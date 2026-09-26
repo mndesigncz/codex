@@ -18,6 +18,10 @@ await ctx.route('**/api/**', async route => {
   if (route.request().method() !== 'GET') { posty.push({ url: u.replace('http://localhost:3000', ''), body: route.request().postData() }); return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, organization: { id: 9, name: 'Moje kavárny', settings: JSON.parse(readFileSync(DIR + 'organization.json', 'utf8')).organization.settings }, kopie: [] }) }); }
   // Kolo 69 (B3): Sklad je plocha s widgety — rozložení (widgety skladu a položky jako nástroj) z fixtury balíku.
   if (new URL(u).pathname === '/api/rozlozeni' && new URL(u).searchParams.get('stranka') === 'vedeni.sklad') return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + 'k69-b3-rozlozeni-sklad.json', 'utf8') });
+  // Kolo 69 (B1): Rozvrh je plocha s widgety — rozložení z fixtury balíku (widgety rozvrhu a plánovač jako nástroj).
+  if (new URL(u).pathname === '/api/rozlozeni' && new URL(u).searchParams.get('stranka') === 'vedeni.rozvrh') return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + 'k69-b1-rozlozeni-rozvrh.json', 'utf8') });
+  // Kolo 69 (B2): Docházka a Tým jsou plochy s widgety — rozložení (widgety a nástroj) z fixtury balíku.
+  if (new URL(u).pathname === '/api/rozlozeni' && ['vedeni.dochazka', 'vedeni.tym'].includes(new URL(u).searchParams.get('stranka'))) return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + (new URL(u).searchParams.get('stranka') === 'vedeni.tym' ? 'k69-b2-rozlozeni-tym' : 'k69-b2-rozlozeni-dochazka') + '.json', 'utf8') });
   const k = keyFor(u);
   if (k && existsSync(DIR + k + '.json')) return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + k + '.json', 'utf8') });
   return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
@@ -35,6 +39,8 @@ const radky = (text, scope = p) => scope.locator(`xpath=//*[${RADEK} and .//text
 
 // 1) Nastavení organizace
 await p.goto('http://localhost:3000/employer/overview?view=team-settings', { waitUntil: 'networkidle' }); await p.waitForTimeout(1200);
+// Kolo 69 (B2): nastavení týmu je v sekcích nástroje; organizace je v sekci Podnik.
+await p.getByRole('tab', { name: 'Podnik' }).click(); await p.waitForTimeout(600);
 let m = norm(await p.locator('main').innerText());
 tvrdi('nastavení: blok „Kdo který číselník spravuje"', m.includes('kdo který číselník spravuje'), m.slice(0, 200));
 tvrdi('nastavení: pět výběrů zdroje', await p.locator('select[aria-labelledby^="org-zdroj-"]').count() === 5, String(await p.locator('select[aria-labelledby^="org-zdroj-"]').count()));
@@ -45,9 +51,12 @@ await p.locator('select[aria-labelledby="org-zdroj-odmeny"]').selectOption('2');
 const patch = posty.find(x => x.url === '/api/organization');
 tvrdi('nastavení: PATCH nese celou mapu zdrojů', !!patch && /"zdrojeCiselniku":\{[^}]*"kategorieSkladu":1[^}]*"odmeny":2/.test(patch.body ?? ''), JSON.stringify(patch).slice(0, 200));
 // vypnutí hlavního vypínače → potvrzení říká, co dostane kopii a co se jen přestane číst; zrušení nic neposílá
-let zprava = ''; p.once('dialog', d => { zprava = d.message(); d.dismiss(); });
+// Kolo 69 (B2): potvrzení je Modal „Změnit sdílení?", ne confirm() prohlížeče.
 const predTim = posty.filter(x => x.url === '/api/organization').length;
 await p.getByRole('switch', { name: 'Sdílené číselníky' }).click(); await p.waitForTimeout(600);
+const okno = p.getByRole('dialog', { name: 'Změnit sdílení?' });
+const zprava = await okno.innerText().catch(() => '');
+await okno.getByRole('button', { name: 'Zrušit' }).click().catch(() => {}); await p.waitForTimeout(300);
 tvrdi('nastavení: potvrzení rozlišuje kopie a „přestanou být vidět"', /kopie toho, co z organizace používají: kategorie skladu, typy směn, kategorie návodů\./.test(zprava) && /přestanou být v podnicích vidět: dodavatelé\./.test(zprava), zprava.slice(0, 220));
 tvrdi('nastavení: zrušené potvrzení nic neuloží', posty.filter(x => x.url === '/api/organization').length === predTim, 'PATCH odešel');
 
@@ -67,8 +76,9 @@ await p.locator('aside').getByText('Rozvrh', { exact: true }).first().click(); a
 await p.getByText('Typy směn', { exact: true }).first().click(); await p.waitForTimeout(900);
 m = norm(await p.locator('main').innerText());
 tvrdi('typy směn: cizí typ s chipem a správcem', m.includes('noční z organizace') && m.includes('spravuje: kavárna vinohrady'), m.slice(0, 160));
-tvrdi('typy směn: cizí typ bez Upravit/Smazat', await radky('Noční z organizace').filter({ has: p.locator('button[title="Upravit"], button[title="Smazat"]') }).count() === 0, 'tlačítka jsou tam');
-tvrdi('typy směn: vlastní typ má Upravit', await radky('Ranní').filter({ has: p.locator('button[title="Upravit"]') }).count() >= 1, 'vlastní typ bez Upravit');
+// Kolo 69 (B1): akce řádku jsou ikonová tlačítka s aria-label („Upravit typ Ranní"), ne title.
+tvrdi('typy směn: cizí typ bez Upravit/Smazat', await p.getByRole('button', { name: /(Upravit|Smazat) typ Noční z organizace/ }).count() === 0, 'tlačítka jsou tam');
+tvrdi('typy směn: vlastní typ má Upravit', await p.getByRole('button', { name: 'Upravit typ Ranní' }).count() >= 1, 'vlastní typ bez Upravit');
 
 // 4) Návody → Spravovat kategorie
 await p.goto('http://localhost:3000/employer/overview?view=guides', { waitUntil: 'networkidle' }); await p.waitForTimeout(1200);

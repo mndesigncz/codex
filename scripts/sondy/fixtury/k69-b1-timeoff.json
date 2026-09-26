@@ -1,0 +1,41 @@
+{
+ "isEmployer": true,
+ "requests": [
+  {
+   "id": 71,
+   "employeeId": 18,
+   "employeeName": "Tereza Malá",
+   "employeeAvatar": "👱‍♀️",
+   "fromDate": "ZA5",
+   "toDate": "ZA7",
+   "type": "vacation",
+   "note": "Svatba",
+   "status": "pending",
+   "createdAt": "DNES"
+  },
+  {
+   "id": 72,
+   "employeeId": 19,
+   "employeeName": "Ondřej Kučera",
+   "employeeAvatar": null,
+   "fromDate": "ZA3",
+   "toDate": "ZA3",
+   "type": "other",
+   "note": null,
+   "status": "pending",
+   "createdAt": "DNES"
+  },
+  {
+   "id": 73,
+   "employeeId": 20,
+   "employeeName": "Petra Dvořáková",
+   "employeeAvatar": "👩‍🦰",
+   "fromDate": "VCERA",
+   "toDate": "ZA3",
+   "type": "vacation",
+   "note": null,
+   "status": "approved",
+   "createdAt": "DNES"
+  }
+ ]
+}

@@ -6,18 +6,39 @@
 // Počítá s tím, že se to obsluhuje z telefonu u stánku: velké cíle na prst,
 // vyprodáno na jedno ťuknutí a bez ukládání (propíše se hned), zbytek
 // se ukládá dohromady tlačítkem.
+//
+// Kolo 69 (balík B4): stránka Menu je plocha s widgety. Hlavička jde do
+// PlochaWidgetu, nad editorem jsou widgety Stav menu, Vyprodáno a Wi-Fi
+// (oblasti/menu.tsx) a tahle komponenta kreslí jen nástroj. Zároveň pryč
+// s ručními tlačítky a štítky (DP §6): položky menu byly rámované boxy
+// tónované podle vazby na kasu (karta v kartě, 230 px na položku), řazení
+// a mazání znaky ↑ ↓ ×, „Otevřít ↗" zeleným textem, výběr menu dvojitě
+// limetkový, prompt() a confirm() místo oken a při neuložených změnách
+// dvě limetky naráz. Oprávnění: pole, na která role nemá klíč, jsou
+// zamčená už tady (server by je stejně odmítl a půlka změny by se neuložila).
+//
+// `hlavicka={false}` kreslí jen nástroj bez plochy — pro záložku Menu
+// v Managero client, dokud si ji ClientAdmin (balík B8) nepřepne na
+// `<MenuEditor />`; jinak by stránka měla dvě hlavičky.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Icon } from '../Icons';
 import {
   type MenuTheme, VYCHOZI_THEME, PREDLOHY, PISMA, normalizeMenuTheme,
 } from '@/lib/menuTheme';
-import { PageHeader } from '../ui';
-import { czCount } from '@/lib/czech';
+import {
+  Button, Card, Chip, EmptyState, Field, Input, Label, Modal, PlovouciLista, Segmented, Select, Skeleton, Switch, SwitchRow, Toast, Well,
+} from '../ui';
+import { czCount, POLOZKA } from '@/lib/czech';
 import { useResultKeys } from '@/lib/useResultKeys';
 import { okJson } from '@/lib/api';
-import { obsahuje, obsahujeNekde } from '@/lib/hledani';
+import { obsahuje } from '@/lib/hledani';
+import { UDALOST_VYPRODANO, URL_MENU, URL_VYPRODANO } from '@/lib/recepturyPrehled';
 import KopieZPodniku, { useJinePodniky } from '../organizace/KopieZPodniku';
+import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
+import { obnovDataWidgetu } from '../widgety/useDataWidgetu';
+import { useOpravneni } from '../role/useOpravneni';
+import { UDALOST_MENU_ZAPNUTO } from '../widgety/oblasti/menu';
 
 interface Item {
   id?: number;
@@ -42,20 +63,41 @@ interface PosProduct { productId: string; name: string; category: string; price:
    Menu s touhle adresou je tím pádem „to, co visí na iPadu“. */
 const VYCHOZI_SLUG = 'akce';
 
-const vstup =
-  'w-full field border border-black/[0.08] px-4 py-3 text-sm focus:border-[#C8F542]/50 focus:outline-none';
+const SEKCE = { one: 'sekce', few: 'sekce', many: 'sekcí' };
+
+/** Po zápisu editoru ať to vidí i widgety nad ním (Stav menu, Vyprodáno). */
+const obnovWidgety = () => { obnovDataWidgetu(URL_MENU); obnovDataWidgetu(URL_VYPRODANO); };
+
+/** Potvrzení nevratného kroku — místo confirm() (DP §3.10). */
+type Potvrzeni = { titulek: string; text: string; akce: string; onAno: () => void } | null;
 
 export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } = {}) {
+  // Tlačítka a pole podle `ma` (před načtením oprávnění a u staršího serveru
+  // ANO — rozhoduje server), ne přísné useSmi widgetů: editor se nesmí
+  // zamknout navždy jen proto, že /api/teams/mine oprávnění nepošle
+  // (stejně Sklad a Docházka).
+  const { ma: smi } = useOpravneni();
+  const smiUpravit = smi('menu.upravit');
+  const smiCeny = smi('menu.ceny');
+  const smiZverejnit = smi('menu.zverejnit');
+  const smiMazat = smi('menu.mazat');
+  const smiVyprodano = smi('menu.vyprodano');
+  const uid = useId();
+
   const [boards, setBoards] = useState<Board[]>([]);
+  /** Počítadlo načtení ze serveru — jen po něm vzniká nová rozpracovaná kopie. */
+  const [nacteno, setNacteno] = useState(0);
   const [aktivni, setAktivni] = useState<number | null>(null);
   const [board, setBoard] = useState<Board | null>(null);
   const [nacitam, setNacitam] = useState(true);
   const [ukladam, setUkladam] = useState(false);
-  const [chyba, setChyba] = useState<string | null>(null);
-  const [hlaska, setHlaska] = useState<string | null>(null);
+  const [chyba, setChybaStav] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ text: string; ton?: 'bad'; id: number; akce?: { label: string; onClick: () => void } } | null>(null);
   const [neniMigrace, setNeniMigrace] = useState(false);
   const [pin, setPin] = useState('');
   const [vzhledOtevren, setVzhledOtevren] = useState(false);
+  const [potvrzeni, setPotvrzeni] = useState<Potvrzeni>(null);
+  const [noveMenu, setNoveMenu] = useState<string | null>(null);
   /* Ukládá se až tlačítkem, takže je potřeba dát najevo, že něco čeká. */
   const [neulozeno, setNeulozeno] = useState(false);
   /*
@@ -70,16 +112,23 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
   const [kopieOpen, setKopieOpen] = useState(false);
   const { jine: jinePodniky, cil: nazevPodniku, chyba: chybaPodniku, znovu: znovuPodniky } = useJinePodniky();
 
-  /* `potichu`: obnovit seznam bez stavu „Načítám menu…" — ten by nahradil
-     celou obrazovku a s ní zavřel i okno kopie dřív, než člověk uvidí výsledek. */
+  /** Hláška úspěchu = Toast; chyba zůstane u tlačítka Uložit a ukáže se i jako Toast (tlačítko bývá mimo obrazovku). */
+  const hlas = (text: string) => setToast({ text, id: Date.now() });
+  const setChyba = (text: string | null) => {
+    setChybaStav(text);
+    if (text) setToast({ text, ton: 'bad', id: Date.now() });
+  };
+
+  /* `potichu`: obnovit seznam bez stavu načítání — ten by nahradil celý
+     nástroj a s ním zavřel i okno kopie dřív, než člověk uvidí výsledek. */
   const load = useCallback(async (potichu = false) => {
     if (!potichu) setNacitam(true);
     try {
-      const r = await fetch('/api/menu');
-      const d = await r.json().catch(() => ({}));
+      const d = await fetch(URL_MENU).then(okJson);
       if (d?.notMigrated) setNeniMigrace(true);
       const list: Board[] = Array.isArray(d?.boards) ? d.boards : [];
       setBoards(list);
+      setNacteno(v => v + 1);
       setAktivni((a) => (a && list.some((b) => b.id === a) ? a : list[0]?.id ?? null));
       if (!list.length) setBoard(null);
     } catch {
@@ -87,7 +136,7 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
     } finally {
       setNacitam(false);
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { load(); }, [load]);
 
@@ -99,12 +148,41 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
     return () => window.removeEventListener('beforeunload', hlidac);
   }, [neulozeno]);
 
-  /* Rozpracovaná deska je vždycky kopie — ať se needituje to, co drží seznam. */
+  /* Rozpracovaná deska je vždycky kopie — ať se needituje to, co drží seznam.
+     Nová kopie jen po načtení ze serveru nebo přepnutí menu, ne při každé
+     změně seznamu: příznak z widgetu (zveřejněno, vyprodáno) mění seznam
+     taky a rozepsaný nadpis by se tím zahodil. */
+  const boardsRef = useRef(boards);
+  boardsRef.current = boards;
   useEffect(() => {
     if (aktivni == null) { setBoard(null); return; }
-    const b = boards.find((x) => x.id === aktivni);
+    const b = boardsRef.current.find((x) => x.id === aktivni);
     if (b) { setBoard(JSON.parse(JSON.stringify(b))); setNeulozeno(false); }
-  }, [aktivni, boards]);
+  }, [aktivni, nacteno]);
+
+  /*
+   * Widgety nad editorem přepínají vyprodáno a zapínají menu přímo na
+   * serveru. Rozpracovaná kopie by o tom nevěděla a další „Uložit" by
+   * vrátilo starý stav — proto si změnu propíše (seznam i kopii) a
+   * neuložené změny kvůli tomu nevznikají.
+   */
+  useEffect(() => {
+    const vyprodano = (e: Event) => {
+      const { itemId, soldOut } = (e as CustomEvent).detail ?? {};
+      const zmen = (b: Board) => ({ ...b, sections: b.sections.map(s => ({ ...s, items: s.items.map(i => (i.id === itemId ? { ...i, soldOut } : i)) })) });
+      setBoard(b => (b ? zmen(b) : b));
+      setBoards(list => list.map(zmen));
+    };
+    const zapnuto = (e: Event) => {
+      const { id, enabled } = (e as CustomEvent).detail ?? {};
+      setBoard(b => (b && b.id === id ? { ...b, enabled } : b));
+      // Jen příznak v seznamu; rozpracovaná kopie se kvůli tomu znovu nevytváří (efekt výš čeká na načtení ze serveru).
+      setBoards(list => list.map(b => (b.id === id ? { ...b, enabled } : b)));
+    };
+    window.addEventListener(UDALOST_VYPRODANO, vyprodano);
+    window.addEventListener(UDALOST_MENU_ZAPNUTO, zapnuto);
+    return () => { window.removeEventListener(UDALOST_VYPRODANO, vyprodano); window.removeEventListener(UDALOST_MENU_ZAPNUTO, zapnuto); };
+  }, []);
 
   /* Ptáme se přesně tou cestou, kterou používá iPad i mobil hosta. */
   const ulozenySlug = boards.find((x) => x.id === aktivni)?.slug ?? null;
@@ -122,7 +200,7 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
 
   /** Založí menu rovnou z katalogu kasy — sekce podle kategorií ve Storyous. */
   const zalozitZPokladny = async () => {
-    setImportuji('new'); setChyba(null); setHlaska(null);
+    setImportuji('new'); setChyba(null);
     try {
       const r = await fetch('/api/menu/pos', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -131,8 +209,9 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { setChyba(d?.error ?? 'Menu z pokladny se nepodařilo založit.'); return; }
       await load();
+      obnovWidgety();
       if (d?.board?.id) setAktivni(d.board.id);
-      setHlaska(`Menu je založené z kasy: ${d?.summary?.added ?? 0} položek v ${d?.summary?.newSections ?? 0} sekcích. Všechny se z objednávky vytisknou na terminálu.`);
+      hlas(`Menu je založené z kasy: ${d?.summary?.added ?? 0} položek v ${d?.summary?.newSections ?? 0} sekcích. Všechny se z objednávky vytisknou na terminálu.`);
       const zbylo = Number(d?.summary?.skippedFull) || 0;
       if (zbylo > 0) setChyba(`${zbylo} položek se nevešlo: jedno menu unese nejvýš 40 sekcí a 100 položek v sekci. Zbytek přidej ručně, nebo si na něj založ druhé menu.`);
     } catch {
@@ -140,13 +219,12 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
     } finally { setImportuji(''); }
   };
 
-  /** Založí menu. Prvni = z dnešní nabídky, další = prázdné, ať se nekopírují ceny. */
-  const zalozit = async (prvni: boolean) => {
-    const nazev = prvni ? 'Venkovní akce' : (prompt('Název nového menu (třeba Stálá nabídka):') || '').trim();
-    if (!prvni && !nazev) return;
-    setUkladam(true); setChyba(null); setHlaska(null);
+  /** Založí menu. Bez názvu = z dnešní nabídky (první menu), s názvem = prázdné, ať se nekopírují ceny. */
+  const zalozit = async (nazev: string | null) => {
+    const prvni = nazev == null;
+    setUkladam(true); setChyba(null);
     try {
-      const r = await fetch('/api/menu', {
+      const r = await fetch(URL_MENU, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(prvni
           ? { name: 'Venkovní akce', slug: 'akce', seed: true }
@@ -154,9 +232,11 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { setChyba(d?.error ?? 'Menu se nepodařilo založit.'); return; }
+      setNoveMenu(null);
       await load();
+      obnovWidgety();
       if (d?.board?.id) setAktivni(d.board.id);
-      setHlaska(prvni
+      hlas(prvni
         ? 'Menu je založené i s dnešní nabídkou.'
         : `Menu „${d?.board?.name ?? nazev}“ je založené. Adresu má /menu-akce.html?menu=${d?.board?.slug ?? ''}`);
     } catch {
@@ -168,13 +248,14 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
 
   const smazat = async () => {
     if (!board) return;
-    if (!confirm(`Smazat menu „${board.name}“ i se všemi položkami? Tohle nejde vzít zpět.`)) return;
     setUkladam(true);
     try {
-      const r = await fetch(`/api/menu?id=${board.id}`, { method: 'DELETE' });
+      const r = await fetch(`${URL_MENU}?id=${board.id}`, { method: 'DELETE' });
       if (!r.ok) { setChyba('Menu se nepodařilo smazat.'); return; }
       setAktivni(null);
       await load();
+      obnovWidgety();
+      hlas('Menu je smazané.');
     } catch {
       setChyba('Menu se nepodařilo smazat — spojení se serverem selhalo.');
     } finally { setUkladam(false); }
@@ -186,29 +267,34 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
    */
   const ulozit = async (navic?: Record<string, any>) => {
     if (!board) return;
-    setUkladam(true); setChyba(null); setHlaska(null);
+    setUkladam(true); setChyba(null);
     try {
       const telo: any = { ...board, ...navic, theme: normalizeMenuTheme(board.theme) };
       if (pin.trim()) telo.pin = pin.trim();
-      const r = await fetch('/api/menu', {
+      const r = await fetch(URL_MENU, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(telo),
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) {
         if (r.status === 409 && d?.adresuDrziNase && !navic?.prevzitAdresu) {
-          const ok = confirm(
-            `${d.error} Chceš ji převzít? Menu „${d.drziNazev}“ dostane jinou adresu ` +
-            `a hostům se od té chvíle bude na téhle adrese ukazovat tohle menu.`);
-          if (ok) { setUkladam(false); await ulozit({ ...navic, prevzitAdresu: true }); return; }
+          setUkladam(false);
+          setPotvrzeni({
+            titulek: 'Převzít adresu?',
+            text: `${d.error} Menu „${d.drziNazev}“ dostane jinou adresu a hostům se od té chvíle bude na téhle adrese ukazovat tohle menu.`,
+            akce: 'Převzít adresu',
+            onAno: () => { void ulozit({ ...navic, prevzitAdresu: true }); },
+          });
+          return;
         }
         setChyba(d?.error ?? `Uložení se nepodařilo (odpověď serveru ${r.status}).`);
         return;
       }
       setPin('');
       await load();
+      obnovWidgety();
       setNeulozeno(false);
-      setHlaska('Uloženo. Na iPadu se to projeví do minuty, ručně obnovovat nemusíš.');
+      hlas('Uloženo. Na iPadu se to projeví do minuty, ručně obnovovat nemusíš.');
     } catch {
       setChyba('Uložení se nepodařilo — spojení se serverem selhalo. Změny máš pořád na obrazovce, zkus to znovu.');
     } finally { setUkladam(false); }
@@ -224,15 +310,17 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
     await ulozit(zmena);
   };
 
+  /* Jen PIN (částečná změna). Plné uložení s `{ id, pin: '' }` dřív smazalo
+     i nadpis, Wi-Fi a poznámku menu. */
   const zrusitPin = async () => {
-    if (!board || !confirm('Zrušit PIN? Od stánku pak nepůjde označovat vyprodané položky.')) return;
+    if (!board) return;
     try {
-      const res = await fetch('/api/menu', {
+      await fetch(URL_MENU, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: board.id, pin: '' }),
-      });
-      if (!res.ok) throw new Error(String(res.status));
-      await load();
+        body: JSON.stringify({ id: board.id, castecne: true, pin: '' }),
+      }).then(okJson);
+      await load(true);
+      hlas('PIN je zrušený.');
     } catch {
       // Nezrušený PIN je bezpečnostní rozdíl, ne kosmetika: člověk si
       // myslí, že od stánku už nikdo označovat nemůže, a přitom může.
@@ -241,22 +329,30 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
   };
 
   /** Vyprodáno se propisuje hned — během akce na to není čas klikat dvakrát. */
-  const prepnoutVyprodano = async (si: number, ii: number) => {
+  const prepnoutVyprodano = async (si: number, ii: number, nove: boolean) => {
     if (!board) return;
     const polozka = board.sections[si].items[ii];
-    const nove = !polozka.soldOut;
-    setBoard((b) => {
+    // Veřejný endpoint zná jen uložené, zapnuté menu pod uloženou adresou a uloženou
+    // položku. Vypnuté menu (připravované před akcí) nebo nová položka se proto přepne
+    // jako běžná neuložená změna — propíše se s „Uložit", místo aby se přepínač vracel.
+    if (!polozka.id || !ulozenySlug || ulozeneZapnuto === false) {
+      upravit((b) => { b.sections[si].items[ii].soldOut = nove; });
+      return;
+    }
+    const zmen = (hodnota: boolean) => setBoard((b) => {
       if (!b) return b;
       const kopie = JSON.parse(JSON.stringify(b)) as Board;
-      kopie.sections[si].items[ii].soldOut = nove;
+      kopie.sections[si].items[ii].soldOut = hodnota;
       return kopie;
     });
-    if (!polozka.id) return; // ještě neuložená položka
-    const r = await fetch(`/api/menu/public/${board.slug}/soldout`, {
+    zmen(nove);
+    // Uložená adresa, ne rozpracovaná kopie: přepsané a neuložené pole Adresa by dalo 404.
+    const r = await fetch(`/api/menu/public/${encodeURIComponent(ulozenySlug)}/soldout`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ itemId: polozka.id, soldOut: nove }),
     }).catch(() => null);
-    if (!r?.ok) setChyba('Vyprodáno se nepodařilo uložit.');
+    if (!r?.ok) { zmen(!nove); setChyba('Vyprodáno se nepodařilo uložit.'); return; }
+    obnovWidgety();
   };
 
   const upravit = (fn: (b: Board) => void) => {
@@ -266,6 +362,29 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
       const kopie = JSON.parse(JSON.stringify(b)) as Board;
       fn(kopie);
       return kopie;
+    });
+  };
+
+  /**
+   * Smazání položky je vratné (platí až po Uložení), proto bez potvrzení, ale s toastem
+   * „Vrátit" (DP §5.5) — omylem trefený koš se jinak pozná až po uložení.
+   */
+  const smazatPolozku = (si: number, ii: number) => {
+    if (!board) return;
+    const deskaId = board.id;
+    const sekce = board.sections[si];
+    const kopie = JSON.parse(JSON.stringify(sekce.items[ii])) as Board['sections'][number]['items'][number];
+    upravit((b) => { b.sections[si].items.splice(ii, 1); });
+    setToast({
+      text: `${kopie.name || 'Položka'}: smazáno`, id: Date.now(),
+      akce: {
+        label: 'Vrátit',
+        // Vracet jen do téže desky a sekce; po přepnutí menu by se položka vložila jinam.
+        onClick: () => upravit((b) => {
+          const cil = b.id === deskaId ? b.sections.find((x, i) => (sekce.id != null ? x.id === sekce.id : i === si)) : undefined;
+          if (cil) cil.items.splice(Math.min(ii, cil.items.length), 0, kopie);
+        }),
+      },
     });
   };
 
@@ -295,8 +414,7 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
     if (posProdukty && !znovu) return posProdukty;
     setPosStav('Načítám katalog kasy…');
     try {
-      const r = await fetch('/api/pos/products');
-      const d = await r.json().catch(() => ({}));
+      const d = await fetch('/api/pos/products').then(okJson);
       setPosPripojena(!!d?.connected);
       if (!d?.connected) { setPosProdukty([]); setPosStav('Pokladna Storyous není připojená. Položky se dají psát ručně, ale z objednávky se pak nevytisknou.'); return []; }
       const p: PosProduct[] = Array.isArray(d?.products) ? d.products : [];
@@ -335,14 +453,14 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
     if (!cil) return;
     if (cil.ii == null) {
       upravit((b) => { b.sections[cil.si].items.push({ name: p.name, price: p.price ?? 0, soldOut: false, posProductId: p.productId }); });
-      if (p.price == null) setHlaska(`„${p.name}“ přidáno, ale kasa u něj nedala cenu — doplň ji ručně.`);
+      if (p.price == null) hlas(`„${p.name}“ přidáno, ale kasa u něj nedala cenu — doplň ji ručně.`);
     } else {
       upravit((b) => {
         const it = b.sections[cil.si].items[cil.ii as number];
         it.posProductId = p.productId;
         if (!it.price && p.price != null) it.price = p.price;
       });
-      setHlaska(`Položka je navázaná na „${p.name}“ z kasy — od teď se z objednávky vytiskne.`);
+      hlas(`Položka je navázaná na „${p.name}“ z kasy — od teď se z objednávky vytiskne.`);
       setPosOtevreno(null);
     }
   };
@@ -352,7 +470,7 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
   const zPokladny = async (mode: 'fill' | 'match', refresh = false) => {
     if (!board) return;
     if (neulozeno) { setChyba('Nejdřív ulož rozdělané změny, ať se import nepotká s nimi.'); return; }
-    setImportuji(mode); setChyba(null); setHlaska(null);
+    setImportuji(mode); setChyba(null);
     try {
       const r = await fetch('/api/menu/pos', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -361,20 +479,20 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { setChyba(d?.error ?? 'Z pokladny se to nepovedlo.'); return; }
       await load();
+      obnovWidgety();
       setPosProdukty(null);
       const su = d?.summary ?? {};
       if (mode === 'match') {
-        setHlaska(su.matched
-          ? `Spárováno ${su.matched} ${su.matched === 1 ? 'položka' : su.matched < 5 ? 'položky' : 'položek'}${su.left ? `, bez páru zůstává ${su.left}` : ', všechno sedí'}.${su.ambiguous?.length ? ` Nejednoznačné (v kase je víc produktů stejného jména): ${su.ambiguous.slice(0, 5).join(', ')}.` : ''}`
-          : `Podle názvu se nepovedlo spárovat nic. ${su.left ? `Bez páru zůstává ${su.left} položek — dopáruj je tlačítkem u položky.` : ''}`);
+        hlas(su.matched
+          ? `Spárováno ${czCount(Number(su.matched), POLOZKA)}${su.left ? `, bez páru zůstává ${su.left}` : ', všechno sedí'}.${su.ambiguous?.length ? ` Nejednoznačné (v kase je víc produktů stejného jména): ${su.ambiguous.slice(0, 5).join(', ')}.` : ''}`
+          : `Podle názvu se nepovedlo spárovat nic. ${su.left ? `Bez páru zůstává ${czCount(Number(su.left), POLOZKA)} — dopáruj je tlačítkem u položky.` : ''}`);
       } else {
         const zbylo = Number(su.skippedFull) || 0;
-        const hlavni = su.added
-          ? `Z kasy přibylo ${su.added} položek${su.newSections ? ` v ${su.newSections} nových sekcích` : ''}. Přeskládej si je, jak chceš — vazba na kasu drží u položky.`
-          : 'Z kasy už je v menu všechno, co tam patří.';
-        setHlaska(hlavni);
+        hlas(su.added
+          ? `Z kasy přibylo ${czCount(Number(su.added), POLOZKA)}${su.newSections ? ` v ${su.newSections} nových sekcích` : ''}. Přeskládej si je, jak chceš — vazba na kasu drží u položky.`
+          : 'Z kasy už je v menu všechno, co tam patří.');
         if (zbylo > 0) {
-          setChyba(`${zbylo} položek se do tohohle menu nevešlo: jedno menu unese nejvýš 40 sekcí a 100 položek v sekci, a kasa má kategorií víc. Zbytek přidej do sekcí ručně tlačítkem „+ Z pokladny“, nebo si na něj založ druhé menu.`);
+          setChyba(`${zbylo} položek se do tohohle menu nevešlo: jedno menu unese nejvýš 40 sekcí a 100 položek v sekci, a kasa má kategorií víc. Zbytek přidej do sekcí ručně tlačítkem „Z pokladny“, nebo si na něj založ druhé menu.`);
         }
       }
     } catch {
@@ -391,614 +509,556 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
 
   // -------------------------------------------------------------------------
 
-  if (nacitam) return <div className="glass-card p-6 text-sm text-black/45">Načítám menu…</div>;
-
-  if (neniMigrace) {
-    return (
-      <div className="glass-card p-6 space-y-2">
-        <h2 className="t-section">Menu pro hosty</h2>
-        <p className="text-sm text-black/60">
-          Tabulky pro menu ještě nejsou v databázi. Otevři jednou <code>/api/init</code> a vrať se sem.
-        </p>
-      </div>
-    );
-  }
-
-  /* Okno kopie je v obou větvích na TÉŽE pozici (druhé dítě fragmentu).
-     Po úspěšné kopii do prázdného editoru se načte první menu a obrazovka
-     přejde z prázdné větve do hlavní — kdyby okno leželo uvnitř každé
-     větve jinde, React by ho odmontoval a namontoval znovu prázdné,
-     výsledek s poznámkou „menu je vypnuté" by zmizel a člověk by
-     kopíroval podruhé. */
+  /* Okno kopie je ve všech větvích na TÉŽE pozici (za nástrojem). Po
+     úspěšné kopii do prázdného editoru se načte první menu a nástroj přejde
+     z prázdné větve do hlavní — kdyby okno leželo uvnitř každé větve jinde,
+     React by ho odmontoval a namontoval znovu prázdné, výsledek s poznámkou
+     „menu je vypnuté" by zmizel a člověk by kopíroval podruhé. */
   const kopieOkno = kopieOpen && (
-    <KopieZPodniku entita="menu" podniky={jinePodniky} cil={nazevPodniku} onClose={() => setKopieOpen(false)} onHotovo={() => { load(true); }} />
+    <KopieZPodniku entita="menu" podniky={jinePodniky} cil={nazevPodniku} onClose={() => setKopieOpen(false)} onHotovo={() => { load(true); obnovWidgety(); }} />
   );
 
-  if (!board) {
-    return (
-      <>
-      <div className="glass-card p-6 space-y-3">
-        <div>
-          <h2 className="t-section">Menu pro hosty</h2>
-          <p className="text-sm text-black/45">
-            To, co visí na iPadu před podnikem a co si host otevře v mobilu přes QR kód.
-          </p>
-        </div>
-        <div className="grid grid-cols-1 sm:flex sm:flex-wrap gap-2">
-          {posPripojena && (
-            <button type="button" onClick={zalozitZPokladny} disabled={!!importuji || ukladam}
-              className="rounded-full bg-[#C8F542] on-accent font-semibold px-5 py-2.5 text-sm disabled:opacity-50">
-              {importuji === 'new' ? 'Načítám z kasy…' : 'Založit menu z pokladny'}
-            </button>
-          )}
-          <button type="button" onClick={() => zalozit(true)} disabled={ukladam || !!importuji}
-            className={`rounded-full font-semibold px-5 py-2.5 text-sm disabled:opacity-50 ${posPripojena ? 'border border-black/10 text-black/70' : 'seg-on'}`}>
-            {ukladam ? 'Zakládám…' : 'Založit menu z dnešní nabídky'}
-          </button>
-          {jinePodniky.length > 0 && (
-            <button type="button" onClick={() => setKopieOpen(true)} disabled={ukladam || !!importuji}
-              className="rounded-full font-semibold px-5 py-2.5 text-sm border border-black/10 text-black/70 disabled:opacity-50">
-              Zkopírovat z jiného podniku
-            </button>
-          )}
-        </div>
+  let nastroj: React.ReactNode;
+  if (nacitam) {
+    nastroj = (
+      <Card aria-busy>
+        <Skeleton className="h-10 w-2/3 rounded-full" />
+        <div className="mt-4 space-y-2">{[0, 1, 2].map(i => <Skeleton key={i} className="h-12" />)}</div>
+      </Card>
+    );
+  } else if (neniMigrace) {
+    nastroj = (
+      <Card>
+        <EmptyState compact icon="warning" title="Tabulky pro menu ještě nejsou v databázi"
+          hint="Otevři jednou /api/init a vrať se sem." />
+      </Card>
+    );
+  } else if (!board) {
+    nastroj = (
+      <Card>
+        <EmptyState icon="clipboard" title="Zatím žádné menu"
+          hint="To, co visí na iPadu před podnikem a co si host otevře v mobilu přes QR kód."
+          action={smiUpravit ? (
+            <div className="flex flex-col sm:flex-row flex-wrap justify-center gap-2">
+              {posPripojena && (
+                <Button variant="accent" loading={importuji === 'new'} disabled={ukladam} onClick={zalozitZPokladny}>Založit menu z pokladny</Button>
+              )}
+              <Button variant={posPripojena ? 'secondary' : 'accent'} loading={ukladam} disabled={!!importuji} onClick={() => zalozit(null)}>
+                Založit menu z dnešní nabídky
+              </Button>
+              {jinePodniky.length > 0 && (
+                <Button variant="ghost" icon="copy" disabled={ukladam || !!importuji} onClick={() => setKopieOpen(true)}>Zkopírovat z jiného podniku</Button>
+              )}
+            </div>
+          ) : undefined} />
         {/* Prázdný editor je místo, kde je kopie hlavní cestou — tady se
             nepovedené načtení ostatních podniků nesmí tvářit jako „žádné nejsou". */}
         {chybaPodniku && (
-          <p className="text-xs text-black/55">
+          <p className="t-meta text-center mt-2">
             Nepodařilo se zjistit, jestli jde menu zkopírovat z jiného podniku.{' '}
-            <button type="button" onClick={znovuPodniky} className="underline font-medium text-black/70">Zkusit znovu</button>
+            <Button variant="ghost" size="sm" onClick={znovuPodniky}>Zkusit znovu</Button>
           </p>
         )}
         {posPripojena && (
-          <p className="text-xs text-black/45">
+          <p className="t-meta text-center mt-2 text-pretty">
             Z pokladny přijdou položky i s cenami a rozdělením do sekcí, jak je máte ve Storyous — a rovnou navázané, takže se objednávka od stolu vytiskne na terminálu.
           </p>
         )}
-        {chyba && <p className="text-bad-ink text-sm">{chyba}</p>}
-        {hlaska && <p className="text-sm text-[#3E5406]">{hlaska}</p>}
-      </div>
-      {kopieOkno}
-      </>
+        {chyba && <p className="note note-danger mt-3" role="alert">{chyba}</p>}
+      </Card>
     );
-  }
+  } else {
+    /* Relativní odkaz stačí pro proklik, ale na iPad se to opisuje ručně,
+       takže se ukazuje celá adresa i s doménou. */
+    const cesta = `/menu-akce.html?menu=${board.slug}`;
+    const adresa = typeof window === 'undefined' ? cesta : window.location.origin + cesta;
+    const t = normalizeMenuTheme(board.theme);
+    const setT = (fn: (x: MenuTheme) => void) =>
+      upravit((b) => { const kop = normalizeMenuTheme(b.theme); fn(kop); b.theme = kop; });
+    const zamceno = !smiUpravit;
 
-  /* Relativní odkaz stačí pro proklik, ale na iPad se to opisuje ručně,
-     takže se ukazuje celá adresa i s doménou. */
-  const cesta = `/menu-akce.html?menu=${board.slug}`;
-  const adresa = typeof window === 'undefined' ? cesta : window.location.origin + cesta;
-
-  return (
-    <>
-    <div className="space-y-4">
-      {/* Nadpis obrazovky. Uvnitř karty byl h2 „Menu pro hosty" — vypadal
-          jako nadpis sekce, ne obrazovky, takže Menu jako jediná položka
-          navigace neřeklo, kde jsi. */}
-      {hlavicka && <PageHeader hintId="menueditor" title="Menu" subtitle="Nabídka pro hosty. Změny se projeví na iPadu i v mobilech po obnovení stránky." />}
-      <div className="glass-card p-6 space-y-4">
-
-        {/* Všechna menu jako dlaždice — na první pohled je vidět, co existuje,
-            co je zapnuté a co se právě edituje. */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
-          {boards.map((b) => {
-            const sekci = b.sections?.length ?? 0;
-            const polozek = (b.sections ?? []).reduce((n, sec) => n + (sec.items?.length ?? 0), 0);
-            const vybrane = b.id === aktivni;
-            return (
-              <button key={b.id} type="button" onClick={() => setAktivni(b.id)}
-                className={`rounded-2xl border p-3.5 text-left transition active:scale-[0.98] ${
-                  vybrane
-                    ? 'bg-[#C8F542]/15 border-[#C8F542]/50 ring-2 ring-[#C8F542]/30'
-                    : 'bg-black/[0.03] border-black/[0.08] hover:bg-black/[0.05]'
-                }`}>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-lg"><Icon name="clipboard" size={15} /></span>
-                  <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${b.enabled ? 'bg-[#8FB811]' : 'bg-black/20'}`}
-                    title={b.enabled ? 'Zapnuté — hosté ho vidí' : 'Vypnuté'} />
-                </div>
-                <p className="mt-1.5 text-sm font-bold text-[#16181A] truncate">{b.name}</p>
-                <p className="text-[11px] text-black/40 truncate">/{b.slug}</p>
-                <p className="text-[11px] text-black/45 mt-1 tabular-nums">
-                  {czCount(sekci, { one: 'sekce', few: 'sekce', many: 'sekcí' })} · {polozek} pol.
-                </p>
-              </button>
-            );
-          })}
-          <button type="button" onClick={() => zalozit(false)} disabled={ukladam}
-            className="col-span-full sm:col-span-1 rounded-2xl border border-dashed border-black/15 p-3.5 text-center text-black/45 hover:text-black hover:bg-black/[0.03] transition disabled:opacity-50 flex flex-col sm:flex-col items-center justify-center gap-1 min-h-[56px] sm:min-h-[104px]">
-            <span className="text-xl leading-none">＋</span>
-            <span className="text-xs font-semibold">Nové menu</span>
-          </button>
-          {/* Při neuložených změnách ne: obnova seznamu po kopii by rozpracovanou
-              desku přepsala tím, co je v databázi. */}
-          {jinePodniky.length > 0 && (
-            <button type="button" onClick={() => setKopieOpen(true)} disabled={ukladam || neulozeno}
-              title={neulozeno ? 'Nejdřív ulož rozdělané změny' : undefined}
-              className="col-span-full sm:col-span-1 rounded-2xl border border-dashed border-black/15 p-3.5 text-center text-black/45 hover:text-black hover:bg-black/[0.03] transition disabled:opacity-50 flex flex-col sm:flex-col items-center justify-center gap-1 min-h-[56px] sm:min-h-[104px]">
-              <Icon name="copy" size={18} />
-              <span className="text-xs font-semibold">Z jiného podniku</span>
-            </button>
-          )}
-        </div>
-
-        <div className="well border border-black/[0.06] p-4 space-y-2">
-          <p className="text-xs font-semibold text-black/50">Adresa pro iPad a pro hosty</p>
-          <div className="flex items-center gap-2 flex-wrap">
-            <code className="text-sm font-mono text-[#16181A] break-all">{adresa}</code>
-            <a href={cesta} target="_blank" rel="noreferrer"
-              className="tap-target-sm text-sm font-medium text-[#8FB811] underline underline-offset-2">
-              Otevřít ↗
-            </a>
-          </div>
-
-          {zive === 'ok' && (
-            <p className="text-xs text-black/45">
-              Na téhle adrese se hostům ukazuje tohle menu. Úpravy se na iPadu projeví do minuty.
-            </p>
-          )}
-          {zive === 'ceka' && <p className="text-xs text-black/35">Kontroluju adresu…</p>}
-          {zive === 'neznamo' && (
-            <p className="text-xs text-black/45">Adresu se teď nepodařilo ověřit — zkontroluj připojení.</p>
-          )}
-          {zive === 'vypnuto' && (
-            <p className="text-xs text-wait-ink">
-              Menu je vypnuté, takže se hostům neukazuje.
-            </p>
-          )}
-          {zive === 'chybi' && (
-            <p className="text-xs text-wait-ink">
-              {ulozenySlug === VYCHOZI_SLUG
-                ? 'Pozor: server na téhle adrese žádné menu nevydává, takže iPad ukazuje záložní nabídku.'
-                : 'Pozor: iPad otevřený bez parametru bere menu s adresou „akce“, a to tohle menu není — proto se tvoje úpravy hostům neukazují.'}
-            </p>
-          )}
-
-          {/*
-            U každé hlášky musí být i náprava. Dřív se tlačítko na adresu
-            schovávalo, když adresa už seděla — u vypnutého menu tak zbyla
-            hláška, se kterou nešlo nic udělat.
-          */}
-          {(zive === 'chybi' || zive === 'vypnuto') && (
-            <div className="pt-1">
-              {/* Vypnuté menu se má zapnout, ne mu přepisovat adresu — u druhého
-                  menu s vlastní adresou by mu ji přepis vzal. */}
-              {zive === 'vypnuto' ? (
-                <button type="button" disabled={ukladam} onClick={() => zverejnit({ enabled: true })}
-                  className="btn btn-primary btn-sm w-full sm:w-auto disabled:opacity-50">
-                  {ukladam ? 'Ukládám…' : 'Zapnout menu pro hosty'}
-                </button>
-              ) : ulozenySlug !== VYCHOZI_SLUG ? (
-                <button type="button" disabled={ukladam} onClick={() => zverejnit({ slug: VYCHOZI_SLUG })}
-                  className="btn btn-primary btn-sm w-full sm:w-auto disabled:opacity-50">
-                  {ukladam ? 'Ukládám…' : 'Nastavit jako menu pro iPad'}
-                </button>
-              ) : (
-                <button type="button" disabled={ukladam}
-                  onClick={() => zverejnit({ slug: VYCHOZI_SLUG, enabled: true })}
-                  className="btn btn-primary btn-sm w-full sm:w-auto disabled:opacity-50">
-                  {ukladam ? 'Ukládám…' : 'Zveřejnit znovu'}
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="space-y-1">
-            <span className="text-xs font-semibold text-black/50">Název menu (jen pro vás)</span>
-            <input className={vstup} value={board.name} maxLength={80}
-              onChange={(e) => upravit((b) => { b.name = e.target.value; })} />
-          </label>
-          <label className="space-y-1">
-            <span className="text-xs font-semibold text-black/50">Adresa</span>
-            <input className={vstup} value={board.slug} maxLength={40}
-              onChange={(e) => upravit((b) => { b.slug = e.target.value; })} />
-            <span className="block text-[11px] text-black/35">
-              Bez diakritiky a mezer. Když ji změníš, přestane platit starý QR kód.
-            </span>
-          </label>
-          <label className="space-y-1">
-            <span className="text-xs font-semibold text-black/50">Nadpis</span>
-            <input className={vstup} value={board.title ?? ''} maxLength={80}
-              onChange={(e) => upravit((b) => { b.title = e.target.value; })} />
-          </label>
-          <label className="space-y-1">
-            <span className="text-xs font-semibold text-black/50">Popisek nad nadpisem</span>
-            <input className={vstup} value={board.eyebrow ?? ''} maxLength={80}
-              onChange={(e) => upravit((b) => { b.eyebrow = e.target.value; })} />
-          </label>
-          <label className="space-y-1">
-            <span className="text-xs font-semibold text-black/50">Wifi — síť</span>
-            <input className={vstup} value={board.wifiSsid ?? ''} maxLength={80}
-              onChange={(e) => upravit((b) => { b.wifiSsid = e.target.value; })} />
-          </label>
-          <label className="space-y-1">
-            <span className="text-xs font-semibold text-black/50">Wifi — heslo</span>
-            <input className={vstup} value={board.wifiPassword ?? ''} maxLength={80}
-              onChange={(e) => upravit((b) => { b.wifiPassword = e.target.value; })} />
-          </label>
-          <label className="space-y-1 sm:col-span-2">
-            <span className="text-xs font-semibold text-black/50">Poznámka v patičce</span>
-            <input className={vstup} value={board.note ?? ''} maxLength={200}
-              onChange={(e) => upravit((b) => { b.note = e.target.value; })} />
-          </label>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="space-y-1">
-            <span className="text-xs font-semibold text-black/50">
-              PIN pro označování vyprodaného od stánku {board.hasPin && '(nastavený)'}
-            </span>
-            <input className={vstup} value={pin} inputMode="numeric" placeholder={board.hasPin ? '••••' : '4 až 8 číslic'}
-              onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))} />
-            <span className="block text-[11px] text-black/35">
-              Na iPadu se zadá jednou a zapamatuje se. Bez PINu jde vyprodáno přepínat jen tady.
-            </span>
-          </label>
-          <div className="flex items-end gap-2">
-            {board.hasPin && (
-              <button type="button" onClick={zrusitPin}
-                className="rounded-full border border-black/10 px-4 py-2.5 text-sm font-medium text-black/60">
-                Zrušit PIN
-              </button>
-            )}
-            <label className="flex items-center gap-2 cursor-pointer min-h-[36px] text-sm text-black/60 py-2.5">
-              <input type="checkbox" checked={board.enabled} className="h-5 w-5 rounded accent-[#8FB811]"
-                onChange={(e) => upravit((b) => { b.enabled = e.target.checked; })} />
-              Menu je veřejně dostupné
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <div className="glass-card p-6 space-y-4">
-        <button type="button" onClick={() => setVzhledOtevren((v) => !v)}
-          className="w-full flex items-center justify-between gap-3 text-left">
-          <span className="min-w-0">
-            <span className="block font-bold tracking-tight text-[#16181A]">Vzhled menu</span>
-            <span className="block text-sm text-black/45">
-              Barvy, logo, písma a prvky na pozadí. Platí jen pro tohle menu.
-            </span>
-          </span>
-          <span className="text-black/40 text-sm">{vzhledOtevren ? 'Skrýt' : 'Upravit'}</span>
-        </button>
-
-        {vzhledOtevren && (() => {
-          const t = normalizeMenuTheme(board.theme);
-          const setT = (fn: (x: MenuTheme) => void) =>
-            upravit((b) => { const kop = normalizeMenuTheme(b.theme); fn(kop); b.theme = kop; });
-
-          const Barva = ({ popis, hodnota, zmen }: { popis: string; hodnota: string; zmen: (v: string) => void }) => (
-            <label className="space-y-1">
-              <span className="text-xs font-semibold text-black/50">{popis}</span>
-              <span className="flex items-center gap-2">
-                <input type="color" value={hodnota} onChange={(e) => zmen(e.target.value)}
-                  className="h-10 w-12 rounded-xl border border-black/[0.08] bg-transparent p-1 cursor-pointer" />
-                <input value={hodnota} maxLength={9} onChange={(e) => zmen(e.target.value)}
-                  className={`${vstup} font-mono`} />
-              </span>
-            </label>
-          );
-
-          return (
-            <div className="space-y-5">
+    nastroj = (
+      <div className="space-y-4">
+        <Card className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="t-card flex items-center gap-2"><Icon name="clipboard" size={17} className="shrink-0 text-black/40" />{boards.length > 1 ? 'Tvoje menu' : board.name}</h2>
+            {smiUpravit && (
               <div className="flex flex-wrap gap-2">
-                {PREDLOHY.map((p) => (
-                  <button key={p.id} type="button"
-                    onClick={() => setT((x) => { x.den = { ...p.theme.den }; x.noc = { ...p.theme.noc }; })}
-                    className="rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-black/60 flex items-center gap-2">
-                    <span className="inline-flex">
-                      <span className="w-3 h-3 rounded-full border border-black/10" style={{ background: p.theme.den.bg }} />
-                      <span className="w-3 h-3 rounded-full border border-black/10 -ml-1" style={{ background: p.theme.den.accent }} />
-                    </span>
-                    {p.label}
-                  </button>
+                <Button variant="secondary" size="sm" icon="plus" disabled={ukladam} onClick={() => setNoveMenu('')}>Nové menu</Button>
+                {/* Při neuložených změnách ne: obnova seznamu po kopii by rozpracovanou
+                    desku přepsala tím, co je v databázi. */}
+                {jinePodniky.length > 0 && (
+                  <Button variant="ghost" size="sm" icon="copy" disabled={ukladam || neulozeno}
+                    title={neulozeno ? 'Nejdřív ulož rozdělané změny' : undefined} onClick={() => setKopieOpen(true)}>Z jiného podniku</Button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Víc menu = přepínač nahoře. Stav zapnuto/vypnuto nese Stav menu nad editorem a adresa níž. */}
+          {boards.length > 1 && (
+            <Segmented wrap ariaLabel="Menu k úpravě" value={String(aktivni ?? '')}
+              options={boards.map(b => ({ id: String(b.id), label: b.name }))}
+              onChange={id => {
+                if (neulozeno) {
+                  setPotvrzeni({ titulek: 'Zahodit neuložené změny?', text: `V menu „${board.name}“ máš neuložené změny. Přepnutím na jiné menu se zahodí.`, akce: 'Zahodit a přepnout', onAno: () => setAktivni(Number(id)) });
+                } else setAktivni(Number(id));
+              }} />
+          )}
+          <p className="t-meta">
+            {czCount(board.sections.length, SEKCE)} · {czCount(vazby.celkem, POLOZKA)}
+            {' · '}{board.enabled ? 'zapnuté' : 'vypnuté'}
+          </p>
+
+          <Well className="space-y-2">
+            <p className="t-label">Adresa pro iPad a pro hosty</p>
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
+              <code className="text-sm font-mono text-[#16181A] break-all min-w-0">{adresa}</code>
+              <a href={cesta} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">
+                <Icon name="external" size={15} className="shrink-0" />Otevřít
+              </a>
+            </div>
+
+            {zive === 'ok' && <p className="t-meta">Na téhle adrese se hostům ukazuje tohle menu. Úpravy se na iPadu projeví do minuty.</p>}
+            {zive === 'ceka' && <p className="t-meta">Kontroluju adresu…</p>}
+            {zive === 'neznamo' && <p className="t-meta">Adresu se teď nepodařilo ověřit — zkontroluj připojení.</p>}
+            {zive === 'vypnuto' && <p className="text-[13px] text-wait-ink">Menu je vypnuté, takže se hostům neukazuje.</p>}
+            {zive === 'chybi' && (
+              <p className="text-[13px] text-wait-ink">
+                {ulozenySlug === VYCHOZI_SLUG
+                  ? 'Pozor: server na téhle adrese žádné menu nevydává, takže iPad ukazuje záložní nabídku.'
+                  : 'Pozor: iPad otevřený bez parametru bere menu s adresou „akce“, a to tohle menu není — proto se tvoje úpravy hostům neukazují.'}
+              </p>
+            )}
+
+            {/*
+              U každé hlášky musí být i náprava. Dřív se tlačítko na adresu
+              schovávalo, když adresa už seděla — u vypnutého menu tak zbyla
+              hláška, se kterou nešlo nic udělat.
+            */}
+            {(zive === 'chybi' || zive === 'vypnuto') && smiZverejnit && (
+              <div className="pt-1">
+                {/* Vypnuté menu se má zapnout, ne mu přepisovat adresu — u druhého
+                    menu s vlastní adresou by mu ji přepis vzal. */}
+                {zive === 'vypnuto' ? (
+                  <Button variant="primary" size="sm" loading={ukladam} onClick={() => zverejnit({ enabled: true })}>Zapnout menu pro hosty</Button>
+                ) : ulozenySlug !== VYCHOZI_SLUG ? (
+                  <Button variant="primary" size="sm" loading={ukladam} onClick={() => zverejnit({ slug: VYCHOZI_SLUG })}>Nastavit jako menu pro iPad</Button>
+                ) : (
+                  <Button variant="primary" size="sm" loading={ukladam} onClick={() => zverejnit({ slug: VYCHOZI_SLUG, enabled: true })}>Zveřejnit znovu</Button>
+                )}
+              </div>
+            )}
+          </Well>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field id={`${uid}-nazev`} label="Název menu (jen pro vás)">
+              <Input id={`${uid}-nazev`} value={board.name} maxLength={80} disabled={zamceno}
+                onChange={(e) => upravit((b) => { b.name = e.target.value; })} />
+            </Field>
+            <Field id={`${uid}-adresa`} label="Adresa" hint="Bez diakritiky a mezer. Když ji změníš, přestane platit starý QR kód.">
+              <Input id={`${uid}-adresa`} value={board.slug} maxLength={40} disabled={zamceno || !smiZverejnit}
+                onChange={(e) => upravit((b) => { b.slug = e.target.value; })} />
+            </Field>
+            <Field id={`${uid}-titul`} label="Nadpis">
+              <Input id={`${uid}-titul`} value={board.title ?? ''} maxLength={80} disabled={zamceno}
+                onChange={(e) => upravit((b) => { b.title = e.target.value; })} />
+            </Field>
+            <Field id={`${uid}-nad`} label="Popisek nad nadpisem">
+              <Input id={`${uid}-nad`} value={board.eyebrow ?? ''} maxLength={80} disabled={zamceno}
+                onChange={(e) => upravit((b) => { b.eyebrow = e.target.value; })} />
+            </Field>
+            <Field id={`${uid}-ssid`} label="Wi-Fi — síť">
+              <Input id={`${uid}-ssid`} value={board.wifiSsid ?? ''} maxLength={80} disabled={zamceno}
+                onChange={(e) => upravit((b) => { b.wifiSsid = e.target.value; })} />
+            </Field>
+            <Field id={`${uid}-heslo`} label="Wi-Fi — heslo">
+              <Input id={`${uid}-heslo`} value={board.wifiPassword ?? ''} maxLength={80} disabled={zamceno}
+                onChange={(e) => upravit((b) => { b.wifiPassword = e.target.value; })} />
+            </Field>
+            <Field id={`${uid}-pozn`} label="Poznámka v patičce" className="sm:col-span-2">
+              <Input id={`${uid}-pozn`} value={board.note ?? ''} maxLength={200} disabled={zamceno}
+                onChange={(e) => upravit((b) => { b.note = e.target.value; })} />
+            </Field>
+          </div>
+
+          {smiZverejnit && (
+            <>
+              <ul className="list">
+                <SwitchRow title="Menu je veřejně dostupné" hint="Vypnuté menu hosté na iPadu ani v mobilu neuvidí. Uloží se tlačítkem dole."
+                  checked={board.enabled} disabled={zamceno} onChange={(v) => upravit((b) => { b.enabled = v; })} />
+              </ul>
+              <div className="grid gap-3 sm:grid-cols-2 items-end">
+                <Field id={`${uid}-pin`} label={`PIN pro označování vyprodaného od stánku${board.hasPin ? ' (nastavený)' : ''}`}
+                  hint="Na iPadu se zadá jednou a zapamatuje se. Bez PINu jde vyprodáno přepínat jen tady.">
+                  <Input id={`${uid}-pin`} value={pin} inputMode="numeric" placeholder={board.hasPin ? '••••' : '4 až 8 číslic'} disabled={zamceno}
+                    onChange={(e) => { setPin(e.target.value.replace(/\D/g, '').slice(0, 8)); setNeulozeno(true); }} />
+                </Field>
+                {board.hasPin && (
+                  <div className="pb-6">
+                    <Button variant="ghost" size="sm" onClick={() => setPotvrzeni({
+                      titulek: 'Zrušit PIN?', text: 'Od stánku pak nepůjde označovat vyprodané položky.', akce: 'Zrušit PIN', onAno: () => { void zrusitPin(); },
+                    })}>Zrušit PIN</Button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </Card>
+
+        <Card className="space-y-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="t-card">Vzhled menu</h2>
+              <p className="t-meta">Barvy, logo, písma a prvky na pozadí. Platí jen pro tohle menu.</p>
+            </div>
+            <Button variant="secondary" size="sm" iconAfter="chevron" aria-expanded={vzhledOtevren} aria-controls={`${uid}-vzhled`}
+              className={`shrink-0 ${vzhledOtevren ? '[&>svg:last-child]:rotate-180' : ''}`} onClick={() => setVzhledOtevren((v) => !v)}>
+              {vzhledOtevren ? 'Skrýt vzhled' : 'Upravit vzhled'}
+            </Button>
+          </div>
+
+          {vzhledOtevren && (
+            <div id={`${uid}-vzhled`} className="space-y-5">
+              {!zamceno && (
+                <div className="flex flex-wrap gap-2" role="group" aria-label="Předlohy vzhledu">
+                  {PREDLOHY.map((p) => (
+                    <Button key={p.id} variant="secondary" size="sm"
+                      onClick={() => setT((x) => { x.den = { ...p.theme.den }; x.noc = { ...p.theme.noc }; })}>
+                      <span className="inline-flex" aria-hidden>
+                        <span className="w-3 h-3 rounded-full border border-black/10" style={{ background: p.theme.den.bg }} />
+                        <span className="w-3 h-3 rounded-full border border-black/10 -ml-1" style={{ background: p.theme.den.accent }} />
+                      </span>
+                      {p.label}
+                    </Button>
+                  ))}
+                </div>
+              )}
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                {(['den', 'noc'] as const).map(rezim => (
+                  <div key={rezim} className="space-y-2" role="group" aria-labelledby={`${uid}-${rezim}`}>
+                    <p id={`${uid}-${rezim}`} className="t-label">{rezim === 'den' ? 'Den' : 'Noc'}</p>
+                    {([['bg', 'Pozadí'], ['fg', 'Text'], ['fgSoft', 'Tlumený text'], ['accent', 'Nadpisy a ceny']] as const).map(([klic, popis]) => (
+                      <Barva key={klic} id={`${uid}-${rezim}-${klic}`} popis={popis} hodnota={t[rezim][klic]} zamceno={zamceno}
+                        zmen={(v) => setT((x) => { x[rezim][klic] = v; })} />
+                    ))}
+                  </div>
                 ))}
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <p className="text-xs font-bold uppercase tracking-wider text-black/40">Den</p>
-                  <Barva popis="Pozadí" hodnota={t.den.bg} zmen={(v) => setT((x) => { x.den.bg = v; })} />
-                  <Barva popis="Text" hodnota={t.den.fg} zmen={(v) => setT((x) => { x.den.fg = v; })} />
-                  <Barva popis="Tlumený text" hodnota={t.den.fgSoft} zmen={(v) => setT((x) => { x.den.fgSoft = v; })} />
-                  <Barva popis="Nadpisy a ceny" hodnota={t.den.accent} zmen={(v) => setT((x) => { x.den.accent = v; })} />
-                </div>
-                <div className="space-y-2">
-                  <p className="text-xs font-bold uppercase tracking-wider text-black/40">Noc</p>
-                  <Barva popis="Pozadí" hodnota={t.noc.bg} zmen={(v) => setT((x) => { x.noc.bg = v; })} />
-                  <Barva popis="Text" hodnota={t.noc.fg} zmen={(v) => setT((x) => { x.noc.fg = v; })} />
-                  <Barva popis="Tlumený text" hodnota={t.noc.fgSoft} zmen={(v) => setT((x) => { x.noc.fgSoft = v; })} />
-                  <Barva popis="Nadpisy a ceny" hodnota={t.noc.accent} zmen={(v) => setT((x) => { x.noc.accent = v; })} />
-                </div>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="space-y-1">
-                  <span className="text-xs font-semibold text-black/50">Logo (odkaz na obrázek)</span>
-                  <input className={vstup} value={t.logo.url} maxLength={2000} placeholder="Prázdné = logo Managero ve stránce"
+                <Field id={`${uid}-logo`} label="Logo (odkaz na obrázek)" hint="Prázdné = logo Managero ve stránce.">
+                  <Input id={`${uid}-logo`} value={t.logo.url} maxLength={2000} disabled={zamceno}
                     onChange={(e) => setT((x) => { x.logo.url = e.target.value; })} />
-                </label>
-                <label className="space-y-1">
-                  <span className="text-xs font-semibold text-black/50">Jak logo vykreslit</span>
-                  <select value={t.logo.rezim} className={vstup}
+                </Field>
+                <Field id={`${uid}-logor`} label="Jak logo vykreslit">
+                  <Select id={`${uid}-logor`} value={t.logo.rezim} disabled={zamceno}
                     onChange={(e) => setT((x) => { x.logo.rezim = e.target.value === 'obrazek' ? 'obrazek' : 'maska'; })}>
                     <option value="maska">Obarvit barvou nadpisů (jednobarevné logo)</option>
                     <option value="obrazek">Vložit tak, jak je (vícebarevné logo)</option>
-                  </select>
-                </label>
-                <label className="space-y-1">
-                  <span className="text-xs font-semibold text-black/50">Písmo nadpisů</span>
-                  <select value={t.pismo.nadpisy} className={vstup}
-                    onChange={(e) => setT((x) => { x.pismo.nadpisy = e.target.value; })}>
+                  </Select>
+                </Field>
+                <Field id={`${uid}-pn`} label="Písmo nadpisů">
+                  <Select id={`${uid}-pn`} value={t.pismo.nadpisy} disabled={zamceno} onChange={(e) => setT((x) => { x.pismo.nadpisy = e.target.value; })}>
                     {PISMA.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
-                  </select>
-                </label>
-                <label className="space-y-1">
-                  <span className="text-xs font-semibold text-black/50">Písmo textu</span>
-                  <select value={t.pismo.text} className={vstup}
-                    onChange={(e) => setT((x) => { x.pismo.text = e.target.value; })}>
+                  </Select>
+                </Field>
+                <Field id={`${uid}-pt`} label="Písmo textu">
+                  <Select id={`${uid}-pt`} value={t.pismo.text} disabled={zamceno} onChange={(e) => setT((x) => { x.pismo.text = e.target.value; })}>
                     {PISMA.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
-                  </select>
-                </label>
-                <label className="space-y-1">
-                  <span className="text-xs font-semibold text-black/50">Prvky na pozadí</span>
-                  <select value={t.pozadi.druh} className={vstup}
-                    onChange={(e) => setT((x) => { x.pozadi.druh = e.target.value as any; })}>
+                  </Select>
+                </Field>
+                <Field id={`${uid}-poz`} label="Prvky na pozadí">
+                  <Select id={`${uid}-poz`} value={t.pozadi.druh} disabled={zamceno} onChange={(e) => setT((x) => { x.pozadi.druh = e.target.value as any; })}>
                     <option value="listy">Listy (kresba Pangey)</option>
                     <option value="zadne">Žádné</option>
                     <option value="vlastni">Vlastní obrázek</option>
-                  </select>
-                </label>
-                <label className="space-y-1">
-                  <span className="text-xs font-semibold text-black/50">Síla prvků: {t.pozadi.sila} %</span>
-                  <input type="range" min={0} max={20} step={0.5} value={t.pozadi.sila}
-                    className="w-full accent-[#8FB811]"
+                  </Select>
+                </Field>
+                <Field id={`${uid}-sila`} label={`Síla prvků: ${t.pozadi.sila} %`}>
+                  <input id={`${uid}-sila`} type="range" min={0} max={20} step={0.5} value={t.pozadi.sila} disabled={zamceno}
+                    className="w-full accent-[#16181A] tap-target-sm"
                     onChange={(e) => setT((x) => { x.pozadi.sila = Number(e.target.value); })} />
-                </label>
+                </Field>
                 {t.pozadi.druh === 'vlastni' && (
-                  <label className="space-y-1 sm:col-span-2">
-                    <span className="text-xs font-semibold text-black/50">Obrázek na pozadí</span>
-                    <input className={vstup} value={t.pozadi.url} maxLength={2000} placeholder="https://…"
+                  <Field id={`${uid}-pozurl`} label="Obrázek na pozadí" className="sm:col-span-2"
+                    hint="Jednobarevná kresba na průhledném pozadí. Obarví se podle textu, takže drží v obou režimech.">
+                    <Input id={`${uid}-pozurl`} value={t.pozadi.url} maxLength={2000} placeholder="https://…" disabled={zamceno}
                       onChange={(e) => setT((x) => { x.pozadi.url = e.target.value; })} />
-                    <span className="block text-[11px] text-black/35">
-                      Jednobarevná kresba na průhledném pozadí. Obarví se podle textu, takže drží v obou režimech.
-                    </span>
-                  </label>
+                  </Field>
                 )}
               </div>
 
-              <div className="flex items-center gap-3 flex-wrap">
-                <button type="button"
-                  onClick={() => setT((x) => { Object.assign(x, JSON.parse(JSON.stringify(VYCHOZI_THEME))); })}
-                  className="rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-black/60">
-                  Vrátit původní vzhled
-                </button>
-                <span className="text-[11px] text-black/35">
-                  Vzhled se uloží spolu se zbytkem menu tlačítkem dole.
-                </span>
-              </div>
-            </div>
-          );
-        })()}
-      </div>
-
-      {/* Vazba na pokladnu. Bez ní je položka pro kasu jen text: objednávka
-          od stolu se do Storyous nepošle a na terminálu se nic nevytiskne.
-          Proto je tohle nad sekcemi, ne schované v nastavení. */}
-      {posPripojena && (
-        <div className="glass-card p-5 space-y-3">
-          <div className="flex items-start gap-3 flex-wrap">
-            <div className="min-w-0 flex-1">
-              <h3 className="t-card flex items-center gap-2">
-                <Icon name="receipt" size={18} className="text-black/40 shrink-0" />Tisk na terminálu
-              </h3>
-              {vazby.celkem === 0 ? (
-                <p className="text-sm text-black/55 mt-1">
-                  Menu je zatím prázdné. Nejrychlejší je natáhnout ho z pokladny — přijde i s cenami a rozdělením do sekcí, jak to máte ve Storyous.
-                </p>
-              ) : vazby.chybi === 0 ? (
-                <p className="text-sm text-[#3E5406] mt-1">
-                  Všech {vazby.celkem} položek má produkt v kase. Co si host objedná, vyjede na terminálu.
-                </p>
-              ) : (
-                <p className="text-sm text-black/60 mt-1">
-                  <strong className="text-[#16181A] tabular-nums">{vazby.spojene} z {vazby.celkem}</strong> položek se z objednávky vytiskne na terminálu.
-                  Zbylých {vazby.chybi} je pro pokladnu jen text — objednávka s nimi zůstane jen tady u nás.
-                </p>
+              {!zamceno && (
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Button variant="ghost" size="sm" icon="undo"
+                    onClick={() => setT((x) => { Object.assign(x, JSON.parse(JSON.stringify(VYCHOZI_THEME))); })}>
+                    Vrátit původní vzhled
+                  </Button>
+                  <span className="t-meta">Vzhled se uloží spolu se zbytkem menu tlačítkem dole.</span>
+                </div>
               )}
             </div>
-            <span className="shrink-0 text-sm font-bold tabular-nums text-black/45">{vazby.celkem ? Math.round((vazby.spojene / vazby.celkem) * 100) : 0} %</span>
-          </div>
-          {vazby.celkem > 0 && (
-            <div className="h-2 rounded-full bg-black/[0.06] overflow-hidden" aria-hidden>
-              <div className="h-full rounded-full bg-[#C8F542] transition-[width]" style={{ width: `${vazby.celkem ? (vazby.spojene / vazby.celkem) * 100 : 0}%` }} />
-            </div>
           )}
-          <div className="flex flex-wrap gap-2">
-            <button type="button" disabled={!!importuji} onClick={() => zPokladny('fill')}
-              className="rounded-full bg-[#16181A] text-white font-semibold px-4 py-2 text-sm disabled:opacity-50">
-              {importuji === 'fill' ? 'Načítám z kasy…' : vazby.celkem === 0 ? 'Natáhnout menu z pokladny' : 'Doplnit, co v menu chybí'}
-            </button>
-            {vazby.chybi > 0 && (
-              <button type="button" disabled={!!importuji} onClick={() => zPokladny('match')}
-                className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-black/70 disabled:opacity-50">
-                {importuji === 'match' ? 'Páruji…' : 'Spárovat podle názvu'}
-              </button>
+        </Card>
+
+        {/* Vazba na pokladnu. Bez ní je položka pro kasu jen text: objednávka
+            od stolu se do Storyous nepošle a na terminálu se nic nevytiskne.
+            Proto je tohle nad sekcemi, ne schované v nastavení. */}
+        {posPripojena && (
+          <Card className="space-y-3">
+            <div className="flex items-start gap-3">
+              <div className="min-w-0 flex-1">
+                <h2 className="t-card flex items-center gap-2">
+                  <Icon name="receipt" size={17} className="text-black/40 shrink-0" />Tisk na terminálu
+                </h2>
+                {vazby.celkem === 0 ? (
+                  <p className="t-meta mt-1">Menu je zatím prázdné. Nejrychlejší je natáhnout ho z pokladny — přijde i s cenami a rozdělením do sekcí, jak to máte ve Storyous.</p>
+                ) : vazby.chybi === 0 ? (
+                  <p className="text-sm text-ok-ink mt-1">Všech {vazby.celkem} položek má produkt v kase. Co si host objedná, vyjede na terminálu.</p>
+                ) : (
+                  <p className="text-sm text-black/60 mt-1">
+                    <strong className="font-semibold text-[#16181A] tabular-nums">{vazby.spojene} z {vazby.celkem}</strong> položek se z objednávky vytiskne na terminálu.
+                    Zbylých {vazby.chybi} je pro pokladnu jen text — objednávka s nimi zůstane jen tady u nás.
+                  </p>
+                )}
+              </div>
+              <span className="shrink-0 text-[15px] font-semibold tabular-nums text-black/55">{vazby.celkem ? Math.round((vazby.spojene / vazby.celkem) * 100) : 0} %</span>
+            </div>
+            {vazby.celkem > 0 && (
+              <div className="h-2 rounded-full bg-black/[0.06] overflow-hidden" aria-hidden>
+                <div className="h-full rounded-full bg-[#C8F542] transition-[width]" style={{ width: `${(vazby.spojene / vazby.celkem) * 100}%` }} />
+              </div>
             )}
-            <button type="button" disabled={!!importuji} onClick={() => zPokladny('fill', true)}
-              className="rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-black/55 disabled:opacity-50">
-              Načíst katalog kasy znovu
-            </button>
-          </div>
-          {objednavaciSlug != null && objednavaciSlug !== '' && board.slug !== objednavaciSlug && (
-            <p className="text-sm text-wait-ink bg-wait/10 border border-wait/30 rounded-2xl px-3.5 py-2.5">
-              Pozor: hosté objednávají z menu s adresou <strong>{objednavaciSlug}</strong>, ne z tohohle. Párování tady se do objednávek nepropíše — přepni na to správné menu, nebo ho podniku nastav v Klientu → Nastavení.
-            </p>
-          )}
-          <p className="text-[11px] text-black/40">
-            Sekce si pak přeskládej, jak chceš — vazba na kasu drží u položky, ne u sekce. Položka s vazbou má v seznamu zelené lemování a tečku.
-          </p>
-        </div>
-      )}
+            {smiUpravit && (
+              <div className="flex flex-wrap gap-2">
+                <Button variant="primary" size="sm" loading={importuji === 'fill'} disabled={!!importuji} onClick={() => zPokladny('fill')}>
+                  {vazby.celkem === 0 ? 'Natáhnout menu z pokladny' : 'Doplnit, co v menu chybí'}
+                </Button>
+                {vazby.chybi > 0 && (
+                  <Button variant="secondary" size="sm" loading={importuji === 'match'} disabled={!!importuji} onClick={() => zPokladny('match')}>Spárovat podle názvu</Button>
+                )}
+                <Button variant="ghost" size="sm" icon="refresh" disabled={!!importuji} onClick={() => zPokladny('fill', true)}>Načíst katalog kasy znovu</Button>
+              </div>
+            )}
+            {objednavaciSlug != null && objednavaciSlug !== '' && board.slug !== objednavaciSlug && (
+              <p className="note note-wait">
+                Pozor: hosté objednávají z menu s adresou <strong>{objednavaciSlug}</strong>, ne z tohohle. Párování tady se do objednávek nepropíše — přepni na to správné menu, nebo ho podniku nastav v Klientu → Nastavení.
+              </p>
+            )}
+            <p className="t-meta">Sekce si pak přeskládej, jak chceš — vazba na kasu drží u položky, ne u sekce. Položka s vazbou má u sebe štítek „Tiskne se na kase".</p>
+          </Card>
+        )}
 
-      {board.sections.map((s, si) => (
-        <div key={s.id ?? `nova-${si}`} className="glass-card p-6 space-y-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <input aria-label="Název sekce menu" className={`${vstup} flex-1 min-w-[8rem] font-semibold`} value={s.title} maxLength={80}
-              onChange={(e) => upravit((b) => { b.sections[si].title = e.target.value; })} />
-            <select value={s.column} aria-label="Sloupec sekce" className="well border border-black/[0.08] px-3 py-3 text-sm"
-              onChange={(e) => upravit((b) => { b.sections[si].column = Number(e.target.value) === 2 ? 2 : 1; })}>
-              <option value={1}>Vlevo</option>
-              <option value={2}>Vpravo</option>
-            </select>
-            <button type="button" title="Nahoru" onClick={() => upravit((b) => posun(b.sections, si, -1))}
-              className="rounded-full border border-black/10 w-10 h-10 text-black/50">↑</button>
-            <button type="button" title="Dolů" onClick={() => upravit((b) => posun(b.sections, si, 1))}
-              className="rounded-full border border-black/10 w-10 h-10 text-black/50">↓</button>
-            <button type="button" title="Smazat sekci"
-              onClick={() => { if (confirm(`Smazat sekci „${s.title}“ i s položkami?`)) upravit((b) => { b.sections.splice(si, 1); }); }}
-              className="rounded-full border border-bad/25 w-10 h-10 text-bad-ink">×</button>
-          </div>
-
-          <div className="space-y-2">
-            {s.items.map((it, ii) => (
-              <div key={it.id ?? `nova-${ii}`}
-                className={`rounded-2xl border p-3 space-y-2 ${
-                  !posPripojena ? 'border-black/[0.06]'
-                    : it.posProductId ? 'border-[#C8F542]/60 bg-[#C8F542]/[0.06]'
-                      : 'border-wait/35 bg-wait/[0.04]'}`}>
-                <div className="flex gap-2 flex-wrap">
-                  <input className={`${vstup} flex-1 min-w-[10rem]`} value={it.name} maxLength={80} placeholder="Název položky"
-                    onChange={(e) => upravit((b) => { b.sections[si].items[ii].name = e.target.value; })} />
-                  <input className={`${vstup} w-24`} value={it.price} inputMode="numeric" placeholder="Cena"
-                    onChange={(e) => upravit((b) => { b.sections[si].items[ii].price = Number(e.target.value.replace(/\D/g, '')) || 0; })} />
+        {board.sections.map((s, si) => (
+          <Card key={s.id ?? `nova-${si}`} as="section" aria-label={`Sekce ${s.title || si + 1}`} className="space-y-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Input aria-label="Název sekce menu" className="flex-1 min-w-[8rem] font-semibold" value={s.title} maxLength={80} disabled={zamceno}
+                onChange={(e) => upravit((b) => { b.sections[si].title = e.target.value; })} />
+              <Select value={s.column} aria-label={`Sloupec sekce ${s.title}`} className="!w-auto" disabled={zamceno}
+                onChange={(e) => upravit((b) => { b.sections[si].column = Number(e.target.value) === 2 ? 2 : 1; })}>
+                <option value={1}>Vlevo</option>
+                <option value={2}>Vpravo</option>
+              </Select>
+              {!zamceno && (
+                // Cíle 44 px (tap-target) a mezi 36px tlačítky 8 px, ať se jejich plochy
+                // nepřekrývají; koš ještě o kus dál, aby palec mířící na „níž" netrefil smazání.
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="sm" iconOnly icon="chevron" className="tap-target [&>svg]:rotate-180" aria-label={`Posunout sekci ${s.title} výš`}
+                    disabled={si === 0} onClick={() => upravit((b) => posun(b.sections, si, -1))} />
+                  <Button variant="ghost" size="sm" iconOnly icon="chevron" className="tap-target" aria-label={`Posunout sekci ${s.title} níž`}
+                    disabled={si === board.sections.length - 1} onClick={() => upravit((b) => posun(b.sections, si, 1))} />
+                  <Button variant="danger" size="sm" iconOnly icon="trash" className="tap-target ml-2" aria-label={`Smazat sekci ${s.title}`}
+                    onClick={() => setPotvrzeni({
+                      titulek: 'Smazat sekci?', text: `Sekce „${s.title}“ zmizí i se všemi ${czCount(s.items.length, POLOZKA)}. Definitivně až po uložení menu.`, akce: 'Smazat sekci',
+                      onAno: () => upravit((b) => { b.sections.splice(si, 1); }),
+                    })} />
                 </div>
-                <input className={vstup} value={it.description ?? ''} maxLength={200} placeholder="Popisek (nepovinný)"
-                  onChange={(e) => upravit((b) => { b.sections[si].items[ii].description = e.target.value; })} />
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button type="button" onClick={() => prepnoutVyprodano(si, ii)}
-                    className={`rounded-full px-4 py-2 text-sm font-semibold ${
-                      it.soldOut ? 'bg-bad text-white' : 'border border-black/10 text-black/60'}`}>
-                    {it.soldOut ? 'Vyprodáno' : 'Na skladě'}
-                  </button>
-                  {posPripojena && (it.posProductId ? (
-                    <span title="Položka má produkt v pokladně, takže se z objednávky vytiskne na terminálu."
-                      className="inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/30 px-2.5 py-1 text-[11px] font-semibold text-[#3E5406]">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#5B7A08]" />Tiskne se na kase
-                    </span>
-                  ) : (
-                    <button type="button" onClick={() => otevritVyber(si, ii)}
-                      title="Bez produktu z pokladny objednávka na terminál nedoletí."
-                      className="tap-target-sm inline-flex items-center gap-1.5 rounded-full border border-wait/50 bg-wait/10 px-2.5 py-1.5 text-[11px] font-semibold text-wait-ink hover:bg-wait/20 transition">
-                      <span className="h-1.5 w-1.5 rounded-full bg-wait" />Netiskne se · spárovat
-                    </button>
-                  ))}
-                  {posPripojena && it.posProductId && (
-                    <button type="button" onClick={() => upravit((b) => { b.sections[si].items[ii].posProductId = null; })}
-                      className="tap-target-sm px-1 py-1 text-[11px] text-black/35 hover:text-black/60 underline underline-offset-2">zrušit vazbu</button>
-                  )}
-                  <span className="flex-1" />
-                  <button type="button" title="Nahoru" onClick={() => upravit((b) => posun(b.sections[si].items, ii, -1))}
-                    className="rounded-full border border-black/10 w-9 h-9 text-black/50">↑</button>
-                  <button type="button" title="Dolů" onClick={() => upravit((b) => posun(b.sections[si].items, ii, 1))}
-                    className="rounded-full border border-black/10 w-9 h-9 text-black/50">↓</button>
-                  <button type="button" title="Smazat položku"
-                    onClick={() => upravit((b) => { b.sections[si].items.splice(ii, 1); })}
-                    className="rounded-full border border-bad/25 w-9 h-9 text-bad-ink">×</button>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex gap-2 flex-wrap">
-            <button type="button"
-              onClick={() => upravit((b) => { b.sections[si].items.push({ name: '', price: 0, soldOut: false }); })}
-              className="rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-black/60">
-              + Položka
-            </button>
-            <button type="button" onClick={() => otevritVyber(si, null)}
-              className="rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-black/60">
-              + Z pokladny
-            </button>
-          </div>
-
-          {posOtevreno?.si === si && (
-            <div className="rounded-2xl border border-black/[0.08] p-3 space-y-2">
-              <div className="flex items-center gap-2">
-                <input ref={posInput} onKeyDown={posKeys.onInputKeyDown} className={`${vstup} flex-1`} value={posHledat} autoFocus
-                  placeholder={posOtevreno?.ii == null ? 'Hledat v katalogu kasy…' : `Ke které položce v kase patří „${s.items[posOtevreno.ii]?.name || '…'}“?`}
-                  onChange={(e) => setPosHledat(e.target.value)} />
-                <button type="button" onClick={() => setPosOtevreno(null)}
-                  className="rounded-full border border-black/10 px-3 py-2 text-sm text-black/50">Zavřít</button>
-              </div>
-              {posStav && <p className="text-sm text-black/45">{posStav}</p>}
-              <div ref={posList} onKeyDown={posKeys.onListKeyDown} className="max-h-64 overflow-y-auto space-y-1">
-                {(posProdukty ?? [])
-                  .filter((p) => obsahuje(p.name + ' ' + p.category, posHledat))
-                  .slice(0, 80)
-                  .map((p) => (
-                    <button key={p.productId} type="button" onClick={() => vybratZPos(p)}
-                      className="w-full text-left rounded-xl px-3 py-2 hover:bg-black/[0.04] flex items-center gap-2">
-                      <span className="flex-1 min-w-0">
-                        <span className="block text-sm truncate">{p.name}</span>
-                        {p.category && <span className="block text-[11px] text-black/35 truncate">{p.category}</span>}
-                      </span>
-                      <span className="text-sm font-semibold text-black/60 whitespace-nowrap">
-                        {p.price != null ? `${p.price} ${board.currency}` : 'bez ceny'}
-                      </span>
-                    </button>
-                  ))}
-              </div>
+              )}
             </div>
+
+            {s.items.length > 0 && (
+              <ul className="list">
+                {s.items.map((it, ii) => {
+                  const idVyp = `${uid}-v${si}-${ii}`;
+                  return (
+                    <li key={it.id ?? `nova-${ii}`} className="py-3 space-y-2">
+                      <div className="grid grid-cols-[minmax(0,1fr)_6.5rem] gap-2">
+                        <Input value={it.name} maxLength={80} placeholder="Název položky" aria-label="Název položky" disabled={zamceno}
+                          onChange={(e) => upravit((b) => { b.sections[si].items[ii].name = e.target.value; })} />
+                        <Input value={it.price} inputMode="numeric" aria-label={`Cena — ${it.name || 'nová položka'} (${board.currency})`}
+                          className="text-right tabular-nums" disabled={zamceno || !smiCeny}
+                          onChange={(e) => upravit((b) => { b.sections[si].items[ii].price = Number(e.target.value.replace(/\D/g, '')) || 0; })} />
+                      </div>
+                      <Input value={it.description ?? ''} maxLength={200} placeholder="Popisek (nepovinný)" aria-label={`Popisek — ${it.name || 'nová položka'}`} disabled={zamceno}
+                        onChange={(e) => upravit((b) => { b.sections[si].items[ii].description = e.target.value; })} />
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="inline-flex items-center gap-2">
+                          <Switch checked={it.soldOut} labelledBy={idVyp} disabled={!smiVyprodano && zamceno}
+                            onChange={(v) => { if (smiVyprodano) void prepnoutVyprodano(si, ii, v); else upravit((b) => { b.sections[si].items[ii].soldOut = v; }); }} />
+                          <span id={idVyp} className={`text-[13px] ${it.soldOut ? 'font-semibold text-bad-ink' : 'text-black/55'}`}>
+                            <span className="sr-only">{it.name}: </span>Vyprodáno
+                          </span>
+                        </span>
+                        {posPripojena && (it.posProductId ? (
+                          <>
+                            <Chip tone="ok" size="sm" icon="check">Tiskne se na kase</Chip>
+                            {!zamceno && <Button variant="ghost" size="sm" onClick={() => upravit((b) => { b.sections[si].items[ii].posProductId = null; })}>Zrušit vazbu</Button>}
+                          </>
+                        ) : (
+                          <>
+                            <Chip tone="wait" size="sm">Netiskne se</Chip>
+                            {!zamceno && <Button variant="secondary" size="sm" onClick={() => otevritVyber(si, ii)}>Spárovat</Button>}
+                          </>
+                        ))}
+                        <span className="flex-1" />
+                        {!zamceno && (
+                          <span className="flex items-center gap-2">
+                            <Button variant="ghost" size="sm" iconOnly icon="chevron" className="tap-target [&>svg]:rotate-180" aria-label={`Posunout ${it.name || 'položku'} výš`}
+                              disabled={ii === 0} onClick={() => upravit((b) => posun(b.sections[si].items, ii, -1))} />
+                            <Button variant="ghost" size="sm" iconOnly icon="chevron" className="tap-target" aria-label={`Posunout ${it.name || 'položku'} níž`}
+                              disabled={ii === s.items.length - 1} onClick={() => upravit((b) => posun(b.sections[si].items, ii, 1))} />
+                            <Button variant="danger" size="sm" iconOnly icon="trash" className="tap-target ml-2" aria-label={`Smazat ${it.name || 'položku'}`}
+                              onClick={() => smazatPolozku(si, ii)} />
+                          </span>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+
+            {!zamceno && (
+              <div className="flex gap-2 flex-wrap">
+                <Button variant="secondary" size="sm" icon="plus"
+                  onClick={() => upravit((b) => { b.sections[si].items.push({ name: '', price: 0, soldOut: false }); })}>
+                  Položka
+                </Button>
+                {posPripojena !== false && (
+                  <Button variant="ghost" size="sm" icon="plus" onClick={() => otevritVyber(si, null)}>Z pokladny</Button>
+                )}
+              </div>
+            )}
+
+            {posOtevreno?.si === si && (
+              <Well className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Input ref={posInput} onKeyDown={posKeys.onInputKeyDown} className="flex-1" value={posHledat} autoFocus
+                    aria-label={posOtevreno?.ii == null ? 'Hledat v katalogu kasy' : `Položka v kase pro ${s.items[posOtevreno.ii]?.name || 'položku'}`}
+                    placeholder={posOtevreno?.ii == null ? 'Hledat v katalogu kasy…' : `Ke které položce v kase patří „${s.items[posOtevreno.ii]?.name || '…'}“?`}
+                    onChange={(e) => setPosHledat(e.target.value)} />
+                  <Button variant="ghost" size="sm" onClick={() => setPosOtevreno(null)}>Zavřít</Button>
+                </div>
+                {posStav && <p className="t-meta">{posStav}</p>}
+                <div ref={posList} onKeyDown={posKeys.onListKeyDown} className="max-h-64 overflow-y-auto divide-y divide-black/[0.06]">
+                  {(posProdukty ?? [])
+                    .filter((p) => obsahuje(p.name + ' ' + p.category, posHledat))
+                    .slice(0, 80)
+                    .map((p) => (
+                      <button key={p.productId} type="button" onClick={() => vybratZPos(p)}
+                        className="w-full text-left rounded-xl px-3 py-2 hover:bg-black/[0.04] transition-colors flex items-center gap-2">
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-sm text-[#16181A] truncate">{p.name}</span>
+                          {p.category && <span className="block text-[13px] text-black/55 truncate">{p.category}</span>}
+                        </span>
+                        <span className="text-sm font-semibold text-black/60 whitespace-nowrap tabular-nums">
+                          {p.price != null ? `${p.price} ${board.currency}` : 'bez ceny'}
+                        </span>
+                      </button>
+                    ))}
+                </div>
+              </Well>
+            )}
+          </Card>
+        ))}
+
+        <Card className="space-y-3">
+          {!zamceno && (
+            <Button variant="secondary" size="sm" icon="plus"
+              onClick={() => upravit((b) => { b.sections.push({ title: 'Nová sekce', column: 1, items: [] }); })}>
+              Sekce
+            </Button>
           )}
-        </div>
-      ))}
-
-      <div className="glass-card p-6 space-y-3">
-        <button type="button"
-          onClick={() => upravit((b) => { b.sections.push({ title: 'Nová sekce', column: 1, items: [] }); })}
-          className="rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-black/60">
-          + Sekce
-        </button>
-
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          {chyba && <p className="text-bad-ink text-sm">{chyba}</p>}
-          {hlaska && !chyba && <p className="text-[#8FB811] text-sm">{hlaska}</p>}
-          {neulozeno && !chyba && (
-            <p className="text-wait-ink text-sm font-semibold">Máš neuložené změny</p>
-          )}
-          <span className="flex-1" />
-          <button type="button" onClick={smazat} disabled={ukladam}
-            className="rounded-full border border-bad/25 px-4 py-2.5 text-sm font-medium text-bad-ink disabled:opacity-50">
-            Smazat menu
-          </button>
-          <button type="button" onClick={() => ulozit()} disabled={ukladam}
-            className={`rounded-full font-semibold px-5 py-2.5 text-sm disabled:opacity-50 ${
-              neulozeno ? 'bg-[#C8F542] text-black' : 'seg-on'}`}>
-            {ukladam ? 'Ukládám…' : neulozeno ? 'Uložit změny' : 'Uložit menu'}
-          </button>
-        </div>
-      </div>
-
-      {/*
-        Menu bývá dlouhé a tlačítko Uložit je až úplně dole. Kdo přidá položku
-        v polovině seznamu, snadno odejde v domnění, že je hotovo — a změny
-        se nikam neuloží. Dokud něco čeká, drží se ukládání na očích.
-      */}
-      {neulozeno && (
-        <div className="sticky bottom-4 z-20 flex justify-center pointer-events-none">
-          <div className="pointer-events-auto flex items-center gap-3 rounded-full bg-[#16181A] text-white shadow-lg pl-5 pr-2 py-2">
-            <span className="text-sm font-medium">Neuložené změny</span>
-            <button type="button" onClick={() => ulozit()} disabled={ukladam}
-              className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2 text-sm disabled:opacity-50">
-              {ukladam ? 'Ukládám…' : 'Uložit'}
-            </button>
+          {chyba && <p className="note note-danger" role="alert">{chyba}</p>}
+          {neulozeno && !chyba && <p className="note note-wait" role="status">Máš neuložené změny.</p>}
+          <div className="flex items-center justify-end gap-2 flex-wrap">
+            {smiMazat && (
+              <Button variant="danger" disabled={ukladam} onClick={() => setPotvrzeni({
+                titulek: 'Smazat menu?', text: `Menu „${board.name}“ zmizí i se všemi položkami a vytištěné QR kódy přestanou fungovat. Tohle nejde vzít zpět.`, akce: 'Smazat menu',
+                onAno: () => { void smazat(); },
+              })}>Smazat menu</Button>
+            )}
+            {smiUpravit && (
+              <Button variant="primary" loading={ukladam} onClick={() => ulozit()}>{neulozeno ? 'Uložit změny' : 'Uložit menu'}</Button>
+            )}
           </div>
-        </div>
-      )}
-    </div>
-    {kopieOkno}
+        </Card>
+
+        {/*
+          Menu bývá dlouhé a tlačítko Uložit je až úplně dole. Kdo přidá položku
+          v polovině seznamu, snadno odejde v domnění, že je hotovo — a změny
+          se nikam neuloží. Dokud něco čeká, drží se ukládání na očích. Plovoucí
+          lišta nese jedinou limetku (tlačítko dole je proto `primary`).
+        */}
+        <PlovouciLista label="Neuložené změny menu" open={neulozeno && smiUpravit} animate>
+          <span className="text-sm font-medium text-white">Neuložené změny</span>
+          <button type="button" onClick={() => ulozit()} disabled={ukladam} className="btn btn-accent btn-sm">
+            {ukladam ? 'Ukládám…' : 'Uložit'}
+          </button>
+        </PlovouciLista>
+      </div>
+    );
+  }
+
+  const okna = (
+    <>
+      {kopieOkno}
+      <Modal open={noveMenu != null} onClose={() => setNoveMenu(null)} size="sm" title="Nové menu" subtitle="Založí se prázdné, s vlastní adresou."
+        footer={<>
+          <Button variant="secondary" onClick={() => setNoveMenu(null)}>Zrušit</Button>
+          <Button variant="primary" type="submit" form={`${uid}-nove`} loading={ukladam}>Založit menu</Button>
+        </>}>
+        <form id={`${uid}-nove`} onSubmit={(e) => { e.preventDefault(); const n = (noveMenu ?? '').trim(); if (n) void zalozit(n); }}>
+          <Field id={`${uid}-nove-nazev`} label="Název menu" hint="Třeba Stálá nabídka. Adresa se z názvu odvodí sama.">
+            <Input id={`${uid}-nove-nazev`} autoFocus value={noveMenu ?? ''} maxLength={80} required onChange={(e) => setNoveMenu(e.target.value)} />
+          </Field>
+        </form>
+      </Modal>
+      <Modal open={potvrzeni != null} onClose={() => setPotvrzeni(null)} size="sm" title={potvrzeni?.titulek ?? ''}
+        footer={<>
+          <Button variant="secondary" onClick={() => setPotvrzeni(null)}>Zrušit</Button>
+          <Button variant={potvrzeni?.akce.startsWith('Smazat') || potvrzeni?.akce.startsWith('Zahodit') ? 'danger-solid' : 'primary'}
+            onClick={() => { const p = potvrzeni; setPotvrzeni(null); p?.onAno(); }}>{potvrzeni?.akce}</Button>
+        </>}>
+        <p className="t-meta">{potvrzeni?.text}</p>
+      </Modal>
+      {toast && <Toast key={toast.id} id={toast.id} message={toast.text} tone={toast.ton} action={toast.akce} onClose={() => setToast(null)} />}
     </>
+  );
+
+  if (!hlavicka) return <>{nastroj}{okna}</>;
+  return (
+    <>
+      <PlochaWidgetu stranka="vedeni.menu"
+        hlavicka={{ title: 'Menu', subtitle: 'Nabídka pro hosty. Změny se projeví na iPadu i v mobilech po obnovení stránky.', hintId: 'menueditor' }}
+        nastroj={nastroj} />
+      {okna}
+    </>
+  );
+}
+
+/** Barva vzhledu: výběr barvy a totéž jako text (hex se dá opsat z manuálu značky). */
+function Barva({ id, popis, hodnota, zmen, zamceno }: { id: string; popis: string; hodnota: string; zmen: (v: string) => void; zamceno: boolean }) {
+  return (
+    <div>
+      <Label htmlFor={id}>{popis}</Label>
+      <span className="flex items-center gap-2">
+        <input type="color" value={hodnota} onChange={(e) => zmen(e.target.value)} disabled={zamceno} aria-label={`${popis} — výběr barvy`}
+          className="h-11 w-12 shrink-0 rounded-xl border border-black/[0.08] bg-transparent p-1 cursor-pointer" />
+        <Input id={id} value={hodnota} maxLength={9} disabled={zamceno} onChange={(e) => zmen(e.target.value)} className="font-mono" />
+      </span>
+    </div>
   );
 }

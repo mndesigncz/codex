@@ -1,19 +1,56 @@
 'use client';
 
+// Rozvrh (vedení) — plocha s widgety a měsíční plánovač jako hlavní nástroj
+// (kolo 69, balík B1, spec §6.2).
+//
+// Do kola 68 měla obrazovka vlastní hlavičku s ručním přepínačem měsíce
+// a záložkami z ručních pilulek, nad mřížkou natvrdo kartu Dostupnost týmu
+// (limetkové dlaždice lidí) a červenou tónovanou kartu Děr v obsazení, pod
+// ní (v layoutu) modrou kartu Výměn a Žádosti o volno s limetkou v každém
+// řádku — devět limetkových ploch na jedné obrazovce (DP §1.3). Ty bloky
+// jsou teď widgety (components/widgety/oblasti/rozvrh.tsx), každý se svým
+// dotazem za svým oprávněním. Tady zůstal plánovač: měsíc, lišta akcí
+// v hlavičce (Vygenerovat = jediná limetka, Publikovat vedle, zbytek v „···"),
+// náhled návrhu a úprav a mřížka s oknem dne. Záložky nastavení (Typy směn,
+// Otevírací doba, Pevné dny, Pravidla) widgety nemají — plocha je jen u
+// záložky Rozvrh, ostatní mají stejnou hlavičku bez mřížky widgetů.
+//
+// Oprávnění (dřív žádná — role s náhledem rozvrhu dostala plánovač, jehož
+// dotazy skončily 403 a nakreslily prázdný měsíc): plánovač jen
+// s rozvrh.zobrazit, jinak náhled z /api/shifts?team=1 bez akcí; každá akce
+// za svým klíčem (upravit, generovat, publikovat, mazat_mesic, exportovat,
+// nastaveni), dostupnost a volno se načítají jen s dostupnost.zobrazit
+// a volno.zobrazit.
+//
+// Widgety s plánovačem mluví událostmi (lib/rozvrhPrehled.ts): „Díry"
+// otevřou den, „Dostupnost týmu" okno dostupnosti člověka a schválená výměna
+// nebo volno plánovač znovu načte. EmployerLayout (jiný balík) argument
+// pohledu Rozvrhu nepředává, proto z jiné stránky žádost počká
+// v sessionStorage.
+
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { zkratkyDnu, odsazeniMesice, zacatekTydne, type ZacatekTydne } from '@/lib/week';
 import { useCurrency } from '@/components/CurrencyProvider';
-import { dayPrefLabel, prefAllowsSlot, parseTypePref } from '@/lib/dayPrefs';
+import { dayPrefLabel, prefAllowsSlot } from '@/lib/dayPrefs';
 import { openSpan, uncovered, typeFitsDay, toHM } from '@/lib/coverage';
 import { Icon } from '../Icons';
-import { Button, Menu, EmptyState } from '../ui';
+import {
+  Avatar, Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Modal, MonthNav, PageHeader, Segmented,
+  SelectBox, Select, Skeleton, Switch, SwitchRow, Well, type MenuItem,
+} from '../ui';
 import ShiftCalendar from './ShiftCalendar';
 import { usePlan, UpgradeModal } from '../Pro';
-import { useModal } from '@/lib/useModal';
-import { okJson } from '@/lib/api';
+import { apiMessage, okJson } from '@/lib/api';
 import { openPrint, esc } from '@/lib/printDoc';
-import { czCount, SMENA, DEN } from '@/lib/czech';
-import { DiscardGuard } from '../ui/DiscardGuard';
+import { czCount, czForm, SMENA, DEN } from '@/lib/czech';
+import { pragueToday } from '@/lib/pragueTime';
+import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
+import { obnovDataWidgetu } from '../widgety/useDataWidgetu';
+import { nactiTeamsMine, useOpravneni } from '../role/useOpravneni';
+import {
+  KLIC_DEN, KLIC_DOSTUPNOST, UDALOST_DEN, UDALOST_DOSTUPNOST, UDALOST_ZMENA, den as denZ, hm as hmZ, posunMesice,
+  kategorieBarvy, rozsahVolna,
+} from '@/lib/rozvrhPrehled';
 
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string; role?: string };
@@ -108,7 +145,15 @@ interface Proposed {
 // klíč otevírací doby (0 = pondělí). Ten se nesmí přeskládat podle toho,
 // jak si podnik nastavil začátek týdne — posunulo by mu to otevírací dobu.
 const CZ_DAYS_FULL = ['Pondělí', 'Úterý', 'Středa', 'Čtvrtek', 'Pátek', 'Sobota', 'Neděle'];
-const COLORS = ['#C8F542', '#3B82F6', '#F59E0B', '#8B5CF6', '#F43F5E', '#14B8A6', '#EC4899', '#64748B'];
+// Barvy typů = kategorie cat-dot-1…6 z globals.css (DP §6.9), ve stejném pořadí. Ukládá se dál
+// hex kvůli kompatibilitě se staršími typy a s API; kreslí se ale vždy třídou kategorie
+// (tridaTecky), takže „Odpolední" má v plánovači stejný odstín jako ve widgetech a Mých směnách.
+const COLORS = ['#C8F542', '#0A84FF', '#8B5CF6', '#F59E0B', '#14B8A6', '#EC4899'];
+/** Třída tečky typu: kategorie podle barvy, neznámá (i stará šedá #64748B) = neutrální šedá. */
+function tridaTecky(barva: unknown): string {
+  const k = kategorieBarvy(barva);
+  return k ? `cat-dot-${k}` : 'bg-black/15';
+}
 const DEFAULT_TYPES = [
   { name: 'Ranní', startTime: '06:00', endTime: '14:00', color: '#C8F542' },
   { name: 'Odpolední', startTime: '14:00', endTime: '22:00', color: '#3B82F6' },
@@ -182,13 +227,49 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'pravidla', label: 'Pravidla' },
 ];
 
-export default function ScheduleBuilder({ user, onNavigate }: Props & { onNavigate?: (view: string, arg?: string) => void }) {
-  // Začátek týdne si volí podnik. Dřív to tahle obrazovka ignorovala
-  // a kreslila vždycky od pondělí, zatímco kalendáře vedle ctily nastavení.
+/** Žádost widgetu, která čekala na připojení plánovače (přechod z jiné stránky). */
+function vezmiZadost(klic: string): string | null {
+  try {
+    const v = sessionStorage.getItem(klic);
+    if (v != null) sessionStorage.removeItem(klic);
+    return v || null;
+  } catch { return null; }
+}
+
+const TITULEK = 'Rozvrh';
+const PODTITULEK = 'Sestav měsíční rozvrh podle dostupnosti týmu.';
+
+export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (view: string, arg?: string) => void }) {
+  // Začátek týdne si volí podnik; kalendáře vedle ho ctí taky.
   const zacatek = zacatekTydne(useCurrency().weekStart);
-  const now = new Date();
-  const currentMonth = ym(now);
-  const nextMonth = ym(new Date(now.getFullYear(), now.getMonth() + 1, 1));
+  const currentMonth = pragueToday().slice(0, 7);
+  const nextMonth = posunMesice(currentMonth, 1);
+
+  const { ma } = useOpravneni();
+  // Dokud nevíme, na co divák má, nic se nenačítá ani nekreslí — jinak by se
+  // plánovač zeptal na /api/schedule dřív, než víme, jestli to není jen
+  // náhled. Po odpovědi rozhoduje `ma`: s oprávněními přísně, po chybě nebo
+  // u odpovědi bez pole (starší server) „ukázat vše" — rozhodne server.
+  const [pripraveno, setPripraveno] = useState(false);
+  useEffect(() => {
+    let zije = true;
+    nactiTeamsMine().catch(() => { /* chyba je ve stavu oprávnění */ }).finally(() => { if (zije) setPripraveno(true); });
+    return () => { zije = false; };
+  }, []);
+  const smi = (klic: string) => pripraveno && ma(klic);
+  const planovac = smi('rozvrh.zobrazit');
+  const smiUpravit = planovac && smi('rozvrh.upravit');
+  const smiGenerovat = planovac && smi('rozvrh.generovat');
+  const smiPublikovat = planovac && smi('rozvrh.publikovat');
+  const smiMazat = planovac && smi('rozvrh.mazat_mesic');
+  const smiExport = planovac && smi('rozvrh.exportovat');
+  const smiNastaveni = smi('rozvrh.nastaveni');
+  const smiOteviraci = smi('podnik.oteviraci_doba');
+  const smiDostupnost = smi('dostupnost.zobrazit');
+  const smiDostupnostUpravit = smi('dostupnost.upravit');
+  const smiVolno = smi('volno.zobrazit');
+  const smiAkce = smi('akce.zobrazit');
+  const smiKalendar = smi('uzaverky.zobrazit_vse');
 
   const [tab, setTab] = useState<Tab>('rozvrh');
   const [month, setMonth] = useState(nextMonth);
@@ -198,26 +279,26 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
   const [shiftTypes, setShiftTypes] = useState<ShiftType[]>([]);
   const [fixed, setFixed] = useState<FixedAssignment[]>([]);
   const [openingHours, setOpeningHours] = useState<Record<string, OpeningDay>>({});
-  // Approved time off — a shift must never land on someone's holiday silently.
+  // Schválené volno — směna nesmí potichu padnout na něčí dovolenou.
   const [timeOff, setTimeOff] = useState<{ employeeId: number; fromDate: string; toDate: string; status: string }[]>([]);
-  // Events land in the planner too — a concert evening needs different staffing.
+  // Akce jsou v plánovači taky — koncertní večer potřebuje jiné obsazení.
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState<number | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [editAvail, setEditAvail] = useState<{ id: number; name: string; avatar: string } | null>(null);
+  // Widget „Dostupnost týmu" požádal o okno člověka; otevře se, až dorazí lidé.
+  const [cekaDostupnost, setCekaDostupnost] = useState<number | null>(null);
   const [dayModal, setDayModal] = useState<string | null>(null);
-  const [publishNote, setPublishNote] = useState('');
+  const [publishNote, setPublishNote] = useState<{ text: string; ok: boolean } | null>(null);
   const { pro } = usePlan();
   const [upgradeFor, setUpgradeFor] = useState<string | null>(null);
-  // Copy a whole week of shifts onto another week — the "typical week" workflow.
+  // Zkopírovat celý týden směn do jiného — „typický týden".
   const [copyOpen, setCopyOpen] = useState(false);
-  const copyModal = useModal(copyOpen, () => setCopyOpen(false), 'Kopírovat týden');
   const [copySrc, setCopySrc] = useState('');
   const [copyDst, setCopyDst] = useState('');
   const [copying, setCopying] = useState(false);
-  // Zpráva o kopírování si nese vlastní příznak úspěchu. Dřív se barva
-  // odvozovala z toho, jestli text obsahoval znak ✓ — takže stačilo
-  // přeformulovat hlášku a úspěch se obarvil červeně.
+  // Zpráva o kopírování nese vlastní příznak úspěchu. Dřív se barva odvozovala
+  // z toho, jestli text obsahoval ✓ — stačilo přeformulovat hlášku.
   const [copyMsg, setCopyMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const mondayOf = (d: Date) => {
     const x = new Date(d); const day = (x.getDay() + 6) % 7; x.setDate(x.getDate() - day); x.setHours(12, 0, 0, 0);
@@ -226,7 +307,7 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
   const iso = (d: Date) => d.toISOString().slice(0, 10);
   const weekLabel = (mon: Date) => {
     const end = new Date(mon); end.setDate(end.getDate() + 6);
-    return `${mon.getDate()}.${mon.getMonth() + 1}. – ${end.getDate()}.${end.getMonth() + 1}.`;
+    return `${mon.getDate()}. ${mon.getMonth() + 1}. – ${end.getDate()}. ${end.getMonth() + 1}.`;
   };
   const weekOptions = (back: number, fwd: number) => {
     const base = mondayOf(new Date());
@@ -237,186 +318,172 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
     }
     return out;
   };
-  const copyWeek = async () => {
-    if (!copySrc || !copyDst || copySrc === copyDst) { setCopyMsg({ text: 'Vyber dva různé týdny.', ok: false }); return; }
-    setCopying(true); setCopyMsg(null);
-    try {
-      // Source shifts may live outside the loaded month — fetch both weeks' months.
-      const months = new Set([copySrc.slice(0, 7), iso(new Date(new Date(copySrc + 'T12:00:00').getTime() + 6 * 86400000)).slice(0, 7)]);
-      let source: Shift[] = [];
-      for (const m of Array.from(months)) {
-        const d = await fetch(`/api/schedule?month=${m}`).then(okJson).catch(() => ({}));
-        source = source.concat(Array.isArray(d?.shifts) ? d.shifts : []);
-      }
-      const srcStart = copySrc;
-      const srcEnd = iso(new Date(new Date(copySrc + 'T12:00:00').getTime() + 6 * 86400000));
-      const offsetDays = Math.round((new Date(copyDst + 'T12:00:00').getTime() - new Date(copySrc + 'T12:00:00').getTime()) / 86400000);
-      const toCreate = source
-        .filter(sh => sh.date >= srcStart && sh.date <= srcEnd)
-        .map(sh => {
-          const nd = new Date(sh.date + 'T12:00:00'); nd.setDate(nd.getDate() + offsetDays);
-          return { employeeId: sh.employeeId, date: iso(nd), startTime: sh.startTime, endTime: sh.endTime, type: sh.type };
-        });
-      if (toCreate.length === 0) { setCopyMsg({ text: 'Ve zdrojovém týdnu nejsou žádné směny.', ok: false }); setCopying(false); return; }
-      const res = await fetch('/api/schedule', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shifts: toCreate }),
-      });
-      if (res.ok) {
-        setCopyMsg({ text: `Hotovo — zkopírováno ${toCreate.length} směn.`, ok: true });
-        await load();
-      } else {
-        const d = await res.json().catch(() => ({}));
-        setCopyMsg({ text: d.error || 'Kopírování se nepodařilo.', ok: false });
-      }
-    } catch { setCopyMsg({ text: 'Kopírování se nepodařilo.', ok: false }); }
-    setCopying(false);
-  };
+
   const [publishing, setPublishing] = useState(false);
-  const publish = async () => {
-    setPublishing(true);
-    try {
-      const res = await fetch('/api/schedule/publish', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ month }),
-      });
-      const d = await res.json().catch(() => ({}));
-      if (res.ok) {
-        const n = Number(d.notified) || 0;
-        setPublishNote(n === 0
-          ? 'V tomhle měsíci zatím nikdo nemá směnu — není komu dát vědět.'
-          : `Hotovo — rozvrh dostal${n === 1 ? '' : 'o'} ${n} ${n === 1 ? 'člověk' : n <= 4 ? 'lidi' : 'lidí'} jako notifikaci. Každá další změna se jim ukáže v „Moje směny".`);
-      } else {
-        setPublishNote(d.error || 'Publikování se nepodařilo — zkus to znovu.');
-      }
-    } catch {
-      setPublishNote('Publikování se nepodařilo — zkus to znovu.');
-    }
-    setPublishing(false);
-  };
   const [confirmClear, setConfirmClear] = useState(false);
-  // Surfaced when an action on the board didn't reach the server.
+  const [clearing, setClearing] = useState(false);
+  // Akce v plánovači, která na server nedošla.
   const [boardError, setBoardError] = useState('');
-  // Blokovač vyskakovacích oken tiskové okno zavře a bez tohohle by se
-  // po kliknutí nestalo vůbec nic.
+  // Blokovač vyskakovacích oken tiskové okno zavře a bez tohohle by se po kliknutí nestalo nic.
   const [printFailed, setPrintFailed] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const seededRef = useRef(false);
   // Hlídá závod při přepnutí měsíce: odpověď starého měsíce nesmí přepsat nový.
   const reqRef = useRef(0);
 
-  // Díry v pokrytí otevírací doby a neobsazená místa — uložený rozvrh je
-  // hlásí stejně jako návrh, protože vzniknou i ruční úpravou.
+  // Díry v pokrytí otevírací doby a neobsazená místa — uložený rozvrh je hlásí
+  // stejně jako návrh, protože vzniknou i ruční úpravou. V mřížce svítí
+  // červeně; seznam je widget „Díry v obsazení".
   const [gaps, setGaps] = useState<Gap[]>([]);
   const [understaffed, setUnderstaffed] = useState<MissingSlot[]>([]);
-  // Kolik hostů na ten den čeká — z rezervací v Managero client. Rozvrh se
-  // jinak plánuje naslepo, přestože podnik to číslo už má.
+  // Kolik hostů na ten den čeká — z rezervací v Managero client.
   const [demand, setDemand] = useState<Record<string, { reservations: number; guests: number }>>({});
 
-  // generate preview state
+  // Náhled generování
   const [generating, setGenerating] = useState(false);
   const [preview, setPreview] = useState<{ proposed: Proposed[]; warnings: string[]; gaps: Gap[]; understaffed: MissingSlot[] } | null>(null);
   const [adjust, setAdjust] = useState<{ changes: any[]; warnings: string[] } | null>(null);
   const [adjustSkipped, setAdjustSkipped] = useState<Set<number>>(new Set());
   const [adjusting, setAdjusting] = useState(false);
   const [applyingAdjust, setApplyingAdjust] = useState(false);
-
-  // "Automaticky upravit": check the SAVED month against the newest
-  // availability and propose the smallest set of swaps/removals.
-  const runAdjust = async () => {
-    setAdjusting(true); setBoardError('');
-    try {
-      const res = await fetch('/api/schedule/adjust', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ month }),
-      });
-      const d = await res.json().catch(() => ({}));
-      if (!res.ok) setBoardError(d.error || 'Kontrola se nepodařila.');
-      else { setAdjust({ changes: d.changes ?? [], warnings: d.warnings ?? [] }); setAdjustSkipped(new Set()); }
-    } catch { setBoardError('Kontrola se nepodařila.'); }
-    setAdjusting(false);
-  };
-
-  const applyAdjust = async () => {
-    if (!adjust) return;
-    const chosen = adjust.changes.filter((_, i) => !adjustSkipped.has(i));
-    if (chosen.length === 0) { setAdjust(null); return; }
-    setApplyingAdjust(true); setBoardError('');
-    try {
-      const res = await fetch('/api/schedule/adjust', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ month, commit: true, changes: chosen }),
-      });
-      const d = await res.json().catch(() => ({}));
-      if (!res.ok) setBoardError(d.error || 'Úpravy se nepodařilo uložit.');
-      else { setAdjust(null); await load(); }
-    } catch { setBoardError('Úpravy se nepodařilo uložit.'); }
-    setApplyingAdjust(false);
-  };
   const [committing, setCommitting] = useState(false);
   const [clearBeforeCommit, setClearBeforeCommit] = useState(true);
 
-  // import preview state
+  // Náhled importu
   const [importPreview, setImportPreview] = useState<{ rows: any[]; errors: string[] } | null>(null);
-  const importModal = useModal(!!importPreview, () => setImportPreview(null), 'Náhled importu');
   const [importing, setImporting] = useState(false);
 
   const employees = useMemo(() => members.filter((m) => m.role === 'employee'), [members]);
-  // Assignable to shifts = employees + the employer (who can also work a shift).
+  // Na směnu jde zaměstnanec i vedení (i vedoucí může mít směnu).
   const assignable = useMemo(() => members.filter((m) => m.role === 'employee' || m.role === 'employer'), [members]);
   const grid = useMemo(() => buildGrid(month, zacatek), [month, zacatek]);
 
+  /** Widgety na stejné URL (Díry, Hodiny, Poptávka, Dostupnost týmu) se po zápisu srovnají. */
+  const obnovWidgety = (m = month) => {
+    obnovDataWidgetu(`/api/schedule?month=${m}`);
+    obnovDataWidgetu(`/api/availability?month=${m}`);
+  };
+
   const load = async () => {
+    if (!pripraveno) return;
     const req = ++reqRef.current;
     setLoading(true);
+    setLoadError(null);
+    const ziskej = (url: string) => fetch(url).then(okJson);
     try {
-      const [tRes, aRes, sRes, stRes, faRes, ohRes, toRes] = await Promise.all([
-        fetch('/api/teams'),
-        fetch(`/api/availability?month=${month}`),
-        fetch(`/api/schedule?month=${month}`),
-        fetch('/api/shift-types'),
-        fetch('/api/fixed-assignments'),
-        fetch('/api/opening-hours'),
-        fetch('/api/timeoff'),
-      ]);
-      const [tData, aData, sData, stData, faData, ohData, toData] = await Promise.all([
-        tRes.json(),
-        aRes.json(),
-        sRes.json(),
-        stRes.json(),
-        faRes.json(),
-        ohRes.json(),
-        toRes.json(),
-      ]);
-      // Přišla-li mezitím novější odpověď (jiný měsíc), tuhle zahoď.
-      if (req !== reqRef.current) return;
-      setMembers(tData.members ?? []);
-      setSubmissions(aData.submissions ?? []);
-      setShifts(sData.shifts ?? []);
-      setGaps(Array.isArray(sData.gaps) ? sData.gaps : []);
-      setUnderstaffed(Array.isArray(sData.understaffed) ? sData.understaffed : []);
-      setDemand(sData.demand && typeof sData.demand === 'object' ? sData.demand : {});
-      setShiftTypes(stData.shiftTypes ?? []);
-      setFixed(faData.assignments ?? []);
-      setOpeningHours(ohData.openingHours ?? {});
-      setTimeOff(Array.isArray(toData?.requests) ? toData.requests.filter((r: any) => r.status === 'approved') : []);
-      fetch('/api/events').then(okJson)
-        .then(d => setEvents((Array.isArray(d.events) ? d.events : []).filter((e: any) => e.status !== 'cancelled')))
-        .catch(() => {});
+      if (planovac) {
+        const [tData, sData, stData, faData, ohData, aData, toData] = await Promise.all([
+          ziskej('/api/teams'),
+          ziskej(`/api/schedule?month=${month}`),
+          ziskej('/api/shift-types'),
+          ziskej('/api/fixed-assignments'),
+          ziskej('/api/opening-hours'),
+          // Dostupnost a volno jen s oprávněním — bez něj by server vrátil 403
+          // (nebo jen vlastní záznam) a plánovač by lhal, že nikdo nezadal.
+          smiDostupnost ? ziskej(`/api/availability?month=${month}`) : Promise.resolve({ submissions: [] }),
+          smiVolno ? ziskej('/api/timeoff') : Promise.resolve({ requests: [] }),
+        ]);
+        if (req !== reqRef.current) return;
+        setMembers(tData.members ?? []);
+        setSubmissions(Array.isArray(aData?.submissions) ? aData.submissions : []);
+        setShifts(sData.shifts ?? []);
+        setGaps(Array.isArray(sData.gaps) ? sData.gaps : []);
+        setUnderstaffed(Array.isArray(sData.understaffed) ? sData.understaffed : []);
+        setDemand(sData.demand && typeof sData.demand === 'object' ? sData.demand : {});
+        setShiftTypes(stData.shiftTypes ?? []);
+        setFixed(faData.assignments ?? []);
+        setOpeningHours(ohData.openingHours ?? {});
+        setTimeOff(Array.isArray(toData?.requests) ? toData.requests.filter((r: any) => r.status === 'approved') : []);
+        // Akce jsou doplněk: jejich výpadek plánovač neshodí, jen je v mřížce neuvidíš.
+        if (smiAkce) {
+          fetch('/api/events').then(okJson)
+            .then(d => { if (req === reqRef.current) setEvents((Array.isArray(d.events) ? d.events : []).filter((e: any) => e.status !== 'cancelled')); })
+            .catch(() => { if (req === reqRef.current) setEvents([]); });
+        }
+      } else {
+        // Jen náhled (rozvrh.nahled): jména a časy týmu, bez dostupnosti, volna a akcí.
+        const [nData, stData, ohData] = await Promise.all([
+          ziskej(`/api/shifts?team=1&month=${month}`),
+          ziskej('/api/shift-types'),
+          ziskej('/api/opening-hours'),
+        ]);
+        if (req !== reqRef.current) return;
+        setShifts((Array.isArray(nData?.shifts) ? nData.shifts : []).map((s: any) => ({
+          id: s.id, employeeId: s.employeeId, employeeName: s.employeeName ?? 'Kolega', employeeAvatar: s.employeeAvatar ?? '',
+          date: denZ(s.date), startTime: hmZ(s.startTime), endTime: hmZ(s.endTime), type: s.type,
+        })));
+        setShiftTypes(stData.shiftTypes ?? []);
+        setOpeningHours(ohData.openingHours ?? {});
+        setMembers([]); setSubmissions([]); setGaps([]); setUnderstaffed([]); setDemand({}); setTimeOff([]); setEvents([]);
+      }
     } catch (e) {
-      console.error(e);
+      // Dřív console.error a prázdná mřížka — výpadek vypadal jako prázdný měsíc.
+      if (req === reqRef.current) setLoadError(apiMessage(e, 'Rozvrh se nenačetl.'));
     } finally {
-      setLoading(false);
+      if (req === reqRef.current) setLoading(false);
     }
   };
+  const loadRef = useRef(load);
+  loadRef.current = load;
+  /** Po zápisu: znovu načíst plánovač a srovnat widgety na stejných URL. */
+  const poZmene = async () => { await load(); obnovWidgety(); };
 
   useEffect(() => {
     load();
-    setPublishNote('');
+    setPublishNote(null);
     setConfirmClear(false);
     setPreview(null);
+    setAdjust(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [month]);
+  }, [month, pripraveno, planovac]);
+
+  // Widgety → plánovač: otevřít den, okno dostupnosti, znovu načíst po zápisu.
+  useEffect(() => {
+    const otevriDen = (d: string) => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+      setTab('rozvrh'); setMonth(d.slice(0, 7)); setDayModal(d);
+    };
+    const otevriDostupnost = (v: string) => {
+      const [id, m] = v.split('|');
+      if (!Number(id) || !/^\d{4}-\d{2}$/.test(m ?? '')) return;
+      setTab('rozvrh'); setMonth(m); setCekaDostupnost(Number(id));
+    };
+    const naDen = (e: Event) => {
+      const d = (e as CustomEvent).detail;
+      if (!d?.hodnota) return;
+      d.prijato = true; otevriDen(String(d.hodnota));
+    };
+    const naDostupnost = (e: Event) => {
+      const d = (e as CustomEvent).detail;
+      if (!d?.hodnota) return;
+      d.prijato = true; otevriDostupnost(String(d.hodnota));
+    };
+    const naZmenu = () => { void loadRef.current(); };
+    window.addEventListener(UDALOST_DEN, naDen);
+    window.addEventListener(UDALOST_DOSTUPNOST, naDostupnost);
+    window.addEventListener(UDALOST_ZMENA, naZmenu);
+    const d = vezmiZadost(KLIC_DEN);
+    if (d) otevriDen(d);
+    const v = vezmiZadost(KLIC_DOSTUPNOST);
+    if (v) otevriDostupnost(v);
+    return () => {
+      window.removeEventListener(UDALOST_DEN, naDen);
+      window.removeEventListener(UDALOST_DOSTUPNOST, naDostupnost);
+      window.removeEventListener(UDALOST_ZMENA, naZmenu);
+    };
+  }, []);
+
+  // Okno dostupnosti z widgetu se otevře, až je načtený měsíc i lidé.
+  useEffect(() => {
+    if (cekaDostupnost == null || loading || loadError) return;
+    const m = members.find(x => x.id === cekaDostupnost);
+    setCekaDostupnost(null);
+    if (!m) { setBoardError('Ten člověk už v týmu není.'); return; }
+    // Bez dostupnost.upravit se okno otevře jen ke čtení: kdo skládá rozvrh, musí vidět,
+    // které dny člověk nemůže a co vedení napsal do poznámky — upravit to ale nesmí.
+    if (!smiDostupnost) { setBoardError('Dostupnost týmu tvoje role nevidí.'); return; }
+    setEditAvail({ id: m.id, name: m.name, avatar: m.avatar ?? '' });
+  }, [cekaDostupnost, loading, loadError, members, smiDostupnost]);
 
   const reloadTypes = async () => {
     const d = await fetch('/api/shift-types').then(okJson);
@@ -427,17 +494,16 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
     setFixed(d.assignments ?? []);
   };
 
-  // Seed default shift types the first time the "Typy směn" tab is opened with none configured.
+  // Výchozí typy směn se založí při prvním otevření záložky Typy směn, když žádné nejsou.
   useEffect(() => {
-    if (tab !== 'typy' || loading || seededRef.current) return;
+    if (tab !== 'typy' || loading || seededRef.current || !smiNastaveni) return;
     if (shiftTypes.length > 0) {
       seededRef.current = true;
       return;
     }
     seededRef.current = true;
     (async () => {
-      // Bez kontroly se mlčky založila jen část výchozích typů a rozvrh
-      // pak nabízel neúplnou nabídku, aniž by kdo tušil proč.
+      // Bez kontroly se mlčky založila jen část výchozích typů.
       let selhalo = 0;
       for (const t of DEFAULT_TYPES) {
         try {
@@ -450,12 +516,11 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
         } catch { selhalo += 1; }
       }
       if (selhalo > 0) setBoardError('Výchozí typy směn se nepodařilo založit celé. Doplň je v záložce Typy směn.');
-      await reloadTypes();
+      await reloadTypes().catch(() => setBoardError('Typy směn se nenačetly.'));
     })();
-  }, [tab, loading, shiftTypes.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, loading, shiftTypes.length, smiNastaveni]);
 
-  const submittedIds = new Set(submissions.map((s) => s.employeeId));
-  const notSubmitted = assignable.filter((e) => !submittedIds.has(e.id));
   const shiftsByDay = useMemo(() => {
     const map: Record<string, Shift[]> = {};
     shifts.forEach((s) => {
@@ -485,10 +550,7 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
     }
     return map;
   }, [activeGaps, activeUnderstaffed]);
-  const problemDates = useMemo(
-    () => Object.keys(problemsByDate).sort(),
-    [problemsByDate],
-  );
+  const problemDates = useMemo(() => Object.keys(problemsByDate).sort(), [problemsByDate]);
 
   const eventsByDate = useMemo(() => {
     const map: Record<string, any[]> = {};
@@ -502,11 +564,16 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
         .filter((s) => (s.unavailableDates ?? []).includes(date) || s.dayPreferences?.[date] === 'off')
         .map((s) => s.employeeId),
     );
-    // Approved holiday counts as unavailable — the whole point of approving it.
+    // Schválená dovolená se počítá jako nedostupnost — proto se schvaluje.
     timeOff.forEach(t => {
       if (t.fromDate <= date && date <= t.toDate) set.add(t.employeeId);
     });
     return set;
+  };
+
+  const chybaZ = async (res: Response | null, vychozi: string) => {
+    const d = res ? await res.json().catch(() => ({} as any)) : {};
+    return (d as any)?.error || vychozi;
   };
 
   const addShift = async (payload: { employeeId: number; date: string; startTime: string; endTime: string; type: string }) => {
@@ -515,30 +582,117 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ shifts: [payload] }),
     }).catch(() => null);
-    if (res?.ok) { await load(); return true; }
-    const d = res ? await res.json().catch(() => ({} as any)) : {};
-    setBoardError(d?.error || 'Směnu se nepodařilo přidat.');
+    if (res?.ok) { await poZmene(); return true; }
+    setBoardError(await chybaZ(res, 'Směnu se nepodařilo přidat.'));
     return false;
   };
 
   const removeShift = async (id: number) => {
     const res = await fetch(`/api/schedule?id=${id}`, { method: 'DELETE' }).catch(() => null);
-    if (res?.ok) setShifts((prev) => prev.filter((s) => s.id !== id));
+    if (res?.ok) { setShifts((prev) => prev.filter((s) => s.id !== id)); obnovWidgety(); }
     else setBoardError('Směnu se nepodařilo smazat.');
   };
 
   const clearMonth = async () => {
+    setClearing(true);
     const res = await fetch(`/api/schedule?month=${month}`, { method: 'DELETE' }).catch(() => null);
-    if (res?.ok) {
-      setShifts([]);
-      setConfirmClear(false);
-    } else {
-      setBoardError('Vymazání měsíce se nepodařilo.');
-      setConfirmClear(false);
-    }
+    setClearing(false);
+    setConfirmClear(false);
+    if (res?.ok) { setShifts([]); obnovWidgety(); }
+    else setBoardError('Vymazání měsíce se nepodařilo.');
   };
 
-  // ---- Generate ----
+  const publish = async () => {
+    setPublishing(true);
+    try {
+      const res = await fetch('/api/schedule/publish', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ month }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) {
+        const n = Number(d.notified) || 0;
+        setPublishNote(n === 0
+          ? { text: 'V tomhle měsíci zatím nikdo nemá směnu — není komu dát vědět.', ok: false }
+          : { text: `Hotovo — rozvrh dostal${n === 1 ? '' : 'o'} ${czCount(n, { one: 'člověk', few: 'lidé', many: 'lidí' })} jako upozornění. Každá další změna se jim ukáže v Mých směnách.`, ok: true });
+      } else {
+        setPublishNote({ text: d.error || 'Publikování se nepodařilo — zkus to znovu.', ok: false });
+      }
+    } catch {
+      setPublishNote({ text: 'Publikování se nepodařilo — zkus to znovu.', ok: false });
+    }
+    setPublishing(false);
+  };
+
+  // „Upravit podle nových požadavků": uložený měsíc proti nejnovější
+  // dostupnosti a nejmenší sada přeobsazení nebo zrušení.
+  const runAdjust = async () => {
+    setAdjusting(true); setBoardError('');
+    try {
+      const res = await fetch('/api/schedule/adjust', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ month }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) setBoardError(d.error || 'Kontrola se nepodařila.');
+      else { setAdjust({ changes: d.changes ?? [], warnings: d.warnings ?? [] }); setAdjustSkipped(new Set()); }
+    } catch { setBoardError('Kontrola se nepodařila.'); }
+    setAdjusting(false);
+  };
+
+  const applyAdjust = async () => {
+    if (!adjust) return;
+    const chosen = adjust.changes.filter((_, i) => !adjustSkipped.has(i));
+    if (chosen.length === 0) { setAdjust(null); return; }
+    setApplyingAdjust(true); setBoardError('');
+    try {
+      const res = await fetch('/api/schedule/adjust', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ month, commit: true, changes: chosen }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) setBoardError(d.error || 'Úpravy se nepodařilo uložit.');
+      else { setAdjust(null); await poZmene(); }
+    } catch { setBoardError('Úpravy se nepodařilo uložit.'); }
+    setApplyingAdjust(false);
+  };
+
+  const copyWeek = async () => {
+    if (!copySrc || !copyDst || copySrc === copyDst) { setCopyMsg({ text: 'Vyber dva různé týdny.', ok: false }); return; }
+    setCopying(true); setCopyMsg(null);
+    try {
+      // Zdrojový týden může ležet i mimo načtený měsíc — načtou se oba měsíce týdne.
+      const months = new Set([copySrc.slice(0, 7), iso(new Date(new Date(copySrc + 'T12:00:00').getTime() + 6 * 86400000)).slice(0, 7)]);
+      let source: Shift[] = [];
+      for (const m of Array.from(months)) {
+        const d = await fetch(`/api/schedule?month=${m}`).then(okJson);
+        source = source.concat(Array.isArray(d?.shifts) ? d.shifts : []);
+      }
+      const srcStart = copySrc;
+      const srcEnd = iso(new Date(new Date(copySrc + 'T12:00:00').getTime() + 6 * 86400000));
+      const offsetDays = Math.round((new Date(copyDst + 'T12:00:00').getTime() - new Date(copySrc + 'T12:00:00').getTime()) / 86400000);
+      const toCreate = source
+        .filter(sh => sh.date >= srcStart && sh.date <= srcEnd)
+        .map(sh => {
+          const nd = new Date(sh.date + 'T12:00:00'); nd.setDate(nd.getDate() + offsetDays);
+          return { employeeId: sh.employeeId, date: iso(nd), startTime: sh.startTime, endTime: sh.endTime, type: sh.type };
+        });
+      if (toCreate.length === 0) { setCopyMsg({ text: 'Ve zdrojovém týdnu nejsou žádné směny.', ok: false }); setCopying(false); return; }
+      const res = await fetch('/api/schedule', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shifts: toCreate }),
+      });
+      if (res.ok) {
+        setCopyMsg({ text: `Hotovo — zkopírováno ${czCount(toCreate.length, SMENA)}.`, ok: true });
+        await poZmene();
+      } else {
+        setCopyMsg({ text: await chybaZ(res, 'Kopírování se nepodařilo.'), ok: false });
+      }
+    } catch (e) { setCopyMsg({ text: apiMessage(e, 'Kopírování se nepodařilo.'), ok: false }); }
+    setCopying(false);
+  };
+
+  // ---- Generování ----
   const generate = async () => {
     setGenerating(true);
     setPreview(null);
@@ -570,35 +724,30 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
     if (!preview || preview.proposed.length === 0) return;
     setCommitting(true);
     try {
-      // The server wipes + inserts in one request — a failed save must leave
-      // the existing schedule untouched, not deleted.
+      // Server maže a vkládá v jednom požadavku — neuložený návrh nechá stávající rozvrh netknutý.
+      // Přepsání celého měsíce smí jen rozvrh.mazat_mesic (katalog oprávnění).
       const res = await fetch('/api/schedule/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ month, commit: true, replaceMonth: clearBeforeCommit, shifts: preview.proposed }),
+        body: JSON.stringify({ month, commit: true, replaceMonth: clearBeforeCommit && smiMazat, shifts: preview.proposed }),
       }).catch(() => null);
       if (res?.ok) {
         setPreview(null);
-        await load();
+        await poZmene();
       } else {
-        const d = res ? await res.json().catch(() => ({} as any)) : {};
-        setBoardError(d?.error || 'Uložení rozvrhu se nepodařilo — nic se nezměnilo, zkus to znovu.');
+        setBoardError(await chybaZ(res, 'Uložení rozvrhu se nepodařilo — nic se nezměnilo, zkus to znovu.'));
       }
     } finally {
       setCommitting(false);
     }
   };
 
-  // ---- CSV export ----
+  // ---- Export CSV ----
   const exportCsv = () => {
     if (!pro) { setUpgradeFor('Export CSV'); return; }
-    // Středník, ne čárka.
-    //
-    // Český Excel čte čárku jako desetinnou a soubor oddělený čárkami
-    // naveze celý měsíc do jednoho sloupce: „2026-08-03,Anna,08:00,…".
-    // Ostatní čtyři exporty v aplikaci to takhle měly od začátku, tenhle
-    // jediný ne — a přitom je to ten, který jde účetní. Import si poradí
-    // s obojím (`splitLine` níž), takže staré soubory dál fungují.
+    // Středník, ne čárka: český Excel čte čárku jako desetinnou a soubor
+    // oddělený čárkami naveze celý měsíc do jednoho sloupce. Import si poradí
+    // s obojím (`splitLine` níž).
     const header = 'datum;zaměstnanec;od;do;typ';
     const lines = shifts
       .slice()
@@ -620,11 +769,8 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
   };
 
   // ---- Tisk na zeď ----
-  //
-  // Rozvrh visí u baru na papíře; kdo zrovna nemá telefon v ruce, kouká
-  // tam. Papír je černobílý, takže typ směny musí být napsaný slovem —
-  // barevná tečka, podle které se to pozná na obrazovce, je na výtisku
-  // neviditelná.
+  // Rozvrh visí u baru na papíře. Papír je černobílý, takže typ směny musí být
+  // napsaný slovem — barevná tečka z obrazovky je na výtisku neviditelná.
   const printSchedule = () => {
     const byDate = new Map<string, typeof shifts>();
     for (const sh of shifts) {
@@ -642,14 +788,12 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
           <div class="note">${esc(dt.toLocaleDateString('cs-CZ', { weekday: 'long' }))}</div>
         </td>
         <td>${list.map(x => `<div>${esc(x.employeeName || 'Neobsazeno')} — ${esc(x.startTime)}–${esc(x.endTime)}`
-          + `${x.type ? ` · ${esc(x.type)}` : ''}</div>`).join('')}</td>
+          + `${x.type ? ` · ${esc(resolveShiftType(x, shiftTypes).label)}` : ''}</div>`).join('')}</td>
         <td class="num">${list.length}</td>
       </tr>`;
     }).join('');
-    const monthName = new Date(month + '-01T00:00:00')
-      .toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
     const ok = openPrint({
-      title: `Rozvrh — ${monthName}`,
+      title: `Rozvrh — ${monthLabel(month)}`,
       subtitle: `${czCount(shifts.length, SMENA)} · ${czCount(days.length, DEN)} se směnou`,
       body: `<table>
         <thead><tr><th style="width:26mm">Den</th><th>Kdo a kdy</th><th class="num">Lidí</th></tr></thead>
@@ -659,7 +803,7 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
     setPrintFailed(!ok);
   };
 
-  // ---- CSV import ----
+  // ---- Import CSV ----
   const splitLine = (line: string) => {
     const out: string[] = [];
     let cur = '';
@@ -698,13 +842,13 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
         continue;
       }
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-        errors.push(`Řádek ${i + 1}: neplatné datum "${date}" (očekává YYYY-MM-DD)`);
+        errors.push(`Řádek ${i + 1}: neplatné datum „${date}" (očekává RRRR-MM-DD)`);
         continue;
       }
       const key = who.toLowerCase();
       const emp = employees.find((e) => e.email.toLowerCase() === key || e.name.toLowerCase() === key);
       if (!emp) {
-        errors.push(`Řádek ${i + 1}: zaměstnanec "${who}" nenalezen v týmu`);
+        errors.push(`Řádek ${i + 1}: zaměstnanec „${who}" není v týmu`);
         continue;
       }
       const normType =
@@ -725,705 +869,447 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
       }).catch(() => null);
       if (res?.ok) {
         setImportPreview(null);
-        await load();
+        await poZmene();
       } else {
-        const d = res ? await res.json().catch(() => ({} as any)) : {};
-        setBoardError(d?.error || 'Import se nepodařilo uložit.');
+        setBoardError(await chybaZ(res, 'Import se nepodařilo uložit.'));
       }
     } finally {
       setImporting(false);
     }
   };
 
-  return (
-    <div className="p-4 sm:p-6 space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="t-page">Rozvrh</h1>
-          <p className="text-black/45 mt-1">Sestav měsíční rozvrh podle dostupnosti týmu.</p>
-        </div>
-        {/* Month selector — arrows for any month, chips for the usual ones.
-            Only the schedule grid is month-scoped; the calendar and the
-            settings tabs bring their own navigation. */}
-        {printFailed && (
-          <div className="w-full note note-wait px-4 py-3 text-sm flex items-center justify-between gap-3">
-            <span className="cz-sentence">Tiskové okno prohlížeč zablokoval. Povol vyskakovací okna pro tuhle stránku a zkus to znovu.</span>
-            <button type="button" aria-label="Zavřít" onClick={() => setPrintFailed(false)}
-              className="shrink-0 text-black/40 hover:text-black"><Icon name="close" size={15} /></button>
-          </div>
-        )}
+  // ---- Hlavička, záložky, akce ----
+  const zalozky = TABS.filter(t => t.id === 'rozvrh'
+    || (t.id === 'kalendar' && smiKalendar)
+    || ((t.id === 'typy' || t.id === 'pevne' || t.id === 'pravidla') && smiNastaveni)
+    || (t.id === 'oteviraci' && (smiNastaveni || smiOteviraci)));
+  const aktivniTab: Tab = zalozky.some(z => z.id === tab) ? tab : 'rozvrh';
+  const naRozvrhu = aktivniTab === 'rozvrh';
+  const aside = zalozky.length > 1
+    ? <Segmented ariaLabel="Část rozvrhu" value={aktivniTab} onChange={(v) => setTab(v as Tab)} options={zalozky} wrap />
+    : undefined;
 
-        {boardError && (
-          <div className="w-full note note-danger px-4 py-3 text-sm font-medium flex items-center justify-between gap-3">
-            <span className="flex items-center gap-2"><Icon name="warning" size={16} /> {boardError}</span>
-            <button aria-label="Zavřít" onClick={() => setBoardError('')} className="shrink-0 text-bad-ink/60 hover:text-bad-ink"><Icon name="close" size={15} /></button>
-          </div>
-        )}
+  const menu: MenuItem[] = [];
+  if (naRozvrhu && !loading && !loadError) {
+    if (smiPublikovat) menu.push({ label: 'Publikovat rozvrh', icon: 'send', onClick: publish, hint: 'Lidé dostanou upozornění, že je rozvrh hotový.' });
+    if (smiUpravit) {
+      menu.push({ label: 'Upravit podle nových požadavků', icon: 'swap', onClick: runAdjust, disabled: adjusting || shifts.length === 0,
+        hint: 'Zkontroluje uložený rozvrh proti nejnovější dostupnosti.' });
+      menu.push({ label: 'Kopírovat týden…', icon: 'copy', onClick: () => { setCopyOpen(true); setCopyMsg(null); setCopySrc(''); setCopyDst(''); } });
+      menu.push({ label: 'Import CSV…', icon: 'upload', onClick: () => fileRef.current?.click() });
+    }
+    if (smiExport) {
+      menu.push({ label: 'Export CSV', icon: 'download', onClick: exportCsv, disabled: shifts.length === 0 });
+      menu.push({ label: 'Vytisknout rozvrh', icon: 'print', onClick: printSchedule, disabled: shifts.length === 0,
+        hint: 'Na papír k baru — černobíle, s typem směny slovem.' });
+    }
+    if (smiMazat) menu.push({ label: 'Vymazat měsíc…', icon: 'trash', onClick: () => setConfirmClear(true), danger: true,
+      hint: 'Smaže všechny směny tohoto měsíce. Potvrdíš to ještě jednou.' });
+  }
+  const hlavicka = {
+    title: TITULEK,
+    subtitle: PODTITULEK,
+    hintId: 'schedulebuilder',
+    aside,
+    primary: naRozvrhu && smiGenerovat && !loadError
+      ? <Button variant="accent" icon="bulb" onClick={generate} loading={generating}>Vygenerovat rozvrh</Button>
+      : undefined,
+    secondary: naRozvrhu && smiPublikovat && !loadError
+      ? <Button variant="secondary" icon="send" onClick={publish} loading={publishing}>Publikovat</Button>
+      : undefined,
+    menu: menu.length ? menu : undefined,
+  };
 
-        {tab === 'rozvrh' && (
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-1 glass rounded-full p-1">
-            <button
-              onClick={() => setMonth(shiftMonth(month, -1))}
-              title="Předchozí měsíc"
-              className="tap-target btn-icon"
-            >
-              <Icon name="chevron" size={17} className="rotate-90" />
-            </button>
-            <span className="px-2 min-w-[9.5rem] text-center text-sm font-semibold cz-sentence text-[#16181A] tabular-nums">
-              {monthLabel(month)}
-            </span>
-            <button
-              onClick={() => setMonth(shiftMonth(month, 1))}
-              title="Další měsíc"
-              className="tap-target btn-icon"
-            >
-              <Icon name="chevron" size={17} className="-rotate-90" />
-            </button>
-          </div>
-          {/* Quick jumps; the current month doubles as "back to today". */}
-          <div className="flex gap-1 glass rounded-full p-1 max-w-full overflow-x-auto">
-            {[currentMonth, nextMonth].map((m) => (
-              <button
-                key={m}
-                onClick={() => setMonth(m)}
-                className={`tap-target-sm px-3.5 py-2 rounded-full text-xs font-medium cz-sentence whitespace-nowrap transition ${
-                  month === m ? 'bg-[#16181A] text-white font-semibold' : 'text-black/55 hover:text-black hover:bg-black/[0.06]'
-                }`}
-              >
-                {m === currentMonth ? 'Tento měsíc' : 'Příští měsíc'}
-              </button>
+  // ---- Nástroj: měsíční plánovač ----
+  const rychleMesice = [
+    { id: currentMonth, label: 'Tento měsíc' },
+    { id: nextMonth, label: 'Příští měsíc' },
+  ];
+  const nastroj = (
+    <Card as="section" aria-labelledby="planovac-nadpis" className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="planovac-nadpis" className="t-card cz-sentence">{monthLabel(month)}</h2>
+        {/* Šipky pro libovolný měsíc, pilulky pro dva obvyklé (tento slouží i jako „zpět na dnešek"). */}
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <MonthNav value={month} onChange={setMonth} />
+          <div className="flex gap-1.5" role="group" aria-label="Rychlý výběr měsíce">
+            {rychleMesice.map(m => (
+              <button key={m.id} type="button" aria-pressed={month === m.id} onClick={() => setMonth(m.id)}
+                className={`filter-pill tap-target-sm ${month === m.id ? 'seg-on' : 'seg-off glass'}`}>{m.label}</button>
             ))}
           </div>
         </div>
-        )}
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 glass rounded-full p-1 w-full sm:w-fit overflow-x-auto">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition duration-300 ${
-              tab === t.id ? 'bg-[#16181A] text-white font-semibold' : 'text-black/60 hover:text-black hover:bg-black/[0.06]'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {!planovac && pripraveno && (
+        <p className="note note-info text-sm">Vidíš náhled rozvrhu týmu — jména a časy. Plánovat může vedení s přístupem k rozvrhu.</p>
+      )}
+      {printFailed && (
+        <p className="note note-wait text-sm flex items-center justify-between gap-3">
+          <span className="cz-sentence">Tiskové okno prohlížeč zablokoval. Povol vyskakovací okna pro tuhle stránku a zkus to znovu.</span>
+          <Button variant="ghost" size="sm" iconOnly icon="close" aria-label="Zavřít" className="shrink-0 -my-1.5" onClick={() => setPrintFailed(false)} />
+        </p>
+      )}
+      {boardError && (
+        <p className="note note-danger text-sm font-medium flex items-center justify-between gap-3" role="alert">
+          <span className="flex items-center gap-2"><Icon name="warning" size={16} className="shrink-0" /> {boardError}</span>
+          <Button variant="ghost" size="sm" iconOnly icon="close" aria-label="Zavřít" className="shrink-0 -my-1.5" onClick={() => setBoardError('')} />
+        </p>
+      )}
+      {publishNote && (
+        <p className={`note ${publishNote.ok ? 'note-ok' : 'note-wait'} text-sm flex items-center justify-between gap-3`} role="status">
+          <span>{publishNote.text}</span>
+          <Button variant="ghost" size="sm" iconOnly icon="close" aria-label="Zavřít" className="shrink-0 -my-1.5" onClick={() => setPublishNote(null)} />
+        </p>
+      )}
 
-      {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="spinner" />
-        </div>
-      ) : tab === 'kalendar' ? (
-        <div className="space-y-3">
-          <p className="text-sm text-black/50">
-            Kdo kdy pracoval, kdo udělal uzávěrku a kde chybí.
-          </p>
-          <ShiftCalendar />
-        </div>
-      ) : tab === 'typy' ? (
-        <ShiftTypesManager shiftTypes={shiftTypes} onReload={reloadTypes} />
-      ) : tab === 'oteviraci' ? (
-        <OpeningHoursEditor value={openingHours} onSaved={(v) => setOpeningHours(v)} />
-      ) : tab === 'pevne' ? (
-        <FixedAssignmentsManager
-          onNavigate={onNavigate}
-          employees={assignable}
-          shiftTypes={shiftTypes}
-          assignments={fixed}
-          onReload={reloadFixed}
-        />
-      ) : tab === 'pravidla' ? (
-        <ScheduleRulesManager />
-      ) : (
-        <>
-          {/* Availability summary */}
-          <div className="glass-card p-5">
-            <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
-              <div className="flex items-center gap-2 min-w-0">
-                <Icon name="users" size={20} className="text-black/70 shrink-0" />
-                <h2 className="t-section truncate">Dostupnost týmu</h2>
-              </div>
-              <span className={`tap-target-sm shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums ${
-                submissions.length >= assignable.length && assignable.length > 0
-                  ? 'bg-[#C8F542]/20 text-[#5B7A08]' : 'bg-black/[0.05] text-black/50'
-              }`}>
-                {submissions.length}/{assignable.length} odesláno
-              </span>
+      {/* Náhled „Upravit podle nových požadavků" */}
+      {adjust && (
+        <Well className="space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="t-card flex items-center gap-2"><Icon name="sparkle" size={17} className="shrink-0 text-black/40" /> Úprava podle nových požadavků</h3>
+              <p className="t-meta mt-0.5">
+                {adjust.changes.length === 0
+                  ? 'Všechno sedí — žádná směna není v rozporu s dostupností.'
+                  : `${czCount(adjust.changes.length, { one: 'navržená změna', few: 'navržené změny', many: 'navržených změn' })}. Odškrtni, co měnit nechceš.`}
+              </p>
             </div>
-            {assignable.length === 0 ? (
-              <p className="text-black/45 text-sm">Zatím nemáš v týmu žádné zaměstnance.</p>
-            ) : (
-              <div className="space-y-3">
-                {/* One row per person, responsive columns — readable at every width. */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
-                  {submissions.map((s) => {
-                    const blocked = (s.unavailableDates ?? []).length;
-                    return (
-                      <button
-                        key={s.employeeId}
-                        onClick={() => setExpanded(expanded === s.employeeId ? null : s.employeeId)}
-                        className={`flex items-center gap-2.5 min-w-0 rounded-2xl px-3 py-2.5 text-sm border text-left transition ${
-                          expanded === s.employeeId
-                            ? 'bg-[#C8F542]/15 border-[#C8F542]/40 text-[#16181A]'
-                            : 'bg-[#C8F542]/[0.08] border-[#C8F542]/20 text-black/80 hover:bg-[#C8F542]/15'
-                        }`}
-                      >
-                        <span className="text-lg flex-shrink-0">{s.employeeAvatar}</span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate font-medium">{s.employeeName}</span>
-                          <span className="block text-[11px] text-black/45 truncate">
-                            {blocked === 0 ? 'bez omezení' : `nemůže ${blocked} ${blocked === 1 ? 'den' : blocked <= 4 ? 'dny' : 'dní'}`}
-                          </span>
-                        </span>
-                        <Icon name="check" size={15} className="text-[#5B7A08] flex-shrink-0" />
-                      </button>
-                    );
-                  })}
-                  {notSubmitted.map((e) => (
-                    <button
-                      key={e.id}
-                      onClick={() => setEditAvail({ id: e.id, name: e.name, avatar: e.avatar ?? '👤' })}
-                      title="Vyplnit dostupnost za tohoto člověka"
-                      className="flex items-center gap-2.5 min-w-0 rounded-2xl px-3 py-2.5 text-sm bg-black/[0.03] border border-black/[0.08] text-black/45 text-left hover:bg-black/[0.06] transition"
-                    >
-                      <span className="text-lg opacity-60 flex-shrink-0">{e.avatar ?? '👤'}</span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate font-medium">{e.name}</span>
-                        {/* Verzálky jsou na krátký štítek, ne na větu. Tahle
-                            se na 1280 px lámala na dva řádky a četla se jako
-                            křik. Stav zůstává štítkem, výzva k akci je věta. */}
-                        <span className="block t-meta truncate">
-                          {e.role === 'employer' ? 'Vedení · ' : ''}Čeká na vyplnění
-                        </span>
-                        <span className="block text-[11px] text-[#5B7A08] font-semibold">Vyplnit za něj</span>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-
-                {expanded != null &&
-                  (() => {
-                    const s = submissions.find((x) => x.employeeId === expanded);
-                    if (!s) return null;
-                    return (
-                      <div className="well border border-black/[0.08] p-4 space-y-2 text-sm">
-                        <div className="flex items-center gap-2 font-semibold text-[#16181A]">
-                          <span className="text-lg">{s.employeeAvatar}</span> {s.employeeName}
-                        </div>
-                        <p className="text-black/60">
-                          Preferuje:{' '}
-                          <span className="text-black/90">
-                            {s.preferredShift === 'morning'
-                              ? 'Ranní'
-                              : s.preferredShift === 'afternoon'
-                              ? 'Odpolední'
-                              : 'Flexibilní'}
-                          </span>
-                          {s.maxShifts != null && (
-                            <>
-                              {' · '}max <span className="text-black/90">{s.maxShifts}</span> směn
-                            </>
-                          )}
-                        </p>
-                        <div className="text-black/60">
-                          Nemůže ({(s.unavailableDates ?? []).length}):{' '}
-                          {(s.unavailableDates ?? []).length === 0 ? (
-                            <span className="text-black/45">bez omezení</span>
-                          ) : (
-                            <span className="flex flex-wrap gap-1 mt-1">
-                              {(s.unavailableDates ?? []).sort().map((d) => (
-                                <span key={d} className="rounded-md bg-bad/15 text-bad-ink px-1.5 py-0.5 text-xs">
-                                  {parseInt(d.split('-')[2])}.{parseInt(d.split('-')[1])}.
-                                </span>
-                              ))}
-                            </span>
-                          )}
-                        </div>
-                        {(() => {
-                          const prefTypes = shiftTypes.map((t) => ({ id: t.id, name: t.name, start: t.startTime }));
-                          const prefs = Object.entries(s.dayPreferences ?? {})
-                            .filter(([d, v]) => (v === 'morning' || v === 'afternoon' || /^type:\d+$/.test(String(v))) && d.startsWith(month + '-'))
-                            .sort(([a], [b]) => a.localeCompare(b));
-                          const kinds = Array.from(new Set(prefs.map(([, v]) => String(v))));
-                          const CHIP_TONES = ['cat-4', 'cat-2', 'cat-3', 'cat-5'];
-                          const chips = (kind: string, tone: string) => {
-                            const list = prefs.filter(([, v]) => v === kind);
-                            if (!list.length) return null;
-                            const lbl = dayPrefLabel(kind, prefTypes) ?? kind;
-                            return (
-                              <div key={kind} className="text-black/60">
-                                {lbl.charAt(0).toUpperCase() + lbl.slice(1)} ({list.length}):{' '}
-                                <span className="inline-flex flex-wrap gap-1 mt-1 align-middle">
-                                  {list.map(([d]) => (
-                                    <span key={d} className={`rounded-md px-1.5 py-0.5 text-xs ${tone}`}>
-                                      {parseInt(d.split('-')[2])}.{parseInt(d.split('-')[1])}.
-                                    </span>
-                                  ))}
-                                </span>
-                              </div>
-                            );
-                          };
-                          return (
-                            <>
-                              {kinds.map((k, i) => chips(k, CHIP_TONES[i % CHIP_TONES.length]))}
-                              {prefs.length > 0 && (
-                                <p className="text-[11px] text-black/40">
-                                  Denní volby jsou závazné — generátor jiný typ směny ten den nenasadí.
-                                </p>
-                              )}
-                            </>
-                          );
-                        })()}
-                        {(() => {
-                          const holidays = timeOff.filter((t: any) => t.employeeId === s.employeeId
-                            && t.toDate >= month + '-01' && t.fromDate <= month + '-31');
-                          if (!holidays.length) return null;
-                          return (
-                            <div className="text-black/60">
-                              <Icon name="sun" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Dovolená ({holidays.length}):{' '}
-                              <span className="inline-flex flex-wrap gap-1 mt-1 align-middle">
-                                {holidays.map((t: any) => (
-                                  <span key={t.id} className="rounded-md bg-[#0A84FF]/15 text-[#0A5CC0] px-1.5 py-0.5 text-xs tabular-nums">
-                                    {parseInt(t.fromDate.split('-')[2])}.{parseInt(t.fromDate.split('-')[1])}.
-                                    {t.fromDate !== t.toDate ? `–${parseInt(t.toDate.split('-')[2])}.${parseInt(t.toDate.split('-')[1])}.` : ''}
-                                  </span>
-                                ))}
-                              </span>
-                              <span className="block text-[11px] text-black/40 mt-0.5">
-                                Generátor tyhle dny automaticky vynechá.{' '}
-                                {/* Odkaz místo popisu cesty: rada, která říká
-                                    „je to níž na stránce", tam má i sjet. */}
-                                <button type="button"
-                                  onClick={() => document.getElementById('zadosti-o-volno')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                                  className="font-semibold underline underline-offset-2 hover:no-underline">
-                                  Upravit v Žádostech o volno
-                                </button>
-                              </span>
-                            </div>
-                          );
-                        })()}
-                        {s.note && <p className="text-black/60">Poznámka: <span className="text-black/90">{s.note}</span></p>}
-                        <button
-                          onClick={() => setEditAvail({ id: s.employeeId, name: s.employeeName, avatar: s.employeeAvatar })}
-                          className="mt-1 rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-xs font-semibold hover:bg-black/[0.05] transition">
-                          <Icon name="pencil" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Upravit dostupnost
-                        </button>
-                      </div>
-                    );
-                  })()}
-              </div>
-            )}
+            <Button variant="ghost" size="sm" iconOnly icon="close" aria-label="Zavřít úpravu" className="shrink-0" onClick={() => setAdjust(null)} />
           </div>
-
-          {/* Lišta akcí: dvě vidět, zbytek v „···". Sedm stejně hlasitých
-              tlačítek vedle sebe neříkalo, čím začít. Postup je vygenerovat →
-              zkontrolovat → publikovat; vygenerovat je limetkové, publikovat
-              tmavé, všechno ostatní čeká v menu. */}
-          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2">
-            <Button variant="accent" icon="bulb" onClick={generate} loading={generating} className="w-full sm:w-auto justify-center">
-              Vygenerovat rozvrh
-            </Button>
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <Button variant="primary" icon="check" onClick={publish} loading={publishing} className="flex-1 sm:flex-none justify-center">
-                Publikovat rozvrh
-              </Button>
-            <Button
-              variant="secondary" icon="swap" onClick={runAdjust} loading={adjusting}
-              disabled={shifts.length === 0}
-              title={shifts.length === 0 ? 'Nejdřív musí existovat uložený rozvrh' : 'Zkontroluje uložený rozvrh proti nejnovější dostupnosti a navrhne přeobsazení'}
-              className="hidden md:inline-flex"
-            >
-              Upravit podle nových požadavků
-            </Button>
-            <Menu
-              label="Další akce s rozvrhem"
-              items={[
-                { label: 'Upravit podle nových požadavků', icon: 'swap', onClick: runAdjust, disabled: adjusting || shifts.length === 0,
-                  hint: 'Zkontroluje uložený rozvrh proti nejnovější dostupnosti.' },
-                { label: 'Kopírovat týden', icon: 'copy', onClick: () => { setCopyOpen(true); setCopyMsg(null); setCopySrc(''); setCopyDst(''); } },
-                { label: 'Import CSV', icon: 'upload', onClick: () => fileRef.current?.click() },
-                { label: 'Export CSV', icon: 'download', onClick: exportCsv, disabled: shifts.length === 0 },
-                { label: 'Vytisknout rozvrh', icon: 'print', onClick: printSchedule, disabled: shifts.length === 0,
-                  hint: 'Na papír k baru — černobíle, s typem směny slovem.' },
-                { label: 'Vymazat měsíc…', icon: 'trash', onClick: () => setConfirmClear(true), danger: true,
-                  hint: 'Smaže všechny směny tohoto měsíce. Potvrdíš to ještě jednou.' },
-              ]}
-            />
-            </div>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".csv,text/csv"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) handleFile(f);
-                e.target.value = '';
-              }}
-            />
-          </div>
-          {confirmClear && (
-            <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-bad/[0.08] border border-bad/30 px-4 py-3 rise-in">
-              <Icon name="warning" size={18} className="text-bad-ink shrink-0" />
-              <p className="text-sm text-bad-ink font-medium flex-1 min-w-[12rem]">Opravdu vymazat všechny směny za {monthLabel(month)}? Nejde to vzít zpět.</p>
-              <div className="flex items-center gap-2 ml-auto">
-                <Button variant="ghost" size="sm" onClick={() => setConfirmClear(false)}>Zrušit</Button>
-                <Button variant="danger-solid" size="sm" icon="trash" onClick={clearMonth}>Vymazat měsíc</Button>
-              </div>
-            </div>
-          )}
-
-          {upgradeFor && <UpgradeModal feature={upgradeFor} onClose={() => setUpgradeFor(null)} />}
-          {copyOpen && (
-            <div className="fixed inset-0 z-[70] flex items-center justify-center modal-overlay p-4" onClick={() => setCopyOpen(false)}>
-              <div ref={copyModal.ref} {...copyModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
-                <DiscardGuard guard={copyModal.guard} />
-                <h3 className="text-lg font-bold tracking-tight text-[#16181A] mb-1">Kopírovat týden</h3>
-                <p className="text-sm text-black/50 mb-4">Vezme všechny směny zdrojového týdne a naplánuje je do cílového (stejné dny, časy i lidi).</p>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Zkopírovat týden</label>
-                    <select value={copySrc} onChange={(e) => setCopySrc(e.target.value)}
-                      className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none">
-                      <option value="">— vyber —</option>
-                      {weekOptions(4, 0).map(w => <option key={w.value} value={w.value}>{w.label}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Do týdne</label>
-                    <select value={copyDst} onChange={(e) => setCopyDst(e.target.value)}
-                      className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none">
-                      <option value="">— vyber —</option>
-                      {weekOptions(0, 5).map(w => <option key={w.value} value={w.value}>{w.label}</option>)}
-                    </select>
-                  </div>
-                  {copyMsg && (
-                    <p className={`text-sm flex items-center gap-1.5 ${copyMsg.ok ? 'text-[#5B7A08]' : 'text-bad-ink'}`}>
-                      <Icon name={copyMsg.ok ? 'check' : 'warning'} size={14} className="shrink-0" />{copyMsg.text}
-                    </p>
-                  )}
-                </div>
-                <div className="flex gap-2 mt-5">
-                  <button onClick={() => setCopyOpen(false)} className="btn btn-secondary flex-1">Zrušit</button>
-                  <button onClick={copyWeek} disabled={copying || !copySrc || !copyDst}
-                    className="btn btn-primary flex-1 disabled:opacity-50">
-                    {copying ? 'Kopíruji…' : 'Zkopírovat'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-          {publishNote && (
-            <div className="glass-card p-4 flex items-start gap-3 border border-[#C8F542]/20">
-              <Icon name="check" size={20} className="text-[#5B7A08] mt-0.5" />
-              <p className="text-sm text-black/70">{publishNote}</p>
-            </div>
-          )}
-
-          {/* Adjust-to-new-requests preview */}
-          {adjust && (
-            <div className="rounded-3xl border border-[#0A84FF]/30 bg-[#0A84FF]/[0.06] p-5 space-y-3">
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <p className="font-bold text-[#16181A]">
-                  🪄 Úprava podle nových požadavků
-                  <span className="ml-2 text-sm font-medium text-black/50">
-                    {adjust.changes.length === 0
-                      ? 'Všechno sedí — žádná směna není v rozporu s dostupností.'
-                      : `${adjust.changes.length} ${adjust.changes.length === 1 ? 'navržená změna' : adjust.changes.length <= 4 ? 'navržené změny' : 'navržených změn'}`}
-                  </span>
-                </p>
-                <button onClick={() => setAdjust(null)} className="tap-target-sm text-black/40 hover:text-black text-sm font-medium">Zavřít ✕</button>
-              </div>
-              {adjust.changes.length > 0 && (
-                <>
-                  <div className="space-y-1.5 max-h-72 overflow-y-auto scrollbar-thin pr-1">
-                    {adjust.changes.map((ch: any, i: number) => (
-                      <div key={i} className={`flex items-center gap-2.5 well bg-white px-3.5 py-2.5 text-sm flex-wrap transition ${adjustSkipped.has(i) ? 'opacity-45' : ''}`}>
-                        <input type="checkbox" checked={!adjustSkipped.has(i)}
-                          onChange={() => setAdjustSkipped(prev => {
-                            const n = new Set(prev);
-                            if (n.has(i)) n.delete(i); else n.add(i);
-                            return n;
-                          })}
-                          className="h-[18px] w-[18px] rounded accent-[#8FB811] shrink-0" />
-                        <span className="font-semibold tabular-nums text-[#16181A] shrink-0 w-14">{parseInt(ch.date.split('-')[2])}.{parseInt(ch.date.split('-')[1])}.</span>
-                        <span className="text-black/45 tabular-nums shrink-0">{ch.startTime}–{ch.endTime}</span>
-                        <span className="inline-flex items-center gap-1 min-w-0">
-                          <span>{ch.fromAvatar}</span>
-                          <span className="font-medium text-[#16181A] truncate">{ch.fromName}</span>
-                        </span>
-                        {ch.action === 'reassign' ? (
-                          <>
-                            <span className="text-black/35">→</span>
-                            <span className="inline-flex items-center gap-1 min-w-0">
-                              <span>{ch.toAvatar}</span>
-                              <span className="font-semibold text-[#5B7A08] truncate">{ch.toName}</span>
-                            </span>
-                          </>
-                        ) : (
-                          <span className="rounded-full bg-bad/15 text-bad-ink px-2.5 py-0.5 text-xs font-bold">zrušit — nikdo nemůže</span>
-                        )}
-                        <span className="text-xs text-black/40 w-full sm:w-auto sm:ml-auto">({ch.reason})</span>
-                      </div>
-                    ))}
-                  </div>
-                  {adjust.warnings.length > 0 && (
-                    <ul className="text-xs text-wait-ink space-y-0.5">
-                      {adjust.warnings.slice(0, 10).map((w, i) => <li key={i}>⚠ {w}</li>)}
-                    </ul>
-                  )}
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <button onClick={applyAdjust}
-                      disabled={applyingAdjust || adjust.changes.length === adjustSkipped.size}
-                      className="rounded-full bg-[#16181A] text-white font-semibold px-5 py-2.5 text-sm hover:bg-black disabled:opacity-50 transition">
-                      {applyingAdjust ? 'Ukládám…' : `Použít vybrané (${adjust.changes.length - adjustSkipped.size})`}
-                    </button>
-                    <button onClick={() => setAdjust(null)} className="rounded-full bg-black/[0.05] text-[#16181A] font-semibold px-5 py-2.5 text-sm hover:bg-black/[0.08] transition">
-                      Zahodit
-                    </button>
-                    <span className="text-[11px] text-black/40">
-                      Odškrtni, co měnit nechceš. Důvody vycházejí z uložené dostupnosti — když nesedí,
-                      oprav ji v „Dostupnost týmu" → Upravit dostupnost. Dotčení lidé dostanou notifikaci.
-                    </span>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Generated preview banner */}
-          {preview && (
-            <div className="glass-card p-5 border border-[#C8F542]/40 space-y-4">
-              <div className="flex items-start justify-between gap-3 flex-wrap">
-                <div className="min-w-0">
-                  <h3 className="font-bold text-[#16181A] flex items-center gap-2">
-                    <span><Icon name="sparkle" size={15} /></span> Navržený rozvrh
-                  </h3>
-                  <p className="text-sm text-black/55 mt-0.5">
-                    {preview.proposed.length} navržených směn
-                    {preview.warnings.length > 0 && ` · ${preview.warnings.length} upozornění`}. Zkontroluj náhled v
-                    kalendáři (zvýrazněno) a ulož.
-                  </p>
-                </div>
-                <button onClick={() => setPreview(null)} className="text-black/45 hover:text-black text-sm whitespace-nowrap flex-shrink-0">
-                  Zahodit náhled
-                </button>
-              </div>
-
-              {preview.warnings.length > 0 && (
-                <div className="rounded-2xl bg-wait/10 border border-wait/25 p-3">
-                  <p className="text-sm font-medium text-wait-ink mb-1 flex items-center gap-1.5">
-                    <Icon name="warning" size={16} /> Upozornění ({preview.warnings.length})
-                  </p>
-                  <ul className="text-xs text-wait-ink/90 space-y-0.5 max-h-40 overflow-y-auto">
-                    {preview.warnings.slice(0, 40).map((w, i) => (
-                      <li key={i}>• {w}</li>
-                    ))}
-                    {preview.warnings.length > 40 && (
-                      <li className="text-wait-ink/60">…a dalších {preview.warnings.length - 40}</li>
-                    )}
-                  </ul>
-                </div>
-              )}
-
-              <label className="flex items-center gap-2 text-sm text-black/60 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={clearBeforeCommit}
-                  onChange={(e) => setClearBeforeCommit(e.target.checked)}
-                  className="accent-[#C8F542] h-4 w-4"
-                />
-                Před uložením vymazat stávající směny měsíce
-              </label>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  onClick={commitPreview}
-                  disabled={committing || preview.proposed.length === 0}
-                  className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2.5 whitespace-nowrap hover:brightness-105 transition disabled:opacity-40 inline-flex items-center gap-2"
-                >
-                  <Icon name="check" size={18} /> {committing ? 'Ukládám…' : 'Potvrdit a uložit'}
-                </button>
-                <button
-                  onClick={() => setPreview(null)}
-                  className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] px-4 py-2.5 whitespace-nowrap transition"
-                >
-                  Zrušit
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Díry v obsazení — nejdřív jako seznam s konkrétními časy, protože
-              do políčka v kalendáři se rozsah hodin na mobilu nevejde. */}
-          {problemDates.length > 0 && (
-            <div className="glass-card p-4 sm:p-5 border border-bad/40 bg-bad/[0.06] space-y-3">
-              <div className="min-w-0">
-                <h3 className="font-bold text-bad-ink flex items-center gap-2">
-                  <Icon name="warning" size={18} /> Díry v obsazení ({problemDates.length})
-                </h3>
-                <p className="text-sm text-bad-ink/70 mt-0.5">
-                  {preview ? 'V navrženém rozvrhu' : 'V uloženém rozvrhu'} jsou dny, kdy je otevřeno a není tam
-                  dost lidí. Klikni na den a doplň směnu ručně.
-                </p>
-              </div>
-              <ul className="space-y-1.5 max-h-64 overflow-y-auto">
-                {problemDates.slice(0, 14).map((date) => {
-                  const pr = problemsByDate[date];
+          {adjust.changes.length > 0 && (
+            <>
+              <ul className="list max-h-72 overflow-y-auto scrollbar-thin">
+                {adjust.changes.map((ch: any, i: number) => {
+                  const vynechat = adjustSkipped.has(i);
+                  const datum = `${parseInt(ch.date.split('-')[2])}. ${parseInt(ch.date.split('-')[1])}.`;
                   return (
-                    <li key={date}>
-                      <button
-                        onClick={() => setDayModal(date)}
-                        className="w-full text-left rounded-2xl bg-white/60 border border-bad/25 px-3.5 py-2.5 hover:bg-white/80 transition"
-                      >
-                        <span className="block text-sm font-semibold text-[#16181A] cz-sentence">{dayLabel(date)}</span>
-                        <span className="block text-xs text-bad-ink/85 mt-0.5 leading-relaxed">
-                          {pr.gaps.map((g) => `Nikdo v podniku ${g.from}–${g.to}.`).join(' ')}
-                          {pr.gaps.length > 0 && pr.missing.length > 0 ? ' ' : ''}
-                          {pr.missing.length > 0
-                            ? `Neobsazeno: ${pr.missing.map((m) => m.shiftTypeName).join(', ')}.`
-                            : ''}
-                        </span>
-                      </button>
+                    <li key={i} className={`flex items-center gap-3 py-2.5 ${vynechat ? 'opacity-45' : ''}`}>
+                      <SelectBox checked={!vynechat} label={`Použít změnu ${datum} ${ch.startTime}–${ch.endTime}`}
+                        onChange={() => setAdjustSkipped(prev => {
+                          const n = new Set(prev);
+                          if (n.has(i)) n.delete(i); else n.add(i);
+                          return n;
+                        })} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-[#16181A] tabular-nums">{datum} · {ch.startTime}–{ch.endTime}</p>
+                        <p className="t-meta flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                          <span>{ch.fromName}</span>
+                          {ch.action === 'reassign' ? (
+                            <><Icon name="chevronRight" size={13} className="shrink-0 text-black/40" /><span className="font-medium text-[#16181A]">{ch.toName}</span></>
+                          ) : (
+                            <Chip tone="bad" size="sm">zrušit — nikdo nemůže</Chip>
+                          )}
+                          {ch.reason && <span>· {ch.reason}</span>}
+                        </p>
+                      </div>
                     </li>
                   );
                 })}
-                {problemDates.length > 14 && (
-                  <li className="text-xs text-bad-ink/60 px-1">…a dalších {problemDates.length - 14} dnů</li>
-                )}
+              </ul>
+              {adjust.warnings.length > 0 && (
+                <ul className="text-xs text-wait-ink space-y-0.5 list-disc pl-4">
+                  {adjust.warnings.slice(0, 10).map((w, i) => <li key={i}>{w}</li>)}
+                </ul>
+              )}
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="primary" size="sm" icon="check" loading={applyingAdjust}
+                  disabled={adjust.changes.length === adjustSkipped.size} onClick={applyAdjust}>
+                  Použít vybrané ({adjust.changes.length - adjustSkipped.size})
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => setAdjust(null)}>Zahodit</Button>
+              </div>
+              <p className="t-meta text-pretty">
+                Důvody vycházejí z uložené dostupnosti — když nesedí, oprav ji ve widgetu Dostupnost týmu. Dotčení lidé dostanou upozornění.
+              </p>
+            </>
+          )}
+        </Well>
+      )}
+
+      {/* Náhled vygenerovaného návrhu */}
+      {preview && (
+        <Well className="space-y-3">
+          <div className="min-w-0">
+            <h3 className="t-card flex items-center gap-2"><Icon name="sparkle" size={17} className="shrink-0 text-black/40" /> Navržený rozvrh</h3>
+            <p className="t-meta mt-0.5 text-pretty">
+              {czCount(preview.proposed.length, { one: 'navržená směna', few: 'navržené směny', many: 'navržených směn' })}
+              {preview.warnings.length > 0 && ` · ${czCount(preview.warnings.length, { one: 'upozornění', few: 'upozornění', many: 'upozornění' })}`}.
+              {' '}Návrh je v mřížce přerušovaně
+              {problemDates.length > 0 ? `; ${czCount(problemDates.length, DEN)} by zůstal${problemDates.length === 1 ? '' : 'y'} s dírou (červeně).` : '.'}
+            </p>
+          </div>
+          {preview.warnings.length > 0 && (
+            <div className="note note-wait">
+              <p className="text-sm font-medium flex items-center gap-1.5"><Icon name="warning" size={16} className="shrink-0" /> Upozornění ({preview.warnings.length})</p>
+              <ul className="text-xs space-y-0.5 max-h-40 overflow-y-auto list-disc pl-4 mt-1">
+                {preview.warnings.slice(0, 40).map((w, i) => <li key={i}>{w}</li>)}
+                {preview.warnings.length > 40 && <li>…a dalších {preview.warnings.length - 40}</li>}
               </ul>
             </div>
           )}
-
-          {/* Calendar grid */}
-          <div className="glass-card p-3 sm:p-5">
-            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-              <h2 className="t-section cz-sentence flex items-center gap-2">
-                <Icon name="calendar" size={20} /> {monthLabel(month)}
-              </h2>
-              <div className="flex items-center gap-3 text-xs flex-wrap">
-                {shiftTypes.map((t) => (
-                  <span key={t.id} className="flex items-center gap-1.5 text-black/55">
-                    <span className="h-3 w-3 rounded-md" style={{ backgroundColor: t.color ?? '#C8F542' }} /> {t.name}
-                  </span>
-                ))}
-                {preview && (
-                  <span className="flex items-center gap-1.5 text-black/55">
-                    <span className="h-3 w-3 rounded-md border-2 border-dashed border-[#5B7A08]" /> Návrh
-                  </span>
-                )}
-                {problemDates.length > 0 && (
-                  <span className="flex items-center gap-1.5 text-bad-ink">
-                    <span className="h-3 w-3 rounded-md bg-bad/25 border border-bad/60" /> Díra v obsazení
-                  </span>
-                )}
-                {Object.keys(demand).length > 0 && (
-                  <span className="flex items-center gap-1.5 text-[#3E5406]">
-                    <span className="h-3 w-3 rounded-md bg-[#C8F542]/40 border border-[#C8F542]" /> Rezervovaní hosté
-                  </span>
-                )}
-              </div>
-            </div>
-            <div className="grid grid-cols-7 gap-1 sm:gap-1.5 mb-1.5">
-              {zkratkyDnu(zacatek).map((d) => (
-                <div key={d} className="text-center text-[11px] font-medium text-black/35 py-1">
-                  {d}
-                </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
-              {grid.map((cell, i) => {
-                if (!cell) return <div key={i} />;
-                const day = parseInt(cell.split('-')[2]);
-                const dayShifts = shiftsByDay[cell] ?? [];
-                const dayProposed = proposedByDay[cell] ?? [];
-                const problem = problemsByDate[cell];
-                const hole = (problem?.gaps.length ?? 0) > 0;
-                // Prázdný podnik je horší než chybějící druhý člověk, ale obojí
-                // svítí červeně — je to díra v obsazení, ne kosmetika.
-                const problemTitle = problem
-                  ? [
-                      ...problem.gaps.map(g => `Nikdo v podniku ${g.from}–${g.to}, přitom je otevřeno`),
-                      ...problem.missing.map(m => `Neobsazená směna „${m.shiftTypeName}"`),
-                    ].join(' · ')
-                  : undefined;
-                return (
-                  <button
-                    key={cell}
-                    onClick={() => setDayModal(cell)}
-                    title={problemTitle}
-                    className={`min-h-[84px] min-w-0 rounded-xl p-1 sm:p-1.5 text-left transition flex flex-col gap-1 overflow-hidden border ${
-                      hole
-                        ? 'bg-bad/15 border-bad/60 hover:bg-bad/[0.18]'
-                        : problem
-                          ? 'bg-bad/[0.06] border-bad/35 hover:bg-bad/10'
-                          : 'bg-black/[0.03] border-black/[0.08] hover:border-[#C8F542]/40 hover:bg-black/[0.04]'
-                    }`}
-                  >
-                    <span className="flex items-center gap-1 min-w-0">
-                      <span className={`text-[11px] sm:text-xs font-medium ${problem ? 'text-bad-ink' : 'text-black/55'}`}>{day}</span>
-                      {problem && (
-                        <span className={`flex-shrink-0 rounded-full ${hole ? 'h-2 w-2 bg-bad' : 'h-1.5 w-1.5 bg-bad/70'}`} />
-                      )}
-                    </span>
-                    <div className="flex flex-col gap-1 min-w-0 overflow-hidden">
-                      {demand[cell]?.guests > 0 && (
-                        <span title={`${demand[cell].reservations} rezervací na ${demand[cell].guests} hostů`}
-                          className="flex items-center gap-1 min-w-0 rounded-md px-1 py-0.5 text-[11px] font-semibold overflow-hidden bg-[#C8F542]/25 text-[#3E5406]">
-                          <span className="flex-shrink-0"><Icon name="users" size={13} /></span>
-                          <span className="truncate min-w-0 tabular-nums">{demand[cell].guests} hostů</span>
-                        </span>
-                      )}
-                      {(eventsByDate[cell] ?? []).map((ev: any) => (
-                        <span key={`e-${ev.id}`} title={`Akce: ${ev.title}${ev.startTime ? ` od ${ev.startTime}` : ''}`}
-                          className="flex items-center gap-1 min-w-0 rounded-md px-1 py-0.5 text-[11px] font-semibold overflow-hidden bg-[#0A84FF]/15 text-[#0A5CC0]">
-                          <span className="flex-shrink-0"><Icon name="calendarCheck" size={15} /></span>
-                          <span className="truncate min-w-0">{ev.title}</span>
-                        </span>
-                      ))}
-                      {dayShifts.slice(0, 3).map((s) => {
-                        const rt = resolveShiftType(s, shiftTypes);
-                        return (
-                          <span
-                            key={s.id}
-                            title={`${s.employeeName} · ${rt.label} · ${s.startTime}–${s.endTime}`}
-                            className="flex items-center gap-1 min-w-0 rounded-md px-1 py-0.5 text-[11px] font-medium overflow-hidden bg-black/[0.05] text-black/70"
-                          >
-                            <span className="h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: rt.color }} />
-                            <span className="flex-shrink-0">{s.employeeAvatar}</span>
-                            <span className="truncate min-w-0">{s.startTime}</span>
-                          </span>
-                        );
-                      })}
-                      {dayShifts.length > 3 && (
-                        <span className="text-[11px] text-black/45">+{dayShifts.length - 3} další</span>
-                      )}
-                      {/* proposed (preview) */}
-                      {dayProposed.slice(0, 3).map((p, idx) => (
-                        <span
-                          key={`p-${idx}`}
-                          title={`Návrh: ${p.employeeName} · ${p.shiftTypeName} ${p.startTime}–${p.endTime}${(p as any).split ? ' (část směny)' : ''}`}
-                          className="flex items-center gap-1 min-w-0 rounded-md px-1 py-0.5 text-[11px] font-medium overflow-hidden border border-dashed border-[#5B7A08]/60 bg-[#C8F542]/10 text-[#5B7A08]"
-                        >
-                          <span className="flex-shrink-0 inline-flex items-center gap-0.5"><Icon name="sparkle" size={11} />{p.employeeAvatar}</span>
-                          <span className="truncate min-w-0">{p.startTime}</span>
-                        </span>
-                      ))}
-                      {dayProposed.length > 3 && (
-                        <span className="text-[11px] text-[#5B7A08]/70">+{dayProposed.length - 3} návrh</span>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+          {smiMazat && (
+            <label className="flex items-center gap-2 text-sm text-black/60 cursor-pointer select-none">
+              <input type="checkbox" checked={clearBeforeCommit} onChange={(e) => setClearBeforeCommit(e.target.checked)} className="h-4 w-4 accent-[#8FB811]" />
+              Před uložením vymazat stávající směny měsíce
+            </label>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="primary" size="sm" icon="check" loading={committing} disabled={preview.proposed.length === 0} onClick={commitPreview}>
+              Potvrdit a uložit
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => setPreview(null)}>Zahodit náhled</Button>
           </div>
-        </>
+        </Well>
+      )}
+
+      {loading ? (
+        <div className="space-y-2" aria-busy>
+          <Skeleton className="h-4 w-1/2 rounded-full" />
+          <Skeleton className="h-72" />
+        </div>
+      ) : loadError ? (
+        <ErrorState compact title="Rozvrh se nenačetl" onRetry={load} detail={loadError} />
+      ) : (
+        <div>
+          <ul className="flex items-center gap-x-3 gap-y-1 t-meta flex-wrap mb-3" aria-label="Legenda">
+            {shiftTypes.map((t) => (
+              <li key={t.id} className="flex items-center gap-1.5">
+                <span aria-hidden className={`h-2.5 w-2.5 rounded-full ${tridaTecky(t.color)}`} /> {t.name}
+              </li>
+            ))}
+            {preview && (
+              <li className="flex items-center gap-1.5"><span aria-hidden className="h-2.5 w-2.5 rounded-full border border-dashed border-black/50 dark:border-white/50" /> Návrh</li>
+            )}
+            {problemDates.length > 0 && (
+              <li className="flex items-center gap-1.5 text-bad-ink"><span aria-hidden className="h-2.5 w-2.5 rounded-full bg-bad" /> Díra v obsazení</li>
+            )}
+            {Object.keys(demand).length > 0 && (
+              <li className="flex items-center gap-1.5"><Icon name="users" size={13} className="shrink-0 text-black/45" /> Rezervovaní hosté</li>
+            )}
+          </ul>
+          <div className="grid grid-cols-7 gap-1 sm:gap-1.5 mb-1.5">
+            {zkratkyDnu(zacatek).map((d) => (
+              <div key={d} className="text-center text-[11px] font-medium text-black/35 py-1">{d}</div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
+            {grid.map((cell, i) => {
+              if (!cell) return <div key={i} />;
+              const day = parseInt(cell.split('-')[2]);
+              const dayShifts = shiftsByDay[cell] ?? [];
+              const dayProposed = proposedByDay[cell] ?? [];
+              const problem = problemsByDate[cell];
+              const hole = (problem?.gaps.length ?? 0) > 0;
+              // Prázdný podnik je horší než chybějící druhý člověk, ale obojí je díra v obsazení.
+              const problemTitle = problem
+                ? [
+                    ...problem.gaps.map(g => `Nikdo v podniku ${g.from}–${g.to}, přitom je otevřeno`),
+                    ...problem.missing.map(m => `Neobsazená směna „${m.shiftTypeName}"`),
+                  ].join(' · ')
+                : undefined;
+              return (
+                <button
+                  key={cell}
+                  type="button"
+                  onClick={() => setDayModal(cell)}
+                  title={problemTitle}
+                  aria-label={`${dayLabel(cell)}: ${czCount(dayShifts.length, SMENA)}${problem ? ', díra v obsazení' : ''}`}
+                  className={`min-h-[84px] min-w-0 rounded-xl p-1 sm:p-1.5 text-left transition-colors flex flex-col gap-1 overflow-hidden border ${
+                    hole
+                      ? 'bg-bad/15 border-bad/60 hover:bg-bad/20'
+                      : problem
+                        ? 'bg-bad/[0.06] border-bad/35 hover:bg-bad/10'
+                        : 'bg-black/[0.03] border-black/[0.08] hover:border-black/20'
+                  }`}
+                >
+                  <span className="flex items-center gap-1 min-w-0">
+                    <span className={`text-[11px] sm:text-xs font-medium ${problem ? 'text-bad-ink' : 'text-black/55'}`}>{day}</span>
+                    {problem && <span aria-hidden className={`flex-shrink-0 rounded-full ${hole ? 'h-2 w-2 bg-bad' : 'h-1.5 w-1.5 bg-bad/70'}`} />}
+                  </span>
+                  <span className="flex flex-col gap-1 min-w-0 overflow-hidden" aria-hidden>
+                    {demand[cell]?.guests > 0 && (
+                      <span title={`${czCount(demand[cell].reservations, { one: 'rezervace', few: 'rezervace', many: 'rezervací' })} na ${czCount(demand[cell].guests, { one: 'hosta', few: 'hosty', many: 'hostů' })}`}
+                        className="flex items-center gap-1 min-w-0 rounded-full px-1 py-0.5 text-[11px] font-semibold overflow-hidden bg-black/[0.06] text-black/70">
+                        <Icon name="users" size={11} className="flex-shrink-0" />
+                        <span className="truncate min-w-0 tabular-nums">{demand[cell].guests}</span>
+                      </span>
+                    )}
+                    {(eventsByDate[cell] ?? []).map((ev: any) => (
+                      <span key={`e-${ev.id}`} title={`Akce: ${ev.title}${ev.startTime ? ` od ${ev.startTime}` : ''}`}
+                        className="flex items-center gap-1 min-w-0 rounded-full px-1 py-0.5 text-[11px] font-semibold overflow-hidden bg-info/15 text-info-ink">
+                        <Icon name="calendarCheck" size={11} className="flex-shrink-0" />
+                        <span className="truncate min-w-0">{ev.title}</span>
+                      </span>
+                    ))}
+                    {dayShifts.slice(0, 3).map((s) => {
+                      const rt = resolveShiftType(s, shiftTypes);
+                      return (
+                        <span key={s.id} title={`${s.employeeName} · ${rt.label} · ${s.startTime}–${s.endTime}`}
+                          className="flex items-center gap-1 min-w-0 rounded-full px-1 py-0.5 text-[11px] font-medium overflow-hidden bg-black/[0.05] text-black/70">
+                          <span className={`h-2 w-2 rounded-full flex-shrink-0 ${tridaTecky(rt.color)}`} />
+                          <span className="flex-shrink-0">{s.employeeAvatar}</span>
+                          <span className="truncate min-w-0">{s.startTime}</span>
+                        </span>
+                      );
+                    })}
+                    {dayShifts.length > 3 && <span className="text-[11px] text-black/45">+{dayShifts.length - 3} další</span>}
+                    {dayProposed.slice(0, 3).map((p, idx) => (
+                      <span key={`p-${idx}`}
+                        title={`Návrh: ${p.employeeName} · ${p.shiftTypeName} ${p.startTime}–${p.endTime}${(p as any).split ? ' (část směny)' : ''}`}
+                        className="flex items-center gap-1 min-w-0 rounded-full px-1 py-0.5 text-[11px] font-medium overflow-hidden border border-dashed border-black/30 dark:border-white/40 text-black/70">
+                        <span className="flex-shrink-0 inline-flex items-center gap-0.5"><Icon name="sparkle" size={11} />{p.employeeAvatar}</span>
+                        <span className="truncate min-w-0">{p.startTime}</span>
+                      </span>
+                    ))}
+                    {dayProposed.length > 3 && <span className="text-[11px] text-black/45">+{dayProposed.length - 3} v návrhu</span>}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+
+  const obsahZalozky = aktivniTab === 'kalendar' ? (
+    <div className="space-y-3">
+      <p className="t-meta">Kdo kdy pracoval, kdo udělal uzávěrku a kde chybí.</p>
+      <ShiftCalendar />
+    </div>
+  ) : aktivniTab === 'typy' ? (
+    <ShiftTypesManager shiftTypes={shiftTypes} onReload={reloadTypes} />
+  ) : aktivniTab === 'oteviraci' ? (
+    <OpeningHoursEditor value={openingHours} readOnly={!smiOteviraci} onSaved={(v) => setOpeningHours(v)} />
+  ) : aktivniTab === 'pevne' ? (
+    <FixedAssignmentsManager onNavigate={onNavigate} employees={assignable} shiftTypes={shiftTypes} assignments={fixed} onReload={reloadFixed} />
+  ) : aktivniTab === 'pravidla' ? (
+    <ScheduleRulesManager />
+  ) : null;
+
+  return (
+    <>
+      {naRozvrhu ? (
+        <PlochaWidgetu stranka="vedeni.rozvrh" hlavicka={hlavicka} nastroj={nastroj} />
+      ) : (
+        // Záložky nastavení widgety nemají: stejná hlavička, pod ní jen obsah záložky.
+        <div className="space-y-6 pb-24 p-4 sm:p-6">
+          <PageHeader title={TITULEK} subtitle={PODTITULEK} aside={aside} />
+          {loading && aktivniTab !== 'kalendar' && aktivniTab !== 'pravidla'
+            ? <Skeleton className="h-64" />
+            : loadError && aktivniTab !== 'kalendar' && aktivniTab !== 'pravidla'
+              ? <Card><ErrorState compact title="Nastavení rozvrhu se nenačetlo" onRetry={load} detail={loadError} /></Card>
+              : obsahZalozky}
+        </div>
+      )}
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".csv,text/csv"
+        className="hidden"
+        aria-label="Soubor CSV s rozvrhem"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) handleFile(f);
+          e.target.value = '';
+        }}
+      />
+
+      {upgradeFor && <UpgradeModal feature={upgradeFor} onClose={() => setUpgradeFor(null)} />}
+
+      {confirmClear && (
+        <Modal open onClose={() => setConfirmClear(false)} size="sm" title="Vymazat celý měsíc?" subtitle={<span className="cz-sentence">{monthLabel(month)}</span>}
+          footer={<>
+            <Button variant="secondary" onClick={() => setConfirmClear(false)}>Zrušit</Button>
+            <Button variant="danger-solid" icon="trash" loading={clearing} onClick={clearMonth}>Vymazat měsíc</Button>
+          </>}>
+          <p className="text-sm text-black/60 text-pretty">Smaže {czCount(shifts.length, SMENA)} tohoto měsíce. Nejde to vzít zpět — lidé, kterým rozvrh přišel, ho ale v upozornění pořád mají.</p>
+        </Modal>
+      )}
+
+      {copyOpen && (
+        <Modal open onClose={() => setCopyOpen(false)} size="sm" title="Kopírovat týden"
+          subtitle="Směny zdrojového týdne se naplánují do cílového — stejné dny, časy i lidi."
+          footer={<>
+            <Button variant="secondary" onClick={() => setCopyOpen(false)}>Zrušit</Button>
+            <Button variant="primary" icon="copy" loading={copying} disabled={!copySrc || !copyDst} onClick={copyWeek}>Zkopírovat</Button>
+          </>}>
+          <div className="space-y-3">
+            <Field id="kopie-z" label="Zkopírovat týden">
+              <Select id="kopie-z" value={copySrc} onChange={(e) => setCopySrc(e.target.value)}>
+                <option value="">Vyber týden…</option>
+                {weekOptions(4, 0).map(w => <option key={w.value} value={w.value}>{w.label}</option>)}
+              </Select>
+            </Field>
+            <Field id="kopie-do" label="Do týdne">
+              <Select id="kopie-do" value={copyDst} onChange={(e) => setCopyDst(e.target.value)}>
+                <option value="">Vyber týden…</option>
+                {weekOptions(0, 5).map(w => <option key={w.value} value={w.value}>{w.label}</option>)}
+              </Select>
+            </Field>
+            {copyMsg && <p className={`note ${copyMsg.ok ? 'note-ok' : 'note-danger'} text-sm`} role={copyMsg.ok ? 'status' : 'alert'}>{copyMsg.text}</p>}
+          </div>
+        </Modal>
+      )}
+
+      {importPreview && (
+        <Modal open onClose={() => setImportPreview(null)} size="lg" title="Náhled importu"
+          subtitle={importPreview.rows.length ? `${czCount(importPreview.rows.length, { one: 'platná směna', few: 'platné směny', many: 'platných směn' })} k importu` : undefined}
+          footer={<>
+            <Button variant="secondary" onClick={() => setImportPreview(null)}>Zrušit</Button>
+            <Button variant="primary" icon="upload" loading={importing} disabled={importPreview.rows.length === 0} onClick={confirmImport}>
+              Importovat {czCount(importPreview.rows.length, SMENA)}
+            </Button>
+          </>}>
+          <div className="space-y-4">
+            <Well className="t-meta">
+              Očekávaný formát: <code className="text-black/80">datum;zaměstnanec;od;do;typ</code> — např.{' '}
+              <code className="text-black/80">2026-08-03;anna@priklad.cz;08:00;14:00;morning</code>. Sloupec „zaměstnanec"
+              může být e-mail nebo jméno, typ morning, afternoon nebo flexible.
+            </Well>
+            {importPreview.rows.length > 0 && (
+              <div className="rounded-2xl border border-black/[0.08] overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[420px] text-xs">
+                    <thead className="bg-black/[0.04] text-black/55">
+                      <tr>
+                        <th className="text-left px-3 py-2">Datum</th>
+                        <th className="text-left px-3 py-2">Zaměstnanec</th>
+                        <th className="text-left px-3 py-2">Od</th>
+                        <th className="text-left px-3 py-2">Do</th>
+                        <th className="text-left px-3 py-2">Typ</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-black/[0.06]">
+                      {importPreview.rows.slice(0, 40).map((r, i) => (
+                        <tr key={i} className="text-black/80">
+                          <td className="px-3 py-1.5 tabular-nums">{r.date}</td>
+                          <td className="px-3 py-1.5">{r.employeeName}</td>
+                          <td className="px-3 py-1.5 tabular-nums">{r.startTime}</td>
+                          <td className="px-3 py-1.5 tabular-nums">{r.endTime}</td>
+                          <td className="px-3 py-1.5">{resolveShiftType(r, shiftTypes).label}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {importPreview.rows.length > 40 && <p className="t-meta px-3 py-2">…a dalších {importPreview.rows.length - 40}</p>}
+              </div>
+            )}
+            {importPreview.errors.length > 0 && (
+              <div className="note note-danger">
+                <p className="text-sm font-medium flex items-center gap-1.5">
+                  <Icon name="warning" size={16} className="shrink-0" /> {czCount(importPreview.errors.length, { one: 'problém', few: 'problémy', many: 'problémů' })} (přeskočeno)
+                </p>
+                <ul className="text-xs space-y-0.5 max-h-32 overflow-y-auto list-disc pl-4 mt-1">
+                  {importPreview.errors.slice(0, 20).map((e, i) => <li key={i}>{e}</li>)}
+                </ul>
+              </div>
+            )}
+          </div>
+        </Modal>
       )}
 
       {editAvail && (
@@ -1432,16 +1318,18 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
           month={month}
           shiftTypes={shiftTypes}
           initial={submissions.find((x) => x.employeeId === editAvail.id) ?? null}
+          jenCist={!smiDostupnostUpravit}
+          volno={timeOff.filter((t) => t.employeeId === editAvail.id && t.status === 'approved')}
           onClose={() => setEditAvail(null)}
-          onSaved={() => { setEditAvail(null); load(); }}
+          onSaved={() => { setEditAvail(null); void poZmene(); }}
         />
       )}
 
-      {/* Day modal */}
       {dayModal && (
         <DayModal
           onNavigate={onNavigate}
           date={dayModal}
+          readOnly={!smiUpravit}
           employees={assignable}
           shifts={shiftsByDay[dayModal] ?? []}
           proposed={proposedByDay[dayModal] ?? []}
@@ -1463,95 +1351,24 @@ export default function ScheduleBuilder({ user, onNavigate }: Props & { onNaviga
           }
         />
       )}
-
-      {/* Import preview modal */}
-      {importPreview && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center modal-overlay p-0 md:p-4">
-          <div ref={importModal.ref} {...importModal.dialogProps} className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-2xl max-h-[85vh] overflow-y-auto p-6 space-y-4">
-            <DiscardGuard guard={importModal.guard} />
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="text-xl font-bold text-[#16181A] min-w-0 truncate">Náhled importu</h3>
-              <button onClick={() => setImportPreview(null)} className="text-black/45 hover:text-black text-2xl leading-none flex-shrink-0">
-                ×
-              </button>
-            </div>
-            <div className="well border border-black/[0.08] p-3 text-xs text-black/55">
-              Očekávaný formát: <code className="text-black/80">datum,zaměstnanec,od,do,typ</code> — např.{' '}
-              <code className="text-black/80">2026-08-03;anna@priklad.cz;08:00;14:00;morning</code>. Sloupec „zaměstnanec"
-              může být e-mail nebo jméno. Typ: morning / afternoon / flexible.
-            </div>
-
-            {importPreview.rows.length > 0 && (
-              <div>
-                <p className="text-sm font-medium text-[#5B7A08] mb-2">{importPreview.rows.length} platných směn k importu</p>
-                <div className="rounded-2xl border border-black/[0.08] overflow-hidden">
-                  <div className="overflow-x-auto">
-                  <table className="w-full min-w-[420px] text-xs">
-                    <thead className="bg-black/[0.04] text-black/55">
-                      <tr>
-                        <th className="text-left px-3 py-2">Datum</th>
-                        <th className="text-left px-3 py-2">Zaměstnanec</th>
-                        <th className="text-left px-3 py-2">Od</th>
-                        <th className="text-left px-3 py-2">Do</th>
-                        <th className="text-left px-3 py-2">Typ</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-black/[0.06]">
-                      {importPreview.rows.slice(0, 40).map((r, i) => (
-                        <tr key={i} className="text-black/80">
-                          <td className="px-3 py-1.5">{r.date}</td>
-                          <td className="px-3 py-1.5">{r.employeeName}</td>
-                          <td className="px-3 py-1.5">{r.startTime}</td>
-                          <td className="px-3 py-1.5">{r.endTime}</td>
-                          <td className="px-3 py-1.5">{resolveShiftType(r, shiftTypes).label}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  </div>
-                  {importPreview.rows.length > 40 && (
-                    <p className="text-[11px] text-black/45 px-3 py-2">…a dalších {importPreview.rows.length - 40}</p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {importPreview.errors.length > 0 && (
-              <div className="note note-danger p-3">
-                <p className="text-sm font-medium text-bad-ink mb-1 flex items-center gap-1.5">
-                  <Icon name="warning" size={16} /> {importPreview.errors.length} problémů (přeskočeno)
-                </p>
-                <ul className="text-xs text-bad-ink/80 space-y-0.5 max-h-32 overflow-y-auto">
-                  {importPreview.errors.slice(0, 20).map((e, i) => (
-                    <li key={i}>• {e}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            <div className="flex flex-wrap items-center gap-2 pt-2">
-              <button
-                onClick={confirmImport}
-                disabled={importing || importPreview.rows.length === 0}
-                className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2.5 whitespace-nowrap hover:brightness-105 transition disabled:opacity-40"
-              >
-                {importing ? 'Importuji…' : `Importovat ${importPreview.rows.length} směn`}
-              </button>
-              <button
-                onClick={() => setImportPreview(null)}
-                className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] px-4 py-2.5 whitespace-nowrap transition"
-              >
-                Zrušit
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </>
   );
 }
 
-// ---- Shift Types manager ----
+// ---------------------------------------------------------------------------
+// Typy směn
+// ---------------------------------------------------------------------------
+
+/** Barevná tečka typu směny — třída kategorie, ne inline hex (stejně jako widgety). */
+function TeckaBarvy({ barva, className = '' }: { barva: string | null | undefined; className?: string }) {
+  return <span aria-hidden className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${tridaTecky(barva)} ${className}`} />;
+}
+
+const NAZEV_BARVY: Record<string, string> = {
+  '#C8F542': 'limetková', '#0A84FF': 'modrá', '#8B5CF6': 'fialová', '#F59E0B': 'oranžová',
+  '#14B8A6': 'tyrkysová', '#EC4899': 'růžová',
+};
+
 function ShiftTypesManager({ shiftTypes, onReload }: { shiftTypes: ShiftType[]; onReload: () => Promise<void> }) {
   const [editing, setEditing] = useState<number | 'new' | null>(null);
   const [name, setName] = useState('');
@@ -1562,24 +1379,15 @@ function ShiftTypesManager({ shiftTypes, onReload }: { shiftTypes: ShiftType[]; 
   const [endsAtClose, setEndsAtClose] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [smazat, setSmazat] = useState<ShiftType | null>(null);
 
   const beginNew = () => {
-    setEditing('new');
-    setName('');
-    setStart('06:00');
-    setEnd('14:00');
-    setColor(COLORS[0]);
-    setStartsAtOpen(false);
-    setEndsAtClose(false);
+    setEditing('new'); setName(''); setStart('06:00'); setEnd('14:00'); setColor(COLORS[0]);
+    setStartsAtOpen(false); setEndsAtClose(false); setErr('');
   };
   const beginEdit = (t: ShiftType) => {
-    setEditing(t.id);
-    setName(t.name);
-    setStart(t.startTime);
-    setEnd(t.endTime);
-    setColor(t.color ?? COLORS[0]);
-    setStartsAtOpen(!!t.startsAtOpen);
-    setEndsAtClose(!!t.endsAtClose);
+    setEditing(t.id); setName(t.name); setStart(t.startTime); setEnd(t.endTime); setColor(t.color ?? COLORS[0]);
+    setStartsAtOpen(!!t.startsAtOpen); setEndsAtClose(!!t.endsAtClose); setErr('');
   };
 
   const save = async () => {
@@ -1588,21 +1396,10 @@ function ShiftTypesManager({ shiftTypes, onReload }: { shiftTypes: ShiftType[]; 
     setBusy(true);
     try {
       const payload = { name: name.trim(), startTime: start, endTime: end, color, startsAtOpen, endsAtClose };
-      let res: Response | null = null;
-      if (editing === 'new') {
-        res = await fetch('/api/shift-types', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-      } else if (typeof editing === 'number') {
-        res = await fetch(`/api/shift-types/${editing}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-      }
-      if (res && !res.ok) {
+      const res = editing === 'new'
+        ? await fetch('/api/shift-types', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        : await fetch(`/api/shift-types/${editing}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      if (!res.ok) {
         // Server umí říct, že typ spravuje jiný podnik organizace — ať to člověk vidí.
         const d = await res.json().catch(() => ({}));
         setErr(d?.error || 'Typ směny se nepodařilo uložit.');
@@ -1617,177 +1414,105 @@ function ShiftTypesManager({ shiftTypes, onReload }: { shiftTypes: ShiftType[]; 
     }
   };
 
-  const remove = async (id: number) => {
+  const remove = async () => {
+    if (!smazat) return;
     setErr('');
-    const t = shiftTypes.find(x => x.id === id);
-    if (!confirm(`Smazat typ směny „${t?.name ?? ''}"? Naplánované směny tohoto typu zůstanou, ale ztratí barvu i název.`)) return;
     setBusy(true);
     try {
-      const res = await fetch(`/api/shift-types/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/shift-types/${smazat.id}`, { method: 'DELETE' });
       if (!res.ok) setErr('Typ směny se nepodařilo smazat.');
+      setSmazat(null);
       await onReload();
+    } catch {
+      setErr('Nepodařilo se spojit se serverem.');
     } finally {
       setBusy(false);
     }
   };
 
+  const formular = (
+    <TypeForm
+      name={name} start={start} end={end} color={color} startsAtOpen={startsAtOpen} endsAtClose={endsAtClose} busy={busy}
+      setName={setName} setStart={setStart} setEnd={setEnd} setColor={setColor}
+      setStartsAtOpen={setStartsAtOpen} setEndsAtClose={setEndsAtClose}
+      onSave={save} onCancel={() => setEditing(null)}
+    />
+  );
+
   return (
-    <div className="glass-card p-5 space-y-4">
-      {err && <p className="text-sm font-medium text-bad-ink">{err}</p>}
+    <Card as="section" aria-labelledby="typy-smen" className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2 min-w-0">
-          <Icon name="clock" size={20} className="text-black/70 flex-shrink-0" />
-          <h2 className="t-section truncate">Typy směn</h2>
-        </div>
-        <button
-          onClick={beginNew}
-          className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2 whitespace-nowrap flex-shrink-0 hover:brightness-105 transition inline-flex items-center gap-1.5 text-sm"
-        >
-          <Icon name="plus" size={16} /> Přidat
-        </button>
+        <h2 id="typy-smen" className="t-section flex items-center gap-2 min-w-0">
+          <Icon name="clock" size={17} className="text-black/40 shrink-0" /><span className="truncate">Typy směn</span>
+        </h2>
+        {editing !== 'new' && <Button variant="accent" size="sm" icon="plus" onClick={beginNew}>Přidat typ</Button>}
       </div>
+      {err && <p className="note note-danger text-sm" role="alert">{err}</p>}
 
       {shiftTypes.length === 0 && editing !== 'new' && (
         <EmptyState illustration="smeny" title="Zatím žádné typy směn" hint="Ranní, odpolední, otvíračka — podle nich generátor obsazuje dny. Přidej první." compact />
       )}
 
-      <div className="space-y-2">
-        {shiftTypes.map((t) =>
-          editing === t.id ? (
-            <TypeForm
-              key={t.id}
-              name={name}
-              start={start}
-              end={end}
-              color={color}
-              startsAtOpen={startsAtOpen}
-              endsAtClose={endsAtClose}
-              busy={busy}
-              setName={setName}
-              setStart={setStart}
-              setEnd={setEnd}
-              setColor={setColor}
-              setStartsAtOpen={setStartsAtOpen}
-              setEndsAtClose={setEndsAtClose}
-              onSave={save}
-              onCancel={() => setEditing(null)}
-            />
+      {shiftTypes.length > 0 && (
+        <ul className="list">
+          {shiftTypes.map((t) => editing === t.id ? (
+            <li key={t.id} className="py-3">{formular}</li>
           ) : (
-            <div
-              key={t.id}
-              className="flex items-center gap-3 well border border-black/[0.08] px-4 py-3"
-            >
-              <span className="h-4 w-4 rounded-md flex-shrink-0" style={{ backgroundColor: t.color ?? '#C8F542' }} />
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-[#16181A] truncate">
-                  {t.name}
-                  {t.zOrganizace && <span className="ml-2 chip chip-sm chip-muted align-middle">z organizace</span>}
-                  {t.sdileno && <span className="ml-2 chip chip-sm chip-info align-middle">sdíleno</span>}
-                </p>
-                <p className="text-xs text-black/45">
-                  {t.startsAtOpen ? 'otevření' : t.startTime}–{t.endsAtClose ? 'zavření' : t.endTime}
-                  {t.zOrganizace && t.spravuje && <> · Spravuje: {t.spravuje}</>}
-                </p>
-              </div>
-              {/* Typ ze zdrojového podniku upraví jen jeho vedení — tlačítka by jen vracela 403. */}
-              {!t.zOrganizace && (
+            <ListRow key={t.id}
+              lead={<span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-black/[0.035]"><TeckaBarvy barva={t.color} className="h-3 w-3" /></span>}
+              title={<>{t.name}{t.zOrganizace && <Chip tone="muted" size="sm" className="ml-2 align-middle">z organizace</Chip>}{t.sdileno && <Chip tone="info" size="sm" className="ml-2 align-middle">sdíleno</Chip>}</>}
+              meta={<>{t.startsAtOpen ? 'otevření' : t.startTime}–{t.endsAtClose ? 'zavření' : t.endTime}{t.zOrganizace && t.spravuje ? ` · spravuje: ${t.spravuje}` : ''}</>}
+              // Typ ze zdrojového podniku upraví jen jeho vedení — tlačítka by jen vracela 403.
+              actions={t.zOrganizace ? undefined : (
                 <>
-                  <button onClick={() => beginEdit(t)} className="text-black/50 hover:text-[#16181A] p-1.5 flex-shrink-0" title="Upravit">
-                    <Icon name="settings" size={18} />
-                  </button>
-                  <button onClick={() => remove(t.id)} className="text-black/30 hover:text-bad-ink p-1.5 flex-shrink-0" title="Smazat">
-                    ×
-                  </button>
+                  <Button variant="ghost" size="sm" iconOnly icon="pencil" aria-label={`Upravit typ ${t.name}`} onClick={() => beginEdit(t)} />
+                  <Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={`Smazat typ ${t.name}`} onClick={() => setSmazat(t)} />
                 </>
               )}
-            </div>
-          ),
-        )}
+            />
+          ))}
+        </ul>
+      )}
 
-        {editing === 'new' && (
-          <TypeForm
-            name={name}
-            start={start}
-            end={end}
-            color={color}
-            startsAtOpen={startsAtOpen}
-            endsAtClose={endsAtClose}
-            busy={busy}
-            setName={setName}
-            setStart={setStart}
-            setEnd={setEnd}
-            setColor={setColor}
-            setStartsAtOpen={setStartsAtOpen}
-            setEndsAtClose={setEndsAtClose}
-            onSave={save}
-            onCancel={() => setEditing(null)}
-          />
-        )}
-      </div>
-    </div>
+      {editing === 'new' && formular}
+
+      {smazat && (
+        <Modal open onClose={() => setSmazat(null)} size="sm" title={`Smazat typ „${smazat.name}"?`}
+          footer={<>
+            <Button variant="secondary" onClick={() => setSmazat(null)}>Zrušit</Button>
+            <Button variant="danger-solid" icon="trash" loading={busy} onClick={remove}>Smazat typ</Button>
+          </>}>
+          <p className="text-sm text-black/60 text-pretty">Naplánované směny tohoto typu zůstanou, ale ztratí barvu i název.</p>
+        </Modal>
+      )}
+    </Card>
   );
 }
 
 function TypeForm({
-  name,
-  start,
-  end,
-  color,
-  startsAtOpen,
-  endsAtClose,
-  busy,
-  setName,
-  setStart,
-  setEnd,
-  setColor,
-  setStartsAtOpen,
-  setEndsAtClose,
-  onSave,
-  onCancel,
+  name, start, end, color, startsAtOpen, endsAtClose, busy,
+  setName, setStart, setEnd, setColor, setStartsAtOpen, setEndsAtClose, onSave, onCancel,
 }: {
-  name: string;
-  start: string;
-  end: string;
-  color: string;
-  startsAtOpen: boolean;
-  endsAtClose: boolean;
-  busy: boolean;
-  setName: (v: string) => void;
-  setStart: (v: string) => void;
-  setEnd: (v: string) => void;
-  setColor: (v: string) => void;
-  setStartsAtOpen: (v: boolean) => void;
-  setEndsAtClose: (v: boolean) => void;
-  onSave: () => void;
-  onCancel: () => void;
+  name: string; start: string; end: string; color: string; startsAtOpen: boolean; endsAtClose: boolean; busy: boolean;
+  setName: (v: string) => void; setStart: (v: string) => void; setEnd: (v: string) => void; setColor: (v: string) => void;
+  setStartsAtOpen: (v: boolean) => void; setEndsAtClose: (v: boolean) => void; onSave: () => void; onCancel: () => void;
 }) {
   return (
-    <div className="well border border-[#C8F542]/30 p-4 space-y-3">
-      <input
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder="Název (např. Ranní)"
-        className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
-      />
-      <div className="flex gap-3">
-        <div className="flex-1">
-          <label className="block text-xs font-medium text-black/55 mb-1">Od</label>
-          {startsAtOpen ? (
-            <div className="w-full well border border-black/[0.08] px-4 py-3 text-sm text-black/45">Otevření podniku</div>
-          ) : (
-            <input type="time" value={start} onChange={(e) => setStart(e.target.value)}
-              className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none" />
-          )}
-        </div>
-        <div className="flex-1">
-          <label className="block text-xs font-medium text-black/55 mb-1">Do</label>
-          {endsAtClose ? (
-            <div className="w-full well border border-black/[0.08] px-4 py-3 text-sm text-black/45">Zavření podniku</div>
-          ) : (
-            <input type="time" value={end} onChange={(e) => setEnd(e.target.value)}
-              className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none" />
-          )}
-        </div>
+    <Well className="space-y-3">
+      <Field id="typ-nazev" label="Název" hint="Třeba Ranní, Odpolední nebo Otvíračka.">
+        <Input id="typ-nazev" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} />
+      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field id="typ-od" label="Od">
+          {startsAtOpen
+            ? <p id="typ-od" className="t-meta py-3">Otevření podniku</p>
+            : <Input id="typ-od" type="time" value={start} onChange={(e) => setStart(e.target.value)} />}
+        </Field>
+        <Field id="typ-do" label="Do">
+          {endsAtClose
+            ? <p id="typ-do" className="t-meta py-3">Zavření podniku</p>
+            : <Input id="typ-do" type="time" value={end} onChange={(e) => setEnd(e.target.value)} />}
+        </Field>
       </div>
       <div className="flex flex-col gap-2">
         <label className="flex items-center gap-2 text-sm text-black/70 cursor-pointer">
@@ -1796,45 +1521,38 @@ function TypeForm({
         </label>
         <label className="flex items-center gap-2 text-sm text-black/70 cursor-pointer">
           <input type="checkbox" checked={endsAtClose} onChange={(e) => setEndsAtClose(e.target.checked)} className="h-4 w-4 accent-[#8FB811]" />
-          Končí zavřením podniku <span className="text-black/35">(do konce směny)</span>
+          Končí zavřením podniku <span className="text-black/45">(do konce směny)</span>
         </label>
       </div>
-      <div>
-        <label className="block text-xs font-medium text-black/55 mb-1.5">Barva</label>
+      <div role="radiogroup" aria-label="Barva typu" className="space-y-1.5">
+        <p className="text-[13px] font-medium text-black/70" aria-hidden>Barva</p>
         <div className="flex flex-wrap gap-2">
           {COLORS.map((c) => (
-            <button
-              key={c}
+            // Vybraná podle kategorie: starý typ uložený jako #3B82F6 je pořád „modrá".
+            // Prstenec má odsazení v barvě plochy a v tmavém režimu světlou barvu.
+            <button key={c} type="button" role="radio" aria-checked={kategorieBarvy(color) === kategorieBarvy(c)} aria-label={NAZEV_BARVY[c] ?? c}
               onClick={() => setColor(c)}
-              className={`h-7 w-7 rounded-lg transition ${color === c ? 'ring-2 ring-offset-2 ring-black/40' : ''}`}
-              style={{ backgroundColor: c }}
-            />
+              className={`tap-target-sm h-7 w-7 rounded-full transition-shadow ${tridaTecky(c)} ${kategorieBarvy(color) === kategorieBarvy(c) ? 'ring-2 ring-offset-2 ring-offset-[var(--surface)] ring-black/40 dark:ring-white/60' : ''}`} />
           ))}
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2 pt-1">
-        <button
-          onClick={onSave}
-          disabled={busy || !name.trim()}
-          className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2 text-sm whitespace-nowrap hover:brightness-105 transition disabled:opacity-40"
-        >
-          {busy ? 'Ukládám…' : 'Uložit'}
-        </button>
-        <button onClick={onCancel} className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] px-4 py-2 text-sm whitespace-nowrap transition">
-          Zrušit
-        </button>
+        <Button variant="primary" size="sm" loading={busy} disabled={!name.trim()} onClick={onSave}>Uložit</Button>
+        <Button variant="secondary" size="sm" onClick={onCancel}>Zrušit</Button>
       </div>
-    </div>
+    </Well>
   );
 }
 
-// ---- Opening hours editor ----
-function OpeningHoursEditor({
-  value,
-  onSaved,
-}: {
+// ---------------------------------------------------------------------------
+// Otevírací doba
+// ---------------------------------------------------------------------------
+
+function OpeningHoursEditor({ value, onSaved, readOnly = false }: {
   value: Record<string, OpeningDay>;
   onSaved: (v: Record<string, OpeningDay>) => void;
+  /** Bez podnik.oteviraci_doba jen ke čtení — server by uložení odmítl. */
+  readOnly?: boolean;
 }) {
   const norm = (v: Record<string, OpeningDay>) => {
     const out: Record<string, OpeningDay> = {};
@@ -1847,6 +1565,7 @@ function OpeningHoursEditor({
   const [hours, setHours] = useState<Record<string, OpeningDay>>(() => norm(value));
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState('');
 
   useEffect(() => {
     setHours(norm(value));
@@ -1859,98 +1578,71 @@ function OpeningHoursEditor({
   };
 
   const save = async () => {
-    setSaving(true);
+    setSaving(true); setErr('');
     try {
       const res = await fetch('/api/opening-hours', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ openingHours: hours }),
       });
-      if (res.ok) {
-        const d = await res.json();
-        onSaved(d.openingHours ?? hours);
-        setSaved(true);
-      }
+      const d = await okJson(res);
+      onSaved(d.openingHours ?? hours);
+      setSaved(true);
+    } catch (e) {
+      setErr(apiMessage(e, 'Otevírací dobu se nepodařilo uložit.'));
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="glass-card p-5 space-y-4">
-      <div className="flex items-center gap-2">
-        <Icon name="clock" size={20} className="text-black/70" />
-        <h2 className="t-section">Otevírací doba</h2>
+    <Card as="section" aria-labelledby="oteviraci-doba" className="space-y-4">
+      <div>
+        <h2 id="oteviraci-doba" className="t-section flex items-center gap-2"><Icon name="clock" size={17} className="text-black/40 shrink-0" /> Otevírací doba</h2>
+        <p className="t-meta mt-0.5">Kdy má provoz otevřeno. Zavřené dny generátor přeskočí a díry hlídá jen v otevírací době.</p>
       </div>
-      <p className="text-sm text-black/45">Nastav, kdy má provoz otevřeno. Zavřené dny algoritmus přeskočí.</p>
 
-      <div className="space-y-2">
+      <ul className="list">
         {CZ_DAYS_FULL.map((label, d) => {
           const day = hours[String(d)] ?? { open: '08:00', close: '20:00', closed: false };
+          const idDne = `oteviraci-${d}`;
           return (
-            <div
-              key={d}
-              className="flex items-center gap-3 well border border-black/[0.08] px-4 py-3 flex-wrap"
-            >
-              <span className="w-24 font-medium text-[#16181A] truncate">{label}</span>
-              <button
-                onClick={() => update(d, { closed: !day.closed })}
-                className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-medium border whitespace-nowrap flex-shrink-0 transition ${
-                  day.closed
-                    ? 'bg-bad/15 border-bad/30 text-bad-ink'
-                    : 'bg-[#C8F542]/15 border-[#C8F542]/40 text-[#5B7A08]'
-                }`}
-              >
-                {day.closed ? 'Zavřeno' : 'Otevřeno'}
-              </button>
+            <li key={d} className="flex items-center gap-3 py-3 flex-wrap min-h-[3.25rem]">
+              <span id={idDne} className="w-24 text-[15px] font-medium text-[#16181A] truncate">{label}</span>
+              <Switch checked={!day.closed} onChange={(on) => update(d, { closed: !on })} labelledBy={idDne} disabled={readOnly} />
+              <span className="t-meta w-20">{day.closed ? 'Zavřeno' : 'Otevřeno'}</span>
               {!day.closed && (
                 <div className="flex items-center gap-2">
-                  <input
-                    type="time"
-                    value={day.open}
-                    onChange={(e) => update(d, { open: e.target.value })}
-                    className="field border border-black/[0.08] px-3 py-2 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
-                  />
-                  <span className="text-black/40">–</span>
-                  <input
-                    type="time"
-                    value={day.close}
-                    onChange={(e) => update(d, { close: e.target.value })}
-                    className="field border border-black/[0.08] px-3 py-2 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
-                  />
+                  <Input type="time" aria-label={`${label} — otevírá v`} value={day.open} disabled={readOnly}
+                    onChange={(e) => update(d, { open: e.target.value })} className="!w-auto" />
+                  <span className="text-black/40" aria-hidden>–</span>
+                  <Input type="time" aria-label={`${label} — zavírá v`} value={day.close} disabled={readOnly}
+                    onChange={(e) => update(d, { close: e.target.value })} className="!w-auto" />
                 </div>
               )}
-            </div>
+            </li>
           );
         })}
-      </div>
+      </ul>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          onClick={save}
-          disabled={saving}
-          className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2.5 whitespace-nowrap hover:brightness-105 transition disabled:opacity-50"
-        >
-          {saving ? 'Ukládám…' : 'Uložit otevírací dobu'}
-        </button>
-        {saved && (
-          <span className="flex items-center gap-1.5 text-[#5B7A08] text-sm font-medium whitespace-nowrap">
-            <Icon name="check" size={18} /> Uloženo!
-          </span>
-        )}
-      </div>
-    </div>
+      {err && <p className="note note-danger text-sm" role="alert">{err}</p>}
+      {readOnly ? (
+        <p className="t-meta">Otevírací dobu mění vedení s oprávněním k nastavení podniku.</p>
+      ) : (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button variant="accent" icon="check" loading={saving} onClick={save}>Uložit otevírací dobu</Button>
+          {saved && <Chip tone="ok" icon="check">Uloženo</Chip>}
+        </div>
+      )}
+    </Card>
   );
 }
 
-// ---- Fixed assignments manager ----
-function FixedAssignmentsManager({
-  employees,
-  shiftTypes,
-  assignments,
-  onReload,
-  onNavigate,
-}: {
+// ---------------------------------------------------------------------------
+// Pevné dny
+// ---------------------------------------------------------------------------
+
+function FixedAssignmentsManager({ employees, shiftTypes, assignments, onReload, onNavigate }: {
   onNavigate?: (view: string, arg?: string) => void;
   employees: Member[];
   shiftTypes: ShiftType[];
@@ -1962,201 +1654,157 @@ function FixedAssignmentsManager({
   const [shiftTypeId, setShiftTypeId] = useState<number | ''>('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [smazat, setSmazat] = useState<FixedAssignment | null>(null);
 
   const add = async () => {
     if (!employeeId) return;
-    setBusy(true);
+    setBusy(true); setErr('');
     try {
-      await fetch('/api/fixed-assignments', {
+      const res = await fetch('/api/fixed-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ employeeId, weekday, shiftTypeId: shiftTypeId === '' ? null : shiftTypeId }),
       });
+      await okJson(res);
       setEmployeeId('');
       setShiftTypeId('');
       await onReload();
+    } catch (e) {
+      setErr(apiMessage(e, 'Pevný den se nepodařilo přidat.'));
     } finally {
       setBusy(false);
     }
   };
 
-  const remove = async (id: number) => {
-    setErr('');
-    if (!confirm('Smazat pevné přiřazení? Z příštího generování rozpisu vypadne.')) return;
-    setBusy(true);
+  const remove = async () => {
+    if (!smazat) return;
+    setBusy(true); setErr('');
     try {
-      const res = await fetch(`/api/fixed-assignments?id=${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/fixed-assignments?id=${smazat.id}`, { method: 'DELETE' });
       if (!res.ok) setErr('Přiřazení se nepodařilo smazat.');
+      setSmazat(null);
       await onReload();
+    } catch {
+      setErr('Nepodařilo se spojit se serverem.');
     } finally {
       setBusy(false);
     }
+  };
+
+  const zmenTyp = async (a: FixedAssignment, v: number | null) => {
+    setErr('');
+    const res = await fetch('/api/fixed-assignments', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: a.id, shiftTypeId: v }),
+    }).catch(() => null);
+    if (res?.ok) await onReload();
+    else setErr('Změnu se nepodařilo uložit.');
   };
 
   const byWeekday = useMemo(() => {
     const map: Record<number, FixedAssignment[]> = {};
-    assignments.forEach((a) => {
-      (map[a.weekday] ||= []).push(a);
-    });
+    assignments.forEach((a) => { (map[a.weekday] ||= []).push(a); });
     return map;
   }, [assignments]);
 
   return (
     <div className="space-y-6">
-      {err && <p className="text-sm font-medium text-bad-ink">{err}</p>}
-      <div className="glass-card p-5 space-y-4">
-        <div className="flex items-center gap-2">
-          <Icon name="swap" size={20} className="text-black/70" />
-          <h2 className="t-section">Přidat pevný den</h2>
+      {err && <p className="note note-danger text-sm" role="alert">{err}</p>}
+      <Card as="section" aria-labelledby="pevny-den" className="space-y-4">
+        <div>
+          <h2 id="pevny-den" className="t-section flex items-center gap-2"><Icon name="swap" size={17} className="text-black/40 shrink-0" /> Přidat pevný den</h2>
+          <p className="t-meta mt-0.5">Přiřaď člověka k opakujícímu se dni v týdnu. Generátor ho na ten den nasadí přednostně.</p>
         </div>
-        <p className="text-sm text-black/45">
-          Přiřaď zaměstnance k opakujícímu se dni v týdnu. Algoritmus ho na tento den nasadí přednostně.
-        </p>
 
         {employees.length === 0 ? (
-          /* Holá věta je slepá ulička: člověk se dozví, že nikoho nemá,
-             ale ne co s tím. Prázdný stav má vést tam, kde se to spraví. */
+          // Holá věta je slepá ulička: prázdný stav má vést tam, kde se to spraví.
           <EmptyState icon="users" compact title="Zatím nikdo v týmu"
             hint="Pevné dny se přiřazují lidem — nejdřív je pozvi do týmu."
-            action={onNavigate ? <Button variant="accent" icon="users" onClick={() => onNavigate('team-settings')}>Pozvat do týmu</Button> : undefined} />
+            action={onNavigate ? <Button variant="secondary" icon="users" onClick={() => onNavigate('team-settings')}>Pozvat do týmu</Button> : undefined} />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-black/55 mb-1">Zaměstnanec</label>
-              <select
-                value={employeeId}
-                onChange={(e) => setEmployeeId(e.target.value === '' ? '' : parseInt(e.target.value))}
-                className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
-              >
-                <option value="">Vyber…</option>
-                {employees.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-black/55 mb-1">Den v týdnu</label>
-              <select
-                value={weekday}
-                onChange={(e) => setWeekday(parseInt(e.target.value))}
-                className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
-              >
-                {CZ_DAYS_FULL.map((label, d) => (
-                  <option key={d} value={d}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-black/55 mb-1">
-                Typ směny <span className="text-black/35">(nepovinné)</span>
-              </label>
-              <select
-                value={shiftTypeId}
-                onChange={(e) => setShiftTypeId(e.target.value === '' ? '' : parseInt(e.target.value))}
-                className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
-              >
+            <Field id="pevny-kdo" label="Kdo">
+              <Select id="pevny-kdo" value={employeeId} onChange={(e) => setEmployeeId(e.target.value === '' ? '' : parseInt(e.target.value))}>
+                <option value="">Vyber člověka…</option>
+                {employees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+              </Select>
+            </Field>
+            <Field id="pevny-den-tydne" label="Den v týdnu">
+              <Select id="pevny-den-tydne" value={weekday} onChange={(e) => setWeekday(parseInt(e.target.value))}>
+                {CZ_DAYS_FULL.map((label, d) => <option key={d} value={d}>{label}</option>)}
+              </Select>
+            </Field>
+            <Field id="pevny-typ" label="Typ směny" hint="Nepovinné — bez něj libovolná směna.">
+              <Select id="pevny-typ" value={shiftTypeId} onChange={(e) => setShiftTypeId(e.target.value === '' ? '' : parseInt(e.target.value))}>
                 <option value="">Libovolná</option>
-                {shiftTypes.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name} ({t.startTime}–{t.endTime})
-                  </option>
-                ))}
-              </select>
-            </div>
+                {shiftTypes.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.startTime}–{t.endTime})</option>)}
+              </Select>
+            </Field>
             <div className="flex items-end">
-              <button
-                onClick={add}
-                disabled={busy || !employeeId}
-                className="w-full rounded-full bg-[#C8F542] text-black font-semibold px-5 py-3 hover:brightness-105 transition disabled:opacity-40 inline-flex items-center justify-center gap-1.5"
-              >
-                <Icon name="plus" size={16} /> Přidat pevný den
-              </button>
+              <Button variant="accent" icon="plus" block loading={busy} disabled={!employeeId} onClick={add} className="sm:!w-full">Přidat pevný den</Button>
             </div>
           </div>
         )}
-      </div>
+      </Card>
 
-      <div className="glass-card p-5 space-y-3">
-        <h2 className="font-bold text-[#16181A] flex items-center gap-2">
-          <Icon name="calendar" size={20} className="text-black/70" /> Pevné dny
-        </h2>
+      <Card as="section" aria-labelledby="pevne-dny" className="space-y-3">
+        <h2 id="pevne-dny" className="t-section flex items-center gap-2"><Icon name="calendar" size={17} className="text-black/40 shrink-0" /> Pevné dny</h2>
         {assignments.length === 0 ? (
           <EmptyState icon="calendar" title="Zatím žádné pevné dny" hint="Kdo chodí vždycky v pondělí, dostane pondělí — generátor to bere jako první." compact />
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {CZ_DAYS_FULL.map((label, d) => {
               const list = byWeekday[d] ?? [];
               if (list.length === 0) return null;
               return (
                 <div key={d}>
-                  <p className="text-xs uppercase tracking-wide text-black/40 mb-1.5">{label}</p>
-                  <div className="flex flex-wrap gap-2">
+                  <p className="t-label mb-1">{label}</p>
+                  <ul className="list">
                     {list.map((a) => (
-                      <span
-                        key={a.id}
-                        className="flex items-center gap-2 max-w-full rounded-full pl-1.5 pr-2 py-1.5 text-sm bg-black/[0.03] border border-black/[0.08] text-[#16181A]"
-                      >
-                        <span className="text-base flex-shrink-0">{a.employeeAvatar}</span>
-                        <span className="min-w-0 truncate">{a.employeeName}</span>
-                        <select
-                          value={a.shiftTypeId ?? ''}
-                          onChange={async (e) => {
-                            const v = e.target.value === '' ? null : parseInt(e.target.value);
-                            const res = await fetch('/api/fixed-assignments', {
-                              method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ id: a.id, shiftTypeId: v }),
-                            }).catch(() => null);
-                            if (res?.ok) await onReload();
-                            else setErr('Změnu se nepodařilo uložit.');
-                          }}
-                          className="text-xs text-black/55 bg-transparent border-0 focus:outline-none cursor-pointer max-w-[140px] truncate"
-                          title="Změnit typ směny"
-                        >
-                          <option value="">libovolná</option>
-                          {shiftTypes.map((t) => (
-                            <option key={t.id} value={t.id}>{t.name}</option>
-                          ))}
-                        </select>
-                        <button
-                          onClick={() => remove(a.id)}
-                          className="text-black/30 hover:text-bad-ink pl-1 flex-shrink-0"
-                          title="Odebrat"
-                        >
-                          ×
-                        </button>
-                      </span>
+                      <ListRow key={a.id}
+                        lead={<Avatar emoji={a.employeeAvatar} size="sm" />}
+                        title={a.employeeName}
+                        right={(
+                          <Select aria-label={`Typ směny — ${a.employeeName}, ${label.toLowerCase()}`} value={a.shiftTypeId ?? ''}
+                            onChange={(e) => zmenTyp(a, e.target.value === '' ? null : parseInt(e.target.value))} className="!w-auto !py-2 text-sm">
+                            <option value="">Libovolná</option>
+                            {shiftTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                          </Select>
+                        )}
+                        actions={<Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={`Odebrat pevný den — ${a.employeeName}, ${label.toLowerCase()}`} onClick={() => setSmazat(a)} />}
+                      />
                     ))}
-                  </div>
+                  </ul>
                 </div>
               );
             })}
           </div>
         )}
-      </div>
+      </Card>
+
+      {smazat && (
+        <Modal open onClose={() => setSmazat(null)} size="sm" title="Odebrat pevný den?"
+          subtitle={`${smazat.employeeName} · ${CZ_DAYS_FULL[smazat.weekday]?.toLowerCase() ?? ''}`}
+          footer={<>
+            <Button variant="secondary" onClick={() => setSmazat(null)}>Zrušit</Button>
+            <Button variant="danger-solid" icon="trash" loading={busy} onClick={remove}>Odebrat</Button>
+          </>}>
+          <p className="text-sm text-black/60 text-pretty">Z příštího generování rozvrhu vypadne. Už naplánované směny zůstanou.</p>
+        </Modal>
+      )}
     </div>
   );
 }
 
-// ---- Day modal for assigning shifts ----
+// ---------------------------------------------------------------------------
+// Okno dne — přiřazení směn
+// ---------------------------------------------------------------------------
+
+const VLASTNI_CAS = '__vlastni';
+
 function DayModal({
-  date,
-  onNavigate,
-  employees,
-  shifts,
-  proposed = [],
-  shiftTypes,
-  openingHours,
-  unavailable,
-  submissions,
-  onClose,
-  onAdd,
-  onRemove,
-  onRemoveProposed,
-  events = [],
+  date, onNavigate, employees, shifts, proposed = [], shiftTypes, openingHours, unavailable, submissions,
+  onClose, onAdd, onRemove, onRemoveProposed, events = [], readOnly = false,
 }: {
   onNavigate?: (view: string, arg?: string) => void;
   date: string;
@@ -2172,21 +1820,21 @@ function DayModal({
   onRemove: (id: number) => void;
   onRemoveProposed?: (p: Proposed) => void;
   events?: any[];
+  /** Náhled rozvrhu (rozvrh.nahled) nebo bez rozvrh.upravit: jen čtení. */
+  readOnly?: boolean;
 }) {
-  const dm = useModal(true, onClose, 'Den v rozvrhu');
-  // Opening hours for THIS day (keyed 0=Mon..6=Sun).
+  // Otevírací doba TOHO dne (klíč 0 = pondělí … 6 = neděle).
   const oh = openingHours[weekdayKey(date)] as OpeningDay | undefined;
   const dayOpen = oh && !oh.closed ? oh.open : null;
   const dayClose = oh && !oh.closed ? oh.close : null;
 
-  // Resolve a shift type's concrete times for this day (following open/close).
+  // Konkrétní časy typu pro tento den (podle otevření a zavření).
   const resolveTimes = (t: ShiftType) => ({
     start: t.startsAtOpen && dayOpen ? dayOpen : t.startTime,
     end: t.endsAtClose && dayClose ? dayClose : t.endTime,
   });
 
-  // Pokrytí toho jednoho dne. Modal je místo, kde se díra opravuje, takže
-  // musí být vidět přímo tady — ne jen v seznamu nad kalendářem.
+  // Pokrytí toho jednoho dne — okno je místo, kde se díra opravuje.
   const dayGaps = useMemo(
     () => uncovered(openSpan(oh ?? null), [...shifts, ...proposed].map((x) => ({ start: x.startTime, end: x.endTime }))),
     [oh, shifts, proposed],
@@ -2194,8 +1842,7 @@ function DayModal({
   const missingHere = useMemo(() => {
     if (!oh || oh.closed) return [] as string[];
     const taken = new Set([...shifts, ...proposed].map((x) => String((x as any).type ?? (x as any).shiftTypeName ?? '').trim().toLowerCase()));
-    // Den psaný ručně (vlastní časy, žádný nastavený typ) se neřeší — chybějící
-    // typ směny se hlásí jen tam, kde se s typy opravdu pracuje.
+    // Den psaný ručně (vlastní časy, žádný nastavený typ) se neřeší.
     const known = new Set(shiftTypes.map((t) => t.name.trim().toLowerCase()));
     if (taken.size === 0 || !Array.from(taken).some((t) => known.has(t))) return [] as string[];
     return shiftTypes
@@ -2205,7 +1852,7 @@ function DayModal({
 
   const first = shiftTypes[0];
   const [employeeId, setEmployeeId] = useState<number | ''>('');
-  // The chosen type name ('' = manual custom time).
+  // Vybraný typ ('' = vlastní čas).
   const [typeName, setTypeName] = useState<string>(first ? first.name : '');
   const [start, setStart] = useState(first ? resolveTimes(first).start : '08:00');
   const [end, setEnd] = useState(first ? resolveTimes(first).end : '16:00');
@@ -2213,261 +1860,186 @@ function DayModal({
 
   const applyShiftType = (t: ShiftType) => {
     const rt = resolveTimes(t);
-    setStart(rt.start);
-    setEnd(rt.end);
-    setTypeName(t.name);
+    setStart(rt.start); setEnd(rt.end); setTypeName(t.name);
   };
   const pickCustom = () => setTypeName('');
 
-  const save = async () => {
-    if (!employeeId || !start || !end) return;
-    // Warn if the chosen person marked this day off / unavailable, or prefers a
-    // different kind of shift than the one being assigned.
+  // Varování místo confirm(): člověk den označil jako nedostupný, nebo má na
+  // něj závaznou volbu jiného typu, nebo obecně preferuje jinou směnu. Ukáže
+  // se hned při výběru a tlačítko řekne „Přesto přidat" — dřív vyskočilo
+  // systémové okno, které na telefonu zakrylo celý den.
+  const varovani = useMemo(() => {
+    if (!employeeId) return null;
     const emp = Number(employeeId);
     const sub = submissions.find((s) => s.employeeId === emp);
-    const empName = employees.find((e) => e.id === emp)?.name ?? 'Zaměstnanec';
+    const empName = employees.find((e) => e.id === emp)?.name ?? 'Tenhle člověk';
     const shiftCat = start < '12:00' ? 'morning' : 'afternoon';
     const dayPref = sub?.dayPreferences?.[date];
     const prefTypesForCheck = shiftTypes.map((t) => ({ id: t.id, name: t.name, start: t.startTime }));
     const slotTypeId = shiftTypes.find((t) => t.name === typeName)?.id ?? null;
     const prefBlocks = dayPref && dayPref !== 'off' && dayPref !== 'flexible'
       && !prefAllowsSlot(dayPref, { typeId: slotTypeId, start }, prefTypesForCheck);
-    if (unavailable.has(emp)) {
-      if (!confirm(`${empName} označil/a tento den jako NEDOSTUPNÝ. Opravdu ho/ji na směnu přiřadit?`)) return;
-    } else if (prefBlocks) {
-      if (!confirm(`${empName} má na tento den závaznou volbu „${dayPrefLabel(dayPref, prefTypesForCheck)}" — tahle směna jí neodpovídá. Opravdu přiřadit?`)) return;
-    } else if (!dayPref && sub?.preferredShift && sub.preferredShift !== 'flexible' && sub.preferredShift !== shiftCat) {
-      if (!confirm(`${empName} preferuje ${sub.preferredShift === 'morning' ? 'ranní' : 'odpolední'} směny. Přesto přiřadit na tuhle?`)) return;
+    if (unavailable.has(emp)) return `${empName} má tento den jako nedostupný (nebo schválené volno).`;
+    if (prefBlocks) return `${empName} má na tento den závaznou volbu „${dayPrefLabel(dayPref, prefTypesForCheck)}" — tahle směna jí neodpovídá.`;
+    if (!dayPref && sub?.preferredShift && sub.preferredShift !== 'flexible' && sub.preferredShift !== shiftCat) {
+      return `${empName} preferuje ${sub.preferredShift === 'morning' ? 'ranní' : 'odpolední'} směny.`;
     }
+    return null;
+  }, [employeeId, start, typeName, submissions, employees, shiftTypes, unavailable, date]);
+
+  const save = async () => {
+    if (!employeeId || !start || !end) return;
     setSaving(true);
     try {
-      const ok = await onAdd({ employeeId: emp, date, startTime: start, endTime: end, type: typeName || 'Vlastní' });
-      // Only a landed save clears the selection — a failure looking identical
-      // to success is how shifts silently go missing.
+      const ok = await onAdd({ employeeId: Number(employeeId), date, startTime: start, endTime: end, type: typeName || 'Vlastní' });
+      // Výběr se smaže jen po uložení — neúspěch nesmí vypadat jako úspěch.
       if (ok) setEmployeeId('');
     } finally {
       setSaving(false);
     }
   };
 
+  const nadpis = dayLabel(date);
   return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center modal-overlay p-0 md:p-4">
-      <div ref={dm.ref} {...dm.dialogProps} className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-lg max-h-[85vh] overflow-y-auto p-6 space-y-5">
-        <DiscardGuard guard={dm.guard} />
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="text-xl font-bold text-[#16181A] cz-sentence min-w-0 truncate">{dayLabel(date)}</h3>
-          <button onClick={onClose} className="text-black/45 hover:text-black text-2xl leading-none flex-shrink-0">
-            ×
-          </button>
-        </div>
+    <Modal open onClose={onClose} size="md" title={nadpis.charAt(0).toUpperCase() + nadpis.slice(1)}
+      subtitle={dayOpen ? `Otevřeno ${dayOpen}–${dayClose}` : oh?.closed ? 'Zavřeno' : undefined}
+      footer={readOnly ? <Button variant="secondary" onClick={onClose}>Zavřít</Button> : <>
+        <Button variant="secondary" onClick={onClose}>Zavřít</Button>
+        <Button variant="primary" icon="plus" loading={saving} disabled={!employeeId || employees.length === 0} onClick={save}>
+          {varovani ? 'Přesto přidat' : 'Přidat směnu'}
+        </Button>
+      </>}>
+      <div className="space-y-5">
+        {!readOnly && (dayGaps.length > 0 || missingHere.length > 0) && (
+          <div className="note note-danger">
+            <p className="text-sm font-semibold flex items-center gap-1.5"><Icon name="warning" size={16} className="shrink-0" /> Díra v obsazení</p>
+            <ul className="text-xs mt-1 space-y-0.5 list-disc pl-4">
+              {dayGaps.map((g, i) => <li key={`g-${i}`}>Od {toHM(g.start)} do {toHM(g.end)} není v podniku nikdo, přitom je otevřeno.</li>)}
+              {missingHere.map((n) => <li key={`m-${n}`}>Směna „{n}" nemá nikoho.</li>)}
+            </ul>
+          </div>
+        )}
 
-        {(dayGaps.length > 0 || missingHere.length > 0) && (
-          <div className="note note-danger p-3.5">
-            <p className="text-sm font-semibold text-bad-ink flex items-center gap-1.5">
-              <Icon name="warning" size={16} /> Díra v obsazení
-            </p>
-            <ul className="text-xs text-bad-ink/80 mt-1 space-y-0.5">
-              {dayGaps.map((g, i) => (
-                <li key={`g-${i}`}>
-                  Od {toHM(g.start)} do {toHM(g.end)} není v podniku nikdo, přitom je otevřeno.
-                </li>
-              ))}
-              {missingHere.map((n) => (
-                <li key={`m-${n}`}>Směna „{n}" nemá nikoho.</li>
+        {events.length > 0 && (
+          <div>
+            <p className="t-label mb-1">Akce</p>
+            <ul className="list">
+              {events.map((ev: any) => (
+                <ListRow key={ev.id}
+                  lead={<span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-black/[0.035] text-black/55"><Icon name="calendarCheck" size={16} /></span>}
+                  title={ev.title}
+                  meta={`${ev.startTime ? `${ev.startTime}${ev.endTime ? `–${ev.endTime}` : ''}` : 'celý den'}${ev.location ? ` · ${ev.location}` : ''}${ev.crewPeople?.length ? ` · na akci: ${ev.crewPeople.map((p: any) => p.name).join(', ')}` : ' · zatím bez obsazení'}`}
+                />
               ))}
             </ul>
           </div>
         )}
 
-        {events.length > 0 && events.map((ev: any) => (
-          <div key={ev.id} className="rounded-2xl bg-[#0A84FF]/[0.07] border border-[#0A84FF]/25 px-4 py-3">
-            <p className="text-sm font-bold text-[#16181A]"><Icon name="calendarCheck" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {ev.title}</p>
-            <p className="text-xs text-black/50 mt-0.5">
-              {ev.startTime ? `${ev.startTime}${ev.endTime ? `–${ev.endTime}` : ''}` : 'celý den'}
-              {ev.location ? ` · ${ev.location}` : ''}
-              {ev.crewPeople?.length ? ` · na akci: ${ev.crewPeople.map((p: any) => p.name).join(', ')}` : ' · zatím bez obsazení'}
-            </p>
-          </div>
-        ))}
+        <div>
+          <p className="t-label mb-1">Přiřazené směny</p>
+          {shifts.length === 0 ? (
+            <p className="t-meta">Na tento den zatím nikdo nemá směnu.</p>
+          ) : (
+            <ul className="list">
+              {shifts.map((s) => {
+                const rt = resolveShiftType(s, shiftTypes);
+                return (
+                  <ListRow key={s.id}
+                    lead={<Avatar emoji={s.employeeAvatar} size="sm" />}
+                    title={s.employeeName}
+                    meta={<span className="inline-flex items-center gap-1.5"><TeckaBarvy barva={rt.color} className="h-2 w-2" />{rt.label}</span>}
+                    value={`${s.startTime}–${s.endTime}`}
+                    actions={readOnly ? undefined : (
+                      <Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={`Odebrat směnu — ${s.employeeName}`} onClick={() => onRemove(s.id)} />
+                    )}
+                  />
+                );
+              })}
+            </ul>
+          )}
+        </div>
 
-        {/* Existing shifts */}
-        {shifts.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-xs uppercase tracking-wide text-black/45">Přiřazené směny</p>
-            {shifts.map((s) => {
-              const rt = resolveShiftType(s, shiftTypes);
-              return (
-              <div key={s.id} className="flex items-center gap-3 well border border-black/[0.08] px-3 py-2">
-                <span className="text-lg flex-shrink-0">{s.employeeAvatar}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-[#16181A] truncate">{s.employeeName}</p>
-                  <p className="text-xs text-black/45">
-                    {s.startTime}–{s.endTime}
-                  </p>
-                </div>
-                <span className="tap-target-sm inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap flex-shrink-0 bg-black/[0.05] text-black/70">
-                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: rt.color }} />
-                  {rt.label}
-                </span>
-                <button onClick={() => onRemove(s.id)} className="text-black/30 hover:text-bad-ink transition p-1 flex-shrink-0" title="Odebrat">
-                  ×
-                </button>
-              </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Auto-generated proposal for this day — the review the calendar icons can't give. */}
+        {/* Návrh generátoru pro tento den — kontrola, kterou ikonky v mřížce nedají. */}
         {proposed.length > 0 && (
-          <div className="space-y-2">
-            {/* Věta v závorce není štítek — verzálky z ní dělají křik. */}
-          <p className="text-[13px] text-[#5B7A08] font-semibold"><Icon name="sparkle" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />Navržené směny <span className="font-medium text-black/50">— náhled, zatím neuloženo</span></p>
-            {proposed.map((p, idx) => (
-              <div key={`prop-${idx}`} className="flex items-center gap-3 rounded-2xl border border-dashed border-[#5B7A08]/50 bg-[#C8F542]/[0.08] px-3 py-2">
-                <span className="text-lg flex-shrink-0">{p.employeeAvatar}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-[#16181A] truncate">{p.employeeName}</p>
-                  <p className="text-xs text-black/45">{p.startTime}–{p.endTime}</p>
-                </div>
-                <span className="tap-target-sm inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap flex-shrink-0 bg-[#C8F542]/25 text-[#5B7A08]">
-                  {p.color && <span className="h-2 w-2 rounded-full" style={{ backgroundColor: p.color }} />}
-                  {p.shiftTypeName || 'Směna'}
-                </span>
-                {onRemoveProposed && (
-                  <button onClick={() => onRemoveProposed(p)}
-                    className="text-black/30 hover:text-bad-ink transition p-1 flex-shrink-0" title="Vyhodit z návrhu">
-                    ×
-                  </button>
-                )}
-              </div>
-            ))}
-            <p className="text-[11px] text-black/40">Uloží se až tlačítkem „Uložit rozvrh" v náhledu.</p>
+          <div>
+            <p className="t-label">Navržené směny</p>
+            <p className="t-meta mb-1">Náhled, zatím neuloženo — uloží se tlačítkem „Potvrdit a uložit" v plánovači.</p>
+            <ul className="list">
+              {proposed.map((p, idx) => (
+                <ListRow key={`prop-${idx}`}
+                  lead={<Avatar emoji={p.employeeAvatar} size="sm" />}
+                  title={p.employeeName}
+                  meta={<span className="inline-flex items-center gap-1.5">{p.color && <TeckaBarvy barva={p.color} className="h-2 w-2" />}{p.shiftTypeName || 'Směna'}</span>}
+                  value={`${p.startTime}–${p.endTime}`}
+                  right={<Chip tone="muted" size="sm" icon="sparkle">Návrh</Chip>}
+                  actions={onRemoveProposed ? (
+                    <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={`Vyhodit z návrhu — ${p.employeeName}`} onClick={() => onRemoveProposed(p)} />
+                  ) : undefined}
+                />
+              ))}
+            </ul>
           </div>
         )}
 
-        {/* Add shift */}
-        <div className="space-y-4 border-t border-black/[0.08] pt-4">
-          <p className="text-xs uppercase tracking-wide text-black/45 flex items-center gap-1.5">
-            <Icon name="plus" size={14} /> Přidat směnu
-          </p>
-
-          <div>
-            <label className="block text-sm font-medium text-black/70 mb-2">Zaměstnanec</label>
+        {!readOnly && (
+          <div className="space-y-4 border-t border-black/[0.08] pt-4">
+            <h3 className="t-card flex items-center gap-2"><Icon name="plus" size={17} className="text-black/40 shrink-0" /> Přidat směnu</h3>
             {employees.length === 0 ? (
               <EmptyState icon="users" compact title="Zatím nikdo v týmu"
                 hint="Směnu je komu přiřadit, až budou v týmu lidé."
-                action={onNavigate ? <Button variant="accent" icon="users" onClick={() => onNavigate('team-settings')}>Pozvat do týmu</Button> : undefined} />
+                action={onNavigate ? <Button variant="secondary" icon="users" onClick={() => onNavigate('team-settings')}>Pozvat do týmu</Button> : undefined} />
             ) : (
-              <div className="grid grid-cols-1 gap-1.5 max-h-48 overflow-y-auto">
-                {employees.map((e) => {
-                  const blocked = unavailable.has(e.id);
-                  const sub = submissions.find((s) => s.employeeId === e.id);
-                  return (
-                    <button
-                      key={e.id}
-                      onClick={() => setEmployeeId(e.id)}
-                      className={`flex items-center gap-2.5 rounded-2xl px-3 py-2 text-left border transition ${
-                        employeeId === e.id
-                          ? 'bg-[#C8F542]/15 border-[#C8F542]/40'
-                          : 'bg-black/[0.03] border-black/[0.08] hover:bg-black/[0.05]'
-                      }`}
-                    >
-                      <span className="text-lg flex-shrink-0">{e.avatar ?? '👤'}</span>
-                      <span className="flex-1 min-w-0 truncate text-sm text-[#16181A]">{e.name}</span>
-                      {blocked && (
-                        <span className="flex items-center gap-1 text-xs text-wait-ink font-medium whitespace-nowrap flex-shrink-0">
-                          <Icon name="warning" size={14} /> nemůže
-                        </span>
-                      )}
-                      {!blocked && sub?.preferredShift && sub.preferredShift !== 'flexible' && (
-                        <span className="text-xs text-[#5B7A08]/80 whitespace-nowrap flex-shrink-0">preferuje {sub.preferredShift === 'morning' ? 'ranní' : 'odpolední'}</span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-            {employeeId !== '' && unavailable.has(Number(employeeId)) && (
-              <p className="mt-2 text-xs text-wait-ink flex items-center gap-1.5">
-                <Icon name="warning" size={14} /> Tento zaměstnanec označil tento den jako nedostupný.
-              </p>
-            )}
-          </div>
+              <>
+                <Field id="den-kdo" label="Kdo">
+                  <Select id="den-kdo" value={employeeId} onChange={(e) => setEmployeeId(e.target.value === '' ? '' : parseInt(e.target.value))}>
+                    <option value="">Vyber člověka…</option>
+                    {employees.map((e) => {
+                      const sub = submissions.find((s) => s.employeeId === e.id);
+                      const pozn = unavailable.has(e.id) ? ' — nemůže'
+                        : sub?.preferredShift && sub.preferredShift !== 'flexible' ? ` — preferuje ${sub.preferredShift === 'morning' ? 'ranní' : 'odpolední'}` : '';
+                      return <option key={e.id} value={e.id}>{e.name}{pozn}</option>;
+                    })}
+                  </Select>
+                </Field>
+                {varovani && <p className="note note-wait text-sm" role="status">{varovani}</p>}
 
-          {/* Shift type quick-picks — from the team's configured types */}
-          <div>
-            <label className="block text-sm font-medium text-black/70 mb-2">Typ směny</label>
-            <div className="flex flex-wrap gap-1.5">
-              {shiftTypes.map((t) => {
-                const rt = resolveTimes(t);
-                const active = typeName === t.name;
-                return (
-                  <button
-                    key={t.id}
-                    onClick={() => applyShiftType(t)}
-                    title={`${rt.start}–${rt.end}`}
-                    className={`rounded-full px-3 py-1.5 text-sm font-medium border whitespace-nowrap transition inline-flex items-center gap-1.5 ${
-                      active ? 'bg-[#C8F542] text-black border-transparent' : 'glass border-black/10 on-accent hover:bg-black/[0.05]'
-                    }`}
-                  >
-                    <span className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: t.color ?? '#C8F542' }} />
-                    {t.name}
-                    {(t.startsAtOpen || t.endsAtClose) && <span className={`text-[11px] ${active ? 'text-black/50' : 'text-black/35'}`}>{rt.start}–{rt.end}</span>}
-                  </button>
-                );
-              })}
-              <button
-                onClick={pickCustom}
-                className={`rounded-full px-3 py-1.5 text-sm font-medium border whitespace-nowrap transition ${
-                  typeName === '' ? 'bg-[#16181A] text-white border-transparent' : 'glass border-black/10 text-[#16181A] hover:bg-black/[0.05]'
-                }`}
-              >
-                Vlastní čas
-              </button>
-            </div>
-            {typeName !== '' && (shiftTypes.find(t => t.name === typeName)?.endsAtClose) && !dayClose && (
-              <p className="text-[11px] text-wait-ink mt-1.5">Tento den je zavřeno — použije se výchozí konec typu.</p>
+                {shiftTypes.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-[13px] font-medium text-black/70" aria-hidden>Typ směny</p>
+                    <Segmented ariaLabel="Typ směny" wrap value={typeName || VLASTNI_CAS}
+                      onChange={(v) => {
+                        if (v === VLASTNI_CAS) { pickCustom(); return; }
+                        const t = shiftTypes.find(x => x.name === v);
+                        if (t) applyShiftType(t);
+                      }}
+                      options={[...shiftTypes.map(t => ({ id: t.name, label: t.name })), { id: VLASTNI_CAS, label: 'Vlastní čas' }]} />
+                    {typeName !== '' && shiftTypes.find(t => t.name === typeName)?.endsAtClose && !dayClose && (
+                      <p className="text-xs text-wait-ink">Tento den je zavřeno — použije se výchozí konec typu.</p>
+                    )}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Field id="den-od" label="Od">
+                    <Input id="den-od" type="time" value={start} onChange={(e) => { setStart(e.target.value); pickCustom(); }} />
+                  </Field>
+                  <Field id="den-do" label="Do">
+                    <Input id="den-do" type="time" value={end} onChange={(e) => { setEnd(e.target.value); pickCustom(); }} />
+                  </Field>
+                </div>
+              </>
             )}
           </div>
-
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-black/70 mb-2">Od</label>
-              <input
-                type="time"
-                value={start}
-                onChange={(e) => { setStart(e.target.value); pickCustom(); }}
-                className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-colors"
-              />
-            </div>
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-black/70 mb-2">Do</label>
-              <input
-                type="time"
-                value={end}
-                onChange={(e) => { setEnd(e.target.value); pickCustom(); }}
-                className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-colors"
-              />
-            </div>
-          </div>
-
-          <button
-            onClick={save}
-            disabled={saving || !employeeId}
-            className="w-full rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 hover:brightness-105 transition disabled:opacity-40"
-          >
-            {saving ? 'Přidávám…' : 'Přidat směnu'}
-          </button>
-        </div>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Pravidla generování — max dní v řadě, týmově + výjimky pro jednotlivce.
+// Pravidla generování — max dní v řadě, hodiny, střídání, dělení směn
 // ---------------------------------------------------------------------------
+
 function ScheduleRulesManager() {
   const [teamMax, setTeamMax] = useState<string>('');
   const [teamMaxHours, setTeamMaxHours] = useState<string>('');
@@ -2478,13 +2050,15 @@ function ScheduleRulesManager() {
   const [hourOverrides, setHourOverrides] = useState<Record<number, string>>({});
   const [splitOks, setSplitOks] = useState<Record<number, boolean>>({});
   const [loading, setLoading] = useState(true);
+  const [loadErr, setLoadErr] = useState('');
+  const [tick, setTick] = useState(0);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
 
   useEffect(() => {
+    setLoading(true); setLoadErr('');
     fetch('/api/schedule/rules').then(okJson).then(d => {
-      if (d?.error) { setErr(d.error); return; }
       setTeamMax(d.teamMax != null ? String(d.teamMax) : '');
       setTeamMaxHours(d.teamMaxHours != null ? String(d.teamMaxHours) : '');
       setBalance(d.balanceShifts !== false);
@@ -2502,8 +2076,8 @@ function ScheduleRulesManager() {
       setOverrides(ov);
       setHourOverrides(hov);
       setSplitOks(sok);
-    }).catch(() => setErr('Načtení se nepodařilo.')).finally(() => setLoading(false));
-  }, []);
+    }).catch((e) => setLoadErr(apiMessage(e, 'Pravidla se nenačetla.'))).finally(() => setLoading(false));
+  }, [tick]);
 
   const save = async () => {
     setSaving(true); setMsg(''); setErr('');
@@ -2523,196 +2097,130 @@ function ScheduleRulesManager() {
           })),
         }),
       });
-      const d = await res.json().catch(() => ({}));
-      if (res.ok) setMsg('Uloženo. Pravidlo se použije při dalším generování rozvrhu.');
-      else setErr(d.error || 'Uložení se nepodařilo.');
-    } catch { setErr('Chyba serveru.'); }
+      await okJson(res);
+      setMsg('Uloženo. Pravidla se použijí při dalším generování rozvrhu.');
+      // Widget „Naplánované hodiny" ukazuje strop z pravidel.
+      obnovDataWidgetu('/api/schedule/rules');
+    } catch (e) { setErr(apiMessage(e, 'Uložení se nepodařilo.')); }
     setSaving(false);
   };
 
   const teamLimit = teamMax === '' ? null : parseInt(teamMax);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-48">
-        <div className="spinner" />
-      </div>
-    );
-  }
+  if (loading) return <Skeleton className="h-64 max-w-2xl" />;
+  if (loadErr) return <Card className="max-w-2xl"><ErrorState compact title="Pravidla se nenačetla" onRetry={() => setTick(t => t + 1)} detail={loadErr} /></Card>;
 
   return (
     <div className="space-y-5 max-w-2xl">
-      <div className="glass-card p-5 space-y-3">
-        <div className="flex items-center gap-2">
-          <Icon name="clock" size={18} className="text-[#5B7A08]" />
-          <h2 className="t-section">Maximálně dní v řadě</h2>
-        </div>
-        <p className="text-sm text-black/50">
-          Kolik dní po sobě může někdo pracovat. Generátor rozvrhu po dosažení limitu
-          člověku automaticky naplánuje volno — a počítá i směny na přelomu měsíce.
+      <Card as="section" aria-labelledby="pravidla-dny" className="space-y-3">
+        <h2 id="pravidla-dny" className="t-section flex items-center gap-2"><Icon name="clock" size={17} className="text-black/40 shrink-0" /> Maximálně dní v řadě</h2>
+        <p className="t-meta text-pretty">
+          Kolik dní po sobě může někdo pracovat. Generátor po dosažení limitu naplánuje volno — a počítá i směny na přelomu měsíce.
         </p>
-        <div className="flex items-center gap-3 flex-wrap">
-          <label className="text-sm font-medium text-[#16181A]">Pro celý tým:</label>
-          <select value={teamMax} onChange={e => setTeamMax(e.target.value)}
-            className="field border border-black/[0.08] px-4 py-2.5 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none">
+        <Field id="pravidla-tym-dny" label="Pro celý tým">
+          <Select id="pravidla-tym-dny" value={teamMax} onChange={e => setTeamMax(e.target.value)} className="sm:!w-64">
             <option value="">Bez omezení</option>
             {[2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14].map(n => (
               <option key={n} value={n}>max {n} {n <= 4 ? 'dny' : 'dní'} po sobě</option>
             ))}
-          </select>
-        </div>
-      </div>
+          </Select>
+        </Field>
+      </Card>
 
-      <div className="glass-card p-5 space-y-3">
-        <div className="flex items-center gap-2">
-          <Icon name="users" size={18} className="text-[#5B7A08]" />
-          <h2 className="t-section">Spravedlivé střídání</h2>
-        </div>
-        <label className="flex items-start gap-3 cursor-pointer">
-          <input type="checkbox" checked={balance} onChange={e => setBalance(e.target.checked)}
-            className="mt-0.5 h-5 w-5 rounded accent-[#8FB811]" />
-          <span className="text-sm text-black/60">
-            <span className="font-semibold text-[#16181A]">Míchat lidi a držet všem podobný počet směn.</span>{' '}
-            Generátor dá přednost tomu, kdo má zatím méně směn, a střídá, kdo s kým slouží.
-            Nedostupnost a limity mají vždy přednost; preference ranní/odpolední se dál
-            zohledňují při rovnosti.
-          </span>
-        </label>
-      </div>
+      <Card as="section" aria-labelledby="pravidla-hodiny" className="space-y-3">
+        <h2 id="pravidla-hodiny" className="t-section flex items-center gap-2"><Icon name="overview" size={17} className="text-black/40 shrink-0" /> Maximálně hodin za měsíc</h2>
+        <p className="t-meta text-pretty">
+          Strop hodin na osobu a měsíc — hodí se pro brigádníky (DPP) nebo úvazky. Generátor po dosažení limitu už směnu nepřidá.
+        </p>
+        <Field id="pravidla-tym-hodiny" label="Pro celý tým (hodin za měsíc)" hint="Prázdné = bez omezení.">
+          <Input id="pravidla-tym-hodiny" type="number" inputMode="numeric" min={8} max={400} value={teamMaxHours}
+            onChange={e => setTeamMaxHours(e.target.value)} className="!w-full sm:!w-36" />
+        </Field>
+      </Card>
 
-      <div className="glass-card p-5 space-y-3">
-        <div className="flex items-center gap-2">
-          <Icon name="swap" size={18} className="text-[#5B7A08]" />
-          <h2 className="t-section">Dělení směn</h2>
-        </div>
-        <label className="flex items-start gap-3 cursor-pointer">
-          <input type="checkbox" checked={split} onChange={e => setSplit(e.target.checked)}
-            className="mt-0.5 h-5 w-5 rounded accent-[#8FB811]" />
-          <span className="text-sm text-black/60">
-            <span className="font-semibold text-[#16181A]">Povolit rozdělení směny mezi dva lidi.</span>{' '}
-            Když směnu nemůže vzít nikdo celou, generátor ji rozpůlí — první část vezme ten,
-            kdo může začátek, druhou ten, kdo může až později (třeba „jen odpolední").
-            V náhledu jsou půlky označené.
-          </span>
-        </label>
-        {split && (
-          <div className="well border border-black/[0.06] p-3.5 space-y-1">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-black/45 mb-1.5">
-              Komu se smí směna rozdělit
-            </p>
-            {members.map(m => (
-              <label key={m.id} className="flex items-center gap-2.5 py-1 cursor-pointer">
-                <input type="checkbox" checked={splitOks[m.id] !== false}
-                  onChange={e => setSplitOks(o => ({ ...o, [m.id]: e.target.checked }))}
-                  className="h-[18px] w-[18px] rounded accent-[#8FB811]" />
-                <span className="text-base flex h-7 w-7 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60 shrink-0">{m.avatar || '👤'}</span>
-                <span className={`text-sm ${splitOks[m.id] !== false ? 'font-semibold text-[#16181A]' : 'text-black/45'}`}>
-                  {m.name}
-                </span>
-                {splitOks[m.id] === false && (
-                  <span className="text-[11px] text-black/35">jen celé směny</span>
-                )}
-              </label>
-            ))}
-            <p className="text-[11px] text-black/40 pt-1">
-              Odškrtnutí lidé dostávají od generátoru vždy jen celé směny.
-            </p>
-          </div>
+      <Card as="section" aria-labelledby="pravidla-generator">
+        <h2 id="pravidla-generator" className="t-section flex items-center gap-2"><Icon name="users" size={17} className="text-black/40 shrink-0" /> Generátor</h2>
+        <ul className="list mt-1">
+          <SwitchRow checked={balance} onChange={setBalance} title="Spravedlivé střídání"
+            hint="Přednost dostane ten, kdo má zatím méně směn, a střídá se, kdo s kým slouží. Nedostupnost a limity mají vždy přednost." />
+          <SwitchRow checked={split} onChange={setSplit} title="Dělení směn mezi dva lidi"
+            hint="Když směnu nemůže vzít nikdo celou, generátor ji rozpůlí — začátek jednomu, konec druhému. V náhledu jsou půlky označené." />
+        </ul>
+        {split && members.length > 0 && (
+          <Well className="mt-3 space-y-1">
+            <p className="t-label">Komu se smí směna rozdělit</p>
+            <ul className="list">
+              {members.map(m => (
+                <SwitchRow key={m.id} checked={splitOks[m.id] !== false}
+                  onChange={on => setSplitOks(o => ({ ...o, [m.id]: on }))}
+                  title={m.name} hint={splitOks[m.id] === false ? 'Jen celé směny' : undefined} />
+              ))}
+            </ul>
+          </Well>
         )}
-      </div>
+      </Card>
 
-      <div className="glass-card p-5 space-y-3">
-        <div className="flex items-center gap-2">
-          <Icon name="overview" size={18} className="text-[#5B7A08]" />
-          <h2 className="t-section">Maximálně hodin za měsíc</h2>
-        </div>
-        <p className="text-sm text-black/50">
-          Strop odpracovaných hodin na osobu a měsíc — hodí se pro brigádníky (DPP)
-          nebo úvazky. Generátor člověku po dosažení limitu už žádnou směnu nepřidá.
-        </p>
-        <div className="flex items-center gap-3 flex-wrap">
-          <label className="text-sm font-medium text-[#16181A]">Pro celý tým:</label>
-          <input type="number" inputMode="numeric" min={8} max={400} value={teamMaxHours}
-            onChange={e => setTeamMaxHours(e.target.value)} placeholder="bez omezení"
-            className="w-36 field border border-black/[0.08] px-4 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
-          <span className="text-sm text-black/45">hodin / měsíc</span>
-        </div>
-      </div>
-
-      <div className="glass-card p-5 space-y-3">
-        <h3 className="t-label">Výjimky pro jednotlivce</h3>
-        <p className="text-sm text-black/50">
-          Kdo to má jinak než tým — třeba brigádník, co chce co nejvíc směn v kuse,
-          nebo někdo, komu tři dny stačí.
-        </p>
-        <div className="divide-y divide-black/[0.06]">
+      <Card as="section" aria-labelledby="pravidla-vyjimky" className="space-y-3">
+        <h2 id="pravidla-vyjimky" className="t-section">Výjimky pro jednotlivce</h2>
+        <p className="t-meta text-pretty">Kdo to má jinak než tým — třeba brigádník, co chce co nejvíc směn v kuse, nebo někdo, komu tři dny stačí.</p>
+        <ul className="list">
           {members.map(m => {
             const v = overrides[m.id] ?? '';
             const effective = v === '' ? (teamLimit != null ? `podle týmu (max ${teamLimit})` : 'bez omezení')
               : v === '0' ? 'bez omezení' : `max ${v} po sobě`;
             const hv = hourOverrides[m.id] ?? '';
             const effHours = hv === '' ? (teamMaxHours !== '' ? `podle týmu (${teamMaxHours} h)` : 'hodiny bez omezení')
-              : hv === '0' ? 'hodiny bez omezení' : `max ${hv} h/měsíc`;
+              : hv === '0' ? 'hodiny bez omezení' : `max ${hv} h za měsíc`;
             return (
-              <div key={m.id} className="flex items-center gap-3 py-2.5 flex-wrap">
-                <span className="text-lg flex h-9 w-9 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60 shrink-0">{m.avatar || '👤'}</span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-[#16181A] truncate">{m.name}</p>
-                  <p className="text-[11px] text-black/40">{effective} · {effHours}</p>
+              <li key={m.id} className="flex items-center gap-3 py-3 flex-wrap">
+                <Avatar emoji={m.avatar} size="sm" />
+                <div className="min-w-0 flex-1 basis-40">
+                  <p className="text-[15px] font-medium text-[#16181A] truncate">{m.name}</p>
+                  <p className="t-meta">{effective} · {effHours}</p>
                 </div>
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-[11px] uppercase tracking-wider text-black/35">dní po sobě</span>
-                  <select value={v}
-                    onChange={e => setOverrides(o => ({ ...o, [m.id]: e.target.value }))}
-                    className="field border border-black/[0.08] px-3.5 py-2 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none">
+                <Field id={`vyjimka-dny-${m.id}`} label="Dní po sobě" className="w-40">
+                  <Select id={`vyjimka-dny-${m.id}`} value={v} onChange={e => setOverrides(o => ({ ...o, [m.id]: e.target.value }))}>
                     <option value="">Podle týmu</option>
                     <option value="0">Bez omezení</option>
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14].map(n => (
-                      <option key={n} value={n}>max {n} po sobě</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-[11px] uppercase tracking-wider text-black/35">hodin / měsíc</span>
-                  <input type="number" inputMode="numeric" min={0} max={400}
-                    value={hourOverrides[m.id] ?? ''}
-                    onChange={e => setHourOverrides(o => ({ ...o, [m.id]: e.target.value }))}
-                    placeholder="podle týmu"
-                    title="Prázdné = podle týmu, 0 = bez omezení"
-                    className="w-28 field border border-black/[0.08] px-3.5 py-2 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
-                </div>
-              </div>
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14].map(n => <option key={n} value={n}>max {n} po sobě</option>)}
+                  </Select>
+                </Field>
+                <Field id={`vyjimka-hodiny-${m.id}`} label="Hodin za měsíc" className="w-32">
+                  <Input id={`vyjimka-hodiny-${m.id}`} type="number" inputMode="numeric" min={0} max={400}
+                    value={hourOverrides[m.id] ?? ''} title="Prázdné = podle týmu, 0 = bez omezení"
+                    onChange={e => setHourOverrides(o => ({ ...o, [m.id]: e.target.value }))} />
+                </Field>
+              </li>
             );
           })}
-        </div>
-      </div>
+        </ul>
+      </Card>
 
-      {err && <p className="text-sm text-bad-ink">{err}</p>}
-      {msg && <p className="text-sm text-[#5B7A08] bg-[#C8F542]/10 border border-[#C8F542]/25 rounded-2xl px-4 py-2.5">{msg}</p>}
-      <button onClick={save} disabled={saving}
-        className="btn btn-primary disabled:opacity-50 transition">
-        {saving ? 'Ukládám…' : 'Uložit pravidla'}
-      </button>
+      {err && <p className="note note-danger text-sm" role="alert">{err}</p>}
+      {msg && <p className="note note-ok text-sm" role="status">{msg}</p>}
+      <Button variant="accent" icon="check" loading={saving} onClick={save}>Uložit pravidla</Button>
     </div>
   );
 }
 
-
 // ---------------------------------------------------------------------------
-// Employer's view of one person's availability — every request on one screen,
-// editable in place. Tapping a day cycles: volno → nemůže → jen ranní → jen
-// odpolední → volno. The employee is notified about any change.
+// Dostupnost jednoho člověka očima vedení — všechny požadavky na jedné
+// obrazovce, upravitelné na místě. Klepnutí na den cyklí: volno → nemůže →
+// jen <typ> → … → volno. Dotyčný dostane upozornění o každé změně.
 // ---------------------------------------------------------------------------
-function EditAvailabilityModal({ member, month, initial, shiftTypes = [], onClose, onSaved }: {
+function EditAvailabilityModal({ member, month, initial, shiftTypes = [], jenCist = false, volno = [], onClose, onSaved }: {
   member: { id: number; name: string; avatar: string };
   month: string;
   initial: Submission | null;
   shiftTypes?: ShiftType[];
+  /** Bez dostupnost.upravit: stejné okno, jen bez přepínání dnů a bez uložení. */
+  jenCist?: boolean;
+  /** Schválená dovolená toho člověka — v náhledu se ukáže, aby vedení nehledalo jinde. */
+  volno?: { fromDate: string; toDate: string }[];
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const am = useModal(true, onClose, 'Upravit dostupnost');
-  // One state per day: '' | 'off' | 'type:<id>' (legacy 'morning'/'afternoon' kept readable).
+  // Jeden stav na den: '' | 'off' | 'type:<id>' (staré 'morning'/'afternoon' zůstávají čitelné).
   const [days, setDays] = useState<Record<string, string>>(() => {
     const d: Record<string, string> = {};
     (initial?.unavailableDates ?? []).forEach((x) => { if (x.startsWith(month + '-')) d[x] = 'off'; });
@@ -2729,7 +2237,7 @@ function EditAvailabilityModal({ member, month, initial, shiftTypes = [], onClos
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
 
-  // The cycle mirrors the team's shift types; binary fallback only without them.
+  // Cyklus kopíruje typy směn týmu; binární „ranní/odpolední" jen bez nich.
   const CYCLE = shiftTypes.length
     ? ['', 'off', ...shiftTypes.map((t) => `type:${t.id}`)]
     : ['', 'off', 'morning', 'afternoon'];
@@ -2742,7 +2250,6 @@ function EditAvailabilityModal({ member, month, initial, shiftTypes = [], onClos
   const zacatek = zacatekTydne(useCurrency().weekStart);
   const grid = buildGrid(month, zacatek);
   // Kategoriální paleta z globals.css — stejné odstíny jako v Dostupnosti.
-  // Dřív si obě obrazovky psaly vlastní pole a lišily se.
   const TYPE_TONES = ['cat-4 border', 'cat-2 border', 'cat-3 border', 'cat-5 border'];
   const toneOf = (v: string) => {
     if (v === 'off') return 'bg-bad/15 border-bad/40 text-bad-ink';
@@ -2758,6 +2265,7 @@ function EditAvailabilityModal({ member, month, initial, shiftTypes = [], onClos
     const t = shiftTypes.find((x) => `type:${x.id}` === v);
     return (t?.name ?? 'směna').slice(0, 6).toLowerCase();
   };
+  const cyklusSlovy = ['volno', 'nemůže', ...(shiftTypes.length ? shiftTypes.map(t => `jen ${t.name}`) : ['jen ranní', 'jen odpolední'])].join(', ');
 
   const save = async () => {
     setSaving(true); setErr('');
@@ -2777,50 +2285,98 @@ function EditAvailabilityModal({ member, month, initial, shiftTypes = [], onClos
           note: note.trim() || null,
         }),
       });
-      const d = await res.json().catch(() => ({}));
-      if (res.ok) onSaved();
-      else setErr(d.error || 'Uložení se nepodařilo.');
-    } catch { setErr('Chyba serveru.'); }
+      await okJson(res);
+      onSaved();
+    } catch (e) { setErr(apiMessage(e, 'Uložení se nepodařilo.')); }
     setSaving(false);
   };
 
-  return (
-    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={onClose}>
-      <div ref={am.ref} {...am.dialogProps} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[92vh] overflow-y-auto p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
-        <DiscardGuard guard={am.guard} />
-        <div className="flex items-center gap-3">
-          <span className="text-xl flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60 shrink-0">{member.avatar}</span>
-          <div className="min-w-0 flex-1">
-            <h3 className="font-bold tracking-tight text-[#16181A] truncate">Dostupnost — {member.name}</h3>
-            <p className="text-xs text-black/45 cz-sentence">{monthLabel(month)}</p>
-          </div>
-          <button onClick={am.guard.attemptClose} className="btn-icon shrink-0" aria-label="Zavřít"><Icon name="close" size={15} /></button>
-        </div>
+  // Dovolená, která zasahuje do měsíce (API vrací celé dny „RRRR-MM-DD", někdy s časem).
+  const volnoVMesici = volno
+    .map((v) => ({ od: denZ(v.fromDate), do: denZ(v.toDate) }))
+    .filter((v) => v.od && v.od.slice(0, 7) <= month && (v.do || v.od).slice(0, 7) >= month);
+  const PREFERENCE: Record<string, string> = { flexible: 'Flexibilní', morning: 'Ranní', afternoon: 'Odpolední' };
 
-        <p className="text-xs text-black/45">
-          Klikáním na den přepínáš: volno → <span className="text-bad-ink font-medium">nemůže</span>
-          {shiftTypes.length
-            ? shiftTypes.map((t) => <span key={t.id}> → <span className="font-medium">jen {t.name}</span></span>)
-            : <> → <span className="text-wait-ink font-medium">jen ranní</span> → <span className="font-medium text-[#0A5CC0]">jen odpolední</span></>}
-          . Denní volby jsou pro generátor závazné — typy se berou z nastavení „Typy směn".
+  if (jenCist) {
+    // Náhled pro vedení bez dostupnost.upravit: všechno, co člověk zadal, bez možnosti to měnit.
+    const zadano = Object.entries(days).filter(([, v]) => v).sort((a, b) => a[0].localeCompare(b[0]));
+    return (
+      <Modal open onClose={onClose} size="md" title={`Dostupnost — ${member.name}`} subtitle={<span className="cz-sentence">{monthLabel(month)}</span>}
+        footer={<Button variant="secondary" onClick={onClose}>Zavřít</Button>}>
+        <div className="space-y-4">
+          {!initial ? (
+            <p className="t-meta text-pretty">Dostupnost na tento měsíc zatím není zadaná.</p>
+          ) : (
+            <>
+              <div>
+                <p className="t-label mb-1">Dny</p>
+                {zadano.length === 0 ? <p className="t-meta">Žádný den není omezený — může kdykoli.</p> : (
+                  <ul className="list">
+                    {zadano.map(([d, v]) => (
+                      <li key={d} className="flex items-center justify-between gap-3 py-2 text-sm">
+                        <span className="cz-sentence tabular-nums">{new Date(`${d}T12:00:00Z`).toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric', timeZone: 'UTC' })}</span>
+                        <Chip size="sm" tone={v === 'off' ? 'bad' : 'muted'}><span className="cz-sentence">{v === 'off' ? 'nemůže' : (dayPrefLabel(v, shiftTypes.map((t) => ({ id: t.id, name: t.name, start: t.startTime }))) ?? labelOf(v))}</span></Chip>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <dl className="grid grid-cols-2 gap-3 text-sm">
+                <div><dt className="t-label">Preferuje</dt><dd className="mt-0.5">{PREFERENCE[preferred] ?? preferred}</dd></div>
+                <div><dt className="t-label">Max směn</dt><dd className="mt-0.5 tabular-nums">{maxShifts || 'bez limitu'}</dd></div>
+              </dl>
+              <div>
+                <p className="t-label mb-1">Poznámka pro vedení</p>
+                <p className="text-sm text-pretty whitespace-pre-line">{note.trim() || <span className="t-meta">Bez poznámky.</span>}</p>
+              </div>
+            </>
+          )}
+          {volnoVMesici.length > 0 && (
+            <div>
+              <p className="t-label mb-1">Schválené volno</p>
+              <ul className="space-y-1 text-sm tabular-nums">
+                {volnoVMesici.map((v, i) => <li key={i}>{rozsahVolna(v.od, v.do)}</li>)}
+              </ul>
+            </div>
+          )}
+          <p className="t-meta text-pretty">Upravit dostupnost za jiné může jen role s oprávněním k úpravě dostupnosti.</p>
+        </div>
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal open onClose={onClose} size="md" title={`Dostupnost — ${member.name}`} subtitle={<span className="cz-sentence">{monthLabel(month)}</span>}
+      footer={<>
+        <Button variant="secondary" onClick={onClose}>Zrušit</Button>
+        <Button variant="primary" icon="send" loading={saving} onClick={save}>Uložit a upozornit</Button>
+      </>}>
+      <div className="space-y-4">
+        <p className="t-meta text-pretty">
+          Klepnutím na den přepínáš: {cyklusSlovy}. Denní volby jsou pro generátor závazné — typy se berou z nastavení Typy směn.
         </p>
+        {volnoVMesici.length > 0 && (
+          <p className="note note-wait text-sm text-pretty">Schválené volno: {volnoVMesici.map((v) => rozsahVolna(v.od, v.do)).join(', ')}</p>
+        )}
 
         <div>
           <div className="grid grid-cols-7 gap-1 mb-1">
             {zkratkyDnu(zacatek).map((d) => (
-              <span key={d} className="text-center text-[11px] uppercase tracking-wide text-black/35">{d}</span>
+              <span key={d} className="text-center text-[11px] font-medium text-black/35">{d}</span>
             ))}
           </div>
           <div className="grid grid-cols-7 gap-1">
             {grid.map((cell, i) => {
               if (!cell) return <div key={i} />;
               const v = days[cell] ?? '';
+              const cislo = parseInt(cell.split('-')[2]);
               return (
-                <button key={cell} onClick={() => cycle(cell)}
-                  className={`aspect-square rounded-xl border text-center flex flex-col items-center justify-center gap-0.5 transition active:scale-95 ${
+                <button key={cell} type="button" onClick={() => cycle(cell)}
+                  aria-label={`${cislo}. — ${v ? labelOf(v) : 'volno'}`}
+                  className={`aspect-square rounded-xl border text-center flex flex-col items-center justify-center gap-0.5 transition-colors ${
                     v ? toneOf(v) : 'bg-black/[0.03] border-black/[0.08] text-black/60 hover:bg-black/[0.06]'
                   }`}>
-                  <span className="text-xs font-semibold leading-none">{parseInt(cell.split('-')[2])}</span>
+                  <span className="text-xs font-semibold leading-none">{cislo}</span>
                   {v && <span className="text-[11px] font-medium leading-none">{labelOf(v)}</span>}
                 </button>
               );
@@ -2829,38 +2385,25 @@ function EditAvailabilityModal({ member, month, initial, shiftTypes = [], onClos
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Preferuje celkově</label>
-            <select value={preferred} onChange={(e) => setPreferred(e.target.value)}
-              className="w-full field border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none">
+          <Field id="dostupnost-preferuje" label="Preferuje celkově">
+            <Select id="dostupnost-preferuje" value={preferred} onChange={(e) => setPreferred(e.target.value)}>
               <option value="flexible">Flexibilní</option>
               <option value="morning">Ranní</option>
               <option value="afternoon">Odpolední</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Max směn</label>
-            <input type="number" inputMode="numeric" min={1} max={31} value={maxShifts}
-              onChange={(e) => setMaxShifts(e.target.value)} placeholder="bez limitu"
-              className="w-full field border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
-          </div>
+            </Select>
+          </Field>
+          <Field id="dostupnost-max" label="Max směn" hint="Prázdné = bez limitu.">
+            <Input id="dostupnost-max" type="number" inputMode="numeric" min={1} max={31} value={maxShifts}
+              onChange={(e) => setMaxShifts(e.target.value)} />
+          </Field>
         </div>
 
-        <div>
-          <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Poznámka</label>
-          <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={500}
-            className="w-full field border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none" />
-        </div>
+        <Field id="dostupnost-pozn" label="Poznámka">
+          <Input id="dostupnost-pozn" value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} />
+        </Field>
 
-        {err && <p className="text-sm text-bad-ink">{err}</p>}
-        <div className="flex gap-2">
-          <button onClick={onClose} className="btn btn-secondary flex-1">Zrušit</button>
-          <button onClick={save} disabled={saving}
-            className="btn btn-primary flex-1 disabled:opacity-50">
-            {saving ? 'Ukládám…' : 'Uložit a upozornit'}
-          </button>
-        </div>
+        {err && <p className="note note-danger text-sm" role="alert">{err}</p>}
       </div>
-    </div>
+    </Modal>
   );
 }

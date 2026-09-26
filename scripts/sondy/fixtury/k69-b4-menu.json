@@ -1,0 +1,12 @@
+{"boards": [
+ {"id": 1, "slug": "akce", "name": "Venkovní akce", "eyebrow": "Letní terasa", "title": "Nabídka", "note": null, "wifiSsid": "Kavarna-host", "wifiPassword": "kafe2026", "currency": "Kč", "enabled": true, "hasPin": true,
+  "sections": [
+   {"id": 10, "title": "Káva", "column": 1, "items": [
+     {"id": 101, "name": "Latte", "price": 75, "description": null, "soldOut": false, "posProductId": "p1"},
+     {"id": 102, "name": "Espresso", "price": 55, "description": null, "soldOut": false, "posProductId": "p2"}]},
+   {"id": 11, "title": "Drinky", "column": 2, "items": [
+     {"id": 111, "name": "Mojito", "price": 150, "description": "s čerstvou mátou", "soldOut": true, "posProductId": null},
+     {"id": 112, "name": "Mražená malina", "price": 0, "description": null, "soldOut": false, "posProductId": null}]}]},
+ {"id": 2, "slug": "zima", "name": "Zimní menu", "eyebrow": null, "title": null, "note": null, "wifiSsid": null, "wifiPassword": null, "currency": "Kč", "enabled": false, "hasPin": false,
+  "sections": [{"id": 20, "title": "Teplé", "column": 1, "items": [{"id": 201, "name": "Svařák", "price": 90, "description": null, "soldOut": true, "posProductId": null}]}]}
+]}

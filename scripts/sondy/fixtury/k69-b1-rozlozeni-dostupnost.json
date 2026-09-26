@@ -1,0 +1,27 @@
+{
+ "stranka": "zamestnanec.dostupnost",
+ "polozky": [
+  {
+   "id": "nastroj",
+   "widget": "nastroj",
+   "velikost": "L"
+  },
+  {
+   "id": "moje-schvalene-volno",
+   "widget": "moje.schvalene_volno",
+   "velikost": "M"
+  }
+ ],
+ "dostupne": [
+  "moje.schvalene_volno",
+  "rozvrh.tym_nahled",
+  "moje.nejblizsi_smena"
+ ],
+ "tarifem": [],
+ "zdroj": "podnik",
+ "rozsah": "typ:zamestnanec",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": false,
+ "verze": 0
+}

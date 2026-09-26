@@ -1,11 +1,21 @@
 'use client';
 
+// Žádost o volno (zaměstnanec i vedení pro sebe) — formulář a vlastní žádosti.
+//
+// Kolo 69 (balík B1): stojí pod plochou Dostupnosti a Mých směn vedení
+// (připojují ho layouty jiného balíku). Limetka „Odeslat žádost" byla druhá
+// limetka na obrazovce vedle „Odeslat dostupnost" → `primary`. Typ volna je
+// Segmented (vybráno = inkoustová pilulka), vlastní žádosti jedna karta
+// s `.list` a stav chipem místo ručně obarvených pilulek; zrušení čekající
+// žádosti se po chybě vrátí a řekne to (dřív se tiše objevila zpátky).
+// Po odeslání se obnoví widget „Moje volno" (stejná data přes /api/timeoff?mine=1).
+
 import { useCallback, useEffect, useState } from 'react';
 
-import { EmptyState } from '../ui';
-import { Icon } from '../Icons';
+import { Button, Card, Chip, EmptyState, Field, Input, ListRow, Segmented } from '../ui';
 import { useDraft } from '@/lib/useDraft';
 import { DraftNote } from '../ui/DraftNote';
+import { obnovDataWidgetu } from '../widgety/useDataWidgetu';
 type TimeOffType = 'vacation' | 'sick' | 'other';
 type TimeOffStatus = 'pending' | 'approved' | 'rejected';
 
@@ -34,10 +44,10 @@ const TYPE_LABELS: Record<TimeOffType, string> = {
   other: 'Jiné',
 };
 
-const STATUS_META: Record<TimeOffStatus, { label: string; cls: string }> = {
-  pending: { label: 'Čeká', cls: 'bg-black/[0.05] text-black/55' },
-  approved: { label: 'Schváleno', cls: 'bg-[#C8F542]/15 text-[#5B7A08]' },
-  rejected: { label: 'Zamítnuto', cls: 'bg-bad/15 text-bad-ink' },
+const STATUS_META: Record<TimeOffStatus, { label: string; tone: 'wait' | 'ok' | 'bad' }> = {
+  pending: { label: 'Čeká', tone: 'wait' },
+  approved: { label: 'Schváleno', tone: 'ok' },
+  rejected: { label: 'Zamítnuto', tone: 'bad' },
 };
 
 function parseDate(s: string): Date {
@@ -60,8 +70,6 @@ function formatRange(fromDate: string, toDate: string): string {
   return `${formatFull(from)} – ${formatFull(to)}`;
 }
 
-const inputCls =
-  'w-full field border border-black/[0.08] px-4 py-3 text-sm appearance-none min-w-0 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-colors';
 
 export default function TimeOffRequest() {
   const [requests, setRequests] = useState<TimeOffRequestItem[]>([]);
@@ -77,19 +85,24 @@ export default function TimeOffRequest() {
     { vychozi: { fromDate: '', toDate: '', type: 'vacation' as TimeOffType, note: '' } });
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [loadErr, setLoadErr] = useState(false);
 
+  // `?mine=1`: vlastní žádosti i pro vedení, kterému by /api/timeoff vrátilo celý tým.
   const load = useCallback(async () => {
     try {
-      const res = await fetch('/api/timeoff');
-      if (!res.ok) return;
+      const res = await fetch('/api/timeoff?mine=1');
+      if (!res.ok) throw new Error(String(res.status));
       const data = await res.json();
       setRequests(Array.isArray(data.requests) ? data.requests : []);
+      setLoadErr(false);
     } catch {
-      // ignore
+      // Prázdný seznam po výpadku by vypadal jako „žádnou žádost jsi neposlal".
+      setLoadErr(true);
     } finally {
       setLoading(false);
     }
   }, []);
+  const obnovWidget = () => obnovDataWidgetu('/api/timeoff?mine=1');
 
   useEffect(() => {
     load();
@@ -122,6 +135,7 @@ export default function TimeOffRequest() {
       setType('vacation');
       setNote('');
       await load();
+      obnovWidget();
     } catch {
       setError('Žádost se nepodařilo odeslat. Zkus to prosím znovu.');
     } finally {
@@ -132,126 +146,73 @@ export default function TimeOffRequest() {
   const cancelRequest = async (id: number) => {
     const prev = requests;
     setRequests((rs) => rs.filter((r) => r.id !== id));
+    setError(null);
     try {
       const res = await fetch(`/api/timeoff?id=${id}`, { method: 'DELETE' });
-      if (!res.ok) setRequests(prev);
+      if (!res.ok) throw new Error(String(res.status));
+      obnovWidget();
     } catch {
       setRequests(prev);
+      setError('Žádost se nepodařilo zrušit — zkus to znovu.');
     }
   };
 
   return (
-    <div className="glass-card p-6 space-y-4">
+    <Card as="section" aria-labelledby="volno-nadpis" className="space-y-4">
       <div>
-        <h2 className="t-section"><Icon name="sun" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Dovolená a volno</h2>
-        <p className="text-sm text-black/45 mt-0.5">
-          Požádej o volno — vedoucí dostane notifikaci a žádost schválí.
-        </p>
+        <h2 id="volno-nadpis" className="t-section">Dovolená a volno</h2>
+        <p className="t-meta mt-0.5">Požádej o volno — vedoucí dostane upozornění a žádost schválí.</p>
       </div>
 
-      {/* Form */}
       <div className="space-y-3">
         <DraftNote koncept={koncept} co="rozepsanou žádost" />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="min-w-0">
-            <label className="block text-sm font-medium text-black/70 mb-1.5">Od</label>
-            <input
-              type="date"
-              aria-label="Volno od"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              className={inputCls}
-              style={{ WebkitAppearance: 'none' }}
-            />
-          </div>
-          <div className="min-w-0">
-            <label className="block text-sm font-medium text-black/70 mb-1.5">Do</label>
-            <input
-              type="date"
-              aria-label="Volno do"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              className={inputCls}
-              style={{ WebkitAppearance: 'none' }}
-            />
-          </div>
+          <Field id="volno-od" label="Od">
+            <Input id="volno-od" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="appearance-none min-w-0" />
+          </Field>
+          <Field id="volno-do" label="Do">
+            <Input id="volno-do" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="appearance-none min-w-0" />
+          </Field>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          {TYPE_OPTIONS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setType(t.id)}
-              className={`rounded-full px-4 py-2 text-sm font-medium whitespace-nowrap transition duration-200 ${
-                type === t.id
-                  ? 'seg-on'
-                  : 'bg-black/[0.04] border border-black/[0.08] text-black/60 hover:bg-black/[0.07]'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        <Segmented ariaLabel="Typ volna" value={type} onChange={(v) => setType(v as TimeOffType)}
+          options={TYPE_OPTIONS.map(t => ({ id: t.id, label: t.label }))} />
 
-        <input
-          type="text"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          aria-label="Poznámka k žádosti o volno (nepovinné)"
-          placeholder="Poznámka (nepovinné)"
-          className={inputCls}
-        />
+        <Field id="volno-poznamka" label="Poznámka" hint="Nepovinné — třeba zkouška nebo svatba.">
+          <Input id="volno-poznamka" type="text" value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} />
+        </Field>
 
-        {error && <p className="text-sm text-bad-ink">{error}</p>}
+        {error && <p className="note note-danger text-sm" role="alert">{error}</p>}
 
-        <button
-          type="button"
-          onClick={submit}
-          disabled={submitting}
-          className="w-full sm:w-auto justify-center rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-105 transition disabled:opacity-50"
-        >
-          {submitting ? 'Odesílám…' : 'Odeslat žádost'}
-        </button>
+        <Button variant="primary" icon="send" block loading={submitting} onClick={submit}>Odeslat žádost</Button>
       </div>
 
-      {/* My requests */}
-      <div className="space-y-2 pt-2 border-t border-black/[0.06]">
-        <h3 className="text-sm font-semibold text-[#16181A]">Moje žádosti</h3>
+      <div className="pt-3 border-t border-black/[0.06]">
+        <h3 className="t-card">Moje žádosti</h3>
         {loading ? (
-          <p className="text-sm text-black/40">Načítám…</p>
+          <p className="t-meta mt-2">Načítám…</p>
+        ) : loadErr ? (
+          <p className="note note-danger text-sm mt-2 flex flex-wrap items-center justify-between gap-2" role="alert">
+            <span>Žádosti se nenačetly.</span>
+            <Button variant="secondary" size="sm" onClick={() => { setLoading(true); load(); }}>Zkusit znovu</Button>
+          </p>
         ) : requests.length === 0 ? (
-          <EmptyState illustration="volno" title="Zatím žádná žádost o volno" hint="Dovolená, doktor, zkoušky — napiš termín a vedení to vidí v rozvrhu." compact />
+          <EmptyState illustration="volno" title="Zatím žádná žádost o volno" hint="Dovolená, doktor, zkoušky — napiš termín a vedení to uvidí v rozvrhu." compact />
         ) : (
-          <ul className="space-y-2">
+          <ul className="list">
             {requests.map((r) => (
-              <li
-                key={r.id}
-                className="flex flex-wrap items-center gap-x-3 gap-y-1.5 well px-4 py-3"
-              >
-                <span className="text-sm font-medium text-[#16181A] tabular-nums">
-                  {formatRange(r.fromDate, r.toDate)}
-                </span>
-                <span className="text-xs text-black/45">{TYPE_LABELS[r.type]}</span>
-                <span
-                  className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_META[r.status].cls}`}
-                >
-                  {STATUS_META[r.status].label}
-                </span>
-                {r.status === 'pending' && (
-                  <button
-                    type="button"
-                    onClick={() => cancelRequest(r.id)}
-                    className="tap-target-sm sm:ml-auto rounded-full bg-black/[0.05] border border-black/10 text-black/60 text-xs px-3 py-1.5 whitespace-nowrap hover:bg-black/[0.08] transition"
-                  >
-                    Zrušit
-                  </button>
-                )}
-              </li>
+              <ListRow key={r.id}
+                title={<span className="tabular-nums">{formatRange(r.fromDate, r.toDate)}</span>}
+                meta={TYPE_LABELS[r.type]}
+                right={<Chip tone={STATUS_META[r.status].tone} size="sm">{STATUS_META[r.status].label}</Chip>}
+                actions={r.status === 'pending'
+                  ? <Button variant="ghost" size="sm" onClick={() => cancelRequest(r.id)}>Zrušit</Button>
+                  : undefined}
+              />
             ))}
           </ul>
         )}
       </div>
-    </div>
+    </Card>
   );
 }

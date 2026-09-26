@@ -29,6 +29,8 @@ async function open(url, w = 1280, dark = false) {
     }
     // Kolo 69 (B3): Sklad je plocha s widgety — rozložení (widgety skladu a položky jako nástroj) z fixtury balíku.
     if (new URL(u).pathname === '/api/rozlozeni' && new URL(u).searchParams.get('stranka') === 'vedeni.sklad') return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + 'k69-b3-rozlozeni-sklad.json', 'utf8') });
+    // Kolo 69 (B1): Rozvrh je plocha s widgety — Žádosti o volno a Výměny směn jsou widgety (střední, s akcemi).
+    if (new URL(u).pathname === '/api/rozlozeni' && new URL(u).searchParams.get('stranka') === 'vedeni.rozvrh') return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + 'k69-b1-rozlozeni-rozvrh.json', 'utf8') });
     // …a widget Nové věci od týmu chce sklad.schvalovat: oprávnění vlastníka (fixtura teams_mine je nemá).
     if (new URL(u).pathname === '/api/teams/mine') {
       const d = JSON.parse(readFileSync(DIR + 'teams_mine.json', 'utf8'));
@@ -67,12 +69,17 @@ const pilulka = (p) => p.evaluate(() => {
 async function queue(name, url, expectPending, { shot = null, w = 1280, dark = false, sekce = null } = {}) {
   console.log(`${name}:`);
   const { ctx, p, errs, sent } = await open(url, w, dark);
-  const more = p.locator('button', { hasText: /^Vybrat víc$/ });
-  const poradi = sekce ? await p.evaluate((sekce) => [...document.querySelectorAll('button')]
-    .filter(x => /^Vybrat víc$/.test(x.innerText.trim()))
-    .findIndex(x => { let s = x; for (let i = 0; i < 8 && s; i++) { s = s.parentElement; const h = s?.querySelector('h1, h2, h3'); if (h) return h.innerText.trim().startsWith(sekce); } return false; }), sekce) : 0;
-  if (await more.count() === 0 || poradi < 0) { bad(`${name}: tlačítko „Vybrat víc" není (fronta prázdná?)`); await ctx.close(); return; }
-  await more.nth(poradi).click();
+  if (sekce) {
+    // Kolo 69 (B1): fronty Rozvrhu jsou widgety a „Vybrat víc" je v nabídce „···" widgetu.
+    const menu = p.getByRole('button', { name: `Další akce: ${sekce}` });
+    if (await menu.count() === 0) { bad(`${name}: nabídka widgetu s „Vybrat víc" není (fronta prázdná?)`); await ctx.close(); return; }
+    await menu.first().click();
+    await p.getByRole('menuitem', { name: /Vybrat víc/ }).click();
+  } else {
+    const more = p.locator('button', { hasText: /^Vybrat víc$/ });
+    if (await more.count() === 0) { bad(`${name}: tlačítko „Vybrat víc" není (fronta prázdná?)`); await ctx.close(); return; }
+    await more.first().click();
+  }
   await p.waitForTimeout(400);
   const boxes = await p.locator('[role="checkbox"]').count();
   boxes === expectPending ? ok(`zaškrtávátek: ${boxes}`) : bad(`${name}: čekáno ${expectPending} zaškrtávátek, je ${boxes}`);

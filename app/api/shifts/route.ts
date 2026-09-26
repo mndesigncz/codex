@@ -69,7 +69,25 @@ export async function GET(req: NextRequest) {
     // Filtr týmu: člověk ve dvou podnicích má směny v obou a vedení A nemá
     // vidět jeho rozvrh v B (ani on sám ho tady, kde je přepnutý do A).
     const rows = await sql`SELECT * FROM shifts WHERE employee_id = ${employeeId} AND team_id = ${c.teamId} ORDER BY date ASC`;
-    return NextResponse.json(rows.map((r: any) => shape(r, resolve)));
+    // Hodnocení k vlastním směnám (kolo 69, widget Minulé směny). Dřív si ho
+    // Moje směny braly z /api/rewards — jenže člověku s odmeny.zebricek tahle
+    // routa vrací žebříček bez `reviews`, takže u každé směny stálo „Bez
+    // hodnocení". Je to jeho vlastní údaj, cizí směny (plánovač) ho nenesou.
+    let hodnoceni = new Map<string, number>();
+    if (!cizi) {
+      try {
+        const rv = await sql`
+          SELECT work_date::text AS den, rating FROM shift_reviews
+          WHERE employee_id = ${employeeId} AND team_id = ${c.teamId} AND rating > 0`;
+        hodnoceni = new Map((rv as any[]).map(r => [String(r.den).slice(0, 10), Number(r.rating)]));
+      } catch { /* tabulka hodnocení chybí — směny bez hodnocení */ }
+    }
+    return NextResponse.json(rows.map((r: any) => {
+      const s = shape(r, resolve);
+      if (cizi) return s;
+      const d = typeof r.date === 'string' ? r.date.slice(0, 10) : new Date(r.date).toISOString().slice(0, 10);
+      return { ...s, rating: hodnoceni.get(d) ?? null };
+    }));
   }
 
   // Náhled rozvrhu celého týmu — jen jména a časy, bez sazeb a bez čehokoli,
@@ -105,15 +123,23 @@ export async function GET(req: NextRequest) {
 
   const resolve = await typeResolver(c.teamId);
   if (opr.has('rozvrh.zobrazit')) {
+    // N5 (kolo 69): jména a avatary k směnám. JOIN na users tu byl odjakživa,
+    // jen se z něj nic nebralo — a Dnešní směny na Přehledu pak u každého
+    // psaly „Zaměstnanec".
     const rows = await sql`
-      SELECT s.* FROM shifts s
+      SELECT s.*, u.name AS employee_name, u.avatar AS employee_avatar FROM shifts s
       JOIN users u ON u.id = s.employee_id
       WHERE s.team_id = ${c.teamId}
       ORDER BY s.date ASC`;
-    return NextResponse.json({ shifts: rows.map((r: any) => shape(r, resolve)), requests: [] });
+    return NextResponse.json({
+      shifts: rows.map((r: any) => ({ ...shape(r, resolve), employeeName: r.employee_name ?? null, employeeAvatar: r.employee_avatar ?? null })),
+      requests: [],
+    });
   }
 
-  const rows = await sql`SELECT * FROM shifts WHERE employee_id = ${c.meId} ORDER BY date ASC`;
+  // Filtr podniku jako ve větvi `employeeId`: kdo pracuje ve dvou podnicích,
+  // nemá v podniku A vidět (a počítat) směny z B.
+  const rows = await sql`SELECT * FROM shifts WHERE employee_id = ${c.meId} AND team_id = ${c.teamId} ORDER BY date ASC`;
   return NextResponse.json({ shifts: rows.map((r: any) => shape(r, resolve)), requests: [] });
 }
 

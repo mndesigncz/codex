@@ -1,8 +1,8 @@
-// Widgety oblasti „Moje směny" — metadata bez Reactu (kolo 68).
+// Widgety oblasti „Moje směny" — metadata bez Reactu (kolo 68, v kole 69 dopsal balík B1).
 //
-// Komponenty jsou v components/widgety/oblasti/moje-smeny.tsx. Widget se stavem 'planovany' komponentu
-// ještě nemá: nekreslí se ani nenabízí, dokud ho balík B1 v kole 69 nenapíše a nepřepne na 'hotovo'.
-// Soubor patří balíku B1; převedeno z katalogu widgetů jednorázovým skriptem (spec §2.2).
+// Komponenty jsou v components/widgety/oblasti/moje-smeny.tsx, výpočty v lib/rozvrhPrehled.ts.
+// Všechno jsou vlastní data přihlášeného (oprávnění žádné): tři dlaždice, Schválené volno
+// a Minulé směny, které dřív Moje směny kreslily natvrdo nad seznamem a pod ním.
 import type { DefiniceWidgetu } from '../typy.ts';
 
 export const WIDGETY: DefiniceWidgetu[] = [
@@ -17,7 +17,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     velikosti: ['S', 'M'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni', 'zamestnanec'],
-    stranky: ['zamestnanec.domu'],
+    stranky: ['zamestnanec.domu', 'zamestnanec.dostupnost'],
     opravneni: { vse: [], nektere: [] },
     tarif: 'zdarma',
     kostra: { S: 'text', M: 'text' },
@@ -30,47 +30,46 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'moje-smeny',
     nazev: 'Moje směny v číslech',
     popis: 'Nadcházející, odpracované a celkem směn.',
-    ikona: 'calendar',
+    ikona: 'overview',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni', 'zamestnanec'],
     stranky: ['vedeni.moje_smeny', 'zamestnanec.moje_smeny'],
     opravneni: { vse: [], nektere: [] },
     tarif: 'zdarma',
-    stav: 'planovany',
+    stav: 'hotovo',
   },
-  // Data: GET /api/shifts?employeeId=<já>; GET /api/rewards → reviews[] (hodnocení k datu)
-  // Backend: triviální jen pro člověka s odmeny.zebricek: /api/rewards mu vrací žebříček bez me/reviews — vracet
-  // je vždy
+  // Data: GET /api/shifts?employeeId=<já> → [{…, rating}] — hodnocení vlastních směn vrací od kola 69
+  // přímo /api/shifts (dřív /api/rewards, které člověku s odmeny.zebricek reviews nevracelo)
   // Pozor: vlastní data
   {
     id: 'moje.minule_smeny',
     oblast: 'moje-smeny',
     nazev: 'Minulé směny',
     popis: 'Odpracované směny s hodnocením.',
-    ikona: 'calendar',
+    ikona: 'archive',
     velikosti: ['M', 'L'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni', 'zamestnanec'],
     stranky: ['vedeni.moje_smeny', 'zamestnanec.moje_smeny'],
     opravneni: { vse: [], nektere: [] },
     tarif: 'zdarma',
-    stav: 'planovany',
+    stav: 'hotovo',
   },
-  // Data: GET /api/timeoff → requests[] (bez volno.zobrazit jen vlastní)
+  // Data: GET /api/timeoff?mine=1 → requests[] (vždy jen vlastní, i vedení s volno.zobrazit)
   // Pozor: vlastní data
   {
     id: 'moje.schvalene_volno',
     oblast: 'moje-smeny',
     nazev: 'Moje volno',
     popis: 'Schválené a čekající žádosti o volno.',
-    ikona: 'calendar',
+    ikona: 'sun',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni', 'zamestnanec'],
-    stranky: ['vedeni.moje_smeny', 'zamestnanec.moje_smeny'],
+    stranky: ['vedeni.moje_smeny', 'zamestnanec.moje_smeny', 'zamestnanec.dostupnost'],
     opravneni: { vse: [], nektere: [] },
     tarif: 'zdarma',
-    stav: 'planovany',
+    stav: 'hotovo',
   },
 ];

@@ -1,0 +1,40 @@
+{
+ "stranka": "vedeni.tym",
+ "polozky": [
+  {
+   "id": "tym-pozvanky",
+   "widget": "tym.pozvanky",
+   "velikost": "S"
+  },
+  {
+   "id": "tym-bez-sazby",
+   "widget": "tym.bez_sazby",
+   "velikost": "S"
+  },
+  {
+   "id": "tym-role",
+   "widget": "tym.role",
+   "velikost": "M"
+  },
+  {
+   "id": "nastroj",
+   "widget": "nastroj",
+   "velikost": "L"
+  }
+ ],
+ "dostupne": [
+  "tym.clenove",
+  "tym.pozvanky",
+  "tym.role",
+  "tym.bez_sazby",
+  "tym.profil_clena",
+  "dochazka.prave_na_smene"
+ ],
+ "tarifem": [],
+ "zdroj": "podnik",
+ "rozsah": "typ:vedeni",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": true,
+ "verze": 0
+}

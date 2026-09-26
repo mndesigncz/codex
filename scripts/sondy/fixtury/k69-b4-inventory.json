@@ -1,0 +1,7 @@
+[
+ {"id": 1, "name": "Mléko plnotučné", "unit": "l", "contentUnit": "l", "packageSize": 1, "unitCost": 25, "quantity": 10, "approved": true, "archived": false, "portions": []},
+ {"id": 2, "name": "Káva zrnková", "unit": "kg", "contentUnit": "kg", "packageSize": 1, "unitCost": 480, "quantity": 3, "approved": true, "archived": false, "portions": []},
+ {"id": 3, "name": "Vodka", "unit": "lahev", "contentUnit": "l", "packageSize": 0.7, "unitCost": 320, "quantity": 4, "approved": true, "archived": false, "portions": [{"name": "panák", "amount": 0.04}]},
+ {"id": 4, "name": "Starý sirup", "unit": "lahev", "contentUnit": "l", "packageSize": 0.7, "unitCost": 150, "quantity": 1, "approved": true, "archived": true, "portions": []},
+ {"id": 5, "name": "Kokosové mléko", "unit": "l", "contentUnit": "l", "packageSize": 1, "unitCost": null, "quantity": 0, "approved": false, "archived": false, "portions": []}
+]

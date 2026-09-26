@@ -1,0 +1,25 @@
+{
+ "isEmployer": false,
+ "requests": [
+  {
+   "id": 81,
+   "employeeId": 15,
+   "fromDate": "ZA5",
+   "toDate": "ZA7",
+   "type": "vacation",
+   "note": null,
+   "status": "approved",
+   "createdAt": "DNES"
+  },
+  {
+   "id": 82,
+   "employeeId": 15,
+   "fromDate": "ZA10",
+   "toDate": "ZA10",
+   "type": "other",
+   "note": "Zkouška",
+   "status": "pending",
+   "createdAt": "DNES"
+  }
+ ]
+}

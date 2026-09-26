@@ -1,11 +1,27 @@
 'use client';
 
+// Dostupnost — kdy člověk může příští měsíc pracovat (kolo 69, balík B1).
+//
+// Zaměstnanec ji má jako samostatnou stránku: plocha s widgety
+// (zamestnanec.dostupnost) a kalendář dostupnosti jako hlavní nástroj.
+// Vedení ji vyplňuje v Mých směnách pod plochou (EmployerLayout, jiný balík,
+// ji tam připojuje s `headingLevel="h2"`) — tam je jen sekcí bez plochy,
+// protože plocha Mých směn už na stránce je.
+//
+// Kolo 69: nástroj je jedna karta (kroky oddělené linkou, ne dvě karty vedle
+// sebe), přepínač měsíce sdílený MonthNav (dřív vlastní šipky s `disabled`,
+// které odfokusovaly klávesnici), preference Segmented (vybráno = inkoust,
+// ne limetka), legenda tečkami místo rámečků `rounded-md` a v podtitulku
+// čárky místo šipek „→". Limetka zůstává jediná — „Odeslat dostupnost".
+// Po odeslání se obnoví widget „Zadej dostupnost" (stejná URL).
+
 import { useState, useEffect, useMemo } from 'react';
 import { zkratkyDnu, odsazeniMesice, zacatekTydne } from '@/lib/week';
 import { useCurrency } from '@/components/CurrencyProvider';
-import { Icon } from '../Icons';
 
-import { PageHeader, ErrorState } from '../ui';
+import { Button, Card, Chip, ErrorState, Field, Input, MonthNav, PageHeader, Segmented, Skeleton, Textarea } from '../ui';
+import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
+import { obnovDataWidgetu } from '../widgety/useDataWidgetu';
 import { okJson } from '@/lib/api';
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string; role?: string };
@@ -38,8 +54,8 @@ const TYPE_TONES = [
 ];
 const AVAILABLE_META = {
   label: 'Dostupný',
-  cls: 'bg-black/[0.03] border-black/[0.10] text-[#16181A] hover:bg-black/[0.06]',
-  dot: 'bg-black/15 ring-1 ring-black/20',
+  cls: 'bg-black/[0.03] border-black/10 text-[#16181A] hover:bg-black/[0.06]',
+  dot: 'bg-black/15 ring-1 ring-black/20 dark:ring-white/25',
 };
 const OFF_META = {
   label: 'Nemůžu',
@@ -49,10 +65,6 @@ const OFF_META = {
 
 function ym(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
-function monthLabel(month: string) {
-  const [y, m] = month.split('-').map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
 }
 function buildGrid(month: string, zacatek: 0 | 1) {
   const [y, m] = month.split('-').map(Number);
@@ -209,6 +221,8 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
       if (res.ok) {
         setExisting(true);
         setConfirmed(true);
+        // Připomínka „Zadej dostupnost" (Domů, Moje směny) čte tutéž URL.
+        obnovDataWidgetu(`/api/availability?month=${month}&mine=1`);
       } else {
         const d = await res.json().catch(() => ({}));
         setErr(d.error || 'Dostupnost se nepodařilo odeslat.');
@@ -230,11 +244,14 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
     return c;
   }, [grid, dayStates]);
 
-  return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-3xl mx-auto">
-      <PageHeader as={headingLevel} hintId="availabilitysubmit" title="Dostupnost"
-        subtitle={<>Klepnutím na den cyklicky nastav:{' '}
-          <span className="text-black/70 font-medium">{stateList.map((st) => metaOf(st).label.toLowerCase()).join(' → ')}</span>.</>} />
+  const popisCyklu = stateList.map((st) => metaOf(st).label.toLowerCase()).join(', ');
+  const nastroj = (
+    <Card as="section" aria-labelledby="dostupnost-kalendar" className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="dostupnost-kalendar" className="t-card">Kalendář dostupnosti</h2>
+        {/* Do minulosti nejde — dostupnost na uplynulý měsíc nemá smysl. */}
+        <MonthNav value={month} onChange={setMonth} min={currentMonth} />
+      </div>
 
       {typesErr && (
         <p className="note note-wait cz-sentence">
@@ -243,69 +260,31 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
         </p>
       )}
 
-      {/* Month selector — navigate freely into the future (no limit), but not
-          before the current month (submitting availability for the past makes
-          no sense). */}
-      {(() => {
-        const [my, mm] = month.split('-').map(Number);
-        const prevM = ym(new Date(my, mm - 2, 1));
-        const nextM = ym(new Date(my, mm, 1));
-        const atFloor = month <= currentMonth;
-        return (
-          <div className="flex items-center gap-1 glass rounded-full p-1 w-fit">
-            <button
-              onClick={() => !atFloor && setMonth(prevM)}
-              disabled={atFloor}
-              aria-label="Předchozí měsíc"
-              className="rounded-full w-9 h-9 flex items-center justify-center text-black/55 hover:text-black hover:bg-black/[0.06] disabled:opacity-30 disabled:hover:bg-transparent transition"
-            >
-              <Icon name="chevron" size={16} className="rotate-90" />
-            </button>
-            <span className="px-3 min-w-[9.5rem] text-center text-sm font-semibold cz-sentence text-[#16181A]">{monthLabel(month)}</span>
-            <button
-              onClick={() => setMonth(nextM)}
-              aria-label="Další měsíc"
-              className="rounded-full w-9 h-9 flex items-center justify-center text-black/55 hover:text-black hover:bg-black/[0.06] transition"
-            >
-              <Icon name="chevron" size={16} className="-rotate-90" />
-            </button>
-          </div>
-        );
-      })()}
-
       {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="spinner" />
+        <div className="space-y-2" aria-busy>
+          <Skeleton className="h-8 w-2/3 rounded-full" />
+          <Skeleton className="h-64" />
         </div>
       ) : loadFailed ? (
         // Raději nic než prázdná mřížka, která vypadá jako „můžu všechny dny".
-        <div className="glass-card">
-          <ErrorState
-            title="Dostupnost se nenačetla"
-            hint="Dokud nevíme, co jsi poslal/a dřív, nejde to odeslat znovu — přepsalo by to původní dostupnost prázdnou."
-            onRetry={() => setReloadKey(k => k + 1)}
-          />
-        </div>
+        <ErrorState
+          compact
+          title="Dostupnost se nenačetla"
+          hint="Dokud nevíme, co jsi poslal/a dřív, nejde to odeslat znovu — přepsalo by to původní dostupnost prázdnou."
+          onRetry={() => setReloadKey(k => k + 1)}
+        />
       ) : (
         <>
-          {/* Calendar */}
-          <div className="glass-card p-3 sm:p-5">
-            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-              <h2 className="t-section cz-sentence flex items-center gap-2">
-                <Icon name="calendar" size={20} />
-                {monthLabel(month)}
-              </h2>
-              <div className="flex items-center gap-3 text-xs flex-wrap">
-                {stateList.map((st) => (
-                  <span key={st} className="flex items-center gap-1.5 text-black/55">
-                    <span className={`h-3 w-3 rounded-md ${metaOf(st).dot}`} /> {metaOf(st).label}
-                  </span>
-                ))}
-              </div>
-            </div>
-            <p className="text-[11px] text-black/40 mb-2">
-              Denní volby jsou závazné — „Jen …" a „Nemůžu" generátor vždy dodrží.
-              Typy směn se berou z nastavení rozvrhu; celková preference níže je jen orientační.
+          <div>
+            <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 t-meta mb-2" aria-label="Legenda">
+              {stateList.map((st) => (
+                <li key={st} className="flex items-center gap-1.5">
+                  <span aria-hidden className={`h-2.5 w-2.5 rounded-full ${metaOf(st).dot}`} /> {metaOf(st).label}
+                </li>
+              ))}
+            </ul>
+            <p className="t-meta mb-3 text-pretty">
+              Klepnutím na den přepínáš: {popisCyklu}. Denní volby jsou závazné — „Jen …" a „Nemůžu" generátor vždy dodrží.
             </p>
             <div className="grid grid-cols-7 gap-1 sm:gap-1.5 mb-1.5">
               {zkratkyDnu(zacatek).map((d) => (
@@ -324,10 +303,12 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
                 return (
                   <button
                     key={cell}
+                    type="button"
                     onClick={() => cycleDay(cell)}
                     title={meta.label}
-                    className={`tap-target-sm aspect-square rounded-xl text-sm font-medium flex items-center justify-center transition duration-200 border ${meta.cls} ${
-                      isToday ? 'ring-2 ring-[#C8F542]/60' : ''
+                    aria-label={`${day}. — ${meta.label}`}
+                    className={`tap-target-sm aspect-square rounded-xl text-sm font-medium flex items-center justify-center transition-colors duration-200 border ${meta.cls} ${
+                      isToday ? 'ring-2 ring-black/30 dark:ring-white/40' : ''
                     }`}
                   >
                     {day}
@@ -335,92 +316,76 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
                 );
               })}
             </div>
-            <p className="text-xs text-black/45 mt-3 flex flex-wrap gap-x-3 gap-y-1">
+            <p className="t-meta mt-3 flex flex-wrap gap-x-3 gap-y-1">
               {stateList.map((st) => (
                 <span key={st}>
-                  {metaOf(st).label}: <span className="text-black/70 font-medium">{counts.get(st) ?? (st === 'available' ? grid.filter(Boolean).length - Array.from(counts.values()).reduce((a, b) => a + b, 0) : 0)}</span>
+                  {metaOf(st).label}: <span className="text-black/70 font-medium tabular-nums">{counts.get(st) ?? (st === 'available' ? grid.filter(Boolean).length - Array.from(counts.values()).reduce((a, b) => a + b, 0) : 0)}</span>
                 </span>
               ))}
             </p>
           </div>
 
-          {/* Preferences */}
-          <div className="glass-card p-5 space-y-5">
-            <div>
-              <label className="block text-sm font-medium text-black/70 mb-2">Preferovaná směna (obecně — nezávazné)</label>
-              <div className="flex gap-1 glass rounded-full p-1 w-fit max-w-full overflow-x-auto">
-                {SHIFTS.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => setPreferredShift(s.id)}
-                    className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition duration-300 ${
-                      preferredShift === s.id
-                        ? 'bg-[#C8F542] text-black font-semibold'
-                        : 'text-black/60 hover:text-black hover:bg-black/[0.06]'
-                    }`}
-                  >
-                    {s.label}
-                  </button>
-                ))}
-              </div>
+          <div className="space-y-4 pt-4 border-t border-black/[0.06]">
+            {/* Segmented nemá pole, ke kterému by šel <label> — jméno nese role="group" s aria-label. */}
+            <div className="space-y-1.5">
+              <p className="text-[13px] font-medium text-black/70" aria-hidden>Preferovaná směna</p>
+              <Segmented ariaLabel="Preferovaná směna" value={preferredShift} onChange={(v) => { setPreferredShift(v); setConfirmed(false); }}
+                options={SHIFTS.map(s => ({ id: s.id, label: s.label }))} />
+              <p className="text-xs text-black/50">Obecně a nezávazně — denní volby v kalendáři mají přednost.</p>
             </div>
 
-            <div>
-              <label htmlFor="dostupnost-max-smen" className="block text-sm font-medium text-black/70 mb-2">
-                Maximální počet směn <span className="text-black/35">(nepovinné)</span>
-              </label>
-              <input
+            <Field id="dostupnost-max-smen" label="Maximální počet směn" hint="Nepovinné.">
+              <Input
                 id="dostupnost-max-smen"
                 type="number" inputMode="numeric"
                 min={0}
                 value={maxShifts}
-                onChange={(e) => setMaxShifts(e.target.value)}
-                placeholder="např. 12"
-                className="w-full sm:w-40 field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-colors"
+                onChange={(e) => { setMaxShifts(e.target.value); setConfirmed(false); }}
+                className="!w-full sm:!w-40"
               />
-            </div>
+            </Field>
 
-            <div>
-              <label htmlFor="dostupnost-poznamka" className="block text-sm font-medium text-black/70 mb-2">
-                Poznámka <span className="text-black/35">(nepovinné)</span>
-              </label>
-              <textarea
+            <Field id="dostupnost-poznamka" label="Poznámka pro vedení" hint="Nepovinné — třeba víkendy ano, ve středu škola.">
+              <Textarea
                 id="dostupnost-poznamka"
                 value={note}
-                onChange={(e) => setNote(e.target.value)}
+                onChange={(e) => { setNote(e.target.value); setConfirmed(false); }}
                 rows={3}
-                placeholder="Např. preferuji víkendy, ve středu mám školu…"
-                className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition-colors resize-none"
+                className="resize-none"
               />
-            </div>
+            </Field>
           </div>
 
-          {/* Submit */}
-          <div className="flex flex-wrap items-center gap-3">
-            {err && (
-              <p className="w-full text-sm font-medium text-bad-ink flex items-center gap-1.5 mb-2">
-                <Icon name="warning" size={15} /> {err}
-              </p>
-            )}
-            <button
-              onClick={submit}
-              disabled={saving || loadFailed}
-              title={loadFailed ? 'Nejdřív je potřeba načíst, co jsi poslal/a dřív.' : undefined}
-              className="w-full sm:w-auto justify-center rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2.5 whitespace-nowrap hover:brightness-105 transition disabled:opacity-50"
-            >
-              {saving ? 'Ukládám…' : existing ? 'Aktualizovat dostupnost' : 'Odeslat dostupnost'}
-            </button>
-            {confirmed && (
-              <span className="flex items-center gap-1.5 text-[#5B7A08] text-sm font-medium">
-                <Icon name="check" size={18} /> Uloženo!
-              </span>
-            )}
-            {existing && !confirmed && (
-              <span className="text-black/45 text-sm">Dostupnost už jsi odeslal/a — můžeš ji upravit.</span>
-            )}
+          <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-black/[0.06]">
+            {err && <p className="w-full note note-danger text-sm" role="alert">{err}</p>}
+            <Button variant="accent" icon="send" block loading={saving} disabled={loadFailed} onClick={submit}
+              title={loadFailed ? 'Nejdřív je potřeba načíst, co jsi poslal/a dřív.' : undefined}>
+              {existing ? 'Aktualizovat dostupnost' : 'Odeslat dostupnost'}
+            </Button>
+            {confirmed && <Chip tone="ok" icon="check">Uloženo</Chip>}
+            {existing && !confirmed && <span className="t-meta">Dostupnost už jsi odeslal/a — můžeš ji upravit.</span>}
           </div>
         </>
       )}
-    </div>
+    </Card>
+  );
+
+  // Samostatná stránka zaměstnance = plocha s widgety; v Mých směnách vedení jen sekce.
+  if (headingLevel === 'h1') {
+    return (
+      <PlochaWidgetu
+        stranka="zamestnanec.dostupnost"
+        hlavicka={{ title: 'Dostupnost', subtitle: 'Dej vedení vědět, kdy můžeš pracovat — podle toho sestaví rozvrh.', hintId: 'availabilitysubmit' }}
+        nastroj={nastroj}
+      />
+    );
+  }
+  return (
+    // Bez max-w-3xl: sekce stojí v Mých směnách vedení pod plochou, která jde přes celou
+    // šířku — užší sloupec by na desktopu nesedl na okraje karet nad ním.
+    <section className="p-4 sm:p-6 space-y-6 w-full">
+      <PageHeader as="h2" title="Dostupnost" subtitle="Kdy můžeš pracovat — podle toho se skládá rozvrh." />
+      {nastroj}
+    </section>
   );
 }

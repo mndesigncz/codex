@@ -1,0 +1,129 @@
+{
+ "team": {
+  "id": 1,
+  "name": "Čajovna Pangea",
+  "join_code": "K69B2X",
+  "owner_id": 15,
+  "week_start": 1,
+  "labor_target_pct": 30,
+  "currency": "CZK",
+  "locale": "cs-CZ",
+  "business_type": "cajovna",
+  "pay_daily_cash": false,
+  "closing_requires_shift": true,
+  "show_team_schedule": true,
+  "payout_from_register": false,
+  "drawer_float": null
+ },
+ "members": [
+  {
+   "id": 15,
+   "name": "Martin Nemeškal",
+   "email": "m@t.cz",
+   "role": "employer",
+   "avatar": "🧑",
+   "phone": "+420 600 100 200",
+   "job_title": "Provozovatel",
+   "hourly_rate": 0,
+   "role_klic": "vedeni",
+   "role_id": null,
+   "role_nazev": "Vedení"
+  },
+  {
+   "id": 16,
+   "name": "Eva Testová",
+   "email": "e@t.cz",
+   "role": "employee",
+   "avatar": "👩",
+   "job_title": "Barista",
+   "hourly_rate": 150,
+   "role_klic": "barista",
+   "role_id": null,
+   "role_nazev": "Barista"
+  },
+  {
+   "id": 17,
+   "name": "Jakub Horák",
+   "email": "j@t.cz",
+   "role": "employee",
+   "avatar": "🧔",
+   "job_title": "Barista",
+   "hourly_rate": 0,
+   "role_klic": "barista",
+   "role_id": null,
+   "role_nazev": "Barista"
+  },
+  {
+   "id": 18,
+   "name": "Petra Malá",
+   "email": "p@t.cz",
+   "role": "employee",
+   "avatar": "👱",
+   "job_title": "Kuchařka",
+   "hourly_rate": 180,
+   "role_klic": "kuchar",
+   "role_id": null,
+   "role_nazev": "Kuchař"
+  },
+  {
+   "id": 19,
+   "name": "Ondřej Veselý",
+   "email": "u19@t.cz",
+   "role": "employee",
+   "avatar": "🙂",
+   "job_title": "Barista",
+   "hourly_rate": 160,
+   "role_klic": "barista",
+   "role_id": null,
+   "role_nazev": "Barista"
+  },
+  {
+   "id": 20,
+   "name": "Lucie Dvořáková",
+   "email": "u20@t.cz",
+   "role": "employee",
+   "avatar": "🙂",
+   "job_title": "Barista",
+   "hourly_rate": 160,
+   "role_klic": "barista",
+   "role_id": null,
+   "role_nazev": "Barista"
+  },
+  {
+   "id": 21,
+   "name": "Tomáš Král",
+   "email": "u21@t.cz",
+   "role": "employee",
+   "avatar": "🙂",
+   "job_title": "Pomocník",
+   "hourly_rate": 160,
+   "role_klic": "barista",
+   "role_id": null,
+   "role_nazev": "Barista"
+  },
+  {
+   "id": 22,
+   "name": "Klára Nová",
+   "email": "u22@t.cz",
+   "role": "employee",
+   "avatar": "🙂",
+   "job_title": "Barista",
+   "hourly_rate": 160,
+   "role_klic": "barista",
+   "role_id": null,
+   "role_nazev": "Barista"
+  },
+  {
+   "id": 23,
+   "name": "Filip Černý",
+   "email": "u23@t.cz",
+   "role": "employee",
+   "avatar": "🙂",
+   "job_title": "Směnový",
+   "hourly_rate": 160,
+   "role_klic": "barista",
+   "role_id": null,
+   "role_nazev": "Barista"
+  }
+ ]
+}

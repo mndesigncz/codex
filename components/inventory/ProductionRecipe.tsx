@@ -7,9 +7,15 @@
 // surovin; co chybí, jde do nákupu jako surovina. Editor sedí v detailu
 // položky vedle „Používá se v kase", protože je to druhá strana téže mince:
 // tam se říká, co se z položky prodává, tady, z čeho se položka dělá.
+//
+// Kolo 69 (B4): dřív modře tónovaný box s ručním štítkem verzálkami, ručním
+// inkoustovým přepínačem a bílými boxy na surovinu. Teď neutrální Well
+// s nadpisem t-card, sdílený Switch (limetka = stav), suroviny jako .list
+// a popisky navázané na pole.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Icon } from '../Icons';
+import { Button, Input, Label, ListRow, Switch, Textarea, Well } from '../ui';
 import { useResultKeys } from '@/lib/useResultKeys';
 import { okJson } from '@/lib/api';
 import { obsahuje } from '@/lib/hledani';
@@ -85,9 +91,15 @@ export default function ProductionRecipe({ item, items, onSaved }: {
     return items.filter(p => p.id !== item.id && !used.has(p.id) && obsahuje(p.name, q)).slice(0, 8);
   }, [query, items, lines, item.id]);
 
-  const save = async (next?: { on?: boolean }) => {
+  const uid = useId();
+
+  /** `radky` = aktuální suroviny, když se mění zároveň s uložením (odebrání):
+   *  stav Reactu v tomhle tiku ještě neplatí a dřív přes setTimeout odešly
+   *  staré suroviny — odebraná surovina se po obnovení vrátila. */
+  const save = async (next?: { on?: boolean; radky?: typeof lines }) => {
     setBusy(true); setErr(''); setSaved(false);
     const madeInHouse = next?.on ?? on;
+    const radky = next?.radky ?? lines;
     try {
       const res = await fetch(`/api/inventory/${item.id}/production`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -95,7 +107,7 @@ export default function ProductionRecipe({ item, items, onSaved }: {
           madeInHouse,
           batchYield: dec(yieldStr) > 0 ? dec(yieldStr) : null,
           batchSteps: steps, productionLabel: label,
-          ingredients: lines.map(l => ({ ingredientId: l.ingredientId, amount: dec(l.amount) })).filter(l => l.amount > 0),
+          ingredients: radky.map(l => ({ ingredientId: l.ingredientId, amount: dec(l.amount) })).filter(l => l.amount > 0),
         }),
       });
       const d = await res.json().catch(() => ({}));
@@ -106,8 +118,7 @@ export default function ProductionRecipe({ item, items, onSaved }: {
     setBusy(false);
   };
 
-  const toggle = async () => {
-    const next = !on;
+  const toggle = async (next: boolean) => {
     setOn(next);
     await save({ on: next });
   };
@@ -115,19 +126,16 @@ export default function ProductionRecipe({ item, items, onSaved }: {
   const availability = new Map((info?.ingredients ?? []).map(l => [l.ingredientId, l]));
 
   return (
-    <div className="rounded-2xl bg-[#0A84FF]/[0.06] border border-[#0A84FF]/20 px-4 py-3.5 space-y-3">
+    <Well className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[11px] font-bold uppercase tracking-wide text-[#0A5CC0] flex items-center gap-1.5">
-          <Icon name="leaf" size={13} /> Vyrábíme sami
-        </p>
-        <button type="button" role="switch" aria-checked={on} onClick={toggle} disabled={busy}
-          className={`tap-target-sm relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition ${on ? 'bg-[#16181A]' : 'bg-black/15'}`}>
-          <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-6' : 'translate-x-1'}`} />
-        </button>
+        <h3 id={`${uid}-t`} className="t-card flex items-center gap-2">
+          <Icon name="leaf" size={17} className="shrink-0 text-black/40" /> Vyrábíme sami
+        </h3>
+        <Switch checked={on} onChange={toggle} disabled={busy} labelledBy={`${uid}-t`} />
       </div>
 
       {!on && (
-        <p className="text-xs text-black/50">
+        <p className="t-meta">
           Zapni u limonády, ice tea, sirupu nebo pečiva, co si děláte sami. Místo nákupního
           seznamu pak při docházejícím stavu dostane směna úkol „vyrobit“ s recepturou.
         </p>
@@ -137,61 +145,60 @@ export default function ProductionRecipe({ item, items, onSaved }: {
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="field-label">Jedna dávka vyrobí</label>
+              <Label htmlFor={`${uid}-davka`}>Jedna dávka vyrobí</Label>
               <div className="flex items-center gap-2">
-                <input inputMode="decimal" value={yieldStr} onChange={e => setYieldStr(e.target.value)} onBlur={() => save()}
-                  placeholder="5" className="field text-center" />
-                <span className="text-sm text-black/50 shrink-0">{item.unit}</span>
+                <Input id={`${uid}-davka`} inputMode="decimal" value={yieldStr} onChange={e => setYieldStr(e.target.value)} onBlur={() => save()}
+                  placeholder="5" className="text-center" />
+                <span className="text-sm text-black/55 shrink-0">{item.unit}</span>
               </div>
             </div>
             <div>
-              <label className="field-label">Název úkolu pro směnu</label>
-              <input value={label} onChange={e => setLabel(e.target.value)} onBlur={() => save()}
-                placeholder={`Vyrobit ${item.name}`} className="field" />
+              <Label htmlFor={`${uid}-ukol`}>Název úkolu pro směnu</Label>
+              <Input id={`${uid}-ukol`} value={label} onChange={e => setLabel(e.target.value)} onBlur={() => save()}
+                placeholder={`Vyrobit ${item.name}`} />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <p className="field-label mb-0">Suroviny na jednu dávku</p>
+            <p id={`${uid}-sur`} className="t-label">Suroviny na jednu dávku</p>
             {lines.length === 0 && (
-              <p className="text-xs text-black/45">Zatím bez surovin — úkol vznikne i tak, jen bez kontroly skladu.</p>
+              <p className="t-meta">Zatím bez surovin — úkol vznikne i tak, jen bez kontroly skladu.</p>
             )}
-            {lines.map(l => {
-              const a = availability.get(l.ingredientId);
-              const short = a && a.missing > 0;
-              return (
-                <div key={l.ingredientId} className="flex items-center gap-2 rounded-2xl bg-white/70 border border-black/[0.06] pl-3.5 pr-2 py-1.5">
-                  <span className="min-w-0 flex-1 text-sm text-[#16181A] truncate">
-                    {l.name}
-                    {a && <span className={`ml-1.5 text-[11px] ${short ? 'text-bad-ink' : 'text-black/40'}`}>ve skladu {fmt(a.available)} {a.unit}</span>}
-                  </span>
-                  <input value={l.amount} inputMode="decimal"
-                    onChange={e => setLines(ls => ls.map(x => x.ingredientId === l.ingredientId ? { ...x, amount: e.target.value } : x))}
-                    onBlur={() => save()}
-                    aria-label={`Množství ${l.name}`}
-                    className="tap-target-sm w-20 shrink-0 field !px-2.5 !py-1.5 text-xs text-right tabular-nums" />
-                  <span className="shrink-0 text-[11px] text-black/40 w-8">{l.unit}</span>
-                  <button type="button" aria-label={`Odebrat ${l.name}`} title="Odebrat z receptury"
-                    onClick={() => { setLines(ls => ls.filter(x => x.ingredientId !== l.ingredientId)); setTimeout(() => save(), 0); }}
-                    className="shrink-0 rounded-full w-7 h-7 flex items-center justify-center text-black/30 hover:text-bad-ink transition">
-                    <Icon name="close" size={13} />
-                  </button>
-                </div>
-              );
-            })}
+            {lines.length > 0 && (
+              <ul className="list" aria-labelledby={`${uid}-sur`}>
+                {lines.map(l => {
+                  const a = availability.get(l.ingredientId);
+                  const short = a && a.missing > 0;
+                  return (
+                    <ListRow key={l.ingredientId} title={l.name}
+                      meta={a ? <span className={short ? 'text-bad-ink' : undefined}>ve skladu {fmt(a.available)} {a.unit}</span> : undefined}
+                      actions={<>
+                        <Input value={l.amount} inputMode="decimal"
+                          onChange={e => setLines(ls => ls.map(x => x.ingredientId === l.ingredientId ? { ...x, amount: e.target.value } : x))}
+                          onBlur={() => save()}
+                          aria-label={`Množství ${l.name} (${l.unit})`}
+                          className="!w-20 text-right tabular-nums" />
+                        <span className="text-[13px] text-black/55 w-8">{l.unit}</span>
+                        <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={`Odebrat ${l.name}`}
+                          onClick={() => { const radky = lines.filter(x => x.ingredientId !== l.ingredientId); setLines(radky); save({ radky }); }} />
+                      </>} />
+                  );
+                })}
+              </ul>
+            )}
             <div className="relative">
-              <input ref={ingInput} value={query} onChange={e => setQuery(e.target.value)}
-                onKeyDown={ingKeys.onInputKeyDown}
-                placeholder="Přidat surovinu ze skladu…" className="field !py-2 text-sm" />
+              <Input ref={ingInput} value={query} onChange={e => setQuery(e.target.value)}
+                onKeyDown={ingKeys.onInputKeyDown} aria-label="Přidat surovinu ze skladu"
+                placeholder="Přidat surovinu ze skladu…" />
               {found.length > 0 && (
                 <div ref={ingList} onKeyDown={ingKeys.onListKeyDown}
-                  className="absolute z-10 left-0 right-0 mt-1 card p-1 max-h-48 overflow-y-auto scrollbar-thin">
+                  className="absolute z-10 left-0 right-0 mt-1 card p-1 shadow-[shadow:var(--shadow-float)] max-h-48 overflow-y-auto scrollbar-thin">
                   {found.map(p => (
                     <button key={p.id} type="button"
                       onClick={() => { setLines(ls => [...ls, { ingredientId: p.id, name: p.name, unit: unitOf(p), amount: '' }]); setQuery(''); }}
-                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-black/[0.04] transition">
+                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-black/[0.04] transition-colors">
                       <span className="block text-sm text-[#16181A] truncate">{p.name}</span>
-                      <span className="block text-[11px] text-black/40 truncate">{p.category || 'bez kategorie'} · {unitOf(p)}</span>
+                      <span className="block text-[13px] text-black/55 truncate">{p.category || 'bez kategorie'} · {unitOf(p)}</span>
                     </button>
                   ))}
                 </div>
@@ -210,30 +217,32 @@ export default function ProductionRecipe({ item, items, onSaved }: {
           />
 
           <div>
-            <label className="field-label">
+            <Label htmlFor={`${uid}-postup`}>
               {maNavodSKroky ? 'Postup (návod ho přebíjí)' : 'Postup (řádek = krok v úkolu)'}
-            </label>
-            <textarea value={steps} onChange={e => setSteps(e.target.value)} onBlur={() => save()} rows={3}
-              placeholder={'Nakrájet citrony\nSvařit sirup s vodou\nNechat vychladnout a stočit'} className="field resize-none text-sm" />
+            </Label>
+            <Textarea id={`${uid}-postup`} value={steps} onChange={e => setSteps(e.target.value)} onBlur={() => save()} rows={3}
+              placeholder={'Nakrájet citrony\nSvařit sirup s vodou\nNechat vychladnout a stočit'} className="text-sm" />
             {maNavodSKroky && (
-              <p className="text-[11px] text-black/45 mt-1">
+              <p className="t-meta mt-1">
                 Kroky do úkolu jdou z návodu „{info?.guideTitle}“. Tenhle text zůstane uložený,
                 ale obsluha ho neuvidí — použije se, až vazbu na návod zrušíš.
               </p>
             )}
           </div>
 
-          <div className="flex items-center justify-between gap-2 text-[11px] text-black/45">
+          <div className="flex items-center justify-between gap-2 t-meta">
             <span>
               {info?.status && info.status !== 'ok'
                 ? `Dochází — směna má úkol „${info.taskTitle}“ (${info.batches}× dávka).`
                 : 'Když bude docházet, směna dostane úkol s touhle recepturou.'}
             </span>
-            <span className={`shrink-0 ${saved ? 'text-[#5B7A08]' : ''}`}>{busy ? 'Ukládám…' : saved ? 'Uloženo ✓' : ''}</span>
+            <span className="shrink-0 inline-flex items-center gap-1" aria-live="polite">
+              {busy ? 'Ukládám…' : saved ? <><Icon name="check" size={13} className="text-ok-ink" /><span className="text-ok-ink">Uloženo</span></> : ''}
+            </span>
           </div>
         </>
       )}
-      {err && <p className="text-xs text-bad-ink">{err}</p>}
-    </div>
+      {err && <p className="note note-danger" role="alert">{err}</p>}
+    </Well>
   );
 }

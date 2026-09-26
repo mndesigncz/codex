@@ -36,6 +36,8 @@ async function kontext(viewport, { mineData = VLASTNIK, roles = ROLE, postRoles,
     if (u.includes('/api/teams/members') && m === 'PATCH') return patchMembers ? patchMembers(req, json) : json({ ok: true });
     if (new URL(u).pathname === '/api/teams' && m === 'GET' && teams) return json(teams);
     if (m !== 'GET') return json({ ok: true });
+    // Kolo 69 (B2): Docházka a Tým jsou plochy s widgety — rozložení (widgety a nástroj) z fixtury balíku.
+    if (new URL(u).pathname === '/api/rozlozeni' && ['vedeni.dochazka', 'vedeni.tym'].includes(new URL(u).searchParams.get('stranka'))) return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + (new URL(u).searchParams.get('stranka') === 'vedeni.tym' ? 'k69-b2-rozlozeni-tym' : 'k69-b2-rozlozeni-dochazka') + '.json', 'utf8') });
     const k = keyFor(u);
     if (k && existsSync(DIR + k + '.json')) return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + k + '.json', 'utf8') });
     return json([]);
@@ -124,19 +126,26 @@ const prepinac = (p, nazev) => p.getByRole('switch', { name: nazev, exact: true 
   const patche = [];
   const teams = JSON.parse(readFileSync(DIR + 'teams.json', 'utf8'));
   teams.members = teams.members.map(m => m.role === 'employee' ? { ...m, role_klic: 'barista', role_id: null } : { ...m, role_klic: 'vedeni', role_id: null });
-  const ctx = await kontext({ width: 1280, height: 950 }, { teams, patchMembers: (req, json) => { patche.push(JSON.parse(req.postData() || '{}')); return json({ ok: true }); } });
+  // Podvrh si změnu role zapíše (kolo 69: Tým po uložení tým znovu načte, jako skutečný server vrátí novou roli).
+  const ctx = await kontext({ width: 1280, height: 950 }, { teams, patchMembers: (req, json) => {
+    const t = JSON.parse(req.postData() || '{}'); patche.push(t);
+    const r = ROLE.vlastni.find(x => x.id === t.roleId);
+    if (r) teams.members = teams.members.map(m => (m.id === t.userId ? { ...m, role_klic: null, role_id: r.id, role_nazev: r.nazev } : m));
+    return json({ ok: true });
+  } });
   const p = await ctx.newPage();
   await p.goto('http://localhost:3000/employer/overview?view=team-settings', { waitUntil: 'networkidle' }); await p.waitForTimeout(1200);
   let t = norm(await p.locator('main').innerText());
   tvrdi('tým: u člena je název role', t.includes('barista / obsluha'), t.slice(0, 200));
-  const radek = p.locator('.py-4').filter({ hasText: 'Eva Testová' }).first();
-  await radek.getByRole('button', { name: 'Upravit' }).click(); await p.waitForTimeout(400);
+  const radek = p.locator('li.list-row').filter({ hasText: 'Eva Testová' }).first();
+  await p.getByRole('button', { name: 'Upravit: Eva Testová' }).click(); await p.waitForTimeout(400); // kolo 69: úprava v okně
   const vyber = p.getByLabel('Role', { exact: true });
   const volby = await vyber.locator('option').allInnerTexts();
   tvrdi('tým: výběr nabízí přednastavené i vlastní role, ne tablet', volby.some(v => v.includes('Provozní')) && volby.some(v => v.includes('Směnový vedoucí')) && !volby.some(v => v.includes('Kiosk')), volby.join(' | '));
   await vyber.selectOption({ label: 'Směnový vedoucí' });
   await p.getByRole('button', { name: 'Uložit', exact: true }).click(); await p.waitForTimeout(700);
   tvrdi('tým: PATCH nese roleId a nic, co se neměnilo', patche.length === 1 && patche[0].roleId === 7 && patche[0].hourlyRate === undefined && patche[0].jobTitle === undefined, JSON.stringify(patche));
+  await p.waitForTimeout(600);
   t = norm(await radek.innerText());
   tvrdi('tým: po uložení je u člena nová role', t.includes('směnový vedoucí'), t.slice(0, 120));
   await ctx.close();

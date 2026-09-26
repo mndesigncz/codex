@@ -1,0 +1,32 @@
+{
+ "submissions": [
+  {
+   "id": 1,
+   "employeeId": 16,
+   "employeeName": "Eva Testová",
+   "employeeAvatar": "🧑",
+   "month": "PRISTI",
+   "unavailableDates": [
+    "PRISTI-03"
+   ],
+   "dayPreferences": {},
+   "preferredShift": "morning",
+   "maxShifts": null,
+   "note": "Škola ve středu",
+   "status": "submitted"
+  },
+  {
+   "id": 2,
+   "employeeId": 17,
+   "employeeName": "Jakub Horák",
+   "employeeAvatar": "🧔",
+   "month": "PRISTI",
+   "unavailableDates": [],
+   "dayPreferences": {},
+   "preferredShift": "flexible",
+   "maxShifts": null,
+   "note": null,
+   "status": "submitted"
+  }
+ ]
+}

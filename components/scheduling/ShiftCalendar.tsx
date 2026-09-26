@@ -1,49 +1,65 @@
 'use client';
 
+// Kalendář směn a uzávěrek — záložka „Kalendář" v plánovači Rozvrhu.
+//
+// Měsíc po dnech: kdo měl směnu, jestli je uzávěrka hotová, chybí, nebo se
+// ještě čeká. Kolo 69 (balík B1): kostra místo kolečka, ruční štítky na
+// `t-label`, „✓" za jménem na ikonu, přepínač měsíce sdílený (MonthNav)
+// a výpadek načtení poctivě jako chyba — dřív tichý catch nakreslil prázdný
+// měsíc, který vypadal jako „nikdo nepracoval".
+//
+// Vlastní kalendář zaměstnance (scope „me") nahradil v Mých směnách widget
+// „Kalendář uzávěrek" (uzaverky.kalendar, rozsah Moje). EmployeeLayout ho
+// ale pořád připojuje (patří balíku B8), proto se se `scope="me"` nekreslí —
+// jinak by na stránce byl dvakrát. Integrace kola 69 řádek z layoutu smaže.
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { zkratkyDnu, zacatekTydne } from '@/lib/week';
 import { Icon } from '../Icons';
+import { Avatar, Card, ErrorState, MonthNav, Skeleton, Well } from '../ui';
 import { useCurrency } from '../CurrencyProvider';
 import { PersonLink } from '../employer/ProfileLinkProvider';
 import { pragueToday } from '@/lib/pragueTime';
-import { okJson } from '@/lib/api';
+import { apiMessage, okJson } from '@/lib/api';
 
 type Person = { id: number; name: string; avatar: string | null; startTime?: string; endTime?: string; hadClosing?: boolean };
 type Day = { onShift: Person[]; closedBy: Person[]; hasClosing: boolean; missing: boolean };
 type Days = Record<string, Day>;
 
-const MONTHS = ['leden', 'únor', 'březen', 'duben', 'květen', 'červen', 'červenec', 'srpen', 'září', 'říjen', 'listopad', 'prosinec'];
-
-const ymOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 const pad = (n: number) => String(n).padStart(2, '0');
 
-// A month grid showing who was on shift each day and whether the closing is
-// done, missing, or still pending. scope='me' limits it to the current user.
 export default function ShiftCalendar({ scope, initialMonth }: { scope?: 'me'; initialMonth?: string }) {
+  if (scope === 'me') return null;
+  return <KalendarSmen initialMonth={initialMonth} />;
+}
+
+function KalendarSmen({ initialMonth }: { initialMonth?: string }) {
   const { weekStart } = useCurrency();
-  const [month, setMonth] = useState(initialMonth ?? ymOf(new Date()));
+  const [month, setMonth] = useState(initialMonth ?? pragueToday().slice(0, 7));
   const [days, setDays] = useState<Days>({});
   const [loading, setLoading] = useState(true);
+  const [chyba, setChyba] = useState<string | null>(null);
   const [sel, setSel] = useState<string | null>(null);
 
-  // Quick month-arrow taps overlap requests; only the newest may paint.
+  // Rychlé ťukání do šipek pouští dotazy přes sebe; kreslit smí jen ten nejnovější.
   const reqRef = useRef(0);
   const load = useCallback(async () => {
     const req = ++reqRef.current;
-    setLoading(true);
+    setLoading(true); setChyba(null);
     try {
-      const q = `month=${month}${scope === 'me' ? '&scope=me' : ''}`;
-      const d = await fetch(`/api/closings/calendar?${q}`).then(okJson);
+      const d = await fetch(`/api/closings/calendar?month=${month}`).then(okJson);
       if (req !== reqRef.current) return;
       setDays(d.days && typeof d.days === 'object' ? d.days : {});
-    } catch { if (req === reqRef.current) setDays({}); }
+    } catch (e) {
+      if (req === reqRef.current) { setDays({}); setChyba(apiMessage(e, 'Kalendář se nenačetl.')); }
+    }
     if (req === reqRef.current) setLoading(false);
-  }, [month, scope]);
+  }, [month]);
   useEffect(() => { load(); }, [load]);
 
   const [y, m] = month.split('-').map(Number);
   const wd = zkratkyDnu(zacatekTydne(weekStart));
-  const firstDow = new Date(y, m - 1, 1).getDay();            // 0=Sun..6=Sat
+  const firstDow = new Date(y, m - 1, 1).getDay();            // 0 = neděle … 6 = sobota
   const lead = (firstDow - weekStart + 7) % 7;
   const daysInMonth = new Date(y, m, 0).getDate();
   const todayStr = pragueToday();
@@ -53,31 +69,24 @@ export default function ShiftCalendar({ scope, initialMonth }: { scope?: 'me'; i
   for (let d = 1; d <= daysInMonth; d++) cells.push(`${month}-${pad(d)}`);
   while (cells.length % 7 !== 0) cells.push(null);
 
-  const step = (delta: number) => { setSel(null); setMonth(ymOf(new Date(y, m - 1 + delta, 1))); };
   const detail = sel ? days[sel] : null;
 
   return (
-    <div className="glass-card p-4 sm:p-5">
-      {/* Header + month nav */}
-      <div className="flex items-center justify-between gap-2 mb-4">
-        <button onClick={() => step(-1)} aria-label="Předchozí měsíc" className="tap-target btn-icon">
-          <Icon name="chevron" size={16} className="rotate-90" />
-        </button>
-        <h3 className="font-bold tracking-tight text-[#16181A] cz-sentence">{MONTHS[m - 1]} {y}</h3>
-        <button onClick={() => step(1)} aria-label="Další měsíc" className="tap-target btn-icon">
-          <Icon name="chevron" size={16} className="-rotate-90" />
-        </button>
-      </div>
-
-      {/* Legend */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-3 text-[11px] text-black/50">
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#C8F542]" /> Uzávěrka hotová</span>
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-bad" /> Chybí uzávěrka</span>
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-black/20" /> Směna</span>
+    <Card>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <MonthNav value={month} onChange={v => { setSel(null); setMonth(v); }} />
+        {/* Legenda: stav nese tón (ok / bad), ne limetka — limetka bez záře by byla „stav" jen napůl. */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 t-meta">
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-ok" /> Uzávěrka hotová</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-bad" /> Chybí uzávěrka</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-black/20" /> Směna</span>
+        </div>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center h-56"><div className="spinner" /></div>
+        <Skeleton className="h-56" />
+      ) : chyba ? (
+        <ErrorState compact title="Kalendář se nenačetl" onRetry={load} detail={chyba} />
       ) : (
         <>
           <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
@@ -92,69 +101,74 @@ export default function ShiftCalendar({ scope, initialMonth }: { scope?: 'me'; i
                 : day.missing
                   ? 'bg-bad/[0.08] border-bad/30'
                   : day.hasClosing
-                    ? 'bg-[#C8F542]/[0.12] border-[#C8F542]/40'
+                    ? 'bg-ok/10 border-ok/30'
                     : day.onShift.length > 0
                       ? 'bg-black/[0.03] border-black/[0.08]'
                       : 'bg-black/[0.015] border-transparent';
               const active = sel === date;
               return (
-                <button key={i} onClick={() => day ? setSel(active ? null : date) : undefined}
-                  className={`tap-target-sm aspect-square rounded-xl border p-1 flex flex-col items-center justify-start gap-0.5 transition ${tone} ${active ? 'ring-2 ring-[#16181A]/40' : ''} ${day ? 'cursor-pointer hover:brightness-95' : 'cursor-default'}`}>
+                <button key={i} type="button" onClick={() => day ? setSel(active ? null : date) : undefined}
+                  aria-pressed={day ? active : undefined}
+                  // Jména lidí na směně patří do popisku tlačítka: v buňce jsou jen avatary
+                  // a title odečítač ani dotyk nepřečte.
+                  aria-label={`${dnum}.${day?.missing ? ' — chybí uzávěrka' : day?.hasClosing ? ' — uzávěrka hotová' : ''}${day && day.onShift.length > 0 ? ` — na směně ${day.onShift.map(p => p.name).join(', ')}` : ''}`}
+                  className={`tap-target-sm aspect-square rounded-xl border p-1 flex flex-col items-center justify-start gap-0.5 transition-colors ${tone} ${active ? 'ring-2 ring-black/40 dark:ring-white/50' : ''} ${day ? 'cursor-pointer hover:border-black/20' : 'cursor-default'}`}>
                   <span className={`text-[11px] font-semibold leading-none mt-0.5 ${isToday ? 'text-[#16181A] underline underline-offset-2' : 'text-black/55'}`}>{dnum}</span>
                   {day && day.onShift.length > 0 && (
-                    <div className="flex flex-wrap justify-center gap-0.5 leading-none">
-                      {day.onShift.slice(0, 3).map(p => <span key={p.id} className="text-[11px]" title={p.name}>{p.avatar ?? '👤'}</span>)}
+                    <span className="flex flex-wrap justify-center gap-0.5 leading-none" aria-hidden>
+                      {/* Avatar má vlastní náhradní ikonu — emoji místo něj zakazuje DP §3.18. */}
+                      {day.onShift.slice(0, 3).map(p => <Avatar key={p.id} emoji={p.avatar} size="xs" ring={false} className="!h-4 !w-4 !text-[11px]" />)}
                       {day.onShift.length > 3 && <span className="text-[11px] text-black/40">+{day.onShift.length - 3}</span>}
-                    </div>
+                    </span>
                   )}
                   {day && (
-                    <span className={`mt-auto w-1.5 h-1.5 rounded-full ${day.missing ? 'bg-bad' : day.hasClosing ? 'bg-[#8FB811]' : day.onShift.length > 0 ? 'bg-black/20' : 'bg-transparent'}`} />
+                    <span aria-hidden className={`mt-auto w-1.5 h-1.5 rounded-full ${day.missing ? 'bg-bad' : day.hasClosing ? 'bg-ok' : day.onShift.length > 0 ? 'bg-black/20' : 'bg-transparent'}`} />
                   )}
                 </button>
               );
             })}
           </div>
 
-          {/* Day detail */}
+          {/* Detail dne */}
           {detail && sel && (
-            <div className="mt-4 rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4 space-y-3">
-              <p className="font-bold tracking-tight text-[#16181A] cz-sentence">
-                {new Date(sel + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
-              </p>
+            <Well className="mt-4 space-y-3">
+              <h3 className="t-card cz-sentence">
+                {new Date(sel + 'T12:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
+              </h3>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-1.5">Na směně</p>
+                <p className="t-label mb-1.5">Na směně</p>
                 {detail.onShift.length === 0 ? (
-                  <p className="text-sm text-black/40">Nikdo neměl směnu.</p>
+                  <p className="t-meta">Nikdo neměl směnu.</p>
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
                     {detail.onShift.map(p => (
-                      <PersonLink key={p.id} id={p.id} className={`tap-target-sm inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${p.hadClosing ? 'bg-[#C8F542]/15 text-[#5B7A08]' : detail.missing ? 'bg-bad/10 text-bad-ink' : 'bg-black/[0.05] text-black/60'}`}>
-                        <span>{p.avatar ?? '👤'}</span> {p.name}
+                      <PersonLink key={p.id} id={p.id} className={`chip ${p.hadClosing ? 'chip-ok' : detail.missing ? 'chip-bad' : 'chip-muted'}`}>
+                        <Avatar emoji={p.avatar} size="xs" ring={false} className="!h-5 !w-5" /> {p.name}
                         {p.startTime && <span className="opacity-60 tabular-nums">{p.startTime}–{p.endTime}</span>}
-                        {p.hadClosing ? ' ✓' : ''}
+                        {p.hadClosing && <Icon name="check" size={13} className="shrink-0" />}
                       </PersonLink>
                     ))}
                   </div>
                 )}
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-1.5">Uzávěrku udělal</p>
+                <p className="t-label mb-1.5">Uzávěrku udělal</p>
                 {detail.closedBy.length === 0 ? (
-                  <p className={`text-sm ${detail.missing ? 'text-bad-ink font-medium' : 'text-black/40'}`}>{detail.missing ? 'Nikdo — uzávěrka chybí.' : 'Zatím nikdo.'}</p>
+                  <p className={detail.missing ? 'text-sm text-bad-ink font-medium' : 't-meta'}>{detail.missing ? 'Nikdo — uzávěrka chybí.' : 'Zatím nikdo.'}</p>
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
                     {detail.closedBy.map(p => (
-                      <PersonLink key={p.id} id={p.id} className="tap-target-sm inline-flex items-center gap-1 btn btn-primary btn-sm">
-                        <span>{p.avatar ?? '👤'}</span> {p.name}
+                      <PersonLink key={p.id} id={p.id} className="chip chip-ok">
+                        <Avatar emoji={p.avatar} size="xs" ring={false} className="!h-5 !w-5" /> {p.name}
                       </PersonLink>
                     ))}
                   </div>
                 )}
               </div>
-            </div>
+            </Well>
           )}
         </>
       )}
-    </div>
+    </Card>
   );
 }

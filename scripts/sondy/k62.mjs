@@ -18,6 +18,8 @@ await ctx.route('**/api/**', async route => {
   const u = route.request().url();
   if (u.includes('/api/auth/')) return route.continue();
   if (route.request().method() !== 'GET') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) });
+  // Kolo 69 (B2): Docházka a Tým jsou plochy s widgety — rozložení (widgety a nástroj) z fixtury balíku.
+  if (new URL(u).pathname === '/api/rozlozeni' && ['vedeni.dochazka', 'vedeni.tym'].includes(new URL(u).searchParams.get('stranka'))) return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + (new URL(u).searchParams.get('stranka') === 'vedeni.tym' ? 'k69-b2-rozlozeni-tym' : 'k69-b2-rozlozeni-dochazka') + '.json', 'utf8') });
   const k = keyFor(u);
   if (k && existsSync(DIR + k + '.json')) return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + k + '.json', 'utf8') });
   return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
@@ -27,10 +29,10 @@ await p.goto('http://localhost:3000/employer/overview?view=team-settings', { wai
 const m = norm(await p.locator('main').innerText());
 tvrdi('tým: člen přepnutý jinam je v seznamu', m.includes('jakub přepnutý'), m.slice(0, 160));
 const chip = p.locator('main span.chip', { hasText: 'právě v jiném podniku' });
-tvrdi('tým: má chip „právě v jiném podniku" s vysvětlením', (await chip.count()) === 1 && /členem i jiného podniku/.test(await chip.first().getAttribute('title') ?? ''), `chipů ${await chip.count()}`);
+// Kolo 69 (B2): vysvětlení nese obal chipu (Chip z components/ui title nebere).
+tvrdi('tým: má chip „právě v jiném podniku" s vysvětlením', (await chip.count()) === 1 && /členem i jiného podniku/.test(await chip.first().evaluate(el => el.closest('[title]')?.getAttribute('title') ?? '')), `chipů ${await chip.count()}`);
 tvrdi('tým: chip jen u něj, ne u ostatních', (await p.locator('main span.chip', { hasText: 'právě v jiném podniku' }).count()) === 1, '');
 // Upravit u něj funguje (tlačítko existuje) — PATCH už umí zapsat do členství.
-const radek = p.locator('main div', { hasText: 'Jakub Přepnutý' }).filter({ has: p.locator('button', { hasText: 'Upravit' }) }).last();
-tvrdi('tým: přepnutého člena jde upravit', (await radek.locator('button', { hasText: 'Upravit' }).count()) >= 1, 'bez tlačítka');
+tvrdi('tým: přepnutého člena jde upravit', (await p.getByRole('button', { name: 'Upravit: Jakub Přepnutý' }).count()) === 1, 'bez tlačítka');
 console.log(fails ? `\n${fails} SELHALO` : '\nčlen zůstává členem, i když stojí jinde');
 await b.close(); process.exit(fails ? 1 : 0);

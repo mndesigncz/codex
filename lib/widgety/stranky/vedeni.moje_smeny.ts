@@ -1,5 +1,12 @@
-// Stránka „Moje směny" (vedení). Kolo 68 založilo metadata z katalogu; plochu zapne (aktivni: true) a
-// doporučené i výchozí rozložení upřesní balík B1 v kole 69.
+// Stránka „Moje směny" (vedení). Kolo 68 založilo metadata z katalogu, kolo 69 (balík B1) plochu
+// zapnulo. Nástroj = nadcházející směny s exportem do kalendáře a nabídkou do burzy
+// (components/employee/MyShifts.tsx). Tři dlaždice, Schválené volno, Minulé směny, Kdo má směnu
+// a burza jsou widgety. Dostupnost a žádost o volno zůstávají pod plochou jako formuláře
+// (kreslí je EmployerLayout, který patří jinému balíku).
+//
+// Výchozí rozložení drží, co MyShifts vedení kreslil do kola 68: Kdo má směnu a Minulé směny
+// s hodnocením — jinak by vedoucímu po nasazení funkce zmizely. Připomínka „Zadej dostupnost"
+// ve výchozím není: formulář dostupnosti stojí na téže stránce hned pod plochou.
 import type { DefiniceStranky } from '../typy.ts';
 
 export const STRANKA: DefiniceStranky = {
@@ -9,29 +16,30 @@ export const STRANKA: DefiniceStranky = {
   pohled: 'my-shifts',
   pristup: null,
   nastroj: {
-    nazev: 'Moje směny',
+    nazev: 'Nadcházející směny',
     ikona: 'calendar',
-    popis: 'Nadcházející směny, export do kalendáře, dostupnost a žádosti o volno.',
+    popis: 'Tvoje nadcházející směny, export do kalendáře a nabídka směny do burzy.',
   },
   doporucene: [
     'moje.smeny_prehled',
-    'rozvrh.tym_nahled',
+    'rozvrh.pripominka_dostupnosti',
+    'rozvrh.vymeny',
     'moje.schvalene_volno',
     'moje.minule_smeny',
+    'rozvrh.tym_nahled',
     'uzaverky.kalendar',
-    'rozvrh.vymeny',
     'moje.vydelek',
     'dochazka.moje_odpracovano',
-    'rozvrh.pripominka_dostupnosti',
   ],
   vychozi: {
     'typ:vedeni': [
       { w: 'moje.smeny_prehled', s: 'M' },
-      { w: 'rozvrh.pripominka_dostupnosti', s: 'M' },
       { w: 'nastroj' },
+      { w: 'rozvrh.tym_nahled', s: 'L' },
       { w: 'rozvrh.vymeny', s: 'M' },
       { w: 'moje.schvalene_volno', s: 'M' },
+      { w: 'moje.minule_smeny', s: 'M' },
     ],
   },
-  aktivni: false,
+  aktivni: true,
 };

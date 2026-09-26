@@ -1,5 +1,9 @@
-// Stránka „Tým" (vedení). Kolo 68 založilo metadata z katalogu; plochu zapne (aktivni: true) a
-// doporučené i výchozí rozložení upřesní balík B2 v kole 69.
+// Stránka „Tým" (vedení). Kolo 68 založilo metadata z katalogu, kolo 69 (balík B2) zapnulo plochu.
+//
+// Katalog: stránka je nastavení — widgety jen nad seznamem členů, sekce formulářů (organizace,
+// provoz podniku, výplaty, sdílení, tablet, integrace) zůstávají pevně v nástroji pod nimi.
+// Nástroj proto nese seznam členů i ty sekce; pozvánky jsou widget (tym.pozvanky) a formulář
+// „Pozvat" otevírá limetka v hlavičce.
 import type { DefiniceStranky } from '../typy.ts';
 
 export const STRANKA: DefiniceStranky = {
@@ -29,5 +33,5 @@ export const STRANKA: DefiniceStranky = {
       { w: 'nastroj' },
     ],
   },
-  aktivni: false,
+  aktivni: true,
 };

@@ -1,0 +1,25 @@
+{
+ "closings": [
+  {
+   "id": 501,
+   "date": "VCERA",
+   "shift_date": "VCERA",
+   "created_by": 16,
+   "covered_by": null,
+   "cash_revenue": 12000,
+   "card_revenue": 8000,
+   "author_name": "Eva Testová"
+  },
+  {
+   "id": 502,
+   "date": "PREDEVCIREM",
+   "shift_date": "PREDEVCIREM",
+   "created_by": 18,
+   "covered_by": null,
+   "cash_revenue": 9000,
+   "card_revenue": 6000,
+   "author_name": "Petra Malá"
+  }
+ ],
+ "payDailyCash": false
+}

@@ -1,0 +1,190 @@
+{
+ "roster": [
+  {
+   "id": 15,
+   "name": "Martin Nemeškal",
+   "avatar": "🧑",
+   "hourlyRate": 0,
+   "hasPin": true,
+   "openSince": null,
+   "openEntryId": null,
+   "shiftStart": null,
+   "shiftEnd": null
+  },
+  {
+   "id": 16,
+   "name": "Eva Testová",
+   "avatar": "👩",
+   "hourlyRate": 150,
+   "hasPin": true,
+   "openSince": "@120",
+   "openEntryId": 901,
+   "shiftStart": "@HM-150",
+   "shiftEnd": "@HM+300"
+  },
+  {
+   "id": 17,
+   "name": "Jakub Horák",
+   "avatar": "🧔",
+   "hourlyRate": 0,
+   "hasPin": false,
+   "openSince": "@600",
+   "openEntryId": 902,
+   "shiftStart": "@HM-620",
+   "shiftEnd": "@HM-60"
+  },
+  {
+   "id": 18,
+   "name": "Petra Malá",
+   "avatar": "👱",
+   "hourlyRate": 180,
+   "hasPin": true,
+   "openSince": null,
+   "openEntryId": null,
+   "shiftStart": "@HM-90",
+   "shiftEnd": "@HM+200"
+  }
+ ],
+ "entries": [
+  {
+   "id": 901,
+   "employeeId": 16,
+   "employeeName": "Eva Testová",
+   "employeeAvatar": "👩",
+   "clockIn": "@120",
+   "clockOut": null,
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 902,
+   "employeeId": 17,
+   "employeeName": "Jakub Horák",
+   "employeeAvatar": "🧔",
+   "clockIn": "@600",
+   "clockOut": null,
+   "source": "self",
+   "note": null
+  },
+  {
+   "id": 881,
+   "employeeId": 16,
+   "employeeName": "Eva Testová",
+   "employeeAvatar": "👩",
+   "clockIn": "@1920",
+   "clockOut": "@1440",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 882,
+   "employeeId": 18,
+   "employeeName": "Petra Malá",
+   "employeeAvatar": "👱",
+   "clockIn": "@1920",
+   "clockOut": "@1440",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 883,
+   "employeeId": 17,
+   "employeeName": "Jakub Horák",
+   "employeeAvatar": "🧔",
+   "clockIn": "@1920",
+   "clockOut": "@1440",
+   "source": "manual",
+   "note": null
+  },
+  {
+   "id": 884,
+   "employeeId": 16,
+   "employeeName": "Eva Testová",
+   "employeeAvatar": "👩",
+   "clockIn": "@3360",
+   "clockOut": "@2880",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 885,
+   "employeeId": 18,
+   "employeeName": "Petra Malá",
+   "employeeAvatar": "👱",
+   "clockIn": "@3360",
+   "clockOut": "@2880",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 886,
+   "employeeId": 17,
+   "employeeName": "Jakub Horák",
+   "employeeAvatar": "🧔",
+   "clockIn": "@3360",
+   "clockOut": "@2880",
+   "source": "manual",
+   "note": null
+  },
+  {
+   "id": 887,
+   "employeeId": 16,
+   "employeeName": "Eva Testová",
+   "employeeAvatar": "👩",
+   "clockIn": "@4800",
+   "clockOut": "@4320",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 888,
+   "employeeId": 18,
+   "employeeName": "Petra Malá",
+   "employeeAvatar": "👱",
+   "clockIn": "@4800",
+   "clockOut": "@4320",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 889,
+   "employeeId": 17,
+   "employeeName": "Jakub Horák",
+   "employeeAvatar": "🧔",
+   "clockIn": "@4800",
+   "clockOut": "@4320",
+   "source": "manual",
+   "note": null
+  },
+  {
+   "id": 890,
+   "employeeId": 16,
+   "employeeName": "Eva Testová",
+   "employeeAvatar": "👩",
+   "clockIn": "@6240",
+   "clockOut": "@5760",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 891,
+   "employeeId": 18,
+   "employeeName": "Petra Malá",
+   "employeeAvatar": "👱",
+   "clockIn": "@6240",
+   "clockOut": "@5760",
+   "source": "kiosk",
+   "note": null
+  },
+  {
+   "id": 892,
+   "employeeId": 17,
+   "employeeName": "Jakub Horák",
+   "employeeAvatar": "🧔",
+   "clockIn": "@6240",
+   "clockOut": "@5760",
+   "source": "manual",
+   "note": null
+  }
+ ]
+}

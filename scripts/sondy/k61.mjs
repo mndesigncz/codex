@@ -31,6 +31,8 @@ async function kontext(viewport) {
     if (new URL(u).pathname === '/api/rozlozeni' && new URL(u).searchParams.get('stranka') === 'vedeni.vsechny_podniky') return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + 'k69-b5b-rozlozeni-podniky.json', 'utf8') });
     // Kolo 69 (B3): Sklad je plocha s widgety — rozložení (widgety skladu a položky jako nástroj) z fixtury balíku.
     if (new URL(u).pathname === '/api/rozlozeni' && new URL(u).searchParams.get('stranka') === 'vedeni.sklad') return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + 'k69-b3-rozlozeni-sklad.json', 'utf8') });
+    // Kolo 69 (B2): Docházka a Tým jsou plochy s widgety — rozložení (widgety a nástroj) z fixtury balíku.
+    if (new URL(u).pathname === '/api/rozlozeni' && ['vedeni.dochazka', 'vedeni.tym'].includes(new URL(u).searchParams.get('stranka'))) return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + (new URL(u).searchParams.get('stranka') === 'vedeni.tym' ? 'k69-b2-rozlozeni-tym' : 'k69-b2-rozlozeni-dochazka') + '.json', 'utf8') });
     const k = keyFor(u);
     if (k === 'teams_mine') { const d = JSON.parse(readFileSync(DIR + k + '.json', 'utf8')); d.muzuZalozit = stav.muzuZalozit; return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(d) }); }
     if (k === 'inventory_categories' && stav.jenCiziKategorie) { const d = JSON.parse(readFileSync(DIR + k + '.json', 'utf8')); return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(d.filter(c => c.zOrganizace)) }); }
@@ -82,13 +84,17 @@ async function kontext(viewport) {
   stav.navodyBezZdroje = true;
   const ctx = await kontext({ width: 1280, height: 950 }); const p = await ctx.newPage();
   await p.goto('http://localhost:3000/employer/overview?view=team-settings', { waitUntil: 'networkidle' }); await p.waitForTimeout(1000);
-  let zprava = ''; p.once('dialog', d => { zprava = d.message(); d.dismiss(); });
+  // Kolo 69 (B2): organizace je v sekci Podnik a potvrzení je Modal „Změnit sdílení?", ne confirm().
+  await p.getByRole('tab', { name: 'Podnik' }).click(); await p.waitForTimeout(600);
+  const okno = p.getByRole('dialog', { name: 'Změnit sdílení?' });
   const pred = posty.filter(x => x.url === '/api/organization').length;
   await p.locator('select[aria-labelledby="org-zdroj-kategorieNavodu"]').selectOption('2'); await p.waitForTimeout(500);
+  const zprava = await okno.innerText().catch(() => '');
   tvrdi('nastavení: zapnutí zdroje se ptá na nahrazení kopií', /nahradí je originál ze zdroje: kategorie návodů/.test(zprava), zprava.slice(0, 200));
+  await okno.getByRole('button', { name: 'Zrušit' }).click().catch(() => {}); await p.waitForTimeout(300);
   tvrdi('nastavení: zrušené potvrzení sloučení nic neuloží', posty.filter(x => x.url === '/api/organization').length === pred, 'PATCH odešel');
-  p.once('dialog', d => d.accept());
-  await p.locator('select[aria-labelledby="org-zdroj-kategorieNavodu"]').selectOption('2'); await p.waitForTimeout(600);
+  await p.locator('select[aria-labelledby="org-zdroj-kategorieNavodu"]').selectOption('2'); await p.waitForTimeout(500);
+  await okno.getByRole('button', { name: 'Pokračovat' }).click().catch(() => {}); await p.waitForTimeout(600);
   tvrdi('nastavení: potvrzené sloučení PATCH odešle', posty.filter(x => x.url === '/api/organization').length === pred + 1, 'PATCH neodešel');
   // Přepínač je mimo komponentu: po kliknutí zůstává fokus na něm.
   const sw = p.getByRole('switch', { name: 'Přehled za všechny podniky' });

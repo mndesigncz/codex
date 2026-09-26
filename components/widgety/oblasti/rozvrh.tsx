@@ -22,16 +22,44 @@
 //    dostupnost.zobrazit, lidé jako PersonChip, „Sestavit rozvrh" `secondary`
 //    (druhá limetka na Přehledu pryč) a jen s rozvrh.generovat;
 //  - rozvrh.pripominka_dostupnosti — výzva místo limetkové karty s vykáním.
+//
+// Kolo 69 (balík B1) — bloky, které visely natvrdo nad plánovačem a pod ním:
+//  - rozvrh.diry — dřív červená tónovaná karta s řádky jako bílé jamky nad mřížkou
+//    (druhá tónovaná plocha na obrazovce). Teď seznam dnů; klepnutí otevře den
+//    v plánovači (událost UDALOST_DEN), jinde přejde na Rozvrh;
+//  - rozvrh.zadosti_volno — dřív TimeOffApprovals pod rozvrhem: limetka „Schválit"
+//    v každém řádku, řádky jako jamky, „✎ Upravit", confirm() při rušení. Teď
+//    `primary` Schválit a `danger` Zamítnout (DP §3.1), schválené volno s nabídkou
+//    „···" a okna <Modal>; hromadně přes „Vybrat víc" v nabídce widgetu;
+//  - rozvrh.vymeny — dřív dvě komponenty (ShiftSwapApprovals s modrou tónovanou
+//    kartou a limetkou, ShiftSwap s kartou na každou nabídku). Teď jedna burza:
+//    ke schválení (vedení), volné směny kolegů, moje nabídky;
+//  - rozvrh.hodiny_lidi, rozvrh.poptavka — nové z dat, která API už vracelo;
+//  - rozvrh.tym_nahled — dřív TeamSchedule v Mých směnách s ručními limetkovými
+//    pilulkami; teď PersonChip (vlastní směna tónem ok, jméno „Ty").
+//
+// Widget, který mění rozvrh (schválená výměna, schválené volno), pošle UDALOST_ZMENA —
+// plánovač se znovu načte, aby nenabízel člověka na den, kdy má dovolenou.
 
-import { useMemo, type ReactNode } from 'react';
-import { Avatar, Button, Chip, EmptyState, ListRow, PersonChip, Stat } from '../../ui';
-import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
+import { useMemo, useState, type ReactNode } from 'react';
+import {
+  Avatar, BulkBar, Button, Chip, EmptyState, Field, Input, ListRow, Menu, Modal, PersonChip, SelectBox, Stat,
+  runBulk, useSelection, type MenuItem,
+} from '../../ui';
+import type { KomponentaWidgetu, Navigace, WidgetProps } from '@/lib/widgety/typy';
 import { Widget, type StavNacteni } from '../Widget';
-import { useDataWidgetu } from '../useDataWidgetu';
+import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
 import { useNavigace, useSmi } from '../NavigaceKontext';
 import { obnovOpravneni, useOpravneni } from '../../role/useOpravneni';
-import { czCount, czVerb, DEN } from '@/lib/czech';
+import { apiMessage, okJson } from '@/lib/api';
+import { czCount, czForm, czVerb, DEN, SMENA } from '@/lib/czech';
 import { parseDbTime, pragueDayOf, pragueHM, pragueToday } from '@/lib/pragueTime';
+import {
+  KLIC_DEN, KLIC_DOSTUPNOST, UDALOST_DEN, UDALOST_DOSTUPNOST, UDALOST_ZMENA,
+  den, denKratce, denVetou, dnySDirou, hm, hodinyLidi, hodinyText, kategorieBarvy, popisDiry, poptavkaTop,
+  rozdelBurzu, rozsahVolna, tymPoDnech, TYP_VOLNA, zadostiVolna,
+  type NabidkaSmeny, type SmenaNahledu, type SmenaRozvrhu, type ZadostVolna,
+} from '@/lib/rozvrhPrehled';
 
 // ---------------------------------------------------------------------------
 // Pomocníci (záměrně v souboru: oblast je samostatný líný kus a v kole 69 má
@@ -48,9 +76,6 @@ function useBrana(klice: readonly string[]): boolean {
   return nacteno ? ma(klice) : chyba;
 }
 
-/** Den z databáze nebo JSONu: „2026-09-26" i „2026-09-26T00:00:00.000Z" → „2026-09-26". */
-const den = (v: unknown): string => (/^\d{4}-\d{2}-\d{2}/.test(String(v ?? '')) ? String(v).slice(0, 10) : '');
-const hm = (t: unknown) => String(t ?? '').slice(0, 5);
 /** „RRRR-MM" posunutý o měsíce — z pražského dne, ne z hodin serveru. */
 function mesicZa(o: number): string {
   const [r, m] = pragueToday().split('-').map(Number);
@@ -64,14 +89,38 @@ function jmenoMesice(mesic: string): string {
 }
 
 const LIDE = { one: 'člověk', few: 'lidé', many: 'lidí' };
+const HOST = { one: 'host', few: 'hosté', many: 'hostů' };
+const REZERVACE = { one: 'rezervace', few: 'rezervace', many: 'rezervací' };
+const ZADOST = { one: 'žádost', few: 'žádosti', many: 'žádostí' };
+const VYMENA = { one: 'výměna', few: 'výměny', many: 'výměn' };
+const cislo = (n: number) => n.toLocaleString('cs-CZ');
 
-// Typ směny nese kategorie (cat-dot-1…6), ne stavová barva: „ranní" není
-// „v pořádku" a „odpolední" není „info". Barvy, které si podnik u typu směny
-// vybírá (ScheduleBuilder, COLORS), se mapují na nejbližší kategorii.
-const KATEGORIE_BARVY: Record<string, number> = {
-  '#c8f542': 1, '#3b82f6': 2, '#0a84ff': 2, '#8b5cf6': 3, '#f59e0b': 4, '#14b8a6': 5, '#ec4899': 6, '#f43f5e': 6,
-};
-const katBarvy = (barva: unknown): number | null => KATEGORIE_BARVY[String(barva ?? '').toLowerCase()] ?? null;
+/**
+ * Widget žádá nástroj stránky Rozvrh (otevřít den, vyplnit dostupnost). Na
+ * stránce ho plánovač slyší hned; jinde si žádost počká v sessionStorage
+ * a widget přejde na Rozvrh (layout argument pohledu nepředává).
+ */
+function predejNastroji(nav: Navigace, udalost: string, klic: string, hodnota: string): void {
+  const detail = { hodnota, prijato: false };
+  window.dispatchEvent(new CustomEvent(udalost, { detail }));
+  if (detail.prijato || !nav.smiPohled('shifts')) return;
+  try { sessionStorage.setItem(klic, hodnota); } catch { /* soukromé okno: Rozvrh se otevře bez předvyplnění */ }
+  nav.onNavigate('shifts');
+}
+
+/** Po zápisu, který mění rozvrh: plánovač a Moje směny se znovu načtou. */
+const oznamZmenu = () => window.dispatchEvent(new CustomEvent(UDALOST_ZMENA));
+
+/** „…a dalších N" pod useknutým seznamem (DP §3.6: tichý strop seznamu je zakázaný). */
+function ADalsich({ n }: { n: number }) {
+  return n > 0 ? <p className="t-meta mt-2">…a dalších {cislo(n)}</p> : null;
+}
+
+/** Čas směny: „08:00–16:00". */
+const casSmeny = (od: unknown, doCasu: unknown) => (hm(od) ? `${hm(od)}–${hm(doCasu)}` : '');
+
+// Typ směny nese kategorie (cat-dot-1…6), ne stavová barva (lib/rozvrhPrehled).
+const katBarvy = kategorieBarvy;
 // Staré typy bez nastavení (API /api/shifts má stejný převod).
 const STARE_TYPY: Record<string, { nazev: string; barva: string | null }> = {
   morning: { nazev: 'Ranní', barva: '#C8F542' },
@@ -307,6 +356,8 @@ function vyberCleny(raw: any): Clen[] {
 
 /** Kolik jmen ukázat jako pilulky ve střední velikosti. */
 const PILULEK_M = 10;
+/** Kolik řádků ukázat ve velké velikosti, než zbytek schová „…a dalších N". */
+const RADKU_L = 8;
 
 function DostupnostTymu({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: string }>) {
   const brana = useBrana(['dostupnost.zobrazit']);
@@ -315,6 +366,7 @@ function DostupnostTymu({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: s
   const mesic = nastaveni.mesic === 'tento' ? mesicZa(0) : mesicZa(1);
   const odevzdani = useDataWidgetu(brana ? `/api/availability?month=${mesic}` : null, vyberOdevzdani);
   const clenove = useDataWidgetu(brana ? '/api/teams' : null, vyberCleny);
+  const [vseLidi, setVseLidi] = useState(false);
 
   const { zadali, chybi, blokovano } = useMemo(() => {
     const podle = new Map<number, Odevzdani>();
@@ -334,6 +386,10 @@ function DostupnostTymu({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: s
   const celkem = zadali.length + chybi.length;
   const naMesic = jmenoMesice(mesic);
   const smiSestavit = !nahled && smi('rozvrh.generovat') && nav.smiPohled('shifts');
+  // Pole katalogu akce:vyplnit_za_cloveka — okno dostupnosti je v plánovači Rozvrhu.
+  const smiVyplnit = !nahled && smi('dostupnost.upravit') && nav.smiPohled('shifts');
+  // Náhled zadané dostupnosti stačí dostupnost.zobrazit (hlavní brána widgetu).
+  const smiNahlednout = !nahled && nav.smiPohled('shifts');
   const sestavit = smiSestavit ? (
     <Button variant="secondary" size="sm" icon="calendar" onClick={() => nav.onNavigate('shifts')}>Sestavit rozvrh</Button>
   ) : null;
@@ -366,23 +422,43 @@ function DostupnostTymu({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: s
       </div>
     );
   } else {
+    // Nejdřív ti, kdo chybí; strop řádků, aby widget nad plánovačem nevypsal celý tým
+    // a hlavní nástroj stránky nezačínal až po obrazovce jmen (DP §5.1, §5.8).
+    const poradi = [...chybi, ...zadali];
+    const radky = vseLidi ? poradi : poradi.slice(0, RADKU_L);
     telo = (
       <div className="space-y-3">
         {vsichni ?? shrnuti}
         <ul className="list">
-          {[...chybi, ...zadali].map(c => {
+          {radky.map(c => {
             const zadal = !chybi.includes(c);
             const dnu = blokovano(Number(c.id));
-            return (
-              <ListRow key={c.id}
-                lead={<Avatar emoji={c.avatar} size="sm" />}
-                title={c.name}
-                meta={!zadal ? 'ještě nezadáno' : dnu === 0 ? 'bez omezení' : `nemůže ${czCount(dnu, DEN)}`}
-                right={zadal ? <Chip tone="ok" size="sm">Zadáno</Chip> : <Chip tone="wait" size="sm">Chybí</Chip>}
-              />
-            );
+            // Stav jde do meta, ne do `right`, a řádek je bez chevronu (klikací je celý):
+            // na telefonu se ocas ListRow láme na celou šířku, takže chip i chevron by
+            // osiřely na vlastním řádku a každý člověk by zabral tři řádky.
+            const obsah = {
+              chevron: false,
+              lead: <Avatar emoji={c.avatar} size="sm" />,
+              title: c.name,
+              meta: !zadal
+                ? <Chip tone="wait" size="sm">Chybí</Chip>
+                : dnu === 0 ? 'zadáno · bez omezení' : `zadáno · nemůže ${czCount(dnu, DEN)}`,
+            };
+            // Klepnutí otevře okno dostupnosti v plánovači: s dostupnost.upravit k úpravě,
+            // jinak jen ke čtení (dny, preference, max. směn, poznámka pro vedení).
+            // U toho, kdo nezadal, je co ukázat jen tomu, kdo může vyplnit za něj.
+            const klik = smiVyplnit || (smiNahlednout && zadal);
+            // Klikací řádek: vlastní <li> + ListRow as="div", jinak .list ztratí linku (DP §3.6).
+            return klik
+              ? <li key={c.id}><ListRow as="div" {...obsah} onClick={() => predejNastroji(nav, UDALOST_DOSTUPNOST, KLIC_DOSTUPNOST, `${c.id}|${mesic}`)} /></li>
+              : <ListRow key={c.id} {...obsah} />;
           })}
         </ul>
+        {poradi.length > RADKU_L && (
+          <Button variant="ghost" size="sm" icon={vseLidi ? 'chevron' : 'chevronRight'} aria-expanded={vseLidi} onClick={() => setVseLidi(v => !v)}>
+            {vseLidi ? 'Ukázat méně' : `…a dalších ${cislo(poradi.length - RADKU_L)}`}
+          </Button>
+        )}
         {sestavit}
       </div>
     );
@@ -454,8 +530,570 @@ function PripominkaDostupnosti({ velikost, nahled }: WidgetProps) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Díry v obsazení
+// ---------------------------------------------------------------------------
+
+interface DataRozvrhu {
+  smeny: SmenaRozvrhu[];
+  gaps: { date: string; from: string; to: string }[];
+  understaffed: { date: string; shiftTypeName: string }[];
+  demand: Record<string, { reservations?: number; guests?: number }>;
+}
+/** /api/schedule?month → shifts, gaps, understaffed, demand (jeden dotaz pro Díry, Hodiny, Poptávku i plánovač). */
+function vyberDataRozvrhu(raw: any): DataRozvrhu {
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.shifts)) throw new Error('Rozvrh přišel v nečekaném tvaru.');
+  return {
+    smeny: raw.shifts,
+    gaps: Array.isArray(raw.gaps) ? raw.gaps : [],
+    understaffed: Array.isArray(raw.understaffed) ? raw.understaffed : [],
+    demand: raw.demand && typeof raw.demand === 'object' ? raw.demand : {},
+  };
+}
+const mesicZVolby = (v: unknown) => (v === 'pristi' ? mesicZa(1) : mesicZa(0));
+
+function Diry({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: string }>) {
+  const brana = useBrana(['rozvrh.zobrazit']);
+  const smi = useSmi();
+  const nav = useNavigace();
+  const mesic = mesicZVolby(nastaveni.mesic);
+  const data = useDataWidgetu(brana ? `/api/schedule?month=${mesic}` : null, vyberDataRozvrhu);
+  const dnes = pragueToday();
+  const dny = useMemo(() => (data.data ? dnySDirou(data.data.gaps, data.data.understaffed, dnes) : []), [data.data, dnes]);
+
+  if (!brana) return <Widget prazdno={null} />;
+  // Doplnit směnu (pole akce:doplnit_smenu): den se otevře v plánovači.
+  const smiDoplnit = !nahled && smi('rozvrh.upravit') && nav.smiPohled('shifts');
+  const otevriDen = (d: string) => predejNastroji(nav, UDALOST_DEN, KLIC_DEN, d);
+  const S = velikost === 'S';
+  const naMesic = jmenoMesice(mesic);
+
+  return (
+    <Widget
+      nacteni={data}
+      doplnek={!S && dny.length > 0 ? <Chip tone="bad" size="sm">{cislo(dny.length)}</Chip> : undefined}
+      otevrit={S && smiDoplnit && dny[0] ? () => otevriDen(dny[0].den) : undefined}
+      prazdno={dny.length === 0 ? <p className="t-meta text-pretty">Na {naMesic} je obsazeno — bez děr.</p> : undefined}
+    >
+      {S ? (
+        <Stat label={naMesic} value={cislo(dny.length)} note={`${czForm(dny.length, DEN)} s dírou · první ${denKratce(dny[0]?.den ?? dnes, dnes).toLowerCase()}`} />
+      ) : (
+        <>
+          <ul className="list">
+            {dny.slice(0, 5).map(d => {
+              const obsah = { title: <span className="cz-sentence">{denVetou(d.den)}</span>, meta: popisDiry(d) };
+              return smiDoplnit
+                ? <li key={d.den}><ListRow as="div" {...obsah} onClick={() => otevriDen(d.den)} /></li>
+                : <ListRow key={d.den} {...obsah} />;
+            })}
+          </ul>
+          <ADalsich n={dny.length - 5} />
+        </>
+      )}
+    </Widget>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Poptávka z rezervací
+// ---------------------------------------------------------------------------
+
+function Poptavka({ nastaveni, nahled }: WidgetProps<{ mesic?: string }>) {
+  const brana = useBrana(['rozvrh.zobrazit']);
+  const nav = useNavigace();
+  const mesic = mesicZVolby(nastaveni.mesic);
+  const data = useDataWidgetu(brana ? `/api/schedule?month=${mesic}` : null, vyberDataRozvrhu);
+  const dnes = pragueToday();
+  const dny = useMemo(() => poptavkaTop(data.data?.demand, dnes, 5), [data.data, dnes]);
+
+  if (!brana) return <Widget prazdno={null} />;
+  const muze = !nahled && nav.smiPohled('shifts');
+
+  return (
+    <Widget
+      nacteni={data}
+      prazdno={dny.length === 0 ? <p className="t-meta text-pretty">Na {jmenoMesice(mesic)} zatím nikdo nerezervoval.</p> : undefined}
+    >
+      <ul className="list">
+        {dny.map(d => {
+          const obsah = {
+            title: <span className="cz-sentence">{denVetou(d.den)}</span>,
+            meta: czCount(d.rezervaci, REZERVACE),
+            value: cislo(d.hostu),
+            valueMeta: czForm(d.hostu, HOST),
+          };
+          return muze
+            ? <li key={d.den}><ListRow as="div" {...obsah} onClick={() => predejNastroji(nav, UDALOST_DEN, KLIC_DEN, d.den)} /></li>
+            : <ListRow key={d.den} {...obsah} />;
+        })}
+      </ul>
+    </Widget>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Naplánované hodiny
+// ---------------------------------------------------------------------------
+
+function vyberPravidla(raw: any): { teamMaxHours: number | null; members: { id: number; maxHours?: number | null }[] } {
+  if (!raw || typeof raw !== 'object') throw new Error('Pravidla přišla v nečekaném tvaru.');
+  return { teamMaxHours: raw.teamMaxHours ?? null, members: Array.isArray(raw.members) ? raw.members : [] };
+}
+
+function HodinyLidi({ velikost, nastaveni }: WidgetProps<{ mesic?: string }>) {
+  const brana = useBrana(['rozvrh.zobrazit']);
+  const smi = useSmi();
+  const mesic = mesicZVolby(nastaveni.mesic);
+  const data = useDataWidgetu(brana ? `/api/schedule?month=${mesic}` : null, vyberDataRozvrhu);
+  // Limit hodin (pole limit_hodin) jen s rozvrh.nastaveni; jeho výpadek widget neshodí —
+  // hodiny platí i bez stropu, jen se neukáže, kdo se k němu blíží.
+  const pravidla = useDataWidgetu(brana && smi('rozvrh.nastaveni') ? '/api/schedule/rules' : null, vyberPravidla);
+  const lide = useMemo(() => (data.data ? hodinyLidi(data.data.smeny, mesic, pravidla.data) : []), [data.data, pravidla.data, mesic]);
+
+  if (!brana) return <Widget prazdno={null} />;
+  const S = velikost === 'S';
+  const L = velikost === 'L';
+  const naMesic = jmenoMesice(mesic);
+  const stav = (c: (typeof lide)[number]) => {
+    if (c.podil == null) return undefined;
+    if (c.podil > 1) return <Chip tone="bad" size="sm">Nad limitem</Chip>;
+    if (c.podil >= 0.9) return <Chip tone="wait" size="sm">U limitu</Chip>;
+    return undefined;
+  };
+  const prvni = lide[0];
+
+  return (
+    <Widget
+      nacteni={data}
+      prazdno={lide.length === 0 ? <p className="t-meta text-pretty">Na {naMesic} zatím nikdo nemá směnu.</p> : undefined}
+    >
+      {prvni && (S ? (
+        <Stat label={prvni.podil != null ? 'Nejblíž limitu' : 'Nejvíc hodin'} value={hodinyText(prvni.hodiny)} unit="h"
+          note={<span className="block truncate">{prvni.jmeno}{prvni.limit ? ` · z ${hodinyText(prvni.limit)} h` : ''}</span>} />
+      ) : (
+        <>
+          {pravidla.error && <p className="note note-wait text-sm mb-2">Limity hodin se nenačetly — ukazuju jen naplánované hodiny.</p>}
+          <ul className="list">
+            {(L ? lide : lide.slice(0, 5)).map(c => (
+              <ListRow key={c.employeeId}
+                lead={<Avatar emoji={c.avatar} size="sm" />}
+                title={c.jmeno}
+                meta={czCount(c.smen, SMENA)}
+                value={`${hodinyText(c.hodiny)} h`}
+                valueMeta={c.limit ? `z ${hodinyText(c.limit)} h` : undefined}
+                right={stav(c)}
+              />
+            ))}
+          </ul>
+          {!L && <ADalsich n={lide.length - 5} />}
+        </>
+      ))}
+    </Widget>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Žádosti o volno (vedení)
+// ---------------------------------------------------------------------------
+
+const URL_VOLNO = '/api/timeoff';
+function vyberZadosti(raw: any): ZadostVolna[] {
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.requests)) throw new Error('Žádosti o volno přišly v nečekaném tvaru.');
+  return raw.requests;
+}
+const CHYBA_ZAPISU = 'Nepodařilo se to uložit — zkus to znovu.';
+
+function ZadostiVolna({ velikost, nahled }: WidgetProps) {
+  const brana = useBrana(['volno.zobrazit']);
+  const smi = useSmi();
+  const data = useDataWidgetu(brana ? URL_VOLNO : null, vyberZadosti);
+  const dnes = pragueToday();
+  const { cekajici, schvalene, vyrizene } = useMemo(() => zadostiVolna(data.data ?? [], dnes), [data.data, dnes]);
+  const sel = useSelection<number>();
+  const [pracuji, setPracuji] = useState<Set<number>>(new Set());
+  const [chyba, setChyba] = useState<string | null>(null);
+  const [upravit, setUpravit] = useState<{ z: ZadostVolna; od: string; do: string } | null>(null);
+  const [zrusit, setZrusit] = useState<ZadostVolna | null>(null);
+  const [historie, setHistorie] = useState(false);
+
+  if (!brana) return <Widget prazdno={null} />;
+  const smiRozhodnout = !nahled && smi('volno.schvalovat');
+  const S = velikost === 'S';
+  const L = velikost === 'L';
+
+  const zapis = async (init: RequestInit, url = URL_VOLNO) => {
+    const res = await fetch(url, init);
+    await okJson(res);
+  };
+  const patch = (body: object) => zapis({ method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const hotovo = () => { obnovDataWidgetu(URL_VOLNO); oznamZmenu(); };
+  const s = (id: number, on: boolean) => setPracuji(p => { const n = new Set(p); if (on) n.add(id); else n.delete(id); return n; });
+
+  const rozhodni = async (z: ZadostVolna, status: 'approved' | 'rejected') => {
+    s(z.id, true); setChyba(null);
+    try { await patch({ id: z.id, status }); hotovo(); } catch (e) { setChyba(apiMessage(e, CHYBA_ZAPISU)); }
+    s(z.id, false);
+  };
+  // Po sezóně dovolených leží ve frontě dvacet žádostí — pustí je naráz a řekne, kolik prošlo.
+  const rozhodniVic = async (status: 'approved' | 'rejected') => {
+    const ids = Array.from(sel.selected);
+    if (!ids.length) return;
+    setChyba(null);
+    setPracuji(new Set(ids));
+    const { failed } = await runBulk(ids, id => patch({ id, status }));
+    setPracuji(new Set());
+    hotovo();
+    if (failed.length) { setChyba(failed.length === ids.length ? CHYBA_ZAPISU : `${failed.length} z ${ids.length} se neuložilo — zkus to znovu.`); return; }
+    sel.exit();
+  };
+  const ulozTermin = async () => {
+    if (!upravit) return;
+    if (!upravit.od || !upravit.do || upravit.od > upravit.do) { setChyba('Konec volna nesmí být před začátkem.'); return; }
+    s(upravit.z.id, true); setChyba(null);
+    try { await patch({ id: upravit.z.id, fromDate: upravit.od, toDate: upravit.do }); hotovo(); setUpravit(null); }
+    catch (e) { setChyba(apiMessage(e, CHYBA_ZAPISU)); }
+    s(upravit.z.id, false);
+  };
+  const zrusVolno = async () => {
+    if (!zrusit) return;
+    s(zrusit.id, true); setChyba(null);
+    try { await zapis({ method: 'DELETE' }, `${URL_VOLNO}?id=${zrusit.id}`); hotovo(); setZrusit(null); }
+    catch (e) { setChyba(apiMessage(e, 'Volno se nezrušilo — zkus to znovu.')); }
+    s(zrusit.id, false);
+  };
+
+  const kdo = (z: ZadostVolna) => z.employeeName || 'Zaměstnanec';
+  const meta = (z: ZadostVolna) => <><span className="tabular-nums">{rozsahVolna(den(z.fromDate), den(z.toDate))}</span> · {TYP_VOLNA[z.type] ?? 'Jiné'}{z.note ? ` · ${z.note}` : ''}</>;
+  const limit = L ? Infinity : 5;
+  const cek = cekajici.slice(0, limit);
+  const sch = schvalene.slice(0, Math.max(0, (L ? Infinity : 5) - cek.length));
+  const akce: MenuItem[] | undefined = smiRozhodnout && !S && cekajici.length > 1 && !sel.selecting
+    ? [{ label: 'Vybrat víc', icon: 'check', onClick: sel.start, hint: 'Schválit nebo zamítnout několik žádostí naráz.' }]
+    : undefined;
+
+  return (
+    <Widget
+      nacteni={data}
+      akce={akce}
+      doplnek={!S && cekajici.length > 0 ? <Chip tone="wait" size="sm">{cislo(cekajici.length)}</Chip> : undefined}
+      prazdno={cekajici.length === 0 && schvalene.length === 0 && (!L || vyrizene.length === 0)
+        ? <p className="t-meta">Žádná žádost o volno nečeká.</p> : undefined}
+    >
+      {S ? (
+        // V malé velikosti jen počet: typ volna (nemoc) je citlivý údaj a do dlaždice nepatří.
+        <Stat label="Čeká" value={cislo(cekajici.length)}
+          note={cekajici.length ? czForm(cekajici.length, ZADOST) : `${cislo(schvalene.length)} schválených`} />
+      ) : (
+        <div className="space-y-3">
+          {chyba && <p className="note note-danger text-sm" role="alert">{chyba}</p>}
+          {cek.length > 0 && (
+            <ul className="list" aria-label="Čekající žádosti">
+              {cek.map(z => (
+                <ListRow key={z.id}
+                  lead={sel.selecting
+                    ? <SelectBox checked={sel.has(z.id)} onChange={() => sel.toggle(z.id)} label={`Vybrat žádost — ${kdo(z)}`} />
+                    : <Avatar emoji={z.employeeAvatar} size="sm" />}
+                  title={kdo(z)}
+                  meta={meta(z)}
+                  actions={smiRozhodnout && !sel.selecting ? (
+                    <>
+                      <Button variant="primary" size="sm" loading={pracuji.has(z.id)} onClick={() => rozhodni(z, 'approved')}>Schválit</Button>
+                      <Button variant="danger" size="sm" disabled={pracuji.has(z.id)} onClick={() => rozhodni(z, 'rejected')}>Zamítnout</Button>
+                    </>
+                  ) : undefined}
+                  right={!smiRozhodnout ? <Chip tone="wait" size="sm">Čeká</Chip> : undefined}
+                />
+              ))}
+            </ul>
+          )}
+          {sch.length > 0 && (
+            <div>
+              <p className="t-label mb-1">Schválené volno</p>
+              <ul className="list">
+                {sch.map(z => (
+                  <ListRow key={z.id}
+                    lead={<Avatar emoji={z.employeeAvatar} size="sm" />}
+                    title={kdo(z)}
+                    meta={meta(z)}
+                    actions={smiRozhodnout ? (
+                      <Menu size="sm" label={`Další akce s volnem — ${kdo(z)}`} items={[
+                        { label: 'Upravit termín…', icon: 'pencil', onClick: () => setUpravit({ z, od: den(z.fromDate), do: den(z.toDate) }) },
+                        { label: 'Zrušit volno…', icon: 'trash', danger: true, hint: 'Dotyčný dostane upozornění.', onClick: () => setZrusit(z) },
+                      ]} />
+                    ) : undefined}
+                  />
+                ))}
+              </ul>
+            </div>
+          )}
+          {!L && <ADalsich n={cekajici.length + schvalene.length - cek.length - sch.length} />}
+          {L && vyrizene.length > 0 && (
+            <div>
+              <Button variant="ghost" size="sm" icon={historie ? 'chevron' : 'chevronRight'} onClick={() => setHistorie(h => !h)} aria-expanded={historie}>
+                {historie ? 'Skrýt vyřízené' : `Vyřízené (${cislo(vyrizene.length)})`}
+              </Button>
+              {historie && (
+                <ul className="list mt-1">
+                  {vyrizene.map(z => (
+                    <ListRow key={z.id} title={kdo(z)} meta={meta(z)}
+                      right={z.status === 'approved' ? <Chip tone="ok" size="sm">Schváleno</Chip> : <Chip tone="bad" size="sm">Zamítnuto</Chip>} />
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      {sel.selecting && (
+        <BulkBar
+          count={sel.count}
+          totalLabel={`Vybrat vše (${cislo(cekajici.length)})`}
+          onSelectAll={() => sel.selectAll(cekajici.map(z => z.id))}
+          onExit={() => { sel.exit(); setChyba(null); }}
+          note={chyba}
+          actions={[
+            { label: 'Schválit', primary: true, disabled: pracuji.size > 0, onClick: () => rozhodniVic('approved') },
+            { label: 'Zamítnout', danger: true, disabled: pracuji.size > 0, onClick: () => rozhodniVic('rejected') },
+          ]}
+        />
+      )}
+      {upravit && (
+        <Modal open onClose={() => setUpravit(null)} size="sm" title="Upravit termín volna" subtitle={kdo(upravit.z)}
+          footer={<>
+            <Button variant="secondary" onClick={() => setUpravit(null)}>Zrušit</Button>
+            <Button variant="primary" loading={pracuji.has(upravit.z.id)} onClick={ulozTermin}>Uložit</Button>
+          </>}>
+          <div className="grid grid-cols-2 gap-3">
+            <Field id="volno-od" label="Od"><Input id="volno-od" type="date" value={upravit.od} onChange={e => setUpravit(u => u && { ...u, od: e.target.value })} /></Field>
+            <Field id="volno-do" label="Do"><Input id="volno-do" type="date" value={upravit.do} onChange={e => setUpravit(u => u && { ...u, do: e.target.value })} /></Field>
+          </div>
+          {chyba && <p className="note note-danger text-sm mt-3" role="alert">{chyba}</p>}
+        </Modal>
+      )}
+      {zrusit && (
+        <Modal open onClose={() => setZrusit(null)} size="sm" title="Zrušit schválené volno?"
+          subtitle={`${kdo(zrusit)} · ${rozsahVolna(den(zrusit.fromDate), den(zrusit.toDate))}`}
+          footer={<>
+            <Button variant="secondary" onClick={() => setZrusit(null)}>Nechat</Button>
+            <Button variant="danger-solid" icon="trash" loading={pracuji.has(zrusit.id)} onClick={zrusVolno}>Zrušit volno</Button>
+          </>}>
+          <p className="text-sm text-black/60 text-pretty">Volno zmizí z rozvrhu a dotyčný dostane upozornění. Generátor ho na ty dny zase může naplánovat.</p>
+          {chyba && <p className="note note-danger text-sm mt-3" role="alert">{chyba}</p>}
+        </Modal>
+      )}
+    </Widget>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Výměny směn (burza)
+// ---------------------------------------------------------------------------
+
+const URL_BURZA = '/api/shifts/offers';
+function vyberBurzu(raw: any): { nabidky: NabidkaSmeny[]; meId: number | null } {
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.offers)) throw new Error('Burza přišla v nečekaném tvaru.');
+  return { nabidky: raw.offers, meId: typeof raw.meId === 'number' ? raw.meId : null };
+}
+
+type RadekBurzy = { o: NabidkaSmeny; druh: 'schvalit' | 'volna' | 'beru' | 'moje' };
+
+function Vymeny({ velikost, nahled }: WidgetProps) {
+  const brana = useBrana(['rozvrh.burza', 'rozvrh.vymeny_schvalovat']);
+  const smi = useSmi();
+  const data = useDataWidgetu(brana ? URL_BURZA : null, vyberBurzu);
+  const dnes = pragueToday();
+  const smiSchvalit = smi('rozvrh.vymeny_schvalovat');
+  const smiBurza = smi('rozvrh.burza');
+  const b = useMemo(() => rozdelBurzu(data.data?.nabidky ?? [], data.data?.meId ?? null, dnes), [data.data, dnes]);
+  const sel = useSelection<number>();
+  const [pracuji, setPracuji] = useState<Set<number>>(new Set());
+  const [chyba, setChyba] = useState<string | null>(null);
+
+  if (!brana) return <Widget prazdno={null} />;
+  const S = velikost === 'S';
+  const L = velikost === 'L';
+  const piseSe = !nahled;
+
+  const radky: RadekBurzy[] = [
+    ...(smiSchvalit ? b.keSchvaleni.map(o => ({ o, druh: 'schvalit' as const })) : []),
+    ...(smiBurza ? b.volne.map(o => ({ o, druh: 'volna' as const })) : []),
+    ...(smiBurza ? b.beru.filter(o => !smiSchvalit).map(o => ({ o, druh: 'beru' as const })) : []),
+    ...(smiBurza ? b.moje.filter(o => !(smiSchvalit && o.status === 'claimed')).map(o => ({ o, druh: 'moje' as const })) : []),
+  ];
+
+  const s = (id: number, on: boolean) => setPracuji(p => { const n = new Set(p); if (on) n.add(id); else n.delete(id); return n; });
+  const patch = async (id: number, action: 'approve' | 'reject' | 'claim' | 'cancel') => {
+    const res = await fetch(URL_BURZA, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, action }) });
+    await okJson(res);
+  };
+  const akceRadku = async (id: number, action: 'approve' | 'reject' | 'claim' | 'cancel') => {
+    s(id, true); setChyba(null);
+    try {
+      await patch(id, action);
+      obnovDataWidgetu(URL_BURZA);
+      // Schválená výměna přepsala směnu — plánovač a Moje směny se znovu načtou.
+      if (action === 'approve') oznamZmenu();
+    } catch (e) { setChyba(apiMessage(e, CHYBA_ZAPISU)); }
+    s(id, false);
+  };
+  const schvalVic = async (action: 'approve' | 'reject') => {
+    const ids = Array.from(sel.selected);
+    if (!ids.length) return;
+    setChyba(null); setPracuji(new Set(ids));
+    const { failed } = await runBulk(ids, id => patch(id, action));
+    setPracuji(new Set());
+    obnovDataWidgetu(URL_BURZA);
+    if (action === 'approve') oznamZmenu();
+    if (failed.length) { setChyba(failed.length === ids.length ? CHYBA_ZAPISU : `${failed.length} z ${ids.length} se neuložilo — zkus to znovu.`); return; }
+    sel.exit();
+  };
+
+  const kdy = (o: NabidkaSmeny) => <span className="cz-sentence">{denKratce(den(o.date), dnes)} · <span className="tabular-nums">{casSmeny(o.startTime, o.endTime)}</span></span>;
+  const obsahRadku = ({ o, druh }: RadekBurzy) => {
+    const od = o.offeredByName ?? 'Kolega';
+    const bere = o.claimedByName ?? 'kolega';
+    switch (druh) {
+      case 'schvalit': return {
+        lead: sel.selecting ? <SelectBox checked={sel.has(o.id)} onChange={() => sel.toggle(o.id)} label={`Vybrat výměnu — ${od}`} /> : <Avatar emoji={o.claimedByAvatar} size="sm" />,
+        meta: `Předává ${od}, bere ${bere}`,
+        actions: piseSe && !sel.selecting ? <>
+          <Button variant="primary" size="sm" loading={pracuji.has(o.id)} onClick={() => akceRadku(o.id, 'approve')}>Schválit</Button>
+          <Button variant="danger" size="sm" disabled={pracuji.has(o.id)} onClick={() => akceRadku(o.id, 'reject')}>Zamítnout</Button>
+        </> : undefined,
+        right: !piseSe ? <Chip tone="wait" size="sm">Ke schválení</Chip> : undefined,
+      };
+      case 'volna': return {
+        lead: <Avatar emoji={o.offeredByAvatar} size="sm" />,
+        meta: <>Nabízí {od}{o.note ? <> · „{o.note}"</> : null}</>,
+        actions: piseSe ? <Button variant="primary" size="sm" loading={pracuji.has(o.id)} onClick={() => akceRadku(o.id, 'claim')}>Převzít</Button> : undefined,
+      };
+      case 'beru': return {
+        lead: <Avatar emoji={o.offeredByAvatar} size="sm" />,
+        meta: `Bereš si od ${od} — čeká na vedení`,
+        right: <Chip tone="wait" size="sm">Ke schválení</Chip>,
+      };
+      default: return {
+        lead: <Avatar emoji={o.offeredByAvatar} size="sm" />,
+        meta: o.status === 'claimed' ? `Bere si ji ${bere} — čeká na vedení` : 'Tvoje nabídka — čeká na zájemce',
+        actions: piseSe ? <Button variant="ghost" size="sm" disabled={pracuji.has(o.id)} onClick={() => akceRadku(o.id, 'cancel')}>Stáhnout</Button> : undefined,
+      };
+    }
+  };
+
+  const ukaz = L ? radky : radky.slice(0, 5);
+  const keSchvaleni = smiSchvalit ? b.keSchvaleni.length : 0;
+  const akce: MenuItem[] | undefined = piseSe && !S && keSchvaleni > 1 && !sel.selecting
+    ? [{ label: 'Vybrat víc', icon: 'check', onClick: sel.start, hint: 'Schválit nebo zamítnout několik výměn naráz.' }]
+    : undefined;
+
+  return (
+    <Widget
+      nacteni={data}
+      akce={akce}
+      doplnek={!S && radky.length > 0 ? <Chip tone={keSchvaleni ? 'wait' : 'muted'} size="sm">{cislo(keSchvaleni || radky.length)}</Chip> : undefined}
+      prazdno={radky.length === 0 ? (
+        <p className="t-meta text-pretty">
+          V burze teď nic není.{smiBurza && !smiSchvalit ? ' Svou směnu nabídneš v seznamu nadcházejících směn.' : ''}
+        </p>
+      ) : undefined}
+    >
+      {S ? (
+        smiSchvalit
+          ? <Stat label="Ke schválení" value={cislo(keSchvaleni)} note={czForm(keSchvaleni, VYMENA)} />
+          : <Stat label="Volné směny" value={cislo(b.volne.length)} note={b.moje.length ? `${cislo(b.moje.length)} tvoje v burze` : 'k převzetí'} />
+      ) : (
+        <>
+          {chyba && <p className="note note-danger text-sm mb-2" role="alert">{chyba}</p>}
+          <ul className="list">
+            {ukaz.map(r => <ListRow key={`${r.druh}-${r.o.id}`} title={kdy(r.o)} {...obsahRadku(r)} />)}
+          </ul>
+          {!L && <ADalsich n={radky.length - ukaz.length} />}
+        </>
+      )}
+      {sel.selecting && (
+        <BulkBar
+          count={sel.count}
+          totalLabel={`Vybrat vše (${cislo(keSchvaleni)})`}
+          onSelectAll={() => sel.selectAll(b.keSchvaleni.map(o => o.id))}
+          onExit={() => { sel.exit(); setChyba(null); }}
+          note={chyba}
+          actions={[
+            { label: 'Schválit výměny', primary: true, disabled: pracuji.size > 0, onClick: () => schvalVic('approve') },
+            { label: 'Zamítnout', danger: true, disabled: pracuji.size > 0, onClick: () => schvalVic('reject') },
+          ]}
+        />
+      )}
+    </Widget>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Kdo má směnu (náhled rozvrhu týmu)
+// ---------------------------------------------------------------------------
+
+function vyberNahledTymu(raw: any): { zapnuto: boolean; smeny: SmenaNahledu[] } {
+  if (raw && typeof raw === 'object' && raw.enabled === false) return { zapnuto: false, smeny: [] };
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.shifts)) throw new Error('Rozvrh týmu přišel v nečekaném tvaru.');
+  return { zapnuto: true, smeny: raw.shifts };
+}
+
+/** Kolik dní se směnami ukáže střední velikost; zbytek rozsahu jen počtem. */
+const DNU_M = 3;
+
+function TymNahled({ velikost, nastaveni }: WidgetProps<{ rozsah?: string }>) {
+  const brana = useBrana(['rozvrh.nahled']);
+  const dnes = pragueToday();
+  // Rozsah platí v obou velikostech (Dnes / Týden / 14 dní). M jen ukáže první dny
+  // a zbytek přizná „…a další N dní" (DP §3.6) — dřív M tiše ořízl týden na dva dny.
+  const dni = nastaveni.rozsah === 'dnes' ? 1 : nastaveni.rozsah === 'dva_tydny' ? 14 : 7;
+  const posledni = pragueToday(dni - 1);
+  const m1 = dnes.slice(0, 7);
+  const m2 = posledni.slice(0, 7);
+  const prvni = useDataWidgetu(brana ? `/api/shifts?team=1&month=${m1}` : null, vyberNahledTymu);
+  // Týden přes přelom měsíce potřebuje i další měsíc (API vrací po měsících).
+  const druhy = useDataWidgetu(brana && m2 !== m1 ? `/api/shifts?team=1&month=${m2}` : null, vyberNahledTymu);
+  const dnyTymu = useMemo(
+    () => tymPoDnech([...(prvni.data?.smeny ?? []), ...(druhy.data?.smeny ?? [])], dnes, dni),
+    [prvni.data, druhy.data, dnes, dni],
+  );
+
+  if (!brana) return <Widget prazdno={null} />;
+  let prazdno: ReactNode | undefined;
+  if (prvni.data && !prvni.data.zapnuto) prazdno = <p className="t-meta">Rozvrh týmu je v podniku vypnutý.</p>;
+  else if (dnyTymu.length === 0) prazdno = <p className="t-meta text-pretty">{dni === 1 ? 'Dnes nemá nikdo naplánovanou směnu.' : 'Na nejbližší dny zatím není rozvrh.'}</p>;
+
+  return (
+    <Widget nacteni={[prvni, druhy]} prazdno={prazdno}>
+      <ul className="list">
+        {(velikost === 'L' ? dnyTymu : dnyTymu.slice(0, DNU_M)).map(({ den: d, smeny }) => (
+          <li key={d} className="py-3 first:pt-0 last:pb-0">
+            <p className="t-label mb-2 cz-sentence">{denKratce(d, dnes)}</p>
+            <ul className="flex flex-wrap gap-1.5" aria-label={`Směny ${denKratce(d, dnes).toLowerCase()}`}>
+              {smeny.map(s => (
+                <li key={s.id} className="min-w-0 max-w-full">
+                  <PersonChip size="sm" name={s.isMine ? 'Ty' : (s.employeeName ?? 'Kolega')} avatar={s.employeeAvatar}
+                    tone={s.isMine ? 'ok' : 'muted'} meta={<span className="tabular-nums">{casSmeny(s.startTime, s.endTime)}</span>} />
+                </li>
+              ))}
+            </ul>
+          </li>
+        ))}
+      </ul>
+      {velikost !== 'L' && dnyTymu.length > DNU_M && (
+        <p className="t-meta mt-2">…a {dnyTymu.length - DNU_M <= 4 ? 'další' : 'dalších'} {czCount(dnyTymu.length - DNU_M, DEN)}</p>
+      )}
+    </Widget>
+  );
+}
+
 export const KOMPONENTY: Record<string, KomponentaWidgetu> = {
   'rozvrh.dnesni_smeny': DnesniSmeny,
   'rozvrh.dostupnost_tymu': DostupnostTymu,
   'rozvrh.pripominka_dostupnosti': PripominkaDostupnosti,
+  'rozvrh.diry': Diry,
+  'rozvrh.poptavka': Poptavka,
+  'rozvrh.hodiny_lidi': HodinyLidi,
+  'rozvrh.zadosti_volno': ZadostiVolna,
+  'rozvrh.vymeny': Vymeny,
+  'rozvrh.tym_nahled': TymNahled,
 };

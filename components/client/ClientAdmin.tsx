@@ -186,10 +186,7 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
             dostává tady. Dřív měla polovina záložek holý odstavec bez
             nadpisu a člověk nepoznal, kde je. */}
         {tab === 'menu' && (
-          <div className="space-y-5 max-w-3xl">
-            <PageHeader hintId="clientadmin-2" title="Menu" subtitle="Nabídka, kterou hosté vidí na tvé stránce a po naskenování QR u stolu. Ceny odsud se berou i do objednávek." />
-            <MenuEditor hlavicka={false} />
-          </div>
+          <div className="-mx-4 sm:-mx-6 -mt-4"><MenuEditor /></div>
         )}
         {tab === 'events' && <EventsView user={(user ?? {}) as any} />}
         {tab === 'customers' && <Customers toast={setToast} initialQuery={custQ} />}

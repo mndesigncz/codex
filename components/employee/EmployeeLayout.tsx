@@ -37,8 +37,6 @@ const Tasks = naLine(() => import('./Tasks'));
 const MyRewards = naLine(() => import('./MyRewards'));
 const CashClosing = naLine(() => import('./CashClosing'));
 const SuggestionsBoard = naLine(() => import('../SuggestionsBoard'));
-const ShiftSwap = naLine(() => import('../scheduling/ShiftSwap'));
-const ShiftCalendar = naLine(() => import('../scheduling/ShiftCalendar'));
 const Procedures = naLine(() => import('../procedures/Procedures'));
 
 
@@ -121,15 +119,8 @@ export default function EmployeeLayout({ user }: Props) {
     if (!smiPohled(currentView)) return <BezOpravneni onZpet={() => setCurrentView('home')} />;
     switch (currentView) {
       case 'home':         return <EmployeeDashboard user={user} />;
-      case 'my-shifts':    return (
-        // Obaly px-4 sm:px-6 jako MyShifts a AvailabilitySubmit (p-4 sm:p-6):
-        // s px-6 měly karty na telefonu okraj 24 px proti 16 px nad nimi.
-        <div className="space-y-2">
-          <MyShifts user={user as any} />
-          <div className="px-4 sm:px-6 pb-2 max-w-3xl mx-auto w-full"><ShiftCalendar scope="me" /></div>
-          <ShiftSwap user={user as any} />
-        </div>
-      );
+      // Výměny a kalendář vlastních směn jsou od kola 69 widgety plochy Mých směn.
+      case 'my-shifts':    return <MyShifts user={user as any} />;
       case 'availability': return (
         <div className="space-y-2">
           <AvailabilitySubmit user={user as any} />

@@ -1,5 +1,10 @@
-// Stránka „Menu" (vedení). Kolo 68 založilo metadata z katalogu; plochu zapne (aktivni: true) a
-// doporučené i výchozí rozložení upřesní balík B4 v kole 69.
+// Stránka „Menu" (vedení, Managero client). Kolo 68 založilo metadata z katalogu, kolo 69 (balík
+// B4) plochu zapnulo. Nástroj = editor menu pro hosty (components/employer/MenuEditor.tsx):
+// výběr menu, adresa, sekce a položky, párování s kasou, vzhled a zveřejnění.
+//
+// Stránka dřív žádné bloky neměla; widgety jsou nové z katalogu: jestli menu hosté vidí (Stav
+// menu), co je teď vyprodané s přepnutím na jedno ťuknutí a Wi-Fi pro hosty k ukázání. Všechno
+// s tarifem Max (Managero client).
 import type { DefiniceStranky } from '../typy.ts';
 
 export const STRANKA: DefiniceStranky = {
@@ -8,7 +13,11 @@ export const STRANKA: DefiniceStranky = {
   nazev: 'Menu',
   pohled: 'klient:menu',
   pristup: ['menu.zobrazit'],
-  nastroj: { nazev: 'Menu', ikona: 'leaf', popis: 'Menu pro hosty: sekce, položky, ceny, vzhled a zveřejnění.' },
+  nastroj: {
+    nazev: 'Editor menu',
+    ikona: 'leaf',
+    popis: 'Menu pro hosty: sekce, položky, ceny, párování s kasou, vzhled a zveřejnění.',
+  },
   doporucene: ['menu.stav', 'menu.vyprodano', 'menu.wifi', 'trzby.top_produkty'],
   vychozi: {
     'typ:vedeni': [
@@ -18,5 +27,5 @@ export const STRANKA: DefiniceStranky = {
       { w: 'nastroj' },
     ],
   },
-  aktivni: false,
+  aktivni: true,
 };

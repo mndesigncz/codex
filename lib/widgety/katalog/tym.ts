@@ -1,8 +1,12 @@
 // Widgety oblasti „Tým" — metadata bez Reactu (kolo 68).
 //
-// Komponenty jsou v components/widgety/oblasti/tym.tsx. Widget se stavem 'planovany' komponentu ještě
-// nemá: nekreslí se ani nenabízí, dokud ho balík B2 v kole 69 nenapíše a nepřepne na 'hotovo'. Soubor
-// patří balíku B2; převedeno z katalogu widgetů jednorázovým skriptem (spec §2.2).
+// Komponenty jsou v components/widgety/oblasti/tym.tsx. Soubor patří balíku B2; převedeno z katalogu
+// widgetů jednorázovým skriptem (spec §2.2). V kole 69 jsou hotové všechny widgety oblasti.
+//
+// Ikony (kolo 69): katalog dal celé oblasti `users`, jenže na stránce Tým má `users` nástroj (Lidé
+// v podniku) a tři widgety výchozího rozložení by se opakovaly (AK-19). Pozvánky mají `mail`, Role
+// `key`, Chybí sazba `tag` (cenovka = sazba; `coins` mají na Docházce Mzdy za období, se kterými
+// se Chybí sazba potkává) a Profil člena `user`.
 import type { DefiniceWidgetu } from '../typy.ts';
 
 export const WIDGETY: DefiniceWidgetu[] = [
@@ -28,14 +32,14 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'tym',
     nazev: 'Pozvánky',
     popis: 'Kód pro připojení a odeslané pozvánky, které ještě nikdo nepřijal.',
-    ikona: 'users',
+    ikona: 'mail',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'S',
     rozhrani: ['vedeni'],
     stranky: ['vedeni.tym'],
     opravneni: { vse: ['tym.pozvat'], nektere: [] },
     tarif: 'zdarma',
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: GET /api/roles → system[{nazev,pocet}], vlastni[{nazev,pocet}]
   {
@@ -43,14 +47,14 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'tym',
     nazev: 'Role v podniku',
     popis: 'Kolik lidí má kterou roli (systémové i vlastní).',
-    ikona: 'users',
+    ikona: 'key',
     velikosti: ['M'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni'],
     stranky: ['vedeni.tym'],
     opravneni: { vse: [], nektere: ['tym.zobrazit', 'tym.role_prirazovat', 'tym.role_spravovat'] },
     tarif: 'zdarma',
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: GET /api/teams → members[{name,hourly_rate}] (sazby jen s finance.mzdy)
   {
@@ -58,14 +62,14 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'tym',
     nazev: 'Chybí sazba',
     popis: 'Kdo nemá nastavenou hodinovou sazbu — jeho mzdy se nikde nespočítají.',
-    ikona: 'users',
+    ikona: 'tag',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'S',
     rozhrani: ['vedeni'],
     stranky: ['vedeni.dochazka', 'vedeni.tym'],
     opravneni: { vse: ['finance.mzdy'], nektere: [], pole: { 'akce:nastavit_sazbu': 'finance.sazby_upravit' } },
     tarif: 'zdarma',
-    stav: 'planovany',
+    stav: 'hotovo',
   },
   // Data: GET /api/employees/{id}
   {
@@ -73,7 +77,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'tym',
     nazev: 'Profil člena',
     popis: 'Jeden člověk: body, úroveň, směny, hodiny, dochvilnost (sazba a hodnocení podle oprávnění).',
-    ikona: 'users',
+    ikona: 'user',
     velikosti: ['M', 'L'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni'],
@@ -85,6 +89,6 @@ export const WIDGETY: DefiniceWidgetu[] = [
     },
     tarif: 'zdarma',
     nastaveni: [{ klic: 'clen', nazev: 'Člen', typ: 'zdroj', zdroj: 'clenove', vychozi: null }],
-    stav: 'planovany',
+    stav: 'hotovo',
   },
 ];

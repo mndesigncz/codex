@@ -4,6 +4,7 @@ import { normalizeLevels, normalizePoints, standingForPoints, PointsConfig } fro
 import { pragueToday, pragueHM } from '@/lib/pragueTime';
 import { clenPodniku } from '@/lib/tenant';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { rozeberZaznam } from '@/lib/dochazkaPrehled';
 
 export const dynamic = 'force-dynamic';
 
@@ -162,19 +163,19 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
       .slice(0, 40);
   } catch { items = []; }
 
-  // Hours actually worked this month (open entry counts up to now).
+  // Odpracováno tento měsíc — stejná pravidla jako Docházka a Domů
+  // (lib/dochazkaPrehled, kolo 69): jen záznamy z TOHOTO podniku,
+  // zapomenutý odchod ani záznam nad 24 h se nepočítá. Dřív tu zapomenuté
+  // odpíchnutí přidalo třicet hodin a profil ukazoval jiné číslo než Docházka.
   let monthMs = 0;
   try {
     const entries = await sql`
       SELECT clock_in, clock_out FROM time_entries
-      WHERE employee_id = ${employeeId} AND to_char((clock_in AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM') = ${monthKey}`;
+      WHERE employee_id = ${employeeId} AND (team_id = ${teamId} OR team_id IS NULL)
+        AND to_char((clock_in AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM') = ${monthKey}`;
     const nowMs = Date.now();
-    monthMs = entries.reduce((sum: number, e: any) => {
-      const inT = new Date(e.clock_in).getTime();
-      if (Number.isNaN(inT)) return sum;
-      const outT = e.clock_out ? new Date(e.clock_out).getTime() : nowMs;
-      return sum + Math.max(0, outT - inT);
-    }, 0);
+    monthMs = entries.reduce((sum: number, e: any) =>
+      sum + rozeberZaznam({ clockIn: e.clock_in, clockOut: e.clock_out }, nowMs).ms, 0);
   } catch { /* ignore */ }
 
   // Punctuality, last 30 days: first clock-in of a day vs the planned start.
