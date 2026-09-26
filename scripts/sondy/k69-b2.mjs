@@ -17,13 +17,26 @@ import {
   kontext, konec, tvrdi, otevri, lista, upravit, hotovo, vUpravach, dokud, poradi, poradiPutu, dotazyNa, roleMine, DIR, OUT,
 } from './k68-spolecne.mjs';
 
-const praha = (o = 0) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now() + o * 86400000));
-const hmPraha = (min) => new Intl.DateTimeFormat('cs-CZ', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(Date.now() + min * 60000));
+// Fixtury počítají časy „dnes, před hodinou" (Jakubovi skončila směna před
+// hodinou, začala před deseti). Před 11:00 pražského času by to padlo přes
+// půlnoc na včerejšek, takže sonda i prohlížeč si hodiny posunou na 14:00
+// téhož dne. Aplikace sama se nemění, jen sonda netvrdí nemožné.
+const POSUN = (() => {
+  const [h, m] = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date()).split(':').map(Number);
+  const min = h * 60 + m;
+  return min < 11 * 60 ? (14 * 60 - min) * 60000 : 0;
+})();
+const ted = () => Date.now() + POSUN;
+// S posunutými hodinami vykreslí server časy bez posunu a React při hydrataci
+// ohlásí nesoulad textu (#418). Je to artefakt sondy, ne chyba aplikace.
+const skutecneChyby = (chyby) => POSUN ? chyby.filter(c => !/Minified React error #418/.test(c)) : chyby;
+const praha = (o = 0) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(ted() + o * 86400000));
+const hmPraha = (min) => new Intl.DateTimeFormat('cs-CZ', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(ted() + min * 60000));
 const DNY = { DNES: praha(0), VCERA: praha(-1), PREDEVCIREM: praha(-2), PRED5: praha(-5) };
 const nacti = (jmeno) => {
   let t = readFileSync(DIR + jmeno + '.json', 'utf8');
   t = t.replace(/"@HM([+-]\d+)"/g, (_, m) => `"${hmPraha(Number(m))}"`);
-  t = t.replace(/"@(\d+)"/g, (_, m) => `"${new Date(Date.now() - Number(m) * 60000).toISOString()}"`);
+  t = t.replace(/"@(\d+)"/g, (_, m) => `"${new Date(ted() - Number(m) * 60000).toISOString()}"`);
   for (const [k, v] of Object.entries(DNY)) t = t.replaceAll(`"${k}"`, `"${v}"`);
   return JSON.parse(t);
 };
@@ -77,7 +90,7 @@ const doporucene = async (p) => {
 
 // 1–3, 7) Hlavička, nástroj, úpravy, galerie, rozepsané hledání.
 {
-  const { ctx, p, stav, chyby } = await kontext({ fix: FIX_DOCHAZKA, dalsi: podvrh() });
+  const { ctx, p, stav, chyby } = await kontext({ posunCasu: POSUN, fix: FIX_DOCHAZKA, dalsi: podvrh() });
   await otevri(p, DOCHAZKA, 'vedeni.dochazka');
   const h1 = await jedenH1(p);
   tvrdi('D1: právě jeden viditelný h1 „Docházka" a je první nadpis plochy', h1.pocet === 1 && h1.prvniJeH1 && h1.text === 'Docházka', JSON.stringify(h1));
@@ -133,14 +146,14 @@ const doporucene = async (p) => {
   await hotovo(p).click().catch(() => {});
   await dokud(async () => !(await vUpravach(p)), 1500);
   tvrdi('D7: rozepsané hledání „Petra" přežilo úpravy', await hledani.inputValue() === 'Petra');
-  tvrdi('D: bez chyb v konzoli', chyby.length === 0, chyby.slice(0, 3).join(' | '));
+  tvrdi('D: bez chyb v konzoli', skutecneChyby(chyby).length === 0, skutecneChyby(chyby).slice(0, 3).join(' | '));
   await ctx.close();
 }
 
 // Otevřené příchody M: Ukončit nabídne plánovaný konec, ne „teď"; úprava záznamu přes Modal.
 {
   const fix = { ...FIX_DOCHAZKA, polozky: FIX_DOCHAZKA.polozky.map(x => (x.widget === 'dochazka.dlouhe_prichody' ? { ...x, velikost: 'M' } : x)) };
-  const { ctx, p, stav } = await kontext({ fix, dalsi: podvrh() });
+  const { ctx, p, stav } = await kontext({ posunCasu: POSUN, fix, dalsi: podvrh() });
   await otevri(p, DOCHAZKA, 'vedeni.dochazka');
   const w = widgetLi(p, 'dochazka.dlouhe_prichody');
   const tl = w.getByRole('button', { name: 'Ukončit příchod: Jakub Horák' });
@@ -170,7 +183,7 @@ const doporucene = async (p) => {
 // Právě na směně (L): „Ukončit" má stejné okno jako Otevřené příchody — plánovaný
 // konec, ne „teď" — a po uložení obnoví i záznamy nástroje (days=30), ne jen days=1.
 {
-  const { ctx, p, stav } = await kontext({ fix: FIX_DOCHAZKA, dalsi: podvrh() });
+  const { ctx, p, stav } = await kontext({ posunCasu: POSUN, fix: FIX_DOCHAZKA, dalsi: podvrh() });
   await otevri(p, DOCHAZKA, 'vedeni.dochazka');
   const w = widgetLi(p, 'dochazka.prave_na_smene');
   const tl = w.getByRole('button', { name: 'Ukončit směnu: Jakub Horák' });
@@ -193,7 +206,7 @@ const doporucene = async (p) => {
 // Podíl na tržbách jen s celými tržbami: bez uzaverky.zobrazit_vse vrátí
 // /api/closings jen vlastní uzávěrky a podíl by vyšel násobně vyšší.
 {
-  const { ctx, p, stav } = await kontext({ fix: FIX_DOCHAZKA, mineData: roleMine('vedeni', ['uzaverky.zobrazit_vse']), dalsi: podvrh() });
+  const { ctx, p, stav } = await kontext({ posunCasu: POSUN, fix: FIX_DOCHAZKA, mineData: roleMine('vedeni', ['uzaverky.zobrazit_vse']), dalsi: podvrh() });
   await otevri(p, DOCHAZKA, 'vedeni.dochazka');
   const mzdy = widgetLi(p, 'dochazka.mzdy_za_obdobi');
   tvrdi('Z1: bez uzaverky.zobrazit_vse Mzdy za období ukážou náklady', await dokud(async () => /Mzdové náklady/i.test(await mzdy.innerText()), 3000));
@@ -203,7 +216,7 @@ const doporucene = async (p) => {
 
 // 4) Oprávnění: Provozní (dochazka.zobrazit + upravit, bez finance.mzdy, mazat, exportovat).
 {
-  const { ctx, p, stav } = await kontext({ fix: FIX_DOCHAZKA, mineData: roleMine('provozni'), dalsi: podvrh() });
+  const { ctx, p, stav } = await kontext({ posunCasu: POSUN, fix: FIX_DOCHAZKA, mineData: roleMine('provozni'), dalsi: podvrh() });
   await otevri(p, DOCHAZKA, 'vedeni.dochazka');
   await p.waitForTimeout(600);
   for (const w of ['dochazka.mzdy_za_obdobi', 'tym.bez_sazby']) tvrdi(`O1: Provozní nevidí ${w}`, await naPlose(p, w) === 0);
@@ -220,7 +233,7 @@ const doporucene = async (p) => {
 
 // 5) 500 na /api/closings → chyba jen ve Mzdách.
 {
-  const { ctx, p, stav } = await kontext({ fix: FIX_DOCHAZKA, dalsi: podvrh() });
+  const { ctx, p, stav } = await kontext({ posunCasu: POSUN, fix: FIX_DOCHAZKA, dalsi: podvrh() });
   stav.chyby['/api/closings'] = 500;
   await otevri(p, DOCHAZKA, 'vedeni.dochazka');
   await p.waitForTimeout(800);
@@ -232,7 +245,7 @@ const doporucene = async (p) => {
 
 // 6) Telefon 390: bez přetečení, „Přidat záznam" vidět a otevře okno.
 {
-  const { ctx, p } = await kontext({ fix: FIX_DOCHAZKA, viewport: { width: 390, height: 844 }, mobil: true, dalsi: podvrh() });
+  const { ctx, p } = await kontext({ posunCasu: POSUN, fix: FIX_DOCHAZKA, viewport: { width: 390, height: 844 }, mobil: true, dalsi: podvrh() });
   await otevri(p, DOCHAZKA, 'vedeni.dochazka');
   tvrdi('T1: telefon 390 — žádné vodorovné přetečení', await bezPreteceni(p));
   const pridat = p.getByRole('button', { name: 'Přidat záznam' });
@@ -256,7 +269,7 @@ const doporucene = async (p) => {
 // ---------------------------------------------------------------------------
 
 {
-  const { ctx, p, stav, chyby } = await kontext({ fix: FIX_TYM, dalsi: podvrh() });
+  const { ctx, p, stav, chyby } = await kontext({ posunCasu: POSUN, fix: FIX_TYM, dalsi: podvrh() });
   await otevri(p, TYM, 'vedeni.tym');
   const h1 = await jedenH1(p);
   tvrdi('M1: právě jeden viditelný h1 „Tým" a je první nadpis plochy', h1.pocet === 1 && h1.prvniJeH1 && h1.text === 'Tým', JSON.stringify(h1));
@@ -316,13 +329,13 @@ const doporucene = async (p) => {
   await hotovo(p).click().catch(() => {});
   await dokud(async () => !(await vUpravach(p)), 1500);
   tvrdi('M7: rozepsané hledání „Petra" přežilo úpravy', await hledani.inputValue() === 'Petra');
-  tvrdi('M: bez chyb v konzoli', chyby.length === 0, chyby.slice(0, 3).join(' | '));
+  tvrdi('M: bez chyb v konzoli', skutecneChyby(chyby).length === 0, skutecneChyby(chyby).slice(0, 3).join(' | '));
   await ctx.close();
 }
 
 // Pozvat: Modal místo formuláře na stránce; zrušení pozvánky přes Modal.
 {
-  const { ctx, p, stav } = await kontext({ fix: FIX_TYM, dalsi: podvrh() });
+  const { ctx, p, stav } = await kontext({ posunCasu: POSUN, fix: FIX_TYM, dalsi: podvrh() });
   await otevri(p, TYM, 'vedeni.tym');
   await p.getByRole('button', { name: 'Pozvat člena' }).click();
   const okno = p.getByRole('dialog', { name: 'Pozvat člena' });
@@ -344,7 +357,7 @@ const doporucene = async (p) => {
 
 // 4) Oprávnění: Provozní (tym.zobrazit + profil, bez tym.pozvat a finance.mzdy).
 {
-  const { ctx, p, stav } = await kontext({ fix: FIX_TYM, mineData: roleMine('provozni'), dalsi: podvrh() });
+  const { ctx, p, stav } = await kontext({ posunCasu: POSUN, fix: FIX_TYM, mineData: roleMine('provozni'), dalsi: podvrh() });
   await otevri(p, TYM, 'vedeni.tym');
   await p.waitForTimeout(600);
   for (const w of ['tym.pozvanky', 'tym.bez_sazby']) tvrdi(`MO1: Provozní nevidí ${w}`, await naPlose(p, w) === 0);
@@ -356,7 +369,7 @@ const doporucene = async (p) => {
 
 // 5) 500 na /api/roles → chyba jen v Rolích; 6) telefon 390.
 {
-  const { ctx, p, stav } = await kontext({ fix: FIX_TYM, viewport: { width: 390, height: 844 }, mobil: true, dalsi: podvrh() });
+  const { ctx, p, stav } = await kontext({ posunCasu: POSUN, fix: FIX_TYM, viewport: { width: 390, height: 844 }, mobil: true, dalsi: podvrh() });
   stav.chyby['/api/roles'] = 500;
   await otevri(p, TYM, 'vedeni.tym');
   await p.waitForTimeout(800);

@@ -1,0 +1,39 @@
+{
+ "stranka": "vedeni.klient_rezervace",
+ "polozky": [
+  {
+   "id": "nastroj",
+   "widget": "nastroj",
+   "velikost": "L"
+  },
+  {
+   "id": "klient-objednavky-od-stolu",
+   "widget": "klient.objednavky_od_stolu",
+   "velikost": "M"
+  }
+ ],
+ "dostupne": [
+  "prehled.ceka_na_tebe",
+  "klient.objednavky_od_stolu",
+  "klient.dnesni_rezervace",
+  "klient.clenove",
+  "klient.hodnoceni",
+  "klient.vernost_30dni",
+  "klient.propojeni",
+  "klient.hoste_vernost",
+  "akce.nejblizsi",
+  "akce.vysledek",
+  "akce.checklist",
+  "menu.vyprodano",
+  "menu.stav",
+  "finance.hoste_vernost",
+  "odkaz"
+ ],
+ "tarifem": [],
+ "zdroj": "aplikace",
+ "rozsah": "typ:vedeni",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": true,
+ "verze": 0
+}

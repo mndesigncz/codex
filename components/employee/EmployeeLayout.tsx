@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { signOut } from 'next-auth/react';
 import PodnikSwitcher from '../PodnikSwitcher';
 import { Icon, LogoMark } from '../Icons';
-import { Avatar, Badge, ErrorBoundary, MenuPanel, MenuItemButton } from '../ui';
+import { Avatar, ErrorBoundary, MenuPanel, MenuItemButton } from '../ui';
+import { Dock } from '../ui/Dock';
 import { usePopover } from '@/lib/usePopover';
 import { czCount, NEPRECTENA_ZPRAVA } from '@/lib/czech';
 import NotificationBell from '../NotificationBell';
@@ -269,29 +270,16 @@ export default function EmployeeLayout({ user }: Props) {
           přesně to, co má člověk otevřené pod ním. */}
       {currentView !== 'chat' && smiPohled('chat') && <MessengerDock user={user as any} />}
 
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),16px)]">
-        <nav className="glass-strong mx-auto max-w-md rounded-3xl px-2 py-2 flex items-center justify-around shadow-[0_10px_34px_rgba(25,35,15,0.16)]">
-          {mojeNav.filter(n => mobilePrimary.includes(n.id)).map(item => (
-            <button key={item.id} onClick={() => { setCurrentView(item.id); setMoreOpen(false); }} title={item.label}
-              className={`relative flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition duration-[var(--dur-2)] ease-[var(--ease-out-soft)] ${
-                currentView === item.id ? 'text-[#16181A] -translate-y-0.5' : 'text-black/40'}`}>
-              <Icon key={currentView === item.id ? 'on' : 'off'} name={item.icon} size={22}
-                strokeWidth={currentView === item.id ? 2 : 1.7}
-                className="i-lead" motion={currentView === item.id ? 'pop' : undefined} />
-              {item.id === 'chat' && currentView !== 'chat' && (
-                <Badge count={unreadChat} label={czCount(unreadChat, NEPRECTENA_ZPRAVA)} className="absolute top-0 right-1" />
-              )}
-              <span className={`text-[11px] leading-none font-medium ${currentView === item.id ? 'text-[#16181A]' : 'text-black/40'}`}>{(item as any).short ?? item.label}</span>
-            </button>
-          ))}
-          <button onClick={() => setMoreOpen(v => !v)} title="Více"
-            className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition duration-200 ${moreOpen || currentView === 'settings' || mobileSecondary.some(n => n.id === currentView) ? 'text-[#16181A]' : 'text-black/40'}`}>
-            <Icon name="menu" size={22} />
-            <span className="text-[11px] leading-none font-medium">Více</span>
-          </button>
-        </nav>
-
-      </div>
+      {/* Spodní dok na telefonu — sdílený components/ui/Dock (kolo 69, B8); dřív
+          vlastní kopie s `glass-strong`, jinak neprůhledná než dok administrace. */}
+      <Dock label="Spodní navigace"
+        items={mojeNav.filter(n => mobilePrimary.includes(n.id)).map(n => ({
+          id: n.id, label: (n as { short?: string }).short ?? n.label, icon: n.icon,
+          ...(n.id === 'chat' && currentView !== 'chat' ? { badge: unreadChat, badgeLabel: czCount(unreadChat, NEPRECTENA_ZPRAVA) } : {}),
+        }))}
+        activeId={currentView}
+        onSelect={id => { setCurrentView(id); setMoreOpen(false); }}
+        more={{ onClick: () => setMoreOpen(v => !v), active: moreOpen || currentView === 'settings' || mobileSecondary.some(n => n.id === currentView) }} />
 
       <MobileMoreSheet
         open={moreOpen}

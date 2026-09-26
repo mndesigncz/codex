@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import { signOut } from 'next-auth/react';
 import { Icon, LogoMark } from '../Icons';
 import PosTick from '../PosTick';
 import StaffInbox, { useStaffInbox } from '../client/StaffInbox';
-import { Avatar, Modal, Button } from '../ui';
+import { Modal, Button, Badge } from '../ui';
 import KioskInventory from './KioskInventory';
 import KioskTasks from './KioskTasks';
 import Procedures from '../procedures/Procedures';
@@ -13,14 +13,14 @@ import Guides from '../Guides';
 import { prevezmiOtevreniNavodu } from '@/lib/otevriNavod';
 import CashClosing from '../employee/CashClosing';
 import MessengerDock from '../chat/MessengerDock';
-import AnnouncementBanner from '../AnnouncementBanner';
 import { usePlan, ProBadge } from '../Pro';
-import { pragueToday } from '@/lib/pragueTime';
+import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
+import { NavigaceKontext, useHodnotaNavigace } from '../widgety/NavigaceKontext';
+import type { PohledNavigace } from '@/lib/widgety/typy';
 import {
   KioskShiftProvider, KioskShiftGate, WhoIsWorking, ActivePersonChip,
   useKioskShift, useNow,
 } from './KioskShiftGate';
-import { okJson } from '@/lib/api';
 
 const TABS = [
   { id: 'shift',      label: 'Směna',    icon: 'clock' },
@@ -31,6 +31,29 @@ const TABS = [
   { id: 'closing',    label: 'Uzávěrka', icon: 'trend' },
   { id: 'guides',     label: 'Návody',   icon: 'book' },
 ] as const;
+
+type IdZalozky = (typeof TABS)[number]['id'];
+
+// Pohled z widgetu → záložka tabletu (kolo 69, B9). Widgety znají pohledy
+// z aplikace vedení a zaměstnance ('inventory', 'klient:orders'…); tablet
+// má vlastní záložky, tak je tady jednou přeložíme. Co tu není (Rozvrh,
+// Finance, chat…), na tabletu nemá kam vést — smiPohled pak vrátí ne
+// a widget odkaz vůbec nenakreslí (spec §2.6, pravidlo 4).
+const POHLED_NA_ZALOZKU: Record<string, IdZalozky> = {
+  tasks: 'tasks',
+  procedures: 'procedures',
+  inventory: 'inventory',
+  'klient:orders': 'orders',
+  closing: 'closing',
+  guides: 'guides',
+};
+
+// Seznam pohledů pro widget Odkaz (výběr cíle): jen záložky, kam z plochy
+// vede cesta, pod id, kterému widgety rozumí.
+const POHLEDY_TABLETU: PohledNavigace[] = Object.entries(POHLED_NA_ZALOZKU).map(([pohled, zalozka]) => {
+  const t = TABS.find(x => x.id === zalozka)!;
+  return { id: pohled, label: t.label, icon: t.icon };
+});
 
 interface KioskUser { id?: string | number; name: string; role: string; avatar?: string }
 
@@ -62,13 +85,11 @@ export default function KioskApp({ user }: { user: KioskUser }) {
 
 function KioskShell({ user }: { user: KioskUser }) {
   const { active } = useKioskShift();
-  const [tab, setTab] = useState<(typeof TABS)[number]['id']>('shift');
+  const [tab, setTab] = useState<IdZalozky>('shift');
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   // Počet nových objednávek od stolu do záložky — tablet na baru je první, kdo je má vidět.
   const inbox = useStaffInbox(true);
   const newOrders = Number(inbox.d?.newCount ?? 0);
-  // Home-screen shortcut: jump to the stock tab with the entry form already open.
-  const [wantStockEntry, setWantStockEntry] = useState(false);
   // Úkol „Vyrobit limonádu“ s návodem musí na tabletu otevřít ten návod,
   // ne jen přepnout na záložku Návody — u baru se nehledá v seznamu.
   const [wantGuide, setWantGuide] = useState<number | null>(null);
@@ -77,6 +98,18 @@ function KioskShell({ user }: { user: KioskUser }) {
   // je na kiosku — proto si otevírání návodů přebereme a přepneme záložku.
   useEffect(() => prevezmiOtevreniNavodu(id => { setWantGuide(id); setTab('guides'); }), []);
   const now = useNow();
+
+  // Navigace pro widgety plochy Směna. Proklik vede na záložku tabletu;
+  // ta je za KioskShiftGate, takže práce se zapíše pod toho, kdo píchl,
+  // stejně jako při ťuknutí na záložku nahoře.
+  const navigujZWidgetu = useCallback((pohled: string, arg?: string) => {
+    const zalozka = POHLED_NA_ZALOZKU[pohled];
+    if (!zalozka) return;
+    if (zalozka === 'guides') setWantGuide(arg && /^\d+$/.test(arg) ? Number(arg) : null);
+    setTab(zalozka);
+  }, []);
+  const smiPohledTabletu = useCallback((pohled: string) => pohled in POHLED_NA_ZALOZKU, []);
+  const navigaceWidgetu = useHodnotaNavigace(navigujZWidgetu, smiPohledTabletu, POHLEDY_TABLETU, []);
   // The real kiosk session user — used where the surface is shared/read-only.
   const kioskUser = { id: user.id ?? 0, name: user.name, role: 'kiosk', avatar: user.avatar ?? '📟' } as any;
   // Work surfaces run under the person currently selected on the tablet.
@@ -87,14 +120,27 @@ function KioskShell({ user }: { user: KioskUser }) {
   // Dokud se neozve prohlížeč, držíme místo zástupným znakem — jinak by se
   // serverový a klientský čas rozešly a React by překreslil celou obrazovku.
   // Hodiny na kiosku ukazují pražský čas i na tabletu nastaveném jinam.
+  // Okna widgetů (NadPlochou v oblastech) a další portály míří do <body>,
+  // tedy mimo .kiosk-surface — a přišla by o tabletových 14 px písma a 44 px
+  // cílů. Třída na <body> po dobu tabletu platí i pro ně. Samotná
+  // .kiosk-surface nemá vlastní vzhled, jen pravidla pro potomky, takže
+  // dvojí výskyt (body i obal) nic nezdvojí.
+  useEffect(() => {
+    document.body.classList.add('kiosk-surface');
+    return () => { document.body.classList.remove('kiosk-surface'); };
+  }, []);
+
   const clock = now ? new Date(now).toLocaleTimeString('cs-CZ', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit' }) : '—:—';
   const dateStr = now ? new Date(now).toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' }) : '\u00a0';
 
   return (
+    <NavigaceKontext.Provider value={navigaceWidgetu}>
     <div className="kiosk-surface min-h-[100dvh] flex flex-col p-5 sm:p-8">
-      {/* Tablet nemá viditelný nadpis — identitu nese jméno a hodiny
-          v hlavičce. Pro odečítač obrazovky ale obrazovka jméno mít musí. */}
-      <h1 className="sr-only">Kiosk — {user.name}</h1>
+      {/* Záložky bez plochy nemají viditelný nadpis — identitu nese jméno
+          a hodiny v hlavičce tabletu. Pro odečítač obrazovky ale obrazovka
+          jméno mít musí. Směna má vlastní h1 v hlavičce plochy, tam by
+          byl druhý (DP T6: právě jeden h1). */}
+      {tab !== 'shift' && <h1 className="sr-only">Kiosk — {user.name}</h1>}
       {/* Header */}
       {/* Kiosk běží hlavně na tabletu, ale na úzkém displeji se jméno mačkalo
           mezi značku a velké hodiny na 28 px. Identita si vezme celý řádek
@@ -113,10 +159,8 @@ function KioskShell({ user }: { user: KioskUser }) {
           {/* Odhlášení tabletu je pro obsluhu slepá ulička: e-mail ani heslo
               zařízení nikdo z baru nezná, takže jedno ťuknutí znamená tablet
               mimo provoz do příchodu vedení. Proto se ptáme. */}
-          <button type="button" onClick={() => setConfirmSignOut(true)} title="Odhlásit tablet"
-            className="rounded-full glass border border-black/10 w-11 h-11 flex items-center justify-center text-black/45 hover:text-black transition shrink-0">
-            <Icon name="logout" size={20} />
-          </button>
+          <Button variant="secondary" iconOnly icon="logout" aria-label="Odhlásit tablet" title="Odhlásit tablet"
+            className="shrink-0" onClick={() => setConfirmSignOut(true)} />
         </div>
       </header>
 
@@ -126,30 +170,55 @@ function KioskShell({ user }: { user: KioskUser }) {
           náznaku, že tam ještě něco je. U baru se nehledá posuvník. */}
       <nav className="mt-5 flex gap-1.5 flex-wrap sm:flex-wrap overflow-x-auto sm:overflow-x-visible scrollbar-thin -mx-1 px-1">
         {TABS.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)}
+          // aria-current: odečítač musí říct, na které obrazovce obsluha je —
+          // třída seg-on je jen pro oko. V tmavém režimu je .seg-on inkoust na
+          // skoro stejně tmavém podkladu a vybraná záložka působila slabší než
+          // nevybrané se skleněnou výplní; světlá linka (ring, bez posunu
+          // rozměru) ji vrátí dopředu, dokud globals.css nemá tmavou .seg-on.
+          <button key={t.id} type="button" onClick={() => setTab(t.id)}
+            aria-current={tab === t.id ? 'page' : undefined}
             className={`inline-flex items-center gap-2 px-5 py-3 rounded-full text-sm font-semibold whitespace-nowrap shrink-0 min-h-[48px] transition active:scale-[0.97] ${
-              tab === t.id ? 'seg-on' : 'seg-off glass'
+              tab === t.id ? 'seg-on dark:ring-1 dark:ring-white/30' : 'seg-off glass'
             }`}>
             <Icon key={tab === t.id ? 'on' : 'off'} name={t.icon} size={17}
               className="i-lead" motion={tab === t.id ? 'pop' : undefined} /> {t.label}
-            {t.id === 'orders' && newOrders > 0 && (
-              <span className={`ml-0.5 rounded-full px-2 min-w-[1.5rem] text-center text-xs font-bold tabular-nums ${tab === t.id ? 'bg-[#C8F542] on-accent' : 'bg-wait text-white'}`}>{newOrders}</span>
+            {/* Jeden odznak jako v doku a na zvonku (DP §3.20): inkoust
+                s limetkovým číslem, ne ručně limetková pilulka. Na vybrané
+                (inkoustové) záložce odliší odznak prstenec plochy. */}
+            {t.id === 'orders' && (
+              <Badge count={newOrders} max={99} className="ml-0.5" label={`Nové objednávky: ${newOrders}`} />
             )}
           </button>
         ))}
       </nav>
 
-      {/* The shift tab is always reachable — it's where people clock in. */}
+      {/* Směna je vždy dostupná — tady se píchá příchod. Od kola 69 je to
+          plocha s widgety (kiosk.smena): nástěnka, předávka, objednávky od
+          stolu, povinné postupy… skládá je vedení v Nastavení → Stránky,
+          tablet sám jen čte (rezim jen-cteni, sdílené zařízení). Nástrojem
+          plochy je „Kdo je na směně" — příchod, odchod a kdo u tabletu stojí. */}
       {tab === 'shift' && (
-        <main className="flex-1 mt-6 space-y-5">
-          <AnnouncementBanner />
-          <WhoIsWorkingOrLock />
-          <KioskHomeExtras onWriteStock={() => { setWantStockEntry(true); setTab('inventory'); }} />
+        <main className="flex-1 mt-6">
+          <ZapisPodJmenem>
+            {zamceno => (
+              <PlochaWidgetu
+                stranka="kiosk.smena"
+                rezim="jen-cteni"
+                hlavicka={{
+                  title: 'Směna',
+                  subtitle: zamceno
+                    ? 'Tablet je zamčený — widgety se odemknou, jakmile se někdo odpíchne.'
+                    : 'Kdo je na směně a co dnes čeká.',
+                }}
+                nastroj={<WhoIsWorkingOrLock />}
+              />
+            )}
+          </ZapisPodJmenem>
         </main>
       )}
 
       {/* Everything else unlocks once somebody is on shift and records under
-          the active person's account. */}
+          the active person's account. Widgety na Směně hlídá ZapisPodJmenem. */}
       {tab !== 'shift' && (
         <KioskShiftGate>
           {tab === 'tasks' && (
@@ -165,7 +234,7 @@ function KioskShell({ user }: { user: KioskUser }) {
           {tab === 'inventory' && (
             <WhoFirst>
               <main className="flex-1 mt-5">
-                <KioskInventory autoOpenEntry={wantStockEntry} onEntryOpened={() => setWantStockEntry(false)} />
+                <KioskInventory />
               </main>
             </WhoFirst>
           )}
@@ -193,6 +262,105 @@ function KioskShell({ user }: { user: KioskUser }) {
         </p>
       </Modal>
     </div>
+    </NavigaceKontext.Provider>
+  );
+}
+
+/**
+ * Widgety na ploše Směna stojí mimo KioskShiftGate (plocha je vidět i na
+ * zamčeném tabletu), a přitom některé zapisují: „Vyrobeno", „Přijmout"
+ * objednávku od stolu, kartička hosta, „Zapsat novou věc", úkoly. Bez téhle
+ * pojistky by šel zápis pod anonymní účet tabletu, nebo pod toho, kdo zůstal
+ * v cookie — přesně to, co kolo 19 zakázalo („tablet nesmí hádat").
+ *
+ * - Nikdo na směně: widgety jsou `inert` (nejdou ťuknout ani zaostřit),
+ *   nástroj — zamykací obrazovka s příchodem — zůstává živý.
+ * - Na směně víc lidí a nikdo vybraný: první ťuknutí na ovládací prvek
+ *   widgetu se zadrží a tablet se zeptá, kdo u něj stojí (requireActive,
+ *   stejně jako WhoFirst). Po výběru se ťuknutí zopakuje, po zavření
+ *   výběru se nestane nic.
+ *
+ * Widgety samy o tabletu nevědí (patří všem rozhraním), proto se hlídá
+ * tady, na hranici plochy — jedno místo pro každý widget, i ten, který
+ * vedení přidá do rozložení později.
+ */
+const NASTROJ_PLOCHY = 'nastroj';
+const OVLADACI_PRVEK = 'button, a[href], input, select, textarea, summary, label, [role="button"], [role="menuitem"], [role="checkbox"], [role="switch"]';
+
+function ZapisPodJmenem({ children }: { children: (zamceno: boolean) => React.ReactNode }) {
+  const { active, onShift, requireActive, loading } = useKioskShift();
+  const obal = useRef<HTMLDivElement>(null);
+  const zamceno = onShift.length === 0;
+  const ptatSe = !active && onShift.length > 1;
+  /** Opakované ťuknutí po výběru osoby — to už pustit. */
+  const propustit = useRef(false);
+
+  // `inert` na buňky widgetů (ne na nástroj). Plocha si buňky překresluje
+  // sama (načtení rozložení, obnovení), proto hlídač změn ve stromu.
+  useLayoutEffect(() => {
+    const el = obal.current;
+    if (!el) return;
+    const nastav = () => {
+      el.querySelectorAll<HTMLElement>('li[data-widget]').forEach(li => {
+        const ma = zamceno && li.dataset.widget !== NASTROJ_PLOCHY;
+        if (li.hasAttribute('inert') !== ma) li.toggleAttribute('inert', ma);
+      });
+    };
+    nastav();
+    const hlidac = new MutationObserver(nastav);
+    hlidac.observe(el, { childList: true, subtree: true });
+    return () => {
+      hlidac.disconnect();
+      el.querySelectorAll<HTMLElement>('li[data-widget][inert]').forEach(li => li.removeAttribute('inert'));
+    };
+  }, [zamceno]);
+
+  const prvekWidgetu = (cil: EventTarget | null): HTMLElement | null => {
+    if (!(cil instanceof Element)) return null;
+    const li = cil.closest<HTMLElement>('li[data-widget]');
+    // Portál (okno widgetu) v DOM do buňky nepatří — to už prošlo branou při otevření.
+    if (!li || !obal.current?.contains(li) || li.dataset.widget === NASTROJ_PLOCHY) return null;
+    const prvek = cil.closest<HTMLElement>(OVLADACI_PRVEK);
+    return prvek && li.contains(prvek) ? prvek : null;
+  };
+
+  const zeptatSeANavazat = (prvek: HTMLElement, akce: () => void) => {
+    void requireActive().then(kdo => {
+      if (!kdo) return;
+      // Po výběru se musí překreslit a zapsat cookie s osobou (efekt
+      // v KioskShiftProvider) — až pak smí odejít zápis.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (!prvek.isConnected) return;
+        propustit.current = true;
+        try { akce(); } finally { propustit.current = false; }
+      }));
+    });
+  };
+
+  const onClickCapture = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!ptatSe || propustit.current) return;
+    const prvek = prvekWidgetu(e.target);
+    if (!prvek) return;
+    e.preventDefault();
+    e.stopPropagation();
+    zeptatSeANavazat(prvek, () => prvek.click());
+  };
+  // Pole ve widgetu (rychlý zápis) jde zaostřit i Tabem, bez kliknutí.
+  const onFocusCapture = (e: React.FocusEvent<HTMLDivElement>) => {
+    if (!ptatSe || propustit.current) return;
+    const cil = e.target as HTMLElement;
+    if (!cil.matches('input, select, textarea') || !prvekWidgetu(cil)) return;
+    cil.blur();
+    zeptatSeANavazat(cil, () => cil.focus());
+  };
+
+  return (
+    <div ref={obal} onClickCapture={onClickCapture} onFocusCapture={onFocusCapture}
+      data-kiosk-zapis={zamceno ? 'zamceno' : ptatSe ? 'kdo' : 'ok'}>
+      {/* Během prvního načtení rozpisu je plocha taky inert (nevíme, kdo je
+          na směně), ale „zamčeno" do podtitulku píšeme až podle odpovědi. */}
+      {children(zamceno && !loading)}
+    </div>
   );
 }
 
@@ -208,7 +376,7 @@ function WhoFirst({ children }: { children: React.ReactNode }) {
   if (active || onShift.length === 0) return <>{children}</>;
   return (
     <div className="flex-1 flex items-start justify-center pt-10 pb-10">
-      <div className="glass-card w-full max-w-lg p-8 text-center">
+      <div className="card w-full max-w-lg p-8 text-center">
         <div className="mx-auto h-16 w-16 rounded-3xl bg-wait/20 text-wait-ink grid place-items-center">
           <Icon name="user" size={30} />
         </div>
@@ -216,187 +384,20 @@ function WhoFirst({ children }: { children: React.ReactNode }) {
         <p className="text-black/50 mt-2.5 max-w-sm mx-auto text-pretty">
           Na směně je vás víc. Ať se práce zapíše pod správné jméno, ťukni na sebe.
         </p>
-        <button type="button" onClick={() => { void requireActive(); }}
-          className="mt-7 inline-flex items-center gap-2.5 rounded-full bg-[#C8F542] text-black font-semibold px-8 py-4 text-lg hover:brightness-110 active:scale-[0.98] transition">
-          <Icon name="user" size={20} /> Vybrat sebe
-        </button>
+        {/* Jediná akce obrazovky → jediná limetka (DP §3.1), velikost lg pro tablet. */}
+        <Button variant="accent" size="lg" icon="user" className="mt-7" onClick={() => { void requireActive(); }}>
+          Vybrat sebe
+        </Button>
       </div>
     </div>
   );
 }
 
-// On the shift tab the gate's lock screen doubles as the clock-in flow, so the
-// same surface serves both an empty and a running shift.
+// Nástroj plochy Směna: když nikdo nepíchl, je to zamykací obrazovka (a tím
+// i příchod), jinak „Kdo teď pracuje". Jeden nástroj pro prázdnou i běžící
+// směnu — widgety kolem se nemusí starat, v jakém stavu tablet je.
 function WhoIsWorkingOrLock() {
   const { onShift } = useKioskShift();
   if (onShift.length === 0) return <KioskShiftGate>{null}</KioskShiftGate>;
   return <WhoIsWorking />;
-}
-
-// Extra context on the tablet's home tab: today's roster, the state of
-// mandatory procedures, and the customer-facing pinned page — the things a
-// shift actually needs at a glance.
-function KioskHomeExtras({ onWriteStock }: { onWriteStock?: () => void }) {
-  const [roster, setRoster] = useState<any[]>([]);
-  const [required, setRequired] = useState<{ id: number; name: string; icon?: string; done: boolean }[]>([]);
-  // Když se povinné postupy nenačtou, nesmí to vypadat jako „dnes žádné nejsou".
-  const [procErr, setProcErr] = useState(false);
-  const [pinnedShare, setPinnedShare] = useState<{ token: string; title: string | null; kind: string } | null>(null);
-  const [handover, setHandover] = useState<any | null>(null);
-  const [nextEvent, setNextEvent] = useState<any | null>(null);
-  // Karty téhle mřížky se prostě nevykreslí, když nemají data — takže výpadek
-  // sítě vypadá jako klidný den. Co se nenačetlo, radši vyjmenujeme.
-  const [failed, setFailed] = useState<string[]>([]);
-  const [tick, setTick] = useState(0);
-
-  useEffect(() => {
-    setFailed([]);
-    const fail = (what: string) => setFailed(list => (list.includes(what) ? list : [...list, what]));
-    fetch('/api/attendance').then(okJson)
-      .then(d => setRoster((d?.roster ?? []).filter((r: any) => r.shiftStart)))
-      .catch(() => fail('dnešní směny'));
-    fetch('/api/teams').then(okJson)
-      .then(d => setPinnedShare(d?.pinnedShare ?? null))
-      .catch(() => fail('připíchnutá stránka'));
-    fetch('/api/closings/handover').then(okJson)
-      .then(d => setHandover(d?.handover ? d : null))
-      .catch(() => fail('předávka'));
-    fetch('/api/events').then(okJson).then(d => {
-      const today0 = pragueToday();
-      const up = (Array.isArray(d.events) ? d.events : [])
-        .filter((e: any) => e.date >= today0 && e.status !== 'cancelled')
-        .sort((a: any, b: any) => a.date.localeCompare(b.date));
-      setNextEvent(up[0] ?? null);
-    }).catch(() => fail('nejbližší akce'));
-    Promise.all([
-      fetch('/api/procedures').then(okJson),
-      fetch('/api/procedures/runs?today=team').then(okJson),
-    ]).then(([pd, rd]) => {
-      const runs = Array.isArray(rd?.runs) ? rd.runs : [];
-      const req = (Array.isArray(pd?.procedures) ? pd.procedures : [])
-        .filter((p: any) => p.requireBeforeClosing === true)
-        .map((p: any) => ({
-          id: p.id, name: p.name, icon: p.icon,
-          done: runs.some((r: any) => r.procedure_id === p.id && r.status === 'completed'),
-        }));
-      setRequired(req); setProcErr(false);
-    }).catch(() => setProcErr(true));
-  }, [tick]);
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {/* Deliveries land while someone is behind the bar — one tap and the new
-          thing is in stock, no walking to a computer. */}
-      {onWriteStock && (
-        <button onClick={onWriteStock}
-          className="md:col-span-2 rounded-3xl bg-[#16181A] text-white p-5 flex items-center gap-4 text-left active:scale-[0.99] transition">
-          <span className="h-12 w-12 rounded-2xl bg-[#C8F542] on-accent flex items-center justify-center shrink-0">
-            <Icon name="plus" size={24} strokeWidth={2.2} />
-          </span>
-          <span className="min-w-0">
-            <span className="block font-bold text-lg">Zapsat novou věc do skladu</span>
-            <span className="block text-sm text-white/55">Přišlo zboží? Vyfoť ho, napiš kolik — vedení potvrdí.</span>
-          </span>
-        </button>
-      )}
-
-      {nextEvent && (
-        <div className="md:col-span-2 rounded-3xl bg-[#0A84FF]/[0.07] border border-[#0A84FF]/25 p-5">
-          <p className="font-bold text-[#16181A] flex items-center gap-2">
-            <Icon name="calendarCheck" size={17} className="shrink-0 text-[#0A5CC0]" />
-            <span className="min-w-0">{nextEvent.title}</span>
-          </p>
-          <p className="text-sm text-black/50 mt-0.5 cz-sentence">
-            {new Date(nextEvent.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
-            {nextEvent.startTime ? ` · ${nextEvent.startTime}` : ''}{nextEvent.location ? ` · ${nextEvent.location}` : ''}
-          </p>
-          {nextEvent.crewPeople?.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-2">
-              {nextEvent.crewPeople.map((p: any) => (
-                <span key={p.id} className="tap-target-sm rounded-full bg-white/70 border border-black/[0.06] px-2.5 py-1 text-xs text-[#16181A]">{p.avatar} {p.name}</span>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {handover && (
-        <div className="md:col-span-2 rounded-3xl bg-[#0A84FF]/[0.07] border border-[#0A84FF]/25 p-5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2 flex items-center gap-1.5">
-            <Icon name="handover" size={14} className="shrink-0" /> Předávka od {handover.authorName ?? 'předchozí směny'}
-          </p>
-          <div className="space-y-1.5 text-sm text-[#16181A]">
-            {handover.handover.todo && <p className="flex gap-2"><Icon name="check" size={16} className="shrink-0 mt-0.5 text-black/45" /><span className="text-black/70">{handover.handover.todo}</span></p>}
-            {handover.handover.runningOut && <p className="flex gap-2"><Icon name="box" size={16} className="shrink-0 mt-0.5 text-black/45" /><span className="text-black/70">{handover.handover.runningOut}</span></p>}
-            {handover.handover.message && <p className="flex gap-2"><Icon name="chat" size={16} className="shrink-0 mt-0.5 text-black/45" /><span className="text-black/70">{handover.handover.message}</span></p>}
-          </div>
-        </div>
-      )}
-      {roster.length > 0 && (
-        /* Všechny ostatní karty téhle mřížky mají md:col-span-2, takže je
-           fakticky jednosloupcová. Bez toho zůstaly „Dnešní směny" na
-           tabletu poloviční a vedle nich díra. */
-        <div className="md:col-span-2 glass-card p-5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-3">Dnešní směny</p>
-          <div className="space-y-2">
-            {roster.map((r: any) => (
-              <div key={r.id} className="flex items-center gap-x-3 gap-y-1 flex-wrap min-w-0">
-                <Avatar emoji={r.avatar} size="sm" />
-                <span className="min-w-0 flex-1 basis-[calc(100%-3rem)] min-[400px]:basis-0 truncate text-sm font-medium text-[#16181A]">{r.name}</span>
-                <span className="shrink-0 ml-auto text-sm text-black/50 tabular-nums">{String(r.shiftStart).slice(0, 5)}–{String(r.shiftEnd ?? '').slice(0, 5)}</span>
-                {r.openSince && <span className="shrink-0 h-2 w-2 rounded-full bg-[#8FB811]" title="Na směně" />}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {failed.length > 0 && (
-        <div role="alert" className="md:col-span-2 note note-wait flex items-center justify-between gap-3 min-w-0">
-          <span className="min-w-0 cz-sentence">Nenačetlo se: {failed.join(', ')}. Co tu chybí, nemusí znamenat, že nic není.</span>
-          <button type="button" onClick={() => setTick(t => t + 1)}
-            className="tap-target-sm shrink-0 font-semibold underline underline-offset-2">Zkusit znovu</button>
-        </div>
-      )}
-
-      {procErr && (
-        <div role="alert" className="glass-card p-4 border border-wait/30 bg-wait/[0.06] text-sm text-wait-ink">
-          Povinné postupy se nepodařilo načíst — nespoléhej, že dnes žádné nejsou. Otevři záložku Postupy.
-        </div>
-      )}
-      {required.length > 0 && (
-        <div className="glass-card p-5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-3">Povinné postupy dnes</p>
-          <div className="flex flex-wrap gap-2">
-            {required.map(p => (
-              <span key={p.id} className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-medium ${
-                p.done ? 'bg-[#C8F542]/15 text-[#5B7A08]' : 'bg-wait/15 text-wait-ink'
-              }`}>
-                {p.icon ? <span>{p.icon}</span> : <Icon name="clipboard" size={15} className="shrink-0" />} {p.name} {p.done ? <Icon name="check" size={15} className="shrink-0" /> : '· čeká'}
-              </span>
-            ))}
-          </div>
-          {required.some(p => !p.done) && (
-            <p className="text-[12px] text-black/45 mt-2.5">Bez dokončení nepůjde odeslat uzávěrka — najdeš je v záložce Postupy.</p>
-          )}
-        </div>
-      )}
-
-      {pinnedShare && (
-        <a href={`/s/${pinnedShare.token}`} target="_blank" rel="noreferrer"
-          className="md:col-span-2 block rounded-3xl bg-[#C8F542]/[0.10] border border-[#C8F542]/30 p-5 hover:bg-[#C8F542]/[0.16] transition">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="font-bold text-[#16181A] truncate flex items-center gap-2">
-                <Icon name="pin" size={17} className="shrink-0 text-[#5B7A08]" />
-                <span className="truncate">{pinnedShare.title || (pinnedShare.kind === 'guides' ? 'Naše nabídka' : 'Co máme skladem')}</span>
-              </p>
-              <p className="text-sm text-black/50 mt-0.5 truncate">Stránka pro zákazníky — otoč tablet a ukaž, co máme.</p>
-            </div>
-            <span className="shrink-0 btn btn-primary whitespace-nowrap">Otevřít →</span>
-          </div>
-        </a>
-      )}
-    </div>
-  );
 }

@@ -4,14 +4,17 @@
 // galerie, barva značky a text o sobě. Obrázky se nahrávají přes společné
 // /api/upload a odkazují se na /api/client/img/<id>, které je veřejné jen
 // pro zapnuté podniky — host totiž tým nemá a na týmové soubory nedosáhne.
+//
+// Kolo 69 (B8), audit „Klient – Vzhled": „Přidat fotku" je tlačítko jako
+// „Nahrát" u loga (dřív popisek stylovaný jako pilulka, na telefonu se zalomil
+// na dva řádky), odebrání fotky je vidět i na dotyku (dřív jen při najetí
+// myší), rámečky obrázků mají rádius jamky, ne karty, „Odebrat" a „Výchozí"
+// jsou Button, popisy sekcí t-meta, pole Field/Input/Textarea.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { onAccent, staciKontrast } from '@/lib/floorplan';
 import { Icon } from '../Icons';
-import { Button, PageHeader, Skeleton, ErrorState } from '../ui';
-
-const input = 'field !py-2.5 text-sm';
-const label = 'field-label';
+import { Button, Card, Field, Input, PageHeader, Skeleton, ErrorState, Textarea } from '../ui';
 
 /** Předvolené barvy značky — podnik si může vybrat i vlastní. */
 const ACCENTS = ['#C8F542', '#E8A33D', '#D9644A', '#7C9A6B', '#4A7DBF', '#9B6BAE', '#16181A'];
@@ -35,8 +38,8 @@ function Picker({ id, title, hint, value, onChange, tall, busy }: {
   const ref = useRef<HTMLInputElement>(null);
   return (
     <div>
-      <p className={label}>{title}</p>
-      <div className={`relative rounded-3xl border border-black/[0.08] overflow-hidden bg-white/60 ${tall ? 'aspect-[16/7]' : 'aspect-square max-w-[10rem]'}`}>
+      <p className="field-label">{title}</p>
+      <div className={`well relative overflow-hidden ${tall ? 'aspect-[16/7]' : 'aspect-square max-w-[10rem]'}`}>
         {value ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={value} alt="" className={`h-full w-full ${tall ? 'object-cover' : 'object-contain p-3'}`} />
@@ -48,8 +51,8 @@ function Picker({ id, title, hint, value, onChange, tall, busy }: {
         <input ref={ref} id={id} type="file" accept="image/*" className="hidden"
           onChange={e => { const f = e.target.files?.[0]; if (f) onChange(f as any); e.target.value = ''; }} />
         <Button type="button" size="sm" variant="secondary" icon="upload" loading={busy} onClick={() => ref.current?.click()}>{value ? 'Změnit' : 'Nahrát'}</Button>
-        {value && <button type="button" onClick={() => onChange('')} className="tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold text-black/55 hover:text-bad-ink hover:bg-bad/10 transition">Odebrat</button>}
-        <span className="text-xs text-black/45">{hint}</span>
+        {value && <Button type="button" size="sm" variant="danger" onClick={() => onChange('')}>Odebrat</Button>}
+        <span className="t-meta">{hint}</span>
       </div>
     </div>
   );
@@ -63,6 +66,7 @@ export default function BrandTab({ toast, onChange }: { toast: (m: string) => vo
   // zůstalo `p === null` a člověk koukal na pulzující obdélník, dokud
   // stránku neobnovil. Teď se to přizná a nabídne další pokus.
   const [error, setError] = useState<string | null>(null);
+  const galerieRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(() => {
     setError(null);
@@ -103,7 +107,7 @@ export default function BrandTab({ toast, onChange }: { toast: (m: string) => vo
   };
 
   if (error) return <ErrorState title="Vzhled se nenačetl" onRetry={load} detail={error} />;
-  if (!p) return <div className="space-y-4"><Skeleton className="h-10 w-56 rounded-full" /><Skeleton className="h-64 rounded-3xl" /></div>;
+  if (!p) return <div className="space-y-4"><Skeleton className="h-10 w-56 rounded-full" /><Skeleton className="h-64" /></div>;
   const gallery: string[] = p.gallery ?? [];
 
   return (
@@ -112,44 +116,44 @@ export default function BrandTab({ toast, onChange }: { toast: (m: string) => vo
         primary={<Button type="submit" variant="accent" loading={busy === 'save'}>Uložit</Button>}
         secondary={<Button type="button" variant="secondary" icon="external" onClick={() => url && window.open(url, '_blank')} disabled={!url}>Zobrazit</Button>} />
 
-      <section className="glass-card p-5 grid gap-5 sm:grid-cols-[auto_1fr]">
+      <Card className="grid gap-5 sm:grid-cols-[auto_1fr]">
         <Picker id="b-logo" title="Logo" hint="Čtverec, aspoň 200 px." value={p.logo_url ?? ''} busy={busy === 'logo_url'} onChange={v => pick('logo_url', v)} />
         <Picker id="b-cover" title="Fotka do záhlaví" hint="Na šířku, aspoň 1200 px." value={p.cover_url ?? ''} tall busy={busy === 'cover_url'} onChange={v => pick('cover_url', v)} />
-      </section>
+      </Card>
 
-      <section className="glass-card p-5 space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="t-section">Galerie</h2>
-            <p className="text-xs text-black/50 mt-0.5">Až osm fotek z podniku. Host je uvidí na tvé stránce.</p>
+      <Card className="space-y-3">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="min-w-0">
+            <h2 className="t-card">Galerie</h2>
+            <p className="t-meta mt-0.5">Až osm fotek z podniku. Host je uvidí na tvé stránce.</p>
           </div>
-          <label className="tap-target-sm inline-flex items-center gap-1.5 rounded-full bg-black/[0.05] px-3.5 py-2 text-sm font-semibold hover:bg-black/[0.09] transition cursor-pointer">
-            <Icon name="plus" size={15} />{busy === 'gallery' ? 'Nahrávám…' : 'Přidat fotku'}
-            <input type="file" accept="image/*" className="hidden" disabled={gallery.length >= 8}
-              onChange={e => { const f = e.target.files?.[0]; if (f) addPhoto(f); e.target.value = ''; }} />
-          </label>
+          <input ref={galerieRef} type="file" accept="image/*" className="hidden" aria-label="Fotka do galerie"
+            onChange={e => { const f = e.target.files?.[0]; if (f) addPhoto(f); e.target.value = ''; }} />
+          <Button type="button" size="sm" variant="secondary" icon="plus" className="whitespace-nowrap" loading={busy === 'gallery'}
+            disabled={gallery.length >= 8} onClick={() => galerieRef.current?.click()}>Přidat fotku</Button>
         </div>
         {gallery.length === 0 ? (
-          <p className="text-sm text-black/50">Zatím žádná fotka. Interiér, šálek, zahrádka — stačí pár.</p>
+          <p className="t-meta">Zatím žádná fotka. Interiér, šálek, zahrádka — stačí pár.</p>
         ) : (
           <ul className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             {gallery.map((g, i) => (
               <li key={g} className="relative group rounded-2xl overflow-hidden border border-black/[0.08] aspect-square">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={g} alt={`Fotka ${i + 1}`} className="h-full w-full object-cover" />
+                {/* Vidět vždy — na dotyku hover není a fotka by nešla odebrat. */}
                 <button type="button" aria-label={`Odebrat fotku ${i + 1}`}
                   onClick={() => setP((x: any) => ({ ...x, gallery: gallery.filter(y => y !== g) }))}
-                  className="absolute top-1.5 right-1.5 h-8 w-8 grid place-items-center rounded-full bg-[#16181A]/80 text-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition"><Icon name="close" size={13} /></button>
+                  className="tap-target-sm absolute top-1.5 right-1.5 h-8 w-8 grid place-items-center rounded-full bg-[#16181A]/80 text-white transition-colors hover:bg-[#16181A]"><Icon name="close" size={13} /></button>
               </li>
             ))}
           </ul>
         )}
-      </section>
+      </Card>
 
-      <section className="glass-card p-5 grid gap-4">
+      <Card className="grid gap-4">
         <div>
-          <h2 className="t-section">Barva značky</h2>
-          <p className="text-xs text-black/50 mt-0.5">Použije se na stránce pro hosty. Bez výběru zůstane limetková jako ve zbytku aplikace.</p>
+          <h2 className="t-card">Barva značky</h2>
+          <p className="t-meta mt-0.5">Použije se na stránce pro hosty. Bez výběru zůstane limetková jako ve zbytku aplikace.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {ACCENTS.map(c => (
@@ -157,10 +161,10 @@ export default function BrandTab({ toast, onChange }: { toast: (m: string) => vo
               className={`h-9 w-9 rounded-full border-2 transition ${p.accent === c ? 'border-[#16181A] scale-110' : 'border-black/10 hover:scale-105'}`}
               style={{ background: c }} />
           ))}
-          <label className="inline-flex items-center gap-2 text-xs text-black/55 ml-1">Vlastní
+          <label className="inline-flex items-center gap-2 text-[13px] text-black/55 ml-1">Vlastní
             <input type="color" aria-label="Vlastní barva značky" value={p.accent || '#C8F542'} onChange={e => setP({ ...p, accent: e.target.value.toUpperCase() })}
-              className="h-9 w-12 rounded-lg border border-black/10 bg-transparent p-0.5" /></label>
-          {p.accent && <button type="button" onClick={() => setP({ ...p, accent: '' })} className="tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold text-black/55 hover:bg-black/[0.06] transition">Výchozí</button>}
+              className="h-9 w-12 rounded-xl border border-black/10 bg-transparent p-0.5" /></label>
+          {p.accent && <Button type="button" size="sm" variant="ghost" onClick={() => setP({ ...p, accent: '' })}>Výchozí</Button>}
         </div>
 
         {/* Ukázka i varování. Na některých barvách se čitelného textu prostě
@@ -172,21 +176,21 @@ export default function BrandTab({ toast, onChange }: { toast: (m: string) => vo
             <span className="inline-flex items-center rounded-full px-5 py-2.5 text-sm font-semibold"
               style={{ background: p.accent, color: onAccent(p.accent) }}>Stát se členem</span>
             {staciKontrast(p.accent)
-              ? <span className="text-xs text-black/45">Takhle uvidí hosté hlavní tlačítko.</span>
-              : <span className="text-xs text-wait-ink max-w-[42ch]">
+              ? <span className="t-meta">Takhle uvidí hosté hlavní tlačítko.</span>
+              : <span className="text-[13px] text-wait-ink max-w-[42ch]">
                   Na téhle barvě se text špatně čte — ani tmavý, ani bílý na ní nedosáhne
                   doporučeného kontrastu. Zkus ji o kus ztmavit nebo zesvětlit.
                 </span>}
           </div>
         )}
-      </section>
+      </Card>
 
-      <section className="glass-card p-5 grid gap-4">
-        <h2 className="t-section">O podniku</h2>
-        <div><label htmlFor="b-tag" className={label}>Motto</label><input id="b-tag" value={p.tagline ?? ''} onChange={e => setP({ ...p, tagline: e.target.value })} placeholder="Čaj z lístků, ne z pytlíků." className={input} maxLength={120} /></div>
-        <div><label htmlFor="b-desc" className={label}>Pár vět</label><textarea id="b-desc" value={p.description ?? ''} onChange={e => setP({ ...p, description: e.target.value })} rows={3} placeholder="Malý podnik v přízemí starého domu. Sedí se u stolů i na baru." className={input} maxLength={1200} /></div>
-        <div><label htmlFor="b-addr" className={label}>Adresa</label><input id="b-addr" value={p.address ?? ''} onChange={e => setP({ ...p, address: e.target.value })} placeholder="Vodní 14, Brno" className={input} /></div>
-      </section>
+      <Card className="grid gap-4">
+        <h2 className="t-card">O podniku</h2>
+        <Field id="b-tag" label="Motto"><Input id="b-tag" value={p.tagline ?? ''} onChange={e => setP({ ...p, tagline: e.target.value })} placeholder="Čaj z lístků, ne z pytlíků." maxLength={120} /></Field>
+        <Field id="b-desc" label="Pár vět"><Textarea id="b-desc" value={p.description ?? ''} onChange={e => setP({ ...p, description: e.target.value })} rows={3} placeholder="Malý podnik v přízemí starého domu. Sedí se u stolů i na baru." maxLength={1200} /></Field>
+        <Field id="b-addr" label="Adresa"><Input id="b-addr" value={p.address ?? ''} onChange={e => setP({ ...p, address: e.target.value })} placeholder="Vodní 14, Brno" /></Field>
+      </Card>
     </form>
   );
 }

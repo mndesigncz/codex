@@ -1,5 +1,8 @@
-// Stránka „Stoly a plánek" (vedení). Katalog widgetů ji nezná: kolo 68 založilo jen nástroj ve
-// výchozím rozložení; widgety doplní a plochu zapne (aktivni: true) balík B8 v kole 69.
+// Stránka „Stoly a plánek" (vedení, Managero client). Kolo 68 založilo jen nástroj, kolo 69
+// (balík B8) plochu zapnulo. Nástroj = seznam stolů, tisk QR a plánek podniku.
+//
+// Výchozí rozložení: jen nástroj — stoly jsou nastavení, ne denní práce; Propojení Clientu
+// (je stůl spárovaný s kasou?) je v doporučených.
 import type { DefiniceStranky } from '../typy.ts';
 
 export const STRANKA: DefiniceStranky = {
@@ -7,9 +10,9 @@ export const STRANKA: DefiniceStranky = {
   rozhrani: 'vedeni',
   nazev: 'Stoly a plánek',
   pohled: 'klient:tables',
-  pristup: ['klient.prehled'],
+  pristup: ['stoly.zobrazit'],
   nastroj: { nazev: 'Stoly a plánek', ikona: 'location', popis: 'Plánek podniku, stoly a QR kódy na stůl.' },
-  doporucene: [],
+  doporucene: ['klient.propojeni', 'klient.dnesni_rezervace', 'klient.objednavky_od_stolu'],
   vychozi: { 'typ:vedeni': [{ w: 'nastroj' }] },
-  aktivni: false,
+  aktivni: true,
 };

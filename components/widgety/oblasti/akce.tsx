@@ -14,17 +14,30 @@
 // dál je „Akce" v hlavičce (ghost s chevronem) místo modrého „Akce →"
 // a „Jsi na akci" je Chip, ne ručně psaná limetková pilulka.
 //
-// Data jen přes useDataWidgetu (sdílená mezipaměť), dotaz až při
-// `nacteno && ma('akce.zobrazit')` (spec §1.5); v náhledu se nic nenaviguje.
+// Kolo 69 (B8) přidalo Přípravu akce (checklist nejbližší akce k odškrtání,
+// jen s akce.checklist) a Výsledek akce (tržba − náklady poslední proběhlé,
+// jen s akce.finance — bez něj API čísla vůbec nepošle).
+//
+// Data jen přes useDataWidgetu (sdílená mezipaměť — všechny tři widgety
+// i nástroj stránky Akce čtou tutéž /api/events), dotaz až při
+// `nacteno && ma('akce.zobrazit')` (spec §1.5); v náhledu se nic nenaviguje
+// ani nezapisuje.
 
+import { createContext, useContext, useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
 import { widget } from '@/lib/widgety/katalog';
 import { dayPlus, pragueToday } from '@/lib/pragueTime';
-import { Chip, ListRow, PersonChip } from '../../ui';
+import { apiMessage } from '@/lib/api';
+import { czCount, type CzNoun } from '@/lib/czech';
+import { akceKPriprave, posledniProbehla, prepniBod, vyberAkceSouhrn, vysledekAkce } from '@/lib/klientPrehled';
+import { useMoney } from '../../CurrencyProvider';
+import { Chip, ListRow, PersonChip, Stat, StatRow } from '../../ui';
+import { Icon } from '../../Icons';
 import { useOpravneni } from '../../role/useOpravneni';
-import { Widget, type StavNacteni } from '../Widget';
-import { useDataWidgetu } from '../useDataWidgetu';
+import { Widget, useWidget, type StavNacteni } from '../Widget';
+import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
+import { useNavigace, useSmi } from '../NavigaceKontext';
 
 type Klic = string | readonly string[];
 
@@ -42,6 +55,15 @@ function useBrana(klic: Klic): { ok: boolean; ceka: boolean } {
 
 /** „Ještě nevíme, jestli smí": kostra a žádný dotaz. */
 const CEKA: StavNacteni = { data: null, error: null, loading: true, reload: () => {} };
+
+/**
+ * Plocha stránky Akce (EventsView) to widgetům řekne: odkaz „Akce ›" by tam
+ * vedl na stránku, na které člověk už je (stejně jako NaStranceOdmen u B7).
+ */
+export const NaStranceAkci = createContext(false);
+function useOdkazAkce(): { popisek: string; pohled: string } | undefined {
+  return useContext(NaStranceAkci) ? undefined : { popisek: 'Akce', pohled: 'events' };
+}
 
 // ---------------------------------------------------------------------------
 // Nejbližší akce
@@ -115,9 +137,10 @@ function NejblizsiAkce({ velikost, nastaveni }: WidgetProps<{ pocet?: unknown }>
     .sort((a, b) => a.date.localeCompare(b.date) || (a.startTime ?? '').localeCompare(b.startTime ?? ''))
     .slice(0, kolik);
   const jsem = (a: Akce) => meId != null && a.crew.includes(meId);
+  const odkaz = useOdkazAkce();
 
   return (
-    <Widget nacteni={ceka ? CEKA : data} odkaz={{ popisek: 'Akce', pohled: 'events' }}
+    <Widget nacteni={ceka ? CEKA : data} odkaz={odkaz}
       // Tři akce jsou seznam i ve střední velikosti — kostra má mít tvar toho, co přijde.
       kostra={kolik === 3 ? 'seznam' : undefined}
       prazdno={nadchazejici.length === 0 ? <p className="t-meta">Žádná akce v plánu.</p> : undefined}>
@@ -158,6 +181,126 @@ function NejblizsiAkce({ velikost, nastaveni }: WidgetProps<{ pocet?: unknown }>
   );
 }
 
+// ---------------------------------------------------------------------------
+// Příprava akce
+// ---------------------------------------------------------------------------
+
+const ID_CHECKLIST = 'akce.checklist';
+const BOD: CzNoun = { one: 'bod', few: 'body', many: 'bodů' };
+
+function PripravaAkce(_: WidgetProps) {
+  const smi = useSmi();
+  const { nahled } = useWidget();
+  const { ok, ceka } = useBrana(widget(ID_CHECKLIST)?.opravneni.vse ?? ['akce.zobrazit']);
+  const data = useDataWidgetu(ok ? '/api/events' : null, vyberAkceSouhrn);
+  const { reload } = data;
+  const klic = widget(ID_CHECKLIST)?.opravneni.pole?.['akce:odskrtnout'] ?? 'akce.checklist';
+  const odskrta = !nahled && smi(klic);
+  const dnes = pragueToday();
+  const akce = akceKPriprave(data.data ?? [], dnes);
+  // Odškrtnutí se ukáže hned; server ho potvrdí a při chybě se vrátí.
+  const [mistni, setMistni] = useState<{ id: number; body: boolean[] } | null>(null);
+  const [chyba, setChyba] = useState<string | null>(null);
+  useEffect(() => { setMistni(null); }, [data.data]);
+  const body = akce ? akce.checklist.map((c, i) => ({ ...c, done: mistni?.id === akce.id ? mistni.body[i] ?? c.done : c.done })) : [];
+  const zbyva = body.filter(c => !c.done).length;
+  const odkaz = useOdkazAkce();
+
+  const prepni = async (i: number) => {
+    if (!akce || !odskrta) return;
+    const novy = prepniBod(body, i);
+    setMistni({ id: akce.id, body: novy.map(c => c.done) });
+    setChyba(null);
+    try {
+      const res = await fetch(`/api/events/${akce.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ checklist: novy }),
+      });
+      if (!res.ok) { const x = await res.json().catch(() => ({})); throw new Error(typeof x?.error === 'string' ? x.error : 'Uložení se nepodařilo.'); }
+    } catch (e) {
+      setMistni(null);
+      setChyba(apiMessage(e, 'Spojení se serverem selhalo.'));
+    } finally {
+      reload();
+      obnovDataWidgetu('/api/events');
+    }
+  };
+
+  return (
+    <Widget nacteni={ceka ? CEKA : data} odkaz={odkaz}
+      doplnek={akce && zbyva > 0 ? <Chip tone="muted" size="sm">{zbyva}</Chip> : undefined}
+      prazdno={data.data && !akce ? <p className="t-meta">Žádná nadcházející akce s přípravou.</p> : undefined}>
+      {akce && (
+        <div className="space-y-3">
+          <p className="t-meta cz-sentence">{akce.nazev} · {denAkce(akce.datum, dnes)}{akce.zacatek ? ` v ${akce.zacatek}` : ''}</p>
+          {chyba && <p className="note note-danger" role="alert">{chyba}</p>}
+          {zbyva === 0 && <p className="note note-ok" role="status">Všechno připravené.</p>}
+          <ul className="list" aria-label={`Příprava: ${akce.nazev}`}>
+            {body.map((c, i) => (
+              <li key={i} className="list-row">
+                <label className={`flex min-w-0 flex-1 items-start gap-3 ${odskrta ? 'cursor-pointer' : ''}`}>
+                  <input type="checkbox" checked={c.done} disabled={!odskrta} onChange={() => { void prepni(i); }}
+                    className="mt-0.5 h-5 w-5 shrink-0 accent-[#8FB811]" />
+                  <span className={`min-w-0 text-[15px] leading-snug text-pretty ${c.done ? 'text-black/45' : 'text-[#16181A]'}`}>{c.text}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+          {!odskrta && !nahled && zbyva > 0 && <p className="t-meta">Zbývá {czCount(zbyva, BOD)}. Odškrtávat může, kdo má přípravu akcí na starosti.</p>}
+        </div>
+      )}
+    </Widget>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Výsledek akce
+// ---------------------------------------------------------------------------
+
+const ID_VYSLEDEK = 'akce.vysledek';
+const UZAVERKA: CzNoun = { one: 'uzávěrka', few: 'uzávěrky', many: 'uzávěrek' };
+
+function VysledekAkce({ velikost }: WidgetProps) {
+  const money = useMoney();
+  const nav = useNavigace();
+  const { ok, ceka } = useBrana(widget(ID_VYSLEDEK)?.opravneni.vse ?? ['akce.zobrazit', 'akce.finance']);
+  const data = useDataWidgetu(ok ? '/api/events' : null, vyberAkceSouhrn);
+  const dnes = pragueToday();
+  const a = posledniProbehla(data.data ?? [], dnes);
+  const vysledek = a ? vysledekAkce(a) : null;
+  const prazdno = data.data && !a ? <p className="t-meta">Zatím žádná proběhlá akce s tržbou nebo náklady.</p> : undefined;
+  const tonVysledku = vysledek == null ? undefined : vysledek >= 0 ? 'text-ok-ink' : 'text-bad-ink';
+  const castka = vysledek == null ? '–' : `${vysledek > 0 ? '+' : ''}${money(vysledek)}`;
+  const odkaz = useOdkazAkce();
+  const naAkcich = !odkaz;
+
+  if (velikost === 'S') {
+    return (
+      <Widget nacteni={ceka ? CEKA : data} prazdno={prazdno}
+        otevrit={!naAkcich && nav.smiPohled('events') ? () => nav.onNavigate('events') : undefined}>
+        {a && <Stat label="Výsledek" value={<span className={tonVysledku}>{castka}</span>} note={a.nazev} />}
+      </Widget>
+    );
+  }
+  return (
+    <Widget nacteni={ceka ? CEKA : data} prazdno={prazdno} odkaz={odkaz}>
+      {a && (
+        <div className="space-y-3">
+          <p className="t-meta cz-sentence">{a.nazev} · {denAkce(a.datum, dnes)}</p>
+          <StatRow>
+            <Stat label="Tržba" value={a.trzba == null ? '–' : money(a.trzba)}
+              note={a.uzaverek > 0 ? `${czCount(a.uzaverek, UZAVERKA)} za akci` : 'zapsaná ručně'} />
+            <Stat label="Náklady" value={a.naklady == null ? '–' : money(a.naklady)} />
+            <Stat label="Výsledek" value={<span className={tonVysledku}>{castka}</span>}
+              note={vysledek == null ? undefined : <span className="inline-flex items-center gap-1"><Icon name="trend" size={13} className={vysledek < 0 ? 'rotate-180' : ''} />{vysledek >= 0 ? 'v plusu' : 've ztrátě'}</span>} />
+          </StatRow>
+        </div>
+      )}
+    </Widget>
+  );
+}
+
 export const KOMPONENTY: Record<string, KomponentaWidgetu> = {
   'akce.nejblizsi': NejblizsiAkce,
+  'akce.checklist': PripravaAkce,
+  'akce.vysledek': VysledekAkce,
 };

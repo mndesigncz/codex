@@ -71,8 +71,9 @@ export function Segmented<T extends string>({ options, value, onChange, size = '
     const list = listRef.current;
     const el = list?.querySelector<HTMLElement>('[data-on="true"]');
     if (!list || !el || list.scrollWidth <= list.clientWidth) return;
-    const zacatek = el.offsetLeft - FADE;
-    const konec = el.offsetLeft + el.offsetWidth + FADE;
+    // O kus víc než šířka vyblednutí, ať okraj pilulku nepřekrývá.
+    const zacatek = el.offsetLeft - FADE - 8;
+    const konec = el.offsetLeft + el.offsetWidth + FADE + 8;
     if (zacatek < list.scrollLeft) list.scrollLeft = Math.max(0, zacatek);
     else if (konec > list.scrollLeft + list.clientWidth) list.scrollLeft = konec - list.clientWidth;
     zmerOkraje();

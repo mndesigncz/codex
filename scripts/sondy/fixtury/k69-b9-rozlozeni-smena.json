@@ -1,0 +1,98 @@
+{
+ "stranka": "kiosk.smena",
+ "polozky": [
+  {
+   "id": "oznameni-nastenka",
+   "widget": "oznameni.nastenka",
+   "velikost": "L"
+  },
+  {
+   "id": "nastroj",
+   "widget": "nastroj",
+   "velikost": "L"
+  },
+  {
+   "id": "klient-objednavky-od-stolu",
+   "widget": "klient.objednavky_od_stolu",
+   "velikost": "M"
+  },
+  {
+   "id": "postupy-povinne-dnes",
+   "widget": "postupy.povinne_dnes",
+   "velikost": "M"
+  },
+  {
+   "id": "uzaverky-predavka",
+   "widget": "uzaverky.predavka",
+   "velikost": "L"
+  },
+  {
+   "id": "rozvrh-dnesni-smeny",
+   "widget": "rozvrh.dnesni_smeny",
+   "velikost": "M"
+  },
+  {
+   "id": "vyroba-k-vyrobe",
+   "widget": "vyroba.k_vyrobe",
+   "velikost": "M"
+  },
+  {
+   "id": "akce-nejblizsi",
+   "widget": "akce.nejblizsi",
+   "velikost": "L"
+  },
+  {
+   "id": "sklad-zapsat-novou",
+   "widget": "sklad.zapsat_novou",
+   "velikost": "M"
+  },
+  {
+   "id": "sklad-dochazi",
+   "widget": "sklad.dochazi",
+   "velikost": "M"
+  },
+  {
+   "id": "sdileni-pripnuta-nabidka",
+   "widget": "sdileni.pripnuta_nabidka",
+   "velikost": "L"
+  }
+ ],
+ "dostupne": [
+  "odkaz",
+  "sdileni.pripnuta_nabidka",
+  "oznameni.nastenka",
+  "chat.neprectene",
+  "uzaverky.predavka",
+  "dochazka.prave_na_smene",
+  "dochazka.dnes_v_podniku",
+  "rozvrh.dnesni_smeny",
+  "sklad.dochazi",
+  "vyroba.k_vyrobe",
+  "sklad.inventura",
+  "sklad.zapsat_novou",
+  "sklad.nahlasit",
+  "sklad.stav_kategorie",
+  "menu.vyprodano",
+  "ukoly.dnes",
+  "ukoly.po_terminu",
+  "postupy.povinne_dnes",
+  "postupy.posledni_prubehy",
+  "postupy.spustit",
+  "postupy.pripominky",
+  "navody.povinne_cteni",
+  "navody.nove",
+  "navody.k_uzaverce",
+  "odmeny.zebricek",
+  "akce.nejblizsi",
+  "akce.checklist",
+  "klient.dnesni_rezervace",
+  "klient.objednavky_od_stolu"
+ ],
+ "tarifem": [],
+ "zdroj": "aplikace",
+ "rozsah": null,
+ "zamceno": false,
+ "smiUpravit": false,
+ "smiVychozi": false,
+ "verze": 0
+}

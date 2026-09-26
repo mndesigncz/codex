@@ -5,10 +5,11 @@ import { useSession } from 'next-auth/react';
 import { planInfoOf, type PlanInfo } from '@/lib/plan';
 import Billing from './Billing';
 import { Icon } from './Icons';
-import { EmptyState, Button, Hint, Skeleton, hintsEnabled, setHintsEnabled, resetHints, dismissedCount } from './ui';
+import { EmptyState, Button, Skeleton, PageHeader, Segmented, SwitchRow, Badge, ListRow, Chip, Modal, Stat, StatRow, Label, hintsEnabled, setHintsEnabled, resetHints, dismissedCount } from './ui';
 import { useTheme } from './ThemeProvider';
 import TeamManagement from './TeamManagement';
 import { dbTimeDayHM } from '@/lib/pragueTime';
+import { czCount } from '@/lib/czech';
 import { okJson } from '@/lib/api';
 import { useOpravneni } from './role/useOpravneni';
 import { useStrazRole, CO_SE_ZAHODI_ROLE } from './role/rozepsano';
@@ -55,12 +56,16 @@ const AVATARS = ['👤', '👩‍💼', '👨‍🍳', '🧑‍🍳', '👩‍�
 const inputClass =
   'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm';
 const labelClass = 'field-label';
-const primaryBtn = 'rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 transition disabled:opacity-50';
-const cardTitle = 'font-bold tracking-tight text-[#16181A]';
+// Nadpis karty skupiny = h2.t-card (DP §3.3). Dřív ruční `font-bold
+// tracking-tight` a hlavní akce formulářů ručně psanou limetkou.
+const cardTitle = 't-card';
 
 const typeIcon: Record<string, string> = {
   chat: 'chat', inventory: 'box', shift: 'calendar', invite: 'users', info: 'bell',
 };
+
+const UCTENKA = { one: 'účtenka', few: 'účtenky', many: 'účtenek' };
+const POLOZKA = { one: 'položka', few: 'položky', many: 'položek' };
 
 const NOTIF_PREFS_KEY = 'managero-notif-prefs';
 const DEFAULT_PREFS = { push: false, messages: true, lowStock: true, shifts: true };
@@ -80,27 +85,6 @@ function relativeCzech(iso: string): string {
   if (d === 1) return 'včera';
   if (d < 7) return `před ${d} dny`;
   return new Date(iso).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', year: 'numeric' });
-}
-
-function Toggle({ on, onChange, disabled }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={on}
-      disabled={disabled}
-      onClick={() => onChange(!on)}
-      className={`relative h-7 w-12 flex-shrink-0 rounded-full transition-colors duration-300 disabled:opacity-40 ${
-        on ? 'bg-[#C8F542]' : 'bg-black/[0.12]'
-      }`}
-    >
-      <span
-        className={`absolute top-0.5 h-6 w-6 rounded-full bg-[#FDFDFB] shadow-sm transition-transform duration-300 ${
-          on ? 'translate-x-[22px]' : 'translate-x-0.5'
-        }`}
-      />
-    </button>
-  );
 }
 
 export default function Settings({ user, initialTab }: Props) {
@@ -146,7 +130,12 @@ export default function Settings({ user, initialTab }: Props) {
   const [posStatus, setPosStatus] = useState<any | null>(null);
   const [posForm, setPosForm] = useState({ clientId: '', clientSecret: '', merchantId: '', placeId: '' });
   const [posBusy, setPosBusy] = useState(false);
-  const [posMsg, setPosMsg] = useState('');
+  // Hláška u pokladny nese tón zvlášť. Dřív se úspěch poznal podle „✓"
+  // v textu — znak místo ikony a křehké pravidlo (DP §3.7).
+  const [posMsg, setPosMsgStav] = useState<{ text: string; ok: boolean } | null>(null);
+  const setPosMsg = (text: string, ok = false) => setPosMsgStav(text ? { text, ok } : null);
+  // Potvrzení nevratných kroků pokladny oknem, ne nativním confirm() (DP §3.10).
+  const [potvrzeni, setPotvrzeni] = useState<null | { title: string; text: string; label: string; danger: boolean; akce: () => void | Promise<void> }>(null);
   // Zdraví zrcadla pokladny (od kdy máme data, poslední synchronizace, chyby).
   const [posHealth, setPosHealth] = useState<any | null>(null);
   const [posAction, setPosAction] = useState<string>('');
@@ -170,12 +159,14 @@ export default function Settings({ user, initialTab }: Props) {
     if (action === 'sync') {
       const b = d.bills ?? {};
       setPosMsg(b.skipped === 'throttled'
-        ? 'Synchronizace běžela před chvílí — pokladna se ptá nejvýš jednou za pár minut. ✓'
-        : `Synchronizováno ✓ ${b.billsSeen ?? 0} účtenek prošlo, ${b.billsChanged ?? 0} nových či změněných${b.itemsPending ? `, ${b.itemsPending} položek se dotáhne příště` : ''}.`);
+        ? 'Synchronizace běžela před chvílí — pokladna se ptá nejvýš jednou za pár minut.'
+        : `Synchronizováno — účtenek prošlo ${b.billsSeen ?? 0}, nových či změněných ${b.billsChanged ?? 0}${b.itemsPending ? `, ${czCount(b.itemsPending, POLOZKA)} dotáhne příští běh` : ''}.`, true);
     } else if (action === 'backfill') {
-      setPosMsg(`Historie načtena ✓ ${d.bills?.billsSeen ?? 0} účtenek.`);
+      setPosMsg(`Historie načtena: ${czCount(d.bills?.billsSeen ?? 0, UCTENKA)}.`, true);
     } else if (action === 'webhook-secret') {
-      setPosMsg('Nové tajemství pro DataSync vygenerováno ✓ Pošli URL i tajemství podpoře Storyous.');
+      setPosMsg('Nové tajemství pro DataSync vygenerováno. Pošli URL i tajemství podpoře Storyous.', true);
+    } else if (action === 'webhook-off') {
+      setPosMsg('Příjem změn z pokladny je vypnutý.', true);
     }
     loadPosHealth();
   };
@@ -188,7 +179,7 @@ export default function Settings({ user, initialTab }: Props) {
     setPosBusy(false);
     if (res?.ok) {
       const d = await res.json();
-      setPosMsg(`Připojeno k provozovně ${d.placeName ?? ''} ✓`);
+      setPosMsg(`Připojeno k provozovně ${d.placeName ?? ''}.`, true);
       setPosStatus(null); setPosForm({ clientId: '', clientSecret: '', merchantId: '', placeId: '' });
       fetch('/api/pos').then(okJson).then(setPosStatus).catch(() => {});
       loadPosHealth();
@@ -389,22 +380,15 @@ export default function Settings({ user, initialTab }: Props) {
 
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-6">
-      <div>
-        <h1 className="t-page">Nastavení</h1>
-        <p className="text-black/45 text-sm mt-1">Spravujte svůj profil, aplikaci, oznámení a zabezpečení.</p>
-      </div>
+      <PageHeader title="Nastavení" subtitle="Spravujte svůj profil, aplikaci, oznámení a zabezpečení." />
       <DiscardGuard guard={straz.guard} what={CO_SE_ZAHODI_ROLE} />
 
-      {/* Mobile: top pills */}
-      <div className="md:hidden -mx-1 flex gap-1 overflow-x-auto scrollbar-thin pb-1 px-1">
-        {sections.map(s => (
-          <button key={s.id} onClick={() => setSection(s.id)} aria-pressed={section === s.id}
-            className={`whitespace-nowrap flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition duration-300 flex items-center gap-2 ${
-              section === s.id ? 'bg-[#16181A] text-white font-semibold' : 'glass text-black/60 hover:text-black'
-            }`}>
-            <Icon name={s.icon} size={16} /> {s.label}
-          </button>
-        ))}
+      {/* Telefon: sekce jako posuvný pás filtrových pilulek. Dřív ruční
+          pilulky bez náznaku, že pás pokračuje — poslední byla useknutá.
+          Segmented umí přetečení s měkkým okrajem sám. */}
+      <div className="md:hidden">
+        <Segmented ariaLabel="Sekce nastavení" value={section} onChange={id => setSection(id)}
+          options={sections.map(s => ({ id: s.id, label: s.label, icon: s.icon, count: s.id === 'notifications' && unreadCount > 0 ? unreadCount : undefined }))} />
       </div>
 
       <div className="flex gap-6">
@@ -418,12 +402,10 @@ export default function Settings({ user, initialTab }: Props) {
               <Icon name={s.icon} size={20} className="flex-shrink-0" />
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-semibold truncate">{s.label}</span>
-                <span className={`block text-[11px] truncate ${section === s.id ? 'text-white/50' : 'text-black/40'}`}>{s.desc}</span>
+                <span className={`block text-xs truncate ${section === s.id ? 'text-white/60' : 'text-black/55'}`}>{s.desc}</span>
               </span>
-              {s.id === 'notifications' && unreadCount > 0 && (
-                <span className={`min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-bold flex items-center justify-center ${
-                  section === s.id ? 'bg-[#C8F542] text-black' : 'bg-[#C8F542] text-black'
-                }`}>{unreadCount > 9 ? '9+' : unreadCount}</span>
+              {s.id === 'notifications' && (
+                <Badge count={unreadCount} label={`Nepřečtená oznámení: ${unreadCount}`} />
               )}
             </button>
           ))}
@@ -432,14 +414,12 @@ export default function Settings({ user, initialTab }: Props) {
         {/* Content */}
         <div className="flex-1 min-w-0">
           {loading ? (
-            <div className="flex items-center justify-center h-48">
-              <div className="spinner" />
-            </div>
+            <Skeleton className="h-72 rounded-3xl" />
           ) : section === 'account' ? (
-            <form onSubmit={saveProfile} className="glass-card p-6 space-y-6">
+            <form onSubmit={saveProfile} className="card p-6 space-y-6">
               {profileMsg && (
-                <div className="rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/20 p-4 text-[#5B7A08] text-sm flex items-center gap-2">
-                  <Icon name="check" size={16} /> {profileMsg}
+                <div role="status" className="note note-ok p-4 text-sm flex items-center gap-2">
+                  <Icon name="check" size={16} className="shrink-0" /> {profileMsg}
                 </div>
               )}
               {profileErr && (
@@ -451,14 +431,16 @@ export default function Settings({ user, initialTab }: Props) {
               <div>
                 <label className={labelClass}>Avatar</label>
                 <div className="flex items-center gap-4 flex-wrap">
-                  <div className="w-16 h-16 rounded-full bg-[#C8F542]/15 border border-[#C8F542]/20 flex items-center justify-center text-3xl flex-shrink-0">
+                  <div className="w-16 h-16 rounded-full bg-[var(--well)] border border-[var(--well-line)] flex items-center justify-center text-3xl flex-shrink-0" aria-hidden>
                     {avatar}
                   </div>
                   <div className="flex flex-wrap gap-2 min-w-0 max-w-full">
                     {AVATARS.map(a => (
-                      <button key={a} type="button" onClick={() => setAvatar(a)}
+                      // Vybraný avatar nese inkoustový prstenec, ne limetkový tón —
+                      // limetka na obrazovce patří tlačítku Uložit.
+                      <button key={a} type="button" onClick={() => setAvatar(a)} aria-pressed={avatar === a} aria-label={`Avatar ${a}`}
                         className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl transition ${
-                          avatar === a ? 'bg-[#C8F542]/20 border border-[#C8F542]/40' : 'bg-black/[0.04] border border-black/[0.08] hover:bg-black/[0.06]'
+                          avatar === a ? 'bg-black/[0.04] ring-2 ring-[#16181A]' : 'bg-black/[0.04] border border-black/[0.08] hover:bg-black/[0.06]'
                         }`}>
                         {a}
                       </button>
@@ -469,90 +451,63 @@ export default function Settings({ user, initialTab }: Props) {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className={labelClass}>Jméno</label>
-                  <input value={name} aria-label="Jméno" onChange={e => setName(e.target.value)} className={inputClass} />
+                  <label htmlFor="nast-jmeno" className={labelClass}>Jméno</label>
+                  <input id="nast-jmeno" value={name} aria-label="Jméno" onChange={e => setName(e.target.value)} className={inputClass} />
                 </div>
                 <div>
-                  <label className={labelClass}>Email</label>
-                  <input value={account?.email ?? ''} aria-label="E-mail" disabled
+                  <label htmlFor="nast-email" className={labelClass}>E-mail</label>
+                  <input id="nast-email" value={account?.email ?? ''} aria-label="E-mail" disabled
                     className={inputClass + ' opacity-60 cursor-not-allowed'} />
                 </div>
                 <div>
-                  <label className={labelClass}>Telefon</label>
-                  <input value={phone} aria-label="Telefon" onChange={e => setPhone(e.target.value)} placeholder="+420…" className={inputClass} />
+                  <label htmlFor="nast-telefon" className={labelClass}>Telefon</label>
+                  <input id="nast-telefon" value={phone} aria-label="Telefon" onChange={e => setPhone(e.target.value)} placeholder="+420…" className={inputClass} />
                 </div>
                 <div>
-                  <label className={labelClass}>Pozice</label>
-                  <input value={jobTitle} aria-label="Pozice" onChange={e => setJobTitle(e.target.value)} placeholder="Barista" className={inputClass} />
+                  <label htmlFor="nast-pozice" className={labelClass}>Pozice</label>
+                  <input id="nast-pozice" value={jobTitle} aria-label="Pozice" onChange={e => setJobTitle(e.target.value)} placeholder="Barista" className={inputClass} />
                 </div>
                 {!isEmployer && (
                   <div className="sm:col-span-2">
-                    <label className={labelClass}>Preference směn</label>
-                    <select value={shiftPreference} onChange={e => setShiftPreference(e.target.value)}
+                    <label htmlFor="nast-preference" className={labelClass}>Preference směn</label>
+                    <select id="nast-preference" value={shiftPreference} onChange={e => setShiftPreference(e.target.value)}
                       className={inputClass + ' appearance-none'}>
-                      <option value="morning">🌅 Ranní</option>
-                      <option value="afternoon">🌆 Odpolední</option>
-                      <option value="flexible">🔄 Flexibilní</option>
+                      <option value="morning">Ranní</option>
+                      <option value="afternoon">Odpolední</option>
+                      <option value="flexible">Flexibilní</option>
                     </select>
                   </div>
                 )}
               </div>
 
               <div className="flex flex-col sm:flex-row sm:justify-end">
-                <button type="submit" disabled={savingProfile} className={`${primaryBtn} w-full sm:w-auto justify-center`}>
-                  {savingProfile ? 'Ukládám…' : 'Uložit změny'}
-                </button>
+                <Button type="submit" variant="accent" block loading={savingProfile}>Uložit změny</Button>
               </div>
             </form>
           ) : section === 'app' ? (
             <div className="space-y-6">
-              {/* Appearance */}
-              <div className="glass-card p-6 space-y-4">
+              {/* Vzhled: přepínač motivu je Segmented (vybráno = inkoust).
+                  Dřív dvě ruční volby, kde vybraná byla plná limetka. */}
+              <section className="card p-6 space-y-4">
                 <div>
-                  <h3 className={cardTitle}>Vzhled</h3>
-                  <p className="text-black/45 text-sm mt-1">Vyberte světlý nebo tmavý motiv aplikace.</p>
+                  <h2 className={cardTitle}>Vzhled</h2>
+                  <p className="t-meta mt-1">Vyberte světlý nebo tmavý motiv aplikace.</p>
                 </div>
-                <div className="grid grid-cols-2 gap-2 well border border-black/[0.08] p-1.5 max-w-sm">
-                  {([
-                    { id: 'light', label: 'Světlý', icon: 'sun' },
-                    { id: 'dark', label: 'Tmavý', icon: 'moon' },
-                  ] as const).map(opt => (
-                    <button key={opt.id} type="button" onClick={() => setTheme(opt.id)}
-                      className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition ${
-                        theme === opt.id ? 'bg-[#C8F542] text-black shadow-sm' : 'text-black/55 hover:text-black hover:bg-black/[0.04]'
-                      }`}>
-                      <Icon name={opt.icon} size={17} /> {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
+                <Segmented ariaLabel="Motiv aplikace" value={theme === 'dark' ? 'dark' : 'light'} onChange={id => setTheme(id)}
+                  options={[{ id: 'light', label: 'Světlý', icon: 'sun' }, { id: 'dark', label: 'Tmavý', icon: 'moon' }]} />
+              </section>
 
-              {/* Nápovědy */}
-              <div className="glass-card p-6 space-y-4">
-                <div>
-                  <h3 className={cardTitle}>Nápovědy</h3>
-                  <p className="text-black/45 text-sm mt-1">
-                    Krátké rady u obrazovek. Jednotlivou radu zavřeš křížkem a už se neukáže — tady je můžeš všechny vrátit nebo vypnout úplně.
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 gap-2 well border border-black/[0.08] p-1.5 max-w-sm">
-                  {([
-                    { on: true, label: 'Zobrazovat', icon: 'bulb' },
-                    { on: false, label: 'Nezobrazovat', icon: 'close' },
-                  ] as const).map(opt => (
-                    <button key={String(opt.on)} type="button"
-                      onClick={() => { setHintsEnabled(opt.on); setHintsOn(opt.on); }}
-                      aria-pressed={hintsOn === opt.on}
-                      className={`tap-target-sm flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition ${
-                        hintsOn === opt.on ? 'bg-[#C8F542] text-black shadow-sm' : 'text-black/55 hover:text-black hover:bg-black/[0.04]'
-                      }`}>
-                      <Icon name={opt.icon} size={17} /> {opt.label}
-                    </button>
-                  ))}
-                </div>
+              {/* Nápovědy: zapnuto/vypnuto je přepínač, ne dvě limetkové volby. */}
+              <section className="card p-6 space-y-4">
+                <h2 className={cardTitle}>Nápovědy</h2>
+                <ul className="list">
+                  <SwitchRow title="Zobrazovat nápovědy"
+                    hint="Krátké rady u obrazovek. Jednotlivou radu zavřeš křížkem a už se neukáže — tady je můžeš všechny vrátit nebo vypnout úplně."
+                    checked={hintsOn} onChange={v => { setHintsEnabled(v); setHintsOn(v); }} />
+                </ul>
                 {hintsHidden > 0 && (
                   <div className="flex items-center justify-between gap-4 flex-wrap">
-                    <p className="text-xs text-black/45">
+                    <p className="t-meta">
                       Zavřených rad: <span className="tabular-nums font-semibold">{hintsHidden}</span>
                     </p>
                     <Button variant="secondary" size="sm" icon="refresh"
@@ -561,122 +516,88 @@ export default function Settings({ user, initialTab }: Props) {
                     </Button>
                   </div>
                 )}
-              </div>
+              </section>
 
-              {/* Language */}
-              <div className="glass-card p-6 space-y-4">
+              <section className="card p-6 space-y-4">
                 <div>
-                  <h3 className={cardTitle}>Jazyk</h3>
-                  <p className="text-black/45 text-sm mt-1">Jazyk rozhraní aplikace.</p>
+                  <h2 className={cardTitle}>Jazyk</h2>
+                  <p className="t-meta mt-1">Jazyk rozhraní aplikace.</p>
                 </div>
-                <div className="flex items-center justify-between gap-4 well border border-black/[0.08] px-4 py-3 opacity-70">
-                  <span className="text-sm font-medium text-[#16181A] flex items-center gap-2">🇨🇿 Čeština</span>
-                  <span className="text-xs text-black/45">Výchozí</span>
-                </div>
-                <p className="text-xs text-black/40">Další jazyky připravujeme.</p>
-              </div>
+                <ul className="list">
+                  <ListRow title="Čeština" right={<Chip size="sm">Výchozí</Chip>} />
+                </ul>
+                <p className="t-meta">Další jazyky připravujeme.</p>
+              </section>
             </div>
           ) : section === 'notifications' ? (
             <div className="space-y-6">
-            {/* Notification preferences */}
-            <div className="glass-card p-6 space-y-1">
-              <div className="pb-2">
-                <h3 className={cardTitle}>Předvolby notifikací</h3>
-                <p className="text-black/45 text-sm mt-1">Nastavte, o čem chcete být informováni.</p>
+            {/* Předvolby: sdílený SwitchRow v jedné kartě s .list (DP §3.20).
+                Starý ruční přepínač měl knoflík bez `left` — vypnutý
+                vypadal jako zapnutý. */}
+            <section className="card p-6 space-y-2">
+              <div>
+                <h2 className={cardTitle}>Předvolby notifikací</h2>
+                <p className="t-meta mt-1">Nastavte, o čem chcete být informováni.</p>
               </div>
-              <div className="divide-y divide-black/[0.06]">
-                <div className="flex items-center justify-between gap-4 py-4">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-[#16181A]">Push notifikace</p>
-                    <p className="text-xs text-black/45 mt-0.5">Povolte oznámení v tomto prohlížeči.</p>
-                  </div>
-                  <Toggle on={prefs.push} onChange={togglePush} />
-                </div>
-                <div className="flex items-center justify-between gap-4 py-4">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-[#16181A]">Nové zprávy</p>
-                    <p className="text-xs text-black/45 mt-0.5">Upozornění na nové zprávy v chatu.</p>
-                  </div>
-                  <Toggle on={prefs.messages} onChange={v => setPref('messages', v)} />
-                </div>
-                <div className="flex items-center justify-between gap-4 py-4">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-[#16181A]">Nízké zásoby</p>
-                    <p className="text-xs text-black/45 mt-0.5">Když skladová položka klesne pod limit.</p>
-                  </div>
-                  <Toggle on={prefs.lowStock} onChange={v => setPref('lowStock', v)} />
-                </div>
-                <div className="flex items-center justify-between gap-4 py-4">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-[#16181A]">Směny</p>
-                    <p className="text-xs text-black/45 mt-0.5">Změny v rozvrhu a nové směny.</p>
-                  </div>
-                  <Toggle on={prefs.shifts} onChange={v => setPref('shifts', v)} />
-                </div>
-              </div>
-            </div>
+              <ul className="list">
+                <SwitchRow title="Push notifikace" hint="Povolte oznámení v tomto prohlížeči." checked={prefs.push} onChange={togglePush} />
+                <SwitchRow title="Nové zprávy" hint="Upozornění na nové zprávy v chatu." checked={prefs.messages} onChange={v => setPref('messages', v)} />
+                <SwitchRow title="Nízké zásoby" hint="Když skladová položka klesne pod limit." checked={prefs.lowStock} onChange={v => setPref('lowStock', v)} />
+                <SwitchRow title="Směny" hint="Změny v rozvrhu a nové směny." checked={prefs.shifts} onChange={v => setPref('shifts', v)} />
+              </ul>
+            </section>
 
-            {/* Notification center */}
-            <div className="glass-card p-6 space-y-4">
+            <section className="card p-6 space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
                 <div className="min-w-0">
-                  <h3 className={cardTitle}>Centrum oznámení</h3>
-                  <p className="text-black/45 text-sm mt-1">
-                    {unreadCount > 0 ? `${unreadCount} nepřečtených oznámení` : 'Vše přečteno'}
+                  <h2 className={cardTitle}>Centrum oznámení</h2>
+                  <p className="t-meta mt-1">
+                    {unreadCount > 0 ? `Nepřečtená oznámení: ${unreadCount}` : 'Vše přečteno'}
                   </p>
                 </div>
                 {unreadCount > 0 && (
-                  <button onClick={markAllRead}
-                    className="rounded-full glass border border-black/10 hover:bg-black/[0.05] text-[#16181A] px-4 py-2 text-sm font-medium transition whitespace-nowrap">
-                    Označit vše jako přečtené
-                  </button>
+                  <Button variant="secondary" size="sm" icon="check" onClick={markAllRead}>Označit vše jako přečtené</Button>
                 )}
               </div>
 
               {notifsLoading ? (
-                <div className="flex items-center justify-center h-40">
-                  <div className="spinner" />
+                <div className="space-y-2" aria-busy="true" aria-label="Načítám oznámení">
+                  {[0, 1, 2].map(i => <Skeleton key={i} className="h-14 w-full" />)}
                 </div>
               ) : notifs.length === 0 ? (
-                <div className="py-14 text-center">
-                  <div className="w-14 h-14 rounded-full bg-black/[0.04] border border-black/[0.08] flex items-center justify-center text-black/30 mx-auto mb-3">
-                    <Icon name="bell" size={24} />
-                  </div>
-                  <p className="text-sm font-medium text-[#16181A]">Žádná oznámení</p>
-                  <p className="text-xs text-black/45 mt-1">Až se něco stane, zobrazí se to tady.</p>
-                </div>
+                <EmptyState compact icon="bell" title="Žádná oznámení" hint="Až se něco stane, zobrazí se to tady." />
               ) : (
-                <div className="divide-y divide-black/[0.06] -mx-2">
+                <ul className="list">
+                  {/* Řádek ručně v .list, ne ListRow: text oznámení se nesmí useknout
+                      na jeden řádek (ListRow meta ořezává). Nepřečtené nese chip,
+                      ne limetkový podklad. */}
                   {notifs.map(n => (
-                    <div key={n.id}
-                      className={`flex gap-3 px-2 py-3.5 rounded-xl ${!n.is_read ? 'bg-[#C8F542]/[0.05]' : ''}`}>
-                      <span className="mt-0.5 inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#C8F542]/15 text-[#5B7A08]">
+                    <li key={n.id} className="list-row !items-start">
+                      <span className="well h-9 w-9 grid place-items-center text-black/55 shrink-0">
                         <Icon name={typeIcon[n.type] || 'bell'} size={16} />
                       </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-3">
-                          <p className={`text-sm truncate ${!n.is_read ? 'font-bold text-[#16181A]' : 'font-semibold text-[#16181A]'}`}>{n.title}</p>
-                          {!n.is_read && <span className="mt-1.5 h-2 w-2 rounded-full bg-[#C8F542] flex-shrink-0" />}
-                        </div>
-                        {n.body && <p className="text-xs text-black/55 mt-0.5 break-words">{n.body}</p>}
-                        <p className="text-[11px] text-black/35 mt-1">{relativeCzech(n.created_at)}</p>
-                      </div>
-                    </div>
+                      <span className="min-w-0 flex-1">
+                        <span className={`block text-[15px] leading-snug text-[#16181A] ${!n.is_read ? 'font-bold' : 'font-medium'}`}>{n.title}</span>
+                        {n.body && <span className="block text-[13px] text-black/55 mt-0.5 break-words">{n.body}</span>}
+                        <span className="block t-meta mt-1">{relativeCzech(n.created_at)}</span>
+                      </span>
+                      {!n.is_read && <Chip tone="info" size="sm" className="shrink-0">Nové</Chip>}
+                    </li>
                   ))}
-                </div>
+                </ul>
               )}
-            </div>
+            </section>
             </div>
           ) : section === 'security' ? (
-            <form onSubmit={savePassword} className="glass-card p-6 space-y-6">
+            <form onSubmit={savePassword} className="card p-6 space-y-6">
               <div>
-                <h3 className={cardTitle}>Změna hesla</h3>
-                <p className="text-black/45 text-sm mt-1">Nové heslo musí mít alespoň 8 znaků.</p>
+                <h2 className={cardTitle}>Změna hesla</h2>
+                <p className="t-meta mt-1">Nové heslo musí mít alespoň 8 znaků.</p>
               </div>
 
               {pwdMsg && (
-                <div className="rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/20 p-4 text-[#5B7A08] text-sm flex items-center gap-2">
-                  <Icon name="check" size={16} /> {pwdMsg}
+                <div role="status" className="note note-ok p-4 text-sm flex items-center gap-2">
+                  <Icon name="check" size={16} className="shrink-0" /> {pwdMsg}
                 </div>
               )}
               {pwdErr && (
@@ -687,57 +608,53 @@ export default function Settings({ user, initialTab }: Props) {
 
               <div className="space-y-4">
                 <div>
-                  <label className={labelClass}>Současné heslo</label>
-                  <input type="password" value={currentPassword} aria-label="Stávající heslo" onChange={e => setCurrentPassword(e.target.value)} className={inputClass} />
+                  <label htmlFor="nast-heslo" className={labelClass}>Současné heslo</label>
+                  <input id="nast-heslo" type="password" value={currentPassword} aria-label="Stávající heslo" onChange={e => setCurrentPassword(e.target.value)} className={inputClass} />
                 </div>
                 <div>
-                  <label className={labelClass}>Nové heslo</label>
-                  <input type="password" value={newPassword} aria-label="Nové heslo" onChange={e => setNewPassword(e.target.value)} className={inputClass} />
+                  <label htmlFor="nast-heslo-nove" className={labelClass}>Nové heslo</label>
+                  <input id="nast-heslo-nove" type="password" value={newPassword} aria-label="Nové heslo" onChange={e => setNewPassword(e.target.value)} className={inputClass} />
                 </div>
                 <div>
-                  <label className={labelClass}>Potvrdit nové heslo</label>
-                  <input type="password" value={confirmPassword} aria-label="Nové heslo znovu" onChange={e => setConfirmPassword(e.target.value)} className={inputClass} />
+                  <label htmlFor="nast-heslo-znovu" className={labelClass}>Potvrdit nové heslo</label>
+                  <input id="nast-heslo-znovu" type="password" value={confirmPassword} aria-label="Nové heslo znovu" onChange={e => setConfirmPassword(e.target.value)} className={inputClass} />
                 </div>
               </div>
 
               <div className="flex justify-end">
-                <button type="submit" disabled={savingPwd} className={primaryBtn}>
-                  {savingPwd ? 'Ukládám…' : 'Změnit heslo'}
-                </button>
+                <Button type="submit" variant="accent" block loading={savingPwd}>Změnit heslo</Button>
               </div>
             </form>
           ) : section === 'billing' ? (
             <Billing />
           ) : section === 'pos' ? (
-            <div className="glass-card p-6">
-              <h3 className={cardTitle}>Napojení pokladny Storyous</h3>
-              <p className="text-black/45 text-sm mt-1 mb-4">
+            <section className="card p-6">
+              <h2 className={cardTitle}>Napojení pokladny Storyous</h2>
+              <p className="t-meta mt-1 mb-4">
                 Jen čtení: appka si bere tržby z účtenek — nic do pokladny nezapisuje. Klíče se ukládají bezpečně na serveru.
               </p>
-              {posMsg && <p className={`text-sm rounded-2xl px-4 py-2.5 mb-3 ${posMsg.includes('✓') ? 'bg-[#C8F542]/10 text-[#5B7A08] border border-[#C8F542]/25' : 'bg-bad/10 text-bad-ink border border-bad/25'}`}>{posMsg}</p>}
+              {posMsg && (
+                <p role={posMsg.ok ? 'status' : 'alert'} className={`note ${posMsg.ok ? 'note-ok' : 'note-danger'} text-sm px-4 py-2.5 mb-3 flex items-start gap-2`}>
+                  <Icon name={posMsg.ok ? 'check' : 'warning'} size={16} className="shrink-0 mt-0.5" /> <span className="min-w-0">{posMsg.text}</span>
+                </p>
+              )}
               {posStatus?.connected ? (
                 <div className="space-y-4">
-                  <div className="rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/25 px-4 py-3">
-                    <p className="text-sm font-semibold text-[#16181A]"><Icon name="check" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Připojeno: {posStatus.placeName ?? posStatus.merchantId}</p>
+                  <div className="note note-ok px-4 py-3">
+                    <p className="text-sm font-semibold"><Icon name="check" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Připojeno: {posStatus.placeName ?? posStatus.merchantId}</p>
                     <p className="text-xs text-black/55 mt-0.5">Client ID {posStatus.clientIdMasked} · účtenky, položky i katalog se zrcadlí do aplikace samy.</p>
                   </div>
 
                   {/* Zdraví: aplikace se synchronizuje sama, tady je vidět, že to opravdu dělá. */}
                   {posHealth?.connected && (
-                    <div className="rounded-2xl border border-black/[0.07] bg-black/[0.02] p-4 space-y-3">
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        {([
-                          ['Účtenek u nás', posHealth.billsCount.toLocaleString('cs-CZ')],
-                          ['Data od', posHealth.firstDay ? new Date(posHealth.firstDay + 'T12:00:00').toLocaleDateString('cs-CZ') : '—'],
-                          ['Produktů s cenou', `${posHealth.productsWithPrice} / ${posHealth.productsCount}`],
-                          ['Poslední sync', posHealth.lastSyncAt ? dbTimeDayHM(posHealth.lastSyncAt) : 'zatím ne'],
-                        ] as const).map(([k, v]) => (
-                          <div key={k} className="min-w-0">
-                            <p className="text-[11px] uppercase tracking-wider text-black/55 truncate">{k}</p>
-                            <p className="text-sm font-bold text-[#16181A] tabular-nums truncate">{v}</p>
-                          </div>
-                        ))}
-                      </div>
+                    <div className="well p-4 space-y-3">
+                      {/* Sdílené Stat/StatRow místo čtyř ručních statistik (DP §3.12). */}
+                      <StatRow className="sm:grid-cols-4">
+                        <Stat label="Účtenek u nás" value={posHealth.billsCount.toLocaleString('cs-CZ')} />
+                        <Stat label="Data od" value={posHealth.firstDay ? new Date(posHealth.firstDay + 'T12:00:00').toLocaleDateString('cs-CZ') : '—'} />
+                        <Stat label="Produktů s cenou" value={`${posHealth.productsWithPrice} / ${posHealth.productsCount}`} />
+                        <Stat label="Poslední sync" value={posHealth.lastSyncAt ? dbTimeDayHM(posHealth.lastSyncAt) : 'zatím ne'} />
+                      </StatRow>
                       {posHealth.lastError && (
                         <p className="text-xs note note-danger px-3 py-2">
                           Poslední chyba{posHealth.lastErrorAt ? ` (${dbTimeDayHM(posHealth.lastErrorAt)})` : ''}: {posHealth.lastError}
@@ -758,22 +675,27 @@ export default function Settings({ user, initialTab }: Props) {
                         Synchronizuje se při každém otevření aplikace i kiosku (nejvýš jednou za pár minut), ráno cronem a večer před souhrnem. Ručně jen když nechceš čekat.
                       </p>
                       <div className="flex flex-wrap gap-2">
-                        <button onClick={() => posDo('sync')} disabled={!!posAction}
-                          className="btn btn-accent btn-sm hover:brightness-105 disabled:opacity-50 transition inline-flex items-center gap-1.5">
-                          <Icon name="refresh" size={15} /> {posAction === 'sync' ? 'Synchronizuji…' : 'Synchronizovat teď'}
-                        </button>
-                        <button onClick={() => { if (confirm('Načíst účtenky za posledních 180 dní? Trvá to pár desítek sekund.')) posDo('backfill', { days: 180 }); }} disabled={!!posAction}
-                          className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-sm font-medium hover:bg-black/[0.05] disabled:opacity-50 transition">
-                          {posAction === 'backfill' ? 'Načítám…' : 'Načíst historii (180 dní)'}
-                        </button>
+                        {/* Ruční synchronizace je jen doplněk (appka se synchronizuje
+                            sama) — vedlejší akce, ne limetka. */}
+                        <Button variant="secondary" size="sm" icon="refresh" loading={posAction === 'sync'} disabled={!!posAction}
+                          onClick={() => posDo('sync')}>
+                          Synchronizovat teď
+                        </Button>
+                        <Button variant="secondary" size="sm" icon="download" loading={posAction === 'backfill'} disabled={!!posAction}
+                          onClick={() => setPotvrzeni({
+                            title: 'Načíst historii?', text: 'Načtou se účtenky za posledních 180 dní. Trvá to pár desítek sekund.',
+                            label: 'Načíst historii', danger: false, akce: () => posDo('backfill', { days: 180 }),
+                          })}>
+                          Načíst historii (180 dní)
+                        </Button>
                       </div>
                     </div>
                   )}
 
                   {/* DataSync: Storyous umí změny posílat sám — zapíná to jejich podpora. */}
                   {posHealth?.connected && (
-                    <div className="rounded-2xl border border-black/[0.07] p-4 space-y-2.5">
-                      <p className="text-sm font-semibold text-[#16181A]">Okamžité změny z pokladny (DataSync)</p>
+                    <div className="well p-4 space-y-2.5">
+                      <h3 className="t-card">Okamžité změny z pokladny (DataSync)</h3>
                       <p className="text-xs text-black/60">
                         Storyous umí každou změnu poslat rovnou sem, bez čekání na další otevření aplikace. Zapíná to podpora Storyous/Teya pro tvoji provozovnu — pošli jim adresu a tajemství níže.
                         {posHealth.lastWebhookAt && <> Naposledy přišlo <strong>{dbTimeDayHM(posHealth.lastWebhookAt)}</strong>.</>}
@@ -782,62 +704,73 @@ export default function Settings({ user, initialTab }: Props) {
                         <div className="space-y-1.5">
                           {([['Adresa (URL)', posHealth.webhookUrl], ['Tajemství (Authorization)', posHealth.webhookSecret]] as const).map(([k, v]) => (
                             <div key={k} className="flex items-center gap-2 min-w-0">
-                              <span className="text-[11px] uppercase tracking-wider text-black/55 w-28 shrink-0">{k}</span>
-                              <code className="flex-1 min-w-0 truncate well rounded-xl px-3 py-1.5 text-xs">{v}</code>
-                              <button onClick={() => { navigator.clipboard?.writeText(String(v)); setPosMsg('Zkopírováno ✓'); }}
-                                className="tap-target-sm shrink-0 rounded-full glass px-3 py-1.5 text-xs font-medium text-black/60 hover:text-black">Kopírovat</button>
+                              <span className="t-label w-28 shrink-0">{k}</span>
+                              <code className="flex-1 min-w-0 truncate rounded-xl bg-[var(--surface)] border border-[var(--well-line)] px-3 py-1.5 text-xs">{v}</code>
+                              <Button variant="secondary" size="sm" icon="copy" className="shrink-0"
+                                onClick={() => { navigator.clipboard?.writeText(String(v)); setPosMsg('Zkopírováno.', true); }}>
+                                Kopírovat
+                              </Button>
                             </div>
                           ))}
-                          <p className="text-[11px] text-black/55">Metoda POST, data od dneška. Bez tajemství v hlavičce se požadavek zahodí.</p>
-                          <button onClick={() => { if (confirm('Vypnout příjem změn? Staré tajemství přestane platit.')) posDo('webhook-off'); }}
-                            className="text-xs text-black/55 hover:text-bad-ink">Vypnout</button>
+                          <p className="t-meta">Metoda POST, data od dneška. Bez tajemství v hlavičce se požadavek zahodí.</p>
+                          <Button variant="danger" size="sm" onClick={() => setPotvrzeni({
+                            title: 'Vypnout příjem změn?', text: 'Staré tajemství přestane platit. Znovu zapnout půjde jen s novým tajemstvím přes podporu Storyous.',
+                            label: 'Vypnout příjem', danger: true, akce: () => posDo('webhook-off'),
+                          })}>Vypnout</Button>
                         </div>
                       ) : (
-                        <button onClick={() => posDo('webhook-secret')} disabled={!!posAction}
-                          className="rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-sm font-medium hover:bg-black/[0.05] disabled:opacity-50 transition">
+                        <Button variant="secondary" size="sm" icon="key" loading={posAction === 'webhook-secret'} disabled={!!posAction}
+                          onClick={() => posDo('webhook-secret')}>
                           Vygenerovat adresu a tajemství
-                        </button>
+                        </Button>
                       )}
                     </div>
                   )}
 
-                  <button onClick={async () => {
-                    if (!confirm('Odpojit pokladnu? Tržby se přestanou načítat.')) return;
-                    await fetch('/api/pos', { method: 'DELETE' }).catch(() => null);
-                    setPosStatus({ connected: false }); setPosHealth(null); setPosMsg('Pokladna odpojena.');
-                  }} className="rounded-full glass text-black/55 hover:text-bad-ink px-4 py-2.5 text-sm font-medium transition">
+                  <Button variant="danger" onClick={() => setPotvrzeni({
+                    title: 'Odpojit pokladnu?', text: 'Tržby se přestanou načítat. Účtenky, které už v aplikaci jsou, zůstanou.',
+                    label: 'Odpojit pokladnu', danger: true,
+                    akce: async () => {
+                      // Odpojeno je až to, co server potvrdí. Dřív se „Pokladna odpojena."
+                      // ukázalo i po 500/403 nebo bez wifi — a po obnovení stránky byla
+                      // pokladna zase připojená a tržby se dál načítaly (DP §3.17).
+                      const res = await fetch('/api/pos', { method: 'DELETE' }).catch(() => null);
+                      if (!res?.ok) { setPosMsg('Pokladnu se nepodařilo odpojit — zkus to znovu.', false); return; }
+                      setPosStatus({ connected: false }); setPosHealth(null); setPosMsg('Pokladna odpojena.', true);
+                    },
+                  })}>
                     Odpojit pokladnu
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <div className="space-y-2.5">
                   {([['clientId', 'Client ID'], ['clientSecret', 'Client Secret'], ['merchantId', 'Merchant ID'], ['placeId', 'Place ID']] as const).map(([k, lbl]) => (
                     <div key={k}>
-                      <label className="block text-xs uppercase tracking-wider text-black/45 mb-1">{lbl}</label>
-                      <input value={(posForm as any)[k]} onChange={e => setPosForm(f => ({ ...f, [k]: e.target.value }))}
+                      <Label htmlFor={`pos-${k}`}>{lbl}</Label>
+                      <input id={`pos-${k}`} value={(posForm as any)[k]} onChange={e => setPosForm(f => ({ ...f, [k]: e.target.value }))}
                         type={k === 'clientSecret' ? 'password' : 'text'} autoComplete="off"
                         className="w-full field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] font-mono focus:border-[#C8F542]/50 focus:outline-none" />
                     </div>
                   ))}
-                  <button onClick={posConnect} disabled={posBusy || Object.values(posForm).some(v => !v.trim())}
-                    className="w-full sm:w-auto rounded-full bg-[#16181A] text-white font-semibold px-6 py-3 text-sm hover:bg-black disabled:opacity-50 transition">
-                    {posBusy ? 'Ověřuji…' : 'Připojit a ověřit'}
-                  </button>
-                  <p className="text-[11px] text-black/35">Klíče získáš v back-office Storyous/Teya (API přístup).</p>
+                  {/* Jediná akce sekce → limetka (DP §3.1). */}
+                  <Button variant="accent" block loading={posBusy} disabled={Object.values(posForm).some(v => !v.trim())} onClick={posConnect}>
+                    Připojit a ověřit
+                  </Button>
+                  <p className="t-meta">Klíče získáš v back-office Storyous/Teya (API přístup).</p>
                 </div>
               )}
-            </div>
+            </section>
           ) : section === 'roles' ? (
             <RoleEditor />
           ) : section === 'stranky' ? (
             <VychoziRozlozeni />
           ) : section === 'audit' ? (
-            <div className="glass-card p-6">
-              <h3 className={cardTitle}>Historie změn</h3>
-              <p className="text-black/45 text-sm mt-1 mb-4">Důležité zásahy v týmu — mazání, nastavení, odměny. Posledních 100 záznamů.</p>
+            <section className="card p-6">
+              <h2 className={cardTitle}>Historie změn</h2>
+              <p className="t-meta mt-1 mb-4">Důležité zásahy v týmu — mazání, nastavení, odměny. Posledních 100 záznamů.</p>
               {auditEntries === null ? (
-                <div className="flex items-center justify-center h-24">
-                  <div className="spinner" />
+                <div className="space-y-2" aria-busy="true" aria-label="Načítám historii">
+                  {[0, 1, 2].map(i => <Skeleton key={i} className="h-10 w-full" />)}
                 </div>
               ) : auditEntries.length === 0 ? (
                 <EmptyState icon="clock" title="Zatím žádný záznam" hint="Kdo co změnil, se sem zapisuje samo — smazání, schválení, úpravy cen." compact />
@@ -851,7 +784,7 @@ export default function Settings({ user, initialTab }: Props) {
                           <strong>{e.userName}</strong> · {e.label}
                           {e.detail && <span className="text-black/50"> — {e.detail}</span>}
                         </p>
-                        <p className="text-[11px] text-black/35 tabular-nums">
+                        <p className="t-meta tabular-nums">
                           {dbTimeDayHM(e.createdAt)}
                         </p>
                       </div>
@@ -859,12 +792,22 @@ export default function Settings({ user, initialTab }: Props) {
                   ))}
                 </div>
               )}
-            </div>
+            </section>
           ) : (
             <TeamManagement user={user} />
           )}
         </div>
       </div>
+
+      <Modal open={!!potvrzeni} onClose={() => setPotvrzeni(null)} size="sm" title={potvrzeni?.title ?? ''}
+        footer={<>
+          <Button variant="secondary" onClick={() => setPotvrzeni(null)}>Zrušit</Button>
+          <Button variant={potvrzeni?.danger ? 'danger-solid' : 'primary'} onClick={() => {
+            const p = potvrzeni; setPotvrzeni(null); void p?.akce();
+          }}>{potvrzeni?.label}</Button>
+        </>}>
+        <p className="t-meta text-pretty">{potvrzeni?.text}</p>
+      </Modal>
     </div>
   );
 }

@@ -1,0 +1,44 @@
+{
+ "stranka": "vedeni.klient_objednavky",
+ "polozky": [
+  {
+   "id": "nastroj",
+   "widget": "nastroj",
+   "velikost": "L"
+  },
+  {
+   "id": "klient-dnesni-rezervace",
+   "widget": "klient.dnesni_rezervace",
+   "velikost": "S"
+  },
+  {
+   "id": "menu-vyprodano",
+   "widget": "menu.vyprodano",
+   "velikost": "M"
+  }
+ ],
+ "dostupne": [
+  "prehled.ceka_na_tebe",
+  "klient.objednavky_od_stolu",
+  "klient.dnesni_rezervace",
+  "klient.clenove",
+  "klient.hodnoceni",
+  "klient.vernost_30dni",
+  "klient.propojeni",
+  "klient.hoste_vernost",
+  "akce.nejblizsi",
+  "akce.vysledek",
+  "akce.checklist",
+  "menu.vyprodano",
+  "menu.stav",
+  "finance.hoste_vernost",
+  "odkaz"
+ ],
+ "tarifem": [],
+ "zdroj": "aplikace",
+ "rozsah": "typ:vedeni",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": true,
+ "verze": 0
+}

@@ -69,7 +69,8 @@ export default function MobileMoreSheet({ open, onClose, title = 'Menu', items, 
           {renderGroups.map((g, gi) => (
             <div key={g.title ?? gi}>
               {g.title && (
-                <p className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-black/35">{g.title}</p>
+                // Štítek skupiny = .t-label (DP §3.3); ruční 35% šeď nesplňovala kontrast.
+                <p className="px-1 pb-1 t-label">{g.title}</p>
               )}
               <div className="grid grid-cols-3 gap-2">
                 {g.items.map(Tile)}

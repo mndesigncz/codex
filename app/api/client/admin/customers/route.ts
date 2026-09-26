@@ -18,6 +18,14 @@ export async function GET(req: NextRequest) {
   // E-mail hosta je kontakt — vidí ho a hledá podle něj jen ten, kdo smí
   // hostům psát. Jinak by šlo e-mail uhodnout hledáním po písmenech.
   const kontakty = ctx.role.opravneni.has('zakaznici.kontakty');
+  // Widget „Členové klubu" (kolo 69, B8) chce jen pět nejvěrnějších podle
+  // zvoleného řazení — ne 500 řádků, ze kterých by si pět vybral sám.
+  // Bez parametrů zůstává pořadí i strop seznamu Zákazníci beze změny.
+  const razeni = String(new URL(req.url).searchParams.get('sort') ?? '');
+  const strop = Math.min(500, Math.max(1, parseInt(String(new URL(req.url).searchParams.get('limit') ?? '500'), 10) || 500));
+  const podleNavstev = razeni === 'navstevy';
+  const podleBodu = razeni === 'body';
+  const nejnovejsi = razeni === 'nejnovejsi';
   const rows = await sql`
     SELECT m.customer_id AS id, us.name, us.email, m.points, m.stamps, m.visits, m.joined_at, m.last_visit_at,
            (SELECT COUNT(*)::int FROM client_reservations r WHERE r.customer_id = m.customer_id AND r.team_id = m.team_id) AS reservations,
@@ -25,7 +33,12 @@ export async function GET(req: NextRequest) {
     FROM client_memberships m JOIN users us ON us.id = m.customer_id
     WHERE m.team_id = ${u.team_id}
       AND (${q} = '' OR LOWER(us.name) LIKE ${like} ESCAPE '\\' OR (${kontakty} AND LOWER(us.email) LIKE ${like} ESCAPE '\\'))
-    ORDER BY m.last_visit_at DESC NULLS LAST, m.joined_at DESC LIMIT 500` as any[];
+    ORDER BY
+      CASE WHEN ${podleNavstev} THEN m.visits END DESC NULLS LAST,
+      CASE WHEN ${podleBodu} THEN m.points END DESC NULLS LAST,
+      CASE WHEN ${nejnovejsi} THEN m.joined_at END DESC NULLS LAST,
+      m.last_visit_at DESC NULLS LAST, m.joined_at DESC
+    LIMIT ${strop}` as any[];
   const [cnt] = await sql`
     SELECT COUNT(*)::int AS total
     FROM client_memberships m JOIN users us ON us.id = m.customer_id

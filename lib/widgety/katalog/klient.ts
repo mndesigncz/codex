@@ -1,8 +1,11 @@
 // Widgety oblasti „Managero client" — metadata bez Reactu (kolo 68).
 //
-// Komponenty jsou v components/widgety/oblasti/klient.tsx. Widget se stavem 'planovany' komponentu
-// ještě nemá: nekreslí se ani nenabízí, dokud ho balík B8 v kole 69 nenapíše a nepřepne na 'hotovo'.
+// Komponenty jsou v components/widgety/oblasti/klient.tsx, výpočty v lib/klientPrehled.ts.
 // Soubor patří balíku B8; převedeno z katalogu widgetů jednorázovým skriptem (spec §2.2).
+//
+// Kolo 69 (B8): všech sedm widgetů je hotových. Ikony se rozešly (dřív pět× „cup"),
+// protože Přehled Clientu má ve výchozím rozložení vedle sebe objednávky, rezervace,
+// členy a hodnocení — a stejná ikona by je na první pohled nerozlišila (AK-19).
 import type { DefiniceWidgetu } from '../typy.ts';
 
 export const WIDGETY: DefiniceWidgetu[] = [
@@ -41,11 +44,11 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'klient',
     nazev: 'Dnešní rezervace',
     popis: 'Čas, host, počet osob, stůl, stav — potvrdit, usadit.',
-    ikona: 'cup',
+    ikona: 'calendarCheck',
     velikosti: ['S', 'M', 'L'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni', 'zamestnanec', 'kiosk'],
-    stranky: ['vedeni.prehled', 'zamestnanec.domu', 'vedeni.klient', 'kiosk.smena'],
+    stranky: ['vedeni.prehled', 'zamestnanec.domu', 'vedeni.klient', 'vedeni.klient_rezervace', 'vedeni.klient_objednavky', 'kiosk.smena'],
     opravneni: {
       vse: ['rezervace.zobrazit'],
       nektere: [],
@@ -56,7 +59,8 @@ export const WIDGETY: DefiniceWidgetu[] = [
       },
     },
     tarif: 'max',
-    stav: 'planovany',
+    kostra: { S: 'cislo', M: 'seznam', L: 'seznam' },
+    stav: 'hotovo',
   },
   // Data: GET /api/client/staff/inbox → orders[], reservations[] (s rezervace.zobrazit), newCount, stuck, pos.
   // Kartička hosta u kasy (CardScan) volá /api/client/staff/scan s vernost.karta.
@@ -69,7 +73,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     velikosti: ['S', 'M', 'L'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni', 'zamestnanec', 'kiosk'],
-    stranky: ['zamestnanec.domu', 'vedeni.klient', 'kiosk.smena'],
+    stranky: ['zamestnanec.domu', 'vedeni.klient', 'vedeni.klient_rezervace', 'kiosk.smena'],
     opravneni: { vse: ['objednavky.zobrazit'], nektere: [], pole: { 'akce:vyridit': 'objednavky.vyridit', 'akce:karta': 'vernost.karta' } },
     tarif: 'max',
     stav: 'hotovo',
@@ -80,23 +84,24 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'klient',
     nazev: 'Hodnocení od hostů',
     popis: 'Průměr, rozložení 1–5 hvězd, poslední komentáře a slabá hodnocení za týden.',
-    ikona: 'cup',
+    ikona: 'star',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni'],
     stranky: ['vedeni.klient', 'vedeni.klient_zakaznici'],
     opravneni: { vse: ['zakaznici.recenze'], nektere: [] },
     tarif: 'max',
-    stav: 'planovany',
+    kostra: { S: 'cislo', M: 'seznam' },
+    stav: 'hotovo',
   },
-  // Data: GET /api/client/admin/summary → members, newMembers30; GET /api/client/admin/customers →
-  // customers[{name,points,visits,last_visit_at,joined_at}]
+  // Data: GET /api/client/admin/summary → members, newMembers30; GET /api/client/admin/customers?sort=&limit=5
+  // (jen se zakaznici.zobrazit) → customers[{name,points,visits,last_visit_at,joined_at}]
   {
     id: 'klient.clenove',
     oblast: 'klient',
     nazev: 'Členové klubu',
     popis: 'Počet členů, noví za 30 dní; u větší velikosti nejvěrnější hosté.',
-    ikona: 'cup',
+    ikona: 'users',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'S',
     rozhrani: ['vedeni'],
@@ -116,7 +121,8 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'navstevy',
       },
     ],
-    stav: 'planovany',
+    kostra: { S: 'cislo', M: 'seznam' },
+    stav: 'hotovo',
   },
   // Data: GET /api/client/admin/loyalty →
   // summary{members,points,credit,couponsOpen,couponsRedeemed,pointsGiven30,pointsSpent30},
@@ -126,14 +132,15 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'klient',
     nazev: 'Věrnost za 30 dní',
     popis: 'Aktivní hosté po dnech, rozdané a utracené body, noví členové, uplatněné kupony.',
-    ikona: 'cup',
+    ikona: 'gift',
     velikosti: ['M', 'L'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni'],
-    stranky: ['vedeni.klient'],
+    stranky: ['vedeni.klient', 'vedeni.klient_vernost', 'vedeni.klient_zakaznici'],
     opravneni: { vse: ['vernost.zobrazit'], nektere: [] },
     tarif: 'max',
-    stav: 'planovany',
+    kostra: { M: 'cislo', L: 'graf' },
+    stav: 'hotovo',
   },
   // Data: GET /api/client/admin/summary → setup{enabled,menu,tables,tablesPaired,pos,location,loyaltyOn,…}
   {
@@ -141,17 +148,18 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'klient',
     nazev: 'Propojení Clientu',
     popis: 'Co je nastavené: zapnuto pro hosty, menu, stoly (spárované s kasou), pokladna, poloha, věrnost.',
-    ikona: 'cup',
+    ikona: 'check',
     velikosti: ['M'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni'],
-    stranky: ['vedeni.klient'],
+    stranky: ['vedeni.klient', 'vedeni.klient_stoly'],
     opravneni: {
       vse: ['klient.prehled'],
       nektere: [],
       pole: { 'akce:nastavit': ['klient.nastaveni', 'stoly.upravit', 'vernost.pravidla'] },
     },
     tarif: 'max',
-    stav: 'planovany',
+    kostra: { M: 'seznam' },
+    stav: 'hotovo',
   },
 ];

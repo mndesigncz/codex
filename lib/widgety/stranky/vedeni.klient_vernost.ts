@@ -1,5 +1,9 @@
-// Stránka „Věrnost" (vedení). Katalog widgetů ji nezná: kolo 68 založilo jen nástroj ve výchozím
-// rozložení; widgety doplní a plochu zapne (aktivni: true) balík B8 v kole 69.
+// Stránka „Věrnost" (vedení, Managero client). Kolo 68 založilo jen nástroj, kolo 69 (balík B8)
+// plochu zapnulo. Nástroj = pravidla bodů a úrovní, razítkové kampaně, kupony a promo kódy
+// (LoyaltyTabs).
+//
+// Výchozí rozložení: čísla za 30 dní nad nástrojem (dřív „Za posledních 30 dní" uvnitř
+// záložky jako další podoba čísel), nástroj pod nimi.
 import type { DefiniceStranky } from '../typy.ts';
 
 export const STRANKA: DefiniceStranky = {
@@ -7,9 +11,9 @@ export const STRANKA: DefiniceStranky = {
   rozhrani: 'vedeni',
   nazev: 'Věrnost',
   pohled: 'klient:loyalty',
-  pristup: ['klient.prehled'],
-  nastroj: { nazev: 'Věrnost', ikona: 'gift', popis: 'Pravidla věrnosti, razítka a kupony.' },
-  doporucene: [],
-  vychozi: { 'typ:vedeni': [{ w: 'nastroj' }] },
-  aktivni: false,
+  pristup: ['vernost.zobrazit', 'kupony.spravovat'],
+  nastroj: { nazev: 'Věrnost', ikona: 'tag', popis: 'Pravidla věrnosti, razítka a kupony.' },
+  doporucene: ['klient.vernost_30dni', 'klient.clenove', 'finance.hoste_vernost'],
+  vychozi: { 'typ:vedeni': [{ w: 'klient.vernost_30dni', s: 'M' }, { w: 'nastroj' }] },
+  aktivni: true,
 };

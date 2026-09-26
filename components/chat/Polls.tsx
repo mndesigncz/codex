@@ -2,10 +2,14 @@
 
 // Active team polls: pinned above the chat. One tap = one vote (changeable).
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 
 import { Icon } from '../Icons';
+import { Button, Field, Input, Modal, Well } from '../ui';
 import { okJson } from '@/lib/api';
+import { czCount } from '@/lib/czech';
+
+const HLAS = { one: 'hlas', few: 'hlasy', many: 'hlasů' };
 export default function PollsStrip({ canCreate = true, isEmployer = false, meId }: {
   canCreate?: boolean; isEmployer?: boolean; meId?: number;
 }) {
@@ -14,6 +18,12 @@ export default function PollsStrip({ canCreate = true, isEmployer = false, meId 
   const [question, setQuestion] = useState('');
   const [opts, setOpts] = useState(['', '']);
   const [err, setErr] = useState('');
+  // Anketa se kreslí v doku i v plném chatu zároveň — id polí musí být jedinečná.
+  const idPole = useId();
+  // Uzavření ankety se ptá oknem, ne nativním confirm() (DP §3.10): na
+  // tabletu v režimu kiosku prohlížeč systémové dialogy potlačuje.
+  const [uzavrit, setUzavrit] = useState<{ id: number; question: string } | null>(null);
+  const [uzaviram, setUzaviram] = useState(false);
 
   const load = useCallback(() =>
     fetch('/api/polls').then(okJson)
@@ -45,20 +55,31 @@ export default function PollsStrip({ canCreate = true, isEmployer = false, meId 
 
   if (polls.length === 0 && !canCreate) return null;
 
+  const potvrdUzavreni = async () => {
+    if (!uzavrit) return;
+    setUzaviram(true);
+    await fetch('/api/polls', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: uzavrit.id, close: true }) }).catch(() => null);
+    setUzaviram(false);
+    setUzavrit(null);
+    await load();
+  };
+  const lzeZalozit = question.trim() !== '' && opts.filter(o => o.trim()).length >= 2;
+
   return (
     <div className="space-y-2 px-3 pt-2">
+      {/* Anketa je neutrální jamka ve vlákně (DP §3.9): limetkový tón by
+          ve vlákně soupeřil s tlačítkem Odeslat o jedinou limetku. */}
       {polls.map(p => (
-        <div key={p.id} className="rounded-2xl bg-[#C8F542]/[0.08] border border-[#C8F542]/25 p-3.5">
+        <Well key={p.id} pad="sm" as="div">
           <div className="flex items-start justify-between gap-2 mb-2">
-            <p className="text-sm font-semibold text-[#16181A] min-w-0"><Icon name="chart" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {p.question}
-              <span className="font-normal text-black/40"> · {p.authorName}</span>
-            </p>
+            <h3 className="t-card min-w-0 flex items-start gap-1.5">
+              <Icon name="chart" size={15} className="shrink-0 mt-0.5 text-black/40" />
+              <span className="min-w-0">{p.question}<span className="font-normal text-black/55"> · {p.authorName}</span></span>
+            </h3>
             {(isEmployer || p.createdBy === meId) && (
-              <button onClick={async () => {
-                if (!confirm('Uzavřít anketu?')) return;
-                await fetch('/api/polls', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: p.id, close: true }) }).catch(() => null);
-                await load();
-              }} className="shrink-0 text-[11px] text-black/35 hover:text-black">uzavřít</button>
+              <Button variant="ghost" size="sm" className="shrink-0" onClick={() => setUzavrit({ id: p.id, question: p.question })}>
+                Uzavřít
+              </Button>
             )}
           </div>
           <div className="space-y-1.5">
@@ -66,54 +87,70 @@ export default function PollsStrip({ canCreate = true, isEmployer = false, meId 
               const pct = p.total > 0 ? Math.round((p.counts[i] / p.total) * 100) : 0;
               const mine = p.myVote === i;
               return (
-                <button key={i} onClick={() => vote(p.id, i)}
+                <button key={i} type="button" onClick={() => vote(p.id, i)} aria-pressed={mine}
                   className={`relative w-full overflow-hidden rounded-xl border px-3 py-2 text-left text-sm transition ${
-                    mine ? 'border-[#8FB811]/50 bg-white/70' : 'border-black/[0.07] bg-white/50 hover:bg-white/80'
+                    mine ? 'border-[#16181A]/40 bg-[var(--surface)]' : 'border-black/[0.07] bg-[var(--surface)] hover:bg-black/[0.03]'
                   }`}>
-                  <span className="absolute inset-y-0 left-0 bg-[#C8F542]/30 transition-[width]" style={{ width: `${pct}%` }} />
+                  <span className="absolute inset-y-0 left-0 bg-[var(--ok-bg)] transition-[width]" style={{ width: `${pct}%` }} />
                   <span className="relative flex items-center justify-between gap-2">
-                    <span className="min-w-0 truncate text-[#16181A]">{mine ? '● ' : ''}{o}</span>
-                    <span className="shrink-0 text-xs text-black/45 tabular-nums">{p.counts[i]} ({pct} %)</span>
+                    <span className="min-w-0 flex items-center gap-1.5 text-[#16181A]">
+                      {mine && <Icon name="check" size={13} className="shrink-0" />}
+                      <span className="truncate">{o}</span>
+                      {mine && <span className="sr-only">(tvůj hlas)</span>}
+                    </span>
+                    <span className="shrink-0 text-xs text-black/55 tabular-nums">{p.counts[i]} ({pct} %)</span>
                   </span>
                 </button>
               );
             })}
           </div>
-          <p className="text-[11px] text-black/35 mt-1.5">{p.total} {p.total === 1 ? 'hlas' : p.total <= 4 ? 'hlasy' : 'hlasů'} · kliknutím hlasuješ (jde změnit)</p>
-        </div>
+          <p className="t-meta mt-1.5">{czCount(p.total, HLAS)} · ťuknutím hlasuješ (jde změnit)</p>
+        </Well>
       ))}
 
       {canCreate && (
         creating ? (
-          <form onSubmit={e => { e.preventDefault(); if (question.trim() && opts.filter(o => o.trim()).length >= 2) create(); }}
-            className="well border border-black/[0.07] p-3.5 space-y-2">
-            {err && <p className="text-xs text-bad-ink">{err}</p>}
-            <input value={question} onChange={e => setQuestion(e.target.value)} placeholder="Otázka ankety…" maxLength={200}
-              className="w-full rounded-xl bg-white/70 border border-black/[0.08] px-3 py-2 text-sm text-[#16181A] placeholder-black/30 focus:outline-none focus:border-[#C8F542]/50" />
-            {opts.map((o, i) => (
-              <input key={i} value={o} onChange={e => setOpts(prev => prev.map((x, j) => j === i ? e.target.value : x))}
-                placeholder={`Možnost ${i + 1}`} maxLength={80}
-                className="w-full rounded-xl bg-white/70 border border-black/[0.08] px-3 py-2 text-sm text-[#16181A] placeholder-black/30 focus:outline-none focus:border-[#C8F542]/50" />
-            ))}
+          <form onSubmit={e => { e.preventDefault(); if (lzeZalozit) create(); }}
+            className="well p-3.5 space-y-2">
+            {err && <p role="alert" className="text-xs text-bad-ink">{err}</p>}
+            {/* Viditelné popisky, ne jen placeholder: ten zmizí, jakmile se začne
+                psát, a u třetího pole pak nikdo neví, co je otázka a co možnost
+                (DP §3.14, stejná oprava jako v KioskSettings v kole 33). */}
+            <Field id={`${idPole}-otazka`} label="Otázka">
+              <Input id={`${idPole}-otazka`} value={question} onChange={e => setQuestion(e.target.value)}
+                placeholder="Např. Kdy uděláme poradu?" maxLength={200} />
+            </Field>
+            <fieldset className="space-y-2 min-w-0">
+              <legend className="t-label mb-1.5">Možnosti</legend>
+              {opts.map((o, i) => (
+                <Field key={i} id={`${idPole}-moznost-${i}`} label={`Možnost ${i + 1}`}>
+                  <Input id={`${idPole}-moznost-${i}`} value={o} maxLength={80}
+                    onChange={e => setOpts(prev => prev.map((x, j) => j === i ? e.target.value : x))} />
+                </Field>
+              ))}
+            </fieldset>
             <div className="flex flex-wrap gap-2">
               {opts.length < 8 && (
-                <button type="button" onClick={() => setOpts(prev => [...prev, ''])} className="tap-target-sm rounded-full glass px-3 py-1.5 text-xs text-black/55 hover:text-black">+ možnost</button>
+                <Button variant="secondary" size="sm" icon="plus" onClick={() => setOpts(prev => [...prev, ''])}>Možnost</Button>
               )}
               <span className="flex-1" />
-              <button type="button" onClick={() => setCreating(false)} className="tap-target-sm rounded-full glass px-3.5 py-1.5 text-xs font-semibold text-black/55 hover:text-black">Zrušit</button>
-              <button type="submit" disabled={!question.trim() || opts.filter(o => o.trim()).length < 2}
-                className="tap-target-sm btn btn-primary btn-sm disabled:opacity-40 transition">
-                Založit anketu
-              </button>
+              <Button variant="ghost" size="sm" onClick={() => setCreating(false)}>Zrušit</Button>
+              <Button type="submit" variant="primary" size="sm" disabled={!lzeZalozit}>Založit anketu</Button>
             </div>
           </form>
         ) : (
-          <button onClick={() => setCreating(true)}
-            className="w-full rounded-2xl border border-dashed border-black/15 px-3 py-2 text-xs text-black/40 hover:text-black hover:border-black/30 transition">
-            <Icon name="chart" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Založit anketu
-          </button>
+          <Button variant="ghost" size="sm" icon="chart" onClick={() => setCreating(true)}>Založit anketu</Button>
         )
       )}
+
+      <Modal open={!!uzavrit} onClose={() => setUzavrit(null)} size="sm" title="Uzavřít anketu?"
+        subtitle={uzavrit ? `„${uzavrit.question}" zmizí z chatu a hlasovat už nepůjde.` : undefined}
+        footer={<>
+          <Button variant="secondary" onClick={() => setUzavrit(null)}>Zrušit</Button>
+          <Button variant="primary" loading={uzaviram} onClick={potvrdUzavreni}>Uzavřít anketu</Button>
+        </>}>
+        <p className="t-meta">Uzavřenou anketu nejde znovu otevřít.</p>
+      </Modal>
     </div>
   );
 }

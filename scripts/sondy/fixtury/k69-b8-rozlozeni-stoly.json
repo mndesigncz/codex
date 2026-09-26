@@ -1,0 +1,34 @@
+{
+ "stranka": "vedeni.klient_stoly",
+ "polozky": [
+  {
+   "id": "nastroj",
+   "widget": "nastroj",
+   "velikost": "L"
+  }
+ ],
+ "dostupne": [
+  "prehled.ceka_na_tebe",
+  "klient.objednavky_od_stolu",
+  "klient.dnesni_rezervace",
+  "klient.clenove",
+  "klient.hodnoceni",
+  "klient.vernost_30dni",
+  "klient.propojeni",
+  "klient.hoste_vernost",
+  "akce.nejblizsi",
+  "akce.vysledek",
+  "akce.checklist",
+  "menu.vyprodano",
+  "menu.stav",
+  "finance.hoste_vernost",
+  "odkaz"
+ ],
+ "tarifem": [],
+ "zdroj": "aplikace",
+ "rozsah": "typ:vedeni",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": true,
+ "verze": 0
+}

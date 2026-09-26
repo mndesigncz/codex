@@ -1,5 +1,11 @@
-// Stránka „Přehled Clientu" (vedení). Kolo 68 založilo metadata z katalogu; plochu zapne (aktivni:
-// true) a doporučené i výchozí rozložení upřesní balík B8 v kole 69.
+// Stránka „Přehled Clientu" (vedení). Kolo 68 založilo metadata z katalogu, kolo 69 (balík B8)
+// plochu zapnulo. Nástroj nemá: celý přehled je z widgetů (katalog, hlavni_nastroj) — dřívější
+// pevné rozvržení (Čeká na tebe, čtyři šedé dlaždice StatCard, Dnešní rezervace, Členové
+// a hodnocení, Propojení) se rozpadlo na widgety, které jde přeskládat.
+//
+// Výchozí rozložení je z katalogu (fronty nahoře, čtyři malá čísla v řadě, pak věrnost
+// a propojení); dnešní rezervace v S — plný seznam má záložka Rezervace. Role bez části
+// oprávnění dostane totéž bez widgetů, na které nemá (spec §1.5).
 import type { DefiniceStranky } from '../typy.ts';
 
 export const STRANKA: DefiniceStranky = {
@@ -34,5 +40,5 @@ export const STRANKA: DefiniceStranky = {
       { w: 'klient.propojeni', s: 'M' },
     ],
   },
-  aktivni: false,
+  aktivni: true,
 };

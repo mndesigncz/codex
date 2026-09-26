@@ -3,11 +3,18 @@
 // Public share links plus the look of the pages they open. Everything here is
 // customer-facing, so the editor stays blunt about what does and doesn't leave
 // the app.
+//
+// Kolo 69 (B8): jazyk zbytku aplikace — karty Card, pole Field/Input/Select,
+// přepínač Ze skladu / Z návodů jako Segmented, hlášky jedním Toastem (dřív
+// limetkový proužek s „✓"), „Vytvořit odkaz" jako Button (dřív ručně psaná
+// limetka), „Kopírovat" tmavě (dřív druhá limetka u každého řádku), QR ikonou
+// místo znaku „⬚", aktivní odkaz jako Switch, skryté kategorie jako
+// filter-pill a smazání odkazu v okně místo confirm().
 
 import { useEffect, useMemo, useState } from 'react';
 import QRCode from 'qrcode';
 import { Icon } from '../Icons';
-import { Modal, Button } from '../ui';
+import { Button, Card, Chip, Field, Input, Menu, Modal, Segmented, Select, Skeleton, Switch, Toast, Well } from '../ui';
 import { usePlan, ProBadge, UpgradeModal } from '../Pro';
 import {
   type ShareLink, type ShareTheme, DEFAULT_THEME, THEME_PRESETS, normalizeTheme,
@@ -16,8 +23,6 @@ import { flattenTree, pathOfId, type CategoryNode } from '@/lib/categoryTree';
 import { useModal } from '@/lib/useModal';
 import { okJson } from '@/lib/api';
 
-const inputClass =
-  'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm';
 
 type GuideCat = { id: number; name: string };
 
@@ -37,7 +42,8 @@ export default function ShareSettings() {
   const [guideCats, setGuideCats] = useState<GuideCat[]>([]);
   const [loading, setLoading] = useState(true);
   const [notMigrated, setNotMigrated] = useState(false);
-  const [msg, setMsg] = useState('');
+  const [msg, setMsg] = useState<string | null>(null);
+  const [mazu, setMazu] = useState<ShareLink | null>(null);
   const [creating, setCreating] = useState(false);
 
   // New-link form.
@@ -66,7 +72,7 @@ export default function ShareSettings() {
   };
   useEffect(() => { load(); }, []);
 
-  const flash = (m: string) => { setMsg(m); setTimeout(() => setMsg(''), 2500); };
+  const flash = (m: string) => setMsg(m);
 
   const create = async () => {
     setCreating(true);
@@ -78,7 +84,7 @@ export default function ShareSettings() {
       if (res.ok) {
         setTitle(''); setNote(''); setCategoryId('');
         await load();
-        flash('Odkaz vytvořen ✓');
+        flash('Odkaz vytvořen.');
       } else {
         const d = await res.json().catch(() => ({}));
         flash(d.error || 'Odkaz se nepodařilo vytvořit.');
@@ -97,7 +103,6 @@ export default function ShareSettings() {
   };
 
   const remove = async (l: ShareLink) => {
-    if (!confirm('Smazat odkaz? Kdo ho má, přestane stránku vidět.')) return;
     setLinks(prev => prev.filter(x => x.id !== l.id));
     try { await fetch(`/api/share/${l.id}`, { method: 'DELETE' }); } catch { load(); }
   };
@@ -108,7 +113,7 @@ export default function ShareSettings() {
       const res = await fetch('/api/share', {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ theme: next }),
       });
-      if (res.ok) flash('Vzhled uložen ✓');
+      if (res.ok) flash('Vzhled uložen.');
     } catch { flash('Vzhled se nepodařilo uložit.'); }
   };
 
@@ -116,127 +121,91 @@ export default function ShareSettings() {
     `${typeof window !== 'undefined' ? window.location.origin : ''}/s/${l.token}`;
 
   const copy = async (l: ShareLink) => {
-    try { await navigator.clipboard.writeText(urlOf(l)); flash('Odkaz zkopírován ✓'); } catch {}
+    try { await navigator.clipboard.writeText(urlOf(l)); flash('Odkaz zkopírován.'); } catch {}
   };
 
   if (loading) {
-    return <div className="glass-card p-6 text-sm text-black/45">Načítám…</div>;
+    return <Card><Skeleton className="h-24" /></Card>;
   }
 
   return (
     <div className="space-y-4">
-      {msg && (
-        <div className="rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/30 text-[#5B7A08] text-sm font-semibold px-4 py-3">
-          {msg}
-        </div>
-      )}
-
       {notMigrated && (
-        <div className="rounded-2xl bg-wait/10 border border-wait/25 text-wait-ink text-sm px-4 py-3">
-          Sdílení zatím není v databázi připravené — spusť <code>/api/init</code>.
-        </div>
+        <p className="note note-wait">Sdílení zatím není v databázi připravené — spusť <code>/api/init</code>.</p>
       )}
 
-      {/* ---- New link ---- */}
-      <div className="glass-card p-6 space-y-4">
+      {/* ---- Nový odkaz ---- */}
+      <Card className="space-y-4">
         <div>
-          <h3 className="t-card flex items-center gap-2">
-            <Icon name="send" size={17} className="text-[#5B7A08]" /> Nový odkaz pro zákazníky
-          </h3>
-          <p className="text-sm text-black/45 mt-0.5">
-            Stránka bez přihlášení, kde je vidět jen název, značka a popis. Žádné počty, ceny ani dodavatelé.
-          </p>
+          <h3 className="t-card flex items-center gap-2"><Icon name="send" size={17} className="text-black/40" />Nový odkaz pro zákazníky</h3>
+          <p className="t-meta mt-0.5">Stránka bez přihlášení, kde je vidět jen název, značka a popis. Žádné počty, ceny ani dodavatelé.</p>
         </div>
 
-        <div className="flex gap-1 rounded-full glass border border-black/[0.07] p-1 w-fit">
-          {([['inventory', 'Ze skladu'], ['guides', 'Z návodů']] as const).map(([k, label]) => (
-            <button key={k} onClick={() => { setKind(k); setCategoryId(''); }}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition ${
-                kind === k ? 'seg-on' : 'seg-off'
-              }`}>
-              {label}
-            </button>
-          ))}
-        </div>
+        <Segmented size="sm" ariaLabel="Co sdílet" value={kind} onChange={k => { setKind(k); setCategoryId(''); }}
+          options={[{ id: 'inventory', label: 'Ze skladu' }, { id: 'guides', label: 'Z návodů' }]} />
 
         {kind === 'inventory' && (
-          <div>
-            <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Co sdílet</label>
-            <select value={categoryId} aria-label="Co sdílet" onChange={e => setCategoryId(e.target.value)} className={inputClass}>
+          <Field id="sdil-co" label="Co sdílet" hint="U kategorie se sdílí i všechny její podkategorie, pěkně pod sebou.">
+            <Select id="sdil-co" value={categoryId} onChange={e => setCategoryId(e.target.value)}>
               <option value="">Celý sklad</option>
               {flat.map(({ cat: c, depth }) => (
-                <option key={c.id} value={String(c.id)}>{' '.repeat(depth * 2)}{c.name}</option>
+                <option key={c.id} value={String(c.id)}>{' '.repeat(depth * 2)}{c.name}</option>
               ))}
-            </select>
-            <p className="text-[11px] text-black/40 mt-1.5">
-              U kategorie se sdílí i všechny její podkategorie, pěkně pod sebou.
-            </p>
-          </div>
+            </Select>
+          </Field>
         )}
         {kind === 'guides' && (
-          <p className="text-[12px] text-black/45 well rounded-xl border border-black/[0.06] px-3 py-2">
-            Sdílí se jen názvy návodů seřazené podle kategorií — obsah návodu se ven nedostane.
-          </p>
+          <Well><p className="t-meta">Sdílí se jen názvy návodů seřazené podle kategorií — obsah návodu se ven nedostane.</p></Well>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label htmlFor="sdil-nadpis" className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Nadpis stránky</label>
-            <input id="sdil-nadpis" value={title} onChange={e => setTitle(e.target.value)} placeholder="Např. Naše tabáky" className={inputClass} />
-          </div>
-          <div>
-            <label htmlFor="sdil-podtitulek" className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Podtitulek</label>
-            <input id="sdil-podtitulek" value={note} onChange={e => setNote(e.target.value)} placeholder="Nepovinný text pod nadpisem" className={inputClass} />
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field id="sdil-nadpis" label="Nadpis stránky">
+            <Input id="sdil-nadpis" value={title} onChange={e => setTitle(e.target.value)} placeholder="Např. Naše tabáky" />
+          </Field>
+          <Field id="sdil-podtitulek" label="Podtitulek">
+            <Input id="sdil-podtitulek" value={note} onChange={e => setNote(e.target.value)} placeholder="Nepovinný text pod nadpisem" />
+          </Field>
         </div>
 
-        <button onClick={create} disabled={creating}
-          className="w-full sm:w-auto justify-center rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 text-sm hover:brightness-110 disabled:opacity-50 inline-flex items-center gap-2">
-          <Icon name="plus" size={16} /> {creating ? 'Vytvářím…' : 'Vytvořit odkaz'}
-        </button>
-      </div>
+        <Button variant="primary" icon="plus" loading={creating} onClick={create}>Vytvořit odkaz</Button>
+      </Card>
 
-      {/* ---- Existing links ---- */}
+      {/* ---- Sdílené odkazy ---- */}
       {links.length > 0 && (
-        <div className="glass-card p-6 space-y-4">
-          <h3 className="t-card">Sdílené odkazy</h3>
-          <div className="divide-y divide-black/[0.06]">
+        <Card pad="none" aria-labelledby="sdil-odkazy">
+          <h3 id="sdil-odkazy" className="t-card px-5 pt-4">Sdílené odkazy</h3>
+          <ul className="list px-5">
             {links.map(l => (
               <LinkRow key={l.id} link={l} cats={cats} guideCats={guideCats}
-                url={urlOf(l)} onCopy={() => copy(l)} onPatch={b => patch(l.id, b)} onRemove={() => remove(l)}
+                url={urlOf(l)} onCopy={() => copy(l)} onPatch={b => patch(l.id, b)} onRemove={() => setMazu(l)}
                 onQr={() => setQrFor({ url: urlOf(l), title: l.title || 'Sdílený odkaz' })} />
             ))}
-          </div>
-        </div>
+          </ul>
+        </Card>
       )}
 
-      {/* ---- Look of the pages ---- */}
+      {/* ---- Vzhled stránek ---- */}
       {!pro ? (
-        <button onClick={() => setUpgradeFor('Vlastní vzhled sdílených stránek')}
-          className="w-full glass-card p-6 flex items-center justify-between gap-3 text-left hover:bg-black/[0.02] transition">
+        <Card className="flex items-center justify-between gap-3 flex-wrap">
           <div className="min-w-0">
-            <p className="font-bold text-[#16181A] flex items-center gap-2"><Icon name="sun" size={17} className="text-[#5B7A08]" /> Vzhled sdílených stránek <ProBadge /></p>
-            <p className="text-sm text-black/45 mt-0.5">Barvy, logo a patička podle vašeho podniku.</p>
+            <h3 className="t-card flex items-center gap-2"><Icon name="sun" size={17} className="text-black/40" /> Vzhled sdílených stránek <ProBadge /></h3>
+            <p className="t-meta mt-0.5">Barvy, logo a patička podle vašeho podniku.</p>
           </div>
-          <span className="shrink-0 text-2xl"><Icon name="lock" size={15} /></span>
-        </button>
+          <Button size="sm" variant="secondary" icon="lock" onClick={() => setUpgradeFor('Vlastní vzhled sdílených stránek')}>Odemknout</Button>
+        </Card>
       ) : (
-      <div className="glass-card p-6 space-y-4">
+      <Card className="space-y-4">
         <div>
-          <h3 className="t-card flex items-center gap-2">
-            <Icon name="sun" size={17} className="text-[#5B7A08]" /> Vzhled sdílených stránek
-          </h3>
-          <p className="text-sm text-black/45 mt-0.5">Platí pro všechny odkazy najednou.</p>
+          <h3 className="t-card flex items-center gap-2"><Icon name="sun" size={17} className="text-black/40" /> Vzhled sdílených stránek</h3>
+          <p className="t-meta mt-0.5">Platí pro všechny odkazy najednou.</p>
         </div>
 
         <div className="flex flex-wrap gap-1.5">
           {THEME_PRESETS.map(p => {
             const active = theme.background === p.theme.background && theme.accent === p.theme.accent;
             return (
-              <button key={p.id} onClick={() => saveTheme({ ...theme, ...p.theme })}
-                className={`inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-xs font-medium transition ${
-                  active ? 'seg-on' : 'seg-off glass'
-                }`}>
+              <button key={p.id} type="button" onClick={() => saveTheme({ ...theme, ...p.theme })} aria-pressed={active}
+                className={`filter-pill tap-target-sm inline-flex items-center gap-2 ${active ? 'seg-on' : 'seg-off glass'}`}>
                 <span className="inline-flex gap-0.5" aria-hidden>
                   <span className="w-3 h-3 rounded-full border border-black/10" style={{ background: p.theme.background }} />
                   <span className="w-3 h-3 rounded-full border border-black/10" style={{ background: p.theme.accent }} />
@@ -247,61 +216,55 @@ export default function ShareSettings() {
           })}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {([
             ['background', 'Pozadí'],
             ['accent', 'Nadpisy'],
             ['text', 'Text'],
           ] as const).map(([key, label]) => (
-            <div key={key}>
-              <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">{label}</label>
+            <Field key={key} id={`sdil-barva-${key}`} label={label}>
               <div className="flex items-center gap-2">
                 <input type="color" value={theme[key]} aria-label={`${label} — barva`}
                   onChange={e => setTheme(t => ({ ...t, [key]: e.target.value }))}
                   onBlur={() => saveTheme(theme)}
-                  className="h-11 w-14 rounded-xl border border-black/[0.08] bg-white cursor-pointer" />
-                <input value={theme[key]} aria-label={`${label} — barva v kódu`}
+                  className="h-11 w-14 shrink-0 rounded-xl border border-black/[0.08] bg-white cursor-pointer" />
+                <Input id={`sdil-barva-${key}`} value={theme[key]}
                   onChange={e => setTheme(t => ({ ...t, [key]: e.target.value }))}
-                  onBlur={() => saveTheme(theme)} className={`${inputClass} font-mono`} />
+                  onBlur={() => saveTheme(theme)} className="font-mono" />
               </div>
-            </div>
+            </Field>
           ))}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label htmlFor="sdil-podnik" className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Název podniku</label>
-            <input id="sdil-podnik" value={theme.businessName} onChange={e => setTheme(t => ({ ...t, businessName: e.target.value }))}
-              onBlur={() => saveTheme(theme)} placeholder="Zobrazí se nad nadpisem" className={inputClass} />
-          </div>
-          <div>
-            <label htmlFor="sdil-logo" className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Logo (odkaz na obrázek)</label>
-            <input id="sdil-logo" value={theme.logoUrl} onChange={e => setTheme(t => ({ ...t, logoUrl: e.target.value }))}
-              onBlur={() => saveTheme(theme)} placeholder="https://…" className={inputClass} />
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field id="sdil-podnik" label="Název podniku">
+            <Input id="sdil-podnik" value={theme.businessName} onChange={e => setTheme(t => ({ ...t, businessName: e.target.value }))}
+              onBlur={() => saveTheme(theme)} placeholder="Zobrazí se nad nadpisem" />
+          </Field>
+          <Field id="sdil-logo" label="Logo (odkaz na obrázek)">
+            <Input id="sdil-logo" value={theme.logoUrl} onChange={e => setTheme(t => ({ ...t, logoUrl: e.target.value }))}
+              onBlur={() => saveTheme(theme)} placeholder="https://…" />
+          </Field>
         </div>
 
-        <div>
-          <label htmlFor="sdil-paticka" className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Patička</label>
-          <input id="sdil-paticka" value={theme.footer} onChange={e => setTheme(t => ({ ...t, footer: e.target.value }))}
-            onBlur={() => saveTheme(theme)} placeholder="Adresa, otevírací doba, kontakt…" className={inputClass} />
-        </div>
+        <Field id="sdil-paticka" label="Patička">
+          <Input id="sdil-paticka" value={theme.footer} onChange={e => setTheme(t => ({ ...t, footer: e.target.value }))}
+            onBlur={() => saveTheme(theme)} placeholder="Adresa, otevírací doba, kontakt…" />
+        </Field>
 
-        {/* Live preview */}
+        {/* Živý náhled */}
         <div className="rounded-2xl overflow-hidden border border-black/[0.08]">
           <div style={{ background: theme.background, color: theme.text }} className="p-5 text-center">
             {theme.logoUrl && (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={theme.logoUrl} alt="" style={{ maxHeight: 36, margin: '0 auto 10px', objectFit: 'contain' }} />
             )}
-            {theme.businessName && (
-              <p className="t-label opacity-60">{theme.businessName}</p>
-            )}
-            <p style={{ color: theme.accent }} className="text-xl font-bold tracking-tight mt-1">Naše nabídka</p>
+            {theme.businessName && <p className="text-[13px] font-semibold opacity-60">{theme.businessName}</p>}
+            <p style={{ color: theme.accent }} className="text-lg font-bold tracking-tight mt-1">Naše nabídka</p>
             <p className="text-xs opacity-60 mt-2">Ukázka toho, jak stránka vypadá.</p>
           </div>
         </div>
-      </div>
+      </Card>
       )}
       {qrFor && (
         <Modal open onClose={() => setQrFor(null)} title={qrFor.title} size="sm"
@@ -317,12 +280,22 @@ export default function ShareSettings() {
           <div className="text-center">
             {qrData
               ? <img src={qrData} alt="QR kód odkazu" className="mx-auto w-64 h-64 rounded-2xl bg-white p-2 border border-black/[0.08]" />
-              : <div className="mx-auto w-64 h-64 well animate-pulse" />}
+              : <Skeleton className="mx-auto w-64 h-64" />}
           </div>
+        </Modal>
+      )}
+      {mazu && (
+        <Modal open onClose={() => setMazu(null)} size="sm" title="Smazat odkaz?"
+          footer={<>
+            <Button variant="secondary" onClick={() => setMazu(null)}>Zrušit</Button>
+            <Button variant="danger-solid" onClick={() => { const l = mazu; setMazu(null); void remove(l); }}>Smazat</Button>
+          </>}>
+          <p className="text-sm text-black/70 text-pretty">Kdo odkaz „{mazu.title || 'bez nadpisu'}“ má, přestane stránku vidět.</p>
         </Modal>
       )}
 
       {upgradeFor && <UpgradeModal feature={upgradeFor} onClose={() => setUpgradeFor(null)} />}
+      <Toast message={msg} onClose={() => setMsg(null)} />
     </div>
   );
 }
@@ -342,7 +315,7 @@ function LinkRow({ link, cats, guideCats, url, onCopy, onPatch, onRemove, onQr }
     ? 'Návody'
     : link.categoryId != null ? pathOfId(cats, link.categoryId) : 'Celý sklad';
 
-  // Excluding only makes sense for what the link actually covers.
+  // Skrýt jde jen to, co odkaz opravdu pokrývá.
   const excludable = link.kind === 'guides'
     ? guideCats.map(g => ({ id: g.id, name: g.name, depth: 0 }))
     : flattenTree(cats).map(({ cat, depth }) => ({ id: cat.id, name: cat.name, depth }));
@@ -353,84 +326,52 @@ function LinkRow({ link, cats, guideCats, url, onCopy, onPatch, onRemove, onQr }
       : [...link.excluded, id];
     onPatch({ excluded: next });
   };
+  const nazev = link.title || scope;
 
   return (
-    <div className="py-3 space-y-2">
+    <li className="list-row flex-col items-stretch gap-2">
       <div className="flex items-center gap-2 flex-wrap">
-        <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider ${
-          link.enabled ? 'bg-[#C8F542]/25 text-[#5B7A08]' : 'bg-black/[0.06] text-black/40'
-        }`}>
-          {link.kind === 'guides' ? 'Návody' : 'Sklad'}
-        </span>
+        <Chip tone={link.enabled ? 'ok' : 'muted'} size="sm">{link.kind === 'guides' ? 'Návody' : 'Sklad'}</Chip>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-[#16181A] truncate">{link.title || scope}</p>
-          <p className="text-[11px] text-black/40 truncate">{scope}{link.excluded.length > 0 ? ` · ${link.excluded.length} skryto` : ''}</p>
+          <p className="text-[15px] font-medium leading-snug text-[#16181A] truncate">{nazev}</p>
+          <p className="text-[13px] text-black/55 truncate">{scope}{link.excluded.length > 0 ? ` · ${link.excluded.length} skryto` : ''}{link.enabled ? '' : ' · vypnutý'}</p>
         </div>
-        <button onClick={() => onPatch({ pinned: !(link.pinned === true) })}
-          title={link.pinned ? 'Odepnout z nástěnek' : 'Připnout na nástěnku všech (i tabletu)'}
-          className={`shrink-0 rounded-full w-8 h-8 flex items-center justify-center text-sm transition ${
-            link.pinned ? 'seg-on' : 'seg-off glass'
-          }`}>
-          <Icon name="pin" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />
-        </button>
-        <button onClick={onQr} title="Zobrazit QR kód"
-          className="shrink-0 rounded-full w-8 h-8 flex items-center justify-center glass text-black/50 hover:text-black text-xs transition">
-          ⬚
-        </button>
-        <button onClick={onCopy} title="Zkopírovat odkaz"
-          className="tap-target-sm shrink-0 btn btn-accent btn-sm">
-          Kopírovat
-        </button>
-        <a href={url} target="_blank" rel="noopener" title="Otevřít stránku"
-          className="tap-target-sm shrink-0 rounded-full glass border border-black/10 px-3.5 py-1.5 text-xs font-medium text-[#16181A] hover:bg-black/[0.05]">
-          Otevřít ↗
-        </a>
-        <button onClick={() => setOpen(o => !o)} title="Nastavení odkazu"
-          className={`shrink-0 rounded-full w-8 h-8 flex items-center justify-center text-sm transition ${
-            open ? 'seg-on' : 'seg-off glass'
-          }`}>
-          <Icon name="settings" size={14} />
-        </button>
+        <Button size="sm" variant="secondary" icon="copy" onClick={onCopy} aria-label={`Zkopírovat odkaz: ${nazev}`}>Kopírovat</Button>
+        <Menu size="sm" label={`Další akce s odkazem ${nazev}`} items={[
+          { label: link.pinned ? 'Odepnout z nástěnek' : 'Připnout na nástěnku všech', icon: 'pin', onClick: () => onPatch({ pinned: !(link.pinned === true) }) },
+          { label: 'QR kód', icon: 'print', onClick: onQr },
+          { label: 'Otevřít stránku', icon: 'external', onClick: () => window.open(url, '_blank', 'noopener') },
+          { label: open ? 'Skrýt nastavení' : 'Nastavení odkazu', icon: 'settings', onClick: () => setOpen(o => !o) },
+          { label: 'Smazat odkaz…', icon: 'trash', danger: true, onClick: onRemove },
+        ]} />
       </div>
 
       {open && (
-        <div className="well border border-black/[0.06] p-3.5 space-y-3">
-          <p className="text-[11px] text-black/45 break-all font-mono">{url}</p>
-
-          <label className="flex items-center gap-2.5 cursor-pointer">
-            <input type="checkbox" checked={link.enabled}
-              onChange={e => onPatch({ enabled: e.target.checked })}
-              className="h-4 w-4 accent-[#C8F542]" />
-            <span className="text-sm text-[#16181A]">Odkaz je aktivní</span>
-          </label>
-
+        <Well className="space-y-3">
+          <p className="t-meta break-all font-mono">{url}</p>
+          <span className="flex items-center gap-2.5">
+            <Switch checked={link.enabled} onChange={v => onPatch({ enabled: v })} label="Odkaz je aktivní" />
+            <span className="text-sm text-[#16181A]" aria-hidden>Odkaz je aktivní</span>
+          </span>
           <div>
-            <p className="text-[11px] uppercase tracking-wider text-black/45 mb-1.5">Nesdílet tyhle kategorie</p>
+            <p className="t-label mb-1.5">Nesdílet tyhle kategorie</p>
             <div className="flex flex-wrap gap-1.5">
               {excludable.map(e => {
                 const off = link.excluded.includes(e.id);
                 return (
-                  <button key={e.id} onClick={() => toggle(e.id)}
+                  <button key={e.id} type="button" onClick={() => toggle(e.id)} aria-pressed={off}
                     style={{ marginLeft: e.depth * 10 }}
-                    className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                      off ? 'bg-bad/15 text-bad-ink line-through' : 'bg-white border border-black/[0.08] text-[#16181A] hover:border-[#C8F542]'
-                    }`}>
-                    {e.name}
+                    className={`filter-pill tap-target-sm ${off ? 'seg-on' : 'seg-off glass'}`}>
+                    {off && <Icon name="close" size={12} />}{e.name}
                   </button>
                 );
               })}
-              {excludable.length === 0 && <span className="text-xs text-black/35">Zatím žádné kategorie.</span>}
+              {excludable.length === 0 && <span className="t-meta">Zatím žádné kategorie.</span>}
             </div>
-            <p className="text-[11px] text-black/40 mt-1.5">Skrytá kategorie schová i všechno pod ní.</p>
+            <p className="t-meta mt-1.5">Vybraná kategorie se nesdílí — schová i všechno pod ní.</p>
           </div>
-
-          <button onClick={onRemove}
-            className="rounded-full glass border border-black/10 text-bad-ink/80 hover:text-bad-ink px-4 py-2 text-xs font-medium">
-            Smazat odkaz
-          </button>
-        </div>
+        </Well>
       )}
-
-    </div>
+    </li>
   );
 }

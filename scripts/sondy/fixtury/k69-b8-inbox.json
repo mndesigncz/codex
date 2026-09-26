@@ -1,0 +1,61 @@
+{
+ "orders": [
+  {
+   "id": 71,
+   "status": "new",
+   "items": [
+    {
+     "name": "Matcha latte",
+     "count": 2,
+     "price": 95
+    }
+   ],
+   "total": 190,
+   "created_at": "2026-09-26 10:00:00",
+   "customer_name": "Jana Dvořáková",
+   "table_name": "U okna",
+   "via_qr": true,
+   "geo_status": "ok",
+   "geo_distance_m": 12,
+   "storyous_order_id": null
+  },
+  {
+   "id": 72,
+   "status": "confirmed",
+   "items": [
+    {
+     "name": "Sencha",
+     "count": 1,
+     "price": 80
+    }
+   ],
+   "total": 80,
+   "created_at": "2026-09-26 09:40:00",
+   "customer_name": "Petr Novák",
+   "table_name": "Zahrádka 1",
+   "via_qr": true,
+   "storyous_order_id": "S-1",
+   "pos_state": "CONFIRMED"
+  }
+ ],
+ "reservations": [
+  {
+   "id": 11,
+   "time": "17:30",
+   "party": 4,
+   "status": "requested",
+   "customer_name": "Jana Dvořáková",
+   "table_name": "U okna"
+  }
+ ],
+ "newCount": 1,
+ "stuck": 0,
+ "pos": {
+  "connected": true,
+  "autoPos": true,
+  "tables": 4,
+  "tablesPaired": 4,
+  "items": 10,
+  "itemsLinked": 10
+ }
+}

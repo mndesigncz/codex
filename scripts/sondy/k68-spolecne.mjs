@@ -65,7 +65,7 @@ export async function konec() {
  * - `mobil`, `reduced`, `tmavy`: telefon s dotykem, omezený pohyb, tmavý režim
  */
 export async function kontext({ viewport = { width: 1280, height: 950 }, role = 'employer', mineData = VLASTNIK, mineZpozdeni = 0,
-  fix = FIX_VEDENI, mobil = false, reduced = false, tmavy = false, dalsi = null } = {}) {
+  fix = FIX_VEDENI, mobil = false, reduced = false, tmavy = false, dalsi = null, posunCasu = 0 } = {}) {
   const b = await browser();
   const ctx = await b.newContext({ viewport, locale: 'cs-CZ', isMobile: mobil, hasTouch: mobil, reducedMotion: reduced ? 'reduce' : 'no-preference' });
   await ctx.addCookies([{ name: 'next-auth.session-token', value: tokenPro(role), domain: 'localhost', path: '/', httpOnly: true, sameSite: 'Lax' }]);
@@ -77,6 +77,17 @@ export async function kontext({ viewport = { width: 1280, height: 950 }, role = 
       if (t) localStorage.setItem('managero-theme', 'dark');
     } catch { /* soukromé okno */ }
   }, [tmavy]);
+  // Posun hodin v prohlížeči (ms): sonda, jejíž fixtury počítají „před
+  // hodinou dnes", po půlnoci jinak tvrdí nemožné. Posouvá se jen Date,
+  // časovače běží dál normálně.
+  if (posunCasu) await ctx.addInitScript((posun) => {
+    const Puvodni = Date;
+    class Posunute extends Puvodni {
+      constructor(...a) { if (a.length === 0) super(Puvodni.now() + posun); else super(...a); }
+      static now() { return Puvodni.now() + posun; }
+    }
+    globalThis.Date = Posunute;
+  }, posunCasu);
   const stav = {
     ulozeno: null, verze: fix?.verze ?? 0, puty: [], deletes: 0, vychoziPuty: [], vychoziDelete: 0,
     dotazy: [], mineDoruceno: null, chyby: {},

@@ -7,10 +7,11 @@
 // podnik (koncepty v sessionStorage, filtry), tím odejde — jinak by v novém
 // podniku svítily rozepsané formuláře z toho starého.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { Icon } from './Icons';
 import { useVejdiSe } from '@/lib/useVejdiSe';
+import { usePopover } from '@/lib/usePopover';
 import { nactiTeamsMine } from './role/useOpravneni';
 
 interface Podnik { teamId: number; teamName: string; role: 'employer' | 'employee' }
@@ -47,10 +48,12 @@ export default function PodnikSwitcher({ compact = false, canCreate = false, jen
   /** Seznam podniků se nenačetl — místo tichého zmizení tlačítko „zkusit znovu". */
   const [chybaSeznamu, setChybaSeznamu] = useState(false);
   const [pokus, setPokus] = useState(0);
-  const box = useRef<HTMLDivElement>(null);
-  const panel = useRef<HTMLDivElement>(null);
+  // Šipky, Escape, klepnutí vedle a návrat fokusu jako u každé jiné
+  // nabídky (usePopover). Dřív šipka dolů panel neotevřela a z klávesnice
+  // se do seznamu podniků nedalo dostat.
+  const pop = usePopover(open, setOpen, { focusFirst: true, arrowKeys: true });
   // Na telefonu se panel vejde na obrazovku (useVejdiSe).
-  const vejdiSe = useVejdiSe(panel, { aktivni: open });
+  const vejdiSe = useVejdiSe(pop.panelRef, { aktivni: open });
 
   useEffect(() => {
     let alive = true;
@@ -61,13 +64,6 @@ export default function PodnikSwitcher({ compact = false, canCreate = false, jen
     return () => { alive = false; };
   }, [pokus]);
 
-  useEffect(() => {
-    if (!open) return;
-    const zavri = (e: MouseEvent) => { if (box.current && !box.current.contains(e.target as Node)) setOpen(false); };
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
-    document.addEventListener('mousedown', zavri); document.addEventListener('keydown', esc);
-    return () => { document.removeEventListener('mousedown', zavri); document.removeEventListener('keydown', esc); };
-  }, [open]);
 
   const aktivni = data?.teams.find(t => t.teamId === data.activeTeamId) ?? null;
   const vicPodniku = (data?.teams.length ?? 0) > 1;
@@ -120,8 +116,8 @@ export default function PodnikSwitcher({ compact = false, canCreate = false, jen
   };
 
   return (
-    <div ref={box} className="relative">
-      <button type="button" onClick={() => setOpen(v => !v)} aria-haspopup="menu" aria-expanded={open}
+    <div ref={pop.ref} className="relative">
+      <button ref={pop.triggerRef} type="button" onClick={() => setOpen(v => !v)} onKeyDown={pop.onTriggerKeyDown} aria-haspopup="menu" aria-expanded={open}
         title={aktivni ? `Podnik: ${aktivni.teamName}` : 'Podnik'}
         className={`flex items-center gap-2 rounded-2xl transition ${compact ? 'p-2 justify-center' : 'px-3 py-2 w-full text-left'} hover:bg-black/[0.05] ${open ? 'bg-black/[0.06]' : ''}`}>
         <Icon name="box" size={18} className="shrink-0 text-black/50" />
@@ -136,7 +132,7 @@ export default function PodnikSwitcher({ compact = false, canCreate = false, jen
         )}
       </button>
       {open && (
-        <div ref={panel} role="menu" style={vejdiSe} className="absolute left-0 right-0 top-full mt-1 z-50 glass-strong rounded-2xl p-1.5 shadow-[0_14px_40px_rgba(25,35,15,0.16)] min-w-[220px] pop-in origin-top">
+        <div ref={pop.panelRef} onKeyDown={pop.onPanelKeyDown} role="menu" style={vejdiSe} className="absolute left-0 right-0 top-full mt-1 z-50 glass-strong rounded-2xl p-1.5 shadow-[0_14px_40px_rgba(25,35,15,0.16)] min-w-[220px] pop-in origin-top">
           {data.teams.map(t => (
             <button key={t.teamId} type="button" role="menuitem" disabled={busy} onClick={() => prepni(t.teamId)}
               className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm transition ${

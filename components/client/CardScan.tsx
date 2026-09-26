@@ -3,14 +3,19 @@
 // Kartička u kasy. Obsluha opíše osm znaků nebo naskenuje QR kamerou
 // (kde prohlížeč umí BarcodeDetector), uvidí hosta a jedním klepnutím dá
 // razítko za návštěvu, body za útratu, nebo uplatní kupon, který host má.
+//
+// Kolo 69 (B8): jamka místo karty, úroveň, sleva a kredit jako Chip (dřív
+// ruční pilulky, sleva tmavá s limetkovým textem), účty z pokladny jako
+// filter-pill, kupony jako seznam (dřív limetkové řádky), štítky t-label,
+// chyba `.note note-danger`, „Jiný host" jako tlačítko.
 
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from '../Icons';
-import { Button } from '../ui';
-import { Initials } from './ClientShell';
+import { Button, Chip, Input, ListRow, Well } from '../ui';
 import { useMoney, useSymbol } from '../CurrencyProvider';
+import { czCount, type CzNoun } from '@/lib/czech';
 
-const input = 'field !py-2.5 text-sm';
+const NAVSTEVA: CzNoun = { one: 'návštěva', few: 'návštěvy', many: 'návštěv' };
 const fmt = (raw: string) => { const c = raw.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8); return c.length > 4 ? `${c.slice(0, 4)}-${c.slice(4)}` : c; };
 
 export default function CardScan({ onToast, onChange }: { onToast: (m: string) => void; onChange?: () => void }) {
@@ -61,54 +66,45 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
   const reset = () => { setHit(null); setCode(''); setErr(''); setAmount(''); setBill(null); };
 
   return (
-    <section aria-labelledby="h-scan" className="card p-4 space-y-3">
+    // Jamka, ne karta: kartička se kreslí uvnitř karty (widget Objednávky od
+    // stolu, příjem na tabletu) a karta v kartě se nedělá (DP §3.2).
+    <Well pad="md" as="div" className="space-y-3" aria-labelledby="h-scan" role="group">
       <div className="flex items-center gap-2 flex-wrap">
-        <h2 id="h-scan" className="font-bold tracking-tight flex items-center gap-2"><Icon name="card" size={18} className="text-black/55" />Kartička hosta</h2>
-        {hit && <button type="button" onClick={reset} className="tap-target-sm sm:ml-auto text-xs font-semibold text-black/55 hover:text-black">Jiný host</button>}
+        <h3 id="h-scan" className="t-card flex items-center gap-2"><Icon name="card" size={17} className="text-black/40" />Kartička hosta</h3>
+        {hit && <Button variant="ghost" size="sm" className="sm:ml-auto" onClick={reset}>Jiný host</Button>}
       </div>
       {!hit ? (
         <form onSubmit={e => { e.preventDefault(); lookup(code); }} className="flex gap-2 flex-wrap">
-          <input aria-label="Kód kartičky" value={code} onChange={e => setCode(fmt(e.target.value))} placeholder="ABCD-EFGH" autoCapitalize="characters" autoComplete="off" inputMode="text"
-            className={`${input} font-mono tracking-[0.2em] flex-1 basis-40 uppercase`} />
+          <Input aria-label="Kód kartičky" value={code} onChange={e => setCode(fmt(e.target.value))} placeholder="ABCD-EFGH" autoCapitalize="characters" autoComplete="off" inputMode="text"
+            className="font-mono tracking-[0.2em] flex-1 basis-40 uppercase !w-auto" />
           <Button type="submit" variant="primary" icon="search" loading={busy === 'lookup'}>Najít</Button>
           {canScan && <Button type="button" variant="secondary" icon="camera" onClick={() => setCam(v => !v)}>{cam ? 'Zavřít kameru' : 'Skenovat'}</Button>}
         </form>
       ) : (
         <div className="space-y-3">
-          <div className="flex items-center gap-3">
-            <Initials name={hit.customer.name} size={40} />
-            <div className="min-w-0 flex-1">
-              <p className="font-bold leading-tight truncate">{hit.customer.name}</p>
-              <p className="text-sm text-black/55 tabular-nums">{hit.member
-                ? (hit.campaigns?.length > 0 ? `${hit.points} b. · ${hit.visits} návštěv` : `${hit.points} b. · ${hit.stamps}/${hit.rules?.stampTarget || '–'} razítek · ${hit.visits} návštěv`)
-                : 'Ještě není členem. Prvním razítkem se stane.'}</p>
-            </div>
+          <div className="min-w-0">
+            <p className="text-[15px] font-semibold leading-tight truncate text-[#16181A]">{hit.customer.name}</p>
+            <p className="t-meta tabular-nums mt-0.5">{hit.member
+              ? (hit.campaigns?.length > 0 ? `${hit.points} b. · ${czCount(hit.visits, NAVSTEVA)}` : `${hit.points} b. · ${hit.stamps}/${hit.rules?.stampTarget || '–'} razítek · ${czCount(hit.visits, NAVSTEVA)}`)
+              : 'Ještě není členem. Prvním razítkem se stane.'}</p>
           </div>
           {hit.member && (hit.discount > 0 || hit.credit > 0 || hit.levelLabel !== 'Člen') && (
-            <div className="flex flex-wrap items-center gap-2">
-              {hit.levelLabel && hit.levelLabel !== 'Člen' && (
-                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${hit.tier === 'gold' ? 'bg-[#C8F542]/30 text-[#3E5406]' : 'bg-black/[0.07] text-black/70'}`}>{hit.levelLabel}</span>
-              )}
-              {hit.discount > 0 && (
-                <span className="rounded-full bg-[#16181A] text-[#C8F542] px-3 py-1 text-xs font-bold">Sleva {hit.discount} %</span>
-              )}
-              {hit.credit > 0 && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/20 text-[#3E5406] px-3 py-1 text-xs font-semibold"><Icon name="card" size={12} />Kredit {money(hit.credit)}</span>
-              )}
-              {hit.nextTierAt && (
-                <span className="text-xs text-black/45">do „{hit.nextTierLabel}" ještě {Math.max(0, hit.nextTierAt - hit.visits)} návštěv</span>
-              )}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {hit.levelLabel && hit.levelLabel !== 'Člen' && <Chip tone={hit.tier === 'silver' ? 'muted' : 'ink'} size="sm">{hit.levelLabel}</Chip>}
+              {hit.discount > 0 && <Chip tone="ok" size="sm">Sleva {hit.discount} %</Chip>}
+              {hit.credit > 0 && <Chip tone="ok" size="sm" icon="card">Kredit {money(hit.credit)}</Chip>}
+              {hit.nextTierAt && <span className="t-meta">do „{hit.nextTierLabel}" ještě {czCount(Math.max(0, hit.nextTierAt - hit.visits), NAVSTEVA)}</span>}
             </div>
           )}
           {hit.campaigns?.length > 0 && (
-            <ul className="space-y-1.5">
+            <ul className="list">
               {hit.campaigns.map((cp: any) => (
-                <li key={cp.id} className="well bg-white px-3.5 py-2">
+                <li key={cp.id} className="list-row flex-col items-stretch gap-1.5">
                   <div className="flex items-baseline justify-between gap-3">
                     <p className="text-sm font-semibold min-w-0 truncate">{cp.name}</p>
-                    <p className="text-xs font-semibold tabular-nums text-black/60 shrink-0">{cp.stamps}/{cp.required}</p>
+                    <p className="text-[13px] font-semibold tabular-nums text-black/60 shrink-0">{cp.stamps}/{cp.required}</p>
                   </div>
-                  <div className="flex gap-1 mt-1.5" aria-hidden>
+                  <div className="flex gap-1" aria-hidden>
                     {Array.from({ length: Math.min(cp.required, 12) }).map((_, i) => (
                       <span key={i} className={`h-1.5 flex-1 rounded-full ${i < cp.stamps ? 'bg-[#C8F542]' : 'bg-black/[0.08]'}`} />
                     ))}
@@ -118,24 +114,25 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
             </ul>
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <Button variant="accent" icon="check" loading={busy === 'stamp'}
+            {/* Tmavé, ne limetka: kartička žije uvnitř widgetu a na ploše je limetka jen „Hotovo" v úpravách. */}
+            <Button variant="primary" icon="check" loading={busy === 'stamp'}
               disabled={hit.stampedToday || (!hit.rules?.stampTarget && !hit.campaigns?.some((cp: any) => cp.ruleType === 'visit'))}
               onClick={() => act('stamp')}>
               {hit.stampedToday ? 'Dnes razítko už má' : 'Razítko za návštěvu'}
             </Button>
             <form onSubmit={e => { e.preventDefault(); act('points'); }} className="flex gap-2">
-              <input aria-label={`Útrata v ${symbol}`} type="number" inputMode="numeric" min={0} step={1} value={amount} onChange={e => setAmount(e.target.value)} placeholder={`Útrata ${symbol}`} className={`${input} !w-28 text-center`} />
-              <Button type="submit" variant="primary" loading={busy === 'points'} disabled={!hit.rules?.pointsPer100 || !amount}>Body</Button>
+              <Input aria-label={`Útrata v ${symbol}`} type="number" inputMode="numeric" min={0} step={1} value={amount} onChange={e => setAmount(e.target.value)} placeholder={`Útrata ${symbol}`} className="!w-32 text-center" />
+              <Button type="submit" variant="secondary" loading={busy === 'points'} disabled={!hit.rules?.pointsPer100 || !amount}>Body</Button>
             </form>
           </div>
           {hit.bills?.length > 0 && (
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-black/45 mb-1.5">Dnešní účty z pokladny</p>
+              <p className="t-label mb-1.5">Dnešní účty z pokladny</p>
               <div className="flex flex-wrap gap-1.5">
                 {hit.bills.map((bl: any) => (
                   <button key={bl.bill_id} type="button" aria-pressed={bill === bl.bill_id}
                     onClick={() => { const on = bill === bl.bill_id; setBill(on ? null : bl.bill_id); setAmount(on ? '' : String(Math.round(Number(bl.final_price)))); }}
-                    className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold tabular-nums transition border ${bill === bl.bill_id ? 'bg-[#16181A] text-[#C8F542] border-[#16181A]' : 'bg-black/[0.05] hover:bg-black/[0.09] border-transparent'}`}>
+                    className={`filter-pill tap-target-sm tabular-nums ${bill === bl.bill_id ? 'seg-on' : 'seg-off glass'}`}>
                     {money(Math.round(Number(bl.final_price)))}
                   </button>
                 ))}
@@ -143,36 +140,37 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
               {bill && (
                 <div className="mt-2 flex items-center gap-2 flex-wrap">
                   <Button size="sm" variant="primary" icon="check" loading={busy === 'bill'} onClick={() => act('bill')}>Připsat z účtenky</Button>
-                  <p className="text-xs text-black/50">Razítka podle položek účtu + body a kredit z částky. Jde to jen jednou na účtenku.</p>
+                  <p className="t-meta">Razítka podle položek účtu + body a kredit z částky. Jde to jen jednou na účtenku.</p>
                 </div>
               )}
             </div>
           )}
           {hit.credit > 0 && (
             <form onSubmit={e => { e.preventDefault(); act('credit'); }} className="flex gap-2 items-center">
-              <input aria-label="Kolik kreditu uplatnit" type="number" inputMode="numeric" min={1} max={hit.credit} value={amount} onChange={e => setAmount(e.target.value)} placeholder={`Max ${hit.credit}`} className={`${input} !w-28 text-center`} />
+              <Input aria-label="Kolik kreditu uplatnit" type="number" inputMode="numeric" min={1} max={hit.credit} value={amount} onChange={e => setAmount(e.target.value)} placeholder={`Max ${hit.credit}`} className="!w-32 text-center" />
               <Button type="submit" variant="secondary" icon="card" loading={busy === 'credit'} disabled={!amount}>Uplatnit kredit</Button>
             </form>
           )}
           {(hit.affordable?.length ?? 0) > 0 && (
-            <p className="text-xs text-black/55">Za body teď dosáhne na: {hit.affordable.map((a: any) => `${a.title} (${a.cost_points} b.)`).join(', ')}. Kupon si vezme sám na své stránce.</p>
+            <p className="t-meta">Za body teď dosáhne na: {hit.affordable.map((a: any) => `${a.title} (${a.cost_points} b.)`).join(', ')}. Kupon si vezme sám na své stránce.</p>
           )}
-          {hit.rules?.pointsPer100 > 0 && <p className="text-xs text-black/50">{hit.rules.pointsPer100} b. za každých 100 {symbol}{hit.rules.cashbackPct > 0 ? ` a ${hit.rules.cashbackPct} % zpět jako kredit` : ''}. Razítko nejvýš jedno denně.</p>}
+          {hit.rules?.pointsPer100 > 0 && <p className="t-meta">{hit.rules.pointsPer100} b. za každých 100 {symbol}{hit.rules.cashbackPct > 0 ? ` a ${hit.rules.cashbackPct} % zpět jako kredit` : ''}. Razítko nejvýš jedno denně.</p>}
           {hit.openCoupons?.length > 0 && (
-            <ul className="space-y-1.5">
-              {hit.openCoupons.map((c: any) => (
-                <li key={c.code} className="flex items-center gap-3 rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 px-3.5 py-2">
-                  <span className="text-sm font-medium min-w-0 flex-1 truncate">{c.title} <span className="font-mono text-black/55">{c.code}</span></span>
-                  <Button size="sm" variant="primary" loading={busy === 'redeem:' + c.code} onClick={() => redeem(c.code)}>Uplatnit</Button>
-                </li>
-              ))}
-            </ul>
+            <div>
+              <p className="t-label mb-1">Kupony k uplatnění</p>
+              <ul className="list">
+                {hit.openCoupons.map((c: any) => (
+                  <ListRow key={c.code} title={c.title} meta={<span className="font-mono">{c.code}</span>}
+                    actions={<Button size="sm" variant="secondary" loading={busy === 'redeem:' + c.code} onClick={() => redeem(c.code)}>Uplatnit</Button>} />
+                ))}
+              </ul>
+            </div>
           )}
         </div>
       )}
       {cam && !hit && <Camera onCode={c => { setCam(false); lookup(c); }} onError={m => { setCam(false); setErr(m); }} />}
-      {err && <p role="alert" className="text-sm text-bad-ink">{err}</p>}
-    </section>
+      {err && <p role="alert" className="note note-danger">{err}</p>}
+    </Well>
   );
 }
 

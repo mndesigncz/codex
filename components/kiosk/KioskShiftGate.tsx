@@ -2,11 +2,10 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../Icons';
-import { Avatar, EmptyState, ErrorState, Modal } from '../ui';
+import { Avatar, Button, Card, Chip, EmptyState, ErrorState, ListRow, MenuPanel, Modal, Toast } from '../ui';
+import { usePopover } from '@/lib/usePopover';
 import { parseDbTime, dbTimeHM } from '@/lib/pragueTime';
-import { useModal } from '@/lib/useModal';
 import { nextActiveId, IDLE_MS } from '@/lib/kioskIdentity';
-import { DiscardGuard } from '../ui/DiscardGuard';
 
 export interface RosterMember {
   id: number;
@@ -114,7 +113,9 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
   const [hydrated, setHydrated] = useState(false);
   const [activeId, setActiveId] = useState<number | null>(null);
   const [punching, setPunching] = useState<RosterMember | null>(null);
-  const [flash, setFlash] = useState('');
+  // Hlášení tabletu jde přes sdílený Toast (role=status, dole uprostřed).
+  // `id` odliší dvě stejná hlášení po sobě, jinak by druhé dostalo zbytek času prvního.
+  const [flash, setFlash] = useState<{ text: string; tone: 'ok' | 'bad'; id: number } | null>(null);
   const now = useNow();
   const [loadFailed, setLoadFailed] = useState(false);
   /** Kdy se naposled někdo tabletu dotkl — podle toho se pozná nečinnost. */
@@ -223,9 +224,8 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
     return new Promise<ActivePerson | null>(resolve => setAsking(() => resolve));
   }, []);
 
-  const showFlash = useCallback((msg: string) => {
-    setFlash(msg);
-    setTimeout(() => setFlash(''), 8000);
+  const showFlash = useCallback((text: string, tone: 'ok' | 'bad' = 'ok') => {
+    setFlash({ text, tone, id: Date.now() });
   }, []);
 
   useEffect(() => { activeRef.current = active; }, [active]);
@@ -259,11 +259,10 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
           />
         </Modal>
       )}
-      {flash && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] max-w-[92vw] px-5 py-3.5 rounded-2xl glass-strong border border-[#C8F542]/40 text-[#5B7A08] font-medium text-center shadow-lg">
-          {flash}
-        </div>
-      )}
+      {/* Dřív ručně psaný limetkový proužek nahoře bez role=status — odečítač
+          o zapomenuté uzávěrce ani o přepnuté identitě nic neřekl (DP §3.17).
+          Obě hlášení jsou varování, ne oslava, proto tón „bad" a 8 s na přečtení. */}
+      <Toast message={flash?.text ?? null} tone={flash?.tone} id={flash?.id} ms={8000} onClose={() => setFlash(null)} />
       {punching && (
         <PunchDialog
           member={punching}
@@ -279,8 +278,8 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
               : null;
             if (action === 'in') { setActiveId(member.id); touchedAt.current = Date.now(); }
             reload();
-            if (msg) showFlash(msg);
-            if (switchedFrom) showFlash(`Zapisuje se teď jako ${member.name}, ne ${switchedFrom}. Přepni nahoře u jména, jestli to není tak.`);
+            if (msg) showFlash(msg, 'bad');
+            if (switchedFrom) showFlash(`Zapisuje se teď jako ${member.name}, ne ${switchedFrom}. Přepni nahoře u jména, jestli to není tak.`, 'bad');
           }}
         />
       )}
@@ -311,8 +310,10 @@ function LockScreen() {
   const [picking, setPicking] = useState(false);
 
   return (
-    <div className="flex-1 flex items-start justify-center pt-10 sm:pt-16 pb-10">
-      <div className="glass-card w-full max-w-3xl p-8 sm:p-10 text-center">
+    <div className="flex-1 flex items-start justify-center pt-4 sm:pt-8 pb-6">
+      {/* Nadpisy jsou h2: h1 má obrazovka (hlavička plochy Směna, nebo skrytý
+          nadpis tabletu na ostatních záložkách) — dva h1 by odečítač zmátly. */}
+      <div className="card w-full max-w-3xl p-8 sm:p-10 text-center">
         {/* Když se rozpis nenačetl, nemá smysl nabízet „Jsem na směně" —
             výběr osoby by byl prázdný. Místo něj rovnou chyba a opakování. */}
         {!picking && loadFailed && roster.length === 0 ? (
@@ -326,25 +327,23 @@ function LockScreen() {
             <div className="mx-auto h-20 w-20 rounded-3xl bg-[#16181A] text-[#C8F542] grid place-items-center">
               <Icon name="clock" size={38} />
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#16181A] mt-6">Tablet čeká na směnu</h1>
+            <h2 className="t-page mt-6 text-balance">Tablet čeká na směnu</h2>
             <p className="text-black/50 mt-3 max-w-md mx-auto leading-relaxed">
               Odemkne se, jakmile se někdo přihlásí na směnu. Všechno, co pak na tabletu uděláš,
               se zapíše pod tvoje jméno.
             </p>
-            <button
-              onClick={() => setPicking(true)}
-              className="mt-8 inline-flex items-center gap-2.5 rounded-full bg-[#C8F542] text-black font-semibold px-8 py-4 text-lg hover:brightness-110 active:scale-[0.98] transition"
-            >
-              <Icon name="play" size={20} /> Jsem na směně
-            </button>
+            {/* Jediná akce zamčeného tabletu → jediná limetka (DP §3.1). */}
+            <Button variant="accent" size="lg" icon="play" className="mt-8" onClick={() => setPicking(true)}>
+              Jsem na směně
+            </Button>
             {roster.length === 0 && (
               <EmptyState illustration="tym" title="Zatím tu nikdo není" hint="Zaměstnance přidá vedení v aplikaci v Nastavení týmu — pak se tady odpíchnou." compact />
             )}
           </>
         ) : (
           <>
-            <h1 className="t-page">Kdo přichází na směnu?</h1>
-            <p className="text-black/45 mt-2">Ťukni na sebe a zaznamenej příchod.</p>
+            <h2 className="t-page text-balance">Kdo přichází na směnu?</h2>
+            <p className="t-meta mt-2">Ťukni na sebe a zaznamenej příchod.</p>
             <div className="mt-7">
               <PersonPicker
                 members={roster}
@@ -352,12 +351,9 @@ function LockScreen() {
                 emptyText="Zatím žádní zaměstnanci. Přidej je v aplikaci vedení (Nastavení týmu)."
               />
             </div>
-            <button
-              onClick={() => setPicking(false)}
-              className="mt-7 rounded-full glass border border-black/10 text-[#16181A] px-6 py-3 text-sm font-medium hover:bg-black/[0.05] transition"
-            >
+            <Button variant="secondary" size="lg" className="mt-7" onClick={() => setPicking(false)}>
               Zpět
-            </button>
+            </Button>
           </>
         )}
       </div>
@@ -372,24 +368,28 @@ export function PersonPicker({ members, onPick, emptyText }: {
   emptyText: string;
 }) {
   if (members.length === 0) {
-    return <p className="text-sm text-black/40 py-6">{emptyText}</p>;
+    return <p className="t-meta py-6">{emptyText}</p>;
   }
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3.5">
       {members.map(m => (
+        // Jamka, ne karta: výběr leží v kartě zamykací obrazovky nebo „Kdo teď
+        // pracuje" a karta v kartě se nedělá (DP §3.9). Velká plocha zůstává —
+        // u baru se ťuká na délku paže.
         <button
+          type="button"
           key={m.id}
           onClick={() => onPick(m)}
-          className="glass-card p-5 text-left min-h-[112px] hover:bg-black/[0.03] active:scale-[0.98] transition"
+          className="well p-5 text-left min-h-[112px] hover:bg-black/[0.05] active:scale-[0.98] transition"
         >
           <Avatar emoji={m.avatar} size="xl" ring={false} />
-          <p className="font-bold text-[#16181A] mt-3 truncate">{m.name}</p>
+          <span className="block t-card mt-3 truncate">{m.name}</span>
           {m.openSince ? (
-            <p className="text-sm font-semibold text-[#5B7A08] mt-0.5">Na směně</p>
+            <span className="block text-sm font-semibold text-ok-ink mt-0.5">Na směně</span>
           ) : m.shiftStart ? (
-            <p className="text-sm text-black/45 tabular-nums mt-0.5">Dnes {m.shiftStart}–{m.shiftEnd}</p>
+            <span className="block t-meta tabular-nums mt-0.5">Dnes {m.shiftStart}–{m.shiftEnd}</span>
           ) : (
-            <p className="text-sm text-black/35 mt-0.5">Mimo směnu</p>
+            <span className="block t-meta mt-0.5">Mimo směnu</span>
           )}
         </button>
       ))}
@@ -397,70 +397,57 @@ export function PersonPicker({ members, onPick, emptyText }: {
   );
 }
 
-/** "Kdo teď pracuje" — pick the person whose account the tablet records under. */
+/**
+ * „Kdo teď pracuje" — nástroj plochy Směna: pod koho se práce na tabletu
+ * zapisuje, přepnutí jedním ťuknutím, odchod a další příchod.
+ *
+ * Do kola 68 to byly bílé karty lidí v bílé kartě (DP §1.3). Teď jedna karta
+ * a v ní `.list`: jméno, jak dlouho je kdo na směně, stav vpravo. Kdo se
+ * zapisuje, nese stavový chip, ne limetkový rámeček — limetka na obrazovce
+ * patří jen hlavní akci.
+ */
 export function WhoIsWorking() {
   const { onShift, offShift, activeId, selectPerson, punch } = useKioskShift();
   const [adding, setAdding] = useState(false);
   const now = useNow();
-  const [loadFailed, setLoadFailed] = useState(false);
 
   return (
-    <section className="glass-card p-4 sm:p-5">
+    <Card as="section" aria-labelledby="kiosk-kdo-pracuje">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-black/40">Kdo teď pracuje</h2>
-        <button
-          onClick={() => setAdding(v => !v)}
-          className="tap-target inline-flex items-center gap-1.5 rounded-full glass border border-black/10 text-[#16181A] px-4 py-2 text-sm font-medium hover:bg-black/[0.05] transition"
-        >
-          <Icon name="plus" size={15} /> {adding ? 'Zavřít' : 'Další příchod'}
-        </button>
+        <h2 id="kiosk-kdo-pracuje" className="t-card flex items-center gap-2 min-w-0">
+          <Icon name="clock" size={17} className="shrink-0 text-black/40" />
+          <span className="truncate">Kdo teď pracuje</span>
+        </h2>
+        {/* Na tabletu u baru cíle nejméně 44 px (DESIGN.md, Kiosk) — proto md, ne sm. */}
+        <Button variant="secondary" icon={adding ? 'close' : 'plus'} aria-expanded={adding} onClick={() => setAdding(v => !v)}>
+          {adding ? 'Zavřít' : 'Další příchod'}
+        </Button>
       </div>
 
-      {/* Dva sloupce už od 420 px daly kartě 171 px a jménu 49 — „Eva Testová"
-          se nevešla. Na telefonu je karta jedna na řádek, od 640 px dvě. */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5 mt-3.5">
+      <ul className="list mt-3">
         {onShift.map(m => {
           const isActive = m.id === activeId;
           return (
-            <div key={m.id} className="relative">
-              <button
-                onClick={() => selectPerson(m.id)}
-                className={`w-full text-left rounded-3xl p-3.5 pr-10 sm:p-4 sm:pr-12 min-h-[112px] border transition active:scale-[0.98] ${
-                  isActive
-                    ? 'bg-[#C8F542]/[0.18] border-[#C8F542] ring-2 ring-[#C8F542]/35'
-                    : 'glass-card hover:bg-black/[0.03]'
-                }`}
-              >
-                <div className="flex items-center gap-2.5 sm:gap-3">
-                  <Avatar emoji={m.avatar} size="lg" ring={false} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block font-bold text-[#16181A] truncate">{m.name}</span>
-                    <span className="block text-sm font-semibold text-[#5B7A08] tabular-nums">
-                      {elapsed(m.openSince!, now)}
-                    </span>
-                  </span>
-                </div>
-                <span className={`mt-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                  isActive ? 'bg-[#16181A] text-[#C8F542]' : 'bg-black/[0.05] text-black/45'
-                }`}>
-                  {isActive ? <><Icon name="check" size={12} /> Zapisuje se</> : 'Přepnout'}
-                </span>
-              </button>
-              <button
-                onClick={() => punch(m)}
-                title={`Odchod – ${m.name}`}
-                className="tap-target absolute top-3 right-3 h-9 w-9 grid place-items-center rounded-full bg-white/70 border border-black/10 text-black/40 hover:text-bad-ink hover:border-bad/30 transition"
-              >
-                <Icon name="logout" size={16} />
-              </button>
-            </div>
+            <ListRow
+              key={m.id}
+              lead={<Avatar emoji={m.avatar} size="md" ring={false} />}
+              title={m.name}
+              meta={<span className="tabular-nums">Na směně {elapsed(m.openSince!, now)}</span>}
+              right={isActive
+                ? <Chip tone="ok" icon="check">Zapisuje se</Chip>
+                : <Button variant="secondary" onClick={() => selectPerson(m.id)} aria-label={`Zapisovat jako ${m.name}`}>Přepnout</Button>}
+              actions={
+                <Button variant="ghost" iconOnly icon="logout" title={`Odchod – ${m.name}`}
+                  aria-label={`Odchod – ${m.name}`} onClick={() => punch(m)} />
+              }
+            />
           );
         })}
-      </div>
+      </ul>
 
       {adding && (
-        <div className="mt-5 pt-5 border-t border-black/[0.06]">
-          <p className="text-sm text-black/45 mb-3">Kdo dále nastupuje na směnu?</p>
+        <div className="mt-4 pt-4 border-t border-black/[0.06]">
+          <p className="t-meta mb-3">Kdo dále nastupuje na směnu?</p>
           <PersonPicker
             members={offShift}
             onPick={m => { setAdding(false); punch(m); }}
@@ -468,7 +455,7 @@ export function WhoIsWorking() {
           />
         </div>
       )}
-    </section>
+    </Card>
   );
 }
 
@@ -487,7 +474,7 @@ export function ActivePersonChip() {
         className="flex items-center gap-2.5 rounded-full glass border border-wait/50 bg-wait/[0.14] pl-3.5 pr-4 py-2 min-h-[44px] hover:bg-wait/20 transition">
         <Icon name="warning" size={17} className="text-wait-ink shrink-0" />
         <span className="text-left leading-tight">
-          <span className="hidden sm:block text-[11px] font-semibold uppercase tracking-[0.12em] text-black/45">Zapisuje se jako</span>
+          <span className="hidden sm:block t-label">Zapisuje se jako</span>
           <span className="block font-bold text-[#16181A] text-sm">Kdo jsi?</span>
         </span>
       </button>
@@ -495,42 +482,65 @@ export function ActivePersonChip() {
   }
   const canSwitch = onShift.length > 1;
 
+  return <PrepinacOsoby active={active} onShift={onShift} canSwitch={canSwitch} selectPerson={selectPerson} />;
+}
+
+/**
+ * Čip „Zapisuje se jako" s nabídkou lidí na směně. Dřív vlastní div s neviditelnou
+ * vrstvou přes obrazovku: Escape ho nezavřel, šipky nechodily a fokus se po
+ * zavření ztratil (DP §3.9). Teď sdílený MenuPanel s usePopover — stejné
+ * chování jako menu „···". Vybraný člověk nese fajfku a aria-checked, ne
+ * limetkový podklad (limetka na obrazovce patří jen hlavní akci).
+ */
+function PrepinacOsoby({ active, onShift, canSwitch, selectPerson }: {
+  active: ActivePerson; onShift: RosterMember[]; canSwitch: boolean; selectPerson: (id: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const pop = usePopover(open, setOpen, { focusFirst: true, arrowKeys: true });
+
   return (
-    <div className="relative">
+    <div ref={pop.ref} className="relative">
       <button
+        type="button"
+        ref={pop.triggerRef}
         onClick={() => canSwitch && setOpen(v => !v)}
-        className={`flex items-center gap-2.5 rounded-full glass border border-[#C8F542]/45 bg-[#C8F542]/[0.14] pl-2.5 pr-4 py-2 transition ${
+        onKeyDown={canSwitch ? pop.onTriggerKeyDown : undefined}
+        aria-haspopup={canSwitch ? 'menu' : undefined}
+        aria-expanded={canSwitch ? open : undefined}
+        className={`flex items-center gap-2.5 rounded-full glass border border-[#C8F542]/45 bg-[#C8F542]/[0.14] pl-2.5 pr-4 py-2 min-h-[44px] transition ${
           canSwitch ? 'hover:bg-[#C8F542]/20' : 'cursor-default'
         }`}
       >
         <Avatar emoji={active.avatar} size="sm" ring={false} />
         <span className="text-left leading-tight min-w-0">
           {/* Na telefonu popisek ustoupí jménu — 49 px na „Eva Testová" nestačilo. */}
-          <span className="hidden sm:block text-[11px] font-semibold uppercase tracking-[0.12em] text-black/45">Zapisuje se jako</span>
+          <span className="hidden sm:block t-label">Zapisuje se jako</span>
           <span className="block font-bold text-[#16181A] text-sm truncate max-w-[7rem] sm:max-w-[11rem]">{active.name}</span>
         </span>
         {canSwitch && <Icon name="chevron" size={15} className="text-black/35" />}
       </button>
 
       {open && canSwitch && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-64 rounded-2xl glass-strong border border-black/10 p-1.5 shadow-xl">
-            {onShift.map(m => (
+        <MenuPanel ref={pop.panelRef} onKeyDown={pop.onPanelKeyDown} aria-label="Zapisovat jako"
+          className="absolute right-0 top-full mt-2 w-64 origin-top-right">
+          {onShift.map(m => {
+            const vybrany = m.id === active.id;
+            return (
               <button
+                type="button"
                 key={m.id}
-                onClick={() => { selectPerson(m.id); setOpen(false); }}
-                className={`w-full flex items-center gap-3 rounded-xl px-3 py-3 min-h-[52px] text-left transition ${
-                  m.id === active.id ? 'bg-[#C8F542]/20' : 'hover:bg-black/[0.05]'
-                }`}
+                role="menuitemradio"
+                aria-checked={vybrany}
+                onClick={() => { selectPerson(m.id); pop.close(); }}
+                className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 min-h-[52px] text-left transition-colors hover:bg-black/[0.05]"
               >
                 <Avatar emoji={m.avatar} size="md" ring={false} />
-                <span className="font-semibold text-[#16181A] truncate flex-1">{m.name}</span>
-                {m.id === active.id && <Icon name="check" size={16} className="text-[#5B7A08]" />}
+                <span className={`text-[#16181A] truncate flex-1 ${vybrany ? 'font-bold' : 'font-medium'}`}>{m.name}</span>
+                {vybrany && <Icon name="check" size={16} className="shrink-0 text-[#16181A]" />}
               </button>
-            ))}
-          </div>
-        </>
+            );
+          })}
+        </MenuPanel>
       )}
     </div>
   );
@@ -542,7 +552,6 @@ export function PunchDialog({ member, now, onClose, onDone }: {
   onClose: () => void;
   onDone: (action: 'in' | 'out', member: RosterMember, flashMsg?: string) => void;
 }) {
-  const m = useModal(true, onClose, 'Příchod a odchod');
   const on = !!member.openSince;
   const needPin = member.hasPin && !on; // PIN only required to clock in
   const [pin, setPin] = useState('');
@@ -559,7 +568,7 @@ export function PunchDialog({ member, now, onClose, onDone }: {
       const d = await res.json();
       if (res.ok) {
         if (d.action === 'out' && d.closingDone === false) {
-          onDone('out', member, `${member.name}: odchod zaznamenán ✓ — nezapomeň vyplnit uzávěrku směny!`);
+          onDone('out', member, `${member.name}: odchod zaznamenán — nezapomeň vyplnit uzávěrku směny!`);
         } else {
           onDone(on ? 'out' : 'in', member);
         }
@@ -571,53 +580,56 @@ export function PunchDialog({ member, now, onClose, onDone }: {
     setBusy(false);
   };
 
+  // Sdílené okno místo ručně psaného překryvu (zákaz č. 23): Escape, past
+  // fokusu, vyjetí zdola na telefonu a DiscardGuard má Modal sám.
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center modal-overlay p-4" onClick={onClose}>
-      <div ref={m.ref} {...m.dialogProps} className="modal-sheet rounded-3xl w-full max-w-sm p-6 text-center max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
-        <DiscardGuard guard={m.guard} />
+    <Modal open onClose={onClose} size="sm" title={member.name}
+      subtitle={on
+        ? `Na směně od ${timeOf(member.openSince!)} · ${elapsed(member.openSince!, now)}`
+        : 'Zaznamenej příchod na směnu'}
+      footer={<>
+        {/* Potvrzení v okně je `primary` (DP §3.1: limetka patří obrazovce,
+            ne modálu), odchod `danger-solid` — ukončuje směnu. */}
+        <Button variant="secondary" size="lg" className="flex-1" onClick={onClose}>Zpět</Button>
+        <Button variant={on ? 'danger-solid' : 'primary'} size="lg" className="flex-1" loading={busy}
+          disabled={needPin && pin.length < 4} onClick={submit}>
+          {on ? 'Odpíchnout odchod' : 'Odpíchnout příchod'}
+        </Button>
+      </>}>
+      <div className="text-center">
         <Avatar emoji={member.avatar} size="xl" ring={false} />
-        <h2 className="t-section mt-2">{member.name}</h2>
-        <p className="text-sm text-black/50 mt-1">
-          {on
-            ? `Na směně od ${timeOf(member.openSince!)} · ${elapsed(member.openSince!, now)}`
-            : 'Zaznamenej příchod na směnu'}
-        </p>
         {!on && member.shiftStart && (
-          <p className="tap-target-sm mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-[#0A84FF]/10 text-[#0A5CC0] px-3 py-1 text-xs font-medium tabular-nums">
-            <Icon name="calendar" size={13} /> Dnes máš směnu {member.shiftStart}–{member.shiftEnd}
+          <p className="mt-2">
+            <Chip tone="info" icon="calendar" className="tabular-nums">Dnes máš směnu {member.shiftStart}–{member.shiftEnd}</Chip>
           </p>
         )}
 
         {needPin && (
           <div className="mt-5">
-            <div className="flex justify-center gap-2 mb-3">
+            {/* Tečky nesou délku PINu i pro odečítač (role=img s popisem). */}
+            <div className="flex justify-center gap-2 mb-3" role="img" aria-label={`Zadáno číslic: ${pin.length}`}>
               {[0, 1, 2, 3].map(i => (
                 <span key={i} className={`h-3.5 w-3.5 rounded-full ${i < pin.length ? 'bg-[#C8F542] ring-1 ring-black/15' : 'bg-black/15'}`} />
               ))}
             </div>
+            {/* Klávesy jsou sdílená tlačítka (zákaz č. 1), číslice 18 px z řady (T13).
+                Smazání je ikona s popiskem, ne znak backspace, který odečítač přečte jako nesmysl. */}
             <div className="grid grid-cols-3 gap-2 max-w-[240px] mx-auto">
-              {['1','2','3','4','5','6','7','8','9','','0','⌫'].map((k, i) => k === '' ? <span key={i} /> : (
-                <button key={i} onClick={() => k === '⌫' ? setPin(p => p.slice(0, -1)) : setPin(p => (p.length < 6 ? p + k : p))}
-                  className="h-14 rounded-2xl glass border border-black/10 text-xl font-semibold text-[#16181A] hover:bg-black/[0.05] active:scale-95 transition">
-                  {k}
-                </button>
+              {['1','2','3','4','5','6','7','8','9'].map(k => (
+                <Button key={k} variant="secondary" size="lg" className="text-lg tabular-nums"
+                  onClick={() => setPin(p => (p.length < 6 ? p + k : p))}>{k}</Button>
               ))}
+              <span />
+              <Button variant="secondary" size="lg" className="text-lg tabular-nums"
+                onClick={() => setPin(p => (p.length < 6 ? p + '0' : p))}>0</Button>
+              <Button variant="secondary" size="lg" iconOnly icon="undo" aria-label="Smazat číslici" title="Smazat číslici"
+                className="w-full" disabled={pin.length === 0} onClick={() => setPin(p => p.slice(0, -1))} />
             </div>
           </div>
         )}
 
-        {err && <p className="text-sm text-bad-ink mt-4">{err}</p>}
-
-        <div className="mt-6 flex gap-2">
-          <button onClick={onClose} className="flex-1 rounded-full bg-black/[0.05] border border-black/10 text-[#16181A] px-4 py-3.5 font-medium hover:bg-black/[0.08] transition">
-            Zpět
-          </button>
-          <button onClick={submit} disabled={busy || (needPin && pin.length < 4)}
-            className={`flex-1 rounded-full px-4 py-3.5 font-semibold text-white transition disabled:opacity-50 ${on ? 'bg-bad hover:brightness-110' : 'bg-[#16181A] hover:bg-black'}`}>
-            {busy ? '…' : on ? 'Odpíchnout odchod' : 'Odpíchnout příchod'}
-          </button>
-        </div>
+        {err && <p role="alert" className="text-sm text-bad-ink mt-4">{err}</p>}
       </div>
-    </div>
+    </Modal>
   );
 }

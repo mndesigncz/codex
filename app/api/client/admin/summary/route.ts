@@ -1,5 +1,11 @@
 // Čísla pro přehled režimu Client a odznak v hlavičce.
+//
+// Kolo 69 (B8, nález N13): vstup do Clientu (klient.prehled) neznamená, že
+// divák smí vidět rezervace, objednávky nebo hodnocení. Každá část odpovědi
+// jde jen s vlastním klíčem, jinak je `null` (souhrnPodleOpravneni) — widget
+// „Hosté a věrnost" i „Čeká na tebe" to hlídaly jen v UI, API to posílalo všem.
 import { NextResponse } from 'next/server';
+import { souhrnPodleOpravneni } from '@/lib/klientPrehled';
 import { sql, ensureProfile } from '@/lib/client';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { pragueToday } from '@/lib/pragueTime';
@@ -25,7 +31,7 @@ export async function GET() {
     sql`SELECT COUNT(*)::int AS count, ROUND(AVG(rating)::numeric, 1)::float AS avg, COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days')::int AS new7, COUNT(*) FILTER (WHERE rating <= 2 AND created_at >= NOW() - INTERVAL '7 days')::int AS low7 FROM client_reviews WHERE team_id = ${u.team_id}`.catch(() => [{ count: 0, avg: null, new7: 0, low7: 0 }]),
     getConnection(u.team_id).catch(() => null),
   ]) as any[];
-  return NextResponse.json({
+  return NextResponse.json(souhrnPodleOpravneni({
     enabled: !!p.enabled, slug: p.slug,
     reservations: { requested: Number(res?.requested) || 0, today: Number(res?.today) || 0 },
     orders: { new: Number(ord?.new) || 0, today: Number(ord?.today) || 0 },
@@ -47,5 +53,5 @@ export async function GET() {
       stampTarget: Number(p.stamp_target) || 0,
       stampReward: p.stamp_reward ?? '',
     },
-  });
+  }, k => ctx.role.opravneni.has(k)));
 }
