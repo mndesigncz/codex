@@ -78,11 +78,15 @@ tvrdi('karta ukazuje body za dnešek s rozpisem',
 const p2 = await mk(b, 'employee');
 await p2.goto('http://localhost:3000/employee/shifts?view=tasks', { waitUntil: 'networkidle' });
 await p2.waitForTimeout(1200);
-const tick = p2.getByRole('button', { name: /Označit jako hotové — Vyrobit Domácí limonáda/ }).first();
+// Kolo 69 (B6a): zaškrtávátko úkolu je role="checkbox" pojmenované názvem úkolu
+// a „Tohle není dnešní úkol" je okno místo confirm().
+const tick = p2.getByRole('checkbox', { name: /Vyrobit Domácí limonáda/ }).first();
 tvrdi('výrobní úkol je v seznamu', await tick.count() > 0, 'tlačítko odškrtnutí nenalezeno');
 if (await tick.count() > 0) {
-  p2.once('dialog', d => d.accept());
   await tick.click();
+  const mimoDen = p2.getByRole('dialog', { name: 'Tohle není dnešní úkol' });
+  await mimoDen.waitFor({ timeout: 800 }).catch(() => {});
+  if (await mimoDen.isVisible().catch(() => false)) await mimoDen.getByRole('button', { name: 'Splnit teď' }).click();
   const toast = p2.getByRole('status').filter({ hasText: /\+5 bodů/ }).first();
   await toast.waitFor({ timeout: 4000 }).catch(() => {});
   tvrdi('po odškrtnutí naskočí „+5 bodů za splněný úkol"', await toast.count() > 0, 'toast se neukázal');

@@ -1,0 +1,54 @@
+{
+ "isEmployer": true,
+ "meId": 15,
+ "suggestions": [
+  {
+   "id": 11,
+   "title": "Druhý mlýnek na kávu",
+   "content": "Ráno se na něj čeká.",
+   "status": "new",
+   "authorId": 16,
+   "authorName": "Eva Testová",
+   "authorAvatar": "🙂",
+   "createdAt": "2026-09-20T10:00:00.000Z",
+   "votes": 4,
+   "hasVoted": false
+  },
+  {
+   "id": 12,
+   "title": "Ovesné mléko",
+   "content": null,
+   "status": "planned",
+   "authorId": 21,
+   "authorName": "Petr Novák",
+   "authorAvatar": null,
+   "createdAt": "2026-09-10T10:00:00.000Z",
+   "votes": 9,
+   "hasVoted": true
+  },
+  {
+   "id": 13,
+   "title": "Nové zástěry",
+   "content": null,
+   "status": "new",
+   "authorId": 15,
+   "authorName": "Martin Nemeškal",
+   "authorAvatar": "🧑",
+   "createdAt": "2026-09-22T10:00:00.000Z",
+   "votes": 1,
+   "hasVoted": false
+  },
+  {
+   "id": 14,
+   "title": "Brunch v neděli",
+   "content": null,
+   "status": "declined",
+   "authorId": 21,
+   "authorName": "Petr Novák",
+   "authorAvatar": null,
+   "createdAt": "2026-09-01T10:00:00.000Z",
+   "votes": 12,
+   "hasVoted": false
+  }
+ ]
+}

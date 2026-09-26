@@ -1,0 +1,35 @@
+{
+ "stranka": "vedeni.navody",
+ "polozky": [
+  {
+   "id": "navody-navrhy",
+   "widget": "navody.navrhy",
+   "velikost": "M"
+  },
+  {
+   "id": "navody-kdo-necetl",
+   "widget": "navody.kdo_necetl",
+   "velikost": "M"
+  },
+  {
+   "id": "nastroj",
+   "widget": "nastroj",
+   "velikost": "L"
+  }
+ ],
+ "dostupne": [
+  "navody.povinne_cteni",
+  "navody.kdo_necetl",
+  "navody.nove",
+  "navody.navrhy",
+  "navody.k_uzaverce",
+  "odkaz"
+ ],
+ "tarifem": [],
+ "zdroj": "podnik",
+ "rozsah": "typ:vedeni",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": true,
+ "verze": 0
+}

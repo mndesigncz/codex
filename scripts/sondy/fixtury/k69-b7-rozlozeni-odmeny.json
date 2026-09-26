@@ -1,0 +1,47 @@
+{
+ "stranka": "vedeni.odmeny",
+ "polozky": [
+  {
+   "id": "odmeny-zadosti",
+   "widget": "odmeny.zadosti",
+   "velikost": "M"
+  },
+  {
+   "id": "hodnoceni-nehodnocene",
+   "widget": "hodnoceni.nehodnocene",
+   "velikost": "S"
+  },
+  {
+   "id": "odmeny-vytky",
+   "widget": "odmeny.vytky_tymu",
+   "velikost": "S"
+  },
+  {
+   "id": "nastroj",
+   "widget": "nastroj",
+   "velikost": "L"
+  }
+ ],
+ "dostupne": [
+  "odmeny.zadosti",
+  "hodnoceni.nehodnocene",
+  "hodnoceni.ohodnotit_smeny",
+  "odmeny.vytky_tymu",
+  "odmeny.zebricek",
+  "odmeny.katalog",
+  "odmeny.urovne",
+  "moje.uroven",
+  "moje.zpetna_vazba",
+  "moje.hodnoceni_smen",
+  "moje.odkud_body",
+  "moje.tento_mesic",
+  "odkaz"
+ ],
+ "tarifem": [],
+ "zdroj": "podnik",
+ "rozsah": "typ:vedeni",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": true,
+ "verze": 0
+}

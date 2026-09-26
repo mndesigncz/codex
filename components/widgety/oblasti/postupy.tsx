@@ -21,7 +21,7 @@
 //    NÁZVU postupu, takže přejmenovaný postup vypadal jako neudělaný. Teď podle ID.
 //  - Přeskočené kroky, Připomínky dnes a Spustit postup jsou nové z dat, která API už vracelo.
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import { Avatar, Button, Chip, ListRow, Stat, runBulk } from '../../ui';
 import { Icon } from '../../Icons';
 import type { KomponentaWidgetu, Navigace, WidgetProps } from '@/lib/widgety/typy';
@@ -60,6 +60,13 @@ function useBrana(vse: readonly string[], nektere: readonly string[] = []): { ok
 
 /** „Ještě nevíme, jestli smí": kostra a žádný dotaz. */
 const CEKA: StavNacteni = { data: null, error: null, loading: true, reload: () => {} };
+
+// Klikací řádek v `.list` musí být vlastní <li> s ListRow as="div": ListRow s onClick se jinak
+// obalí <li className="contents"> a na prvku s display:contents pravidlo `.list > * + *`
+// linku nenakreslí — řádky splynou (DP §3.6). Neklikací řádek zůstává obyčejným ListRow.
+function Radek({ onClick, ...p }: ComponentProps<typeof ListRow>) {
+  return onClick ? <li><ListRow as="div" {...p} onClick={onClick} /></li> : <ListRow {...p} />;
+}
 
 const NAVRH: CzNoun = { one: 'návrh', few: 'návrhy', many: 'návrhů' };
 const KROK: CzNoun = { one: 'krok', few: 'kroky', many: 'kroků' };
@@ -172,7 +179,7 @@ function PovinneDnes({ velikost, nahled }: WidgetProps) {
               const bezi = active?.procedureId === p.id;
               const klik = smiSpustit && !p.hotovo && !bezi ? () => spust(p.id) : undefined;
               return (
-                <ListRow key={p.id}
+                <Radek key={p.id}
                   lead={<Jamka ikona={p.ikona} />}
                   title={p.nazev}
                   meta={p.hotovo ? (p.kdo ? `Dokončil(a) ${p.kdo}` : 'Dnes dokončeno') : klik ? 'Klepnutím spustíš' : undefined}
@@ -224,7 +231,7 @@ function PosledniPrubehy({ velikost, nastaveni, nahled }: WidgetProps<{ pocet?: 
         {radky.map(r => {
           const detailOk = !nahled && r.hotovo;
           return (
-            <ListRow key={r.id}
+            <Radek key={r.id}
               lead={tym ? <Avatar emoji={r.avatar} size="sm" /> : <Jamka ikona="clipboard" />}
               title={r.nazev}
               meta={[tym ? r.kdo : null, r.hotovo ? kdyPrubehu(r.kdy) : 'probíhá'].filter(Boolean).join(' · ')}
@@ -373,7 +380,7 @@ function NavrhyPostupu({ velikost, nahled }: WidgetProps) {
           {chyba && <p className="note note-danger text-sm" role="alert">{chyba}</p>}
           <ul className="list">
             {navrhy.slice(0, 5).map(p => (
-              <ListRow key={p.id}
+              <Radek key={p.id}
                 lead={<Jamka ikona={p.icon || 'clipboard'} />}
                 title={p.name}
                 meta={czCount(parseSteps(p.items).length, KROK)}

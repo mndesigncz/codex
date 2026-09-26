@@ -12,7 +12,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
-const BASELINE = 16; // kolo 69 (B3): Sklad — položka, hlášení, hromadná úprava, nákup, kategorie, dodavatelé, inventura, K výrobě → <Modal>; B1: Rozvrh — den, dostupnost, kopie týdne, import → <Modal> (−4); B2: profil člena a odebrání člena → <Modal> (−2)
+const BASELINE = 8; // kolo 69 (B3): Sklad — položka, hlášení, hromadná úprava, nákup, kategorie, dodavatelé, inventura, K výrobě → <Modal>; B1: Rozvrh — den, dostupnost, kopie týdne, import → <Modal> (−4); B2: profil člena a odebrání člena → <Modal> (−2); B6a: Nový podnět → <Modal> (−1) a souběžně B6b (návody a postupy); B6b: postupy (smazání, detail, průběh, editor) a návody (čtečka, editor, kategorie) → <Modal> (−7; zbytek do 8 je souběžný B6a)
 
 const hits = [];
 const walk = (dir) => {

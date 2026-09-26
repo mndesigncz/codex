@@ -3,6 +3,8 @@
 // Komponenty jsou v components/widgety/oblasti/ukoly.tsx, výpočty v lib/ukolyPrehled.ts.
 // Soubor patří balíku B6a. Kolo 69: všech pět widgetů hotových. Ikony se liší, ať jde widgety
 // v galerii i na ploše rozeznat podle ikony, ne jen podle titulku (dřív všech pět „check").
+// Po termínu má `fire` (hoří): ve výchozím Přehledu vedení je vedle Moje píchačky (`clock`),
+// Úkolů na dnes (`check`) a Čeká na tebe (`inbox`) a ikona se tam nesmí opakovat (AK-19).
 import type { DefiniceWidgetu } from '../typy.ts';
 
 export const WIDGETY: DefiniceWidgetu[] = [
@@ -42,7 +44,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     oblast: 'ukoly',
     nazev: 'Úkoly po termínu',
     popis: 'Nedokončené úkoly po termínu — kolik a čí.',
-    ikona: 'clock',
+    ikona: 'fire',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'S',
     rozhrani: ['vedeni', 'zamestnanec', 'kiosk'],

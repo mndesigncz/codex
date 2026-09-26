@@ -38,7 +38,6 @@ import { useOtevreniNavodu } from '@/lib/otevriNavod';
 import KopieZPodniku, { useJinePodniky } from '../organizace/KopieZPodniku';
 import { PlochaWidgetu, type HlavickaPlochy } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
-import { useSmi } from '../widgety/NavigaceKontext';
 import { useOpravneni } from '../role/useOpravneni';
 import {
   URL_POSTUPY, URL_PRUBEHY, UDALOST_OTEVRIT_POSTUP, vyberPostupy, vyberPrubehy, posledniDokonceni, popisPripominky,
@@ -104,11 +103,12 @@ function Jamka({ ikona }: { ikona: string }) {
 
 export default function Procedures({ user }: Props) {
   const pathname = usePathname() ?? '';
-  const { role } = useOpravneni();
+  // Nástroj stránky (ne widget) bere mírné `ma()`: bez načtených oprávnění ukáže akce
+  // a rozhodne server (jako ostatní obrazovky); přísné useSmi je pro widgety (spec §1.5).
+  const { role, ma: smi } = useOpravneni();
   // Tablet nemá plochu (kiosk.smena je jiná stránka, balík B9) — nástroj s vlastní hlavičkou.
   const tablet = pathname.startsWith('/kiosk') || role?.typ === 'kiosk';
   const stranka = pathname.startsWith('/employer') ? 'vedeni.postupy' : 'zamestnanec.postupy';
-  const smi = useSmi();
   const smiVytvorit = smi('postupy.vytvorit');
   const smiNavrhnout = smi('postupy.navrhnout');
   const smiUpravit = smi('postupy.upravit');
@@ -131,6 +131,10 @@ export default function Procedures({ user }: Props) {
   const [confirmDel, setConfirmDel] = useState<Procedure | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [chyba, setChyba] = useState('');
+  // Potvrzení odeslaného návrhu. GET /api/procedures vrací neschválené postupy jen schvalovateli,
+  // takže autorovi návrh po obnovení ze seznamu zmizí — bez hlášky nevěděl, jestli odešel,
+  // a posílal ho znovu (duplicity).
+  const [odeslano, setOdeslano] = useState('');
   // Kopie z jiného podniku organizace — jen s právem zakládat a jen když takový podnik existuje.
   const [kopieOpen, setKopieOpen] = useState(false);
   const { jine: jinePodniky, cil: nazevPodniku } = useJinePodniky(smiVytvorit);
@@ -194,7 +198,7 @@ export default function Procedures({ user }: Props) {
     }
   };
 
-  const openNew = () => { setEditing(null); setEditorOpen(true); };
+  const openNew = () => { setEditing(null); setOdeslano(''); setEditorOpen(true); };
   const openEdit = (p: Procedure) => { setEditing(p); setEditorOpen(true); };
   const spust = (p: Procedure) => { if (!starting) void startRun(p as any); };
 
@@ -264,16 +268,20 @@ export default function Procedures({ user }: Props) {
               ...(smiMazat ? [{ label: 'Smazat', icon: 'trash', danger: true, onClick: () => setConfirmDel(p) }] : []),
             ];
             return (
-              <ListRow key={p.id}
+              <ListRow key={p.id} className="relative"
                 lead={<Jamka ikona={p.icon} />}
                 // Řádek má vlastní tlačítka (Spustit, „···"), takže celý klikací být nemůže
                 // (tlačítko v tlačítku) — detail otevře název.
-                title={<button type="button" onClick={() => setDetailId(p.id)} className="block max-w-full truncate text-left hover:underline underline-offset-2 focus-visible:outline-none focus-visible:underline">{p.name}</button>}
+                // Cíl je celý řádek: ::after tlačítka se roztáhne přes <li className="relative">
+                // (samotný text měřil na telefonu ~20 px; tap-target i -my ořízne `truncate` obalu).
+                // Akce leží nad ním, protože jsou pozicované a v DOM později (Menu je relative,
+                // Spustit dostal `relative`). Fokus = limetkový prstenec řádku jako u Button.
+                title={<button type="button" onClick={() => setDetailId(p.id)} className="block max-w-full truncate text-left hover:underline underline-offset-2 focus-visible:outline-none after:absolute after:inset-0 after:rounded-[var(--r-md)] after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[#C8F542]">{p.name}</button>}
                 meta={meta}
                 right={navrh ? <Chip tone="wait" size="sm">Čeká na schválení</Chip> : running ? <Chip tone="info" size="sm">Probíhá</Chip> : undefined}
                 actions={<>
                   {smiSpoustet && !navrh && !running && (
-                    <Button variant="secondary" size="sm" icon="play" disabled={starting} onClick={() => spust(p)}>Spustit</Button>
+                    <Button variant="secondary" size="sm" icon="play" className="relative" disabled={starting} onClick={() => spust(p)}>Spustit</Button>
                   )}
                   <Menu size="sm" label={`Další akce s postupem ${p.name}`} items={polozky} />
                 </>} />
@@ -322,13 +330,19 @@ export default function Procedures({ user }: Props) {
           navrh={!smiVytvorit && !editing}
           onClose={() => setEditorOpen(false)}
           onSaved={(saved) => {
+            setEditorOpen(false);
+            // Návrh, který autor sám neuvidí: do seznamu ho nepřidávat (reload ho hned zase
+            // vyhodí, řádek jen blikne) a místo toho potvrdit odeslání.
+            if (saved.approved === false && !smiSchvalovat) {
+              setOdeslano(saved.name);
+              return;
+            }
             data.set(prev => {
               if (!prev) return prev as any;
               const exists = prev.postupy.some(p => p.id === saved.id);
               return { ...prev, postupy: exists ? prev.postupy.map(p => (p.id === saved.id ? saved : p)) : [...prev.postupy, saved] };
             });
             reload();
-            setEditorOpen(false);
           }}
         />
       )}
@@ -338,6 +352,7 @@ export default function Procedures({ user }: Props) {
   const telo = (
     <div className="space-y-3">
       {chyba && <p className="note note-danger" role="alert">{chyba}</p>}
+      {odeslano && <p className="note note-ok text-pretty" role="status">Návrh „{odeslano}" odeslán — schválí ho vedení.</p>}
       {nastroj}
     </div>
   );

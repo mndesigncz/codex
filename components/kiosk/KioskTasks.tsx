@@ -28,7 +28,7 @@ import { vyberUkoly, rozdelPoDnech, type Ukol } from '@/lib/ukolyPrehled';
 type Filter = 'all' | 'mine' | 'open' | 'done';
 
 const BOD: CzNoun = { one: 'bod', few: 'body', many: 'bodů' };
-const prioDot = (p: string) => p === 'high' ? 'bg-bad' : p === 'medium' ? 'bg-wait' : 'bg-black/20';
+const prioDot = (p: string) => p === 'high' ? 'bg-bad' : p === 'medium' ? 'bg-wait' : 'bg-[#C8F542]';
 const denKratce = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' });
 const JSON_HLAVICKA = { 'Content-Type': 'application/json' };
 
@@ -134,7 +134,7 @@ export default function KioskTasks({ onOpenGuide }: { onOpenGuide?: (id: number)
             </Button>
           )}
           {!isDone && t.checklist.length > 0 && (
-            <TaskChecklist items={t.checklist} onToggle={i => void toggleChecklistItem(t, i)} />
+            <TaskChecklist velky items={t.checklist} onToggle={i => void toggleChecklistItem(t, i)} />
           )}
         </div>
       </li>

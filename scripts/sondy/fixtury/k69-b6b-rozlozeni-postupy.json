@@ -1,0 +1,41 @@
+{
+ "stranka": "vedeni.postupy",
+ "polozky": [
+  {
+   "id": "postupy-povinne-dnes",
+   "widget": "postupy.povinne_dnes",
+   "velikost": "M"
+  },
+  {
+   "id": "postupy-navrhy",
+   "widget": "postupy.navrhy",
+   "velikost": "M"
+  },
+  {
+   "id": "nastroj",
+   "widget": "nastroj",
+   "velikost": "L"
+  },
+  {
+   "id": "postupy-posledni-prubehy",
+   "widget": "postupy.posledni_prubehy",
+   "velikost": "L"
+  }
+ ],
+ "dostupne": [
+  "postupy.povinne_dnes",
+  "postupy.navrhy",
+  "postupy.posledni_prubehy",
+  "postupy.preskocene_kroky",
+  "postupy.pripominky",
+  "postupy.spustit",
+  "odkaz"
+ ],
+ "tarifem": [],
+ "zdroj": "podnik",
+ "rozsah": "typ:vedeni",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": true,
+ "verze": 0
+}

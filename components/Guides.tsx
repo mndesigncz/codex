@@ -43,7 +43,6 @@ import { obsahujeNekde } from '@/lib/hledani';
 import KopieZPodniku, { useJinePodniky } from './organizace/KopieZPodniku';
 import { PlochaWidgetu, type HlavickaPlochy } from './widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from './widgety/useDataWidgetu';
-import { useSmi } from './widgety/NavigaceKontext';
 import { useOpravneni } from './role/useOpravneni';
 import {
   URL_NAVODY, URL_CTENARI, UDALOST_OTEVRIT_NAVOD, vyberNavody, poctyKategorii, kdyUpraveno, type NavodApi,
@@ -172,11 +171,12 @@ export default function Guides({ user, ticksFor, openGuideId }: {
   openGuideId?: number | null;
 }) {
   const pathname = usePathname() ?? '';
-  const { role } = useOpravneni();
+  // Nástroj stránky (ne widget) bere mírné `ma()`: bez načtených oprávnění ukáže akce
+  // a rozhodne server (jako ostatní obrazovky); přísné useSmi je pro widgety (spec §1.5).
+  const { role, ma: smi } = useOpravneni();
   // Tablet nemá plochu (kiosk.smena je jiná stránka, balík B9) — nástroj s vlastní hlavičkou.
   const tablet = pathname.startsWith('/kiosk') || user.role === 'kiosk' || role?.typ === 'kiosk';
   const stranka = pathname.startsWith('/employer') ? 'vedeni.navody' : 'zamestnanec.navody';
-  const smi = useSmi();
   const smiVytvorit = smi('navody.vytvorit');
   const smiNavrhnout = smi('navody.navrhnout');
   const smiUpravit = smi('navody.upravit');
@@ -390,14 +390,21 @@ export default function Guides({ user, ticksFor, openGuideId }: {
                 : undefined;
             if (polozky.length === 0) {
               return (
-                <ListRow key={g.id} title={g.title} meta={meta} aside={kdyUpraveno(g.updatedAt)} right={stav}
-                  onClick={() => { void openReader(g.id); }} />
+                // Vlastní <li> + ListRow as="div": obal <li className="contents"> by .list nenakreslil linku (DP §3.6).
+                <li key={g.id}>
+                  <ListRow as="div" title={g.title} meta={meta} aside={kdyUpraveno(g.updatedAt)} right={stav}
+                    onClick={() => { void openReader(g.id); }} />
+                </li>
               );
             }
             return (
-              <ListRow key={g.id}
+              <ListRow key={g.id} className="relative"
                 // Řádek má „···", takže celý klikací být nemůže (tlačítko v tlačítku) — čtečku otevře název.
-                title={<button type="button" onClick={() => { void openReader(g.id); }} className="block max-w-full truncate text-left hover:underline underline-offset-2 focus-visible:outline-none focus-visible:underline">{g.title}</button>}
+                // Cíl je celý řádek: ::after tlačítka se roztáhne přes <li className="relative">
+                // (samotný text měřil na telefonu ~20 px; tap-target i -my ořízne `truncate` obalu).
+                // Akce leží nad ním, protože jsou pozicované a v DOM později (Menu je relative,
+                // Spustit dostal `relative`). Fokus = limetkový prstenec řádku jako u Button.
+                title={<button type="button" onClick={() => { void openReader(g.id); }} className="block max-w-full truncate text-left hover:underline underline-offset-2 focus-visible:outline-none after:absolute after:inset-0 after:rounded-[var(--r-md)] after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[#C8F542]">{g.title}</button>}
                 meta={meta} aside={kdyUpraveno(g.updatedAt)} right={stav}
                 actions={<Menu size="sm" label={`Další akce s návodem ${g.title}`} items={polozky} />} />
             );

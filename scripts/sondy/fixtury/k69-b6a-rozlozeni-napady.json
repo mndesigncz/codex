@@ -1,0 +1,33 @@
+{
+ "stranka": "vedeni.napady",
+ "polozky": [
+  {
+   "id": "napady-nove",
+   "widget": "napady.nove",
+   "velikost": "M"
+  },
+  {
+   "id": "napady-nejzadanejsi",
+   "widget": "napady.nejzadanejsi",
+   "velikost": "M"
+  },
+  {
+   "id": "nastroj",
+   "widget": "nastroj",
+   "velikost": "L"
+  }
+ ],
+ "dostupne": [
+  "napady.nejzadanejsi",
+  "napady.nove",
+  "planovani.souhrn",
+  "odkaz"
+ ],
+ "tarifem": [],
+ "zdroj": "podnik",
+ "rozsah": "typ:vedeni",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": true,
+ "verze": 0
+}

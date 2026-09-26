@@ -22,6 +22,14 @@ await ctx.route('**/api/**', async route => {
   if (new URL(u).pathname === '/api/rozlozeni' && new URL(u).searchParams.get('stranka') === 'vedeni.rozvrh') return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + 'k69-b1-rozlozeni-rozvrh.json', 'utf8') });
   // Kolo 69 (B2): Docházka a Tým jsou plochy s widgety — rozložení (widgety a nástroj) z fixtury balíku.
   if (new URL(u).pathname === '/api/rozlozeni' && ['vedeni.dochazka', 'vedeni.tym'].includes(new URL(u).searchParams.get('stranka'))) return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + (new URL(u).searchParams.get('stranka') === 'vedeni.tym' ? 'k69-b2-rozlozeni-tym' : 'k69-b2-rozlozeni-dochazka') + '.json', 'utf8') });
+  // Kolo 69 (B7): Odměny jsou plocha s widgety — Žádosti o odměny jsou widget (střední, s „Vybrat víc").
+  if (new URL(u).pathname === '/api/rozlozeni' && new URL(u).searchParams.get('stranka') === 'vedeni.odmeny') return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + 'k69-b7-rozlozeni-odmeny.json', 'utf8') });
+  // …a Nastavení odměn (katalog) chce odmeny.katalog: oprávnění vlastníka (fixtura teams_mine je nemá).
+  if (new URL(u).pathname === '/api/teams/mine') {
+    const d = JSON.parse(readFileSync(DIR + 'teams_mine.json', 'utf8'));
+    d.opravneni = JSON.parse(readFileSync(DIR + 'roles.json', 'utf8')).ja.opravneni;
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(d) });
+  }
   const k = keyFor(u);
   if (k && existsSync(DIR + k + '.json')) return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + k + '.json', 'utf8') });
   return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
@@ -82,17 +90,23 @@ tvrdi('typy směn: vlastní typ má Upravit', await p.getByRole('button', { name
 
 // 4) Návody → Spravovat kategorie
 await p.goto('http://localhost:3000/employer/overview?view=guides', { waitUntil: 'networkidle' }); await p.waitForTimeout(1200);
-await p.locator('button[title="Spravovat kategorie"]').first().click(); await p.waitForTimeout(700);
+// Kolo 69 (B6b): správa kategorií je v „···" hlavičky plochy (Další akce → Spravovat kategorie).
+await p.locator('[data-plocha] header, [data-plocha]').first().getByRole('button', { name: 'Další akce', exact: true }).first().click(); await p.waitForTimeout(300);
+await p.getByRole('menuitem', { name: 'Spravovat kategorie' }).click(); await p.waitForTimeout(700);
 m = norm(await p.locator('body').innerText());
 tvrdi('návody: cizí kategorie s chipem', m.includes('bezpečnost z organizace') && (m.match(/z organizace/g) || []).length >= 2, m.slice(0, 160));
 await p.keyboard.press('Escape'); await p.waitForTimeout(300);
 
 // 5) Odměny
 await p.goto('http://localhost:3000/employer/overview?view=rewards', { waitUntil: 'networkidle' }); await p.waitForTimeout(1200);
+// Kolo 69 (B7): Odměny jsou plocha s widgety; katalog se spravuje v části Nastavení
+// a mazání má popisek „Smazat odměnu <název>".
+await p.locator('[data-plocha]').getByRole('tab', { name: 'Nastavení' }).click(); await p.waitForTimeout(800);
 m = norm(await p.locator('main').innerText());
-tvrdi('odměny: cizí odměna s chipem a správcem', m.includes('volný den z organizace') && m.includes('spravuje: kavárna vinohrady'), m.slice(0, 160));
-tvrdi('odměny: cizí odměna bez Odebrat', await radky('Volný den z organizace').filter({ has: p.locator('button[aria-label="Odebrat"]') }).count() === 0, 'Odebrat je tam');
-tvrdi('odměny: vlastní odměna má Odebrat', await radky('Volný pátek').filter({ has: p.locator('button[aria-label="Odebrat"]') }).count() >= 1, 'vlastní bez Odebrat');
+tvrdi('odměny: cizí odměna s chipem a správcem', m.includes('volný den z organizace') && m.includes('spravuje kavárna vinohrady'), m.slice(0, 160));
+tvrdi('odměny: cizí odměna bez Smazat a bez přepínače', await p.getByRole('button', { name: 'Smazat odměnu Volný den z organizace' }).count() === 0
+  && await p.getByRole('switch', { name: /Volný den z organizace/ }).count() === 0, 'Smazat je tam');
+tvrdi('odměny: vlastní odměna má Smazat', await p.getByRole('button', { name: 'Smazat odměnu Volný pátek' }).count() >= 1, 'vlastní bez Smazat');
 
 console.log(fails ? `\n${fails} SELHALO` : '\njeden podnik spravuje, ostatní vidí — a je vidět odkud');
 await b.close(); process.exit(fails ? 1 : 0);

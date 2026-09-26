@@ -1,0 +1,68 @@
+{
+ "guides": [
+  {
+   "id": 1,
+   "title": "Jak se dělá flat white",
+   "categoryId": 1,
+   "updatedAt": "2026-09-25T09:10:00Z",
+   "approved": true,
+   "submittedBy": null,
+   "requireRead": true,
+   "readCount": 4,
+   "myRead": false,
+   "excerpt": "Dvojité espresso, mléko do 60 °C…",
+   "hasChecklist": true,
+   "productId": null,
+   "forClosing": false,
+   "itemId": null
+  },
+  {
+   "id": 2,
+   "title": "Když kasa nesedí",
+   "categoryId": null,
+   "updatedAt": "2026-09-20T09:10:00Z",
+   "approved": true,
+   "submittedBy": null,
+   "requireRead": false,
+   "readCount": 0,
+   "myRead": false,
+   "excerpt": "Nejdřív přepočítej bankovky…",
+   "hasChecklist": false,
+   "productId": null,
+   "forClosing": true,
+   "itemId": null
+  },
+  {
+   "id": 3,
+   "title": "Čištění mlýnku",
+   "categoryId": 2,
+   "updatedAt": "2026-09-10T09:10:00Z",
+   "approved": true,
+   "submittedBy": null,
+   "requireRead": true,
+   "readCount": 6,
+   "myRead": true,
+   "excerpt": "Každý pátek po zavření…",
+   "hasChecklist": true,
+   "productId": null,
+   "forClosing": false,
+   "itemId": null
+  },
+  {
+   "id": 4,
+   "title": "Nový drink: matcha tonic",
+   "categoryId": 1,
+   "updatedAt": "2026-09-26T08:00:00Z",
+   "approved": false,
+   "submittedBy": 7,
+   "requireRead": false,
+   "readCount": 0,
+   "myRead": false,
+   "excerpt": "Navrhuji do letního menu…",
+   "hasChecklist": false,
+   "productId": null,
+   "forClosing": false,
+   "itemId": null
+  }
+ ]
+}

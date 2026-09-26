@@ -42,7 +42,7 @@ const PRIORITIES = [
   { id: 'medium', label: 'Střední' },
   { id: 'high', label: 'Vysoká' },
 ] as const;
-const prioDot = (p: string) => p === 'high' ? 'bg-bad' : p === 'medium' ? 'bg-wait' : 'bg-black/20';
+const prioDot = (p: string) => p === 'high' ? 'bg-bad' : p === 'medium' ? 'bg-wait' : 'bg-[#C8F542]';
 const PRIORITA: Record<string, string> = { high: 'vysoká', medium: 'střední', low: 'nízká' };
 
 const emptyForm = () => ({ title: '', description: '', assignedTo: '', priority: 'medium', dueDate: '', recurrence: '', checklist: [] as ChecklistItem[] });
@@ -271,7 +271,10 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
             )}
           </div>
           {t.checklist.length > 0 && (
-            <TaskChecklist items={t.checklist} onToggle={i => toggleChecklistItem(t, i)} onToggleAll={d => toggleChecklistAll(t, d)} />
+            // Body checklistu smí odškrtnout jen ten, kdo smí splnit úkol (u checklistu platí na serveru stejné
+            // `allowed` jako u stavu), jinak by optimistická změna skončila 403 a vrácením.
+            <TaskChecklist items={t.checklist} onToggle={smiSplnit(t) ? i => toggleChecklistItem(t, i) : undefined}
+              onToggleAll={smiSplnit(t) ? d => toggleChecklistAll(t, d) : undefined} />
           )}
         </div>
         <div className="flex items-center gap-1 shrink-0">

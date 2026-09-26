@@ -23,8 +23,14 @@ export function recurrenceLabel(r?: string | null): string | null {
 
 // A read/tick checklist rendered under a task. `onToggle(index)` flips one item;
 // the parent persists the whole list.
-export function TaskChecklist({ items, onToggle, onToggleAll }: {
+export function TaskChecklist({ items, onToggle, onToggleAll, velky = false }: {
   items: ChecklistItem[];
+  /**
+   * Tablet u baru: řádek skutečně vysoký 44 px. Rozšířená plocha přes ::before
+   * (tap-target-sm) by se u těsně naskládaných kroků překrývala se sousedem
+   * a ťuknutí do spodku kroku 2 by odškrtlo krok 3 (review kola 69).
+   */
+  velky?: boolean;
   onToggle?: (index: number) => void;
   /**
    * Odškrtnout celý seznam najednou. Dvanáctibodový zavírací postup se
@@ -61,7 +67,9 @@ export function TaskChecklist({ items, onToggle, onToggleAll }: {
             role="checkbox"
             aria-checked={it.done}
             // Rádiusy ze systému (řádek i zaškrtávátko 10 px) a fajfka z Icons.tsx místo vlastního SVG (kolo 69).
-            className={`tap-target-sm flex w-full items-center gap-2 rounded-xl px-1.5 py-1 text-left text-sm transition-colors ${onToggle ? 'hover:bg-black/[0.03]' : ''}`}
+            // Dotyková plocha je skutečná výška řádku (36 px, na tabletu 44 px), ne přesahující ::before:
+            // kroky jsou naskládané těsně a přesah by sahal do sousedního kroku.
+            className={`${velky ? 'min-h-[44px]' : 'min-h-9'} flex w-full items-center gap-2 rounded-xl px-1.5 py-1 text-left text-sm transition-colors ${onToggle ? 'hover:bg-black/[0.03]' : ''}`}
           >
             <span aria-hidden className={`grid place-items-center h-[18px] w-[18px] shrink-0 rounded-xl border transition-colors ${
               it.done ? 'bg-[#C8F542] border-[#C8F542] on-accent' : 'border-black/25 text-transparent'

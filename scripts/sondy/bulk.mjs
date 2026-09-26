@@ -31,6 +31,8 @@ async function open(url, w = 1280, dark = false) {
     if (new URL(u).pathname === '/api/rozlozeni' && new URL(u).searchParams.get('stranka') === 'vedeni.sklad') return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + 'k69-b3-rozlozeni-sklad.json', 'utf8') });
     // Kolo 69 (B1): Rozvrh je plocha s widgety — Žádosti o volno a Výměny směn jsou widgety (střední, s akcemi).
     if (new URL(u).pathname === '/api/rozlozeni' && new URL(u).searchParams.get('stranka') === 'vedeni.rozvrh') return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + 'k69-b1-rozlozeni-rozvrh.json', 'utf8') });
+    // Kolo 69 (B7): Odměny jsou plocha s widgety — Žádosti o odměny jsou widget (střední, s „Vybrat víc").
+    if (new URL(u).pathname === '/api/rozlozeni' && new URL(u).searchParams.get('stranka') === 'vedeni.odmeny') return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + 'k69-b7-rozlozeni-odmeny.json', 'utf8') });
     // …a widget Nové věci od týmu chce sklad.schvalovat: oprávnění vlastníka (fixtura teams_mine je nemá).
     if (new URL(u).pathname === '/api/teams/mine') {
       const d = JSON.parse(readFileSync(DIR + 'teams_mine.json', 'utf8'));

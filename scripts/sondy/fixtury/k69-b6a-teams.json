@@ -1,0 +1,28 @@
+{
+ "team": {
+  "id": 1,
+  "name": "Kavárna",
+  "week_start": 1
+ },
+ "members": [
+  {
+   "id": 15,
+   "name": "Martin Nemeškal",
+   "role": "employer",
+   "avatar": "🧑"
+  },
+  {
+   "id": 16,
+   "name": "Eva Testová",
+   "role": "employee",
+   "avatar": "🙂"
+  },
+  {
+   "id": 21,
+   "name": "Petr Novák",
+   "role": "employee",
+   "avatar": null
+  }
+ ],
+ "isOwner": true
+}

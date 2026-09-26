@@ -1,0 +1,52 @@
+{
+ "stranka": "zamestnanec.odmeny",
+ "polozky": [
+  {
+   "id": "moje-zpetna-vazba",
+   "widget": "moje.zpetna_vazba",
+   "velikost": "M"
+  },
+  {
+   "id": "nastroj",
+   "widget": "nastroj",
+   "velikost": "L"
+  },
+  {
+   "id": "odmeny-katalog",
+   "widget": "odmeny.katalog",
+   "velikost": "L"
+  },
+  {
+   "id": "moje-odkud-body",
+   "widget": "moje.odkud_body",
+   "velikost": "M"
+  },
+  {
+   "id": "odmeny-urovne",
+   "widget": "odmeny.urovne",
+   "velikost": "M"
+  },
+  {
+   "id": "moje-hodnoceni-smen",
+   "widget": "moje.hodnoceni_smen",
+   "velikost": "L"
+  }
+ ],
+ "dostupne": [
+  "moje.zpetna_vazba",
+  "odmeny.katalog",
+  "moje.odkud_body",
+  "odmeny.urovne",
+  "moje.hodnoceni_smen",
+  "moje.tento_mesic",
+  "moje.uroven",
+  "odkaz"
+ ],
+ "tarifem": [],
+ "zdroj": "podnik",
+ "rozsah": "typ:zamestnanec",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": false,
+ "verze": 0
+}

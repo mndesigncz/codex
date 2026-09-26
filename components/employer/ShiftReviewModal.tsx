@@ -7,7 +7,7 @@ import { normalizePoints } from '@/lib/rewardLevels';
 import { pragueToday } from '@/lib/pragueTime';
 import { czForm } from '@/lib/czech';
 import { okJson } from '@/lib/api';
-import { Modal, Button, Segmented, Skeleton } from '../ui';
+import { Modal, Button, Segmented, Skeleton, Switch, SwitchRow } from '../ui';
 
 export interface ItemMark { points: number; note: string | null; flagged: boolean }
 type ItemKind = 'task' | 'procedure' | 'closing';
@@ -53,7 +53,8 @@ function StarPicker({ value, onChange }: { value: number; onChange: (n: number) 
   return (
     <div className="flex gap-1.5">
       {[1, 2, 3, 4, 5].map(i => (
-        <button key={i} type="button" onClick={() => onChange(i === value ? 0 : i)} className="transition active:scale-90">
+        <button key={i} type="button" onClick={() => onChange(i === value ? 0 : i)} aria-label={`${i} z 5`} aria-pressed={i <= value}
+          className="tap-target-sm transition active:scale-90">
           <svg width="30" height="30" viewBox="0 0 24 24" fill={i <= value ? '#C8F542' : 'none'} stroke={i <= value ? '#8FB811' : 'currentColor'} strokeWidth="1.5" className={i <= value ? '' : 'text-black/25 hover:text-black/40'}>
             <path d="m12 3 2.6 5.3 5.9.9-4.2 4.1 1 5.8L12 16.9 6.7 19.2l1-5.8-4.2-4.1 5.9-.9L12 3Z" strokeLinejoin="round" />
           </svg>
@@ -111,7 +112,9 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
     setLoadingSummary(true);
     fetch(`/api/shift-reviews?employeeId=${employee.id}&date=${date}`).then(okJson).then((d: Summary) => {
-      if (d && !(d as any).error) {
+      // Jen odpověď ve tvaru přehledu směny: jiný tvar (starší server, chyba
+      // s kódem 200) by okno shodil na `summary.tasks.filter`.
+      if (d && !(d as any).error && Array.isArray(d.tasks) && Array.isArray(d.procedures)) {
         setSummary(d);
         setRating(d.review?.rating ?? 0);
         setNote(d.review?.note ?? '');
@@ -213,15 +216,16 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
       <div className="mt-2.5 space-y-2">
         <div className="flex items-center gap-2 flex-wrap">
           <div className="inline-flex items-center rounded-full bg-black/[0.05] border border-black/[0.07] overflow-hidden">
-            <button onClick={() => step(-1)} className="tap-target w-8 h-8 flex items-center justify-center text-black/50 hover:bg-black/[0.06] transition" aria-label="Ubrat bod">−</button>
+            <button onClick={() => step(-1)} className="tap-target w-8 h-8 flex items-center justify-center text-black/50 hover:bg-black/[0.06] transition" aria-label="Ubrat bod"><Icon name="minus" size={14} /></button>
             <span className={`min-w-[3rem] text-center text-[13px] font-semibold tabular-nums ${value > 0 ? 'text-[#5B7A08]' : value < 0 ? 'text-bad-ink' : 'text-black/40'}`}>{signed(value)}</span>
-            <button onClick={() => step(1)} className="tap-target w-8 h-8 flex items-center justify-center text-black/50 hover:bg-black/[0.06] transition" aria-label="Přidat bod">+</button>
+            <button onClick={() => step(1)} className="tap-target w-8 h-8 flex items-center justify-center text-black/50 hover:bg-black/[0.06] transition" aria-label="Přidat bod"><Icon name="plus" size={14} /></button>
           </div>
-          <button
-            onClick={() => saveItem(kind, id, { flagged: !isFlagged })}
-            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-medium transition ${isFlagged ? 'bg-wait/15 text-wait-ink border border-wait/40' : 'bg-black/[0.05] text-black/50 border border-transparent hover:bg-black/[0.09]'}`}>
-            <Icon name="warning" size={13} /> {isFlagged ? 'Označeno jako špatně' : 'Něco je špatně'}
-          </button>
+          {/* Přepínač Switch, ne ručně psaná pilulka: dřív měla ~30 px a vlastní tóny (DP §6.2 bod 4).
+              Stejný tvar jako celosměnové „Označit směnu k nápravě" níž v okně. */}
+          <span className="inline-flex items-center gap-2">
+            <Switch checked={isFlagged} onChange={v => saveItem(kind, id, { flagged: v })} labelledBy={`spatne-${kind}-${id}`} />
+            <span id={`spatne-${kind}-${id}`} className="t-meta">Něco je špatně</span>
+          </span>
         </div>
         <textarea
           defaultValue={mark?.note ?? legacyNote ?? ''} rows={2} placeholder="Poznámka pro zaměstnance…"
@@ -272,7 +276,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
             {shiftDates.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {shiftDates.map(d => (
-                  <button key={d} onClick={() => setDate(d)} className={`tap-target-sm rounded-full px-3 py-1 text-xs font-medium transition ${date === d ? 'seg-on' : 'seg-off bg-black/[0.05]'}`}>
+                  <button key={d} type="button" aria-pressed={date === d} onClick={() => setDate(d)} className={`filter-pill tap-target-sm ${date === d ? 'seg-on' : 'seg-off glass'}`}>
                     {fmtChip(d)}
                   </button>
                 ))}
@@ -414,7 +418,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
                             {itemBadge(p.item)}
                             {(p.item?.note || p.reviewNote) && <Icon name="chat" size={13} className="text-[#5B7A08] shrink-0" />}
                             <span className="text-[11px] tabular-nums shrink-0 text-[#5B7A08]">{p.done}/{count}</span>
-                            {p.skippedCount > 0 && <span className="text-[11px] text-wait-ink shrink-0">{p.skippedCount}⤳</span>}
+                            {p.skippedCount > 0 && <span className="text-[11px] text-wait-ink shrink-0" title="Přeskočené kroky">{p.skippedCount} přeskočeno</span>}
                             {p.missing.length > 0 && <span className="text-[11px] text-bad-ink shrink-0">{p.missing.length}<Icon name="close" size={10} className="inline -mt-0.5" /></span>}
                             {chev(!!expanded[key])}
                           </button>
@@ -429,7 +433,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
                                   return (
                                     <button key={i} onClick={() => toggleProcStep(p.id, i)} className="w-full flex items-center gap-2.5 text-left group">
                                       <span className={`w-5 h-5 rounded-xl border flex items-center justify-center shrink-0 transition ${checked ? 'bg-[#C8F542] border-[#C8F542] text-black' : skipped ? 'bg-wait/80 border-wait text-white' : 'border-bad/40 group-hover:border-[#C8F542]/60'}`}>
-                                        {checked ? <span className="text-[11px] font-bold"><Icon name="check" size={15} /></span> : skipped ? <span className="text-[11px] font-bold">⤳</span> : null}
+                                        {checked ? <span className="text-[11px] font-bold"><Icon name="check" size={15} /></span> : skipped ? <Icon name="chevronRight" size={13} /> : null}
                                       </span>
                                       <span className={`text-[13px] ${checked ? 'text-black/45 line-through' : skipped ? 'text-wait-ink' : 'text-bad-ink'}`}>{p.steps[i] ?? `Krok ${i + 1}`}</span>
                                       {!checked && !skipped && <span className="text-[11px] text-bad-ink shrink-0">neuděláno</span>}
@@ -493,10 +497,9 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
                 )}
               </div>
             </div>
-            <button onClick={() => setFlagged(f => !f)}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-medium transition ${flagged ? 'bg-bad/15 text-bad-ink border border-bad/40' : 'bg-black/[0.05] text-black/55 border border-transparent hover:bg-black/[0.09]'}`}>
-              <Icon name="warning" size={14} /> {flagged ? 'Směna označena k nápravě' : 'Označit směnu k nápravě'}
-            </button>
+            {/* Kolo 69 (B7): dřív ručně obarvená pilulka — je to zapnuto/vypnuto, tak Switch (DP §3.20). */}
+            <SwitchRow as="div" title="Označit směnu k nápravě" checked={flagged} onChange={setFlagged}
+              hint="Zaměstnanec uvidí výtku nahoře v Odměnách a potvrdí, že ji četl." />
           </div>
         </div>
 

@@ -14,7 +14,7 @@
 // dřív tabule ukazovala ovládání i roli bez práva a klik skončil 403 (audit Plánování).
 
 import { useState } from 'react';
-import { Button, Chip, ListRow, Stat, StatRow } from '../../ui';
+import { Button, Chip, ListRow, Menu, Stat, StatRow } from '../../ui';
 import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
 import { widget } from '@/lib/widgety/katalog';
 import { Widget, type StavNacteni } from '../Widget';
@@ -120,12 +120,16 @@ function KeSchvaleni({ nahled }: WidgetProps) {
         {fronta.slice(0, 5).map(c => (
           <ListRow key={c.id} title={c.title} meta={c.description ?? undefined}
             actions={smiPresun ? (
-              <>
-                <Button variant="primary" size="sm" loading={probiha === c.id} disabled={probiha != null && probiha !== c.id}
+              // Jedna tichá akce v řádku a Vrátit v menu (DP §5.1): pět inkoustových pilulek pod sebou
+              // tahalo oko víc než limetka v hlavičce a na telefonu byly přes celou šířku řádku.
+              // Obal drží obě ovládání u pravého okraje i tam, kde .list-actions natahuje první dítě.
+              <span className="flex items-center justify-end gap-1">
+                <Button variant="ghost" size="sm" icon="check" loading={probiha === c.id} disabled={probiha != null && probiha !== c.id}
                   onClick={() => presun(c, 'done')} aria-label={`Schválit kartu ${c.title}`}>Schválit</Button>
-                <Button variant="ghost" size="sm" disabled={probiha != null}
-                  onClick={() => presun(c, 'in_progress')} aria-label={`Vrátit kartu ${c.title} do Rozpracováno`}>Vrátit</Button>
-              </>
+                <Menu size="sm" label={`Další akce s kartou ${c.title}`} items={[
+                  { label: 'Vrátit do Rozpracováno', icon: 'undo', disabled: probiha != null, onClick: () => presun(c, 'in_progress') },
+                ]} />
+              </span>
             ) : undefined} />
         ))}
       </ul>

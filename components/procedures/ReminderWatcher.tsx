@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../Icons';
+import { Button } from '../ui';
 import { useProcedures, type ProcedureLite } from './ProcedureProvider';
 
 const FIRED_KEY = 'managero-proc-fired';
@@ -143,53 +144,55 @@ export default function ReminderWatcher() {
     if (active) setDue(null);
   }, [active]);
 
-  if (!due || active) return null;
+  const zobrazit = !!due && !active;
 
   const startNow = () => {
     const p = due;
+    if (!p) return;
     setDue(null);
     startRun(p);
   };
 
+  // Nemodální panel, ne alertdialog: stránku neblokuje a fokus nebere (připomínka ve 14:00
+  // nesmí vytrhnout rozepsaný formulář), jenže role alertdialog slibovala fokus uvnitř,
+  // Escape a modalitu. Odečítači ji oznámí živá oblast, která je v DOM trvale — oblast
+  // vložená až s obsahem se v řadě čteček neohlásí. K tlačítkům se dojde přes orientační
+  // bod (region s nadpisem).
+  const hlaseni = (
+    <p className="sr-only" role="status" aria-live="polite">
+      {zobrazit ? `Připomínka: je čas na ${due!.name}.` : ''}
+    </p>
+  );
+  // Vždy jako první dítě fragmentu, aby React živou oblast při ukázání panelu nepřestavěl.
+  if (!zobrazit || !due) return <>{hlaseni}</>;
+
+  // Kolo 69 (B6b): limetkový čtverec se zvonkem, štítek verzálkami ručně nad nadpisem, „Je čas na …!"
+  // text-lg s vykřičníkem, vlastní keyframes a ruční tlačítka (Spustit teď limetkou —
+  // druhá limetka nad stránkou) → glass-strong s pop-in, řádek kontextu, t-section, Button.
   return (
+    <>
+    {hlaseni}
     <div className="fixed z-50 bottom-[calc(96px+env(safe-area-inset-bottom))] md:bottom-6 inset-x-3 md:inset-x-0 md:flex md:justify-center pointer-events-none">
-      <div className="mx-auto w-full md:max-w-sm pointer-events-auto glass-strong rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.28)] motion-safe:animate-[pr-remind-pop_0.3s_ease-out]">
-        <style>{`
-          @keyframes pr-remind-pop { 0% { opacity:0; transform: translateY(10px) scale(0.98); } 100% { opacity:1; transform: translateY(0) scale(1); } }
-        `}</style>
+      <section aria-labelledby="pripominka-postupu" className="mx-auto w-full md:max-w-sm pointer-events-auto glass-strong rounded-3xl shadow-[shadow:var(--shadow-float)] pop-in">
         <div className="flex items-start gap-3 px-5 pt-5 pb-4">
-          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-[#C8F542] text-black motion-safe:animate-[pr-remind-pop_0.4s_ease-out]">
-            <Icon name="bell" size={22} />
-          </div>
+          <span aria-hidden className="chip-ok grid h-11 w-11 flex-shrink-0 place-items-center rounded-full">
+            <Icon name="bell" size={20} />
+          </span>
           <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-[0.14em] text-[#5B7A08]">Připomínka</p>
-            <p className="mt-0.5 text-lg font-bold leading-snug tracking-tight text-[#16181A]">
-              Je čas na {due.name}!
+            {/* Bez štítku „Připomínka" nad nadpisem (kicker je zákaz DP §6.12) — patří do řádku kontextu. */}
+            <h3 id="pripominka-postupu" className="t-section text-pretty">Je čas na {due.name}</h3>
+            <p className="t-meta mt-0.5 inline-flex items-center gap-1 tabular-nums">
+              <Icon name="clock" size={13} /> Připomínka{dueTime ? ` · ${dueTime}` : ''}
+              {due.remindAnchor === 'open' ? ' · otevření' : due.remindAnchor === 'close' ? ' · zavření' : ''}
             </p>
-            {dueTime && (
-              <p className="mt-0.5 inline-flex items-center gap-1 text-xs text-black/45">
-                <Icon name="clock" size={13} /> {dueTime}
-                {due.remindAnchor === 'open' ? ' · otevření' : due.remindAnchor === 'close' ? ' · zavření' : ''}
-              </p>
-            )}
           </div>
         </div>
         <div className="flex items-center gap-2 px-5 pb-5">
-          <button
-            onClick={() => setDue(null)}
-            className="rounded-full glass border border-black/10 text-[#16181A] px-5 py-2.5 font-medium hover:bg-black/[0.05] transition"
-          >
-            Odložit
-          </button>
-          <button
-            onClick={startNow}
-            disabled={starting}
-            className="flex-1 rounded-full bg-[#C8F542] text-black font-semibold px-5 py-2.5 hover:brightness-110 transition disabled:opacity-60"
-          >
-            Spustit teď
-          </button>
+          <Button variant="secondary" onClick={() => setDue(null)}>Odložit</Button>
+          <Button variant="primary" icon="play" block onClick={startNow} loading={starting}>Spustit teď</Button>
         </div>
-      </div>
+      </section>
     </div>
+    </>
   );
 }

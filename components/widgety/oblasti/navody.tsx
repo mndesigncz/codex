@@ -19,7 +19,7 @@
 //    z jednoho dotazu (GET /api/guides/ctenari).
 //  - Návod k uzávěrce — CashClosing si ho hledal sám v /api/guides; tady je vidět i mimo krok kasy.
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ComponentProps } from 'react';
 import { Button, Chip, ListRow, Stat, runBulk } from '../../ui';
 import type { KomponentaWidgetu, Navigace, WidgetProps } from '@/lib/widgety/typy';
 import { Widget, type StavNacteni } from '../Widget';
@@ -44,6 +44,13 @@ function useBrana(klice: readonly string[]): { ok: boolean; ceka: boolean } {
 }
 
 const CEKA: StavNacteni = { data: null, error: null, loading: true, reload: () => {} };
+
+// Klikací řádek v `.list` musí být vlastní <li> s ListRow as="div": ListRow s onClick se jinak
+// obalí <li className="contents"> a na prvku s display:contents pravidlo `.list > * + *`
+// linku nenakreslí — řádky splynou (DP §3.6). Neklikací řádek zůstává obyčejným ListRow.
+function Radek({ onClick, ...p }: ComponentProps<typeof ListRow>) {
+  return onClick ? <li><ListRow as="div" {...p} onClick={onClick} /></li> : <ListRow {...p} />;
+}
 const NAVOD: CzNoun = { one: 'návod', few: 'návody', many: 'návodů' };
 const NAVRH: CzNoun = { one: 'návrh', few: 'návrhy', many: 'návrhů' };
 
@@ -88,7 +95,7 @@ function PovinneCteni({ velikost, nahled }: WidgetProps) {
         <>
           <ul className="list">
             {seznam.slice(0, 5).map(g => (
-              <ListRow key={g.id} title={g.title} meta={g.excerpt || undefined}
+              <Radek key={g.id} title={g.title} meta={g.excerpt || undefined}
                 onClick={muze ? () => otevriNavodZWidgetu(nav, g.id) : undefined} />
             ))}
           </ul>
@@ -126,7 +133,7 @@ function KdoNecetl({ velikost, nahled }: WidgetProps) {
           const vsichni = r.precetlo >= r.celkem;
           const jmena = r.neprecetli.map(p => p.name).filter(Boolean);
           return (
-            <ListRow key={r.id}
+            <Radek key={r.id}
               title={r.title}
               // Jména jen ve velké velikosti — ve střední by se řádek lámal na telefonu.
               meta={L && !vsichni && jmena.length ? `Chybí: ${jmena.slice(0, 4).join(', ')}${jmena.length > 4 ? ` +${jmena.length - 4}` : ''}` : undefined}
@@ -162,7 +169,7 @@ function NoveUpravene({ nastaveni, nahled }: WidgetProps<{ pocet?: string }>) {
       prazdno={seznam.length === 0 ? <p className="t-meta text-pretty">Zatím tu nejsou žádné návody.</p> : undefined}>
       <ul className="list">
         {seznam.map(g => (
-          <ListRow key={g.id} title={g.title} meta={g.excerpt || undefined}
+          <Radek key={g.id} title={g.title} meta={g.excerpt || undefined}
             aside={kdyUpraveno(g.updatedAt)}
             onClick={muze ? () => otevriNavodZWidgetu(nav, g.id) : undefined} />
         ))}
@@ -219,7 +226,7 @@ function NavrhyNavodu({ velikost, nahled }: WidgetProps) {
           {chyba && <p className="note note-danger text-sm" role="alert">{chyba}</p>}
           <ul className="list">
             {navrhy.slice(0, 5).map(g => (
-              <ListRow key={g.id} title={g.title} meta={g.excerpt || undefined} aside={kdyUpraveno(g.updatedAt)}
+              <Radek key={g.id} title={g.title} meta={g.excerpt || undefined} aside={kdyUpraveno(g.updatedAt)}
                 onClick={muze ? () => otevriNavodZWidgetu(nav, g.id) : undefined} />
             ))}
           </ul>

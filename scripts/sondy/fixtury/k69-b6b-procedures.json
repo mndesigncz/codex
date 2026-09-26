@@ -1,0 +1,84 @@
+{
+ "procedures": [
+  {
+   "id": 1,
+   "name": "Otevírací rutina",
+   "description": "Co se dělá před otevřením.",
+   "icon": "clock",
+   "color": "1",
+   "items": [
+    {
+     "text": "Zapnout kávovar",
+     "emoji": "☕",
+     "minutes": 10
+    },
+    {
+     "text": "Zkontrolovat mléko"
+    }
+   ],
+   "remindAt": null,
+   "remindDays": [],
+   "remindAnchor": "open",
+   "requireBeforeClosing": false,
+   "approved": true,
+   "submittedBy": null
+  },
+  {
+   "id": 2,
+   "name": "Zavírání",
+   "description": "Večerní uzavření.",
+   "icon": "check",
+   "color": "1",
+   "items": [
+    "Uklidit bar",
+    "Spočítat kasu",
+    "Zamknout"
+   ],
+   "remindAt": null,
+   "remindDays": [],
+   "remindAnchor": "close",
+   "requireBeforeClosing": true,
+   "approved": true,
+   "submittedBy": null
+  },
+  {
+   "id": 3,
+   "name": "Kontrola lednic",
+   "description": null,
+   "icon": "box",
+   "color": "1",
+   "items": [
+    "Změřit teplotu"
+   ],
+   "remindAt": "14:00",
+   "remindDays": [],
+   "remindAnchor": "time",
+   "requireBeforeClosing": true,
+   "approved": true,
+   "submittedBy": null
+  },
+  {
+   "id": 4,
+   "name": "Příjem zboží (návrh)",
+   "description": "Navrhla Jana.",
+   "icon": "box",
+   "color": "1",
+   "items": [
+    "Zkontrolovat dodací list",
+    "Uložit do lednice"
+   ],
+   "remindAt": null,
+   "remindDays": [],
+   "remindAnchor": "time",
+   "requireBeforeClosing": false,
+   "approved": false,
+   "submittedBy": 7
+  }
+ ],
+ "hasShiftToday": true,
+ "openingToday": {
+  "open": "07:30",
+  "close": "21:00",
+  "closed": false
+ }
+}

@@ -1,0 +1,34 @@
+{
+ "stranka": "vedeni.planovani",
+ "polozky": [
+  {
+   "id": "planovani-souhrn",
+   "widget": "planovani.souhrn",
+   "velikost": "S"
+  },
+  {
+   "id": "planovani-ke_schvaleni",
+   "widget": "planovani.ke_schvaleni",
+   "velikost": "M"
+  },
+  {
+   "id": "nastroj",
+   "widget": "nastroj",
+   "velikost": "L"
+  }
+ ],
+ "dostupne": [
+  "planovani.souhrn",
+  "planovani.ke_schvaleni",
+  "napady.nejzadanejsi",
+  "napady.nove",
+  "odkaz"
+ ],
+ "tarifem": [],
+ "zdroj": "podnik",
+ "rozsah": "typ:vedeni",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": true,
+ "verze": 0
+}

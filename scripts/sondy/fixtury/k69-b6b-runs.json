@@ -1,0 +1,50 @@
+{
+ "runs": [
+  {
+   "id": 31,
+   "procedure_id": 2,
+   "procedure_name": "Zavírání",
+   "procedure_icon": "check",
+   "user_id": 7,
+   "user_name": "Jana Nováková",
+   "user_avatar": "🙂",
+   "status": "completed",
+   "total_items": 3,
+   "checked_items": [
+    0,
+    1
+   ],
+   "skipped_items": [
+    2
+   ],
+   "skip_reasons": {
+    "2": {
+     "reason": "no_time"
+    }
+   },
+   "started_at": "DNES 20:00:00",
+   "completed_at": "DNES 20:20:00",
+   "duration_seconds": 1200
+  },
+  {
+   "id": 32,
+   "procedure_id": 1,
+   "procedure_name": "Otevírací rutina",
+   "procedure_icon": "clock",
+   "user_id": 8,
+   "user_name": "Petr Malý",
+   "user_avatar": "😎",
+   "status": "completed",
+   "total_items": 2,
+   "checked_items": [
+    0,
+    1
+   ],
+   "skipped_items": [],
+   "skip_reasons": {},
+   "started_at": "DNES 07:31:00",
+   "completed_at": "DNES 07:40:00",
+   "duration_seconds": 540
+  }
+ ]
+}

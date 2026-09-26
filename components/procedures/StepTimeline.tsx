@@ -82,7 +82,7 @@ export default function StepTimeline({ steps, statuses = {}, onToggle, onSkip, i
                     </p>
                     {skipped ? (
                       <p className="mt-0.5 inline-flex items-center gap-1 text-xs font-semibold text-wait-ink">
-                        <Icon name="chevronRight" size={13} /> Přeskočeno
+                        <Icon name="play" size={13} /> Přeskočeno
                       </p>
                     ) : s.note && !compact && (
                       <p className="mt-1 flex items-start gap-1.5 text-xs text-black/45">
@@ -111,14 +111,16 @@ export default function StepTimeline({ steps, statuses = {}, onToggle, onSkip, i
                   {s.minutes != null && !skipped && (
                     <Chip tone="muted" size="sm" icon="clock" className="flex-shrink-0 tabular-nums">{fmtMinutes(s.minutes)}</Chip>
                   )}
-                  {/* Skip / undo-skip control */}
+                  {/* Přeskočit / vrátit. Text zůstává vidět i v plovoucím běhu: samotná šipka
+                      znamená v aplikaci „vede jinam" (DP §3.6), takže barista čekal detail kroku
+                      a vyskočil mu dotaz na důvod. Ikona „skip" v sadě není (DP §6.2 — nepřidávat);
+                      `play` je tatáž značka přeskočeného kroku jako v DetailPrubehu. V compact bez
+                      ikony, ať se tlačítko vejde vedle textu kroku na telefonu. */}
                   {interactive && onSkip && !done && (
-                    <Button variant="ghost" size="sm" icon={skipped ? 'undo' : 'chevronRight'} className="flex-shrink-0"
-                      iconOnly={compact && !skipped}
+                    <Button variant="ghost" size="sm" icon={skipped ? 'undo' : compact ? undefined : 'play'} className="flex-shrink-0"
                       aria-label={skipped ? `Vrátit mezi kroky: ${s.text}` : `Přeskočit krok: ${s.text}`}
-                      title={skipped ? 'Vrátit mezi kroky' : 'Přeskočit tento krok'}
                       onClick={(e) => { e.stopPropagation(); onSkip(i); }}>
-                      {compact && !skipped ? undefined : skipped ? 'Vrátit' : 'Přeskočit'}
+                      {skipped ? 'Vrátit' : 'Přeskočit'}
                     </Button>
                   )}
                 </div>
@@ -132,23 +134,24 @@ export default function StepTimeline({ steps, statuses = {}, onToggle, onSkip, i
               {/* outgoing segment (into next dot, bridging the card gap) */}
               {!last && <span className={`absolute left-1/2 -translate-x-1/2 top-1/2 ${compact ? '-bottom-2' : '-bottom-3'} w-[3px] rounded-full ${segColor(status)}`} />}
               {/* status dot, vertically centered on the card */}
-              <button
-                type="button"
-                disabled={!interactive}
-                onClick={() => onToggle?.(i)}
+              {/* Tečka je jen značka stavu. Dřív to bylo <button>: v detailu (neinteraktivní)
+                  „tlačítko, nedostupné" bez jména a vzhledem nepoužitelný checkbox, v běhu cíl
+                  28 px a druhý Tab na tutéž akci, kterou nese karta (role=button). Klik myší na
+                  tečku v běhu dál odškrtne krok, ale mimo pořadí Tabu a odečítače. */}
+              <span
+                aria-hidden
+                onClick={interactive ? () => onToggle?.(i) : undefined}
                 onContextMenu={(e) => { if (interactive && onSkip) { e.preventDefault(); onSkip(i); } }}
-                title={interactive ? (done ? 'Zrušit označení' : 'Označit jako splněné') : undefined}
-                aria-label={interactive ? `${done ? 'Zrušit splnění' : 'Označit jako hotové'} — ${s.text}` : undefined}
                 className={`absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full transition-colors ${
                   done
                     ? 'bg-[#16181A] text-white'
                     : skipped
                     ? 'bg-wait text-white'
                     : `bg-white border-2 border-black/15 ${interactive ? 'hover:border-black/40 cursor-pointer' : ''}`
-                }`}
+                } ${interactive ? 'tap-target' : ''}`}
               >
-                {done ? <Icon name="check" size={15} strokeWidth={2.4} /> : skipped ? <Icon name="chevronRight" size={13} strokeWidth={2.4} /> : null}
-              </button>
+                {done ? <Icon name="check" size={15} strokeWidth={2.4} /> : skipped ? <Icon name="play" size={13} strokeWidth={2.4} /> : null}
+              </span>
             </div>
           </li>
         );

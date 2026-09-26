@@ -9,10 +9,16 @@
 // a opakování znak „↻" (audit obsah-kontrola). Teď: sloupec = jamka (Well),
 // úkol = bílá karta, dnešek a počet přes Chip, opakování ikonou, šipky týdne
 // jako Button. Dnešek se bere z pražského dne, ne z hodin prohlížeče.
+//
+// Přesun má vedle tažení i tlačítko na kartě, které otevře volbu dne: HTML5 drag
+// na dotyku nefunguje a z klávesnice se nedá spustit vůbec, takže tablet a
+// klávesnice by přesun, který tabule nabízí, neměly jak udělat (review kola 69,
+// DP §5.5). Volba je okno, ne rozbalovací menu — tabule je vodorovně posuvná
+// a absolutně umístěný panel by v ní uřízl okraj sloupce.
 
 import { useMemo, useState } from 'react';
 import { Icon } from './Icons';
-import { Button, Chip } from './ui';
+import { Button, Chip, Modal } from './ui';
 import { recurrenceLabel } from './TaskChecklist';
 import { pragueToday } from '@/lib/pragueTime';
 
@@ -30,7 +36,7 @@ export type BoardTask = {
 
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const WD = ['Ne', 'Po', 'Út', 'St', 'Čt', 'Pá', 'So'];
-const prioDot = (p: string) => p === 'high' ? 'bg-bad' : p === 'medium' ? 'bg-wait' : 'bg-black/20';
+const prioDot = (p: string) => p === 'high' ? 'bg-bad' : p === 'medium' ? 'bg-wait' : 'bg-[#C8F542]';
 const PRIORITA: Record<string, string> = { high: 'vysoká', medium: 'střední', low: 'nízká' };
 
 export default function TaskWeekBoard({ tasks, weekStart, onComplete, labelFor, onOpen, onMove, onAddForDay, canComplete, canMove }: {
@@ -73,6 +79,15 @@ export default function TaskWeekBoard({ tasks, weekStart, onComplete, labelFor, 
     if (t && t.dueDate !== key) onMove?.(t, key);
   };
 
+  // Cíle přesunu: dny zobrazeného týdne a tentýž den o týden dál (karta je vidět
+  // jen ve svém týdnu, takže to pokryje každý rozumný posun).
+  const [presouvany, setPresouvany] = useState<BoardTask | null>(null);
+  const presun = (t: BoardTask, den: string) => {
+    setPresouvany(null);
+    if (t.dueDate !== den) onMove?.(t, den);
+  };
+  const tydenPoz = (d: string) => { const x = new Date(`${d}T12:00:00`); x.setDate(x.getDate() + 7); return ymd(x); };
+
   const card = (t: BoardTask) => {
     const done = t.status === 'done';
     const label = labelFor?.(t);
@@ -85,7 +100,7 @@ export default function TaskWeekBoard({ tasks, weekStart, onComplete, labelFor, 
         draggable={tah}
         onDragStart={tah ? () => setDragId(t.id) : undefined}
         onDragEnd={() => { setDragId(null); setDragOver(null); }}
-        className={`card p-3 transition-shadow ${tah ? 'cursor-grab active:cursor-grabbing' : ''} ${dragId === t.id ? 'opacity-40' : 'hover:shadow-[var(--shadow-float)]'}`}
+        className={`card p-3 transition-shadow ${tah ? 'cursor-grab active:cursor-grabbing' : ''} ${dragId === t.id ? 'opacity-40' : 'hover:shadow-[shadow:var(--shadow-float)]'}`}
       >
         <div className="flex items-start gap-2">
           <button type="button" role="checkbox" aria-checked={done} aria-label={t.title}
@@ -102,6 +117,7 @@ export default function TaskWeekBoard({ tasks, weekStart, onComplete, labelFor, 
           ) : (
             <div className="min-w-0 flex-1"><Obsah t={t} done={done} label={label} opakovani={opakovani} /></div>
           )}
+          {tah && <Button variant="ghost" size="sm" iconOnly icon="calendar" className="-my-1 -mr-1 shrink-0" aria-label={`Přesunout úkol ${t.title} na jiný den`} onClick={() => setPresouvany(t)} />}
         </div>
       </div>
     );
@@ -158,6 +174,31 @@ export default function TaskWeekBoard({ tasks, weekStart, onComplete, labelFor, 
           );
         })}
       </div>
+
+      <Modal open={presouvany != null} onClose={() => setPresouvany(null)} size="sm" title="Přesunout úkol" subtitle={presouvany?.title}
+        footer={<Button variant="secondary" onClick={() => setPresouvany(null)}>Zrušit</Button>}>
+        {presouvany && (
+          <div className="grid gap-2" role="group" aria-label="Den, na který úkol přesunout">
+            {days.map(d => {
+              const key = ymd(d);
+              const ted = key === presouvany.dueDate;
+              return (
+                <Button key={key} variant="secondary" className="w-full justify-between" disabled={ted} aria-current={ted ? 'date' : undefined}
+                  onClick={() => presun(presouvany, key)}>
+                  <span className="capitalize">{d.toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'numeric' })}</span>
+                  {ted && <span className="t-meta">teď</span>}
+                  {!ted && key === today && <span className="t-meta">dnes</span>}
+                </Button>
+              );
+            })}
+            {presouvany.dueDate && (
+              <Button variant="ghost" icon="chevronRight" className="w-full" onClick={() => presun(presouvany, tydenPoz(presouvany.dueDate!))}>
+                O týden později
+              </Button>
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

@@ -13,6 +13,14 @@ let fails = 0;
 const tvrdi = (popis, ok, co = '') => { console.log(`${ok ? '✓' : '✗'} ${popis}${ok ? '' : '  ← ' + co}`); if (!ok) fails++; };
 const norm = s => s.replace(/ /g, ' ').toLowerCase();
 const posty = [];
+// Kolo 69 (B6b): na telefonu se vedlejší akce hlavičky plochy schovají do „···"
+// (Další akce → Kopírovat z jiného podniku); na monitoru je vidět tlačítko.
+async function otevriKopii(p) {
+  const btn = p.getByRole('button', { name: /Z jiného podniku/ }).first();
+  if (await btn.isVisible().catch(() => false)) return btn.click();
+  await p.getByRole('button', { name: 'Další akce', exact: true }).first().click(); await p.waitForTimeout(300);
+  await p.getByRole('menuitem', { name: /z jiného podniku/i }).first().click();
+}
 async function kontext(viewport) {
   const ctx = await b.newContext({ viewport, locale: 'cs-CZ' });
   await ctx.addCookies([{ name: 'next-auth.session-token', value: tok, domain: 'localhost', path: '/', httpOnly: true, sameSite: 'Lax' }]);
@@ -61,7 +69,7 @@ async function kontext(viewport) {
   const ctx = await kontext({ width: 1280, height: 950 }); const p = await ctx.newPage();
   await p.goto('http://localhost:3000/employer/overview?view=procedures', { waitUntil: 'networkidle' }); await p.waitForTimeout(900);
   tvrdi('postupy: tlačítko „Z jiného podniku"', await p.getByRole('button', { name: /Z jiného podniku/ }).first().isVisible(), 'chybí');
-  await p.getByRole('button', { name: /Z jiného podniku/ }).first().click(); await p.waitForTimeout(800);
+  await otevriKopii(p); await p.waitForTimeout(800);
   tvrdi('postupy: okno nabízí postup ze zdroje', norm(await p.locator('body').innerText()).includes('zavírání'), '');
   await p.keyboard.press('Escape'); await p.waitForTimeout(300);
   await p.goto('http://localhost:3000/employer/overview?view=menu', { waitUntil: 'networkidle' }); await p.waitForTimeout(900);
@@ -83,14 +91,14 @@ async function kontext(viewport) {
   });
   const p = await ctx.newPage();
   await p.goto('http://localhost:3000/employer/overview?view=guides', { waitUntil: 'networkidle' }); await p.waitForTimeout(900);
-  await p.getByRole('button', { name: /Z jiného podniku/ }).first().click(); await p.waitForTimeout(900);
+  await otevriKopii(p); await p.waitForTimeout(900);
   const boxy = p.getByRole('dialog').locator('[role="checkbox"], input[type="checkbox"]');
   await boxy.nth(0).click(); await boxy.nth(1).click(); await p.waitForTimeout(200);
   await p.getByRole('button', { name: /Zkopírovat \(2\)/ }).click(); await p.waitForTimeout(900);
   let t = norm(await p.getByRole('dialog').innerText());
   tvrdi('souhrn: dílčí úspěch „Zkopírováno 1 z 2."', t.includes('zkopírováno 1 z 2.'), t.slice(0, 200));
   await p.keyboard.press('Escape'); await p.waitForTimeout(400);
-  await p.getByRole('button', { name: /Z jiného podniku/ }).first().click(); await p.waitForTimeout(900);
+  await otevriKopii(p); await p.waitForTimeout(900);
   await p.getByRole('dialog').locator('[role="checkbox"], input[type="checkbox"]').nth(0).click(); await p.waitForTimeout(200);
   await p.getByRole('button', { name: /Zkopírovat \(1\)/ }).click(); await p.waitForTimeout(900);
   t = norm(await p.getByRole('dialog').innerText());
@@ -138,7 +146,7 @@ async function kontext(viewport) {
   });
   const p = await ctx.newPage();
   await p.goto('http://localhost:3000/employer/overview?view=guides', { waitUntil: 'networkidle' }); await p.waitForTimeout(1000);
-  await p.getByRole('button', { name: /Z jiného podniku/ }).first().click(); await p.waitForTimeout(700);
+  await otevriKopii(p); await p.waitForTimeout(700);
   const dlg = p.getByRole('dialog');
   let t = norm(await dlg.innerText());
   tvrdi('telefon: nabídka jen podniků, kde jsem ve vedení', t.includes('bistro smíchov') && t.includes('kavárna karlín') && !t.includes('cizí pobočka'), t.slice(0, 200));
@@ -159,7 +167,7 @@ async function kontext(viewport) {
   const ctx = await kontext({ width: 390, height: 844 }); const p = await ctx.newPage();
   await ctx.addInitScript(() => { try { localStorage.setItem('managero-app-mode', 'full'); } catch {} });
   await p.goto('http://localhost:3000/employer/overview?view=guides', { waitUntil: 'networkidle' }); await p.waitForTimeout(1000);
-  await p.getByRole('button', { name: /Z jiného podniku/ }).first().click(); await p.waitForTimeout(800);
+  await otevriKopii(p); await p.waitForTimeout(800);
   const sirka = await p.evaluate(() => document.documentElement.scrollWidth);
   tvrdi('telefon: okno kopie nepřetéká šířku obrazovky', sirka <= 390, `scrollWidth ${sirka}`);
   await ctx.close();

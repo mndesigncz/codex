@@ -1,0 +1,42 @@
+{
+ "stranka": "vedeni.ukoly",
+ "polozky": [
+  {
+   "id": "ukoly-po_terminu",
+   "widget": "ukoly.po_terminu",
+   "velikost": "S"
+  },
+  {
+   "id": "ukoly-splneno_dnes",
+   "widget": "ukoly.splneno_dnes",
+   "velikost": "S"
+  },
+  {
+   "id": "ukoly-podle_lidi",
+   "widget": "ukoly.podle_lidi",
+   "velikost": "M"
+  },
+  {
+   "id": "nastroj",
+   "widget": "nastroj",
+   "velikost": "L"
+  }
+ ],
+ "dostupne": [
+  "ukoly.po_terminu",
+  "ukoly.podle_lidi",
+  "ukoly.splneno_dnes",
+  "ukoly.dnes",
+  "ukoly.tyden",
+  "vyroba.k_vyrobe",
+  "postupy.povinne_dnes",
+  "odkaz"
+ ],
+ "tarifem": [],
+ "zdroj": "podnik",
+ "rozsah": "typ:vedeni",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": true,
+ "verze": 0
+}
