@@ -23,7 +23,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const ROOTS = ['app', 'components'];
-const BASELINE = 79; // kolo 69 (B3): Sklad a inventura — popisky přes Field/htmlFor a aria-label; B5a: výběr směny na tabletu
+const BASELINE = 44; // kolo 69 (B3): Sklad a inventura — popisky přes Field/htmlFor a aria-label; B5a: výběr směny na tabletu; B1: Rozvrh, Dostupnost, Volno přes Field (−20); B2: Docházka, Tým, profil a organizace přes Field (−12); B4: receptury a menu přes Field/Label (−3)
 
 function* walk(dir) {
   for (const name of readdirSync(dir)) {

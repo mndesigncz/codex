@@ -22,6 +22,9 @@ import { useSession } from 'next-auth/react';
 import { apiMessage, okJson } from '@/lib/api';
 import type { IdStranky, PolozkaRozlozeni, Rozsah, RozsahVolba, Tarif, Velikost, Zdroj } from '@/lib/widgety/typy';
 import { klicPoslednihoRozlozeni } from '@/lib/widgety/rozlozeni';
+import { stranka as definiceStranky } from '@/lib/widgety/stranky';
+import { NASTROJ } from '@/lib/widgety/konstanty';
+import { idZWidgetu } from '@/lib/widgety/hash';
 import { OPAKOVANI_ZAPISU_MS, SLUCOVANI_ZAPISU_MS, VRATIT_KROKU } from '@/lib/widgety/konstanty';
 
 /** Co se se zápisem stalo — plocha z toho dělá toasty a hlášení. */
@@ -123,6 +126,16 @@ function zapisPosledni(klic: string, polozky: readonly PolozkaRozlozeni[]) {
 const stejne = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
 /**
+ * Nástroj stránky nejde odebrat, takže v modelu musí být vždycky. Server ho
+ * doplňuje sám (normalizujRozlozeni), ale odpověď bez `polozky` nebo z cache
+ * či podvrhu by jinak nechala stránku bez hlavní práce.
+ */
+function doplnNastroj(id: IdStranky, pol: PolozkaRozlozeni[]): PolozkaRozlozeni[] {
+  if (!definiceStranky(id)?.nastroj || pol.some(p => p.widget === NASTROJ)) return pol;
+  return [{ id: idZWidgetu(NASTROJ), widget: NASTROJ, velikost: 'L' }, ...pol];
+}
+
+/**
  * Rozložení stránky: GET, model, fronta zápisů a „Vrátit" (spec §4.7).
  * S `rozsah` pracuje s výchozím rozložením podniku (Nastavení → Stránky).
  */
@@ -187,7 +200,7 @@ export function useRozlozeni(stranka: IdStranky, volby: VolbyRozlozeni = {}): Ro
 
   /** Převezme tvar GET (osobní i výchozí; také `aktualni` u 409 a odpověď DELETE). */
   const prevezmi = useCallback((d: any) => {
-    const pol: PolozkaRozlozeni[] = Array.isArray(d?.polozky) ? d.polozky : [];
+    const pol: PolozkaRozlozeni[] = doplnNastroj(stranka, Array.isArray(d?.polozky) ? d.polozky : []);
     nastavModel(pol);
     verze.current = Number.isInteger(d?.verze) ? d.verze : 0;
     setVerzeStav(verze.current);
@@ -210,7 +223,7 @@ export function useRozlozeni(stranka: IdStranky, volby: VolbyRozlozeni = {}): Ro
     setChybaNacteni(null);
     setNacteni('ok');
     if (klicPoslednihoRef.current) zapisPosledni(klicPoslednihoRef.current, pol);
-  }, [vychozi, nastavModel]);
+  }, [stranka, vychozi, nastavModel]);
 
   const nactiRef = useRef<() => void>(() => {});
   const nacti = useCallback(() => {

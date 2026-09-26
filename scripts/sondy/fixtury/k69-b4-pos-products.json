@@ -1,0 +1,82 @@
+{
+ "connected": true,
+ "products": [
+  {
+   "productId": "p1",
+   "name": "Latte",
+   "category": "Káva",
+   "price": 75
+  },
+  {
+   "productId": "p2",
+   "name": "Espresso",
+   "category": "Káva",
+   "price": 55
+  },
+  {
+   "productId": "p3",
+   "name": "Limonáda domácí",
+   "category": "Nápoje",
+   "price": 60
+  },
+  {
+   "productId": "p4",
+   "name": "Blue Lagoon",
+   "category": "Drinky",
+   "price": 160
+  },
+  {
+   "productId": "p5",
+   "name": "Mražená malina",
+   "category": "Nápoje",
+   "price": 70
+  }
+ ],
+ "recipes": [
+  {
+   "productId": "p1",
+   "productName": "Latte",
+   "ingredients": [
+    {
+     "itemId": 1,
+     "amount": 0.2,
+     "itemName": "Mléko plnotučné",
+     "itemUnit": "l",
+     "packageSize": 1
+    },
+    {
+     "itemId": 2,
+     "amount": 0.009,
+     "itemName": "Káva zrnková",
+     "itemUnit": "kg",
+     "packageSize": 1
+    }
+   ]
+  },
+  {
+   "productId": "p2",
+   "productName": "Espresso",
+   "ingredients": [
+    {
+     "itemId": 2,
+     "amount": 0.009,
+     "itemName": "Káva zrnková",
+     "itemUnit": "kg",
+     "packageSize": 1
+    }
+   ]
+  }
+ ],
+ "unmapped": [
+  {
+   "productId": "p4",
+   "productName": "Blue Lagoon",
+   "soldCount": 30
+  },
+  {
+   "productId": "p3",
+   "productName": "Limonáda domácí",
+   "soldCount": 12
+  }
+ ]
+}

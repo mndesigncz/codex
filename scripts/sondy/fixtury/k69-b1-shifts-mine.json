@@ -1,0 +1,54 @@
+[
+ {
+  "id": 701,
+  "employeeId": 0,
+  "date": "PRED3",
+  "startTime": "22:00",
+  "endTime": "06:00",
+  "start_time": "22:00",
+  "end_time": "06:00",
+  "type": "Noční",
+  "typeLabel": "Noční",
+  "typeColor": "#8B5CF6",
+  "rating": 5
+ },
+ {
+  "id": 702,
+  "employeeId": 0,
+  "date": "VCERA",
+  "startTime": "08:00",
+  "endTime": "12:30",
+  "start_time": "08:00",
+  "end_time": "12:30",
+  "type": "Ranní",
+  "typeLabel": "Ranní",
+  "typeColor": "#C8F542",
+  "rating": null
+ },
+ {
+  "id": 703,
+  "employeeId": 0,
+  "date": "ZITRA",
+  "startTime": "08:00",
+  "endTime": "16:00",
+  "start_time": "08:00",
+  "end_time": "16:00",
+  "type": "Ranní",
+  "typeLabel": "Ranní",
+  "typeColor": "#C8F542",
+  "rating": null
+ },
+ {
+  "id": 704,
+  "employeeId": 0,
+  "date": "ZA5",
+  "startTime": "14:00",
+  "endTime": "22:00",
+  "start_time": "14:00",
+  "end_time": "22:00",
+  "type": "Odpolední",
+  "typeLabel": "Odpolední",
+  "typeColor": "#3B82F6",
+  "rating": null
+ }
+]

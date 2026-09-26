@@ -1,0 +1,39 @@
+{
+ "stranka": "vedeni.menu",
+ "polozky": [
+  {
+   "id": "menu-stav",
+   "widget": "menu.stav",
+   "velikost": "M"
+  },
+  {
+   "id": "menu-vyprodano",
+   "widget": "menu.vyprodano",
+   "velikost": "M"
+  },
+  {
+   "id": "menu-wifi",
+   "widget": "menu.wifi",
+   "velikost": "S"
+  },
+  {
+   "id": "nastroj",
+   "widget": "nastroj",
+   "velikost": "L"
+  }
+ ],
+ "dostupne": [
+  "menu.stav",
+  "menu.vyprodano",
+  "menu.wifi",
+  "trzby.top_produkty",
+  "odkaz"
+ ],
+ "tarifem": [],
+ "zdroj": "podnik",
+ "rozsah": "typ:vedeni",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": true,
+ "verze": 0
+}

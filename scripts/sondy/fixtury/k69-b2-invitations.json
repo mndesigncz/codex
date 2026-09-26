@@ -1,0 +1,31 @@
+{
+ "invitations": [
+  {
+   "id": 71,
+   "email": "nova.barista@example.cz",
+   "job_title": "Barista",
+   "status": "pending",
+   "token": "tok-71",
+   "created_at": "VCERA",
+   "role": "employee"
+  },
+  {
+   "id": 72,
+   "email": "brigadnik@example.cz",
+   "job_title": "Pomocník",
+   "status": "pending",
+   "token": "tok-72",
+   "created_at": "PRED5",
+   "role": "employee"
+  },
+  {
+   "id": 70,
+   "email": "prijato@example.cz",
+   "job_title": "Barista",
+   "status": "accepted",
+   "token": null,
+   "created_at": "PRED5",
+   "role": "employee"
+  }
+ ]
+}

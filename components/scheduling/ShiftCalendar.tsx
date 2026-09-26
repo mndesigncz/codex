@@ -16,7 +16,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { zkratkyDnu, zacatekTydne } from '@/lib/week';
 import { Icon } from '../Icons';
-import { Card, ErrorState, MonthNav, Skeleton, Well } from '../ui';
+import { Avatar, Card, ErrorState, MonthNav, Skeleton, Well } from '../ui';
 import { useCurrency } from '../CurrencyProvider';
 import { PersonLink } from '../employer/ProfileLinkProvider';
 import { pragueToday } from '@/lib/pragueTime';
@@ -109,12 +109,15 @@ function KalendarSmen({ initialMonth }: { initialMonth?: string }) {
               return (
                 <button key={i} type="button" onClick={() => day ? setSel(active ? null : date) : undefined}
                   aria-pressed={day ? active : undefined}
-                  aria-label={`${dnum}. ${day?.missing ? '— chybí uzávěrka' : day?.hasClosing ? '— uzávěrka hotová' : ''}`}
-                  className={`tap-target-sm aspect-square rounded-xl border p-1 flex flex-col items-center justify-start gap-0.5 transition-colors ${tone} ${active ? 'ring-2 ring-[#16181A]/40' : ''} ${day ? 'cursor-pointer hover:border-black/20' : 'cursor-default'}`}>
+                  // Jména lidí na směně patří do popisku tlačítka: v buňce jsou jen avatary
+                  // a title odečítač ani dotyk nepřečte.
+                  aria-label={`${dnum}.${day?.missing ? ' — chybí uzávěrka' : day?.hasClosing ? ' — uzávěrka hotová' : ''}${day && day.onShift.length > 0 ? ` — na směně ${day.onShift.map(p => p.name).join(', ')}` : ''}`}
+                  className={`tap-target-sm aspect-square rounded-xl border p-1 flex flex-col items-center justify-start gap-0.5 transition-colors ${tone} ${active ? 'ring-2 ring-black/40 dark:ring-white/50' : ''} ${day ? 'cursor-pointer hover:border-black/20' : 'cursor-default'}`}>
                   <span className={`text-[11px] font-semibold leading-none mt-0.5 ${isToday ? 'text-[#16181A] underline underline-offset-2' : 'text-black/55'}`}>{dnum}</span>
                   {day && day.onShift.length > 0 && (
                     <span className="flex flex-wrap justify-center gap-0.5 leading-none" aria-hidden>
-                      {day.onShift.slice(0, 3).map(p => <span key={p.id} className="text-[11px]" title={p.name}>{p.avatar ?? '👤'}</span>)}
+                      {/* Avatar má vlastní náhradní ikonu — emoji místo něj zakazuje DP §3.18. */}
+                      {day.onShift.slice(0, 3).map(p => <Avatar key={p.id} emoji={p.avatar} size="xs" ring={false} className="!h-4 !w-4 !text-[11px]" />)}
                       {day.onShift.length > 3 && <span className="text-[11px] text-black/40">+{day.onShift.length - 3}</span>}
                     </span>
                   )}
@@ -140,7 +143,7 @@ function KalendarSmen({ initialMonth }: { initialMonth?: string }) {
                   <div className="flex flex-wrap gap-1.5">
                     {detail.onShift.map(p => (
                       <PersonLink key={p.id} id={p.id} className={`chip ${p.hadClosing ? 'chip-ok' : detail.missing ? 'chip-bad' : 'chip-muted'}`}>
-                        <span aria-hidden>{p.avatar ?? '👤'}</span> {p.name}
+                        <Avatar emoji={p.avatar} size="xs" ring={false} className="!h-5 !w-5" /> {p.name}
                         {p.startTime && <span className="opacity-60 tabular-nums">{p.startTime}–{p.endTime}</span>}
                         {p.hadClosing && <Icon name="check" size={13} className="shrink-0" />}
                       </PersonLink>
@@ -156,7 +159,7 @@ function KalendarSmen({ initialMonth }: { initialMonth?: string }) {
                   <div className="flex flex-wrap gap-1.5">
                     {detail.closedBy.map(p => (
                       <PersonLink key={p.id} id={p.id} className="chip chip-ok">
-                        <span aria-hidden>{p.avatar ?? '👤'}</span> {p.name}
+                        <Avatar emoji={p.avatar} size="xs" ring={false} className="!h-5 !w-5" /> {p.name}
                       </PersonLink>
                     ))}
                   </div>

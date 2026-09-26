@@ -356,6 +356,8 @@ function vyberCleny(raw: any): Clen[] {
 
 /** Kolik jmen ukázat jako pilulky ve střední velikosti. */
 const PILULEK_M = 10;
+/** Kolik řádků ukázat ve velké velikosti, než zbytek schová „…a dalších N". */
+const RADKU_L = 8;
 
 function DostupnostTymu({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: string }>) {
   const brana = useBrana(['dostupnost.zobrazit']);
@@ -364,6 +366,7 @@ function DostupnostTymu({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: s
   const mesic = nastaveni.mesic === 'tento' ? mesicZa(0) : mesicZa(1);
   const odevzdani = useDataWidgetu(brana ? `/api/availability?month=${mesic}` : null, vyberOdevzdani);
   const clenove = useDataWidgetu(brana ? '/api/teams' : null, vyberCleny);
+  const [vseLidi, setVseLidi] = useState(false);
 
   const { zadali, chybi, blokovano } = useMemo(() => {
     const podle = new Map<number, Odevzdani>();
@@ -385,6 +388,8 @@ function DostupnostTymu({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: s
   const smiSestavit = !nahled && smi('rozvrh.generovat') && nav.smiPohled('shifts');
   // Pole katalogu akce:vyplnit_za_cloveka — okno dostupnosti je v plánovači Rozvrhu.
   const smiVyplnit = !nahled && smi('dostupnost.upravit') && nav.smiPohled('shifts');
+  // Náhled zadané dostupnosti stačí dostupnost.zobrazit (hlavní brána widgetu).
+  const smiNahlednout = !nahled && nav.smiPohled('shifts');
   const sestavit = smiSestavit ? (
     <Button variant="secondary" size="sm" icon="calendar" onClick={() => nav.onNavigate('shifts')}>Sestavit rozvrh</Button>
   ) : null;
@@ -417,26 +422,43 @@ function DostupnostTymu({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: s
       </div>
     );
   } else {
+    // Nejdřív ti, kdo chybí; strop řádků, aby widget nad plánovačem nevypsal celý tým
+    // a hlavní nástroj stránky nezačínal až po obrazovce jmen (DP §5.1, §5.8).
+    const poradi = [...chybi, ...zadali];
+    const radky = vseLidi ? poradi : poradi.slice(0, RADKU_L);
     telo = (
       <div className="space-y-3">
         {vsichni ?? shrnuti}
         <ul className="list">
-          {[...chybi, ...zadali].map(c => {
+          {radky.map(c => {
             const zadal = !chybi.includes(c);
             const dnu = blokovano(Number(c.id));
+            // Stav jde do meta, ne do `right`, a řádek je bez chevronu (klikací je celý):
+            // na telefonu se ocas ListRow láme na celou šířku, takže chip i chevron by
+            // osiřely na vlastním řádku a každý člověk by zabral tři řádky.
             const obsah = {
+              chevron: false,
               lead: <Avatar emoji={c.avatar} size="sm" />,
               title: c.name,
-              meta: !zadal ? 'ještě nezadáno' : dnu === 0 ? 'bez omezení' : `nemůže ${czCount(dnu, DEN)}`,
-              right: zadal ? <Chip tone="ok" size="sm">Zadáno</Chip> : <Chip tone="wait" size="sm">Chybí</Chip>,
+              meta: !zadal
+                ? <Chip tone="wait" size="sm">Chybí</Chip>
+                : dnu === 0 ? 'zadáno · bez omezení' : `zadáno · nemůže ${czCount(dnu, DEN)}`,
             };
-            // Klepnutí otevře okno dostupnosti toho člověka v plánovači (vyplnit za něj / opravit).
+            // Klepnutí otevře okno dostupnosti v plánovači: s dostupnost.upravit k úpravě,
+            // jinak jen ke čtení (dny, preference, max. směn, poznámka pro vedení).
+            // U toho, kdo nezadal, je co ukázat jen tomu, kdo může vyplnit za něj.
+            const klik = smiVyplnit || (smiNahlednout && zadal);
             // Klikací řádek: vlastní <li> + ListRow as="div", jinak .list ztratí linku (DP §3.6).
-            return smiVyplnit
+            return klik
               ? <li key={c.id}><ListRow as="div" {...obsah} onClick={() => predejNastroji(nav, UDALOST_DOSTUPNOST, KLIC_DOSTUPNOST, `${c.id}|${mesic}`)} /></li>
               : <ListRow key={c.id} {...obsah} />;
           })}
         </ul>
+        {poradi.length > RADKU_L && (
+          <Button variant="ghost" size="sm" icon={vseLidi ? 'chevron' : 'chevronRight'} aria-expanded={vseLidi} onClick={() => setVseLidi(v => !v)}>
+            {vseLidi ? 'Ukázat méně' : `…a dalších ${cislo(poradi.length - RADKU_L)}`}
+          </Button>
+        )}
         {sestavit}
       </div>
     );
@@ -1015,11 +1037,15 @@ function vyberNahledTymu(raw: any): { zapnuto: boolean; smeny: SmenaNahledu[] } 
   return { zapnuto: true, smeny: raw.shifts };
 }
 
+/** Kolik dní se směnami ukáže střední velikost; zbytek rozsahu jen počtem. */
+const DNU_M = 3;
+
 function TymNahled({ velikost, nastaveni }: WidgetProps<{ rozsah?: string }>) {
   const brana = useBrana(['rozvrh.nahled']);
   const dnes = pragueToday();
-  // M = dnes a zítra, L = týden (katalog); volba „Dnes" zúží obojí na dnešek.
-  const dni = nastaveni.rozsah === 'dnes' ? 1 : velikost === 'L' ? 7 : 2;
+  // Rozsah platí v obou velikostech (Dnes / Týden / 14 dní). M jen ukáže první dny
+  // a zbytek přizná „…a další N dní" (DP §3.6) — dřív M tiše ořízl týden na dva dny.
+  const dni = nastaveni.rozsah === 'dnes' ? 1 : nastaveni.rozsah === 'dva_tydny' ? 14 : 7;
   const posledni = pragueToday(dni - 1);
   const m1 = dnes.slice(0, 7);
   const m2 = posledni.slice(0, 7);
@@ -1039,7 +1065,7 @@ function TymNahled({ velikost, nastaveni }: WidgetProps<{ rozsah?: string }>) {
   return (
     <Widget nacteni={[prvni, druhy]} prazdno={prazdno}>
       <ul className="list">
-        {dnyTymu.map(({ den: d, smeny }) => (
+        {(velikost === 'L' ? dnyTymu : dnyTymu.slice(0, DNU_M)).map(({ den: d, smeny }) => (
           <li key={d} className="py-3 first:pt-0 last:pb-0">
             <p className="t-label mb-2 cz-sentence">{denKratce(d, dnes)}</p>
             <ul className="flex flex-wrap gap-1.5" aria-label={`Směny ${denKratce(d, dnes).toLowerCase()}`}>
@@ -1053,6 +1079,9 @@ function TymNahled({ velikost, nastaveni }: WidgetProps<{ rozsah?: string }>) {
           </li>
         ))}
       </ul>
+      {velikost !== 'L' && dnyTymu.length > DNU_M && (
+        <p className="t-meta mt-2">…a {dnyTymu.length - DNU_M <= 4 ? 'další' : 'dalších'} {czCount(dnyTymu.length - DNU_M, DEN)}</p>
+      )}
     </Widget>
   );
 }

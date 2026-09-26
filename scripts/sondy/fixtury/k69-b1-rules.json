@@ -1,0 +1,26 @@
+{
+ "teamMax": 5,
+ "teamMaxHours": 20,
+ "balanceShifts": true,
+ "splitShifts": false,
+ "members": [
+  {
+   "id": 16,
+   "name": "Eva Testová",
+   "avatar": "🧑",
+   "role": "employee",
+   "maxConsecutive": null,
+   "maxHours": null,
+   "splitOk": true
+  },
+  {
+   "id": 17,
+   "name": "Jakub Horák",
+   "avatar": "🧔",
+   "role": "employee",
+   "maxConsecutive": null,
+   "maxHours": 10,
+   "splitOk": true
+  }
+ ]
+}

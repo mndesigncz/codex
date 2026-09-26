@@ -37,7 +37,7 @@ import { Widget, type StavNacteni } from '../Widget';
 import { useDataWidgetu } from '../useDataWidgetu';
 import { useNavigace } from '../NavigaceKontext';
 import { pragueHM, pragueToday } from '@/lib/pragueTime';
-import { czForm, SMENA } from '@/lib/czech';
+import { czCount, czForm, SMENA } from '@/lib/czech';
 import {
   den as denZ, denKratce as denKratceZ, dnuVolna, hodinyText, kategorieBarvy, minuleSmeny, mojeCisla, popisekTypu,
   rozsahVolna, TYP_VOLNA, zadostiVolna, type ZadostVolna,
@@ -180,7 +180,7 @@ function SmenyPrehled({ velikost, nahled }: WidgetProps) {
       ) : (
         <StatRow>
           <Stat label="Nadcházející" value={c.nadchazejici.toLocaleString('cs-CZ')} note={czForm(c.nadchazejici, SMENA)} />
-          <Stat label="Odpracováno" value={hodinyText(c.odpracovanoH)} unit="h" note={`z ${c.minulych.toLocaleString('cs-CZ')} ${czForm(c.minulych, SMENA)}`} />
+          <Stat label="Odpracováno" value={hodinyText(c.odpracovanoH)} unit="h" note={`${czCount(c.minulych, SMENA)} do včerejška`} />
           <Stat label="Celkem" value={c.celkem.toLocaleString('cs-CZ')} note={czForm(c.celkem, SMENA)} />
         </StatRow>
       )}

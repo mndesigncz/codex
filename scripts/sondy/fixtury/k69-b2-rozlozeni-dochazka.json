@@ -1,0 +1,52 @@
+{
+ "stranka": "vedeni.dochazka",
+ "polozky": [
+  {
+   "id": "dochazka-prave",
+   "widget": "dochazka.prave_na_smene",
+   "velikost": "L"
+  },
+  {
+   "id": "dochazka-otevrene",
+   "widget": "dochazka.dlouhe_prichody",
+   "velikost": "S"
+  },
+  {
+   "id": "dochazka-mzdy",
+   "widget": "dochazka.mzdy_za_obdobi",
+   "velikost": "M"
+  },
+  {
+   "id": "tym-bez-sazby",
+   "widget": "tym.bez_sazby",
+   "velikost": "S"
+  },
+  {
+   "id": "dochazka-souhrn",
+   "widget": "dochazka.souhrn_hodin",
+   "velikost": "L"
+  },
+  {
+   "id": "nastroj",
+   "widget": "nastroj",
+   "velikost": "L"
+  }
+ ],
+ "dostupne": [
+  "dochazka.prave_na_smene",
+  "dochazka.dnes_v_podniku",
+  "dochazka.dlouhe_prichody",
+  "dochazka.mzdy_za_obdobi",
+  "dochazka.souhrn_hodin",
+  "dochazka.moje_pichacky",
+  "tym.bez_sazby",
+  "rozvrh.dnesni_smeny"
+ ],
+ "tarifem": [],
+ "zdroj": "podnik",
+ "rozsah": "typ:vedeni",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": true,
+ "verze": 0
+}

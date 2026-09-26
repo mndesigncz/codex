@@ -1,0 +1,33 @@
+{
+ "proposed": [
+  {
+   "employeeId": 16,
+   "employeeName": "Eva Testová",
+   "employeeAvatar": "🧑",
+   "date": "PRISTI-06",
+   "startTime": "08:00",
+   "endTime": "16:00",
+   "type": "Ranní",
+   "shiftTypeId": 1,
+   "shiftTypeName": "Ranní",
+   "color": "#C8F542"
+  },
+  {
+   "employeeId": 17,
+   "employeeName": "Jakub Horák",
+   "employeeAvatar": "🧔",
+   "date": "PRISTI-07",
+   "startTime": "14:00",
+   "endTime": "22:00",
+   "type": "Odpolední",
+   "shiftTypeId": 2,
+   "shiftTypeName": "Odpolední",
+   "color": "#3B82F6"
+  }
+ ],
+ "warnings": [
+  "Tereza Malá má jen 2 směny."
+ ],
+ "gaps": [],
+ "understaffed": []
+}

@@ -1,0 +1,57 @@
+{
+ "stranka": "vedeni.rozvrh",
+ "polozky": [
+  {
+   "id": "rozvrh-dostupnost-tymu",
+   "widget": "rozvrh.dostupnost_tymu",
+   "velikost": "L"
+  },
+  {
+   "id": "rozvrh-diry",
+   "widget": "rozvrh.diry",
+   "velikost": "M"
+  },
+  {
+   "id": "rozvrh-zadosti-volno",
+   "widget": "rozvrh.zadosti_volno",
+   "velikost": "M"
+  },
+  {
+   "id": "rozvrh-vymeny",
+   "widget": "rozvrh.vymeny",
+   "velikost": "M"
+  },
+  {
+   "id": "rozvrh-hodiny-lidi",
+   "widget": "rozvrh.hodiny_lidi",
+   "velikost": "M"
+  },
+  {
+   "id": "nastroj",
+   "widget": "nastroj",
+   "velikost": "L"
+  }
+ ],
+ "dostupne": [
+  "rozvrh.dnesni_smeny",
+  "rozvrh.dostupnost_tymu",
+  "rozvrh.diry",
+  "rozvrh.poptavka",
+  "rozvrh.zadosti_volno",
+  "rozvrh.vymeny",
+  "rozvrh.hodiny_lidi",
+  "rozvrh.tym_nahled",
+  "rozvrh.pripominka_dostupnosti",
+  "uzaverky.kalendar",
+  "akce.nejblizsi",
+  "dochazka.prave_na_smene",
+  "odkaz"
+ ],
+ "tarifem": [],
+ "zdroj": "podnik",
+ "rozsah": "typ:vedeni",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": false,
+ "verze": 0
+}

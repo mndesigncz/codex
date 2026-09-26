@@ -82,7 +82,10 @@ export const WIDGETY: DefiniceWidgetu[] = [
     opravneni: {
       vse: ['dochazka.zobrazit', 'finance.mzdy'],
       nektere: [],
-      pole: { podil_na_trzbach: 'finance.trzby' },
+      // Podíl potřebuje obojí (pole s polem klíčů znamená „kterýkoli"), proto dva
+      // záznamy: tržby vidět a vidět je ze všech uzávěrek — bez zobrazit_vse
+      // vrátí /api/closings jen vlastní uzávěrky a podíl by vyšel násobně vyšší.
+      pole: { podil_na_trzbach: 'finance.trzby', podil_na_trzbach_vsechny_uzaverky: 'uzaverky.zobrazit_vse' },
     },
     tarif: 'zdarma',
     nastaveni: [

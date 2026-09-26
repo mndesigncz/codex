@@ -24,6 +24,8 @@ await ctx.route('**/api/**', async route => {
     if (u.includes('/api/teams/switch')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, teamId: 2, role: 'employer', teamName: 'Kavárna Karlín' }) });
     return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
   }
+  // Kolo 69 (B2): Docházka a Tým jsou plochy s widgety — rozložení (widgety a nástroj) z fixtury balíku.
+  if (new URL(u).pathname === '/api/rozlozeni' && ['vedeni.dochazka', 'vedeni.tym'].includes(new URL(u).searchParams.get('stranka'))) return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + (new URL(u).searchParams.get('stranka') === 'vedeni.tym' ? 'k69-b2-rozlozeni-tym' : 'k69-b2-rozlozeni-dochazka') + '.json', 'utf8') });
   const k = keyFor(u);
   if (k && existsSync(DIR + k + '.json')) return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + k + '.json', 'utf8') });
   return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
@@ -54,6 +56,8 @@ if (await prepinac.count() > 0) {
 
 await p.goto('http://localhost:3000/employer/overview?view=team-settings', { waitUntil: 'networkidle' });
 await p.waitForTimeout(1500);
+// Kolo 69 (B2): nastavení týmu je v sekcích nástroje; organizace je v sekci Podnik.
+await p.getByRole('tab', { name: 'Podnik' }).click(); await p.waitForTimeout(600);
 const t2 = (await p.locator('main').innerText()).toLowerCase();
 tvrdi('nastavení týmu ukazuje kartu organizace', t2.includes('organizace: moje kavárny'), t2.slice(0, 200));
 tvrdi('karta jmenuje oba podniky', t2.includes('kavárna vinohrady') && t2.includes('kavárna karlín'), 'názvy podniků chybí');

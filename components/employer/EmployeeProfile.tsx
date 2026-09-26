@@ -1,13 +1,27 @@
 'use client';
 
+// Profil člena — okno z Týmu, Docházky, Odměn (PersonLink) a widgetu Profil člena.
+//
+// Kolo 69 (balík B2, audit Týmu): dřív ručně psané okno s vlastním
+// kolečkem načítání, zavíracím SVG bez popisku, záložkami seg-on/seg-off,
+// třemi čísly v jamkách 11 px a emoji ⏰ 📞 jako ikonami. Teď <Modal size="lg">
+// (DiscardGuard, Escape a fokus řeší Modal), Segmented, StatRow, .list
+// a stavy přes Chip. Odpracováno počítá server stejně jako Docházka
+// (lib/dochazkaPrehled: bez zapomenutých odchodů a jen v tomhle podniku).
+//
+// Oprávnění: záložka Hodnocení a hvězdy jen s hodnoceni.zobrazit (server
+// je bez něj neposílá), „Ohodnotit" jen s hodnoceni.hodnotit, sazba jen
+// s finance.mzdy, kontakty jen s tym.kontakty (obojí server vynechá).
+
 import { useEffect, useState, useCallback } from 'react';
 import { Icon } from '../Icons';
-import { EmptyState } from '../ui';
+import { Button, Chip, EmptyState, ErrorState, ListRow, Modal, Segmented, Skeleton, Stat, StatRow, Avatar } from '../ui';
 import ShiftReviewModal from './ShiftReviewModal';
 import type { RewardLevel } from '@/lib/rewardLevels';
-import { useModal } from '@/lib/useModal';
-import { okJson } from '@/lib/api';
-import { DiscardGuard } from '../ui/DiscardGuard';
+import { apiMessage, okJson } from '@/lib/api';
+import { useMoney } from '../CurrencyProvider';
+import { useOpravneni } from '../role/useOpravneni';
+import { hodinyMinuty } from '@/lib/dochazkaPrehled';
 
 interface ShiftRow {
   id: number; date: string; startTime: string | null; endTime: string | null; type: string | null;
@@ -23,7 +37,7 @@ interface Profile {
   employee: { id: number; name: string; avatar?: string; email: string | null; phone: string | null; jobTitle: string | null; hourlyRate: number | null };
   standing: { points: number; levelName: string; levelIndex: number; perks: string; next: RewardLevel | null; pctToNext: number; pointsIntoLevel: number; pointsForNext: number };
   levels: RewardLevel[];
-  breakdown: { tasks: number; procedures: number; closings: number; reviewPoints: number; autoPoints: number; itemPoints: number; ratedShifts: number; flagged: number };
+  breakdown: { tasks: number; procedures: number; closings: number; reviewPoints: number | null; autoPoints: number | null; itemPoints: number | null; ratedShifts: number | null; flagged: number | null };
   shifts: { upcoming: ShiftRow[]; recent: ShiftRow[] };
   reviews: Review[];
   items: FeedbackItem[];
@@ -31,296 +45,227 @@ interface Profile {
   punctuality?: { checked: number; late: number } | null;
 }
 
+type Zalozka = 'overview' | 'shifts' | 'feedback';
+
 const KIND_LABEL: Record<string, string> = { task: 'Úkol', procedure: 'Postup', closing: 'Uzávěrka' };
-const fmtDay = (s: string) => new Date(String(s).slice(0, 10) + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' });
-const fmtDayLong = (s: string) => new Date(String(s).slice(0, 10) + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'long' });
+const fmtDay = (s: string) => new Date(String(s).slice(0, 10) + 'T12:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' });
+const fmtDayLong = (s: string) => new Date(String(s).slice(0, 10) + 'T12:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'long' });
+const hm = (t: string | null) => String(t ?? '').slice(0, 5);
 
-const Stars = ({ n }: { n: number }) => (
-  <span className="inline-flex gap-0.5">
-    {[1, 2, 3, 4, 5].map(i => (
-      <svg key={i} width="12" height="12" viewBox="0 0 24 24" fill={i <= n ? '#C8F542' : 'none'} stroke={i <= n ? '#8FB811' : 'currentColor'} strokeWidth="1.6" className={i <= n ? '' : 'text-black/20'}>
-        <path d="m12 3 2.6 5.3 5.9.9-4.2 4.1 1 5.8L12 16.9 6.7 19.2l1-5.8-4.2-4.1 5.9-.9L12 3Z" strokeLinejoin="round" />
-      </svg>
-    ))}
-  </span>
+/** Body jako stav: kladné ok, záporné bad, nula nic. */
+const Body = ({ n }: { n: number | null | undefined }) => !n ? null : (
+  <Chip tone={n > 0 ? 'ok' : 'bad'} size="sm">{n > 0 ? '+' : ''}{n.toLocaleString('cs-CZ')} b</Chip>
 );
-
-const PointsBadge = ({ n }: { n: number }) => n === 0 ? null : (
-  <span className={`text-[11px] font-bold tabular-nums rounded-full px-2 py-0.5 shrink-0 ${n > 0 ? 'bg-[#C8F542]/25 text-[#5B7A08]' : 'bg-bad/15 text-bad-ink'}`}>
-    {n > 0 ? '+' : ''}{n} b
-  </span>
-);
+const Hvezdy = ({ n }: { n: number }) => n > 0 ? <Chip tone="muted" size="sm" icon="star">{n}/5</Chip> : null;
 
 export default function EmployeeProfile({ employeeId, onClose }: { employeeId: number; onClose: () => void }) {
-  const m = useModal(true, onClose, 'Profil zaměstnance');
+  // Jako na stránkách: před načtením oprávnění rozhoduje server (data bez klíče nepošle).
+  const { ma: smi } = useOpravneni();
+  const money = useMoney();
+  const vidiHodnoceni = smi('hodnoceni.zobrazit');
+  const smiHodnotit = smi('hodnoceni.hodnotit');
   const [p, setP] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'overview' | 'shifts' | 'feedback'>('overview');
+  const [chyba, setChyba] = useState<string | null>(null);
+  const [tab, setTab] = useState<Zalozka>('overview');
   const [rateDate, setRateDate] = useState<string | null>(null);
 
   const load = useCallback(() => {
-    fetch(`/api/employees/${employeeId}`).then(okJson).then(d => {
-      if (d && !d.error) setP(d);
-    }).catch(() => {}).finally(() => setLoading(false));
+    setChyba(null);
+    fetch(`/api/employees/${employeeId}`).then(okJson)
+      .then(d => { if (d && d.employee) setP(d); else setChyba('Profil přišel v nečekaném tvaru.'); })
+      .catch(e => setChyba(apiMessage(e, 'Profil se nepodařilo načíst.')));
   }, [employeeId]);
   useEffect(() => { load(); }, [load]);
 
-  const hours = p ? Math.floor(p.month.hoursMs / 3600000) : 0;
-  const minutes = p ? Math.floor((p.month.hoursMs % 3600000) / 60000) : 0;
   const flaggedItems = p?.items.filter(i => i.flagged) ?? [];
+  const e = p?.employee;
+  const podtitul = e ? [e.jobTitle || 'Člen týmu', smi('finance.mzdy') && e.hourlyRate ? `${money(e.hourlyRate)}/h` : null].filter(Boolean).join(' · ') : undefined;
+  const zalozky = [
+    { id: 'overview' as const, label: 'Přehled' },
+    { id: 'shifts' as const, label: 'Směny' },
+    ...(vidiHodnoceni ? [{ id: 'feedback' as const, label: 'Hodnocení', count: flaggedItems.length || undefined }] : []),
+  ];
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={onClose}>
-      <div ref={m.ref} {...m.dialogProps} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-2xl max-h-[94vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <DiscardGuard guard={m.guard} />
-        {loading || !p ? (
-          <div className="p-10 flex items-center justify-center">
-            <div className="h-9 w-9 rounded-full border-2 border-black/10 border-t-[#8FB811] animate-spin" />
+    <>
+      <Modal open onClose={onClose} size="lg" title={e?.name ?? 'Profil zaměstnance'} subtitle={podtitul}>
+        {chyba ? (
+          <ErrorState compact title="Profil se nenačetl" detail={chyba} onRetry={load} />
+        ) : !p || !e ? (
+          <div className="space-y-3" aria-busy>
+            <Skeleton className="h-14" />
+            <Skeleton className="h-24" />
+            <Skeleton className="h-10 w-2/3" />
           </div>
         ) : (
-          <>
-            {/* Header */}
-            <div className="sticky top-0 z-10 glass-strong chrome-edge">
-              <div className="flex items-center gap-3.5 px-5 pt-5 pb-3">
-                <span className="text-3xl flex h-14 w-14 items-center justify-center rounded-full ring-1 ring-black/10 bg-white/60 shrink-0">{p.employee.avatar || '👤'}</span>
-                <div className="min-w-0 flex-1">
-                  <h2 className="t-section truncate">{p.employee.name}</h2>
-                  <p className="text-sm text-black/50 truncate">
-                    {p.employee.jobTitle || 'Zaměstnanec'}
-                    {p.employee.hourlyRate ? ` · ${p.employee.hourlyRate} Kč/h` : ''}
-                  </p>
-                </div>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#16181A] text-[#C8F542] px-3.5 py-1.5 text-sm font-bold tabular-nums shrink-0">
-                  <Icon name="award" size={15} /> {p.standing.points} b
-                </span>
-                <button onClick={onClose} className="rounded-full w-9 h-9 flex items-center justify-center text-black/45 hover:bg-black/[0.06] shrink-0">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
-                </button>
+          <div className="space-y-5">
+            <div className="flex items-center gap-3 flex-wrap">
+              <Avatar emoji={e.avatar} size="lg" />
+              <div className="min-w-0 flex-1">
+                <p className="t-label">Úroveň</p>
+                <p className="t-section">{p.standing.levelName}</p>
               </div>
-              <div className="flex gap-1 px-5 pb-3">
-                {([['overview', 'Přehled'], ['shifts', 'Směny'], ['feedback', 'Hodnocení']] as const).map(([v, lbl]) => (
-                  <button key={v} onClick={() => setTab(v)}
-                    className={`tap-target-sm px-3.5 py-1.5 rounded-full text-xs font-semibold transition ${tab === v ? 'seg-on' : 'seg-off bg-black/[0.05]'}`}>
-                    {lbl}
-                    {v === 'feedback' && flaggedItems.length > 0 && <span className="ml-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-bad text-white text-[11px] px-1">{flaggedItems.length}</span>}
-                  </button>
-                ))}
-              </div>
+              <Chip tone="ink" icon="award">{p.standing.points.toLocaleString('cs-CZ')} b</Chip>
             </div>
+            <Segmented size="sm" ariaLabel="Část profilu" value={tab} onChange={setTab} options={zalozky} />
 
-            <div className="p-5 space-y-5">
-              {tab === 'overview' && (
-                <>
-                  {/* Level + progress */}
-                  <div className="well border border-black/[0.05] p-4">
-                    <div className="flex items-end justify-between gap-2 flex-wrap">
-                      <div>
-                        <p className="t-label text-black/40">Úroveň</p>
-                        <p className="text-2xl font-bold tracking-tight text-[#16181A]">{p.standing.levelName}</p>
-                      </div>
-                      {p.standing.next && (
-                        <p className="text-xs text-black/50 tabular-nums">do <strong className="text-[#16181A]">{p.standing.next.name}</strong> zbývá {Math.max(0, p.standing.pointsForNext - p.standing.pointsIntoLevel)} b</p>
-                      )}
-                    </div>
-                    {p.standing.next && (
-                      <div className="mt-2.5 h-2 w-full rounded-full bg-black/[0.06] overflow-hidden">
-                        <div className="h-full rounded-full bg-[#C8F542]" style={{ width: `${p.standing.pctToNext}%` }} />
-                      </div>
-                    )}
-                    {p.standing.perks && (
-                      <p className="mt-2.5 text-xs text-[#5B7A08] whitespace-pre-line"><strong>Výhody:</strong> {p.standing.perks}</p>
-                    )}
-                  </div>
-
-                  {/* This month */}
+            {tab === 'overview' && (
+              <>
+                {p.standing.next && (
                   <div>
-                    <h3 className="t-label mb-2">Tento měsíc</h3>
-                    <div className="grid grid-cols-3 gap-2.5">
-                      <div className="well p-3 text-center">
-                        <p className="text-base sm:text-xl font-bold tracking-tight text-[#16181A] tabular-nums whitespace-nowrap">{hours}<span className="text-xs font-semibold text-black/40"> h </span>{minutes > 0 && <>{minutes}<span className="text-xs font-semibold text-black/40"> m</span></>}</p>
-                        <p className="text-[11px] text-black/45 mt-0.5">odpracováno</p>
-                      </div>
-                      <div className="well p-3 text-center">
-                        <p className="text-xl font-bold tracking-tight text-[#16181A] tabular-nums">{p.month.shifts}</p>
-                        <p className="text-[11px] text-black/45 mt-0.5">směn</p>
-                      </div>
-                      <div className="well p-3 text-center">
-                        <p className="text-xl font-bold tracking-tight text-[#16181A] tabular-nums">{p.month.closings}</p>
-                        <p className="text-[11px] text-black/45 mt-0.5">uzávěrek</p>
-                      </div>
+                    <div className="flex items-center justify-between gap-2 text-[13px] text-black/55 tabular-nums">
+                      <span>do úrovně {p.standing.next.name}</span>
+                      <span>zbývá {Math.max(0, p.standing.pointsForNext - p.standing.pointsIntoLevel).toLocaleString('cs-CZ')} b</span>
                     </div>
-                    {p.punctuality && (
-                      <p className={`mt-2 text-[12px] rounded-xl px-3 py-2 ${
-                        p.punctuality.late === 0
-                          ? 'bg-[#C8F542]/10 text-[#5B7A08]'
-                          : 'bg-wait/10 text-wait-ink'
-                      }`}>
-                        ⏰ Dochvilnost (30 dní): {p.punctuality.checked - p.punctuality.late}/{p.punctuality.checked} včas
-                        {p.punctuality.late > 0 && ` · ${p.punctuality.late}× pozdě (víc než 10 min)`}
-                      </p>
-                    )}
+                    <div className="mt-1.5 h-2 w-full rounded-full bg-black/[0.06] overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(p.standing.pctToNext)} aria-label="Postup na další úroveň">
+                      <div className="h-full rounded-full bg-[#16181A]" style={{ width: `${p.standing.pctToNext}%` }} />
+                    </div>
                   </div>
+                )}
+                {p.standing.perks && <p className="text-[13px] text-black/60 whitespace-pre-line"><strong className="font-semibold text-[#16181A]">Výhody:</strong> {p.standing.perks}</p>}
 
-                  {/* Points breakdown */}
-                  <div>
-                    <h3 className="t-label mb-2">Odkud má body</h3>
-                    <div className="flex flex-wrap gap-1.5">
-                      {([
-                        ['Úkoly', p.breakdown.tasks], ['Postupy', p.breakdown.procedures], ['Uzávěrky', p.breakdown.closings],
-                        ['Z hodnocení', p.breakdown.reviewPoints], ['Automaticky', p.breakdown.autoPoints], ['K položkám', p.breakdown.itemPoints],
-                      ] as [string, number][]).map(([label, val]) => (
-                        <span key={label} className="inline-flex items-center gap-1 rounded-full bg-black/[0.04] px-2.5 py-1 text-[11px] font-medium text-black/55 tabular-nums">
-                          {label}: <strong className="text-[#16181A]">{val}</strong>
-                        </span>
+                <section aria-labelledby="profil-mesic">
+                  <h3 id="profil-mesic" className="t-label mb-2">Tento měsíc</h3>
+                  <StatRow>
+                    <Stat label="Odpracováno" value={hodinyMinuty(p.month.hoursMs)} />
+                    <Stat label="Směny" value={p.month.shifts.toLocaleString('cs-CZ')} />
+                    <Stat label="Uzávěrky" value={p.month.closings.toLocaleString('cs-CZ')} />
+                  </StatRow>
+                  {p.punctuality && (
+                    <p className={`note mt-3 ${p.punctuality.late === 0 ? 'note-ok' : 'note-wait'}`}>
+                      <Icon name="clock" size={14} className="inline -mt-0.5 mr-1.5" />
+                      Dochvilnost za 30 dní: {p.punctuality.checked - p.punctuality.late}/{p.punctuality.checked} včas
+                      {p.punctuality.late > 0 && ` · ${p.punctuality.late}× pozdě (víc než 10 min)`}
+                    </p>
+                  )}
+                </section>
+
+                <section aria-labelledby="profil-body">
+                  <h3 id="profil-body" className="t-label mb-2">Odkud má body</h3>
+                  <div className="flex flex-wrap gap-1.5">
+                    {([
+                      ['Úkoly', p.breakdown.tasks], ['Postupy', p.breakdown.procedures], ['Uzávěrky', p.breakdown.closings],
+                      ...(vidiHodnoceni ? [['Z hodnocení', p.breakdown.reviewPoints], ['Automaticky', p.breakdown.autoPoints], ['K položkám', p.breakdown.itemPoints]] : []),
+                    ] as [string, number | null][]).filter(([, v]) => v != null).map(([label, val]) => (
+                      <Chip key={label} tone="muted" size="sm">{label}: {(val ?? 0).toLocaleString('cs-CZ')}</Chip>
+                    ))}
+                    {vidiHodnoceni && (p.breakdown.flagged ?? 0) > 0 && <Chip tone="bad" size="sm" icon="warning">Výtky: {p.breakdown.flagged}</Chip>}
+                  </div>
+                </section>
+
+                {flaggedItems.length > 0 && (
+                  <section aria-labelledby="profil-napravit">
+                    <h3 id="profil-napravit" className="t-label mb-1">Co je potřeba napravit</h3>
+                    <ul className="list">
+                      {flaggedItems.slice(0, 5).map(it => (
+                        <ListRow key={`${it.kind}-${it.refId}`} title={it.label}
+                          meta={[`${KIND_LABEL[it.kind] ?? ''} · ${fmtDay(it.workDate)}`, it.note].filter(Boolean).join(' · ')}
+                          right={<Body n={it.points} />} />
                       ))}
-                      {p.breakdown.flagged > 0 && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-bad/15 px-2.5 py-1 text-[11px] font-medium text-bad-ink tabular-nums">
-                          <Icon name="warning" size={11} /> Výtky: <strong>{p.breakdown.flagged}</strong>
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                    </ul>
+                  </section>
+                )}
 
-                  {/* Reminders — unresolved flagged feedback */}
-                  {flaggedItems.length > 0 && (
-                    <div>
-                      <h3 className="text-xs font-bold uppercase tracking-[0.13em] text-bad-ink mb-2">Co je potřeba napravit</h3>
-                      <div className="space-y-1.5">
-                        {flaggedItems.slice(0, 5).map(it => (
-                          <div key={`${it.kind}-${it.refId}`} className="rounded-xl px-3 py-2 bg-wait/[0.12] border border-wait/30">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <Icon name="warning" size={13} className="text-wait-ink shrink-0" />
-                              <span className="text-[11px] font-semibold uppercase tracking-wider text-black/40">{KIND_LABEL[it.kind] ?? ''} · {fmtDay(it.workDate)}</span>
-                              <span className="text-[13px] font-medium text-[#16181A] min-w-0 flex-1 truncate">{it.label}</span>
-                              <PointsBadge n={it.points} />
-                            </div>
-                            {it.note && <p className="text-[13px] text-black/60 mt-1">{it.note}</p>}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                {(e.email || e.phone) && (
+                  <section aria-labelledby="profil-kontakt">
+                    <h3 id="profil-kontakt" className="t-label mb-1">Kontakt</h3>
+                    <ul className="list">
+                      {e.email && <ListRow lead={<Icon name="mail" size={16} className="text-black/40" />} title={<a href={`mailto:${e.email}`} className="hover:underline">{e.email}</a>} />}
+                      {e.phone && <ListRow lead={<Icon name="chat" size={16} className="text-black/40" />} title={<a href={`tel:${e.phone}`} className="hover:underline">{e.phone}</a>} />}
+                    </ul>
+                  </section>
+                )}
+              </>
+            )}
 
-                  {/* Contact */}
-                  {(p.employee.email || p.employee.phone) && (
-                    <div>
-                      <h3 className="t-label mb-2">Kontakt</h3>
-                      <div className="well p-3.5 space-y-1 text-sm">
-                        {p.employee.email && <p className="text-[#16181A] truncate"><Icon name="mail" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> {p.employee.email}</p>}
-                        {p.employee.phone && <p className="text-[#16181A]">📞 {p.employee.phone}</p>}
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-
-              {tab === 'shifts' && (
-                <>
-                  {p.shifts.upcoming.length > 0 && (
-                    <div>
-                      <h3 className="text-xs font-bold uppercase tracking-[0.13em] text-[#5B7A08] mb-2">Nadcházející ({p.shifts.upcoming.length})</h3>
-                      <div className="space-y-1.5">
-                        {p.shifts.upcoming.map(sh => (
-                          <div key={sh.id} className="flex items-center gap-3 rounded-2xl bg-[#C8F542]/[0.08] border border-[#C8F542]/20 px-3.5 py-2.5">
-                            <span className="text-sm font-semibold text-[#16181A] cz-sentence flex-1 min-w-0 truncate">{fmtDayLong(sh.date)}</span>
-                            <span className="text-xs text-black/50 tabular-nums shrink-0">{sh.startTime}–{sh.endTime}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  <div>
-                    <h3 className="t-label mb-2">Odpracované ({p.shifts.recent.length})</h3>
-                    {p.shifts.recent.length === 0 ? (
-                      <EmptyState illustration="smeny" title="Zatím žádná odpracovaná směna" compact />
-                    ) : (
-                      <div className="space-y-1.5">
-                        {p.shifts.recent.map(sh => (
-                          <div key={sh.id} className={`flex items-center gap-2.5 rounded-2xl px-3.5 py-2.5 ${sh.flagged ? 'bg-bad/[0.06] border border-bad/20' : 'bg-black/[0.03]'}`}>
-                            <span className="text-sm font-medium text-[#16181A] cz-sentence min-w-0 flex-1 truncate">{fmtDayLong(sh.date)}</span>
-                            <span className="text-xs text-black/45 tabular-nums shrink-0 hidden sm:inline">{sh.startTime}–{sh.endTime}</span>
-                            {sh.reviewed ? (
-                              <span className="flex items-center gap-1.5 flex-wrap min-w-0">
-                                {sh.rating > 0 && <Stars n={sh.rating} />}
-                                {sh.flagged && <Icon name="warning" size={13} className="text-bad-ink" />}
-                                <PointsBadge n={sh.reviewPoints} />
-                              </span>
-                            ) : (
-                              <span className="text-[11px] font-medium text-wait-ink bg-wait/15 rounded-full px-2 py-0.5 shrink-0">Nehodnoceno</span>
-                            )}
-                            <button onClick={() => setRateDate(sh.date)}
-                              className="btn btn-primary btn-sm transition shrink-0">
-                              {sh.reviewed ? 'Upravit' : 'Ohodnotit'}
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-
-              {tab === 'feedback' && (
-                <>
-                  {p.reviews.length === 0 && p.items.length === 0 ? (
-                    <EmptyState illustration="odmeny" title="Zatím žádné hodnocení" hint="Otevři záložku Směny a ohodnoť první." compact />
+            {tab === 'shifts' && (
+              <>
+                {p.shifts.upcoming.length > 0 && (
+                  <section aria-labelledby="profil-nadchazejici">
+                    <h3 id="profil-nadchazejici" className="t-label mb-1">Nadcházející ({p.shifts.upcoming.length})</h3>
+                    <ul className="list">
+                      {p.shifts.upcoming.map(sh => (
+                        <ListRow key={sh.id} title={<span className="cz-sentence">{fmtDayLong(sh.date)}</span>} value={`${hm(sh.startTime)}–${hm(sh.endTime)}`} />
+                      ))}
+                    </ul>
+                  </section>
+                )}
+                <section aria-labelledby="profil-odpracovane">
+                  <h3 id="profil-odpracovane" className="t-label mb-1">Odpracované ({p.shifts.recent.length})</h3>
+                  {p.shifts.recent.length === 0 ? (
+                    <EmptyState illustration="smeny" title="Zatím žádná odpracovaná směna" compact />
                   ) : (
-                    <div className="space-y-2.5">
-                      {p.reviews.map(r => {
-                        const dayItems = p.items.filter(i => i.workDate === r.work_date);
-                        const alert = r.flagged === true || dayItems.some(i => i.flagged);
-                        return (
-                          <div key={r.work_date} className={`rounded-2xl p-3.5 border ${alert ? 'bg-white/60 border-bad/25' : 'bg-black/[0.03] border-transparent'}`}>
-                            <div className="flex items-center justify-between gap-2 flex-wrap">
-                              <span className="text-sm font-semibold text-[#16181A]">{fmtDayLong(r.work_date)}</span>
-                              <div className="flex items-center gap-2">
-                                {r.rating > 0 && <Stars n={r.rating} />}
-                                <PointsBadge n={r.points} />
-                                {(r.autoPoints ?? 0) !== 0 && (
-                                  <span className={`text-[11px] tabular-nums rounded-full px-1.5 py-0.5 bg-black/[0.05] ${(r.autoPoints ?? 0) > 0 ? 'text-[#5B7A08]' : 'text-bad-ink'}`}>
-                                    {(r.autoPoints ?? 0) > 0 ? '+' : ''}{r.autoPoints} auto
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            {r.note && <p className="text-sm text-black/60 mt-1.5 whitespace-pre-line">{r.note}</p>}
-                            {dayItems.length > 0 && (
-                              <div className="mt-2 space-y-1.5">
-                                {dayItems.map(it => (
-                                  <div key={`${it.kind}-${it.refId}`} className={`rounded-xl px-3 py-2 ${it.flagged ? 'bg-wait/[0.12] border border-wait/30' : 'bg-black/[0.04]'}`}>
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      {it.flagged && <Icon name="warning" size={12} className="text-wait-ink shrink-0" />}
-                                      <span className="text-[11px] font-semibold uppercase tracking-wider text-black/40 shrink-0">{KIND_LABEL[it.kind] ?? ''}</span>
-                                      <span className="text-[13px] text-[#16181A] min-w-0 flex-1 truncate">{it.label}</span>
-                                      <PointsBadge n={it.points} />
-                                    </div>
-                                    {it.note && <p className="text-[13px] text-black/60 mt-1">{it.note}</p>}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                    <ul className="list">
+                      {p.shifts.recent.map(sh => (
+                        <ListRow key={sh.id}
+                          title={<span className="cz-sentence">{fmtDayLong(sh.date)}</span>}
+                          meta={`${hm(sh.startTime)}–${hm(sh.endTime)}`}
+                          right={vidiHodnoceni ? (sh.reviewed ? <>
+                            <Hvezdy n={sh.rating} />
+                            {sh.flagged && <Chip tone="bad" size="sm" icon="warning">Výtka</Chip>}
+                            <Body n={sh.reviewPoints} />
+                          </> : <Chip tone="wait" size="sm">Nehodnoceno</Chip>) : undefined}
+                          actions={smiHodnotit ? (
+                            <Button variant="secondary" size="sm" onClick={() => setRateDate(sh.date)}>{sh.reviewed ? 'Upravit' : 'Ohodnotit'}</Button>
+                          ) : undefined}
+                        />
+                      ))}
+                    </ul>
                   )}
-                </>
-              )}
-            </div>
-          </>
+                </section>
+              </>
+            )}
+
+            {tab === 'feedback' && vidiHodnoceni && (
+              p.reviews.length === 0 && p.items.length === 0 ? (
+                <EmptyState illustration="odmeny" title="Zatím žádné hodnocení" hint="Otevři záložku Směny a ohodnoť první." compact />
+              ) : (
+                <ul className="list">
+                  {p.reviews.map(r => {
+                    const dayItems = p.items.filter(i => i.workDate === r.work_date);
+                    return (
+                      <li key={r.work_date} className="py-3">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <span className="text-[15px] font-medium text-[#16181A] cz-sentence">{fmtDayLong(r.work_date)}</span>
+                          <span className="flex items-center gap-1.5 flex-wrap">
+                            <Hvezdy n={r.rating} />
+                            {r.flagged && <Chip tone="bad" size="sm" icon="warning">Výtka</Chip>}
+                            <Body n={r.points} />
+                            {(r.autoPoints ?? 0) !== 0 && <Chip tone="muted" size="sm">{(r.autoPoints ?? 0) > 0 ? '+' : ''}{r.autoPoints} auto</Chip>}
+                          </span>
+                        </div>
+                        {r.note && <p className="text-sm text-black/60 mt-1.5 whitespace-pre-line">{r.note}</p>}
+                        {dayItems.length > 0 && (
+                          <ul className="mt-2 space-y-1">
+                            {dayItems.map(it => (
+                              <li key={`${it.kind}-${it.refId}`} className="flex items-center gap-2 flex-wrap text-[13px]">
+                                {it.flagged && <Icon name="warning" size={13} className="text-wait-ink shrink-0" />}
+                                <span className="text-black/55 shrink-0">{KIND_LABEL[it.kind] ?? ''}</span>
+                                <span className="text-[#16181A] min-w-0 flex-1 truncate">{it.label}</span>
+                                <Body n={it.points} />
+                                {it.note && <span className="basis-full text-black/60">{it.note}</span>}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )
+            )}
+          </div>
         )}
-      </div>
+      </Modal>
 
       {rateDate && p && (
-        <div onClick={e => e.stopPropagation()}>
-          <ShiftReviewModal
-            employee={{ id: p.employee.id, name: p.employee.name, avatar: p.employee.avatar }}
-            initialDate={rateDate}
-            onClose={() => setRateDate(null)}
-            onSaved={() => { setRateDate(null); load(); }}
-          />
-        </div>
+        <ShiftReviewModal
+          employee={{ id: p.employee.id, name: p.employee.name, avatar: p.employee.avatar }}
+          initialDate={rateDate}
+          onClose={() => setRateDate(null)}
+          onSaved={() => { setRateDate(null); load(); }}
+        />
       )}
-    </div>
+    </>
   );
 }

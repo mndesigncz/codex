@@ -14,7 +14,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../Icons';
-import { Button, Chip, DiscardGuard, EmptyState, ErrorState, Input, Label, Modal, SearchField, Segmented, Textarea } from '../ui';
+import { Button, Chip, DiscardGuard, EmptyState, ErrorState, Input, Label, Modal, SearchField, Segmented, Switch, Textarea } from '../ui';
 import { okJson, apiMessage, ApiError } from '@/lib/api';
 import { czCount, czForm, czVerb } from '@/lib/czech';
 import { obsahujeNekde } from '@/lib/hledani';
@@ -291,18 +291,6 @@ function RadekRole({ nazev, popis, typ, pocetOpravneni, pocetLidi, vychozi, moje
   );
 }
 
-function Prepinac({ on, onChange, disabled, labelledBy, describedBy }: {
-  on: boolean; onChange: (v: boolean) => void; disabled?: boolean; labelledBy: string; describedBy?: string;
-}) {
-  return (
-    <button type="button" role="switch" aria-checked={on} aria-labelledby={labelledBy} aria-describedby={describedBy}
-      disabled={disabled} onClick={() => onChange(!on)}
-      className={`relative h-7 w-12 flex-shrink-0 rounded-full transition-colors duration-300 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542] focus-visible:ring-offset-2 ${on ? 'bg-[#C8F542]' : 'bg-black/[0.12]'}`}>
-      <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-[#FDFDFB] shadow-sm transition-transform duration-300 ${on ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
-    </button>
-  );
-}
-
 function EditorRole({ otevreno, ja, smiSpravovat, onZpet, onKopie, onUlozeno }: {
   otevreno: Otevreno; ja: Ja; smiSpravovat: boolean;
   onZpet: () => void; onKopie: (r: SysRole | VlRole) => void; onUlozeno: (zprava: string) => void | Promise<void>;
@@ -573,7 +561,9 @@ function EditorRole({ otevreno, ja, smiSpravovat, onZpet, onKopie, onUlozeno }: 
                       const lid = `op-${o.id.replace('.', '-')}`;
                       return (
                         <li key={o.id} className="flex items-start gap-3 px-3.5 py-3">
-                          <div className="pt-0.5"><Prepinac on={on} disabled={!!jenCist || (!!z && !on)} labelledBy={`${lid}-n`} describedBy={`${lid}-p`}
+                          {/* Kolo 69: Switch z components/ui místo vlastní kopie (audit: přepínač
+                              s `disabled` ztrácel fokus po každém přepnutí; Switch má aria-disabled). */}
+                          <div className="pt-0.5"><Switch checked={on} disabled={!!jenCist || (!!z && !on)} labelledBy={`${lid}-n`} describedBy={`${lid}-p`}
                             onChange={v => prepni(o.id, v)} /></div>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5 flex-wrap">

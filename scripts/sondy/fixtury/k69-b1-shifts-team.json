@@ -1,0 +1,41 @@
+{
+ "enabled": true,
+ "shifts": [
+  {
+   "id": 801,
+   "employeeId": 16,
+   "employeeName": "Eva Testová",
+   "employeeAvatar": "🧑",
+   "date": "DNES",
+   "startTime": "08:00",
+   "endTime": "16:00",
+   "typeLabel": "Ranní",
+   "typeColor": "#C8F542",
+   "isMine": true
+  },
+  {
+   "id": 802,
+   "employeeId": 17,
+   "employeeName": "Jakub Horák",
+   "employeeAvatar": "🧔",
+   "date": "DNES",
+   "startTime": "14:00",
+   "endTime": "22:00",
+   "typeLabel": "Odpolední",
+   "typeColor": "#3B82F6",
+   "isMine": false
+  },
+  {
+   "id": 803,
+   "employeeId": 18,
+   "employeeName": "Tereza Malá",
+   "employeeAvatar": "👱‍♀️",
+   "date": "ZITRA",
+   "startTime": "08:00",
+   "endTime": "16:00",
+   "typeLabel": "Ranní",
+   "typeColor": "#C8F542",
+   "isMine": false
+  }
+ ]
+}

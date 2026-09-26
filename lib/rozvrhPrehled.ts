@@ -347,12 +347,13 @@ export interface NabidkaSmeny {
 /**
  * Burza po skupinách: co čeká na schválení vedení (převzaté), volné směny
  * kolegů (k převzetí), moje nabídky a co si beru já. Minulé směny do burzy
- * nepatří (převzít včerejšek nejde).
+ * nepatří (převzít včerejšek nejde) — kromě fronty ke schválení: převzetí,
+ * které vedení nestihlo rozhodnout, by jinak viselo „čeká" navždy.
  */
 export function rozdelBurzu<T extends NabidkaSmeny>(nabidky: readonly T[], meId: number | null, dnes: string) {
   const aktualni = nabidky.filter(o => den(o.date) >= dnes);
   return {
-    keSchvaleni: aktualni.filter(o => o.status === 'claimed'),
+    keSchvaleni: nabidky.filter(o => o.status === 'claimed'),
     volne: aktualni.filter(o => o.status === 'open' && o.offeredBy !== meId),
     moje: aktualni.filter(o => o.offeredBy === meId && (o.status === 'open' || o.status === 'claimed')),
     beru: aktualni.filter(o => o.claimedBy === meId && o.status === 'claimed'),

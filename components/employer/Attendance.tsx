@@ -21,12 +21,12 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Avatar, Button, Card, Chip, ErrorState, Field, Input, ListRow, Modal, SearchField, Segmented, Select, Skeleton } from '../ui';
-import { PersonLink } from './ProfileLinkProvider';
+import { usePersonProfile } from './ProfileLinkProvider';
 import { useSymbol } from '../CurrencyProvider';
 import { usePlan, UpgradeModal } from '../Pro';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
-import { useSmi } from '../widgety/NavigaceKontext';
+import { useOpravneni } from '../role/useOpravneni';
 import { ObdobiStrankyDochazky, obnovDochazku } from '../widgety/oblasti/dochazka';
 import { dbTimeHM, parseDbTime, pragueDayOf } from '@/lib/pragueTime';
 import { earnedFor } from '@/lib/wages';
@@ -63,11 +63,18 @@ function hMM(ms: number): string {
 const ZDROJ: Record<string, string> = { kiosk: 'tablet', closing: 'z uzávěrky', self: 'sám', manual: 'ručně' };
 
 export default function Attendance({ user: _user }: { user: { id?: string | number } }) {
-  const smi = useSmi();
+  // Akce stránky podle `ma` (před načtením oprávnění a u staršího serveru ANO —
+  // rozhoduje server), ne přísné useSmi widgetů: tlačítko se nesmí schovat
+  // navždy jen proto, že /api/teams/mine oprávnění nepošle.
+  const { ma: smi, nacteno } = useOpravneni();
   const smiUpravit = smi('dochazka.upravit');
   const smiMazat = smi('dochazka.mazat');
   const smiExport = smi('dochazka.exportovat');
   const vidiMzdy = smi('finance.mzdy');
+  // Profil člena jen s tym.profil (přísně, jako widgety a Tým) — jinak by
+  // okno profilu skončilo 403.
+  const otevriProfil = usePersonProfile();
+  const smiProfil = !!otevriProfil && nacteno && smi('tym.profil');
   const symbol = useSymbol();
   const { pro } = usePlan();
   const [upgradeFor, setUpgradeFor] = useState<string | null>(null);
@@ -253,8 +260,16 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                 );
                 return (
                   <ListRow key={e.id}
-                    lead={<PersonLink id={Number(e.employeeId)}><Avatar emoji={e.employeeAvatar} size="sm" /></PersonLink>}
-                    title={e.employeeName ?? 'Neznámý'}
+                    lead={<Avatar emoji={e.employeeAvatar} size="sm" />}
+                    // Odkaz na profil nese jméno, ne avatar (ten je aria-hidden):
+                    // odečítač tak přečte „Profil: Petra", ne jen „Zobrazit profil".
+                    // Celý řádek klikací být nemůže — uvnitř jsou Upravit a Smazat.
+                    title={smiProfil && otevriProfil ? (
+                      <button type="button" onClick={() => otevriProfil(Number(e.employeeId))} aria-label={`Profil: ${e.employeeName ?? 'Neznámý'}`}
+                        className="max-w-full truncate text-left rounded-sm hover:underline decoration-black/25 underline-offset-2">
+                        {e.employeeName ?? 'Neznámý'}
+                      </button>
+                    ) : (e.employeeName ?? 'Neznámý')}
                     meta={meta}
                     value={zapomenuty ? undefined : bezi ? `běží ${hodinyMinuty(z.delka)}` : hodinyMinuty(z.delka)}
                     right={zapomenuty ? <Chip tone="wait" size="sm" icon="warning">Zapomenutý odchod?</Chip>
@@ -283,6 +298,8 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
             <Button variant="accent" icon="plus" onClick={() => { setChybaPridani(null); setPridat(true); }}>Přidat záznam</Button>
           ) : undefined,
           secondary: smiExport && entries.length > 0 ? <Button variant="secondary" icon="download" onClick={exportCsv}>Export CSV</Button> : undefined,
+          // Vedlejší akce se na telefonu schovají (DP §3.4) — Export proto i v „···".
+          menu: smiExport && entries.length > 0 ? [{ label: 'Export CSV', icon: 'download', onClick: exportCsv }] : undefined,
           aside: (
             <Segmented size="sm" ariaLabel="Období" value={String(dni)} onChange={v => setDni(Number(v) as Obdobi)}
               options={OBDOBI.map(p => ({ id: String(p), label: `${p} dní` }))} />

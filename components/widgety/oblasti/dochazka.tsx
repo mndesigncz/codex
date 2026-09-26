@@ -18,7 +18,8 @@
 //    žádná tónovaná karta ani kolečko s limetkou;
 //  - dochazka.prave_na_smene — nástupce bloku „Právě na směně" z Přehledu: bez
 //    animate-ping a limetkové karty, lidé jako PersonChip s časem příchodu, odkaz
-//    „Docházka"; ve velké velikosti stopky a „Ukončit" (jen s dochazka.upravit);
+//    „Docházka"; ve velké velikosti stopky a „Ukončit" (jen s dochazka.upravit) se stejným
+//    oknem jako Otevřené příchody — navrhne plánovaný konec, ne „teď";
 //  - dochazka.moje_odpracovano — jedno číslo „Odpracováno" místo dvou různých, která
 //    Domů zaměstnance ukazovalo naráz (audit: 433 h proti 225 h). Zapomenutý příchod
 //    se nepřičítá, ale přizná chipem.
@@ -27,7 +28,8 @@
 // aby Docházka, Domů i profil člena počítaly hodiny stejně (zapomenutý odchod
 // ani záznam nad 24 h se nepočítá):
 //  - dochazka.mzdy_za_obdobi — mzdové náklady a podíl na tržbách proti cíli
-//    (StatRow místo dvou dlaždic s ručními štítky); podíl jen s finance.trzby;
+//    (StatRow místo dvou dlaždic s ručními štítky); podíl jen s finance.trzby
+//    a uzaverky.zobrazit_vse (bez něj by tržby byly jen z vlastních uzávěrek);
 //  - dochazka.souhrn_hodin — hodiny po lidech v jedné kartě s .list (dřív mřížka
 //    karet); Kč a řazení podle mzdy jen s finance.mzdy;
 //  - dochazka.dlouhe_prichody — kdo je napíchnutý déle než plán, s „Ukončit"
@@ -55,9 +57,9 @@ import { useCurrency, useMoney } from '../../CurrencyProvider';
 import { usePersonProfile } from '../../employer/ProfileLinkProvider';
 import { apiMessage, okJson } from '@/lib/api';
 import { czCount, czForm, DEN } from '@/lib/czech';
-import { dbTimeDayHM, dbTimeHM, parseDbTime, pragueDayOf, pragueHM, pragueMomentOf, pragueToday } from '@/lib/pragueTime';
+import { dbTimeDayHM, dbTimeHM, parseDbTime, pragueDayOf, pragueToday } from '@/lib/pragueTime';
 import {
-  ZAPOMENUTY_MS, dnesVPodniku, hodinyMinuty, mujMesic, mzdyZaObdobi, obdobiDni, otevrenePrichody, podilMezd,
+  ZAPOMENUTY_MS, dnesVPodniku, konecSmeny, hodinyMinuty, mujMesic, mzdyZaObdobi, obdobiDni, otevrenePrichody, podilMezd,
   sazbyZRosteru, seradSouhrn, souhrnHodin, trzbyZaObdobi,
   type OtevrenyPrichod, type RadekDne, type RazeniSouhrnu, type UzaverkaTrzby,
 } from '@/lib/dochazkaPrehled';
@@ -282,8 +284,8 @@ function PraveNaSmene({ velikost, nahled }: WidgetProps) {
   const nav = useNavigace();
   const data = useDataWidgetu<Dochazka>(brana ? URL_DNES : null, vyberDochazku);
   const [ukoncit, setUkoncit] = useState<ClenRosteru | null>(null);
-  const [ukoncuji, setUkoncuji] = useState(false);
-  const [chybaUkonceni, setChybaUkonceni] = useState<string | null>(null);
+  // Na samotné Docházce odkaz „Docházka“ nikam nevede — stránka dá období přes kontext.
+  const naDochazce = useContext(ObdobiStrankyDochazky) != null;
 
   const lide = useMemo(() => (data.data?.roster ?? [])
     .map(r => ({ r, od: parseDbTime(r.openSince) }))
@@ -296,23 +298,6 @@ function PraveNaSmene({ velikost, nahled }: WidgetProps) {
 
   // Bez oprávnění ho plocha vůbec nepřipojí; kdyby přece, nesmí tvrdit „nikdo tu není".
   if (!brana) return <Widget prazdno={null} />;
-
-  const potvrdUkonceni = async () => {
-    if (!ukoncit?.openEntryId || ukoncuji) return;
-    setUkoncuji(true); setChybaUkonceni(null);
-    try {
-      // PATCH jen s id = „Ukončit": odchod se zapíše na teď (API /api/attendance).
-      await fetch('/api/attendance', {
-        method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify({ id: ukoncit.openEntryId }),
-      }).then(okJson);
-      setUkoncit(null);
-      data.reload();
-    } catch (e) {
-      setChybaUkonceni(apiMessage(e, 'Směnu se nepodařilo ukončit.'));
-    } finally {
-      setUkoncuji(false);
-    }
-  };
 
   const n = lide.length;
   const pocet = n.toLocaleString('cs-CZ');
@@ -360,7 +345,7 @@ function PraveNaSmene({ velikost, nahled }: WidgetProps) {
               value={zapomenuty ? undefined : delkaSlovy(ted - od.getTime())}
               right={zapomenuty ? <Chip tone="wait" size="sm">Zapomenutý odchod?</Chip> : undefined}
               actions={smiUkoncit && r.openEntryId ? (
-                <Button variant="secondary" size="sm" onClick={() => { setChybaUkonceni(null); setUkoncit(r); }}
+                <Button variant="secondary" size="sm" onClick={() => setUkoncit(r)}
                   aria-label={`Ukončit směnu: ${r.name ?? 'bez jména'}`}>
                   Ukončit
                 </Button>
@@ -377,28 +362,25 @@ function PraveNaSmene({ velikost, nahled }: WidgetProps) {
       <Widget
         nacteni={data}
         doplnek={velikost !== 'S' && n > 0 ? <Chip tone="muted" size="sm">{pocet}</Chip> : undefined}
-        odkaz={velikost === 'S' ? undefined : { popisek: 'Docházka', pohled: 'attendance' }}
+        odkaz={velikost === 'S' || naDochazce ? undefined : { popisek: 'Docházka', pohled: 'attendance' }}
         otevrit={velikost === 'S' && !nahled && nav.smiPohled('attendance') ? () => nav.onNavigate('attendance') : undefined}
         prazdno={n === 0 ? <p className="t-meta">Teď není nikdo napíchnutý.</p> : undefined}
       >
         {telo}
       </Widget>
-      {/* Okno přes portál: karta widgetu může mít transformaci (FLIP, promáčknutí)
-          a `fixed` uvnitř transformovaného předka by se kreslilo do karty. */}
-      {ukoncit && typeof document !== 'undefined' && createPortal(
-        <Modal open onClose={() => setUkoncit(null)} size="sm" title="Ukončit směnu" subtitle={ukoncit.name}
-          footer={<>
-            <Button variant="secondary" onClick={() => setUkoncit(null)}>Zrušit</Button>
-            <Button variant="primary" loading={ukoncuji} onClick={potvrdUkonceni}>Ukončit směnu</Button>
-          </>}>
-          <p className="text-sm text-black/70 text-pretty">
-            Odchod se zapíše na teď ({pragueHM()}).
-            {nav.smiPohled('attendance') ? ' Jiný čas pak opravíš v Docházce.' : ''}
-          </p>
-          {chybaUkonceni && <p className="note note-danger mt-3" role="alert">{chybaUkonceni}</p>}
-        </Modal>,
-        document.body,
-      )}
+      {/* Stejné okno jako Otevřené příchody: „Ukončit" nesmí zapsat odchod
+          natvrdo na teď — kdo odešel v 16:00 a vedoucí to zavírá v 19:00, měl
+          by ve mzdě tři hodiny navíc. Navrhne plánovaný konec směny (bez plánu
+          teď) a po uložení obnoví všechna období, ať nástroj Docházky, Souhrn
+          i Mzdy neukazují záznam dál jako běžící. */}
+      {ukoncit?.openEntryId && (() => {
+        const od = parseDbTime(ukoncit.openSince);
+        const plan = od ? navrhOdchodu(od, konecSmeny(pragueToday(), ukoncit.shiftStart, ukoncit.shiftEnd)) : { cas: new Date(), zPlanu: false };
+        return (
+          <OknoUkonceni jmeno={ukoncit.name ?? 'Bez jména'} entryId={ukoncit.openEntryId} navrh={plan.cas} zPlanu={plan.zPlanu}
+            onZavrit={() => setUkoncit(null)} onHotovo={() => { setUkoncit(null); obnovDochazku(); }} />
+        );
+      })()}
     </>
   );
 }
@@ -449,12 +431,24 @@ function doVstupu(d: Date): string {
 }
 
 /**
+ * Návrh času odchodu: plánovaný konec směny (i přes půlnoc), pokud leží mezi
+ * příchodem a teď a ne dál než 24 h od příchodu (dnešní plán se nesmí
+ * přilepit ke včerejšímu zapomenutému příchodu). Jinak (bez plánu, směna
+ * ještě běží) teď — budoucí odchod by nedával smysl.
+ */
+function navrhOdchodu(od: Date, konec: Date | null): { cas: Date; zPlanu: boolean } {
+  const ted = Date.now();
+  if (konec && konec.getTime() > od.getTime() && konec.getTime() <= ted && konec.getTime() - od.getTime() <= 24 * 3600_000) return { cas: konec, zPlanu: true };
+  return { cas: new Date(ted), zPlanu: false };
+}
+
+/**
  * Okno „Ukončit příchod" s časem odchodu. Zapomenutý odchod se nemá
  * zavírat na „teď" — směna od osmi do teď by byla dvanáct hodin práce
  * navíc ve mzdě. Předvyplní se plánovaný konec směny, bez plánu teď.
  */
-function OknoUkonceni({ jmeno, entryId, navrh, onHotovo, onZavrit }: {
-  jmeno: string; entryId: number; navrh: Date; onHotovo: () => void; onZavrit: () => void;
+function OknoUkonceni({ jmeno, entryId, navrh, zPlanu, onHotovo, onZavrit }: {
+  jmeno: string; entryId: number; navrh: Date; zPlanu: boolean; onHotovo: () => void; onZavrit: () => void;
 }) {
   const [cas, setCas] = useState(() => doVstupu(navrh));
   const [pise, setPise] = useState(false);
@@ -481,7 +475,7 @@ function OknoUkonceni({ jmeno, entryId, navrh, onHotovo, onZavrit }: {
         <Button variant="secondary" onClick={onZavrit}>Zrušit</Button>
         <Button variant="primary" loading={pise} onClick={uloz}>Uložit odchod</Button>
       </>}>
-      <Field id={idPole} label="Odchod" hint="Předvyplněný je plánovaný konec směny. Uprav ho, jestli odešel jindy." error={chyba}>
+      <Field id={idPole} label="Odchod" hint={zPlanu ? 'Předvyplněný je plánovaný konec směny. Uprav ho, jestli odešel jindy.' : 'Plánovanou směnu nemá, předvyplněný je aktuální čas. Uprav ho, jestli odešel dřív.'} error={chyba}>
         <Input id={idPole} type="datetime-local" value={cas} onChange={e => setCas(e.target.value)} />
       </Field>
     </Modal>,
@@ -586,7 +580,10 @@ function MzdyZaObdobi({ velikost, nastaveni }: WidgetProps<{ obdobi?: string }>)
   const { laborTargetPct } = useCurrency();
   const { dni, naStrance } = useDniWidgetu(nastaveni.obdobi);
   const M = velikost !== 'S';
-  const podil = M && smi('finance.trzby');
+  // Podíl jen s celými tržbami: bez uzaverky.zobrazit_vse vrátí /api/closings
+  // jen vlastní uzávěrky (bez příznaku trzbaSkryta) a 2 z 30 uzávěrek by
+  // udělaly z 25 % „240 % · Nad cílem".
+  const podil = M && smi('finance.trzby') && smi('uzaverky.zobrazit_vse');
   const data = useDataWidgetu<Dochazka>(brana ? urlDni(dni) : null, vyberDochazku);
   const trzbyData = useDataWidgetu<UzaverkaTrzby[]>(brana && podil ? '/api/closings' : null, vyberUzaverky);
   const ted = useTed(!!data.data?.entries.some(e => !e.clockOut), 60_000);
@@ -601,7 +598,7 @@ function MzdyZaObdobi({ velikost, nastaveni }: WidgetProps<{ obdobi?: string }>)
   const pct = mzdy && trzby && !trzby.skryto ? podilMezd(mzdy.celkem, trzby.trzby) : null;
   const nad = pct != null && laborTargetPct != null && pct > laborTargetPct;
   const poznamkaMezd = mzdy && mzdy.bezSazby > 0
-    ? `bez ${czCount(mzdy.bezSazby, LIDI)} bez sazby`
+    ? `bez sazby: ${czCount(mzdy.bezSazby, LIDI)}`
     : `za ${NAZEV_DNI(dni)}`;
   return (
     <Widget nacteni={[data, trzbyData]}
@@ -707,13 +704,6 @@ function DlouhePrichody({ velikost, nahled }: WidgetProps) {
 
   const smiUkoncit = !nahled && smi('dochazka.upravit');
   const n = seznam.length;
-  const navrh = (o: OtevrenyPrichod): Date => {
-    if (o.planDo) {
-      const k = pragueMomentOf(pragueDayOf(o.od), o.planDo);
-      if (k && k.getTime() > o.od.getTime()) return k;
-    }
-    return new Date();
-  };
   return (
     <>
       <Widget nacteni={data}
@@ -740,10 +730,10 @@ function DlouhePrichody({ velikost, nahled }: WidgetProps) {
           </>
         )}
       </Widget>
-      {ukoncit?.openEntryId && (
-        <OknoUkonceni jmeno={ukoncit.jmeno} entryId={ukoncit.openEntryId} navrh={navrh(ukoncit)}
+      {ukoncit?.openEntryId && (() => { const plan = navrhOdchodu(ukoncit.od, ukoncit.planKonec); return (
+        <OknoUkonceni jmeno={ukoncit.jmeno} entryId={ukoncit.openEntryId} navrh={plan.cas} zPlanu={plan.zPlanu}
           onZavrit={() => setUkoncit(null)} onHotovo={() => { setUkoncit(null); obnovDochazku(); }} />
-      )}
+      ); })()}
     </>
   );
 }

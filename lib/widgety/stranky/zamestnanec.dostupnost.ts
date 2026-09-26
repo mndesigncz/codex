@@ -5,7 +5,9 @@
 //
 // Widgety jsou jen ty, které rozhodování „kdy můžu" usnadní: moje volno (ať si člověk
 // neoznačí dovolenou podruhé), kdo má kdy směnu a nejbližší vlastní směna. Výchozí je
-// střídmé — hlavní věc je kalendář, volno pod ním.
+// jen nástroj: žádosti o volno i s jejich stavem vypisuje „Moje žádosti" pod plochou
+// (TimeOffRequest) a stejný seznam dvakrát na jedné obrazovce je šum. Widgety zůstávají
+// v galerii pro toho, kdo si formulář volna posune jinam.
 import type { DefiniceStranky } from '../typy.ts';
 
 export const STRANKA: DefiniceStranky = {
@@ -19,7 +21,6 @@ export const STRANKA: DefiniceStranky = {
   vychozi: {
     'typ:zamestnanec': [
       { w: 'nastroj' },
-      { w: 'moje.schvalene_volno', s: 'M' },
     ],
   },
   aktivni: true,

@@ -10,9 +10,14 @@
 // Textové pole zůstává pro položky, kde návod nikdo psát nebude („Svařit
 // a stočit“ opravdu nepotřebuje kategorii). Jakmile je ale návod připnutý,
 // kroky do úkolu „Vyrobit X“ jdou z něj.
+//
+// Kolo 69 (B4): připnutý návod byl limetkově tónovaný box uvnitř modrého
+// boxu výroby a „Připojit návod" ruční skleněná pilulka. Teď řádek .list
+// (bez tónu — tón nese stav, ne ozdobu) a tlačítka z ui.
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { Icon } from '../Icons';
+import { Button, Input, ListRow } from '../ui';
 import { useResultKeys } from '@/lib/useResultKeys';
 import { okJson } from '@/lib/api';
 import { obsahuje } from '@/lib/hledani';
@@ -78,44 +83,37 @@ export default function ProductionGuideLink({ itemId, itemName, guideId, guideTi
       <p id={popisek} className="field-label">Návod k výrobě (volitelné)</p>
       {guideId ? (
         <div className="space-y-1.5">
-          <div className="flex items-center gap-2 rounded-2xl bg-[#C8F542]/[0.09] border border-[#C8F542]/25 px-4 py-2.5">
-            <Icon name="book" size={15} className="shrink-0 text-[#5B7A08]" />
-            <a href={`?view=guides&guide=${guideId}`}
-              className="min-w-0 flex-1 truncate text-sm text-[#16181A] underline decoration-black/20 underline-offset-2 hover:decoration-black/50">
-              {guideTitle ?? `Návod #${guideId}`}
-            </a>
-            <button type="button" disabled={busy} onClick={() => uloz({ itemId: null }, guideId)}
-              title="Zrušit vazbu" aria-label="Zrušit vazbu na návod"
-              className="shrink-0 btn-icon btn-icon-danger transition disabled:opacity-50">
-              <Icon name="close" size={13} />
-            </button>
-          </div>
-          <p className="text-[11px] text-black/45">
+          <ul className="list">
+            <ListRow lead={<Icon name="book" size={16} className="text-black/40" />}
+              title={guideTitle ?? `Návod #${guideId}`} href={`?view=guides&guide=${guideId}`} chevron={false}
+              actions={<Button variant="ghost" size="sm" iconOnly icon="close" disabled={busy}
+                aria-label="Zrušit vazbu na návod" onClick={() => uloz({ itemId: null }, guideId)} />} />
+          </ul>
+          <p className="t-meta">
             {guideSteps > 0
               ? `Úkol „Vyrobit ${itemName}“ dostane ${guideSteps} kroků z tohohle návodu.`
               : 'Návod nemá checklist — do úkolu půjde postup z pole níž. Doplň kroky v Návodech.'}
           </p>
         </div>
       ) : open ? (
-        <div className="well border border-black/[0.07] p-3 space-y-2">
-          <input ref={vstup} autoFocus value={query} onChange={e => setQuery(e.target.value)}
-            onKeyDown={keys.onInputKeyDown}
-            placeholder="Hledat mezi návody…"
-            className="w-full rounded-2xl bg-white/70 border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
+        <div className="space-y-2">
+          <Input ref={vstup} autoFocus value={query} onChange={e => setQuery(e.target.value)}
+            onKeyDown={keys.onInputKeyDown} aria-label="Hledat mezi návody"
+            placeholder="Hledat mezi návody…" />
           {nalezene.length === 0 && (
-            <p className="text-xs text-black/40">
+            <p className="t-meta">
               {all.length === 0 ? 'Zatím žádné návody — napiš ho v záložce Návody.' : 'Nic takového mezi návody není.'}
             </p>
           )}
           {nalezene.length > 0 && (
             <div ref={seznam} onKeyDown={keys.onListKeyDown}
-              className="max-h-44 overflow-y-auto scrollbar-thin divide-y divide-black/[0.05]">
+              className="max-h-44 overflow-y-auto scrollbar-thin divide-y divide-black/[0.06]">
               {nalezene.map(g => (
                 <button key={g.id} type="button" disabled={busy}
                   onClick={() => uloz({ itemId }, g.id)}
-                  className="w-full text-left px-1 py-2 hover:bg-black/[0.03] transition disabled:opacity-50">
+                  className="w-full text-left px-1 py-2 hover:bg-black/[0.04] transition-colors disabled:opacity-50">
                   <span className="block text-sm text-[#16181A] truncate">{g.title}</span>
-                  <span className="block text-[11px] text-black/40 truncate">
+                  <span className="block text-[13px] text-black/55 truncate">
                     {g.hasChecklist ? 'má checklist' : 'bez checklistu'}
                     {g.approved === false ? ' · čeká na schválení' : ''}
                   </span>
@@ -123,16 +121,12 @@ export default function ProductionGuideLink({ itemId, itemName, guideId, guideTi
               ))}
             </div>
           )}
-          <button type="button" onClick={() => { setOpen(false); setQuery(''); }}
-            className="text-xs font-semibold text-black/45 hover:text-black transition">Zrušit</button>
+          <Button variant="ghost" size="sm" onClick={() => { setOpen(false); setQuery(''); }}>Zrušit</Button>
         </div>
       ) : (
-        <button type="button" onClick={() => setOpen(true)}
-          className="w-full rounded-2xl glass border border-black/10 text-black/60 hover:bg-black/[0.06] hover:text-black px-4 py-2.5 text-sm text-left transition inline-flex items-center gap-2">
-          <Icon name="plus" size={15} /> Připojit návod
-        </button>
+        <Button variant="secondary" size="sm" icon="plus" onClick={() => setOpen(true)}>Připojit návod</Button>
       )}
-      {err && <p className="text-xs text-bad-ink mt-1">{err}</p>}
+      {err && <p className="note note-danger mt-1" role="alert">{err}</p>}
     </div>
   );
 }

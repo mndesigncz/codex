@@ -103,6 +103,9 @@ export const ZELENE = [
   'k69-b5a',
   'k69-b5b',
   'k69-b3',
+  'k69-b4',
+  'k69-b1',
+  'k69-b2',
 ];
 
 const MIMO = new Set(['spust', 'cookie-role', 'fixtury-k53', 'fixtury-navody', 'k68-spolecne']);

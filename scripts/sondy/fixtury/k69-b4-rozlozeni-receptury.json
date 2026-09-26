@@ -1,0 +1,40 @@
+{
+ "stranka": "vedeni.receptury",
+ "polozky": [
+  {
+   "id": "receptury-pokryti",
+   "widget": "receptury.pokryti",
+   "velikost": "M"
+  },
+  {
+   "id": "finance-marze",
+   "widget": "finance.marze",
+   "velikost": "S"
+  },
+  {
+   "id": "receptury-bez-receptury",
+   "widget": "receptury.bez_receptury",
+   "velikost": "L"
+  },
+  {
+   "id": "nastroj",
+   "widget": "nastroj",
+   "velikost": "L"
+  }
+ ],
+ "dostupne": [
+  "receptury.pokryti",
+  "receptury.bez_receptury",
+  "finance.marze",
+  "sklad.chybi_udaje",
+  "trzby.top_produkty",
+  "odkaz"
+ ],
+ "tarifem": [],
+ "zdroj": "podnik",
+ "rozsah": "typ:vedeni",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": true,
+ "verze": 0
+}

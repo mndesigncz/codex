@@ -62,10 +62,35 @@ async function loadBoard(boardRow: any) {
 
 // ---------------------------------------------------------------------------
 
-export async function GET() {
-  const c = await pozaduj('menu.zobrazit');
+export async function GET(request: Request) {
+  // Kolo 69 (widget Vyprodáno): `?jen=vyprodano` pustí i roli, která smí
+  // jen přepínat vyprodáno (Barista, tablet), a vrátí jen to, co k tomu
+  // potřebuje — zapnutá menu, jejich sekce a položky s id, názvem a
+  // příznakem. Ceny, Wi-Fi, PIN ani vzhled v odpovědi nejsou: ty patří
+  // pod menu.zobrazit. Bez tohohle by widget u baru neměl odkud číst.
+  const jenVyprodano = new URL(request.url).searchParams.get('jen') === 'vyprodano';
+  const c = await pozaduj(jenVyprodano ? ['menu.zobrazit', 'menu.vyprodano'] : 'menu.zobrazit');
   if (jeOdpoved(c)) return c;
   const me = { meId: c.meId, teamId: c.teamId };
+
+  if (jenVyprodano) {
+    try {
+      const rows = await sql`
+        SELECT id, slug, name FROM menu_boards
+        WHERE team_id = ${me.teamId} AND enabled IS NOT FALSE ORDER BY id` as any[];
+      const boards = [];
+      for (const r of rows) {
+        const b = await loadBoard(r);
+        boards.push({
+          id: b.id, slug: b.slug, name: b.name, enabled: true,
+          sections: b.sections.map(s => ({ title: s.title, items: s.items.map(i => ({ id: i.id, name: i.name, soldOut: i.soldOut })) })),
+        });
+      }
+      return NextResponse.json({ boards });
+    } catch {
+      return NextResponse.json({ boards: [], notMigrated: true });
+    }
+  }
 
   let rows: any[] = [];
   try {
@@ -172,6 +197,31 @@ export async function PUT(request: Request) {
   const [board] = await sql`
     SELECT * FROM menu_boards WHERE id = ${id} AND team_id = ${me.teamId}`;
   if (!board) return NextResponse.json({ error: 'Menu nenalezeno' }, { status: 404 });
+
+  // ---- částečná změna: jen zapnutí nebo PIN (kolo 69) ----
+  // Widget Stav menu („Zveřejnit") a zrušení PINu posílají jen to, co mění.
+  // Plné uložení níž přepisuje celou hlavičku desky a chybějící pole bere
+  // jako prázdná — `{ id, pin: '' }` tak dřív kromě PINu smazalo i nadpis,
+  // Wi-Fi a poznámku a menu mimochodem zapnulo.
+  if (body?.castecne === true) {
+    if (!c.role.opravneni.has('menu.zverejnit')) {
+      return NextResponse.json({ error: 'Zveřejnění menu a PIN mění jen ten, kdo smí menu zveřejnit.' }, { status: 403 });
+    }
+    if (typeof body.enabled === 'boolean') {
+      await sql`UPDATE menu_boards SET enabled = ${body.enabled}, updated_at = NOW() WHERE id = ${id}`;
+    }
+    if (Object.prototype.hasOwnProperty.call(body, 'pin')) {
+      if (body.pin === null || String(body.pin).trim() === '') {
+        await sql`UPDATE menu_boards SET pin_hash = NULL, updated_at = NOW() WHERE id = ${id}`;
+      } else {
+        const pin = cleanPin(body.pin);
+        if (!pin) return NextResponse.json({ error: 'PIN musí být 4 až 8 číslic' }, { status: 400 });
+        await sql`UPDATE menu_boards SET pin_hash = ${await bcrypt.hash(pin, 10)}, updated_at = NOW() WHERE id = ${id}`;
+      }
+    }
+    const [fresh] = await sql`SELECT * FROM menu_boards WHERE id = ${id}`;
+    return NextResponse.json({ board: await loadBoard(fresh) });
+  }
 
   // ---- hlavička desky ----
   const name = cleanText(body?.name, MAX_NAME) || board.name;

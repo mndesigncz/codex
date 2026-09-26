@@ -1,0 +1,38 @@
+{
+ "meId": 15,
+ "isEmployer": true,
+ "offers": [
+  {
+   "id": 91,
+   "shiftId": 601,
+   "offeredBy": 17,
+   "claimedBy": 18,
+   "status": "claimed",
+   "note": null,
+   "date": "ZA3",
+   "startTime": "08:00",
+   "endTime": "16:00",
+   "type": "Ranní",
+   "offeredByName": "Jakub Horák",
+   "offeredByAvatar": "🧔",
+   "claimedByName": "Tereza Malá",
+   "claimedByAvatar": "👱‍♀️"
+  },
+  {
+   "id": 92,
+   "shiftId": 602,
+   "offeredBy": 19,
+   "claimedBy": null,
+   "status": "open",
+   "note": "Nemoc v rodině",
+   "date": "ZA5",
+   "startTime": "14:00",
+   "endTime": "22:00",
+   "type": "Odpolední",
+   "offeredByName": "Ondřej Kučera",
+   "offeredByAvatar": null,
+   "claimedByName": null,
+   "claimedByAvatar": null
+  }
+ ]
+}

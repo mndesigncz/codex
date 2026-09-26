@@ -218,12 +218,14 @@ export interface OtevrenyPrichod {
   openEntryId: number | null;
   /** Plánovaný konec směny „HH:MM", nebo null bez plánu. */
   planDo: string | null;
+  /** Plánovaný konec jako okamžik (i přes půlnoc) — návrh času odchodu v „Ukončit". */
+  planKonec: Date | null;
   /** Jak dlouho po plánovaném konci (bez plánu: jak dlouho vůbec) — ms. */
   pres: number;
 }
 
 /** Konec dnešní směny jako okamžik; směna přes půlnoc (konec ≤ začátek) končí zítra. */
-function konecSmeny(dnes: string, start: string | null | undefined, konec: string | null | undefined): Date | null {
+export function konecSmeny(dnes: string, start: string | null | undefined, konec: string | null | undefined): Date | null {
   if (!konec) return null;
   const k = String(konec).slice(0, 5);
   const s = start ? String(start).slice(0, 5) : null;
@@ -254,6 +256,7 @@ export function otevrenePrichody(roster: readonly ClenRosteru[], ted: number, dn
       id: String(r.id), jmeno: r.name ?? 'Bez jména', avatar: r.avatar ?? null, od,
       openEntryId: r.openEntryId ?? null,
       planDo: konec && od.getTime() < konec.getTime() ? String(r.shiftEnd).slice(0, 5) : null,
+      planKonec: konec && od.getTime() < konec.getTime() ? konec : null,
       pres,
     });
   }

@@ -1,0 +1,68 @@
+{
+ "shifts": [
+  {
+   "id": 501,
+   "employeeId": 16,
+   "employeeName": "Eva Testová",
+   "employeeAvatar": "🧑",
+   "date": "@-02",
+   "startTime": "08:00",
+   "endTime": "16:00",
+   "type": "Ranní"
+  },
+  {
+   "id": 502,
+   "employeeId": 16,
+   "employeeName": "Eva Testová",
+   "employeeAvatar": "🧑",
+   "date": "@-03",
+   "startTime": "22:00",
+   "endTime": "06:00",
+   "type": "Noční"
+  },
+  {
+   "id": 503,
+   "employeeId": 17,
+   "employeeName": "Jakub Horák",
+   "employeeAvatar": "🧔",
+   "date": "@-04",
+   "startTime": "08:00",
+   "endTime": "20:00",
+   "type": "Ranní"
+  },
+  {
+   "id": 504,
+   "employeeId": 18,
+   "employeeName": "Tereza Malá",
+   "employeeAvatar": "👱‍♀️",
+   "date": "@-05",
+   "startTime": "10:00",
+   "endTime": "14:00",
+   "type": "Odpolední"
+  }
+ ],
+ "gaps": [
+  {
+   "date": "ZITRA",
+   "from": "14:00",
+   "to": "16:00",
+   "minutes": 120
+  }
+ ],
+ "understaffed": [
+  {
+   "date": "POZITRI",
+   "shiftTypeName": "Odpolední"
+  }
+ ],
+ "demand": {
+  "ZITRA": {
+   "reservations": 6,
+   "guests": 31
+  },
+  "POZITRI": {
+   "reservations": 2,
+   "guests": 7
+  }
+ }
+}

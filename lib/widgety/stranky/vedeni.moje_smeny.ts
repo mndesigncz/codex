@@ -3,6 +3,10 @@
 // (components/employee/MyShifts.tsx). Tři dlaždice, Schválené volno, Minulé směny, Kdo má směnu
 // a burza jsou widgety. Dostupnost a žádost o volno zůstávají pod plochou jako formuláře
 // (kreslí je EmployerLayout, který patří jinému balíku).
+//
+// Výchozí rozložení drží, co MyShifts vedení kreslil do kola 68: Kdo má směnu a Minulé směny
+// s hodnocením — jinak by vedoucímu po nasazení funkce zmizely. Připomínka „Zadej dostupnost"
+// ve výchozím není: formulář dostupnosti stojí na téže stránce hned pod plochou.
 import type { DefiniceStranky } from '../typy.ts';
 
 export const STRANKA: DefiniceStranky = {
@@ -30,10 +34,11 @@ export const STRANKA: DefiniceStranky = {
   vychozi: {
     'typ:vedeni': [
       { w: 'moje.smeny_prehled', s: 'M' },
-      { w: 'rozvrh.pripominka_dostupnosti', s: 'M' },
       { w: 'nastroj' },
+      { w: 'rozvrh.tym_nahled', s: 'L' },
       { w: 'rozvrh.vymeny', s: 'M' },
       { w: 'moje.schvalene_volno', s: 'M' },
+      { w: 'moje.minule_smeny', s: 'M' },
     ],
   },
   aktivni: true,

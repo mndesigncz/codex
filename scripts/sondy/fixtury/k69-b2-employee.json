@@ -1,0 +1,74 @@
+{
+ "employee": {
+  "id": 16,
+  "name": "Eva Testová",
+  "avatar": "👩",
+  "email": "e@t.cz",
+  "phone": null,
+  "jobTitle": "Barista",
+  "hourlyRate": 150
+ },
+ "standing": {
+  "points": 320,
+  "levelName": "Zkušená",
+  "levelIndex": 2,
+  "perks": "",
+  "next": {
+   "name": "Mistr",
+   "min": 500
+  },
+  "pctToNext": 40,
+  "pointsIntoLevel": 120,
+  "pointsForNext": 300
+ },
+ "levels": [],
+ "breakdown": {
+  "tasks": 20,
+  "procedures": 5,
+  "closings": 8,
+  "reviewPoints": 30,
+  "autoPoints": 4,
+  "itemPoints": 2,
+  "ratedShifts": 6,
+  "flagged": 0
+ },
+ "shifts": {
+  "upcoming": [
+   {
+    "id": 1,
+    "date": "DNES",
+    "startTime": "10:00",
+    "endTime": "18:00",
+    "type": "ranni",
+    "reviewed": false,
+    "rating": 0,
+    "flagged": false,
+    "reviewPoints": 0
+   }
+  ],
+  "recent": [
+   {
+    "id": 2,
+    "date": "VCERA",
+    "startTime": "10:00",
+    "endTime": "18:00",
+    "type": "ranni",
+    "reviewed": true,
+    "rating": 4,
+    "flagged": false,
+    "reviewPoints": 3
+   }
+  ]
+ },
+ "reviews": [],
+ "items": [],
+ "month": {
+  "hoursMs": 151200000,
+  "shifts": 12,
+  "closings": 5
+ },
+ "punctuality": {
+  "checked": 10,
+  "late": 1
+ }
+}

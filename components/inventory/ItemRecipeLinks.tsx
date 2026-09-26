@@ -6,17 +6,20 @@
 // Dosud to šlo jen z Receptur — tedy „vyber produkt, pak najdi surovinu".
 // Když ale někdo zakládá surovinu, přemýšlí opačně: „tohle je vodka, jde do
 // Blue Lagoonu a do Espressa Martini". Tenhle panel to umí i tímhle směrem.
+//
+// Kolo 69 (B4): dřív limetkově tónovaný box s ručním štítkem verzálkami,
+// bílými boxy na řádek a ručním „Přidat do receptury". Teď neutrální Well
+// s nadpisem t-card, řádky .list, tlačítka z ui a cena v měně podniku
+// (dřív natvrdo „Kč").
 
-import { useEffect, useRef, useState } from 'react';
-import { Icon } from '../Icons';
+import { useEffect, useId, useRef, useState } from 'react';
+import { useMoney } from '../CurrencyProvider';
+import { Button, Input, Label, ListRow, Well } from '../ui';
 import { useResultKeys } from '@/lib/useResultKeys';
 import { okJson } from '@/lib/api';
 
 type Link = { productId: string; productName: string | null; amount: number };
 type Product = { productId: string; name: string; category?: string | null; price?: number | null };
-
-const field =
-  'w-full rounded-2xl bg-white/70 border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none';
 
 const dec = (v: string) => Number(String(v).replace(',', '.')) || 0;
 const fmt = (n: number) => n.toLocaleString('cs-CZ', { maximumFractionDigits: 3 });
@@ -29,6 +32,8 @@ export default function ItemRecipeLinks({ item, links, unitLabel, onChanged, onO
   onChanged: (next: Link[]) => void;
   onOpenRecipe?: (productId: string) => void;
 }) {
+  const money = useMoney();
+  const uid = useId();
   const [adding, setAdding] = useState(false);
   const [query, setQuery] = useState('');
   const [found, setFound] = useState<Product[]>([]);
@@ -88,112 +93,96 @@ export default function ItemRecipeLinks({ item, links, unitLabel, onChanged, onO
   };
 
   return (
-    <div className="rounded-2xl bg-[#C8F542]/[0.09] border border-[#C8F542]/25 px-4 py-3.5 space-y-3">
+    <Well className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[11px] font-bold uppercase tracking-wide text-[#5B7A08]">
-          Používá se v kase{links.length > 0 ? ` (${links.length}×)` : ''}
-        </p>
+        <h3 className="t-card">Používá se v kase{links.length > 0 ? ` (${links.length}×)` : ''}</h3>
         {!adding && (
-          <button type="button" onClick={() => { setAdding(true); setErr(''); }}
-            className="tap-target-sm rounded-full bg-white/70 hover:bg-white border border-black/[0.07] px-3 py-1.5 text-xs font-bold text-[#5B7A08] transition inline-flex items-center gap-1">
-            <Icon name="plus" size={13} /> Přidat do receptury
-          </button>
+          <Button variant="secondary" size="sm" icon="plus" onClick={() => { setAdding(true); setErr(''); }}>Přidat do receptury</Button>
         )}
       </div>
 
       {links.length === 0 && !adding && (
-        <p className="text-xs text-black/50">
-          Zatím v žádné receptuře. Dokud tam nebude, prodej téhle suroviny sklad neodepíše.
-        </p>
+        <p className="t-meta">Zatím v žádné receptuře. Dokud tam nebude, prodej téhle suroviny sklad neodepíše.</p>
       )}
 
       {links.length > 0 && (
-        <div className="space-y-1.5">
+        <ul className="list">
           {links.map(l => (
-            <div key={l.productId} className="flex items-center gap-2 rounded-2xl bg-white/70 border border-black/[0.06] pl-3.5 pr-2 py-1.5">
-              <button type="button" onClick={() => onOpenRecipe?.(l.productId)} title="Otevřít recepturu"
-                className="min-w-0 flex-1 text-left text-sm text-[#16181A] truncate hover:text-[#5B7A08] transition">
-                {l.productName ?? l.productId}
-              </button>
-              <input
-                defaultValue={fmt(l.amount)} inputMode="decimal"
-                onBlur={e => {
-                  const v = dec(e.target.value);
-                  if (v > 0 && v !== l.amount) send(l.productId, l.productName, v);
-                }}
-                className="tap-target-sm w-20 shrink-0 field rounded-xl border border-black/[0.07] px-2.5 py-1.5 text-xs text-right tabular-nums text-[#16181A] focus:border-[#C8F542]/50 focus:outline-none"
-              />
-              <span className="shrink-0 text-[11px] text-black/40 w-8">{unitLabel}</span>
-              <button type="button" onClick={() => send(l.productId, l.productName, 0)}
-                disabled={busy === l.productId} title="Odebrat z receptury" aria-label="Odebrat z receptury"
-                className="shrink-0 rounded-full w-7 h-7 flex items-center justify-center text-black/30 hover:text-bad-ink transition">
-                <Icon name="close" size={13} />
-              </button>
-            </div>
+            <ListRow key={l.productId} title={l.productName ?? l.productId}
+              actions={<>
+                <Input
+                  defaultValue={fmt(l.amount)} inputMode="decimal" aria-label={`Množství na porci — ${l.productName ?? l.productId} (${unitLabel})`}
+                  onBlur={e => {
+                    const v = dec(e.target.value);
+                    if (v > 0 && v !== l.amount) send(l.productId, l.productName, v);
+                  }}
+                  className="!w-20 text-right tabular-nums"
+                />
+                <span className="text-[13px] text-black/55 w-8">{unitLabel}</span>
+                {onOpenRecipe && (
+                  <Button variant="ghost" size="sm" iconOnly icon="clipboard" aria-label={`Otevřít recepturu ${l.productName ?? l.productId}`}
+                    onClick={() => onOpenRecipe(l.productId)} />
+                )}
+                <Button variant="ghost" size="sm" iconOnly icon="close" disabled={busy === l.productId}
+                  aria-label={`Odebrat z receptury ${l.productName ?? l.productId}`} onClick={() => send(l.productId, l.productName, 0)} />
+              </>} />
           ))}
-        </div>
+        </ul>
       )}
 
       {adding && (
-        <div className="rounded-2xl bg-white/70 border border-black/[0.07] p-3 space-y-2">
+        <div className="space-y-2">
           {picked ? (
             <>
               <p className="text-sm text-[#16181A]">
-                <b>{picked.name}</b>
-                {picked.category ? <span className="text-black/40"> · {picked.category}</span> : null}
+                <span className="font-semibold">{picked.name}</span>
+                {picked.category ? <span className="text-black/55"> · {picked.category}</span> : null}
               </p>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-black/50">Na jednu porci jde</span>
-                <input autoFocus inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)}
+              <div className="flex flex-wrap items-center gap-2">
+                <Label htmlFor={`${uid}-porce`} className="!mb-0">Na jednu porci jde</Label>
+                <Input id={`${uid}-porce`} autoFocus inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); confirmAdd(); } }}
-                  placeholder="0,04" className={`${field} w-24 text-center py-1.5`} />
-                <span className="text-xs text-black/50">{unitLabel}</span>
+                  placeholder="0,04" className="!w-24 text-center" />
+                <span className="text-[13px] text-black/55">{unitLabel}</span>
               </div>
               <div className="flex items-center gap-2">
-                <button type="button" onClick={confirmAdd} disabled={!!busy}
-                  className="btn btn-primary btn-sm disabled:opacity-50 transition">
-                  {busy ? 'Ukládám…' : 'Přidat'}
-                </button>
-                <button type="button" onClick={() => { setPicked(null); setAmount(''); }}
-                  className="text-xs font-semibold text-black/45 hover:text-black transition">Zpět na hledání</button>
+                <Button variant="primary" size="sm" loading={!!busy} onClick={confirmAdd}>Přidat</Button>
+                <Button variant="ghost" size="sm" onClick={() => { setPicked(null); setAmount(''); }}>Zpět na hledání</Button>
               </div>
             </>
           ) : (
             <>
-              <input ref={searchRef} autoFocus value={query} onChange={e => setQuery(e.target.value)}
-                onKeyDown={keys.onInputKeyDown}
-                placeholder="Hledat položku v kase…" className={field} />
+              <Input ref={searchRef} autoFocus value={query} onChange={e => setQuery(e.target.value)}
+                onKeyDown={keys.onInputKeyDown} aria-label="Hledat položku v kase"
+                placeholder="Hledat položku v kase…" />
               {query.trim().length >= 2 && found.length === 0 && (
-                <p className="text-xs text-black/40">Nic takového v menu není.</p>
+                <p className="t-meta">Nic takového v menu není.</p>
               )}
               {found.length > 0 && (
                 <div ref={pickList} onKeyDown={keys.onListKeyDown}
-                  className="max-h-48 overflow-y-auto scrollbar-thin divide-y divide-black/[0.05]">
+                  className="max-h-48 overflow-y-auto scrollbar-thin divide-y divide-black/[0.06]">
                   {found.map(p => (
                     <button key={p.productId} type="button" onClick={() => { setPicked(p); setErr(''); }}
-                      className="w-full text-left px-1 py-2 hover:bg-black/[0.03] transition">
+                      className="w-full text-left px-1 py-2 hover:bg-black/[0.04] transition-colors">
                       <span className="block text-sm text-[#16181A] truncate">{p.name}</span>
-                      <span className="block text-[11px] text-black/40 truncate">
-                        {p.category || 'bez kategorie'}{p.price != null ? ` · ${p.price} Kč` : ''}
+                      <span className="block text-[13px] text-black/55 truncate">
+                        {p.category || 'bez kategorie'}{p.price != null ? ` · ${money(p.price)}` : ''}
                       </span>
                     </button>
                   ))}
                 </div>
               )}
-              <button type="button" onClick={() => { setAdding(false); setQuery(''); setFound([]); setErr(''); }}
-                className="text-xs font-semibold text-black/45 hover:text-black transition">Zrušit</button>
+              <Button variant="ghost" size="sm" onClick={() => { setAdding(false); setQuery(''); setFound([]); setErr(''); }}>Zrušit</Button>
             </>
           )}
         </div>
       )}
 
-      {err && <p className="text-xs text-bad-ink">{err}</p>}
+      {err && <p className="note note-danger" role="alert">{err}</p>}
 
       {links.length > 0 && (
-        <p className="text-[11px] text-black/45">
-          Změna velikosti balení nebo ceny se propíše do marží těchhle položek.
-        </p>
+        <p className="t-meta">Změna velikosti balení nebo ceny se propíše do marží těchhle položek.</p>
       )}
-    </div>
+    </Well>
   );
 }

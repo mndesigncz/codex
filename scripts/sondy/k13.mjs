@@ -18,6 +18,8 @@ async function open(url) {
   await ctx.route('**/api/**', async route => {
     const u = route.request().url();
     if (u.includes('/api/auth/')) return route.continue();
+    // Kolo 69 (B2): Docházka a Tým jsou plochy s widgety — rozložení z fixtury balíku (jako att.mjs).
+    if (new URL(u).pathname === '/api/rozlozeni' && ['vedeni.dochazka', 'vedeni.tym'].includes(new URL(u).searchParams.get('stranka'))) return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + (new URL(u).searchParams.get('stranka') === 'vedeni.tym' ? 'k69-b2-rozlozeni-tym' : 'k69-b2-rozlozeni-dochazka') + '.json', 'utf8') });
     if (route.request().method() !== 'GET') {
       sent.push({ m: route.request().method(), u: u.replace('http://localhost:3000',''), body: route.request().postData() });
       return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"token":"t1","emailSent":true}' });
@@ -55,12 +57,16 @@ console.log('Úkoly — odškrtnout celý checklist:');
 console.log('Tým — pozvat víc lidí naráz:');
 {
   const { ctx, p, errs, sent } = await open('/employer/overview?view=team-settings');
-  const f = p.locator('input[aria-label="E-mail nebo víc e-mailů oddělených čárkou"]');
+  // Kolo 69 (B2): pozvání je okno (Modal) z limetky „Pozvat člena", ne pole na stránce.
+  await p.getByRole('button', { name: 'Pozvat člena' }).first().click().catch(() => {});
+  const okno = p.getByRole('dialog', { name: 'Pozvat člena' });
+  await okno.waitFor({ timeout: 3000 }).catch(() => {});
+  const f = okno.getByLabel('E-mail');
   if (await f.count() === 0) bad('pole pro pozvánku nenalezeno');
   else {
     await f.fill('a@x.cz, b@x.cz  c@x.cz');
     const before = sent.length;
-    await p.locator('button', { hasText: /Poslat pozvánku|Pozvat|Odeslat/ }).first().click();
+    await okno.getByRole('button', { name: 'Odeslat pozvánku' }).click();
     await p.waitForTimeout(1500);
     const posts = sent.slice(before).filter(x => x.u.includes('/api/invitations') && x.m === 'POST');
     posts.length === 3 ? ok('tři e-maily = tři pozvánky z jednoho odeslání') : bad(`čekány 3 pozvánky, odešlo ${posts.length}`);

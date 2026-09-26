@@ -17,8 +17,6 @@ import { useConversations } from '../chat/useChat';
 import EmployerDashboard from './EmployerDashboard';
 
 import ReceiptsPanel from './ReceiptsPanel';
-import ShiftSwap from '../scheduling/ShiftSwap';
-import ShiftSwapApprovals from '../scheduling/ShiftSwapApprovals';
 import MobileMoreSheet from '../MobileMoreSheet';
 import { ProfileLinkProvider } from './ProfileLinkProvider';
 import { usePlan, MaxGate } from '../Pro';
@@ -65,7 +63,6 @@ const Attendance = naLine(() => import('./Attendance'));
 const MyShifts = naLine(() => import('../employee/MyShifts'));
 const AvailabilitySubmit = naLine(() => import('../scheduling/AvailabilitySubmit'));
 const TimeOffRequest = naLine(() => import('../scheduling/TimeOffRequest'));
-const TimeOffApprovals = naLine(() => import('../scheduling/TimeOffApprovals'));
 const Procedures = naLine(() => import('../procedures/Procedures'));
 const ToGoMode = naLine(() => import('./ToGoMode'));
 const ClientAdmin = naLine(() => import('../client/ClientAdmin'));
@@ -254,19 +251,11 @@ export default function EmployerLayout({ user }: Props) {
     if (!smiPohled(currentView)) return <BezOpravneni onZpet={() => setCurrentView('overview')} />;
     switch (currentView) {
       case 'overview':  return <EmployerDashboard user={user} />;
-      case 'shifts':    return (
-        <div>
-          <ScheduleBuilder user={user as any} onNavigate={navigate} />
-          {/* Stejný rytmus jako obal ScheduleBuilderu (p-4 sm:p-6): na telefonu
-              byly karty pod rozvrhem s px-6 užší než rozvrh nad nimi. */}
-          <div className="px-4 sm:px-6 pb-6 w-full space-y-4">
-            <ShiftSwapApprovals />
-            <TimeOffApprovals />
-          </div>
-        </div>
-      );
+      // Výměny a žádosti o volno jsou od kola 69 widgety plochy Rozvrhu.
+      case 'shifts':    return <ScheduleBuilder user={user as any} onNavigate={navigate} />;
       case 'inventory': return <Inventory user={user as any} initialCategory={inventoryCat} onNavigate={navigate} />;
-      case 'menu':      return <div className="px-4 sm:px-6 pb-6 w-full max-w-3xl mx-auto"><MenuEditor /></div>;
+      // Menu je plocha s vlastní hlavičkou a odsazením (kolo 69).
+      case 'menu':      return <MenuEditor />;
       case 'recipes':   return <RecipesView openProductId={recipeProduct} onNavigate={navigate} />;
       case 'chat':      return <ChatView user={user as any} openConversationId={chatConvId} />;
       case 'procedures': return <Procedures user={user as any} />;
@@ -279,7 +268,6 @@ export default function EmployerLayout({ user }: Props) {
       case 'my-shifts': return (
         <div className="space-y-2">
           <MyShifts user={user as any} />
-          <ShiftSwap user={user as any} />
           {/* Uvnitř Mých směn; `h1` už patří jim. */}
           <AvailabilitySubmit user={user as any} headingLevel="h2" />
           <div className="px-4 sm:px-6 pb-6 max-w-3xl mx-auto w-full"><TimeOffRequest /></div>

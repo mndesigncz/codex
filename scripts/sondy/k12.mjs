@@ -17,6 +17,10 @@ async function open(url, role = 'employer') {
   await ctx.route('**/api/**', async route => {
     const u = route.request().url();
     if (u.includes('/api/auth/')) return route.continue();
+    // Kolo 69 (B2): Docházka a Tým jsou plochy s widgety — rozložení z fixtury balíku (jako att.mjs).
+    // Widgety čtou oprávnění přísně (useSmi) — starý teams_mine je nemá, doplnit vlastníkova z roles.json.
+    if (new URL(u).pathname === '/api/teams/mine') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...JSON.parse(readFileSync(DIR + 'teams_mine.json', 'utf8')), opravneni: JSON.parse(readFileSync(DIR + 'roles.json', 'utf8')).ja.opravneni, role: { klic: 'vedeni', roleId: null, nazev: 'Vlastník', typ: 'vedeni', jeVlastnik: true } }) });
+    if (new URL(u).pathname === '/api/rozlozeni' && ['vedeni.dochazka', 'vedeni.tym'].includes(new URL(u).searchParams.get('stranka'))) return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + (new URL(u).searchParams.get('stranka') === 'vedeni.tym' ? 'k69-b2-rozlozeni-tym' : 'k69-b2-rozlozeni-dochazka') + '.json', 'utf8') });
     if (route.request().method() !== 'GET') return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
     const k = keyFor(u);
     if (k && existsSync(DIR + k + '.json')) return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + k + '.json', 'utf8') });
@@ -31,16 +35,21 @@ async function open(url, role = 'employer') {
 console.log('Docházka — řazení souhrnu:');
 {
   const { ctx, p, errs } = await open('/employer/overview?view=attendance');
-  const names = () => p.evaluate(() => Array.from(document.querySelectorAll('.glass-card'))
-    .map(c => (c.textContent || '').replace(/\s+/g, ' ').trim()).filter(t => /\d+ h|\d+ min/.test(t)).map(t => t.slice(0, 22)));
+  // Kolo 69 (B2): souhrn hodin je widget s .list řádky a řazením v Segmented
+  // („Řadit souhrn": Hodiny / Mzda / Jméno) místo mřížky karet a „Podle jména".
+  const souhrn = p.locator('[data-widget="dochazka.souhrn_hodin"]');
+  const names = () => souhrn.locator('.list-row').evaluateAll(els => els.map(e => (e.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 22)));
+  // Widget se stahuje líně (až když je na obrazovce) — doscrollovat a počkat na řádky.
+  await souhrn.scrollIntoViewIfNeeded().catch(() => {});
+  await souhrn.locator('.list-row').first().waitFor({ timeout: 8000 }).catch(() => {});
   const before = await names();
-  const byName = p.locator('button', { hasText: /^Podle jména$/ });
+  const byName = souhrn.getByRole('tablist', { name: 'Řadit souhrn' }).getByRole('tab', { name: 'Jméno' });
   if (await byName.count() === 0) bad('přepínač řazení souhrnu není');
   else {
     await byName.first().click(); await p.waitForTimeout(500);
     const after = await names();
     JSON.stringify(after) !== JSON.stringify(before)
-      ? ok(`řazení podle jména změnilo pořadí (${before.length} karet)`)
+      ? ok(`řazení podle jména změnilo pořadí (${before.length} řádků)`)
       : bad('řazení podle jména nic nezměnilo');
     await p.screenshot({ path: `${OUT}k12-dochazka-1280.png` });
   }

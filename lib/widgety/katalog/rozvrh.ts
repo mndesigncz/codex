@@ -192,7 +192,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     id: 'rozvrh.tym_nahled',
     oblast: 'rozvrh',
     nazev: 'Kdo má směnu',
-    popis: 'Náhled rozvrhu týmu (jména a časy, bez sazeb) na dnes a týden.',
+    popis: 'Náhled rozvrhu týmu (jména a časy, bez sazeb) na dnes, týden nebo 14 dní.',
     ikona: 'users',
     velikosti: ['M', 'L'],
     vychoziVelikost: 'L',
@@ -205,7 +205,9 @@ export const WIDGETY: DefiniceWidgetu[] = [
         klic: 'rozsah',
         nazev: 'Rozsah',
         typ: 'vyber',
-        moznosti: [{ id: 'dnes', nazev: 'Dnes' }, { id: 'tyden', nazev: 'Týden' }],
+        // 14 dní jako dřívější TeamSchedule (DAYS_AHEAD = 13): zaměstnanec řeší „s kým jsem
+        // příští týden", ne jen tenhle. Výchozí zůstává týden, aby Domů nebyla dlouhá.
+        moznosti: [{ id: 'dnes', nazev: 'Dnes' }, { id: 'tyden', nazev: 'Týden' }, { id: 'dva_tydny', nazev: '14 dní' }],
         vychozi: 'tyden',
       },
     ],
