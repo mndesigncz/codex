@@ -1099,6 +1099,16 @@ h3             { letter-spacing: -0.01em;  line-height: 1.25; }
 .chrom-inkoust { background: #16181A; color: #fff; box-shadow: var(--shadow-float); }
 :root[data-theme="dark"] .chrom-inkoust { background: #2A2D31; }
 
+/* Chat v doku (MessengerDock) v režimu úprav plochy ustoupí do inkoustu:
+   jediná limetka režimu úprav je „Hotovo" v liště (DP §5.5, §6.2). Plocha
+   nese data-upravy na svém kořeni, tak se to čte přes :has — dok žije
+   v layoutu mimo plochu a nic dalšího si předávat nemusí. Barvy jako
+   u .chrom-inkoust, ať tlačítko v tmavém režimu nesplyne s papírem. */
+:root:has(.plocha[data-upravy]) .fab-chat { background: #16181A; color: #fff; }
+:root[data-theme="dark"]:has(.plocha[data-upravy]) .fab-chat { background: #2A2D31; }
+/* !important kvůli tmavému přemapování .bg-[#16181A] (to má !important samo). */
+:root:has(.plocha[data-upravy]) .fab-chat-odznak { background: #fff !important; color: #16181A !important; }
+
 /* Odznak s počtem (Badge): inkoust s limetkovým číslem. Vlastní třída
    místo `bg-[#16181A]`: ta se v tmavém režimu přepisuje na 14% bílou, takže
    odznak byl průhledný a ikona pod ním (chat v doku) prosvítala číslem.

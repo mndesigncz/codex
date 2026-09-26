@@ -1317,6 +1317,96 @@ provoz. Obrazovka to musí říkat dřív, než kdo klikne:
 Hlídá to `scripts/check-admin-auth.mjs`: žádná admin routa bez brány,
 middleware s blokací existuje, `lib/superadmin.ts` je bez Node importů.
 
+## Plocha s widgety
+
+Od kola 68 je stránka **plocha**: shora `PageHeader` (jediný h1), pod ním
+chrom stránky (přepínač pohledu, filtry — nehýbe se) a mřížka widgetů. Na
+pracovních stránkách je v mřížce i hlavní nástroj (seznam skladu, uzávěrek)
+jako povinná položka přes celou šířku. Plochu si každý poskládá jako
+domovskou obrazovku iPhonu; vedení může dát výchozí rozložení celému vedení,
+zaměstnancům nebo jedné roli a zamknout ho. Mechaniku popisuje
+`components/widgety/PlochaWidgetu.tsx` a čistá logika v `lib/widgety/`;
+žádná obrazovka si vlastní režim úprav, lištu ani galerii nestaví.
+
+**Rozhodnutí, která drží tvar:**
+
+- **Widget bez oprávnění neexistuje.** Server ho nevrátí, galerie ho
+  nenabídne a klient ho nepřipojí — data se načtou až při `nacteno && ma()`.
+  `ma()` před načtením oprávnění vrací ANO, pro widget to nestačí. Žádný
+  zamčený ani rozmazaný náhled: prozradil by, že data existují.
+- **Rozložení je pole `{id, widget, velikost, nastaveni}`** a pořadí na
+  obrazovce = pořadí v DOM = pořadí pro Tab i odečítač. Proto mřížka nemá
+  `grid-flow-dense`.
+- **Každá změna se uloží hned**, optimisticky: model se změní, zápisy se
+  slučují 400 ms, běží nejvýš jeden. 409 převezme novější stav serveru
+  a vyprázdní „Vrátit"; síťová chyba model nechá („Neuloženo · Zkusit
+  znovu") — změna je záměr člověka.
+- **Žádná knihovna na tah ani pružiny.** Náhled pořadí přes CSS `order`
+  (přesun uzlu v DOM by uvolnil pointer capture a tah by se utrhl),
+  rychlost prstu se předá pružině, pokračování tahem z menu — tohle
+  hotové knihovny neumí.
+
+### Interakce
+
+- **Vstup do úprav:** podržení prázdného místa 500 ms, „Upravit" v hlavičce
+  (na telefonu „Upravit stránku" v „···") nebo položka menu widgetu.
+  Podržení widgetu otevře kontextové menu: **Nastavit widget · Upravit
+  stránku · Odebrat widget** (ne „Upravit widget / Upravit plochu" — dvě
+  položky začínající stejným slovem se v menu o třech řádcích pletou).
+  Pohyb o víc než 10 px podržení zruší, protože skoro každé rolování
+  přehledu začíná na nějakém widgetu.
+- **Režim úprav:** widgety se vlní, „−" odebere hned bez potvrzení (nic se
+  nemaže, toast nabídne „Vrátit" na 6 s, Ctrl+Z taky), „+ Přidat widget"
+  a „Hotovo" jsou v plovoucí inkoustové liště dole. Lišta je vždy na dosah
+  palce; tlačítko v hlavičce by po odrolování zmizelo.
+- **Tah:** myš po 4 px pohybu, prst po 180 ms držení bez pohybu. Rychlý
+  švih stránku posune — plocha iOS se svisle neposouvá, naše stránky ano,
+  takže okamžitý tah by znemožnil rolovat. Karta jde 1 : 1 se stálým
+  offsetem úchopu, ostatní uhýbají pružinou (tlumení 1, odezva 0,35 s),
+  puštěná karta dosedne s rychlostí prstu. V úpravách
+  `touch-action: pan-y` a nepasivní `touchmove` jen během tahu.
+- **Klávesnice (tah nikdy není jediná cesta):** Tab na widget, šipky
+  přesouvají hned a **bez animace** (akce z klávesnice se neanimují),
+  Enter otevře menu s Posunout výš/níž, Delete odebere, Escape úpravy
+  ukončí a fokus vrátí na „Upravit". Odečítač slyší „název, velikost,
+  pozice i z n" a každou změnu přes `aria-live`.
+- **Omezený pohyb:** žádné vlnění ani zmenšení; úpravy pozná podle
+  přerušovaného obrysu karet a odznaků „−". Vlnění je deklarované jen
+  uvnitř `prefers-reduced-motion: no-preference` — globální pravidlo
+  `animation-duration: .01ms` by ho jinak nechalo jednou škubnout.
+- **Haptika** (`navigator.vibrate(8)`, jen dotyk) jen u otevření menu
+  podržením, vstupu podržením, zvednutí, puštění se změnou pořadí
+  a odebrání „−". Víc zpětné vazby naučí lidi ji ignorovat.
+- **Tablet** má jen výchozí rozložení (edituje ho vedení v Nastavení →
+  Stránky) a sám úpravy nemá — je sdílený.
+
+### Vzhled
+
+- **Widget** je vždy `<Widget>` = `Card as="section"`: titulek `h2.t-card`
+  s ikonou 17 px `text-black/40` (bez kolečka), odkaz dál jako
+  `Button ghost sm` s chevronem, čísla `Stat`, seznamy `.list` + `ListRow`
+  (ve střední velikosti nejvýš 5 a „…a dalších N"). Všechny čtyři stavy:
+  kostra, `ErrorState compact` se „Zkusit znovu", prázdno větou, a bez
+  oprávnění nic. Pád jednoho widgetu neshodí plochu.
+- **Limetka ve widgetu nikdy.** V úpravách je jedinou limetkou „Hotovo",
+  v klidu přehledy limetku nemají vůbec. Tón má jen „Čeká na tebe",
+  inkoustovou plochu nejvýš jeden widget peněz na stránce.
+- **Mřížka podle šířky plochy, ne okna** (boční pás, TO GO, náhled
+  v Nastavení): 4 sloupce od 840 px, 2 od 300 px, jinak 1. V klidu se
+  zbylé sloupce řady rozdělí mezi její položky (žádná osiřelá buňka),
+  v úpravách platí jmenovité velikosti, aby se karty neměnily pod prstem.
+- **Vlnění:** úhel podle úhlopříčky karty (roh se vychýlí o 2,3 px, strop
+  1,2°), délka kmitu 239–283 ms a fáze z hashe id — sousedé se nekývou
+  v zákrytu a fáze je stálá mezi překresleními. Hýbe se jen `transform`.
+- **Nastavení → Stránky** kreslí widgety jen schematicky, bez dat:
+  správce vidí, co kde bude, ale data jiných lidí mu neprotečou.
+
+Hlídají to sondy `scripts/sondy/k68-*.mjs` (plocha, telefon, klávesnice,
+oprávnění, výchozí rozložení, design) a testy `scripts/testy/k68-widgety.ts`.
+Hodnoty podržení, vlnění a zvednutí jsou v `lib/widgety/konstanty.ts` —
+ladí se na skutečném iPhonu a Androidu, emulace v Chromiu nepozná callout,
+výběr textu ani kolizi podržení s rolováním.
+
 ## Anti-vzory (zdejší zákazy)
 
 Karta v kartě; víc než jedna limetková akce na obrazovce; ručně psané
@@ -1327,4 +1417,7 @@ na datech; `String(date).slice` a `toDateString()` místo pragueTime; písmo pod
 blur mimo plovoucí lištu, dock a topbar; `<div onClick>` bez `role`
 a `tabIndex`; tlačítko bez `type` uvnitř `<form>`; tiše oříznutý seznam; fronta
 ke schválení, kde jde schvalovat jen po jednom; dva tvary po číslovce;
-oslava akce, u které se nezkontrolovalo `res.ok`.
+oslava akce, u které se nezkontrolovalo `res.ok`; vlastní režim úprav,
+lišta nebo galerie widgetů mimo `PlochaWidgetu`; widget bez `<Widget>`,
+s vlastním `fetch` nebo s `accent`; `grid-flow-dense` a `touch-action: none`
+na ploše; vlnění mimo režim úprav a animace přesunu z klávesnice.

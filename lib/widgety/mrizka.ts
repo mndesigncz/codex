@@ -72,21 +72,31 @@ export function vnitrniZona(r: Obdelnik): Obdelnik {
   return { left: r.left + r.width * 0.25, top: r.top + r.height * 0.2, width: r.width * 0.5, height: r.height * 0.6 };
 }
 
-const uvnitr = (b: { x: number; y: number }, r: Obdelnik) =>
-  b.x >= r.left && b.x <= r.left + r.width && b.y >= r.top && b.y <= r.top + r.height;
+/** Leží bod ve vnitřní zóně obdélníku? */
+export function veVnitrniZone(b: { x: number; y: number }, r: Obdelnik): boolean {
+  const z = vnitrniZona(r);
+  return b.x >= z.left && b.x <= z.left + z.width && b.y >= z.top && b.y <= z.top + z.height;
+}
 
 /**
  * Cílový index tahu. `obdelniky` jsou v náhledovém pořadí (null = skrytá
  * položka), `tazeny` je index tažené položky, `dosavadni` dosavadní cíl.
  * Ukazatel ve vnitřní zóně položky j → cíl j (tažená zaujme její místo,
  * ostatní uhnou). Pod poslední řadou → konec. Jinde se cíl nemění.
+ *
+ * `blokovany` je položka, která vyvolala minulé přeskládání. Její zóna cíl
+ * nemění, dokud z ní ukazatel neodejde (hlídá volající). Hystereze okrajů
+ * nestačí: když karta po přesunu zůstane na místě (malá karta nad velkou,
+ * která zabírá celou řadu — bez `grid-auto-flow: dense` velká neuhne),
+ * ukazatel je pořád v její zóně a cíl by se přepínal „za ni" a „před ni"
+ * donekonečna (review kola 68, sonda rev-fyz2).
  */
-export function cilovyIndex(bod: { x: number; y: number }, obdelniky: readonly (Obdelnik | null)[], tazeny: number, dosavadni: number): number {
+export function cilovyIndex(bod: { x: number; y: number }, obdelniky: readonly (Obdelnik | null)[], tazeny: number, dosavadni: number, blokovany = -1): number {
   let spodek = -Infinity;
   for (let j = 0; j < obdelniky.length; j++) {
     const r = obdelniky[j];
     if (!r || j === tazeny) continue;
-    if (uvnitr(bod, vnitrniZona(r))) return j;
+    if (veVnitrniZone(bod, r)) return j === blokovany ? dosavadni : j;
     spodek = Math.max(spodek, r.top + r.height);
   }
   if (spodek > -Infinity && bod.y > spodek) return obdelniky.length - 1;

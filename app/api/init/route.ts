@@ -7,8 +7,13 @@ import { checkCron } from '@/lib/cronAuth';
 import { hit } from '@/lib/rateLimit';
 import { zDashboardConfig } from '@/lib/widgety/migrace';
 
-/** Jednorázový převod dashboard_config → rozlozeni_stranek; zapne ho nasazení plochy na přehledech (kolo 68, krok C). */
-const PREVEST_DASHBOARD_CONFIG = false;
+/**
+ * Jednorázový převod dashboard_config → rozlozeni_stranek. Zapnutý ve stejném
+ * nasazení, které přepnulo Přehled vedení a Domů zaměstnance na plochu
+ * widgetů (kolo 68, krok C): starý editor už neexistuje, takže config se
+ * od téhle chvíle nemění a převod nemůže zahodit pozdější úpravy.
+ */
+const PREVEST_DASHBOARD_CONFIG = true;
 import { normalizujRozlozeni } from '@/lib/widgety/rozlozeni';
 import { stranka as strankaRozlozeni } from '@/lib/widgety/stranky';
 
@@ -1917,12 +1922,12 @@ export async function GET(request: Request) {
     // deterministický a dalším během by se nespravila, takže se přeskočí,
     // zaloguje a tým příznak dostane.
     //
-    // Převod je zatím VYPNUTÝ (PREVEST_DASHBOARD_CONFIG). Dokud přehledy běží
-    // na starém editoru, vedení v něm pořád upravuje dashboard_config — a
-    // převod v tuhle chvíli by jeho pozdější úpravy při přepnutí na plochu
-    // zahodil. Do té doby rozložení počítá převod za běhu (vyresRozlozeni,
-    // krok 5) vždy z aktuálního configu. Zapne se ve stejném nasazení, které
-    // přehledy přepne na plochu widgetů.
+    // Převod hlídá PREVEST_DASHBOARD_CONFIG. Dokud přehledy běžely na starém
+    // editoru, byl vypnutý: vedení v něm pořád upravovalo dashboard_config
+    // a převod by jeho pozdější úpravy při přepnutí na plochu zahodil.
+    // Zapnul se ve stejném nasazení, které přehledy přepnulo na plochu
+    // widgetů (kolo 68, krok C). Než init proběhne, počítá rozložení převod
+    // za běhu (vyresRozlozeni, krok 5).
     if (PREVEST_DASHBOARD_CONFIG) try {
       const tymy = await sql`
         SELECT id, dashboard_config FROM teams

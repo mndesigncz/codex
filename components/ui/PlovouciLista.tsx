@@ -19,6 +19,13 @@ const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayout
 // Víc lišt naráz (hromadný pruh v okně nad lištou úprav) je výjimka, ale
 // nesmí se rozbít: platí výška té nejvyšší a odchod jedné nesmaže druhou.
 const vysky = new Map<symbol, number>();
+
+/**
+ * Jak dlouho po zavření zůstane záchyt: animace odjezdu trvá 160 ms, ale
+ * netrpělivé druhé klepnutí přijde i za 250 ms — to už je lišta pryč
+ * a klepnutí by trefilo obsah pod ní.
+ */
+const ODJEZD_MS = 320;
 function zapisVysku() {
   if (typeof document === 'undefined') return;
   const root = document.documentElement;
@@ -44,7 +51,8 @@ export function PlovouciLista({ label, children, note, open = true, animate = fa
   /** Třídy navíc pro samotnou pilulku. */
   className?: string;
 }) {
-  // Při zavírání s animací zůstane lišta ještě 160 ms vykreslená a odjíždí.
+  // Při zavírání s animací zůstane lišta ještě chvíli vykreslená: 160 ms
+  // odjíždí a do ODJEZD_MS drží na původním místě neviditelný záchyt.
   // Stav se odvodí hned při vykreslení (ne až v efektu), takže bez animace
   // zmizí ve stejném snímku jako dřív BulkBar.
   const [odjizdi, setOdjizdi] = useState(false);
@@ -55,7 +63,7 @@ export function PlovouciLista({ label, children, note, open = true, animate = fa
   }
   useEffect(() => {
     if (!odjizdi) return;
-    const t = setTimeout(() => setOdjizdi(false), 160);
+    const t = setTimeout(() => setOdjizdi(false), ODJEZD_MS);
     return () => clearTimeout(t);
   }, [odjizdi]);
 
@@ -102,20 +110,27 @@ export function PlovouciLista({ label, children, note, open = true, animate = fa
       role="region"
       aria-label={label}
     >
-      <div
-        // Odjíždějící lištu už nejde ovládat — kliknutí by šlo do prázdna.
-        inert={odjizdi || undefined}
-        className={`flex flex-col items-center max-w-full ${odjizdi ? 'pointer-events-none lista-odjezd' : `pointer-events-auto ${animate ? 'lista-prijezd' : ''}`}`}
-      >
-        {/* Plocha a stín z `.chrom-inkoust`: pevná i v tmavém režimu (obsah pod
-            lištou neprosvítá) a se skutečným stínem — utilita stínu s holou
-            proměnnou v Tailwindu 3.4 žádný stín nedá (scripts/check-shadow-var). */}
-        <div className={`flex items-center gap-2 flex-wrap justify-center rounded-full chrom-inkoust px-4 py-2.5 ${className}`}>
-          {children}
+      {/* Záchyt: při odjezdu stojí na místě lišty (transform animace rozměry
+          nemění) a spolkne klepnutí. Odjíždějící lišta sama je `inert`, a ten
+          se při hledání cíle chová jako pointer-events: none — druhé klepnutí
+          dvojklepu na „Hotovo" by jinak propadlo na widget pod lištou
+          (na telefonu otevřelo Docházku, review kola 68 rev-fyz6). */}
+      <div className={`max-w-full ${odjizdi ? 'pointer-events-auto' : ''}`} aria-hidden={odjizdi || undefined}>
+        <div
+          // Odjíždějící lištu už nejde ovládat.
+          inert={odjizdi || undefined}
+          className={`flex flex-col items-center max-w-full ${odjizdi ? 'pointer-events-none lista-odjezd' : `pointer-events-auto ${animate ? 'lista-prijezd' : ''}`}`}
+        >
+          {/* Plocha a stín z `.chrom-inkoust`: pevná i v tmavém režimu (obsah pod
+              lištou neprosvítá) a se skutečným stínem — utilita stínu s holou
+              proměnnou v Tailwindu 3.4 žádný stín nedá (scripts/check-shadow-var). */}
+          <div className={`flex items-center gap-2 flex-wrap justify-center rounded-full chrom-inkoust px-4 py-2.5 ${className}`}>
+            {children}
+          </div>
+          {note && (
+            <p className="mt-2 rounded-full bg-white/95 px-3 py-1.5 text-center text-xs font-medium text-bad-ink shadow">{note}</p>
+          )}
         </div>
-        {note && (
-          <p className="mt-2 rounded-full bg-white/95 px-3 py-1.5 text-center text-xs font-medium text-bad-ink shadow">{note}</p>
-        )}
       </div>
     </div>
   );

@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { signOut } from 'next-auth/react';
 import PodnikSwitcher from '../PodnikSwitcher';
 import { Icon, LogoMark } from '../Icons';
-import { Avatar, Badge, ErrorBoundary } from '../ui';
+import { Avatar, Badge, ErrorBoundary, MenuPanel, MenuItemButton } from '../ui';
+import { usePopover } from '@/lib/usePopover';
 import { czCount, NEPRECTENA_ZPRAVA } from '@/lib/czech';
 import NotificationBell from '../NotificationBell';
 import MessengerDock from '../chat/MessengerDock';
@@ -15,6 +16,7 @@ import dynamic from 'next/dynamic';
 import { PageSkeleton } from '../ui';
 import { useOpravneni } from '../role/useOpravneni';
 import BezOpravneni from '../role/BezOpravneni';
+import { NavigaceKontext, useHodnotaNavigace } from '../widgety/NavigaceKontext';
 
 // Pohledy se stahují až při otevření — viz EmployerLayout. Zaměstnanec
 // otevře za směnu obvykle dvě obrazovky; stahovat kvůli tomu uzávěrku,
@@ -84,7 +86,7 @@ interface Props {
 
 export default function EmployeeLayout({ user }: Props) {
   const [currentView, setCurrentView] = useState('home');
-  const { ma } = useOpravneni();
+  const { ma, opravneni, nacteno } = useOpravneni();
   const smiPohled = (id: string) => { const k = KLICE_POHLEDU[id]; return k == null || ma(k); };
   // Deep links from notifications: /employee/shifts?view=X
   useEffect(() => {
@@ -112,23 +114,26 @@ export default function EmployeeLayout({ user }: Props) {
   const unreadChat = chatConvs.reduce((n, c) => n + (c.unreadCount || 0), 0);
   const [moreOpen, setMoreOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const ucet = usePopover(accountOpen, setAccountOpen, { focusFirst: true, arrowKeys: true });
   const openSettings = () => { setCurrentView('settings'); setAccountOpen(false); setMoreOpen(false); };
 
   const renderView = () => {
     if (!smiPohled(currentView)) return <BezOpravneni onZpet={() => setCurrentView('home')} />;
     switch (currentView) {
-      case 'home':         return <EmployeeDashboard user={user as any} onNavigate={navigate} />;
+      case 'home':         return <EmployeeDashboard user={user} />;
       case 'my-shifts':    return (
+        // Obaly px-4 sm:px-6 jako MyShifts a AvailabilitySubmit (p-4 sm:p-6):
+        // s px-6 měly karty na telefonu okraj 24 px proti 16 px nad nimi.
         <div className="space-y-2">
           <MyShifts user={user as any} />
-          <div className="px-6 pb-2 max-w-3xl mx-auto w-full"><ShiftCalendar scope="me" /></div>
+          <div className="px-4 sm:px-6 pb-2 max-w-3xl mx-auto w-full"><ShiftCalendar scope="me" /></div>
           <ShiftSwap user={user as any} />
         </div>
       );
       case 'availability': return (
         <div className="space-y-2">
           <AvailabilitySubmit user={user as any} />
-          <div className="px-6 pb-6"><TimeOffRequest /></div>
+          <div className="px-4 sm:px-6 pb-6 max-w-3xl mx-auto w-full"><TimeOffRequest /></div>
         </div>
       );
       case 'inventory':    return <InventoryReport user={user as any} initialCategory={inventoryCat} />;
@@ -140,7 +145,7 @@ export default function EmployeeLayout({ user }: Props) {
       case 'guides':       return <Guides user={user as any} openGuideId={guideId} />;
       case 'suggestions':  return <SuggestionsBoard />;
       case 'settings':     return <Settings user={user as any} initialTab="account" />;
-      default:             return <EmployeeDashboard user={user as any} onNavigate={navigate} />;
+      default:             return <EmployeeDashboard user={user} />;
     }
   };
 
@@ -153,7 +158,14 @@ export default function EmployeeLayout({ user }: Props) {
     .map(sec => ({ title: sec.title, items: sec.ids.map(id => mojeById[id]).filter(n => n && !mobilePrimary.includes(n.id)) }))
     .filter(g => g.items.length);
 
+  // Navigace pro widgety na ploše (kolo 68, spec §2.6): proklik z widgetu vede
+  // jen na pohled, který zaměstnanecký layout zná a kam divák smí — smiPohled
+  // pro neznámé id vrací ano (null = každý), proto ještě kontrola seznamu.
+  const smiPohledZWidgetu = (pohled: string) => (byId[pohled] != null || pohled === 'settings') && smiPohled(pohled);
+  const navigaceWidgetu = useHodnotaNavigace(navigate, smiPohledZWidgetu, mojeNav, [opravneni, nacteno]);
+
   return (
+    <NavigaceKontext.Provider value={navigaceWidgetu}>
     <div className="flex h-[100dvh] overflow-hidden">
       <aside className={`${sidebarOpen ? 'w-64' : 'w-[76px]'} glass-strong hidden md:flex m-4 mr-0 rounded-3xl text-[#16181A] flex-col transition-[width] duration-300 flex-shrink-0`}>
         <div className={`flex items-center gap-3 py-5 border-b border-black/[0.07] ${sidebarOpen ? 'px-5' : 'px-0 justify-center'}`}>
@@ -176,7 +188,8 @@ export default function EmployeeLayout({ user }: Props) {
             return (
               <div key={sec.title ?? 'top'} className={si > 0 ? 'pt-2.5' : ''}>
                 {sec.title && (sidebarOpen
-                  ? <p className="px-3.5 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.13em] text-black/30">{sec.title}</p>
+                  // Štítek skupiny jako všude jinde (t-label), ne ručně psaný (audit kola 68, rám).
+                  ? <p className="t-label px-3.5 pb-1.5">{sec.title}</p>
                   : <div className="mx-3 mb-1.5 h-px bg-black/[0.07]" />
                 )}
                 <div className="space-y-0.5">
@@ -196,19 +209,20 @@ export default function EmployeeLayout({ user }: Props) {
             );
           })}
         </nav>
-        <div className="p-3 border-t border-black/[0.07] relative">
+        <div ref={ucet.ref} className="p-3 border-t border-black/[0.07] relative">
+          {/* Účtové menu je MenuPanel jako každá jiná nabídka (audit kola 68,
+              rám): dřív vlastní panel se stínem psaným ručně, bez Escapu,
+              bez zavření klepnutím vedle a bez šipek. */}
           {accountOpen && (
-            <div className="absolute left-3 right-3 bottom-full mb-2 z-50 glass-strong rounded-2xl p-1.5 shadow-[0_14px_40px_rgba(25,35,15,0.16)] pop-in origin-bottom">
-              <button onClick={openSettings} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-black/70 hover:text-black hover:bg-black/[0.05] transition-colors">
-                <Icon name="settings" size={18} /> Nastavení
-              </button>
-              <div className="h-px bg-black/[0.06] my-1" />
-              <button onClick={() => signOut({ callbackUrl: '/login' })} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-bad-ink hover:bg-bad/[0.06] transition-colors">
-                <Icon name="logout" size={18} /> Odhlásit se
-              </button>
-            </div>
+            <MenuPanel ref={ucet.panelRef} onKeyDown={ucet.onPanelKeyDown} direction="up" aria-label="Účet"
+              className="absolute left-3 right-3 bottom-full mb-2 origin-bottom-left">
+              <MenuItemButton label="Nastavení" icon="settings" onClick={openSettings} />
+              <div role="separator" className="h-px bg-black/[0.06] my-1" />
+              <MenuItemButton label="Odhlásit se" icon="logout" danger onClick={() => signOut({ callbackUrl: '/login' })} />
+            </MenuPanel>
           )}
-          <button onClick={() => setAccountOpen(v => !v)} title="Účet"
+          <button ref={ucet.triggerRef} type="button" onClick={() => setAccountOpen(v => !v)} onKeyDown={ucet.onTriggerKeyDown}
+            title="Účet" aria-haspopup="menu" aria-expanded={accountOpen}
             className={`w-full flex items-center gap-3 rounded-2xl transition-colors ${accountOpen ? 'bg-black/[0.06]' : 'bg-black/[0.04] hover:bg-black/[0.05]'} ${sidebarOpen ? 'p-2' : 'p-2 justify-center'}`}>
             <Avatar emoji={user.avatar} size="md" />
             {sidebarOpen && (
@@ -248,7 +262,7 @@ export default function EmployeeLayout({ user }: Props) {
             // Chat se na telefonu nescrolluje, takže odsazení pro dok
             // jen ukusovalo z plochy na zprávy: z 844px displeje zbývalo
             // na vlákno 467, a pod psacím polem bylo 80px prázdna.
-            ? 'pb-[84px] md:pb-4 overflow-hidden flex flex-col mx-2 my-2 md:m-4 glass rounded-3xl'
+            ? 'pb-[84px] md:pb-4 overflow-hidden flex flex-col mx-2 my-2 md:m-4'
             : 'pb-28 md:pb-4 overflow-y-auto scrollbar-thin'}`}>
           {currentView === 'chat' ? (
             <ErrorBoundary resetKey={currentView}>{renderView()}</ErrorBoundary>
@@ -300,5 +314,6 @@ export default function EmployeeLayout({ user }: Props) {
         ]}
       />
     </div>
+    </NavigaceKontext.Provider>
   );
 }
