@@ -82,14 +82,30 @@ export function RadyJakoSeznam({ rady, limit = Infinity }: {
   );
 }
 
-/** Tržba po hodinách: sloupky 0–23, nejsilnější hodina zvýrazněná, popisek každé tři hodiny. */
+/**
+ * Tržba po hodinách: sloupky 0–23, nejsilnější hodina zvýrazněná. Popisky
+ * osy jsou vlastní řádek po šesti hodinách — dvouciferná hodina se do slotu
+ * jednoho sloupku (na telefonu ~13 px) nevejde a BarSpark by ji uřízl na „1…".
+ */
 export function HodinyPokladny({ hodiny, vyska = 56 }: { hodiny: number[]; vyska?: number }) {
   const money = useMoney();
   const max = hodiny.reduce((m, v) => Math.max(m, v), 0);
   const spicka = max > 0 ? hodiny.indexOf(max) : undefined;
   return (
-    <BarSpark height={vyska} showLabels highlight={spicka} label="Tržba po hodinách"
-      data={hodiny.map((v, h) => ({ value: v, label: h % 3 === 0 ? String(h) : '', tip: `${h}:00 — ${money(v)}` }))} />
+    <div>
+      <BarSpark height={vyska} highlight={spicka} label="Tržba po hodinách"
+        data={hodiny.map((v, h) => ({ value: v, tip: `${h}:00 — ${money(v)}` }))} />
+      <OsaGrafu popisky={['0:00', '6:00', '12:00', '18:00', '23:00']} />
+    </div>
+  );
+}
+
+/** Popisky pod grafem rozložené po šířce (první vlevo, poslední vpravo). Jen obrázek — hodnoty čte odečítač z grafu. */
+export function OsaGrafu({ popisky }: { popisky: string[] }) {
+  return (
+    <div aria-hidden className="mt-1 flex justify-between text-[11px] leading-snug tabular-nums text-black/55">
+      {popisky.map(p => <span key={p}>{p}</span>)}
+    </div>
   );
 }
 

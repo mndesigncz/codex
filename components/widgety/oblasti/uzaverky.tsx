@@ -13,8 +13,8 @@
 //
 // Z čeho widgety vznikly (ClosingsOverview a CashClosing do kola 68):
 //  - Chybějící uzávěrky — červená tónovaná karta s bílými kartami dnů uvnitř (karta v kartě)
-//    a ručně psanou tmavou pilulkou „Vyplnit". Teď jeden `.list`, lidé jako PersonChip,
-//    řádek sám vede k vyplnění. Dnešní běžící směna už nesvítí (N9).
+//    a ručně psanou tmavou pilulkou „Vyplnit". Teď jeden `.list`, lidé jako text v meta
+//    (PersonChipy se na telefonu lámaly a odtrhly šipku), řádek sám vede k vyplnění. Dnešní běžící směna už nesvítí (N9).
 //  - Ke schválení — žlutá karta s limetkovým „Schválit" v každém řádku (druhá, třetí limetka
 //    na obrazovce). Teď `primary sm` v řádku (DP §3.1) a mazání v „···" za Modal.
 //  - Souhrn — čtyři dlaždice s ručními štítky, které bez finance.trzby ukazovaly „0 Kč"
@@ -25,9 +25,12 @@
 //  - Kalendář — tónované buňky (limetka, červená, žlutá přes celý měsíc) a vlastní šipky.
 //    Teď neutrální buňky s tečkou stavu a MonthNav; klepnutí zúží seznam uzávěrek.
 //  - Moje uzávěrky — karta na každou uzávěrku pod formulářem, ruční štítky, `confirm()`.
+//    Teď řádky s rozklikem do detailu (pohyby, bankovky, odvod, důvod rozdílu, poznámka;
+//    tam i smazání vlastní) a „Zobrazit všechny" místo mrtvého „…a dalších N".
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Button, Chip, ListRow, Menu, Modal, MonthNav, PersonChip, Stat, StatRow, posunMesic } from '../../ui';
+import dynamic from 'next/dynamic';
+import { Button, Chip, ListRow, Menu, Modal, MonthNav, Stat, StatRow, posunMesic } from '../../ui';
 import { Icon } from '../../Icons';
 import type { KomponentaWidgetu, Navigace, WidgetProps } from '@/lib/widgety/typy';
 import { Widget, type StavNacteni } from '../Widget';
@@ -84,6 +87,15 @@ function Jamka({ ikona }: { ikona: string }) {
       <Icon name={ikona} size={16} className="text-black/55" />
     </span>
   );
+}
+
+/**
+ * Šipka klikacího řádku jen od `sm`. ListRow ji kreslí za ocasem řádku, který se
+ * na telefonu láme na celou šířku — šipka pak osiřela na vlastním řádku (T9).
+ * Na telefonu řádek vede celou plochou (tap podklad), šipka tu jen ruší.
+ */
+function Sipka() {
+  return <Icon name="chevron" size={16} className="hidden sm:block shrink-0 -rotate-90 text-black/30" />;
 }
 
 /** Rozdíl kasy jako stav: sedí / přebytek / manko (tón nese stav, ne ozdobu). */
@@ -255,6 +267,7 @@ function MojeUzaverka({ velikost, nahled }: WidgetProps) {
             <li key={`${s.id}-${s.den}`}>
               <ListRow as="div" title={<span className="cz-sentence block truncate">{denVetou(s.den)}</span>}
                 value={s.od ? `${s.od}–${s.do}` : undefined}
+                right={muze ? <Sipka /> : undefined} chevron={false}
                 onClick={muze ? () => vyplnitDen(s.den) : undefined} />
             </li>
           ))}
@@ -318,13 +331,15 @@ function Chybejici({ velikost, nastaveni, nahled }: WidgetProps<{ dnes?: boolean
               <li key={d.date}>
                 <ListRow as="div"
                   title={<span className="cz-sentence block truncate">{d.dnesni ? `Dnes · ${denVetou(d.date)}` : denVetou(d.date)}</span>}
-                  meta={d.employees.length > 0 ? (
-                    <span className="flex flex-wrap gap-1 pt-1 whitespace-normal">
-                      {d.employees.slice(0, 4).map(e => <PersonChip key={e.id} name={e.name} avatar={e.avatar} size="sm" />)}
-                      {d.employees.length > 4 && <span className="t-meta self-center">+{d.employees.length - 4}</span>}
-                    </span>
-                  ) : undefined}
-                  right={d.dnesni ? <Chip tone="wait" size="sm">Čeká</Chip> : undefined}
+                  // Lidé textem: PersonChipy v meta se na telefonu zalamovaly a řádek odtrhl šipku.
+                  meta={d.employees.length > 0
+                    ? `${d.employees.slice(0, 3).map(e => e.name).join(', ')}${d.employees.length > 3 ? ` +${d.employees.length - 3}` : ''}`
+                    : undefined}
+                  right={(d.dnesni || muze) ? <>
+                    {d.dnesni && <Chip tone="wait" size="sm">Čeká</Chip>}
+                    {muze && <Sipka />}
+                  </> : undefined}
+                  chevron={false}
                   onClick={muze ? () => vyplnit(d.date) : undefined} />
               </li>
             ))}
@@ -445,7 +460,7 @@ function Souhrn({ velikost, nastaveni }: WidgetProps<{ obdobi?: ObdobiSouhrnu; m
   const vyplata = data.data?.payDailyCash === true;
   const rozdil = s ? <span className={s.rozdil === 0 ? '' : s.rozdil > 0 ? 'text-info-ink' : 'text-bad-ink'}>{s.rozdil > 0 ? '+' : ''}{money(s.rozdil)}</span> : null;
   const cisla: Record<Metrika, { label: string; value: ReactNode; note?: string }> = s ? {
-    trzba: { label: 'Tržba', value: money(s.trzba), note: `hotově ${money(s.hotove)} · kartou ${money(s.kartou)}` },
+    trzba: { label: 'Tržba', value: money(s.trzba), note: `z toho kartou ${money(s.kartou)}` },
     odvedeno: { label: 'Odvedeno', value: money(s.odvedeno), note: 'odloženo ven a odvody' },
     vyplaceno: { label: 'Vyplaceno', value: money(s.vyplaceno), note: 'v hotovosti z kasy' },
     spropitne: { label: 'Spropitné', value: money(s.spropitne) },
@@ -687,8 +702,10 @@ function Kalendar({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: 'tento'
           {trzba > 0 && !M && <span> · tržba {money(trzba)}</span>}
         </p>
       </div>
-      <div className="mt-3 grid grid-cols-7 gap-1 sm:gap-1.5" role="grid" aria-label="Uzávěrky po dnech">
-        {zkratky.map(z => <div key={z} role="columnheader" className="text-center text-[11px] font-semibold text-black/45 pb-1">{z}</div>)}
+      {/* Žádné role=grid: slibovalo by řádky a šipky, které tu nejsou. Každý den nese
+          celé datum a stav v popisku, zkratky dnů jsou jen pro oko. */}
+      <div className="mt-3 grid grid-cols-7 gap-1 sm:gap-1.5" role="group" aria-label="Uzávěrky po dnech">
+        {zkratky.map(z => <div key={z} aria-hidden className="text-center text-[11px] font-semibold text-black/45 pb-1">{z}</div>)}
         {bunky.map((d, i) => {
           if (!d) return <div key={`p${i}`} aria-hidden />;
           const den = dny[d];
@@ -699,21 +716,29 @@ function Kalendar({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: 'tento'
           const popis = `${cisloDne}. ${Number(d.slice(5, 7))}. — ${POPIS_STAVU[stav]}${stav === 'hotovo' && revenue > 0 ? `, tržba ${money(revenue)}` : ''}${den?.onShift?.length ? `, na směně ${den.onShift.map(p => p.name).join(', ')}` : ''}`;
           const obsah = (
             <>
-              <span className={`text-[11px] font-semibold leading-none mt-0.5 tabular-nums ${d === dnes ? 'text-[#16181A] underline underline-offset-2' : 'text-black/55'}`}>{cisloDne}</span>
+              {/* Vybraný den = inkoustová pilulka čísla (chip-ink má tmavou variantu);
+                  prstenec ring-[#16181A] v tmavém režimu na tmavé kartě zmizel. */}
+              <span className={`text-[11px] font-semibold leading-none mt-0.5 tabular-nums ${vybranyDen ? 'chip-ink rounded-full px-1.5 py-0.5 -mt-0.5' : d === dnes ? 'text-[#16181A] underline underline-offset-2' : 'text-black/55'}`}>{cisloDne}</span>
               {!M && stav === 'hotovo' && revenue > 0 && <span className="text-[11px] leading-none font-semibold text-ok-ink tabular-nums truncate max-w-full">{kratce(revenue)}</span>}
               {!M && stav !== 'hotovo' && (den?.onShift?.length ?? 0) > 0 && <span className="text-[11px] leading-none text-black/45 tabular-nums">{den!.onShift.length}×</span>}
               <span aria-hidden className={`mt-auto h-1.5 w-1.5 rounded-full ${TECKA[stav]}`} />
             </>
           );
-          const tvar = `${M ? 'h-10' : 'aspect-square'} min-w-0 rounded-xl p-1 flex flex-col items-center justify-start gap-0.5 ${vybranyDen ? 'ring-2 ring-[#16181A]/40' : ''} ${den ? 'bg-black/[0.03]' : ''}`;
+          // Pevná výška, ne čtverec: ve velkém widgetu přes celou šířku by čtverec měl 130 px.
+          // Nejmíň 44 px na výšku (h-11 v M); na šířku se sedm sloupců na 390 px do 44 px
+          // nevejde, cíl dorovná tap-target (::before 44 × 44).
+          const tvar = `${M ? 'h-11' : 'h-14 sm:h-16'} min-w-0 rounded-xl p-1 flex flex-col items-center justify-start gap-0.5 ${den ? 'bg-black/[0.03]' : ''}`;
           return muzeFiltrovat ? (
             <button key={d} type="button" title={popis} aria-label={popis} aria-pressed={vybranyDen}
               onClick={() => predejNastroji(nav, UDALOST_DEN, KLIC_DEN, vybranyDen ? '' : d, vybranyDen ? null : 'reports')}
-              className={`${tvar} transition-colors hover:bg-black/[0.06]`}>
+              className={`${tvar} tap-target transition-colors hover:bg-black/[0.06]`}>
               {obsah}
             </button>
           ) : (
-            <div key={d} role="gridcell" title={popis} aria-label={popis} className={tvar}>{obsah}</div>
+            <div key={d} title={popis} className={tvar}>
+              <span className="sr-only">{popis}</span>
+              <span aria-hidden className="contents">{obsah}</span>
+            </div>
           );
         })}
       </div>
@@ -730,72 +755,73 @@ function Kalendar({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: 'tento'
 // Moje uzávěrky (historie)
 // ---------------------------------------------------------------------------
 
+// Detail je velký (pohyby, bankovky, docházka…) a otvírá se až na klepnutí —
+// do líného kusu oblasti ho netaháme předem.
+const ClosingDetail = dynamic(() => import('../../employer/ClosingDetail'), { ssr: false });
+
 function MojeHistorie({ velikost, nastaveni, nahled }: WidgetProps<{ pocet?: string }>) {
   const { ok, ceka } = useBrana(['uzaverky.vytvorit']);
-  const smi = useSmi();
   const money = useMoney();
   const data = useDataWidgetu(ok ? URL_SEZNAM : null, vyberSeznam);
-  const [mazat, setMazat] = useState<RadekUzaverky | null>(null);
-  const [pracuji, setPracuji] = useState(false);
-  const [chyba, setChyba] = useState<string | null>(null);
+  // Rozkliknutá uzávěrka a okno se všemi — do kola 68 ukazovala historie pod
+  // formulářem všechny vlastní uzávěrky i s pohyby, bankovkami a důvodem rozdílu.
+  // Widget má strop řádků, tak se zbytek i detail otvírají, ne zahazují.
+  const [detail, setDetail] = useState<number | null>(null);
+  const [vse, setVse] = useState(false);
+  const tablet = useOpravneni().role?.typ === 'kiosk';
   const moje = useMemo(() => mojeUzaverky(data.data?.radky ?? [], data.data?.meId ?? null), [data.data]);
 
   if (!ok && !ceka) return <Widget prazdno={null} />;
 
   // Nastavení „Kolik řádků"; M má strop 5 řádků (DP §3.6), L až 10.
   const pocet = Math.min(Number(nastaveni.pocet) || 3, velikost === 'M' ? 5 : 10);
-  const smiMazat = !nahled && (smi('uzaverky.mazat_vlastni') || smi('uzaverky.mazat'));
   const vyplata = data.data?.payDailyCash === true;
+  // V náhledu (galerie, úpravy) se nic neotvírá; sdílený tablet detail nečte (API 403).
+  const otevri = nahled || tablet ? undefined : (id: number) => setDetail(id);
 
-  const smaz = async () => {
-    if (!mazat) return;
-    setPracuji(true); setChyba(null);
-    try {
-      await okJson(await fetch(`/api/closings/${mazat.id}`, { method: 'DELETE' }));
-      obnovDataWidgetu(URL_SEZNAM);
-      setMazat(null);
-    } catch (e) { setChyba(apiMessage(e, 'Uzávěrka se nesmazala.')); }
-    setPracuji(false);
+  const radek = (c: RadekUzaverky) => {
+    const r = rozdilUzaverky(c);
+    const castky = [
+      `hotově ${money(Number(c.cash_revenue) || 0)}`,
+      `kartou ${money(Number(c.card_revenue) || 0)}`,
+      (Number(c.cash_removed) || 0) > 0 ? `odloženo ${money(Number(c.cash_removed))}` : null,
+      vyplata && (Number(c.self_payout) || 0) > 0 ? `výplata ${money(Number(c.self_payout))}` : null,
+    ].filter(Boolean).join(' · ');
+    return (
+      <ListRow key={c.id}
+        title={<span className="cz-sentence block truncate">{denVetou(denUzaverky(c))}{c.shift_label ? ` · ${c.shift_label}` : ''}</span>}
+        meta={castky}
+        right={<>
+          {c.approved === false && <Chip tone="wait" size="sm">Čeká na schválení</Chip>}
+          {r != null && <RozdilChip rozdil={r} money={money} />}
+          {otevri && <Sipka />}
+        </>}
+        chevron={false}
+        onClick={otevri ? () => otevri(c.id) : undefined}
+      />
+    );
   };
+  const zbyva = moje.length - pocet;
 
   return (
     <Widget nacteni={ceka ? CEKA : data}
       prazdno={moje.length === 0 ? <p className="t-meta text-pretty">Zatím žádná uzávěrka. Po směně ji vyplníš ve formuláři na téhle stránce.</p> : undefined}>
-      {chyba && <p className="note note-danger text-sm mb-2" role="alert">{chyba}</p>}
-      <ul className="list">
-        {moje.slice(0, pocet).map(c => {
-          const r = rozdilUzaverky(c);
-          const castky = [
-            `hotově ${money(Number(c.cash_revenue) || 0)}`,
-            `kartou ${money(Number(c.card_revenue) || 0)}`,
-            (Number(c.cash_removed) || 0) > 0 ? `odloženo ${money(Number(c.cash_removed))}` : null,
-            vyplata && (Number(c.self_payout) || 0) > 0 ? `výplata ${money(Number(c.self_payout))}` : null,
-          ].filter(Boolean).join(' · ');
-          return (
-            <ListRow key={c.id}
-              title={<span className="cz-sentence block truncate">{denVetou(denUzaverky(c))}{c.shift_label ? ` · ${c.shift_label}` : ''}</span>}
-              meta={castky}
-              right={<>
-                {c.approved === false && <Chip tone="wait" size="sm">Čeká na schválení</Chip>}
-                {r != null && <RozdilChip rozdil={r} money={money} />}
-              </>}
-              actions={smiMazat ? (
-                <Menu size="sm" label={`Další akce s uzávěrkou ${denVetou(denUzaverky(c))}`}
-                  items={[{ label: 'Smazat uzávěrku…', icon: 'trash', danger: true, hint: 'Pak ji můžeš vyplnit znovu správně.', onClick: () => setMazat(c) }]} />
-              ) : undefined}
-            />
-          );
-        })}
-      </ul>
-      <ADalsich n={moje.length - pocet} />
-      {mazat && (
-        <Modal open onClose={() => setMazat(null)} size="sm" title="Smazat uzávěrku?" subtitle={denVetou(denUzaverky(mazat))}
-          footer={<>
-            <Button variant="secondary" onClick={() => setMazat(null)}>Zrušit</Button>
-            <Button variant="danger-solid" icon="trash" loading={pracuji} onClick={smaz}>Smazat</Button>
-          </>}>
-          <p className="text-sm text-black/60">Po smazání ji můžeš vyplnit znovu správně.</p>
+      <ul className="list">{moje.slice(0, pocet).map(radek)}</ul>
+      {zbyva > 0 && (nahled ? <ADalsich n={zbyva} /> : (
+        <Button variant="ghost" size="sm" className="mt-2" onClick={() => setVse(true)}>
+          Zobrazit všechny ({cislo(moje.length)})
+        </Button>
+      ))}
+      {vse && (
+        <Modal open onClose={() => setVse(false)} size="lg" title="Moje uzávěrky"
+          subtitle={czCount(moje.length, UZAVERKA)}>
+          <ul className="list">{moje.map(radek)}</ul>
         </Modal>
+      )}
+      {detail != null && (
+        <ClosingDetail id={detail} payDailyCash={vyplata} mazatVlastni
+          onClose={() => setDetail(null)}
+          onChanged={() => obnovDataWidgetu(URL_SEZNAM)} />
       )}
     </Widget>
   );

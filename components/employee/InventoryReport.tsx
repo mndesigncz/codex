@@ -1,16 +1,33 @@
 'use client';
 
+// Sklad (zaměstnanec) — plocha s widgety a stav skladu jako hlavní nástroj
+// (kolo 69, balík B3, spec §6.2).
+//
+// Do kola 68 tu nad seznamem stála plná limetková plocha „Probíhá inventura",
+// karta „Přivezl se něco nového?" s formulářem, ručně tónovaná karta
+// „Dochází — uprav stav" s řádky jako boxy (karta v kartě, stejné položky
+// podruhé) a dole rozbalovací „Nahlásit chybějící" se šipkami ▲▼. Každý řádek
+// měl ruční „Nevedeme" a limetkové „Uložit" — při dvou změnách dvě limetky.
+// Bloky jsou teď widgety (sklad.inventura, sklad.zapsat_novou, sklad.dochazi,
+// sklad.nahlasit v components/widgety/oblasti/sklad.tsx); tady zůstal seznam
+// se zápisem množství v jedné kartě (DP §3.6) a kategorie s balením.
+//
+// Položky přes useDataWidgetu (sdílená mezipaměť): widget „Zapsat novou věc"
+// po zápisu obnoví /api/inventory a nová věc se tu objeví sama. Rozepsaná
+// množství (`draft`) drží tahle komponenta — nástroj zůstává v úpravách
+// plochy připojený, takže je vstup do úprav nezahodí.
+
 import { useState, useEffect, useMemo } from 'react';
-import { Icon } from '../Icons';
-import { PageHeader , SearchField } from '../ui';
+import { Button, Card, Chip, EmptyState, ErrorState, ListRow, Menu, SearchField, Skeleton, Toast, type MenuItem } from '../ui';
 import CategoryStockView from '../inventory/CategoryStockView';
 import { normalizeCategoryPackaging } from '@/lib/packaging';
 import { packagingSourceOf, branchTracksOpen, findById, matcher } from '@/lib/categoryTree';
 import CategoryNav from '../inventory/CategoryNav';
-import NewStockEntry from '../inventory/NewStockEntry';
-import StocktakeModal from '../inventory/Stocktake';
-import { okJson } from '@/lib/api';
-import { obsahuje, obsahujeNekde } from '@/lib/hledani';
+import { czCount, POLOZKA } from '@/lib/czech';
+import { obsahuje } from '@/lib/hledani';
+import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
+import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
+import { useOpravneni } from '../role/useOpravneni';
 
 interface InventoryItem {
   id: number;
@@ -26,15 +43,20 @@ interface InventoryItem {
   brand?: string | null;
   description?: string | null;
   archived?: boolean;
+  approved?: boolean;
   status?: 'ok' | 'low' | 'critical';
   packageSize?: number | null;
   openAmount?: number | null;
 }
 
 interface Props {
-  user: { id?: string; name?: string | null };
+  user?: { id?: string; name?: string | null };
   initialCategory?: string;
 }
+
+const URL_SKLAD = '/api/inventory';
+const URL_KATEGORIE = '/api/inventory/categories';
+const pole = (raw: unknown): any[] => (Array.isArray(raw) ? raw : []);
 
 // The API already applied the category's threshold unit; the comparison below
 // is only a fallback for payloads from an older deployment.
@@ -46,13 +68,16 @@ function statusOf(i: InventoryItem): 'ok' | 'low' | 'critical' {
 }
 const statusRank = { critical: 0, low: 1, ok: 2 } as const;
 
-export default function InventoryReport({ user, initialCategory }: Props) {
+export default function InventoryReport({ initialCategory }: Props) {
+  const sklad = useDataWidgetu<InventoryItem[]>(URL_SKLAD, pole);
+  const kat = useDataWidgetu<any[]>(URL_KATEGORIE, pole);
   const [items, setItems] = useState<InventoryItem[]>([]);
+  useEffect(() => { if (sklad.data) setItems(sklad.data); }, [sklad.data]);
   // All categories — the tap-scale view is offered for the ones that track open
   // packages, and subcategories inherit that setting from their parent.
-  const [allCats, setAllCats] = useState<any[]>([]);
+  const allCats = kat.data ?? [];
   const [openCat, setOpenCat] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
+  const loading = sklad.data == null && !sklad.error;
   const [search, setSearch] = useState('');
   // Parked items step aside from the working list but stay one tap away.
   const [showParked, setShowParked] = useState(false);
@@ -60,38 +85,11 @@ export default function InventoryReport({ user, initialCategory }: Props) {
   // Per-item edited (unsaved) quantity draft.
   const [draft, setDraft] = useState<Record<number, number>>({});
   const [savingId, setSavingId] = useState<number | null>(null);
-  const [savedId, setSavedId] = useState<number | null>(null);
-
-  // Secondary "nahlásit" report flow.
-  const [showReport, setShowReport] = useState(false);
-  const [selected, setSelected] = useState<number[]>([]);
-  const [note, setNote] = useState('');
-  // Writing a brand-new thing into stock — live right away, employer confirms.
-  const [proposeOpen, setProposeOpen] = useState(false);
-  const [propCatId] = useState<number | ''>('');
-  const [propMsg, setPropMsg] = useState('');
-  const reloadItems = () =>
-    fetch('/api/inventory').then(okJson).then(d => { if (Array.isArray(d)) setItems(d); }).catch(() => {});
-  const [submitting, setSubmitting] = useState(false);
-  const [stocktakeOpen, setStocktakeOpen] = useState(false);
-  const [counting, setCounting] = useState(false);
-  useEffect(() => {
-    fetch('/api/stocktake').then(okJson)
-      .then(d => setStocktakeOpen(!!d?.open))
-      .catch(() => setStocktakeOpen(false));
-  }, [counting]);
-  const [success, setSuccess] = useState(false);
-
-  useEffect(() => {
-    Promise.all([
-      fetch('/api/inventory').then(okJson).catch(() => []),
-      fetch('/api/inventory/categories').then(okJson).catch(() => []),
-    ]).then(([data, cats]) => {
-      if (Array.isArray(data)) setItems(data);
-      if (Array.isArray(cats)) setAllCats(cats);
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, []);
+  const [zprava, setZprava] = useState<{ text: string; ton?: 'bad' } | null>(null);
+  // Zápis stavu a „nevedeme" chce sklad.zapsat_stav (kolo 67) — bez něj seznam jen čte.
+  // `ma()` se záchytem: dokud oprávnění nedorazí, krokovač je vidět (server zápis stejně hlídá).
+  const { ma } = useOpravneni();
+  const smiZapsat = ma(['sklad.zapsat_stav', 'sklad.upravit']);
 
   // Offered here: anything that tracks open packages, anything that inherits it
   // from an ancestor, and any parent on the way down to such a category —
@@ -112,10 +110,8 @@ export default function InventoryReport({ user, initialCategory }: Props) {
 
   // Newly written-in things count as stock from the moment they land — hiding
   // them until the employer ticks them off would mean the shift can't work with
-  // what it just unpacked. They only carry a „čeká na potvrzení" badge.
-  const usable = useMemo(() => items, [items]);
-  const myPending = useMemo(() => items.filter((i: any) => i.approved === false), [items]);
-  const countIn = (id: number) => usable.filter(matcher(allCats as any, id)).length;
+  // what it just unpacked. They only carry a „čeká na potvrzení" chip.
+  const countIn = (id: number) => items.filter(matcher(allCats as any, id)).length;
 
   // A quick-access tile still points at a category by name; resolve it to an id
   // once the categories have loaded.
@@ -127,10 +123,7 @@ export default function InventoryReport({ user, initialCategory }: Props) {
 
   const qtyOf = (i: InventoryItem) => (draft[i.id] !== undefined ? draft[i.id] : i.quantity);
   const isDirty = (i: InventoryItem) => draft[i.id] !== undefined && draft[i.id] !== i.quantity;
-
-  const setQty = (id: number, val: number) => {
-    setDraft(prev => ({ ...prev, [id]: Math.max(0, val) }));
-  };
+  const setQty = (id: number, val: number) => setDraft(prev => ({ ...prev, [id]: Math.max(0, val) }));
 
   const save = async (item: InventoryItem) => {
     const newQty = qtyOf(item);
@@ -142,32 +135,27 @@ export default function InventoryReport({ user, initialCategory }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ quantity: newQty, note: 'Úprava stavu zaměstnancem' }),
       });
-      if (res.ok) {
-        const updated = await res.json().catch(() => null);
-        setItems(prev => prev.map(x => x.id === item.id ? { ...x, ...(updated ?? { quantity: newQty }) } : x));
-        setDraft(prev => { const n = { ...prev }; delete n[item.id]; return n; });
-        setSavedId(item.id);
-        setTimeout(() => setSavedId(s => (s === item.id ? null : s)), 2500);
-      }
-    } catch (e) {
-      console.error(e);
+      if (!res.ok) throw new Error();
+      const updated = await res.json().catch(() => null);
+      setItems(prev => prev.map(x => x.id === item.id ? { ...x, ...(updated ?? { quantity: newQty }) } : x));
+      setDraft(prev => { const n = { ...prev }; delete n[item.id]; return n; });
+      setZprava({ text: `${item.name}: uloženo ${newQty} ${item.unit}.` });
+      // Docházející zásoby a další widgety na ploše ať vidí nový stav hned.
+      obnovDataWidgetu(URL_SKLAD);
+    } catch {
+      setZprava({ text: 'Množství se nepodařilo uložit — zkus to znovu.', ton: 'bad' });
     } finally {
       setSavingId(null);
     }
   };
 
-  // Parked items are not on the shelf — they must not raise alerts either.
-  const lowItems = useMemo(
-    () => usable.filter(i => i.archived !== true && statusOf(i) !== 'ok')
-      .sort((a, b) => statusRank[statusOf(a)] - statusRank[statusOf(b)] || a.name.localeCompare(b.name, 'cs')),
-    [usable],
-  );
-  const parkedCount = usable.filter(i => i.archived === true).length;
+  const parkedCount = items.filter(i => i.archived === true).length;
   const filtered = useMemo(
-    () => usable.filter(i =>
-      (showParked ? i.archived === true : i.archived !== true)
-      && obsahuje(i.name, search)),
-    [usable, search, showParked],
+    () => items
+      .filter(i => (showParked ? i.archived === true : i.archived !== true) && obsahuje(i.name, search))
+      // Co dochází, nahoře — dřív to byl samostatný blok se stejnými položkami podruhé.
+      .sort((a, b) => statusRank[statusOf(a)] - statusRank[statusOf(b)] || a.name.localeCompare(b.name, 'cs')),
+    [items, search, showParked],
   );
 
   // The person at the counter is the one who knows something ran out.
@@ -178,161 +166,64 @@ export default function InventoryReport({ user, initialCategory }: Props) {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ archived, note: archived ? 'Označeno „nevedeme"' : 'Vráceno do skladu' }),
       });
-      if (!res.ok) setItems(prev => prev.map(x => x.id === item.id ? { ...x, archived: !archived } : x));
+      if (!res.ok) throw new Error();
+      obnovDataWidgetu(URL_SKLAD);
     } catch {
       setItems(prev => prev.map(x => x.id === item.id ? { ...x, archived: !archived } : x));
+      setZprava({ text: 'Změnu se nepodařilo uložit.', ton: 'bad' });
     }
   };
 
-  const toggle = (id: number) => {
-    setSelected(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (selected.length === 0) return;
-    setSubmitting(true);
-    try {
-      const res = await fetch('/api/inventory/reports', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: JSON.stringify(selected.map(id => {
-            const it = items.find(i => i.id === id);
-            return { id, name: it?.name ?? `#${id}` };
-          })),
-          note,
-        }),
-      });
-      if (res.ok) {
-        setSuccess(true);
-        setSelected([]);
-        setNote('');
-        setTimeout(() => setSuccess(false), 4000);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const Stepper = ({ item }: { item: InventoryItem }) => {
+  const radek = (item: InventoryItem) => {
+    const st = statusOf(item);
     const dirty = isDirty(item);
+    const menu: MenuItem[] = [
+      ...(smiZapsat ? [{ label: item.archived ? 'Máme zpátky' : 'Momentálně nevedeme', icon: 'archive', onClick: () => setParked(item, item.archived !== true) }] : []),
+      ...(item.supplierUrl ? [{ label: 'Objednat u dodavatele', icon: 'external', onClick: () => { window.open(item.supplierUrl, '_blank', 'noopener'); } }] : []),
+    ];
     return (
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-1 shrink-0">
-          <button type="button" onClick={() => setQty(item.id, qtyOf(item) - 1)}
-            aria-label={`Ubrat — ${item.name}`}
-            className="tap-target rounded-full glass w-9 h-9 shrink-0 flex items-center justify-center text-black/70 hover:text-black text-lg leading-none">−</button>
-          <input
-            type="number" inputMode="numeric"
-            // Bez popisku odečítátko přečte jen „číslo" a člověk neví, čeho.
-            aria-label={`Množství — ${item.name}${item.unit ? ` (${item.unit})` : ''}`}
-            value={qtyOf(item)}
-            onChange={e => setQty(item.id, parseInt(e.target.value) || 0)}
-            className="w-16 text-center field border border-black/[0.08] px-2 py-2 text-sm font-semibold text-[#16181A] tabular-nums focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
-          />
-          <button type="button" onClick={() => setQty(item.id, qtyOf(item) + 1)}
-            aria-label={`Přidat — ${item.name}`}
-            className="tap-target rounded-full glass w-9 h-9 shrink-0 flex items-center justify-center text-black/70 hover:text-black text-lg leading-none">+</button>
-          <span className="text-xs text-black/40 w-6">{item.unit}</span>
-        </div>
-        {item.supplierUrl && (
-          <a href={item.supplierUrl} target="_blank" rel="noopener" title="Objednat u dodavatele"
-            className="rounded-full bg-[#C8F542]/20 text-[#5B7A08] hover:bg-[#C8F542]/30 px-3 h-9 flex items-center text-xs font-semibold whitespace-nowrap">Objednat ↗</a>
-        )}
-        <button type="button" onClick={() => setParked(item, item.archived !== true)}
-          title={item.archived ? 'Vrátit mezi to, co máme' : 'Momentálně nevedeme'}
-          className={`tap-target rounded-full px-4 h-9 text-xs font-semibold whitespace-nowrap transition ${
-            item.archived
-              ? 'bg-[#C8F542] text-black hover:brightness-110'
-              : 'glass border border-black/10 text-black/50 hover:text-black'
-          }`}>
-          {item.archived ? 'Máme zpátky' : 'Nevedeme'}
-        </button>
-        <button type="button" onClick={() => save(item)} disabled={!dirty || savingId === item.id}
-          className={`tap-target sm:ml-auto rounded-full px-4 h-9 text-xs font-semibold whitespace-nowrap transition ${dirty ? 'bg-[#C8F542] text-black hover:brightness-110' : savedId === item.id ? 'bg-[#C8F542]/15 text-[#5B7A08]' : 'glass border border-black/10 text-black/30'} disabled:cursor-not-allowed`}>
-          {savingId === item.id ? 'Ukládám…' : savedId === item.id && !dirty ? 'Uloženo ✓' : 'Uložit'}
-        </button>
-      </div>
+      <li key={item.id}>
+        <ListRow as="div"
+          lead={<span className={`w-2 h-2 rounded-full shrink-0 ${st === 'critical' ? 'bg-bad' : st === 'low' ? 'bg-wait' : 'bg-ok'}`} aria-hidden />}
+          title={<>{item.name}{item.brand && <span className="ml-1.5 font-normal text-black/55">{item.brand}</span>}</>}
+          // Stav jde do meta řádku, ne do ocasu jako chip: na telefonu se ocas
+          // (chip + krokovač + jednotka + Uložit + „···") do karty 390 px
+          // nevešel a Uložit s menu skončily mimo obrazovku. Barvu stavu nese
+          // tečka vlevo, slovo tónovaný text.
+          meta={(st !== 'ok' || item.approved === false || item.description || item.category) ? <>
+            {st !== 'ok' && <span className={`font-medium ${st === 'critical' ? 'text-bad-ink' : 'text-wait-ink'}`}>{st === 'critical' ? 'kriticky' : 'dochází'}</span>}
+            {item.approved === false && <span className="font-medium text-wait-ink">{st !== 'ok' ? ' · ' : ''}čeká na potvrzení</span>}
+            {(item.description || item.category) && <>{st !== 'ok' || item.approved === false ? ' · ' : ''}{item.description || item.category}</>}
+          </> : undefined}
+          actions={smiZapsat ? <>
+            <span className="flex items-center gap-1">
+              <Button variant="secondary" size="sm" iconOnly icon="minus" aria-label={`Ubrat — ${item.name}`} onClick={() => setQty(item.id, qtyOf(item) - 1)} />
+              <input
+                type="number" inputMode="numeric"
+                // Bez popisku odečítač přečte jen „číslo" a člověk neví, čeho.
+                aria-label={`Množství — ${item.name}${item.unit ? ` (${item.unit})` : ''}`}
+                value={qtyOf(item)}
+                onChange={e => setQty(item.id, parseInt(e.target.value) || 0)}
+                className="field !w-16 !px-2 text-center tabular-nums"
+              />
+              <Button variant="secondary" size="sm" iconOnly icon="plus" aria-label={`Přidat — ${item.name}`} onClick={() => setQty(item.id, qtyOf(item) + 1)} />
+              <span className="text-xs text-black/55 w-6">{item.unit}</span>
+            </span>
+            {/* Uložit je `primary` jen s rozepsanou změnou — limetka na obrazovce
+                je jedna a v řádku nikdy (DP §3.1). */}
+            <Button variant={dirty ? 'primary' : 'secondary'} size="sm" disabled={!dirty} loading={savingId === item.id}
+              onClick={() => save(item)}>Uložit</Button>
+            {menu.length > 0 && <Menu size="sm" label={`Další akce: ${item.name}`} items={menu} />}
+          </> : (
+            <span className="text-sm font-medium tabular-nums">{item.quantity} {item.unit}</span>
+          )}
+        />
+      </li>
     );
   };
 
-  return (
-    <div className="p-4 sm:p-6 space-y-6">
-      <PageHeader hintId="inventoryreport" title="Sklad" subtitle="Uprav stav, když něco dochází — vedení dostane upozornění." />
-
-      {/* Inventuru zahajuje vedení, ale počítá ji ten, kdo je u regálu. */}
-      {stocktakeOpen && (
-        <button onClick={() => setCounting(true)}
-          className="w-full rounded-2xl bg-[#C8F542] on-accent px-5 py-3.5 text-sm font-bold flex items-center justify-center gap-2 hover:brightness-110 transition">
-          <Icon name="clipboard" size={18} /> Probíhá inventura — pomoct spočítat sklad
-        </button>
-      )}
-      {counting && (
-        <StocktakeModal isEmployer={false} onClose={() => setCounting(false)} onApplied={() => {}} />
-      )}
-
-      {success && (
-        <div className="rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/20 p-4 text-[#5B7A08] text-sm">
-          <Icon name="check" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Hlášení bylo odesláno zaměstnavateli.
-        </div>
-      )}
-
-      {propMsg && (
-        <div className="rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/20 p-4 text-[#5B7A08] text-sm">{propMsg}</div>
-      )}
-
-      <div className="glass-card p-5">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="min-w-0">
-            <p className="font-semibold text-[#16181A]">Přivezl se něco nového?</p>
-            <p className="text-sm text-black/45 mt-0.5">
-              Zapiš to rovnou do skladu i s množstvím — vedení to jen potvrdí.
-            </p>
-          </div>
-          <button onClick={() => setProposeOpen(o => !o)}
-            className="shrink-0 btn btn-primary btn-sm justify-center w-full sm:w-auto transition">
-            {proposeOpen ? 'Zavřít' : '＋ Nová věc do skladu'}
-          </button>
-        </div>
-        {proposeOpen && (
-          <div className="mt-4">
-            <NewStockEntry
-              initialCategoryId={typeof propCatId === 'number' ? propCatId : null}
-              onSaved={() => {
-                setProposeOpen(false);
-                setPropMsg('Zapsáno do skladu — vedení to potvrdí. ✓');
-                setTimeout(() => setPropMsg(''), 4000);
-                reloadItems();
-              }}
-              onCancel={() => setProposeOpen(false)}
-            />
-          </div>
-        )}
-        {myPending.length > 0 && (
-          <div className="mt-3 space-y-1.5">
-            <p className="text-xs font-bold uppercase tracking-wider text-black/40">Čeká na potvrzení vedením</p>
-            <div className="flex flex-wrap gap-1.5">
-              {myPending.map((i: any) => (
-                <span key={i.id} className="tap-target-sm flex items-center gap-2 rounded-full bg-wait/15 text-wait-ink pl-1.5 pr-3 py-1 text-xs font-medium">
-                  {i.photoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={i.photoUrl} alt="" className="h-6 w-6 rounded-full object-cover" />
-                  ) : (
-                    <span className="h-6 w-6 rounded-full bg-wait/20 flex items-center justify-center">
-                      <Icon name="box" size={12} strokeWidth={2} />
-                    </span>
-                  )}
-                  {i.name}{i.quantity > 0 ? ` · ${i.quantity} ${i.unit}` : ''}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
+  const nastroj = (
+    <div className="space-y-4">
       {!loading && packagedCats.length > 0 && (
         <div className="space-y-3">
           <CategoryNav
@@ -342,7 +233,6 @@ export default function InventoryReport({ user, initialCategory }: Props) {
             countOf={countIn}
             rootLabel="Zbytky"
           />
-
           {openCat != null && openPackaging && (() => {
             const inCat = matcher(allCats as any, openCat);
             return (
@@ -350,148 +240,63 @@ export default function InventoryReport({ user, initialCategory }: Props) {
                 category={openCategory?.name ?? ''}
                 packaging={normalizeCategoryPackaging(openPackaging)}
                 items={items.filter(inCat) as any}
-                canEdit
-                onChanged={u => setItems(list => list.map(x => x.id === u.id ? { ...x, ...u } : x))}
+                canEdit={smiZapsat}
+                onChanged={u => { setItems(list => list.map(x => x.id === u.id ? { ...x, ...u } : x)); obnovDataWidgetu(URL_SKLAD); }}
               />
             );
           })()}
         </div>
       )}
 
-      {loading ? (
-        <div className="flex items-center justify-center h-48"><div className="spinner" /></div>
-      ) : (
-        <>
-          {/* Prominent low / critical items on top */}
-          {lowItems.length > 0 && (
-            <div className="glass-card border-wait/20 bg-wait/[0.06] p-5 space-y-3">
-              <p className="font-semibold text-sm flex items-center gap-2 text-wait-ink"><Icon name="warning" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Dochází — uprav stav</p>
-              <div className="space-y-2">
-                {lowItems.map(i => {
-                  const st = statusOf(i);
-                  return (
-                    <div key={i.id} className="flex items-center justify-between gap-3 flex-wrap bg-white/40 dark:bg-black/10 rounded-2xl px-4 py-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-[#16181A] truncate">
-                          {i.name}
-                          <span className={`ml-2 text-xs font-semibold ${st === 'critical' ? 'text-bad-ink' : 'text-wait-ink'}`}>
-                            {st === 'critical' ? 'kriticky' : 'dochází'}
-                          </span>
-                        </p>
-                        <p className="text-xs text-black/45">{i.category}</p>
-                      </div>
-                      <Stepper item={i} />
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Full list with steppers */}
-          <div>
-            <SearchField className="max-w-sm" value={search} onChange={setSearch}
-              placeholder="Hledat položku…" storageKey="inventory-employee"
-              suggestions={Array.from(new Set(items.map(i => i.category).filter(Boolean))).slice(0, 6).map(c => ({ label: String(c), hint: 'kategorie' }))} />
-          </div>
-
-          <div className="glass-card overflow-hidden">
-            <div className="p-4 border-b border-black/[0.06] flex items-center justify-between gap-3 flex-wrap">
-              <p className="text-xs font-semibold text-black/45 uppercase tracking-wider">
-                {showParked ? `Momentálně nevedeme (${filtered.length})` : `Všechny položky (${filtered.length})`}
-              </p>
-              {(parkedCount > 0 || showParked) && (
-                <button onClick={() => setShowParked(v => !v)}
-                  className={`tap-target-sm rounded-full px-3.5 py-1.5 text-xs font-medium transition ${
-                    showParked ? 'seg-on' : 'seg-off glass'
-                  }`}>
-                  {showParked ? 'Zpět na to, co máme' : `Nevedeme (${parkedCount})`}
-                </button>
-              )}
-            </div>
-            <div className="divide-y divide-black/[0.06]">
-              {filtered.map(item => {
-                const st = statusOf(item);
-                const dot = st === 'critical' ? 'bg-bad' : st === 'low' ? 'bg-wait' : 'bg-[#C8F542]';
-                return (
-                  <div key={item.id} className="flex items-center justify-between gap-3 flex-wrap px-5 py-4 hover:bg-black/[0.02] transition-colors">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${dot}`} title={st} />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-[#16181A] truncate">
-                          {item.name}
-                          {item.brand && <span className="ml-1.5 font-normal text-black/40">{item.brand}</span>}
-                          {(item as any).approved === false && (
-                            <span className="ml-1.5 rounded-full bg-wait/15 text-wait-ink px-2 py-0.5 text-[11px] font-semibold align-middle">
-                              čeká na potvrzení
-                            </span>
-                          )}
-                        </p>
-                        <p className="text-xs text-black/45 truncate">{item.description || item.category}</p>
-                      </div>
-                    </div>
-                    <Stepper item={item} />
-                  </div>
-                );
-              })}
-              {filtered.length === 0 && (
-                <div className="p-8 text-center text-black/45 text-sm">Žádné položky neodpovídají hledání.</div>
-              )}
-            </div>
-          </div>
-
-          {/* Secondary: multi-select report flow */}
-          <div className="glass-card overflow-hidden">
-            <button onClick={() => setShowReport(s => !s)}
-              className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-black/[0.02] transition-colors">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-[#16181A]">Nahlásit chybějící položky</p>
-                <p className="text-xs text-black/45">Pošli vedení seznam s poznámkou</p>
-              </div>
-              <span className="text-black/40 text-sm shrink-0">{showReport ? '▲' : '▼'}</span>
-            </button>
-
-            {showReport && (
-              <form onSubmit={handleSubmit} className="border-t border-black/[0.06] p-5 space-y-4">
-                <p className="text-xs font-semibold text-black/45 uppercase tracking-wider">Vyberte položky k nahlášení ({selected.length} vybráno)</p>
-                <div className="divide-y divide-black/[0.06] rounded-2xl border border-black/[0.06] overflow-hidden">
-                  {filtered.map(item => {
-                    const isLow = statusOf(item) !== 'ok';
-                    const isChecked = selected.includes(item.id);
-                    return (
-                      <label key={item.id} className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-black/[0.03] transition-colors ${isChecked ? 'bg-[#C8F542]/[0.06]' : ''}`}>
-                        <span className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 transition ${isChecked ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/15'}`}>
-                          {isChecked && <span className="text-xs font-bold"><Icon name="check" size={15} /></span>}
-                        </span>
-                        <input type="checkbox" checked={isChecked} onChange={() => toggle(item.id)} className="sr-only" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-[#16181A] truncate">{item.name}</p>
-                          <p className="text-xs text-black/45 truncate">{item.category}</p>
-                        </div>
-                        <span className={`text-xs font-medium shrink-0 whitespace-nowrap ${isLow ? 'text-bad-ink' : 'text-black/55'}`}>
-                          {item.quantity} {item.unit}{isLow && <Icon name="warning" size={13} className="inline ml-1 -mt-0.5 text-wait-ink" />}
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
-
-                <div>
-                  <label className="field-label">Poznámka (volitelné)</label>
-                  <textarea value={note} onChange={e => setNote(e.target.value)} rows={3}
-                    placeholder="Popište stav zásob nebo další informace..."
-                    className="w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm resize-none" />
-                </div>
-
-                <button type="submit" disabled={selected.length === 0 || submitting}
-                  className="rounded-full bg-[#C8F542] text-black font-semibold px-6 py-3 hover:brightness-110 transition disabled:opacity-40 disabled:cursor-not-allowed">
-                  {submitting ? 'Odesílám…' : `Odeslat hlášení (${selected.length} položek)`}
-                </button>
-              </form>
+      <Card pad="none" aria-labelledby="sklad-zam-seznam">
+        <div className="px-5 pt-5 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 id="sklad-zam-seznam" className="t-card flex items-center gap-2">
+              {showParked ? 'Momentálně nevedeme' : 'Všechny položky'}
+              {sklad.data && <Chip tone="muted" size="sm">{filtered.length.toLocaleString('cs-CZ')}</Chip>}
+            </h2>
+            {(parkedCount > 0 || showParked) && (
+              <button type="button" aria-pressed={showParked} onClick={() => setShowParked(v => !v)}
+                className={`filter-pill tap-target-sm ${showParked ? 'seg-on' : 'seg-off glass'}`}>
+                Nevedeme · {parkedCount}
+              </button>
             )}
           </div>
-        </>
-      )}
+          <SearchField value={search} onChange={setSearch}
+            placeholder="Hledat položku…" ariaLabel="Hledat ve skladu" storageKey="inventory-employee"
+            suggestions={Array.from(new Set(items.map(i => i.category).filter(Boolean))).slice(0, 6).map(c => ({ label: String(c), hint: 'kategorie' }))} />
+        </div>
+        <div className="px-5 pb-2">
+          {sklad.error && !sklad.data ? (
+            <ErrorState compact title="Sklad se nenačetl" onRetry={sklad.reload} detail={sklad.error} className="!py-6" />
+          ) : loading ? (
+            <div className="space-y-2 py-3" aria-busy>
+              <Skeleton className="h-12" /><Skeleton className="h-12" /><Skeleton className="h-12 w-2/3" />
+            </div>
+          ) : filtered.length === 0 ? (
+            items.length === 0
+              ? <EmptyState compact illustration="sklad" title="Sklad je zatím prázdný" hint="Položky zakládá vedení. Když něco přivezeš, zapiš to widgetem Zapsat novou věc." className="!py-6" />
+              : <EmptyState compact icon="search" title="Nic neodpovídá hledání" hint="Zkus jiné slovo nebo zruš filtr." className="!py-6" />
+          ) : (
+            <ul className="list">{filtered.map(radek)}</ul>
+          )}
+        </div>
+      </Card>
     </div>
+  );
+
+  return (
+    <>
+      <PlochaWidgetu
+        stranka="zamestnanec.sklad"
+        hlavicka={{
+          title: 'Sklad',
+          subtitle: sklad.data ? `${czCount(items.filter(i => i.archived !== true).length, POLOZKA)} · uprav stav, když něco dochází` : 'Uprav stav, když něco dochází — vedení dostane upozornění.',
+          hintId: 'inventoryreport',
+        }}
+        nastroj={nastroj}
+      />
+      {zprava && <Toast message={zprava.text} tone={zprava.ton} onClose={() => setZprava(null)} />}
+    </>
   );
 }

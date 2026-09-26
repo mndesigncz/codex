@@ -27,6 +27,14 @@ async function open(url, w = 1280, dark = false) {
       sent.push(`${route.request().method()} ${u.replace('http://localhost:3000', '')}`);
       return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
     }
+    // Kolo 69 (B3): Sklad je plocha s widgety — rozložení (widgety skladu a položky jako nástroj) z fixtury balíku.
+    if (new URL(u).pathname === '/api/rozlozeni' && new URL(u).searchParams.get('stranka') === 'vedeni.sklad') return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + 'k69-b3-rozlozeni-sklad.json', 'utf8') });
+    // …a widget Nové věci od týmu chce sklad.schvalovat: oprávnění vlastníka (fixtura teams_mine je nemá).
+    if (new URL(u).pathname === '/api/teams/mine') {
+      const d = JSON.parse(readFileSync(DIR + 'teams_mine.json', 'utf8'));
+      d.opravneni = JSON.parse(readFileSync(DIR + 'roles.json', 'utf8')).ja.opravneni;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(d) });
+    }
     const k = keyFor(u);
     if (k && existsSync(DIR + k + '.json')) return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + k + '.json', 'utf8') });
     return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });

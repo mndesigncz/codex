@@ -1,0 +1,30 @@
+[
+ {
+  "id": 101,
+  "itemId": 6,
+  "oldQuantity": 3,
+  "newQuantity": 3,
+  "oldOpen": 0.39,
+  "newOpen": 0.35,
+  "note": "Prodej (Storyous)",
+  "createdAt": "2026-09-26T09:00:00Z",
+  "userName": null,
+  "itemName": "Gin London Dry",
+  "unit": "lahev",
+  "contentUnit": "l"
+ },
+ {
+  "id": 100,
+  "itemId": 1,
+  "oldQuantity": 2,
+  "newQuantity": 8,
+  "oldOpen": null,
+  "newOpen": null,
+  "note": "Příjem objednávky",
+  "createdAt": "2026-09-25T09:00:00Z",
+  "userName": "Martin Nemeškal",
+  "itemName": "Mléko plnotučné",
+  "unit": "l",
+  "contentUnit": null
+ }
+]

@@ -1,5 +1,5 @@
 'use client';
-import { SearchField } from '../ui';
+import { Button, Chip, EmptyState, SearchField, Segmented } from '../ui';
 
 // A packaged category (tobacco tins, bottles…) in two modes:
 //  • Přehled — read-only, for staff serving a customer: what do we have and
@@ -45,27 +45,26 @@ function ItemControls({ item, onStep, onEditItem, onRemoveItem }: {
     <div className="mt-3 flex items-center justify-between gap-2 flex-wrap">
       {onStep ? (
         <div className="flex items-center gap-1.5">
-          <button onClick={() => onStep(item, -1)} disabled={item.quantity <= 0} title="Ubrat zavřené balení"
-            className="tap-target btn-icon disabled:opacity-30">−</button>
-          <span className="text-base font-bold text-[#16181A] tabular-nums min-w-[3.5rem] text-center">
-            {item.quantity} <span className="text-[11px] font-medium text-black/45">{item.unit}</span>
+          <Button variant="secondary" size="sm" iconOnly icon="minus" aria-label={`Ubrat zavřené balení — ${item.name}`}
+            disabled={item.quantity <= 0} onClick={() => onStep(item, -1)} />
+          <span className="text-[15px] font-semibold text-[#16181A] tabular-nums min-w-[3.5rem] text-center">
+            {item.quantity} <span className="text-xs font-medium text-black/55">{item.unit}</span>
           </span>
-          <button onClick={() => onStep(item, 1)} title="Přidat zavřené balení"
-            className="tap-target btn-icon">+</button>
+          <Button variant="secondary" size="sm" iconOnly icon="plus" aria-label={`Přidat zavřené balení — ${item.name}`}
+            onClick={() => onStep(item, 1)} />
         </div>
       ) : <span />}
       <div className="flex items-center gap-1">
         {item.supplierUrl && (
-          <a href={item.supplierUrl} target="_blank" rel="noopener" title="Objednat u dodavatele"
-            className="rounded-full bg-[#C8F542]/20 text-[#5B7A08] hover:bg-[#C8F542]/30 px-3 h-9 flex items-center text-xs font-semibold whitespace-nowrap">Objednat ↗</a>
+          <a href={item.supplierUrl} target="_blank" rel="noopener" className="btn btn-secondary btn-sm">
+            <Icon name="external" size={15} /> Objednat
+          </a>
         )}
         {onEditItem && (
-          <button onClick={() => onEditItem(item)} title="Upravit položku"
-            className="tap-target btn-icon text-sm"><Icon name="pencil" size={15} /></button>
+          <Button variant="ghost" size="sm" iconOnly icon="pencil" aria-label={`Upravit ${item.name}`} onClick={() => onEditItem(item)} />
         )}
         {onRemoveItem && (
-          <button onClick={() => onRemoveItem(item)} title="Smazat položku"
-            className="tap-target btn-icon btn-icon-danger text-sm"><Icon name="close" size={15} /></button>
+          <Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={`Smazat ${item.name}`} onClick={() => onRemoveItem(item)} />
         )}
       </div>
     </div>
@@ -81,27 +80,22 @@ function ParkButton({ item, busy, onToggle, className = '' }: {
   className?: string;
 }) {
   const parked = item.archived === true;
+  // „Máme zpátky" je primary, ne limetka — limetka je na obrazovce jedna (DP §3.1).
   return (
-    <button
-      onClick={() => onToggle(item, !parked)}
-      disabled={busy}
-      className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold min-h-[40px] transition active:scale-[0.97] disabled:opacity-50 ${
-        parked
-          ? 'bg-[#C8F542] text-black hover:brightness-110'
-          : 'glass border border-black/10 text-black/55 hover:text-black'
-      } ${className}`}
-    >
-      <Icon name={parked ? 'check' : 'warning'} size={14} />
+    <Button variant={parked ? 'primary' : 'secondary'} size="sm" icon={parked ? 'check' : 'archive'}
+      loading={busy} onClick={() => onToggle(item, !parked)} className={className}>
       {parked ? 'Máme zpátky' : 'Nevedeme'}
-    </button>
+    </Button>
   );
 }
 
 const TONE = {
-  critical: { bar: 'bg-bad', text: 'text-bad-ink', chip: 'bg-bad/15 text-bad-ink' },
-  low: { bar: 'bg-wait', text: 'text-wait-ink', chip: 'bg-wait/15 text-wait-ink' },
-  ok: { bar: 'bg-[#C8F542]', text: 'text-[#5B7A08]', chip: 'bg-[#C8F542]/20 text-[#5B7A08]' },
+  critical: { bar: 'bg-bad', chip: 'bad' },
+  low: { bar: 'bg-wait', chip: 'wait' },
+  ok: { bar: 'bg-ok', chip: 'ok' },
 } as const;
+const stavChip = (st: 'ok' | 'low' | 'critical') =>
+  st === 'ok' ? null : <Chip tone={TONE[st].chip} size="sm" className="shrink-0">{st === 'critical' ? 'Kriticky' : 'Dochází'}</Chip>;
 
 export default function CategoryStockView({
   category, packaging, items, canEdit, onChanged, onEditItem, onRemoveItem, onStep,
@@ -212,50 +206,41 @@ export default function CategoryStockView({
     <div className="space-y-4">
       {/* Mode switch + category total */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex gap-1 rounded-full glass border border-black/[0.07] p-1 shrink-0">
-          {([['view', 'Přehled'], ['edit', 'Zápis zbytků']] as const).map(([m, label]) => (
-            <button key={m} onClick={() => setMode(m)}
-              disabled={m === 'edit' && !canEdit}
-              className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition disabled:opacity-40 ${
-                mode === m ? 'seg-on' : 'seg-off'
-              }`}>
-              {label}
-            </button>
-          ))}
-        </div>
+        {canEdit ? (
+          <Segmented ariaLabel="Režim" value={mode} onChange={setMode}
+            options={[{ id: 'view', label: 'Přehled' }, { id: 'edit', label: 'Zápis zbytků' }]} />
+        ) : <span />}
         <div className="flex items-center gap-3 flex-wrap">
           {unit && !showParked && (
-            <span className="text-sm text-black/50">
+            <span className="text-sm text-black/55">
               Celkem v kategorii <strong className="text-[#16181A] tabular-nums">{fmtAmount(totalOfCategory)} {unit}</strong>
             </span>
           )}
           {(parkedCount > 0 || showParked) && (
-            <button onClick={() => setShowParked(v => !v)}
-              className={`tap-target-sm rounded-full px-3.5 py-1.5 text-xs font-medium whitespace-nowrap transition ${
-                showParked ? 'seg-on' : 'seg-off glass'
-              }`}>
-              {showParked ? 'Zpět na skladem' : `Nevedeme (${parkedCount})`}
+            <button type="button" aria-pressed={showParked} onClick={() => setShowParked(v => !v)}
+              className={`filter-pill tap-target-sm ${showParked ? 'seg-on' : 'seg-off glass'}`}>
+              Nevedeme · {parkedCount}
             </button>
           )}
         </div>
       </div>
 
       {items.length > 6 && (
-        <SearchField value={search} onChange={setSearch} placeholder={`Hledat v ${category}…`}
+        <SearchField value={search} onChange={setSearch} placeholder={`Hledat v ${category}…`} ariaLabel={`Hledat v kategorii ${category}`}
           storageKey={`stock-${category}`} inputClassName="!py-2.5 text-sm" />
       )}
 
       {list.length === 0 ? (
-        <div className="glass-card p-8 text-center text-black/45">
-          {search ? 'Nic nenalezeno.' : `V kategorii ${category} zatím nic není.`}
+        <div className="card">
+          <EmptyState compact icon={search ? 'search' : 'box'} title={search ? 'Nic nenalezeno' : `V kategorii ${category} zatím nic není`} />
         </div>
       ) : mode === 'view' ? (
         <div className="space-y-5">
           {groups.map(([groupName, groupItems]) => (
             <div key={groupName} className="space-y-2.5">
               {showHeadings && (
-                <p className="text-[11px] uppercase tracking-wider text-black/40 font-semibold">
-                  {groupName} <span className="text-black/25 tabular-nums">· {groupItems.length}</span>
+                <p className="t-label">
+                  {groupName} <span className="tabular-nums">· {groupItems.length}</span>
                 </p>
               )}
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -264,19 +249,15 @@ export default function CategoryStockView({
                   const st = stockStatus(i, packaging);
                   const pct = openPct({ ...i, packageSize: size });
                   return (
-                    <div key={i.id} className={`glass-card p-4 ${i.archived ? 'opacity-60' : ''}`}>
+                    <div key={i.id} className={`card p-4 ${i.archived ? 'opacity-60' : ''}`}>
                       <div className="flex items-start justify-between gap-2">
-                        <p className="font-semibold text-[#16181A] leading-snug min-w-0">
+                        <h3 className="t-card leading-snug min-w-0">
                           {i.name}
-                          {i.brand && <span className="ml-1.5 font-normal text-black/40">{i.brand}</span>}
-                        </p>
-                        {st !== 'ok' && (
-                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider ${TONE[st].chip}`}>
-                            {st === 'critical' ? 'Kriticky' : 'Dochází'}
-                          </span>
-                        )}
+                          {i.brand && <span className="ml-1.5 font-normal text-black/55">{i.brand}</span>}
+                        </h3>
+                        {stavChip(st)}
                       </div>
-                      {i.description && <p className="text-xs text-black/55 mt-1 line-clamp-2">{i.description}</p>}
+                      {i.description && <p className="t-meta mt-1 line-clamp-2">{i.description}</p>}
                       <p className="text-sm text-black/55 mt-1 tabular-nums">
                         {formatStock({ ...i, packageSize: size }, unit, i.unit)}
                       </p>
@@ -285,10 +266,10 @@ export default function CategoryStockView({
                           <div className="mt-2.5 h-2 w-full rounded-full bg-black/[0.06] overflow-hidden">
                             <div className={`h-full rounded-full ${TONE[st].bar} transition-[width]`} style={{ width: `${pct}%` }} />
                           </div>
-                          <p className="text-[11px] text-black/40 mt-1">Načaté balení: {pct} %</p>
+                          <p className="t-meta mt-1">Načaté balení: {pct} %</p>
                         </>
                       )}
-                      <p className="text-[11px] text-black/30 mt-1.5">
+                      <p className="t-meta mt-1.5">
                         Limit: {i.minQuantity} · kriticky: {i.criticalQuantity} {thresholdUnitLabel(packaging, i.unit)}
                       </p>
                       {canEdit && (
@@ -312,40 +293,38 @@ export default function CategoryStockView({
             const current = Number(i.openAmount) || 0;
             const st = stockStatus(i, packaging);
             return (
-              <div key={i.id} className={`glass-card p-4 ${i.archived ? 'opacity-60' : ''}`}>
+              <div key={i.id} className={`card p-4 ${i.archived ? 'opacity-60' : ''}`}>
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="min-w-0">
-                    <p className="font-semibold text-[#16181A] leading-snug">
+                    <h3 className="t-card leading-snug">
                       {i.name}
-                      {i.brand && <span className="ml-1.5 font-normal text-black/40">{i.brand}</span>}
+                      {i.brand && <span className="ml-1.5 font-normal text-black/55">{i.brand}</span>}
                       {showHeadings && i.category && i.category !== category && (
-                        <span className="ml-2 rounded-full bg-black/[0.05] px-2 py-0.5 text-[11px] font-medium text-black/45 align-middle">{i.category}</span>
+                        <Chip tone="muted" size="sm" className="ml-2 align-middle">{i.category}</Chip>
                       )}
-                    </p>
-                    <p className="text-xs text-black/45 tabular-nums mt-0.5">
+                    </h3>
+                    <p className="t-meta tabular-nums mt-0.5">
                       {formatStock({ ...i, packageSize: size }, unit, i.unit)}
-                      {size > 0 && <span className="text-black/30"> · balení {fmtAmount(size)} {unit}</span>}
+                      {size > 0 && <> · balení {fmtAmount(size)} {unit}</>}
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-                    {savedId === i.id && <span className="text-xs font-medium text-[#5B7A08]">Uloženo ✓</span>}
+                    {savedId === i.id && (
+                      <span className="text-xs font-medium text-ok-ink flex items-center gap-1" role="status">
+                        <Icon name="check" size={13} /> Uloženo
+                      </span>
+                    )}
                     {failedId === i.id && (
                       <span className="text-xs font-semibold text-bad-ink flex items-center gap-1">
                         <Icon name="warning" size={13} /> Neuloženo
                       </span>
                     )}
-                    {st !== 'ok' && (
-                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider ${TONE[st].chip}`}>
-                        {st === 'critical' ? 'Kriticky' : 'Dochází'}
-                      </span>
-                    )}
+                    {stavChip(st)}
                     {onEditItem && (
-                      <button onClick={() => onEditItem(i)} title="Upravit položku"
-                        className="tap-target rounded-full glass w-8 h-8 flex items-center justify-center text-black/50 hover:text-black text-sm"><Icon name="pencil" size={15} /></button>
+                      <Button variant="ghost" size="sm" iconOnly icon="pencil" aria-label={`Upravit ${i.name}`} onClick={() => onEditItem(i)} />
                     )}
                     {onRemoveItem && (
-                      <button onClick={() => onRemoveItem(i)} title="Smazat položku"
-                        className="tap-target rounded-full glass w-8 h-8 flex items-center justify-center text-bad-ink/70 hover:text-bad-ink text-sm"><Icon name="close" size={15} /></button>
+                      <Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={`Smazat ${i.name}`} onClick={() => onRemoveItem(i)} />
                     )}
                   </div>
                 </div>
@@ -363,20 +342,21 @@ export default function CategoryStockView({
                   </>
                 ) : (
                   <>
-                    <div className="flex flex-wrap gap-1.5 mt-3">
+                    {/* Vybraný stupeň je inkoustová pilulka (DP §3.8) — dřív limetka, jako by šlo o akci. */}
+                    <div className="flex flex-wrap gap-1.5 mt-3" role="group" aria-label={`Kolik zbývá v načatém — ${i.name}`}>
                       {steps.map(s => {
                         const active = Math.abs(current - s.amount) < 0.05;
                         return (
                           <button
+                            type="button"
                             key={s.label}
+                            aria-pressed={active}
                             onClick={() => persist(i, { openAmount: s.amount })}
                             disabled={savingId === i.id}
-                            className={`rounded-full px-3.5 py-2 text-sm font-medium min-h-[40px] transition active:scale-[0.97] disabled:opacity-50 ${
-                              active ? 'bg-[#C8F542] text-black font-semibold' : 'bg-black/[0.05] text-black/60 hover:bg-black/[0.09]'
-                            }`}
+                            className={`filter-pill tap-target-sm disabled:opacity-50 ${active ? 'seg-on' : 'seg-off glass'}`}
                           >
                             {s.label}
-                            <span className={`ml-1.5 text-[11px] tabular-nums ${active ? 'text-black/50' : 'text-black/35'}`}>
+                            <span className="ml-1.5 text-xs tabular-nums opacity-70">
                               {fmtAmount(s.amount)}{unit}
                             </span>
                           </button>
@@ -398,31 +378,30 @@ export default function CategoryStockView({
                       />
                     </div>
                     <div className="flex items-center gap-2 mt-3 flex-wrap">
-                      <button
+                      <Button variant="secondary" size="sm" icon="plus"
                         onClick={() => openNext(i)}
                         disabled={i.quantity <= 0 || savingId === i.id}
-                        title={i.quantity <= 0 ? 'Není žádné zavřené balení' : undefined}
-                        className="inline-flex items-center gap-1.5 rounded-full glass border border-black/10 text-[#16181A] px-4 py-2.5 min-h-[40px] text-xs font-medium hover:bg-black/[0.05] transition disabled:opacity-40 active:scale-[0.97]"
-                      >
-                        <Icon name="plus" size={14} /> Otevřít další balení
-                      </button>
+                        title={i.quantity <= 0 ? 'Není žádné zavřené balení' : undefined}>
+                        Otevřít další balení
+                      </Button>
                       {onStep ? (
-                        <span className="inline-flex items-center gap-1.5 text-[11px] text-black/40">
+                        <span className="inline-flex items-center gap-1.5 t-meta">
                           Zavřených:
-                          <button onClick={() => onStep(i, -1)} disabled={i.quantity <= 0} aria-label="Ubrat zavřené balení"
-                            className="rounded-full glass w-10 h-10 flex items-center justify-center text-black/70 hover:text-black text-lg leading-none disabled:opacity-30 active:scale-95 transition">−</button>
-                          <strong className="text-black/60 tabular-nums w-6 text-center text-sm">{i.quantity}</strong>
-                          <button onClick={() => onStep(i, 1)} aria-label="Přidat zavřené balení"
-                            className="rounded-full glass w-10 h-10 flex items-center justify-center text-black/70 hover:text-black text-lg leading-none active:scale-95 transition">+</button>
+                          <Button variant="secondary" size="sm" iconOnly icon="minus" aria-label={`Ubrat zavřené balení — ${i.name}`}
+                            disabled={i.quantity <= 0} onClick={() => onStep(i, -1)} />
+                          <strong className="text-[#16181A] tabular-nums w-6 text-center text-sm">{i.quantity}</strong>
+                          <Button variant="secondary" size="sm" iconOnly icon="plus" aria-label={`Přidat zavřené balení — ${i.name}`}
+                            onClick={() => onStep(i, 1)} />
                         </span>
                       ) : (
-                        <span className="text-[11px] text-black/40">
-                          Zavřených: <strong className="text-black/60 tabular-nums">{i.quantity}</strong>
+                        <span className="t-meta">
+                          Zavřených: <strong className="text-[#16181A] tabular-nums">{i.quantity}</strong>
                         </span>
                       )}
                       {i.supplierUrl && (
-                        <a href={i.supplierUrl} target="_blank" rel="noopener" title="Objednat u dodavatele"
-                          className="tap-target-sm rounded-full bg-[#C8F542]/20 text-[#5B7A08] hover:bg-[#C8F542]/30 px-3 py-1.5 text-xs font-semibold whitespace-nowrap">Objednat ↗</a>
+                        <a href={i.supplierUrl} target="_blank" rel="noopener" className="btn btn-secondary btn-sm">
+                          <Icon name="external" size={15} /> Objednat
+                        </a>
                       )}
                     </div>
                   </>

@@ -1,5 +1,11 @@
-// Stránka „Sklad" (vedení). Kolo 68 založilo metadata z katalogu; plochu zapne (aktivni: true) a
-// doporučené i výchozí rozložení upřesní balík B3 v kole 69.
+// Stránka „Sklad" (vedení). Kolo 68 založilo metadata z katalogu, kolo 69 (balík B3) plochu
+// zapnulo. Nástroj = položky skladu s hledáním, kategoriemi, řazením a hromadnými úpravami
+// (components/employer/Inventory.tsx); bloky, které byly natvrdo nad seznamem (návrhy od týmu,
+// chybějící údaje, souhrn docházejících, K výrobě, objednávky, hlášení z menu), jsou widgety.
+//
+// Výchozí rozložení je z katalogu: fronty nahoře (co čeká na člověka), pak zásoby a výroba.
+// Provozní nemá sklad.ceny — Suroviny bez ceny se mu profiltrují pryč (N4), zbytek vidí.
+// Skladník má vlastní rozložení s nákupem a hodnotou zásob.
 import type { DefiniceStranky } from '../typy.ts';
 
 export const STRANKA: DefiniceStranky = {
@@ -49,5 +55,5 @@ export const STRANKA: DefiniceStranky = {
       { w: 'nastroj' },
     ],
   },
-  aktivni: false,
+  aktivni: true,
 };

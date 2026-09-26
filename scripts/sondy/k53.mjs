@@ -18,10 +18,28 @@ const tok = execSync(`NEXTAUTH_SECRET=${process.env.NEXTAUTH_SECRET ?? "design-r
 const b = await chromium.launch({ executablePath: process.env.SONDY_CHROMIUM || undefined });
 const ctx = await b.newContext({ viewport: { width: 1280, height: 950 }, locale: 'cs-CZ' });
 await ctx.addCookies([{ name: 'next-auth.session-token', value: tok, domain: 'localhost', path: '/', httpOnly: true, sameSite: 'Lax' }]);
+// Podvrh /api/teams/mine se řídí tím, čí cookie zrovna kontext nese (část 3 přepne na zaměstnance).
+let jeZam = false;
 await ctx.route('**/api/**', async route => {
   const u = route.request().url();
   if (u.includes('/api/auth/')) return route.continue();
   if (route.request().method() !== 'GET') return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
+  // Kolo 69: plocha připojí nástroj i widgety až po načtení oprávnění; teams_mine.json
+  // je ze starší verze API bez nich (stránka by zůstala na kostrách). Zaměstnanec dostane
+  // systémovou roli baristy (typ zamestnanec) — s oprávněními vlastníka by uzávěrka šla
+  // větví „za kohokoli“ a sonda by přestala ověřovat skutečný tok zaměstnance.
+  if (new URL(u).pathname === '/api/teams/mine') {
+    const role = JSON.parse(readFileSync(DIR + 'roles.json', 'utf8'));
+    const r = jeZam ? role.system.find(x => x.klic === 'barista') : role.ja;
+    const mine = { ...JSON.parse(readFileSync(DIR + 'teams_mine.json', 'utf8')), opravneni: r.opravneni, role: jeZam
+      ? { klic: 'barista', roleId: null, nazev: r.nazev, typ: 'zamestnanec', jeVlastnik: false }
+      : { klic: r.klic, roleId: r.roleId, nazev: r.nazev, typ: 'vedeni', jeVlastnik: r.jeVlastnik } };
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mine) });
+  }
+  // Kolo 69: záložka Uzávěrka je plocha s widgety a formulář je její nástroj — bez
+  // rozložení (holé [] z podvrhu) by plocha byla prázdná a formulář by chyběl.
+  if (new URL(u).pathname === '/api/rozlozeni' && new URL(u).searchParams.get('stranka') === 'zamestnanec.uzaverka')
+    return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + 'k69-b5a-rozlozeni-uzaverka.json', 'utf8') });
   const k = keyFor(u);
   if (k && existsSync(DIR + k + '.json')) return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + k + '.json', 'utf8') });
   return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
@@ -63,6 +81,7 @@ if (await odkaz.count() > 0) {
 // přesměruje jinam. Stejné podvržené API, jiná role.
 const tokZam = execSync(`NEXTAUTH_SECRET=${process.env.NEXTAUTH_SECRET ?? "design-round-secret-0123456789ab"} node ${new URL('./cookie-role.mjs', import.meta.url).pathname} employee`, { encoding: 'utf8' }).trim();
 await ctx.addCookies([{ name: 'next-auth.session-token', value: tokZam, domain: 'localhost', path: '/', httpOnly: true, sameSite: 'Lax' }]);
+jeZam = true;
 await p.goto('http://localhost:3000/employee/shifts?view=closing', { waitUntil: 'networkidle' });
 await p.waitForTimeout(1200);
 const telo = await p.locator('body').innerText();
@@ -80,6 +99,7 @@ if (jeUzaverka) {
 
 // ---- 4. Kdo nečetl -------------------------------------------------------
 await ctx.addCookies([{ name: 'next-auth.session-token', value: tok, domain: 'localhost', path: '/', httpOnly: true, sameSite: 'Lax' }]);
+jeZam = false;
 await p.goto('http://localhost:3000/employer/overview?view=guides&guide=1', { waitUntil: 'networkidle' });
 await p.waitForTimeout(1200);
 const ctecka = p.locator('[role="dialog"]').first();

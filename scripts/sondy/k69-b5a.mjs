@@ -37,6 +37,7 @@ const podvrh = ({ closings = 'k69-b5a-closings', upravit: uprav = null } = {}) =
   if (path === '/api/closings') { const d = nacti(closings); return json(uprav ? uprav(d) : d); }
   if (path === '/api/closings/calendar') return json({ ...nacti('k69-b5a-calendar'), month: url.searchParams.get('month') ?? MESIC });
   if (path === '/api/closings/handover') return json(nacti('k69-b5a-handover'));
+  if (/^\/api\/closings\/\d+$/.test(path)) return json(nacti('k69-b5a-closing-detail'));
   if (path === '/api/finance') return json(JSON.parse(readFileSync(DIR + 'finance_month_2026-09.json', 'utf8')));
   return undefined;
 };
@@ -78,9 +79,13 @@ const bezPreteceni = (p) => p.evaluate(() => document.documentElement.scrollWidt
     && await widgetLi(p, 'uzaverky.ke_schvaleni').locator('button.on-accent').count() === 0);
   tvrdi('V: Souhrn má čísla (Tržba) a žádnou dlaždici s ručním štítkem', (await widgetLi(p, 'uzaverky.souhrn').innerText()).includes('TRŽBA') || (await widgetLi(p, 'uzaverky.souhrn').innerText()).includes('Tržba'));
 
+  await p.screenshot({ path: OUT + 'k69-b5a-uzaverky-desk.png', fullPage: true });
+
   // 2) Úpravy: nástroj je zástupce bez „−", přesun šipkami nad widget i pod něj.
   await upravit(p).click();
   tvrdi('V2: vstup do úprav', await dokud(() => vUpravach(p), 1500));
+  await p.waitForTimeout(400);
+  await p.screenshot({ path: OUT + 'k69-b5a-uzaverky-desk-upravy.png', fullPage: true });
   tvrdi('V2: nástroj je v úpravách sbalený do zástupce', await nastroj.getByText('Hlavní část stránky — v úpravách je sbalená.').isVisible());
   tvrdi('V2: zástupce nástroje nemá „−" (nejde odebrat)', await nastroj.locator('[data-odznak]').count() === 0);
   tvrdi('V2: widgety „−" mají', await widgetLi(p, 'uzaverky.souhrn').locator('[data-odznak]').count() === 1);
@@ -124,6 +129,16 @@ const bezPreteceni = (p) => p.evaluate(() => document.documentElement.scrollWidt
     const nastroj = widgetLi(p, 'nastroj');
     tvrdi('W1: klepnutí na den v kalendáři zúží seznam (Zrušit výběr)', await dokud(() => nastroj.getByRole('button', { name: 'Zrušit výběr' }).isVisible(), 2000));
     tvrdi('W1: …a den je v kalendáři označený', await bunka.getAttribute('aria-pressed') === 'true');
+    // Oprava po review: výběr nesl jen ring-[#16181A]/40, který v tmavém režimu na tmavé
+    // kartě zmizel. Teď inkoustová pilulka čísla (chip-ink), která tmavou variantu má.
+    await p.evaluate(() => { document.documentElement.dataset.theme = 'dark'; });
+    const barvy = await bunka.evaluate(b => {
+      const pil = b.querySelector('.chip-ink');
+      const karta = b.closest('li[data-widget]')?.querySelector('.card, [class*="card"]') ?? b.closest('li[data-widget]');
+      return { pil: pil ? getComputedStyle(pil).backgroundColor : null, karta: karta ? getComputedStyle(karta).backgroundColor : null };
+    });
+    tvrdi('W1: vybraný den je v tmavém režimu vidět (světlá pilulka čísla na tmavé kartě)', barvy.pil === 'rgb(237, 242, 228)', JSON.stringify(barvy));
+    await p.evaluate(() => { delete document.documentElement.dataset.theme; });
   } else tvrdi('W1: (přeskočeno — včerejšek je v jiném měsíci)', true);
   const radek = widgetLi(p, 'uzaverky.chybejici').locator('button.list-row').first();
   await radek.click();
@@ -184,6 +199,18 @@ const bezPreteceni = (p) => p.evaluate(() => document.documentElement.scrollWidt
   tvrdi('T1: telefon 390 — žádné vodorovné přetečení', await bezPreteceni(p));
   const nova = p.getByRole('button', { name: 'Nová uzávěrka' });
   tvrdi('T1: „Nová uzávěrka" je vidět a povolená', await nova.isVisible() && await nova.isEnabled());
+  // Oprava po review: šipka klikacího řádku Chybějících osiřela na telefonu na vlastním řádku.
+  const radekCh = widgetLi(p, 'uzaverky.chybejici').locator('button.list-row').first();
+  const sipky = await radekCh.evaluate(b => [...b.querySelectorAll('svg')].filter(s => s.getBoundingClientRect().width > 0).length);
+  tvrdi('T1: řádek Chybějících nemá na telefonu osiřelou šipku', sipky === 0, `${sipky} viditelných šipek`);
+  // Kalendář: bez role=grid (sliboval šipky a řádky), dny s cílem aspoň 44 px.
+  const kalT = widgetLi(p, 'uzaverky.kalendar');
+  tvrdi('T1: kalendář nemá role=grid ani gridcell', await kalT.locator('[role="grid"], [role="gridcell"], [role="columnheader"]').count() === 0);
+  const cile = await kalT.locator('button[aria-pressed]').evaluateAll(bs => bs.map(b => {
+    const r = b.getBoundingClientRect(); const pr = getComputedStyle(b, '::before');
+    return { h: r.height, w: Math.max(r.width, parseFloat(pr.width) || 0), hc: Math.max(r.height, parseFloat(pr.height) || 0) };
+  }));
+  tvrdi('T1: dny kalendáře mají dotykový cíl aspoň 44 × 44 px', cile.length > 0 && cile.every(c => c.w >= 44 && c.hc >= 44), JSON.stringify(cile.slice(0, 2)));
   await p.screenshot({ path: OUT + 'k69-b5a-uzaverky-tel.png', fullPage: true });
   await nova.click();
   tvrdi('T1: …a otevře formulář', await dokud(() => p.getByRole('button', { name: 'Zpět na uzávěrky' }).isVisible(), 3000));
@@ -209,6 +236,8 @@ const BARISTA = roleMine('barista');
   tvrdi('Z1: Moje uzávěrka hlásí neuzavřenou směnu', (await widgetLi(p, 'uzaverky.moje_uzaverka').innerText()).includes('Vyplň uzávěrku'));
   tvrdi('Z1: Moje uzávěrky ukazují vlastní historii', (await widgetLi(p, 'uzaverky.moje_historie').innerText()).includes('Čeká na schválení'));
   tvrdi('Z1: barista nemá tým v kalendáři — žádný dotaz na kalendář týmu', dotazyNa(stav, ['/api/closings/calendar']).filter(d => !d.u.includes('scope=me')).length === 0);
+
+  await p.screenshot({ path: OUT + 'k69-b5a-uzaverka-desk.png', fullPage: true });
 
   // 7) Rozepsaný formulář přežije vstup do úprav a výstup z nich.
   const pole = nastroj.getByLabel('Kasa na začátku');
@@ -244,6 +273,33 @@ const BARISTA = roleMine('barista');
   await widgetLi(p, 'uzaverky.moje_uzaverka').locator('button.list-row').first().click();
   tvrdi('Z4: řádek směny v „Moje uzávěrka" nastaví formulář na ten den', await dokud(async () => (await nastroj.getByLabel('Datum uzávěrky').inputValue()) === DNY.PREDEVCIREM, 2000));
   tvrdi('Z: bez chyb v konzoli', chyby.length === 0, chyby.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
+// Oprava po review: Moje uzávěrky — rozklik na detail vlastní uzávěrky a „Zobrazit všechny".
+{
+  // Pět vlastních uzávěrek (widget L má výchozí 3 řádky), ať je co ukázat v okně „všechny".
+  const vic = (d) => ({ ...d, closings: [...d.closings, ...[0, 1, 2].map(i => ({ ...d.closings[0], id: 600 + i, date: DNY.PRED6, shift_date: DNY.PRED6 }))] });
+  const { ctx, p, stav, chyby } = await kontext({ role: 'employee', fix: FIX_UZAVERKA, mineData: BARISTA, dalsi: podvrh({ closings: 'k69-b5a-closings-zamestnanec', upravit: vic }) });
+  await otevri(p, ZAMESTNANEC, 'zamestnanec.uzaverka');
+  const hist = widgetLi(p, 'uzaverky.moje_historie');
+  await hist.locator('button.list-row').first().waitFor({ timeout: 10000 }).catch(() => {});
+  tvrdi('H1: řádky Moje uzávěrky jsou klikací (3 z 5)', await hist.locator('button.list-row').count() === 3);
+  tvrdi('H1: pod useknutým seznamem je „Zobrazit všechny (5)", ne mrtvé „…a dalších"', await hist.getByRole('button', { name: 'Zobrazit všechny (5)' }).isVisible() && !(await hist.innerText()).includes('a dalších'));
+  await hist.locator('button.list-row').first().click();
+  const det = p.getByRole('dialog', { name: 'Detail uzávěrky' });
+  tvrdi('H1: klepnutí otevře detail vlastní uzávěrky', await dokud(() => det.getByText('Dvoustovka zapadla pod šuplík.').isVisible(), 4000));
+  const td = await det.innerText();
+  tvrdi('H1: detail ukáže důvod rozdílu, poznámku a odvod na konci', td.includes('Přepočítáno špatně') && td.includes('Došlo ovesné mléko.') && /Odvod/i.test(td), td.slice(0, 300));
+  tvrdi('H1: autor s mazat_vlastni má v detailu „Smazat"', await det.getByRole('button', { name: 'Smazat' }).isVisible());
+  tvrdi('H1: barista nemá v detailu „Schválit"', await det.getByRole('button', { name: /Schválit/ }).count() === 0);
+  tvrdi('H1: dotaz šel na detail té uzávěrky', dotazyNa(stav, ['/api/closings/']).some(d => /\/api\/closings\/\d+$/.test(d.path)));
+  await det.getByRole('button', { name: 'Zavřít' }).last().click();
+  await dokud(async () => !(await det.isVisible()), 2000);
+  await hist.getByRole('button', { name: 'Zobrazit všechny (5)' }).click();
+  const vse = p.getByRole('dialog', { name: 'Moje uzávěrky' });
+  tvrdi('H2: okno „Moje uzávěrky" ukáže všech pět', await dokud(async () => (await vse.locator('button.list-row').count()) === 5, 3000));
+  tvrdi('H: bez chyb v konzoli', chyby.length === 0, chyby.slice(0, 3).join(' | '));
   await ctx.close();
 }
 

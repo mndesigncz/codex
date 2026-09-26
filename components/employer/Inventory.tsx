@@ -1,8 +1,32 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+// Sklad (vedení) — plocha s widgety a položky skladu jako hlavní nástroj
+// (kolo 69, balík B3, spec §6.2).
+//
+// Do kola 68 byly nad seznamem natvrdo až čtyři tónované karty (chybějící
+// údaje, návrhy od týmu, souhrn „kriticky/dochází", K výrobě) a panel
+// objednávek; hlášení od týmu a inventura se schovávaly v menu. Všechno
+// z jednoho velkého načtení a všechno bez ohledu na oprávnění. Bloky jsou teď
+// widgety (components/widgety/oblasti/sklad.tsx), každý se svým dotazem za
+// svým oprávněním; kdo je nechce, odebere je. Tady zůstaly položky skladu
+// s hledáním, kategoriemi, řazením, hromadnými úpravami a okna, která s nimi
+// pracují (položka, nákupní seznam, kategorie, dodavatelé, inventura).
+//
+// Položky se berou přes useDataWidgetu: widget, který schválí návrh nebo
+// přijme objednávku, obnoví tutéž URL a seznam se srovná sám (a na stránku
+// je to jeden dotaz na /api/inventory, ne tři). Kroky ± se dál ukládají
+// optimisticky do místního stavu, ten se s další odpovědí serveru přepíše.
+//
+// Widgety s nástrojem mluví událostmi (lib/skladPrehled.ts): „Objednat"
+// v Nákupním seznamu otevře okno nákupu, řádek v Surovinách bez ceny
+// otevře úpravu položky. Z jiné stránky žádost počká v sessionStorage.
+
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Icon } from '../Icons';
-import { Button, PageHeader, EmptyState, SearchField, BulkBar, SelectBox, useSelection, runBulk } from '../ui';
+import {
+  Button, Card, Chip, EmptyState, ErrorState, Field, ListRow, Menu, Modal, SearchField, Segmented, Skeleton, Toast,
+  BulkBar, SelectBox, Avatar, SwitchRow, type MenuItem,
+} from '../ui';
 import CategoryStockView from '../inventory/CategoryStockView';
 import {
   normalizeCategoryPackaging, normalizeScale, stockStatus, thresholdUnitLabel,
@@ -19,19 +43,27 @@ import { type ItemDefaults, DEFAULT_FIELDS, mergeDefaults, hasDefaults } from '@
 import StocktakeModal from '../inventory/Stocktake';
 import ItemRecipeLinks from '../inventory/ItemRecipeLinks';
 import ProductionRecipe from '../inventory/ProductionRecipe';
-import ProductionBoard from '../inventory/ProductionBoard';
 import { useMoney, useSymbol } from '../CurrencyProvider';
-import { useModal } from '@/lib/useModal';
-import { usePopover } from '@/lib/usePopover';
 import { czForm, czCount, czVerb, POLOZKA } from '@/lib/czech';
 import { okJson } from '@/lib/api';
 import { openPrint, esc } from '@/lib/printDoc';
-import { DiscardGuard } from '../ui/DiscardGuard';
-import { obsahuje, obsahujeNekde } from '@/lib/hledani';
+import { obsahujeNekde } from '@/lib/hledani';
+import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
+import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
+import { useSmi } from '../widgety/NavigaceKontext';
+import { useOpravneni } from '../role/useOpravneni';
+import {
+  KLIC_NAKUP, KLIC_UPRAVIT, UDALOST_NAKUP, UDALOST_UPRAVIT, hodnotaZasob, navrhMnozstvi,
+} from '@/lib/skladPrehled';
+
+const URL_SKLAD = '/api/inventory';
+const URL_KATEGORIE = '/api/inventory/categories';
 
 const pluralPolozka = (n: number) => czForm(n, POLOZKA);
-/** „1 kategorie / 3 kategorie / 5 kategorií" — nominativ pro počet v chipu. */
+// „kategorie" má po číslovce tvar kategorie/kategorie/kategorií (KATEGORIE
+// v lib/czech je 4. pád „1 kategorii" pro věty typu „vybral jsi").
 const pocetKategorii = (n: number) => czCount(n, { one: 'kategorie', few: 'kategorie', many: 'kategorií' });
+const OBJEDNAVKA = { one: 'objednávka', few: 'objednávky', many: 'objednávek' };
 
 interface Item {
   id: number;
@@ -85,25 +117,6 @@ interface Category {
   spravuje?: string | null;
 }
 
-interface OrderItem {
-  name: string;
-  qty: number;
-  unit: string;
-  itemId?: number | null;
-}
-
-interface Order {
-  id: number;
-  supplier?: string | null;
-  items: OrderItem[];
-  totalCost?: number | null;
-  status: 'ordered' | 'received' | 'cancelled';
-  note?: string | null;
-  createdAt: string;
-  receivedAt?: string | null;
-  createdByName?: string;
-}
-
 type SortKey = 'name' | 'qtyAsc' | 'qtyDesc' | 'status' | 'updated';
 type View = 'list' | 'grid';
 
@@ -117,11 +130,12 @@ const dec = (v: string | number) => Number(String(v).replace(',', '.')) || 0;
 
 const emptyForm = { name: '', categoryId: null as number | null, quantity: '10', minQuantity: '5', criticalQuantity: '2', maxQuantity: '50', unit: 'ks', supplier: '', supplierUrl: '', unitCost: '', brand: '', description: '', packageSize: '', contentUnit: '', openAmount: '', portions: [] as { name: string; amount: string }[], archived: false, hideFromOverview: false, highlight: '' };
 
+// Popisky řazení slovy — šipky ↑↓ a „A→Z" v textu nahrazovaly ikonu (DP §6.8).
 const SORTS: { key: SortKey; label: string }[] = [
-  { key: 'name', label: 'Název A→Z' },
-  { key: 'qtyAsc', label: 'Množství ↑' },
-  { key: 'qtyDesc', label: 'Množství ↓' },
-  { key: 'status', label: 'Stav' },
+  { key: 'name', label: 'Podle názvu' },
+  { key: 'qtyAsc', label: 'Od nejmenšího množství' },
+  { key: 'qtyDesc', label: 'Od největšího množství' },
+  { key: 'status', label: 'Podle stavu' },
   { key: 'updated', label: 'Naposledy upraveno' },
 ];
 
@@ -133,18 +147,11 @@ function statusOf(i: Item, pk?: PackagingLookup): 'ok' | 'low' | 'critical' {
   return stockStatus(i as any, pk ? pk(i) : null);
 }
 const statusRank = { critical: 0, low: 1, ok: 2 } as const;
+const STAV_CHIP: Record<'ok' | 'low' | 'critical', 'ok' | 'wait' | 'bad'> = { ok: 'ok', low: 'wait', critical: 'bad' };
 
-// Suggested order amount: refill up to maxQuantity; if max is not set,
-// aim for twice the minimum. Always suggest at least 1.
-function suggestedAmount(i: Item): number {
-  const base = i.maxQuantity && i.maxQuantity > 0
-    ? i.maxQuantity - i.quantity
-    : i.minQuantity * 2 - i.quantity;
-  // Surovina chybějící na výrobu: aspoň tolik, kolik na dávky chybí.
-  const forMaking = (i.buyFor ?? []).reduce((s, f) => s + (f.amount ?? 0), 0);
-  return Math.max(1, Math.max(0, base), Math.ceil(forMaking));
-}
-
+// Návrh množství k objednání je jeden pro nástroj i widget Nákupní seznam
+// (lib/skladPrehled.ts navrhMnozstvi) — dřív si ho počítal každý sám.
+const suggestedAmount = (i: Item): number => navrhMnozstvi(i);
 
 function relTime(iso?: string) {
   if (!iso) return '';
@@ -158,15 +165,40 @@ function relTime(iso?: string) {
   if (h < 24) return `před ${h} h`;
   const days = Math.round(h / 24);
   if (days < 30) return `před ${days} d`;
-  return new Date(iso).toLocaleDateString('cs-CZ');
+  return new Date(iso).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' });
 }
 
-export default function Inventory({ user, initialCategory, onNavigate }: {
+/** Potvrzení nevratné akce — místo confirm() (DP §3.10, audit: 8× confirm v tomhle souboru). */
+interface Potvrzeni { titulek: string; text: string; akce: string; provest: () => Promise<void> | void }
+
+function OknoPotvrzeni({ p, onZavrit }: { p: Potvrzeni; onZavrit: () => void }) {
+  const [pracuji, setPracuji] = useState(false);
+  return (
+    <Modal open onClose={onZavrit} size="sm" title={p.titulek}
+      footer={<>
+        <Button variant="secondary" onClick={onZavrit}>Zrušit</Button>
+        <Button variant="danger-solid" loading={pracuji} onClick={async () => {
+          setPracuji(true);
+          try { await p.provest(); } finally { setPracuji(false); onZavrit(); }
+        }}>{p.akce}</Button>
+      </>}>
+      <p className="t-meta">{p.text}</p>
+    </Modal>
+  );
+}
+
+export default function Inventory({ initialCategory, onNavigate }: {
   user?: any; initialCategory?: string; onNavigate?: (view: string, arg?: string) => void;
 }) {
+  const smi = useSmi();
+  // Položky a kategorie přes sdílenou mezipaměť widgetů (viz hlavička souboru).
+  const sklad = useDataWidgetu<Item[]>(URL_SKLAD, raw => (Array.isArray(raw) ? raw : []));
+  const katData = useDataWidgetu<Category[]>(URL_KATEGORIE, raw => (Array.isArray(raw) ? raw : []));
   const [items, setItems] = useState<Item[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
+  useEffect(() => { if (sklad.data) setItems(sklad.data); }, [sklad.data]);
+  useEffect(() => { if (katData.data) setCategories(katData.data); }, [katData.data]);
+  const loading = sklad.data == null && !sklad.error;
   // Which category is open, by id. Names may repeat across branches, ids never do.
   const [catId, setCatId] = useState<number | null>(null);
   // A label used by items whose category was deleted; browsed on its own.
@@ -184,9 +216,9 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
   const catLabel = orphanCat ?? (current ? current.name : '');
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortKey>('name');
-  const [view, setView] = useState<View>('grid');
+  // Výchozí je seznam v jedné kartě (DP §3.6); karty na položku jsou volitelný pohled.
+  const [view, setView] = useState<View>('list');
   const [showForm, setShowForm] = useState(false);
-  const formModal = useModal<HTMLFormElement>(showForm, () => setShowForm(false), 'Položka skladu');
   const [showCats, setShowCats] = useState(false);
   const [editing, setEditing] = useState<Item | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -199,15 +231,15 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
   const [inlineParent, setInlineParent] = useState('');
   const [addingCat, setAddingCat] = useState(false);
   const [showShopping, setShowShopping] = useState(false);
+  // Jen dodavatel z widgetu Nákupní seznam (nastavení widgetu) — okno ukáže jeho skupinu.
+  const [shoppingSupplier, setShoppingSupplier] = useState<string | null>(null);
   // Reports employees filed via "Nahlásit chybějící" on the tablet/phone.
   const [reports, setReports] = useState<any[]>([]);
   const [showReports, setShowReports] = useState(false);
-  const reportsModal = useModal(showReports, () => setShowReports(false), 'Hlášení ze skladu');
   const [showStocktake, setShowStocktake] = useState(false);
   // Supplier entities — the address an order can actually be sent to.
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [showSuppliers, setShowSuppliers] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
   // Movement history of the item being edited — who changed the stock and when.
   const [itemLog, setItemLog] = useState<any[]>([]);
   const [logOpen, setLogOpen] = useState(false);
@@ -219,6 +251,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [showBulk, setShowBulk] = useState(false);
+  const [potvrzeni, setPotvrzeni] = useState<Potvrzeni | null>(null);
   // The toolbar sticks to the top while scrolling; once it does it collapses to
   // a single row so it stops eating the screen. A sentinel just above it tells
   // us when that happened without listening to every scroll event.
@@ -231,86 +264,50 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
     io.observe(el);
     return () => io.disconnect();
   }, []);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [notice, setNotice] = useState('');
-  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Potvrzení akce jako Toast (DP §3.17) místo ručně limetkového boxu na stránce.
+  const [notice, setNotice] = useState<{ text: string; ton?: 'bad' } | null>(null);
+  const showNotice = (text: string, ton?: 'bad') => setNotice({ text, ton });
 
-  const showNotice = (msg: string) => {
-    setNotice(msg);
-    if (noticeTimer.current) clearTimeout(noticeTimer.current);
-    noticeTimer.current = setTimeout(() => setNotice(''), 4000);
-  };
-  useEffect(() => () => { if (noticeTimer.current) clearTimeout(noticeTimer.current); }, []);
+  // Oprávnění nástroje (katalog kola 67). Server hlídá každý zápis sám; tady
+  // jde o to, aby se tlačítko, které skončí 403, vůbec nekreslilo. Tlačítka
+  // berou `ma()` (záchyt „ukázat vše", dokud /api/teams/mine nedorazí nebo
+  // když ho starší server neposílá — nástroj nesmí zmizet celý), dotazy na
+  // data přísné `smi()` (useSmi: bez jistoty se neptat, jinak 403 v konzoli).
+  const { ma } = useOpravneni();
+  const smiPridat = ma('sklad.pridat');
+  const smiUpravit = ma('sklad.upravit');
+  const smiMazat = ma('sklad.mazat');
+  const smiStav = ma(['sklad.zapsat_stav', 'sklad.upravit']);
+  const smiKategorie = ma('sklad.kategorie');
+  const smiCeny = smi('sklad.ceny');
+  const smiInventura = ma('inventura.pocitat');
+  const smiHlaseni = smi('sklad.hlaseni_vyridit');
+  const smiReceptury = smi('receptury.zobrazit');
+  const smiObjednat = ma('nakup.vytvorit');
+  const smiDodavatele = ma('dodavatele.zobrazit');
 
-  // Návrhy od týmu: po inventuře jich přijde třicet a schvalovaly se po
-  // jedné, každá s vlastním načtením celého skladu.
-  const proposals = items.filter(i => i.approved === false);
-  const propSel = useSelection<number>();
-  const [propNote, setPropNote] = useState('');
-
-  const approveProposal = async (id: number) => {
-    const res = await fetch(`/api/inventory/${id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ approve: true }),
-    });
-    if (!res.ok) throw new Error('nepovedlo se');
-  };
-  const rejectProposal = async (id: number) => {
-    const res = await fetch(`/api/inventory/${id}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error('nepovedlo se');
-  };
-
-  const decideProposals = async (action: 'approve' | 'reject') => {
-    const ids = Array.from(propSel.selected);
-    if (ids.length === 0) return;
-    if (action === 'reject' && !confirm(`Zamítnout a smazat ${ids.length} ${ids.length === 1 ? 'návrh' : ids.length < 5 ? 'návrhy' : 'návrhů'}?`)) return;
-    setPropNote('');
-    const { failed } = await runBulk(ids, id => action === 'approve' ? approveProposal(id) : rejectProposal(id));
-    await load();
-    if (failed.length) {
-      setPropNote(failed.length === ids.length
-        ? 'Nepodařilo se to uložit. Zkuste to znovu.'
-        : `${failed.length} z ${ids.length} se neuložilo — zkuste to znovu.`);
-      return;
-    }
-    propSel.exit();
-  };
-
-  const loadOrders = async () => {
-    try {
-      const data = await fetch('/api/orders').then(okJson);
-      if (Array.isArray(data?.orders)) setOrders(data.orders);
-    } catch {}
-  };
-
-  const load = async () => {
+  const nactiDodavatele = useCallback(() => {
     fetch('/api/suppliers').then(okJson)
       .then(d => setSuppliers(Array.isArray(d.suppliers) ? d.suppliers : []))
       .catch(() => {});
+  }, []);
+  const nactiHlaseni = useCallback(() => {
+    if (!smiHlaseni) return;
     fetch('/api/inventory/reports').then(okJson)
       .then(d => setReports(Array.isArray(d.reports) ? d.reports : []))
       .catch(() => {});
-    try {
-      const [data, cats] = await Promise.all([
-        fetch('/api/inventory').then(okJson),
-        fetch('/api/inventory/categories').then(okJson),
-      ]);
-      if (Array.isArray(data)) setItems(data);
-      if (Array.isArray(cats)) setCategories(cats);
-    } catch {}
-    setLoading(false);
+  }, [smiHlaseni]);
+  useEffect(() => { nactiDodavatele(); }, [nactiDodavatele]);
+  useEffect(() => { nactiHlaseni(); }, [nactiHlaseni]);
+
+  /** Znovu načíst sklad — nástroji i všem widgetům na ploše (sdílená mezipaměť). */
+  const load = async () => {
+    obnovDataWidgetu(URL_SKLAD);
+    obnovDataWidgetu(URL_KATEGORIE);
   };
-  useEffect(() => { load(); loadOrders(); }, []);
 
   // Category names available for the pick-list: custom categories, plus any
   // category strings already used by items (so nothing gets orphaned in the UI).
-  const catNames = useMemo(() => {
-    const set = new Set<string>();
-    categories.forEach(c => set.add(c.name));
-    items.forEach(i => { if (i.category) set.add(i.category); });
-    return Array.from(set);
-  }, [categories, items]);
-
   const flatCats = useMemo(() => flattenTree(categories), [categories]);
   // Nová kategorie jde zanořit jen pod vlastní — kategorie z organizace
   // spravuje jiný podnik a server zanoření pod ně odmítne.
@@ -355,7 +352,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
   // Parked items are out of the active stock entirely — they must not show up
   // in counts, alerts or the shopping list.
   const active = useMemo(() => items.filter(i => i.archived !== true && i.approved !== false), [items]);
-  const archivedCount = items.length - active.length;
+  const archivedCount = items.filter(i => i.archived === true && i.approved !== false).length;
 
   // Counts on the navigation buttons include everything nested below.
   const countIn = useMemo(() => (id: number) => {
@@ -414,9 +411,6 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
     return sorted;
   }, [items, categories, catId, orphanCat, search, sort, pk, showArchived]);
 
-  const critical = active.filter(i => statusOf(i, pk) === 'critical');
-  const low = active.filter(i => statusOf(i, pk) === 'low');
-
   // Items to (re)order: critical first, then low, alphabetically within each group.
   // Vlastní výroba do nákupu nepatří — ta dostává úkol „vyrobit". Naopak
   // surovina, která chybí na dávku, jde do nákupu i když sama pod limitem není.
@@ -428,7 +422,11 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
         return d !== 0 ? d : a.name.localeCompare(b.name, 'cs');
       }),
   [active, pk]);
-  const toMake = useMemo(() => active.filter(i => i.madeInHouse && statusOf(i, pk) !== 'ok'), [active, pk]);
+
+  // N8: hodnota zásob jedním výpočtem se stejným vzorcem jako Finance
+  // (bez archivovaných, s podílem načatého balení). Dřív tu bylo Σ množství ×
+  // cena včetně archivovaných a bez načatých balení — jiné číslo za totéž.
+  const hodnota = useMemo(() => (smiCeny ? hodnotaZasob(items).hodnota : 0), [items, smiCeny]);
 
   // Defaults for a category = everything its ancestors set, overridden by its
   // own, so a rule high up still holds while a subcategory can tweak one field.
@@ -470,13 +468,15 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
     setShowForm(true);
   };
   // Kde se položka používá v kase — čte jen tabulku párování, takže se to dá
-  // ukázat rovnou v editaci položky bez čekání na pokladnu.
+  // ukázat rovnou v editaci položky bez čekání na pokladnu. Jen s oprávněním
+  // na receptury (jinak by dotaz skončil 403 v konzoli).
   const [posUsage, setPosUsage] = useState<Record<string, { productId: string; productName: string | null; amount: number }[]>>({});
   useEffect(() => {
+    if (!smiReceptury) return;
     fetch('/api/pos/usage').then(okJson)
       .then(d => setPosUsage(d?.usage ?? {}))
       .catch(() => {});
-  }, []);
+  }, [smiReceptury]);
 
   const openEdit = (i: Item) => {
     setFormErr('');
@@ -484,23 +484,76 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
     setForm({ name: i.name, categoryId: i.categoryId ?? categories.find(c => c.name === i.category)?.id ?? null, quantity: String(i.quantity), minQuantity: String(i.minQuantity), criticalQuantity: String(i.criticalQuantity), maxQuantity: String(i.maxQuantity), unit: i.unit, supplier: i.supplier ?? '', supplierUrl: i.supplierUrl ?? '', unitCost: i.unitCost != null ? String(i.unitCost) : '', brand: i.brand ?? '', description: i.description ?? '', packageSize: i.packageSize != null ? String(i.packageSize) : '', contentUnit: i.contentUnit ?? '', openAmount: i.openAmount != null ? String(i.openAmount) : '', portions: Array.isArray((i as any).portions) ? (i as any).portions.map((p: any) => ({ name: String(p.name ?? ''), amount: String(p.amount ?? '') })) : [], archived: i.archived === true, hideFromOverview: i.hideFromOverview === true, highlight: i.highlight ?? '' });
     setNewCatInline('');
     setItemLog([]); setLogOpen(false);
-    fetch(`/api/inventory/log?itemId=${i.id}`).then(okJson)
-      .then(d => setItemLog(Array.isArray(d.log) ? d.log : Array.isArray(d) ? d : []))
-      .catch(() => {});
+    if (smi('sklad.historie')) {
+      fetch(`/api/inventory/log?itemId=${i.id}`).then(okJson)
+        .then(d => setItemLog(Array.isArray(d.log) ? d.log : Array.isArray(d) ? d : []))
+        .catch(() => {});
+    }
     setShowForm(true);
   };
+
+  // ---- Žádosti z widgetů (lib/skladPrehled.ts) ----
+  // Nástroj je přijme synchronně (detail.prijato), z jiné stránky počkají
+  // v sessionStorage, než se sem člověk přepne.
+  const openEditRef = useRef(openEdit);
+  openEditRef.current = openEdit;
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+  const [cekaUprava, setCekaUprava] = useState<number | null>(null);
+  useEffect(() => {
+    const nakup = (e: Event) => {
+      const d = (e as CustomEvent).detail ?? {};
+      d.prijato = true;
+      setShoppingSupplier(typeof d.dodavatel === 'string' ? d.dodavatel : null);
+      setShowShopping(true);
+    };
+    const uprav = (e: Event) => {
+      const d = (e as CustomEvent).detail ?? {};
+      d.prijato = true;
+      if (Number.isFinite(Number(d.id))) setCekaUprava(Number(d.id));
+    };
+    window.addEventListener(UDALOST_NAKUP, nakup);
+    window.addEventListener(UDALOST_UPRAVIT, uprav);
+    try {
+      const n = sessionStorage.getItem(KLIC_NAKUP);
+      if (n != null) {
+        sessionStorage.removeItem(KLIC_NAKUP);
+        const d = JSON.parse(n || '{}');
+        setShoppingSupplier(typeof d?.dodavatel === 'string' ? d.dodavatel : null);
+        setShowShopping(true);
+      }
+      const u = sessionStorage.getItem(KLIC_UPRAVIT);
+      if (u != null) {
+        sessionStorage.removeItem(KLIC_UPRAVIT);
+        const d = JSON.parse(u || '{}');
+        if (Number.isFinite(Number(d?.id))) setCekaUprava(Number(d.id));
+      }
+    } catch { /* soukromé okno */ }
+    return () => {
+      window.removeEventListener(UDALOST_NAKUP, nakup);
+      window.removeEventListener(UDALOST_UPRAVIT, uprav);
+    };
+  }, []);
+  // Úprava položky čeká, až dorazí seznam (ze Skladu je hned, z Přehledu ne).
+  useEffect(() => {
+    if (cekaUprava == null || items.length === 0) return;
+    const i = itemsRef.current.find(x => x.id === cekaUprava);
+    setCekaUprava(null);
+    if (i) openEditRef.current(i);
+  }, [cekaUprava, items]);
 
   const createCategory = async (name: string, parentId?: number | null): Promise<boolean> => {
     const clean = name.trim();
     if (!clean) return false;
     try {
-      const res = await fetch('/api/inventory/categories', {
+      const res = await fetch(URL_KATEGORIE, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: clean, parentId: parentId ?? null }),
       });
       if (!res.ok) return false;
-      const cats = await fetch('/api/inventory/categories').then(okJson);
+      const cats = await fetch(URL_KATEGORIE).then(okJson);
       if (Array.isArray(cats)) { setCategories(cats); lastCats.current = cats; }
+      obnovDataWidgetu(URL_KATEGORIE);
       return true;
     } catch { return false; }
   };
@@ -543,13 +596,17 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
         .map(p => ({ name: p.name.trim(), amount: Number(String(p.amount).replace(',', '.')) })),
       openAmount: form.openAmount === '' ? null : Math.max(0, dec(form.openAmount)),
     };
+    // Bez práva měnit ceny server cenu zahodí (kolo 67) — neposílat ji vůbec,
+    // ať úprava jiného pole nevypadá, že přepsala cenu na nic.
+    if (!ma('sklad.ceny_upravit')) delete (payload as any).unitCost;
     setFormErr('');
     try {
       const res = editing
         ? await fetch(`/api/inventory/${editing.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-        : await fetch('/api/inventory', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        : await fetch(URL_SKLAD, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (res.ok) {
         setShowForm(false);
+        showNotice(editing ? 'Položka uložena.' : 'Položka přidána.');
         await load();
       } else {
         // Keep the form open with what was typed — closing it would look like
@@ -572,7 +629,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
     } catch {
       // Put the old number back — a stepper that lies is worse than one that fails.
       setItems(prev => prev.map(x => x.id === i.id ? { ...x, quantity: i.quantity } : x));
-      showNotice('Množství se nepodařilo uložit.');
+      showNotice('Množství se nepodařilo uložit.', 'bad');
     }
   };
 
@@ -588,7 +645,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
     } catch {
       // I HTTP chyba (ne jen síť): vrať stav zpět, ať UI neukazuje odmítnutou změnu.
       setItems(prev => prev.map(x => x.id === i.id ? { ...x, archived: !archived } : x));
-      showNotice(archived ? 'Zaparkování se nepodařilo.' : 'Odparkování se nepodařilo.');
+      showNotice(archived ? 'Zaparkování se nepodařilo.' : 'Odparkování se nepodařilo.', 'bad');
     }
   };
 
@@ -598,8 +655,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
     setItems(prev => prev.map(x => x.id === updated.id ? { ...x, ...updated } : x));
   // Selhání odpisu se u vedení dřív spolklo (na rozdíl od kiosku a zaměstnance):
   // tlačítko se odemklo, číslo se nezměnilo a nikdo nevěděl, jestli je odepsáno.
-  const [consumeErr, setConsumeErr] = useState('');
-  const onConsumeFail = () => { setConsumeErr('Odpis se nepodařilo uložit. Zkontroluj připojení a zkus to znovu.'); setTimeout(() => setConsumeErr(''), 4000); };
+  const onConsumeFail = () => showNotice('Odpis se nepodařilo uložit. Zkontroluj připojení a zkus to znovu.', 'bad');
 
   const toggleSelected = (id: number) =>
     setSelected(prev => {
@@ -620,230 +676,103 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        showNotice(d.error || 'Hromadnou úpravu se nepodařilo uložit.');
+        showNotice(d.error || 'Hromadnou úpravu se nepodařilo uložit.', 'bad');
         return false;
       }
       const d = await res.json().catch(() => ({}));
       await load();
-      showNotice(`Upraveno ${d.count ?? ids.length} ${pluralPolozka(d.count ?? ids.length)} ✓`);
+      showNotice(`Upraveno: ${czCount(d.count ?? ids.length, POLOZKA)}.`);
       return true;
     } catch {
-      showNotice('Nepodařilo se spojit se serverem.');
+      showNotice('Nepodařilo se spojit se serverem.', 'bad');
       return false;
     }
   };
 
-  const bulkDelete = async () => {
+  const bulkDelete = () => {
     const ids = Array.from(selected);
     if (ids.length === 0) return;
-    if (!confirm(`Smazat ${ids.length} ${pluralPolozka(ids.length)}? Tohle nejde vrátit.`)) return;
-    try {
-      const res = await fetch('/api/inventory/bulk', {
-        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids }),
-      });
-      if (res.ok) {
-        setItems(prev => prev.filter(x => !selected.has(x.id)));
-        exitSelection();
-        showNotice(`Smazáno ${ids.length} ${pluralPolozka(ids.length)}`);
-      } else showNotice('Smazání se nepodařilo.');
-    } catch { showNotice('Nepodařilo se spojit se serverem.'); }
+    setPotvrzeni({
+      titulek: `Smazat ${czCount(ids.length, POLOZKA)}?`,
+      text: 'Položky zmizí ze skladu i z historie. Tohle nejde vrátit — jestli je jen teď nevedete, odlož je.',
+      akce: 'Smazat',
+      provest: async () => {
+        try {
+          const res = await fetch('/api/inventory/bulk', {
+            method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids }),
+          });
+          if (res.ok) {
+            setItems(prev => prev.filter(x => !ids.includes(x.id)));
+            exitSelection();
+            showNotice(`Smazáno: ${czCount(ids.length, POLOZKA)}.`);
+            await load();
+          } else showNotice('Smazání se nepodařilo.', 'bad');
+        } catch { showNotice('Nepodařilo se spojit se serverem.', 'bad'); }
+      },
+    });
   };
 
-  const remove = async (i: Item) => {
-    if (!confirm(`Smazat položku „${i.name}"?`)) return;
-    setItems(prev => prev.filter(x => x.id !== i.id));
-    try {
-      const res = await fetch(`/api/inventory/${i.id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error();
-    } catch {
-      setItems(prev => [...prev, i].sort((a, b) => a.name.localeCompare(b.name, 'cs')));
-      showNotice('Položku se nepodařilo smazat.');
-    }
+  const remove = (i: Item) => {
+    setPotvrzeni({
+      titulek: `Smazat „${i.name}"?`,
+      text: 'Položka zmizí ze skladu i z historie. Jestli ji jen teď nevedete, odlož ji — jde vrátit jedním klepnutím.',
+      akce: 'Smazat položku',
+      provest: async () => {
+        setItems(prev => prev.filter(x => x.id !== i.id));
+        try {
+          const res = await fetch(`/api/inventory/${i.id}`, { method: 'DELETE' });
+          if (!res.ok) throw new Error();
+          await load();
+        } catch {
+          setItems(prev => [...prev, i].sort((a, b) => a.name.localeCompare(b.name, 'cs')));
+          showNotice('Položku se nepodařilo smazat.', 'bad');
+        }
+      },
+    });
   };
 
-  return (
-    <div className="p-4 sm:p-6 space-y-6">
-      <PageHeader hintId="inventory"
-        title="Sklad"
-        subtitle={<>
-          {items.length} {items.length === 1 ? 'položka' : items.length >= 2 && items.length <= 4 ? 'položky' : 'položek'}
-          {(() => {
-            const val = items.reduce((s, i) => s + (i.unitCost ? i.quantity * i.unitCost : 0), 0);
-            return val > 0 ? <> · hodnota zásob <span className="font-semibold text-[#16181A]">{money(val)}</span></> : ' · přidávejte a hlídejte limity';
-          })()}
-        </>}
-        secondary={toBuy.length > 0 && (
-          <Button variant="secondary" icon="cart" onClick={() => setShowShopping(true)}>Nakoupit ({toBuy.length})</Button>
-        )}
-        menu={[
-          ...(toBuy.length > 0 ? [{ label: `Nakoupit (${toBuy.length})`, icon: 'cart', onClick: () => setShowShopping(true),
-            hint: 'Nákupní seznam z položek pod limitem.' }] : []),
-          { label: 'Dodavatelé', icon: 'users', onClick: () => setShowSuppliers(true) },
-          { label: 'Inventura', icon: 'clipboard', onClick: () => setShowStocktake(true),
-            hint: 'Přepočítat sklad a zapsat rozdíly.' },
-          // Párování s kasou má vlastní obrazovku — dvě místa na jednu věc
-          // byla hlavní důvod, proč to působilo krkolomně.
-          { label: 'Receptury a prodeje z kasy', icon: 'card', onClick: () => onNavigate?.('recipes') },
-          ...(reports.length > 0 ? [{
-            label: reports.some(r => r.status !== 'done')
-              ? `Hlášení od týmu (${reports.filter(r => r.status !== 'done').length} nových)`
-              : 'Hlášení od týmu',
-            icon: 'inbox', onClick: () => setShowReports(true),
-          }] : []),
-        ]}
-        primary={<Button variant="accent" icon="plus" onClick={openNew}>Přidat položku</Button>}
-      />
+  // ---- Hlavička ----
+  const noveHlaseni = reports.filter(r => r.status !== 'done').length;
+  const menu: MenuItem[] = [
+    ...(toBuy.length > 0 ? [{ label: `Nakoupit (${toBuy.length})`, icon: 'cart', onClick: () => { setShoppingSupplier(null); setShowShopping(true); },
+      hint: 'Nákupní seznam z položek pod limitem.' }] : []),
+    ...(smiUpravit || smiMazat ? [{ label: 'Vybrat víc položek', icon: 'check', onClick: () => setSelecting(true) }] : []),
+    ...(smiKategorie ? [{ label: 'Kategorie a balení', icon: 'settings', onClick: () => setShowCats(true) }] : []),
+    ...(smiDodavatele ? [{ label: 'Dodavatelé', icon: 'users', onClick: () => setShowSuppliers(true) }] : []),
+    ...(smiInventura ? [{ label: 'Inventura', icon: 'clipboard', onClick: () => setShowStocktake(true),
+      hint: 'Přepočítat sklad a zapsat rozdíly.' }] : []),
+    ...(archivedCount > 0 || showArchived ? [{
+      label: showArchived ? 'Zpět na aktivní sklad' : `Momentálně nevedeme (${archivedCount})`, icon: 'archive',
+      onClick: () => setShowArchived(v => !v),
+    }] : []),
+    // Párování s kasou má vlastní obrazovku — dvě místa na jednu věc
+    // byla hlavní důvod, proč to působilo krkolomně.
+    ...(smiReceptury && onNavigate ? [{ label: 'Receptury a prodeje z kasy', icon: 'card', onClick: () => onNavigate('recipes') }] : []),
+    ...(smiHlaseni && reports.length > 0 ? [{
+      label: noveHlaseni > 0 ? `Hlášení od týmu (${noveHlaseni} nových)` : 'Hlášení od týmu',
+      icon: 'inbox', onClick: () => setShowReports(true),
+    }] : []),
+  ];
 
-      {notice && (
-        <div className="rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/30 text-[#5B7A08] text-sm font-semibold px-4 py-3">
-          {notice}
-        </div>
-      )}
+  const subtitle = <>
+    {czCount(active.length, POLOZKA)}
+    {hodnota > 0 ? <> · hodnota zásob <span className="font-semibold text-[#16181A]">{money(hodnota)}</span></> : ' · přidávej položky a hlídej limity'}
+  </>;
 
-      {/* Protějšek fronty „prodává se, ale neodepisuje" z Receptur: suroviny,
-          které kasa používá, ale nemají cenu nebo velikost balení. Bez nich
-          se marže nespočítá a odpis z načatého balení nefunguje — a nikde
-          jinde to není vidět. */}
-      {(() => {
-        const gaps = items.filter(i =>
-          (posUsage[String(i.id)]?.length ?? 0) > 0
-          && (!(Number(i.unitCost) > 0) || !(Number(i.packageSize) > 0)));
-        if (!gaps.length) return null;
-        return (
-          <div className="glass-card border-wait/25 bg-wait/[0.05] p-4 space-y-2">
-            <p className="text-xs font-bold uppercase tracking-wide text-wait-ink flex items-center gap-1.5">
-              <Icon name="warning" size={14} /> Používá se v recepturách, ale chybí údaje ({gaps.length})
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {gaps.slice(0, 12).map(i => (
-                <button key={i.id} onClick={() => openEdit(i)}
-                  className="tap-target-sm rounded-full bg-white/70 hover:bg-white border border-wait/20 px-3.5 py-1.5 text-xs font-semibold text-[#16181A] transition active:scale-95">
-                  {i.name}
-                  <span className="ml-1.5 font-normal text-wait-ink">
-                    {!(Number(i.unitCost) > 0) && !(Number(i.packageSize) > 0) ? 'cena i balení'
-                      : !(Number(i.unitCost) > 0) ? 'cena' : 'velikost balení'}
-                  </span>
-                </button>
-              ))}
-            </div>
-            <p className="text-[11px] text-black/45">
-              Dokud chybí, nespočítá se marže položek, které je používají — a odpis nebere z načatého balení.
-            </p>
-          </div>
-        );
-      })()}
-
-      {items.some(i => i.approved === false) && (
-        <div className="glass-card border-[#C8F542]/30 bg-[#C8F542]/[0.06] p-5 space-y-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <p className="font-semibold text-sm text-[#16181A]"><Icon name="inbox" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Nové věci od týmu ({proposals.length})</p>
-            {proposals.length > 1 && !propSel.selecting && (
-              <button type="button" onClick={propSel.start}
-                className="sm:ml-auto tap-target-sm rounded-full glass border border-black/10 px-3 py-1.5 text-xs font-semibold text-black/60 hover:text-[#16181A] transition whitespace-nowrap">
-                <Icon name="check" size={14} className="inline -mt-0.5 mr-1" />Vybrat víc
-              </button>
-            )}
-          </div>
-          <div className="space-y-2">
-            {proposals.map(i => (
-              <div key={i.id} className="flex flex-wrap items-center gap-2.5 rounded-2xl bg-white/60 border border-black/[0.07] px-4 py-2.5">
-                {propSel.selecting && (
-                  <SelectBox checked={propSel.has(i.id)} onChange={() => propSel.toggle(i.id)}
-                    label={`Vybrat návrh — ${i.name}`} />
-                )}
-                {(i as any).photoUrl ? (
-                  <a href={(i as any).photoUrl} target="_blank" rel="noreferrer" className="shrink-0">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={(i as any).photoUrl} alt="" className="h-12 w-12 rounded-xl object-cover border border-black/[0.06]" />
-                  </a>
-                ) : (
-                  <span className="shrink-0 h-12 w-12 well rounded-xl flex items-center justify-center text-black/35">
-                    <Icon name="box" size={19} strokeWidth={1.7} />
-                  </span>
-                )}
-                <span className="min-w-0 flex-1 text-sm font-medium text-[#16181A]">
-                  <span className="block line-clamp-2">
-                    {i.name}
-                    <span className="text-black/40 font-normal"> · {i.category || 'bez kategorie'} · {i.quantity} {i.unit}</span>
-                  </span>
-                  <span className="block text-[11px] font-normal text-black/40 line-clamp-2">
-                    {(i as any).submittedByName ? `zapsal/a ${(i as any).submittedByName}` : 'zapsal někdo z týmu'}
-                    {(i as any).description ? ` · „${(i as any).description}"` : ''}
-                  </span>
-                </span>
-                {!propSel.selecting && (<>
-                  <button type="button"
-                    onClick={async () => {
-                      try { await approveProposal(i.id); await load(); }
-                      catch { showNotice('Schválení se nepodařilo.'); }
-                    }}
-                    className="tap-target-sm shrink-0 btn btn-primary btn-sm transition">
-                    Schválit
-                  </button>
-                  <button type="button"
-                    onClick={async () => {
-                      if (!confirm(`Zamítnout a smazat návrh „${i.name}"?`)) return;
-                      try { await rejectProposal(i.id); await load(); } catch { /* ignore */ }
-                    }}
-                    className="tap-target-sm shrink-0 rounded-full glass text-black/50 hover:text-bad-ink px-3 py-1.5 text-xs font-semibold transition">
-                    Zamítnout
-                  </button>
-                </>)}
-              </div>
-            ))}
-          </div>
-
-          {propSel.selecting && (
-            <BulkBar
-              count={propSel.count}
-              totalLabel={`Vybrat vše (${proposals.length})`}
-              onSelectAll={() => propSel.selectAll(proposals.map(i => i.id))}
-              onExit={() => { propSel.exit(); setPropNote(''); }}
-              note={propNote}
-              actions={[
-                { label: 'Schválit', primary: true, onClick: () => decideProposals('approve') },
-                { label: 'Zamítnout', danger: true, onClick: () => decideProposals('reject') },
-              ]}
-            />
-          )}
-        </div>
-      )}
-
-      {(critical.length > 0 || low.length > 0) && (
-        <div className="glass-card border-wait/20 bg-wait/[0.06] p-5">
-          <p className="font-semibold text-sm flex flex-wrap items-center gap-2 text-wait-ink">
-            <Icon name="warning" size={16} />
-            {critical.length > 0 && <span className="text-bad-ink">{critical.length} kriticky málo</span>}
-            {critical.length > 0 && low.length > 0 && <span className="text-black/30">·</span>}
-            {low.length > 0 && <span className="text-wait-ink">{low.length} dochází</span>}
-            {toMake.length > 0 && <span className="text-black/30">·</span>}
-            {toMake.length > 0 && <span className="text-[#0A5CC0]">{toMake.length} k výrobě</span>}
-          </p>
-          {/* Není to název, je to výčet — u 190 položek chtěl řádek 17 000 px.
-              Na desktopu se z něj po `truncate` četlo pět procent, takže se
-              zalamuje všude stejně a zbytek je za „a další". */}
-          <p className="text-black/55 text-sm mt-1 line-clamp-2">
-            {[...critical, ...low].slice(0, 12).map(i => i.name).join(', ')}
-            {critical.length + low.length > 12 && ` a další ${critical.length + low.length - 12}`}
-          </p>
-        </div>
-      )}
-
-      {/* Co si směna má vyrobit — s recepturou a stavem surovin. */}
-      <ProductionBoard onOpenTasks={onNavigate ? () => onNavigate('tasks') : undefined}
-        onChanged={msg => { setNotice(msg); load(); }} />
-
-      {/* Toolbar */}
+  const nastroj = (
+    <div className="space-y-4">
+      {/* Toolbar — v klidu leží na papíře; až se přilepí nahoru, stane se plovoucím chromem. */}
       <div ref={sentinel} aria-hidden className="h-px -mb-px" />
-      <div className={`sticky top-0 z-20 -mx-4 px-4 sm:-mx-6 sm:px-6 bg-white/60 dark:bg-transparent backdrop-blur-md transition-[padding] ${
-        stuck ? 'py-2 space-y-2 shadow-sm shadow-black/[0.04]' : 'py-3 space-y-3'
+      <div className={`sticky top-0 z-20 transition-[padding,box-shadow] ${
+        stuck ? '-mx-4 px-4 sm:-mx-6 sm:px-6 py-2 space-y-2 glass-strong rounded-b-3xl shadow-[shadow:var(--shadow-float)]' : 'py-1 space-y-3'
       }`}>
         <div className="flex flex-col lg:flex-row gap-3 lg:items-center">
           <SearchField
             className="flex-1 min-w-0"
             value={search} onChange={setSearch}
             placeholder="Hledat položku nebo dodavatele…"
+            ariaLabel="Hledat ve skladu"
             storageKey="inventory"
             suggestions={[
               ...categories.map(c => ({ label: c.name, hint: 'kategorie' })),
@@ -852,22 +781,11 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
             inputClassName={stuck ? '!py-2' : ''}
           />
           <div className="flex flex-wrap items-center gap-2 shrink-0 min-w-0">
-            {selecting && (
-              <button onClick={exitSelection}
-                className="btn btn-primary whitespace-nowrap">
-                Zrušit výběr
-              </button>
-            )}
-            <SortMenu sort={sort} setSort={setSort} />
-            <MoreMenu
-              view={view} setView={setView}
-              onSelect={() => setSelecting(true)} selecting={selecting}
-              onCategories={() => setShowCats(true)}
-              onShopping={toBuy.length > 0 ? () => setShowShopping(true) : undefined}
-              shoppingCount={toBuy.length}
-              archivedCount={archivedCount} showArchived={showArchived}
-              onToggleArchived={() => setShowArchived(v => !v)}
-            />
+            {selecting && <Button variant="secondary" onClick={exitSelection}>Zrušit výběr</Button>}
+            <Segmented ariaLabel="Zobrazení" size="sm" value={view} onChange={setView}
+              options={[{ id: 'list', label: 'Seznam' }, { id: 'grid', label: 'Karty' }]} />
+            <Menu label={`Řadit: ${SORTS.find(s => s.key === sort)?.label ?? ''}`} icon="swap"
+              items={SORTS.map(s => ({ label: s.label, icon: s.key === sort ? 'check' : undefined, onClick: () => setSort(s.key) }))} />
           </div>
         </div>
         <CategoryNav
@@ -882,401 +800,349 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
         />
       </div>
 
-      {orders.length > 0 && (
-        <OrdersPanel orders={orders} refreshOrders={loadOrders} refreshItems={load} notify={showNotice} />
-      )}
-
-      <div className="flex items-center justify-between text-xs text-black/45">
-        <span>
-          {filtered.length} {filtered.length === 1 ? 'položka' : filtered.length >= 2 && filtered.length <= 4 ? 'položky' : 'položek'}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="t-meta">
+          {czCount(filtered.length, POLOZKA)}
           {orphanCat ? ` v „${orphanCat}"` : catId != null ? ` v „${pathOfId(categories, catId)}"` : ''}
           {catId != null && subCats.length > 0 ? ' včetně podkategorií' : ''}
-        </span>
+          {showArchived ? ' · momentálně nevedeme' : ''}
+        </p>
         {showArchived && (
-          <button onClick={() => setShowArchived(false)}
-            className="tap-target-sm btn btn-primary btn-sm">
-            Zpět na aktivní sklad
-          </button>
+          <Button variant="secondary" size="sm" onClick={() => setShowArchived(false)}>Zpět na aktivní sklad</Button>
         )}
       </div>
 
-      {consumeErr && (
-        <div role="alert" className="note note-danger px-4 py-3 text-sm font-semibold">{consumeErr}</div>
-      )}
-      {loading ? (
-        <div className="flex items-center justify-center h-48"><div className="spinner" /></div>
+      {sklad.error && !sklad.data ? (
+        <Card><ErrorState compact title="Sklad se nenačetl" onRetry={sklad.reload} detail={sklad.error} /></Card>
+      ) : loading ? (
+        <Card aria-busy className="space-y-2">
+          <Skeleton className="h-12" /><Skeleton className="h-12" /><Skeleton className="h-12" /><Skeleton className="h-12 w-2/3" />
+        </Card>
       ) : filtered.length === 0 ? (
-        <div className="glass-card p-8 text-center text-black/45">{items.length === 0 ? 'Žádné položky. Přidejte první.' : 'Žádné položky neodpovídají filtru.'}</div>
+        <Card>
+          {items.length === 0 ? (
+            <EmptyState compact illustration="sklad" title="Sklad je zatím prázdný"
+              hint="Přidej první položku — pak tu uvidíš, co dochází, a nákupní seznam se sestaví sám."
+              action={smiPridat ? <Button variant="secondary" icon="plus" onClick={openNew}>Přidat položku</Button> : undefined} />
+          ) : (
+            <EmptyState compact icon="search" title="Nic neodpovídá filtru"
+              hint={search ? 'Zkus hledat jinak, nebo vyber jinou kategorii.' : 'V téhle kategorii zatím nic není.'} />
+          )}
+        </Card>
       ) : packagedCat ? (
         <CategoryStockView
           category={catLabel}
           packaging={normalizeCategoryPackaging(packagedCat)}
           items={filtered as any}
-          canEdit
+          canEdit={smiStav}
           onChanged={updated => setItems(list => list.map(x => x.id === updated.id ? { ...x, ...updated } : x))}
-          onEditItem={i => openEdit(items.find(x => x.id === i.id) ?? (i as any))}
-          onRemoveItem={i => remove(items.find(x => x.id === i.id) ?? (i as any))}
-          onStep={(i, d) => step(items.find(x => x.id === i.id) ?? (i as any), d)}
+          onEditItem={smiUpravit ? (i => openEdit(items.find(x => x.id === i.id) ?? (i as any))) : undefined}
+          onRemoveItem={smiMazat ? (i => remove(items.find(x => x.id === i.id) ?? (i as any))) : undefined}
+          onStep={smiStav ? ((i, d) => step(items.find(x => x.id === i.id) ?? (i as any), d)) : undefined}
         />
       ) : view === 'list' ? (
-        <ListView items={filtered} step={step} openEdit={openEdit} remove={remove} pk={pk} setArchived={setArchived} selecting={selecting} selected={selected} onToggle={toggleSelected} onConsumed={onConsumed} onConsumeFail={onConsumeFail} />
+        <ListView items={filtered} step={smiStav ? step : undefined} openEdit={smiUpravit ? openEdit : undefined} remove={smiMazat ? remove : undefined} pk={pk}
+          setArchived={smiUpravit || smiStav ? setArchived : undefined} selecting={selecting} selected={selected} onToggle={toggleSelected}
+          onConsumed={onConsumed} onConsumeFail={onConsumeFail} />
       ) : (
-        <GridView items={filtered} step={step} openEdit={openEdit} remove={remove} money={money} pk={pk} setArchived={setArchived} selecting={selecting} selected={selected} onToggle={toggleSelected} onConsumed={onConsumed} onConsumeFail={onConsumeFail} />
+        <GridView items={filtered} step={smiStav ? step : undefined} openEdit={smiUpravit ? openEdit : undefined} remove={smiMazat ? remove : undefined} money={money} pk={pk}
+          setArchived={smiUpravit || smiStav ? setArchived : undefined} selecting={selecting} selected={selected} onToggle={toggleSelected}
+          onConsumed={onConsumed} onConsumeFail={onConsumeFail} />
       )}
+    </div>
+  );
 
-      {/* Item form modal */}
-      {showForm && (
-        <div className="fixed inset-0 modal-overlay z-50 flex items-end md:items-center justify-center md:p-4" onClick={() => setShowForm(false)}>
-          <form ref={formModal.ref} {...formModal.dialogProps} onClick={e => e.stopPropagation()} onSubmit={save} className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-lg max-h-[88vh] overflow-y-auto scrollbar-thin">
-            <DiscardGuard guard={formModal.guard} />
-            {/* Sticky header */}
-            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 px-6 py-4 bg-white/70 backdrop-blur-xl chrome-edge">
-              <div className="flex items-center gap-3 min-w-0">
-                <span className="shrink-0 w-10 h-10 rounded-2xl bg-[#C8F542] text-black flex items-center justify-center">
-                  <Icon name={editing ? 'box' : 'plus'} size={18} />
-                </span>
-                <div className="min-w-0">
-                  <h3 className="text-lg font-bold tracking-tight text-[#16181A] leading-tight truncate">{editing ? 'Upravit položku' : 'Nová položka'}</h3>
-                  <p className="text-xs text-black/45 truncate">{editing ? editing.name : 'Přidejte novou zásobu do skladu'}</p>
-                </div>
-              </div>
-              <button aria-label="Zavřít" type="button" onClick={() => setShowForm(false)} className="shrink-0 btn-icon"><Icon name="close" size={15} /></button>
+  const idFormulare = 'sklad-polozka-formular';
+  const jednotkaPrahu = thresholdUnitLabel(pk(form), form.unit || 'ks');
+
+  return (
+    <>
+      <PlochaWidgetu
+        stranka="vedeni.sklad"
+        hlavicka={{
+          title: 'Sklad',
+          subtitle,
+          hintId: 'inventory',
+          secondary: toBuy.length > 0
+            ? <Button variant="secondary" icon="cart" onClick={() => { setShoppingSupplier(null); setShowShopping(true); }}>Nakoupit ({toBuy.length})</Button>
+            : undefined,
+          menu,
+          primary: smiPridat ? <Button variant="accent" icon="plus" onClick={openNew}>Přidat položku</Button> : undefined,
+        }}
+        nastroj={nastroj}
+      />
+
+      {notice && <Toast message={notice.text} tone={notice.ton} onClose={() => setNotice(null)} />}
+
+      {/* Formulář položky — jedno okno z ui (dřív ruční překryv s blur hlavičkou,
+          limetkovým čtvercem v titulku a limetkou v patičce). */}
+      <Modal open={showForm} onClose={() => setShowForm(false)} size="lg"
+        title={editing ? 'Upravit položku' : 'Nová položka'}
+        subtitle={editing ? editing.name : 'Přidej novou zásobu do skladu.'}
+        footer={<>
+          <Button variant="secondary" onClick={() => setShowForm(false)}>Zrušit</Button>
+          <Button type="submit" form={idFormulare} variant="primary" icon="check" loading={saving}>Uložit položku</Button>
+        </>}>
+        <form id={idFormulare} onSubmit={save} className="space-y-6">
+          {/* Druhá strana provázání: co se z týhle položky na kase prodává.
+              Bez toho člověk mění gramáž nebo cenu naslepo. */}
+          {editing && smiReceptury && (
+            <ItemRecipeLinks
+              item={{ id: editing.id, name: editing.name }}
+              links={posUsage[String(editing.id)] ?? []}
+              unitLabel={editing.contentUnit ?? editing.unit}
+              onChanged={next => setPosUsage(u => ({ ...u, [String(editing.id)]: next }))}
+              onOpenRecipe={pid => { setShowForm(false); onNavigate?.('recipes', pid); }}
+            />
+          )}
+          {/* Z čeho se položka dělá — když ji vyrábíme sami. */}
+          {editing && (
+            <ProductionRecipe
+              item={{ id: editing.id, name: editing.name, unit: editing.unit }}
+              items={items.filter(i => !i.archived)}
+              onSaved={r => setItems(prev => prev.map(x => x.id === r.itemId
+                ? { ...x, madeInHouse: r.madeInHouse, batchYield: r.batchYield, productionLabel: r.productionLabel || null } : x))}
+            />
+          )}
+
+          {/* Skupiny oddělené rozestupem a štítkem (DP §4.D) — dřív šedý box
+              na každou skupinu a v něm další box (karta v kartě). */}
+          <section className="space-y-3" aria-labelledby="sklad-f-zaklad">
+            <p id="sklad-f-zaklad" className="t-label">Základní informace</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field id="sklad-f-nazev" label="Název">
+                <input id="sklad-f-nazev" required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Např. Mléko plnotučné" className={inputClass} />
+              </Field>
+              <Field id="sklad-f-znacka" label="Značka">
+                <input id="sklad-f-znacka" value={form.brand} onChange={e => setForm(f => ({ ...f, brand: e.target.value }))} placeholder="Např. Stanislaw" className={inputClass} />
+              </Field>
             </div>
-
-            <div className="p-6 space-y-4">
-              {/* Druhá strana provázání: co se z týhle položky na kase prodává.
-                  Bez toho člověk mění gramáž nebo cenu naslepo. */}
-              {editing && (
-                <ItemRecipeLinks
-                  item={{ id: editing.id, name: editing.name }}
-                  links={posUsage[String(editing.id)] ?? []}
-                  unitLabel={editing.contentUnit ?? editing.unit}
-                  onChanged={next => setPosUsage(u => ({ ...u, [String(editing.id)]: next }))}
-                  onOpenRecipe={pid => { setShowForm(false); onNavigate?.('recipes', pid); }}
-                />
-              )}
-              {/* Z čeho se položka dělá — když ji vyrábíme sami. */}
-              {editing && (
-                <ProductionRecipe
-                  item={{ id: editing.id, name: editing.name, unit: editing.unit }}
-                  items={items.filter(i => !i.archived)}
-                  onSaved={r => setItems(prev => prev.map(x => x.id === r.itemId
-                    ? { ...x, madeInHouse: r.madeInHouse, batchYield: r.batchYield, productionLabel: r.productionLabel || null } : x))}
-                />
-              )}
-              {/* Section: základ */}
-              <div className="rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4 space-y-4">
-                <p className="flex items-center gap-2 text-xs uppercase tracking-wider text-black/45 font-semibold">
-                  <Icon name="leaf" size={14} className="text-[#5B7A08]" /> Základní informace
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Název</label>
-                    <input required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Např. Mléko plnotučné" className={inputClass} />
-                  </div>
-                  <div>
-                    <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Značka</label>
-                    <input value={form.brand} onChange={e => setForm(f => ({ ...f, brand: e.target.value }))} placeholder="Např. Stanislaw" className={inputClass} />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">
-                    Krátký popis <span className="normal-case tracking-normal text-black/30">· uvidí ho obsluha rovnou na kartě</span>
-                  </label>
-                  <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2}
-                    placeholder="Např. medová, jemná, pro začátečníky"
-                    className={`${inputClass} resize-none`} />
-                </div>
-                <div>
-                  <label className="field-label">Kategorie</label>
-                  {(flatCats.length > 0 || orphanNames.length > 0) && (
-                    <div className="space-y-1.5 mb-2.5 max-h-56 overflow-y-auto scrollbar-thin pr-1">
-                      {flatCats.map(({ cat: c, depth }) => (
-                        <div key={c.id} style={{ paddingLeft: depth * 14 }}
-                          className={depth > 0 ? 'border-l border-black/[0.08] ml-1' : ''}>
-                          <CatChip name={c.zOrganizace ? `${c.name} · z organizace` : c.name} active={form.categoryId === c.id} small={depth > 0}
-                            onPick={() => pickCategory(c.id)} />
-                        </div>
+            <Field id="sklad-f-popis" label="Krátký popis" hint="Uvidí ho obsluha rovnou na kartě.">
+              <textarea id="sklad-f-popis" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2}
+                placeholder="Např. medová, jemná, pro začátečníky"
+                className={`${inputClass} resize-none`} />
+            </Field>
+            <div>
+              <p className="field-label" id="sklad-f-kat">Kategorie</p>
+              {(flatCats.length > 0 || orphanNames.length > 0) && (
+                <div role="group" aria-labelledby="sklad-f-kat" className="space-y-1.5 mb-2.5 max-h-56 overflow-y-auto scrollbar-thin pr-1">
+                  {flatCats.map(({ cat: c, depth }) => (
+                    <div key={c.id} style={{ paddingLeft: depth * 14 }}
+                      className={depth > 0 ? 'border-l border-black/[0.08] ml-1' : ''}>
+                      <CatChip name={c.zOrganizace ? `${c.name} · z organizace` : c.name} active={form.categoryId === c.id} small={depth > 0}
+                        onPick={() => pickCategory(c.id)} />
+                    </div>
+                  ))}
+                  {orphanNames.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {orphanNames.map(c => (
+                        <CatChip key={c} name={c} active={false} onPick={async () => {
+                          if (await createCategory(c)) {
+                            const created = lastCats.current.find((x: any) => x.name === c);
+                            if (created) pickCategory(created.id);
+                          }
+                        }} />
                       ))}
-                      {orphanNames.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 pt-1">
-                          {orphanNames.map(c => (
-                            <CatChip key={c} name={c} active={false} onPick={async () => {
-                              if (await createCategory(c)) {
-                                const created = lastCats.current.find((x: any) => x.name === c);
-                                if (created) pickCategory(created.id);
-                              }
-                            }} />
-                          ))}
-                        </div>
-                      )}
                     </div>
                   )}
-                  <div className="flex gap-2">
-                    <div className="relative flex-1 min-w-0">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-black/30 pointer-events-none"><Icon name="plus" size={14} /></span>
-                      <input value={newCatInline} onChange={e => setNewCatInline(e.target.value)} placeholder="Nová kategorie"
-                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addInlineCategory(); } }}
-                        className={`${inputClass} py-2 pl-8`} />
-                    </div>
-                    <select value={inlineParent} onChange={e => setInlineParent(e.target.value)}
-                      title="Kam novou kategorii zařadit"
-                      className="shrink-0 max-w-[9rem] field border border-black/[0.08] px-3 text-sm text-[#16181A] focus:outline-none focus:border-[#C8F542]/50">
-                      <option value="">Hlavní</option>
-                      {flatOwnCats.map(({ cat: c, depth }) => (
-                        <option key={c.id} value={String(c.id)}>{'\u00A0'.repeat(depth * 2)}pod {c.name}</option>
-                      ))}
-                    </select>
-                    <button type="button" onClick={addInlineCategory} disabled={addingCat || !newCatInline.trim()} className="shrink-0 rounded-2xl glass border border-black/10 text-[#16181A] px-4 text-sm font-medium hover:bg-black/[0.05] disabled:opacity-40">
-                      {addingCat ? '…' : 'Přidat'}
-                    </button>
-                  </div>
                 </div>
-              </div>
-
-              {/* Section: množství */}
-              <div className="rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4 space-y-4">
-                <p className="flex items-center gap-2 text-xs uppercase tracking-wider text-black/45 font-semibold">
-                  <Icon name="box" size={14} className="text-black/40" /> Množství
-                </p>
-                <div className="grid grid-cols-2 gap-3 items-end">
-                  <div className="col-span-2 sm:col-span-1">
-                    <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Aktuální množství</label>
-                    <div className="flex items-center well border border-black/[0.08] p-1 focus-within:border-[#C8F542]/50 focus-within:ring-2 focus-within:ring-[#C8F542]/20 transition">
-                      <button type="button" aria-label="Ubrat" onClick={() => setForm(f => ({ ...f, quantity: String(Math.max(0, (parseInt(f.quantity) || 0) - 1)) }))}
-                        className="well rounded-xl hover:bg-black/[0.08] w-9 h-9 flex items-center justify-center text-lg leading-none text-[#16181A] shrink-0">−</button>
-                      <input type="number" inputMode="numeric" aria-label="Množství" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
-                        className="flex-1 min-w-0 bg-transparent text-center text-sm font-semibold text-[#16181A] focus:outline-none tabular-nums" />
-                      <button type="button" aria-label="Přidat" onClick={() => setForm(f => ({ ...f, quantity: String(Math.max(0, (parseInt(f.quantity) || 0) + 1)) }))}
-                        className="rounded-xl bg-[#C8F542] hover:brightness-110 w-9 h-9 flex items-center justify-center text-lg leading-none text-black shrink-0">+</button>
-                    </div>
-                  </div>
-                  <div className="col-span-1">
-                    <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Jednotka</label>
-                    <input value={form.unit} onChange={e => setForm(f => ({ ...f, unit: e.target.value }))} placeholder="ks" className={inputClass} />
-                  </div>
-                  <div className="col-span-1">
-                    <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Max. množství</label>
-                    <input type="number" inputMode="numeric" aria-label="Maximální množství" value={form.maxQuantity} onChange={e => setForm(f => ({ ...f, maxQuantity: e.target.value }))} className={inputClass} />
-                  </div>
-                </div>
-
-                {/* Partial consumption: any item can say how big one package is
-                    and what's left in the open one — a bottle of wine doesn't
-                    leave whole when one glass is poured. */}
-                <div className="rounded-2xl bg-white/40 border border-black/[0.05] p-3.5 space-y-3">
-                  <p className="text-xs font-semibold text-black/50">
-                    🍾 Načaté balení <span className="font-normal text-black/35">· pro zboží, ze kterého se spotřebovává jen část (lahev vína, plechovka tabáku…)</span>
-                  </p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Velikost balení</label>
-                      <div className="flex gap-2">
-                        <input inputMode="decimal" value={form.packageSize} onChange={e => setForm(f => ({ ...f, packageSize: e.target.value }))}
-                          placeholder={String(pk(form)?.defaultPackageSize ?? '750')} className={`${inputClass} min-w-0`} />
-                        <select aria-label="Jednotka obsahu" value={form.contentUnit} onChange={e => setForm(f => ({ ...f, contentUnit: e.target.value }))}
-                          className={`${inputClass} !w-20 shrink-0 px-2`}>
-                          <option value="">{pk(form)?.contentUnit ?? '—'}</option>
-                          {CONTENT_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                        </select>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">V načatém zbývá</label>
-                      <div className="relative">
-                        <input inputMode="decimal" value={form.openAmount} onChange={e => setForm(f => ({ ...f, openAmount: e.target.value }))}
-                          placeholder="0" className={`${inputClass} pr-12`} />
-                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{form.contentUnit || pk(form)?.contentUnit || ''}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-[11px] text-black/40">
-                    Aktuální množství pak počítá jen zavřená balení; odpisy (ruční i z pokladny) berou nejdřív z načatého.
-                    {pk(form) ? ' Prázdná velikost = výchozí z kategorie.' : ''}
-                  </p>
-
-                  {/* Dílčí díly: pojmenované porce, které pak receptury jen
-                      vybírají — místo aby se 0,02 přepisovalo u každého drinku. */}
-                  <div className="pt-1 space-y-2">
-                    <label className="block text-xs uppercase tracking-wider text-black/45">
-                      Dílčí díly <span className="normal-case tracking-normal text-black/35">— porce k výběru v recepturách</span>
-                    </label>
-                    {(form.portions ?? []).map((p, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <input value={p.name} placeholder="panák"
-                          onChange={e => setForm(f => ({ ...f, portions: f.portions.map((x, i) => i === idx ? { ...x, name: e.target.value } : x) }))}
-                          className={`${inputClass} flex-1`} />
-                        <input value={p.amount} placeholder="0,04" inputMode="decimal"
-                          onChange={e => setForm(f => ({ ...f, portions: f.portions.map((x, i) => i === idx ? { ...x, amount: e.target.value } : x) }))}
-                          className={`${inputClass} !w-24 text-center`} />
-                        <span className="text-xs text-black/40 w-8">{form.contentUnit || pk(form)?.contentUnit || form.unit}</span>
-                        <button aria-label="Zavřít" type="button" onClick={() => setForm(f => ({ ...f, portions: f.portions.filter((_, i) => i !== idx) }))}
-                          className="text-black/30 hover:text-bad-ink transition px-1"><Icon name="close" size={15} /></button>
-                      </div>
-                    ))}
-                    <button type="button"
-                      onClick={() => setForm(f => ({ ...f, portions: [...(f.portions ?? []), { name: '', amount: '' }] }))}
-                      className="tap-target-sm rounded-full glass px-3.5 py-1.5 text-xs font-bold text-[#5B7A08] hover:brightness-110 transition inline-flex items-center gap-1">
-                      <Icon name="plus" size={13} /> Přidat díl
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Section: upozornění */}
-              <div className="rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4 space-y-4">
-                <p className="flex items-center gap-2 text-xs uppercase tracking-wider text-black/45 font-semibold">
-                  <Icon name="warning" size={14} className="text-wait-ink" /> Hlídání zásob
-                  <span className="normal-case tracking-normal text-black/35 font-normal">
-                    · v {thresholdUnitLabel(pk(form), form.unit || 'ks')}
-                  </span>
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-wait-ink/70 mb-1.5">
-                      <span className="w-2 h-2 rounded-full bg-wait" /> Upozornit při
-                    </label>
-                    <div className="relative">
-                      <input type="number" inputMode="numeric" aria-label="Minimální množství" value={form.minQuantity} onChange={e => setForm(f => ({ ...f, minQuantity: e.target.value }))} className={`${inputClass} pr-14`} />
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{thresholdUnitLabel(pk(form), form.unit || 'ks')}</span>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-bad-ink/70 mb-1.5">
-                      <span className="w-2 h-2 rounded-full bg-bad" /> Kriticky málo při
-                    </label>
-                    <div className="relative">
-                      <input type="number" inputMode="numeric" aria-label="Kritické množství" value={form.criticalQuantity} onChange={e => setForm(f => ({ ...f, criticalQuantity: e.target.value }))} className={`${inputClass} pr-14`} />
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{thresholdUnitLabel(pk(form), form.unit || 'ks')}</span>
-                    </div>
-                  </div>
-                </div>
-                {pk(form)?.thresholdUnit === 'content' && (
-                  <p className="text-[11px] text-black/45 rounded-xl bg-[#C8F542]/[0.12] border border-[#C8F542]/25 px-3 py-2">
-                    Kategorie „{findById(categories, form.categoryId)?.name}" hlídá zásoby podle obsahu, ne podle počtu balení — započítá se i zbytek v načatém balení.
-                  </p>
-                )}
-              </div>
-
-              {/* Section: dodavatel */}
-              <div className="rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4 space-y-4">
-                <p className="flex items-center gap-2 text-xs uppercase tracking-wider text-black/45 font-semibold">
-                  <Icon name="send" size={14} className="text-black/40" /> Dodavatel <span className="normal-case tracking-normal text-black/30 font-normal">· volitelné</span>
-                </p>
-                <div>
-                  <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Cena za jednotku</label>
-                  <div className="relative">
-                    <input type="number" inputMode="numeric" aria-label="Cena za jednotku" value={form.unitCost} onChange={e => setForm(f => ({ ...f, unitCost: e.target.value }))} placeholder="0" className={`${inputClass} pr-12`} />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{symbol}/{form.unit || 'ks'}</span>
-                  </div>
-                  <p className="text-[11px] text-black/40 mt-1.5">Slouží k výpočtu hodnoty zásob.</p>
-                </div>
-                <div>
-                  <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Název dodavatele</label>
-                  <input value={form.supplier} onChange={e => setForm(f => ({ ...f, supplier: e.target.value }))} placeholder="Např. Velkoobchod s.r.o." className={inputClass} list="managero-suppliers" />
-                </div>
-                <div>
-                  <label className="block text-xs uppercase tracking-wider text-black/45 mb-1.5">Odkaz na objednání</label>
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black/30 pointer-events-none"><Icon name="send" size={15} /></span>
-                    <input type="url" inputMode="url" value={form.supplierUrl} onChange={e => setForm(f => ({ ...f, supplierUrl: e.target.value }))} placeholder="https://..." className={`${inputClass} !pl-10`} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Section: dostupnost */}
-              <label className="flex items-start gap-2.5 rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4 cursor-pointer">
-                <input type="checkbox" checked={form.archived} onChange={e => setForm(f => ({ ...f, archived: e.target.checked }))}
-                  className="mt-0.5 h-5 w-5 accent-[#C8F542]" />
-                <span className="min-w-0">
-                  <span className="block text-sm font-medium text-[#16181A]">Momentálně nevedeme</span>
-                  <span className="block text-[11px] text-black/45 mt-0.5">
-                    Zůstane v katalogu, ale zmizí z aktivního skladu i z hlídání zásob. Až přijde, jedním klikem ji vrátíš zpět.
-                  </span>
-                </span>
-              </label>
-              <div className="well border border-black/[0.07] p-3.5">
-                <span className="block text-sm font-medium text-[#16181A]">Zvýraznit zákazníkům</span>
-                <span className="block text-[11px] text-black/45 mt-0.5 mb-2">Na sdílené stránce dostane odznak a řadí se nahoru.</span>
-                <div className="flex gap-1.5">
-                  {([['', 'Nic'], ['new', 'Novinka'], ['tip', '👍 Tip']] as const).map(([v, lbl]) => (
-                    <button key={v} type="button" onClick={() => setForm(f => ({ ...f, highlight: v }))}
-                      className={`tap-target-sm rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
-                        form.highlight === v ? 'seg-on' : 'seg-off glass'
-                      }`}>
-                      {lbl}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <label className="flex items-start gap-2.5 well border border-black/[0.07] p-3.5 cursor-pointer">
-                <input type="checkbox" checked={form.hideFromOverview} onChange={e => setForm(f => ({ ...f, hideFromOverview: e.target.checked }))}
-                  className="mt-0.5 h-5 w-5 accent-[#C8F542]" />
-                <span className="min-w-0">
-                  <span className="block text-sm font-medium text-[#16181A]">Jen ve své kategorii</span>
-                  <span className="block text-[11px] text-black/45 mt-0.5">
-                    V přehledu „Vše" se nezobrazí — uvidíš ji až po otevření kategorie. Hlídání zásob funguje dál.
-                  </span>
-                </span>
-              </label>
-            </div>
-
-            {/* Sticky footer */}
-            {editing && itemLog.length > 0 && (
-              <div className="px-6 pb-4">
-                <button type="button" onClick={() => setLogOpen(o => !o)}
-                  className="w-full flex items-center justify-between gap-2 well border border-black/[0.06] px-4 py-3 text-sm font-semibold text-[#16181A]">
-                  <span>🕓 Historie změn ({itemLog.length})</span>
-                  <Icon name="chevron" size={15} className={`text-black/35 transition-transform ${logOpen ? 'rotate-180' : ''}`} />
-                </button>
-                {logOpen && (
-                  <div className="mt-2 rounded-2xl border border-black/[0.06] divide-y divide-black/[0.05] max-h-56 overflow-y-auto scrollbar-thin">
-                    {itemLog.map((l: any) => {
-                      const delta = Number(l.newQuantity) - Number(l.oldQuantity);
-                      // Odpis podle receptury často ubere jen z načatého balení —
-                      // kusy se nezmění a bez tohohle by řádek hlásil „0".
-                      const openDelta = l.oldOpen != null && l.newOpen != null
-                        ? Math.round((Number(l.newOpen) - Number(l.oldOpen)) * 1000) / 1000 : 0;
-                      const label = delta !== 0
-                        ? (delta > 0 ? `+${delta}` : String(delta))
-                        : openDelta !== 0
-                          ? `${openDelta > 0 ? '+' : ''}${openDelta.toLocaleString('cs-CZ', { maximumFractionDigits: 3 })}${l.contentUnit ? ' ' + l.contentUnit : ''}`
-                          : '0';
-                      const tone = delta || openDelta;
-                      return (
-                        <div key={l.id} className="flex items-center gap-2.5 px-4 py-2.5 text-sm">
-                          <span className={`shrink-0 font-bold tabular-nums ${tone > 0 ? 'text-[#5B7A08]' : tone < 0 ? 'text-bad-ink' : 'text-black/40'}`}>
-                            {label}
-                          </span>
-                          <span className="min-w-0 flex-1 truncate text-black/55">
-                            {l.userName ?? 'Někdo'}{l.note ? ` · ${l.note}` : ''}
-                          </span>
-                          <span className="shrink-0 text-xs text-black/35 tabular-nums">
-                            {new Date(l.createdAt).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-            <div className="sticky bottom-0 z-10 px-6 py-4 bg-white/70 backdrop-blur-xl border-t border-black/[0.06] space-y-2.5">
-              {formErr && (
-                <p className="text-sm font-medium text-bad-ink flex items-center gap-1.5">
-                  <Icon name="warning" size={15} /> {formErr}
-                </p>
               )}
-              <div className="flex gap-3">
-              <button type="button" onClick={() => setShowForm(false)} className="flex-1 rounded-full glass border border-black/10 text-[#16181A] py-3 text-sm font-medium hover:bg-black/[0.06] whitespace-nowrap">Zrušit</button>
-              <button type="submit" disabled={saving} className="flex-1 rounded-full bg-[#C8F542] text-black py-3 text-sm font-semibold hover:brightness-110 disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap">
-                <Icon name="check" size={16} />{saving ? 'Ukládám…' : 'Uložit položku'}
-              </button>
+              {smiKategorie && (
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input value={newCatInline} onChange={e => setNewCatInline(e.target.value)} placeholder="Nová kategorie"
+                    aria-label="Nová kategorie"
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addInlineCategory(); } }}
+                    className={`${inputClass} flex-1 min-w-0`} />
+                  <select value={inlineParent} onChange={e => setInlineParent(e.target.value)}
+                    aria-label="Kam novou kategorii zařadit"
+                    className={`${inputClass} !w-full sm:!w-40 shrink-0`}>
+                    <option value="">Hlavní</option>
+                    {flatOwnCats.map(({ cat: c, depth }) => (
+                      <option key={c.id} value={String(c.id)}>{' '.repeat(depth * 2)}pod {c.name}</option>
+                    ))}
+                  </select>
+                  <Button type="button" variant="secondary" icon="plus" onClick={addInlineCategory} loading={addingCat} disabled={!newCatInline.trim()}>Přidat</Button>
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="space-y-3" aria-labelledby="sklad-f-mnozstvi">
+            <p id="sklad-f-mnozstvi" className="t-label">Množství</p>
+            <div className="grid grid-cols-2 gap-3 items-end">
+              <div className="col-span-2 sm:col-span-1">
+                <label htmlFor="sklad-f-q" className="field-label">Aktuální množství</label>
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="secondary" size="sm" iconOnly icon="minus" aria-label="Ubrat"
+                    onClick={() => setForm(f => ({ ...f, quantity: String(Math.max(0, (parseInt(f.quantity) || 0) - 1)) }))} />
+                  <input id="sklad-f-q" type="number" inputMode="numeric" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
+                    className={`${inputClass} flex-1 min-w-0 text-center tabular-nums`} />
+                  <Button type="button" variant="secondary" size="sm" iconOnly icon="plus" aria-label="Přidat"
+                    onClick={() => setForm(f => ({ ...f, quantity: String(Math.max(0, (parseInt(f.quantity) || 0) + 1)) }))} />
+                </div>
+              </div>
+              <Field id="sklad-f-jednotka" label="Jednotka">
+                <input id="sklad-f-jednotka" value={form.unit} onChange={e => setForm(f => ({ ...f, unit: e.target.value }))} placeholder="ks" className={inputClass} />
+              </Field>
+              <Field id="sklad-f-max" label="Max. množství">
+                <input id="sklad-f-max" type="number" inputMode="numeric" value={form.maxQuantity} onChange={e => setForm(f => ({ ...f, maxQuantity: e.target.value }))} className={inputClass} />
+              </Field>
+            </div>
+
+            {/* Partial consumption: any item can say how big one package is
+                and what's left in the open one — a bottle of wine doesn't
+                leave whole when one glass is poured. */}
+            <div className="well p-4 space-y-3">
+              <p className="t-card">Načaté balení</p>
+              <p className="t-meta -mt-2">Pro zboží, ze kterého se spotřebovává jen část (lahev vína, plechovka tabáku…).</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="sklad-f-baleni" className="field-label">Velikost balení</label>
+                  <div className="flex gap-2">
+                    <input id="sklad-f-baleni" inputMode="decimal" value={form.packageSize} onChange={e => setForm(f => ({ ...f, packageSize: e.target.value }))}
+                      placeholder={String(pk(form)?.defaultPackageSize ?? '750')} className={`${inputClass} min-w-0`} />
+                    <select aria-label="Jednotka obsahu" value={form.contentUnit} onChange={e => setForm(f => ({ ...f, contentUnit: e.target.value }))}
+                      className={`${inputClass} !w-20 shrink-0 px-2`}>
+                      <option value="">{pk(form)?.contentUnit ?? '—'}</option>
+                      {CONTENT_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="sklad-f-nacate" className="field-label">V načatém zbývá</label>
+                  <div className="relative">
+                    <input id="sklad-f-nacate" inputMode="decimal" value={form.openAmount} onChange={e => setForm(f => ({ ...f, openAmount: e.target.value }))}
+                      placeholder="0" className={`${inputClass} pr-12`} />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/55">{form.contentUnit || pk(form)?.contentUnit || ''}</span>
+                  </div>
+                </div>
+              </div>
+              <p className="t-meta">
+                Aktuální množství pak počítá jen zavřená balení; odpisy (ruční i z pokladny) berou nejdřív z načatého.
+                {pk(form) ? ' Prázdná velikost = výchozí z kategorie.' : ''}
+              </p>
+
+              {/* Dílčí díly: pojmenované porce, které pak receptury jen
+                  vybírají — místo aby se 0,02 přepisovalo u každého drinku. */}
+              <div className="pt-1 space-y-2">
+                <p className="field-label">Dílčí díly <span className="font-normal text-black/55">— porce k výběru v recepturách</span></p>
+                {(form.portions ?? []).map((p, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <input value={p.name} placeholder="panák" aria-label={`Název dílu ${idx + 1}`}
+                      onChange={e => setForm(f => ({ ...f, portions: f.portions.map((x, i) => i === idx ? { ...x, name: e.target.value } : x) }))}
+                      className={`${inputClass} flex-1 min-w-0`} />
+                    <input value={p.amount} placeholder="0,04" inputMode="decimal" aria-label={`Množství dílu ${idx + 1}`}
+                      onChange={e => setForm(f => ({ ...f, portions: f.portions.map((x, i) => i === idx ? { ...x, amount: e.target.value } : x) }))}
+                      className={`${inputClass} !w-24 text-center`} />
+                    <span className="text-xs text-black/55 w-8">{form.contentUnit || pk(form)?.contentUnit || form.unit}</span>
+                    <Button type="button" variant="ghost" size="sm" iconOnly icon="trash" aria-label={`Odebrat díl ${p.name || idx + 1}`}
+                      onClick={() => setForm(f => ({ ...f, portions: f.portions.filter((_, i) => i !== idx) }))} />
+                  </div>
+                ))}
+                <Button type="button" variant="ghost" size="sm" icon="plus"
+                  onClick={() => setForm(f => ({ ...f, portions: [...(f.portions ?? []), { name: '', amount: '' }] }))}>
+                  Přidat díl
+                </Button>
               </div>
             </div>
-          </form>
-        </div>
-      )}
+          </section>
+
+          <section className="space-y-3" aria-labelledby="sklad-f-hlidani">
+            <p id="sklad-f-hlidani" className="t-label">Hlídání zásob · v {jednotkaPrahu}</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="sklad-f-min" className="field-label flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-wait" aria-hidden /> Upozornit při</label>
+                <div className="relative">
+                  <input id="sklad-f-min" type="number" inputMode="numeric" value={form.minQuantity} onChange={e => setForm(f => ({ ...f, minQuantity: e.target.value }))} className={`${inputClass} pr-14`} />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/55">{jednotkaPrahu}</span>
+                </div>
+              </div>
+              <div>
+                <label htmlFor="sklad-f-krit" className="field-label flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-bad" aria-hidden /> Kriticky málo při</label>
+                <div className="relative">
+                  <input id="sklad-f-krit" type="number" inputMode="numeric" value={form.criticalQuantity} onChange={e => setForm(f => ({ ...f, criticalQuantity: e.target.value }))} className={`${inputClass} pr-14`} />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/55">{jednotkaPrahu}</span>
+                </div>
+              </div>
+            </div>
+            {pk(form)?.thresholdUnit === 'content' && (
+              <p className="note note-info text-[13px]">
+                Kategorie „{findById(categories, form.categoryId)?.name}" hlídá zásoby podle obsahu, ne podle počtu balení — započítá se i zbytek v načatém balení.
+              </p>
+            )}
+          </section>
+
+          <section className="space-y-3" aria-labelledby="sklad-f-dodavatel">
+            <p id="sklad-f-dodavatel" className="t-label">Dodavatel · volitelné</p>
+            {ma('sklad.ceny_upravit') && (
+              <Field id="sklad-f-cena" label="Cena za jednotku" hint="Slouží k výpočtu hodnoty zásob a marže.">
+                <div className="relative">
+                  <input id="sklad-f-cena" type="number" inputMode="numeric" value={form.unitCost} onChange={e => setForm(f => ({ ...f, unitCost: e.target.value }))} placeholder="0" className={`${inputClass} pr-12`} />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/55">{symbol}/{form.unit || 'ks'}</span>
+                </div>
+              </Field>
+            )}
+            <Field id="sklad-f-dod" label="Název dodavatele">
+              <input id="sklad-f-dod" value={form.supplier} onChange={e => setForm(f => ({ ...f, supplier: e.target.value }))} placeholder="Např. Velkoobchod s.r.o." className={inputClass} list="managero-suppliers" />
+            </Field>
+            <Field id="sklad-f-url" label="Odkaz na objednání">
+              <input id="sklad-f-url" type="url" inputMode="url" value={form.supplierUrl} onChange={e => setForm(f => ({ ...f, supplierUrl: e.target.value }))} placeholder="https://..." className={inputClass} />
+            </Field>
+          </section>
+
+          <section className="space-y-3" aria-labelledby="sklad-f-zobrazeni">
+            <p id="sklad-f-zobrazeni" className="t-label">Zobrazení</p>
+            <ul className="list">
+              <SwitchRow title="Momentálně nevedeme"
+                hint="Zůstane v katalogu, ale zmizí z aktivního skladu i z hlídání zásob. Až přijde, jedním klepnutím ji vrátíš."
+                checked={form.archived} onChange={v => setForm(f => ({ ...f, archived: v }))} />
+              <SwitchRow title="Jen ve své kategorii"
+                hint="V přehledu „Vše“ se nezobrazí — uvidíš ji až po otevření kategorie. Hlídání zásob funguje dál."
+                checked={form.hideFromOverview} onChange={v => setForm(f => ({ ...f, hideFromOverview: v }))} />
+              <li className="py-3">
+                <p className="text-sm font-medium text-[#16181A]" id="sklad-f-zvyraznit">Zvýraznit zákazníkům</p>
+                <p className="t-meta mt-0.5 mb-2">Na sdílené stránce dostane odznak a řadí se nahoru.</p>
+                <Segmented ariaLabel="Zvýraznit zákazníkům" size="sm" value={(form.highlight || 'nic') as 'nic' | 'new' | 'tip'}
+                  onChange={v => setForm(f => ({ ...f, highlight: v === 'nic' ? '' : v }))}
+                  options={[{ id: 'nic', label: 'Nic' }, { id: 'new', label: 'Novinka' }, { id: 'tip', label: 'Tip' }]} />
+              </li>
+            </ul>
+          </section>
+
+          {editing && itemLog.length > 0 && (
+            <section className="space-y-2">
+              <Button type="button" variant="ghost" size="sm" iconAfter="chevron" aria-expanded={logOpen}
+                className={logOpen ? '[&_svg]:rotate-180' : ''} onClick={() => setLogOpen(o => !o)}>
+                Historie změn ({itemLog.length})
+              </Button>
+              {logOpen && (
+                <ul className="list max-h-56 overflow-y-auto scrollbar-thin">
+                  {itemLog.map((l: any) => {
+                    const delta = Number(l.newQuantity) - Number(l.oldQuantity);
+                    // Odpis podle receptury často ubere jen z načatého balení —
+                    // kusy se nezmění a bez tohohle by řádek hlásil „0".
+                    const openDelta = l.oldOpen != null && l.newOpen != null
+                      ? Math.round((Number(l.newOpen) - Number(l.oldOpen)) * 1000) / 1000 : 0;
+                    const label = delta !== 0
+                      ? (delta > 0 ? `+${delta}` : `−${Math.abs(delta)}`)
+                      : openDelta !== 0
+                        ? `${openDelta > 0 ? '+' : '−'}${Math.abs(openDelta).toLocaleString('cs-CZ', { maximumFractionDigits: 3 })}${l.contentUnit ? ' ' + l.contentUnit : ''}`
+                        : '0';
+                    const tone = delta || openDelta;
+                    return (
+                      <ListRow key={l.id}
+                        title={`${l.userName ?? 'Někdo'}${l.note ? ` · ${l.note}` : ''}`}
+                        meta={new Date(l.createdAt).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        value={<span className={tone > 0 ? 'text-ok-ink' : tone < 0 ? 'text-bad-ink' : 'text-black/55'}>{label}</span>} />
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+          )}
+          {formErr && <p className="note note-danger" role="alert">{formErr}</p>}
+        </form>
+      </Modal>
 
       {/* Lišta, ze které tenhle vzor vzešel — teď už sdílená komponenta,
           takže vypadá stejně tady i ve frontách ke schválení. */}
@@ -1287,10 +1153,10 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
           onSelectAll={() => setSelected(new Set(filtered.map(i => i.id)))}
           onExit={exitSelection}
           actions={[
-            { label: 'Upravit', primary: true, onClick: () => setShowBulk(true) },
-            { label: showArchived ? 'Naskladnit' : 'Odložit',
-              onClick: async () => { if (await bulkPatch({ archived: !showArchived })) exitSelection(); } },
-            { label: 'Smazat', danger: true, onClick: bulkDelete },
+            ...(smiUpravit ? [{ label: 'Upravit', primary: true, onClick: () => setShowBulk(true) }] : []),
+            ...(smiUpravit ? [{ label: showArchived ? 'Naskladnit' : 'Odložit',
+              onClick: async () => { if (await bulkPatch({ archived: !showArchived })) exitSelection(); } }] : []),
+            ...(smiMazat ? [{ label: 'Smazat', danger: true, onClick: bulkDelete }] : []),
           ]}
         />
       )}
@@ -1300,6 +1166,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
           count={selected.size}
           categories={categories}
           symbol={symbol}
+          smiCenu={ma('sklad.ceny_upravit')}
           onClose={() => setShowBulk(false)}
           onApply={async patch => {
             const ok = await bulkPatch(patch);
@@ -1315,6 +1182,7 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
           onClose={() => setShowCats(false)}
           onChanged={load}
           createCategory={createCategory}
+          potvrdit={setPotvrzeni}
         />
       )}
 
@@ -1323,114 +1191,95 @@ export default function Inventory({ user, initialCategory, onNavigate }: {
       </datalist>
 
       {showSuppliers && (
-        <SuppliersModal suppliers={suppliers} onClose={() => setShowSuppliers(false)}
-          onChanged={async () => {
-            const d = await fetch('/api/suppliers').then(okJson).catch(() => ({}));
-            setSuppliers(Array.isArray(d.suppliers) ? d.suppliers : []);
-          }} />
+        <SuppliersModal suppliers={suppliers} smiUpravit={ma('dodavatele.upravit')} onClose={() => setShowSuppliers(false)}
+          onChanged={nactiDodavatele} potvrdit={setPotvrzeni} />
       )}
 
       {showStocktake && (
-        <StocktakeModal isEmployer onClose={() => setShowStocktake(false)} onApplied={load} />
+        <StocktakeModal smiZahajit={ma('inventura.spravovat')} smiDokoncit={ma('inventura.dokoncit')} smiZtraty={ma('finance.ztraty')} onClose={() => { setShowStocktake(false); obnovDataWidgetu('/api/stocktake'); }} onApplied={load} />
       )}
 
-      {showReports && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center modal-overlay p-4" onClick={() => setShowReports(false)}>
-          <div ref={reportsModal.ref} {...reportsModal.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
-            <DiscardGuard guard={reportsModal.guard} />
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <h3 className="t-card"><Icon name="box" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Hlášení ze skladu</h3>
-              <button aria-label="Zavřít" onClick={() => setShowReports(false)} className="btn-icon"><Icon name="close" size={15} /></button>
-            </div>
-            {reports.length === 0 ? (
-              <p className="text-black/45 text-sm text-center py-8">Žádná hlášení od zaměstnanců.</p>
-            ) : (
-              <div className="space-y-3">
-                {reports.map(r => {
-                  let list: any[] = [];
-                  try { list = typeof r.items === 'string' ? JSON.parse(r.items) : (r.items ?? []); } catch {}
-                  const done = r.status === 'done';
-                  return (
-                    <div key={r.id} className={`rounded-2xl border p-4 ${done ? 'border-black/[0.06] opacity-60' : 'border-wait/25 bg-wait/[0.04]'}`}>
-                      <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
-                        <p className="text-sm font-semibold text-[#16181A] min-w-0">
-                          {r.author_avatar ?? '👤'} {r.author_name ?? 'Zaměstnanec'}
-                          <span className="font-normal text-black/40"> · {new Date(r.created_at).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                        </p>
-                        <button
-                          onClick={() => {
-                            const wanted: Item[] = [];
-                            list.forEach((it: any) => {
-                              const id = typeof it === 'number' ? it : it?.id;
-                              const found = items.find(x => x.id === id)
-                                ?? items.find(x => x.name === (typeof it === 'string' ? it : it?.name));
-                              if (found && !wanted.some(w => w.id === found.id)) wanted.push(found);
-                            });
-                            setShoppingExtra(wanted);
-                            setShowReports(false);
-                            setShowShopping(true);
-                          }}
-                          className="tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition glass text-[#5B7A08] hover:brightness-105"
-                        >
-                          <Icon name="cart" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Do nákupu
-                        </button>
-                        <button
-                          onClick={async () => {
-                            const res = await fetch('/api/inventory/reports', {
-                              method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ id: r.id, status: done ? 'new' : 'done' }),
-                            });
-                            if (res.ok) setReports(prev => prev.map(x => x.id === r.id ? { ...x, status: done ? 'new' : 'done' } : x));
-                          }}
-                          className={`tap-target-sm rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition ${
-                            done ? 'glass text-black/50 hover:text-black' : 'bg-[#16181A] text-white hover:bg-black'
-                          }`}>
-                          {done ? 'Vyřízeno' : 'Označit vyřízené'}
-                        </button>
-                      </div>
-                      {list.length > 0 && (
-                        <ul className="text-sm text-black/70 space-y-0.5">
-                          {list.map((it: any, i: number) => (
-                            <li key={i} className="flex items-baseline gap-2">
-                              <span className="text-black/30">•</span>
-                              <span className="min-w-0">{
-                                typeof it === 'string' ? it
-                                : typeof it === 'number' ? (items.find(x => x.id === it)?.name ?? `Položka #${it}`)
-                                : `${it.name ?? it.title ?? '?'}${it.quantity ? ` — ${it.quantity}` : ''}${it.note ? ` (${it.note})` : ''}`
-                              }</span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                      {r.note && <p className="text-sm text-black/50 mt-1.5 italic">„{r.note}"</p>}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      <Modal open={showReports} onClose={() => setShowReports(false)} size="md" title="Hlášení ze skladu"
+        subtitle="Co tým nahlásil jako docházející nebo chybějící.">
+        {reports.length === 0 ? (
+          <p className="t-meta">Žádná hlášení od týmu.</p>
+        ) : (
+          <ul className="list">
+            {reports.map(r => {
+              let list: any[] = [];
+              try { list = typeof r.items === 'string' ? JSON.parse(r.items) : (r.items ?? []); } catch { list = []; }
+              const done = r.status === 'done';
+              const nazvy = list.map((it: any) =>
+                typeof it === 'string' ? it
+                  : typeof it === 'number' ? (items.find(x => x.id === it)?.name ?? `Položka #${it}`)
+                    : `${it.name ?? it.title ?? '?'}${it.quantity ? ` — ${it.quantity}` : ''}${it.note ? ` (${it.note})` : ''}`);
+              return (
+                <li key={r.id}>
+                  <ListRow as="div"
+                    lead={<Avatar emoji={r.author_avatar} size="sm" />}
+                    title={nazvy.length > 0 ? nazvy.join(', ') : 'Bez položek'}
+                    meta={[r.author_name ?? 'Zaměstnanec',
+                      new Date(r.created_at).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                      r.note ? `„${r.note}"` : null].filter(Boolean).join(' · ')}
+                    right={!done ? <Chip tone="wait" size="sm">nové</Chip> : undefined}
+                    actions={<>
+                      <Button variant="secondary" size="sm" icon="cart" onClick={() => {
+                        const wanted: Item[] = [];
+                        list.forEach((it: any) => {
+                          const id = typeof it === 'number' ? it : it?.id;
+                          const found = items.find(x => x.id === id)
+                            ?? items.find(x => x.name === (typeof it === 'string' ? it : it?.name));
+                          if (found && !wanted.some(w => w.id === found.id)) wanted.push(found);
+                        });
+                        setShoppingExtra(wanted);
+                        setShowReports(false);
+                        setShoppingSupplier(null);
+                        setShowShopping(true);
+                      }}>Do nákupu</Button>
+                      <Button variant={done ? 'ghost' : 'primary'} size="sm" onClick={async () => {
+                        const res = await fetch('/api/inventory/reports', {
+                          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ id: r.id, status: done ? 'new' : 'done' }),
+                        }).catch(() => null);
+                        if (res?.ok) {
+                          setReports(prev => prev.map(x => x.id === r.id ? { ...x, status: done ? 'new' : 'done' } : x));
+                          obnovDataWidgetu('/api/inventory/reports');
+                        } else showNotice('Uložení se nepodařilo.', 'bad');
+                      }}>{done ? 'Znovu otevřít' : 'Vyřízeno'}</Button>
+                    </>}
+                  />
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Modal>
 
       {showShopping && (
         <ShoppingListModal
           suppliers={suppliers}
-          items={[...toBuy, ...shoppingExtra.filter(e => !toBuy.some(t => t.id === e.id))]}
+          items={[...toBuy, ...shoppingExtra.filter(e => !toBuy.some(t => t.id === e.id))]
+            .filter(i => !shoppingSupplier || (i.supplier ?? '').trim() === shoppingSupplier)}
           pk={pk}
-          onClose={() => { setShowShopping(false); setShoppingExtra([]); }}
-          onOrdered={async (count) => {
+          smiObjednat={smiObjednat}
+          smiOdeslat={ma('nakup.odeslat')}
+          onClose={() => { setShowShopping(false); setShoppingExtra([]); setShoppingSupplier(null); }}
+          onOrdered={(count, zadano) => {
             setShowShopping(false);
             setShoppingExtra([]);
+            setShoppingSupplier(null);
             if (count > 0) {
-              showNotice(count === 1 ? 'Objednávka vytvořena ✓' : count <= 4 ? `Vytvořeny ${count} objednávky ✓` : `Vytvořeno ${count} objednávek ✓`);
-              await loadOrders();
+              showNotice(count === zadano ? `Vytvořeno: ${czCount(count, OBJEDNAVKA)}.` : `Vytvořeno ${count} z ${czCount(zadano, OBJEDNAVKA)} — zbytek zkus znovu.`, count === zadano ? undefined : 'bad');
+              obnovDataWidgetu('/api/orders');
             } else {
-              showNotice('Objednávku se nepodařilo vytvořit');
+              showNotice('Objednávku se nepodařilo vytvořit.', 'bad');
             }
           }}
         />
       )}
-    </div>
+      {/* Potvrzení až na konci: otevírá se i nad oknem kategorií a dodavatelů. */}
+      {potvrzeni && <OknoPotvrzeni p={potvrzeni} onZavrit={() => setPotvrzeni(null)} />}
+    </>
   );
 }
 
@@ -1451,19 +1300,20 @@ const BULK_FIELDS: { key: string; label: string; kind: 'text' | 'number' | 'url'
   { key: 'supplierUrl', label: 'Odkaz na objednání', kind: 'url' },
 ];
 
-function BulkEditModal({ count, categories, symbol, onClose, onApply }: {
+function BulkEditModal({ count, categories, symbol, smiCenu, onClose, onApply }: {
   count: number;
   categories: Category[];
   symbol: string;
+  smiCenu: boolean;
   onClose: () => void;
   onApply: (patch: Record<string, any>) => Promise<boolean>;
 }) {
-  const bm = useModal(true, onClose, 'Hromadná úprava položek');
   const [on, setOn] = useState<Record<string, boolean>>({});
   const [values, setValues] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const flat = useMemo(() => flattenTree(categories), [categories]);
-  const chosen = BULK_FIELDS.filter(f => on[f.key]);
+  const pole = BULK_FIELDS.filter(f => f.key !== 'unitCost' || smiCenu);
+  const chosen = pole.filter(f => on[f.key]);
 
   const apply = async () => {
     setBusy(true);
@@ -1479,286 +1329,152 @@ function BulkEditModal({ count, categories, symbol, onClose, onApply }: {
   };
 
   return (
-    <div className="fixed inset-0 modal-overlay z-50 flex items-end md:items-center justify-center md:p-4" onClick={onClose}>
-      <div ref={bm.ref} {...bm.dialogProps} onClick={e => e.stopPropagation()} className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-lg max-h-[88vh] overflow-y-auto scrollbar-thin p-6 space-y-4">
-        <DiscardGuard guard={bm.guard} />
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <h3 className="t-card">Hromadná úprava</h3>
-            <p className="text-xs text-black/45">Změní se {count} {pluralPolozka(count)} — jen zaškrtnutá pole.</p>
-          </div>
-          <button onClick={bm.guard.attemptClose} className="shrink-0 btn-icon" aria-label="Zavřít"><Icon name="close" size={15} /></button>
-        </div>
-
-        <div className="space-y-2">
-          {BULK_FIELDS.map(f => (
-            <div key={f.key} className={`rounded-2xl border p-3 transition ${
-              on[f.key] ? 'bg-[#C8F542]/[0.10] border-[#C8F542]/30' : 'bg-black/[0.02] border-black/[0.06]'
-            }`}>
+    <Modal open onClose={onClose} size="md" title="Hromadná úprava"
+      subtitle={`Změní se ${czCount(count, POLOZKA)} — jen zaškrtnutá pole.`}
+      footer={<>
+        <Button variant="secondary" onClick={onClose}>Zrušit</Button>
+        <Button variant="primary" loading={busy} disabled={chosen.length === 0} onClick={apply}>
+          {`Použít na ${czCount(count, POLOZKA)}`}
+        </Button>
+      </>}>
+      <ul className="list">
+        {pole.map(f => {
+          const id = `sklad-hromadne-${f.key}`;
+          return (
+            <li key={f.key} className="py-3">
               <label className="flex items-center gap-2.5 cursor-pointer">
                 <input type="checkbox" checked={!!on[f.key]}
                   onChange={e => setOn(v => ({ ...v, [f.key]: e.target.checked }))}
-                  className="h-4 w-4 accent-[#C8F542]" />
+                  className="h-4 w-4 accent-[#16181A]" />
                 <span className="text-sm font-medium text-[#16181A]">{f.label}</span>
               </label>
               {on[f.key] && (
                 <div className="mt-2.5">
                   {f.kind === 'category' ? (
-                    <select value={values[f.key] ?? ''} onChange={e => setValues(v => ({ ...v, [f.key]: e.target.value }))}
-                      className={`${inputClass} py-2`}>
+                    <select id={id} aria-label={f.label} value={values[f.key] ?? ''} onChange={e => setValues(v => ({ ...v, [f.key]: e.target.value }))}
+                      className={inputClass}>
                       <option value="">— vyber kategorii —</option>
                       {flat.map(({ cat: c, depth }) => (
-                        <option key={c.id} value={String(c.id)}>{'\u00A0'.repeat(depth * 2)}{c.name}{c.zOrganizace ? ' \u00B7 z organizace' : ''}</option>
+                        <option key={c.id} value={String(c.id)}>{' '.repeat(depth * 2)}{c.name}{c.zOrganizace ? ' · z organizace' : ''}</option>
                       ))}
                     </select>
                   ) : f.kind === 'multiline' ? (
-                    <textarea rows={2} value={values[f.key] ?? ''} onChange={e => setValues(v => ({ ...v, [f.key]: e.target.value }))}
+                    <textarea id={id} aria-label={f.label} rows={2} value={values[f.key] ?? ''} onChange={e => setValues(v => ({ ...v, [f.key]: e.target.value }))}
                       placeholder="Prázdné pole popis smaže"
-                      className={`${inputClass} py-2 resize-none`} />
+                      className={`${inputClass} resize-none`} />
                   ) : (
                     <div className="relative">
-                      <input type={f.kind === 'number' ? 'number' : f.kind === 'url' ? 'url' : 'text'}
+                      <input id={id} aria-label={f.label} type={f.kind === 'number' ? 'number' : f.kind === 'url' ? 'url' : 'text'}
+                        inputMode={f.kind === 'number' ? 'decimal' : undefined}
                         value={values[f.key] ?? ''} onChange={e => setValues(v => ({ ...v, [f.key]: e.target.value }))}
                         placeholder={f.kind === 'text' || f.kind === 'url' ? 'Prázdné pole hodnotu smaže' : ''}
-                        className={`${inputClass} py-2 ${f.key === 'unitCost' ? 'pr-12' : ''}`} />
+                        className={`${inputClass} ${f.key === 'unitCost' ? 'pr-12' : ''}`} />
                       {f.key === 'unitCost' && (
-                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{symbol}</span>
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/55">{symbol}</span>
                       )}
                     </div>
                   )}
                 </div>
               )}
-            </div>
-          ))}
-        </div>
-
-        <div className="flex gap-3 sticky bottom-0 bg-white/70 backdrop-blur-xl -mx-6 px-6 py-3 border-t border-black/[0.06]">
-          <button onClick={onClose} className="flex-1 rounded-full glass border border-black/10 text-[#16181A] py-3 text-sm font-medium hover:bg-black/[0.06]">Zrušit</button>
-          <button onClick={apply} disabled={busy || chosen.length === 0}
-            className="flex-1 rounded-full bg-[#C8F542] text-black py-3 text-sm font-semibold hover:brightness-110 disabled:opacity-40">
-            {busy ? 'Ukládám…' : `Použít na ${count} ${pluralPolozka(count)}`}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ---------- Selection tick ---------- */
-function Tick({ on, className = '' }: { on: boolean; className?: string }) {
-  return (
-    <span className={`shrink-0 w-5 h-5 rounded-full border flex items-center justify-center transition ${
-      on ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/20'
-    } ${className}`}>
-      {on && <Icon name="check" size={13} />}
-    </span>
+            </li>
+          );
+        })}
+      </ul>
+    </Modal>
   );
 }
 
 /* ---------- One category chip in the item form ---------- */
+// Vybraná kategorie je inkoustová pilulka (DP §3.8) — dřív limetková, jako by šlo o akci.
 function CatChip({ name, active, small, onPick }: {
   name: string; active: boolean; small?: boolean; onPick: () => void;
 }) {
   return (
-    <button type="button" onClick={onPick}
-      className={`tap-target-sm rounded-full font-medium transition inline-flex items-center gap-1.5 ${
-        small ? 'px-3 py-1 text-[11px]' : 'px-3.5 py-1.5 text-xs'
-      } ${active ? 'bg-[#C8F542] text-black' : 'glass text-black/55 hover:text-black'}`}>
-      {active && <Icon name="check" size={small ? 11 : 13} />}{name}
+    <button type="button" onClick={onPick} aria-pressed={active}
+      className={`filter-pill tap-target-sm inline-flex items-center gap-1.5 ${small ? '!text-[12px]' : ''} ${active ? 'seg-on' : 'seg-off glass'}`}>
+      {active && <Icon name="check" size={small ? 12 : 13} />}{name}
     </button>
   );
 }
 
-/* ---------- Everything else, behind one button ---------- */
-// The stock header used to carry six controls at once. Only adding an item and
-// sorting stay in the open; the rest lives here so the toolbar is two controls.
-function MoreMenu({
-  view, setView, onSelect, selecting, onCategories, onShopping, shoppingCount,
-  archivedCount, showArchived, onToggleArchived,
-}: {
-  view: View; setView: (v: View) => void;
-  onSelect: () => void; selecting: boolean;
-  onCategories: () => void;
-  onShopping?: () => void; shoppingCount: number;
-  archivedCount: number; showArchived: boolean; onToggleArchived: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  // Escape, kliknutí mimo, šipky i návrat fokusu drží společný `usePopover`
-  // — stejně jako sdílené menu „···", zvonek a účet.
-  const pop = usePopover(open, setOpen, { focusFirst: true, arrowKeys: true });
+/** Akce řádku položky: nejvýš dvě tlačítka, zbytek v „···" (DP §3.6). */
+function akcePolozky(i: Item, h: { openEdit?: (i: Item) => void; remove?: (i: Item) => void; setArchived?: (i: Item, a: boolean) => void; objednat?: boolean }): MenuItem[] {
+  return [
+    // Seznam nemá pro odkaz na dodavatele místo v řádku (akce nejvýš dvě),
+    // tak jde do „···" — dřív ho měl řádek i karta a kdo přes něj objednával,
+    // v seznamu ho po kole 69 nenašel. Karty mají vlastní tlačítko „Objednat".
+    ...(h.objednat && i.supplierUrl ? [{ label: 'Objednat u dodavatele', icon: 'external', onClick: () => { window.open(i.supplierUrl, '_blank', 'noopener'); } }] : []),
+    ...(h.openEdit ? [{ label: 'Upravit položku', icon: 'pencil', onClick: () => h.openEdit!(i) }] : []),
+    ...(h.setArchived ? [{ label: i.archived ? 'Vrátit do skladu' : 'Momentálně nevedeme', icon: 'archive', onClick: () => h.setArchived!(i, !i.archived) }] : []),
+    ...(h.remove ? [{ label: 'Smazat položku…', icon: 'trash', danger: true, onClick: () => h.remove!(i) }] : []),
+  ];
+}
 
-  const row = 'w-full text-left px-3 py-2.5 rounded-xl text-sm flex items-center gap-2.5 transition-colors text-[#16181A] hover:bg-black/[0.04]';
-
+/** Krokovač ± (ikonová tlačítka s popiskem — dřív holé znaky − a + bez aria-label). */
+function Krokovac({ i, step }: { i: Item; step: (i: Item, d: number) => void }) {
   return (
-    <div ref={pop.ref} className="relative shrink-0">
-      <button ref={pop.triggerRef} type="button" onClick={() => setOpen(o => !o)}
-        onKeyDown={pop.onTriggerKeyDown} aria-haspopup="menu" aria-expanded={open} title="Další"
-        className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] w-11 h-11 flex items-center justify-center">
-        <Icon name="menu" size={17} className="text-black/50" />
-      </button>
-      {open && (
-        <div role="menu" ref={pop.panelRef} onKeyDown={pop.onPanelKeyDown}
-          className="absolute right-0 mt-2 w-64 max-w-[calc(100vw-3rem)] z-30 rounded-2xl glass-strong border border-black/[0.08] shadow-xl shadow-black/10 p-1.5 space-y-0.5">
-          <button className={row} onClick={() => { onSelect(); setOpen(false); }} disabled={selecting}>
-            <Icon name="check" size={16} className="text-black/40" /> Vybrat více položek
-          </button>
-          <button className={row} onClick={() => { onCategories(); setOpen(false); }}>
-            <Icon name="settings" size={16} className="text-black/40" /> Kategorie a balení
-          </button>
-          {onShopping && (
-            <button className={row} onClick={() => { onShopping(); setOpen(false); }}>
-              <span className="w-4 text-center" aria-hidden><Icon name="cart" size={15} /></span> Nákupní seznam
-              <span className="ml-auto text-xs text-black/35 tabular-nums">{shoppingCount}</span>
-            </button>
-          )}
-          {(archivedCount > 0 || showArchived) && (
-            <button className={row} onClick={() => { onToggleArchived(); setOpen(false); }}>
-              <Icon name="box" size={16} className="text-black/40" />
-              {showArchived ? 'Zpět na aktivní sklad' : 'Momentálně nevedeme'}
-              {!showArchived && <span className="ml-auto text-xs text-black/35 tabular-nums">{archivedCount}</span>}
-            </button>
-          )}
-
-          <div className="border-t border-black/[0.06] pt-1.5 mt-1.5">
-            <p className="px-3 pb-1 text-[11px] uppercase tracking-wider text-black/35 font-semibold">Zobrazení</p>
-            <div className="flex gap-1 px-1.5 pb-0.5">
-              {([['grid', 'Karty', 'trend'], ['list', 'Seznam', 'box']] as const).map(([v, label, icon]) => (
-                <button key={v} onClick={() => { setView(v); setOpen(false); }}
-                  className={`flex-1 rounded-xl px-3 py-2 text-xs font-medium flex items-center justify-center gap-1.5 transition ${
-                    view === v ? 'seg-on' : 'seg-off'
-                  }`}>
-                  <Icon name={icon} size={14} /> {label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    <span className="flex items-center gap-1">
+      <Button variant="secondary" size="sm" iconOnly icon="minus" aria-label={`Ubrat — ${i.name}`} onClick={() => step(i, -1)} />
+      <Button variant="secondary" size="sm" iconOnly icon="plus" aria-label={`Přidat — ${i.name}`} onClick={() => step(i, 1)} />
+    </span>
   );
 }
 
-/* ---------- Sort dropdown (custom popover) ---------- */
-function SortMenu({ sort, setSort }: { sort: SortKey; setSort: (k: SortKey) => void }) {
-  const [open, setOpen] = useState(false);
-  // Escape, kliknutí mimo, šipky i návrat fokusu drží společný `usePopover`
-  // — stejně jako sdílené menu „···", zvonek a účet.
-  const pop = usePopover(open, setOpen, { focusFirst: true, arrowKeys: true });
-  const current = SORTS.find(s => s.key === sort) ?? SORTS[0];
-  return (
-    <div ref={pop.ref} className="relative min-w-0">
-      <button ref={pop.triggerRef} type="button" onClick={() => setOpen(o => !o)}
-        onKeyDown={pop.onTriggerKeyDown} aria-haspopup="listbox" aria-expanded={open}
-        className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] px-4 py-2.5 text-sm flex items-center gap-2 font-medium min-w-0 max-w-full">
-        <Icon name="swap" size={15} className="text-black/40 shrink-0" />
-        <span className="truncate min-w-0">{current.label}</span>
-        <Icon name="chevron" size={14} className={`text-black/40 transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-      {open && (
-        <div role="listbox" ref={pop.panelRef} onKeyDown={pop.onPanelKeyDown}
-          className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-3rem)] z-30 rounded-2xl glass-strong border border-black/[0.08] shadow-xl shadow-black/10 p-1.5">
-          {SORTS.map(s => {
-            const active = s.key === sort;
-            return (
-              <button key={s.key} role="option" aria-selected={active} type="button"
-                onClick={() => { setSort(s.key); setOpen(false); }}
-                className={`w-full text-left px-3 py-2 rounded-xl text-sm flex items-center justify-between gap-2 transition-colors ${active ? 'bg-[#C8F542]/20 text-[#5B7A08] font-semibold' : 'text-[#16181A] hover:bg-black/[0.04]'}`}>
-                <span>{s.label}</span>
-                {active && <Icon name="check" size={15} />}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
+const stavPopisek = (st: 'ok' | 'low' | 'critical', vyroba?: boolean) =>
+  st === 'critical' ? (vyroba ? 'Vyrobit' : 'Kriticky') : st === 'low' ? (vyroba ? 'Vyrobit' : 'Dochází') : 'OK';
 
-/* ---------- List view (dense rows) ---------- */
+/* ---------- List view: jedna karta s linkami (DP §3.6) ---------- */
 function ListView({ items, step, openEdit, remove, pk, setArchived, selecting, selected, onToggle, onConsumed, onConsumeFail }: {
-  items: Item[]; step: (i: Item, d: number) => void; openEdit: (i: Item) => void; remove: (i: Item) => void;
-  pk: PackagingLookup; setArchived: (i: Item, archived: boolean) => void;
+  items: Item[]; step?: (i: Item, d: number) => void; openEdit?: (i: Item) => void; remove?: (i: Item) => void;
+  pk: PackagingLookup; setArchived?: (i: Item, archived: boolean) => void;
   selecting: boolean; selected: Set<number>; onToggle: (id: number) => void;
   onConsumed: (updated: any) => void; onConsumeFail: () => void;
 }) {
   return (
-    <div className="glass-card overflow-hidden">
-      <div className="hidden md:grid grid-cols-[auto_1fr_140px_200px_auto] gap-3 px-4 py-2.5 border-b border-black/[0.06] text-[11px] uppercase tracking-wider text-black/40 font-semibold">
-        <span className="w-2" />
-        <span>Položka</span>
-        <span>Kategorie</span>
-        <span>Množství</span>
-        <span className="text-right">Akce</span>
-      </div>
-      <div className="divide-y divide-black/[0.06]">
+    <Card pad="none" className="px-5">
+      <ul className="list">
         {items.map(i => {
           const st = statusOf(i, pk);
-          const pct = Math.min(100, Math.round((i.quantity / Math.max(1, i.maxQuantity)) * 100));
-          const dot = st === 'critical' ? 'bg-bad' : st === 'low' ? 'bg-wait' : 'bg-[#C8F542]';
-          const bar = st === 'critical' ? 'bg-bad' : st === 'low' ? 'bg-wait' : 'bg-[#C8F542]';
+          const cu = itemContentUnit(i, pk(i));
+          const mnozstvi = Number(i.packageSize) > 0 ? formatStock(i, cu, i.unit) : `${i.quantity} ${i.unit}`;
+          // Popis (jak se položka používá, co s ní) patří do meta jako na
+          // Skladu zaměstnance — seznam je výchozí pohled, karty ho mají zvlášť.
+          const meta = [i.brand, i.description || null, i.category || null, i.supplier || null, i.updatedAt ? `${relTime(i.updatedAt)}${i.updatedByName ? ` · ${i.updatedByName}` : ''}` : null]
+            .filter(Boolean).join(' · ');
+          const menu = akcePolozky(i, { openEdit, remove, setArchived, objednat: true });
           return (
-            <div key={i.id}
-              onClick={selecting ? () => onToggle(i.id) : undefined}
-              className={`grid grid-cols-[auto_1fr_auto] md:grid-cols-[auto_1fr_140px_200px_auto] gap-2 md:gap-3 items-center px-4 py-3 transition-colors ${
-                selecting ? `cursor-pointer ${selected.has(i.id) ? 'bg-[#C8F542]/[0.14]' : 'hover:bg-black/[0.03]'}` : 'hover:bg-black/[0.02]'
-              }`}>
-              {selecting ? (
-                <Tick on={selected.has(i.id)} />
-              ) : (
-                <span className={`w-2 h-2 rounded-full shrink-0 ${dot}`} title={st} />
-              )}
-              <div className="min-w-0">
-                <p className="font-medium text-sm text-[#16181A] line-clamp-2">
-                  {i.name}
-                  {i.brand && <span className="ml-1.5 font-normal text-black/40">{i.brand}</span>}
-                </p>
-                {i.description && <p className="text-[11px] text-black/50 truncate">{i.description}</p>}
-                <p className="text-[11px] text-black/40 truncate md:hidden">{i.category}{i.supplier ? ` · ${i.supplier}` : ''}</p>
-                {(i.updatedByName || i.updatedAt) && (
-                  <p className="text-[11px] text-black/30 truncate hidden md:block">{relTime(i.updatedAt)}{i.updatedByName ? ` · ${i.updatedByName}` : ''}</p>
-                )}
-              </div>
-              <span className="hidden md:block text-xs text-black/50 truncate">{i.category || '—'}</span>
-              <div className="hidden md:flex items-center gap-2">
-                <div className="h-1.5 w-14 bg-black/[0.06] rounded-full overflow-hidden shrink-0">
-                  <div className={`h-full ${bar} rounded-full`} style={{ width: `${pct}%` }} />
-                </div>
-                <span className="text-xs text-black/60 tabular-nums whitespace-nowrap truncate">
-                  {Number(i.packageSize) > 0
-                    ? formatStock(i, itemContentUnit(i, pk(i)), i.unit)
-                    : <>{i.quantity} {i.unit}</>}
-                </span>
-              </div>
-              <div className={`flex items-center gap-1 justify-end flex-wrap ${selecting ? 'hidden' : ''}`}>
-                {Number(i.packageSize) > 0 && (
-                  <ConsumeControl itemId={i.id} unit={itemContentUnit(i, pk(i))} onDone={onConsumed} onFail={onConsumeFail} />
-                )}
-                <button onClick={() => step(i, -1)} className="tap-target btn-icon">−</button>
-                <span className="md:hidden text-sm font-semibold text-[#16181A] w-12 text-center tabular-nums">{i.quantity}<span className="text-[11px] text-black/40 ml-0.5">{i.unit}</span></span>
-                <button onClick={() => step(i, 1)} className="tap-target btn-icon">+</button>
-                {i.archived ? (
-                  <button onClick={() => setArchived(i, false)} title="Vrátit do aktivního skladu"
-                    className="btn btn-accent btn-sm whitespace-nowrap">Naskladnit</button>
-                ) : i.supplierUrl ? (
-                  <a href={i.supplierUrl} target="_blank" rel="noopener" title="Objednat u dodavatele" className="rounded-full bg-[#C8F542]/20 text-[#5B7A08] hover:bg-[#C8F542]/30 px-3 h-8 hidden sm:flex items-center gap-1 text-xs font-semibold whitespace-nowrap">Objednat ↗</a>
-                ) : null}
-                <button onClick={() => openEdit(i)} title="Upravit" aria-label="Upravit"
-                  className="btn-icon"><Icon name="pencil" size={15} /></button>
-                <button onClick={() => remove(i)} title="Smazat" aria-label="Smazat"
-                  className="btn-icon btn-icon-danger"><Icon name="trash" size={15} /></button>
-              </div>
-            </div>
+            <li key={i.id}>
+              <ListRow as="div"
+                lead={selecting
+                  ? <SelectBox checked={selected.has(i.id)} onChange={() => onToggle(i.id)} label={`Vybrat ${i.name}`} />
+                  : <span className={`w-2 h-2 rounded-full shrink-0 ${st === 'critical' ? 'bg-bad' : st === 'low' ? 'bg-wait' : 'bg-ok'}`} aria-hidden />}
+                title={i.name}
+                meta={meta || undefined}
+                value={<span className="tabular-nums">{mnozstvi}</span>}
+                right={st !== 'ok' ? <Chip tone={STAV_CHIP[st]} size="sm">{stavPopisek(st, i.madeInHouse)}</Chip> : undefined}
+                onClick={selecting ? () => onToggle(i.id) : undefined}
+                actions={selecting ? undefined : <>
+                  {Number(i.packageSize) > 0 && step && (
+                    <ConsumeControl itemId={i.id} unit={cu} onDone={onConsumed} onFail={onConsumeFail} />
+                  )}
+                  {i.archived && setArchived
+                    ? <Button variant="primary" size="sm" onClick={() => setArchived(i, false)}>Naskladnit</Button>
+                    : step ? <Krokovac i={i} step={step} /> : null}
+                  {menu.length > 0 && <Menu size="sm" label={`Další akce: ${i.name}`} items={menu} />}
+                </>}
+              />
+            </li>
           );
         })}
-      </div>
-    </div>
+      </ul>
+    </Card>
   );
 }
 
-/* ---------- Grid view (glass cards) ---------- */
+/* ---------- Grid view (karta na položku — volitelný pohled) ---------- */
 function GridView({ items, step, openEdit, remove, money, pk, setArchived, selecting, selected, onToggle, onConsumed, onConsumeFail }: {
-  items: Item[]; step: (i: Item, d: number) => void; openEdit: (i: Item) => void; remove: (i: Item) => void;
-  money: (n: number) => string; pk: PackagingLookup; setArchived: (i: Item, archived: boolean) => void;
+  items: Item[]; step?: (i: Item, d: number) => void; openEdit?: (i: Item) => void; remove?: (i: Item) => void;
+  money: (n: number) => string; pk: PackagingLookup; setArchived?: (i: Item, archived: boolean) => void;
   selecting: boolean; selected: Set<number>; onToggle: (id: number) => void;
   onConsumed: (updated: any) => void; onConsumeFail: () => void;
 }) {
@@ -1767,27 +1483,23 @@ function GridView({ items, step, openEdit, remove, money, pk, setArchived, selec
       {items.map(i => {
         const st = statusOf(i, pk);
         const pct = Math.min(100, Math.round((i.quantity / Math.max(1, i.maxQuantity)) * 100));
-        const barColor = st === 'critical' ? 'bg-bad' : st === 'low' ? 'bg-wait' : 'bg-[#C8F542]';
-        const chip = st === 'critical' ? 'bg-bad/15 text-bad-ink' : st === 'low' ? 'bg-wait/15 text-wait-ink' : 'bg-[#C8F542]/15 text-[#5B7A08]';
+        const barColor = st === 'critical' ? 'bg-bad' : st === 'low' ? 'bg-wait' : 'bg-ok';
+        const menu = akcePolozky(i, { openEdit, remove, setArchived });
         return (
-          <div key={i.id}
-            onClick={selecting ? () => onToggle(i.id) : undefined}
-            className={`glass-card p-5 flex flex-col h-full transition ${
-              selecting ? `cursor-pointer ${selected.has(i.id) ? 'ring-2 ring-[#C8F542]' : 'hover:bg-black/[0.02]'}` : ''
-            }`}>
-            <div className="flex items-start justify-between gap-x-2 gap-y-1 flex-wrap">
-              {selecting && <Tick on={selected.has(i.id)} className="mt-0.5 mr-1" />}
-              <div className="min-w-0 flex-1 basis-[calc(100%-5rem)] min-[420px]:basis-0">
-                <p className="font-semibold text-[#16181A] line-clamp-2">
+          <Card key={i.id} className={`flex flex-col h-full ${selecting && selected.has(i.id) ? 'ring-2 ring-[#16181A]' : ''}`}>
+            <div className="flex items-start justify-between gap-x-2 gap-y-1">
+              {selecting && <SelectBox checked={selected.has(i.id)} onChange={() => onToggle(i.id)} label={`Vybrat ${i.name}`} />}
+              <div className="min-w-0 flex-1">
+                <h3 className="t-card line-clamp-2">
                   {i.name}
-                  {i.brand && <span className="ml-1.5 font-normal text-black/40">{i.brand}</span>}
-                </p>
-                {i.description && <p className="text-xs text-black/55 line-clamp-2 mt-0.5">{i.description}</p>}
-                <p className="text-xs text-black/40 line-clamp-2 mt-0.5">{i.category}{i.supplier ? ` · ${i.supplier}` : ''}</p>
+                  {i.brand && <span className="ml-1.5 font-normal text-black/55">{i.brand}</span>}
+                </h3>
+                {i.description && <p className="t-meta line-clamp-2 mt-0.5">{i.description}</p>}
+                <p className="t-meta line-clamp-2 mt-0.5">{i.category}{i.supplier ? ` · ${i.supplier}` : ''}</p>
               </div>
               <span className="flex items-center gap-1 shrink-0">
-                {i.madeInHouse && <span className="chip chip-sm chip-info" title="Vyrábíme sami — místo nákupu dostane směna úkol">vyrábíme</span>}
-                <span className={`tap-target-sm rounded-full px-3 py-1 text-xs font-medium ${chip}`}>{st === 'critical' ? (i.madeInHouse ? 'Vyrobit' : 'Kriticky') : st === 'low' ? (i.madeInHouse ? 'Vyrobit' : 'Dochází') : 'OK'}</span>
+                {i.madeInHouse && <Chip tone="info" size="sm">vyrábíme</Chip>}
+                <Chip tone={STAV_CHIP[st]} size="sm">{stavPopisek(st, i.madeInHouse)}</Chip>
               </span>
             </div>
             <div className="mt-3 h-1.5 bg-black/[0.06] rounded-full overflow-hidden">
@@ -1797,260 +1509,58 @@ function GridView({ items, step, openEdit, remove, money, pk, setArchived, selec
               const cu = itemContentUnit(i, pk(i));
               return (
                 <div className={`mt-2.5 flex flex-wrap items-center justify-between gap-2 ${selecting ? 'hidden' : ''}`}>
-                  <span className="text-xs text-black/55 tabular-nums min-w-0">
-                    <Icon name="box" size={13} className="inline-block -mt-0.5 mr-1 text-black/35" />{formatStock(i, cu, i.unit)}
-                    {cu ? <span className="text-black/35"> · celkem {fmtAmount(totalContent(i))} {cu}</span> : null}
+                  <span className="t-meta tabular-nums min-w-0">
+                    {formatStock(i, cu, i.unit)}
+                    {cu ? <> · celkem {fmtAmount(totalContent(i))} {cu}</> : null}
                   </span>
-                  <ConsumeControl itemId={i.id} unit={cu} onDone={onConsumed} onFail={onConsumeFail} />
+                  {step && <ConsumeControl itemId={i.id} unit={cu} onDone={onConsumed} onFail={onConsumeFail} />}
                 </div>
               );
             })()}
-            <div className={`mt-auto pt-3 flex items-center justify-between ${selecting ? 'hidden' : ''}`}>
+            <div className={`mt-auto pt-3 flex items-center justify-between gap-2 ${selecting ? 'hidden' : ''}`}>
               <div className="flex items-center gap-2">
-                <button onClick={() => step(i, -1)} className="tap-target btn-icon">−</button>
-                <span className="text-lg font-bold text-[#16181A] w-16 text-center tabular-nums">{i.quantity} <span className="text-xs text-black/45">{i.unit}</span></span>
-                <button onClick={() => step(i, 1)} className="tap-target btn-icon">+</button>
+                {step && <Button variant="secondary" size="sm" iconOnly icon="minus" aria-label={`Ubrat — ${i.name}`} onClick={() => step(i, -1)} />}
+                <span className="text-[18px] font-semibold text-[#16181A] min-w-[4rem] text-center tabular-nums">{i.quantity} <span className="text-xs font-normal text-black/55">{i.unit}</span></span>
+                {step && <Button variant="secondary" size="sm" iconOnly icon="plus" aria-label={`Přidat — ${i.name}`} onClick={() => step(i, 1)} />}
               </div>
               <div className="flex items-center gap-1">
-                {i.archived ? (
-                  <button onClick={() => setArchived(i, false)} title="Vrátit do aktivního skladu"
-                    className="btn btn-accent btn-sm whitespace-nowrap">Naskladnit</button>
+                {i.archived && setArchived ? (
+                  <Button variant="primary" size="sm" onClick={() => setArchived(i, false)}>Naskladnit</Button>
                 ) : i.supplierUrl ? (
-                  <a href={i.supplierUrl} target="_blank" rel="noopener" title="Objednat u dodavatele" className="rounded-full bg-[#C8F542]/20 text-[#5B7A08] hover:bg-[#C8F542]/30 px-3 h-9 flex items-center text-xs font-semibold whitespace-nowrap">Objednat ↗</a>
+                  <a href={i.supplierUrl} target="_blank" rel="noopener" className="btn btn-secondary btn-sm">
+                    <Icon name="external" size={15} /> Objednat
+                  </a>
                 ) : null}
-                <button onClick={() => openEdit(i)} title="Upravit" aria-label="Upravit"
-                  className="btn-icon"><Icon name="pencil" size={15} /></button>
-                <button onClick={() => remove(i)} title="Smazat" aria-label="Smazat"
-                  className="btn-icon btn-icon-danger"><Icon name="trash" size={15} /></button>
+                {menu.length > 0 && <Menu size="sm" label={`Další akce: ${i.name}`} items={menu} />}
               </div>
             </div>
-            <p className="text-[11px] text-black/25 mt-2">Limit: {i.minQuantity} · kriticky: {i.criticalQuantity} {thresholdUnitLabel(pk(i), i.unit)}{i.unitCost ? ` · ${money(i.unitCost)}/${i.unit} · hodnota ${money(i.quantity * i.unitCost)}` : ''}{i.updatedByName ? ` · ${relTime(i.updatedAt)} ${i.updatedByName}` : ''}</p>
-          </div>
+            <p className="t-meta mt-2">Limit: {i.minQuantity} · kriticky: {i.criticalQuantity} {thresholdUnitLabel(pk(i), i.unit)}{i.unitCost ? ` · ${money(i.unitCost)}/${i.unit}` : ''}{i.updatedByName ? ` · ${relTime(i.updatedAt)} ${i.updatedByName}` : ''}</p>
+          </Card>
         );
       })}
     </div>
   );
 }
 
-/* ---------- Orders panel ---------- */
-function OrdersPanel({ orders, refreshOrders, refreshItems, notify }: {
-  orders: Order[];
-  refreshOrders: () => Promise<void> | void;
-  refreshItems: () => Promise<void> | void;
-  notify: (msg: string) => void;
-}) {
-  const open = orders.filter(o => o.status === 'ordered');
-  const history = orders.filter(o => o.status !== 'ordered');
-
-  // Default: expanded when any open order exists, collapsed otherwise.
-  // null = user has not toggled yet.
-  const [expandedOverride, setExpandedOverride] = useState<boolean | null>(null);
-  const expanded = expandedOverride ?? open.length > 0;
-  const [showHistory, setShowHistory] = useState(false);
-  const [receivingId, setReceivingId] = useState<number | null>(null);
-  const [costInput, setCostInput] = useState('');
-  const [busyId, setBusyId] = useState<number | null>(null);
-  const money = useMoney();
-  const symbol = useSymbol();
-
-  const now = new Date();
-  const monthlySpend = orders
-    .filter(o => o.status === 'received' && typeof o.totalCost === 'number' && o.totalCost > 0 && o.receivedAt)
-    .filter(o => {
-      const d = new Date(o.receivedAt as string);
-      return !isNaN(d.getTime()) && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-    })
-    .reduce((sum, o) => sum + (o.totalCost as number), 0);
-
-  const summary = (o: Order) => o.items.map(it => `${it.name} ×${it.qty}`).join(', ');
-  const fmtDate = (iso?: string | null) => {
-    if (!iso) return '';
-    const d = new Date(iso);
-    return isNaN(d.getTime()) ? '' : d.toLocaleDateString('cs-CZ');
-  };
-  const fmtKc = (n: number) => money(n);
-
-  const markReceived = async (o: Order) => {
-    setBusyId(o.id);
-    try {
-      const cost = parseFloat(costInput.replace(',', '.'));
-      const res = await fetch('/api/orders', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: o.id, action: 'received', ...(isNaN(cost) ? {} : { totalCost: cost }) }),
-      });
-      if (res.ok) {
-        const data = await res.json().catch(() => null);
-        const n = typeof data?.restocked === 'number' ? data.restocked : o.items.length;
-        notify(`Naskladněno ${czCount(n, POLOZKA)}`);
-        setReceivingId(null);
-        setCostInput('');
-        await Promise.all([refreshOrders(), refreshItems()]);
-      } else {
-        const d = await res.json().catch(() => ({} as any));
-        notify(d?.error || 'Potvrzení příjmu se nepodařilo — zkus to znovu.');
-      }
-    } catch {}
-    setBusyId(null);
-  };
-
-  const cancelOrder = async (o: Order) => {
-    if (!confirm(`Zrušit objednávku${o.supplier ? ` u „${o.supplier}"` : ''}?`)) return;
-    setBusyId(o.id);
-    try {
-      const res = await fetch('/api/orders', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: o.id, action: 'cancelled' }),
-      });
-      if (res.ok) await refreshOrders();
-    } catch {}
-    setBusyId(null);
-  };
-
-  const deleteOrder = async (o: Order) => {
-    if (!confirm('Smazat objednávku z historie?')) return;
-    setBusyId(o.id);
-    try {
-      const res = await fetch(`/api/orders?id=${o.id}`, { method: 'DELETE' });
-      if (res.ok) await refreshOrders();
-    } catch {}
-    setBusyId(null);
-  };
-
-  return (
-    <div className="glass-card p-5">
-      {/* Header */}
-      <button type="button" onClick={() => setExpandedOverride(!expanded)} className="w-full flex items-center gap-2 text-left min-w-0">
-        <span className="font-bold tracking-tight text-[#16181A] flex items-center gap-2 min-w-0">
-          <span aria-hidden><Icon name="box" size={15} /></span> <span className="truncate">Objednávky</span>
-        </span>
-        {open.length > 0 && (
-          <span className="shrink-0 rounded-full bg-[#C8F542]/20 text-[#5B7A08] px-2.5 py-0.5 text-xs font-semibold tabular-nums">{open.length}</span>
-        )}
-        <span className="flex-1" />
-        <Icon name="chevron" size={16} className={`shrink-0 text-black/40 transition-transform ${expanded ? 'rotate-180' : ''}`} />
-      </button>
-
-      {expanded && (
-        <div className="mt-4 space-y-4">
-          {/* Open orders */}
-          {open.length === 0 ? (
-            <p className="text-sm text-black/45">Žádné otevřené objednávky.</p>
-          ) : (
-            <div className="divide-y divide-black/[0.06]">
-              {open.map(o => (
-                <div key={o.id} className="py-3 space-y-2">
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-[#16181A] truncate">
-                        {o.supplier || 'Bez dodavatele'}
-                        <span className="font-normal text-black/40"> · {fmtDate(o.createdAt)}</span>
-                      </p>
-                      <p className="text-xs text-black/50 min-w-0 truncate">{summary(o)}</p>
-                    </div>
-                    <div className="flex items-center gap-2 flex-wrap min-w-0">
-                      <button
-                        onClick={() => { setReceivingId(receivingId === o.id ? null : o.id); setCostInput(''); }}
-                        disabled={busyId === o.id}
-                        className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2 text-xs hover:brightness-110 disabled:opacity-50 whitespace-nowrap shrink-0">
-                        Přišlo
-                      </button>
-                      <button
-                        onClick={() => cancelOrder(o)}
-                        disabled={busyId === o.id}
-                        className="rounded-full glass border border-black/10 text-black/50 hover:text-bad-ink px-4 py-2 text-xs font-medium disabled:opacity-50 whitespace-nowrap shrink-0">
-                        Zrušit
-                      </button>
-                    </div>
-                  </div>
-                  {receivingId === o.id && (
-                    <div className="flex flex-wrap items-center gap-2 well border border-black/[0.06] p-3">
-                      <label className="text-xs text-black/50 whitespace-nowrap">Celková cena ({symbol}, nepovinné)</label>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        min={0}
-                        autoFocus
-                        value={costInput}
-                        onChange={e => setCostInput(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); markReceived(o); } }}
-                        placeholder="např. 1250"
-                        className="flex-1 min-w-[6rem] rounded-xl bg-white/70 border border-black/[0.08] px-3 py-2 text-sm text-[#16181A] tabular-nums focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none" />
-                      <button
-                        onClick={() => markReceived(o)}
-                        disabled={busyId === o.id}
-                        className="btn btn-primary btn-sm hover:opacity-90 disabled:opacity-50 whitespace-nowrap shrink-0">
-                        {busyId === o.id ? 'Naskladňuji…' : 'Potvrdit příjem'}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* History */}
-          {history.length > 0 && (
-            <div>
-              <button type="button" onClick={() => setShowHistory(h => !h)} className="flex items-center gap-1.5 text-xs font-semibold text-black/45 hover:text-black">
-                <Icon name="chevron" size={13} className={`transition-transform ${showHistory ? 'rotate-180' : ''}`} />
-                Historie ({history.length})
-              </button>
-              {showHistory && (
-                <div className="mt-2 divide-y divide-black/[0.06]">
-                  {history.map(o => (
-                    <div key={o.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 py-2.5">
-                      <span className="text-xs text-black/45 tabular-nums whitespace-nowrap shrink-0">{fmtDate(o.receivedAt ?? o.createdAt)}</span>
-                      <span className="text-sm text-[#16181A] min-w-0 flex-1 truncate">{o.supplier || 'Bez dodavatele'}</span>
-                      <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold shrink-0 whitespace-nowrap ${o.status === 'received' ? 'bg-[#C8F542]/20 text-[#5B7A08]' : 'bg-bad/10 text-bad-ink'}`}>
-                        {o.status === 'received' ? 'Přijato' : 'Zrušeno'}
-                      </span>
-                      {typeof o.totalCost === 'number' && o.totalCost > 0 && (
-                        <span className="text-xs font-semibold text-[#16181A] tabular-nums whitespace-nowrap shrink-0">{fmtKc(o.totalCost)}</span>
-                      )}
-                      <button
-                        onClick={() => deleteOrder(o)}
-                        disabled={busyId === o.id}
-                        title="Smazat"
-                        className="rounded-full glass w-7 h-7 flex items-center justify-center text-bad-ink/60 hover:text-bad-ink text-xs disabled:opacity-50 shrink-0">
-                        <Icon name="trash" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Monthly spend */}
-          {monthlySpend > 0 && (
-            <p className="text-xs text-black/50 border-t border-black/[0.06] pt-3">
-              Tento měsíc utraceno za zboží: <span className="font-semibold text-[#16181A] tabular-nums">{fmtKc(monthlySpend)}</span>
-            </p>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 /* ---------- Shopping list modal ---------- */
-function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [] }: {
+function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [], smiObjednat, smiOdeslat }: {
   items: Item[];
   onClose: () => void;
-  onOrdered: (createdCount: number) => void;
+  onOrdered: (createdCount: number, requested: number) => void;
   pk: PackagingLookup;
   suppliers?: any[];
+  /** nakup.vytvorit — bez něj jde seznam jen zkopírovat, vytisknout nebo poslat. */
+  smiObjednat: boolean;
+  /** nakup.odeslat — objednávka e-mailem přímo dodavateli. */
+  smiOdeslat: boolean;
 }) {
-  const sm = useModal(true, onClose, 'Nákupní seznam');
   const supplierByName = (name: string) => suppliers.find(sp => sp.name === name) ?? null;
   const [emailing, setEmailing] = useState<string | null>(null);
-  const [emailMsg, setEmailMsg] = useState('');
+  const [emailMsg, setEmailMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const emailGroup = async (supplier: string, list: Item[]) => {
     const sp = supplierByName(supplier);
     if (!sp?.email) return;
-    setEmailing(supplier); setEmailMsg('');
+    setEmailing(supplier); setEmailMsg(null);
     try {
       const res = await fetch('/api/orders', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -2060,13 +1570,14 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [] }: {
         }),
       });
       const d = await res.json().catch(() => ({}));
-      if (res.ok && d.emailed) setEmailMsg(`Objednávka odeslána na ${sp.email} ✓`);
+      if (res.ok && d.emailed) setEmailMsg({ text: `Objednávka odeslána na ${sp.email}.`, ok: true });
       // Server teď říká i proč. Dřív se tu psalo obecné „nepodařilo se"
       // — a hlavně se sem často ani nedostalo, protože odmítnutý e-mail
       // se tvářil jako odeslaný.
-      else if (res.ok) setEmailMsg(`Objednávka je vytvořená, ale e-mail neodešel${d.emailError ? ` (${d.emailError})` : ''} — pošli ji ručně.`);
-      else setEmailMsg(d.error || 'Odeslání se nepodařilo.');
-    } catch { setEmailMsg('Odeslání se nepodařilo.'); }
+      else if (res.ok) setEmailMsg({ text: `Objednávka je vytvořená, ale e-mail neodešel${d.emailError ? ` (${d.emailError})` : ''} — pošli ji ručně.`, ok: false });
+      else setEmailMsg({ text: d.error || 'Odeslání se nepodařilo.', ok: false });
+      if (res.ok) obnovDataWidgetu('/api/orders');
+    } catch { setEmailMsg({ text: 'Odeslání se nepodařilo.', ok: false }); }
     setEmailing(null);
   };
   const [copied, setCopied] = useState(false);
@@ -2107,7 +1618,7 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [] }: {
       setCopied(true);
       if (copyTimer.current) clearTimeout(copyTimer.current);
       copyTimer.current = setTimeout(() => setCopied(false), 2000);
-    } catch {}
+    } catch { /* schránka nedostupná — tlačítko zůstane „Zkopírovat" */ }
   };
 
   // Do velkoobchodu se nejde s telefonem v ruce a prstem po seznamu —
@@ -2137,7 +1648,7 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [] }: {
 
   const canShare = typeof navigator !== 'undefined' && 'share' in navigator;
   const share = async () => {
-    try { await navigator.share({ title: 'Nákupní seznam', text: buildText() }); } catch {}
+    try { await navigator.share({ title: 'Nákupní seznam', text: buildText() }); } catch { /* zrušeno */ }
   };
 
   // One order per supplier group.
@@ -2156,103 +1667,80 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [] }: {
           }),
         });
         if (res.ok) created++;
-      } catch {}
+      } catch { /* spočítá se jako nevytvořená */ }
     }
     setOrdering(false);
-    onOrdered(created);
+    onOrdered(created, groups.length);
   };
 
+  const mailto = `mailto:?subject=${encodeURIComponent('Objednávka – ' + new Date().toLocaleDateString('cs-CZ'))}&body=${encodeURIComponent(buildText())}`;
+
   return (
-    <div className="fixed inset-0 modal-overlay z-50 flex items-end sm:items-center justify-center sm:p-4" onClick={onClose}>
-      <div ref={sm.ref} {...sm.dialogProps} onClick={e => e.stopPropagation()} className="modal-sheet rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md p-6 space-y-4 max-h-[85vh] overflow-y-auto scrollbar-thin">
-        <DiscardGuard guard={sm.guard} />
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="t-card">Nákupní seznam</h3>
-          <button onClick={sm.guard.attemptClose} className="shrink-0 btn-icon" aria-label="Zavřít"><Icon name="close" size={15} /></button>
-        </div>
-        {emailMsg && <p className={`text-sm rounded-2xl px-4 py-2.5 ${emailMsg.includes('✓') ? 'bg-[#C8F542]/10 text-[#5B7A08] border border-[#C8F542]/25' : 'bg-wait/10 text-wait-ink border border-wait/25'}`}>{emailMsg}</p>}
+    <Modal open onClose={onClose} size="lg" title="Nákupní seznam" subtitle={czCount(items.length, POLOZKA)}
+      footer={<>
+        <Menu label="Další možnosti seznamu" items={[
+          { label: 'Vytisknout', icon: 'print', hint: 'S čtverečky k odškrtání v obchodě.', onClick: printList },
+          { label: 'Poslat e-mailem', icon: 'mail', hint: 'Otevře e-mail s předvyplněným seznamem.', onClick: () => { window.location.href = mailto; } },
+          ...(canShare ? [{ label: 'Sdílet', icon: 'send', onClick: share }] : []),
+        ]} />
+        <Button variant="secondary" icon="copy" onClick={copy}>{copied ? 'Zkopírováno' : 'Zkopírovat'}</Button>
+        {smiObjednat && (
+          <Button variant="primary" loading={ordering} disabled={items.length === 0} onClick={createOrders}>Vytvořit objednávku</Button>
+        )}
+      </>}>
+      <div className="space-y-4">
+        {emailMsg && <p className={`note ${emailMsg.ok ? 'note-ok' : 'note-wait'}`} role="status">{emailMsg.text}</p>}
         {printFailed && (
           <p className="note note-wait">
             Tiskové okno prohlížeč zablokoval. Povol vyskakovací okna pro tuhle stránku,
             nebo si seznam zkopíruj a vytiskni odjinud.
           </p>
         )}
-
-        <div className="space-y-4">
-          {groups.map(([supplier, list]) => (
-            <div key={supplier} className="space-y-1">
-              {hasSuppliers && (
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs uppercase tracking-wider text-black/45 font-semibold">{supplier}</p>
-                  {supplierByName(supplier)?.email && (
-                    <button onClick={() => emailGroup(supplier, list)} disabled={emailing === supplier}
-                      className="btn btn-primary btn-sm disabled:opacity-50 transition whitespace-nowrap">
-                      {emailing === supplier ? 'Odesílám…' : 'Objednat e-mailem'}
-                    </button>
-                  )}
-                </div>
-              )}
-              <div className="divide-y divide-black/[0.06]">
-                {list.map(i => {
-                  const st = statusOf(i, pk);
-                  return (
-                    <div key={i.id} className="flex items-center gap-2.5 py-2.5">
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${st === 'critical' ? 'bg-bad' : st === 'low' ? 'bg-wait' : 'bg-[#0A84FF]'}`} title={st === 'critical' ? 'Kriticky málo' : st === 'low' ? 'Dochází' : 'Chybí na výrobu'} />
-                      <span className="flex-1 min-w-0">
-                        <span className="block truncate text-sm font-medium text-[#16181A]">{i.name}</span>
-                        {(i.buyFor?.length ?? 0) > 0 && (
-                          <span className="block truncate text-[11px] text-[#0A5CC0]">na výrobu: {i.buyFor!.map(f => f.name).join(', ')}</span>
-                        )}
-                      </span>
-                      <span className="shrink-0 text-xs text-black/45 tabular-nums whitespace-nowrap">{i.quantity} {i.unit}</span>
-                      <span className="shrink-0 text-sm font-bold text-[#16181A] tabular-nums whitespace-nowrap">objednat +{suggestedAmount(i)} {i.unit}</span>
-                      {i.supplierUrl && (
-                        <a href={i.supplierUrl} target="_blank" rel="noopener" title="Objednat u dodavatele" className="shrink-0 rounded-full glass w-7 h-7 flex items-center justify-center text-xs text-[#5B7A08] hover:bg-black/[0.05]">↗</a>
-                      )}
-                    </div>
-                  );
-                })}
+        {items.length === 0 && <p className="t-meta">Od tohoto dodavatele teď nic nechybí.</p>}
+        {groups.map(([supplier, list]) => (
+          <section key={supplier} aria-label={supplier}>
+            {hasSuppliers && (
+              <div className="flex items-center justify-between gap-2">
+                <p className="t-label">{supplier}</p>
+                {smiOdeslat && supplierByName(supplier)?.email && (
+                  <Button variant="secondary" size="sm" icon="send" loading={emailing === supplier} onClick={() => emailGroup(supplier, list)}>
+                    Objednat e-mailem
+                  </Button>
+                )}
               </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="flex flex-wrap gap-3 pt-1">
-          <button onClick={createOrders} disabled={ordering} className="flex-1 basis-full sm:basis-auto rounded-full bg-[#C8F542] text-black py-3 px-4 text-sm font-semibold hover:brightness-110 disabled:opacity-50 whitespace-nowrap">
-            {ordering ? 'Vytvářím…' : 'Vytvořit objednávku'}
-          </button>
-          <button onClick={copy} className="flex-1 rounded-full bg-[#16181A] text-white py-3 px-4 text-sm font-semibold hover:opacity-90 whitespace-nowrap">
-            {copied ? 'Zkopírováno' : 'Zkopírovat seznam'}
-          </button>
-          <button type="button" onClick={printList} className="btn btn-secondary"
-            title="Seznam na papír, s čtverečky k odškrtání v obchodě">
-            <Icon name="print" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Vytisknout
-          </button>
-          <a
-            href={`mailto:?subject=${encodeURIComponent('Objednávka – ' + new Date().toLocaleDateString('cs-CZ'))}&body=${encodeURIComponent(buildText())}`}
-            className="btn btn-secondary"
-            title="Otevře e-mail s předvyplněným seznamem — doplň adresu dodavatele">
-            <Icon name="mail" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Poslat e-mailem
-          </a>
-          {canShare && (
-            <button onClick={share} className="flex-1 rounded-full glass border border-black/10 text-[#16181A] py-3 px-4 text-sm font-medium hover:bg-black/[0.06] whitespace-nowrap">
-              Sdílet
-            </button>
-          )}
-        </div>
+            )}
+            <ul className="list mt-1">
+              {list.map(i => {
+                const st = statusOf(i, pk);
+                return (
+                  <ListRow key={i.id}
+                    title={i.name}
+                    meta={[`zbývá ${i.quantity} ${i.unit}`, (i.buyFor?.length ?? 0) > 0 ? `na výrobu: ${i.buyFor!.map(f => f.name).join(', ')}` : null].filter(Boolean).join(' · ')}
+                    value={<span className="tabular-nums">+{suggestedAmount(i)} {i.unit}</span>}
+                    right={<Chip tone={st === 'critical' ? 'bad' : st === 'low' ? 'wait' : 'info'} size="sm">{st === 'critical' ? 'kriticky' : st === 'low' ? 'dochází' : 'na výrobu'}</Chip>}
+                    actions={i.supplierUrl ? (
+                      <a href={i.supplierUrl} target="_blank" rel="noopener" className="btn-icon" aria-label={`Objednat ${i.name} u dodavatele`}>
+                        <Icon name="external" size={15} />
+                      </a>
+                    ) : undefined} />
+                );
+              })}
+            </ul>
+          </section>
+        ))}
       </div>
-    </div>
+    </Modal>
   );
 }
 
 /* ---------- Category management modal ---------- */
-function CategoryManager({ categories, onClose, onChanged, createCategory }: {
+function CategoryManager({ categories, onClose, onChanged, createCategory, potvrdit }: {
   categories: Category[];
   onClose: () => void;
   onChanged: () => Promise<void> | void;
   createCategory: (name: string, parentId?: number | null) => Promise<boolean>;
+  potvrdit: (p: Potvrzeni) => void;
 }) {
-  const cm = useModal(true, onClose, 'Správa kategorií skladu');
   const [newName, setNewName] = useState('');
   const [newParent, setNewParent] = useState('');
   const [busy, setBusy] = useState(false);
@@ -2399,58 +1887,58 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
     await onChanged();
   };
 
-  const del = async (c: Category) => {
+  const del = (c: Category) => {
     const kids = own.filter(x => x.parentId === c.id).length;
     const extra = kids > 0 ? ` ${czCount(kids, { one: 'podkategorie', few: 'podkategorie', many: 'podkategorií' })} se ${czVerb(kids, 'přesune', 'přesunou')} na hlavní úroveň.` : '';
-    if (!confirm(`Smazat kategorii „${c.name}"? Položky si svůj štítek ponechají.${extra}`)) return;
-    setBusy(true); setErr('');
-    try {
-      const res = await fetch(`/api/inventory/categories/${c.id}`, { method: 'DELETE' });
-      if (!res.ok) setErr('Kategorii se nepodařilo smazat.');
-    } catch { setErr('Nepodařilo se spojit se serverem.'); }
-    setBusy(false);
-    await onChanged();
+    potvrdit({
+      titulek: `Smazat kategorii „${c.name}"?`,
+      text: `Položky si svůj štítek ponechají.${extra}`,
+      akce: 'Smazat kategorii',
+      provest: async () => {
+        setBusy(true); setErr('');
+        try {
+          const res = await fetch(`/api/inventory/categories/${c.id}`, { method: 'DELETE' });
+          if (!res.ok) setErr('Kategorii se nepodařilo smazat.');
+        } catch { setErr('Nepodařilo se spojit se serverem.'); }
+        setBusy(false);
+        await onChanged();
+      },
+    });
   };
 
   return (
-    <div className="fixed inset-0 modal-overlay z-50 flex items-end md:items-center justify-center md:p-4" onClick={onClose}>
-      <div ref={cm.ref} {...cm.dialogProps} onClick={e => e.stopPropagation()} className="modal-sheet rounded-3xl rounded-b-none md:rounded-3xl w-full max-w-md p-6 space-y-4 max-h-[85vh] overflow-y-auto scrollbar-thin">
-        <DiscardGuard guard={cm.guard} />
-        <div className="flex items-center justify-between">
-          <h3 className="t-card">Kategorie</h3>
-          <button onClick={cm.guard.attemptClose} className="btn-icon" aria-label="Zavřít"><Icon name="close" size={15} /></button>
-        </div>
-
-        <div className="flex gap-2">
+    <Modal open onClose={onClose} size="lg" title="Kategorie a balení"
+      subtitle="Pořadí, zanoření, předvyplnění nových položek a sledování načatých balení."
+      footer={<Button variant="secondary" onClick={onClose}>Hotovo</Button>}>
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row gap-2">
           <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Název nové kategorie"
+            aria-label="Název nové kategorie"
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
-            className={inputClass} />
+            className={`${inputClass} flex-1 min-w-0`} />
           {flat.length > 0 && (
             <select value={newParent} onChange={e => setNewParent(e.target.value)}
-              title="Kam ji zařadit"
-              className="shrink-0 max-w-[9rem] field border border-black/[0.08] px-3 text-sm text-[#16181A] focus:outline-none focus:border-[#C8F542]/50">
+              aria-label="Kam novou kategorii zařadit"
+              className={`${inputClass} !w-full sm:!w-40 shrink-0`}>
               <option value="">Hlavní</option>
               {flat.map(({ cat: c, depth }) => (
-                <option key={c.id} value={String(c.id)}>{'\u00A0'.repeat(depth * 2)}pod {c.name}</option>
+                <option key={c.id} value={String(c.id)}>{' '.repeat(depth * 2)}pod {c.name}</option>
               ))}
             </select>
           )}
-          <button onClick={add} disabled={busy || !newName.trim()} className="shrink-0 rounded-full bg-[#C8F542] text-black font-semibold px-5 text-sm hover:brightness-110 disabled:opacity-40">Přidat</button>
+          <Button variant="primary" icon="plus" onClick={add} loading={busy} disabled={!newName.trim()}>Přidat</Button>
         </div>
 
-        {err && <p className="text-xs font-medium text-bad-ink">{err}</p>}
+        {err && <p className="note note-danger" role="alert">{err}</p>}
 
         {own.length === 0 ? (cizi.length > 0 ? (
           // Bez vlastních kategorií, ale s kategoriemi z organizace: sklad
           // prázdný není a výchozí sada by se dublovala s tou sdílenou.
-          <p className="text-sm text-black/55 py-2">Vlastní kategorie zatím nemáš — používáš kategorie z organizace níže. Vlastní přidáš nahoře.</p>
+          <p className="t-meta py-2">Vlastní kategorie zatím nemáš — používáš kategorie z organizace níže. Vlastní přidáš nahoře.</p>
         ) : (
-          <div className="text-center space-y-3 py-4">
-            <EmptyState illustration="sklad" title="Sklad je zatím prázdný" hint="Začni kategoriemi — nápoje, suroviny, nádobí, drogerie. Můžeš je nechat založit a pak upravit." compact />
-            <button onClick={seedDefaults} disabled={busy} className="rounded-full glass border border-black/10 text-[#16181A] hover:bg-black/[0.05] px-4 py-2 text-sm font-medium disabled:opacity-40">
-              Přidat výchozí: {DEFAULT_CATEGORIES.join(', ')}
-            </button>
-          </div>
+          <EmptyState illustration="sklad" title="Sklad je zatím prázdný" compact
+            hint="Začni kategoriemi — nápoje, suroviny, nádobí, drogerie. Můžeš je nechat založit a pak upravit."
+            action={<Button variant="secondary" onClick={seedDefaults} loading={busy}>Přidat výchozí: {DEFAULT_CATEGORIES.join(', ')}</Button>} />
         )) : (
           <div className="divide-y divide-black/[0.06]">
             {tree.map(node => renderNode(node, tree.map(t => t.cat), 0))}
@@ -2460,31 +1948,32 @@ function CategoryManager({ categories, onClose, onChanged, createCategory }: {
         {/* Kategorie zdrojového podniku organizace — jen ke čtení; položky
             na ně můžou ukazovat, ale upraví je vedení podniku, který je spravuje. */}
         {ciziTree.length > 0 && (
-          <div className="space-y-1 pt-2">
-            <p className="flex items-center gap-2 text-xs uppercase tracking-wider text-black/45 font-semibold">
-              Z organizace <span className="chip chip-sm chip-muted normal-case tracking-normal">{pocetKategorii(cizi.length)}</span>
+          <section className="space-y-1 pt-2" aria-labelledby="sklad-kat-org">
+            <p id="sklad-kat-org" className="t-label flex items-center gap-2">
+              Z organizace <Chip tone="muted" size="sm">{pocetKategorii(cizi.length)}</Chip>
             </p>
-            {spravuje && <p className="text-xs text-black/45">Spravuje: {spravuje}. Upraví je jeho vedení.</p>}
+            {spravuje && <p className="t-meta">Spravuje: {spravuje}. Upraví je jeho vedení.</p>}
             <div className="divide-y divide-black/[0.06]">
               {ciziTree.map(node => renderNode(node, ciziTree.map(t => t.cat), 0, true))}
             </div>
-          </div>
+          </section>
         )}
-
-        <button onClick={onClose} className="w-full rounded-full glass border border-black/10 text-[#16181A] py-3 text-sm font-medium hover:bg-black/[0.06]">Hotovo</button>
       </div>
-    </div>
+    </Modal>
   );
 }
 
 /* ---------- One row in the category manager ---------- */
+// Akce řádku jsou v jedné nabídce „···" (DP §3.6: nejvýš dvě tlačítka v řádku).
+// Dřív šest kulatých tlačítek, řazení znaky ▲▼, skrytí emoji a mazání ikonou
+// křížku s popiskem „Zavřít".
 function CategoryRow({
   c, siblings, idx, busy, nested, readOnly, editing, editName, setEditName, startEdit, cancelEdit, saveRename,
   move, onDelete, packOpen, togglePack, moveOpen, toggleMove, parentOptions, setParent, childCount,
   inheritsPackaging, prefillOpen, togglePrefill, hasPrefill, pathLabel, onToggleHide,
 }: {
   c: Category; siblings: Category[]; idx: number; busy: boolean; nested?: boolean;
-  /** Kategorie z organizace: bez tužky, šipek, přesunu, koše i editorů. */
+  /** Kategorie z organizace: bez úprav, přesunu, mazání i editorů. */
   readOnly?: boolean;
   onToggleHide: () => void;
   editing: boolean; editName: string; setEditName: (v: string) => void;
@@ -2502,82 +1991,65 @@ function CategoryRow({
   // Anything can be re-filed except under its own branch, which possibleParents
   // has already excluded.
   const canMove = parentOptions.length > 0 || c.parentId != null;
+  const nazev = (
+    <span className={`flex-1 min-w-0 truncate ${nested ? 'text-[13px] text-black/70' : 'text-sm text-[#16181A] font-medium'}`}>
+      {c.name}
+      {childCount > 0 && <span className="text-xs text-black/55 ml-1.5">{childCount} podkat.</span>}
+      {inheritsPackaging && !c.tracksOpen && <span className="text-xs text-black/55 ml-1.5">balení dědí</span>}
+    </span>
+  );
   if (readOnly) {
     return (
       <div className="flex items-center gap-2">
-        <span className={`flex-1 min-w-0 truncate ${nested ? 'text-[13px] text-black/70' : 'text-sm text-[#16181A] font-medium'}`}>
-          {c.name}
-          {childCount > 0 && <span className="text-[11px] text-black/30 ml-1.5">{childCount} podkat.</span>}
-          {inheritsPackaging && !c.tracksOpen && <span className="text-[11px] text-black/30 ml-1.5">balení dědí</span>}
-        </span>
-        <span className="chip chip-sm chip-muted shrink-0" title={c.spravuje ? `Spravuje: ${c.spravuje}` : undefined}>z organizace</span>
+        {nazev}
+        <Chip tone="muted" size="sm" className="shrink-0">z organizace</Chip>
       </div>
     );
   }
+  const stavy = [
+    c.sdileno ? <Chip key="s" tone="info" size="sm">sdíleno</Chip> : null,
+    c.hideFromOverview ? <Chip key="h" tone="muted" size="sm">skrytá ve Vše</Chip> : null,
+    hasPrefill ? <Chip key="p" tone="muted" size="sm">předvyplnění</Chip> : null,
+    c.tracksOpen ? <Chip key="b" tone="muted" size="sm">balení</Chip> : null,
+  ].filter(Boolean);
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
-        <div className="flex flex-col shrink-0">
-          <button onClick={() => move(siblings, idx, -1)} disabled={busy || idx === 0}
-            className="text-black/40 hover:text-black disabled:opacity-20 leading-none text-xs">▲</button>
-          <button onClick={() => move(siblings, idx, 1)} disabled={busy || idx === siblings.length - 1}
-            className="text-black/40 hover:text-black disabled:opacity-20 leading-none text-xs">▼</button>
-        </div>
         {editing ? (
-          <input autoFocus value={editName} onChange={e => setEditName(e.target.value)}
+          <input autoFocus value={editName} onChange={e => setEditName(e.target.value)} aria-label={`Nový název kategorie ${c.name}`}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); saveRename(); } if (e.key === 'Escape') cancelEdit(); }}
             onBlur={saveRename}
-            className="flex-1 min-w-0 field rounded-xl border border-black/[0.08] px-3 py-1.5 text-sm text-[#16181A] focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none" />
-        ) : (
-          <span className={`flex-1 min-w-0 truncate ${nested ? 'text-[13px] text-black/70' : 'text-sm text-[#16181A] font-medium'}`}>
-            {c.name}
-            {childCount > 0 && <span className="text-[11px] text-black/30 ml-1.5">{childCount} podkat.</span>}
-            {inheritsPackaging && !c.tracksOpen && <span className="text-[11px] text-black/30 ml-1.5">balení dědí</span>}
-            {c.sdileno && <span className="ml-1.5 chip chip-sm chip-info align-middle" title="Vidí a používají ji i ostatní podniky organizace">sdíleno</span>}
-          </span>
-        )}
-        {canMove && (
-          <button onClick={toggleMove} title="Přesunout pod jinou kategorii"
-            className={`shrink-0 rounded-full w-8 h-8 flex items-center justify-center text-sm transition ${moveOpen ? 'seg-on' : 'seg-off glass'}`}>
-            <Icon name="swap" size={14} />
-          </button>
-        )}
-        <button onClick={onToggleHide} title={c.hideFromOverview ? 'Kategorie je skrytá z přehledu „Vše" — kliknutím zobrazíš' : 'Skrýt obsah kategorie z přehledu „Vše"'}
-          className={`shrink-0 rounded-full w-8 h-8 flex items-center justify-center text-sm transition ${
-            c.hideFromOverview ? 'seg-on' : 'seg-off glass'
-          }`}>
-          {c.hideFromOverview ? '🙈' : '👁'}
-        </button>
-        <button onClick={togglePrefill} title="Předvyplnění nových položek"
-          className={`shrink-0 rounded-full w-8 h-8 flex items-center justify-center text-sm transition ${
-            prefillOpen ? 'seg-on' : hasPrefill ? 'bg-[#C8F542] text-black' : 'glass text-black/50 hover:text-black'
-          }`}>
-          <Icon name="clipboard" size={14} />
-        </button>
-        <button onClick={togglePack} title="Balení a zbytky"
-          className={`shrink-0 rounded-full w-8 h-8 flex items-center justify-center text-sm transition ${c.tracksOpen ? 'bg-[#C8F542] text-black' : 'glass text-black/50 hover:text-black'}`}>
-          <Icon name="box" size={15} />
-        </button>
-        <button onClick={startEdit} className="tap-target shrink-0 rounded-full glass w-8 h-8 flex items-center justify-center text-black/50 hover:text-black text-sm"><Icon name="pencil" size={15} /></button>
-        <button onClick={onDelete} className="tap-target shrink-0 rounded-full glass w-8 h-8 flex items-center justify-center text-bad-ink/70 hover:text-bad-ink text-sm" aria-label="Zavřít"><Icon name="close" size={15} /></button>
+            className={`${inputClass} flex-1 min-w-0`} />
+        ) : nazev}
+        {stavy.length > 0 && <span className="hidden sm:flex items-center gap-1 shrink-0">{stavy}</span>}
+        <Menu size="sm" label={`Další akce: ${c.name}`} items={[
+          { label: 'Přejmenovat', icon: 'pencil', onClick: startEdit },
+          ...(idx > 0 ? [{ label: 'Posunout výš', icon: 'chevron', onClick: () => { if (!busy) move(siblings, idx, -1); } }] : []),
+          ...(idx < siblings.length - 1 ? [{ label: 'Posunout níž', icon: 'chevron', onClick: () => { if (!busy) move(siblings, idx, 1); } }] : []),
+          ...(canMove ? [{ label: moveOpen ? 'Zavřít přesun' : 'Přesunout pod jinou…', icon: 'swap', onClick: toggleMove }] : []),
+          { label: c.hideFromOverview ? 'Ukázat v přehledu „Vše"' : 'Skrýt z přehledu „Vše"', icon: 'search', onClick: onToggleHide },
+          { label: prefillOpen ? 'Zavřít předvyplnění' : 'Předvyplnění nových položek', icon: 'clipboard', onClick: togglePrefill },
+          { label: packOpen ? 'Zavřít balení' : 'Balení a zbytky', icon: 'box', onClick: togglePack },
+          { label: 'Smazat kategorii…', icon: 'trash', danger: true, onClick: onDelete },
+        ]} />
       </div>
 
       {moveOpen && (
-        <div className="flex flex-wrap items-center gap-1.5 well rounded-xl border border-black/[0.06] px-3 py-2">
-          <span className="text-[11px] text-black/45">Zařadit:</span>
-          <button onClick={() => setParent(null)} disabled={busy || c.parentId == null}
-            className={`rounded-full px-3 py-1 text-[11px] font-medium transition disabled:opacity-30 ${c.parentId == null ? 'bg-[#C8F542] text-black' : 'bg-white border border-black/[0.08] on-accent hover:border-[#C8F542]'}`}>
+        <div className="well flex flex-wrap items-center gap-1.5 px-3 py-2" role="group" aria-label={`Kam zařadit ${c.name}`}>
+          <span className="t-meta">Zařadit:</span>
+          <button type="button" onClick={() => setParent(null)} disabled={busy || c.parentId == null} aria-pressed={c.parentId == null}
+            className={`filter-pill tap-target-sm disabled:opacity-40 ${c.parentId == null ? 'seg-on' : 'seg-off glass'}`}>
             Hlavní úroveň
           </button>
           {parentOptions.map(p => (
-            <button key={p.id} onClick={() => setParent(p.id)} disabled={busy || c.parentId === p.id}
-              title={pathLabel(p.id)}
-              className={`rounded-full px-3 py-1 text-[11px] font-medium transition disabled:opacity-30 ${c.parentId === p.id ? 'bg-[#C8F542] text-black' : 'bg-white border border-black/[0.08] on-accent hover:border-[#C8F542]'}`}>
+            <button type="button" key={p.id} onClick={() => setParent(p.id)} disabled={busy || c.parentId === p.id}
+              title={pathLabel(p.id)} aria-pressed={c.parentId === p.id}
+              className={`filter-pill tap-target-sm disabled:opacity-40 ${c.parentId === p.id ? 'seg-on' : 'seg-off glass'}`}>
               pod {pathLabel(p.id)}
             </button>
           ))}
           {parentOptions.length === 0 && c.parentId == null && (
-            <span className="text-[11px] text-black/35">Zatím není kam ji zanořit.</span>
+            <span className="t-meta">Zatím není kam ji zanořit.</span>
           )}
         </div>
       )}
@@ -2625,40 +2097,34 @@ function DefaultsEditor({ category, inherited, onSaved }: {
   };
 
   return (
-    <div className="mt-2.5 well border border-black/[0.06] p-3.5 space-y-3">
-      <p className="text-[11px] text-black/50">
-        Nová položka v této kategorii se předvyplní tímhle. Cokoliv jde u položky přepsat.
-      </p>
+    <div className="mt-2.5 well p-4 space-y-3">
+      <p className="t-meta">Nová položka v této kategorii se předvyplní tímhle. Cokoliv jde u položky přepsat.</p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
         {DEFAULT_FIELDS.map(f => {
           const fromParent = (inherited as any)[f.key];
+          const id = `sklad-predvyplneni-${category.id}-${f.key}`;
           return (
-            <div key={f.key} className={f.kind === 'multiline' ? 'sm:col-span-2' : ''}>
-              <label className="block text-[11px] uppercase tracking-wider text-black/45 mb-1">{f.label}</label>
+            <Field key={f.key} id={id} label={f.label} className={f.kind === 'multiline' ? 'sm:col-span-2' : ''}
+              hint={fromParent != null && !values[f.key] ? 'Zdědí se z nadřazené kategorie.' : undefined}>
               {f.kind === 'multiline' ? (
-                <textarea rows={2} value={values[f.key]} onChange={e => setValues(v => ({ ...v, [f.key]: e.target.value }))}
+                <textarea id={id} rows={2} value={values[f.key]} onChange={e => setValues(v => ({ ...v, [f.key]: e.target.value }))}
                   placeholder={fromParent != null ? String(fromParent) : f.hint}
-                  className="w-full rounded-xl bg-white border border-black/[0.08] px-3 py-2 text-sm text-[#16181A] resize-none focus:outline-none focus:border-[#C8F542]/50" />
+                  className={`${inputClass} resize-none`} />
               ) : (
-                <input type={f.kind === 'number' ? 'number' : f.kind === 'url' ? 'url' : 'text'}
+                <input id={id} type={f.kind === 'number' ? 'number' : f.kind === 'url' ? 'url' : 'text'}
+                  inputMode={f.kind === 'number' ? 'decimal' : undefined}
                   value={values[f.key]} onChange={e => setValues(v => ({ ...v, [f.key]: e.target.value }))}
                   placeholder={fromParent != null ? String(fromParent) : f.hint}
-                  className="w-full rounded-xl bg-white border border-black/[0.08] px-3 py-2 text-sm text-[#16181A] focus:outline-none focus:border-[#C8F542]/50" />
+                  className={inputClass} />
               )}
-              {fromParent != null && !values[f.key] && (
-                <p className="text-[11px] text-black/35 mt-0.5">Zdědí se z nadřazené kategorie.</p>
-              )}
-            </div>
+            </Field>
           );
         })}
       </div>
       <div className="flex items-center gap-2">
-        <button onClick={save} disabled={busy}
-          className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2 text-xs hover:brightness-110 disabled:opacity-50 transition">
-          {busy ? 'Ukládám…' : 'Uložit'}
-        </button>
-        {saved && <span className="text-xs font-medium text-[#5B7A08]">Uloženo</span>}
-        {err && <span className="text-xs font-medium text-bad-ink">{err}</span>}
+        <Button variant="primary" size="sm" onClick={save} loading={busy}>Uložit</Button>
+        {saved && <span className="text-xs font-medium text-ok-ink" role="status">Uloženo</span>}
+        {err && <span className="text-xs font-medium text-bad-ink" role="alert">{err}</span>}
       </div>
     </div>
   );
@@ -2709,83 +2175,66 @@ function PackagingEditor({ category, onSaved }: {
 
   const setStep = (i: number, patch: Partial<ScaleStep>) =>
     setSteps(list => list.map((s, idx) => idx === i ? { ...s, ...patch } : s));
+  const idK = `sklad-baleni-${category.id}`;
 
   return (
-    <div className="mt-2.5 well border border-black/[0.06] p-3.5 space-y-3">
-      <label className="flex items-start gap-2.5 cursor-pointer">
-        <input type="checkbox" checked={on} onChange={e => setOn(e.target.checked)} className="mt-0.5 h-5 w-5 accent-[#C8F542]" />
-        <span className="min-w-0">
-          <span className="block text-sm font-medium text-[#16181A]">Sledovat zbytek v načatém balení</span>
-          <span className="block text-[11px] text-black/45 mt-0.5">
-            Obsluha na konci směny jen ťukne, jak je krabička plná — nic neváží.
-          </span>
-        </span>
-      </label>
+    <div className="mt-2.5 well p-4 space-y-3">
+      <SwitchRow as="div" title="Sledovat zbytek v načatém balení"
+        hint="Obsluha na konci směny jen ťukne, jak je krabička plná — nic neváží."
+        checked={on} onChange={setOn} />
 
       {on && (
         <>
           <div className="grid grid-cols-2 gap-2.5">
-            <div>
-              <label className="block text-[11px] uppercase tracking-wider text-black/45 mb-1">Jednotka obsahu</label>
-              <select value={unit} onChange={e => setUnit(e.target.value)}
-                className="w-full rounded-xl bg-white border border-black/[0.08] px-3 py-2 text-sm text-[#16181A] focus:outline-none focus:border-[#C8F542]/50">
+            <Field id={`${idK}-jednotka`} label="Jednotka obsahu">
+              <select id={`${idK}-jednotka`} value={unit} onChange={e => setUnit(e.target.value)} className={inputClass}>
                 {CONTENT_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
               </select>
-            </div>
-            <div>
-              <label className="block text-[11px] uppercase tracking-wider text-black/45 mb-1">Výchozí balení</label>
-              <input type="number" inputMode="numeric" min={0} value={size} onChange={e => setSize(e.target.value)} placeholder="100"
-                className="w-full rounded-xl bg-white border border-black/[0.08] px-3 py-2 text-sm text-[#16181A] tabular-nums focus:outline-none focus:border-[#C8F542]/50" />
-            </div>
+            </Field>
+            <Field id={`${idK}-velikost`} label="Výchozí balení">
+              <input id={`${idK}-velikost`} type="number" inputMode="numeric" min={0} value={size} onChange={e => setSize(e.target.value)} placeholder="100"
+                className={`${inputClass} tabular-nums`} />
+            </Field>
           </div>
 
           <div>
-            <p className="text-[11px] uppercase tracking-wider text-black/45 mb-1.5">Hlídat zásoby podle</p>
-            <div className="flex gap-1 rounded-full bg-white border border-black/[0.08] p-1 w-fit">
-              {([['package', 'Balení'], ['content', unit ? `Obsahu (${unit})` : 'Obsahu']] as const).map(([v, lbl]) => (
-                <button key={v} type="button" onClick={() => setThresholdUnit(v)}
-                  className={`tap-target-sm px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${
-                    thresholdUnit === v ? 'seg-on' : 'seg-off'
-                  }`}>
-                  {lbl}
-                </button>
-              ))}
-            </div>
-            <p className="text-[11px] text-black/40 mt-1.5">
+            <p className="field-label">Hlídat zásoby podle</p>
+            <Segmented ariaLabel="Hlídat zásoby podle" size="sm" value={thresholdUnit} onChange={setThresholdUnit}
+              options={[{ id: 'package', label: 'Balení' }, { id: 'content', label: unit ? `Obsahu (${unit})` : 'Obsahu' }]} />
+            <p className="t-meta mt-1.5">
               {thresholdUnit === 'content'
                 ? `„Upozornit při" a „Kriticky málo při" se u položek zadávají v ${unit || 'jednotkách obsahu'} — počítá se všechno dohromady, zavřená balení i zbytek v načatém.`
                 : 'Prahy se zadávají v balení; načaté balení se počítá jako část (půl krabičky = 0,5).'}
             </p>
             {thresholdUnit !== (category.thresholdUnit === 'content' ? 'content' : 'package') && (
-              <p className="text-[11px] text-wait-ink bg-wait/10 border border-wait/25 rounded-xl px-3 py-2 mt-1.5">
+              <p className="note note-wait mt-1.5 text-[13px]">
                 Prahy u položek v této kategorii jsou zadané v {thresholdUnit === 'content' ? 'balení' : (unit || 'jednotkách obsahu')} — po uložení je bude potřeba přepsat, jinak budou hlásit nesmysl.
               </p>
             )}
           </div>
 
           <div>
-            <p className="text-[11px] uppercase tracking-wider text-black/45 mb-1.5">Stupně měřítka</p>
+            <p className="field-label">Stupně měřítka</p>
             <div className="space-y-1.5">
               {steps.map((s, i) => (
                 <div key={i} className="flex items-center gap-2">
-                  <input value={s.label} onChange={e => setStep(i, { label: e.target.value })}
-                    className="flex-1 min-w-0 rounded-xl bg-white border border-black/[0.08] px-3 py-1.5 text-sm text-[#16181A] focus:outline-none focus:border-[#C8F542]/50" />
+                  <input value={s.label} onChange={e => setStep(i, { label: e.target.value })} aria-label={`Název stupně ${i + 1}`}
+                    className={`${inputClass} flex-1 min-w-0`} />
                   <div className="flex items-center gap-1 shrink-0">
-                    <input type="number" inputMode="numeric" min={0} max={100} value={s.pct ?? 0}
+                    <input type="number" inputMode="numeric" min={0} max={100} value={s.pct ?? 0} aria-label={`Procenta stupně ${s.label || i + 1}`}
                       onChange={e => setStep(i, { pct: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })}
-                      className="w-16 rounded-xl bg-white border border-black/[0.08] px-2 py-1.5 text-sm text-[#16181A] tabular-nums focus:outline-none focus:border-[#C8F542]/50" />
-                    <span className="text-xs text-black/40">%</span>
+                      className={`${inputClass} !w-20 tabular-nums`} />
+                    <span className="text-xs text-black/55">%</span>
                   </div>
-                  <button aria-label="Zavřít" onClick={() => setSteps(l => l.filter((_, idx) => idx !== i))}
-                    className="shrink-0 btn-icon btn-icon-danger"><Icon name="close" size={15} /></button>
+                  <Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={`Odebrat stupeň ${s.label || i + 1}`}
+                    onClick={() => setSteps(l => l.filter((_, idx) => idx !== i))} />
                 </div>
               ))}
             </div>
-            <button onClick={() => setSteps(l => [...l, { label: 'Nový stupeň', pct: 50 }])}
-              className="tap-target-sm mt-2 inline-flex items-center gap-1.5 rounded-full bg-black/[0.05] text-black/60 px-3 py-1.5 text-xs font-medium hover:bg-black/[0.09] transition">
-              <Icon name="plus" size={13} /> Přidat stupeň
-            </button>
-            <p className="text-[11px] text-black/40 mt-1.5">
+            <Button variant="ghost" size="sm" icon="plus" className="mt-2" onClick={() => setSteps(l => [...l, { label: 'Nový stupeň', pct: 50 }])}>
+              Přidat stupeň
+            </Button>
+            <p className="t-meta mt-1.5">
               Procenta platí pro jakoukoliv velikost balení — „Půl" je 50 g u stogramové i 25 g u padesátigramové.
             </p>
           </div>
@@ -2793,24 +2242,23 @@ function PackagingEditor({ category, onSaved }: {
       )}
 
       <div className="flex items-center gap-2">
-        <button onClick={save} disabled={busy}
-          className="rounded-full bg-[#C8F542] text-black font-semibold px-4 py-2 text-xs hover:brightness-110 disabled:opacity-50 transition">
-          {busy ? 'Ukládám…' : 'Uložit'}
-        </button>
-        {saved && <span className="text-xs font-medium text-[#5B7A08]">Uloženo</span>}
-        {err && <span className="text-xs font-medium text-bad-ink">{err}</span>}
+        <Button variant="primary" size="sm" onClick={save} loading={busy}>Uložit</Button>
+        {saved && <span className="text-xs font-medium text-ok-ink" role="status">Uloženo</span>}
+        {err && <span className="text-xs font-medium text-bad-ink" role="alert">{err}</span>}
       </div>
     </div>
   );
 }
 
 // Suppliers manager: name + e-mail is all an order needs to leave the app.
-function SuppliersModal({ suppliers, onClose, onChanged }: {
+function SuppliersModal({ suppliers, smiUpravit, onClose, onChanged, potvrdit }: {
   suppliers: any[];
+  /** dodavatele.upravit — bez něj se seznam jen čte. */
+  smiUpravit: boolean;
   onClose: () => void;
   onChanged: () => Promise<void> | void;
+  potvrdit: (p: Potvrzeni) => void;
 }) {
-  const pm = useModal(true, onClose, 'Dodavatelé');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -2832,70 +2280,69 @@ function SuppliersModal({ suppliers, onClose, onChanged }: {
   };
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center modal-overlay p-4" onClick={onClose}>
-      <div ref={pm.ref} {...pm.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
-        <DiscardGuard guard={pm.guard} />
-        <div className="flex items-center justify-between gap-3 mb-1">
-          <h3 className="t-card"><Icon name="box" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Dodavatelé</h3>
-          <button onClick={pm.guard.attemptClose} className="btn-icon" aria-label="Zavřít"><Icon name="close" size={15} /></button>
-        </div>
-        <p className="text-sm text-black/45 mb-4">S vyplněným e-mailem jde objednávka poslat rovnou z nákupního seznamu. Jméno dodavatele u položek vybíráš našeptávačem.</p>
-        {err && <p className="text-sm text-bad-ink mb-2">{err}</p>}
-
-        <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 mb-4">
-          <input value={name} onChange={e => setName(e.target.value)} placeholder="Název dodavatele" maxLength={120}
-            className="field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
-          <input value={email} onChange={e => setEmail(e.target.value)} placeholder="objednavky@dodavatel.cz" type="email" maxLength={200}
-            className="field border border-black/[0.08] px-4 py-3 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none" />
-          <button onClick={add} disabled={busy || !name.trim()}
-            className="rounded-full bg-[#C8F542] text-black font-semibold px-5 py-3 text-sm hover:brightness-110 disabled:opacity-50 transition whitespace-nowrap">
-            Přidat
-          </button>
-        </div>
+    <Modal open onClose={onClose} size="lg" title="Dodavatelé"
+      subtitle="S vyplněným e-mailem jde objednávka poslat rovnou z nákupního seznamu. Jméno dodavatele u položek vybíráš našeptávačem.">
+      <div className="space-y-4">
+        {err && <p className="note note-danger" role="alert">{err}</p>}
+        {smiUpravit && (
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-end">
+            <Field id="sklad-dod-nazev" label="Název dodavatele">
+              <input id="sklad-dod-nazev" value={name} onChange={e => setName(e.target.value)} maxLength={120} className={inputClass} />
+            </Field>
+            <Field id="sklad-dod-email" label="E-mail pro objednávky">
+              <input id="sklad-dod-email" value={email} onChange={e => setEmail(e.target.value)} placeholder="objednavky@dodavatel.cz" type="email" maxLength={200} className={inputClass} />
+            </Field>
+            <Button variant="primary" icon="plus" onClick={add} loading={busy} disabled={!name.trim()}>Přidat</Button>
+          </div>
+        )}
 
         {suppliers.length === 0 ? (
           <EmptyState illustration="sklad" title="Zatím žádný dodavatel" hint="S dodavatelem u položky pošleš objednávku e-mailem rovnou z nákupního seznamu." compact />
         ) : (
-          <div className="divide-y divide-black/[0.06] rounded-2xl border border-black/[0.06] overflow-hidden">
+          <ul className="list">
             {suppliers.map(sp => (
-              <div key={sp.id} className="flex flex-wrap items-center gap-2 px-4 py-3">
-                <span className="min-w-0 flex-1 text-sm font-medium text-[#16181A] truncate">
-                  {sp.name}
-                  {sp.zOrganizace && <span className="ml-1.5 chip chip-sm chip-muted align-middle" title={sp.spravuje ? `Spravuje: ${sp.spravuje}` : undefined}>z organizace</span>}
-                  {sp.sdileno && <span className="ml-1.5 chip chip-sm chip-info align-middle" title="Vidí a používají ho i ostatní podniky organizace">sdíleno</span>}
-                </span>
-                {/* Dodavatele z organizace spravuje jiný podnik — tady se jen čte. */}
-                {sp.zOrganizace ? (
-                  <span className={`shrink-0 text-xs ${sp.email ? 'text-black/50' : 'text-wait-ink'}`}>{sp.email ?? 'bez e-mailu'}</span>
-                ) : editId === sp.id ? (
-                  <span className="flex items-center gap-1.5">
-                    <input value={editEmail} onChange={e => setEditEmail(e.target.value)} type="email" placeholder="e-mail"
-                      className="tap-target-sm w-52 field rounded-xl border border-black/[0.08] px-3 py-1.5 text-xs text-[#16181A] focus:outline-none focus:border-[#C8F542]/50" />
-                    <button onClick={async () => {
-                      const res = await fetch('/api/suppliers', {
-                        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ id: sp.id, email: editEmail.trim() || null }),
-                      }).catch(() => null);
-                      if (res?.ok) { setEditId(null); await onChanged(); }
-                    }} className="tap-target-sm btn btn-primary btn-sm">Uložit</button>
-                  </span>
-                ) : (
-                  <>
-                    <span className={`shrink-0 text-xs ${sp.email ? 'text-black/50' : 'text-wait-ink'}`}>{sp.email ?? 'bez e-mailu'}</span>
-                    <button onClick={() => { setEditId(sp.id); setEditEmail(sp.email ?? ''); }}
-                      className="shrink-0 rounded-full glass w-7 h-7 flex items-center justify-center text-black/40 hover:text-black text-xs"><Icon name="pencil" size={15} /></button>
-                    <button aria-label="Odebrat" onClick={async () => {
-                      if (!confirm(`Smazat dodavatele „${sp.name}"?`)) return;
-                      const res = await fetch(`/api/suppliers?id=${sp.id}`, { method: 'DELETE' }).catch(() => null);
-                      if (res?.ok) await onChanged();
-                    }} className="shrink-0 rounded-full glass w-7 h-7 flex items-center justify-center text-black/40 hover:text-bad-ink text-xs"><Icon name="close" size={15} /></button>
-                  </>
-                )}
-              </div>
+              <li key={sp.id}>
+                <ListRow as="div"
+                  title={<>
+                    {sp.name}
+                    {sp.zOrganizace && <Chip tone="muted" size="sm" className="ml-1.5 align-middle">z organizace</Chip>}
+                    {sp.sdileno && <Chip tone="info" size="sm" className="ml-1.5 align-middle">sdíleno</Chip>}
+                  </>}
+                  meta={editId === sp.id ? undefined : <span className={sp.email ? '' : 'text-wait-ink'}>{sp.email ?? 'bez e-mailu'}</span>}
+                  actions={sp.zOrganizace || !smiUpravit ? undefined : editId === sp.id ? (
+                    <span className="flex items-center gap-1.5">
+                      <input value={editEmail} onChange={e => setEditEmail(e.target.value)} type="email" aria-label={`E-mail dodavatele ${sp.name}`}
+                        className={`${inputClass} !w-full sm:!w-52`} />
+                      <Button variant="primary" size="sm" onClick={async () => {
+                        const res = await fetch('/api/suppliers', {
+                          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ id: sp.id, email: editEmail.trim() || null }),
+                        }).catch(() => null);
+                        if (res?.ok) { setEditId(null); await onChanged(); }
+                        else setErr('E-mail se nepodařilo uložit.');
+                      }}>Uložit</Button>
+                    </span>
+                  ) : (
+                    <Menu size="sm" label={`Další akce: ${sp.name}`} items={[
+                      { label: 'Upravit e-mail', icon: 'pencil', onClick: () => { setEditId(sp.id); setEditEmail(sp.email ?? ''); } },
+                      { label: 'Smazat dodavatele…', icon: 'trash', danger: true, onClick: () => potvrdit({
+                        titulek: `Smazat dodavatele „${sp.name}"?`,
+                        text: 'U položek zůstane jeho jméno jako text, jen z něj nepůjde poslat objednávka e-mailem.',
+                        akce: 'Smazat dodavatele',
+                        provest: async () => {
+                          const res = await fetch(`/api/suppliers?id=${sp.id}`, { method: 'DELETE' }).catch(() => null);
+                          if (res?.ok) await onChanged();
+                          else setErr('Dodavatele se nepodařilo smazat.');
+                        },
+                      }) },
+                    ]} />
+                  )}
+                />
+              </li>
             ))}
-          </div>
+          </ul>
         )}
       </div>
-    </div>
+    </Modal>
   );
 }

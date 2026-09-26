@@ -37,7 +37,7 @@ import { Chip, ListRow, Stat, StatRow } from '../../ui';
 import { useOpravneni } from '../../role/useOpravneni';
 import { Widget, type StavNacteni } from '../Widget';
 import { useDataWidgetu } from '../useDataWidgetu';
-import { useNavigace, useSmi } from '../NavigaceKontext';
+import { useSmi } from '../NavigaceKontext';
 
 /** Měsíc z přepínače v hlavičce Všech podniků („RRRR-MM"); jinde null = dnešní měsíc. */
 export const MesicStrankyOrganizace = createContext<string | null>(null);
@@ -69,7 +69,6 @@ function useBrana(): { ok: boolean; ceka: boolean } {
 const CEKA: StavNacteni = { data: null, error: null, loading: true, reload: () => {} };
 
 function Podniky({ velikost, nastaveni }: WidgetProps<{ mesic: string }>) {
-  const nav = useNavigace();
   const smi = useSmi();
   const { ok, ceka } = useBrana();
   const zaklad = useContext(MesicStrankyOrganizace) ?? pragueToday().slice(0, 7);
@@ -78,9 +77,10 @@ function Podniky({ velikost, nastaveni }: WidgetProps<{ mesic: string }>) {
   const p = data.data;
   const t = p?.celkem;
   // Pole katalogu: tržby jen s finance.trzby, mzdy s finance.mzdy. API je v podnicích bez
-  // oprávnění pošle jako null samo; tady se navíc nekreslí údaj, na který divák nemá ani doma.
-  const trzby = smi('finance.trzby');
-  const mzdy = smi('finance.mzdy');
+  // oprávnění pošle jako null samo; údaj se kreslí, když ho divák smí doma, nebo když mu
+  // server aspoň v jednom podniku poslal číslo — stejné pravidlo jako nástroj stránky.
+  const trzby = smi('finance.trzby') || (p?.podniky ?? []).some(r => r.revenue != null);
+  const mzdy = smi('finance.mzdy') || (p?.podniky ?? []).some(r => r.wages != null);
   const naStrance = !!useContext(MesicStrankyOrganizace);
   const problemove = (p?.podniky ?? []).filter(potrebujePozornost);
 
@@ -108,19 +108,23 @@ function Podniky({ velikost, nastaveni }: WidgetProps<{ mesic: string }>) {
           </p>
         </div>
       ) : (
+        // Řádky se neproklikávají: všechny by vedly na tutéž stránku (ne na podnik) a
+        // klikací ListRow se kreslí jako <li class="contents">, na kterém `.list`
+        // nenakreslí linky mezi podniky. Cestu na stránku nese odkaz v hlavičce widgetu.
         <ul className="list">
           {p.podniky.map(r => (
-            <ListRow key={r.teamId} title={r.name}
-              meta={[czCount(r.members, CLEN), czCount(r.closings, UZAVERKA), `${r.onShiftNow.toLocaleString('cs-CZ')} na směně`].join(' · ')}
-              value={trzby ? <span className="tabular-nums"><Penize castka={r.revenue} mena={r.currency} /></span> : undefined}
-              valueMeta={mzdy && r.wages != null && r.revenue ? `mzdy ${Math.round((r.wages / r.revenue) * 100)} %` : undefined}
-              right={(r.missingClosings > 0 || r.stockAlerts > 0) ? (
-                <span className="flex flex-col items-end gap-1">
-                  {r.missingClosings > 0 && <Chip tone="bad" size="sm">chybí {czCount(r.missingClosings, UZAVERKA)}</Chip>}
-                  {r.stockAlerts > 0 && <Chip tone="wait" size="sm">sklad {r.stockAlerts.toLocaleString('cs-CZ')}</Chip>}
-                </span>
-              ) : undefined}
-              onClick={!naStrance && nav.smiPohled('org') ? () => nav.onNavigate('org') : undefined} />
+            <li key={r.teamId}>
+              <ListRow as="div" title={r.name}
+                meta={[czCount(r.members, CLEN), czCount(r.closings, UZAVERKA), `${r.onShiftNow.toLocaleString('cs-CZ')} na směně`].join(' · ')}
+                value={trzby ? <span className="tabular-nums"><Penize castka={r.revenue} mena={r.currency} /></span> : undefined}
+                valueMeta={mzdy && r.wages != null && r.revenue ? `mzdy ${Math.round((r.wages / r.revenue) * 100)} %` : undefined}
+                right={(r.missingClosings > 0 || r.stockAlerts > 0) ? (
+                  <span className="flex flex-col items-end gap-1">
+                    {r.missingClosings > 0 && <Chip tone="bad" size="sm">chybí {czCount(r.missingClosings, UZAVERKA)}</Chip>}
+                    {r.stockAlerts > 0 && <Chip tone="wait" size="sm">sklad {r.stockAlerts.toLocaleString('cs-CZ')}</Chip>}
+                  </span>
+                ) : undefined} />
+            </li>
           ))}
         </ul>
       ))}

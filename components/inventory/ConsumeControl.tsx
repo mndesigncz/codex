@@ -5,8 +5,8 @@
 // partial pour never costs a whole bottle.
 
 import { useState } from 'react';
+import { Button } from '../ui';
 
-import { Icon } from '../Icons';
 export default function ConsumeControl({ itemId, unit, quickAmounts, onDone, onFail }: {
   itemId: number;
   /** Unit the amount is measured in — content unit for packaged items, the item's own unit otherwise. */
@@ -39,37 +39,36 @@ export default function ConsumeControl({ itemId, unit, quickAmounts, onDone, onF
 
   if (!open) {
     return (
-      <button onClick={e => { e.stopPropagation(); setOpen(true); }}
-        title="Odepsat spotřebované množství"
-        className="rounded-full glass border border-black/10 text-black/55 hover:text-black px-3 h-8 flex items-center gap-1 text-xs font-semibold whitespace-nowrap transition">
-        − Odpis
-      </button>
+      // Ikona `minus` místo znaku „−" v popisku (kolo 69, audit Skladu).
+      <Button variant="secondary" size="sm" icon="minus" title="Odepsat spotřebované množství"
+        onClick={e => { e.stopPropagation(); setOpen(true); }}>
+        Odpis
+      </Button>
     );
   }
 
   return (
     <div className="flex flex-wrap items-center gap-1.5" onClick={e => e.stopPropagation()}>
       {(quickAmounts ?? []).map(q => (
-        <button key={q} onClick={() => consume(q)} disabled={saving}
-          className="rounded-full bg-black/[0.05] hover:bg-black/[0.09] text-black/60 px-2.5 h-8 text-xs font-semibold tabular-nums transition disabled:opacity-50">
+        <Button key={q} variant="secondary" size="sm" disabled={saving} onClick={() => consume(q)} className="tabular-nums">
           −{q}{unit ? ` ${unit}` : ''}
-        </button>
+        </Button>
       ))}
       <input
         autoFocus inputMode="decimal" value={amount}
         onChange={e => setAmount(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); consume(Number(amount.replace(',', '.'))); } }}
         placeholder={unit ?? 'množství'}
-        className="w-20 rounded-full bg-black/[0.04] border border-black/[0.08] px-3 h-8 text-xs text-[#16181A] text-right tabular-nums placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none"
+        aria-label={`Kolik odepsat${unit ? ` (${unit})` : ''}`}
+        className="field !w-20 !py-1.5 text-right tabular-nums"
       />
-      {unit && <span className="text-[11px] text-black/40">{unit}</span>}
-      <button onClick={() => consume(Number(amount.replace(',', '.')))}
-        disabled={saving || !(Number(amount.replace(',', '.')) > 0)}
-        className="btn btn-primary btn-sm transition disabled:opacity-40">
-        {saving ? '…' : 'Odepsat'}
-      </button>
-      <button aria-label="Zavřít" onClick={() => { setOpen(false); setAmount(''); }}
-        className="tap-target rounded-full w-8 h-8 flex items-center justify-center text-black/35 hover:text-black text-sm"><Icon name="close" size={15} /></button>
+      {unit && <span className="text-xs text-black/55">{unit}</span>}
+      <Button variant="primary" size="sm" loading={saving}
+        disabled={!(Number(amount.replace(',', '.')) > 0)}
+        onClick={() => consume(Number(amount.replace(',', '.')))}>
+        Odepsat
+      </Button>
+      <Button variant="ghost" size="sm" iconOnly icon="close" aria-label="Zrušit odpis" onClick={() => { setOpen(false); setAmount(''); }} />
     </div>
   );
 }

@@ -32,6 +32,7 @@ import { pragueToday } from '@/lib/pragueTime';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useSmi } from '../widgety/NavigaceKontext';
+import { useOpravneni } from '../role/useOpravneni';
 import { MesicStrankyFinanci } from '../widgety/oblasti/finance';
 import { urlFinanci, vyberFinance, type FinanceMesice, type RadekKnihy } from '@/lib/financeWidgety';
 
@@ -174,6 +175,11 @@ function ExportDialog({ mesic, onClose }: { mesic: string; onClose: () => void }
 function KnihaVydaju({ mesic }: { mesic: string }) {
   const money = useMoney();
   const smi = useSmi();
+  // useSmi() před načtením oprávnění vrací „ne" — kniha by pak majiteli s plnými
+  // právy na okamžik ukázala zámek „požádej majitele". Tři stavy jako useBrana
+  // ve widgetech: nevíme → kostra, víme a nesmí → zámek, smí → data.
+  const { nacteno, chyba } = useOpravneni();
+  const ceka = !nacteno && !chyba;
   const smiFinance = smi('finance.zobrazit');
   const data = useDataWidgetu<FinanceMesice>(smiFinance ? urlFinanci(mesic) : null, vyberFinance);
   const [filtr, setFiltr] = useState<Filtr>('all');
@@ -189,6 +195,14 @@ function KnihaVydaju({ mesic }: { mesic: string }) {
   const jehla = q.trim();
   const vybrane = kniha.filter(r => filtr === 'all' || r.kind === filtr).filter(r => obsahuje(`${r.label} ${r.note ?? ''}`, jehla));
   const soucet = vybrane.reduce((a, r) => a + r.amount, 0);
+
+  if (ceka) {
+    return (
+      <Section id="finance-vydaje" title="Výdaje">
+        <Card aria-busy><div className="space-y-2">{[0, 1, 2, 3].map(i => <Skeleton key={i} className={`h-12 ${i === 3 ? 'w-2/3' : ''}`} />)}</div></Card>
+      </Section>
+    );
+  }
 
   if (!smiFinance) {
     return (
@@ -220,13 +234,19 @@ function KnihaVydaju({ mesic }: { mesic: string }) {
           <ul className="list">
             {vybrane.map((r, i) => {
               const druh = DRUHY[r.kind] ?? { label: r.kind, tecka: 'cat-dot-6' };
+              // Vlastní <li>: klikací ListRow se jinak kreslí jako <li class="contents">
+              // a `.list > * + *` na něm linku nad řádkem nenakreslí. Šipka žádná —
+              // měla by ji jen účtenka a odsunula by jí částku ze sloupce čísel;
+              // detail se otevírá klepnutím na celý řádek.
               return (
-                <ListRow key={`${r.date}-${i}`}
-                  lead={<span aria-hidden className={`h-2.5 w-2.5 rounded-full ${druh.tecka}`} />}
-                  title={r.label}
-                  meta={[kratce(r.date), druh.label, r.note, r.photoUrl ? 's fotkou' : null].filter(Boolean).join(' · ')}
-                  value={<span className="tabular-nums">−{money(r.amount)}</span>}
-                  onClick={r.kind === 'receipt' ? () => setDetail(r) : undefined} />
+                <li key={`${r.date}-${i}`}>
+                  <ListRow as="div" chevron={false}
+                    lead={<span aria-hidden className={`h-2.5 w-2.5 rounded-full ${druh.tecka}`} />}
+                    title={r.label}
+                    meta={[kratce(r.date), druh.label, r.note, r.photoUrl ? 's fotkou' : null].filter(Boolean).join(' · ')}
+                    value={<span className="tabular-nums">−{money(r.amount)}</span>}
+                    onClick={r.kind === 'receipt' ? () => setDetail(r) : undefined} />
+                </li>
               );
             })}
           </ul>

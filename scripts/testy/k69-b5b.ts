@@ -19,6 +19,7 @@ import {
 import { mesicZVolby, WIDGETY as FINANCE } from '../../lib/widgety/katalog/finance.ts';
 import { WIDGETY as TRZBY } from '../../lib/widgety/katalog/trzby.ts';
 import { WIDGETY as ORGANIZACE } from '../../lib/widgety/katalog/organizace.ts';
+import { KATALOG_WIDGETU } from '../../lib/widgety/katalog/index.ts';
 import { stranka } from '../../lib/widgety/stranky/index.ts';
 import { vyresRozlozeni } from '../../lib/widgety/rozlozeni.ts';
 import { KATALOG, SYSTEMOVE_ROLE } from '../../lib/opravneni.ts';
@@ -140,9 +141,16 @@ export default function ({ eq, ok }: Testy) {
   };
   const vid = (sid: string, d: Divak) => vyresRozlozeni({ stranka: stranka(sid as any)!, divak: d, osobni: null, vychozi: [] }).polozky.map(x => x.widget);
   const vlastnik: Divak = { ...role('vedeni'), opravneni: new Set(KATALOG.map(x => x.id)), jeSpravce: true };
-  eq('výchozí TO GO pro vlastníka: hero a týden první, pak zprávy, sklad a účtenky',
-    vid('vedeni.togo', vlastnik).filter(w => ['pokladna.dnes', 'trzby.po_dnech', 'chat.neprectene', 'sklad.dochazi', 'finance.uctenky'].includes(w)),
-    ['pokladna.dnes', 'trzby.po_dnech', 'chat.neprectene', 'sklad.dochazi', 'finance.uctenky']);
+  eq('výchozí TO GO pro vlastníka: hero a týden, kdo je na směně, výroba, pak uzávěrky ke schválení, úkoly, zprávy, sklad, účtenky a odkaz',
+    vid('vedeni.togo', vlastnik),
+    ['pokladna.dnes', 'trzby.po_dnech', 'dochazka.prave_na_smene', 'vyroba.k_vyrobe', 'uzaverky.ke_schvaleni', 'ukoly.dnes',
+      'chat.neprectene', 'sklad.dochazi', 'finance.uctenky', 'odkaz']);
+  // Plánovaný widget se nekreslí a resolver ho potichu vynechá — TO GO by tak beze stopy
+  // přišlo o obsah (dřív „Dnes v podniku"). Každý widget výchozího rozložení musí být hotový.
+  eq('výchozí TO GO: každý widget ve výchozím rozložení je hotový (žádný plánovaný, který by potichu zmizel)',
+    Object.values(stranka('vedeni.togo')!.vychozi).flat().filter(q => q!.w !== 'nastroj' && KATALOG_WIDGETU.find(w => w.id === q!.w)?.stav !== 'hotovo').map(q => q!.w), []);
+  eq('výchozí TO GO: odkaz vede na Postupy (zkratka místo dřívější dlaždice)',
+    vyresRozlozeni({ stranka: stranka('vedeni.togo')!, divak: vlastnik, osobni: null, vychozi: [] }).polozky.find(x => x.widget === 'odkaz')?.nastaveni, { cil: 'view:procedures' });
   ok('výchozí TO GO pro Provozní (N2): žádná tržba ani týden tržeb', !vid('vedeni.togo', role('provozni')).some(w => w === 'pokladna.dnes' || w === 'trzby.po_dnech'));
   eq('výchozí Finance pro Účetní: souhrn, podíl mezd, účtenky… a kniha výdajů na konci',
     vid('vedeni.finance', role('ucetni')).filter(w => w.startsWith('finance.') || w === 'nastroj'),

@@ -1,0 +1,64 @@
+{
+ "stranka": "vedeni.sklad",
+ "polozky": [
+  {
+   "id": "sklad-navrhy",
+   "widget": "sklad.navrhy",
+   "velikost": "M"
+  },
+  {
+   "id": "sklad-chybi-udaje",
+   "widget": "sklad.chybi_udaje",
+   "velikost": "S"
+  },
+  {
+   "id": "sklad-hlaseni",
+   "widget": "sklad.hlaseni",
+   "velikost": "S"
+  },
+  {
+   "id": "sklad-dochazi",
+   "widget": "sklad.dochazi",
+   "velikost": "M"
+  },
+  {
+   "id": "sklad-objednavky",
+   "widget": "sklad.objednavky",
+   "velikost": "M"
+  },
+  {
+   "id": "vyroba-k-vyrobe",
+   "widget": "vyroba.k_vyrobe",
+   "velikost": "L"
+  },
+  {
+   "id": "nastroj",
+   "widget": "nastroj",
+   "velikost": "L"
+  }
+ ],
+ "dostupne": [
+  "sklad.dochazi",
+  "sklad.nakupni_seznam",
+  "sklad.hodnota_zasob",
+  "sklad.navrhy",
+  "sklad.hlaseni",
+  "sklad.objednavky",
+  "vyroba.k_vyrobe",
+  "sklad.chybi_udaje",
+  "sklad.posledni_pohyby",
+  "sklad.inventura",
+  "sklad.zapsat_novou",
+  "sklad.nahlasit",
+  "sklad.stav_kategorie",
+  "finance.ztraty",
+  "odkaz"
+ ],
+ "tarifem": [],
+ "zdroj": "podnik",
+ "rozsah": "typ:vedeni",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": true,
+ "verze": 0
+}

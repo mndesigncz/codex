@@ -829,11 +829,12 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
             <span className="text-xs font-medium text-white/70">Očekáváno v kase</span>
             <span className="flex items-center gap-2.5 min-w-0">
               <span className="text-base font-bold tabular-nums">{money(expected)}</span>
+              {/* Rozdíl slovem, ne ručním štítkem: tónované chipy (průsvitná výplň
+                  + tmavý inkoust) jsou na inkoustovém pásu nečitelné a plná limetka
+                  vedle hlavní akce je zákaz. Stav nese slovo (sedí / přebytek / manko). */}
               {diff !== null && (
-                <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold tabular-nums ${
-                  diff === 0 ? 'bg-[#C8F542] text-black' : diff > 0 ? 'bg-[#0A84FF] text-white' : 'bg-bad text-white'
-                }`}>
-                  {diff === 0 ? 'sedí' : `${diff > 0 ? '+' : ''}${money(diff)}`}
+                <span className="shrink-0 text-xs font-semibold tabular-nums text-white/85">
+                  {diff === 0 ? 'Sedí' : `${diff > 0 ? 'Přebytek +' : 'Manko '}${money(diff)}`}
                 </span>
               )}
             </span>
@@ -904,32 +905,25 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
             </div>
             {isKiosk ? (
               <div className="min-w-0">
-                <label className="field-label">Kterou směnu uzavíráš?</label>
-                <div className="flex flex-col gap-2">
+                {/* Stejné pilulky jako u zaměstnance (DP §3.8): vybráno = inkoust, nikdy
+                    limetka, a žádná bílá karta v kartě formuláře. aria-pressed řekne
+                    čtečce, která směna je vybraná. */}
+                <p id="uzaverka-smena-kiosk" className="field-label">Kterou směnu uzavíráš?</p>
+                <div className="flex flex-wrap gap-2" role="group" aria-labelledby="uzaverka-smena-kiosk">
                   {eligible.map(s => {
                     const active = form.date === s.date && selEmployee === (s.employeeId ?? null);
                     return (
                       <button
                         key={s.id}
                         type="button"
+                        aria-pressed={active}
                         onClick={() => pickShift(s)}
-                        className={`flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left transition ${
-                          active ? 'bg-[#C8F542]/[0.12] border-[#C8F542]/40' : 'bg-white border-black/[0.08] hover:border-black/20'
-                        }`}
+                        className={`filter-pill tap-target-sm cz-sentence ${active ? 'seg-on' : 'seg-off glass'}`}
                       >
-                        <span className="min-w-0 flex items-center gap-2.5">
-                          {s.employeeName && <Avatar emoji={s.employeeAvatar} size="sm" />}
-                          <span className="min-w-0">
-                            <span className="block text-sm font-semibold text-[#16181A] cz-sentence truncate">
-                              {s.employeeName ? `${s.employeeName} · ` : ''}
-                              {new Date(s.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
-                            </span>
-                            <span className="block text-xs text-black/45 tabular-nums">{s.startTime}–{s.endTime}</span>
-                          </span>
-                        </span>
-                        <span className={`shrink-0 flex h-5 w-5 items-center justify-center rounded-full border-2 ${active ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/20 text-transparent'}`}>
-                          <Icon name="check" size={12} strokeWidth={3} />
-                        </span>
+                        {s.employeeName && <Avatar emoji={s.employeeAvatar} size="sm" />}
+                        {s.employeeName ? `${s.employeeName} · ` : ''}
+                        {new Date(s.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })}
+                        <span className="font-normal opacity-70"> · {s.startTime}–{s.endTime}</span>
                       </button>
                     );
                   })}

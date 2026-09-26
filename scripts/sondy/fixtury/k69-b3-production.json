@@ -1,0 +1,38 @@
+{
+ "toMake": [
+  {
+   "taskId": 41,
+   "title": "Vyrobit Limonáda domácí",
+   "priority": "normal",
+   "status": "todo",
+   "item": {
+    "id": 7,
+    "name": "Limonáda domácí",
+    "unit": "l",
+    "status": "low",
+    "quantity": 1,
+    "available": 1,
+    "recipeUnit": "l"
+   },
+   "batches": 2,
+   "yieldTotal": 6,
+   "batchYield": 3,
+   "steps": "Smíchat cukr s vodou.",
+   "guideId": null,
+   "guideTitle": null,
+   "lines": [
+    {
+     "ingredientId": 4,
+     "name": "Cukr třtinový",
+     "amount": 0.5,
+     "unit": "kg",
+     "available": 6,
+     "need": 1,
+     "missing": 0
+    }
+   ],
+   "missing": [],
+   "ready": true
+  }
+ ]
+}

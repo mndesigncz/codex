@@ -12,7 +12,7 @@
 //
 // API je podvržené (k68-spolecne.mjs), data widgetů z fixtur k69-b5b-*.json.
 import {
-  kontext, konec, tvrdi, otevri, lista, upravit, vUpravach, dokud, dotazyNa, roleMine, VLASTNIK, fixtura, hotovo, OUT,
+  kontext, konec, tvrdi, otevri, lista, upravit, vUpravach, dokud, dotazyNa, roleMine, VLASTNIK, fixtura, hotovo, OUT, BASE,
 } from './k68-spolecne.mjs';
 
 const dnes = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date());
@@ -69,6 +69,23 @@ const pretece = (p) => p.evaluate(() => document.documentElement.scrollWidth > w
   const financeDotazu = new Set(dotazyNa(stav, ['/api/finance']).filter(d => !d.path.includes('advice')).map(d => d.u)).size;
   tvrdi('finance 1: widgety a kniha výdajů sdílí jednu URL /api/finance', financeDotazu === 1, String(financeDotazu));
 
+  // Kniha výdajů: klikací účtenka nesmí být <li class="contents"> (bez linky nad sebou)
+  // a šipka jen u účtenek nesmí odsunout částku ze sloupce čísel (DP §3.6).
+  const kniha = await p.evaluate(() => {
+    const ul = document.querySelector('[data-plocha] li[data-widget="nastroj"] ul.list');
+    if (!ul) return null;
+    const radky = [...ul.children];
+    return {
+      radku: radky.length,
+      contents: radky.filter(li => getComputedStyle(li).display === 'contents').length,
+      bezLinky: radky.slice(1).filter(li => getComputedStyle(li).borderTopWidth === '0px').length,
+      praveHrany: [...new Set([...ul.querySelectorAll('.list-value')].map(e => Math.round(e.getBoundingClientRect().right)))],
+    };
+  });
+  tvrdi('finance 1: kniha výdajů má linku nad každým řádkem, i nad klikací účtenkou',
+    !!kniha && kniha.radku > 2 && kniha.contents === 0 && kniha.bezLinky === 0, JSON.stringify(kniha));
+  tvrdi('finance 1: částky knihy sedí v jednom pravém sloupci (účtenka je neodsouvá)', !!kniha && kniha.praveHrany.length === 1, JSON.stringify(kniha?.praveHrany));
+
   // 7) Rozepsané hledání v nástroji přežije úpravy.
   const hledat = p.getByRole('combobox', { name: 'Hledat ve výdajích' }).or(p.getByLabel('Hledat ve výdajích')).first();
   await hledat.fill('Makro');
@@ -101,9 +118,8 @@ const pretece = (p) => p.evaluate(() => document.documentElement.scrollWidth > w
   const galerie = p.getByRole('dialog', { name: 'Přidat widget' });
   await dokud(() => galerie.isVisible(), 3000);
   await p.waitForTimeout(400);
-  const g = await galerie.innerText();
-  const doporucene = g.split(/Doporučené pro tuto stránku/i)[1]?.split(/\n(?=[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ ]{4,}\n)/)[0] ?? '';
-  tvrdi('finance 3: galerie má „Doporučené" s widgety balíku', /Doporučené/i.test(g) && ['Tržba po dnech', 'Top produkty', 'Stav pokladny'].every(x => doporucene.includes(x)), doporucene.slice(0, 200));
+  const doporucene = await galerie.locator('section[aria-labelledby="galerie-doporucene"]').innerText().catch(() => '');
+  tvrdi('finance 3: galerie má „Doporučené" s widgety balíku', ['Tržba po dnech', 'Top produkty', 'Stav pokladny', 'Postřehy měsíce'].every(x => doporucene.includes(x)), doporucene.slice(0, 200));
   await p.keyboard.press('Escape');
   await p.waitForTimeout(300);
   await hotovo(p).click();
@@ -124,16 +140,36 @@ const pretece = (p) => p.evaluate(() => document.documentElement.scrollWidth > w
   await ctx.close();
 }
 
-// 4) Oprávnění: Provozní (bez financí) — žádný finanční widget ani dotaz; kniha výdajů vysvětlí proč.
+// 4) Oprávnění: role s tržbami, ale bez finance.zobrazit (Provozní + finance.trzby). Stránku otevře
+//    (přístup je finance.zobrazit | finance.trzby), widgety financí ale nevidí a jejich dotazy neodejdou.
 {
-  const { ctx, p, stav } = await kontext({ fix: s('k69-b5b-rozlozeni-finance'), mineData: roleMine('provozni'), dalsi: data() });
+  const r = roleMine('provozni');
+  const mineData = { ...r, opravneni: [...r.opravneni, 'finance.trzby'] };
+  const { ctx, p, stav } = await kontext({ fix: s('k69-b5b-rozlozeni-finance'), mineData, dalsi: data() });
   await otevri(p, '/employer/overview?view=finance', 'vedeni.finance');
   await p.waitForTimeout(1500);
   const vidim = await p.$$eval('[data-plocha] li[data-widget]:not([hidden])', els => els.map(e => e.getAttribute('data-widget')));
-  tvrdi('finance 4: Provozní nevidí žádný widget financí ani tržeb', vidim.every(w => w === 'nastroj'), vidim.join(','));
-  const zakazane = dotazyNa(stav, ['/api/finance', '/api/pos/daily', '/api/pos/margins', '/api/inventory/shrinkage', '/api/receipts']);
-  tvrdi('finance 4: a jejich endpointy se nevolají', zakazane.length === 0, zakazane.map(d => d.path).join(','));
+  tvrdi('finance 4: bez finance.zobrazit žádný widget financí (souhrn, podíl mezd, Kam šly peníze, marže, ztráty, účtenky)',
+    !vidim.some(w => w.startsWith('finance.')), vidim.join(','));
+  tvrdi('finance 4: tržby z pokladny (finance.trzby) zůstávají', vidim.includes('pokladna.zive') && vidim.includes('trzby.platby'), vidim.join(','));
+  const zakazane = dotazyNa(stav, ['/api/finance', '/api/pos/margins', '/api/inventory/shrinkage', '/api/receipts']);
+  tvrdi('finance 4: endpointy financí se nevolají', zakazane.length === 0, zakazane.map(d => d.path).join(','));
   tvrdi('finance 4: kniha výdajů místo 403 řekne, kdo ji vidí', /vidí jen role s přístupem k financím/.test(await p.locator('[data-plocha]').innerText()));
+  tvrdi('finance 4: bez finance.exportovat není Export pro účetní', await p.getByRole('button', { name: 'Export pro účetní' }).count() === 0);
+  await ctx.close();
+}
+{
+  // Než dorazí oprávnění (/api/teams/mine), kniha výdajů ukáže kostru — ne zámek
+  // „vidí jen role s přístupem k financím", který by majitel s plnými právy zahlédl.
+  const { ctx, p, stav } = await kontext({ fix: s('k69-b5b-rozlozeni-finance'), mineZpozdeni: 4000, dalsi: data() });
+  await p.goto(BASE + '/employer/overview?view=finance', { waitUntil: 'domcontentloaded' });
+  const vidim = await p.locator('[data-plocha] li[data-widget="nastroj"]').first().waitFor({ timeout: 3500 }).then(() => true, () => false);
+  const pred = vidim && stav.mineDoruceno == null ? await p.locator('[data-plocha] li[data-widget="nastroj"]').innerText() : null;
+  tvrdi('finance 4: před načtením oprávnění kniha výdajů neukazuje zámek',
+    pred == null || !/vidí jen role s přístupem k financím/.test(pred), vidim ? (pred ?? 'oprávnění už dorazila').slice(0, 120) : 'plocha se před oprávněními nekreslí');
+  await dokud(() => stav.mineDoruceno != null, 6000);
+  await p.waitForTimeout(1200);
+  tvrdi('finance 4: po načtení oprávnění majitel knihu vidí', await p.locator('[data-plocha] li[data-widget="nastroj"] >> text=Výdaje').first().isVisible());
   await ctx.close();
 }
 {
@@ -183,7 +219,7 @@ async function togo(opts) {
   tvrdi('togo 6: dva malé widgety vedle sebe', dveS.length === 2 && Math.abs(dveS[0][0] - dveS[1][0]) <= 1 && dveS[0][1] !== dveS[1][1], JSON.stringify(dveS));
   tvrdi('togo 6: bez vodorovného přetečení', !(await pretece(p)));
   const admin = p.getByRole('button', { name: 'Administrace' });
-  tvrdi('togo 6: „Administrace" vidět a klikatelná (ne limetka)', await admin.isVisible() && !(await admin.getAttribute('class') ?? '').includes('C8F542'));
+  tvrdi('togo 6: „Administrace" vidět a klikatelná (ne limetka)', await admin.isVisible() && !((await admin.getAttribute('class')) ?? '').includes('bg-[#C8F542]'));
   tvrdi('togo 1: bez šipek-znaků a ručních odznaků', !/[↗↘→]/.test(await p.locator('body').innerText()));
   tvrdi('togo 1: žádná chyba v konzoli', chyby.length === 0, chyby.slice(0, 2).join(' | '));
   await p.screenshot({ path: OUT + 'k69-b5b-togo-tel.png', fullPage: true });
@@ -201,7 +237,7 @@ async function togo(opts) {
   const sChybou = await p.$$eval('[data-plocha] li[data-widget]', els => els.filter(e => /Zkusit znovu/.test(e.textContent ?? '')).map(e => e.getAttribute('data-widget')));
   tvrdi('togo 5: 500 na /api/pos/daily → chyba jen u widgetů z něj (týden, průměrná účtenka)',
     sChybou.length === 2 && sChybou.includes('trzby.po_dnech') && sChybou.includes('trzby.prumerna_uctenka'), sChybou.join(','));
-  tvrdi('togo 5: Pokladna dnes žije', /Tržba/.test(await text(p, 'pokladna.dnes')));
+  tvrdi('togo 5: Pokladna dnes žije', /Tržba/i.test(await text(p, 'pokladna.dnes')));
   await ctx.close();
 }
 
@@ -244,7 +280,8 @@ async function togo(opts) {
   await lista(p).getByRole('button', { name: 'Přidat widget' }).click();
   const galerie = p.getByRole('dialog', { name: 'Přidat widget' });
   await dokud(() => galerie.isVisible(), 3000);
-  tvrdi('podniky 3: galerie má „Doporučené" s Všemi podniky', /Doporučené[\s\S]*Všechny podniky/i.test(await galerie.innerText()));
+  await p.waitForTimeout(300);
+  tvrdi('podniky 3: galerie má „Doporučené" s Všemi podniky', /Všechny podniky/.test(await galerie.locator('section[aria-labelledby="galerie-doporucene"]').innerText().catch(() => '')));
   await ctx.close();
 }
 {
@@ -255,6 +292,41 @@ async function togo(opts) {
   await p.waitForTimeout(1200);
   const t = (await p.locator('[data-plocha]').innerText()).replace(/ /g, ' ');
   tvrdi('podniky 4: skryté tržby a mzdy jsou „skryto", nikde „0 Kč"', /skryto/.test(t) && !/\b0 Kč/.test(t), t.match(/.{0,30}0 Kč.{0,20}/)?.[0] ?? '');
+  await ctx.close();
+}
+{
+  // Role s přehledem organizace, ale bez finance.trzby a finance.mzdy (API pošle všude null):
+  // řada Tržby / Mzdy se nekreslí vůbec — ani v nástroji, ani ve widgetu (DP §5.3).
+  const r = roleMine('provozni', ['finance.trzby', 'finance.mzdy']);
+  const mineData = { ...r, opravneni: [...new Set([...r.opravneni, 'organizace.prehled'])] };
+  const f = fixtura('organization_overview');
+  const prehled = { ...f, teams: f.teams.map(t => ({ ...t, revenue: null, wages: null })), total: { ...f.total, revenue: null, wages: null, laborPct: null } };
+  const { ctx, p } = await kontext({ fix: s('k69-b5b-rozlozeni-podniky'), mineData, dalsi: data({ prehled }) });
+  await otevri(p, '/employer/overview?view=org', 'vedeni.vsechny_podniky');
+  await p.waitForTimeout(1200);
+  const t = await p.locator('[data-plocha]').innerText();
+  tvrdi('podniky 4: role bez finančních klíčů nevidí řadu Tržby / Mzdy ani „skryto"', !/Tržby|Mzdy|skryto/.test(t), t.match(/.{0,30}(Tržby|Mzdy|skryto).{0,20}/)?.[0] ?? '');
+  await ctx.close();
+}
+{
+  // Widget Všechny podniky ve velikosti L na Přehledu: seznam má linky mezi podniky
+  // (žádné <li class="contents">) a cestu na stránku nese odkaz v hlavičce, ne každý řádek.
+  const fix = { ...s('k69-b5b-rozlozeni-podniky'), stranka: 'vedeni.prehled', polozky: [{ id: 'podniky', widget: 'organizace.podniky', velikost: 'L' }] };
+  const { ctx, p } = await kontext({ fix, dalsi: data() });
+  await otevri(p, '/employer/overview', 'vedeni.prehled');
+  await p.waitForTimeout(1200);
+  const w = await p.evaluate(() => {
+    const ul = document.querySelector('[data-plocha] li[data-widget="organizace.podniky"] ul.list');
+    if (!ul) return null;
+    const radky = [...ul.children];
+    return {
+      radku: radky.length,
+      contents: radky.filter(li => getComputedStyle(li).display === 'contents').length,
+      bezLinky: radky.slice(1).filter(li => getComputedStyle(li).borderTopWidth === '0px').length,
+      tlacitek: ul.querySelectorAll('button').length,
+    };
+  });
+  tvrdi('podniky L: linky mezi podniky, řádky nejsou tlačítka', !!w && w.radku === 2 && w.contents === 0 && w.bezLinky === 0 && w.tlacitek === 0, JSON.stringify(w));
   await ctx.close();
 }
 {

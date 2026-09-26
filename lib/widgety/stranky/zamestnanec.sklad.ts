@@ -1,5 +1,9 @@
-// Stránka „Sklad" (zaměstnanec). Kolo 68 založilo metadata z katalogu; plochu zapne (aktivni: true) a
-// doporučené i výchozí rozložení upřesní balík B3 v kole 69.
+// Stránka „Sklad" (zaměstnanec). Kolo 68 založilo metadata z katalogu, kolo 69 (balík B3) plochu
+// zapnulo. Nástroj = stav skladu se zápisem množství (components/employee/InventoryReport.tsx);
+// banner inventury, zápis nové věci, docházející nahoře a nahlášení chybějících jsou widgety.
+//
+// Výchozí rozložení je z katalogu. Docházející zásoby jsou L — na telefonu je to první,
+// co člověk u regálu hledá, a velký widget je seskupí podle kategorie.
 import type { DefiniceStranky } from '../typy.ts';
 
 export const STRANKA: DefiniceStranky = {
@@ -8,7 +12,7 @@ export const STRANKA: DefiniceStranky = {
   nazev: 'Sklad',
   pohled: 'inventory',
   pristup: ['sklad.zobrazit'],
-  nastroj: { nazev: 'Sklad', ikona: 'archive', popis: 'Stav skladu po kategoriích se zápisem množství.' },
+  nastroj: { nazev: 'Stav skladu', ikona: 'archive', popis: 'Stav skladu po kategoriích se zápisem množství.' },
   doporucene: [
     'sklad.inventura',
     'sklad.zapsat_novou',
@@ -27,5 +31,5 @@ export const STRANKA: DefiniceStranky = {
       { w: 'nastroj' },
     ],
   },
-  aktivni: false,
+  aktivni: true,
 };

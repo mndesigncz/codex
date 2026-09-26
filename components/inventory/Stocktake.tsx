@@ -6,9 +6,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../Icons';
 import ShrinkageReport from './ShrinkageReport';
-import { useModal } from '@/lib/useModal';
 import { okJson } from '@/lib/api';
-import { DiscardGuard } from '../ui/DiscardGuard';
+import { czCount, POLOZKA } from '@/lib/czech';
+import { Button, Chip, ListRow, Modal, Skeleton } from '../ui';
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 const fmt = (n: number) => round3(n).toLocaleString('cs-CZ', { maximumFractionDigits: 3 });
@@ -23,18 +23,31 @@ type Row = {
 };
 type Take = { id: number; status: string; data: Row[]; createdAt: string; completedAt: string | null };
 
-export default function StocktakeModal({ isEmployer, onClose, onApplied }: {
-  isEmployer: boolean;
+/**
+ * Tři samostatná oprávnění místo jednoho „isEmployer" (kolo 69): server
+ * zahájení a zrušení pouští s `inventura.spravovat`, zápis rozdílů s
+ * `inventura.dokoncit` a report ztrát s `finance.ztraty`. Vlastní role může
+ * mít jen některé z nich — jeden příznak pro všechno jí buď schoval tlačítko,
+ * na které má právo, nebo ukázal takové, které server odmítne.
+ */
+export default function StocktakeModal({ smiZahajit, smiDokoncit, smiZtraty, onClose, onApplied }: {
+  /** inventura.spravovat — zahájit a zrušit inventuru. */
+  smiZahajit: boolean;
+  /** inventura.dokoncit — zapsat rozdíly do skladu. */
+  smiDokoncit: boolean;
+  /** finance.ztraty — report ztrát z minulých inventur. */
+  smiZtraty: boolean;
   onClose: () => void;
   onApplied: () => void;
 }) {
-  const m = useModal(true, onClose, 'Inventura skladu');
   const [open, setOpen] = useState<Take | null>(null);
   const [history, setHistory] = useState<Take[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [confirmDone, setConfirmDone] = useState(false);
+  // Zrušení inventury se potvrzuje v okně (dřív confirm()).
+  const [confirmCancel, setConfirmCancel] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingCounts = useRef<Record<string, number | null>>({});
   const pendingOpens = useRef<Record<string, number | null>>({});
@@ -111,7 +124,7 @@ export default function StocktakeModal({ isEmployer, onClose, onApplied }: {
       await load();
       onApplied();
       setErr('');
-      setDoneMsg(`Hotovo — spočítáno ${d.applied ?? 0} položek, zapsáno ${d.diffs ?? 0} rozdílů. ✓`);
+      setDoneMsg(`Hotovo — spočítáno: ${czCount(d.applied ?? 0, POLOZKA)}, zapsáno: ${czCount(d.diffs ?? 0, { one: 'rozdíl', few: 'rozdíly', many: 'rozdílů' })}.`);
     } else {
       const d = res ? await res.json().catch(() => ({})) : {};
       setErr(d.error || 'Dokončení se nepodařilo.');
@@ -122,7 +135,8 @@ export default function StocktakeModal({ isEmployer, onClose, onApplied }: {
   const [selected, setSelected] = useState<number | null>(null);
 
   const cancel = async () => {
-    if (!open || !confirm('Zrušit rozpočítanou inventuru? Napočítané hodnoty se zahodí.')) return;
+    if (!open) return;
+    setConfirmCancel(false);
     const res = await fetch('/api/stocktake', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: open.id, cancel: true }),
@@ -145,156 +159,156 @@ export default function StocktakeModal({ isEmployer, onClose, onApplied }: {
     (r.counted != null && r.counted !== r.expected) ||
     (r.countedOpen != null && r.countedOpen !== (r.expectedOpen ?? 0))).length : 0;
 
-  return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center modal-overlay p-4" onClick={onClose}>
-      <div ref={m.ref} {...m.dialogProps} className="modal-sheet rounded-3xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto scrollbar-thin" onClick={e => e.stopPropagation()}>
-        <DiscardGuard guard={m.guard} />
-        <div className="flex items-center justify-between gap-3 mb-1">
-          <h3 className="t-card"><Icon name="clipboard" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" /> Inventura skladu</h3>
-          <button onClick={m.guard.attemptClose} className="btn-icon" aria-label="Zavřít"><Icon name="close" size={15} /></button>
-        </div>
+  const plural = (n: number) => czCount(n, { one: 'rozdíl', few: 'rozdíly', many: 'rozdílů' });
 
-        {err && <p className="text-sm text-bad-ink mt-2">{err}</p>}
-        {doneMsg && <p className="text-sm text-[#5B7A08] bg-[#C8F542]/10 border border-[#C8F542]/25 rounded-2xl px-4 py-3 mt-3">{doneMsg}</p>}
+  // Jedno okno z ui (DP §3.10) místo ručního překryvu; úvod bez karty v okně,
+  // „Zahájit" je potvrzení v okně = primary, ne limetka.
+  return (
+    <Modal open onClose={onClose} size="lg" title="Inventura skladu"
+      subtitle={open ? `Zahájena ${new Date(open.createdAt).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long' })}` : 'Spočítat skutečné stavy a zapsat rozdíly.'}>
+      <div className="space-y-4">
+        {err && <p className="note note-danger" role="alert">{err}</p>}
+        {doneMsg && <p className="note note-ok" role="status">{doneMsg}</p>}
 
         {loading ? (
-          <div className="flex items-center justify-center h-32">
-            <div className="spinner" />
+          <div className="space-y-2" aria-busy>
+            <Skeleton className="h-10" /><Skeleton className="h-10" /><Skeleton className="h-10 w-2/3" />
           </div>
         ) : !open ? (
-          <div className="mt-4 space-y-5">
-            <div className="glass-card p-6 text-center space-y-3">
-              <p className="text-sm text-black/55">Projdi sklad položku po položce a spočítej skutečné stavy. Rozdíly proti evidenci se po potvrzení zapíšou a uloží do historie položek.</p>
-              {isEmployer ? (
-                <button onClick={start} disabled={busy}
-                  className="rounded-full bg-[#C8F542] text-black font-semibold px-6 py-3 text-sm hover:brightness-110 disabled:opacity-50 transition">
-                  {busy ? 'Připravuji…' : 'Zahájit inventuru'}
-                </button>
+          <div className="space-y-5">
+            <div className="space-y-3">
+              <p className="t-meta">Projdi sklad položku po položce a spočítej skutečné stavy. Rozdíly proti evidenci se po potvrzení zapíšou a uloží do historie položek.</p>
+              {smiZahajit ? (
+                <Button variant="primary" icon="clipboard" onClick={start} loading={busy}>Zahájit inventuru</Button>
               ) : (
-                <p className="text-xs text-black/40">Inventuru zahajuje vedení — pak může počítat kdokoli.</p>
+                <p className="t-meta">Inventuru zahajuje vedení — pak může počítat kdokoli.</p>
               )}
             </div>
-            {isEmployer && history.length > 0 && (
+            {smiZtraty && history.length > 0 && (
               <ShrinkageReport stocktakeId={selected ?? undefined} />
             )}
 
             {history.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">Minulé inventury</p>
-                <div className="space-y-2">
+              <section aria-labelledby="inventura-historie">
+                <p id="inventura-historie" className="t-label">Minulé inventury</p>
+                <ul className="list mt-1">
                   {history.map(h => {
                     const counted = h.data.filter(r => r.counted != null || r.countedOpen != null);
                     const diffs = counted.filter(r =>
                       (r.counted != null && r.counted !== r.expected) ||
                       (r.countedOpen != null && r.countedOpen !== (r.expectedOpen ?? 0)));
+                    const vybrana = (selected ?? history[0]?.id) === h.id;
                     return (
-                      <button key={h.id} type="button" onClick={() => setSelected(h.id)}
-                        className={`w-full text-left flex flex-wrap items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm transition ${
-                          (selected ?? history[0]?.id) === h.id
-                            ? 'bg-[#C8F542]/10 border-[#C8F542]/30'
-                            : 'bg-black/[0.03] border-black/[0.06] hover:bg-black/[0.05]'
-                        }`}>
-                        <span className="font-medium text-[#16181A]">
-                          {h.completedAt ? new Date(h.completedAt).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}
-                        </span>
-                        <span className="text-black/45">· {counted.length} spočítáno</span>
-                        <span className={diffs.length ? 'text-wait-ink font-medium' : 'text-[#5B7A08]'}>
-                          · {diffs.length ? `${diffs.length} rozdílů` : 'vše sedělo ✓'}
-                        </span>
-                      </button>
+                      <li key={h.id} className={vybrana ? 'bg-black/[0.04] rounded-xl' : ''}>
+                        <ListRow as="div"
+                          title={h.completedAt ? new Date(h.completedAt).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}
+                          meta={`${counted.length} spočítáno`}
+                          right={<Chip tone={diffs.length ? 'wait' : 'ok'} size="sm">{diffs.length ? plural(diffs.length) : 'vše sedělo'}</Chip>}
+                          onClick={() => setSelected(h.id)} />
+                      </li>
                     );
                   })}
-                </div>
-              </div>
+                </ul>
+              </section>
             )}
           </div>
         ) : (
-          <div className="mt-3 space-y-4">
+          <div className="space-y-4">
             <div className="sticky top-0 z-10 glass-strong rounded-2xl px-4 py-3 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm font-semibold text-[#16181A] tabular-nums">
+              <p className="text-sm font-semibold text-[#16181A] tabular-nums" aria-live="polite">
                 {countedN}/{open.data.length} spočítáno
-                {diffN > 0 && <span className="text-wait-ink"> · {diffN} rozdílů</span>}
+                {diffN > 0 && <span className="text-wait-ink"> · {plural(diffN)}</span>}
               </p>
-              <div className="flex gap-2">
-                {isEmployer && (
-                  <button onClick={cancel} className="rounded-full glass text-black/50 hover:text-bad-ink px-3.5 py-2 text-xs font-semibold transition">Zrušit</button>
-                )}
-                {isEmployer && (
-                  confirmDone ? (
-                    <button onClick={complete} disabled={busy}
-                      className="rounded-full bg-bad/15 border border-bad/30 text-bad-ink px-4 py-2 text-xs font-bold disabled:opacity-50 transition">
-                      {busy ? 'Zapisuji…' : `Opravdu zapsat ${diffN} rozdílů?`}
-                    </button>
+              <div className="flex flex-wrap gap-2">
+                {smiZahajit && (
+                  confirmCancel ? (
+                    <>
+                      <Button variant="secondary" size="sm" onClick={() => setConfirmCancel(false)}>Nechat běžet</Button>
+                      <Button variant="danger-solid" size="sm" onClick={cancel}>Zahodit napočítané</Button>
+                    </>
                   ) : (
-                    <button onClick={() => setConfirmDone(true)} disabled={countedN === 0}
-                      className="btn btn-primary btn-sm disabled:opacity-40 transition">
+                    <Button variant="danger" size="sm" onClick={() => { setConfirmDone(false); setConfirmCancel(true); }}>Zrušit inventuru</Button>
+                  )
+                )}
+                {smiDokoncit && !confirmCancel && (
+                  confirmDone ? (
+                    <>
+                      <Button variant="secondary" size="sm" onClick={() => setConfirmDone(false)}>Ještě ne</Button>
+                      <Button variant="danger-solid" size="sm" loading={busy} onClick={complete}>
+                        {diffN > 0 ? `Zapsat ${plural(diffN)}` : 'Zapsat'}
+                      </Button>
+                    </>
+                  ) : (
+                    <Button variant="primary" size="sm" disabled={countedN === 0} onClick={() => setConfirmDone(true)}>
                       Dokončit a zapsat
-                    </button>
+                    </Button>
                   )
                 )}
               </div>
             </div>
 
             {grouped.map(([cat, rows]) => (
-              <div key={cat}>
-                <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-1.5">{cat}</p>
-                <div className="rounded-2xl border border-black/[0.06] divide-y divide-black/[0.05] overflow-hidden">
+              <section key={cat} aria-label={cat}>
+                <p className="t-label">{cat}</p>
+                <ul className="list mt-1">
                   {rows.map(r => {
                     const diff = r.counted != null ? r.counted - r.expected : null;
                     const pkg = Number(r.packageSize) || 0;
                     const openDiff = r.countedOpen != null ? round3(r.countedOpen - (r.expectedOpen ?? 0)) : null;
-                    const touched = r.counted != null || r.countedOpen != null;
                     return (
-                      <div key={r.itemId} className={`px-4 py-2.5 ${touched ? 'bg-[#C8F542]/[0.05]' : ''}`}>
+                      <li key={r.itemId} className="py-2.5">
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                           <span className="w-full sm:w-auto sm:flex-1 min-w-0 text-sm text-[#16181A] truncate">{r.name}</span>
                           <span className="sm:hidden flex-1" />
-                          <span className="shrink-0 text-xs text-black/40 tabular-nums whitespace-nowrap">evid. {r.expected} {r.unit}</span>
+                          <span className="shrink-0 text-xs text-black/55 tabular-nums whitespace-nowrap">evid. {r.expected} {r.unit}</span>
                           <input
                             type="number" inputMode="numeric" min={0}
+                            aria-label={`Spočítáno — ${r.name} (${r.unit})`}
                             value={r.counted ?? ''}
                             onChange={e => setCount(r.itemId, e.target.value)}
                             placeholder="—"
-                            className="w-20 shrink-0 rounded-xl bg-white/70 border border-black/[0.08] px-3 py-2 text-sm text-right tabular-nums text-[#16181A] placeholder-black/25 focus:border-[#C8F542]/50 focus:outline-none"
+                            className="field !w-20 shrink-0 text-right tabular-nums"
                           />
-                          <span className={`w-12 shrink-0 text-right text-xs font-semibold tabular-nums ${
-                            diff == null ? 'text-black/20' : diff === 0 ? 'text-[#5B7A08]' : 'text-wait-ink'
-                          }`}>
-                            {diff == null ? '' : diff === 0 ? '✓' : diff > 0 ? `+${diff}` : diff}
-                          </span>
+                          <Rozdil n={diff} text={diff == null ? '' : diff > 0 ? `+${diff}` : String(diff)} />
                         </div>
                         {pkg > 0 && (
                           <div className="flex items-center gap-3 pl-4 mt-1.5">
-                            <span className="min-w-0 flex-1 text-[11px] text-black/40 truncate">
-                              ↳ <span className="hidden sm:inline">zbytek v </span>načatém balení
-                              <span className="text-black/25 hidden sm:inline"> (z {pkg} {r.contentUnit || 'l'})</span>
+                            <span className="min-w-0 flex-1 text-xs text-black/55 truncate">
+                              Zbytek v načatém balení
+                              <span className="hidden sm:inline"> (z {pkg} {r.contentUnit || 'l'})</span>
                             </span>
-                            <span className="shrink-0 text-[11px] text-black/35 tabular-nums whitespace-nowrap">
+                            <span className="shrink-0 text-xs text-black/55 tabular-nums whitespace-nowrap">
                               evid. {fmt(r.expectedOpen ?? 0)} {r.contentUnit || ''}
                             </span>
                             <input
                               inputMode="decimal"
+                              aria-label={`Zbytek v načatém — ${r.name}`}
                               value={r.countedOpen ?? ''}
                               onChange={e => setOpenAmount(r.itemId, e.target.value)}
                               placeholder="—"
-                              className="tap-target-sm w-20 shrink-0 rounded-xl bg-white/60 border border-black/[0.07] px-3 py-1.5 text-xs text-right tabular-nums text-[#16181A] placeholder-black/25 focus:border-[#C8F542]/50 focus:outline-none"
+                              className="field !w-20 shrink-0 text-right tabular-nums"
                             />
-                            <span className={`w-12 shrink-0 text-right text-[11px] font-semibold tabular-nums ${
-                              openDiff == null ? 'text-black/20' : openDiff === 0 ? 'text-[#5B7A08]' : 'text-wait-ink'
-                            }`}>
-                              {openDiff == null ? '' : openDiff === 0 ? '✓' : openDiff > 0 ? `+${fmt(openDiff)}` : fmt(openDiff)}
-                            </span>
+                            <Rozdil n={openDiff} text={openDiff == null ? '' : openDiff > 0 ? `+${fmt(openDiff)}` : fmt(openDiff)} />
                           </div>
                         )}
-                      </div>
+                      </li>
                     );
                   })}
-                </div>
-              </div>
+                </ul>
+              </section>
             ))}
           </div>
         )}
       </div>
-    </div>
+    </Modal>
+  );
+}
+
+/** Rozdíl proti evidenci: sedí = ikona fajfky (dřív znak ✓), jinak číslo. */
+function Rozdil({ n, text }: { n: number | null; text: string }) {
+  return (
+    <span className={`w-12 shrink-0 flex justify-end text-xs font-semibold tabular-nums ${n === 0 ? 'text-ok-ink' : 'text-wait-ink'}`}>
+      {n == null ? null : n === 0 ? <><Icon name="check" size={14} /><span className="sr-only">sedí</span></> : text}
+    </span>
   );
 }

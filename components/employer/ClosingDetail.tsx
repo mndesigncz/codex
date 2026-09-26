@@ -91,8 +91,11 @@ function Row({ label, value, tone }: { label: string; value: React.ReactNode; to
   );
 }
 
-export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: {
+export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, mazatVlastni }: {
   id: number; onClose: () => void; onChanged?: () => void; payDailyCash?: boolean;
+  /** Otevřeno z widgetu Moje uzávěrky (jen vlastní uzávěrky): smazat smí i autor
+   *  s uzaverky.mazat_vlastni — server to ověří znovu. */
+  mazatVlastni?: boolean;
 }) {
   const money = useMoney();
   const symbol = useSymbol();
@@ -167,8 +170,9 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
   const [potvrdSmazani, setPotvrdSmazani] = useState(false);
   const smi = useSmi();
   const smiSchvalit = smi('uzaverky.schvalovat');
-  // Detail otvírá vedení z přehledu uzávěrek; vlastní uzávěrku maže autor ve widgetu Moje uzávěrky.
-  const smiSmazat = smi('uzaverky.mazat');
+  // Cizí uzávěrku maže jen vedení (uzaverky.mazat); vlastní i autor, když detail
+  // otevřel z widgetu Moje uzávěrky (tam jsou jen jeho uzávěrky).
+  const smiSmazat = smi('uzaverky.mazat') || (!!mazatVlastni && smi('uzaverky.mazat_vlastni'));
   const remove = async () => {
     if (!c) return;
     setBusy(true);
@@ -211,10 +215,11 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash }: 
           </div>
           <div className="flex items-center gap-2 flex-wrap min-w-0">
             {c && !c.covered_by && (
-              <span className={`tap-target-sm text-xs font-bold rounded-full px-3 py-1.5 whitespace-nowrap tabular-nums ${
-                diff === 0 ? 'bg-[#C8F542]/20 text-[#5B7A08]' : diff > 0 ? 'bg-[#0A84FF]/15 text-[#0A5CC0]' : 'bg-bad/15 text-bad-ink'}`}>
+              // Stav rozdílu jako Chip (tóny ze stavových tokenů, i v tmavém režimu) —
+              // dřív ručně psaná pilulka s hexy mimo tokeny.
+              <Chip tone={diff === 0 ? 'ok' : diff > 0 ? 'info' : 'bad'} className="tabular-nums">
                 {diff === 0 ? 'Sedí' : `${diff > 0 ? '+' : ''}${money(diff)}`}
-              </span>
+              </Chip>
             )}
             <button onClick={modal.guard.attemptClose} aria-label="Zavřít"
               className="tap-target h-9 w-9 flex items-center justify-center rounded-full text-black/40 hover:text-[#16181A] hover:bg-black/[0.06] transition-colors">

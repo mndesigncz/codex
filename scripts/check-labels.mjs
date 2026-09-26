@@ -23,7 +23,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const ROOTS = ['app', 'components'];
-const BASELINE = 110; // kolo 68: smazaný DashboardEditor, přehledy jako plocha, ShiftReviewModal
+const BASELINE = 79; // kolo 69 (B3): Sklad a inventura — popisky přes Field/htmlFor a aria-label; B5a: výběr směny na tabletu
 
 function* walk(dir) {
   for (const name of readdirSync(dir)) {

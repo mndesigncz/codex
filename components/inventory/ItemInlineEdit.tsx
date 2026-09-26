@@ -7,12 +7,10 @@
 // produkt. Panel řeší přesně ta pole, která receptura potřebuje, a k tomu
 // pojmenované díly — „panák 0,04 l" se definuje jednou a pak se jen vybírá.
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Icon } from '../Icons';
 import { useMoney } from '../CurrencyProvider';
-
-const field =
-  'w-full field border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none';
+import { Button, Field, Input, Label } from '../ui';
 
 export type Portion = { name: string; amount: number };
 
@@ -25,6 +23,7 @@ export default function ItemInlineEdit({ item, onSaved, onClose }: {
   onClose: () => void;
 }) {
   const money = useMoney();
+  const uid = useId();
   const [packageSize, setPackageSize] = useState(item.packageSize != null ? String(item.packageSize) : '');
   const [contentUnit, setContentUnit] = useState(item.contentUnit ?? '');
   const [unitCost, setUnitCost] = useState(item.unitCost != null ? String(item.unitCost) : '');
@@ -66,69 +65,67 @@ export default function ItemInlineEdit({ item, onSaved, onClose }: {
   };
 
   return (
-    <div className="rounded-2xl bg-white/70 border border-[#C8F542]/40 p-3.5 space-y-3 rise-in">
-      <p className="text-xs font-bold uppercase tracking-wide text-[#5B7A08] flex items-center gap-1.5">
-        <Icon name="box" size={13} /> Úprava skladové položky · {item.name}
-      </p>
+    <div className="well p-4 space-y-3 rise-in">
+      {/* Neutrální jamka s nadpisem (kolo 69, audit Receptur) — dřív limetkový
+          rámeček a limetkový štítek verzálkami, limetka jako ozdoba. */}
+      <h3 className="t-card flex items-center gap-2">
+        <Icon name="box" size={15} className="text-black/40" /> Úprava skladové položky · {item.name}
+      </h3>
 
+      {/* Kolo 69: pole a tlačítka z ui (Field, Input, Button) místo ručních
+          štítků 11 px, glass pilulek a limetkového textu „Přidat díl"
+          (DP §6.16). Odebrání dílu je ikonové tlačítko 44 px s popiskem
+          „Odebrat díl …" — dřív cíl ~23 px a odečítač hlásil „Zavřít". */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-        <label className="space-y-1">
-          <span className="block text-[11px] font-semibold text-black/50">Velikost balení</span>
-          <input value={packageSize} onChange={e => setPackageSize(e.target.value)}
-            inputMode="decimal" placeholder="0,7" className={field} />
-        </label>
-        <label className="space-y-1">
-          <span className="block text-[11px] font-semibold text-black/50">Jednotka obsahu</span>
-          <input value={contentUnit} onChange={e => setContentUnit(e.target.value)}
-            placeholder="l / kg / ks" className={field} />
-        </label>
-        <label className="space-y-1">
-          <span className="block text-[11px] font-semibold text-black/50">Cena za balení</span>
-          <input value={unitCost} onChange={e => setUnitCost(e.target.value)}
-            inputMode="numeric" placeholder="Kč" className={field} />
-        </label>
+        <Field id={`${uid}-baleni`} label="Velikost balení">
+          <Input id={`${uid}-baleni`} value={packageSize} onChange={e => setPackageSize(e.target.value)}
+            inputMode="decimal" placeholder="0,7" />
+        </Field>
+        <Field id={`${uid}-jednotka`} label="Jednotka obsahu">
+          <Input id={`${uid}-jednotka`} value={contentUnit} onChange={e => setContentUnit(e.target.value)}
+            placeholder="l / kg / ks" />
+        </Field>
+        <Field id={`${uid}-cena`} label="Cena za balení">
+          <Input id={`${uid}-cena`} value={unitCost} onChange={e => setUnitCost(e.target.value)}
+            inputMode="numeric" placeholder="Kč" />
+        </Field>
       </div>
       {perUnit != null && (
-        <p className="text-[11px] text-black/45">
+        <p className="t-meta">
           Vychází na <b className="text-[#16181A]">{money(Math.round(perUnit))}</b> za {contentUnit || 'jednotku'}.
         </p>
       )}
 
       {/* Pojmenované díly — definuj jednou, pak se v recepturách jen vybírají. */}
       <div className="space-y-2">
-        <p className="text-[11px] font-semibold text-black/50">
-          Dílčí díly <span className="font-normal text-black/35">— pojmenované porce, které pak jen vybereš</span>
-        </p>
-        {portions.map((p, idx) => (
-          <div key={idx} className="flex items-center gap-2">
-            <input value={p.name} placeholder="panák"
-              onChange={e => setPortions(list => list.map((x, i) => i === idx ? { ...x, name: e.target.value } : x))}
-              className={`${field} flex-1`} />
-            <input value={p.amount} placeholder="0,04" inputMode="decimal"
-              onChange={e => setPortions(list => list.map((x, i) => i === idx ? { ...x, amount: e.target.value } : x))}
-              className={`${field} w-24 text-center`} />
-            <span className="text-xs text-black/40 w-8">{contentUnit || item.unit}</span>
-            <button aria-label="Zavřít" type="button" onClick={() => setPortions(list => list.filter((_, i) => i !== idx))}
-              className="text-black/30 hover:text-bad-ink transition px-1"><Icon name="close" size={15} /></button>
-          </div>
-        ))}
-        <button type="button" onClick={() => setPortions(list => [...list, { name: '', amount: '' }])}
-          className="tap-target-sm rounded-full glass px-3.5 py-1.5 text-xs font-bold text-[#5B7A08] hover:brightness-110 transition inline-flex items-center gap-1">
-          <Icon name="plus" size={13} /> Přidat díl
-        </button>
+        <Label>Dílčí díly</Label>
+        <p className="t-meta -mt-1">Pojmenované porce, které pak v receptuře jen vybereš.</p>
+        {portions.map((p, idx) => {
+          const jmeno = p.name.trim() || `${idx + 1}`;
+          return (
+            <div key={idx} className="flex items-center gap-2">
+              <Input value={p.name} placeholder="panák" aria-label={`Název dílu ${idx + 1}`}
+                onChange={e => setPortions(list => list.map((x, i) => i === idx ? { ...x, name: e.target.value } : x))}
+                className="flex-1 min-w-0" />
+              <Input value={p.amount} placeholder="0,04" inputMode="decimal" aria-label={`Množství dílu ${jmeno}`}
+                onChange={e => setPortions(list => list.map((x, i) => i === idx ? { ...x, amount: e.target.value } : x))}
+                className="!w-24 text-center" />
+              <span className="t-meta w-8 shrink-0">{contentUnit || item.unit}</span>
+              <Button variant="ghost" size="sm" iconOnly icon="close" className="tap-target-sm shrink-0" aria-label={`Odebrat díl ${jmeno}`}
+                onClick={() => setPortions(list => list.filter((_, i) => i !== idx))} />
+            </div>
+          );
+        })}
+        <Button variant="secondary" size="sm" icon="plus" onClick={() => setPortions(list => [...list, { name: '', amount: '' }])}>
+          Přidat díl
+        </Button>
       </div>
 
-      {err && <p className="text-sm text-bad-ink">{err}</p>}
+      {err && <p className="note note-danger" role="alert">{err}</p>}
 
-      <div className="flex items-center gap-2">
-        <button onClick={save} disabled={saving}
-          className="btn btn-primary disabled:opacity-50 transition">
-          {saving ? 'Ukládám…' : 'Uložit položku'}
-        </button>
-        <button onClick={onClose} disabled={saving}
-          className="rounded-full glass px-4 py-2.5 text-sm font-semibold text-black/55 hover:text-black transition">
-          Zrušit
-        </button>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="primary" loading={saving} onClick={save}>Uložit položku</Button>
+        <Button variant="secondary" disabled={saving} onClick={onClose}>Zrušit</Button>
       </div>
     </div>
   );

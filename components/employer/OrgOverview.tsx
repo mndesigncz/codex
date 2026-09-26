@@ -61,14 +61,18 @@ function SeznamPodniku({ mesic, onOpenTeam }: { mesic: string; onOpenTeam?: (tea
     return (
       <Card>
         <EmptyState compact icon="overview" title={p.zprava ?? 'Přehled organizace teď nejde ukázat.'}
-          hint={p.duvod === 'vypnuto' ? 'Zapíná se v Nastavení týmu → Organizace.' : undefined}
+          hint={p.duvod === 'vypnuto' ? 'Zapíná se v Nastavení týmu, v části Organizace.' : undefined}
           action={vNastaveni ? <Button variant="secondary" icon="settings" onClick={() => nav.onNavigate('team-settings')}>Otevřít nastavení</Button> : undefined} />
       </Card>
     );
   }
 
-  const trzby = smi('finance.trzby');
-  const mzdy = smi('finance.mzdy');
+  // Řada Tržby / Mzdy se kreslí, když ji divák smí v aktivním podniku, nebo když mu
+  // server aspoň v jednom podniku poslal číslo (klíč má jen jinde). „Skryto" tak zůstane
+  // jen pro smíšený případ; role, která klíč nemá nikde, řadu nevidí vůbec — zamčený
+  // náhled se nekreslí (DP §5.3) a stejně se chová widget nad seznamem.
+  const trzby = smi('finance.trzby') || p.podniky.some(t => t.revenue != null);
+  const mzdy = smi('finance.mzdy') || p.podniky.some(t => t.wages != null);
   return (
     <div className="space-y-4">
       {chybaPrepnuti && <p role="alert" className="note note-danger">{chybaPrepnuti}</p>}
@@ -84,7 +88,9 @@ function SeznamPodniku({ mesic, onOpenTeam }: { mesic: string; onOpenTeam?: (tea
                 <Button variant="secondary" size="sm" loading={otevira === t.teamId} onClick={() => otevri(t.teamId)}>Otevřít</Button>
               )}
             </div>
-            {/* Dvě řady po dvou: čtyři částky vedle sebe se do půlky monitoru nevejdou. */}
+            {/* Dvě řady po dvou: čtyři částky vedle sebe se do půlky monitoru nevejdou.
+                Tržby a mzdy podniku, kam role nesmí, posílá API jako null a ukáže se „skryto";
+                rozhoduje server v každém podniku zvlášť. */}
             {(trzby || mzdy) && (
               <StatRow>
                 {trzby && <Stat label="Tržby" value={<Penize castka={t.revenue} mena={t.currency} />} />}

@@ -57,6 +57,11 @@ import { NovaUctenka, SeznamUctenek, URL_UCTENEK, vyberUctenky } from '../../emp
 /** Měsíc z přepínače v hlavičce Financí („RRRR-MM"); mimo Finance null = dnešní měsíc. */
 export const MesicStrankyFinanci = createContext<string | null>(null);
 
+/** Widget stojí přímo na Financích — odkaz „Finance ›" by vedl na stránku, kde už je. */
+export function useNaFinancich(): boolean {
+  return useContext(MesicStrankyFinanci) != null;
+}
+
 function useMesic(volba: unknown): string {
   const zaklad = useContext(MesicStrankyFinanci) ?? pragueToday().slice(0, 7);
   return mesicZVolby(volba, zaklad);
@@ -118,6 +123,7 @@ function SouhrnMesice({ velikost, nastaveni }: WidgetProps<{ mesic: string; metr
   const mesic = useMesic(nastaveni.mesic);
   const data = useDataWidgetu(ok ? urlFinanci(mesic) : null, vyberFinance);
   const f = data.data;
+  const naFinancich = useNaFinancich();
 
   let obsah: ReactNode = null;
   if (f) {
@@ -142,7 +148,8 @@ function SouhrnMesice({ velikost, nastaveni }: WidgetProps<{ mesic: string; metr
       obsah = (
         <div className="min-w-0">
           <InkoustoveCislo velke stitek="Tržby" hodnota={money(s.revenue)} poznamka={pozTrzby} />
-          <dl className={`mt-4 grid gap-3 border-t border-white/10 pt-3 ${ostatni.length === 3 ? 'grid-cols-3' : 'grid-cols-1'}`}>
+          {/* Tři údaje se na telefonu nevejdou vedle sebe bez uříznutých štítků — dvě a dvě. */}
+          <dl className={`mt-4 grid gap-3 border-t border-white/10 pt-3 ${ostatni.length === 3 ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-1'}`}>
             {ostatni.map(k => (
               <div key={k} className="min-w-0">
                 <dt className="t-label !text-white/55 truncate">{polozky[k].stitek}</dt>
@@ -163,7 +170,7 @@ function SouhrnMesice({ velikost, nastaveni }: WidgetProps<{ mesic: string; metr
 
   return (
     <Widget nacteni={ceka ? CEKA : data} kostra="cislo"
-      odkaz={velikost === 'S' ? undefined : { popisek: 'Finance', pohled: 'finance' }}>
+      odkaz={velikost === 'S' || naFinancich ? undefined : { popisek: 'Finance', pohled: 'finance' }}>
       {f && (
         <div className="space-y-3">
           {velikost !== 'S' && <p className={`t-meta cz-sentence ${inkoust ? '!text-white/60' : ''}`}>{nazevMesice(f.mesic || mesic)}</p>}
@@ -533,6 +540,7 @@ function Uctenky({ velikost, nahled }: WidgetProps) {
   const { ok, ceka } = useBrana('finance.uctenky', []);
   const data = useDataWidgetu(ok ? URL_UCTENEK : null, vyberUctenky);
   const [nova, setNova] = useState(false);
+  const naFinancich = useNaFinancich();
   const u = data.data;
   const smiPridat = ok && smi('finance.uctenky_pridat') && !nahled;
   const tentoMesic = pragueToday().slice(0, 7);
@@ -545,7 +553,7 @@ function Uctenky({ velikost, nahled }: WidgetProps) {
   return (
     <>
       <Widget nacteni={ceka ? CEKA : data} kostra={velikost === 'S' ? 'cislo' : 'seznam'}
-        odkaz={velikost !== 'S' && nav.smiPohled('finance') && smi('finance.zobrazit') ? { popisek: 'Finance', pohled: 'finance' } : undefined}
+        odkaz={velikost !== 'S' && !naFinancich && nav.smiPohled('finance') && smi('finance.zobrazit') ? { popisek: 'Finance', pohled: 'finance' } : undefined}
         prazdno={u && u.length === 0 ? (
           <div className="space-y-3">
             <p className="t-meta text-pretty">{smiPridat ? 'Zatím žádná účtenka. Nafoť ji hned po nákupu — do Financí se propíše sama.' : 'Zatím žádná účtenka.'}</p>

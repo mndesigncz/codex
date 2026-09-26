@@ -47,8 +47,9 @@ import { useOpravneni } from '../../role/useOpravneni';
 import { Widget, useWidget, type StavNacteni } from '../Widget';
 import { useDataWidgetu, obnovDataWidgetu } from '../useDataWidgetu';
 import { useNavigace, useSmi } from '../NavigaceKontext';
+import { useNaFinancich } from './finance';
 import {
-  DnyPokladny, HodinyPokladny, ObsluhaPokladny, ProdanoPokladny, RadyJakoSeznam,
+  DnyPokladny, HodinyPokladny, ObsluhaPokladny, OsaGrafu, ProdanoPokladny, RadyJakoSeznam,
   KUS, UCTENKA, kratkeDatum, obdobiPokladny, pismenoDne, popisUctenek, vyberDenniPokladnu, type DenniPokladna,
 } from '../../employer/LiveRevenue';
 
@@ -204,6 +205,7 @@ function ZivePokladna({ velikost, nastaveni }: WidgetProps<{ obdobi: string }>) 
   const money = useMoney();
   const { ok, ceka } = useBrana(klice('pokladna.zive', ['finance.trzby']));
   const { data, obdobi } = useDenniPokladna(ok, nastaveni.obdobi);
+  const naFinancich = useNaFinancich();
   const d = data.data;
   const L = velikost === 'L';
   const t = d?.soucty;
@@ -212,7 +214,7 @@ function ZivePokladna({ velikost, nastaveni }: WidgetProps<{ obdobi: string }>) 
 
   return (
     <Widget nacteni={ceka ? CEKA : data} kostra="cislo"
-      odkaz={L ? undefined : { popisek: 'Finance', pohled: 'finance' }}
+      odkaz={L || naFinancich ? undefined : { popisek: 'Finance', pohled: 'finance' }}
       prazdno={d && !d.propojeno ? <NepropojenaPokladna /> : undefined}>
       {d && t && (
         <div className="space-y-4">
@@ -311,23 +313,28 @@ function PoDnech({ velikost, nastaveni }: WidgetProps<{ obdobi: string; zdroj: s
   const rekord = sTrzbou.reduce<DenTrzby | null>((m, x) => (!m || x.trzba > m.trzba ? x : m), null);
   const L = velikost === 'L';
   const nacteni = ceka ? CEKA : zUzaverek ? [kal1, kal2] : pos;
+  const naFinancich = useNaFinancich();
   const prazdno = !zUzaverek && pos.data?.propojeno === false ? <NepropojenaPokladna /> : undefined;
 
   return (
     <Widget nacteni={nacteni} kostra="graf" prazdno={prazdno}
-      odkaz={nastaveni.zdroj === 'uzaverky' || zUzaverek ? { popisek: 'Uzávěrky', pohled: 'reports' } : { popisek: 'Finance', pohled: 'finance' }}>
+      odkaz={nastaveni.zdroj === 'uzaverky' || zUzaverek ? { popisek: 'Uzávěrky', pohled: 'reports' } : naFinancich ? undefined : { popisek: 'Finance', pohled: 'finance' }}>
       {dny && (
         <div className="space-y-3">
           <Stat label={obdobi.popis} value={money(celkem)}
             note={`${zUzaverek ? 'z uzávěrek' : 'z pokladny'}${prumer > 0 ? ` · průměr ${money(prumer)} za den` : ''}`} />
-          <BarSpark height={L ? 96 : 56} showLabels={dny.length <= 14 || L}
+          <div>
+          <BarSpark height={L ? 96 : 56} showLabels={dny.length <= 14}
             highlight={dny.findIndex(x => x.den === dnes) >= 0 ? dny.findIndex(x => x.den === dnes) : undefined}
             label={`Tržba po dnech: ${obdobi.popis.toLowerCase()}`}
             data={dny.map(x => ({
               value: x.den > dnes ? null : x.trzba,
-              label: dny.length <= 14 ? pismenoDne(x.den) : (Number(x.den.slice(8)) % 5 === 1 ? String(Number(x.den.slice(8))) : ''),
+              label: pismenoDne(x.den),
               tip: `${pismenoDne(x.den)} ${kratkeDatum(x.den)}: ${money(x.trzba)}`,
             }))} />
+          {/* Víc než dva týdny: písmeno dne by se do sloupku nevešlo — osa jen se začátkem a koncem. */}
+          {dny.length > 14 && <OsaGrafu popisky={[kratkeDatum(dny[0].den), kratkeDatum(dny[dny.length - 1].den)]} />}
+          </div>
           {L && rekord && (
             <p className="t-meta">Nejsilnější den {pismenoDne(rekord.den)} {kratkeDatum(rekord.den)} · {money(rekord.trzba)}</p>
           )}

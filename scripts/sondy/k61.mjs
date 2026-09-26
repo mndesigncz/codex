@@ -27,6 +27,10 @@ async function kontext(viewport) {
       posty.push({ url: u.replace('http://localhost:3000', ''), body: route.request().postData() });
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, organization: JSON.parse(readFileSync(DIR + 'organization.json', 'utf8')).organization, kopie: [] }) });
     }
+    // Kolo 69 (B5b): Všechny podniky jsou plocha — rozložení se seznamem podniků (nástroj) z fixtury balíku.
+    if (new URL(u).pathname === '/api/rozlozeni' && new URL(u).searchParams.get('stranka') === 'vedeni.vsechny_podniky') return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + 'k69-b5b-rozlozeni-podniky.json', 'utf8') });
+    // Kolo 69 (B3): Sklad je plocha s widgety — rozložení (widgety skladu a položky jako nástroj) z fixtury balíku.
+    if (new URL(u).pathname === '/api/rozlozeni' && new URL(u).searchParams.get('stranka') === 'vedeni.sklad') return route.fulfill({ status: 200, contentType: 'application/json', body: readFileSync(DIR + 'k69-b3-rozlozeni-sklad.json', 'utf8') });
     const k = keyFor(u);
     if (k === 'teams_mine') { const d = JSON.parse(readFileSync(DIR + k + '.json', 'utf8')); d.muzuZalozit = stav.muzuZalozit; return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(d) }); }
     if (k === 'inventory_categories' && stav.jenCiziKategorie) { const d = JSON.parse(readFileSync(DIR + k + '.json', 'utf8')); return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(d.filter(c => c.zOrganizace)) }); }
@@ -100,7 +104,7 @@ async function kontext(viewport) {
   stav.jenCiziKategorie = true;
   const ctx = await kontext({ width: 1280, height: 950 }); const p = await ctx.newPage();
   await p.goto('http://localhost:3000/employer/overview?view=inventory', { waitUntil: 'networkidle' }); await p.waitForTimeout(1000);
-  await p.locator('button[title="Další"]').first().click(); await p.waitForTimeout(300);
+  await p.locator('[data-plocha] button[aria-label="Další akce"]:visible').first().click(); // kolo 69: „···" hlavičky plochy await p.waitForTimeout(300);
   await p.getByRole('menuitem', { name: /Kategorie a balení/ }).or(p.getByText('Kategorie a balení')).first().click(); await p.waitForTimeout(700);
   const m = norm(await p.locator('body').innerText());
   tvrdi('sklad: bez vlastních kategorií neříká „prázdný", když jsou kategorie z organizace', m.includes('vlastní kategorie zatím nemáš') && !m.includes('sklad je zatím prázdný') && m.includes('sirupy z organizace'), m.slice(0, 200));
