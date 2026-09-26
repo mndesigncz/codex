@@ -1,6 +1,7 @@
 // Malá regresní síť na čistou logiku kolem peněz a napojení na pokladnu.
 // Bez frameworku a bez databáze: jen funkce, které se dají zavolat přímo.
 // Spouští se `npm test` (Node 22 sám odloupne typy). Když spadne, spadne i CI.
+import { readdirSync } from 'node:fs';
 import { tierFor } from '../lib/clientSlots.ts';
 import { normName, matchByName, sectionTitles } from '../lib/menuPos.ts';
 import { contrast, normalizeQrDesign } from '../lib/qrDesign.ts';
@@ -1018,6 +1019,29 @@ eq('chyba: řetězec místo výjimky → obecná', verejnaHlaska('boom', 'Nepove
   ok('výchozí role: s tym.pozvat ne', !smiBytVychozi(['tym.zobrazit', 'tym.pozvat']).ok);
   ok('výchozí role: s citlivým oprávněním ne', !smiBytVychozi(['finance.mzdy']).ok);
 }
+
+// ---- Testy po souborech: scripts/testy/*.ts (kolo 68) ----
+// Balíky kola 69 si přidávají testy vlastními soubory, aby do tohohle souboru
+// nesahalo jedenáct lidí naráz. Každý soubor vyexportuje `default` funkci,
+// která dostane eq/ok (typ Testy v scripts/testy/_testy.ts); načtou se
+// v abecedním pořadí. Soubor s podtržítkem na začátku je pomocný, ne test.
+// Spadlý soubor se počítá jako selhání — nesmí tiše vypadnout z běhu.
+pending.push((async () => {
+  const slozka = new URL('./testy/', import.meta.url);
+  let soubory: string[] = [];
+  try { soubory = readdirSync(slozka).filter(f => f.endsWith('.ts') && !f.startsWith('_')).sort(); }
+  catch { return; }
+  for (const f of soubory) {
+    try {
+      const m = await import(new URL(f, slozka).href);
+      if (typeof m.default !== 'function') { console.error(`✗ scripts/testy/${f}: chybí export default funkce`); failed++; continue; }
+      await m.default({ eq, ok });
+    } catch (e) {
+      console.error(`✗ scripts/testy/${f}: test spadl\n    ${(e as Error)?.stack ?? e}`);
+      failed++;
+    }
+  }
+})());
 
 // Kontrola je až tady a čeká i na asynchronní testy. Dřív seděla uprostřed
 // souboru — všechno pod ní se sice vypsalo, ale do návratového kódu se

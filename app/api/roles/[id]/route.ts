@@ -107,6 +107,11 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
       AND NOT EXISTS (SELECT 1 FROM team_members WHERE team_id = ${c.teamId} AND role_id = ${role.id})
     RETURNING id` as any[];
   if (!smazano.length) return NextResponse.json({ error: 'Roli mezitím někdo dostal — nejdřív mu dej jinou.' }, { status: 409 });
+  // Výchozí rozložení stránek pro tuhle roli (rozsah role:#id, kolo 68) by
+  // teď nepatřilo nikomu. Úklid je best-effort: když se nepovede, řádek jen
+  // leží v databázi — id role se znovu nepřidělí, takže nikoho nezasáhne.
+  const rozsahRole = `role:#${role.id}`;
+  try { await sql`DELETE FROM rozlozeni_stranek WHERE team_id = ${c.teamId} AND rozsah = ${rozsahRole}`; } catch { /* před migrací kola 68 */ }
   audit(c.teamId, c.meId, 'role.delete', 'role', role.id, role.nazev);
   return NextResponse.json({ ok: true });
 }

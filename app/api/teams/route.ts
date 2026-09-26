@@ -234,8 +234,22 @@ export async function PATCH(request: Request) {
   if (typeof tipsInDrawer === 'boolean') {
     try { await sql`UPDATE teams SET tips_in_drawer = ${tipsInDrawer} WHERE id = ${team.id}`; } catch { /* not migrated */ }
   }
-  if (dashboardConfig && typeof dashboardConfig === 'object') {
-    try { await sql`UPDATE teams SET dashboard_config = ${JSON.stringify(dashboardConfig)}::jsonb WHERE id = ${team.id}`; } catch { /* not migrated */ }
+  // Jen prostý objekt: pole by se s příznakem spojilo do pole (jsonb `||`)
+  // a operátor `?` by v něm klíč neviděl — druhý PATCH by pak příznak
+  // zahodil a init by starý přehled převedl znovu.
+  if (dashboardConfig && typeof dashboardConfig === 'object' && !Array.isArray(dashboardConfig)) {
+    // Posílají ho už jen otevřené záložky ze starého editoru přehledu (kolo 68
+    // ho nahradilo rozložením stránek). Příznak migrovano68 se musí zachovat:
+    // bez něj by další /api/init převedl starý přehled znovu a vrátil výchozí
+    // rozložení, které vedení mezitím smazalo. Příznak patří serveru, proto
+    // se ten z těla zahodí (stará záložka ho posílá zpátky, jak ho načetla).
+    const { migrovano68: _prevzato, ...novy } = dashboardConfig as Record<string, unknown>;
+    try {
+      await sql`
+        UPDATE teams SET dashboard_config = ${JSON.stringify(novy)}::jsonb
+          || CASE WHEN dashboard_config ? 'migrovano68' THEN '{"migrovano68": true}'::jsonb ELSE '{}'::jsonb END
+        WHERE id = ${team.id}`;
+    } catch { /* not migrated */ }
   }
   if (Array.isArray(levelsConfig)) {
     try { await sql`UPDATE teams SET levels_config = ${JSON.stringify(levelsConfig)}::jsonb WHERE id = ${team.id}`; } catch { /* not migrated */ }

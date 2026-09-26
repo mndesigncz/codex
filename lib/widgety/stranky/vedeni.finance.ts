@@ -1,0 +1,57 @@
+// Stránka „Finance" (vedení). Kolo 68 založilo metadata z katalogu; plochu zapne (aktivni: true) a
+// doporučené i výchozí rozložení upřesní balík B5b v kole 69.
+import type { DefiniceStranky } from '../typy.ts';
+
+export const STRANKA: DefiniceStranky = {
+  id: 'vedeni.finance',
+  rozhrani: 'vedeni',
+  nazev: 'Finance',
+  pohled: 'finance',
+  pristup: ['finance.zobrazit', 'finance.trzby'],
+  nastroj: { nazev: 'Finance', ikona: 'coins', popis: 'Kniha výdajů měsíce s účtenkami, objednávkami a výplatami.' },
+  inkoust: true,
+  doporucene: [
+    'finance.souhrn_mesice',
+    'finance.trzby_vs_mzdy',
+    'finance.kam_sly_penize',
+    'finance.hoste_vernost',
+    'finance.doporuceni',
+    'finance.postrehy',
+    'pokladna.zive',
+    'trzby.po_dnech',
+    'trzby.top_produkty',
+    'trzby.platby',
+    'trzby.po_obsluze',
+    'trzby.hodiny',
+    'finance.ztraty',
+    'finance.marze',
+    'finance.uctenky',
+    'sklad.hodnota_zasob',
+    'uzaverky.rozdil_kasy',
+    'dochazka.mzdy_za_obdobi',
+  ],
+  vychozi: {
+    'typ:vedeni': [
+      { w: 'finance.souhrn_mesice', s: 'L' },
+      { w: 'finance.trzby_vs_mzdy', s: 'S' },
+      { w: 'finance.kam_sly_penize', s: 'M' },
+      { w: 'sklad.hodnota_zasob', s: 'S' },
+      { w: 'finance.doporuceni', s: 'L' },
+      { w: 'pokladna.zive', s: 'L' },
+      { w: 'finance.marze', s: 'L' },
+      { w: 'finance.ztraty', s: 'M' },
+      { w: 'finance.hoste_vernost', s: 'M' },
+      { w: 'nastroj' },
+    ],
+    'role:ucetni': [
+      { w: 'finance.souhrn_mesice', s: 'L' },
+      { w: 'finance.trzby_vs_mzdy', s: 'S' },
+      { w: 'uzaverky.rozdil_kasy', s: 'S' },
+      { w: 'finance.uctenky', s: 'M' },
+      { w: 'finance.kam_sly_penize', s: 'M' },
+      { w: 'finance.ztraty', s: 'M' },
+      { w: 'nastroj' },
+    ],
+  },
+  aktivni: false,
+};
