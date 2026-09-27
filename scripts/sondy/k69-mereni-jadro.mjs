@@ -33,6 +33,17 @@ for (const f of readdirSync(KOREN + 'lib/widgety/stranky').filter(f => f.endsWit
   const { STRANKA } = await import(KOREN + 'lib/widgety/stranky/' + f);
   if (STRANKA?.aktivni) stranky.push(STRANKA);
 }
+// Třicet šest stránek × čtyři snímky trvá v jednom procesu přes 4 minuty, víc
+// než strop jedné sondy (SONDY_LIMIT_MS). Spouští se proto po třetinách
+// (k69-mereni-1/2/3.mjs nastaví MERENI_DIL="k/n"), které běží souběžně.
+{
+  const m = /^(\d+)\/(\d+)$/.exec(process.env.MERENI_DIL ?? '');
+  if (m) {
+    const [k, n] = [Number(m[1]), Number(m[2])];
+    const vse = stranky.splice(0);
+    vse.forEach((s, i) => { if (i % n === k - 1) stranky.push(s); });
+  }
+}
 
 // Adresa podle pohledu. Výjimky jsou stránky s vlastní routou (Receptury, Sklad vedení) a Client,
 // který přepíná záložky parametrem `tab`; Menu vedení se otevírá přes view=menu jako v sondě B4.

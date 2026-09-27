@@ -150,7 +150,7 @@ export default function ({ eq, ok }: Testy) {
   const volno = bezKomentaru('../../components/scheduling/TimeOffRequest.tsx');
   ok('Žádost o volno: bez limetky (Odeslat žádost je primary — limetka patří Dostupnosti)', !/variant="accent"/.test(volno) && !/bg-\[#C8F542\]/.test(volno));
   const dostupnost = bezKomentaru('../../components/scheduling/AvailabilitySubmit.tsx');
-  ok('Dostupnost: jediná limetka a plocha zamestnanec.dostupnost', (dostupnost.match(/variant="accent"/g) ?? []).length === 1 && /stranka="zamestnanec\.dostupnost"/.test(dostupnost));
+  ok('Dostupnost: jediná limetka a plocha zamestnanec.dostupnost', (dostupnost.match(/variant="accent"|: 'accent'\}/g) ?? []).length === 1 && /stranka="zamestnanec\.dostupnost"/.test(dostupnost));
   // ---- opravy po review ----
   const vychoziW = (st: typeof MOJE_V) => Object.values(st.vychozi).flatMap(v => v ?? []).map(p => p.w);
   ok('review: Moje směny vedení mají ve výchozím Minulé směny i Kdo má směnu (MyShifts je kreslil i vedení)',

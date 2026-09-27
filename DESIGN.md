@@ -212,7 +212,7 @@ a směny), `k69-b2` (docházka a tým), `k69-b3` (sklad), `k69-b4` (receptury
 a menu), `k69-b5a` (uzávěrky), `k69-b5b` (finance, TO GO, všechny podniky),
 `k69-b6a` (úkoly, plánování, nápady), `k69-b6b` (postupy a návody), `k69-b7`
 (odměny), `k69-b8` (Managero client a akce), `k69-b9` (tablet, chat,
-nastavení). `k69-mereni` projde každou aktivní stránku na počítači
+nastavení). `k69-mereni-1/2/3` (společné jádro `k69-mereni-jadro.mjs`, po třetinách kvůli stropu jedné sondy) projdou každou aktivní stránku na počítači
 i telefonu, v klidu i v úpravách, s výchozím rozložením z aplikace (to, co
 uvidí nový podnik), uloží snímky do `scripts/sondy/shots/` a tvrdí jeden h1,
 nula přetečení a nejvýš jednu limetku. Snímky se pak měří pixelově — tónované
