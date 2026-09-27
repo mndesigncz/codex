@@ -128,10 +128,12 @@ function Overview({ toast }: { toast: (m: string) => void }) {
   return (
     <div className="space-y-4">
       {!p.loyalty_on && (
-        <Card tone="wait" className="flex items-center justify-between gap-3 flex-wrap">
-          <p className="text-[15px] font-semibold text-[#16181A]">Věrnost je pro hosty vypnutá.</p>
-          {smi('vernost.pravidla') && <Button size="sm" variant="accent" loading={busy} onClick={zapnout}>Zapnout</Button>}
-        </Card>
+        // Upozornění, ne tónovaná karta přes celou šířku s limetkou uvnitř:
+        // ta sama dělala 8 % tónu stránky a soupeřila s hlavní akcí.
+        <div className="note note-wait flex items-center justify-between gap-3 flex-wrap">
+          <p className="text-[15px] font-semibold">Věrnost je pro hosty vypnutá.</p>
+          {smi('vernost.pravidla') && <Button size="sm" variant="secondary" loading={busy} onClick={zapnout}>Zapnout</Button>}
+        </div>
       )}
       <Card>
         <StatRow>

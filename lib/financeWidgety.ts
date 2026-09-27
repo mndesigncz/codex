@@ -11,6 +11,7 @@
 // nesmí vidět) zůstává null, ne nula, která by tvrdila, že podnik nic neutržil.
 
 import { dayPlus, pragueToday } from './pragueTime.ts';
+import { dnesJesteChybi } from './uzaverkyOrganizace.ts';
 
 const cis = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 const nebo = (v: unknown) => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
@@ -230,10 +231,14 @@ export interface RadekPodnikuApi {
   revenue: number | null; wages: number | null;
   closings: number; missingClosings: number; pendingApproval: number;
   members: number; onShiftNow: number; stockAlerts: number;
+  /** Dnešek bez uzávěrky (do `missingClosings` se nepočítá — N9) a jestli podnik už zavřel. */
+  missingToday: boolean; todayAfterClose: boolean;
 }
 export interface SouhrnApi {
   currency: string | null; revenue: number | null; wages: number | null; laborPct: number | null;
   missingClosings: number; pendingApproval: number; onShiftNow: number; stockAlerts: number;
+  /** Podniky, které dnes už zavřely a uzávěrku ještě nemají. */
+  missingTodayAfterClose: number;
 }
 export interface PrehledOrganizace {
   dostupny: boolean;
@@ -261,17 +266,24 @@ export function vyberPrehled(raw: any): PrehledOrganizace {
       revenue: nebo(r.revenue), wages: nebo(r.wages),
       closings: cis(r.closings), missingClosings: cis(r.missingClosings), pendingApproval: cis(r.pendingApproval),
       members: cis(r.members), onShiftNow: cis(r.onShiftNow), stockAlerts: cis(r.stockAlerts),
+      // Jen skutečné true: starší server pole neposílá a z undefined nesmí vzniknout připomínka.
+      missingToday: r.missingToday === true, todayAfterClose: r.todayAfterClose === true,
     })) : [],
     celkem: {
       currency: typeof t.currency === 'string' ? t.currency : null,
       revenue: nebo(t.revenue), wages: nebo(t.wages), laborPct: nebo(t.laborPct),
       missingClosings: cis(t.missingClosings), pendingApproval: cis(t.pendingApproval),
       onShiftNow: cis(t.onShiftNow), stockAlerts: cis(t.stockAlerts),
+      missingTodayAfterClose: cis(t.missingTodayAfterClose),
     },
   };
 }
 
 export const urlPrehledu = (mesic: string) => `/api/organization/overview?month=${mesic}`;
 
-/** Podnik „potřebuje pozornost": chybí uzávěrka, čeká schválení nebo dochází sklad. */
-export const potrebujePozornost = (r: RadekPodnikuApi) => r.missingClosings > 0 || r.pendingApproval > 0 || r.stockAlerts > 0;
+/**
+ * Podnik „potřebuje pozornost": chybí uzávěrka (i dnešní, když už podnik
+ * zavřel), čeká schválení nebo dochází sklad.
+ */
+export const potrebujePozornost = (r: RadekPodnikuApi) => r.missingClosings > 0 || r.pendingApproval > 0 || r.stockAlerts > 0
+  || dnesJesteChybi(r);

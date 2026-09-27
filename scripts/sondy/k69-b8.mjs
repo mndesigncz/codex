@@ -454,5 +454,41 @@ const OBSLUHA_CLIENTU = mine(['klient.prehled', 'rezervace.zobrazit', 'rezervace
     && await widgetLi(p, 'nastroj').getByText('Akce se nenačetly').isVisible() && await widgetLi(p, 'akce.checklist').getByText('Widget se nenačetl').isVisible());
   await ctx.close();
 }
+{
+  // 6) Telefon 390 — detail akce. DESIGN.md „Okno na telefonu vyjíždí zdola": sdílený
+  // <Modal> dosedne na spodní hranu, obsluha jsou PersonChipy (ne ručně barvené
+  // pilulky), „Oznámit týmu" hlásí Toastem (role=status), žádný nativní dialog,
+  // Tab zůstane v okně a Escape zavře jen vrchní okno (tady jediné — detail).
+  const { ctx, p, stav, chyby } = await kontext({ fix: nacti('k69-b8-rozlozeni-akce'), viewport: { width: 390, height: 844 }, mobil: true, dalsi: podvrh });
+  let nativni = false;
+  p.on('dialog', d => { nativni = true; void d.dismiss(); });
+  await otevri(p, AKCE, 'vedeni.akce');
+  await dokud(() => widgetLi(p, 'nastroj').getByRole('button', { name: /Výjezd na farmářský trh/ }).isVisible(), 3000);
+  await widgetLi(p, 'nastroj').getByRole('button', { name: /Výjezd na farmářský trh/ }).click();
+  const detail = p.getByRole('dialog', { name: 'Výjezd na farmářský trh' });
+  tvrdi('A6: telefon — detail akce se otevře jako dialog', await dokud(() => detail.isVisible(), 2000));
+  // Vyjetí zdola: po doběhnutí animace sedí spodní hrana okna na spodní hraně obrazovky.
+  await p.waitForTimeout(500);
+  const box = await detail.boundingBox();
+  tvrdi('A6: telefon — okno dosedne na spodní hranu (vyjíždí zdola)', !!box && Math.abs(box.y + box.height - 844) <= 2 && box.width >= 380, JSON.stringify(box));
+  tvrdi('A6: telefon — jedno okno, žádný ruční překryv vedle', await p.locator('.modal-overlay').count() === 1);
+  tvrdi('A6: obsluha akce je PersonChip (chip s avatarem), ne ruční pilulka',
+    await detail.locator('.chip', { hasText: 'Jakub Horák' }).count() === 1);
+  tvrdi('A6: telefon — bez vodorovného přetečení', await bezPreteceni(p));
+  await detail.getByRole('button', { name: 'Oznámit týmu' }).click();
+  const toast = p.getByRole('status').filter({ hasText: 'Tým dostal notifikaci o akci.' });
+  tvrdi('A6: „Oznámit týmu" — PATCH publishToTeam a Toast (role=status), žádný alert()',
+    await dokud(() => (stav.akce ?? []).some(b => b.id === 4 && b.publishToTeam === true), 2000)
+    && await dokud(() => toast.isVisible(), 2000) && !nativni);
+  await detail.getByRole('button', { name: 'Zavřít' }).focus();
+  for (let i = 0; i < 25; i++) await p.keyboard.press('Tab');
+  tvrdi('A6: Tab zůstane v okně detailu', await p.evaluate(() => !!document.activeElement?.closest('[role="dialog"]')));
+  await p.keyboard.press('Escape');
+  tvrdi('A6: Escape detail zavře', await dokud(async () => !(await detail.isVisible()), 1500));
+  tvrdi('A6: po zavření žádné okno nezůstalo', await p.getByRole('dialog').count() === 0);
+  tvrdi('A6: bez chyb v konzoli', chyby.length === 0, chyby.slice(0, 3).join(' | '));
+  await p.screenshot({ path: OUT + 'k69-b8-akce-detail-mob.png' });
+  await ctx.close();
+}
 
 await konec();

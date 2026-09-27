@@ -358,7 +358,9 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
 
           <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-black/[0.06]">
             {err && <p className="w-full note note-danger text-sm" role="alert">{err}</p>}
-            <Button variant="accent" icon="send" block loading={saving} disabled={loadFailed} onClick={submit}
+            {/* Jako sekce pod plochou Mých směn vedení (h2) není hlavní akcí
+                obrazovky — limetku tam má „Hotovo“ v úpravách. Tmavá. */}
+            <Button variant={headingLevel === 'h2' ? 'primary' : 'accent'} icon="send" block loading={saving} disabled={loadFailed} onClick={submit}
               title={loadFailed ? 'Nejdřív je potřeba načíst, co jsi poslal/a dřív.' : undefined}>
               {existing ? 'Aktualizovat dostupnost' : 'Odeslat dostupnost'}
             </Button>

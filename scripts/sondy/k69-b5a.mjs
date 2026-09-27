@@ -199,10 +199,18 @@ const bezPreteceni = (p) => p.evaluate(() => document.documentElement.scrollWidt
   tvrdi('T1: telefon 390 — žádné vodorovné přetečení', await bezPreteceni(p));
   const nova = p.getByRole('button', { name: 'Nová uzávěrka' });
   tvrdi('T1: „Nová uzávěrka" je vidět a povolená', await nova.isVisible() && await nova.isEnabled());
-  // Oprava po review: šipka klikacího řádku Chybějících osiřela na telefonu na vlastním řádku.
+  // Šipka klikacího řádku Chybějících dřív osiřela na telefonu na vlastním
+  // řádku, a proto ji widget pod `sm` skrýval. Kolo 69 (rámec) to opravilo
+  // v ListRow: šipka se na telefonu řadí před ocas, takže sedí v prvním řádku
+  // vedle názvu. Tvrdíme tedy nový záměr (jako k69-b3 T1): právě jedna
+  // viditelná šipka a leží v horní polovině řádku, ne pod ním.
   const radekCh = widgetLi(p, 'uzaverky.chybejici').locator('button.list-row').first();
-  const sipky = await radekCh.evaluate(b => [...b.querySelectorAll('svg')].filter(s => s.getBoundingClientRect().width > 0).length);
-  tvrdi('T1: řádek Chybějících nemá na telefonu osiřelou šipku', sipky === 0, `${sipky} viditelných šipek`);
+  const sipka = await radekCh.evaluate(b => {
+    const r = b.getBoundingClientRect();
+    const s = [...b.querySelectorAll('svg')].map(x => x.getBoundingClientRect()).filter(x => x.width > 0);
+    return { n: s.length, h: Math.round(r.height), vedleNazvu: s.length === 1 && s[0].top < r.top + r.height / 2 + 4 && s[0].right <= r.right + 1 };
+  });
+  tvrdi('T1: řádek Chybějících má šipku vedle názvu, ne na vlastním řádku', sipka.vedleNazvu, JSON.stringify(sipka));
   // Kalendář: bez role=grid (sliboval šipky a řádky), dny s cílem aspoň 44 px.
   const kalT = widgetLi(p, 'uzaverky.kalendar');
   tvrdi('T1: kalendář nemá role=grid ani gridcell', await kalT.locator('[role="grid"], [role="gridcell"], [role="columnheader"]').count() === 0);

@@ -38,7 +38,7 @@ import { createPortal } from 'react-dom';
 import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
 import { widget } from '@/lib/widgety/katalog';
 import { ZDROJE_FRONT } from '@/lib/widgety/katalog/obecne';
-import { czCount, czForm, type CzNoun } from '@/lib/czech';
+import { czCount, czForm, czVerb, POLOZKA, type CzNoun } from '@/lib/czech';
 import { dbTimeDayHM, parseDbTime } from '@/lib/pragueTime';
 import { useDraft } from '@/lib/useDraft';
 import { Icon } from '../../Icons';
@@ -237,9 +237,23 @@ function CekaNaTebe({ nastaveni }: WidgetProps<{ fronty?: unknown }>) {
     : aktivni.filter(x => !x.s.error).map(x => x.s);
   // Když nic nečeká, v klidu se widget nekreslí (spec O5) — pojistkou zůstávají odznaky v navigaci.
   const prazdno = !ceka && !nacitaSe && cekaji.length === 0 && selhane.length === 0 ? null : undefined;
+  const celkem = cekaji.reduce((s, x) => s + (x.s.data ?? 0), 0);
 
+  // Bílá karta, ne `ton="wait"`: jantarový podklad na velikosti L zabral na Přehledu 15–20 %
+  // obsahu a na telefonu přes polovinu okna (ds/pokryti.py, kolo 69), přitom DP §5 dává tónům
+  // celkem do ~5 %. Stav „něco čeká" nese jantarový chip s počtem u titulku — ten je vidět
+  // i v menší velikosti a nepřebije jedinou limetku ani inkoustový widget peněz.
   return (
-    <Widget ton="wait" nacteni={nacteni} prazdno={prazdno}>
+    <Widget nacteni={nacteni} prazdno={prazdno}
+      doplnek={celkem > 0 ? (
+        // Holé „5" by nikdo nepřečetl: sčítá různé fronty (směny, objednávky…)
+        // a odečítač by po titulku řekl jen „pět". Vidící dostanou „5 čeká",
+        // odečítač celou větu se skloněným podstatným jménem (stejně jako Badge).
+        <Chip tone="wait" size="sm">
+          <span aria-hidden>{celkem} čeká</span>
+          <span className="sr-only">Celkem {czCount(celkem, POLOZKA)} {czVerb(celkem, 'čeká', 'čekají')}</span>
+        </Chip>
+      ) : undefined}>
       <div className="space-y-3">
         {cekaji.length > 0 && (
           <div className="flex flex-wrap gap-2">
@@ -684,7 +698,7 @@ function Nastenka({ velikost, nastaveni, nahled }: WidgetProps<{ archiv?: unknow
 
   const radek = (a: Oznameni) => (
     <ListRow key={a.id} className="items-start"
-      lead={<Avatar emoji={a.authorAvatar} size="sm" />}
+      lead={<Avatar emoji={a.authorAvatar} name={a.authorName} size="sm" />}
       // Text oznámení se zalamuje (ListRow jinak řádek ořízne); na střední nástěnce nejvýš tři řádky.
       // `line-clamp` si nastavuje vlastní display, proto ne zároveň s `block` (ten by ořez přebil).
       title={<span className={`whitespace-pre-wrap break-words ${M ? 'line-clamp-3' : 'block'}`}>{a.content}</span>}
@@ -821,7 +835,7 @@ function NeprecteneZpravy({ velikost }: WidgetProps) {
           // Klikací řádek ve vlastním <li>, jinak by .list nad ním nekreslil linku (DP §3.6).
           <li key={v.id}>
             <ListRow as="div"
-              lead={v.tym ? <JamkaIkony ikona="users" /> : <Avatar emoji={v.avatar} size="sm" />}
+              lead={v.tym ? <JamkaIkony ikona="users" /> : <Avatar emoji={v.avatar} name={v.nazev} size="sm" />}
               title={v.nazev} meta={v.posledni ?? 'Příloha'}
               right={<Chip tone="info" size="sm">{cislo(v.neprectenych)}</Chip>}
               onClick={doChatu ? () => nav.onNavigate('chat', String(v.id)) : undefined} />

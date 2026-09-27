@@ -102,15 +102,6 @@ function useBrana(id: string): { ok: boolean; ceka: boolean } {
 /** Klíč tlačítka nebo pole z katalogu (`opravneni.pole`). */
 const pole = (def: DefiniceWidgetu | undefined, klic: string): string | string[] | undefined => def?.opravneni.pole?.[klic];
 
-/**
- * Klikací řádek bez čísla a akcí (jen titulek, meta a šipka). ListRow kreslí
- * ocas `.list-tail` vždy, i prázdný, a na telefonu mu globals.css dává
- * `flex: 1 1 100%` — prázdný ocas tak odlomí šipku na samostatný řádek pod
- * položku. Prázdný ocas proto skryjeme; plný (s číslem nebo akcí) zůstává.
- * Patří to opravit v ListRow (zamčený soubor, balík B0) — pak tahle třída odpadne.
- */
-const BEZ_PRAZDNEHO_OCASU = '[&>.list-tail:empty]:hidden';
-
 /** „Ještě nevíme, jestli smí": kostra a žádný dotaz. */
 const CEKA: StavNacteni = { data: null, error: null, loading: true, reload: () => {} };
 
@@ -279,12 +270,11 @@ function Dochazi({ velikost, nastaveni, nahled }: WidgetProps<NastaveniDochazi>)
     <li key={p.id}>
       <ListRow
         as="div"
-        className={BEZ_PRAZDNEHO_OCASU}
         lead={<span className={`w-2 h-2 rounded-full shrink-0 ${p.kriticke ? 'bg-bad' : 'bg-wait'}`} aria-hidden />}
         title={p.nazev}
         // Množství jde do meta tónovaným textem, ne jako chip do ocasu: na
         // telefonu se ocas s chipem i šipkou zalamoval každý na vlastní
-        // řádek a tři položky zabraly přes 400 px (viz BEZ_PRAZDNEHO_OCASU).
+        // řádek a tři položky zabraly přes 400 px.
         meta={<>
           <span className={`font-medium tabular-nums ${p.kriticke ? 'text-bad-ink' : 'text-wait-ink'}`}>{mnozstvi(p.mnozstvi)} {p.jednotka}</span>
           {metaKategorie && p.kategorie ? ` · ${p.kategorie}` : ''}
@@ -647,7 +637,7 @@ function HlaseniW({ velikost, nahled }: WidgetProps) {
           {nova.slice(0, strop).map(h => (
             <li key={h.id}>
               <ListRow as="div"
-                lead={<Avatar emoji={h.avatar} size="sm" />}
+                lead={<Avatar emoji={h.avatar} name={h.autor} size="sm" />}
                 title={h.polozky.length > 0 ? h.polozky.join(', ') : 'Bez položek'}
                 meta={[h.autor, pred(h.kdy), h.poznamka ? `„${h.poznamka}"` : null].filter(Boolean).join(' · ')}
                 actions={
@@ -930,7 +920,7 @@ function ChybiUdaje({ velikost, nahled }: WidgetProps) {
       <ul className="list">
         {radky.slice(0, strop).map(r => (
           <li key={r.id}>
-            <ListRow as="div" className={BEZ_PRAZDNEHO_OCASU} title={r.nazev}
+            <ListRow as="div" title={r.nazev}
               meta={<>
                 <span className="font-medium text-wait-ink">chybí {r.chybi}</span>
                 {` · kasa ho používá v ${czCount(r.produktu, { one: 'produktu', few: 'produktech', many: 'produktech' })}`}
