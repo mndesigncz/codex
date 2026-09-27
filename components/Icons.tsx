@@ -156,6 +156,11 @@ const paths: Record<string, React.ReactNode> = {
   // otočení nese každé místo zvlášť a `iconAfter` u tlačítka otočit nejde —
   // proto zelené „Sklad →" s šipkou v textu.
   chevronRight: <path d="m9 6 6 6-6 6" />,
+  // „Zpět". Vlastní tvar místo `undo` nebo otočeného chevronu: `undo` říká
+  // „vrátit změnu" (něco se odvolá), kdežto zpět jen vede o obrazovku výš.
+  arrowLeft: <path d="M19 12H5m0 0 6-6m-6 6 6 6" />,
+  // Příloha zprávy. Chat i dok si dřív kreslily každý vlastní sponku.
+  paperclip: <path d="M21 11.5 12.5 20a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8" />,
   // Odebrat widget: kolečko s mínusem. Koš by tvrdil, že se něco maže — nic se
   // nemaže, widget jde vrátit.
   minus: <path d="M5 12h14" />,

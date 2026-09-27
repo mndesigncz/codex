@@ -193,7 +193,7 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
             Na telefonu ho nahrazuje spodní dok a list „Více". */}
         <aside className="glass-strong hidden md:flex m-4 mr-0 w-60 rounded-3xl text-[#16181A] flex-col flex-shrink-0">
           <div className="flex items-center gap-2.5 py-3.5 px-3 border-b border-black/[0.07]">
-            <Button variant="ghost" size="sm" iconOnly icon="chevron" className="[&>svg]:rotate-90 shrink-0"
+            <Button variant="ghost" size="sm" iconOnly icon="arrowLeft" className="shrink-0"
               aria-label="Zpět do administrace" title="Zpět do administrace" onClick={onExit} />
             <LogoMark size={32} />
             <div className="min-w-0">
@@ -236,7 +236,7 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
 
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
           <header className="px-4 sm:px-6 pt-5 pb-1 flex items-center gap-2 sm:gap-3 flex-shrink-0">
-            <Button variant="ghost" size="sm" iconOnly icon="chevron" className="md:hidden [&>svg]:rotate-90 shrink-0"
+            <Button variant="ghost" size="sm" iconOnly icon="arrowLeft" className="md:hidden shrink-0"
               aria-label="Zpět do administrace" title="Zpět do administrace" onClick={onExit} />
             <div className="hidden min-[380px]:block md:hidden shrink-0"><LogoMark size={30} /></div>
             <div className="flex-1 min-w-0">
@@ -283,7 +283,7 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
           onSelect={id => prejdi(id as Tab)}
           actions={[
             { label: 'Stránka pro hosty', icon: 'external', onClick: () => { setMoreOpen(false); strankaProHosty(); } },
-            { label: 'Zpět do administrace', icon: 'swap', onClick: onExit },
+            { label: 'Zpět do administrace', icon: 'arrowLeft', onClick: onExit },
           ]}
         />
         <Toast message={hlaska?.text ?? null} tone={hlaska?.ton} onClose={() => setHlaska(null)} />

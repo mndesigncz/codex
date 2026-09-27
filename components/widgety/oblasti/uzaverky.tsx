@@ -89,15 +89,6 @@ function Jamka({ ikona }: { ikona: string }) {
   );
 }
 
-/**
- * Šipka klikacího řádku jen od `sm`. ListRow ji kreslí za ocasem řádku, který se
- * na telefonu láme na celou šířku — šipka pak osiřela na vlastním řádku (T9).
- * Na telefonu řádek vede celou plochou (tap podklad), šipka tu jen ruší.
- */
-function Sipka() {
-  return <Icon name="chevron" size={16} className="hidden sm:block shrink-0 -rotate-90 text-black/30" />;
-}
-
 /** Rozdíl kasy jako stav: sedí / přebytek / manko (tón nese stav, ne ozdobu). */
 function RozdilChip({ rozdil, money }: { rozdil: number; money: (n: number) => string }) {
   if (rozdil === 0) return <Chip tone="ok" size="sm">Sedí</Chip>;
@@ -267,7 +258,7 @@ function MojeUzaverka({ velikost, nahled }: WidgetProps) {
             <li key={`${s.id}-${s.den}`}>
               <ListRow as="div" title={<span className="cz-sentence block truncate">{denVetou(s.den)}</span>}
                 value={s.od ? `${s.od}–${s.do}` : undefined}
-                right={muze ? <Sipka /> : undefined} chevron={false}
+                chevron={muze}
                 onClick={muze ? () => vyplnitDen(s.den) : undefined} />
             </li>
           ))}
@@ -335,11 +326,8 @@ function Chybejici({ velikost, nastaveni, nahled }: WidgetProps<{ dnes?: boolean
                   meta={d.employees.length > 0
                     ? `${d.employees.slice(0, 3).map(e => e.name).join(', ')}${d.employees.length > 3 ? ` +${d.employees.length - 3}` : ''}`
                     : undefined}
-                  right={(d.dnesni || muze) ? <>
-                    {d.dnesni && <Chip tone="wait" size="sm">Čeká</Chip>}
-                    {muze && <Sipka />}
-                  </> : undefined}
-                  chevron={false}
+                  right={d.dnesni ? <Chip tone="wait" size="sm">Čeká</Chip> : undefined}
+                  chevron={muze}
                   onClick={muze ? () => vyplnit(d.date) : undefined} />
               </li>
             ))}
@@ -791,12 +779,11 @@ function MojeHistorie({ velikost, nastaveni, nahled }: WidgetProps<{ pocet?: str
       <ListRow key={c.id}
         title={<span className="cz-sentence block truncate">{denVetou(denUzaverky(c))}{c.shift_label ? ` · ${c.shift_label}` : ''}</span>}
         meta={castky}
-        right={<>
+        right={(c.approved === false || r != null) ? <>
           {c.approved === false && <Chip tone="wait" size="sm">Čeká na schválení</Chip>}
           {r != null && <RozdilChip rozdil={r} money={money} />}
-          {otevri && <Sipka />}
-        </>}
-        chevron={false}
+        </> : undefined}
+        chevron={!!otevri}
         onClick={otevri ? () => otevri(c.id) : undefined}
       />
     );

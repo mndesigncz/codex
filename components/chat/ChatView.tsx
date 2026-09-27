@@ -493,7 +493,7 @@ function Thread({
           {uploading ? (
             <span className="spinner spinner-sm" aria-hidden />
           ) : (
-            <PaperclipIcon />
+            <Icon name="paperclip" size={20} />
           )}
         </button>
         {/* Jednořádkové pole nutilo psát provozní pokyn do jedné věty, nebo
@@ -569,7 +569,9 @@ export function MessageBubble({
               own ? 'bg-black/10' : 'bg-black/[0.04]'
             }`}
           >
-            <FileIcon />
+            {/* Sponka i u přijaté přílohy: stejný znak jako tlačítko „Připojit
+                soubor", takže je jasné, že jde o totéž. */}
+            <Icon name="paperclip" size={18} className="flex-shrink-0" />
             <span className="text-sm truncate min-w-0 max-w-[min(160px,100%)] underline">
               {msg.attachmentName ?? 'Soubor'}
             </span>
@@ -587,22 +589,5 @@ export function MessageBubble({
         </div>
       </div>
     </div>
-  );
-}
-
-function PaperclipIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 11.5 12.5 20a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8" />
-    </svg>
-  );
-}
-
-function FileIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
-      <path d="M14 3v5h5" />
-      <path d="M19 8.5V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h7.5L19 8.5Z" />
-    </svg>
   );
 }

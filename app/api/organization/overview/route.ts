@@ -13,8 +13,8 @@ import { procNejde, souhrn, hraniceMesice, type RadekPodniku } from '@/lib/prehl
 import { pozaduj, jeOdpoved, roleClena } from '@/lib/opravneniDb';
 import { wagesTotal } from '@/lib/wages';
 import { teamStock } from '@/lib/production';
-import { zavreneDnyTydne, smenaBezUzaverky } from '@/lib/staleShifts';
-import { pragueToday } from '@/lib/pragueTime';
+import { chybejiciUzaverkyPodniku, poZaviraciDobe, zavreneDny, type DenSeSmenou } from '@/lib/uzaverkyOrganizace';
+import { pragueHM, pragueToday } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
 const sql = neon(process.env.DATABASE_URL!);
@@ -33,6 +33,10 @@ export async function GET(req: NextRequest) {
   // podniku kvůli otevření obrazovky a v KAŽDÉM sčítaném podniku zvlášť:
   // role v jedné pobočce neotevírá čísla ostatních. Tržby a mzdy podniku
   // navíc jen s finance.trzby a finance.mzdy v tom podniku.
+  // Aktivní podnik bere `pozaduj` z databáze (SELECT team_id FROM users
+  // WHERE id = meId), nikdy z JWT ani z těla požadavku: po přepnutí podniku
+  // v jiné kartě by token ukazoval na starý podnik a přehled by se otevřel
+  // s oprávněním odjinud.
   const c = await pozaduj('organizace.prehled');
   if (jeOdpoved(c)) return c;
   const meId = c.meId;
@@ -57,16 +61,25 @@ export async function GET(req: NextRequest) {
   if (!hranice) return NextResponse.json({ error: 'Neplatný měsíc' }, { status: 400 });
   const [od, do_] = hranice;
   const dnes = pragueToday();
+  const ted = pragueHM();
+  // Dnešek patří jen do přehledu měsíce, ve kterém dnes je — v minulém
+  // měsíci žádné „dnes ještě chybí" nemá co dělat.
+  const dnesVMesici = dnes >= od && dnes <= do_;
 
   const radky: RadekPodniku[] = [];
   for (const { teamId, trzby, mzdy } of prava) {
     const radek: RadekPodniku = {
       teamId, name: '', currency: 'CZK', revenue: 0, wages: 0, closings: 0,
-      missingClosings: 0, pendingApproval: 0, members: 0, onShiftNow: 0, stockAlerts: 0,
+      missingClosings: 0, missingToday: false, todayAfterClose: false,
+      pendingApproval: 0, members: 0, onShiftNow: 0, stockAlerts: 0,
     };
+    // Otevírací doba jde stejným dotazem jako název: potřebuje ji výpočet
+    // chybějících uzávěrek (zavřené dny, zavírací doba dneška).
+    let otevreno: unknown = null;
     try {
-      const [t] = await sql`SELECT name, COALESCE(currency, 'CZK') AS currency FROM teams WHERE id = ${teamId}`;
+      const [t] = await sql`SELECT name, COALESCE(currency, 'CZK') AS currency, opening_hours FROM teams WHERE id = ${teamId}`;
       radek.name = String(t?.name ?? `Podnik ${teamId}`); radek.currency = String(t?.currency ?? 'CZK');
+      otevreno = t?.opening_hours ?? null;
     } catch { radek.name = `Podnik ${teamId}`; }
 
     try {
@@ -101,14 +114,24 @@ export async function GET(req: NextRequest) {
     } catch { /* před migrací */ }
 
     try {
-      const zavreno = await zavreneDnyTydne(teamId);
+      // Kolo 69 (N9): stejné pravidlo jako Uzávěrky — „chybí" jen do
+      // včerejška, dnešek zvlášť (`missingToday`) a UI ho ukáže jako „dnes
+      // ještě chybí" až po zavírací době (`todayAfterClose`). Výpočet je
+      // čistá funkce v lib/uzaverkyOrganizace.ts; SQL jen donese dny se
+      // směnou do dneška a jestli je ten obchodní den uzavřený.
       const dny = await sql`
-        SELECT DISTINCT s.date, s.auto_created FROM shifts s
-        WHERE s.team_id = ${teamId} AND s.date >= ${od} AND s.date <= ${do_} AND s.date < ${dnes}
-          AND NOT EXISTS (
-            SELECT 1 FROM cash_closings cc
-            WHERE cc.team_id = ${teamId} AND COALESCE(cc.shift_date, cc.date) = s.date)`;
-      radek.missingClosings = new Set((dny as any[]).filter(d => !smenaBezUzaverky(d, zavreno)).map(d => String(d.date))).size;
+        SELECT DISTINCT s.date, s.auto_created,
+               EXISTS (
+                 SELECT 1 FROM cash_closings cc
+                 WHERE cc.team_id = ${teamId} AND COALESCE(cc.shift_date, cc.date) = s.date) AS uzavreno
+        FROM shifts s
+        WHERE s.team_id = ${teamId} AND s.date >= ${od} AND s.date <= ${do_} AND s.date <= ${dnes}`;
+      const vysledek = chybejiciUzaverkyPodniku((dny as any[]).map((d): DenSeSmenou => ({
+        date: String(d.date), auto_created: d.auto_created === true, uzavreno: d.uzavreno === true,
+      })), dnes, zavreneDny(otevreno));
+      radek.missingClosings = vysledek.chybi;
+      radek.missingToday = dnesVMesici && vysledek.dnesChybi;
+      radek.todayAfterClose = radek.missingToday && poZaviraciDobe(otevreno, dnes, ted);
     } catch { /* před migrací */ }
 
     // Stejné číslo jako limit plánu: členství NEBO zrcadlo, bez tabletu (kolo 62).

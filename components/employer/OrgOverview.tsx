@@ -18,10 +18,13 @@
 //  - tvary po číslovce přes czCount („0 členů", ne „0 členové"), chipy přes Chip;
 //  - vypnutý přehled je EmptyState s cestou do nastavení, ne holá věta;
 //  - načítání je kostra, ne kolečko uprostřed.
+//  - N9: „chybí" jen do včerejška jako v Uzávěrkách; dnešek bez uzávěrky je
+//    zvlášť — „dnes ještě chybí" (čekací tón, ne chyba) až po zavírací době.
 
 import { useState } from 'react';
 import { czCount, POLOZKA } from '@/lib/czech';
 import { pragueToday } from '@/lib/pragueTime';
+import { dnesJesteChybi } from '@/lib/uzaverkyOrganizace';
 import { Button, Card, Chip, EmptyState, ErrorState, MonthNav, Skeleton, Stat, StatRow } from '../ui';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
@@ -102,9 +105,11 @@ function SeznamPodniku({ mesic, onOpenTeam }: { mesic: string; onOpenTeam?: (tea
               <Stat label="Na směně" value={t.onShiftNow.toLocaleString('cs-CZ')} />
               <Stat label="Sklad dochází" value={t.stockAlerts.toLocaleString('cs-CZ')} note={t.stockAlerts > 0 ? czCount(t.stockAlerts, POLOZKA) : undefined} />
             </StatRow>
-            {(t.missingClosings > 0 || t.pendingApproval > 0) && (
+            {(t.missingClosings > 0 || t.pendingApproval > 0 || dnesJesteChybi(t)) && (
               <div className="flex flex-wrap gap-2">
                 {t.missingClosings > 0 && <Chip tone="bad" size="sm">chybí {czCount(t.missingClosings, UZAVERKA)}</Chip>}
+                {/* Dnešek je připomínka, ne chyba: podnik zavřel, uzávěrka se ještě může dodělat. */}
+                {dnesJesteChybi(t) && <Chip tone="wait" size="sm">dnes ještě chybí</Chip>}
                 {t.pendingApproval > 0 && <Chip tone="wait" size="sm">{t.pendingApproval.toLocaleString('cs-CZ')} ke schválení</Chip>}
               </div>
             )}

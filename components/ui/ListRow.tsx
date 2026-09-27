@@ -39,6 +39,9 @@ export function ListRow({
 }) {
   const interactive = !!(onClick || href);
   const Tag = (as ?? 'li') as any;
+  const maCislo = value != null || valueMeta != null;
+  const maOcas = maCislo || aside != null || !!right || !!actions;
+  const jenDoplnek = aside != null && !maCislo && !right && !actions;
   const inner = (
     <>
       {lead && <span className="shrink-0 flex items-center">{lead}</span>}
@@ -50,7 +53,13 @@ export function ListRow({
           a akce sedí ve svých svislých sloupcích. Na mobilu se z něj stane
           samostatný druhý řádek — jinak by se na 390 px jméno ořezalo na
           „Pet…" a z přehledného seznamu by zbyla drť. */}
-      <span className="list-tail">
+      {/* Prázdný ocas nekreslíme vůbec. Na telefonu má `.list-tail` šířku
+          celého řádku (flex: 1 1 100 %), takže i prázdný zabral vlastní
+          řádek a odlomil šipku pod položku — widgety to obcházely vlastní
+          třídou, která prázdný ocas skrývala. Ocas jen s doplňkem dostane
+          `list-tail-tichy`: doplněk je pod `lg` skrytý, na telefonu by
+          z ocasu zbyl prázdný druhý řádek. */}
+      {maOcas && <span className={`list-tail${jenDoplnek ? ' list-tail-tichy' : ''}`}>
         {(value != null || valueMeta != null) && (
           <span className="list-value shrink-0">
             {value != null && <span className="block font-bold text-[15px] leading-snug text-[#16181A]">{value}</span>}
@@ -66,7 +75,10 @@ export function ListRow({
         {aside != null && <span className="list-aside shrink-0 hidden lg:block text-[13px] text-black/55">{aside}</span>}
         {right && <span className="shrink-0 flex items-center gap-2 text-right">{right}</span>}
         {actions && <span className="list-actions shrink-0">{actions}</span>}
-      </span>
+      </span>}
+      {/* Šipka stojí v DOM za ocasem (na počítači je tak poslední sloupec),
+          ale na telefonu ji globals.css posune `order` před ocas — sedí
+          vedle názvu a ocas se odlomí až pod ni. */}
       {(chevron ?? interactive) && <Icon name="chevron" size={16} className="shrink-0 -rotate-90 text-black/30" />}
     </>
   );

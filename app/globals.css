@@ -328,7 +328,12 @@ button:where(.list-row-tap) { margin: 0 -0.5rem; padding-left: 0.5rem; padding-r
   /* Na mobilu se ocas odlomí pod jméno: číslo vlevo, akce vpravo. Pevná
      šířka sloupce by tu jen ubírala místo textu, tak ji pouštíme. */
   :where(.list-row) { flex-wrap: wrap; }
-  .list-tail { display: flex; flex: 1 1 100%; align-items: flex-end; justify-content: space-between; gap: 0.5rem; }
+  /* `order: 1` pošle ocas za šipku: první řádek je obrázek, jméno
+     a šipka, druhý číslo a akce. Bez toho šipka (v DOM za ocasem) spadla
+     na třetí, osiřelý řádek. */
+  .list-tail { display: flex; flex: 1 1 100%; order: 1; align-items: flex-end; justify-content: space-between; gap: 0.5rem; }
+  /* Ocas jen se skrytým doplňkem by byl prázdný řádek navíc. */
+  .list-tail-tichy { display: none; }
   .list-value { width: auto; text-align: left; }
   /* Když v ocase nic než akce není, `space-between` položí jediný prvek
      doleva a pravá půlka řádku zůstane prázdná — „QR na stůl" končící

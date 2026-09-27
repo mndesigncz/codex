@@ -37,7 +37,7 @@ docku a topbaru, nikde jinde.
 | Třída | Použití |
 |---|---|
 | `.card` (alias `.glass-card`) | bílá karta se stínem — obsahová jednotka obrazovky |
-| `.card-accent` / `.card-wait` / `.card-danger` / `.card-info` | tónovaná karta: „čeká na tebe“, chybí uzávěrka, upozornění |
+| `.card-accent` / `.card-wait` / `.card-danger` / `.card-info` | tónovaná karta jen pro výpadek nebo chybějící uzávěrku (danger), nejvýš jedna na obrazovce; fronty („Čeká na tebe“) jsou bílá karta s chipem |
 | `.well` | jamka uvnitř karty: sloupec kanbanu, pole formuláře v modálu, kód k zkopírování |
 | `.note` + `note-danger/wait/info/ok` | inline hláška (chyba, čeká, info); nikdy ručně `bg-red-500/10` |
 | `.glass` | tónovaný povrch bez bluru (starší kód); `.glass-strong` blur jen pro plovoucí chrome |
@@ -71,7 +71,8 @@ Písmo **Geist** (balíček `geist`, `--font-geist-sans`), kódy kartiček a kup
   `btn-lg` 48. Ručně psané pilulky `rounded-full bg-[#16181A] …` jsou
   zakázané.
 - Chipy stavu: `.chip` + `chip-ok/wait/bad/info/muted/ink`, `chip-sm`.
-- Přepínač pohledu: `Segmented` (tmavá pilulka klouže, `aria-selected`).
+- Přepínač pohledu: `Segmented` (tmavá pilulka klouže, `aria-selected`,
+  vždy jeden řádek, co se nevejde, posouvá se do strany).
 - Statistiky: `Stat` / `StatRow` (štítek `.t-label`, číslo 28 px tabular).
 
 ## Komponenty (components/ui)
@@ -81,11 +82,40 @@ kusů pozadu a to je nejjistější způsob, jak vznikne desátá podoba téhož
 
 **Rozvržení a text:** PageHeader (title/subtitle/primary/secondary/aside/
 menu), Section (t-section + jedna akce vpravo), Card/Well, Stat/StatRow,
-Chip, ListRow, Avatar/Initials.
+Chip, ListRow, Avatar (emoji → iniciály z `name` → silueta; iniciály počítá
+`inicialy()` z `components/ui/Avatar.tsx`, jinou variantu nepiš). Stojí-li
+jméno vedle kruhu, předej ho v `name` a kruh je pro odečítač skrytý; osamocený
+avatar dostane `title`, který se stane jeho přístupným jménem. Lokální
+`Initials` v `components/client/ClientShell.tsx` je starší duplikát, nový kód
+ho nepoužívá.
 
-**Ovládání:** Button, Segmented, Menu (roste z tlačítka, `pop-in` 160 ms),
+**Ovládání:** Button, Segmented (vždy jeden posuvný řádek — viz „Posuvný
+pás a rozbalovací panely"), Menu (roste z tlačítka, `pop-in` 160 ms)
+a z něj vytažené `MenuPanel` + `MenuItemButton` pro panel, který z tlačítka
+neroste (kontextové menu widgetu vypadá přesně jako „···"),
 Field/Label/Input/Select/Textarea, SearchField (poslední hledání, návrhy,
-klávesnice), Modal (sm/md/lg + `sheet`), Toast.
+klávesnice), Modal (sm/md/lg + `sheet`), Switch/SwitchRow.
+
+**Toast s akcí:** `action={{ label: 'Vrátit', onClick }}` přidá tlačítko —
+bílé a podtržené, ne limetkové (limetka na obrazovce už je) — a toast pak
+drží 6 s místo 3,6 s, aby se na něj dalo dosáhnout. Pod ukazatelem,
+s fokusem uvnitř a na skryté kartě se odpočet zastaví. Kdo ukazuje stejný
+text dvakrát po sobě („Widget odebrán" u dvou widgetů), dá každému
+zobrazení nové `id`, jinak druhý toast dostane jen zbytek času prvního.
+Stojí nad plovoucí lištou, když nějaká je (`--lista-vyska`).
+
+**Kusy z kol 68–69** — každý nahradil tři až devět ručních kopií:
+
+| Kus | Kdy a jak |
+|---|---|
+| `Switch`, `SwitchRow` | nastavení, které platí hned po přepnutí. Limetka bez záře je stav, do pravidla jedné limetky se nepočítá. Zakázaný je `aria-disabled`, ne `disabled` — prohlížeč by zakázané tlačítko odfokusoval a klávesnice by po každém uložení začínala od začátku stránky. `SwitchRow` je `<li>` do `.list` v jedné kartě, ne vlastní box |
+| `Badge` | odznak počtu na navigaci a dlaždici: inkoust s limetkovým číslem, nad devět `9+`, při nule se nekreslí. `wait` jen pro varování, `bad` pro vlajku. `label` je celá věta pro odečítač — „9+" samo nic neříká |
+| `PersonChip` | člověk jako pilulka (avatar, jméno, krátký údaj `meta`); tón nese stav (`ok` = právě na směně). Není tlačítko — proklik dodá obal |
+| `Checklist` | kroky s odškrtnutím v `.list` („První kroky", napojení služeb). Hotový krok = limetkové kolečko s fajfkou a tlumený text, **bez přeškrtnutí** — hotové nemá vypadat jako smazané. Počet „2/4" patří do titulku karty |
+| `MonthNav` (+ `posunMesic`, `nazevMesice`) | ‹ září 2026 › na obrazovkách jednoho měsíce; `min`/`max` zamknou šipku na kraji, název má pevnou šířku, ať šipky neuskakují |
+| `BarSpark` | sloupky bez os pro tvar týdne; nula je dvoupixelová čárka, `null` = den bez dat (místo zůstane prázdné), `surface="ink"` na inkoustové ploše. Hodnoty čte odečítač ze skrytého seznamu |
+| `PlovouciLista` | inkoustová pilulka u spodní hrany, na telefonu nad dokem; základ `BulkBar` i lišty úprav plochy. Zapisuje `--lista-vyska`, ze které si toast bere odsazení |
+| `Dock` | spodní dok na telefonu — jeden pro administraci, zaměstnance i Managero client, odznaky přes `Badge`, poslední „Více" otevře list. Importuje se z `components/ui/Dock` (v `index.ts` není) |
 
 **Stavy obrazovky:** EmptyState, Skeleton/PageSkeleton (shimmer),
 ErrorState (třetí poctivý stav), ErrorBoundary (pád sekce nevybílí
@@ -114,7 +144,11 @@ Klient navíc: StatCard, SectionTitle, TableMap.
   datové (finance, docházka, sklad) plná šířka `max-w-7xl`.
 - Seznam = jedna karta s `.list`; ne jedna karta na položku (Úkoly, Nápady,
   Průběhy). Dlaždice (návody, kategorie skladu) max. 2 sloupce vedle railu.
-- „Čeká na tebe“: `card-wait` s chipy-prokliky, jeden na obrazovce.
+- „Čeká na tebe“: bílá karta (ne `card-wait`), stav nese jantarový chip
+  s počtem u titulku („5 čeká“, odečítači celá věta přes `czCount`),
+  prokliky na fronty jsou `Button secondary sm`. Tónovaná karta zabrala na
+  telefonu přes polovinu okna; zůstává jen pro výpadek nebo chybějící
+  uzávěrku (danger), nejvýš jedna na obrazovce.
 - Kanban: sloupce `well`, karty `card` s `hover:shadow-float`.
 - Navigace: desktop levý rail (administrace) nebo horní záložky (client);
   mobil spodní dock `dock-strong`.
@@ -137,21 +171,71 @@ tvrdší okraje.
 
 Před pushem: `npm run typecheck`, `npm test` (podle **návratového kódu**,
 ne podle hledání „✗" ve výstupu — tvrdý pád jinak vypadá jako nula chyb),
-`npm run build` a dvacet kontrol ze `scripts/check-*.mjs`:
+`npm run build` a všechny kontroly ze `scripts/check-*.mjs`
+(`for f in scripts/check-*.mjs; do node $f || echo FAIL $f; done`) —
+na konci kola 69 jich je 34:
 
-`check-contrast-classes` · `check-czech` · `check-dark-classes` ·
-`check-dead-ends` ·
-`check-decimal-inputs` · `check-email` · `check-fetch-ok` · `check-forms` ·
-`check-generic-copy` · `check-ics` · `check-modals` · `check-money` ·
-`check-labels` · `check-palette` · `check-silent-load` · `check-silent-mutation` ·
+`check-admin-auth` · `check-contrast-classes` · `check-czech` ·
+`check-dark-classes` · `check-dead-ends` · `check-decimal-inputs` ·
+`check-draft-safety` · `check-email` · `check-fetch-ok` ·
+`check-floating-glass` · `check-forms` · `check-generic-copy` ·
+`check-hledani` · `check-ics` · `check-labels` · `check-lazy-views` ·
+`check-mobile-align` · `check-modal-guard` · `check-modals` · `check-money` ·
+`check-offline-cache` · `check-opacity-steps` · `check-palette` ·
+`check-shadow-var` · `check-sheet` · `check-silent-load` ·
+`check-silent-mutation` · `check-sql` · `check-status-colors` ·
 `check-test-imports` · `check-time` · `check-transitions` ·
-`check-width-clash`
+`check-week-start` · `check-width-clash`
+
+Kontrola s ráčnou (`BASELINE`) hlásí i to, že nálezů **ubylo** — pak se
+`BASELINE` sníží, jinak by se získaný prostor potichu zase zaplnil.
 
 Vizuálně: Playwright přes 62 obrazovek (46 administrace, 15 klient,
 sdílený odkaz) na
 1280 a 390 px, se sweepem přetečení, věčných skeletonů, prázdných stránek
 a dotykových cílů — vše 0. K tomu sondy na klávesnici, hromadné akce
 a filtry.
+
+**Sondy plochy widgetů** (`scripts/sondy/`, Playwright přes
+`playwright-core`). Rámec hlídá sedm sond kola 68: `k68-plocha` (podržení,
+vlnění, tah, Vrátit, galerie, nastavení, omezený pohyb, 500 na jednom
+widgetu), `k68-telefon` (390 px, dva S vedle sebe, tah prstem, lišta nad
+dokem), `k68-klavesnice`, `k68-opravneni` (widget bez klíče není vidět
+a jeho endpoint se **nezavolá ani jednou**, ani před načtením oprávnění;
+zamčené rozložení nepošle PUT), `k68-vychozi` (Uložit jako výchozí,
+Nastavení → Stránky bez datových dotazů), `k68-design` (žádná osiřelá
+buňka na pěti šířkách, jeden h1, typografická řada, tmavý režim)
+a `k68-fyzika` (fyzika tahu: malá karta nad velkou nepřeskládává dokola,
+409 během tahu tah zruší, rychlá klepnutí, zápis při odchodu). Každý balík stránek kola 69 má svoji
+sondu podle šablony z „Jak přidat stránku nebo widget": `k69-b1` (rozvrh
+a směny), `k69-b2` (docházka a tým), `k69-b3` (sklad), `k69-b4` (receptury
+a menu), `k69-b5a` (uzávěrky), `k69-b5b` (finance, TO GO, všechny podniky),
+`k69-b6a` (úkoly, plánování, nápady), `k69-b6b` (postupy a návody), `k69-b7`
+(odměny), `k69-b8` (Managero client a akce), `k69-b9` (tablet, chat,
+nastavení). `k69-mereni-1/2/3` (společné jádro `k69-mereni-jadro.mjs`, po třetinách kvůli stropu jedné sondy) projdou každou aktivní stránku na počítači
+i telefonu, v klidu i v úpravách, s výchozím rozložením z aplikace (to, co
+uvidí nový podnik), uloží snímky do `scripts/sondy/shots/` a tvrdí jeden h1,
+nula přetečení a nejvýš jednu limetku. Snímky se pak měří pixelově — tónované
+plochy pod ~6 % obsahu, inkoust do 10 % — mimo CI, protože tam není Python
+s PIL a hranice tónů je řád, ne přesné číslo.
+
+Sondy sdílí podvrh ze `scripts/sondy/k68-spolecne.mjs` (není sonda):
+stavový `/api/rozlozeni` (GET vrátí naposledy uložené, PUT si tělo zapíše
+do `stav.puty`), fixtury podle cesty API a gesta `podrzMysi`,
+`podrzPrstem`, `tahniMysi`, `tahniPrstem`. Sondy tvrdí, co pošle UI, a to
+jde tvrdit jen proti jednomu serveru — proto podvrh není v každé sondě
+jiný. Spouštění (`scripts/sondy/README.md`):
+
+    npm run build && npx next start -p 3000 &
+    npm run sondy                          # seznam ZELENE ve spust.mjs
+    npm run sondy -- k68-plocha k69-b3     # jen vybrané
+    npm run sondy -- --vse                 # i rozpracované
+
+Server i sondy musí mít stejný `NEXTAUTH_SECRET` (sondy si podle něj razí
+session cookie), Chromium se bere ze `SONDY_CHROMIUM`. Adresa
+`http://localhost:3000` je v sondách napevno; kdo pouští sondy proti
+serveru na jiném portu (souběžná práce, kopie stromu), přepíše ji v kopii,
+ne v repu.
 
 **Chyba se ověřuje výpadkem, ne úvahou.** Sonda, která vrátí na vybrané
 GETy 500 (`probe-k15`, `probe-k18`), je jediný způsob, jak zjistit, že se
@@ -1317,16 +1401,143 @@ provoz. Obrazovka to musí říkat dřív, než kdo klikne:
 Hlídá to `scripts/check-admin-auth.mjs`: žádná admin routa bez brány,
 middleware s blokací existuje, `lib/superadmin.ts` je bez Node importů.
 
-## Plocha s widgety
+## Plocha widgetů
 
-Od kola 68 je stránka **plocha**: shora `PageHeader` (jediný h1), pod ním
-chrom stránky (přepínač pohledu, filtry — nehýbe se) a mřížka widgetů. Na
-pracovních stránkách je v mřížce i hlavní nástroj (seznam skladu, uzávěrek)
-jako povinná položka přes celou šířku. Plochu si každý poskládá jako
-domovskou obrazovku iPhonu; vedení může dát výchozí rozložení celému vedení,
-zaměstnancům nebo jedné roli a zamknout ho. Mechaniku popisuje
-`components/widgety/PlochaWidgetu.tsx` a čistá logika v `lib/widgety/`;
-žádná obrazovka si vlastní režim úprav, lištu ani galerii nestaví.
+Od kol 68–69 je každá pracovní stránka **plocha**: shora `PageHeader`
+(jediný h1), pod ním chrom stránky (přepínač pohledu, filtry — nehýbe se)
+a mřížka widgetů. Na pracovních stránkách je v mřížce i hlavní **nástroj**
+(seznam skladu, uzávěrek, rozvrh) jako povinná položka přes celou šířku.
+Plochu si každý poskládá jako domovskou obrazovku iPhonu; vedení může dát
+výchozí rozložení celému vedení, zaměstnancům, jedné roli nebo tabletu
+a zamknout ho. Mechaniku drží `components/widgety/PlochaWidgetu.tsx`, čistou
+logiku `lib/widgety/` (bez Reactu, běží na serveru, v klientu i v testech).
+Žádná obrazovka si vlastní režim úprav, lištu ani galerii nestaví.
+
+Plochu nemají chat (jedna plocha přes celou výšku), Nastavení (formulář),
+hostovská část a správa platformy — do provozu nepatří.
+
+### Stránka
+
+Každá stránka je jeden soubor `lib/widgety/stranky/<id>.ts` s
+`DefiniceStranky` (typ v `lib/widgety/typy.ts`), registr `STRANKY`
+a `stranka(id)` je v `lib/widgety/stranky/index.ts`. Id má tvar
+`<rozhraní>.<název>` (`vedeni.sklad`, `zamestnanec.domu`, `kiosk.smena`).
+
+| Pole | Co znamená |
+|---|---|
+| `rozhrani` | `vedeni` / `zamestnanec` / `kiosk` — typ role, pro kterou stránka je; jiný typ dostane 403 |
+| `pohled`, `pristup` | klíč pohledu v layoutu a klíče oprávnění, které ho otevírají (stejné jako `KLICE_POHLEDU`; `null` = každý) |
+| `aktivni` | plochu už kreslí; `false` = GET vrátí 404 a Nastavení → Stránky ji nenabízí. Dnes je aktivních všech 36 |
+| `nastroj` | `{ nazev, ikona, popis }` hlavní pracovní části, nebo `null` (Přehled, Domů, TO GO) |
+| `vychozi` | výchozí rozložení z aplikace pod klíči `typ:<rozhraní>` a volitelně `role:<klíč>`; položky ve zkratce `{ w, s?, o? }` (widget, velikost, nastavení) |
+| `doporucene` | widgety první skupiny galerie „Doporučené pro tuto stránku" |
+| `inkoust` | smí mít jeden inkoustový widget peněz (Přehled, TO GO, Finance, Uzávěrky) |
+
+### Widget
+
+Widget je **typ bloku** z katalogu; jeho výskyt na ploše je **instance**
+s vlastním `id`, velikostí a nastavením. Metadata (`DefiniceWidgetu`) jsou po
+oblastech v `lib/widgety/katalog/<oblast>.ts` bez Reactu — server je
+potřebuje kvůli validaci a oprávněním. Komponenty jsou zvlášť v
+`components/widgety/oblasti/<oblast>.tsx` (`export const KOMPONENTY`)
+a `components/widgety/registr.ts` stahuje oblast líně, až když je na ploše.
+
+- **Id `oblast.jmeno` je neměnné** (`sklad.dochazi`): leží uložené
+  v rozloženích lidí. Přejmenovat widget znamená migraci, ne úpravu textu.
+- **Velikosti S / M / L** (`velikosti`, `vychoziVelikost`): S = jeden
+  sloupec, M = dva, L = celá řada. Widget nabízí jen velikosti, ve kterých
+  má co ukázat.
+- **Stav `hotovo` / `planovany`.** Plánovaný widget nemá komponentu: nikde se
+  nekreslí, galerie ho nenabízí a normalizace ho z rozložení zahodí. Kolo 69
+  skončilo se 122 hotovými a nula plánovanými.
+- **Oprávnění** `opravneni.vse` (musí mít všechny), `opravneni.nektere`
+  (aspoň jedno, prázdné = bez podmínky) rozhodují, jestli widget pro diváka
+  **existuje** (`jeViditelny` v `lib/widgety/rozlozeni.ts`, stejná funkce na
+  serveru i v klientu, k tomu rozhraní a tarif). `opravneni.pole` jsou
+  části widgetu podle dalších klíčů — číslo, fronta, tlačítko; tlačítka
+  s předponou `akce:` (`'akce:ukoncit': 'dochazka.upravit'`). Komponenta se
+  na ně ptá přes `useSmi()` z `components/widgety/NavigaceKontext.tsx`.
+- **Klíč v katalogu je povinný, i když API hlídá samo.** Katalog kola 68
+  našel tři endpointy, které pustily víc, než měly; widget se na API
+  nespoléhá.
+- Dál `tarif`, `vicekrat` (odkaz, stav kategorie), `muzeInkoust`, `kostra`
+  (tvar Skeletonu) a `nastaveni` (schéma polí; UI polí je
+  `components/widgety/upravy/PoleNastaveni.tsx`).
+
+### Nástroj
+
+`nastroj` je položka rozložení jako každá jiná, jen **povinná**: normalizace
+ji doplní právě jednou (když chybí, na místo z výchozího rozložení), stránka
+bez nástroje ji zahodí. Vždy přes celou šířku a v klidu **bez obalu karty** —
+kreslí se tak, jak ho stránka nakreslí.
+
+V úpravách je místo nástroje **sbalený zástupce**: `Card` s ikonou, názvem
+nástroje a větou „Hlavní část stránky — v úpravách je sbalená.", bez „−",
+přesunutelný nad widgety i pod ně. Skutečný nástroj přitom zůstává
+**připojený s `hidden`** — rozepsaný formulář, filtr ani pozice v seznamu se
+vstupem do úprav neztratí. Odmontovat ho by bylo jednodušší a stálo by
+člověka rozepsanou práci.
+
+### Čí rozložení platí
+
+Rozložení je pole `{ id, widget, velikost, nastaveni }`, pořadí na obrazovce
+= pořadí v DOM = pořadí pro Tab i odečítač (proto mřížka nemá
+`grid-flow-dense`). Ukládá se do jedné tabulky `rozlozeni_stranek` po
+**rozsazích**: `osobni:<userId>`, `role:#<id>` (vlastní role), `role:<klíč>`
+(systémová role), `typ:<rozhraní>`. `vyresRozlozeni()` vybírá v tomhle
+pořadí:
+
+1. **zamčené výchozí podniku** — platí pro každého kromě správce;
+2. **osobní** rozložení;
+3. **výchozí podniku**, nejkonkrétnější, jaké existuje: `role:#<id>` →
+   `role:<klíč>` → `typ:<rozhraní>`;
+4. starý `teams.dashboard_config` (jen Přehled a Domů, dokud je init
+   nepřevede — `lib/widgety/migrace.ts`);
+5. **výchozí z aplikace** — `vychozi` v souboru stránky.
+
+GET o tom vrací `zdroj`: `osobni`, `podnik`, nebo `aplikace`. Osobní řádek
+vzniká až první úpravou (kopie při zápisu); kdo si stránku jednou upravil,
+výchozí podniku už nevidí, dokud nedá „Obnovit výchozí rozložení" nebo
+vedení nezamkne. Je to záměr, jako na iOS — a vedení to proto říká věta
+v okně „Uložit jako výchozí".
+
+**Pravidlo tří.** Výchozí z aplikace pro roli (`role:<klíč>`, u vlastní
+role pro systémovou, ze které vznikla) platí, jen když z něj divák uvidí
+**aspoň tři widgety a zároveň aspoň polovinu jeho položek**
+(`PRAVIDLO_TRI`, `PRAVIDLO_TRI_PODIL` v `lib/widgety/konstanty.ts`); jinak
+dostane výchozí svého typu. Samotná trojka nestačila: Skladník s tarifem
+Max viděl tři widgety z deseti, se slabším tarifem padl na plné výchozí
+vedení — vyšší tarif znamenal chudší plochu.
+
+**Skryté se neztrácí.** Server vrací jen viditelné položky, ale při zápisu
+položky bez oprávnění nebo tarifu **nezahodí** — `zachovejSkryte()` je
+vrátí za jejich posledního viditelného předchůdce. Bez toho by stačilo
+jednou přeskládat plochu během výpadku tarifu a všechny widgety Pro by
+zmizely natrvalo. Totéž platí pro výchozí, které ukládá správce, jenž
+některé widgety sám nevidí.
+
+**Verze a 409.** Každý řádek má `verze`. Klient posílá verzi, kterou viděl
+(0 = řádek ještě není), a zápis platí jen `WHERE verze = …`. Když se
+rozešla (druhé okno bylo rychlejší), přijde **409 s `aktualni`**: klient
+převezme novější stav serveru, řekne to toastem a vyprázdní „Vrátit" —
+vracet do stavu, který už neexistuje, by přepsalo cizí změnu. Síťová chyba
+a 5xx naopak model **nechají** („Neuloženo · Zkusit znovu", nový pokus po
+2, 5 a 15 s): změna je záměr člověka. Zápisy se slučují 400 ms, běží nejvýš
+jeden a při odchodu ze stránky se dopíšou s `keepalive`
+(`components/widgety/useRozlozeni.ts`).
+
+**Zamčené rozložení.** Výchozí nastavuje a zamyká ten, kdo má
+`podnik.nastaveni` (u tabletu stačí `kiosk.spravovat`) — z plochy přes
+„Uložit jako výchozí pro…", nebo v Nastavení → Stránky
+(`components/widgety/VychoziRozlozeni.tsx`). U zamčené stránky nemá divák
+„Upravit", podržení nic neotevře a UI nepošle ani jeden PUT; kdyby ho
+poslalo, server odpoví 403 (`smiUpravitRozlozeni`). Osobní řádek se zámkem
+**nemaže** — po odemčení se člověku vrátí jeho plocha. Tablet úpravy nemá
+vůbec: je sdílený, jeho rozložení skládá vedení.
+
+API: `app/api/rozlozeni/route.ts` (GET/PUT/DELETE osobního),
+`app/api/rozlozeni/vychozi/route.ts` (výchozí podniku), SQL v
+`lib/widgety/rozlozeniDb.ts`.
 
 **Rozhodnutí, která drží tvar:**
 
@@ -1334,78 +1545,197 @@ zaměstnancům nebo jedné roli a zamknout ho. Mechaniku popisuje
   nenabídne a klient ho nepřipojí — data se načtou až při `nacteno && ma()`.
   `ma()` před načtením oprávnění vrací ANO, pro widget to nestačí. Žádný
   zamčený ani rozmazaný náhled: prozradil by, že data existují.
-- **Rozložení je pole `{id, widget, velikost, nastaveni}`** a pořadí na
-  obrazovce = pořadí v DOM = pořadí pro Tab i odečítač. Proto mřížka nemá
-  `grid-flow-dense`.
-- **Každá změna se uloží hned**, optimisticky: model se změní, zápisy se
-  slučují 400 ms, běží nejvýš jeden. 409 převezme novější stav serveru
-  a vyprázdní „Vrátit"; síťová chyba model nechá („Neuloženo · Zkusit
-  znovu") — změna je záměr člověka.
+- **Každá změna se uloží hned**, optimisticky — žádné „Uložit" na konci
+  úprav, které by člověk zapomněl.
 - **Žádná knihovna na tah ani pružiny.** Náhled pořadí přes CSS `order`
   (přesun uzlu v DOM by uvolnil pointer capture a tah by se utrhl),
   rychlost prstu se předá pružině, pokračování tahem z menu — tohle
   hotové knihovny neumí.
 
-### Interakce
-
-- **Vstup do úprav:** podržení prázdného místa 500 ms, „Upravit" v hlavičce
-  (na telefonu „Upravit stránku" v „···") nebo položka menu widgetu.
-  Podržení widgetu otevře kontextové menu: **Nastavit widget · Upravit
-  stránku · Odebrat widget** (ne „Upravit widget / Upravit plochu" — dvě
-  položky začínající stejným slovem se v menu o třech řádcích pletou).
-  Pohyb o víc než 10 px podržení zruší, protože skoro každé rolování
-  přehledu začíná na nějakém widgetu.
-- **Režim úprav:** widgety se vlní, „−" odebere hned bez potvrzení (nic se
-  nemaže, toast nabídne „Vrátit" na 6 s, Ctrl+Z taky), „+ Přidat widget"
-  a „Hotovo" jsou v plovoucí inkoustové liště dole. Lišta je vždy na dosah
-  palce; tlačítko v hlavičce by po odrolování zmizelo.
-- **Tah:** myš po 4 px pohybu, prst po 180 ms držení bez pohybu. Rychlý
-  švih stránku posune — plocha iOS se svisle neposouvá, naše stránky ano,
-  takže okamžitý tah by znemožnil rolovat. Karta jde 1 : 1 se stálým
-  offsetem úchopu, ostatní uhýbají pružinou (tlumení 1, odezva 0,35 s),
-  puštěná karta dosedne s rychlostí prstu. V úpravách
-  `touch-action: pan-y` a nepasivní `touchmove` jen během tahu.
-- **Klávesnice (tah nikdy není jediná cesta):** Tab na widget, šipky
-  přesouvají hned a **bez animace** (akce z klávesnice se neanimují),
-  Enter otevře menu s Posunout výš/níž, Delete odebere, Escape úpravy
-  ukončí a fokus vrátí na „Upravit". Odečítač slyší „název, velikost,
-  pozice i z n" a každou změnu přes `aria-live`.
-- **Omezený pohyb:** žádné vlnění ani zmenšení; úpravy pozná podle
-  přerušovaného obrysu karet a odznaků „−". Vlnění je deklarované jen
-  uvnitř `prefers-reduced-motion: no-preference` — globální pravidlo
-  `animation-duration: .01ms` by ho jinak nechalo jednou škubnout.
-- **Haptika** (`navigator.vibrate(8)`, jen dotyk) jen u otevření menu
-  podržením, vstupu podržením, zvednutí, puštění se změnou pořadí
-  a odebrání „−". Víc zpětné vazby naučí lidi ji ignorovat.
-- **Tablet** má jen výchozí rozložení (edituje ho vedení v Nastavení →
-  Stránky) a sám úpravy nemá — je sdílený.
-
 ### Vzhled
 
-- **Widget** je vždy `<Widget>` = `Card as="section"`: titulek `h2.t-card`
-  s ikonou 17 px `text-black/40` (bez kolečka), odkaz dál jako
-  `Button ghost sm` s chevronem, čísla `Stat`, seznamy `.list` + `ListRow`
-  (ve střední velikosti nejvýš 5 a „…a dalších N"). Všechny čtyři stavy:
-  kostra, `ErrorState compact` se „Zkusit znovu", prázdno větou, a bez
-  oprávnění nic. Pád jednoho widgetu neshodí plochu.
+- **Widget** je vždy `<Widget>` z `components/widgety/Widget.tsx` =
+  `Card as="section"`: titulek `h2.t-card` s ikonou 17 px `text-black/40`
+  (bez kolečka), odkaz dál jako `Button ghost sm` s chevronem, čísla `Stat`,
+  seznamy `.list` + `ListRow` (ve střední velikosti nejvýš 5 a „…a dalších
+  N"). Všechny čtyři stavy: kostra, `ErrorState compact` se „Zkusit znovu",
+  prázdno větou, a bez oprávnění nic. Pád jednoho widgetu neshodí plochu.
 - **Limetka ve widgetu nikdy.** V úpravách je jedinou limetkou „Hotovo",
-  v klidu přehledy limetku nemají vůbec. Tón má jen „Čeká na tebe",
-  inkoustovou plochu nejvýš jeden widget peněz na stránce.
+  v klidu přehledy limetku nemají vůbec. Widgety jsou bílé karty, i „Čeká
+  na tebe" (stav nese jantarový chip s počtem u titulku). Tónovaná karta
+  jen pro výpadek nebo chybějící uzávěrku (danger), nejvýš jedna na
+  obrazovce; inkoustovou plochu nejvýš jeden widget peněz na stránce.
 - **Mřížka podle šířky plochy, ne okna** (boční pás, TO GO, náhled
-  v Nastavení): 4 sloupce od 840 px, 2 od 300 px, jinak 1. V klidu se
-  zbylé sloupce řady rozdělí mezi její položky (žádná osiřelá buňka),
-  v úpravách platí jmenovité velikosti, aby se karty neměnily pod prstem.
+  v Nastavení): 4 sloupce od 840 px, 2 od 300 px, jinak 1
+  (`lib/widgety/mrizka.ts`). V klidu se zbylé sloupce řady rozdělí mezi její
+  položky (žádná osiřelá buňka), v úpravách platí jmenovité velikosti, aby
+  se karty neměnily pod prstem.
 - **Vlnění:** úhel podle úhlopříčky karty (roh se vychýlí o 2,3 px, strop
-  1,2°), délka kmitu 239–283 ms a fáze z hashe id — sousedé se nekývou
-  v zákrytu a fáze je stálá mezi překresleními. Hýbe se jen `transform`.
+  1,2°), délka kmitu 239–283 ms a fáze z hashe id (`lib/widgety/hash.ts`) —
+  sousedé se nekývou v zákrytu a fáze je stálá mezi překresleními. Hýbe se
+  jen `transform`.
 - **Nastavení → Stránky** kreslí widgety jen schematicky, bez dat:
   správce vidí, co kde bude, ale data jiných lidí mu neprotečou.
 
-Hlídají to sondy `scripts/sondy/k68-*.mjs` (plocha, telefon, klávesnice,
-oprávnění, výchozí rozložení, design) a testy `scripts/testy/k68-widgety.ts`.
-Hodnoty podržení, vlnění a zvednutí jsou v `lib/widgety/konstanty.ts` —
-ladí se na skutečném iPhonu a Androidu, emulace v Chromiu nepozná callout,
-výběr textu ani kolizi podržení s rolováním.
+## Úpravy jako na iPhonu
+
+Hodnoty podržení, vlnění, tahu a pružiny jsou na jednom místě v
+`lib/widgety/konstanty.ts` — ladí se na skutečném iPhonu a Androidu,
+emulace v Chromiu nepozná callout, výběr textu ani kolizi podržení
+s rolováním.
+
+- **Vstup do úprav:** podržení prázdného místa 500 ms, „Upravit"
+  v hlavičce (`secondary`, ikona tužky; když stránka má dvě vlastní vedlejší
+  akce, je „Upravit stránku" v „···", na telefonu vždy v „···") nebo
+  položka kontextového menu. Při vstupu tlačítkem nebo klávesnicí jde fokus
+  na první widget, při podržení zůstane, kde byl.
+- **Kontextové menu** (`components/widgety/KontextoveMenu.tsx`): podržení
+  widgetu 500 ms, pravé tlačítko myši (hned) nebo Shift+F10. Položky
+  **Nastavit widget · Upravit stránku · Odebrat widget** (ne „Upravit
+  widget / Upravit plochu" — dvě položky začínající stejným slovem se
+  v menu o třech řádcích pletou); v úpravách místo „Upravit stránku"
+  **Posunout výš / Posunout níž**. „Nastavit" jen tam, kde je co nastavit,
+  „Odebrat" poslední a červeně. Panel je `MenuPanel` z `Menu.tsx`, roste
+  z místa stisku; na dotyku leží pod widgetem, ať ho prst nezakryje. Pohyb
+  o víc než 10 px podržení zruší, protože skoro každé rolování přehledu
+  začíná na nějakém widgetu. Když se prst po otevření menu pohne, menu
+  zmizí a tentýž widget se zvedne pod prstem (jako na iOS; na dotyku
+  best-effort).
+- **Vlnění:** v úpravách se widgety kývou (`.w-kyv`), zmenší na 0,98,
+  odznaky „−" naskočí všechny najednou. Vlnění je deklarované jen uvnitř
+  `prefers-reduced-motion: no-preference` — globální pravidlo
+  `animation-duration: .01ms` by ho jinak nechalo jednou škubnout.
+- **Tah s pružinou** (`components/widgety/upravy/useTazeni.ts`): myš po
+  4 px pohybu, prst po 180 ms držení bez pohybu. Rychlý švih stránku
+  posune — plocha iOS se svisle neposouvá, naše stránky ano, takže okamžitý
+  tah by znemožnil rolovat. Karta jde 1 : 1 se stálým offsetem úchopu,
+  nový cíl platí, až v něm prst vydrží 80 ms, ostatní uhýbají pružinou.
+  Pružina (`krok()` v `lib/widgety/pruzina.ts`) má kritické tlumení
+  a odezvu 0,35 s v uzavřeném tvaru — nic se neintegruje, výsledek
+  nezávisí na snímkové frekvenci a pružinu jde kdykoli přerušit novým cílem
+  bez ztráty rychlosti. **Puštěná karta dosedne s rychlostí prstu**
+  (`rychlostZVzorku`): počítá se z posledních vzorků nejvýš 100 ms před
+  puštěním a puštění samo je poslední vzorek. Když prst zastaví a drží,
+  `pointermove` nechodí — rychlost z pohybu před zastavením by kartu
+  „odhodila" až 2 500 px/s; takhle ji pauza srazí na nulu. U okraje se
+  stránka roluje sama. V úpravách `touch-action: pan-y` a nepasivní
+  `touchmove` jen během tahu.
+- **Galerie „Přidat widget"** (`components/widgety/upravy/GalerieWidgetu.tsx`)
+  z plovoucí inkoustové lišty dole nebo z buňky „+" na konci mřížky:
+  `Modal lg` (na telefonu list zdola), hledání bez diakritiky, první
+  skupina **Doporučené pro tuto stránku** (z `doporucene`; při hledání se
+  schová, jinak by zdvojovala výsledky), pak oblasti v pevném pořadí.
+  Nabízí jen to, co divák smí; živé náhledy se kreslí, až když doroluje.
+  Detail s výběrem velikosti je v tomtéž okně. Nový widget jde na konec,
+  z lišty před nástroj, pokud je nástroj poslední.
+- **Lišta úprav** (`components/widgety/upravy/ListaUprav.tsx` na
+  `PlovouciLista`): „Přidat widget", „···" (obnovit výchozí, uložit jako
+  výchozí pro…) a „Hotovo" jako jediná limetka. Lišta je vždy na dosah
+  palce; tlačítko v hlavičce by po odrolování zmizelo.
+- **Odebrat a Vrátit:** „−" odebere hned a bez potvrzení — nic se nemaže.
+  Toast „Widget odebrán" s **Vrátit** drží 6 s, v úpravách funguje i
+  Ctrl/Cmd+Z; zásobník má 20 kroků a platí do odchodu ze stránky. Vrátit
+  pošle PUT jako každá jiná změna.
+- **Klávesnice (tah nikdy není jediná cesta):** Tab na widget, šipky
+  přesouvají o místo, Home/End na kraj — hned a **bez animace** (akce
+  z klávesnice se neanimují) a každý přesun odejde jako PUT. Enter otevře
+  menu s Posunout výš/níž, Delete odebere, Escape úpravy ukončí a fokus
+  vrátí na „Upravit". Odečítač slyší „název, velikost, pozice i z n"
+  a každou změnu přes `aria-live`.
+- **Omezený pohyb:** žádné vlnění ani zmenšení, přesuny rovnou na místo;
+  úpravy pozná podle přerušovaného obrysu karet a odznaků „−". JS čte
+  `prefers-reduced-motion` živě, takže se pružiny vypnou i za běhu.
+- **Haptika** (`navigator.vibrate(8)`, jen dotyk) jen u otevření menu
+  podržením, vstupu podržením, zvednutí, puštění se změnou pořadí
+  a odebrání „−". Víc zpětné vazby naučí lidi ji ignorovat.
+- **Odchod z úprav:** „Hotovo", Escape, klepnutí na prázdné místo plochy
+  nebo na hlavičku. Fronta zápisů se odešle hned.
+
+## Jak přidat stránku nebo widget
+
+Pořadí se vyplatí dodržet — každý krok má kontrolu, která spadne, když se
+předchozí přeskočí.
+
+1. **Widget do katalogu.** `DefiniceWidgetu` do
+   `lib/widgety/katalog/<oblast>.ts` (index `katalog/index.ts` se nemění).
+   Ikona musí existovat v `components/Icons.tsx`, klíče oprávnění
+   v `lib/opravneniKatalog.ts`. Dokud není komponenta,
+   `stav: 'planovany'`.
+2. **Komponenta v oblasti.** Funkce v `components/widgety/oblasti/<oblast>.tsx`,
+   zapsaná do `KOMPONENTY` pod id z katalogu. Pravidla: kreslí se vždy
+   v `<Widget>`; data jen přes `useDataWidgetu(url)`
+   (`components/widgety/useDataWidgetu.ts`, sdílená mezipaměť 30 s) a URL
+   je `null`, dokud neplatí `useSmi()` pro pole, na které se ptá; všechny
+   čtyři stavy; žádné `accent`; odkaz dál jen přes `odkaz={{ popisek,
+   pohled }}` (na pohled, kam divák nesmí, se sám nekreslí); v
+   `nahled === true` žádné zápisy ani navigace; peníze `useMoney`
+   (`components/CurrencyProvider.tsx`), tvary po číslovce `lib/czech.ts`,
+   čas `lib/pragueTime.ts`. Pak přepni `stav: 'hotovo'`.
+3. **Stránka.** Soubor `lib/widgety/stranky/<id>.ts` (nová stránka navíc
+   id do `IdStranky` v `lib/widgety/typy.ts` a do `STRANKY`): `aktivni`,
+   `nastroj`, `vychozi` pro typ a případně role, `doporucene`, `pristup`.
+   V obrazovce vlastní hlavičku nahradí
+   `<PlochaWidgetu stranka="…" hlavicka={{ title, subtitle, primary,
+   secondary, menu, aside, hintId }} nastroj={…} />` — vzor
+   `components/employer/Inventory.tsx`. Jediná limetka stránky jde do
+   `primary` (v úpravách se schová), nejvýš dvě vedlejší akce do
+   `secondary`; bloky, které stály natvrdo nad seznamem, se stanou widgety.
+4. **Testy.** `npm test` pouští `scripts/testy/k68-widgety.ts`, který hlídá
+   **AK-19** (ve výchozím rozložení stránky se neopakuje ikona — kreslí se
+   jen hotové widgety a nástroj) a **AK-20** (katalog je konzistentní:
+   unikátní id, výchozí velikost mezi povolenými, ikony a klíče existují,
+   výchozí rozložení odkazují na widgety správného rozhraní, `hotovo` ⇔
+   komponenta v oblasti). Vlastní testy do `scripts/testy/<klíč>.ts`
+   s `export default function ({ eq, ok }: Testy)` (typ v
+   `scripts/testy/_testy.ts`) — `npm test` je najde sám. Relativní importy
+   s příponou `.ts`, žádné `@/`, žádné JSX (hlídá `check-test-imports`).
+5. **Sonda** `scripts/sondy/k69-<klíč>.mjs` nad společným podvrhem
+   `scripts/sondy/k68-spolecne.mjs`, fixtury `fixtury/k69-<klíč>-*.json`.
+   Pro každou stránku tvrdí: jeden h1 jako první prvek a v klidu vidět
+   nástroj (`li[data-widget="nastroj"]`); v úpravách zástupce bez „−",
+   přesunutý nad widget i pod něj → PUT; galerie nabízí widgety stránky
+   v „Doporučené"; role bez klíče widget nevidí a jeho endpoint **se
+   nevolá**; 500 na jednom endpointu shodí jen jeden widget; telefon
+   390 px bez přetečení s použitelnou hlavní akcí; rozepsaný formulář
+   v nástroji přežije vstup do úprav a výstup z nich.
+6. **Do CI.** Až sonda projde, připiš ji do `ZELENE` ve
+   `scripts/sondy/spust.mjs`. Kdo sondu rozbije, opraví kód, ne seznam.
+
+## Posuvný pás a rozbalovací panely
+
+**`Segmented` je vždy jeden řádek.** Co se nevejde, jede prstem do strany
+uvnitř vlastního pásu (`overflow-x-auto`, přichycení, položky
+`whitespace-nowrap`), nikdy se nezalamuje. Dřív se šest a víc položek na
+telefonu zalomilo na dva řádky a přepínač vypadal jako hromádka textu, ne
+jako jedna ovládací lišta. Že je kus mimo, prozradí vyblednutý okraj
+(jen na straně, kde něco je) a vybraná položka se sama posune do záběru —
+přes `scrollLeft` pásu, ne `scrollIntoView`, který by posunul i celou
+stránku. Tmavá pilulka leží uvnitř pásu, takže jede s obsahem. Filtrovací
+pás pilulek se chová stejně.
+
+**Rozbalovací panel se vejde na obrazovku.** Panely se kotví k tlačítku
+(`absolute right-0`), a na telefonu to nestačí: „···" vlevo v hlavičce
+s panelem zarovnaným doprava utekl z levého okraje a půlka položek byla
+mimo. `lib/useVejdiSe.ts` panel po otevření změří, posune zpátky dovnitř
+s okrajem 16 px (stejná mezera jako obsah stránky) a když je vyšší než
+místo pod kotvou, dá mu strop a vlastní posuv. Posouvá přes CSS vlastnost
+`translate`, ne `transform`, aby se nepral s animací `pop-in`, a měří
+z rozvržení (`offsetLeft`), ne z `getBoundingClientRect` — panel právě
+škáluje z 0,96 a vlastní posun by se započítal podruhé. Má ho `Menu`,
+`components/PodnikSwitcher.tsx` i `components/NotificationBell.tsx`;
+každý nový rozbalovací panel ho dostane taky.
+
+**Přilepená lišta nástroje.** Lišta s hledáním a kategoriemi se při
+rolování přilepí nahoru a sbalí na jeden řádek, aby nežrala obrazovku.
+Že se přilepila, pozná `IntersectionObserver` na jednopixelové značce nad
+ní — ne posluchač na každý posun. **Hlídač se zapíná přes callback ref**
+(`ref={setSentinelEl}` do stavu a efekt závislý na tom prvku), ne `useRef`
+s efektem `[]`: na ploše přichází nástroj až s rozložením, takže efekt po
+prvním vykreslení našel prázdný ref, lišta se nikdy nesbalila a celý
+průhledný panel kategorií zůstal přilepený přes seznam (Sklad, kolo 69).
+Obecně: cokoli uvnitř nástroje, co se měří nebo pozoruje, nesmí spoléhat
+na to, že při prvním vykreslení existuje. Vzor
+`components/employer/Inventory.tsx`.
 
 ## Anti-vzory (zdejší zákazy)
 

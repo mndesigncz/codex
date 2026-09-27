@@ -21,6 +21,8 @@
 //  - „3 položky docházejí" pod počtem lidí na směně → vlastní údaj Sklad dochází;
 //  - ruční tvary po číslovce („0 členové") → czCount;
 //  - sčítá se jen stejná měna: s korunami a eury vedle sebe widget řekne „různé měny".
+//  - N9: „Chybí uzávěrka" jen do včerejška (jako Uzávěrky); dnešek bez uzávěrky
+//    je zvlášť jako „dnes ještě chybí" a jen u podniku, který už zavřel.
 //
 // Měsíc: volba „Tento" = měsíc stránky (MesicStrankyOrganizace z OrgOverview),
 // jinde dnešní pražský měsíc — mesicZVolby v katalogu finance.
@@ -33,6 +35,7 @@ import { mesicZVolby } from '@/lib/widgety/katalog/finance';
 import { czCount, POLOZKA, type CzNoun } from '@/lib/czech';
 import { formatMoney } from '@/lib/money';
 import { pragueToday } from '@/lib/pragueTime';
+import { dnesJesteChybi } from '@/lib/uzaverkyOrganizace';
 import { Chip, ListRow, Stat, StatRow } from '../../ui';
 import { useOpravneni } from '../../role/useOpravneni';
 import { Widget, type StavNacteni } from '../Widget';
@@ -97,7 +100,11 @@ function Podniky({ velikost, nastaveni }: WidgetProps<{ mesic: string }>) {
             {mzdy && <Stat label="Mzdy celkem" value={<Penize castka={t.wages} mena={t.currency} />}
               note={t.laborPct != null ? `${t.laborPct.toLocaleString('cs-CZ')} % tržeb` : undefined} />}
             <Stat label="Chybí uzávěrka" value={t.missingClosings.toLocaleString('cs-CZ')}
-              note={t.pendingApproval > 0 ? `${t.pendingApproval.toLocaleString('cs-CZ')} ke schválení` : undefined} />
+              note={[
+                // Dnešek do čísla nepatří (N9) — jen poznámkou, a až po zavírací době.
+                t.missingTodayAfterClose > 0 ? `dnes ještě chybí (${czCount(t.missingTodayAfterClose, PODNIK)})` : null,
+                t.pendingApproval > 0 ? `${t.pendingApproval.toLocaleString('cs-CZ')} ke schválení` : null,
+              ].filter(Boolean).join(' · ') || undefined} />
           </StatRow>
           <StatRow className="border-t border-[var(--surface-line)] pt-4">
             <Stat label="Právě na směně" value={t.onShiftNow.toLocaleString('cs-CZ')} />
@@ -118,9 +125,10 @@ function Podniky({ velikost, nastaveni }: WidgetProps<{ mesic: string }>) {
                 meta={[czCount(r.members, CLEN), czCount(r.closings, UZAVERKA), `${r.onShiftNow.toLocaleString('cs-CZ')} na směně`].join(' · ')}
                 value={trzby ? <span className="tabular-nums"><Penize castka={r.revenue} mena={r.currency} /></span> : undefined}
                 valueMeta={mzdy && r.wages != null && r.revenue ? `mzdy ${Math.round((r.wages / r.revenue) * 100)} %` : undefined}
-                right={(r.missingClosings > 0 || r.stockAlerts > 0) ? (
+                right={(r.missingClosings > 0 || r.stockAlerts > 0 || dnesJesteChybi(r)) ? (
                   <span className="flex flex-col items-end gap-1">
                     {r.missingClosings > 0 && <Chip tone="bad" size="sm">chybí {czCount(r.missingClosings, UZAVERKA)}</Chip>}
+                    {dnesJesteChybi(r) && <Chip tone="wait" size="sm">dnes ještě chybí</Chip>}
                     {r.stockAlerts > 0 && <Chip tone="wait" size="sm">sklad {r.stockAlerts.toLocaleString('cs-CZ')}</Chip>}
                   </span>
                 ) : undefined} />

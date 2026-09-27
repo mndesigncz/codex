@@ -323,7 +323,7 @@ function ChatWindow({
           {uploading ? (
             <span className="spinner spinner-sm" aria-hidden />
           ) : (
-            <PaperclipIcon />
+            <Icon name="paperclip" size={18} />
           )}
         </button>
         <input
@@ -338,13 +338,5 @@ function ChatWindow({
           disabled={!text.trim() || sending} className="shrink-0" />
       </form>
     </div>
-  );
-}
-
-function PaperclipIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 11.5 12.5 20a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8" />
-    </svg>
   );
 }

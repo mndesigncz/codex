@@ -111,9 +111,12 @@ export const ZELENE = [
   'k69-b7',
   'k69-b8',
   'k69-b9',
+  'k69-mereni-1',
+  'k69-mereni-2',
+  'k69-mereni-3',
 ];
 
-const MIMO = new Set(['spust', 'cookie-role', 'fixtury-k53', 'fixtury-navody', 'k68-spolecne']);
+const MIMO = new Set(['spust', 'cookie-role', 'fixtury-k53', 'fixtury-navody', 'k68-spolecne', 'k69-mereni-jadro']);
 const vsechny = readdirSync(DIR).filter(f => f.endsWith('.mjs')).map(f => f.slice(0, -4)).filter(n => !MIMO.has(n)).sort();
 
 const args = process.argv.slice(2);

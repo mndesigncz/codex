@@ -18,6 +18,13 @@ export interface RadekPodniku {
   closings: number;
   /** Dny se směnou bez uzávěrky (do včerejška). */
   missingClosings: number;
+  /**
+   * Dnes se pracuje a uzávěrka zatím není (kolo 69, N9) — do `missingClosings`
+   * se nepočítá, stejně jako v Uzávěrkách. Nepovinné: starší řádky ho nemají.
+   */
+  missingToday?: boolean;
+  /** Podnik už dnes zavřel — teprve pak UI ukáže „dnes ještě chybí". */
+  todayAfterClose?: boolean;
   pendingApproval: number;
   members: number;
   onShiftNow: number;
@@ -33,6 +40,8 @@ export interface Souhrn {
   /** Mzdy jako podíl tržeb v procentech; null bez tržeb. */
   laborPct: number | null;
   missingClosings: number;
+  /** Kolik podniků už dnes zavřelo a dnešní uzávěrku ještě nemá. */
+  missingTodayAfterClose: number;
   pendingApproval: number;
   onShiftNow: number;
   stockAlerts: number;
@@ -48,6 +57,7 @@ export function souhrn(radky: RadekPodniku[]): Souhrn {
     revenue, wages,
     laborPct: jednaMena && revenue > 0 ? Math.round((wages / revenue) * 1000) / 10 : null,
     missingClosings: radky.reduce((s, r) => s + r.missingClosings, 0),
+    missingTodayAfterClose: radky.filter(r => r.missingToday === true && r.todayAfterClose === true).length,
     pendingApproval: radky.reduce((s, r) => s + r.pendingApproval, 0),
     onShiftNow: radky.reduce((s, r) => s + r.onShiftNow, 0),
     stockAlerts: radky.reduce((s, r) => s + r.stockAlerts, 0),

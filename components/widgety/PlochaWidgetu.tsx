@@ -184,6 +184,25 @@ const PolozkaPlochy = memo(function PolozkaPlochy(props: PolozkaProps) {
   const ikona = jeNastroj ? stranka.nastroj?.ikona : def?.ikona;
   const povinna = jeNastroj || !!def?.povinny;
 
+  // Nástroj bez obsahu (kuchař bez práva na formulář uzávěrky dostane
+  // `nastroj={null}`, nebo komponenta sama vrátí null) nechával v mřížce
+  // prázdný řádek — mezera mřížky nad ním i pod ním dělala díru mezi
+  // widgety. Prázdnotu měříme v DOM, protože z ReactNode se nepozná, jestli
+  // komponenta něco vykreslí. Hlásíme ji stejnou cestou jako prázdný widget
+  // (`nahlasSkryti`): plocha pak řádek v klidu skryje a v úpravách ho nechá
+  // jako zástupce, ať jde nástroj dál přesouvat.
+  const obalNastroje = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (!jeNastroj) return;
+    const el = obalNastroje.current;
+    if (!el) return;
+    const zmer = () => nahlasSkryti(el.childElementCount === 0 && !el.textContent?.trim());
+    zmer();
+    const pozorovatel = new MutationObserver(zmer);
+    pozorovatel.observe(el, { childList: true, subtree: true, characterData: true });
+    return () => pozorovatel.disconnect();
+  }, [jeNastroj, nahlasSkryti]);
+
   if (!def && !jeNastroj) {
     // Neznámý widget (starý záznam v posledním známém rozložení): drží jen
     // pořadí, aby indexy v DOM seděly s modelem, a nic nekreslí.
@@ -226,7 +245,7 @@ const PolozkaPlochy = memo(function PolozkaPlochy(props: PolozkaProps) {
         )}
         {/* Skutečný nástroj zůstává připojený i v úpravách — rozepsaný formulář,
             filtr ani pozice v seznamu se vstupem do úprav neztratí. */}
-        <div hidden={upravy}>{nastroj}</div>
+        <div ref={obalNastroje} hidden={upravy}>{nastroj}</div>
       </li>
     );
   }
