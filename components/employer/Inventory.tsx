@@ -771,11 +771,16 @@ export default function Inventory({ initialCategory, onNavigate }: {
       <div className={`sticky top-0 z-20 transition-[padding,box-shadow] ${
         stuck ? '-mx-4 px-4 sm:-mx-6 sm:px-6 py-2 space-y-2 glass-strong rounded-b-3xl shadow-[shadow:var(--shadow-float)]' : 'py-1 space-y-3'
       }`}>
-        <div className="flex flex-col lg:flex-row gap-3 lg:items-center">
+        {/* V klidu: hledání přes celou šířku, pod ním Seznam/Karty a řazení.
+            Přilepená: jeden řádek — hledání a vedle dvě ikonová tlačítka
+            (zobrazení, řazení), pod ním posuvný pás kategorií. Dřív měla
+            přilepená lišta na telefonu tři řádky (157 px, pětina obrazovky)
+            a pás kategorií byl na pravé hraně useknutý bez náznaku. */}
+        <div className={`flex gap-2 ${stuck ? 'items-center' : 'flex-col lg:flex-row gap-3 lg:items-center'}`}>
           <SearchField
             className="flex-1 min-w-0"
             value={search} onChange={setSearch}
-            placeholder="Hledat položku nebo dodavatele…"
+            placeholder={stuck ? 'Hledat ve skladu…' : 'Hledat položku nebo dodavatele…'}
             ariaLabel="Hledat ve skladu"
             storageKey="inventory"
             suggestions={[
@@ -784,10 +789,16 @@ export default function Inventory({ initialCategory, onNavigate }: {
             ]}
             inputClassName={stuck ? '!py-2' : ''}
           />
-          <div className="flex flex-wrap items-center gap-2 shrink-0 min-w-0">
-            {selecting && <Button variant="secondary" onClick={exitSelection}>Zrušit výběr</Button>}
-            <Segmented ariaLabel="Zobrazení" size="sm" value={view} onChange={setView}
-              options={[{ id: 'list', label: 'Seznam' }, { id: 'grid', label: 'Karty' }]} />
+          <div className="flex items-center gap-2 shrink-0 min-w-0">
+            {selecting && <Button variant="secondary" size={stuck ? 'sm' : 'md'} onClick={exitSelection}>Zrušit výběr</Button>}
+            {stuck ? (
+              <Button variant="secondary" iconOnly icon={view === 'list' ? 'grid' : 'menu'}
+                aria-label={view === 'list' ? 'Zobrazit jako karty' : 'Zobrazit jako seznam'}
+                onClick={() => setView(view === 'list' ? 'grid' : 'list')} />
+            ) : (
+              <Segmented ariaLabel="Zobrazení" size="sm" value={view} onChange={setView}
+                options={[{ id: 'list', label: 'Seznam', icon: 'menu' }, { id: 'grid', label: 'Karty', icon: 'grid' }]} />
+            )}
             <Menu label={`Řadit: ${SORTS.find(s => s.key === sort)?.label ?? ''}`} icon="swap"
               items={SORTS.map(s => ({ label: s.label, icon: s.key === sort ? 'check' : undefined, onClick: () => setSort(s.key) }))} />
           </div>
