@@ -1,0 +1,122 @@
+{
+ "shifts": [
+  {
+   "id": 700,
+   "employeeId": 16,
+   "employeeName": "Eva Testová",
+   "employeeAvatar": "🧑",
+   "date": "@-02",
+   "startTime": "08:00",
+   "endTime": "14:00",
+   "type": "Ranní"
+  },
+  {
+   "id": 701,
+   "employeeId": 16,
+   "employeeName": "Eva Testová",
+   "employeeAvatar": "🧑",
+   "date": "@-03",
+   "startTime": "08:00",
+   "endTime": "14:00",
+   "type": "Ranní"
+  },
+  {
+   "id": 702,
+   "employeeId": 16,
+   "employeeName": "Eva Testová",
+   "employeeAvatar": "🧑",
+   "date": "@-04",
+   "startTime": "14:00",
+   "endTime": "20:00",
+   "type": "Odpolední"
+  },
+  {
+   "id": 703,
+   "employeeId": 16,
+   "employeeName": "Eva Testová",
+   "employeeAvatar": "🧑",
+   "date": "@-09",
+   "startTime": "08:00",
+   "endTime": "14:00",
+   "type": "Ranní"
+  },
+  {
+   "id": 704,
+   "employeeId": 16,
+   "employeeName": "Eva Testová",
+   "employeeAvatar": "🧑",
+   "date": "@-10",
+   "startTime": "14:00",
+   "endTime": "20:00",
+   "type": "Odpolední"
+  },
+  {
+   "id": 705,
+   "employeeId": 17,
+   "employeeName": "Jakub Horák",
+   "employeeAvatar": "🧔",
+   "date": "@-02",
+   "startTime": "14:00",
+   "endTime": "20:00",
+   "type": "Odpolední"
+  },
+  {
+   "id": 706,
+   "employeeId": 17,
+   "employeeName": "Jakub Horák",
+   "employeeAvatar": "🧔",
+   "date": "@-05",
+   "startTime": "08:00",
+   "endTime": "14:00",
+   "type": "Ranní"
+  },
+  {
+   "id": 707,
+   "employeeId": 17,
+   "employeeName": "Jakub Horák",
+   "employeeAvatar": "🧔",
+   "date": "@-11",
+   "startTime": "14:00",
+   "endTime": "20:00",
+   "type": "Odpolední"
+  },
+  {
+   "id": 708,
+   "employeeId": 18,
+   "employeeName": "Tereza Malá",
+   "employeeAvatar": "👱‍♀️",
+   "date": "@-06",
+   "startTime": "08:00",
+   "endTime": "14:00",
+   "type": "Ranní"
+  },
+  {
+   "id": 799,
+   "employeeId": 21,
+   "employeeName": "Lukáš Beneš",
+   "employeeAvatar": "🧑‍🦱",
+   "date": "@-07",
+   "startTime": "10:00",
+   "endTime": "13:00",
+   "type": "Vlastní"
+  }
+ ],
+ "gaps": [
+  {
+   "date": "@-08",
+   "from": "08:00",
+   "to": "20:00",
+   "minutes": 720,
+   "uroven": "povinna"
+  },
+  {
+   "date": "@-12",
+   "from": "14:00",
+   "to": "20:00",
+   "minutes": 360,
+   "uroven": "zadouci"
+  }
+ ],
+ "understaffed": [],
+ "demand": {}
+}
