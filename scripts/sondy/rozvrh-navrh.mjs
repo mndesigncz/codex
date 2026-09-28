@@ -14,6 +14,12 @@
 // nevyplněno), poznámka, pořadí, „Přidat" s výběrem typu, u „nemůže" jen
 // s potvrzením, bez dostupnost.zobrazit se sekce nekreslí ani nenačítá.
 //
+// Po review navíc: upravený návrh se bez ptaní nezahodí (Vygenerovat znovu,
+// Zahodit náhled, přepnutí přepisu měsíce), s návrhem nejdou zápisy rovnou do
+// DB (Import, Kopírovat týden, Upravit podle požadavků), odchod jinam se
+// zeptá, přepis uložených směn se před publikováním potvrdí, dvě ukládací
+// tlačítka = jeden commit, commit nese verzi měsíce a 409 návrh nechá.
+//
 // Fixtury: k69-b1-generate/-schedule (návrh a uložené směny) a rozvrh-navrh-*
 // (dostupnost a volno na den PRISTI-06).
 import { readFileSync } from 'node:fs';
@@ -25,8 +31,12 @@ const PRISTI = (() => { const [y, m] = MESIC.split('-').map(Number); const d = n
 const nacti = (jmeno, mesic = PRISTI) => JSON.parse(readFileSync(DIR + jmeno + '.json', 'utf8')
   .replaceAll('PRISTI', PRISTI).replaceAll('"@-', `"${mesic}-`).replaceAll('"ZITRA"', `"${praha(1)}"`).replaceAll('"POZITRI"', `"${praha(2)}"`));
 
-/** Podvrh API rozvrhu; každý zápis (i commit návrhu) jde do `stav.zapisy` s pořadím. */
-const podvrh = () => (req, json, stav) => {
+/**
+ * Podvrh API rozvrhu; každý zápis (i commit návrhu) jde do `stav.zapisy` s pořadím.
+ * `konflikt`: commit vrátí 409 (jiná záložka mezitím změnila měsíc).
+ * `pomalyCommit`: commit odpoví až po 900 ms (na souběh dvou tlačítek).
+ */
+const podvrh = ({ konflikt = false, pomalyCommit = false } = {}) => (req, json, stav) => {
   const url = new URL(req.url());
   const path = url.pathname;
   const q = url.searchParams;
@@ -36,13 +46,17 @@ const podvrh = () => (req, json, stav) => {
       (stav.zapisy ??= []).push({ m: req.method(), path, body, i: (stav.zapisy ?? []).length });
     }
     if (path === '/api/schedule/generate') {
-      return JSON.parse(body || '{}').commit ? json({ ok: true, inserted: 2 }) : json(nacti('k69-b1-generate'));
+      if (!JSON.parse(body || '{}').commit) return json(nacti('k69-b1-generate'));
+      if (konflikt) return json({ error: 'Rozvrh tohoto měsíce mezitím někdo změnil (jiné okno nebo zařízení). Nic se neuložilo — návrh zůstal otevřený, zkontroluj uložené směny a ulož znovu.', konflikt: true }, 409);
+      if (pomalyCommit) return new Promise(res => setTimeout(() => res(json({ ok: true, inserted: 2 })), 900));
+      return json({ ok: true, inserted: 2 });
     }
     if (path === '/api/schedule/publish') return json({ ok: true, notified: 3 });
     if (path === '/api/schedule') return json({ inserted: 1 });
     return undefined;
   }
-  if (path === '/api/schedule') return json(nacti('k69-b1-schedule', q.get('month') ?? PRISTI));
+  // `verze` = otisk uloženého měsíce; commit ho musí poslat zpátky (hlídání souběhu).
+  if (path === '/api/schedule') return json({ ...nacti('k69-b1-schedule', q.get('month') ?? PRISTI), verze: 'verze-sonda' });
   if (path === '/api/schedule/rules') return json(nacti('k69-b1-rules'));
   if (path === '/api/availability') return json(q.get('mine') ? null : nacti('rozvrh-navrh-availability'));
   if (path === '/api/timeoff') return json(nacti('rozvrh-navrh-timeoff'));
@@ -81,18 +95,27 @@ async function otevriDen(p, d) {
   tvrdi('N1: Vygenerovat ukáže návrh', await vygeneruj(p));
   tvrdi('N1: s návrhem říká tlačítko „Uložit a publikovat"', await p.getByRole('button', { name: 'Uložit a publikovat' }).isVisible());
   tvrdi('N1: okno dne s návrhem se otevře', await otevriDen(p, DEN));
-  await okno(p).getByRole('button', { name: 'Vyhodit z návrhu — Eva Testová' }).click();
-  tvrdi('N1: Eva z návrhu dne zmizela', await dokud(async () => await okno(p).getByRole('button', { name: 'Vyhodit z návrhu — Eva Testová' }).count() === 0, 1500));
+  await okno(p).getByRole('button', { name: 'Odebrat z návrhu — Eva Testová' }).click();
+  tvrdi('N1: Eva z návrhu dne zmizela', await dokud(async () => await okno(p).getByRole('button', { name: 'Odebrat z návrhu — Eva Testová' }).count() === 0, 1500));
   await radek(p, 'Lukáš Beneš').getByRole('button', { name: 'Přidat — Lukáš Beneš' }).click();
   const potvrdit = okno(p).getByRole('button', { name: 'Přidat do návrhu' }).first();
   tvrdi('N1: rozbalené přidání nabízí „Přidat do návrhu"', await dokud(() => potvrdit.isVisible(), 1500));
   await potvrdit.click();
-  tvrdi('N1: Lukáš je v navržených směnách dne', await dokud(async () => await okno(p).getByRole('button', { name: 'Vyhodit z návrhu — Lukáš Beneš' }).count() === 1, 1500));
+  tvrdi('N1: Lukáš je v navržených směnách dne', await dokud(async () => await okno(p).getByRole('button', { name: 'Odebrat z návrhu — Lukáš Beneš' }).count() === 1, 1500));
+  tvrdi('N1: přidání ohlásí hláška (role=status) a fokus zůstane u Lukáše', await dokud(async () => (await okno(p).locator('[data-hlaska-tym]').innerText()).includes('Lukáš Beneš — přidáno do návrhu'), 1500)
+    && await dokud(() => p.evaluate(() => { const a = document.activeElement; return a?.getAttribute('aria-label') === 'Přidat — Lukáš Beneš' || a?.hasAttribute('data-hlaska-tym'); }), 1500));
   tvrdi('N1: přidání do návrhu nic nezapsalo do uložených směn (žádný POST /api/schedule)', !(stav.zapisy ?? []).some(z => z.path === '/api/schedule'));
   await p.screenshot({ path: OUT + 'rozvrh-navrh-den.png' });
   await okno(p).getByRole('button', { name: 'Zavřít' }).first().click();
   await dokud(async () => !(await okno(p).isVisible()), 2000);
+  tvrdi('N1: s návrhem je limetkou „Uložit a publikovat", „Vygenerovat znovu" jen sekundárně',
+    await p.getByRole('button', { name: 'Uložit a publikovat' }).evaluate(el => el.classList.contains('on-accent'))
+    && await p.getByRole('button', { name: 'Vygenerovat znovu' }).evaluate(el => !el.classList.contains('on-accent')));
   await p.getByRole('button', { name: 'Uložit a publikovat' }).click();
+  tvrdi('N1: přepis měsíce s uloženými směnami se nejdřív zeptá („Nahradit uložené směny?")', await dokud(() => okno(p).getByText('Nahradit uložené směny?').isVisible(), 2000)
+    && (await okno(p).innerText()).includes('zmizí 4 směny'));
+  tvrdi('N1: …a do potvrzení nic neuložil', commity(stav).length === 0);
+  await okno(p).getByRole('button', { name: 'Nahradit a publikovat' }).click();
   tvrdi('N1: Uložit a publikovat → publikace odešla', await dokud(() => publikace(stav).length === 1, 4000));
   const c = commity(stav);
   const telo = c[0] ? JSON.parse(c[0].body) : { shifts: [] };
@@ -100,6 +123,7 @@ async function otevriDen(p, d) {
   tvrdi('N1: návrh se uložil jedním commitem', c.length === 1, `${c.length}×`);
   tvrdi('N1: tělo commitu = upravený návrh (Lukáš místo Evy na den 6.)', naDen.includes(21) && !naDen.includes(16), JSON.stringify(telo.shifts));
   tvrdi('N1: …a zbytek návrhu zůstal (Jakub 7.)', telo.shifts.some(s => s.employeeId === 17 && s.date === `${PRISTI}-07`));
+  tvrdi('N1: commit nese verzi uloženého měsíce (hlídání souběhu dvou záložek)', telo.verze === 'verze-sonda', String(telo.verze));
   tvrdi('N1: publish se zavolal až po commitu', c[0] && publikace(stav)[0] && c[0].i < publikace(stav)[0].i);
   tvrdi('N1: po uložení návrh zmizel a tlačítko je zase „Publikovat"', await dokud(async () => !(await p.getByText('Navržený rozvrh').isVisible()) && await p.getByRole('button', { name: 'Publikovat', exact: true }).isVisible(), 3000));
   tvrdi('N1: bez chyb v konzoli', chyby.length === 0, chyby.slice(0, 3).join(' | '));
@@ -136,7 +160,7 @@ async function otevriDen(p, d) {
   const stavy = await tym(p).locator('li.list-row').evaluateAll(els => Object.fromEntries(els.map(e => [e.querySelector(':scope > span.min-w-0 > span')?.textContent?.trim(), e.querySelector('[data-stav]')?.getAttribute('data-stav')])));
   tvrdi('D1: stavy dne ze dostupnosti a volna', stavy['Lukáš Beneš'] === 'muze' && stavy['Jakub Horák'] === 'omezeni' && stavy['Tereza Malá'] === 'nemuze'
     && stavy['Petra Dvořáková'] === 'volno' && stavy['Ondřej Kučera'] === 'nevyplneno', JSON.stringify(stavy));
-  tvrdi('D1: chip „jen Ranní" u Jakuba a „schválené volno" u Petry', (await radek(p, 'Jakub Horák').innerText()).includes('jen Ranní') && (await radek(p, 'Petra Dvořáková').innerText()).includes('schválené volno'));
+  tvrdi('D1: chip „jen Ranní" u Jakuba a „dovolená" u Petry', (await radek(p, 'Jakub Horák').innerText()).includes('jen Ranní') && (await radek(p, 'Petra Dvořáková').innerText()).includes('dovolená'));
   tvrdi('D1: poznámka pro vedení u řádku (Tereza, Lukáš)', (await radek(p, 'Tereza Malá').innerText()).includes('Rodinná oslava') && (await radek(p, 'Lukáš Beneš').innerText()).includes('Víkendy ano'));
   tvrdi('D1: kdo je v návrhu, je označený „má směnu"', (await radek(p, 'Eva Testová').innerText()).includes('má směnu'));
   tvrdi('D1: obecná preference u Nikoly', (await radek(p, 'Nikola Šťastná').innerText()).includes('preferuje odpolední'));
@@ -145,20 +169,100 @@ async function otevriDen(p, d) {
   // „nemůže" → přidání jen s potvrzením
   await radek(p, 'Tereza Malá').getByRole('button', { name: 'Přidat — Tereza Malá' }).click();
   tvrdi('D2: u „nemůže" je potvrzení „Přesto přidat" s vysvětlením', await dokud(() => okno(p).getByRole('button', { name: 'Přesto přidat' }).first().isVisible(), 1500)
-    && await okno(p).getByText('Přidat jde, ale jen když to s ním máš domluvené.').isVisible());
+    && await okno(p).getByText('Tereza Malá podle své dostupnosti tento den nemůže. Přidat jde, ale jen když je to domluvené.').isVisible());
   await okno(p).getByRole('button', { name: 'Zrušit' }).first().click();
 
   // Jakub: výchozí typ podle jeho volby, po přidání už Ranní nejde znovu (překryv)
   await radek(p, 'Jakub Horák').getByRole('button', { name: 'Přidat — Jakub Horák' }).click();
   tvrdi('D3: výchozí typ podle denní volby (Ranní)', await dokud(() => okno(p).getByText(/Ranní · 07:00–15:00/).isVisible(), 1500));
   await okno(p).getByRole('button', { name: 'Přidat do návrhu' }).first().click();
-  tvrdi('D3: Jakub je v návrhu dne', await dokud(async () => await okno(p).getByRole('button', { name: 'Vyhodit z návrhu — Jakub Horák' }).count() === 1, 1500));
+  tvrdi('D3: Jakub je v návrhu dne', await dokud(async () => await okno(p).getByRole('button', { name: 'Odebrat z návrhu — Jakub Horák' }).count() === 1, 1500));
+  const poradiPo = await tym(p).locator('li.list-row').evaluateAll(els => els.map(e => e.querySelector(':scope > span.min-w-0 > span')?.textContent?.trim()));
+  tvrdi('D3: po přidání řádky neuskočily (pořadí drží, dokud je okno otevřené)', JSON.stringify(poradiPo) === JSON.stringify(poradi), JSON.stringify(poradiPo));
   tvrdi('D3: …a v týmu označený „má směnu 07:00–15:00"', await dokud(async () => (await radek(p, 'Jakub Horák').innerText()).includes('má směnu 07:00–15:00'), 1500));
   await radek(p, 'Jakub Horák').getByRole('button', { name: 'Přidat — Jakub Horák' }).click();
   tvrdi('D3: podruhé se nabízí jen typ, který se nepřekrývá (Noční, ne Ranní)', await dokud(() => okno(p).getByText(/Noční z organizace · 18:00–02:00/).isVisible(), 1500)
     && await tym(p).getByRole('tab', { name: 'Ranní' }).count() === 0);
   await okno(p).getByRole('button', { name: 'Zrušit' }).first().click();
   tvrdi('D3: nic z toho nešlo do uložených směn', !(stav.zapisy ?? []).some(z => z.path === '/api/schedule'));
+
+  // Escape v rozbaleném výběru sbalí jen výběr, okno dne zůstane.
+  await radek(p, 'Lukáš Beneš').getByRole('button', { name: 'Přidat — Lukáš Beneš' }).click();
+  await dokud(() => okno(p).getByRole('button', { name: 'Přidat do návrhu' }).first().isVisible(), 1500);
+  await okno(p).getByRole('button', { name: 'Zrušit' }).first().focus();
+  await p.keyboard.press('Escape');
+  await p.waitForTimeout(250);
+  tvrdi('D4: Escape ve výběru typu nechá okno dne otevřené', await okno(p).getByText('Tým na tento den').isVisible());
+  tvrdi('D4: …výběr se sbalil a fokus je zpět na „Přidat — Lukáš Beneš"', await radek(p, 'Lukáš Beneš').getByRole('button', { name: 'Přidat — Lukáš Beneš' }).getAttribute('aria-expanded') === 'false'
+    && await p.evaluate(() => document.activeElement?.getAttribute('aria-label')) === 'Přidat — Lukáš Beneš');
+  tvrdi('D5: s Týmem na den patička okna nemá „Přidat do návrhu" (jen Zavřít)', await okno(p).getByRole('button', { name: /^Přidat (do návrhu|směnu)$/ }).count() === 0
+    && await okno(p).getByRole('button', { name: 'Přidat s vlastním časem…' }).isVisible());
+  await ctx.close();
+}
+
+// 7) Ruční úpravy se bez ptaní nezahodí; zápisy do DB s otevřeným návrhem nejdou; SPA navigace se zeptá.
+{
+  const { ctx, p, stav } = await kontext({ fix: FIX, dalsi: podvrh() });
+  await otevri(p, ROZVRH, 'vedeni.rozvrh');
+  await vygeneruj(p);
+  const generovani = () => (stav.zapisy ?? []).filter(z => z.path === '/api/schedule/generate' && !JSON.parse(z.body || '{}').commit);
+  tvrdi('Z0: generování posílá, jestli se měsíc přepíše (nahradit)', JSON.parse(generovani()[0]?.body || '{}').nahradit === true, generovani()[0]?.body);
+  await p.getByRole('button', { name: 'Vygenerovat znovu' }).click();
+  tvrdi('Z1: neupravený návrh se přegeneruje bez ptaní', await dokud(() => generovani().length === 2, 2000) && await okno(p).count() === 0);
+  await otevriDen(p, DEN);
+  await okno(p).getByRole('button', { name: 'Odebrat z návrhu — Eva Testová' }).click();
+  await okno(p).getByRole('button', { name: 'Zavřít' }).first().click();
+  await dokud(async () => !(await okno(p).isVisible()), 2000);
+  await p.getByRole('button', { name: 'Vygenerovat znovu' }).click();
+  tvrdi('Z2: upravený návrh → „Vygenerovat znovu" se zeptá („Návrh má tvoje úpravy")', await dokud(() => okno(p).getByText('Návrh má tvoje úpravy').isVisible(), 1500));
+  await okno(p).getByRole('button', { name: 'Nechat' }).click();
+  tvrdi('Z2: „Nechat" návrh nechá (žádné nové generování)', generovani().length === 2 && await p.getByText('Navržený rozvrh').isVisible());
+  await p.getByRole('button', { name: 'Zahodit náhled' }).click();
+  tvrdi('Z3: „Zahodit náhled" u upraveného návrhu se taky zeptá', await dokud(() => okno(p).getByText('Návrh má tvoje úpravy').isVisible(), 1500));
+  await okno(p).getByRole('button', { name: 'Nechat' }).click();
+  await p.getByRole('switch', { name: 'Nahradit uložené směny měsíce' }).click();
+  tvrdi('Z4: přepnutí „Nahradit uložené směny" u upraveného návrhu se zeptá', await dokud(() => okno(p).getByText('Návrh má tvoje úpravy').isVisible(), 1500));
+  await okno(p).getByRole('button', { name: 'Zahodit a vygenerovat znovu' }).click();
+  tvrdi('Z4: …po potvrzení se generuje bez přepisu (nahradit: false)', await dokud(() => generovani().length === 3, 2000) && JSON.parse(generovani()[2].body).nahradit === false, generovani()[2]?.body);
+
+  await p.getByRole('button', { name: 'Další akce' }).first().click().catch(() => {});
+  const polozka = (t) => p.getByRole('menuitem', { name: new RegExp(t) });
+  await dokud(() => polozka('Import CSV').isVisible(), 1500);
+  tvrdi('Z5: s návrhem jsou Import CSV, Kopírovat týden a Upravit podle požadavků vypnuté',
+    await polozka('Import CSV').isDisabled() && await polozka('Kopírovat týden').isDisabled() && await polozka('Upravit podle nových požadavků').isDisabled());
+  await p.keyboard.press('Escape');
+
+  const kam = await p.evaluate(() => { const b = [...document.querySelectorAll('aside button, aside a')].find(e => /Docházka|Sklad/.test(e.textContent || '')); b?.click(); return b?.textContent ?? null; });
+  tvrdi('Z6: odchod do jiné sekce s neuloženým návrhem se zeptá', !!kam && await dokud(() => p.locator('.discard-guard').isVisible(), 1500)
+    && (await p.locator('.discard-guard').innerText()).includes('Navržený rozvrh'), String(kam));
+  await p.locator('.discard-guard button', { hasText: /Zpět k úpravám/ }).click();
+  tvrdi('Z6: „Zpět k úpravám" nechá návrh na místě', await dokud(() => p.getByText('Navržený rozvrh').isVisible(), 1500));
+  await ctx.close();
+}
+
+// 8) Souběh: „Potvrdit a uložit" a hned „Uložit a publikovat" → jediný commit.
+{
+  const { ctx, p, stav } = await kontext({ fix: FIX, dalsi: podvrh({ pomalyCommit: true }) });
+  await otevri(p, ROZVRH, 'vedeni.rozvrh');
+  await vygeneruj(p);
+  await p.getByRole('button', { name: 'Potvrdit a uložit' }).click();
+  await p.getByRole('button', { name: 'Uložit a publikovat' }).click({ force: true, timeout: 1000 }).catch(() => {});
+  await p.waitForTimeout(1500);
+  tvrdi('S1: dvě ukládací tlačítka rychle za sebou = jeden commit', commity(stav).length === 1, `${commity(stav).length}×`);
+  await ctx.close();
+}
+
+// 9) 409 od serveru (jiná záložka změnila měsíc): chyba, návrh zůstane, plánovač se znovu načte.
+{
+  const { ctx, p, stav } = await kontext({ fix: FIX, dalsi: podvrh({ konflikt: true }) });
+  await otevri(p, ROZVRH, 'vedeni.rozvrh');
+  await vygeneruj(p);
+  const nacteniMesice = () => stav.dotazy.filter(d => d.path === '/api/schedule' && d.m === 'GET').length;
+  const pred = nacteniMesice();
+  await p.getByRole('button', { name: 'Potvrdit a uložit' }).click();
+  tvrdi('K1: 409 ukáže „mezitím někdo změnil"', await dokud(() => p.getByText(/mezitím někdo změnil/).first().isVisible(), 2500));
+  tvrdi('K1: …návrh zůstal otevřený', await p.getByText('Navržený rozvrh').isVisible());
+  tvrdi('K1: …a uložený měsíc se znovu načetl (nová verze)', await dokud(() => nacteniMesice() > pred, 2000));
   await ctx.close();
 }
 

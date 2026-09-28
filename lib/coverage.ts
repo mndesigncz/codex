@@ -91,7 +91,20 @@ export function weekdayKey(date: string): string {
   return String((new Date(date + 'T12:00:00Z').getUTCDay() + 6) % 7);
 }
 
-export interface DayGap { date: string; from: string; to: string; minutes: number }
+/**
+ * Jak vážná je díra. Podnik se bez člověka na otevření vůbec neotevře —
+ * to je „povinná" díra. Prázdno později během dne (chybí druhá směna, první
+ * končí dřív) je „žádoucí": otevře se, jen s menší obsluhou nebo zavře dřív.
+ * Martin to řekl přímo: hlavní je otevírací směna, druhá je, když je kdo.
+ */
+export type UrovenDiry = 'povinna' | 'zadouci';
+
+/** Díra, která začíná hned v čase otevření (tolerance jako u `uncovered`), je povinná. */
+export function urovenDiry(open: Interval, g: Interval, toleranceMin = 5): UrovenDiry {
+  return g.start <= open.start + toleranceMin ? 'povinna' : 'zadouci';
+}
+
+export interface DayGap { date: string; from: string; to: string; minutes: number; uroven?: UrovenDiry }
 
 /**
  * Díry v pokrytí pro zadané dny.
@@ -112,7 +125,7 @@ export function coverageGaps(
     if (!open) continue;                       // zavřeno — pokrývat není co
     const shifts = shiftsByDate.get(date) ?? [];
     for (const g of uncovered(open, shifts)) {
-      out.push({ date, from: toHM(g.start), to: toHM(g.end), minutes: g.end - g.start });
+      out.push({ date, from: toHM(g.start), to: toHM(g.end), minutes: g.end - g.start, uroven: urovenDiry(open, g) });
     }
   }
   return out;

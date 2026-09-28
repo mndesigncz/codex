@@ -502,6 +502,10 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS allow_split_shifts BOOLEAN`);
     // Per-person opt-out from split shifts (NULL = allowed when the team allows).
     await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS split_shifts_ok BOOLEAN`);
+    // Nastavení generování jako JSON — dnes počet lidí podle tržeb
+    // ({ podleTrzeb, prah }), výchozí vypnuto. JSON, ať každé další volitelné
+    // pravidlo generátoru nepotřebuje vlastní sloupec (lib/rozvrhGenerator.ts).
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS staffing_rules JSONB`);
     // watchdog for forgotten clock-outs: when the person was already reminded
     await ddl(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS nudged_at TIMESTAMP`);
 

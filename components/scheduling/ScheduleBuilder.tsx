@@ -32,7 +32,7 @@ import { Fragment, useState, useEffect, useMemo, useRef } from 'react';
 import { zkratkyDnu, odsazeniMesice, zacatekTydne, type ZacatekTydne } from '@/lib/week';
 import { useCurrency } from '@/components/CurrencyProvider';
 import { dayPrefLabel, prefAllowsSlot } from '@/lib/dayPrefs';
-import { openSpan, uncovered, typeFitsDay, toHM } from '@/lib/coverage';
+import { openSpan, uncovered, typeFitsDay, toHM, urovenDiry } from '@/lib/coverage';
 import { Icon } from '../Icons';
 import {
   Avatar, Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Modal, MonthNav, PageHeader, Segmented,
@@ -42,11 +42,12 @@ import ShiftCalendar from './ShiftCalendar';
 import { usePlan, UpgradeModal } from '../Pro';
 import { apiMessage, okJson } from '@/lib/api';
 import { openPrint, esc } from '@/lib/printDoc';
-import { czCount, czForm, SMENA, DEN } from '@/lib/czech';
+import { czCount, czForm, SMENA, DEN, HODINA, HODINU } from '@/lib/czech';
 import { pragueToday } from '@/lib/pragueTime';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu } from '../widgety/useDataWidgetu';
 import { nactiTeamsMine, useOpravneni } from '../role/useOpravneni';
+import { nastavRozepsanyNavrh } from '../role/rozepsano';
 import { prepocitejDen, stavClenaDne, seradRadky, kolize, vychoziTyp, type StavClenaDne, type TypDne } from '@/lib/rozvrhDen';
 import {
   KLIC_DEN, KLIC_DOSTUPNOST, UDALOST_DEN, UDALOST_DOSTUPNOST, UDALOST_ZMENA, den as denZ, hm as hmZ, posunMesice,
@@ -84,18 +85,57 @@ interface Shift {
   endTime: string;
   type: string;
 }
-/** Úsek otevírací doby, kdy v podniku není nikdo. */
+/**
+ * Úsek otevírací doby, kdy v podniku není nikdo. `uroven` od generátoru
+ * i z /api/schedule: povinná = nikdo neotevře (podnik se neotevře),
+ * žádoucí = prázdno později během dne. Bez úrovně (starší odpověď) se bere
+ * jako povinná — radši hlasitě než potichu.
+ */
 interface Gap {
   date: string;
   from: string;
   to: string;
   minutes: number;
+  uroven?: 'povinna' | 'zadouci';
 }
 /** Typ směny, který se na ten den vejde, ale nikdo na něm není. */
 interface MissingSlot {
   date: string;
   shiftTypeName: string;
+  uroven?: 'povinna' | 'zadouci';
 }
+/** Doporučení počtu lidí podle tržeb — jen když je v Pravidlech zapnuté. */
+interface Doporuceni {
+  date: string;
+  lidi: 1 | 2;
+  trzba: number;
+  vzorek: number;
+  usporaHodin: number;
+  /** Tržba by stačila na jednoho, ale otevírací směna nepokryje celý den — obsazeno normálně. */
+  nepokryjeJeden?: boolean;
+}
+/** Doporučení „stačí jeden", které generátor opravdu uplatnil (druhou směnu vynechal). */
+const jedenUplatnen = (x: Doporuceni | undefined) => x?.lidi === 1 && !x.nepokryjeJeden;
+interface NahledGeneratoru {
+  proposed: Proposed[];
+  warnings: string[];
+  gaps: Gap[];
+  understaffed: MissingSlot[];
+  /** Chybí, když je doporučení podle tržeb vypnuté (UI pak o tržbách mlčí). */
+  doporuceni?: Doporuceni[];
+  trzby?: { stav: 'ok' | 'bez_opravneni' | 'bez_dat' | 'bez_prahu'; prah: number | null };
+  hodiny?: { celkem: number; usporaDoporucenim: number };
+  /** Z čeho návrh vyšel: true = uložení přepíše měsíc, false = návrh vedle uložených směn. */
+  nahradit?: boolean;
+  /**
+   * Vedení návrh ručně upravilo (přidalo nebo odebralo směnu). Pak se před
+   * každou akcí, která návrh zahodí (nové generování, Zahodit náhled,
+   * přepnutí přepisu měsíce), ptáme — ruční úpravy jsou práce, kterou už
+   * generátor nevrátí.
+   */
+  upraveno?: boolean;
+}
+const jePovinna = (g: { uroven?: string }) => g.uroven !== 'zadouci';
 interface ShiftType {
   id: number;
   name: string;
@@ -140,6 +180,8 @@ interface Proposed {
   shiftTypeId: number;
   shiftTypeName: string;
   color: string;
+  /** Směna, která otvírá podnik (od generátoru). */
+  oteviraci?: boolean;
 }
 
 // `CZ_DAYS_FULL` se dál používá tam, kde index NENÍ sloupec mřížky, ale
@@ -201,6 +243,15 @@ function shiftMonth(month: string, delta: number) {
 function monthLabel(month: string) {
   const [y, m] = month.split('-').map(Number);
   return new Date(y, m - 1, 1).toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
+}
+/** „3 směny, které už v měsíci jsou" — kolik uložených směn přepsání měsíce smaže. */
+function ulozeneVMesici(n: number) {
+  return `${czCount(n, SMENA)}, ${n === 1 ? 'která už v měsíci je' : 'které už v měsíci jsou'}`;
+}
+/** „5. 10." — krátce do výčtu dnů. */
+function kratkeDatum(date: string) {
+  const [, m, d] = date.split('-').map(Number);
+  return `${d}. ${m}.`;
 }
 function dayLabel(date: string) {
   const [y, m, d] = date.split('-').map(Number);
@@ -342,7 +393,7 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
 
   // Náhled generování
   const [generating, setGenerating] = useState(false);
-  const [preview, setPreview] = useState<{ proposed: Proposed[]; warnings: string[]; gaps: Gap[]; understaffed: MissingSlot[] } | null>(null);
+  const [preview, setPreview] = useState<NahledGeneratoru | null>(null);
   const [adjust, setAdjust] = useState<{ changes: any[]; warnings: string[] } | null>(null);
   const [adjustSkipped, setAdjustSkipped] = useState<Set<number>>(new Set());
   const [adjusting, setAdjusting] = useState(false);
@@ -355,6 +406,22 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
   const [cekaMesic, setCekaMesic] = useState<{ mesic: string; den?: string } | null>(null);
   const maNavrhRef = useRef(false);
   maNavrhRef.current = preview != null;
+  // Akce, která by zahodila RUČNĚ UPRAVENÝ návrh, čeká na potvrzení (stejné
+  // okno jako přepnutí měsíce). Dřív „Vygenerovat rozvrh" a „Zahodit náhled"
+  // úpravy smazaly jedním klepnutím — přesně ta ztráta, na kterou si Martin
+  // stěžoval.
+  const [ptamSe, setPtamSe] = useState<{ akce: 'generovat'; nahradit: boolean } | { akce: 'zahodit' } | null>(null);
+  // „Uložit a publikovat" s přepsáním měsíce smaže i uložené směny — při
+  // zavřeném náhledu to nebylo nikde vidět, proto se nejdřív zeptá.
+  const [potvrdNahrazeni, setPotvrdNahrazeni] = useState(false);
+  // Uložení návrhu běží nejvýš jednou: „Potvrdit a uložit" a hned „Uložit
+  // a publikovat" (nebo „Uložit a přepnout") by jinak poslaly dva commity
+  // a každý by vložil celý návrh — každý člověk by měl každou směnu dvakrát.
+  const ukladaRef = useRef(false);
+  // Verze uloženého měsíce, ze které plánovač vychází (GET /api/schedule).
+  // Commit ji pošle zpátky; když ji mezitím změnila jiná záložka nebo jiné
+  // zařízení, server vrátí 409 místo tichého přepsání.
+  const [verzeMesice, setVerzeMesice] = useState<string | null>(null);
 
   // Náhled importu
   const [importPreview, setImportPreview] = useState<{ rows: any[]; errors: string[] } | null>(null);
@@ -394,6 +461,7 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
         setMembers(tData.members ?? []);
         setSubmissions(Array.isArray(aData?.submissions) ? aData.submissions : []);
         setShifts(sData.shifts ?? []);
+        setVerzeMesice(typeof sData.verze === 'string' ? sData.verze : null);
         setGaps(Array.isArray(sData.gaps) ? sData.gaps : []);
         setUnderstaffed(Array.isArray(sData.understaffed) ? sData.understaffed : []);
         setDemand(sData.demand && typeof sData.demand === 'object' ? sData.demand : {});
@@ -455,6 +523,13 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
   };
   const zmenMesicRef = useRef(zmenMesic);
   zmenMesicRef.current = zmenMesic;
+
+  // Neuložený návrh a přechod na jiný pohled aplikace (navigace, „Pozvat do
+  // týmu", proklik z widgetu): EmployerLayout se přes stráž zeptá. Stav je
+  // v modulu, protože navigace je o několik úrovní výš.
+  const maNavrh = preview != null;
+  useEffect(() => { nastavRozepsanyNavrh(maNavrh); }, [maNavrh]);
+  useEffect(() => () => nastavRozepsanyNavrh(false), []);
 
   // Neuložený návrh a zavření karty: prohlížeč se zeptá (text si volí sám).
   useEffect(() => {
@@ -579,6 +654,13 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
     return map;
   }, [activeGaps, activeUnderstaffed]);
   const problemDates = useMemo(() => Object.keys(problemsByDate).sort(), [problemsByDate]);
+  // Dny, kdy nikdo neotevře — ty mají být vidět na první pohled.
+  const povinneDny = useMemo(() => problemDates.filter((d) => problemsByDate[d].gaps.some(jePovinna)), [problemDates, problemsByDate]);
+  const doporuceniByDate = useMemo(() => {
+    const map: Record<string, Doporuceni> = {};
+    (preview?.doporuceni ?? []).forEach((x) => { map[x.date] = x; });
+    return map;
+  }, [preview]);
 
   const eventsByDate = useMemo(() => {
     const map: Record<string, any[]> = {};
@@ -635,12 +717,17 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
   // a návrh visel dál jen v prohlížeči — upozornění odešlo na starý (nebo
   // prázdný) rozvrh a úpravy návrhu se ztratily při první změně měsíce, nebo
   // je pozdější „Potvrdit a uložit" s přepsáním měsíce smazalo.
-  const publish = async () => {
+  const publish = async (nahrazeniPotvrzeno = false) => {
+    // Běží-li uložení (tlačítko ve Wellu, okno měsíce), druhé nezačíná.
+    if (ukladaRef.current || publishing) return;
     if (preview) {
       if (preview.proposed.length === 0) {
         setBoardError('Návrh je prázdný — přidej do něj směny, nebo ho zahoď, a pak publikuj.');
         return;
       }
+      // Přepsání měsíce smaže i uložené směny a hned je publikuje — přepínač
+      // je jen ve Wellu náhledu, který může být odrolovaný pryč.
+      if (nahradiUlozene && shifts.length > 0 && !nahrazeniPotvrzeno) { setPotvrdNahrazeni(true); return; }
       setPublishing(true);
       const ulozeno = await commitPreview();
       if (!ulozeno) { setPublishing(false); return; }
@@ -735,14 +822,17 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
   };
 
   // ---- Generování ----
-  const generate = async () => {
+  // `nahradit` = uložení návrhu přepíše měsíc. Bez přepisu generátor počítá
+  // s uloženými směnami jako s obsazenými (nenavrhne je podruhé a nehlásí
+  // falešné díry), proto přepnutí přepínače vyvolá nové generování.
+  const generate = async (nahradit: boolean) => {
     setGenerating(true);
     setPreview(null);
     try {
       const res = await fetch('/api/schedule/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ month }),
+        body: JSON.stringify({ month, nahradit: nahradit && smiMazat }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -751,6 +841,11 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
           warnings: data.warnings ?? [],
           gaps: Array.isArray(data.gaps) ? data.gaps : [],
           understaffed: Array.isArray(data.understaffed) ? data.understaffed : [],
+          // Doporučení a stav tržeb jen tehdy, když je server poslal (funkce zapnutá).
+          ...(Array.isArray(data.doporuceni) ? { doporuceni: data.doporuceni } : {}),
+          ...(data.trzby && typeof data.trzby === 'object' ? { trzby: data.trzby } : {}),
+          ...(data.hodiny && typeof data.hodiny === 'object' ? { hodiny: data.hodiny } : {}),
+          nahradit: typeof data.nahradit === 'boolean' ? data.nahradit : nahradit && smiMazat,
         });
       } else {
         setPreview({ proposed: [], warnings: [data.error ?? 'Generování selhalo.'], gaps: [], understaffed: [] });
@@ -762,17 +857,36 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
     }
   };
 
+  /**
+   * Vygenerovat (znovu). Ručně upravený návrh se bez ptaní nezahodí;
+   * `nahradit` je nový stav přepínače „Nahradit uložené směny" — nastaví se
+   * až po potvrzení, ať „Nechat" nechá přepínač i návrh, jak byly.
+   */
+  const zadejGenerovani = (nahradit: boolean) => {
+    if (preview?.upraveno) { setPtamSe({ akce: 'generovat', nahradit }); return; }
+    setClearBeforeCommit(nahradit);
+    void generate(nahradit);
+  };
+  const zahoditNavrh = () => {
+    if (preview?.upraveno) { setPtamSe({ akce: 'zahodit' }); return; }
+    setPreview(null);
+  };
+
   /** Uloží návrh přesně tak, jak je na obrazovce (s ručními úpravami). Vrací, jestli se to povedlo. */
   const commitPreview = async (): Promise<boolean> => {
     if (!preview || preview.proposed.length === 0) return false;
+    if (ukladaRef.current) return false;
+    ukladaRef.current = true;
     setCommitting(true);
     try {
-      // Server maže a vkládá v jednom požadavku — neuložený návrh nechá stávající rozvrh netknutý.
-      // Přepsání celého měsíce smí jen rozvrh.mazat_mesic (katalog oprávnění).
+      // Server maže a vkládá jedním příkazem (atomicky) — neúspěch nechá
+      // stávající rozvrh netknutý. Přepsání celého měsíce smí jen
+      // rozvrh.mazat_mesic (katalog oprávnění). `verze` = uložený měsíc,
+      // ze kterého návrh vychází; jiná záložka ho mezitím změnila → 409.
       const res = await fetch('/api/schedule/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ month, commit: true, replaceMonth: clearBeforeCommit && smiMazat, shifts: preview.proposed }),
+        body: JSON.stringify({ month, commit: true, replaceMonth: clearBeforeCommit && smiMazat, verze: verzeMesice, shifts: preview.proposed }),
       }).catch(() => null);
       if (res?.ok) {
         setPreview(null);
@@ -780,8 +894,12 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
         return true;
       }
       setBoardError(await chybaZ(res, 'Uložení rozvrhu se nepodařilo — nic se nezměnilo, zkus to znovu.'));
+      // Souběh: načíst, co teď v měsíci opravdu je (a novou verzi). Návrh
+      // zůstává — vedení se podívá a uloží znovu vědomě.
+      if (res?.status === 409) await poZmene();
       return false;
     } finally {
+      ukladaRef.current = false;
       setCommitting(false);
     }
   };
@@ -796,6 +914,9 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
     ...(nahradiUlozene ? [] : (shiftsByDay[datum] ?? [])),
     ...proposed.filter((x) => x.date === datum),
   ];
+  // Doporučení „stačí jeden" platí i po ruční úpravě: odebraná druhá směna
+  // se pak do neobsazených nevrací, generátor ji za potřebnou nepovažoval.
+  const jedenStaciDne = (n: NahledGeneratoru, datum: string) => jedenUplatnen(n.doporuceni?.find((x) => x.date === datum));
   const pridejDoNavrhu = (payload: { employeeId: number; date: string; startTime: string; endTime: string; type: string }) => {
     const clen = members.find((m) => m.id === payload.employeeId);
     const typ = shiftTypes.find((t) => t.name === payload.type);
@@ -815,8 +936,8 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
       if (!prev) return prev;
       const proposed = [...prev.proposed, novy];
       const prepocet = prepocitejDen(prev, payload.date, openingHours[weekdayKey(payload.date)],
-        smenyNavrhuDne(payload.date, proposed), { pridanTyp: typ?.name ?? null });
-      return { ...prev, proposed, ...prepocet };
+        smenyNavrhuDne(payload.date, proposed), { pridanTyp: typ?.name ?? null, jedenStaci: jedenStaciDne(prev, payload.date) });
+      return { ...prev, proposed, ...prepocet, upraveno: true };
     });
     return true;
   };
@@ -830,8 +951,8 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
       if (i < 0) return prev;
       const proposed = prev.proposed.filter((_, j) => j !== i);
       const prepocet = prepocitejDen(prev, p.date, openingHours[weekdayKey(p.date)],
-        smenyNavrhuDne(p.date, proposed), { odebranTyp: p.shiftTypeName || p.type });
-      return { ...prev, proposed, ...prepocet };
+        smenyNavrhuDne(p.date, proposed), { odebranTyp: p.shiftTypeName || p.type, jedenStaci: jedenStaciDne(prev, p.date) });
+      return { ...prev, proposed, ...prepocet, upraveno: true };
     });
   };
 
@@ -983,15 +1104,21 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
     : undefined;
 
   const menu: MenuItem[] = [];
+  // Import, kopírování týdne a úprava podle požadavků zapisují rovnou do
+  // uložených směn. S otevřeným návrhem by je jeho uložení (výchozí
+  // s přepsáním měsíce) vzápětí smazalo — stejná příčina jako u „Přidat
+  // směnu" v okně dne. Proto do té doby nejdou.
+  const hintNavrh = 'Nejdřív ulož nebo zahoď návrh — jinak by jeho uložení tuhle změnu přepsalo.';
   if (naRozvrhu && !loading && !loadError) {
     if (smiPublikovat) menu.push(preview
-      ? { label: 'Uložit návrh a publikovat', icon: 'send', onClick: publish, hint: 'Návrh se uloží i s tvými úpravami a lidé dostanou upozornění.' }
-      : { label: 'Publikovat rozvrh', icon: 'send', onClick: publish, hint: 'Lidé dostanou upozornění, že je rozvrh hotový.' });
+      ? { label: 'Uložit návrh a publikovat', icon: 'send', onClick: () => { void publish(); }, disabled: committing || publishing, hint: 'Návrh se uloží i s tvými úpravami a lidé dostanou upozornění.' }
+      : { label: 'Publikovat rozvrh', icon: 'send', onClick: () => { void publish(); }, disabled: publishing, hint: 'Lidé dostanou upozornění, že je rozvrh hotový.' });
     if (smiUpravit) {
-      menu.push({ label: 'Upravit podle nových požadavků', icon: 'swap', onClick: runAdjust, disabled: adjusting || shifts.length === 0,
-        hint: 'Zkontroluje uložený rozvrh proti nejnovější dostupnosti.' });
-      menu.push({ label: 'Kopírovat týden…', icon: 'copy', onClick: () => { setCopyOpen(true); setCopyMsg(null); setCopySrc(''); setCopyDst(''); } });
-      menu.push({ label: 'Import CSV…', icon: 'upload', onClick: () => fileRef.current?.click() });
+      menu.push({ label: 'Upravit podle nových požadavků', icon: 'swap', onClick: runAdjust, disabled: !!preview || adjusting || shifts.length === 0,
+        hint: preview ? hintNavrh : 'Zkontroluje uložený rozvrh proti nejnovější dostupnosti.' });
+      menu.push({ label: 'Kopírovat týden…', icon: 'copy', disabled: !!preview, hint: preview ? hintNavrh : undefined,
+        onClick: () => { setCopyOpen(true); setCopyMsg(null); setCopySrc(''); setCopyDst(''); } });
+      menu.push({ label: 'Import CSV…', icon: 'upload', disabled: !!preview, hint: preview ? hintNavrh : undefined, onClick: () => fileRef.current?.click() });
     }
     if (smiExport) {
       menu.push({ label: 'Export CSV', icon: 'download', onClick: exportCsv, disabled: shifts.length === 0 });
@@ -1006,13 +1133,26 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
     subtitle: PODTITULEK,
     hintId: 'schedulebuilder',
     aside,
-    primary: naRozvrhu && smiGenerovat && !loadError
-      ? <Button variant="accent" icon="bulb" onClick={generate} loading={generating}>Vygenerovat rozvrh</Button>
-      : undefined,
-    secondary: naRozvrhu && smiPublikovat && !loadError
-      // S otevřeným návrhem tlačítko říká, co udělá: návrh uloží a pak publikuje.
-      ? <Button variant="secondary" icon="send" onClick={publish} loading={publishing}>{preview ? 'Uložit a publikovat' : 'Publikovat'}</Button>
-      : undefined,
+    // S otevřeným návrhem je hlavní akcí jeho uložení, ne nové generování:
+    // limetka přejde na „Uložit a publikovat" a „Vygenerovat znovu" je jen
+    // sekundární (a u upraveného návrhu se nejdřív zeptá). Dřív svítila
+    // limetkou pořád „Vygenerovat" a vedla prst přímo k zahození úprav.
+    primary: !naRozvrhu || loadError ? undefined
+      : preview
+        ? (smiPublikovat
+          ? <Button variant="accent" icon="send" onClick={() => { void publish(); }} loading={publishing} disabled={committing}>Uložit a publikovat</Button>
+          : undefined)
+        : smiGenerovat
+          ? <Button variant="accent" icon="bulb" onClick={() => zadejGenerovani(clearBeforeCommit)} loading={generating}>Vygenerovat rozvrh</Button>
+          : undefined,
+    secondary: !naRozvrhu || loadError ? undefined
+      : preview
+        ? (smiGenerovat
+          ? <Button variant="secondary" icon="bulb" onClick={() => zadejGenerovani(clearBeforeCommit)} loading={generating} disabled={committing || publishing}>Vygenerovat znovu</Button>
+          : undefined)
+        : smiPublikovat
+          ? <Button variant="secondary" icon="send" onClick={() => { void publish(); }} loading={publishing}>Publikovat</Button>
+          : undefined,
     menu: menu.length ? menu : undefined,
   };
 
@@ -1129,13 +1269,32 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
           <div className="min-w-0">
             <h3 className="t-card flex items-center gap-2"><Icon name="sparkle" size={17} className="shrink-0 text-black/40" /> Navržený rozvrh</h3>
             <p className="t-meta mt-0.5 text-pretty">
-              {czCount(preview.proposed.length, { one: 'navržená směna', few: 'navržené směny', many: 'navržených směn' })}
-              {preview.warnings.length > 0 && ` · ${czCount(preview.warnings.length, { one: 'upozornění', few: 'upozornění', many: 'upozornění' })}`}.
-              {' '}Návrh je v mřížce přerušovaně
-              {problemDates.length > 0 ? `; ${czCount(problemDates.length, DEN)} by zůstal${problemDates.length === 1 ? '' : 'y'} s dírou (červeně).` : '.'}
+              {/* Jedna věta s jednou tečkou na konci — dřív „… upozornění. · 80 hodin." */}
+              {[
+                czCount(preview.proposed.length, { one: 'navržená směna', few: 'navržené směny', many: 'navržených směn' }),
+                preview.warnings.length > 0 ? czCount(preview.warnings.length, { one: 'upozornění', few: 'upozornění', many: 'upozornění' }) : null,
+                preview.hodiny ? czCount(Math.round(preview.hodiny.celkem), HODINA) : null,
+              ].filter(Boolean).join(' · ')}.
+              {' '}Návrh je v mřížce přerušovaně.
+              {preview.upraveno ? ' Obsahuje tvoje ruční úpravy.' : ''}
               {' '}Klepnutím na den návrh upravíš — uloží se přesně to, co tu vidíš.
             </p>
           </div>
+          {povinneDny.length > 0 && (
+            // Povinná díra = podnik se neotevře. Musí být vidět hned, ne až
+            // jako řádek v seznamu upozornění.
+            <div className="note note-danger" data-povinne-diry>
+              <p className="text-sm font-semibold flex items-center gap-1.5"><Icon name="warning" size={16} className="shrink-0" /> Nikdo neotevře — {czCount(povinneDny.length, DEN)} bez otevírací směny</p>
+              <p className="text-xs mt-0.5 text-pretty">Bez člověka na otevření se podnik ten den neotevře: {povinneDny.slice(0, 8).map((d) => kratkeDatum(d)).join(', ')}{povinneDny.length > 8 ? ' …' : ''}. Klepni na den a doplň někoho.</p>
+            </div>
+          )}
+          {problemDates.length > povinneDny.length && (
+            <p className="t-meta text-pretty" data-zadouci-diry>
+              <span aria-hidden className="inline-block h-2 w-2 rounded-full bg-wait mr-1.5 align-middle" />
+              {czCount(problemDates.length - povinneDny.length, DEN)} bez druhého člověka — otevře se, jen s menší obsluhou.
+            </p>
+          )}
+          {preview.trzby && <SouhrnTrzeb trzby={preview.trzby} doporuceni={preview.doporuceni ?? []} hodiny={preview.hodiny} />}
           {preview.warnings.length > 0 && (
             <div className="note note-wait">
               <p className="text-sm font-medium flex items-center gap-1.5"><Icon name="warning" size={16} className="shrink-0" /> Upozornění ({preview.warnings.length})</p>
@@ -1146,16 +1305,22 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
             </div>
           )}
           {smiMazat && (
-            <label className="flex items-center gap-2 text-sm text-black/60 cursor-pointer select-none">
-              <input type="checkbox" checked={clearBeforeCommit} onChange={(e) => setClearBeforeCommit(e.target.checked)} className="h-4 w-4 accent-[#8FB811]" />
-              Před uložením vymazat stávající směny měsíce
-            </label>
+            // Přepnutí platí hned: návrh se přegeneruje proti tomu, co v měsíci
+            // zůstane (bez přepisu počítá s uloženými směnami jako s obsazenými).
+            <ul className="list">
+              <SwitchRow checked={clearBeforeCommit} onChange={(v) => zadejGenerovani(v)} title="Nahradit uložené směny měsíce"
+                hint={clearBeforeCommit
+                  ? (shifts.length > 0
+                    ? `Uložením návrhu zmizí ${ulozeneVMesici(shifts.length)}.`
+                    : 'V měsíci zatím nic uloženého není.')
+                  : 'Návrh se přidá k uloženým směnám a počítá s nimi — nic se nesmaže.'} />
+            </ul>
           )}
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="primary" size="sm" icon="check" loading={committing} disabled={preview.proposed.length === 0} onClick={() => { void commitPreview(); }}>
+            <Button variant="primary" size="sm" icon="check" loading={committing} disabled={preview.proposed.length === 0 || publishing} onClick={() => { void commitPreview(); }}>
               Potvrdit a uložit
             </Button>
-            <Button variant="secondary" size="sm" onClick={() => setPreview(null)}>Zahodit náhled</Button>
+            <Button variant="secondary" size="sm" disabled={committing || publishing} onClick={zahoditNavrh}>Zahodit náhled</Button>
           </div>
         </Well>
       )}
@@ -1178,8 +1343,15 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
             {preview && (
               <li className="flex items-center gap-1.5"><span aria-hidden className="h-2.5 w-2.5 rounded-full border border-dashed border-black/50 dark:border-white/50" /> Návrh</li>
             )}
-            {problemDates.length > 0 && (
-              <li className="flex items-center gap-1.5 text-bad-ink"><span aria-hidden className="h-2.5 w-2.5 rounded-full bg-bad" /> Díra v obsazení</li>
+            {/* Dvě úrovně se liší barvou I tvarem: povinná = červený výstražný
+                trojúhelník, žádoucí = oranžová tečka (tokeny wait jako v okně dne
+                a ve widgetu Díry). Samotný odstín červené na telefonu a v tmavém
+                režimu nešel rozlišit. */}
+            {povinneDny.length > 0 && (
+              <li className="flex items-center gap-1.5 text-bad-ink"><Icon name="warning" size={13} className="shrink-0" /> Nikdo neotevře</li>
+            )}
+            {problemDates.length > povinneDny.length && (
+              <li className="flex items-center gap-1.5 text-wait-ink"><span aria-hidden className="h-2 w-2 rounded-full bg-wait" /> Chybí druhý člověk</li>
             )}
             {Object.keys(demand).length > 0 && (
               <li className="flex items-center gap-1.5"><Icon name="users" size={13} className="shrink-0 text-black/45" /> Rezervovaní hosté</li>
@@ -1197,11 +1369,14 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
               const dayShifts = shiftsByDay[cell] ?? [];
               const dayProposed = proposedByDay[cell] ?? [];
               const problem = problemsByDate[cell];
-              const hole = (problem?.gaps.length ?? 0) > 0;
-              // Prázdný podnik je horší než chybějící druhý člověk, ale obojí je díra v obsazení.
+              // Dvě úrovně: nikdo neotevře (povinná — podnik se neotevře) svítí
+              // plně červeně, chybějící druhý člověk (žádoucí) jen jemně.
+              const hole = !!problem?.gaps.some(jePovinna);
               const problemTitle = problem
                 ? [
-                    ...problem.gaps.map(g => `Nikdo v podniku ${g.from}–${g.to}, přitom je otevřeno`),
+                    ...problem.gaps.map(g => jePovinna(g)
+                      ? `Nikdo neotevře — ${g.from}–${g.to} v podniku nikdo, podnik se neotevře`
+                      : `${g.from}–${g.to} v podniku nikdo — chybí druhý člověk`),
                     ...problem.missing.map(m => `Neobsazená směna „${m.shiftTypeName}"`),
                   ].join(' · ')
                 : undefined;
@@ -1211,18 +1386,21 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
                   type="button"
                   onClick={() => setDayModal(cell)}
                   title={problemTitle}
-                  aria-label={`${dayLabel(cell)}: ${czCount(dayShifts.length, SMENA)}${problem ? ', díra v obsazení' : ''}`}
+                  aria-label={`${dayLabel(cell)}: ${czCount(dayShifts.length, SMENA)}${nahradiUlozene && dayShifts.length > 0 ? ' (uložením návrhu se nahradí)' : ''}${dayProposed.length > 0 ? `, v návrhu ${czCount(dayProposed.length, SMENA)}` : ''}${hole ? ', nikdo neotevře' : problem ? ', chybí druhý člověk' : ''}`}
+                  data-dira={hole ? 'povinna' : problem ? 'zadouci' : undefined}
                   className={`min-h-[84px] min-w-0 rounded-xl p-1 sm:p-1.5 text-left transition-colors flex flex-col gap-1 overflow-hidden border ${
                     hole
                       ? 'bg-bad/15 border-bad/60 hover:bg-bad/20'
                       : problem
-                        ? 'bg-bad/[0.06] border-bad/35 hover:bg-bad/10'
+                        ? 'bg-wait/[0.08] border-wait/40 hover:bg-wait/15'
                         : 'bg-black/[0.03] border-black/[0.08] hover:border-black/20'
                   }`}
                 >
                   <span className="flex items-center gap-1 min-w-0">
-                    <span className={`text-[11px] sm:text-xs font-medium ${problem ? 'text-bad-ink' : 'text-black/55'}`}>{day}</span>
-                    {problem && <span aria-hidden className={`flex-shrink-0 rounded-full ${hole ? 'h-2 w-2 bg-bad' : 'h-1.5 w-1.5 bg-bad/70'}`} />}
+                    <span className={`text-[11px] sm:text-xs font-medium ${hole ? 'text-bad-ink' : 'text-black/55'}`}>{day}</span>
+                    {hole
+                      ? <Icon name="warning" size={11} className="flex-shrink-0 text-bad-ink" />
+                      : problem && <span aria-hidden className="flex-shrink-0 rounded-full h-1.5 w-1.5 bg-wait" />}
                   </span>
                   <span className="flex flex-col gap-1 min-w-0 overflow-hidden" aria-hidden>
                     {demand[cell]?.guests > 0 && (
@@ -1243,8 +1421,10 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
                       const rt = resolveShiftType(s, shiftTypes);
                       return (
                         <span key={s.id} title={`${s.employeeName} · ${rt.label} · ${s.startTime}–${s.endTime}`}
-                          // Uložení návrhu tyhle směny přepíše — v mřížce proto ztlumené, ať je vidět, co zůstane.
-                          className={`flex items-center gap-1 min-w-0 rounded-full px-1 py-0.5 text-[11px] font-medium overflow-hidden bg-black/[0.05] text-black/70 ${nahradiUlozene ? 'opacity-40 line-through' : ''}`}>
+                          // Uložení návrhu tyhle směny přepíše — v mřížce proto ztlumené a přeškrtnuté,
+                          // ať je vidět, co zůstane. Tlumí se tokenem (text-black/45 hlídá kontrola
+                          // kontrastu), ne opacity: ta na 11 px srazila kontrast asi na 2 : 1.
+                          className={`flex items-center gap-1 min-w-0 rounded-full px-1 py-0.5 text-[11px] font-medium overflow-hidden bg-black/[0.05] ${nahradiUlozene ? 'line-through text-black/45' : 'text-black/70'}`}>
                           <span className={`h-2 w-2 rounded-full flex-shrink-0 ${tridaTecky(rt.color)}`} />
                           <span className="flex-shrink-0">{s.employeeAvatar}</span>
                           <span className="truncate min-w-0">{s.startTime}</span>
@@ -1428,6 +1608,41 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
           </>}>
           <p className="text-sm text-black/60 text-pretty">
             Navržený rozvrh i s tvými úpravami je zatím jen tady v prohlížeči. Při přepnutí měsíce by se zahodil.
+            {nahradiUlozene && shifts.length > 0 ? ` Uložením zmizí ${ulozeneVMesici(shifts.length)}.` : ''}
+          </p>
+        </Modal>
+      )}
+
+      {ptamSe && (
+        <Modal open onClose={() => setPtamSe(null)} size="sm" title="Návrh má tvoje úpravy"
+          subtitle={<span className="cz-sentence">{monthLabel(month)}</span>}
+          footer={<>
+            <Button variant="secondary" onClick={() => setPtamSe(null)}>Nechat</Button>
+            <Button variant="danger-solid" onClick={() => {
+              const a = ptamSe; setPtamSe(null);
+              if (a.akce === 'zahodit') { setPreview(null); return; }
+              setClearBeforeCommit(a.nahradit);
+              void generate(a.nahradit);
+            }}>{ptamSe.akce === 'zahodit' ? 'Zahodit návrh' : 'Zahodit a vygenerovat znovu'}</Button>
+          </>}>
+          <p className="text-sm text-black/60 text-pretty">
+            {ptamSe.akce === 'zahodit'
+              ? 'V návrhu jsou ruční úpravy (přidané nebo odebrané směny). Zahozením zmizí i ony.'
+              : 'Nové generování vytvoří návrh od začátku — ruční úpravy (přidané nebo odebrané směny) zmizí. Chceš-li je zachovat, návrh nejdřív ulož.'}
+          </p>
+        </Modal>
+      )}
+
+      {potvrdNahrazeni && (
+        <Modal open onClose={() => setPotvrdNahrazeni(false)} size="sm" title="Nahradit uložené směny?"
+          subtitle={<span className="cz-sentence">{monthLabel(month)}</span>}
+          footer={<>
+            <Button variant="secondary" onClick={() => setPotvrdNahrazeni(false)}>Zrušit</Button>
+            <Button variant="primary" icon="send" loading={publishing} onClick={async () => { setPotvrdNahrazeni(false); await publish(true); }}>Nahradit a publikovat</Button>
+          </>}>
+          <p className="text-sm text-black/60 text-pretty">
+            Uložením návrhu zmizí {ulozeneVMesici(shifts.length)}, a lidé hned dostanou rozvrh jen z návrhu.
+            {' '}Chceš-li je ponechat, vypni v náhledu „Nahradit uložené směny měsíce".
           </p>
         </Modal>
       )}
@@ -1460,6 +1675,8 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
           submissions={submissions}
           navrh={!!preview}
           nahradiUlozene={nahradiUlozene}
+          // Jen se zapnutým doporučením podle tržeb — jinak undefined a okno o tržbách mlčí.
+          doporuceni={doporuceniByDate[dayModal]}
           // Dostupnost týmu jen s dostupnost.zobrazit — data jsou tatáž, která
           // plánovač načetl pro měsíc (jeden dotaz, ne dotaz na každý den).
           dostupnost={smiDostupnost ? { submissions, volno: timeOff } : null}
@@ -1471,6 +1688,46 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
         />
       )}
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Souhrn doporučení podle tržeb v náhledu návrhu. Kreslí se jen tehdy, když
+// server poslal `trzby` — tedy když je funkce v Pravidlech zapnutá. Vypnutá
+// = o tržbách ani slovo (Martin: „ať to tam zbytečně není").
+// ---------------------------------------------------------------------------
+
+function SouhrnTrzeb({ trzby, doporuceni, hodiny }: {
+  trzby: NonNullable<NahledGeneratoru['trzby']>;
+  doporuceni: Doporuceni[];
+  hodiny?: NahledGeneratoru['hodiny'];
+}) {
+  const { money } = useCurrency();
+  if (trzby.stav !== 'ok') {
+    const text = trzby.stav === 'bez_opravneni'
+      ? 'Počet lidí podle tržeb je zapnutý, ale na tržby nemáš oprávnění — generátor ho vynechal a řídil se jen otevírací směnou.'
+      : trzby.stav === 'bez_prahu'
+        ? 'Počet lidí podle tržeb je zapnutý, ale chybí práh — nastav ho v záložce Pravidla.'
+        : 'Počet lidí podle tržeb je zapnutý, ale za posledních 8 týdnů nejsou uzávěrky s tržbou — generátor se řídil jen otevírací směnou.';
+    return <p className="note note-wait text-sm text-pretty" data-souhrn-trzeb={trzby.stav}>{text}</p>;
+  }
+  const jeden = doporuceni.filter((x) => jedenUplatnen(x));
+  const dva = doporuceni.filter((x) => x.lidi === 2);
+  // Tržba by stačila na jednoho, ale otevírací směna nepokryje celý den —
+  // generátor proto dal dva (jinak by „jeden" znamenal zavřít v půli dne).
+  const nepokryje = doporuceni.filter((x) => x.lidi === 1 && x.nepokryjeJeden);
+  const prumerJeden = jeden.length ? Math.round(jeden.reduce((n, x) => n + x.trzba, 0) / jeden.length) : 0;
+  return (
+    <p className="t-meta flex items-start gap-1.5 text-pretty" data-souhrn-trzeb="ok">
+      <Icon name="users" size={15} className="shrink-0 mt-0.5 text-black/40" />
+      <span>
+        {jeden.length > 0 && <>Stačí jeden — {czCount(jeden.length, DEN)}, očekávaná tržba ~{money(prumerJeden)}. </>}
+        {dva.length > 0 && <>Dva lidé — {czCount(dva.length, DEN)} nad prahem {money(trzby.prah ?? 0)}. </>}
+        {nepokryje.length > 0 && <>{czCount(nepokryje.length, DEN)} by tržba stačila na jednoho, ale otevírací směna nepokryje celou otevírací dobu — proto dva. </>}
+        {jeden.length === 0 && dva.length === 0 && nepokryje.length === 0 && <>Na dny v tomhle měsíci nejsou tržby k porovnání s prahem. </>}
+        {hodiny && hodiny.usporaDoporucenim > 0 && <>Oproti dvěma lidem to ušetří ~{czCount(Math.round(hodiny.usporaDoporucenim), HODINU)}.</>}
+      </span>
+    </p>
   );
 }
 
@@ -1924,7 +2181,7 @@ const VLASTNI_CAS = '__vlastni';
 function DayModal({
   date, onNavigate, employees, shifts, proposed = [], shiftTypes, openingHours, unavailable, submissions,
   onClose, onAdd, onRemove, onRemoveProposed, events = [], readOnly = false,
-  navrh = false, nahradiUlozene = false, dostupnost = null,
+  navrh = false, nahradiUlozene = false, dostupnost = null, doporuceni,
 }: {
   onNavigate?: (view: string, arg?: string) => void;
   date: string;
@@ -1948,7 +2205,10 @@ function DayModal({
   nahradiUlozene?: boolean;
   /** Dostupnost týmu na měsíc; null = role ji nevidí a sekce se nekreslí. */
   dostupnost?: { submissions: Submission[]; volno: { employeeId: number; fromDate: string; toDate: string; type?: string | null }[] } | null;
+  /** Doporučení počtu lidí podle tržeb (jen když je funkce zapnutá a v návrhu). */
+  doporuceni?: Doporuceni;
 }) {
+  const { money } = useCurrency();
   // Otevírací doba TOHO dne (klíč 0 = pondělí … 6 = neděle).
   const oh = openingHours[weekdayKey(date)] as OpeningDay | undefined;
   const dayOpen = oh && !oh.closed ? oh.open : null;
@@ -1970,8 +2230,17 @@ function DayModal({
     () => uncovered(openSpan(oh ?? null), obsazene.map((x) => ({ start: x.startTime, end: x.endTime }))),
     [oh, obsazene],
   );
+  // Stejné dvě úrovně jako generátor: díra od otevření = nikdo neotevře.
+  const nikdoNeotevre = useMemo(() => {
+    const open = openSpan(oh ?? null);
+    return !!open && dayGaps.some((g) => urovenDiry(open, g) === 'povinna');
+  }, [oh, dayGaps]);
+  const lidiDne = useMemo(() => new Set(obsazene.map((x) => x.employeeId)).size, [obsazene]);
   const missingHere = useMemo(() => {
     if (!oh || oh.closed) return [] as string[];
+    // Podle tržeb stačí jeden: druhou směnu generátor vědomě neobsadil,
+    // okno ji nesmí hlásit jako chybějící (jen když ho opravdu uplatnil).
+    if (jedenUplatnen(doporuceni)) return [] as string[];
     const taken = new Set(obsazene.map((x) => String((x as any).type ?? (x as any).shiftTypeName ?? '').trim().toLowerCase()));
     // Den psaný ručně (vlastní časy, žádný nastavený typ) se neřeší.
     const known = new Set(shiftTypes.map((t) => t.name.trim().toLowerCase()));
@@ -1979,7 +2248,7 @@ function DayModal({
     return shiftTypes
       .filter((t) => typeFitsDay(t as any, oh as any) && !taken.has(t.name.trim().toLowerCase()))
       .map((t) => t.name);
-  }, [oh, obsazene, shiftTypes]);
+  }, [oh, obsazene, shiftTypes, doporuceni]);
 
   const first = shiftTypes[0];
   const [employeeId, setEmployeeId] = useState<number | ''>('');
@@ -2034,24 +2303,52 @@ function DayModal({
   };
 
   const nadpis = dayLabel(date);
+  // S Týmem na den se přidává z řádku člověka. Formulář s vlastním časem je
+  // pak jen doplněk pod rozbalením a jeho tlačítko je u něj — lepivá patička
+  // s „Přidat do návrhu" mířila na vzdálený select pod dlouhým seznamem
+  // a vedle rozbaleného řádku byla druhým tmavým tlačítkem se stejným textem.
+  const sTymem = !!dostupnost && !readOnly;
+  const [vlastniCas, setVlastniCas] = useState(false);
+  const tlacitkoPridat = (
+    <Button variant="primary" icon="plus" loading={saving} disabled={!employeeId || employees.length === 0 || kolidujeRucne} onClick={save}>
+      {varovani ? 'Přesto přidat' : navrh ? 'Přidat do návrhu' : 'Přidat směnu'}
+    </Button>
+  );
   return (
     <Modal open onClose={onClose} size="md" title={nadpis.charAt(0).toUpperCase() + nadpis.slice(1)}
       subtitle={dayOpen ? `Otevřeno ${dayOpen}–${dayClose}` : oh?.closed ? 'Zavřeno' : undefined}
-      footer={readOnly ? <Button variant="secondary" onClick={onClose}>Zavřít</Button> : <>
+      footer={readOnly || sTymem ? <Button variant="secondary" onClick={onClose}>Zavřít</Button> : <>
         <Button variant="secondary" onClick={onClose}>Zavřít</Button>
-        <Button variant="primary" icon="plus" loading={saving} disabled={!employeeId || employees.length === 0 || kolidujeRucne} onClick={save}>
-          {varovani ? 'Přesto přidat' : navrh ? 'Přidat do návrhu' : 'Přidat směnu'}
-        </Button>
+        {tlacitkoPridat}
       </>}>
       <div className="space-y-5">
         {!readOnly && (dayGaps.length > 0 || missingHere.length > 0) && (
-          <div className="note note-danger">
-            <p className="text-sm font-semibold flex items-center gap-1.5"><Icon name="warning" size={16} className="shrink-0" /> Díra v obsazení</p>
+          // Povinná (nikdo neotevře) výrazně, žádoucí (chybí druhý) mírně.
+          <div className={`note ${nikdoNeotevre ? 'note-danger' : 'note-wait'}`} data-dira={nikdoNeotevre ? 'povinna' : 'zadouci'}>
+            <p className="text-sm font-semibold flex items-center gap-1.5">
+              <Icon name="warning" size={16} className="shrink-0" />
+              {nikdoNeotevre ? 'Nikdo neotevře — podnik se ten den neotevře'
+                : lidiDne === 1 ? 'Druhá směna neobsazená — otevře se s jedním člověkem' : 'Směna neobsazená — otevře se i bez ní'}
+            </p>
             <ul className="text-xs mt-1 space-y-0.5 list-disc pl-4">
               {dayGaps.map((g, i) => <li key={`g-${i}`}>Od {toHM(g.start)} do {toHM(g.end)} není v podniku nikdo, přitom je otevřeno.</li>)}
               {missingHere.map((n) => <li key={`m-${n}`}>Směna „{n}" nemá nikoho.</li>)}
             </ul>
           </div>
+        )}
+
+        {doporuceni && (
+          // Tržba je PRŮMĚR stejného dne v týdnu za posledních 8 týdnů, ne
+          // předpověď — text to musí říct, jinak se čte jako odhad na ten den.
+          <p className="t-meta flex items-start gap-1.5 text-pretty" data-doporuceni>
+            <Icon name="users" size={15} className="shrink-0 mt-0.5 text-black/40" />
+            <span>
+              {doporuceni.nepokryjeJeden
+                ? <>Podle tržby by stačil 1 člověk (průměrná tržba v tento den v týdnu ~{money(doporuceni.trzba)}), ale otevírací směna nepokryje celou otevírací dobu — proto dva.</>
+                : <>Doporučení: {doporuceni.lidi === 1 ? '1 člověk' : '2 lidé'} · průměrná tržba v tento den v týdnu ~{money(doporuceni.trzba)}
+                  {doporuceni.usporaHodin > 0 ? ` · ušetří ${czCount(Math.round(doporuceni.usporaHodin), HODINU)}` : ''}</>}
+            </span>
+          </p>
         )}
 
         {events.length > 0 && (
@@ -2077,15 +2374,19 @@ function DayModal({
           {shifts.length === 0 ? (
             <p className="t-meta">Na tento den zatím nikdo nemá směnu.</p>
           ) : (
-            <ul className={`list ${nahradiUlozene ? 'opacity-60' : ''}`}>
+            // Směny, které uložení návrhu smaže: tlumí se jen jméno a typ
+            // (token + přeškrtnutí) a stav řekne i Chip „zmizí". Dřív opacity
+            // na celém seznamu ztlumila i aktivní tlačítko koše.
+            <ul className="list">
               {shifts.map((s) => {
                 const rt = resolveShiftType(s, shiftTypes);
                 return (
                   <ListRow key={s.id}
                     lead={<Avatar emoji={s.employeeAvatar} size="sm" />}
-                    title={s.employeeName}
-                    meta={<span className="inline-flex items-center gap-1.5"><TeckaBarvy barva={rt.color} className="h-2 w-2" />{rt.label}</span>}
+                    title={nahradiUlozene ? <span className="line-through text-black/45">{s.employeeName}</span> : s.employeeName}
+                    meta={<span className={`inline-flex items-center gap-1.5 ${nahradiUlozene ? 'line-through text-black/45' : ''}`}><TeckaBarvy barva={rt.color} className="h-2 w-2" />{rt.label}</span>}
                     value={`${s.startTime}–${s.endTime}`}
+                    right={nahradiUlozene ? <Chip tone="muted" size="sm">zmizí</Chip> : undefined}
                     actions={readOnly ? undefined : (
                       <Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={`Odebrat směnu — ${s.employeeName}`} onClick={() => onRemove(s.id)} />
                     )}
@@ -2110,7 +2411,7 @@ function DayModal({
                   value={`${p.startTime}–${p.endTime}`}
                   right={<Chip tone="muted" size="sm" icon="sparkle">Návrh</Chip>}
                   actions={onRemoveProposed ? (
-                    <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={`Vyhodit z návrhu — ${p.employeeName}`} onClick={() => onRemoveProposed(p)} />
+                    <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={`Odebrat z návrhu — ${p.employeeName}`} onClick={() => onRemoveProposed(p)} />
                   ) : undefined}
                 />
               ))}
@@ -2124,7 +2425,12 @@ function DayModal({
             navrh={navrh} readOnly={readOnly} onAdd={onAdd} />
         )}
 
-        {!readOnly && (
+        {!readOnly && sTymem && !vlastniCas && employees.length > 0 && (
+          <div className="border-t border-black/[0.08] pt-3">
+            <Button variant="ghost" icon="clock" aria-expanded={false} onClick={() => setVlastniCas(true)}>Přidat s vlastním časem…</Button>
+          </div>
+        )}
+        {!readOnly && (!sTymem || vlastniCas || employees.length === 0) && (
           <div className="space-y-4 border-t border-black/[0.08] pt-4">
             <h3 className="t-card flex items-center gap-2"><Icon name="plus" size={17} className="text-black/40 shrink-0" /> {navrh ? 'Přidat do návrhu' : 'Přidat směnu'}</h3>
             {employees.length === 0 ? (
@@ -2172,6 +2478,12 @@ function DayModal({
                     <Input id="den-do" type="time" value={end} onChange={(e) => { setEnd(e.target.value); pickCustom(); }} />
                   </Field>
                 </div>
+                {sTymem && (
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <Button variant="ghost" aria-expanded onClick={() => setVlastniCas(false)}>Sbalit</Button>
+                    {tlacitkoPridat}
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -2223,17 +2535,58 @@ function TymNaDen({
   // Člověk jednou, i když ho seznam týmu vrátí dvakrát (členství + zrcadlo
   // users.team_id po přepnutí podniku) — jinak by šel přidat „dvakrát".
   const lide = useMemo(() => employees.filter((e, i) => employees.findIndex((x) => x.id === e.id) === i), [employees]);
-  const radky = useMemo(() => seradRadky(lide.map((e) => {
-    const smeny = obsazene.filter((x) => x.employeeId === e.id);
-    const stav = stavClenaDne(date, dostupnost.submissions.find((x) => x.employeeId === e.id) ?? null,
-      dostupnost.volno.filter((v) => v.employeeId === e.id), typyPref);
-    return { id: e.id, jmeno: e.name, clen: e, stav: stav.stav, info: stav, smeny, maSmenu: smeny.length > 0 };
-  })), [lide, obsazene, dostupnost, date, typyPref]);
+  // Pořadí (může → omezení → má směnu → …) se určí při otevření dne a pak
+  // drží: po „Přidat" by člověk jinak odskočil do skupiny „má směnu" jinam
+  // v seznamu a řádek pod prstem (i fokus) by se ztratil.
+  const poradiRef = useRef<{ date: string; ids: number[] } | null>(null);
+  const radky = useMemo(() => {
+    const serazene = seradRadky(lide.map((e) => {
+      const smeny = obsazene.filter((x) => x.employeeId === e.id);
+      const stav = stavClenaDne(date, dostupnost.submissions.find((x) => x.employeeId === e.id) ?? null,
+        dostupnost.volno.filter((v) => v.employeeId === e.id), typyPref);
+      return { id: e.id, jmeno: e.name, clen: e, stav: stav.stav, info: stav, smeny, maSmenu: smeny.length > 0 };
+    }));
+    const drzene = poradiRef.current;
+    if (!drzene || drzene.date !== date) {
+      poradiRef.current = { date, ids: serazene.map((x) => x.id) };
+      return serazene;
+    }
+    const kde = new Map(drzene.ids.map((id, i) => [id, i]));
+    return [...serazene].sort((a, b) => (kde.get(a.id) ?? 1e9) - (kde.get(b.id) ?? 1e9));
+  }, [lide, obsazene, dostupnost, date, typyPref]);
 
   const [otevreny, setOtevreny] = useState<number | null>(null);
   const [typ, setTyp] = useState<string>('');
   const [pridavam, setPridavam] = useState(false);
   const [chyba, setChyba] = useState('');
+  // Potvrzení přidání pro oči i odečítač (přidání do návrhu je jinak tiché).
+  const [hlaska, setHlaska] = useState('');
+  const sekceRef = useRef<HTMLElement>(null);
+  const hlaskaRef = useRef<HTMLParagraphElement>(null);
+  const wellRef = useRef<HTMLDivElement>(null);
+  /** Fokus zpátky na „Přidat — jméno"; když tlačítko zmizelo (žádný volný typ), na hlášku. */
+  const fokusNaRadek = (id: number) => setTimeout(() => {
+    const tl = sekceRef.current?.querySelector<HTMLElement>(`[data-pridat="${id}"]`);
+    (tl ?? hlaskaRef.current)?.focus({ preventScroll: false });
+  }, 0);
+
+  // Escape v rozbaleném výběru typu sbalí jen ten výběr, ne celé okno dne
+  // (useModal chytá Escape na documentu ve fázi capture — window capture je
+  // před ním, proto se tady zastaví dřív, než k oknu dojde).
+  useEffect(() => {
+    if (otevreny == null) return;
+    const naKlavesu = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || !wellRef.current?.contains(document.activeElement)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const id = otevreny;
+      setOtevreny(null);
+      fokusNaRadek(id);
+    };
+    window.addEventListener('keydown', naKlavesu, true);
+    return () => window.removeEventListener('keydown', naKlavesu, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [otevreny]);
 
   const rozbal = (id: number, info: StavClenaDne, smeny: { startTime: string; endTime: string }[]) => {
     if (otevreny === id) { setOtevreny(null); return; }
@@ -2247,19 +2600,25 @@ function TymNaDen({
     setPridavam(true); setChyba('');
     try {
       const ok = await onAdd({ employeeId: e.id, date, startTime: t.od, endTime: t.do, type: t.name });
-      if (ok) setOtevreny(null);
-      else setChyba('Nepřidalo se — zkus to znovu.');
+      if (ok) {
+        setOtevreny(null);
+        setHlaska(`${e.name} — ${navrh ? 'přidáno do návrhu' : 'směna přidána'} · ${t.name} ${t.od}–${t.do}`);
+        fokusNaRadek(e.id);
+      } else setChyba('Nepřidalo se — zkus to znovu.');
     } finally { setPridavam(false); }
   };
 
   const pocetMuze = radky.filter((r) => (r.stav === 'muze' || r.stav === 'omezeni') && !r.maSmenu).length;
 
   return (
-    <section aria-labelledby={`tym-den-${date}`}>
+    <section ref={sekceRef} aria-labelledby={`tym-den-${date}`}>
       <div className="flex items-baseline justify-between gap-3 mb-1">
         <p id={`tym-den-${date}`} className="t-label">Tým na tento den</p>
         <p className="t-meta tabular-nums">{pocetMuze > 0 ? czCount(pocetMuze, { one: 'člověk může', few: 'lidé můžou', many: 'lidí může' }) : 'další nikdo nemůže'}</p>
       </div>
+      <p ref={hlaskaRef} tabIndex={-1} role="status" className={`t-meta flex items-center gap-1.5 outline-none ${hlaska ? 'mb-1' : 'sr-only'}`} data-hlaska-tym>
+        {hlaska && <><Icon name="check" size={14} className="shrink-0 text-ok-ink" />{hlaska}</>}
+      </p>
       {radky.length === 0 ? (
         <p className="t-meta">V týmu zatím nikdo není.</p>
       ) : (
@@ -2269,9 +2628,13 @@ function TymNaDen({
             const volneTypy = typyDne.filter((t) => !kolize(smeny, { startTime: t.od, endTime: t.do }));
             const muzePridat = !readOnly && volneTypy.length > 0;
             const proti = info.stav === 'nemuze' || info.stav === 'volno';
+            // První řádek: směna a preference; poznámky pod ním zvlášť a zkrácené
+            // na dva řádky, ať odstavcová poznámka nenatáhne okno přes celý telefon.
             const meta = [
               r.maSmenu ? `má směnu ${smeny.map((x) => `${x.startTime}–${x.endTime}`).join(', ')}` : null,
               info.preferuje,
+            ].filter(Boolean).join(' · ');
+            const poznamky = [
               info.poznamkaDne ? `k tomuto dni: „${info.poznamkaDne}“` : null,
               info.poznamka ? `„${info.poznamka}“` : null,
             ].filter(Boolean).join(' · ');
@@ -2284,16 +2647,19 @@ function TymNaDen({
                 <ListRow
                   lead={<Avatar emoji={clen.avatar} name={clen.name} size="sm" />}
                   title={clen.name}
-                  meta={meta ? <span className="block whitespace-normal text-pretty">{meta}</span> : undefined}
+                  meta={meta || poznamky ? <>
+                    {meta && <span className="block whitespace-normal text-pretty">{meta}</span>}
+                    {poznamky && <PoznamkaClena text={poznamky} />}
+                  </> : undefined}
                   right={<span data-stav={info.stav}><Chip tone={info.ton} size="sm">{info.popis}</Chip></span>}
                   actions={muzePridat ? (
-                    <Button variant="secondary" size="sm" icon="plus" aria-expanded={otevreny === clen.id}
+                    <Button variant="secondary" size="sm" icon="plus" aria-expanded={otevreny === clen.id} data-pridat={clen.id}
                       aria-label={`Přidat — ${clen.name}`} onClick={() => rozbal(clen.id, info, smeny)}>Přidat</Button>
                   ) : undefined}
                 />
                 {otevreny === clen.id && vybrany && (
                   <li className="py-3">
-                    <Well className="space-y-3">
+                    <div ref={wellRef}><Well className="space-y-3">
                       {volneTypy.length > 1 && (
                         <Segmented ariaLabel={`Typ směny pro ${clen.name}`} size="sm" value={vybrany.name}
                           onChange={(v) => setTyp(v)} options={volneTypy.map((t) => ({ id: t.name, label: t.name }))} />
@@ -2301,12 +2667,15 @@ function TymNaDen({
                       <p className="t-meta tabular-nums">{vybrany.name} · {vybrany.od}–{vybrany.do}{navrh ? ' · do návrhu' : ''}</p>
                       {proti && (
                         <p className="note note-wait text-sm text-pretty" role="status">
-                          {clen.name} má na tento den „{info.popis}“. Přidat jde, ale jen když to s ním máš domluvené.
+                          {info.stav === 'volno'
+                            ? `${clen.name} má na tento den ${info.popis === 'dovolená' ? 'dovolenou' : info.popis}.`
+                            : `${clen.name} podle své dostupnosti tento den nemůže.`}
+                          {' '}Přidat jde, ale jen když je to domluvené.
                         </p>
                       )}
                       {!proti && mimoVolbu && (
                         <p className="note note-wait text-sm text-pretty" role="status">
-                          {clen.name} má na tento den „{info.popis}“ — {vybrany.name} tomu neodpovídá.
+                          {clen.name} má na tento den v dostupnosti „{info.popis}“ — {vybrany.name} tomu neodpovídá.
                         </p>
                       )}
                       {chyba && <p className="note note-danger text-sm" role="alert">{chyba}</p>}
@@ -2316,7 +2685,7 @@ function TymNaDen({
                           {proti || mimoVolbu ? 'Přesto přidat' : navrh ? 'Přidat do návrhu' : 'Přidat směnu'}
                         </Button>
                       </div>
-                    </Well>
+                    </Well></div>
                   </li>
                 )}
               </Fragment>
@@ -2325,6 +2694,24 @@ function TymNaDen({
         </ul>
       )}
     </section>
+  );
+}
+
+/** Poznámka člena v Týmu na den: dva řádky, delší se rozbalí na klepnutí. */
+function PoznamkaClena({ text }: { text: string }) {
+  const [cela, setCela] = useState(false);
+  // Odhad podle délky: změřit přetečení by chtělo ResizeObserver na každý
+  // řádek; dva řádky na telefonu pojmou zhruba 90 znaků.
+  const dlouha = text.length > 90;
+  return (
+    <span className="block whitespace-normal text-pretty">
+      <span className={cela ? 'block' : 'line-clamp-2'}>{text}</span>
+      {dlouha && (
+        <Button variant="ghost" size="sm" className="-ml-2" aria-expanded={cela} onClick={() => setCela((v) => !v)}>
+          {cela ? 'Méně' : 'Celá poznámka'}
+        </Button>
+      )}
+    </span>
   );
 }
 
@@ -2341,6 +2728,18 @@ function ScheduleRulesManager() {
   const [overrides, setOverrides] = useState<Record<number, string>>({});
   const [hourOverrides, setHourOverrides] = useState<Record<number, string>>({});
   const [splitOks, setSplitOks] = useState<Record<number, boolean>>({});
+  // Počet lidí podle tržeb — výchozí vypnuto; práh a průměry jen s finance.trzby.
+  const [podleTrzeb, setPodleTrzeb] = useState(false);
+  const [prah, setPrah] = useState('');
+  const [trzbyInfo, setTrzbyInfo] = useState<{ smiTrzby: boolean; prahNastaven?: boolean; dny?: Record<string, { prumer: number; vzorek: number }>; navrhPrahu?: number | null }>({ smiTrzby: false });
+  // Chyba prahu až po pokusu o uložení nebo po opuštění pole — zapnutí
+  // funkce bez dat nesmí vypadat jako chyba uživatele.
+  const [prahDotcen, setPrahDotcen] = useState(false);
+  // Co je uložené na serveru — z toho se pozná neuložená změna (limetka
+  // u Uložit) a jestli se mají posílat tržby.
+  const [ulozeno, setUlozeno] = useState('');
+  const [ulozeneTrzby, setUlozeneTrzby] = useState('');
+  const { money, symbol } = useCurrency();
   const [loading, setLoading] = useState(true);
   const [loadErr, setLoadErr] = useState('');
   const [tick, setTick] = useState(0);
@@ -2355,6 +2754,11 @@ function ScheduleRulesManager() {
       setTeamMaxHours(d.teamMaxHours != null ? String(d.teamMaxHours) : '');
       setBalance(d.balanceShifts !== false);
       setSplit(d.splitShifts === true);
+      const t = d.trzby && typeof d.trzby === 'object' ? d.trzby : {};
+      setPodleTrzeb(t.podleTrzeb === true);
+      setPrah(t.prah != null ? String(t.prah) : '');
+      setPrahDotcen(false);
+      setTrzbyInfo({ smiTrzby: t.smiTrzby === true, prahNastaven: t.prahNastaven === true, dny: t.dny ?? undefined, navrhPrahu: t.navrhPrahu ?? null });
       const list = Array.isArray(d.members) ? d.members : [];
       setMembers(list);
       const ov: Record<number, string> = {};
@@ -2368,10 +2772,31 @@ function ScheduleRulesManager() {
       setOverrides(ov);
       setHourOverrides(hov);
       setSplitOks(sok);
+      const tz = JSON.stringify({ podleTrzeb: t.podleTrzeb === true, prah: t.prah != null ? String(t.prah) : '' });
+      setUlozeneTrzby(tz);
+      setUlozeno(JSON.stringify({
+        teamMax: d.teamMax != null ? String(d.teamMax) : '', teamMaxHours: d.teamMaxHours != null ? String(d.teamMaxHours) : '',
+        balance: d.balanceShifts !== false, split: d.splitShifts === true, ov, hov, sok, tz,
+      }));
     }).catch((e) => setLoadErr(apiMessage(e, 'Pravidla se nenačetla.'))).finally(() => setLoading(false));
   }, [tick]);
 
+  const prahCislo = prah.trim() === '' ? null : Math.round(Number(prah));
+  // Bez finance.trzby práh nevidí ani nemění (server ho nevydá), takže ho ani nekontroluje.
+  const prahChyba = trzbyInfo.smiTrzby && podleTrzeb && (prahCislo == null || !Number.isFinite(prahCislo) || prahCislo <= 0);
+  const trzbyTed = JSON.stringify({ podleTrzeb, prah: prah.trim() });
+  const trzbyZmena = trzbyTed !== ulozeneTrzby;
+  const stavPravidel = (tz: string) => JSON.stringify({ teamMax, teamMaxHours, balance, split, ov: overrides, hov: hourOverrides, sok: splitOks, tz });
+  const stavTed = stavPravidel(trzbyTed);
+  const neulozeno = ulozeno !== '' && stavTed !== ulozeno;
+  /** Zapnutí předvyplní práh návrhem z dat, ať se nezačíná od prázdného pole. */
+  const prepniTrzby = (on: boolean) => {
+    setPodleTrzeb(on);
+    if (on && prah === '' && trzbyInfo.navrhPrahu) setPrah(String(trzbyInfo.navrhPrahu));
+  };
+
   const save = async () => {
+    if (prahChyba) { setPrahDotcen(true); setErr('Zadej práh tržby, nad kterým mají být dva lidé — nebo počet lidí podle tržeb vypni.'); return; }
     setSaving(true); setMsg(''); setErr('');
     try {
       const res = await fetch('/api/schedule/rules', {
@@ -2381,6 +2806,9 @@ function ScheduleRulesManager() {
           teamMaxHours: teamMaxHours === '' ? null : parseInt(teamMaxHours),
           balanceShifts: balance,
           splitShifts: split,
+          // Tržby jen se změnou a jen s finance.trzby: jinak by uložení
+          // jiného pravidla přepsalo práh (bez oprávnění ho klient ani nezná).
+          ...(trzbyInfo.smiTrzby && trzbyZmena ? { trzby: { podleTrzeb, prah: prahCislo } } : {}),
           overrides: members.map(m => ({
             id: m.id,
             maxConsecutive: overrides[m.id] === '' ? null : parseInt(overrides[m.id]),
@@ -2389,8 +2817,15 @@ function ScheduleRulesManager() {
           })),
         }),
       });
-      await okJson(res);
-      setMsg('Uloženo. Pravidla se použijí při dalším generování rozvrhu.');
+      const d = await okJson(res);
+      // Neuložené tržby zůstanou „neuložené" i v signálu u tlačítka.
+      setUlozeno(d?.trzbyNeulozeny ? stavPravidel(ulozeneTrzby) : stavTed);
+      if (d?.trzbyNeulozeny) {
+        setErr('Počet lidí podle tržeb se neuložil — databáze ho ještě nezná (spusť /api/init). Ostatní pravidla jsou uložená.');
+      } else {
+        setUlozeneTrzby(trzbyTed);
+        setMsg('Uloženo. Pravidla se použijí při dalším generování rozvrhu.');
+      }
       // Widget „Naplánované hodiny" ukazuje strop z pravidel.
       obnovDataWidgetu('/api/schedule/rules');
     } catch (e) { setErr(apiMessage(e, 'Uložení se nepodařilo.')); }
@@ -2437,7 +2872,49 @@ function ScheduleRulesManager() {
             hint="Přednost dostane ten, kdo má zatím méně směn, a střídá se, kdo s kým slouží. Nedostupnost a limity mají vždy přednost." />
           <SwitchRow checked={split} onChange={setSplit} title="Dělení směn mezi dva lidi"
             hint="Když směnu nemůže vzít nikdo celou, generátor ji rozpůlí — začátek jednomu, konec druhému. V náhledu jsou půlky označené." />
+          {/* Bez finance.trzby je přepínač vidět (ať je jasné, jestli je
+              zapnutý), ale měnit ho nejde — práh prozrazuje tržby a bez
+              oprávnění by generátor doporučení stejně vynechal. */}
+          <SwitchRow checked={podleTrzeb} onChange={prepniTrzby} title="Počet lidí podle tržeb" disabled={!trzbyInfo.smiTrzby}
+            hint={trzbyInfo.smiTrzby
+              ? 'Otevírací směnu generátor obsadí vždy. Pod prahem stačí jeden člověk na celý den (když ho otevírací směna pokryje), nad ním dva — podle průměrné tržby stejného dne za posledních 8 týdnů. Platí po uložení.'
+              : 'Zapnout a nastavit může jen někdo s přístupem k tržbám.'} />
         </ul>
+        {podleTrzeb && (
+          <Well className="mt-3 space-y-3" data-trzby-nastaveni>
+            {trzbyInfo.smiTrzby ? (
+              <Field id="pravidla-prah" label={`Dva lidé, když průměrná tržba dne přesáhne (${symbol})`}
+                error={prahChyba && prahDotcen ? 'Zadej kladné číslo.' : undefined}
+                hint={trzbyInfo.navrhPrahu ? `Návrh z vašich tržeb: ${money(trzbyInfo.navrhPrahu)} — zhruba půlka dnů v týdnu je nad ním.` : 'Pod prahem stačí jeden člověk na celý den.'}>
+                <Input id="pravidla-prah" type="number" inputMode="numeric" min={1} value={prah}
+                  onChange={e => setPrah(e.target.value)} onBlur={() => setPrahDotcen(true)} className="!w-full sm:!w-44" />
+              </Field>
+            ) : (
+              <p className="t-meta text-pretty">{trzbyInfo.prahNastaven ? 'Práh tržby je nastavený.' : 'Práh tržby zatím není nastavený.'} Hodnotu vidí jen ten, kdo smí vidět tržby.</p>
+            )}
+            {!trzbyInfo.smiTrzby ? (
+              <p className="t-meta text-pretty">Doporučení spočítá generování u někoho, kdo tržby vidět smí — u tebe ho generátor vynechá a řekne to.</p>
+            ) : trzbyInfo.dny && Object.keys(trzbyInfo.dny).length > 0 ? (
+              <div>
+                <p className="t-label mb-1">Průměrná tržba podle dne v týdnu</p>
+                <ul className="list">
+                  {CZ_DAYS_FULL.map((nazev, i) => {
+                    const d = trzbyInfo.dny?.[String(i)];
+                    if (!d) return null;
+                    const lidi = prahCislo && prahCislo > 0 ? (d.prumer > prahCislo ? 2 : 1) : null;
+                    return (
+                      <ListRow key={nazev} title={nazev} meta={`z ${czCount(d.vzorek, DEN)}`}
+                        value={`~${money(d.prumer)}`}
+                        right={lidi ? <Chip tone={lidi === 2 ? 'info' : 'muted'} size="sm">{lidi === 2 ? '2 lidé' : '1 člověk'}</Chip> : undefined} />
+                    );
+                  })}
+                </ul>
+              </div>
+            ) : (
+              <p className="t-meta text-pretty">Za posledních 8 týdnů nejsou uzávěrky s tržbou — dokud nebudou, generátor se řídí jen otevírací směnou.</p>
+            )}
+          </Well>
+        )}
         {split && members.length > 0 && (
           <Well className="mt-3 space-y-1">
             <p className="t-label">Komu se smí směna rozdělit</p>
@@ -2490,7 +2967,13 @@ function ScheduleRulesManager() {
 
       {err && <p className="note note-danger text-sm" role="alert">{err}</p>}
       {msg && <p className="note note-ok text-sm" role="status">{msg}</p>}
-      <Button variant="accent" icon="check" loading={saving} onClick={save}>Uložit pravidla</Button>
+      {/* Limetka jen při neuložené změně (DESIGN.md: „Uložit … při dirty stavu
+          limetkou") — přepínače se tu projeví až po uložení, a bez signálu
+          šlo odejít s vypnutou funkcí v domnění, že je zapnutá. */}
+      <div className="flex flex-wrap items-center gap-3">
+        <Button variant={neulozeno ? 'accent' : 'secondary'} icon="check" loading={saving} onClick={save}>Uložit pravidla</Button>
+        {neulozeno && <span className="t-meta" data-neulozeno>Neuložené změny</span>}
+      </div>
     </div>
   );
 }

@@ -87,7 +87,19 @@ export async function GET(req: Request) {
     }
   } catch { /* Managero client nemusí být zapnutý */ }
 
-  return NextResponse.json({ shifts, gaps, understaffed, demand });
+  // Verze uloženého měsíce: otisk směn, ze kterých plánovač vychází. Uložení
+  // návrhu ji pošle zpátky a server při neshodě vrátí 409 — jinak by návrh
+  // z jedné záložky tiše smazal, co mezitím někdo ručně přidal v jiné (nebo
+  // na druhém zařízení). Výraz MUSÍ sedět s commitem v generate/route.ts.
+  let verze: string | null = null;
+  try {
+    const [v] = await sql`
+      SELECT md5(COALESCE(string_agg(id::text || '|' || employee_id::text || '|' || date || '|' || start_time || '|' || end_time, ',' ORDER BY id), '')) AS verze
+      FROM shifts WHERE team_id = ${ctx.teamId} AND date >= ${month + '-01'} AND date <= ${month + '-31'}` as any[];
+    verze = v?.verze ?? null;
+  } catch { /* bez verze se uložení návrhu jen nehlídá proti souběhu */ }
+
+  return NextResponse.json({ shifts, gaps, understaffed, demand, verze });
 }
 
 // POST (employer) — { shifts: [{employeeId, date, startTime, endTime, type}] } bulk append

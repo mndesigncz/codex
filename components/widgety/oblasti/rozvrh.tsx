@@ -536,7 +536,7 @@ function PripominkaDostupnosti({ velikost, nahled }: WidgetProps) {
 
 interface DataRozvrhu {
   smeny: SmenaRozvrhu[];
-  gaps: { date: string; from: string; to: string }[];
+  gaps: { date: string; from: string; to: string; uroven?: 'povinna' | 'zadouci' }[];
   understaffed: { date: string; shiftTypeName: string }[];
   demand: Record<string, { reservations?: number; guests?: number }>;
 }
@@ -571,7 +571,8 @@ function Diry({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: string }>) 
   return (
     <Widget
       nacteni={data}
-      doplnek={!S && dny.length > 0 ? <Chip tone="bad" size="sm">{cislo(dny.length)}</Chip> : undefined}
+      // Červeně jen, když někde nikdo neotevře; chybějící druhý člověk je mírnější.
+      doplnek={!S && dny.length > 0 ? <Chip tone={dny.some(d => d.povinna) ? 'bad' : 'wait'} size="sm">{cislo(dny.length)}</Chip> : undefined}
       otevrit={S && smiDoplnit && dny[0] ? () => otevriDen(dny[0].den) : undefined}
       prazdno={dny.length === 0 ? <p className="t-meta text-pretty">Na {naMesic} je obsazeno — bez děr.</p> : undefined}
     >
@@ -581,7 +582,11 @@ function Diry({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: string }>) 
         <>
           <ul className="list">
             {dny.slice(0, 5).map(d => {
-              const obsah = { title: <span className="cz-sentence">{denVetou(d.den)}</span>, meta: popisDiry(d) };
+              // Povinná díra (nikdo neotevře) výrazně, žádoucí (chybí druhý) mírně.
+              const obsah = {
+                title: <span className="cz-sentence">{denVetou(d.den)}</span>, meta: popisDiry(d),
+                right: <Chip tone={d.povinna ? 'bad' : 'wait'} size="sm">{d.povinna ? 'neotevře se' : 'chybí druhý'}</Chip>,
+              };
               return smiDoplnit
                 ? <li key={d.den}><ListRow as="div" {...obsah} onClick={() => otevriDen(d.den)} /></li>
                 : <ListRow key={d.den} {...obsah} />;

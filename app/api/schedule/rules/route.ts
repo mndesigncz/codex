@@ -6,6 +6,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { audit } from '@/lib/audit';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { pragueToday } from '@/lib/pragueTime';
+import { navrhPrahu, ocekavaneTrzby, vycistiNastaveniTrzeb, type TrzbyDnu } from '@/lib/rozvrhGenerator';
 
 export const dynamic = 'force-dynamic';
 
@@ -94,10 +96,46 @@ export async function GET() {
       ORDER BY COALESCE(m.role, p.role) DESC, p.name ASC`;
   }
 
-  return NextResponse.json({ teamMax, teamMaxHours, balanceShifts, splitShifts, members });
+  // Počet lidí podle tržeb (výchozí vypnuto). Průměry dnů v týdnu a návrh
+  // prahu jen s finance.trzby — bez něj přepínač jde, ale čísla se neukážou
+  // a generátor doporučení vynechá (a řekne to).
+  let nastaveni = vycistiNastaveniTrzeb(null);
+  let oteviraci: Record<string, any> | null = null;
+  try {
+    const [t] = await sql`SELECT staffing_rules, opening_hours FROM teams WHERE id = ${u.team_id}`;
+    nastaveni = vycistiNastaveniTrzeb(t?.staffing_rules);
+    oteviraci = t?.opening_hours ?? null;
+  } catch { /* sloupec ještě není — funkce vypnutá */ }
+  const smiTrzby = c.role.opravneni.has('finance.trzby');
+  let dny: TrzbyDnu | null = null;
+  if (smiTrzby) {
+    const dnes = pragueToday();
+    const od = (() => { const d = new Date(dnes + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() - 8 * 7); return d.toISOString().slice(0, 10); })();
+    try {
+      const rows = await sql`
+        SELECT COALESCE(shift_date, date)::text AS date,
+               SUM(COALESCE(cash_revenue, 0) + COALESCE(card_revenue, 0))::float AS trzba
+        FROM cash_closings
+        WHERE team_id = ${u.team_id} AND COALESCE(shift_date, date) >= ${od} AND COALESCE(shift_date, date) < ${dnes}
+        GROUP BY 1`;
+      dny = ocekavaneTrzby((rows as any[]).map(r => ({ date: String(r.date).slice(0, 10), trzba: Number(r.trzba) || 0 })), dnes, oteviraci);
+    } catch { dny = {}; }
+  }
+  // Práh je typicky medián denní tržby (návrh z dat), takže prozrazuje
+  // tržby stejně jako průměry: bez finance.trzby se vrací jen to, JESTLI je
+  // nastavený, ne jeho hodnota.
+  const trzby = {
+    podleTrzeb: nastaveni.podleTrzeb,
+    prah: smiTrzby ? nastaveni.prah : null,
+    prahNastaven: nastaveni.prah != null,
+    smiTrzby,
+    ...(smiTrzby ? { dny: dny ?? {}, navrhPrahu: navrhPrahu(dny ?? {}) } : {}),
+  };
+
+  return NextResponse.json({ teamMax, teamMaxHours, balanceShifts, splitShifts, members, trzby });
 }
 
-// PUT { teamMax?, teamMaxHours?, balanceShifts?, overrides?: [{ id, maxConsecutive?, maxHours? }] }
+// PUT { teamMax?, teamMaxHours?, balanceShifts?, trzby?: { podleTrzeb, prah }, overrides?: [{ id, maxConsecutive?, maxHours? }] }
 export async function PUT(req: NextRequest) {
   const c = await pozaduj('rozvrh.nastaveni');
   if (jeOdpoved(c)) return c;
@@ -148,7 +186,20 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: 'Pravidla nejsou dostupná — spusť /api/init.' }, { status: 400 });
   }
 
+  // Počet lidí podle tržeb: jen s finance.trzby (práh prozrazuje tržby a bez
+  // oprávnění ho klient ani nezná — kdyby ho poslal, smazal by ho). Vlastní
+  // try/catch: chybějící sloupec staffing_rules (neproběhl /api/init) nesmí
+  // shodit uložení ostatních pravidel, která se výš už zapsala.
+  let trzbyNeulozeny = false;
+  if (b.trzby !== undefined && c.role.opravneni.has('finance.trzby')) {
+    // Vyčištěné celé — do JSON se nedostane nic jiného než { podleTrzeb, prah }.
+    const t = vycistiNastaveniTrzeb(b.trzby);
+    try {
+      await sql`UPDATE teams SET staffing_rules = ${JSON.stringify(t)}::jsonb WHERE id = ${u.team_id}`;
+    } catch { trzbyNeulozeny = true; }
+  }
+
   audit(u.team_id, u.id, 'schedule.rules', 'schedule', null,
     b.teamMax !== undefined ? `Max dní po sobě: ${cleanTeamLimit(b.teamMax) ?? 'bez omezení'}` : 'Výjimky u lidí');
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, ...(trzbyNeulozeny ? { trzbyNeulozeny: true } : {}) });
 }

@@ -30,9 +30,10 @@ export default function ({ eq, ok }: Testy) {
   eq('rozvrh-den: stará binární volba = jen odpolední', stavClenaDne(D, { dayPreferences: { [D]: 'afternoon' } }, [], typy).popis, 'jen odpolední');
   eq('rozvrh-den: flexible není omezení', stavClenaDne(D, { dayPreferences: { [D]: 'flexible' } }, [], typy).stav, 'muze');
   const vol = stavClenaDne(D, { dayPreferences: {} }, [{ fromDate: '2026-10-05', toDate: '2026-10-07T00:00:00Z', type: 'vacation' }], typy);
-  eq('rozvrh-den: schválené volno přebije „může" (i s časem v datu)', [vol.stav, vol.ton, vol.popis], ['volno', 'wait', 'schválené volno · dovolená']);
+  eq('rozvrh-den: schválené volno přebije „může" (i s časem v datu)', [vol.stav, vol.ton, vol.popis], ['volno', 'wait', 'dovolená']);
   eq('rozvrh-den: volno mimo den se nepočítá', stavClenaDne(D, { dayPreferences: {} }, [{ fromDate: '2026-10-07', toDate: '2026-10-09' }], typy).stav, 'muze');
   eq('rozvrh-den: volno platí i bez vyplněné dostupnosti', stavClenaDne(D, null, [{ fromDate: D, toDate: D }], typy).stav, 'volno');
+  eq('rozvrh-den: volno bez typu = „schválené volno"', stavClenaDne(D, null, [{ fromDate: D, toDate: D, type: 'other' }], typy).popis, 'schválené volno');
   eq('rozvrh-den: poznámka ke dni, když v datech je', stavClenaDne(D, { poznamkyDnu: { [D]: 'až od 10' } }, [], typy).poznamkaDne, 'až od 10');
   eq('rozvrh-den: denní omezení nemá obecnou preferenci navíc', jen.preferuje, null);
 
@@ -71,8 +72,14 @@ export default function ({ eq, ok }: Testy) {
   eq('rozvrh-den: přidaný typ zmizí z neobsazených (bez ohledu na velikost písmen)', poPridani.understaffed, []);
   eq('rozvrh-den: jiné dny se nepřepočítávají', poPridani.gaps, zaklad.gaps);
   const poOdebrani = prepocitejDen(zaklad, D, oh, [{ startTime: '14:00', endTime: '22:00', type: 'Odpolední' }], { odebranTyp: 'Ranní' });
-  eq('rozvrh-den: po odebrání ranní díra 08–14 a chybí Ranní', [poOdebrani.gaps.filter(g => g.date === D), poOdebrani.understaffed.map(m => m.shiftTypeName)],
-    [[{ date: D, from: '08:00', to: '14:00', minutes: 360 }], ['Odpolední', 'Ranní']]);
+  // Díra od otevření = nikdo neotevře → povinná (úroveň jako u generátoru).
+  eq('rozvrh-den: po odebrání ranní povinná díra 08–14 a chybí Ranní', [poOdebrani.gaps.filter(g => g.date === D), poOdebrani.understaffed.map(m => m.shiftTypeName)],
+    [[{ date: D, from: '08:00', to: '14:00', minutes: 360, uroven: 'povinna' }], ['Odpolední', 'Ranní']]);
+  const poOdebraniOdpo = prepocitejDen({ gaps: [], understaffed: [] }, D, oh, [{ startTime: '08:00', endTime: '14:00', type: 'Ranní' }], { odebranTyp: 'Odpolední' });
+  eq('rozvrh-den: díra později během dne je jen žádoucí', poOdebraniOdpo.gaps.map(g => [g.from, g.uroven]), [['14:00', 'zadouci']]);
+  eq('rozvrh-den: odebraná druhá směna chybí jako žádoucí', poOdebraniOdpo.understaffed, [{ date: D, shiftTypeName: 'Odpolední', uroven: 'zadouci' }]);
+  eq('rozvrh-den: když podle tržeb stačí jeden, odebraná druhá nechybí',
+    prepocitejDen({ gaps: [], understaffed: [] }, D, oh, [{ startTime: '08:00', endTime: '22:00', type: 'Ranní' }], { odebranTyp: 'Odpolední', jedenStaci: true }).understaffed, []);
   const dvaRanni = prepocitejDen({ gaps: [], understaffed: [] }, D, oh, [{ startTime: '08:00', endTime: '14:00', type: 'Ranní' }, { startTime: '14:00', endTime: '22:00', type: 'X' }], { odebranTyp: 'Ranní' });
   eq('rozvrh-den: odebraný typ, který ten den ještě někdo má, nechybí', dvaRanni.understaffed, []);
   eq('rozvrh-den: zavřený den bez děr', prepocitejDen({ gaps: [], understaffed: [] }, D, { closed: true }, [], {}).gaps, []);

@@ -15,7 +15,7 @@
 // případ, že přibude, dnes ho nikdo neplní.
 
 import { dayPrefLabel, isRestrictingPref, parseTypePref, prefAllowsSlot, type PrefType } from './dayPrefs.ts';
-import { openSpan, toHM, toMinutes, uncovered, type OpeningDay } from './coverage.ts';
+import { openSpan, toHM, toMinutes, uncovered, urovenDiry, type OpeningDay, type UrovenDiry } from './coverage.ts';
 
 export type StavDne = 'muze' | 'omezeni' | 'nemuze' | 'volno' | 'nevyplneno';
 /** Tón chipu — stejné stavové tokeny jako všude jinde (DESIGN.md). */
@@ -69,7 +69,9 @@ export function stavClenaDne(
   const zaklad = { volba: null, preferuje: null, poznamka, poznamkaDne };
 
   const v = volno.find(x => den10(x.fromDate) <= datum && datum <= den10(x.toDate || x.fromDate));
-  if (v) return { ...zaklad, stav: 'volno', popis: `schválené volno${v.type && TYP_VOLNA[v.type] && v.type !== 'other' ? ` · ${TYP_VOLNA[v.type]}` : ''}`, ton: 'wait' };
+  // Krátce, ať se chip vejde vedle jména: „dovolená" / „nemoc", jinak
+  // „schválené volno" (do okna dne se dostane jen schválené).
+  if (v) return { ...zaklad, stav: 'volno', popis: (v.type && v.type !== 'other' && TYP_VOLNA[v.type]) || 'schválené volno', ton: 'wait' };
 
   if (!dostupnost) return { ...zaklad, stav: 'nevyplneno', popis: 'nevyplněno', ton: 'muted' };
 
@@ -173,27 +175,30 @@ export function vychoziTyp(
 
 // ---- Návrh po ruční úpravě ----------------------------------------------------
 
-export interface DiraDne { date: string; from: string; to: string; minutes: number }
-export interface ChybiDne { date: string; shiftTypeName: string }
+export interface DiraDne { date: string; from: string; to: string; minutes: number; uroven?: UrovenDiry }
+export interface ChybiDne { date: string; shiftTypeName: string; uroven?: UrovenDiry }
 
 /**
  * Přepočet červených dnů návrhu po ruční úpravě jednoho dne. Díry v pokrytí
  * se pro ten den spočítají znovu z toho, co v něm teď je. Neobsazená místa se
  * jen posunou: přidaný typ ze seznamu zmizí, odebraný (a jinak neobsazený)
  * typ do něj přibude — co den potřebuje, určil generátor, klient to znovu
- * nevymýšlí.
+ * nevymýšlí. Díra dostane úroveň stejně jako u generátoru (díra od otevření
+ * = povinná, pozdější = žádoucí). `jedenStaci` = doporučení podle tržeb řeklo,
+ * že ten den stačí jeden člověk: odebraná druhá směna pak do neobsazených
+ * nepřibude, protože ji generátor za potřebnou nepovažoval.
  */
 export function prepocitejDen(
   stav: { gaps: DiraDne[]; understaffed: ChybiDne[] },
   datum: string,
   oteviraciDen: OpeningDay | null | undefined,
   smenyDne: readonly { startTime: string; endTime: string; type?: string | null }[],
-  zmena: { pridanTyp?: string | null; odebranTyp?: string | null },
+  zmena: { pridanTyp?: string | null; odebranTyp?: string | null; jedenStaci?: boolean },
 ): { gaps: DiraDne[]; understaffed: ChybiDne[] } {
   const open = openSpan(oteviraciDen ?? null);
-  const nove = open
+  const nove: DiraDne[] = open
     ? uncovered(open, smenyDne.map(s => ({ start: s.startTime, end: s.endTime })))
-      .map(g => ({ date: datum, from: toHM(g.start), to: toHM(g.end), minutes: g.end - g.start }))
+      .map(g => ({ date: datum, from: toHM(g.start), to: toHM(g.end), minutes: g.end - g.start, uroven: urovenDiry(open, g) }))
     : [];
   const gaps = [...stav.gaps.filter(g => g.date !== datum), ...nove];
   const norm = (n: unknown) => String(n ?? '').trim().toLowerCase();
@@ -201,9 +206,11 @@ export function prepocitejDen(
   if (zmena.pridanTyp) {
     understaffed = understaffed.filter(m => !(m.date === datum && norm(m.shiftTypeName) === norm(zmena.pridanTyp)));
   }
-  if (zmena.odebranTyp && !smenyDne.some(s => norm(s.type) === norm(zmena.odebranTyp))
+  if (zmena.odebranTyp && !zmena.jedenStaci && !smenyDne.some(s => norm(s.type) === norm(zmena.odebranTyp))
     && !understaffed.some(m => m.date === datum && norm(m.shiftTypeName) === norm(zmena.odebranTyp))) {
-    understaffed = [...understaffed, { date: datum, shiftTypeName: String(zmena.odebranTyp) }];
+    // Neobsazené místo samo je vždy jen žádoucí — když chybí člověk na
+    // otevření, řekne to povinná díra v pokrytí výš.
+    understaffed = [...understaffed, { date: datum, shiftTypeName: String(zmena.odebranTyp), uroven: 'zadouci' }];
   }
   return { gaps, understaffed };
 }

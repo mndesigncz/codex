@@ -1,0 +1,24 @@
+{
+ "proposed": [
+  { "employeeId": 16, "employeeName": "Eva Testová", "employeeAvatar": "🧑", "date": "PRISTI-07", "startTime": "08:00", "endTime": "16:00", "type": "Ranní", "shiftTypeId": 1, "shiftTypeName": "Ranní", "color": "#C8F542", "oteviraci": true },
+  { "employeeId": 17, "employeeName": "Jakub Horák", "employeeAvatar": "🧔", "date": "PRISTI-08", "startTime": "08:00", "endTime": "16:00", "type": "Ranní", "shiftTypeId": 1, "shiftTypeName": "Ranní", "color": "#C8F542", "oteviraci": true }
+ ],
+ "warnings": [
+  "6.10. — NIKDO NEOTEVŘE — podnik se ten den neotevře (08:00–22:00 v podniku nikdo). Doplň někoho ručně.",
+  "7.10. — druhá směna „Odpolední\" neobsazená (nikdo dostupný) — otevře se s jedním člověkem."
+ ],
+ "gaps": [
+  { "date": "PRISTI-06", "from": "08:00", "to": "22:00", "minutes": 840, "uroven": "povinna" },
+  { "date": "PRISTI-07", "from": "16:00", "to": "22:00", "minutes": 360, "uroven": "zadouci" }
+ ],
+ "understaffed": [
+  { "date": "PRISTI-06", "shiftTypeName": "Ranní", "uroven": "povinna" },
+  { "date": "PRISTI-07", "shiftTypeName": "Odpolední", "uroven": "zadouci" }
+ ],
+ "doporuceni": [
+  { "date": "PRISTI-08", "lidi": 1, "trzba": 8000, "vzorek": 8, "usporaHodin": 8 },
+  { "date": "PRISTI-07", "lidi": 2, "trzba": 15000, "vzorek": 8, "usporaHodin": 0 }
+ ],
+ "trzby": { "stav": "ok", "prah": 12000 },
+ "hodiny": { "celkem": 16, "usporaDoporucenim": 8 }
+}

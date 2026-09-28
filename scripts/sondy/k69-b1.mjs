@@ -185,7 +185,9 @@ const FIX_ROZVRH = nacti('k69-b1-rozlozeni-rozvrh');
   await widgetLi(p, 'rozvrh.diry').locator('.list-row, button').filter({ hasText: 'Nikdo 14:00–16:00' }).first().click();
   const den = p.getByRole('dialog');
   tvrdi('W1: řádek Děr otevře v plánovači okno toho dne', await dokud(() => den.getByText('Přiřazené směny').isVisible(), 3000));
-  tvrdi('W1: …s oknem <Modal> a polem „Kdo" (ne confirm ani ruční overlay)', await den.getByLabel('Kdo').isVisible());
+  // S Týmem na den je formulář s vlastním časem sbalený pod „Přidat s vlastním časem…".
+  await den.getByRole('button', { name: 'Přidat s vlastním časem…' }).click().catch(() => {});
+  tvrdi('W1: …s oknem <Modal> a polem „Kdo" (ne confirm ani ruční overlay)', await dokud(() => den.getByLabel('Kdo').isVisible(), 1500));
   await den.getByLabel('Kdo').selectOption({ label: 'Eva Testová' }).catch(() => {});
   await p.keyboard.press('Escape');
   await p.waitForTimeout(300);
