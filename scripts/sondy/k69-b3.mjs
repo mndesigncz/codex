@@ -261,7 +261,7 @@ const doporucene = (galerie) => galerie.evaluate(el => {
     const cs = getComputedStyle(s);
     return { h: Math.round(r.height), neprusvitna: cs.backdropFilter !== 'none' || !/rgba\(0, 0, 0, 0\)|transparent/.test(cs.backgroundColor), karetKategorii: s.querySelectorAll('.grid button, .grid a').length };
   });
-  tvrdi('T1: přilepená lišta Skladu je po posunu sbalená (do 170 px), neprůsvitná a bez mřížky kategorií', !!lista && lista.h <= 170 && lista.neprusvitna && lista.karetKategorii === 0, JSON.stringify(lista));
+  tvrdi('T1: přilepená lišta Skladu je po posunu sbalená (do 120 px, dva řádky), neprůsvitná a bez mřížky kategorií', !!lista && lista.h <= 120 && lista.neprusvitna && lista.karetKategorii === 0, JSON.stringify(lista));
   await p.evaluate(() => document.querySelector('main')?.scrollTo(0, 0));
   // Menu „···" vedle hlavní akce: panel zarovnaný k pravé hraně tlačítka dřív
   // na telefonu utekl z levého okraje a půlka položek byla mimo obrazovku.

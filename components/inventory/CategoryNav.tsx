@@ -48,7 +48,10 @@ export default function CategoryNav<T extends CategoryNode>({
   // the toolbar stays a single row no matter how deep the tree goes.
   if (condensed) {
     return (
-      <div className="flex items-center gap-1 overflow-x-auto scrollbar-thin -mx-1 px-1 py-0.5">
+      // Posuvný pás: bez posuvníku, s vyblednutým pravým okrajem, dokud je co
+      // posouvat (at-end ho vypne), a se zarážkou na hraně pilulky.
+      <div onScroll={e => { const el = e.currentTarget; el.classList.toggle('at-end', el.scrollLeft + el.clientWidth >= el.scrollWidth - 2); }}
+        className="flex items-center gap-1.5 overflow-x-auto overscroll-x-contain snap-x snap-proximity scrollbar-none scroll-fade-x -mx-1 px-1 py-0.5">
         <button type="button" onClick={() => onNavigate(null)}
           className={`tap-target-sm shrink-0 rounded-full px-3 py-1.5 text-xs font-medium whitespace-nowrap transition ${
             current === null ? 'seg-on' : 'seg-off glass'
@@ -91,8 +94,10 @@ export default function CategoryNav<T extends CategoryNode>({
 
   return (
     <div className="space-y-2.5">
-      {/* Breadcrumb — every step back is one tap. */}
-      <div className="flex items-center gap-1 flex-wrap text-sm">
+      {/* Breadcrumb — every step back is one tap. Na nejvyšší úrovni mimo
+          tablet samotné „Vše" nic neříká (dlaždice pod ním ukazují, kam jít)
+          a zabíralo řádek, tak se ukáže až uvnitř kategorie. */}
+      <div className={`flex items-center gap-1 flex-wrap text-sm ${current === null && !touch && level.length > 0 ? 'hidden' : ''}`}>
         <button type="button" onClick={() => onNavigate(null)}
           className={`tap-target-sm rounded-full font-medium transition ${touch ? 'px-4 py-2.5 min-h-[44px]' : 'px-3 py-1.5'} ${
             current === null ? 'seg-on' : 'seg-off glass'
@@ -114,7 +119,9 @@ export default function CategoryNav<T extends CategoryNode>({
 
       {/* One level in. Only rendered when there is somewhere to go. */}
       {(level.length > 0 || (current === null && extraRoots.length > 0)) && (
-        <div className={`grid gap-2 ${touch ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 min-[400px]:grid-cols-2 sm:grid-cols-3 xl:grid-cols-4'}`}>
+        // Na telefonu dva sloupce kompaktních dlaždic: v jednom sloupci zabralo
+        // pět kategorií ~360 px, než se člověk dostal k první položce.
+        <div className={`grid gap-2 ${touch ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-2 sm:grid-cols-3 xl:grid-cols-4'}`}>
           {level.map(c => {
             const kids = childrenOfId(categories, c.id).length;
             const count = countOf ? countOf(c.id) : null;
@@ -126,20 +133,22 @@ export default function CategoryNav<T extends CategoryNode>({
                 }`}>
                 {/* Ikona v neutrální jamce (kolo 69, audit Skladu): limetkový
                     čtverec u každé dlaždice byl limetka jako ozdoba. */}
-                <span className={`well inline-flex shrink-0 items-center justify-center text-black/55 ${
-                  touch ? 'h-11 w-11' : 'h-9 w-9'
+                <span className={`well shrink-0 items-center justify-center text-black/55 ${
+                  touch ? 'inline-flex h-11 w-11' : 'hidden sm:inline-flex h-9 w-9'
                 }`}>
                   <Icon name="box" size={touch ? 20 : 16} />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className={`block t-card line-clamp-2 ${touch ? '!text-base' : ''}`}>{c.name}</span>
-                  <span className="block t-meta line-clamp-2">
+                  <span className={`block t-card truncate ${touch ? '!text-base' : ''}`}>{c.name}</span>
+                  <span className="block t-meta truncate">
                     {count !== null && <>{count} {pluralPolozka(count)}</>}
                     {kids > 0 && <>{count !== null ? ' · ' : ''}{kids} podkat.</>}
+                    {/* Na úzké dlaždici místo chipu jen jantarový počet v řádku. */}
+                    {alerts > 0 && !touch && <span className="sm:hidden text-wait-ink font-semibold"> · {alerts} dochází</span>}
                   </span>
                 </span>
-                {alerts > 0 && <Chip tone="wait" size="sm" className="shrink-0">{alerts} dochází</Chip>}
-                <Icon name="chevronRight" size={touch ? 18 : 15} className="text-black/40 shrink-0" />
+                {alerts > 0 && <Chip tone="wait" size="sm" className={`shrink-0 ${touch ? '' : 'hidden sm:inline-flex'}`}>{alerts} dochází</Chip>}
+                <Icon name="chevronRight" size={touch ? 18 : 15} className={`text-black/40 shrink-0 ${touch ? '' : 'hidden sm:block'}`} />
               </button>
             );
           })}
@@ -148,8 +157,8 @@ export default function CategoryNav<T extends CategoryNode>({
               className={`card bg-white flex items-center gap-2.5 text-left transition-shadow hover:shadow-[shadow:var(--shadow-float)] active:scale-[0.99] ${
                 touch ? 'p-4 min-h-[72px]' : 'p-3'
               }`}>
-              <span className={`well inline-flex shrink-0 items-center justify-center text-black/40 ${
-                touch ? 'h-11 w-11' : 'h-9 w-9'
+              <span className={`well shrink-0 items-center justify-center text-black/40 ${
+                touch ? 'inline-flex h-11 w-11' : 'hidden sm:inline-flex h-9 w-9'
               }`}>
                 <Icon name="box" size={touch ? 20 : 16} />
               </span>
