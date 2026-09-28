@@ -1,0 +1,92 @@
+{
+ "proposed": [
+  {
+   "employeeId": 16,
+   "employeeName": "Eva Testová",
+   "employeeAvatar": "🧑",
+   "date": "PRISTI-02",
+   "startTime": "08:00",
+   "endTime": "14:00",
+   "type": "Ranní",
+   "shiftTypeId": 1,
+   "shiftTypeName": "Ranní",
+   "color": "#C8F542"
+  },
+  {
+   "employeeId": 16,
+   "employeeName": "Eva Testová",
+   "employeeAvatar": "🧑",
+   "date": "PRISTI-03",
+   "startTime": "08:00",
+   "endTime": "14:00",
+   "type": "Ranní",
+   "shiftTypeId": 1,
+   "shiftTypeName": "Ranní",
+   "color": "#C8F542"
+  },
+  {
+   "employeeId": 17,
+   "employeeName": "Jakub Horák",
+   "employeeAvatar": "🧔",
+   "date": "PRISTI-04",
+   "startTime": "14:00",
+   "endTime": "20:00",
+   "type": "Odpolední",
+   "shiftTypeId": 2,
+   "shiftTypeName": "Odpolední",
+   "color": "#3B82F6"
+  },
+  {
+   "employeeId": 17,
+   "employeeName": "Jakub Horák",
+   "employeeAvatar": "🧔",
+   "date": "PRISTI-05",
+   "startTime": "08:00",
+   "endTime": "14:00",
+   "type": "Ranní",
+   "shiftTypeId": 1,
+   "shiftTypeName": "Ranní",
+   "color": "#C8F542"
+  },
+  {
+   "employeeId": 17,
+   "employeeName": "Jakub Horák",
+   "employeeAvatar": "🧔",
+   "date": "PRISTI-06",
+   "startTime": "14:00",
+   "endTime": "20:00",
+   "type": "Odpolední",
+   "shiftTypeId": 2,
+   "shiftTypeName": "Odpolední",
+   "color": "#3B82F6"
+  },
+  {
+   "employeeId": 17,
+   "employeeName": "Jakub Horák",
+   "employeeAvatar": "🧔",
+   "date": "PRISTI-09",
+   "startTime": "08:00",
+   "endTime": "14:00",
+   "type": "Ranní",
+   "shiftTypeId": 1,
+   "shiftTypeName": "Ranní",
+   "color": "#C8F542"
+  },
+  {
+   "employeeId": 22,
+   "employeeName": "Nikola Šťastná",
+   "employeeAvatar": "👩",
+   "date": "PRISTI-10",
+   "startTime": "14:00",
+   "endTime": "20:00",
+   "type": "Odpolední",
+   "shiftTypeId": 2,
+   "shiftTypeName": "Odpolední",
+   "color": "#3B82F6"
+  }
+ ],
+ "warnings": [],
+ "gaps": [],
+ "understaffed": [],
+ "nahradit": true
+}

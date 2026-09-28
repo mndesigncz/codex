@@ -309,8 +309,11 @@ const FIX_ROZVRH = nacti('k69-b1-rozlozeni-rozvrh');
   await dokud(() => widgetLi(p, 'nastroj').getByText('Navržený rozvrh').isVisible(), 3000);
   const navrh = await kontrastCar(p, '[data-plocha] li[data-widget="nastroj"] .border-dashed');
   tvrdi('T11: návrh v mřížce i tečka „Návrh" v legendě mají čitelný rámeček (≥ 2:1)', navrh.pocet > 1 && navrh.nejhorsi >= 2, JSON.stringify(navrh));
-  const tecky = await p.locator('[data-plocha] li[data-widget="nastroj"] [aria-label="Legenda"] [class*="cat-dot-"], [data-plocha] li[data-widget="nastroj"] [aria-label="Legenda"] .bg-black\\/15').count();
-  tvrdi('T11: tečky typů v legendě jsou třídy kategorií, ne inline hex', tecky > 0 && await p.locator('[data-plocha] li[data-widget="nastroj"] [aria-label="Legenda"] [style*="background"]').count() === 0, `${tecky}`);
+  // Od filtru rozvrhu (rozvrh-filtr) stojí tečky typů v pásu typů nad mřížkou
+  // a legenda je podruhé nekreslí — hlídá se obojí místo.
+  const kde = ['[aria-label="Legenda"]', '[data-pas="typy"]'].map(m => `[data-plocha] li[data-widget="nastroj"] ${m}`);
+  const tecky = await p.locator(kde.flatMap(m => [`${m} [class*="cat-dot-"]`, `${m} .bg-black\\/15`]).join(', ')).count();
+  tvrdi('T11: tečky typů v legendě a pásu typů jsou třídy kategorií, ne inline hex', tecky > 0 && await p.locator(kde.map(m => `${m} [style*="background"]`).join(', ')).count() === 0, `${tecky}`);
   await p.screenshot({ path: OUT + 'k69-b1-rozvrh-tmavy.png', fullPage: true });
   tvrdi('T11: bez chyb v konzoli', chyby.length === 0, chyby.slice(0, 3).join(' | '));
   await ctx.close();

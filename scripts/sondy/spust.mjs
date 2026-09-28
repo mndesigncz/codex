@@ -116,6 +116,7 @@ export const ZELENE = [
   'k69-mereni-3',
   'rozvrh-navrh',
   'rozvrh-generator',
+  'rozvrh-filtr',
 ];
 
 const MIMO = new Set(['spust', 'cookie-role', 'fixtury-k53', 'fixtury-navody', 'k68-spolecne', 'k69-mereni-jadro']);

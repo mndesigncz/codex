@@ -1,0 +1,43 @@
+{
+ "submissions": [
+  {
+   "id": 1,
+   "employeeId": 16,
+   "employeeName": "Eva Testová",
+   "employeeAvatar": "🧑",
+   "month": "PRISTI",
+   "unavailableDates": [],
+   "dayPreferences": {},
+   "preferredShift": "flexible",
+   "maxShifts": 3,
+   "note": null,
+   "status": "submitted"
+  },
+  {
+   "id": 2,
+   "employeeId": 17,
+   "employeeName": "Jakub Horák",
+   "employeeAvatar": "🧔",
+   "month": "PRISTI",
+   "unavailableDates": [],
+   "dayPreferences": {},
+   "preferredShift": "flexible",
+   "maxShifts": 6,
+   "note": null,
+   "status": "submitted"
+  },
+  {
+   "id": 3,
+   "employeeId": 22,
+   "employeeName": "Nikola Šťastná",
+   "employeeAvatar": "👩",
+   "month": "PRISTI",
+   "unavailableDates": [],
+   "dayPreferences": {},
+   "preferredShift": "flexible",
+   "maxShifts": 4,
+   "note": null,
+   "status": "submitted"
+  }
+ ]
+}

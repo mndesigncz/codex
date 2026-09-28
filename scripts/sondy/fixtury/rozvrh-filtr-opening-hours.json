@@ -1,0 +1,39 @@
+{
+ "openingHours": {
+  "0": {
+   "open": "08:00",
+   "close": "20:00",
+   "closed": false
+  },
+  "1": {
+   "open": "08:00",
+   "close": "20:00",
+   "closed": false
+  },
+  "2": {
+   "open": "08:00",
+   "close": "20:00",
+   "closed": false
+  },
+  "3": {
+   "open": "08:00",
+   "close": "20:00",
+   "closed": false
+  },
+  "4": {
+   "open": "08:00",
+   "close": "20:00",
+   "closed": false
+  },
+  "5": {
+   "open": "08:00",
+   "close": "20:00",
+   "closed": false
+  },
+  "6": {
+   "open": "08:00",
+   "close": "20:00",
+   "closed": false
+  }
+ }
+}

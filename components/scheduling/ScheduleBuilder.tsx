@@ -28,7 +28,7 @@
 // pohledu Rozvrhu nepředává, proto z jiné stránky žádost počká
 // v sessionStorage.
 
-import { Fragment, useState, useEffect, useMemo, useRef } from 'react';
+import { Fragment, useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { zkratkyDnu, odsazeniMesice, zacatekTydne, type ZacatekTydne } from '@/lib/week';
 import { useCurrency } from '@/components/CurrencyProvider';
 import { dayPrefLabel, prefAllowsSlot } from '@/lib/dayPrefs';
@@ -36,7 +36,7 @@ import { openSpan, uncovered, typeFitsDay, toHM, urovenDiry } from '@/lib/covera
 import { Icon } from '../Icons';
 import {
   Avatar, Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Modal, MonthNav, PageHeader, Segmented,
-  SelectBox, Select, Skeleton, Switch, SwitchRow, Well, type MenuItem,
+  SelectBox, Select, Skeleton, Switch, SwitchRow, Toast, Well, type MenuItem,
 } from '../ui';
 import ShiftCalendar from './ShiftCalendar';
 import { usePlan, UpgradeModal } from '../Pro';
@@ -53,6 +53,12 @@ import {
   KLIC_DEN, KLIC_DOSTUPNOST, UDALOST_DEN, UDALOST_DOSTUPNOST, UDALOST_ZMENA, den as denZ, hm as hmZ, posunMesice,
   kategorieBarvy, rozsahVolna,
 } from '@/lib/rozvrhPrehled';
+import {
+  KLIC_FILTRU, KLIC_PREHLEDU, PRAZDNY_FILTR, klicFiltru, procistiFiltr, jeAktivni, nactiFiltr, nactiRazeni, prepni, projdeSmena, denProjde,
+  pocetPodleLidi, pocetPodleTypu, lideFiltru, lideDoPasu, typyDoPasu, popisFiltru, popisVysledku, vytizeni, seradVytizeni,
+  type FiltrRozvrhu, type RazeniVytizeni, type SmenaFiltru,
+} from '@/lib/rozvrhFiltr';
+import { ListaFiltru, PasLidi, PasTypu, PrehledLidi, StavFiltru } from './RozvrhFiltr';
 
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string; role?: string };
@@ -291,7 +297,7 @@ function vezmiZadost(klic: string): string | null {
 const TITULEK = 'Rozvrh';
 const PODTITULEK = 'Sestav měsíční rozvrh podle dostupnosti týmu.';
 
-export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (view: string, arg?: string) => void }) {
+export default function ScheduleBuilder({ onNavigate, user }: Props & { onNavigate?: (view: string, arg?: string) => void }) {
   // Začátek týdne si volí podnik; kalendáře vedle ho ctí taky.
   const zacatek = zacatekTydne(useCurrency().weekStart);
   const currentMonth = pragueToday().slice(0, 7);
@@ -303,9 +309,13 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
   // náhled. Po odpovědi rozhoduje `ma`: s oprávněními přísně, po chybě nebo
   // u odpovědi bez pole (starší server) „ukázat vše" — rozhodne server.
   const [pripraveno, setPripraveno] = useState(false);
+  // Aktivní podnik — jen pro klíč uloženého filtru (id lidí platí v jednom podniku).
+  const [podnikId, setPodnikId] = useState<number | null>(null);
   useEffect(() => {
     let zije = true;
-    nactiTeamsMine().catch(() => { /* chyba je ve stavu oprávnění */ }).finally(() => { if (zije) setPripraveno(true); });
+    nactiTeamsMine()
+      .then((d) => { if (zije) setPodnikId(d?.activeTeamId != null ? Number(d.activeTeamId) : null); })
+      .catch(() => { /* chyba je ve stavu oprávnění */ }).finally(() => { if (zije) setPripraveno(true); });
     return () => { zije = false; };
   }, []);
   const smi = (klic: string) => pripraveno && ma(klic);
@@ -422,6 +432,72 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
   // Commit ji pošle zpátky; když ji mezitím změnila jiná záložka nebo jiné
   // zařízení, server vrátí 409 místo tichého přepsání.
   const [verzeMesice, setVerzeMesice] = useState<string | null>(null);
+
+  // Filtr mřížky (lidé, typ, jen díry) a přehled „Směny podle lidí".
+  // Pamatuje se v localStorage jednoho zařízení, ne v URL: adresu stránky
+  // spravuje EmployerLayout a filtr je pohodlí plánovače, ne sdílený stav.
+  // Jeden záznam pro všechny měsíce — „Eva" platí i po přepnutí na další
+  // měsíc (jak chtěl Martin: přepnu měsíc a pořád vidím její směny) —, ale
+  // zvlášť pro každého přihlášeného a podnik (klicFiltru).
+  const [filtr, setFiltr] = useState<FiltrRozvrhu>(PRAZDNY_FILTR);
+  const [prehledOtevren, setPrehledOtevren] = useState(false);
+  const [razeni, setRazeni] = useState<RazeniVytizeni>('smeny');
+  const klicUlozeni = pripraveno ? klicFiltru(user?.id ?? null, podnikId) : null;
+  // Pod jakým klíčem je filtr načtený — dřív se neukládá (první běh by
+  // přepsal uložený filtr prázdným) a po přepnutí podniku ne pod starý.
+  const [nactenyKlic, setNactenyKlic] = useState<string | null>(null);
+  useEffect(() => {
+    if (!klicUlozeni) return;
+    // Soukromé okno nebo zablokované úložiště: filtr prostě začne prázdný.
+    try {
+      setFiltr(nactiFiltr(localStorage.getItem(klicUlozeni)));
+      // Společný záznam z první verze (bez podniku a uživatele) už neplatí.
+      localStorage.removeItem(KLIC_FILTRU);
+      const p = JSON.parse(localStorage.getItem(KLIC_PREHLEDU) || '{}');
+      // Otevřený přehled se obnoví jen na širší obrazovce: na telefonu by
+      // po načtení odsunul mřížku o víc než obrazovku.
+      const siroka = window.matchMedia?.('(min-width: 640px)').matches ?? true;
+      setPrehledOtevren(siroka && p?.otevreno === true);
+      setRazeni(nactiRazeni(p?.razeni));
+    } catch { /* bez úložiště */ }
+    setNactenyKlic(klicUlozeni);
+  }, [klicUlozeni]);
+  useEffect(() => {
+    if (!nactenyKlic) return;
+    try {
+      localStorage.setItem(nactenyKlic, JSON.stringify(filtr));
+      localStorage.setItem(KLIC_PREHLEDU, JSON.stringify({ otevreno: prehledOtevren, razeni }));
+    } catch { /* bez úložiště */ }
+    // Ukládá se změna filtru, ne načtení pod novým klíčem (to by uložilo starý filtr).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtr, prehledOtevren, razeni]);
+  // Den, který plánovač s „Jen dny s dírou" právě opravuje: zůstane
+  // v mřížce, i když díru zaplnil — jinak by zmizel i s přidanou směnou
+  // a nešla by zkontrolovat ani odebrat. Platí, dokud se filtr nezmění.
+  const [drzeneDny, setDrzeneDny] = useState<ReadonlySet<string>>(() => new Set());
+  useEffect(() => { setDrzeneDny(d => (d.size ? new Set() : d)); }, [filtr]);
+  const otevriDen = (den: string) => {
+    if (filtr.jenDiry) setDrzeneDny(d => (d.has(den) ? d : new Set([...d, den])));
+    setDayModal(den);
+  };
+  // Směny přidané v okně dne, které filtr mřížky skryje — po zavření okna
+  // se to řekne (jinak směna „zmizí" a plánovač neví proč).
+  const mimoFiltrRef = useRef<{ employeeId: number; typ: string }[]>([]);
+  const [hlaskaFiltru, setHlaskaFiltru] = useState<{ text: string; id: number; ukazat: { lide: number[]; typy: string[] } } | null>(null);
+  // Kde byl naposledy fokus: když zmizí prvek filtru, na kterém stál
+  // (Zrušit filtr, poslední pilulka), vrátí se fokus na začátek filtru,
+  // ne na <body> a začátek stránky.
+  const filtrObalRef = useRef<HTMLDivElement>(null);
+  const fokusVeFiltruRef = useRef(false);
+  useEffect(() => {
+    const kde = (e: FocusEvent) => { fokusVeFiltruRef.current = !!filtrObalRef.current?.contains(e.target as Node); };
+    document.addEventListener('focusin', kde);
+    return () => document.removeEventListener('focusin', kde);
+  }, []);
+  const mrizkaRef = useRef<HTMLDivElement>(null);
+  // Jména lidí, které plánovač už viděl (i v jiném měsíci): vybraný člověk
+  // bez směny v novém měsíci musí v pásu zůstat, jinak by nešel odkliknout.
+  const znamiRef = useRef(new Map<number, { jmeno: string; avatar: string | null }>());
 
   // Náhled importu
   const [importPreview, setImportPreview] = useState<{ rows: any[]; errors: string[] } | null>(null);
@@ -956,6 +1032,138 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
     });
   };
 
+  // ---- Filtr mřížky ----
+  // Počítá se z toho, co mřížka právě kreslí a co by po uložení platilo:
+  // s otevřeným návrhem návrh (a s přepisem měsíce bez uložených směn),
+  // jinak uložené směny. Dřív šlo počty lidí zjistit jen z widgetu
+  // „Naplánované hodiny", který o návrhu neví.
+  const typUlozene = (s: Shift) => resolveShiftType(s, shiftTypes).label;
+  const typNavrhu = (p: Proposed) => p.shiftTypeName || resolveShiftType(p, shiftTypes).label;
+  const smenyFiltru = useMemo<SmenaFiltru[]>(() => [
+    ...(nahradiUlozene ? [] : shifts.map(s => ({
+      employeeId: s.employeeId, jmeno: s.employeeName, avatar: s.employeeAvatar || null,
+      date: s.date, startTime: s.startTime, endTime: s.endTime, typ: resolveShiftType(s, shiftTypes).label,
+    }))),
+    ...(preview?.proposed ?? []).map(p => ({
+      employeeId: p.employeeId, jmeno: p.employeeName, avatar: p.employeeAvatar || null,
+      date: p.date, startTime: p.startTime, endTime: p.endTime, typ: p.shiftTypeName || resolveShiftType(p, shiftTypes).label,
+    })),
+  ], [nahradiUlozene, shifts, preview, shiftTypes]);
+  const filtrAktivni = jeAktivni(filtr);
+  // Lidé a typy filtrují směny; „jen díry" filtruje dny.
+  const filtrujeSmeny = filtr.lide.length > 0 || filtr.typy.length > 0;
+  const lideMesice = useMemo(() => {
+    const lide = lideFiltru(members, smenyFiltru, smiDostupnost ? submissions : null);
+    for (const c of lide) znamiRef.current.set(c.id, { jmeno: c.jmeno, avatar: c.avatar });
+    return lide;
+  }, [members, smenyFiltru, smiDostupnost, submissions]);
+  // Vybraný člověk bez směny v měsíci (vedoucí, zaměstnanec mimo pás):
+  // jméno ze seznamu týmu, jinak z paměti. Neznámé id pročistí efekt níž.
+  const lidePlanovace = useMemo(() => [
+    ...lideMesice,
+    ...filtr.lide.filter(id => !lideMesice.some(c => c.id === id)).map(id => {
+      const clen = members.find(m => Number(m.id) === id);
+      const znamy = znamiRef.current.get(id);
+      return { id, jmeno: clen?.name || znamy?.jmeno || 'Bez jména', avatar: clen?.avatar ?? znamy?.avatar ?? null };
+    }),
+  ], [lideMesice, filtr.lide, members]);
+  // Id, která ve filtru nemají co dělat — nejsou v týmu ani nemají směnu
+  // v načteném měsíci (odešli, smazaní). Jen s načteným týmem: bez seznamu
+  // (náhled) nevíme, kdo v týmu je, a vyhodili bychom i platný výběr.
+  useEffect(() => {
+    if (!nactenyKlic || loading || loadError || members.length === 0) return;
+    const zname = new Set<number>([...members.map(m => Number(m.id)), ...smenyFiltru.map(s => Number(s.employeeId))]);
+    setFiltr(f => procistiFiltr(f, zname));
+  }, [nactenyKlic, loading, loadError, members, smenyFiltru]);
+  /** Ukazuje mřížka den? (S „jen díry" den s dírou nebo den, který plánovač opravuje.) */
+  const denVidet = (datum: string) => !!problemsByDate[datum] || drzeneDny.has(datum);
+  const pocetLidi = useMemo(() => pocetPodleLidi(smenyFiltru, filtr, denVidet),
+    // denVidet = problemsByDate + drzeneDny
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [smenyFiltru, filtr, problemsByDate, drzeneDny]);
+  const pasLidi = useMemo(() => lideDoPasu(lidePlanovace, pocetLidi), [lidePlanovace, pocetLidi]);
+  const celkemVPasu = useMemo(() => [...pocetLidi.values()].reduce((n, x) => n + x, 0), [pocetLidi]);
+  const pasTypu = useMemo(() => typyDoPasu(shiftTypes, pocetPodleTypu(smenyFiltru, filtr, denVidet), filtr.typy),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [shiftTypes, smenyFiltru, filtr, problemsByDate, drzeneDny]);
+  const dobaDne = (datum: string) => {
+    const oh = openingHours[weekdayKey(datum)];
+    return oh && !oh.closed && oh.close ? { open: oh.open ?? null, close: oh.close } : null;
+  };
+  const dnyMesice = useMemo(() => grid.filter((d): d is string => !!d), [grid]);
+  const vytizeniLidi = useMemo(
+    () => vytizeni(lideMesice, smenyFiltru, smiDostupnost ? submissions : null, dobaDne, { dny: dnyMesice, volno: timeOff }),
+    // dobaDne závisí jen na openingHours
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lideMesice, smenyFiltru, smiDostupnost, submissions, openingHours, dnyMesice, timeOff],
+  );
+  const radkyPrehledu = useMemo(() => seradVytizeni(vytizeniLidi.radky, razeni), [vytizeniLidi, razeni]);
+  const jmenaFiltru = useMemo(() => new Map(lidePlanovace.map(c => [c.id, c.jmeno])), [lidePlanovace]);
+  const kratkaFiltru = useMemo(() => new Map(pasLidi.map(c => [c.id, c.kratce])), [pasLidi]);
+  const viditelnych = useMemo(
+    () => smenyFiltru.filter(s => projdeSmena(s, filtr) && denProjde(denVidet(s.date), filtr)).length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [smenyFiltru, filtr, problemsByDate, drzeneDny],
+  );
+  const popisAktivniho = filtrAktivni ? `Filtr: ${popisFiltru(filtr, jmenaFiltru, kratkaFiltru)} — ${popisVysledku(viditelnych, !!preview)}` : '';
+  // Hlášení pro odečítač: výsledek filtru, po vypnutí „Filtr vypnut".
+  // Při načtení stránky mlčí (nic se nezměnilo, jen obnovil uložený stav).
+  const bylFiltrRef = useRef(false);
+  if (filtrAktivni) bylFiltrRef.current = true;
+  const stavFiltru = filtrAktivni ? popisAktivniho : bylFiltrRef.current ? 'Filtr vypnut, celý měsíc.' : '';
+  // Pás typů má smysl od dvou typů (nebo když je co odkliknout / jsou díry).
+  const ukazPasTypu = pasTypu.length >= 2 || filtr.typy.length > 0 || filtr.jenDiry || (problemDates.length > 0 && pasTypu.length >= 1);
+  // Filtr se změnil a prvek s fokusem zmizel (Zrušit filtr i s lištou,
+  // poslední pilulka pásu typů): fokus na první pilulku, jinak na mřížku.
+  useLayoutEffect(() => {
+    if (!fokusVeFiltruRef.current) return;
+    const ztracen = !document.activeElement || document.activeElement === document.body;
+    if (!ztracen) return;
+    const cil = filtrObalRef.current?.querySelector<HTMLElement>('[data-pas] button') ?? mrizkaRef.current;
+    cil?.focus({ preventScroll: false });
+  }, [filtr]);
+  const zrusFiltr = () => setFiltr(PRAZDNY_FILTR);
+  /**
+   * Klepnutí na člověka v přehledu: mřížka jen na jeho směny, VŠECH typů
+   * a dnů — tedy přesně to číslo, na které plánovač klepl. Kdyby zůstal
+   * filtr „Ranní", řádek by říkal 5 a mřížka ukázala 3. Druhé klepnutí na
+   * jediného vybraného filtr lidí zruší.
+   */
+  const vyberClovekaZPrehledu = (id: number) => {
+    setFiltr(f => (f.lide.length === 1 && f.lide[0] === id ? { ...f, lide: [] } : { lide: [id], typy: [], jenDiry: false }));
+    const el = mrizkaRef.current;
+    if (el && el.getBoundingClientRect().top > window.innerHeight * 0.75) {
+      const klid = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      el.scrollIntoView({ block: 'start', behavior: klid ? 'auto' : 'smooth' });
+    }
+  };
+  const hintCelyMesic = filtrAktivni ? ' Vždy celý měsíc — filtr se nepoužije.' : '';
+  /** Přidání v okně dne: směnu, kterou filtr mřížky skryje, si zapamatovat na hlášku. */
+  const pridejVOkne = async (x: { employeeId: number; date: string; startTime: string; endTime: string; type: string }) => {
+    const ok = preview ? pridejDoNavrhu(x) : await addShift(x);
+    const typ = shiftTypes.find(t => t.name === x.type)?.name ?? x.type;
+    if (ok && jeAktivni(filtr) && !projdeSmena({ employeeId: x.employeeId, typ }, filtr)) mimoFiltrRef.current.push({ employeeId: x.employeeId, typ });
+    return ok;
+  };
+  const zavriDen = () => {
+    setDayModal(null);
+    const mimo = mimoFiltrRef.current;
+    mimoFiltrRef.current = [];
+    if (mimo.length === 0) return;
+    const lide = [...new Set(mimo.map(m => m.employeeId))];
+    const jmeno = (id: number) => (members.find(m => Number(m.id) === id)?.name || znamiRef.current.get(id)?.jmeno || 'Kolega').split(/\s+/)[0];
+    const text = mimo.length === 1
+      ? `Přidáno — ${jmeno(mimo[0].employeeId)} je mimo filtr`
+      : `Přidáno — ${czCount(mimo.length, SMENA)} mimo filtr`;
+    setHlaskaFiltru({ text, id: Date.now(), ukazat: { lide, typy: [...new Set(mimo.map(m => m.typ))] } });
+  };
+  /** „Ukázat" v hlášce: přidat přidané lidi a typy do filtru, ať je směna v mřížce vidět. */
+  const ukazPridane = (u: { lide: number[]; typy: string[] }) => setFiltr(f => ({
+    ...f,
+    lide: f.lide.length > 0 ? [...new Set([...f.lide, ...u.lide])] : f.lide,
+    typy: f.typy.length > 0 ? [...new Set([...f.typy, ...u.typy])] : f.typy,
+  }));
+
   // ---- Export CSV ----
   const exportCsv = () => {
     if (!pro) { setUpgradeFor('Export CSV'); return; }
@@ -1111,8 +1319,8 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
   const hintNavrh = 'Nejdřív ulož nebo zahoď návrh — jinak by jeho uložení tuhle změnu přepsalo.';
   if (naRozvrhu && !loading && !loadError) {
     if (smiPublikovat) menu.push(preview
-      ? { label: 'Uložit návrh a publikovat', icon: 'send', onClick: () => { void publish(); }, disabled: committing || publishing, hint: 'Návrh se uloží i s tvými úpravami a lidé dostanou upozornění.' }
-      : { label: 'Publikovat rozvrh', icon: 'send', onClick: () => { void publish(); }, disabled: publishing, hint: 'Lidé dostanou upozornění, že je rozvrh hotový.' });
+      ? { label: 'Uložit návrh a publikovat', icon: 'send', onClick: () => { void publish(); }, disabled: committing || publishing, hint: `Návrh se uloží i s tvými úpravami a lidé dostanou upozornění.${hintCelyMesic}` }
+      : { label: 'Publikovat rozvrh', icon: 'send', onClick: () => { void publish(); }, disabled: publishing, hint: `Lidé dostanou upozornění, že je rozvrh hotový.${hintCelyMesic}` });
     if (smiUpravit) {
       menu.push({ label: 'Upravit podle nových požadavků', icon: 'swap', onClick: runAdjust, disabled: !!preview || adjusting || shifts.length === 0,
         hint: preview ? hintNavrh : 'Zkontroluje uložený rozvrh proti nejnovější dostupnosti.' });
@@ -1121,9 +1329,12 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
       menu.push({ label: 'Import CSV…', icon: 'upload', disabled: !!preview, hint: preview ? hintNavrh : undefined, onClick: () => fileRef.current?.click() });
     }
     if (smiExport) {
-      menu.push({ label: 'Export CSV', icon: 'download', onClick: exportCsv, disabled: shifts.length === 0 });
+      // Export a tisk berou vždy uložené směny celého měsíce (`shifts`), ne
+      // to, co zrovna ukazuje filtr — soubor pro účetní ani papír na zeď
+      // nesmí potichu vynechat lidi, které si plánovač zrovna skryl.
+      menu.push({ label: 'Export CSV', icon: 'download', onClick: exportCsv, disabled: shifts.length === 0, hint: hintCelyMesic.trim() || undefined });
       menu.push({ label: 'Vytisknout rozvrh', icon: 'print', onClick: printSchedule, disabled: shifts.length === 0,
-        hint: 'Na papír k baru — černobíle, s typem směny slovem.' });
+        hint: `Na papír k baru — černobíle, s typem směny slovem.${hintCelyMesic}` });
     }
     if (smiMazat) menu.push({ label: 'Vymazat měsíc…', icon: 'trash', onClick: () => setConfirmClear(true), danger: true,
       hint: 'Smaže všechny směny tohoto měsíce. Potvrdíš to ještě jednou.' });
@@ -1333,9 +1544,39 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
       ) : loadError ? (
         <ErrorState compact title="Rozvrh se nenačetl" onRetry={load} detail={loadError} />
       ) : (
-        <div>
-          <ul className="flex items-center gap-x-3 gap-y-1 t-meta flex-wrap mb-3" aria-label="Legenda">
-            {shiftTypes.map((t) => (
+        <div className="min-w-0">
+          <StavFiltru text={stavFiltru} />
+          <div ref={filtrObalRef}>
+          {/* Filtr: pás lidí (kolik kdo má směn), přehled vytížení, pás typů
+              a „jen díry". Pás se ukáže, až je co filtrovat (DESIGN.md). */}
+          {(pasLidi.length >= 2 || filtr.lide.length > 0) && (
+            <PasLidi lide={pasLidi} vybrani={filtr.lide} celkem={celkemVPasu} navrh={!!preview}
+              onPrepni={(id) => setFiltr(f => ({ ...f, lide: prepni(f.lide, id) }))}
+              onVsichni={() => setFiltr(f => ({ ...f, lide: [] }))} />
+          )}
+          {ukazPasTypu && (
+            <PasTypu typy={pasTypu} vybrane={filtr.typy} tecka={tridaTecky} navrh={!!preview}
+              onPrepni={(t) => setFiltr(f => ({ ...f, typy: prepni(f.typy, t) }))}
+              diry={problemDates.length > 0 || filtr.jenDiry ? problemDates.length : null}
+              jenDiry={filtr.jenDiry} onJenDiry={() => setFiltr(f => ({ ...f, jenDiry: !f.jenDiry }))} />
+          )}
+          {planovac && lideMesice.length > 0 && (
+            <div className="mt-2">
+              <PrehledLidi v={vytizeniLidi} radky={radkyPrehledu} razeni={razeni} onRazeni={setRazeni}
+                otevreno={prehledOtevren} onOtevreno={setPrehledOtevren} vybrani={filtr.lide}
+                onVyber={vyberClovekaZPrehledu} navrh={!!preview} dostupnostViditelna={smiDostupnost}
+                bezFiltru={filtr.typy.length > 0 && filtr.jenDiry ? 'všechny typy a dny' : filtr.typy.length > 0 ? 'všechny typy směn' : filtr.jenDiry ? 'všechny dny' : null} />
+            </div>
+          )}
+          {filtrAktivni && (
+            <div className="mt-3">
+              <ListaFiltru popis={popisFiltru(filtr, jmenaFiltru, kratkaFiltru)} vysledek={popisVysledku(viditelnych, !!preview)} onZrusit={zrusFiltr} />
+            </div>
+          )}
+          </div>
+          <ul className="flex items-center gap-x-3 gap-y-1 t-meta flex-wrap mb-3 mt-3" aria-label="Legenda">
+            {/* Typy s tečkou ukazuje pás typů — v legendě by byly podruhé. */}
+            {!ukazPasTypu && shiftTypes.map((t) => (
               <li key={t.id} className="flex items-center gap-1.5">
                 <span aria-hidden className={`h-2.5 w-2.5 rounded-full ${tridaTecky(t.color)}`} /> {t.name}
               </li>
@@ -1357,7 +1598,8 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
               <li className="flex items-center gap-1.5"><Icon name="users" size={13} className="shrink-0 text-black/45" /> Rezervovaní hosté</li>
             )}
           </ul>
-          <div className="grid grid-cols-7 gap-1 sm:gap-1.5 mb-1.5">
+          {/* tabIndex -1: kam se vrátí fokus, když zmizí poslední prvek filtru. */}
+          <div ref={mrizkaRef} tabIndex={-1} aria-label="Mřížka rozvrhu" className="grid grid-cols-7 gap-1 sm:gap-1.5 mb-1.5 scroll-mt-4 outline-none">
             {zkratkyDnu(zacatek).map((d) => (
               <div key={d} className="text-center text-[11px] font-medium text-black/35 py-1">{d}</div>
             ))}
@@ -1366,12 +1608,27 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
             {grid.map((cell, i) => {
               if (!cell) return <div key={i} />;
               const day = parseInt(cell.split('-')[2]);
-              const dayShifts = shiftsByDay[cell] ?? [];
-              const dayProposed = proposedByDay[cell] ?? [];
+              // Filtr lidí a typů směny ostatních SKRYJE (ne ztlumí): ztlumené
+              // by v plné mřížce pořád přehlušily těch pár, o které jde.
+              const dayShifts = (shiftsByDay[cell] ?? []).filter(s => projdeSmena({ employeeId: s.employeeId, typ: typUlozene(s) }, filtr));
+              const dayProposed = (proposedByDay[cell] ?? []).filter(p => projdeSmena({ employeeId: p.employeeId, typ: typNavrhu(p) }, filtr));
               const problem = problemsByDate[cell];
+              // „Jen dny s dírou": den bez díry zůstane v mřížce jako prázdné
+              // místo s číslem (týden se nerozsype), bez směn a bez klepnutí.
+              if (!denProjde(denVidet(cell), filtr)) {
+                return (
+                  <div key={cell} data-mimo-filtr className="min-h-[84px] min-w-0 rounded-xl p-1 sm:p-1.5 border border-dashed border-black/[0.08]">
+                    <span className="text-[11px] sm:text-xs font-medium text-black/35">{day}</span>
+                  </div>
+                );
+              }
               // Dvě úrovně: nikdo neotevře (povinná — podnik se neotevře) svítí
               // plně červeně, chybějící druhý člověk (žádoucí) jen jemně.
               const hole = !!problem?.gaps.some(jePovinna);
+              // S filtrem lidí nebo typu je díra jen tenká značka u horní hrany:
+              // plánovač řeší Evu, ne obsazení — ale přehled o dírách neztratí.
+              // S „jen díry" zůstává plné zvýraznění, o díry tam jde.
+              const znacka = !!problem && filtrujeSmeny && !filtr.jenDiry;
               const problemTitle = problem
                 ? [
                     ...problem.gaps.map(g => jePovinna(g)
@@ -1384,23 +1641,28 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
                 <button
                   key={cell}
                   type="button"
-                  onClick={() => setDayModal(cell)}
+                  onClick={() => otevriDen(cell)}
                   title={problemTitle}
-                  aria-label={`${dayLabel(cell)}: ${czCount(dayShifts.length, SMENA)}${nahradiUlozene && dayShifts.length > 0 ? ' (uložením návrhu se nahradí)' : ''}${dayProposed.length > 0 ? `, v návrhu ${czCount(dayProposed.length, SMENA)}` : ''}${hole ? ', nikdo neotevře' : problem ? ', chybí druhý člověk' : ''}`}
+                  aria-label={`${dayLabel(cell)}: ${czCount(dayShifts.length, SMENA)}${filtrujeSmeny ? ' podle filtru' : ''}${nahradiUlozene && dayShifts.length > 0 ? ' (uložením návrhu se nahradí)' : ''}${dayProposed.length > 0 ? `, v návrhu ${czCount(dayProposed.length, SMENA)}` : ''}${hole ? ', nikdo neotevře' : problem ? ', chybí druhý člověk' : ''}`}
                   data-dira={hole ? 'povinna' : problem ? 'zadouci' : undefined}
+                  data-znacka-diry={znacka ? 'ano' : undefined}
                   className={`min-h-[84px] min-w-0 rounded-xl p-1 sm:p-1.5 text-left transition-colors flex flex-col gap-1 overflow-hidden border ${
-                    hole
+                    hole && !znacka
                       ? 'bg-bad/15 border-bad/60 hover:bg-bad/20'
-                      : problem
+                      : problem && !znacka
                         ? 'bg-wait/[0.08] border-wait/40 hover:bg-wait/15'
                         : 'bg-black/[0.03] border-black/[0.08] hover:border-black/20'
                   }`}
                 >
                   <span className="flex items-center gap-1 min-w-0">
-                    <span className={`text-[11px] sm:text-xs font-medium ${hole ? 'text-bad-ink' : 'text-black/55'}`}>{day}</span>
+                    <span className={`text-[11px] sm:text-xs font-medium ${hole && !znacka ? 'text-bad-ink' : 'text-black/55'}`}>{day}</span>
+                    {/* Díra se tvarem pozná i bez barvy (WCAG 1.4.1): povinná
+                        = výstražná ikona, žádoucí = tečka. S filtrem jen bez
+                        podbarvení buňky a tečka v sytém odstínu (-ink), světlá
+                        wait na šedé buňce má kontrast ~2:1. */}
                     {hole
                       ? <Icon name="warning" size={11} className="flex-shrink-0 text-bad-ink" />
-                      : problem && <span aria-hidden className="flex-shrink-0 rounded-full h-1.5 w-1.5 bg-wait" />}
+                      : problem && <span aria-hidden className={`flex-shrink-0 rounded-full h-1.5 w-1.5 ${znacka ? 'bg-wait-ink' : 'bg-wait'}`} />}
                   </span>
                   <span className="flex flex-col gap-1 min-w-0 overflow-hidden" aria-hidden>
                     {demand[cell]?.guests > 0 && (
@@ -1675,18 +1937,21 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
           submissions={submissions}
           navrh={!!preview}
           nahradiUlozene={nahradiUlozene}
+          filtrAktivni={filtrujeSmeny}
           // Jen se zapnutým doporučením podle tržeb — jinak undefined a okno o tržbách mlčí.
           doporuceni={doporuceniByDate[dayModal]}
           // Dostupnost týmu jen s dostupnost.zobrazit — data jsou tatáž, která
           // plánovač načetl pro měsíc (jeden dotaz, ne dotaz na každý den).
           dostupnost={smiDostupnost ? { submissions, volno: timeOff } : null}
-          onClose={() => setDayModal(null)}
+          onClose={zavriDen}
           // S otevřeným návrhem se přidává do návrhu, jinak rovnou do rozvrhu.
-          onAdd={preview ? async (x) => pridejDoNavrhu(x) : addShift}
+          onAdd={pridejVOkne}
           onRemove={removeShift}
           onRemoveProposed={odeberZNavrhu}
         />
       )}
+      <Toast message={hlaskaFiltru?.text ?? null} id={hlaskaFiltru?.id} onClose={() => setHlaskaFiltru(null)}
+        action={hlaskaFiltru ? { label: 'Ukázat', onClick: () => { ukazPridane(hlaskaFiltru.ukazat); setHlaskaFiltru(null); } } : undefined} />
     </>
   );
 }
@@ -2181,7 +2446,7 @@ const VLASTNI_CAS = '__vlastni';
 function DayModal({
   date, onNavigate, employees, shifts, proposed = [], shiftTypes, openingHours, unavailable, submissions,
   onClose, onAdd, onRemove, onRemoveProposed, events = [], readOnly = false,
-  navrh = false, nahradiUlozene = false, dostupnost = null, doporuceni,
+  navrh = false, nahradiUlozene = false, dostupnost = null, doporuceni, filtrAktivni = false,
 }: {
   onNavigate?: (view: string, arg?: string) => void;
   date: string;
@@ -2207,6 +2472,8 @@ function DayModal({
   dostupnost?: { submissions: Submission[]; volno: { employeeId: number; fromDate: string; toDate: string; type?: string | null }[] } | null;
   /** Doporučení počtu lidí podle tržeb (jen když je funkce zapnutá a v návrhu). */
   doporuceni?: Doporuceni;
+  /** Mřížka je vyfiltrovaná na lidi nebo typ — okno přesto ukazuje celý den. */
+  filtrAktivni?: boolean;
 }) {
   const { money } = useCurrency();
   // Otevírací doba TOHO dne (klíč 0 = pondělí … 6 = neděle).
@@ -2322,6 +2589,14 @@ function DayModal({
         {tlacitkoPridat}
       </>}>
       <div className="space-y-5">
+        {filtrAktivni && (
+          // Okno dne je místo, kde se den opravuje: potřebuje vidět všechny
+          // (kdo už stojí, kdo může) — filtr by tu schoval právě ty, kým se díra zaplní.
+          <p className="t-meta flex items-center gap-1.5" data-okno-bez-filtru>
+            <Icon name="info" size={14} className="shrink-0 text-black/45" />
+            Okno ukazuje celý den — filtr platí jen pro mřížku.
+          </p>
+        )}
         {!readOnly && (dayGaps.length > 0 || missingHere.length > 0) && (
           // Povinná (nikdo neotevře) výrazně, žádoucí (chybí druhý) mírně.
           <div className={`note ${nikdoNeotevre ? 'note-danger' : 'note-wait'}`} data-dira={nikdoNeotevre ? 'povinna' : 'zadouci'}>
