@@ -1,0 +1,9 @@
+{
+ "submissions": [
+  { "id": 1, "employeeId": 16, "employeeName": "Eva Testová", "employeeAvatar": "🧑", "month": "PRISTI", "unavailableDates": [], "dayPreferences": {}, "preferredShift": "flexible", "maxShifts": null, "note": "Škola ve středu", "status": "submitted" },
+  { "id": 2, "employeeId": 17, "employeeName": "Jakub Horák", "employeeAvatar": "🧔", "month": "PRISTI", "unavailableDates": [], "dayPreferences": { "PRISTI-06": "type:1" }, "preferredShift": "flexible", "maxShifts": null, "note": null, "status": "submitted" },
+  { "id": 3, "employeeId": 18, "employeeName": "Tereza Malá", "employeeAvatar": "👱‍♀️", "month": "PRISTI", "unavailableDates": ["PRISTI-06"], "dayPreferences": {}, "preferredShift": "flexible", "maxShifts": null, "note": "Rodinná oslava", "status": "submitted" },
+  { "id": 4, "employeeId": 21, "employeeName": "Lukáš Beneš", "employeeAvatar": "🧑‍🦱", "month": "PRISTI", "unavailableDates": [], "dayPreferences": {}, "preferredShift": "flexible", "maxShifts": null, "note": "Víkendy ano, jinak po škole", "status": "submitted" },
+  { "id": 5, "employeeId": 22, "employeeName": "Nikola Šťastná", "employeeAvatar": "👩", "month": "PRISTI", "unavailableDates": [], "dayPreferences": {}, "preferredShift": "afternoon", "maxShifts": null, "note": null, "status": "submitted" }
+ ]
+}

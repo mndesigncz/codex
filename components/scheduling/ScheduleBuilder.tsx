@@ -28,7 +28,7 @@
 // pohledu Rozvrhu nepředává, proto z jiné stránky žádost počká
 // v sessionStorage.
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { Fragment, useState, useEffect, useMemo, useRef } from 'react';
 import { zkratkyDnu, odsazeniMesice, zacatekTydne, type ZacatekTydne } from '@/lib/week';
 import { useCurrency } from '@/components/CurrencyProvider';
 import { dayPrefLabel, prefAllowsSlot } from '@/lib/dayPrefs';
@@ -47,6 +47,7 @@ import { pragueToday } from '@/lib/pragueTime';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu } from '../widgety/useDataWidgetu';
 import { nactiTeamsMine, useOpravneni } from '../role/useOpravneni';
+import { prepocitejDen, stavClenaDne, seradRadky, kolize, vychoziTyp, type StavClenaDne, type TypDne } from '@/lib/rozvrhDen';
 import {
   KLIC_DEN, KLIC_DOSTUPNOST, UDALOST_DEN, UDALOST_DOSTUPNOST, UDALOST_ZMENA, den as denZ, hm as hmZ, posunMesice,
   kategorieBarvy, rozsahVolna,
@@ -280,7 +281,7 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
   const [fixed, setFixed] = useState<FixedAssignment[]>([]);
   const [openingHours, setOpeningHours] = useState<Record<string, OpeningDay>>({});
   // Schválené volno — směna nesmí potichu padnout na něčí dovolenou.
-  const [timeOff, setTimeOff] = useState<{ employeeId: number; fromDate: string; toDate: string; status: string }[]>([]);
+  const [timeOff, setTimeOff] = useState<{ employeeId: number; fromDate: string; toDate: string; status: string; type?: string | null }[]>([]);
   // Akce jsou v plánovači taky — koncertní večer potřebuje jiné obsazení.
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -348,6 +349,12 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
   const [applyingAdjust, setApplyingAdjust] = useState(false);
   const [committing, setCommitting] = useState(false);
   const [clearBeforeCommit, setClearBeforeCommit] = useState(true);
+  // Přepnutí měsíce by neuložený návrh zahodilo (useEffect níž ho maže) —
+  // bez ptaní to byla další tichá ztráta ručních úprav. Čeká tu cílový měsíc
+  // (a případně den, který chtěl otevřít widget), dokud vedení nerozhodne.
+  const [cekaMesic, setCekaMesic] = useState<{ mesic: string; den?: string } | null>(null);
+  const maNavrhRef = useRef(false);
+  maNavrhRef.current = preview != null;
 
   // Náhled importu
   const [importPreview, setImportPreview] = useState<{ rows: any[]; errors: string[] } | null>(null);
@@ -437,16 +444,37 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [month, pripraveno, planovac]);
 
+  const mesicRef = useRef(month);
+  mesicRef.current = month;
+  /** Přepnout měsíc — s otevřeným návrhem až po rozhodnutí, co s ním. */
+  const zmenMesic = (m: string, den?: string) => {
+    if (maNavrhRef.current && m !== mesicRef.current) { setCekaMesic({ mesic: m, den }); return false; }
+    setMonth(m);
+    if (den) setDayModal(den);
+    return true;
+  };
+  const zmenMesicRef = useRef(zmenMesic);
+  zmenMesicRef.current = zmenMesic;
+
+  // Neuložený návrh a zavření karty: prohlížeč se zeptá (text si volí sám).
+  useEffect(() => {
+    if (!preview) return;
+    const pred = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', pred);
+    return () => window.removeEventListener('beforeunload', pred);
+  }, [preview]);
+
   // Widgety → plánovač: otevřít den, okno dostupnosti, znovu načíst po zápisu.
   useEffect(() => {
     const otevriDen = (d: string) => {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
-      setTab('rozvrh'); setMonth(d.slice(0, 7)); setDayModal(d);
+      setTab('rozvrh'); zmenMesicRef.current(d.slice(0, 7), d);
     };
     const otevriDostupnost = (v: string) => {
       const [id, m] = v.split('|');
       if (!Number(id) || !/^\d{4}-\d{2}$/.test(m ?? '')) return;
-      setTab('rozvrh'); setMonth(m); setCekaDostupnost(Number(id));
+      setTab('rozvrh');
+      if (zmenMesicRef.current(m)) setCekaDostupnost(Number(id));
     };
     const naDen = (e: Event) => {
       const d = (e as CustomEvent).detail;
@@ -602,7 +630,21 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
     else setBoardError('Vymazání měsíce se nepodařilo.');
   };
 
+  // Publikovat při otevřeném návrhu: nejdřív uložit návrh (i s ručními
+  // úpravami), teprve pak dát lidem vědět. Dřív publish poslal jen {month}
+  // a návrh visel dál jen v prohlížeči — upozornění odešlo na starý (nebo
+  // prázdný) rozvrh a úpravy návrhu se ztratily při první změně měsíce, nebo
+  // je pozdější „Potvrdit a uložit" s přepsáním měsíce smazalo.
   const publish = async () => {
+    if (preview) {
+      if (preview.proposed.length === 0) {
+        setBoardError('Návrh je prázdný — přidej do něj směny, nebo ho zahoď, a pak publikuj.');
+        return;
+      }
+      setPublishing(true);
+      const ulozeno = await commitPreview();
+      if (!ulozeno) { setPublishing(false); return; }
+    }
     setPublishing(true);
     try {
       const res = await fetch('/api/schedule/publish', {
@@ -720,8 +762,9 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
     }
   };
 
-  const commitPreview = async () => {
-    if (!preview || preview.proposed.length === 0) return;
+  /** Uloží návrh přesně tak, jak je na obrazovce (s ručními úpravami). Vrací, jestli se to povedlo. */
+  const commitPreview = async (): Promise<boolean> => {
+    if (!preview || preview.proposed.length === 0) return false;
     setCommitting(true);
     try {
       // Server maže a vkládá v jednom požadavku — neuložený návrh nechá stávající rozvrh netknutý.
@@ -734,12 +777,62 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
       if (res?.ok) {
         setPreview(null);
         await poZmene();
-      } else {
-        setBoardError(await chybaZ(res, 'Uložení rozvrhu se nepodařilo — nic se nezměnilo, zkus to znovu.'));
+        return true;
       }
+      setBoardError(await chybaZ(res, 'Uložení rozvrhu se nepodařilo — nic se nezměnilo, zkus to znovu.'));
+      return false;
     } finally {
       setCommitting(false);
     }
+  };
+
+  // ---- Ruční úpravy návrhu ----
+  // Návrh je jediný zdroj pravdy, dokud je otevřený: přidání v okně dne jde
+  // do něj, ne do uložených směn. Dřív „Přidat směnu" zapsalo rovnou do
+  // databáze a „Potvrdit a uložit" (výchozí s přepsáním měsíce) ho vzápětí
+  // smazalo spolu se vším ostatním — v rozvrhu zůstal původní návrh.
+  const nahradiUlozene = !!preview && clearBeforeCommit && smiMazat;
+  const smenyNavrhuDne = (datum: string, proposed: Proposed[]) => [
+    ...(nahradiUlozene ? [] : (shiftsByDay[datum] ?? [])),
+    ...proposed.filter((x) => x.date === datum),
+  ];
+  const pridejDoNavrhu = (payload: { employeeId: number; date: string; startTime: string; endTime: string; type: string }) => {
+    const clen = members.find((m) => m.id === payload.employeeId);
+    const typ = shiftTypes.find((t) => t.name === payload.type);
+    const novy: Proposed = {
+      employeeId: payload.employeeId,
+      employeeName: clen?.name ?? 'Kolega',
+      employeeAvatar: clen?.avatar ?? '',
+      date: payload.date,
+      startTime: payload.startTime,
+      endTime: payload.endTime,
+      type: payload.type,
+      shiftTypeId: typ?.id ?? 0,
+      shiftTypeName: typ?.name ?? payload.type,
+      color: typ?.color ?? '',
+    };
+    setPreview((prev) => {
+      if (!prev) return prev;
+      const proposed = [...prev.proposed, novy];
+      const prepocet = prepocitejDen(prev, payload.date, openingHours[weekdayKey(payload.date)],
+        smenyNavrhuDne(payload.date, proposed), { pridanTyp: typ?.name ?? null });
+      return { ...prev, proposed, ...prepocet };
+    });
+    return true;
+  };
+  const odeberZNavrhu = (p: Proposed) => {
+    setPreview((prev) => {
+      if (!prev) return prev;
+      // Odebere se právě jedna položka — stejný člověk může mít v návrhu
+      // i rozdělenou směnu se stejným začátkem jen výjimečně, ale dvě kopie
+      // naráz zmizet nesmí.
+      const i = prev.proposed.findIndex((x) => x.date === p.date && x.employeeId === p.employeeId && x.startTime === p.startTime && x.endTime === p.endTime);
+      if (i < 0) return prev;
+      const proposed = prev.proposed.filter((_, j) => j !== i);
+      const prepocet = prepocitejDen(prev, p.date, openingHours[weekdayKey(p.date)],
+        smenyNavrhuDne(p.date, proposed), { odebranTyp: p.shiftTypeName || p.type });
+      return { ...prev, proposed, ...prepocet };
+    });
   };
 
   // ---- Export CSV ----
@@ -891,7 +984,9 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
 
   const menu: MenuItem[] = [];
   if (naRozvrhu && !loading && !loadError) {
-    if (smiPublikovat) menu.push({ label: 'Publikovat rozvrh', icon: 'send', onClick: publish, hint: 'Lidé dostanou upozornění, že je rozvrh hotový.' });
+    if (smiPublikovat) menu.push(preview
+      ? { label: 'Uložit návrh a publikovat', icon: 'send', onClick: publish, hint: 'Návrh se uloží i s tvými úpravami a lidé dostanou upozornění.' }
+      : { label: 'Publikovat rozvrh', icon: 'send', onClick: publish, hint: 'Lidé dostanou upozornění, že je rozvrh hotový.' });
     if (smiUpravit) {
       menu.push({ label: 'Upravit podle nových požadavků', icon: 'swap', onClick: runAdjust, disabled: adjusting || shifts.length === 0,
         hint: 'Zkontroluje uložený rozvrh proti nejnovější dostupnosti.' });
@@ -915,7 +1010,8 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
       ? <Button variant="accent" icon="bulb" onClick={generate} loading={generating}>Vygenerovat rozvrh</Button>
       : undefined,
     secondary: naRozvrhu && smiPublikovat && !loadError
-      ? <Button variant="secondary" icon="send" onClick={publish} loading={publishing}>Publikovat</Button>
+      // S otevřeným návrhem tlačítko říká, co udělá: návrh uloží a pak publikuje.
+      ? <Button variant="secondary" icon="send" onClick={publish} loading={publishing}>{preview ? 'Uložit a publikovat' : 'Publikovat'}</Button>
       : undefined,
     menu: menu.length ? menu : undefined,
   };
@@ -931,10 +1027,10 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
         <h2 id="planovac-nadpis" className="t-card cz-sentence">{monthLabel(month)}</h2>
         {/* Šipky pro libovolný měsíc, pilulky pro dva obvyklé (tento slouží i jako „zpět na dnešek"). */}
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-          <MonthNav value={month} onChange={setMonth} />
+          <MonthNav value={month} onChange={(m) => { zmenMesic(m); }} />
           <div className="flex gap-1.5" role="group" aria-label="Rychlý výběr měsíce">
             {rychleMesice.map(m => (
-              <button key={m.id} type="button" aria-pressed={month === m.id} onClick={() => setMonth(m.id)}
+              <button key={m.id} type="button" aria-pressed={month === m.id} onClick={() => zmenMesic(m.id)}
                 className={`filter-pill tap-target-sm ${month === m.id ? 'seg-on' : 'seg-off glass'}`}>{m.label}</button>
             ))}
           </div>
@@ -1037,6 +1133,7 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
               {preview.warnings.length > 0 && ` · ${czCount(preview.warnings.length, { one: 'upozornění', few: 'upozornění', many: 'upozornění' })}`}.
               {' '}Návrh je v mřížce přerušovaně
               {problemDates.length > 0 ? `; ${czCount(problemDates.length, DEN)} by zůstal${problemDates.length === 1 ? '' : 'y'} s dírou (červeně).` : '.'}
+              {' '}Klepnutím na den návrh upravíš — uloží se přesně to, co tu vidíš.
             </p>
           </div>
           {preview.warnings.length > 0 && (
@@ -1055,7 +1152,7 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
             </label>
           )}
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="primary" size="sm" icon="check" loading={committing} disabled={preview.proposed.length === 0} onClick={commitPreview}>
+            <Button variant="primary" size="sm" icon="check" loading={committing} disabled={preview.proposed.length === 0} onClick={() => { void commitPreview(); }}>
               Potvrdit a uložit
             </Button>
             <Button variant="secondary" size="sm" onClick={() => setPreview(null)}>Zahodit náhled</Button>
@@ -1146,7 +1243,8 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
                       const rt = resolveShiftType(s, shiftTypes);
                       return (
                         <span key={s.id} title={`${s.employeeName} · ${rt.label} · ${s.startTime}–${s.endTime}`}
-                          className="flex items-center gap-1 min-w-0 rounded-full px-1 py-0.5 text-[11px] font-medium overflow-hidden bg-black/[0.05] text-black/70">
+                          // Uložení návrhu tyhle směny přepíše — v mřížce proto ztlumené, ať je vidět, co zůstane.
+                          className={`flex items-center gap-1 min-w-0 rounded-full px-1 py-0.5 text-[11px] font-medium overflow-hidden bg-black/[0.05] text-black/70 ${nahradiUlozene ? 'opacity-40 line-through' : ''}`}>
                           <span className={`h-2 w-2 rounded-full flex-shrink-0 ${tridaTecky(rt.color)}`} />
                           <span className="flex-shrink-0">{s.employeeAvatar}</span>
                           <span className="truncate min-w-0">{s.startTime}</span>
@@ -1312,6 +1410,28 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
         </Modal>
       )}
 
+      {cekaMesic && (
+        <Modal open onClose={() => setCekaMesic(null)} size="sm" title="Návrh není uložený"
+          subtitle={<span className="cz-sentence">{monthLabel(month)}</span>}
+          footer={<>
+            <Button variant="secondary" onClick={() => {
+              const c = cekaMesic; setCekaMesic(null); setPreview(null); maNavrhRef.current = false;
+              setMonth(c.mesic); if (c.den) setDayModal(c.den);
+            }}>Zahodit</Button>
+            <Button variant="primary" icon="check" loading={committing} disabled={!preview || preview.proposed.length === 0}
+              onClick={async () => {
+                const c = cekaMesic;
+                if (!(await commitPreview())) { setCekaMesic(null); return; }
+                setCekaMesic(null); maNavrhRef.current = false;
+                setMonth(c.mesic); if (c.den) setDayModal(c.den);
+              }}>Uložit a přepnout</Button>
+          </>}>
+          <p className="text-sm text-black/60 text-pretty">
+            Navržený rozvrh i s tvými úpravami je zatím jen tady v prohlížeči. Při přepnutí měsíce by se zahodil.
+          </p>
+        </Modal>
+      )}
+
       {editAvail && (
         <EditAvailabilityModal
           member={editAvail}
@@ -1338,17 +1458,16 @@ export default function ScheduleBuilder({ onNavigate }: Props & { onNavigate?: (
           openingHours={openingHours}
           unavailable={unavailableOn(dayModal)}
           submissions={submissions}
+          navrh={!!preview}
+          nahradiUlozene={nahradiUlozene}
+          // Dostupnost týmu jen s dostupnost.zobrazit — data jsou tatáž, která
+          // plánovač načetl pro měsíc (jeden dotaz, ne dotaz na každý den).
+          dostupnost={smiDostupnost ? { submissions, volno: timeOff } : null}
           onClose={() => setDayModal(null)}
-          onAdd={addShift}
+          // S otevřeným návrhem se přidává do návrhu, jinak rovnou do rozvrhu.
+          onAdd={preview ? async (x) => pridejDoNavrhu(x) : addShift}
           onRemove={removeShift}
-          onRemoveProposed={(p) =>
-            setPreview((prev) => prev && ({
-              ...prev,
-              proposed: prev.proposed.filter(
-                (x) => !(x.date === p.date && x.employeeId === p.employeeId && x.startTime === p.startTime),
-              ),
-            }))
-          }
+          onRemoveProposed={odeberZNavrhu}
         />
       )}
     </>
@@ -1805,6 +1924,7 @@ const VLASTNI_CAS = '__vlastni';
 function DayModal({
   date, onNavigate, employees, shifts, proposed = [], shiftTypes, openingHours, unavailable, submissions,
   onClose, onAdd, onRemove, onRemoveProposed, events = [], readOnly = false,
+  navrh = false, nahradiUlozene = false, dostupnost = null,
 }: {
   onNavigate?: (view: string, arg?: string) => void;
   date: string;
@@ -1822,6 +1942,12 @@ function DayModal({
   events?: any[];
   /** Náhled rozvrhu (rozvrh.nahled) nebo bez rozvrh.upravit: jen čtení. */
   readOnly?: boolean;
+  /** Je otevřený neuložený návrh — přidání jde do něj. */
+  navrh?: boolean;
+  /** Uložení návrhu přepíše měsíc: uložené směny dne zmizí, počítá se jen návrh. */
+  nahradiUlozene?: boolean;
+  /** Dostupnost týmu na měsíc; null = role ji nevidí a sekce se nekreslí. */
+  dostupnost?: { submissions: Submission[]; volno: { employeeId: number; fromDate: string; toDate: string; type?: string | null }[] } | null;
 }) {
   // Otevírací doba TOHO dne (klíč 0 = pondělí … 6 = neděle).
   const oh = openingHours[weekdayKey(date)] as OpeningDay | undefined;
@@ -1835,20 +1961,25 @@ function DayModal({
   });
 
   // Pokrytí toho jednoho dne — okno je místo, kde se díra opravuje.
+  // Co ten den po uložení opravdu bude: s přepsáním měsíce jen návrh.
+  const obsazene = useMemo<{ employeeId: number; startTime: string; endTime: string; type?: string; shiftTypeName?: string }[]>(
+    () => [...(nahradiUlozene ? [] : shifts), ...proposed],
+    [nahradiUlozene, shifts, proposed],
+  );
   const dayGaps = useMemo(
-    () => uncovered(openSpan(oh ?? null), [...shifts, ...proposed].map((x) => ({ start: x.startTime, end: x.endTime }))),
-    [oh, shifts, proposed],
+    () => uncovered(openSpan(oh ?? null), obsazene.map((x) => ({ start: x.startTime, end: x.endTime }))),
+    [oh, obsazene],
   );
   const missingHere = useMemo(() => {
     if (!oh || oh.closed) return [] as string[];
-    const taken = new Set([...shifts, ...proposed].map((x) => String((x as any).type ?? (x as any).shiftTypeName ?? '').trim().toLowerCase()));
+    const taken = new Set(obsazene.map((x) => String((x as any).type ?? (x as any).shiftTypeName ?? '').trim().toLowerCase()));
     // Den psaný ručně (vlastní časy, žádný nastavený typ) se neřeší.
     const known = new Set(shiftTypes.map((t) => t.name.trim().toLowerCase()));
     if (taken.size === 0 || !Array.from(taken).some((t) => known.has(t))) return [] as string[];
     return shiftTypes
       .filter((t) => typeFitsDay(t as any, oh as any) && !taken.has(t.name.trim().toLowerCase()))
       .map((t) => t.name);
-  }, [oh, shifts, proposed, shiftTypes]);
+  }, [oh, obsazene, shiftTypes]);
 
   const first = shiftTypes[0];
   const [employeeId, setEmployeeId] = useState<number | ''>('');
@@ -1887,8 +2018,11 @@ function DayModal({
     return null;
   }, [employeeId, start, typeName, submissions, employees, shiftTypes, unavailable, date]);
 
+  // Druhá směna téhož člověka na překrývající se čas je vždycky omyl.
+  const kolidujeRucne = !!employeeId && kolize(obsazene.filter((x) => x.employeeId === Number(employeeId)), { startTime: start, endTime: end });
+
   const save = async () => {
-    if (!employeeId || !start || !end) return;
+    if (!employeeId || !start || !end || kolidujeRucne) return;
     setSaving(true);
     try {
       const ok = await onAdd({ employeeId: Number(employeeId), date, startTime: start, endTime: end, type: typeName || 'Vlastní' });
@@ -1905,8 +2039,8 @@ function DayModal({
       subtitle={dayOpen ? `Otevřeno ${dayOpen}–${dayClose}` : oh?.closed ? 'Zavřeno' : undefined}
       footer={readOnly ? <Button variant="secondary" onClick={onClose}>Zavřít</Button> : <>
         <Button variant="secondary" onClick={onClose}>Zavřít</Button>
-        <Button variant="primary" icon="plus" loading={saving} disabled={!employeeId || employees.length === 0} onClick={save}>
-          {varovani ? 'Přesto přidat' : 'Přidat směnu'}
+        <Button variant="primary" icon="plus" loading={saving} disabled={!employeeId || employees.length === 0 || kolidujeRucne} onClick={save}>
+          {varovani ? 'Přesto přidat' : navrh ? 'Přidat do návrhu' : 'Přidat směnu'}
         </Button>
       </>}>
       <div className="space-y-5">
@@ -1937,10 +2071,13 @@ function DayModal({
 
         <div>
           <p className="t-label mb-1">Přiřazené směny</p>
+          {shifts.length > 0 && nahradiUlozene && (
+            <p className="t-meta mb-1 text-pretty">Uložením návrhu se tyhle směny smažou — je zapnuté vymazání stávajících směn měsíce.</p>
+          )}
           {shifts.length === 0 ? (
             <p className="t-meta">Na tento den zatím nikdo nemá směnu.</p>
           ) : (
-            <ul className="list">
+            <ul className={`list ${nahradiUlozene ? 'opacity-60' : ''}`}>
               {shifts.map((s) => {
                 const rt = resolveShiftType(s, shiftTypes);
                 return (
@@ -1963,7 +2100,7 @@ function DayModal({
         {proposed.length > 0 && (
           <div>
             <p className="t-label">Navržené směny</p>
-            <p className="t-meta mb-1">Náhled, zatím neuloženo — uloží se tlačítkem „Potvrdit a uložit" v plánovači.</p>
+            <p className="t-meta mb-1 text-pretty">Náhled, zatím neuloženo — uloží se přesně takhle tlačítkem „Potvrdit a uložit" nebo „Uložit a publikovat".</p>
             <ul className="list">
               {proposed.map((p, idx) => (
                 <ListRow key={`prop-${idx}`}
@@ -1981,9 +2118,15 @@ function DayModal({
           </div>
         )}
 
+        {dostupnost && (
+          <TymNaDen date={date} employees={employees} obsazene={obsazene} dostupnost={dostupnost}
+            shiftTypes={shiftTypes} oh={oh} resolveTimes={resolveTimes} missingHere={missingHere}
+            navrh={navrh} readOnly={readOnly} onAdd={onAdd} />
+        )}
+
         {!readOnly && (
           <div className="space-y-4 border-t border-black/[0.08] pt-4">
-            <h3 className="t-card flex items-center gap-2"><Icon name="plus" size={17} className="text-black/40 shrink-0" /> Přidat směnu</h3>
+            <h3 className="t-card flex items-center gap-2"><Icon name="plus" size={17} className="text-black/40 shrink-0" /> {navrh ? 'Přidat do návrhu' : 'Přidat směnu'}</h3>
             {employees.length === 0 ? (
               <EmptyState icon="users" compact title="Zatím nikdo v týmu"
                 hint="Směnu je komu přiřadit, až budou v týmu lidé."
@@ -2001,7 +2144,9 @@ function DayModal({
                     })}
                   </Select>
                 </Field>
-                {varovani && <p className="note note-wait text-sm" role="status">{varovani}</p>}
+                {kolidujeRucne
+                  ? <p className="note note-danger text-sm" role="alert">Tenhle člověk už ten den má směnu, která se s tímhle časem překrývá.</p>
+                  : varovani && <p className="note note-wait text-sm" role="status">{varovani}</p>}
 
                 {shiftTypes.length > 0 && (
                   <div className="space-y-1.5">
@@ -2033,6 +2178,153 @@ function DayModal({
         )}
       </div>
     </Modal>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tým na den — kdo z lidí ten den může, s poznámkou, a přidání jedním klepnutím
+// ---------------------------------------------------------------------------
+//
+// Vedení po vygenerování doplňovalo lidi se dvěma zařízeními v ruce: na
+// jednom rozvrh, na druhém dostupnost. Tady je celý tým se stavem právě na
+// tenhle den (lib/rozvrhDen.ts) a s poznámkou pro vedení. „Přidat" rozbalí
+// výběr typu přímo pod řádkem; u „nemůže" a volna chce tlačítko potvrzení
+// („Přesto přidat"), protože jde proti tomu, co člověk sám napsal.
+
+function TymNaDen({
+  date, employees, obsazene, dostupnost, shiftTypes, oh, resolveTimes, missingHere, navrh, readOnly, onAdd,
+}: {
+  date: string;
+  employees: Member[];
+  obsazene: { employeeId: number; startTime: string; endTime: string }[];
+  dostupnost: { submissions: Submission[]; volno: { employeeId: number; fromDate: string; toDate: string; type?: string | null }[] };
+  shiftTypes: ShiftType[];
+  oh: OpeningDay | undefined;
+  resolveTimes: (t: ShiftType) => { start: string; end: string };
+  missingHere: string[];
+  navrh: boolean;
+  readOnly: boolean;
+  onAdd: (p: { employeeId: number; date: string; startTime: string; endTime: string; type: string }) => Promise<boolean>;
+}) {
+  const typyPref = useMemo(() => shiftTypes.map((t) => ({ id: t.id, name: t.name, start: t.startTime })), [shiftTypes]);
+  // Nabízejí se typy, které se do otevírací doby dne vejdou; zavřený den
+  // (nebo den, kam se nevejde nic) nabídne všechny — vedení ví, proč tam
+  // někoho chce.
+  const typyDne = useMemo<TypDne[]>(() => {
+    const vejdou = oh && !oh.closed ? shiftTypes.filter((t) => typeFitsDay(t as any, oh as any)) : [];
+    return (vejdou.length ? vejdou : shiftTypes).map((t) => {
+      const rt = resolveTimes(t);
+      return { id: t.id, name: t.name, start: t.startTime, od: rt.start, do: rt.end };
+    });
+    // resolveTimes závisí jen na `oh`
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shiftTypes, oh]);
+
+  // Člověk jednou, i když ho seznam týmu vrátí dvakrát (členství + zrcadlo
+  // users.team_id po přepnutí podniku) — jinak by šel přidat „dvakrát".
+  const lide = useMemo(() => employees.filter((e, i) => employees.findIndex((x) => x.id === e.id) === i), [employees]);
+  const radky = useMemo(() => seradRadky(lide.map((e) => {
+    const smeny = obsazene.filter((x) => x.employeeId === e.id);
+    const stav = stavClenaDne(date, dostupnost.submissions.find((x) => x.employeeId === e.id) ?? null,
+      dostupnost.volno.filter((v) => v.employeeId === e.id), typyPref);
+    return { id: e.id, jmeno: e.name, clen: e, stav: stav.stav, info: stav, smeny, maSmenu: smeny.length > 0 };
+  })), [lide, obsazene, dostupnost, date, typyPref]);
+
+  const [otevreny, setOtevreny] = useState<number | null>(null);
+  const [typ, setTyp] = useState<string>('');
+  const [pridavam, setPridavam] = useState(false);
+  const [chyba, setChyba] = useState('');
+
+  const rozbal = (id: number, info: StavClenaDne, smeny: { startTime: string; endTime: string }[]) => {
+    if (otevreny === id) { setOtevreny(null); return; }
+    const t = vychoziTyp(typyDne, info.volba, missingHere, smeny);
+    setTyp(t?.name ?? '');
+    setChyba('');
+    setOtevreny(id);
+  };
+
+  const pridej = async (e: Member, t: TypDne) => {
+    setPridavam(true); setChyba('');
+    try {
+      const ok = await onAdd({ employeeId: e.id, date, startTime: t.od, endTime: t.do, type: t.name });
+      if (ok) setOtevreny(null);
+      else setChyba('Nepřidalo se — zkus to znovu.');
+    } finally { setPridavam(false); }
+  };
+
+  const pocetMuze = radky.filter((r) => (r.stav === 'muze' || r.stav === 'omezeni') && !r.maSmenu).length;
+
+  return (
+    <section aria-labelledby={`tym-den-${date}`}>
+      <div className="flex items-baseline justify-between gap-3 mb-1">
+        <p id={`tym-den-${date}`} className="t-label">Tým na tento den</p>
+        <p className="t-meta tabular-nums">{pocetMuze > 0 ? czCount(pocetMuze, { one: 'člověk může', few: 'lidé můžou', many: 'lidí může' }) : 'další nikdo nemůže'}</p>
+      </div>
+      {radky.length === 0 ? (
+        <p className="t-meta">V týmu zatím nikdo není.</p>
+      ) : (
+        <ul className="list" data-tym-den>
+          {radky.map((r) => {
+            const { clen, info, smeny } = r;
+            const volneTypy = typyDne.filter((t) => !kolize(smeny, { startTime: t.od, endTime: t.do }));
+            const muzePridat = !readOnly && volneTypy.length > 0;
+            const proti = info.stav === 'nemuze' || info.stav === 'volno';
+            const meta = [
+              r.maSmenu ? `má směnu ${smeny.map((x) => `${x.startTime}–${x.endTime}`).join(', ')}` : null,
+              info.preferuje,
+              info.poznamkaDne ? `k tomuto dni: „${info.poznamkaDne}“` : null,
+              info.poznamka ? `„${info.poznamka}“` : null,
+            ].filter(Boolean).join(' · ');
+            const vybrany = volneTypy.find((t) => t.name === typ) ?? volneTypy[0];
+            // Omezení na jiný typ, než se právě vybírá — stejné varování jako ve formuláři.
+            const mimoVolbu = info.stav === 'omezeni' && vybrany
+              && !prefAllowsSlot(info.volba, { typeId: vybrany.id, start: vybrany.od }, typyPref);
+            return (
+              <Fragment key={clen.id}>
+                <ListRow
+                  lead={<Avatar emoji={clen.avatar} name={clen.name} size="sm" />}
+                  title={clen.name}
+                  meta={meta ? <span className="block whitespace-normal text-pretty">{meta}</span> : undefined}
+                  right={<span data-stav={info.stav}><Chip tone={info.ton} size="sm">{info.popis}</Chip></span>}
+                  actions={muzePridat ? (
+                    <Button variant="secondary" size="sm" icon="plus" aria-expanded={otevreny === clen.id}
+                      aria-label={`Přidat — ${clen.name}`} onClick={() => rozbal(clen.id, info, smeny)}>Přidat</Button>
+                  ) : undefined}
+                />
+                {otevreny === clen.id && vybrany && (
+                  <li className="py-3">
+                    <Well className="space-y-3">
+                      {volneTypy.length > 1 && (
+                        <Segmented ariaLabel={`Typ směny pro ${clen.name}`} size="sm" value={vybrany.name}
+                          onChange={(v) => setTyp(v)} options={volneTypy.map((t) => ({ id: t.name, label: t.name }))} />
+                      )}
+                      <p className="t-meta tabular-nums">{vybrany.name} · {vybrany.od}–{vybrany.do}{navrh ? ' · do návrhu' : ''}</p>
+                      {proti && (
+                        <p className="note note-wait text-sm text-pretty" role="status">
+                          {clen.name} má na tento den „{info.popis}“. Přidat jde, ale jen když to s ním máš domluvené.
+                        </p>
+                      )}
+                      {!proti && mimoVolbu && (
+                        <p className="note note-wait text-sm text-pretty" role="status">
+                          {clen.name} má na tento den „{info.popis}“ — {vybrany.name} tomu neodpovídá.
+                        </p>
+                      )}
+                      {chyba && <p className="note note-danger text-sm" role="alert">{chyba}</p>}
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => setOtevreny(null)}>Zrušit</Button>
+                        <Button variant="primary" size="sm" icon="plus" loading={pridavam} onClick={() => pridej(clen, vybrany)}>
+                          {proti || mimoVolbu ? 'Přesto přidat' : navrh ? 'Přidat do návrhu' : 'Přidat směnu'}
+                        </Button>
+                      </div>
+                    </Well>
+                  </li>
+                )}
+              </Fragment>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }
 
