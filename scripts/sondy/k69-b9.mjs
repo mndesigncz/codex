@@ -301,8 +301,11 @@ const zalozka = (p, nazev) => p.locator('nav').getByRole('button', { name: new R
   await tablet.getByRole('button', { name: 'Upravit' }).first().click();
   const plocha = p.locator(`[data-plocha="${STRANKA}"]`);
   tvrdi('N3: editor výchozího ukáže plochu Směny v úpravách', await dokud(() => plocha.isVisible(), 3000) && await plocha.evaluate(el => el.hasAttribute('data-upravy')));
-  tvrdi('N3: nástroj je v editoru zástupce bez „−"', await plocha.locator('li[data-widget="nastroj"] [data-odznak]').count() === 0
-    && await plocha.locator('li[data-widget="nastroj"]').getByText('Hlavní část stránky — v úpravách je sbalená.').isVisible());
+  // Zástupce nástroje se vykreslí až s rozložením — počkat jako u sousedních
+  // tvrzení; bez čekání na vytíženém CI běžci tvrzení občas padlo dřív, než
+  // se text objevil (plocha už viditelná, zástupce ještě ne).
+  tvrdi('N3: nástroj je v editoru zástupce bez „−"', await dokud(async () => await plocha.locator('li[data-widget="nastroj"]').getByText('Hlavní část stránky — v úpravách je sbalená.').isVisible(), 3000)
+    && await plocha.locator('li[data-widget="nastroj"] [data-odznak]').count() === 0);
   await p.getByRole('region', { name: 'Úpravy stránky' }).getByRole('button', { name: 'Přidat widget' }).click();
   const galerie = p.getByRole('dialog', { name: 'Přidat widget' });
   await dokud(() => galerie.isVisible(), 3000);
