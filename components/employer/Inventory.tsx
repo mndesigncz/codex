@@ -252,22 +252,35 @@ export default function Inventory({ initialCategory, onNavigate }: {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [showBulk, setShowBulk] = useState(false);
   const [potvrzeni, setPotvrzeni] = useState<Potvrzeni | null>(null);
-  // The toolbar sticks to the top while scrolling; once it does it collapses to
-  // a single row so it stops eating the screen. A sentinel just above it tells
-  // us when that happened without listening to every scroll event.
+  // Lišta nástroje má dvě podoby a ŽÁDNÁ z nich při posunu nemění výšku
+  // v toku stránky. Plná (hledání, Seznam/Karty, mřížka kategorií) leží v toku
+  // a nelepí se. Kompaktní (hledání + dvě ikony + pás kategorií) se ukáže
+  // jako plovoucí vrstva nad obsahem, až plná odjede nad horní hranu
+  // posuvné oblasti — v obalu výšky 0, takže nic neposune.
   //
-  // Hlídač se zapíná ve chvíli, kdy značka vznikne (callback ref), ne jednou
-  // po prvním vykreslení: na ploše widgetů přijde nástroj až s rozložením,
-  // takže efekt s [] našel prázdný ref, lišta se nikdy nesbalila a celý
-  // průhledný panel s kategoriemi zůstal přilepený přes seznam (kolo 69).
-  const [stuck, setStuck] = useState(false);
-  const [sentinelEl, setSentinelEl] = useState<HTMLDivElement | null>(null);
+  // Dřív jedna přilepená lišta při přilepení zmizela o ~300 px (mřížka →
+  // pás): obsah pod prstem poskočil, hlídač se na hraně přepínal tam a zpět
+  // a posun se „sekal a nechtěl pustit". A „nevidím značku" se bralo jako
+  // „přilepeno", takže na počítači, kde nástroj začíná pod widgety mimo
+  // obrazovku, se lišta sbalila hned bez posunu.
+  //
+  // Hlídač se zapíná, když plná lišta vznikne (callback ref) — na ploše
+  // widgetů přijde nástroj až s rozložením (kolo 69). Kořen je posuvný
+  // <main> layoutu, ne okno: jen tak jde poznat „odjela nahoru".
+  const [plovouci, setPlovouci] = useState(false);
+  const [plnaListaEl, setPlnaListaEl] = useState<HTMLDivElement | null>(null);
   useEffect(() => {
-    if (!sentinelEl || typeof IntersectionObserver === 'undefined') return;
-    const io = new IntersectionObserver(([e]) => setStuck(!e.isIntersecting), { threshold: 1 });
-    io.observe(sentinelEl);
-    return () => { io.disconnect(); setStuck(false); };
-  }, [sentinelEl]);
+    if (!plnaListaEl || typeof IntersectionObserver === 'undefined') return;
+    const koren = plnaListaEl.closest('main');
+    const io = new IntersectionObserver(([e]) => {
+      const horni = e.rootBounds?.top ?? 0;
+      // Plovoucí jen když lišta NENÍ vidět a je NAD horní hranou (ne pod
+      // spodní — to je stav „ještě jsem k ní nedojel").
+      setPlovouci(!e.isIntersecting && e.boundingClientRect.bottom <= horni + 1);
+    }, { root: koren, threshold: 0 });
+    io.observe(plnaListaEl);
+    return () => { io.disconnect(); setPlovouci(false); };
+  }, [plnaListaEl]);
   // Potvrzení akce jako Toast (DP §3.17) místo ručně limetkového boxu na stránce.
   const [notice, setNotice] = useState<{ text: string; ton?: 'bad' } | null>(null);
   const showNotice = (text: string, ton?: 'bad') => setNotice({ text, ton });
@@ -764,34 +777,31 @@ export default function Inventory({ initialCategory, onNavigate }: {
     {hodnota > 0 ? <> · hodnota zásob <span className="font-semibold text-[#16181A]">{money(hodnota)}</span></> : ' · přidávej položky a hlídej limity'}
   </>;
 
-  const nastroj = (
-    <div className="space-y-4">
-      {/* Toolbar — v klidu leží na papíře; až se přilepí nahoru, stane se plovoucím chromem. */}
-      <div ref={setSentinelEl} aria-hidden className="h-px -mb-px" />
-      <div className={`sticky top-0 z-20 transition-[padding,box-shadow] ${
-        stuck ? '-mx-4 px-4 sm:-mx-6 sm:px-6 py-2 space-y-2 glass-strong rounded-b-3xl shadow-[shadow:var(--shadow-float)]' : 'py-1 space-y-3'
-      }`}>
+  // Obsah lišty ve dvou podobách (viz hlídač výš). Hledání sdílí stav,
+  // takže rozepsaný dotaz je v obou stejný.
+  const lista = (kompakt: boolean) => (
+    <>
         {/* V klidu: hledání přes celou šířku, pod ním Seznam/Karty a řazení.
             Přilepená: jeden řádek — hledání a vedle dvě ikonová tlačítka
             (zobrazení, řazení), pod ním posuvný pás kategorií. Dřív měla
             přilepená lišta na telefonu tři řádky (157 px, pětina obrazovky)
             a pás kategorií byl na pravé hraně useknutý bez náznaku. */}
-        <div className={`flex gap-2 ${stuck ? 'items-center' : 'flex-col lg:flex-row gap-3 lg:items-center'}`}>
+        <div className={`flex gap-2 ${kompakt ? 'items-center' : 'flex-col lg:flex-row gap-3 lg:items-center'}`}>
           <SearchField
             className="flex-1 min-w-0"
             value={search} onChange={setSearch}
-            placeholder={stuck ? 'Hledat ve skladu…' : 'Hledat položku nebo dodavatele…'}
+            placeholder={kompakt ? 'Hledat ve skladu…' : 'Hledat položku nebo dodavatele…'}
             ariaLabel="Hledat ve skladu"
             storageKey="inventory"
             suggestions={[
               ...categories.map(c => ({ label: c.name, hint: 'kategorie' })),
               ...Array.from(new Set(items.map(i => (i.supplier ?? '').trim()).filter(Boolean))).slice(0, 6).map(sp => ({ label: sp, hint: 'dodavatel' })),
             ]}
-            inputClassName={stuck ? '!py-2' : ''}
+            inputClassName={kompakt ? '!py-2' : ''}
           />
           <div className="flex items-center gap-2 shrink-0 min-w-0">
-            {selecting && <Button variant="secondary" size={stuck ? 'sm' : 'md'} onClick={exitSelection}>Zrušit výběr</Button>}
-            {stuck ? (
+            {selecting && <Button variant="secondary" size={kompakt ? 'sm' : 'md'} onClick={exitSelection}>Zrušit výběr</Button>}
+            {kompakt ? (
               <Button variant="secondary" iconOnly icon={view === 'list' ? 'grid' : 'menu'}
                 aria-label={view === 'list' ? 'Zobrazit jako karty' : 'Zobrazit jako seznam'}
                 onClick={() => setView(view === 'list' ? 'grid' : 'list')} />
@@ -811,8 +821,25 @@ export default function Inventory({ initialCategory, onNavigate }: {
           alertOf={alertsIn}
           extraRoots={orphanNames}
           onNavigateOrphan={name => { setOrphanCat(name); setCatId(null); }}
-          condensed={stuck}
+          condensed={kompakt}
         />
+    </>
+  );
+
+  const nastroj = (
+    <div className="space-y-4">
+      {/* Toolbar — v klidu leží na papíře; až se přilepí nahoru, stane se plovoucím chromem. */}
+      {/* Kompaktní lišta: obal výšky 0 lepí k horní hraně, vrstva uvnitř
+          plave nad obsahem a v toku nezabírá místo. */}
+      <div className="sticky top-0 z-20 h-0">
+        {plovouci && (
+          <div className="absolute inset-x-0 top-0 -mx-4 px-4 sm:-mx-6 sm:px-6 py-2 space-y-2 glass-strong rounded-b-3xl shadow-[shadow:var(--shadow-float)] pop-in">
+            {lista(true)}
+          </div>
+        )}
+      </div>
+      <div ref={setPlnaListaEl} className="py-1 space-y-3">
+        {lista(false)}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2">

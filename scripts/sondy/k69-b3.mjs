@@ -68,6 +68,12 @@ const doporucene = (galerie) => galerie.evaluate(el => {
 {
   const { ctx, p, stav, chyby } = await kontext({ fix: FIX_VEDENI, dalsi: podvrh() });
   await otevri(p, VEDENI, 'vedeni.sklad');
+  // Na počítači leží nástroj pod widgety mimo obrazovku; dřív se lišta
+  // sbalila hned bez posunu, protože „nevidím" se bralo jako „přilepeno".
+  await p.waitForTimeout(600);
+  tvrdi('V1: bez posunu se kompaktní lišta neukáže a plná lišta má mřížku kategorií',
+    await p.locator('[data-plocha] li[data-widget="nastroj"] .sticky > div').count() === 0
+    && await p.locator('[data-plocha] li[data-widget="nastroj"] .grid button').count() > 0);
   const h = await h1(p);
   tvrdi('V1: právě jeden viditelný h1 a je první nadpis plochy', h.pocet === 1 && h.prvniJeH1, JSON.stringify(h));
   tvrdi('V1: h1 = „Sklad"', h.text === 'Sklad', h.text);
@@ -247,21 +253,35 @@ const doporucene = (galerie) => galerie.evaluate(el => {
   const pridat = p.getByRole('button', { name: 'Přidat položku' });
   tvrdi('T1: „Přidat položku" je vidět a povolené', await pridat.isVisible() && await pridat.isEnabled());
   await p.screenshot({ path: OUT + 'k69-b3-sklad-tel.png', fullPage: true });
-  // Lišta nástroje (hledání, Seznam/Karty, kategorie) se po odjetí nahoru
-  // sbalí do jednoho řádku. Na ploše přijde nástroj až s rozložením a hlídač
-  // lepení se dřív nezapnul: celý průhledný panel s mřížkou kategorií zůstal
-  // přilepený přes seznam položek.
+  // Lišta nástroje (hledání, Seznam/Karty, kategorie): plná leží v toku
+  // stránky, kompaktní plave nad obsahem, až plná odjede nahoru. Dřív se
+  // jedna přilepená lišta při přilepení zmenšila o ~300 px, obsah pod prstem
+  // poskočil a posun se na hraně sekal. Měří se, že přechod přes hranu nic
+  // neposune: položka seznamu se pohne přesně o délku posunu.
+  const plovouciLista = () => p.locator('[data-plocha] li[data-widget="nastroj"] .sticky > div');
   await widgetLi(p, 'nastroj').scrollIntoViewIfNeeded();
-  await p.evaluate(() => document.querySelector('main')?.scrollBy(0, 600));
-  await p.waitForTimeout(500);
-  const lista = await p.evaluate(() => {
-    const s = document.querySelector('[data-plocha] li[data-widget="nastroj"] .sticky');
-    if (!s) return null;
+  const polozka = () => p.evaluate(() => {
+    const m = document.querySelector('main'); const el = document.querySelector('[data-plocha] li[data-widget="nastroj"] .list-row, [data-plocha] li[data-widget="nastroj"] article');
+    return { top: el ? el.getBoundingClientRect().top : null, scroll: m?.scrollTop ?? 0 };
+  });
+  const skoky = [];
+  let pred = await polozka();
+  for (let i = 0; i < 12; i++) {
+    await p.evaluate(() => document.querySelector('main')?.scrollBy(0, 60));
+    await p.waitForTimeout(120);
+    const po = await polozka();
+    if (pred.top != null && po.top != null) skoky.push(Math.round((pred.top - po.top) - (po.scroll - pred.scroll)));
+    pred = po;
+  }
+  tvrdi('T1: posun přes hranu lišty nic neposkočí (položka jede přesně s posunem)', skoky.length > 0 && skoky.every(d => Math.abs(d) <= 1), JSON.stringify(skoky));
+  await p.evaluate(() => document.querySelector('main')?.scrollBy(0, 300));
+  await p.waitForTimeout(400);
+  const lista = await plovouciLista().count() ? await plovouciLista().evaluate(s => {
     const r = s.getBoundingClientRect();
     const cs = getComputedStyle(s);
     return { h: Math.round(r.height), neprusvitna: cs.backdropFilter !== 'none' || !/rgba\(0, 0, 0, 0\)|transparent/.test(cs.backgroundColor), karetKategorii: s.querySelectorAll('.grid button, .grid a').length };
-  });
-  tvrdi('T1: přilepená lišta Skladu je po posunu sbalená (do 120 px, dva řádky), neprůsvitná a bez mřížky kategorií', !!lista && lista.h <= 120 && lista.neprusvitna && lista.karetKategorii === 0, JSON.stringify(lista));
+  }) : null;
+  tvrdi('T1: plovoucí lišta Skladu je po posunu kompaktní (do 120 px, dva řádky), neprůsvitná a bez mřížky kategorií', !!lista && lista.h <= 120 && lista.neprusvitna && lista.karetKategorii === 0, JSON.stringify(lista));
   await p.evaluate(() => document.querySelector('main')?.scrollTo(0, 0));
   // Menu „···" vedle hlavní akce: panel zarovnaný k pravé hraně tlačítka dřív
   // na telefonu utekl z levého okraje a půlka položek byla mimo obrazovku.

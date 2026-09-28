@@ -140,7 +140,13 @@ async function zavriOkno(p) {
     && await p.locator('[data-zadouci-diry]').evaluate(el => !el.classList.contains('note-danger')));
   tvrdi('G2: den bez otevírací směny v mřížce jako povinná díra', (await bunka(p, `${PRISTI}-06`).getAttribute('data-dira')) === 'povinna');
   tvrdi('G2: den bez druhého člověka jako žádoucí', (await bunka(p, `${PRISTI}-07`).getAttribute('data-dira')) === 'zadouci');
-  const tony = await Promise.all([6, 7].map(d => bunka(p, `${PRISTI}-0${d}`).evaluate(el => getComputedStyle(el).backgroundColor)));
+  // Buňka má transition-colors: hned po vygenerování je barva ještě na
+  // startu přechodu (obě stejné), proto čekat, až se usadí.
+  let tony = [];
+  await dokud(async () => {
+    tony = await Promise.all([6, 7].map(d => bunka(p, `${PRISTI}-0${d}`).evaluate(el => getComputedStyle(el).backgroundColor)));
+    return tony[0] !== tony[1];
+  }, 2000);
   tvrdi('G2: povinná buňka je výraznější než žádoucí (jiné pozadí)', tony[0] !== tony[1], JSON.stringify(tony));
   tvrdi('G3: souhrn tržeb v náhledu „Stačí jeden"', (await p.locator('[data-souhrn-trzeb="ok"]').innerText()).includes('Stačí jeden'));
 

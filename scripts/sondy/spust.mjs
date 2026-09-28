@@ -170,7 +170,12 @@ await Promise.all(Array.from({ length: Math.min(SOUBEZNE, fronta.length) }, asyn
 const spadle = vysledky.filter(r => !r.ok).sort((a, b) => a.jmeno.localeCompare(b.jmeno));
 for (const r of spadle) {
   console.log(`\n──── ${r.jmeno} ────`);
-  console.log(r.out.split('\n').filter(l => !l.startsWith('✓') && !l.startsWith('  ✓')).slice(-25).join('\n'));
+  // Neprošlé tvrzení napřed: dlouhý výpis (tabulka měření) by ho jinak
+  // vytlačil z posledních řádků a v logu CI by chyběla příčina.
+  const radky = r.out.split('\n');
+  const spadla = radky.filter(l => l.startsWith('✗'));
+  if (spadla.length) console.log(spadla.join('\n') + '\n…');
+  console.log(radky.filter(l => !l.startsWith('✓') && !l.startsWith('  ✓') && !l.startsWith('✗')).slice(-25).join('\n'));
 }
 console.log(`\nSondy: ${vysledky.length - spadle.length} z ${vysledky.length} prošlo.`);
 if (args.includes('--vse')) console.log('Zelené: ' + JSON.stringify(vysledky.filter(r => r.ok).map(r => r.jmeno).sort()));
