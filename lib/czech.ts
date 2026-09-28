@@ -41,5 +41,9 @@ export const POLOZKA: CzNoun = { one: 'položka', few: 'položky', many: 'polož
 export const SMENA: CzNoun = { one: 'směna', few: 'směny', many: 'směn' };
 export const DEN: CzNoun = { one: 'den', few: 'dny', many: 'dní' };
 export const KATEGORIE: CzNoun = { one: 'kategorii', few: 'kategorie', many: 'kategorií' };
+/** Rozvrh: „56 hodin v návrhu", doporučení podle tržeb „ušetří 8 hodin". */
+export const HODINA: CzNoun = { one: 'hodina', few: 'hodiny', many: 'hodin' };
+/** 4. pád po slovese: „ušetří 1 hodinu / 3 hodiny / 8 hodin" (ne „ušetří 1 hodina"). */
+export const HODINU: CzNoun = { one: 'hodinu', few: 'hodiny', many: 'hodin' };
 /** Odznak chatu v doku vedení i zaměstnance: „1 nepřečtená zpráva", ne „1 nepřečtených zpráv". */
 export const NEPRECTENA_ZPRAVA: CzNoun = { one: 'nepřečtená zpráva', few: 'nepřečtené zprávy', many: 'nepřečtených zpráv' };

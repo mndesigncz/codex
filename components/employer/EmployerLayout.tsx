@@ -28,7 +28,7 @@ import dynamic from 'next/dynamic';
 import { PageSkeleton } from '../ui';
 import { useOpravneni } from '../role/useOpravneni';
 import BezOpravneni from '../role/BezOpravneni';
-import { useStrazRole, CO_SE_ZAHODI_ROLE } from '../role/rozepsano';
+import { useStrazRole, coSeZahodi } from '../role/rozepsano';
 import { NavigaceKontext, useHodnotaNavigace } from '../widgety/NavigaceKontext';
 
 // Pohledy se stahují až při otevření.
@@ -379,7 +379,7 @@ export default function EmployerLayout({ user }: Props) {
     <NavigaceKontext.Provider value={navigaceWidgetu}>
     <ProfileLinkProvider>
     <div className="flex h-[100dvh] overflow-hidden">
-      <DiscardGuard guard={straz.guard} what={CO_SE_ZAHODI_ROLE} />
+      <DiscardGuard guard={straz.guard} what={coSeZahodi()} />
       {/* Desktop sidebar */}
       <aside className={`${sidebarOpen ? 'w-64' : 'w-[76px]'} glass-strong hidden md:flex m-4 mr-0 rounded-3xl text-[#16181A] flex-col transition-[width] duration-300 flex-shrink-0`}>
         <div className={`flex items-center gap-3 py-3.5 border-b border-black/[0.07] ${sidebarOpen ? 'px-5' : 'px-0 justify-center'}`}>

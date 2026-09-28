@@ -1,0 +1,6 @@
+{
+ "isEmployer": true,
+ "requests": [
+  { "id": 81, "employeeId": 20, "employeeName": "Petra Dvořáková", "employeeAvatar": "👩‍🦰", "fromDate": "PRISTI-05", "toDate": "PRISTI-08", "type": "vacation", "note": null, "status": "approved", "createdAt": "2026-01-01" }
+ ]
+}

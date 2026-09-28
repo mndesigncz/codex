@@ -1,87 +1,24 @@
 import { NextResponse } from 'next/server';
-import { openSpan, uncovered, gapText, type Interval } from '@/lib/coverage';
 import { neon } from '@neondatabase/serverless';
-import { prefAllowsSlot, dayPrefLabel, type PrefType } from '@/lib/dayPrefs';
 import { tymyCiselniku, idClenu } from '@/lib/tenant';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { pragueToday } from '@/lib/pragueTime';
+import {
+  navrhniRozvrh, ocekavaneTrzby, vycistiNastaveniTrzeb, type ClovekGeneratoru, type TypSmeny, type VstupGeneratoru,
+} from '@/lib/rozvrhGenerator';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-// weekday 0=Mon..6=Sun from a YYYY-MM-DD date
-function weekdayOf(date: string) {
-  const [y, m, d] = date.split('-').map(Number);
-  return (new Date(y, m - 1, d).getDay() + 6) % 7;
-}
-// categorize a shift by its start time → matches 'morning'|'afternoon' preferences
-function categoryOf(startTime: string) {
-  return startTime < '12:00' ? 'morning' : 'afternoon';
-}
-// A shift type's concrete times for a given day, following opening hours when
-// the type is set to start at open / end at close.
-function resolveTimes(st: any, oh: { open: string; close: string }) {
-  return {
-    start: st.starts_at_open && oh.open ? oh.open : st.start_time,
-    end: st.ends_at_close && oh.close ? oh.close : st.end_time,
-  };
-}
-// does a shift [start,end] fit inside opening [open,close]?
-function fitsWithin(start: string, end: string, open: string, close: string) {
-  // overnight shift (end <= start): only require start within open window
-  if (end <= start) return start >= open;
-  return start >= open && end <= close;
-}
-// Hours a shift spans; 18:00–02:00 crosses midnight and counts as 8.
-function shiftHours(start: string, end: string): number {
-  const [sh, sm] = String(start).slice(0, 5).split(':').map(Number);
-  const [eh, em] = String(end).slice(0, 5).split(':').map(Number);
-  if (![sh, sm, eh, em].every(Number.isFinite)) return 8;
-  let mins = (eh * 60 + em) - (sh * 60 + sm);
-  if (mins <= 0) mins += 24 * 60;
-  return mins / 60;
-}
-function toMin(t: string) {
-  const [h, m] = String(t).slice(0, 5).split(':').map(Number);
-  return (h ?? 0) * 60 + (m ?? 0);
-}
-function toHM(min: number) {
-  const m = ((min % (24 * 60)) + 24 * 60) % (24 * 60);
-  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
-}
-function prevDay(date: string) {
-  const d = new Date(date + 'T12:00:00Z');
-  d.setUTCDate(d.getUTCDate() - 1);
-  return d.toISOString().slice(0, 10);
-}
-function daysInMonth(month: string) {
-  const [y, m] = month.split('-').map(Number);
-  return new Date(y, m, 0).getDate();
-}
+// Rozhodování (kdo kam, povinná otevírací směna, žádoucí druhá, doporučení
+// podle tržeb, díry a jejich úroveň) je v lib/rozvrhGenerator.ts, ať ho
+// hlídají testy. Tady se jen načtou data aktivního podniku a výsledek vrátí.
+
 function defaultsOpening() {
   const oh: Record<string, { open: string; close: string; closed: boolean }> = {};
   for (let d = 0; d <= 6; d++) oh[String(d)] = { open: '08:00', close: '20:00', closed: false };
   return oh;
-}
-
-interface Emp {
-  id: number;
-  name: string;
-  avatar: string;
-  unavailable: Set<string>;
-  dayPrefs: Record<string, string>;
-  preferredShift: string | null;
-  maxShifts: number | null;
-  /** How many days in a row this person may work (null = no limit). */
-  maxConsecutive: number | null;
-  assigned: number;
-  /** Every date already taken by this person — seeds the streak check. */
-  workedDates: Set<string>;
-  /** Monthly hour cap (null = no limit) and hours proposed so far. */
-  maxHours: number | null;
-  assignedHours: number;
-  /** Last date this person got a shift — drives the rotation tiebreak. */
-  lastAssigned: string;
 }
 
 export async function POST(req: Request) {
@@ -98,33 +35,59 @@ export async function POST(req: Request) {
   if (body.commit) {
     const list: any[] = Array.isArray(body.shifts) ? body.shifts : [];
     if (list.length === 0) return NextResponse.json({ inserted: 0 });
-    // replaceMonth: wipe the month only here, right before inserting — the old
-    // client-side "DELETE, then hope the commit succeeds" lost the whole month
-    // whenever the second request failed.
     // Přepsání měsíce je zároveň vymazání měsíce — bez toho klíče by šel
     // generátorem obejít (kontroluje se před zápisem, ať nevznikne půlka).
-    if (body.replaceMonth === true && !ctx.role.opravneni.has('rozvrh.mazat_mesic')) {
+    const nahradit = body.replaceMonth === true;
+    if (nahradit && !ctx.role.opravneni.has('rozvrh.mazat_mesic')) {
       return NextResponse.json({ error: 'Na vymazání celého měsíce nemáš oprávnění — ulož návrh bez přepsání.' }, { status: 403 });
     }
-    if (body.replaceMonth === true && /^\d{4}-\d{2}$/.test(String(month))) {
-      await sql`
-        DELETE FROM shifts
-        WHERE team_id = ${ctx.teamId} AND date >= ${month + '-01'} AND date <= ${month + '-31'}`;
-    }
-    // Členství jednou před cyklem (kolo 62) — stejná množina lidí, ze které
-    // vzešel náhled, jinak se směny člena přepnutého jinam tiše zahodí.
+    // Členství jednou (kolo 62) — stejná množina lidí, ze které vzešel
+    // náhled, jinak se směny člena přepnutého jinam tiše zahodí.
     const clenove = new Set(await idClenu(ctx.teamId));
-    let inserted = 0;
-    for (const s of list) {
-      const employeeId = parseInt(s.employeeId);
-      if (!employeeId || !s.date || !s.startTime || !s.endTime) continue;
-      if (!clenove.has(employeeId)) continue;
-      await sql`
-        INSERT INTO shifts (team_id, employee_id, date, start_time, end_time, type)
-        VALUES (${ctx.teamId}, ${employeeId}, ${s.date}, ${s.startTime}, ${s.endTime}, ${s.type ?? 'flexible'})`;
-      inserted++;
+    const platne = list
+      .map(s => ({ employeeId: parseInt(s.employeeId), date: String(s.date ?? ''), startTime: String(s.startTime ?? ''), endTime: String(s.endTime ?? ''), type: String(s.type ?? 'flexible') }))
+      .filter(s => s.employeeId && s.date.startsWith(month + '-') && s.startTime && s.endTime && clenove.has(s.employeeId));
+    // Verze uloženého měsíce, ze které plánovač vycházel (GET /api/schedule).
+    // Bez ní (starší klient) se souběh nehlídá.
+    const verze: string | null = typeof body.verze === 'string' && body.verze ? body.verze : null;
+
+    // Smazání měsíce a vložení návrhu JEDNÍM příkazem: CTE běží atomicky nad
+    // jedním snímkem, takže výpadek uprostřed nenechá měsíc napůl smazaný
+    // (dřív DELETE a pak INSERT po jednom, každý vlastní HTTP dotaz). Zámek
+    // na podnik a měsíc seřadí dvě současná uložení (dvojklik, dvě tlačítka,
+    // dvě záložky): druhé po získání zámku vidí změněnou verzi a skončí 409,
+    // místo aby vložilo návrh podruhé. Výraz verze MUSÍ sedět s GET
+    // /api/schedule.
+    const [, vysledek] = await sql.transaction([
+      sql`SELECT pg_advisory_xact_lock(hashtext(${`rozvrh-commit:${ctx.teamId}:${month}`}))`,
+      sql`
+        WITH kontrola AS (
+          SELECT (${verze}::text IS NULL OR md5(COALESCE(string_agg(id::text || '|' || employee_id::text || '|' || date || '|' || start_time || '|' || end_time, ',' ORDER BY id), '')) = ${verze}::text) AS ok
+          FROM shifts WHERE team_id = ${ctx.teamId} AND date >= ${month + '-01'} AND date <= ${month + '-31'}
+        ),
+        smazane AS (
+          DELETE FROM shifts
+          WHERE ${nahradit}::boolean AND (SELECT ok FROM kontrola)
+            AND team_id = ${ctx.teamId} AND date >= ${month + '-01'} AND date <= ${month + '-31'}
+          RETURNING id
+        ),
+        vlozene AS (
+          INSERT INTO shifts (team_id, employee_id, date, start_time, end_time, type)
+          SELECT ${ctx.teamId}, x.e, x.d, x.s, x.k, x.t
+          FROM unnest(${platne.map(s => s.employeeId)}::int[], ${platne.map(s => s.date)}::text[], ${platne.map(s => s.startTime)}::text[], ${platne.map(s => s.endTime)}::text[], ${platne.map(s => s.type)}::text[]) AS x(e, d, s, k, t)
+          WHERE (SELECT ok FROM kontrola)
+          RETURNING id
+        )
+        SELECT (SELECT ok FROM kontrola) AS ok, (SELECT COUNT(*) FROM vlozene)::int AS vlozeno`,
+    ]) as any[];
+    const r = (vysledek as any[])?.[0];
+    if (!r?.ok) {
+      return NextResponse.json({
+        error: 'Rozvrh tohoto měsíce mezitím někdo změnil (jiné okno nebo zařízení). Nic se neuložilo — návrh zůstal otevřený, zkontroluj uložené směny a ulož znovu.',
+        konflikt: true,
+      }, { status: 409 });
     }
-    return NextResponse.json({ inserted, ok: true });
+    return NextResponse.json({ inserted: Number(r.vlozeno) || 0, ok: true });
   }
 
   // ---- Preview path: run the algorithm ----
@@ -185,11 +148,6 @@ export async function POST(req: Request) {
   }
   const fixedRows = await sql`
     SELECT employee_id, weekday, shift_type_id FROM fixed_assignments WHERE team_id = ${ctx.teamId}`;
-  // Day choices reference the team's shift types; legacy binary values map by
-  // rank (earliest type = "ranní"), never by the hard-coded noon boundary.
-  const prefTypes: PrefType[] = shiftTypes.map((t: any) => ({
-    id: Number(t.id), name: String(t.name), start: String(t.start_time).slice(0, 5),
-  }));
   const [team] = await sql`SELECT opening_hours FROM teams WHERE id = ${ctx.teamId}`;
 
   // ---- Rule: how many days in a row may someone work ----
@@ -252,389 +210,113 @@ export async function POST(req: Request) {
   const openingHours =
     team?.opening_hours && Object.keys(team.opening_hours).length > 0 ? team.opening_hours : defaultsOpening();
 
-  const warnings: string[] = [];
   if (shiftTypes.length === 0) {
     return NextResponse.json({
       proposed: [],
       warnings: ['Nejsou nastaveny žádné typy směn. Přidej je v záložce „Typy směn".'],
+      gaps: [], understaffed: [],
     });
   }
   if (employeeRows.length === 0) {
-    return NextResponse.json({ proposed: [], warnings: ['V týmu nejsou žádní zaměstnanci.'] });
+    return NextResponse.json({ proposed: [], warnings: ['V týmu nejsou žádní zaměstnanci.'], gaps: [], understaffed: [] });
   }
 
   const availByEmp = new Map<number, any>();
   availRows.forEach((a: any) => availByEmp.set(a.employee_id, a));
 
-  const emps: Emp[] = employeeRows.map((u: any) => {
+  const lide: ClovekGeneratoru[] = employeeRows.map((u: any) => {
     const a = availByEmp.get(u.id);
     return {
       id: u.id,
       name: u.name,
       avatar: u.avatar ?? '👤',
-      unavailable: new Set<string>([...(a?.unavailable_dates ?? []), ...Array.from(timeOffByEmp.get(u.id) ?? new Set<string>())]),
+      unavailable: [...(a?.unavailable_dates ?? []), ...Array.from(timeOffByEmp.get(u.id) ?? new Set<string>())],
       dayPrefs: (a?.day_preferences ?? {}) as Record<string, string>,
       preferredShift: a?.preferred_shift ?? null,
       maxShifts: a?.max_shifts ?? null,
-      // Personal override wins (0 = explicitly no limit for them); otherwise
-      // the team default; null everywhere = no limit at all.
-      maxConsecutive: personalMax.get(u.id) === 0
-        ? null
-        : (personalMax.get(u.id) ?? teamMaxConsecutive ?? null),
-      assigned: 0,
-      workedDates: new Set<string>(priorByEmp.get(u.id) ?? []),
-      // Personal 0 = explicitly unlimited; null = follow the team default.
-      maxHours: personalHours.get(u.id) === 0
-        ? null
-        : (personalHours.get(u.id) ?? teamMaxHours ?? null),
-      assignedHours: 0,
-      lastAssigned: '',
+      // Osobní výjimka vyhrává (0 = výslovně bez limitu), jinak týmový
+      // výchozí; null všude = bez limitu.
+      maxConsecutive: personalMax.get(u.id) === 0 ? null : (personalMax.get(u.id) ?? teamMaxConsecutive ?? null),
+      maxHours: personalHours.get(u.id) === 0 ? null : (personalHours.get(u.id) ?? teamMaxHours ?? null),
+      priorDates: Array.from(priorByEmp.get(u.id) ?? []),
+      splitOk: splitOk.get(u.id) !== false,
     };
   });
-  const empById = new Map<number, Emp>(emps.map((e) => [e.id, e]));
 
-  // fixed assignments indexed by weekday
-  const fixedByWeekday = new Map<number, { employeeId: number; shiftTypeId: number | null }[]>();
-  fixedRows.forEach((f: any) => {
-    const arr = fixedByWeekday.get(f.weekday) ?? [];
-    arr.push({ employeeId: f.employee_id, shiftTypeId: f.shift_type_id });
-    fixedByWeekday.set(f.weekday, arr);
+  // ---- Počet lidí podle tržeb (volitelné, výchozí vypnuto) ----
+  // Nastavení je v teams.staffing_rules (JSON). Tržby jsou citlivé: počítají
+  // se jen s finance.trzby. Bez něj se doporučení vynechá a UI to řekne —
+  // generátor pak jede jen podle povinné a žádoucí směny.
+  let nastaveniTrzeb = vycistiNastaveniTrzeb(null);
+  try {
+    const [t] = await sql`SELECT staffing_rules FROM teams WHERE id = ${ctx.teamId}`;
+    nastaveniTrzeb = vycistiNastaveniTrzeb(t?.staffing_rules);
+  } catch { /* sloupec ještě není (spusť /api/init) — funkce zůstává vypnutá */ }
+  let trzby: VstupGeneratoru['trzby'] = null;
+  let stavTrzeb: 'ok' | 'bez_opravneni' | 'bez_dat' | 'bez_prahu' | null = null;
+  if (nastaveniTrzeb.podleTrzeb) {
+    if (!ctx.role.opravneni.has('finance.trzby')) {
+      stavTrzeb = 'bez_opravneni';
+    } else if (!nastaveniTrzeb.prah) {
+      stavTrzeb = 'bez_prahu';
+    } else {
+      // Stejný zdroj jako kalendář uzávěrek (/api/closings/calendar): tržba
+      // dne = hotovost + karta ze všech uzávěrek dne směny.
+      const dnes = pragueToday();
+      const od = (() => { const d = new Date(dnes + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() - 8 * 7); return d.toISOString().slice(0, 10); })();
+      let historie: { date: string; trzba: number }[] = [];
+      try {
+        const rows = await sql`
+          SELECT COALESCE(shift_date, date)::text AS date,
+                 SUM(COALESCE(cash_revenue, 0) + COALESCE(card_revenue, 0))::float AS trzba
+          FROM cash_closings
+          WHERE team_id = ${ctx.teamId} AND COALESCE(shift_date, date) >= ${od} AND COALESCE(shift_date, date) < ${dnes}
+          GROUP BY 1`;
+        historie = (rows as any[]).map(r => ({ date: String(r.date).slice(0, 10), trzba: Number(r.trzba) || 0 }));
+      } catch { historie = []; }
+      const dny = ocekavaneTrzby(historie, dnes, openingHours);
+      if (Object.keys(dny).length === 0) stavTrzeb = 'bez_dat';
+      else { stavTrzeb = 'ok'; trzby = { prah: nastaveniTrzeb.prah, dny }; }
+    }
+  }
+
+  // Uložené směny měsíce, když je uložení návrhu nepřepíše (bez
+  // rozvrh.mazat_mesic nikdy, jinak podle přepínače v náhledu). Generátor je
+  // bere jako obsazené — jinak hlásil falešné „Nikdo neotevře" na dnech
+  // s uloženou otvíračkou a návrh pak vedle ní uložil další lidi.
+  // Starší klient `nahradit` neposílá: pak platí výchozí stav přepínače
+  // (zapnuto, když to role smí).
+  const smiMazat = ctx.role.opravneni.has('rozvrh.mazat_mesic');
+  const nahradit = smiMazat && body.nahradit !== false;
+  let ulozene: VstupGeneratoru['ulozene'] = [];
+  if (!nahradit) {
+    const rows = await sql`
+      SELECT employee_id, date, start_time, end_time, type FROM shifts
+      WHERE team_id = ${ctx.teamId} AND date >= ${month + '-01'} AND date <= ${month + '-31'}`;
+    ulozene = (rows as any[]).map(r => ({
+      employeeId: Number(r.employee_id), date: String(r.date).slice(0, 10),
+      startTime: String(r.start_time).slice(0, 5), endTime: String(r.end_time).slice(0, 5), type: r.type ?? null,
+    }));
+  }
+
+  const vysledek = navrhniRozvrh({
+    month,
+    lide,
+    typy: shiftTypes as TypSmeny[],
+    openingHours,
+    pevne: (fixedRows as any[]).map(f => ({ employeeId: f.employee_id, weekday: f.weekday, shiftTypeId: f.shift_type_id })),
+    pravidla: { balanceShifts, splitShifts },
+    trzby,
+    ulozene,
   });
 
-  function isAvailable(emp: Emp, date: string) {
-    if (emp.unavailable.has(date)) return false;
-    if (emp.dayPrefs[date] === 'off') return false;
-    return true;
-  }
-  function hasCapacity(emp: Emp) {
-    return emp.maxShifts == null || emp.assigned < emp.maxShifts;
-  }
-  /**
-   * Day preferences are STRICT: "ten den můžu jen odpolední" means the
-   * generator may never hand them the opening shift that day. 'flexible'
-   * or no entry keeps every slot open; 'off' is handled by isAvailable.
-   */
-  function dayPrefOk(emp: Emp, date: string, st: any, start: string) {
-    return prefAllowsSlot(emp.dayPrefs[date], { typeId: st?.id ?? null, start }, prefTypes);
-  }
-  function prefText(emp: Emp, date: string) {
-    return dayPrefLabel(emp.dayPrefs[date], prefTypes) ?? 'jiný typ směny';
-  }
-  /** Days worked in an unbroken run ending the day before `date`. */
-  function streakBefore(emp: Emp, date: string) {
-    let n = 0;
-    let cursor = prevDay(date);
-    while (emp.workedDates.has(cursor) && n < 40) {
-      n++;
-      cursor = prevDay(cursor);
-    }
-    return n;
-  }
-  /** Would this shift break "max X days in a row"? */
-  function restOk(emp: Emp, date: string) {
-    if (emp.maxConsecutive == null) return true;
-    if (emp.workedDates.has(date)) return true; // already working today
-    return streakBefore(emp, date) < emp.maxConsecutive;
-  }
-  /** Would this shift push the person over their monthly hour cap? */
-  function hoursOk(emp: Emp, hours: number) {
-    return emp.maxHours == null || emp.assignedHours + hours <= emp.maxHours + 0.01;
-  }
-  function take(emp: Emp, date: string, hours: number) {
-    emp.assigned++;
-    emp.workedDates.add(date);
-    emp.assignedHours += hours;
-    emp.lastAssigned = date;
-  }
-
-  const proposed: any[] = [];
-  // Díry v pokrytí a neobsazená místa se vracejí i strukturovaně, aby je
-  // kalendář mohl rozsvítit červeně, ne jen vypsat do seznamu textů.
-  const gaps: { date: string; from: string; to: string; minutes: number }[] = [];
-  const understaffed: { date: string; shiftTypeName: string }[] = [];
-  const monthDays = daysInMonth(month);
-
-  for (let d = 1; d <= monthDays; d++) {
-    const date = `${month}-${String(d).padStart(2, '0')}`;
-    const wd = weekdayOf(date);
-    const oh = openingHours[String(wd)] ?? { open: '08:00', close: '20:00', closed: false };
-    if (oh.closed) continue;
-
-    // shift types that fit within this day's opening hours (times resolved to
-    // the day's open/close where the type follows them)
-    const fitting = shiftTypes.filter((st: any) => {
-      const rt = resolveTimes(st, oh);
-      return fitsWithin(rt.start, rt.end, oh.open, oh.close);
-    });
-
-    // Kontrola pokrytí dne — volá se i pro den, na který se nevejde žádný typ
-    // směny. Otevřeno bez jediné použitelné směny je taky díra, jen se na ni
-    // dřív nikdo neptal.
-    const reportGaps = (placed: { start: string; end: string }[]) => {
-      const open = openSpan(oh);
-      if (!open) return;
-      for (const g of uncovered(open, placed)) {
-        const [, mm2, dd2] = date.split('-');
-        gaps.push({ date, from: toHM(g.start), to: toHM(g.end), minutes: g.end - g.start });
-        warnings.unshift(
-          `${parseInt(dd2)}.${parseInt(mm2)}. — NIKDO V PODNIKU ${gapText(g)}, přitom je otevřeno. Doplň někoho ručně.`,
-        );
-      }
-    };
-
-    if (fitting.length === 0) {
-      reportGaps([]);
-      if (shiftTypes.length > 0) {
-        const [, mm0, dd0] = date.split('-');
-        warnings.push(
-          `${parseInt(dd0)}.${parseInt(mm0)}. — žádný nastavený typ směny se nevejde do otevírací doby ${oh.open}–${oh.close}.`,
-        );
-      }
-      continue;
-    }
-
-    const assignedToday = new Set<number>(); // employee ids already placed this day
-    const slotFilled = new Map<number, number>(); // shiftTypeId → employeeId
-
-    const fixedToday = fixedByWeekday.get(wd) ?? [];
-
-    // Pass 1a: fixed assignments bound to a specific shift type
-    for (const fx of fixedToday) {
-      if (fx.shiftTypeId == null) continue;
-      const st = fitting.find((s: any) => s.id === fx.shiftTypeId);
-      if (!st) continue; // that shift type doesn't fit today
-      if (slotFilled.has(st.id)) continue;
-      const emp = empById.get(fx.employeeId);
-      if (!emp || !isAvailable(emp, date) || assignedToday.has(emp.id)) continue;
-      const stHours = (() => { const rt = resolveTimes(st, oh); return shiftHours(rt.start, rt.end); })();
-      if (!dayPrefOk(emp, date, st, resolveTimes(st, oh).start)) {
-        const [, mm, dd] = date.split('-');
-        warnings.push(`${parseInt(dd)}.${parseInt(mm)}. — ${emp.name} má pevný den, ale na ten den si zadal/a ${prefText(emp, date)}. Vynecháno.`);
-        continue;
-      }
-      if (!restOk(emp, date)) {
-        const [, mm, dd] = date.split('-');
-        warnings.push(`${parseInt(dd)}.${parseInt(mm)}. — ${emp.name} má pevný den, ale už by šlo o ${emp.maxConsecutive! + 1}. směnu v řadě (limit ${emp.maxConsecutive}). Vynecháno.`);
-        continue;
-      }
-      if (!hoursOk(emp, stHours)) {
-        const [, mm, dd] = date.split('-');
-        warnings.push(`${parseInt(dd)}.${parseInt(mm)}. — ${emp.name} má pevný den, ale směna by překročila limit ${emp.maxHours} h/měsíc. Vynecháno.`);
-        continue;
-      }
-      slotFilled.set(st.id, emp.id);
-      assignedToday.add(emp.id);
-      take(emp, date, stHours);
-    }
-
-    // Pass 1b: fixed assignments with no specific shift type → place in first open fitting slot
-    for (const fx of fixedToday) {
-      if (fx.shiftTypeId != null) continue;
-      const emp = empById.get(fx.employeeId);
-      if (!emp || !isAvailable(emp, date) || assignedToday.has(emp.id)) continue;
-      // prefer a shift matching their day/overall preference
-      const wantPref = emp.dayPrefs[date] && emp.dayPrefs[date] !== 'flexible' ? emp.dayPrefs[date] : emp.preferredShift;
-      const openSlots = fitting.filter((s: any) =>
-        !slotFilled.has(s.id) && dayPrefOk(emp, date, s, resolveTimes(s, oh).start));
-      if (openSlots.length === 0) continue;
-      if (!restOk(emp, date)) {
-        const [, mm, dd] = date.split('-');
-        warnings.push(`${parseInt(dd)}.${parseInt(mm)}. — ${emp.name} má pevný den, ale už by šlo o ${emp.maxConsecutive! + 1}. směnu v řadě (limit ${emp.maxConsecutive}). Vynecháno.`);
-        continue;
-      }
-      const match = openSlots.find((s: any) =>
-        wantPref?.startsWith('type:') ? `type:${s.id}` === wantPref : categoryOf(s.start_time) === wantPref,
-      ) ?? openSlots[0];
-      const matchHours = (() => { const rt = resolveTimes(match, oh); return shiftHours(rt.start, rt.end); })();
-      if (!hoursOk(emp, matchHours)) {
-        const [, mm, dd] = date.split('-');
-        warnings.push(`${parseInt(dd)}.${parseInt(mm)}. — ${emp.name} má pevný den, ale směna by překročila limit ${emp.maxHours} h/měsíc. Vynecháno.`);
-        continue;
-      }
-      slotFilled.set(match.id, emp.id);
-      assignedToday.add(emp.id);
-      take(emp, date, matchHours);
-    }
-
-    // Pass 2: fill remaining slots with best candidate.
-    //
-    // Pořadí není libovolné. Dřív se typy braly tak, jak přišly, a každý se
-    // řešil sám za sebe — takže když na otvíračku 14–22 nikdo nebyl a na
-    // odpolední 17–22 ano, obsadila se odpolední a od dvou do pěti bylo
-    // otevřeno a prázdno. Teď se pokaždé bere ten typ, který zakryje nejvíc
-    // zbývající nepokryté otevírací doby; kdo drží podnik otevřený, jde první.
-    const openSpanToday = openSpan(oh);
-    const filledSpans = () => fitting
-      .filter((s: any) => slotFilled.has(s.id))
-      .map((s: any) => { const r = resolveTimes(s, oh); return { start: r.start, end: r.end }; });
-    const remainingGain = (st: any) => {
-      if (!openSpanToday) return 0;
-      const before = uncovered(openSpanToday, filledSpans())
-        .reduce((n, g) => n + (g.end - g.start), 0);
-      const r = resolveTimes(st, oh);
-      const after = uncovered(openSpanToday, [...filledSpans(), { start: r.start, end: r.end }])
-        .reduce((n, g) => n + (g.end - g.start), 0);
-      return before - after;
-    };
-
-    const pending = fitting.filter((s: any) => !slotFilled.has(s.id));
-    while (pending.length > 0) {
-      pending.sort((a: any, b: any) => {
-        const ga = remainingGain(a), gb = remainingGain(b);
-        if (ga !== gb) return gb - ga;                    // víc pokryje = dřív
-        const ra = resolveTimes(a, oh), rb = resolveTimes(b, oh);
-        const ha = shiftHours(ra.start, ra.end), hb = shiftHours(rb.start, rb.end);
-        if (ha !== hb) return hb - ha;                    // pak delší směna
-        return String(a.name).localeCompare(String(b.name));
-      });
-      const st = pending.shift()!;
-      if (slotFilled.has(st.id)) continue;
-      const cat = categoryOf(st.start_time);
-      const rtSt = resolveTimes(st, oh);
-      const stHours = shiftHours(rtSt.start, rtSt.end);
-      const candidates = emps.filter(
-        (e) => isAvailable(e, date) && !assignedToday.has(e.id) && hasCapacity(e)
-          && restOk(e, date) && hoursOk(e, stHours) && dayPrefOk(e, date, st, rtSt.start),
-      );
-      if (candidates.length === 0) continue;
-
-      candidates.sort((a, b) => {
-        // 0. fair rotation (when on): fewest shifts so far goes first, so the
-        //    whole team ends the month with a similar count. Hard requests
-        //    (unavailability, day off, limits) were already filtered out;
-        //    soft preferences still break the ties below.
-        if (balanceShifts && a.assigned !== b.assigned) return a.assigned - b.assigned;
-        // 1. exact day preference for this shift category
-        const aDay = a.dayPrefs[date] === cat ? 1 : 0;
-        const bDay = b.dayPrefs[date] === cat ? 1 : 0;
-        if (aDay !== bDay) return bDay - aDay;
-        // 2. overall preferred shift matches category
-        const aPref = a.preferredShift === cat ? 1 : 0;
-        const bPref = b.preferredShift === cat ? 1 : 0;
-        if (aPref !== bPref) return bPref - aPref;
-        // 3. rest — whoever has worked fewer days in a row goes first, so the
-        //    rota spreads out instead of running people to their limit.
-        const aStreak = streakBefore(a, date);
-        const bStreak = streakBefore(b, date);
-        if (aStreak !== bStreak) return aStreak - bStreak;
-        // 4. fairness — fewest assigned so far
-        if (a.assigned !== b.assigned) return a.assigned - b.assigned;
-        // 5. rotation — whoever waited longest since their last shift goes
-        //    first, so the same faces don't cluster on the same days.
-        if (a.lastAssigned !== b.lastAssigned) return a.lastAssigned < b.lastAssigned ? -1 : 1;
-        // 6. stable by name
-        return a.name.localeCompare(b.name);
-      });
-
-      const pick = candidates[0];
-      slotFilled.set(st.id, pick.id);
-      assignedToday.add(pick.id);
-      take(pick, date, stHours);
-    }
-
-
-    // Build proposed list + warnings for the day
-    for (const st of fitting) {
-      const empId = slotFilled.get(st.id);
-      if (empId == null) {
-        const [, mm, dd] = date.split('-');
-        const rtW = resolveTimes(st, oh);
-        const hW = shiftHours(rtW.start, rtW.end);
-
-        // Nobody can hold the whole slot. With splitting enabled, cut it in
-        // half (rounded to 30 min) and look for two DIFFERENT people — a day
-        // choice like "jen odpolední" also unlocks the matching half when that
-        // type's window overlaps it.
-        if (splitShifts && hW >= 3) {
-          const startMin = toMin(rtW.start);
-          const endMinRaw = toMin(rtW.end);
-          const endMin = endMinRaw <= startMin ? endMinRaw + 24 * 60 : endMinRaw;
-          const midMin = Math.round((startMin + endMin) / 2 / 30) * 30;
-          const halves = [
-            { start: toHM(startMin), end: toHM(midMin), startMin, endMin: midMin },
-            { start: toHM(midMin), end: toHM(endMin), startMin: midMin, endMin },
-          ];
-          const halfPrefOk = (e: Emp, half: { startMin: number; endMin: number; start: string }) => {
-            if (dayPrefOk(e, date, st, half.start)) return true;
-            // "jen <typ>" also allows the half its type-window overlaps.
-            const wanted = String(emps ? e.dayPrefs[date] ?? '' : '');
-            const m = /^type:(\d+)$/.exec(wanted);
-            if (!m) return false;
-            const t = shiftTypes.find((x: any) => Number(x.id) === parseInt(m[1]));
-            if (!t) return false;
-            const rt = resolveTimes(t, oh);
-            const ts = toMin(rt.start);
-            const teRaw = toMin(rt.end);
-            const te = teRaw <= ts ? teRaw + 24 * 60 : teRaw;
-            return ts < half.endMin && half.startMin < te;
-          };
-          const picks: (Emp | null)[] = [null, null];
-          for (let hi = 0; hi < 2; hi++) {
-            const half = halves[hi];
-            const hHours = (half.endMin - half.startMin) / 60;
-            const cands = emps.filter((e) =>
-              isAvailable(e, date) && !assignedToday.has(e.id) && hasCapacity(e)
-              && restOk(e, date) && hoursOk(e, hHours) && halfPrefOk(e, half)
-              && (splitOk.get(e.id) !== false)
-              && picks[0]?.id !== e.id,
-            );
-            cands.sort((a, b) => a.assigned - b.assigned || a.name.localeCompare(b.name));
-            picks[hi] = cands[0] ?? null;
-          }
-          if (picks[0] && picks[1]) {
-            for (let hi = 0; hi < 2; hi++) {
-              const half = halves[hi];
-              const who = picks[hi]!;
-              assignedToday.add(who.id);
-              take(who, date, (half.endMin - half.startMin) / 60);
-              proposed.push({
-                employeeId: who.id, employeeName: who.name, employeeAvatar: who.avatar,
-                date, startTime: half.start, endTime: half.end,
-                type: st.name, shiftTypeId: st.id, shiftTypeName: st.name, color: st.color,
-                split: true,
-              });
-            }
-            warnings.push(`${parseInt(dd)}.${parseInt(mm)}. — směna „${st.name}" rozdělena: ${picks[0]!.name} (${halves[0].start}–${halves[0].end}) + ${picks[1]!.name} (${halves[1].start}–${halves[1].end}).`);
-            continue;
-          }
-        }
-
-        const free = emps.filter((e) => isAvailable(e, date) && !assignedToday.has(e.id) && hasCapacity(e));
-        const blockedByPref = free.some((e) => !dayPrefOk(e, date, st, rtW.start));
-        const blockedByRest = free.some((e) => dayPrefOk(e, date, st, rtW.start) && !restOk(e, date));
-        const blockedByHours = free.some((e) => dayPrefOk(e, date, st, rtW.start) && restOk(e, date) && !hoursOk(e, hW));
-        warnings.push(
-          `${parseInt(dd)}.${parseInt(mm)}. — nepokrytá směna „${st.name}" (${
-            blockedByRest ? 'volní lidé už mají limit dní v řadě'
-            : blockedByHours ? 'volní lidé už mají limit hodin za měsíc'
-            : blockedByPref ? 'volní lidé mají ten den povolený jen jiný typ směny'
-            : 'nikdo dostupný'}).`,
-        );
-        understaffed.push({ date, shiftTypeName: st.name });
-        continue;
-      }
-      const emp = empById.get(empId)!;
-      const rt = resolveTimes(st, oh);
-      proposed.push({
-        employeeId: emp.id,
-        employeeName: emp.name,
-        employeeAvatar: emp.avatar,
-        date,
-        startTime: rt.start,
-        endTime: rt.end,
-        type: st.name, // store the configured type name so the calendar shows it
-        shiftTypeId: st.id,
-        shiftTypeName: st.name,
-        color: st.color,
-      });
-    }
-
-    // Poslední kontrola dne: je v každé minutě otevírací doby někdo?
-    // Tohle je jiná otázka než „je obsazená každá směna" — a právě ta chyběla.
-    // Podnik s otevřeno 14–22 a jedinou směnou 17–22 měl všechny směny
-    // obsazené a přesto tři hodiny prázdno.
-    reportGaps(proposed.filter(p => p.date === date).map(p => ({ start: p.startTime, end: p.endTime })));
-  }
-
-  return NextResponse.json({ proposed, warnings, gaps, understaffed });
+  // Tvar odpovědi: proposed/warnings/gaps/understaffed jako dřív (sondy
+  // i plánovač je čtou beze změny), gaps a understaffed mají navíc `uroven`
+  // (povinna | zadouci). O tržbách odpověď mlčí, když je funkce vypnutá.
+  return NextResponse.json({
+    ...vysledek,
+    // Z čeho návrh vyšel: s přepsáním měsíce, nebo vedle uložených směn.
+    nahradit,
+    ...(stavTrzeb ? { trzby: { stav: stavTrzeb, prah: stavTrzeb === 'ok' ? nastaveniTrzeb.prah : null } } : {}),
+  });
 }

@@ -1,0 +1,46 @@
+{
+ "teamMax": 5,
+ "teamMaxHours": 20,
+ "balanceShifts": true,
+ "splitShifts": false,
+ "members": [
+  {
+   "id": 16,
+   "name": "Eva Testová",
+   "avatar": "🧑",
+   "role": "employee",
+   "maxConsecutive": null,
+   "maxHours": null,
+   "splitOk": true
+  },
+  {
+   "id": 17,
+   "name": "Jakub Horák",
+   "avatar": "🧔",
+   "role": "employee",
+   "maxConsecutive": null,
+   "maxHours": 10,
+   "splitOk": true
+  }
+ ],
+ "trzby": {
+  "podleTrzeb": false,
+  "prah": null,
+  "smiTrzby": true,
+  "dny": {
+   "0": {
+    "prumer": 8200,
+    "vzorek": 8
+   },
+   "4": {
+    "prumer": 14100,
+    "vzorek": 8
+   },
+   "5": {
+    "prumer": 21000,
+    "vzorek": 7
+   }
+  },
+  "navrhPrahu": 14000
+ }
+}

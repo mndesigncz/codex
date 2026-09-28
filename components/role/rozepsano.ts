@@ -18,6 +18,19 @@ import type { ModalGuard } from '@/lib/useModal';
 // ho i EmployerLayout, a editor rolí se má stahovat až při otevření.
 
 let rozepsano = false;
+// Neuložený návrh rozvrhu (ScheduleBuilder) — stejná past: návrh žije jen ve
+// stavu plánovače a přechod na jiný pohled ho odmontuje. beforeunload hlídá
+// jen zavření karty, SPA navigaci ne; Martin si „jen na chvíli" odskočil do
+// Týmu ověřit dostupnost a po návratu byl návrh i s úpravami pryč.
+let rozepsanyNavrh = false;
+
+/** Plánovač hlásí, jestli drží neuložený návrh. Při odmontování vždy `false`. */
+export function nastavRozepsanyNavrh(v: boolean): void { rozepsanyNavrh = v; }
+
+/** Co se přechodem zahodí — text pro <DiscardGuard what>. */
+export function coSeZahodi(): string {
+  return rozepsanyNavrh && !rozepsano ? CO_SE_ZAHODI_NAVRH : CO_SE_ZAHODI_ROLE;
+}
 
 /** Editor hlásí, jestli drží neuložené změny. Při odmontování vždy `false`. */
 export function nastavRozepsanouRoli(v: boolean): void { rozepsano = v; }
@@ -35,17 +48,18 @@ export function jeRozepsanaRole(): boolean { return rozepsano; }
 export function useStrazRole() {
   const [odlozeno, setOdlozeno] = useState<null | (() => void)>(null);
   const pokus = (fn: () => void) => {
-    if (!rozepsano) { fn(); return; }
+    if (!rozepsano && !rozepsanyNavrh) { fn(); return; }
     // Funkce do useState se musí zabalit, jinak by ji React zavolal jako updater.
     setOdlozeno(() => fn);
   };
   const guard: ModalGuard = {
     asking: odlozeno != null,
-    dirty: rozepsano,
+    dirty: rozepsano || rozepsanyNavrh,
     keep: () => setOdlozeno(null),
     discard: () => {
       const fn = odlozeno;
       rozepsano = false;
+      rozepsanyNavrh = false;
       setOdlozeno(null);
       fn?.();
     },
@@ -55,3 +69,4 @@ export function useStrazRole() {
 }
 
 export const CO_SE_ZAHODI_ROLE = 'Rozepsané změny role se neuloží.';
+export const CO_SE_ZAHODI_NAVRH = 'Navržený rozvrh i s tvými úpravami zatím není uložený — přechodem jinam se zahodí.';

@@ -168,6 +168,12 @@ export interface DenSDirou {
   mezery: { od: string; do: string }[];
   /** Typy směn, které se na den vejdou, ale nikdo na nich není. */
   neobsazeno: string[];
+  /**
+   * Nikdo neotevře (díra od otevření) — podnik se ten den neotevře. Jinak
+   * jde jen o chybějícího druhého člověka. Díra bez úrovně (starší odpověď)
+   * se počítá jako povinná.
+   */
+  povinna: boolean;
 }
 
 /**
@@ -175,13 +181,19 @@ export interface DenSDirou {
  * včera už nejde doplnit a widget by jí zbytečně strašil.
  */
 export function dnySDirou(
-  gaps: readonly { date: string; from: string; to: string }[],
+  gaps: readonly { date: string; from: string; to: string; uroven?: string }[],
   understaffed: readonly { date: string; shiftTypeName: string }[],
   dnes: string,
 ): DenSDirou[] {
   const m = new Map<string, DenSDirou>();
-  const dej = (d: string) => { let x = m.get(d); if (!x) { x = { den: d, mezery: [], neobsazeno: [] }; m.set(d, x); } return x; };
-  for (const g of gaps) { const d = den(g.date); if (d && d >= dnes) dej(d).mezery.push({ od: hm(g.from), do: hm(g.to) }); }
+  const dej = (d: string) => { let x = m.get(d); if (!x) { x = { den: d, mezery: [], neobsazeno: [], povinna: false }; m.set(d, x); } return x; };
+  for (const g of gaps) {
+    const d = den(g.date);
+    if (!d || d < dnes) continue;
+    const x = dej(d);
+    x.mezery.push({ od: hm(g.from), do: hm(g.to) });
+    if (g.uroven !== 'zadouci') x.povinna = true;
+  }
   for (const u of understaffed) {
     const d = den(u.date);
     if (d && d >= dnes && u.shiftTypeName && !dej(d).neobsazeno.includes(u.shiftTypeName)) dej(d).neobsazeno.push(u.shiftTypeName);
