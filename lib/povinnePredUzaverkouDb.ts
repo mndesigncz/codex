@@ -11,7 +11,7 @@ import { NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { maOpravneni, type Kontext } from '@/lib/opravneniDb';
 import { clenPodniku } from '@/lib/tenant';
-import { pragueToday, NIGHT_CUTOFF_HOUR } from '@/lib/pragueTime';
+import { pragueToday, dayPlus, NIGHT_CUTOFF_HOUR } from '@/lib/pragueTime';
 import { windowOf } from '@/lib/shiftWindow';
 import { denUzaverkyPro } from '@/lib/staleShifts';
 import {
@@ -30,6 +30,8 @@ export interface KontextUzaverky {
   eventId: number | null;
   /** Kdo směnu odpracoval s ním (překryv časů), vždy včetně něj. */
   posadka: number[];
+  /** Které druhy povinných věcí se u tohohle odesílání hlídají (viz níž). */
+  typy: TypPovinne[];
 }
 
 /** Vstup z formuláře — POST posílá tělo, GET query parametry; obojí stejně pojmenované. */
@@ -106,8 +108,16 @@ export async function urciKontextUzaverky(c: Kontext, b: VstupUzaverky): Promise
     const wantEvent = parseInt(String(b.eventId));
     if (Number.isFinite(wantEvent)) {
       try {
-        const [ev] = await sql`SELECT id FROM events WHERE id = ${wantEvent} AND team_id = ${c.teamId}`;
+        const [ev] = await sql`SELECT id, date FROM events WHERE id = ${wantEvent} AND team_id = ${c.teamId}`;
         if (!ev) return NextResponse.json({ error: 'Akce nenalezena.' }, { status: 400 });
+        // Uzávěrka za akci se nehlídá povinnými věcmi — bez kontroly data by
+        // stačilo poslat id libovolné staré akce a zámek by se obešel. Akce
+        // musí být v den uzávěrky; po půlnoci noční směny formulář ukazuje
+        // akce kalendářního dne, proto i den po obchodním.
+        const denAkce = String(ev.date ?? '').slice(0, 10);
+        if (denAkce !== shiftDate && denAkce !== dayPlus(shiftDate, 1)) {
+          return NextResponse.json({ error: 'Tahle akce se v den uzávěrky nekoná.' }, { status: 400 });
+        }
         eventId = wantEvent;
       } catch {
         return NextResponse.json({ error: 'Akce nejsou dostupné — spusť /api/init.' }, { status: 400 });
@@ -150,7 +160,13 @@ export async function urciKontextUzaverky(c: Kontext, b: VstupUzaverky): Promise
     }
   } catch { /* shifts table issue — the author alone owns the closing */ }
 
-  return { actorId, shiftDate, shift: shift ?? null, eventId, posadka };
+  // Návod potvrzuje přečtení každý na svém účtu — tablet to za vybraného
+  // člověka neumí (GuideReader tam tlačítko nemá, POST /api/guides/[id]
+  // kiosk odmítá). Kdyby tablet návody hlídal, uzávěrka by tam šla odemknout
+  // jen z cizího telefonu a kdo žádný nemá, zůstal by zamčený natrvalo.
+  const typy: TypPovinne[] = tablet ? ['postup', 'ukol'] : ['postup', 'ukol', 'navod'];
+
+  return { actorId, shiftDate, shift: shift ?? null, eventId, posadka, typy };
 }
 
 /**
@@ -169,9 +185,11 @@ export async function chybejiciPredUzaverkou(o: {
   const vsechny: PovinnaPolozka[] = [];
   const neznamo: TypPovinne[] = [];
 
-  // Postupy: stačí, když ho ten obchodní den dokončil kdokoli z podniku.
-  // Obchodní den = pražský čas minus NIGHT_CUTOFF_HOUR (jako businessDayOf),
-  // takže postup dodělaný v 0:30 noční směny patří k večeru, který se zavírá.
+  // Postupy: stačí, když ho ten den dokončil kdokoli z podniku. Platí
+  // obchodní den (pražský čas minus NIGHT_CUTOFF_HOUR, jako businessDayOf) —
+  // postup dodělaný v 0:30 noční směny patří k večeru, který se zavírá — NEBO
+  // kalendářní den: ranní „Otevření" v 5:40 je obchodně včerejšek, ale patří
+  // k dnešní uzávěrce (a widget i /api/procedures/runs ho počítají k dnešku).
   // Neschválený návrh postupu neblokuje nikdy (widget to tak měl, brána ne).
   if (typy.has('postup')) {
     try {
@@ -181,7 +199,10 @@ export async function chybejiciPredUzaverkou(o: {
             SELECT 1 FROM procedure_runs r
             WHERE r.procedure_id = p.id AND r.team_id = ${o.teamId} AND r.status = 'completed'
               AND r.completed_at IS NOT NULL
-              AND to_char(((r.completed_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') - make_interval(hours => ${NIGHT_CUTOFF_HOUR}::int), 'YYYY-MM-DD') = ${o.den}
+              AND (
+                to_char(((r.completed_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') - make_interval(hours => ${NIGHT_CUTOFF_HOUR}::int), 'YYYY-MM-DD') = ${o.den}
+                OR to_char((r.completed_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD') = ${o.den}
+              )
           ) AS hotovo
         FROM procedures p
         WHERE p.team_id = ${o.teamId} AND p.require_before_closing = TRUE
@@ -209,7 +230,7 @@ export async function chybejiciPredUzaverkou(o: {
         if (!ukolProPosadku(kdo, o.posadka)) continue;
         vsechny.push({
           typ: 'ukol', id: Number(r.id), nazev: String(r.title ?? ''), ikona: 'check',
-          kdo: kdo == null ? 'Kdokoli' : (r.assignee_name ?? null),
+          kdo: kdo == null ? 'Kdokoli' : (r.assignee_name ?? null), kdoId: kdo,
           hotovo: r.status === 'done',
           odkaz: { pohled: 'tasks', arg: String(r.id), href: '/employee/shifts?view=tasks' },
         });

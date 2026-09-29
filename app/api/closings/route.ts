@@ -360,7 +360,7 @@ export async function POST(request: Request) {
   // tady nikdy nehleděly na jiný den nebo jinou osádku.
   const kontext = await urciKontextUzaverky(c, b);
   if (kontext instanceof NextResponse) return kontext;
-  const { actorId, shiftDate, shift, eventId, posadka: shiftEmployeeIds } = kontext;
+  const { actorId, shiftDate, shift, eventId, posadka: shiftEmployeeIds, typy: typyPovinnych } = kontext;
   const date = shiftDate;
 
   // One closing per person per BUSINESS DAY. The day is what the till is
@@ -402,7 +402,7 @@ export async function POST(request: Request) {
   // ji by nechalo peníze nenahlášené. Zdroj, který nejde zjistit (migrace),
   // neblokuje. Odpověď nese `kod` a seznam, aby formulář ukázal zámek.
   if (!p.obejitPostupy && eventId == null && shift) {
-    const stav = await chybejiciPredUzaverkou({ teamId: c.teamId, den: shiftDate, actorId, posadka: shiftEmployeeIds });
+    const stav = await chybejiciPredUzaverkou({ teamId: c.teamId, den: shiftDate, actorId, posadka: shiftEmployeeIds, typy: typyPovinnych });
     if (jeZamceno(stav)) {
       return NextResponse.json({
         error: zpravaZamceno(stav.polozky),

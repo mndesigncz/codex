@@ -93,10 +93,12 @@ const SKUPINY: { typ: TypPovinne; nadpis: string }[] = [
 const ikonaPolozky = (p: PovinnaPolozka) =>
   p.typ === 'postup' ? (p.ikona || 'clipboard') : p.typ === 'ukol' ? 'calendarCheck' : 'book';
 
-export function ZamekUzaverky({ stav, actingAs, onZmena, predOdchodem, pulz }: {
+export function ZamekUzaverky({ stav, actingAs, proKoho, onZmena, predOdchodem, pulz }: {
   stav: StavZamku | null;
   /** Za koho se úkol odškrtne (tablet: člověk, za kterého se zavírá). */
   actingAs: number | null;
+  /** Čí je uzávěrka — úkol přidělený někomu jinému z osádky je „čeká na kolegu". */
+  proKoho: number | null;
   /** Něco se tu udělalo — ať formulář stav načte znovu. */
   onZmena: () => void;
   /** Těsně před odchodem na jiný pohled (formulář si uloží rozepsanou kasu). */
@@ -183,6 +185,11 @@ export function ZamekUzaverky({ stav, actingAs, onZmena, predOdchodem, pulz }: {
     return !!u && u.status !== 'done' && u.checklist.length === 0 && u.source !== 'production';
   };
   const odkazJde = (p: PovinnaPolozka) => nav.smiPohled(p.odkaz.pohled);
+  // Úkol kolegy ze směny: server ho do zámku počítá (osádka), ale v Úkolech ho
+  // zaměstnanec bez širších práv nevidí — klik by vedl do prázdna a formulář
+  // by se zbytečně odmontoval. Kdo ho v seznamu úkolů má (vedení), otevře ho.
+  const cizi = (p: PovinnaPolozka) =>
+    p.typ === 'ukol' && p.kdoId != null && p.kdoId !== proKoho && !ukolPodleId.has(p.id);
 
   const otevri = (p: PovinnaPolozka) => {
     setChyba('');
@@ -223,11 +230,14 @@ export function ZamekUzaverky({ stav, actingAs, onZmena, predOdchodem, pulz }: {
       if (jinyBezi(p) && active) return `Nejdřív dokonči běžící postup ${active.name}.`;
       return 'Otevře se v Postupech.';
     }
+    if (cizi(p)) return `Čeká na: ${p.kdo || 'kolegu'} — odškrtne ho ve svém účtu.`;
     if (p.typ === 'ukol') return p.kdo ? `Pro: ${p.kdo}` : null;
     return 'Přečti a potvrď, že máš přečteno.';
   };
 
-  const prvni = chybi.find(p => !bezi(p)) ?? chybi[0];
+  // Hlavní akce jen na to, co jde udělat odsud — ne na kolegův úkol.
+  const mojeChybi = chybi.filter(p => !cizi(p));
+  const prvni = mojeChybi.find(p => !bezi(p)) ?? mojeChybi[0];
   const pct = stav.celkem > 0 ? Math.round((stav.hotovo / stav.celkem) * 100) : 0;
   const zbyva = chybi.length;
 
@@ -241,7 +251,11 @@ export function ZamekUzaverky({ stav, actingAs, onZmena, predOdchodem, pulz }: {
         </span>
         <div className="min-w-0 flex-1">
           <h2 id="zamek-uzaverky-titulek" className="t-card">Uzávěrka je zamčená</h2>
-          <p className="t-meta mt-0.5 text-pretty">Nejdřív dokonči {czCount(zbyva, VEC)}. Pak se odemkne sama.</p>
+          <p className="t-meta mt-0.5 text-pretty">
+            {mojeChybi.length > 0
+              ? <>Nejdřív dokonči {czCount(zbyva, VEC)}. Pak se odemkne sama.</>
+              : <>Zbývá {czCount(zbyva, VEC)} na kolezích ze směny. Až je odškrtnou, odemkne se sama.</>}
+          </p>
         </div>
       </div>
 
@@ -279,6 +293,19 @@ export function ZamekUzaverky({ stav, actingAs, onZmena, predOdchodem, pulz }: {
                   );
                 }
                 const hint = napoveda(p);
+                if (cizi(p)) {
+                  // Jen informace: žádná šipka ani tlačítko, nic k otevření.
+                  return (
+                    <li key={`${p.typ}:${p.id}`} className="list-row !py-2 gap-3">
+                      {kruh}
+                      <Icon name="users" size={17} className="shrink-0 text-black/45" />
+                      <span className="min-w-0 flex-1">
+                        <span className="t-card block text-pretty">{p.nazev}</span>
+                        {hint && <span className="t-meta block text-pretty">{hint}</span>}
+                      </span>
+                    </li>
+                  );
+                }
                 const obsah = (
                   <>
                     {kruh}

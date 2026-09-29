@@ -215,9 +215,26 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       content = COALESCE(${nextContent}, content),
       category_id = ${nextCategory},
       checklist = COALESCE(${nextChecklist}::jsonb, checklist),
-      updated_at = NOW()
+      -- Posunout jen při skutečné změně textu: povinný návod porovnává
+      -- potvrzení s updated_at a pouhé uložení editoru (třeba jen přepnutí
+      -- „povinné") by všem zneplatnilo čtení a zamklo dnešní uzávěrky.
+      updated_at = CASE
+        WHEN title IS DISTINCT FROM COALESCE(${nextTitle}, title)
+          OR content IS DISTINCT FROM COALESCE(${nextContent}, content)
+          OR checklist IS DISTINCT FROM COALESCE(${nextChecklist}::jsonb, checklist)
+        THEN NOW() ELSE updated_at END
     WHERE id = ${id} AND team_id = ${c.teamId}
-    RETURNING id, title, content, checklist, category_id, updated_at`;
+    RETURNING id, title, content, checklist, category_id, updated_at, (updated_at >= NOW()) AS zmeneno`;
+
+  // Kdo text právě změnil, novou verzi zná — ať si nezamkne vlastní uzávěrku
+  // a nemusí potvrzovat, co sám napsal. Tablet čtení nepotvrzuje (je sdílený).
+  if (g?.zmeneno === true && c.role.typ !== 'kiosk') {
+    try {
+      await sql`
+        INSERT INTO guide_reads (guide_id, user_id) VALUES (${id}, ${c.meId})
+        ON CONFLICT (guide_id, user_id) DO UPDATE SET read_at = NOW()`;
+    } catch { /* guide_reads ještě není — nic se nezamyká */ }
+  }
 
   if (hasProduct) {
     try {

@@ -32,6 +32,8 @@ export async function GET(request: Request) {
     const volno = duvodVolna({ eventId: kontext.eventId, maSmenu: !!kontext.shift });
     const stav = await chybejiciPredUzaverkou({
       teamId: c.teamId, den: kontext.shiftDate, actorId: kontext.actorId, posadka: kontext.posadka,
+      // Stejné druhy jako brána v POST (tablet bez návodů), jinak by se rozešly.
+      typy: kontext.typy,
     });
     const { celkem, hotovo } = pocty(stav);
     return NextResponse.json({

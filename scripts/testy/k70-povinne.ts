@@ -10,7 +10,7 @@
 import { readFileSync } from 'node:fs';
 import type { Testy } from './_testy.ts';
 import {
-  seradPolozky, sestavStav, jeZamceno, pocty, duvodVolna, ukolProPosadku, denDokonceni, zpravaZamceno,
+  seradPolozky, sestavStav, jeZamceno, pocty, duvodVolna, ukolProPosadku, denDokonceni, dokoncenoKeDni, zpravaZamceno,
   type PovinnaPolozka,
 } from '../../lib/povinnePredUzaverkou.ts';
 
@@ -76,6 +76,13 @@ export default function ({ eq, ok }: Testy) {
   eq('den: 00:30 v zimě → včera', denDokonceni(new Date('2026-01-14T23:30:00Z')), '2026-01-14');
   eq('den: 06:00 v zimě → dnes', denDokonceni(new Date('2026-01-15T05:00:00Z')), '2026-01-15');
 
+  // Ranní směna: otevření v 5:40 je obchodně včerejšek, ale k dnešní
+  // uzávěrce patří (dřív kalendářní den, ranní směna nesmí zůstat zamčená).
+  ok('ke dni: 05:40 ranní otevření → dnešní uzávěrka', dokoncenoKeDni(new Date('2026-09-29T03:40:00Z'), '2026-09-29'));
+  ok('ke dni: 00:30 noční směny → včerejší uzávěrka', dokoncenoKeDni(new Date('2026-09-28T22:30:00Z'), '2026-09-28'));
+  ok('ke dni: 14:00 → dnes', dokoncenoKeDni(new Date('2026-09-29T12:00:00Z'), '2026-09-29'));
+  ok('ke dni: 14:00 včera → dnes ne', !dokoncenoKeDni(new Date('2026-09-28T12:00:00Z'), '2026-09-29'));
+
   // ---- hláška pro starší klienty (ukazují jen `error`) ----
   eq('hláška: jedna věc', zpravaZamceno([pol('ukol', 1, 'Vynést koš', false)]),
     'Uzávěrka je zamčená — nejdřív dokonči 1 věc: Vynést koš.');
@@ -102,6 +109,14 @@ export default function ({ eq, ok }: Testy) {
     /approved IS DISTINCT FROM FALSE/.test(db) && /r\.team_id = \$\{o\.teamId\}/.test(db));
   ok('DB: postupy podle obchodního dne (NIGHT_CUTOFF_HOUR)', /NIGHT_CUTOFF_HOUR/.test(db));
   ok('DB: návod vyžaduje přečtení aktuální verze', /gr\.read_at >= g\.updated_at/.test(db));
+  ok('DB: postupy i podle kalendářního dne (ranní směna)',
+    /- make_interval\(hours => \$\{NIGHT_CUTOFF_HOUR\}::int\), 'YYYY-MM-DD'\) = \$\{o\.den\}\s*OR to_char\(\(r\.completed_at AT TIME ZONE 'UTC'\) AT TIME ZONE 'Europe\/Prague', 'YYYY-MM-DD'\) = \$\{o\.den\}/.test(db));
+  ok('DB: akce jen v den uzávěrky (jinak by id staré akce obešlo zámek)',
+    /SELECT id, date FROM events/.test(db) && /denAkce !== shiftDate && denAkce !== dayPlus\(shiftDate, 1\)/.test(db));
+  ok('DB: tablet nehlídá návody (potvrdit je tam nejde)', /tablet \? \['postup', 'ukol'\]/.test(db));
+  ok('DB: úkol nese kdoId', /kdoId: kdo/.test(db));
+  ok('POST i GET: stejné druhy povinných z kontextu',
+    /typy: typyPovinnych/.test(post) && /typy: kontext\.typy/.test(get));
 
   const init = zdroj('app/api/init/route.ts');
   ok('DDL: tasks.require_before_closing', /ALTER TABLE tasks ADD COLUMN IF NOT EXISTS require_before_closing BOOLEAN DEFAULT FALSE/.test(init));
@@ -117,4 +132,13 @@ export default function ({ eq, ok }: Testy) {
 
   const navod = kod('app/api/guides/[id]/route.ts');
   ok('návody: opakované potvrzení obnoví čas čtení', /ON CONFLICT \(guide_id, user_id\) DO UPDATE SET read_at = NOW\(\)/.test(navod));
+  ok('návody: updated_at se posune jen při změně textu',
+    /updated_at = CASE/.test(navod) && !/updated_at = NOW\(\)/.test(navod));
+
+  const formular = kod('components/employee/CashClosing.tsx');
+  ok('formulář: zamčené odeslání je aria-disabled, ne disabled (klik ukáže zámek)',
+    /aria-disabled=\{!povinne!\.smiObejit/.test(formular) && !/disabled=\{!povinne!\.smiObejit\}/.test(formular));
+  ok('formulář: rozepsaná kasa na tabletu jen krátce', /PLATNOST_ROZPRACOVANEHO_TABLET_MS/.test(formular));
+  const zamek = kod('components/employee/ZamekUzaverky.tsx');
+  ok('zámek: kolegův úkol není hlavní akce', /mojeChybi\.find/.test(zamek) && /const cizi = /.test(zamek));
 }

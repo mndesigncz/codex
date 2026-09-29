@@ -9,7 +9,7 @@
 // Tenhle soubor je bez databáze, aby se pravidla dala otestovat
 // (scripts/testy/k70-povinne.ts). Dotazy jsou v lib/povinnePredUzaverkouDb.ts.
 
-import { businessDayOf } from './pragueTime.ts';
+import { businessDayOf, pragueDayOf } from './pragueTime.ts';
 import { czCount, type CzNoun } from './czech.ts';
 
 export type TypPovinne = 'postup' | 'ukol' | 'navod';
@@ -21,6 +21,9 @@ export interface PovinnaPolozka {
   ikona: string | null;
   /** Úkol: komu patří (jméno), „Kdokoli" u úkolu pro celý tým. */
   kdo?: string | null;
+  /** Úkol: id toho, komu patří (null = kdokoli). Formulář podle něj pozná
+   *  kolegův úkol, který sám neotevře ani neodškrtne. */
+  kdoId?: number | null;
   hotovo: boolean;
   /** Kam z položky jít. `pohled`/`arg` pro navigaci uvnitř plochy, `href` jako záloha. */
   odkaz: { pohled: 'procedures' | 'tasks' | 'guides'; arg?: string; href: string };
@@ -95,6 +98,16 @@ export function ukolProPosadku(assignedTo: number | null | undefined, posadka: n
  */
 export function denDokonceni(d: Date): string {
   return businessDayOf(d);
+}
+
+/**
+ * Počítá se dokončení k uzávěrce dne `den`? Obchodní den (noční směna po
+ * půlnoci) NEBO kalendářní den: ranní otevření v 5:40 je obchodně včerejšek,
+ * ale k dnešní uzávěrce patří — jen obchodní den by ranní směnu zamkl.
+ * SQL v lib/povinnePredUzaverkouDb.ts má obě podmínky spojené OR.
+ */
+export function dokoncenoKeDni(d: Date, den: string): boolean {
+  return businessDayOf(d) === den || pragueDayOf(d) === den;
 }
 
 const VEC: CzNoun = { one: 'věc', few: 'věci', many: 'věcí' };

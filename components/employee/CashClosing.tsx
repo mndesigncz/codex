@@ -51,6 +51,10 @@ const today = () => pragueToday();
 // ranní směna nesmí dostat večerní čísla.
 const KLIC_ROZPRACOVANO = 'managero-uzaverka-rozpracovano';
 const PLATNOST_ROZPRACOVANEHO_MS = 3 * 60 * 60 * 1000;
+// Tablet je jeden účet pro všechny u baru: rozepsaná kasa jednoho by se po
+// hodinách vrátila dalšímu, který by ji mohl odeslat za cizího. Na tabletu
+// tedy vydrží jen krátkou odbočku do zámku (úkol, postup) a zpátky.
+const PLATNOST_ROZPRACOVANEHO_TABLET_MS = 10 * 60 * 1000;
 
 type FormState = {
   date: string; shiftLabel: string;
@@ -521,6 +525,10 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
     try {
       sessionStorage.setItem(KLIC_ROZPRACOVANO, JSON.stringify({
         cas: Date.now(), uzivatel: user.id,
+        // Stav z doby uložení — obnova běží v uzávěru prvního vykreslení,
+        // kde isKiosk i members ještě nejsou načtené.
+        tablet: isKiosk,
+        jmeno: isKiosk && selEmployee != null ? (members.find(m => m.id === selEmployee)?.name ?? null) : null,
         form, movements, denoms, countMode, leaveCash, hoTodo, hoRunningOut, hoMessage,
         diffReason, diffNote, eventId, pickedShiftId, selEmployee, coworkerSel,
         payoutFromRegister, tipsInDrawer,
@@ -535,8 +543,9 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
       r = JSON.parse(sessionStorage.getItem(KLIC_ROZPRACOVANO) || 'null');
       sessionStorage.removeItem(KLIC_ROZPRACOVANO);
     } catch { return; }
+    const platnost = r?.tablet === true ? PLATNOST_ROZPRACOVANEHO_TABLET_MS : PLATNOST_ROZPRACOVANEHO_MS;
     if (!r || typeof r !== 'object' || r.uzivatel !== user.id || !r.form
-      || !(Date.now() - Number(r.cas) < PLATNOST_ROZPRACOVANEHO_MS)) return;
+      || !(Date.now() - Number(r.cas) < platnost)) return;
     setForm({ ...emptyForm(), ...r.form });
     if (Array.isArray(r.movements)) setMovements(r.movements);
     if (r.denoms && typeof r.denoms === 'object') setDenoms(r.denoms);
@@ -550,7 +559,11 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
     if (r.coworkerSel && typeof r.coworkerSel === 'object') setCoworkerSel(r.coworkerSel);
     if (typeof r.payoutFromRegister === 'boolean') setPayoutFromRegister(r.payoutFromRegister);
     if (typeof r.tipsInDrawer === 'boolean') setTipsInDrawer(r.tipsInDrawer);
-    setMsg('Rozepsanou uzávěrku máš zpátky — pokračuj, kde jsi skončil(a).');
+    // Na tabletu jmenovitě, ať si případný další u baru hned všimne, že
+    // rozepsaná kasa není jeho.
+    setMsg(r.tablet === true && typeof r.jmeno === 'string' && r.jmeno
+      ? `Rozepsaná uzávěrka za ${r.jmeno} je zpátky — pokud nejsi ${r.jmeno}, vyber svou směnu a začni znovu.`
+      : 'Rozepsanou uzávěrku máš zpátky — pokračuj, kde jsi skončil(a).');
     setTimeout(() => setMsg(m => (m.startsWith('Rozepsanou') ? '' : m)), 6000);
   };
 
@@ -888,7 +901,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
       )}
       {/* Zámek nad formulářem, ne pod ním: co chybí, se člověk dozví dřív,
           než začne počítat, a karta v kartě se nedělá (DP §4 D). */}
-      <ZamekUzaverky stav={povinne} actingAs={isSelf ? null : (selEmployee ?? null)}
+      <ZamekUzaverky stav={povinne} actingAs={isSelf ? null : (selEmployee ?? null)} proKoho={actorId}
         onZmena={povinneZmena} predOdchodem={ulozRozpracovane} pulz={pulzZamku} />
       {/* Výzva „Chybí ti uzávěrka" nad formulářem je od kola 69 widget
           uzaverky.moje_uzaverka; směny k vyplnění nabízí i první krok. */}
@@ -941,13 +954,14 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
             // Jediná inkoustová plocha formuláře (souhrn peněz, DP §4 D) — bez
             // rozmazání: blur v obsahu je zákaz a plná barva čte stejně.
             className="sticky top-2 z-20 w-full flex items-center justify-between gap-3 rounded-2xl bg-[#16181A] px-4 py-2.5 text-white shadow-[shadow:var(--shadow-float)] active:scale-[0.99] transition-transform">
-            <span className="text-xs font-medium text-white/70">Očekáváno v kase</span>
-            <span className="flex items-center gap-2.5 min-w-0">
+            {/* Na 390 px se vedle zámku a rozdílu nevejde celý popisek — zkrátí se, čísla ne. */}
+            <span className="min-w-0 truncate text-left text-xs font-medium text-white/70">Očekáváno<span className="hidden sm:inline"> v kase</span></span>
+            <span className="flex shrink-0 items-center gap-2.5">
               {/* Zámek slovem a ikonou, ne tónovaným chipem — ten je na
                   inkoustovém pásu nečitelný (viz rozdíl níž). */}
               {zamceno && (
                 <span className="shrink-0 inline-flex items-center gap-1 text-xs font-semibold text-white/85">
-                  <Icon name="lock" size={12} className="shrink-0" /> Zamčeno · {chybiPovinne.length}
+                  <Icon name="lock" size={12} className="shrink-0" /><span className="hidden sm:inline">Zamčeno ·</span> {chybiPovinne.length}
                   <span className="sr-only"> — {czCount(chybiPovinne.length, VEC)} chybí</span>
                 </span>
               )}
@@ -1486,8 +1500,15 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
             Zamčeno: limetku přebírá „Dokončit: …" v zámku a odeslání zešedne.
             Kdo smí obejít, odesílá dál (sklo), jen dostane otázku. */}
         {zamceno ? (
+          // Ne `disabled`: to by spolklo klepnutí i Enter a submit() by nemohl
+          // ukázat zámek. Šedé jen vzhledem, klik vyjede nahoru k „Dokončit".
           <Button type="submit" variant="secondary" size="lg" block icon="lock" loading={submitting}
-            disabled={!povinne!.smiObejit}
+            aria-disabled={!povinne!.smiObejit || undefined}
+            // Zamčeno bez práva obejít: klepnutí vyřídit tady. Jinak by prohlížeč
+            // napřed zastavil odeslání na prázdném povinném poli („Vyplňte toto
+            // pole") a místo zámku ukazoval na kasu.
+            onClick={povinne!.smiObejit ? undefined : (e: React.MouseEvent) => { e.preventDefault(); setErr(''); setPulzZamku(x => x + 1); }}
+            className={povinne!.smiObejit ? '' : 'opacity-45 cursor-not-allowed shadow-none'}
             aria-describedby="zamek-uzaverky-titulek">
             {povinne!.smiObejit ? 'Odeslat i bez povinných věcí' : 'Uzávěrka je zamčená'}
           </Button>
