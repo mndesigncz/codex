@@ -18,7 +18,7 @@
 import { useState, useEffect, useMemo, useCallback, useId } from 'react';
 import { Icon } from '../Icons';
 import {
-  Button, Card, Chip, EmptyState, ErrorState, Field, Input, Modal, Segmented, Select, Skeleton, Textarea, Toast,
+  Button, Card, Chip, EmptyState, ErrorState, Field, Input, Modal, Segmented, Select, Skeleton, SwitchRow, Textarea, Toast,
 } from '../ui';
 import { useCurrency } from '../CurrencyProvider';
 import { TaskChecklist, recurrenceLabel, RECURRENCE_OPTIONS, ChecklistItem } from '../TaskChecklist';
@@ -34,6 +34,7 @@ import { useDraft } from '@/lib/useDraft';
 import { DraftNote } from '../ui/DraftNote';
 import { czCount } from '@/lib/czech';
 import { vyberUkoly, rozdelPoDnech, jeCiziUkol, type Ukol } from '@/lib/ukolyPrehled';
+import { oznamZmenuPovinnych, ChipPredUzaverkou } from '../PredUzaverkou';
 
 interface Member { id: number; name: string; role: string }
 
@@ -45,7 +46,11 @@ const PRIORITIES = [
 const prioDot = (p: string) => p === 'high' ? 'bg-bad' : p === 'medium' ? 'bg-wait' : 'bg-[#C8F542]';
 const PRIORITA: Record<string, string> = { high: 'vysoká', medium: 'střední', low: 'nízká' };
 
-const emptyForm = () => ({ title: '', description: '', assignedTo: '', priority: 'medium', dueDate: '', recurrence: '', checklist: [] as ChecklistItem[] });
+const emptyForm = () => ({
+  title: '', description: '', assignedTo: '', priority: 'medium', dueDate: '', recurrence: '', checklist: [] as ChecklistItem[],
+  // Úkol zamyká uzávěrku dne, dokud není hotový (tasks.require_before_closing).
+  requireBeforeClosing: false,
+});
 type Form = ReturnType<typeof emptyForm>;
 
 const vyberCleny = (raw: any): Member[] =>
@@ -63,6 +68,8 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
   const tasks = useMemo(() => data.data ?? [], [data.data]);
   const members = clenoveData.data ?? [];
   const zadava = smi('ukoly.zadavat');
+  // Zámek uzávěrky nastaví jen vedení — server příznak bez těchhle práv ignoruje.
+  const smiPovinny = zadava || smi('ukoly.upravit');
 
   // Padesát úkolů napříč osmi lidmi a jediné, co šlo, bylo číst je podle
   // data. „Co má dneska Eva" nešlo zjistit jinak než očima přes celý seznam.
@@ -136,6 +143,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
       assignedTo: t.assignedTo == null ? '' : String(t.assignedTo),
       priority: t.priority, dueDate: t.dueDate ?? '',
       recurrence: t.recurrence ?? '', checklist: t.checklist ?? [],
+      requireBeforeClosing: t.requireBeforeClosing === true,
     });
     setShowForm(true); setError('');
   };
@@ -145,12 +153,18 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
     setError('');
     if (!form.title.trim()) { setError('Zadej název úkolu.'); return; }
     if (form.assignedTo === '' && !form.dueDate) { setError('U úkolu pro kohokoli vyber den (termín).'); return; }
+    // Zámek patří dni — bez termínu i opakování by úkol nezamkl nikdy nic (server vrátí totéž).
+    if (smiPovinny && form.requireBeforeClosing && !form.dueDate && !form.recurrence && !editingSeries) {
+      setError('Povinný úkol potřebuje den nebo opakování.'); return;
+    }
     setSaving(true);
     const spolecne = {
       title: form.title.trim(), description: form.description.trim() || null, priority: form.priority,
       assignedTo: form.assignedTo === '' ? null : parseInt(form.assignedTo),
       dueDate: form.dueDate || null,
       recurrence: form.recurrence || null,
+      // Bez práva se příznak neposílá vůbec: úprava od autora bez práva ho pak na serveru nechá, jak byl.
+      ...(smiPovinny ? { requireBeforeClosing: form.requireBeforeClosing } : {}),
     };
     try {
       // Úprava: všechno jde změnit jako při založení. U opakovaného úkolu server
@@ -165,6 +179,8 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
       koncept.hotovo(); closeForm();
       // Znovu načíst: opakovaný úkol si na serveru vygeneruje nejbližší výskyty.
       data.reload();
+      // Změna příznaku mění zámek dnešní uzávěrky — otevřený formulář uzávěrky se přepočítá.
+      oznamZmenuPovinnych();
       setZprava(novy ? 'Úkol je zadaný.' : 'Změny úkolu jsou uložené.');
     } catch (err) {
       setError(apiMessage(err, editingId ? 'Úkol se nepodařilo upravit.' : 'Úkol se nepodařilo vytvořit.'));
@@ -180,6 +196,8 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
     try {
       await fetch(URL_UKOLY, { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify(telo) }).then(okJson);
       data.reload();
+      // Splnění i přesun na jiný den mění zámek uzávěrky — otevřený formulář se přepočítá.
+      oznamZmenuPovinnych();
     } catch (e) {
       data.set(() => puvodni ?? []);
       setAkceChyba(apiMessage(e, chyba));
@@ -262,6 +280,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
             </span>
             {t.source === 'production' && <Chip tone="info" size="sm" icon="leaf">Výroba</Chip>}
             {opakovani && <Chip tone="muted" size="sm" icon="refresh">{opakovani}</Chip>}
+            {t.requireBeforeClosing && <ChipPredUzaverkou />}
             {/* Vedení odsud vidí, podle čeho obsluha vyrábí — a jedním ťuknutím je v tom návodu. */}
             {t.sourceMeta?.guideId && (
               <a href={`/employer/overview?view=guides&guide=${t.sourceMeta.guideId}`} className="btn btn-ghost btn-sm -my-1">
@@ -367,6 +386,13 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
               </Select>
             </Field>
           </div>
+          {smiPovinny && (
+            <ul className="list">
+              <SwitchRow title={<span className="inline-flex items-center gap-1.5"><Icon name="lock" size={15} className="shrink-0 text-black/55" />Vyžadovat před uzávěrkou</span>}
+                hint="Dokud nebude hotový, uzávěrka dne zůstane zamčená. Počítá se jen výskyt na daný den a jen pro lidi na směně."
+                checked={form.requireBeforeClosing} onChange={v => setForm(f => ({ ...f, requireBeforeClosing: v }))} />
+            </ul>
+          )}
 
           <fieldset className="min-w-0">
             <legend className="field-label">Kontrolní seznam <span className="text-black/45 font-normal">— nepovinné</span></legend>

@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
 import type { Testy } from './_testy.ts';
 import type { Divak } from '../../lib/widgety/typy.ts';
 import {
-  vyberUkoly, poTerminu, jePoTerminu, vRozsahu, rozdelPoDnech, podleLidi, splnenoDnes, jeCiziUkol,
+  vyberUkoly, poTerminu, jePoTerminu, vRozsahu, rozdelPoDnech, podleLidi, splnenoDnes, jeCiziUkol, jePovinnyDnes,
   vyberKarty, souhrnPlanu, kartySloupce, vyberPodnety, nejzadanejsi, novePodnety, prepniHlas,
 } from '../../lib/ukolyPrehled.ts';
 import { WIDGETY as UKOLY } from '../../lib/widgety/katalog/ukoly.ts';
@@ -59,6 +59,19 @@ export default function ({ eq, ok }: Testy) {
   eq('úkoly: rozdělení po dnech (po termínu, dnes — bez termínu první, týden, později, hotové)', [
     sk.poTerminu.map(t => t.id), sk.dnes.map(t => t.id), sk.tentoTyden.map(t => t.id), sk.pozdeji.map(t => t.id), sk.hotove.length,
   ], [[1, 3], [6, 2], [4], [5], 4]);
+
+  // Povinné před uzávěrkou: příznak přežije výběr (jinak by štítek nikde nesvítil)
+  // a v sekci Dnes jde povinný úkol nahoru — bez něj nepůjde dnešní uzávěrka.
+  const pov = vyberUkoly([
+    { id: 21, title: 'Obyčejný', status: 'pending', priority: 'medium', dueDate: DNES, assignedTo: 7 },
+    { id: 22, title: 'Zavřít bar', status: 'pending', priority: 'low', dueDate: DNES, assignedTo: null, requireBeforeClosing: true },
+    { id: 23, title: 'Povinný zítra', status: 'pending', priority: 'low', dueDate: '2026-09-27', assignedTo: null, requireBeforeClosing: true },
+    { id: 24, title: 'Starý tvar', status: 'pending', priority: 'low', dueDate: DNES, assignedTo: 7, requireBeforeClosing: 'ano' },
+  ]);
+  eq('povinné: příznak z API zůstane, cokoli jiného než true je false', pov.map(t => t.requireBeforeClosing), [false, true, true, false]);
+  eq('povinné: v sekci Dnes povinný úkol první, zbytek podle termínu a id', rozdelPoDnech(pov, DNES, '2026-10-03').dnes.map(t => t.id), [22, 21, 24]);
+  ok('povinné na dnešek: jen s dnešním termínem a nehotový',
+    jePovinnyDnes(pov[1], DNES) && !jePovinnyDnes(pov[2], DNES) && !jePovinnyDnes({ ...pov[1], status: 'done' }, DNES));
 
   const lide = podleLidi(u, DNES);
   eq('podle lidí: Eva má 2 aktivní a 1 po termínu, Petr jen úkol bez termínu (zítřejší výskyt série a ten za dva týdny se nepočítají), pro kohokoli na konci',

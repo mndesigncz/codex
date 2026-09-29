@@ -44,6 +44,7 @@ import KopieZPodniku, { useJinePodniky } from './organizace/KopieZPodniku';
 import { PlochaWidgetu, type HlavickaPlochy } from './widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from './widgety/useDataWidgetu';
 import { useOpravneni } from './role/useOpravneni';
+import { oznamZmenuPovinnych, ChipPredUzaverkou } from './PredUzaverkou';
 import {
   URL_NAVODY, URL_CTENARI, UDALOST_OTEVRIT_NAVOD, vyberNavody, poctyKategorii, kdyUpraveno, type NavodApi,
 } from '@/lib/navodyPrehled';
@@ -318,6 +319,8 @@ export default function Guides({ user, ticksFor, openGuideId }: {
       const res = await fetch(`/api/guides/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       await okJson(res);
       reloadGuides();
+      // Zapnutý/vypnutý zámek návodu mění, jestli jde odeslat uzávěrka.
+      if ('requireBeforeClosing' in body) oznamZmenuPovinnych();
     } catch (e) {
       setChyba(apiMessage(e, chybaText));
     }
@@ -385,9 +388,7 @@ export default function Guides({ user, ticksFor, openGuideId }: {
             const meta = [cat?.name, g.excerpt].filter(Boolean).join(' · ') || undefined;
             const stav = g.approved === false
               ? <Chip tone="wait" size="sm">Čeká na schválení</Chip>
-              : g.requireRead
-                ? <Chip tone={g.myRead ? 'ok' : 'wait'} size="sm" icon={g.myRead ? 'check' : 'book'}>{g.myRead ? 'Přečteno' : 'Povinné čtení'}</Chip>
-                : undefined;
+              : <StavCteni g={g} />;
             if (polozky.length === 0) {
               return (
                 // Vlastní <li> + ListRow as="div": obal <li className="contents"> by .list nenakreslil linku (DP §3.6).
@@ -461,6 +462,8 @@ export default function Guides({ user, ticksFor, openGuideId }: {
               });
               await okJson(res);
               reloadGuides();
+              // Potvrzený povinný návod odemyká uzávěrku — otevřený formulář se přepočítá sám.
+              oznamZmenuPovinnych();
             } catch (e) {
               setChyba(apiMessage(e, 'Přečtení se nepodařilo potvrdit.'));
             }
@@ -482,9 +485,12 @@ export default function Guides({ user, ticksFor, openGuideId }: {
           editing={editing}
           categories={categories}
           navrh={!smiVytvorit && !editing}
+          // Zámek uzávěrky jen vedení a nikdy na návrhu — server by ho stejně odmítl.
+          smiPredUzaverkou={smiUpravit && (editing ? guides.find(g => g.id === editing.id)?.approved !== false : smiVytvorit)}
+          predUzaverkou={editing ? guides.find(g => g.id === editing.id)?.requireBeforeClosing === true : false}
           defaultCategory={typeof activeCat === 'number' && activeCat > 0 ? activeCat : null}
           onClose={closeEditor}
-          onSaved={() => { reloadGuides(); closeEditor(); }}
+          onSaved={() => { reloadGuides(); closeEditor(); oznamZmenuPovinnych(); }}
         />
       )}
 
@@ -548,6 +554,9 @@ function GuideReader({
   const [ctenari, setCtenari] = useState(false);
   const [potvrzuji, setPotvrzuji] = useState(false);
   const povinne = summary?.requireRead === true;
+  // Před uzávěrkou platí jen přečtení aktuální verze — po úpravě obsahu je potřeba potvrdit znovu.
+  const predUzaverkou = summary?.requireBeforeClosing === true && summary?.approved !== false;
+  const aktualne = predUzaverkou ? summary?.myReadCurrent === true : summary?.myRead === true;
   const polozky: MenuItem[] = loading ? [] : [
     ...(summary?.approved === false && smiSchvalit ? [{ label: 'Schválit návrh', icon: 'check', onClick: () => { void onPatch({ approve: true }, 'Návod se neschválil.'); } }] : []),
     ...(smiUpravit ? [{ label: 'Upravit', icon: 'pencil', onClick: onEdit }] : []),
@@ -563,9 +572,16 @@ function GuideReader({
       hint: 'Ukáže se u kroku „Kontrola kasy" v uzávěrce',
       onClick: () => { void onPatch({ forClosing: !summary.forClosing }, 'Připnutí k uzávěrce se nepodařilo změnit.'); },
     }] : []),
+    ...(smiUpravit && summary && summary.approved !== false ? [{
+      label: predUzaverkou ? 'Nevyžadovat před uzávěrkou' : 'Vyžadovat přečtení před uzávěrkou', icon: 'lock',
+      hint: 'Kdo nemá přečtenou aktuální verzi, neodešle uzávěrku',
+      onClick: () => { void onPatch({ requireBeforeClosing: !predUzaverkou }, 'Zámek uzávěrky se nepodařilo změnit.'); },
+    }] : []),
     ...(smiMazat ? [{ label: 'Smazat', icon: 'trash', danger: true, onClick: onDelete }] : []),
   ];
-  const potvrdit = povinne && summary?.myRead !== true && !tablet;
+  const potvrdit = (povinne || predUzaverkou) && !aktualne && !tablet;
+  // Přečtené kdysi, ale od té doby se návod změnil — tlačítko musí říct proč znovu.
+  const znovu = predUzaverkou && summary?.myRead === true && !aktualne;
 
   return (
     <Modal open onClose={onClose} size="lg" title={reader.title || 'Návod'}
@@ -573,7 +589,7 @@ function GuideReader({
       footer={potvrdit ? (
         <Button variant="primary" icon="check" loading={potvrzuji}
           onClick={async () => { setPotvrzuji(true); await onMarkRead(); setPotvrzuji(false); }}>
-          Potvrzuji přečtení
+          {znovu ? 'Potvrzuji přečtení nové verze' : 'Potvrzuji přečtení'}
         </Button>
       ) : undefined}>
       {loading ? (
@@ -584,10 +600,10 @@ function GuideReader({
         </div>
       ) : (
         <>
-          {(polozky.length > 0 || povinne || summary?.forClosing || summary?.approved === false) && (
+          {(polozky.length > 0 || povinne || predUzaverkou || summary?.forClosing || summary?.approved === false) && (
             <div className="mb-4 flex flex-wrap items-center gap-2">
               {summary?.approved === false && <Chip tone="wait" size="sm">Čeká na schválení</Chip>}
-              {povinne && <Chip tone={summary?.myRead ? 'ok' : 'wait'} size="sm" icon={summary?.myRead ? 'check' : 'book'}>{summary?.myRead ? 'Přečteno' : 'Povinné čtení'}</Chip>}
+              {summary && summary.approved !== false && <StavCteni g={summary} />}
               {summary?.forClosing && <Chip tone="muted" size="sm" icon="pin">U uzávěrky</Chip>}
               {polozky.length > 0 && <Menu size="sm" label="Akce s návodem" items={polozky} className="ml-auto" />}
             </div>
@@ -599,6 +615,19 @@ function GuideReader({
               <Icon name="leaf" size={14} className="shrink-0 text-black/45" />
               {reader.itemMadeInHouse ? `Vyrábíme podle něj: ${reader.itemName}` : `Položka ${reader.itemName} už není vlastní výroba`}
             </p>
+          )}
+          {/* Proč tlačítko dole: bez něj by člověk nevěděl, že ho návod drží u uzávěrky. */}
+          {predUzaverkou && !aktualne && (
+            <div className="note note-wait mb-4 flex items-start gap-2.5 text-sm rise-in" role="status">
+              <Icon name="lock" size={16} className="shrink-0 mt-0.5" />
+              <span className="text-pretty">
+                {tablet
+                  ? 'Tenhle návod je povinný před uzávěrkou. Přečtení potvrdí každý ve svém účtu v aplikaci — na tabletu to nejde.'
+                  : znovu
+                    ? 'Návod se od tvého posledního čtení změnil. Dokud nepotvrdíš novou verzi, tvoje uzávěrka zůstane zamčená.'
+                    : 'Dokud nepotvrdíš přečtení, tvoje uzávěrka zůstane zamčená.'}
+              </span>
+            </div>
           )}
           {smiPovinne && povinne && ctenari && <CtenariNavodu guideId={reader.id} />}
           <div className="text-[15px] whitespace-pre-wrap break-words">{renderContent(reader.content)}</div>
@@ -686,12 +715,16 @@ function ReaderChecklist({ steps, guideId, ticksFor }: { steps: GuideStep[]; gui
 // ---------------------------------------------------------------------------
 
 function GuideEditor({
-  editing, categories, navrh, defaultCategory, onClose, onSaved,
+  editing, categories, navrh, smiPredUzaverkou, predUzaverkou, defaultCategory, onClose, onSaved,
 }: {
   editing: GuideFull | null;
   categories: Category[];
   /** Ukládá se jako návrh ke schválení (navody.navrhnout bez navody.vytvorit). */
   navrh: boolean;
+  /** Smí nastavit zámek uzávěrky (navody.upravit, ne u návrhu). */
+  smiPredUzaverkou: boolean;
+  /** Stav příznaku u upravovaného návodu (GET /api/guides/[id] ho nevrací, bere se ze seznamu). */
+  predUzaverkou: boolean;
   defaultCategory: number | null;
   onClose: () => void;
   onSaved: () => void;
@@ -707,6 +740,7 @@ function GuideEditor({
   // A druhým směrem: podle kterého návodu se položka vyrábí.
   const [itemId, setItemId] = useState<number | null>(editing?.itemId ?? null);
   const [alsoRecipe, setAlsoRecipe] = useState(true);
+  const [povinnyPredUzaverkou, setPovinnyPredUzaverkou] = useState(predUzaverkou);
   const [items, setItems] = useState<any[]>([]);
   const [stockCategories, setStockCategories] = useState<{ id: number; name: string }[]>([]);
   useEffect(() => {
@@ -738,7 +772,11 @@ function GuideEditor({
     setSaving(true);
     setError('');
     const checklist = normalizeSteps(steps);
-    const payload = { title: title.trim(), content, categoryId, checklist, productId, productName, itemId };
+    const payload = {
+      title: title.trim(), content, categoryId, checklist, productId, productName, itemId,
+      // Bez práva se klíč neposílá — PATCH s ním by bez navody.upravit skončil 403.
+      ...(smiPredUzaverkou ? { requireBeforeClosing: povinnyPredUzaverkou } : {}),
+    };
     try {
       const res = await fetch(editing ? `/api/guides/${editing.id}` : '/api/guides', {
         method: editing ? 'PATCH' : 'POST',
@@ -853,9 +891,39 @@ function GuideEditor({
           )}
         </div>
 
+        {smiPredUzaverkou && (
+          <ul className="list">
+            <SwitchRow
+              title={<span className="inline-flex items-center gap-1.5"><Icon name="lock" size={15} className="shrink-0 text-black/55" />Vyžadovat přečtení před uzávěrkou</span>}
+              hint={editing && povinnyPredUzaverkou
+                ? 'Každý musí potvrdit přečtení aktuální verze, jinak neodešle svou uzávěrku. Po uložení změn obsahu si ho všichni musí přečíst znovu.'
+                : 'Každý musí potvrdit přečtení aktuální verze, jinak neodešle svou uzávěrku. Po každé úpravě obsahu je potřeba potvrdit znovu.'}
+              checked={povinnyPredUzaverkou} onChange={setPovinnyPredUzaverkou} />
+          </ul>
+        )}
+
         {error && <p className="note note-danger text-sm" role="alert">{error}</p>}
       </div>
     </Modal>
+  );
+}
+
+/**
+ * Stav čtení u návodu — v seznamu i ve čtečce stejně. Povinný před uzávěrkou
+ * počítá jen přečtení aktuální verze (myReadCurrent), jinak stačí kdykoli.
+ */
+function StavCteni({ g }: { g: NavodApi }) {
+  const predUzaverkou = g.requireBeforeClosing === true;
+  if (!predUzaverkou && !g.requireRead) return null;
+  const precteno = predUzaverkou ? g.myReadCurrent === true : g.myRead === true;
+  const znovu = predUzaverkou && g.myRead === true && !precteno;
+  return (
+    <span className="inline-flex flex-wrap items-center justify-end gap-1.5">
+      <Chip tone={precteno ? 'ok' : 'wait'} size="sm" icon={precteno ? 'check' : znovu ? 'refresh' : 'book'}>
+        {precteno ? 'Přečteno' : znovu ? 'Přečíst znovu' : 'Povinné čtení'}
+      </Chip>
+      {predUzaverkou && !precteno && <ChipPredUzaverkou />}
+    </span>
   );
 }
 

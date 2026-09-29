@@ -13,6 +13,7 @@ import { pragueToday } from '@/lib/pragueTime';
 import { escHtml } from '@/lib/email';
 import { tymyCiselnikuHromadne } from '@/lib/tenant';
 import { clenoveSOpravnenim, maOpravneni } from '@/lib/opravneniDb';
+import { chybejiciPredUzaverkou } from '@/lib/povinnePredUzaverkouDb';
 
 export const dynamic = 'force-dynamic';
 // Digest iteruje přes všechny týmy a u každého sahá na pokladnu — default 10 s
@@ -85,18 +86,16 @@ export async function GET(request: Request) {
         stillOn = (rows as any[]).map(r => String(r.name));
       } catch { /* ignore */ }
 
-      // --- required procedures ---
+      // --- povinné před uzávěrkou (postupy a úkoly) ---
+      // Stejná pravidla jako brána uzávěrky; úkoly bez filtru osádky, protože
+      // souhrn je za celý podnik. Návody ne — čtení je osobní, ne denní.
       let procsMissing: string[] = [];
-      try {
-        const rows = await sql`
-          SELECT p.name FROM procedures p
-          WHERE p.team_id = ${team.id} AND p.require_before_closing = TRUE
-            AND NOT EXISTS (
-              SELECT 1 FROM procedure_runs r
-              WHERE r.procedure_id = p.id AND r.status = 'completed'
-                AND to_char((r.completed_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD') = ${today})`;
-        procsMissing = (rows as any[]).map(r => r.name);
-      } catch { /* ignore */ }
+      let ukolyMissing: string[] = [];
+      {
+        const stav = await chybejiciPredUzaverkou({ teamId: Number(team.id), den: today, actorId: null, posadka: null, typy: ['postup', 'ukol'] });
+        procsMissing = stav.polozky.filter(x => x.typ === 'postup').map(x => x.nazev);
+        ukolyMissing = stav.polozky.filter(x => x.typ === 'ukol').map(x => x.nazev);
+      }
 
       // Write off today's sales first, so the low-stock count below is honest.
       // Bez force: pokud /api/pos/cron synchronizoval nedávno (5min throttle),
@@ -237,7 +236,7 @@ export async function GET(request: Request) {
       } catch { /* hodnocení nemusí existovat */ }
 
       // Nothing at all happened and nothing needs eyes — stay silent.
-      if (closings.length === 0 && worked.length === 0 && stillOn.length === 0 && procsMissing.length === 0 && lowCount === 0 && tomorrowEvents.length === 0 && !guestLine && !reviewLine) continue;
+      if (closings.length === 0 && worked.length === 0 && stillOn.length === 0 && procsMissing.length === 0 && ukolyMissing.length === 0 && lowCount === 0 && tomorrowEvents.length === 0 && !guestLine && !reviewLine) continue;
 
       // Tržby a rozdíl v kase jen pro příjemce s finance.trzby (kolo 67):
       // souhrn může dostávat i role, která peníze vidět nemá. Vedení má obojí,
@@ -252,6 +251,7 @@ export async function GET(request: Request) {
           real.length ? (trzby ? `Tržba ${czk(revenue)} · ${verdict}` : verdict) : 'Bez uzávěrky',
           worked.length ? `${worked.length} lidí odpracovalo ${worked.reduce((s, w) => s + w.hours, 0).toFixed(1)} h` + (stillOn.length ? `, ${stillOn.length} ještě na směně` : '') : stillOn.length ? `${stillOn.length} ještě na směně` : null,
           procsMissing.length ? `⚠️ nedokončené postupy: ${procsMissing.join(', ')}` : null,
+          ukolyMissing.length ? `⚠️ nesplněné povinné úkoly: ${ukolyMissing.join(', ')}` : null,
           lowCount ? `${lowCount} položek dochází${makeCount ? ` (${makeCount} k výrobě)` : ''}` : null,
           tomorrowEvents.length ? `Zítra: ${tomorrowEvents.map((e: any) => `${e.title}${e.start_time ? ` od ${String(e.start_time).slice(0, 5)}` : ''}`).join(', ')}` : null,
           trzby ? posLine : null,
@@ -268,13 +268,14 @@ export async function GET(request: Request) {
             <tr><td style="padding:8px 0; color:#666;">Kasa</td><td style="text-align:right; font-weight:700;">${escHtml(verdict)}</td></tr>
             <tr><td style="padding:8px 0; color:#666;">Na směně</td><td style="text-align:right;">${escHtml([...worked.map(w => `${w.name} (${w.hours} h)`), ...stillOn.map(n => `${n} (ještě pracuje)`)].join(', ') || '—')}</td></tr>
             <tr><td style="padding:8px 0; color:#666;">Povinné postupy</td><td style="text-align:right;">${procsMissing.length ? '⚠️ chybí: ' + escHtml(procsMissing.join(', ')) : 'hotové ✓'}</td></tr>
+            ${ukolyMissing.length ? `<tr><td style="padding:8px 0; color:#666;">Povinné úkoly</td><td style="text-align:right;">⚠️ chybí: ${escHtml(ukolyMissing.join(', '))}</td></tr>` : ''}
             <tr><td style="padding:8px 0; color:#666;">Docházející zásoby</td><td style="text-align:right;">${lowCount ? lowCount + ' položek' + (makeCount ? ` (${makeCount} k výrobě)` : '') : 'nic ✓'}</td></tr>
             ${trzby && posLine ? `<tr><td style="padding:8px 0; color:#666;">Pokladna</td><td style="text-align:right;">${escHtml(posLine.replace('Pokladna: ', ''))}</td></tr>` : ''}
             ${guest ? `<tr><td style="padding:8px 0; color:#666;">Hosté</td><td style="text-align:right;">${escHtml(guest)}</td></tr>` : ''}
             ${reviewLine ? `<tr><td style="padding:8px 0; color:#666;">Hodnocení</td><td style="text-align:right;">${escHtml(reviewLine)}</td></tr>` : ''}
             ${tomorrowEvents.length ? `<tr><td style="padding:8px 0; color:#666;">Zítra akce</td><td style="text-align:right;">${escHtml(tomorrowEvents.map((e: any) => `${e.title}${e.start_time ? ' od ' + String(e.start_time).slice(0, 5) : ''}`).join(', '))}</td></tr>` : ''}
           </table>`;
-        return { verdict, pushBody, emailHtml, warning: (trzby && diff < 0) || procsMissing.length > 0 };
+        return { verdict, pushBody, emailHtml, warning: (trzby && diff < 0) || procsMissing.length > 0 || ukolyMissing.length > 0 };
       };
       const sTrzbami = souhrn(true);
       const bezTrzeb = souhrn(false);

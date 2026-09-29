@@ -156,6 +156,27 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     }
   }
 
+  // Povinný před uzávěrkou: zamkne uzávěrku každému, kdo nemá přečtenou
+  // aktuální verzi. Přepínač samostatně (jako forClosing), nebo spolu s
+  // úpravou obsahu níž, když ho editor pošle s formulářem.
+  const maPovinny = body.requireBeforeClosing !== undefined;
+  const upravujeObsah = ['title', 'content', 'categoryId', 'checklist', 'productId', 'itemId']
+    .some(k => Object.prototype.hasOwnProperty.call(body, k));
+  if (maPovinny && !opr.has('navody.upravit')) return zakazano();
+  if (maPovinny && !upravujeObsah) {
+    try {
+      const [row] = await sql`
+        UPDATE guides SET require_before_closing = ${body.requireBeforeClosing === true}
+        WHERE id = ${id} AND team_id = ${c.teamId} AND approved IS DISTINCT FROM FALSE
+        RETURNING id`;
+      // Neschválený návrh povinný být nemůže — nejdřív ho někdo musí schválit.
+      if (!row) return NextResponse.json({ error: 'Návrh návodu nejde označit jako povinný — nejdřív ho schval.' }, { status: 400 });
+      return NextResponse.json({ ok: true });
+    } catch {
+      return NextResponse.json({ error: 'Povinné před uzávěrkou není dostupné — spusť /api/init.' }, { status: 400 });
+    }
+  }
+
   if (!opr.has('navody.upravit')) return zakazano();
   const { title, content, categoryId, checklist } = body;
   const hasProduct = Object.prototype.hasOwnProperty.call(body, 'productId');
@@ -204,6 +225,16 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     } catch { /* sloupce ještě nejsou — vazba se prostě neuloží */ }
   }
   if (hasItem && c.teamId) await pripniNavodKPolozce(Number(c.teamId), id, itemId);
+  let povinny: boolean | undefined;
+  if (maPovinny) {
+    try {
+      const [row] = await sql`
+        UPDATE guides SET require_before_closing = ${body.requireBeforeClosing === true}
+        WHERE id = ${id} AND team_id = ${c.teamId} AND approved IS DISTINCT FROM FALSE
+        RETURNING require_before_closing`;
+      povinny = row ? row.require_before_closing === true : undefined;
+    } catch { /* sloupec ještě není — obsah se uložil, příznak ne */ }
+  }
 
   return NextResponse.json({
     guide: {
@@ -213,6 +244,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       checklist: parseChecklist(g.checklist),
       categoryId: g.category_id,
       updatedAt: g.updated_at,
+      ...(povinny !== undefined ? { requireBeforeClosing: povinny } : {}),
     },
   });
 }
@@ -245,9 +277,12 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   const [g] = await sql`SELECT id FROM guides WHERE id = ${id} AND team_id = ${c.teamId}`;
   if (!g) return NextResponse.json({ error: 'Návod nenalezen' }, { status: 404 });
   try {
+    // Opakované potvrzení obnoví čas: návod povinný před uzávěrkou chce
+    // přečtenou AKTUÁLNÍ verzi (read_at >= updated_at), a potvrzení z doby
+    // před úpravou by jinak zamklo uzávěrku natrvalo.
     await sql`
       INSERT INTO guide_reads (guide_id, user_id) VALUES (${id}, ${c.meId})
-      ON CONFLICT (guide_id, user_id) DO NOTHING`;
+      ON CONFLICT (guide_id, user_id) DO UPDATE SET read_at = NOW()`;
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: 'Potvrzení není dostupné — spusť /api/init.' }, { status: 400 });

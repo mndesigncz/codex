@@ -485,8 +485,8 @@ export const KATALOG: Opravneni[] = [
  {
   "id": "uzaverky.obejit_postupy",
   "oblast": "Uzávěrky",
-  "nazev": "Obejít povinné postupy",
-  "popis": "Odeslat uzávěrku i v případě, že nejsou splněné povinné postupy.",
+  "nazev": "Obejít povinné úkoly a postupy",
+  "popis": "Odeslat uzávěrku, i když nejsou splněné povinné postupy, úkoly a návody.",
   "citlivost": "střední",
   "vyzaduje": [
    "uzaverky.vytvorit"

@@ -20,6 +20,7 @@ import { useMemo, useState } from 'react';
 import { Icon } from './Icons';
 import { Button, Chip, Modal } from './ui';
 import { recurrenceLabel } from './TaskChecklist';
+import { ChipPredUzaverkou } from './PredUzaverkou';
 import { pragueToday } from '@/lib/pragueTime';
 
 export type BoardTask = {
@@ -32,6 +33,8 @@ export type BoardTask = {
   recurrence?: string | null;
   teamTask?: boolean;
   completedByName?: string | null;
+  /** Zamyká uzávěrku dne, dokud není hotový — karta nese štítek se zámkem. */
+  requireBeforeClosing?: boolean;
 };
 
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -138,7 +141,10 @@ export default function TaskWeekBoard({ tasks, weekStart, onComplete, labelFor, 
       <div className="flex gap-3 overflow-x-auto scrollbar-thin pb-2 -mx-1 px-1 snap-x">
         {days.map(d => {
           const key = ymd(d);
-          const list = (byDay.get(key) ?? []).slice().sort((a, b) => Number(a.status === 'done') - Number(b.status === 'done'));
+          // Hotové dolů; z nehotových nahoru ty, bez kterých nepůjde uzávěrka dne.
+          const list = (byDay.get(key) ?? []).slice().sort((a, b) =>
+            (Number(a.status === 'done') - Number(b.status === 'done'))
+            || (Number(!!b.requireBeforeClosing) - Number(!!a.requireBeforeClosing)));
           const isToday = key === today;
           return (
             <section
@@ -212,6 +218,7 @@ function Obsah({ t, done, label, opakovani }: { t: BoardTask; done: boolean; lab
         <span className="sr-only">Priorita {PRIORITA[t.priority] ?? 'střední'}.</span>
         {label && <span className="text-xs text-black/55 truncate max-w-[9rem]">{label}</span>}
         {opakovani && <><Icon name="refresh" size={13} className="shrink-0 text-black/45" title={`Opakuje se: ${opakovani}`} /><span className="sr-only">Opakuje se: {opakovani}.</span></>}
+        {t.requireBeforeClosing && !done && <ChipPredUzaverkou />}
       </div>
       {done && t.completedByName && <p className="text-xs text-black/45 mt-1">splnil {t.completedByName}</p>}
     </>

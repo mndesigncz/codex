@@ -835,6 +835,13 @@ export async function GET(request: Request) {
     // per-step skip reasons on a run + which procedures are mandatory before the closing
     await ddl(sql`ALTER TABLE procedure_runs ADD COLUMN IF NOT EXISTS skip_reasons JSONB`);
     await ddl(sql`ALTER TABLE procedures ADD COLUMN IF NOT EXISTS require_before_closing BOOLEAN DEFAULT FALSE`);
+    // Povinné před uzávěrkou i u úkolů a návodů (kolo 70). Úkol zamyká jen
+    // svým výskytem na den uzávěrky; částečný index drží dotaz brány malý,
+    // protože povinných úkolů je proti všem úkolům podniku hrstka. Návod
+    // zvlášť od require_read: povinné čtení jen připomíná, tohle zamyká.
+    await ddl(sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS require_before_closing BOOLEAN DEFAULT FALSE`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS tasks_povinne ON tasks (team_id, due_date) WHERE require_before_closing = TRUE`);
+    await ddl(sql`ALTER TABLE guides ADD COLUMN IF NOT EXISTS require_before_closing BOOLEAN DEFAULT FALSE`);
     // items/categories that only show inside their category, not on the "Vše" overview
     await ddl(sql`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS hide_from_overview BOOLEAN DEFAULT FALSE`);
     await ddl(sql`ALTER TABLE inventory_categories ADD COLUMN IF NOT EXISTS hide_from_overview BOOLEAN DEFAULT FALSE`);

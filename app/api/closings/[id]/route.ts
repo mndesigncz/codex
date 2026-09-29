@@ -6,6 +6,8 @@ import { notifyUser } from '@/lib/push';
 import { getConnection } from '@/lib/storyous';
 import { daySummaryFor } from '@/lib/posMirror';
 import { normalizeHandover, normalizeMovements } from '@/lib/closing';
+import { chybejiciPredUzaverkou } from '@/lib/povinnePredUzaverkouDb';
+import type { PovinnaPolozka } from '@/lib/povinnePredUzaverkou';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -180,18 +182,21 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
       }));
   } catch { /* nepodstatné */ }
 
-  // Povinné postupy, které ten den nikdo nedokončil — uzávěrka na ně čeká.
+  // Povinné věci, které ten den zůstaly nesplněné — stejná pravidla jako
+  // brána uzávěrky (lib/povinnePredUzaverkouDb): obchodní den s nocí, jen
+  // schválené postupy, běhy jen tohoto podniku, úkoly osádky té směny.
+  // Návody ne: potvrzení čtení je osobní a dnešní stav by o starém dni lhal.
+  // `missingProcedures` zůstává kvůli stávajícímu klientovi.
   let missingProcedures: string[] = [];
-  if (full) try {
-    missingProcedures = (await sql`
-      SELECT p.name FROM procedures p
-      WHERE p.team_id = ${teamId} AND p.require_before_closing = TRUE
-        AND NOT EXISTS (
-          SELECT 1 FROM procedure_runs r
-          WHERE r.procedure_id = p.id AND r.status = 'completed'
-            AND to_char((r.completed_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD') = ${day})` as any[])
-      .map(r => String(r.name));
-  } catch { /* nepodstatné */ }
+  let missingRequired: PovinnaPolozka[] = [];
+  if (full) {
+    const posadka = (Array.isArray(c.shift_employees) ? c.shift_employees : [])
+      .map((x: any) => Number(x)).filter((n: number) => Number.isFinite(n) && n > 0);
+    if (!posadka.includes(Number(c.created_by))) posadka.push(Number(c.created_by));
+    const stav = await chybejiciPredUzaverkou({ teamId, den: day, actorId: null, posadka, typy: ['postup', 'ukol'] });
+    missingRequired = stav.polozky;
+    missingProcedures = stav.polozky.filter(x => x.typ === 'postup').map(x => x.nazev);
+  }
 
   // --- úkoly odškrtnuté ten den ---
   let tasks: any[] = [];
@@ -292,7 +297,7 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
       approvedByName: c.approved_by ? (person(c.approved_by)?.name ?? null) : null,
       ...(trzbaSkryta ? { trzbaSkryta: true } : {}),
     },
-    crew, covered, planned, attendance, procedures, missingProcedures,
+    crew, covered, planned, attendance, procedures, missingProcedures, missingRequired,
     tasks, receipts, pos, products, notes, day,
   });
 }

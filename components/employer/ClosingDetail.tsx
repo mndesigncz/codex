@@ -26,6 +26,7 @@ import { openPrint, esc } from '@/lib/printDoc';
 import { DiscardGuard } from '../ui/DiscardGuard';
 import { Avatar, Button, Chip } from '../ui';
 import { useSmi } from '../widgety/NavigaceKontext';
+import type { PovinnaPolozka } from '@/lib/povinnePredUzaverkou';
 
 type Person = { id: number; name: string; avatar?: string | null };
 
@@ -41,6 +42,9 @@ interface Detail {
   attendance: { id: number; employee: Person | null; clockIn: string; clockOut: string | null; source: string | null; note: string | null; minutes: number | null }[];
   procedures: { id: number; name: string; employee: Person | null; status: string; completedAt: string | null; durationSeconds: number | null; done: number; total: number; required: boolean }[];
   missingProcedures: string[];
+  /** Povinné postupy a úkoly, které ten den chyběly (návody ne — stav čtení je dnešní, ne tehdejší).
+   *  Starší server pole neposílá, pak platí jen missingProcedures. */
+  missingRequired?: PovinnaPolozka[];
   tasks: { id: number; title: string; employee: Person | null; completedAt: string | null; priority: string }[];
   receipts: { id: number; employee: Person | null; photoUrl: string | null; supplier: string | null; amount: number; note: string | null; createdAt: string }[];
   pos: null | {
@@ -124,6 +128,12 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
   }, [id]);
 
   const c = d?.closing;
+  // Nový server posílá postupy i úkoly; starší jen názvy postupů — ty se převedou do stejného tvaru.
+  const chybelo: Pick<PovinnaPolozka, 'typ' | 'id' | 'nazev' | 'ikona' | 'kdo'>[] = d
+    ? (Array.isArray(d.missingRequired)
+      ? d.missingRequired
+      : (d.missingProcedures ?? []).map((nazev, i) => ({ typ: 'postup' as const, id: -1 - i, nazev, ikona: null, kdo: null })))
+    : [];
   const diff = c ? cashDifference(c) : 0;
   const lines = c ? expectedCashLines(c, { payoutLabel: 'Výplata zaměstnance' }) : [];
   const cashTips = c ? Math.max(0, (c.tips ?? 0) - (Number(c.tips_card) || 0)) : 0;
@@ -478,7 +488,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
                 )}
               </Section>
 
-              {(d.procedures.length > 0 || d.missingProcedures.length > 0 || d.tasks.length > 0) && (
+              {(d.procedures.length > 0 || chybelo.length > 0 || d.tasks.length > 0) && (
                 <Section title="Co se ten den udělalo">
                   {d.procedures.length > 0 && (
                     <div className="divide-y divide-black/[0.06] mb-2">
@@ -497,11 +507,24 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
                       ))}
                     </div>
                   )}
-                  {d.missingProcedures.length > 0 && (
-                    <p className="flex gap-2 text-[13px] text-wait-ink leading-snug">
-                      <Icon name="warning" size={13} className="shrink-0 mt-0.5" />
-                      <span>Povinné postupy, které ten den nikdo nedokončil: {d.missingProcedures.join(', ')}.</span>
-                    </p>
+                  {chybelo.length > 0 && (
+                    // Vedení u schvalování vidí, co bylo před uzávěrkou povinné a nestalo se —
+                    // uzávěrka mohla projít obejitím nebo proto, že člověk neměl směnu.
+                    <div className="note note-wait text-[13px] leading-snug" role="note">
+                      <p className="flex items-center gap-2 font-medium">
+                        <Icon name="lock" size={13} className="shrink-0" />
+                        Povinné před uzávěrkou, co ten den chybělo
+                      </p>
+                      <ul className="mt-1.5 space-y-1 pl-[21px]">
+                        {chybelo.map(x => (
+                          <li key={`${x.typ}-${x.id}`} className="flex items-center gap-1.5 min-w-0">
+                            <Icon name={x.typ === 'ukol' ? 'check' : (x.ikona || 'clipboard')} size={13} className="shrink-0 opacity-70" />
+                            <span className="truncate">{x.nazev}</span>
+                            <span className="shrink-0 opacity-70">· {x.typ === 'ukol' ? `úkol${x.kdo ? `, ${x.kdo}` : ''}` : 'postup'}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   )}
                   {d.tasks.length > 0 && (
                     <div className="divide-y divide-black/[0.06] mt-2">

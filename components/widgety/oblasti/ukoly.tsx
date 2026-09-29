@@ -37,10 +37,11 @@ import { useDataWidgetu, type StavDat } from '../useDataWidgetu';
 import { useNavigace, useSmi } from '../NavigaceKontext';
 import { useOpravneni } from '../../role/useOpravneni';
 import { apiMessage, okJson } from '@/lib/api';
+import { oznamZmenuPovinnych, ChipPredUzaverkou } from '../../PredUzaverkou';
 import { pragueToday, pragueHM } from '@/lib/pragueTime';
 import { czCount, czForm, DEN, type CzNoun } from '@/lib/czech';
 import {
-  vyberUkoly, vRozsahu, poTerminu, podleLidi, splnenoDnes, jeCiziUkol, type Ukol, type RozsahUkolu,
+  vyberUkoly, vRozsahu, poTerminu, podleLidi, splnenoDnes, jeCiziUkol, povinnePrvni, type Ukol, type RozsahUkolu,
 } from '@/lib/ukolyPrehled';
 
 // ---------------------------------------------------------------------------
@@ -149,6 +150,8 @@ function useOdskrtavani(data: StavDat<Ukol[]>, ja: number | null, nahled: boolea
       await fetch(URL_UKOLY, { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify({ id: t.id, status: novy }) }).then(okJson);
       // Srovná i ostatní widgety a nástroj nad /api/tasks (sdílená mezipaměť).
       data.reload();
+      // Povinný úkol zamyká uzávěrku — otevřený formulář uzávěrky se přepočítá.
+      oznamZmenuPovinnych();
       return true;
     } catch (e) {
       data.set(prev => (prev ?? []).map(x => (x.id === t.id ? { ...x, status: t.status } : x)));
@@ -183,7 +186,8 @@ function UkolyDnes({ velikost, nastaveni, nahled }: WidgetProps<{ rozsah?: strin
     const dnes = pragueToday();
     const vidim = vRozsahu(data.data ?? [], rozsah, ja.id).filter(t => t.status !== 'done' || odskrtnute.has(t.id));
     const po = vidim.filter(t => t.dueDate && t.dueDate < dnes);
-    const dnesni = vidim.filter(t => !t.dueDate || t.dueDate === dnes);
+    // Povinné před uzávěrkou nahoru — bez nich nepůjde dnešní uzávěrka odeslat.
+    const dnesni = vidim.filter(t => !t.dueDate || t.dueDate === dnes).sort(povinnePrvni<Ukol>(dnes));
     const vse = [...po, ...dnesni];
     return {
       radky: vse,
@@ -227,7 +231,8 @@ function UkolyDnes({ velikost, nastaveni, nahled }: WidgetProps<{ rozsah?: strin
                     onClick={() => { setOdskrtnute(p => new Set(p).add(t.id)); void o.prepni(t); }} />}
                   title={<span className={hotovo ? 'text-black/45' : undefined}>{t.title}</span>}
                   meta={meta || undefined}
-                  right={pozde && !hotovo ? <Chip tone="bad" size="sm">Po termínu</Chip> : undefined}
+                  right={pozde && !hotovo ? <Chip tone="bad" size="sm">Po termínu</Chip>
+                    : t.requireBeforeClosing && !hotovo ? <ChipPredUzaverkou /> : undefined}
                 />
               );
             })}
@@ -347,6 +352,8 @@ function Tyden({ nahled }: WidgetProps) {
     try {
       await fetch(URL_UKOLY, { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify({ id: t.id, move: true, dueDate: datum }) }).then(okJson);
       data.reload();
+      // Přesun povinného úkolu na jiný den mění, kterou uzávěrku zamyká.
+      if (t.requireBeforeClosing) oznamZmenuPovinnych();
     } catch (e) {
       data.set(prev => (prev ?? []).map(x => (x.id === t.id ? { ...x, dueDate: t.dueDate } : x)));
       setChybaPresunu(apiMessage(e, 'Úkol se nepodařilo přesunout.'));

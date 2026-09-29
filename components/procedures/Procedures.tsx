@@ -592,7 +592,7 @@ function ProcedureEditor({
 
         {smiPovinny && !navrh && (
           <ul className="list">
-            <SwitchRow title="Vyžadovat před uzávěrkou" hint="Bez dokončení tohoto postupu nepůjde odeslat uzávěrka dne."
+            <SwitchRow title="Vyžadovat před uzávěrkou" hint="Dokud nebude dokončený, uzávěrka dne zůstane zamčená. Dokončení po půlnoci (do 6:00) se počítá ke včerejší uzávěrce."
               checked={requireBeforeClosing} onChange={setRequireBeforeClosing} />
           </ul>
         )}

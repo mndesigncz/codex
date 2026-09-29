@@ -16,6 +16,7 @@ import MessengerDock from '../chat/MessengerDock';
 import { usePlan, ProBadge } from '../Pro';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { NavigaceKontext, useHodnotaNavigace } from '../widgety/NavigaceKontext';
+import { otevriPostupPoPrechodu } from '@/lib/otevriPostup';
 import type { PohledNavigace } from '@/lib/widgety/typy';
 import {
   KioskShiftProvider, KioskShiftGate, WhoIsWorking, ActivePersonChip,
@@ -106,6 +107,9 @@ function KioskShell({ user }: { user: KioskUser }) {
     const zalozka = POHLED_NA_ZALOZKU[pohled];
     if (!zalozka) return;
     if (zalozka === 'guides') setWantGuide(arg && /^\d+$/.test(arg) ? Number(arg) : null);
+    // Konkrétní postup ze zamčené uzávěrky: detail se otevře, až Postupy
+    // naskočí (i po „Kdo jsi?" ve WhoFirst — událost se zkouší znovu).
+    if (zalozka === 'procedures' && arg && /^\d+$/.test(arg)) otevriPostupPoPrechodu(Number(arg));
     setTab(zalozka);
   }, []);
   const smiPohledTabletu = useCallback((pohled: string) => pohled in POHLED_NA_ZALOZKU, []);

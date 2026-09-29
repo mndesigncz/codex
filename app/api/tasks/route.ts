@@ -39,7 +39,32 @@ const shape = (r: any) => ({
   source: r.source ?? null,
   sourceRef: r.source_ref ?? null,
   sourceMeta: r.source_meta ?? null,
+  // Kolo 70: výskyt úkolu zamyká uzávěrku svého dne, dokud není hotový.
+  requireBeforeClosing: r.require_before_closing === true,
 });
+
+// Povinný před uzávěrkou smí úkol označit jen ten, kdo úkoly zadává nebo
+// upravuje (jako u postupů, kde návrh zaměstnance povinný být nemůže) — jinak
+// by si kdokoli mohl zamknout uzávěrku celé směny. Bez práva se příznak
+// ignoruje, ne odmítá: formulář ho bez práva ani neukazuje.
+const smiPovinny = (opr: Set<string>) => opr.has('ukoly.zadavat') || opr.has('ukoly.upravit');
+const BEZ_DNE = 'Povinný úkol před uzávěrkou potřebuje den nebo opakování.';
+
+// Příznak se zapisuje ZVLÁŠŤ, best-effort. Kdyby byl v INSERTech, před
+// migrací by spadly i záložní vložení bez nového sloupce a úkol by nešel
+// založit vůbec. Takhle se před migrací jen neuloží příznak.
+async function zapisPovinny(flag: boolean, cil: { id?: number | null; seriesId?: string | null; odDne?: string }) {
+  try {
+    if (cil.seriesId && cil.odDne) {
+      // Série: jen budoucí nesplněné výskyty — historie se nepřepisuje.
+      await sql`UPDATE tasks SET require_before_closing = ${flag}
+        WHERE series_id = ${cil.seriesId} AND due_date >= ${cil.odDne} AND status <> 'done'`;
+    } else if (cil.seriesId) {
+      await sql`UPDATE tasks SET require_before_closing = ${flag} WHERE series_id = ${cil.seriesId}`;
+    }
+    if (cil.id != null) await sql`UPDATE tasks SET require_before_closing = ${flag} WHERE id = ${cil.id}`;
+  } catch { /* sloupec ještě není — úkol platí, jen bez zámku */ }
+}
 
 const RECURRENCES = ['daily', 'weekdays', 'weekly'];
 const TARGET_UPCOMING = 5;   // keep this many future, undone occurrences per series
@@ -111,6 +136,15 @@ async function topUpSeries(teamId: number) {
                   ${tmpl.priority}, 'pending', ${date}, ${tmpl.recurrence},
                   ${JSON.stringify(resetChecklist(tmpl.checklist))}::jsonb, ${seriesId})`;
       } catch { /* best-effort */ }
+    }
+    // Nové výskyty dědí „povinný před uzávěrkou" ze vzoru. Sloupec se
+    // záměrně nečte v SELECTu nahoře — před migrací by top-up skončil celý.
+    if (inserts.length) {
+      try {
+        await sql`
+          UPDATE tasks SET require_before_closing = (SELECT COALESCE(require_before_closing, FALSE) FROM tasks WHERE id = ${tmpl.id})
+          WHERE series_id = ${seriesId} AND due_date = ANY(${inserts}::text[])`;
+      } catch { /* před migrací */ }
     }
   }
 }
@@ -197,6 +231,10 @@ export async function POST(req: NextRequest) {
     : [];
   const priority = b.priority ?? 'medium';
   const dueDate = b.dueDate || null;
+  const povinny = b.requireBeforeClosing === true && smiPovinny(c.opr);
+  // Zámek patří dni — úkol bez termínu a bez opakování by nezamkl nikdy nic
+  // a manažer by si myslel, že hlídá.
+  if (povinny && !dueDate && !recurrence) return NextResponse.json({ error: BEZ_DNE }, { status: 400 });
 
   // Build the list of dates to create: one for a single task, or the first
   // TARGET_UPCOMING occurrences for a recurring one.
@@ -226,6 +264,10 @@ export async function POST(req: NextRequest) {
       VALUES (${title}, ${b.description ?? null}, ${assignedTo ?? c.meId}, ${c.meId}, ${priority}, 'pending', ${dueDate})
       RETURNING *`;
     first = row;
+  }
+  if (povinny && first) {
+    await zapisPovinny(true, seriesId ? { seriesId } : { id: Number(first.id) });
+    first = { ...first, require_before_closing: true };
   }
 
   // Notify the assignee (specific person) when it isn't self-assigned.
@@ -337,6 +379,20 @@ export async function PATCH(req: NextRequest) {
       : (task.recurrence ?? null);
     const dueDate = b.dueDate !== undefined ? (b.dueDate || null) : task.due_date;
 
+    // Příznak: z formuláře jen s právem, jinak zůstává, jak byl. Zapisuje se
+    // vždycky (i beze změny), protože přestavba série níž maže budoucí výskyty
+    // a zakládá nové s výchozím FALSE — bez toho by úprava názvu zámek ztratila.
+    const bylPovinny = task.require_before_closing === true;
+    const povinny = b.requireBeforeClosing !== undefined && smiPovinny(c.opr)
+      ? b.requireBeforeClosing === true
+      : bylPovinny;
+    if (povinny && !newRecurrence && !(dueDate || task.series_id)) {
+      return NextResponse.json({ error: BEZ_DNE }, { status: 400 });
+    }
+    // Kam příznak zapsat — série (budoucí nesplněné), nebo jeden řádek.
+    let cilPovinny: { id?: number | null; seriesId?: string | null; odDne?: string } =
+      task.series_id ? { seriesId: task.series_id, odDne: today } : { id };
+
     if (task.series_id) {
       const sid = task.series_id;
       // Shared text fields propagate to every occurrence for consistency.
@@ -351,9 +407,11 @@ export async function PATCH(req: NextRequest) {
         await sql`DELETE FROM tasks WHERE series_id = ${sid} AND due_date >= ${today} AND status <> 'done'`;
         if (!newRecurrence) {
           // No longer recurring → one standalone task on the anchor date.
-          await sql`
+          const [samostatny] = await sql`
             INSERT INTO tasks (title, description, assigned_to, created_by, team_id, priority, status, due_date, recurrence, checklist, series_id)
-            VALUES (${title}, ${description}, ${assignedTo}, ${task.created_by}, ${c.teamId}, ${priority}, 'pending', ${anchor}, NULL, ${JSON.stringify(freshChecklist)}::jsonb, NULL)`;
+            VALUES (${title}, ${description}, ${assignedTo}, ${task.created_by}, ${c.teamId}, ${priority}, 'pending', ${anchor}, NULL, ${JSON.stringify(freshChecklist)}::jsonb, NULL)
+            RETURNING id`;
+          if (samostatny?.id != null) cilPovinny = { id: Number(samostatny.id) };
         } else {
           const dates = [anchor];
           let cursor = anchor;
@@ -376,6 +434,7 @@ export async function PATCH(req: NextRequest) {
       // Single task. Adding a recurrence turns it into a series.
       if (newRecurrence) {
         const sid = genSeriesId();
+        cilPovinny = { seriesId: sid, odDne: today, id };
         try {
           await sql`
             UPDATE tasks SET title = ${title}, description = ${description}, priority = ${priority},
@@ -385,6 +444,8 @@ export async function PATCH(req: NextRequest) {
           if (c.teamId) await topUpSeries(c.teamId);
         } catch {
           await sql`UPDATE tasks SET title = ${title}, description = ${description}, priority = ${priority}, assigned_to = ${assignedTo}, due_date = ${dueDate || today} WHERE id = ${id}`;
+          // Série se nezaložila (před migrací) — příznak patří jen tomuhle řádku.
+          cilPovinny = { id };
         }
       } else {
         try {
@@ -397,6 +458,8 @@ export async function PATCH(req: NextRequest) {
         }
       }
     }
+
+    if (povinny || bylPovinny) await zapisPovinny(povinny, cilPovinny);
 
     // Return a representative row (the edited one if it survived, else the series' next occurrence).
     let [row] = await sql`

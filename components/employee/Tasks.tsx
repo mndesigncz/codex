@@ -29,6 +29,7 @@ import { useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useSmi } from '../widgety/NavigaceKontext';
 import { URL_UKOLY, UKOL, Zaskrtnuti } from '../widgety/oblasti/ukoly';
 import { vyberUkoly, vRozsahu, rozdelPoDnech, jeCiziUkol, type Ukol } from '@/lib/ukolyPrehled';
+import { oznamZmenuPovinnych, ChipPredUzaverkou } from '../PredUzaverkou';
 
 interface Props {
   user: { id?: string };
@@ -73,6 +74,8 @@ export default function Tasks({ user }: Props) {
       const pts = Number(d?.pointsEarned);
       if (newStatus === 'done' && Number.isFinite(pts) && pts > 0) setBodyToast(`+${czCount(pts, BOD)} za splněný úkol`);
       data.reload();
+      // Hotový povinný úkol odemyká uzávěrku — otevřený formulář uzávěrky se přepočítá sám.
+      oznamZmenuPovinnych();
     } catch (e) {
       data.set(prev => (prev ?? []).map(t => (t.id === task.id ? { ...t, status: puvodni } : t)));
       setSaveErr(apiMessage(e, 'Změnu stavu se nepodařilo uložit.'));
@@ -126,6 +129,7 @@ export default function Tasks({ user }: Props) {
             {task.source === 'production' && <Chip tone="info" size="sm" icon="leaf">Výroba</Chip>}
             {task.teamTask && <Chip tone="info" size="sm" icon="users">Pro kohokoli</Chip>}
             {opakovani && <Chip tone="muted" size="sm" icon="refresh">{opakovani}</Chip>}
+            {task.requireBeforeClosing && !hotovo && <ChipPredUzaverkou />}
             {hotovo && task.completedByName && <span>splnil {task.completedByName}</span>}
             {/* Postup bydlí v návodu — odsud se na něj dá dostat jedním ťuknutím místo hledání v seznamu návodů. */}
             {task.sourceMeta?.guideId && (
