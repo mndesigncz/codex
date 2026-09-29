@@ -30,6 +30,7 @@ import { useOpravneni } from '../role/useOpravneni';
 import BezOpravneni from '../role/BezOpravneni';
 import { useStrazRole, coSeZahodi } from '../role/rozepsano';
 import { NavigaceKontext, useHodnotaNavigace } from '../widgety/NavigaceKontext';
+import { otevriPostupPoPrechodu } from '@/lib/otevriPostup';
 
 // Pohledy se stahují až při otevření.
 //
@@ -219,6 +220,8 @@ export default function EmployerLayout({ user }: Props) {
     setRecipeProduct(view === 'recipes' ? arg : undefined);
     setChatConvId(view === 'chat' && arg ? Number(arg) : null);
     setGuideId(view === 'guides' && arg ? Number(arg) : null);
+    // Konkrétní postup (zamčená uzávěrka, widget) — detail se otevře, až se Postupy připojí.
+    if (view === 'procedures' && arg && /^\d+$/.test(arg)) otevriPostupPoPrechodu(Number(arg));
     // Rada, která říká „nastav to v Nastavení → Pokladna", musí umět
     // otevřít rovnou tu záložku. Bez tohohle vedla do Účtu a člověk
     // hledal dál sám.

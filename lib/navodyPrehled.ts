@@ -19,6 +19,10 @@ export interface NavodApi {
   excerpt?: string;
   hasChecklist?: boolean;
   forClosing?: boolean;
+  /** Zamyká uzávěrku každému, kdo nemá přečtenou AKTUÁLNÍ verzi. */
+  requireBeforeClosing?: boolean;
+  /** Divák potvrdil přečtení po poslední úpravě obsahu (myRead = kdykoli). */
+  myReadCurrent?: boolean;
 }
 
 /** Řádek GET /api/guides/ctenari (povinné čtení po návodech; jen navody.povinne_cteni). */

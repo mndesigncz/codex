@@ -18,7 +18,8 @@
   "completedByName": null,
   "completedAt": null,
   "source": null,
-  "sourceMeta": null
+  "sourceMeta": null,
+  "requireBeforeClosing": false
  },
  {
   "id": 2,
@@ -55,7 +56,8 @@
   "sourceMeta": {
    "guideId": 4,
    "guideTitle": "Sirupy na baru"
-  }
+  },
+  "requireBeforeClosing": false
  },
  {
   "id": 3,
@@ -76,7 +78,8 @@
   "completedByName": null,
   "completedAt": null,
   "source": null,
-  "sourceMeta": null
+  "sourceMeta": null,
+  "requireBeforeClosing": false
  },
  {
   "id": 4,
@@ -97,7 +100,8 @@
   "completedByName": null,
   "completedAt": null,
   "source": null,
-  "sourceMeta": null
+  "sourceMeta": null,
+  "requireBeforeClosing": false
  },
  {
   "id": 5,
@@ -118,7 +122,8 @@
   "completedByName": null,
   "completedAt": null,
   "source": null,
-  "sourceMeta": null
+  "sourceMeta": null,
+  "requireBeforeClosing": false
  },
  {
   "id": 6,
@@ -139,7 +144,8 @@
   "completedByName": null,
   "completedAt": null,
   "source": null,
-  "sourceMeta": null
+  "sourceMeta": null,
+  "requireBeforeClosing": false
  },
  {
   "id": 7,
@@ -160,7 +166,8 @@
   "completedByName": "Eva Testová",
   "completedAt": "CAS_DNES",
   "source": null,
-  "sourceMeta": null
+  "sourceMeta": null,
+  "requireBeforeClosing": false
  },
  {
   "id": 8,
@@ -181,7 +188,8 @@
   "completedByName": "Petr Novák",
   "completedAt": "CAS_PREDVCEREM",
   "source": null,
-  "sourceMeta": null
+  "sourceMeta": null,
+  "requireBeforeClosing": false
  },
  {
   "id": 9,
@@ -215,6 +223,7 @@
   "completedByName": null,
   "completedAt": null,
   "source": null,
-  "sourceMeta": null
+  "sourceMeta": null,
+  "requireBeforeClosing": true
  }
 ]

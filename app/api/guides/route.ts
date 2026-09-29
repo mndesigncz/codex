@@ -94,6 +94,21 @@ export async function GET(request: Request) {
   // ostatní z něj nic nepotřebují (UI ho ukazuje jen vedení).
   const vidiCtenare = opr.has('navody.povinne_cteni');
 
+  // Kolo 70: „povinný před uzávěrkou" a jestli mám přečtenou AKTUÁLNÍ verzi
+  // (potvrzení starší než poslední úprava obsahu neplatí). Zvlášť a
+  // best-effort — kdyby byl sloupec v hlavním dotazu, před migrací by spadl
+  // do nouzového SELECTu bez povinného čtení a schvalování.
+  const predUzaverkou = new Map<number, { povinny: boolean; aktualni: boolean }>();
+  try {
+    for (const r of await sql`
+      SELECT g.id, g.require_before_closing,
+        EXISTS (SELECT 1 FROM guide_reads gr WHERE gr.guide_id = g.id AND gr.user_id = ${c.meId}
+                  AND (g.updated_at IS NULL OR gr.read_at >= g.updated_at)) AS aktualni
+      FROM guides g WHERE g.team_id = ${c.teamId}` as any[]) {
+      predUzaverkou.set(Number(r.id), { povinny: r.require_before_closing === true, aktualni: r.aktualni === true });
+    }
+  } catch { /* před migrací — nic není povinné */ }
+
   const guides = rows.map((g: any) => ({
     id: g.id,
     title: g.title,
@@ -109,6 +124,9 @@ export async function GET(request: Request) {
     productId: g.product_id ?? null,
     itemId: g.item_id != null ? Number(g.item_id) : null,
     forClosing: g.for_closing === true,
+    requireBeforeClosing: predUzaverkou.get(Number(g.id))?.povinny === true,
+    // Přečteno po poslední úpravě. `myRead` zůstává „někdy potvrzeno".
+    myReadCurrent: predUzaverkou.get(Number(g.id))?.aktualni === true,
   }));
 
   return NextResponse.json({ guides });
@@ -162,6 +180,14 @@ export async function POST(request: Request) {
     // Vazba na skladovou položku „vyrábíme sami“ — ověřuje tým, takže cizí
     // položku připnout nejde.
     if (itemId && guide?.id) await pripniNavodKPolozce(c.teamId, Number(guide.id), itemId);
+    // Povinný před uzávěrkou jen od toho, kdo návody upravuje, a nikdy u
+    // návrhu (jako u postupů). Zvlášť, aby INSERT prošel i před migrací.
+    if (body.requireBeforeClosing === true && !isProposal && c.role.opravneni.has('navody.upravit') && guide?.id) {
+      try {
+        await sql`UPDATE guides SET require_before_closing = TRUE WHERE id = ${guide.id} AND team_id = ${c.teamId}`;
+        guide.require_before_closing = true;
+      } catch { /* sloupec ještě není */ }
+    }
   } catch {
     // approval columns not migrated yet — insert the old shape (auto-approved)
     [guide] = await sql`
@@ -202,6 +228,7 @@ export async function POST(request: Request) {
       updatedAt: guide.updated_at,
       excerpt: excerpt(guide.content),
       hasChecklist: checklistLength(guide.checklist) > 0,
+      requireBeforeClosing: guide.require_before_closing === true,
     },
   });
 }

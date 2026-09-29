@@ -18,6 +18,7 @@ import { PageSkeleton } from '../ui';
 import { useOpravneni } from '../role/useOpravneni';
 import BezOpravneni from '../role/BezOpravneni';
 import { NavigaceKontext, useHodnotaNavigace } from '../widgety/NavigaceKontext';
+import { otevriPostupPoPrechodu } from '@/lib/otevriPostup';
 
 // Pohledy se stahují až při otevření — viz EmployerLayout. Zaměstnanec
 // otevře za směnu obvykle dvě obrazovky; stahovat kvůli tomu uzávěrku,
@@ -103,6 +104,10 @@ export default function EmployeeLayout({ user }: Props) {
   const navigate = (view: string, arg?: string) => {
     setInventoryCat(view === 'inventory' ? arg : undefined);
     setGuideId(view === 'guides' && arg ? Number(arg) : null);
+    // Proklik na KONKRÉTNÍ postup (zamčená uzávěrka, widget) — bez toho
+    // skončil člověk na seznamu a hledal. Detail otevře událost, až se
+    // Postupy připojí. Úkoly `arg` zatím nevyužijí (seznam je krátký).
+    if (view === 'procedures' && arg && /^\d+$/.test(arg)) otevriPostupPoPrechodu(Number(arg));
     setCurrentView(view);
   };
   const [sidebarOpen, setSidebarOpen] = useState(true);

@@ -1,15 +1,16 @@
 import { NextResponse } from 'next/server';
-import { pozaduj, jeOdpoved, maOpravneni, clenoveSOpravnenim, type Kontext } from '@/lib/opravneniDb';
+import { pozaduj, jeOdpoved, clenoveSOpravnenim, type Kontext } from '@/lib/opravneniDb';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { cashDifference, czk, normalizeMovements, normalizeDenominations, normalizeHandover, ShiftPerson } from '@/lib/closing';
 import { dayPlus, pragueToday } from '@/lib/pragueTime';
-import { windowOf } from '@/lib/shiftWindow';
-import { denSmeny, denUzaverkyPro, zavreneDnyTydne, smenaBezUzaverky } from '@/lib/staleShifts';
+import { denSmeny, zavreneDnyTydne, smenaBezUzaverky } from '@/lib/staleShifts';
 import { mzdaZaSmenu } from '@/lib/mzdaSmeny';
 import { getConnection } from '@/lib/storyous';
 import { eventWindowFromPos } from '@/lib/eventPos';
-import { clenovePodniku, clenPodniku, idClenu } from '@/lib/tenant';
+import { clenovePodniku, idClenu } from '@/lib/tenant';
+import { urciKontextUzaverky, chybejiciPredUzaverkou } from '@/lib/povinnePredUzaverkouDb';
+import { jeZamceno, zpravaZamceno } from '@/lib/povinnePredUzaverkou';
 
 export const dynamic = 'force-dynamic';
 
@@ -307,6 +308,10 @@ export async function GET() {
     // s volným datem" a „sdílený tablet".
     isEmployer: p.zaJineho,
     isKiosk: p.tablet,
+    // Smí odeslat uzávěrku i se zamčenými povinnými věcmi. Dřív to formulář
+    // odvozoval z isEmployer (za_jineho), server z obejit_postupy — Provozní
+    // pak dostal „Odeslat přesto" a hned nato 400.
+    obejitPovinne: p.obejitPostupy,
     eligibleShifts,
     members,
     scheduledByDate,
@@ -325,14 +330,6 @@ export async function POST(request: Request) {
   const p = prava(c);
 
   const b = await request.json();
-  const today = pragueToday();
-  // Datum z formuláře je návrh. Pole má vždycky hodnotu, takže „bez data"
-  // odsud nikdy nepřijde — a po půlnoci v něm stojí zítřek jen proto, že
-  // tak šly hodiny. Obchodní den se spočítá níž, až víme, za koho se zavírá.
-  const zvoleno = typeof b.date === 'string' && b.date ? b.date : null;
-  const isKiosk = p.tablet;
-  // Za jiného zavírá tablet (výběrem směny) i člen s uzaverky.za_jineho.
-  const smiZaJineho = c.role.opravneni.has('uzaverky.za_jineho');
   let payDailyCash = false;
   try {
     const [team] = await sql`SELECT pay_daily_cash FROM teams WHERE id = ${c.teamId}`;
@@ -358,76 +355,13 @@ export async function POST(request: Request) {
   } catch { /* not migrated */ }
   if (typeof b.tipsInDrawer === 'boolean') tipsInDrawer = b.tipsInDrawer;
 
-  // The kiosk AND the employer can submit ON BEHALF of a chosen team member —
-  // the closing is attributed to them (author, one-per-day, notifications).
-  let actorId = c.meId;
-  const wantEmployeeId = parseInt(b.employeeId);
-  if (isKiosk && !Number.isFinite(wantEmployeeId)) {
-    return NextResponse.json({ error: 'Vyber, kdo uzávěrku odesílá.' }, { status: 400 });
-  }
-  if (smiZaJineho && Number.isFinite(wantEmployeeId) && wantEmployeeId !== c.meId) {
-    // Kolo 62: členství nebo zrcadlo; tablet helper bez volby vyloučí sám.
-    const emp = await clenPodniku(wantEmployeeId, c.teamId);
-    if (!emp) {
-      return NextResponse.json({ error: 'Zaměstnanec není ve vašem týmu.' }, { status: 400 });
-    }
-    // Tablet jedná za člověka, který se u něj vybral — uzávěrku za něj
-    // odešle jen tehdy, když ji ten člověk smí odeslat i sám (oponentura
-    // c4). Jinak by Kuchař bez uzaverky.vytvorit uzávěrku odeslal přes
-    // tablet. Každý dnešní zaměstnanec i vedení to oprávnění má.
-    if (isKiosk && !(await maOpravneni(wantEmployeeId, c.teamId, 'uzaverky.vytvorit'))) {
-      return NextResponse.json({ error: 'Tenhle člověk podle své role uzávěrku odesílat nesmí.' }, { status: 403 });
-    }
-    actorId = wantEmployeeId;
-  }
-
-  // No closing a day that hasn't happened yet.
-  if (zvoleno && zvoleno > today) {
-    return NextResponse.json({ error: 'Uzávěrku nelze vyplnit pro budoucí datum.' }, { status: 400 });
-  }
-
-  // Ke kterému dni uzávěrka patří — jedním pravidlem s příchodem
-  // (`denUzaverky`). Dřív se datum z formuláře bralo jako hotová věc a záchrana
-  // „směna přes půlnoc" se spouštěla jen bez data, což se z formuláře nikdy
-  // nestalo. Sobotní směna zavřená v 0:20 tak ležela pod nedělí, sobota se
-  // hlásila jako nezavřená a kolegům přibyly nedělní směny. Od teď je `date`
-  // obchodní den a `shift_date` totéž — jedna pravda pro všechny čtenáře.
-  const shiftDate = await denUzaverkyPro(c.teamId, actorId, zvoleno, new Date());
+  // Kdo zavírá, za který obchodní den, kterou směnu, jakou akci a s kým —
+  // stejně jako GET /api/closings/povinne, aby zámek ve formuláři a brána
+  // tady nikdy nehleděly na jiný den nebo jinou osádku.
+  const kontext = await urciKontextUzaverky(c, b);
+  if (kontext instanceof NextResponse) return kontext;
+  const { actorId, shiftDate, shift, eventId, posadka: shiftEmployeeIds, typy: typyPovinnych } = kontext;
   const date = shiftDate;
-  // Somebody who worked twice that day says WHICH shift they are closing;
-  // without that we would always resolve to the first one and the second
-  // closing would look like a duplicate of the first.
-  const pickedShiftId = parseInt(b.shiftId);
-  let shift: any = null;
-  if (Number.isFinite(pickedShiftId)) {
-    const [picked] = await sql`
-      SELECT id, start_time, end_time FROM shifts
-      WHERE id = ${pickedShiftId} AND employee_id = ${actorId} AND date = ${shiftDate}`;
-    if (picked) shift = picked;
-  }
-  if (!shift) {
-    [shift] = await sql`
-      SELECT id, start_time, end_time FROM shifts
-      WHERE employee_id = ${actorId} AND date = ${shiftDate}
-      ORDER BY start_time ASC LIMIT 1`;
-  }
-
-  // One closing per person per shift.
-  // A closing may belong to an off-site event — it lives BESIDE the shop's
-  // closing for the day (one per person per event), never instead of it.
-  let eventId: number | null = null;
-  if (b.eventId !== undefined && b.eventId !== null && b.eventId !== '') {
-    const wantEvent = parseInt(b.eventId);
-    if (Number.isFinite(wantEvent)) {
-      try {
-        const [ev] = await sql`SELECT id FROM events WHERE id = ${wantEvent} AND team_id = ${c.teamId}`;
-        if (!ev) return NextResponse.json({ error: 'Akce nenalezena.' }, { status: 400 });
-        eventId = wantEvent;
-      } catch {
-        return NextResponse.json({ error: 'Akce nejsou dostupné — spusť /api/init.' }, { status: 400 });
-      }
-    }
-  }
 
   // One closing per person per BUSINESS DAY. The day is what the till is
   // counted for: a Friday shift that closes at 00:40 still belongs to Friday,
@@ -461,67 +395,21 @@ export async function POST(request: Request) {
   // trusted. Otherwise it needs approval when the person wasn't on shift.
   const approved = p.bezSchvaleni || !!shift;
 
-  // The closing covers the whole SHIFT, so record everyone who worked it. The
-  // time window comes from an explicitly passed shift, otherwise the author's
-  // own. A window is only usable when it doesn't wrap past midnight — for an
-  // overnight shift we fall back to everybody scheduled that day.
-  let windowShift: any = shift;
-  const wantShiftId = parseInt(b.shiftId);
-  if (Number.isFinite(wantShiftId)) {
-    try {
-      const [s] = await sql`SELECT id, start_time, end_time FROM shifts WHERE id = ${wantShiftId} AND date = ${shiftDate} AND team_id = ${c.teamId}`;
-      if (s) windowShift = s;
-    } catch { /* ignore — keep the author's own shift */ }
-  }
-  // Who else worked this shift: real-time overlap of the spans, so a night
-  // shift (18:00–02:00) pairs correctly with 20:00–02:00 instead of falling
-  // back to "everyone rostered that day".
-  const shiftEmployeeIds: number[] = [actorId];
-  try {
-    const mineWindow = windowShift ? windowOf({ ...windowShift, date: shiftDate }) : null;
-    const crew = await sql`
-      SELECT DISTINCT s.employee_id AS id, s.start_time, s.end_time
-      FROM shifts s JOIN users u ON u.id = s.employee_id
-      WHERE s.team_id = ${c.teamId} AND s.date = ${shiftDate}`;
-    for (const r of crew as any[]) {
-      const id = Number(r.id);
-      if (!Number.isFinite(id) || shiftEmployeeIds.includes(id)) continue;
-      // Without a shift of our own there is no window to compare against, so
-      // there is nothing to prove anybody shared it — claiming the whole day's
-      // roster would file other people's work under this closing.
-      if (!mineWindow) continue;
-      const theirs = windowOf({ ...r, date: shiftDate });
-      // Unknown times can't be told apart — keep them on the shift.
-      if (theirs && !(mineWindow.start < theirs.end && theirs.start < mineWindow.end)) continue;
-      shiftEmployeeIds.push(id);
-    }
-  } catch { /* shifts table issue — the author alone owns the closing */ }
-
-  // Required procedures gate the closing server-side too — the client check
-  // alone would be decorative. uzaverky.obejit_postupy may override (they
-  // confirmed in UI).
-  // Not for an off-site event (the stall doesn't run the shop's opening
-  // routine) and not for someone who wasn't on the shift at all — that closing
-  // already goes to the employer for approval, so blocking it would just leave
-  // the money unreported. The runs are matched against the SHIFT's day, so a
-  // night shift filed after midnight still sees what was done before midnight.
+  // Povinné věci (postupy, úkoly, návody) hlídá i server — kontrola jen ve
+  // formuláři by byla dekorace. uzaverky.obejit_postupy smí odeslat přesto
+  // (ve formuláři to potvrdil). Ne za akci (stánek nedělá rutinu podniku) a
+  // ne za člověka bez směny — ta uzávěrka jde vedení ke schválení a blokovat
+  // ji by nechalo peníze nenahlášené. Zdroj, který nejde zjistit (migrace),
+  // neblokuje. Odpověď nese `kod` a seznam, aby formulář ukázal zámek.
   if (!p.obejitPostupy && eventId == null && shift) {
-    try {
-      const req = await sql`
-        SELECT p.id, p.name FROM procedures p
-        WHERE p.team_id = ${c.teamId} AND p.require_before_closing = TRUE
-          AND NOT EXISTS (
-            SELECT 1 FROM procedure_runs r
-            WHERE r.procedure_id = p.id AND r.team_id = ${c.teamId} AND r.status = 'completed'
-              AND to_char((r.completed_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD')
-                  IN (${shiftDate}, ${date})
-          )`;
-      if ((req as any[]).length > 0) {
-        return NextResponse.json({
-          error: `Nejdřív dokonči povinné postupy: ${(req as any[]).map((r: any) => r.name).join(', ')}.`,
-        }, { status: 400 });
-      }
-    } catch { /* column not migrated yet — don't block */ }
+    const stav = await chybejiciPredUzaverkou({ teamId: c.teamId, den: shiftDate, actorId, posadka: shiftEmployeeIds, typy: typyPovinnych });
+    if (jeZamceno(stav)) {
+      return NextResponse.json({
+        error: zpravaZamceno(stav.polozky),
+        kod: 'POVINNE_NESPLNENO',
+        chybi: stav.polozky,
+      }, { status: 400 });
+    }
   }
 
   // Itemised movements and the reason for a mismatch travel with the closing.

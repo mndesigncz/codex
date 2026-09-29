@@ -38,6 +38,8 @@ export interface Ukol {
   checklist: PolozkaChecklistu[];
   source: string | null;
   sourceMeta: { guideId?: number | null; guideTitle?: string | null } | null;
+  /** Dokud není hotový, zamyká uzávěrku dne (jen výskyt s termínem ten den). */
+  requireBeforeClosing?: boolean;
 }
 
 const den = (v: unknown): string | null => (/^\d{4}-\d{2}-\d{2}/.test(String(v ?? '')) ? String(v).slice(0, 10) : null);
@@ -71,6 +73,8 @@ export function vyberUkoly(raw: unknown): Ukol[] {
       : [],
     source: t?.source ?? null,
     sourceMeta: t?.sourceMeta && typeof t.sourceMeta === 'object' ? t.sourceMeta : null,
+    // Bez tohohle by klient příznak zahodil a štítek „Před uzávěrkou" by nikde nesvítil.
+    requireBeforeClosing: t?.requireBeforeClosing === true,
   })).filter(t => Number.isFinite(t.id));
 }
 
@@ -90,6 +94,14 @@ export function vRozsahu(ukoly: readonly Ukol[], rozsah: RozsahUkolu, ja: number
 
 const podleTerminu = (a: Ukol, b: Ukol) => String(a.dueDate ?? '').localeCompare(String(b.dueDate ?? '')) || a.id - b.id;
 
+/** Povinný úkol na dnešek (zamyká dnešní uzávěrku). */
+export const jePovinnyDnes = (t: Pick<Ukol, 'requireBeforeClosing' | 'dueDate' | 'status'>, dnes: string) =>
+  t.requireBeforeClosing === true && t.dueDate === dnes && !jeHotovy(t);
+
+/** V sekci „Dnes" jdou povinné úkoly nahoru — dokud nejsou hotové, uzávěrka dne nepůjde odeslat. */
+export const povinnePrvni = <T extends Pick<Ukol, 'requireBeforeClosing' | 'dueDate' | 'status'>>(dnes: string) =>
+  (a: T, b: T) => Number(jePovinnyDnes(b, dnes)) - Number(jePovinnyDnes(a, dnes));
+
 /** Nedokončené úkoly po termínu, nejstarší termín první. */
 export function poTerminu(ukoly: readonly Ukol[], dnes: string): Ukol[] {
   return ukoly.filter(t => jePoTerminu(t, dnes)).sort(podleTerminu);
@@ -105,7 +117,8 @@ export function rozdelPoDnech(ukoly: readonly Ukol[], dnes: string, zaTyden: str
   const budouci = nehotove.filter(t => t.dueDate && t.dueDate > dnes).sort(podleTerminu);
   return {
     poTerminu: nehotove.filter(t => t.dueDate && t.dueDate < dnes).sort(podleTerminu),
-    dnes: nehotove.filter(t => !t.dueDate || t.dueDate === dnes).sort(podleTerminu),
+    dnes: nehotove.filter(t => !t.dueDate || t.dueDate === dnes)
+      .sort((a, b) => povinnePrvni<Ukol>(dnes)(a, b) || podleTerminu(a, b)),
     tentoTyden: budouci.filter(t => t.dueDate! <= zaTyden),
     pozdeji: budouci.filter(t => t.dueDate! > zaTyden),
     hotove: ukoly.filter(jeHotovy).sort((a, b) => podleTerminu(b, a)).slice(0, hotovychNejvys),

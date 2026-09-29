@@ -16,7 +16,7 @@
 // sekundární (dřív limetka); přepínače jsou SwitchRow, ruční štítky t-label,
 // název ikony postupu se už netiskne jako text a `confirm()` nahradil Modal.
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Icon } from '../Icons';
 import { Avatar, Button, Chip, Modal, PageHeader, Segmented, SwitchRow } from '../ui';
 import {
@@ -34,11 +34,27 @@ import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu } from '../widgety/useDataWidgetu';
 import { useSmi } from '../widgety/NavigaceKontext';
 import { KLIC_VYPLNIT, UDALOST_VYPLNIT } from '@/lib/uzaverkyPrehled';
+import { czCount } from '@/lib/czech';
+import type { PovinnaPolozka } from '@/lib/povinnePredUzaverkou';
+import { UDALOST_ZMENA_POVINNYCH } from '../PredUzaverkou';
+import { ZamekUzaverky, URL_POVINNE, VEC, vyberStavZamku, stavZOdmitnuti, type StavZamku } from './ZamekUzaverky';
 
 const inputClass =
   'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm';
 
 const today = () => pragueToday();
+
+// Odchod ze zamčené uzávěrky za povinnou věcí (Úkoly, Návody, Postupy)
+// formulář odpojí a napočítaná kasa by zmizela — člověk by se vrátil
+// k prázdnému formuláři a počítal znovu. Rozepsané se proto při odchodu ze
+// zámku uloží sem a po návratu vrátí. Jen v téhle kartě a jen pár hodin:
+// ranní směna nesmí dostat večerní čísla.
+const KLIC_ROZPRACOVANO = 'managero-uzaverka-rozpracovano';
+const PLATNOST_ROZPRACOVANEHO_MS = 3 * 60 * 60 * 1000;
+// Tablet je jeden účet pro všechny u baru: rozepsaná kasa jednoho by se po
+// hodinách vrátila dalšímu, který by ji mohl odeslat za cizího. Na tabletu
+// tedy vydrží jen krátkou odbočku do zámku (úkol, postup) a zpátky.
+const PLATNOST_ROZPRACOVANEHO_TABLET_MS = 10 * 60 * 1000;
 
 type FormState = {
   date: string; shiftLabel: string;
@@ -371,12 +387,20 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
   // že ji dopíše do dneška. Přesně tak sobota potichu splynula s pondělím.
   const [gapDays, setGapDays] = useState<string[]>([]);
   // Today's procedure runs — the closing is the natural moment to notice an
-  // unfinished closing checklist.
+  // unfinished closing checklist. Jen informace („Dnešní postupy"); co
+  // uzávěrku zamyká, říká server v `povinne` níž.
   const [todayRuns, setTodayRuns] = useState<any[]>([]);
-  // Procedures the employer marked as mandatory before the closing.
-  const [requiredProcs, setRequiredProcs] = useState<{ id: number; name: string; icon?: string }[]>([]);
-  // Víme vůbec, co se dnes odškrtlo? Bez toho se nesmí blokovat.
-  const [runsZname, setRunsZname] = useState(false);
+  // Povinné věci před uzávěrkou (postupy, úkoly, návody) z GET
+  // /api/closings/povinne — stejný kontext jako POST, takže zámek ve
+  // formuláři a brána na serveru vidí tentýž den a tutéž osádku. null =
+  // nevíme (nenačteno, chyba) → formulář nezamyká, rozhodne POST.
+  const [povinne, setPovinne] = useState<StavZamku | null>(null);
+  const [povinneTik, setPovinneTik] = useState(0);
+  // Pokus o odeslání zamčené uzávěrky — zámek se ukáže a dostane fokus.
+  const [pulzZamku, setPulzZamku] = useState(0);
+  // Dokud load() nezjistí, kdo formulář vyplňuje (tablet, vedení, směny),
+  // dotaz na povinné věci by se ptal za špatného člověka.
+  const [zakladNacten, setZakladNacten] = useState(false);
   // Real numbers from the POS (Storyous), when the team connected one.
   const [pos, setPos] = useState<any | null>(null);
   // Counting the drawer by denomination instead of typing one total. When the
@@ -407,6 +431,13 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
   const { currency } = useCurrency();
   const denomSet = denominationsFor(currency);
 
+  const nactiBehy = async () => {
+    try {
+      const rd = await fetch('/api/procedures/runs?today=team').then(okJson);
+      setTodayRuns(Array.isArray(rd?.runs) ? rd.runs : []);
+    } catch { /* jen informace — zámek na nich nestojí */ }
+  };
+
   const load = async () => {
     // The team decides whether cash tips stay in the drawer — it changes the
     // expected-cash maths, so the form must start from the team's reality.
@@ -422,23 +453,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
         setLeaveCash(l => (l === '' ? String(Math.round(Number(df))) : l));
       }
     } catch { /* keep the safe default: tips are kept aside */ }
-    try {
-      const rd = await fetch('/api/procedures/runs?today=team').then(okJson);
-      setTodayRuns(Array.isArray(rd?.runs) ? rd.runs : []);
-      setRunsZname(true);
-    } catch {
-      // Běhy nejsou „nice-to-have": jsou to jediný doklad, že postup
-      // proběhl. Když se nenačtou, prázdný seznam vypadá stejně jako
-      // „dnes nikdo nic neudělal" — a uzávěrka pak zablokuje celý tým.
-      // Neblokovat je v tomhle případě poctivější než blokovat naslepo.
-      setRunsZname(false);
-    }
-    try {
-      const pd = await fetch('/api/procedures').then(okJson);
-      const list = Array.isArray(pd?.procedures) ? pd.procedures : [];
-      setRequiredProcs(list.filter((p: any) => p.requireBeforeClosing === true)
-        .map((p: any) => ({ id: p.id, name: p.name, icon: p.icon })));
-    } catch { /* enforcement needs the list; without it nothing blocks */ }
+    await nactiBehy();
     try {
       const d = await fetch('/api/closings').then(okJson);
       const list: Closing[] = Array.isArray(d.closings) ? d.closings : [];
@@ -504,7 +519,54 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
       }
       if (chteny) requestAnimationFrame(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
     } catch { /* ignore */ }
+    setZakladNacten(true);
   };
+  const ulozRozpracovane = () => {
+    try {
+      sessionStorage.setItem(KLIC_ROZPRACOVANO, JSON.stringify({
+        cas: Date.now(), uzivatel: user.id,
+        // Stav z doby uložení — obnova běží v uzávěru prvního vykreslení,
+        // kde isKiosk i members ještě nejsou načtené.
+        tablet: isKiosk,
+        jmeno: isKiosk && selEmployee != null ? (members.find(m => m.id === selEmployee)?.name ?? null) : null,
+        form, movements, denoms, countMode, leaveCash, hoTodo, hoRunningOut, hoMessage,
+        diffReason, diffNote, eventId, pickedShiftId, selEmployee, coworkerSel,
+        payoutFromRegister, tipsInDrawer,
+      }));
+    } catch { /* soukromé okno: po návratu se počítá znovu, jako dřív */ }
+  };
+
+  // Až po load(): ten nastavuje výchozí den, směnu a kasu a přepsal by vrácené.
+  const obnovRozpracovane = () => {
+    let r: any = null;
+    try {
+      r = JSON.parse(sessionStorage.getItem(KLIC_ROZPRACOVANO) || 'null');
+      sessionStorage.removeItem(KLIC_ROZPRACOVANO);
+    } catch { return; }
+    const platnost = r?.tablet === true ? PLATNOST_ROZPRACOVANEHO_TABLET_MS : PLATNOST_ROZPRACOVANEHO_MS;
+    if (!r || typeof r !== 'object' || r.uzivatel !== user.id || !r.form
+      || !(Date.now() - Number(r.cas) < platnost)) return;
+    setForm({ ...emptyForm(), ...r.form });
+    if (Array.isArray(r.movements)) setMovements(r.movements);
+    if (r.denoms && typeof r.denoms === 'object') setDenoms(r.denoms);
+    setCountMode(r.countMode === true);
+    if (typeof r.leaveCash === 'string') setLeaveCash(r.leaveCash);
+    setHoTodo(String(r.hoTodo ?? '')); setHoRunningOut(String(r.hoRunningOut ?? '')); setHoMessage(String(r.hoMessage ?? ''));
+    setDiffReason(String(r.diffReason ?? '')); setDiffNote(String(r.diffNote ?? ''));
+    setEventId(typeof r.eventId === 'number' ? r.eventId : '');
+    setPickedShiftId(typeof r.pickedShiftId === 'number' ? r.pickedShiftId : null);
+    if (typeof r.selEmployee === 'number') setSelEmployee(r.selEmployee);
+    if (r.coworkerSel && typeof r.coworkerSel === 'object') setCoworkerSel(r.coworkerSel);
+    if (typeof r.payoutFromRegister === 'boolean') setPayoutFromRegister(r.payoutFromRegister);
+    if (typeof r.tipsInDrawer === 'boolean') setTipsInDrawer(r.tipsInDrawer);
+    // Na tabletu jmenovitě, ať si případný další u baru hned všimne, že
+    // rozepsaná kasa není jeho.
+    setMsg(r.tablet === true && typeof r.jmeno === 'string' && r.jmeno
+      ? `Rozepsaná uzávěrka za ${r.jmeno} je zpátky — pokud nejsi ${r.jmeno}, vyber svou směnu a začni znovu.`
+      : 'Rozepsanou uzávěrku máš zpátky — pokračuj, kde jsi skončil(a).');
+    setTimeout(() => setMsg(m => (m.startsWith('Rozepsanou') ? '' : m)), 6000);
+  };
+
   useEffect(() => {
     if (vPlose) {
       try {
@@ -512,7 +574,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
         sessionStorage.removeItem(KLIC_VYPLNIT);
       } catch { /* soukromé okno: formulář se otevře na výchozí směně */ }
     }
-    load();
+    void load().then(obnovRozpracovane);
     // Jednorázově při připojení; `vPlose` se za života formuláře nemění.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -653,26 +715,72 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
   const scrollToStep = (i: number) =>
     stepRefs.current[i]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-  // A required procedure counts as done when ANYONE on the team completed it
-  // today. The check only has meaning for today's SHOP closing filed by someone
-  // who was actually on shift — an off-site stall doesn't run the shop's
-  // routine, a backfilled day can't be fixed by doing the routine now, and
-  // someone who wasn't on shift can't be asked to finish a shift they never
-  // had (that closing goes to the employer for approval anyway).
-  const closingIsToday = form.date === today();
-  const proceduresApply = runsZname && eventId === '' && closingIsToday && (!isSelf || onShift);
-  const missingRequired = !proceduresApply ? [] : requiredProcs.filter(p =>
-    !todayRuns.some((r: any) => r.procedure_id === p.id && r.status === 'completed'));
+  // Povinné věci před uzávěrkou — ptá se server, stejným kontextem jako
+  // POST (kdo, obchodní den, směna, akce). Dřív si formulář počítal sám
+  // jen postupy a jen „dnes", a noční směna po půlnoci pak viděla odemčeno
+  // a dostala 400. Dotaz se odkládá o chvilku, ať přepínání dne nebo směny
+  // nepošle dotaz za každé ťuknutí.
+  const klicPovinnych = useRef('');
+  useEffect(() => {
+    if (!zakladNacten) return;
+    // Tablet bez vybrané směny neví, kdo zavírá — server by vrátil 400.
+    if (isKiosk && selEmployee == null) { setPovinne(null); return; }
+    const q = new URLSearchParams({ date: form.date });
+    if (!isSelf && selEmployee != null) q.set('employeeId', String(selEmployee));
+    if (pickedShiftId != null) q.set('shiftId', String(pickedShiftId));
+    if (eventId !== '') q.set('eventId', String(eventId));
+    const klic = q.toString();
+    let alive = true;
+    const t = setTimeout(() => {
+      fetch(`${URL_POVINNE}?${klic}`, { cache: 'no-store' }).then(okJson).then(vyberStavZamku)
+        .then(st => { if (alive) { klicPovinnych.current = klic; setPovinne(st); } })
+        .catch(() => {
+          // Zámek nesmí zmizet kvůli výpadku při obnově téhož dotazu (bliklo
+          // by „odemčeno" a POST by vrátil 400). Pro nový den či člověka ale
+          // starý stav neplatí → nevíme → nezamykat, rozhodne server.
+          if (alive && klicPovinnych.current !== klic) { klicPovinnych.current = ''; setPovinne(null); }
+        });
+    }, 250);
+    return () => { alive = false; clearTimeout(t); };
+  }, [zakladNacten, isKiosk, isSelf, selEmployee, form.date, pickedShiftId, eventId, povinneTik]);
+
+  // Povinnou věc často dodělá někdo jiný na svém telefonu — po návratu do
+  // okna se stav načte znovu, ať se zámek odemkne sám.
+  useEffect(() => {
+    const znovu = () => { if (document.visibilityState === 'visible') setPovinneTik(x => x + 1); };
+    // Odškrtnutý úkol / potvrzený návod jinde na téže obrazovce (plovoucí
+    // okna, widgety) dá vědět událostí — mezipaměť widgetů jde podle přesné
+    // adresy a náš dotaz s parametry by holé obnovDataWidgetu minulo.
+    const hned = () => setPovinneTik(x => x + 1);
+    window.addEventListener('focus', znovu);
+    document.addEventListener('visibilitychange', znovu);
+    window.addEventListener(UDALOST_ZMENA_POVINNYCH, hned);
+    return () => {
+      window.removeEventListener('focus', znovu);
+      document.removeEventListener('visibilitychange', znovu);
+      window.removeEventListener(UDALOST_ZMENA_POVINNYCH, hned);
+    };
+  }, []);
+
+  // Něco se udělalo přímo ze zámku (úkol odškrtnut, postup doběhl).
+  const povinneZmena = useCallback(() => {
+    setPovinneTik(x => x + 1);
+    void nactiBehy();
+    obnovDataWidgetu('/api/procedures/runs?today=team');
+    // nactiBehy je stabilní co do chování (jen fetch + setState).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const zamceno = povinne?.zamceno === true;
+  const chybiPovinne: PovinnaPolozka[] = zamceno ? povinne!.polozky : [];
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault(); setErr(''); setMsg('');
+    if (zamceno && !povinne!.smiObejit) { setPulzZamku(x => x + 1); return; }
     if (form.closingCash === '') { setErr('Zadej skutečný stav kasy na konci směny.'); return; }
     if (leaveTooHigh) { setErr('V kase nemůže zůstat víc, než kolik jsi napočítal/a. Uprav odvod na konci směny.'); return; }
-    if (missingRequired.length > 0 && !isEmployer) {
-      setErr(`Nejdřív dokonči ${missingRequired.length === 1 ? 'povinný postup' : 'povinné postupy'}: ${missingRequired.map(p => p.name).join(', ')}. Pak půjde uzávěrka odeslat.`);
-      return;
-    }
-    if (missingRequired.length > 0 && isEmployer) { setPotvrditPostupy(true); return; }
+    // Kdo smí obejít (uzaverky.obejit_postupy), dostane otázku, ne zámek.
+    if (zamceno) { setPotvrditPostupy(true); return; }
     pokracuj();
   };
 
@@ -725,6 +833,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
         // Widgety na ploše (Moje uzávěrka, Moje uzávěrky, Předávka) čtou tytéž URL.
         obnovDataWidgetu('/api/closings');
         obnovDataWidgetu('/api/closings/handover');
+        try { sessionStorage.removeItem(KLIC_ROZPRACOVANO); } catch { /* nic k úklidu */ }
         setForm(emptyForm());
         setPickedShiftId(null);
         setCoworkerSel({});
@@ -740,7 +849,15 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
         setTimeout(() => setMsg(''), neodpichnuti.length ? 12000 : 4000);
       } else {
         const d = await res.json().catch(() => ({}));
-        setErr(d.error || 'Uzávěrku se nepodařilo odeslat.');
+        if (d?.kod === 'POVINNE_NESPLNENO' && Array.isArray(d.chybi) && d.chybi.length > 0) {
+          // Mezi načtením a odesláním se něco „od-hotovilo" (nebo se zámek
+          // nenačetl). Místo červené věty dole zámek nahoře — s cestou dál.
+          setPovinne(prev => stavZOdmitnuti(prev, d.chybi));
+          setPulzZamku(x => x + 1);
+          setPovinneTik(x => x + 1);
+        } else {
+          setErr(d.error || 'Uzávěrku se nepodařilo odeslat.');
+        }
       }
     } catch { setErr('Chyba serveru.'); }
     setSubmitting(false);
@@ -782,6 +899,10 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
           <Icon name="warning" size={17} className="shrink-0" /> {err}
         </p>
       )}
+      {/* Zámek nad formulářem, ne pod ním: co chybí, se člověk dozví dřív,
+          než začne počítat, a karta v kartě se nedělá (DP §4 D). */}
+      <ZamekUzaverky stav={povinne} actingAs={isSelf ? null : (selEmployee ?? null)} proKoho={actorId}
+        onZmena={povinneZmena} predOdchodem={ulozRozpracovane} pulz={pulzZamku} />
       {/* Výzva „Chybí ti uzávěrka" nad formulářem je od kola 69 widget
           uzaverky.moje_uzaverka; směny k vyplnění nabízí i první krok. */}
 
@@ -800,8 +921,14 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
             {['Kasa', 'Tržby', 'Výdaje', 'Kontrola'].map((lbl, i) => (
               <div key={lbl} className="flex items-center gap-2 flex-1 last:flex-initial min-w-0">
                 <button type="button" onClick={() => scrollToStep(i)} title={`Přejít na krok ${lbl}`}
-                  aria-label={`Přejít na krok ${lbl}`}
+                  aria-label={i === totalSteps - 1 && zamceno ? `Přejít na krok ${lbl} (uzávěrka je zamčená)` : `Přejít na krok ${lbl}`}
                   className="tap-target-sm flex items-center gap-2 shrink-0 group">
+                  {/* Poslední krok (odeslání) nese zámek, dokud chybí povinné věci. */}
+                  {i === totalSteps - 1 && zamceno ? (
+                    <span className="grid place-items-center h-6 w-6 shrink-0 rounded-full bg-wait/20 text-wait-ink">
+                      <Icon name="lock" size={12} strokeWidth={2.4} />
+                    </span>
+                  ) : (
                   <span
                     className={`grid place-items-center h-6 w-6 shrink-0 rounded-full text-[11px] font-bold transition ${
                       stepDone[i]
@@ -811,6 +938,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
                   >
                     {stepDone[i] ? <Icon name="check" size={12} strokeWidth={3} /> : i + 1}
                   </span>
+                  )}
                   <span className={`text-[11px] font-semibold hidden sm:inline transition ${stepDone[i] ? 'text-ok-ink' : 'text-black/45'}`}>{lbl}</span>
                 </button>
                 {i < totalSteps - 1 && <span className={`h-px flex-1 transition ${stepDone[i] ? 'bg-[#C8F542]/60' : 'bg-black/[0.09]'}`} />}
@@ -826,8 +954,17 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
             // Jediná inkoustová plocha formuláře (souhrn peněz, DP §4 D) — bez
             // rozmazání: blur v obsahu je zákaz a plná barva čte stejně.
             className="sticky top-2 z-20 w-full flex items-center justify-between gap-3 rounded-2xl bg-[#16181A] px-4 py-2.5 text-white shadow-[shadow:var(--shadow-float)] active:scale-[0.99] transition-transform">
-            <span className="text-xs font-medium text-white/70">Očekáváno v kase</span>
-            <span className="flex items-center gap-2.5 min-w-0">
+            {/* Na 390 px se vedle zámku a rozdílu nevejde celý popisek — zkrátí se, čísla ne. */}
+            <span className="min-w-0 truncate text-left text-xs font-medium text-white/70">Očekáváno<span className="hidden sm:inline"> v kase</span></span>
+            <span className="flex shrink-0 items-center gap-2.5">
+              {/* Zámek slovem a ikonou, ne tónovaným chipem — ten je na
+                  inkoustovém pásu nečitelný (viz rozdíl níž). */}
+              {zamceno && (
+                <span className="shrink-0 inline-flex items-center gap-1 text-xs font-semibold text-white/85">
+                  <Icon name="lock" size={12} className="shrink-0" /><span className="hidden sm:inline">Zamčeno ·</span> {chybiPovinne.length}
+                  <span className="sr-only"> — {czCount(chybiPovinne.length, VEC)} chybí</span>
+                </span>
+              )}
               <span className="text-base font-bold tabular-nums">{money(expected)}</span>
               {/* Rozdíl slovem, ne ručním štítkem: tónované chipy (průsvitná výplň
                   + tmavý inkoust) jsou na inkoustovém pásu nečitelné a plná limetka
@@ -1264,29 +1401,17 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
         </Step>
 
         <div>
-          {/* Say WHY nothing is being demanded, so a blank space doesn't read
-              as a bug the next time somebody expects the checklist. */}
-          {missingRequired.length === 0 && requiredProcs.length > 0 && !proceduresApply && (
+          {/* Proč se tu nic nevyžaduje, i když povinné věci existují — prázdné
+              místo by příště vypadalo jako chyba. Důvod určuje server. */}
+          {povinne?.duvodVolna && povinne.vsechny.length > 0 && (
             <div className="well px-4 py-3">
               <p className="t-meta">
-                {eventId !== '' ? 'Uzávěrka za akci — povinné postupy prodejny se u ní neřeší.'
-                  : !closingIsToday ? 'Uzávěrka za jiný den — dnešní postupy ji neblokují.'
-                  : 'Tenhle den nemáš směnu — uzávěrku můžeš odeslat a vedení ji potvrdí.'}
+                {povinne.duvodVolna === 'akce'
+                  ? 'Uzávěrka za akci — povinné věci podniku se u ní neřeší.'
+                  : isSelf
+                    ? 'Tenhle den nemáš směnu — uzávěrku můžeš odeslat a vedení ji potvrdí.'
+                    : 'Tenhle člověk ten den nemá směnu — povinné věci uzávěrku neblokují.'}
               </p>
-            </div>
-          )}
-          {missingRequired.length > 0 && (
-            <div className="note note-danger rise-in" role="alert">
-              <p className="text-sm font-semibold flex items-center gap-2">
-                <Icon name="warning" size={16} className="shrink-0" /> Před uzávěrkou je potřeba dokončit:
-              </p>
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {/* Ikona postupu je název ikony — dřív se vytiskl jako text („moon Zavírací rutina"). */}
-                {missingRequired.map(p => (
-                  <Chip key={p.id} tone="bad" icon={p.icon || 'clipboard'}>{p.name}</Chip>
-                ))}
-              </div>
-              <p className="text-[13px] mt-2">Najdeš je v sekci Postupy. Jakmile je někdo ze směny dokončí, uzávěrka půjde odeslat.</p>
             </div>
           )}
 
@@ -1371,10 +1496,27 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
           <textarea id="uzaverka-poznamka" value={form.notes} onChange={set('notes')} rows={2} placeholder="Cokoliv důležitého k předání…" className={`${inputClass} resize-none`} />
         </div>
 
-        {/* Jediná limetka obrazovky (DP §4 D) — dřív tmavá, zatímco limetku nesl vedlejší „Přidat". */}
-        <Button type="submit" variant="accent" size="lg" block iconAfter="check" loading={submitting}>
-          Odeslat uzávěrku
-        </Button>
+        {/* Jediná limetka obrazovky (DP §4 D) — dřív tmavá, zatímco limetku nesl vedlejší „Přidat".
+            Zamčeno: limetku přebírá „Dokončit: …" v zámku a odeslání zešedne.
+            Kdo smí obejít, odesílá dál (sklo), jen dostane otázku. */}
+        {zamceno ? (
+          // Ne `disabled`: to by spolklo klepnutí i Enter a submit() by nemohl
+          // ukázat zámek. Šedé jen vzhledem, klik vyjede nahoru k „Dokončit".
+          <Button type="submit" variant="secondary" size="lg" block icon="lock" loading={submitting}
+            aria-disabled={!povinne!.smiObejit || undefined}
+            // Zamčeno bez práva obejít: klepnutí vyřídit tady. Jinak by prohlížeč
+            // napřed zastavil odeslání na prázdném povinném poli („Vyplňte toto
+            // pole") a místo zámku ukazoval na kasu.
+            onClick={povinne!.smiObejit ? undefined : (e: React.MouseEvent) => { e.preventDefault(); setErr(''); setPulzZamku(x => x + 1); }}
+            className={povinne!.smiObejit ? '' : 'opacity-45 cursor-not-allowed shadow-none'}
+            aria-describedby="zamek-uzaverky-titulek">
+            {povinne!.smiObejit ? 'Odeslat i bez povinných věcí' : 'Uzávěrka je zamčená'}
+          </Button>
+        ) : (
+          <Button type="submit" variant="accent" size="lg" block iconAfter="check" loading={submitting}>
+            Odeslat uzávěrku
+          </Button>
+        )}
       </form>
 
       {/* Historie „Moje uzávěrky" je od kola 69 widget uzaverky.moje_historie
@@ -1397,16 +1539,26 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
         </Modal>
       )}
 
-      {/* Vedení odesílá i bez povinných postupů — dřív přes confirm() prohlížeče. */}
+      {/* Kdo smí obejít (uzaverky.obejit_postupy), odešle i se zámkem — ale
+          vědomě, s výčtem toho, co chybí. Dřív jen vedení a jen postupy. */}
       {potvrditPostupy && (
         <Modal open onClose={() => setPotvrditPostupy(false)} size="sm"
-          title="Povinné postupy nejsou dokončené"
-          subtitle={missingRequired.map(p => p.name).join(', ')}
+          title="Povinné věci nejsou hotové"
+          subtitle={`Chybí ${czCount(chybiPovinne.length, VEC)}.`}
           footer={<>
             <Button variant="secondary" onClick={() => setPotvrditPostupy(false)}>Zrušit</Button>
             <Button variant="primary" icon="send" loading={submitting} onClick={pokracuj}>Odeslat přesto</Button>
           </>}>
-          <p className="text-sm text-black/60">Uzávěrka se odešle, i když dnešní povinné postupy nikdo nedokončil.</p>
+          <ul className="list">
+            {chybiPovinne.map(p => (
+              <li key={`${p.typ}:${p.id}`} className="list-row !min-h-0 !py-2">
+                <Icon name={p.typ === 'postup' ? (p.ikona || 'clipboard') : p.typ === 'ukol' ? 'calendarCheck' : 'book'} size={16} className="shrink-0 text-black/45" />
+                <span className="t-card min-w-0 flex-1 text-pretty">{p.nazev}</span>
+                <span className="t-meta shrink-0">{p.typ === 'postup' ? 'Postup' : p.typ === 'ukol' ? 'Úkol' : 'Návod'}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="t-meta mt-3 text-pretty">Uzávěrka se odešle, i když tyhle věci zatím nikdo nedokončil.</p>
         </Modal>
       )}
     </div>

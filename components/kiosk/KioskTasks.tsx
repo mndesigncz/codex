@@ -24,6 +24,7 @@ import { Icon } from '../Icons';
 import { TaskChecklist } from '../TaskChecklist';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
 import { vyberUkoly, rozdelPoDnech, type Ukol } from '@/lib/ukolyPrehled';
+import { oznamZmenuPovinnych, ChipPredUzaverkou } from '../PredUzaverkou';
 
 type Filter = 'all' | 'mine' | 'open' | 'done';
 
@@ -57,6 +58,8 @@ export default function KioskTasks({ onOpenGuide }: { onOpenGuide?: (id: number)
       const pts = Number(d?.pointsEarned);
       if (status === 'done' && Number.isFinite(pts) && pts > 0) setBodyToast(`${who.name}: +${czCount(pts, BOD)} za splněný úkol`);
       data.reload();
+      // Na tabletu je uzávěrka o záložku vedle — po splnění povinného úkolu se odemkne sama.
+      oznamZmenuPovinnych();
     } catch (e) {
       data.set(prev => (prev ?? []).map(x => (x.id === t.id ? { ...x, status: t.status } : x)));
       setChyba(apiMessage(e, 'Úkol se nepodařilo uložit.'));
@@ -112,6 +115,7 @@ export default function KioskTasks({ onOpenGuide }: { onOpenGuide?: (id: number)
             <span className={`mt-2 w-2 h-2 rounded-full shrink-0 ${prioDot(t.priority)}`} aria-hidden />
             <span className={`font-medium leading-snug ${isDone ? 'text-black/45' : 'text-[#16181A]'}`}>{t.title}</span>
           </p>
+          {t.requireBeforeClosing && !isDone && <ChipPredUzaverkou className="mt-1 mr-1" />}
           {t.source === 'production' && !isDone && <Chip tone="info" size="sm" icon="leaf" className="mt-1">Výroba · odškrtnutí naskladní dávku</Chip>}
           {t.description && !isDone && <p className="text-sm text-black/55 mt-1 whitespace-pre-wrap text-pretty">{t.description}</p>}
           <p className="text-sm text-black/55 mt-1.5 flex items-center gap-1.5 min-w-0">

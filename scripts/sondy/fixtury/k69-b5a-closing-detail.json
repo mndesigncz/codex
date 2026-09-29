@@ -45,6 +45,7 @@
  "attendance": [],
  "procedures": [],
  "missingProcedures": [],
+ "missingRequired": [],
  "tasks": [],
  "receipts": [],
  "pos": null,
