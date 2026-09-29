@@ -191,6 +191,15 @@ const podvrh = (balik, d) => (req, json) => {
 const pocetH1 = (p) => p.evaluate(() => [...document.querySelectorAll('h1')]
   .filter(h => h.offsetParent !== null || h.getClientRects().length > 0 || h.classList.contains('sr-only')).length);
 const preteceni = (p) => p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+// Svislé přetečení dokumentu: stránka se posouvá uvnitř <main>, dokument sám
+// je vždy jen na výšku okna. Když ho něco nafoukne (absolutní sr-only popisek
+// bez pozicovaného předka), tah prstem po pozadí posune celé rozvržení nahoru.
+// Jen tam, kde se posouvá <main> (vedení, zaměstnanec) — kiosk posouvá dokument.
+const preteceniDolu = (p) => p.evaluate(() => {
+  const m = document.querySelector('main');
+  if (!m || !/auto|scroll/.test(getComputedStyle(m).overflowY)) return 0;
+  return document.documentElement.scrollHeight - window.innerHeight;
+});
 /**
  * Plné limetky: tlačítka a odkazy s .on-accent (a „Hotovo" lišty úprav, které je `btn btn-accent`
  * bez .on-accent) velikosti tlačítka (aspoň 40 × 26 px, práh jako
@@ -248,6 +257,14 @@ for (const s of stranky) {
     const h1 = await pocetH1(p);
     tvrdi(`${jmeno} klid: právě jeden h1`, h1 === 1, `${h1}×`);
     if (r.mobil) { const x = await preteceni(p); tvrdi(`${jmeno} klid: bez vodorovného přetečení`, x <= 1, `o ${x} px`); }
+    if (r.mobil) {
+      const y = await preteceniDolu(p);
+      const kdo = y > 1 ? await p.evaluate(() => [...document.querySelectorAll('body *')].filter(el => {
+        const cs = getComputedStyle(el); if (cs.position !== 'absolute' && cs.position !== 'fixed') return false;
+        return el.getBoundingClientRect().bottom > innerHeight + 5 && !el.closest('main')?.contains(el.offsetParent ?? document.body);
+      }).slice(0, 3).map(el => `${el.tagName}.${String(el.className).slice(0, 50)}`).join(' | ')) : '';
+      tvrdi(`${jmeno} klid: dokument není vyšší než okno (tah po pozadí nic neposune)`, y <= 1, `o ${y} px · ${kdo}`);
+    }
     const limK = await limetky(p);
     tvrdi(`${jmeno} klid: nejvýš jedna plná limetka`, limK.length <= 1, JSON.stringify(limK));
     const ton = await tonovane(p);

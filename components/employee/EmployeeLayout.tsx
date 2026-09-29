@@ -250,7 +250,13 @@ export default function EmployeeLayout({ user }: Props) {
           <NotificationBell />
         </header>
 
-        <main className={`flex-1 ${currentView === 'chat'
+        {/* relative: absolutně umístěné prvky uvnitř (skryté popisky pro
+            odečítač, sr-only) se jinak vztahují k celému dokumentu, ne
+            k posuvné <main> — v jejím obsahu ležely pod okrajem obrazovky
+            a nafoukly dokument. Na telefonu pak tah prstem po pozadí
+            posunul celé rozvržení nahoru: hlavička zmizela a pod kartami
+            zůstal prázdný pruh. */}
+        <main className={`relative flex-1 ${currentView === 'chat'
             // Chat se na telefonu nescrolluje, takže odsazení pro dok
             // jen ukusovalo z plochy na zprávy: z 844px displeje zbývalo
             // na vlákno 467, a pod psacím polem bylo 80px prázdna.

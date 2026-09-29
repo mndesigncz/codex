@@ -246,7 +246,9 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
             {kVyrizeni > 0 && <Chip tone="wait" size="sm" className="hidden sm:inline-flex">{kVyrizeni} k vyřízení</Chip>}
           </header>
 
-          <main className="flex-1 overflow-y-auto scrollbar-thin pb-36 md:pb-4">
+          {/* relative: sr-only popisky plochy se vztahují k <main>, ne k dokumentu
+              (jinak ho nafouknou a tah po pozadí posune celé rozvržení). */}
+          <main className="relative flex-1 overflow-y-auto scrollbar-thin pb-36 md:pb-4">
             <div className="mx-auto w-full max-w-7xl">
               <ErrorBoundary resetKey={tab} title={`${aktivni.label}: tahle část se nenačetla`}>
                 {tab === 'overview' && <PrehledClientu zapnuto={souhrn?.zapnuto ?? null} slug={souhrn?.slug ?? null} prejdi={prejdi} />}
