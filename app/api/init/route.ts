@@ -984,6 +984,23 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE team_members ADD COLUMN IF NOT EXISTS role_klic TEXT`);
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS vychozi_role_id INTEGER`);
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS vychozi_role_klic TEXT`);
+    // Úpravy PŘEDNASTAVENÝCH rolí podnikem (lib/roleUpravy.ts). Bez řádku
+    // platí sada z kódu, takže podniky bez úprav se chovají jako dosud.
+    // Klíčem je (podnik, klíč role) — jedna úprava na roli; „Obnovit
+    // výchozí" řádek smaže. Vedení a Tablet se sem nezapisují a čtení je
+    // ignoruje.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS role_upravy (
+        team_id INTEGER NOT NULL,
+        klic TEXT NOT NULL,
+        opravneni JSONB NOT NULL DEFAULT '[]',
+        nazev TEXT,
+        popis TEXT,
+        verze INTEGER NOT NULL DEFAULT 1,
+        upraveno_at TIMESTAMP DEFAULT NOW(),
+        upravil INTEGER,
+        PRIMARY KEY (team_id, klic)
+      )`);
     await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS active_team_id INTEGER`);
     // Zpětné naplnění: každý, kdo má tým, je jeho členem se svou dnešní rolí.
     // Idempotentní — ON CONFLICT nic nepřepíše, takže pozdější změna role

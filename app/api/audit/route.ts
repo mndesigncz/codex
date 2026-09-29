@@ -23,6 +23,8 @@ const LABELS: Record<string, string> = {
   'role.update': 'Upravena role',
   'role.delete': 'Smazána role',
   'role.assign': 'Změněna role člena',
+  'role.system_update': 'Upravena přednastavená role',
+  'role.system_reset': 'Přednastavená role vrácena na výchozí',
 };
 
 export async function GET() {

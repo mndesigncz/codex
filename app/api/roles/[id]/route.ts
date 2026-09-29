@@ -1,10 +1,10 @@
-// Úprava a smazání vlastní role (kolo 67). Systémové role jsou v kódu a
-// upravit ani smazat nejdou — jde je jen zkopírovat do vlastní.
+// Úprava a smazání vlastní role (kolo 67). Přednastavené role jsou v kódu
+// a smazat nejdou; jejich úpravu podnikem řeší /api/roles/system/[klic].
 
 import { NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { SYSTEMOVE_ROLE, sZavislostmi, vycisti, smiUpravitRoli, smiBytVychozi, navic, type TypRole } from '@/lib/opravneni';
-import { pozaduj, jeOdpoved, vlastniRole, zneplatniOpravneni } from '@/lib/opravneniDb';
+import { pozaduj, jeOdpoved, vlastniRole, zneplatniOpravneni, systemoveRolePodniku } from '@/lib/opravneniDb';
 import { audit } from '@/lib/audit';
 import { czCount, czVerb } from '@/lib/czech';
 
@@ -45,7 +45,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   if (nazev.toLocaleLowerCase('cs') !== role.nazev.toLocaleLowerCase('cs')) {
     const jine = (await vlastniRole(c.teamId)).filter(r => r.id !== role.id).map(r => r.nazev);
-    if ([...jine, ...SYSTEMOVE_ROLE.map(r => r.nazev)].some(n => n.toLocaleLowerCase('cs') === nazev.toLocaleLowerCase('cs'))) {
+    const system = await systemoveRolePodniku(c.teamId).catch(() => SYSTEMOVE_ROLE.map(r => ({ nazev: r.nazev, vychoziNazev: r.nazev })));
+    if ([...jine, ...system.flatMap(r => [r.nazev, r.vychoziNazev])].some(n => n.toLocaleLowerCase('cs') === nazev.toLocaleLowerCase('cs'))) {
       return NextResponse.json({ error: 'Role s tímhle názvem už existuje.' }, { status: 409 });
     }
   }

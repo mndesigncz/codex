@@ -6,8 +6,8 @@
 
 import { NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
-import { systemovaRole, smiBytVychozi, navic } from '@/lib/opravneni';
-import { pozaduj, jeOdpoved, vlastniRole } from '@/lib/opravneniDb';
+import { smiBytVychozi, navic } from '@/lib/opravneni';
+import { pozaduj, jeOdpoved, vlastniRole, systemovaRolePodniku } from '@/lib/opravneniDb';
 import { audit } from '@/lib/audit';
 
 export const dynamic = 'force-dynamic';
@@ -24,7 +24,11 @@ export async function PUT(request: Request) {
     if (r.typ !== 'zamestnanec') return NextResponse.json({ error: r.typ === 'kiosk' ? 'Roli tabletu nejde dát jako výchozí.' : 'Výchozí role musí být typu zaměstnanec — role typu vedení otevírá rozhraní vedení každému, kdo zná kód.' }, { status: 400 });
     sada = r.opravneni; roleId = r.id; nazev = r.nazev;
   } else {
-    const r = systemovaRole(b?.klic);
+    // Sada, jak ji podnik v přednastavené roli má (i s úpravou) — tu nový
+    // člen opravdu dostane, tak ji musí pravidla výchozí role pustit.
+    let r;
+    try { r = await systemovaRolePodniku(c.teamId, b?.klic); }
+    catch { return NextResponse.json({ error: 'Roli se teď nepodařilo načíst. Zkus to za chvíli znovu.' }, { status: 503 }); }
     if (!r) return NextResponse.json({ error: 'Neznámá role.' }, { status: 400 });
     if (r.typ !== 'zamestnanec') return NextResponse.json({ error: r.typ === 'kiosk' ? 'Roli tabletu nejde dát jako výchozí.' : 'Výchozí role musí být typu zaměstnanec — role typu vedení otevírá rozhraní vedení každému, kdo zná kód.' }, { status: 400 });
     sada = r.opravneni; klic = r.klic; nazev = r.nazev;

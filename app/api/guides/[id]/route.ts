@@ -4,7 +4,8 @@ import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { pripniNavodKPolozce } from '@/lib/navodyDb';
 import { idClenu, tymyCiselniku } from '@/lib/tenant';
-import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { pozaduj, jeOdpoved, maOpravneni } from '@/lib/opravneniDb';
+import { ctenarNaTabletu } from '@/lib/povinnePredUzaverkouDb';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,7 +24,7 @@ function parseChecklist(raw: any) {
 const normalizeChecklist = normalizeSteps;
 
 // GET — single guide full content (team members only)
-export async function GET(_request: Request, props: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const c = await pozaduj('navody.zobrazit');
   if (jeOdpoved(c)) return c;
@@ -55,7 +56,31 @@ export async function GET(_request: Request, props: { params: Promise<{ id: stri
     return NextResponse.json({ error: 'Návod nenalezen' }, { status: 404 });
   }
 
+  // Tablet: stav čtení za člověka, který u něj stojí (?actingAs=). Seznam
+  // návodů nese „moje přečtení" účtu tabletu, a to nic neříká — čtečka by
+  // jinak nabízela potvrzení i tomu, kdo už potvrdil. Stejná pravidla jako
+  // POST (ctenarNaTabletu: odpíchnutý, nebo ten, za koho se zavírá den
+  // ?den=); jinak se `ctenar` nepošle a čtečka potvrzení nenabídne.
+  let ctenar: { id: number; name: string; read: boolean; readCurrent: boolean } | undefined;
+  if (c.role.typ === 'kiosk') {
+    const q = new URL(request.url).searchParams;
+    const kdo = await ctenarNaTabletu(c, q.get('actingAs'), q.get('den'), request);
+    if (kdo != null && await maOpravneni(kdo, c.teamId, 'navody.zobrazit').catch(() => false)) {
+      try {
+        const [r] = await sql`
+          SELECT u.name, gr.read_at IS NOT NULL AS precteno,
+                 (gr.read_at IS NOT NULL AND (g.updated_at IS NULL OR gr.read_at >= g.updated_at)) AS aktualne
+          FROM users u
+          JOIN guides g ON g.id = ${id} AND g.team_id = ${c.teamId}
+          LEFT JOIN guide_reads gr ON gr.guide_id = g.id AND gr.user_id = u.id
+          WHERE u.id = ${kdo}`;
+        if (r) ctenar = { id: kdo, name: String(r.name ?? ''), read: r.precteno === true, readCurrent: r.aktualne === true };
+      } catch { /* guide_reads ještě není — čtečka stav nezná, potvrzení zkusí POST */ }
+    }
+  }
+
   return NextResponse.json({
+    ...(ctenar ? { ctenar } : {}),
     guide: {
       id: g.id,
       title: g.title,
@@ -281,16 +306,36 @@ export async function DELETE(_request: Request, props: { params: Promise<{ id: s
 }
 
 // POST — the reader confirms they read a required guide: { markRead: true }.
+// Tablet posílá navíc { actingAs, den? }: potvrzuje za člověka, který u něj
+// stojí, nebo za kterého se ten den zavírá.
 export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  // Potvrdit lze jen návod, který člověk smí číst. Tablet je sdílený účet —
-  // to je typ účtu, ne oprávnění, a potvrzení za „tablet" by nic neznamenalo.
+  // Potvrdit lze jen návod, který člověk smí číst.
   const c = await pozaduj('navody.zobrazit');
   if (jeOdpoved(c)) return c;
-  if (c.role.typ === 'kiosk') return NextResponse.json({ error: 'Potvrzení čtení je osobní — přihlas se svým účtem.' }, { status: 403 });
   const id = parseInt(params.id);
   const b = await request.json().catch(() => ({}));
   if (b.markRead !== true) return NextResponse.json({ error: 'Neplatný požadavek' }, { status: 400 });
+
+  // Za koho. Mimo tablet vždy za sebe — actingAs se ignoruje, jednat za
+  // ostatní umí jen tablet. Tablet ověří člověka stejným pravidlem, jaké
+  // platí pro zámek uzávěrky (ctenarNaTabletu: skutečný účet tabletu, člen
+  // podniku, odpíchnutý — nebo měl v den uzávěrky směnu). Potvrzení za
+  // samotný „tablet" by nic neznamenalo — zámek se ptá na člověka.
+  let kdo = c.meId;
+  if (c.role.typ === 'kiosk') {
+    const zaKoho = await ctenarNaTabletu(c, b.actingAs, b.den, request);
+    if (zaKoho == null) {
+      return NextResponse.json({ error: 'Vyber, kdo návod přečetl — potvrdit jde jen za člověka na směně nebo za toho, za koho se zavírá.' }, { status: 400 });
+    }
+    kdo = zaKoho;
+    // Za člověka, který návody podle své role číst nesmí, se čtení nepotvrzuje
+    // (stejně jako uzávěrku za něj tablet neodešle, když ji nesmí sám).
+    if (!(await maOpravneni(kdo, c.teamId, 'navody.zobrazit'))) {
+      return NextResponse.json({ error: 'Tenhle člověk podle své role návody nečte.' }, { status: 403 });
+    }
+  }
+
   const [g] = await sql`SELECT id FROM guides WHERE id = ${id} AND team_id = ${c.teamId}`;
   if (!g) return NextResponse.json({ error: 'Návod nenalezen' }, { status: 404 });
   try {
@@ -298,9 +343,9 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     // přečtenou AKTUÁLNÍ verzi (read_at >= updated_at), a potvrzení z doby
     // před úpravou by jinak zamklo uzávěrku natrvalo.
     await sql`
-      INSERT INTO guide_reads (guide_id, user_id) VALUES (${id}, ${c.meId})
+      INSERT INTO guide_reads (guide_id, user_id) VALUES (${id}, ${kdo})
       ON CONFLICT (guide_id, user_id) DO UPDATE SET read_at = NOW()`;
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, userId: kdo });
   } catch {
     return NextResponse.json({ error: 'Potvrzení není dostupné — spusť /api/init.' }, { status: 400 });
   }

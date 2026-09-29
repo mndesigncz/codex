@@ -12,6 +12,7 @@ import Procedures from '../procedures/Procedures';
 import Guides from '../Guides';
 import { prevezmiOtevreniNavodu } from '@/lib/otevriNavod';
 import CashClosing from '../employee/CashClosing';
+import { UDALOST_CTENI_ZA } from '../employee/ZamekUzaverky';
 import MessengerDock from '../chat/MessengerDock';
 import { usePlan, ProBadge } from '../Pro';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
@@ -85,7 +86,7 @@ export default function KioskApp({ user }: { user: KioskUser }) {
 }
 
 function KioskShell({ user }: { user: KioskUser }) {
-  const { active } = useKioskShift();
+  const { active, onShift, selectPerson, requireActive } = useKioskShift();
   const [tab, setTab] = useState<IdZalozky>('shift');
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   // Počet nových objednávek od stolu do záložky — tablet na baru je první, kdo je má vidět.
@@ -98,6 +99,43 @@ function KioskShell({ user }: { user: KioskUser }) {
   // Plovoucí běžec postupů visí nad všemi třemi rozhraními a sám neví, že
   // je na kiosku — proto si otevírání návodů přebereme a přepneme záložku.
   useEffect(() => prevezmiOtevreniNavodu(id => { setWantGuide(id); setTab('guides'); }), []);
+  // Návod ze zamčené uzávěrky: přečtení potvrzuje ten, za koho se zavírá —
+  // NIKDY tiše ten, kdo byl u tabletu vybraný předtím. Je-li na směně,
+  // vybere se u tabletu; kdo už odešel (nebo se dohání včerejšek), toho
+  // čtečka dostane i s dnem uzávěrky a server ho ověří podle směny
+  // (ctenarNaTabletu). Jméno doplní čtečka z odpovědi serveru.
+  const naSmene = useRef(onShift);
+  naSmene.current = onShift;
+  const [cteniZa, setCteniZa] = useState<{ id: number; name: string; den: string | null } | null>(null);
+  useEffect(() => {
+    const zmena = (e: Event) => {
+      const d = (e as CustomEvent<{ id?: unknown; den?: unknown }>).detail;
+      const id = Number(d?.id);
+      if (!Number.isFinite(id)) return;
+      const den = typeof d?.den === 'string' ? d.den : null;
+      const clen = naSmene.current.find(m => m.id === id);
+      if (clen) selectPerson(id);
+      setCteniZa({ id, name: clen?.name ?? '', den });
+    };
+    window.addEventListener(UDALOST_CTENI_ZA, zmena);
+    return () => window.removeEventListener(UDALOST_CTENI_ZA, zmena);
+  }, [selectPerson]);
+  // Cíl ze zámku platí jen pro tuhle návštěvu návodů — po odchodu ze záložky
+  // se čte zase za toho, kdo je u tabletu vybraný.
+  useEffect(() => { if (tab !== 'guides') setCteniZa(null); }, [tab]);
+  // Ručně PŘEPNUTÝ člověk u tabletu má přednost před cílem ze zámku. První
+  // výběr (null → někdo, třeba když se brána zeptá, kdo u tabletu stojí)
+  // cíl nechá — jinak by se návod za odpíchnutého přepsal na toho, kdo
+  // zrovna klepl na své jméno.
+  const aktivniId = active?.id ?? null;
+  const predtimAktivni = useRef(aktivniId);
+  useEffect(() => {
+    const predtim = predtimAktivni.current;
+    predtimAktivni.current = aktivniId;
+    if (predtim != null && aktivniId != null && aktivniId !== predtim) {
+      setCteniZa(z => (z && z.id !== aktivniId ? null : z));
+    }
+  }, [aktivniId]);
   const now = useNow();
 
   // Navigace pro widgety plochy Směna. Proklik vede na záložku tabletu;
@@ -246,7 +284,9 @@ function KioskShell({ user }: { user: KioskUser }) {
           {tab === 'closing' && <main className="flex-1 mt-2 -mx-1"><CashClosing user={kioskUser} /></main>}
           {tab === 'guides' && (
             <main className="flex-1 mt-2 -mx-1">
-              <Guides user={kioskUser} ticksFor={active?.id ?? null} openGuideId={wantGuide} />
+              {/* Čtení se potvrzuje za vybraného člověka; bez výběru se čtečka zeptá. */}
+              <Guides user={kioskUser} ticksFor={active?.id ?? null} openGuideId={wantGuide}
+                zaKoho={cteniZa ?? (active ? { id: active.id, name: active.name } : null)} vyberKoho={requireActive} />
             </main>
           )}
         </KioskShiftGate>

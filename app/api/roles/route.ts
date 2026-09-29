@@ -7,7 +7,8 @@
 import { NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { KATALOG, OBLASTI, SYSTEMOVE_ROLE, KIOSK_BILA_LISTINA, sZavislostmi, vycisti, smiUpravitRoli, type TypRole } from '@/lib/opravneni';
-import { pozaduj, jeOdpoved, vlastniRole, pocetyRoli } from '@/lib/opravneniDb';
+import { pozaduj, jeOdpoved, vlastniRole, pocetyRoli, systemoveRolePodniku } from '@/lib/opravneniDb';
+import { efektivniSystemova, procNeupravitelna } from '@/lib/roleUpravy';
 import { audit } from '@/lib/audit';
 
 export const dynamic = 'force-dynamic';
@@ -21,6 +22,13 @@ export async function GET() {
   const c = await pozaduj(['tym.zobrazit', 'tym.role_prirazovat', 'tym.role_spravovat']);
   if (jeOdpoved(c)) return c;
   const [vlastni, pocty] = await Promise.all([vlastniRole(c.teamId), pocetyRoli(c.teamId)]);
+  // Přednastavené role, jak platí V TOMHLE podniku (úpravy z role_upravy).
+  // Když se úpravy nepodaří načíst, ukáže se sada z kódu, ale editor dostane
+  // upravyNedostupne a úpravy zamkne — jinak by uložil výchozí sadu přes
+  // úpravu, kterou jen neviděl.
+  let upravyNedostupne = false;
+  const system = await systemoveRolePodniku(c.teamId)
+    .catch(() => { upravyNedostupne = true; return SYSTEMOVE_ROLE.map(r => efektivniSystemova(r)); });
   let vychozi: { id: number | null; klic: string | null } = { id: null, klic: 'barista' };
   try {
     const [t] = await sql`SELECT vychozi_role_id, vychozi_role_klic FROM teams WHERE id = ${c.teamId}`;
@@ -29,7 +37,8 @@ export async function GET() {
   } catch { /* před migrací */ }
   return NextResponse.json({
     katalog: KATALOG, oblasti: OBLASTI, kioskPovoleno: [...KIOSK_BILA_LISTINA],
-    system: SYSTEMOVE_ROLE.map(r => ({ ...r, pocet: pocty.system[r.klic] ?? 0 })),
+    system: system.map(r => ({ ...r, pocet: pocty.system[r.klic] ?? 0, procZamceno: procNeupravitelna(r.klic) })),
+    upravyNedostupne,
     vlastni: vlastni.map(r => ({ ...r, pocet: pocty.vlastni[r.id] ?? 0 })),
     vychozi,
     ja: { jeVlastnik: c.role.jeVlastnik, klic: c.role.klic, roleId: c.role.roleId, nazev: c.role.nazev, opravneni: [...c.role.opravneni].sort() },
@@ -52,7 +61,9 @@ export async function POST(request: Request) {
 
   const existujici = await vlastniRole(c.teamId);
   if (existujici.length >= MAX_ROLI) return NextResponse.json({ error: `Podnik může mít nejvýš ${MAX_ROLI} vlastních rolí.` }, { status: 400 });
-  const kolize = [...existujici.map(r => r.nazev), ...SYSTEMOVE_ROLE.map(r => r.nazev)]
+  // Přednastavené role podnik může přejmenovat — kolize se hlídá s oběma názvy.
+  const system = await systemoveRolePodniku(c.teamId).catch(() => SYSTEMOVE_ROLE.map(r => efektivniSystemova(r)));
+  const kolize = [...existujici.map(r => r.nazev), ...system.flatMap(r => [r.nazev, r.vychoziNazev])]
     .some(n => n.toLocaleLowerCase('cs') === nazev.toLocaleLowerCase('cs'));
   if (kolize) return NextResponse.json({ error: 'Role s tímhle názvem už existuje.' }, { status: 409 });
 

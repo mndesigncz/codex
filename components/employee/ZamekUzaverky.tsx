@@ -26,6 +26,9 @@ import { useProcedures } from '../procedures/ProcedureProvider';
 
 export { URL_POVINNE_PRED_UZAVERKOU as URL_POVINNE } from '../PredUzaverkou';
 
+/** Zámek otevírá návod za konkrétního člověka — tablet (KioskApp) ho vybere. */
+export const UDALOST_CTENI_ZA = 'uzaverka:cteni-za';
+
 /** Odpověď GET /api/closings/povinne (viz app/api/closings/povinne/route.ts). */
 export interface StavZamku {
   den: string;
@@ -200,6 +203,13 @@ export function ZamekUzaverky({ stav, actingAs, proKoho, onZmena, predOdchodem, 
       return;
     }
     predOdchodem();
+    // Návod potvrzuje přečtení ten, za koho se zavírá. Tablet (jediný, kdo tu
+    // má actingAs a navigaci uvnitř plochy) čtečce předá právě jeho i s dnem
+    // uzávěrky — server pak přijme i toho, kdo už je odpíchnutý. Jinak by
+    // čtečka nabídla potvrzení za toho, kdo byl vybraný předtím.
+    if (p.typ === 'navod' && actingAs != null && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent(UDALOST_CTENI_ZA, { detail: { id: actingAs, den: stav?.den ?? null } }));
+    }
     if (!odkazJde(p)) { window.location.assign(p.odkaz.href); return; }
     // Konkrétní postup otevře layout (navigate s id → otevriPostupPoPrechodu).
     nav.onNavigate(p.odkaz.pohled, p.odkaz.arg);
@@ -355,7 +365,12 @@ export function ZamekUzaverky({ stav, actingAs, proKoho, onZmena, predOdchodem, 
         </Button>
       )}
       {stav.smiObejit && (
-        <p className="t-meta text-pretty">Máš právo odeslat uzávěrku i tak — při odeslání se tě ještě zeptáme.</p>
+        <p className="t-meta text-pretty">
+          {/* Na tabletu jde o právo člověka, za kterého se zavírá (smiObejitPovinne). */}
+          {actingAs != null
+            ? 'Podle své role smí tenhle člověk odeslat uzávěrku i tak — při odeslání se ještě zeptáme.'
+            : 'Máš právo odeslat uzávěrku i tak — při odeslání se tě ještě zeptáme.'}
+        </p>
       )}
     </Card>
     </div>

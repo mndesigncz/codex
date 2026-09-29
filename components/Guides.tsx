@@ -55,6 +55,13 @@ interface User {
   role: string;
 }
 
+/**
+ * Tablet: za koho se potvrzuje přečtení — vybraný člověk (KioskShiftGate →
+ * ActivePerson), nebo cíl ze zámku uzávěrky i s jejím dnem (`den`), aby
+ * server přijal i toho, kdo už je odpíchnutý. Prázdné `name` doplní server.
+ */
+interface Osoba { id: number; name: string; den?: string | null }
+
 interface Category {
   id: number;
   name: string;
@@ -165,11 +172,15 @@ function renderInline(text: string) {
   });
 }
 
-export default function Guides({ user, ticksFor, openGuideId }: {
+export default function Guides({ user, ticksFor, openGuideId, zaKoho, vyberKoho }: {
   user: User;
   ticksFor?: number | null;
   /** Otevřít rovnou tenhle návod — proklik z receptury, ze skladu, z úkolu nebo z widgetu. */
   openGuideId?: number | null;
+  /** Tablet: člověk vybraný u tabletu — za něj se potvrzuje přečtení. */
+  zaKoho?: Osoba | null;
+  /** Tablet: zeptá se, kdo u tabletu stojí (null = výběr zavřel). */
+  vyberKoho?: () => Promise<Osoba | null>;
 }) {
   const pathname = usePathname() ?? '';
   // Nástroj stránky (ne widget) bere mírné `ma()`: bez načtených oprávnění ukáže akce
@@ -445,6 +456,8 @@ export default function Guides({ user, ticksFor, openGuideId }: {
           summary={summary}
           kategorie={reader.categoryId != null ? catById.get(reader.categoryId) ?? null : null}
           tablet={tablet}
+          zaKoho={zaKoho ?? null}
+          vyberKoho={vyberKoho}
           ticksFor={ticksFor ?? user.id}
           smiUpravit={smiUpravit}
           smiMazat={smiMazat}
@@ -454,18 +467,21 @@ export default function Guides({ user, ticksFor, openGuideId }: {
           onEdit={() => { const r = reader; setReader(null); openEditor(r); }}
           onDelete={() => setSmazat({ id: reader.id, title: reader.title })}
           onPatch={(body, text) => patchGuide(reader.id, body, text)}
-          onMarkRead={async () => {
+          onMarkRead={async (kdo) => {
             setChyba('');
             try {
               const res = await fetch(`/api/guides/${reader.id}`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ markRead: true }),
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ markRead: true, ...(kdo ? { actingAs: kdo.id, ...(kdo.den ? { den: kdo.den } : {}) } : {}) }),
               });
               await okJson(res);
               reloadGuides();
               // Potvrzený povinný návod odemyká uzávěrku — otevřený formulář se přepočítá sám.
               oznamZmenuPovinnych();
+              return true;
             } catch (e) {
               setChyba(apiMessage(e, 'Přečtení se nepodařilo potvrdit.'));
+              return false;
             }
           }}
         />
@@ -531,7 +547,7 @@ export default function Guides({ user, ticksFor, openGuideId }: {
 // ---------------------------------------------------------------------------
 
 function GuideReader({
-  reader, loading, summary, kategorie, tablet, ticksFor, smiUpravit, smiMazat, smiPovinne, smiSchvalit,
+  reader, loading, summary, kategorie, tablet, zaKoho, vyberKoho, ticksFor, smiUpravit, smiMazat, smiPovinne, smiSchvalit,
   onClose, onEdit, onDelete, onPatch, onMarkRead,
 }: {
   reader: GuideFull;
@@ -539,6 +555,8 @@ function GuideReader({
   summary: NavodApi | null;
   kategorie: Category | null;
   tablet: boolean;
+  zaKoho: Osoba | null;
+  vyberKoho?: () => Promise<Osoba | null>;
   ticksFor: number | null;
   smiUpravit: boolean;
   smiMazat: boolean;
@@ -548,15 +566,51 @@ function GuideReader({
   onEdit: () => void;
   onDelete: () => void;
   onPatch: (body: Record<string, unknown>, chyba: string) => Promise<void>;
-  onMarkRead: () => Promise<void>;
+  /** `kdo` jen z tabletu. Vrací, jestli se potvrzení povedlo. */
+  onMarkRead: (kdo?: Osoba) => Promise<boolean>;
 }) {
   // U kterého návodu má vedení rozbalený seznam „kdo četl".
   const [ctenari, setCtenari] = useState(false);
   const [potvrzuji, setPotvrzuji] = useState(false);
+  // Tablet: „moje přečtení" v seznamu patří účtu tabletu, ne člověku u něj.
+  // Stav čtení vybraného člověka se proto ptá zvlášť (GET s actingAs) a po
+  // změně osoby nebo potvrzení znovu. Bez vybraného člověka se nic neví.
+  const zaId = tablet ? zaKoho?.id ?? null : null;
+  const zaDen = tablet ? zaKoho?.den ?? null : null;
+  const [stavOsoby, setStavOsoby] = useState<{ id: number; name: string; read: boolean; readCurrent: boolean } | null>(null);
+  // Server za tohohle člověka potvrzení nepřijme (není na směně ani se za
+  // něj nezavírá) — pak tlačítko nesmí slibovat, že zámek odemkne.
+  const [odmitnuto, setOdmitnuto] = useState(false);
+  const [znovuNacist, setZnovuNacist] = useState(0);
+  // Za koho už odpověď dorazila — do té doby tlačítko nesvítí, jinak by
+  // blesklo i tomu, kdo má přečteno.
+  const [nactenoPro, setNactenoPro] = useState<number | null>(null);
+  useEffect(() => {
+    if (zaId == null || loading) { setStavOsoby(null); setOdmitnuto(false); return; }
+    let zruseno = false;
+    fetch(`/api/guides/${reader.id}?actingAs=${zaId}${zaDen ? `&den=${encodeURIComponent(zaDen)}` : ''}`).then(okJson)
+      .then(d => {
+        if (zruseno) return;
+        const c = d?.ctenar;
+        const ok = !!c && Number(c.id) === zaId;
+        setStavOsoby(ok ? { id: zaId, name: String(c.name ?? ''), read: c.read === true, readCurrent: c.readCurrent === true } : null);
+        setOdmitnuto(!ok);
+        setNactenoPro(zaId);
+      })
+      // Stav se nezjistil (síť): tlačítko radši ukázat — potvrzení rozhodne server.
+      .catch(() => { if (!zruseno) { setStavOsoby(null); setOdmitnuto(false); setNactenoPro(zaId); } });
+    return () => { zruseno = true; };
+  }, [reader.id, zaId, zaDen, loading, znovuNacist]);
+  // Jméno: od tabletu, jinak z odpovědi serveru (cíl ze zámku ho nezná).
+  const zaJmeno = zaKoho?.name || stavOsoby?.name || 'vybraného člověka';
+  // Na tabletu se stav čtení (štítek, tlačítko) počítá za vybraného člověka.
+  const stav: NavodApi | null = tablet && summary
+    ? { ...summary, myRead: stavOsoby?.read === true, myReadCurrent: stavOsoby?.readCurrent === true }
+    : summary;
   const povinne = summary?.requireRead === true;
   // Před uzávěrkou platí jen přečtení aktuální verze — po úpravě obsahu je potřeba potvrdit znovu.
   const predUzaverkou = summary?.requireBeforeClosing === true && summary?.approved !== false;
-  const aktualne = predUzaverkou ? summary?.myReadCurrent === true : summary?.myRead === true;
+  const aktualne = predUzaverkou ? stav?.myReadCurrent === true : stav?.myRead === true;
   const polozky: MenuItem[] = loading ? [] : [
     ...(summary?.approved === false && smiSchvalit ? [{ label: 'Schválit návrh', icon: 'check', onClick: () => { void onPatch({ approve: true }, 'Návod se neschválil.'); } }] : []),
     ...(smiUpravit ? [{ label: 'Upravit', icon: 'pencil', onClick: onEdit }] : []),
@@ -579,17 +633,32 @@ function GuideReader({
     }] : []),
     ...(smiMazat ? [{ label: 'Smazat', icon: 'trash', danger: true, onClick: onDelete }] : []),
   ];
-  const potvrdit = (povinne || predUzaverkou) && !aktualne && !tablet;
+  const potvrdit = (povinne || predUzaverkou) && !aktualne && !(zaId != null && (nactenoPro !== zaId || odmitnuto));
   // Přečtené kdysi, ale od té doby se návod změnil — tlačítko musí říct proč znovu.
-  const znovu = predUzaverkou && summary?.myRead === true && !aktualne;
+  const znovu = predUzaverkou && stav?.myRead === true && !aktualne;
+  // Tablet potvrzuje za toho, kdo u něj stojí. Když to neví, zeptá se
+  // (stejné okno jako WhoFirst) — za „tablet" se čtení nepotvrzuje.
+  const potvrd = async () => {
+    setPotvrzuji(true);
+    try {
+      if (!tablet) { await onMarkRead(); return; }
+      const kdo = zaKoho ?? (vyberKoho ? await vyberKoho() : null);
+      if (!kdo) return;
+      if (await onMarkRead(kdo)) setZnovuNacist(n => n + 1);
+    } finally {
+      setPotvrzuji(false);
+    }
+  };
+  const popisek = tablet
+    ? (zaKoho ? `Potvrdit přečtení za ${zaJmeno}` : 'Potvrdit přečtení…')
+    : znovu ? 'Potvrzuji přečtení nové verze' : 'Potvrzuji přečtení';
 
   return (
     <Modal open onClose={onClose} size="lg" title={reader.title || 'Návod'}
       subtitle={loading ? undefined : [kategorie?.name, reader.author, reader.updatedAt ? `aktualizováno ${formatDate(reader.updatedAt)}` : null].filter(Boolean).join(' · ') || undefined}
       footer={potvrdit ? (
-        <Button variant="primary" icon="check" loading={potvrzuji}
-          onClick={async () => { setPotvrzuji(true); await onMarkRead(); setPotvrzuji(false); }}>
-          {znovu ? 'Potvrzuji přečtení nové verze' : 'Potvrzuji přečtení'}
+        <Button variant="primary" icon="check" loading={potvrzuji} onClick={() => { void potvrd(); }}>
+          {popisek}
         </Button>
       ) : undefined}>
       {loading ? (
@@ -603,7 +672,7 @@ function GuideReader({
           {(polozky.length > 0 || povinne || predUzaverkou || summary?.forClosing || summary?.approved === false) && (
             <div className="mb-4 flex flex-wrap items-center gap-2">
               {summary?.approved === false && <Chip tone="wait" size="sm">Čeká na schválení</Chip>}
-              {summary && summary.approved !== false && <StavCteni g={summary} />}
+              {stav && stav.approved !== false && <StavCteni g={stav} />}
               {summary?.forClosing && <Chip tone="muted" size="sm" icon="pin">U uzávěrky</Chip>}
               {polozky.length > 0 && <Menu size="sm" label="Akce s návodem" items={polozky} className="ml-auto" />}
             </div>
@@ -622,7 +691,13 @@ function GuideReader({
               <Icon name="lock" size={16} className="shrink-0 mt-0.5" />
               <span className="text-pretty">
                 {tablet
-                  ? 'Tenhle návod je povinný před uzávěrkou. Přečtení potvrdí každý ve svém účtu v aplikaci — na tabletu to nejde.'
+                  ? zaKoho
+                    ? odmitnuto && nactenoPro === zaId
+                      ? `Za ${zaJmeno} tady přečtení potvrdit nejde — není na směně a tablet za něj tenhle den uzávěrku nezavírá. Potvrdit ho může ve svém účtu v aplikaci.`
+                      : znovu
+                      ? `Návod se od posledního čtení změnil. Dokud ${zaJmeno} nepotvrdí novou verzi, uzávěrka zůstane zamčená.`
+                      : `Návod je povinný před uzávěrkou. Dokud ${zaJmeno} nepotvrdí přečtení, uzávěrka zůstane zamčená.`
+                    : 'Návod je povinný před uzávěrkou. Při potvrzení se tablet zeptá, kdo ho přečetl.'
                   : znovu
                     ? 'Návod se od tvého posledního čtení změnil. Dokud nepotvrdíš novou verzi, tvoje uzávěrka zůstane zamčená.'
                     : 'Dokud nepotvrdíš přečtení, tvoje uzávěrka zůstane zamčená.'}

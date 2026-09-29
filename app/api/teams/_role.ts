@@ -9,7 +9,7 @@
 
 import { neon } from '@neondatabase/serverless';
 import { systemovaRole, smiBytVychozi, smiPriraditRoli, typNaUcet, type TypRole } from '@/lib/opravneni';
-import { roleClena, vlastniRole, zneplatniOpravneni } from '@/lib/opravneniDb';
+import { roleClena, vlastniRole, zneplatniOpravneni, systemovaRolePodniku } from '@/lib/opravneniDb';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -31,6 +31,19 @@ function zeSystemove(klic: string): RoleNoveho | null {
 const barista = (): RoleNoveho => zeSystemove('barista')!;
 
 /**
+ * Přednastavená role, jak platí v podniku (i s úpravou z role_upravy).
+ * Když úpravu nejde načíst, vrátí sadu z kódu — ta se tu používá jen na
+ * typ účtu a kontroly; oprávnění člena pak stejně počítá roleClena podle
+ * klíče, a ta chybu databáze nespolkne.
+ */
+async function zeSystemovePodniku(teamId: number, klic: string): Promise<RoleNoveho | null> {
+  try {
+    const r = await systemovaRolePodniku(teamId, klic);
+    return r ? { klic: r.klic, roleId: null, typ: r.typ, nazev: r.nazev, opravneni: [...r.opravneni] } : null;
+  } catch { return zeSystemove(klic); }
+}
+
+/**
  * Výchozí role podniku. Pravidla výchozí role (žádný tablet, nic citlivého,
  * žádná správa týmu — smiBytVychozi) se tu ověřují ZNOVU: vlastní roli jde
  * upravit i potom, co se stala výchozí, a kód pro připojení zná kdokoli,
@@ -47,11 +60,13 @@ export async function vychoziRolePodniku(teamId: number): Promise<RoleNoveho> {
     if (r && r.typ !== 'kiosk' && smiBytVychozi(r.opravneni).ok) {
       return { klic: null, roleId: r.id, typ: r.typ, nazev: r.nazev, opravneni: r.opravneni };
     }
-    return barista();
+    return (await zeSystemovePodniku(teamId, 'barista')) ?? barista();
   }
-  const s = t?.vychozi_role_klic ? zeSystemove(String(t.vychozi_role_klic)) : null;
+  const s = t?.vychozi_role_klic ? await zeSystemovePodniku(teamId, String(t.vychozi_role_klic)) : null;
   if (s && s.typ !== 'kiosk' && smiBytVychozi(s.opravneni).ok) return s;
-  return barista();
+  // Barista i s úpravou podniku — tu úpravu pravidla výchozí role hlídají
+  // vždy (lib/roleUpravy.ts), takže je bezpečná i jako náhrada.
+  return (await zeSystemovePodniku(teamId, 'barista')) ?? barista();
 }
 
 /** Systémová role Vedení — pozvánka „jako vedení" z doby před rolemi. */

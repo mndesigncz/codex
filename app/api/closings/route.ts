@@ -9,7 +9,7 @@ import { mzdaZaSmenu } from '@/lib/mzdaSmeny';
 import { getConnection } from '@/lib/storyous';
 import { eventWindowFromPos } from '@/lib/eventPos';
 import { clenovePodniku, idClenu } from '@/lib/tenant';
-import { urciKontextUzaverky, chybejiciPredUzaverkou } from '@/lib/povinnePredUzaverkouDb';
+import { urciKontextUzaverky, chybejiciPredUzaverkou, smiObejitPovinne } from '@/lib/povinnePredUzaverkouDb';
 import { jeZamceno, zpravaZamceno } from '@/lib/povinnePredUzaverkou';
 
 export const dynamic = 'force-dynamic';
@@ -401,7 +401,8 @@ export async function POST(request: Request) {
   // ne za člověka bez směny — ta uzávěrka jde vedení ke schválení a blokovat
   // ji by nechalo peníze nenahlášené. Zdroj, který nejde zjistit (migrace),
   // neblokuje. Odpověď nese `kod` a seznam, aby formulář ukázal zámek.
-  if (!p.obejitPostupy && eventId == null && shift) {
+  // Na tabletu rozhoduje role člověka, za kterého se zavírá (smiObejitPovinne).
+  if (eventId == null && shift && !(await smiObejitPovinne(c, actorId))) {
     const stav = await chybejiciPredUzaverkou({ teamId: c.teamId, den: shiftDate, actorId, posadka: shiftEmployeeIds, typy: typyPovinnych });
     if (jeZamceno(stav)) {
       return NextResponse.json({
