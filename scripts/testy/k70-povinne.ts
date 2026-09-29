@@ -113,7 +113,44 @@ export default function ({ eq, ok }: Testy) {
     /- make_interval\(hours => \$\{NIGHT_CUTOFF_HOUR\}::int\), 'YYYY-MM-DD'\) = \$\{o\.den\}\s*OR to_char\(\(r\.completed_at AT TIME ZONE 'UTC'\) AT TIME ZONE 'Europe\/Prague', 'YYYY-MM-DD'\) = \$\{o\.den\}/.test(db));
   ok('DB: akce jen v den uzávěrky (jinak by id staré akce obešlo zámek)',
     /SELECT id, date FROM events/.test(db) && /denAkce !== shiftDate && denAkce !== dayPlus\(shiftDate, 1\)/.test(db));
-  ok('DB: tablet nehlídá návody (potvrdit je tam nejde)', /tablet \? \['postup', 'ukol'\]/.test(db));
+  ok('DB: tablet hlídá i návody (zámek a brána se shodnou)',
+    /const typy: TypPovinne\[\] = \['postup', 'ukol', 'navod'\];/.test(db) && !/tablet \? \['postup', 'ukol'\]/.test(db));
+  const cteni = kod('app/api/guides/[id]/route.ts');
+  ok('POST /api/guides/[id]: tablet potvrzuje podle ctenarNaTabletu (i s dnem uzávěrky)',
+    /ctenarNaTabletu\(c, b\.actingAs, b\.den, request\)/.test(cteni));
+  ok('GET /api/guides/[id]: stav čtení za stejným pravidlem jako POST',
+    /ctenarNaTabletu\(c, q\.get\('actingAs'\), q\.get\('den'\), request\)/.test(cteni));
+  ok('POST /api/guides/[id]: tablet bez vybraného člověka nepotvrdí za sebe',
+    /if \(zaKoho == null\)/.test(cteni) && !/Potvrzení čtení je osobní/.test(cteni));
+  // Tabletová uzávěrka za odpíchnutého (nebo za včerejšek): přečtení musí jít
+  // potvrdit i bez otevřeného příchodu — jinak zámek s návody zamkne toho,
+  // kdo nemá telefon, natrvalo. Pravidlo = za koho smí tablet zavírat.
+  const ctenar = db.slice(db.indexOf('export async function ctenarNaTabletu'), db.indexOf('export async function smiObejitPovinne'));
+  ok('ctenarNaTabletu: odpíchnutý přes resolveActingUser, jinak směna v den uzávěrky',
+    /resolveActingUser\(c\.meId, 'kiosk', c\.teamId, chtene, req\)/.test(ctenar)
+    && /jeUcetTabletu\(c\.meId, c\.teamId\)/.test(ctenar)
+    && /clenPodniku\(id, c\.teamId\)/.test(ctenar)
+    && /maOpravneni\(id, c\.teamId, 'uzaverky\.vytvorit'\)/.test(ctenar)
+    && /FROM shifts WHERE employee_id = \$\{id\} AND date = \$\{d\} AND team_id = \$\{c\.teamId\}/.test(ctenar));
+  ok('ctenarNaTabletu: budoucí den ani nesmyslné datum neprojde', /d > pragueToday\(\)/.test(ctenar) && /\\d\{4\}-/.test(ctenar));
+  // Provozní obchází zámek i na tabletu: rozhoduje role toho, za koho se zavírá.
+  const obejit = db.slice(db.indexOf('export async function smiObejitPovinne'));
+  ok('smiObejitPovinne: tablet podle vybraného, ne podle účtu tabletu',
+    /c\.role\.typ !== 'kiosk'\) return c\.role\.opravneni\.has\('uzaverky\.obejit_postupy'\)/.test(obejit)
+    && /if \(actorId === c\.meId\) return false/.test(obejit)
+    && /maOpravneni\(actorId, c\.teamId, 'uzaverky\.obejit_postupy'\)/.test(obejit));
+  ok('POST i GET: obejít podle stejné funkce',
+    /smiObejitPovinne\(c, actorId\)/.test(post) && /smiObejit: await smiObejitPovinne\(c, kontext\.actorId\)/.test(get)
+    && !/!p\.obejitPostupy && eventId/.test(post));
+  // Upravená role bez navody.zobrazit: návody nehlídat, potvrdit by je nešlo.
+  ok('DB: návody nehlídá u člověka, který je podle role nečte',
+    /maOpravneni\(o\.actorId, o\.teamId, 'navody\.zobrazit'\)/.test(db));
+  const kiosk = kod('components/kiosk/KioskApp.tsx');
+  ok('tablet: čtečka dostane cíl ze zámku, ne tiše dříve vybraného',
+    /setCteniZa\(\{ id, name: clen\?\.name \?\? '', den \}\)/.test(kiosk) && /zaKoho=\{cteniZa \?\?/.test(kiosk));
+  const guides = kod('components/Guides.tsx');
+  ok('čtečka: bez ctenar ze serveru tlačítko nenabídne',
+    /nactenoPro !== zaId \|\| odmitnuto/.test(guides) && /setOdmitnuto\(!ok\)/.test(guides));
   ok('DB: úkol nese kdoId', /kdoId: kdo/.test(db));
   ok('POST i GET: stejné druhy povinných z kontextu',
     /typy: typyPovinnych/.test(post) && /typy: kontext\.typy/.test(get));

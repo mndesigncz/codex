@@ -1836,6 +1836,7 @@ export const SYSTEMOVE_ROLE: SystemovaRole[] = [
    "ukoly.zadavat",
    "ukoly.zobrazit_tym",
    "uzaverky.mazat_vlastni",
+   "uzaverky.obejit_postupy",
    "uzaverky.predavka",
    "uzaverky.schvalovat",
    "uzaverky.vytvorit",

@@ -14,6 +14,7 @@ import { clenPodniku } from '@/lib/tenant';
 import { pragueToday, dayPlus, NIGHT_CUTOFF_HOUR } from '@/lib/pragueTime';
 import { windowOf } from '@/lib/shiftWindow';
 import { denUzaverkyPro } from '@/lib/staleShifts';
+import { resolveActingUser, jeUcetTabletu } from '@/lib/kioskActing';
 import {
   sestavStav, ukolProPosadku, type PovinnaPolozka, type StavPovinnych, type TypPovinne,
 } from '@/lib/povinnePredUzaverkou';
@@ -160,13 +161,62 @@ export async function urciKontextUzaverky(c: Kontext, b: VstupUzaverky): Promise
     }
   } catch { /* shifts table issue — the author alone owns the closing */ }
 
-  // Návod potvrzuje přečtení každý na svém účtu — tablet to za vybraného
-  // člověka neumí (GuideReader tam tlačítko nemá, POST /api/guides/[id]
-  // kiosk odmítá). Kdyby tablet návody hlídal, uzávěrka by tam šla odemknout
-  // jen z cizího telefonu a kdo žádný nemá, zůstal by zamčený natrvalo.
-  const typy: TypPovinne[] = tablet ? ['postup', 'ukol'] : ['postup', 'ukol', 'navod'];
+  // Tablet hlídá všechny tři druhy: přečtení návodu potvrdí za člověka, za
+  // kterého se zavírá (POST /api/guides/[id] s actingAs a dnem uzávěrky —
+  // `ctenarNaTabletu` níž pustí i toho, kdo už je odpíchnutý nebo zavírá
+  // chybějící den). Dřív tablet návody vynechával, protože to neuměl — a
+  // zámek pak na tabletu pouštěl uzávěrku, kterou by telefon zamkl.
+  const typy: TypPovinne[] = ['postup', 'ukol', 'navod'];
 
   return { actorId, shiftDate, shift: shift ?? null, eventId, posadka, typy };
+}
+
+/**
+ * Za koho smí tablet potvrdit přečtení návodu (GET i POST /api/guides/[id]).
+ * Jedno pravidlo pro zámek i potvrzení, jinak by zámek chtěl přečtení, které
+ * tablet neumí zapsat:
+ * - odpíchnutý člověk (resolveActingUser — jako úkoly a postupy), NEBO
+ * - člověk, za kterého tablet smí zavřít uzávěrku dne `den`: člen podniku
+ *   s uzaverky.vytvorit, který ten den měl směnu (jen tehdy zámek platí,
+ *   viz urciKontextUzaverky). Bez toho by kdo se odpíchl a pak zavíral
+ *   u tabletu — nebo dohání včerejšek — zůstal zamčený, dokud nepotvrdí
+ *   z vlastního telefonu, a kdo telefon nemá, natrvalo.
+ * Vrací id člověka, nebo null. Při chybě dotazu null (nic se nepotvrdí).
+ */
+export async function ctenarNaTabletu(c: Kontext, chtene: unknown, den: unknown, req?: Request): Promise<number | null> {
+  const kdo = await resolveActingUser(c.meId, 'kiosk', c.teamId, chtene, req);
+  if (kdo !== c.meId) return kdo;
+  const id = parseInt(String(chtene ?? ''), 10);
+  const d = typeof den === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(den) ? den : null;
+  if (!Number.isFinite(id) || id <= 0 || id === c.meId || !d || d > pragueToday()) return null;
+  try {
+    if (!(await jeUcetTabletu(c.meId, c.teamId))) return null;
+    if (!(await clenPodniku(id, c.teamId))) return null;
+    if (!(await maOpravneni(id, c.teamId, 'uzaverky.vytvorit'))) return null;
+    const [s] = await sql`
+      SELECT 1 AS ok FROM shifts WHERE employee_id = ${id} AND date = ${d} AND team_id = ${c.teamId} LIMIT 1`;
+    return s ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Smí se uzávěrka odeslat i se zamčenými povinnými věcmi? Mimo tablet podle
+ * role volajícího. Tablet je sdílený účet a obejít nesmí nikdy sám za sebe —
+ * rozhoduje role člověka, za kterého se zavírá (Provozní u baru tak smí totéž
+ * co ze svého telefonu; tablet za něj uzávěrku odesílá tak jako tak). Stejná
+ * funkce pro GET /api/closings/povinne i POST /api/closings, ať se tlačítko
+ * „Odeslat i bez povinných věcí" a brána nerozejdou. Chyba = nesmí.
+ */
+export async function smiObejitPovinne(c: Kontext, actorId: number): Promise<boolean> {
+  if (c.role.typ !== 'kiosk') return c.role.opravneni.has('uzaverky.obejit_postupy');
+  if (actorId === c.meId) return false;
+  try {
+    return await maOpravneni(actorId, c.teamId, 'uzaverky.obejit_postupy');
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -244,6 +294,10 @@ export async function chybejiciPredUzaverkou(o: {
   // potvrdit znovu (POST /api/guides/[id] čas potvrzení obnoví).
   if (typy.has('navod') && o.actorId != null) {
     try {
+      // Kdo podle své role návody nečte (podnik si mohl upravit i
+      // přednastavenou roli), ten je potvrdit nemůže — ani sám, ani přes
+      // tablet. Hlídat mu je by uzávěrku zamklo natrvalo.
+      if (!(await maOpravneni(o.actorId, o.teamId, 'navody.zobrazit'))) return sestavStav(vsechny, neznamo);
       const rows = await sql`
         SELECT g.id, g.title,
           EXISTS (

@@ -10,7 +10,7 @@
 // „nic nechybí" a zámek by zmizel kvůli výpadku.
 import { NextResponse } from 'next/server';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
-import { urciKontextUzaverky, chybejiciPredUzaverkou } from '@/lib/povinnePredUzaverkouDb';
+import { urciKontextUzaverky, chybejiciPredUzaverkou, smiObejitPovinne } from '@/lib/povinnePredUzaverkouDb';
 import { duvodVolna, jeZamceno, pocty } from '@/lib/povinnePredUzaverkou';
 
 export const dynamic = 'force-dynamic';
@@ -32,7 +32,7 @@ export async function GET(request: Request) {
     const volno = duvodVolna({ eventId: kontext.eventId, maSmenu: !!kontext.shift });
     const stav = await chybejiciPredUzaverkou({
       teamId: c.teamId, den: kontext.shiftDate, actorId: kontext.actorId, posadka: kontext.posadka,
-      // Stejné druhy jako brána v POST (tablet bez návodů), jinak by se rozešly.
+      // Stejné druhy jako brána v POST, jinak by se zámek a odeslání rozešly.
       typy: kontext.typy,
     });
     const { celkem, hotovo } = pocty(stav);
@@ -44,8 +44,9 @@ export async function GET(request: Request) {
       polozky: stav.polozky,
       vsechny: stav.vsechny,
       neznamo: stav.neznamo,
-      // Právo z role VOLAJÍCÍHO, ne vybraného člověka — tablet ho nemá nikdy.
-      smiObejit: c.role.opravneni.has('uzaverky.obejit_postupy'),
+      // Stejná funkce jako brána v POST: tablet podle člověka, za kterého
+      // zavírá (Provozní u baru), jinak podle volajícího.
+      smiObejit: await smiObejitPovinne(c, kontext.actorId),
       duvodVolna: volno,
       celkem,
       hotovo,

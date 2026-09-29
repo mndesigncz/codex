@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 import { zneplatniStav } from '@/lib/auth';
 import { jeClenem } from '@/lib/tenant';
 import { neon } from '@neondatabase/serverless';
-import { pozaduj, jeOdpoved, roleClena, vlastniRole, zneplatniOpravneni, type Kontext } from '@/lib/opravneniDb';
-import { systemovaRole, roleZTypu, smiPriraditRoli, smiSpravovatClena, typNaUcet, type TypRole } from '@/lib/opravneni';
+import { pozaduj, jeOdpoved, roleClena, vlastniRole, zneplatniOpravneni, systemovaRolePodniku, type Kontext } from '@/lib/opravneniDb';
+import { roleZTypu, smiPriraditRoli, smiSpravovatClena, typNaUcet, type TypRole } from '@/lib/opravneni';
 import { jeUcetTabletu } from '@/lib/kioskActing';
 import { audit } from '@/lib/audit';
 
@@ -66,7 +66,11 @@ export async function PATCH(request: Request) {
       nova = { klic: null, roleId: r.id, typ: r.typ, opravneni: r.opravneni, nazev: r.nazev };
     } else {
       const klic = b?.roleKlic ?? (b?.role === 'employer' ? 'vedeni' : b?.role === 'employee' ? 'barista' : null);
-      const r = systemovaRole(klic);
+      // Sada, jak ji role v podniku má (i s úpravou přednastavené role) —
+      // přidělující musí pokrýt to, co člověk opravdu dostane.
+      let r;
+      try { r = await systemovaRolePodniku(c.teamId, klic); }
+      catch { return NextResponse.json({ error: 'Roli se teď nepodařilo načíst. Zkus to za chvíli znovu.' }, { status: 503 }); }
       if (!r) return NextResponse.json({ error: 'Neplatná role.' }, { status: 400 });
       nova = { klic: r.klic, roleId: null, typ: r.typ, opravneni: r.opravneni, nazev: r.nazev };
     }

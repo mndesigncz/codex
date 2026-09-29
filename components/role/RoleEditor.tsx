@@ -3,7 +3,9 @@
 // Nastavení → Role a oprávnění (kolo 67).
 //
 // Dvě obrazovky v jedné záložce: seznam rolí (přednastavené z kódu +
-// vlastní role podniku) a editor jedné role. Editor je na stránce, ne
+// vlastní role podniku) a editor jedné role. Přednastavené role si podnik
+// může upravit (kromě Majitele / Vedení a Tabletu — lib/roleUpravy.ts);
+// úprava platí jen v tomhle podniku a jde vrátit na výchozí. Editor je na stránce, ne
 // v okně: katalog má přes sto šedesát oprávnění ve čtrnácti oblastech
 // a v okně na telefonu by se rolovalo v rolování.
 //
@@ -25,10 +27,16 @@ import {
 import { obnovOpravneni } from './useOpravneni';
 import { nastavRozepsanouRoli, CO_SE_ZAHODI_ROLE } from './rozepsano';
 
-interface SysRole { klic: string; nazev: string; popis: string; typ: TypRole; opravneni: string[]; pocet: number }
+interface SysRole {
+  klic: string; nazev: string; popis: string; typ: TypRole; opravneni: string[]; pocet: number;
+  // Úprava podnikem (kolo 71). Starší odpověď serveru je nemá — pak se
+  // role chová jako dřív: jen ke čtení a ke kopii.
+  upraveno?: boolean; upravitelna?: boolean; verze?: number; procZamceno?: string | null;
+  vychoziOpravneni?: string[]; vychoziNazev?: string; vychoziPopis?: string;
+}
 interface VlRole { id: number; nazev: string; popis: string | null; typ: TypRole; opravneni: string[]; zdroj: string | null; pocet: number }
 interface Ja { jeVlastnik: boolean; klic: string | null; roleId: number | null; nazev: string; opravneni: string[] }
-interface Data { system: SysRole[]; vlastni: VlRole[]; vychozi: { id: number | null; klic: string | null }; ja: Ja }
+interface Data { system: SysRole[]; vlastni: VlRole[]; vychozi: { id: number | null; klic: string | null }; ja: Ja; upravyNedostupne: boolean }
 
 /** Co editor otevírá: novou roli (případně z předlohy), nebo existující vlastní či přednastavenou. */
 type Otevreno =
@@ -80,6 +88,8 @@ export default function RoleEditor() {
   const [mazat, setMazat] = useState<VlRole | null>(null);
   const [mazu, setMazu] = useState(false);
   const [nastavujiVychozi, setNastavujiVychozi] = useState<string | null>(null);
+  const [obnovit, setObnovit] = useState<SysRole | null>(null);
+  const [obnovuji, setObnovuji] = useState(false);
 
   const nacti = () => {
     setChybaNacteni(null);
@@ -89,6 +99,7 @@ export default function RoleEditor() {
         vlastni: Array.isArray(d?.vlastni) ? d.vlastni : [],
         vychozi: d?.vychozi ?? { id: null, klic: 'barista' },
         ja: d?.ja ?? { jeVlastnik: false, klic: null, roleId: null, nazev: '', opravneni: [] },
+        upravyNedostupne: d?.upravyNedostupne === true,
       }))
       .catch(e => setChybaNacteni(apiMessage(e, 'Role se nepodařilo načíst.')));
   };
@@ -107,11 +118,17 @@ export default function RoleEditor() {
   const moje = new Set(ja.opravneni);
   const smiSpravovat = ja.jeVlastnik || moje.has('tym.role_spravovat');
 
+  // Přednastavenou roli jde upravit, jen když ji server pustí (ne Vedení
+  // ani Tablet) a úpravy podniku se podařilo načíst — jinak by editor
+  // uložil sadu z kódu přes úpravu, kterou jen neviděl.
+  const lzeUpravitSystemovou = (r: SysRole) => smiSpravovat && r.upravitelna === true && !data.upravyNedostupne;
+
   if (otevreno) {
     return (
       <EditorRole
         key={otevreno.druh === 'vlastni' ? `v${otevreno.role.id}` : otevreno.druh === 'system' ? `s${otevreno.role.klic}` : 'nova'}
-        otevreno={otevreno} ja={ja} smiSpravovat={smiSpravovat}
+        otevreno={otevreno} ja={ja} smiSpravovat={smiSpravovat} upravyNedostupne={data.upravyNedostupne}
+        vychoziProNove={otevreno.druh === 'system' ? jeVychoziRole(data.vychozi, { klic: otevreno.role.klic }) : otevreno.druh === 'vlastni' && jeVychoziRole(data.vychozi, { id: otevreno.role.id })}
         onZpet={() => setOtevreno(null)}
         onKopie={(r) => setOtevreno({ druh: 'nova', predloha: predlohaZ(r, ja) })}
         onUlozeno={async (m) => { await nacti(); setOtevreno(null); flash(m); obnovOpravneni(); }}
@@ -127,8 +144,7 @@ export default function RoleEditor() {
     r.typ === 'zamestnanec' && smiBytVychozi(r.opravneni).ok
     && (ja.jeVlastnik || navic(r.opravneni, moje).length === 0);
 
-  const jeVychozi = (r: { klic?: string; id?: number }) =>
-    r.id != null ? data.vychozi.id === r.id : data.vychozi.id == null && data.vychozi.klic === r.klic;
+  const jeVychozi = (r: { klic?: string; id?: number }) => jeVychoziRole(data.vychozi, r);
 
   const nastavVychozi = async (telo: { roleId: number } | { klic: string }, nazev: string) => {
     const k = 'roleId' in telo ? `v${telo.roleId}` : `s${telo.klic}`;
@@ -139,6 +155,24 @@ export default function RoleEditor() {
       flash(`Noví členové teď dostanou roli „${nazev}".`);
     } catch (e) { setChyba(apiMessage(e, 'Výchozí roli se nepodařilo nastavit.')); }
     setNastavujiVychozi(null);
+  };
+
+  const obnovVychozi = async () => {
+    if (!obnovit) return;
+    setObnovuji(true); setChyba('');
+    try {
+      await fetch(`/api/roles/system/${encodeURIComponent(obnovit.klic)}`, { method: 'DELETE' }).then(okJson);
+      const n = obnovit.vychoziNazev ?? obnovit.nazev;
+      setObnovit(null);
+      await nacti();
+      obnovOpravneni();
+      flash(`Role „${n}" má zase výchozí oprávnění.`);
+    } catch (e) {
+      // 403 (návrat by přidal práva, která nemáš / je to tvoje role) říká server přesně.
+      setChyba(apiMessage(e, 'Roli se nepodařilo vrátit na výchozí.'));
+      setObnovit(null);
+    }
+    setObnovuji(false);
   };
 
   const smaz = async () => {
@@ -165,8 +199,9 @@ export default function RoleEditor() {
           <div className="min-w-0">
             <h3 className="font-bold tracking-tight text-[#16181A]">Role a oprávnění</h3>
             <p className="text-black/45 text-sm mt-1 text-pretty">
-              Role je sada oprávnění — co člověk v podniku vidí a smí. Přednastavené role jdou jen zkopírovat;
-              vlastní si složíš přesně podle toho, jak u vás práce vypadá. Vlastník podniku má vždycky všechno.
+              Role je sada oprávnění — co člověk v podniku vidí a smí. Přednastavené role si můžeš upravit pro svůj
+              podnik (kromě Majitele a Tabletu) nebo zkopírovat; vlastní si složíš přesně podle toho, jak u vás práce
+              vypadá. Vlastník podniku má vždycky všechno.
             </p>
           </div>
           {smiSpravovat && (
@@ -224,8 +259,16 @@ export default function RoleEditor() {
         <ul className="divide-y divide-black/[0.06]">
           {data.system.map(r => (
             <RadekRole key={r.klic} nazev={r.nazev} popis={r.popis} typ={r.typ} pocetOpravneni={r.opravneni.length} pocetLidi={r.pocet}
-              vychozi={jeVychozi({ klic: r.klic })} mojeRole={ja.roleId == null && ja.klic === r.klic && !ja.jeVlastnik} system>
-              <Button size="sm" variant="ghost" onClick={() => setOtevreno({ druh: 'system', role: r })}>Zobrazit</Button>
+              vychozi={jeVychozi({ klic: r.klic })} mojeRole={ja.roleId == null && ja.klic === r.klic && !ja.jeVlastnik}
+              system={r.upravitelna ? 'upravitelna' : 'zamcena'} upraveno={r.upraveno === true}>
+              {lzeUpravitSystemovou(r) ? (
+                <Button size="sm" variant="secondary" icon="pencil" onClick={() => setOtevreno({ druh: 'system', role: r })}>Upravit</Button>
+              ) : (
+                <Button size="sm" variant="ghost" onClick={() => setOtevreno({ druh: 'system', role: r })}>Zobrazit</Button>
+              )}
+              {lzeUpravitSystemovou(r) && r.upraveno && (
+                <Button size="sm" variant="ghost" icon="undo" onClick={() => { setChyba(''); setObnovit(r); }}>Obnovit výchozí</Button>
+              )}
               {smiSpravovat && (
                 <Button size="sm" variant="secondary" icon="copy"
                   onClick={() => setOtevreno({ druh: 'nova', predloha: predlohaZ(r, ja) })}>Zkopírovat do vlastní</Button>
@@ -238,6 +281,24 @@ export default function RoleEditor() {
           ))}
         </ul>
       </section>
+
+      <Modal open={!!obnovit} onClose={() => !obnovuji && setObnovit(null)} size="sm" title="Obnovit výchozí oprávnění?"
+        footer={<>
+          <Button variant="secondary" onClick={() => setObnovit(null)} disabled={obnovuji}>Zrušit</Button>
+          <Button variant="accent" icon="undo" loading={obnovuji} onClick={obnovVychozi}>Obnovit výchozí</Button>
+        </>}>
+        {obnovit && (
+          <div className="space-y-3 text-sm text-black/60">
+            <p>
+              Role <strong className="text-[#16181A]">{obnovit.nazev}</strong> dostane zpátky výchozí název, popis a oprávnění
+              {obnovit.vychoziOpravneni ? ` (${czCount(obnovit.vychoziOpravneni.length, OPRAVNENI)})` : ''}. Úpravy tvého podniku se zahodí.
+            </p>
+            {obnovit.pocet > 0 && (
+              <p className="note">Změna platí hned pro {lide(obnovit.pocet)} s touhle rolí — při příštím načtení aplikace.</p>
+            )}
+          </div>
+        )}
+      </Modal>
 
       <Modal open={!!mazat} onClose={() => !mazu && setMazat(null)} size="sm" title="Smazat roli?"
         footer={<>
@@ -261,6 +322,11 @@ export default function RoleEditor() {
   );
 }
 
+/** Je role výchozí pro nové členy? Bez nastavené výchozí je to Barista (server posílá klíč). */
+function jeVychoziRole(vychozi: Data['vychozi'], r: { klic?: string; id?: number }) {
+  return r.id != null ? vychozi.id === r.id : vychozi.id == null && vychozi.klic === r.klic;
+}
+
 /** Předloha pro kopii: jen oprávnění, která volající sám má (jinak by server kopii odmítl). */
 function predlohaZ(r: SysRole | VlRole, ja: Ja) {
   const moje = new Set(ja.opravneni);
@@ -269,9 +335,9 @@ function predlohaZ(r: SysRole | VlRole, ja: Ja) {
   return { nazev: `${r.nazev} (kopie)`.slice(0, 60), popis: r.popis ?? '', typ: r.typ, opravneni: sada, zdroj, vynechano: r.opravneni.length - sada.length };
 }
 
-function RadekRole({ nazev, popis, typ, pocetOpravneni, pocetLidi, vychozi, mojeRole, system, children }: {
+function RadekRole({ nazev, popis, typ, pocetOpravneni, pocetLidi, vychozi, mojeRole, system, upraveno, children }: {
   nazev: string; popis: string | null; typ: TypRole; pocetOpravneni: number; pocetLidi: number;
-  vychozi: boolean; mojeRole: boolean; system?: boolean; children: React.ReactNode;
+  vychozi: boolean; mojeRole: boolean; system?: 'upravitelna' | 'zamcena'; upraveno?: boolean; children: React.ReactNode;
 }) {
   return (
     <li className="py-3.5 flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4">
@@ -281,7 +347,9 @@ function RadekRole({ nazev, popis, typ, pocetOpravneni, pocetLidi, vychozi, moje
           <Chip size="sm" tone="info">{TYP_NAZEV[typ]}</Chip>
           {vychozi && <Chip size="sm" tone="ok">Výchozí pro nové</Chip>}
           {mojeRole && <Chip size="sm" tone="ink">Tvoje role</Chip>}
-          {system && <Chip size="sm" tone="muted" icon="lock">Přednastavená</Chip>}
+          {/* Zámek jen u rolí, které upravit nejde (Majitel / Vedení, Tablet). */}
+          {system && <Chip size="sm" tone="muted" icon={system === 'zamcena' ? 'lock' : undefined}>Přednastavená</Chip>}
+          {upraveno && <Chip size="sm" tone="wait">Upraveno</Chip>}
         </div>
         {popis && <p className="text-xs text-black/50 mt-1 line-clamp-2 text-pretty">{popis}</p>}
         <p className="text-xs text-black/45 mt-1 tabular-nums">{pocetOpravneni} oprávnění · {lide(pocetLidi)}</p>
@@ -291,8 +359,8 @@ function RadekRole({ nazev, popis, typ, pocetOpravneni, pocetLidi, vychozi, moje
   );
 }
 
-function EditorRole({ otevreno, ja, smiSpravovat, onZpet, onKopie, onUlozeno }: {
-  otevreno: Otevreno; ja: Ja; smiSpravovat: boolean;
+function EditorRole({ otevreno, ja, smiSpravovat, upravyNedostupne, vychoziProNove, onZpet, onKopie, onUlozeno }: {
+  otevreno: Otevreno; ja: Ja; smiSpravovat: boolean; upravyNedostupne: boolean; vychoziProNove: boolean;
   onZpet: () => void; onKopie: (r: SysRole | VlRole) => void; onUlozeno: (zprava: string) => void | Promise<void>;
 }) {
   const moje = useMemo(() => new Set(ja.opravneni), [ja.opravneni]);
@@ -312,11 +380,16 @@ function EditorRole({ otevreno, ja, smiSpravovat, onZpet, onKopie, onUlozeno }: 
 
   // Proč se role nedá upravit — jedna věta, nahoře, místo desítek
   // zašedlých přepínačů bez vysvětlení.
-  const mimoMoje = otevreno.druh === 'vlastni' && !ja.jeVlastnik ? navic(otevreno.role.opravneni, moje) : [];
+  const mimoMoje = otevreno.druh !== 'nova' && !ja.jeVlastnik ? navic(otevreno.role.opravneni, moje) : [];
+  const system = otevreno.druh === 'system' ? otevreno.role : null;
+  // Stejná pravidla jako server (lib/roleUpravy.ts → smiUpravitSystemovou);
+  // rozhoduje stejně server, tohle jen vysvětlí dopředu.
   const jenCist: string | null =
-    otevreno.druh === 'system' ? 'Přednastavená role se nedá upravit. Zkopíruj ji do vlastní a uprav kopii.'
+    system && system.upravitelna !== true ? (system.procZamceno ?? 'Přednastavená role se nedá upravit. Zkopíruj ji do vlastní a uprav kopii.')
+    : system && upravyNedostupne ? 'Úpravy přednastavených rolí se teď nepodařilo načíst, takže roli ukazuji jen ke čtení. Zkus stránku načíst znovu.'
     : !smiSpravovat ? 'Na správu rolí nemáš oprávnění — roli si můžeš jen prohlédnout.'
     : otevreno.druh === 'vlastni' && !ja.jeVlastnik && ja.roleId === otevreno.role.id ? 'Tohle je tvoje vlastní role. Upravit ji může jen někdo jiný — jinak by si kdokoli mohl přidat práva sám.'
+    : system && !ja.jeVlastnik && ja.roleId == null && ja.klic === system.klic ? 'Tohle je tvoje role. Upravit ji může jen někdo jiný — jinak by si kdokoli mohl přidat práva sám.'
     : mimoMoje.length ? `Tahle role má oprávnění, která ty nemáš (${nazvyKlicu(mimoMoje)}) — upravit ji může jen někdo s nimi.`
     : null;
 
@@ -432,7 +505,15 @@ function EditorRole({ otevreno, ja, smiSpravovat, onZpet, onKopie, onUlozeno }: 
     setUkladam(true); setChyba('');
     const telo = { nazev: nazev.trim(), popis: popis.trim(), typ, opravneni: [...sada].sort() };
     try {
-      if (otevreno.druh === 'vlastni') {
+      if (otevreno.druh === 'system') {
+        // Typ přednastavené role je pevný; posílá se jen sada, název, popis
+        // a verze, se kterou se role otevřela (server odmítne souběžnou změnu).
+        const bezTypu = { nazev: telo.nazev, popis: telo.popis, opravneni: telo.opravneni, verze: otevreno.role.verze ?? 0 };
+        await fetch(`/api/roles/system/${encodeURIComponent(otevreno.role.klic)}`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(bezTypu),
+        }).then(okJson);
+        await onUlozeno(`Role „${telo.nazev}" je uložená — platí hned pro všechny, kdo ji mají.`);
+      } else if (otevreno.druh === 'vlastni') {
         await fetch(`/api/roles/${otevreno.role.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(telo) }).then(okJson);
         await onUlozeno(`Role „${telo.nazev}" je uložená.`);
       } else {
@@ -478,11 +559,33 @@ function EditorRole({ otevreno, ja, smiSpravovat, onZpet, onKopie, onUlozeno }: 
           </p>
         )}
 
+        {system && !jenCist && (
+          <p className="note text-sm flex items-start gap-2">
+            <Icon name="info" size={15} className="shrink-0 mt-0.5" />
+            <span className="min-w-0">
+              Úprava platí jen v tomhle podniku a hned pro všechny, kdo roli mají ({lide(system.pocet)}).
+              {system.upraveno && system.vychoziOpravneni && (() => {
+                const plus = navic(sada, system.vychoziOpravneni).length, minus = navic(system.vychoziOpravneni, sada).length;
+                return plus || minus ? ` Proti výchozí: ${plus} navíc, ${minus} vypnuto.` : ' Oprávnění jsou teď stejná jako výchozí.';
+              })()}
+              {' '}Výchozí stav vrátíš v seznamu rolí tlačítkem „Obnovit výchozí".
+            </span>
+          </p>
+        )}
+        {system && !jenCist && (vychoziProNove || system.klic === 'barista') && !smiBytVychozi(sada).ok && (
+          <p role="alert" className="note note-danger text-sm flex items-start gap-2">
+            <Icon name="warning" size={15} className="shrink-0 mt-0.5" />
+            <span className="min-w-0">
+              {vychoziProNove ? 'Tuhle roli dostane každý nový člen' : 'Baristu dostane nový člen, kdykoli výchozí role nejde použít'} — a {smiBytVychozi(sada).proc}. Takhle ji uložit nepůjde; pro citlivější práva vytvoř vlastní roli.
+            </span>
+          </p>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="min-w-0">
             <Label htmlFor="role-nazev">Název role</Label>
             <Input id="role-nazev" value={nazev} maxLength={60} required disabled={!!jenCist}
-              placeholder="Třeba Směnový vedoucí" onChange={e => setNazev(e.target.value)} />
+              placeholder={system?.vychoziNazev ?? 'Třeba Směnový vedoucí'} onChange={e => setNazev(e.target.value)} />
           </div>
           <div className="min-w-0">
             <Label htmlFor="role-popis">Popis (nepovinné)</Label>
@@ -493,7 +596,7 @@ function EditorRole({ otevreno, ja, smiSpravovat, onZpet, onKopie, onUlozeno }: 
 
         <div className="space-y-2">
           <p className="field-label" id="role-typ">Typ rozhraní</p>
-          {jenCist ? (
+          {jenCist || system ? (
             <p className="text-sm text-[#16181A] font-semibold">{TYP_NAZEV[typ]}</p>
           ) : (
             <Segmented ariaLabel="Typ rozhraní" options={TYPY} value={typ} onChange={zmenTyp} />
@@ -604,8 +707,8 @@ function EditorRole({ otevreno, ja, smiSpravovat, onZpet, onKopie, onUlozeno }: 
         <div className="glass-strong rounded-2xl p-2.5 flex items-center gap-2 justify-end flex-wrap">
           <Button variant="secondary" onClick={zpet}>{jenCist ? 'Zpět' : 'Zrušit'}</Button>
           {!jenCist && (
-            <Button type="submit" variant="accent" icon="check" loading={ukladam} disabled={!nazev.trim() || (otevreno.druh === 'vlastni' && !zmeneno)}>
-              {otevreno.druh === 'vlastni' ? 'Uložit změny' : 'Vytvořit roli'}
+            <Button type="submit" variant="accent" icon="check" loading={ukladam} disabled={!nazev.trim() || (otevreno.druh !== 'nova' && !zmeneno)}>
+              {otevreno.druh !== 'nova' ? 'Uložit změny' : 'Vytvořit roli'}
             </Button>
           )}
         </div>

@@ -14,6 +14,7 @@ import {
   SYSTEMOVE_ROLE, VSECHNA, roleZTypu, systemovaRole, vycisti, sZavislostmi,
   type TypRole, type SystemovaRole,
 } from './opravneni';
+import { efektivniSystemova, jeUpravitelnaSystemova, poleOpravneni, type EfektivniRole, type UpravaRole } from './roleUpravy';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -38,6 +39,14 @@ export function zneplatniOpravneni(userId?: number, teamId?: number): void {
   if (userId == null) { cache.clear(); return; }
   if (teamId == null) { for (const k of [...cache.keys()]) if (k.startsWith(`${userId}:`)) cache.delete(k); return; }
   cache.delete(`${userId}:${teamId}`);
+}
+
+/**
+ * Zahodí cache všech členů podniku — po úpravě přednastavené role (drží ji
+ * kdokoli v podniku, včetně lidí, kterým se role odvozuje z typu účtu).
+ */
+export function zneplatniOpravneniPodniku(teamId: number): void {
+  for (const k of [...cache.keys()]) if (k.endsWith(`:${teamId}`)) cache.delete(k);
 }
 
 /**
@@ -131,11 +140,58 @@ async function nactiRoli(userId: number, teamId: number): Promise<RoleClena | nu
   } else {
     sys = systemovaRole(m.role_klic) ?? roleZTypu(m.role);
   }
+  // Úprava přednastavené role podnikem (role_upravy). Vedení a Tablet se
+  // nedotazují vůbec — upravit nejdou. Chyba databáze (mimo stav před
+  // migrací) se propaguje jako výš: sada z kódu místo upravené by mohla
+  // dát víc, než podnik roli nechal.
+  if (jeUpravitelnaSystemova(sys.klic)) sys = efektivniSystemova(sys, await upravaRole(teamId, sys.klic));
   const opr = new Set(sys.opravneni);
   // Podnik, který zaměstnancům schoval rozvrh týmu (dřívější přepínač),
   // ho schovává dál — přepínač teď znamená „Barista bez náhledu rozvrhu".
   if (sys.klic === 'barista' && t?.show_team_schedule === false) opr.delete('rozvrh.nahled');
   return { userId, teamId, jeVlastnik, klic: sys.klic, roleId: null, nazev: sys.nazev, typ: sys.typ, opravneni: opr };
+}
+
+const naUpravu = (r: any): UpravaRole => ({
+  klic: String(r.klic), opravneni: poleOpravneni(r.opravneni).filter((x): x is string => typeof x === 'string'),
+  nazev: r.nazev ?? null, popis: r.popis ?? null, verze: Number(r.verze) || 1,
+});
+
+/**
+ * Úprava jedné přednastavené role v podniku, nebo null. Před migrací
+ * (tabulka role_upravy ještě není) null = platí kód. Jiná chyba VYHODÍ.
+ */
+export async function upravaRole(teamId: number, klic: string): Promise<UpravaRole | null> {
+  try {
+    const [r] = await sql`SELECT klic, opravneni, nazev, popis, verze FROM role_upravy WHERE team_id = ${teamId} AND klic = ${klic}`;
+    return r ? naUpravu(r) : null;
+  } catch (e) {
+    if (jePredMigraci(e)) return null;
+    throw e;
+  }
+}
+
+/** Všechny přednastavené role, jak platí v podniku (s úpravami). Chyba DB mimo stav před migrací VYHODÍ. */
+export async function systemoveRolePodniku(teamId: number): Promise<EfektivniRole[]> {
+  let upravy = new Map<string, UpravaRole>();
+  try {
+    const rows = await sql`SELECT klic, opravneni, nazev, popis, verze FROM role_upravy WHERE team_id = ${teamId}` as any[];
+    upravy = new Map(rows.map(r => [String(r.klic), naUpravu(r)]));
+  } catch (e) {
+    if (!jePredMigraci(e)) throw e;
+  }
+  return SYSTEMOVE_ROLE.map(r => efektivniSystemova(r, upravy.get(r.klic)));
+}
+
+/**
+ * Přednastavená role podle klíče, jak platí v podniku — pro přidělení
+ * člověku, výchozí roli a pozvánky. Kdo roli přiděluje, musí „pokrýt"
+ * sadu, kterou člověk opravdu dostane, ne tu z kódu.
+ */
+export async function systemovaRolePodniku(teamId: number, klic: string | null | undefined): Promise<EfektivniRole | null> {
+  const r = systemovaRole(klic);
+  if (!r) return null;
+  return efektivniSystemova(r, jeUpravitelnaSystemova(r.klic) ? await upravaRole(teamId, r.klic) : null);
 }
 
 export async function maOpravneni(userId: number, teamId: number, klic: string): Promise<boolean> {
