@@ -46,6 +46,7 @@
   "Zúžit boční pás": "Collapse sidebar",
   "neuvedeno": "not specified",
   "zavřeno": "closed",
+  "{n, plural, one {# nepřečtená zpráva} few {# nepřečtené zprávy} other {# nepřečtených zpráv}}": "{n, plural, one {# unread message} other {# unread messages}}",
   "Úkoly|nav": "Tasks",
   "Účet": "Account"
 }

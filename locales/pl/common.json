@@ -46,6 +46,7 @@
   "Zúžit boční pás": "Zwiń panel boczny",
   "neuvedeno": "nie podano",
   "zavřeno": "zamknięte",
+  "{n, plural, one {# nepřečtená zpráva} few {# nepřečtené zprávy} other {# nepřečtených zpráv}}": "{n, plural, one {# nieprzeczytana wiadomość} few {# nieprzeczytane wiadomości} many {# nieprzeczytanych wiadomości} other {# nieprzeczytanej wiadomości}}",
   "Úkoly|nav": "Zadania",
   "Účet": "Konto"
 }
