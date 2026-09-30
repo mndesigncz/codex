@@ -155,7 +155,7 @@ export default function ({ eq, ok }: Testy) {
   ], [true, true, true, true]);
   // Review kola 69.
   eq('zdrojáky B6a: checklist úkolu se odškrtává jen se smiSplnit (vedení i zaměstnanec)', ['components/employer/TaskManager.tsx', 'components/employee/Tasks.tsx']
-    .filter(f => !/onToggle=\{smiSplnit\((t|task)\) \?/.test(kod(f)) || !/onToggleAll=\{smiSplnit\((t|task)\) \?/.test(kod(f))), []);
+    .filter(f => !/onToggle=\{smiSplnit\((t|uk|task)\) \?/.test(kod(f)) || !/onToggleAll=\{smiSplnit\((t|uk|task)\) \?/.test(kod(f))), []);
   ok('zdrojáky B6a: krok checklistu má skutečnou výšku (36/44 px), ne přesahující tap-target-sm', /min-h-\[44px\]' : 'min-h-9'/.test(kod('components/TaskChecklist.tsx'))
     && !kod('components/TaskChecklist.tsx').includes('tap-target-sm') && /<TaskChecklist velky/.test(kod('components/kiosk/KioskTasks.tsx')));
   ok('zdrojáky B6a: fronta ke schválení bez primary tlačítka, Vrátit v menu řádku', !/variant="primary"/.test(kod('components/widgety/oblasti/planovani.tsx'))

@@ -1,13 +1,14 @@
 'use client';
 
 import { KODY_ALERGENU, KODY_STITKU, ALERGENY, STITKY, type KodAlergenu, type KodStitku } from '@/lib/alergeny';
+import { useT, useJazyk } from '@/lib/i18n/client';
 
 // Výběr alergenů (14 skupin podle nařízení EU 1169/2011) a štítků jídla.
 //
 // Čtrnáct přepínacích čipů (aria-pressed), na telefonu ve dvou sloupcích,
 // každý s cílem 44 px. Vybraný čip je inkoustový (chip-ink), ne limetkový:
-// jednu plnou limetku na obrazovce drží „Uložit". Editor je správa, takže mluví
-// česky; hostovi se názvy posílají v jeho jazyce ze serveru (lib/alergeny.ts).
+// jednu plnou limetku na obrazovce drží „Uložit". Názvy alergenů a štítků jdou
+// v jazyce uživatele z katalogu lib/alergeny.ts (stejné názvy vidí i host).
 //
 // Důležité pro právo: prázdný výběr NEZNAMENÁ „bez alergenů", jen „nevyplněno".
 // Host u takové položky neuvidí nic a pod lístkem stojí věta „zeptejte se obsluhy".
@@ -19,6 +20,8 @@ export default function AlergenyPicker({ alergeny, stitky, onAlergeny, onStitky,
   onStitky: (kody: KodStitku[]) => void;
   disabled?: boolean;
 }) {
+  const t = useT('sprava');
+  const { jazyk } = useJazyk();
   const vybrane = new Set(alergeny);
   const vybraneStitky = new Set(stitky);
 
@@ -39,30 +42,31 @@ export default function AlergenyPicker({ alergeny, stitky, onAlergeny, onStitky,
   return (
     <div className="space-y-5">
       <div>
-        <p className="t-label mb-2">Alergeny</p>
-        <div className="grid grid-cols-2 gap-2" role="group" aria-label="Alergeny položky">
+        <p className="t-label mb-2">{t('Alergeny')}</p>
+        <div className="grid grid-cols-2 gap-2" role="group" aria-label={t('Alergeny položky')}>
           {KODY_ALERGENU.map(k => (
             <button key={k} type="button" disabled={disabled} aria-pressed={vybrane.has(k)} onClick={() => prepni(k)} className={cip(vybrane.has(k))}>
               <span className="tabular-nums font-semibold shrink-0">{k}</span>
-              <span className="min-w-0">{ALERGENY[k].cs}</span>
+              <span className="min-w-0">{ALERGENY[k][jazyk] ?? ALERGENY[k].cs}</span>
             </button>
           ))}
         </div>
         <p className="t-meta mt-2 text-pretty">
-          Prázdný výběr neznamená „bez alergenů“, jen že nejsou vyplněné. Host u takové položky nic neuvidí a pod lístkem najde větu, ať se zeptá obsluhy.
+          
+          {t('Prázdný výběr neznamená „bez alergenů“, jen že nejsou vyplněné. Host u takové položky nic neuvidí a pod lístkem najde větu, ať se zeptá obsluhy.')}
         </p>
       </div>
 
       <div>
-        <p className="t-label mb-2">Štítky</p>
-        <div className="grid grid-cols-2 gap-2" role="group" aria-label="Štítky položky">
+        <p className="t-label mb-2">{t('Štítky')}</p>
+        <div className="grid grid-cols-2 gap-2" role="group" aria-label={t('Štítky položky')}>
           {KODY_STITKU.map(k => (
             <button key={k} type="button" disabled={disabled} aria-pressed={vybraneStitky.has(k)} onClick={() => prepniStitek(k)} className={cip(vybraneStitky.has(k))}>
-              {STITKY[k].cs}
+              {STITKY[k][jazyk] ?? STITKY[k].cs}
             </button>
           ))}
         </div>
-        <p className="t-meta mt-2 text-pretty">Označ jen to, čeho jsi si jistý. Štítky „Vegan“ a „Bez lepku“ jsou tvrzení pro hosta.</p>
+        <p className="t-meta mt-2 text-pretty">{t('Označ jen to, čeho jsi si jistý. Štítky „Vegan“ a „Bez lepku“ jsou tvrzení pro hosta.')}</p>
       </div>
     </div>
   );

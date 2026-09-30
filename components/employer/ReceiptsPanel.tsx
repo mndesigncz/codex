@@ -28,6 +28,8 @@ import { useMoney, useSymbol } from '../CurrencyProvider';
 import { Button, Field, Input, ListRow, Modal, Skeleton, ErrorState } from '../ui';
 import { useDataWidgetu, obnovDataWidgetu } from '../widgety/useDataWidgetu';
 import { useSmi } from '../widgety/NavigaceKontext';
+import { useT } from '@/lib/i18n/client';
+import { useLocale } from './jazyk';
 
 export const URL_UCTENEK = '/api/receipts';
 
@@ -43,7 +45,7 @@ export interface Uctenka {
 
 /** Odpověď /api/receipts: `{ receipts, error? }`. Chybějící tabulka (error) je chyba, ne prázdný seznam. */
 export function vyberUctenky(raw: any): Uctenka[] {
-  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.receipts)) throw new Error('Účtenky přišly v nečekaném tvaru.');
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.receipts)) throw new Error('Účtenky přišly v nečekaném tvaru.'); // i18n-ok
   if (typeof raw.error === 'string' && raw.error) throw new Error(raw.error);
   return raw.receipts.map((r: any) => ({
     id: Number(r.id),
@@ -82,6 +84,8 @@ function vyberSklad(raw: any): PolozkaSkladu[] {
  * uložení nečekalo na síť dvakrát.
  */
 export function NovaUctenka({ onUlozeno }: { onUlozeno?: () => void }) {
+  const loc = useLocale();
+  const t = useT('sprava');
   const symbol = useSymbol();
   const smi = useSmi();
   // Naskladnění z účtenky jen s oprávněním skladu; bez něj se sklad ani nečte.
@@ -107,8 +111,8 @@ export function NovaUctenka({ onUlozeno }: { onUlozeno?: () => void }) {
       fd.append('file', await compressImage(f));
       const d = await fetch('/api/upload', { method: 'POST', body: fd }).then(okJson);
       if (typeof d?.url === 'string' && d.url) setPhotoUrl(d.url);
-      else setChyba('Fotku se nepodařilo nahrát.');
-    } catch (e) { setChyba(apiMessage(e, 'Fotku se nepodařilo nahrát — zkontroluj připojení.')); }
+      else setChyba(t('Fotku se nepodařilo nahrát.'));
+    } catch (e) { setChyba(apiMessage(e, t('Fotku se nepodařilo nahrát — zkontroluj připojení.'))); }
     setNahravam(false);
   };
 
@@ -132,10 +136,10 @@ export function NovaUctenka({ onUlozeno }: { onUlozeno?: () => void }) {
         }),
       }).then(okJson);
       setPhotoUrl(null); setObchod(''); setCastka(''); setPoznamka(''); setNaskladneno({});
-      setHotovo('Účtenka uložena.');
+      setHotovo(t('Účtenka uložena.'));
       obnovDataWidgetu(URL_UCTENEK);
       onUlozeno?.();
-    } catch (e) { setChyba(apiMessage(e, 'Uložení se nepodařilo.')); }
+    } catch (e) { setChyba(apiMessage(e, t('Uložení se nepodařilo.'))); }
     setUkladam(false);
   };
 
@@ -144,11 +148,11 @@ export function NovaUctenka({ onUlozeno }: { onUlozeno?: () => void }) {
     try {
       await fetch(`/api/inventory/${i.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quantity: i.quantity + 1, note: `Naskladněno z účtenky${obchod.trim() ? ` (${obchod.trim()})` : ''}` }),
+        body: JSON.stringify({ quantity: i.quantity + 1, note: `Naskladněno z účtenky${obchod.trim() ? ` (${obchod.trim()})` : ''}` }), // i18n-ok (poznámka se ukládá do historie skladu)
       }).then(okJson);
       setNaskladneno(r => ({ ...r, [i.id]: true }));
       sklad.set(list => (list ?? []).map(x => (x.id === i.id ? { ...x, quantity: x.quantity + 1 } : x)));
-    } catch (e) { setChyba(apiMessage(e, `${i.name} se nepodařilo naskladnit.`)); }
+    } catch (e) { setChyba(apiMessage(e, t('{nazev} se nepodařilo naskladnit.', { nazev: i.name }))); }
   };
 
   const prazdna = !photoUrl && !obchod.trim() && !castka && !poznamka.trim();
@@ -158,36 +162,36 @@ export function NovaUctenka({ onUlozeno }: { onUlozeno?: () => void }) {
         onChange={e => onFile(e.target.files?.[0] ?? null)} />
       <div className="flex items-start gap-3">
         <button type="button" onClick={() => fileRef.current?.click()} disabled={nahravam}
-          aria-label={photoUrl ? 'Vyfotit účtenku znovu' : 'Vyfotit účtenku'}
+          aria-label={photoUrl ? t('Vyfotit účtenku znovu') : t('Vyfotit účtenku')}
           className={`shrink-0 h-20 w-20 rounded-2xl border grid place-items-center overflow-hidden transition-colors ${
             photoUrl ? 'border-[var(--surface-line)]' : 'border-dashed border-black/15 text-black/45 hover:text-[#16181A] hover:bg-black/[0.03]'}`}>
           {nahravam ? <Skeleton className="h-full w-full !rounded-none" />
             : photoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={photoUrl} alt="Nafocená účtenka" className="h-full w-full object-cover" />
+              <img src={photoUrl} alt={t('Nafocená účtenka')} className="h-full w-full object-cover" />
             ) : <Icon name="camera" size={22} />}
         </button>
         <div className="min-w-0 flex-1 space-y-2">
-          <Field id="uctenka-obchod" label="Kde nakoupeno">
-            <Input id="uctenka-obchod" value={obchod} onChange={e => setObchod(e.target.value)} placeholder="Makro, večerka…" autoComplete="off" />
+          <Field id="uctenka-obchod" label={t('Kde nakoupeno')}>
+            <Input id="uctenka-obchod" value={obchod} onChange={e => setObchod(e.target.value)} placeholder={t('Makro, večerka…')} autoComplete="off" />
           </Field>
-          <Field id="uctenka-castka" label={`Částka (${symbol})`}>
+          <Field id="uctenka-castka" label={t('Částka ({symbol})', { symbol })}>
             <Input id="uctenka-castka" type="number" inputMode="numeric" min={0} value={castka} onChange={e => setCastka(e.target.value)} />
           </Field>
         </div>
       </div>
-      <Field id="uctenka-poznamka" label="Co se kupovalo">
-        <Input id="uctenka-poznamka" value={poznamka} onChange={e => setPoznamka(e.target.value)} placeholder="Mléko, sirup Mango…" autoComplete="off" />
+      <Field id="uctenka-poznamka" label={t('Co se kupovalo')}>
+        <Input id="uctenka-poznamka" value={poznamka} onChange={e => setPoznamka(e.target.value)} placeholder={t('Mléko, sirup Mango…')} autoComplete="off" />
       </Field>
 
       {smiNaskladnit && shody.length > 0 && (
         <div>
-          <p className="t-label mb-1.5">Tohle vedeme ve skladu</p>
+          <p className="t-label mb-1.5">{t('Tohle vedeme ve skladu')}</p>
           <div className="flex flex-wrap gap-2">
             {shody.map(i => (
               <Button key={i.id} variant="secondary" size="sm" icon={naskladneno[i.id] ? 'check' : 'plus'}
                 disabled={naskladneno[i.id]} onClick={() => naskladni(i)}>
-                {naskladneno[i.id] ? `${i.name} naskladněno` : `1× ${i.name} (${i.quantity.toLocaleString('cs-CZ')} ${i.unit})`}
+                {naskladneno[i.id] ? t('{nazev} naskladněno', { nazev: i.name }) : t('1× {nazev} ({mnozstvi} {jednotka})', { nazev: i.name, mnozstvi: i.quantity.toLocaleString(loc), jednotka: i.unit })}
               </Button>
             ))}
           </div>
@@ -196,7 +200,7 @@ export function NovaUctenka({ onUlozeno }: { onUlozeno?: () => void }) {
 
       {chyba && <p role="alert" className="note note-danger">{chyba}</p>}
       {hotovo && !chyba && <p role="status" className="note note-ok">{hotovo}</p>}
-      <Button variant="primary" block loading={ukladam} disabled={nahravam || prazdna} onClick={uloz}>Uložit účtenku</Button>
+      <Button variant="primary" block loading={ukladam} disabled={nahravam || prazdna} onClick={uloz}>{t('Uložit účtenku')}</Button>
     </div>
   );
 }
@@ -209,6 +213,8 @@ export function NovaUctenka({ onUlozeno }: { onUlozeno?: () => void }) {
 export function SeznamUctenek({ uctenky, limit = Infinity, sFotkou = false, smiMazat = false }: {
   uctenky: Uctenka[]; limit?: number; sFotkou?: boolean; smiMazat?: boolean;
 }) {
+  const loc = useLocale();
+  const t = useT('sprava');
   const money = useMoney();
   const [mazana, setMazana] = useState<Uctenka | null>(null);
   const [mazu, setMazu] = useState(false);
@@ -222,7 +228,7 @@ export function SeznamUctenek({ uctenky, limit = Infinity, sFotkou = false, smiM
       await fetch(`${URL_UCTENEK}?id=${mazana.id}`, { method: 'DELETE' }).then(okJson);
       setMazana(null);
       obnovDataWidgetu(URL_UCTENEK);
-    } catch (e) { setChyba(apiMessage(e, 'Účtenku se nepodařilo smazat.')); }
+    } catch (e) { setChyba(apiMessage(e, t('Účtenku se nepodařilo smazat.'))); }
     setMazu(false);
   };
 
@@ -232,7 +238,7 @@ export function SeznamUctenek({ uctenky, limit = Infinity, sFotkou = false, smiM
         {vidim.map(r => (
           <ListRow key={r.id}
             lead={sFotkou && r.photoUrl ? (
-              <a href={r.photoUrl} target="_blank" rel="noreferrer" aria-label={`Fotka účtenky ${r.supplier ?? ''}`.trim()} className="shrink-0">
+              <a href={r.photoUrl} target="_blank" rel="noreferrer" aria-label={t('Fotka účtenky {dodavatel}', { dodavatel: r.supplier ?? '' }).trim()} className="shrink-0">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={r.photoUrl} alt="" className="h-10 w-10 rounded-xl object-cover border border-[var(--surface-line)]" />
               </a>
@@ -241,23 +247,23 @@ export function SeznamUctenek({ uctenky, limit = Infinity, sFotkou = false, smiM
                 <Icon name={r.photoUrl ? 'camera' : 'receipt'} size={16} className="text-black/55" />
               </span>
             )}
-            title={r.supplier ?? 'Účtenka'}
+            title={r.supplier ?? t('Účtenka')}
             meta={[denUctenky(r.createdAt), r.note, r.authorName].filter(Boolean).join(' · ')}
             value={r.amount != null ? <span className="tabular-nums">{money(r.amount)}</span> : undefined}
             actions={smiMazat ? (
-              <Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={`Smazat účtenku ${r.supplier ?? ''}`.trim()}
+              <Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={t('Smazat účtenku {dodavatel}', { dodavatel: r.supplier ?? '' }).trim()}
                 onClick={() => { setChyba(''); setMazana(r); }} />
             ) : undefined} />
         ))}
       </ul>
-      {uctenky.length > vidim.length && <p className="t-meta mt-2">…a dalších {(uctenky.length - vidim.length).toLocaleString('cs-CZ')}</p>}
-      <Modal open={!!mazana} onClose={() => setMazana(null)} size="sm" title="Smazat účtenku?"
-        subtitle={mazana ? [mazana.supplier ?? 'Účtenka', mazana.amount != null ? money(mazana.amount) : null, denUctenky(mazana.createdAt)].filter(Boolean).join(' · ') : undefined}
+      {uctenky.length > vidim.length && <p className="t-meta mt-2">{t('…a dalších {n}', { n: (uctenky.length - vidim.length).toLocaleString(loc) })}</p>}
+      <Modal open={!!mazana} onClose={() => setMazana(null)} size="sm" title={t('Smazat účtenku?')}
+        subtitle={mazana ? [mazana.supplier ?? t('Účtenka'), mazana.amount != null ? money(mazana.amount) : null, denUctenky(mazana.createdAt)].filter(Boolean).join(' · ') : undefined}
         footer={<>
-          <Button variant="secondary" onClick={() => setMazana(null)}>Zrušit</Button>
-          <Button variant="danger" icon="trash" loading={mazu} onClick={smaz}>Smazat</Button>
+          <Button variant="secondary" onClick={() => setMazana(null)}>{t('Zrušit')}</Button>
+          <Button variant="danger" icon="trash" loading={mazu} onClick={smaz}>{t('Smazat')}</Button>
         </>}>
-        <p className="t-meta">Účtenka zmizí z Financí i z knihy výdajů. Fotka se smaže s ní.</p>
+        <p className="t-meta">{t('Účtenka zmizí z Financí i z knihy výdajů. Fotka se smaže s ní.')}</p>
         {chyba && <p role="alert" className="note note-danger mt-3">{chyba}</p>}
       </Modal>
     </>
@@ -266,6 +272,7 @@ export function SeznamUctenek({ uctenky, limit = Infinity, sFotkou = false, smiM
 
 /** Okno „Účtenky" v hlavičce administrace: nová účtenka a pod ní posledních třicet. */
 export default function ReceiptsPanel() {
+  const t = useT('sprava');
   const smi = useSmi();
   const data = useDataWidgetu(URL_UCTENEK, vyberUctenky);
   const smiPridat = smi('finance.uctenky_pridat');
@@ -273,12 +280,12 @@ export default function ReceiptsPanel() {
     <div className="space-y-5">
       {smiPridat && <NovaUctenka />}
       {data.error ? (
-        <ErrorState compact title="Účtenky se nenačetly" detail={data.error} onRetry={data.reload} />
+        <ErrorState compact title={t('Účtenky se nenačetly')} detail={data.error} onRetry={data.reload} />
       ) : data.loading ? (
         <div className="space-y-2"><Skeleton className="h-12" /><Skeleton className="h-12 w-2/3" /></div>
       ) : (data.data?.length ?? 0) > 0 && (
         <div>
-          <p className="t-label mb-1">Poslední účtenky</p>
+          <p className="t-label mb-1">{t('Poslední účtenky')}</p>
           <SeznamUctenek uctenky={data.data!} limit={30} sFotkou smiMazat={smi('finance.uctenky_upravit')} />
         </div>
       )}

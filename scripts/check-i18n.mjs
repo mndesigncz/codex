@@ -37,7 +37,7 @@ import { RES_STATUS, tierFor } from '../lib/clientSlots.ts';
 const JAZYKY = ['en', 'de', 'sk', 'pl'];
 const ROOTS = ['app', 'components', 'lib'];
 /** Kolik `'cs-CZ'` je v kódu mimo výjimky. Klesá s každou dávkou migrace na lib/i18n/format; nesmí růst. */
-const BASELINE_CS_CZ = 238; // +3: výchozí čeština průvodce a předvolby zemí, cena na (zatím české) prodejní stránce
+const BASELINE_CS_CZ = 185; // +3: výchozí čeština průvodce a předvolby zemí, cena na (zatím české) prodejní stránce
 /** Natvrdo psané české řetězce v přeložených souborech (soubor → kolik). Nesmí růst; klesá s dalšími dávkami. */
 const BASELINE_NATVRDO = {};
 
@@ -104,6 +104,7 @@ for (const root of ROOTS) for (const f of walk(root)) {
   // Ráčna natvrdo psaných textů hlídá jen plně přeložené oblasti (host, přihlášení); slupka aplikace
   // (layouty, Nastavení) je přeložená jen zčásti a tvoří ji většinou česká správa.
   if ((nalezeno || RE_SEKCE.test(src)) && (sek === 'auth' || sek === 'klient-host' || sek === 'zamestnanec' || sek === 'kiosk' || sek === 'chat')) prelozeneSoubory.add(rel);
+  if ((nalezeno || RE_SEKCE.test(src)) && ['sprava', 'tym', 'navody', 'postupy'].includes(sek)) prelozeneSoubory.add(rel); // správa podniku (vedení)
 }
 
 // Data, která se překládají podle textu a v kódu nejsou jako `t('…')` (volání je nepřímé).
@@ -229,6 +230,45 @@ for (const [f, n] of Object.entries(natvrdoZmereno)) {
   if (povoleno === undefined) { if (n > 0) chyby.push(`${f}: nový přeložený soubor má ${n} natvrdo psaných českých řetězců (přidej do BASELINE_NATVRDO nebo je převeď na t())`); }
   else if (n > povoleno) chyby.push(`${f}: natvrdo psaných českých řetězců ${n} (povoleno ${povoleno}); nový text patří do t('…')`);
   else if (n < povoleno) chyby.push(`${f}: natvrdo psaných řetězců ubylo (${n} místo ${povoleno}); sniž BASELINE_NATVRDO, ať ráčna drží`);
+}
+
+// 4b. Sekce správy (sprava, tym, navody, postupy) se v aplikaci slévají do jednoho slovníku
+// (pozdější přepisuje dřívější). Stejný klíč s jinou hodnotou v jiné sekci by se proto ukázal
+// v jiném významu podle pořadí načtení; dvojí význam patří do klíče s kontextem (`t('Odložit', {}, 'sklad')`).
+const SKUPINA_SPRAVY = ['sprava', 'tym', 'navody', 'postupy'];
+for (const j of JAZYKY) {
+  const videno = new Map();
+  for (const sek of SKUPINA_SPRAVY) {
+    const slov = nacti(j, sek);
+    if (!slov) continue;
+    for (const [k, v] of Object.entries(slov)) {
+      const d = videno.get(k);
+      if (d && d.v !== v) chyby.push(`${j}: klíč „${k}“ má jiný překlad v sekci ${d.s} („${d.v}“) a ${sek} („${v}“); dvojí význam patří do kontextu t('…', {}, 'ctx')`);
+      else if (!d) videno.set(k, { s: sek, v });
+    }
+  }
+}
+// 4c. České věty v uvozovkách mimo t(), které ale ve slovníku jsou (label: 'Ze skladu'): zapomenuté t().
+{
+  const klice = new Set();
+  for (const sek of SKUPINA_SPRAVY) for (const k of Object.keys(nacti('en', sek) ?? {})) if (!k.includes('|') && /\p{L}{3}/u.test(k)) klice.add(k);
+  for (const f of prelozeneSoubory) {
+    if (!existsSync(f)) continue;
+    const src = readFileSync(f, 'utf8');
+    const puvodni = src.split('\n');
+    const bezKomentaru = src.replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' ')).split('\n');
+    bezKomentaru.forEach((radek, i) => {
+      const r = radek.trim();
+      if (r.startsWith('//') || /i18n-ok/.test(puvodni[i]) || /^(import|export) /.test(r)) return;
+      const bezT = bezVolaniT(r).replace(/\/\/.*$/, '');
+      for (const m of bezT.matchAll(/'((?:[^'\\]|\\.)*)'/g)) {
+        const text = m[1].replace(/\\'/g, "'");
+        // Holé ASCII slovo malými písmeny ('postup', 'ukol') je interní identifikátor typu, ne text pro člověka.
+        if (/^[a-z0-9_-]+$/.test(text)) continue;
+        if (klice.has(text)) chyby.push(`${f}:${i + 1}: „${text}“ je ve slovníku, ale stojí v uvozovkách mimo t('…'); obal ho t() (nebo označ řádek i18n-ok)`);
+      }
+    });
+  }
 }
 
 // 5. staré konstrukce

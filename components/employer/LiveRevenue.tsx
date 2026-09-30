@@ -23,16 +23,19 @@ import { BarSpark, Chip, ListRow } from '../ui';
 import { czCount, type CzNoun } from '@/lib/czech';
 
 import type { DenPokladny, OsobaPokladny, PolozkaPokladny, TonRady } from '@/lib/financeWidgety';
+import { useT, type PrekladFn } from '@/lib/i18n/client';
+import { useLocale } from './jazyk';
 
 // Výběr dat z /api/pos/daily a období jsou čistá logika v lib/financeWidgety (testuje se v Node);
 // odsud se jen znovu vyvážejí, ať widgety tržeb berou všechno z jednoho místa.
 export { obdobiPokladny, vyberDenniPokladnu, type DenniPokladna, type DenPokladny } from '@/lib/financeWidgety';
 export type TonPoznamky = TonRady;
 
-export const UCTENKA: CzNoun = { one: 'účtenka', few: 'účtenky', many: 'účtenek' };
-export const KUS: CzNoun = { one: 'kus', few: 'kusy', many: 'kusů' };
+// Tvary pro widgety, které ještě nepřekládají (czCount); tahle obrazovka skloňuje přes plurály v t().
+export const UCTENKA: CzNoun = { one: 'účtenka', few: 'účtenky', many: 'účtenek' }; // i18n-ok
+export const KUS: CzNoun = { one: 'kus', few: 'kusy', many: 'kusů' }; // i18n-ok
 
-const PISMENA_DNU = ['Ne', 'Po', 'Út', 'St', 'Čt', 'Pá', 'So'];
+const PISMENA_DNU = ['Ne', 'Po', 'Út', 'St', 'Čt', 'Pá', 'So']; // i18n-ok
 /** „Po" z „2026-09-21" — poledne UTC, ať se den nepřehoupne podle pásma zařízení. */
 export const pismenoDne = (d: string) => PISMENA_DNU[new Date(`${d}T12:00:00Z`).getUTCDay()] ?? '';
 /** „21. 9." */
@@ -57,6 +60,8 @@ export function RadyJakoSeznam({ rady, limit = Infinity }: {
   rady: { tone: TonPoznamky; title: string; text?: string; ikona?: string; doplnek?: ReactNode }[];
   limit?: number;
 }) {
+  const t = useT('sprava');
+  const loc = useLocale();
   const vidim = rady.slice(0, limit);
   return (
     <>
@@ -77,7 +82,7 @@ export function RadyJakoSeznam({ rady, limit = Infinity }: {
           );
         })}
       </ul>
-      {rady.length > vidim.length && <p className="t-meta mt-2">…a dalších {(rady.length - vidim.length).toLocaleString('cs-CZ')}</p>}
+      {rady.length > vidim.length && <p className="t-meta mt-2">{t('…a dalších {n}', { n: (rady.length - vidim.length).toLocaleString(loc) })}</p>}
     </>
   );
 }
@@ -88,12 +93,13 @@ export function RadyJakoSeznam({ rady, limit = Infinity }: {
  * jednoho sloupku (na telefonu ~13 px) nevejde a BarSpark by ji uřízl na „1…".
  */
 export function HodinyPokladny({ hodiny, vyska = 56 }: { hodiny: number[]; vyska?: number }) {
+  const t = useT('sprava');
   const money = useMoney();
   const max = hodiny.reduce((m, v) => Math.max(m, v), 0);
   const spicka = max > 0 ? hodiny.indexOf(max) : undefined;
   return (
     <div>
-      <BarSpark height={vyska} highlight={spicka} label="Tržba po hodinách"
+      <BarSpark height={vyska} highlight={spicka} label={t('Tržba po hodinách')}
         data={hodiny.map((v, h) => ({ value: v, tip: `${h}:00 — ${money(v)}` }))} />
       <OsaGrafu popisky={['0:00', '6:00', '12:00', '18:00', '23:00']} />
     </div>
@@ -111,6 +117,8 @@ export function OsaGrafu({ popisky }: { popisky: string[] }) {
 
 /** Co se prodalo: řádek na produkt, kusy vlevo pod názvem, tržba v pravém sloupci. */
 export function ProdanoPokladny({ polozky, limit, razeni = 'kusy' }: { polozky: PolozkaPokladny[]; limit: number; razeni?: 'kusy' | 'trzba' }) {
+  const t = useT('sprava');
+  const loc = useLocale();
   const money = useMoney();
   const serazene = [...polozky].sort((a, b) => (razeni === 'trzba' ? (b.revenue ?? 0) - (a.revenue ?? 0) : b.qty - a.qty));
   const vidim = serazene.slice(0, limit);
@@ -119,30 +127,32 @@ export function ProdanoPokladny({ polozky, limit, razeni = 'kusy' }: { polozky: 
       <ul className="list">
         {vidim.map(i => (
           <ListRow key={i.productId} title={i.name}
-            meta={`${czCount(Math.round(i.qty), KUS)}${i.category ? ` · ${i.category}` : ''}`}
+            meta={`${t('{n, plural, one {# kus} few {# kusy} other {# kusů}}', { n: Math.round(i.qty) })}${i.category ? ` · ${i.category}` : ''}`}
             value={<span className="tabular-nums">{i.revenue != null ? money(i.revenue) : '—'}</span>}
             valueMeta={i.revenue == null ? 'bez ceny' : undefined} />
         ))}
       </ul>
-      {serazene.length > vidim.length && <p className="t-meta mt-2">…a dalších {(serazene.length - vidim.length).toLocaleString('cs-CZ')}</p>}
+      {serazene.length > vidim.length && <p className="t-meta mt-2">{t('…a dalších {n}', { n: (serazene.length - vidim.length).toLocaleString(loc) })}</p>}
     </>
   );
 }
 
 /** Kdo kolik namarkoval: tržba a podíl v pravém sloupci, počet účtenek v meta řádku. */
 export function ObsluhaPokladny({ obsluha, celkem, limit }: { obsluha: OsobaPokladny[]; celkem: number; limit: number }) {
+  const t = useT('sprava');
+  const loc = useLocale();
   const money = useMoney();
   const vidim = obsluha.slice(0, limit);
   return (
     <>
       <ul className="list">
         {vidim.map(p => (
-          <ListRow key={p.name} title={p.name} meta={czCount(p.bills, UCTENKA)}
+          <ListRow key={p.name} title={p.name} meta={t('{n, plural, one {# účtenka} few {# účtenky} other {# účtenek}}', { n: p.bills })}
             value={<span className="tabular-nums">{money(p.total)}</span>}
             valueMeta={celkem > 0 ? `${Math.round((p.total / celkem) * 100)} %` : undefined} />
         ))}
       </ul>
-      {obsluha.length > vidim.length && <p className="t-meta mt-2">…a dalších {(obsluha.length - vidim.length).toLocaleString('cs-CZ')}</p>}
+      {obsluha.length > vidim.length && <p className="t-meta mt-2">{t('…a dalších {n}', { n: (obsluha.length - vidim.length).toLocaleString(loc) })}</p>}
     </>
   );
 }
@@ -152,25 +162,28 @@ export function ObsluhaPokladny({ obsluha, celkem, limit }: { obsluha: OsobaPokl
  * přebil zbytek widgetu. Rozdíl nad práh je chip „wait", sedící den „ok".
  */
 export function DnyPokladny({ dny, prah = 50 }: { dny: DenPokladny[]; prah?: number }) {
+  const t = useT('sprava');
+  const loc = useLocale();
+  const pismenaDne = [t('Ne', {}, 'den'), t('Po', {}, 'den'), t('Út', {}, 'den'), t('St', {}, 'den'), t('Čt', {}, 'den'), t('Pá', {}, 'den'), t('So', {}, 'den')];
   const money = useMoney();
   const [otevreno, setOtevreno] = useState(false);
   return (
     <div>
       <button type="button" onClick={() => setOtevreno(o => !o)} aria-expanded={otevreno}
         className="tap-target-sm inline-flex items-center gap-1.5 text-sm font-semibold text-[#16181A] hover:text-black">
-        Den po dni ({dny.length.toLocaleString('cs-CZ')})
+        {t('Den po dni ({n})', { n: dny.length.toLocaleString(loc) })}
         <Icon name="chevron" size={15} className={`text-black/40 transition-transform ${otevreno ? 'rotate-180' : ''}`} />
       </button>
       {otevreno && (
         <ul className="list mt-2">
           {dny.map(d => (
             <ListRow key={d.day}
-              title={<span className="tabular-nums">{pismenoDne(d.day)} {kratkeDatum(d.day)}</span>}
-              meta={`${czCount(d.bills, UCTENKA)} · hotově ${money(d.cash)} · kartou ${money(d.card)}`}
+              title={<span className="tabular-nums">{pismenaDne[new Date(`${d.day}T12:00:00Z`).getUTCDay()]} {kratkeDatum(d.day)}</span>}
+              meta={t('{n, plural, one {# účtenka} few {# účtenky} other {# účtenek}} · hotově {hotove} · kartou {kartou}', { n: d.bills, hotove: money(d.cash), kartou: money(d.card) })}
               value={<span className="tabular-nums">{money(d.total)}</span>}
               right={d.diff == null ? undefined
                 : Math.abs(d.diff) <= prah
-                  ? <Chip tone="ok" size="sm" icon="check">sedí</Chip>
+                  ? <Chip tone="ok" size="sm" icon="check">{t('sedí')}</Chip>
                   : <Chip tone="wait" size="sm">{d.diff > 0 ? '+' : '−'}{money(Math.abs(d.diff))}</Chip>} />
           ))}
         </ul>
@@ -180,7 +193,9 @@ export function DnyPokladny({ dny, prah = 50 }: { dny: DenPokladny[]; prah?: num
 }
 
 /** Popisek součtu účtenek: „128 účtenek · ⌀ 164 Kč". */
-export function popisUctenek(bills: number, prumer: number, money: (n: number) => string): string {
-  return `${czCount(bills, UCTENKA)}${bills > 0 ? ` · průměr ${money(prumer)}` : ''}`;
+export function popisUctenek(bills: number, prumer: number, money: (n: number) => string, t?: PrekladFn): string {
+  // Bez překladače (widgety, které se překládají později) zůstává čeština jako dřív.
+  if (!t) return `${czCount(bills, UCTENKA)}${bills > 0 ? ` · průměr ${money(prumer)}` : ''}`; // i18n-ok
+  return `${t('{n, plural, one {# účtenka} few {# účtenky} other {# účtenek}}', { n: bills })}${bills > 0 ? ` · ${t('průměr {castka}', { castka: money(prumer) })}` : ''}`;
 }
 

@@ -14,10 +14,11 @@ import { useProcedures } from './ProcedureProvider';
 import { parseSteps } from '@/lib/steps';
 import { SKIP_REASONS } from '@/lib/procedureScoring';
 import StepTimeline from './StepTimeline';
+import { duvodPreskoceni } from './DetailPrubehu';
 import { useOtevreniNavodu } from '@/lib/otevriNavod';
 import { Icon } from '../Icons';
 import { Button, Chip, Input } from '../ui';
-import { czCount, czForm } from '@/lib/czech';
+import { useT } from '@/lib/i18n/client';
 
 function fmt(sec: number) {
   const m = Math.floor(sec / 60);
@@ -37,11 +38,12 @@ function useElapsed(startedAt?: string | null) {
   return Math.max(0, Math.round((now - new Date(startedAt).getTime()) / 1000));
 }
 
-const KROK = { one: 'krok', few: 'kroky', many: 'kroků' };
+
 const POZICE = 'fixed z-50 bottom-[calc(92px+env(safe-area-inset-bottom))] inset-x-3 md:inset-x-auto md:bottom-4 md:left-4 md:w-[340px]';
 const PANEL = 'overflow-hidden glass-strong rounded-3xl shadow-[shadow:var(--shadow-float)] pop-in';
 
 export default function FloatingRunner() {
+  const t = useT('postupy');
   const { active, justCompleted, syncFailed, toggleItem, toggleSkip, setSkipReason, complete, cancel, dismissCelebration } = useProcedures();
   const [minimized, setMinimized] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
@@ -71,15 +73,15 @@ export default function FloatingRunner() {
         <div className={PANEL} role="status">
           <div className="px-6 py-6 text-center">
             <span aria-hidden className="chip-ok mx-auto grid h-11 w-11 place-items-center rounded-full"><Icon name="check" size={20} strokeWidth={2.2} /></span>
-            <h3 className="t-section mt-3">Postup je hotový</h3>
+            <h3 className="t-section mt-3">{t('Postup je hotový')}</h3>
             <p className="t-meta mt-1 truncate">{justCompleted.name}</p>
             <p className="mt-4 text-[28px] font-bold leading-none tracking-tight text-[#16181A] tabular-nums">{fmt(justCompleted.duration)}</p>
-            <p className="t-label mt-1.5">Celkový čas</p>
+            <p className="t-label mt-1.5">{t('Celkový čas')}</p>
             <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5">
-              <Chip tone="ok" size="sm" icon="check">{justCompleted.done} {czForm(justCompleted.done, KROK)} splněno</Chip>
-              {justCompleted.skipped > 0 && <Chip tone="wait" size="sm">{justCompleted.skipped} přeskočeno</Chip>}
+              <Chip tone="ok" size="sm" icon="check">{t('{n, plural, one {# krok} few {# kroky} other {# kroků}} splněno', { n: justCompleted.done })}</Chip>
+              {justCompleted.skipped > 0 && <Chip tone="wait" size="sm">{t('{n} přeskočeno', { n: justCompleted.skipped })}</Chip>}
             </div>
-            <Button variant="primary" block className="mt-5" onClick={dismissCelebration}>Zavřít</Button>
+            <Button variant="primary" block className="mt-5" onClick={dismissCelebration}>{t('Zavřít')}</Button>
           </div>
         </div>
       </div>
@@ -104,7 +106,7 @@ export default function FloatingRunner() {
   // ---- Minimized pill ----
   if (minimized) {
     return (
-      <Button variant="primary" onClick={() => setMinimized(false)} aria-label={`Otevřít průběh postupu ${active.name}`}
+      <Button variant="primary" onClick={() => setMinimized(false)} aria-label={t('Otevřít průběh postupu {nazev}', { nazev: active.name })}
         className="fixed z-50 bottom-[calc(92px+env(safe-area-inset-bottom))] left-4 md:bottom-4 shadow-[shadow:var(--shadow-float)]">
         <Icon name="play" size={14} />
         <span className="max-w-[140px] truncate">{active.name}</span>
@@ -118,7 +120,7 @@ export default function FloatingRunner() {
     <div className={POZICE}>
       <div className={PANEL}>
         {/* Průběh: inkoust, ne limetka — limetka je akce. */}
-        <div className="h-1 w-full bg-black/[0.06]" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Hotové kroky">
+        <div className="h-1 w-full bg-black/[0.06]" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={t('Hotové kroky')}>
           <div className="h-full bg-[#16181A] transition-[width] duration-300 ease-out" style={{ width: `${pct}%` }} />
         </div>
 
@@ -129,8 +131,8 @@ export default function FloatingRunner() {
           // tabletu za barem se čte na délku paže.
           <p className="note note-wait !rounded-none flex items-start gap-1.5 text-[13px] font-medium leading-snug" role="alert">
             <Icon name="warning" size={16} className="mt-px shrink-0" />
-            Neukládá se na server — zkontroluj připojení a zkus to znovu.
-            Postup zůstane otevřený, dokud se odeslání nepovede.
+            
+            {t('Neukládá se na server — zkontroluj připojení a zkus to znovu. Postup zůstane otevřený, dokud se odeslání nepovede.')}
           </p>
         )}
 
@@ -144,31 +146,31 @@ export default function FloatingRunner() {
               <span className="inline-flex items-center gap-1"><Icon name="clock" size={13} />{fmt(elapsed)}</span>
             </p>
           </div>
-          <Button variant="ghost" size="sm" iconOnly icon="minus" aria-label="Zmenšit" title="Zmenšit" onClick={() => setMinimized(true)} />
-          <Button variant="ghost" size="sm" iconOnly icon="close" aria-label="Zrušit průběh" title="Zrušit průběh" onClick={() => setConfirmClose(true)} />
+          <Button variant="ghost" size="sm" iconOnly icon="minus" aria-label={t('Zmenšit')} title={t('Zmenšit')} onClick={() => setMinimized(true)} />
+          <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={t('Zrušit průběh')} title={t('Zrušit průběh')} onClick={() => setConfirmClose(true)} />
         </div>
 
         {confirmClose ? (
           /* Confirm cancel — replaces the card body cleanly (no foggy overlay) */
           <div className="px-5 pb-5 pt-3 text-center pop-in">
-            <p className="text-sm font-semibold text-[#16181A]">Zrušit tento průběh?</p>
-            <p className="t-meta mt-1">Odškrtnuté kroky se neuloží.</p>
+            <p className="text-sm font-semibold text-[#16181A]">{t('Zrušit tento průběh?')}</p>
+            <p className="t-meta mt-1">{t('Odškrtnuté kroky se neuloží.')}</p>
             <div className="mt-4 flex gap-2">
-              <Button variant="secondary" block onClick={() => setConfirmClose(false)}>Pokračovat</Button>
-              <Button variant="danger-solid" block onClick={doCancel}>Zrušit průběh</Button>
+              <Button variant="secondary" block onClick={() => setConfirmClose(false)}>{t('Pokračovat')}</Button>
+              <Button variant="danger-solid" block onClick={doCancel}>{t('Zrušit průběh')}</Button>
             </div>
           </div>
         ) : confirmFinish ? (
           /* Confirm finishing with unfinished steps */
           <div className="px-5 pb-5 pt-3 text-center pop-in">
-            <p className="text-sm font-semibold text-[#16181A]">Dokončit, i když není vše hotové?</p>
+            <p className="text-sm font-semibold text-[#16181A]">{t('Dokončit, i když není vše hotové?')}</p>
             <p className="t-meta mt-1 text-pretty">
-              {[skipped > 0 ? `přeskočeno: ${czCount(skipped, KROK)}` : null, remaining > 0 ? `neodškrtnuto: ${czCount(remaining, KROK)}` : null].filter(Boolean).join(', ')}.
-              {' '}Vedení uvidí, co zůstalo nedokončené.
+              {[skipped > 0 ? t('přeskočeno: {n, plural, one {# krok} few {# kroky} other {# kroků}}', { n: skipped }) : null, remaining > 0 ? t('neodškrtnuto: {n, plural, one {# krok} few {# kroky} other {# kroků}}', { n: remaining }) : null].filter(Boolean).join(', ')}.
+              {' '}{t('Vedení uvidí, co zůstalo nedokončené.')}
             </p>
             <div className="mt-4 flex gap-2">
-              <Button variant="secondary" block onClick={() => setConfirmFinish(false)} disabled={completing}>Pokračovat</Button>
-              <Button variant="primary" block onClick={doComplete} loading={completing}>Přesto dokončit</Button>
+              <Button variant="secondary" block onClick={() => setConfirmFinish(false)} disabled={completing}>{t('Pokračovat')}</Button>
+              <Button variant="primary" block onClick={doComplete} loading={completing}>{t('Přesto dokončit')}</Button>
             </div>
           </div>
         ) : (
@@ -194,8 +196,8 @@ export default function FloatingRunner() {
 
             {skipFor != null && (
               <div className="px-3.5 pb-2">
-                <div className="well p-3 space-y-2" role="group" aria-label="Proč krok přeskakuješ">
-                  <p className="text-xs font-semibold text-[#16181A]">Proč krok přeskakuješ?</p>
+                <div className="well p-3 space-y-2" role="group" aria-label={t('Proč krok přeskakuješ')}>
+                  <p className="text-xs font-semibold text-[#16181A]">{t('Proč krok přeskakuješ?')}</p>
                   <div className="flex flex-wrap gap-1.5">
                     {SKIP_REASONS.map(r => (
                       <button key={r.id} type="button"
@@ -207,13 +209,13 @@ export default function FloatingRunner() {
                           setSkipFor(null);
                         }}
                         className="filter-pill tap-target seg-off glass disabled:opacity-50">
-                        {r.label}{r.excused ? '' : ' (−body)'}
+                        {duvodPreskoceni(r.id, t)}{r.excused ? '' : ` ${t('(−body)')}`}
                       </button>
                     ))}
                   </div>
                   <Input value={skipNote} onChange={e => setSkipNote(e.target.value)} maxLength={200}
-                    aria-label="Důvod přeskočení (u „Jiný důvod“ povinný)" placeholder={'U „Jiný důvod" napiš proč…'} />
-                  <Button variant="ghost" size="sm" onClick={() => setSkipFor(null)}>Zrušit</Button>
+                    aria-label={t('Důvod přeskočení (u „Jiný důvod“ povinný)')} placeholder={t('U „Jiný důvod" napiš proč…')} />
+                  <Button variant="ghost" size="sm" onClick={() => setSkipFor(null)}>{t('Zrušit')}</Button>
                 </div>
               </div>
             )}
@@ -223,12 +225,12 @@ export default function FloatingRunner() {
               {/* Live tally — highlights anything not yet finished */}
               {unfinished > 0 && (
                 <p className="t-meta text-center">
-                  {done} hotovo
-                  {skipped > 0 && <span className="text-wait-ink"> · {skipped} přeskočeno</span>}
-                  {remaining > 0 && <> · {remaining} zbývá</>}
+                  {t('{n} hotovo', { n: done })}
+                  {skipped > 0 && <span className="text-wait-ink"> · {t('{n} přeskočeno', { n: skipped })}</span>}
+                  {remaining > 0 && <> · {t('{n} zbývá', { n: remaining })}</>}
                 </p>
               )}
-              <Button variant="primary" block icon="check" onClick={onFinishClick} loading={completing}>Dokončit</Button>
+              <Button variant="primary" block icon="check" onClick={onFinishClick} loading={completing}>{t('Dokončit')}</Button>
             </div>
           </>
         )}
