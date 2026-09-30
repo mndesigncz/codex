@@ -1,0 +1,166 @@
+# apps/fastlane/Fastfile: dvě aplikace, stejné lane pod různými jmény.
+# Spouštět z adresáře apps/:   cd apps && bundle exec fastlane ios client_beta
+# Nic tu není tajné. Klíče a hesla se čtou z prostředí (viz apps/app-store/README.md).
+default_platform(:ios)
+
+# ID musí souhlasit s apps/apps.json (jediný zdroj pravdy); bundle ID a applicationId jsou stejné.
+APPS = {
+  'managero' => { id: 'app.managero.app',    name: 'Managero',        ios: 'managero/ios/App/App.xcodeproj', aab: 'managero/android/app/build/outputs/bundle/release/app-release.aab' },
+  'client'   => { id: 'app.managero.client', name: 'Managero client', ios: 'client/ios/App/App.xcodeproj',   aab: 'client/android/app/build/outputs/bundle/release/app-release.aab' },
+}.freeze
+
+def review_information(key)
+  # Poznámky pro recenzenta: metadata/review_information/notes.txt obsahuje {{ZÁSTUPCE}} pro přihlašovací údaje.
+  # Ty doplní tahle funkce z prostředí a předá je deliveru explicitně (app_review_information), takže se hesla
+  # nikdy neukládají do repa. Deliver NESPOUŠTĚT mimo lane, nahrál by zástupce doslova.
+  notes = File.read("app-store/#{key}/metadata/review_information/notes.txt")
+  notes.scan(/\{\{([A-Z0-9_]+)\}\}/).flatten.uniq.each do |var|
+    notes = notes.gsub("{{#{var}}}", ENV.fetch(var))   # chybí-li proměnná, lane spadne dřív než odešle placeholder
+  end
+  {
+    first_name:    ENV.fetch('REVIEW_FIRST_NAME'),
+    last_name:     ENV.fetch('REVIEW_LAST_NAME'),
+    phone_number:  ENV.fetch('REVIEW_PHONE'),            # formát +420…
+    email_address: ENV.fetch('REVIEW_EMAIL'),
+    demo_user:     ENV.fetch("REVIEW_#{key.upcase}_USER"),
+    demo_password: ENV.fetch("REVIEW_#{key.upcase}_PASSWORD"),
+    notes:         notes,
+  }
+end
+
+platform :ios do
+  before_all do
+    app_store_connect_api_key(
+      key_id:       ENV.fetch('ASC_KEY_ID'),
+      issuer_id:    ENV.fetch('ASC_ISSUER_ID'),
+      key_filepath: ENV.fetch('ASC_KEY_PATH'),          # .p8 mimo repo
+      in_house:     false
+    )
+  end
+
+  APPS.each do |key, app|
+    desc "#{app[:name]}: certifikát a profil přes match (jen čtení v CI)"
+    lane :"#{key}_certs" do
+      match(app_identifier: app[:id])
+    end
+
+    desc "#{app[:name]}: build + nahrání do TestFlightu. APP_VERSION=1.0.0 volitelně."
+    lane :"#{key}_beta" do
+      build_no = latest_testflight_build_number(app_identifier: app[:id]) + 1
+      version  = ENV['APP_VERSION'] || '1.0.0'
+      build_app(
+        project:          app[:ios],
+        scheme:           'App',
+        configuration:    'Release',
+        export_method:    'app-store',
+        output_directory: "build/#{key}",
+        output_name:      "#{app[:name]}.ipa",
+        clean:            true,
+        # číslo verze a buildu jde přes build settings, žádné úpravy pbxproj
+        xcargs: "-allowProvisioningUpdates MARKETING_VERSION=#{version} CURRENT_PROJECT_VERSION=#{build_no}"
+      )
+      upload_to_testflight(
+        app_identifier: app[:id],
+        skip_waiting_for_build_processing: true,
+        changelog: File.read("app-store/#{key}/metadata/cs/release_notes.txt")
+      )
+    end
+
+    desc "#{app[:name]}: jen metadata (bez binárky, bez snímků, bez odeslání)"
+    lane :"#{key}_metadata" do
+      deliver(
+        app_identifier:      app[:id],
+        metadata_path:       "app-store/#{key}/metadata",
+        skip_binary_upload:  true,
+        skip_screenshots:    true,
+        force:               true,        # bez HTML náhledu (CI, dlouhé sezení)
+        submit_for_review:   false,
+        app_review_information: review_information(key),
+        precheck_include_in_app_purchases: false
+      )
+    end
+
+    desc "#{app[:name]}: metadata + snímky (přepíše celé sady) + poznámky pro recenzenta. NEODESÍLÁ."
+    lane :"#{key}_listing" do
+      deliver(
+        app_identifier:       app[:id],
+        metadata_path:        "app-store/#{key}/metadata",
+        screenshots_path:     "app-store/#{key}/screenshots",
+        skip_binary_upload:   true,
+        overwrite_screenshots: true,
+        force:                true,
+        submit_for_review:    false,
+        app_review_information: review_information(key),
+        precheck_include_in_app_purchases: false
+      )
+    end
+
+    desc "#{app[:name]}: odeslat vybraný build na kontrolu (ručně vybrat build v ASC, nebo BUILD=<číslo>). Vydání ručně."
+    lane :"#{key}_submit" do
+      deliver(
+        app_identifier:      app[:id],
+        metadata_path:       "app-store/#{key}/metadata",
+        screenshots_path:    "app-store/#{key}/screenshots",
+        skip_binary_upload:  true,
+        build_number:        ENV['BUILD'],        # nutné, aby deliver přiřadil už zpracovaný build
+        submit_for_review:   true,
+        automatic_release:   false,               # po schválení vydá člověk (nebo fázovaně v ASC)
+        force:               true,
+        overwrite_screenshots: true,
+        submission_information: {
+          add_id_info_uses_idfa: false,           # žádná reklama, žádné IDFA
+          export_compliance_uses_encryption: false
+        },
+        app_review_information: review_information(key),
+        run_precheck_before_submit: true
+      )
+    end
+  end
+end
+
+# ---------------------------------------------------------------------------------------------
+# Android / Google Play přes `supply`. Klíč servisního účtu (JSON) je MIMO repo: PLAY_JSON_KEY_PATH.
+# První AAB každé nové aplikace se nahrává RUČNĚ v Play Console (vznikne podpis aplikace), teprve potom
+# funguje API. Kontrolu podkladů spusť předem: node scripts/kontrola-listingu.mjs --jen=play
+# ---------------------------------------------------------------------------------------------
+platform :android do
+  APPS.each do |key, app|
+    desc "#{app[:name]}: jen texty a obrázky do Play Console (bez AAB). Nic neodesílá do produkce."
+    lane :"#{key}_listing" do
+      upload_to_play_store(
+        package_name:        app[:id],
+        json_key:            ENV.fetch('PLAY_JSON_KEY_PATH'),
+        metadata_path:       "play-store/#{key}/metadata/android",
+        skip_upload_aab:     true,
+        skip_upload_apk:     true,
+        skip_upload_changelogs: false,
+        skip_upload_screenshots: false,
+        skip_upload_images:  false
+      )
+    end
+
+    desc "#{app[:name]}: nahraje AAB do interního testování jako koncept (vydání potvrdí člověk v konzoli)."
+    lane :"#{key}_internal" do
+      upload_to_play_store(
+        package_name:   app[:id],
+        json_key:       ENV.fetch('PLAY_JSON_KEY_PATH'),
+        aab:            ENV['AAB'] || app[:aab],
+        track:          'internal',
+        release_status: 'draft',
+        skip_upload_metadata: true, skip_upload_images: true, skip_upload_screenshots: true, skip_upload_changelogs: true
+      )
+    end
+
+    desc "#{app[:name]}: povýší poslední verzi z interního do uzavřeného testování (track closed, ručně založený v konzoli)."
+    lane :"#{key}_closed" do
+      upload_to_play_store(
+        package_name:   app[:id],
+        json_key:       ENV.fetch('PLAY_JSON_KEY_PATH'),
+        track:          'internal',
+        track_promote_to: ENV.fetch('TRACK', 'alpha'),
+        release_status: 'draft',
+        skip_upload_aab: true, skip_upload_apk: true, skip_upload_metadata: true, skip_upload_images: true, skip_upload_screenshots: true
+      )
+    end
+  end
+end

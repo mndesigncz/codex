@@ -1,0 +1,88 @@
+{
+  "app": "managero",
+  "poznamka": "Scénář snímků sdílí App Store i Google Play. Pořadí = pořadí v obchodě (první tři jsou vidět ve výsledcích hledání). Zdroj 'demo' = /demo (lib/demo, skutečná aplikace proti mock serveru v prohlížeči, bez databáze). iPhone a Android telefon berou seznam 'iphone', iPad a Android tablety seznam 'ipad'. Podnik, lidé a čísla jsou vymyšlené (Kavárna U Lípy, ukázka).",
+  "ua": "ManageroApp/1.0.0",
+  "hodiny": "2026-10-14T09:41:00+02:00",
+  "iphone": [
+    {
+      "id": "prehled",
+      "zdroj": "demo",
+      "url": "/demo?scena=prehled&role=vedeni&rezim=okno",
+      "cs": "Celý provoz na jednom přehledu",
+      "en-US": "Your whole operation at a glance"
+    },
+    {
+      "id": "rozvrh",
+      "zdroj": "demo",
+      "url": "/demo?scena=rozvrh&role=zamestnanec&rezim=okno",
+      "cs": "Vlastní směny vždy po ruce",
+      "en-US": "Your own shifts always at hand"
+    },
+    {
+      "id": "uzaverka",
+      "zdroj": "demo",
+      "url": "/demo?scena=uzaverka&role=zamestnanec&rezim=okno",
+      "cs": "Uzávěrka bez zapomenutých věcí",
+      "en-US": "A closing with nothing forgotten"
+    },
+    {
+      "id": "sklad",
+      "zdroj": "demo",
+      "url": "/demo?scena=sklad&role=vedeni&rezim=okno",
+      "cs": "Sklad hlídá, co dochází",
+      "en-US": "Stock that watches itself"
+    },
+    {
+      "id": "ukoly",
+      "zdroj": "demo",
+      "url": "/demo?scena=ukoly&role=vedeni&rezim=okno",
+      "cs": "Úkoly a postupy na každou směnu",
+      "en-US": "Tasks and procedures for every shift"
+    },
+    {
+      "id": "tym",
+      "zdroj": "demo",
+      "url": "/demo?scena=tym&role=vedeni&rezim=okno",
+      "cs": "Tým, role a oprávnění",
+      "en-US": "Team, roles and permissions"
+    }
+  ],
+  "ipad": [
+    {
+      "id": "kiosk",
+      "zdroj": "demo",
+      "url": "/demo?scena=kiosk&rezim=okno",
+      "orientace": "na-sirku",
+      "cs": "Tablet u baru bez hesel",
+      "en-US": "A bar tablet without passwords"
+    },
+    {
+      "id": "prehled",
+      "zdroj": "demo",
+      "url": "/demo?scena=prehled&role=vedeni",
+      "cs": "Celý provoz na jednom přehledu",
+      "en-US": "Your whole operation at a glance"
+    },
+    {
+      "id": "rozvrh",
+      "zdroj": "demo",
+      "url": "/demo?scena=rozvrh&role=zamestnanec",
+      "cs": "Vlastní směny vždy po ruce",
+      "en-US": "Your own shifts always at hand"
+    },
+    {
+      "id": "sklad",
+      "zdroj": "demo",
+      "url": "/demo?scena=sklad&role=vedeni",
+      "cs": "Sklad hlídá, co dochází",
+      "en-US": "Stock that watches itself"
+    },
+    {
+      "id": "tym",
+      "zdroj": "demo",
+      "url": "/demo?scena=tym&role=vedeni",
+      "cs": "Tým, role a oprávnění",
+      "en-US": "Team, roles and permissions"
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+<!doctype html>
+<meta charset="utf-8">
+<!-- Feature graphic pro Google Play (1024×500). Parametry v adrese: app=managero|client, t (hlavní text), s (podtext),
+     ikona (file:// cesta k icon-only.png). Písmo Geist z balíčku `geist`, barvy podle značky (tokeny z app/globals.css).
+     Text drží od okraje dál než 10 %, jak Google chce. Bez cen, bez superlativů, bez loga třetích stran. -->
+<style>
+@font-face { font-family: Geist; font-weight: 100 900; src: url('GEIST_URL') format('woff2'); }
+:root { --ink: #16181A; --lime: #C8F542; --bg: #F3F4F0; }
+* { box-sizing: border-box; }
+html, body { margin: 0; width: 1024px; height: 500px; overflow: hidden; font-family: Geist, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+body { position: relative; display: flex; align-items: center; padding: 0 110px; gap: 64px; }
+body.managero { background: radial-gradient(90% 120% at 0% 0%, #EEFFB4 0%, #C8F542 45%, #79D06B 100%); color: var(--ink); }
+body.client { background: radial-gradient(80% 110% at 0% 0%, rgba(200,245,66,.30) 0%, rgba(200,245,66,0) 60%), linear-gradient(160deg, #23262A, #0C0D0F); color: var(--bg); }
+.dlazdice { flex: none; width: 240px; height: 240px; border-radius: 56px; overflow: hidden; box-shadow: 0 30px 60px -20px rgba(10,20,5,.45); }
+.dlazdice img { width: 100%; height: 100%; display: block; }
+h1 { margin: 0 0 14px; font-size: 64px; line-height: 1.02; letter-spacing: -0.035em; font-weight: 750; }
+p { margin: 0; font-size: 30px; line-height: 1.25; letter-spacing: -0.01em; opacity: .78; max-width: 460px; }
+body.client h1 em { font-style: normal; color: var(--lime); }
+</style>
+<body><div class="dlazdice"><img id="i" alt=""></div><div><h1 id="t"></h1><p id="s"></p></div>
+<script>
+const q = new URLSearchParams(location.search);
+document.body.className = q.get('app');
+document.getElementById('t').textContent = q.get('t');
+document.getElementById('s').textContent = q.get('s');
+const i = document.getElementById('i'); i.src = q.get('ikona');
+i.decode().then(() => document.fonts.ready).then(() => document.documentElement.setAttribute('data-hotovo', '1'));
+</script>

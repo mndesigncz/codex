@@ -1,0 +1,3 @@
+source 'https://rubygems.org'
+# Verzi zamknout po prvním `bundle install` (Gemfile.lock se commituje).
+gem 'fastlane', '>= 2.228'

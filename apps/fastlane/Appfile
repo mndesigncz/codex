@@ -1,0 +1,4 @@
+# Bez tajemství. Dvě aplikace, proto tu NENÍ app_identifier (nastavuje se v lane).
+# Přihlášení k Apple jde přes App Store Connect API klíč (Fastfile, before_all), ne přes Apple ID + heslo.
+team_id(ENV['APPLE_TEAM_ID'])                      # Developer Portal Team ID, 10 znaků
+itc_team_id(ENV['ASC_TEAM_ID']) if ENV['ASC_TEAM_ID']  # jen když účet patří do víc týmů v App Store Connect

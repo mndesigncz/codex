@@ -1,0 +1,30 @@
+Managero is an operations app for cafes, restaurants, bistros and tea rooms. Shifts, time tracking, stock, recipes, tasks and end-of-day closings live in one place, on every team member's phone.
+
+FOR MANAGERS
+• Rota: a generator proposes shifts based on availability, you review and publish them with one tap.
+• Time and earnings: who is on shift right now, hours worked, time-off and shift-swap requests.
+• Closing: the till counted note by note, and a difference that cannot be hidden. The closing stays locked until required tasks are done.
+• Stock and recipes: what is running low, what to reorder, margins calculated from ingredients. The app emails the supplier order for you.
+• Tasks and procedures: opening and closing checklists, step-by-step guides right on the shift.
+• Team, roles and permissions: whoever should not see wages does not see them. Custom roles with a choice of features.
+• Multiple venues: each location has its own rota, stock and closings, and management sees them all together.
+• Guest management: reservations, table orders, loyalty, coupons, events and news for guests using the Managero client app.
+
+FOR STAFF
+• My shifts, availability and time-off requests.
+• Ticking off tasks and procedures during the shift.
+• Team chat, announcements and polls.
+• Rewards and ideas to improve operations.
+
+TABLET BEHIND THE BAR
+Kiosk mode for a shared iPad: tap your name instead of a password, clock in and out, shift tasks and closing. A shared device has no password to leak.
+
+NOTIFICATIONS
+New shift, rota change, low stock, a chat message. Every notification category can be turned off in settings.
+
+ACCOUNT
+You need a business account to sign in. Management creates the business and invites the team with a code or by email. The app is for management and staff of businesses, not for guests. Guests have their own app, Managero client.
+
+Your data belongs to your business. You can delete your account in the app.
+
+The app interface is currently available in Czech only.

@@ -1,0 +1,45 @@
+<!doctype html>
+<meta charset="utf-8">
+<!-- Rámeček snímku pro App Store: nadpis + snímek aplikace, který přetéká přes spodní okraj.
+     Parametry v adrese: w, h (výstup v px), app=managero|client, t (nadpis), img (file:// snímek aplikace).
+     Písmo Geist je stejné jako v aplikaci (balíček `geist`), takže nadpis mluví stejným hlasem. -->
+<style>
+@font-face { font-family: Geist; font-weight: 100 900;
+  src: url('../../../node_modules/geist/dist/fonts/geist-sans/Geist-Variable.woff2') format('woff2'); }
+:root { --ink:#16181A; --lime:#C8F542; --bg:#F3F4F0; }
+* { box-sizing: border-box; }
+html, body { margin: 0; overflow: hidden; font-family: Geist, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+body.managero { background: radial-gradient(120% 70% at 20% 0%, #E9F7B5 0%, #F3F4F0 55%, #E6EEDA 100%); color: var(--ink); }
+body.client   { background: radial-gradient(110% 60% at 15% 0%, rgba(200,245,66,.32) 0%, rgba(200,245,66,0) 60%), linear-gradient(170deg,#22252A,#0C0D0F); color: #F3F4F0; }
+h1 { position: absolute; margin: 0; left: 0; right: 0; text-align: center; font-weight: 700; letter-spacing: -0.03em;
+     line-height: 1.04; text-wrap: balance; padding: 0 var(--pad); }
+h1 em { font-style: normal; }
+body.managero h1 em { background: linear-gradient(transparent 62%, rgba(200,245,66,.85) 62% 92%, transparent 92%); }
+body.client   h1 em { color: var(--lime); }
+.tel { position: absolute; overflow: hidden; background: #fff;
+       box-shadow: 0 0 0 2px rgba(22,24,26,.10), 0 70px 120px -30px rgba(15,20,10,.45); }
+body.client .tel { box-shadow: 0 0 0 2px rgba(255,255,255,.14), 0 70px 120px -30px rgba(0,0,0,.7); }
+.tel img { display: block; width: 100%; height: auto; }
+</style>
+<body><h1 id="t"></h1><div class="tel"><img id="i" alt=""></div>
+<script>
+const q = new URLSearchParams(location.search);
+const w = +q.get('w'), h = +q.get('h'), app = q.get('app') || 'managero';
+document.body.className = app;
+Object.assign(document.documentElement.style, { width: w + 'px', height: h + 'px' });
+document.body.style.width = w + 'px'; document.body.style.height = h + 'px';
+const na = w > h; // iPad na šířku
+const t = document.getElementById('t'), tel = document.querySelector('.tel'), img = document.getElementById('i');
+// *hvězdička* kolem slova = zvýrazněné slovo v nadpisu
+t.innerHTML = (q.get('t') || '').replace(/[&<]/g, c => ({ '&': '&amp;', '<': '&lt;' }[c])).replace(/\*(.+?)\*/g, '<em>$1</em>');
+const font = na ? h * 0.062 : w * 0.088;
+t.style.fontSize = font + 'px'; t.style.setProperty('--pad', (w * 0.07) + 'px');
+t.style.top = (na ? h * 0.055 : h * 0.052) + 'px';
+const sirka = +q.get('sirka') || (na ? 0.78 : 0.74); // podíl šířky snímku, který zabere obrazovka aplikace
+const iw = w * sirka; // celá obrazovka včetně docku, nic se nepřeřezává
+tel.style.width = iw + 'px'; tel.style.left = ((w - iw) / 2) + 'px';
+tel.style.top = (na ? h * 0.19 : h * 0.19) + 'px';
+tel.style.borderRadius = (iw * (na ? 0.03 : (+q.get('r') || 0.10))) + 'px';
+img.src = q.get('img');
+img.decode().then(() => document.documentElement.setAttribute('data-hotovo', '1'));
+</script>

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 120 120">
+<defs>
+<linearGradient id="g" x1="20" y1="0" x2="100" y2="120" gradientUnits="userSpaceOnUse"><stop stop-color="#EEFFB4"/><stop offset=".38" stop-color="#C8F542"/><stop offset=".72" stop-color="#79D06B"/><stop offset="1" stop-color="#2FA968"/></linearGradient>
+<linearGradient id="m" x1="60" y1="34" x2="60" y2="88" gradientUnits="userSpaceOnUse"><stop stop-color="#fff"/><stop offset="1" stop-color="#EDF3F6"/></linearGradient>
+<radialGradient id="t" cx="45" cy="12" r="60" gradientUnits="userSpaceOnUse"><stop stop-color="#fff" stop-opacity=".5"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+<filter id="s" x="-40%" y="-40%" width="180%" height="200%"><feDropShadow dx="0" dy="2.4" stdDeviation="2.2" flood-color="#0c2b16" flood-opacity=".3"/></filter>
+</defs>
+<rect width="120" height="120" fill="url(#g)"/><rect width="120" height="120" fill="url(#t)"/>
+<g transform="translate(60 61.5) scale(1.35) translate(-60 -61.5)" filter="url(#s)"><path d="M44 38 Q44 34 48 34 H72 Q76 34 76 38 V86.5 Q76 89 73.6 87.5 L60 79 L46.4 87.5 Q44 89 44 86.5 Z" fill="url(#m)"/></g>
+</svg>

@@ -1,0 +1,23 @@
+Managero is an operations app for cafés, bars and restaurants. Managers and staff keep everything that matters in one place: on a phone, on a tablet behind the bar or on a computer.
+
+WHAT IT DOES
+• Shifts and rota: build the schedule, collect team availability, swap shifts, request time off and see "my shifts".
+• Attendance: clock-ins and clock-outs, worked-hours overview.
+• Tasks and procedures: daily tasks, opening and closing checklists, step-by-step guides.
+• Stock: inventory levels, goods in, stocktake, shopping list and supplier orders.
+• Recipes and menu: cost per portion, the venue's menu.
+• Closing: end-of-shift closing with a check of required items.
+• Chat and announcements: team chat, direct messages, announcements and polls.
+• Rewards and ideas: points for extra work and an idea board for improving daily operations.
+• Kiosk: a shared tablet behind the bar where staff sign in by tapping their name.
+• Notifications about shifts, messages and low stock. Every kind can be switched off.
+
+WHO IT IS FOR
+Owners and managers who want their venue under control, and baristas and cooks who want to know when they work and what to do.
+
+NOTES
+• The app interface is currently available in Czech only.
+• You need a venue account or an invitation from management to sign in. You can delete your account inside the app.
+• Guests of venues use the separate app Managero client.
+
+Support: podpora@managero.app

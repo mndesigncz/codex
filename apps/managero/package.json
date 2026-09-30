@@ -1,0 +1,37 @@
+{
+  "name": "managero-obal-managero",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Nativní obal (Capacitor 8) aplikace Managero. Mimo hlavní build webu: nic odsud se neinstaluje do kořenového package.json.",
+  "scripts": {
+    "sync-www": "node ../scripts/sync-www.mjs managero",
+    "ikony": "node ../scripts/ikony.mjs",
+    "pridej-ios": "npm run sync-www && npx cap add ios && node ../scripts/po-cap-add.mjs managero ios",
+    "pridej-android": "npm run sync-www && npx cap add android && node ../scripts/po-cap-add.mjs managero android",
+    "sync": "npm run sync-www && npx cap sync && node ../scripts/po-cap-add.mjs managero",
+    "assety": "npx @capacitor/assets generate --ios --android --iconBackgroundColor '#C8F542' --splashBackgroundColor '#F3F4F0' --splashBackgroundColorDark '#0C0D0F'",
+    "otevri-ios": "npx cap open ios",
+    "otevri-android": "npx cap open android"
+  },
+  "dependencies": {
+    "@aparajita/capacitor-biometric-auth": "^10.0.0",
+    "@capacitor-mlkit/barcode-scanning": "^8.2.1",
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/ios": "^8.5.2",
+    "@capacitor/preferences": "^8.0.1",
+    "@capacitor/push-notifications": "^8.1.2",
+    "@capacitor/share": "^8.0.2",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.3"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.5.2",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  },
+  "engines": { "node": ">=22" }
+}

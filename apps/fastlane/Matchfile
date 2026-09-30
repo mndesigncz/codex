@@ -1,0 +1,10 @@
+# Certifikáty a profily v soukromém, šifrovaném git repu (NE v tomhle repu).
+# Volitelné: první vydání jde i bez matche (Xcode "Automatically manage signing"), match se hodí pro CI.
+git_url(ENV['MATCH_GIT_URL'])          # např. git@github.com:<org>/managero-certs.git (soukromé, prázdné při založení)
+storage_mode('git')
+type('appstore')                       # distribuční certifikát + App Store profil
+app_identifier(['app.managero.app', 'app.managero.client'])
+team_id(ENV['APPLE_TEAM_ID'])
+readonly(ENV['CI'] == 'true')          # v CI jen čte; nové certifikáty se zakládají lokálně: `bundle exec fastlane match appstore`
+# MATCH_PASSWORD (heslo k šifrování repa) jen v env / CI secrets.
+# Pozn.: jedno heslo, jeden repozitář, oba bundle ID; profily vzniknou dva.

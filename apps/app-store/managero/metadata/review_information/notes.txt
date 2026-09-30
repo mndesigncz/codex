@@ -1,0 +1,33 @@
+WHAT THIS APP IS
+Managero is a B2B operations app for cafes and restaurants (shift rota, time tracking, stock, end-of-day closing, tasks, team chat). It is used by business owners/managers and their employees. Guests of these venues use a SEPARATE app, "Managero client" (app.managero.client), which is not part of this submission. The interface is currently Czech only.
+
+HOW TO SIGN IN
+Demo credentials are in the Demo Account fields (manager role, sees everything). A second, employee-role account:
+  e-mail:   {{REVIEW_MANAGERO_EMPLOYEE_USER}}
+  password: {{REVIEW_MANAGERO_EMPLOYEE_PASSWORD}}
+Both accounts are pre-verified, have no 2FA and belong to a fictional venue "Ukázková kavárna". The data is reset before every submission.
+There is no public sign-up for guests. Employees join a venue with an invitation code from their manager.
+
+WHERE TO FIND THINGS (manager account)
+- Navigation: Přehled (home dashboard of widgets), Rozvrh (shift rota; "Generovat" proposes shifts, then "Zveřejnit"), Sklad (stock and shopping list), Úkoly, Chat, Uzávěrky (end-of-day closing; stays locked until required tasks are done).
+- Account menu, item "Managero client": management of the guest-facing side (reservations, table orders, loyalty, coupons, events). This is a management screen; the guest app itself is a separate app.
+- Employee account: Přehled, Moje směny, Úkoly, Postupy, Chat.
+- Kiosk mode for a shared iPad: created by the manager in Settings, then open the app on an iPad and pick a name (no password on the shared device).
+
+NATIVE FEATURES (guideline 4.2)
+Push notifications through APNs (new shift, rota change, low stock, chat message), camera and photo library for receipt and stock photos, native share sheet for exports (rota, shopping list), iPad kiosk layout. Notification categories can be switched off in Settings.
+
+PAYMENTS (guideline 3.1.1 / 3.1.3(c))
+The app contains no purchases, no prices and no links to purchase. Business subscriptions are agreed directly between us and the business (B2B enterprise service, guideline 3.1.3(c)) outside the app. Employees never pay anything.
+
+USER-GENERATED CONTENT (guideline 1.2)
+Team chat exists only inside one business: members are invited by the business owner, who can remove members and delete messages. There is no public content and no contact with strangers.
+
+ACCOUNT DELETION (guideline 5.1.1(v))
+Settings > Account > "Smazat účet" deletes the signed-in account inside the app. Deleting a business owner account requires closing or handing over the business first; the app explains it.
+
+PERMISSIONS
+Camera and photo library (receipt and stock photos), location (only when the manager sets the venue position), notifications. Each has a purpose string and is requested at the moment of use.
+
+CONTACT
+If anything does not work, please reply in App Store Connect; we answer within one working day.
