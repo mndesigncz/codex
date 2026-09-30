@@ -186,7 +186,10 @@ async function overKrok(p, popis, { cislo } = {}) {
   tvrdi(`P1 ${popis}: aria-live na čítači kroků`, (await p.locator('[data-krok-x-z-y]').getAttribute('aria-live')) === 'polite');
   const o = await overflow(p);
   tvrdi(`P1 ${popis}: žádné přetečení`, o.dok <= 0 && o.telo <= 0, JSON.stringify(o));
-  const lim = await limetky(p);
+  // Na zatíženém stroji doběhne vstupní animace a uložení později než za čtvrt vteřiny: počkat na klid.
+  await p.waitForFunction(() => document.getAnimations().every(a => a.playState !== 'running' || a.effect?.getTiming().iterations === Infinity), null, { timeout: 10000 });
+  let lim = await limetky(p);
+  for (let i = 0; i < 20 && lim.length !== 1; i++) { await p.waitForTimeout(150); lim = await limetky(p); }
   tvrdi(`P1 ${popis}: právě jedna plná limetka`, lim.length === 1, JSON.stringify(lim));
   const bt = await tlacitkaBezTypu(p);
   tvrdi(`P1 ${popis}: tlačítka mají type`, bt.length === 0, JSON.stringify(bt));
@@ -487,6 +490,9 @@ for (const [nazev, vp, mobil] of [['1280', { width: 1280, height: 900 }, false],
   tvrdi(`P9 ${nazev}: tmavý režim je zapnutý`, tm === 'dark', String(tm));
   for (const [re, nazevKroku] of [[/Jaký podnik vedeš/, 'Typ'], [/Jak se jmenuje/, 'Podnik'], [/Kdy máte otevřeno/, 'Doba'], [/Kdo s tebou pracuje/, 'Tým'], [/Co chceš mít pod kontrolou/, 'Cíle']]) {
     await cekejNaH1(p, re);
+    // Kontrast se měří až po dojetí vstupních animací (rozjetý průhledný text by vyšel 1 : 1);
+    // nekonečný ken-burns fotky se nečeká. Na zatíženém stroji animace dojíždějí později než za 400 ms.
+    await p.waitForFunction(() => document.getAnimations().every(a => a.playState !== 'running' || a.effect?.getTiming().iterations === Infinity), null, { timeout: 10000 });
     const k = await kontrast(p);
     tvrdi(`P9 ${nazev} ${nazevKroku}: text v tmavém režimu ≥ 4,5 : 1`, k.length === 0, k.slice(0, 6).join(' | '));
     const f = await pismo(p);
