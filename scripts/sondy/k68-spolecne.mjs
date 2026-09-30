@@ -77,6 +77,19 @@ export async function kontext({ viewport = { width: 1280, height: 950 }, role = 
       if (t) localStorage.setItem('managero-theme', 'dark');
     } catch { /* soukromé okno */ }
   }, [tmavy]);
+  // Připomínky postupů (ReminderWatcher) se spouštějí přesně v minutě otevírací doby a banner
+  // dole přes obrazovku zachytí klepnutí — sonda, která zrovna běžela v 08:00, pak čekala
+  // na tlačítko zakryté bannerem. Dnešní připomínky se předem označí jako už spuštěné
+  // (stejný klíč, jaký si aplikace píše sama), ať výsledek nezávisí na minutě dne.
+  await ctx.addInitScript(() => {
+    try {
+      const d = new Date();
+      const dnes = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const mapa = {};
+      for (let i = 1; i <= 300; i++) mapa[`${i}-${dnes}`] = true;
+      localStorage.setItem('managero-proc-fired', JSON.stringify(mapa));
+    } catch { /* soukromé okno */ }
+  });
   // Posun hodin v prohlížeči (ms): sonda, jejíž fixtury počítají „před
   // hodinou dnes", po půlnoci jinak tvrdí nemožné. Posouvá se jen Date,
   // časovače běží dál normálně.

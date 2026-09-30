@@ -1,6 +1,8 @@
 // Events (akce): concerts, lectures, workshops and the offsite trips where
 // the whole tea house packs up and moves. Shared model for API and UI.
 
+import { cenaMenu, MAX_CENA } from './cena.ts';
+
 export type EventKind = 'concert' | 'lecture' | 'workshop' | 'outdoor' | 'private' | 'other';
 export type EventStatus = 'planned' | 'confirmed' | 'done' | 'cancelled';
 
@@ -91,7 +93,8 @@ export function normalizeEventMenu(raw: any): EventMenuLine[] {
     .map((l: any) => {
       const itemId = Number(l?.itemId);
       const boardId = Number(l?.boardId);
-      const price = l?.price == null || l?.price === '' ? null : Math.max(0, Math.round(Number(l.price) || 0));
+      // Haléře zůstanou (3,50 €); dřív Math.round z toho udělal 4.
+      const price = l?.price == null || l?.price === '' ? null : cenaMenu(l.price, MAX_CENA);
       return {
         itemId: Number.isFinite(itemId) && itemId > 0 ? itemId : null,
         boardId: Number.isFinite(boardId) && boardId > 0 ? boardId : null,

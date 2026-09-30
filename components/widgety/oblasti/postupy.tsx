@@ -170,7 +170,9 @@ function PovinneDnes({ velikost, nahled }: WidgetProps) {
     >
       {S ? (
         <Stat label="Hotovo" value={`${seznam.length - cekaji.length} z ${seznam.length}`}
-          note={cekaji.length === 0 ? 'Uzávěrka může jít' : `čeká ${czCount(cekaji.length, { one: 'postup', few: 'postupy', many: 'postupů' })}`} />
+          // „Postupy hotové“, ne „Uzávěrka může jít“: uzávěrku mohou zamykat i povinné úkoly a návody,
+          // o kterých tenhle widget neví — tvrdit povolení vedle zámku uzávěrky by lhalo.
+          note={cekaji.length === 0 ? 'Postupy hotové' : `čeká ${czCount(cekaji.length, { one: 'postup', few: 'postupy', many: 'postupů' })}`} />
       ) : (
         <>
           {cekaji.length > 0 && <p className="t-meta text-pretty">Bez nich nepůjde odeslat uzávěrka.</p>}

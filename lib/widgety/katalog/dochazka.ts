@@ -32,6 +32,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
       pole: { 'akce:ukoncit': 'dochazka.upravit' },
     },
     tarif: 'zdarma',
+    cil: { pohled: 'attendance' },
     stav: 'hotovo',
   },
   // Data: GET /api/attendance?days=1 → roster[{name,shiftStart,shiftEnd,openSince}]
@@ -48,6 +49,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['vedeni.prehled', 'vedeni.dochazka', 'vedeni.togo', 'kiosk.smena'],
     opravneni: { vse: [], nektere: ['dochazka.zobrazit', 'dochazka.tablet'] },
     tarif: 'zdarma',
+    cil: { pohled: 'attendance' },
     stav: 'hotovo',
   },
   // Data: GET /api/attendance → roster[me].openSince; POST /api/attendance {employeeId, action: in|out}
@@ -65,6 +67,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     opravneni: { vse: [], nektere: [] },
     tarif: 'zdarma',
     kostra: { S: 'text', M: 'text' },
+    cil: { pohled: 'attendance' },
     stav: 'hotovo',
   },
   // Data: GET /api/attendance?days=N → entries[] × roster.hourlyRate (lib/wages); GET /api/closings → tržby;
@@ -102,6 +105,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'stranka',
       },
     ],
+    cil: { pohled: 'attendance' },
     stav: 'hotovo',
   },
   // Data: GET /api/attendance?days=N → entries[{employeeId,employeeName,clockIn,clockOut}], roster.hourlyRate
@@ -138,6 +142,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'hodiny',
       },
     ],
+    cil: { pohled: 'attendance' },
     stav: 'hotovo',
   },
   // Data: GET /api/attendance?days=1 → roster[{openSince,shiftEnd}] (openSince && teď > shiftEnd)
@@ -154,6 +159,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['vedeni.dochazka'],
     opravneni: { vse: ['dochazka.zobrazit'], nektere: [], pole: { 'akce:ukoncit': 'dochazka.upravit' } },
     tarif: 'zdarma',
+    cil: { pohled: 'attendance' },
     stav: 'hotovo',
   },
   // Data: GET /api/attendance → entries[{clockIn,clockOut}] (posledních 60 dní)
@@ -172,6 +178,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['zamestnanec.domu', 'vedeni.moje_smeny', 'zamestnanec.moje_smeny'],
     opravneni: { vse: [], nektere: [] },
     tarif: 'zdarma',
+    cil: { pohled: 'attendance' },
     stav: 'hotovo',
   },
   // Data: dnes jen po dnech: GET /api/closings/wage?date → wage{ms,rate,earned}

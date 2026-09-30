@@ -10,6 +10,8 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { Icon } from '../Icons';
 import { Button } from '../ui';
+import { useSymbol } from '../CurrencyProvider';
+import { cenaDoPole } from '@/lib/cena';
 import { ancestryOfId, flattenTree } from '@/lib/categoryTree';
 import { mergeDefaults, type ItemDefaults } from '@/lib/itemDefaults';
 import { okJson } from '@/lib/api';
@@ -52,6 +54,7 @@ export default function NewStockEntry({
   const [brand, setBrand] = useState('');
   const [packageSize, setPackageSize] = useState('');
   const [unitCost, setUnitCost] = useState('');
+  const symbol = useSymbol();
   const [supplier, setSupplier] = useState('');
   const [more, setMore] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -85,7 +88,7 @@ export default function NewStockEntry({
     if (d.brand) setBrand(d.brand);
     if (d.supplier) setSupplier(d.supplier);
     if (d.packageSize != null) setPackageSize(String(d.packageSize));
-    if (d.unitCost != null && smiCenu) setUnitCost(String(d.unitCost));
+    if (d.unitCost != null && smiCenu) setUnitCost(cenaDoPole(d.unitCost));
   };
 
   const onFile = async (f: File | null) => {
@@ -252,8 +255,8 @@ export default function NewStockEntry({
           {smiCenu && (
             <div>
               <label htmlFor="nova-vec-cena" className={label}>Cena za kus</label>
-              <input id="nova-vec-cena" type="number" inputMode="numeric" value={unitCost}
-                onChange={e => setUnitCost(e.target.value)} className={field} placeholder="Kč" />
+              <input id="nova-vec-cena" inputMode="decimal" value={unitCost}
+                onChange={e => setUnitCost(e.target.value)} className={field} placeholder={symbol} />
             </div>
           )}
           <div>

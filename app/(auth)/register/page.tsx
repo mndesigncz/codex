@@ -19,6 +19,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { LogoMark, Icon } from '@/components/Icons';
 import { PLAN_NAMES, PRICES, TRIAL_DAYS, priceLabel, type Interval, type PlanId } from '@/lib/plan';
+import { textPoRegistraci } from '@/lib/predplatneTexty';
 import { formatMoney } from '@/lib/money';
 
 // Pokladna se stahuje, až když má opravdu vyskočit. Kdo zakládá podnik na
@@ -103,14 +104,17 @@ export default function RegisterPage() {
             <h1 className="text-2xl font-bold tracking-tight text-[#16181A] mb-2">Podnik vytvořen!</h1>
             <p className="text-black/55 text-sm mb-2">Sdílejte tento kód se zaměstnanci — připojí se do vašeho týmu.</p>
 
+            {/* Sdělení musí říkat pravdu o tom, co se stalo: nový podnik je na
+                tarifu Zdarma a zkouška Pro/Max běží až po zadání karty ve
+                Stripe pokladně (lib/predplatneTexty.ts). */}
             {zaplaceno ? (
               <p className="text-xs text-[#5B7A08] bg-[#C8F542]/10 border border-[#C8F542]/25 rounded-xl px-3 py-2 mb-6 inline-flex items-center gap-1.5">
                 <Icon name="check" size={13} className="shrink-0" />
-                {PLAN_NAMES[plan]} je aktivní. Prvních {TRIAL_DAYS} dní zdarma, pak {priceLabel(plan as 'pro' | 'max', interval)}.
+                {textPoRegistraci({ plan, stav: 'aktivni', interval })}
               </p>
             ) : (
-              <p className="text-xs text-[#5B7A08] bg-[#C8F542]/10 border border-[#C8F542]/25 rounded-xl px-3 py-2 mb-6">
-                Prvních {TRIAL_DAYS} dní máte všechny funkce Pro zdarma.
+              <p className="note note-info text-xs mb-6">
+                {textPoRegistraci({ plan, stav: placeny && !prihlaseniSelhalo ? 'zavrenaPokladna' : 'zdarma', interval })}
               </p>
             )}
 

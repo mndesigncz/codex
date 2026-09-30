@@ -9,7 +9,8 @@
 
 import { useId, useState } from 'react';
 import { Icon } from '../Icons';
-import { useMoney } from '../CurrencyProvider';
+import { useCost, useSymbol } from '../CurrencyProvider';
+import { cenaDoPole, cenaZFormulare } from '@/lib/cena';
 import { Button, Field, Input, Label } from '../ui';
 
 export type Portion = { name: string; amount: number };
@@ -22,11 +23,14 @@ export default function ItemInlineEdit({ item, onSaved, onClose }: {
   onSaved: (patch: any) => void;
   onClose: () => void;
 }) {
-  const money = useMoney();
+  // Cena za jednotku obsahu bývá pod jednou měnovou jednotkou (0,025 Kč za g) —
+  // useCost přidá desetinná místa, kde by se jinak ukázala nula.
+  const cost = useCost();
+  const symbol = useSymbol();
   const uid = useId();
   const [packageSize, setPackageSize] = useState(item.packageSize != null ? String(item.packageSize) : '');
   const [contentUnit, setContentUnit] = useState(item.contentUnit ?? '');
-  const [unitCost, setUnitCost] = useState(item.unitCost != null ? String(item.unitCost) : '');
+  const [unitCost, setUnitCost] = useState(cenaDoPole(item.unitCost));
   const [portions, setPortions] = useState<{ name: string; amount: string }[]>(
     Array.isArray(item.portions) && item.portions.length
       ? item.portions.map((p: any) => ({ name: String(p.name ?? ''), amount: String(p.amount ?? '') }))
@@ -39,11 +43,14 @@ export default function ItemInlineEdit({ item, onSaved, onClose }: {
     ? num(unitCost) / num(packageSize) : null;
 
   const save = async () => {
+    // Cena smí mít haléře; text, který cena není, se neuloží jako nula.
+    const cena = cenaZFormulare(unitCost);
+    if (!cena.ok) { setErr('Cena musí být číslo, třeba 4,99.'); return; }
     setSaving(true); setErr('');
     const payload = {
       packageSize: packageSize === '' ? null : num(packageSize),
       contentUnit: contentUnit.trim() || null,
-      unitCost: unitCost === '' ? null : Math.max(0, Math.round(num(unitCost))),
+      unitCost: cena.hodnota,
       portions: portions
         .filter(p => p.name.trim() && num(p.amount) > 0)
         .map(p => ({ name: p.name.trim(), amount: num(p.amount) })),
@@ -87,12 +94,12 @@ export default function ItemInlineEdit({ item, onSaved, onClose }: {
         </Field>
         <Field id={`${uid}-cena`} label="Cena za balení">
           <Input id={`${uid}-cena`} value={unitCost} onChange={e => setUnitCost(e.target.value)}
-            inputMode="numeric" placeholder="Kč" />
+            inputMode="decimal" placeholder={symbol} />
         </Field>
       </div>
       {perUnit != null && (
         <p className="t-meta">
-          Vychází na <b className="text-[#16181A]">{money(Math.round(perUnit))}</b> za {contentUnit || 'jednotku'}.
+          Vychází na <b className="text-[#16181A]">{cost(perUnit)}</b> za {contentUnit || 'jednotku'}.
         </p>
       )}
 

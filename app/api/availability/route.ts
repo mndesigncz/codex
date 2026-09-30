@@ -76,7 +76,22 @@ export async function GET(req: Request) {
       status: r.status,
       createdAt: r.created_at,
     }));
-    return NextResponse.json({ submissions });
+    // Kolik směn je na měsíc naplánováno: widget Dostupnost týmu z toho
+    // odvozuje „vyřízeno" (všichni zadali a rozvrh na měsíc už existuje).
+    // Zveřejnění rozvrhu se nikde neukládá (publish jen rozešle upozornění),
+    // takže počet směn je nejbližší poctivý ukazatel — a jede s odpovědí,
+    // kterou widget stejně čte, ať neposílá dotaz navíc.
+    // Směny s auto_created se nepočítají: vznikají samy z příchodu na směnu
+    // a z uzávěrky (ne z plánování), takže by jedno ranní píchnutí „naplánovalo"
+    // měsíc, na který nikdo rozvrh nesestavil, a widget by lhal, že je vyřízeno.
+    // `IS NOT TRUE` bere i NULL ze starých řádků; na stroji před migrací sloupec
+    // chybí, dotaz spadne do catch a widget se konzervativně neminimalizuje.
+    let naplanovanoSmen = 0;
+    try {
+      const [n] = await sql`SELECT COUNT(*)::int AS n FROM shifts WHERE team_id = ${ctx.teamId} AND date LIKE ${month + '-%'} AND auto_created IS NOT TRUE`;
+      naplanovanoSmen = Number(n?.n) || 0;
+    } catch { /* bez počtu zůstane 0 — widget se jen neminimalizuje */ }
+    return NextResponse.json({ submissions, naplanovanoSmen });
   }
 
   // employee — own submission
@@ -111,12 +126,13 @@ export async function POST(req: Request) {
 
   const body = await req.json();
   const month: string = body.month;
-  const unavailableDates: string[] = Array.isArray(body.unavailableDates) ? body.unavailableDates : [];
   const preferredShift: string | null = body.preferredShift ?? null;
+  // Stejné meze jako u vedení (PATCH): 0 generátor čte jako „žádná směna“, ale
+  // přehled vytížení jako „bez limitu“, proto se nula a nesmysl berou jako bez limitu.
   const maxShifts: number | null =
     body.maxShifts === null || body.maxShifts === undefined || body.maxShifts === ''
       ? null
-      : parseInt(body.maxShifts);
+      : (Math.max(1, Math.min(31, parseInt(body.maxShifts) || 0)) || null);
   const note: string | null = body.note ?? null;
 
   if (!month || !/^\d{4}-\d{2}$/.test(month)) {
@@ -124,6 +140,11 @@ export async function POST(req: Request) {
   }
   // Až po kontrole měsíce: filtr potřebuje vědět, do kterého měsíce dny patří.
   const dayPreferences = await ocistiPreference(ctx.teamId, month, body.dayPreferences);
+  // Jako u vedení (PATCH): jen dny tohoto měsíce, bez duplicit, nejvýš 62.
+  // Dřív se pole ukládalo, jak přišlo — libovolné řetězce a tisíce položek.
+  const unavailableDates: string[] = Array.isArray(body.unavailableDates)
+    ? Array.from(new Set(body.unavailableDates.filter(vMesici(month)))).slice(0, 62) as string[]
+    : [];
 
   // delete existing for this employee+month, then insert
   await sql`

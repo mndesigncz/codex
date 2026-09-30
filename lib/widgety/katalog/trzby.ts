@@ -28,6 +28,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     tarif: 'max',
     kostra: { S: 'cislo', M: 'cislo' },
     muzeInkoust: true,
+    cil: { pohled: 'finance' },
     stav: 'hotovo',
   },
   // Data: GET /api/pos/daily?from&to → totals{total,bills,cash,card,tips,methods,avgBill}, notes[], lastSyncAt
@@ -58,6 +59,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'dnes',
       },
     ],
+    cil: { pohled: 'finance' },
     stav: 'hotovo',
   },
   // Data: pokladna: GET /api/pos/daily?from&to → days[{day,total,bills}]; uzávěrky:
@@ -98,6 +100,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'pokladna',
       },
     ],
+    cil: { pohled: 'finance' },
     stav: 'hotovo',
   },
   // Data: období: GET /api/pos/daily?from&to → hours[24]; měsíc: GET /api/pos/insights?month → hours[24],
@@ -133,6 +136,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: '7_dni',
       },
     ],
+    cil: { pohled: 'finance' },
     stav: 'hotovo',
   },
   // Data: období: GET /api/pos/daily?from&to → items[{name,category,qty,revenue}]; měsíc s marží:
@@ -177,6 +181,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: '5',
       },
     ],
+    cil: { pohled: 'finance' },
     stav: 'hotovo',
   },
   // Data: GET /api/pos/daily?from&to → byPerson[{name,total,bills}]
@@ -206,6 +211,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'dnes',
       },
     ],
+    cil: { pohled: 'finance' },
     stav: 'hotovo',
   },
   // Data: GET /api/pos/daily?from&to → totals{cash,card,other,methods[{label,amount}],tips,tipsCash,tipsCard}
@@ -235,6 +241,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'dnes',
       },
     ],
+    cil: { pohled: 'finance' },
     stav: 'hotovo',
   },
   // Data: období: GET /api/pos/daily → totals.avgBill, totals.bills; měsíc: GET /api/pos/insights?month →
@@ -260,6 +267,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: '7_dni',
       },
     ],
+    cil: { pohled: 'finance' },
     stav: 'hotovo',
   },
   // Data: GET /api/pos/daily?from&to → days[{day,total,declared,diff,closings}]; měsíc:
@@ -303,6 +311,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         napoveda: 'Částka v měně podniku.',
       },
     ],
+    cil: { pohled: 'reports' },
     stav: 'hotovo',
   },
   // Data: GET /api/pos/status → connected, placeName, lastSyncAt, lastError, itemsPending, billsCount, lastDay
@@ -324,6 +333,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
       pole: { 'akce:synchronizovat_ted': 'pokladna.synchronizovat' },
     },
     tarif: 'max',
+    cil: { pohled: 'finance' },
     stav: 'hotovo',
   },
 ];

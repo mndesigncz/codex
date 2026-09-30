@@ -12,6 +12,8 @@
 
 import { useState } from 'react';
 import { Icon } from '../Icons';
+import { useCost, useSymbol } from '../CurrencyProvider';
+import { cenaZFormulare } from '@/lib/cena';
 
 const field =
   'w-full rounded-2xl bg-white/70 border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none';
@@ -36,6 +38,8 @@ export default function NewIngredientInline({ categories, onCreated, onCancel }:
   const [packageSize, setPackageSize] = useState('');
   const [contentUnit, setContentUnit] = useState('');
   const [unitCost, setUnitCost] = useState('');
+  const cost = useCost();
+  const symbol = useSymbol();
   const [quantity, setQuantity] = useState('');
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
@@ -45,6 +49,9 @@ export default function NewIngredientInline({ categories, onCreated, onCancel }:
 
   const save = async () => {
     if (!name.trim()) { setErr('Napiš, jak se surovina jmenuje.'); return; }
+    // Cena smí mít haléře; text, který cena není, se neuloží jako nula.
+    const cena = cenaZFormulare(unitCost);
+    if (!cena.ok) { setErr('Cena musí být číslo, třeba 4,99.'); return; }
     setSaving(true); setErr('');
     try {
       // Nová kategorie musí vzniknout dřív — položka na ni ukazuje.
@@ -68,7 +75,7 @@ export default function NewIngredientInline({ categories, onCreated, onCancel }:
         quantity: dec(quantity),
         minQuantity: 1, criticalQuantity: 0, maxQuantity: Math.max(5, Math.ceil(dec(quantity) * 2)),
         unit: unit.trim() || 'ks',
-        unitCost: unitCost === '' ? null : Math.max(0, Math.round(dec(unitCost))),
+        unitCost: cena.hodnota,
         packageSize: packageSize === '' ? null : dec(packageSize),
         contentUnit: contentUnit || null,
       };
@@ -149,7 +156,7 @@ export default function NewIngredientInline({ categories, onCreated, onCancel }:
         <label className="space-y-1">
           <span className="block text-[11px] font-semibold text-black/50">Cena za balení</span>
           <input inputMode="decimal" value={unitCost} onChange={e => setUnitCost(e.target.value)}
-            placeholder="Kč" className={field} />
+            placeholder={symbol} className={field} />
         </label>
       </div>
 
@@ -161,7 +168,7 @@ export default function NewIngredientInline({ categories, onCreated, onCancel }:
           <span className="whitespace-nowrap">{unit || 'ks'}</span>
         </label>
         {perUnit != null && (
-          <span>Vychází na <b className="text-[#16181A]">{Math.round(perUnit)} Kč</b> za {contentUnit || 'jednotku'}.</span>
+          <span>Vychází na <b className="text-[#16181A]">{cost(perUnit)}</b> za {contentUnit || 'jednotku'}.</span>
         )}
       </div>
 

@@ -7,6 +7,7 @@ import { organizaceTymu, podnikyOrganizace } from '@/lib/tenant';
 import { CISELNIKY, coSeSlucuje, coSeVypina, normalizujNastaveni, normalizujZdroje, ocistiZdroje } from '@/lib/organizace';
 import { provedZmenuZdroju, type VysledekKopie } from '@/lib/sdileneCiselnikyDb';
 import { audit } from '@/lib/audit';
+import { shrnutiNastaveniOrganizace, shrnutiSdilenychCiselniku } from '@/lib/auditPopisky';
 
 export const dynamic = 'force-dynamic';
 const sql = neon(process.env.DATABASE_URL!);
@@ -95,13 +96,13 @@ export async function PATCH(req: Request) {
   }
 
   await sql`UPDATE organizations SET name = ${name}, settings = ${JSON.stringify(nastaveni)}::jsonb WHERE id = ${org.id}`;
-  audit(c.teamId, c.meId, 'organization.settings', 'organization', org.id, JSON.stringify(nastaveni));
+  audit(c.teamId, c.meId, 'organization.settings', 'organization', org.id, shrnutiNastaveniOrganizace(nastaveni));
   // Změna zdrojů zvlášť: audit_log nemá organization_id, píše se k aktivnímu podniku jako dosud.
   const zmenaZdroju = vypina.length > 0 || coSeSlucuje(org.nastaveni, nastaveni).length > 0
     || JSON.stringify(org.nastaveni.zdrojeCiselniku) !== JSON.stringify(nastaveni.zdrojeCiselniku);
   if (zmenaZdroju || kopie.some(k => !k.ok || k.pocet > 0)) {
     audit(c.teamId, c.meId, 'organization.ciselniky', 'organization', org.id,
-      JSON.stringify({ sdileneCiselniky: nastaveni.sdileneCiselniky, zdroje: nastaveni.zdrojeCiselniku }));
+      shrnutiSdilenychCiselniku(nastaveni.sdileneCiselniky, nastaveni.zdrojeCiselniku));
   }
   return NextResponse.json({ ok: true, organization: { id: org.id, name, settings: nastaveni }, kopie });
 }

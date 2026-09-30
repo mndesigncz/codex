@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { audit } from '@/lib/audit';
+import { popisPoliNastaveni } from '@/lib/auditPopisky';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
@@ -217,8 +218,12 @@ export async function PATCH(request: Request) {
   const me = { id: c.meId };
 
   audit(team.id, me.id, 'team.settings', 'team', team.id,
-    Object.keys(body).filter(k => body[k] !== undefined).join(', ').slice(0, 200));
-  if (name) await sql`UPDATE teams SET name = ${name} WHERE id = ${team.id}`;
+    popisPoliNastaveni(Object.keys(body).filter(k => body[k] !== undefined)) || undefined);
+  // Stejný strop jako při založení podniku (80 znaků): název jde do hlaviček,
+  // přepínače podniků, správy platformy i e-mailů s pozvánkou, takže dlouhý
+  // řetězec z API by se tam roznesl celý.
+  const novyNazev = typeof name === 'string' ? name.trim().slice(0, 80) : '';
+  if (novyNazev) await sql`UPDATE teams SET name = ${novyNazev} WHERE id = ${team.id}`;
   if (typeof payDailyCash === 'boolean') await sql`UPDATE teams SET pay_daily_cash = ${payDailyCash} WHERE id = ${team.id}`;
   if (body.drawerFloat !== undefined) {
     const df = body.drawerFloat === null || body.drawerFloat === '' ? null : Math.max(0, Math.round(Number(body.drawerFloat)) || 0) || null;

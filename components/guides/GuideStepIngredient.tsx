@@ -8,6 +8,7 @@
 
 import { useState } from 'react';
 import { Icon } from '../Icons';
+import { usePrice } from '../CurrencyProvider';
 import type { GuideStep } from '@/lib/guideSteps';
 import NewIngredientInline from '../inventory/NewIngredientInline';
 
@@ -34,6 +35,7 @@ export default function GuideStepIngredient({ step, items, categories, onChange,
   onChange: (patch: Partial<GuideStep>) => void;
   onItemCreated: (item: any) => void;
 }) {
+  const cena = usePrice();
   const [creating, setCreating] = useState(false);
   const item = items.find(i => String(i.id) === String(step.itemId));
   const units = UNIT_SETS[familyOf(item)];
@@ -102,7 +104,7 @@ export default function GuideStepIngredient({ step, items, categories, onChange,
       {item && Number(item.packageSize) > 0 && (
         <p className="t-meta">
           Balení {Number(item.packageSize).toLocaleString('cs-CZ')} {item.contentUnit ?? item.unit}
-          {Number(item.unitCost) > 0 ? ` · ${item.unitCost} Kč` : ' · cena chybí'}
+          {Number(item.unitCost) > 0 ? ` · ${cena(Number(item.unitCost))}` : ' · cena chybí'}
         </p>
       )}
     </div>

@@ -1,4 +1,6 @@
 // "Mám zájem o Pro" — records demand while real billing doesn't exist yet.
+// Od spuštění plateb ho žádná obrazovka nevolá. Smazat jde po dalším buildu
+// (.next/types na něj odkazuje, dokud se nepřegeneruje).
 import { NextResponse } from 'next/server';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { neon } from '@neondatabase/serverless';
@@ -19,6 +21,6 @@ export async function POST() {
     if (!dup) await sql`INSERT INTO billing_interest (team_id, user_id) VALUES (${u.team_id}, ${meId})`;
     return NextResponse.json({ ok: true });
   } catch {
-    return NextResponse.json({ error: 'Zatím nedostupné — spusť /api/init.' }, { status: 400 });
+    return NextResponse.json({ error: 'Zatím nedostupné, zkuste to za chvíli.' }, { status: 400 });
   }
 }

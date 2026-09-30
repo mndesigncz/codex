@@ -28,11 +28,11 @@ import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useOpravneni } from '../role/useOpravneni';
 import { ObdobiStrankyDochazky, obnovDochazku } from '../widgety/oblasti/dochazka';
-import { dbTimeHM, parseDbTime, pragueDayOf } from '@/lib/pragueTime';
+import { dbTimeHM, parseDbTime, pragueDayOf, pragueToday } from '@/lib/pragueTime';
 import { earnedFor } from '@/lib/wages';
 import { apiMessage, okJson } from '@/lib/api';
 import { obsahuje } from '@/lib/hledani';
-import { hodinyMinuty, rozeberZaznam, sazbyZRosteru, type ClenRosteru, type ZaznamDochazky } from '@/lib/dochazkaPrehled';
+import { hodinyMinuty, konecSmeny, navrhOdchodu, rozeberZaznam, sazbyZRosteru, type ClenRosteru, type ZaznamDochazky } from '@/lib/dochazkaPrehled';
 
 type Zaznam = ZaznamDochazky & { id: number | string; employeeId: number | string };
 interface Data { roster: ClenRosteru[]; entries: Zaznam[] }
@@ -117,12 +117,26 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
   }, [zobrazene]);
 
   // ---- Úprava a ukončení ----
-  const [uprava, setUprava] = useState<{ e: Zaznam; od: string; do: string } | null>(null);
+  const [uprava, setUprava] = useState<{ e: Zaznam; od: string; do: string; zPlanu?: boolean } | null>(null);
   const [ukladam, setUkladam] = useState(false);
   const [chybaUpravy, setChybaUpravy] = useState<string | null>(null);
+  // „Ukončit" zapomenutého odchodu nesmí předvyplnit teď: kdo odešel v 16:00 a vedoucí
+  // to zavírá v 19:00, dostal by tři hodiny navíc ve mzdě. Stejně jako widgety
+  // Právě na směně a Otevřené příchody navrhne plánovaný konec směny; bez plánu
+  // (nebo u staršího dne, kam dnešní plán nepatří) teď.
   const otevriUpravu = (e: Zaznam, ukoncit = false) => {
     setChybaUpravy(null);
-    setUprava({ e, od: doVstupu(e.clockIn), do: ukoncit ? doVstupu(new Date()) : doVstupu(e.clockOut) });
+    let odchod = doVstupu(e.clockOut);
+    let zPlanu = false;
+    if (ukoncit) {
+      const od = parseDbTime(e.clockIn);
+      const clen = roster.find(m => String(m.id) === String(e.employeeId));
+      const konec = konecSmeny(pragueToday(), clen?.shiftStart, clen?.shiftEnd);
+      const n = od ? navrhOdchodu(od, konec, Date.now()) : null;
+      odchod = doVstupu(n?.cas ?? new Date());
+      zPlanu = !!n?.zPlanu;
+    }
+    setUprava({ e, od: doVstupu(e.clockIn), do: odchod, zPlanu });
   };
   const ulozUpravu = async () => {
     if (!uprava) return;
@@ -341,7 +355,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
             <Field id="dochazka-uprava-od" label="Příchod">
               <Input id="dochazka-uprava-od" type="datetime-local" value={uprava.od} onChange={e => setUprava(u => (u ? { ...u, od: e.target.value } : u))} />
             </Field>
-            <Field id="dochazka-uprava-do" label="Odchod" hint="Prázdné pole = pořád na směně." error={chybaUpravy}>
+            <Field id="dochazka-uprava-do" label="Odchod" hint={uprava.zPlanu ? 'Předvyplněný je plánovaný konec směny. Uprav ho, jestli odešel jindy.' : 'Prázdné pole = pořád na směně.'} error={chybaUpravy}>
               <Input id="dochazka-uprava-do" type="datetime-local" value={uprava.do} onChange={e => setUprava(u => (u ? { ...u, do: e.target.value } : u))} />
             </Field>
           </div>

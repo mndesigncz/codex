@@ -17,9 +17,11 @@ import { Icon } from '../Icons';
 import { PersonLink } from './ProfileLinkProvider';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 import {
-  Closing, expectedCash, expectedCashLines, cashDifference, cashLeft,
+  Closing, expectedCash, expectedCashLines, cashLeft,
   movementLabel, diffReasonLabel, hasDenominations, MOVEMENT_KINDS,
 } from '@/lib/closing';
+import { rozdilUzaverky, maSkrytouTrzbu } from '@/lib/uzaverkyPrehled';
+import { okJson, apiMessage } from '@/lib/api';
 import { dbTimeHM, dbTimeDayHM } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
 import { openPrint, esc } from '@/lib/printDoc';
@@ -35,6 +37,8 @@ interface Detail {
     approved?: boolean; covered_by?: number | null; approvedByName?: string | null;
     approved_by?: number | null; review_note?: string | null; shift_date?: string | null;
     event_title?: string | null; tips_card?: number | null;
+    /** Server cizí uzávěrce roli bez finance.trzby smaže tržbu, spropitné a stav kasy. */
+    trzbaSkryta?: boolean;
   };
   crew: Person[];
   covered: { id: number; employeeId: number; name: string | null; avatar: string | null; selfPayout: number }[];
@@ -134,9 +138,13 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
       ? d.missingRequired
       : (d.missingProcedures ?? []).map((nazev, i) => ({ typ: 'postup' as const, id: -1 - i, nazev, ikona: null, kdo: null })))
     : [];
-  const diff = c ? cashDifference(c) : 0;
-  const lines = c ? expectedCashLines(c, { payoutLabel: 'Výplata zaměstnance' }) : [];
-  const cashTips = c ? Math.max(0, (c.tips ?? 0) - (Number(c.tips_card) || 0)) : 0;
+  // Bez finance.trzby server tržbová pole maže. Počítat z nich rozdíl kasy by dalo
+  // NaN → „Manko 0 Kč" a vedení by schvalovalo podle falešného manka; proto se
+  // rozdíl, očekávaná kasa i celé peněžní řádky u skryté uzávěrky vůbec nekreslí.
+  const skryta = !!c && maSkrytouTrzbu(c);
+  const diff = c && !skryta ? (rozdilUzaverky({ ...c, covered_by: null }) ?? 0) : 0;
+  const lines = c && !skryta ? expectedCashLines(c, { payoutLabel: 'Výplata zaměstnance' }) : [];
+  const cashTips = c && !skryta ? Math.max(0, (c.tips ?? 0) - (Number(c.tips_card) || 0)) : 0;
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
@@ -154,15 +162,16 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
     if (!c) return;
     const row = (label: string, val: string, strong = false) =>
       `<tr><td>${esc(label)}</td><td class="num"${strong ? ' style="font-weight:700"' : ''}>${esc(val)}</td></tr>`;
+    // Skrytá tržba se netiskne ani jako nula — papír by lhal stejně jako obrazovka.
     const body = `<table><tbody>
-        ${lines.map(l => row(l.label, `${l.sign < 0 ? '− ' : '+ '}${money(l.amount)}`)).join('')}
-        ${row('Očekávaný stav kasy', money(expectedCash(c)), true)}
-        ${row('Skutečný stav kasy', money(c.closing_cash), true)}
-        ${row(diff === 0 ? 'Kasa sedí' : diff > 0 ? 'Přebytek' : 'Manko', (diff > 0 ? '+' : '') + money(diff), true)}
-        ${Number(c.final_removal) ? row('Odvod na konci směny', '− ' + money(Number(c.final_removal))) + row('Zůstalo v kase', money(cashLeft(c))) : ''}
-        ${row('Tržba kartou', money(c.card_revenue))}
-        ${row('Spropitné hotově', money(cashTips))}
-        ${row('Spropitné kartou', money(Number(c.tips_card) || 0))}
+        ${skryta ? '' : lines.map(l => row(l.label, `${l.sign < 0 ? '− ' : '+ '}${money(l.amount)}`)).join('')}
+        ${skryta ? '' : row('Očekávaný stav kasy', money(expectedCash(c)), true)}
+        ${skryta ? '' : row('Skutečný stav kasy', money(c.closing_cash), true)}
+        ${skryta ? '' : row(diff === 0 ? 'Kasa sedí' : diff > 0 ? 'Přebytek' : 'Manko', (diff > 0 ? '+' : '') + money(diff), true)}
+        ${skryta ? '' : Number(c.final_removal) ? row('Odvod na konci směny', '− ' + money(Number(c.final_removal))) + row('Zůstalo v kase', money(cashLeft(c))) : ''}
+        ${skryta ? '' : row('Tržba kartou', money(c.card_revenue))}
+        ${skryta ? '' : row('Spropitné hotově', money(cashTips))}
+        ${skryta ? '' : row('Spropitné kartou', money(Number(c.tips_card) || 0))}
         ${row('Zákazníků', String(c.customers))}
         ${d?.pos ? row('Pokladna — hotovost', money(d.pos.cash)) + row('Pokladna — karta', money(d.pos.card)) : ''}
       </tbody></table>
@@ -186,6 +195,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
   const remove = async () => {
     if (!c) return;
     setBusy(true);
+    setErr(null);
     try {
       const res = await fetch(`/api/closings/${id}`, { method: 'DELETE' });
       if (!res.ok) { setErr('Uzávěrku se nepodařilo smazat.'); return; }
@@ -194,12 +204,17 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
     } finally { setBusy(false); }
   };
 
+  // Bez kontroly odpovědi tlačítko po 403 nebo 400 „chybí migrace" jen přestalo
+  // se točit a uzávěrka dál „čekala na schválení" bez jediného slova.
   const approve = async () => {
     setBusy(true);
+    setErr(null);
     try {
-      await fetch(`/api/closings/${id}`, { method: 'PATCH' });
+      await okJson(await fetch(`/api/closings/${id}`, { method: 'PATCH' }));
       await load();
       onChanged?.();
+    } catch (e) {
+      setErr(apiMessage(e, 'Uzávěrku se nepodařilo schválit.'));
     } finally { setBusy(false); }
   };
 
@@ -224,7 +239,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap min-w-0">
-            {c && !c.covered_by && (
+            {c && !c.covered_by && !skryta && (
               // Stav rozdílu jako Chip (tóny ze stavových tokenů, i v tmavém režimu) —
               // dřív ručně psaná pilulka s hexy mimo tokeny.
               <Chip tone={diff === 0 ? 'ok' : diff > 0 ? 'info' : 'bad'} className="tabular-nums">
@@ -239,7 +254,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
         </div>
 
         <div className="flex-1 overflow-y-auto scrollbar-thin px-5 sm:px-6 py-5 divide-y divide-black/[0.06]">
-          {err && <p className="text-sm text-bad-ink py-4">{err}</p>}
+          {err && !d && <p className="text-sm text-bad-ink py-4">{err}</p>}
           {!d && !err && <p className="text-sm text-black/40 py-8 text-center">Načítám…</p>}
 
           {d && c && (
@@ -249,9 +264,9 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
               <Section title="Vyplněná čísla">
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-5">
                   <Row label="Kasa na začátku" value={money(c.opening_cash)} />
-                  <Row label="Tržba hotově" value={money(c.cash_revenue)} />
-                  <Row label="Tržba kartou" value={money(c.card_revenue)} />
-                  {Array.isArray((c as any).event_breakdown) && (c as any).event_breakdown.length > 0 && (
+                  {!skryta && <Row label="Tržba hotově" value={money(c.cash_revenue)} />}
+                  {!skryta && <Row label="Tržba kartou" value={money(c.card_revenue)} />}
+                  {!skryta && Array.isArray((c as any).event_breakdown) && (c as any).event_breakdown.length > 0 && (
                     // „Podřadná uzávěrka" akce: kolik z denní tržby spadlo do
                     // okna akce (z účtenek pokladny). Jen rozpis, nic se nemění.
                     <div className="rounded-xl bg-[#0A84FF]/[0.06] border border-[#0A84FF]/20 px-3 py-2 my-1.5 space-y-1">
@@ -264,8 +279,8 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
                       ))}
                     </div>
                   )}
-                  <Row label="Spropitné hotově" value={money(cashTips)} />
-                  <Row label="Spropitné kartou" value={money(Number(c.tips_card) || 0)} />
+                  {!skryta && <Row label="Spropitné hotově" value={money(cashTips)} />}
+                  {!skryta && <Row label="Spropitné kartou" value={money(Number(c.tips_card) || 0)} />}
                   <Row label="Výdaje z kasy" value={money(c.expenses)} />
                   <Row label="Odloženo ven" value={money(c.cash_removed)} />
                   {payDailyCash && <Row label="Výplata zaměstnance" value={money(c.self_payout)} />}
@@ -276,10 +291,16 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
                     <Row label={`Mzda za směnu (${hodinyMinuty(Number((c as any).worked_ms))} × ${Number((c as any).wage_rate) || 0} ${symbol}/h)`}
                       value={money(Number((c as any).wage_earned) || 0)} />
                   )}
-                  <Row label="Kasa na konci" value={money(c.closing_cash)} />
+                  {!skryta && <Row label="Kasa na konci" value={money(c.closing_cash)} />}
                   {(Number(c.final_removal) || 0) > 0 && <Row label="Odvod na konci" value={money(Number(c.final_removal))} />}
                   <Row label="Zákazníků" value={String(c.customers)} />
                 </div>
+                {skryta && (
+                  // Prázdné místo by vypadalo jako „nic nevyplnil" — vedení má vědět, že je to záměr.
+                  <p className="note note-wait mt-3 cz-sentence" role="note">
+                    Tržbu, spropitné a stav kasy tahle role u cizí uzávěrky nevidí (chybí oprávnění Tržby). Rozdíl kasy se proto nepočítá.
+                  </p>
+                )}
                 {/* Dva přepínače, které mění výpočet. Když nejsou vidět, vypadá
                     očekávaná kasa jako záhada. */}
                 <div className="flex flex-wrap gap-1.5 mt-3">
@@ -302,7 +323,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
                 </div>
               </Section>
 
-              {!c.covered_by && (
+              {!c.covered_by && !skryta && (
                 <Section title="Jak vyšla kasa" hint="Řádek po řádku, v pořadí, jak se peníze pohnuly.">
                   <div className="well border border-black/[0.07] px-4 py-2">
                     {lines.map(l => (
@@ -352,7 +373,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
                     )}
                   </div>
                 ) : (
-                  <p className="text-sm text-black/45">Bez dat z pokladny.</p>
+                  <p className="text-sm text-black/45">{skryta ? 'Porovnání s pokladnou vidí jen role s oprávněním Tržby.' : 'Bez dat z pokladny.'}</p>
                 )}
                 {(d.notes?.length ?? 0) > 0 && (
                   <ul className="mt-3 space-y-1.5">
@@ -591,6 +612,9 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
           )}
         </div>
 
+        {err && d && (
+          <p className="note note-danger mx-5 sm:mx-6 mb-3 cz-sentence" role="alert">{err}</p>
+        )}
         {printFailed && (
           <p className="note note-wait mx-5 sm:mx-6 mb-3 cz-sentence">
             Tiskové okno prohlížeč zablokoval. Povol vyskakovací okna pro tuhle stránku a zkus to znovu.

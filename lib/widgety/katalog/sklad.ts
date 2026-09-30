@@ -45,6 +45,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
       { klic: 'vyroba', typ: 'prepinac', nazev: 'Včetně vlastní výroby', vychozi: false },
     ],
     kostra: { S: 'cislo', M: 'seznam', L: 'seznam' },
+    cil: { pohled: 'inventory' },
     stav: 'hotovo',
   },
   // Data: GET /api/inventory →
@@ -81,6 +82,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
       },
       { klic: 'jen_kriticke', nazev: 'Jen kriticky málo', typ: 'prepinac', vychozi: false },
     ],
+    cil: { pohled: 'inventory' },
     stav: 'hotovo',
   },
   // Data: GET /api/finance?month → summary.stockValue (finance.zobrazit); nebo GET /api/inventory → Σ quantity ×
@@ -100,6 +102,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['vedeni.sklad', 'vedeni.finance'],
     opravneni: { vse: [], nektere: ['sklad.ceny', 'finance.zobrazit'] },
     tarif: 'zdarma',
+    cil: { pohled: 'inventory' },
     stav: 'hotovo',
   },
   // Data: GET /api/inventory →
@@ -120,6 +123,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
       pole: { 'akce:schvalit': 'sklad.schvalovat', 'akce:zamitnout': 'sklad.schvalovat' },
     },
     tarif: 'zdarma',
+    cil: { pohled: 'inventory' },
     stav: 'hotovo',
   },
   // Data: GET /api/inventory/reports → reports[{items,note,status,author_name,created_at}]
@@ -135,6 +139,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['vedeni.sklad'],
     opravneni: { vse: ['sklad.hlaseni_vyridit'], nektere: [] },
     tarif: 'zdarma',
+    cil: { pohled: 'inventory' },
     stav: 'hotovo',
   },
   // Data: GET /api/orders → orders[{supplier,items[],status,createdAt,receivedAt,totalCost}]
@@ -156,6 +161,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
       pole: { totalcost: 'sklad.ceny', 'pole:cena_prijmu': 'sklad.ceny_upravit', 'akce:prijmout_zrusit': 'nakup.prijmout', 'akce:smazat_historii': 'nakup.prijmout' },
     },
     tarif: 'zdarma',
+    cil: { pohled: 'inventory' },
     stav: 'hotovo',
   },
   // Data: GET /api/production → toMake[]; POST /api/inventory/{id}/produce
@@ -180,6 +186,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     ],
     opravneni: { vse: ['vyroba.vyrabet'], nektere: [] },
     tarif: 'max',
+    cil: { pohled: 'inventory' },
     stav: 'hotovo',
   },
   // Data: GET /api/inventory → [{unitCost,packageSize}]; GET /api/pos/usage →
@@ -202,6 +209,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
       pole: { 'akce:doplnit': ['sklad.upravit', 'sklad.ceny_upravit'] },
     },
     tarif: 'max',
+    cil: { pohled: 'inventory' },
     stav: 'hotovo',
   },
   // Data: GET /api/inventory/log → [{itemName,oldQuantity,newQuantity,oldOpen,newOpen,note,userName,createdAt}]
@@ -230,6 +238,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'vse',
       },
     ],
+    cil: { pohled: 'inventory' },
     stav: 'hotovo',
   },
   // Data: GET /api/stocktake → open{data[],createdAt}, history[{completedAt}]
@@ -249,6 +258,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
       pole: { 'akce:zahajit_zrusit': 'inventura.spravovat', 'akce:dokoncit': 'inventura.dokoncit' },
     },
     tarif: 'zdarma',
+    cil: { pohled: 'inventory' },
     stav: 'hotovo',
   },
   // Data: POST /api/inventory (NewStockEntry)
@@ -306,6 +316,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         napoveda: 'Bez vybrané kategorie widget nic neukáže.',
       },
     ],
+    cil: { pohled: 'inventory' },
     stav: 'hotovo',
   },
 ];

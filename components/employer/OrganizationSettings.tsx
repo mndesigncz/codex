@@ -46,14 +46,28 @@ export default function OrganizationSettings() {
 
   /** Změna, která něco vypíná nebo slučuje — čeká na potvrzení v okně. */
   const [potvrdit, setPotvrdit] = useState<{ veta: string; patch: Partial<NastaveniOrganizace> } | null>(null);
+  // Výpadek načtení není „podnik není v organizaci“: karta dřív při chybě tiše
+  // zmizela a majitel řetězce nepoznal, že sekce existuje, jen se nenačetla.
+  const [chyba, setChyba] = useState(false);
+  const [pokus, setPokus] = useState(0);
   useEffect(() => {
     let alive = true;
+    setChyba(false);
     fetch('/api/organization').then(okJson)
       .then(d => { if (alive) { setOrg(d?.organization ?? null); setNacteno(true); } })
-      .catch(() => { if (alive) setNacteno(true); });
+      .catch(() => { if (alive) { setChyba(true); setNacteno(true); } });
     return () => { alive = false; };
-  }, []);
+  }, [pokus]);
 
+  if (chyba) {
+    return (
+      <Card>
+        <p className="text-sm font-semibold text-[#16181A]">Organizace se nenačetla</p>
+        <p className="t-meta mt-1">Nejspíš vypadlo připojení. Nastavení je v pořádku — zkuste to znovu.</p>
+        <div className="mt-3"><Button variant="secondary" size="sm" icon="refresh" onClick={() => setPokus(n => n + 1)}>Zkusit znovu</Button></div>
+      </Card>
+    );
+  }
   if (!nacteno || !org) return null;
 
   const nazevPodniku = (id: number) => org.teams.find(t => t.id === id)?.name ?? `Podnik ${id}`;

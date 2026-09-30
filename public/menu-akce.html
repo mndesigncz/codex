@@ -427,6 +427,9 @@ function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt
 /* česká typografie — jednopísmenné předložky a spojky se nesmí lámat na konec řádku */
 function cz(s){ return esc(s).replace(/(^|[\s(])([aikosuvzAIKOSUVZ])\s+/g, '$1$2\u00A0'); }
 
+/* cena s haléři jen tam, kde je má: 4,50 (ne 4.5 ani 5), ale 49 zůstane 49 */
+function cena(n){ n = Number(n) || 0; return Number.isInteger(n) ? String(n) : n.toFixed(2).replace('.', ','); }
+
 function render(){
   $('eyebrow').textContent = MENU.eyebrow || '';
   $('title').textContent   = MENU.title || '';
@@ -448,7 +451,7 @@ function render(){
         '<div class="row">' +
           '<span class="name">' + cz(p.name) + '</span>' +
           '<span class="dots" aria-hidden="true"></span>' +
-          '<span class="price">' + p.price + '<small>' + esc(MENU.mena) + '</small></span>' +
+          '<span class="price">' + cena(p.price) + '<small>' + esc(MENU.mena) + '</small></span>' +
         '</div>' +
         (p.desc ? '<p class="desc">' + cz(p.desc) + '</p>' : '') +
       '</li>';

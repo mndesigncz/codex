@@ -142,6 +142,14 @@ export interface DefiniceWidgetu {
   kostra?: Partial<Record<Velikost, Kostra>>;
   /** Widget peněz: smí být jedinou inkoustovou plochou stránky (DP §2.10). */
   muzeInkoust?: boolean;
+  /**
+   * Kam vede klepnutí na kartu v klidu: pohled layoutu (a případný argument),
+   * odkud jsou data widgetu. Vyplňuje se jen u widgetů, které ukazují data
+   * z jiné sekce; bez `cil` karta na klepnutí nereaguje. Divák bez práva na
+   * pohled (smiPohled) žádný proklik nedostane — stejné pravidlo jako
+   * u `odkaz` v obalu widgetu.
+   */
+  cil?: { pohled: string; arg?: string };
   /** planovany = komponenta ještě není; nikde se nekreslí ani nenabízí. */
   stav: 'hotovo' | 'planovany';
 }

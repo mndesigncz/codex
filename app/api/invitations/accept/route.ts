@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { neon } from '@neondatabase/serverless';
+import { normalizujEmail } from '@/lib/emailAdresa';
 import { planInfoOf, PLAN_ENFORCED, canAddMember } from '@/lib/plan';
 import { linkNewMember } from '@/lib/chat';
 import { notifyUser, notifyUsers } from '@/lib/push';
@@ -62,7 +63,7 @@ export async function POST(request: Request) {
     // znovu (e-mail je unikátní) a nevrací se 409. Přesně tohle je majitel
     // druhé kavárny nebo barista, který jezdí mezi pobočkami. Heslo se
     // ověřuje, aby pozvánka v cizí schránce nešla přijmout za někoho jiného.
-    const [existing] = await sql`SELECT id, name, password_hash FROM users WHERE email = ${inv.email}`;
+    const [existing] = await sql`SELECT id, name, password_hash FROM users WHERE lower(email) = ${normalizujEmail(inv.email)} ORDER BY id LIMIT 1`;
     if (existing) {
       const ok = await bcrypt.compare(password, String(existing.password_hash ?? ''));
       if (!ok) return NextResponse.json({ error: 'Účet s tímhle e-mailem už existuje — zadej jeho heslo.' }, { status: 409 });
@@ -105,7 +106,7 @@ export async function POST(request: Request) {
     }
     const [user] = await sql`
       INSERT INTO users (name, email, password_hash, role, avatar, job_title, team_id, employer_id)
-      VALUES (${name}, ${inv.email}, ${passwordHash}, ${newRole}, '👤', ${inv.job_title || 'Barista'}, ${team.id}, ${team.owner_id})
+      VALUES (${name}, ${normalizujEmail(inv.email)}, ${passwordHash}, ${newRole}, '👤', ${inv.job_title || 'Barista'}, ${team.id}, ${team.owner_id})
       RETURNING id, name, email, role`;
 
     await sql`UPDATE invitations SET status = 'accepted' WHERE id = ${inv.id}`;

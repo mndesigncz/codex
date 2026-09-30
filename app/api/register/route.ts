@@ -4,6 +4,7 @@ import { neon } from '@neondatabase/serverless';
 import { generateJoinCode } from '@/lib/team';
 import { hit } from '@/lib/rateLimit';
 import { klientIp } from '@/lib/klientIp';
+import { normalizujEmail, vypadaJakoEmail } from '@/lib/emailAdresa';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +12,11 @@ export const dynamic = 'force-dynamic';
 // a join code (/api/teams/join) or an email invitation (/api/invitations/accept).
 export async function POST(request: Request) {
   try {
-    const { name, email, password, teamName, ref } = await request.json();
+    const b = await request.json();
+    const { name, password, teamName, ref } = b;
+    // E-mail se ukládá oříznutý a malými písmeny: mobilní klávesnice napíše
+    // „Jan@firma.cz" a při přihlášení pak „jan@firma.cz" účet nenašlo.
+    const email = normalizujEmail(b.email);
 
     if (!name || !email || !password) {
       return NextResponse.json({ error: 'Všechna pole jsou povinná' }, { status: 400 });
@@ -23,24 +28,37 @@ export async function POST(request: Request) {
     if (!gate.ok) {
       return NextResponse.json({ error: `Příliš mnoho registrací z této sítě. Zkus to znovu za ${Math.ceil(gate.retryAfter / 60)} min.` }, { status: 429, headers: { 'Retry-After': String(gate.retryAfter) } });
     }
-    if (password.length < 8) {
+    if (!vypadaJakoEmail(email)) {
+      return NextResponse.json({ error: 'E-mail nevypadá správně.' }, { status: 400 });
+    }
+    if (typeof password !== 'string' || password.length < 8) {
       return NextResponse.json({ error: 'Heslo musí mít alespoň 8 znaků' }, { status: 400 });
     }
 
     const sql = neon(process.env.DATABASE_URL!);
 
-    const existing = await sql`SELECT id FROM users WHERE email = ${email}`;
+    // Hledá se bez ohledu na velikost písmen, ať se neobejde ani účet, který
+    // vznikl dřív než sjednocení e-mailů.
+    const existing = await sql`SELECT id FROM users WHERE lower(email) = ${email} LIMIT 1`;
     if (existing.length > 0) {
       return NextResponse.json({ error: 'Tento email je již zaregistrován' }, { status: 409 });
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
 
-    // Create the employer account
-    const [user] = await sql`
-      INSERT INTO users (name, email, password_hash, role, avatar, job_title)
-      VALUES (${name}, ${email}, ${passwordHash}, 'employer', '👔', 'Provozovatel')
-      RETURNING id, name, email, role`;
+    // Create the employer account. Dvě souběžné registrace téhož e-mailu
+    // projdou kontrolou výš obě; unikát v databázi rozhodne a druhá dostane
+    // srozumitelné 409 místo pětistovky.
+    let user: any;
+    try {
+      [user] = await sql`
+        INSERT INTO users (name, email, password_hash, role, avatar, job_title)
+        VALUES (${name}, ${email}, ${passwordHash}, 'employer', '👔', 'Provozovatel')
+        RETURNING id, name, email, role`;
+    } catch (e: any) {
+      if (e?.code === '23505') return NextResponse.json({ error: 'Tento email je již zaregistrován' }, { status: 409 });
+      throw e;
+    }
 
     // Create their team with a unique join code
     let joinCode = generateJoinCode();

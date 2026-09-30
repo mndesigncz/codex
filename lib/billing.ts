@@ -11,6 +11,12 @@
 // ne návrat z pokladny. Denní cron stav dorovná, kdyby webhook nedošel.
 // Ceny se hledají podle lookup_key (pro_monthly…), takže sandbox i živý
 // účet fungují bez ID v env — stačí STRIPE_SECRET_KEY a STRIPE_WEBHOOK_SECRET.
+//
+// Sandbox a živý účet Stripe jsou dva oddělené světy: jiní zákazníci, jiná
+// předplatná. U podniku se proto s ID ukládá i režim (`teams.stripe_mode`,
+// z prefixu klíče) a ID z jiného režimu se nikdy neposílá do Stripe — po
+// přepnutí na živé klíče by checkout padal na „No such customer". Rozhodnutí
+// jsou v billingPravidla.ts (čistá, s testy), tady je jejich provedení.
 
 import Stripe from 'stripe';
 import { clenoveSOpravnenim } from './opravneniDb';
@@ -20,6 +26,10 @@ import { generateJoinCode } from './team';
 import { notifyUsers } from './push';
 import { audit } from './audit';
 import { pragueToday } from './pragueTime';
+import {
+  rezimZKlice, rezimZLivemode, rozhodniOZdroji, jeChybejiciZdroj, jeChybejiciZakaznik, jeSmazanyZakaznik,
+  udalostPatriDoRezimu, vyhodnotPredplatne, nabidnoutTrial, jeZivyStav, ulozenyRezim, type StripeRezim,
+} from './billingPravidla';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -37,6 +47,10 @@ export function stripe(): Stripe | null {
   if (!key) return null;
   if (!client) client = new Stripe(key, { typescript: true });
   return client;
+}
+/** V jakém režimu Stripe aplikace běží (podle klíče); `null` = neznámý formát klíče. */
+export function stripeRezim(): StripeRezim | null {
+  return rezimZKlice(process.env.STRIPE_SECRET_KEY);
 }
 export const NOT_CONFIGURED = 'Platby ještě nejsou nastavené (chybí STRIPE_SECRET_KEY).';
 
@@ -69,20 +83,110 @@ export function planOfPrice(price: Stripe.Price | null | undefined): { plan: Pai
 
 // ---- Tým ↔ zákazník ----
 async function teamRow(teamId: number) {
-  const [t] = await sql`
-    SELECT t.id, t.name, t.plan, t.stripe_customer_id, t.stripe_subscription_id, t.subscription_status,
-           t.subscription_interval, t.current_period_end, t.cancel_at_period_end, t.trial_end, t.max_offer_until,
-           t.had_subscription, t.referral_code, t.referred_by_team_id, t.referral_rewarded, t.trial_ends_at,
-           u.email AS owner_email, u.name AS owner_name
-    FROM teams t LEFT JOIN users u ON u.id = t.owner_id
-    WHERE t.id = ${teamId}`;
-  return t ?? null;
+  try {
+    const [t] = await sql`
+      SELECT t.id, t.name, t.plan, t.stripe_customer_id, t.stripe_subscription_id, t.stripe_mode, t.subscription_status,
+             t.subscription_interval, t.current_period_end, t.cancel_at_period_end, t.trial_end, t.max_offer_until,
+             t.had_subscription, t.referral_code, t.referred_by_team_id, t.referral_rewarded, t.trial_ends_at,
+             u.email AS owner_email, u.name AS owner_name
+      FROM teams t LEFT JOIN users u ON u.id = t.owner_id
+      WHERE t.id = ${teamId}`;
+    return t ?? null;
+  } catch {
+    // Před migrací (sloupec stripe_mode ještě není): platby jedou postaru,
+    // bez kontroly režimu, dokud neproběhne /api/init.
+    const [t] = await sql`
+      SELECT t.id, t.name, t.plan, t.stripe_customer_id, t.stripe_subscription_id, t.subscription_status,
+             t.subscription_interval, t.current_period_end, t.cancel_at_period_end, t.trial_end, t.max_offer_until,
+             t.had_subscription, t.referral_code, t.referred_by_team_id, t.referral_rewarded, t.trial_ends_at,
+             u.email AS owner_email, u.name AS owner_name
+      FROM teams t LEFT JOIN users u ON u.id = t.owner_id
+      WHERE t.id = ${teamId}`;
+    return t ? { ...t, stripe_mode: null } : null;
+  }
+}
+
+/** Zapíše režim, do kterého patří uložená ID. Před migrací tiše nic. */
+async function oznacRezim(teamId: number, rezim: StripeRezim | null) {
+  if (!rezim) return;
+  try { await sql`UPDATE teams SET stripe_mode = ${rezim} WHERE id = ${teamId}`; } catch { /* před migrací */ }
+}
+
+/**
+ * Vymaže z podniku předplatné, které Stripe (v tomhle režimu) nezná: buď je
+ * ze sandboxu a klíče se přepnuly na živé, nebo ho někdo smazal. Podnik se
+ * vrací na Zdarma — testovací platba nesmí dávat Pro za skutečné peníze.
+ * Zkušební doba se vrací jen když šlo o testovací předplatné a jedeme živě
+ * (sandbox nesmí spálit skutečný trial).
+ */
+async function odpojPredplatne(teamId: number, stareId: string, staryRezim: StripeRezim | null, duvod: string) {
+  const vratitTrial = rezimZKlice(process.env.STRIPE_SECRET_KEY) === 'live' && staryRezim !== 'live';
+  await sql`
+    UPDATE teams SET
+      plan = 'free',
+      stripe_subscription_id = NULL, subscription_status = NULL, subscription_interval = NULL,
+      subscription_price = NULL, current_period_end = NULL, cancel_at_period_end = FALSE, trial_end = NULL,
+      had_subscription = CASE WHEN ${vratitTrial} THEN FALSE ELSE had_subscription END,
+      max_offer_until = CASE WHEN ${vratitTrial} THEN NULL ELSE max_offer_until END,
+      billing_synced_at = NOW()
+    WHERE id = ${teamId} AND stripe_subscription_id = ${stareId}`;
+  audit(teamId, null, 'billing.subscription_reset', 'team', teamId, `Předplatné ${stareId} vymazáno: ${duvod}`);
+}
+
+/** Zapomene zákazníka, kterého Stripe (v tomhle režimu) nezná; nový se založí při nejbližším použití. */
+async function odpojZakaznika(teamId: number, stareId: string, duvod: string) {
+  await sql`UPDATE teams SET stripe_customer_id = NULL WHERE id = ${teamId} AND stripe_customer_id = ${stareId}`;
+  audit(teamId, null, 'billing.customer_reset', 'team', teamId, `Zákazník ${stareId} zapomenut: ${duvod}`);
+}
+
+/**
+ * Srovná uložená ID podniku s účtem Stripe, na kterém aplikace běží, a vrátí
+ * čerstvý řádek. ID z jiného režimu se zahodí (zákazník se založí znovu při
+ * použití), ID bez značky režimu se jednou ověří dotazem na Stripe a označí.
+ * Živé záznamy se z testovacího klíče nikdy nemažou — radši chyba.
+ */
+export async function srovnejSeStripe(teamId: number) {
+  const s = stripe(); if (!s) throw new Error(NOT_CONFIGURED);
+  let t = await teamRow(teamId);
+  if (!t) throw new Error('Tým nenalezen');
+  const rezim = stripeRezim();
+  if (!rezim) return t;
+  let zmena = false;
+
+  if (t.stripe_subscription_id) {
+    const r = rozhodniOZdroji({ id: t.stripe_subscription_id, ulozeny: t.stripe_mode, aktualni: rezim });
+    if (r === 'odmitnout') throw new Error('Podnik má živé předplatné, ale aplikace běží na testovacím klíči Stripe.');
+    if (r === 'nahradit') {
+      await odpojPredplatne(teamId, String(t.stripe_subscription_id), ulozenyRezim(t.stripe_mode), 'patří do jiného režimu Stripe'); zmena = true;
+    } else if (r === 'overit') {
+      try { await s.subscriptions.retrieve(String(t.stripe_subscription_id)); }
+      catch (e) {
+        if (!jeChybejiciZdroj(e)) throw e;
+        await odpojPredplatne(teamId, String(t.stripe_subscription_id), null, 've Stripe neexistuje'); zmena = true;
+      }
+    }
+  }
+  if (t.stripe_customer_id) {
+    const r = rozhodniOZdroji({ id: t.stripe_customer_id, ulozeny: t.stripe_mode, aktualni: rezim });
+    if (r === 'odmitnout') throw new Error('Podnik má živého zákazníka Stripe, ale aplikace běží na testovacím klíči.');
+    if (r === 'nahradit') {
+      await odpojZakaznika(teamId, String(t.stripe_customer_id), 'patří do jiného režimu Stripe'); zmena = true;
+    } else if (r === 'overit') {
+      let existuje = true;
+      try { existuje = !jeSmazanyZakaznik(await s.customers.retrieve(String(t.stripe_customer_id))); }
+      catch (e) { if (!jeChybejiciZdroj(e)) throw e; existuje = false; }
+      if (!existuje) { await odpojZakaznika(teamId, String(t.stripe_customer_id), 've Stripe neexistuje'); zmena = true; }
+    }
+  }
+  // Všechno, co v řádku zbylo, je ověřené pro tenhle režim.
+  if (t.stripe_mode !== rezim) { await oznacRezim(teamId, rezim); zmena = true; }
+  if (zmena) t = (await teamRow(teamId)) ?? t;
+  return t;
 }
 
 export async function ensureCustomer(teamId: number): Promise<string> {
   const s = stripe(); if (!s) throw new Error(NOT_CONFIGURED);
-  const t = await teamRow(teamId);
-  if (!t) throw new Error('Tým nenalezen');
+  const t = await srovnejSeStripe(teamId);
   if (t.stripe_customer_id) return String(t.stripe_customer_id);
   const c = await s.customers.create({
     name: String(t.name ?? `Podnik ${teamId}`),
@@ -90,8 +194,45 @@ export async function ensureCustomer(teamId: number): Promise<string> {
     metadata: { teamId: String(teamId), app: 'managero' },
     preferred_locales: ['cs'],
   });
-  await sql`UPDATE teams SET stripe_customer_id = ${c.id} WHERE id = ${teamId}`;
+  // Uloží se jen do prázdného místa: dvě souběžné pokladny by jinak každá
+  // založily zákazníka a jedna z nich by přepsala druhou.
+  const rezim = stripeRezim();
+  let zapsano: any[];
+  try {
+    zapsano = await sql`UPDATE teams SET stripe_customer_id = ${c.id}, stripe_mode = ${rezim} WHERE id = ${teamId} AND stripe_customer_id IS NULL RETURNING id`;
+  } catch {
+    zapsano = await sql`UPDATE teams SET stripe_customer_id = ${c.id} WHERE id = ${teamId} AND stripe_customer_id IS NULL RETURNING id`;
+  }
+  if (zapsano.length === 0) {
+    // Někdo byl rychlejší — použije se jeho zákazník a náš přebytečný se smaže.
+    try { await s.customers.del(c.id); } catch { /* osiřelý zákazník bez předplatného nevadí */ }
+    const znovu = await teamRow(teamId);
+    if (znovu?.stripe_customer_id) return String(znovu.stripe_customer_id);
+    throw new Error('Zákazníka Stripe se nepodařilo uložit.');
+  }
   return c.id;
+}
+
+/**
+ * Provede akci se zákazníkem Stripe. Když Stripe zákazníka přesto nezná
+ * („No such customer" — smazaný v dashboardu, jiný účet, kterého klíč jsme
+ * nepoznali), zapomene ho, založí nového a akci zopakuje jednou. Ostatní
+ * chyby (síť, limity, neplatná cena) se nezopakují: jinak by výpadek
+ * Stripe vedl k zakládání duplicitních zákazníků.
+ */
+async function sZakaznikem<T>(teamId: number, akce: (customer: string) => Promise<T>): Promise<T> {
+  const customer = await ensureCustomer(teamId);
+  try {
+    return await akce(customer);
+  } catch (e) {
+    if (!jeChybejiciZakaznik(e)) throw e;
+    const rezim = stripeRezim();
+    const t = await teamRow(teamId);
+    // Živého zákazníka testovací klíč nezahazuje (viz srovnejSeStripe).
+    if (rozhodniOZdroji({ id: customer, ulozeny: t?.stripe_mode, aktualni: rezim }) === 'odmitnout') throw e;
+    await odpojZakaznika(teamId, customer, 'Stripe ho nezná (resource_missing)');
+    return await akce(await ensureCustomer(teamId));
+  }
 }
 
 // ---- Checkout ----
@@ -101,16 +242,17 @@ export async function ensureCustomer(teamId: number): Promise<string> {
 export type CheckoutMode = 'hosted' | 'embedded';
 export async function createCheckout(teamId: number, plan: PaidPlan, interval: Interval, mode: CheckoutMode = 'hosted'): Promise<{ url?: string; clientSecret?: string }> {
   const s = stripe(); if (!s) throw new Error(NOT_CONFIGURED);
-  const t = await teamRow(teamId);
-  if (!t) throw new Error('Tým nenalezen');
-  if (t.stripe_subscription_id && ['active', 'trialing', 'past_due'].includes(String(t.subscription_status))) {
+  // Nejdřív srovnat s účtem Stripe: předplatné ze sandboxu nesmí po přepnutí
+  // na živé klíče blokovat pokladnu hláškou „podnik už předplatné má".
+  const t = await srovnejSeStripe(teamId);
+  if (t.stripe_subscription_id && jeZivyStav(t.subscription_status)) {
     throw new Error('Podnik už předplatné má — změny dělej přes „Spravovat předplatné“.');
   }
-  const customer = await ensureCustomer(teamId);
   const price = await priceFor(plan, interval);
   // Trial s kartou jen jednou na podnik — kdo už předplatné měl, platí hned.
-  const trial = !t.had_subscription && !t.stripe_subscription_id;
-  const session = await s.checkout.sessions.create({
+  // Stejné pravidlo používají texty v aplikaci (billingPravidla.nabidnoutTrial).
+  const trial = nabidnoutTrial({ hadSubscription: t.had_subscription, stripeSubscriptionId: t.stripe_subscription_id });
+  const session = await sZakaznikem(teamId, customer => s.checkout.sessions.create({
     mode: 'subscription',
     customer,
     client_reference_id: String(teamId),
@@ -136,12 +278,12 @@ export async function createCheckout(teamId: number, plan: PaidPlan, interval: I
       ui_mode: 'embedded_page' as const,
       // Zůstat v aplikaci; přesměruje se jen když to banka po 3D Secure vyžaduje.
       redirect_on_completion: 'if_required' as const,
-      return_url: `${appUrl()}/employer/overview?view=settings&billing=success`,
+      return_url: `${appUrl()}/employer/overview?view=settings&tab=billing&billing=success`,
     } : {
-      success_url: `${appUrl()}/employer/overview?view=settings&billing=success`,
-      cancel_url: `${appUrl()}/employer/overview?view=settings&billing=cancel`,
+      success_url: `${appUrl()}/employer/overview?view=settings&tab=billing&billing=success`,
+      cancel_url: `${appUrl()}/employer/overview?view=settings&tab=billing&billing=cancel`,
     }),
-  });
+  }));
   if (mode === 'embedded') {
     if (!session.client_secret) throw new Error('Stripe nevrátil klíč pokladny.');
     return { clientSecret: session.client_secret };
@@ -185,12 +327,11 @@ async function portalConfiguration(s: Stripe): Promise<string> {
 
 export async function createPortal(teamId: number): Promise<string> {
   const s = stripe(); if (!s) throw new Error(NOT_CONFIGURED);
-  const customer = await ensureCustomer(teamId);
   const configuration = await portalConfiguration(s);
-  const session = await s.billingPortal.sessions.create({
+  const session = await sZakaznikem(teamId, customer => s.billingPortal.sessions.create({
     customer, configuration, locale: 'cs',
-    return_url: `${appUrl()}/employer/overview?view=settings`,
-  });
+    return_url: `${appUrl()}/employer/overview?view=settings&tab=billing`,
+  }));
   return session.url;
 }
 
@@ -209,21 +350,29 @@ export async function applySubscription(sub: Stripe.Subscription): Promise<numbe
   const item = sub.items.data[0];
   const info = planOfPrice(item?.price);
   const status = sub.status;
-  const live = ['active', 'trialing', 'past_due'].includes(status);
-  // Novější předplatné vyhrává (portál umí založit nové, když staré doběhlo).
-  if (t.stripe_subscription_id && t.stripe_subscription_id !== sub.id && !live) return id;
+  // Rozhodnutí (nedokončená pokladna, starší předplatné, nabídka Max) jsou
+  // v billingPravidla.ts s testy.
+  const v = vyhodnotPredplatne({
+    status, planZCeny: info?.plan ?? null, ulozenyPlan: t.plan, ulozeneSubId: t.stripe_subscription_id,
+    subId: sub.id, nabidkaDo: t.max_offer_until,
+  });
+  if (v.akce === 'preskocit') return id;
+  if (v.live && !info) console.error('[billing] živé předplatné s neznámou cenou — podnik zůstane na Zdarma', sub.id, item?.price?.id);
 
   const periodEnd = item?.current_period_end ? new Date(item.current_period_end * 1000).toISOString()
     : (sub as any).current_period_end ? new Date((sub as any).current_period_end * 1000).toISOString() : null;
   const trialEnd = sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null;
-  const plan: PlanId = live && info ? info.plan : 'free';
   // Po koupi Pro běží 7 dní nabídka Max −30 % — jen jednou.
-  const startOffer = live && info?.plan === 'pro' && t.plan !== 'pro' && !t.max_offer_until;
-  const offerUntil = startOffer ? new Date(Date.now() + MAX_OFFER_DAYS * 86400000).toISOString() : null;
-  await sql`
+  const offerUntil = v.zacitNabidkuMax ? new Date(Date.now() + MAX_OFFER_DAYS * 86400000).toISOString() : null;
+  const rezim = rezimZLivemode(sub.livemode) ?? stripeRezim();
+  const live = v.live;
+  // Platí-li předplatné, zákazník je ten, na kterém běží (portál i faktury se
+  // hledají přes něj); u zrušeného zůstává uložený.
+  const zapis = (sloupecRezim: boolean) => sloupecRezim ? sql`
     UPDATE teams SET
-      plan = ${plan},
-      stripe_customer_id = COALESCE(stripe_customer_id, ${customer}),
+      plan = ${v.plan},
+      stripe_customer_id = CASE WHEN ${live} THEN ${customer} ELSE COALESCE(stripe_customer_id, ${customer}) END,
+      stripe_mode = ${rezim},
       stripe_subscription_id = ${live ? sub.id : null},
       subscription_status = ${status},
       subscription_interval = ${info?.interval ?? null},
@@ -231,11 +380,27 @@ export async function applySubscription(sub: Stripe.Subscription): Promise<numbe
       current_period_end = ${periodEnd},
       cancel_at_period_end = ${!!sub.cancel_at_period_end},
       trial_end = ${trialEnd},
-      had_subscription = TRUE,
+      had_subscription = COALESCE(had_subscription, FALSE) OR ${v.meloPredplatne},
+      trial_ends_at = NULL,
+      max_offer_until = COALESCE(${offerUntil}, max_offer_until),
+      billing_synced_at = NOW()
+    WHERE id = ${id}` : sql`
+    UPDATE teams SET
+      plan = ${v.plan},
+      stripe_customer_id = CASE WHEN ${live} THEN ${customer} ELSE COALESCE(stripe_customer_id, ${customer}) END,
+      stripe_subscription_id = ${live ? sub.id : null},
+      subscription_status = ${status},
+      subscription_interval = ${info?.interval ?? null},
+      subscription_price = ${item?.price?.lookup_key ?? null},
+      current_period_end = ${periodEnd},
+      cancel_at_period_end = ${!!sub.cancel_at_period_end},
+      trial_end = ${trialEnd},
+      had_subscription = COALESCE(had_subscription, FALSE) OR ${v.meloPredplatne},
       trial_ends_at = NULL,
       max_offer_until = COALESCE(${offerUntil}, max_offer_until),
       billing_synced_at = NOW()
     WHERE id = ${id}`;
+  try { await zapis(true); } catch { await zapis(false); /* před migrací: sloupec stripe_mode ještě není */ }
   return id;
 }
 
@@ -279,15 +444,36 @@ export async function rewardReferrer(referredTeamId: number, invoiceId: string):
     await notifyUsers(await employersOf(referrerId), {
       title: 'Měsíc zdarma za doporučení 🎉',
       body: `${t.name} začal platit — odečteme ti ${amount / 100} Kč z další faktury.`,
-      type: 'billing', link: '/employer/overview?view=settings',
+      type: 'billing', link: '/employer/overview?view=settings&tab=billing',
     });
   } catch { /* push best-effort */ }
   return true;
 }
 
 // ---- Události z webhooku ----
+/**
+ * Předplatné z události se nebere ze zprávy, ale znovu ze Stripe: události
+ * nechodí v pořadí (starší `updated` může dorazit po novějším) a zpráva
+ * nese stav z doby odeslání. Když ho Stripe nezná (smazané v sandboxu),
+ * platí zpráva; jiná chyba (síť) shodí zpracování a Stripe pošle událost znovu.
+ */
+async function cerstvePredplatne(s: Stripe, sub: Stripe.Subscription): Promise<Stripe.Subscription> {
+  try {
+    return await s.subscriptions.retrieve(sub.id);
+  } catch (e) {
+    if (jeChybejiciZdroj(e)) return sub;
+    throw e;
+  }
+}
+
 export async function handleEvent(event: Stripe.Event): Promise<void> {
   const s = stripe(); if (!s) return;
+  // Událost z druhého režimu (sandbox × živý) by dala podniku Pro za testovací
+  // platbu nebo naopak. Tiše se přeskočí — jako zpracovaná, ať ji Stripe neopakuje.
+  if (!udalostPatriDoRezimu(event.livemode, stripeRezim())) {
+    console.warn('[billing] událost z jiného režimu Stripe přeskočena', event.id, event.type);
+    return;
+  }
   switch (event.type) {
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session;
@@ -300,18 +486,23 @@ export async function handleEvent(event: Stripe.Event): Promise<void> {
     case 'customer.subscription.created':
     case 'customer.subscription.updated':
     case 'customer.subscription.deleted': {
-      await applySubscription(event.data.object as Stripe.Subscription);
+      await applySubscription(await cerstvePredplatne(s, event.data.object as Stripe.Subscription));
       break;
     }
     case 'customer.subscription.trial_will_end': {
-      const sub = event.data.object as Stripe.Subscription;
+      const sub = await cerstvePredplatne(s, event.data.object as Stripe.Subscription);
       const teamId = await applySubscription(sub);
       if (teamId) {
+        // Kdo předplatné během zkoušky zrušil, nic platit nebude — sdělení
+        // „strhne se první platba" by lhalo.
+        const zruseno = !!sub.cancel_at_period_end || sub.status !== 'trialing';
         try {
           await notifyUsers(await employersOf(teamId), {
             title: 'Zkušební období končí za 3 dny',
-            body: 'Potom se z karty strhne první platba. Změnit nebo zrušit jde v Nastavení → Předplatné.',
-            type: 'billing', link: '/employer/overview?view=settings',
+            body: zruseno
+              ? 'Předplatné máte zrušené, nic se nestrhne. Po skončení zkoušky se podnik vrátí na tarif Zdarma.'
+              : 'Potom se z karty strhne první platba. Změnit nebo zrušit jde v Nastavení → Předplatné.',
+            type: 'billing', link: '/employer/overview?view=settings&tab=billing',
           });
         } catch { /* ignore */ }
       }
@@ -339,7 +530,7 @@ export async function handleEvent(event: Stripe.Event): Promise<void> {
           await notifyUsers(await employersOf(Number(t.id)), {
             title: 'Platba předplatného se nezdařila',
             body: 'Stripe to zkusí znovu. Zkontroluj kartu v Nastavení → Předplatné → Spravovat předplatné.',
-            type: 'billing', link: '/employer/overview?view=settings',
+            type: 'billing', link: '/employer/overview?view=settings&tab=billing',
           });
         } catch { /* ignore */ }
       }
@@ -424,24 +615,46 @@ export async function billingStatus(teamId: number) {
 }
 
 // ---- Denní dorovnání se Stripe (kdyby webhook nedošel) ----
-export async function reconcile(limit = 40): Promise<{ checked: number }> {
-  const s = stripe(); if (!s) return { checked: 0 };
+export async function reconcile(limit = 40): Promise<{ checked: number; reset: number }> {
+  const s = stripe(); if (!s) return { checked: 0, reset: 0 };
+  const rezim = stripeRezim();
   let rows: any[] = [];
   try {
     rows = await sql`
-      SELECT id, stripe_subscription_id FROM teams
+      SELECT id, stripe_subscription_id, stripe_mode FROM teams
       WHERE stripe_subscription_id IS NOT NULL
       ORDER BY billing_synced_at ASC NULLS FIRST LIMIT ${limit}`;
-  } catch { return { checked: 0 }; }
-  let checked = 0;
-  for (const r of rows) {
+  } catch {
     try {
-      const sub = await s.subscriptions.retrieve(String(r.stripe_subscription_id));
+      rows = await sql`
+        SELECT id, stripe_subscription_id FROM teams
+        WHERE stripe_subscription_id IS NOT NULL
+        ORDER BY billing_synced_at ASC NULLS FIRST LIMIT ${limit}`;
+    } catch { return { checked: 0, reset: 0 }; }
+  }
+  let checked = 0, reset = 0;
+  for (const r of rows) {
+    const subId = String(r.stripe_subscription_id);
+    try {
+      const rozhodnuti = rozhodniOZdroji({ id: subId, ulozeny: r.stripe_mode, aktualni: rezim });
+      // Živé předplatné se z testovacího klíče nedotýkáme; jen se odloží na příště.
+      if (rozhodnuti === 'odmitnout') { await sql`UPDATE teams SET billing_synced_at = NOW() WHERE id = ${r.id}`; continue; }
+      // Předplatné z druhého režimu Stripe nemá smysl číst — nikdy tam nebylo.
+      if (rozhodnuti === 'nahradit') {
+        await odpojPredplatne(Number(r.id), subId, ulozenyRezim(r.stripe_mode), 'patří do jiného režimu Stripe');
+        reset++; continue;
+      }
+      const sub = await s.subscriptions.retrieve(subId);
       await applySubscription(sub);
       checked++;
-    } catch {
+    } catch (e) {
+      if (jeChybejiciZdroj(e)) {
+        // Stripe předplatné nezná (sandbox po vyčištění, ID z jiného účtu).
+        // Nechat podniku Pro napořád by byl dar zdarma.
+        try { await odpojPredplatne(Number(r.id), subId, null, 've Stripe neexistuje'); reset++; continue; } catch { /* níž */ }
+      }
       await sql`UPDATE teams SET billing_synced_at = NOW() WHERE id = ${r.id}`;
     }
   }
-  return { checked };
+  return { checked, reset };
 }

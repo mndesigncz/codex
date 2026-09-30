@@ -901,7 +901,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
       )}
       {/* Zámek nad formulářem, ne pod ním: co chybí, se člověk dozví dřív,
           než začne počítat, a karta v kartě se nedělá (DP §4 D). */}
-      <ZamekUzaverky stav={povinne} actingAs={isSelf ? null : (selEmployee ?? null)} proKoho={actorId}
+      <ZamekUzaverky stav={povinne} actingAs={isSelf ? null : (selEmployee ?? null)} naTabletu={isKiosk} proKoho={actorId}
         onZmena={povinneZmena} predOdchodem={ulozRozpracovane} pulz={pulzZamku} />
       {/* Výzva „Chybí ti uzávěrka" nad formulářem je od kola 69 widget
           uzaverky.moje_uzaverka; směny k vyplnění nabízí i první krok. */}

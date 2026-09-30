@@ -8,27 +8,14 @@ import { audit } from './audit';
 import { ensureProductionTasks } from './production';
 import { pragueToday, dayPlus } from './pragueTime';
 import { vedeniPodniku } from './tenant';
+import { odepsatProdej } from './packaging';
+import { sloupecJeDesetinny } from './cenaSloupce';
 
 const sql = neon(process.env.DATABASE_URL!);
 
 /** Kolik dní zpět se odepisují neprocesované účtenky — starší se nechají být,
  *  ať zapnutí receptury dnes neodepíše sklad za půl roku zpětně. */
 const WRITE_OFF_WINDOW_DAYS = 7;
-
-/** Odečet z načatého balení: nejdřív načaté, pak se načne nové, nikdy pod nulu. */
-function consume(qty: number, open: number, pkg: number, amount: number) {
-  if (pkg > 0) {
-    open -= amount;
-    while (open < 0 && qty > 0) { qty -= 1; open += pkg; }
-    if (open < 0) open = 0;
-    // Tři desetinná místa: 0,7 l minus 0,02 l musí zůstat 0,68 — zaokrouhlení
-    // na desetiny by podniku vracelo 0,02 l při každém drinku.
-    open = Math.round(open * 1000) / 1000;
-  } else {
-    qty = Math.max(0, Math.round((qty - amount) * 1000) / 1000);
-  }
-  return { qty, open };
-}
 
 export async function runPosSync(teamId: number, userId: number | null, force = false) {
   const conn = await getConnection(teamId);
@@ -130,6 +117,9 @@ export async function runPosSync(teamId: number, userId: number | null, force = 
   const writes: any[] = [];
   // Suroviny načteme jedním dotazem místo jednoho na položku (N+1). Rušný den
   // odepisuje desítky surovin a tohle běží i z tick/cronu/digestu.
+  // Sloupec quantity je v DDL INTEGER; bez migrace na NUMERIC by desetinný
+  // odpis (0,25 kg citronu na prodej) odmítla databáze a shodila by celou transakci.
+  const celeKusy = !(await sloupecJeDesetinny('inventory_items.quantity'));
   const itemIds = Array.from(totals.keys()).filter(id => Number.isFinite(id));
   const itemById = new Map<number, any>();
   if (itemIds.length) {
@@ -148,7 +138,7 @@ export async function runPosSync(teamId: number, userId: number | null, force = 
     const pkg = Number(it.package_size) || 0;
     const oldQty = Number(it.quantity) || 0;
     const oldOpen = Number(it.open_amount) || 0;
-    const next = consume(oldQty, oldOpen, pkg, amount);
+    const next = odepsatProdej(oldQty, oldOpen, pkg, amount, celeKusy);
     if (next.qty === oldQty && next.open === oldOpen) continue;
     writes.push(sql`
       UPDATE inventory_items SET quantity = ${next.qty},
@@ -159,17 +149,55 @@ export async function runPosSync(teamId: number, userId: number | null, force = 
       VALUES (${itemId}, ${actor}, ${oldQty}, ${next.qty}, ${oldOpen}, ${pkg > 0 ? next.open : null}, ${'Prodej (Storyous)'}, NOW())`);
     deducted.push({ name: it.name, amount });
   }
-  for (const billId of ids) {
-    writes.push(sql`
-      INSERT INTO pos_processed_bills (team_id, bill_id)
-      VALUES (${teamId}, ${billId}) ON CONFLICT DO NOTHING`);
+  // Značky účtenek jedním příkazem (max. 400 účtenek na průchod), ať zápis
+  // skladu i značky drží v jedné transakci bez ohledu na počet surovin.
+  writes.push(sql`
+    INSERT INTO pos_processed_bills (team_id, bill_id)
+    SELECT ${teamId}, x FROM unnest(${ids}::text[]) AS x
+    ON CONFLICT DO NOTHING`);
+
+  // Prodeje po produktech a nenamapované položky jdou do TÉŽE transakce jako
+  // značky účtenek. Dřív šly až po ní a s tichým catch: pád nebo výpadek po
+  // označení účtenek nechal tržby v pos_sales natrvalo chybět (účtenky už se
+  // nikdy nevrátí) a marže, „Bez receptury" i rady počítaly z podhodnocených
+  // prodejů. Tabulky se ověří jednou předem — chybějící tabulka (před
+  // /api/init) přeskočí jen svůj zápis, ne celý odpis.
+  let maProdeje = false, maNenamapovane = false;
+  try {
+    const [t] = await sql`SELECT to_regclass('pos_sales') IS NOT NULL AS s, to_regclass('pos_unmapped') IS NOT NULL AS u`;
+    maProdeje = !!t?.s; maNenamapovane = !!t?.u;
+  } catch { /* bez ověření se přeskočí obojí; odpis skladu tím nestrádá */ }
+  if (maProdeje) {
+    for (const v of Array.from(sales.values())) {
+      writes.push(sql`
+        INSERT INTO pos_sales (team_id, date, product_id, product_name, qty)
+        VALUES (${teamId}, ${v.day}, ${v.productId}, ${v.name}, ${v.qty})
+        ON CONFLICT (team_id, date, product_id) DO UPDATE SET
+          qty = pos_sales.qty + ${v.qty},
+          product_name = COALESCE(EXCLUDED.product_name, pos_sales.product_name)`);
+    }
+  }
+  if (maNenamapovane) {
+    for (const [productId, v] of Array.from(unmapped.entries())) {
+      writes.push(sql`
+        INSERT INTO pos_unmapped (team_id, product_id, product_name, sold_count, last_seen)
+        VALUES (${teamId}, ${productId}, ${v.name}, ${v.count}, NOW())
+        ON CONFLICT (team_id, product_id) DO UPDATE SET
+          sold_count = pos_unmapped.sold_count + ${v.count},
+          product_name = ${v.name}, last_seen = NOW()`);
+    }
   }
 
   let processed = 0;
   try {
-    for (let i = 0; i < writes.length; i += 150) await sql.transaction(writes.slice(i, i + 150));
+    // Jedna transakce, žádné dávkování po 150: dřív šly značky účtenek až v
+    // poslední dávce, takže výpadek uprostřed nechal sklad odepsaný a účtenky
+    // neoznačené — další „Odepsat prodeje“ pak odepsalo totéž podruhé.
+    await sql.transaction(writes);
     processed = ids.length;
-  } catch {
+  } catch (e) {
+    // Příčina do logu: bez ní se „Zápis odpisů selhal" nedalo dohledat.
+    console.error('posSync: zápis odpisů selhal', teamId, e);
     return { connected: true as const, error: 'Zápis odpisů selhal — zkus to znovu.' };
   }
 
@@ -180,30 +208,6 @@ export async function runPosSync(teamId: number, userId: number | null, force = 
     // docházejí, směna dostane úkol je vyrobit, ne nákupní seznam.
     try { await ensureProductionTasks(teamId, actor); } catch { /* před migrací */ }
   }
-  // Prodeje a nenamapované položky zapíšeme dávkově v transakci místo jednoho
-  // round-tripu na řádek (rušné okno = stovky produktů). Skupina se přeskočí
-  // celá, když tabulka ještě není — stejný čistý efekt jako dřív po jednom.
-  const salesWrites = Array.from(sales.values()).map(v => sql`
-    INSERT INTO pos_sales (team_id, date, product_id, product_name, qty)
-    VALUES (${teamId}, ${v.day}, ${v.productId}, ${v.name}, ${v.qty})
-    ON CONFLICT (team_id, date, product_id) DO UPDATE SET
-      qty = pos_sales.qty + ${v.qty},
-      product_name = COALESCE(EXCLUDED.product_name, pos_sales.product_name)`);
-  if (salesWrites.length) {
-    try { for (let i = 0; i < salesWrites.length; i += 150) await sql.transaction(salesWrites.slice(i, i + 150)); }
-    catch { /* tabulka ještě není */ }
-  }
-  const unmappedWrites = Array.from(unmapped.entries()).map(([productId, v]) => sql`
-    INSERT INTO pos_unmapped (team_id, product_id, product_name, sold_count, last_seen)
-    VALUES (${teamId}, ${productId}, ${v.name}, ${v.count}, NOW())
-    ON CONFLICT (team_id, product_id) DO UPDATE SET
-      sold_count = pos_unmapped.sold_count + ${v.count},
-      product_name = ${v.name}, last_seen = NOW()`);
-  if (unmappedWrites.length) {
-    try { for (let i = 0; i < unmappedWrites.length; i += 150) await sql.transaction(unmappedWrites.slice(i, i + 150)); }
-    catch { /* tabulka ještě není */ }
-  }
-
   return {
     connected: true as const,
     processed,

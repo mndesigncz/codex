@@ -94,22 +94,37 @@ export async function POST(req: NextRequest) {
     ingredients.push({ itemId, amount: Number.isFinite(amount) && amount > 0 ? amount : 1 });
   }
   try {
-    await sql`DELETE FROM pos_product_map WHERE team_id = ${u.team_id} AND product_id = ${productId}`;
+    // Suroviny se ověří dřív a celá výměna receptury (smazání starých řádků + vložení
+    // nových) jde v JEDNÉ transakci: pád mezi DELETE a INSERTy dřív smazal recepturu
+    // bez náhrady a produkt se přestal odepisovat.
+    const ids = Array.from(new Set(ingredients.map(i => i.itemId)));
+    const znama = ids.length
+      ? new Set((await sql`SELECT id FROM inventory_items WHERE id = ANY(${ids}) AND team_id = ${u.team_id}`).map((r: any) => Number(r.id)))
+      : new Set<number>();
+    const jmeno = b.productName ? String(b.productName).slice(0, 160) : null;
+    const writes: any[] = [sql`DELETE FROM pos_product_map WHERE team_id = ${u.team_id} AND product_id = ${productId}`];
     for (const ing of ingredients) {
-      const [item] = await sql`SELECT id FROM inventory_items WHERE id = ${ing.itemId} AND team_id = ${u.team_id}`;
-      if (!item) continue;
-      await sql`
+      if (!znama.has(ing.itemId)) continue;
+      writes.push(sql`
         INSERT INTO pos_product_map (team_id, product_id, product_name, item_id, amount_per_sale)
-        VALUES (${u.team_id}, ${productId}, ${b.productName ? String(b.productName).slice(0, 160) : null}, ${ing.itemId}, ${ing.amount})
-        ON CONFLICT DO NOTHING`;
+        VALUES (${u.team_id}, ${productId}, ${jmeno}, ${ing.itemId}, ${ing.amount})
+        ON CONFLICT DO NOTHING`);
     }
+    await sql.transaction(writes);
     if (ingredients.length) {
       try { await sql`DELETE FROM pos_unmapped WHERE team_id = ${u.team_id} AND product_id = ${productId}`; } catch {}
     }
     audit(u.team_id, u.id, 'pos.recipe', 'pos', null,
       `${b.productName ?? productId}: ${ingredients.length} ingrediencí`);
     return NextResponse.json({ ok: true });
-  } catch {
-    return NextResponse.json({ error: 'Receptura není dostupná — spusť /api/init.' }, { status: 400 });
+  } catch (e) {
+    // „Spusť /api/init" patří jen k chybějící tabulce (42P01). Při výpadku spojení
+    // by ta rada člověka poslala špatným směrem — a stará receptura teď zůstala
+    // beze změny, což se má říct.
+    if ((e as any)?.code === '42P01') {
+      return NextResponse.json({ error: 'Receptura není dostupná — spusť /api/init.' }, { status: 400 });
+    }
+    console.error('[pos/products] uložení receptury selhalo', e);
+    return NextResponse.json({ error: 'Recepturu se nepodařilo uložit, původní zůstala beze změny. Zkus to za chvíli.' }, { status: 503 });
   }
 }

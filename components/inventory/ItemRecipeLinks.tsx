@@ -13,7 +13,7 @@
 // (dřív natvrdo „Kč").
 
 import { useEffect, useId, useRef, useState } from 'react';
-import { useMoney } from '../CurrencyProvider';
+import { usePrice } from '../CurrencyProvider';
 import { Button, Input, Label, ListRow, Well } from '../ui';
 import { useResultKeys } from '@/lib/useResultKeys';
 import { okJson } from '@/lib/api';
@@ -32,7 +32,8 @@ export default function ItemRecipeLinks({ item, links, unitLabel, onChanged, onO
   onChanged: (next: Link[]) => void;
   onOpenRecipe?: (productId: string) => void;
 }) {
-  const money = useMoney();
+  // Cena produktu z kasy smí mít haléře.
+  const money = usePrice();
   const uid = useId();
   const [adding, setAdding] = useState(false);
   const [query, setQuery] = useState('');

@@ -17,6 +17,7 @@ import { tymyCiselniku } from './tenant';
 import { verejnaHlaska } from './verejnaChyba';
 import { normName } from './menuPos';
 import { cleanSlug, DEFAULT_CURRENCY } from './menu';
+import { cenaZDb } from './cena';
 import { czCount, type CzNoun } from './czech';
 import {
   nazvyNormovane, premapujGuideId, premapujKroky, premapujPodleNazvu, volnySlug,
@@ -332,6 +333,8 @@ async function kopieMenu({ z, nazevZdroje, teamId, meId, ids }: ZadaniKopie): Pr
             SELECT section_id, name, price, description, position FROM menu_items
             WHERE section_id = ANY(${sekce.map(s => Number(s.id))}) ORDER BY position, id` as any[]
         : [];
+      // Cena jako numeric[]: centy (4,50 €) se kopírují beze ztráty; do sloupce,
+      // který je ještě INTEGER, ji databáze zaokrouhlí sama (přiřazovací přetypování).
       // Položky sekce jedním dotazem (unnest polí), ne po jedné: menu smí mít
       // desítky sekcí po stovce položek a po jednom by to byly tisíce dotazů
       // v jednom požadavku.
@@ -345,7 +348,7 @@ async function kopieMenu({ z, nazevZdroje, teamId, meId, ids }: ZadaniKopie): Pr
         await sql`
           INSERT INTO menu_items (section_id, name, price, description, sold_out, pos_product_id, position)
           SELECT ${nova.id}, x.name, x.price, x.description, FALSE, NULL, x.position
-          FROM unnest(${jeho.map(it => String(it.name ?? ''))}::text[], ${jeho.map(it => Math.round(Number(it.price) || 0))}::int[],
+          FROM unnest(${jeho.map(it => String(it.name ?? ''))}::text[], ${jeho.map(it => cenaZDb(it.price) ?? 0)}::numeric[],
                       ${jeho.map(it => (it.description ?? null) as string | null)}::text[], ${jeho.map((_, i) => i)}::int[])
                AS x(name, price, description, position)`;
       }

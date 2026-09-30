@@ -33,6 +33,7 @@ import { czCount, POLOZKA } from '@/lib/czech';
 import { useResultKeys } from '@/lib/useResultKeys';
 import { okJson } from '@/lib/api';
 import { obsahuje } from '@/lib/hledani';
+import { cenaDoPole, cenaZFormulare } from '@/lib/cena';
 import { UDALOST_VYPRODANO, URL_MENU, URL_VYPRODANO } from '@/lib/recepturyPrehled';
 import KopieZPodniku, { useJinePodniky } from '../organizace/KopieZPodniku';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
@@ -110,6 +111,10 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
   /* Kopie menu z jiného podniku organizace. Editor vidí jen vedení, takže
      stačí hlídat, jestli vůbec existuje odkud kopírovat. */
   const [kopieOpen, setKopieOpen] = useState(false);
+  // Rozepsaná cena položky, klíč `sekce-položka`. Pole nesmí při každém úhozu
+  // přepisovat samo sebe z čísla: „4," by ztratilo čárku a „4,50" se dřív po
+  // vyhození nečíslic slilo do 450. Po opuštění pole se ukáže normalizovaná cena.
+  const [cenaText, setCenaText] = useState<Record<string, string>>({});
   const { jine: jinePodniky, cil: nazevPodniku, chyba: chybaPodniku, znovu: znovuPodniky } = useJinePodniky();
 
   /** Hláška úspěchu = Toast; chyba zůstane u tlačítka Uložit a ukáže se i jako Toast (tlačítko bývá mimo obrazovku). */
@@ -887,9 +892,19 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
                       <div className="grid grid-cols-[minmax(0,1fr)_6.5rem] gap-2">
                         <Input value={it.name} maxLength={80} placeholder="Název položky" aria-label="Název položky" disabled={zamceno}
                           onChange={(e) => upravit((b) => { b.sections[si].items[ii].name = e.target.value; })} />
-                        <Input value={it.price} inputMode="numeric" aria-label={`Cena — ${it.name || 'nová položka'} (${board.currency})`}
+                        <Input value={cenaText[`${si}-${ii}`] ?? cenaDoPole(it.price)} inputMode="decimal"
+                          aria-label={`Cena — ${it.name || 'nová položka'} (${board.currency})`}
+                          aria-invalid={cenaText[`${si}-${ii}`] !== undefined && !cenaZFormulare(cenaText[`${si}-${ii}`]).ok ? true : undefined}
                           className="text-right tabular-nums" disabled={zamceno || !smiCeny}
-                          onChange={(e) => upravit((b) => { b.sections[si].items[ii].price = Number(e.target.value.replace(/\D/g, '')) || 0; })} />
+                          onChange={(e) => {
+                            const text = e.target.value;
+                            const k = `${si}-${ii}`;
+                            setCenaText((t) => ({ ...t, [k]: text }));
+                            // Nečitelný text cenu nemění — zůstává poslední platná.
+                            const c = cenaZFormulare(text);
+                            if (c.ok) upravit((b) => { b.sections[si].items[ii].price = c.hodnota ?? 0; });
+                          }}
+                          onBlur={() => setCenaText((t) => { const kopie = { ...t }; delete kopie[`${si}-${ii}`]; return kopie; })} />
                       </div>
                       <Input value={it.description ?? ''} maxLength={200} placeholder="Popisek (nepovinný)" aria-label={`Popisek — ${it.name || 'nová položka'}`} disabled={zamceno}
                         onChange={(e) => upravit((b) => { b.sections[si].items[ii].description = e.target.value; })} />
@@ -964,7 +979,7 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
                           {p.category && <span className="block text-[13px] text-black/55 truncate">{p.category}</span>}
                         </span>
                         <span className="text-sm font-semibold text-black/60 whitespace-nowrap tabular-nums">
-                          {p.price != null ? `${p.price} ${board.currency}` : 'bez ceny'}
+                          {p.price != null ? `${cenaDoPole(p.price)} ${board.currency}` : 'bez ceny'}
                         </span>
                       </button>
                     ))}

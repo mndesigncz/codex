@@ -29,6 +29,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
       },
     ],
     kostra: { M: 'text', L: 'seznam' },
+    cil: { pohled: 'events' },
     stav: 'hotovo',
   },
   // Data: GET /api/events → events[0].checklist[]; PATCH /api/events/{id}
@@ -45,6 +46,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     opravneni: { vse: ['akce.zobrazit'], nektere: [], pole: { 'akce:odskrtnout': 'akce.checklist' } },
     tarif: 'zdarma',
     kostra: { M: 'seznam' },
+    cil: { pohled: 'events' },
     stav: 'hotovo',
   },
   // Data: GET /api/events → events[{revenue,costs,closingsTotal,closingsCount}] (null bez akce.finance)
@@ -61,6 +63,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     opravneni: { vse: ['akce.zobrazit', 'akce.finance'], nektere: [] },
     tarif: 'zdarma',
     kostra: { S: 'cislo', M: 'cislo' },
+    cil: { pohled: 'events' },
     stav: 'hotovo',
   },
 ];

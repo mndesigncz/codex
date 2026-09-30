@@ -4,6 +4,7 @@ import { audit } from '@/lib/audit';
 import { neon } from '@neondatabase/serverless';
 import { tymyCiselniku, idClenu } from '@/lib/tenant';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { platnyCas, platneDatum } from '@/lib/rozvrhCsv';
 
 export const dynamic = 'force-dynamic';
 
@@ -117,14 +118,23 @@ export async function POST(req: Request) {
   // Podle členství (kolo 62), ať člen přepnutý jinam není tiše přeskočen.
   const memberIds = new Set(await idClenu(ctx.teamId));
 
+  // Nečitelný čas („25:99“, „ráno“) by v pokrytí tiše vypadl z výpočtu děr a
+  // délka směny by se počítala jako 8 h naslepo — raději celé odmítnout, než
+  // uložit půlku a tvářit se, že je hotovo.
+  if (list.some((s) => !platneDatum(s?.date) || !platnyCas(s?.startTime) || !platnyCas(s?.endTime))) {
+    return NextResponse.json({ error: 'Směna má neplatné datum nebo čas (očekává se RRRR-MM-DD a HH:MM).' }, { status: 400 });
+  }
+
   let inserted = 0;
   for (const s of list) {
     const employeeId = parseInt(s.employeeId);
     if (!employeeId || !s.date || !s.startTime || !s.endTime) continue;
     if (!memberIds.has(employeeId)) continue; // cizí zaměstnanec — přeskoč
+    const od = platnyCas(s.startTime), doCasu = platnyCas(s.endTime);
+    if (!od || !doCasu) continue; // ověřeno už výš, tady jen zúžení typu
     await sql`
       INSERT INTO shifts (team_id, employee_id, date, start_time, end_time, type)
-      VALUES (${ctx.teamId}, ${employeeId}, ${s.date}, ${s.startTime}, ${s.endTime}, ${s.type ?? 'flexible'})`;
+      VALUES (${ctx.teamId}, ${employeeId}, ${s.date}, ${od}, ${doCasu}, ${s.type ?? 'flexible'})`;
     inserted++;
   }
   return NextResponse.json({ inserted });

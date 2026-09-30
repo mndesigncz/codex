@@ -19,6 +19,7 @@ import { teamIsPro, PRO_ONLY_MSG } from '@/lib/planServer';
 import { pragueHourOf, pragueDayOf, dayPlus, businessDayOf, NIGHT_CUTOFF_HOUR } from '@/lib/pragueTime';
 import { czCount } from '@/lib/czech';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { menaPodniku } from '@/lib/menaPodniku';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -35,6 +36,8 @@ export async function GET(req: NextRequest) {
   if (!(await teamIsPro(u.team_id))) {
     return NextResponse.json({ error: PRO_ONLY_MSG }, { status: 403 });
   }
+  // Texty rad ukazují částky a prahy v měně podniku, ne natvrdo v korunách.
+  const mena = await menaPodniku(u.team_id);
   const conn = await getConnection(u.team_id);
   if (!conn) return NextResponse.json({ connected: false });
 
@@ -151,13 +154,13 @@ export async function GET(req: NextRequest) {
         staffingAdvice.push({
           tone: 'warn',
           title: `${hh(x.hour)} táhne ${x.revenueShare} % tržby, ale jen ${x.staffShare} % hodin`,
-          text: `Na jednoho člověka tu připadá ${x.perHour != null ? x.perHour.toLocaleString('cs-CZ') + ' Kč' : 'nejvíc z celého dne'} za hodinu. Přidat na tuhle hodinu překryv obvykle zvedne tržbu víc, než stojí mzda.`,
+          text: `Na jednoho člověka tu připadá ${x.perHour != null ? mena.money(x.perHour) : 'nejvíc z celého dne'} za hodinu. Přidat na tuhle hodinu překryv obvykle zvedne tržbu víc, než stojí mzda.`,
         });
       }
       const idle = staffing.filter(x => x.staffShare >= 4 && x.revenueShare <= 1)
         .sort((a, b) => b.staffShare - a.staffShare).slice(0, 2);
       for (const x of idle) {
-        const cost = avgRate != null ? ` Hodina obsluhy vyjde v průměru na ${avgRate} Kč.` : '';
+        const cost = mzdy && wageHours > 0 ? ` Hodina obsluhy vyjde v průměru na ${mena.price(Math.round((wageSum / wageHours) * 100) / 100)}.` : '';
         staffingAdvice.push({
           tone: 'info',
           title: `${hh(x.hour)} je zaplacená, ale skoro bez tržby`,
@@ -170,7 +173,7 @@ export async function GET(req: NextRequest) {
         staffingAdvice.push({
           tone: 'good',
           title: `Nejvýnosnější hodina: ${hh(bestHour.hour)}`,
-          text: `Jeden člověk tu udělá ${(bestHour.perHour ?? 0).toLocaleString('cs-CZ')} Kč za hodinu. Rozvrh na špičky sedí.`,
+          text: `Jeden člověk tu udělá ${mena.money(bestHour.perHour ?? 0)} za hodinu. Rozvrh na špičky sedí.`,
         });
       }
     }
@@ -217,25 +220,27 @@ export async function GET(req: NextRequest) {
 
     const compared = days.filter(d => d.diff != null);
     // 50 Kč je zaokrouhlování a drobné; nad to jde o překlep nebo chybějící platbu.
-    const off = compared.filter(d => Math.abs(d.diff as number) > 50)
+    // Práh se přepočítá na měnu podniku (v eurech ~2 €, ne 50 €).
+    const prahDrobne = mena.prah(50), prahVelky = mena.prah(500);
+    const off = compared.filter(d => Math.abs(d.diff as number) > prahDrobne)
       .sort((a, b) => Math.abs(b.diff as number) - Math.abs(a.diff as number));
     const missingClosing = days.filter(d => (d.bills ?? 0) > 0 && d.closings === 0);
     const noPosDays = days.filter(d => d.closings > 0 && (d.bills ?? 0) === 0);
-    const csDate = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('cs-CZ');
+    const csDate = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString(mena.locale);
 
     const reconcileInsights: { icon: string; title: string; text: string; tone: 'good' | 'warn' | 'info' }[] = [];
     if (compared.length && !off.length) {
       reconcileInsights.push({
         icon: 'check', tone: 'good', title: 'Uzávěrky sedí s pokladnou',
-        text: `Porovnáno ${compared.length} dní, nikde rozdíl nad 50 Kč.`,
+        text: `Porovnáno ${compared.length} dní, nikde rozdíl nad ${mena.money(prahDrobne)}.`,
       });
     }
     if (off.length) {
       const w = off[0];
       reconcileInsights.push({
-        icon: 'warning', tone: Math.abs(w.diff as number) > 500 ? 'warn' : 'info',
+        icon: 'warning', tone: Math.abs(w.diff as number) > prahVelky ? 'warn' : 'info',
         title: `${czCount(off.length, { one: 'den', few: 'dny', many: 'dní' })} nesedí s pokladnou`,
-        text: `Největší rozdíl ${csDate(w.day)}: uzávěrka ${(w.declared ?? 0).toLocaleString('cs-CZ')} Kč proti ${(w.posTotal ?? 0).toLocaleString('cs-CZ')} Kč z kasy${w.people ? ` (${w.people})` : ''}. Nejčastěji překlep v uzávěrce nebo platba, která se do kasy nedostala.`,
+        text: `Největší rozdíl ${csDate(w.day)}: uzávěrka ${mena.money(w.declared ?? 0)} proti ${mena.money(w.posTotal ?? 0)} z kasy${w.people ? ` (${w.people})` : ''}. Nejčastěji překlep v uzávěrce nebo platba, která se do kasy nedostala.`,
       });
     }
     if (missingClosing.length) {

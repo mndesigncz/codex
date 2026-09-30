@@ -5,7 +5,8 @@
 
 import { createContext, useContext, useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { planInfoOf, isPro, isMax, PRO_PRICE, PRICES, PLAN_NAMES, TRIAL_DAYS, priceLabel, MAX_EXTRAS, type PlanInfo } from '@/lib/plan';
+import { planInfoOf, isPro, isMax, PRO_PRICE, PRICES, PLAN_NAMES, priceLabel, MAX_EXTRAS, type PlanInfo } from '@/lib/plan';
+import { slibZamku } from '@/lib/predplatneTexty';
 import { Icon } from './Icons';
 import { Modal, Button } from './ui';
 
@@ -59,7 +60,8 @@ export function usePlan(): { plan: PlanInfo | null; pro: boolean; max: boolean; 
  * dohledat, co vlastně chtěl. Tady se rovnou otevře to, co dává smysl:
  *
  *  - podnik bez předplatného → pokladna Stripe s vybraným tarifem
- *    (`/api/billing/checkout`, {TRIAL_DAYS} dní zdarma a karta rovnou),
+ *    (`/api/billing/checkout`; 30 dní zdarma s kartou dostane jen podnik,
+ *    který předplatné ještě neměl — kdo už měl, platí hned),
  *  - podnik s běžícím Pro, který chce Max → změna tarifu na stávajícím
  *    předplatném (`/api/billing/upgrade`), protože pokladna by v tom
  *    případě skončila chybou „podnik už předplatné má".
@@ -111,7 +113,8 @@ export function OdemknoutButton({ plan, className = '' }: { plan: 'pro' | 'max';
         <CheckoutModal
           plan={plan}
           interval={info?.interval ?? 'month'}
-          trial={!info?.hadSubscription}
+          // Slib zkoušky jen tomu, o kom víme, že ji ještě neměl (Stripe dává trial jednou).
+          trial={!!info && !info.hadSubscription}
           onClose={() => setPokladna(false)}
           onDone={() => window.location.reload()}
         />
@@ -199,6 +202,7 @@ export function ProGate({ feature, children, benefit, employer = true }: {
 
 /** Okno pro zamčenou akci v řádku (třeba Export CSV na tarifu Zdarma). */
 export function UpgradeModal({ feature, plan = 'pro', onClose }: { feature: string; plan?: 'pro' | 'max'; onClose: () => void }) {
+  const { plan: info, loaded } = usePlan();
   return (
     <Modal open onClose={onClose} size="sm"
       title={<span className="flex items-center gap-2">{feature} {plan === 'max' ? <MaxBadge /> : <ProBadge />}</span>}
@@ -209,7 +213,9 @@ export function UpgradeModal({ feature, plan = 'pro', onClose }: { feature: stri
       <div className="text-center space-y-3">
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#C8F542]/15 text-[#5B7A08]"><Icon name="lock" size={20} /></div>
         <p className="text-sm text-black/55">Tuhle funkci odemyká plán {PLAN_NAMES[plan]} ({priceLabel(plan, 'month')}).</p>
-        <p className="text-xs text-black/40">{TRIAL_DAYS} dní zdarma, zrušit jde kdykoliv.</p>
+        {/* Zkouška zdarma je jen pro podnik, který předplatné ještě neměl —
+            jinak by okno slibovalo 30 dní a pokladna strhla platbu hned. */}
+        <p className="text-xs text-black/40">{slibZamku({ nacteno: loaded && !!info, hadSubscription: !!info?.hadSubscription })}</p>
       </div>
     </Modal>
   );

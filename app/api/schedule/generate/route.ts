@@ -233,7 +233,8 @@ export async function POST(req: Request) {
       unavailable: [...(a?.unavailable_dates ?? []), ...Array.from(timeOffByEmp.get(u.id) ?? new Set<string>())],
       dayPrefs: (a?.day_preferences ?? {}) as Record<string, string>,
       preferredShift: a?.preferred_shift ?? null,
-      maxShifts: a?.max_shifts ?? null,
+      // Uložená 0 (dřívější formulář ji pustil) je „bez limitu“, stejně jako v přehledu vytížení.
+      maxShifts: Number(a?.max_shifts) > 0 ? Number(a.max_shifts) : null,
       // Osobní výjimka vyhrává (0 = výslovně bez limitu), jinak týmový
       // výchozí; null všude = bez limitu.
       maxConsecutive: personalMax.get(u.id) === 0 ? null : (personalMax.get(u.id) ?? teamMaxConsecutive ?? null),

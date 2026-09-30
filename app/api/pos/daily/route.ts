@@ -19,6 +19,7 @@ import { getConnection, paymentLabel } from '@/lib/storyous';
 import { billsOfDays, productsFromMirror, mirrorCovers, soldLines, soldDays, type SoldLine } from '@/lib/posMirror';
 import { pragueToday, businessDayOf, dayPlus, pragueHourOf, NIGHT_CUTOFF_HOUR } from '@/lib/pragueTime';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { menaPodniku } from '@/lib/menaPodniku';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -47,6 +48,8 @@ export async function GET(req: NextRequest) {
   const c = await pozaduj('finance.trzby');
   if (jeOdpoved(c)) return c;
   const teamId = c.teamId;
+  // Texty poznámek ukazují částky v měně podniku, ne natvrdo v korunách.
+  const mena = await menaPodniku(teamId);
   const poLidech = c.role.opravneni.has('finance.trzby_lide');
 
   const sp = new URL(req.url).searchParams;
@@ -208,10 +211,10 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  if (items.length > 0 && Math.abs(gap) > Math.max(50, posTotal * 0.02)) {
+  if (items.length > 0 && Math.abs(gap) > Math.max(mena.prah(50), posTotal * 0.02)) {
     notes.push({
       tone: 'info',
-      title: `Rozpis po produktech je o ${Math.abs(gap).toLocaleString('cs-CZ')} Kč ${gap > 0 ? 'nižší' : 'vyšší'}`,
+      title: `Rozpis po produktech je o ${mena.money(Math.abs(gap))} ${gap > 0 ? 'nižší' : 'vyšší'}`,
       text: gap > 0
         ? 'Rozdíl dělají položky bez ceny v menu, slevy na účtence a spropitné — účtenka je vždycky ta hlavní pravda.'
         : 'Ceníková cena je vyšší než co se opravdu vybralo — obvykle slevy nebo ruční úprava ceny na účtence.',
@@ -222,7 +225,7 @@ export async function GET(req: NextRequest) {
   if (refunds > 0) {
     notes.push({
       tone: 'warn',
-      title: `Refundace ${refunds.toLocaleString('cs-CZ')} Kč`,
+      title: `Refundace ${mena.money(refunds)}`,
       text: `${sum('refundCount')}× vrácená účtenka. Do tržby se nepočítá; stojí za to vědět, co se vracelo.`,
     });
   }

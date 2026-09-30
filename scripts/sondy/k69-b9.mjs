@@ -333,7 +333,12 @@ const zalozka = (p, nazev) => p.locator('nav').getByRole('button', { name: new R
   // Zvonek v hlavičce se jmenuje taky „Notifikace" — sekce má i popisek „Centrum oznámení".
   await p.getByRole('button', { name: /Notifikace\s*Centrum oznámení/ }).filter({ visible: true }).first().click();
   const zpravy = p.getByRole('switch', { name: /Nové zprávy/ });
-  tvrdi('S3: čtyři přepínače notifikací (SwitchRow)', await dokud(() => zpravy.isVisible(), 1500) && await p.getByRole('switch').count() === 4);
+  // Push se nabízí jen tam, kde jsou nastavené VAPID klíče (NEXT_PUBLIC_VAPID_PUBLIC_KEY); bez nich jsou
+  // přepínače tři a stránka to říká — slibovat zapnutí, které nic neudělá, je horší než ho nenabízet.
+  await dokud(() => zpravy.isVisible(), 1500);
+  const maPush = await p.getByRole('switch', { name: 'Push notifikace' }).count() === 1;
+  tvrdi('S3: přepínače notifikací (SwitchRow): 4 s push, 3 bez nakonfigurovaného pushe', await zpravy.isVisible()
+    && await p.getByRole('switch').count() === (maPush ? 4 : 3), `${await p.getByRole('switch').count()}× push=${maPush}`);
   const pred = await zpravy.getAttribute('aria-checked');
   await zpravy.click();
   tvrdi('S3: přepnutí „Nové zprávy" změní stav a uloží notifPrefs', await dokud(async () => (await zpravy.getAttribute('aria-checked')) !== pred, 1000)

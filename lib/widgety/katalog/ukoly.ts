@@ -35,6 +35,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'moje_a_volne',
       },
     ],
+    cil: { pohled: 'tasks' },
     stav: 'hotovo',
   },
   // Data: GET /api/tasks → [dueDate < dnes && status != done]
@@ -51,6 +52,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['vedeni.prehled', 'zamestnanec.domu', 'vedeni.ukoly', 'zamestnanec.ukoly'],
     opravneni: { vse: [], nektere: [], pole: { cely_tym: 'ukoly.zobrazit_tym' } },
     tarif: 'zdarma',
+    cil: { pohled: 'tasks' },
     stav: 'hotovo',
   },
   // Data: GET /api/tasks; GET /api/teams → members
@@ -66,6 +68,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['vedeni.ukoly'],
     opravneni: { vse: ['ukoly.zobrazit_tym'], nektere: [] },
     tarif: 'zdarma',
+    cil: { pohled: 'tasks' },
     stav: 'hotovo',
   },
   // Data: GET /api/tasks; GET /api/teams → team.week_start
@@ -86,6 +89,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
       pole: { cely_tym: 'ukoly.zobrazit_tym', 'akce:presunout_cizi': 'ukoly.upravit' },
     },
     tarif: 'zdarma',
+    cil: { pohled: 'tasks' },
     stav: 'hotovo',
   },
   // Data: GET /api/tasks → [status=done, completedByName]
@@ -102,6 +106,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['vedeni.ukoly'],
     opravneni: { vse: ['ukoly.zobrazit_tym'], nektere: [] },
     tarif: 'zdarma',
+    cil: { pohled: 'tasks' },
     stav: 'hotovo',
   },
 ];

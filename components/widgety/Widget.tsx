@@ -40,10 +40,21 @@ export interface KontextWidgetu {
   inkoust: boolean;
   /** Prázdný widget s `prazdno={null}` se v klidu nekreslí — plocha pak jeho buňku schová. */
   nahlasSkryti: (skryto: boolean) => void;
+  /**
+   * Widget ohlásí „vyřízeno" se stručným souhrnem (např. „Dostupnost odevzdaná ·
+   * rozvrh naplánovaný"); null = zase je co řešit. Plocha vyřízený widget
+   * v klidu minimalizuje — viz `mini`.
+   */
+  nahlasVyrizeno: (souhrn: string | null) => void;
+  /** Plocha rozhodla: místo plné karty se kreslí nízká vyřízená karta s tímhle souhrnem. */
+  mini: string | null;
+  /** „Ukázat i tak" — rozbalí vyřízený widget do konce sezení. */
+  rozbal: () => void;
 }
 
 const MIMO_PLOCHU: KontextWidgetu = {
-  instance: 'widget', velikost: 'M', definice: undefined, nahled: false, upravy: false, inkoust: false, nahlasSkryti: () => {},
+  instance: 'widget', velikost: 'M', definice: undefined, nahled: false, upravy: false, inkoust: false,
+  nahlasSkryti: () => {}, nahlasVyrizeno: () => {}, mini: null, rozbal: () => {},
 };
 
 export const KontextWidgetuCtx = createContext<KontextWidgetu>(MIMO_PLOCHU);
@@ -55,6 +66,21 @@ export const KontextWidgetuCtx = createContext<KontextWidgetu>(MIMO_PLOCHU);
  */
 export function useWidget(): KontextWidgetu {
   return useContext(KontextWidgetuCtx);
+}
+
+/**
+ * Widget ohlásí, že jeho věc je vyřízená (všichni odevzdali, fronta je
+ * prázdná…). Plocha ho pak v klidu vykreslí minimalizovaně: nízká karta
+ * s názvem, fajfkou a `souhrn`em; klepnutí naviguje na `cil` z katalogu
+ * a „Ukázat i tak" ho rozbalí do konce sezení. Konzervativně: hotovo smí
+ * být true jen nad načtenými daty, nikdy během načítání nebo po chybě —
+ * jinak by se widget minimalizoval dřív, než ví, jestli je co řešit.
+ */
+export function useVyrizeno(hotovo: boolean, souhrn: string): void {
+  const { nahlasVyrizeno } = useWidget();
+  useEffect(() => { nahlasVyrizeno(hotovo ? souhrn : null); }, [hotovo, souhrn, nahlasVyrizeno]);
+  // Odpojení (odebrání z plochy) po sobě uklidí, ať plocha nedrží mrtvý stav.
+  useEffect(() => () => nahlasVyrizeno(null), [nahlasVyrizeno]);
 }
 
 // ---------------------------------------------------------------------------
@@ -94,6 +120,12 @@ export interface ObalWidgetuProps {
   prazdno?: React.ReactNode | null;
   children?: React.ReactNode;
 }
+
+/**
+ * Nadpis karty přijímá fokus programově (tabIndex -1, mimo Tab): plocha ho tam
+ * vrací po výměně plné karty za minimalizovanou a zpět. Prstenec jen pro klávesnici.
+ */
+const FOKUS_TITULKU = 'rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)]';
 
 /** Vypnutý dotaz (useDataWidgetu s url null) nesmí držet widget na kostře. */
 const jeVypnuto = (s: StavNacteni) => s.vypnuto === true;
@@ -156,6 +188,42 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, ton, nac
   const idTitulku = `w-${k.instance}-t`;
   const zkusitZnovu = () => aktivni.forEach(s => { if (s.error) s.reload(); });
 
+  // Cíl karty z katalogu (kolo 71): klepnutí na kartu v klidu naviguje do
+  // sekce, odkud jsou data — samotné klepnutí obsluhuje plocha na <li>
+  // (hystereze, podržení). Obal přidá jemnou nápovědu (chevron v hlavičce,
+  // zvednutí na hover) a klávesovou cestu: <li> v klidu tabIndex mít nesmí
+  // (sonda k68-klavesnice 5), takže Enter nese tlačítko „Otevřít …".
+  const cilKarty = k.definice?.cil;
+  const smiCil = !!cilKarty && !k.nahled && !k.upravy && nav.smiPohled(cilKarty.pohled);
+  const klepnutelna = smiCil && !otevrit;
+  const otevriCil = () => { if (cilKarty) nav.onNavigate(cilKarty.pohled, cilKarty.arg); };
+
+  // Vyřízený widget v klidu: nízká karta s fajfkou a souhrnem místo plného
+  // obsahu (plocha rozhodla přes `mini`). Data widgetu žijí dál — komponenta
+  // je připojená a hlásí, kdyby zase bylo co řešit.
+  if (k.mini != null && !k.upravy && !k.nahled) {
+    return (
+      <Card as="section" pad="sm" aria-label={`${nazev} — vyřízeno`} className="relative min-w-0 flex items-center gap-3">
+        {smiCil && (
+          <button type="button" onClick={otevriCil} aria-label={`Otevřít ${nazev}`}
+            className="absolute inset-0 rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)]" />
+        )}
+        {/* Fajfka bez záře: stav, ne akce (DP T3) — proto ne .dot-ok (ten má prstenec) a žádný button.on-accent. */}
+        <span aria-hidden className="relative shrink-0 grid h-6 w-6 place-items-center rounded-full bg-ok on-accent">
+          <Icon name="check" size={14} strokeWidth={2.5} />
+        </span>
+        <div className="relative min-w-0 flex-1">
+          {/* tabIndex -1 + data-w-titulek: cíl fokusu po výměně karet (plocha sem vrátí
+              fokus, když klávesnicí ovládané tlačítko, které ho neslo, zmizelo z DOM). */}
+          <h2 id={idTitulku} data-w-titulek="" tabIndex={-1} className={`t-card truncate ${FOKUS_TITULKU}`}>{nazev}</h2>
+          <p className="t-meta truncate">{k.mini}</p>
+        </div>
+        <Button variant="ghost" size="sm" icon="chevron" aria-label={`Ukázat celý widget ${nazev}`}
+          className="relative shrink-0 -my-1 -mr-2" onClick={k.rozbal} />
+      </Card>
+    );
+  }
+
   let obsah: React.ReactNode;
   if (nacitam) obsah = <KostraTela tvar={kostra ?? kostraWidgetu(k.definice, k.velikost)} velikost={k.velikost} />;
   else if (chyba) obsah = <ErrorState compact title="Widget se nenačetl" onRetry={zkusitZnovu} detail={chyba} className="!py-3" />;
@@ -177,8 +245,9 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, ton, nac
       inert={k.upravy || undefined}
       className={[
         'min-w-0 h-full flex flex-col',
-        S ? 'sm:p-5 min-h-[8.5rem]' : '',
-        otevrit ? 'relative transition-shadow hover:shadow-[shadow:var(--shadow-float)]' : '',
+        S ? 'sm:p-5 min-h-[8.5rem] relative' : '',
+        // Klepnutelná karta (natažený odkaz, nebo cíl z katalogu) se na hover jemně zvedne.
+        otevrit || klepnutelna ? 'relative transition-shadow hover:shadow-[shadow:var(--shadow-float)]' : '',
         // Jediná tmavá plocha v obsahu: hlavní číslo peněz se září v rohu (DP §2.10).
         inkoust ? 'relative overflow-hidden bg-[#16181A] text-white border-transparent' : '',
       ].join(' ')}
@@ -186,12 +255,20 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, ton, nac
       {inkoust && (
         <span aria-hidden className="pointer-events-none absolute -top-14 -right-10 h-32 w-32 rounded-full bg-[#C8F542]/25 blur-2xl" />
       )}
+      {/* Limetkový dotek karet čísel: gradient (background-image), žádná plná
+          plocha — sonda k68-design měří backgroundColor, gradientu se netýká. */}
+      {S && !inkoust && <span aria-hidden className="w-dotek" />}
       <div className="relative flex items-start justify-between gap-3">
         {/* Malá karta je na telefonu široká ~171 px a na název zbývá ~125 px:
             „Docházející zásoby" by skončil jako „Docházející zá…" a číslo pod
             ním by nemělo jméno. U S proto dva řádky, ikona u prvního. */}
-        <h2 id={idTitulku} className={`t-card flex ${S ? 'items-start' : 'items-center'} gap-2 min-w-0 ${inkoust ? '!text-white' : ''}`}>
-          <Icon name={ikona ?? k.definice?.ikona ?? 'overview'} size={17} className={`shrink-0 ${S ? 'mt-px' : ''} ${inkoust ? 'text-white/60' : 'text-black/40'}`} />
+        <h2 id={idTitulku} data-w-titulek="" tabIndex={-1} className={`t-card flex ${S ? 'items-start' : 'items-center'} gap-2 min-w-0 ${FOKUS_TITULKU} ${inkoust ? '!text-white' : ''}`}>
+          {/* Ikona v limetkové dlaždičce: jemný akcent hlavičky (kolo 71). Tónovaná
+              průhledností (bg-ok/15) — plná limetka je vyhrazená akci (DP T3)
+              a v tmavém režimu by svítila. Na inkoustové ploše bílá s průhledností. */}
+          <span aria-hidden className={`shrink-0 grid h-6 w-6 place-items-center rounded-xl ${S ? '-mt-0.5' : ''} ${inkoust ? 'bg-white/10 text-white/70' : 'bg-ok/15 text-ok-ink'}`}>
+            <Icon name={ikona ?? k.definice?.ikona ?? 'overview'} size={14} />
+          </span>
           <span className={S ? 'line-clamp-2 break-words' : 'truncate'}>{nazev}</span>
           {doplnek}
         </h2>
@@ -204,6 +281,14 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, ton, nac
         )}
         {!odkaz && akce && akce.length > 0 && (
           <Menu size="sm" label={`Další akce: ${nazev}`} items={akce} className="-my-1.5 -mr-2" />
+        )}
+        {/* Jemná nápověda navigovatelné karty: chevron jen tam, kde v hlavičce
+            není odkaz ani „···" — a zároveň klávesová cesta (Enter naviguje),
+            protože <li> v klidu tabIndex nemá (sonda k68-klavesnice 5). */}
+        {klepnutelna && !vidiOdkaz && !(akce && akce.length > 0) && (
+          <Button variant="ghost" size="sm" icon="chevronRight" aria-label={`Otevřít ${nazev}`}
+            className={`shrink-0 -my-1.5 -mr-2 ${inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : ''}`}
+            onClick={otevriCil} />
         )}
       </div>
       <div className={`relative mt-3 flex-1 min-h-0 ${S ? 'flex flex-col justify-end' : ''}`}>{obsah}</div>

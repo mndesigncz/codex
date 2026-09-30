@@ -116,6 +116,20 @@ export async function GET(req: NextRequest) {
         ORDER BY COALESCE(m.role, u.role) DESC, u.name ASC`;
     }
 
+    // hasPin: PINy se ukládají do pin_hash (PATCH /api/kiosk) a starý čitelný
+    // sloupec pin se po prvním použití nuluje. Dotaz výš čte jen pin, takže po
+    // uložení PINu hlásil hasPin=false — tablet pak nenabídl číselník a člověk
+    // se z tabletu nemohl odpíchnout ani zrušit PIN. Čte se zvlášť, ať výpadek
+    // sloupce pin_hash (chybí migrace) neshodí celý roster.
+    try {
+      const ids = (roster as any[]).map(r => Number(r.id));
+      if (ids.length) {
+        const rows = await sql`SELECT id FROM users WHERE id = ANY(${ids}) AND pin_hash IS NOT NULL AND pin_hash <> ''`;
+        const shash = new Set((rows as any[]).map(r => Number(r.id)));
+        for (const r of roster as any[]) r.hasPin = r.hasPin === true || shash.has(Number(r.id));
+      }
+    } catch { /* bez pin_hash zůstává starý sloupec pin */ }
+
     // Inline watchdog: the shop kiosk polls this endpoint all day, so every
     // roster load doubles as the hourly check that Vercel's daily-cron limit
     // won't give us. The daily cron stays as a backstop for quiet teams.

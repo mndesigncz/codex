@@ -12,6 +12,7 @@ import {
 } from '@/lib/packaging';
 import { packagingSourceOf, branchTracksOpen, childrenOfId, findById, matcher } from '@/lib/categoryTree';
 import CategoryNav from '../inventory/CategoryNav';
+import { Button } from '../ui';
 
 interface Item {
   id: number;
@@ -119,10 +120,11 @@ export default function KioskPackagedStock({ items, categories, onChanged, onFoc
         )}
 
         {!showParked && list.length > 1 && (
-          <button onClick={() => setSweeping(true)}
-            className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-[#C8F542] text-black px-5 py-4 text-base font-bold min-h-[56px] active:scale-[0.99] transition">
-            <Icon name="play" size={18} /> Projít vše ({list.length})
-          </button>
+          // Jediná plná limetka obrazovky (DP §3.1): stupně škály níž jsou stav, ne akce,
+          // a označují se inkoustem jako vybraná pilulka.
+          <Button variant="accent" size="lg" icon="play" block className="w-full min-h-[56px]" onClick={() => setSweeping(true)}>
+            Projít vše ({list.length})
+          </Button>
         )}
 
         {direct.length === 0 ? (
@@ -206,10 +208,10 @@ function ItemRow({ item, packaging, onChanged }: {
           {item.name}
           {item.brand && <span className="ml-1.5 font-normal text-black/40">{item.brand}</span>}
         </p>
-        <button onClick={() => apply({ archived: false })} disabled={busy}
-          className="inline-flex items-center gap-1.5 btn btn-accent btn-lg min-h-[48px] disabled:opacity-40 active:scale-[0.97] transition">
-          <Icon name="check" size={15} /> Máme zpátky
-        </button>
+        {/* Víc odložených položek pod sebou = víc limetek; „Máme zpátky" je běžná akce. */}
+        <Button variant="secondary" size="lg" icon="check" disabled={busy} className="min-h-[48px]" onClick={() => apply({ archived: false })}>
+          Máme zpátky
+        </Button>
       </div>
     );
   }
@@ -256,7 +258,7 @@ function ItemRow({ item, packaging, onChanged }: {
       </div>
 
       <div className="h-2 w-full rounded-full bg-black/[0.06] overflow-hidden">
-        <div className="h-full rounded-full bg-[#C8F542] transition-[width]" style={{ width: `${pct}%` }} />
+        <div className="h-full rounded-full bg-ok transition-[width]" style={{ width: `${pct}%` }} />
       </div>
 
       <StepButtons steps={steps} current={current} unit={unit} busy={busy}
@@ -297,9 +299,10 @@ function StepButtons({ steps, current, unit, busy, onPick, big }: {
           <button key={s.label} onClick={() => onPick(s.amount)} disabled={busy}
             className={`rounded-2xl font-bold transition active:scale-[0.97] disabled:opacity-50 ${
               big ? 'py-6 text-2xl' : 'py-4 text-lg min-h-[64px]'
-            } ${active ? 'bg-[#C8F542] text-black' : 'glass border border-black/10 text-black/70'}`}>
+            } ${active ? 'seg-on' : 'glass border border-black/10 text-black/70'}`}
+            aria-pressed={active}>
             {s.label}
-            <span className={`block text-xs font-medium tabular-nums ${active ? 'text-black/50' : 'text-black/35'}`}>
+            <span className={`block text-xs font-medium tabular-nums ${active ? 'text-white/60' : 'text-black/35'}`}>
               {fmtAmount(s.amount)} {unit}
             </span>
           </button>
@@ -398,7 +401,7 @@ function SweepMode({ category, packaging, items, onChanged, onDone }: {
       </div>
 
       <div className="h-1.5 w-full rounded-full bg-black/[0.06] overflow-hidden">
-        <div className="h-full rounded-full bg-[#C8F542] transition-[width]"
+        <div className="h-full rounded-full bg-ok transition-[width]"
           style={{ width: `${Math.round((idx / items.length) * 100)}%` }} />
       </div>
 

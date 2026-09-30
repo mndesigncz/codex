@@ -44,6 +44,38 @@ export function vyberNavody(raw: any): NavodApi[] {
   return raw.guides.filter((g: any) => g && Number.isFinite(Number(g.id))).map((g: any) => ({ ...g, id: Number(g.id), title: String(g.title ?? '') }));
 }
 
+/** Adresa seznamu návodů se stavem čtení za člověka u tabletu (den = den zavírané uzávěrky). */
+export function urlNavoduZa(osoba: { id: number; den?: string | null } | null | undefined): string | null {
+  if (!osoba || !Number.isFinite(osoba.id) || osoba.id <= 0) return null;
+  return `${URL_NAVODY}?actingAs=${osoba.id}${osoba.den ? `&den=${encodeURIComponent(osoba.den)}` : ''}`;
+}
+
+/** Seznam návodů + kdo je čtenář (server `ctenar` nese jen tehdy, když jeho stav opravdu počítal). */
+export function vyberNavodyOsoby(raw: any): { guides: NavodApi[]; ctenar: number | null } {
+  const n = Number(raw?.ctenar);
+  return { guides: vyberNavody(raw), ctenar: Number.isFinite(n) && n > 0 ? n : null };
+}
+
+/**
+ * Na tabletu je „moje přečtení" z GET /api/guides přečtení ÚČTU TABLETU, které
+ * nikdy nevznikne (potvrzuje se pod člověka) — povinné návody by v seznamu
+ * věčně svítily „Povinné čtení". Stav čtení se proto přepíše stavem člověka u
+ * tabletu, ale jen když server potvrdí, že počítal za něj (`ctenar` = jeho id);
+ * jinak zůstává, co je, a nikdy se nevymýšlí.
+ */
+export function sloucStavCteni(
+  navody: readonly NavodApi[],
+  zaOsobu: { guides: readonly NavodApi[]; ctenar: number | null } | null | undefined,
+  osobaId: number | null | undefined,
+): NavodApi[] {
+  if (!zaOsobu || osobaId == null || zaOsobu.ctenar !== osobaId) return [...navody];
+  const podleId = new Map(zaOsobu.guides.map(g => [g.id, g]));
+  return navody.map(g => {
+    const o = podleId.get(g.id);
+    return o ? { ...g, myRead: o.myRead === true, myReadCurrent: o.myReadCurrent === true } : g;
+  });
+}
+
 export function vyberCtenare(raw: any): CtenariNavodu[] {
   if (!raw || typeof raw !== 'object' || !Array.isArray(raw.guides)) throw new Error('Čtenáři návodů přišli v nečekaném tvaru.');
   return raw.guides.map((g: any) => ({

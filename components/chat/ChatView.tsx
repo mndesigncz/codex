@@ -20,6 +20,8 @@ import {
   dayLabel,
 } from './useChat';
 import { useDraft } from '@/lib/useDraft';
+import { prvniNeprectenaId } from '@/lib/chatVlakno';
+import { useOpravneni } from '../role/useOpravneni';
 import { obsahuje, obsahujeNekde } from '@/lib/hledani';
 
 interface Props {
@@ -280,6 +282,12 @@ function Thread({
   onSent: () => void;
 }) {
   const { messages, setMessages, loading } = useThreadMessages(conv.id);
+  // Cizí anketu smí zavřít ten, kdo spravuje ankety (server to hlídá stejným
+  // klíčem). Do ankety se dřív předávalo jen meId, takže „Uzavřít“ viděl
+  // jen autor. Před načtením oprávnění tlačítko nekreslíme (`ma()` by tehdy
+  // odpovídalo ano).
+  const { ma, nacteno } = useOpravneni();
+  const jeVedeni = nacteno && ma('oznameni.spravovat');
   const [text, setText] = useState('');
   // Rozepsaná zpráva je vázaná na kanál: přepnu jinam, vrátím se a mám ji
   // tam, kde byla. Banner se tu nevykresluje schválně — viz DESIGN.md:
@@ -380,11 +388,13 @@ function Thread({
     setUploading(false);
   };
 
-  // Index první nepřečtené zprávy — nad ni patří čára. Nula znamená, že
-  // nepřečtené bylo celé vlákno; tam čára nemá co oddělovat.
-  const firstUnread = unreadAtOpen > 0 && unreadAtOpen < messages.length
-    ? messages.length - unreadAtOpen
-    : -1;
+  // Čára „Nepřečtené“ se přišpendlí k id zprávy při prvním načtení vlákna;
+  // odvozená z živé délky by se posouvala s každou novou zprávou.
+  const [firstUnreadId, setFirstUnreadId] = useState<number | null | undefined>(undefined);
+  useEffect(() => {
+    if (firstUnreadId !== undefined || loading || messages.length === 0) return;
+    setFirstUnreadId(prvniNeprectenaId(messages, unreadAtOpen));
+  }, [firstUnreadId, loading, messages, unreadAtOpen]);
 
   return (
     <>
@@ -406,7 +416,7 @@ function Thread({
         onScroll={onScroll}
         className="relative flex-1 overflow-y-auto scrollbar-thin px-4 py-4 space-y-2"
       >
-        {conv.type === 'team' && <PollsStrip meId={meId} />}
+        {conv.type === 'team' && <PollsStrip meId={meId} isEmployer={jeVedeni} />}
         {loading && (
           <div className="space-y-2 py-2" aria-busy="true" aria-label="Načítám zprávy">
             <Skeleton className="h-10 w-2/3" />
@@ -430,7 +440,7 @@ function Thread({
                   <span className="h-px flex-1 bg-black/[0.07]" />
                 </div>
               )}
-              {i === firstUnread && (
+              {m.id === firstUnreadId && (
                 <div className="flex items-center gap-3 pt-1 pb-1">
                   <span className="h-px flex-1 bg-[#C8F542]" />
                   <span className="t-label text-[#5B7A08]">Nepřečtené</span>
@@ -585,7 +595,7 @@ export function MessageBubble({
         <div
           className="text-[11px] mt-1 text-black/55 text-right tabular-nums"
         >
-          {formatTime(msg.createdAt)}
+          {dayShown ? formatClock(msg.createdAt) : formatTime(msg.createdAt)}
         </div>
       </div>
     </div>

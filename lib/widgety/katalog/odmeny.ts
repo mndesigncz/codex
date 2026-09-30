@@ -22,6 +22,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['vedeni.prehled', 'vedeni.odmeny'],
     opravneni: { vse: ['hodnoceni.zobrazit'], nektere: [], pole: { 'akce:hodnotit': 'hodnoceni.hodnotit' } },
     tarif: 'pro',
+    cil: { pohled: 'rewards' },
     stav: 'hotovo',
   },
   // Data: GET /api/shift-reviews?month → days[{date,pending}]
@@ -46,6 +47,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'tento',
       },
     ],
+    cil: { pohled: 'rewards' },
     stav: 'hotovo',
   },
   // Data: GET /api/rewards → standings[{name,avatar,points,levelName,pctToNext}]
@@ -70,6 +72,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: '5',
       },
     ],
+    cil: { pohled: 'rewards' },
     stav: 'hotovo',
   },
   // Data: GET /api/rewards/catalog → redemptions[status=pending]
@@ -86,6 +89,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['vedeni.odmeny'],
     opravneni: { vse: ['odmeny.schvalovat'], nektere: [] },
     tarif: 'pro',
+    cil: { pohled: 'rewards' },
     stav: 'hotovo',
   },
   // Data: GET /api/rewards → standings[{name,avatar,flagged,flaggedUnseen}] (flaggedUnseen od kola 69)
@@ -101,6 +105,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['vedeni.odmeny'],
     opravneni: { vse: ['odmeny.zebricek', 'hodnoceni.zobrazit'], nektere: [] },
     tarif: 'pro',
+    cil: { pohled: 'rewards' },
     stav: 'hotovo',
   },
   // Data: GET /api/rewards/catalog → catalog[{title,icon,cost,active}]; GET /api/rewards → me.points
@@ -118,6 +123,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['zamestnanec.odmeny'],
     opravneni: { vse: [], nektere: [], pole: { 'akce:spravovat_katalog': 'odmeny.katalog' } },
     tarif: 'pro',
+    cil: { pohled: 'rewards' },
     stav: 'hotovo',
   },
   // Data: GET /api/rewards → levels[], me.levelIndex
@@ -135,6 +141,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['zamestnanec.odmeny'],
     opravneni: { vse: [], nektere: [] },
     tarif: 'pro',
+    cil: { pohled: 'rewards' },
     stav: 'hotovo',
   },
   // Data: GET /api/rewards → me{points,levelName,next,pctToNext,pointsIntoLevel,pointsForNext,perks}
@@ -152,6 +159,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['zamestnanec.domu'],
     opravneni: { vse: [], nektere: [] },
     tarif: 'pro',
+    cil: { pohled: 'rewards' },
     stav: 'hotovo',
   },
   // Data: GET /api/rewards → reviews[{work_date,rating,points,flagged,note,seen_at}], unseenFlagged;
@@ -171,6 +179,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     opravneni: { vse: [], nektere: [] },
     tarif: 'pro',
     kostra: { M: 'text', L: 'seznam' },
+    cil: { pohled: 'rewards' },
     stav: 'hotovo',
   },
   // Data: GET /api/rewards → reviews[]
@@ -197,6 +206,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: '5',
       },
     ],
+    cil: { pohled: 'rewards' },
     stav: 'hotovo',
   },
   // Data: GET /api/rewards → me.breakdown, points (sazebník)
@@ -214,6 +224,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['zamestnanec.odmeny'],
     opravneni: { vse: [], nektere: [] },
     tarif: 'pro',
+    cil: { pohled: 'rewards' },
     stav: 'hotovo',
   },
   // Data: GET /api/attendance → entries[]; GET /api/rewards → reviews[]
@@ -232,6 +243,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     opravneni: { vse: [], nektere: [] },
     tarif: 'zdarma',
     kostra: { M: 'cislo' },
+    cil: { pohled: 'rewards' },
     stav: 'hotovo',
   },
 ];

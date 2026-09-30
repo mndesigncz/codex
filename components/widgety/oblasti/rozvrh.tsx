@@ -47,7 +47,7 @@ import {
   runBulk, useSelection, type MenuItem,
 } from '../../ui';
 import type { KomponentaWidgetu, Navigace, WidgetProps } from '@/lib/widgety/typy';
-import { Widget, type StavNacteni } from '../Widget';
+import { Widget, useVyrizeno, type StavNacteni } from '../Widget';
 import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
 import { useNavigace, useSmi } from '../NavigaceKontext';
 import { obnovOpravneni, useOpravneni } from '../../role/useOpravneni';
@@ -306,7 +306,8 @@ function DnesniSmeny({ velikost, nastaveni, nahled }: WidgetProps<{ den?: string
     <Widget
       titulek={zitra ? 'Zítřejší směny' : undefined}
       nacteni={nacteni}
-      doplnek={!S && smeny.length > 0 ? <Chip tone="muted" size="sm">{pocet}</Chip> : undefined}
+      // Dnešek limetkově (kolo 71): tónovaný chip, ne plná limetka. Zítřek tlumeně.
+      doplnek={!S && smeny.length > 0 ? <Chip tone={zitra ? 'muted' : 'ok'} size="sm">{pocet}</Chip> : undefined}
       odkaz={S ? undefined : cil}
       otevrit={S && !nahled && nav.smiPohled(cil.pohled) ? () => nav.onNavigate(cil.pohled) : undefined}
       prazdno={prazdno}
@@ -341,11 +342,15 @@ function DnesniSmeny({ velikost, nastaveni, nahled }: WidgetProps<{ den?: string
 interface Odevzdani { employeeId: number; unavailableDates?: unknown[] }
 interface Clen { id: number; name: string; avatar?: string | null; role?: string }
 
-function vyberOdevzdani(raw: any): Odevzdani[] {
+interface DataDostupnosti { odevzdane: Odevzdani[]; naplanovanoSmen: number }
+
+function vyberOdevzdani(raw: any): DataDostupnosti {
   // Bez dostupnost.zobrazit by API vrátilo jen vlastní záznam (nebo null) —
   // to je jiný tvar, ne „nikdo nezadal".
   if (!raw || typeof raw !== 'object' || !Array.isArray(raw.submissions)) throw new Error('Dostupnost týmu přišla v nečekaném tvaru.');
-  return raw.submissions;
+  // Počet naplánovaných směn měsíce je novější pole odpovědi — bez něj 0,
+  // widget se pak jen neminimalizuje (konzervativně).
+  return { odevzdane: raw.submissions, naplanovanoSmen: Number(raw.naplanovanoSmen) || 0 };
 }
 function vyberCleny(raw: any): Clen[] {
   if (!raw || typeof raw !== 'object' || !Array.isArray(raw.members)) throw new Error('Seznam lidí přišel v nečekaném tvaru.');
@@ -370,7 +375,7 @@ function DostupnostTymu({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: s
 
   const { zadali, chybi, blokovano } = useMemo(() => {
     const podle = new Map<number, Odevzdani>();
-    for (const o of odevzdani.data ?? []) podle.set(Number(o.employeeId), o);
+    for (const o of odevzdani.data?.odevzdane ?? []) podle.set(Number(o.employeeId), o);
     const lide = [...(clenove.data ?? [])].sort((a, b) => String(a.name).localeCompare(String(b.name), 'cs'));
     return {
       zadali: lide.filter(c => podle.has(Number(c.id))),
@@ -380,11 +385,22 @@ function DostupnostTymu({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: s
     };
   }, [odevzdani.data, clenove.data]);
 
-  // Bez oprávnění ho plocha vůbec nepřipojí; kdyby přece, nesmí tvrdit „v týmu nikdo není".
-  if (!brana) return <Widget prazdno={null} />;
-
   const celkem = zadali.length + chybi.length;
   const naMesic = jmenoMesice(mesic);
+
+  // Všichni odevzdali A na měsíc už existují naplánované směny = vyřízeno,
+  // plocha widget v klidu minimalizuje (kolo 71). „Zveřejnění" se nikde
+  // neukládá (publish jen rozešle upozornění), počet směn je nejbližší
+  // poctivá náhrada — nese ho odpověď /api/availability, kterou widget
+  // stejně čte. Jen nad načtenými daty, nikdy během načítání.
+  useVyrizeno(
+    brana && odevzdani.data != null && clenove.data != null && celkem > 0
+      && chybi.length === 0 && odevzdani.data.naplanovanoSmen > 0,
+    `Dostupnost na ${naMesic} odevzdaná · rozvrh naplánovaný`,
+  );
+
+  // Bez oprávnění ho plocha vůbec nepřipojí; kdyby přece, nesmí tvrdit „v týmu nikdo není".
+  if (!brana) return <Widget prazdno={null} />;
   const smiSestavit = !nahled && smi('rozvrh.generovat') && nav.smiPohled('shifts');
   // Pole katalogu akce:vyplnit_za_cloveka — okno dostupnosti je v plánovači Rozvrhu.
   const smiVyplnit = !nahled && smi('dostupnost.upravit') && nav.smiPohled('shifts');
@@ -442,7 +458,11 @@ function DostupnostTymu({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: s
               title: c.name,
               meta: !zadal
                 ? <Chip tone="wait" size="sm">Chybí</Chip>
-                : dnu === 0 ? 'zadáno · bez omezení' : `zadáno · nemůže ${czCount(dnu, DEN)}`,
+                // Limetková tečka u splněných řádků — bez záře (stav, ne akce, DP T3).
+                : <>
+                  <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full bg-ok align-middle mr-1.5" />
+                  {dnu === 0 ? 'zadáno · bez omezení' : `zadáno · nemůže ${czCount(dnu, DEN)}`}
+                </>,
             };
             // Klepnutí otevře okno dostupnosti v plánovači: s dostupnost.upravit k úpravě,
             // jinak jen ke čtení (dny, preference, max. směn, poznámka pro vedení).

@@ -12,6 +12,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { pocetZPole } from '@/lib/inventura';
+import { sloupecJeDesetinny } from '@/lib/cenaSloupce';
+import { cenaZDb } from '@/lib/cena';
+import { ensureProductionTasks } from '@/lib/production';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,6 +58,10 @@ export async function GET() {
     return NextResponse.json({
       open: open ? shape(open, vidiCeny) : null,
       history: (history as any[]).map(r => shape(r, vidiCeny)),
+      // Smí se počet zapsat s desetinami (2,35 kg)? Sloupec `quantity` je v DDL
+      // INTEGER; dokud tomu tak je, inventura celé počty vynucuje (a řekne to),
+      // místo aby je tiše zaokrouhlila a zapsala rozdíl, který neexistuje.
+      mnozstviDesetinne: await sloupecJeDesetinny('inventory_items.quantity'),
     });
   } catch {
     return NextResponse.json({ open: null, history: [], notMigrated: true });
@@ -91,7 +99,7 @@ export async function POST() {
         contentUnit: i.content_unit ?? null,
         expectedOpen: pkg > 0 ? Number(i.open_amount) || 0 : null,
         countedOpen: null,
-        unitCost: i.unit_cost != null ? Number(i.unit_cost) : null,
+        unitCost: cenaZDb(i.unit_cost),
       };
     });
     if (data.length === 0) return NextResponse.json({ error: 'Ve skladu nejsou žádné aktivní položky.' }, { status: 400 });
@@ -130,13 +138,34 @@ export async function PATCH(req: NextRequest) {
   const hasCounts = b.counts && typeof b.counts === 'object';
   const hasOpens = b.opens && typeof b.opens === 'object';
   if (hasCounts || hasOpens) {
+    // Nejdřív se ověří všechno, teprve pak se cokoli uloží: desetinný počet
+    // tam, kde se počítá na celé, se dřív tiše zaokrouhlil (2,35 kg → 2 kg)
+    // a dokončení zapsalo do skladu i do reportu ztrát falešné manko.
+    const desetinne = await sloupecJeDesetinny('inventory_items.quantity');
+    const jmeno = (itemId: string) => String(data.find(d => String(d.itemId) === itemId)?.name ?? itemId);
+    if (hasCounts) {
+      for (const [itemId, v] of Object.entries(b.counts as Record<string, unknown>)) {
+        const p = pocetZPole(v, desetinne);
+        if (p.ok) continue;
+        return NextResponse.json({
+          error: p.duvod === 'cele'
+            ? `„${jmeno(itemId)}" se eviduje v celých kusech — zapiš celé číslo.`
+            : `Počet u „${jmeno(itemId)}" není číslo.`,
+        }, { status: 400 });
+      }
+    }
+    if (hasOpens) {
+      for (const [itemId, v] of Object.entries(b.opens as Record<string, unknown>)) {
+        if (!pocetZPole(v, true).ok) return NextResponse.json({ error: `Zbytek u „${jmeno(itemId)}" není číslo.` }, { status: 400 });
+      }
+    }
     const next = data.map(d => {
       let out = d;
       if (hasCounts) {
         const v = (b.counts as any)[String(d.itemId)];
         if (v !== undefined) {
-          const n = v === null || v === '' ? null : Math.max(0, Math.round(Number(v)));
-          out = { ...out, counted: n != null && Number.isFinite(n) ? n : null };
+          const p = pocetZPole(v, desetinne);
+          out = { ...out, counted: p.ok ? p.hodnota : null };
         }
       }
       if (hasOpens) {
@@ -144,8 +173,8 @@ export async function PATCH(req: NextRequest) {
         if (v !== undefined) {
           // Zbytek v načatém balení je desetinný (0,68 l) — zaokrouhlovat
           // na celá by z láhve dělalo buď plnou, nebo prázdnou.
-          const raw = v === null || v === '' ? null : Math.max(0, Math.round(Number(v) * 1000) / 1000);
-          out = { ...out, countedOpen: raw != null && Number.isFinite(raw) ? raw : null };
+          const p = pocetZPole(v, true);
+          out = { ...out, countedOpen: p.ok ? p.hodnota : null };
         }
       }
       return out;
@@ -205,6 +234,11 @@ export async function PATCH(req: NextRequest) {
     }
     const [done] = await sql`
       UPDATE stocktakes SET status = 'done', completed_at = NOW() WHERE id = ${id} RETURNING *`;
+    // Inventura je pohyb skladu jako každý jiný: kontrakt lib/production říká,
+    // že se po ní srovnají výrobní úkoly a nákupní vlajky. Bez toho úkol
+    // „vyrobit limonádu" po inventuře, která zjistila nulu, vznikl až při
+    // příštím otevření Úkolů — a naopak visel úkol na zásobu, která už je.
+    if (diffs > 0) { try { await ensureProductionTasks(u.team_id, u.id); } catch { /* před migrací */ } }
     return NextResponse.json({ ok: true, applied, diffs, stocktake: shape(done, u.ma('sklad.ceny')) });
   }
 

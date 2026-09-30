@@ -32,7 +32,7 @@ import TaskWeekBoard from '../../TaskWeekBoard';
 import { useCurrency } from '../../CurrencyProvider';
 import type { KomponentaWidgetu, Navigace, WidgetProps } from '@/lib/widgety/typy';
 import { widget } from '@/lib/widgety/katalog';
-import { Widget, type StavNacteni } from '../Widget';
+import { Widget, useVyrizeno, type StavNacteni } from '../Widget';
 import { useDataWidgetu, type StavDat } from '../useDataWidgetu';
 import { useNavigace, useSmi } from '../NavigaceKontext';
 import { useOpravneni } from '../../role/useOpravneni';
@@ -262,6 +262,10 @@ function PoTerminu({ velikost, nahled }: WidgetProps) {
   const vse = useMemo(() => poTerminu(vRozsahu(data.data ?? [], celyTym ? 'tym' : 'moje_a_volne', ja.id), dnes), [data.data, celyTym, ja.id, dnes]);
   const moje = vse.filter(t => t.assignedTo === ja.id).length;
   const S = velikost === 'S';
+
+  // Nic po termínu = vyřízeno: plocha widget v klidu minimalizuje (kolo 71).
+  // Jen nad načtenými daty — během načítání a po chybě se nesmí minimalizovat.
+  useVyrizeno(data.data != null && vse.length === 0, 'Nic není po termínu');
 
   return (
     <Widget

@@ -134,9 +134,16 @@ export function buildIcs(events: IcsEvent[], prodId = '-//Managero//CS', now: Da
     if (st) {
       lines.push(`DTSTART;TZID=Europe/Prague:${d}T${st}`);
       const en = time6(e.endTime ?? '');
-      // Konec před začátkem by kalendář nakreslil pozpátku; radši ho vynecháme
-      // a necháme událost jen se začátkem.
       if (en && en > st) lines.push(`DTEND;TZID=Europe/Prague:${d}T${en}`);
+      // Konec před začátkem je směna přes půlnoc (22:00–06:00) — tak ji čte
+      // celý rozvrh (hodinySmeny, delkaSmeny, coverage). Bez DTEND by kalendář
+      // nakreslil jen bod ve 22:00 a noční směna by nic neblokovala, proto
+      // konec patří na následující den. Konec přesně rovný začátku je nejspíš
+      // chyba v datech (nula hodin, nebo 24?), takže ten se vynechá.
+      else if (en && en < st) {
+        const dalsi = stamp(new Date(Date.UTC(+d.slice(0, 4), +d.slice(4, 6) - 1, +d.slice(6, 8) + 1))).slice(0, 8);
+        lines.push(`DTEND;TZID=Europe/Prague:${dalsi}T${en}`);
+      }
     } else {
       // Celodenní: `DTEND` je den následující, protože konec je nevýlučný.
       const next = new Date(Date.UTC(+d.slice(0, 4), +d.slice(4, 6) - 1, +d.slice(6, 8) + 1));

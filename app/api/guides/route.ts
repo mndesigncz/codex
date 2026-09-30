@@ -5,6 +5,7 @@ import { notifyUsers, notifyUser } from '@/lib/push';
 import { pripniNavodKPolozce } from '@/lib/navodyDb';
 import { tymyCiselniku } from '@/lib/tenant';
 import { pozaduj, jeOdpoved, clenoveSOpravnenim } from '@/lib/opravneniDb';
+import { ctenarNaTabletu } from '@/lib/povinnePredUzaverkouDb';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,6 +55,17 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const categoryId = searchParams.get('categoryId');
 
+  // Čí stav čtení se počítá. Tablet je sdílený účet, jehož „moje přečtení" nikdy
+  // nevznikne (potvrzení se zapisuje pod člověka) — seznam by u povinných
+  // návodů věčně svítil „Povinné čtení". S ?actingAs=ID[&den=] se počítá za
+  // člověka u tabletu podle stejného pravidla jako potvrzení (ctenarNaTabletu);
+  // když ho server nepřijme, zůstává účet volajícího a odpověď `ctenar` nenese.
+  let ctenarId = c.meId;
+  if (c.role.typ === 'kiosk' && searchParams.get('actingAs')) {
+    const kdo = await ctenarNaTabletu(c, searchParams.get('actingAs'), searchParams.get('den'), request);
+    if (kdo != null) ctenarId = kdo;
+  }
+
   let rows: any[];
   try {
     rows = categoryId
@@ -61,7 +73,7 @@ export async function GET(request: Request) {
           SELECT g.id, g.title, g.category_id, g.content, g.checklist, g.updated_at, g.approved, g.submitted_by, g.product_id,
                  g.item_id, g.require_read, g.for_closing,
                  (SELECT COUNT(*)::int FROM guide_reads gr WHERE gr.guide_id = g.id) AS read_count,
-                 EXISTS (SELECT 1 FROM guide_reads gr2 WHERE gr2.guide_id = g.id AND gr2.user_id = ${c.meId}) AS my_read
+                 EXISTS (SELECT 1 FROM guide_reads gr2 WHERE gr2.guide_id = g.id AND gr2.user_id = ${ctenarId}) AS my_read
           FROM guides g
           WHERE g.team_id = ${c.teamId} AND g.category_id = ${parseInt(categoryId)}
           ORDER BY g.updated_at DESC`
@@ -69,7 +81,7 @@ export async function GET(request: Request) {
           SELECT g.id, g.title, g.category_id, g.content, g.checklist, g.updated_at, g.approved, g.submitted_by, g.product_id,
                  g.item_id, g.require_read, g.for_closing,
                  (SELECT COUNT(*)::int FROM guide_reads gr WHERE gr.guide_id = g.id) AS read_count,
-                 EXISTS (SELECT 1 FROM guide_reads gr2 WHERE gr2.guide_id = g.id AND gr2.user_id = ${c.meId}) AS my_read
+                 EXISTS (SELECT 1 FROM guide_reads gr2 WHERE gr2.guide_id = g.id AND gr2.user_id = ${ctenarId}) AS my_read
           FROM guides g
           WHERE g.team_id = ${c.teamId}
           ORDER BY g.updated_at DESC`;
@@ -102,7 +114,7 @@ export async function GET(request: Request) {
   try {
     for (const r of await sql`
       SELECT g.id, g.require_before_closing,
-        EXISTS (SELECT 1 FROM guide_reads gr WHERE gr.guide_id = g.id AND gr.user_id = ${c.meId}
+        EXISTS (SELECT 1 FROM guide_reads gr WHERE gr.guide_id = g.id AND gr.user_id = ${ctenarId}
                   AND (g.updated_at IS NULL OR gr.read_at >= g.updated_at)) AS aktualni
       FROM guides g WHERE g.team_id = ${c.teamId}` as any[]) {
       predUzaverkou.set(Number(r.id), { povinny: r.require_before_closing === true, aktualni: r.aktualni === true });
@@ -129,7 +141,7 @@ export async function GET(request: Request) {
     myReadCurrent: predUzaverkou.get(Number(g.id))?.aktualni === true,
   }));
 
-  return NextResponse.json({ guides });
+  return NextResponse.json({ guides, ctenar: ctenarId !== c.meId ? ctenarId : null });
 }
 
 // POST — založit návod (navody.vytvorit), nebo jen navrhnout

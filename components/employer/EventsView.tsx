@@ -27,10 +27,11 @@ import { Icon } from '../Icons';
 import {
   Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Modal, PersonChip, Segmented, Select, Skeleton, Switch, Textarea, Toast, type ChipTone,
 } from '../ui';
-import { useMoney } from '../CurrencyProvider';
+import { useMoney, usePrice } from '../CurrencyProvider';
 import { EVENT_KINDS, EVENT_STATUSES, kindSpec, statusLabel } from '@/lib/events';
 import { pragueToday } from '@/lib/pragueTime';
 import { okJson } from '@/lib/api';
+import { cenaZFormulare } from '@/lib/cena';
 import { useDraft } from '@/lib/useDraft';
 import { DraftNote } from '../ui/DraftNote';
 import { obsahuje, obsahujeNekde } from '@/lib/hledani';
@@ -296,6 +297,8 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, oznam
   oznam: OznamAkce;
   onClose: () => void; onDeleted: () => void;
 }) {
+  // Cena položky menu smí mít haléře (4,50 €).
+  const cena = usePrice();
   const [checkTxt, setCheckTxt] = useState('');
   const [packSearch, setPackSearch] = useState('');
   const [menuPickOpen, setMenuPickOpen] = useState(false);
@@ -303,6 +306,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, oznam
   const [crewOpen, setCrewOpen] = useState(false);
   const [customName, setCustomName] = useState('');
   const [customPrice, setCustomPrice] = useState('');
+  const [customPriceErr, setCustomPriceErr] = useState<string | null>(null);
   const [places, setPlaces] = useState<any | null>(null);
   const [pos, setPos] = useState<any | null>(null);
   const [posBusy, setPosBusy] = useState(false);
@@ -381,7 +385,12 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, oznam
   };
   const addCustomLine = () => {
     if (!customName.trim()) return;
-    patch(e.id, { menu: [...(e.menu ?? []), { name: customName.trim(), price: customPrice === '' ? null : Number(customPrice) }] });
+    // Cena přes společný parser: „3,50" s čárkou nesmí skončit jako 4 (ani NaN),
+    // nečíslo se neposílá a pole řekne proč.
+    const c = cenaZFormulare(customPrice);
+    if (!c.ok) { setCustomPriceErr('Napiš cenu číslem, třeba 3,50.'); return; }
+    setCustomPriceErr(null);
+    patch(e.id, { menu: [...(e.menu ?? []), { name: customName.trim(), price: c.hodnota }] });
     setCustomName(''); setCustomPrice('');
   };
   const pridejUkol = () => {
@@ -645,7 +654,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, oznam
                         {l.itemId != null && (l.pos
                           ? <Chip tone="ok" size="sm" icon="receipt">kasa</Chip>
                           : <Chip tone="wait" size="sm">bez kasy</Chip>)}
-                        {l.price != null && <span className="text-xs text-black/55 tabular-nums">{money(l.price)}</span>}
+                        {l.price != null && <span className="text-xs text-black/55 tabular-nums">{cena(l.price)}</span>}
                       </>}
                       actions={<Button size="sm" variant="ghost" iconOnly icon="close" aria-label={`Vyřadit ${l.name} z menu akce`}
                         onClick={() => patch(e.id, { menu: (e.menu ?? []).filter((_: any, j: number) => j !== i) })} />} />
@@ -674,7 +683,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, oznam
                               return (
                                 <button key={mi.id} type="button" onClick={() => toggleMenuItem(mi.id)} aria-pressed={on}
                                   className={`filter-pill tap-target-sm ${on ? 'seg-on' : 'seg-off glass'}`}>
-                                  {mi.name}{mi.price != null ? ` · ${mi.price}` : ''}{on ? <Icon name="check" size={11} className="inline ml-1 -mt-0.5" /> : null}
+                                  {mi.name}{mi.price != null ? ` · ${cena(Number(mi.price))}` : ''}{on ? <Icon name="check" size={11} className="inline ml-1 -mt-0.5" /> : null}
                                 </button>
                               );
                             })}
@@ -693,8 +702,8 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, oznam
                     <Input id={`akce-vlastni-${e.id}`} value={customName} onChange={ev3 => setCustomName(ev3.target.value)} maxLength={120}
                       onKeyDown={ev3 => { if (ev3.key === 'Enter') { ev3.preventDefault(); addCustomLine(); } }} />
                   </Field>
-                  <Field id={`akce-vlastni-cena-${e.id}`} label="Cena" className="w-24 shrink-0">
-                    <Input id={`akce-vlastni-cena-${e.id}`} value={customPrice} onChange={ev3 => setCustomPrice(ev3.target.value)} type="number" inputMode="numeric" className="text-center" />
+                  <Field id={`akce-vlastni-cena-${e.id}`} label="Cena" error={customPriceErr} className="w-24 shrink-0">
+                    <Input id={`akce-vlastni-cena-${e.id}`} value={customPrice} onChange={ev3 => { setCustomPrice(ev3.target.value); setCustomPriceErr(null); }} inputMode="decimal" className="text-center" />
                   </Field>
                   <Button iconOnly icon="plus" aria-label="Přidat vlastní položku" disabled={!customName.trim()} onClick={addCustomLine} />
                 </div>

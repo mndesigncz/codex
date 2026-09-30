@@ -4,6 +4,7 @@ import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { getConnection } from '@/lib/storyous';
+import { menaPodniku } from '@/lib/menaPodniku';
 import { daySummaryFor } from '@/lib/posMirror';
 import { normalizeHandover, normalizeMovements } from '@/lib/closing';
 import { chybejiciPredUzaverkou } from '@/lib/povinnePredUzaverkouDb';
@@ -239,14 +240,18 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
       const s = await daySummaryFor(teamId, day);
       // Ostatní uzávěrky téhož dne — porovnávat jednu směnu proti celodenní
       // tržbě by hlásilo rozdíl, který si aplikace vyrobila sama.
-      let dayCash = Number(c.cash_revenue) || 0;
-      let dayCard = Number(c.card_revenue) || 0;
+      // Uzávěrky akcí (event_id) se do denního součtu nepočítají — stejně jako v
+      // /api/pos/daily, widgetu Kasa a přehledu organizace. Jinak by detail říkal
+      // „sedí" a widget ten samý den hlásil rozdíl ve výši tržby akce.
+      const jeAkce = c.event_id != null;
+      let dayCash = jeAkce ? 0 : Number(c.cash_revenue) || 0;
+      let dayCard = jeAkce ? 0 : Number(c.card_revenue) || 0;
       let siblings = 0;
       try {
         const rows = await sql`
           SELECT cash_revenue, card_revenue FROM cash_closings
           WHERE team_id = ${teamId} AND COALESCE(shift_date, date) = ${day}
-            AND id <> ${id} AND covered_by IS NULL`;
+            AND id <> ${id} AND covered_by IS NULL AND event_id IS NULL`;
         for (const r of rows as any[]) {
           siblings++;
           dayCash += Number(r.cash_revenue) || 0;
@@ -268,7 +273,7 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
         notes.push(`K tomuhle dni je uzávěrek ${siblings + 1}, takže se pokladna porovnává proti jejich součtu, ne proti téhle jedné.`);
       }
       if (s.other > 0) {
-        notes.push(`${Math.round(s.other).toLocaleString('cs-CZ')} Kč z pokladny má jiný způsob platby než hotovost nebo kartu — v uzávěrce pro to není kolonka, takže se to v rozdílu projeví.`);
+        notes.push(`${(await menaPodniku(teamId)).money(Math.round(s.other))} z pokladny má jiný způsob platby než hotovost nebo kartu — v uzávěrce pro to není kolonka, takže se to v rozdílu projeví.`);
       }
       if (s.tipsOther > 0) {
         notes.push('U části spropitného se nedá vyčíst, jestli přišlo hotově nebo kartou — počítá se zvlášť, ne odhadem do jedné strany.');

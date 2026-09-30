@@ -23,6 +23,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['vedeni.tym'],
     opravneni: { vse: ['tym.zobrazit'], nektere: [], pole: { profil: 'tym.profil', kontakty: 'tym.kontakty' } },
     tarif: 'zdarma',
+    cil: { pohled: 'team-settings' },
     stav: 'hotovo',
   },
   // Data: GET /api/teams → team.join_code (jen s tym.pozvat); GET /api/invitations →
@@ -39,6 +40,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['vedeni.tym'],
     opravneni: { vse: ['tym.pozvat'], nektere: [] },
     tarif: 'zdarma',
+    cil: { pohled: 'team-settings' },
     stav: 'hotovo',
   },
   // Data: GET /api/roles → system[{nazev,pocet}], vlastni[{nazev,pocet}]
@@ -54,6 +56,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['vedeni.tym'],
     opravneni: { vse: [], nektere: ['tym.zobrazit', 'tym.role_prirazovat', 'tym.role_spravovat'] },
     tarif: 'zdarma',
+    cil: { pohled: 'team-settings' },
     stav: 'hotovo',
   },
   // Data: GET /api/teams → members[{name,hourly_rate}] (sazby jen s finance.mzdy)
@@ -69,6 +72,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['vedeni.dochazka', 'vedeni.tym'],
     opravneni: { vse: ['finance.mzdy'], nektere: [], pole: { 'akce:nastavit_sazbu': 'finance.sazby_upravit' } },
     tarif: 'zdarma',
+    cil: { pohled: 'team-settings' },
     stav: 'hotovo',
   },
   // Data: GET /api/employees/{id}
@@ -89,6 +93,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     },
     tarif: 'zdarma',
     nastaveni: [{ klic: 'clen', nazev: 'Člen', typ: 'zdroj', zdroj: 'clenove', vychozi: null }],
+    cil: { pohled: 'team-settings' },
     stav: 'hotovo',
   },
 ];

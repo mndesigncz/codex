@@ -20,6 +20,10 @@ export const VYJIMKY = [
   '/api/init',        // migrace
   '/api/register',
   '/api/billing/webhook', // Stripe nemá session, ale ať je to napsané
+  // Pozastavení vypíná aplikaci, ne fakturaci: majitel s běžícím předplatným
+  // ho musí umět zrušit. Portál smí otevřít jen ten, kdo má oprávnění
+  // predplatne.spravovat (kontroluje routa).
+  '/api/billing/portal',
   '/pozastaveno',     // stránka, kam se přesměrovává
   // Kdo má víc podniků, musí se z pozastaveného dostat do zdravého: switch
   // sám do pozastaveného cíle nepustí (423), mine jen vypíše členství.

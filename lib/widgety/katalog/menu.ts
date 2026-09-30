@@ -23,6 +23,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['zamestnanec.domu', 'vedeni.menu', 'vedeni.klient', 'kiosk.smena'],
     opravneni: { vse: [], nektere: ['menu.zobrazit', 'menu.vyprodano'], pole: { 'akce:prepnout_vyprodano': 'menu.vyprodano' } },
     tarif: 'max',
+    cil: { pohled: 'klient:menu' },
     stav: 'hotovo',
   },
   // Data: GET /api/menu → boards[{name,slug,enabled,hasPin,updatedAt,sections[].items[{price,posProductId}]}]
@@ -38,6 +39,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['vedeni.menu', 'vedeni.klient'],
     opravneni: { vse: ['menu.zobrazit'], nektere: [], pole: { 'akce:zverejnit': 'menu.zverejnit' } },
     tarif: 'max',
+    cil: { pohled: 'klient:menu' },
     stav: 'hotovo',
   },
   // Data: GET /api/menu → boards[].wifiSsid, wifiPassword

@@ -719,6 +719,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
    třídy je jiné. Přesně takhle tu už jednou vypadl stupeň /65 a opravil
    se zvlášť; tohle je zbytek téže řady. Hlídá to `check-dark-classes`. */
 :root[data-theme="dark"] .seg-off{ color:rgba(237,242,228,0.62); }
+/* Vybraná pilulka: inkoust #16181A na tmavém podkladu (26,28,31) splývá s nevybranými
+   skleněnými. Světlý vnitřní okraj (box-shadow, žádný posun rozměru) ji vrací dopředu
+   všude — záložky tabletu, filtry Úkolů i kategorie Skladu. */
+:root[data-theme="dark"] .seg-on{ box-shadow: inset 0 0 0 1px rgba(255,255,255,0.30); }
 @media (hover: hover) { :root[data-theme="dark"] .seg-off:hover{ color:#EDF2E4; background:rgba(255,255,255,0.08); } }
 :root[data-theme="dark"] .btn-icon{
   background:rgba(255,255,255,0.08); color:rgba(237,242,228,0.62);
@@ -1126,19 +1130,37 @@ h3             { letter-spacing: -0.01em;  line-height: 1.25; }
 .odznak-inkoust { background: #16181A; color: #C8F542; }
 :root[data-theme="dark"] .odznak-inkoust { background: #34373B; color: #C8F542; }
 
-/* BarSpark: sloupky bez os. Kontext je tlumený inkoust a zvýrazněný sloupek
-   (dnes, vybrané období) plný inkoust — „vybráno = inkoust" jako v celé
-   aplikaci. Limetka to na bílé kartě být nemůže: vedle papíru má 1,3 : 1 a je
-   vyhrazená akci. Na inkoustové ploše (DP §2.10) se to obrací: kontext bílou,
+/* BarSpark: sloupky bez os. Od kola 71 jsou grafy tržeb limetkové: kontext
+   nese světlý limetkový tón a zvýrazněný sloupek (dnes, vybrané období)
+   tmavou limetkovou zeleň (--ok-ink) — plná limetka #C8F542 na bílé kartě
+   být nesmí (1,3 : 1 vedle papíru, DP T3 ji vyhrazuje akci), tmavá zeleň
+   drží 5,5 : 1 a v tmavém režimu se přes --ok-ink převrátí na svítící
+   limetku sama. Na inkoustové ploše (DP §2.10) beze změny: kontext bílou,
    zvýraznění limetkou, bez záře — záře patří jen hlavní akci. */
-.spark-sloupek    { background: rgba(22,24,26,0.18); }
-.spark-sloupek-hl { background: #16181A; }
+.spark-sloupek    { background: rgba(200,245,66,0.45); }
+.spark-sloupek-hl { background: var(--ok-ink); }
 .spark-inkoust .spark-sloupek    { background: rgba(255,255,255,0.24); }
 .spark-inkoust .spark-sloupek-hl { background: #C8F542; }
-:root[data-theme="dark"] .spark-sloupek    { background: rgba(237,242,228,0.24); }
-:root[data-theme="dark"] .spark-sloupek-hl { background: #EDF2E4; }
+:root[data-theme="dark"] .spark-sloupek    { background: rgba(200,245,66,0.25); }
+:root[data-theme="dark"] .spark-sloupek-hl { background: #C8F542; }
 :root[data-theme="dark"] .spark-inkoust .spark-sloupek    { background: rgba(255,255,255,0.24); }
 :root[data-theme="dark"] .spark-inkoust .spark-sloupek-hl { background: #C8F542; }
+
+/* Limetkový dotek malých karet čísel (kolo 71): jemný gradient v pravém
+   horním rohu, aby domovské plochy nepůsobily jen bíle. Je to
+   background-image, ne barva — sonda k68-design měří backgroundColor
+   (plné limetkové plochy) a kontrast textu počítá jen z barev podkladu,
+   takže se ho dotek netýká. V tmavém režimu ztlumený, limetka na tmavé
+   jinak svítí. */
+.w-dotek {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: radial-gradient(140px 100px at 100% 0%, rgba(200,245,66,0.16), transparent 70%);
+}
+:root[data-theme="dark"] .w-dotek {
+  background: radial-gradient(140px 100px at 100% 0%, rgba(200,245,66,0.09), transparent 70%);
+}
 
 /* České datum se píše větně: „úterý 18. srpna" → „Úterý 18. srpna".
    Tailwindí `capitalize` zvětší KAŽDÉ slovo a udělá z toho anglický

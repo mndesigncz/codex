@@ -21,7 +21,8 @@ import ReceiptsPanel from './ReceiptsPanel';
 import MobileMoreSheet from '../MobileMoreSheet';
 import { ProfileLinkProvider } from './ProfileLinkProvider';
 import { usePlan, MaxGate } from '../Pro';
-import { czDays } from '@/lib/plan';
+import { TRIAL_DAYS } from '@/lib/plan';
+import { textZkousky } from '@/lib/predplatneTexty';
 import { useModal } from '@/lib/useModal';
 import { DiscardGuard } from '../ui/DiscardGuard';
 import dynamic from 'next/dynamic';
@@ -226,6 +227,9 @@ export default function EmployerLayout({ user }: Props) {
     // otevřít rovnou tu záložku. Bez tohohle vedla do Účtu a člověk
     // hledal dál sám.
     setSettingsTab(view === 'settings' ? arg : undefined);
+    // Settings už může být otevřené (banner v hlavičce je vidět všude), takže
+    // změna záložky se mu oznámí počítadlem, ne jen novým výchozím tabem.
+    if (view === 'settings') setSettingsNonce(n => n + 1);
     setCurrentViewRaw(view);
   };
   // Deep links from notifications and old bookmarks: /employer/overview?view=X
@@ -233,6 +237,14 @@ export default function EmployerLayout({ user }: Props) {
     const p = new URLSearchParams(window.location.search);
     const v = p.get('view');
     if (v && (byId[v] || v === 'settings' || v === 'team-settings' || v === 'org')) setCurrentViewRaw(v);
+    // Odkaz na konkrétní záložku Nastavení: `&tab=billing`. Návrat ze Stripe
+    // pokladny nese jen `&billing=success|cancel` (starší odkazy a záložky),
+    // což taky znamená Předplatné — bez toho se otevřel Účet a potvrzení
+    // platby se nikde neukázalo.
+    if (v === 'settings') {
+      const tab = p.get('tab') ?? (p.get('billing') ? 'billing' : null);
+      if (tab) setSettingsTab(tab);
+    }
     const g = Number(p.get('guide'));
     if (v === 'guides' && Number.isFinite(g) && g > 0) setGuideId(g);
   }, []);
@@ -243,6 +255,7 @@ export default function EmployerLayout({ user }: Props) {
   const { conversations: chatConvs } = useConversations();
   const unreadChat = chatConvs.reduce((n, c) => n + (c.unreadCount || 0), 0);
   const [settingsTab, setSettingsTab] = useState<string | undefined>();
+  const [settingsNonce, setSettingsNonce] = useState(0);
   const [moreOpen, setMoreOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const ucet = usePopover(accountOpen, setAccountOpen, { focusFirst: true, arrowKeys: true });
@@ -281,7 +294,7 @@ export default function EmployerLayout({ user }: Props) {
       case 'org':       return <OrgOverview onOpenTeam={prepniAOtevri} />;
       case 'finance':   return <FinanceView />;
       case 'suggestions': return <SuggestionsBoard />;
-      case 'settings':  return <Settings user={user as any} initialTab={(settingsTab ?? 'account') as any} />;
+      case 'settings':  return <Settings user={user as any} initialTab={(settingsTab ?? 'account') as any} tabNonce={settingsNonce} />;
       case 'team-settings': return <TeamManagement user={user as any} />;
       default:          return <EmployerDashboard user={user} />;
     }
@@ -500,27 +513,25 @@ export default function EmployerLayout({ user }: Props) {
           <NotificationBell />
         </header>
 
+        {/* Bannery předplatného vedou rovnou na záložku Předplatné, ne na Účet.
+            Past_due je jedno tlačítko (dřív <button> v <button>: neplatné HTML
+            a dvě různé cesty podle toho, kam se kliklo). */}
         {plan?.pastDue ? (
-          <button onClick={() => setCurrentView('settings')}
+          <button type="button" onClick={() => navigate('settings', 'billing')}
             className="mx-4 mt-3 note note-danger text-left font-medium hover:brightness-95 transition">
             <Icon name="warning" size={15} className="inline -mt-0.5 mr-1.5" />Platba předplatného se nezdařila.{' '}
-            <button type="button" onClick={() => navigate('settings', 'billing')}
-              className="tap-target-sm font-semibold underline underline-offset-2 hover:no-underline">
-              Zkontrolovat kartu
-            </button>
+            <span className="font-semibold underline underline-offset-2">Zkontrolovat kartu</span>
           </button>
         ) : plan?.trialing ? (
-          <button onClick={() => setCurrentView('settings')}
+          <button type="button" onClick={() => navigate('settings', 'billing')}
             className="mx-4 mt-3 rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/35 px-4 py-2.5 text-sm text-left text-[#5B7A08] font-medium hover:bg-[#C8F542]/25 transition">
             <Icon name="sparkle" size={15} className="inline -mt-0.5 mr-1.5" />
-            {plan.subscriptionStatus === 'trialing'
-              ? `Zkoušíte ${plan.effective === 'max' ? 'Max' : 'Pro'} — zbývá ${czDays(plan.trialDaysLeft)}, potom se strhne první platba.`
-              : `Zkoušíte Pro — zbývá ${czDays(plan.trialDaysLeft)}. Kliknutím zjistíte, co zůstane ve Zdarma.`}
+            {textZkousky(plan)}
           </button>
         ) : plan && plan.effective === 'free' && !plan.hadSubscription ? (
-          <button onClick={() => setCurrentView('settings')}
+          <button type="button" onClick={() => navigate('settings', 'billing')}
             className="mx-4 mt-3 rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/35 px-4 py-2.5 text-sm text-left text-[#5B7A08] font-medium hover:bg-[#C8F542]/25 transition">
-            <Icon name="sparkle" size={15} className="inline -mt-0.5 mr-1.5" />Vyzkoušejte Pro 30 dní zdarma — neomezený tým, kiosk, odměny a přehledy. Karta se strhne až po měsíci.
+            <Icon name="sparkle" size={15} className="inline -mt-0.5 mr-1.5" />Vyzkoušejte Pro {TRIAL_DAYS} dní zdarma — neomezený tým, kiosk, odměny a přehledy. Karta se strhne až po měsíci.
           </button>
         ) : null}
         {/* relative: absolutně umístěné prvky uvnitř (skryté popisky pro

@@ -59,7 +59,7 @@ import { apiMessage, okJson } from '@/lib/api';
 import { czCount, czForm, DEN } from '@/lib/czech';
 import { dbTimeDayHM, dbTimeHM, parseDbTime, pragueDayOf, pragueToday } from '@/lib/pragueTime';
 import {
-  ZAPOMENUTY_MS, dnesVPodniku, konecSmeny, hodinyMinuty, mujMesic, mzdyZaObdobi, obdobiDni, otevrenePrichody, podilMezd,
+  ZAPOMENUTY_MS, dnesVPodniku, konecSmeny, navrhOdchodu as navrhOdchoduPlan, hodinyMinuty, mujMesic, mzdyZaObdobi, obdobiDni, otevrenePrichody, podilMezd,
   sazbyZRosteru, seradSouhrn, souhrnHodin, trzbyZaObdobi,
   type OtevrenyPrichod, type RadekDne, type RazeniSouhrnu, type UzaverkaTrzby,
 } from '@/lib/dochazkaPrehled';
@@ -430,16 +430,9 @@ function doVstupu(d: Date): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-/**
- * Návrh času odchodu: plánovaný konec směny (i přes půlnoc), pokud leží mezi
- * příchodem a teď a ne dál než 24 h od příchodu (dnešní plán se nesmí
- * přilepit ke včerejšímu zapomenutému příchodu). Jinak (bez plánu, směna
- * ještě běží) teď — budoucí odchod by nedával smysl.
- */
+/** Návrh času odchodu (sdílená logika v lib/dochazkaPrehled — používá ji i nástroj Docházky). */
 function navrhOdchodu(od: Date, konec: Date | null): { cas: Date; zPlanu: boolean } {
-  const ted = Date.now();
-  if (konec && konec.getTime() > od.getTime() && konec.getTime() <= ted && konec.getTime() - od.getTime() <= 24 * 3600_000) return { cas: konec, zPlanu: true };
-  return { cas: new Date(ted), zPlanu: false };
+  return navrhOdchoduPlan(od, konec, Date.now());
 }
 
 /**

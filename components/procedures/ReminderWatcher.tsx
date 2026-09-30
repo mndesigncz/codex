@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useSession } from 'next-auth/react';
 import { Icon } from '../Icons';
 import { Button } from '../ui';
 import { useProcedures, type ProcedureLite } from './ProcedureProvider';
@@ -53,6 +54,7 @@ function markFired(key: string) {
  */
 export default function ReminderWatcher() {
   const { active, startRun, starting } = useProcedures();
+  const { status: stavRelace } = useSession();
   const proceduresRef = useRef<ProcedureLite[]>([]);
   const hasShiftTodayRef = useRef(false);
   const openingRef = useRef<{ open: string; close: string; closed: boolean }>({ open: '08:00', close: '20:00', closed: false });
@@ -124,6 +126,8 @@ export default function ReminderWatcher() {
   }, [fireRemind]);
 
   useEffect(() => {
+    // Bez přihlášení není co hlídat (a /api/procedures by vrátilo 401).
+    if (stavRelace !== 'authenticated') return;
     let cancelled = false;
     (async () => {
       await loadProcedures();
@@ -137,7 +141,7 @@ export default function ReminderWatcher() {
       clearInterval(tick);
       clearInterval(refresh);
     };
-  }, [loadProcedures, check]);
+  }, [loadProcedures, check, stavRelace]);
 
   // If a run starts (this or another procedure), drop the prompt.
   useEffect(() => {

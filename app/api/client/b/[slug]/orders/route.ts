@@ -4,6 +4,7 @@ import { sql, customer, profileBySlug, join } from '@/lib/client';
 import { buildLines, notifyNewOrder, parseGeo, checkGeo, geoMode, setOrderStatus } from '@/lib/clientOrders';
 import { getConnection } from '@/lib/storyous';
 import { hit } from '@/lib/rateLimit';
+import { cenaKZapisu } from '@/lib/cenaSloupce';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -43,9 +44,11 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
   if (open) return NextResponse.json({ error: 'Předchozí objednávka ještě čeká na obsluhu.' }, { status: 409 });
   await join(me.id, teamId);
   const note = String(b.note ?? '').trim().slice(0, 300) || null;
+  // Součet z cen menu smí mít haléře (13,50 €); sloupec ho unese jen jako NUMERIC.
+  const soucet = (await cenaKZapisu('client_orders.total', built.total)) ?? 0;
   const [o] = await sql`
     INSERT INTO client_orders (team_id, customer_id, table_id, items, total, note, status, via_qr, geo_status, geo_distance_m)
-    VALUES (${teamId}, ${me.id}, ${table.id}, ${JSON.stringify(built.lines)}, ${built.total}, ${note}, 'new', ${viaQr}, ${geo.status}, ${geo.distance})
+    VALUES (${teamId}, ${me.id}, ${table.id}, ${JSON.stringify(built.lines)}, ${soucet}, ${note}, 'new', ${viaQr}, ${geo.status}, ${geo.distance})
     RETURNING id, items, total, status, created_at`;
   await sql`UPDATE client_orders SET external_id = ${'mgr-ord-' + o.id} WHERE id = ${o.id}`;
 

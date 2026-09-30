@@ -6,7 +6,8 @@ import { neon } from '@neondatabase/serverless';
 import { hit, clear } from './rateLimit';
 import { db } from './db';
 import { users } from './db/schema';
-import { eq } from 'drizzle-orm';
+import { sql as sqlD } from 'drizzle-orm';
+import { normalizujEmail, poradiKandidatu } from './emailAdresa';
 import { generateJoinCode } from './team';
 import { jeSpravcePodleDb } from './superadminDb';
 import { zajistiClenstvi, clenstviUzivatele, prepniTym } from './tenant';
@@ -90,19 +91,29 @@ export const authOptions: NextAuthOptions = {
         if (!ipGate.ok) return null;
         // Deset neúspěchů na e-mail za čtvrt hodiny. Bez tohohle šlo heslo
         // hádat donekonečna — bcrypt sice zdržuje, ale útočníka neodradí.
-        const email = String(credentials.email).trim().toLowerCase();
+        const email = normalizujEmail(credentials.email);
+        if (!email) return null;
         const gate = await hit(`login:${email}`, 10, 15 * 60, { failClosed: true });
         if (!gate.ok) {
           // Stejná odpověď jako u špatného hesla: ať se nedá zjistit, které
           // e-maily v aplikaci existují.
           return null;
         }
-        const user = await db.query.users.findFirst({
-          where: eq(users.email, credentials.email),
+        // Hledá se bez ohledu na velikost písmen: účty z doby před sjednocením
+        // mají e-mail uložený tak, jak ho člověk poprvé napsal („Jan@firma.cz"),
+        // a mobilní klávesnice ho dnes pošle malými. Kdyby z dřívějška existovaly
+        // dva účty lišící se jen velikostí písmen, zkusí se nejdřív ten, který
+        // přesně odpovídá zadání, a pustí se ten, jehož heslo sedí.
+        const nalezeni = await db.query.users.findMany({
+          where: sqlD`lower(${users.email}) = ${email}`,
+          limit: 5,
         });
+        if (nalezeni.length === 0) return null;
+        let user: (typeof nalezeni)[number] | null = null;
+        for (const kandidat of poradiKandidatu(credentials.email, nalezeni)) {
+          if (await bcrypt.compare(credentials.password, kandidat.passwordHash)) { user = kandidat; break; }
+        }
         if (!user) return null;
-        const valid = await bcrypt.compare(credentials.password, user.passwordHash);
-        if (!valid) return null;
         await clear(`login:${email}`);
         let teamId: number | null = user.teamId ?? null;
         if (user.role === 'employer') {

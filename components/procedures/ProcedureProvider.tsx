@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 import ReminderWatcher from './ReminderWatcher';
 
 export interface ActiveRun {
@@ -70,8 +71,14 @@ export function ProcedureProvider({ children }: { children: React.ReactNode }) {
   // Debounce PATCH progress writes so rapid taps don't spam the server.
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Postupy jsou jen pro přihlášené. Provider je v kořeni celé aplikace,
+  // takže bez téhle kontroly střílel i anonymní návštěvník prodejní stránky
+  // na /api/procedures/runs a dostával 401 (dvě chyby v konzoli na každé načtení).
+  const { status: stavRelace } = useSession();
+
   // Hydrate on mount: trust the server's running run; localStorage only gates the fetch.
   useEffect(() => {
+    if (stavRelace !== 'authenticated') return;
     let cancelled = false;
     (async () => {
       try {
@@ -84,7 +91,7 @@ export function ProcedureProvider({ children }: { children: React.ReactNode }) {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [stavRelace]);
 
   // Mirror the active run id into localStorage so a refresh knows to restore.
   useEffect(() => {

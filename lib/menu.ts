@@ -6,10 +6,12 @@
 // nedosáhne (výpadek wifi na akci), použije to, co má zadrátované v sobě —
 // proto tady drží i výchozí obsah.
 
+import { cenaMenu } from './cena.ts';
+
 export interface MenuItem {
   id: number;
   name: string;
-  /** V celých korunách. */
+  /** V jednotkách měny, s haléři (4,50 €) — dřív celé koruny. */
   price: number;
   description: string | null;
   soldOut: boolean;
@@ -56,10 +58,13 @@ export function cleanText(raw: any, max: number): string {
   return String(raw ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 }
 
+/**
+ * Cena položky menu s haléři: 4,50 € zůstane 4,50 (dřív Math.round → 5 a
+ * v editoru se z „4,50" po vyhození nečíslic stalo 450). Sloupec ještě
+ * nemusí být NUMERIC — před zápisem se ještě hlídá lib/cenaSloupce.
+ */
 export function cleanPrice(raw: any): number {
-  const n = Math.round(Number(raw));
-  if (!Number.isFinite(n) || n < 0) return 0;
-  return Math.min(n, MAX_PRICE);
+  return cenaMenu(raw, MAX_PRICE);
 }
 
 /** Slug do URL: /menu-akce.html?menu=<slug> a /api/menu/public/<slug>. */

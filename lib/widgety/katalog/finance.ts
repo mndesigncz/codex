@@ -64,6 +64,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'trzby',
       },
     ],
+    cil: { pohled: 'finance' },
     stav: 'hotovo',
   },
   // Data: GET /api/finance?month → summary.revenue, summary.wagesWorked, summary.wagesCash, summary.prevRevenue,
@@ -89,6 +90,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'tento',
       },
     ],
+    cil: { pohled: 'finance' },
     stav: 'hotovo',
   },
   // Data: GET /api/finance?month → ledger[{kind,amount}], summary{wagesCash,wagesWorked,stockValue,stockTop}
@@ -114,6 +116,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'tento',
       },
     ],
+    cil: { pohled: 'finance' },
     stav: 'hotovo',
   },
   // Data: GET /api/pos/margins?month → totals{marginPct,margin,cogs,revenueKnown,noRecipe,noRecipeShare},
@@ -147,6 +150,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'trzba',
       },
     ],
+    cil: { pohled: 'finance' },
     stav: 'hotovo',
   },
   // Data: GET /api/finance?month → guest{orders,total,offPos,offPosTotal,members,newMembers,couponsRedeemed}
@@ -171,6 +175,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'tento',
       },
     ],
+    cil: { pohled: 'klient:loyalty' },
     stav: 'hotovo',
   },
   // Data: GET /api/finance/advice?month → advice[], blind[], counts{}
@@ -195,6 +200,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'tento',
       },
     ],
+    cil: { pohled: 'finance' },
     stav: 'hotovo',
   },
   // Data: GET /api/finance?month → insights[{icon,title,text,tone}]
@@ -220,6 +226,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'tento',
       },
     ],
+    cil: { pohled: 'finance' },
     stav: 'hotovo',
   },
   // Data: GET /api/inventory/shrinkage[?id] → ready, stocktake{completedAt,counted},
@@ -236,6 +243,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['vedeni.sklad', 'vedeni.finance'],
     opravneni: { vse: ['finance.ztraty'], nektere: [] },
     tarif: 'zdarma',
+    cil: { pohled: 'finance' },
     stav: 'hotovo',
   },
   // Data: GET /api/receipts → receipts[{photoUrl,supplier,amount,note,createdAt}] (bez finance.uctenky_zobrazit
@@ -256,6 +264,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
       pole: { 'akce:nafotit': 'finance.uctenky_pridat', 'akce:upravit_smazat': 'finance.uctenky_upravit' },
     },
     tarif: 'zdarma',
+    cil: { pohled: 'finance' },
     stav: 'hotovo',
   },
 ];

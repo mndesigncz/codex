@@ -58,14 +58,14 @@ export async function POST(req: NextRequest) {
 
   if (existing) {
     // Make sure the new e-mail isn't taken by someone else.
-    const [clash] = await sql`SELECT id FROM users WHERE email = ${email} AND id <> ${existing.id}`;
+    const [clash] = await sql`SELECT id FROM users WHERE lower(email) = ${email} AND id <> ${existing.id} LIMIT 1`;
     if (clash) return NextResponse.json({ error: 'Tento e-mail už používá jiný účet.' }, { status: 409 });
     await sql`UPDATE users SET email = ${email}, password_hash = ${hash} WHERE id = ${existing.id}`;
     audit(c.teamId, c.meId, 'kiosk.login', 'user', Number(existing.id), `Změněno přihlášení tabletu (${email})`);
     return NextResponse.json({ ok: true, kiosk: { id: existing.id, email } });
   }
 
-  const [clash] = await sql`SELECT id FROM users WHERE email = ${email}`;
+  const [clash] = await sql`SELECT id FROM users WHERE lower(email) = ${email} LIMIT 1`;
   if (clash) return NextResponse.json({ error: 'Tento e-mail už používá jiný účet.' }, { status: 409 });
 
   const [k] = await sql`

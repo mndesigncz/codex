@@ -7,6 +7,7 @@
 
 import { NextResponse } from 'next/server';
 import { coverageGaps } from '@/lib/coverage';
+import { radaDniOk } from '@/lib/rozvrhGenerator';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { audit } from '@/lib/audit';
@@ -200,7 +201,8 @@ export async function POST(req: Request) {
       unavailable: new Set<string>([...(a?.unavailable_dates ?? []), ...Array.from(timeOffByEmp.get(u.id) ?? [])]),
       dayPrefs: (a?.day_preferences ?? {}) as Record<string, string>,
       preferredShift: a?.preferred_shift ?? null,
-      maxShifts: a?.max_shifts ?? null,
+      // Uložená 0 je „bez limitu“, stejně jako v přehledu vytížení.
+      maxShifts: Number(a?.max_shifts) > 0 ? Number(a.max_shifts) : null,
       maxConsecutive: personalMax.get(u.id) === 0 ? null : (personalMax.get(u.id) ?? teamMaxConsecutive ?? null),
       maxHours: personalHours.get(u.id) === 0 ? null : (personalHours.get(u.id) ?? teamMaxHours ?? null),
       workedDates: new Set<string>(),
@@ -224,8 +226,9 @@ export async function POST(req: Request) {
     while (p.workedDates.has(cursor) && n < 40) { n++; cursor = prevDay(cursor); }
     return n;
   };
-  const restOk = (p: P, date: string) =>
-    p.maxConsecutive == null || p.workedDates.has(date) || streakBefore(p, date) < p.maxConsecutive;
+  // Řada dní se počítá oběma směry (jako v generátoru): přeřazení doprostřed
+  // existující řady ji spojí, takže pohled jen dozadu by pustil řadu přes limit.
+  const restOk = (p: P, date: string) => radaDniOk(p.workedDates, date, p.maxConsecutive);
   const hoursOk = (p: P, h: number) => p.maxHours == null || p.monthHours + h <= p.maxHours + 0.01;
   const shiftsOk = (p: P) => p.maxShifts == null || p.monthShifts < p.maxShifts;
 
