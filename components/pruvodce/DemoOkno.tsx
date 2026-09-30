@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { IdScenyDema } from '@/lib/demo/sceny';
+import { useT } from '@/lib/i18n/client';
 
 // Živá ukázka aplikace uvnitř průvodce: skutečná aplikace (veřejná ukázka
 // /demo, lib/demo) v rámu telefonu. Nejsou to obrázky ani maketa — widgety,
@@ -31,6 +32,7 @@ export default function DemoOkno({ scena, maxVyska, className = '' }: {
   maxVyska?: number;
   className?: string;
 }) {
+  const t = useT('pruvodce');
   const obal = useRef<HTMLDivElement>(null);
   const ramec = useRef<HTMLIFrameElement>(null);
   const prvniScena = useRef(scena);
@@ -89,13 +91,13 @@ export default function DemoOkno({ scena, maxVyska, className = '' }: {
         <div className="pv-zarizeni-platno" style={{ width: SIRKA * k, height: VYSKA * k }}>
           <iframe
             ref={ramec}
-            title="Ukázka aplikace s vymyšlenými daty"
+            title={t('Ukázka aplikace s vymyšlenými daty')}
             src={`/demo?scena=${prvniScena.current}&role=vedeni&rezim=okno`}
             width={SIRKA}
             height={VYSKA}
             style={{ transform: `scale(${k})` }}
           />
-          {zaves && <div className="pv-zarizeni-zaves" role="status"><span>Načítám ukázku…</span></div>}
+          {zaves && <div className="pv-zarizeni-zaves" role="status"><span>{t('Načítám ukázku…')}</span></div>}
         </div>
       </div>
     </div>

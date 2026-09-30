@@ -21,7 +21,10 @@
       "navody": "strojový",
       "postupy": "strojový",
       "rozvrh": "strojový",
-      "sklad": "strojový"
+      "sklad": "strojový",
+      "pruvodce": "strojový",
+      "spolecne": "strojový",
+      "predplatne": "strojový"
     },
     "de": {
       "common": "strojový",
@@ -36,7 +39,10 @@
       "navody": "strojový",
       "postupy": "strojový",
       "rozvrh": "strojový",
-      "sklad": "strojový"
+      "sklad": "strojový",
+      "pruvodce": "strojový",
+      "spolecne": "strojový",
+      "predplatne": "strojový"
     },
     "sk": {
       "common": "strojový",
@@ -51,7 +57,10 @@
       "navody": "strojový",
       "postupy": "strojový",
       "rozvrh": "strojový",
-      "sklad": "strojový"
+      "sklad": "strojový",
+      "pruvodce": "strojový",
+      "spolecne": "strojový",
+      "predplatne": "strojový"
     },
     "pl": {
       "common": "strojový",
@@ -66,7 +75,10 @@
       "navody": "strojový",
       "postupy": "strojový",
       "rozvrh": "strojový",
-      "sklad": "strojový"
+      "sklad": "strojový",
+      "pruvodce": "strojový",
+      "spolecne": "strojový",
+      "predplatne": "strojový"
     }
   },
   "nepreklada_se": [

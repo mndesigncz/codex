@@ -2,6 +2,7 @@
 
 import { Chip, Well } from '@/components/ui';
 import { Icon } from '@/components/Icons';
+import { useT } from '@/lib/i18n/client';
 import { TRIAL_DAYS } from '@/lib/plan';
 import { CILE_PODLE_TYPU } from '@/lib/pruvodce/predvolby';
 import { CILE, type Cil } from '@/lib/pruvodce/typy';
@@ -21,6 +22,7 @@ export function vybraneCile(odp: KrokProps['odp']): Cil[] {
 }
 
 export default function Cile({ odp, zmen, fokus, naFokus }: KrokProps & { fokus: Cil | null; naFokus: (c: Cil | null) => void }) {
+  const t = useT('pruvodce');
   const vybrane = vybraneCile(odp);
   const prepni = (c: Cil) => {
     naFokus(c);
@@ -30,7 +32,7 @@ export default function Cile({ odp, zmen, fokus, naFokus }: KrokProps & { fokus:
 
   return (
     <div>
-      <ul className="grid gap-3 sm:grid-cols-2" aria-label="Co chceš mít pod kontrolou">
+      <ul className="grid gap-3 sm:grid-cols-2" aria-label={t('Co chceš mít pod kontrolou')}>
         {CILE.map(c => {
           const on = vybrane.includes(c.id);
           return (
@@ -42,12 +44,12 @@ export default function Cile({ odp, zmen, fokus, naFokus }: KrokProps & { fokus:
                   <Icon name={on ? 'check' : c.ikona} size={18} strokeWidth={on ? 2.4 : 1.7} />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="t-card block">{c.nazev}</span>
-                  <span className="t-meta mt-0.5 block text-pretty">{c.veta}</span>
+                  <span className="t-card block">{t(c.nazev)}</span>
+                  <span className="t-meta mt-0.5 block text-pretty">{t(c.veta)}</span>
                   {c.tarif !== 'zdarma' && (
                     <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
                       <Chip tone="muted" size="sm">{c.tarif === 'max' ? 'Max' : 'Pro'}</Chip>
-                      <span className="text-[11px] text-black/50">Vyzkoušíš zdarma {TRIAL_DAYS} dní</span>
+                      <span className="text-[11px] text-black/50">{t('Vyzkoušíš zdarma {n} dní', { n: TRIAL_DAYS })}</span>
                     </span>
                   )}
                 </span>
@@ -57,8 +59,8 @@ export default function Cile({ odp, zmen, fokus, naFokus }: KrokProps & { fokus:
         })}
       </ul>
       <Well className="mt-4" aria-live="polite" data-ukazka-cile={ukazany.id}>
-        <p className="t-label">Ukázka · {ukazany.nazev}</p>
-        <p className="mt-1.5 text-[14px] leading-snug text-[#16181A] text-pretty">{ukazany.ukazka}</p>
+        <p className="t-label">{t('Ukázka · {nazev}', { nazev: t(ukazany.nazev) })}</p>
+        <p className="mt-1.5 text-[14px] leading-snug text-[#16181A] text-pretty">{t(ukazany.ukazka)}</p>
       </Well>
     </div>
   );

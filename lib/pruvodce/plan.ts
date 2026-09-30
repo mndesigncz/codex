@@ -53,6 +53,34 @@ export const NAZVY_OPERACI: Record<KlicOperace, string> = {
   sklad: 'Kategorie skladu', postupy: 'Postupy', prehled: 'Přehled', kasa: 'Hotovost v kase',
 };
 
+/** Poznámky přeskočených operací a pevné věty výsledku. Vstup pro překlad na serveru i pro kontrolu slovníků. */
+export const POZNAMKY = {
+  hotovoNastavene: 'Už je nastavené.',
+  hotovoNastavena: 'Už je nastavená.',
+  dobaMate: 'Otevírací dobu už máte nastavenou, nechali jsme ji.',
+  smenyZalozene: 'Už jsou založené.',
+  smenyMate: 'Typy směn už máte, nechali jsme je.',
+  smenyStejne: 'Stejné typy směn už jsou založené.',
+  pravidloMate: 'Pravidlo už máte nastavené, nechali jsme ho.',
+  kategorieStejne: 'Stejné kategorie už máte.',
+  postupyStejne: 'Postupy se stejným názvem už máte.',
+  prehledUpraveny: 'Přehled už máte upravený, nechali jsme ho.',
+  prehledHotovy: 'Už je složený.',
+  kasaMate: 'Hotovost v kase už máte nastavenou, nechali jsme ji.',
+  adresaNejde: 'Adresu a zemi se zatím uložit nepodařilo, doplníš je v Nastavení.',
+  zalozeniSelhalo: 'Založení selhalo.',
+  rucne: 'Nastavíš to ručně: {kde}.',
+  prehledZmenen: 'Přehled se mezitím změnil jinde.',
+} as const;
+
+/** Počty založených věcí (plurály se vybírají v jazyce majitele). */
+export const POCTY = {
+  smeny: '{n, plural, one {# typ směny} few {# typy směn} other {# typů směn}}',
+  sklad: '{n, plural, one {# kategorie} few {# kategorie} other {# kategorií}}',
+  postupy: '{n, plural, one {# postup} few {# postupy} other {# postupů}}',
+  prehled: '{n, plural, one {# widget} few {# widgety} other {# widgetů}}',
+} as const;
+
 /** Kam v aplikaci to jde nastavit ručně, když se operace nepovedla. */
 export const KDE_V_NASTAVENI: Record<KlicOperace, string> = {
   podnik: 'Nastavení → Tým → Provoz podniku', doba: 'Rozvrh → Nastavení → Otevírací doba', smeny: 'Rozvrh → Nastavení → Typy směn',
@@ -88,7 +116,15 @@ export function dataPodniku(o: Odpovedi): DataPodniku {
   return d;
 }
 
-export function sestavPlan(o: Odpovedi, stav: StavPodniku, pouzito: Record<string, string> = {}): Operace[] {
+export type Prekladac = (cs: string) => string;
+const beze: Prekladac = cs => cs;
+
+/**
+ * `pr` přeloží české výchozí názvy (směny, kategorie, postupy) do jazyka majitele:
+ * do databáze jdou v jeho jazyce. Otisky (ledger) se počítají z českého zdroje, ať
+ * změna jazyka neznehodnotí „už je založeno"; dedupe podle názvu zná český i přeložený tvar.
+ */
+export function sestavPlan(o: Odpovedi, stav: StavPodniku, pouzito: Record<string, string> = {}, pr: Prekladac = beze): Operace[] {
   const plan: Operace[] = [];
   const presk = (klic: KlicOperace, hash: string, poznamka: string): Operace => ({ klic, nazev: NAZVY_OPERACI[klic], hash, stav: 'preskocit', poznamka });
   const uz = (klic: KlicOperace, hash: string) => pouzito[klic] === hash;
@@ -99,16 +135,16 @@ export function sestavPlan(o: Odpovedi, stav: StavPodniku, pouzito: Record<strin
   const dp = krok('podnik') || krok('typ') ? dataPodniku(o) : {};
   if (Object.keys(dp).length) {
     const h = otisk(dp);
-    plan.push(uz('podnik', h) ? presk('podnik', h, 'Už je nastavené.') : { klic: 'podnik', nazev: NAZVY_OPERACI.podnik, hash: h, stav: 'provest', podnik: dp });
+    plan.push(uz('podnik', h) ? presk('podnik', h, POZNAMKY.hotovoNastavene) : { klic: 'podnik', nazev: NAZVY_OPERACI.podnik, hash: h, stav: 'provest', podnik: dp });
   }
 
   // --- otevírací doba ---
   if (o.doba && krok('doba')) {
     const h = otisk(o.doba);
-    if (uz('doba', h)) plan.push(presk('doba', h, 'Už je nastavená.'));
+    if (uz('doba', h)) plan.push(presk('doba', h, POZNAMKY.hotovoNastavena));
     // Doba, kterou člověk nastavil sám, se nepřepisuje. Přepsat smíme jen
     // prázdnou nebo tu, kterou tu dříve nastavil průvodce (má záznam v ledgeru).
-    else if (!stav.openingHoursPrazdne && !pouzito.doba) plan.push(presk('doba', h, 'Otevírací dobu už máte nastavenou, nechali jsme ji.'));
+    else if (!stav.openingHoursPrazdne && !pouzito.doba) plan.push(presk('doba', h, POZNAMKY.dobaMate));
     else plan.push({ klic: 'doba', nazev: NAZVY_OPERACI.doba, hash: h, stav: 'provest', doba: o.doba });
   }
 
@@ -117,20 +153,21 @@ export function sestavPlan(o: Odpovedi, stav: StavPodniku, pouzito: Record<strin
     const navrh = navrhniSmeny(o.typ, o.doba ?? (o.typ ? vychoziDoba(o.typ) : undefined));
     const h = otisk(navrh);
     const existuji = new Set(stav.typySmen.map(male));
-    const nove = navrh.filter(s => !existuji.has(male(s.name)));
+    const jeTam = (n: string) => existuji.has(male(n)) || existuji.has(male(pr(n)));
+    const nove = navrh.filter(s => !jeTam(s.name)).map(s => ({ ...s, name: pr(s.name) }));
     if (!navrh.length) { /* všechny dny zavřeno: není z čeho */ }
-    else if (uz('smeny', h)) plan.push(presk('smeny', h, 'Už jsou založené.'));
+    else if (uz('smeny', h)) plan.push(presk('smeny', h, POZNAMKY.smenyZalozene));
     // Podnik, který už nějaké typy směn má, si je poskládal sám.
-    else if (stav.typySmen.length > 0) plan.push(presk('smeny', h, 'Typy směn už máte, nechali jsme je.'));
-    else if (!nove.length) plan.push(presk('smeny', h, 'Stejné typy směn už jsou založené.'));
+    else if (stav.typySmen.length > 0) plan.push(presk('smeny', h, POZNAMKY.smenyMate));
+    else if (!nove.length) plan.push(presk('smeny', h, POZNAMKY.smenyStejne));
     else plan.push({ klic: 'smeny', nazev: NAZVY_OPERACI.smeny, hash: h, stav: 'provest', smeny: nove });
   }
 
   // --- pravidla rozvrhu ---
   if (cile.includes('rozvrh') && zapnuto(o, 'pravidla')) {
     const h = otisk({ maxDni: 6 });
-    if (uz('pravidla', h)) plan.push(presk('pravidla', h, 'Už je nastavené.'));
-    else if (!stav.maxDniNull) plan.push(presk('pravidla', h, 'Pravidlo už máte nastavené, nechali jsme ho.'));
+    if (uz('pravidla', h)) plan.push(presk('pravidla', h, POZNAMKY.hotovoNastavene));
+    else if (!stav.maxDniNull) plan.push(presk('pravidla', h, POZNAMKY.pravidloMate));
     else plan.push({ klic: 'pravidla', nazev: NAZVY_OPERACI.pravidla, hash: h, stav: 'provest', maxDni: 6 });
   }
 
@@ -139,9 +176,9 @@ export function sestavPlan(o: Odpovedi, stav: StavPodniku, pouzito: Record<strin
     const nazvy = KATEGORIE_SKLADU[o.typ];
     const h = otisk(nazvy);
     const existuji = new Set(stav.kategorieSkladu.map(male));
-    const nove = nazvy.filter(n => !existuji.has(male(n)));
-    if (uz('sklad', h) && !nove.length) plan.push(presk('sklad', h, 'Už jsou založené.'));
-    else if (!nove.length) plan.push(presk('sklad', h, 'Stejné kategorie už máte.'));
+    const nove = nazvy.filter(n => !existuji.has(male(n)) && !existuji.has(male(pr(n)))).map(x => pr(x));
+    if (uz('sklad', h) && !nove.length) plan.push(presk('sklad', h, POZNAMKY.smenyZalozene));
+    else if (!nove.length) plan.push(presk('sklad', h, POZNAMKY.kategorieStejne));
     else plan.push({ klic: 'sklad', nazev: NAZVY_OPERACI.sklad, hash: h, stav: 'provest', kategorie: nove });
   }
 
@@ -150,8 +187,9 @@ export function sestavPlan(o: Odpovedi, stav: StavPodniku, pouzito: Record<strin
     const navrh = POSTUPY[o.typ];
     const h = otisk(navrh.map(p => p.name));
     const existuji = new Set(stav.postupy.map(male));
-    const nove = navrh.filter(p => !existuji.has(male(p.name)));
-    if (!nove.length) plan.push(presk('postupy', h, uz('postupy', h) ? 'Už jsou založené.' : 'Postupy se stejným názvem už máte.'));
+    const nove = navrh.filter(p => !existuji.has(male(p.name)) && !existuji.has(male(pr(p.name))))
+      .map(p => ({ name: pr(p.name), description: pr(p.description), kroky: p.kroky.map(x => pr(x)) }));
+    if (!nove.length) plan.push(presk('postupy', h, uz('postupy', h) ? POZNAMKY.smenyZalozene : POZNAMKY.postupyStejne));
     else plan.push({ klic: 'postupy', nazev: NAZVY_OPERACI.postupy, hash: h, stav: 'provest', postupy: nove });
   }
 
@@ -159,34 +197,34 @@ export function sestavPlan(o: Odpovedi, stav: StavPodniku, pouzito: Record<strin
   if (cile.length > 0 && krok('cile') && zapnuto(o, 'prehled')) {
     const polozky = sestavPrehled({ cile, velikostTymu: o.tym?.velikost, pokladna: o.pokladna, tarif: stav.tarif });
     const h = otisk(polozky);
-    if (stav.prehled === 'jiny') plan.push(presk('prehled', h, 'Přehled už máte upravený, nechali jsme ho.'));
-    else if (stav.prehled === 'pruvodce' && uz('prehled', h)) plan.push(presk('prehled', h, 'Už je složený.'));
+    if (stav.prehled === 'jiny') plan.push(presk('prehled', h, POZNAMKY.prehledUpraveny));
+    else if (stav.prehled === 'pruvodce' && uz('prehled', h)) plan.push(presk('prehled', h, POZNAMKY.prehledHotovy));
     else plan.push({ klic: 'prehled', nazev: NAZVY_OPERACI.prehled, hash: h, stav: 'provest', prehled: polozky });
   }
 
   // --- hotovost v kase ---
   if (cile.includes('uzaverky') && krok('kasa') && typeof o.hotovostVKase === 'number' && o.hotovostVKase > 0) {
     const h = otisk({ k: o.hotovostVKase });
-    if (uz('kasa', h)) plan.push(presk('kasa', h, 'Už je nastavená.'));
-    else if (!stav.drawerFloatNull) plan.push(presk('kasa', h, 'Hotovost v kase už máte nastavenou, nechali jsme ji.'));
+    if (uz('kasa', h)) plan.push(presk('kasa', h, POZNAMKY.hotovoNastavena));
+    else if (!stav.drawerFloatNull) plan.push(presk('kasa', h, POZNAMKY.kasaMate));
     else plan.push({ klic: 'kasa', nazev: NAZVY_OPERACI.kasa, hash: h, stav: 'provest', hotovost: o.hotovostVKase });
   }
   return plan;
 }
 
 /** Přehled pro Shrnutí: názvy, které se vytvoří (kvůli řádkům s přepínači). */
-export interface RadekShrnuti { klic: 'smeny' | 'sklad' | 'postupy' | 'prehled' | 'pravidla'; nazev: string; popis: string }
+export interface RadekShrnuti { klic: 'smeny' | 'sklad' | 'postupy' | 'prehled' | 'pravidla'; nazev: string; popis: string; /** Jednotlivé názvy (česky), ať je UI přeloží každý zvlášť. */ polozky: string[] }
 
 export function radkyShrnuti(o: Odpovedi): RadekShrnuti[] {
   const out: RadekShrnuti[] = [];
   const cile = o.cile ?? [];
   if (o.typ || o.doba) {
     const s = navrhniSmeny(o.typ, o.doba ?? (o.typ ? vychoziDoba(o.typ) : undefined));
-    if (s.length) out.push({ klic: 'smeny', nazev: 'Typy směn', popis: s.map(x => x.name).join(', ') });
+    if (s.length) out.push({ klic: 'smeny', nazev: 'Typy směn', popis: s.map(x => x.name).join(', '), polozky: s.map(x => x.name) });
   }
-  if (cile.includes('rozvrh')) out.push({ klic: 'pravidla', nazev: 'Pravidla rozvrhu', popis: 'Nejvýš šest dní v řadě' });
-  if (cile.includes('sklad') && o.typ) out.push({ klic: 'sklad', nazev: 'Kategorie skladu', popis: KATEGORIE_SKLADU[o.typ].join(', ') });
-  if (cile.includes('provoz') && o.typ) out.push({ klic: 'postupy', nazev: 'Postupy', popis: POSTUPY[o.typ].map(p => p.name).join(', ') });
+  if (cile.includes('rozvrh')) out.push({ klic: 'pravidla', nazev: 'Pravidla rozvrhu', popis: 'Nejvýš šest dní v řadě', polozky: [] });
+  if (cile.includes('sklad') && o.typ) out.push({ klic: 'sklad', nazev: 'Kategorie skladu', popis: KATEGORIE_SKLADU[o.typ].join(', '), polozky: KATEGORIE_SKLADU[o.typ] });
+  if (cile.includes('provoz') && o.typ) out.push({ klic: 'postupy', nazev: 'Postupy', popis: POSTUPY[o.typ].map(p => p.name).join(', '), polozky: POSTUPY[o.typ].map(p => p.name) });
   return out;
 }
 

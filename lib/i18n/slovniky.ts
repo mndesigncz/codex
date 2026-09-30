@@ -17,9 +17,10 @@ export const SEKCE = [
   'zamestnanec', 'kiosk', 'chat',
   'sprava', 'tym', 'navody', 'postupy',
   'rozvrh', 'sklad',
+  'spolecne', 'pruvodce', 'predplatne',
 ] as const;
 export type Sekce = (typeof SEKCE)[number];
-export const SEKCE_VZDY: readonly Sekce[] = ['common', 'api'];
+export const SEKCE_VZDY: readonly Sekce[] = ['common', 'api', 'spolecne'];
 
 const rozpracovano = new Map<string, Promise<Slovnik>>();
 

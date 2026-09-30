@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../Icons';
 import { obsahuje, proHledani } from '@/lib/hledani';
+import { useT } from '@/lib/i18n/client';
 
 export interface SearchSuggestion {
   label: string;
@@ -25,7 +26,7 @@ const readRecent = (k: string): string[] => {
   catch { return []; }
 };
 
-export function SearchField({ value, onChange, placeholder = 'Hledat…', suggestions = [], storageKey, autoFocus, className = '', inputClassName = '', ariaLabel }: {
+export function SearchField({ value, onChange, placeholder, suggestions = [], storageKey, autoFocus, className = '', inputClassName = '', ariaLabel }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
@@ -38,6 +39,8 @@ export function SearchField({ value, onChange, placeholder = 'Hledat…', sugges
   inputClassName?: string;
   ariaLabel?: string;
 }) {
+  const t = useT('spolecne');
+  const hledat = placeholder ?? t('Hledat…');
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const [recent, setRecent] = useState<string[]>([]);
@@ -75,9 +78,10 @@ export function SearchField({ value, onChange, placeholder = 'Hledat…', sugges
       .map(s => ({ kind: 'sug' as const, label: s.label, hint: s.hint, value: s.value ?? s.label }));
     const rec = (q ? recent.filter(r => obsahuje(r, q) && proHledani(r) !== proHledani(q)) : recent)
       .filter(r => !sug.some(s => s.value.toLowerCase() === r.toLowerCase()))
-      .map(r => ({ kind: 'rec' as const, label: r, hint: 'poslední hledání', value: r }));
+      .map(r => ({ kind: 'rec' as const, label: r, hint: t('poslední hledání'), value: r }));
     return [...rec.slice(0, 3), ...sug];
-  }, [q, suggestions, recent]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, suggestions, recent, t]);
 
   const pick = (v: string) => { onChange(v); setOpen(false); setActive(-1); input.current?.focus(); };
   const showPanel = open && items.length > 0;
@@ -90,10 +94,10 @@ export function SearchField({ value, onChange, placeholder = 'Hledat…', sugges
         type="search"
         role="combobox"
         aria-expanded={showPanel}
-        aria-label={ariaLabel ?? placeholder}
+        aria-label={ariaLabel ?? hledat}
         autoFocus={autoFocus}
         value={value}
-        placeholder={placeholder}
+        placeholder={hledat}
         onChange={e => { onChange(e.target.value); setOpen(true); setActive(-1); }}
         onFocus={() => setOpen(true)}
         onKeyDown={e => {
@@ -106,7 +110,7 @@ export function SearchField({ value, onChange, placeholder = 'Hledat…', sugges
         className={`field !pl-10 ${value ? '!pr-10' : ''} ${inputClassName}`}
       />
       {value && (
-        <button type="button" aria-label="Vyčistit hledání" onClick={() => { onChange(''); input.current?.focus(); }}
+        <button type="button" aria-label={t('Vyčistit hledání')} onClick={() => { onChange(''); input.current?.focus(); }}
           className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 rounded-full flex items-center justify-center text-black/35 hover:text-black">
           <Icon name="close" size={13} />
         </button>

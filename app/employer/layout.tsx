@@ -13,6 +13,7 @@ export default async function EmployerLayout({ children }: { children: React.Rea
   const role = (session.user as any)?.role;
   if (role !== 'employer') redirect('/employee/shifts');
 
-  // Vedení používá správu podniku, rozvrh, sklad i přeložené obrazovky zaměstnance, kiosku a chatu (Nastavení, náhledy).
-  return <><Slovniky sekce={['zamestnanec', 'kiosk', 'chat', 'sprava', 'tym', 'navody', 'postupy', 'rozvrh', 'sklad']} />{children}</>;
+  // Vedení používá správu podniku, rozvrh, sklad, předplatné (Nastavení → Předplatné, zámky Pro/Max, platební okno) i přeložené obrazovky
+  // zaměstnance, kiosku a chatu; slovníky jdou v prvním HTML, ať se v cizím jazyce nic nepřekreslí česky.
+  return <><Slovniky sekce={['zamestnanec', 'kiosk', 'chat', 'sprava', 'tym', 'navody', 'postupy', 'rozvrh', 'sklad', 'spolecne', 'predplatne']} />{children}</>;
 }

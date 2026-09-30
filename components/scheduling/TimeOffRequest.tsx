@@ -149,7 +149,7 @@ export default function TimeOffRequest() {
       </div>
 
       <div className="space-y-3">
-        <DraftNote koncept={koncept} druh="zadost" />
+        <DraftNote koncept={koncept} co="rozepsanou žádost" />{/* i18n-ok: druh konceptu je identifikátor, větu překládá DraftNote */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field id="volno-od" label={t('Od')}>
             <Input id="volno-od" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="appearance-none min-w-0" />

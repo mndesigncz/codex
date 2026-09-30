@@ -22,7 +22,7 @@ import {
   minuty, navrhniSmeny, rozsahDoby, vychoziDoba,
 } from '../../lib/pruvodce/predvolby.ts';
 import { MIN_PREHLEDU, STROP_PREHLEDU, sestavPrehled } from '../../lib/pruvodce/widgety.ts';
-import { dataPodniku, doporucenyTarif, otisk, radkyShrnuti, sestavPlan, type StavPodniku } from '../../lib/pruvodce/plan.ts';
+import { POZNAMKY, dataPodniku, doporucenyTarif, otisk, radkyShrnuti, sestavPlan, type StavPodniku } from '../../lib/pruvodce/plan.ts';
 import { MAX_BAJTU, bajtu, cistiOdpovedi, cistiOnboarding, jeMalyDost, odeberKlice, slouciOdpovedi } from '../../lib/pruvodce/schema.ts';
 
 const zdroj = (cesta: string) => readFileSync(new URL(`../../${cesta}`, import.meta.url), 'utf8');
@@ -163,6 +163,25 @@ export default function ({ eq, ok }: Testy) {
   eq('dataPodniku: Jiná země nepřepisuje měnu', dataPodniku({ zeme: 'JINA' }), { zeme: 'JINA' });
   ok('Shrnutí: řádky odpovídají cílům a typu', radkyShrnuti({ typ: 'bar', cile: ['sklad'] }).map(r => r.klic).join() === 'smeny,sklad');
   ok('Shrnutí bez odpovědí je prázdné', radkyShrnuti({}).length === 0);
+  ok('Shrnutí nese jednotlivé názvy pro překlad', radkyShrnuti({ typ: 'bar', cile: ['sklad'] }).every(r => r.polozky.length > 0 && r.polozky.join(', ') === r.popis));
+
+  // Výchozí obsah se zakládá v jazyce majitele: názvy jdou přes překladač, otisky (ledger) zůstávají z češtiny.
+  const EN: Record<string, string> = { 'Otevírací': 'Opening', 'Zavírací': 'Closing', 'Káva': 'Coffee', 'Otevírání': 'Opening (routine)', 'Odemknout a rozsvítit': 'Unlock' };
+  const pr = (cs: string) => EN[cs] ?? cs;
+  const planEn = sestavPlan(kavarna, PRAZDNY, {}, pr);
+  const smenyEn = planEn.find(o => o.klic === 'smeny');
+  ok('překladač: názvy typů směn jdou v jazyce majitele', smenyEn?.stav === 'provest' && smenyEn.klic === 'smeny' && smenyEn.smeny.map(x => x.name).join() === 'Opening,Closing');
+  const skladEn = planEn.find(o => o.klic === 'sklad');
+  ok('překladač: kategorie skladu', skladEn?.stav === 'provest' && skladEn.klic === 'sklad' && skladEn.kategorie[0] === 'Coffee');
+  const postupyEn = planEn.find(o => o.klic === 'postupy');
+  ok('překladač: název, popis i kroky postupu', postupyEn?.stav === 'provest' && postupyEn.klic === 'postupy'
+    && postupyEn.postupy[0].name === 'Opening (routine)' && postupyEn.postupy[0].kroky[0] === 'Unlock');
+  eq('překladač nemění otisky (ledger zná češtinu)', planEn.map(o => o.hash), plan.map(o => o.hash));
+  // majitel, který průvodce spustil česky a pak znovu anglicky, nedostane duplicity
+  const cesky = sestavPlan(kavarna, { ...stavPo, prehled: 'zadny' }, {}, pr);
+  ok('dedupe zná český i přeložený název', !cesky.some(o => o.stav === 'provest' && ['smeny', 'sklad', 'postupy'].includes(o.klic)));
+  ok('bez překladače je plán beze změny oproti češtině', sestavPlan(kavarna, PRAZDNY, {}, s => s).map(o => o.klic).join() === plan.map(o => o.klic).join());
+  ok('poznámky přeskočených operací jsou z jednoho seznamu', cizi.filter(o => o.stav === 'preskocit').every(o => Object.values(POZNAMKY).includes((o.poznamka ?? '') as never)));
   ok('doporučení tarifu: hosté → Max, tablet → Pro, jinak Zdarma',
     doporucenyTarif({ cile: ['hoste'] }) === 'max' && doporucenyTarif({ pokladna: 'storyous' }) === 'max' && doporucenyTarif({ tablet: true }) === 'pro'
     && doporucenyTarif({ tym: { velikost: 'velky' } }) === 'pro' && doporucenyTarif({ cile: ['sklad'] }) === 'zdarma');
