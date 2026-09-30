@@ -1536,3 +1536,18 @@ input[type='search']::-webkit-search-decoration {
 .srov .srov-pro { background: rgba(200,245,66,0.12); }
 .srov thead .srov-pro { border-top-left-radius: var(--r-md); border-top-right-radius: var(--r-md); }
 .srov tbody tr:last-child .srov-pro { border-bottom-left-radius: var(--r-md); border-bottom-right-radius: var(--r-md); }
+
+/* Nativní obal (iOS WKWebView s contentInset: never, Android edge-to-edge):
+   s `viewport-fit=cover` jde obsah pod stavový řádek a výřez. Horní vložka se
+   bere z env() (iOS) nebo z --safe-area-inset-top (Android WebView, plugin
+   SystemBars), ať vyjde správně na obou. Lepivé hlavičky se posunou pod výřez
+   a pruh nad nimi zakrývá obsah, který by pod stavovým řádkem probleskoval. */
+html[data-obal] { --obal-top: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px)); }
+html[data-obal] body { padding-top: var(--obal-top); }
+html[data-obal] body::before {
+  content: ''; position: fixed; top: 0; left: 0; right: 0; height: var(--obal-top);
+  background: var(--bg); z-index: 60; pointer-events: none;
+}
+html[data-obal] .sticky.top-0 { top: var(--obal-top); }
+/* Dekorace jen pro web (odkazy na ceník, „Jsem podnik“ apod.), v obalu se nevykreslí. */
+html[data-obal] .jen-web { display: none !important; }

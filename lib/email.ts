@@ -121,6 +121,50 @@ export async function sendInvitationEmail(to: string, name: string, tempPassword
   });
 }
 
+/** Základ odkazů v e-mailech, které vedou na jednorázové stránky (heslo, smazání účtu). */
+export function odkazovyZaklad(): string {
+  // Bez importu lib/web: tenhle soubor načítají i testy přímo v Node (bez rozlišení cest bez přípony).
+  return (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://www.managero.app').replace(/\/+$/, '');
+}
+
+/** E-mail s odkazem na nové heslo. Odkaz platí hodinu a jde použít jednou. */
+export async function sendPasswordResetEmail(to: string, name: string, cesta: string): Promise<SendResult> {
+  const url = `${odkazovyZaklad()}${cesta}`;
+  return send({
+    label: 'Managero',
+    to,
+    subject: 'Nové heslo do Managero',
+    html: `
+      <div style="font-family: -apple-system, sans-serif; max-width: 500px; margin: 0 auto; padding: 28px; background: #F1F4EC; color: #16181A; border-radius: 20px;">
+        <h1 style="font-size: 22px; margin: 0 0 8px;">Nové heslo</h1>
+        <p style="color: #5c6353;">Ahoj ${escHtml(name)}, požádali jste o obnovení hesla. Odkaz platí hodinu a jde použít jednou.</p>
+        <a href="${escHtml(url)}" style="display: inline-block; margin-top: 8px; background: #C8F542; color: #16181A; padding: 14px 28px; border-radius: 999px; text-decoration: none; font-weight: bold;">Nastavit nové heslo</a>
+        <p style="color: #5c6353; font-size: 13px; margin-top: 22px;">Pokud jste o nic nežádali, e-mail ignorujte, heslo zůstává beze změny.</p>
+        <p style="color: #8a917f; font-size: 12px;">Pokud tlačítko nefunguje, otevřete: ${escHtml(url)}</p>
+      </div>
+    `,
+  });
+}
+
+/** E-mail s potvrzením smazání účtu. Bez otevření odkazu se nic nesmaže. */
+export async function sendAccountDeleteEmail(to: string, name: string, cesta: string): Promise<SendResult> {
+  const url = `${odkazovyZaklad()}${cesta}`;
+  return send({
+    label: 'Managero',
+    to,
+    subject: 'Potvrďte smazání účtu Managero',
+    html: `
+      <div style="font-family: -apple-system, sans-serif; max-width: 500px; margin: 0 auto; padding: 28px; background: #F1F4EC; color: #16181A; border-radius: 20px;">
+        <h1 style="font-size: 22px; margin: 0 0 8px;">Smazání účtu</h1>
+        <p style="color: #5c6353;">Ahoj ${escHtml(name)}, někdo požádal o smazání účtu s tímto e-mailem. Když jste to byli vy, potvrďte to odkazem. Odkaz platí hodinu.</p>
+        <a href="${escHtml(url)}" style="display: inline-block; margin-top: 8px; background: #16181A; color: #ffffff; padding: 14px 28px; border-radius: 999px; text-decoration: none; font-weight: bold;">Přejít k potvrzení</a>
+        <p style="color: #5c6353; font-size: 13px; margin-top: 22px;">Pokud jste o smazání nežádali, e-mail ignorujte. Účet zůstane beze změny.</p>
+        <p style="color: #8a917f; font-size: 12px;">Pokud tlačítko nefunguje, otevřete: ${escHtml(url)}</p>
+      </div>
+    `,
+  });
+}
+
 export async function sendTeamInvitation(to: string, teamName: string, inviterName: string, token: string): Promise<SendResult> {
   const url = `${APP_URL()}/join?token=${encodeURIComponent(token)}`;
   return send({

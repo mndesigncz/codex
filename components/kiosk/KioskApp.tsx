@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
-import { signOut } from 'next-auth/react';
+import { odhlasit } from '@/lib/odhlaseni';
 import { Icon, LogoMark } from '../Icons';
 import PosTick from '../PosTick';
 import StaffInbox, { useStaffInbox } from '../client/StaffInbox';
@@ -297,7 +297,7 @@ function KioskShell({ user }: { user: KioskUser }) {
         subtitle="Zařízení se vrátí na přihlašovací obrazovku a bude potřeba e-mail a heslo tabletového účtu. Odpíchnout se odsud do té doby nepůjde."
         footer={<>
           <Button variant="secondary" onClick={() => setConfirmSignOut(false)}>Zrušit</Button>
-          <Button variant="primary" icon="logout" onClick={() => signOut({ callbackUrl: '/login' })}>Odhlásit tablet</Button>
+          <Button variant="primary" icon="logout" onClick={() => odhlasit({ callbackUrl: '/login' })}>Odhlásit tablet</Button>
         </>}>
         <p className="t-meta text-pretty">
           Tohle není konec směny — na ten je tlačítko u jména nahoře.

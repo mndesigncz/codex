@@ -3,7 +3,7 @@
 import { useSession } from 'next-auth/react';
 
 import { useState, useEffect } from 'react';
-import { signOut } from 'next-auth/react';
+import { odhlasit } from '@/lib/odhlaseni';
 import PodnikSwitcher, { uklidKonceptu } from '../PodnikSwitcher';
 import { Icon, LogoMark } from '../Icons';
 import { Avatar, ErrorBoundary, MenuPanel, MenuItemButton, type MenuItem } from '../ui';
@@ -351,7 +351,7 @@ export default function EmployerLayout({ user }: Props) {
       className="absolute left-3 right-3 bottom-full mb-2 origin-bottom-left">
       {polozkyUctu.map(it => <MenuItemButton key={it.label} {...it} />)}
       <div role="separator" className="h-px bg-black/[0.06] my-1" />
-      <MenuItemButton label="Odhlásit se" icon="logout" danger onClick={() => signOut({ callbackUrl: '/login' })} />
+      <MenuItemButton label="Odhlásit se" icon="logout" danger onClick={() => odhlasit({ callbackUrl: '/login' })} />
     </MenuPanel>
   );
 
@@ -597,7 +597,7 @@ export default function EmployerLayout({ user }: Props) {
           // Správce platformy podle prostředí (SUPERADMIN_USER_IDS), ne podle role.
           ...(user.superadmin ? [{ label: 'Správa platformy', icon: 'lock', onClick: () => { window.location.assign('/admin'); } }] : []),
           ...(smiKlient ? [{ label: 'Managero client', icon: 'gift', onClick: () => { setMoreOpen(false); switchMode('client'); } }] : []),
-          { label: 'Odhlásit se', icon: 'logout', onClick: () => signOut({ callbackUrl: '/login' }), danger: true },
+          { label: 'Odhlásit se', icon: 'logout', onClick: () => odhlasit({ callbackUrl: '/login' }), danger: true },
         ]}
       />
     </div>

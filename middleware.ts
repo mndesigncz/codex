@@ -14,9 +14,18 @@ import { getToken } from 'next-auth/jwt';
 import { neon } from '@neondatabase/serverless';
 import { rozhodni, ZPRAVA_423, VYJIMKY } from '@/lib/blokace';
 import { ciziPuvod } from '@/lib/puvod';
+import { obalZUserAgent, rozhodniObal } from '@/lib/obal';
 
+// Matcher je široký kvůli bráně nativního obalu (lib/obal.ts): ta musí vidět i
+// úvodní stránku, přihlášení a registraci, jinak by aplikace hostů otevřela
+// prodejní stránku s cenami. Kontrola je porovnání řetězce, webu nic nepřidá.
+// `/.well-known` a statické soubory tu záměrně NEJSOU: ověření universal links
+// (apple-app-site-association, assetlinks.json) nesmí projít žádným přesměrováním.
 export const config = {
-  matcher: ['/api/:path*', '/employer/:path*', '/employee/:path*', '/kiosk/:path*', '/client/:path*'],
+  matcher: [
+    '/', '/login', '/register', '/join', '/zapomenute-heslo', '/nove-heslo', '/s/:path*', '/demo/:path*', '/admin/:path*', '/pozastaveno',
+    '/api/:path*', '/employer/:path*', '/employee/:path*', '/kiosk/:path*', '/client/:path*',
+  ],
 };
 
 const TTL_MS = 30_000;
@@ -60,6 +69,23 @@ export async function middleware(req: NextRequest) {
     && ciziPuvod(req.method, req.headers.get('origin'), req.headers.get('x-forwarded-host') ?? req.headers.get('host'))) {
     return NextResponse.json({ error: 'Požadavek z cizí stránky byl zamítnut.' }, { status: 403 });
   }
+  // Brána nativního obalu PŘED čtením relace: značka v User-Agentu práva jen
+  // zužuje (hostovská aplikace smí jen /client a spol., provozní nepustí
+  // hostovské stránky, platby v obalu nikdy). Nikdy nic nerozšiřuje.
+  const obal = obalZUserAgent(req.headers.get('user-agent')).obal;
+  if (obal) {
+    const o = rozhodniObal({ obal, pathname: req.nextUrl.pathname, method: req.method });
+    if (o.akce === 'api') return NextResponse.json({ error: o.zprava }, { status: o.status });
+    if (o.akce === 'presmerovat') {
+      const url = req.nextUrl.clone();
+      url.pathname = o.kam;
+      url.search = '';
+      return NextResponse.redirect(url);
+    }
+  }
+  // Širší matcher nesmí změnit blokaci: ta platí jen tam, kde platila dřív.
+  // Jinak by pozastavený podnik neměl jak otevřít /login a přihlásit se jinak.
+  if (!/^\/(api|employer|employee|kiosk|client)(\/|$)/.test(req.nextUrl.pathname)) return NextResponse.next();
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
   if (!token) return NextResponse.next();
   const cesta = req.nextUrl.pathname;

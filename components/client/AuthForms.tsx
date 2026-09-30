@@ -3,11 +3,14 @@
 // Registrace a přihlášení hosta. Popisek nad polem, chyba pod ním.
 
 import { useState } from 'react';
-import { signIn } from 'next-auth/react';
+import { signIn, signOut, getSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Icon } from '../Icons';
 import { mistniCesta } from '@/lib/bezpecnaUrl';
+import { useObal } from '../ObalProvider';
+import { HLASKA_ROLE_V_CLIENTU } from '@/lib/obal';
+import PravniOdkazy from '../pravni/PravniOdkazy';
 
 const input = 'field text-sm';
 const label = 'field-label';
@@ -29,12 +32,14 @@ export function RegisterForm() {
   const [name, setName] = useState(''); const [email, setEmail] = useState(''); const [pw, setPw] = useState('');
   // Kód z pozvánky (?ref=…) se předvyplní; jde přepsat i vyplnit ručně.
   const [ref, setRef] = useState(() => (params.get('ref') ?? '').toUpperCase());
+  // Souhlas s rozesíláním podniků je dobrovolný a výchozí je NE (Apple 4.5.4, zákon 480/2004).
+  const [novinky, setNovinky] = useState(false);
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setErr('');
     if (pw.length < 8) { setErr('Heslo musí mít alespoň 8 znaků.'); return; }
     setBusy(true);
-    const r = await fetch('/api/client/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, password: pw, ref: ref.trim() || undefined }) });
+    const r = await fetch('/api/client/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, password: pw, ref: ref.trim() || undefined, novinky, terms: true }) });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) { setErr(d.error || 'Registrace se nepovedla.'); setBusy(false); return; }
     const s = await signIn('credentials', { email, password: pw, redirect: false });
@@ -48,10 +53,15 @@ export function RegisterForm() {
         <Field id="r-email" label="E-mail"><input id="r-email" type="email" className={input} value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required /></Field>
         <Field id="r-pw" label="Heslo" hint="Aspoň 8 znaků."><input id="r-pw" type="password" className={input} value={pw} onChange={e => setPw(e.target.value)} autoComplete="new-password" required /></Field>
         <Field id="r-ref" label="Kód od kamaráda" hint="Nepovinné. Až se přidáš do podniku, kde je členem, dostanete oba body."><input id="r-ref" className={`${input} font-mono tracking-widest`} value={ref} onChange={e => setRef(e.target.value.toUpperCase())} placeholder="ABCD-EFGH" autoComplete="off" /></Field>
+        <label className="flex items-start gap-3 text-sm text-black/70 cursor-pointer">
+          <input type="checkbox" checked={novinky} onChange={e => setNovinky(e.target.checked)} className="mt-1 h-5 w-5 shrink-0 accent-[#16181A]" />
+          <span>Chci dostávat novinky a akce od podniků, kde jsem členem. Nepovinné, půjde to kdykoli vypnout v profilu.</span>
+        </label>
         {err && <p role="alert" className="note note-danger text-sm px-3 py-2">{err}</p>}
         <button type="submit" disabled={busy} className="tap-target btn btn-accent hover:brightness-105 active:scale-[0.98] disabled:opacity-50 transition inline-flex items-center justify-center gap-2">
           {busy ? 'Zakládám…' : <><Icon name="plus" size={16} /> Založit účet</>}
         </button>
+        <p className="text-xs text-black/50 text-center text-pretty">Založením účtu souhlasíš s <Link href="/podminky" className="underline underline-offset-2">Podmínkami užívání</Link> a bereš na vědomí <Link href="/soukromi" className="underline underline-offset-2">Zásady ochrany osobních údajů</Link>.</p>
         <p className="text-sm text-black/55 text-center">Už účet máš? <Link href={`/client/login?next=${encodeURIComponent(next)}`} className="tap-target-sm inline-flex items-center font-semibold text-[#16181A] underline-offset-2 hover:underline">Přihlas se</Link></p>
       </form>
     </AuthCard>
@@ -60,6 +70,7 @@ export function RegisterForm() {
 
 export function LoginForm() {
   const router = useRouter();
+  const { jeObal } = useObal();
   const params = useSearchParams();
   const next = mistniCesta(params.get('next'), '/client');
   const [email, setEmail] = useState(''); const [pw, setPw] = useState('');
@@ -67,7 +78,19 @@ export function LoginForm() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setErr(''); setBusy(true);
     const s = await signIn('credentials', { email, password: pw, redirect: false });
-    if (s?.error) { setErr('E-mail nebo heslo nesedí.'); setBusy(false); return; }
+    if (s?.error) {
+      // Server v obalu vrací OBAL_ROLE jen po správném hesle: účet podniku v aplikaci pro hosty.
+      setErr(s.error === 'OBAL_ROLE' ? HLASKA_ROLE_V_CLIENTU : 'E-mail nebo heslo nesedí.');
+      setBusy(false); return;
+    }
+    // Kdo není host (vedení, zaměstnanec), v hostovské části nic nemá: na webu ho pošleme domů
+    // do jeho aplikace, v obalu by ho server stejně odmítl (pojistka, kdyby prošel).
+    const sess = await getSession();
+    const role = (sess?.user as any)?.role;
+    if (role && role !== 'customer') {
+      if (jeObal) { await signOut({ redirect: false }); setErr(HLASKA_ROLE_V_CLIENTU); setBusy(false); return; }
+      router.push('/'); router.refresh(); return;
+    }
     router.push(next); router.refresh();
   };
   return (
@@ -75,17 +98,19 @@ export function LoginForm() {
       <form onSubmit={submit} className="grid gap-4" noValidate>
         <Field id="l-email" label="E-mail"><input id="l-email" type="email" className={input} value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required /></Field>
         <Field id="l-pw" label="Heslo"><input id="l-pw" type="password" className={input} value={pw} onChange={e => setPw(e.target.value)} autoComplete="current-password" required /></Field>
+        <p className="-mt-2 text-sm"><Link href="/client/zapomenute-heslo" className="tap-target-sm inline-flex items-center font-semibold text-[#16181A] underline-offset-2 hover:underline">Zapomenuté heslo</Link></p>
         {err && <p role="alert" className="note note-danger text-sm px-3 py-2">{err}</p>}
         <button type="submit" disabled={busy} className="tap-target btn btn-accent hover:brightness-105 active:scale-[0.98] disabled:opacity-50 transition">
           {busy ? 'Přihlašuji…' : 'Přihlásit se'}
         </button>
+        <PravniOdkazy jen={['soukromi', 'podminky', 'podpora']} className="justify-center text-xs text-black/50" />
         <p className="text-sm text-black/55 text-center">Ještě účet nemáš? <Link href={`/client/register?next=${encodeURIComponent(next)}`} className="tap-target-sm inline-flex items-center font-semibold text-[#16181A] underline-offset-2 hover:underline">Založ si ho</Link></p>
       </form>
     </AuthCard>
   );
 }
 
-function AuthCard({ title, lead, children }: { title: string; lead: string; children: React.ReactNode }) {
+export function AuthCard({ title, lead, children }: { title: string; lead: string; children: React.ReactNode }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-8 md:gap-14 items-start">
       <div className="md:pt-8">
