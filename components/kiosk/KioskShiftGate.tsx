@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { Icon } from '../Icons';
 import { Avatar, Button, Card, Chip, EmptyState, ErrorState, ListRow, MenuPanel, Modal, Toast } from '../ui';
 import { usePopover } from '@/lib/usePopover';
+import { useT } from '@/lib/i18n/client';
 import { parseDbTime, dbTimeHM } from '@/lib/pragueTime';
 import { nextActiveId, IDLE_MS, ACTING_MAX_AGE_S, ACTING_OBNOVA_MS, obnovitCookie } from '@/lib/kioskIdentity';
 
@@ -109,6 +110,7 @@ export function useKioskShift(): KioskShiftValue {
 }
 
 export function KioskShiftProvider({ children }: { children: React.ReactNode }) {
+  const t = useT('kiosk');
   const [roster, setRoster] = useState<RosterMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [hydrated, setHydrated] = useState(false);
@@ -276,12 +278,12 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
       {/* Tablet se ptá místo aby hádal. Zavřít jde — ale pak se nic nezapíše,
           protože zápis pod cizí jméno je horší než žádný zápis. */}
       {asking && (
-        <Modal open onClose={() => answer(null)} title="Kdo teď u tabletu stojí?"
-          subtitle="Pod tímhle jménem se práce zapíše." size="lg">
+        <Modal open onClose={() => answer(null)} title={t('Kdo teď u tabletu stojí?')}
+          subtitle={t('Pod tímhle jménem se práce zapíše.')} size="lg">
           <PersonPicker
             members={onShift}
             onPick={m => answer({ id: m.id, name: m.name, avatar: m.avatar || '👤' })}
-            emptyText="Nikdo není na směně. Nejdřív se odpíchni."
+            emptyText={t('Nikdo není na směně. Nejdřív se odpíchni.')}
           />
         </Modal>
       )}
@@ -305,7 +307,7 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
             if (action === 'in') { setActiveId(member.id); touchedAt.current = Date.now(); }
             reload();
             if (msg) showFlash(msg, 'bad');
-            if (switchedFrom) showFlash(`Zapisuje se teď jako ${member.name}, ne ${switchedFrom}. Přepni nahoře u jména, jestli to není tak.`, 'bad');
+            if (switchedFrom) showFlash(t('Zapisuje se teď jako {jmeno}, ne {predtim}. Přepni nahoře u jména, jestli to není tak.', { jmeno: member.name, predtim: switchedFrom }), 'bad');
           }}
         />
       )}
@@ -332,6 +334,7 @@ export function KioskShiftGate({ children }: { children: React.ReactNode }) {
 }
 
 function LockScreen() {
+  const t = useT('kiosk');
   const { roster, punch, loadFailed, reload } = useKioskShift();
   const [picking, setPicking] = useState(false);
 
@@ -344,8 +347,8 @@ function LockScreen() {
             výběr osoby by byl prázdný. Místo něj rovnou chyba a opakování. */}
         {!picking && loadFailed && roster.length === 0 ? (
           <ErrorState
-            title="Rozpis se nenačetl"
-            hint="Tablet se nedostal na server — zkontroluj připojení. Lidé v týmu tam jsou, jen je odsud teď není vidět."
+            title={t('Rozpis se nenačetl')}
+            hint={t('Tablet se nedostal na server — zkontroluj připojení. Lidé v týmu tam jsou, jen je odsud teď není vidět.')}
             onRetry={() => { void reload(); }}
           />
         ) : !picking ? (
@@ -353,32 +356,31 @@ function LockScreen() {
             <div className="mx-auto h-20 w-20 rounded-3xl bg-[#16181A] text-[#C8F542] grid place-items-center">
               <Icon name="clock" size={38} />
             </div>
-            <h2 className="t-page mt-6 text-balance">Tablet čeká na směnu</h2>
+            <h2 className="t-page mt-6 text-balance">{t('Tablet čeká na směnu')}</h2>
             <p className="text-black/50 mt-3 max-w-md mx-auto leading-relaxed">
-              Odemkne se, jakmile se někdo přihlásí na směnu. Všechno, co pak na tabletu uděláš,
-              se zapíše pod tvoje jméno.
+              {t('Odemkne se, jakmile se někdo přihlásí na směnu. Všechno, co pak na tabletu uděláš, se zapíše pod tvoje jméno.')}
             </p>
             {/* Jediná akce zamčeného tabletu → jediná limetka (DP §3.1). */}
             <Button variant="accent" size="lg" icon="play" className="mt-8" onClick={() => setPicking(true)}>
-              Jsem na směně
+              {t('Jsem na směně')}
             </Button>
             {roster.length === 0 && (
-              <EmptyState illustration="tym" title="Zatím tu nikdo není" hint="Zaměstnance přidá vedení v aplikaci v Nastavení týmu — pak se tady odpíchnou." compact />
+              <EmptyState illustration="tym" title={t('Zatím tu nikdo není')} hint={t('Zaměstnance přidá vedení v aplikaci v Nastavení týmu — pak se tady odpíchnou.')} compact />
             )}
           </>
         ) : (
           <>
-            <h2 className="t-page text-balance">Kdo přichází na směnu?</h2>
-            <p className="t-meta mt-2">Ťukni na sebe a zaznamenej příchod.</p>
+            <h2 className="t-page text-balance">{t('Kdo přichází na směnu?')}</h2>
+            <p className="t-meta mt-2">{t('Ťukni na sebe a zaznamenej příchod.')}</p>
             <div className="mt-7">
               <PersonPicker
                 members={roster}
                 onPick={punch}
-                emptyText="Zatím žádní zaměstnanci. Přidej je v aplikaci vedení (Nastavení týmu)."
+                emptyText={t('Zatím žádní zaměstnanci. Přidej je v aplikaci vedení (Nastavení týmu).')}
               />
             </div>
             <Button variant="secondary" size="lg" className="mt-7" onClick={() => setPicking(false)}>
-              Zpět
+              {t('Zpět')}
             </Button>
           </>
         )}
@@ -393,6 +395,7 @@ export function PersonPicker({ members, onPick, emptyText }: {
   onPick: (m: RosterMember) => void;
   emptyText: string;
 }) {
+  const t = useT('kiosk');
   if (members.length === 0) {
     return <p className="t-meta py-6">{emptyText}</p>;
   }
@@ -411,11 +414,11 @@ export function PersonPicker({ members, onPick, emptyText }: {
           <Avatar emoji={m.avatar} size="xl" ring={false} />
           <span className="block t-card mt-3 truncate">{m.name}</span>
           {m.openSince ? (
-            <span className="block text-sm font-semibold text-ok-ink mt-0.5">Na směně</span>
+            <span className="block text-sm font-semibold text-ok-ink mt-0.5">{t('Na směně')}</span>
           ) : m.shiftStart ? (
-            <span className="block t-meta tabular-nums mt-0.5">Dnes {m.shiftStart}–{m.shiftEnd}</span>
+            <span className="block t-meta tabular-nums mt-0.5">{t('Dnes {od}–{do}', { od: m.shiftStart, do: m.shiftEnd })}</span>
           ) : (
-            <span className="block t-meta mt-0.5">Mimo směnu</span>
+            <span className="block t-meta mt-0.5">{t('Mimo směnu')}</span>
           )}
         </button>
       ))}
@@ -433,6 +436,7 @@ export function PersonPicker({ members, onPick, emptyText }: {
  * patří jen hlavní akci.
  */
 export function WhoIsWorking() {
+  const t = useT('kiosk');
   const { onShift, offShift, activeId, selectPerson, punch } = useKioskShift();
   const [adding, setAdding] = useState(false);
   const now = useNow();
@@ -442,11 +446,11 @@ export function WhoIsWorking() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h2 id="kiosk-kdo-pracuje" className="t-card flex items-center gap-2 min-w-0">
           <Icon name="clock" size={17} className="shrink-0 text-black/40" />
-          <span className="truncate">Kdo teď pracuje</span>
+          <span className="truncate">{t('Kdo teď pracuje')}</span>
         </h2>
         {/* Na tabletu u baru cíle nejméně 44 px (DESIGN.md, Kiosk) — proto md, ne sm. */}
         <Button variant="secondary" icon={adding ? 'close' : 'plus'} aria-expanded={adding} onClick={() => setAdding(v => !v)}>
-          {adding ? 'Zavřít' : 'Další příchod'}
+          {adding ? t('Zavřít') : t('Další příchod')}
         </Button>
       </div>
 
@@ -458,13 +462,13 @@ export function WhoIsWorking() {
               key={m.id}
               lead={<Avatar emoji={m.avatar} size="md" ring={false} />}
               title={m.name}
-              meta={<span className="tabular-nums">Na směně {elapsed(m.openSince!, now)}</span>}
+              meta={<span className="tabular-nums">{t('Na směně {doba}', { doba: elapsed(m.openSince!, now) })}</span>}
               right={isActive
-                ? <Chip tone="ok" icon="check">Zapisuje se</Chip>
-                : <Button variant="secondary" onClick={() => selectPerson(m.id)} aria-label={`Zapisovat jako ${m.name}`}>Přepnout</Button>}
+                ? <Chip tone="ok" icon="check">{t('Zapisuje se')}</Chip>
+                : <Button variant="secondary" onClick={() => selectPerson(m.id)} aria-label={t('Zapisovat jako {jmeno}', { jmeno: m.name })}>{t('Přepnout')}</Button>}
               actions={
-                <Button variant="ghost" iconOnly icon="logout" title={`Odchod – ${m.name}`}
-                  aria-label={`Odchod – ${m.name}`} onClick={() => punch(m)} />
+                <Button variant="ghost" iconOnly icon="logout" title={t('Odchod – {jmeno}', { jmeno: m.name })}
+                  aria-label={t('Odchod – {jmeno}', { jmeno: m.name })} onClick={() => punch(m)} />
               }
             />
           );
@@ -473,11 +477,11 @@ export function WhoIsWorking() {
 
       {adding && (
         <div className="mt-4 pt-4 border-t border-black/[0.06]">
-          <p className="t-meta mb-3">Kdo dále nastupuje na směnu?</p>
+          <p className="t-meta mb-3">{t('Kdo dále nastupuje na směnu?')}</p>
           <PersonPicker
             members={offShift}
             onPick={m => { setAdding(false); punch(m); }}
-            emptyText="Všichni z týmu už jsou na směně."
+            emptyText={t('Všichni z týmu už jsou na směně.')}
           />
         </div>
       )}
@@ -487,6 +491,7 @@ export function WhoIsWorking() {
 
 /** Header chip: who the tablet is recording as, plus a one-tap switcher. */
 export function ActivePersonChip() {
+  const t = useT('kiosk');
   const { active, onShift, selectPerson, requireActive } = useKioskShift();
   const [open, setOpen] = useState(false);
 
@@ -500,8 +505,8 @@ export function ActivePersonChip() {
         className="flex items-center gap-2.5 rounded-full glass border border-wait/50 bg-wait/[0.14] pl-3.5 pr-4 py-2 min-h-[44px] hover:bg-wait/20 transition">
         <Icon name="warning" size={17} className="text-wait-ink shrink-0" />
         <span className="text-left leading-tight">
-          <span className="hidden sm:block t-label">Zapisuje se jako</span>
-          <span className="block font-bold text-[#16181A] text-sm">Kdo jsi?</span>
+          <span className="hidden sm:block t-label">{t('Zapisuje se jako')}</span>
+          <span className="block font-bold text-[#16181A] text-sm">{t('Kdo jsi?')}</span>
         </span>
       </button>
     );
@@ -522,6 +527,7 @@ function PrepinacOsoby({ active, onShift, canSwitch, selectPerson }: {
   active: ActivePerson; onShift: RosterMember[]; canSwitch: boolean; selectPerson: (id: number) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const t = useT('kiosk');
   const pop = usePopover(open, setOpen, { focusFirst: true, arrowKeys: true });
 
   return (
@@ -540,14 +546,14 @@ function PrepinacOsoby({ active, onShift, canSwitch, selectPerson }: {
         <Avatar emoji={active.avatar} size="sm" ring={false} />
         <span className="text-left leading-tight min-w-0">
           {/* Na telefonu popisek ustoupí jménu — 49 px na „Eva Testová" nestačilo. */}
-          <span className="hidden sm:block t-label">Zapisuje se jako</span>
+          <span className="hidden sm:block t-label">{t('Zapisuje se jako')}</span>
           <span className="block font-bold text-[#16181A] text-sm truncate max-w-[7rem] sm:max-w-[11rem]">{active.name}</span>
         </span>
         {canSwitch && <Icon name="chevron" size={15} className="text-black/35" />}
       </button>
 
       {open && canSwitch && (
-        <MenuPanel ref={pop.panelRef} onKeyDown={pop.onPanelKeyDown} aria-label="Zapisovat jako"
+        <MenuPanel ref={pop.panelRef} onKeyDown={pop.onPanelKeyDown} aria-label={t('Zapisovat jako')}
           className="absolute right-0 top-full mt-2 w-64 origin-top-right">
           {onShift.map(m => {
             const vybrany = m.id === active.id;
@@ -578,6 +584,7 @@ export function PunchDialog({ member, now, onClose, onDone }: {
   onClose: () => void;
   onDone: (action: 'in' | 'out', member: RosterMember, flashMsg?: string) => void;
 }) {
+  const t = useT('kiosk');
   const on = !!member.openSince;
   const needPin = member.hasPin && !on; // PIN only required to clock in
   const [pin, setPin] = useState('');
@@ -594,15 +601,15 @@ export function PunchDialog({ member, now, onClose, onDone }: {
       const d = await res.json();
       if (res.ok) {
         if (d.action === 'out' && d.closingDone === false) {
-          onDone('out', member, `${member.name}: odchod zaznamenán — nezapomeň vyplnit uzávěrku směny!`);
+          onDone('out', member, t('{jmeno}: odchod zaznamenán — nezapomeň vyplnit uzávěrku směny!', { jmeno: member.name }));
         } else {
           onDone(on ? 'out' : 'in', member);
         }
       } else {
-        setErr(d.error || 'Nepodařilo se zaznamenat.');
+        setErr(d.error || t('Nepodařilo se zaznamenat.'));
         setPin('');
       }
-    } catch { setErr('Chyba serveru.'); }
+    } catch { setErr(t('Chyba serveru.')); }
     setBusy(false);
   };
 
@@ -611,29 +618,29 @@ export function PunchDialog({ member, now, onClose, onDone }: {
   return (
     <Modal open onClose={onClose} size="sm" title={member.name}
       subtitle={on
-        ? `Na směně od ${timeOf(member.openSince!)} · ${elapsed(member.openSince!, now)}`
-        : 'Zaznamenej příchod na směnu'}
+        ? t('Na směně od {cas} · {doba}', { cas: timeOf(member.openSince!), doba: elapsed(member.openSince!, now) })
+        : t('Zaznamenej příchod na směnu')}
       footer={<>
         {/* Potvrzení v okně je `primary` (DP §3.1: limetka patří obrazovce,
             ne modálu), odchod `danger-solid` — ukončuje směnu. */}
-        <Button variant="secondary" size="lg" className="flex-1" onClick={onClose}>Zpět</Button>
+        <Button variant="secondary" size="lg" className="flex-1" onClick={onClose}>{t('Zpět')}</Button>
         <Button variant={on ? 'danger-solid' : 'primary'} size="lg" className="flex-1" loading={busy}
           disabled={needPin && pin.length < 4} onClick={submit}>
-          {on ? 'Odpíchnout odchod' : 'Odpíchnout příchod'}
+          {on ? t('Odpíchnout odchod') : t('Odpíchnout příchod')}
         </Button>
       </>}>
       <div className="text-center">
         <Avatar emoji={member.avatar} size="xl" ring={false} />
         {!on && member.shiftStart && (
           <p className="mt-2">
-            <Chip tone="info" icon="calendar" className="tabular-nums">Dnes máš směnu {member.shiftStart}–{member.shiftEnd}</Chip>
+            <Chip tone="info" icon="calendar" className="tabular-nums">{t('Dnes máš směnu {od}–{do}', { od: member.shiftStart, do: member.shiftEnd })}</Chip>
           </p>
         )}
 
         {needPin && (
           <div className="mt-5">
             {/* Tečky nesou délku PINu i pro odečítač (role=img s popisem). */}
-            <div className="flex justify-center gap-2 mb-3" role="img" aria-label={`Zadáno číslic: ${pin.length}`}>
+            <div className="flex justify-center gap-2 mb-3" role="img" aria-label={t('Zadáno číslic: {n}', { n: pin.length })}>
               {[0, 1, 2, 3].map(i => (
                 <span key={i} className={`h-3.5 w-3.5 rounded-full ${i < pin.length ? 'bg-[#C8F542] ring-1 ring-black/15' : 'bg-black/15'}`} />
               ))}
@@ -648,7 +655,7 @@ export function PunchDialog({ member, now, onClose, onDone }: {
               <span />
               <Button variant="secondary" size="lg" className="text-lg tabular-nums"
                 onClick={() => setPin(p => (p.length < 6 ? p + '0' : p))}>0</Button>
-              <Button variant="secondary" size="lg" iconOnly icon="undo" aria-label="Smazat číslici" title="Smazat číslici"
+              <Button variant="secondary" size="lg" iconOnly icon="undo" aria-label={t('Smazat číslici')} title={t('Smazat číslici')}
                 className="w-full" disabled={pin.length === 0} onClick={() => setPin(p => p.slice(0, -1))} />
             </div>
           </div>
