@@ -11,6 +11,8 @@ import { Icon } from '../Icons';
 import { usePrice } from '../CurrencyProvider';
 import type { GuideStep } from '@/lib/guideSteps';
 import NewIngredientInline from '../inventory/NewIngredientInline';
+import { useT } from '@/lib/i18n/client';
+import { useLocale } from '../employer/jazyk';
 
 /** Jednotky nabízené podle toho, v čem je položka vedená. */
 const UNIT_SETS: Record<string, string[]> = {
@@ -35,6 +37,8 @@ export default function GuideStepIngredient({ step, items, categories, onChange,
   onChange: (patch: Partial<GuideStep>) => void;
   onItemCreated: (item: any) => void;
 }) {
+  const loc = useLocale();
+  const t = useT('navody');
   const cena = usePrice();
   const [creating, setCreating] = useState(false);
   const item = items.find(i => String(i.id) === String(step.itemId));
@@ -67,9 +71,9 @@ export default function GuideStepIngredient({ step, items, categories, onChange,
               unit: next ? (next.contentUnit ?? next.unit ?? null) : null,
             });
           }}
-          aria-label="Surovina ze skladu"
+          aria-label={t('Surovina ze skladu')}
           className="field flex-1 min-w-[160px] max-w-[22rem]">
-          <option value="">— vyber ze skladu —</option>
+          <option value="">{t('— vyber ze skladu —')}</option>
           {items.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
         </select>
         <input
@@ -77,7 +81,7 @@ export default function GuideStepIngredient({ step, items, categories, onChange,
           value={step.amount == null ? '' : String(step.amount).replace('.', ',')}
           onChange={e => onChange({ amount: e.target.value === '' ? null : dec(e.target.value) })}
           placeholder="0,04"
-          aria-label="Množství suroviny"
+          aria-label={t('Množství suroviny')}
           className="field !w-24 text-center tabular-nums"
         />
         <div className="flex gap-1">
@@ -89,7 +93,7 @@ export default function GuideStepIngredient({ step, items, categories, onChange,
           ))}
         </div>
         <button type="button" onClick={() => onChange({ itemId: null, amount: null, unit: null })}
-          title="Zrušit surovinu" aria-label="Zrušit surovinu"
+          title={t('Zrušit surovinu')} aria-label={t('Zrušit surovinu')}
           className="btn-icon tap-target">
           <Icon name="close" size={14} />
         </button>
@@ -98,13 +102,13 @@ export default function GuideStepIngredient({ step, items, categories, onChange,
       {!step.itemId && (
         <button type="button" onClick={() => setCreating(true)}
           className="btn btn-ghost btn-sm">
-          <Icon name="plus" size={13} /> Sklad ji ještě nezná — založit
+          <Icon name="plus" size={13} />  {t('Sklad ji ještě nezná — založit')}
         </button>
       )}
       {item && Number(item.packageSize) > 0 && (
         <p className="t-meta">
-          Balení {Number(item.packageSize).toLocaleString('cs-CZ')} {item.contentUnit ?? item.unit}
-          {Number(item.unitCost) > 0 ? ` · ${cena(Number(item.unitCost))}` : ' · cena chybí'}
+          {t('Balení {mnozstvi} {jednotka}', { mnozstvi: Number(item.packageSize).toLocaleString(loc), jednotka: item.contentUnit ?? item.unit })}
+          {Number(item.unitCost) > 0 ? ` · ${cena(Number(item.unitCost))}` : ` · ${t('cena chybí')}`}
         </p>
       )}
     </div>

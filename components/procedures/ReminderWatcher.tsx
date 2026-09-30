@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react';
 import { Icon } from '../Icons';
 import { Button } from '../ui';
 import { useProcedures, type ProcedureLite } from './ProcedureProvider';
+import { useT } from '@/lib/i18n/client';
 
 const FIRED_KEY = 'managero-proc-fired';
 
@@ -53,6 +54,7 @@ function markFired(key: string) {
  * Mounted inside ProcedureProvider — never rendered on its own.
  */
 export default function ReminderWatcher() {
+  const t = useT('postupy');
   const { active, startRun, starting } = useProcedures();
   const { status: stavRelace } = useSession();
   const proceduresRef = useRef<ProcedureLite[]>([]);
@@ -164,7 +166,7 @@ export default function ReminderWatcher() {
   // bod (region s nadpisem).
   const hlaseni = (
     <p className="sr-only" role="status" aria-live="polite">
-      {zobrazit ? `Připomínka: je čas na ${due!.name}.` : ''}
+      {zobrazit ? t('Připomínka: je čas na {nazev}.', { nazev: due!.name }) : ''}
     </p>
   );
   // Vždy jako první dítě fragmentu, aby React živou oblast při ukázání panelu nepřestavěl.
@@ -184,16 +186,16 @@ export default function ReminderWatcher() {
           </span>
           <div className="min-w-0">
             {/* Bez štítku „Připomínka" nad nadpisem (kicker je zákaz DP §6.12) — patří do řádku kontextu. */}
-            <h3 id="pripominka-postupu" className="t-section text-pretty">Je čas na {due.name}</h3>
+            <h3 id="pripominka-postupu" className="t-section text-pretty">{t('Je čas na {nazev}', { nazev: due.name })}</h3>
             <p className="t-meta mt-0.5 inline-flex items-center gap-1 tabular-nums">
-              <Icon name="clock" size={13} /> Připomínka{dueTime ? ` · ${dueTime}` : ''}
-              {due.remindAnchor === 'open' ? ' · otevření' : due.remindAnchor === 'close' ? ' · zavření' : ''}
+              <Icon name="clock" size={13} /> {t('Připomínka')}{dueTime ? ` · ${dueTime}` : ''}
+              {due.remindAnchor === 'open' ? ` · ${t('otevření')}` : due.remindAnchor === 'close' ? ` · ${t('zavření')}` : ''}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2 px-5 pb-5">
-          <Button variant="secondary" onClick={() => setDue(null)}>Odložit</Button>
-          <Button variant="primary" icon="play" block onClick={startNow} loading={starting}>Spustit teď</Button>
+          <Button variant="secondary" onClick={() => setDue(null)}>{t('Odložit')}</Button>
+          <Button variant="primary" icon="play" block onClick={startNow} loading={starting}>{t('Spustit teď')}</Button>
         </div>
       </section>
     </div>

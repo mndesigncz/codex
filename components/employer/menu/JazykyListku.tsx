@@ -5,6 +5,7 @@ import { Button, Chip, Modal, Segmented, SwitchRow } from '../../ui';
 import { JAZYKY, JAZYK_NAZEV, type Jazyk } from '@/lib/i18n/config';
 import { chybiPreklad, type JazykyListku as Langs } from '@/lib/menu';
 import { Icon } from '../../Icons';
+import { useT } from '@/lib/i18n/client';
 
 // Jazyky lístku: které jazyky host smí zvolit, který je výchozí, a přepínač
 // „co právě upravuju". Výchozí jazyk = texty v polích lístku (běžná editace);
@@ -22,6 +23,7 @@ export default function JazykyListku({ langs, upravLangs, editace, setEditace, d
   deska: Parameters<typeof chybiPreklad>[0];
   zamceno: boolean;
 }) {
+  const t = useT('sprava');
   const [otevreno, setOtevreno] = useState(false);
   // Rozpracovaný výběr v okně; uloží se do lístku až tlačítkem v okně.
   const [zapnute, setZapnute] = useState<Set<Jazyk>>(new Set(langs.nabizet));
@@ -42,56 +44,58 @@ export default function JazykyListku({ langs, upravLangs, editace, setEditace, d
     <div className="space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="t-card flex items-center gap-2"><Icon name="globe" size={17} className="shrink-0 text-black/40" />Jazyky lístku</h2>
+          <h2 className="t-card flex items-center gap-2"><Icon name="globe" size={17} className="shrink-0 text-black/40" />{t('Jazyky lístku')}</h2>
           <p className="t-meta mt-1 text-pretty">
             {viceJazyku
-              ? `Host si vybere z: ${langs.nabizet.map(j => JAZYK_NAZEV[j]).join(', ')}. Výchozí je ${JAZYK_NAZEV[langs.vychozi]}.`
-              : `Lístek je jen v jazyce ${JAZYK_NAZEV[langs.vychozi]}. Přidej další a host si u lístku uvidí přepínač jazyka.`}
+              ? t('Host si vybere z: {jazyky}. Výchozí je {vychozi}.', { jazyky: langs.nabizet.map(j => JAZYK_NAZEV[j]).join(', '), vychozi: JAZYK_NAZEV[langs.vychozi] })
+              : t('Lístek je jen v jazyce {jazyk}. Přidej další a host si u lístku uvidí přepínač jazyka.', { jazyk: JAZYK_NAZEV[langs.vychozi] })}
           </p>
         </div>
-        {!zamceno && <Button variant="secondary" size="sm" className="shrink-0" onClick={otevri}>Nastavit jazyky</Button>}
+        {!zamceno && <Button variant="secondary" size="sm" className="shrink-0" onClick={otevri}>{t('Nastavit jazyky')}</Button>}
       </div>
 
       {viceJazyku && (
         <>
-          <Segmented ariaLabel="Jazyk, který upravuješ"
+          <Segmented ariaLabel={t('Jazyk, který upravuješ')}
             value={editace ?? langs.vychozi}
-            options={langs.nabizet.map(j => ({ id: j, label: j === langs.vychozi ? `${JAZYK_NAZEV[j]} (výchozí)` : JAZYK_NAZEV[j] }))}
+            options={langs.nabizet.map(j => ({ id: j, label: j === langs.vychozi ? t('{jazyk} (výchozí)', { jazyk: JAZYK_NAZEV[j] }) : JAZYK_NAZEV[j] }))}
             onChange={(j) => setEditace(j === langs.vychozi ? null : j)} />
           <div className="flex flex-wrap gap-2" aria-live="polite">
             {preklady.map(j => {
               const chybi = chybiPreklad(deska, j);
               return chybi > 0
-                ? <Chip key={j} tone="wait" size="sm">{JAZYK_NAZEV[j]}: {chybi} bez překladu</Chip>
-                : <Chip key={j} tone="ok" size="sm" icon="check">{JAZYK_NAZEV[j]}: přeloženo</Chip>;
+                ? <Chip key={j} tone="wait" size="sm">{t('{jazyk}: {n} bez překladu', { jazyk: JAZYK_NAZEV[j], n: chybi })}</Chip>
+                : <Chip key={j} tone="ok" size="sm" icon="check">{t('{jazyk}: přeloženo', { jazyk: JAZYK_NAZEV[j] })}</Chip>;
             })}
           </div>
           <p className="t-meta text-pretty">
-            Chybí-li překlad, hostovi se ukáže výchozí text. Cena a „vyprodáno“ jsou pro všechny jazyky stejné.
+            
+            {t('Chybí-li překlad, hostovi se ukáže výchozí text. Cena a „vyprodáno“ jsou pro všechny jazyky stejné.')}
           </p>
         </>
       )}
 
-      <Modal open={otevreno} onClose={() => setOtevreno(false)} size="sm" title="Jazyky lístku"
-        subtitle="Které jazyky smí host zvolit. Překlady textů doplníš po uložení v seznamu jazyků."
+      <Modal open={otevreno} onClose={() => setOtevreno(false)} size="sm" title={t('Jazyky lístku')}
+        subtitle={t('Které jazyky smí host zvolit. Překlady textů doplníš po uložení v seznamu jazyků.')}
         footer={<>
-          <Button variant="secondary" onClick={() => setOtevreno(false)}>Zrušit</Button>
-          <Button variant="primary" onClick={potvrd}>Použít</Button>
+          <Button variant="secondary" onClick={() => setOtevreno(false)}>{t('Zrušit')}</Button>
+          <Button variant="primary" onClick={potvrd}>{t('Použít')}</Button>
         </>}>
         <ul className="list">
           {JAZYKY.map(j => (
-            <SwitchRow key={j} title={JAZYK_NAZEV[j]} hint={j === vychozi ? 'Výchozí jazyk lístku' : undefined}
+            <SwitchRow key={j} title={JAZYK_NAZEV[j]} hint={j === vychozi ? t('Výchozí jazyk lístku') : undefined}
               checked={j === vychozi || zapnute.has(j)} disabled={j === vychozi}
               onChange={(v) => setZapnute(z => { const n = new Set(z); if (v) n.add(j); else n.delete(j); return n; })} />
           ))}
         </ul>
         <div className="mt-4">
-          <p className="t-label mb-2">Výchozí jazyk</p>
-          <Segmented ariaLabel="Výchozí jazyk lístku" value={vychozi} size="sm"
+          <p className="t-label mb-2">{t('Výchozí jazyk')}</p>
+          <Segmented ariaLabel={t('Výchozí jazyk lístku')} value={vychozi} size="sm"
             options={JAZYKY.map(j => ({ id: j, label: JAZYK_NAZEV[j] }))}
             onChange={(j) => { setVychozi(j); setZapnute(z => new Set(z).add(j)); }} />
           <p className="t-meta mt-2 text-pretty">
-            Texty, které máš v lístku napsané teď, se berou jako výchozí jazyk. Změna výchozího jazyka je hlavně pro lístek, který už píšeš jinak než česky.
+            
+            {t('Texty, které máš v lístku napsané teď, se berou jako výchozí jazyk. Změna výchozího jazyka je hlavně pro lístek, který už píšeš jinak než česky.')}
           </p>
         </div>
       </Modal>

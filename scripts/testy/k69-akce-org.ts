@@ -108,5 +108,5 @@ export default function ({ eq, ok }: Testy) {
   ok('akce: detail je <Modal>', /<Modal[\s\S]*?title=\{titulek\}/.test(akce));
   ok('akce: lidé jsou PersonChip, stav Chip', akce.includes('<PersonChip') && akce.includes('<Chip'));
   ok('akce: hlášky přes Toast', akce.includes('<Toast'));
-  ok('akce: „Oznámit týmu" hlásí přes oznam (Toast), ne alert', akce.includes("oznam('Tým dostal notifikaci o akci.')"));
+  ok('akce: „Oznámit týmu" hlásí přes oznam (Toast), ne alert', /oznam\((?:t\()?'Tým dostal notifikaci o akci\.'\)?\)/.test(akce));
 }

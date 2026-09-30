@@ -15,6 +15,7 @@ import type { Slovnik } from './core.ts';
 export const SEKCE = [
   'common', 'api', 'auth', 'klient-host',
   'zamestnanec', 'kiosk', 'chat',
+  'sprava', 'tym', 'navody', 'postupy',
 ] as const;
 export type Sekce = (typeof SEKCE)[number];
 export const SEKCE_VZDY: readonly Sekce[] = ['common', 'api'];

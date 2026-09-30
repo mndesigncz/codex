@@ -4,6 +4,7 @@ import { Step, fmtMinutes } from '@/lib/steps';
 import { Icon } from '../Icons';
 import { Button, Chip } from '../ui';
 import { clickable } from '@/lib/clickable';
+import { useT } from '@/lib/i18n/client';
 
 type Status = 'pending' | 'done' | 'skipped';
 
@@ -33,6 +34,7 @@ interface Props {
 // tečka s fajfkou a přeškrtnutý text, přeskočené = tečka ve stavovém tónu „čeká".
 
 export default function StepTimeline({ steps, statuses = {}, onToggle, onSkip, interactive = false, compact = false, onOpenGuide, guideHref }: Props) {
+  const t = useT('postupy');
   return (
     <ol className="relative">
       {steps.map((s, i) => {
@@ -52,7 +54,7 @@ export default function StepTimeline({ steps, statuses = {}, onToggle, onSkip, i
               <div
                 {...clickable(() => onToggle?.(i), {
                   disabled: !interactive,
-                  label: `${done ? 'Zrušit splnění' : 'Označit jako hotové'} — ${s.text}`,
+                  label: `${done ? t('Zrušit splnění') : t('Označit jako hotové')} — ${s.text}`,
                 })}
                 // Přeskočení krok viselo jen na pravém tlačítku myši, takže
                 // klávesnicí ani na tabletu nešlo vůbec. Pravé tlačítko
@@ -82,7 +84,7 @@ export default function StepTimeline({ steps, statuses = {}, onToggle, onSkip, i
                     </p>
                     {skipped ? (
                       <p className="mt-0.5 inline-flex items-center gap-1 text-xs font-semibold text-wait-ink">
-                        <Icon name="play" size={13} /> Přeskočeno
+                        <Icon name="play" size={13} />  {t('Přeskočeno')}
                       </p>
                     ) : s.note && !compact && (
                       <p className="mt-1 flex items-start gap-1.5 text-xs text-black/45">
@@ -97,13 +99,14 @@ export default function StepTimeline({ steps, statuses = {}, onToggle, onSkip, i
                       onOpenGuide ? (
                         <Button variant="secondary" size="sm" icon="book" className="mt-1.5"
                           onClick={(e) => { e.stopPropagation(); onOpenGuide(s.guideId as number); }}>
-                          Otevřít návod
+                          
+                          {t('Otevřít návod')}
                         </Button>
                       ) : (
                         <a href={guideHref!(s.guideId as number)}
                           onClick={(e) => e.stopPropagation()}
                           className="btn btn-secondary btn-sm mt-1.5 inline-flex items-center gap-1.5">
-                          <Icon name="book" size={14} /> Otevřít návod
+                          <Icon name="book" size={14} />  {t('Otevřít návod')}
                         </a>
                       )
                     )}
@@ -118,9 +121,9 @@ export default function StepTimeline({ steps, statuses = {}, onToggle, onSkip, i
                       ikony, ať se tlačítko vejde vedle textu kroku na telefonu. */}
                   {interactive && onSkip && !done && (
                     <Button variant="ghost" size="sm" icon={skipped ? 'undo' : compact ? undefined : 'play'} className="flex-shrink-0"
-                      aria-label={skipped ? `Vrátit mezi kroky: ${s.text}` : `Přeskočit krok: ${s.text}`}
+                      aria-label={skipped ? t('Vrátit mezi kroky: {text}', { text: s.text }) : t('Přeskočit krok: {text}', { text: s.text })}
                       onClick={(e) => { e.stopPropagation(); onSkip(i); }}>
-                      {skipped ? 'Vrátit' : 'Přeskočit'}
+                      {skipped ? t('Vrátit') : t('Přeskočit')}
                     </Button>
                   )}
                 </div>

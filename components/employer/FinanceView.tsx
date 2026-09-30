@@ -36,25 +36,34 @@ import { useSmi } from '../widgety/NavigaceKontext';
 import { useOpravneni } from '../role/useOpravneni';
 import { MesicStrankyFinanci } from '../widgety/oblasti/finance';
 import { urlFinanci, vyberFinance, type FinanceMesice, type RadekKnihy } from '@/lib/financeWidgety';
+import { useT, type PrekladFn } from '@/lib/i18n/client';
+import { useLocale } from './jazyk';
 
 /** Druhy výdajů: kategorie (cat-dot), ne stav — stavové barvy patří stavu (DP §2.1). */
-const DRUHY: Record<string, { label: string; tecka: string }> = {
-  receipt: { label: 'Účtenka', tecka: 'cat-dot-2' },
-  order: { label: 'Objednávka', tecka: 'cat-dot-3' },
-  expense: { label: 'Výdaj z kasy', tecka: 'cat-dot-5' },
-  wage: { label: 'Výplata', tecka: 'cat-dot-4' },
-  removal: { label: 'Odvod', tecka: 'cat-dot-6' },
+const DRUHY: Record<string, { label: string; tecka: string }> = { // i18n-ok (popisky pro CSV pro účetní zůstávají česky, na obrazovce je překládá druhyVydaju)
+  receipt: { label: 'Účtenka', tecka: 'cat-dot-2' }, // i18n-ok
+  order: { label: 'Objednávka', tecka: 'cat-dot-3' }, // i18n-ok
+  expense: { label: 'Výdaj z kasy', tecka: 'cat-dot-5' }, // i18n-ok
+  wage: { label: 'Výplata', tecka: 'cat-dot-4' }, // i18n-ok
+  removal: { label: 'Odvod', tecka: 'cat-dot-6' }, // i18n-ok
 };
+const druhyVydaju = (t: PrekladFn): Record<string, { label: string; tecka: string }> => ({
+  receipt: { label: t('Účtenka'), tecka: 'cat-dot-2' },
+  order: { label: t('Objednávka'), tecka: 'cat-dot-3' },
+  expense: { label: t('Výdaj z kasy'), tecka: 'cat-dot-5' },
+  wage: { label: t('Výplata'), tecka: 'cat-dot-4' },
+  removal: { label: t('Odvod'), tecka: 'cat-dot-6' },
+});
 
 type Filtr = 'all' | 'receipt' | 'order' | 'expense' | 'wage';
-const FILTRY: { id: Filtr; label: string }[] = [
-  { id: 'all', label: 'Vše' }, { id: 'receipt', label: 'Účtenky' }, { id: 'order', label: 'Objednávky' },
-  { id: 'expense', label: 'Z kasy' }, { id: 'wage', label: 'Výplaty' },
+const filtryVydaju = (t: PrekladFn): { id: Filtr; label: string }[] => [
+  { id: 'all', label: t('Vše') }, { id: 'receipt', label: t('Účtenky') }, { id: 'order', label: t('Objednávky') },
+  { id: 'expense', label: t('Z kasy') }, { id: 'wage', label: t('Výplaty') },
 ];
 
 /** „26. 9." z „2026-09-26" — datum z databáze je už pražský den. */
 const kratce = (d: string) => { const [, m, dd] = d.split('-').map(Number); return m && dd ? `${dd}. ${m}.` : d; };
-const dlouze = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+const dlouze = (d: string, loc: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString(loc, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 
 // ---------------------------------------------------------------------------
 // CSV pro účetní
@@ -66,26 +75,26 @@ interface VolbyExportu { from: string; to: string; items: boolean; summary: bool
 function radkyCsv(mo: string, raw: any, o: VolbyExportu, symbol: string): string[][] {
   const rows: string[][] = [];
   if (o.items) {
-    rows.push([`Položky ${mo}`, '', '', '', '']);
-    rows.push(['Datum', 'Typ', 'Popis', `Částka (${symbol})`, 'Poznámka']);
+    rows.push([`Položky ${mo}`, '', '', '', '']); // i18n-ok (CSV)
+    rows.push(['Datum', 'Typ', 'Popis', `Částka (${symbol})`, 'Poznámka']); // i18n-ok (CSV)
     for (const r of (raw.ledger ?? []) as RadekKnihy[]) rows.push([r.date, DRUHY[r.kind]?.label ?? r.kind, r.label, String(r.amount), r.note ?? '']);
     rows.push([]);
   }
   if (o.summary) {
     const q = raw.summary ?? {};
-    rows.push([`Souhrn ${mo}`, '', '', '', '']);
-    for (const [lb, v] of [['Tržby celkem', q.revenue], ['— hotovost', q.cash], ['— karty', q.card], ['Spropitné', q.tips],
-      ['Nákupy a výdaje', q.purchases], ['Mzdy (odpracováno × sazba)', q.wagesWorked], ['Výplaty hotově z kasy', q.wagesCash],
-      ['Hodnota skladu', q.stockValue], ['Rozdíly v kase', q.diffSum], ['Hrubý výsledek', q.gross]] as [string, unknown][]) {
+    rows.push([`Souhrn ${mo}`, '', '', '', '']); // i18n-ok (CSV)
+    for (const [lb, v] of [['Tržby celkem', q.revenue], ['— hotovost', q.cash], ['— karty', q.card], ['Spropitné', q.tips], // i18n-ok (CSV)
+      ['Nákupy a výdaje', q.purchases], ['Mzdy (odpracováno × sazba)', q.wagesWorked], ['Výplaty hotově z kasy', q.wagesCash], // i18n-ok
+      ['Hodnota skladu', q.stockValue], ['Rozdíly v kase', q.diffSum], ['Hrubý výsledek', q.gross]] as [string, unknown][]) { // i18n-ok
       rows.push(['', lb, '', String(Math.round(Number(v) || 0)), '']);
     }
     rows.push([]);
   }
   if (o.guest && raw.guest) {
-    rows.push([`Hosté ${mo}`, '', '', '', '']);
-    for (const [lb, v] of [['Objednávek od stolu', raw.guest.orders], ['Tržba z objednávek', raw.guest.total],
-      ['Z toho mimo pokladnu', raw.guest.offPosTotal], ['Členů věrnosti', raw.guest.members],
-      ['Nových členů', raw.guest.newMembers], ['Uplatněných kuponů', raw.guest.couponsRedeemed]] as [string, unknown][]) {
+    rows.push([`Hosté ${mo}`, '', '', '', '']); // i18n-ok (CSV)
+    for (const [lb, v] of [['Objednávek od stolu', raw.guest.orders], ['Tržba z objednávek', raw.guest.total], // i18n-ok (CSV)
+      ['Z toho mimo pokladnu', raw.guest.offPosTotal], ['Členů věrnosti', raw.guest.members], // i18n-ok
+      ['Nových členů', raw.guest.newMembers], ['Uplatněných kuponů', raw.guest.couponsRedeemed]] as [string, unknown][]) { // i18n-ok
       rows.push(['', lb, '', String(Math.round(Number(v) || 0)), '']);
     }
     rows.push([]);
@@ -107,6 +116,7 @@ function mesiceOdDo(od: string, doMesice: string): string[] {
 
 /** Sestavitelný export: od kdy do kdy a co v souboru bude. */
 function ExportDialog({ mesic, onClose }: { mesic: string; onClose: () => void }) {
+  const t = useT('sprava');
   const symbol = useSymbol();
   const [od, setOd] = useState(mesic);
   const [doMesice, setDoMesice] = useState(mesic);
@@ -129,35 +139,35 @@ function ExportDialog({ mesic, onClose }: { mesic: string; onClose: () => void }
       await ulozSoubor(nazev, '﻿' + csv, 'text/csv;charset=utf-8');
       onClose();
     } catch {
-      setChyba('Data pro export se nepodařilo načíst. Zkus to znovu.');
+      setChyba(t('Data pro export se nepodařilo načíst. Zkus to znovu.'));
     }
     setBezi(false);
   };
 
   return (
-    <Modal open onClose={onClose} size="md" title="Export pro účetní"
-      subtitle="Stáhne se jeden soubor CSV, který otevře Excel i účetní program."
+    <Modal open onClose={onClose} size="md" title={t('Export pro účetní')}
+      subtitle={t('Stáhne se jeden soubor CSV, který otevře Excel i účetní program.')}
       footer={<>
-        <Button variant="secondary" onClick={onClose}>Zrušit</Button>
-        <Button variant="primary" icon="download" loading={bezi} disabled={!polozky && !souhrn && !hoste} onClick={stahni}>Stáhnout</Button>
+        <Button variant="secondary" onClick={onClose}>{t('Zrušit')}</Button>
+        <Button variant="primary" icon="download" loading={bezi} disabled={!polozky && !souhrn && !hoste} onClick={stahni}>{t('Stáhnout')}</Button>
       </>}>
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
-          <Field id="ex-od" label="Od měsíce"><Input id="ex-od" type="month" value={od} onChange={e => setOd(e.target.value)} /></Field>
-          <Field id="ex-do" label="Do měsíce"><Input id="ex-do" type="month" value={doMesice} onChange={e => setDoMesice(e.target.value)} /></Field>
+          <Field id="ex-od" label={t('Od měsíce')}><Input id="ex-od" type="month" value={od} onChange={e => setOd(e.target.value)} /></Field>
+          <Field id="ex-do" label={t('Do měsíce')}><Input id="ex-do" type="month" value={doMesice} onChange={e => setDoMesice(e.target.value)} /></Field>
         </div>
         <div>
-          <p className="t-label mb-1">Co zahrnout</p>
+          <p className="t-label mb-1">{t('Co zahrnout')}</p>
           <ul className="list">
-            <SwitchRow title="Jednotlivé výdaje" checked={polozky} onChange={setPolozky} />
-            <SwitchRow title="Souhrn měsíce" checked={souhrn} onChange={setSouhrn} />
-            <SwitchRow title="Hosté a věrnost" checked={hoste} onChange={setHoste} />
+            <SwitchRow title={t('Jednotlivé výdaje')} checked={polozky} onChange={setPolozky} />
+            <SwitchRow title={t('Souhrn měsíce')} checked={souhrn} onChange={setSouhrn} />
+            <SwitchRow title={t('Hosté a věrnost')} checked={hoste} onChange={setHoste} />
           </ul>
         </div>
-        <Field id="ex-sep" label="Oddělovač">
+        <Field id="ex-sep" label={t('Oddělovač')}>
           <Select id="ex-sep" value={sep} onChange={e => setSep(e.target.value)}>
-            <option value=";">Středník — pro český Excel</option>
-            <option value=",">Čárka — pro účetní programy a Google Tabulky</option>
+            <option value=";">{t('Středník — pro český Excel')}</option>
+            <option value=",">{t('Čárka — pro účetní programy a Google Tabulky')}</option>
           </Select>
         </Field>
         {chyba && <p role="alert" className="note note-danger">{chyba}</p>}
@@ -171,6 +181,8 @@ function ExportDialog({ mesic, onClose }: { mesic: string; onClose: () => void }
 // ---------------------------------------------------------------------------
 
 function KnihaVydaju({ mesic }: { mesic: string }) {
+  const t = useT('sprava');
+  const loc = useLocale();
   const money = useMoney();
   const smi = useSmi();
   // useSmi() před načtením oprávnění vrací „ne" — kniha by pak majiteli s plnými
@@ -196,7 +208,7 @@ function KnihaVydaju({ mesic }: { mesic: string }) {
 
   if (ceka) {
     return (
-      <Section id="finance-vydaje" title="Výdaje">
+      <Section id="finance-vydaje" title={t('Výdaje')}>
         <Card aria-busy><div className="space-y-2">{[0, 1, 2, 3].map(i => <Skeleton key={i} className={`h-12 ${i === 3 ? 'w-2/3' : ''}`} />)}</div></Card>
       </Section>
     );
@@ -205,33 +217,33 @@ function KnihaVydaju({ mesic }: { mesic: string }) {
   if (!smiFinance) {
     return (
       <Card>
-        <EmptyState compact icon="lock" title="Knihu výdajů vidí jen role s přístupem k financím"
-          hint="Tržby z pokladny máš ve widgetech nad tímhle. O přístup k výdajům požádej majitele." />
+        <EmptyState compact icon="lock" title={t('Knihu výdajů vidí jen role s přístupem k financím')}
+          hint={t('Tržby z pokladny máš ve widgetech nad tímhle. O přístup k výdajům požádej majitele.')} />
       </Card>
     );
   }
 
   return (
-    <Section id="finance-vydaje" title="Výdaje"
-      hint={data.data ? `${vybrane.length.toLocaleString('cs-CZ')}${vybrane.length !== kniha.length ? ` z ${kniha.length.toLocaleString('cs-CZ')}` : ''} · celkem ${money(soucet)}` : undefined}>
+    <Section id="finance-vydaje" title={t('Výdaje')}
+      hint={data.data ? `${vybrane.length.toLocaleString(loc)}${vybrane.length !== kniha.length ? ` ${t('z {n}', { n: kniha.length.toLocaleString(loc) })}` : ''} · ${t('celkem {castka}', { castka: money(soucet) })}` : undefined}>
       <div className="flex flex-col sm:flex-row sm:items-center gap-2 min-w-0">
         <SearchField className="min-w-0 sm:w-64" value={q} onChange={setQ}
-          placeholder="Hledat v popisu" ariaLabel="Hledat ve výdajích" storageKey="finance" />
-        <Segmented size="sm" ariaLabel="Druh výdaje" value={filtr} onChange={setFiltr}
-          options={FILTRY.map(f => ({ id: f.id, label: f.label, count: pocty[f.id] ?? 0 }))} />
+          placeholder={t('Hledat v popisu')} ariaLabel={t('Hledat ve výdajích')} storageKey="finance" />
+        <Segmented size="sm" ariaLabel={t('Druh výdaje')} value={filtr} onChange={setFiltr}
+          options={filtryVydaju(t).map(f => ({ id: f.id, label: f.label, count: pocty[f.id] ?? 0 }))} />
       </div>
       {data.error ? (
-        <ErrorState title="Výdaje se nenačetly" detail={data.error} onRetry={data.reload} />
+        <ErrorState title={t('Výdaje se nenačetly')} detail={data.error} onRetry={data.reload} />
       ) : data.loading ? (
         <Card aria-busy><div className="space-y-2">{[0, 1, 2, 3].map(i => <Skeleton key={i} className={`h-12 ${i === 3 ? 'w-2/3' : ''}`} />)}</div></Card>
       ) : vybrane.length === 0 ? (
-        <Card><EmptyState compact icon="book" title={kniha.length ? 'Nic neodpovídá hledání' : 'V tomhle měsíci žádné výdaje'}
-          hint={kniha.length ? 'Zkus jiný druh nebo kratší slovo.' : 'Účtenky, objednávky a výdaje z kasy se sem propíšou samy.'} /></Card>
+        <Card><EmptyState compact icon="book" title={kniha.length ? t('Nic neodpovídá hledání') : t('V tomhle měsíci žádné výdaje')}
+          hint={kniha.length ? t('Zkus jiný druh nebo kratší slovo.') : t('Účtenky, objednávky a výdaje z kasy se sem propíšou samy.')} /></Card>
       ) : (
         <Card pad="none" className="px-5">
           <ul className="list">
             {vybrane.map((r, i) => {
-              const druh = DRUHY[r.kind] ?? { label: r.kind, tecka: 'cat-dot-6' };
+              const druh = druhyVydaju(t)[r.kind] ?? { label: r.kind, tecka: 'cat-dot-6' };
               // Vlastní <li>: klikací ListRow se jinak kreslí jako <li class="contents">
               // a `.list > * + *` na něm linku nad řádkem nenakreslí. Šipka žádná —
               // měla by ji jen účtenka a odsunula by jí částku ze sloupce čísel;
@@ -241,7 +253,7 @@ function KnihaVydaju({ mesic }: { mesic: string }) {
                   <ListRow as="div" chevron={false}
                     lead={<span aria-hidden className={`h-2.5 w-2.5 rounded-full ${druh.tecka}`} />}
                     title={r.label}
-                    meta={[kratce(r.date), druh.label, r.note, r.photoUrl ? 's fotkou' : null].filter(Boolean).join(' · ')}
+                    meta={[kratce(r.date), druh.label, r.note, r.photoUrl ? t('s fotkou') : null].filter(Boolean).join(' · ')}
                     value={<span className="tabular-nums">−{money(r.amount)}</span>}
                     onClick={r.kind === 'receipt' ? () => setDetail(r) : undefined} />
                 </li>
@@ -251,13 +263,13 @@ function KnihaVydaju({ mesic }: { mesic: string }) {
         </Card>
       )}
 
-      <Modal open={!!detail} onClose={() => setDetail(null)} size="md" title={detail?.label ?? 'Účtenka'}
-        subtitle={detail ? `${dlouze(detail.date)} · ${money(detail.amount)}` : undefined}
+      <Modal open={!!detail} onClose={() => setDetail(null)} size="md" title={detail?.label ?? t('Účtenka')}
+        subtitle={detail ? `${dlouze(detail.date, loc)} · ${money(detail.amount)}` : undefined}
         footer={detail?.photoUrl ? (
           // V obalu `download` z odkazu nic neudělá: fotka jde přes lib/stahni (sdílecí list).
           <a href={detail.photoUrl} download={`uctenka-${detail.date}.jpg`} className="btn btn-primary"
             onClick={ev => { if (jeObalKlient()) { ev.preventDefault(); void ulozZAdresy(detail.photoUrl!, `uctenka-${detail.date}.jpg`); } }}>
-            <Icon name="download" size={18} /> Stáhnout fotku
+            <Icon name="download" size={18} />  {t('Stáhnout fotku')}
           </a>
         ) : undefined}>
         {detail && (
@@ -265,8 +277,8 @@ function KnihaVydaju({ mesic }: { mesic: string }) {
             {detail.note && <Well><p className="text-sm text-[#16181A]">{detail.note}</p></Well>}
             {detail.photoUrl
               // eslint-disable-next-line @next/next/no-img-element
-              ? <img src={detail.photoUrl} alt={`Účtenka ${detail.label}`} className="w-full rounded-2xl border border-[var(--surface-line)]" />
-              : <p className="t-meta">Účtenka je bez fotky.</p>}
+              ? <img src={detail.photoUrl} alt={t('Účtenka {nazev}', { nazev: detail.label })} className="w-full rounded-2xl border border-[var(--surface-line)]" />
+              : <p className="t-meta">{t('Účtenka je bez fotky.')}</p>}
           </div>
         )}
       </Modal>
@@ -279,6 +291,7 @@ function KnihaVydaju({ mesic }: { mesic: string }) {
 // ---------------------------------------------------------------------------
 
 export default function FinanceView() {
+  const t = useT('sprava');
   const smi = useSmi();
   const { pro } = usePlan();
   const dnes = pragueToday().slice(0, 7);
@@ -293,11 +306,11 @@ export default function FinanceView() {
       <PlochaWidgetu
         stranka="vedeni.finance"
         hlavicka={{
-          title: 'Finance',
-          subtitle: 'Tržby, nákupy a mzdy měsíce pohromadě.',
+          title: t('Finance'),
+          subtitle: t('Tržby, nákupy a mzdy měsíce pohromadě.'),
           hintId: 'financeview',
           primary: smiExport ? (
-            <Button variant="accent" icon="download" onClick={() => (pro ? setExportuji(true) : setUpgrade('Export pro účetní'))}>Export pro účetní</Button>
+            <Button variant="accent" icon="download" onClick={() => (pro ? setExportuji(true) : setUpgrade(t('Export pro účetní')))}>{t('Export pro účetní')}</Button>
           ) : undefined,
           // Budoucí měsíc nemá co ukázat — šipka dopředu se na dnešku zastaví.
           aside: <MonthNav value={mesic} onChange={setMesic} max={dnes} />,
