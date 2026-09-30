@@ -19,6 +19,8 @@ function bezpecnostniHlavicky({ ramovatSam }) {
     // v rámu jen na stránce téhož původu.
     { key: 'X-Frame-Options', value: ramovatSam ? 'SAMEORIGIN' : 'DENY' },
     { key: 'X-Content-Type-Options', value: 'nosniff' },
+    // Ukázka má být mimo vyhledávače i tehdy, kdyby robota nezajímala metadata stránky.
+    ...(ramovatSam ? [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] : []),
     // Adresa s tokenem sdílené stránky se nemá odeslat cizímu webu
     // v hlavičce Referer.
     { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },

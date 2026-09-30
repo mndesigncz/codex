@@ -38,16 +38,18 @@ export function dnyMesice(m: string): string[] {
   return Array.from({ length: pocet }, (_, i) => `${m}-${String(i + 1).padStart(2, '0')}`);
 }
 
-/** ISO čas dnes v hodině:minutě pražského času (pro příchody, zprávy…). */
+/** ISO čas pro pražské hh:mm daného dne (příchody, zprávy…). */
 export function casDnes(hm: string, den: string = dnes()): string {
-  // Praha je UTC+1/+2; příchod „v 7:05" má být v 7:05 na hodinách v Praze.
-  // Zkusí se obě hodnoty posunu a vezme ta, jejíž pražský zápis sedí.
+  // Praha je UTC+1 nebo +2 podle data; zkusí se oba posuny a vezme ten, jehož
+  // pražský zápis sedí. Datum se skládá aritmeticky, ne řetězcem, ať hodina
+  // po půlnoci (00:05) nespadne do neplatného „-1".
+  const [r, mm, dd] = den.split('-').map(Number);
   const [h, m] = hm.split(':').map(Number);
+  const zapis = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit', hour12: false });
+  const cil = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
   for (const posun of [1, 2]) {
-    const t = new Date(`${den}T${String(h - posun).padStart(2, '0')}:${String(m).padStart(2, '0')}:00Z`);
-    if (Number.isNaN(t.getTime())) continue;
-    const pr = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit', hour12: false }).format(t);
-    if (pr === `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`) return t.toISOString();
+    const t = new Date(Date.UTC(r, mm - 1, dd, h - posun, m));
+    if (zapis.format(t) === cil) return t.toISOString();
   }
-  return new Date(`${den}T${hm}:00`).toISOString();
+  return new Date(Date.UTC(r, mm - 1, dd, h - 1, m)).toISOString();
 }
