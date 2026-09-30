@@ -9,10 +9,21 @@
 
 import { Icon } from '../Icons';
 import { Avatar, Chip, Modal } from '../ui';
-import { isExcused, skipReasonLabel } from '@/lib/procedureScoring';
+import { isExcused } from '@/lib/procedureScoring';
 import { parseSteps, stepPenalty, stepPlus } from '@/lib/steps';
 import { delka, type PrubehApi } from '@/lib/postupyPrehled';
-import { useT } from '@/lib/i18n/client';
+import { useT, type PrekladFn } from '@/lib/i18n/client';
+
+/** Důvod přeskočení kroku podle id (id se ukládá, text se překládá až na obrazovce). */
+export function duvodPreskoceni(id: string | null | undefined, t: PrekladFn): string {
+  switch (id) {
+    case 'not_needed': return t('Nebylo potřeba');
+    case 'missing': return t('Chybělo zboží / vybavení');
+    case 'no_time': return t('Nestíhal/a jsem');
+    case 'other': return t('Jiný důvod');
+    default: return id || t('Bez důvodu');
+  }
+}
 
 /** Kroky postupu, ke kterému průběh patří (průběh si ukládá jen indexy). */
 export default function DetailPrubehu({ prubeh, kroky, kdy, onClose }: {
@@ -49,7 +60,7 @@ export default function DetailPrubehu({ prubeh, kroky, kdy, onClose }: {
             const meta = hotovo
               ? undefined
               : preskoceno
-                ? `${skipReasonLabel(d?.reason)}${d?.note ? ` — „${d.note}"` : ''}${omluveno ? ` · ${t('omluveno, bez bodové ztráty')}` : ` · ${t('−{n} b.', { n: stepPenalty(st) })}`}`
+                ? `${duvodPreskoceni(d?.reason, t)}${d?.note ? ` — „${d.note}"` : ''}${omluveno ? ` · ${t('omluveno, bez bodové ztráty')}` : ` · ${t('−{n} b.', { n: stepPenalty(st) })}`}`
                 : t('Nedokončeno · −{n} b.', { n: stepPenalty(st) });
             return (
               <li key={i} className="flex items-start gap-3 py-2.5">

@@ -84,10 +84,11 @@ const VYCHOZI_SLUG = 'akce';
 const obnovWidgety = () => { obnovDataWidgetu(URL_MENU); obnovDataWidgetu(URL_VYPRODANO); };
 
 /** Potvrzení nevratného kroku — místo confirm() (DP §3.10). */
-type Potvrzeni = { titulek: string; text: string; akce: string; onAno: () => void } | null;
+type Potvrzeni = { titulek: string; text: string; akce: string; danger?: boolean; onAno: () => void } | null;
 
 export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } = {}) {
   const t = useT('sprava');
+  const tRef = useRef(t); tRef.current = t; // callbacky nesmí držet starý jazyk po přepnutí
   // Tlačítka a pole podle `ma` (před načtením oprávnění a u staršího serveru
   // ANO — rozhoduje server), ne přísné useSmi widgetů: editor se nesmí
   // zamknout navždy jen proto, že /api/teams/mine oprávnění nepošle
@@ -146,6 +147,7 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
   /* `potichu`: obnovit seznam bez stavu načítání — ten by nahradil celý
      nástroj a s ním zavřel i okno kopie dřív, než člověk uvidí výsledek. */
   const load = useCallback(async (potichu = false) => {
+    const t = tRef.current;
     if (!potichu) setNacitam(true);
     try {
       const d = await fetch(URL_MENU).then(okJson);
@@ -402,7 +404,7 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
     setToast({
       text: t('{nazev}: smazáno', { nazev: kopie.name || t('Položka') }), id: Date.now(),
       akce: {
-        label: t('Vrátit'),
+        label: t('Vrátit', {}, 'zpet'),
         // Vracet jen do téže desky a sekce; po přepnutí menu by se položka vložila jinam.
         onClick: () => upravit((b) => {
           const cil = b.id === deskaId ? b.sections.find((x, i) => (sekce.id != null ? x.id === sekce.id : i === si)) : undefined;
@@ -435,6 +437,7 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
 
   /* Katalog se tahá jednou a drží — při psaní menu se do něj sahá často. */
   const nacistKatalog = useCallback(async (znovu = false) => {
+    const t = tRef.current;
     if (posProdukty && !znovu) return posProdukty;
     setPosStav(t('Načítám katalog kasy…'));
     try {
@@ -632,7 +635,7 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
               options={boards.map(b => ({ id: String(b.id), label: b.name }))}
               onChange={id => {
                 if (neulozeno) {
-                  setPotvrzeni({ titulek: t('Zahodit neuložené změny?'), text: t('V menu „{nazev}“ máš neuložené změny. Přepnutím na jiné menu se zahodí.', { nazev: board.name }), akce: t('Zahodit a přepnout'), onAno: () => setAktivni(Number(id)) });
+                  setPotvrzeni({ titulek: t('Zahodit neuložené změny?'), text: t('V menu „{nazev}“ máš neuložené změny. Přepnutím na jiné menu se zahodí.', { nazev: board.name }), akce: t('Zahodit a přepnout'), danger: true, onAno: () => setAktivni(Number(id)) });
                 } else setAktivni(Number(id));
               }} />
           )}
@@ -926,7 +929,7 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
                     disabled={si === board.sections.length - 1} onClick={() => upravit((b) => posun(b.sections, si, 1))} />
                   <Button variant="danger" size="sm" iconOnly icon="trash" className="tap-target ml-2" aria-label={t('Smazat sekci {nazev}', { nazev: s.title })}
                     onClick={() => setPotvrzeni({
-                      titulek: t('Smazat sekci?'), text: t('Sekce „{nazev}“ zmizí i se všemi {n, plural, one {# položka} few {# položky} other {# položek}}. Definitivně až po uložení menu.', { nazev: s.title, n: s.items.length }), akce: t('Smazat sekci'),
+                      titulek: t('Smazat sekci?'), text: t('Sekce „{nazev}“ zmizí i se všemi {n, plural, one {# položka} few {# položky} other {# položek}}. Definitivně až po uložení menu.', { nazev: s.title, n: s.items.length }), akce: t('Smazat sekci'), danger: true,
                       onAno: () => upravit((b) => { b.sections.splice(si, 1); }),
                     })} />
                 </div>
@@ -1048,7 +1051,7 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
         <Card className="space-y-3">
           {!zamceno && !editace && (
             <Button variant="secondary" size="sm" icon="plus"
-              onClick={() => upravit((b) => { b.sections.push({ title: t('Nová sekce'), column: 1, items: [] }); })}>
+              onClick={() => upravit((b) => { b.sections.push({ title: 'Nová sekce' /* i18n-ok (obsah podniku se nepřekládá, ukládá se na server) */, column: 1, items: [] }); })}>
               
               {t('Sekce')}
             </Button>
@@ -1058,7 +1061,7 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
           <div className="flex items-center justify-end gap-2 flex-wrap">
             {smiMazat && (
               <Button variant="danger" disabled={ukladam} onClick={() => setPotvrzeni({
-                titulek: t('Smazat menu?'), text: t('Menu „{nazev}“ zmizí i se všemi položkami a vytištěné QR kódy přestanou fungovat. Tohle nejde vzít zpět.', { nazev: board.name }), akce: t('Smazat menu'),
+                titulek: t('Smazat menu?'), text: t('Menu „{nazev}“ zmizí i se všemi položkami a vytištěné QR kódy přestanou fungovat. Tohle nejde vzít zpět.', { nazev: board.name }), akce: t('Smazat menu'), danger: true,
                 onAno: () => { void smazat(); },
               })}>{t('Smazat menu')}</Button>
             )}
@@ -1115,7 +1118,7 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
       <Modal open={potvrzeni != null} onClose={() => setPotvrzeni(null)} size="sm" title={potvrzeni?.titulek ?? ''}
         footer={<>
           <Button variant="secondary" onClick={() => setPotvrzeni(null)}>{t('Zrušit')}</Button>
-          <Button variant={potvrzeni?.akce.startsWith('Smazat') || potvrzeni?.akce.startsWith('Zahodit') ? 'danger-solid' : 'primary'}
+          <Button variant={potvrzeni?.danger ? 'danger-solid' : 'primary'}
             onClick={() => { const p = potvrzeni; setPotvrzeni(null); p?.onAno(); }}>{potvrzeni?.akce}</Button>
         </>}>
         <p className="t-meta">{potvrzeni?.text}</p>

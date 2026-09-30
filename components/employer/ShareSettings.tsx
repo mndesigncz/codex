@@ -24,6 +24,7 @@ import { flattenTree, pathOfId, type CategoryNode } from '@/lib/categoryTree';
 import { useModal } from '@/lib/useModal';
 import { okJson } from '@/lib/api';
 import { useT } from '@/lib/i18n/client';
+import { sUzlem, VLOZ } from './jazyk';
 
 
 type GuideCat = { id: number; name: string };
@@ -134,7 +135,7 @@ export default function ShareSettings() {
   return (
     <div className="space-y-4">
       {notMigrated && (
-        <p className="note note-wait">{t('Sdílení zatím není v databázi připravené — spusť {cesta}.', { cesta: '/api/init' })}</p>
+        <p className="note note-wait">{sUzlem(t('Sdílení zatím není v databázi připravené — spusť {cesta}.', { cesta: VLOZ }), <code>/api/init</code>)}</p>
       )}
 
       {/* ---- Nový odkaz ---- */}
@@ -145,7 +146,7 @@ export default function ShareSettings() {
         </div>
 
         <Segmented size="sm" ariaLabel={t('Co sdílet')} value={kind} onChange={k => { setKind(k); setCategoryId(''); }}
-          options={[{ id: 'inventory', label: 'Ze skladu' }, { id: 'guides', label: t('Z návodů') }]} />
+          options={[{ id: 'inventory', label: t('Ze skladu') }, { id: 'guides', label: t('Z návodů') }]} />
 
         {kind === 'inventory' && (
           <Field id="sdil-co" label={t('Co sdílet')} hint={t('U kategorie se sdílí i všechny její podkategorie, pěkně pod sebou.')}>
@@ -344,7 +345,7 @@ function LinkRow({ link, cats, guideCats, url, onCopy, onPatch, onRemove, onQr }
         <Button size="sm" variant="secondary" icon="copy" onClick={onCopy} aria-label={t('Zkopírovat odkaz: {nazev}', { nazev })}>{t('Kopírovat')}</Button>
         <Menu size="sm" label={t('Další akce s odkazem {nazev}', { nazev })} items={[
           { label: link.pinned ? t('Odepnout z nástěnek') : t('Připnout na nástěnku všech'), icon: 'pin', onClick: () => onPatch({ pinned: !(link.pinned === true) }) },
-          { label: 'QR kód', icon: 'print', onClick: onQr },
+          { label: t('QR kód'), icon: 'print', onClick: onQr },
           { label: t('Otevřít stránku'), icon: 'external', onClick: () => window.open(url, '_blank', 'noopener') },
           { label: open ? t('Skrýt nastavení') : t('Nastavení odkazu'), icon: 'settings', onClick: () => setOpen(o => !o) },
           { label: t('Smazat odkaz…'), icon: 'trash', danger: true, onClick: onRemove },

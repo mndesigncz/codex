@@ -772,7 +772,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, oznam
                   )}
                   {e.packing.some((p: any) => p.itemId && p.packed && p.returned == null) && (
                     <Button size="sm" variant="secondary" icon="swap" onClick={() => otevriPotvrzeni({
-                      title: t('Vrátit sbalené do skladu?'), akce: t('Vrátit'),
+                      title: t('Vrátit sbalené do skladu?'), akce: t('Vrátit', {}, 'sklad'),
                       text: t('Vrací se plné množství — spotřebu pak uprav ve skladu.'),
                       run: () => { void patch(e.id, { packAction: 'return' }); },
                     })}>{t('Vrátit do skladu')}</Button>

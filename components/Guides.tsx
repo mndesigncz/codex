@@ -185,6 +185,7 @@ export default function Guides({ user, ticksFor, openGuideId, zaKoho, vyberKoho 
   vyberKoho?: () => Promise<Osoba | null>;
 }) {
   const t = useT('navody');
+  const tRef = useRef(t); tRef.current = t; // callbacky nesmí držet starý jazyk po přepnutí
   const pathname = usePathname() ?? '';
   // Nástroj stránky (ne widget) bere mírné `ma()`: bez načtených oprávnění ukáže akce
   // a rozhodne server (jako ostatní obrazovky); přísné useSmi je pro widgety (spec §1.5).
@@ -256,6 +257,7 @@ export default function Guides({ user, ticksFor, openGuideId, zaKoho, vyberKoho 
   const hasUncategorized = useMemo(() => guides.some((g) => g.categoryId == null), [guides]);
 
   const openReader = useCallback(async (id: number) => {
+    const t = tRef.current;
     setReaderLoading(true);
     setReader({ id, title: '', content: '', checklist: [], categoryId: null, updatedAt: '' });
     try {
@@ -444,7 +446,7 @@ export default function Guides({ user, ticksFor, openGuideId, zaKoho, vyberKoho 
       {chyba && <p className="note note-danger" role="alert">{chyba}</p>}
       {kategorie.error && <p className="note note-wait" role="status">{t('Kategorie se nenačetly — návody ukazuji bez nich.')} {kategorie.error}</p>}
       <SearchField value={search} onChange={setSearch} placeholder={t('Hledat návody…')} storageKey="guides" ariaLabel={t('Hledat návody')}
-        suggestions={categories.map(c => ({ label: c.name, hint: 'kategorie' }))} />
+        suggestions={categories.map(c => ({ label: c.name, hint: t('kategorie') }))} />
       {(categories.length > 0 || hasUncategorized || (smiKategorie && !kategorie.loading)) && (
         <div className="flex gap-2 overflow-x-auto scrollbar-thin scroll-fade-x -mx-1 px-1 items-center" role="group" aria-label={t('Kategorie návodů')}>
           {pilulka('all', t('Vše'), counts.get('vse') ?? 0)}

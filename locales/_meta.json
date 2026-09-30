@@ -50,9 +50,9 @@
     }
   },
   "nepreklada_se": [
-    "správa podniku (vedení)",
     "superadmin",
-    "ceník a platební podmínky (právně citlivé)",
+    "ceník a platební podmínky (právně citlivé): věty o zkušební době, stržení karty, neúspěšné platbě a plánech v správě podniku zůstávají česky do lidské revize",
+    "katalog oprávnění (lib/opravneniKatalog.ts): názvy a popisy oprávnění a oblastí ve správě rolí, zatím česky",
     "obsah podniku (názvy položek, rolí, návodů)"
   ]
 }

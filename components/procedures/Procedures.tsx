@@ -39,11 +39,33 @@ import { PlochaWidgetu, type HlavickaPlochy } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useOpravneni } from '../role/useOpravneni';
 import {
-  URL_POSTUPY, URL_PRUBEHY, UDALOST_OTEVRIT_POSTUP, vyberPostupy, vyberPrubehy, posledniDokonceni, popisPripominky,
+  URL_POSTUPY, URL_PRUBEHY, UDALOST_OTEVRIT_POSTUP, vyberPostupy, vyberPrubehy, posledniDokonceni,
   type PostupApi,
 } from '@/lib/postupyPrehled';
-import { kdyPrubehu, useObnovaPoPrubehu } from '../widgety/oblasti/postupy';
-import { useT, type PrekladFn } from '@/lib/i18n/client';
+import { useObnovaPoPrubehu } from '../widgety/oblasti/postupy';
+import { useT, useJazyk, type PrekladFn } from '@/lib/i18n/client';
+import { parseDbTime, dbTimeHM, pragueToday } from '@/lib/pragueTime';
+import { fmtDatum } from '@/lib/i18n/format';
+import type { Jazyk } from '@/lib/i18n/config';
+
+/** Krátký popis spouštěče připomínky do řádku postupu (přeložený až na obrazovce). */
+function popisPripominky(p: PostupApi, t: PrekladFn): string | null {
+  if (p.remindAnchor === 'open') return t('Při otevření');
+  if (p.remindAnchor === 'close') return t('Při zavření');
+  return p.remindAt ? t('V {cas}', { cas: p.remindAt }) : null;
+}
+
+/** Kdy průběh skončil: „dnes 7:40“, jinak „12. 3. 7:40“ (pražský den), v jazyce uživatele. */
+function kdyPrubehu(iso: string | null | undefined, t: PrekladFn, jazyk: Jazyk): string {
+  if (!iso) return '';
+  const d = parseDbTime(iso);
+  if (!d) return '';
+  const den = (x: Date) => x.toLocaleDateString('en-CA', { timeZone: 'Europe/Prague' });
+  const cas = dbTimeHM(d);
+  if (den(d) === pragueToday()) return t('dnes {cas}', { cas });
+  if (den(d) === pragueToday(-1)) return t('včera {cas}', { cas });
+  return `${fmtDatum(d, { jazyk, styl: 'kratce' })} ${cas}`;
+}
 
 interface Props {
   user: { id?: string | number; name?: string | null; role?: string; avatar?: string };
@@ -104,6 +126,7 @@ function Jamka({ ikona }: { ikona: string }) {
 
 export default function Procedures({ user }: Props) {
   const t = useT('postupy');
+  const { jazyk } = useJazyk();
   const pathname = usePathname() ?? '';
   // Nástroj stránky (ne widget) bere mírné `ma()`: bez načtených oprávnění ukáže akce
   // a rozhodne server (jako ostatní obrazovky); přísné useSmi je pro widgety (spec §1.5).
@@ -260,8 +283,8 @@ export default function Procedures({ user }: Props) {
             const meta = [
               t('{n, plural, one {# krok} few {# kroky} other {# kroků}}', { n: steps.length }),
               mins > 0 ? fmtMinutes(mins) : null,
-              popisPripominky(p),
-              last ? `naposledy ${kdyPrubehu(last.completed_at || last.started_at)}` : null,
+              popisPripominky(p, t),
+              last ? t('naposledy {kdy}', { kdy: kdyPrubehu(last.completed_at || last.started_at, t, jazyk) }) : null,
             ].filter(Boolean).join(' · ');
             const polozky: MenuItem[] = [
               { label: t('Zobrazit kroky'), icon: 'clipboard', onClick: () => setDetailId(p.id) },
@@ -398,7 +421,7 @@ function ProcedureDetail({
 
   return (
     <Modal open onClose={onClose} size="md" title={procedure.name}
-      subtitle={[t('{n, plural, one {# krok} few {# kroky} other {# kroků}}', { n: steps.length }), mins > 0 ? fmtMinutes(mins) : null, popisPripominky(procedure)].filter(Boolean).join(' · ')}
+      subtitle={[t('{n, plural, one {# krok} few {# kroky} other {# kroků}}', { n: steps.length }), mins > 0 ? fmtMinutes(mins) : null, popisPripominky(procedure, t)].filter(Boolean).join(' · ')}
       footer={<>
         {smiUpravit && <Button variant="secondary" icon="pencil" onClick={onEdit}>{t('Upravit')}</Button>}
         {navrh && smiSchvalit && <Button variant="primary" icon="check" onClick={onApprove}>{t('Schválit')}</Button>}
@@ -524,7 +547,7 @@ function ProcedureEditor({
         <Button variant="primary" onClick={save} loading={saving}>{initial ? t('Uložit změny') : navrh ? t('Odeslat návrh') : t('Vytvořit postup')}</Button>
       </>}>
       <div className="space-y-4">
-        <Field id={`${uid}-nazev`} label={t('Název')}>
+        <Field id={`${uid}-nazev`} label={t('Název', {}, 'postup')}>
           <Input id={`${uid}-nazev`} value={name} onChange={e => setName(e.target.value)} placeholder={t('Např. Otevírání')} />
         </Field>
         <Field id={`${uid}-popis`} label={t('Popis (nepovinné)')}>

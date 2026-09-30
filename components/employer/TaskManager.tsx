@@ -21,7 +21,7 @@ import {
   Button, Card, Chip, EmptyState, ErrorState, Field, Input, Modal, Segmented, Select, Skeleton, SwitchRow, Textarea, Toast,
 } from '../ui';
 import { useCurrency } from '../CurrencyProvider';
-import { TaskChecklist, recurrenceLabel, RECURRENCE_OPTIONS, ChecklistItem } from '../TaskChecklist';
+import { TaskChecklist, ChecklistItem } from '../TaskChecklist';
 import TaskWeekBoard from '../TaskWeekBoard';
 import { PersonLink } from './ProfileLinkProvider';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
@@ -68,6 +68,8 @@ const JSON_HLAVICKA = { 'Content-Type': 'application/json' };
 export default function TaskManager({ user }: { user: { id?: string | number } }) {
   const loc = useLocale();
   const t = useT('sprava');
+  const opakovaniText = (r?: string | null) => r === 'daily' ? t('Denně') : r === 'weekdays' ? t('Pracovní dny') : r === 'weekly' ? t('Týdně') : null;
+  const moznostiOpakovani = [{ value: '', label: t('Neopakovat') }, { value: 'daily', label: t('Denně') }, { value: 'weekdays', label: t('Pracovní dny') }, { value: 'weekly', label: t('Týdně') }];
   const ja = Number(user.id) || null;
   const smi = useSmi();
   const data = useDataWidgetu<Ukol[]>(URL_UKOLY, vyberUkoly);
@@ -267,7 +269,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
     const done = uk.status === 'done';
     // Budoucí výskyty ještě neplatí → tlumeně, dokud nepřijde jejich den.
     const inactive = !done && !!uk.dueDate && uk.dueDate > today;
-    const opakovani = recurrenceLabel(uk.recurrence);
+    const opakovani = opakovaniText(uk.recurrence);
     return (
       <li key={uk.id} className="list-row items-start">
         <span className="shrink-0 pt-0.5">
@@ -389,7 +391,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
             <Field id={fid('opak')} label={t('Opakování')}
               hint={form.recurrence ? t('Dopředu se připraví nejbližší výskyty; po splnění se neobnoví hned.') : undefined}>
               <Select id={fid('opak')} value={form.recurrence} onChange={e => setForm(f => ({ ...f, recurrence: e.target.value }))}>
-                {RECURRENCE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                {moznostiOpakovani.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </Select>
             </Field>
           </div>

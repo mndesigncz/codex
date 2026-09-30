@@ -171,7 +171,7 @@ export default function OrganizationSettings() {
         <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
           <div className="min-w-0">
             <p id="org-fakturace" className="text-sm font-semibold text-[#16181A]">{t('Fakturace')} <Chip tone="muted" size="sm" className="ml-1 align-middle">{t('připravuje se')}</Chip></p>
-            <p className="text-xs text-black/45 mt-0.5 text-pretty">{t('Každý podnik má svůj plán a fakturu, nebo jedna faktura za organizaci.')}</p>
+            <p className="text-xs text-black/45 mt-0.5 text-pretty">{'Každý podnik má svůj plán a fakturu, nebo jedna faktura za organizaci.' /* i18n-ok (platební a cenové věty jsou právně citlivé, překlad až po lidské revizi) */}</p>
           </div>
           {org.isOwner ? (
             <Segmented size="sm" ariaLabel={t('Fakturace')} value={org.settings.fakturace ?? 'per_team'}

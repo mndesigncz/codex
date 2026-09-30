@@ -67,6 +67,7 @@ const ZDROJ: Record<string, string> = { kiosk: 'tablet', closing: 'z uzávěrky'
 
 export default function Attendance({ user: _user }: { user: { id?: string | number } }) {
   const t = useT('sprava');
+  const zdrojText = (s?: string | null) => s === 'kiosk' ? t('tablet') : s === 'closing' ? t('z uzávěrky') : s === 'self' ? t('sám') : t('ručně');
   const loc = useLocale();
   // Akce stránky podle `ma` (před načtením oprávnění a u staršího serveru ANO —
   // rozhoduje server), ne přísné useSmi widgetů: tlačítko se nesmí schovat
@@ -207,7 +208,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
   };
 
   const exportCsv = () => {
-    if (!pro) { setUpgradeFor('Export CSV'); return; }
+    if (!pro) { setUpgradeFor('Export CSV'); return; } // i18n-ok (název funkce)
     const hlava = ['Datum', 'Zaměstnanec', 'Příchod', 'Odchod', 'Odpracováno', 'Zdroj', ...(vidiMzdy ? [`Mzda (${symbol})`] : [])]; // i18n-ok (CSV pro účetní zůstává česky)
     const radky = entries.map(e => {
       const od = parseDbTime(e.clockIn);
@@ -263,7 +264,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                 const bezi = z.druh === 'bezi';
                 const zapomenuty = z.druh === 'zapomenuty';
                 const cas = `${dbTimeHM(e.clockIn)} – ${e.clockOut ? dbTimeHM(e.clockOut) : '…'}`;
-                const meta = [cas, ZDROJ[e.source ?? ''] ?? t('ručně'), e.note].filter(Boolean).join(' · ');
+                const meta = [cas, zdrojText(e.source), e.note].filter(Boolean).join(' · ');
                 const akce = (
                   <>
                     {smiUpravit && (zapomenuty
@@ -315,7 +316,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
           ) : undefined,
           secondary: smiExport && entries.length > 0 ? <Button variant="secondary" icon="download" onClick={exportCsv}>{t('Export CSV')}</Button> : undefined,
           // Vedlejší akce se na telefonu schovají (DP §3.4) — Export proto i v „···".
-          menu: smiExport && entries.length > 0 ? [{ label: 'Export CSV', icon: 'download', onClick: exportCsv }] : undefined,
+          menu: smiExport && entries.length > 0 ? [{ label: t('Export CSV'), icon: 'download', onClick: exportCsv }] : undefined,
           aside: (
             <Segmented size="sm" ariaLabel={t('Období')} value={String(dni)} onChange={v => setDni(Number(v) as Obdobi)}
               options={OBDOBI.map(p => ({ id: String(p), label: t('{n} dní', { n: p }) }))} />

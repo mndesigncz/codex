@@ -38,7 +38,7 @@ const COLUMNS = [
   { id: 'ideas', label: 'Nápady', dot: 'cat-dot-2' }, // i18n-ok (popisky překládá nazevSloupce)
   { id: 'in_progress', label: 'Rozpracováno', dot: 'cat-dot-4' }, // i18n-ok
   { id: 'review', label: 'Ke schválení', dot: 'cat-dot-5' }, // i18n-ok
-  { id: 'done', label: 'Hotovo', dot: 'cat-dot-1' },
+  { id: 'done', label: 'Hotovo', dot: 'cat-dot-1' }, // i18n-ok
 ] as const;
 
 const JSON_HLAVICKA = { 'Content-Type': 'application/json' };

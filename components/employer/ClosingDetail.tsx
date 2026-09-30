@@ -12,7 +12,7 @@
 // Nic se tu neschovává za „zobrazit více". Když člověk něco vyplnil, musí to
 // být vidět — i kdyby to bylo jen proto, aby poznal, že to vyplňovat nemusel.
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Icon } from '../Icons';
 import { PersonLink } from './ProfileLinkProvider';
 import { useMoney, useSymbol } from '../CurrencyProvider';
@@ -109,6 +109,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
 }) {
   const loc = useLocale();
   const t = useT('sprava');
+  const tRef = useRef(t); tRef.current = t; // callbacky nesmí držet starý jazyk po přepnutí
   const money = useMoney();
   const symbol = useSymbol();
   // Jediné okno v aplikaci, které si překryv skládalo samo. Mělo sice
@@ -121,6 +122,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
+    const t = tRef.current;
     setErr(null);
     try {
       const res = await fetch(`/api/closings/${id}`);
@@ -140,7 +142,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
   const chybelo: Pick<PovinnaPolozka, 'typ' | 'id' | 'nazev' | 'ikona' | 'kdo'>[] = d
     ? (Array.isArray(d.missingRequired)
       ? d.missingRequired
-      : (d.missingProcedures ?? []).map((nazev, i) => ({ typ: 'postup' as const, id: -1 - i, nazev, ikona: null, kdo: null })))
+      : (d.missingProcedures ?? []).map((nazev, i) => ({ typ: 'postup' as const /* i18n-ok (id) */, id: -1 - i, nazev, ikona: null, kdo: null })))
     : [];
   // Bez finance.trzby server tržbová pole maže. Počítat z nich rozdíl kasy by dalo
   // NaN → „Manko 0 Kč" a vedení by schvalovalo podle falešného manka; proto se

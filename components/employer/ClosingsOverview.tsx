@@ -165,7 +165,7 @@ export default function ClosingsOverview() {
   const v = (x: unknown) => (x == null ? '' : Number(x) || 0);
 
   const exportCsv = () => {
-    if (!pro) { setUpgradeFor('Export CSV'); return; }
+    if (!pro) { setUpgradeFor('Export CSV'); return; } // i18n-ok (název funkce)
     const head = ['Datum', 'Směna', 'Vyplnil/a', 'Na směně', 'Kasa na začátku', 'Tržba hotově', 'Tržba kartou', 'Spropitné', 'Spropitné v kase', 'Výdaje', 'Odloženo', 'Výplata', 'Kasa na konci', 'Očekávaná kasa', 'Rozdíl', 'Odvod na konci', 'Zůstalo v kase', 'Zákazníků', 'Poznámka']; // i18n-ok (CSV pro účetní zůstává česky)
     const rows = closings.map(c => [
       denUzaverky(c), c.shift_label ?? '', c.author_name ?? '', crewOf(c).map(p => p.name).join(', '),
@@ -194,7 +194,7 @@ export default function ClosingsOverview() {
     const rows = Array.from(byDay.entries()).sort((a, b) => a[0].localeCompare(b[0]))
       .map(([date, d]) => [date, d.cash, d.card, d.cash + d.card, d.tips, d.exp, d.rem, d.pay]);
     const trzby = rows.reduce((s, r) => s + Number(r[3]), 0);
-    const summary: (string | number)[][] = [[], ['SOUHRN OBDOBÍ', month === 'all' ? t('vše') : month], ['Tržby celkem', trzby]]; // i18n-ok (CSV pro účetní zůstává česky)
+    const summary: (string | number)[][] = [[], ['SOUHRN OBDOBÍ', month === 'all' ? 'vše' : month], ['Tržby celkem', trzby]]; // i18n-ok (CSV pro účetní zůstává česky)
     if (month !== 'all' && smi('finance.zobrazit')) {
       try {
         const f = await fetch(`/api/finance?month=${month}`).then(okJson);
@@ -219,7 +219,7 @@ export default function ClosingsOverview() {
   }
 
   const menu = smiExport && topLevel.length > 0 ? [
-    { label: 'Export CSV', icon: 'download', onClick: exportCsv },
+    { label: t('Export CSV'), icon: 'download', onClick: exportCsv },
     { label: t('Pro účetní'), icon: 'receipt', hint: t('Tržby po dnech a souhrn nákladů.'), onClick: () => { void exportAccountant(); } },
   ] : undefined;
 

@@ -13,7 +13,7 @@
 // je bez něj neposílá), „Ohodnotit" jen s hodnoceni.hodnotit, sazba jen
 // s finance.mzdy, kontakty jen s tym.kontakty (obojí server vynechá).
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Icon } from '../Icons';
 import { Button, Chip, EmptyState, ErrorState, ListRow, Modal, Segmented, Skeleton, Stat, StatRow, Avatar } from '../ui';
 import ShiftReviewModal from './ShiftReviewModal';
@@ -67,6 +67,7 @@ const Hvezdy = ({ n }: { n: number }) => n > 0 ? <Chip tone="muted" size="sm" ic
 export default function EmployeeProfile({ employeeId, onClose }: { employeeId: number; onClose: () => void }) {
   const loc = useLocale();
   const t = useT('sprava');
+  const tRef = useRef(t); tRef.current = t; // callbacky nesmí držet starý jazyk po přepnutí
   // Jako na stránkách: před načtením oprávnění rozhoduje server (data bez klíče nepošle).
   const { ma: smi } = useOpravneni();
   const money = useMoney();
@@ -78,6 +79,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
   const [rateDate, setRateDate] = useState<string | null>(null);
 
   const load = useCallback(() => {
+    const t = tRef.current;
     setChyba(null);
     fetch(`/api/employees/${employeeId}`).then(okJson)
       .then(d => { if (d && d.employee) setP(d); else setChyba(t('Profil přišel v nečekaném tvaru.')); })

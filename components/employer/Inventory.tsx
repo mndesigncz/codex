@@ -1203,7 +1203,7 @@ export default function Inventory({ initialCategory, onNavigate }: {
           onExit={exitSelection}
           actions={[
             ...(smiUpravit ? [{ label: t('Upravit'), primary: true, onClick: () => setShowBulk(true) }] : []),
-            ...(smiUpravit ? [{ label: showArchived ? t('Naskladnit') : t('Odložit'),
+            ...(smiUpravit ? [{ label: showArchived ? t('Naskladnit') : t('Odložit', {}, 'sklad'),
               onClick: async () => { if (await bulkPatch({ archived: !showArchived })) exitSelection(); } }] : []),
             ...(smiMazat ? [{ label: t('Smazat'), danger: true, onClick: bulkDelete }] : []),
           ]}
@@ -1670,19 +1670,20 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [], smiO
   const groups = useMemo(() => {
     const map = new Map<string, Item[]>();
     items.forEach(i => {
-      const key = (i.supplier ?? '').trim() || t('Bez dodavatele');
+      const key = (i.supplier ?? '').trim(); // '' = bez dodavatele (klíč se nepřekládá, popisek až při výpisu)
       const arr = map.get(key);
       if (arr) arr.push(i); else map.set(key, [i]);
     });
     return Array.from(map.entries());
   }, [items]);
+  const popisDodavatele = (s: string) => s || t('Bez dodavatele');
 
   const buildText = () => {
     const date = new Date().toLocaleDateString(loc);
     const lines: string[] = [t('Nákupní seznam – Managero ({datum})', { datum: date })];
     groups.forEach(([supplier, list]) => {
       lines.push('');
-      lines.push(`${supplier}:`);
+      lines.push(`${popisDodavatele(supplier)}:`);
       list.forEach(i => {
         const why = (i.buyFor?.length ?? 0) > 0 ? ` — ${t('na výrobu: {seznam}', { seznam: i.buyFor!.map(f => f.name).join(', ') })}` : '';
         lines.push(`• ${i.name} — ${t('objednat {mnozstvi} {jednotka} (zbývá {zbyva})', { mnozstvi: suggestedAmount(i), jednotka: i.unit, zbyva: i.quantity })}${why}`);
@@ -1705,7 +1706,7 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [], smiO
   const [printFailed, setPrintFailed] = useState(false);
   const printList = () => {
     const rows = groups.map(([supplier, list]) => `
-      <h2>${esc(supplier)}</h2>
+      <h2>${esc(popisDodavatele(supplier))}</h2>
       <table>
         <thead><tr><th style="width:8mm"></th><th>${esc(t('Položka'))}</th><th class="num">${esc(t('Objednat'))}</th><th class="num">${esc(t('Zbývá'))}</th></tr></thead>
         <tbody>${list.map(i => `<tr>
@@ -1741,7 +1742,7 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [], smiO
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            supplier: supplier === 'Bez dodavatele' ? null : supplier,
+            supplier: supplier === '' ? null : supplier,
             items: list.map(i => ({ name: i.name, qty: suggestedAmount(i), unit: i.unit, itemId: i.id })),
           }),
         });
@@ -1777,10 +1778,10 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [], smiO
         )}
         {items.length === 0 && <p className="t-meta">{t('Od tohoto dodavatele teď nic nechybí.')}</p>}
         {groups.map(([supplier, list]) => (
-          <section key={supplier} aria-label={supplier}>
+          <section key={supplier || '_bez'} aria-label={popisDodavatele(supplier)}>
             {hasSuppliers && (
               <div className="flex items-center justify-between gap-2">
-                <p className="t-label">{supplier}</p>
+                <p className="t-label">{popisDodavatele(supplier)}</p>
                 {smiOdeslat && supplierByName(supplier)?.email && (
                   <Button variant="secondary" size="sm" icon="send" loading={emailing === supplier} onClick={() => emailGroup(supplier, list)}>
                     
@@ -1918,7 +1919,7 @@ function CategoryManager({ categories, onClose, onChanged, createCategory, potvr
     setBusy(false);
   };
 
-  const vychoziKategorie = [t('Nápoje'), t('Suroviny'), t('Nádobí'), t('Drogerie')];
+  const vychoziKategorie = ['Nápoje', 'Suroviny', 'Nádobí', 'Drogerie']; // i18n-ok (obsah podniku: ukládá se na server česky, nezávisle na jazyce prohlížení)
   const seedDefaults = async () => {
     setBusy(true);
     const existing = new Set(own.map(c => c.name.toLowerCase()));

@@ -86,6 +86,19 @@ for (const [jazyk, sloupec] of [['de', 1], ['en', 2]]) {
   await ctx.close();
 }
 
+
+// po recenzi: texty z pomocných funkcí (opakování úkolu, připomínka postupu, zdroj docházky,
+// „naposledy“) se překládají na obrazovce; v angličtině nesmí v hlavním obsahu zbýt české tvary.
+{
+  const ZBYTKY = /Denně|Pracovní dny|Týdně|Neopakovat|Při otevření|Při zavření|naposledy|Nestíhal|Jiný důvod|ručně|z uzávěrky|Bez dodavatele/;
+  for (const pohled of ['tasks', 'procedures', 'attendance', 'inventory']) {
+    const { ctx, p } = await otevri('en', pohled);
+    const t = (await p.locator('main').first().innerText()).replace(/\s+/g, ' ');
+    tvrdi(`en ${pohled}: bez českých zbytků z pomocných funkcí`, !ZBYTKY.test(t), (t.match(ZBYTKY) ?? [])[0]);
+    await ctx.close();
+  }
+}
+
 // tmavý režim: nadpis čitelný i v němčině
 for (const pohled of ['team-settings', 'attendance', 'inventory']) {
   const { ctx, p } = await otevri('de', pohled, { tmavy: true });

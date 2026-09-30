@@ -138,7 +138,7 @@ const stavPozvanky = (t: PrekladFn): Record<string, { label: string; tone: 'ok' 
   pending: { label: t('Čeká'), tone: 'info' },
 });
 
-type Sekce = 'lide' | 'podnik' | 'uzaverka' | 'sdileni' | 'tablet' | 'integrace';
+type Sekce = 'lide' | 'podnik' | 'uzaverka' | 'sdileni' | 'tablet' | 'integrace'; // i18n-ok (id záložek)
 const JSON_HLAVICKA = { 'Content-Type': 'application/json' };
 
 
@@ -197,7 +197,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
     { id: 'podnik', label: t('Podnik') },
     ...(ma('uzaverky.nastaveni') ? [{ id: 'uzaverka' as const, label: t('Uzávěrka') }] : []),
     ...(ma('sdileni.spravovat') ? [{ id: 'sdileni' as const, label: t('Sdílení') }] : []),
-    ...(ma(['kiosk.spravovat', 'dochazka.piny']) ? [{ id: 'tablet' as const, label: t('Tablet') }] : []),
+    ...(ma(['kiosk.spravovat', 'dochazka.piny']) ? [{ id: 'tablet' as const, label: t('Tablet') }] : []), // i18n-ok (id)
     ...(ma('integrace.spravovat') ? [{ id: 'integrace' as const, label: t('Integrace') }] : []),
   ];
   const [zvolena, setZvolena] = useState<Sekce>('lide');
@@ -687,9 +687,9 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
               value={kasa ?? (team.drawer_float != null ? String(team.drawer_float) : '')} onChange={e => setKasa(e.target.value)} />
             <span className="t-meta">{symbol}</span>
             {kasa !== null && (
-              <Button variant="primary" size="sm" loading={ukladam === 'kasa'} onClick={async () => {
+              <Button variant="primary" size="sm" loading={ukladam === 'kasa' /* i18n-ok (id) */} onClick={async () => {
                 const v = kasa === '' ? null : parseInt(kasa, 10);
-                await prepni('kasa', { drawerFloat: v }, { drawer_float: v }, t('Cílový stav kasy je uložený.'));
+                await prepni('kasa' /* i18n-ok (id) */, { drawerFloat: v }, { drawer_float: v }, t('Cílový stav kasy je uložený.'));
                 setKasa(null);
               }}>{t('Uložit')}</Button>
             )}
@@ -719,7 +719,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
         {aktivni === 'podnik' && podnik}
         {aktivni === 'uzaverka' && uzaverka}
         {aktivni === 'sdileni' && <ShareSettings />}
-        {aktivni === 'tablet' && <KioskSettings />}
+        {aktivni === 'tablet' && <KioskSettings />} {/* i18n-ok (id) */}
         {aktivni === 'integrace' && <NoisiumConnect />}
       </>
     );

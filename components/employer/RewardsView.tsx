@@ -238,7 +238,7 @@ function FormularBodu({ levels: vychoziUrovne, points: vychoziBody, onUlozeno }:
   const [toast, setToast] = useState<string | null>(null);
 
   const zmenUroven = (i: number, patch: Partial<RewardLevel>) => setUrovne(ls => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
-  const pridatUroven = () => setUrovne(ls => [...ls, { name: t('Nová úroveň'), minPoints: (ls[ls.length - 1]?.minPoints ?? 0) + 300, perks: '' }]);
+  const pridatUroven = () => setUrovne(ls => [...ls, { name: 'Nová úroveň' /* i18n-ok (obsah podniku, ukládá se na server) */, minPoints: (ls[ls.length - 1]?.minPoints ?? 0) + 300, perks: '' }]);
   const odebratUroven = (i: number) => setUrovne(ls => ls.filter((_, idx) => idx !== i));
 
   const ulozit = async () => {
@@ -248,7 +248,7 @@ function FormularBodu({ levels: vychoziUrovne, points: vychoziBody, onUlozeno }:
       await fetch('/api/teams', {
         method: 'PATCH', headers: JSON_HLAVICKA,
         body: JSON.stringify({
-          levelsConfig: urovne.map(l => ({ name: l.name.trim() || t('Úroveň'), minPoints: Math.max(0, Math.round(l.minPoints) || 0), perks: l.perks.trim() })),
+          levelsConfig: urovne.map(l => ({ name: l.name.trim() || 'Úroveň' /* i18n-ok (obsah podniku) */, minPoints: Math.max(0, Math.round(l.minPoints) || 0), perks: l.perks.trim() })),
           pointsConfig: body,
         }),
       }).then(okJson);
@@ -283,7 +283,7 @@ function FormularBodu({ levels: vychoziUrovne, points: vychoziBody, onUlozeno }:
         <p className="t-meta mt-1">{t('Kolik bodů zaměstnanec získá za každou akci.')}</p>
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
           {pole(t('Za úkol'), 'task', t('Za každý splněný úkol'))}
-          {pole('Za postup', 'procedure', t('Za každý dokončený postup'))}
+          {pole(t('Za postup'), 'procedure', t('Za každý dokončený postup'))}
           {pole(t('Za uzávěrku'), 'closing', t('Za vyplněnou uzávěrku'))}
           {pole(t('Za hvězdu'), 'ratingStar', t('Návrh bodů = hvězdy × tohle'))}
         </div>

@@ -232,6 +232,43 @@ for (const [f, n] of Object.entries(natvrdoZmereno)) {
   else if (n < povoleno) chyby.push(`${f}: natvrdo psaných řetězců ubylo (${n} místo ${povoleno}); sniž BASELINE_NATVRDO, ať ráčna drží`);
 }
 
+// 4b. Sekce správy (sprava, tym, navody, postupy) se v aplikaci slévají do jednoho slovníku
+// (pozdější přepisuje dřívější). Stejný klíč s jinou hodnotou v jiné sekci by se proto ukázal
+// v jiném významu podle pořadí načtení; dvojí význam patří do klíče s kontextem (`t('Odložit', {}, 'sklad')`).
+const SKUPINA_SPRAVY = ['sprava', 'tym', 'navody', 'postupy'];
+for (const j of JAZYKY) {
+  const videno = new Map();
+  for (const sek of SKUPINA_SPRAVY) {
+    const slov = nacti(j, sek);
+    if (!slov) continue;
+    for (const [k, v] of Object.entries(slov)) {
+      const d = videno.get(k);
+      if (d && d.v !== v) chyby.push(`${j}: klíč „${k}“ má jiný překlad v sekci ${d.s} („${d.v}“) a ${sek} („${v}“); dvojí význam patří do kontextu t('…', {}, 'ctx')`);
+      else if (!d) videno.set(k, { s: sek, v });
+    }
+  }
+}
+// 4c. České věty v uvozovkách mimo t(), které ale ve slovníku jsou (label: 'Ze skladu'): zapomenuté t().
+{
+  const klice = new Set();
+  for (const sek of SKUPINA_SPRAVY) for (const k of Object.keys(nacti('en', sek) ?? {})) if (!k.includes('|') && /\p{L}{3}/u.test(k)) klice.add(k);
+  for (const f of prelozeneSoubory) {
+    if (!existsSync(f)) continue;
+    const src = readFileSync(f, 'utf8');
+    const puvodni = src.split('\n');
+    const bezKomentaru = src.replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' ')).split('\n');
+    bezKomentaru.forEach((radek, i) => {
+      const r = radek.trim();
+      if (r.startsWith('//') || /i18n-ok/.test(puvodni[i]) || /^(import|export) /.test(r)) return;
+      const bezT = bezVolaniT(r).replace(/\/\/.*$/, '');
+      for (const m of bezT.matchAll(/'((?:[^'\\]|\\.)*)'/g)) {
+        const text = m[1].replace(/\\'/g, "'");
+        if (klice.has(text)) chyby.push(`${f}:${i + 1}: „${text}“ je ve slovníku, ale stojí v uvozovkách mimo t('…'); obal ho t() (nebo označ řádek i18n-ok)`);
+      }
+    });
+  }
+}
+
 // 5. staré konstrukce
 let csCz = 0;
 for (const root of ROOTS) for (const f of walk(root)) {

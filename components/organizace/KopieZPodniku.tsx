@@ -108,6 +108,7 @@ export default function KopieZPodniku({ entita, podniky: jine, cil, onClose, onH
   onHotovo: () => void;
 }) {
   const t = useT('sprava');
+  const tRef = useRef(t); tRef.current = t; // callbacky nesmí držet starý jazyk po přepnutí
   const tx = texty(t, entita);
 
   // Jediný jiný podnik se nevybírá — rovnou se ukáže, co v něm je.
@@ -131,6 +132,7 @@ export default function KopieZPodniku({ entita, podniky: jine, cil, onClose, onH
   // pak mířila do jiného zdroje, než jaký okno ukazuje.
   const pozadavek = useRef(0);
   const nactiSeznam = useCallback(async (p: Podnik) => {
+    const t = tRef.current;
     const moje = ++pozadavek.current;
     setNacitamSeznam(true); setChybaSeznamu(''); setPolozky(null); setVybrane(new Set());
     try {

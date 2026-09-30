@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
+import { Slovniky } from '@/lib/i18n/server';
 
 // Přihlášená část: nic z ní nemá být ve vyhledávači.
 export const metadata: Metadata = { robots: { index: false, follow: false } };
@@ -12,5 +13,6 @@ export default async function EmployeeLayout({ children }: { children: React.Rea
   const role = (session.user as any)?.role;
   if (role === 'employer') redirect('/employer/overview');
 
-  return <>{children}</>;
+  // Návody, postupy a společné součásti správy běží i v aplikaci zaměstnance: slovníky se stáhnou se stránkou, ať se nebliká česky.
+  return <><Slovniky sekce={['sprava', 'tym', 'navody', 'postupy']} />{children}</>;
 }

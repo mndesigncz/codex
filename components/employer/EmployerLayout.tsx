@@ -361,7 +361,7 @@ export default function EmployerLayout({ user }: Props) {
   if (appMode === 'client') {
     return (
       <NavigaceKontext.Provider value={navigaceWidgetu}>
-        <MaxGate feature="Managero client" benefit={t('Věrnost, rezervace a objednávky od stolu pro vaše hosty patří do plánu Max.')}>
+        <MaxGate feature="Managero client" benefit={'Věrnost, rezervace a objednávky od stolu pro vaše hosty patří do plánu Max.' /* i18n-ok (platební a cenové věty jsou právně citlivé, překlad až po lidské revizi) */}>
           <ProfileLinkProvider>
             <ClientAdmin onExit={() => switchMode('full')} initialTab={clientTab} user={user as any} />
           </ProfileLinkProvider>
@@ -516,7 +516,7 @@ export default function EmployerLayout({ user }: Props) {
         {plan?.pastDue ? (
           <button type="button" onClick={() => navigate('settings', 'billing')}
             className="mx-4 mt-3 note note-danger text-left font-medium hover:brightness-95 transition">
-            <Icon name="warning" size={15} className="inline -mt-0.5 mr-1.5" />{t('Platba předplatného se nezdařila.')}{' '}
+            <Icon name="warning" size={15} className="inline -mt-0.5 mr-1.5" />{'Platba předplatného se nezdařila.' /* i18n-ok (platební a cenové věty jsou právně citlivé, překlad až po lidské revizi) */}{' '}
             <span className="font-semibold underline underline-offset-2">{t('Zkontrolovat kartu')}</span>
           </button>
         ) : plan?.trialing ? (
@@ -528,7 +528,7 @@ export default function EmployerLayout({ user }: Props) {
         ) : plan && plan.effective === 'free' && !plan.hadSubscription ? (
           <button type="button" onClick={() => navigate('settings', 'billing')}
             className="mx-4 mt-3 rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/35 px-4 py-2.5 text-sm text-left text-[#5B7A08] font-medium hover:bg-[#C8F542]/25 transition">
-            <Icon name="sparkle" size={15} className="inline -mt-0.5 mr-1.5" />{t('Vyzkoušejte Pro {dni} dní zdarma — neomezený tým, kiosk, odměny a přehledy. Karta se strhne až po měsíci.', { dni: TRIAL_DAYS })}
+            <Icon name="sparkle" size={15} className="inline -mt-0.5 mr-1.5" />{`Vyzkoušejte Pro ${TRIAL_DAYS} dní zdarma — neomezený tým, kiosk, odměny a přehledy. Karta se strhne až po měsíci.` /* i18n-ok (platební a cenové věty jsou právně citlivé, překlad až po lidské revizi) */}
           </button>
         ) : null}
         {/* relative: absolutně umístěné prvky uvnitř (skryté popisky pro

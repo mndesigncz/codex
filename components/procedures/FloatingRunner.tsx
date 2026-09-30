@@ -14,6 +14,7 @@ import { useProcedures } from './ProcedureProvider';
 import { parseSteps } from '@/lib/steps';
 import { SKIP_REASONS } from '@/lib/procedureScoring';
 import StepTimeline from './StepTimeline';
+import { duvodPreskoceni } from './DetailPrubehu';
 import { useOtevreniNavodu } from '@/lib/otevriNavod';
 import { Icon } from '../Icons';
 import { Button, Chip, Input } from '../ui';
@@ -208,7 +209,7 @@ export default function FloatingRunner() {
                           setSkipFor(null);
                         }}
                         className="filter-pill tap-target seg-off glass disabled:opacity-50">
-                        {r.label}{r.excused ? '' : ' (−body)'}
+                        {duvodPreskoceni(r.id, t)}{r.excused ? '' : ` ${t('(−body)')}`}
                       </button>
                     ))}
                   </div>
