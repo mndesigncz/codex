@@ -18,7 +18,8 @@ import { useMemo, useState } from 'react';
 import { useKioskShift } from './KioskShiftGate';
 import { pragueToday } from '@/lib/pragueTime';
 import { okJson, apiMessage } from '@/lib/api';
-import { czCount, type CzNoun } from '@/lib/czech';
+import { useJazyk, useT } from '@/lib/i18n/client';
+import { fmtDatum } from '@/lib/i18n/format';
 import { Avatar, Button, Card, Chip, EmptyState, ErrorState, Skeleton, Toast } from '../ui';
 import { Icon } from '../Icons';
 import { TaskChecklist } from '../TaskChecklist';
@@ -28,12 +29,13 @@ import { oznamZmenuPovinnych, ChipPredUzaverkou } from '../PredUzaverkou';
 
 type Filter = 'all' | 'mine' | 'open' | 'done';
 
-const BOD: CzNoun = { one: 'bod', few: 'body', many: 'bodů' };
 const prioDot = (p: string) => p === 'high' ? 'bg-bad' : p === 'medium' ? 'bg-wait' : 'bg-[#C8F542]';
-const denKratce = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' });
 const JSON_HLAVICKA = { 'Content-Type': 'application/json' };
 
 export default function KioskTasks({ onOpenGuide }: { onOpenGuide?: (id: number) => void }) {
+  const t = useT('kiosk');
+  const { jazyk } = useJazyk();
+  const denKratce = (d: string) => fmtDatum(d, { jazyk, styl: 'denKratce' });
   const { active, requireActive } = useKioskShift();
   // Když se úkoly nenačtou, nesmí to vypadat jako „žádné úkoly" —
   // na tabletu je tahle obrazovka jediné místo, kde se úkol dá vidět.
@@ -46,37 +48,37 @@ export default function KioskTasks({ onOpenGuide }: { onOpenGuide?: (id: number)
   // Kdo splnil úkol, je záznam o práci. Když tablet neví, koho zapsat,
   // musí se zeptat dřív, než se cokoli pošle — `actingAs: undefined` dřív
   // znamenalo, že si úkol připsal tablet sám.
-  const setStatus = async (t: Ukol, status: string) => {
+  const setStatus = async (u: Ukol, status: string) => {
     const who = await requireActive();
     if (!who) return;
     setChyba(null);
-    data.set(prev => (prev ?? []).map(x => (x.id === t.id ? { ...x, status } : x)));
+    data.set(prev => (prev ?? []).map(x => (x.id === u.id ? { ...x, status } : x)));
     try {
-      const d = await fetch('/api/tasks', { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify({ id: t.id, status, actingAs: who.id }) }).then(okJson);
+      const d = await fetch('/api/tasks', { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify({ id: u.id, status, actingAs: who.id }) }).then(okJson);
       // Body patří tomu, kdo u tabletu stojí — a má je vidět hned, jinak
       // odškrtnutí „vyrob limonádu" nic neznamená.
       const pts = Number(d?.pointsEarned);
-      if (status === 'done' && Number.isFinite(pts) && pts > 0) setBodyToast(`${who.name}: +${czCount(pts, BOD)} za splněný úkol`);
+      if (status === 'done' && Number.isFinite(pts) && pts > 0) setBodyToast(t('{jmeno}: +{n, plural, one {# bod} few {# body} other {# bodů}} za splněný úkol', { jmeno: who.name, n: pts }));
       data.reload();
       // Na tabletu je uzávěrka o záložku vedle — po splnění povinného úkolu se odemkne sama.
       oznamZmenuPovinnych();
     } catch (e) {
-      data.set(prev => (prev ?? []).map(x => (x.id === t.id ? { ...x, status: t.status } : x)));
-      setChyba(apiMessage(e, 'Úkol se nepodařilo uložit.'));
+      data.set(prev => (prev ?? []).map(x => (x.id === u.id ? { ...x, status: u.status } : x)));
+      setChyba(apiMessage(e, t('Úkol se nepodařilo uložit.')));
     }
   };
 
-  const toggleChecklistItem = async (t: Ukol, index: number) => {
+  const toggleChecklistItem = async (u: Ukol, index: number) => {
     const who = await requireActive();
     if (!who) return;
     setChyba(null);
-    const next = t.checklist.map((it, i) => (i === index ? { ...it, done: !it.done } : it));
-    data.set(prev => (prev ?? []).map(x => (x.id === t.id ? { ...x, checklist: next } : x)));
+    const next = u.checklist.map((it, i) => (i === index ? { ...it, done: !it.done } : it));
+    data.set(prev => (prev ?? []).map(x => (x.id === u.id ? { ...x, checklist: next } : x)));
     try {
-      await fetch('/api/tasks', { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify({ id: t.id, checklist: next, actingAs: who.id }) }).then(okJson);
+      await fetch('/api/tasks', { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify({ id: u.id, checklist: next, actingAs: who.id }) }).then(okJson);
     } catch (e) {
-      data.set(prev => (prev ?? []).map(x => (x.id === t.id ? { ...x, checklist: t.checklist } : x)));
-      setChyba(apiMessage(e, 'Krok se nepodařilo uložit.'));
+      data.set(prev => (prev ?? []).map(x => (x.id === u.id ? { ...x, checklist: u.checklist } : x)));
+      setChyba(apiMessage(e, t('Krok se nepodařilo uložit.')));
     }
   };
 
@@ -92,19 +94,19 @@ export default function KioskTasks({ onOpenGuide }: { onOpenGuide?: (id: number)
   const sk = rozdelPoDnech(filtered, today, weekAhead, 30);
 
   const FILTERS: { id: Filter; label: string }[] = [
-    { id: 'open', label: 'Nesplněné' },
-    { id: 'mine', label: active ? `Moje (${active.name.split(' ')[0]})` : 'Moje' },
-    { id: 'all', label: 'Vše' },
-    { id: 'done', label: 'Hotové' },
+    { id: 'open', label: t('Nesplněné') },
+    { id: 'mine', label: active ? t('Moje ({jmeno})', { jmeno: active.name.split(' ')[0] }) : t('Moje') },
+    { id: 'all', label: t('Vše') },
+    { id: 'done', label: t('Hotové') },
   ];
 
-  const row = (t: Ukol) => {
-    const isDone = t.status === 'done';
-    const overdueTask = !isDone && !!t.dueDate && t.dueDate < today;
+  const row = (u: Ukol) => {
+    const isDone = u.status === 'done';
+    const overdueTask = !isDone && !!u.dueDate && u.dueDate < today;
     return (
-      <li key={t.id} className="list-row items-start">
-        <button type="button" role="checkbox" aria-checked={isDone} aria-label={t.title}
-          onClick={() => setStatus(t, isDone ? 'pending' : 'done')}
+      <li key={u.id} className="list-row items-start">
+        <button type="button" role="checkbox" aria-checked={isDone} aria-label={u.title}
+          onClick={() => setStatus(u, isDone ? 'pending' : 'done')}
           // fokus-kontrast: obrys fokusu musí být vidět i kolem limetkového (splněného) kolečka.
           className={`tap-target fokus-kontrast mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full transition-colors ${
             isDone ? 'bg-[#C8F542] on-accent' : 'border-2 border-black/15 hover:bg-black/[0.05]'}`}>
@@ -112,33 +114,33 @@ export default function KioskTasks({ onOpenGuide }: { onOpenGuide?: (id: number)
         </button>
         <div className="min-w-0 flex-1">
           <p className="flex items-start gap-2">
-            <span className={`mt-2 w-2 h-2 rounded-full shrink-0 ${prioDot(t.priority)}`} aria-hidden />
-            <span className={`font-medium leading-snug ${isDone ? 'text-black/45' : 'text-[#16181A]'}`}>{t.title}</span>
+            <span className={`mt-2 w-2 h-2 rounded-full shrink-0 ${prioDot(u.priority)}`} aria-hidden />
+            <span className={`font-medium leading-snug ${isDone ? 'text-black/45' : 'text-[#16181A]'}`}>{u.title}</span>
           </p>
-          {t.requireBeforeClosing && !isDone && <ChipPredUzaverkou className="mt-1 mr-1" />}
-          {t.source === 'production' && !isDone && <Chip tone="info" size="sm" icon="leaf" className="mt-1">Výroba · odškrtnutí naskladní dávku</Chip>}
-          {t.description && !isDone && <p className="text-sm text-black/55 mt-1 whitespace-pre-wrap text-pretty">{t.description}</p>}
+          {u.requireBeforeClosing && !isDone && <ChipPredUzaverkou className="mt-1 mr-1" />}
+          {u.source === 'production' && !isDone && <Chip tone="info" size="sm" icon="leaf" className="mt-1">{t('Výroba · odškrtnutí naskladní dávku')}</Chip>}
+          {u.description && !isDone && <p className="text-sm text-black/55 mt-1 whitespace-pre-wrap text-pretty">{u.description}</p>}
           <p className="text-sm text-black/55 mt-1.5 flex items-center gap-1.5 min-w-0">
-            {t.assignedTo == null ? <span>Kdokoli</span> : (
-              <><Avatar emoji={t.assigneeAvatar} size="xs" ring={false} /><span className="truncate">{t.assigneeName ?? ''}</span></>
+            {u.assignedTo == null ? <span>{t('Kdokoli')}</span> : (
+              <><Avatar emoji={u.assigneeAvatar} size="xs" ring={false} /><span className="truncate">{u.assigneeName ?? ''}</span></>
             )}
-            {t.dueDate && (
+            {u.dueDate && (
               <span className={`whitespace-nowrap ${overdueTask ? 'text-bad-ink font-medium' : ''}`}>
-                {' · '}{denKratce(t.dueDate)}{overdueTask && ' · po termínu'}
+                {' · '}{denKratce(u.dueDate)}{overdueTask && ` · ${t('po termínu')}`}
               </span>
             )}
-            {isDone && t.completedByName && <span className="truncate"> · splnil {t.completedByName}</span>}
+            {isDone && u.completedByName && <span className="truncate"> · {t('splnil {jmeno}', { jmeno: u.completedByName })}</span>}
           </p>
           {/* Postup je v návodu, ne v popisu úkolu. U baru je rozdíl mezi
               „přepni na Návody a najdi si to" a jedním ťuknutím zásadní.
               Vedlejší akce, ne limetka — ta by svítila u každého úkolu. */}
-          {!isDone && t.sourceMeta?.guideId && onOpenGuide && (
-            <Button variant="secondary" size="lg" icon="book" className="mt-2" onClick={() => onOpenGuide(Number(t.sourceMeta!.guideId))}>
-              {t.sourceMeta.guideTitle ? `Návod: ${t.sourceMeta.guideTitle}` : 'Otevřít návod'}
+          {!isDone && u.sourceMeta?.guideId && onOpenGuide && (
+            <Button variant="secondary" size="lg" icon="book" className="mt-2" onClick={() => onOpenGuide(Number(u.sourceMeta!.guideId))}>
+              {u.sourceMeta.guideTitle ? t('Návod: {nazev}', { nazev: u.sourceMeta.guideTitle }) : t('Otevřít návod')}
             </Button>
           )}
-          {!isDone && t.checklist.length > 0 && (
-            <TaskChecklist velky items={t.checklist} onToggle={i => void toggleChecklistItem(t, i)} />
+          {!isDone && u.checklist.length > 0 && (
+            <TaskChecklist velky items={u.checklist} onToggle={i => void toggleChecklistItem(u, i)} />
           )}
         </div>
       </li>
@@ -148,7 +150,7 @@ export default function KioskTasks({ onOpenGuide }: { onOpenGuide?: (id: number)
   const section = (title: string, list: Ukol[], tone = '') =>
     list.length > 0 && (
       <section className="space-y-2" aria-label={title}>
-        <h2 className={`t-label ${tone}`}>{title} ({list.length.toLocaleString('cs-CZ')})</h2>
+        <h2 className={`t-label ${tone}`}>{title} ({list.length})</h2>
         <Card pad="none" className="px-5"><ul className="list">{list.map(row)}</ul></Card>
       </section>
     );
@@ -157,7 +159,7 @@ export default function KioskTasks({ onOpenGuide }: { onOpenGuide?: (id: number)
   return (
     <div className="space-y-6">
       <Toast message={bodyToast} onClose={() => setBodyToast(null)} />
-      <div className="flex gap-1.5 overflow-x-auto overscroll-x-contain scrollbar-none scroll-fade-x -mx-1 px-1" role="group" aria-label="Filtr úkolů">
+      <div className="flex gap-1.5 overflow-x-auto overscroll-x-contain scrollbar-none scroll-fade-x -mx-1 px-1" role="group" aria-label={t('Filtr úkolů')}>
         {FILTERS.map(f => (
           <button key={f.id} type="button" aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}
             className={`filter-pill tap-target ${filter === f.id ? 'seg-on' : 'seg-off glass'}`}>
@@ -168,24 +170,24 @@ export default function KioskTasks({ onOpenGuide }: { onOpenGuide?: (id: number)
       {chyba && <p className="note note-danger" role="alert">{chyba}</p>}
 
       {data.error && !data.data ? (
-        <Card><ErrorState title="Úkoly se nenačetly" hint={data.error} onRetry={data.reload} /></Card>
+        <Card><ErrorState title={t('Úkoly se nenačetly')} hint={data.error} onRetry={data.reload} /></Card>
       ) : data.loading ? (
         <Card aria-busy className="space-y-2"><Skeleton className="h-14" /><Skeleton className="h-14" /><Skeleton className="h-14 w-2/3" /></Card>
       ) : filtered.length === 0 ? (
         <Card>
-          <EmptyState compact illustration="ukoly" title={filter === 'done' ? 'Zatím nic hotového' : 'Žádné úkoly'}
-            hint={filter === 'done' ? 'Splněné úkoly se objeví tady.' : 'Až vedení něco zadá, objeví se to tady.'} />
+          <EmptyState compact illustration="ukoly" title={filter === 'done' ? t('Zatím nic hotového') : t('Žádné úkoly')}
+            hint={filter === 'done' ? t('Splněné úkoly se objeví tady.') : t('Až vedení něco zadá, objeví se to tady.')} />
         </Card>
       ) : (
         <>
           {filter !== 'done' && nesplnenych === 0 && (
-            <Card><EmptyState compact illustration="ukoly" title="Na dnešek je hotovo" hint="Všechny úkoly jsou splněné." /></Card>
+            <Card><EmptyState compact illustration="ukoly" title={t('Na dnešek je hotovo')} hint={t('Všechny úkoly jsou splněné.')} /></Card>
           )}
-          {section('Po termínu', sk.poTerminu, 'text-bad-ink')}
-          {section('Dnes', sk.dnes)}
-          {section('Tento týden', sk.tentoTyden)}
-          {section('Později', sk.pozdeji)}
-          {(filter === 'done' || filter === 'all') && section('Hotové — posledních 30', sk.hotove)}
+          {section(t('Po termínu'), sk.poTerminu, 'text-bad-ink')}
+          {section(t('Dnes'), sk.dnes)}
+          {section(t('Tento týden'), sk.tentoTyden)}
+          {section(t('Později'), sk.pozdeji)}
+          {(filter === 'done' || filter === 'all') && section(t('Hotové — posledních 30'), sk.hotove)}
         </>
       )}
     </div>

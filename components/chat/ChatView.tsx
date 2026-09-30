@@ -20,7 +20,9 @@ import {
   formatClock,
   dayKey,
   dayLabel,
+  TEXT_PRILOHA,
 } from './useChat';
+import { useT } from '@/lib/i18n/client';
 import { useDraft } from '@/lib/useDraft';
 import { prvniNeprectenaId } from '@/lib/chatVlakno';
 import { useOpravneni } from '../role/useOpravneni';
@@ -37,6 +39,7 @@ interface Props {
 }
 
 export default function ChatView({ user, openConversationId = null }: Props) {
+  const t = useT('chat');
   const meId = typeof user.id === 'string' ? parseInt(user.id) : user.id;
   const { conversations, loading, refresh, setConversations } = useConversations();
   const [activeId, setActiveId] = useState<number | null>(null);
@@ -92,7 +95,7 @@ export default function ChatView({ user, openConversationId = null }: Props) {
       {/* Nadpis obrazovky. Vizuálně je zbytečný — celá plocha je zjevně
           chat —, ale kdo se po aplikaci pohybuje podle nadpisů, měl tu
           jedinou obrazovku bez záchytného bodu. */}
-      <h1 className="sr-only">Chat</h1>
+      <h1 className="sr-only">{t('Chat')}</h1>
       {/* Conversation list */}
       <aside
         className={`${
@@ -102,16 +105,16 @@ export default function ChatView({ user, openConversationId = null }: Props) {
         <div className="px-4 py-3.5 border-b border-black/[0.06] space-y-3">
           <div className="flex items-center gap-2">
             <Icon name="chat" size={17} className="shrink-0 text-black/40" />
-            <h2 className="t-section flex-1">Zprávy</h2>
+            <h2 className="t-section flex-1">{t('Zprávy')}</h2>
             <Button size="sm" variant="secondary" icon="plus" onClick={() => setNewOpen(true)}>
-              Nová
+              {t('Nová')}
             </Button>
           </div>
           <SearchField
             value={q}
             onChange={setQ}
-            placeholder="Hledat v konverzacích…"
-            ariaLabel="Hledat v konverzacích"
+            placeholder={t('Hledat v konverzacích…')}
+            ariaLabel={t('Hledat v konverzacích')}
             storageKey="chat"
           />
           {/* Filtr se ukazuje jen když je co filtrovat — prázdný přepínač
@@ -125,13 +128,13 @@ export default function ChatView({ user, openConversationId = null }: Props) {
               // text narážel na rámeček. filter-pill je v @layer components.
               className={`filter-pill tap-target-sm ${onlyUnread ? 'seg-on' : 'seg-off glass'}`}
             >
-              Nepřečtené · {totalUnread}
+              {t('Nepřečtené · {n}', { n: totalUnread })}
             </button>
           )}
         </div>
         <div className="flex-1 overflow-y-auto scrollbar-thin divide-y divide-black/[0.06]">
           {loading && (
-            <div className="p-4 space-y-3" aria-busy="true" aria-label="Načítám konverzace">
+            <div className="p-4 space-y-3" aria-busy="true" aria-label={t('Načítám konverzace')}>
               {[0, 1, 2].map(i => <Skeleton key={i} className="h-12 w-full" />)}
             </div>
           )}
@@ -139,14 +142,14 @@ export default function ChatView({ user, openConversationId = null }: Props) {
             <EmptyState
               illustration="chat"
               compact
-              title="Zatím žádné konverzace"
-              hint="Napište kolegovi — vlákno vznikne prvním odeslaným řádkem."
-              action={<Button icon="plus" onClick={() => setNewOpen(true)}>Nová zpráva</Button>}
+              title={t('Zatím žádné konverzace')}
+              hint={t('Napište kolegovi — vlákno vznikne prvním odeslaným řádkem.')}
+              action={<Button icon="plus" onClick={() => setNewOpen(true)}>{t('Nová zpráva')}</Button>}
             />
           )}
           {!loading && conversations.length > 0 && shown.length === 0 && (
             <p className="p-6 text-center t-meta">
-              {onlyUnread ? 'Všechno přečtené.' : 'Nic neodpovídá hledání.'}
+              {onlyUnread ? t('Všechno přečtené.') : t('Nic neodpovídá hledání.')}
             </p>
           )}
           {shown.map((c) => (
@@ -178,7 +181,7 @@ export default function ChatView({ user, openConversationId = null }: Props) {
         ) : (
           <div className="flex-1 hidden md:flex flex-col items-center justify-center text-black/45 gap-3">
             <Icon name="chat" size={48} className="text-black/15" />
-            <p className="text-sm">Vyberte konverzaci</p>
+            <p className="text-sm">{t('Vyberte konverzaci')}</p>
           </div>
         )}
       </section>
@@ -203,6 +206,7 @@ function ConversationRow({
   active: boolean;
   onClick: () => void;
 }) {
+  const t = useT('chat');
   return (
     <button
       onClick={onClick}
@@ -217,7 +221,7 @@ function ConversationRow({
             {conv.name}
           </span>
           <span className="text-[11px] text-black/45 flex-shrink-0">
-            {formatTime(conv.lastTime)}
+            {formatTime(conv.lastTime, t)}
           </span>
         </div>
         {/* V provozním chatu nese zpráva pokyn („dodávka dorazí mezi devátou
@@ -225,13 +229,13 @@ function ConversationRow({
             takže náhled dostal řádky dva. */}
         <div className="flex items-start justify-between gap-2">
           <span className={`min-w-0 flex-1 text-sm line-clamp-2 ${conv.unreadCount > 0 ? 'text-black/80 font-medium' : 'text-black/45'}`}>
-            {conv.lastMessage === 'Příloha'
-              ? <span className="inline-flex items-center gap-1"><Icon name="clipboard" size={13} className="shrink-0 opacity-70" />Příloha</span>
-              : (conv.lastMessage ?? 'Zatím žádné zprávy')}
+            {conv.lastMessage === TEXT_PRILOHA
+              ? <span className="inline-flex items-center gap-1"><Icon name="clipboard" size={13} className="shrink-0 opacity-70" />{t('Příloha')}</span>
+              : (conv.lastMessage ?? t('Zatím žádné zprávy'))}
           </span>
           {/* Jeden odznak pro celou aplikaci (DP §3.20), ne ruční limetka. */}
           <Badge count={conv.unreadCount} max={99} ring={false} className="shrink-0 mt-0.5"
-            label={`Nepřečtené: ${conv.unreadCount}`} />
+            label={t('Nepřečtené: {n}', { n: conv.unreadCount })} />
         </div>
       </div>
     </button>
@@ -283,6 +287,7 @@ function Thread({
   onBack: () => void;
   onSent: () => void;
 }) {
+  const t = useT('chat');
   const { messages, setMessages, loading } = useThreadMessages(conv.id);
   // Cizí anketu smí zavřít ten, kdo spravuje ankety (server to hlídá stejným
   // klíčem). Do ankety se dřív předávalo jen meId, takže „Uzavřít“ viděl
@@ -300,28 +305,28 @@ function Thread({
     try {
       const r = await fetch('/api/blocks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: m.senderId }) });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) { setModeraceZprava(d.error || 'Zablokovat se nepodařilo.'); return; }
+      if (!r.ok) { setModeraceZprava(d.error || t('Zablokovat se nepodařilo.')); return; }
       setMessages(prev => prev.filter(x => x.senderId !== m.senderId));
-      setModeraceZprava(`Uživatel ${m.senderName} je zablokovaný a jeho zprávy se nezobrazují. Odblokovat jde v Nastavení, Zabezpečení.`);
-    } catch { setModeraceZprava('Zablokovat se nepodařilo. Zkontrolujte připojení.'); }
+      setModeraceZprava(t('Uživatel {jmeno} je zablokovaný a jeho zprávy se nezobrazují. Odblokovat jde v Nastavení, Zabezpečení.', { jmeno: m.senderName }));
+    } catch { setModeraceZprava(t('Zablokovat se nepodařilo. Zkontrolujte připojení.')); }
   };
   const smazZpravu = async (m: ChatMessage) => {
     setModeraceZprava('');
     try {
       const r = await fetch(`/api/conversations/${conv.id}/messages/${m.id}`, { method: 'DELETE' });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) { setModeraceZprava(d.error || 'Zprávu se nepodařilo smazat.'); return; }
+      if (!r.ok) { setModeraceZprava(d.error || t('Zprávu se nepodařilo smazat.')); return; }
       setMessages(prev => prev.filter(x => x.id !== m.id));
-    } catch { setModeraceZprava('Zprávu se nepodařilo smazat. Zkontrolujte připojení.'); }
+    } catch { setModeraceZprava(t('Zprávu se nepodařilo smazat. Zkontrolujte připojení.')); }
   };
   const akceZpravy = (m: ChatMessage): MenuItem[] => {
     const own = m.senderId === meId;
     const out: MenuItem[] = [];
     if (!own) {
-      out.push({ label: 'Nahlásit zprávu', icon: 'warning', onClick: () => setNahlasit(m.id) });
-      out.push({ label: 'Zablokovat autora', icon: 'lock', onClick: () => { void zablokuj(m); } });
+      out.push({ label: t('Nahlásit zprávu'), icon: 'warning', onClick: () => setNahlasit(m.id) });
+      out.push({ label: t('Zablokovat autora'), icon: 'lock', onClick: () => { void zablokuj(m); } });
     }
-    if (own || moderator) out.push({ label: 'Smazat zprávu', icon: 'trash', danger: true, onClick: () => { void smazZpravu(m); } });
+    if (own || moderator) out.push({ label: t('Smazat zprávu'), icon: 'trash', danger: true, onClick: () => { void smazZpravu(m); } });
     return out;
   };
   const [text, setText] = useState('');
@@ -383,18 +388,18 @@ function Thread({
 
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    const t = text.trim();
-    if (!t || sending) return;
+    const obsah = text.trim();
+    if (!obsah || sending) return;
     setSending(true);
     setText('');
     koncept.hotovo();
     requestAnimationFrame(autoGrow);
-    const ok = await doSend({ content: t });
+    const ok = await doSend({ content: obsah });
     // The input was cleared optimistically; a failed send must give the text
     // back rather than swallow what the person wrote.
     if (!ok) {
-      setText(t);
-      setSendError('Zprávu se nepodařilo odeslat.');
+      setText(obsah);
+      setSendError(t('Zprávu se nepodařilo odeslat.'));
     }
     setSending(false);
   };
@@ -405,12 +410,12 @@ function Thread({
     if (!file) return;
     // Say it right away instead of uploading for a minute and then failing.
     if (file.size > MAX_UPLOAD_BYTES) {
-      setSendError(`Soubor je příliš velký (max ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)} MB).`);
+      setSendError(t('Soubor je příliš velký (max {n} MB).', { n: Math.round(MAX_UPLOAD_BYTES / 1024 / 1024) }));
       return;
     }
     setSendError('');
     setUploading(true);
-    const up = await uploadFile(file);
+    const up = await uploadFile(file, t);
     if ('error' in up) { setSendError(up.error); setUploading(false); return; }
     if (up) {
       await doSend({
@@ -419,7 +424,7 @@ function Thread({
         attachmentName: up.name,
       });
     } else {
-      setSendError('Nahrání souboru se nezdařilo.');
+      setSendError(t('Nahrání souboru se nezdařilo.'));
     }
     setUploading(false);
   };
@@ -435,14 +440,14 @@ function Thread({
   return (
     <>
       <header className="px-4 py-3 border-b border-black/[0.06] flex items-center gap-3">
-        <Button variant="ghost" size="sm" iconOnly aria-label="Zpět" onClick={onBack} className="md:hidden -ml-1">
+        <Button variant="ghost" size="sm" iconOnly aria-label={t('Zpět')} onClick={onBack} className="md:hidden -ml-1">
           <Icon name="chevronRight" size={18} className="rotate-180" />
         </Button>
         <Avatar conv={conv} size={38} />
         <div className="min-w-0 flex-1">
           <div className="font-semibold text-[#16181A] truncate">{conv.name}</div>
           <div className="t-meta">
-            {conv.type === 'team' ? 'Týmový kanál — vidí celý tým' : 'Jen vy dva'}
+            {conv.type === 'team' ? t('Týmový kanál — vidí celý tým') : t('Jen vy dva')}
           </div>
         </div>
       </header>
@@ -454,13 +459,13 @@ function Thread({
       >
         {conv.type === 'team' && <PollsStrip meId={meId} isEmployer={jeVedeni} />}
         {loading && (
-          <div className="space-y-2 py-2" aria-busy="true" aria-label="Načítám zprávy">
+          <div className="space-y-2 py-2" aria-busy="true" aria-label={t('Načítám zprávy')}>
             <Skeleton className="h-10 w-2/3" />
             <Skeleton className="h-10 w-1/2 ml-auto" />
           </div>
         )}
         {!loading && messages.length === 0 && (
-          <EmptyState illustration="chat" title="Zatím žádné zprávy" hint="Napiš první — tým to uvidí v aplikaci i na kiosku." compact />
+          <EmptyState illustration="chat" title={t('Zatím žádné zprávy')} hint={t('Napiš první — tým to uvidí v aplikaci i na kiosku.')} compact />
         )}
         {messages.map((m, i) => {
           const prev = messages[i - 1];
@@ -472,14 +477,14 @@ function Thread({
               {newDay && (
                 <div className="flex items-center gap-3 pt-2 pb-1">
                   <span className="h-px flex-1 bg-black/[0.07]" />
-                  <span className="t-label text-black/40">{dayLabel(m.createdAt)}</span>
+                  <span className="t-label text-black/40">{dayLabel(m.createdAt, t)}</span>
                   <span className="h-px flex-1 bg-black/[0.07]" />
                 </div>
               )}
               {m.id === firstUnreadId && (
                 <div className="flex items-center gap-3 pt-1 pb-1">
                   <span className="h-px flex-1 bg-[#C8F542]" />
-                  <span className="t-label text-[#5B7A08]">Nepřečtené</span>
+                  <span className="t-label text-[#5B7A08]">{t('Nepřečtené')}</span>
                   <span className="h-px flex-1 bg-[#C8F542]" />
                 </div>
               )}
@@ -504,7 +509,7 @@ function Thread({
             type="button"
             onClick={() => { setAtBottom(true); scrollToBottom(); }}
             className="absolute -top-14 right-4 z-10 btn-icon bg-[#16181A] text-[#C8F542] shadow-lg"
-            aria-label="Přejít na konec"
+            aria-label={t('Přejít na konec')}
           >
             <Icon name="chevron" size={16} className="rotate-90" />
           </button>
@@ -538,7 +543,7 @@ function Thread({
           onClick={() => fileRef.current?.click()}
           disabled={uploading}
           className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-black/60 hover:text-black hover:bg-black/[0.04] transition-colors disabled:opacity-40"
-          aria-label="Připojit soubor"
+          aria-label={t('Připojit soubor')}
         >
           {/* Bílé kolečko na bílé liště nebylo vidět — při nahrávání to
               vypadalo, že se nic neděje. */}
@@ -559,12 +564,12 @@ function Thread({
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
           }}
-          placeholder="Napište zprávu…"
-          aria-label="Text zprávy"
+          placeholder={t('Napište zprávu…')}
+          aria-label={t('Text zprávy')}
           className="flex-1 min-w-0 resize-none field border border-black/[0.08] px-4 py-2.5 leading-snug text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none"
         />
         {/* Odeslat je hlavní akce vlákna → jediná limetka obrazovky. */}
-        <Button type="submit" variant="accent" iconOnly icon="send" aria-label="Odeslat"
+        <Button type="submit" variant="accent" iconOnly icon="send" aria-label={t('Odeslat')}
           disabled={!text.trim() || sending} className="shrink-0" />
       </form>
     </>
@@ -590,6 +595,7 @@ export function MessageBubble({
    */
   dayShown?: boolean;
 }) {
+  const t = useT('chat');
   return (
     <div className={`flex flex-col ${own ? 'items-end' : 'items-start'}`}>
       {showSender && (
@@ -610,7 +616,7 @@ export function MessageBubble({
           <a href={msg.attachmentUrl} target="_blank" rel="noreferrer">
             <img
               src={msg.attachmentUrl}
-              alt={msg.attachmentName ?? 'obrázek'}
+              alt={msg.attachmentName ?? t('obrázek')}
               className="max-w-[min(220px,100%)] max-h-[220px] rounded-2xl object-cover"
             />
           </a>
@@ -629,7 +635,7 @@ export function MessageBubble({
                 soubor", takže je jasné, že jde o totéž. */}
             <Icon name="paperclip" size={18} className="flex-shrink-0" />
             <span className="text-sm truncate min-w-0 max-w-[min(160px,100%)] underline">
-              {msg.attachmentName ?? 'Soubor'}
+              {msg.attachmentName ?? t('Soubor')}
             </span>
           </a>
         )}
@@ -641,12 +647,12 @@ export function MessageBubble({
         <div
           className="text-[11px] mt-1 text-black/55 text-right tabular-nums"
         >
-          {dayShown ? formatClock(msg.createdAt) : formatTime(msg.createdAt)}
+          {dayShown ? formatClock(msg.createdAt, t) : formatTime(msg.createdAt, t)}
         </div>
       </div>
       {akce && akce.length > 0 && (
         // Na počítači se nabídka ukáže po najetí nebo fokusu, na dotykovém zařízení je vidět vždy.
-        <Menu items={akce} size="sm" label="Akce se zprávou" align={own ? 'left' : 'right'}
+        <Menu items={akce} size="sm" label={t('Akce se zprávou')} align={own ? 'left' : 'right'}
           className="opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity" />
       )}
       </div>

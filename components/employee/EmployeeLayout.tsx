@@ -7,7 +7,6 @@ import { Icon, LogoMark } from '../Icons';
 import { Avatar, ErrorBoundary, MenuPanel, MenuItemButton } from '../ui';
 import { Dock } from '../ui/Dock';
 import { usePopover } from '@/lib/usePopover';
-import { czCount, NEPRECTENA_ZPRAVA } from '@/lib/czech';
 import NotificationBell from '../NotificationBell';
 import MessengerDock from '../chat/MessengerDock';
 import { useConversations } from '../chat/useChat';
@@ -289,7 +288,7 @@ export default function EmployeeLayout({ user }: Props) {
       <Dock label={t('Spodní navigace')}
         items={nav.dok.map(n => ({
           id: n.id, label: (n as { short?: string }).short ?? n.label, icon: n.icon,
-          ...(n.id === 'chat' && currentView !== 'chat' ? { badge: unreadChat, badgeLabel: czCount(unreadChat, NEPRECTENA_ZPRAVA) } : {}),
+          ...(n.id === 'chat' && currentView !== 'chat' ? { badge: unreadChat, badgeLabel: t('{n, plural, one {# nepřečtená zpráva} few {# nepřečtené zprávy} other {# nepřečtených zpráv}}', { n: unreadChat }) } : {}),
         }))}
         activeId={currentView}
         onSelect={id => { setCurrentView(id); setMoreOpen(false); }}

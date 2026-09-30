@@ -21,23 +21,26 @@ import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
 import { MojeUrovenObsah, NaStranceOdmen } from '../widgety/oblasti/odmeny';
 import { vyberOdmeny } from '@/lib/odmenyPrehled';
+import { useT } from '@/lib/i18n/client';
 
 export default function MyRewards() {
+  const t = useT('zamestnanec');
   return (
-    <ProGate feature="Moje odměny" employer={false} benefit="Body, úrovně a odměny za dobře odvedené směny.">
+    <ProGate feature={t('Moje odměny')} employer={false} benefit={t('Body, úrovně a odměny za dobře odvedené směny.')}>
       <MyRewardsInner />
     </ProGate>
   );
 }
 
 function MyRewardsInner() {
+  const t = useT('zamestnanec');
   const data = useDataWidgetu('/api/rewards', vyberOdmeny);
   const ja = data.data?.ja ?? null;
 
   const nastroj = (
-    <Card aria-label="Moje úroveň">
+    <Card aria-label={t('Moje úroveň')}>
       {data.error ? (
-        <ErrorState compact title="Odměny se nenačetly" onRetry={data.reload} detail={data.error} />
+        <ErrorState compact title={t('Odměny se nenačetly')} onRetry={data.reload} detail={data.error} />
       ) : data.loading ? (
         <div className="space-y-3" aria-busy>
           <Skeleton className="h-3 w-24 rounded-full" />
@@ -47,8 +50,8 @@ function MyRewardsInner() {
       ) : ja ? (
         <MojeUrovenObsah ja={ja} velikost="L" />
       ) : (
-        <EmptyState compact illustration="odmeny" title="Odměny tu zatím nejsou"
-          hint="Tenhle účet body nesbírá. Body se připisují za úkoly, postupy, uzávěrky a hodnocení směn." />
+        <EmptyState compact illustration="odmeny" title={t('Odměny tu zatím nejsou')}
+          hint={t('Tenhle účet body nesbírá. Body se připisují za úkoly, postupy, uzávěrky a hodnocení směn.')} />
       )}
     </Card>
   );
@@ -59,8 +62,8 @@ function MyRewardsInner() {
       <PlochaWidgetu
         stranka="zamestnanec.odmeny"
         hlavicka={{
-          title: 'Odměny',
-          subtitle: 'Body za směny, úroveň a co si za ně můžeš vybrat.',
+          title: t('Odměny'),
+          subtitle: t('Body za směny, úroveň a co si za ně můžeš vybrat.'),
           hintId: 'myrewards',
         }}
         nastroj={nastroj}

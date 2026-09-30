@@ -14,6 +14,7 @@ import { Icon } from '@/components/Icons';
 import { Modal, Avatar, SearchField, EmptyState, ErrorState } from '../ui';
 import { startDirect, Conversation } from './useChat';
 import { obsahuje, obsahujeNekde } from '@/lib/hledani';
+import { useT } from '@/lib/i18n/client';
 
 interface Mate {
   id: number;
@@ -32,6 +33,7 @@ export default function NewConversation({ open, onClose, meId, conversations, on
   /** Voláno s id konverzace, kterou má volající otevřít. */
   onOpened: (conversationId: number) => void;
 }) {
+  const t = useT('chat');
   const [mates, setMates] = useState<Mate[] | null>(null);
   const [error, setError] = useState('');
   const [q, setQ] = useState('');
@@ -42,12 +44,13 @@ export default function NewConversation({ open, onClose, meId, conversations, on
     setError('');
     setMates(null);
     fetch('/api/users')
-      .then(r => { if (!r.ok) throw new Error('načtení týmu selhalo'); return r.json(); })
+      .then(r => { if (!r.ok) throw new Error(t('načtení týmu selhalo')); return r.json(); })
       .then((rows: any) => {
-        if (!Array.isArray(rows)) throw new Error('nečekaná odpověď');
+        if (!Array.isArray(rows)) throw new Error(t('nečekaná odpověď'));
         setMates(rows.filter((u: Mate) => u.id !== meId && u.role !== 'kiosk'));
       })
-      .catch(e => setError(e?.message ?? 'Kolegy se nepodařilo načíst.'));
+      .catch(e => setError(e?.message ?? t('Kolegy se nepodařilo načíst.')));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, meId]);
 
   const existingFor = useMemo(() => {
@@ -73,29 +76,29 @@ export default function NewConversation({ open, onClose, meId, conversations, on
     setBusy(u.id);
     const id = await startDirect(u.id);
     setBusy(null);
-    if (id == null) { setError(`Konverzaci s ${u.name} se nepodařilo založit.`); return; }
+    if (id == null) { setError(t('Konverzaci s {jmeno} se nepodařilo založit.', { jmeno: u.name })); return; }
     onOpened(id);
     onClose();
   };
 
   return (
     <Modal open={open} onClose={onClose} size="md"
-      title="Nová zpráva"
-      subtitle="Vyberte kolegu — vlákno se otevře hned.">
+      title={t('Nová zpráva')}
+      subtitle={t('Vyberte kolegu — vlákno se otevře hned.')}>
       <div className="space-y-3">
-        <SearchField value={q} onChange={setQ} placeholder="Hledat v týmu…"
-          ariaLabel="Hledat kolegu" autoFocus />
+        <SearchField value={q} onChange={setQ} placeholder={t('Hledat v týmu…')}
+          ariaLabel={t('Hledat kolegu')} autoFocus />
 
-        {error && <ErrorState title="Něco se nepovedlo" detail={error} compact />}
+        {error && <ErrorState title={t('Něco se nepovedlo')} detail={error} compact />}
 
         {mates === null && !error && (
-          <p className="t-meta py-6 text-center">Načítání týmu…</p>
+          <p className="t-meta py-6 text-center">{t('Načítání týmu…')}</p>
         )}
 
         {mates !== null && shown.length === 0 && (
           <EmptyState illustration="tym" compact
-            title={q ? 'Nikdo neodpovídá hledání' : 'V týmu zatím nikdo další není'}
-            hint={q ? 'Zkuste jiné jméno nebo pozici.' : 'Pozvěte kolegy v sekci Tým.'} />
+            title={q ? t('Nikdo neodpovídá hledání') : t('V týmu zatím nikdo další není')}
+            hint={q ? t('Zkuste jiné jméno nebo pozici.') : t('Pozvěte kolegy v sekci Tým.')} />
         )}
 
         {mates !== null && shown.length > 0 && (
@@ -111,7 +114,7 @@ export default function NewConversation({ open, onClose, meId, conversations, on
                     {u.jobTitle && <span className="block t-meta truncate">{u.jobTitle}</span>}
                   </span>
                   <span className="t-meta shrink-0">
-                    {busy === u.id ? 'Otevírám…' : known ? 'Už si píšete' : <Icon name="chevron" size={16} />}
+                    {busy === u.id ? t('Otevírám…') : known ? t('Už si píšete') : <Icon name="chevron" size={16} />}
                   </span>
                 </button>
               );

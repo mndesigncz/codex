@@ -46,6 +46,7 @@
   "Zúžit boční pás": "Seitenleiste einklappen",
   "neuvedeno": "nicht angegeben",
   "zavřeno": "geschlossen",
+  "{n, plural, one {# nepřečtená zpráva} few {# nepřečtené zprávy} other {# nepřečtených zpráv}}": "{n, plural, one {# ungelesene Nachricht} other {# ungelesene Nachrichten}}",
   "Úkoly|nav": "Aufgaben",
   "Účet": "Konto"
 }
