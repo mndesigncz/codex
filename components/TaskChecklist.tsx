@@ -3,6 +3,7 @@
 import { Icon } from './Icons';
 import { Button } from './ui';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
+import { tg } from '@/lib/i18n/stav';
 
 export type ChecklistItem = { text: string; done: boolean };
 
@@ -23,11 +24,15 @@ export function recurrenceOptions(t: PrekladFn) {
   ];
 }
 
-export function recurrenceLabel(r?: string | null, t?: PrekladFn): string | null {
+/**
+ * Popisek opakování. Bez `t` se překládá podle jazyka aplikace (`tg`), takže
+ * i volající, který `t` nemá po ruce (seznamy úkolů), ukáže správný jazyk.
+ */
+export function recurrenceLabel(r?: string | null, t: (klic: string) => string = (klic) => tg(klic)): string | null {
   switch (r) {
-    case 'daily': return t ? t('Denně') : 'Denně';
-    case 'weekdays': return t ? t('Pracovní dny') : 'Pracovní dny';
-    case 'weekly': return t ? t('Týdně') : 'Týdně';
+    case 'daily': return t('Denně');
+    case 'weekdays': return t('Pracovní dny');
+    case 'weekly': return t('Týdně');
     default: return null;
   }
 }

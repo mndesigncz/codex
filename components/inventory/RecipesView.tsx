@@ -27,7 +27,9 @@ import NewIngredientInline from './NewIngredientInline';
 import { apiMessage, okJson } from '@/lib/api';
 import { recipeCost, ingredientCost, marginPct } from '@/lib/recipeCost';
 import { obsahujeNekde } from '@/lib/hledani';
-import { czCount, type CzNoun } from '@/lib/czech';
+import { tg } from '@/lib/i18n/stav';
+import { useJazyk, useT } from '@/lib/i18n/client';
+import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
 import { vyberReceptury, vetaOdpisu, type DataReceptur, type Receptura } from '@/lib/recepturyPrehled';
 import {
   Button, Card, Chip, EmptyState, Field, Input, ListRow, Modal, SearchField, Segmented, Select, Skeleton, Stat, Toast, Well,
@@ -45,7 +47,9 @@ const URL_NAVODY = '/api/guides';
 type Ingredient = { itemId: string; amount: string; unit: string };
 type Draft = { productId: string; productName: string; ingredients: Ingredient[]; existing: boolean };
 
-const SUROVINA: CzNoun = { one: 'surovina', few: 'suroviny', many: 'surovin' };
+/** Vnitřní hodnoty filtru kategorií (zobrazují se přeložené, porovnávají se tyhle). */
+const VSE = 'Vše';
+const BEZ_KATEGORIE = 'Bez kategorie';
 
 /** Jednotky, ve kterých se dá zadávat, a jejich převod na základní (l / kg / ks). */
 const UNITS: Record<string, { label: string; toBase: number; base: string }[]> = {
@@ -117,6 +121,8 @@ const vyberNavody = (raw: any): { id: number; title: string; productId: string |
 export default function RecipesView({ openProductId, onNavigate }: RecipesViewProps = {}) {
   // Data (návody) přísně přes useSmi — bez jistoty se neptat; tlačítka přes
   // `ma` jako Sklad: do načtení oprávnění ANO, rozhodne server.
+  const t = useT('sklad');
+  const { jazyk } = useJazyk();
   const smi = useSmi();
   const { ma } = useOpravneni();
   const money = useMoney();
@@ -139,7 +145,7 @@ export default function RecipesView({ openProductId, onNavigate }: RecipesViewPr
   const d = data.data;
   const products = d?.produkty ?? [];
   const recipes: Receptura[] = d?.receptury ?? [];
-  const [cat, setCat] = useState('Vše');
+  const [cat, setCat] = useState(VSE);
   const [search, setSearch] = useState('');
   const [onlyMissing, setOnlyMissing] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -191,19 +197,19 @@ export default function RecipesView({ openProductId, onNavigate }: RecipesViewPr
 
   const categories = useMemo(() => {
     const set = new Set<string>();
-    products.forEach(p => set.add(p.category || 'Bez kategorie'));
-    return ['Vše', ...Array.from(set).sort((a, b) => a.localeCompare(b, 'cs'))];
-  }, [products]);
+    products.forEach(p => set.add(p.category || BEZ_KATEGORIE));
+    return [VSE, ...Array.from(set).sort((a, b) => a.localeCompare(b, LOCALE_PRO_JAZYK[jazyk]))];
+  }, [products, jazyk]);
 
   const q = search.trim();
   const shown = useMemo(() => products.filter(p => {
-    if (cat !== 'Vše' && (p.category || 'Bez kategorie') !== cat) return false;
+    if (cat !== VSE && (p.category || BEZ_KATEGORIE) !== cat) return false;
     if (onlyMissing && recipeByProduct.get(p.productId)?.ingredients.length) return false;
     if (q && !obsahujeNekde(q, p.name, p.category)) return false;
     return true;
   }).sort((a, b) => (soldByProduct.get(b.productId) ?? 0) - (soldByProduct.get(a.productId) ?? 0)
-    || a.name.localeCompare(b.name, 'cs')),
-  [products, cat, onlyMissing, q, recipeByProduct, soldByProduct]);
+    || a.name.localeCompare(b.name, LOCALE_PRO_JAZYK[jazyk])),
+  [products, cat, onlyMissing, q, recipeByProduct, soldByProduct, jazyk]);
 
   /** Co stojí suroviny na jednu porci produktu — a jaká z toho vyjde marže.
    *  Chybí-li u některé suroviny cena nebo balení, vrátíme null: nadhodnocená
@@ -246,9 +252,9 @@ export default function RecipesView({ openProductId, onNavigate }: RecipesViewPr
         body: JSON.stringify({ productId: draft.productId, productName: draft.productName, ingredients }),
       }).then(okJson);
       setDraft(null);
-      setZprava({ text: ingredients.length ? 'Receptura uložena.' : 'Receptura smazána.' });
+      setZprava({ text: ingredients.length ? t('Receptura uložena.') : t('Receptura smazána.') });
       obnovDataWidgetu(URL_RECEPTURY);
-    } catch (e) { setErr(apiMessage(e, 'Uložení se nepodařilo.')); }
+    } catch (e) { setErr(apiMessage(e, t('Uložení se nepodařilo.'))); }
     setSaving(false);
   };
 
@@ -260,11 +266,11 @@ export default function RecipesView({ openProductId, onNavigate }: RecipesViewPr
       const r = await fetch('/api/pos/sync', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ force: true }),
       }).then(okJson);
-      const v = vetaOdpisu(r);
+      const v = vetaOdpisu(r, t);
       setZprava({ text: v.text, ton: v.chyba ? 'bad' : undefined });
       obnovDataWidgetu(URL_RECEPTURY);
       obnovDataWidgetu(URL_SKLAD);
-    } catch (e) { setZprava({ text: apiMessage(e, 'Odpis se nepodařil.'), ton: 'bad' }); }
+    } catch (e) { setZprava({ text: apiMessage(e, t('Odpis se nepodařil.')), ton: 'bad' }); }
     setSyncing(false);
   };
 
@@ -283,20 +289,20 @@ export default function RecipesView({ openProductId, onNavigate }: RecipesViewPr
   };
 
   const hlavicka = {
-    title: 'Receptury',
-    subtitle: 'Co ze skladu ubude, když se prodá jedna položka. Podle toho se sklad odepisuje sám.',
+    title: t('Receptury'),
+    subtitle: t('Co ze skladu ubude, když se prodá jedna položka. Podle toho se sklad odepisuje sám.'),
     hintId: 'recipes',
-    secondary: smiOdepsat ? <Button variant="secondary" icon="swap" loading={syncing} onClick={sync}>Odepsat prodeje</Button> : undefined,
+    secondary: smiOdepsat ? <Button variant="secondary" icon="swap" loading={syncing} onClick={sync}>{t('Odepsat prodeje')}</Button> : undefined,
     // Vedlejší akce se na telefonu schovají — v „···" musí být i tam.
-    menu: smiOdepsat ? [{ label: 'Odepsat prodeje', icon: 'swap', onClick: sync }] : undefined,
+    menu: smiOdepsat ? [{ label: t('Odepsat prodeje'), icon: 'swap', onClick: sync }] : undefined,
   };
 
   let nastroj: React.ReactNode;
   if (data.error) {
     nastroj = (
       <Card>
-        <EmptyState compact icon="warning" title="Receptury se nenačetly" hint={data.error}
-          action={<Button variant="secondary" size="sm" onClick={data.reload}>Zkusit znovu</Button>} />
+        <EmptyState compact icon="warning" title={t('Receptury se nenačetly')} hint={data.error}
+          action={<Button variant="secondary" size="sm" onClick={data.reload}>{t('Zkusit znovu')}</Button>} />
       </Card>
     );
   } else if (!d || sklad.loading) {
@@ -309,10 +315,10 @@ export default function RecipesView({ openProductId, onNavigate }: RecipesViewPr
   } else if (!d.propojeno) {
     nastroj = (
       <Card>
-        <EmptyState icon="receipt" title="Receptury potřebují připojenou pokladnu"
-          hint="Propoj pokladnu a pak si u každé položky z menu naklikáš, co a kolik se z ní odepíše ze skladu."
+        <EmptyState icon="receipt" title={t('Receptury potřebují připojenou pokladnu')}
+          hint={t('Propoj pokladnu a pak si u každé položky z menu naklikáš, co a kolik se z ní odepíše ze skladu.')}
           // Rada, která jmenuje místo, tam musí i zavést — jinak ho člověk hledá v nastavení sám.
-          action={onNavigate ? <Button variant="accent" icon="receipt" onClick={() => onNavigate('settings', 'pos')}>Nastavit pokladnu</Button> : undefined} />
+          action={onNavigate ? <Button variant="accent" icon="receipt" onClick={() => onNavigate('settings', 'pos')}>{t('Nastavit pokladnu')}</Button> : undefined} />
       </Card>
     );
   } else if (draft) {
@@ -330,23 +336,23 @@ export default function RecipesView({ openProductId, onNavigate }: RecipesViewPr
   } else {
     nastroj = (
       <div className="space-y-4">
-        {sklad.error && <p className="note note-wait" role="status">Sklad se nenačetl — marže a suroviny teď nespočítám. {sklad.error}</p>}
+        {sklad.error && <p className="note note-wait" role="status">{t('Sklad se nenačetl — marže a suroviny teď nespočítám.')} {sklad.error}</p>}
         {d.chyba && <p className="note note-danger" role="alert">{d.chyba}</p>}
         {/* Procházení menu — hledání, jen chybějící, kategorie */}
         <div className="flex flex-wrap gap-2 items-center">
           <SearchField className="flex-1 min-w-[200px]" value={search} onChange={setSearch}
-            placeholder={`Hledat mezi ${products.length} položkami menu…`} storageKey="recipes" ariaLabel="Hledat položku menu" />
+            placeholder={t('Hledat mezi {n} položkami menu…', { n: products.length })} storageKey="recipes" ariaLabel={t('Hledat položku menu')} />
           <button type="button" aria-pressed={onlyMissing} onClick={() => setOnlyMissing(v => !v)}
             className={`filter-pill tap-target ${onlyMissing ? 'seg-on' : 'seg-off glass'}`}>
-            Jen bez receptury
+            {t('Jen bez receptury')}
           </button>
         </div>
         {categories.length > 2 && (
-          <div className="flex gap-2 overflow-x-auto scrollbar-thin scroll-fade-x -mx-1 px-1" role="group" aria-label="Kategorie menu">
+          <div className="flex gap-2 overflow-x-auto scrollbar-thin scroll-fade-x -mx-1 px-1" role="group" aria-label={t('Kategorie menu')}>
             {categories.map(c => (
               <button key={c} type="button" aria-pressed={cat === c} onClick={() => setCat(c)}
                 className={`filter-pill tap-target whitespace-nowrap shrink-0 ${cat === c ? 'seg-on' : 'seg-off glass'}`}>
-                {c}
+                {c === VSE ? t('Vše') : c === BEZ_KATEGORIE ? t('Bez kategorie') : c}
               </button>
             ))}
           </div>
@@ -356,8 +362,8 @@ export default function RecipesView({ openProductId, onNavigate }: RecipesViewPr
           {shown.length === 0 ? (
             <div className="p-5">
               <EmptyState compact icon="search"
-                title={onlyMissing ? 'Všechno tady má recepturu' : 'Nic nenalezeno'}
-                hint={onlyMissing ? 'V téhle kategorii se každý prodej odepisuje ze skladu.' : 'Zkus jiné hledání nebo kategorii.'} />
+                title={onlyMissing ? t('Všechno tady má recepturu') : t('Nic nenalezeno')}
+                hint={onlyMissing ? t('V téhle kategorii se každý prodej odepisuje ze skladu.') : t('Zkus jiné hledání nebo kategorii.')} />
             </div>
           ) : (
             <ul className="list px-5">
@@ -370,12 +376,12 @@ export default function RecipesView({ openProductId, onNavigate }: RecipesViewPr
                   <li key={p.productId}>
                     <ListRow as="div" title={p.name}
                       meta={sRec
-                        ? r!.ingredients.map(ing => `${Number(ing.amount).toLocaleString('cs-CZ', { maximumFractionDigits: 3 })} ${ing.itemUnit ?? ''} ${ing.itemName ?? '?'}`.replace(/\s+/g, ' ').trim()).join(' + ')
-                        : (p.category || 'bez kategorie')}
+                        ? r!.ingredients.map(ing => `${Number(ing.amount).toLocaleString(LOCALE_PRO_JAZYK[jazyk], { maximumFractionDigits: 3 })} ${ing.itemUnit ?? ''} ${ing.itemName ?? '?'}`.replace(/\s+/g, ' ').trim()).join(' + ')
+                        : (p.category || t('bez kategorie'))}
                       value={eco?.marginPct != null ? <span className={tonMarze(eco.marginPct)}>{eco.marginPct} %</span> : undefined}
-                      valueMeta={eco ? `náklad ${money(eco.cost)}` : undefined}
-                      aside={sold > 0 ? `prodáno ${sold}×` : undefined}
-                      right={sRec ? undefined : <Chip tone="wait" size="sm">bez receptury</Chip>}
+                      valueMeta={eco ? t('náklad {castka}', { castka: money(eco.cost) }) : undefined}
+                      aside={sold > 0 ? t('prodáno {n}×', { n: sold }) : undefined}
+                      right={sRec ? undefined : <Chip tone="wait" size="sm">{t('bez receptury')}</Chip>}
                       onClick={() => openEditor(p.productId, p.name)} />
                   </li>
                 );
@@ -387,7 +393,7 @@ export default function RecipesView({ openProductId, onNavigate }: RecipesViewPr
               nedozvěděl. Řádek to říká nahlas a rovnou nabídne hledání. */}
           {shown.length > LIMIT && (
             <p className="t-meta px-5 pb-4 text-pretty">
-              Zobrazeno prvních {LIMIT} z {shown.length} položek. Zbytek najdeš přes hledání nahoře, nebo si vyber kategorii.
+              {t('Zobrazeno prvních {limit} z {celkem} položek. Zbytek najdeš přes hledání nahoře, nebo si vyber kategorii.', { limit: LIMIT, celkem: shown.length })}
             </p>
           )}
         </Card>
@@ -420,6 +426,8 @@ function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, 
   onItemSaved: (item: any) => void;
   onItemCreated: (item: any) => void;
 }) {
+  const t = useT('sklad');
+  const { jazyk } = useJazyk();
   const money = useMoney();
   // Surovina může stát míň než korunu; `money` by dvanáct haléřů cukru
   // ukázal jako „0 Kč" a marže by pak seděla na sto procentech.
@@ -434,7 +442,7 @@ function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, 
   const nameOfProduct = (r: Receptura) => products.find(p => p.productId === r.productId)?.name ?? r.productName ?? r.productId;
   const copyable = recipes
     .filter(r => r.productId !== draft.productId && r.ingredients.length)
-    .sort((a, b) => nameOfProduct(a).localeCompare(nameOfProduct(b), 'cs'));
+    .sort((a, b) => nameOfProduct(a).localeCompare(nameOfProduct(b), LOCALE_PRO_JAZYK[jazyk]));
 
   /** Převezme suroviny z jiné receptury — nápoje se liší jedním sirupem. */
   const copyFrom = (productId: string) => {
@@ -465,12 +473,12 @@ function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="secondary" size="sm" onClick={() => setDraft(null)}>Zpět na seznam</Button>
+        <Button variant="secondary" size="sm" onClick={() => setDraft(null)}>{t('Zpět na seznam')}</Button>
         <div className="min-w-0 flex-1">
           <h2 className="t-section truncate">{draft.productName}</h2>
           <p className="t-meta">
-            {ready === 0 ? 'Zatím bez surovin' : `${czCount(ready, SUROVINA)} v receptuře`}
-            {menuPrice != null && <span> · v kase za {money(menuPrice)}</span>}
+            {ready === 0 ? t('Zatím bez surovin') : t('{n, plural, one {# surovina} few {# suroviny} other {# surovin}} v receptuře', { n: ready })}
+            {menuPrice != null && <span> · {t('v kase za {cena}', { cena: money(menuPrice) })}</span>}
           </p>
         </div>
       </div>
@@ -482,9 +490,9 @@ function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, 
           {/* Opisovat kvůli jednomu sirupu celou recepturu znovu je práce
               navíc, kterou nikdo neudělá — a produkt zůstane bez receptury. */}
           {smiUpravit && copyable.length > 0 && draft.ingredients.every(i => !i.itemId) && (
-            <Field id={`${uid}-prevzit`} label="Převzít z jiné položky">
+            <Field id={`${uid}-prevzit`} label={t('Převzít z jiné položky')}>
               <Select id={`${uid}-prevzit`} value="" onChange={e => copyFrom(e.target.value)} className="sm:max-w-sm">
-                <option value="">Vyber recepturu</option>
+                <option value="">{t('Vyber recepturu')}</option>
                 {copyable.map(r => <option key={r.productId} value={r.productId}>{nameOfProduct(r)} ({r.ingredients.length})</option>)}
               </Select>
             </Field>
@@ -500,35 +508,35 @@ function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, 
               return (
                 <Well as="li" key={idx} className="space-y-2">
                   <div className="flex flex-wrap items-end gap-2">
-                    <Field id={idPolozky} label="Surovina" className="flex-1 min-w-[12rem]">
+                    <Field id={idPolozky} label={t('Surovina')} className="flex-1 min-w-[12rem]">
                       <Select id={idPolozky} value={ing.itemId} disabled={!smiUpravit}
                         onChange={e => {
                           const next = itemById.get(e.target.value);
                           setIng(idx, { itemId: e.target.value, unit: UNITS[familyOf(next)][0].label });
                         }}>
-                        <option value="">Vyber ze skladu</option>
+                        <option value="">{t('Vyber ze skladu')}</option>
                         {items.filter((i: any) => i.archived !== true || String(i.id) === ing.itemId).map((i: any) => (
-                          <option key={i.id} value={i.id}>{i.archived === true ? `${i.name} (archivovaná)` : i.name}</option>
+                          <option key={i.id} value={i.id}>{i.archived === true ? t('{nazev} (archivovaná)', { nazev: i.name }) : i.name}</option>
                         ))}
                       </Select>
                     </Field>
-                    <Field id={`${idPolozky}-m`} label="Množství" className="w-full sm:w-28">
+                    <Field id={`${idPolozky}-m`} label={t('Množství')} className="w-full sm:w-28">
                       <Input id={`${idPolozky}-m`} inputMode="decimal" value={ing.amount} disabled={!smiUpravit}
                         onChange={e => setIng(idx, { amount: e.target.value })} placeholder="0,02" className="text-center font-semibold tabular-nums" />
                     </Field>
                     {opts.length > 1 && (
-                      <Segmented size="sm" ariaLabel={`Jednotka — ${item?.name ?? 'surovina'}`} value={ing.unit}
+                      <Segmented size="sm" ariaLabel={t('Jednotka — {nazev}', { nazev: item?.name ?? t('surovina') })} value={ing.unit}
                         options={opts.map(u => ({ id: u.label, label: u.label }))} onChange={u => smiUpravit && setIng(idx, { unit: u })} />
                     )}
                     {smiUpravit && (
-                      <Button variant="ghost" size="sm" iconOnly icon="close" className="tap-target" aria-label={`Odebrat surovinu ${item?.name ?? idx + 1}`}
+                      <Button variant="ghost" size="sm" iconOnly icon="close" className="tap-target" aria-label={t('Odebrat surovinu {nazev}', { nazev: item?.name ?? idx + 1 })}
                         onClick={() => setDraft(x => x && ({ ...x, ingredients: x.ingredients.filter((_, i) => i !== idx) }))} />
                     )}
                   </div>
                   {/* Díly položky — definované u ní, tady se jen vyberou. */}
                   {smiUpravit && item && Array.isArray(item.portions) && item.portions.length > 0 && (
-                    <div className="flex flex-wrap items-center gap-2" role="group" aria-label={`Díly — ${item.name}`}>
-                      <span className="t-meta">Díly:</span>
+                    <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t('Díly — {nazev}', { nazev: item.name })}>
+                      <span className="t-meta">{t('Díly:')}</span>
                       {item.portions.map((pt: any) => {
                         const active = Math.abs((num(ing.amount) * conv) / itemFactor(item) - Number(pt.amount)) < 1e-9;
                         return (
@@ -545,14 +553,14 @@ function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, 
                   {item && (
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 t-meta">
                       {num(ing.amount) > 0 && (y?.portions != null
-                        ? <span>Z balení ({Number(item.packageSize).toLocaleString('cs-CZ')} {item.contentUnit ?? item.unit}) vyjde <b className="font-semibold text-[#16181A] tabular-nums">{y.portions}×</b></span>
-                        : <span className="text-wait-ink">Chybí velikost balení — porce ani cenu nespočítám.</span>)}
-                      {y?.perPortion != null && <span>· surovina za porci <b className="font-semibold text-[#16181A] tabular-nums">{cena(y.perPortion)}</b></span>}
-                      {num(ing.amount) > 0 && y?.perPortion == null && !(Number(item.unitCost) > 0) && <span className="text-wait-ink">· chybí cena za balení</span>}
+                        ? <span>{t('Z balení ({velikost}) vyjde', { velikost: `${Number(item.packageSize).toLocaleString(LOCALE_PRO_JAZYK[jazyk])} ${item.contentUnit ?? item.unit}` })} <b className="font-semibold text-[#16181A] tabular-nums">{y.portions}×</b></span>
+                        : <span className="text-wait-ink">{t('Chybí velikost balení — porce ani cenu nespočítám.')}</span>)}
+                      {y?.perPortion != null && <span>{t('· surovina za porci')} <b className="font-semibold text-[#16181A] tabular-nums">{cena(y.perPortion)}</b></span>}
+                      {num(ing.amount) > 0 && y?.perPortion == null && !(Number(item.unitCost) > 0) && <span className="text-wait-ink">{t('· chybí cena za balení')}</span>}
                       {smiUpravit && (
                         <Button variant="ghost" size="sm" icon={editingItem === ing.itemId ? 'close' : 'pencil'} aria-expanded={editingItem === ing.itemId}
                           onClick={() => setEditingItem(editingItem === ing.itemId ? null : ing.itemId)}>
-                          {editingItem === ing.itemId ? 'Zavřít úpravu' : 'Upravit položku a díly'}
+                          {editingItem === ing.itemId ? t('Zavřít úpravu') : t('Upravit položku a díly')}
                         </Button>
                       )}
                     </div>
@@ -590,10 +598,10 @@ function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, 
             <div className="flex flex-wrap items-center gap-2">
               <Button variant="secondary" size="sm" icon="plus"
                 onClick={() => setDraft(x => x && ({ ...x, ingredients: [...x.ingredients, { itemId: '', amount: '', unit: 'ks' }] }))}>
-                Další surovina
+                {t('Další surovina')}
               </Button>
               <Button variant="ghost" size="sm" icon="box" onClick={() => setCreatingAt(draft.ingredients.findIndex(i => !i.itemId))}>
-                Založit novou surovinu
+                {t('Založit novou surovinu')}
               </Button>
             </div>
           ))}
@@ -601,21 +609,21 @@ function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, 
 
         {/* Souhrn: co to stojí, co z toho zbude, a uložení na dosah. */}
         <Card as="div" className="space-y-4 lg:sticky lg:top-4">
-          <Stat label="Suroviny na porci" value={totalCost > 0 ? money(totalCost) : '—'}
+          <Stat label={t('Suroviny na porci')} value={totalCost > 0 ? money(totalCost) : '—'}
             note={cost.missingPrice > 0
-              ? `chybí cena u ${czCount(cost.missingPrice, SUROVINA)} — součet je neúplný`
-              : totalCost > 0 ? 'podle cen ve skladu' : 'doplň množství a ceny balení'} />
+              ? t('chybí cena u {n, plural, one {# surovina} few {# suroviny} other {# surovin}} — součet je neúplný', { n: cost.missingPrice })
+              : totalCost > 0 ? t('podle cen ve skladu') : t('doplň množství a ceny balení')} />
 
           {menuPrice != null && (
             <Well className="space-y-1.5">
               <div className="flex items-baseline justify-between gap-2 text-sm">
-                <span className="text-black/55">Cena v kase</span>
+                <span className="text-black/55">{t('Cena v kase')}</span>
                 <span className="font-semibold tabular-nums text-[#16181A]">{money(menuPrice)}</span>
               </div>
               {margin != null && (
                 <>
                   <div className="flex items-baseline justify-between gap-2 text-sm">
-                    <span className="text-black/55">Zbyde na porci</span>
+                    <span className="text-black/55">{t('Zbyde na porci')}</span>
                     <span className="font-semibold tabular-nums text-[#16181A]">{money(menuPrice - cost.exact)}</span>
                   </div>
                   <div className="h-1.5 rounded-full bg-black/[0.06] overflow-hidden mt-1.5" aria-hidden>
@@ -623,7 +631,7 @@ function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, 
                       style={{ width: `${Math.max(0, Math.min(100, margin))}%` }} />
                   </div>
                   <p className={`text-[13px] font-semibold ${margin >= 65 ? 'text-ok-ink' : margin >= 45 ? 'text-wait-ink' : 'text-bad-ink'}`}>
-                    marže {margin} %
+                    {t('marže {n} %', { n: margin })}
                   </p>
                 </>
               )}
@@ -633,32 +641,32 @@ function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, 
           {err && <p className="note note-danger" role="alert">{err}</p>}
           {smiUpravit ? (
             <div className="space-y-2">
-              <Button variant="accent" className="w-full" loading={saving} onClick={() => save()}>Uložit recepturu</Button>
+              <Button variant="accent" className="w-full" loading={saving} onClick={() => save()}>{t('Uložit recepturu')}</Button>
               {draft.existing && (
-                <Button variant="danger" className="w-full" disabled={saving} onClick={() => setMazani(true)}>Smazat recepturu</Button>
+                <Button variant="danger" className="w-full" disabled={saving} onClick={() => setMazani(true)}>{t('Smazat recepturu')}</Button>
               )}
             </div>
           ) : (
-            <p className="t-meta">Recepturu mění jen ten, kdo smí receptury upravovat.</p>
+            <p className="t-meta">{t('Recepturu mění jen ten, kdo smí receptury upravovat.')}</p>
           )}
 
           {guide && (
             <a href={`/employer/overview?view=guides&guide=${guide.id}`} className="btn btn-secondary btn-sm w-full min-w-0">
               <Icon name="book" size={15} className="shrink-0" />
-              <span className="min-w-0 truncate">Návod: {guide.title}</span>
+              <span className="min-w-0 truncate">{t('Návod: {nazev}', { nazev: guide.title })}</span>
             </a>
           )}
 
-          <p className="t-meta">Uloženou recepturu odepisuje synchronizace s pokladnou po každém prodeji.</p>
+          <p className="t-meta">{t('Uloženou recepturu odepisuje synchronizace s pokladnou po každém prodeji.')}</p>
         </Card>
       </div>
 
-      <Modal open={mazani} onClose={() => setMazani(false)} size="sm" title="Smazat recepturu?"
+      <Modal open={mazani} onClose={() => setMazani(false)} size="sm" title={t('Smazat recepturu?')}
         footer={<>
-          <Button variant="secondary" onClick={() => setMazani(false)}>Zrušit</Button>
-          <Button variant="danger-solid" loading={saving} onClick={() => { setMazani(false); save(true); }}>Smazat recepturu</Button>
+          <Button variant="secondary" onClick={() => setMazani(false)}>{t('Zrušit')}</Button>
+          <Button variant="danger-solid" loading={saving} onClick={() => { setMazani(false); save(true); }}>{t('Smazat recepturu')}</Button>
         </>}>
-        <p className="t-meta">Prodeje „{draft.productName}" se pak ze skladu přestanou odepisovat, dokud recepturu znovu nesložíš.</p>
+        <p className="t-meta">{t('Prodeje „{nazev}" se pak ze skladu přestanou odepisovat, dokud recepturu znovu nesložíš.', { nazev: draft.productName })}</p>
       </Modal>
     </div>
   );

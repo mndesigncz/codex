@@ -21,6 +21,8 @@ import { Button, Input, ListRow } from '../ui';
 import { useResultKeys } from '@/lib/useResultKeys';
 import { okJson } from '@/lib/api';
 import { obsahuje } from '@/lib/hledani';
+import { tg } from '@/lib/i18n/stav';
+import { useT } from '@/lib/i18n/client';
 
 type GuideOption = { id: number; title: string; hasChecklist?: boolean; approved?: boolean; itemId?: number | null };
 
@@ -33,6 +35,7 @@ export default function ProductionGuideLink({ itemId, itemName, guideId, guideTi
   guideSteps: number;
   onChanged: () => void;
 }) {
+  const t = useT('sklad');
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [all, setAll] = useState<GuideOption[]>([]);
@@ -47,7 +50,7 @@ export default function ProductionGuideLink({ itemId, itemName, guideId, guideTi
     let alive = true;
     fetch('/api/guides').then(okJson).then(d => {
       if (alive && Array.isArray(d.guides)) setAll(d.guides);
-    }).catch(() => { if (alive) setErr('Návody se nenačetly.'); });
+    }).catch(() => { if (alive) setErr(t('Návody se nenačetly.')); });
     return () => { alive = false; };
   }, [open]);
 
@@ -67,11 +70,11 @@ export default function ProductionGuideLink({ itemId, itemName, guideId, guideTi
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        setErr(d.error || 'Uložení se nepodařilo.');
+        setErr(d.error ? tg(d.error) : t('Uložení se nepodařilo.'));
       } else {
         setOpen(false); setQuery(''); onChanged();
       }
-    } catch { setErr('Uložení se nepodařilo.'); }
+    } catch { setErr(t('Uložení se nepodařilo.')); }
     setBusy(false);
   };
 
@@ -80,29 +83,29 @@ export default function ProductionGuideLink({ itemId, itemName, guideId, guideTi
 
   return (
     <div role="group" aria-labelledby={popisek}>
-      <p id={popisek} className="field-label">Návod k výrobě (volitelné)</p>
+      <p id={popisek} className="field-label">{t('Návod k výrobě (volitelné)')}</p>
       {guideId ? (
         <div className="space-y-1.5">
           <ul className="list">
             <ListRow lead={<Icon name="book" size={16} className="text-black/40" />}
-              title={guideTitle ?? `Návod #${guideId}`} href={`?view=guides&guide=${guideId}`} chevron={false}
+              title={guideTitle ?? t('Návod #{id}', { id: guideId })} href={`?view=guides&guide=${guideId}`} chevron={false}
               actions={<Button variant="ghost" size="sm" iconOnly icon="close" disabled={busy}
-                aria-label="Zrušit vazbu na návod" onClick={() => uloz({ itemId: null }, guideId)} />} />
+                aria-label={t('Zrušit vazbu na návod')} onClick={() => uloz({ itemId: null }, guideId)} />} />
           </ul>
           <p className="t-meta">
             {guideSteps > 0
-              ? `Úkol „Vyrobit ${itemName}“ dostane ${guideSteps} kroků z tohohle návodu.`
-              : 'Návod nemá checklist — do úkolu půjde postup z pole níž. Doplň kroky v Návodech.'}
+              ? t('Úkol „Vyrobit {nazev}“ dostane {n} kroků z tohohle návodu.', { nazev: itemName, n: guideSteps })
+              : t('Návod nemá checklist — do úkolu půjde postup z pole níž. Doplň kroky v Návodech.')}
           </p>
         </div>
       ) : open ? (
         <div className="space-y-2">
           <Input ref={vstup} autoFocus value={query} onChange={e => setQuery(e.target.value)}
-            onKeyDown={keys.onInputKeyDown} aria-label="Hledat mezi návody"
-            placeholder="Hledat mezi návody…" />
+            onKeyDown={keys.onInputKeyDown} aria-label={t('Hledat mezi návody')}
+            placeholder={t('Hledat mezi návody…')} />
           {nalezene.length === 0 && (
             <p className="t-meta">
-              {all.length === 0 ? 'Zatím žádné návody — napiš ho v záložce Návody.' : 'Nic takového mezi návody není.'}
+              {all.length === 0 ? t('Zatím žádné návody — napiš ho v záložce Návody.') : t('Nic takového mezi návody není.')}
             </p>
           )}
           {nalezene.length > 0 && (
@@ -114,17 +117,17 @@ export default function ProductionGuideLink({ itemId, itemName, guideId, guideTi
                   className="w-full text-left px-1 py-2 hover:bg-black/[0.04] transition-colors disabled:opacity-50">
                   <span className="block text-sm text-[#16181A] truncate">{g.title}</span>
                   <span className="block text-[13px] text-black/55 truncate">
-                    {g.hasChecklist ? 'má checklist' : 'bez checklistu'}
-                    {g.approved === false ? ' · čeká na schválení' : ''}
+                    {g.hasChecklist ? t('má checklist') : t('bez checklistu')}
+                    {g.approved === false ? ` · ${t('čeká na schválení')}` : ''}
                   </span>
                 </button>
               ))}
             </div>
           )}
-          <Button variant="ghost" size="sm" onClick={() => { setOpen(false); setQuery(''); }}>Zrušit</Button>
+          <Button variant="ghost" size="sm" onClick={() => { setOpen(false); setQuery(''); }}>{t('Zrušit')}</Button>
         </div>
       ) : (
-        <Button variant="secondary" size="sm" icon="plus" onClick={() => setOpen(true)}>Připojit návod</Button>
+        <Button variant="secondary" size="sm" icon="plus" onClick={() => setOpen(true)}>{t('Připojit návod')}</Button>
       )}
       {err && <p className="note note-danger mt-1" role="alert">{err}</p>}
     </div>

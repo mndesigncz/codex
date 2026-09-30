@@ -16,6 +16,8 @@ import { ancestryOfId, flattenTree } from '@/lib/categoryTree';
 import { mergeDefaults, type ItemDefaults } from '@/lib/itemDefaults';
 import { okJson } from '@/lib/api';
 import { useOpravneni } from '../role/useOpravneni';
+import { tg } from '@/lib/i18n/stav';
+import { useT } from '@/lib/i18n/client';
 
 /** Číslo z pole, které snese i desetinnou čárku — „0,7" jinak spadne na nulu. */
 const dec = (v: string | number) => Number(String(v).replace(',', '.')) || 0;
@@ -36,6 +38,7 @@ const UNITS = ['ks', 'balení', 'l', 'kg', 'g', 'ml'];
 export default function NewStockEntry({
   variant = 'app', actingAs = null, initialCategoryId = null, onSaved, onCancel,
 }: Props) {
+  const t = useT('sklad');
   const big = variant === 'kiosk';
   // Kolo 67: nákupní cenu zapisuje jen ten, kdo smí upravovat ceny skladu —
   // server ji ostatním stejně zahodí (/api/inventory). Baristovi a tabletu se
@@ -101,8 +104,8 @@ export default function NewStockEntry({
       const res = await fetch('/api/upload', { method: 'POST', body: fd });
       const d = await res.json().catch(() => ({}));
       if (res.ok && d.url) setPhotoUrl(d.url);
-      else setErr(d.error || `Fotku se nepodařilo nahrát (HTTP ${res.status}).`);
-    } catch { setErr('Fotku se nepodařilo nahrát — zkontroluj připojení.'); }
+      else setErr(d.error ? tg(d.error) : t('Fotku se nepodařilo nahrát (HTTP {status}).', { status: res.status }));
+    } catch { setErr(t('Fotku se nepodařilo nahrát — zkontroluj připojení.')); }
     setUploading(false);
   };
 
@@ -117,7 +120,7 @@ export default function NewStockEntry({
    * název a množství. Tohle nechá to společné na místě a vyprázdní zbytek.
    */
   const save = async (keepOpen = false) => {
-    if (!name.trim()) { setErr('Napiš, co to je.'); return; }
+    if (!name.trim()) { setErr(t('Napiš, co to je.')); return; }
     setSaving(true); setErr('');
     const cat = flat.find(f => f.cat.id === categoryId)?.cat as any;
     try {
@@ -142,7 +145,7 @@ export default function NewStockEntry({
         }),
       });
       const d = await res.json().catch(() => ({}));
-      if (!res.ok) { setErr(d.error || 'Zápis se nepodařilo uložit.'); setSaving(false); return; }
+      if (!res.ok) { setErr(d.error ? tg(d.error) : t('Zápis se nepodařilo uložit.')); setSaving(false); return; }
       if (keepOpen) {
         setAdded(prev => [...prev, name.trim()]);
         // Kategorie, jednotka, dodavatel a značka zůstávají — z jedné bedny
@@ -155,7 +158,7 @@ export default function NewStockEntry({
         return;
       }
       onSaved?.();
-    } catch { setErr('Zápis se nepodařilo uložit — zkontroluj připojení.'); }
+    } catch { setErr(t('Zápis se nepodařilo uložit — zkontroluj připojení.')); }
     setSaving(false);
   };
 
@@ -182,20 +185,20 @@ export default function NewStockEntry({
           {uploading ? <span className="spinner spinner-sm" />
             : photoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={photoUrl} alt="Nová položka" className="h-full w-full object-cover" />
+              <img src={photoUrl} alt={t('Nová položka')} className="h-full w-full object-cover" />
             ) : <Icon name="camera" size={big ? 34 : 26} strokeWidth={1.7} />}
         </button>
         <div className="min-w-0 flex-1">
-          <label htmlFor="nova-vec-nazev" className={label}>Co to je?</label>
+          <label htmlFor="nova-vec-nazev" className={label}>{t('Co to je?')}</label>
           <input id="nova-vec-nazev" ref={nameRef} value={name} onChange={e => setName(e.target.value)} autoFocus
-            placeholder="Např. Sirup Mango 0,7 l" className={field} />
+            placeholder={t('Např. Sirup Mango 0,7 l')} className={field} />
         </div>
       </div>
 
       {/* Where it belongs */}
       {flat.length > 0 && (
         <div>
-          <p id="nova-vec-kategorie" className={label}>Kam to patří</p>
+          <p id="nova-vec-kategorie" className={label}>{t('Kam to patří')}</p>
           <div role="group" aria-labelledby="nova-vec-kategorie" className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
             {flat.map(({ cat, depth }: any) => (
               <button key={cat.id} type="button" onClick={() => pickCategory(cat.id)} aria-pressed={categoryId === cat.id}
@@ -203,7 +206,7 @@ export default function NewStockEntry({
                   categoryId === cat.id ? 'seg-on' : 'seg-off glass'}`}>
                 {depth > 0 && <span className="opacity-40">{'· '.repeat(depth)}</span>}{cat.name}
                 {/* Kategorie zdrojového podniku organizace — ať jde poznat od stejnojmenné vlastní. */}
-                {cat.zOrganizace && <span className="opacity-40"> · z organizace</span>}
+                {cat.zOrganizace && <span className="opacity-40"> {t('· z organizace')}</span>}
               </button>
             ))}
           </div>
@@ -212,20 +215,20 @@ export default function NewStockEntry({
 
       {/* How much came in */}
       <div>
-        <label htmlFor="nova-vec-mnozstvi" className={label}>Kolik toho je</label>
+        <label htmlFor="nova-vec-mnozstvi" className={label}>{t('Kolik toho je')}</label>
         {/* Na úzkém displeji se „− 140px + ks balení l kg g ml" do jednoho
             řádku nevejde: kiosk má velká tlačítka (2×56 px) a pevně široké
             pole, takže řádek roztáhl celou stránku a zapnul vodorovný scroll.
             Počítadlo drží řádek, jednotky se zalomí pod něj. */}
         <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="secondary" size={big ? 'lg' : 'md'} iconOnly icon="minus" aria-label="Ubrat" onClick={() => bump(-1)} />
+          <Button variant="secondary" size={big ? 'lg' : 'md'} iconOnly icon="minus" aria-label={t('Ubrat')} onClick={() => bump(-1)} />
           <input id="nova-vec-mnozstvi" inputMode="decimal" value={quantity}
             onChange={e => setQuantity(e.target.value)}
             className={`${field} text-center font-bold tabular-nums min-w-0 flex-1`}
             style={{ maxWidth: big ? 120 : 100 }} />
-          <Button variant="secondary" size={big ? 'lg' : 'md'} iconOnly icon="plus" aria-label="Přidat" onClick={() => bump(1)} />
+          <Button variant="secondary" size={big ? 'lg' : 'md'} iconOnly icon="plus" aria-label={t('Přidat')} onClick={() => bump(1)} />
           {/* Vybraná jednotka je inkoustová pilulka (DP §3.8), ne limetka. */}
-          <div role="group" aria-label="Jednotka" className="flex flex-wrap gap-1.5 min-w-0 basis-full sm:basis-0 sm:flex-1">
+          <div role="group" aria-label={t('Jednotka')} className="flex flex-wrap gap-1.5 min-w-0 basis-full sm:basis-0 sm:flex-1">
             {UNITS.map(u => (
               <button key={u} type="button" onClick={() => setUnit(u)} aria-pressed={unit === u}
                 className={`filter-pill tap-target-sm whitespace-nowrap ${big ? '!text-sm sm:!text-base sm:!px-4 sm:!py-2.5' : ''} ${unit === u ? 'seg-on' : 'seg-off glass'}`}>
@@ -239,37 +242,37 @@ export default function NewStockEntry({
       {/* Everything the shop can also fill in later */}
       <Button variant="ghost" size={big ? 'md' : 'sm'} iconAfter="chevron" aria-expanded={more}
         className={more ? '[&_svg]:rotate-180' : ''} onClick={() => setMore(m => !m)}>
-        {more ? 'Skrýt detaily' : 'Značka, cena, dodavatel…'}
+        {more ? t('Skrýt detaily') : t('Značka, cena, dodavatel…')}
       </Button>
       {more && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label htmlFor="nova-vec-znacka" className={label}>Značka</label>
-            <input id="nova-vec-znacka" value={brand} onChange={e => setBrand(e.target.value)} className={field} placeholder="Např. Monin" />
+            <label htmlFor="nova-vec-znacka" className={label}>{t('Značka')}</label>
+            <input id="nova-vec-znacka" value={brand} onChange={e => setBrand(e.target.value)} className={field} placeholder={t('Např. Monin')} />
           </div>
           <div>
-            <label htmlFor="nova-vec-baleni" className={label}>Velikost balení</label>
+            <label htmlFor="nova-vec-baleni" className={label}>{t('Velikost balení')}</label>
             <input id="nova-vec-baleni" inputMode="decimal" value={packageSize}
               onChange={e => setPackageSize(e.target.value)} className={field} placeholder="0,7" />
           </div>
           {smiCenu && (
             <div>
-              <label htmlFor="nova-vec-cena" className={label}>Cena za kus</label>
+              <label htmlFor="nova-vec-cena" className={label}>{t('Cena za kus')}</label>
               <input id="nova-vec-cena" inputMode="decimal" value={unitCost}
                 onChange={e => setUnitCost(e.target.value)} className={field} placeholder={symbol} />
             </div>
           )}
           <div>
-            <label htmlFor="nova-vec-dodavatel" className={label}>Odkud je</label>
-            <input id="nova-vec-dodavatel" value={supplier} onChange={e => setSupplier(e.target.value)} className={field} placeholder="Makro, dodavatel…" />
+            <label htmlFor="nova-vec-dodavatel" className={label}>{t('Odkud je')}</label>
+            <input id="nova-vec-dodavatel" value={supplier} onChange={e => setSupplier(e.target.value)} className={field} placeholder={t('Makro, dodavatel…')} />
           </div>
         </div>
       )}
 
       <div>
-        <label htmlFor="nova-vec-poznamka" className={label}>Poznámka pro vedení</label>
+        <label htmlFor="nova-vec-poznamka" className={label}>{t('Poznámka pro vedení')}</label>
         <input id="nova-vec-poznamka" value={note} onChange={e => setNote(e.target.value)} className={field}
-          placeholder="Např. přivezl dodavatel navíc, zkoušíme" />
+          placeholder={t('Např. přivezl dodavatel navíc, zkoušíme')} />
       </div>
 
       {err && <p className="note note-danger" role="alert">{err}</p>}
@@ -277,8 +280,8 @@ export default function NewStockEntry({
       {added.length > 0 && (
         <p className="note note-ok text-sm">
           <Icon name="check" size={15} className="inline -mt-0.5 mr-1.5" />
-          Zapsáno {added.length === 1 ? '' : `${added.length}×`}: {added.slice(-3).reverse().join(', ')}
-          {added.length > 3 ? ` a ${added.length - 3} další` : ''}
+          {added.length === 1 ? t('Zapsáno: {nazvy}', { nazvy: added.slice(-3).reverse().join(', ') }) : t('Zapsáno {n}×: {nazvy}', { n: added.length, nazvy: added.slice(-3).reverse().join(', ') })}
+          {added.length > 3 ? ` ${t('a {n} další', { n: added.length - 3 })}` : ''}
         </p>
       )}
 
@@ -286,20 +289,20 @@ export default function NewStockEntry({
         {/* Potvrzení formuláře je `primary` (DP §3.1) — dřív ručně psaná tmavá pilulka. */}
         <Button type="submit" variant="primary" size={big ? 'lg' : 'md'} className="flex-1 min-w-[10rem] justify-center"
           loading={saving} disabled={uploading || !name.trim()}>
-          {added.length > 0 ? 'Zapsat a zavřít' : 'Zapsat do skladu'}
+          {added.length > 0 ? t('Zapsat a zavřít') : t('Zapsat do skladu')}
         </Button>
         <Button variant="secondary" size={big ? 'lg' : 'md'} icon="plus" disabled={saving || uploading || !name.trim()}
-          title="Uloží a nechá kategorii, jednotku i dodavatele nastavené" onClick={() => save(true)}>
-          Uložit a přidat další
+          title={t('Uloží a nechá kategorii, jednotku i dodavatele nastavené')} onClick={() => save(true)}>
+          {t('Uložit a přidat další')}
         </Button>
         {onCancel && (
-          <Button variant="ghost" size={big ? 'lg' : 'md'} disabled={saving} onClick={onCancel}>Zrušit</Button>
+          <Button variant="ghost" size={big ? 'lg' : 'md'} disabled={saving} onClick={onCancel}>{t('Zrušit')}</Button>
         )}
       </div>
       <p className="t-meta">
         {ma('sklad.pridat')
-          ? 'Věc se hned objeví ve skladu s množstvím, které jsi zapsal/a.'
-          : 'Věc se hned objeví ve skladu s množstvím, které jsi zapsal/a. Vedení ji jen potvrdí.'}
+          ? t('Věc se hned objeví ve skladu s množstvím, které jsi zapsal/a.')
+          : t('Věc se hned objeví ve skladu s množstvím, které jsi zapsal/a. Vedení ji jen potvrdí.')}
       </p>
     </form>
   );

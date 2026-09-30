@@ -6,9 +6,7 @@
 
 import { Icon } from '../Icons';
 import { Chip } from '../ui';
-import { czForm, POLOZKA } from '@/lib/czech';
-
-const pluralPolozka = (n: number) => czForm(n, POLOZKA);
+import { useT } from '@/lib/i18n/client';
 import {
   ancestryOfId, childrenOfId, findById, scopeIds, type CategoryNode,
 } from '@/lib/categoryTree';
@@ -37,8 +35,10 @@ export interface CategoryNavProps<T extends CategoryNode> {
 
 export default function CategoryNav<T extends CategoryNode>({
   categories, current, onNavigate, countOf, alertOf,
-  size = 'normal', rootLabel = 'Vše', extraRoots = [], onNavigateOrphan, condensed = false,
+  size = 'normal', rootLabel: rootLabelProp, extraRoots = [], onNavigateOrphan, condensed = false,
 }: CategoryNavProps<T>) {
+  const t = useT('sklad');
+  const rootLabel = rootLabelProp ?? t('Vše');
   const trail = ancestryOfId(categories, current);
   const level = childrenOfId(categories, current);
 
@@ -141,13 +141,13 @@ export default function CategoryNav<T extends CategoryNode>({
                 <span className="min-w-0 flex-1">
                   <span className={`block t-card truncate ${touch ? '!text-base' : ''}`}>{c.name}</span>
                   <span className="block t-meta truncate">
-                    {count !== null && <>{count} {pluralPolozka(count)}</>}
-                    {kids > 0 && <>{count !== null ? ' · ' : ''}{kids} podkat.</>}
+                    {count !== null && <>{t('{n, plural, one {# položka} few {# položky} other {# položek}}', { n: count })}</>}
+                    {kids > 0 && <>{count !== null ? ' · ' : ''}{t('{n} podkat.', { n: kids })}</>}
                     {/* Na úzké dlaždici místo chipu jen jantarový počet v řádku. */}
-                    {alerts > 0 && !touch && <span className="sm:hidden text-wait-ink font-semibold"> · {alerts} dochází</span>}
+                    {alerts > 0 && !touch && <span className="sm:hidden text-wait-ink font-semibold"> · {t('{n} dochází', { n: alerts })}</span>}
                   </span>
                 </span>
-                {alerts > 0 && <Chip tone="wait" size="sm" className={`shrink-0 ${touch ? '' : 'hidden sm:inline-flex'}`}>{alerts} dochází</Chip>}
+                {alerts > 0 && <Chip tone="wait" size="sm" className={`shrink-0 ${touch ? '' : 'hidden sm:inline-flex'}`}>{t('{n} dochází', { n: alerts })}</Chip>}
                 <Icon name="chevronRight" size={touch ? 18 : 15} className={`text-black/40 shrink-0 ${touch ? '' : 'hidden sm:block'}`} />
               </button>
             );
@@ -164,7 +164,7 @@ export default function CategoryNav<T extends CategoryNode>({
               </span>
               <span className="min-w-0 flex-1">
                 <span className={`block t-card truncate ${touch ? '!text-base' : ''}`}>{name}</span>
-                <span className="block t-meta">Bez kategorie</span>
+                <span className="block t-meta">{t('Bez kategorie')}</span>
               </span>
               <Icon name="chevronRight" size={touch ? 18 : 15} className="text-black/40 shrink-0" />
             </button>

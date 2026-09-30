@@ -160,6 +160,6 @@ export default function ({ eq, ok }: Testy) {
     && !kod('components/TaskChecklist.tsx').includes('tap-target-sm') && /<TaskChecklist velky/.test(kod('components/kiosk/KioskTasks.tsx')));
   ok('zdrojáky B6a: fronta ke schválení bez primary tlačítka, Vrátit v menu řádku', !/variant="primary"/.test(kod('components/widgety/oblasti/planovani.tsx'))
     && /Vrátit do Rozpracováno/.test(kod('components/widgety/oblasti/planovani.tsx')));
-  ok('zdrojáky B6a: týdenní tabule má přesun i bez tažení (tlačítko + okno s volbou dne)', /na jiný den/.test(kod('components/TaskWeekBoard.tsx')) && /<Modal\b/.test(kod('components/TaskWeekBoard.tsx')) && /title="Přesunout úkol"/.test(kod('components/TaskWeekBoard.tsx')));
+  ok('zdrojáky B6a: týdenní tabule má přesun i bez tažení (tlačítko + okno s volbou dne)', /na jiný den/.test(kod('components/TaskWeekBoard.tsx')) && /<Modal\b/.test(kod('components/TaskWeekBoard.tsx')) && /title=(?:"Přesunout úkol"|\{t\('Přesunout úkol'\)\})/.test(kod('components/TaskWeekBoard.tsx')));
   ok('API úkolů vrací completedAt (widget Splněno dnes)', /completedAt:\s*r\.completed_at/.test(kod('app/api/tasks/route.ts')));
 }
