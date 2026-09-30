@@ -94,6 +94,8 @@ const cekejNaBublinu = (p, re) => p.waitForFunction(
   tvrdi('L3 po kliknutí přejde coach na další krok (Potvrdit a uložit)', await cekejNaBublinu(p, /potvrdíš/));
   tvrdi('L3 reakce na demo-akce: „Návrh rozvrhu je hotový" ve role=status', /Návrh rozvrhu je hotový/.test(await status(p)), await status(p));
   await vr.getByRole('button', { name: 'Potvrdit a uložit' }).click();
+  // Ukazatel musí krok nejdřív zaměřit; člověk klikne až poté, sonda je rychlejší než 250ms tik (na CI to byl závod).
+  await cekejNaBublinu(p, /tým ho uvidí/);
   await vr.getByRole('button', { name: /^Publikovat$/ }).first().click();
   await p.waitForFunction(() => /zveřejněný/.test(document.querySelector('section[aria-label^="Ukázka aplikace"] [role="status"]')?.textContent ?? ''), null, { timeout: 8000 })
     .then(() => tvrdi('L3 po publikaci stránka řekne „Rozvrh je zveřejněný, tým ho má v telefonu"', true))
