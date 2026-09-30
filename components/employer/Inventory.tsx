@@ -44,7 +44,6 @@ import StocktakeModal from '../inventory/Stocktake';
 import ItemRecipeLinks from '../inventory/ItemRecipeLinks';
 import ProductionRecipe from '../inventory/ProductionRecipe';
 import { useMoney, usePrice, useSymbol } from '../CurrencyProvider';
-import { czForm, czCount, czVerb, POLOZKA } from '@/lib/czech';
 import { okJson } from '@/lib/api';
 import { openPrint, esc } from '@/lib/printDoc';
 import { obsahujeNekde } from '@/lib/hledani';
@@ -57,15 +56,13 @@ import { useOpravneni } from '../role/useOpravneni';
 import {
   KLIC_NAKUP, KLIC_UPRAVIT, UDALOST_NAKUP, UDALOST_UPRAVIT, hodnotaZasob, navrhMnozstvi,
 } from '@/lib/skladPrehled';
+import { useT, type PrekladFn } from '@/lib/i18n/client';
+import { useLocale } from './jazyk';
 
 const URL_SKLAD = '/api/inventory';
 const URL_KATEGORIE = '/api/inventory/categories';
 
-const pluralPolozka = (n: number) => czForm(n, POLOZKA);
-// „kategorie" má po číslovce tvar kategorie/kategorie/kategorií (KATEGORIE
-// v lib/czech je 4. pád „1 kategorii" pro věty typu „vybral jsi").
-const pocetKategorii = (n: number) => czCount(n, { one: 'kategorie', few: 'kategorie', many: 'kategorií' });
-const OBJEDNAVKA = { one: 'objednávka', few: 'objednávky', many: 'objednávek' };
+
 
 interface Item {
   id: number;
@@ -124,7 +121,6 @@ type View = 'list' | 'grid';
 
 // Výchozí kategorie musí dávat smysl kavárně, restauraci i čajovně —
 // proto obecné skupiny, ne konkrétní sortiment.
-const DEFAULT_CATEGORIES = ['Nápoje', 'Suroviny', 'Nádobí', 'Drogerie'];
 const inputClass = 'field';
 /** Číslo z pole, které snese i desetinnou čárku. V poli type="number"
  *  se „0,7" zahodí na prázdno — a velikost balení pak tiše zmizí. */
@@ -133,12 +129,12 @@ const dec = (v: string | number) => Number(String(v).replace(',', '.')) || 0;
 const emptyForm = { name: '', categoryId: null as number | null, quantity: '10', minQuantity: '5', criticalQuantity: '2', maxQuantity: '50', unit: 'ks', supplier: '', supplierUrl: '', unitCost: '', brand: '', description: '', packageSize: '', contentUnit: '', openAmount: '', portions: [] as { name: string; amount: string }[], archived: false, hideFromOverview: false, highlight: '' };
 
 // Popisky řazení slovy — šipky ↑↓ a „A→Z" v textu nahrazovaly ikonu (DP §6.8).
-const SORTS: { key: SortKey; label: string }[] = [
-  { key: 'name', label: 'Podle názvu' },
-  { key: 'qtyAsc', label: 'Od nejmenšího množství' },
-  { key: 'qtyDesc', label: 'Od největšího množství' },
-  { key: 'status', label: 'Podle stavu' },
-  { key: 'updated', label: 'Naposledy upraveno' },
+const razeni = (t: PrekladFn): { key: SortKey; label: string }[] => [
+  { key: 'name', label: t('Podle názvu') },
+  { key: 'qtyAsc', label: t('Od nejmenšího množství') },
+  { key: 'qtyDesc', label: t('Od největšího množství') },
+  { key: 'status', label: t('Podle stavu') },
+  { key: 'updated', label: t('Naposledy upraveno') },
 ];
 
 // Packaged categories decide what the thresholds are counted in, so the status
@@ -155,30 +151,31 @@ const STAV_CHIP: Record<'ok' | 'low' | 'critical', 'ok' | 'wait' | 'bad'> = { ok
 // (lib/skladPrehled.ts navrhMnozstvi) — dřív si ho počítal každý sám.
 const suggestedAmount = (i: Item): number => navrhMnozstvi(i);
 
-function relTime(iso?: string) {
+function relTime(iso: string | undefined, t: PrekladFn, loc: string) {
   if (!iso) return '';
   const d = new Date(iso).getTime();
   if (isNaN(d)) return '';
   const diff = Date.now() - d;
   const min = Math.round(diff / 60000);
-  if (min < 1) return 'právě teď';
-  if (min < 60) return `před ${min} min`;
+  if (min < 1) return t('právě teď');
+  if (min < 60) return t('před {n} min', { n: min });
   const h = Math.round(min / 60);
-  if (h < 24) return `před ${h} h`;
+  if (h < 24) return t('před {n} h', { n: h });
   const days = Math.round(h / 24);
-  if (days < 30) return `před ${days} d`;
-  return new Date(iso).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' });
+  if (days < 30) return t('před {n} d', { n: days });
+  return new Date(iso).toLocaleDateString(loc, { day: 'numeric', month: 'numeric' });
 }
 
 /** Potvrzení nevratné akce — místo confirm() (DP §3.10, audit: 8× confirm v tomhle souboru). */
 interface Potvrzeni { titulek: string; text: string; akce: string; provest: () => Promise<void> | void }
 
 function OknoPotvrzeni({ p, onZavrit }: { p: Potvrzeni; onZavrit: () => void }) {
+  const t = useT('sprava');
   const [pracuji, setPracuji] = useState(false);
   return (
     <Modal open onClose={onZavrit} size="sm" title={p.titulek}
       footer={<>
-        <Button variant="secondary" onClick={onZavrit}>Zrušit</Button>
+        <Button variant="secondary" onClick={onZavrit}>{t('Zrušit')}</Button>
         <Button variant="danger-solid" loading={pracuji} onClick={async () => {
           setPracuji(true);
           try { await p.provest(); } finally { setPracuji(false); onZavrit(); }
@@ -192,6 +189,8 @@ function OknoPotvrzeni({ p, onZavrit }: { p: Potvrzeni; onZavrit: () => void }) 
 export default function Inventory({ initialCategory, onNavigate }: {
   user?: any; initialCategory?: string; onNavigate?: (view: string, arg?: string) => void;
 }) {
+  const loc = useLocale();
+  const t = useT('sprava');
   const smi = useSmi();
   // Položky a kategorie přes sdílenou mezipaměť widgetů (viz hlavička souboru).
   const sklad = useDataWidgetu<Item[]>(URL_SKLAD, raw => (Array.isArray(raw) ? raw : []));
@@ -601,7 +600,7 @@ export default function Inventory({ initialCategory, onNavigate }: {
     // Cena smí mít haléře (4,99 €); co cenou není, se nesmí tiše uložit jako
     // nula — dřív parseInt z „4,99" udělal 4 a z „abc" nulu.
     const cena = cenaZFormulare(form.unitCost);
-    if (!cena.ok) { setFormErr('Cena musí být číslo, třeba 4,99.'); return; }
+    if (!cena.ok) { setFormErr(t('Cena musí být číslo, třeba 4,99.')); return; }
     setSaving(true);
     const payload = {
       name: form.name,
@@ -629,16 +628,16 @@ export default function Inventory({ initialCategory, onNavigate }: {
         : await fetch(URL_SKLAD, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (res.ok) {
         setShowForm(false);
-        showNotice(editing ? 'Položka uložena.' : 'Položka přidána.');
+        showNotice(editing ? t('Položka uložena.') : t('Položka přidána.'));
         await load();
       } else {
         // Keep the form open with what was typed — closing it would look like
         // a successful save and quietly lose the work.
         const d = await res.json().catch(() => ({}));
-        setFormErr(d.error || 'Položku se nepodařilo uložit.');
+        setFormErr(d.error || t('Položku se nepodařilo uložit.'));
       }
     } catch {
-      setFormErr('Nepodařilo se spojit se serverem.');
+      setFormErr(t('Nepodařilo se spojit se serverem.'));
     }
     setSaving(false);
   };
@@ -652,7 +651,7 @@ export default function Inventory({ initialCategory, onNavigate }: {
     } catch {
       // Put the old number back — a stepper that lies is worse than one that fails.
       setItems(prev => prev.map(x => x.id === i.id ? { ...x, quantity: i.quantity } : x));
-      showNotice('Množství se nepodařilo uložit.', 'bad');
+      showNotice(t('Množství se nepodařilo uložit.'), 'bad');
     }
   };
 
@@ -668,7 +667,7 @@ export default function Inventory({ initialCategory, onNavigate }: {
     } catch {
       // I HTTP chyba (ne jen síť): vrať stav zpět, ať UI neukazuje odmítnutou změnu.
       setItems(prev => prev.map(x => x.id === i.id ? { ...x, archived: !archived } : x));
-      showNotice(archived ? 'Zaparkování se nepodařilo.' : 'Odparkování se nepodařilo.', 'bad');
+      showNotice(archived ? t('Zaparkování se nepodařilo.') : t('Odparkování se nepodařilo.'), 'bad');
     }
   };
 
@@ -678,7 +677,7 @@ export default function Inventory({ initialCategory, onNavigate }: {
     setItems(prev => prev.map(x => x.id === updated.id ? { ...x, ...updated } : x));
   // Selhání odpisu se u vedení dřív spolklo (na rozdíl od kiosku a zaměstnance):
   // tlačítko se odemklo, číslo se nezměnilo a nikdo nevěděl, jestli je odepsáno.
-  const onConsumeFail = () => showNotice('Odpis se nepodařilo uložit. Zkontroluj připojení a zkus to znovu.', 'bad');
+  const onConsumeFail = () => showNotice(t('Odpis se nepodařilo uložit. Zkontroluj připojení a zkus to znovu.'), 'bad');
 
   const toggleSelected = (id: number) =>
     setSelected(prev => {
@@ -699,15 +698,15 @@ export default function Inventory({ initialCategory, onNavigate }: {
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        showNotice(d.error || 'Hromadnou úpravu se nepodařilo uložit.', 'bad');
+        showNotice(d.error || t('Hromadnou úpravu se nepodařilo uložit.'), 'bad');
         return false;
       }
       const d = await res.json().catch(() => ({}));
       await load();
-      showNotice(`Upraveno: ${czCount(d.count ?? ids.length, POLOZKA)}.`);
+      showNotice(`Upraveno: ${t('{n, plural, one {# položka} few {# položky} other {# položek}}', { n: d.count ?? ids.length })}.`);
       return true;
     } catch {
-      showNotice('Nepodařilo se spojit se serverem.', 'bad');
+      showNotice(t('Nepodařilo se spojit se serverem.'), 'bad');
       return false;
     }
   };
@@ -716,9 +715,9 @@ export default function Inventory({ initialCategory, onNavigate }: {
     const ids = Array.from(selected);
     if (ids.length === 0) return;
     setPotvrzeni({
-      titulek: `Smazat ${czCount(ids.length, POLOZKA)}?`,
-      text: 'Položky zmizí ze skladu i z historie. Tohle nejde vrátit — jestli je jen teď nevedete, odlož je.',
-      akce: 'Smazat',
+      titulek: t('Smazat {n, plural, one {# položka} few {# položky} other {# položek}}?', { n: ids.length }),
+      text: t('Položky zmizí ze skladu i z historie. Tohle nejde vrátit — jestli je jen teď nevedete, odlož je.'),
+      akce: t('Smazat'),
       provest: async () => {
         try {
           const res = await fetch('/api/inventory/bulk', {
@@ -728,19 +727,19 @@ export default function Inventory({ initialCategory, onNavigate }: {
           if (res.ok) {
             setItems(prev => prev.filter(x => !ids.includes(x.id)));
             exitSelection();
-            showNotice(`Smazáno: ${czCount(ids.length, POLOZKA)}.`);
+            showNotice(t('Smazáno: {n, plural, one {# položka} few {# položky} other {# položek}}.', { n: ids.length }));
             await load();
-          } else showNotice('Smazání se nepodařilo.', 'bad');
-        } catch { showNotice('Nepodařilo se spojit se serverem.', 'bad'); }
+          } else showNotice(t('Smazání se nepodařilo.'), 'bad');
+        } catch { showNotice(t('Nepodařilo se spojit se serverem.'), 'bad'); }
       },
     });
   };
 
   const remove = (i: Item) => {
     setPotvrzeni({
-      titulek: `Smazat „${i.name}"?`,
-      text: 'Položka zmizí ze skladu i z historie. Jestli ji jen teď nevedete, odlož ji — jde vrátit jedním klepnutím.',
-      akce: 'Smazat položku',
+      titulek: t('Smazat „{nazev}"?', { nazev: i.name }),
+      text: t('Položka zmizí ze skladu i z historie. Jestli ji jen teď nevedete, odlož ji — jde vrátit jedním klepnutím.'),
+      akce: t('Smazat položku'),
       provest: async () => {
         setItems(prev => prev.filter(x => x.id !== i.id));
         try {
@@ -749,7 +748,7 @@ export default function Inventory({ initialCategory, onNavigate }: {
           await load();
         } catch {
           setItems(prev => [...prev, i].sort((a, b) => a.name.localeCompare(b.name, 'cs')));
-          showNotice('Položku se nepodařilo smazat.', 'bad');
+          showNotice(t('Položku se nepodařilo smazat.'), 'bad');
         }
       },
     });
@@ -758,29 +757,29 @@ export default function Inventory({ initialCategory, onNavigate }: {
   // ---- Hlavička ----
   const noveHlaseni = reports.filter(r => r.status !== 'done').length;
   const menu: MenuItem[] = [
-    ...(toBuy.length > 0 ? [{ label: `Nakoupit (${toBuy.length})`, icon: 'cart', onClick: () => { setShoppingSupplier(null); setShowShopping(true); },
-      hint: 'Nákupní seznam z položek pod limitem.' }] : []),
-    ...(smiUpravit || smiMazat ? [{ label: 'Vybrat víc položek', icon: 'check', onClick: () => setSelecting(true) }] : []),
-    ...(smiKategorie ? [{ label: 'Kategorie a balení', icon: 'settings', onClick: () => setShowCats(true) }] : []),
-    ...(smiDodavatele ? [{ label: 'Dodavatelé', icon: 'users', onClick: () => setShowSuppliers(true) }] : []),
-    ...(smiInventura ? [{ label: 'Inventura', icon: 'clipboard', onClick: () => setShowStocktake(true),
-      hint: 'Přepočítat sklad a zapsat rozdíly.' }] : []),
+    ...(toBuy.length > 0 ? [{ label: t('Nakoupit ({n})', { n: toBuy.length }), icon: 'cart', onClick: () => { setShoppingSupplier(null); setShowShopping(true); },
+      hint: t('Nákupní seznam z položek pod limitem.') }] : []),
+    ...(smiUpravit || smiMazat ? [{ label: t('Vybrat víc položek'), icon: 'check', onClick: () => setSelecting(true) }] : []),
+    ...(smiKategorie ? [{ label: t('Kategorie a balení'), icon: 'settings', onClick: () => setShowCats(true) }] : []),
+    ...(smiDodavatele ? [{ label: t('Dodavatelé'), icon: 'users', onClick: () => setShowSuppliers(true) }] : []),
+    ...(smiInventura ? [{ label: t('Inventura'), icon: 'clipboard', onClick: () => setShowStocktake(true),
+      hint: t('Přepočítat sklad a zapsat rozdíly.') }] : []),
     ...(archivedCount > 0 || showArchived ? [{
-      label: showArchived ? 'Zpět na aktivní sklad' : `Momentálně nevedeme (${archivedCount})`, icon: 'archive',
+      label: showArchived ? t('Zpět na aktivní sklad') : t('Momentálně nevedeme ({n})', { n: archivedCount }), icon: 'archive',
       onClick: () => setShowArchived(v => !v),
     }] : []),
     // Párování s kasou má vlastní obrazovku — dvě místa na jednu věc
     // byla hlavní důvod, proč to působilo krkolomně.
-    ...(smiReceptury && onNavigate ? [{ label: 'Receptury a prodeje z kasy', icon: 'card', onClick: () => onNavigate('recipes') }] : []),
+    ...(smiReceptury && onNavigate ? [{ label: t('Receptury a prodeje z kasy'), icon: 'card', onClick: () => onNavigate('recipes') }] : []),
     ...(smiHlaseni && reports.length > 0 ? [{
-      label: noveHlaseni > 0 ? `Hlášení od týmu (${noveHlaseni} nových)` : 'Hlášení od týmu',
+      label: noveHlaseni > 0 ? t('Hlášení od týmu ({n} nových)', { n: noveHlaseni }) : t('Hlášení od týmu'),
       icon: 'inbox', onClick: () => setShowReports(true),
     }] : []),
   ];
 
   const subtitle = <>
-    {czCount(active.length, POLOZKA)}
-    {hodnota > 0 ? <> · hodnota zásob <span className="font-semibold text-[#16181A]">{money(hodnota)}</span></> : ' · přidávej položky a hlídej limity'}
+    {t('{n, plural, one {# položka} few {# položky} other {# položek}}', { n: active.length })}
+    {hodnota > 0 ? <> · {t('hodnota zásob')} <span className="font-semibold text-[#16181A]">{money(hodnota)}</span></> : ` · ${t('přidávej položky a hlídej limity')}`}
   </>;
 
   // Obsah lišty ve dvou podobách (viz hlídač výš). Hledání sdílí stav,
@@ -796,27 +795,27 @@ export default function Inventory({ initialCategory, onNavigate }: {
           <SearchField
             className="flex-1 min-w-0"
             value={search} onChange={setSearch}
-            placeholder={kompakt ? 'Hledat ve skladu…' : 'Hledat položku nebo dodavatele…'}
-            ariaLabel="Hledat ve skladu"
+            placeholder={kompakt ? t('Hledat ve skladu…') : t('Hledat položku nebo dodavatele…')}
+            ariaLabel={t('Hledat ve skladu')}
             storageKey="inventory"
             suggestions={[
-              ...categories.map(c => ({ label: c.name, hint: 'kategorie' })),
-              ...Array.from(new Set(items.map(i => (i.supplier ?? '').trim()).filter(Boolean))).slice(0, 6).map(sp => ({ label: sp, hint: 'dodavatel' })),
+              ...categories.map(c => ({ label: c.name, hint: t('kategorie') })),
+              ...Array.from(new Set(items.map(i => (i.supplier ?? '').trim()).filter(Boolean))).slice(0, 6).map(sp => ({ label: sp, hint: t('dodavatel') })),
             ]}
             inputClassName={kompakt ? '!py-2' : ''}
           />
           <div className="flex items-center gap-2 shrink-0 min-w-0">
-            {selecting && <Button variant="secondary" size={kompakt ? 'sm' : 'md'} onClick={exitSelection}>Zrušit výběr</Button>}
+            {selecting && <Button variant="secondary" size={kompakt ? 'sm' : 'md'} onClick={exitSelection}>{t('Zrušit výběr')}</Button>}
             {kompakt ? (
               <Button variant="secondary" iconOnly icon={view === 'list' ? 'grid' : 'menu'}
-                aria-label={view === 'list' ? 'Zobrazit jako karty' : 'Zobrazit jako seznam'}
+                aria-label={view === 'list' ? t('Zobrazit jako karty') : t('Zobrazit jako seznam')}
                 onClick={() => setView(view === 'list' ? 'grid' : 'list')} />
             ) : (
-              <Segmented ariaLabel="Zobrazení" size="sm" value={view} onChange={setView}
-                options={[{ id: 'list', label: 'Seznam', icon: 'menu' }, { id: 'grid', label: 'Karty', icon: 'grid' }]} />
+              <Segmented ariaLabel={t('Zobrazení')} size="sm" value={view} onChange={setView}
+                options={[{ id: 'list', label: t('Seznam'), icon: 'menu' }, { id: 'grid', label: t('Karty'), icon: 'grid' }]} />
             )}
-            <Menu label={`Řadit: ${SORTS.find(s => s.key === sort)?.label ?? ''}`} icon="swap"
-              items={SORTS.map(s => ({ label: s.label, icon: s.key === sort ? 'check' : undefined, onClick: () => setSort(s.key) }))} />
+            <Menu label={t('Řadit: {druh}', { druh: razeni(t).find(s => s.key === sort)?.label ?? '' })} icon="swap"
+              items={razeni(t).map(s => ({ label: s.label, icon: s.key === sort ? 'check' : undefined, onClick: () => setSort(s.key) }))} />
           </div>
         </div>
         <CategoryNav
@@ -850,18 +849,18 @@ export default function Inventory({ initialCategory, onNavigate }: {
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="t-meta">
-          {czCount(filtered.length, POLOZKA)}
+          {t('{n, plural, one {# položka} few {# položky} other {# položek}}', { n: filtered.length })}
           {orphanCat ? ` v „${orphanCat}"` : catId != null ? ` v „${pathOfId(categories, catId)}"` : ''}
-          {catId != null && subCats.length > 0 ? ' včetně podkategorií' : ''}
-          {showArchived ? ' · momentálně nevedeme' : ''}
+          {catId != null && subCats.length > 0 ? ` ${t('včetně podkategorií')}` : ''}
+          {showArchived ? ` · ${t('momentálně nevedeme')}` : ''}
         </p>
         {showArchived && (
-          <Button variant="secondary" size="sm" onClick={() => setShowArchived(false)}>Zpět na aktivní sklad</Button>
+          <Button variant="secondary" size="sm" onClick={() => setShowArchived(false)}>{t('Zpět na aktivní sklad')}</Button>
         )}
       </div>
 
       {sklad.error && !sklad.data ? (
-        <Card><ErrorState compact title="Sklad se nenačetl" onRetry={sklad.reload} detail={sklad.error} /></Card>
+        <Card><ErrorState compact title={t('Sklad se nenačetl')} onRetry={sklad.reload} detail={sklad.error} /></Card>
       ) : loading ? (
         <Card aria-busy className="space-y-2">
           <Skeleton className="h-12" /><Skeleton className="h-12" /><Skeleton className="h-12" /><Skeleton className="h-12 w-2/3" />
@@ -869,12 +868,12 @@ export default function Inventory({ initialCategory, onNavigate }: {
       ) : filtered.length === 0 ? (
         <Card>
           {items.length === 0 ? (
-            <EmptyState compact illustration="sklad" title="Sklad je zatím prázdný"
-              hint="Přidej první položku — pak tu uvidíš, co dochází, a nákupní seznam se sestaví sám."
-              action={smiPridat ? <Button variant="secondary" icon="plus" onClick={openNew}>Přidat položku</Button> : undefined} />
+            <EmptyState compact illustration="sklad" title={t('Sklad je zatím prázdný')}
+              hint={t('Přidej první položku — pak tu uvidíš, co dochází, a nákupní seznam se sestaví sám.')}
+              action={smiPridat ? <Button variant="secondary" icon="plus" onClick={openNew}>{t('Přidat položku')}</Button> : undefined} />
           ) : (
-            <EmptyState compact icon="search" title="Nic neodpovídá filtru"
-              hint={search ? 'Zkus hledat jinak, nebo vyber jinou kategorii.' : 'V téhle kategorii zatím nic není.'} />
+            <EmptyState compact icon="search" title={t('Nic neodpovídá filtru')}
+              hint={search ? t('Zkus hledat jinak, nebo vyber jinou kategorii.') : t('V téhle kategorii zatím nic není.')} />
           )}
         </Card>
       ) : packagedCat ? (
@@ -908,14 +907,14 @@ export default function Inventory({ initialCategory, onNavigate }: {
       <PlochaWidgetu
         stranka="vedeni.sklad"
         hlavicka={{
-          title: 'Sklad',
+          title: t('Sklad'),
           subtitle,
           hintId: 'inventory',
           secondary: toBuy.length > 0
-            ? <Button variant="secondary" icon="cart" onClick={() => { setShoppingSupplier(null); setShowShopping(true); }}>Nakoupit ({toBuy.length})</Button>
+            ? <Button variant="secondary" icon="cart" onClick={() => { setShoppingSupplier(null); setShowShopping(true); }}>{t('Nakoupit ({n})', { n: toBuy.length })}</Button>
             : undefined,
           menu,
-          primary: smiPridat ? <Button variant="accent" icon="plus" onClick={openNew}>Přidat položku</Button> : undefined,
+          primary: smiPridat ? <Button variant="accent" icon="plus" onClick={openNew}>{t('Přidat položku')}</Button> : undefined,
         }}
         nastroj={nastroj}
       />
@@ -925,11 +924,11 @@ export default function Inventory({ initialCategory, onNavigate }: {
       {/* Formulář položky — jedno okno z ui (dřív ruční překryv s blur hlavičkou,
           limetkovým čtvercem v titulku a limetkou v patičce). */}
       <Modal open={showForm} onClose={() => setShowForm(false)} size="lg"
-        title={editing ? 'Upravit položku' : 'Nová položka'}
-        subtitle={editing ? editing.name : 'Přidej novou zásobu do skladu.'}
+        title={editing ? t('Upravit položku') : t('Nová položka')}
+        subtitle={editing ? editing.name : t('Přidej novou zásobu do skladu.')}
         footer={<>
-          <Button variant="secondary" onClick={() => setShowForm(false)}>Zrušit</Button>
-          <Button type="submit" form={idFormulare} variant="primary" icon="check" loading={saving}>Uložit položku</Button>
+          <Button variant="secondary" onClick={() => setShowForm(false)}>{t('Zrušit')}</Button>
+          <Button type="submit" form={idFormulare} variant="primary" icon="check" loading={saving}>{t('Uložit položku')}</Button>
         </>}>
         <form id={idFormulare} onSubmit={save} className="space-y-6">
           {/* Druhá strana provázání: co se z týhle položky na kase prodává.
@@ -956,28 +955,28 @@ export default function Inventory({ initialCategory, onNavigate }: {
           {/* Skupiny oddělené rozestupem a štítkem (DP §4.D) — dřív šedý box
               na každou skupinu a v něm další box (karta v kartě). */}
           <section className="space-y-3" aria-labelledby="sklad-f-zaklad">
-            <p id="sklad-f-zaklad" className="t-label">Základní informace</p>
+            <p id="sklad-f-zaklad" className="t-label">{t('Základní informace')}</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Field id="sklad-f-nazev" label="Název">
-                <input id="sklad-f-nazev" required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Např. Mléko plnotučné" className={inputClass} />
+              <Field id="sklad-f-nazev" label={t('Název')}>
+                <input id="sklad-f-nazev" required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder={t('Např. Mléko plnotučné')} className={inputClass} />
               </Field>
-              <Field id="sklad-f-znacka" label="Značka">
-                <input id="sklad-f-znacka" value={form.brand} onChange={e => setForm(f => ({ ...f, brand: e.target.value }))} placeholder="Např. Stanislaw" className={inputClass} />
+              <Field id="sklad-f-znacka" label={t('Značka')}>
+                <input id="sklad-f-znacka" value={form.brand} onChange={e => setForm(f => ({ ...f, brand: e.target.value }))} placeholder={t('Např. Stanislaw')} className={inputClass} />
               </Field>
             </div>
-            <Field id="sklad-f-popis" label="Krátký popis" hint="Uvidí ho obsluha rovnou na kartě.">
+            <Field id="sklad-f-popis" label={t('Krátký popis')} hint={t('Uvidí ho obsluha rovnou na kartě.')}>
               <textarea id="sklad-f-popis" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2}
-                placeholder="Např. medová, jemná, pro začátečníky"
+                placeholder={t('Např. medová, jemná, pro začátečníky')}
                 className={`${inputClass} resize-none`} />
             </Field>
             <div>
-              <p className="field-label" id="sklad-f-kat">Kategorie</p>
+              <p className="field-label" id="sklad-f-kat">{t('Kategorie')}</p>
               {(flatCats.length > 0 || orphanNames.length > 0) && (
                 <div role="group" aria-labelledby="sklad-f-kat" className="space-y-1.5 mb-2.5 max-h-56 overflow-y-auto scrollbar-thin pr-1">
                   {flatCats.map(({ cat: c, depth }) => (
                     <div key={c.id} style={{ paddingLeft: depth * 14 }}
                       className={depth > 0 ? 'border-l border-black/[0.08] ml-1' : ''}>
-                      <CatChip name={c.zOrganizace ? `${c.name} · z organizace` : c.name} active={form.categoryId === c.id} small={depth > 0}
+                      <CatChip name={c.zOrganizace ? `${c.name} · ${t('z organizace')}` : c.name} active={form.categoryId === c.id} small={depth > 0}
                         onPick={() => pickCategory(c.id)} />
                     </div>
                   ))}
@@ -997,42 +996,42 @@ export default function Inventory({ initialCategory, onNavigate }: {
               )}
               {smiKategorie && (
                 <div className="flex flex-col sm:flex-row gap-2">
-                  <input value={newCatInline} onChange={e => setNewCatInline(e.target.value)} placeholder="Nová kategorie"
-                    aria-label="Nová kategorie"
+                  <input value={newCatInline} onChange={e => setNewCatInline(e.target.value)} placeholder={t('Nová kategorie')}
+                    aria-label={t('Nová kategorie')}
                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addInlineCategory(); } }}
                     className={`${inputClass} flex-1 min-w-0`} />
                   <select value={inlineParent} onChange={e => setInlineParent(e.target.value)}
-                    aria-label="Kam novou kategorii zařadit"
+                    aria-label={t('Kam novou kategorii zařadit')}
                     className={`${inputClass} !w-full sm:!w-40 shrink-0`}>
-                    <option value="">Hlavní</option>
+                    <option value="">{t('Hlavní')}</option>
                     {flatOwnCats.map(({ cat: c, depth }) => (
-                      <option key={c.id} value={String(c.id)}>{' '.repeat(depth * 2)}pod {c.name}</option>
+                      <option key={c.id} value={String(c.id)}>{' '.repeat(depth * 2)}{t('pod {nazev}', { nazev: c.name })}</option>
                     ))}
                   </select>
-                  <Button type="button" variant="secondary" icon="plus" onClick={addInlineCategory} loading={addingCat} disabled={!newCatInline.trim()}>Přidat</Button>
+                  <Button type="button" variant="secondary" icon="plus" onClick={addInlineCategory} loading={addingCat} disabled={!newCatInline.trim()}>{t('Přidat')}</Button>
                 </div>
               )}
             </div>
           </section>
 
           <section className="space-y-3" aria-labelledby="sklad-f-mnozstvi">
-            <p id="sklad-f-mnozstvi" className="t-label">Množství</p>
+            <p id="sklad-f-mnozstvi" className="t-label">{t('Množství')}</p>
             <div className="grid grid-cols-2 gap-3 items-end">
               <div className="col-span-2 sm:col-span-1">
-                <label htmlFor="sklad-f-q" className="field-label">Aktuální množství</label>
+                <label htmlFor="sklad-f-q" className="field-label">{t('Aktuální množství')}</label>
                 <div className="flex items-center gap-2">
-                  <Button type="button" variant="secondary" size="sm" iconOnly icon="minus" aria-label="Ubrat"
+                  <Button type="button" variant="secondary" size="sm" iconOnly icon="minus" aria-label={t('Ubrat')}
                     onClick={() => setForm(f => ({ ...f, quantity: String(Math.max(0, (parseInt(f.quantity) || 0) - 1)) }))} />
                   <input id="sklad-f-q" type="number" inputMode="numeric" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
                     className={`${inputClass} flex-1 min-w-0 text-center tabular-nums`} />
-                  <Button type="button" variant="secondary" size="sm" iconOnly icon="plus" aria-label="Přidat"
+                  <Button type="button" variant="secondary" size="sm" iconOnly icon="plus" aria-label={t('Přidat')}
                     onClick={() => setForm(f => ({ ...f, quantity: String(Math.max(0, (parseInt(f.quantity) || 0) + 1)) }))} />
                 </div>
               </div>
-              <Field id="sklad-f-jednotka" label="Jednotka">
+              <Field id="sklad-f-jednotka" label={t('Jednotka')}>
                 <input id="sklad-f-jednotka" value={form.unit} onChange={e => setForm(f => ({ ...f, unit: e.target.value }))} placeholder="ks" className={inputClass} />
               </Field>
-              <Field id="sklad-f-max" label="Max. množství">
+              <Field id="sklad-f-max" label={t('Max. množství')}>
                 <input id="sklad-f-max" type="number" inputMode="numeric" value={form.maxQuantity} onChange={e => setForm(f => ({ ...f, maxQuantity: e.target.value }))} className={inputClass} />
               </Field>
             </div>
@@ -1041,15 +1040,15 @@ export default function Inventory({ initialCategory, onNavigate }: {
                 and what's left in the open one — a bottle of wine doesn't
                 leave whole when one glass is poured. */}
             <div className="well p-4 space-y-3">
-              <p className="t-card">Načaté balení</p>
-              <p className="t-meta -mt-2">Pro zboží, ze kterého se spotřebovává jen část (lahev vína, plechovka tabáku…).</p>
+              <p className="t-card">{t('Načaté balení')}</p>
+              <p className="t-meta -mt-2">{t('Pro zboží, ze kterého se spotřebovává jen část (lahev vína, plechovka tabáku…).')}</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="sklad-f-baleni" className="field-label">Velikost balení</label>
+                  <label htmlFor="sklad-f-baleni" className="field-label">{t('Velikost balení')}</label>
                   <div className="flex gap-2">
                     <input id="sklad-f-baleni" inputMode="decimal" value={form.packageSize} onChange={e => setForm(f => ({ ...f, packageSize: e.target.value }))}
                       placeholder={String(pk(form)?.defaultPackageSize ?? '750')} className={`${inputClass} min-w-0`} />
-                    <select aria-label="Jednotka obsahu" value={form.contentUnit} onChange={e => setForm(f => ({ ...f, contentUnit: e.target.value }))}
+                    <select aria-label={t('Jednotka obsahu')} value={form.contentUnit} onChange={e => setForm(f => ({ ...f, contentUnit: e.target.value }))}
                       className={`${inputClass} !w-20 shrink-0 px-2`}>
                       <option value="">{pk(form)?.contentUnit ?? '—'}</option>
                       {CONTENT_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
@@ -1057,7 +1056,7 @@ export default function Inventory({ initialCategory, onNavigate }: {
                   </div>
                 </div>
                 <div>
-                  <label htmlFor="sklad-f-nacate" className="field-label">V načatém zbývá</label>
+                  <label htmlFor="sklad-f-nacate" className="field-label">{t('V načatém zbývá')}</label>
                   <div className="relative">
                     <input id="sklad-f-nacate" inputMode="decimal" value={form.openAmount} onChange={e => setForm(f => ({ ...f, openAmount: e.target.value }))}
                       placeholder="0" className={`${inputClass} pr-12`} />
@@ -1066,47 +1065,49 @@ export default function Inventory({ initialCategory, onNavigate }: {
                 </div>
               </div>
               <p className="t-meta">
-                Aktuální množství pak počítá jen zavřená balení; odpisy (ruční i z pokladny) berou nejdřív z načatého.
-                {pk(form) ? ' Prázdná velikost = výchozí z kategorie.' : ''}
+                
+                {t('Aktuální množství pak počítá jen zavřená balení; odpisy (ruční i z pokladny) berou nejdřív z načatého.')}
+                {pk(form) ? ` ${t('Prázdná velikost = výchozí z kategorie.')}` : ''}
               </p>
 
               {/* Dílčí díly: pojmenované porce, které pak receptury jen
                   vybírají — místo aby se 0,02 přepisovalo u každého drinku. */}
               <div className="pt-1 space-y-2">
-                <p className="field-label">Dílčí díly <span className="font-normal text-black/55">— porce k výběru v recepturách</span></p>
+                <p className="field-label">{t('Dílčí díly')} <span className="font-normal text-black/55">{t('— porce k výběru v recepturách')}</span></p>
                 {(form.portions ?? []).map((p, idx) => (
                   <div key={idx} className="flex items-center gap-2">
-                    <input value={p.name} placeholder="panák" aria-label={`Název dílu ${idx + 1}`}
+                    <input value={p.name} placeholder={t('panák')} aria-label={t('Název dílu {n}', { n: idx + 1 })}
                       onChange={e => setForm(f => ({ ...f, portions: f.portions.map((x, i) => i === idx ? { ...x, name: e.target.value } : x) }))}
                       className={`${inputClass} flex-1 min-w-0`} />
-                    <input value={p.amount} placeholder="0,04" inputMode="decimal" aria-label={`Množství dílu ${idx + 1}`}
+                    <input value={p.amount} placeholder="0,04" inputMode="decimal" aria-label={t('Množství dílu {n}', { n: idx + 1 })}
                       onChange={e => setForm(f => ({ ...f, portions: f.portions.map((x, i) => i === idx ? { ...x, amount: e.target.value } : x) }))}
                       className={`${inputClass} !w-24 text-center`} />
                     <span className="text-xs text-black/55 w-8">{form.contentUnit || pk(form)?.contentUnit || form.unit}</span>
-                    <Button type="button" variant="ghost" size="sm" iconOnly icon="trash" aria-label={`Odebrat díl ${p.name || idx + 1}`}
+                    <Button type="button" variant="ghost" size="sm" iconOnly icon="trash" aria-label={t('Odebrat díl {nazev}', { nazev: p.name || idx + 1 })}
                       onClick={() => setForm(f => ({ ...f, portions: f.portions.filter((_, i) => i !== idx) }))} />
                   </div>
                 ))}
                 <Button type="button" variant="ghost" size="sm" icon="plus"
                   onClick={() => setForm(f => ({ ...f, portions: [...(f.portions ?? []), { name: '', amount: '' }] }))}>
-                  Přidat díl
+                  
+                  {t('Přidat díl')}
                 </Button>
               </div>
             </div>
           </section>
 
           <section className="space-y-3" aria-labelledby="sklad-f-hlidani">
-            <p id="sklad-f-hlidani" className="t-label">Hlídání zásob · v {jednotkaPrahu}</p>
+            <p id="sklad-f-hlidani" className="t-label">{t('Hlídání zásob · v {jednotka}', { jednotka: jednotkaPrahu })}</p>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="sklad-f-min" className="field-label flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-wait" aria-hidden /> Upozornit při</label>
+                <label htmlFor="sklad-f-min" className="field-label flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-wait" aria-hidden /> {t('Upozornit při')}</label>
                 <div className="relative">
                   <input id="sklad-f-min" type="number" inputMode="numeric" value={form.minQuantity} onChange={e => setForm(f => ({ ...f, minQuantity: e.target.value }))} className={`${inputClass} pr-14`} />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/55">{jednotkaPrahu}</span>
                 </div>
               </div>
               <div>
-                <label htmlFor="sklad-f-krit" className="field-label flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-bad" aria-hidden /> Kriticky málo při</label>
+                <label htmlFor="sklad-f-krit" className="field-label flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-bad" aria-hidden /> {t('Kriticky málo při')}</label>
                 <div className="relative">
                   <input id="sklad-f-krit" type="number" inputMode="numeric" value={form.criticalQuantity} onChange={e => setForm(f => ({ ...f, criticalQuantity: e.target.value }))} className={`${inputClass} pr-14`} />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/55">{jednotkaPrahu}</span>
@@ -1115,44 +1116,44 @@ export default function Inventory({ initialCategory, onNavigate }: {
             </div>
             {pk(form)?.thresholdUnit === 'content' && (
               <p className="note note-info text-[13px]">
-                Kategorie „{findById(categories, form.categoryId)?.name}" hlídá zásoby podle obsahu, ne podle počtu balení — započítá se i zbytek v načatém balení.
+                {t('Kategorie „{nazev}" hlídá zásoby podle obsahu, ne podle počtu balení — započítá se i zbytek v načatém balení.', { nazev: findById(categories, form.categoryId)?.name })}
               </p>
             )}
           </section>
 
           <section className="space-y-3" aria-labelledby="sklad-f-dodavatel">
-            <p id="sklad-f-dodavatel" className="t-label">Dodavatel · volitelné</p>
+            <p id="sklad-f-dodavatel" className="t-label">{t('Dodavatel · volitelné')}</p>
             {ma('sklad.ceny_upravit') && (
-              <Field id="sklad-f-cena" label="Cena za jednotku" hint="Slouží k výpočtu hodnoty zásob a marže.">
+              <Field id="sklad-f-cena" label={t('Cena za jednotku')} hint={t('Slouží k výpočtu hodnoty zásob a marže.')}>
                 <div className="relative">
                   <input id="sklad-f-cena" inputMode="decimal" value={form.unitCost} onChange={e => setForm(f => ({ ...f, unitCost: e.target.value }))} placeholder="0" className={`${inputClass} pr-12`} />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/55">{symbol}/{form.unit || 'ks'}</span>
                 </div>
               </Field>
             )}
-            <Field id="sklad-f-dod" label="Název dodavatele">
-              <input id="sklad-f-dod" value={form.supplier} onChange={e => setForm(f => ({ ...f, supplier: e.target.value }))} placeholder="Např. Velkoobchod s.r.o." className={inputClass} list="managero-suppliers" />
+            <Field id="sklad-f-dod" label={t('Název dodavatele')}>
+              <input id="sklad-f-dod" value={form.supplier} onChange={e => setForm(f => ({ ...f, supplier: e.target.value }))} placeholder={t('Např. Velkoobchod s.r.o.')} className={inputClass} list="managero-suppliers" />
             </Field>
-            <Field id="sklad-f-url" label="Odkaz na objednání">
+            <Field id="sklad-f-url" label={t('Odkaz na objednání')}>
               <input id="sklad-f-url" type="url" inputMode="url" value={form.supplierUrl} onChange={e => setForm(f => ({ ...f, supplierUrl: e.target.value }))} placeholder="https://..." className={inputClass} />
             </Field>
           </section>
 
           <section className="space-y-3" aria-labelledby="sklad-f-zobrazeni">
-            <p id="sklad-f-zobrazeni" className="t-label">Zobrazení</p>
+            <p id="sklad-f-zobrazeni" className="t-label">{t('Zobrazení')}</p>
             <ul className="list">
-              <SwitchRow title="Momentálně nevedeme"
-                hint="Zůstane v katalogu, ale zmizí z aktivního skladu i z hlídání zásob. Až přijde, jedním klepnutím ji vrátíš."
+              <SwitchRow title={t('Momentálně nevedeme')}
+                hint={t('Zůstane v katalogu, ale zmizí z aktivního skladu i z hlídání zásob. Až přijde, jedním klepnutím ji vrátíš.')}
                 checked={form.archived} onChange={v => setForm(f => ({ ...f, archived: v }))} />
-              <SwitchRow title="Jen ve své kategorii"
-                hint="V přehledu „Vše“ se nezobrazí — uvidíš ji až po otevření kategorie. Hlídání zásob funguje dál."
+              <SwitchRow title={t('Jen ve své kategorii')}
+                hint={t('V přehledu „Vše“ se nezobrazí — uvidíš ji až po otevření kategorie. Hlídání zásob funguje dál.')}
                 checked={form.hideFromOverview} onChange={v => setForm(f => ({ ...f, hideFromOverview: v }))} />
               <li className="py-3">
-                <p className="text-sm font-medium text-[#16181A]" id="sklad-f-zvyraznit">Zvýraznit zákazníkům</p>
-                <p className="t-meta mt-0.5 mb-2">Na sdílené stránce dostane odznak a řadí se nahoru.</p>
-                <Segmented ariaLabel="Zvýraznit zákazníkům" size="sm" value={(form.highlight || 'nic') as 'nic' | 'new' | 'tip'}
+                <p className="text-sm font-medium text-[#16181A]" id="sklad-f-zvyraznit">{t('Zvýraznit zákazníkům')}</p>
+                <p className="t-meta mt-0.5 mb-2">{t('Na sdílené stránce dostane odznak a řadí se nahoru.')}</p>
+                <Segmented ariaLabel={t('Zvýraznit zákazníkům')} size="sm" value={(form.highlight || 'nic') as 'nic' | 'new' | 'tip'}
                   onChange={v => setForm(f => ({ ...f, highlight: v === 'nic' ? '' : v }))}
-                  options={[{ id: 'nic', label: 'Nic' }, { id: 'new', label: 'Novinka' }, { id: 'tip', label: 'Tip' }]} />
+                  options={[{ id: 'nic', label: t('Nic') }, { id: 'new', label: t('Novinka') }, { id: 'tip', label: t('Tip') }]} />
               </li>
             </ul>
           </section>
@@ -1161,7 +1162,7 @@ export default function Inventory({ initialCategory, onNavigate }: {
             <section className="space-y-2">
               <Button type="button" variant="ghost" size="sm" iconAfter="chevron" aria-expanded={logOpen}
                 className={logOpen ? '[&_svg]:rotate-180' : ''} onClick={() => setLogOpen(o => !o)}>
-                Historie změn ({itemLog.length})
+                {t('Historie změn ({n})', { n: itemLog.length })}
               </Button>
               {logOpen && (
                 <ul className="list max-h-56 overflow-y-auto scrollbar-thin">
@@ -1174,13 +1175,13 @@ export default function Inventory({ initialCategory, onNavigate }: {
                     const label = delta !== 0
                       ? (delta > 0 ? `+${delta}` : `−${Math.abs(delta)}`)
                       : openDelta !== 0
-                        ? `${openDelta > 0 ? '+' : '−'}${Math.abs(openDelta).toLocaleString('cs-CZ', { maximumFractionDigits: 3 })}${l.contentUnit ? ' ' + l.contentUnit : ''}`
+                        ? `${openDelta > 0 ? '+' : '−'}${Math.abs(openDelta).toLocaleString(loc, { maximumFractionDigits: 3 })}${l.contentUnit ? ' ' + l.contentUnit : ''}`
                         : '0';
                     const tone = delta || openDelta;
                     return (
                       <ListRow key={l.id}
-                        title={`${l.userName ?? 'Někdo'}${l.note ? ` · ${l.note}` : ''}`}
-                        meta={new Date(l.createdAt).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        title={`${l.userName ?? t('Někdo')}${l.note ? ` · ${l.note}` : ''}`}
+                        meta={new Date(l.createdAt).toLocaleDateString(loc, { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         value={<span className={tone > 0 ? 'text-ok-ink' : tone < 0 ? 'text-bad-ink' : 'text-black/55'}>{label}</span>} />
                     );
                   })}
@@ -1197,14 +1198,14 @@ export default function Inventory({ initialCategory, onNavigate }: {
       {selecting && (
         <BulkBar
           count={selected.size}
-          totalLabel={`Vybrat vše (${filtered.length})`}
+          totalLabel={t('Vybrat vše ({n})', { n: filtered.length })}
           onSelectAll={() => setSelected(new Set(filtered.map(i => i.id)))}
           onExit={exitSelection}
           actions={[
-            ...(smiUpravit ? [{ label: 'Upravit', primary: true, onClick: () => setShowBulk(true) }] : []),
-            ...(smiUpravit ? [{ label: showArchived ? 'Naskladnit' : 'Odložit',
+            ...(smiUpravit ? [{ label: t('Upravit'), primary: true, onClick: () => setShowBulk(true) }] : []),
+            ...(smiUpravit ? [{ label: showArchived ? t('Naskladnit') : t('Odložit'),
               onClick: async () => { if (await bulkPatch({ archived: !showArchived })) exitSelection(); } }] : []),
-            ...(smiMazat ? [{ label: 'Smazat', danger: true, onClick: bulkDelete }] : []),
+            ...(smiMazat ? [{ label: t('Smazat'), danger: true, onClick: bulkDelete }] : []),
           ]}
         />
       )}
@@ -1247,10 +1248,10 @@ export default function Inventory({ initialCategory, onNavigate }: {
         <StocktakeModal smiZahajit={ma('inventura.spravovat')} smiDokoncit={ma('inventura.dokoncit')} smiZtraty={ma('finance.ztraty')} onClose={() => { setShowStocktake(false); obnovDataWidgetu('/api/stocktake'); }} onApplied={load} />
       )}
 
-      <Modal open={showReports} onClose={() => setShowReports(false)} size="md" title="Hlášení ze skladu"
-        subtitle="Co tým nahlásil jako docházející nebo chybějící.">
+      <Modal open={showReports} onClose={() => setShowReports(false)} size="md" title={t('Hlášení ze skladu')}
+        subtitle={t('Co tým nahlásil jako docházející nebo chybějící.')}>
         {reports.length === 0 ? (
-          <p className="t-meta">Žádná hlášení od týmu.</p>
+          <p className="t-meta">{t('Žádná hlášení od týmu.')}</p>
         ) : (
           <ul className="list">
             {reports.map(r => {
@@ -1259,17 +1260,17 @@ export default function Inventory({ initialCategory, onNavigate }: {
               const done = r.status === 'done';
               const nazvy = list.map((it: any) =>
                 typeof it === 'string' ? it
-                  : typeof it === 'number' ? (items.find(x => x.id === it)?.name ?? `Položka #${it}`)
+                  : typeof it === 'number' ? (items.find(x => x.id === it)?.name ?? t('Položka #{id}', { id: it }))
                     : `${it.name ?? it.title ?? '?'}${it.quantity ? ` — ${it.quantity}` : ''}${it.note ? ` (${it.note})` : ''}`);
               return (
                 <li key={r.id}>
                   <ListRow as="div"
                     lead={<Avatar emoji={r.author_avatar} size="sm" />}
-                    title={nazvy.length > 0 ? nazvy.join(', ') : 'Bez položek'}
-                    meta={[r.author_name ?? 'Zaměstnanec',
-                      new Date(r.created_at).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                    title={nazvy.length > 0 ? nazvy.join(', ') : t('Bez položek')}
+                    meta={[r.author_name ?? t('Zaměstnanec'),
+                      new Date(r.created_at).toLocaleDateString(loc, { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' }),
                       r.note ? `„${r.note}"` : null].filter(Boolean).join(' · ')}
-                    right={!done ? <Chip tone="wait" size="sm">nové</Chip> : undefined}
+                    right={!done ? <Chip tone="wait" size="sm">{t('nové')}</Chip> : undefined}
                     actions={<>
                       <Button variant="secondary" size="sm" icon="cart" onClick={() => {
                         const wanted: Item[] = [];
@@ -1283,7 +1284,7 @@ export default function Inventory({ initialCategory, onNavigate }: {
                         setShowReports(false);
                         setShoppingSupplier(null);
                         setShowShopping(true);
-                      }}>Do nákupu</Button>
+                      }}>{t('Do nákupu')}</Button>
                       <Button variant={done ? 'ghost' : 'primary'} size="sm" onClick={async () => {
                         const res = await fetch('/api/inventory/reports', {
                           method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -1292,8 +1293,8 @@ export default function Inventory({ initialCategory, onNavigate }: {
                         if (res?.ok) {
                           setReports(prev => prev.map(x => x.id === r.id ? { ...x, status: done ? 'new' : 'done' } : x));
                           obnovDataWidgetu('/api/inventory/reports');
-                        } else showNotice('Uložení se nepodařilo.', 'bad');
-                      }}>{done ? 'Znovu otevřít' : 'Vyřízeno'}</Button>
+                        } else showNotice(t('Uložení se nepodařilo.'), 'bad');
+                      }}>{done ? t('Znovu otevřít') : t('Vyřízeno')}</Button>
                     </>}
                   />
                 </li>
@@ -1317,10 +1318,10 @@ export default function Inventory({ initialCategory, onNavigate }: {
             setShoppingExtra([]);
             setShoppingSupplier(null);
             if (count > 0) {
-              showNotice(count === zadano ? `Vytvořeno: ${czCount(count, OBJEDNAVKA)}.` : `Vytvořeno ${count} z ${czCount(zadano, OBJEDNAVKA)} — zbytek zkus znovu.`, count === zadano ? undefined : 'bad');
+              showNotice(count === zadano ? t('Vytvořeno: {n, plural, one {# objednávka} few {# objednávky} other {# objednávek}}.', { n: count }) : t('Vytvořeno {n} z {celkem, plural, one {# objednávka} few {# objednávky} other {# objednávek}} — zbytek zkus znovu.', { n: count, celkem: zadano }), count === zadano ? undefined : 'bad');
               obnovDataWidgetu('/api/orders');
             } else {
-              showNotice('Objednávku se nepodařilo vytvořit.', 'bad');
+              showNotice(t('Objednávku se nepodařilo vytvořit.'), 'bad');
             }
           }}
         />
@@ -1334,18 +1335,18 @@ export default function Inventory({ initialCategory, onNavigate }: {
 /* ---------- Bulk edit ---------- */
 // Only the ticked fields are sent, so a bulk edit changes exactly what was asked
 // for and leaves everything else on each item alone.
-const BULK_FIELDS: { key: string; label: string; kind: 'text' | 'number' | 'url' | 'multiline' | 'category' }[] = [
-  { key: 'categoryId', label: 'Kategorie', kind: 'category' },
-  { key: 'brand', label: 'Značka', kind: 'text' },
-  { key: 'description', label: 'Popis', kind: 'multiline' },
-  { key: 'unit', label: 'Jednotka', kind: 'text' },
-  { key: 'packageSize', label: 'Velikost balení', kind: 'number' },
-  { key: 'minQuantity', label: 'Upozornit při', kind: 'number' },
-  { key: 'criticalQuantity', label: 'Kriticky málo při', kind: 'number' },
-  { key: 'maxQuantity', label: 'Max. množství', kind: 'number' },
-  { key: 'unitCost', label: 'Cena za jednotku', kind: 'number' },
-  { key: 'supplier', label: 'Dodavatel', kind: 'text' },
-  { key: 'supplierUrl', label: 'Odkaz na objednání', kind: 'url' },
+const bulkFields = (t: PrekladFn): { key: string; label: string; kind: 'text' | 'number' | 'url' | 'multiline' | 'category' }[] => [
+  { key: 'categoryId', label: t('Kategorie'), kind: 'category' },
+  { key: 'brand', label: t('Značka'), kind: 'text' },
+  { key: 'description', label: t('Popis'), kind: 'multiline' },
+  { key: 'unit', label: t('Jednotka'), kind: 'text' },
+  { key: 'packageSize', label: t('Velikost balení'), kind: 'number' },
+  { key: 'minQuantity', label: t('Upozornit při'), kind: 'number' },
+  { key: 'criticalQuantity', label: t('Kriticky málo při'), kind: 'number' },
+  { key: 'maxQuantity', label: t('Max. množství'), kind: 'number' },
+  { key: 'unitCost', label: t('Cena za jednotku'), kind: 'number' },
+  { key: 'supplier', label: t('Dodavatel'), kind: 'text' },
+  { key: 'supplierUrl', label: t('Odkaz na objednání'), kind: 'url' },
 ];
 
 function BulkEditModal({ count, categories, symbol, smiCenu, onClose, onApply }: {
@@ -1356,11 +1357,12 @@ function BulkEditModal({ count, categories, symbol, smiCenu, onClose, onApply }:
   onClose: () => void;
   onApply: (patch: Record<string, any>) => Promise<boolean>;
 }) {
+  const t = useT('sprava');
   const [on, setOn] = useState<Record<string, boolean>>({});
   const [values, setValues] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const flat = useMemo(() => flattenTree(categories), [categories]);
-  const pole = BULK_FIELDS.filter(f => f.key !== 'unitCost' || smiCenu);
+  const pole = bulkFields(t).filter(f => f.key !== 'unitCost' || smiCenu);
   const chosen = pole.filter(f => on[f.key]);
 
   const [chyba, setChyba] = useState<string | null>(null);
@@ -1386,7 +1388,7 @@ function BulkEditModal({ count, categories, symbol, smiCenu, onClose, onApply }:
       patch[f.key] = raw;   // empty string clears the field on purpose
     });
     if (spatne.length) {
-      setChyba(`${spatne.join(', ')}: napiš číslo, třeba 12 nebo 0,5.`);
+      setChyba(t('{pole}: napiš číslo, třeba 12 nebo 0,5.', { pole: spatne.join(', ') }));
       return;
     }
     setChyba(null);
@@ -1396,12 +1398,12 @@ function BulkEditModal({ count, categories, symbol, smiCenu, onClose, onApply }:
   };
 
   return (
-    <Modal open onClose={onClose} size="md" title="Hromadná úprava"
-      subtitle={`Změní se ${czCount(count, POLOZKA)} — jen zaškrtnutá pole.`}
+    <Modal open onClose={onClose} size="md" title={t('Hromadná úprava')}
+      subtitle={t('Změní se {n, plural, one {# položka} few {# položky} other {# položek}} — jen zaškrtnutá pole.', { n: count })}
       footer={<>
-        <Button variant="secondary" onClick={onClose}>Zrušit</Button>
+        <Button variant="secondary" onClick={onClose}>{t('Zrušit')}</Button>
         <Button variant="primary" loading={busy} disabled={chosen.length === 0} onClick={apply}>
-          {`Použít na ${czCount(count, POLOZKA)}`}
+          {t('Použít na {n, plural, one {# položka} few {# položky} other {# položek}}', { n: count })}
         </Button>
       </>}>
       {chyba && <p className="note note-danger mb-3" role="alert">{chyba}</p>}
@@ -1421,21 +1423,21 @@ function BulkEditModal({ count, categories, symbol, smiCenu, onClose, onApply }:
                   {f.kind === 'category' ? (
                     <select id={id} aria-label={f.label} value={values[f.key] ?? ''} onChange={e => setValues(v => ({ ...v, [f.key]: e.target.value }))}
                       className={inputClass}>
-                      <option value="">— vyber kategorii —</option>
+                      <option value="">{t('— vyber kategorii —')}</option>
                       {flat.map(({ cat: c, depth }) => (
-                        <option key={c.id} value={String(c.id)}>{' '.repeat(depth * 2)}{c.name}{c.zOrganizace ? ' · z organizace' : ''}</option>
+                        <option key={c.id} value={String(c.id)}>{' '.repeat(depth * 2)}{c.name}{c.zOrganizace ? ` · ${t('z organizace')}` : ''}</option>
                       ))}
                     </select>
                   ) : f.kind === 'multiline' ? (
                     <textarea id={id} aria-label={f.label} rows={2} value={values[f.key] ?? ''} onChange={e => setValues(v => ({ ...v, [f.key]: e.target.value }))}
-                      placeholder="Prázdné pole popis smaže"
+                      placeholder={t('Prázdné pole popis smaže')}
                       className={`${inputClass} resize-none`} />
                   ) : (
                     <div className="relative">
                       <input id={id} aria-label={f.label} type={f.kind === 'url' ? 'url' : 'text'}
                         inputMode={f.kind === 'number' ? 'decimal' : undefined}
                         value={values[f.key] ?? ''} onChange={e => setValues(v => ({ ...v, [f.key]: e.target.value }))}
-                        placeholder={f.kind === 'text' || f.kind === 'url' ? 'Prázdné pole hodnotu smaže' : ''}
+                        placeholder={f.kind === 'text' || f.kind === 'url' ? t('Prázdné pole hodnotu smaže') : ''}
                         className={`${inputClass} ${f.key === 'unitCost' ? 'pr-12' : ''}`} />
                       {f.key === 'unitCost' && (
                         <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/55">{symbol}</span>
@@ -1466,30 +1468,31 @@ function CatChip({ name, active, small, onPick }: {
 }
 
 /** Akce řádku položky: nejvýš dvě tlačítka, zbytek v „···" (DP §3.6). */
-function akcePolozky(i: Item, h: { openEdit?: (i: Item) => void; remove?: (i: Item) => void; setArchived?: (i: Item, a: boolean) => void; objednat?: boolean }): MenuItem[] {
+function akcePolozky(t: PrekladFn, i: Item, h: { openEdit?: (i: Item) => void; remove?: (i: Item) => void; setArchived?: (i: Item, a: boolean) => void; objednat?: boolean }): MenuItem[] {
   return [
     // Seznam nemá pro odkaz na dodavatele místo v řádku (akce nejvýš dvě),
     // tak jde do „···" — dřív ho měl řádek i karta a kdo přes něj objednával,
     // v seznamu ho po kole 69 nenašel. Karty mají vlastní tlačítko „Objednat".
-    ...(h.objednat && i.supplierUrl ? [{ label: 'Objednat u dodavatele', icon: 'external', onClick: () => { window.open(i.supplierUrl, '_blank', 'noopener'); } }] : []),
-    ...(h.openEdit ? [{ label: 'Upravit položku', icon: 'pencil', onClick: () => h.openEdit!(i) }] : []),
-    ...(h.setArchived ? [{ label: i.archived ? 'Vrátit do skladu' : 'Momentálně nevedeme', icon: 'archive', onClick: () => h.setArchived!(i, !i.archived) }] : []),
-    ...(h.remove ? [{ label: 'Smazat položku…', icon: 'trash', danger: true, onClick: () => h.remove!(i) }] : []),
+    ...(h.objednat && i.supplierUrl ? [{ label: t('Objednat u dodavatele'), icon: 'external', onClick: () => { window.open(i.supplierUrl, '_blank', 'noopener'); } }] : []),
+    ...(h.openEdit ? [{ label: t('Upravit položku'), icon: 'pencil', onClick: () => h.openEdit!(i) }] : []),
+    ...(h.setArchived ? [{ label: i.archived ? t('Vrátit do skladu') : t('Momentálně nevedeme'), icon: 'archive', onClick: () => h.setArchived!(i, !i.archived) }] : []),
+    ...(h.remove ? [{ label: t('Smazat položku…'), icon: 'trash', danger: true, onClick: () => h.remove!(i) }] : []),
   ];
 }
 
 /** Krokovač ± (ikonová tlačítka s popiskem — dřív holé znaky − a + bez aria-label). */
 function Krokovac({ i, step }: { i: Item; step: (i: Item, d: number) => void }) {
+  const t = useT('sprava');
   return (
     <span className="flex items-center gap-1">
-      <Button variant="secondary" size="sm" iconOnly icon="minus" aria-label={`Ubrat — ${i.name}`} onClick={() => step(i, -1)} />
-      <Button variant="secondary" size="sm" iconOnly icon="plus" aria-label={`Přidat — ${i.name}`} onClick={() => step(i, 1)} />
+      <Button variant="secondary" size="sm" iconOnly icon="minus" aria-label={t('Ubrat — {nazev}', { nazev: i.name })} onClick={() => step(i, -1)} />
+      <Button variant="secondary" size="sm" iconOnly icon="plus" aria-label={t('Přidat — {nazev}', { nazev: i.name })} onClick={() => step(i, 1)} />
     </span>
   );
 }
 
-const stavPopisek = (st: 'ok' | 'low' | 'critical', vyroba?: boolean) =>
-  st === 'critical' ? (vyroba ? 'Vyrobit' : 'Kriticky') : st === 'low' ? (vyroba ? 'Vyrobit' : 'Dochází') : 'OK';
+const stavPopisek = (t: PrekladFn, st: 'ok' | 'low' | 'critical', vyroba?: boolean) =>
+  st === 'critical' ? (vyroba ? t('Vyrobit') : t('Kriticky')) : st === 'low' ? (vyroba ? t('Vyrobit') : t('Dochází')) : t('OK');
 
 /* ---------- List view: jedna karta s linkami (DP §3.6) ---------- */
 function ListView({ items, step, openEdit, remove, pk, setArchived, selecting, selected, onToggle, onConsumed, onConsumeFail }: {
@@ -1498,6 +1501,8 @@ function ListView({ items, step, openEdit, remove, pk, setArchived, selecting, s
   selecting: boolean; selected: Set<number>; onToggle: (id: number) => void;
   onConsumed: (updated: any) => void; onConsumeFail: () => void;
 }) {
+  const t = useT('sprava');
+  const loc = useLocale();
   return (
     <Card pad="none" className="px-5">
       <ul className="list">
@@ -1507,28 +1512,28 @@ function ListView({ items, step, openEdit, remove, pk, setArchived, selecting, s
           const mnozstvi = Number(i.packageSize) > 0 ? formatStock(i, cu, i.unit) : `${i.quantity} ${i.unit}`;
           // Popis (jak se položka používá, co s ní) patří do meta jako na
           // Skladu zaměstnance — seznam je výchozí pohled, karty ho mají zvlášť.
-          const meta = [i.brand, i.description || null, i.category || null, i.supplier || null, i.updatedAt ? `${relTime(i.updatedAt)}${i.updatedByName ? ` · ${i.updatedByName}` : ''}` : null]
+          const meta = [i.brand, i.description || null, i.category || null, i.supplier || null, i.updatedAt ? `${relTime(i.updatedAt, t, loc)}${i.updatedByName ? ` · ${i.updatedByName}` : ''}` : null]
             .filter(Boolean).join(' · ');
-          const menu = akcePolozky(i, { openEdit, remove, setArchived, objednat: true });
+          const menu = akcePolozky(t, i, { openEdit, remove, setArchived, objednat: true });
           return (
             <li key={i.id}>
               <ListRow as="div"
                 lead={selecting
-                  ? <SelectBox checked={selected.has(i.id)} onChange={() => onToggle(i.id)} label={`Vybrat ${i.name}`} />
+                  ? <SelectBox checked={selected.has(i.id)} onChange={() => onToggle(i.id)} label={t('Vybrat {nazev}', { nazev: i.name })} />
                   : <span className={`w-2 h-2 rounded-full shrink-0 ${st === 'critical' ? 'bg-bad' : st === 'low' ? 'bg-wait' : 'bg-ok'}`} aria-hidden />}
                 title={i.name}
                 meta={meta || undefined}
                 value={<span className="tabular-nums">{mnozstvi}</span>}
-                right={st !== 'ok' ? <Chip tone={STAV_CHIP[st]} size="sm">{stavPopisek(st, i.madeInHouse)}</Chip> : undefined}
+                right={st !== 'ok' ? <Chip tone={STAV_CHIP[st]} size="sm">{stavPopisek(t, st, i.madeInHouse)}</Chip> : undefined}
                 onClick={selecting ? () => onToggle(i.id) : undefined}
                 actions={selecting ? undefined : <>
                   {Number(i.packageSize) > 0 && step && (
                     <ConsumeControl itemId={i.id} unit={cu} onDone={onConsumed} onFail={onConsumeFail} />
                   )}
                   {i.archived && setArchived
-                    ? <Button variant="primary" size="sm" onClick={() => setArchived(i, false)}>Naskladnit</Button>
+                    ? <Button variant="primary" size="sm" onClick={() => setArchived(i, false)}>{t('Naskladnit')}</Button>
                     : step ? <Krokovac i={i} step={step} /> : null}
-                  {menu.length > 0 && <Menu size="sm" label={`Další akce: ${i.name}`} items={menu} />}
+                  {menu.length > 0 && <Menu size="sm" label={t('Další akce: {nazev}', { nazev: i.name })} items={menu} />}
                 </>}
               />
             </li>
@@ -1546,6 +1551,8 @@ function GridView({ items, step, openEdit, remove, money, pk, setArchived, selec
   selecting: boolean; selected: Set<number>; onToggle: (id: number) => void;
   onConsumed: (updated: any) => void; onConsumeFail: () => void;
 }) {
+  const t = useT('sprava');
+  const loc = useLocale();
   // Nákupní cena balení smí mít haléře (4,99 €) — money() ji ukáže jako 5 €.
   const cena = usePrice();
   return (
@@ -1554,11 +1561,11 @@ function GridView({ items, step, openEdit, remove, money, pk, setArchived, selec
         const st = statusOf(i, pk);
         const pct = Math.min(100, Math.round((i.quantity / Math.max(1, i.maxQuantity)) * 100));
         const barColor = st === 'critical' ? 'bg-bad' : st === 'low' ? 'bg-wait' : 'bg-ok';
-        const menu = akcePolozky(i, { openEdit, remove, setArchived });
+        const menu = akcePolozky(t, i, { openEdit, remove, setArchived });
         return (
           <Card key={i.id} className={`flex flex-col h-full ${selecting && selected.has(i.id) ? 'ring-2 ring-[#16181A]' : ''}`}>
             <div className="flex items-start justify-between gap-x-2 gap-y-1">
-              {selecting && <SelectBox checked={selected.has(i.id)} onChange={() => onToggle(i.id)} label={`Vybrat ${i.name}`} />}
+              {selecting && <SelectBox checked={selected.has(i.id)} onChange={() => onToggle(i.id)} label={t('Vybrat {nazev}', { nazev: i.name })} />}
               <div className="min-w-0 flex-1">
                 <h3 className="t-card line-clamp-2">
                   {i.name}
@@ -1568,8 +1575,8 @@ function GridView({ items, step, openEdit, remove, money, pk, setArchived, selec
                 <p className="t-meta line-clamp-2 mt-0.5">{i.category}{i.supplier ? ` · ${i.supplier}` : ''}</p>
               </div>
               <span className="flex items-center gap-1 shrink-0">
-                {i.madeInHouse && <Chip tone="info" size="sm">vyrábíme</Chip>}
-                <Chip tone={STAV_CHIP[st]} size="sm">{stavPopisek(st, i.madeInHouse)}</Chip>
+                {i.madeInHouse && <Chip tone="info" size="sm">{t('vyrábíme')}</Chip>}
+                <Chip tone={STAV_CHIP[st]} size="sm">{stavPopisek(t, st, i.madeInHouse)}</Chip>
               </span>
             </div>
             <div className="mt-3 h-1.5 bg-black/[0.06] rounded-full overflow-hidden">
@@ -1581,7 +1588,7 @@ function GridView({ items, step, openEdit, remove, money, pk, setArchived, selec
                 <div className={`mt-2.5 flex flex-wrap items-center justify-between gap-2 ${selecting ? 'hidden' : ''}`}>
                   <span className="t-meta tabular-nums min-w-0">
                     {formatStock(i, cu, i.unit)}
-                    {cu ? <> · celkem {fmtAmount(totalContent(i))} {cu}</> : null}
+                    {cu ? <> · {t('celkem {mnozstvi} {jednotka}', { mnozstvi: fmtAmount(totalContent(i)), jednotka: cu })}</> : null}
                   </span>
                   {step && <ConsumeControl itemId={i.id} unit={cu} onDone={onConsumed} onFail={onConsumeFail} />}
                 </div>
@@ -1589,22 +1596,22 @@ function GridView({ items, step, openEdit, remove, money, pk, setArchived, selec
             })()}
             <div className={`mt-auto pt-3 flex items-center justify-between gap-2 ${selecting ? 'hidden' : ''}`}>
               <div className="flex items-center gap-2">
-                {step && <Button variant="secondary" size="sm" iconOnly icon="minus" aria-label={`Ubrat — ${i.name}`} onClick={() => step(i, -1)} />}
+                {step && <Button variant="secondary" size="sm" iconOnly icon="minus" aria-label={t('Ubrat — {nazev}', { nazev: i.name })} onClick={() => step(i, -1)} />}
                 <span className="text-[18px] font-semibold text-[#16181A] min-w-[4rem] text-center tabular-nums">{i.quantity} <span className="text-xs font-normal text-black/55">{i.unit}</span></span>
-                {step && <Button variant="secondary" size="sm" iconOnly icon="plus" aria-label={`Přidat — ${i.name}`} onClick={() => step(i, 1)} />}
+                {step && <Button variant="secondary" size="sm" iconOnly icon="plus" aria-label={t('Přidat — {nazev}', { nazev: i.name })} onClick={() => step(i, 1)} />}
               </div>
               <div className="flex items-center gap-1">
                 {i.archived && setArchived ? (
-                  <Button variant="primary" size="sm" onClick={() => setArchived(i, false)}>Naskladnit</Button>
+                  <Button variant="primary" size="sm" onClick={() => setArchived(i, false)}>{t('Naskladnit')}</Button>
                 ) : i.supplierUrl ? (
                   <a href={i.supplierUrl} target="_blank" rel="noopener" className="btn btn-secondary btn-sm">
-                    <Icon name="external" size={15} /> Objednat
+                    <Icon name="external" size={15} />  {t('Objednat')}
                   </a>
                 ) : null}
-                {menu.length > 0 && <Menu size="sm" label={`Další akce: ${i.name}`} items={menu} />}
+                {menu.length > 0 && <Menu size="sm" label={t('Další akce: {nazev}', { nazev: i.name })} items={menu} />}
               </div>
             </div>
-            <p className="t-meta mt-2">Limit: {i.minQuantity} · kriticky: {i.criticalQuantity} {thresholdUnitLabel(pk(i), i.unit)}{i.unitCost ? ` · ${cena(i.unitCost)}/${i.unit}` : ''}{i.updatedByName ? ` · ${relTime(i.updatedAt)} ${i.updatedByName}` : ''}</p>
+            <p className="t-meta mt-2">{t('Limit: {limit} · kriticky: {krit} {jednotka}', { limit: i.minQuantity, krit: i.criticalQuantity, jednotka: thresholdUnitLabel(pk(i), i.unit) })}{i.unitCost ? ` · ${cena(i.unitCost)}/${i.unit}` : ''}{i.updatedByName ? ` · ${relTime(i.updatedAt, t, loc)} ${i.updatedByName}` : ''}</p>
           </Card>
         );
       })}
@@ -1624,6 +1631,8 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [], smiO
   /** nakup.odeslat — objednávka e-mailem přímo dodavateli. */
   smiOdeslat: boolean;
 }) {
+  const loc = useLocale();
+  const t = useT('sprava');
   const supplierByName = (name: string) => suppliers.find(sp => sp.name === name) ?? null;
   const [emailing, setEmailing] = useState<string | null>(null);
   const [emailMsg, setEmailMsg] = useState<{ text: string; ok: boolean } | null>(null);
@@ -1640,14 +1649,14 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [], smiO
         }),
       });
       const d = await res.json().catch(() => ({}));
-      if (res.ok && d.emailed) setEmailMsg({ text: `Objednávka odeslána na ${sp.email}.`, ok: true });
+      if (res.ok && d.emailed) setEmailMsg({ text: t('Objednávka odeslána na {email}.', { email: sp.email }), ok: true });
       // Server teď říká i proč. Dřív se tu psalo obecné „nepodařilo se"
       // — a hlavně se sem často ani nedostalo, protože odmítnutý e-mail
       // se tvářil jako odeslaný.
-      else if (res.ok) setEmailMsg({ text: `Objednávka je vytvořená, ale e-mail neodešel${d.emailError ? ` (${d.emailError})` : ''} — pošli ji ručně.`, ok: false });
-      else setEmailMsg({ text: d.error || 'Odeslání se nepodařilo.', ok: false });
+      else if (res.ok) setEmailMsg({ text: d.emailError ? t('Objednávka je vytvořená, ale e-mail neodešel ({chyba}) — pošli ji ručně.', { chyba: d.emailError }) : t('Objednávka je vytvořená, ale e-mail neodešel — pošli ji ručně.'), ok: false });
+      else setEmailMsg({ text: d.error || t('Odeslání se nepodařilo.'), ok: false });
       if (res.ok) obnovDataWidgetu('/api/orders');
-    } catch { setEmailMsg({ text: 'Odeslání se nepodařilo.', ok: false }); }
+    } catch { setEmailMsg({ text: t('Odeslání se nepodařilo.'), ok: false }); }
     setEmailing(null);
   };
   const [copied, setCopied] = useState(false);
@@ -1661,7 +1670,7 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [], smiO
   const groups = useMemo(() => {
     const map = new Map<string, Item[]>();
     items.forEach(i => {
-      const key = (i.supplier ?? '').trim() || 'Bez dodavatele';
+      const key = (i.supplier ?? '').trim() || t('Bez dodavatele');
       const arr = map.get(key);
       if (arr) arr.push(i); else map.set(key, [i]);
     });
@@ -1669,14 +1678,14 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [], smiO
   }, [items]);
 
   const buildText = () => {
-    const date = new Date().toLocaleDateString('cs-CZ');
-    const lines: string[] = [`Nákupní seznam – Managero (${date})`];
+    const date = new Date().toLocaleDateString(loc);
+    const lines: string[] = [t('Nákupní seznam – Managero ({datum})', { datum: date })];
     groups.forEach(([supplier, list]) => {
       lines.push('');
       lines.push(`${supplier}:`);
       list.forEach(i => {
-        const why = (i.buyFor?.length ?? 0) > 0 ? ` — na výrobu: ${i.buyFor!.map(f => f.name).join(', ')}` : '';
-        lines.push(`• ${i.name} — objednat ${suggestedAmount(i)} ${i.unit} (zbývá ${i.quantity})${why}`);
+        const why = (i.buyFor?.length ?? 0) > 0 ? ` — ${t('na výrobu: {seznam}', { seznam: i.buyFor!.map(f => f.name).join(', ') })}` : '';
+        lines.push(`• ${i.name} — ${t('objednat {mnozstvi} {jednotka} (zbývá {zbyva})', { mnozstvi: suggestedAmount(i), jednotka: i.unit, zbyva: i.quantity })}${why}`);
       });
     });
     return lines.join('\n');
@@ -1698,19 +1707,19 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [], smiO
     const rows = groups.map(([supplier, list]) => `
       <h2>${esc(supplier)}</h2>
       <table>
-        <thead><tr><th style="width:8mm"></th><th>Položka</th><th class="num">Objednat</th><th class="num">Zbývá</th></tr></thead>
+        <thead><tr><th style="width:8mm"></th><th>${esc(t('Položka'))}</th><th class="num">${esc(t('Objednat'))}</th><th class="num">${esc(t('Zbývá'))}</th></tr></thead>
         <tbody>${list.map(i => `<tr>
           <td><span class="tick"></span></td>
           <td>${esc(i.name)}${(i.buyFor?.length ?? 0) > 0
-            ? `<div class="note">na výrobu: ${esc(i.buyFor!.map(x => x.name).join(', '))}</div>` : ''}</td>
+            ? `<div class="note">${esc(t('na výrobu: {seznam}', { seznam: i.buyFor!.map(x => x.name).join(', ') }))}</div>` : ''}</td>
           <td class="num">${esc(suggestedAmount(i))} ${esc(i.unit)}</td>
           <td class="num">${esc(i.quantity)} ${esc(i.unit)}</td>
         </tr>`).join('')}</tbody>
       </table>`).join('');
     const n = items.length;
     const ok = openPrint({
-      title: 'Nákupní seznam',
-      subtitle: `${czCount(n, POLOZKA)} · ${new Date().toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}`,
+      title: t('Nákupní seznam'),
+      subtitle: `${t('{n, plural, one {# položka} few {# položky} other {# položek}}', { n: n })} · ${new Date().toLocaleDateString(loc, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}`,
       body: rows,
     });
     setPrintFailed(!ok);
@@ -1718,7 +1727,7 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [], smiO
 
   const canShare = typeof navigator !== 'undefined' && 'share' in navigator;
   const share = async () => {
-    try { await navigator.share({ title: 'Nákupní seznam', text: buildText() }); } catch { /* zrušeno */ }
+    try { await navigator.share({ title: t('Nákupní seznam'), text: buildText() }); } catch { /* zrušeno */ }
   };
 
   // One order per supplier group.
@@ -1743,30 +1752,30 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [], smiO
     onOrdered(created, groups.length);
   };
 
-  const mailto = `mailto:?subject=${encodeURIComponent('Objednávka – ' + new Date().toLocaleDateString('cs-CZ'))}&body=${encodeURIComponent(buildText())}`;
+  const mailto = `mailto:?subject=${encodeURIComponent(t('Objednávka – {datum}', { datum: new Date().toLocaleDateString(loc) }))}&body=${encodeURIComponent(buildText())}`;
 
   return (
-    <Modal open onClose={onClose} size="lg" title="Nákupní seznam" subtitle={czCount(items.length, POLOZKA)}
+    <Modal open onClose={onClose} size="lg" title={t('Nákupní seznam')} subtitle={t('{n, plural, one {# položka} few {# položky} other {# položek}}', { n: items.length })}
       footer={<>
-        <Menu label="Další možnosti seznamu" items={[
-          { label: 'Vytisknout', icon: 'print', hint: 'S čtverečky k odškrtání v obchodě.', onClick: printList },
-          { label: 'Poslat e-mailem', icon: 'mail', hint: 'Otevře e-mail s předvyplněným seznamem.', onClick: () => { window.location.href = mailto; } },
-          ...(canShare ? [{ label: 'Sdílet', icon: 'send', onClick: share }] : []),
+        <Menu label={t('Další možnosti seznamu')} items={[
+          { label: t('Vytisknout'), icon: 'print', hint: t('S čtverečky k odškrtání v obchodě.'), onClick: printList },
+          { label: t('Poslat e-mailem'), icon: 'mail', hint: t('Otevře e-mail s předvyplněným seznamem.'), onClick: () => { window.location.href = mailto; } },
+          ...(canShare ? [{ label: t('Sdílet'), icon: 'send', onClick: share }] : []),
         ]} />
-        <Button variant="secondary" icon="copy" onClick={copy}>{copied ? 'Zkopírováno' : 'Zkopírovat'}</Button>
+        <Button variant="secondary" icon="copy" onClick={copy}>{copied ? t('Zkopírováno') : t('Zkopírovat')}</Button>
         {smiObjednat && (
-          <Button variant="primary" loading={ordering} disabled={items.length === 0} onClick={createOrders}>Vytvořit objednávku</Button>
+          <Button variant="primary" loading={ordering} disabled={items.length === 0} onClick={createOrders}>{t('Vytvořit objednávku')}</Button>
         )}
       </>}>
       <div className="space-y-4">
         {emailMsg && <p className={`note ${emailMsg.ok ? 'note-ok' : 'note-wait'}`} role="status">{emailMsg.text}</p>}
         {printFailed && (
           <p className="note note-wait">
-            Tiskové okno prohlížeč zablokoval. Povol vyskakovací okna pro tuhle stránku,
-            nebo si seznam zkopíruj a vytiskni odjinud.
+            
+            {t('Tiskové okno prohlížeč zablokoval. Povol vyskakovací okna pro tuhle stránku, nebo si seznam zkopíruj a vytiskni odjinud.')}
           </p>
         )}
-        {items.length === 0 && <p className="t-meta">Od tohoto dodavatele teď nic nechybí.</p>}
+        {items.length === 0 && <p className="t-meta">{t('Od tohoto dodavatele teď nic nechybí.')}</p>}
         {groups.map(([supplier, list]) => (
           <section key={supplier} aria-label={supplier}>
             {hasSuppliers && (
@@ -1774,7 +1783,8 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [], smiO
                 <p className="t-label">{supplier}</p>
                 {smiOdeslat && supplierByName(supplier)?.email && (
                   <Button variant="secondary" size="sm" icon="send" loading={emailing === supplier} onClick={() => emailGroup(supplier, list)}>
-                    Objednat e-mailem
+                    
+                    {t('Objednat e-mailem')}
                   </Button>
                 )}
               </div>
@@ -1785,11 +1795,11 @@ function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [], smiO
                 return (
                   <ListRow key={i.id}
                     title={i.name}
-                    meta={[`zbývá ${i.quantity} ${i.unit}`, (i.buyFor?.length ?? 0) > 0 ? `na výrobu: ${i.buyFor!.map(f => f.name).join(', ')}` : null].filter(Boolean).join(' · ')}
+                    meta={[t('zbývá {n} {jednotka}', { n: i.quantity, jednotka: i.unit }), (i.buyFor?.length ?? 0) > 0 ? t('na výrobu: {seznam}', { seznam: i.buyFor!.map(f => f.name).join(', ') }) : null].filter(Boolean).join(' · ')}
                     value={<span className="tabular-nums">+{suggestedAmount(i)} {i.unit}</span>}
-                    right={<Chip tone={st === 'critical' ? 'bad' : st === 'low' ? 'wait' : 'info'} size="sm">{st === 'critical' ? 'kriticky' : st === 'low' ? 'dochází' : 'na výrobu'}</Chip>}
+                    right={<Chip tone={st === 'critical' ? 'bad' : st === 'low' ? 'wait' : 'info'} size="sm">{st === 'critical' ? t('kriticky') : st === 'low' ? t('dochází') : t('na výrobu')}</Chip>}
                     actions={i.supplierUrl ? (
-                      <a href={i.supplierUrl} target="_blank" rel="noopener" className="btn-icon" aria-label={`Objednat ${i.name} u dodavatele`}>
+                      <a href={i.supplierUrl} target="_blank" rel="noopener" className="btn-icon" aria-label={t('Objednat {nazev} u dodavatele', { nazev: i.name })}>
                         <Icon name="external" size={15} />
                       </a>
                     ) : undefined} />
@@ -1811,6 +1821,7 @@ function CategoryManager({ categories, onClose, onChanged, createCategory, potvr
   createCategory: (name: string, parentId?: number | null) => Promise<boolean>;
   potvrdit: (p: Potvrzeni) => void;
 }) {
+  const t = useT('sprava');
   const [newName, setNewName] = useState('');
   const [newParent, setNewParent] = useState('');
   const [busy, setBusy] = useState(false);
@@ -1859,7 +1870,7 @@ function CategoryManager({ categories, onClose, onChanged, createCategory, potvr
               body: JSON.stringify({ hideFromOverview: !(c.hideFromOverview === true) }),
             }).catch(() => null);
             if (res?.ok) await onChanged();
-            else setErr('Skrytí kategorie se nepodařilo uložit.');
+            else setErr(t('Skrytí kategorie se nepodařilo uložit.'));
           }}
         />
         {!readOnly && prefillId === c.id && (
@@ -1885,7 +1896,7 @@ function CategoryManager({ categories, onClose, onChanged, createCategory, potvr
     const ok = await createCategory(newName, newParent ? parseInt(newParent) : null);
     setBusy(false);
     if (ok) { setNewName(''); await onChanged(); }
-    else setErr('Kategorii se nepodařilo vytvořit.');
+    else setErr(t('Kategorii se nepodařilo vytvořit.'));
   };
 
   // Re-file a category: null lifts it back to the top level.
@@ -1898,19 +1909,20 @@ function CategoryManager({ categories, onClose, onChanged, createCategory, potvr
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        setErr(d.error || 'Přesun se nepodařil.');
+        setErr(d.error || t('Přesun se nepodařil.'));
       } else {
         setMoveId(null);
         await onChanged();
       }
-    } catch { setErr('Nepodařilo se spojit se serverem.'); }
+    } catch { setErr(t('Nepodařilo se spojit se serverem.')); }
     setBusy(false);
   };
 
+  const vychoziKategorie = [t('Nápoje'), t('Suroviny'), t('Nádobí'), t('Drogerie')];
   const seedDefaults = async () => {
     setBusy(true);
     const existing = new Set(own.map(c => c.name.toLowerCase()));
-    for (const name of DEFAULT_CATEGORIES) {
+    for (const name of vychoziKategorie) {
       if (!existing.has(name.toLowerCase())) await createCategory(name);
     }
     setBusy(false);
@@ -1925,12 +1937,12 @@ function CategoryManager({ categories, onClose, onChanged, createCategory, potvr
       const res = await fetch(`/api/inventory/categories/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        setErr(d.error || 'Přejmenování se nepodařilo.');
+        setErr(d.error || t('Přejmenování se nepodařilo.'));
         setBusy(false);
         return; // keep the editor open — closing would throw the typed name away
       }
     } catch {
-      setErr('Nepodařilo se spojit se serverem.');
+      setErr(t('Nepodařilo se spojit se serverem.'));
       setBusy(false);
       return;
     }
@@ -1951,25 +1963,25 @@ function CategoryManager({ categories, onClose, onChanged, createCategory, potvr
         fetch(`/api/inventory/categories/${a.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ position: b.position }) }),
         fetch(`/api/inventory/categories/${b.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ position: a.position }) }),
       ]);
-      if (res.some(r => !r.ok)) setErr('Pořadí se nepodařilo uložit.');
-    } catch { setErr('Nepodařilo se spojit se serverem.'); }
+      if (res.some(r => !r.ok)) setErr(t('Pořadí se nepodařilo uložit.'));
+    } catch { setErr(t('Nepodařilo se spojit se serverem.')); }
     setBusy(false);
     await onChanged();
   };
 
   const del = (c: Category) => {
     const kids = own.filter(x => x.parentId === c.id).length;
-    const extra = kids > 0 ? ` ${czCount(kids, { one: 'podkategorie', few: 'podkategorie', many: 'podkategorií' })} se ${czVerb(kids, 'přesune', 'přesunou')} na hlavní úroveň.` : '';
+    const extra = kids > 0 ? ` ${t('{n, plural, one {# podkategorie se přesune na hlavní úroveň.} few {# podkategorie se přesunou na hlavní úroveň.} other {# podkategorií se přesune na hlavní úroveň.}}', { n: kids })}` : '';
     potvrdit({
-      titulek: `Smazat kategorii „${c.name}"?`,
-      text: `Položky si svůj štítek ponechají.${extra}`,
-      akce: 'Smazat kategorii',
+      titulek: t('Smazat kategorii „{nazev}"?', { nazev: c.name }),
+      text: `${t('Položky si svůj štítek ponechají.')}${extra}`,
+      akce: t('Smazat kategorii'),
       provest: async () => {
         setBusy(true); setErr('');
         try {
           const res = await fetch(`/api/inventory/categories/${c.id}`, { method: 'DELETE' });
-          if (!res.ok) setErr('Kategorii se nepodařilo smazat.');
-        } catch { setErr('Nepodařilo se spojit se serverem.'); }
+          if (!res.ok) setErr(t('Kategorii se nepodařilo smazat.'));
+        } catch { setErr(t('Nepodařilo se spojit se serverem.')); }
         setBusy(false);
         await onChanged();
       },
@@ -1977,26 +1989,26 @@ function CategoryManager({ categories, onClose, onChanged, createCategory, potvr
   };
 
   return (
-    <Modal open onClose={onClose} size="lg" title="Kategorie a balení"
-      subtitle="Pořadí, zanoření, předvyplnění nových položek a sledování načatých balení."
-      footer={<Button variant="secondary" onClick={onClose}>Hotovo</Button>}>
+    <Modal open onClose={onClose} size="lg" title={t('Kategorie a balení')}
+      subtitle={t('Pořadí, zanoření, předvyplnění nových položek a sledování načatých balení.')}
+      footer={<Button variant="secondary" onClick={onClose}>{t('Hotovo')}</Button>}>
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row gap-2">
-          <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Název nové kategorie"
-            aria-label="Název nové kategorie"
+          <input value={newName} onChange={e => setNewName(e.target.value)} placeholder={t('Název nové kategorie')}
+            aria-label={t('Název nové kategorie')}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
             className={`${inputClass} flex-1 min-w-0`} />
           {flat.length > 0 && (
             <select value={newParent} onChange={e => setNewParent(e.target.value)}
-              aria-label="Kam novou kategorii zařadit"
+              aria-label={t('Kam novou kategorii zařadit')}
               className={`${inputClass} !w-full sm:!w-40 shrink-0`}>
-              <option value="">Hlavní</option>
+              <option value="">{t('Hlavní')}</option>
               {flat.map(({ cat: c, depth }) => (
-                <option key={c.id} value={String(c.id)}>{' '.repeat(depth * 2)}pod {c.name}</option>
+                <option key={c.id} value={String(c.id)}>{' '.repeat(depth * 2)}{t('pod {nazev}', { nazev: c.name })}</option>
               ))}
             </select>
           )}
-          <Button variant="primary" icon="plus" onClick={add} loading={busy} disabled={!newName.trim()}>Přidat</Button>
+          <Button variant="primary" icon="plus" onClick={add} loading={busy} disabled={!newName.trim()}>{t('Přidat')}</Button>
         </div>
 
         {err && <p className="note note-danger" role="alert">{err}</p>}
@@ -2004,11 +2016,11 @@ function CategoryManager({ categories, onClose, onChanged, createCategory, potvr
         {own.length === 0 ? (cizi.length > 0 ? (
           // Bez vlastních kategorií, ale s kategoriemi z organizace: sklad
           // prázdný není a výchozí sada by se dublovala s tou sdílenou.
-          <p className="t-meta py-2">Vlastní kategorie zatím nemáš — používáš kategorie z organizace níže. Vlastní přidáš nahoře.</p>
+          <p className="t-meta py-2">{t('Vlastní kategorie zatím nemáš — používáš kategorie z organizace níže. Vlastní přidáš nahoře.')}</p>
         ) : (
-          <EmptyState illustration="sklad" title="Sklad je zatím prázdný" compact
-            hint="Začni kategoriemi — nápoje, suroviny, nádobí, drogerie. Můžeš je nechat založit a pak upravit."
-            action={<Button variant="secondary" onClick={seedDefaults} loading={busy}>Přidat výchozí: {DEFAULT_CATEGORIES.join(', ')}</Button>} />
+          <EmptyState illustration="sklad" title={t('Sklad je zatím prázdný')} compact
+            hint={t('Začni kategoriemi — nápoje, suroviny, nádobí, drogerie. Můžeš je nechat založit a pak upravit.')}
+            action={<Button variant="secondary" onClick={seedDefaults} loading={busy}>{t('Přidat výchozí: {seznam}', { seznam: vychoziKategorie.join(', ') })}</Button>} />
         )) : (
           <div className="divide-y divide-black/[0.06]">
             {tree.map(node => renderNode(node, tree.map(t => t.cat), 0))}
@@ -2020,9 +2032,9 @@ function CategoryManager({ categories, onClose, onChanged, createCategory, potvr
         {ciziTree.length > 0 && (
           <section className="space-y-1 pt-2" aria-labelledby="sklad-kat-org">
             <p id="sklad-kat-org" className="t-label flex items-center gap-2">
-              Z organizace <Chip tone="muted" size="sm">{pocetKategorii(cizi.length)}</Chip>
+              {t('Z organizace')} <Chip tone="muted" size="sm">{t('{n, plural, one {# kategorie} few {# kategorie} other {# kategorií}}', { n: cizi.length })}</Chip>
             </p>
-            {spravuje && <p className="t-meta">Spravuje: {spravuje}. Upraví je jeho vedení.</p>}
+            {spravuje && <p className="t-meta">{t('Spravuje: {kdo}. Upraví je jeho vedení.', { kdo: spravuje })}</p>}
             <div className="divide-y divide-black/[0.06]">
               {ciziTree.map(node => renderNode(node, ciziTree.map(t => t.cat), 0, true))}
             </div>
@@ -2058,68 +2070,70 @@ function CategoryRow({
   /** Full path of a category, so two same-named options stay distinguishable. */
   pathLabel: (id: number) => string;
 }) {
+  const t = useT('sprava');
   // Anything can be re-filed except under its own branch, which possibleParents
   // has already excluded.
   const canMove = parentOptions.length > 0 || c.parentId != null;
   const nazev = (
     <span className={`flex-1 min-w-0 truncate ${nested ? 'text-[13px] text-black/70' : 'text-sm text-[#16181A] font-medium'}`}>
       {c.name}
-      {childCount > 0 && <span className="text-xs text-black/55 ml-1.5">{childCount} podkat.</span>}
-      {inheritsPackaging && !c.tracksOpen && <span className="text-xs text-black/55 ml-1.5">balení dědí</span>}
+      {childCount > 0 && <span className="text-xs text-black/55 ml-1.5">{t('{n} podkat.', { n: childCount })}</span>}
+      {inheritsPackaging && !c.tracksOpen && <span className="text-xs text-black/55 ml-1.5">{t('balení dědí')}</span>}
     </span>
   );
   if (readOnly) {
     return (
       <div className="flex items-center gap-2">
         {nazev}
-        <Chip tone="muted" size="sm" className="shrink-0">z organizace</Chip>
+        <Chip tone="muted" size="sm" className="shrink-0">{t('z organizace')}</Chip>
       </div>
     );
   }
   const stavy = [
-    c.sdileno ? <Chip key="s" tone="info" size="sm">sdíleno</Chip> : null,
-    c.hideFromOverview ? <Chip key="h" tone="muted" size="sm">skrytá ve Vše</Chip> : null,
-    hasPrefill ? <Chip key="p" tone="muted" size="sm">předvyplnění</Chip> : null,
-    c.tracksOpen ? <Chip key="b" tone="muted" size="sm">balení</Chip> : null,
+    c.sdileno ? <Chip key="s" tone="info" size="sm">{t('sdíleno')}</Chip> : null,
+    c.hideFromOverview ? <Chip key="h" tone="muted" size="sm">{t('skrytá ve Vše')}</Chip> : null,
+    hasPrefill ? <Chip key="p" tone="muted" size="sm">{t('předvyplnění')}</Chip> : null,
+    c.tracksOpen ? <Chip key="b" tone="muted" size="sm">{t('balení')}</Chip> : null,
   ].filter(Boolean);
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
         {editing ? (
-          <input autoFocus value={editName} onChange={e => setEditName(e.target.value)} aria-label={`Nový název kategorie ${c.name}`}
+          <input autoFocus value={editName} onChange={e => setEditName(e.target.value)} aria-label={t('Nový název kategorie {nazev}', { nazev: c.name })}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); saveRename(); } if (e.key === 'Escape') cancelEdit(); }}
             onBlur={saveRename}
             className={`${inputClass} flex-1 min-w-0`} />
         ) : nazev}
         {stavy.length > 0 && <span className="hidden sm:flex items-center gap-1 shrink-0">{stavy}</span>}
-        <Menu size="sm" label={`Další akce: ${c.name}`} items={[
-          { label: 'Přejmenovat', icon: 'pencil', onClick: startEdit },
-          ...(idx > 0 ? [{ label: 'Posunout výš', icon: 'chevron', onClick: () => { if (!busy) move(siblings, idx, -1); } }] : []),
-          ...(idx < siblings.length - 1 ? [{ label: 'Posunout níž', icon: 'chevron', onClick: () => { if (!busy) move(siblings, idx, 1); } }] : []),
-          ...(canMove ? [{ label: moveOpen ? 'Zavřít přesun' : 'Přesunout pod jinou…', icon: 'swap', onClick: toggleMove }] : []),
-          { label: c.hideFromOverview ? 'Ukázat v přehledu „Vše"' : 'Skrýt z přehledu „Vše"', icon: 'search', onClick: onToggleHide },
-          { label: prefillOpen ? 'Zavřít předvyplnění' : 'Předvyplnění nových položek', icon: 'clipboard', onClick: togglePrefill },
-          { label: packOpen ? 'Zavřít balení' : 'Balení a zbytky', icon: 'box', onClick: togglePack },
-          { label: 'Smazat kategorii…', icon: 'trash', danger: true, onClick: onDelete },
+        <Menu size="sm" label={t('Další akce: {nazev}', { nazev: c.name })} items={[
+          { label: t('Přejmenovat'), icon: 'pencil', onClick: startEdit },
+          ...(idx > 0 ? [{ label: t('Posunout výš'), icon: 'chevron', onClick: () => { if (!busy) move(siblings, idx, -1); } }] : []),
+          ...(idx < siblings.length - 1 ? [{ label: t('Posunout níž'), icon: 'chevron', onClick: () => { if (!busy) move(siblings, idx, 1); } }] : []),
+          ...(canMove ? [{ label: moveOpen ? t('Zavřít přesun') : t('Přesunout pod jinou…'), icon: 'swap', onClick: toggleMove }] : []),
+          { label: c.hideFromOverview ? t('Ukázat v přehledu „Vše"') : t('Skrýt z přehledu „Vše"'), icon: 'search', onClick: onToggleHide },
+          { label: prefillOpen ? t('Zavřít předvyplnění') : t('Předvyplnění nových položek'), icon: 'clipboard', onClick: togglePrefill },
+          { label: packOpen ? t('Zavřít balení') : t('Balení a zbytky'), icon: 'box', onClick: togglePack },
+          { label: t('Smazat kategorii…'), icon: 'trash', danger: true, onClick: onDelete },
         ]} />
       </div>
 
       {moveOpen && (
-        <div className="well flex flex-wrap items-center gap-1.5 px-3 py-2" role="group" aria-label={`Kam zařadit ${c.name}`}>
-          <span className="t-meta">Zařadit:</span>
+        <div className="well flex flex-wrap items-center gap-1.5 px-3 py-2" role="group" aria-label={t('Kam zařadit {nazev}', { nazev: c.name })}>
+          <span className="t-meta">{t('Zařadit:')}</span>
           <button type="button" onClick={() => setParent(null)} disabled={busy || c.parentId == null} aria-pressed={c.parentId == null}
             className={`filter-pill tap-target-sm disabled:opacity-40 ${c.parentId == null ? 'seg-on' : 'seg-off glass'}`}>
-            Hlavní úroveň
+            
+            {t('Hlavní úroveň')}
           </button>
           {parentOptions.map(p => (
             <button type="button" key={p.id} onClick={() => setParent(p.id)} disabled={busy || c.parentId === p.id}
               title={pathLabel(p.id)} aria-pressed={c.parentId === p.id}
               className={`filter-pill tap-target-sm disabled:opacity-40 ${c.parentId === p.id ? 'seg-on' : 'seg-off glass'}`}>
-              pod {pathLabel(p.id)}
+              {t('pod {cesta}', { cesta: pathLabel(p.id) })}
             </button>
           ))}
           {parentOptions.length === 0 && c.parentId == null && (
-            <span className="t-meta">Zatím není kam ji zanořit.</span>
+            <span className="t-meta">{t('Zatím není kam ji zanořit.')}</span>
           )}
         </div>
       )}
@@ -2135,6 +2149,7 @@ function DefaultsEditor({ category, inherited, onSaved }: {
   inherited: ItemDefaults;
   onSaved: () => Promise<void> | void;
 }) {
+  const t = useT('sprava');
   const [values, setValues] = useState<Record<string, string>>(() => {
     const own = category.defaults ?? {};
     const out: Record<string, string> = {};
@@ -2160,22 +2175,22 @@ function DefaultsEditor({ category, inherited, onSaved }: {
       if (res.ok) { setSaved(true); await onSaved(); setTimeout(() => setSaved(false), 1800); }
       else {
         const d = await res.json().catch(() => ({}));
-        setErr(d.error || 'Předvyplnění se nepodařilo uložit.');
+        setErr(d.error || t('Předvyplnění se nepodařilo uložit.'));
       }
-    } catch { setErr('Nepodařilo se spojit se serverem.'); }
+    } catch { setErr(t('Nepodařilo se spojit se serverem.')); }
     setBusy(false);
   };
 
   return (
     <div className="mt-2.5 well p-4 space-y-3">
-      <p className="t-meta">Nová položka v této kategorii se předvyplní tímhle. Cokoliv jde u položky přepsat.</p>
+      <p className="t-meta">{t('Nová položka v této kategorii se předvyplní tímhle. Cokoliv jde u položky přepsat.')}</p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
         {DEFAULT_FIELDS.map(f => {
           const fromParent = (inherited as any)[f.key];
           const id = `sklad-predvyplneni-${category.id}-${f.key}`;
           return (
             <Field key={f.key} id={id} label={f.label} className={f.kind === 'multiline' ? 'sm:col-span-2' : ''}
-              hint={fromParent != null && !values[f.key] ? 'Zdědí se z nadřazené kategorie.' : undefined}>
+              hint={fromParent != null && !values[f.key] ? t('Zdědí se z nadřazené kategorie.') : undefined}>
               {f.kind === 'multiline' ? (
                 <textarea id={id} rows={2} value={values[f.key]} onChange={e => setValues(v => ({ ...v, [f.key]: e.target.value }))}
                   placeholder={fromParent != null ? String(fromParent) : f.hint}
@@ -2192,8 +2207,8 @@ function DefaultsEditor({ category, inherited, onSaved }: {
         })}
       </div>
       <div className="flex items-center gap-2">
-        <Button variant="primary" size="sm" onClick={save} loading={busy}>Uložit</Button>
-        {saved && <span className="text-xs font-medium text-ok-ink" role="status">Uloženo</span>}
+        <Button variant="primary" size="sm" onClick={save} loading={busy}>{t('Uložit')}</Button>
+        {saved && <span className="text-xs font-medium text-ok-ink" role="status">{t('Uloženo')}</span>}
         {err && <span className="text-xs font-medium text-bad-ink" role="alert">{err}</span>}
       </div>
     </div>
@@ -2207,6 +2222,7 @@ function PackagingEditor({ category, onSaved }: {
   category: Category;
   onSaved: () => Promise<void> | void;
 }) {
+  const t = useT('sprava');
   const [on, setOn] = useState(category.tracksOpen === true);
   const [unit, setUnit] = useState(category.contentUnit ?? 'g');
   const [size, setSize] = useState(category.defaultPackageSize != null ? String(category.defaultPackageSize) : '');
@@ -2235,10 +2251,10 @@ function PackagingEditor({ category, onSaved }: {
         setSaved(true); await onSaved(); setTimeout(() => setSaved(false), 1800);
       } else {
         const d = await res.json().catch(() => ({}));
-        setErr(d.error || 'Nastavení se nepodařilo uložit.');
+        setErr(d.error || t('Nastavení se nepodařilo uložit.'));
       }
     } catch {
-      setErr('Nepodařilo se spojit se serverem.');
+      setErr(t('Nepodařilo se spojit se serverem.'));
     }
     setBusy(false);
   };
@@ -2249,71 +2265,73 @@ function PackagingEditor({ category, onSaved }: {
 
   return (
     <div className="mt-2.5 well p-4 space-y-3">
-      <SwitchRow as="div" title="Sledovat zbytek v načatém balení"
-        hint="Obsluha na konci směny jen ťukne, jak je krabička plná — nic neváží."
+      <SwitchRow as="div" title={t('Sledovat zbytek v načatém balení')}
+        hint={t('Obsluha na konci směny jen ťukne, jak je krabička plná — nic neváží.')}
         checked={on} onChange={setOn} />
 
       {on && (
         <>
           <div className="grid grid-cols-2 gap-2.5">
-            <Field id={`${idK}-jednotka`} label="Jednotka obsahu">
+            <Field id={`${idK}-jednotka`} label={t('Jednotka obsahu')}>
               <select id={`${idK}-jednotka`} value={unit} onChange={e => setUnit(e.target.value)} className={inputClass}>
                 {CONTENT_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
               </select>
             </Field>
-            <Field id={`${idK}-velikost`} label="Výchozí balení">
+            <Field id={`${idK}-velikost`} label={t('Výchozí balení')}>
               <input id={`${idK}-velikost`} type="number" inputMode="numeric" min={0} value={size} onChange={e => setSize(e.target.value)} placeholder="100"
                 className={`${inputClass} tabular-nums`} />
             </Field>
           </div>
 
           <div>
-            <p className="field-label">Hlídat zásoby podle</p>
-            <Segmented ariaLabel="Hlídat zásoby podle" size="sm" value={thresholdUnit} onChange={setThresholdUnit}
-              options={[{ id: 'package', label: 'Balení' }, { id: 'content', label: unit ? `Obsahu (${unit})` : 'Obsahu' }]} />
+            <p className="field-label">{t('Hlídat zásoby podle')}</p>
+            <Segmented ariaLabel={t('Hlídat zásoby podle')} size="sm" value={thresholdUnit} onChange={setThresholdUnit}
+              options={[{ id: 'package', label: t('Balení') }, { id: 'content', label: unit ? t('Obsahu ({jednotka})', { jednotka: unit }) : t('Obsahu') }]} />
             <p className="t-meta mt-1.5">
               {thresholdUnit === 'content'
-                ? `„Upozornit při" a „Kriticky málo při" se u položek zadávají v ${unit || 'jednotkách obsahu'} — počítá se všechno dohromady, zavřená balení i zbytek v načatém.`
-                : 'Prahy se zadávají v balení; načaté balení se počítá jako část (půl krabičky = 0,5).'}
+                ? t('„Upozornit při" a „Kriticky málo při" se u položek zadávají v {jednotka} — počítá se všechno dohromady, zavřená balení i zbytek v načatém.', { jednotka: unit || t('jednotkách obsahu') })
+                : t('Prahy se zadávají v balení; načaté balení se počítá jako část (půl krabičky = 0,5).')}
             </p>
             {thresholdUnit !== (category.thresholdUnit === 'content' ? 'content' : 'package') && (
               <p className="note note-wait mt-1.5 text-[13px]">
-                Prahy u položek v této kategorii jsou zadané v {thresholdUnit === 'content' ? 'balení' : (unit || 'jednotkách obsahu')} — po uložení je bude potřeba přepsat, jinak budou hlásit nesmysl.
+                {t('Prahy u položek v této kategorii jsou zadané v {jednotka} — po uložení je bude potřeba přepsat, jinak budou hlásit nesmysl.', { jednotka: thresholdUnit === 'content' ? t('balení') : (unit || t('jednotkách obsahu')) })}
               </p>
             )}
           </div>
 
           <div>
-            <p className="field-label">Stupně měřítka</p>
+            <p className="field-label">{t('Stupně měřítka')}</p>
             <div className="space-y-1.5">
               {steps.map((s, i) => (
                 <div key={i} className="flex items-center gap-2">
-                  <input value={s.label} onChange={e => setStep(i, { label: e.target.value })} aria-label={`Název stupně ${i + 1}`}
+                  <input value={s.label} onChange={e => setStep(i, { label: e.target.value })} aria-label={t('Název stupně {n}', { n: i + 1 })}
                     className={`${inputClass} flex-1 min-w-0`} />
                   <div className="flex items-center gap-1 shrink-0">
-                    <input type="number" inputMode="numeric" min={0} max={100} value={s.pct ?? 0} aria-label={`Procenta stupně ${s.label || i + 1}`}
+                    <input type="number" inputMode="numeric" min={0} max={100} value={s.pct ?? 0} aria-label={t('Procenta stupně {nazev}', { nazev: s.label || i + 1 })}
                       onChange={e => setStep(i, { pct: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })}
                       className={`${inputClass} !w-20 tabular-nums`} />
                     <span className="text-xs text-black/55">%</span>
                   </div>
-                  <Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={`Odebrat stupeň ${s.label || i + 1}`}
+                  <Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={t('Odebrat stupeň {nazev}', { nazev: s.label || i + 1 })}
                     onClick={() => setSteps(l => l.filter((_, idx) => idx !== i))} />
                 </div>
               ))}
             </div>
-            <Button variant="ghost" size="sm" icon="plus" className="mt-2" onClick={() => setSteps(l => [...l, { label: 'Nový stupeň', pct: 50 }])}>
-              Přidat stupeň
+            <Button variant="ghost" size="sm" icon="plus" className="mt-2" onClick={() => setSteps(l => [...l, { label: t('Nový stupeň'), pct: 50 }])}>
+              
+              {t('Přidat stupeň')}
             </Button>
             <p className="t-meta mt-1.5">
-              Procenta platí pro jakoukoliv velikost balení — „Půl" je 50 g u stogramové i 25 g u padesátigramové.
+              
+              {t('Procenta platí pro jakoukoliv velikost balení — „Půl" je 50 g u stogramové i 25 g u padesátigramové.')}
             </p>
           </div>
         </>
       )}
 
       <div className="flex items-center gap-2">
-        <Button variant="primary" size="sm" onClick={save} loading={busy}>Uložit</Button>
-        {saved && <span className="text-xs font-medium text-ok-ink" role="status">Uloženo</span>}
+        <Button variant="primary" size="sm" onClick={save} loading={busy}>{t('Uložit')}</Button>
+        {saved && <span className="text-xs font-medium text-ok-ink" role="status">{t('Uloženo')}</span>}
         {err && <span className="text-xs font-medium text-bad-ink" role="alert">{err}</span>}
       </div>
     </div>
@@ -2329,6 +2347,7 @@ function SuppliersModal({ suppliers, smiUpravit, onClose, onChanged, potvrdit }:
   onChanged: () => Promise<void> | void;
   potvrdit: (p: Potvrzeni) => void;
 }) {
+  const t = useT('sprava');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -2346,28 +2365,28 @@ function SuppliersModal({ suppliers, smiUpravit, onClose, onChanged, potvrdit }:
     }).catch(() => null);
     setBusy(false);
     if (res?.ok) { setName(''); setEmail(''); setPhone(''); await onChanged(); }
-    else { const d = res ? await res.json().catch(() => ({})) : {}; setErr(d.error || 'Uložení se nepodařilo.'); }
+    else { const d = res ? await res.json().catch(() => ({})) : {}; setErr(d.error || t('Uložení se nepodařilo.')); }
   };
 
   return (
-    <Modal open onClose={onClose} size="lg" title="Dodavatelé"
-      subtitle="S vyplněným e-mailem jde objednávka poslat rovnou z nákupního seznamu. Jméno dodavatele u položek vybíráš našeptávačem.">
+    <Modal open onClose={onClose} size="lg" title={t('Dodavatelé')}
+      subtitle={t('S vyplněným e-mailem jde objednávka poslat rovnou z nákupního seznamu. Jméno dodavatele u položek vybíráš našeptávačem.')}>
       <div className="space-y-4">
         {err && <p className="note note-danger" role="alert">{err}</p>}
         {smiUpravit && (
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-end">
-            <Field id="sklad-dod-nazev" label="Název dodavatele">
+            <Field id="sklad-dod-nazev" label={t('Název dodavatele')}>
               <input id="sklad-dod-nazev" value={name} onChange={e => setName(e.target.value)} maxLength={120} className={inputClass} />
             </Field>
-            <Field id="sklad-dod-email" label="E-mail pro objednávky">
+            <Field id="sklad-dod-email" label={t('E-mail pro objednávky')}>
               <input id="sklad-dod-email" value={email} onChange={e => setEmail(e.target.value)} placeholder="objednavky@dodavatel.cz" type="email" maxLength={200} className={inputClass} />
             </Field>
-            <Button variant="primary" icon="plus" onClick={add} loading={busy} disabled={!name.trim()}>Přidat</Button>
+            <Button variant="primary" icon="plus" onClick={add} loading={busy} disabled={!name.trim()}>{t('Přidat')}</Button>
           </div>
         )}
 
         {suppliers.length === 0 ? (
-          <EmptyState illustration="sklad" title="Zatím žádný dodavatel" hint="S dodavatelem u položky pošleš objednávku e-mailem rovnou z nákupního seznamu." compact />
+          <EmptyState illustration="sklad" title={t('Zatím žádný dodavatel')} hint={t('S dodavatelem u položky pošleš objednávku e-mailem rovnou z nákupního seznamu.')} compact />
         ) : (
           <ul className="list">
             {suppliers.map(sp => (
@@ -2375,13 +2394,13 @@ function SuppliersModal({ suppliers, smiUpravit, onClose, onChanged, potvrdit }:
                 <ListRow as="div"
                   title={<>
                     {sp.name}
-                    {sp.zOrganizace && <Chip tone="muted" size="sm" className="ml-1.5 align-middle">z organizace</Chip>}
-                    {sp.sdileno && <Chip tone="info" size="sm" className="ml-1.5 align-middle">sdíleno</Chip>}
+                    {sp.zOrganizace && <Chip tone="muted" size="sm" className="ml-1.5 align-middle">{t('z organizace')}</Chip>}
+                    {sp.sdileno && <Chip tone="info" size="sm" className="ml-1.5 align-middle">{t('sdíleno')}</Chip>}
                   </>}
-                  meta={editId === sp.id ? undefined : <span className={sp.email ? '' : 'text-wait-ink'}>{sp.email ?? 'bez e-mailu'}</span>}
+                  meta={editId === sp.id ? undefined : <span className={sp.email ? '' : 'text-wait-ink'}>{sp.email ?? t('bez e-mailu')}</span>}
                   actions={sp.zOrganizace || !smiUpravit ? undefined : editId === sp.id ? (
                     <span className="flex items-center gap-1.5">
-                      <input value={editEmail} onChange={e => setEditEmail(e.target.value)} type="email" aria-label={`E-mail dodavatele ${sp.name}`}
+                      <input value={editEmail} onChange={e => setEditEmail(e.target.value)} type="email" aria-label={t('E-mail dodavatele {nazev}', { nazev: sp.name })}
                         className={`${inputClass} !w-full sm:!w-52`} />
                       <Button variant="primary" size="sm" onClick={async () => {
                         const res = await fetch('/api/suppliers', {
@@ -2389,20 +2408,20 @@ function SuppliersModal({ suppliers, smiUpravit, onClose, onChanged, potvrdit }:
                           body: JSON.stringify({ id: sp.id, email: editEmail.trim() || null }),
                         }).catch(() => null);
                         if (res?.ok) { setEditId(null); await onChanged(); }
-                        else setErr('E-mail se nepodařilo uložit.');
-                      }}>Uložit</Button>
+                        else setErr(t('E-mail se nepodařilo uložit.'));
+                      }}>{t('Uložit')}</Button>
                     </span>
                   ) : (
-                    <Menu size="sm" label={`Další akce: ${sp.name}`} items={[
-                      { label: 'Upravit e-mail', icon: 'pencil', onClick: () => { setEditId(sp.id); setEditEmail(sp.email ?? ''); } },
-                      { label: 'Smazat dodavatele…', icon: 'trash', danger: true, onClick: () => potvrdit({
-                        titulek: `Smazat dodavatele „${sp.name}"?`,
-                        text: 'U položek zůstane jeho jméno jako text, jen z něj nepůjde poslat objednávka e-mailem.',
-                        akce: 'Smazat dodavatele',
+                    <Menu size="sm" label={t('Další akce: {nazev}', { nazev: sp.name })} items={[
+                      { label: t('Upravit e-mail'), icon: 'pencil', onClick: () => { setEditId(sp.id); setEditEmail(sp.email ?? ''); } },
+                      { label: t('Smazat dodavatele…'), icon: 'trash', danger: true, onClick: () => potvrdit({
+                        titulek: t('Smazat dodavatele „{nazev}"?', { nazev: sp.name }),
+                        text: t('U položek zůstane jeho jméno jako text, jen z něj nepůjde poslat objednávka e-mailem.'),
+                        akce: t('Smazat dodavatele'),
                         provest: async () => {
                           const res = await fetch(`/api/suppliers?id=${sp.id}`, { method: 'DELETE' }).catch(() => null);
                           if (res?.ok) await onChanged();
-                          else setErr('Dodavatele se nepodařilo smazat.');
+                          else setErr(t('Dodavatele se nepodařilo smazat.'));
                         },
                       }) },
                     ]} />

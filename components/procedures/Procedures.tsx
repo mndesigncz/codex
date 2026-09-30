@@ -31,7 +31,6 @@ import {
 import { useProcedures } from './ProcedureProvider';
 import StepTimeline from './StepTimeline';
 import { parseSteps, totalMinutes, fmtMinutes, STEP_WEIGHTS, weightSpec, type Step } from '@/lib/steps';
-import { czCount, type CzNoun } from '@/lib/czech';
 import { okJson, apiMessage } from '@/lib/api';
 import StepGuidePicker, { type PickableGuide } from '../guides/StepGuidePicker';
 import { useOtevreniNavodu } from '@/lib/otevriNavod';
@@ -44,6 +43,7 @@ import {
   type PostupApi,
 } from '@/lib/postupyPrehled';
 import { kdyPrubehu, useObnovaPoPrubehu } from '../widgety/oblasti/postupy';
+import { useT, type PrekladFn } from '@/lib/i18n/client';
 
 interface Props {
   user: { id?: string | number; name?: string | null; role?: string; avatar?: string };
@@ -55,38 +55,39 @@ interface Procedure extends PostupApi {
   color?: string;
 }
 
-const WEEKDAYS = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];
-const KROK: CzNoun = { one: 'krok', few: 'kroky', many: 'kroků' };
-const ICON_CHOICES: { id: string; nazev: string }[] = [
-  { id: 'check', nazev: 'Fajfka' }, { id: 'clock', nazev: 'Hodiny' }, { id: 'box', nazev: 'Krabice' }, { id: 'book', nazev: 'Kniha' },
-  { id: 'leaf', nazev: 'List' }, { id: 'users', nazev: 'Lidé' }, { id: 'calendar', nazev: 'Kalendář' }, { id: 'chat', nazev: 'Bublina' },
-  { id: 'trend', nazev: 'Graf' }, { id: 'warning', nazev: 'Výstraha' }, { id: 'settings', nazev: 'Ozubené kolo' }, { id: 'search', nazev: 'Lupa' },
+const dnyTydne = (t: PrekladFn) => [t('Po', {}, 'den'), t('Út', {}, 'den'), t('St', {}, 'den'), t('Čt', {}, 'den'), t('Pá', {}, 'den'), t('So', {}, 'den'), t('Ne', {}, 'den')];
+const ikonyPostupu = (t: PrekladFn): { id: string; nazev: string }[] => [
+  { id: 'check', nazev: t('Fajfka') }, { id: 'clock', nazev: t('Hodiny') }, { id: 'box', nazev: t('Krabice') }, { id: 'book', nazev: t('Kniha') },
+  { id: 'leaf', nazev: t('List') }, { id: 'users', nazev: t('Lidé') }, { id: 'calendar', nazev: t('Kalendář') }, { id: 'chat', nazev: t('Bublina') },
+  { id: 'trend', nazev: t('Graf') }, { id: 'warning', nazev: t('Výstraha') }, { id: 'settings', nazev: t('Ozubené kolo') }, { id: 'search', nazev: t('Lupa') },
 ];
+/** Důležitost kroku v jazyce uživatele (katalog `lib/steps` zůstává česky pro server). */
+const vahaKroku = (t: PrekladFn): Record<string, string> => ({ key: t('Klíčový'), normal: t('Běžný'), minor: t('Drobný') });
 
 const SEEDS = [
   {
-    name: 'Otevírání',
-    description: 'Ranní příprava provozovny před otevřením.',
+    name: 'Otevírání', // i18n-ok (ukázkové postupy jsou obsah podniku)
+    description: 'Ranní příprava provozovny před otevřením.', // i18n-ok (ukázkové postupy jsou obsah podniku)
     icon: 'clock',
     items: [
       { text: 'Odemknout provozovnu', emoji: '🔑', minutes: 1 },
-      { text: 'Zapnout světla a hudbu', emoji: '💡', minutes: 1 },
-      { text: 'Spustit kávovar a ohřev vody', emoji: '☕', minutes: 10, note: 'Nechat nahřát před prvním kafem.' },
-      { text: 'Zkontrolovat pokladnu', emoji: '💰', minutes: 3, note: 'Ověřit počáteční hotovost.' },
-      { text: 'Doplnit vitrínu', emoji: '🧁', minutes: 8 },
-      { text: 'Otočit ceduli OTEVŘENO', emoji: '🚪', minutes: 1 },
+      { text: 'Zapnout světla a hudbu', emoji: '💡', minutes: 1 }, // i18n-ok (ukázkové postupy jsou obsah podniku)
+      { text: 'Spustit kávovar a ohřev vody', emoji: '☕', minutes: 10, note: 'Nechat nahřát před prvním kafem.' }, // i18n-ok (ukázkové postupy jsou obsah podniku)
+      { text: 'Zkontrolovat pokladnu', emoji: '💰', minutes: 3, note: 'Ověřit počáteční hotovost.' }, // i18n-ok (ukázkové postupy jsou obsah podniku)
+      { text: 'Doplnit vitrínu', emoji: '🧁', minutes: 8 }, // i18n-ok (ukázkové postupy jsou obsah podniku)
+      { text: 'Otočit ceduli OTEVŘENO', emoji: '🚪', minutes: 1 }, // i18n-ok (ukázkové postupy jsou obsah podniku)
     ],
   },
   {
-    name: 'Zavírání',
-    description: 'Večerní uzavření provozovny.',
+    name: 'Zavírání', // i18n-ok (ukázkové postupy jsou obsah podniku)
+    description: 'Večerní uzavření provozovny.', // i18n-ok (ukázkové postupy jsou obsah podniku)
     icon: 'check',
     items: [
-      { text: 'Otočit ceduli ZAVŘENO', emoji: '🚪', minutes: 1 },
-      { text: 'Uklidit a vytřít', emoji: '🧹', minutes: 15 },
-      { text: 'Vypnout spotřebiče', emoji: '🔌', minutes: 3 },
-      { text: 'Spočítat pokladnu', emoji: '💰', minutes: 8, note: 'Provést uzávěrku.' },
-      { text: 'Vynést odpadky', emoji: '🗑️', minutes: 3 },
+      { text: 'Otočit ceduli ZAVŘENO', emoji: '🚪', minutes: 1 }, // i18n-ok (ukázkové postupy jsou obsah podniku)
+      { text: 'Uklidit a vytřít', emoji: '🧹', minutes: 15 }, // i18n-ok (ukázkové postupy jsou obsah podniku)
+      { text: 'Vypnout spotřebiče', emoji: '🔌', minutes: 3 }, // i18n-ok (ukázkové postupy jsou obsah podniku)
+      { text: 'Spočítat pokladnu', emoji: '💰', minutes: 8, note: 'Provést uzávěrku.' }, // i18n-ok (ukázkové postupy jsou obsah podniku)
+      { text: 'Vynést odpadky', emoji: '🗑️', minutes: 3 }, // i18n-ok (ukázkové postupy jsou obsah podniku)
       { text: 'Zamknout a zapnout alarm', emoji: '🔒', minutes: 2 },
     ],
   },
@@ -102,6 +103,7 @@ function Jamka({ ikona }: { ikona: string }) {
 }
 
 export default function Procedures({ user }: Props) {
+  const t = useT('postupy');
   const pathname = usePathname() ?? '';
   // Nástroj stránky (ne widget) bere mírné `ma()`: bez načtených oprávnění ukáže akce
   // a rozhodne server (jako ostatní obrazovky); přísné useSmi je pro widgety (spec §1.5).
@@ -162,7 +164,7 @@ export default function Procedures({ user }: Props) {
       await okJson(res);
       reload();
     } catch (e) {
-      setChyba(apiMessage(e, 'Postup se neschválil.'));
+      setChyba(apiMessage(e, t('Postup se neschválil.')));
     }
   };
 
@@ -175,7 +177,7 @@ export default function Procedures({ user }: Props) {
         if (!res.ok) selhalo += 1;
       } catch { selhalo += 1; }
     }
-    if (selhalo) setChyba('Některé ukázkové postupy se nepodařilo založit. Zkus to znovu.');
+    if (selhalo) setChyba(t('Některé ukázkové postupy se nepodařilo založit. Zkus to znovu.'));
     reload();
     setSeeding(false);
   };
@@ -191,7 +193,7 @@ export default function Procedures({ user }: Props) {
       setConfirmDel(null);
     } catch (e) {
       // Dřív se postup z obrazovky odebral hned a chyba smazání se zahodila — po obnovení byl zpátky.
-      setChyba(apiMessage(e, 'Postup se nepodařilo smazat.'));
+      setChyba(apiMessage(e, t('Postup se nepodařilo smazat.')));
       setConfirmDel(null);
     } finally {
       setDeleting(false);
@@ -204,20 +206,20 @@ export default function Procedures({ user }: Props) {
 
   const smiZakladat = smiVytvorit || smiNavrhnout;
   const hlavicka: HlavickaPlochy = {
-    title: 'Postupy',
-    subtitle: 'Krok za krokem — otevírání, zavírání a další rutiny.',
+    title: t('Postupy'),
+    subtitle: t('Krok za krokem — otevírání, zavírání a další rutiny.'),
     hintId: 'procedures',
     // Jediná limetka stránky. Bez postupů ji nese prázdný stav (ukázkové postupy), ne hlavička.
     primary: smiZakladat && procedures.length > 0 ? (
-      <Button variant="accent" icon="plus" onClick={openNew} title={smiVytvorit ? undefined : 'Návrh schválí vedení'}>
-        {smiVytvorit ? 'Nový postup' : 'Navrhnout postup'}
+      <Button variant="accent" icon="plus" onClick={openNew} title={smiVytvorit ? undefined : t('Návrh schválí vedení')}>
+        {smiVytvorit ? t('Nový postup') : t('Navrhnout postup')}
       </Button>
     ) : undefined,
     secondary: smiVytvorit && jinePodniky.length > 0
-      ? <Button variant="secondary" icon="copy" onClick={() => setKopieOpen(true)}>Z jiného podniku</Button>
+      ? <Button variant="secondary" icon="copy" onClick={() => setKopieOpen(true)}>{t('Z jiného podniku')}</Button>
       : undefined,
     menu: smiVytvorit && jinePodniky.length > 0
-      ? [{ label: 'Kopírovat z jiného podniku', icon: 'copy', onClick: () => setKopieOpen(true) }]
+      ? [{ label: t('Kopírovat z jiného podniku'), icon: 'copy', onClick: () => setKopieOpen(true) }]
       : undefined,
   };
 
@@ -229,20 +231,20 @@ export default function Procedures({ user }: Props) {
       </Card>
     );
   } else if (data.error) {
-    nastroj = <Card><ErrorState title="Postupy se nenačetly" hint={data.error} onRetry={data.reload} /></Card>;
+    nastroj = <Card><ErrorState title={t('Postupy se nenačetly')} hint={data.error} onRetry={data.reload} /></Card>;
   } else if (procedures.length === 0) {
     nastroj = (
       <Card>
-        <EmptyState illustration="postupy" title="Zatím žádné postupy"
+        <EmptyState illustration="postupy" title={t('Zatím žádné postupy')}
           hint={smiVytvorit
-            ? 'Otevírání, zavírání, příjem zboží — krok za krokem, s časy a tím, co je klíčové. Tým je pak odklikne na baru.'
-            : 'Až je vedení sepíše, najdeš je tady a projdeš krok po kroku.'}
+            ? t('Otevírání, zavírání, příjem zboží — krok za krokem, s časy a tím, co je klíčové. Tým je pak odklikne na baru.')
+            : t('Až je vedení sepíše, najdeš je tady a projdeš krok po kroku.')}
           action={smiVytvorit ? (
             <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5">
-              <Button variant="accent" icon="leaf" onClick={seedExamples} loading={seeding}>Vytvořit ukázkové postupy</Button>
-              <Button variant="secondary" icon="plus" onClick={openNew}>Vlastní postup</Button>
+              <Button variant="accent" icon="leaf" onClick={seedExamples} loading={seeding}>{t('Vytvořit ukázkové postupy')}</Button>
+              <Button variant="secondary" icon="plus" onClick={openNew}>{t('Vlastní postup')}</Button>
             </div>
-          ) : smiNavrhnout ? <Button variant="secondary" icon="plus" onClick={openNew}>Navrhnout postup</Button> : undefined} />
+          ) : smiNavrhnout ? <Button variant="secondary" icon="plus" onClick={openNew}>{t('Navrhnout postup')}</Button> : undefined} />
       </Card>
     );
   } else {
@@ -256,16 +258,16 @@ export default function Procedures({ user }: Props) {
             const last = posledniDokonceni(behy.data ?? [], p.id);
             const navrh = p.approved === false;
             const meta = [
-              czCount(steps.length, KROK),
+              t('{n, plural, one {# krok} few {# kroky} other {# kroků}}', { n: steps.length }),
               mins > 0 ? fmtMinutes(mins) : null,
               popisPripominky(p),
               last ? `naposledy ${kdyPrubehu(last.completed_at || last.started_at)}` : null,
             ].filter(Boolean).join(' · ');
             const polozky: MenuItem[] = [
-              { label: 'Zobrazit kroky', icon: 'clipboard', onClick: () => setDetailId(p.id) },
-              ...(navrh && smiSchvalovat ? [{ label: 'Schválit návrh', icon: 'check', onClick: () => { void approveProcedure(p.id); } }] : []),
-              ...(smiUpravit ? [{ label: 'Upravit', icon: 'pencil', onClick: () => openEdit(p) }] : []),
-              ...(smiMazat ? [{ label: 'Smazat', icon: 'trash', danger: true, onClick: () => setConfirmDel(p) }] : []),
+              { label: t('Zobrazit kroky'), icon: 'clipboard', onClick: () => setDetailId(p.id) },
+              ...(navrh && smiSchvalovat ? [{ label: t('Schválit návrh'), icon: 'check', onClick: () => { void approveProcedure(p.id); } }] : []),
+              ...(smiUpravit ? [{ label: t('Upravit'), icon: 'pencil', onClick: () => openEdit(p) }] : []),
+              ...(smiMazat ? [{ label: t('Smazat'), icon: 'trash', danger: true, onClick: () => setConfirmDel(p) }] : []),
             ];
             return (
               <ListRow key={p.id} className="relative"
@@ -278,12 +280,12 @@ export default function Procedures({ user }: Props) {
                 // Spustit dostal `relative`). Fokus = limetkový prstenec řádku jako u Button.
                 title={<button type="button" onClick={() => setDetailId(p.id)} className="block max-w-full truncate text-left hover:underline underline-offset-2 focus-visible:outline-none after:absolute after:inset-0 after:rounded-[var(--r-md)] after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-[#C8F542]">{p.name}</button>}
                 meta={meta}
-                right={navrh ? <Chip tone="wait" size="sm">Čeká na schválení</Chip> : running ? <Chip tone="info" size="sm">Probíhá</Chip> : undefined}
+                right={navrh ? <Chip tone="wait" size="sm">{t('Čeká na schválení')}</Chip> : running ? <Chip tone="info" size="sm">{t('Probíhá')}</Chip> : undefined}
                 actions={<>
                   {smiSpoustet && !navrh && !running && (
-                    <Button variant="secondary" size="sm" icon="play" className="relative" disabled={starting} onClick={() => spust(p)}>Spustit</Button>
+                    <Button variant="secondary" size="sm" icon="play" className="relative" disabled={starting} onClick={() => spust(p)}>{t('Spustit')}</Button>
                   )}
-                  <Menu size="sm" label={`Další akce s postupem ${p.name}`} items={polozky} />
+                  <Menu size="sm" label={t('Další akce s postupem {nazev}', { nazev: p.name })} items={polozky} />
                 </>} />
             );
           })}
@@ -294,13 +296,13 @@ export default function Procedures({ user }: Props) {
 
   const okna = (
     <>
-      <Modal open={!!confirmDel} onClose={() => { if (!deleting) setConfirmDel(null); }} size="sm" title="Smazat postup?"
+      <Modal open={!!confirmDel} onClose={() => { if (!deleting) setConfirmDel(null); }} size="sm" title={t('Smazat postup?')}
         subtitle={confirmDel ? `„${confirmDel.name}"` : undefined}
         footer={<>
-          <Button variant="secondary" onClick={() => setConfirmDel(null)} disabled={deleting}>Zrušit</Button>
-          <Button variant="danger-solid" icon="trash" onClick={doConfirmDelete} loading={deleting}>Smazat</Button>
+          <Button variant="secondary" onClick={() => setConfirmDel(null)} disabled={deleting}>{t('Zrušit')}</Button>
+          <Button variant="danger-solid" icon="trash" onClick={doConfirmDelete} loading={deleting}>{t('Smazat')}</Button>
         </>}>
-        <p className="text-sm text-black/55 text-pretty">Postup se odstraní i s nastavenou připomínkou. Proběhlé průběhy v historii zůstanou.</p>
+        <p className="text-sm text-black/55 text-pretty">{t('Postup se odstraní i s nastavenou připomínkou. Proběhlé průběhy v historii zůstanou.')}</p>
       </Modal>
 
       {kopieOpen && smiVytvorit && (
@@ -352,7 +354,7 @@ export default function Procedures({ user }: Props) {
   const telo = (
     <div className="space-y-3">
       {chyba && <p className="note note-danger" role="alert">{chyba}</p>}
-      {odeslano && <p className="note note-ok text-pretty" role="status">Návrh „{odeslano}" odeslán — schválí ho vedení.</p>}
+      {odeslano && <p className="note note-ok text-pretty" role="status">{t('Návrh „{nazev}" odeslán — schválí ho vedení.', { nazev: odeslano })}</p>}
       {nastroj}
     </div>
   );
@@ -388,6 +390,7 @@ function ProcedureDetail({
   onEdit: () => void;
   onClose: () => void;
 }) {
+  const t = useT('postupy');
   const steps = parseSteps(procedure.items);
   const mins = totalMinutes(steps);
   const navodOdkaz = useOtevreniNavodu();
@@ -395,17 +398,17 @@ function ProcedureDetail({
 
   return (
     <Modal open onClose={onClose} size="md" title={procedure.name}
-      subtitle={[czCount(steps.length, KROK), mins > 0 ? fmtMinutes(mins) : null, popisPripominky(procedure)].filter(Boolean).join(' · ')}
+      subtitle={[t('{n, plural, one {# krok} few {# kroky} other {# kroků}}', { n: steps.length }), mins > 0 ? fmtMinutes(mins) : null, popisPripominky(procedure)].filter(Boolean).join(' · ')}
       footer={<>
-        {smiUpravit && <Button variant="secondary" icon="pencil" onClick={onEdit}>Upravit</Button>}
-        {navrh && smiSchvalit && <Button variant="primary" icon="check" onClick={onApprove}>Schválit</Button>}
+        {smiUpravit && <Button variant="secondary" icon="pencil" onClick={onEdit}>{t('Upravit')}</Button>}
+        {navrh && smiSchvalit && <Button variant="primary" icon="check" onClick={onApprove}>{t('Schválit')}</Button>}
         {!navrh && smiSpustit && (
           <Button variant="primary" icon="play" onClick={onRun} loading={starting} disabled={running}>
-            {running ? 'Právě probíhá' : 'Spustit postup'}
+            {running ? t('Právě probíhá') : t('Spustit postup')}
           </Button>
         )}
       </>}>
-      {navrh && <p className="note note-wait text-sm mb-3">Návrh čeká na schválení — spustit půjde až potom.</p>}
+      {navrh && <p className="note note-wait text-sm mb-3">{t('Návrh čeká na schválení — spustit půjde až potom.')}</p>}
       {procedure.description && <p className="text-sm leading-relaxed text-black/60 mb-3 text-pretty">{procedure.description}</p>}
       <StepTimeline steps={steps} {...navodOdkaz} />
     </Modal>
@@ -423,6 +426,7 @@ function ProcedureEditor({
   onClose: () => void;
   onSaved: (p: Procedure) => void;
 }) {
+  const t = useT('postupy');
   const uid = useId();
   const [name, setName] = useState(initial?.name ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
@@ -482,8 +486,8 @@ function ProcedureEditor({
         guideId: s.guideId ?? null,
       }))
       .filter(s => s.text.length > 0);
-    if (!cleanName) { setError('Zadej název postupu.'); return; }
-    if (items.length === 0) { setError('Přidej aspoň jeden krok.'); return; }
+    if (!cleanName) { setError(t('Zadej název postupu.')); return; }
+    if (items.length === 0) { setError(t('Přidej aspoň jeden krok.')); return; }
     setSaving(true);
     try {
       const reminderOn = remindAnchor !== 'time' || !!remindAt;
@@ -505,7 +509,7 @@ function ProcedureEditor({
       const d = await okJson(res);
       onSaved(d.procedure as Procedure);
     } catch (e) {
-      setError(apiMessage(e, 'Uložení se nezdařilo.'));
+      setError(apiMessage(e, t('Uložení se nezdařilo.')));
     } finally {
       setSaving(false);
     }
@@ -513,25 +517,25 @@ function ProcedureEditor({
 
   return (
     <Modal open onClose={onClose} size="lg"
-      title={initial ? 'Upravit postup' : navrh ? 'Navrhnout postup' : 'Nový postup'}
-      subtitle={navrh ? 'Návrh schválí vedení, pak ho uvidí celý tým.' : undefined}
+      title={initial ? t('Upravit postup') : navrh ? t('Navrhnout postup') : t('Nový postup')}
+      subtitle={navrh ? t('Návrh schválí vedení, pak ho uvidí celý tým.') : undefined}
       footer={<>
-        <Button variant="secondary" onClick={onClose}>Zrušit</Button>
-        <Button variant="primary" onClick={save} loading={saving}>{initial ? 'Uložit změny' : navrh ? 'Odeslat návrh' : 'Vytvořit postup'}</Button>
+        <Button variant="secondary" onClick={onClose}>{t('Zrušit')}</Button>
+        <Button variant="primary" onClick={save} loading={saving}>{initial ? t('Uložit změny') : navrh ? t('Odeslat návrh') : t('Vytvořit postup')}</Button>
       </>}>
       <div className="space-y-4">
-        <Field id={`${uid}-nazev`} label="Název">
-          <Input id={`${uid}-nazev`} value={name} onChange={e => setName(e.target.value)} placeholder="Např. Otevírání" />
+        <Field id={`${uid}-nazev`} label={t('Název')}>
+          <Input id={`${uid}-nazev`} value={name} onChange={e => setName(e.target.value)} placeholder={t('Např. Otevírání')} />
         </Field>
-        <Field id={`${uid}-popis`} label="Popis (nepovinné)">
-          <Input id={`${uid}-popis`} value={description ?? ''} onChange={e => setDescription(e.target.value)} placeholder="Krátký popis postupu" />
+        <Field id={`${uid}-popis`} label={t('Popis (nepovinné)')}>
+          <Input id={`${uid}-popis`} value={description ?? ''} onChange={e => setDescription(e.target.value)} placeholder={t('Krátký popis postupu')} />
         </Field>
 
         <div role="group" aria-labelledby={`${uid}-ikona`}>
-          <p id={`${uid}-ikona`} className="field-label">Ikona</p>
+          <p id={`${uid}-ikona`} className="field-label">{t('Ikona')}</p>
           <div className="flex flex-wrap gap-2">
-            {ICON_CHOICES.map(ic => (
-              <button key={ic.id} type="button" onClick={() => setIcon(ic.id)} aria-label={`Ikona ${ic.nazev}`} aria-pressed={icon === ic.id}
+            {ikonyPostupu(t).map(ic => (
+              <button key={ic.id} type="button" onClick={() => setIcon(ic.id)} aria-label={t('Ikona {nazev}', { nazev: ic.nazev })} aria-pressed={icon === ic.id}
                 className={`filter-pill tap-target grid h-11 w-11 place-items-center !px-0 ${icon === ic.id ? 'seg-on' : 'seg-off glass'}`}>
                 <Icon name={ic.id} size={20} />
               </button>
@@ -540,88 +544,88 @@ function ProcedureEditor({
         </div>
 
         <div>
-          <p className="field-label">Kroky</p>
-          <p className="t-meta mb-2 text-pretty">Emoji a čas jsou nepovinné. Důležitost kroku řídí body: hotový krok přičítá, vynechaný odečítá (klíčový +2/−3, běžný +1/−1, drobný 0). Vlastní minus body mají přednost.</p>
+          <p className="field-label">{t('Kroky')}</p>
+          <p className="t-meta mb-2 text-pretty">{t('Emoji a čas jsou nepovinné. Důležitost kroku řídí body: hotový krok přičítá, vynechaný odečítá (klíčový +2/−3, běžný +1/−1, drobný 0). Vlastní minus body mají přednost.')}</p>
           <ol className="space-y-2.5">
             {steps.map((s, i) => (
               <li key={i} className="space-y-2">
                 <div className="well p-2.5 space-y-2">
                   <div className="flex items-center gap-2">
                     <Input value={s.emoji ?? ''} onChange={e => patchStep(i, { emoji: e.target.value })} placeholder="🙂" maxLength={4}
-                      aria-label={`Emoji kroku ${i + 1} (nepovinné)`} className="!w-12 shrink-0 text-center !px-1" />
-                    <Input value={s.text} onChange={e => patchStep(i, { text: e.target.value })} placeholder={`Krok ${i + 1}`}
-                      aria-label={`Krok ${i + 1}`} className="flex-1 min-w-0" />
+                      aria-label={t('Emoji kroku {n} (nepovinné)', { n: i + 1 })} className="!w-12 shrink-0 text-center !px-1" />
+                    <Input value={s.text} onChange={e => patchStep(i, { text: e.target.value })} placeholder={t('Krok {n}', { n: i + 1 })}
+                      aria-label={t('Krok {n}', { n: i + 1 })} className="flex-1 min-w-0" />
                     <Input type="number" min={0} inputMode="numeric" value={s.minutes ?? ''}
                       onChange={e => patchStep(i, { minutes: e.target.value ? Math.max(0, parseInt(e.target.value)) : null })}
-                      placeholder="min" aria-label={`Minuty kroku ${i + 1} (nepovinné)`} className="!w-20 shrink-0 tabular-nums" />
+                      placeholder="min" aria-label={t('Minuty kroku {n} (nepovinné)', { n: i + 1 })} className="!w-20 shrink-0 tabular-nums" />
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
                     {/* Důležitost řídí automatické body: hotovo = +, vynecháno = − */}
-                    <Segmented size="sm" ariaLabel={`Důležitost kroku ${i + 1}`} value={s.weight ?? 'normal'}
+                    <Segmented size="sm" ariaLabel={t('Důležitost kroku {n}', { n: i + 1 })} value={s.weight ?? 'normal'}
                       onChange={w => patchStep(i, { weight: w })}
-                      options={STEP_WEIGHTS.map(w => ({ id: w.id, label: w.label }))} />
+                      options={STEP_WEIGHTS.map(w => ({ id: w.id, label: vahaKroku(t)[w.id] ?? w.label }))} />
                     <Input type="number" min={0} inputMode="numeric" value={s.penalty ?? ''}
                       onChange={e => patchStep(i, { penalty: e.target.value === '' ? null : Math.max(0, parseInt(e.target.value) || 0) })}
                       placeholder={`−${weightSpec(s.weight ?? 'normal').minus}`}
-                      aria-label={`Vlastní minus body kroku ${i + 1}, když se neudělá`} className="!w-20 shrink-0 tabular-nums" />
+                      aria-label={t('Vlastní minus body kroku {n}, když se neudělá', { n: i + 1 })} className="!w-20 shrink-0 tabular-nums" />
                     <Input value={s.note ?? ''} onChange={e => patchStep(i, { note: e.target.value })}
-                      aria-label={`Poznámka ke kroku ${i + 1} (nepovinné)`} placeholder="Poznámka (nepovinné)" className="flex-1 min-w-[10rem]" />
+                      aria-label={t('Poznámka ke kroku {n} (nepovinné)', { n: i + 1 })} placeholder={t('Poznámka (nepovinné)')} className="flex-1 min-w-[10rem]" />
                     {/* Poznámka je na jednu větu. „Vyčistit kávovar" chce celý
                         postup — a ten v Návodech nejspíš už je. */}
                     <StepGuidePicker guides={guideOptions} value={s.guideId ?? null} stepNumber={i + 1}
                       onChange={g => patchStep(i, { guideId: g })} />
                     <div className="flex shrink-0 items-center">
-                      <Button variant="ghost" size="sm" iconOnly icon="chevron" className="rotate-180" aria-label={`Posunout krok ${i + 1} výš`}
+                      <Button variant="ghost" size="sm" iconOnly icon="chevron" className="rotate-180" aria-label={t('Posunout krok {n} výš', { n: i + 1 })}
                         onClick={() => move(i, -1)} disabled={i === 0} />
-                      <Button variant="ghost" size="sm" iconOnly icon="chevron" aria-label={`Posunout krok ${i + 1} níž`}
+                      <Button variant="ghost" size="sm" iconOnly icon="chevron" aria-label={t('Posunout krok {n} níž', { n: i + 1 })}
                         onClick={() => move(i, 1)} disabled={i === steps.length - 1} />
-                      <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={`Odebrat krok ${i + 1}`} onClick={() => removeStep(i)} />
+                      <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={t('Odebrat krok {n}', { n: i + 1 })} onClick={() => removeStep(i)} />
                     </div>
                   </div>
                 </div>
                 {i < steps.length - 1 && (
                   <div className="flex justify-center">
-                    <Button variant="ghost" size="sm" icon="plus" onClick={() => insertStep(i)} aria-label={`Vložit krok za krok ${i + 1}`}>Vložit</Button>
+                    <Button variant="ghost" size="sm" icon="plus" onClick={() => insertStep(i)} aria-label={t('Vložit krok za krok {n}', { n: i + 1 })}>{t('Vložit')}</Button>
                   </div>
                 )}
               </li>
             ))}
           </ol>
-          <Button variant="secondary" size="sm" icon="plus" className="mt-2.5" onClick={addStep}>Přidat krok</Button>
+          <Button variant="secondary" size="sm" icon="plus" className="mt-2.5" onClick={addStep}>{t('Přidat krok')}</Button>
         </div>
 
         {smiPovinny && !navrh && (
           <ul className="list">
-            <SwitchRow title="Vyžadovat před uzávěrkou" hint="Dokud nebude dokončený, uzávěrka dne zůstane zamčená. Dokončení po půlnoci (do 6:00) se počítá ke včerejší uzávěrce."
+            <SwitchRow title={t('Vyžadovat před uzávěrkou')} hint={t('Dokud nebude dokončený, uzávěrka dne zůstane zamčená. Dokončení po půlnoci (do 6:00) se počítá ke včerejší uzávěrce.')}
               checked={requireBeforeClosing} onChange={setRequireBeforeClosing} />
           </ul>
         )}
 
         <div>
-          <p className="field-label">Připomínka (nepovinné)</p>
-          <p className="t-meta mb-2 text-pretty">Postup se v daný čas sám otevře a lidem na směně přijde upozornění.</p>
-          <Segmented ariaLabel="Kdy připomenout" value={remindAnchor} onChange={setRemindAnchor}
-            options={[{ id: 'time', label: 'V určený čas' }, { id: 'open', label: 'Při otevření' }, { id: 'close', label: 'Při zavření' }]} />
+          <p className="field-label">{t('Připomínka (nepovinné)')}</p>
+          <p className="t-meta mb-2 text-pretty">{t('Postup se v daný čas sám otevře a lidem na směně přijde upozornění.')}</p>
+          <Segmented ariaLabel={t('Kdy připomenout')} value={remindAnchor} onChange={setRemindAnchor}
+            options={[{ id: 'time', label: t('V určený čas') }, { id: 'open', label: t('Při otevření') }, { id: 'close', label: t('Při zavření') }]} />
           <div className="mt-2.5">
             {remindAnchor === 'time' ? (
               <div className="flex items-center gap-2">
-                <Input type="time" aria-label="Čas připomenutí" value={remindAt ?? ''} onChange={e => setRemindAt(e.target.value)}
+                <Input type="time" aria-label={t('Čas připomenutí')} value={remindAt ?? ''} onChange={e => setRemindAt(e.target.value)}
                   className="flex-1 min-w-0 tabular-nums" />
                 {remindAt && (
-                  <Button variant="ghost" iconOnly icon="close" aria-label="Zrušit připomínku" onClick={() => { setRemindAt(''); setRemindDays([]); }} />
+                  <Button variant="ghost" iconOnly icon="close" aria-label={t('Zrušit připomínku')} onClick={() => { setRemindAt(''); setRemindDays([]); }} />
                 )}
               </div>
             ) : (
               <p className="t-meta text-pretty">
-                Připomene se podle otevírací doby daného dne{remindAnchor === 'open' ? ' (při otevření)' : ' (při zavření)'} — když je zavřeno, ten den se nepřipomene.
+                {remindAnchor === 'open' ? t('Připomene se podle otevírací doby daného dne (při otevření) — když je zavřeno, ten den se nepřipomene.') : t('Připomene se podle otevírací doby daného dne (při zavření) — když je zavřeno, ten den se nepřipomene.')}
               </p>
             )}
           </div>
           {(remindAnchor !== 'time' || remindAt) && (
             <div className="mt-2.5" role="group" aria-labelledby={`${uid}-dny`}>
-              <p id={`${uid}-dny`} className="t-meta mb-1.5">Ve dnech (nevybráno = každý den)</p>
+              <p id={`${uid}-dny`} className="t-meta mb-1.5">{t('Ve dnech (nevybráno = každý den)')}</p>
               <div className="flex flex-wrap gap-1.5">
-                {WEEKDAYS.map((label, d) => {
+                {dnyTydne(t).map((label, d) => {
                   const on = remindDays.includes(d);
                   return (
                     <button key={d} type="button" onClick={() => toggleDay(d)} aria-pressed={on}

@@ -9,6 +9,7 @@
 
 import { createContext, useContext, useState } from 'react';
 import EmployeeProfile from './EmployeeProfile';
+import { useT } from '@/lib/i18n/client';
 
 const Ctx = createContext<((id: number) => void) | null>(null);
 
@@ -33,6 +34,7 @@ export function PersonLink({ id, children, className = '' }: {
   children: React.ReactNode;
   className?: string;
 }) {
+  const t = useT('sprava');
   const open = useContext(Ctx);
   if (!open || id == null) {
     return className ? <span className={className}>{children}</span> : <>{children}</>;
@@ -41,7 +43,7 @@ export function PersonLink({ id, children, className = '' }: {
     <span
       role="button"
       tabIndex={0}
-      title="Zobrazit profil"
+      title={t('Zobrazit profil')}
       onClick={e => { e.stopPropagation(); e.preventDefault(); open(id); }}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); e.preventDefault(); open(id); } }}
       // rounded-full: prstenec fokusu kopíruje tvar prvku, a odkaz na profil

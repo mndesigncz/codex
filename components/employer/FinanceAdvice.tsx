@@ -19,6 +19,8 @@ import { useMemo, useState } from 'react';
 import { useMoney } from '../CurrencyProvider';
 import { Chip, Segmented, Well } from '../ui';
 import { RadyJakoSeznam, type TonPoznamky } from './LiveRevenue';
+import { useT, type PrekladFn } from '@/lib/i18n/client';
+import { useLocale } from './jazyk';
 
 export type SkupinaRady = 'revenue' | 'products' | 'people' | 'stock' | 'guests';
 
@@ -36,18 +38,27 @@ export interface Rada {
 export interface Doporuceni { rady: Rada[]; slepa: string[] }
 
 export const SKUPINY: { id: SkupinaRady; label: string }[] = [
-  { id: 'revenue', label: 'Tržby' },
-  { id: 'products', label: 'Co se prodává' },
-  { id: 'people', label: 'Provoz a lidé' },
-  { id: 'stock', label: 'Nákup a sklad' },
-  { id: 'guests', label: 'Hosté a věrnost' },
+  { id: 'revenue', label: 'Tržby' }, // i18n-ok
+  { id: 'products', label: 'Co se prodává' }, // i18n-ok
+  { id: 'people', label: 'Provoz a lidé' }, // i18n-ok
+  { id: 'stock', label: 'Nákup a sklad' }, // i18n-ok
+  { id: 'guests', label: 'Hosté a věrnost' }, // i18n-ok
 ];
+
+/** Název skupiny v jazyce uživatele (SKUPINY.label zůstává česky pro widgety, které se překládají později). */
+export const nazevSkupiny = (t: PrekladFn, id: SkupinaRady): string => ({
+  revenue: t('Tržby'),
+  products: t('Co se prodává'),
+  people: t('Provoz a lidé'),
+  stock: t('Nákup a sklad'),
+  guests: t('Hosté a věrnost'),
+})[id];
 
 const SKUPINA_IDS = new Set<string>(SKUPINY.map(s => s.id));
 
 /** Z /api/finance/advice vybere rady známých skupin a tónů; neznámý tvar je chyba widgetu. */
 export function vyberDoporuceni(raw: any): Doporuceni {
-  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.advice)) throw new Error('Doporučení přišla v nečekaném tvaru.');
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.advice)) throw new Error('Doporučení přišla v nečekaném tvaru.'); // i18n-ok
   return {
     rady: raw.advice
       .filter((a: any) => a && SKUPINA_IDS.has(a.group) && typeof a.title === 'string')
@@ -67,15 +78,16 @@ export function vyberDoporuceni(raw: any): Doporuceni {
 
 /** Rada jako řádek: co se stalo, pod tím co udělat; částka „jde o …" a důkaz v chipech vpravo. */
 function useRadky() {
+  const t = useT('sprava');
   const money = useMoney();
   return (rady: Rada[]) => rady.map(a => ({
     tone: a.tone,
     ikona: a.icon,
     title: a.title,
-    text: [a.text, a.action && `Co udělat: ${a.action}`].filter(Boolean).join(' '),
+    text: [a.text, a.action && t('Co udělat: {akce}', { akce: a.action })].filter(Boolean).join(' '),
     doplnek: a.impact != null || a.evidence ? (
       <span className="flex flex-col items-end gap-1">
-        {a.impact != null && <Chip tone="muted" size="sm"><span className="tabular-nums">jde o {money(a.impact)}</span></Chip>}
+        {a.impact != null && <Chip tone="muted" size="sm"><span className="tabular-nums">{t('jde o {castka}', { castka: money(a.impact) })}</span></Chip>}
         {a.evidence && <Chip tone="muted" size="sm">{a.evidence}</Chip>}
       </span>
     ) : undefined,
@@ -94,6 +106,8 @@ export function PrvniRady({ d, pocet = 3 }: { d: Doporuceni; pocet?: number }) {
  * neříká „tolik vyděláš" — říká, o kolik peněz se v nich mluví.
  */
 export function SkupinyDoporuceni({ d }: { d: Doporuceni }) {
+  const t = useT('sprava');
+  const loc = useLocale();
   const money = useMoney();
   const radky = useRadky();
   const [jen, setJen] = useState<SkupinaRady | 'vse'>('vse');
@@ -105,24 +119,24 @@ export function SkupinyDoporuceni({ d }: { d: Doporuceni }) {
   }, [d.rady]);
   const celkem = d.rady.reduce((s, a) => s + (a.impact ?? 0), 0);
   const moznosti = [
-    { id: 'vse' as const, label: 'Vše', count: d.rady.length },
-    ...SKUPINY.filter(s => (podleSkupin.get(s.id)?.length ?? 0) > 0).map(s => ({ id: s.id, label: s.label, count: podleSkupin.get(s.id)!.length })),
+    { id: 'vse' as const, label: t('Vše'), count: d.rady.length },
+    ...SKUPINY.filter(s => (podleSkupin.get(s.id)?.length ?? 0) > 0).map(s => ({ id: s.id, label: nazevSkupiny(t, s.id), count: podleSkupin.get(s.id)!.length })),
   ];
   return (
     <div className="space-y-4">
       <p className="t-meta">
-        {d.rady.length.toLocaleString('cs-CZ')} pozorování z čísel měsíce
-        {celkem > 0 && <> · dohromady se tu mluví o <span className="font-semibold text-[#16181A] tabular-nums">{money(celkem)}</span></>}
+        {t('{n} pozorování z čísel měsíce', { n: d.rady.length.toLocaleString(loc) })}
+        {celkem > 0 && <> · {t('dohromady se tu mluví o')} <span className="font-semibold text-[#16181A] tabular-nums">{money(celkem)}</span></>}
       </p>
       {moznosti.length > 2 && (
-        <Segmented size="sm" ariaLabel="Skupina doporučení" options={moznosti} value={jen} onChange={setJen} />
+        <Segmented size="sm" ariaLabel={t('Skupina doporučení')} options={moznosti} value={jen} onChange={setJen} />
       )}
       {SKUPINY.filter(s => jen === 'vse' || s.id === jen).map(s => {
         const list = podleSkupin.get(s.id) ?? [];
         if (!list.length) return null;
         return (
           <div key={s.id}>
-            <p className="t-label mb-1">{s.label}</p>
+            <p className="t-label mb-1">{nazevSkupiny(t, s.id)}</p>
             <RadyJakoSeznam rady={radky(list)} />
           </div>
         );
@@ -130,7 +144,7 @@ export function SkupinyDoporuceni({ d }: { d: Doporuceni }) {
       {/* Slepá místa: když se něco nedá spočítat, je to informace, ne mlčení. */}
       {d.slepa.length > 0 && (
         <Well>
-          <p className="t-label mb-1.5">Co se nepodařilo spočítat</p>
+          <p className="t-label mb-1.5">{t('Co se nepodařilo spočítat')}</p>
           <ul className="space-y-1">
             {d.slepa.map((b, i) => <li key={i} className="t-meta">{b}</li>)}
           </ul>

@@ -29,6 +29,8 @@ import { DiscardGuard } from '../ui/DiscardGuard';
 import { Avatar, Button, Chip } from '../ui';
 import { useSmi } from '../widgety/NavigaceKontext';
 import type { PovinnaPolozka } from '@/lib/povinnePredUzaverkou';
+import { useT } from '@/lib/i18n/client';
+import { useLocale } from './jazyk';
 
 type Person = { id: number; name: string; avatar?: string | null };
 
@@ -105,13 +107,15 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
    *  s uzaverky.mazat_vlastni — server to ověří znovu. */
   mazatVlastni?: boolean;
 }) {
+  const loc = useLocale();
+  const t = useT('sprava');
   const money = useMoney();
   const symbol = useSymbol();
   // Jediné okno v aplikaci, které si překryv skládalo samo. Mělo sice
   // `role="dialog"`, ale Escape ho nezavřel, Tab z něj utekl na stránku pod
   // ním a pozadí se scrollovalo — a je to zrovna to okno, ve kterém se čte
   // nejvíc čísel. `useModal` řeší fokus, Escape i zámek posouvání.
-  const modal = useModal<HTMLDivElement>(true, onClose, 'Detail uzávěrky');
+  const modal = useModal<HTMLDivElement>(true, onClose, t('Detail uzávěrky'));
   const [d, setD] = useState<Detail | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -122,12 +126,12 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
       const res = await fetch(`/api/closings/${id}`);
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
-        setErr(j.error ?? 'Detail se nepodařilo načíst.');
+        setErr(j.error ?? t('Detail se nepodařilo načíst.'));
         return;
       }
       setD(await res.json());
     } catch {
-      setErr('Detail se nepodařilo načíst — zkontroluj připojení.');
+      setErr(t('Detail se nepodařilo načíst — zkontroluj připojení.'));
     }
   }, [id]);
 
@@ -143,7 +147,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
   // rozdíl, očekávaná kasa i celé peněžní řádky u skryté uzávěrky vůbec nekreslí.
   const skryta = !!c && maSkrytouTrzbu(c);
   const diff = c && !skryta ? (rozdilUzaverky({ ...c, covered_by: null }) ?? 0) : 0;
-  const lines = c && !skryta ? expectedCashLines(c, { payoutLabel: 'Výplata zaměstnance' }) : [];
+  const lines = c && !skryta ? expectedCashLines(c, { payoutLabel: t('Výplata zaměstnance') }) : [];
   const cashTips = c && !skryta ? Math.max(0, (c.tips ?? 0) - (Number(c.tips_card) || 0)) : 0;
 
   useEffect(() => { load(); }, [load]);
@@ -165,20 +169,20 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
     // Skrytá tržba se netiskne ani jako nula — papír by lhal stejně jako obrazovka.
     const body = `<table><tbody>
         ${skryta ? '' : lines.map(l => row(l.label, `${l.sign < 0 ? '− ' : '+ '}${money(l.amount)}`)).join('')}
-        ${skryta ? '' : row('Očekávaný stav kasy', money(expectedCash(c)), true)}
-        ${skryta ? '' : row('Skutečný stav kasy', money(c.closing_cash), true)}
-        ${skryta ? '' : row(diff === 0 ? 'Kasa sedí' : diff > 0 ? 'Přebytek' : 'Manko', (diff > 0 ? '+' : '') + money(diff), true)}
-        ${skryta ? '' : Number(c.final_removal) ? row('Odvod na konci směny', '− ' + money(Number(c.final_removal))) + row('Zůstalo v kase', money(cashLeft(c))) : ''}
-        ${skryta ? '' : row('Tržba kartou', money(c.card_revenue))}
-        ${skryta ? '' : row('Spropitné hotově', money(cashTips))}
-        ${skryta ? '' : row('Spropitné kartou', money(Number(c.tips_card) || 0))}
-        ${row('Zákazníků', String(c.customers))}
-        ${d?.pos ? row('Pokladna — hotovost', money(d.pos.cash)) + row('Pokladna — karta', money(d.pos.card)) : ''}
+        ${skryta ? '' : row(t('Očekávaný stav kasy'), money(expectedCash(c)), true)}
+        ${skryta ? '' : row(t('Skutečný stav kasy'), money(c.closing_cash), true)}
+        ${skryta ? '' : row(diff === 0 ? t('Kasa sedí') : diff > 0 ? t('Přebytek') : t('Manko'), (diff > 0 ? '+' : '') + money(diff), true)}
+        ${skryta ? '' : Number(c.final_removal) ? row(t('Odvod na konci směny'), '− ' + money(Number(c.final_removal))) + row(t('Zůstalo v kase'), money(cashLeft(c))) : ''}
+        ${skryta ? '' : row(t('Tržba kartou'), money(c.card_revenue))}
+        ${skryta ? '' : row(t('Spropitné hotově'), money(cashTips))}
+        ${skryta ? '' : row(t('Spropitné kartou'), money(Number(c.tips_card) || 0))}
+        ${row(t('Zákazníků'), String(c.customers))}
+        ${d?.pos ? row(t('Pokladna — hotovost'), money(d.pos.cash)) + row(t('Pokladna — karta'), money(d.pos.card)) : ''}
       </tbody></table>
-      ${c.notes ? `<p class="note">Poznámka: ${esc(c.notes)}</p>` : ''}`;
+      ${c.notes ? `<p class="note">${esc(t('Poznámka: {text}', { text: c.notes }))}</p>` : ''}`;
     const ok = openPrint({
-      title: `Uzávěrka — ${new Date(c.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}`,
-      subtitle: `${c.shift_label ?? ''}${c.shift_label ? ' · ' : ''}vyplnil/a ${c.author_name ?? '—'}${c.created_at ? ` · ${dayTime(c.created_at)}` : ''}`,
+      title: t('Uzávěrka — {den}', { den: new Date(c.date + 'T00:00:00').toLocaleDateString(loc, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) }),
+      subtitle: `${c.shift_label ?? ''}${c.shift_label ? ' · ' : ''}${t('vyplnil/a {jmeno}', { jmeno: c.author_name ?? '—' })}${c.created_at ? ` · ${dayTime(c.created_at)}` : ''}`,
       body,
     });
     setPrintFailed(!ok);
@@ -198,7 +202,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
     setErr(null);
     try {
       const res = await fetch(`/api/closings/${id}`, { method: 'DELETE' });
-      if (!res.ok) { setErr('Uzávěrku se nepodařilo smazat.'); return; }
+      if (!res.ok) { setErr(t('Uzávěrku se nepodařilo smazat.')); return; }
       onChanged?.();
       onClose();
     } finally { setBusy(false); }
@@ -214,7 +218,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
       await load();
       onChanged?.();
     } catch (e) {
-      setErr(apiMessage(e, 'Uzávěrku se nepodařilo schválit.'));
+      setErr(apiMessage(e, t('Uzávěrku se nepodařilo schválit.')));
     } finally { setBusy(false); }
   };
 
@@ -230,11 +234,11 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
         <div className="dock-strong shrink-0 px-5 sm:px-6 py-4 flex items-start justify-between gap-3 border-b border-black/[0.07]">
           <div className="min-w-0">
             <p className="font-bold tracking-tight text-[#16181A] text-lg truncate">
-              {c ? new Date(c.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'Uzávěrka'}
+              {c ? new Date(c.date + 'T00:00:00').toLocaleDateString(loc, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : t('Uzávěrka')}
             </p>
             <p className="text-xs text-black/45 truncate">
               {c?.shift_label ? `${c.shift_label} · ` : ''}
-              vyplnil/a {c?.author_name ?? '—'}
+              {t('vyplnil/a {jmeno}', { jmeno: c?.author_name ?? '—' })}
               {c?.created_at ? ` · ${dayTime(c.created_at)}` : ''}
             </p>
           </div>
@@ -243,10 +247,10 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
               // Stav rozdílu jako Chip (tóny ze stavových tokenů, i v tmavém režimu) —
               // dřív ručně psaná pilulka s hexy mimo tokeny.
               <Chip tone={diff === 0 ? 'ok' : diff > 0 ? 'info' : 'bad'} className="tabular-nums">
-                {diff === 0 ? 'Sedí' : `${diff > 0 ? '+' : ''}${money(diff)}`}
+                {diff === 0 ? t('Sedí') : `${diff > 0 ? '+' : ''}${money(diff)}`}
               </Chip>
             )}
-            <button onClick={modal.guard.attemptClose} aria-label="Zavřít"
+            <button onClick={modal.guard.attemptClose} aria-label={t('Zavřít')}
               className="tap-target h-9 w-9 flex items-center justify-center rounded-full text-black/40 hover:text-[#16181A] hover:bg-black/[0.06] transition-colors">
               <Icon name="close" size={17} />
             </button>
@@ -255,17 +259,17 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
 
         <div className="flex-1 overflow-y-auto scrollbar-thin px-5 sm:px-6 py-5 divide-y divide-black/[0.06]">
           {err && !d && <p className="text-sm text-bad-ink py-4">{err}</p>}
-          {!d && !err && <p className="text-sm text-black/40 py-8 text-center">Načítám…</p>}
+          {!d && !err && <p className="text-sm text-black/40 py-8 text-center">{t('Načítám…')}</p>}
 
           {d && c && (
             <>
               {/* Co všechno se do uzávěrky vyplnilo. Nulové kolonky zůstávají —
                   „nula" je taky odpověď a její chybění vypadá jako opomenutí. */}
-              <Section title="Vyplněná čísla">
+              <Section title={t('Vyplněná čísla')}>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-5">
-                  <Row label="Kasa na začátku" value={money(c.opening_cash)} />
-                  {!skryta && <Row label="Tržba hotově" value={money(c.cash_revenue)} />}
-                  {!skryta && <Row label="Tržba kartou" value={money(c.card_revenue)} />}
+                  <Row label={t('Kasa na začátku')} value={money(c.opening_cash)} />
+                  {!skryta && <Row label={t('Tržba hotově')} value={money(c.cash_revenue)} />}
+                  {!skryta && <Row label={t('Tržba kartou')} value={money(c.card_revenue)} />}
                   {!skryta && Array.isArray((c as any).event_breakdown) && (c as any).event_breakdown.length > 0 && (
                     // „Podřadná uzávěrka" akce: kolik z denní tržby spadlo do
                     // okna akce (z účtenek pokladny). Jen rozpis, nic se nemění.
@@ -273,43 +277,44 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
                       {(c as any).event_breakdown.map((eb: any, i: number) => (
                         <p key={i} className="text-sm text-[#16181A]">
                           <Icon name="calendarCheck" size={14} className="inline -mt-0.5 mr-1.5 text-[#0A5CC0]" />
-                          Z toho akce „{eb.title}"{eb.from ? ` (${eb.from}–${eb.till ?? 'konec'})` : ''}: <span className="font-bold tabular-nums">{money(eb.revenue)}</span>
-                          <span className="text-black/45"> · {eb.bills} úč.</span>
+                          {t('Z toho akce „{nazev}"{cas}:', { nazev: eb.title, cas: eb.from ? ` (${eb.from}–${eb.till ?? t('konec')})` : '' })} <span className="font-bold tabular-nums">{money(eb.revenue)}</span>
+                          <span className="text-black/45"> · {t('{n} úč.', { n: eb.bills })}</span>
                         </p>
                       ))}
                     </div>
                   )}
-                  {!skryta && <Row label="Spropitné hotově" value={money(cashTips)} />}
-                  {!skryta && <Row label="Spropitné kartou" value={money(Number(c.tips_card) || 0)} />}
-                  <Row label="Výdaje z kasy" value={money(c.expenses)} />
-                  <Row label="Odloženo ven" value={money(c.cash_removed)} />
-                  {payDailyCash && <Row label="Výplata zaměstnance" value={money(c.self_payout)} />}
+                  {!skryta && <Row label={t('Spropitné hotově')} value={money(cashTips)} />}
+                  {!skryta && <Row label={t('Spropitné kartou')} value={money(Number(c.tips_card) || 0)} />}
+                  <Row label={t('Výdaje z kasy')} value={money(c.expenses)} />
+                  <Row label={t('Odloženo ven')} value={money(c.cash_removed)} />
+                  {payDailyCash && <Row label={t('Výplata zaměstnance')} value={money(c.self_payout)} />}
                   {/* Snímek z okamžiku uzávěrky — sazba i čas tak, jak byly tehdy.
                       Docházka a Finance počítají živě; tady zůstává, co člověk
                       viděl, když uzávěrku odesílal. */}
                   {(c as any).wage_earned != null && (Number((c as any).worked_ms) || 0) > 0 && (
-                    <Row label={`Mzda za směnu (${hodinyMinuty(Number((c as any).worked_ms))} × ${Number((c as any).wage_rate) || 0} ${symbol}/h)`}
+                    <Row label={t('Mzda za směnu ({cas} × {sazba} {mena}/h)', { cas: hodinyMinuty(Number((c as any).worked_ms)), sazba: Number((c as any).wage_rate) || 0, mena: symbol })}
                       value={money(Number((c as any).wage_earned) || 0)} />
                   )}
-                  {!skryta && <Row label="Kasa na konci" value={money(c.closing_cash)} />}
-                  {(Number(c.final_removal) || 0) > 0 && <Row label="Odvod na konci" value={money(Number(c.final_removal))} />}
-                  <Row label="Zákazníků" value={String(c.customers)} />
+                  {!skryta && <Row label={t('Kasa na konci')} value={money(c.closing_cash)} />}
+                  {(Number(c.final_removal) || 0) > 0 && <Row label={t('Odvod na konci')} value={money(Number(c.final_removal))} />}
+                  <Row label={t('Zákazníků')} value={String(c.customers)} />
                 </div>
                 {skryta && (
                   // Prázdné místo by vypadalo jako „nic nevyplnil" — vedení má vědět, že je to záměr.
                   <p className="note note-wait mt-3 cz-sentence" role="note">
-                    Tržbu, spropitné a stav kasy tahle role u cizí uzávěrky nevidí (chybí oprávnění Tržby). Rozdíl kasy se proto nepočítá.
+                    
+                    {t('Tržbu, spropitné a stav kasy tahle role u cizí uzávěrky nevidí (chybí oprávnění Tržby). Rozdíl kasy se proto nepočítá.')}
                   </p>
                 )}
                 {/* Dva přepínače, které mění výpočet. Když nejsou vidět, vypadá
                     očekávaná kasa jako záhada. */}
                 <div className="flex flex-wrap gap-1.5 mt-3">
                   <span className="chip chip-muted">
-                    Spropitné {c.tips_in_drawer ? 'zůstalo v kase' : 'se z kasy vyndalo'}
+                    {c.tips_in_drawer ? t('Spropitné zůstalo v kase') : t('Spropitné se z kasy vyndalo')}
                   </span>
                   {payDailyCash && (
                     <span className="chip chip-muted">
-                      Výplata {c.payout_from_register === false ? 'nešla z kasy' : 'šla z kasy'}
+                      {c.payout_from_register === false ? t('Výplata nešla z kasy') : t('Výplata šla z kasy')}
                     </span>
                   )}
                   {c.event_title && (
@@ -317,31 +322,31 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
                   )}
                   {c.shift_date && c.shift_date !== c.date && (
                     <span className="chip chip-muted">
-                      Obchodní den {c.shift_date}
+                      {t('Obchodní den {datum}', { datum: c.shift_date })}
                     </span>
                   )}
                 </div>
               </Section>
 
               {!c.covered_by && !skryta && (
-                <Section title="Jak vyšla kasa" hint="Řádek po řádku, v pořadí, jak se peníze pohnuly.">
+                <Section title={t('Jak vyšla kasa')} hint={t('Řádek po řádku, v pořadí, jak se peníze pohnuly.')}>
                   <div className="well border border-black/[0.07] px-4 py-2">
                     {lines.map(l => (
                       <Row key={l.label} label={l.label} value={`${l.sign < 0 ? '− ' : '+ '}${money(l.amount)}`} />
                     ))}
                     <div className="border-t border-black/[0.07] mt-1 pt-1">
-                      <Row label="Očekávaný stav kasy" value={money(expectedCash(c))} tone="strong" />
-                      <Row label="Skutečný stav kasy" value={money(c.closing_cash)} tone="strong" />
+                      <Row label={t('Očekávaný stav kasy')} value={money(expectedCash(c))} tone="strong" />
+                      <Row label={t('Skutečný stav kasy')} value={money(c.closing_cash)} tone="strong" />
                       {(Number(c.final_removal) || 0) > 0 && (
                         <>
-                          <Row label="Odvod na konci směny" value={`− ${money(Number(c.final_removal))}`} />
-                          <Row label="Zůstalo na další směnu" value={money(cashLeft(c))} tone="strong" />
+                          <Row label={t('Odvod na konci směny')} value={`− ${money(Number(c.final_removal))}`} />
+                          <Row label={t('Zůstalo na další směnu')} value={money(cashLeft(c))} tone="strong" />
                         </>
                       )}
                     </div>
                     <div className={`-mx-1 mt-1 mb-1.5 rounded-xl px-3 py-2 flex items-center justify-between gap-3 ${
                       diff === 0 ? 'bg-[#C8F542]/15 text-[#5B7A08]' : diff > 0 ? 'bg-[#0A84FF]/10 text-[#0A5CC0]' : 'bg-bad/10 text-bad-ink'}`}>
-                      <span className="text-sm font-semibold">{diff === 0 ? 'Kasa sedí' : diff > 0 ? 'Přebytek' : 'Manko'}</span>
+                      <span className="text-sm font-semibold">{diff === 0 ? t('Kasa sedí') : diff > 0 ? t('Přebytek') : t('Manko')}</span>
                       <span className="text-sm font-bold tabular-nums">{diff > 0 ? '+' : ''}{money(diff)}</span>
                     </div>
                   </div>
@@ -350,30 +355,30 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
 
               {/* Kontrola proti pokladně. Nejdůležitější číslo na téhle
                   obrazovce — a jediné, které uzávěrka sama nemůže potvrdit. */}
-              <Section title="Kontrola proti pokladně">
+              <Section title={t('Kontrola proti pokladně')}>
                 {d.pos ? (
                   <div className="well border border-black/[0.07] px-4 py-2">
-                    <Row label={`Pokladna — hotovost (${d.pos.bills} úč.)`} value={money(d.pos.cash)} />
-                    <Row label="Uzávěrka — hotovost" value={money(d.pos.dayCash)} />
-                    <Row label="Rozdíl hotovost" value={`${d.pos.diffCash > 0 ? '+' : ''}${money(d.pos.diffCash)}`}
+                    <Row label={t('Pokladna — hotovost ({n} úč.)', { n: d.pos.bills })} value={money(d.pos.cash)} />
+                    <Row label={t('Uzávěrka — hotovost')} value={money(d.pos.dayCash)} />
+                    <Row label={t('Rozdíl hotovost')} value={`${d.pos.diffCash > 0 ? '+' : ''}${money(d.pos.diffCash)}`}
                       tone={d.pos.diffCash === 0 ? undefined : d.pos.diffCash > 0 ? 'plus' : 'minus'} />
                     <div className="border-t border-black/[0.07] my-1" />
-                    <Row label="Pokladna — karta" value={money(d.pos.card)} />
-                    <Row label="Uzávěrka — karta" value={money(d.pos.dayCard)} />
-                    <Row label="Rozdíl karta" value={`${d.pos.diffCard > 0 ? '+' : ''}${money(d.pos.diffCard)}`}
+                    <Row label={t('Pokladna — karta')} value={money(d.pos.card)} />
+                    <Row label={t('Uzávěrka — karta')} value={money(d.pos.dayCard)} />
+                    <Row label={t('Rozdíl karta')} value={`${d.pos.diffCard > 0 ? '+' : ''}${money(d.pos.diffCard)}`}
                       tone={d.pos.diffCard === 0 ? undefined : d.pos.diffCard > 0 ? 'plus' : 'minus'} />
                     {(d.pos.other > 0 || d.pos.tips > 0) && (
                       <div className="border-t border-black/[0.07] my-1 pt-1">
-                        {d.pos.other > 0 && <Row label="Pokladna — jiná platba" value={money(d.pos.other)} />}
+                        {d.pos.other > 0 && <Row label={t('Pokladna — jiná platba')} value={money(d.pos.other)} />}
                         {d.pos.tips > 0 && (
-                          <Row label="Pokladna — spropitné"
-                            value={`${money(d.pos.tips)} (${money(d.pos.tipsCash)} hotově, ${money(d.pos.tipsCard)} kartou${d.pos.tipsOther ? `, ${money(d.pos.tipsOther)} neurčeno` : ''})`} />
+                          <Row label={t('Pokladna — spropitné')}
+                            value={`${money(d.pos.tips)} (${t('{hotove} hotově, {kartou} kartou', { hotove: money(d.pos.tipsCash), kartou: money(d.pos.tipsCard) })}${d.pos.tipsOther ? `, ${t('{castka} neurčeno', { castka: money(d.pos.tipsOther) })}` : ''})`} />
                         )}
                       </div>
                     )}
                   </div>
                 ) : (
-                  <p className="text-sm text-black/45">{skryta ? 'Porovnání s pokladnou vidí jen role s oprávněním Tržby.' : 'Bez dat z pokladny.'}</p>
+                  <p className="text-sm text-black/45">{skryta ? t('Porovnání s pokladnou vidí jen role s oprávněním Tržby.') : t('Bez dat z pokladny.')}</p>
                 )}
                 {(d.notes?.length ?? 0) > 0 && (
                   <ul className="mt-3 space-y-1.5">
@@ -388,7 +393,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
               </Section>
 
               {(c.movements?.length ?? 0) > 0 && (
-                <Section title="Pohyby v kase" hint="Co přesně z kasy odešlo nebo do ní přišlo.">
+                <Section title={t('Pohyby v kase')} hint={t('Co přesně z kasy odešlo nebo do ní přišlo.')}>
                   <div className="divide-y divide-black/[0.06]">
                     {c.movements!.map((m, i) => {
                       const spec = MOVEMENT_KINDS.find(k => k.kind === m.kind);
@@ -405,11 +410,11 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
               )}
 
               {hasDenominations(c.denominations) && (
-                <Section title="Kasa napočítaná po bankovkách">
+                <Section title={t('Kasa napočítaná po bankovkách')}>
                   <div className="flex flex-wrap gap-1.5">
                     {Object.entries(c.denominations!).sort((a, b) => Number(b[0]) - Number(a[0])).map(([den, count]) => (
                       <span key={den} className="tap-target-sm rounded-full bg-white border border-black/[0.08] px-2.5 py-1 text-xs tabular-nums text-[#16181A]">
-                        <strong>{count}×</strong> {Number(den).toLocaleString('cs-CZ')}
+                        <strong>{count}×</strong> {Number(den).toLocaleString(loc)}
                       </span>
                     ))}
                   </div>
@@ -417,7 +422,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
               )}
 
               {(c.diff_reason || c.diff_note) && (
-                <Section title="Proč kasa nesedí">
+                <Section title={t('Proč kasa nesedí')}>
                   <div className="rounded-2xl bg-wait/[0.08] border border-wait/25 p-3.5">
                     {c.diff_reason && <p className="text-sm font-semibold text-[#16181A]">{diffReasonLabel(c.diff_reason)}</p>}
                     {c.diff_note && <p className="text-sm text-black/55 mt-0.5">{c.diff_note}</p>}
@@ -428,18 +433,18 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
               {/* Předávka se dosud zobrazovala jen další směně na dashboardu —
                   v uzávěrce, kde vznikla, ji nikdo nenašel. */}
               {c.handover && (
-                <Section title="Předávka další směně">
+                <Section title={t('Předávka další směně')}>
                   <div className="space-y-2.5">
                     {c.handover.todo && (
-                      <div><p className="t-label">Zbývá udělat</p>
+                      <div><p className="t-label">{t('Zbývá udělat')}</p>
                         <p className="text-sm text-[#16181A] whitespace-pre-wrap">{c.handover.todo}</p></div>
                     )}
                     {c.handover.runningOut && (
-                      <div><p className="t-label">Dochází</p>
+                      <div><p className="t-label">{t('Dochází')}</p>
                         <p className="text-sm text-[#16181A] whitespace-pre-wrap">{c.handover.runningOut}</p></div>
                     )}
                     {c.handover.message && (
-                      <div><p className="t-label">Vzkaz</p>
+                      <div><p className="t-label">{t('Vzkaz')}</p>
                         <p className="text-sm text-[#16181A] whitespace-pre-wrap">{c.handover.message}</p></div>
                     )}
                   </div>
@@ -447,27 +452,27 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
               )}
 
               {c.notes && (
-                <Section title="Poznámka k uzávěrce">
+                <Section title={t('Poznámka k uzávěrce')}>
                   <p className="text-sm text-black/65 whitespace-pre-wrap">{c.notes}</p>
                 </Section>
               )}
 
               {/* Kdo tam byl podle plánu, kdo podle píchaček. Rozdíl mezi tím
                   dvojím je přesně to, co vedení potřebuje vidět. */}
-              <Section title="Kdo byl na směně">
+              <Section title={t('Kdo byl na směně')}>
                 <div className="flex flex-wrap gap-1.5 mb-3">
                   {d.crew.map(p => (
                     <PersonLink key={p.id} id={p.id}
                       className="tap-target-sm inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/15 text-[#5B7A08] px-2.5 py-1 text-xs font-medium">
                       <Avatar emoji={p.avatar} size="xs" ring={false} />{p.name}
-                      {p.id === c.created_by && <span className="opacity-70">· vyplnil/a</span>}
+                      {p.id === c.created_by && <span className="opacity-70">· {t('vyplnil/a')}</span>}
                     </PersonLink>
                   ))}
                   {d.covered.map(cv => (
                     <PersonLink key={cv.id} id={cv.employeeId}
                       className="tap-target-sm inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/15 text-[#5B7A08] px-2.5 py-1 text-xs font-medium">
-                      <Avatar emoji={cv.avatar} size="xs" ring={false} />{cv.name ?? 'Neznámý'}
-                      {payDailyCash && cv.selfPayout > 0 && <span className="opacity-70">· výplata {money(cv.selfPayout)}</span>}
+                      <Avatar emoji={cv.avatar} size="xs" ring={false} />{cv.name ?? t('Neznámý')}
+                      {payDailyCash && cv.selfPayout > 0 && <span className="opacity-70">· {t('výplata {castka}', { castka: money(cv.selfPayout) })}</span>}
                     </PersonLink>
                   ))}
                 </div>
@@ -476,16 +481,16 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
                     {d.attendance.map(a => (
                       <div key={a.id} className="flex items-center gap-2.5 py-2 text-sm">
                         <Avatar emoji={a.employee?.avatar} size="xs" ring={false} />
-                        <span className="min-w-0 flex-1 truncate text-[#16181A]">{a.employee?.name ?? 'Neznámý'}</span>
+                        <span className="min-w-0 flex-1 truncate text-[#16181A]">{a.employee?.name ?? t('Neznámý')}</span>
                         <span className="shrink-0 text-black/45 tabular-nums text-[13px] whitespace-nowrap">
-                          {hhmm(a.clockIn)}–{a.clockOut ? hhmm(a.clockOut) : 'běží'}
+                          {hhmm(a.clockIn)}–{a.clockOut ? hhmm(a.clockOut) : t('běží')}
                         </span>
                         <span className="shrink-0 font-semibold text-[#16181A] tabular-nums text-[13px] w-24 text-right whitespace-nowrap">{hours(a.minutes)}</span>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-black/45">Za tenhle den není žádná docházka.</p>
+                  <p className="text-sm text-black/45">{t('Za tenhle den není žádná docházka.')}</p>
                 )}
                 {/* Automaticky doplněný odchod je odhad — ať je to vidět tady,
                     ne až ve mzdách. */}
@@ -497,7 +502,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
                 ))}
                 {d.planned.length > 0 && (
                   <div className="mt-3">
-                    <p className="t-label mb-1.5">Podle rozvrhu</p>
+                    <p className="t-label mb-1.5">{t('Podle rozvrhu')}</p>
                     <div className="flex flex-wrap gap-1.5">
                       {d.planned.map((p, i) => (
                         <span key={i} className="chip chip-muted">
@@ -510,7 +515,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
               </Section>
 
               {(d.procedures.length > 0 || chybelo.length > 0 || d.tasks.length > 0) && (
-                <Section title="Co se ten den udělalo">
+                <Section title={t('Co se ten den udělalo')}>
                   {d.procedures.length > 0 && (
                     <div className="divide-y divide-black/[0.06] mb-2">
                       {d.procedures.map(p => (
@@ -519,7 +524,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
                             className={`shrink-0 ${p.status === 'completed' ? 'text-[#5B7A08]' : 'text-black/30'}`} />
                           <span className="min-w-0 flex-1 truncate text-[#16181A]">
                             {p.name}
-                            {p.required && <Chip tone="muted" size="sm" className="ml-1.5">povinný</Chip>}
+                            {p.required && <Chip tone="muted" size="sm" className="ml-1.5">{t('povinný')}</Chip>}
                           </span>
                           <span className="shrink-0 text-black/45 text-[13px] tabular-nums whitespace-nowrap">
                             {p.done}/{p.total} · {p.employee?.name ?? '—'} · {hhmm(p.completedAt)}
@@ -534,14 +539,15 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
                     <div className="note note-wait text-[13px] leading-snug" role="note">
                       <p className="flex items-center gap-2 font-medium">
                         <Icon name="lock" size={13} className="shrink-0" />
-                        Povinné před uzávěrkou, co ten den chybělo
+                        
+                        {t('Povinné před uzávěrkou, co ten den chybělo')}
                       </p>
                       <ul className="mt-1.5 space-y-1 pl-[21px]">
                         {chybelo.map(x => (
                           <li key={`${x.typ}-${x.id}`} className="flex items-center gap-1.5 min-w-0">
                             <Icon name={x.typ === 'ukol' ? 'check' : (x.ikona || 'clipboard')} size={13} className="shrink-0 opacity-70" />
                             <span className="truncate">{x.nazev}</span>
-                            <span className="shrink-0 opacity-70">· {x.typ === 'ukol' ? `úkol${x.kdo ? `, ${x.kdo}` : ''}` : 'postup'}</span>
+                            <span className="shrink-0 opacity-70">· {x.typ === 'ukol' ? `${t('úkol')}${x.kdo ? `, ${x.kdo}` : ''}` : t('postup')}</span>
                           </li>
                         ))}
                       </ul>
@@ -562,7 +568,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
               )}
 
               {d.receipts.length > 0 && (
-                <Section title="Účtenky z toho dne">
+                <Section title={t('Účtenky z toho dne')}>
                   <div className="space-y-2">
                     {d.receipts.map(r => (
                       <div key={r.id} className="flex items-center gap-3">
@@ -572,7 +578,7 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
                             </a>
                           : <span className="shrink-0 h-12 w-12 rounded-xl bg-black/[0.05] flex items-center justify-center text-black/25"><Icon name="receipt" size={18} /></span>}
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-[#16181A] truncate">{r.supplier || 'Bez dodavatele'}</p>
+                          <p className="text-sm font-medium text-[#16181A] truncate">{r.supplier || t('Bez dodavatele')}</p>
                           <p className="text-xs text-black/45 truncate">{r.employee?.name ?? '—'} · {hhmm(r.createdAt)}{r.note ? ` · ${r.note}` : ''}</p>
                         </div>
                         <span className="shrink-0 font-semibold text-[#16181A] tabular-nums text-sm">{money(r.amount)}</span>
@@ -583,27 +589,27 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
               )}
 
               {d.products.length > 0 && (
-                <Section title="Co se ten den prodalo" hint="Z prodejů stažených z pokladny — podle nich se odepisuje sklad.">
+                <Section title={t('Co se ten den prodalo')} hint={t('Z prodejů stažených z pokladny — podle nich se odepisuje sklad.')}>
                   <div className="flex flex-wrap gap-1.5">
                     {d.products.map((p, i) => (
                       <span key={i} className="tap-target-sm rounded-full bg-black/[0.04] border border-black/[0.06] px-2.5 py-1 text-xs text-[#16181A]">
-                        <strong className="tabular-nums">{Math.round(p.qty * 10) / 10}×</strong> {p.name ?? 'bez názvu'}
+                        <strong className="tabular-nums">{Math.round(p.qty * 10) / 10}×</strong> {p.name ?? t('bez názvu')}
                       </span>
                     ))}
                   </div>
                 </Section>
               )}
 
-              <Section title="Záznam">
+              <Section title={t('Záznam')}>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5">
-                  <Row label="Vyplněno" value={dayTime(c.created_at)} />
-                  <Row label="Vyplnil/a" value={c.author_name ?? '—'} />
-                  <Row label="Stav" value={c.approved === false ? 'Čeká na schválení' : 'Schváleno'} />
-                  {c.approvedByName && <Row label="Schválil/a" value={c.approvedByName} />}
+                  <Row label={t('Vyplněno')} value={dayTime(c.created_at)} />
+                  <Row label={t('Vyplnil/a')} value={c.author_name ?? '—'} />
+                  <Row label={t('Stav')} value={c.approved === false ? t('Čeká na schválení') : t('Schváleno')} />
+                  {c.approvedByName && <Row label={t('Schválil/a')} value={c.approvedByName} />}
                 </div>
                 {c.review_note && (
                   <div className="mt-2 well border border-black/[0.06] p-3.5">
-                    <p className="t-label mb-0.5">Poznámka vedení</p>
+                    <p className="t-label mb-0.5">{t('Poznámka vedení')}</p>
                     <p className="text-sm text-black/65 whitespace-pre-wrap">{c.review_note}</p>
                   </div>
                 )}
@@ -617,25 +623,26 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
         )}
         {printFailed && (
           <p className="note note-wait mx-5 sm:mx-6 mb-3 cz-sentence">
-            Tiskové okno prohlížeč zablokoval. Povol vyskakovací okna pro tuhle stránku a zkus to znovu.
+            
+            {t('Tiskové okno prohlížeč zablokoval. Povol vyskakovací okna pro tuhle stránku a zkus to znovu.')}
           </p>
         )}
         {c && (
           <div className="dock-strong shrink-0 px-5 sm:px-6 py-3 border-t border-black/[0.07] flex flex-wrap items-center gap-2">
             {potvrdSmazani ? (
               <>
-                <p className="text-sm text-[#16181A] min-w-0 flex-1">Smazat uzávěrku? Tohle nejde vrátit.</p>
-                <Button variant="secondary" size="sm" onClick={() => setPotvrdSmazani(false)}>Zrušit</Button>
-                <Button variant="danger-solid" size="sm" icon="trash" loading={busy} onClick={remove}>Smazat</Button>
+                <p className="text-sm text-[#16181A] min-w-0 flex-1">{t('Smazat uzávěrku? Tohle nejde vrátit.')}</p>
+                <Button variant="secondary" size="sm" onClick={() => setPotvrdSmazani(false)}>{t('Zrušit')}</Button>
+                <Button variant="danger-solid" size="sm" icon="trash" loading={busy} onClick={remove}>{t('Smazat')}</Button>
               </>
             ) : (
               <>
                 {c.approved === false && smiSchvalit && (
-                  <Button variant="primary" icon="check" loading={busy} onClick={approve}>Schválit uzávěrku</Button>
+                  <Button variant="primary" icon="check" loading={busy} onClick={approve}>{t('Schválit uzávěrku')}</Button>
                 )}
-                <Button variant="secondary" icon="print" onClick={print}>Vytisknout</Button>
-                {smiSmazat && <Button variant="danger" onClick={() => setPotvrdSmazani(true)} disabled={busy}>Smazat</Button>}
-                <Button variant="secondary" onClick={onClose} className="ml-auto">Zavřít</Button>
+                <Button variant="secondary" icon="print" onClick={print}>{t('Vytisknout')}</Button>
+                {smiSmazat && <Button variant="danger" onClick={() => setPotvrdSmazani(true)} disabled={busy}>{t('Smazat')}</Button>}
+                <Button variant="secondary" onClick={onClose} className="ml-auto">{t('Zavřít')}</Button>
               </>
             )}
           </div>

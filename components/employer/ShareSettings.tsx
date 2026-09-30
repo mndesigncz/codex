@@ -23,11 +23,13 @@ import {
 import { flattenTree, pathOfId, type CategoryNode } from '@/lib/categoryTree';
 import { useModal } from '@/lib/useModal';
 import { okJson } from '@/lib/api';
+import { useT } from '@/lib/i18n/client';
 
 
 type GuideCat = { id: number; name: string };
 
 export default function ShareSettings() {
+  const t = useT('sprava');
   const [links, setLinks] = useState<ShareLink[]>([]);
   const [theme, setTheme] = useState<ShareTheme>(DEFAULT_THEME);
   const { pro } = usePlan();
@@ -85,12 +87,12 @@ export default function ShareSettings() {
       if (res.ok) {
         setTitle(''); setNote(''); setCategoryId('');
         await load();
-        flash('Odkaz vytvořen.');
+        flash(t('Odkaz vytvořen.'));
       } else {
         const d = await res.json().catch(() => ({}));
-        flash(d.error || 'Odkaz se nepodařilo vytvořit.');
+        flash(d.error || t('Odkaz se nepodařilo vytvořit.'));
       }
-    } catch { flash('Nepodařilo se spojit se serverem.'); }
+    } catch { flash(t('Nepodařilo se spojit se serverem.')); }
     setCreating(false);
   };
 
@@ -114,15 +116,15 @@ export default function ShareSettings() {
       const res = await fetch('/api/share', {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ theme: next }),
       });
-      if (res.ok) flash('Vzhled uložen.');
-    } catch { flash('Vzhled se nepodařilo uložit.'); }
+      if (res.ok) flash(t('Vzhled uložen.'));
+    } catch { flash(t('Vzhled se nepodařilo uložit.')); }
   };
 
   const urlOf = (l: ShareLink) =>
     `${typeof window !== 'undefined' ? window.location.origin : ''}/s/${l.token}`;
 
   const copy = async (l: ShareLink) => {
-    try { await navigator.clipboard.writeText(urlOf(l)); flash('Odkaz zkopírován.'); } catch {}
+    try { await navigator.clipboard.writeText(urlOf(l)); flash(t('Odkaz zkopírován.')); } catch {}
   };
 
   if (loading) {
@@ -132,23 +134,23 @@ export default function ShareSettings() {
   return (
     <div className="space-y-4">
       {notMigrated && (
-        <p className="note note-wait">Sdílení zatím není v databázi připravené — spusť <code>/api/init</code>.</p>
+        <p className="note note-wait">{t('Sdílení zatím není v databázi připravené — spusť {cesta}.', { cesta: '/api/init' })}</p>
       )}
 
       {/* ---- Nový odkaz ---- */}
       <Card className="space-y-4">
         <div>
-          <h3 className="t-card flex items-center gap-2"><Icon name="send" size={17} className="text-black/40" />Nový odkaz pro zákazníky</h3>
-          <p className="t-meta mt-0.5">Stránka bez přihlášení, kde je vidět jen název, značka a popis. Žádné počty, ceny ani dodavatelé.</p>
+          <h3 className="t-card flex items-center gap-2"><Icon name="send" size={17} className="text-black/40" />{t('Nový odkaz pro zákazníky')}</h3>
+          <p className="t-meta mt-0.5">{t('Stránka bez přihlášení, kde je vidět jen název, značka a popis. Žádné počty, ceny ani dodavatelé.')}</p>
         </div>
 
-        <Segmented size="sm" ariaLabel="Co sdílet" value={kind} onChange={k => { setKind(k); setCategoryId(''); }}
-          options={[{ id: 'inventory', label: 'Ze skladu' }, { id: 'guides', label: 'Z návodů' }]} />
+        <Segmented size="sm" ariaLabel={t('Co sdílet')} value={kind} onChange={k => { setKind(k); setCategoryId(''); }}
+          options={[{ id: 'inventory', label: 'Ze skladu' }, { id: 'guides', label: t('Z návodů') }]} />
 
         {kind === 'inventory' && (
-          <Field id="sdil-co" label="Co sdílet" hint="U kategorie se sdílí i všechny její podkategorie, pěkně pod sebou.">
+          <Field id="sdil-co" label={t('Co sdílet')} hint={t('U kategorie se sdílí i všechny její podkategorie, pěkně pod sebou.')}>
             <Select id="sdil-co" value={categoryId} onChange={e => setCategoryId(e.target.value)}>
-              <option value="">Celý sklad</option>
+              <option value="">{t('Celý sklad')}</option>
               {flat.map(({ cat: c, depth }) => (
                 <option key={c.id} value={String(c.id)}>{' '.repeat(depth * 2)}{c.name}</option>
               ))}
@@ -156,30 +158,30 @@ export default function ShareSettings() {
           </Field>
         )}
         {kind === 'guides' && (
-          <Well><p className="t-meta">Sdílí se jen názvy návodů seřazené podle kategorií — obsah návodu se ven nedostane.</p></Well>
+          <Well><p className="t-meta">{t('Sdílí se jen názvy návodů seřazené podle kategorií — obsah návodu se ven nedostane.')}</p></Well>
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field id="sdil-nadpis" label="Nadpis stránky">
-            <Input id="sdil-nadpis" value={title} onChange={e => setTitle(e.target.value)} placeholder="Např. Naše tabáky" />
+          <Field id="sdil-nadpis" label={t('Nadpis stránky')}>
+            <Input id="sdil-nadpis" value={title} onChange={e => setTitle(e.target.value)} placeholder={t('Např. Naše tabáky')} />
           </Field>
-          <Field id="sdil-podtitulek" label="Podtitulek">
-            <Input id="sdil-podtitulek" value={note} onChange={e => setNote(e.target.value)} placeholder="Nepovinný text pod nadpisem" />
+          <Field id="sdil-podtitulek" label={t('Podtitulek')}>
+            <Input id="sdil-podtitulek" value={note} onChange={e => setNote(e.target.value)} placeholder={t('Nepovinný text pod nadpisem')} />
           </Field>
         </div>
 
-        <Button variant="primary" icon="plus" loading={creating} onClick={create}>Vytvořit odkaz</Button>
+        <Button variant="primary" icon="plus" loading={creating} onClick={create}>{t('Vytvořit odkaz')}</Button>
       </Card>
 
       {/* ---- Sdílené odkazy ---- */}
       {links.length > 0 && (
         <Card pad="none" aria-labelledby="sdil-odkazy">
-          <h3 id="sdil-odkazy" className="t-card px-5 pt-4">Sdílené odkazy</h3>
+          <h3 id="sdil-odkazy" className="t-card px-5 pt-4">{t('Sdílené odkazy')}</h3>
           <ul className="list px-5">
             {links.map(l => (
               <LinkRow key={l.id} link={l} cats={cats} guideCats={guideCats}
                 url={urlOf(l)} onCopy={() => copy(l)} onPatch={b => patch(l.id, b)} onRemove={() => setMazu(l)}
-                onQr={() => setQrFor({ url: urlOf(l), title: l.title || 'Sdílený odkaz' })} />
+                onQr={() => setQrFor({ url: urlOf(l), title: l.title || t('Sdílený odkaz') })} />
             ))}
           </ul>
         </Card>
@@ -189,16 +191,16 @@ export default function ShareSettings() {
       {!pro ? (
         <Card className="flex items-center justify-between gap-3 flex-wrap">
           <div className="min-w-0">
-            <h3 className="t-card flex items-center gap-2"><Icon name="sun" size={17} className="text-black/40" /> Vzhled sdílených stránek <ProBadge /></h3>
-            <p className="t-meta mt-0.5">Barvy, logo a patička podle vašeho podniku.</p>
+            <h3 className="t-card flex items-center gap-2"><Icon name="sun" size={17} className="text-black/40" />  {t('Vzhled sdílených stránek')} <ProBadge /></h3>
+            <p className="t-meta mt-0.5">{t('Barvy, logo a patička podle vašeho podniku.')}</p>
           </div>
-          <Button size="sm" variant="secondary" icon="lock" onClick={() => setUpgradeFor('Vlastní vzhled sdílených stránek')}>Odemknout</Button>
+          <Button size="sm" variant="secondary" icon="lock" onClick={() => setUpgradeFor(t('Vlastní vzhled sdílených stránek'))}>{t('Odemknout')}</Button>
         </Card>
       ) : (
       <Card className="space-y-4">
         <div>
-          <h3 className="t-card flex items-center gap-2"><Icon name="sun" size={17} className="text-black/40" /> Vzhled sdílených stránek</h3>
-          <p className="t-meta mt-0.5">Platí pro všechny odkazy najednou.</p>
+          <h3 className="t-card flex items-center gap-2"><Icon name="sun" size={17} className="text-black/40" />  {t('Vzhled sdílených stránek')}</h3>
+          <p className="t-meta mt-0.5">{t('Platí pro všechny odkazy najednou.')}</p>
         </div>
 
         <div className="flex flex-wrap gap-1.5">
@@ -219,13 +221,13 @@ export default function ShareSettings() {
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {([
-            ['background', 'Pozadí'],
-            ['accent', 'Nadpisy'],
-            ['text', 'Text'],
+            ['background', t('Pozadí')],
+            ['accent', t('Nadpisy')],
+            ['text', t('Text')],
           ] as const).map(([key, label]) => (
             <Field key={key} id={`sdil-barva-${key}`} label={label}>
               <div className="flex items-center gap-2">
-                <input type="color" value={theme[key]} aria-label={`${label} — barva`}
+                <input type="color" value={theme[key]} aria-label={t('{label} — barva', { label })}
                   onChange={e => setTheme(t => ({ ...t, [key]: e.target.value }))}
                   onBlur={() => saveTheme(theme)}
                   className="h-11 w-14 shrink-0 rounded-xl border border-black/[0.08] bg-white cursor-pointer" />
@@ -238,19 +240,19 @@ export default function ShareSettings() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field id="sdil-podnik" label="Název podniku">
+          <Field id="sdil-podnik" label={t('Název podniku')}>
             <Input id="sdil-podnik" value={theme.businessName} onChange={e => setTheme(t => ({ ...t, businessName: e.target.value }))}
-              onBlur={() => saveTheme(theme)} placeholder="Zobrazí se nad nadpisem" />
+              onBlur={() => saveTheme(theme)} placeholder={t('Zobrazí se nad nadpisem')} />
           </Field>
-          <Field id="sdil-logo" label="Logo (odkaz na obrázek)">
+          <Field id="sdil-logo" label={t('Logo (odkaz na obrázek)')}>
             <Input id="sdil-logo" value={theme.logoUrl} onChange={e => setTheme(t => ({ ...t, logoUrl: e.target.value }))}
               onBlur={() => saveTheme(theme)} placeholder="https://…" />
           </Field>
         </div>
 
-        <Field id="sdil-paticka" label="Patička">
+        <Field id="sdil-paticka" label={t('Patička')}>
           <Input id="sdil-paticka" value={theme.footer} onChange={e => setTheme(t => ({ ...t, footer: e.target.value }))}
-            onBlur={() => saveTheme(theme)} placeholder="Adresa, otevírací doba, kontakt…" />
+            onBlur={() => saveTheme(theme)} placeholder={t('Adresa, otevírací doba, kontakt…')} />
         </Field>
 
         {/* Živý náhled */}
@@ -261,38 +263,38 @@ export default function ShareSettings() {
               <img src={theme.logoUrl} alt="" style={{ maxHeight: 36, margin: '0 auto 10px', objectFit: 'contain' }} />
             )}
             {theme.businessName && <p className="text-[13px] font-semibold opacity-60">{theme.businessName}</p>}
-            <p style={{ color: theme.accent }} className="text-lg font-bold tracking-tight mt-1">Naše nabídka</p>
-            <p className="text-xs opacity-60 mt-2">Ukázka toho, jak stránka vypadá.</p>
+            <p style={{ color: theme.accent }} className="text-lg font-bold tracking-tight mt-1">{t('Naše nabídka')}</p>
+            <p className="text-xs opacity-60 mt-2">{t('Ukázka toho, jak stránka vypadá.')}</p>
           </div>
         </div>
       </Card>
       )}
       {qrFor && (
         <Modal open onClose={() => setQrFor(null)} title={qrFor.title} size="sm"
-          subtitle="Vytiskni a polož na pult — zákazník načte mobilem."
+          subtitle={t('Vytiskni a polož na pult — zákazník načte mobilem.')}
           footer={<>
-            <Button variant="secondary" onClick={() => setQrFor(null)}>Zavřít</Button>
+            <Button variant="secondary" onClick={() => setQrFor(null)}>{t('Zavřít')}</Button>
             {qrData && (
               <a href={qrData} download="qr-nabidka.png" className="btn btn-primary"
                 onClick={ev => { if (jeObalKlient()) { ev.preventDefault(); void ulozZAdresy(qrData, 'qr-nabidka.png'); } }}>
-                <Icon name="download" size={17} />Stáhnout PNG
+                <Icon name="download" size={17} />{t('Stáhnout PNG')}
               </a>
             )}
           </>}>
           <div className="text-center">
             {qrData
-              ? <img src={qrData} alt="QR kód odkazu" className="mx-auto w-64 h-64 rounded-2xl bg-white p-2 border border-black/[0.08]" />
+              ? <img src={qrData} alt={t('QR kód odkazu')} className="mx-auto w-64 h-64 rounded-2xl bg-white p-2 border border-black/[0.08]" />
               : <Skeleton className="mx-auto w-64 h-64" />}
           </div>
         </Modal>
       )}
       {mazu && (
-        <Modal open onClose={() => setMazu(null)} size="sm" title="Smazat odkaz?"
+        <Modal open onClose={() => setMazu(null)} size="sm" title={t('Smazat odkaz?')}
           footer={<>
-            <Button variant="secondary" onClick={() => setMazu(null)}>Zrušit</Button>
-            <Button variant="danger-solid" onClick={() => { const l = mazu; setMazu(null); void remove(l); }}>Smazat</Button>
+            <Button variant="secondary" onClick={() => setMazu(null)}>{t('Zrušit')}</Button>
+            <Button variant="danger-solid" onClick={() => { const l = mazu; setMazu(null); void remove(l); }}>{t('Smazat')}</Button>
           </>}>
-          <p className="text-sm text-black/70 text-pretty">Kdo odkaz „{mazu.title || 'bez nadpisu'}“ má, přestane stránku vidět.</p>
+          <p className="text-sm text-black/70 text-pretty">{t('Kdo odkaz „{nazev}“ má, přestane stránku vidět.', { nazev: mazu.title || t('bez nadpisu') })}</p>
         </Modal>
       )}
 
@@ -312,10 +314,11 @@ function LinkRow({ link, cats, guideCats, url, onCopy, onPatch, onRemove, onQr }
   onQr: () => void;
   onRemove: () => void;
 }) {
+  const t = useT('sprava');
   const [open, setOpen] = useState(false);
   const scope = link.kind === 'guides'
-    ? 'Návody'
-    : link.categoryId != null ? pathOfId(cats, link.categoryId) : 'Celý sklad';
+    ? t('Návody')
+    : link.categoryId != null ? pathOfId(cats, link.categoryId) : t('Celý sklad');
 
   // Skrýt jde jen to, co odkaz opravdu pokrývá.
   const excludable = link.kind === 'guides'
@@ -333,18 +336,18 @@ function LinkRow({ link, cats, guideCats, url, onCopy, onPatch, onRemove, onQr }
   return (
     <li className="list-row flex-col items-stretch gap-2">
       <div className="flex items-center gap-2 flex-wrap">
-        <Chip tone={link.enabled ? 'ok' : 'muted'} size="sm">{link.kind === 'guides' ? 'Návody' : 'Sklad'}</Chip>
+        <Chip tone={link.enabled ? 'ok' : 'muted'} size="sm">{link.kind === 'guides' ? t('Návody') : t('Sklad')}</Chip>
         <div className="min-w-0 flex-1">
           <p className="text-[15px] font-medium leading-snug text-[#16181A] truncate">{nazev}</p>
-          <p className="text-[13px] text-black/55 truncate">{scope}{link.excluded.length > 0 ? ` · ${link.excluded.length} skryto` : ''}{link.enabled ? '' : ' · vypnutý'}</p>
+          <p className="text-[13px] text-black/55 truncate">{scope}{link.excluded.length > 0 ? ` · ${t('{n} skryto', { n: link.excluded.length })}` : ''}{link.enabled ? '' : ` · ${t('vypnutý')}`}</p>
         </div>
-        <Button size="sm" variant="secondary" icon="copy" onClick={onCopy} aria-label={`Zkopírovat odkaz: ${nazev}`}>Kopírovat</Button>
-        <Menu size="sm" label={`Další akce s odkazem ${nazev}`} items={[
-          { label: link.pinned ? 'Odepnout z nástěnek' : 'Připnout na nástěnku všech', icon: 'pin', onClick: () => onPatch({ pinned: !(link.pinned === true) }) },
+        <Button size="sm" variant="secondary" icon="copy" onClick={onCopy} aria-label={t('Zkopírovat odkaz: {nazev}', { nazev })}>{t('Kopírovat')}</Button>
+        <Menu size="sm" label={t('Další akce s odkazem {nazev}', { nazev })} items={[
+          { label: link.pinned ? t('Odepnout z nástěnek') : t('Připnout na nástěnku všech'), icon: 'pin', onClick: () => onPatch({ pinned: !(link.pinned === true) }) },
           { label: 'QR kód', icon: 'print', onClick: onQr },
-          { label: 'Otevřít stránku', icon: 'external', onClick: () => window.open(url, '_blank', 'noopener') },
-          { label: open ? 'Skrýt nastavení' : 'Nastavení odkazu', icon: 'settings', onClick: () => setOpen(o => !o) },
-          { label: 'Smazat odkaz…', icon: 'trash', danger: true, onClick: onRemove },
+          { label: t('Otevřít stránku'), icon: 'external', onClick: () => window.open(url, '_blank', 'noopener') },
+          { label: open ? t('Skrýt nastavení') : t('Nastavení odkazu'), icon: 'settings', onClick: () => setOpen(o => !o) },
+          { label: t('Smazat odkaz…'), icon: 'trash', danger: true, onClick: onRemove },
         ]} />
       </div>
 
@@ -352,11 +355,11 @@ function LinkRow({ link, cats, guideCats, url, onCopy, onPatch, onRemove, onQr }
         <Well className="space-y-3">
           <p className="t-meta break-all font-mono">{url}</p>
           <span className="flex items-center gap-2.5">
-            <Switch checked={link.enabled} onChange={v => onPatch({ enabled: v })} label="Odkaz je aktivní" />
-            <span className="text-sm text-[#16181A]" aria-hidden>Odkaz je aktivní</span>
+            <Switch checked={link.enabled} onChange={v => onPatch({ enabled: v })} label={t('Odkaz je aktivní')} />
+            <span className="text-sm text-[#16181A]" aria-hidden>{t('Odkaz je aktivní')}</span>
           </span>
           <div>
-            <p className="t-label mb-1.5">Nesdílet tyhle kategorie</p>
+            <p className="t-label mb-1.5">{t('Nesdílet tyhle kategorie')}</p>
             <div className="flex flex-wrap gap-1.5">
               {excludable.map(e => {
                 const off = link.excluded.includes(e.id);
@@ -368,9 +371,9 @@ function LinkRow({ link, cats, guideCats, url, onCopy, onPatch, onRemove, onQr }
                   </button>
                 );
               })}
-              {excludable.length === 0 && <span className="t-meta">Zatím žádné kategorie.</span>}
+              {excludable.length === 0 && <span className="t-meta">{t('Zatím žádné kategorie.')}</span>}
             </div>
-            <p className="t-meta mt-1.5">Vybraná kategorie se nesdílí — schová i všechno pod ní.</p>
+            <p className="t-meta mt-1.5">{t('Vybraná kategorie se nesdílí — schová i všechno pod ní.')}</p>
           </div>
         </Well>
       )}

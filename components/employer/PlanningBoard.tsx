@@ -23,10 +23,11 @@ import { Button, Card, Chip, EmptyState, ErrorState, Field, Input, Menu, Modal, 
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useSmi } from '../widgety/NavigaceKontext';
-import { URL_PLANOVANI, KARTA } from '../widgety/oblasti/planovani';
+import { URL_PLANOVANI } from '../widgety/oblasti/planovani';
 import { apiMessage, okJson } from '@/lib/api';
-import { czCount, czForm } from '@/lib/czech';
 import { vyberKarty, kartySloupce, sloupecKarty, type KartaPlanu } from '@/lib/ukolyPrehled';
+import { useT } from '@/lib/i18n/client';
+import { useLocale } from './jazyk';
 
 // Sloupce tabule jsou kategorie, ne stavy — každý potřebuje vlastní
 // rozlišitelnou barvu, a stavové tóny na to nestačí. Proto kategoriální
@@ -34,15 +35,18 @@ import { vyberKarty, kartySloupce, sloupecKarty, type KartaPlanu } from '@/lib/u
 // „Rozpracováno" oranžové, vypadalo to jako dva odstíny téhož; po
 // sjednocení oranžové na amber z nich byla dokonce jedna barva.)
 const COLUMNS = [
-  { id: 'ideas', label: 'Nápady', dot: 'cat-dot-2' },
-  { id: 'in_progress', label: 'Rozpracováno', dot: 'cat-dot-4' },
-  { id: 'review', label: 'Ke schválení', dot: 'cat-dot-5' },
+  { id: 'ideas', label: 'Nápady', dot: 'cat-dot-2' }, // i18n-ok (popisky překládá nazevSloupce)
+  { id: 'in_progress', label: 'Rozpracováno', dot: 'cat-dot-4' }, // i18n-ok
+  { id: 'review', label: 'Ke schválení', dot: 'cat-dot-5' }, // i18n-ok
   { id: 'done', label: 'Hotovo', dot: 'cat-dot-1' },
 ] as const;
 
 const JSON_HLAVICKA = { 'Content-Type': 'application/json' };
 
 export default function PlanningBoard() {
+  const loc = useLocale();
+  const t = useT('sprava');
+  const nazvySloupcu: Record<(typeof COLUMNS)[number]['id'], string> = { ideas: t('Nápady'), in_progress: t('Rozpracováno'), review: t('Ke schválení'), done: t('Hotovo') };
   const smi = useSmi();
   const upravuje = smi('planovani.upravit');
   const data = useDataWidgetu<KartaPlanu[]>(URL_PLANOVANI, vyberKarty);
@@ -74,8 +78,8 @@ export default function PlanningBoard() {
     setPublishing(card.id);
     try {
       await fetch('/api/noisium/publish', { method: 'POST', headers: JSON_HLAVICKA, body: JSON.stringify({ cardId: card.id }) }).then(okJson);
-      setZprava({ text: `„${card.title}" je publikované do Noisium.` });
-    } catch (e) { setZprava({ text: apiMessage(e, 'Publikování se nepodařilo.'), ton: 'bad' }); }
+      setZprava({ text: t('„{nazev}" je publikované do Noisium.', { nazev: card.title }) });
+    } catch (e) { setZprava({ text: apiMessage(e, t('Publikování se nepodařilo.')), ton: 'bad' }); }
     setPublishing(null);
   };
 
@@ -93,7 +97,7 @@ export default function PlanningBoard() {
       setNewCard(null);
     } catch (e) {
       // Dřív jen console.error — karta nevznikla a nikdo se to nedozvěděl.
-      setChybaFormulare(apiMessage(e, 'Kartu se nepodařilo přidat.'));
+      setChybaFormulare(apiMessage(e, t('Kartu se nepodařilo přidat.')));
     } finally {
       setAdding(false);
     }
@@ -108,7 +112,7 @@ export default function PlanningBoard() {
       data.reload();
     } catch (e) {
       data.set(prev => (prev ?? []).map(c => (c.id === card.id ? card : c)));
-      setZprava({ text: apiMessage(e, 'Kartu se nepodařilo přesunout.'), ton: 'bad' });
+      setZprava({ text: apiMessage(e, t('Kartu se nepodařilo přesunout.')), ton: 'bad' });
     }
   };
 
@@ -123,7 +127,7 @@ export default function PlanningBoard() {
       data.set(prev => (prev ?? []).map(c => (c.id === editCard.id ? { ...c, title: editCard.title.trim(), description: editCard.description.trim() || null } : c)));
       data.reload();
       setEditCard(null);
-    } catch (e) { setZprava({ text: apiMessage(e, 'Kartu se nepodařilo uložit.'), ton: 'bad' }); }
+    } catch (e) { setZprava({ text: apiMessage(e, t('Kartu se nepodařilo uložit.')), ton: 'bad' }); }
     setSavingEdit(false);
   };
 
@@ -136,8 +140,8 @@ export default function PlanningBoard() {
       await fetch(`${URL_PLANOVANI}/${card.id}`, { method: 'DELETE' }).then(okJson);
       data.set(prev => (prev ?? []).filter(c => c.id !== card.id));
       data.reload();
-      setZprava({ text: 'Karta je smazaná.' });
-    } catch (e) { setZprava({ text: apiMessage(e, 'Kartu se nepodařilo smazat.'), ton: 'bad' }); }
+      setZprava({ text: t('Karta je smazaná.') });
+    } catch (e) { setZprava({ text: apiMessage(e, t('Kartu se nepodařilo smazat.')), ton: 'bad' }); }
     setMazani(null);
     setMazu(false);
   };
@@ -151,16 +155,16 @@ export default function PlanningBoard() {
   };
 
   const polozkyMenu = (card: KartaPlanu): MenuItem[] => [
-    ...COLUMNS.filter(c => c.id !== sloupecKarty(card)).map(c => ({ label: `Přesunout do: ${c.label}`, icon: 'swap', onClick: () => void moveCard(card, c.id) })),
-    ...(noisium ? [{ label: publishing === card.id ? 'Publikuji…' : 'Publikovat do Noisium', icon: 'upload', onClick: () => void publishToNoisium(card) }] : []),
-    { label: 'Upravit kartu', icon: 'pencil', onClick: () => setEditCard({ id: card.id, title: card.title, description: card.description ?? '' }) },
-    { label: 'Smazat kartu…', icon: 'trash', danger: true, onClick: () => setMazani(card) },
+    ...COLUMNS.filter(c => c.id !== sloupecKarty(card)).map(c => ({ label: t('Přesunout do: {sloupec}', { sloupec: nazvySloupcu[c.id] }), icon: 'swap', onClick: () => void moveCard(card, c.id) })),
+    ...(noisium ? [{ label: publishing === card.id ? t('Publikuji…') : t('Publikovat do Noisium'), icon: 'upload', onClick: () => void publishToNoisium(card) }] : []),
+    { label: t('Upravit kartu'), icon: 'pencil', onClick: () => setEditCard({ id: card.id, title: card.title, description: card.description ?? '' }) },
+    { label: t('Smazat kartu…'), icon: 'trash', danger: true, onClick: () => setMazani(card) },
   ];
 
   const otevriNovou = (column: string = COLUMNS[0].id) => { setChybaFormulare(null); setNewCard({ column, title: '', description: '' }); };
 
   const nastroj = data.error && !data.data ? (
-    <Card><ErrorState title="Plánování se nenačetlo" onRetry={data.reload} detail={data.error} /></Card>
+    <Card><ErrorState title={t('Plánování se nenačetlo')} onRetry={data.reload} detail={data.error} /></Card>
   ) : data.loading ? (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" aria-busy>
       {COLUMNS.map(c => <div key={c.id} className="well p-3 space-y-2"><Skeleton className="h-5 w-24" /><Skeleton className="h-16" /></div>)}
@@ -171,9 +175,9 @@ export default function PlanningBoard() {
         /* Prázdná tabule sama o sobě neřekne, k čemu je. Než čtyři prázdné
            sloupce ve výšce obrazovky, radši jedna věta a první karta. */
         <Card>
-          <EmptyState illustration="postupy" title="Tabule je zatím prázdná"
-            hint="Sem patří všechno, co chcete v podniku posunout — nová položka do nabídky, oprava kávovaru, nápad od někoho z týmu. Karta putuje zleva doprava, jak se na ní pracuje."
-            action={upravuje ? <Button variant="secondary" icon="plus" onClick={() => otevriNovou()}>Přidat první kartu</Button> : undefined} />
+          <EmptyState illustration="postupy" title={t('Tabule je zatím prázdná')}
+            hint={t('Sem patří všechno, co chcete v podniku posunout — nová položka do nabídky, oprava kávovaru, nápad od někoho z týmu. Karta putuje zleva doprava, jak se na ní pracuje.')}
+            action={upravuje ? <Button variant="secondary" icon="plus" onClick={() => otevriNovou()}>{t('Přidat první kartu')}</Button> : undefined} />
         </Card>
       )}
       {/* Na telefonu vodorovný pás sloupců (jeden a kousek dalšího na šířku), od sm mřížka. */}
@@ -192,9 +196,9 @@ export default function PlanningBoard() {
               <div className="flex items-center justify-between gap-2 px-1">
                 <h3 id={`${idForm}-${col.id}`} className="t-card flex items-center gap-2 min-w-0">
                   <span className={`w-2 h-2 rounded-full shrink-0 ${col.dot}`} aria-hidden />
-                  <span className="truncate">{col.label}</span>
+                  <span className="truncate">{nazvySloupcu[col.id]}</span>
                 </h3>
-                <Chip tone="muted" size="sm">{karty.length.toLocaleString('cs-CZ')}<span className="sr-only"> {czForm(karty.length, KARTA)}</span></Chip>
+                <Chip tone="muted" size="sm">{karty.length.toLocaleString(loc)}<span className="sr-only"> {t('{n, plural, one {karta} few {karty} other {karet}}', { n: karty.length })}</span></Chip>
               </div>
 
               <ul className="space-y-2 min-h-[3rem]">
@@ -211,29 +215,29 @@ export default function PlanningBoard() {
                         <p className="font-medium text-[15px] leading-snug text-[#16181A] break-words">{card.title}</p>
                         {card.description && <p className="text-[13px] text-black/55 mt-1 break-words text-pretty">{card.description}</p>}
                       </div>
-                      {upravuje && <Menu size="sm" label={`Možnosti karty ${card.title}`} items={polozkyMenu(card)} className="-mr-1.5 -mt-1" />}
+                      {upravuje && <Menu size="sm" label={t('Možnosti karty {nazev}', { nazev: card.title })} items={polozkyMenu(card)} className="-mr-1.5 -mt-1" />}
                     </div>
                   </li>
                 ))}
-                {karty.length === 0 && newCard?.column !== col.id && <li className="t-meta text-center py-3">Žádná karta</li>}
+                {karty.length === 0 && newCard?.column !== col.id && <li className="t-meta text-center py-3">{t('Žádná karta')}</li>}
               </ul>
 
               {upravuje && (newCard?.column === col.id ? (
-                <form onSubmit={e => { e.preventDefault(); void handleAddCard(); }} className="card p-3 space-y-2" aria-label={`Nová karta do sloupce ${col.label}`}>
-                  <Input autoFocus value={newCard.title} aria-label="Název karty" placeholder="Název karty" maxLength={200}
+                <form onSubmit={e => { e.preventDefault(); void handleAddCard(); }} className="card p-3 space-y-2" aria-label={t('Nová karta do sloupce {sloupec}', { sloupec: nazvySloupcu[col.id] })}>
+                  <Input autoFocus value={newCard.title} aria-label={t('Název karty')} placeholder={t('Název karty')} maxLength={200}
                     onChange={e => setNewCard(prev => (prev ? { ...prev, title: e.target.value } : null))} />
-                  <Textarea value={newCard.description} aria-label="Popis karty" placeholder="Popis (nepovinný)" rows={2} maxLength={2000}
+                  <Textarea value={newCard.description} aria-label={t('Popis karty')} placeholder={t('Popis (nepovinný)')} rows={2} maxLength={2000}
                     onChange={e => setNewCard(prev => (prev ? { ...prev, description: e.target.value } : null))} />
                   {chybaFormulare && <p className="note note-danger text-sm" role="alert">{chybaFormulare}</p>}
                   <div className="flex gap-2">
-                    <Button type="submit" variant="primary" size="sm" loading={adding} disabled={!newCard.title.trim()}>Přidat</Button>
-                    <Button variant="ghost" size="sm" onClick={() => setNewCard(null)}>Zrušit</Button>
+                    <Button type="submit" variant="primary" size="sm" loading={adding} disabled={!newCard.title.trim()}>{t('Přidat')}</Button>
+                    <Button variant="ghost" size="sm" onClick={() => setNewCard(null)}>{t('Zrušit')}</Button>
                   </div>
                 </form>
               ) : (
                 <button type="button" onClick={() => otevriNovou(col.id)}
                   className="tap-target-sm w-full py-2 rounded-2xl border border-dashed border-black/15 text-sm text-black/45 inline-flex items-center justify-center gap-1.5 hover:text-[#16181A] hover:bg-black/[0.03] transition-colors">
-                  <Icon name="plus" size={15} /> Přidat kartu
+                  <Icon name="plus" size={15} />  {t('Přidat kartu')}
                 </button>
               ))}
             </section>
@@ -249,38 +253,38 @@ export default function PlanningBoard() {
       <PlochaWidgetu
         stranka="vedeni.planovani"
         hlavicka={{
-          title: 'Plánování',
+          title: t('Plánování'),
           subtitle: data.data && cards.length > 0
-            ? `${czCount(cards.length, KARTA)} na tabuli, v práci ${vPraci.toLocaleString('cs-CZ')}.`
-            : 'Nápady a úkoly, které čekají na svůj čas.',
+            ? t('{n, plural, one {# karta} few {# karty} other {# karet}} na tabuli, v práci {praci}.', { n: cards.length, praci: vPraci.toLocaleString(loc) })
+            : t('Nápady a úkoly, které čekají na svůj čas.'),
           hintId: 'planningboard',
-          primary: upravuje ? <Button variant="accent" icon="plus" onClick={() => otevriNovou()}>Nová karta</Button> : undefined,
+          primary: upravuje ? <Button variant="accent" icon="plus" onClick={() => otevriNovou()}>{t('Nová karta')}</Button> : undefined,
         }}
         nastroj={nastroj}
       />
       {editCard && (
-        <Modal open onClose={() => setEditCard(null)} title="Upravit kartu" size="sm"
+        <Modal open onClose={() => setEditCard(null)} title={t('Upravit kartu')} size="sm"
           footer={<>
-            <Button variant="secondary" onClick={() => setEditCard(null)}>Zrušit</Button>
-            <Button variant="primary" icon="check" loading={savingEdit} disabled={!editCard.title.trim()} onClick={saveEdit}>Uložit</Button>
+            <Button variant="secondary" onClick={() => setEditCard(null)}>{t('Zrušit')}</Button>
+            <Button variant="primary" icon="check" loading={savingEdit} disabled={!editCard.title.trim()} onClick={saveEdit}>{t('Uložit')}</Button>
           </>}>
           <div className="space-y-3">
-            <Field id={`${idForm}-e-nazev`} label="Název">
+            <Field id={`${idForm}-e-nazev`} label={t('Název')}>
               <Input id={`${idForm}-e-nazev`} value={editCard.title} onChange={e => setEditCard(c => c && { ...c, title: e.target.value })} maxLength={200} />
             </Field>
-            <Field id={`${idForm}-e-popis`} label="Popis" hint="Nepovinné.">
+            <Field id={`${idForm}-e-popis`} label={t('Popis')} hint={t('Nepovinné.')}>
               <Textarea id={`${idForm}-e-popis`} value={editCard.description} onChange={e => setEditCard(c => c && { ...c, description: e.target.value })} rows={3} maxLength={2000} />
             </Field>
           </div>
         </Modal>
       )}
       {mazani && (
-        <Modal open onClose={() => setMazani(null)} title="Smazat kartu?" size="sm"
+        <Modal open onClose={() => setMazani(null)} title={t('Smazat kartu?')} size="sm"
           footer={<>
-            <Button variant="secondary" onClick={() => setMazani(null)}>Zrušit</Button>
-            <Button variant="danger-solid" loading={mazu} onClick={deleteCard}>Smazat</Button>
+            <Button variant="secondary" onClick={() => setMazani(null)}>{t('Zrušit')}</Button>
+            <Button variant="danger-solid" loading={mazu} onClick={deleteCard}>{t('Smazat')}</Button>
           </>}>
-          <p className="text-sm text-black/70 text-pretty">„{mazani.title}" zmizí z tabule. Vrátit to nepůjde.</p>
+          <p className="text-sm text-black/70 text-pretty">{t('„{nazev}" zmizí z tabule. Vrátit to nepůjde.', { nazev: mazani.title })}</p>
         </Modal>
       )}
       <Toast message={zprava?.text ?? null} tone={zprava?.ton} onClose={() => setZprava(null)} />

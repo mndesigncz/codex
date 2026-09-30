@@ -147,12 +147,12 @@ export default function ({ eq, ok }: Testy) {
   ok('EventsView: „Nová akce" jen s akce.upravit', /primary: spravuje \?/.test(ev) && /ma\('akce\.upravit'\)/.test(ev));
   ok('StaffInbox: „Přijmout" tmavě a jen s objednavky.vyridit', !/variant="accent"/.test(precti('components/client/StaffInbox.tsx')) && /ma\('objednavky\.vyridit'\)/.test(precti('components/client/StaffInbox.tsx')));
   // ---- opravy po review ----
-  ok('EventsView: bez alert() — hlášky přes Toast (oznam)', !/\balert\(/.test(ev) && /oznam\('Tým dostal notifikaci o akci\.'\)/.test(ev) && /<Toast /.test(ev));
+  ok('EventsView: bez alert() — hlášky přes Toast (oznam)', !/\balert\(/.test(ev) && /oznam\((?:t\()?'Tým dostal notifikaci o akci\.'\)?\)/.test(ev) && /<Toast /.test(ev));
   ok('EventsView: Nová akce i detail jsou <Modal>, žádné ruční okno ani useModal vedle', !/modal-overlay|modal-sheet|useModal\(/.test(ev) && (ev.match(/<Modal /g) ?? []).length === 2);
   ok('EventsView: potvrzení a balení jsou krok téhož okna, Escape v kroku jen zpět (window capture)', /onClose=\{krok \? zavriKrok : onClose\}/.test(ev) && /window\.addEventListener\('keydown', naKlavesu, true\)/.test(ev) && /hidden=\{!!krok\}/.test(ev));
-  ok('EventsView: stav a místo přes Segmented, lidé PersonChip, pole s Field (bez inputClass a ručních barev)', /ariaLabel="Stav akce"/.test(ev) && /ariaLabel="Kde se akce koná"/.test(ev)
+  ok('EventsView: stav a místo přes Segmented, lidé PersonChip, pole s Field (bez inputClass a ručních barev)', /ariaLabel=(?:"Stav akce"|\{t\('Stav akce'\)\})/.test(ev) && /ariaLabel=(?:"Kde se akce koná"|\{t\('Kde se akce koná'\)\})/.test(ev)
     && /<PersonChip /.test(ev) && !/inputClass|#0A84FF|#0A5CC0|bg-white\/70|>\+<\/button>/.test(ev) && !/role="radiogroup"/.test(ev));
-  ok('EventsView: pole detailu mají popisek (Název akce, Nový úkol k akci)', /label="Název akce"/.test(ev) && /label="Nový úkol k akci"/.test(ev) && !/placeholder="Název akce"/.test(ev));
+  ok('EventsView: pole detailu mají popisek (Název akce, Nový úkol k akci)', /label=(?:"Název akce"|\{t\('Název akce'\)\})/.test(ev) && /label=(?:"Nový úkol k akci"|\{t\('Nový úkol k akci'\)\})/.test(ev) && !/placeholder="Název akce"/.test(ev));
   ok('ClientAdmin: souhrn (odznaky) se obnoví při změně záložky a periodicky', /minulaZalozka\.current = tab;\s*obnovSouhrn\(\)/.test(admin) && /setInterval\(\(\) => \{ if \(document\.visibilityState === 'visible'\) obnovSouhrn\(\)/.test(admin));
   ok('StaffInbox a widget Objednávky od stolu obnoví souhrn po změně objednávky', /onZmena\?\.\(\)/.test(precti('components/client/StaffInbox.tsx')) && /<StaffInbox onToast=\{t => oznam\(t\)\} onZmena=\{onZmena\} \/>/.test(admin)
     && /obnovDataWidgetu\('\/api\/client\/admin\/summary'\);\s*\}\s*\};\s*const vse = data\.data\?\.objednavky/.test(precti('components/widgety/oblasti/klient.tsx')));

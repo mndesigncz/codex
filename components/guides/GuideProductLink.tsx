@@ -10,6 +10,7 @@ import { Icon } from '../Icons';
 import { usePrice } from '../CurrencyProvider';
 import { useResultKeys } from '@/lib/useResultKeys';
 import { okJson } from '@/lib/api';
+import { useT } from '@/lib/i18n/client';
 
 type Product = { productId: string; name: string; category?: string | null; price?: number | null };
 
@@ -18,6 +19,7 @@ export default function GuideProductLink({ productId, productName, onPick }: {
   productName: string | null;
   onPick: (id: string | null, name: string | null) => void;
 }) {
+  const t = useT('navody');
   const cena = usePrice();
   const popisek = useId();
   const [open, setOpen] = useState(false);
@@ -47,14 +49,14 @@ export default function GuideProductLink({ productId, productName, onPick }: {
   return (
     // Popisek skupiny, ne jednoho pole (pole se objeví až po „Připojit") — proto skupina, ne <label>.
     <div role="group" aria-labelledby={popisek}>
-      <p id={popisek} className="field-label">Položka v kase (volitelné)</p>
+      <p id={popisek} className="field-label">{t('Položka v kase (volitelné)')}</p>
       {productId ? (
         <div className="well flex items-center gap-2 px-4 py-2.5">
           {/* Kolo 69 (B6b): dřív limetkově tónovaný blok — limetka je akce, ne stav vazby. */}
           <Icon name="receipt" size={15} className="shrink-0 text-black/45" />
           <span className="min-w-0 flex-1 truncate text-sm text-[#16181A]">{productName ?? productId}</span>
           <button type="button" onClick={() => { onPick(null, null); setOpen(false); setQuery(''); }}
-            title="Zrušit vazbu" aria-label="Zrušit vazbu"
+            title={t('Zrušit vazbu')} aria-label={t('Zrušit vazbu')}
             className="shrink-0 btn-icon btn-icon-danger transition">
             <Icon name="close" size={13} />
           </button>
@@ -63,10 +65,10 @@ export default function GuideProductLink({ productId, productName, onPick }: {
         <div className="well p-3 space-y-2">
           <input ref={pickInput} autoFocus value={query} onChange={e => setQuery(e.target.value)}
             onKeyDown={keys.onInputKeyDown}
-            placeholder="Hledat položku v kase…"
+            placeholder={t('Hledat položku v kase…')}
             className="field w-full" />
           {query.trim().length >= 2 && found.length === 0 && (
-            <p className="t-meta">{note || 'Nic takového v menu není.'}</p>
+            <p className="t-meta">{note || t('Nic takového v menu není.')}</p>
           )}
           {found.length > 0 && (
             <div ref={pickList} onKeyDown={keys.onListKeyDown}
@@ -84,12 +86,12 @@ export default function GuideProductLink({ productId, productName, onPick }: {
             </div>
           )}
           <button type="button" onClick={() => { setOpen(false); setQuery(''); setFound([]); }}
-            className="btn btn-ghost btn-sm">Zrušit</button>
+            className="btn btn-ghost btn-sm">{t('Zrušit')}</button>
         </div>
       ) : (
         <button type="button" onClick={() => setOpen(true)}
           className="btn btn-secondary btn-sm">
-          <Icon name="plus" size={15} /> Připojit k položce v kase
+          <Icon name="plus" size={15} />  {t('Připojit k položce v kase')}
         </button>
       )}
     </div>
