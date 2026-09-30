@@ -22,7 +22,6 @@
 //    zvlášť — „dnes ještě chybí" (čekací tón, ne chyba) až po zavírací době.
 
 import { useState } from 'react';
-import { czCount, POLOZKA } from '@/lib/czech';
 import { pragueToday } from '@/lib/pragueTime';
 import { dnesJesteChybi } from '@/lib/uzaverkyOrganizace';
 import { Button, Card, Chip, EmptyState, ErrorState, MonthNav, Skeleton, Stat, StatRow } from '../ui';
@@ -30,7 +29,7 @@ import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useNavigace, useSmi } from '../widgety/NavigaceKontext';
 import {
-  CLEN, MesicStrankyOrganizace, Penize, UZAVERKA, urlPrehledu, vyberPrehled, type PrehledOrganizace,
+  MesicStrankyOrganizace, Penize, urlPrehledu, vyberPrehled, type PrehledOrganizace,
 } from '../widgety/oblasti/organizace';
 import { useT } from '@/lib/i18n/client';
 import { useLocale } from './jazyk';

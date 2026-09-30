@@ -23,9 +23,8 @@ import { Button, Card, Chip, EmptyState, ErrorState, Field, Input, Menu, Modal, 
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useSmi } from '../widgety/NavigaceKontext';
-import { URL_PLANOVANI, KARTA } from '../widgety/oblasti/planovani';
+import { URL_PLANOVANI } from '../widgety/oblasti/planovani';
 import { apiMessage, okJson } from '@/lib/api';
-import { czCount, czForm } from '@/lib/czech';
 import { vyberKarty, kartySloupce, sloupecKarty, type KartaPlanu } from '@/lib/ukolyPrehled';
 import { useT } from '@/lib/i18n/client';
 import { useLocale } from './jazyk';

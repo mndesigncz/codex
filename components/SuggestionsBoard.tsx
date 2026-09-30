@@ -27,7 +27,6 @@ import { useDataWidgetu, obnovDataWidgetu } from './widgety/useDataWidgetu';
 import { useSmi } from './widgety/NavigaceKontext';
 import { URL_NAPADY, Hlas } from './widgety/oblasti/napady';
 import { apiMessage, okJson } from '@/lib/api';
-import { czCount, type CzNoun } from '@/lib/czech';
 import { vyberPodnety, prepniHlas, type DataPodnetu, type Podnet } from '@/lib/ukolyPrehled';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { useLocale } from './employer/jazyk';

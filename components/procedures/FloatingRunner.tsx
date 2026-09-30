@@ -17,7 +17,6 @@ import StepTimeline from './StepTimeline';
 import { useOtevreniNavodu } from '@/lib/otevriNavod';
 import { Icon } from '../Icons';
 import { Button, Chip, Input } from '../ui';
-import { czCount, czForm } from '@/lib/czech';
 import { useT } from '@/lib/i18n/client';
 
 function fmt(sec: number) {

@@ -20,8 +20,6 @@ import { useCurrency } from '../CurrencyProvider';
 import ShiftReviewModal from './ShiftReviewModal';
 import { pragueToday } from '@/lib/pragueTime';
 import { bunkyMesice } from '@/lib/uzaverkyPrehled';
-import { czCount, czForm } from '@/lib/czech';
-import { NEHODNOCENA_SMENA } from '@/lib/odmenyPrehled';
 import { Avatar, Button, Card, Chip, ErrorState, ListRow, MonthNav, Skeleton } from '../ui';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useT, type PrekladFn } from '@/lib/i18n/client';

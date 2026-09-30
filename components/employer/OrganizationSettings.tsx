@@ -21,7 +21,6 @@ import { Icon } from '../Icons';
 import { Button, Card, Chip, Modal, Segmented, Select, SwitchRow, Toast } from '../ui';
 import { okJson } from '@/lib/api';
 import { CISELNIKY, coSeSlucuje, coSeVypina, normalizujNastaveni, type Ciselnik, type NastaveniOrganizace, type ZdrojeCiselniku } from '@/lib/organizace';
-import { czCount, type CzNoun } from '@/lib/czech';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 
 interface Org { id: number; name: string; isOwner: boolean; settings: NastaveniOrganizace; teams: { id: number; name: string }[] }

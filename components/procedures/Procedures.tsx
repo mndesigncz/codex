@@ -31,7 +31,6 @@ import {
 import { useProcedures } from './ProcedureProvider';
 import StepTimeline from './StepTimeline';
 import { parseSteps, totalMinutes, fmtMinutes, STEP_WEIGHTS, weightSpec, type Step } from '@/lib/steps';
-import { czCount, type CzNoun } from '@/lib/czech';
 import { okJson, apiMessage } from '@/lib/api';
 import StepGuidePicker, { type PickableGuide } from '../guides/StepGuidePicker';
 import { useOtevreniNavodu } from '@/lib/otevriNavod';

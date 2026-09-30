@@ -5,7 +5,6 @@ import { Icon } from '../Icons';
 import { useMoney } from '../CurrencyProvider';
 import { normalizePoints } from '@/lib/rewardLevels';
 import { pragueToday } from '@/lib/pragueTime';
-import { czForm } from '@/lib/czech';
 import { okJson } from '@/lib/api';
 import { Modal, Button, Segmented, Skeleton, Switch, SwitchRow } from '../ui';
 import { useT } from '@/lib/i18n/client';

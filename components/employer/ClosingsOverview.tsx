@@ -31,7 +31,6 @@ import { useMoney } from '../CurrencyProvider';
 import CashClosing from '../employee/CashClosing';
 import ClosingDetail from './ClosingDetail';
 import { okJson } from '@/lib/api';
-import { czCount } from '@/lib/czech';
 import { pragueToday } from '@/lib/pragueTime';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
@@ -44,7 +43,6 @@ import { useT } from '@/lib/i18n/client';
 import { useLocale } from './jazyk';
 
 const URL_SEZNAM = '/api/closings';
-const UZAVERKA = { one: 'uzávěrka', few: 'uzávěrky', many: 'uzávěrek' }; // i18n-ok
 
 type Person = { id: number; name: string; avatar?: string | null };
 

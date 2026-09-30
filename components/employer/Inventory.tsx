@@ -44,7 +44,6 @@ import StocktakeModal from '../inventory/Stocktake';
 import ItemRecipeLinks from '../inventory/ItemRecipeLinks';
 import ProductionRecipe from '../inventory/ProductionRecipe';
 import { useMoney, usePrice, useSymbol } from '../CurrencyProvider';
-import { czVerb } from '@/lib/czech';
 import { okJson } from '@/lib/api';
 import { openPrint, esc } from '@/lib/printDoc';
 import { obsahujeNekde } from '@/lib/hledani';
@@ -122,7 +121,6 @@ type View = 'list' | 'grid';
 
 // Výchozí kategorie musí dávat smysl kavárně, restauraci i čajovně —
 // proto obecné skupiny, ne konkrétní sortiment.
-const DEFAULT_CATEGORIES = ['Nápoje', 'Suroviny', 'Nádobí', 'Drogerie']; // i18n-ok (vzor; název založené kategorie vzniká překladem v seedDefaults)
 const inputClass = 'field';
 /** Číslo z pole, které snese i desetinnou čárku. V poli type="number"
  *  se „0,7" zahodí na prázdno — a velikost balení pak tiše zmizí. */

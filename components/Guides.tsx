@@ -38,7 +38,6 @@ import GuideStepIngredient from './guides/GuideStepIngredient';
 import GuideProductLink from './guides/GuideProductLink';
 import GuideItemLink from './guides/GuideItemLink';
 import { okJson, apiMessage } from '@/lib/api';
-import { czCount, KATEGORIE, type CzNoun } from '@/lib/czech';
 import { obsahujeNekde } from '@/lib/hledani';
 import KopieZPodniku, { useJinePodniky } from './organizace/KopieZPodniku';
 import { PlochaWidgetu, type HlavickaPlochy } from './widgety/PlochaWidgetu';

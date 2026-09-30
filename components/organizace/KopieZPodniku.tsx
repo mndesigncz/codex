@@ -13,7 +13,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../Icons';
 import { Modal, Button, SearchField, ErrorState, EmptyState, SelectBox } from '../ui';
 import { okJson, apiMessage } from '@/lib/api';
-import { czCount, type CzNoun } from '@/lib/czech';
 import { obsahujeNekde } from '@/lib/hledani';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 

@@ -29,7 +29,6 @@ import {
 import {
   Button, Card, Chip, EmptyState, Field, Input, Label, Modal, PlovouciLista, Segmented, Select, Skeleton, Switch, SwitchRow, Toast, Well,
 } from '../ui';
-import { czCount, POLOZKA } from '@/lib/czech';
 import { useResultKeys } from '@/lib/useResultKeys';
 import { okJson } from '@/lib/api';
 import { obsahuje } from '@/lib/hledani';

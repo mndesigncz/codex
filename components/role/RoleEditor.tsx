@@ -18,14 +18,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../Icons';
 import { Button, Chip, DiscardGuard, EmptyState, ErrorState, Input, Label, Modal, SearchField, Segmented, Switch, Textarea } from '../ui';
 import { okJson, apiMessage, ApiError } from '@/lib/api';
-import { czCount, czForm, czVerb } from '@/lib/czech';
 import { obsahujeNekde } from '@/lib/hledani';
 import {
   KATALOG, OBLASTI, KIOSK_BILA_LISTINA, sZavislostmi, bezZavislych, navic, smiBytVychozi, opravneni as popisKlice,
   type TypRole, type Opravneni,
 } from '@/lib/opravneni';
 import { obnovOpravneni } from './useOpravneni';
-import { nastavRozepsanouRoli, CO_SE_ZAHODI_ROLE } from './rozepsano';
+import { nastavRozepsanouRoli } from './rozepsano';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { sUzlem, VLOZ } from '../employer/jazyk';
 

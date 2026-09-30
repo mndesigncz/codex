@@ -9,7 +9,6 @@ import { Icon, LogoMark } from '../Icons';
 import { Avatar, ErrorBoundary, MenuPanel, MenuItemButton, type MenuItem } from '../ui';
 import { Dock } from '../ui/Dock';
 import { usePopover } from '@/lib/usePopover';
-import { czCount, NEPRECTENA_ZPRAVA } from '@/lib/czech';
 import NotificationBell from '../NotificationBell';
 
 import MessengerDock from '../chat/MessengerDock';

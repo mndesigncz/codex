@@ -37,7 +37,6 @@ import NavigaceNastaveni from './NavigaceNastaveni';
 import { JAZYKY, JAZYK_NAZEV, cistyJazyk } from '@/lib/i18n/config';
 import { ZEME, PREDVOLBY_ZEMI, predvolbaProZemi, navrhNastaveni } from '@/lib/i18n/zeme';
 import { useSymbol } from './CurrencyProvider';
-import { czCount } from '@/lib/czech';
 import { apiMessage, okJson } from '@/lib/api';
 import { obsahujeNekde } from '@/lib/hledani';
 import { useOpravneni } from './role/useOpravneni';

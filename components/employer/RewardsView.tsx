@@ -29,8 +29,7 @@ import {
   Avatar, Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Modal, Segmented, Skeleton, Switch, Textarea, Toast,
 } from '../ui';
 import { DEFAULT_POINTS, normalizeLevels, normalizePoints, type RewardLevel, type PointsConfig } from '@/lib/rewardLevels';
-import { BOD, KLIC_KALENDAR, UDALOST_KALENDAR, VYTKA, vyberKatalog, vyberPoradi, type Odmena, type Poradi } from '@/lib/odmenyPrehled';
-import { czCount, czForm } from '@/lib/czech';
+import { KLIC_KALENDAR, UDALOST_KALENDAR, vyberKatalog, vyberPoradi, type Odmena, type Poradi } from '@/lib/odmenyPrehled';
 import { apiMessage, okJson } from '@/lib/api';
 import ShiftReviewModal from './ShiftReviewModal';
 import ShiftReviewCalendar from './ShiftReviewCalendar';
