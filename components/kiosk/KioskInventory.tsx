@@ -9,6 +9,7 @@ import StocktakeModal from '../inventory/Stocktake';
 import { useKioskShift } from './KioskShiftGate';
 import { okJson } from '@/lib/api';
 import { obsahuje, obsahujeNekde } from '@/lib/hledani';
+import { useT } from '@/lib/i18n/client';
 
 interface Item {
   id: number;
@@ -24,6 +25,9 @@ interface Item {
   openAmount?: number | null;
 }
 
+/** Interní hodnota filtru „všechny kategorie“ — nápis se překládá až při vykreslení. */
+const KAT_VSE = '*vse*';
+
 const statusOf = (i: Item) =>
   (i as any).status ?? (i.quantity <= (i.criticalQuantity ?? 0) ? 'critical' : i.quantity <= i.minQuantity ? 'low' : 'ok');
 
@@ -31,6 +35,7 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
   autoOpenEntry?: boolean;
   onEntryOpened?: () => void;
 } = {}) {
+  const t = useT('kiosk');
   const [items, setItems] = useState<Item[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,7 +43,7 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
   // musí to být vidět na obrazovce, ne zmizet do prázdného seznamu.
   const [loadErr, setLoadErr] = useState(false);
   const [saveErr, setSaveErr] = useState('');
-  const [cat, setCat] = useState('Vše');
+  const [cat, setCat] = useState(KAT_VSE);
   const [search, setSearch] = useState('');
   // Debounced quantity saves so rapid taps don't spam the server.
   const timers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
@@ -82,18 +87,18 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
     onEntryOpened?.();
   }, [autoOpenEntry]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const cats = useMemo(() => ['Vše', ...Array.from(new Set(items.map(i => i.category).filter(Boolean)))], [items]);
+  const cats = useMemo(() => [KAT_VSE, ...Array.from(new Set(items.map(i => i.category).filter(Boolean)))], [items]);
   const parkedCount = items.filter(i => i.archived === true).length;
   const filtered = items.filter(i =>
     (showParked ? i.archived === true : i.archived !== true) &&
-    (cat === 'Vše' || i.category === cat) &&
+    (cat === KAT_VSE || i.category === cat) &&
     obsahuje(i.name, search));
 
   const setParked = (item: Item, archived: boolean) => {
     setItems(list => list.map(x => x.id === item.id ? { ...x, archived } : x));
     fetch(`/api/inventory/${item.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ archived, note: archived ? 'Označeno „nevedeme"' : 'Vráceno do skladu' }),
+      body: JSON.stringify({ archived, note: archived ? 'Označeno „nevedeme"' : 'Vráceno do skladu' }), // i18n-ok: poznámka do historie skladu
     }).catch(() => setItems(list => list.map(x => x.id === item.id ? { ...x, archived: !archived } : x)));
   };
 
@@ -114,7 +119,7 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
         // Uložení neprošlo: vrátit číslo zpět, ať tablet neukazuje stav, který
         // v databázi není, a říct to nahlas.
         setItems(list => list.map(x => x.id === item.id ? { ...x, quantity: before } : x));
-        setSaveErr(`Změnu u „${item.name}" se nepodařilo uložit. Zkontroluj připojení a zkus to znovu.`);
+        setSaveErr(t('Změnu u „{nazev}" se nepodařilo uložit. Zkontroluj připojení a zkus to znovu.', { nazev: item.name }));
       }
     }, 500);
   };
@@ -146,8 +151,8 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
           {adding ? (
             <Card className="space-y-4" aria-labelledby="kiosk-sklad-nova">
               <h2 id="kiosk-sklad-nova" className="t-card flex flex-wrap items-center gap-2">
-                <Icon name="box" size={20} /> Nová věc do skladu
-                {active && <span className="t-meta">· zapisuje {active.name}</span>}
+                <Icon name="box" size={20} /> {t('Nová věc do skladu')}
+                {active && <span className="t-meta">· {t('zapisuje {jmeno}', { jmeno: active.name })}</span>}
               </h2>
               <NewStockEntry
                 variant="kiosk"
@@ -158,35 +163,35 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
             </Card>
           ) : (
             <Button variant="primary" size="lg" icon="plus" block className="w-full" onClick={() => setAdding(true)}>
-              Zapsat novou věc do skladu
+              {t('Zapsat novou věc do skladu')}
             </Button>
           )}
           {/* Inventuru zahajuje vedení, ale počítá ji ten, kdo stojí u regálu —
               tedy zpravidla někdo s tímhle tabletem v ruce. */}
           {stocktakeOpen && (
             <Button variant="accent" size="lg" icon="clipboard" block className="w-full" onClick={() => setCounting(true)}>
-              Probíhá inventura — spočítat sklad
+              {t('Probíhá inventura — spočítat sklad')}
             </Button>
           )}
           {justAdded && (
             // Stavové hlášení `.note` (DP §3.15) — dřív ručně limetkový box a znak ✓.
             <p className="note note-ok text-base font-semibold" role="status">
-              Zapsáno do skladu. Vedení to potvrdí.
+              {t('Zapsáno do skladu. Vedení to potvrdí.')}
             </p>
           )}
-          <SearchField value={search} onChange={setSearch} placeholder="Hledat položku…" storageKey="inventory-kiosk"
-            suggestions={Array.from(new Set(items.map(i => i.category).filter(Boolean))).slice(0, 6).map(c => ({ label: String(c), hint: 'kategorie' }))}
+          <SearchField value={search} onChange={setSearch} placeholder={t('Hledat položku…')} storageKey="inventory-kiosk"
+            suggestions={Array.from(new Set(items.map(i => i.category).filter(Boolean))).slice(0, 6).map(c => ({ label: String(c), hint: t('kategorie') }))}
             inputClassName="!py-3.5 text-base" />
           {(parkedCount > 0 || showParked) && (
             <Button variant="secondary" size="lg" block className="w-full" aria-pressed={showParked} onClick={() => setShowParked(v => !v)}>
-              {showParked ? 'Zpět na to, co máme' : `Co nevedeme (${parkedCount})`}
+              {showParked ? t('Zpět na to, co máme') : t('Co nevedeme ({n})', { n: parkedCount })}
             </Button>
           )}
           <div className="flex gap-1.5 overflow-x-auto scrollbar-thin -mx-1 px-1">
             {cats.map(c => (
               <button key={c} type="button" aria-pressed={cat === c} onClick={() => setCat(c)}
                 className={`filter-pill whitespace-nowrap shrink-0 ${cat === c ? 'seg-on' : 'seg-off glass'}`}>
-                {c}
+                {c === KAT_VSE ? t('Vše') : c}
               </button>
             ))}
           </div>
@@ -200,13 +205,13 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
             <div className="flex items-center justify-center h-40"><div className="spinner" /></div>
           ) : loadErr ? (
             <Card pad="none">
-              <ErrorState compact title="Sklad se nepodařilo načíst."
-                hint="Nejspíš vypadlo připojení. Data můžou být neúplná — nespoléhej na tenhle seznam, dokud se nenačte."
+              <ErrorState compact title={t('Sklad se nepodařilo načíst.')}
+                hint={t('Nejspíš vypadlo připojení. Data můžou být neúplná — nespoléhej na tenhle seznam, dokud se nenačte.')}
                 onRetry={() => { setLoading(true); reload(); }} />
             </Card>
           ) : filtered.length === 0 ? (
-            <Card pad="sm"><EmptyState icon="box" compact title="Žádné položky"
-              hint="V téhle kategorii zatím nic není. Zkus jinou, nebo hledej podle názvu." /></Card>
+            <Card pad="sm"><EmptyState icon="box" compact title={t('Žádné položky')}
+              hint={t('V téhle kategorii zatím nic není. Zkus jinou, nebo hledej podle názvu.')} /></Card>
           ) : (
             // Jedna karta s linkami (DP §3.6), ne karta na položku. Na telefonu
             // ListRow zalomí ovládání pod název, takže „Sirup Monin Levandule"
@@ -222,21 +227,21 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
                         lead={<span className={`w-2.5 h-2.5 rounded-full shrink-0 ${st === 'critical' ? 'bg-bad' : st === 'low' ? 'bg-wait' : 'bg-ok'}`} aria-hidden />}
                         title={<>{i.name}{i.brand && <span className="ml-1.5 font-normal text-black/55">{i.brand}</span>}</>}
                         meta={<>
-                          {st !== 'ok' && <span className={`font-medium ${st === 'critical' ? 'text-bad-ink' : 'text-wait-ink'}`}>{st === 'critical' ? 'kriticky · ' : 'dochází · '}</span>}
-                          {ceka && <span className="font-medium text-wait-ink">čeká na potvrzení · </span>}
+                          {st !== 'ok' && <span className={`font-medium ${st === 'critical' ? 'text-bad-ink' : 'text-wait-ink'}`}>{st === 'critical' ? `${t('kriticky')} · ` : `${t('dochází')} · `}</span>}
+                          {ceka && <span className="font-medium text-wait-ink">{t('čeká na potvrzení')} · </span>}
                           {i.category}
                         </>}
                         actions={i.archived ? (
-                          <Button variant="secondary" onClick={() => setParked(i, false)}>Máme zpátky</Button>
+                          <Button variant="secondary" onClick={() => setParked(i, false)}>{t('Máme zpátky')}</Button>
                         ) : <>
-                          <Button variant="ghost" iconOnly icon="archive" aria-label={`Momentálně nevedeme — ${i.name}`} title="Momentálně nevedeme"
+                          <Button variant="ghost" iconOnly icon="archive" aria-label={t('Momentálně nevedeme — {nazev}', { nazev: i.name })} title={t('Momentálně nevedeme')}
                             onClick={() => setParked(i, true)} />
                           <span className="flex items-center gap-1.5">
-                            <Button variant="secondary" iconOnly icon="minus" aria-label={`Ubrat — ${i.name}`} onClick={() => step(i, -1)} />
+                            <Button variant="secondary" iconOnly icon="minus" aria-label={t('Ubrat — {nazev}', { nazev: i.name })} onClick={() => step(i, -1)} />
                             <span className="w-14 text-center font-bold text-[#16181A] tabular-nums text-lg" aria-live="polite">
                               {i.quantity}<span className="block text-[11px] font-medium text-black/55 leading-none">{i.unit}</span>
                             </span>
-                            <Button variant="secondary" iconOnly icon="plus" aria-label={`Přidat — ${i.name}`} onClick={() => step(i, 1)} />
+                            <Button variant="secondary" iconOnly icon="plus" aria-label={t('Přidat — {nazev}', { nazev: i.name })} onClick={() => step(i, 1)} />
                           </span>
                         </>}
                       />

@@ -7,12 +7,12 @@ import { useCallback, useEffect, useId, useState } from 'react';
 import { Icon } from '../Icons';
 import { Button, Field, Input, Modal, Well } from '../ui';
 import { okJson } from '@/lib/api';
-import { czCount } from '@/lib/czech';
+import { useT } from '@/lib/i18n/client';
 
-const HLAS = { one: 'hlas', few: 'hlasy', many: 'hlasů' };
 export default function PollsStrip({ canCreate = true, isEmployer = false, meId }: {
   canCreate?: boolean; isEmployer?: boolean; meId?: number;
 }) {
+  const t = useT('chat');
   const [polls, setPolls] = useState<any[]>([]);
   const [creating, setCreating] = useState(false);
   const [question, setQuestion] = useState('');
@@ -50,7 +50,7 @@ export default function PollsStrip({ canCreate = true, isEmployer = false, meId 
       body: JSON.stringify({ question, options: opts }),
     }).catch(() => null);
     if (res?.ok) { setQuestion(''); setOpts(['', '']); setCreating(false); await load(); }
-    else { const d = res ? await res.json().catch(() => ({})) : {}; setErr(d.error || 'Anketu se nepodařilo založit.'); }
+    else { const d = res ? await res.json().catch(() => ({})) : {}; setErr(d.error || t('Anketu se nepodařilo založit.')); }
   };
 
   if (polls.length === 0 && !canCreate) return null;
@@ -78,7 +78,7 @@ export default function PollsStrip({ canCreate = true, isEmployer = false, meId 
             </h3>
             {(isEmployer || p.createdBy === meId) && (
               <Button variant="ghost" size="sm" className="shrink-0" onClick={() => setUzavrit({ id: p.id, question: p.question })}>
-                Uzavřít
+                {t('Uzavřít')}
               </Button>
             )}
           </div>
@@ -96,7 +96,7 @@ export default function PollsStrip({ canCreate = true, isEmployer = false, meId 
                     <span className="min-w-0 flex items-center gap-1.5 text-[#16181A]">
                       {mine && <Icon name="check" size={13} className="shrink-0" />}
                       <span className="truncate">{o}</span>
-                      {mine && <span className="sr-only">(tvůj hlas)</span>}
+                      {mine && <span className="sr-only">{t('(tvůj hlas)')}</span>}
                     </span>
                     <span className="shrink-0 text-xs text-black/55 tabular-nums">{p.counts[i]} ({pct} %)</span>
                   </span>
@@ -104,7 +104,7 @@ export default function PollsStrip({ canCreate = true, isEmployer = false, meId 
               );
             })}
           </div>
-          <p className="t-meta mt-1.5">{czCount(p.total, HLAS)} · ťuknutím hlasuješ (jde změnit)</p>
+          <p className="t-meta mt-1.5">{t('{n, plural, one {# hlas} few {# hlasy} other {# hlasů}} · ťuknutím hlasuješ (jde změnit)', { n: p.total })}</p>
         </Well>
       ))}
 
@@ -116,14 +116,14 @@ export default function PollsStrip({ canCreate = true, isEmployer = false, meId 
             {/* Viditelné popisky, ne jen placeholder: ten zmizí, jakmile se začne
                 psát, a u třetího pole pak nikdo neví, co je otázka a co možnost
                 (DP §3.14, stejná oprava jako v KioskSettings v kole 33). */}
-            <Field id={`${idPole}-otazka`} label="Otázka">
+            <Field id={`${idPole}-otazka`} label={t('Otázka')}>
               <Input id={`${idPole}-otazka`} value={question} onChange={e => setQuestion(e.target.value)}
-                placeholder="Např. Kdy uděláme poradu?" maxLength={200} />
+                placeholder={t('Např. Kdy uděláme poradu?')} maxLength={200} />
             </Field>
             <fieldset className="space-y-2 min-w-0">
-              <legend className="t-label mb-1.5">Možnosti</legend>
+              <legend className="t-label mb-1.5">{t('Možnosti')}</legend>
               {opts.map((o, i) => (
-                <Field key={i} id={`${idPole}-moznost-${i}`} label={`Možnost ${i + 1}`}>
+                <Field key={i} id={`${idPole}-moznost-${i}`} label={t('Možnost {n}', { n: i + 1 })}>
                   <Input id={`${idPole}-moznost-${i}`} value={o} maxLength={80}
                     onChange={e => setOpts(prev => prev.map((x, j) => j === i ? e.target.value : x))} />
                 </Field>
@@ -131,25 +131,25 @@ export default function PollsStrip({ canCreate = true, isEmployer = false, meId 
             </fieldset>
             <div className="flex flex-wrap gap-2">
               {opts.length < 8 && (
-                <Button variant="secondary" size="sm" icon="plus" onClick={() => setOpts(prev => [...prev, ''])}>Možnost</Button>
+                <Button variant="secondary" size="sm" icon="plus" onClick={() => setOpts(prev => [...prev, ''])}>{t('Možnost')}</Button>
               )}
               <span className="flex-1" />
-              <Button variant="ghost" size="sm" onClick={() => setCreating(false)}>Zrušit</Button>
-              <Button type="submit" variant="primary" size="sm" disabled={!lzeZalozit}>Založit anketu</Button>
+              <Button variant="ghost" size="sm" onClick={() => setCreating(false)}>{t('Zrušit')}</Button>
+              <Button type="submit" variant="primary" size="sm" disabled={!lzeZalozit}>{t('Založit anketu')}</Button>
             </div>
           </form>
         ) : (
-          <Button variant="ghost" size="sm" icon="chart" onClick={() => setCreating(true)}>Založit anketu</Button>
+          <Button variant="ghost" size="sm" icon="chart" onClick={() => setCreating(true)}>{t('Založit anketu')}</Button>
         )
       )}
 
-      <Modal open={!!uzavrit} onClose={() => setUzavrit(null)} size="sm" title="Uzavřít anketu?"
-        subtitle={uzavrit ? `„${uzavrit.question}" zmizí z chatu a hlasovat už nepůjde.` : undefined}
+      <Modal open={!!uzavrit} onClose={() => setUzavrit(null)} size="sm" title={t('Uzavřít anketu?')}
+        subtitle={uzavrit ? t('„{otazka}" zmizí z chatu a hlasovat už nepůjde.', { otazka: uzavrit.question }) : undefined}
         footer={<>
-          <Button variant="secondary" onClick={() => setUzavrit(null)}>Zrušit</Button>
-          <Button variant="primary" loading={uzaviram} onClick={potvrdUzavreni}>Uzavřít anketu</Button>
+          <Button variant="secondary" onClick={() => setUzavrit(null)}>{t('Zrušit')}</Button>
+          <Button variant="primary" loading={uzaviram} onClick={potvrdUzavreni}>{t('Uzavřít anketu')}</Button>
         </>}>
-        <p className="t-meta">Uzavřenou anketu nejde znovu otevřít.</p>
+        <p className="t-meta">{t('Uzavřenou anketu nejde znovu otevřít.')}</p>
       </Modal>
     </div>
   );
