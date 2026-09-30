@@ -16,6 +16,15 @@ import Link from 'next/link';
 import { Icon } from './Icons';
 import { Segmented } from './ui';
 import { PLAN_FEATURES, PLAN_NAMES, PRICES, TRIAL_DAYS } from '@/lib/plan';
+import { czCount, type CzNoun } from '@/lib/czech';
+
+const MESIC: CzNoun = { one: 'měsíc', few: 'měsíce', many: 'měsíců' };
+
+// Úspora se počítá, ne opisuje: 12 × měsíční cena mínus roční. Dřív tu stála
+// přeškrtnutá „srovnávací" cena (4 990 Kč), kterou nikdo nikdy neúčtoval, a štítek
+// „2 měsíce zdarma" neodpovídal ani jí (roční platba stojí 8 měsíců, ne 10).
+const uspora = (p: 'pro' | 'max') => 12 * PRICES[p].month - PRICES[p].year;
+const USPORA_MESICU = Math.floor(Math.min(uspora('pro') / PRICES.pro.month, uspora('max') / PRICES.max.month));
 
 type Interval = 'month' | 'year';
 
@@ -54,8 +63,8 @@ export default function Pricing() {
   const cena = (p: 'pro' | 'max') => {
     const pr = PRICES[p];
     return interval === 'year'
-      ? { hlavni: `${pr.year.toLocaleString('cs-CZ')} Kč`, pod: 'ročně za podnik', skrt: `${pr.yearCompare.toLocaleString('cs-CZ')} Kč` }
-      : { hlavni: `${pr.month} Kč`, pod: 'měsíčně za podnik', skrt: null };
+      ? { hlavni: `${pr.year.toLocaleString('cs-CZ')} Kč`, pod: 'ročně za podnik', usetrite: `${uspora(p).toLocaleString('cs-CZ')} Kč` }
+      : { hlavni: `${pr.month} Kč`, pod: 'měsíčně za podnik', usetrite: null };
   };
   const mesicne = (p: 'pro' | 'max') => `${Math.round(PRICES[p][interval === 'year' ? 'year' : 'month'] / (interval === 'year' ? 12 : 1))} Kč/měs`;
 
@@ -71,7 +80,7 @@ export default function Pricing() {
           </p>
         </div>
         <Segmented size="sm" ariaLabel="Období" value={interval} onChange={v => setInterval_(v as Interval)}
-          options={[{ id: 'month', label: 'Měsíčně' }, { id: 'year', label: 'Ročně · 2 měsíce zdarma' }]} />
+          options={[{ id: 'month', label: 'Měsíčně' }, { id: 'year', label: `Ročně · ušetříte ${czCount(USPORA_MESICU, MESIC)}` }]} />
       </div>
 
       {/* Karty. Pro je zvednutá a má stín — je to doporučená volba a má to
@@ -88,8 +97,8 @@ export default function Pricing() {
               {pro && <span className="absolute top-5 right-5 chip chip-sm chip-ok uppercase tracking-wider">Doporučeno</span>}
               <p className="t-label text-black/45">{PLAN_NAMES[k.id]}</p>
               <p className="mt-2 text-4xl font-bold tracking-tight text-[#16181A] tabular-nums">{c ? c.hlavni : '0 Kč'}</p>
-              <p className="text-xs text-black/45 mt-1">{c ? c.pod : 'navždy, až 3 lidé'}</p>
-              {c?.skrt && <p className="text-xs text-black/45"><s>{c.skrt}</s> ročně, vychází na {mesicne(k.id as 'pro' | 'max')}</p>}
+              <p className="text-xs text-black/55 mt-1">{c ? c.pod : 'navždy, až 3 lidé'}</p>
+              {c?.usetrite && <p className="text-xs text-black/55">Ušetříte {c.usetrite} oproti měsíčnímu placení, vychází na {mesicne(k.id as 'pro' | 'max')}</p>}
               <p className="mt-4 text-sm font-semibold text-[#16181A] text-pretty">{k.veta}</p>
               <ul className="mt-4 space-y-2 text-sm text-black/65">
                 {k.body.map(b => (

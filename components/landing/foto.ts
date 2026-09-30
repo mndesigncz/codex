@@ -15,6 +15,8 @@
 // Nejsou to skuteční zákazníci a stránka to nikde netvrdí — žádná jména
 // podniků, žádné uvozovky, žádná loga, která nemáme.
 
+import { FOTO_PODNIKY, FOTO_V2 } from './foto2.generated';
+
 export interface Fotka {
   src: string;
   w: number;
@@ -25,7 +27,7 @@ export interface Fotka {
   blur: string;
 }
 
-export const FOTO = {
+const FOTO_ZAKLAD = {
   kavarna: {
     src: '/brand/landing/foto/kavarna.webp',
     w: 1344, h: 768,
@@ -83,6 +85,10 @@ export const FOTO = {
     blur: 'data:image/webp;base64,UklGRqAAAABXRUJQVlA4IJQAAAAwBACdASoQABYAPu1iqU2ppaOiMAgBMB2JQBdmUABbdi6Zp+5a3iGZEgAA+n/lKrXUNDcSaNIa/nEwf/zfSxuzvILEOtshf9PRjYIdenX5oAft4erDzbW/+IV/cytPtVdbetfOPHpJ8avf9Ud3IGj6cOifNy2oEC2OZOt6xfv9bUbw9HfnCyxfnOd2lZgqPPueAAAA',
   },
 } satisfies Record<string, Fotka>;
+
+// Druhá sada (kampaň v2) je doplněk k živé ukázce, ne hlavní sdělení; její
+// rozměry a náhledy vznikají skriptem ze samotných souborů.
+export const FOTO = { ...FOTO_ZAKLAD, ...FOTO_V2, ...FOTO_PODNIKY } satisfies Record<string, Fotka>;
 
 export type FotoId = keyof typeof FOTO;
 

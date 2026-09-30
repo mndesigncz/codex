@@ -41,7 +41,7 @@ export async function generateMetadata(): Promise<Metadata> {
       card: 'summary_large_image',
       title: SITE_TITULEK,
       description: popis,
-      images: ['/brand/hero-counter.webp'],
+      images: ['/brand/landing/og.png'],
     },
   };
 }

@@ -1,0 +1,152 @@
+/* Prodejní stránka: styly, které nepatří do globals.css.
+
+   Proč zvláštní soubor: globals.css je sdílený s celou aplikací a mění se
+   souběžně v jiných větvích; prodejní stránka si tu nese jen to, co potřebuje
+   ona (rámy zařízení, ukázka, coach marks, nahrávky). Všechny třídy mají
+   předponu ld-. Barvy jsou tokeny z globals.css (--ink, --lime, --surface,
+   --shadow-*), ne holé hexy: když se paleta změní, změní se i tady. */
+
+/* ——— Rám zařízení ——————————————————————————————————————————————
+   Jeden rám pro živou ukázku i pro smyčky, ať telefon vypadá jako telefon
+   všude. `data-zar` určuje poměr stran; u ukázky navíc existuje `auto`:
+   počítač od 768 px, pod tím telefon (stejné rozhodnutí, jaké pak udělá
+   skript, takže se při hydrataci nic nepřeskládá). */
+.ld-ram {
+  position: relative;
+  margin-inline: auto;
+  width: 100%;
+  padding: 7px;
+  background: var(--ink);
+  border-radius: 1.35rem;
+  box-shadow: var(--shadow-float);
+}
+.ld-ram[data-zar="telefon"] { max-width: 19rem; padding: 9px; border-radius: 2.4rem; }
+.ld-ram[data-zar="tablet"] { max-width: 44rem; padding: 10px; border-radius: 1.9rem; }
+.ld-ram[data-zar="pocitac"] { max-width: 64rem; }
+/* Malé rámy ve smyčkách Dne s podnikem. */
+.ld-ram-m[data-zar="telefon"] { max-width: 15rem; }
+.ld-ram-m[data-zar="tablet"] { max-width: 34rem; }
+.ld-ram-m[data-zar="pocitac"] { max-width: 40rem; }
+
+.ld-obrazovka {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface);
+  border-radius: 0.9rem;
+  /* Poměr stran drží místo dřív, než cokoli dorazí (CLS 0). */
+  aspect-ratio: var(--ld-pomer, 1100 / 690);
+}
+.ld-ram[data-zar="telefon"] .ld-obrazovka { border-radius: 1.75rem; }
+.ld-ram[data-zar="tablet"] .ld-obrazovka { border-radius: 1.2rem; }
+.ld-ram[data-zar="pocitac"] .ld-obrazovka { --ld-pomer: 1100 / 690; }
+.ld-ram[data-zar="telefon"] .ld-obrazovka { --ld-pomer: 390 / 780; }
+.ld-ram[data-zar="tablet"] .ld-obrazovka { --ld-pomer: 1024 / 768; }
+
+/* Ukázka bez zvoleného zařízení: počítač, na telefonu telefon. */
+.ld-ram[data-zar="auto"] { max-width: 64rem; }
+.ld-ram[data-zar="auto"] .ld-obrazovka { --ld-pomer: 1100 / 690; }
+@media (max-width: 767px) {
+  .ld-ram[data-zar="auto"] { max-width: 19rem; padding: 9px; border-radius: 2.4rem; }
+  .ld-ram[data-zar="auto"] .ld-obrazovka { --ld-pomer: 390 / 780; border-radius: 1.75rem; }
+}
+
+.ld-obrazovka > img,
+.ld-obrazovka > video,
+.ld-obrazovka > picture,
+.ld-obrazovka > picture > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+
+/* iframe má logický rozměr zařízení a zmenšuje se transformací: aplikace uvnitř
+   je tedy opravdu rozložená na 1100 (390, 1024) px, ne stlačená na 340. */
+.ld-iframe {
+  position: absolute;
+  left: 0; top: 0;
+  border: 0;
+  transform-origin: 0 0;
+  transform: scale(var(--ld-skala, 1));
+  background: var(--surface);
+  opacity: 0;
+}
+.ld-iframe[data-hotovo="true"] { opacity: 1; }
+@media (prefers-reduced-motion: no-preference) {
+  .ld-iframe { transition: opacity 260ms var(--ease-out, ease-out); }
+}
+
+/* Jeviště rámu: od 768 px drží výšku rámu počítače, ať přepnutí na telefon nebo
+   tablet (jsou nižší) nezkrátí stránku a obsah pod ukázkou neposkočí. Výška se
+   počítá z šířky okna ukázky (cqw), protože poměr stran rámu je pevný. */
+.ld-okno { container-type: inline-size; }
+@media (min-width: 768px) {
+  .ld-stage {
+    display: flex; align-items: center; justify-content: center;
+    /* Větší z rámu počítače a rámu telefonu (37 rem: telefon je vysoký, i když je úzký). */
+    min-height: max(calc(min(100cqw, 64rem) * 0.6273 + 14px), 37rem);
+  }
+  .ld-stage > .ld-ram { flex: 0 1 100%; }
+  .ld-stage > .ld-ram[data-zar="telefon"] { flex-basis: 19rem; }
+  .ld-stage > .ld-ram[data-zar="tablet"] { flex-basis: 44rem; }
+}
+
+/* ——— Coach marks ————————————————————————————————————————————
+   Kurzor a bublina leží nad iframem a nezachytávají dotyky (pointer-events:
+   none), takže se jimi dá proklikávat. Polohu nastavuje skript z polohy prvku
+   uvnitř ukázky. Pohyb je jen tam, kde ho člověk nevypnul. */
+.ld-coach { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+.ld-coach-kurzor {
+  position: absolute; left: 0; top: 0;
+  width: 26px; height: 26px;
+  transform: translate(var(--x, 50%), var(--y, 50%));
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.35));
+}
+.ld-coach-kurzor[data-skryt="true"], .ld-coach-bublina[data-skryt="true"] { opacity: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .ld-coach-kurzor { transition: transform 720ms cubic-bezier(0.23, 1, 0.32, 1), opacity 180ms ease-out; }
+  .ld-coach-bublina { transition: transform 720ms cubic-bezier(0.23, 1, 0.32, 1), opacity 180ms ease-out; }
+  .ld-coach-kruh { animation: ld-puls 1.7s cubic-bezier(0.23, 1, 0.32, 1) infinite; }
+}
+.ld-coach-kruh {
+  position: absolute; left: -10px; top: -10px; width: 20px; height: 20px;
+  border-radius: 9999px;
+  border: 2px solid var(--ink);
+  background: color-mix(in srgb, var(--lime) 55%, transparent);
+}
+@keyframes ld-puls { 0% { transform: scale(0.6); opacity: 1; } 70%, 100% { transform: scale(2.4); opacity: 0; } }
+.ld-coach-bublina {
+  position: absolute; left: 0; top: 0;
+  transform: translate(var(--bx, 0px), var(--by, 0px));
+  max-width: min(15rem, 70%);
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--r-md);
+  background: var(--ink);
+  color: #fff;
+  font-size: 0.8125rem;
+  line-height: 1.3;
+  font-weight: 600;
+  box-shadow: var(--shadow-float);
+}
+
+
+/* ——— Den s podnikem: aktivní krok určuje IntersectionObserver ——— */
+/* Telefon ve sticky rámu nesmí být vyšší než rám (36 rem). */
+.ld-den .ld-ram[data-zar="telefon"] { max-width: 15rem; }
+.ld-den [data-krok] { transition: opacity 240ms ease-out; }
+@media (min-width: 1024px) {
+  .ld-den [data-krok] { opacity: 0.45; }
+  .ld-den[data-aktivni="0"] [data-krok="0"],
+  .ld-den[data-aktivni="1"] [data-krok="1"],
+  .ld-den[data-aktivni="2"] [data-krok="2"],
+  .ld-den[data-aktivni="3"] [data-krok="3"],
+  .ld-den[data-aktivni="4"] [data-krok="4"] { opacity: 1; }
+  .ld-den [data-scena] { opacity: 0; pointer-events: none; }
+  .ld-den[data-aktivni="0"] [data-scena="0"],
+  .ld-den[data-aktivni="1"] [data-scena="1"],
+  .ld-den[data-aktivni="2"] [data-scena="2"],
+  .ld-den[data-aktivni="3"] [data-scena="3"],
+  .ld-den[data-aktivni="4"] [data-scena="4"] { opacity: 1; pointer-events: auto; }
+  .ld-den [data-scena] { transition: opacity 320ms ease-out; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ld-den [data-krok], .ld-den [data-scena] { transition: none; }
+}
+
+/* ——— Srovnání „Dnes / S Managerem" ——————————————————————————— */
+.ld-srov th, .ld-srov td { text-align: left; vertical-align: top; }

@@ -4,6 +4,9 @@
   "private": true,
   "scripts": {
     "sondy": "node scripts/sondy/spust.mjs",
+    "landing:nahravky": "node scripts/nahravky/nahraj.mjs",
+    "landing:og": "node scripts/landing-og.mjs",
+    "landing:foto": "node scripts/landing-foto.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

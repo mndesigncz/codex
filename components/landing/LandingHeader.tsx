@@ -23,6 +23,7 @@ import JazykMenu from '@/components/ui/JazykMenu';
 // odpověď na „kde jsem".
 
 const ODKAZY: { id: string; label: string }[] = [
+  { id: 'ukazka-okno', label: 'Ukázka' },
   { id: 'funkce', label: 'Funkce' },
   { id: 'den', label: 'Jeden den' },
   { id: 'zacatek', label: 'Jak začít' },
