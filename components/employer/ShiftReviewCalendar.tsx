@@ -24,12 +24,14 @@ import { czCount, czForm } from '@/lib/czech';
 import { NEHODNOCENA_SMENA } from '@/lib/odmenyPrehled';
 import { Avatar, Button, Card, Chip, ErrorState, ListRow, MonthNav, Skeleton } from '../ui';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
+import { useT, type PrekladFn } from '@/lib/i18n/client';
+import { useLocale } from './jazyk';
 
 interface Clovek { id: number; name: string; avatar: string | null; reviewed: boolean; rating: number; flagged: boolean }
 interface Den { date: string; staff: Clovek[]; pending: number }
 
 function vyberDny(raw: any): Record<string, Den> {
-  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.days)) throw new Error('Kalendář hodnocení přišel v nečekaném tvaru.');
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.days)) throw new Error('Kalendář hodnocení přišel v nečekaném tvaru.'); // i18n-ok
   const mapa: Record<string, Den> = {};
   for (const d of raw.days) {
     if (!d?.date) continue;
@@ -46,9 +48,8 @@ type Stav = 'vytka' | 'ceka' | 'hotovo' | 'nic';
 const stavDne = (d: Den | undefined): Stav => !d ? 'nic' : d.staff.some(s => s.flagged) ? 'vytka' : d.pending > 0 ? 'ceka' : 'hotovo';
 // Tečka nese stav, buňka zůstává neutrální (DP §2.1: tóny nad ~6 % obsahu se nesmí).
 const TECKA: Record<Stav, string> = { hotovo: 'bg-[#8FB811]', ceka: 'bg-wait', vytka: 'bg-bad', nic: 'bg-transparent' };
-const POPIS: Record<Stav, string> = { hotovo: 'vše ohodnoceno', ceka: 'čeká na hodnocení', vytka: 'něco je špatně', nic: 'bez směny' };
-const LIDE = { one: 'člověk', few: 'lidé', many: 'lidí' };
-const denVetou = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' });
+const popisStavu = (t: PrekladFn): Record<Stav, string> => ({ hotovo: t('vše ohodnoceno'), ceka: t('čeká na hodnocení'), vytka: t('něco je špatně'), nic: t('bez směny') });
+const denVetou = (d: string, loc: string) => new Date(`${d}T12:00:00`).toLocaleDateString(loc, { weekday: 'long', day: 'numeric', month: 'long' });
 
 export default function ShiftReviewCalendar({ onSaved, den, smiHodnotit = true }: {
   onSaved?: () => void;
@@ -57,6 +58,8 @@ export default function ShiftReviewCalendar({ onSaved, den, smiHodnotit = true }
   /** Bez hodnoceni.hodnotit se kalendář jen prohlíží — okno hodnocení se neotevře. */
   smiHodnotit?: boolean;
 }) {
+  const t = useT('sprava');
+  const loc = useLocale();
   const { weekStart } = useCurrency();
   const dnes = pragueToday();
   const tento = dnes.slice(0, 7);
@@ -84,14 +87,15 @@ export default function ShiftReviewCalendar({ onSaved, den, smiHodnotit = true }
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="kalendar-hodnoceni" className="t-card flex items-center gap-2">
           <Icon name="calendar" size={17} className="shrink-0 text-black/40" />
-          Kalendář hodnocení
-          {cekaCelkem > 0 && <Chip tone="wait" size="sm">{czCount(cekaCelkem, NEHODNOCENA_SMENA)}</Chip>}
+          
+          {t('Kalendář hodnocení')}
+          {cekaCelkem > 0 && <Chip tone="wait" size="sm">{t('{n, plural, one {# nehodnocená směna} few {# nehodnocené směny} other {# nehodnocených směn}}', { n: cekaCelkem })}</Chip>}
         </h2>
         <MonthNav value={mesic} onChange={zmenMesic} max={tento} />
       </div>
 
       {data.error ? (
-        <ErrorState compact title="Kalendář se nenačetl" onRetry={data.reload} detail={data.error} className="mt-3" />
+        <ErrorState compact title={t('Kalendář se nenačetl')} onRetry={data.reload} detail={data.error} className="mt-3" />
       ) : data.loading ? (
         <div className="mt-4 space-y-2" aria-busy>
           <Skeleton className="h-6" />
@@ -99,7 +103,7 @@ export default function ShiftReviewCalendar({ onSaved, den, smiHodnotit = true }
         </div>
       ) : (
         <>
-          <div className="mt-4 grid grid-cols-7 gap-1 sm:gap-1.5" role="group" aria-label="Hodnocení po dnech">
+          <div className="mt-4 grid grid-cols-7 gap-1 sm:gap-1.5" role="group" aria-label={t('Hodnocení po dnech')}>
             {zkratky.map(z => <div key={z} aria-hidden className="text-center text-[11px] font-semibold text-black/45 pb-1">{z}</div>)}
             {bunky.map((d, i) => {
               if (!d) return <div key={`p${i}`} aria-hidden />;
@@ -107,7 +111,7 @@ export default function ShiftReviewCalendar({ onSaved, den, smiHodnotit = true }
               const stav = stavDne(x);
               const cislo = Number(d.slice(8, 10));
               const vybranyDen = vybrany === d;
-              const popis = `${cislo}. ${Number(d.slice(5, 7))}. — ${POPIS[stav]}${x ? `, na směně ${czCount(x.staff.length, LIDE)}` : ''}`;
+              const popis = `${cislo}. ${Number(d.slice(5, 7))}. — ${popisStavu(t)[stav]}${x ? `, ${t('na směně {n, plural, one {# člověk} few {# lidé} other {# lidí}}', { n: x.staff.length })}` : ''}`;
               const obsah = (
                 <>
                   <span className={`text-[11px] font-semibold leading-none mt-0.5 tabular-nums ${vybranyDen ? 'chip-ink rounded-full px-1.5 py-0.5 -mt-0.5' : d === dnes ? 'text-[#16181A] underline underline-offset-2' : 'text-black/55'}`}>{cislo}</span>
@@ -131,42 +135,42 @@ export default function ShiftReviewCalendar({ onSaved, den, smiHodnotit = true }
             })}
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 t-meta">
-            <span className="flex items-center gap-1.5"><span aria-hidden className={`h-2 w-2 rounded-full ${TECKA.hotovo}`} /> Ohodnoceno</span>
-            <span className="flex items-center gap-1.5"><span aria-hidden className={`h-2 w-2 rounded-full ${TECKA.ceka}`} /> Čeká na hodnocení</span>
-            <span className="flex items-center gap-1.5"><span aria-hidden className={`h-2 w-2 rounded-full ${TECKA.vytka}`} /> Něco je špatně</span>
+            <span className="flex items-center gap-1.5"><span aria-hidden className={`h-2 w-2 rounded-full ${TECKA.hotovo}`} /> {t('Ohodnoceno')}</span>
+            <span className="flex items-center gap-1.5"><span aria-hidden className={`h-2 w-2 rounded-full ${TECKA.ceka}`} /> {t('Čeká na hodnocení')}</span>
+            <span className="flex items-center gap-1.5"><span aria-hidden className={`h-2 w-2 rounded-full ${TECKA.vytka}`} /> {t('Něco je špatně')}</span>
           </div>
 
-          {Object.keys(dny).length === 0 && <p className="t-meta mt-4">V tomhle měsíci zatím nikdo neměl směnu.</p>}
+          {Object.keys(dny).length === 0 && <p className="t-meta mt-4">{t('V tomhle měsíci zatím nikdo neměl směnu.')}</p>}
 
           {/* Detail dne: kdo pracoval a jestli je ohodnocený; klepnutí otevře hodnocení. */}
           {detail && vybrany && (
             <section aria-labelledby="den-hodnoceni" className="mt-5 border-t border-[var(--surface-line)] pt-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 id="den-hodnoceni" className="t-card cz-sentence">{denVetou(vybrany)}</h3>
+                <h3 id="den-hodnoceni" className="t-card cz-sentence">{denVetou(vybrany, loc)}</h3>
                 {detail.pending > 0
-                  ? <Chip tone="wait" size="sm">{czCount(detail.pending, NEHODNOCENA_SMENA)}</Chip>
-                  : <Chip tone="ok" size="sm" icon="check">Vše ohodnoceno</Chip>}
+                  ? <Chip tone="wait" size="sm">{t('{n, plural, one {# nehodnocená směna} few {# nehodnocené směny} other {# nehodnocených směn}}', { n: detail.pending })}</Chip>
+                  : <Chip tone="ok" size="sm" icon="check">{t('Vše ohodnoceno')}</Chip>}
               </div>
               {smiHodnotit && detail.staff.length > 1 && (
                 <Button variant="secondary" size="sm" icon="users" className="mt-3"
                   onClick={() => setHodnotim({ clovek: detail.staff[0], den: vybrany, cela: true })}>
-                  Ohodnotit celou směnu ({detail.staff.length} {czForm(detail.staff.length, LIDE)})
+                  {t('Ohodnotit celou směnu ({n, plural, one {# člověk} few {# lidé} other {# lidí}})', { n: detail.staff.length })}
                 </Button>
               )}
               <ul className="list mt-2">
                 {detail.staff.map(p => {
-                  const stav = !p.reviewed ? <Chip tone="wait" size="sm">Čeká</Chip>
-                    : p.flagged ? <Chip tone="bad" size="sm" icon="warning">Výtka</Chip>
-                    : <Chip tone="ok" size="sm" icon="star">{p.rating > 0 ? `${p.rating}/5` : 'Hodnoceno'}</Chip>;
+                  const stav = !p.reviewed ? <Chip tone="wait" size="sm">{t('Čeká')}</Chip>
+                    : p.flagged ? <Chip tone="bad" size="sm" icon="warning">{t('Výtka')}</Chip>
+                    : <Chip tone="ok" size="sm" icon="star">{p.rating > 0 ? `${p.rating}/5` : t('Hodnoceno')}</Chip>;
                   return smiHodnotit ? (
                     <li key={p.id}>
                       <ListRow as="div" lead={<Avatar emoji={p.avatar} size="sm" />} title={p.name}
-                        meta={p.reviewed ? 'Ohodnoceno' : 'Čeká na hodnocení'} right={stav}
+                        meta={p.reviewed ? t('Ohodnoceno') : t('Čeká na hodnocení')} right={stav}
                         onClick={() => setHodnotim({ clovek: p, den: vybrany, cela: false })} />
                     </li>
                   ) : (
                     <ListRow key={p.id} lead={<Avatar emoji={p.avatar} size="sm" />} title={p.name}
-                      meta={p.reviewed ? 'Ohodnoceno' : 'Čeká na hodnocení'} right={stav} />
+                      meta={p.reviewed ? t('Ohodnoceno') : t('Čeká na hodnocení')} right={stav} />
                   );
                 })}
               </ul>

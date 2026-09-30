@@ -34,12 +34,14 @@ import { earnedFor } from '@/lib/wages';
 import { apiMessage, okJson } from '@/lib/api';
 import { obsahuje } from '@/lib/hledani';
 import { hodinyMinuty, konecSmeny, navrhOdchodu, rozeberZaznam, sazbyZRosteru, type ClenRosteru, type ZaznamDochazky } from '@/lib/dochazkaPrehled';
+import { useT } from '@/lib/i18n/client';
+import { useLocale } from './jazyk';
 
 type Zaznam = ZaznamDochazky & { id: number | string; employeeId: number | string };
 interface Data { roster: ClenRosteru[]; entries: Zaznam[] }
 
 function vyberData(raw: any): Data {
-  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.roster)) throw new Error('Docházka přišla v nečekaném tvaru.');
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.roster)) throw new Error('Docházka přišla v nečekaném tvaru.'); // i18n-ok
   return { roster: raw.roster, entries: Array.isArray(raw.entries) ? raw.entries : [] };
 }
 
@@ -61,9 +63,11 @@ function hMM(ms: number): string {
   return `${Math.floor(min / 60)}:${String(min % 60).padStart(2, '0')}`;
 }
 
-const ZDROJ: Record<string, string> = { kiosk: 'tablet', closing: 'z uzávěrky', self: 'sám', manual: 'ručně' };
+const ZDROJ: Record<string, string> = { kiosk: 'tablet', closing: 'z uzávěrky', self: 'sám', manual: 'ručně' }; // i18n-ok (CSV pro účetní zůstává česky)
 
 export default function Attendance({ user: _user }: { user: { id?: string | number } }) {
+  const t = useT('sprava');
+  const loc = useLocale();
   // Akce stránky podle `ma` (před načtením oprávnění a u staršího serveru ANO —
   // rozhoduje server), ne přísné useSmi widgetů: tlačítko se nesmí schovat
   // navždy jen proto, že /api/teams/mine oprávnění nepošle.
@@ -112,10 +116,10 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
     }
     return [...m.entries()].map(([den, list]) => ({
       den,
-      nazev: den ? new Date(`${den}T12:00:00`).toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' }) : 'Bez data',
+      nazev: den ? new Date(`${den}T12:00:00`).toLocaleDateString(loc, { weekday: 'long', day: 'numeric', month: 'long' }) : t('Bez data'),
       list,
     }));
-  }, [zobrazene]);
+  }, [zobrazene, loc, t]);
 
   // ---- Úprava a ukončení ----
   const [uprava, setUprava] = useState<{ e: Zaznam; od: string; do: string; zPlanu?: boolean } | null>(null);
@@ -154,7 +158,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
       setUprava(null);
       obnovDochazku();
     } catch (err) {
-      setChybaUpravy(apiMessage(err, 'Změnu se nepodařilo uložit.'));
+      setChybaUpravy(apiMessage(err, t('Změnu se nepodařilo uložit.')));
     } finally {
       setUkladam(false);
     }
@@ -166,7 +170,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
   const [pridavam, setPridavam] = useState(false);
   const [chybaPridani, setChybaPridani] = useState<string | null>(null);
   const ulozNovy = async () => {
-    if (!novy.kdo || !novy.od || !novy.do) { setChybaPridani('Vyplň člověka i oba časy.'); return; }
+    if (!novy.kdo || !novy.od || !novy.do) { setChybaPridani(t('Vyplň člověka i oba časy.')); return; }
     setPridavam(true); setChybaPridani(null);
     try {
       await fetch('/api/attendance', {
@@ -177,7 +181,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
       setNovy({ kdo: '', od: '', do: '' });
       obnovDochazku();
     } catch (err) {
-      setChybaPridani(apiMessage(err, 'Záznam se nepodařilo přidat.'));
+      setChybaPridani(apiMessage(err, t('Záznam se nepodařilo přidat.')));
     } finally {
       setPridavam(false);
     }
@@ -196,7 +200,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
       setSmazat(null);
       obnovDochazku();
     } catch (err) {
-      setChybaSmazani(apiMessage(err, 'Záznam se nepodařilo smazat.'));
+      setChybaSmazani(apiMessage(err, t('Záznam se nepodařilo smazat.')));
     } finally {
       setMazu(false);
     }
@@ -204,18 +208,18 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
 
   const exportCsv = () => {
     if (!pro) { setUpgradeFor('Export CSV'); return; }
-    const hlava = ['Datum', 'Zaměstnanec', 'Příchod', 'Odchod', 'Odpracováno', 'Zdroj', ...(vidiMzdy ? [`Mzda (${symbol})`] : [])];
+    const hlava = ['Datum', 'Zaměstnanec', 'Příchod', 'Odchod', 'Odpracováno', 'Zdroj', ...(vidiMzdy ? [`Mzda (${symbol})`] : [])]; // i18n-ok (CSV pro účetní zůstává česky)
     const radky = entries.map(e => {
       const od = parseDbTime(e.clockIn);
       const z = rozeberZaznam(e, Date.now());
       const sazba = sazby.get(String(e.employeeId));
       return [
         od ? od.toLocaleDateString('cs-CZ', { timeZone: 'Europe/Prague' }) : '',
-        e.employeeName ?? 'Neznámý',
+        e.employeeName ?? 'Neznámý', // i18n-ok
         dbTimeHM(e.clockIn),
         e.clockOut ? dbTimeHM(e.clockOut) : '',
         hMM(z.delka),
-        ZDROJ[e.source ?? ''] ?? 'ručně',
+        ZDROJ[e.source ?? ''] ?? 'ručně', // i18n-ok
         // Stejné pravidlo jako součty (lib/wages): mzda po záznamu, záznam nad 24 h 0.
         ...(vidiMzdy ? [sazba ? String(earnedFor(z.ms, sazba)) : ''] : []),
       ];
@@ -230,25 +234,26 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
       <div className="px-5 pt-5 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 id="dochazka-zaznamy-t" className="t-card flex items-center gap-2">
-            Záznamy docházky
+            
+            {t('Záznamy docházky')}
             {data.data && (
-              <Chip tone="muted" size="sm">{q.trim() && pocet !== entries.length ? `${pocet.toLocaleString('cs-CZ')} z ${entries.length.toLocaleString('cs-CZ')}` : pocet.toLocaleString('cs-CZ')}</Chip>
+              <Chip tone="muted" size="sm">{q.trim() && pocet !== entries.length ? t('{a} z {b}', { a: pocet.toLocaleString(loc), b: entries.length.toLocaleString(loc) }) : pocet.toLocaleString(loc)}</Chip>
             )}
           </h2>
         </div>
         {entries.length > 10 && (
-          <SearchField value={q} onChange={setQ} storageKey="dochazka" placeholder="Hledat člověka…" ariaLabel="Hledat člověka v docházce" />
+          <SearchField value={q} onChange={setQ} storageKey="dochazka" placeholder={t('Hledat člověka…')} ariaLabel={t('Hledat člověka v docházce')} />
         )}
       </div>
       <div className="px-5 pb-3 pt-2">
         {data.loading ? (
           <div className="space-y-2 pb-2">{[0, 1, 2, 3].map(i => <Skeleton key={i} className="h-12" />)}</div>
         ) : data.error ? (
-          <ErrorState compact title="Záznamy se nenačetly" detail={data.error} onRetry={data.reload} />
+          <ErrorState compact title={t('Záznamy se nenačetly')} detail={data.error} onRetry={data.reload} />
         ) : entries.length === 0 ? (
-          <p className="t-meta py-4">Za {dni} dní nejsou žádné záznamy docházky.</p>
+          <p className="t-meta py-4">{t('Za {dni} dní nejsou žádné záznamy docházky.', { dni })}</p>
         ) : pocet === 0 ? (
-          <p className="t-meta py-4">Nikdo takový za tohle období nic neodpíchl.</p>
+          <p className="t-meta py-4">{t('Nikdo takový za tohle období nic neodpíchl.')}</p>
         ) : dny.map(d => (
           <section key={d.den} aria-label={d.nazev} className="pt-2">
             <p className="t-label cz-sentence pt-2">{d.nazev}</p>
@@ -258,14 +263,14 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                 const bezi = z.druh === 'bezi';
                 const zapomenuty = z.druh === 'zapomenuty';
                 const cas = `${dbTimeHM(e.clockIn)} – ${e.clockOut ? dbTimeHM(e.clockOut) : '…'}`;
-                const meta = [cas, ZDROJ[e.source ?? ''] ?? 'ručně', e.note].filter(Boolean).join(' · ');
+                const meta = [cas, ZDROJ[e.source ?? ''] ?? t('ručně'), e.note].filter(Boolean).join(' · ');
                 const akce = (
                   <>
                     {smiUpravit && (zapomenuty
-                      ? <Button variant="secondary" size="sm" onClick={() => otevriUpravu(e, true)} aria-label={`Ukončit příchod: ${e.employeeName ?? ''}`}>Ukončit</Button>
-                      : <Button variant="ghost" size="sm" iconOnly icon="pencil" onClick={() => otevriUpravu(e)} aria-label={`Upravit čas: ${e.employeeName ?? ''}`} />)}
+                      ? <Button variant="secondary" size="sm" onClick={() => otevriUpravu(e, true)} aria-label={t('Ukončit příchod: {jmeno}', { jmeno: e.employeeName ?? '' })}>{t('Ukončit')}</Button>
+                      : <Button variant="ghost" size="sm" iconOnly icon="pencil" onClick={() => otevriUpravu(e)} aria-label={t('Upravit čas: {jmeno}', { jmeno: e.employeeName ?? '' })} />)}
                     {smiMazat && (
-                      <Button variant="ghost" size="sm" iconOnly icon="trash" onClick={() => { setChybaSmazani(null); setSmazat(e); }} aria-label={`Smazat záznam: ${e.employeeName ?? ''}`} />
+                      <Button variant="ghost" size="sm" iconOnly icon="trash" onClick={() => { setChybaSmazani(null); setSmazat(e); }} aria-label={t('Smazat záznam: {jmeno}', { jmeno: e.employeeName ?? '' })} />
                     )}
                   </>
                 );
@@ -276,16 +281,16 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                     // odečítač tak přečte „Profil: Petra", ne jen „Zobrazit profil".
                     // Celý řádek klikací být nemůže — uvnitř jsou Upravit a Smazat.
                     title={smiProfil && otevriProfil ? (
-                      <button type="button" onClick={() => otevriProfil(Number(e.employeeId))} aria-label={`Profil: ${e.employeeName ?? 'Neznámý'}`}
+                      <button type="button" onClick={() => otevriProfil(Number(e.employeeId))} aria-label={`Profil: ${e.employeeName ?? t('Neznámý')}`}
                         className="max-w-full truncate text-left rounded-sm hover:underline decoration-black/25 underline-offset-2">
-                        {e.employeeName ?? 'Neznámý'}
+                        {e.employeeName ?? t('Neznámý')}
                       </button>
-                    ) : (e.employeeName ?? 'Neznámý')}
+                    ) : (e.employeeName ?? t('Neznámý'))}
                     meta={meta}
-                    value={zapomenuty ? undefined : bezi ? `běží ${hodinyMinuty(z.delka)}` : hodinyMinuty(z.delka)}
-                    right={zapomenuty ? <Chip tone="wait" size="sm" icon="warning">Zapomenutý odchod?</Chip>
-                      : e.note ? <Chip tone="wait" size="sm">Zkontrolovat</Chip>
-                      : z.druh === 'dlouhy' ? <Chip tone="wait" size="sm">Nad 24 h</Chip> : undefined}
+                    value={zapomenuty ? undefined : bezi ? t('běží {cas}', { cas: hodinyMinuty(z.delka) }) : hodinyMinuty(z.delka)}
+                    right={zapomenuty ? <Chip tone="wait" size="sm" icon="warning">{t('Zapomenutý odchod?')}</Chip>
+                      : e.note ? <Chip tone="wait" size="sm">{t('Zkontrolovat')}</Chip>
+                      : z.druh === 'dlouhy' ? <Chip tone="wait" size="sm">{t('Nad 24 h')}</Chip> : undefined}
                     actions={smiUpravit || smiMazat ? akce : undefined}
                   />
                 );
@@ -302,40 +307,40 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
       <PlochaWidgetu
         stranka="vedeni.dochazka"
         hlavicka={{
-          title: 'Docházka',
-          subtitle: 'Kdo je na směně, odpracované hodiny a mzdy za období.',
+          title: t('Docházka'),
+          subtitle: t('Kdo je na směně, odpracované hodiny a mzdy za období.'),
           hintId: 'attendance',
           primary: smiUpravit ? (
-            <Button variant="accent" icon="plus" onClick={() => { setChybaPridani(null); setPridat(true); }}>Přidat záznam</Button>
+            <Button variant="accent" icon="plus" onClick={() => { setChybaPridani(null); setPridat(true); }}>{t('Přidat záznam')}</Button>
           ) : undefined,
-          secondary: smiExport && entries.length > 0 ? <Button variant="secondary" icon="download" onClick={exportCsv}>Export CSV</Button> : undefined,
+          secondary: smiExport && entries.length > 0 ? <Button variant="secondary" icon="download" onClick={exportCsv}>{t('Export CSV')}</Button> : undefined,
           // Vedlejší akce se na telefonu schovají (DP §3.4) — Export proto i v „···".
           menu: smiExport && entries.length > 0 ? [{ label: 'Export CSV', icon: 'download', onClick: exportCsv }] : undefined,
           aside: (
-            <Segmented size="sm" ariaLabel="Období" value={String(dni)} onChange={v => setDni(Number(v) as Obdobi)}
-              options={OBDOBI.map(p => ({ id: String(p), label: `${p} dní` }))} />
+            <Segmented size="sm" ariaLabel={t('Období')} value={String(dni)} onChange={v => setDni(Number(v) as Obdobi)}
+              options={OBDOBI.map(p => ({ id: String(p), label: t('{n} dní', { n: p }) }))} />
           ),
         }}
         nastroj={nastroj}
       />
 
       {pridat && (
-        <Modal open onClose={() => setPridat(false)} size="sm" title="Přidat záznam docházky" subtitle="Když se někdo zapomněl odpíchnout úplně."
+        <Modal open onClose={() => setPridat(false)} size="sm" title={t('Přidat záznam docházky')} subtitle={t('Když se někdo zapomněl odpíchnout úplně.')}
           footer={<>
-            <Button variant="secondary" onClick={() => setPridat(false)}>Zrušit</Button>
-            <Button variant="primary" icon="plus" loading={pridavam} onClick={ulozNovy}>Přidat záznam</Button>
+            <Button variant="secondary" onClick={() => setPridat(false)}>{t('Zrušit')}</Button>
+            <Button variant="primary" icon="plus" loading={pridavam} onClick={ulozNovy}>{t('Přidat záznam')}</Button>
           </>}>
           <div className="space-y-3">
-            <Field id="dochazka-novy-kdo" label="Kdo">
+            <Field id="dochazka-novy-kdo" label={t('Kdo')}>
               <Select id="dochazka-novy-kdo" value={novy.kdo} onChange={e => setNovy(n => ({ ...n, kdo: e.target.value }))}>
-                <option value="">Vyber člověka</option>
+                <option value="">{t('Vyber člověka')}</option>
                 {roster.map(m => <option key={m.id} value={String(m.id)}>{m.name}</option>)}
               </Select>
             </Field>
-            <Field id="dochazka-novy-od" label="Příchod">
+            <Field id="dochazka-novy-od" label={t('Příchod')}>
               <Input id="dochazka-novy-od" type="datetime-local" value={novy.od} onChange={e => setNovy(n => ({ ...n, od: e.target.value }))} />
             </Field>
-            <Field id="dochazka-novy-do" label="Odchod" error={chybaPridani}>
+            <Field id="dochazka-novy-do" label={t('Odchod')} error={chybaPridani}>
               <Input id="dochazka-novy-do" type="datetime-local" value={novy.do} onChange={e => setNovy(n => ({ ...n, do: e.target.value }))} />
             </Field>
           </div>
@@ -343,16 +348,16 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
       )}
 
       {uprava && (
-        <Modal open onClose={() => setUprava(null)} size="sm" title="Upravit čas na směně" subtitle={uprava.e.employeeName ?? undefined}
+        <Modal open onClose={() => setUprava(null)} size="sm" title={t('Upravit čas na směně')} subtitle={uprava.e.employeeName ?? undefined}
           footer={<>
-            <Button variant="secondary" onClick={() => setUprava(null)}>Zrušit</Button>
-            <Button variant="primary" icon="check" loading={ukladam} onClick={ulozUpravu}>Uložit</Button>
+            <Button variant="secondary" onClick={() => setUprava(null)}>{t('Zrušit')}</Button>
+            <Button variant="primary" icon="check" loading={ukladam} onClick={ulozUpravu}>{t('Uložit')}</Button>
           </>}>
           <div className="space-y-3">
-            <Field id="dochazka-uprava-od" label="Příchod">
+            <Field id="dochazka-uprava-od" label={t('Příchod')}>
               <Input id="dochazka-uprava-od" type="datetime-local" value={uprava.od} onChange={e => setUprava(u => (u ? { ...u, od: e.target.value } : u))} />
             </Field>
-            <Field id="dochazka-uprava-do" label="Odchod" hint={uprava.zPlanu ? 'Předvyplněný je plánovaný konec směny. Uprav ho, jestli odešel jindy.' : 'Prázdné pole = pořád na směně.'} error={chybaUpravy}>
+            <Field id="dochazka-uprava-do" label={t('Odchod')} hint={uprava.zPlanu ? t('Předvyplněný je plánovaný konec směny. Uprav ho, jestli odešel jindy.') : t('Prázdné pole = pořád na směně.')} error={chybaUpravy}>
               <Input id="dochazka-uprava-do" type="datetime-local" value={uprava.do} onChange={e => setUprava(u => (u ? { ...u, do: e.target.value } : u))} />
             </Field>
           </div>
@@ -360,13 +365,13 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
       )}
 
       {smazat && (
-        <Modal open onClose={() => setSmazat(null)} size="sm" title="Smazat záznam?"
-          subtitle={`${smazat.employeeName ?? 'Neznámý'} · ${dbTimeHM(smazat.clockIn)} – ${smazat.clockOut ? dbTimeHM(smazat.clockOut) : '…'}`}
+        <Modal open onClose={() => setSmazat(null)} size="sm" title={t('Smazat záznam?')}
+          subtitle={`${smazat.employeeName ?? t('Neznámý')} · ${dbTimeHM(smazat.clockIn)} – ${smazat.clockOut ? dbTimeHM(smazat.clockOut) : '…'}`}
           footer={<>
-            <Button variant="secondary" onClick={() => setSmazat(null)}>Zrušit</Button>
-            <Button variant="danger-solid" loading={mazu} onClick={potvrdSmazani}>Smazat</Button>
+            <Button variant="secondary" onClick={() => setSmazat(null)}>{t('Zrušit')}</Button>
+            <Button variant="danger-solid" loading={mazu} onClick={potvrdSmazani}>{t('Smazat')}</Button>
           </>}>
-          <p className="text-sm text-black/70 text-pretty">Odpracované hodiny ze záznamu zmizí i ze mzdy. Vrátit to nejde.</p>
+          <p className="text-sm text-black/70 text-pretty">{t('Odpracované hodiny ze záznamu zmizí i ze mzdy. Vrátit to nejde.')}</p>
           {chybaSmazani && <p className="note note-danger mt-3" role="alert">{chybaSmazani}</p>}
         </Modal>
       )}

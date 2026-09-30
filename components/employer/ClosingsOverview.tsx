@@ -40,9 +40,11 @@ import {
   KLIC_DEN, KLIC_VYPLNIT, UDALOST_DEN, UDALOST_VYPLNIT,
   denUzaverky, jeHlavni, rozdilUzaverky, type RadekUzaverky,
 } from '@/lib/uzaverkyPrehled';
+import { useT } from '@/lib/i18n/client';
+import { useLocale } from './jazyk';
 
 const URL_SEZNAM = '/api/closings';
-const UZAVERKA = { one: 'uzávěrka', few: 'uzávěrky', many: 'uzávěrek' };
+const UZAVERKA = { one: 'uzávěrka', few: 'uzávěrky', many: 'uzávěrek' }; // i18n-ok
 
 type Person = { id: number; name: string; avatar?: string | null };
 
@@ -56,11 +58,11 @@ interface Seznam {
 const crewOf = (c: RadekUzaverky): ShiftPerson[] =>
   c.shiftEmployees && c.shiftEmployees.length
     ? c.shiftEmployees
-    : [{ id: c.created_by, name: c.author_name ?? 'Neznámý', avatar: c.author_avatar ?? null }];
+    : [{ id: c.created_by, name: c.author_name ?? 'Neznámý' /* i18n-ok */, avatar: c.author_avatar ?? null }];
 
-const denVetou = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' });
-const denKratce = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'long' });
-const nazevMesice = (m: string) => new Date(`${m}-01T12:00:00`).toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
+const denVetou = (d: string, loc: string) => new Date(`${d}T12:00:00`).toLocaleDateString(loc, { weekday: 'long', day: 'numeric', month: 'long' });
+const denKratce = (d: string, loc: string) => new Date(`${d}T12:00:00`).toLocaleDateString(loc, { weekday: 'short', day: 'numeric', month: 'long' });
+const nazevMesice = (m: string, loc: string) => new Date(`${m}-01T12:00:00`).toLocaleDateString(loc, { month: 'long', year: 'numeric' });
 
 /** Přečte a smaže žádost, která čekala na připojení nástroje (z jiné stránky). */
 function vezmiZadost(klic: string): string | null {
@@ -77,6 +79,8 @@ function stahniCsv(radky: (string | number)[][], jmeno: string) {
 }
 
 export default function ClosingsOverview() {
+  const t = useT('sprava');
+  const loc = useLocale();
   const money = useMoney();
   const smi = useSmi();
   const { pro } = usePlan();
@@ -90,7 +94,7 @@ export default function ClosingsOverview() {
   const listRef = useRef<HTMLDivElement>(null);
 
   const data = useDataWidgetu<Seznam>(URL_SEZNAM, raw => {
-    if (!raw || typeof raw !== 'object' || !Array.isArray(raw.closings)) throw new Error('Uzávěrky přišly v nečekaném tvaru.');
+    if (!raw || typeof raw !== 'object' || !Array.isArray(raw.closings)) throw new Error(t('Uzávěrky přišly v nečekaném tvaru.'));
     return {
       radky: raw.closings,
       payDailyCash: raw.payDailyCash === true,
@@ -164,7 +168,7 @@ export default function ClosingsOverview() {
 
   const exportCsv = () => {
     if (!pro) { setUpgradeFor('Export CSV'); return; }
-    const head = ['Datum', 'Směna', 'Vyplnil/a', 'Na směně', 'Kasa na začátku', 'Tržba hotově', 'Tržba kartou', 'Spropitné', 'Spropitné v kase', 'Výdaje', 'Odloženo', 'Výplata', 'Kasa na konci', 'Očekávaná kasa', 'Rozdíl', 'Odvod na konci', 'Zůstalo v kase', 'Zákazníků', 'Poznámka'];
+    const head = ['Datum', 'Směna', 'Vyplnil/a', 'Na směně', 'Kasa na začátku', 'Tržba hotově', 'Tržba kartou', 'Spropitné', 'Spropitné v kase', 'Výdaje', 'Odloženo', 'Výplata', 'Kasa na konci', 'Očekávaná kasa', 'Rozdíl', 'Odvod na konci', 'Zůstalo v kase', 'Zákazníků', 'Poznámka']; // i18n-ok (CSV pro účetní zůstává česky)
     const rows = closings.map(c => [
       denUzaverky(c), c.shift_label ?? '', c.author_name ?? '', crewOf(c).map(p => p.name).join(', '),
       v(c.opening_cash), v(c.cash_revenue), v(c.card_revenue), v(c.tips), c.tips_in_drawer ? 'ano' : 'ne', v(c.expenses),
@@ -180,8 +184,8 @@ export default function ClosingsOverview() {
   // zdroj jako Finance (/api/finance) — dřív si ho počítal sám z docházky
   // a přijatých objednávek a vycházel jinak než obrazovka Finance.
   const exportAccountant = async () => {
-    if (!pro) { setUpgradeFor('Export pro účetní'); return; }
-    const head = ['Datum', 'Tržba hotově', 'Tržba kartou', 'Tržba celkem', 'Spropitné', 'Výdaje z kasy', 'Odvedeno', 'Vyplaceno hotově'];
+    if (!pro) { setUpgradeFor(t('Export pro účetní')); return; }
+    const head = ['Datum', 'Tržba hotově', 'Tržba kartou', 'Tržba celkem', 'Spropitné', 'Výdaje z kasy', 'Odvedeno', 'Vyplaceno hotově']; // i18n-ok (CSV pro účetní zůstává česky)
     const byDay = new Map<string, { cash: number; card: number; tips: number; exp: number; rem: number; pay: number }>();
     closings.forEach(c => {
       const d = byDay.get(denUzaverky(c)) ?? { cash: 0, card: 0, tips: 0, exp: 0, rem: 0, pay: 0 };
@@ -192,15 +196,15 @@ export default function ClosingsOverview() {
     const rows = Array.from(byDay.entries()).sort((a, b) => a[0].localeCompare(b[0]))
       .map(([date, d]) => [date, d.cash, d.card, d.cash + d.card, d.tips, d.exp, d.rem, d.pay]);
     const trzby = rows.reduce((s, r) => s + Number(r[3]), 0);
-    const summary: (string | number)[][] = [[], ['SOUHRN OBDOBÍ', month === 'all' ? 'vše' : month], ['Tržby celkem', trzby]];
+    const summary: (string | number)[][] = [[], ['SOUHRN OBDOBÍ', month === 'all' ? t('vše') : month], ['Tržby celkem', trzby]]; // i18n-ok (CSV pro účetní zůstává česky)
     if (month !== 'all' && smi('finance.zobrazit')) {
       try {
         const f = await fetch(`/api/finance?month=${month}`).then(okJson);
         const s = f?.summary ?? {};
-        if (!s.mzdySkryte) summary.push(['Mzdové náklady', Math.max(Number(s.wagesWorked) || 0, Number(s.wagesCash) || 0)]);
-        summary.push(['Nákupy (účtenky, objednávky, výdaje z kasy)', Number(s.purchases) || 0]);
-        if (!s.mzdySkryte) summary.push(['Provozní výsledek (orientační)', Number(s.gross) || 0]);
-      } catch { summary.push(['Náklady', 'nepodařilo se načíst — viz Finance']); }
+        if (!s.mzdySkryte) summary.push(['Mzdové náklady', Math.max(Number(s.wagesWorked) || 0, Number(s.wagesCash) || 0)]); // i18n-ok (CSV pro účetní zůstává česky)
+        summary.push(['Nákupy (účtenky, objednávky, výdaje z kasy)', Number(s.purchases) || 0]); // i18n-ok (CSV pro účetní zůstává česky)
+        if (!s.mzdySkryte) summary.push(['Provozní výsledek (orientační)', Number(s.gross) || 0]); // i18n-ok (CSV pro účetní zůstává česky)
+      } catch { summary.push(['Náklady', 'nepodařilo se načíst — viz Finance']); } // i18n-ok (CSV pro účetní zůstává česky)
     }
     stahniCsv([head, ...rows, ...summary], `ucetni-podklad${month === 'all' ? '' : '-' + month}.csv`);
   };
@@ -209,8 +213,8 @@ export default function ClosingsOverview() {
   if (creating) {
     return (
       <div className="p-4 sm:p-6 space-y-4">
-        <Button variant="secondary" size="sm" onClick={() => { setCreating(false); setCreatingDate(undefined); }}>Zpět na uzávěrky</Button>
-        <CashClosing user={{ id: 0, name: 'Vedení' }} hideHistory initialDate={creatingDate}
+        <Button variant="secondary" size="sm" onClick={() => { setCreating(false); setCreatingDate(undefined); }}>{t('Zpět na uzávěrky')}</Button>
+        <CashClosing user={{ id: 0, name: 'Vedení' }} hideHistory initialDate={creatingDate} // i18n-ok (jméno autora pro vedení)
           onSubmitted={() => { setCreating(false); obnov(creatingDate); setCreatingDate(undefined); }} />
       </div>
     );
@@ -218,7 +222,7 @@ export default function ClosingsOverview() {
 
   const menu = smiExport && topLevel.length > 0 ? [
     { label: 'Export CSV', icon: 'download', onClick: exportCsv },
-    { label: 'Pro účetní', icon: 'receipt', hint: 'Tržby po dnech a souhrn nákladů.', onClick: () => { void exportAccountant(); } },
+    { label: t('Pro účetní'), icon: 'receipt', hint: t('Tržby po dnech a souhrn nákladů.'), onClick: () => { void exportAccountant(); } },
   ] : undefined;
 
   const nastroj = (
@@ -226,29 +230,30 @@ export default function ClosingsOverview() {
       <div ref={listRef} className="scroll-mt-4 px-5 pt-5 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 id="uzaverky-seznam-t" className="t-card flex items-center gap-2">
-            Seznam uzávěrek
-            {data.data && <Chip tone="muted" size="sm">{topLevel.length.toLocaleString('cs-CZ')}</Chip>}
+            
+            {t('Seznam uzávěrek')}
+            {data.data && <Chip tone="muted" size="sm">{topLevel.length.toLocaleString(loc)}</Chip>}
           </h2>
         </div>
         {selectedDate ? (
           <div className="well flex flex-wrap items-center justify-between gap-2 px-4 py-3">
             <p className="text-sm font-medium text-[#16181A] cz-sentence min-w-0">
-              {denVetou(selectedDate)}
-              <span className="font-normal text-black/55"> · {topLevel.length === 0 ? 'bez uzávěrky' : czCount(topLevel.length, UZAVERKA)}</span>
+              {denVetou(selectedDate, loc)}
+              <span className="font-normal text-black/55"> · {topLevel.length === 0 ? t('bez uzávěrky') : t('{n, plural, one {# uzávěrka} few {# uzávěrky} other {# uzávěrek}}', { n: topLevel.length })}</span>
             </p>
             <div className="flex items-center gap-2 flex-wrap">
               {topLevel.length === 0 && smiVytvorit && (
-                <Button variant="secondary" size="sm" icon="plus" onClick={() => openCreate(selectedDate)}>Vyplnit</Button>
+                <Button variant="secondary" size="sm" icon="plus" onClick={() => openCreate(selectedDate)}>{t('Vyplnit')}</Button>
               )}
-              <Button variant="ghost" size="sm" onClick={() => vyber(null)}>Zrušit výběr</Button>
+              <Button variant="ghost" size="sm" onClick={() => vyber(null)}>{t('Zrušit výběr')}</Button>
             </div>
           </div>
         ) : months.length > 1 && (
-          <div className="flex gap-1.5 overflow-x-auto scrollbar-thin -mx-1 px-1 pb-1" role="group" aria-label="Měsíc">
+          <div className="flex gap-1.5 overflow-x-auto scrollbar-thin -mx-1 px-1 pb-1" role="group" aria-label={t('Měsíc')}>
             {(['all', ...months] as string[]).map(m => (
               <button key={m} type="button" aria-pressed={month === m} onClick={() => setMonth(m)}
                 className={`filter-pill tap-target-sm ${m === 'all' ? '' : 'cz-sentence'} ${month === m ? 'seg-on' : 'seg-off glass'}`}>
-                {m === 'all' ? 'Vše' : nazevMesice(m)}
+                {m === 'all' ? t('Vše') : nazevMesice(m, loc)}
               </button>
             ))}
           </div>
@@ -261,11 +266,11 @@ export default function ClosingsOverview() {
             <Skeleton className="h-12" /><Skeleton className="h-12" /><Skeleton className="h-12 w-2/3" />
           </div>
         ) : data.error ? (
-          <ErrorState compact title="Uzávěrky se nenačetly" onRetry={data.reload} detail={data.error} className="!py-6" />
+          <ErrorState compact title={t('Uzávěrky se nenačetly')} onRetry={data.reload} detail={data.error} className="!py-6" />
         ) : topLevel.length === 0 ? (
           selectedDate
-            ? <EmptyState compact icon="receipt" title="Za tento den není uzávěrka" hint="Buď se ten den nepracovalo, nebo na ni někdo zapomněl." />
-            : <EmptyState compact illustration="uzaverka" title="Zatím žádné uzávěrky" hint="Zaměstnanci je vyplňují po směně v aplikaci nebo na tabletu. Tady je uvidíš a schválíš." />
+            ? <EmptyState compact icon="receipt" title={t('Za tento den není uzávěrka')} hint={t('Buď se ten den nepracovalo, nebo na ni někdo zapomněl.')} />
+            : <EmptyState compact illustration="uzaverka" title={t('Zatím žádné uzávěrky')} hint={t('Zaměstnanci je vyplňují po směně v aplikaci nebo na tabletu. Tady je uvidíš a schválíš.')} />
         ) : (
           <ul className="list">
             {topLevel.map(c => {
@@ -279,15 +284,15 @@ export default function ClosingsOverview() {
                 <li key={c.id}>
                   <ListRow as="div"
                     lead={<Avatar emoji={c.author_avatar} size="sm" />}
-                    title={<span className="cz-sentence">{denKratce(denUzaverky(c))}{c.shift_label ? ` · ${c.shift_label}` : ''}</span>}
-                    meta={`Směna: ${crew}${trzba != null ? ` · tržba ${money(trzba)}` : ''}`}
+                    title={<span className="cz-sentence">{denKratce(denUzaverky(c), loc)}{c.shift_label ? ` · ${c.shift_label}` : ''}</span>}
+                    meta={`${t('Směna: {crew}', { crew })}${trzba != null ? ` · ${t('tržba {castka}', { castka: money(trzba) })}` : ''}`}
                     right={<>
                       {c.event_title && <Chip tone="info" size="sm" icon="calendarCheck" className="hidden sm:inline-flex">{c.event_title}</Chip>}
                       {covered.length > 0 && <Chip tone="muted" size="sm" icon="users" className="hidden sm:inline-flex">+{covered.length}</Chip>}
-                      {c.approved === false && <Chip tone="wait" size="sm">Čeká na schválení</Chip>}
+                      {c.approved === false && <Chip tone="wait" size="sm">{t('Čeká na schválení')}</Chip>}
                       {d != null && (
                         <Chip tone={d === 0 ? 'ok' : d > 0 ? 'info' : 'bad'} size="sm">
-                          {d === 0 ? 'Sedí' : `${d > 0 ? '+' : ''}${money(d)}`}
+                          {d === 0 ? t('Sedí') : `${d > 0 ? '+' : ''}${money(d)}`}
                           {duvod && <span className="hidden sm:inline font-normal"> · {duvod}</span>}
                         </Chip>
                       )}
@@ -307,10 +312,10 @@ export default function ClosingsOverview() {
       <PlochaWidgetu
         stranka="vedeni.uzaverky"
         hlavicka={{
-          title: 'Uzávěrky',
-          subtitle: 'Denní tržby, rozdíly proti kase a co čeká na schválení.',
+          title: t('Uzávěrky'),
+          subtitle: t('Denní tržby, rozdíly proti kase a co čeká na schválení.'),
           hintId: 'closingsoverview',
-          primary: smiVytvorit ? <Button variant="accent" icon="plus" onClick={() => openCreate()}>Nová uzávěrka</Button> : undefined,
+          primary: smiVytvorit ? <Button variant="accent" icon="plus" onClick={() => openCreate()}>{t('Nová uzávěrka')}</Button> : undefined,
           menu,
         }}
         nastroj={nastroj}

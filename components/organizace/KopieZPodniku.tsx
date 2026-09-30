@@ -15,6 +15,7 @@ import { Modal, Button, SearchField, ErrorState, EmptyState, SelectBox } from '.
 import { okJson, apiMessage } from '@/lib/api';
 import { czCount, type CzNoun } from '@/lib/czech';
 import { obsahujeNekde } from '@/lib/hledani';
+import { useT, type PrekladFn } from '@/lib/i18n/client';
 
 export type KopieEntita = 'navody' | 'postupy' | 'menu';
 
@@ -25,26 +26,27 @@ interface Vysledek { id: number; noveId: number | null; nazev: string; poznamky:
 /** Server bere nejvýš tolik položek v jedné dávce. */
 const MAX_DAVKA = 50;
 
-const TEXTY: Record<KopieEntita, { nadpis: string; nic: (podnik: string) => string; jednotka: CzNoun; polozka: CzNoun }> = {
+interface TextyKopie { nadpis: string; nic: (podnik: string) => string; jednotka: (n: number) => string; polozka: (n: number) => string }
+const texty = (t: PrekladFn, entita: KopieEntita): TextyKopie => ({
   navody: {
-    nadpis: 'Návody z jiného podniku',
-    nic: p => `V podniku ${p} žádné návody nejsou.`,
-    jednotka: { one: 'krok', few: 'kroky', many: 'kroků' },
-    polozka: { one: 'návod', few: 'návody', many: 'návodů' },
+    nadpis: t('Návody z jiného podniku'),
+    nic: (p: string) => t('V podniku {podnik} žádné návody nejsou.', { podnik: p }),
+    jednotka: (n: number) => t('{n, plural, one {# krok} few {# kroky} other {# kroků}}', { n }),
+    polozka: (n: number) => t('{n, plural, one {# návod} few {# návody} other {# návodů}}', { n }),
   },
   postupy: {
-    nadpis: 'Postupy z jiného podniku',
-    nic: p => `V podniku ${p} žádné postupy nejsou.`,
-    jednotka: { one: 'krok', few: 'kroky', many: 'kroků' },
-    polozka: { one: 'postup', few: 'postupy', many: 'postupů' },
+    nadpis: t('Postupy z jiného podniku'),
+    nic: (p: string) => t('V podniku {podnik} žádné postupy nejsou.', { podnik: p }),
+    jednotka: (n: number) => t('{n, plural, one {# krok} few {# kroky} other {# kroků}}', { n }),
+    polozka: (n: number) => t('{n, plural, one {# postup} few {# postupy} other {# postupů}}', { n }),
   },
   menu: {
-    nadpis: 'Menu z jiného podniku',
-    nic: p => `V podniku ${p} žádné menu není.`,
-    jednotka: { one: 'položka', few: 'položky', many: 'položek' },
-    polozka: { one: 'menu', few: 'menu', many: 'menu' },
+    nadpis: t('Menu z jiného podniku'),
+    nic: (p: string) => t('V podniku {podnik} žádné menu není.', { podnik: p }),
+    jednotka: (n: number) => t('{n, plural, one {# položka} few {# položky} other {# položek}}', { n }),
+    polozka: (n: number) => t('{n} menu', { n }),
   },
-};
+})[entita];
 
 /**
  * Podniky, ze kterých smí aktivní vedení kopírovat: ostatní podniky TÉŽE
@@ -106,7 +108,8 @@ export default function KopieZPodniku({ entita, podniky: jine, cil, onClose, onH
   /** Kopie proběhla — rodič si znovu načte seznam. */
   onHotovo: () => void;
 }) {
-  const t = TEXTY[entita];
+  const t = useT('sprava');
+  const tx = texty(t, entita);
 
   // Jediný jiný podnik se nevybírá — rovnou se ukáže, co v něm je.
   const [zdroj, setZdroj] = useState<Podnik | null>(jine.length === 1 ? jine[0] : null);
@@ -139,7 +142,7 @@ export default function KopieZPodniku({ entita, podniky: jine, cil, onClose, onH
       setCelkem(Number(d?.celkem) || seznam.length);
     } catch (e) {
       if (moje !== pozadavek.current) return;
-      setChybaSeznamu(apiMessage(e, 'Seznam z druhého podniku se nenačetl.'));
+      setChybaSeznamu(apiMessage(e, t('Seznam z druhého podniku se nenačetl.')));
     } finally {
       if (moje === pozadavek.current) setNacitamSeznam(false);
     }
@@ -181,7 +184,7 @@ export default function KopieZPodniku({ entita, podniky: jine, cil, onClose, onH
       setVysledky(v);
       if (v.some(r => r.noveId != null)) { onHotovo(); setObnoveno(true); }
     } catch (e) {
-      setChybaKopie(apiMessage(e, 'Kopie se nepovedla.'));
+      setChybaKopie(apiMessage(e, t('Kopie se nepovedla.')));
     } finally {
       setKopiruji(false);
     }
@@ -202,31 +205,31 @@ export default function KopieZPodniku({ entita, podniky: jine, cil, onClose, onH
   const presDavku = vybrane.size > MAX_DAVKA;
 
   const podtitul = krok === 'podnik'
-    ? 'Vyber, odkud se má kopírovat.'
+    ? t('Vyber, odkud se má kopírovat.')
     : krok === 'vyber' && zdroj
-      ? `Z podniku ${zdroj.name} do ${cil ? `podniku ${cil}` : 'toho, ve kterém teď jsi'}. Vznikne kopie — další úpravy už spolu nesouvisí.`
-      : zdroj ? `Z podniku ${zdroj.name}${cil ? ` do podniku ${cil}` : ''}` : undefined;
+      ? t('Z podniku {zdroj} do {cil}. Vznikne kopie — další úpravy už spolu nesouvisí.', { zdroj: zdroj.name, cil: cil ? t('podniku {podnik}', { podnik: cil }) : t('toho, ve kterém teď jsi') })
+      : zdroj ? (cil ? t('Z podniku {zdroj} do podniku {cil}', { zdroj: zdroj.name, cil }) : t('Z podniku {zdroj}', { zdroj: zdroj.name })) : undefined;
 
   // Patička má jen dvě tlačítka: se třetím („Jiný podnik") se na telefonu
   // nevejde a levé by skončilo za okrajem. Volba podniku je v těle okna.
   const paticka = krok === 'vyber' ? (
     <>
-      <Button variant="ghost" onClick={zavrit} disabled={kopiruji}>Zrušit</Button>
+      <Button variant="ghost" onClick={zavrit} disabled={kopiruji}>{t('Zrušit')}</Button>
       <Button variant="accent" icon="copy" loading={kopiruji} disabled={vybrane.size === 0 || presDavku || !!chybaSeznamu}
         onClick={zkopirovat}>
-        Zkopírovat ({vybrane.size})
+        {t('Zkopírovat ({n})', { n: vybrane.size })}
       </Button>
     </>
   ) : krok === 'vysledek' ? (
-    <Button variant="accent" onClick={() => { if (!obnoveno) onHotovo(); onClose(); }}>Hotovo</Button>
+    <Button variant="accent" onClick={() => { if (!obnoveno) onHotovo(); onClose(); }}>{t('Hotovo')}</Button>
   ) : undefined;
 
   return (
-    <Modal open onClose={zavrit} title={t.nadpis} subtitle={podtitul} size="lg" footer={paticka}>
+    <Modal open onClose={zavrit} title={tx.nadpis} subtitle={podtitul} size="lg" footer={paticka}>
       {krok === 'podnik' && (
         jine.length === 0 ? (
-          <EmptyState compact icon="box" title="Není odkud kopírovat"
-            hint="Kopírovat jde jen z jiného podniku téže organizace — a ten tu zatím není." />
+          <EmptyState compact icon="box" title={t('Není odkud kopírovat')}
+            hint={t('Kopírovat jde jen z jiného podniku téže organizace — a ten tu zatím není.')} />
         ) : (
           <ul className="space-y-2">
             {jine.map(p => (
@@ -247,40 +250,41 @@ export default function KopieZPodniku({ entita, podniky: jine, cil, onClose, onH
         <div className="-mt-1 mb-3">
           <Button variant="ghost" size="sm" disabled={kopiruji}
             onClick={() => { pozadavek.current++; setZdroj(null); setPolozky(null); setChybaSeznamu(''); setNacitamSeznam(false); }}>
-            Vybrat jiný podnik
+            
+            {t('Vybrat jiný podnik')}
           </Button>
         </div>
       )}
 
       {krok === 'vyber' && zdroj && (
         nacitamSeznam ? (
-          <div className="flex justify-center py-10"><span className="spinner" aria-label="Načítám seznam" /></div>
+          <div className="flex justify-center py-10"><span className="spinner" aria-label={t('Načítám seznam')} /></div>
         ) : chybaSeznamu ? (
-          <ErrorState compact title="Seznam se nenačetl" hint={chybaSeznamu} onRetry={() => nactiSeznam(zdroj)} />
+          <ErrorState compact title={t('Seznam se nenačetl')} hint={chybaSeznamu} onRetry={() => nactiSeznam(zdroj)} />
         ) : (polozky ?? []).length === 0 ? (
-          <EmptyState compact icon="copy" title={t.nic(zdroj.name)} />
+          <EmptyState compact icon="copy" title={tx.nic(zdroj.name)} />
         ) : (
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               {/* Hledání je pomocné — rozepsaný dotaz nemá okno držet otevřené otázkou „zahodit?". */}
               <div data-transient className="flex-1 min-w-0">
-                <SearchField value={hledat} onChange={setHledat} placeholder="Hledat…" ariaLabel="Hledat v seznamu" />
+                <SearchField value={hledat} onChange={setHledat} placeholder={t('Hledat…')} ariaLabel={t('Hledat v seznamu')} />
               </div>
               <Button variant="ghost" size="sm" onClick={prepnoutVse} disabled={filtrovane.length === 0}>
-                {vseVybrano ? 'Zrušit výběr' : 'Vybrat vše'}
+                {vseVybrano ? t('Zrušit výběr') : t('Vybrat vše')}
               </Button>
             </div>
             {polozky && celkem > polozky.length && (
               <p className="note note-wait">
-                Zobrazeno {polozky.length} z {celkem} — co tu nevidíš, hledej podle názvu v menším výběru nebo zkopíruj po částech.
+                {t('Zobrazeno {n} z {celkem} — co tu nevidíš, hledej podle názvu v menším výběru nebo zkopíruj po částech.', { n: polozky.length, celkem })}
               </p>
             )}
             {presDavku && (
-              <p role="alert" className="note note-wait">Najednou jde zkopírovat nejvýš {MAX_DAVKA} položek — odeber {vybrane.size - MAX_DAVKA}.</p>
+              <p role="alert" className="note note-wait">{t('Najednou jde zkopírovat nejvýš {max} položek — odeber {n}.', { max: MAX_DAVKA, n: vybrane.size - MAX_DAVKA })}</p>
             )}
             {chybaKopie && <p role="alert" className="note note-danger">{chybaKopie}</p>}
             {filtrovane.length === 0 ? (
-              <p className="text-sm text-black/55 py-4 text-center">Nic takového tu není.</p>
+              <p className="text-sm text-black/55 py-4 text-center">{t('Nic takového tu není.')}</p>
             ) : (
               <ul className="space-y-1.5">
                 {filtrovane.map(p => {
@@ -293,12 +297,12 @@ export default function KopieZPodniku({ entita, podniky: jine, cil, onClose, onH
                       <div onClick={e => { if ((e.target as HTMLElement).closest('button')) return; prepnout(p.id); }}
                         className={`flex items-center gap-3 rounded-2xl border px-3 py-2.5 cursor-pointer transition ${
                           on ? 'border-[#C8F542]/50 bg-[#C8F542]/10' : 'border-black/[0.08] bg-black/[0.02] hover:bg-black/[0.05]'}`}>
-                        <SelectBox checked={on} onChange={() => prepnout(p.id)} label={`Vybrat ${p.nazev}`} />
+                        <SelectBox checked={on} onChange={() => prepnout(p.id)} label={t('Vybrat {nazev}', { nazev: p.nazev })} />
                         <span className="min-w-0 flex-1">
                           <span className="block text-sm font-medium text-[#16181A] truncate">{p.nazev}</span>
                           {meta && <span className="block text-xs text-black/55 truncate">{meta}</span>}
                         </span>
-                        <span className="chip chip-sm chip-muted shrink-0 tabular-nums">{czCount(p.pocet, t.jednotka)}</span>
+                        <span className="chip chip-sm chip-muted shrink-0 tabular-nums">{tx.jednotka(p.pocet)}</span>
                       </div>
                     </li>
                   );
@@ -315,10 +319,10 @@ export default function KopieZPodniku({ entita, podniky: jine, cil, onClose, onH
             {/* „2 z 3 návody" je špatný pád; číslo po „z" se proto neskloňuje
                 a podstatné jméno nese jen souhrn, když prošlo všechno. */}
             {uspesne === 0
-              ? 'Nic se nezkopírovalo.'
+              ? t('Nic se nezkopírovalo.')
               : uspesne === vysledky.length
-                ? `Zkopírováno: ${czCount(uspesne, t.polozka)}.`
-                : `Zkopírováno ${uspesne} z ${vysledky.length}.`}
+                ? t('Zkopírováno: {co}.', { co: tx.polozka(uspesne) })
+                : t('Zkopírováno {n} z {celkem}.', { n: uspesne, celkem: vysledky.length })}
           </p>
           <ul className="space-y-1.5">
             {vysledky.map(r => {

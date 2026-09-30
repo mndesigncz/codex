@@ -46,6 +46,8 @@ import AlergenyPicker from './menu/AlergenyPicker';
 import { STITKY } from '@/lib/alergeny';
 import type { Jazyk } from '@/lib/i18n/config';
 import type { JazykyListku as Langs, Preklady } from '@/lib/menu';
+import { useT } from '@/lib/i18n/client';
+import { sUzlem, VLOZ } from './jazyk';
 
 interface Item {
   id?: number;
@@ -77,7 +79,7 @@ interface PosProduct { productId: string; name: string; category: string; price:
    Menu s touhle adresou je tím pádem „to, co visí na iPadu“. */
 const VYCHOZI_SLUG = 'akce';
 
-const SEKCE = { one: 'sekce', few: 'sekce', many: 'sekcí' };
+
 
 /** Po zápisu editoru ať to vidí i widgety nad ním (Stav menu, Vyprodáno). */
 const obnovWidgety = () => { obnovDataWidgetu(URL_MENU); obnovDataWidgetu(URL_VYPRODANO); };
@@ -86,6 +88,7 @@ const obnovWidgety = () => { obnovDataWidgetu(URL_MENU); obnovDataWidgetu(URL_VY
 type Potvrzeni = { titulek: string; text: string; akce: string; onAno: () => void } | null;
 
 export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } = {}) {
+  const t = useT('sprava');
   // Tlačítka a pole podle `ma` (před načtením oprávnění a u staršího serveru
   // ANO — rozhoduje server), ne přísné useSmi widgetů: editor se nesmí
   // zamknout navždy jen proto, že /api/teams/mine oprávnění nepošle
@@ -154,7 +157,7 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
       setAktivni((a) => (a && list.some((b) => b.id === a) ? a : list[0]?.id ?? null));
       if (!list.length) setBoard(null);
     } catch {
-      setChyba('Menu se nepodařilo načíst.');
+      setChyba(t('Menu se nepodařilo načíst.'));
     } finally {
       setNacitam(false);
     }
@@ -226,18 +229,18 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
     try {
       const r = await fetch('/api/menu/pos', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'new', name: 'Nabídka z pokladny', slug: 'menu' }),
+        body: JSON.stringify({ mode: 'new', name: 'Nabídka z pokladny' /* i18n-ok (název nového menu je obsah podniku) */, slug: 'menu' }),
       });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) { setChyba(d?.error ?? 'Menu z pokladny se nepodařilo založit.'); return; }
+      if (!r.ok) { setChyba(d?.error ?? t('Menu z pokladny se nepodařilo založit.')); return; }
       await load();
       obnovWidgety();
       if (d?.board?.id) setAktivni(d.board.id);
-      hlas(`Menu je založené z kasy: ${d?.summary?.added ?? 0} položek v ${d?.summary?.newSections ?? 0} sekcích. Všechny se z objednávky vytisknou na terminálu.`);
+      hlas(t('Menu je založené z kasy: {n, plural, one {# položka} few {# položky} other {# položek}} v {s, plural, one {# sekci} few {# sekcích} other {# sekcích}}. Všechny se z objednávky vytisknou na terminálu.', { n: d?.summary?.added ?? 0, s: d?.summary?.newSections ?? 0 }));
       const zbylo = Number(d?.summary?.skippedFull) || 0;
-      if (zbylo > 0) setChyba(`${zbylo} položek se nevešlo: jedno menu unese nejvýš 40 sekcí a 100 položek v sekci. Zbytek přidej ručně, nebo si na něj založ druhé menu.`);
+      if (zbylo > 0) setChyba(t('{n, plural, one {# položka se nevešla} few {# položky se nevešly} other {# položek se nevešlo}}: jedno menu unese nejvýš 40 sekcí a 100 položek v sekci. Zbytek přidej ručně, nebo si na něj založ druhé menu.', { n: zbylo }));
     } catch {
-      setChyba('Spojení se serverem selhalo, menu se nezaložilo.');
+      setChyba(t('Spojení se serverem selhalo, menu se nezaložilo.'));
     } finally { setImportuji(''); }
   };
 
@@ -249,22 +252,22 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
       const r = await fetch(URL_MENU, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(prvni
-          ? { name: 'Venkovní akce', slug: 'akce', seed: true }
+          ? { name: 'Venkovní akce' /* i18n-ok (název nového menu je obsah podniku) */, slug: 'akce', seed: true }
           : { name: nazev, slug: nazev, seed: false }),
       });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) { setChyba(d?.error ?? 'Menu se nepodařilo založit.'); return; }
+      if (!r.ok) { setChyba(d?.error ?? t('Menu se nepodařilo založit.')); return; }
       setNoveMenu(null);
       await load();
       obnovWidgety();
       if (d?.board?.id) setAktivni(d.board.id);
       hlas(prvni
-        ? 'Menu je založené i s dnešní nabídkou.'
-        : `Menu „${d?.board?.name ?? nazev}“ je založené. Adresu má /menu-akce.html?menu=${d?.board?.slug ?? ''}`);
+        ? t('Menu je založené i s dnešní nabídkou.')
+        : t('Menu „{nazev}“ je založené. Adresu má {adresa}', { nazev: d?.board?.name ?? nazev, adresa: `/menu-akce.html?menu=${d?.board?.slug ?? ''}` }));
     } catch {
       // Bez tohohle by selhání sítě zmizelo beze stopy: tlačítko by se
       // odemklo a uživatel by netušil, že se nic neuložilo.
-      setChyba('Menu se nepodařilo založit — spojení se serverem selhalo. Zkus to prosím znovu.');
+      setChyba(t('Menu se nepodařilo založit — spojení se serverem selhalo. Zkus to prosím znovu.'));
     } finally { setUkladam(false); }
   };
 
@@ -273,13 +276,13 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
     setUkladam(true);
     try {
       const r = await fetch(`${URL_MENU}?id=${board.id}`, { method: 'DELETE' });
-      if (!r.ok) { setChyba('Menu se nepodařilo smazat.'); return; }
+      if (!r.ok) { setChyba(t('Menu se nepodařilo smazat.')); return; }
       setAktivni(null);
       await load();
       obnovWidgety();
-      hlas('Menu je smazané.');
+      hlas(t('Menu je smazané.'));
     } catch {
-      setChyba('Menu se nepodařilo smazat — spojení se serverem selhalo.');
+      setChyba(t('Menu se nepodařilo smazat — spojení se serverem selhalo.'));
     } finally { setUkladam(false); }
   };
 
@@ -302,23 +305,23 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
         if (r.status === 409 && d?.adresuDrziNase && !navic?.prevzitAdresu) {
           setUkladam(false);
           setPotvrzeni({
-            titulek: 'Převzít adresu?',
-            text: `${d.error} Menu „${d.drziNazev}“ dostane jinou adresu a hostům se od té chvíle bude na téhle adrese ukazovat tohle menu.`,
-            akce: 'Převzít adresu',
+            titulek: t('Převzít adresu?'),
+            text: t('{chyba} Menu „{nazev}“ dostane jinou adresu a hostům se od té chvíle bude na téhle adrese ukazovat tohle menu.', { chyba: d.error, nazev: d.drziNazev }),
+            akce: t('Převzít adresu'),
             onAno: () => { void ulozit({ ...navic, prevzitAdresu: true }); },
           });
           return;
         }
-        setChyba(d?.error ?? `Uložení se nepodařilo (odpověď serveru ${r.status}).`);
+        setChyba(d?.error ?? t('Uložení se nepodařilo (odpověď serveru {status}).', { status: r.status }));
         return;
       }
       setPin('');
       await load();
       obnovWidgety();
       setNeulozeno(false);
-      hlas('Uloženo. Na iPadu se to projeví do minuty, ručně obnovovat nemusíš.');
+      hlas(t('Uloženo. Na iPadu se to projeví do minuty, ručně obnovovat nemusíš.'));
     } catch {
-      setChyba('Uložení se nepodařilo — spojení se serverem selhalo. Změny máš pořád na obrazovce, zkus to znovu.');
+      setChyba(t('Uložení se nepodařilo — spojení se serverem selhalo. Změny máš pořád na obrazovce, zkus to znovu.'));
     } finally { setUkladam(false); }
   };
 
@@ -342,11 +345,11 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
         body: JSON.stringify({ id: board.id, castecne: true, pin: '' }),
       }).then(okJson);
       await load(true);
-      hlas('PIN je zrušený.');
+      hlas(t('PIN je zrušený.'));
     } catch {
       // Nezrušený PIN je bezpečnostní rozdíl, ne kosmetika: člověk si
       // myslí, že od stánku už nikdo označovat nemůže, a přitom může.
-      setChyba('PIN se nepodařilo zrušit — pořád platí. Zkus to prosím znovu.');
+      setChyba(t('PIN se nepodařilo zrušit — pořád platí. Zkus to prosím znovu.'));
     }
   };
 
@@ -373,7 +376,7 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ itemId: polozka.id, soldOut: nove }),
     }).catch(() => null);
-    if (!r?.ok) { zmen(!nove); setChyba('Vyprodáno se nepodařilo uložit.'); return; }
+    if (!r?.ok) { zmen(!nove); setChyba(t('Vyprodáno se nepodařilo uložit.')); return; }
     obnovWidgety();
   };
 
@@ -398,9 +401,9 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
     const kopie = JSON.parse(JSON.stringify(sekce.items[ii])) as Board['sections'][number]['items'][number];
     upravit((b) => { b.sections[si].items.splice(ii, 1); });
     setToast({
-      text: `${kopie.name || 'Položka'}: smazáno`, id: Date.now(),
+      text: t('{nazev}: smazáno', { nazev: kopie.name || t('Položka') }), id: Date.now(),
       akce: {
-        label: 'Vrátit',
+        label: t('Vrátit'),
         // Vracet jen do téže desky a sekce; po přepnutí menu by se položka vložila jinam.
         onClick: () => upravit((b) => {
           const cil = b.id === deskaId ? b.sections.find((x, i) => (sekce.id != null ? x.id === sekce.id : i === si)) : undefined;
@@ -434,17 +437,17 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
   /* Katalog se tahá jednou a drží — při psaní menu se do něj sahá často. */
   const nacistKatalog = useCallback(async (znovu = false) => {
     if (posProdukty && !znovu) return posProdukty;
-    setPosStav('Načítám katalog kasy…');
+    setPosStav(t('Načítám katalog kasy…'));
     try {
       const d = await fetch('/api/pos/products').then(okJson);
       setPosPripojena(!!d?.connected);
-      if (!d?.connected) { setPosProdukty([]); setPosStav('Pokladna Storyous není připojená. Položky se dají psát ručně, ale z objednávky se pak nevytisknou.'); return []; }
+      if (!d?.connected) { setPosProdukty([]); setPosStav(t('Pokladna Storyous není připojená. Položky se dají psát ručně, ale z objednávky se pak nevytisknou.')); return []; }
       const p: PosProduct[] = Array.isArray(d?.products) ? d.products : [];
       setPosProdukty(p);
-      setPosStav(p.length ? null : 'Katalog kasy je prázdný.');
+      setPosStav(p.length ? null : t('Katalog kasy je prázdný.'));
       return p;
     } catch {
-      setPosProdukty([]); setPosStav('Katalog kasy se nepodařilo načíst.');
+      setPosProdukty([]); setPosStav(t('Katalog kasy se nepodařilo načíst.'));
       return [];
     }
   }, [posProdukty]);
@@ -475,14 +478,14 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
     if (!cil) return;
     if (cil.ii == null) {
       upravit((b) => { b.sections[cil.si].items.push({ name: p.name, price: p.price ?? 0, soldOut: false, posProductId: p.productId }); });
-      if (p.price == null) hlas(`„${p.name}“ přidáno, ale kasa u něj nedala cenu — doplň ji ručně.`);
+      if (p.price == null) hlas(t('„{nazev}“ přidáno, ale kasa u něj nedala cenu — doplň ji ručně.', { nazev: p.name }));
     } else {
       upravit((b) => {
         const it = b.sections[cil.si].items[cil.ii as number];
         it.posProductId = p.productId;
         if (!it.price && p.price != null) it.price = p.price;
       });
-      hlas(`Položka je navázaná na „${p.name}“ z kasy — od teď se z objednávky vytiskne.`);
+      hlas(t('Položka je navázaná na „{nazev}“ z kasy — od teď se z objednávky vytiskne.', { nazev: p.name }));
       setPosOtevreno(null);
     }
   };
@@ -491,7 +494,7 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
      databáze, takže rozdělaná editace se musí nejdřív uložit. */
   const zPokladny = async (mode: 'fill' | 'match', refresh = false) => {
     if (!board) return;
-    if (neulozeno) { setChyba('Nejdřív ulož rozdělané změny, ať se import nepotká s nimi.'); return; }
+    if (neulozeno) { setChyba(t('Nejdřív ulož rozdělané změny, ať se import nepotká s nimi.')); return; }
     setImportuji(mode); setChyba(null);
     try {
       const r = await fetch('/api/menu/pos', {
@@ -506,19 +509,21 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
       const su = d?.summary ?? {};
       if (mode === 'match') {
         hlas(su.matched
-          ? `Spárováno ${czCount(Number(su.matched), POLOZKA)}${su.left ? `, bez páru zůstává ${su.left}` : ', všechno sedí'}.${su.ambiguous?.length ? ` Nejednoznačné (v kase je víc produktů stejného jména): ${su.ambiguous.slice(0, 5).join(', ')}.` : ''}`
-          : `Podle názvu se nepovedlo spárovat nic. ${su.left ? `Bez páru zůstává ${czCount(Number(su.left), POLOZKA)} — dopáruj je tlačítkem u položky.` : ''}`);
+          ? `${su.left ? t('Spárováno {n, plural, one {# položka} few {# položky} other {# položek}}, bez páru zůstává {zbyva}.', { n: Number(su.matched), zbyva: su.left }) : t('Spárováno {n, plural, one {# položka} few {# položky} other {# položek}}, všechno sedí.', { n: Number(su.matched) })}${su.ambiguous?.length ? ` ${t('Nejednoznačné (v kase je víc produktů stejného jména): {seznam}.', { seznam: su.ambiguous.slice(0, 5).join(', ') })}` : ''}`
+          : `${t('Podle názvu se nepovedlo spárovat nic.')} ${su.left ? t('Bez páru zůstává {n, plural, one {# položka} few {# položky} other {# položek}} — dopáruj je tlačítkem u položky.', { n: Number(su.left) }) : ''}`);
       } else {
         const zbylo = Number(su.skippedFull) || 0;
         hlas(su.added
-          ? `Z kasy přibylo ${czCount(Number(su.added), POLOZKA)}${su.newSections ? ` v ${su.newSections} nových sekcích` : ''}. Přeskládej si je, jak chceš — vazba na kasu drží u položky.`
-          : 'Z kasy už je v menu všechno, co tam patří.');
+          ? (su.newSections
+            ? t('Z kasy přibylo {n, plural, one {# položka} few {# položky} other {# položek}} v {s} nových sekcích. Přeskládej si je, jak chceš — vazba na kasu drží u položky.', { n: Number(su.added), s: su.newSections })
+            : t('Z kasy přibylo {n, plural, one {# položka} few {# položky} other {# položek}}. Přeskládej si je, jak chceš — vazba na kasu drží u položky.', { n: Number(su.added) }))
+          : t('Z kasy už je v menu všechno, co tam patří.'));
         if (zbylo > 0) {
-          setChyba(`${zbylo} položek se do tohohle menu nevešlo: jedno menu unese nejvýš 40 sekcí a 100 položek v sekci, a kasa má kategorií víc. Zbytek přidej do sekcí ručně tlačítkem „Z pokladny“, nebo si na něj založ druhé menu.`);
+          setChyba(t('{n, plural, one {# položka se do tohohle menu nevešla} few {# položky se do tohohle menu nevešly} other {# položek se do tohohle menu nevešlo}}: jedno menu unese nejvýš 40 sekcí a 100 položek v sekci, a kasa má kategorií víc. Zbytek přidej do sekcí ručně tlačítkem „Z pokladny“, nebo si na něj založ druhé menu.', { n: zbylo }));
         }
       }
     } catch {
-      setChyba('Spojení se serverem selhalo, z pokladny se nic nenačetlo.');
+      setChyba(t('Spojení se serverem selhalo, z pokladny se nic nenačetlo.'));
     } finally { setImportuji(''); }
   };
 
@@ -551,25 +556,26 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
   } else if (neniMigrace) {
     nastroj = (
       <Card>
-        <EmptyState compact icon="warning" title="Tabulky pro menu ještě nejsou v databázi"
-          hint="Otevři jednou /api/init a vrať se sem." />
+        <EmptyState compact icon="warning" title={t('Tabulky pro menu ještě nejsou v databázi')}
+          hint={t('Otevři jednou /api/init a vrať se sem.')} />
       </Card>
     );
   } else if (!board) {
     nastroj = (
       <Card>
-        <EmptyState icon="clipboard" title="Zatím žádné menu"
-          hint="To, co visí na iPadu před podnikem a co si host otevře v mobilu přes QR kód."
+        <EmptyState icon="clipboard" title={t('Zatím žádné menu')}
+          hint={t('To, co visí na iPadu před podnikem a co si host otevře v mobilu přes QR kód.')}
           action={smiUpravit ? (
             <div className="flex flex-col sm:flex-row flex-wrap justify-center gap-2">
               {posPripojena && (
-                <Button variant="accent" loading={importuji === 'new'} disabled={ukladam} onClick={zalozitZPokladny}>Založit menu z pokladny</Button>
+                <Button variant="accent" loading={importuji === 'new'} disabled={ukladam} onClick={zalozitZPokladny}>{t('Založit menu z pokladny')}</Button>
               )}
               <Button variant={posPripojena ? 'secondary' : 'accent'} loading={ukladam} disabled={!!importuji} onClick={() => zalozit(null)}>
-                Založit menu z dnešní nabídky
+                
+                {t('Založit menu z dnešní nabídky')}
               </Button>
               {jinePodniky.length > 0 && (
-                <Button variant="ghost" icon="copy" disabled={ukladam || !!importuji} onClick={() => setKopieOpen(true)}>Zkopírovat z jiného podniku</Button>
+                <Button variant="ghost" icon="copy" disabled={ukladam || !!importuji} onClick={() => setKopieOpen(true)}>{t('Zkopírovat z jiného podniku')}</Button>
               )}
             </div>
           ) : undefined} />
@@ -577,13 +583,15 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
             nepovedené načtení ostatních podniků nesmí tvářit jako „žádné nejsou". */}
         {chybaPodniku && (
           <p className="t-meta text-center mt-2">
-            Nepodařilo se zjistit, jestli jde menu zkopírovat z jiného podniku.{' '}
-            <Button variant="ghost" size="sm" onClick={znovuPodniky}>Zkusit znovu</Button>
+            
+            {t('Nepodařilo se zjistit, jestli jde menu zkopírovat z jiného podniku.')}{' '}
+            <Button variant="ghost" size="sm" onClick={znovuPodniky}>{t('Zkusit znovu')}</Button>
           </p>
         )}
         {posPripojena && (
           <p className="t-meta text-center mt-2 text-pretty">
-            Z pokladny přijdou položky i s cenami a rozdělením do sekcí, jak je máte ve Storyous — a rovnou navázané, takže se objednávka od stolu vytiskne na terminálu.
+            
+            {t('Z pokladny přijdou položky i s cenami a rozdělením do sekcí, jak je máte ve Storyous — a rovnou navázané, takže se objednávka od stolu vytiskne na terminálu.')}
           </p>
         )}
         {chyba && <p className="note note-danger mt-3" role="alert">{chyba}</p>}
@@ -594,7 +602,7 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
        takže se ukazuje celá adresa i s doménou. */
     const cesta = `/menu-akce.html?menu=${board.slug}`;
     const adresa = typeof window === 'undefined' ? cesta : window.location.origin + cesta;
-    const t = normalizeMenuTheme(board.theme);
+    const tema = normalizeMenuTheme(board.theme);
     const setT = (fn: (x: MenuTheme) => void) =>
       upravit((b) => { const kop = normalizeMenuTheme(b.theme); fn(kop); b.theme = kop; });
     const zamceno = !smiUpravit;
@@ -605,15 +613,15 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
       <div className="space-y-4">
         <Card className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="t-card flex items-center gap-2"><Icon name="clipboard" size={17} className="shrink-0 text-black/40" />{boards.length > 1 ? 'Tvoje menu' : board.name}</h2>
+            <h2 className="t-card flex items-center gap-2"><Icon name="clipboard" size={17} className="shrink-0 text-black/40" />{boards.length > 1 ? t('Tvoje menu') : board.name}</h2>
             {smiUpravit && (
               <div className="flex flex-wrap gap-2">
-                <Button variant="secondary" size="sm" icon="plus" disabled={ukladam} onClick={() => setNoveMenu('')}>Nové menu</Button>
+                <Button variant="secondary" size="sm" icon="plus" disabled={ukladam} onClick={() => setNoveMenu('')}>{t('Nové menu')}</Button>
                 {/* Při neuložených změnách ne: obnova seznamu po kopii by rozpracovanou
                     desku přepsala tím, co je v databázi. */}
                 {jinePodniky.length > 0 && (
                   <Button variant="ghost" size="sm" icon="copy" disabled={ukladam || neulozeno}
-                    title={neulozeno ? 'Nejdřív ulož rozdělané změny' : undefined} onClick={() => setKopieOpen(true)}>Z jiného podniku</Button>
+                    title={neulozeno ? t('Nejdřív ulož rozdělané změny') : undefined} onClick={() => setKopieOpen(true)}>{t('Z jiného podniku')}</Button>
                 )}
               </div>
             )}
@@ -621,37 +629,37 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
 
           {/* Víc menu = přepínač nahoře. Stav zapnuto/vypnuto nese Stav menu nad editorem a adresa níž. */}
           {boards.length > 1 && (
-            <Segmented ariaLabel="Menu k úpravě" value={String(aktivni ?? '')}
+            <Segmented ariaLabel={t('Menu k úpravě')} value={String(aktivni ?? '')}
               options={boards.map(b => ({ id: String(b.id), label: b.name }))}
               onChange={id => {
                 if (neulozeno) {
-                  setPotvrzeni({ titulek: 'Zahodit neuložené změny?', text: `V menu „${board.name}“ máš neuložené změny. Přepnutím na jiné menu se zahodí.`, akce: 'Zahodit a přepnout', onAno: () => setAktivni(Number(id)) });
+                  setPotvrzeni({ titulek: t('Zahodit neuložené změny?'), text: t('V menu „{nazev}“ máš neuložené změny. Přepnutím na jiné menu se zahodí.', { nazev: board.name }), akce: t('Zahodit a přepnout'), onAno: () => setAktivni(Number(id)) });
                 } else setAktivni(Number(id));
               }} />
           )}
           <p className="t-meta">
-            {czCount(board.sections.length, SEKCE)} · {czCount(vazby.celkem, POLOZKA)}
-            {' · '}{board.enabled ? 'zapnuté' : 'vypnuté'}
+            {t('{n, plural, one {# sekce} few {# sekce} other {# sekcí}}', { n: board.sections.length })} · {t('{n, plural, one {# položka} few {# položky} other {# položek}}', { n: vazby.celkem })}
+            {' · '}{board.enabled ? t('zapnuté') : t('vypnuté')}
           </p>
 
           <Well className="space-y-2">
-            <p className="t-label">Adresa pro iPad a pro hosty</p>
+            <p className="t-label">{t('Adresa pro iPad a pro hosty')}</p>
             <div className="flex items-center gap-2 flex-wrap min-w-0">
               <code className="text-sm font-mono text-[#16181A] break-all min-w-0">{adresa}</code>
               <a href={cesta} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">
-                <Icon name="external" size={15} className="shrink-0" />Otevřít
+                <Icon name="external" size={15} className="shrink-0" />{t('Otevřít')}
               </a>
             </div>
 
-            {zive === 'ok' && <p className="t-meta">Na téhle adrese se hostům ukazuje tohle menu. Úpravy se na iPadu projeví do minuty.</p>}
-            {zive === 'ceka' && <p className="t-meta">Kontroluju adresu…</p>}
-            {zive === 'neznamo' && <p className="t-meta">Adresu se teď nepodařilo ověřit — zkontroluj připojení.</p>}
-            {zive === 'vypnuto' && <p className="text-[13px] text-wait-ink">Menu je vypnuté, takže se hostům neukazuje.</p>}
+            {zive === 'ok' && <p className="t-meta">{t('Na téhle adrese se hostům ukazuje tohle menu. Úpravy se na iPadu projeví do minuty.')}</p>}
+            {zive === 'ceka' && <p className="t-meta">{t('Kontroluju adresu…')}</p>}
+            {zive === 'neznamo' && <p className="t-meta">{t('Adresu se teď nepodařilo ověřit — zkontroluj připojení.')}</p>}
+            {zive === 'vypnuto' && <p className="text-[13px] text-wait-ink">{t('Menu je vypnuté, takže se hostům neukazuje.')}</p>}
             {zive === 'chybi' && (
               <p className="text-[13px] text-wait-ink">
                 {ulozenySlug === VYCHOZI_SLUG
-                  ? 'Pozor: server na téhle adrese žádné menu nevydává, takže iPad ukazuje záložní nabídku.'
-                  : 'Pozor: iPad otevřený bez parametru bere menu s adresou „akce“, a to tohle menu není — proto se tvoje úpravy hostům neukazují.'}
+                  ? t('Pozor: server na téhle adrese žádné menu nevydává, takže iPad ukazuje záložní nabídku.')
+                  : t('Pozor: iPad otevřený bez parametru bere menu s adresou „akce“, a to tohle menu není — proto se tvoje úpravy hostům neukazují.')}
               </p>
             )}
 
@@ -665,42 +673,42 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
                 {/* Vypnuté menu se má zapnout, ne mu přepisovat adresu — u druhého
                     menu s vlastní adresou by mu ji přepis vzal. */}
                 {zive === 'vypnuto' ? (
-                  <Button variant="primary" size="sm" loading={ukladam} onClick={() => zverejnit({ enabled: true })}>Zapnout menu pro hosty</Button>
+                  <Button variant="primary" size="sm" loading={ukladam} onClick={() => zverejnit({ enabled: true })}>{t('Zapnout menu pro hosty')}</Button>
                 ) : ulozenySlug !== VYCHOZI_SLUG ? (
-                  <Button variant="primary" size="sm" loading={ukladam} onClick={() => zverejnit({ slug: VYCHOZI_SLUG })}>Nastavit jako menu pro iPad</Button>
+                  <Button variant="primary" size="sm" loading={ukladam} onClick={() => zverejnit({ slug: VYCHOZI_SLUG })}>{t('Nastavit jako menu pro iPad')}</Button>
                 ) : (
-                  <Button variant="primary" size="sm" loading={ukladam} onClick={() => zverejnit({ slug: VYCHOZI_SLUG, enabled: true })}>Zveřejnit znovu</Button>
+                  <Button variant="primary" size="sm" loading={ukladam} onClick={() => zverejnit({ slug: VYCHOZI_SLUG, enabled: true })}>{t('Zveřejnit znovu')}</Button>
                 )}
               </div>
             )}
           </Well>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field id={`${uid}-nazev`} label="Název menu (jen pro vás)">
+            <Field id={`${uid}-nazev`} label={t('Název menu (jen pro vás)')}>
               <Input id={`${uid}-nazev`} value={board.name} maxLength={80} disabled={zamceno}
                 onChange={(e) => upravit((b) => { b.name = e.target.value; })} />
             </Field>
-            <Field id={`${uid}-adresa`} label="Adresa" hint="Bez diakritiky a mezer. Když ji změníš, přestane platit starý QR kód.">
+            <Field id={`${uid}-adresa`} label={t('Adresa')} hint={t('Bez diakritiky a mezer. Když ji změníš, přestane platit starý QR kód.')}>
               <Input id={`${uid}-adresa`} value={board.slug} maxLength={40} disabled={zamceno || !smiZverejnit}
                 onChange={(e) => upravit((b) => { b.slug = e.target.value; })} />
             </Field>
-            <Field id={`${uid}-titul`} label="Nadpis">
+            <Field id={`${uid}-titul`} label={t('Nadpis')}>
               <Input id={`${uid}-titul`} value={board.title ?? ''} maxLength={80} disabled={zamceno}
                 onChange={(e) => upravit((b) => { b.title = e.target.value; })} />
             </Field>
-            <Field id={`${uid}-nad`} label="Popisek nad nadpisem">
+            <Field id={`${uid}-nad`} label={t('Popisek nad nadpisem')}>
               <Input id={`${uid}-nad`} value={board.eyebrow ?? ''} maxLength={80} disabled={zamceno}
                 onChange={(e) => upravit((b) => { b.eyebrow = e.target.value; })} />
             </Field>
-            <Field id={`${uid}-ssid`} label="Wi-Fi — síť">
+            <Field id={`${uid}-ssid`} label={t('Wi-Fi — síť')}>
               <Input id={`${uid}-ssid`} value={board.wifiSsid ?? ''} maxLength={80} disabled={zamceno}
                 onChange={(e) => upravit((b) => { b.wifiSsid = e.target.value; })} />
             </Field>
-            <Field id={`${uid}-heslo`} label="Wi-Fi — heslo">
+            <Field id={`${uid}-heslo`} label={t('Wi-Fi — heslo')}>
               <Input id={`${uid}-heslo`} value={board.wifiPassword ?? ''} maxLength={80} disabled={zamceno}
                 onChange={(e) => upravit((b) => { b.wifiPassword = e.target.value; })} />
             </Field>
-            <Field id={`${uid}-pozn`} label="Poznámka v patičce" className="sm:col-span-2">
+            <Field id={`${uid}-pozn`} label={t('Poznámka v patičce')} className="sm:col-span-2">
               <Input id={`${uid}-pozn`} value={board.note ?? ''} maxLength={200} disabled={zamceno}
                 onChange={(e) => upravit((b) => { b.note = e.target.value; })} />
             </Field>
@@ -709,20 +717,20 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
           {smiZverejnit && (
             <>
               <ul className="list">
-                <SwitchRow title="Menu je veřejně dostupné" hint="Vypnuté menu hosté na iPadu ani v mobilu neuvidí. Uloží se tlačítkem dole."
+                <SwitchRow title={t('Menu je veřejně dostupné')} hint={t('Vypnuté menu hosté na iPadu ani v mobilu neuvidí. Uloží se tlačítkem dole.')}
                   checked={board.enabled} disabled={zamceno} onChange={(v) => upravit((b) => { b.enabled = v; })} />
               </ul>
               <div className="grid gap-3 sm:grid-cols-2 items-end">
-                <Field id={`${uid}-pin`} label={`PIN pro označování vyprodaného od stánku${board.hasPin ? ' (nastavený)' : ''}`}
-                  hint="Na iPadu se zadá jednou a zapamatuje se. Bez PINu jde vyprodáno přepínat jen tady.">
-                  <Input id={`${uid}-pin`} value={pin} inputMode="numeric" placeholder={board.hasPin ? '••••' : '4 až 8 číslic'} disabled={zamceno}
+                <Field id={`${uid}-pin`} label={board.hasPin ? t('PIN pro označování vyprodaného od stánku (nastavený)') : t('PIN pro označování vyprodaného od stánku')}
+                  hint={t('Na iPadu se zadá jednou a zapamatuje se. Bez PINu jde vyprodáno přepínat jen tady.')}>
+                  <Input id={`${uid}-pin`} value={pin} inputMode="numeric" placeholder={board.hasPin ? '••••' : t('4 až 8 číslic')} disabled={zamceno}
                     onChange={(e) => { setPin(e.target.value.replace(/\D/g, '').slice(0, 8)); setNeulozeno(true); }} />
                 </Field>
                 {board.hasPin && (
                   <div className="pb-6">
                     <Button variant="ghost" size="sm" onClick={() => setPotvrzeni({
-                      titulek: 'Zrušit PIN?', text: 'Od stánku pak nepůjde označovat vyprodané položky.', akce: 'Zrušit PIN', onAno: () => { void zrusitPin(); },
-                    })}>Zrušit PIN</Button>
+                      titulek: t('Zrušit PIN?'), text: t('Od stánku pak nepůjde označovat vyprodané položky.'), akce: t('Zrušit PIN'), onAno: () => { void zrusitPin(); },
+                    })}>{t('Zrušit PIN')}</Button>
                   </div>
                 )}
               </div>
@@ -743,19 +751,19 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
         <Card className="space-y-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h2 className="t-card">Vzhled menu</h2>
-              <p className="t-meta">Barvy, logo, písma a prvky na pozadí. Platí jen pro tohle menu.</p>
+              <h2 className="t-card">{t('Vzhled menu')}</h2>
+              <p className="t-meta">{t('Barvy, logo, písma a prvky na pozadí. Platí jen pro tohle menu.')}</p>
             </div>
             <Button variant="secondary" size="sm" iconAfter="chevron" aria-expanded={vzhledOtevren} aria-controls={`${uid}-vzhled`}
               className={`shrink-0 ${vzhledOtevren ? '[&>svg:last-child]:rotate-180' : ''}`} onClick={() => setVzhledOtevren((v) => !v)}>
-              {vzhledOtevren ? 'Skrýt vzhled' : 'Upravit vzhled'}
+              {vzhledOtevren ? t('Skrýt vzhled') : t('Upravit vzhled')}
             </Button>
           </div>
 
           {vzhledOtevren && (
             <div id={`${uid}-vzhled`} className="space-y-5">
               {!zamceno && (
-                <div className="flex flex-wrap gap-2" role="group" aria-label="Předlohy vzhledu">
+                <div className="flex flex-wrap gap-2" role="group" aria-label={t('Předlohy vzhledu')}>
                   {PREDLOHY.map((p) => (
                     <Button key={p.id} variant="secondary" size="sm"
                       onClick={() => setT((x) => { x.den = { ...p.theme.den }; x.noc = { ...p.theme.noc }; })}>
@@ -772,9 +780,9 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
               <div className="grid gap-4 sm:grid-cols-2">
                 {(['den', 'noc'] as const).map(rezim => (
                   <div key={rezim} className="space-y-2" role="group" aria-labelledby={`${uid}-${rezim}`}>
-                    <p id={`${uid}-${rezim}`} className="t-label">{rezim === 'den' ? 'Den' : 'Noc'}</p>
-                    {([['bg', 'Pozadí'], ['fg', 'Text'], ['fgSoft', 'Tlumený text'], ['accent', 'Nadpisy a ceny']] as const).map(([klic, popis]) => (
-                      <Barva key={klic} id={`${uid}-${rezim}-${klic}`} popis={popis} hodnota={t[rezim][klic]} zamceno={zamceno}
+                    <p id={`${uid}-${rezim}`} className="t-label">{rezim === 'den' ? t('Den') : t('Noc')}</p>
+                    {([['bg', t('Pozadí')], ['fg', t('Text')], ['fgSoft', t('Tlumený text')], ['accent', t('Nadpisy a ceny')]] as const).map(([klic, popis]) => (
+                      <Barva key={klic} id={`${uid}-${rezim}-${klic}`} popis={popis} hodnota={tema[rezim][klic]} zamceno={zamceno}
                         zmen={(v) => setT((x) => { x[rezim][klic] = v; })} />
                     ))}
                   </div>
@@ -782,43 +790,43 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                <Field id={`${uid}-logo`} label="Logo (odkaz na obrázek)" hint="Prázdné = logo Managero ve stránce.">
-                  <Input id={`${uid}-logo`} value={t.logo.url} maxLength={2000} disabled={zamceno}
+                <Field id={`${uid}-logo`} label={t('Logo (odkaz na obrázek)')} hint={t('Prázdné = logo Managero ve stránce.')}>
+                  <Input id={`${uid}-logo`} value={tema.logo.url} maxLength={2000} disabled={zamceno}
                     onChange={(e) => setT((x) => { x.logo.url = e.target.value; })} />
                 </Field>
-                <Field id={`${uid}-logor`} label="Jak logo vykreslit">
-                  <Select id={`${uid}-logor`} value={t.logo.rezim} disabled={zamceno}
+                <Field id={`${uid}-logor`} label={t('Jak logo vykreslit')}>
+                  <Select id={`${uid}-logor`} value={tema.logo.rezim} disabled={zamceno}
                     onChange={(e) => setT((x) => { x.logo.rezim = e.target.value === 'obrazek' ? 'obrazek' : 'maska'; })}>
-                    <option value="maska">Obarvit barvou nadpisů (jednobarevné logo)</option>
-                    <option value="obrazek">Vložit tak, jak je (vícebarevné logo)</option>
+                    <option value="maska">{t('Obarvit barvou nadpisů (jednobarevné logo)')}</option>
+                    <option value="obrazek">{t('Vložit tak, jak je (vícebarevné logo)')}</option>
                   </Select>
                 </Field>
-                <Field id={`${uid}-pn`} label="Písmo nadpisů">
-                  <Select id={`${uid}-pn`} value={t.pismo.nadpisy} disabled={zamceno} onChange={(e) => setT((x) => { x.pismo.nadpisy = e.target.value; })}>
+                <Field id={`${uid}-pn`} label={t('Písmo nadpisů')}>
+                  <Select id={`${uid}-pn`} value={tema.pismo.nadpisy} disabled={zamceno} onChange={(e) => setT((x) => { x.pismo.nadpisy = e.target.value; })}>
                     {PISMA.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
                   </Select>
                 </Field>
-                <Field id={`${uid}-pt`} label="Písmo textu">
-                  <Select id={`${uid}-pt`} value={t.pismo.text} disabled={zamceno} onChange={(e) => setT((x) => { x.pismo.text = e.target.value; })}>
+                <Field id={`${uid}-pt`} label={t('Písmo textu')}>
+                  <Select id={`${uid}-pt`} value={tema.pismo.text} disabled={zamceno} onChange={(e) => setT((x) => { x.pismo.text = e.target.value; })}>
                     {PISMA.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
                   </Select>
                 </Field>
-                <Field id={`${uid}-poz`} label="Prvky na pozadí">
-                  <Select id={`${uid}-poz`} value={t.pozadi.druh} disabled={zamceno} onChange={(e) => setT((x) => { x.pozadi.druh = e.target.value as any; })}>
-                    <option value="listy">Listy (kresba Pangey)</option>
-                    <option value="zadne">Žádné</option>
-                    <option value="vlastni">Vlastní obrázek</option>
+                <Field id={`${uid}-poz`} label={t('Prvky na pozadí')}>
+                  <Select id={`${uid}-poz`} value={tema.pozadi.druh} disabled={zamceno} onChange={(e) => setT((x) => { x.pozadi.druh = e.target.value as any; })}>
+                    <option value="listy">{t('Listy (kresba Pangey)')}</option>
+                    <option value="zadne">{t('Žádné')}</option>
+                    <option value="vlastni">{t('Vlastní obrázek')}</option>
                   </Select>
                 </Field>
-                <Field id={`${uid}-sila`} label={`Síla prvků: ${t.pozadi.sila} %`}>
-                  <input id={`${uid}-sila`} type="range" min={0} max={20} step={0.5} value={t.pozadi.sila} disabled={zamceno}
+                <Field id={`${uid}-sila`} label={t('Síla prvků: {n} %', { n: tema.pozadi.sila })}>
+                  <input id={`${uid}-sila`} type="range" min={0} max={20} step={0.5} value={tema.pozadi.sila} disabled={zamceno}
                     className="w-full accent-[#16181A] tap-target-sm"
                     onChange={(e) => setT((x) => { x.pozadi.sila = Number(e.target.value); })} />
                 </Field>
-                {t.pozadi.druh === 'vlastni' && (
-                  <Field id={`${uid}-pozurl`} label="Obrázek na pozadí" className="sm:col-span-2"
-                    hint="Jednobarevná kresba na průhledném pozadí. Obarví se podle textu, takže drží v obou režimech.">
-                    <Input id={`${uid}-pozurl`} value={t.pozadi.url} maxLength={2000} placeholder="https://…" disabled={zamceno}
+                {tema.pozadi.druh === 'vlastni' && (
+                  <Field id={`${uid}-pozurl`} label={t('Obrázek na pozadí')} className="sm:col-span-2"
+                    hint={t('Jednobarevná kresba na průhledném pozadí. Obarví se podle textu, takže drží v obou režimech.')}>
+                    <Input id={`${uid}-pozurl`} value={tema.pozadi.url} maxLength={2000} placeholder="https://…" disabled={zamceno}
                       onChange={(e) => setT((x) => { x.pozadi.url = e.target.value; })} />
                   </Field>
                 )}
@@ -828,9 +836,10 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
                 <div className="flex items-center gap-3 flex-wrap">
                   <Button variant="ghost" size="sm" icon="undo"
                     onClick={() => setT((x) => { Object.assign(x, JSON.parse(JSON.stringify(VYCHOZI_THEME))); })}>
-                    Vrátit původní vzhled
+                    
+                    {t('Vrátit původní vzhled')}
                   </Button>
-                  <span className="t-meta">Vzhled se uloží spolu se zbytkem menu tlačítkem dole.</span>
+                  <span className="t-meta">{t('Vzhled se uloží spolu se zbytkem menu tlačítkem dole.')}</span>
                 </div>
               )}
             </div>
@@ -845,16 +854,16 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
             <div className="flex items-start gap-3">
               <div className="min-w-0 flex-1">
                 <h2 className="t-card flex items-center gap-2">
-                  <Icon name="receipt" size={17} className="text-black/40 shrink-0" />Tisk na terminálu
+                  <Icon name="receipt" size={17} className="text-black/40 shrink-0" />{t('Tisk na terminálu')}
                 </h2>
                 {vazby.celkem === 0 ? (
-                  <p className="t-meta mt-1">Menu je zatím prázdné. Nejrychlejší je natáhnout ho z pokladny — přijde i s cenami a rozdělením do sekcí, jak to máte ve Storyous.</p>
+                  <p className="t-meta mt-1">{t('Menu je zatím prázdné. Nejrychlejší je natáhnout ho z pokladny — přijde i s cenami a rozdělením do sekcí, jak to máte ve Storyous.')}</p>
                 ) : vazby.chybi === 0 ? (
-                  <p className="text-sm text-ok-ink mt-1">Všech {vazby.celkem} položek má produkt v kase. Co si host objedná, vyjede na terminálu.</p>
+                  <p className="text-sm text-ok-ink mt-1">{t('Všech {n} položek má produkt v kase. Co si host objedná, vyjede na terminálu.', { n: vazby.celkem })}</p>
                 ) : (
                   <p className="text-sm text-black/60 mt-1">
-                    <strong className="font-semibold text-[#16181A] tabular-nums">{vazby.spojene} z {vazby.celkem}</strong> položek se z objednávky vytiskne na terminálu.
-                    Zbylých {vazby.chybi} je pro pokladnu jen text — objednávka s nimi zůstane jen tady u nás.
+                    {sUzlem(t('{spojene} položek se z objednávky vytiskne na terminálu.', { spojene: VLOZ }), <strong className="font-semibold text-[#16181A] tabular-nums">{t('{n} z {celkem}', { n: vazby.spojene, celkem: vazby.celkem })}</strong>)}{' '}
+                    {t('Zbylých {n} je pro pokladnu jen text — objednávka s nimi zůstane jen tady u nás.', { n: vazby.chybi })}
                   </p>
                 )}
               </div>
@@ -868,20 +877,20 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
             {smiUpravit && (
               <div className="flex flex-wrap gap-2">
                 <Button variant="primary" size="sm" loading={importuji === 'fill'} disabled={!!importuji} onClick={() => zPokladny('fill')}>
-                  {vazby.celkem === 0 ? 'Natáhnout menu z pokladny' : 'Doplnit, co v menu chybí'}
+                  {vazby.celkem === 0 ? t('Natáhnout menu z pokladny') : t('Doplnit, co v menu chybí')}
                 </Button>
                 {vazby.chybi > 0 && (
-                  <Button variant="secondary" size="sm" loading={importuji === 'match'} disabled={!!importuji} onClick={() => zPokladny('match')}>Spárovat podle názvu</Button>
+                  <Button variant="secondary" size="sm" loading={importuji === 'match'} disabled={!!importuji} onClick={() => zPokladny('match')}>{t('Spárovat podle názvu')}</Button>
                 )}
-                <Button variant="ghost" size="sm" icon="refresh" disabled={!!importuji} onClick={() => zPokladny('fill', true)}>Načíst katalog kasy znovu</Button>
+                <Button variant="ghost" size="sm" icon="refresh" disabled={!!importuji} onClick={() => zPokladny('fill', true)}>{t('Načíst katalog kasy znovu')}</Button>
               </div>
             )}
             {objednavaciSlug != null && objednavaciSlug !== '' && board.slug !== objednavaciSlug && (
               <p className="note note-wait">
-                Pozor: hosté objednávají z menu s adresou <strong>{objednavaciSlug}</strong>, ne z tohohle. Párování tady se do objednávek nepropíše — přepni na to správné menu, nebo ho podniku nastav v Klientu → Nastavení.
+                {sUzlem(t('Pozor: hosté objednávají z menu s adresou {slug}, ne z tohohle. Párování tady se do objednávek nepropíše — přepni na to správné menu, nebo ho podniku nastav v Klientu → Nastavení.', { slug: VLOZ }), <strong>{objednavaciSlug}</strong>)}
               </p>
             )}
-            <p className="t-meta">Sekce si pak přeskládej, jak chceš — vazba na kasu drží u položky, ne u sekce. Položka s vazbou má u sebe štítek „Tiskne se na kase".</p>
+            <p className="t-meta">{t('Sekce si pak přeskládej, jak chceš — vazba na kasu drží u položky, ne u sekce. Položka s vazbou má u sebe štítek „Tiskne se na kase".')}</p>
           </Card>
         )}
 
@@ -891,7 +900,7 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
           const s = vse.filter(i => (i.allergens?.length ?? 0) > 0).length;
           return s > 0 && s < vse.length ? (
             <p className="note note-info" role="status">
-              Alergeny jsou vyplněné u {s} z {czCount(vse.length, POLOZKA)}. U ostatních host nic neuvidí, jen pod lístkem větu, ať se zeptá obsluhy.
+              {t('Alergeny jsou vyplněné u {s} z {n, plural, one {# položka} few {# položky} other {# položek}}. U ostatních host nic neuvidí, jen pod lístkem větu, ať se zeptá obsluhy.', { s, n: vse.length })}
             </p>
           ) : null;
         })()}
@@ -899,26 +908,26 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
         {editace ? (
           <PrekladListku deska={board as any} jazyk={editace} upravit={upravit as any} zamceno={zamceno} uid={uid} />
         ) : board.sections.map((s, si) => (
-          <Card key={s.id ?? `nova-${si}`} as="section" aria-label={`Sekce ${s.title || si + 1}`} className="space-y-3">
+          <Card key={s.id ?? `nova-${si}`} as="section" aria-label={t('Sekce {nazev}', { nazev: s.title || si + 1 })} className="space-y-3">
             <div className="flex items-center gap-2 flex-wrap">
-              <Input aria-label="Název sekce menu" className="flex-1 min-w-[8rem] font-semibold" value={s.title} maxLength={80} disabled={zamceno}
+              <Input aria-label={t('Název sekce menu')} className="flex-1 min-w-[8rem] font-semibold" value={s.title} maxLength={80} disabled={zamceno}
                 onChange={(e) => upravit((b) => { b.sections[si].title = e.target.value; })} />
-              <Select value={s.column} aria-label={`Sloupec sekce ${s.title}`} className="!w-auto" disabled={zamceno}
+              <Select value={s.column} aria-label={t('Sloupec sekce {nazev}', { nazev: s.title })} className="!w-auto" disabled={zamceno}
                 onChange={(e) => upravit((b) => { b.sections[si].column = Number(e.target.value) === 2 ? 2 : 1; })}>
-                <option value={1}>Vlevo</option>
-                <option value={2}>Vpravo</option>
+                <option value={1}>{t('Vlevo')}</option>
+                <option value={2}>{t('Vpravo')}</option>
               </Select>
               {!zamceno && (
                 // Cíle 44 px (tap-target) a mezi 36px tlačítky 8 px, ať se jejich plochy
                 // nepřekrývají; koš ještě o kus dál, aby palec mířící na „níž" netrefil smazání.
                 <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="sm" iconOnly icon="chevron" className="tap-target [&>svg]:rotate-180" aria-label={`Posunout sekci ${s.title} výš`}
+                  <Button variant="ghost" size="sm" iconOnly icon="chevron" className="tap-target [&>svg]:rotate-180" aria-label={t('Posunout sekci {nazev} výš', { nazev: s.title })}
                     disabled={si === 0} onClick={() => upravit((b) => posun(b.sections, si, -1))} />
-                  <Button variant="ghost" size="sm" iconOnly icon="chevron" className="tap-target" aria-label={`Posunout sekci ${s.title} níž`}
+                  <Button variant="ghost" size="sm" iconOnly icon="chevron" className="tap-target" aria-label={t('Posunout sekci {nazev} níž', { nazev: s.title })}
                     disabled={si === board.sections.length - 1} onClick={() => upravit((b) => posun(b.sections, si, 1))} />
-                  <Button variant="danger" size="sm" iconOnly icon="trash" className="tap-target ml-2" aria-label={`Smazat sekci ${s.title}`}
+                  <Button variant="danger" size="sm" iconOnly icon="trash" className="tap-target ml-2" aria-label={t('Smazat sekci {nazev}', { nazev: s.title })}
                     onClick={() => setPotvrzeni({
-                      titulek: 'Smazat sekci?', text: `Sekce „${s.title}“ zmizí i se všemi ${czCount(s.items.length, POLOZKA)}. Definitivně až po uložení menu.`, akce: 'Smazat sekci',
+                      titulek: t('Smazat sekci?'), text: t('Sekce „{nazev}“ zmizí i se všemi {n, plural, one {# položka} few {# položky} other {# položek}}. Definitivně až po uložení menu.', { nazev: s.title, n: s.items.length }), akce: t('Smazat sekci'),
                       onAno: () => upravit((b) => { b.sections.splice(si, 1); }),
                     })} />
                 </div>
@@ -932,10 +941,10 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
                   return (
                     <li key={it.id ?? `nova-${ii}`} className="py-3 space-y-2">
                       <div className="grid grid-cols-[minmax(0,1fr)_6.5rem] gap-2">
-                        <Input value={it.name} maxLength={80} placeholder="Název položky" aria-label="Název položky" disabled={zamceno}
+                        <Input value={it.name} maxLength={80} placeholder={t('Název položky')} aria-label={t('Název položky')} disabled={zamceno}
                           onChange={(e) => upravit((b) => { b.sections[si].items[ii].name = e.target.value; })} />
                         <Input value={cenaText[`${si}-${ii}`] ?? cenaDoPole(it.price)} inputMode="decimal"
-                          aria-label={`Cena — ${it.name || 'nová položka'} (${board.currency})`}
+                          aria-label={t('Cena — {nazev} ({mena})', { nazev: it.name || t('nová položka'), mena: board.currency })}
                           aria-invalid={cenaText[`${si}-${ii}`] !== undefined && !cenaZFormulare(cenaText[`${si}-${ii}`]).ok ? true : undefined}
                           className="text-right tabular-nums" disabled={zamceno || !smiCeny}
                           onChange={(e) => {
@@ -948,40 +957,40 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
                           }}
                           onBlur={() => setCenaText((t) => { const kopie = { ...t }; delete kopie[`${si}-${ii}`]; return kopie; })} />
                       </div>
-                      <Input value={it.description ?? ''} maxLength={200} placeholder="Popisek (nepovinný)" aria-label={`Popisek — ${it.name || 'nová položka'}`} disabled={zamceno}
+                      <Input value={it.description ?? ''} maxLength={200} placeholder={t('Popisek (nepovinný)')} aria-label={t('Popisek — {nazev}', { nazev: it.name || t('nová položka') })} disabled={zamceno}
                         onChange={(e) => upravit((b) => { b.sections[si].items[ii].description = e.target.value; })} />
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="inline-flex items-center gap-2">
                           <Switch checked={it.soldOut} labelledBy={idVyp} disabled={!smiVyprodano && zamceno}
                             onChange={(v) => { if (smiVyprodano) void prepnoutVyprodano(si, ii, v); else upravit((b) => { b.sections[si].items[ii].soldOut = v; }); }} />
                           <span id={idVyp} className={`text-[13px] ${it.soldOut ? 'font-semibold text-bad-ink' : 'text-black/55'}`}>
-                            <span className="sr-only">{it.name}: </span>Vyprodáno
+                            <span className="sr-only">{it.name}: </span>{t('Vyprodáno')}
                           </span>
                         </span>
                         {posPripojena && (it.posProductId ? (
                           <>
-                            <Chip tone="ok" size="sm" icon="check">Tiskne se na kase</Chip>
-                            {!zamceno && <Button variant="ghost" size="sm" onClick={() => upravit((b) => { b.sections[si].items[ii].posProductId = null; })}>Zrušit vazbu</Button>}
+                            <Chip tone="ok" size="sm" icon="check">{t('Tiskne se na kase')}</Chip>
+                            {!zamceno && <Button variant="ghost" size="sm" onClick={() => upravit((b) => { b.sections[si].items[ii].posProductId = null; })}>{t('Zrušit vazbu')}</Button>}
                           </>
                         ) : (
                           <>
-                            <Chip tone="wait" size="sm">Netiskne se</Chip>
-                            {!zamceno && <Button variant="secondary" size="sm" onClick={() => otevritVyber(si, ii)}>Spárovat</Button>}
+                            <Chip tone="wait" size="sm">{t('Netiskne se')}</Chip>
+                            {!zamceno && <Button variant="secondary" size="sm" onClick={() => otevritVyber(si, ii)}>{t('Spárovat')}</Button>}
                           </>
                         ))}
                         <Button variant="ghost" size="sm" onClick={() => setAlergenyOtevreno({ si, ii })}
-                          aria-label={`Alergeny a štítky — ${it.name || 'nová položka'}`}>
-                          {(it.allergens?.length ?? 0) > 0 ? `Alergeny: ${it.allergens!.join(', ')}` : 'Alergeny'}
+                          aria-label={t('Alergeny a štítky — {nazev}', { nazev: it.name || t('nová položka') })}>
+                          {(it.allergens?.length ?? 0) > 0 ? t('Alergeny: {seznam}', { seznam: it.allergens!.join(', ') }) : t('Alergeny')}
                         </Button>
                         {(it.tags ?? []).map(k => <Chip key={k} size="sm">{(STITKY as any)[k]?.cs ?? k}</Chip>)}
                         <span className="flex-1" />
                         {!zamceno && (
                           <span className="flex items-center gap-2">
-                            <Button variant="ghost" size="sm" iconOnly icon="chevron" className="tap-target [&>svg]:rotate-180" aria-label={`Posunout ${it.name || 'položku'} výš`}
+                            <Button variant="ghost" size="sm" iconOnly icon="chevron" className="tap-target [&>svg]:rotate-180" aria-label={t('Posunout {nazev} výš', { nazev: it.name || t('položku') })}
                               disabled={ii === 0} onClick={() => upravit((b) => posun(b.sections[si].items, ii, -1))} />
-                            <Button variant="ghost" size="sm" iconOnly icon="chevron" className="tap-target" aria-label={`Posunout ${it.name || 'položku'} níž`}
+                            <Button variant="ghost" size="sm" iconOnly icon="chevron" className="tap-target" aria-label={t('Posunout {nazev} níž', { nazev: it.name || t('položku') })}
                               disabled={ii === s.items.length - 1} onClick={() => upravit((b) => posun(b.sections[si].items, ii, 1))} />
-                            <Button variant="danger" size="sm" iconOnly icon="trash" className="tap-target ml-2" aria-label={`Smazat ${it.name || 'položku'}`}
+                            <Button variant="danger" size="sm" iconOnly icon="trash" className="tap-target ml-2" aria-label={t('Smazat {nazev}', { nazev: it.name || t('položku') })}
                               onClick={() => smazatPolozku(si, ii)} />
                           </span>
                         )}
@@ -996,10 +1005,11 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
               <div className="flex gap-2 flex-wrap">
                 <Button variant="secondary" size="sm" icon="plus"
                   onClick={() => upravit((b) => { b.sections[si].items.push({ name: '', price: 0, soldOut: false }); })}>
-                  Položka
+                  
+                  {t('Položka')}
                 </Button>
                 {posPripojena !== false && (
-                  <Button variant="ghost" size="sm" icon="plus" onClick={() => otevritVyber(si, null)}>Z pokladny</Button>
+                  <Button variant="ghost" size="sm" icon="plus" onClick={() => otevritVyber(si, null)}>{t('Z pokladny')}</Button>
                 )}
               </div>
             )}
@@ -1008,10 +1018,10 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
               <Well className="space-y-2">
                 <div className="flex items-center gap-2">
                   <Input ref={posInput} onKeyDown={posKeys.onInputKeyDown} className="flex-1" value={posHledat} autoFocus
-                    aria-label={posOtevreno?.ii == null ? 'Hledat v katalogu kasy' : `Položka v kase pro ${s.items[posOtevreno.ii]?.name || 'položku'}`}
-                    placeholder={posOtevreno?.ii == null ? 'Hledat v katalogu kasy…' : `Ke které položce v kase patří „${s.items[posOtevreno.ii]?.name || '…'}“?`}
+                    aria-label={posOtevreno?.ii == null ? t('Hledat v katalogu kasy') : t('Položka v kase pro {nazev}', { nazev: s.items[posOtevreno.ii]?.name || t('položku') })}
+                    placeholder={posOtevreno?.ii == null ? t('Hledat v katalogu kasy…') : t('Ke které položce v kase patří „{nazev}“?', { nazev: s.items[posOtevreno.ii]?.name || '…' })}
                     onChange={(e) => setPosHledat(e.target.value)} />
-                  <Button variant="ghost" size="sm" onClick={() => setPosOtevreno(null)}>Zavřít</Button>
+                  <Button variant="ghost" size="sm" onClick={() => setPosOtevreno(null)}>{t('Zavřít')}</Button>
                 </div>
                 {posStav && <p className="t-meta">{posStav}</p>}
                 <div ref={posList} onKeyDown={posKeys.onListKeyDown} className="max-h-64 overflow-y-auto divide-y divide-black/[0.06]">
@@ -1039,21 +1049,22 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
         <Card className="space-y-3">
           {!zamceno && !editace && (
             <Button variant="secondary" size="sm" icon="plus"
-              onClick={() => upravit((b) => { b.sections.push({ title: 'Nová sekce', column: 1, items: [] }); })}>
-              Sekce
+              onClick={() => upravit((b) => { b.sections.push({ title: t('Nová sekce'), column: 1, items: [] }); })}>
+              
+              {t('Sekce')}
             </Button>
           )}
           {chyba && <p className="note note-danger" role="alert">{chyba}</p>}
-          {neulozeno && !chyba && <p className="note note-wait" role="status">Máš neuložené změny.</p>}
+          {neulozeno && !chyba && <p className="note note-wait" role="status">{t('Máš neuložené změny.')}</p>}
           <div className="flex items-center justify-end gap-2 flex-wrap">
             {smiMazat && (
               <Button variant="danger" disabled={ukladam} onClick={() => setPotvrzeni({
-                titulek: 'Smazat menu?', text: `Menu „${board.name}“ zmizí i se všemi položkami a vytištěné QR kódy přestanou fungovat. Tohle nejde vzít zpět.`, akce: 'Smazat menu',
+                titulek: t('Smazat menu?'), text: t('Menu „{nazev}“ zmizí i se všemi položkami a vytištěné QR kódy přestanou fungovat. Tohle nejde vzít zpět.', { nazev: board.name }), akce: t('Smazat menu'),
                 onAno: () => { void smazat(); },
-              })}>Smazat menu</Button>
+              })}>{t('Smazat menu')}</Button>
             )}
             {smiUpravit && (
-              <Button variant="primary" loading={ukladam} onClick={() => ulozit()}>{neulozeno ? 'Uložit změny' : 'Uložit menu'}</Button>
+              <Button variant="primary" loading={ukladam} onClick={() => ulozit()}>{neulozeno ? t('Uložit změny') : t('Uložit menu')}</Button>
             )}
           </div>
         </Card>
@@ -1064,10 +1075,10 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
           se nikam neuloží. Dokud něco čeká, drží se ukládání na očích. Plovoucí
           lišta nese jedinou limetku (tlačítko dole je proto `primary`).
         */}
-        <PlovouciLista label="Neuložené změny menu" open={neulozeno && smiUpravit} animate>
-          <span className="text-sm font-medium text-white">Neuložené změny</span>
+        <PlovouciLista label={t('Neuložené změny menu')} open={neulozeno && smiUpravit} animate>
+          <span className="text-sm font-medium text-white">{t('Neuložené změny')}</span>
           <button type="button" onClick={() => ulozit()} disabled={ukladam} className="btn btn-accent btn-sm">
-            {ukladam ? 'Ukládám…' : 'Uložit'}
+            {ukladam ? t('Ukládám…') : t('Uložit')}
           </button>
         </PlovouciLista>
       </div>
@@ -1078,9 +1089,9 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
     <>
       {kopieOkno}
       <Modal open={alergenyOtevreno != null && !!board?.sections[alergenyOtevreno.si]?.items[alergenyOtevreno.ii]} onClose={() => setAlergenyOtevreno(null)} size="md"
-        title="Alergeny a štítky"
-        subtitle={alergenyOtevreno && board ? (board.sections[alergenyOtevreno.si]?.items[alergenyOtevreno.ii]?.name || 'Nová položka') : undefined}
-        footer={<Button variant="primary" onClick={() => setAlergenyOtevreno(null)}>Hotovo</Button>}>
+        title={t('Alergeny a štítky')}
+        subtitle={alergenyOtevreno && board ? (board.sections[alergenyOtevreno.si]?.items[alergenyOtevreno.ii]?.name || t('Nová položka')) : undefined}
+        footer={<Button variant="primary" onClick={() => setAlergenyOtevreno(null)}>{t('Hotovo')}</Button>}>
         {alergenyOtevreno && board?.sections[alergenyOtevreno.si]?.items[alergenyOtevreno.ii] && (() => {
           const { si, ii } = alergenyOtevreno;
           const it = board.sections[si].items[ii];
@@ -1091,20 +1102,20 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
           );
         })()}
       </Modal>
-      <Modal open={noveMenu != null} onClose={() => setNoveMenu(null)} size="sm" title="Nové menu" subtitle="Založí se prázdné, s vlastní adresou."
+      <Modal open={noveMenu != null} onClose={() => setNoveMenu(null)} size="sm" title={t('Nové menu')} subtitle={t('Založí se prázdné, s vlastní adresou.')}
         footer={<>
-          <Button variant="secondary" onClick={() => setNoveMenu(null)}>Zrušit</Button>
-          <Button variant="primary" type="submit" form={`${uid}-nove`} loading={ukladam}>Založit menu</Button>
+          <Button variant="secondary" onClick={() => setNoveMenu(null)}>{t('Zrušit')}</Button>
+          <Button variant="primary" type="submit" form={`${uid}-nove`} loading={ukladam}>{t('Založit menu')}</Button>
         </>}>
         <form id={`${uid}-nove`} onSubmit={(e) => { e.preventDefault(); const n = (noveMenu ?? '').trim(); if (n) void zalozit(n); }}>
-          <Field id={`${uid}-nove-nazev`} label="Název menu" hint="Třeba Stálá nabídka. Adresa se z názvu odvodí sama.">
+          <Field id={`${uid}-nove-nazev`} label={t('Název menu')} hint={t('Třeba Stálá nabídka. Adresa se z názvu odvodí sama.')}>
             <Input id={`${uid}-nove-nazev`} autoFocus value={noveMenu ?? ''} maxLength={80} required onChange={(e) => setNoveMenu(e.target.value)} />
           </Field>
         </form>
       </Modal>
       <Modal open={potvrzeni != null} onClose={() => setPotvrzeni(null)} size="sm" title={potvrzeni?.titulek ?? ''}
         footer={<>
-          <Button variant="secondary" onClick={() => setPotvrzeni(null)}>Zrušit</Button>
+          <Button variant="secondary" onClick={() => setPotvrzeni(null)}>{t('Zrušit')}</Button>
           <Button variant={potvrzeni?.akce.startsWith('Smazat') || potvrzeni?.akce.startsWith('Zahodit') ? 'danger-solid' : 'primary'}
             onClick={() => { const p = potvrzeni; setPotvrzeni(null); p?.onAno(); }}>{potvrzeni?.akce}</Button>
         </>}>
@@ -1118,7 +1129,7 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
   return (
     <>
       <PlochaWidgetu stranka="vedeni.menu"
-        hlavicka={{ title: 'Menu', subtitle: 'Nabídka pro hosty. Změny se projeví na iPadu i v mobilech po obnovení stránky.', hintId: 'menueditor' }}
+        hlavicka={{ title: t('Menu'), subtitle: t('Nabídka pro hosty. Změny se projeví na iPadu i v mobilech po obnovení stránky.'), hintId: 'menueditor' }}
         nastroj={nastroj} />
       {okna}
     </>
@@ -1127,11 +1138,12 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
 
 /** Barva vzhledu: výběr barvy a totéž jako text (hex se dá opsat z manuálu značky). */
 function Barva({ id, popis, hodnota, zmen, zamceno }: { id: string; popis: string; hodnota: string; zmen: (v: string) => void; zamceno: boolean }) {
+  const t = useT('sprava');
   return (
     <div>
       <Label htmlFor={id}>{popis}</Label>
       <span className="flex items-center gap-2">
-        <input type="color" value={hodnota} onChange={(e) => zmen(e.target.value)} disabled={zamceno} aria-label={`${popis} — výběr barvy`}
+        <input type="color" value={hodnota} onChange={(e) => zmen(e.target.value)} disabled={zamceno} aria-label={t('{popis} — výběr barvy', { popis })}
           className="h-11 w-12 shrink-0 rounded-xl border border-black/[0.08] bg-transparent p-1 cursor-pointer" />
         <Input id={id} value={hodnota} maxLength={9} disabled={zamceno} onChange={(e) => zmen(e.target.value)} className="font-mono" />
       </span>

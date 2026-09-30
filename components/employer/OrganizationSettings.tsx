@@ -22,25 +22,26 @@ import { Button, Card, Chip, Modal, Segmented, Select, SwitchRow, Toast } from '
 import { okJson } from '@/lib/api';
 import { CISELNIKY, coSeSlucuje, coSeVypina, normalizujNastaveni, type Ciselnik, type NastaveniOrganizace, type ZdrojeCiselniku } from '@/lib/organizace';
 import { czCount, type CzNoun } from '@/lib/czech';
+import { useT, type PrekladFn } from '@/lib/i18n/client';
 
 interface Org { id: number; name: string; isOwner: boolean; settings: NastaveniOrganizace; teams: { id: number; name: string }[] }
 
 /** Co server vrátí za každý podnik, kterému se kopírovalo nebo slučovalo. */
 interface Kopie { teamId: number; ciselnik: Ciselnik; akce: 'kopie' | 'slouceni'; ok: boolean; pocet: number }
 
-/** Skloňování počtu zkopírovaných řádků podle číselníku (jen ty, které se kopírují). */
-const RADKY: Partial<Record<Ciselnik, CzNoun>> = {
-  kategorieSkladu: { one: 'kategorie', few: 'kategorie', many: 'kategorií' },
-  typySmen: { one: 'typ směny', few: 'typy směn', many: 'typů směn' },
-  kategorieNavodu: { one: 'kategorie', few: 'kategorie', many: 'kategorií' },
-};
+/** Počet zkopírovaných řádků se skloňováním podle číselníku (jen ty, které se kopírují). */
+const popisRadku = (t: PrekladFn, ciselnik: Ciselnik, n: number): string =>
+  ciselnik === 'typySmen' ? t('{n, plural, one {# typ směny} few {# typy směn} other {# typů směn}}', { n })
+    : ciselnik === 'kategorieSkladu' || ciselnik === 'kategorieNavodu' ? t('{n, plural, one {# kategorie} few {# kategorie} other {# kategorií}}', { n })
+    : t('{n, plural, one {# řádek} few {# řádky} other {# řádků}}', { n });
 
 export default function OrganizationSettings() {
+  const t = useT('sprava');
   const [org, setOrg] = useState<Org | null>(null);
   const [nacteno, setNacteno] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
-  const msgChyba = msg !== '' && msg !== 'Nastavení organizace uloženo.';
+  const msgChyba = msg !== '' && msg !== t('Nastavení organizace uloženo.');
   /** Výpis kopií po posledním uložení — zůstává, dokud se neuloží znovu. */
   const [kopieInfo, setKopieInfo] = useState<{ text: string; chyba: boolean }[]>([]);
 
@@ -62,15 +63,15 @@ export default function OrganizationSettings() {
   if (chyba) {
     return (
       <Card>
-        <p className="text-sm font-semibold text-[#16181A]">Organizace se nenačetla</p>
-        <p className="t-meta mt-1">Nejspíš vypadlo připojení. Nastavení je v pořádku — zkuste to znovu.</p>
-        <div className="mt-3"><Button variant="secondary" size="sm" icon="refresh" onClick={() => setPokus(n => n + 1)}>Zkusit znovu</Button></div>
+        <p className="text-sm font-semibold text-[#16181A]">{t('Organizace se nenačetla')}</p>
+        <p className="t-meta mt-1">{t('Nejspíš vypadlo připojení. Nastavení je v pořádku — zkuste to znovu.')}</p>
+        <div className="mt-3"><Button variant="secondary" size="sm" icon="refresh" onClick={() => setPokus(n => n + 1)}>{t('Zkusit znovu')}</Button></div>
       </Card>
     );
   }
   if (!nacteno || !org) return null;
 
-  const nazevPodniku = (id: number) => org.teams.find(t => t.id === id)?.name ?? `Podnik ${id}`;
+  const nazevPodniku = (id: number) => org.teams.find(x => x.id === id)?.name ?? t('Podnik {id}', { id });
 
   /** Řádky `kopie[]` z odpovědi → věty pro člověka; podniky bez kopií se nevypisují. */
   const popisKopie = (kopie: Kopie[]) => {
@@ -78,10 +79,10 @@ export default function OrganizationSettings() {
     for (const k of kopie) {
       const nazev = CISELNIKY.find(c => c.klic === k.ciselnik)?.nazev ?? k.ciselnik;
       if (!k.ok) {
-        out.push({ chyba: true, text: `${nazevPodniku(k.teamId)}: ${nazev.toLocaleLowerCase('cs')} se nepodařilo ${k.akce === 'kopie' ? 'zkopírovat' : 'sloučit'}. Zkuste to znovu, nebo spusťte /api/init.` });
+        out.push({ chyba: true, text: t('{podnik}: {nazev} se nepodařilo {akce}. Zkuste to znovu, nebo spusťte /api/init.', { podnik: nazevPodniku(k.teamId), nazev: nazev.toLocaleLowerCase(t.jazyk), akce: k.akce === 'kopie' ? t('zkopírovat') : t('sloučit') }) });
       } else if (k.pocet > 0) {
-        const pocet = czCount(k.pocet, RADKY[k.ciselnik] ?? { one: 'řádek', few: 'řádky', many: 'řádků' });
-        out.push({ chyba: false, text: `${k.akce === 'kopie' ? 'Zkopírováno do' : 'Sloučeno v'}: ${nazevPodniku(k.teamId)} (${pocet})` });
+        const pocet = popisRadku(t, k.ciselnik, k.pocet);
+        out.push({ chyba: false, text: t('{akce}: {podnik} ({pocet})', { akce: k.akce === 'kopie' ? t('Zkopírováno do') : t('Sloučeno v'), podnik: nazevPodniku(k.teamId), pocet }) });
       }
     }
     return out;
@@ -96,7 +97,7 @@ export default function OrganizationSettings() {
     // v prvním pádu, ať se nemusí skloňovat.
     const nove = normalizujNastaveni({ ...org.settings, ...patch });
     const popis = (ciselnik: Ciselnik) => CISELNIKY.find(c => c.klic === ciselnik);
-    const nazvy = (v: { ciselnik: Ciselnik }[]) => v.map(x => popis(x.ciselnik)?.nazev.toLocaleLowerCase('cs') ?? x.ciselnik).join(', ');
+    const nazvy = (v: { ciselnik: Ciselnik }[]) => v.map(x => popis(x.ciselnik)?.nazev.toLocaleLowerCase(t.jazyk) ?? x.ciselnik).join(', ');
     // Zapnutí nebo změna zdroje je opak vypnutí: kopie z dřívějšího sdílení
     // se nahradí originálem a co si v nich podniky upravily, se ztratí.
     // Jedno okno pro obojí — změna zdroje A → B vypíná A a zapíná B naráz.
@@ -106,9 +107,9 @@ export default function OrganizationSettings() {
       const sKopii = vypina.filter(v => popis(v.ciselnik)?.kopie);
       const bezKopie = vypina.filter(v => !popis(v.ciselnik)?.kopie);
       const veta = [
-        sKopii.length ? `Podniky dostanou vlastní kopie toho, co z organizace používají: ${nazvy(sKopii)}.` : '',
-        bezKopie.length ? `Řádky z organizace přestanou být v podnicích vidět: ${nazvy(bezKopie)}.` : '',
-        slucuje.length ? `Pokud mají podniky kopie z dřívějšího sdílení, nahradí je originál ze zdroje: ${nazvy(slucuje)} — co si v nich upravily, se ztratí.` : '',
+        sKopii.length ? t('Podniky dostanou vlastní kopie toho, co z organizace používají: {seznam}.', { seznam: nazvy(sKopii) }) : '',
+        bezKopie.length ? t('Řádky z organizace přestanou být v podnicích vidět: {seznam}.', { seznam: nazvy(bezKopie) }) : '',
+        slucuje.length ? t('Pokud mají podniky kopie z dřívějšího sdílení, nahradí je originál ze zdroje: {seznam} — co si v nich upravily, se ztratí.', { seznam: nazvy(slucuje) }) : '',
       ].filter(Boolean).join(' ');
       setPotvrdit({ veta, patch });
       return;
@@ -123,16 +124,16 @@ export default function OrganizationSettings() {
     try {
       const res = await fetch('/api/organization', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ settings: patch }) });
       const d = await res.json().catch(() => ({}));
-      if (!res.ok) { setOrg(o => o ? { ...o, settings: puvodni } : o); setMsg(d.error || 'Uložení se nepodařilo.'); }
+      if (!res.ok) { setOrg(o => o ? { ...o, settings: puvodni } : o); setMsg(d.error || t('Uložení se nepodařilo.')); }
       else {
         // Server je pravda (ořezal by cizí zdroj); a výpis kopií říká,
         // kterému podniku co vzniklo — nebo kde to selhalo.
         if (d.organization?.settings) setOrg(o => o ? { ...o, settings: normalizujNastaveni(d.organization.settings) } : o);
         const info = popisKopie(Array.isArray(d.kopie) ? d.kopie : []);
         setKopieInfo(info);
-        setMsg(info.some(i => i.chyba) ? 'Uloženo, ale kopie se nepodařila.' : 'Nastavení organizace uloženo.');
+        setMsg(info.some(i => i.chyba) ? t('Uloženo, ale kopie se nepodařila.') : t('Nastavení organizace uloženo.'));
       }
-    } catch { setOrg(o => o ? { ...o, settings: puvodni } : o); setMsg('Uložení se nepodařilo.'); }
+    } catch { setOrg(o => o ? { ...o, settings: puvodni } : o); setMsg(t('Uložení se nepodařilo.')); }
     setBusy(false);
   };
 
@@ -147,7 +148,7 @@ export default function OrganizationSettings() {
   const zamceno = !org.isOwner || busy;
   const volby = (
     <>
-      <option value="">Každý podnik zvlášť</option>
+      <option value="">{t('Každý podnik zvlášť')}</option>
       {org.teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
     </>
   );
@@ -155,48 +156,48 @@ export default function OrganizationSettings() {
     <Card aria-labelledby="org-nadpis">
       <h2 id="org-nadpis" className="t-card flex items-center gap-2 min-w-0">
         <Icon name="grid" size={17} className="shrink-0 text-black/40" />
-        <span className="truncate">Organizace: {org.name}</span>
+        <span className="truncate">{t('Organizace: {nazev}', { nazev: org.name })}</span>
       </h2>
       <p className="t-meta mt-1 text-pretty">
-        {czCount(org.teams.length, { one: 'podnik', few: 'podniky', many: 'podniků' })} pod jednou střechou: {org.teams.map(t => t.name).join(', ')}.
-        {!org.isOwner && ' Nastavení mění vlastník organizace.'}
+        {t('{n, plural, one {# podnik} few {# podniky} other {# podniků}} pod jednou střechou: {seznam}.', { n: org.teams.length, seznam: org.teams.map(x => x.name).join(', ') })}
+        {!org.isOwner && ` ${t('Nastavení mění vlastník organizace.')}`}
       </p>
       <ul className="list mt-2">
         <SwitchRow checked={org.settings.sdileniLidi === true} disabled={zamceno} onChange={v => uloz({ sdileniLidi: v })}
-          title="Sdílení lidí mezi podniky" hint="Zaměstnanec může být členem víc podniků a přepínat mezi nimi. Vedení může vždy." />
+          title={t('Sdílení lidí mezi podniky')} hint={t('Zaměstnanec může být členem víc podniků a přepínat mezi nimi. Vedení může vždy.')} />
         <SwitchRow checked={org.settings.konsolidovanyPrehled === true} disabled={zamceno} onChange={v => uloz({ konsolidovanyPrehled: v })}
-          title="Přehled za všechny podniky" hint="Tržby, mzdy a uzávěrky všech podniků na jedné obrazovce — v přepínači podniku nahoře, položka „Všechny podniky“." />
+          title={t('Přehled za všechny podniky')} hint={t('Tržby, mzdy a uzávěrky všech podniků na jedné obrazovce — v přepínači podniku nahoře, položka „Všechny podniky“.')} />
         <SwitchRow checked={org.settings.sdileneCiselniky === true} disabled={zamceno} onChange={v => uloz({ sdileneCiselniky: v })}
-          title="Sdílené číselníky" hint="Jeden podnik číselník spravuje, ostatní ho vidí a používají. U každé položky je vidět, odkud je. Kontakty dodavatelů uvidí i ostatní podniky." />
+          title={t('Sdílené číselníky')} hint={t('Jeden podnik číselník spravuje, ostatní ho vidí a používají. U každé položky je vidět, odkud je. Kontakty dodavatelů uvidí i ostatní podniky.')} />
         <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
           <div className="min-w-0">
-            <p id="org-fakturace" className="text-sm font-semibold text-[#16181A]">Fakturace <Chip tone="muted" size="sm" className="ml-1 align-middle">připravuje se</Chip></p>
-            <p className="text-xs text-black/45 mt-0.5 text-pretty">Každý podnik má svůj plán a fakturu, nebo jedna faktura za organizaci.</p>
+            <p id="org-fakturace" className="text-sm font-semibold text-[#16181A]">{t('Fakturace')} <Chip tone="muted" size="sm" className="ml-1 align-middle">{t('připravuje se')}</Chip></p>
+            <p className="text-xs text-black/45 mt-0.5 text-pretty">{t('Každý podnik má svůj plán a fakturu, nebo jedna faktura za organizaci.')}</p>
           </div>
           {org.isOwner ? (
-            <Segmented size="sm" ariaLabel="Fakturace" value={org.settings.fakturace ?? 'per_team'}
+            <Segmented size="sm" ariaLabel={t('Fakturace')} value={org.settings.fakturace ?? 'per_team'}
               onChange={v => { if (!busy) void uloz({ fakturace: v }); }}
-              options={[{ id: 'per_team', label: 'Za podnik' }, { id: 'per_org', label: 'Za organizaci' }]} />
+              options={[{ id: 'per_team', label: t('Za podnik') }, { id: 'per_org', label: t('Za organizaci') }]} />
           ) : (
-            <span className="t-meta">{org.settings.fakturace === 'per_org' ? 'Za organizaci' : 'Za podnik'}</span>
+            <span className="t-meta">{org.settings.fakturace === 'per_org' ? t('Za organizaci') : t('Za podnik')}</span>
           )}
         </li>
       </ul>
       {org.settings.sdileneCiselniky && (
         <div role="group" aria-labelledby="org-zdroje-nadpis" className="mt-3">
-          <p id="org-zdroje-nadpis" className="t-label">Kdo který číselník spravuje</p>
+          <p id="org-zdroje-nadpis" className="t-label">{t('Kdo který číselník spravuje')}</p>
           <ul className="list">
             {/* Pevný sloupec selectu: dřív justify-between se selectem na šířku obsahu
                 a každý řádek začínal jinde (audit: x = 532, 464, 570…). Na telefonu pod sebou. */}
             <li className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_16rem] items-center gap-x-4 gap-y-1.5 py-3">
-              <p id="org-zdroje-vse" className="text-sm font-semibold text-[#16181A]">Všechny najednou</p>
+              <p id="org-zdroje-vse" className="text-sm font-semibold text-[#16181A]">{t('Všechny najednou')}</p>
               <Select aria-labelledby="org-zdroje-vse" value={spolecny} disabled={zamceno}
                 onChange={e => {
                   if (e.target.value === 'ruzne') return;
                   const v = hodnota(e.target.value);
                   void ulozZdroje(Object.fromEntries(CISELNIKY.map(c => [c.klic, v])) as ZdrojeCiselniku);
                 }}>
-                {!vsechnyStejne && <option value="ruzne" disabled>Různě</option>}
+                {!vsechnyStejne && <option value="ruzne" disabled>{t('Různě')}</option>}
                 {volby}
               </Select>
             </li>
@@ -214,7 +215,8 @@ export default function OrganizationSettings() {
             ))}
           </ul>
           <p className="t-meta mt-2 text-pretty">
-            Vypnutím dostanou podniky vlastní kopie toho, co z organizace používaly. Zapnutím se kopie z dřívějšího sdílení nahradí originálem. Nastavení veřejné stránky se nepřepojuje.
+            
+            {t('Vypnutím dostanou podniky vlastní kopie toho, co z organizace používaly. Zapnutím se kopie z dřívějšího sdílení nahradí originálem. Nastavení veřejné stránky se nepřepojuje.')}
           </p>
         </div>
       )}
@@ -224,10 +226,10 @@ export default function OrganizationSettings() {
         </ul>
       )}
       {potvrdit && (
-        <Modal open onClose={() => setPotvrdit(null)} size="sm" title="Změnit sdílení?"
+        <Modal open onClose={() => setPotvrdit(null)} size="sm" title={t('Změnit sdílení?')}
           footer={<>
-            <Button variant="secondary" onClick={() => setPotvrdit(null)}>Zrušit</Button>
-            <Button variant="primary" loading={busy} onClick={async () => { const p = potvrdit.patch; setPotvrdit(null); await proved(p); }}>Pokračovat</Button>
+            <Button variant="secondary" onClick={() => setPotvrdit(null)}>{t('Zrušit')}</Button>
+            <Button variant="primary" loading={busy} onClick={async () => { const p = potvrdit.patch; setPotvrdit(null); await proved(p); }}>{t('Pokračovat')}</Button>
           </>}>
           <p className="text-sm text-black/70 text-pretty">{potvrdit.veta}</p>
         </Modal>

@@ -26,6 +26,8 @@ import {
 } from '@/lib/opravneni';
 import { obnovOpravneni } from './useOpravneni';
 import { nastavRozepsanouRoli, CO_SE_ZAHODI_ROLE } from './rozepsano';
+import { useT, type PrekladFn } from '@/lib/i18n/client';
+import { sUzlem, VLOZ } from '../employer/jazyk';
 
 interface SysRole {
   klic: string; nazev: string; popis: string; typ: TypRole; opravneni: string[]; pocet: number;
@@ -44,42 +46,35 @@ type Otevreno =
   | { druh: 'vlastni'; role: VlRole }
   | { druh: 'system'; role: SysRole };
 
-const LIDE = { one: 'člověk', few: 'lidé', many: 'lidí' };
-const lide = (n: number) => (n === 0 ? 'nikdo' : czCount(n, LIDE));
+const lide = (t: PrekladFn, n: number) => (n === 0 ? t('nikdo') : t('{n, plural, one {# člověk} few {# lidé} other {# lidí}}', { n }));
 
-const TYPY: { id: TypRole; label: string; icon: string }[] = [
-  { id: 'vedeni', label: 'Vedení', icon: 'overview' },
-  { id: 'zamestnanec', label: 'Zaměstnanec', icon: 'user' },
-  { id: 'kiosk', label: 'Tablet', icon: 'cup' },
+const typy = (t: PrekladFn): { id: TypRole; label: string; icon: string }[] => [
+  { id: 'vedeni', label: t('Vedení'), icon: 'overview' },
+  { id: 'zamestnanec', label: t('Zaměstnanec'), icon: 'user' },
+  { id: 'kiosk', label: t('Tablet'), icon: 'cup' },
 ];
 // Typ rozhraní ≠ oprávnění: říká, která aplikace se otevře a koho se
 // týká rozvrh a žebříček. Proto má vlastní vysvětlení, ne jen štítek.
-const TYP_VYSVETLENI: Record<TypRole, string> = {
-  vedeni: 'Otevře se správa podniku. V navigaci uvidí jen obrazovky, na které má oprávnění níže.',
-  zamestnanec: 'Otevře se aplikace pro zaměstnance — moje směny, uzávěrka, úkoly. Bere se do rozvrhu a do žebříčku odměn.',
-  kiosk: 'Pro sdílený tablet za barem. Jde zapnout jen to, co na tabletu dává smysl — kdo zná heslo tabletu, dostane všechno, co tablet smí.',
-};
-const TYP_NAZEV: Record<TypRole, string> = { vedeni: 'Vedení', zamestnanec: 'Zaměstnanec', kiosk: 'Tablet' };
+const typVysvetleni = (t: PrekladFn): Record<TypRole, string> => ({
+  vedeni: t('Otevře se správa podniku. V navigaci uvidí jen obrazovky, na které má oprávnění níže.'),
+  zamestnanec: t('Otevře se aplikace pro zaměstnance — moje směny, uzávěrka, úkoly. Bere se do rozvrhu a do žebříčku odměn.'),
+  kiosk: t('Pro sdílený tablet za barem. Jde zapnout jen to, co na tabletu dává smysl — kdo zná heslo tabletu, dostane všechno, co tablet smí.'),
+});
+const typNazev = (t: PrekladFn): Record<TypRole, string> => ({ vedeni: t('Vedení'), zamestnanec: t('Zaměstnanec'), kiosk: t('Tablet') });
 
-const CITLIVOST: Record<string, { tone: 'muted' | 'wait' | 'bad'; text: string }> = {
-  'nízká': { tone: 'muted', text: 'Běžné' },
-  'střední': { tone: 'wait', text: 'Střední' },
-  'vysoká': { tone: 'bad', text: 'Citlivé' },
-};
-
-const nazvyKlicu = (ids: string[], max = 3) => {
-  const n = ids.slice(0, max).map(id => `„${popisKlice(id)?.nazev ?? id}"`).join(', ');
-  return ids.length > max ? `${n} a další ${ids.length - max}` : n;
-};
+// Klíče jsou úrovně citlivosti z katalogu (data), ne text pro člověka.
+const citlivost = (t: PrekladFn): Record<string, { tone: 'muted' | 'wait' | 'bad'; text: string }> => ({
+  'nízká': { tone: 'muted', text: t('Běžné') }, // i18n-ok
+  'střední': { tone: 'wait', text: t('Střední') }, // i18n-ok
+  'vysoká': { tone: 'bad', text: t('Citlivé') }, // i18n-ok
+});
 
 /** Vyhodí z množiny klíče, jejichž závislosti v ní chybí (opak sZavislostmi, bez jednoho vypnutého). */
-// „Oprávnění" má ve všech třech tvarech stejnou podobu; přes czCount jde
-// kvůli jednotnosti a kvůli check-czech, které hlídá číslo před slovem.
-const OPRAVNENI = { one: 'oprávnění', few: 'oprávnění', many: 'oprávnění' };
 
 const beZDer = (sada: Iterable<string>) => bezZavislych(sada, '');
 
 export default function RoleEditor() {
+  const t = useT('sprava');
   const [data, setData] = useState<Data | null>(null);
   const [chybaNacteni, setChybaNacteni] = useState<string | null>(null);
   const [otevreno, setOtevreno] = useState<Otevreno | null>(null);
@@ -101,14 +96,14 @@ export default function RoleEditor() {
         ja: d?.ja ?? { jeVlastnik: false, klic: null, roleId: null, nazev: '', opravneni: [] },
         upravyNedostupne: d?.upravyNedostupne === true,
       }))
-      .catch(e => setChybaNacteni(apiMessage(e, 'Role se nepodařilo načíst.')));
+      .catch(e => setChybaNacteni(apiMessage(e, t('Role se nepodařilo načíst.'))));
   };
   useEffect(() => { nacti(); }, []);
 
   const flash = (m: string) => { setZprava(m); setChyba(''); setTimeout(() => setZprava(''), 4000); };
 
   if (chybaNacteni) {
-    return <div className="glass-card"><ErrorState title="Role se nepodařilo načíst" hint={chybaNacteni} onRetry={nacti} /></div>;
+    return <div className="glass-card"><ErrorState title={t('Role se nepodařilo načíst')} hint={chybaNacteni} onRetry={nacti} /></div>;
   }
   if (!data) {
     return <div className="glass-card flex items-center justify-center h-48"><div className="spinner" /></div>;
@@ -152,8 +147,8 @@ export default function RoleEditor() {
     try {
       await fetch('/api/roles/vychozi', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(telo) }).then(okJson);
       await nacti();
-      flash(`Noví členové teď dostanou roli „${nazev}".`);
-    } catch (e) { setChyba(apiMessage(e, 'Výchozí roli se nepodařilo nastavit.')); }
+      flash(t('Noví členové teď dostanou roli „{nazev}".', { nazev }));
+    } catch (e) { setChyba(apiMessage(e, t('Výchozí roli se nepodařilo nastavit.'))); }
     setNastavujiVychozi(null);
   };
 
@@ -166,10 +161,10 @@ export default function RoleEditor() {
       setObnovit(null);
       await nacti();
       obnovOpravneni();
-      flash(`Role „${n}" má zase výchozí oprávnění.`);
+      flash(t('Role „{n}" má zase výchozí oprávnění.', { n }));
     } catch (e) {
       // 403 (návrat by přidal práva, která nemáš / je to tvoje role) říká server přesně.
-      setChyba(apiMessage(e, 'Roli se nepodařilo vrátit na výchozí.'));
+      setChyba(apiMessage(e, t('Roli se nepodařilo vrátit na výchozí.')));
       setObnovit(null);
     }
     setObnovuji(false);
@@ -183,10 +178,10 @@ export default function RoleEditor() {
       const n = mazat.nazev;
       setMazat(null);
       await nacti();
-      flash(`Role „${n}" je smazaná.`);
+      flash(t('Role „{n}" je smazaná.', { n }));
     } catch (e) {
       // 409 (roli někdo má, je výchozí) i 403 říká server česky a přesně.
-      setChyba(apiMessage(e, 'Roli se nepodařilo smazat.'));
+      setChyba(apiMessage(e, t('Roli se nepodařilo smazat.')));
       setMazat(null);
     }
     setMazu(false);
@@ -197,22 +192,22 @@ export default function RoleEditor() {
       <div className="glass-card p-5 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:justify-between">
           <div className="min-w-0">
-            <h3 className="font-bold tracking-tight text-[#16181A]">Role a oprávnění</h3>
+            <h3 className="font-bold tracking-tight text-[#16181A]">{t('Role a oprávnění')}</h3>
             <p className="text-black/45 text-sm mt-1 text-pretty">
-              Role je sada oprávnění — co člověk v podniku vidí a smí. Přednastavené role si můžeš upravit pro svůj
-              podnik (kromě Majitele a Tabletu) nebo zkopírovat; vlastní si složíš přesně podle toho, jak u vás práce
-              vypadá. Vlastník podniku má vždycky všechno.
+              
+              {t('Role je sada oprávnění — co člověk v podniku vidí a smí. Přednastavené role si můžeš upravit pro svůj podnik (kromě Majitele a Tabletu) nebo zkopírovat; vlastní si složíš přesně podle toho, jak u vás práce vypadá. Vlastník podniku má vždycky všechno.')}
             </p>
           </div>
           {smiSpravovat && (
             <Button variant="accent" icon="plus" block className="shrink-0"
-              onClick={() => setOtevreno({ druh: 'nova' })}>Nová role</Button>
+              onClick={() => setOtevreno({ druh: 'nova' })}>{t('Nová role')}</Button>
           )}
         </div>
         {!smiSpravovat && (
           <p className="note mt-4 text-sm flex items-start gap-2">
             <Icon name="lock" size={15} className="shrink-0 mt-0.5" />
-            Role si můžeš prohlédnout a přidělovat lidem. Vytvářet a upravovat je může jen ten, kdo má oprávnění „Spravovat role".
+            
+            {t('Role si můžeš prohlédnout a přidělovat lidem. Vytvářet a upravovat je může jen ten, kdo má oprávnění „Spravovat role".')}
           </p>
         )}
       </div>
@@ -229,23 +224,23 @@ export default function RoleEditor() {
       )}
 
       <section className="glass-card p-5 sm:p-6" aria-labelledby="role-vlastni">
-        <h4 id="role-vlastni" className="t-label mb-2">Vlastní role ({data.vlastni.length})</h4>
+        <h4 id="role-vlastni" className="t-label mb-2">{t('Vlastní role ({n})', { n: data.vlastni.length })}</h4>
         {data.vlastni.length === 0 ? (
-          <EmptyState icon="lock" compact title="Zatím žádná vlastní role"
-            hint="Zkopíruj přednastavenou (třeba Barista bez uzávěrky) nebo slož novou od nuly." />
+          <EmptyState icon="lock" compact title={t('Zatím žádná vlastní role')}
+            hint={t('Zkopíruj přednastavenou (třeba Barista bez uzávěrky) nebo slož novou od nuly.')} />
         ) : (
           <ul className="divide-y divide-black/[0.06]">
             {data.vlastni.map(r => (
               <RadekRole key={r.id} nazev={r.nazev} popis={r.popis} typ={r.typ} pocetOpravneni={r.opravneni.length} pocetLidi={r.pocet}
                 vychozi={jeVychozi({ id: r.id })} mojeRole={ja.roleId === r.id}>
                 <Button size="sm" variant="secondary" icon={smiSpravovat ? 'pencil' : undefined}
-                  onClick={() => setOtevreno({ druh: 'vlastni', role: r })}>{smiSpravovat ? 'Upravit' : 'Zobrazit'}</Button>
+                  onClick={() => setOtevreno({ druh: 'vlastni', role: r })}>{smiSpravovat ? t('Upravit') : t('Zobrazit')}</Button>
                 {smiSpravovat && muzeBytVychozi(r) && !jeVychozi({ id: r.id }) && (
                   <Button size="sm" variant="ghost" loading={nastavujiVychozi === `v${r.id}`}
-                    onClick={() => nastavVychozi({ roleId: r.id }, r.nazev)}>Nastavit jako výchozí</Button>
+                    onClick={() => nastavVychozi({ roleId: r.id }, r.nazev)}>{t('Nastavit jako výchozí')}</Button>
                 )}
                 {smiSpravovat && (
-                  <Button size="sm" variant="danger" icon="trash" iconOnly aria-label={`Smazat roli ${r.nazev}`} title="Smazat roli"
+                  <Button size="sm" variant="danger" icon="trash" iconOnly aria-label={t('Smazat roli {nazev}', { nazev: r.nazev })} title={t('Smazat roli')}
                     onClick={() => { setChyba(''); setMazat(r); }} />
                 )}
               </RadekRole>
@@ -255,65 +250,67 @@ export default function RoleEditor() {
       </section>
 
       <section className="glass-card p-5 sm:p-6" aria-labelledby="role-system">
-        <h4 id="role-system" className="t-label mb-2">Přednastavené role</h4>
+        <h4 id="role-system" className="t-label mb-2">{t('Přednastavené role')}</h4>
         <ul className="divide-y divide-black/[0.06]">
           {data.system.map(r => (
             <RadekRole key={r.klic} nazev={r.nazev} popis={r.popis} typ={r.typ} pocetOpravneni={r.opravneni.length} pocetLidi={r.pocet}
               vychozi={jeVychozi({ klic: r.klic })} mojeRole={ja.roleId == null && ja.klic === r.klic && !ja.jeVlastnik}
               system={r.upravitelna ? 'upravitelna' : 'zamcena'} upraveno={r.upraveno === true}>
               {lzeUpravitSystemovou(r) ? (
-                <Button size="sm" variant="secondary" icon="pencil" onClick={() => setOtevreno({ druh: 'system', role: r })}>Upravit</Button>
+                <Button size="sm" variant="secondary" icon="pencil" onClick={() => setOtevreno({ druh: 'system', role: r })}>{t('Upravit')}</Button>
               ) : (
-                <Button size="sm" variant="ghost" onClick={() => setOtevreno({ druh: 'system', role: r })}>Zobrazit</Button>
+                <Button size="sm" variant="ghost" onClick={() => setOtevreno({ druh: 'system', role: r })}>{t('Zobrazit')}</Button>
               )}
               {lzeUpravitSystemovou(r) && r.upraveno && (
-                <Button size="sm" variant="ghost" icon="undo" onClick={() => { setChyba(''); setObnovit(r); }}>Obnovit výchozí</Button>
+                <Button size="sm" variant="ghost" icon="undo" onClick={() => { setChyba(''); setObnovit(r); }}>{t('Obnovit výchozí')}</Button>
               )}
               {smiSpravovat && (
                 <Button size="sm" variant="secondary" icon="copy"
-                  onClick={() => setOtevreno({ druh: 'nova', predloha: predlohaZ(r, ja) })}>Zkopírovat do vlastní</Button>
+                  onClick={() => setOtevreno({ druh: 'nova', predloha: predlohaZ(r, ja) })}>{t('Zkopírovat do vlastní')}</Button>
               )}
               {smiSpravovat && muzeBytVychozi(r) && !jeVychozi({ klic: r.klic }) && (
                 <Button size="sm" variant="ghost" loading={nastavujiVychozi === `s${r.klic}`}
-                  onClick={() => nastavVychozi({ klic: r.klic }, r.nazev)}>Nastavit jako výchozí</Button>
+                  onClick={() => nastavVychozi({ klic: r.klic }, r.nazev)}>{t('Nastavit jako výchozí')}</Button>
               )}
             </RadekRole>
           ))}
         </ul>
       </section>
 
-      <Modal open={!!obnovit} onClose={() => !obnovuji && setObnovit(null)} size="sm" title="Obnovit výchozí oprávnění?"
+      <Modal open={!!obnovit} onClose={() => !obnovuji && setObnovit(null)} size="sm" title={t('Obnovit výchozí oprávnění?')}
         footer={<>
-          <Button variant="secondary" onClick={() => setObnovit(null)} disabled={obnovuji}>Zrušit</Button>
-          <Button variant="accent" icon="undo" loading={obnovuji} onClick={obnovVychozi}>Obnovit výchozí</Button>
+          <Button variant="secondary" onClick={() => setObnovit(null)} disabled={obnovuji}>{t('Zrušit')}</Button>
+          <Button variant="accent" icon="undo" loading={obnovuji} onClick={obnovVychozi}>{t('Obnovit výchozí')}</Button>
         </>}>
         {obnovit && (
           <div className="space-y-3 text-sm text-black/60">
             <p>
-              Role <strong className="text-[#16181A]">{obnovit.nazev}</strong> dostane zpátky výchozí název, popis a oprávnění
-              {obnovit.vychoziOpravneni ? ` (${czCount(obnovit.vychoziOpravneni.length, OPRAVNENI)})` : ''}. Úpravy tvého podniku se zahodí.
+              {sUzlem(t('Role {nazev} dostane zpátky výchozí název, popis a oprávnění{pocet}. Úpravy tvého podniku se zahodí.', {
+                nazev: VLOZ,
+                pocet: obnovit.vychoziOpravneni ? ` (${t('{n} oprávnění', { n: obnovit.vychoziOpravneni.length })})` : '',
+              }), <strong className="text-[#16181A]">{obnovit.nazev}</strong>)}
             </p>
             {obnovit.pocet > 0 && (
-              <p className="note">Změna platí hned pro {lide(obnovit.pocet)} s touhle rolí — při příštím načtení aplikace.</p>
+              <p className="note">{t('Změna platí hned pro {lide} s touhle rolí — při příštím načtení aplikace.', { lide: lide(t, obnovit.pocet) })}</p>
             )}
           </div>
         )}
       </Modal>
 
-      <Modal open={!!mazat} onClose={() => !mazu && setMazat(null)} size="sm" title="Smazat roli?"
+      <Modal open={!!mazat} onClose={() => !mazu && setMazat(null)} size="sm" title={t('Smazat roli?')}
         footer={<>
-          <Button variant="secondary" onClick={() => setMazat(null)} disabled={mazu}>Zrušit</Button>
+          <Button variant="secondary" onClick={() => setMazat(null)} disabled={mazu}>{t('Zrušit')}</Button>
           <Button variant="danger-solid" icon="trash" loading={mazu} onClick={smaz}
-            disabled={!!mazat && (mazat.pocet > 0 || jeVychozi({ id: mazat.id }))}>Smazat</Button>
+            disabled={!!mazat && (mazat.pocet > 0 || jeVychozi({ id: mazat.id }))}>{t('Smazat')}</Button>
         </>}>
         {mazat && (
           <div className="space-y-3 text-sm text-black/60">
-            <p>Role <strong className="text-[#16181A]">{mazat.nazev}</strong> zmizí. Nepřijaté pozvánky s touhle rolí dostanou při přijetí výchozí roli podniku.</p>
+            <p>{sUzlem(t('Role {nazev} zmizí. Nepřijaté pozvánky s touhle rolí dostanou při přijetí výchozí roli podniku.', { nazev: VLOZ }), <strong className="text-[#16181A]">{mazat.nazev}</strong>)}</p>
             {mazat.pocet > 0 && (
-              <p className="note note-danger">Roli má {lide(mazat.pocet)}. Nejdřív je v Nastavení týmu převeď na jinou roli — jinak by zůstali bez oprávnění.</p>
+              <p className="note note-danger">{t('Roli má {lide}. Nejdřív je v Nastavení týmu převeď na jinou roli — jinak by zůstali bez oprávnění.', { lide: lide(t, mazat.pocet) })}</p>
             )}
             {jeVychozi({ id: mazat.id }) && (
-              <p className="note note-danger">Tohle je výchozí role pro nové členy. Nejdřív nastav jako výchozí jinou.</p>
+              <p className="note note-danger">{t('Tohle je výchozí role pro nové členy. Nejdřív nastav jako výchozí jinou.')}</p>
             )}
           </div>
         )}
@@ -339,20 +336,21 @@ function RadekRole({ nazev, popis, typ, pocetOpravneni, pocetLidi, vychozi, moje
   nazev: string; popis: string | null; typ: TypRole; pocetOpravneni: number; pocetLidi: number;
   vychozi: boolean; mojeRole: boolean; system?: 'upravitelna' | 'zamcena'; upraveno?: boolean; children: React.ReactNode;
 }) {
+  const t = useT('sprava');
   return (
     <li className="py-3.5 flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5 flex-wrap">
           <p className="font-semibold text-[#16181A] min-w-0 break-words">{nazev}</p>
-          <Chip size="sm" tone="info">{TYP_NAZEV[typ]}</Chip>
-          {vychozi && <Chip size="sm" tone="ok">Výchozí pro nové</Chip>}
-          {mojeRole && <Chip size="sm" tone="ink">Tvoje role</Chip>}
+          <Chip size="sm" tone="info">{typNazev(t)[typ]}</Chip>
+          {vychozi && <Chip size="sm" tone="ok">{t('Výchozí pro nové')}</Chip>}
+          {mojeRole && <Chip size="sm" tone="ink">{t('Tvoje role')}</Chip>}
           {/* Zámek jen u rolí, které upravit nejde (Majitel / Vedení, Tablet). */}
-          {system && <Chip size="sm" tone="muted" icon={system === 'zamcena' ? 'lock' : undefined}>Přednastavená</Chip>}
-          {upraveno && <Chip size="sm" tone="wait">Upraveno</Chip>}
+          {system && <Chip size="sm" tone="muted" icon={system === 'zamcena' ? 'lock' : undefined}>{t('Přednastavená')}</Chip>}
+          {upraveno && <Chip size="sm" tone="wait">{t('Upraveno')}</Chip>}
         </div>
         {popis && <p className="text-xs text-black/50 mt-1 line-clamp-2 text-pretty">{popis}</p>}
-        <p className="text-xs text-black/45 mt-1 tabular-nums">{pocetOpravneni} oprávnění · {lide(pocetLidi)}</p>
+        <p className="text-xs text-black/45 mt-1 tabular-nums">{t('{n} oprávnění', { n: pocetOpravneni })} · {lide(t, pocetLidi)}</p>
       </div>
       <div className="flex items-center gap-1.5 flex-wrap shrink-0">{children}</div>
     </li>
@@ -363,6 +361,11 @@ function EditorRole({ otevreno, ja, smiSpravovat, upravyNedostupne, vychoziProNo
   otevreno: Otevreno; ja: Ja; smiSpravovat: boolean; upravyNedostupne: boolean; vychoziProNove: boolean;
   onZpet: () => void; onKopie: (r: SysRole | VlRole) => void; onUlozeno: (zprava: string) => void | Promise<void>;
 }) {
+  const t = useT('sprava');
+  const nazvyKlicu = (ids: string[], max = 3) => {
+    const n = ids.slice(0, max).map(id => t('„{nazev}"', { nazev: popisKlice(id)?.nazev ?? id })).join(', ');
+    return ids.length > max ? t('{seznam} a další {n}', { seznam: n, n: ids.length - max }) : n;
+  };
   const moje = useMemo(() => new Set(ja.opravneni), [ja.opravneni]);
   const vychoziHodnoty = otevreno.druh === 'nova'
     ? { nazev: otevreno.predloha?.nazev ?? '', popis: otevreno.predloha?.popis ?? '', typ: otevreno.predloha?.typ ?? 'zamestnanec' as TypRole, opravneni: otevreno.predloha?.opravneni ?? [] }
@@ -385,17 +388,17 @@ function EditorRole({ otevreno, ja, smiSpravovat, upravyNedostupne, vychoziProNo
   // Stejná pravidla jako server (lib/roleUpravy.ts → smiUpravitSystemovou);
   // rozhoduje stejně server, tohle jen vysvětlí dopředu.
   const jenCist: string | null =
-    system && system.upravitelna !== true ? (system.procZamceno ?? 'Přednastavená role se nedá upravit. Zkopíruj ji do vlastní a uprav kopii.')
-    : system && upravyNedostupne ? 'Úpravy přednastavených rolí se teď nepodařilo načíst, takže roli ukazuji jen ke čtení. Zkus stránku načíst znovu.'
-    : !smiSpravovat ? 'Na správu rolí nemáš oprávnění — roli si můžeš jen prohlédnout.'
-    : otevreno.druh === 'vlastni' && !ja.jeVlastnik && ja.roleId === otevreno.role.id ? 'Tohle je tvoje vlastní role. Upravit ji může jen někdo jiný — jinak by si kdokoli mohl přidat práva sám.'
-    : system && !ja.jeVlastnik && ja.roleId == null && ja.klic === system.klic ? 'Tohle je tvoje role. Upravit ji může jen někdo jiný — jinak by si kdokoli mohl přidat práva sám.'
-    : mimoMoje.length ? `Tahle role má oprávnění, která ty nemáš (${nazvyKlicu(mimoMoje)}) — upravit ji může jen někdo s nimi.`
+    system && system.upravitelna !== true ? (system.procZamceno ?? t('Přednastavená role se nedá upravit. Zkopíruj ji do vlastní a uprav kopii.'))
+    : system && upravyNedostupne ? t('Úpravy přednastavených rolí se teď nepodařilo načíst, takže roli ukazuji jen ke čtení. Zkus stránku načíst znovu.')
+    : !smiSpravovat ? t('Na správu rolí nemáš oprávnění — roli si můžeš jen prohlédnout.')
+    : otevreno.druh === 'vlastni' && !ja.jeVlastnik && ja.roleId === otevreno.role.id ? t('Tohle je tvoje vlastní role. Upravit ji může jen někdo jiný — jinak by si kdokoli mohl přidat práva sám.')
+    : system && !ja.jeVlastnik && ja.roleId == null && ja.klic === system.klic ? t('Tohle je tvoje role. Upravit ji může jen někdo jiný — jinak by si kdokoli mohl přidat práva sám.')
+    : mimoMoje.length ? t('Tahle role má oprávnění, která ty nemáš ({seznam}) — upravit ji může jen někdo s nimi.', { seznam: nazvyKlicu(mimoMoje) })
     : null;
 
   const zamek = (id: string): string | null => {
-    if (typ === 'kiosk' && !KIOSK_BILA_LISTINA.has(id)) return 'Tablet tohle mít nesmí — kdo zná heslo tabletu, dostal by to taky.';
-    if (!ja.jeVlastnik && !moje.has(id)) return 'Sám tohle oprávnění nemáš, takže ho do role dát nemůžeš.';
+    if (typ === 'kiosk' && !KIOSK_BILA_LISTINA.has(id)) return t('Tablet tohle mít nesmí — kdo zná heslo tabletu, dostal by to taky.');
+    if (!ja.jeVlastnik && !moje.has(id)) return t('Sám tohle oprávnění nemáš, takže ho do role dát nemůžeš.');
     return null;
   };
 
@@ -412,16 +415,16 @@ function EditorRole({ otevreno, ja, smiSpravovat, upravyNedostupne, vychoziProNo
     if (on) {
       const v = zapnout([id]);
       if ('blokuje' in v) {
-        setInfo(`„${popisKlice(id)?.nazev}" nejde zapnout: potřebuje „${popisKlice(v.blokuje)?.nazev}" — ${zamek(v.blokuje)?.charAt(0).toLowerCase()}${zamek(v.blokuje)?.slice(1)}`);
+        setInfo(t('„{nazev}" nejde zapnout: potřebuje „{potrebuje}" — {proc}', { nazev: popisKlice(id)?.nazev, potrebuje: popisKlice(v.blokuje)?.nazev, proc: `${zamek(v.blokuje)?.charAt(0).toLowerCase()}${zamek(v.blokuje)?.slice(1)}` }));
         return;
       }
       setSada(v.dalsi);
-      setInfo(v.pridano.length ? `Zapnuto i ${nazvyKlicu(v.pridano)} — „${popisKlice(id)?.nazev}" bez toho nefunguje.` : '');
+      setInfo(v.pridano.length ? t('Zapnuto i {seznam} — „{nazev}" bez toho nefunguje.', { seznam: nazvyKlicu(v.pridano), nazev: popisKlice(id)?.nazev }) : '');
     } else {
       const zbyva = new Set(bezZavislych(sada, id));
       const vypnuto = [...sada].filter(k => k !== id && !zbyva.has(k));
       setSada(zbyva);
-      setInfo(vypnuto.length ? `Vypnuto i ${nazvyKlicu(vypnuto)} — stojí na „${popisKlice(id)?.nazev}".` : '');
+      setInfo(vypnuto.length ? t('Vypnuto i {seznam} — stojí na „{nazev}".', { seznam: nazvyKlicu(vypnuto), nazev: popisKlice(id)?.nazev }) : '');
     }
   };
 
@@ -435,27 +438,27 @@ function EditorRole({ otevreno, ja, smiSpravovat, upravyNedostupne, vychoziProNo
       const zbylo = klice.length - klice.filter(o => sada.has(o.id)).length - lze.length;
       // Shoda podle čísla: „1 … zůstalo vypnuté — je zamčené", „3 … zůstala
       // vypnutá — jsou zamčená", „5 … zůstalo vypnutých".
-      setInfo(zbylo > 0 ? `${czCount(zbylo, OPRAVNENI)} ${czForm(zbylo, { one: 'zůstalo vypnuté — je zamčené', few: 'zůstala vypnutá — jsou zamčená', many: 'zůstalo vypnutých — jsou zamčená' })}.` : '');
+      setInfo(zbylo > 0 ? t('{n, plural, one {# oprávnění zůstalo vypnuté — je zamčené.} few {# oprávnění zůstala vypnutá — jsou zamčená.} other {# oprávnění zůstalo vypnutých — jsou zamčená.}}', { n: zbylo }) : '');
     } else {
       let s: Iterable<string> = sada;
       for (const o of klice) if (sada.has(o.id) && !zamek(o.id)) s = bezZavislych(s, o.id);
       const zbyva = new Set(s);
       const mimo = [...sada].filter(k => !zbyva.has(k) && popisKlice(k)?.oblast !== klice[0]?.oblast);
       setSada(zbyva);
-      setInfo(mimo.length ? `Vypnuto i ${nazvyKlicu(mimo)} z jiných oblastí — stály na vypnutých.` : '');
+      setInfo(mimo.length ? t('Vypnuto i {seznam} z jiných oblastí — stály na vypnutých.', { seznam: nazvyKlicu(mimo) }) : '');
     }
   };
 
-  const zmenTyp = (t: TypRole) => {
-    setTyp(t);
-    if (t !== 'kiosk') { setInfo(''); return; }
+  const zmenTyp = (novy: TypRole) => {
+    setTyp(novy);
+    if (novy !== 'kiosk') { setInfo(''); return; }
     // Tablet smí jen bílou listinu; co mimo ni, se vypne i se vším, co na tom stojí.
     let s: Iterable<string> = sada;
     for (const k of sada) if (!KIOSK_BILA_LISTINA.has(k)) s = bezZavislych(s, k);
     const zbyva = new Set(s);
     const vypnuto = sada.size - zbyva.size;
     setSada(zbyva);
-    setInfo(vypnuto ? `Tablet nesmí mít ${czCount(vypnuto, OPRAVNENI)} z původního výběru — ${czVerb(vypnuto, 'vypnulo', 'vypnula')} se.` : '');
+    setInfo(vypnuto ? t('{n, plural, one {Tablet nesmí mít # oprávnění z původního výběru — vypnulo se.} few {Tablet nesmí mít # oprávnění z původního výběru — vypnula se.} other {Tablet nesmí mít # oprávnění z původního výběru — vypnulo se.}}', { n: vypnuto }) : '');
   };
 
   const skupiny = useMemo(() => OBLASTI.map(oblast => ({
@@ -501,7 +504,7 @@ function EditorRole({ otevreno, ja, smiSpravovat, upravyNedostupne, vychoziProNo
   const uloz = async (e: React.FormEvent) => {
     e.preventDefault();
     if (jenCist) return;
-    if (!nazev.trim()) { setChyba('Zadej název role.'); return; }
+    if (!nazev.trim()) { setChyba(t('Zadej název role.')); return; }
     setUkladam(true); setChyba('');
     const telo = { nazev: nazev.trim(), popis: popis.trim(), typ, opravneni: [...sada].sort() };
     try {
@@ -512,35 +515,35 @@ function EditorRole({ otevreno, ja, smiSpravovat, upravyNedostupne, vychoziProNo
         await fetch(`/api/roles/system/${encodeURIComponent(otevreno.role.klic)}`, {
           method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(bezTypu),
         }).then(okJson);
-        await onUlozeno(`Role „${telo.nazev}" je uložená — platí hned pro všechny, kdo ji mají.`);
+        await onUlozeno(t('Role „{nazev}" je uložená — platí hned pro všechny, kdo ji mají.', { nazev: telo.nazev }));
       } else if (otevreno.druh === 'vlastni') {
         await fetch(`/api/roles/${otevreno.role.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(telo) }).then(okJson);
-        await onUlozeno(`Role „${telo.nazev}" je uložená.`);
+        await onUlozeno(t('Role „{nazev}" je uložená.', { nazev: telo.nazev }));
       } else {
         const zdroj = otevreno.druh === 'nova' ? otevreno.predloha?.zdroj ?? null : null;
         await fetch('/api/roles', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...telo, zdroj }) }).then(okJson);
-        await onUlozeno(`Role „${telo.nazev}" je vytvořená. Přidělíš ji v Nastavení týmu u člověka.`);
+        await onUlozeno(t('Role „{nazev}" je vytvořená. Přidělíš ji v Nastavení týmu u člověka.', { nazev: telo.nazev }));
       }
     } catch (err) {
       // 403 s důvodem („Roli nemůžeš dát oprávnění, která sám nemáš: …")
       // se ukáže doslova — je to přesnější než cokoli, co by odhadl klient.
-      setChyba(apiMessage(err, 'Roli se nepodařilo uložit.') + (err instanceof ApiError && err.status >= 500 ? ' Zkus to prosím znovu.' : ''));
+      setChyba(apiMessage(err, t('Roli se nepodařilo uložit.')) + (err instanceof ApiError && err.status >= 500 ? ` ${t('Zkus to prosím znovu.')}` : ''));
       setUkladam(false);
     }
   };
 
-  const nadpis = otevreno.druh === 'nova' ? 'Nová role' : otevreno.role.nazev;
+  const nadpis = otevreno.druh === 'nova' ? t('Nová role') : otevreno.role.nazev;
   const predloha = otevreno.druh === 'nova' ? otevreno.predloha as (undefined | { vynechano?: number }) : undefined;
 
   return (
     <form onSubmit={uloz} className="space-y-4 pb-24 md:pb-0" aria-labelledby="role-editor-nadpis">
-      <DiscardGuard guard={strazZpet} what={CO_SE_ZAHODI_ROLE} />
+      <DiscardGuard guard={strazZpet} what={t('Rozepsané změny role se neuloží.')} />
       <div className="glass-card p-5 sm:p-6 space-y-5">
         <div className="flex items-start gap-3">
-          <Button variant="ghost" size="sm" icon="chevron" iconOnly aria-label="Zpět na seznam rolí" className="rotate-90 shrink-0 -ml-2" onClick={zpet} />
+          <Button variant="ghost" size="sm" icon="chevron" iconOnly aria-label={t('Zpět na seznam rolí')} className="rotate-90 shrink-0 -ml-2" onClick={zpet} />
           <div className="min-w-0 flex-1">
             <h3 id="role-editor-nadpis" className="font-bold tracking-tight text-[#16181A] break-words">{nadpis}</h3>
-            <p className="text-sm text-black/45 mt-0.5 tabular-nums">Zapnuto {sada.size} ze {KATALOG.length} oprávnění</p>
+            <p className="text-sm text-black/45 mt-0.5 tabular-nums">{t('Zapnuto {n} ze {celkem} oprávnění', { n: sada.size, celkem: KATALOG.length })}</p>
           </div>
         </div>
 
@@ -548,14 +551,14 @@ function EditorRole({ otevreno, ja, smiSpravovat, upravyNedostupne, vychoziProNo
           <div className="note text-sm flex flex-col sm:flex-row sm:items-center gap-2.5">
             <span className="flex items-start gap-2 min-w-0 flex-1"><Icon name="lock" size={15} className="shrink-0 mt-0.5" />{jenCist}</span>
             {smiSpravovat && otevreno.druh !== 'nova' && (
-              <Button size="sm" variant="secondary" icon="copy" className="shrink-0" onClick={() => onKopie(otevreno.role)}>Zkopírovat do vlastní</Button>
+              <Button size="sm" variant="secondary" icon="copy" className="shrink-0" onClick={() => onKopie(otevreno.role)}>{t('Zkopírovat do vlastní')}</Button>
             )}
           </div>
         )}
         {!!predloha?.vynechano && (
           <p className="note text-sm flex items-start gap-2">
             <Icon name="info" size={15} className="shrink-0 mt-0.5" />
-            Z předlohy jsem vynechal {czCount(predloha.vynechano, OPRAVNENI)}, {czForm(predloha.vynechano, { one: 'které', few: 'která', many: 'která' })} sám nemáš — do role {predloha.vynechano === 1 ? 'ho' : 'je'} dát nemůžeš.
+            {t('{n, plural, one {Z předlohy jsem vynechal # oprávnění, které sám nemáš — do role ho dát nemůžeš.} few {Z předlohy jsem vynechal # oprávnění, která sám nemáš — do role je dát nemůžeš.} other {Z předlohy jsem vynechal # oprávnění, která sám nemáš — do role je dát nemůžeš.}}', { n: predloha.vynechano })}
           </p>
         )}
 
@@ -563,12 +566,12 @@ function EditorRole({ otevreno, ja, smiSpravovat, upravyNedostupne, vychoziProNo
           <p className="note text-sm flex items-start gap-2">
             <Icon name="info" size={15} className="shrink-0 mt-0.5" />
             <span className="min-w-0">
-              Úprava platí jen v tomhle podniku a hned pro všechny, kdo roli mají ({lide(system.pocet)}).
+              {t('Úprava platí jen v tomhle podniku a hned pro všechny, kdo roli mají ({lide}).', { lide: lide(t, system.pocet) })}
               {system.upraveno && system.vychoziOpravneni && (() => {
                 const plus = navic(sada, system.vychoziOpravneni).length, minus = navic(system.vychoziOpravneni, sada).length;
-                return plus || minus ? ` Proti výchozí: ${plus} navíc, ${minus} vypnuto.` : ' Oprávnění jsou teď stejná jako výchozí.';
+                return plus || minus ? ` ${t('Proti výchozí: {plus} navíc, {minus} vypnuto.', { plus, minus })}` : ` ${t('Oprávnění jsou teď stejná jako výchozí.')}`;
               })()}
-              {' '}Výchozí stav vrátíš v seznamu rolí tlačítkem „Obnovit výchozí".
+              {' '}{t('Výchozí stav vrátíš v seznamu rolí tlačítkem „Obnovit výchozí".')}
             </span>
           </p>
         )}
@@ -576,50 +579,50 @@ function EditorRole({ otevreno, ja, smiSpravovat, upravyNedostupne, vychoziProNo
           <p role="alert" className="note note-danger text-sm flex items-start gap-2">
             <Icon name="warning" size={15} className="shrink-0 mt-0.5" />
             <span className="min-w-0">
-              {vychoziProNove ? 'Tuhle roli dostane každý nový člen' : 'Baristu dostane nový člen, kdykoli výchozí role nejde použít'} — a {smiBytVychozi(sada).proc}. Takhle ji uložit nepůjde; pro citlivější práva vytvoř vlastní roli.
+              {vychoziProNove ? t('Tuhle roli dostane každý nový člen') : t('Baristu dostane nový člen, kdykoli výchozí role nejde použít')} — {t('a {proc}. Takhle ji uložit nepůjde; pro citlivější práva vytvoř vlastní roli.', { proc: smiBytVychozi(sada).proc })}
             </span>
           </p>
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="min-w-0">
-            <Label htmlFor="role-nazev">Název role</Label>
+            <Label htmlFor="role-nazev">{t('Název role')}</Label>
             <Input id="role-nazev" value={nazev} maxLength={60} required disabled={!!jenCist}
-              placeholder={system?.vychoziNazev ?? 'Třeba Směnový vedoucí'} onChange={e => setNazev(e.target.value)} />
+              placeholder={system?.vychoziNazev ?? t('Třeba Směnový vedoucí')} onChange={e => setNazev(e.target.value)} />
           </div>
           <div className="min-w-0">
-            <Label htmlFor="role-popis">Popis (nepovinné)</Label>
+            <Label htmlFor="role-popis">{t('Popis (nepovinné)')}</Label>
             <Textarea id="role-popis" value={popis} maxLength={240} rows={2} disabled={!!jenCist}
-              placeholder="Pro koho role je a co dělá" onChange={e => setPopis(e.target.value)} />
+              placeholder={t('Pro koho role je a co dělá')} onChange={e => setPopis(e.target.value)} />
           </div>
         </div>
 
         <div className="space-y-2">
-          <p className="field-label" id="role-typ">Typ rozhraní</p>
+          <p className="field-label" id="role-typ">{t('Typ rozhraní')}</p>
           {jenCist || system ? (
-            <p className="text-sm text-[#16181A] font-semibold">{TYP_NAZEV[typ]}</p>
+            <p className="text-sm text-[#16181A] font-semibold">{typNazev(t)[typ]}</p>
           ) : (
-            <Segmented ariaLabel="Typ rozhraní" options={TYPY} value={typ} onChange={zmenTyp} />
+            <Segmented ariaLabel={t('Typ rozhraní')} options={typy(t)} value={typ} onChange={zmenTyp} />
           )}
-          <p className="text-xs text-black/50 text-pretty">{TYP_VYSVETLENI[typ]}</p>
+          <p className="text-xs text-black/50 text-pretty">{typVysvetleni(t)[typ]}</p>
           {otevreno.druh === 'vlastni' && typ !== otevreno.role.typ && otevreno.role.pocet > 0 && (
-            <p className="note text-xs">Změna typu přepne rozhraní všem, kdo tuhle roli mají ({lide(otevreno.role.pocet)}) — při příštím načtení aplikace.</p>
+            <p className="note text-xs">{t('Změna typu přepne rozhraní všem, kdo tuhle roli mají ({lide}) — při příštím načtení aplikace.', { lide: lide(t, otevreno.role.pocet) })}</p>
           )}
         </div>
       </div>
 
       <div className="glass-card p-5 sm:p-6 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          <h4 className="t-label flex-1">Oprávnění</h4>
+          <h4 className="t-label flex-1">{t('Oprávnění')}</h4>
           <SearchField value={hledani} onChange={setHledani} storageKey="role-opravneni" className="sm:w-72"
-            placeholder="Hledat oprávnění…" ariaLabel="Hledat v oprávněních" />
+            placeholder={t('Hledat oprávnění…')} ariaLabel={t('Hledat v oprávněních')} />
         </div>
         {info && (
           <p role="status" className="note text-sm flex items-start gap-2">
             <Icon name="info" size={15} className="shrink-0 mt-0.5" /><span className="min-w-0">{info}</span>
           </p>
         )}
-        {nicNeodpovida && <EmptyState icon="search" compact title="Nic neodpovídá hledání" hint="Zkus jiné slovo — hledá se v názvu i popisu oprávnění." />}
+        {nicNeodpovida && <EmptyState icon="search" compact title={t('Nic neodpovídá hledání')} hint={t('Zkus jiné slovo — hledá se v názvu i popisu oprávnění.')} />}
 
         <div className="space-y-2">
           {skupiny.map(({ oblast, vse, shoda }) => {
@@ -646,11 +649,11 @@ function EditorRole({ otevreno, ja, smiSpravovat, upravyNedostupne, vychoziProNo
                   </button>
                   {!jenCist && odemcene.length > 0 && (
                     <Button size="sm" variant="ghost" className="shrink-0"
-                      aria-label={`${vseZapnute ? 'Vypnout' : 'Zapnout'} ${hleda ? 'nalezená oprávnění' : 'vše'} v oblasti ${oblast}`}
+                      aria-label={t('{akce} {co} v oblasti {oblast}', { akce: vseZapnute ? t('Vypnout') : t('Zapnout'), co: hleda ? t('nalezená oprávnění') : t('vše'), oblast })}
                       onClick={() => prepniOblast(viditelne, !vseZapnute)}>
                       {/* Na telefonu by „Zapnout vše" ukouslo název oblasti. */}
-                      <span className="sm:hidden">{vseZapnute ? 'Vypnout' : hleda ? 'Nalezená' : 'Vše'}</span>
-                      <span className="hidden sm:inline">{vseZapnute ? (hleda ? 'Vypnout nalezená' : 'Vypnout vše') : (hleda ? 'Zapnout nalezená' : 'Zapnout vše')}</span>
+                      <span className="sm:hidden">{vseZapnute ? t('Vypnout') : hleda ? t('Nalezená') : t('Vše')}</span>
+                      <span className="hidden sm:inline">{vseZapnute ? (hleda ? t('Vypnout nalezená') : t('Vypnout vše')) : (hleda ? t('Zapnout nalezená') : t('Zapnout vše'))}</span>
                     </Button>
                   )}
                 </div>
@@ -660,7 +663,7 @@ function EditorRole({ otevreno, ja, smiSpravovat, upravyNedostupne, vychoziProNo
                       const on = sada.has(o.id);
                       const z = zamek(o.id);
                       const kvuli = on ? [...sada].filter(j => j !== o.id && popisKlice(j)?.vyzaduje.includes(o.id)) : [];
-                      const c = CITLIVOST[o.citlivost] ?? CITLIVOST['nízká'];
+                      const c = citlivost(t)[o.citlivost] ?? citlivost(t)['nízká']; // i18n-ok
                       const lid = `op-${o.id.replace('.', '-')}`;
                       return (
                         <li key={o.id} className="flex items-start gap-3 px-3.5 py-3">
@@ -678,10 +681,10 @@ function EditorRole({ otevreno, ja, smiSpravovat, upravyNedostupne, vychoziProNo
                               {z && <span className="flex items-start gap-1 mt-1 text-black/60"><Icon name="lock" size={12} className="shrink-0 mt-0.5" />{z}</span>}
                             </p>
                             {kvuli.length > 0 && (
-                              <p className="text-xs text-[#5B7A08] mt-1">Zapnuto kvůli {nazvyKlicu(kvuli, 2)}</p>
+                              <p className="text-xs text-[#5B7A08] mt-1">{t('Zapnuto kvůli {seznam}', { seznam: nazvyKlicu(kvuli, 2) })}</p>
                             )}
                             {!on && o.vyzaduje.length > 0 && !z && (
-                              <p className="text-xs text-black/45 mt-1">Zapne i {nazvyKlicu(o.vyzaduje, 2)}</p>
+                              <p className="text-xs text-black/45 mt-1">{t('Zapne i {seznam}', { seznam: nazvyKlicu(o.vyzaduje, 2) })}</p>
                             )}
                           </div>
                         </li>
@@ -705,10 +708,10 @@ function EditorRole({ otevreno, ja, smiSpravovat, upravyNedostupne, vychoziProNo
           by se k tlačítku jinak rolovalo zpátky přes celý katalog. */}
       <div className="sticky bottom-24 md:bottom-4 z-10">
         <div className="glass-strong rounded-2xl p-2.5 flex items-center gap-2 justify-end flex-wrap">
-          <Button variant="secondary" onClick={zpet}>{jenCist ? 'Zpět' : 'Zrušit'}</Button>
+          <Button variant="secondary" onClick={zpet}>{jenCist ? t('Zpět') : t('Zrušit')}</Button>
           {!jenCist && (
             <Button type="submit" variant="accent" icon="check" loading={ukladam} disabled={!nazev.trim() || (otevreno.druh !== 'nova' && !zmeneno)}>
-              {otevreno.druh !== 'nova' ? 'Uložit změny' : 'Vytvořit roli'}
+              {otevreno.druh !== 'nova' ? t('Uložit změny') : t('Vytvořit roli')}
             </Button>
           )}
         </div>

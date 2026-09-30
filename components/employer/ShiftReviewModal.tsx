@@ -8,6 +8,8 @@ import { pragueToday } from '@/lib/pragueTime';
 import { czForm } from '@/lib/czech';
 import { okJson } from '@/lib/api';
 import { Modal, Button, Segmented, Skeleton, Switch, SwitchRow } from '../ui';
+import { useT } from '@/lib/i18n/client';
+import { useLocale } from './jazyk';
 
 export interface ItemMark { points: number; note: string | null; flagged: boolean }
 type ItemKind = 'task' | 'procedure' | 'closing';
@@ -46,7 +48,7 @@ export interface Summary {
 
 const todayStr = () => pragueToday();
 const inputCls = 'field';
-const plural = (n: number, one: string, few: string, many: string) => czForm(n, { one, few, many });
+
 const signed = (n: number) => `${n > 0 ? '+' : ''}${n}`;
 
 function StarPicker({ value, onChange }: { value: number; onChange: (n: number) => void }) {
@@ -73,6 +75,8 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
     /** Opened from "ohodnotit celou směnu" — rate everyone who worked it. */
     initialWholeShift?: boolean;
     onClose: () => void; onSaved: () => void }) {
+  const loc = useLocale();
+  const t = useT('sprava');
   const money = useMoney();
   const [date, setDate] = useState(initialDate || todayStr());
   const [shiftDates, setShiftDates] = useState<string[]>([]);
@@ -197,14 +201,14 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
       if (res.ok) onSaved();
       else {
         const d = await res.json().catch(() => ({}));
-        setSaveErr(d.error || 'Hodnocení se nepodařilo uložit.');
+        setSaveErr(d.error || t('Hodnocení se nepodařilo uložit.'));
       }
     } catch {
-      setSaveErr('Nepodařilo se spojit se serverem.');
+      setSaveErr(t('Nepodařilo se spojit se serverem.'));
     } finally { setSaving(false); }
   };
 
-  const fmtChip = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' });
+  const fmtChip = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString(loc, { day: 'numeric', month: 'numeric' });
   const prioDot = (p: string) => p === 'high' ? 'bg-bad' : p === 'medium' ? 'bg-wait' : 'bg-[#C8F542]';
 
   // Shared per-item review controls: points stepper + flag + note.
@@ -216,19 +220,19 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
       <div className="mt-2.5 space-y-2">
         <div className="flex items-center gap-2 flex-wrap">
           <div className="inline-flex items-center rounded-full bg-black/[0.05] border border-black/[0.07] overflow-hidden">
-            <button onClick={() => step(-1)} className="tap-target w-8 h-8 flex items-center justify-center text-black/50 hover:bg-black/[0.06] transition" aria-label="Ubrat bod"><Icon name="minus" size={14} /></button>
+            <button onClick={() => step(-1)} className="tap-target w-8 h-8 flex items-center justify-center text-black/50 hover:bg-black/[0.06] transition" aria-label={t('Ubrat bod')}><Icon name="minus" size={14} /></button>
             <span className={`min-w-[3rem] text-center text-[13px] font-semibold tabular-nums ${value > 0 ? 'text-[#5B7A08]' : value < 0 ? 'text-bad-ink' : 'text-black/40'}`}>{signed(value)}</span>
-            <button onClick={() => step(1)} className="tap-target w-8 h-8 flex items-center justify-center text-black/50 hover:bg-black/[0.06] transition" aria-label="Přidat bod"><Icon name="plus" size={14} /></button>
+            <button onClick={() => step(1)} className="tap-target w-8 h-8 flex items-center justify-center text-black/50 hover:bg-black/[0.06] transition" aria-label={t('Přidat bod')}><Icon name="plus" size={14} /></button>
           </div>
           {/* Přepínač Switch, ne ručně psaná pilulka: dřív měla ~30 px a vlastní tóny (DP §6.2 bod 4).
               Stejný tvar jako celosměnové „Označit směnu k nápravě" níž v okně. */}
           <span className="inline-flex items-center gap-2">
             <Switch checked={isFlagged} onChange={v => saveItem(kind, id, { flagged: v })} labelledBy={`spatne-${kind}-${id}`} />
-            <span id={`spatne-${kind}-${id}`} className="t-meta">Něco je špatně</span>
+            <span id={`spatne-${kind}-${id}`} className="t-meta">{t('Něco je špatně')}</span>
           </span>
         </div>
         <textarea
-          defaultValue={mark?.note ?? legacyNote ?? ''} rows={2} placeholder="Poznámka pro zaměstnance…"
+          defaultValue={mark?.note ?? legacyNote ?? ''} rows={2} placeholder={t('Poznámka pro zaměstnance…')}
           onBlur={e => saveItem(kind, id, { note: e.target.value.trim() || null })}
           className={`${inputCls} !py-2 !text-[13px] resize-none`}
         />
@@ -250,11 +254,11 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
   const targetNames = [employee.name, ...coworkers.map(c => c.name)];
 
   const titulek = wholeShift && coworkers.length > 0
-    ? `Hodnotit směnu — ${targetNames.map(n => n.split(' ')[0]).join(' + ')}`
-    : `Hodnotit směnu — ${employee.name}`;
+    ? t('Hodnotit směnu — {jmena}', { jmena: targetNames.map(n => n.split(' ')[0]).join(' + ') })
+    : t('Hodnotit směnu — {jmena}', { jmena: employee.name });
   const podtitulek = summary?.shift
-    ? `${summary.shift.label}${summary.shift.startTime ? ` · ${summary.shift.startTime}–${summary.shift.endTime ?? ''}` : ''}${summary?.window?.overnight ? ' · přes půlnoc' : ''}`
-    : 'Rozklikni položky, oprav odškrtnutí a připiš poznámku.';
+    ? `${summary.shift.label}${summary.shift.startTime ? ` · ${summary.shift.startTime}–${summary.shift.endTime ?? ''}` : ''}${summary?.window?.overnight ? ` · ${t('přes půlnoc')}` : ''}`
+    : t('Rozklikni položky, oprav odškrtnutí a připiš poznámku.');
 
   // Společné okno (kolo 68, audit Přehledu vedení): dřív ručně skládané
   // s vlastní šířkou 512 px mimo tři velikosti Modal, s vlastním křížkem
@@ -263,16 +267,16 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
   return (
     <Modal open onClose={onClose} size="md" title={titulek} subtitle={podtitulek}
       footer={<>
-        <Button variant="secondary" onClick={onClose} title="Body a poznámky u položek se ukládají průběžně">Hotovo</Button>
+        <Button variant="secondary" onClick={onClose} title={t('Body a poznámky u položek se ukládají průběžně')}>{t('Hotovo')}</Button>
         <Button variant="primary" onClick={saveRating} loading={saving}>
-          {wholeShift ? `Uložit pro ${targetNames.length} ${plural(targetNames.length, 'člověka', 'lidi', 'lidí')}` : 'Uložit hodnocení'}
+          {wholeShift ? t('Uložit pro {n, plural, one {# člověka} few {# lidi} other {# lidí}}', { n: targetNames.length }) : t('Uložit hodnocení')}
         </Button>
       </>}>
         <div className="space-y-5">
           {/* Date picker */}
           <div>
-            <label className="field-label">Den směny</label>
-            <input type="date" aria-label="Datum směny" value={date} max={todayStr()} onChange={e => setDate(e.target.value)} className={`${inputCls} appearance-none`} style={{ WebkitAppearance: 'none' }} />
+            <label className="field-label">{t('Den směny')}</label>
+            <input type="date" aria-label={t('Datum směny')} value={date} max={todayStr()} onChange={e => setDate(e.target.value)} className={`${inputCls} appearance-none`} style={{ WebkitAppearance: 'none' }} />
             {shiftDates.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {shiftDates.map(d => (
@@ -289,17 +293,17 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
             // Bez limetkového panelu a ručního přepínače (DP §3, Segmented):
             // výběr je rozhodnutí, ne upozornění, a limetka patří jen hlavní akci.
             <div>
-              <p className="t-label mb-2">Koho hodnotíš</p>
-              <Segmented size="sm" ariaLabel="Koho hodnotíš" value={wholeShift ? 'smena' : 'jeden'}
+              <p className="t-label mb-2">{t('Koho hodnotíš')}</p>
+              <Segmented size="sm" ariaLabel={t('Koho hodnotíš')} value={wholeShift ? 'smena' : 'jeden'}
                 onChange={v => setWholeShift(v === 'smena')}
                 options={[
-                  { id: 'smena', label: `Celou směnu (${targetNames.length} ${plural(targetNames.length, 'člověk', 'lidé', 'lidí')})` },
-                  { id: 'jeden', label: `Jen ${employee.name.split(' ')[0]}` },
+                  { id: 'smena', label: t('Celou směnu ({n, plural, one {# člověk} few {# lidé} other {# lidí}})', { n: targetNames.length }) },
+                  { id: 'jeden', label: t('Jen {jmeno}', { jmeno: employee.name.split(' ')[0] }) },
                 ]} />
               <p className="text-xs text-black/50 mt-2">
                 {wholeShift
-                  ? `Hvězdičky, poznámka i body se uloží všem: ${targetNames.join(', ')}. Automatické body se počítají každému zvlášť podle toho, co odvedl.`
-                  : `Uloží se jen pro ${employee.name}. Na směně byl/a ještě: ${coworkers.map(c => c.name).join(', ')}.`}
+                  ? t('Hvězdičky, poznámka i body se uloží všem: {jmena}. Automatické body se počítají každému zvlášť podle toho, co odvedl.', { jmena: targetNames.join(', ') })
+                  : t('Uloží se jen pro {jmeno}. Na směně byl/a ještě: {ostatni}.', { jmeno: employee.name, ostatni: coworkers.map(c => c.name).join(', ') })}
               </p>
             </div>
           )}
@@ -316,8 +320,8 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
                   </span>
                   <span className="flex-1 min-w-0 text-sm text-[#16181A]">
                     {summary.closing
-                      ? <>Uzávěrka hotová{summary.closing.filedByName ? ` · vyplnil/a ${summary.closing.filedByName}` : ''}{summary.closing.approved ? '' : ' · čeká na schválení'}</>
-                      : 'Uzávěrka nevyplněna'}
+                      ? <>{t('Uzávěrka hotová')}{summary.closing.filedByName ? ` · ${t('vyplnil/a {jmeno}', { jmeno: summary.closing.filedByName })}` : ''}{summary.closing.approved ? '' : ` · ${t('čeká na schválení')}`}</>
+                      : t('Uzávěrka nevyplněna')}
                   </span>
                   {summary.closing && itemBadge(summary.closing.item)}
                   {summary.closing && chev(!!expanded['closing'])}
@@ -326,25 +330,25 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
                   <div className={`px-3.5 pb-3.5 pt-0.5 border-t border-black/[0.05] ${flagRing(summary.closing.item) || 'bg-black/[0.015]'}`}>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mt-2.5 text-[13px]">
                       {([
-                        ['Tržba hotovost', summary.closing.cashRevenue], ['Tržba karta', summary.closing.cardRevenue],
-                        ['Spropitné', summary.closing.tips], ['Výdaje', summary.closing.expenses],
-                        ['Kasa na konci', summary.closing.closingCash], ['Zákazníků', summary.closing.customers],
+                        [t('Tržba hotovost'), summary.closing.cashRevenue], [t('Tržba karta'), summary.closing.cardRevenue],
+                        [t('Spropitné'), summary.closing.tips], [t('Výdaje'), summary.closing.expenses],
+                        [t('Kasa na konci'), summary.closing.closingCash], [t('Zákazníků'), summary.closing.customers],
                       ] as [string, number | null][]).filter(([, v]) => v != null).map(([label, v]) => (
                         <div key={label} className="flex items-center justify-between gap-2">
                           <span className="text-black/50">{label}</span>
-                          <span className="font-medium text-[#16181A] tabular-nums">{label === 'Zákazníků' ? v : money(Number(v))}</span>
+                          <span className="font-medium text-[#16181A] tabular-nums">{label === t('Zákazníků') ? v : money(Number(v))}</span>
                         </div>
                       ))}
                     </div>
                     {summary.closing.expected != null && summary.closing.difference != null && (
                       <div className="mt-2.5 flex items-center justify-between gap-2 well rounded-xl px-3 py-2 text-[13px]">
-                        <span className="text-black/50">Očekávaná kasa {money(summary.closing.expected)}</span>
+                        <span className="text-black/50">{t('Očekávaná kasa {castka}', { castka: money(summary.closing.expected) })}</span>
                         <span className={`font-semibold tabular-nums ${summary.closing.difference === 0 ? 'text-[#5B7A08]' : summary.closing.difference > 0 ? 'text-wait-ink' : 'text-bad-ink'}`}>
-                          {summary.closing.difference === 0 ? 'sedí' : `${summary.closing.difference > 0 ? 'přebytek' : 'manko'} ${money(Math.abs(summary.closing.difference))}`}
+                          {summary.closing.difference === 0 ? t('sedí') : `${summary.closing.difference > 0 ? t('přebytek') : 'manko'} ${money(Math.abs(summary.closing.difference))}`}
                         </span>
                       </div>
                     )}
-                    {summary.closing.notes && <p className="mt-2.5 text-[13px] text-black/60"><span className="text-black/40">Poznámka zaměstnance:</span> {summary.closing.notes}</p>}
+                    {summary.closing.notes && <p className="mt-2.5 text-[13px] text-black/60"><span className="text-black/40">{t('Poznámka zaměstnance:')}</span> {summary.closing.notes}</p>}
                     {itemControls('closing', summary.closing.id, summary.closing.item, summary.closing.reviewNote)}
                   </div>
                 )}
@@ -355,33 +359,33 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
                 <div className="flex items-center gap-2.5 px-3.5 py-3">
                   <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#C8F542]/20 text-[#5B7A08] shrink-0"><Icon name="check" size={14} /></span>
                   <span className="flex-1 text-sm text-[#16181A]">
-                    {doneTasks.length} {plural(doneTasks.length, 'splněný úkol', 'splněné úkoly', 'splněných úkolů')}
-                    {missedTasks.length > 0 && <span className="text-bad-ink"> · {missedTasks.length} {plural(missedTasks.length, 'nesplněný', 'nesplněné', 'nesplněných')}</span>}
+                    {t('{n, plural, one {# splněný úkol} few {# splněné úkoly} other {# splněných úkolů}}', { n: doneTasks.length })}
+                    {missedTasks.length > 0 && <span className="text-bad-ink"> · {t('{n, plural, one {# nesplněný} few {# nesplněné} other {# nesplněných}}', { n: missedTasks.length })}</span>}
                   </span>
                 </div>
                 {summary.tasks.length > 0 && (
                   <div className="border-t border-black/[0.05] divide-y divide-black/[0.05]">
-                    {summary.tasks.map(t => {
-                      const key = `task-${t.id}`;
-                      const missed = t.state === 'missed';
+                    {summary.tasks.map(ukol => {
+                      const key = `task-${ukol.id}`;
+                      const missed = ukol.state === 'missed';
                       return (
-                        <div key={t.id} className={t.item?.flagged ? 'bg-wait/[0.07]' : ''}>
+                        <div key={ukol.id} className={ukol.item?.flagged ? 'bg-wait/[0.07]' : ''}>
                           <button onClick={() => toggleExpand(key)} className="w-full flex items-center gap-2 px-3.5 py-2.5 text-left">
-                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${prioDot(t.priority)}`} />
-                            <span className={`flex-1 min-w-0 text-[13px] truncate ${missed ? 'text-bad-ink' : 'text-[#16181A]'}`}>{t.title}</span>
-                            {missed && <span className="rounded-full bg-bad/15 text-bad-ink px-2 py-0.5 text-[11px] font-semibold shrink-0">neuděláno</span>}
-                            {itemBadge(t.item)}
-                            {(t.item?.note || t.reviewNote) && <Icon name="chat" size={13} className="text-[#5B7A08] shrink-0" />}
-                            {t.checklist.length > 0 && <span className="text-[11px] text-black/40 tabular-nums shrink-0">{t.checklist.filter(i => i.done).length}/{t.checklist.length}</span>}
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${prioDot(ukol.priority)}`} />
+                            <span className={`flex-1 min-w-0 text-[13px] truncate ${missed ? 'text-bad-ink' : 'text-[#16181A]'}`}>{ukol.title}</span>
+                            {missed && <span className="rounded-full bg-bad/15 text-bad-ink px-2 py-0.5 text-[11px] font-semibold shrink-0">{t('neuděláno')}</span>}
+                            {itemBadge(ukol.item)}
+                            {(ukol.item?.note || ukol.reviewNote) && <Icon name="chat" size={13} className="text-[#5B7A08] shrink-0" />}
+                            {ukol.checklist.length > 0 && <span className="text-[11px] text-black/40 tabular-nums shrink-0">{ukol.checklist.filter(i => i.done).length}/{ukol.checklist.length}</span>}
                             {chev(!!expanded[key])}
                           </button>
                           {expanded[key] && (
-                            <div className={`px-3.5 pb-3 pt-0.5 ${t.item?.flagged ? '' : 'bg-black/[0.015]'}`}>
-                              {t.description && <p className="text-[13px] text-black/55 mt-1.5">{t.description}</p>}
-                              {t.checklist.length > 0 && (
+                            <div className={`px-3.5 pb-3 pt-0.5 ${ukol.item?.flagged ? '' : 'bg-black/[0.015]'}`}>
+                              {ukol.description && <p className="text-[13px] text-black/55 mt-1.5">{ukol.description}</p>}
+                              {ukol.checklist.length > 0 && (
                                 <div className="mt-2 space-y-1">
-                                  {t.checklist.map((it, i) => (
-                                    <button key={i} onClick={() => toggleTaskCheck(t.id, i)} className="w-full flex items-center gap-2.5 text-left group">
+                                  {ukol.checklist.map((it, i) => (
+                                    <button key={i} onClick={() => toggleTaskCheck(ukol.id, i)} className="w-full flex items-center gap-2.5 text-left group">
                                       <span className={`w-5 h-5 rounded-xl border flex items-center justify-center shrink-0 transition ${it.done ? 'bg-[#C8F542] border-[#C8F542] text-black' : 'border-black/20 group-hover:border-[#C8F542]/60'}`}>
                                         {it.done && <span className="text-[11px] font-bold"><Icon name="check" size={15} /></span>}
                                       </span>
@@ -390,7 +394,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
                                   ))}
                                 </div>
                               )}
-                              {itemControls('task', t.id, t.item, t.reviewNote)}
+                              {itemControls('task', ukol.id, ukol.item, ukol.reviewNote)}
                             </div>
                           )}
                         </div>
@@ -404,7 +408,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
               <div className="rounded-2xl border border-black/[0.06] overflow-hidden">
                 <div className="flex items-center gap-2.5 px-3.5 py-3">
                   <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#C8F542]/20 text-[#5B7A08] shrink-0"><Icon name="clipboard" size={14} /></span>
-                  <span className="flex-1 text-sm text-[#16181A]">{summary.procedures.length} {plural(summary.procedures.length, 'postup', 'postupy', 'postupů')}</span>
+                  <span className="flex-1 text-sm text-[#16181A]">{t('{n, plural, one {# postup} few {# postupy} other {# postupů}}', { n: summary.procedures.length })}</span>
                 </div>
                 {summary.procedures.length > 0 && (
                   <div className="border-t border-black/[0.05] divide-y divide-black/[0.05]">
@@ -418,14 +422,14 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
                             {itemBadge(p.item)}
                             {(p.item?.note || p.reviewNote) && <Icon name="chat" size={13} className="text-[#5B7A08] shrink-0" />}
                             <span className="text-[11px] tabular-nums shrink-0 text-[#5B7A08]">{p.done}/{count}</span>
-                            {p.skippedCount > 0 && <span className="text-[11px] text-wait-ink shrink-0" title="Přeskočené kroky">{p.skippedCount} přeskočeno</span>}
+                            {p.skippedCount > 0 && <span className="text-[11px] text-wait-ink shrink-0" title={t('Přeskočené kroky')}>{t('{n} přeskočeno', { n: p.skippedCount })}</span>}
                             {p.missing.length > 0 && <span className="text-[11px] text-bad-ink shrink-0">{p.missing.length}<Icon name="close" size={10} className="inline -mt-0.5" /></span>}
                             {chev(!!expanded[key])}
                           </button>
                           {expanded[key] && (
                             <div className={`px-3.5 pb-3 pt-0.5 ${p.item?.flagged ? '' : 'bg-black/[0.015]'}`}>
-                              {p.status !== 'completed' && <p className="text-[11px] text-wait-ink mt-1.5">Postup nebyl dokončen.</p>}
-                              {p.missing.length > 0 && <p className="text-[11px] text-bad-ink mt-1.5">{p.missing.length} {plural(p.missing.length, 'krok', 'kroky', 'kroků')} vůbec neudělali.</p>}
+                              {p.status !== 'completed' && <p className="text-[11px] text-wait-ink mt-1.5">{t('Postup nebyl dokončen.')}</p>}
+                              {p.missing.length > 0 && <p className="text-[11px] text-bad-ink mt-1.5">{t('{n, plural, one {# krok} few {# kroky} other {# kroků}} vůbec neudělali.', { n: p.missing.length })}</p>}
                               <div className="mt-2 space-y-1">
                                 {Array.from({ length: count }).map((_, i) => {
                                   const checked = p.checked.includes(i);
@@ -435,8 +439,8 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
                                       <span className={`w-5 h-5 rounded-xl border flex items-center justify-center shrink-0 transition ${checked ? 'bg-[#C8F542] border-[#C8F542] text-black' : skipped ? 'bg-wait/80 border-wait text-white' : 'border-bad/40 group-hover:border-[#C8F542]/60'}`}>
                                         {checked ? <span className="text-[11px] font-bold"><Icon name="check" size={15} /></span> : skipped ? <Icon name="chevronRight" size={13} /> : null}
                                       </span>
-                                      <span className={`text-[13px] ${checked ? 'text-black/45 line-through' : skipped ? 'text-wait-ink' : 'text-bad-ink'}`}>{p.steps[i] ?? `Krok ${i + 1}`}</span>
-                                      {!checked && !skipped && <span className="text-[11px] text-bad-ink shrink-0">neuděláno</span>}
+                                      <span className={`text-[13px] ${checked ? 'text-black/45 line-through' : skipped ? 'text-wait-ink' : 'text-bad-ink'}`}>{p.steps[i] ?? t('Krok {n}', { n: i + 1 })}</span>
+                                      {!checked && !skipped && <span className="text-[11px] text-bad-ink shrink-0">{t('neuděláno')}</span>}
                                     </button>
                                   );
                                 })}
@@ -452,7 +456,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
               </div>
 
               {!summary.hadShift && !summary.closing && summary.tasks.length === 0 && summary.procedures.length === 0 && (
-                <p className="text-xs text-black/40 text-center py-1">Pro tento den nemáme žádnou aktivitu ani naplánovanou směnu.</p>
+                <p className="text-xs text-black/40 text-center py-1">{t('Pro tento den nemáme žádnou aktivitu ani naplánovanou směnu.')}</p>
               )}
 
               {/* Automatic points */}
@@ -460,7 +464,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
                 <div className="rounded-2xl border border-black/[0.06] bg-black/[0.02] p-3.5">
                   <div className="flex items-center gap-2 mb-2">
                     <Icon name="bulb" size={14} className="text-black/45" />
-                    <span className="t-label">Automatické body</span>
+                    <span className="t-label">{t('Automatické body')}</span>
                     <span className={`ml-auto text-sm font-bold tabular-nums ${summary.autoPoints.total > 0 ? 'text-[#5B7A08]' : summary.autoPoints.total < 0 ? 'text-bad-ink' : 'text-black/40'}`}>{signed(summary.autoPoints.total)}</span>
                   </div>
                   <div className="space-y-1">
@@ -471,7 +475,7 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
                       </div>
                     ))}
                   </div>
-                  <p className="text-[11px] text-black/40 mt-2">Připočítají se automaticky k bodům níže.</p>
+                  <p className="text-[11px] text-black/40 mt-2">{t('Připočítají se automaticky k bodům níže.')}</p>
                 </div>
               )}
             </div>
@@ -480,26 +484,26 @@ export default function ShiftReviewModal({ employee, initialDate, initialWholeSh
           {/* Rating */}
           <div className="space-y-3 pt-1">
             <div>
-              <label className="field-label">Celkové hodnocení směny</label>
+              <label className="field-label">{t('Celkové hodnocení směny')}</label>
               <StarPicker value={rating} onChange={setRating} />
             </div>
             <div>
-              <label className="field-label">Zpětná vazba (uvidí zaměstnanec)</label>
-              <textarea value={note} onChange={e => setNote(e.target.value)} rows={3} placeholder="Co bylo super, co příště zlepšit…" className={`${inputCls} resize-none`} />
+              <label className="field-label">{t('Zpětná vazba (uvidí zaměstnanec)')}</label>
+              <textarea value={note} onChange={e => setNote(e.target.value)} rows={3} placeholder={t('Co bylo super, co příště zlepšit…')} className={`${inputCls} resize-none`} />
             </div>
             <div>
-              <label className="field-label">Body za směnu</label>
+              <label className="field-label">{t('Body za směnu')}</label>
               <div className="flex items-center gap-2 flex-wrap">
                 <input type="number" inputMode="numeric" value={pts} onChange={e => { setPtsTouched(true); setPts(parseInt(e.target.value) || 0); }} className={`${inputCls} !py-2.5 max-w-[130px] tabular-nums`} />
-                <span className="text-xs text-black/45">bodů {!ptsTouched && rating > 0 && '(návrh z hvězd)'}</span>
+                <span className="text-xs text-black/45">{t('bodů')} {!ptsTouched && rating > 0 && t('(návrh z hvězd)')}</span>
                 {summary && summary.autoPoints.total !== 0 && (
-                  <span className="text-xs text-black/45 tabular-nums">· celkem s automatickými: <strong className="text-[#16181A]">{signed(pts + summary.autoPoints.total)}</strong></span>
+                  <span className="text-xs text-black/45 tabular-nums">· {t('celkem s automatickými:')} <strong className="text-[#16181A]">{signed(pts + summary.autoPoints.total)}</strong></span>
                 )}
               </div>
             </div>
             {/* Kolo 69 (B7): dřív ručně obarvená pilulka — je to zapnuto/vypnuto, tak Switch (DP §3.20). */}
-            <SwitchRow as="div" title="Označit směnu k nápravě" checked={flagged} onChange={setFlagged}
-              hint="Zaměstnanec uvidí výtku nahoře v Odměnách a potvrdí, že ji četl." />
+            <SwitchRow as="div" title={t('Označit směnu k nápravě')} checked={flagged} onChange={setFlagged}
+              hint={t('Zaměstnanec uvidí výtku nahoře v Odměnách a potvrdí, že ji četl.')} />
           </div>
         </div>
 

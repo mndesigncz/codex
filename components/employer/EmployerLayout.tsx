@@ -123,7 +123,7 @@ export default function EmployerLayout({ user }: Props) {
   const plan = smiPlatby ? planPodniku : null;
   const { ma, role, opravneni, nacteno } = useOpravneni();
   const smiPohled = (id: string) => { const k = KLICE_POHLEDU[id]; return k == null || ma(k); };
-  const t = useT();
+  const t = useT('sprava');
   const { jazyk } = useJazyk();
   // Navigace podle oprávnění (první) a nastavení podniku (skrýt, přejmenovat, pořadí).
   const nav = useNavigaceAplikace('vedeni', smiPohled, [opravneni, nacteno]);
@@ -140,7 +140,7 @@ export default function EmployerLayout({ user }: Props) {
   // Odkaz z oznámení o nové rezervaci otevře rovnou správnou záložku Clientu.
   const [clientTab, setClientTab] = useState<string | undefined>();
   const [receiptsOpen, setReceiptsOpen] = useState(false);
-  const receiptsModal = useModal(receiptsOpen, () => setReceiptsOpen(false), 'Účtenky');
+  const receiptsModal = useModal(receiptsOpen, () => setReceiptsOpen(false), t('Účtenky'));
   useEffect(() => {
     // Odkaz na konkrétní obrazovku má přednost před kapesním režimem. Bez
     // toho notifikace „schvaluje se ti uzávěrka" otevřela na telefonu TO GO
@@ -194,12 +194,12 @@ export default function EmployerLayout({ user }: Props) {
     try {
       const res = await fetch('/api/teams/switch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ teamId }) });
       const d = await res.json().catch(() => ({}));
-      if (!res.ok) return d?.error || 'Přepnutí se nepodařilo.';
+      if (!res.ok) return d?.error || t('Přepnutí se nepodařilo.');
       uklidKonceptu();
       try { await obnovRelaci(); } catch { /* token se obnoví při načtení */ }
       window.location.href = '/employer/overview';
       return null;
-    } catch { return 'Nepodařilo se spojit se serverem.'; }
+    } catch { return t('Nepodařilo se spojit se serverem.'); }
   };
   const navigate = (view: string, arg?: string) => {
     if (view !== currentView) { straz.pokus(() => naviguj(view, arg)); return; }
@@ -355,14 +355,14 @@ export default function EmployerLayout({ user }: Props) {
     // ?mode=client) — ne bílá obrazovka, ale vysvětlení a cesta zpět.
     return (
       <NavigaceKontext.Provider value={navigaceWidgetu}>
-        <BezOpravneni co="Managero client (hosté, rezervace, věrnost)" onZpet={() => switchMode('full')} />
+        <BezOpravneni co={t('Managero client (hosté, rezervace, věrnost)')} onZpet={() => switchMode('full')} />
       </NavigaceKontext.Provider>
     );
   }
   if (appMode === 'client') {
     return (
       <NavigaceKontext.Provider value={navigaceWidgetu}>
-        <MaxGate feature="Managero client" benefit="Věrnost, rezervace a objednávky od stolu pro vaše hosty patří do plánu Max.">
+        <MaxGate feature="Managero client" benefit={t('Věrnost, rezervace a objednávky od stolu pro vaše hosty patří do plánu Max.')}>
           <ProfileLinkProvider>
             <ClientAdmin onExit={() => switchMode('full')} initialTab={clientTab} user={user as any} />
           </ProfileLinkProvider>
@@ -397,7 +397,7 @@ export default function EmployerLayout({ user }: Props) {
           <LogoMark size={40} />
           {sidebarOpen && (
             <div className="overflow-hidden">
-              <p className="font-bold text-sm leading-tight tracking-tight">Managero</p>
+              <p className="font-bold text-sm leading-tight tracking-tight">{t('Managero')}</p>
               <p className="t-label text-black/40 mt-0.5">{t('Správa podniku')}</p>
             </div>
           )}
@@ -493,20 +493,20 @@ export default function EmployerLayout({ user }: Props) {
               informace, žádné okno. Skrytí je preference, ne zákaz. */}
           {jeSkryty && <Chip tone="muted" size="sm" className="shrink-0">{t('Skrytá sekce')}</Chip>}
           {ma(UCTENKY) && (
-          <button onClick={() => setReceiptsOpen(true)} title="Účtenky" aria-label="Účtenky"
+          <button onClick={() => setReceiptsOpen(true)} title={t('Účtenky')} aria-label={t('Účtenky')}
             className="tap-target-sm shrink-0 rounded-full p-2 text-black/45 hover:text-black hover:bg-black/[0.05] transition-colors">
             <Icon name="receipt" size={20} />
           </button>
           )}
           {smiKlient && (
-          <button onClick={() => switchMode('client')} title="Managero client: hosté, rezervace, věrnost" aria-label="Přepnout do Managero client"
+          <button onClick={() => switchMode('client')} title={t('Managero client: hosté, rezervace, věrnost')} aria-label={t('Přepnout do Managero client')}
             className="tap-target shrink-0 inline-flex items-center gap-1.5 rounded-full bg-[#16181A]/[0.06] border border-black/10 text-[#16181A] px-2.5 sm:px-3 py-1.5 text-xs font-bold hover:bg-[#16181A]/[0.1] transition whitespace-nowrap">
-            <Icon name="gift" size={15} className="shrink-0" /><span className="hidden sm:inline">Client</span>
+            <Icon name="gift" size={15} className="shrink-0" /><span className="hidden sm:inline">{t('Client')}</span>
           </button>
           )}
-          <button onClick={() => switchMode('togo')} title="Přepnout do TO GO režimu" aria-label="Přepnout do TO GO režimu"
+          <button onClick={() => switchMode('togo')} title={t('Přepnout do TO GO režimu')} aria-label={t('Přepnout do TO GO režimu')}
             className="tap-target shrink-0 inline-flex items-center gap-1.5 rounded-full bg-[#C8F542]/25 border border-[#C8F542]/40 text-[#5B7A08] px-2.5 sm:px-3 py-1.5 text-xs font-bold hover:bg-[#C8F542]/40 transition whitespace-nowrap">
-            <Icon name="cup" size={15} className="shrink-0" /><span className="hidden sm:inline">TO GO</span>
+            <Icon name="cup" size={15} className="shrink-0" /><span className="hidden sm:inline">{t('TO GO')}</span>
           </button>
           <NotificationBell />
         </header>
@@ -517,8 +517,8 @@ export default function EmployerLayout({ user }: Props) {
         {plan?.pastDue ? (
           <button type="button" onClick={() => navigate('settings', 'billing')}
             className="mx-4 mt-3 note note-danger text-left font-medium hover:brightness-95 transition">
-            <Icon name="warning" size={15} className="inline -mt-0.5 mr-1.5" />Platba předplatného se nezdařila.{' '}
-            <span className="font-semibold underline underline-offset-2">Zkontrolovat kartu</span>
+            <Icon name="warning" size={15} className="inline -mt-0.5 mr-1.5" />{t('Platba předplatného se nezdařila.')}{' '}
+            <span className="font-semibold underline underline-offset-2">{t('Zkontrolovat kartu')}</span>
           </button>
         ) : plan?.trialing ? (
           <button type="button" onClick={() => navigate('settings', 'billing')}
@@ -529,7 +529,7 @@ export default function EmployerLayout({ user }: Props) {
         ) : plan && plan.effective === 'free' && !plan.hadSubscription ? (
           <button type="button" onClick={() => navigate('settings', 'billing')}
             className="mx-4 mt-3 rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/35 px-4 py-2.5 text-sm text-left text-[#5B7A08] font-medium hover:bg-[#C8F542]/25 transition">
-            <Icon name="sparkle" size={15} className="inline -mt-0.5 mr-1.5" />Vyzkoušejte Pro {TRIAL_DAYS} dní zdarma — neomezený tým, kiosk, odměny a přehledy. Karta se strhne až po měsíci.
+            <Icon name="sparkle" size={15} className="inline -mt-0.5 mr-1.5" />{t('Vyzkoušejte Pro {dni} dní zdarma — neomezený tým, kiosk, odměny a přehledy. Karta se strhne až po měsíci.', { dni: TRIAL_DAYS })}
           </button>
         ) : null}
         {/* relative: absolutně umístěné prvky uvnitř (skryté popisky pro
@@ -545,10 +545,10 @@ export default function EmployerLayout({ user }: Props) {
             ? 'pb-[84px] md:pb-4 overflow-hidden flex flex-col mx-2 my-2 md:m-4'
             : 'pb-36 md:pb-4 overflow-y-auto scrollbar-thin'}`}>
           {currentView === 'chat' ? (
-            <ErrorBoundary resetKey={currentView} title={`${title ?? 'Tahle část'} se nenačetla`}>{renderView()}</ErrorBoundary>
+            <ErrorBoundary resetKey={currentView} title={t('{nazev} se nenačetla', { nazev: title ?? t('Tahle část') })}>{renderView()}</ErrorBoundary>
           ) : (
             <div className="mx-auto w-full max-w-7xl">
-              <ErrorBoundary resetKey={currentView} title={`${title ?? 'Tahle část'} se nenačetla`}>{renderView()}</ErrorBoundary>
+              <ErrorBoundary resetKey={currentView} title={t('{nazev} se nenačetla', { nazev: title ?? t('Tahle část') })}>{renderView()}</ErrorBoundary>
             </div>
           )}
         </main>
@@ -562,7 +562,7 @@ export default function EmployerLayout({ user }: Props) {
       <Dock label={t('Spodní navigace')}
         items={nav.dok.map(n => ({
           id: n.id, label: n.label, icon: n.icon,
-          ...(n.id === 'chat' && currentView !== 'chat' ? { badge: unreadChat, badgeLabel: czCount(unreadChat, NEPRECTENA_ZPRAVA) } : {}),
+          ...(n.id === 'chat' && currentView !== 'chat' ? { badge: unreadChat, badgeLabel: t('{n, plural, one {# nepřečtená zpráva} few {# nepřečtené zprávy} other {# nepřečtených zpráv}}', { n: unreadChat }) } : {}),
         }))}
         activeId={currentView}
         onSelect={id => { setCurrentView(id); setMoreOpen(false); }}
@@ -574,9 +574,9 @@ export default function EmployerLayout({ user }: Props) {
             <DiscardGuard guard={receiptsModal.guard} />
             <div className="flex items-center justify-between gap-3 mb-3">
               <h3 className="t-card flex items-center gap-2">
-                <Icon name="receipt" size={20} className="text-[#5B7A08]" /> Účtenky
+                <Icon name="receipt" size={20} className="text-[#5B7A08]" />  {t('Účtenky')}
               </h3>
-              <button aria-label="Zavřít" onClick={() => setReceiptsOpen(false)} className="btn-icon"><Icon name="close" size={15} /></button>
+              <button aria-label={t('Zavřít')} onClick={() => setReceiptsOpen(false)} className="btn-icon"><Icon name="close" size={15} /></button>
             </div>
             <ReceiptsPanel />
           </div>
@@ -594,7 +594,7 @@ export default function EmployerLayout({ user }: Props) {
           ...(smiTym ? [{ label: t('Nastavení týmu'), icon: 'users', onClick: openTeam }] : []),
           { label: `${t('Jazyk')}: ${JAZYK_NAZEV[jazyk]}`, icon: 'globe', onClick: () => { setMoreOpen(false); setJazykOpen(true); } },
           // Správce platformy podle prostředí (SUPERADMIN_USER_IDS), ne podle role.
-          ...(user.superadmin ? [{ label: 'Správa platformy', icon: 'lock', onClick: () => { window.location.assign('/admin'); } }] : []),
+          ...(user.superadmin ? [{ label: t('Správa platformy'), icon: 'lock', onClick: () => { window.location.assign('/admin'); } }] : []),
           ...(smiKlient ? [{ label: 'Managero client', icon: 'gift', onClick: () => { setMoreOpen(false); switchMode('client'); } }] : []),
           { label: t('Odhlásit se'), icon: 'logout', onClick: () => odhlasit({ callbackUrl: '/login' }), danger: true },
         ]}

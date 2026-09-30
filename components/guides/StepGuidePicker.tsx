@@ -14,6 +14,7 @@
 import { useId, useState } from 'react';
 import { Icon } from '../Icons';
 import { obsahuje } from '@/lib/hledani';
+import { useT } from '@/lib/i18n/client';
 
 export interface PickableGuide { id: number; title: string }
 
@@ -24,6 +25,7 @@ export default function StepGuidePicker({ guides, value, onChange, stepNumber }:
   /** Jen do popisku pro odečítač — „Návod ke kroku 3". */
   stepNumber: number;
 }) {
+  const t = useT('navody');
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const popisek = useId();
@@ -35,9 +37,9 @@ export default function StepGuidePicker({ guides, value, onChange, stepNumber }:
       // Kolo 69 (B6b): vybraný návod byl limetková pilulka — teď neutrální chip (limetka je akce).
       <span className="chip chip-muted inline-flex min-w-0 items-center gap-1.5 !pr-1">
         <Icon name="book" size={12} className="shrink-0" />
-        <span className="truncate max-w-[10rem]">{vybrany?.title ?? `Návod #${value}`}</span>
+        <span className="truncate max-w-[10rem]">{vybrany?.title ?? t('Návod #{id}', { id: value })}</span>
         <button type="button" onClick={() => onChange(null)}
-          aria-label={`Zrušit návod u kroku ${stepNumber}`} title="Zrušit návod"
+          aria-label={t('Zrušit návod u kroku {n}', { n: stepNumber })} title={t('Zrušit návod')}
           className="btn-icon btn-icon-danger shrink-0 !h-6 !w-6">
           <Icon name="close" size={11} />
         </button>
@@ -48,23 +50,23 @@ export default function StepGuidePicker({ guides, value, onChange, stepNumber }:
   if (!open) {
     return (
       <button type="button" onClick={() => setOpen(true)}
-        title="Připojit ke kroku návod"
+        title={t('Připojit ke kroku návod')}
         className="btn btn-secondary btn-sm">
-        <Icon name="book" size={12} /> Návod
+        <Icon name="book" size={12} />  {t('Návod')}
       </button>
     );
   }
 
   return (
     <div role="group" aria-labelledby={popisek} className="w-full min-w-0 well p-2 space-y-1.5">
-      <p id={popisek} className="sr-only">Návod ke kroku {stepNumber}</p>
+      <p id={popisek} className="sr-only">{t('Návod ke kroku {n}', { n: stepNumber })}</p>
       <input autoFocus value={query} onChange={e => setQuery(e.target.value)}
         onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); setOpen(false); setQuery(''); } }}
-        placeholder="Hledat mezi návody…" aria-label={`Hledat návod ke kroku ${stepNumber}`}
+        placeholder={t('Hledat mezi návody…')} aria-label={t('Hledat návod ke kroku {n}', { n: stepNumber })}
         className="field w-full" />
       {nalezene.length === 0 ? (
         <p className="t-meta px-1">
-          {guides.length === 0 ? 'Zatím žádné návody — napiš je v záložce Návody.' : 'Nic takového mezi návody není.'}
+          {guides.length === 0 ? t('Zatím žádné návody — napiš je v záložce Návody.') : t('Nic takového mezi návody není.')}
         </p>
       ) : (
         <div className="max-h-36 overflow-y-auto scrollbar-thin divide-y divide-black/[0.05]">
@@ -78,7 +80,7 @@ export default function StepGuidePicker({ guides, value, onChange, stepNumber }:
         </div>
       )}
       <button type="button" onClick={() => { setOpen(false); setQuery(''); }}
-        className="btn btn-ghost btn-sm">Zrušit</button>
+        className="btn btn-ghost btn-sm">{t('Zrušit')}</button>
     </div>
   );
 }
