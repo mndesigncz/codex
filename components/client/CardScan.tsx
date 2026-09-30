@@ -14,6 +14,7 @@ import { Icon } from '../Icons';
 import { Button, Chip, Input, ListRow, Well } from '../ui';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 import { czCount, type CzNoun } from '@/lib/czech';
+import { kodKarty } from '@/lib/nativni/most';
 
 const NAVSTEVA: CzNoun = { one: 'návštěva', few: 'návštěvy', many: 'návštěv' };
 const fmt = (raw: string) => { const c = raw.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8); return c.length > 4 ? `${c.slice(0, 4)}-${c.slice(4)}` : c; };
@@ -28,7 +29,24 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
   const [cam, setCam] = useState(false);
-  const canScan = typeof window !== 'undefined' && 'BarcodeDetector' in window;
+  // Nativní skener z obalu (window.manageroNative, components/NativeBridge): na iPhonu
+  // BarcodeDetector není, nativní ML Kit skener ano. Most se nahlásí až po hydrataci.
+  const [nativni, setNativni] = useState(false);
+  useEffect(() => {
+    const zjisti = () => setNativni(!!window.manageroNative?.skenujQr);
+    zjisti();
+    window.addEventListener('managero:nativni-pripraveno', zjisti);
+    return () => window.removeEventListener('managero:nativni-pripraveno', zjisti);
+  }, []);
+  const canScan = nativni || (typeof window !== 'undefined' && 'BarcodeDetector' in window);
+  const skenujNativne = async () => {
+    setErr('');
+    const text = await window.manageroNative?.skenujQr();
+    if (text == null) return; // zrušeno
+    const kod = kodKarty(text);
+    if (!kod) { setErr('Tohle není karta hosta. Opiš kód ručně.'); return; }
+    void lookup(kod);
+  };
 
   const lookup = async (c: string) => {
     const norm = c.replace(/[^A-Z0-9]/g, '');
@@ -78,7 +96,7 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
           <Input aria-label="Kód kartičky" value={code} onChange={e => setCode(fmt(e.target.value))} placeholder="ABCD-EFGH" autoCapitalize="characters" autoComplete="off" inputMode="text"
             className="font-mono tracking-[0.2em] flex-1 basis-40 uppercase !w-auto" />
           <Button type="submit" variant="primary" icon="search" loading={busy === 'lookup'}>Najít</Button>
-          {canScan && <Button type="button" variant="secondary" icon="camera" onClick={() => setCam(v => !v)}>{cam ? 'Zavřít kameru' : 'Skenovat'}</Button>}
+          {canScan && <Button type="button" variant="secondary" icon="camera" onClick={() => (nativni ? void skenujNativne() : setCam(v => !v))}>{cam ? 'Zavřít kameru' : 'Skenovat'}</Button>}
         </form>
       ) : (
         <div className="space-y-3">

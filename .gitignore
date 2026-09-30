@@ -1,4 +1,4 @@
-node_modules/
+node_modules
 dist/
 .env
 .env.local
@@ -9,3 +9,32 @@ dist/
 
 # Snímky ze sond v prohlížeči
 scripts/sondy/shots/
+
+# Nativní obaly (apps/): generované projekty vznikají na Macu přes `npx cap add`,
+# v repu jsou jen konfigurace, šablony a skripty, které je po cap add doplní.
+apps/*/node_modules
+apps/*/ios/
+apps/*/android/
+apps/*/assets/generated/
+apps/build/
+apps/fastlane/report.xml
+apps/.bundle/
+# Snímky a videa pro obchody se generují skriptem (apps/scripts/snimky.mjs, preview.mjs).
+apps/app-store/*/screenshots/
+apps/app-store/*/previews/*.mp4
+apps/app-store/*/.tmp-*
+apps/play-store/*/metadata/android/*/images/phoneScreenshots/
+apps/play-store/*/metadata/android/*/images/sevenInchScreenshots/
+apps/play-store/*/metadata/android/*/images/tenInchScreenshots/
+# Tajemství: nikdy do repa.
+*.p8
+*.p12
+*.cer
+*.mobileprovision
+*.jks
+*.keystore
+keystore.properties
+google-services.json
+GoogleService-Info.plist
+play-key*.json
+local.properties

@@ -1,10 +1,16 @@
 import type { MetadataRoute } from 'next';
+import { getJazyk } from '@/lib/i18n/server';
+import { POPIS_MANIFESTU } from '@/lib/i18n/meta';
 
-export default function manifest(): MetadataRoute.Manifest {
+// Manifest je jeden na celý web, proto se řídí jazykem z cookie (stejně jako
+// <html lang>). Bez cookie (instalace z prohlížeče poprvé) je česky.
+export default async function manifest(): Promise<MetadataRoute.Manifest> {
+  const jazyk = await getJazyk();
   return {
     name: 'Managero',
     short_name: 'Managero',
-    description: 'Systém pro správu podniku',
+    description: POPIS_MANIFESTU[jazyk],
+    lang: jazyk,
     start_url: '/',
     display: 'standalone',
     background_color: '#F1F4EC',

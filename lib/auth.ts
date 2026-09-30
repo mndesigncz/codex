@@ -11,6 +11,8 @@ import { normalizujEmail, poradiKandidatu } from './emailAdresa';
 import { generateJoinCode } from './team';
 import { jeSpravcePodleDb } from './superadminDb';
 import { zajistiClenstvi, clenstviUzivatele, prepniTym } from './tenant';
+import { obalZUserAgent, rolePatriDoObalu } from './obal';
+import { cistyJazyk } from './i18n/config';
 
 // Self-heal: an employer must always have a team. If theirs is missing
 // (e.g. after a DB issue), recreate/relink it on login so the app never
@@ -62,8 +64,18 @@ async function stavUzivatele(id: number, cerstve: boolean): Promise<{ role: stri
   if (!cerstve && c && Date.now() - c.at < STAV_TTL_MS) return c.v;
   try {
     const sql = neon(process.env.DATABASE_URL!);
-    const [u] = await sql`SELECT team_id, role FROM users WHERE id = ${id}`;
-    const v = u ? { role: String(u.role), teamId: u.team_id == null ? null : Number(u.team_id) } : 'smazan' as const;
+    // Smazaný (anonymizovaný) účet řádek v users má, ale nese `deleted_at`: pro
+    // relaci je to totéž co neexistující. Před migrací sloupec chybí — dotaz se
+    // pak opakuje bez něj, ať výpadek migrace neshodí čtení relace všem.
+    let u: any;
+    let smazan = false;
+    try {
+      [u] = await sql`SELECT team_id, role, deleted_at FROM users WHERE id = ${id}`;
+      smazan = !!u?.deleted_at;
+    } catch {
+      [u] = await sql`SELECT team_id, role FROM users WHERE id = ${id}`;
+    }
+    const v = u && !smazan ? { role: String(u.role), teamId: u.team_id == null ? null : Number(u.team_id) } : 'smazan' as const;
     if (stavCache.size > 5000) stavCache.clear();
     stavCache.set(id, { at: Date.now(), v });
     return v;
@@ -114,6 +126,14 @@ export const authOptions: NextAuthOptions = {
           if (await bcrypt.compare(credentials.password, kandidat.passwordHash)) { user = kandidat; break; }
         }
         if (!user) return null;
+        // Nativní obal: host patří do Managero client, ostatní do Managero. Kontrola
+        // je AŽ po správném hesle, takže jiný chybový kód než „špatné heslo“ dostane
+        // jen ten, kdo účet opravdu vlastní (nejde tak zjistit, které e-maily existují).
+        // Značka jen zužuje: bez ní (web) se nic nemění a falešná značka nic neodemkne.
+        const hlavicky = (req?.headers ?? {}) as Record<string, string | string[] | undefined>;
+        const ua = hlavicky['user-agent'];
+        const obal = obalZUserAgent(Array.isArray(ua) ? ua[0] : ua).obal;
+        if (!rolePatriDoObalu(obal, user.role)) throw new Error('OBAL_ROLE');
         await clear(`login:${email}`);
         let teamId: number | null = user.teamId ?? null;
         if (user.role === 'employer') {
@@ -135,6 +155,14 @@ export const authOptions: NextAuthOptions = {
         // Správce platformy se rozhodne tady, podle databáze, a jede v tokenu.
         // Klient si token nepřepíše; obnovuje se jen z databáze (níž).
         const superadmin = await jeSpravcePodleDb(user.id);
+        // Jazyk aplikace (kolo 76): zvlášť a defenzivně, sloupec `users.lang`
+        // před migrací není a přihlášení kvůli němu selhat nesmí.
+        let lang: string | undefined;
+        try {
+          const sqlJ = neon(process.env.DATABASE_URL!);
+          const [l] = await sqlJ`SELECT lang FROM users WHERE id = ${user.id}`;
+          lang = cistyJazyk(l?.lang);
+        } catch { /* sloupec ještě není */ }
         return {
           id: String(user.id),
           name: user.name,
@@ -144,6 +172,7 @@ export const authOptions: NextAuthOptions = {
           jobTitle: user.jobTitle ?? 'Barista',
           teamId,
           superadmin,
+          lang,
         } as any;
       },
     }),
@@ -156,6 +185,7 @@ export const authOptions: NextAuthOptions = {
         token.jobTitle = (user as any).jobTitle;
         token.teamId = (user as any).teamId;
         token.superadmin = (user as any).superadmin === true;
+        token.lang = cistyJazyk((user as any).lang);
       }
       // session.update() volá PROHLÍŽEČ. Smí proto obnovit jen to, co je
       // kosmetické — jméno a avatar. Příslušnost k týmu odsud přijímat nelze:
@@ -164,6 +194,8 @@ export const authOptions: NextAuthOptions = {
       if (trigger === 'update' && session?.user) {
         if (session.user.name) token.name = session.user.name;
         if ((session.user as any).avatar) token.avatar = (session.user as any).avatar;
+        // Jazyk je kosmetika jako jméno a avatar; neplatná hodnota se zahodí.
+        if ((session.user as any).lang !== undefined) token.lang = cistyJazyk((session.user as any).lang);
       }
       // Role a tým se berou z databáze při KAŽDÉM čtení relace, ne jen když
       // prohlížeč sám zavolá update(). Token platí 30 dní a asi 68 rout čte
@@ -200,6 +232,7 @@ export const authOptions: NextAuthOptions = {
         // Správce platformy z tokenu — rozhodl se při přihlášení podle databáze
         // (role vedení, e-mail ze seznamu, bez dvojníka). Klient ho nezmění.
         (session.user as any).superadmin = token.superadmin === true;
+        (session.user as any).lang = cistyJazyk(token.lang);
       }
       return session;
     },

@@ -35,6 +35,9 @@ export async function GET() {
     FROM client_coupon_claims cl JOIN client_coupons c ON c.id = cl.coupon_id JOIN client_profiles p ON p.team_id = cl.team_id JOIN teams t ON t.id = cl.team_id
     WHERE cl.customer_id = ${me.id} ORDER BY cl.redeemed_at NULLS FIRST, cl.claimed_at DESC LIMIT 40`;
   const [profile] = await sql`SELECT id, name, email, phone, birthday FROM users WHERE id = ${me.id}`;
+  // Souhlas s novinkami podniků (opt-in): chybí-li nastavení nebo sloupec, je to NE.
+  let novinky = false;
+  try { const [p] = await sql`SELECT notif_prefs FROM users WHERE id = ${me.id}`; novinky = p?.notif_prefs?.novinky === true; } catch { /* před migrací */ }
   // Razítkové kampaně všech mých podniků + můj průběh — dvě skupinové otázky.
   let campaignRows: any[] = []; let progRows: any[] = [];
   try {
@@ -59,7 +62,7 @@ export async function GET() {
     });
   }
   return NextResponse.json({
-    me: profile ?? me,
+    me: { ...(profile ?? me), novinky },
     memberships: memberships.map(m => ({ ...publicProfile(m), points: Number(m.points), stamps: Number(m.stamps), visits: Number(m.visits), credit: Number(m.credit ?? 0), lastVisitAt: m.last_visit_at, campaigns: campsByTeam.get(Number(m.team_id)) ?? [] })),
     reservations, orders, claims, today,
   });
@@ -74,6 +77,14 @@ export async function PATCH(req: NextRequest) {
   const phone = b.phone != null ? String(b.phone).replace(/[^\d+ ]/g, '').trim().slice(0, 20) : null;
   const birthday = b.birthday != null ? (/^\d{4}-\d{2}-\d{2}$/.test(String(b.birthday)) ? String(b.birthday) : '') : null;
   if (name !== null && !name) return NextResponse.json({ error: 'Jméno nesmí být prázdné.' }, { status: 400 });
+  // Souhlas s novinkami podniků (nebo jeho odvolání). Čas souhlasu se zapisuje, ať je co doložit.
+  if (typeof b.novinky === 'boolean') {
+    try {
+      await sql`UPDATE users SET notif_prefs = COALESCE(notif_prefs, '{}'::jsonb) || jsonb_build_object('novinky', ${b.novinky}::boolean, 'novinkyAt', ${new Date().toISOString()}::text) WHERE id = ${me.id}`;
+    } catch {
+      return NextResponse.json({ error: 'Nastavení se zatím nepodařilo uložit.' }, { status: 503 });
+    }
+  }
   // Ovladač neumí skládat úryvky SQL, proto COALESCE: null znamená „nech, jak je".
   const setBirthday = birthday !== null;
   await sql`UPDATE users SET
@@ -81,5 +92,7 @@ export async function PATCH(req: NextRequest) {
     birthday = CASE WHEN ${setBirthday} THEN ${birthday || null} ELSE birthday END
     WHERE id = ${me.id}`;
   const [u] = await sql`SELECT id, name, email, phone, birthday FROM users WHERE id = ${me.id}`;
-  return NextResponse.json({ ok: true, me: u });
+  let novinky = false;
+  try { const [p] = await sql`SELECT notif_prefs FROM users WHERE id = ${me.id}`; novinky = p?.notif_prefs?.novinky === true; } catch { /* před migrací */ }
+  return NextResponse.json({ ok: true, me: { ...u, novinky } });
 }

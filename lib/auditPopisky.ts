@@ -8,6 +8,14 @@
 export const AUDIT_POPISKY: Record<string, string> = {
   // podnik a lidé
   'team.settings': 'Změna nastavení podniku',
+  'ucet.smazan': 'Účet smazán jeho majitelem',
+  'ucet.stripe_chyba': 'Smazání účtu: Stripe se nepodařilo uklidit, dokončit ručně',
+  'podnik.smazan': 'Podnik smazán spolu s účtem vlastníka',
+  'nahlaseni.vytvoreno': 'Obsah nahlášen',
+  'nahlaseni.vyreseno': 'Nahlášení vyřízeno',
+  'uzivatel.zablokovan': 'Uživatel zablokován',
+  'uzivatel.odblokovan': 'Uživatel odblokován',
+  'zprava.smazana': 'Zpráva v chatu smazána',
   'team.switch': 'Přepnutí do jiného podniku',
   'team.create': 'Založen nový podnik',
   'team.create_account': 'Založen účet člena',
@@ -15,6 +23,7 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'kiosk.login': 'Změna přihlášení tabletu',
   'kiosk.pin': 'Změna PINu člena',
   'rozlozeni.vychozi': 'Změna výchozího rozložení stránky',
+  'onboarding.apply': 'Průvodce nastavením podniku založil předvolby',
   // role
   'role.create': 'Vytvořena role',
   'role.update': 'Upravena role',
@@ -91,7 +100,8 @@ const POLE_NASTAVENI: Record<string, string> = {
   payDailyCash: 'denní výplata v hotovosti', drawerFloat: 'kasa na začátku', closingRequiresShift: 'uzávěrka jen ve směně',
   payoutFromRegister: 'výplaty z kasy', tipsInDrawer: 'spropitné v kase', laborTargetPct: 'cíl mzdových nákladů',
   levelsConfig: 'úrovně odměn', pointsConfig: 'body odměn', lowStockDefault: 'výchozí nízký stav',
-  criticalStockDefault: 'výchozí kritický stav',
+  criticalStockDefault: 'výchozí kritický stav', address: 'adresa',
+  country: 'země', defaultLang: 'jazyk podniku', timeFormat: 'formát času', timezone: 'časové pásmo', navConfig: 'navigace aplikace',
 };
 
 /** Seznam změněných polí česky: „název, měna“. Neznámé pole se vynechá, ne vypíše syrově. */

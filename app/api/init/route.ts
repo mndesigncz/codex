@@ -609,10 +609,28 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'CZK'`);
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS locale TEXT DEFAULT 'cs-CZ'`);
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS week_start INTEGER DEFAULT 1`); // 1 = Monday, 0 = Sunday
+    // ---- Vícejazyčnost a lokalizace podniku (kolo 76) ----
+    // Všechno idempotentní a čtené defenzivně: před touhle migrací se aplikace
+    // chová jako dřív (čeština, Praha, 24 h). `country` jen předvyplňuje návrhy,
+    // nic nezamyká. `vat_rates` a `labor_rules` zatím nic nečte (jen číselníky do
+    // budoucna); `nav_config` řídí přizpůsobení navigace (lib/navigace.ts).
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS country TEXT`);                      // ISO 3166-1 alfa-2: CZ, SK, DE, AT, PL
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS default_lang TEXT DEFAULT 'cs'`);    // cs|en|de|sk|pl
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS timezone TEXT DEFAULT 'Europe/Prague'`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS time_format TEXT DEFAULT '24'`);     // '24' | '12'
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS vat_rates JSONB`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS labor_rules JSONB`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS nav_config JSONB`);
+    await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT`);                          // null = podle podniku
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS labor_target_pct INTEGER`);      // target labor cost as % of revenue
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS low_stock_default INTEGER DEFAULT 5`);
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS critical_stock_default INTEGER DEFAULT 2`);
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS business_type TEXT`);
+    // Průvodce prvotním nastavením (lib/pruvodce): stav a odpovědi v jednom JSONB,
+    // plus adresa a země podniku. NULL = podnik z doby před průvodcem, ten ho neuvidí.
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS onboarding JSONB`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS address TEXT`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS country TEXT`);
     // per-team dashboard customization: { employer: {widgetId:false}, employee: {...} }
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS dashboard_config JSONB DEFAULT '{}'`);
 
@@ -814,6 +832,15 @@ export async function GET(request: Request) {
     // Vzhled menu (barvy, logo, písma, prvky na pozadí). Prázdné = vzhled
     // zapečený ve stránce, takže staré menu vypadá dál stejně.
     await ddl(sql`ALTER TABLE menu_boards ADD COLUMN IF NOT EXISTS theme JSONB`);
+    // Jazyky lístku (kolo 76): `langs` = {"vychozi":"cs","nabizet":["cs","en"]},
+    // `i18n` = {"en":{"title":…}} u desky, sekce i položky. Alergeny jsou kódy
+    // 1–14 podle nařízení EU 1169/2011, `tags` jsou štítky jako 'vegan'.
+    await ddl(sql`ALTER TABLE menu_boards ADD COLUMN IF NOT EXISTS langs JSONB`);
+    await ddl(sql`ALTER TABLE menu_boards ADD COLUMN IF NOT EXISTS i18n JSONB`);
+    await ddl(sql`ALTER TABLE menu_sections ADD COLUMN IF NOT EXISTS i18n JSONB`);
+    await ddl(sql`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS i18n JSONB`);
+    await ddl(sql`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS allergens SMALLINT[]`);
+    await ddl(sql`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS tags TEXT[]`);
     // A closing belongs to the whole shift, not just its author.
     await ddl(sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS shift_employees JSONB DEFAULT '[]'`);
     // Business day the closing belongs to. A night shift ending at 02:00 files
@@ -2052,6 +2079,72 @@ export async function GET(request: Request) {
     // člena a podnik (hlídá deník), takže opakované volání nic nerozdá dvakrát.
     let birthdays = 0;
     try { birthdays = await awardBirthdays(); } catch { /* nesmí shodit migrace */ }
+
+    // ---- Kolo 77: nativní obal a obchody (App Store, Google Play) ----
+    // Vše idempotentní; kód, který tyhle tabulky čte, je před migrací fail-open.
+    // Smazání účtu: anonymizovaný řádek users nese čas smazání, přihlášení ho odmítne.
+    await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP`);
+    // Souhlas s podmínkami a zásadami při založení účtu (čas, kdy ho člověk dal).
+    await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMP`);
+    // Reset hesla: v databázi je jen otisk tokenu, nikdy token sám (únik DB nedá přístup k účtům).
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS password_resets (
+        token_hash TEXT PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        used_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS password_resets_user ON password_resets (user_id)`);
+    // Žádost o smazání účtu z webu bez přihlášení: potvrdí se odkazem v e-mailu.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS account_delete_requests (
+        token_hash TEXT PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        used_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS account_delete_requests_user ON account_delete_requests (user_id)`);
+    // Nativní push (APNs / FCM): token zařízení. Webový push zůstává v push_subscriptions.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS device_tokens (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        app TEXT NOT NULL DEFAULT 'managero',
+        platform TEXT NOT NULL,
+        token TEXT NOT NULL UNIQUE,
+        env TEXT NOT NULL DEFAULT 'production',
+        app_version TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        last_seen_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS device_tokens_user ON device_tokens (user_id)`);
+    // Moderace uživatelského obsahu (Apple 1.2, Google Play UGC): nahlášení a blokace.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS content_reports (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER,
+        reporter_id INTEGER NOT NULL,
+        reported_user_id INTEGER,
+        kind TEXT NOT NULL,
+        ref_id INTEGER,
+        reason TEXT NOT NULL,
+        detail TEXT,
+        snapshot TEXT,
+        status TEXT NOT NULL DEFAULT 'open',
+        resolved_by INTEGER,
+        resolved_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS content_reports_team ON content_reports (team_id, status)`);
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS user_blocks (
+        blocker_id INTEGER NOT NULL,
+        blocked_id INTEGER NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        PRIMARY KEY (blocker_id, blocked_id)
+      )`);
 
     // Kroky migrace, které selhaly (a byly zachyceny), ať se to pozná zvenku
     // místo tichého „ok". Prázdné pole = celé schéma prošlo.

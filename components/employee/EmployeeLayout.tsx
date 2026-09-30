@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { signOut } from 'next-auth/react';
+import { odhlasit } from '@/lib/odhlaseni';
 import PodnikSwitcher from '../PodnikSwitcher';
 import { Icon, LogoMark } from '../Icons';
 import { Avatar, ErrorBoundary, MenuPanel, MenuItemButton } from '../ui';
@@ -13,6 +13,12 @@ import MessengerDock from '../chat/MessengerDock';
 import { useConversations } from '../chat/useChat';
 import EmployeeDashboard from './EmployeeDashboard';
 import MobileMoreSheet from '../MobileMoreSheet';
+import { VYCHOZI_NAV } from '@/lib/navigace';
+import { useNavigaceAplikace } from '../useNavigaceAplikace';
+import { useJazyk, useT } from '@/lib/i18n/client';
+import { JAZYK_NAZEV } from '@/lib/i18n/config';
+import JazykOkno from '../JazykOkno';
+import { Chip } from '../ui';
 import dynamic from 'next/dynamic';
 import { PageSkeleton } from '../ui';
 import { useOpravneni } from '../role/useOpravneni';
@@ -42,30 +48,10 @@ const SuggestionsBoard = naLine(() => import('../SuggestionsBoard'));
 const Procedures = naLine(() => import('../procedures/Procedures'));
 
 
-const navItems = [
-  { id: 'home',        label: 'Přehled',    icon: 'overview' },
-  { id: 'my-shifts',   label: 'Moje směny', icon: 'calendar', short: 'Směny' },
-  { id: 'procedures',  label: 'Postupy',    icon: 'clipboard' },
-  { id: 'availability',label: 'Dostupnost', icon: 'swap' },
-  { id: 'inventory',   label: 'Sklad',      icon: 'box' },
-  { id: 'closing',     label: 'Uzávěrka',   icon: 'trend' },
-  { id: 'tasks',       label: 'Úkoly',      icon: 'check' },
-  { id: 'rewards',     label: 'Odměny',     icon: 'award' },
-  { id: 'chat',        label: 'Chat',       icon: 'chat' }, // mobile dock only
-  { id: 'guides',      label: 'Návody',     icon: 'book' },
-  { id: 'suggestions', label: 'Nápady',     icon: 'bulb' },
-];
-
-// Grouped navigation categories for the menus.
-const navSections: { title: string | null; ids: string[] }[] = [
-  { title: null,        ids: ['home'] },
-  { title: 'Směny',     ids: ['my-shifts', 'availability'] },
-  { title: 'Práce',     ids: ['closing', 'inventory', 'tasks', 'procedures'] },
-  { title: 'Tým',       ids: ['rewards', 'chat', 'guides', 'suggestions'] },
-];
+// Výchozí pohledy, skupiny a dok jsou v lib/navigace.ts (sdílí je oba layouty
+// a skládání navigace podle nastavení podniku).
+const navItems = VYCHOZI_NAV.zamestnanec.polozky;
 const byId = Object.fromEntries(navItems.map(n => [n.id, n]));
-
-const mobilePrimary = ['home', 'my-shifts', 'inventory', 'chat'];
 
 // Pohledy podle oprávnění (kolo 67). Barista má všechno níže, takže se mu
 // nic neschová; vlastní role typu Zaměstnanec (třeba Kuchař bez uzávěrky)
@@ -88,6 +74,11 @@ export default function EmployeeLayout({ user }: Props) {
   const [currentView, setCurrentView] = useState('home');
   const { ma, opravneni, nacteno } = useOpravneni();
   const smiPohled = (id: string) => { const k = KLICE_POHLEDU[id]; return k == null || ma(k); };
+  const t = useT();
+  const { jazyk } = useJazyk();
+  // Navigace podle oprávnění (první) a nastavení podniku (skrýt, přejmenovat, pořadí).
+  const nav = useNavigaceAplikace('zamestnanec', smiPohled, [opravneni, nacteno]);
+  const [jazykOpen, setJazykOpen] = useState(false);
   // Deep links from notifications: /employee/shifts?view=X
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
@@ -151,13 +142,17 @@ export default function EmployeeLayout({ user }: Props) {
     }
   };
 
-  const active = navItems.find(n => n.id === currentView);
-  const title = currentView === 'settings' ? 'Nastavení' : active?.label;
+  // Štítek aktivního pohledu z poskládané navigace (přejmenování, jazyk); skrytý
+  // pohled otevřený odkazem se hledá mezi skrytými, neznámý spadne na výchozí název.
+  const active = [...nav.vse, ...nav.skryte].find(n => n.id === currentView)
+    ?? (byId[currentView] ? { ...byId[currentView], label: t(byId[currentView].label, undefined, 'nav') } : undefined);
+  const jeSkryty = nav.skryte.some(n => n.id === currentView);
+  const title = currentView === 'settings' ? t('Nastavení') : active?.label;
   const mojeNav = navItems.filter(n => smiPohled(n.id));
-  const mojeById = Object.fromEntries(mojeNav.map(n => [n.id, n]));
-  const mobileSecondary = mojeNav.filter(n => !mobilePrimary.includes(n.id));
-  const mobileGroups = navSections
-    .map(sec => ({ title: sec.title, items: sec.ids.map(id => mojeById[id]).filter(n => n && !mobilePrimary.includes(n.id)) }))
+  const vDoku = (id: string) => nav.dok.some(d => d.id === id);
+  const mobileSecondary = nav.vse.filter(n => !vDoku(n.id));
+  const mobileGroups = nav.sekce
+    .map(sec => ({ title: sec.title, items: sec.items.filter(n => !vDoku(n.id)) }))
     .filter(g => g.items.length);
 
   // Navigace pro widgety na ploše (kolo 68, spec §2.6): proklik z widgetu vede
@@ -175,7 +170,7 @@ export default function EmployeeLayout({ user }: Props) {
           {sidebarOpen && (
             <div className="overflow-hidden">
               <p className="font-bold text-sm leading-tight tracking-tight">Managero</p>
-              <p className="t-label text-black/40 mt-0.5">Portál zaměstnance</p>
+              <p className="t-label text-black/40 mt-0.5">{t('Portál zaměstnance')}</p>
             </div>
           )}
         </div>
@@ -184,11 +179,11 @@ export default function EmployeeLayout({ user }: Props) {
           <PodnikSwitcher compact={!sidebarOpen} />
         </div>
         <nav className="flex-1 py-3 space-y-0.5 px-3 overflow-y-auto scrollbar-thin">
-          {navSections.map((sec, si) => {
-            const items = sec.ids.map(id => mojeById[id]).filter(n => n && n.id !== 'chat');
+          {nav.sekce.map((sec, si) => {
+            const items = sec.items.filter(n => n.id !== 'chat');
             if (!items.length) return null;
             return (
-              <div key={sec.title ?? 'top'} className={si > 0 ? 'pt-2.5' : ''}>
+              <div key={sec.id} className={si > 0 ? 'pt-2.5' : ''}>
                 {sec.title && (sidebarOpen
                   // Štítek skupiny jako všude jinde (t-label), ne ručně psaný (audit kola 68, rám).
                   ? <p className="t-label px-3.5 pb-1.5">{sec.title}</p>
@@ -216,15 +211,16 @@ export default function EmployeeLayout({ user }: Props) {
               rám): dřív vlastní panel se stínem psaným ručně, bez Escapu,
               bez zavření klepnutím vedle a bez šipek. */}
           {accountOpen && (
-            <MenuPanel ref={ucet.panelRef} onKeyDown={ucet.onPanelKeyDown} direction="up" aria-label="Účet"
+            <MenuPanel ref={ucet.panelRef} onKeyDown={ucet.onPanelKeyDown} direction="up" aria-label={t('Účet')}
               className="absolute left-3 right-3 bottom-full mb-2 origin-bottom-left">
-              <MenuItemButton label="Nastavení" icon="settings" onClick={openSettings} />
+              <MenuItemButton label={t('Nastavení')} icon="settings" onClick={openSettings} />
+              <MenuItemButton label={`${t('Jazyk')}: ${JAZYK_NAZEV[jazyk]}`} icon="globe" onClick={() => { setAccountOpen(false); setJazykOpen(true); }} />
               <div role="separator" className="h-px bg-black/[0.06] my-1" />
-              <MenuItemButton label="Odhlásit se" icon="logout" danger onClick={() => signOut({ callbackUrl: '/login' })} />
+              <MenuItemButton label={t('Odhlásit se')} icon="logout" danger onClick={() => odhlasit({ callbackUrl: '/login' })} />
             </MenuPanel>
           )}
           <button ref={ucet.triggerRef} type="button" onClick={() => setAccountOpen(v => !v)} onKeyDown={ucet.onTriggerKeyDown}
-            title="Účet" aria-haspopup="menu" aria-expanded={accountOpen}
+            title={t('Účet')} aria-haspopup="menu" aria-expanded={accountOpen}
             className={`w-full flex items-center gap-3 rounded-2xl transition-colors ${accountOpen ? 'bg-black/[0.06]' : 'bg-black/[0.04] hover:bg-black/[0.05]'} ${sidebarOpen ? 'p-2' : 'p-2 justify-center'}`}>
             <Avatar emoji={user.avatar} size="md" />
             {sidebarOpen && (
@@ -246,7 +242,7 @@ export default function EmployeeLayout({ user }: Props) {
           {/* Ikonové tlačítko bez textu je pro odečítač obrazovky prostě
               „tlačítko". Tenhle přepínač je na každé obrazovce aplikace. */}
           <button onClick={() => setSidebarOpen(v => !v)} type="button"
-            aria-label={sidebarOpen ? 'Zúžit boční pás' : 'Rozbalit boční pás'}
+            aria-label={sidebarOpen ? t('Zúžit boční pás') : t('Rozbalit boční pás')}
             aria-expanded={sidebarOpen}
             className="hidden md:flex rounded-full p-2 text-black/45 hover:text-black hover:bg-black/[0.05] transition-colors">
             <Icon name="menu" size={20} />
@@ -257,6 +253,8 @@ export default function EmployeeLayout({ user }: Props) {
           <div className="flex-1 min-w-0">
             <h2 className="font-bold text-[#16181A] text-lg tracking-tight truncate">{title}</h2>
           </div>
+          {/* Sekce skrytá v nastavení podniku, otevřená odkazem nebo widgetem: preference, ne zákaz. */}
+          {jeSkryty && <Chip tone="muted" size="sm" className="shrink-0">{t('Skrytá sekce')}</Chip>}
           <NotificationBell />
         </header>
 
@@ -288,8 +286,8 @@ export default function EmployeeLayout({ user }: Props) {
 
       {/* Spodní dok na telefonu — sdílený components/ui/Dock (kolo 69, B8); dřív
           vlastní kopie s `glass-strong`, jinak neprůhledná než dok administrace. */}
-      <Dock label="Spodní navigace"
-        items={mojeNav.filter(n => mobilePrimary.includes(n.id)).map(n => ({
+      <Dock label={t('Spodní navigace')}
+        items={nav.dok.map(n => ({
           id: n.id, label: (n as { short?: string }).short ?? n.label, icon: n.icon,
           ...(n.id === 'chat' && currentView !== 'chat' ? { badge: unreadChat, badgeLabel: czCount(unreadChat, NEPRECTENA_ZPRAVA) } : {}),
         }))}
@@ -304,10 +302,12 @@ export default function EmployeeLayout({ user }: Props) {
         activeId={currentView}
         onSelect={setCurrentView}
         actions={[
-          { label: 'Nastavení', icon: 'settings', onClick: openSettings },
-          { label: 'Odhlásit se', icon: 'logout', onClick: () => signOut({ callbackUrl: '/login' }), danger: true },
+          { label: t('Nastavení'), icon: 'settings', onClick: openSettings },
+          { label: `${t('Jazyk')}: ${JAZYK_NAZEV[jazyk]}`, icon: 'globe', onClick: () => { setMoreOpen(false); setJazykOpen(true); } },
+          { label: t('Odhlásit se'), icon: 'logout', onClick: () => odhlasit({ callbackUrl: '/login' }), danger: true },
         ]}
       />
+      <JazykOkno open={jazykOpen} onClose={() => setJazykOpen(false)} />
     </div>
     </NavigaceKontext.Provider>
   );

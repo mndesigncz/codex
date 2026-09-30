@@ -1,0 +1,1 @@
+Rozvrh navrhne generátor, sklad hlídá zásoby a uzávěrku nejde zapomenout. Celý provoz kavárny nebo restaurace v jedné aplikaci.

@@ -10,7 +10,9 @@ import { Segmented, Skeleton, EmptyState, ErrorState } from '../ui';
 import { Initials } from './ClientShell';
 import TableMap, { placedTables } from './TableMap';
 import { onAccent } from '@/lib/floorplan';
-import { hoursLabel, slotsFor, czDay, DAY_NAMES, RES_STATUS } from '@/lib/clientSlots';
+import { hoursLabel, slotsFor, RES_STATUS } from '@/lib/clientSlots';
+import { useJazyk, useT } from '@/lib/i18n/client';
+import { fmtDatum, fmtDenVTydnu, fmtMesic } from '@/lib/i18n/format';
 import { pragueToday, dayPlus } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
 import { formatMoney, formatPrice, currencySymbol } from '@/lib/money';
@@ -20,15 +22,18 @@ import { DiscardGuard } from '../ui/DiscardGuard';
 
 type Tab = 'menu' | 'reserve' | 'order' | 'loyalty';
 
-/** Zkratky měsíců pro dlaždici akce — celý název by se tam nevešel. */
-const MONTHS = ['led', 'úno', 'bře', 'dub', 'kvě', 'čvn', 'čvc', 'srp', 'zář', 'říj', 'lis', 'pro'];
-
 const btnPrimary = 'tap-target inline-flex items-center justify-center gap-2 btn btn-accent hover:brightness-105 active:scale-[0.98] disabled:opacity-50 transition';
 const btnQuiet = 'tap-target inline-flex items-center justify-center gap-2 btn btn-secondary hover:bg-black/[0.05] active:scale-[0.98] disabled:opacity-50 transition';
 const input = 'field text-sm';
 const label = 'field-label';
 
 export default function BusinessPage({ slug }: { slug: string }) {
+  // Jazyk stránky je jazyk hosta (?lang=, cookie, jazyk prohlížeče; viz lib/i18n/client).
+  // Texty podniku (název, popis, novinky) se nepřekládají, jsou to obsah podniku;
+  // překládá se obal stránky a nabídka podle jazyků, které podnik v lístku zapnul.
+  // Tón: hostům tykání (německy „du“), věty o alergenech jsou formální (server).
+  const t = useT('klient-host');
+  const { jazyk } = useJazyk();
   const [d, setD] = useState<any | null>(null);
   const [notFound, setNotFound] = useState(false);
   /** Nepovedlo se načíst — na rozdíl od „podnik neexistuje" se dá zkusit znovu. */
@@ -47,24 +52,24 @@ export default function BusinessPage({ slug }: { slug: string }) {
   // existuje; jen se k ní telefon zrovna nedovolal.
   const load = useCallback(() => {
     setLoadErr('');
-    return fetch(`/api/client/b/${encodeURIComponent(slug)}`)
+    return fetch(`/api/client/b/${encodeURIComponent(slug)}?lang=${jazyk}`)
       .then(r => {
         if (r.status === 404) { setNotFound(true); return null; }
         return okJson(r);
       })
       .then(x => { if (x) { setD(x); setNotFound(false); } })
-      .catch(e => setLoadErr(apiMessage(e, 'Stránku podniku se nepodařilo načíst.')));
-  }, [slug]);
+      .catch(e => setLoadErr(apiMessage(e, t('Stránku podniku se nepodařilo načíst.'))));
+  }, [slug, jazyk, t]);
   useEffect(() => { load(); }, [load]);
   useEffect(() => { if (flash) { const t = setTimeout(() => setFlash(''), 4000); return () => clearTimeout(t); } }, [flash]);
 
-  if (notFound) return <EmptyState icon="location" title="Podnik tu není" hint="Buď má jinou adresu, nebo Managero client zatím nezapnul." action={<Link href="/client" className={btnQuiet}>Zpět na podniky</Link>} />;
+  if (notFound) return <EmptyState icon="location" title={t('Podnik tu není')} hint={t('Buď má jinou adresu, nebo Managero client zatím nezapnul.')} action={<Link href="/client" className={btnQuiet}>{t('Zpět na podniky')}</Link>} />;
   if (loadErr && !d) return (
     <ErrorState
-      title="Stránka podniku se nenačetla"
+      title={t('Stránka podniku se nenačetla')}
       /* Zprávu posílá server a nemusí končit tečkou; bez tohohle by se
          obě věty slily dohromady. */
-      hint={`${/[.!?…]$/.test(loadErr) ? loadErr : loadErr + '.'} Podnik tu nejspíš je — jen se k němu teď nedovoláme.`}
+      hint={`${/[.!?…]$/.test(loadErr) ? loadErr : loadErr + '.'} ${t('Podnik tu nejspíš je — jen se k němu teď nedovoláme.')}`}
       onRetry={() => { void load(); }}
     />
   );
@@ -74,10 +79,10 @@ export default function BusinessPage({ slug }: { slug: string }) {
   // Barva značky podniku; bez vlastní volby zůstává limetková jako ve zbytku aplikace.
   const accent: string = b.accent || '#C8F542';
   const tabs: { id: Tab; label: string; icon: string }[] = [
-    { id: 'menu', label: 'Nabídka', icon: 'leaf' },
-    ...(b.reservationsOn ? [{ id: 'reserve' as Tab, label: 'Rezervace', icon: 'calendarCheck' }] : []),
-    ...(b.orderingOn && (d.tables?.length ?? 0) > 0 ? [{ id: 'order' as Tab, label: 'Objednat', icon: 'cup' }] : []),
-    ...(b.loyaltyOn ? [{ id: 'loyalty' as Tab, label: 'Věrnost', icon: 'gift' }] : []),
+    { id: 'menu', label: t('Nabídka'), icon: 'leaf' },
+    ...(b.reservationsOn ? [{ id: 'reserve' as Tab, label: t('Rezervace'), icon: 'calendarCheck' }] : []),
+    ...(b.orderingOn && (d.tables?.length ?? 0) > 0 ? [{ id: 'order' as Tab, label: t('Objednat'), icon: 'cup' }] : []),
+    ...(b.loyaltyOn ? [{ id: 'loyalty' as Tab, label: t('Věrnost'), icon: 'gift' }] : []),
   ];
   const join = async () => {
     if (joining) return;
@@ -85,9 +90,9 @@ export default function BusinessPage({ slug }: { slug: string }) {
     try {
       const r = await fetch(`/api/client/b/${encodeURIComponent(slug)}/join`, { method: 'POST' });
       if (r.status === 401) { window.location.href = `/client/login?next=${encodeURIComponent('/client/' + slug)}`; return; }
-      if (r.ok) { setFlash('Jsi členem. Vítej.'); load(); return; }
+      if (r.ok) { setFlash(t('Jsi členem. Vítej.')); load(); return; }
       const d = await r.json().catch(() => ({}));
-      setFlash(d.error || 'Přidat se teď nepovedlo. Zkus to prosím znovu.');
+      setFlash(d.error ? t(d.error) : t('Přidat se teď nepovedlo. Zkus to prosím znovu.'));
     } finally { setJoining(false); }
   };
 
@@ -117,7 +122,7 @@ export default function BusinessPage({ slug }: { slug: string }) {
               <h1 className="text-3xl sm:text-[2.6rem] font-bold tracking-tighter leading-[1.02] text-balance">{b.name}</h1>
               {b.tagline && <p className={`mt-1.5 text-base sm:text-lg leading-snug text-pretty max-w-[40ch] ${b.coverUrl ? 'text-white/85' : 'text-black/65'}`}>{b.tagline}</p>}
               <p className={`mt-2 text-sm flex flex-wrap items-center gap-x-3 gap-y-1 ${b.coverUrl ? 'text-white/75' : 'text-black/55'}`}>
-                <span className="inline-flex items-center gap-1.5"><Icon name="clock" size={15} />Dnes {hoursLabel(b.hours, today)}</span>
+                <span className="inline-flex items-center gap-1.5"><Icon name="clock" size={15} />{t('Dnes {hodiny}', { hodiny: hoursLabel(b.hours, today, cs => t(cs)) })}</span>
                 {b.address && <span className="inline-flex items-center gap-1.5"><Icon name="location" size={15} />{b.address}</span>}
               </p>
               {/* Tady dřív stály pilulky „Rezervovat / Objednat od stolu /
@@ -132,14 +137,14 @@ export default function BusinessPage({ slug }: { slug: string }) {
             {me?.member ? (
               <div className={`rounded-2xl px-4 py-3 ${b.coverUrl ? 'bg-white/15 backdrop-blur' : ''}`}
                 style={b.coverUrl ? undefined : { background: `${accent}22`, border: `1px solid ${accent}66` }}>
-                <p className="text-[11px] uppercase tracking-wider opacity-70">{me.levelLabel ?? 'Člen'}{me.discount > 0 ? ` · sleva ${me.discount} %` : ''}</p>
-                <p className="text-lg font-bold tabular-nums leading-tight">{me.points} b. <span className="opacity-60 font-medium text-sm">· {me.stamps}/{b.stampTarget || '–'} razítek</span></p>
-                {me.credit > 0 && <p className="text-sm font-semibold tabular-nums leading-tight">{formatMoney(me.credit, b.currency)} kreditu</p>}
-                {me.nextTierAt && <p className="text-[11px] opacity-60 leading-snug">do „{me.nextTierLabel}" ještě {Math.max(0, me.nextTierAt - me.visits)} návštěv</p>}
+                <p className="text-[11px] uppercase tracking-wider opacity-70">{t(me.levelLabel ?? 'Člen')}{me.discount > 0 ? ` · ${t('sleva {n} %', { n: me.discount })}` : ''}</p>
+                <p className="text-lg font-bold tabular-nums leading-tight">{me.points} {t('b.')} <span className="opacity-60 font-medium text-sm">· {t('{stamps}/{target} razítek', { stamps: me.stamps, target: b.stampTarget || '–' })}</span></p>
+                {me.credit > 0 && <p className="text-sm font-semibold tabular-nums leading-tight">{t('{castka} kreditu', { castka: formatMoney(me.credit, b.currency) })}</p>}
+                {me.nextTierAt && <p className="text-[11px] opacity-60 leading-snug">{t('do „{level}“ ještě {n, plural, one {# návštěva} few {# návštěvy} other {# návštěv}}', { level: t(me.nextTierLabel), n: Math.max(0, me.nextTierAt - me.visits) })}</p>}
               </div>
             ) : (
               <button onClick={join} disabled={joining} className="tap-target w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold hover:brightness-105 active:scale-[0.98] disabled:opacity-60 transition"
-                style={{ background: accent, color: onAccent(accent) }}><Icon name="plus" size={16} /> Stát se členem</button>
+                style={{ background: accent, color: onAccent(accent) }}><Icon name="plus" size={16} /> {t('Stát se členem')}</button>
             )}
           </div>
         </div>
@@ -147,7 +152,7 @@ export default function BusinessPage({ slug }: { slug: string }) {
 
       {flash && <p role="status" className="toast-in rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 text-[#3E5406] text-sm px-4 py-3">{flash}</p>}
 
-      {tabs.length > 1 && <Segmented options={tabs} value={tab} onChange={setTab} ariaLabel="Části stránky podniku" />}
+      {tabs.length > 1 && <Segmented options={tabs} value={tab} onChange={setTab} ariaLabel={t('Části stránky podniku')} />}
 
       {tab === 'menu' && <MenuTab menu={d.menu} news={d.news} events={d.events} gallery={b.gallery} accent={accent} tagline={b.tagline} address={b.address} description={b.description} hours={b.hours} currency={b.currency} slug={slug} signedIn={d.signedIn} businessName={b.name} />}
       {tab === 'reserve' && b.reservationsOn && <ReserveTab slug={slug} b={b} me={me} today={today} signedIn={d.signedIn} onDone={(m: string) => { setFlash(m); load(); }} />}
@@ -160,6 +165,8 @@ export default function BusinessPage({ slug }: { slug: string }) {
 function MenuTab({ menu, news, events, gallery, accent, tagline, address, description, hours, currency, slug, signedIn, businessName }: { menu: any; news?: any[]; events?: any[]; gallery?: string[]; accent?: string; tagline: string; address: string; description: string; hours: any; currency: string; slug: string; signedIn: boolean; businessName: string }) {
   // Dřív `currency === 'CZK' ? 'Kč' : currency`, takže eurová kavárna
   // ukazovala hostům „120 EUR" a dvanáct a půl tisíce jako „12500 Kč".
+  const t = useT('klient-host');
+  const { jazyk } = useJazyk();
   const cur = currencySymbol(currency);
   // Ceny v menu smějí mít haléře (4,50 €) — formatMoney by je zaokrouhlil na celé.
   const money = (n: number) => formatPrice(n, currency);
@@ -168,7 +175,7 @@ function MenuTab({ menu, news, events, gallery, accent, tagline, address, descri
   return (
     <div className="space-y-8">
       {(gallery?.length ?? 0) > 0 && (
-        <section aria-label="Fotky z podniku" className="-mx-4 sm:mx-0">
+        <section aria-label={t('Fotky z podniku')} className="-mx-4 sm:mx-0">
           {/* Pás fotek: na telefonu se posouvá prstem, na monitoru se zarovná
               do mřížky. První fotka je větší — podnik má čím začít. */}
           <ul className="flex gap-2.5 overflow-x-auto px-4 sm:px-0 sm:grid sm:grid-cols-4 scrollbar-thin snap-x">
@@ -184,7 +191,7 @@ function MenuTab({ menu, news, events, gallery, accent, tagline, address, descri
 
       {(events?.length ?? 0) > 0 && (
         <section aria-labelledby="h-events">
-          <h2 id="h-events" className="text-lg font-bold tracking-tight mb-3">Co se u nás chystá</h2>
+          <h2 id="h-events" className="text-lg font-bold tracking-tight mb-3">{t('Co se u nás chystá')}</h2>
           <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {events!.map((e: any) => (
               <li key={e.id}>
@@ -196,15 +203,15 @@ function MenuTab({ menu, news, events, gallery, accent, tagline, address, descri
                   ) : (
                     <span className="shrink-0 grid place-items-center rounded-2xl h-14 w-14 text-center leading-none" style={{ background: `${ac}26` }}>
                       <span className="block text-lg font-bold tabular-nums">{Number(String(e.date).slice(8, 10))}</span>
-                      <span className="block text-[11px] uppercase tracking-wider text-black/50 mt-0.5">{MONTHS[Number(String(e.date).slice(5, 7)) - 1]}</span>
+                      <span className="block text-[11px] uppercase tracking-wider text-black/50 mt-0.5">{fmtMesic(Number(String(e.date).slice(5, 7)), { jazyk, styl: 'kratky' })}</span>
                     </span>
                   )}
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold leading-tight">{e.title}</p>
-                    <p className="text-xs text-black/55 mt-0.5 cz-sentence">{czDay(e.date, true)}{e.start_time ? ` · ${e.start_time}` : ''}{e.location ? ` · ${e.location}` : ''}</p>
+                    <p className="text-xs text-black/55 mt-0.5 cz-sentence">{fmtDatum(e.date, { jazyk, styl: 'denDlouze' })}{e.start_time ? ` · ${e.start_time}` : ''}{e.location ? ` · ${e.location}` : ''}</p>
                     {e.description && <p className="text-sm text-black/65 mt-1 line-clamp-2 text-pretty">{e.description}</p>}
                     {(e.going > 0 || e.capacity) && (
-                      <p className="text-[11px] text-black/45 mt-1">{e.going > 0 ? `✋ ${e.going} ${e.going === 1 ? 'člověk jde' : e.going < 5 ? 'lidi jdou' : 'lidí jde'}` : ''}{e.going > 0 && e.capacity ? ' · ' : ''}{e.capacity ? `kapacita ${e.capacity}` : ''}</p>
+                      <p className="text-[11px] text-black/45 mt-1">{e.going > 0 ? t('✋ {n, plural, one {# člověk jde} few {# lidi jdou} other {# lidí jde}}', { n: e.going }) : ''}{e.going > 0 && e.capacity ? ' · ' : ''}{e.capacity ? t('kapacita {n}', { n: e.capacity }) : ''}</p>
                     )}
                   </div>
                   <Icon name="chevron" size={16} className="shrink-0 self-center -rotate-90 text-black/30" />
@@ -225,15 +232,25 @@ function MenuTab({ menu, news, events, gallery, accent, tagline, address, descri
               {s.items.map((it: any) => (
                 <li key={it.id} className={`py-2.5 flex items-baseline gap-3 ${it.soldOut ? 'opacity-50' : ''}`}>
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium leading-tight">{it.name}{it.soldOut && <span className="ml-2 text-[11px] uppercase tracking-wider text-black/50">vyprodáno</span>}</p>
+                    <p className="font-medium leading-tight">{it.name}{it.soldOut && <span className="ml-2 text-[11px] uppercase tracking-wider text-black/50">{t('vyprodáno')}</span>}</p>
                     {it.description && <p className="text-sm text-black/55 mt-0.5 text-pretty">{it.description}</p>}
+                    {/* Alergeny jen u položek, kde je podnik vyplnil: prázdné neznamená „bez alergenů“. */}
+                    {Array.isArray(it.alergeny) && it.alergeny.length > 0 && <p className="text-xs text-black/55 mt-0.5"><span className="font-semibold">{t('Alergeny')}:</span> {it.alergeny.join(', ')}</p>}
                   </div>
                   <span className="tabular-nums font-semibold shrink-0">{money(it.price)}</span>
                 </li>
               ))}
             </ul>
           </section>
-        )) : <EmptyState icon="leaf" title="Nabídka zatím není zveřejněná" hint="Podnik ji doplní v aplikaci." compact />}
+        )) : <EmptyState icon="leaf" title={t('Nabídka zatím není zveřejněná')} hint={t('Podnik ji doplní v aplikaci.')} compact />}
+        {/* Legenda alergenů a věta o složení přicházejí ze serveru v jazyce hosta (formální „Sie“ u němčiny, právně citlivé). */}
+        {menu?.alergenyNazvy && Object.keys(menu.alergenyNazvy).length > 0 && (
+          <div className="text-xs text-black/55 leading-relaxed space-y-1">
+            <p><span className="font-semibold text-black/70">{t('Alergeny')}:</span> {Object.entries(menu.alergenyNazvy).map(([k, n]) => `${k} ${n}`).join(' · ')}</p>
+            {menu.alergenyPoznamka && <p>{menu.alergenyPoznamka}</p>}
+            {menu.alergenyNeuplne && <p>{t('U některých položek alergeny nejsou vyplněny — zeptejte se obsluhy.')}</p>}
+          </div>
+        )}
       </div>
       <aside className="space-y-5 md:sticky md:top-24">
         {tagline && <p className="text-base font-semibold tracking-tight text-pretty">{tagline}</p>}
@@ -242,24 +259,25 @@ function MenuTab({ menu, news, events, gallery, accent, tagline, address, descri
         <div>
           {(news?.length ?? 0) > 0 && (
             <div className="mb-5">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-black/45 mb-2">Novinky</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-black/45 mb-2">{t('Novinky')}</p>
               <ul className="space-y-3">
                 {news!.map((n: any) => (
                   <li key={n.id}>
                     <p className="font-semibold text-sm leading-tight">{n.title}</p>
                     {n.body && <p className="text-sm text-black/60 text-pretty">{n.body}</p>}
-                    <p className="text-xs text-black/40 mt-0.5"><span className="cz-sentence">{czDay(String(n.sent_at).slice(0, 10), true)}</span></p>
+                    <p className="text-xs text-black/40 mt-0.5"><span className="cz-sentence">{fmtDatum(String(n.sent_at).slice(0, 10), { jazyk, styl: 'denDlouze' })}</span></p>
                   </li>
                 ))}
               </ul>
             </div>
           )}
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-black/45 mb-2">Otevírací doba</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-black/45 mb-2">{t('Otevírací doba')}</p>
           <ul className="text-sm divide-y divide-black/[0.06]">
-            {DAY_NAMES.map((n, i) => {
+            {[0, 1, 2, 3, 4, 5, 6].map(i => {
+              const n = fmtDenVTydnu(i, { jazyk, styl: 'dlouhy' });
               const day = hours?.[String(i)];
-              const txt = !day ? 'neuvedeno' : day.closed || !day.open ? 'zavřeno' : `${day.open}–${day.close}`;
-              return <li key={n} className="py-1.5 flex justify-between gap-3"><span className="cz-sentence">{n}</span><span className="tabular-nums text-black/70">{txt}</span></li>;
+              const txt = !day ? t('neuvedeno') : day.closed || !day.open ? t('zavřeno') : `${day.open}–${day.close}`;
+              return <li key={i} className="py-1.5 flex justify-between gap-3"><span className="cz-sentence">{n}</span><span className="tabular-nums text-black/70">{txt}</span></li>;
             })}
           </ul>
         </div>
@@ -270,6 +288,8 @@ function MenuTab({ menu, news, events, gallery, accent, tagline, address, descri
 }
 
 function ReserveTab({ slug, b, me, today, signedIn, onDone }: { slug: string; b: any; me: any; today: string; signedIn: boolean; onDone: (m: string) => void }) {
+  const t = useT('klient-host');
+  const { jazyk } = useJazyk();
   const [date, setDate] = useState(today);
   const [time, setTime] = useState('');
   const [party, setParty] = useState(2);
@@ -283,7 +303,7 @@ function ReserveTab({ slug, b, me, today, signedIn, onDone }: { slug: string; b:
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setErr('');
     if (!signedIn) { window.location.href = `/client/login?next=${encodeURIComponent('/client/' + slug)}`; return; }
-    if (!time) { setErr('Vyber čas.'); return; }
+    if (!time) { setErr(t('Vyber čas.')); return; }
     setBusy(true);
     // Bez `try` umřela obsluha na výpadku spojení uvnitř `await fetch`
     // a nestalo se **vůbec nic**: žádná chyba, žádné potvrzení. Host pak
@@ -292,65 +312,65 @@ function ReserveTab({ slug, b, me, today, signedIn, onDone }: { slug: string; b:
     try {
       const r = await fetch(`/api/client/b/${encodeURIComponent(slug)}/reservations`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date, time, party, note }) });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) { setErr(d.error || 'Rezervace se nepovedla.'); return; }
-      setNote(''); onDone('Rezervace odeslána. Podnik ji potvrdí.');
+      if (!r.ok) { setErr(d.error ? t(d.error) : t('Rezervace se nepovedla.')); return; }
+      setNote(''); onDone(t('Rezervace odeslána. Podnik ji potvrdí.'));
     } catch {
-      setErr('Rezervace neodešla — vypadlo připojení. Zkus to prosím znovu.');
+      setErr(t('Rezervace neodešla — vypadlo připojení. Zkus to prosím znovu.'));
     } finally {
       setBusy(false);
     }
   };
   const cancel = async (id: number) => {
-    if (!confirm('Zrušit rezervaci?')) return;
+    if (!confirm(t('Zrušit rezervaci?'))) return;
     try {
       const r = await fetch(`/api/client/reservations/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'cancelled' }) });
-      if (r.ok) { onDone('Rezervace zrušena.'); return; }
+      if (r.ok) { onDone(t('Rezervace zrušena.')); return; }
       const d = await r.json().catch(() => ({}));
-      setErr(d.error || 'Zrušení se nepovedlo. Zkus to prosím znovu.');
+      setErr(d.error ? t(d.error) : t('Zrušení se nepovedlo. Zkus to prosím znovu.'));
     } catch {
       // Nezrušená rezervace je horší než neodeslaná: podnik na hosta čeká.
-      setErr('Zrušení neodešlo — vypadlo připojení. Rezervace zatím platí, zkus to prosím znovu.');
+      setErr(t('Zrušení neodešlo — vypadlo připojení. Rezervace zatím platí, zkus to prosím znovu.'));
     }
   };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-[3fr_2fr] gap-6 md:gap-10 items-start">
       <form onSubmit={submit} className="glass-card p-5 sm:p-6 grid gap-4" noValidate>
-        <h2 className="t-section">Rezervovat stůl</h2>
+        <h2 className="t-section">{t('Rezervovat stůl')}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="grid gap-2">
-            <label htmlFor="r-date" className={label}>Den</label>
+            <label htmlFor="r-date" className={label}>{t('Den')}</label>
             <input id="r-date" type="date" min={today} max={maxDate} value={date} onChange={e => setDate(e.target.value)} className={input} required />
           </div>
           <div className="grid gap-2">
-            <label htmlFor="r-time" className={label}>Čas</label>
+            <label htmlFor="r-time" className={label}>{t('Čas')}</label>
             {slots.length ? (
               <select id="r-time" value={time} onChange={e => setTime(e.target.value)} className={input}>
                 {slots.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
-            ) : <p className="text-sm text-black/55 py-3">V tento den je zavřeno.</p>}
+            ) : <p className="text-sm text-black/55 py-3">{t('V tento den je zavřeno.')}</p>}
           </div>
           <div className="grid gap-2">
-            <label htmlFor="r-party" className={label}>Kolik vás bude</label>
+            <label htmlFor="r-party" className={label}>{t('Kolik vás bude')}</label>
             <div className="flex items-center gap-2">
-              <button type="button" aria-label="Méně" onClick={() => setParty(p => Math.max(1, p - 1))} className="tap-target h-11 w-11 rounded-full glass border border-black/10 grid place-items-center hover:bg-black/[0.05] active:scale-95 transition"><span className="text-lg leading-none">−</span></button>
+              <button type="button" aria-label={t('Méně')} onClick={() => setParty(p => Math.max(1, p - 1))} className="tap-target h-11 w-11 rounded-full glass border border-black/10 grid place-items-center hover:bg-black/[0.05] active:scale-95 transition"><span className="text-lg leading-none">−</span></button>
               <input id="r-party" type="number" min={1} max={b.maxParty} value={party} onChange={e => setParty(Math.max(1, Math.min(b.maxParty, parseInt(e.target.value || '1', 10))))} className={`${input} text-center tabular-nums !w-20`} />
-              <button type="button" aria-label="Více" onClick={() => setParty(p => Math.min(b.maxParty, p + 1))} className="tap-target h-11 w-11 rounded-full glass border border-black/10 grid place-items-center hover:bg-black/[0.05] active:scale-95 transition"><span className="text-lg leading-none">+</span></button>
+              <button type="button" aria-label={t('Více')} onClick={() => setParty(p => Math.min(b.maxParty, p + 1))} className="tap-target h-11 w-11 rounded-full glass border border-black/10 grid place-items-center hover:bg-black/[0.05] active:scale-95 transition"><span className="text-lg leading-none">+</span></button>
             </div>
-            <p className="text-xs text-black/45">Nejvíc {b.maxParty} u jedné rezervace.</p>
+            <p className="text-xs text-black/45">{t('Nejvíc {n} u jedné rezervace.', { n: b.maxParty })}</p>
           </div>
           <div className="grid gap-2 sm:col-span-2">
-            <label htmlFor="r-note" className={label}>Poznámka</label>
-            <input id="r-note" value={note} onChange={e => setNote(e.target.value)} placeholder="Kočárek, oslava, u okna…" className={input} maxLength={300} />
+            <label htmlFor="r-note" className={label}>{t('Poznámka')}</label>
+            <input id="r-note" value={note} onChange={e => setNote(e.target.value)} placeholder={t('Kočárek, oslava, u okna…')} className={input} maxLength={300} />
           </div>
         </div>
         {err && <p role="alert" className="note note-danger text-sm px-3 py-2">{err}</p>}
         <button type="submit" disabled={busy || !slots.length} className={btnPrimary}>
-          <Icon name="calendarCheck" size={16} /> {busy ? 'Odesílám…' : signedIn ? 'Odeslat rezervaci' : 'Přihlásit se a rezervovat'}
+          <Icon name="calendarCheck" size={16} /> {busy ? t('Odesílám…') : signedIn ? t('Odeslat rezervaci') : t('Přihlásit se a rezervovat')}
         </button>
       </form>
       <aside>
-        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-black/45 mb-2">Moje rezervace tady</h3>
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-black/45 mb-2">{t('Moje rezervace tady')}</h3>
         {me?.reservations?.length ? (
           <ul className="divide-y divide-black/[0.06]">
             {me.reservations.map((r: any) => {
@@ -358,24 +378,26 @@ function ReserveTab({ slug, b, me, today, signedIn, onDone }: { slug: string; b:
               return (
                 <li key={r.id} className="py-3 flex items-start gap-3">
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold cz-sentence">{czDay(r.date, true)} <span className="text-black/50 font-medium">· {r.time}</span></p>
-                    <p className="text-sm text-black/55">{r.party} {r.party === 1 ? 'osoba' : r.party < 5 ? 'osoby' : 'osob'}{r.note ? ` · ${r.note}` : ''}</p>
-                    <span className={`inline-block mt-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${st.tone === 'ok' ? 'bg-[#C8F542]/25 text-[#3E5406]' : st.tone === 'wait' ? 'bg-wait/15 text-wait-ink' : 'bg-black/[0.06] text-black/60'}`}>{st.label}</span>
+                    <p className="font-semibold cz-sentence">{fmtDatum(r.date, { jazyk, styl: 'denDlouze' })} <span className="text-black/50 font-medium">· {r.time}</span></p>
+                    <p className="text-sm text-black/55">{t('{n, plural, one {# osoba} few {# osoby} other {# osob}}', { n: r.party })}{r.note ? ` · ${r.note}` : ''}</p>
+                    <span className={`inline-block mt-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${st.tone === 'ok' ? 'bg-[#C8F542]/25 text-[#3E5406]' : st.tone === 'wait' ? 'bg-wait/15 text-wait-ink' : 'bg-black/[0.06] text-black/60'}`}>{t(st.label)}</span>
                   </div>
                   {['requested', 'confirmed'].includes(r.status) && (
-                    <button onClick={() => cancel(r.id)} className="tap-target-sm text-xs text-black/55 hover:text-bad-ink transition shrink-0">Zrušit</button>
+                    <button onClick={() => cancel(r.id)} className="tap-target-sm text-xs text-black/55 hover:text-bad-ink transition shrink-0">{t('Zrušit')}</button>
                   )}
                 </li>
               );
             })}
           </ul>
-        ) : <p className="text-sm text-black/55">Zatím žádná. První je hned vlevo.</p>}
+        ) : <p className="text-sm text-black/55">{t('Zatím žádná. První je hned vlevo.')}</p>}
       </aside>
     </div>
   );
 }
 
 function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slug: string; b: any; me: any; campaigns: any[]; coupons: any[]; signedIn: boolean; onDone: (m: string) => void }) {
+  const t = useT('klient-host');
+  const { jazyk } = useJazyk();
   const [busy, setBusy] = useState<number | null>(null);
   const [err, setErr] = useState('');
   const [promo, setPromo] = useState('');
@@ -389,12 +411,12 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
     try {
       const r = await fetch(`/api/client/b/${encodeURIComponent(slug)}/promo`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: promo }) });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) { setPromoErr(d.error || 'Kód nešel uplatnit.'); return; }
+      if (!r.ok) { setPromoErr(d.error ? t(d.error) : t('Kód nešel uplatnit.')); return; }
       setPromo('');
-      onDone(`${d.title}: ${[d.points ? `+${d.points} bodů` : '', d.coupon ? `kupon ${d.coupon}` : ''].filter(Boolean).join(' a ')}.`);
+      onDone(`${d.title}: ${[d.points ? t('+{n} bodů', { n: d.points }) : '', d.coupon ? t('kupon {kod}', { kod: d.coupon }) : ''].filter(Boolean).join(` ${t('a')} `)}.`);
     } catch {
       // Kód zůstává v poli — jednorázový promo kód se nepřepisuje naslepo.
-      setPromoErr('Kód se nepodařilo odeslat — vypadlo připojení. Zkus to znovu.');
+      setPromoErr(t('Kód se nepodařilo odeslat — vypadlo připojení. Zkus to znovu.'));
     } finally {
       setPromoBusy(false);
     }
@@ -405,10 +427,10 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
     try {
       const r = await fetch(`/api/client/b/${encodeURIComponent(slug)}/coupons/${id}/claim`, { method: 'POST' });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) { setErr(d.error || 'Kupon se nepodařilo vzít.'); return; }
-      onDone(`Kupon je tvůj. Kód ${d.code} ukaž u kasy.`);
+      if (!r.ok) { setErr(d.error ? t(d.error) : t('Kupon se nepodařilo vzít.')); return; }
+      onDone(t('Kupon je tvůj. Kód {kod} ukaž u kasy.', { kod: d.code }));
     } catch {
-      setErr('Kupon se nepodařilo vzít — vypadlo připojení. Zkus to znovu.');
+      setErr(t('Kupon se nepodařilo vzít — vypadlo připojení. Zkus to znovu.'));
     } finally {
       setBusy(null);
     }
@@ -417,7 +439,7 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
   return (
     <div className="grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-6 md:gap-10 items-start">
       <section className="glass-card p-5 sm:p-6">
-        <h2 className="t-section">Razítka a body</h2>
+        <h2 className="t-section">{t('Razítka a body')}</h2>
         {me?.member ? (
           <>
             {(me.campaigns ?? []).length > 0 ? (
@@ -434,14 +456,14 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
                         <span key={i} className={`h-8 rounded-lg border ${i < cp.stamps ? 'bg-[#C8F542] border-[#C8F542]' : 'bg-white/60 border-black/[0.08]'}`} />
                       ))}
                     </div>
-                    {cp.reward && <p className="mt-2 text-xs text-black/55">Za plnou kartu: <strong className="text-black/80">{cp.reward}</strong>{cp.completed > 0 ? ` · dokončeno ${cp.completed}×` : ''}</p>}
+                    {cp.reward && <p className="mt-2 text-xs text-black/55">{t('Za plnou kartu:')} <strong className="text-black/80">{cp.reward}</strong>{cp.completed > 0 ? ` · ${t('dokončeno {n}×', { n: cp.completed })}` : ''}</p>}
                   </li>
                 ))}
               </ul>
             ) : target > 0 && (
               <div className="mt-4">
                 <div className="flex items-baseline justify-between gap-3">
-                  <p className="text-sm text-black/60">Razítka za návštěvy</p>
+                  <p className="text-sm text-black/60">{t('Razítka za návštěvy')}</p>
                   <p className="text-sm font-semibold tabular-nums">{me.stamps} / {target}</p>
                 </div>
                 <div className="mt-2 grid gap-1.5" style={{ gridTemplateColumns: `repeat(${Math.min(target, 10)}, minmax(0, 1fr))` }} aria-hidden>
@@ -449,31 +471,31 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
                     <span key={i} className={`h-8 rounded-lg border ${i < me.stamps ? 'bg-[#C8F542] border-[#C8F542]' : 'bg-white/60 border-black/[0.08]'}`} />
                   ))}
                 </div>
-                <p className="mt-2 text-xs text-black/55">Za {target} návštěv: <strong className="text-black/80">{b.stampReward || 'odměna'}</strong>. Razítko přibude, když podnik uzavře tvoji rezervaci nebo objednávku.</p>
+                <p className="mt-2 text-xs text-black/55">{t('Za {n, plural, one {# návštěvu} few {# návštěvy} other {# návštěv}}:', { n: target })} <strong className="text-black/80">{b.stampReward || t('odměna')}</strong>. {t('Razítko přibude, když podnik uzavře tvoji rezervaci nebo objednávku.')}</p>
               </div>
             )}
             <div className="mt-5 flex items-baseline justify-between gap-3 border-t border-black/[0.06] pt-4">
-              <p className="text-sm text-black/60">Body</p>
+              <p className="text-sm text-black/60">{t('Body')}</p>
               <p className="text-2xl font-bold tabular-nums">{me.points}</p>
             </div>
-            <p className="text-xs text-black/55 mt-1">{b.pointsPer100} bodů za každých {formatMoney(100, b.currency)} útraty od stolu. Body jsou na kupony vpravo.</p>
+            <p className="text-xs text-black/55 mt-1">{t('{body} bodů za každých {castka} útraty od stolu. Body jsou na kupony vpravo.', { body: b.pointsPer100, castka: formatMoney(100, b.currency) })}</p>
             {b.cashbackPct > 0 && (
               <div className="mt-4 flex items-baseline justify-between gap-3 border-t border-black/[0.06] pt-4">
                 <div className="min-w-0">
-                  <p className="text-sm text-black/60">Kredit</p>
-                  <p className="text-xs text-black/55 mt-0.5">{b.cashbackPct} % z každé útraty se vrací jako kredit. Obsluha ho odečte u kasy.</p>
+                  <p className="text-sm text-black/60">{t('Kredit')}</p>
+                  <p className="text-xs text-black/55 mt-0.5">{t('{n} % z každé útraty se vrací jako kredit. Obsluha ho odečte u kasy.', { n: b.cashbackPct })}</p>
                 </div>
                 <p className="text-2xl font-bold tabular-nums shrink-0">{formatMoney(me.credit ?? 0, b.currency)}</p>
               </div>
             )}
             {me.discount > 0 && (
               <p className="mt-4 rounded-2xl bg-[#16181A] text-[#C8F542] px-3.5 py-2.5 text-sm font-semibold">
-                Jako „{me.levelLabel}" máš u nás slevu {me.discount} %.{me.nextTierAt ? ` Do „${me.nextTierLabel}" ti zbývá ${Math.max(0, me.nextTierAt - me.visits)} návštěv.` : ''}
+                {t('Jako „{level}“ máš u nás slevu {n} %.', { level: t(me.levelLabel), n: me.discount })}{me.nextTierAt ? ` ${t('Do „{level}“ ti zbývá {n, plural, one {# návštěva} few {# návštěvy} other {# návštěv}}.', { level: t(me.nextTierLabel), n: Math.max(0, me.nextTierAt - me.visits) })}` : ''}
               </p>
             )}
             {me.claims?.length > 0 && (
               <div className="mt-5 border-t border-black/[0.06] pt-4">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-black/45 mb-2">Kupony k uplatnění</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-black/45 mb-2">{t('Kupony k uplatnění')}</p>
                 <ul className="space-y-2">
                   {me.claims.map((c: any) => (
                     <li key={c.id} className="flex items-center justify-between gap-3 rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 px-3.5 py-2.5">
@@ -482,22 +504,22 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
                     </li>
                   ))}
                 </ul>
-                <p className="text-xs text-black/50 mt-2">Kód ukaž obsluze u kasy.</p>
+                <p className="text-xs text-black/50 mt-2">{t('Kód ukaž obsluze u kasy.')}</p>
               </div>
             )}
           </>
         ) : (
           <>
-            <p className="mt-2 text-sm text-black/60">Staň se členem a začni sbírat razítka za návštěvy a body za útratu. Kartičku s QR máš v Moje.</p>
+            <p className="mt-2 text-sm text-black/60">{t('Staň se členem a začni sbírat razítka za návštěvy a body za útratu. Kartičku s QR máš v Moje.')}</p>
             {campaigns.length > 0 && (
               <ul className="mt-4 space-y-3">
                 {campaigns.map((cp: any) => (
                   <li key={cp.id} className="well bg-white px-4 py-3">
                     <div className="flex items-baseline justify-between gap-3">
                       <p className="text-sm font-semibold min-w-0 truncate">{cp.name}</p>
-                      <p className="text-xs text-black/50 tabular-nums shrink-0">{cp.required} razítek</p>
+                      <p className="text-xs text-black/50 tabular-nums shrink-0">{t('{n} razítek', { n: cp.required })}</p>
                     </div>
-                    <p className="text-xs text-black/55 mt-0.5">{cp.description || (cp.reward ? `Za plnou kartu: ${cp.reward}` : '')}</p>
+                    <p className="text-xs text-black/55 mt-0.5">{cp.description || (cp.reward ? `${t('Za plnou kartu:')} ${cp.reward}` : '')}</p>
                   </li>
                 ))}
               </ul>
@@ -505,16 +527,16 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
           </>
         )}
         <form onSubmit={usePromo} className="mt-5 border-t border-black/[0.06] pt-4">
-          <label htmlFor="promo-code" className={label}>Máš promo kód?</label>
+          <label htmlFor="promo-code" className={label}>{t('Máš promo kód?')}</label>
           <div className="flex gap-2">
-            <input id="promo-code" value={promo} onChange={e => setPromo(e.target.value.toUpperCase())} placeholder="Z letáku nebo účtenky" autoComplete="off" className={`${input} font-mono tracking-widest flex-1 min-w-0`} />
-            <button type="submit" disabled={promoBusy} className="tap-target shrink-0 inline-flex items-center btn btn-primary active:scale-[0.98] disabled:opacity-50 transition">{promoBusy ? '…' : 'Uplatnit'}</button>
+            <input id="promo-code" value={promo} onChange={e => setPromo(e.target.value.toUpperCase())} placeholder={t('Z letáku nebo účtenky')} autoComplete="off" className={`${input} font-mono tracking-widest flex-1 min-w-0`} />
+            <button type="submit" disabled={promoBusy} className="tap-target shrink-0 inline-flex items-center btn btn-primary active:scale-[0.98] disabled:opacity-50 transition">{promoBusy ? '…' : t('Uplatnit')}</button>
           </div>
           {promoErr && <p role="alert" className="mt-2 text-sm text-bad-ink">{promoErr}</p>}
         </form>
       </section>
       <section>
-        <h2 className="t-section mb-3">Kupony za body</h2>
+        <h2 className="t-section mb-3">{t('Kupony za body')}</h2>
         {err && <p role="alert" className="mb-3 note note-danger text-sm px-3 py-2">{err}</p>}
         {coupons?.length ? (
           <ul className="divide-y divide-black/[0.06]">
@@ -530,23 +552,23 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
                     {c.description && <p className="text-sm text-black/55 text-pretty">{c.description}</p>}
                     {(c.badges?.length > 0 || c.valid_until) && (
                       <p className="text-xs text-black/45 mt-0.5">
-                        {[...(c.badges ?? []), c.valid_until ? `do ${czDay(c.valid_until)}` : null].filter(Boolean).join(' · ')}
+                        {[...(c.badges ?? []), c.valid_until ? t('do {datum}', { datum: fmtDatum(c.valid_until, { jazyk, styl: 'denKratce' }) }) : null].filter(Boolean).join(' · ')}
                       </p>
                     )}
                     {c.blocked && <p className="text-xs text-wait-ink mt-0.5">{c.blocked}</p>}
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-sm font-semibold tabular-nums">{Number(c.cost_points) === 0 ? 'zdarma' : `${c.cost_points} b.`}</p>
+                    <p className="text-sm font-semibold tabular-nums">{Number(c.cost_points) === 0 ? t('zdarma') : t('{n} b.', { n: c.cost_points })}</p>
                     <button onClick={() => claim(c.id)} disabled={busy === c.id || (signedIn && me?.member && !can)}
                       className="tap-target-sm mt-1 btn btn-primary btn-sm active:scale-[0.97] disabled:opacity-40 transition">
-                      {busy === c.id ? '…' : 'Vzít'}
+                      {busy === c.id ? '…' : t('Vzít')}
                     </button>
                   </div>
                 </li>
               );
             })}
           </ul>
-        ) : <EmptyState icon="gift" title="Zatím žádné kupony" hint="Podnik je přidá, jakmile bude mít co nabídnout." compact />}
+        ) : <EmptyState icon="gift" title={t('Zatím žádné kupony')} hint={t('Podnik je přidá, jakmile bude mít co nabídnout.')} compact />}
       </section>
     </div>
   );
@@ -554,9 +576,11 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
 
 // ---- Objednávka od stolu ---------------------------------------------------------
 
-const ORDER_LABEL: Record<string, string> = { new: 'Čeká na obsluhu', confirmed: 'Připravuje se', done: 'Hotovo', declined: 'Nepřijato' };
+/** Stavy objednávky; klíče do slovníku drží check-i18n (EXTRA_KLIENT_HOST). */
+const ORDER_LABEL: Record<string, string> = { new: 'Čeká na obsluhu', confirmed: 'Připravuje se', done: 'Hotovo', declined: 'Nepřijato' }; // i18n-ok: klíče slovníku, překládá se při vykreslení
 
 function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: string; b: any; menu: any; tables: any[]; plan?: any; signedIn: boolean; onDone: (m: string) => void }) {
+  const t = useT('klient-host');
   const [tableId, setTableId] = useState<number | ''>(() => {
     if (typeof window === 'undefined') return '';
     const t = parseInt(new URLSearchParams(window.location.search).get('table') ?? '', 10);
@@ -604,19 +628,19 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
   const submit = async () => {
     setErr('');
     if (!signedIn) { window.location.href = `/client/login?next=${encodeURIComponent('/client/' + slug + '?tab=order')}`; return; }
-    if (!tableId) { setErr(qrOnly ? 'Naskenuj QR kód na stole.' : 'Vyber stůl, u kterého sedíš.'); return; }
-    if (!lines.length) { setErr('Přidej aspoň jednu položku.'); return; }
+    if (!tableId) { setErr(qrOnly ? t('Naskenuj QR kód na stole.') : t('Vyber stůl, u kterého sedíš.')); return; }
+    if (!lines.length) { setErr(t('Přidej aspoň jednu položku.')); return; }
     setBusy(true);
     const pos = geo.status === 'ok' ? { lat: geo.lat, lng: geo.lng, accuracy: geo.accuracy } : await askGeo();
-    if (geoMode === 'block' && !pos) { setBusy(false); setErr('Bez polohy objednat nejde. Povol polohu v prohlížeči a zkus to znovu.'); return; }
+    if (geoMode === 'block' && !pos) { setBusy(false); setErr(t('Bez polohy objednat nejde. Povol polohu v prohlížeči a zkus to znovu.')); return; }
     try {
       const r = await fetch(`/api/client/b/${encodeURIComponent(slug)}/orders`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tableId, token, geo: pos, items: lines.map(l => ({ id: l.id, count: l.count })), note }) });
       const x = await r.json().catch(() => ({}));
-      if (!r.ok) { setErr(x.error || 'Objednávka se nepovedla.'); return; }
-      setCart({}); setNote(''); onDone(x.straight ? 'Objednávka je v pokladně. Obsluha ji už připravuje.' : 'Objednávka odeslána. Obsluha ji za chvíli potvrdí.'); loadOrders();
+      if (!r.ok) { setErr(x.error ? t(x.error) : t('Objednávka se nepovedla.')); return; }
+      setCart({}); setNote(''); onDone(x.straight ? t('Objednávka je v pokladně. Obsluha ji už připravuje.') : t('Objednávka odeslána. Obsluha ji za chvíli potvrdí.')); loadOrders();
     } catch {
       // Košík schválně zůstává plný: host ťukne znovu a neztratí, co navybíral.
-      setErr('Objednávka neodešla — vypadlo připojení. Nic se neodeslalo, zkus to prosím znovu.');
+      setErr(t('Objednávka neodešla — vypadlo připojení. Nic se neodeslalo, zkus to prosím znovu.'));
     } finally {
       setBusy(false);
     }
@@ -628,40 +652,40 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
         <div className="glass-card p-5 grid gap-2">
           {qrTable ? (
             <>
-              <p className={label}>Kde sedíš</p>
-              <p className="text-lg font-bold tracking-tight flex items-center gap-2"><span className="rounded-lg bg-[#16181A] text-[#C8F542] px-2 py-0.5 text-sm">{qrTable.name}</span><span className="text-sm font-medium text-black/50">podle QR na stole</span></p>
-              <TableMap tables={tables} plan={plan} selectedId={qrTable.id} caption="Tvůj stůl na plánku podniku." />
+              <p className={label}>{t('Kde sedíš')}</p>
+              <p className="text-lg font-bold tracking-tight flex items-center gap-2"><span className="rounded-lg bg-[#16181A] text-[#C8F542] px-2 py-0.5 text-sm">{qrTable.name}</span><span className="text-sm font-medium text-black/50">{t('podle QR na stole')}</span></p>
+              <TableMap tables={tables} plan={plan} selectedId={qrTable.id} caption={t('Tvůj stůl na plánku podniku.')} />
             </>
           ) : qrOnly ? (
             <>
-              <p className={label}>Kde sedíš</p>
-              <p className="font-semibold leading-tight">Naskenuj QR kód na stole</p>
-              <p className="text-xs text-black/55">Objednat jde jen od stolu, kde sedíš. Otevři kameru v telefonu a namiř ji na kód na stole; otevře se tahle stránka s vybraným stolem.</p>
+              <p className={label}>{t('Kde sedíš')}</p>
+              <p className="font-semibold leading-tight">{t('Naskenuj QR kód na stole')}</p>
+              <p className="text-xs text-black/55">{t('Objednat jde jen od stolu, kde sedíš. Otevři kameru v telefonu a namiř ji na kód na stole; otevře se tahle stránka s vybraným stolem.')}</p>
             </>
           ) : (
             <>
-              <label htmlFor="o-table" className={label}>Kde sedíš</label>
+              <label htmlFor="o-table" className={label}>{t('Kde sedíš')}</label>
               {placedTables(tables).length > 0 && (
                 <TableMap tables={tables} plan={plan} selectedId={tableId || null} onPick={id => setTableId(id)}
-                  caption="Klepni na stůl, u kterého sedíš." />
+                  caption={t('Klepni na stůl, u kterého sedíš.')} />
               )}
-              <select id="o-table" value={tableId} onChange={e => setTableId(e.target.value ? Number(e.target.value) : '')} className={input} aria-label="Stůl ze seznamu">
-                <option value="">{placedTables(tables).length ? 'Nebo vyber ze seznamu' : 'Vyber stůl'}</option>
+              <select id="o-table" value={tableId} onChange={e => setTableId(e.target.value ? Number(e.target.value) : '')} className={input} aria-label={t('Stůl ze seznamu')}>
+                <option value="">{placedTables(tables).length ? t('Nebo vyber ze seznamu') : t('Vyber stůl')}</option>
                 {tables.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
-              {placedTables(tables).length === 0 && <p className="text-xs text-black/45">Číslo stolu bývá na cedulce na stole.</p>}
+              {placedTables(tables).length === 0 && <p className="text-xs text-black/45">{t('Číslo stolu bývá na cedulce na stole.')}</p>}
             </>
           )}
           {geoMode !== 'off' && (!qrOnly || token) && (
             <p className={`text-xs flex items-center gap-1.5 ${geo.status === 'ok' ? 'text-[#3E5406]' : geo.status === 'denied' ? (geoMode === 'block' ? 'text-bad-ink' : 'text-wait-ink') : 'text-black/50'}`}>
               <Icon name="location" size={13} />
-              {geo.status === 'ok' ? 'Poloha ověřena.' : geo.status === 'asking' || geo.status === 'idle' ? 'Ověřujeme, že sedíš u stolu…'
-                : geoMode === 'block' ? 'Bez polohy objednat nejde. Povol ji v prohlížeči.' : 'Bez polohy objednávku nejdřív potvrdí obsluha.'}
-              {geo.status === 'denied' && <button type="button" onClick={() => askGeo()} className="tap-target-sm underline font-medium">Zkusit znovu</button>}
+              {geo.status === 'ok' ? t('Poloha ověřena.') : geo.status === 'asking' || geo.status === 'idle' ? t('Ověřujeme, že sedíš u stolu…')
+                : geoMode === 'block' ? t('Bez polohy objednat nejde. Povol ji v prohlížeči.') : t('Bez polohy objednávku nejdřív potvrdí obsluha.')}
+              {geo.status === 'denied' && <button type="button" onClick={() => askGeo()} className="tap-target-sm underline font-medium">{t('Zkusit znovu')}</button>}
             </p>
           )}
         </div>
-        {items.length === 0 ? <EmptyState icon="leaf" title="Zatím není z čeho objednat" hint="Podnik nabídku doplní v aplikaci." compact /> : (
+        {items.length === 0 ? <EmptyState icon="leaf" title={t('Zatím není z čeho objednat')} hint={t('Podnik nabídku doplní v aplikaci.')} compact /> : (
           <div className="space-y-5">
             {(menu?.sections ?? []).map((s: any) => {
               const list = s.items.filter((it: any) => !it.soldOut && it.price > 0);
@@ -679,12 +703,12 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
                             <p className="text-sm text-black/55">{money(it.price)}{it.description ? ` · ${it.description}` : ''}</p>
                           </div>
                           {n === 0 ? (
-                            <button onClick={() => setCount(it.id, 1)} aria-label={`Přidat ${it.name}`} className="tap-target-sm rounded-full bg-[#16181A] text-white h-9 w-9 grid place-items-center hover:bg-black active:scale-95 transition"><Icon name="plus" size={16} /></button>
+                            <button onClick={() => setCount(it.id, 1)} aria-label={t('Přidat {name}', { name: it.name })} className="tap-target-sm rounded-full bg-[#16181A] text-white h-9 w-9 grid place-items-center hover:bg-black active:scale-95 transition"><Icon name="plus" size={16} /></button>
                           ) : (
                             <div className="flex items-center gap-1.5">
-                              <button onClick={() => setCount(it.id, n - 1)} aria-label="Méně" className="tap-target-sm h-9 w-9 rounded-full glass border border-black/10 grid place-items-center active:scale-95 transition"><span className="text-lg leading-none">−</span></button>
+                              <button onClick={() => setCount(it.id, n - 1)} aria-label={t('Méně')} className="tap-target-sm h-9 w-9 rounded-full glass border border-black/10 grid place-items-center active:scale-95 transition"><span className="text-lg leading-none">−</span></button>
                               <span className="w-6 text-center font-semibold tabular-nums" aria-live="polite">{n}</span>
-                              <button onClick={() => setCount(it.id, n + 1)} aria-label="Více" className="tap-target-sm h-9 w-9 rounded-full bg-[#16181A] text-white grid place-items-center active:scale-95 transition"><Icon name="plus" size={16} /></button>
+                              <button onClick={() => setCount(it.id, n + 1)} aria-label={t('Více')} className="tap-target-sm h-9 w-9 rounded-full bg-[#16181A] text-white grid place-items-center active:scale-95 transition"><Icon name="plus" size={16} /></button>
                             </div>
                           )}
                         </li>
@@ -699,32 +723,32 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
       </div>
       <aside className="space-y-4 md:sticky md:top-24">
         <div className="glass-card p-5 space-y-3">
-          <h2 className="t-section">Objednávka</h2>
-          {lines.length === 0 ? <p className="text-sm text-black/55">Zatím prázdná. Přidej něco z nabídky.</p> : (
+          <h2 className="t-section">{t('Objednávka')}</h2>
+          {lines.length === 0 ? <p className="text-sm text-black/55">{t('Zatím prázdná. Přidej něco z nabídky.')}</p> : (
             <ul className="divide-y divide-black/[0.06] text-sm">
               {lines.map(l => <li key={l.id} className="py-1.5 flex justify-between gap-3"><span><span className="font-semibold tabular-nums">{l.count}×</span> {l.name}</span><span className="tabular-nums">{money(l.price * l.count)}</span></li>)}
             </ul>
           )}
           <div className="flex items-baseline justify-between border-t border-black/[0.06] pt-3">
-            <span className="text-sm text-black/60">Celkem</span>
+            <span className="text-sm text-black/60">{t('Celkem')}</span>
             <span className="text-xl font-bold tabular-nums">{money(total)}</span>
           </div>
           <div className="grid gap-2">
-            <label htmlFor="o-note" className={label}>Poznámka pro obsluhu</label>
-            <input id="o-note" value={note} onChange={e => setNote(e.target.value)} placeholder="Bez cukru, mléko zvlášť…" className={input} maxLength={300} />
+            <label htmlFor="o-note" className={label}>{t('Poznámka pro obsluhu')}</label>
+            <input id="o-note" value={note} onChange={e => setNote(e.target.value)} placeholder={t('Bez cukru, mléko zvlášť…')} className={input} maxLength={300} />
           </div>
           {err && <p role="alert" className="note note-danger text-sm px-3 py-2">{err}</p>}
-          <button onClick={submit} disabled={busy} className={`${btnPrimary} w-full`}><Icon name="cup" size={16} /> {busy ? 'Odesílám…' : signedIn ? 'Objednat' : 'Přihlásit se a objednat'}</button>
-          <p className="text-xs text-black/45">Platí se u obsluhy jako obvykle. Za každých 100 {cur} dostaneš {b.pointsPer100} bodů.</p>
+          <button onClick={submit} disabled={busy} className={`${btnPrimary} w-full`}><Icon name="cup" size={16} /> {busy ? t('Odesílám…') : signedIn ? t('Objednat') : t('Přihlásit se a objednat')}</button>
+          <p className="text-xs text-black/45">{t('Platí se u obsluhy jako obvykle. Za každých 100 {mena} dostaneš {body} bodů.', { mena: cur, body: b.pointsPer100 })}</p>
         </div>
         {orders && orders.length > 0 && (
           <section>
-            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-black/45 mb-2">Dnešní objednávky</h3>
+            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-black/45 mb-2">{t('Dnešní objednávky')}</h3>
             <ul className="space-y-2">
               {orders.map(o => (
                 <li key={o.id} className={`rounded-2xl border px-3.5 py-2.5 ${o.status === 'new' ? 'bg-wait/[0.08] border-wait/30' : o.status === 'confirmed' ? 'bg-[#C8F542]/15 border-[#C8F542]/40' : 'bg-white/60 border-black/[0.06]'}`}>
                   <div className="flex items-center justify-between gap-3">
-                    <span className="font-semibold text-sm">{ORDER_LABEL[o.status] ?? o.status}</span>
+                    <span className="font-semibold text-sm">{ORDER_LABEL[o.status] ? t(ORDER_LABEL[o.status]) : o.status}</span>
                     <span className="text-sm tabular-nums">{money(o.total)}{o.table_name ? ` · ${o.table_name}` : ''}</span>
                   </div>
                   <p className="text-xs text-black/55 truncate">{(o.items ?? []).map((l: any) => `${l.count}× ${l.name}`).join(', ')}</p>
@@ -743,7 +767,9 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
 function EventSheet({ e, currency, ac, slug, signedIn, businessName, address, onClose }: {
   e: any; currency: string; ac: string; slug: string; signedIn: boolean; businessName: string; address: string; onClose: () => void;
 }) {
-  const m = useModal(true, onClose, `Akce ${e.title}`);
+  const t = useT('klient-host');
+  const { jazyk } = useJazyk();
+  const m = useModal(true, onClose, t('Akce {nazev}', { nazev: e.title }));
   const money = (n: number) => formatPrice(n, currency);
   // Sledování se drží lokálně, ať tlačítka reagují hned a bez načítání celé stránky.
   const [follow, setFollow] = useState<boolean>(e.myFollow === true);
@@ -764,9 +790,9 @@ function EventSheet({ e, currency, ac, slug, signedIn, businessName, address, on
       : await fetch(`/api/client/events/${e.id}/follow`, { method: 'DELETE' }).catch(() => null);
     setBusy(false);
     const d = res?.ok ? await res.json().catch(() => null) : null;
-    if (!d) { setMsg('Nepovedlo se — zkus to za chvíli.'); return; }
+    if (!d) { setMsg(t('Nepovedlo se — zkus to za chvíli.')); return; }
     setFollow(d.myFollow === true); setGoing(d.myGoing === true); setGoingCount(Number(d.going) || 0);
-    setMsg(next.follow ? (next.going ? 'Počítáme s tebou! Den předem ti to připomeneme.' : 'Hlídáme ti to — den předem přijde připomínka.') : 'Už nehlídáme.');
+    setMsg(next.follow ? (next.going ? t('Počítáme s tebou! Den předem ti to připomeneme.') : t('Hlídáme ti to — den předem přijde připomínka.')) : t('Už nehlídáme.'));
   };
 
   // .ics ke stažení — bez času je to celodenní událost. Skládá `lib/ics`,
@@ -798,10 +824,10 @@ function EventSheet({ e, currency, ac, slug, signedIn, businessName, address, on
             <div className="min-w-0">
               <h3 className="text-xl font-bold tracking-tight text-[#16181A]">{e.title}</h3>
               <p className="text-sm text-black/55 cz-sentence mt-0.5">
-                {czDay(e.date, true)}{e.start_time ? ` · ${e.start_time}${e.end_time ? `–${e.end_time}` : ''}` : ''}
+                {fmtDatum(e.date, { jazyk, styl: 'denDlouze' })}{e.start_time ? ` · ${e.start_time}${e.end_time ? `–${e.end_time}` : ''}` : ''}
               </p>
             </div>
-            <button onClick={m.guard.attemptClose} className="tap-target-sm shrink-0 btn-icon" aria-label="Zavřít"><Icon name="close" size={15} /></button>
+            <button onClick={m.guard.attemptClose} className="tap-target-sm shrink-0 btn-icon" aria-label={t('Zavřít')}><Icon name="close" size={15} /></button>
           </div>
 
           {place && (
@@ -809,12 +835,12 @@ function EventSheet({ e, currency, ac, slug, signedIn, businessName, address, on
               <Icon name="location" size={15} className="inline -mt-0.5 mr-1.5 shrink-0" />{place}
               {mapQuery && (
                 <a href={`https://mapy.cz/zakladni?q=${encodeURIComponent(mapQuery)}`} target="_blank" rel="noopener noreferrer"
-                  className="tap-target-sm inline-block ml-2 py-1 text-[#0A5CC0] underline decoration-[#0A5CC0]/30 hover:decoration-[#0A5CC0]">mapa ↗</a>
+                  className="tap-target-sm inline-block ml-2 py-1 text-[#0A5CC0] underline decoration-[#0A5CC0]/30 hover:decoration-[#0A5CC0]">{t('mapa ↗')}</a>
               )}
             </p>
           )}
           {(goingCount > 0 || e.capacity) && (
-            <p className="text-xs text-black/45 mt-1.5">{goingCount > 0 ? `✋ ${goingCount} ${goingCount === 1 ? 'člověk jde' : goingCount < 5 ? 'lidi jdou' : 'lidí jde'}` : ''}{goingCount > 0 && e.capacity ? ' · ' : ''}{e.capacity ? `kapacita ${e.capacity}` : ''}</p>
+            <p className="text-xs text-black/45 mt-1.5">{goingCount > 0 ? t('✋ {n, plural, one {# člověk jde} few {# lidi jdou} other {# lidí jde}}', { n: goingCount }) : ''}{goingCount > 0 && e.capacity ? ' · ' : ''}{e.capacity ? t('kapacita {n}', { n: e.capacity }) : ''}</p>
           )}
 
           {e.description && <p className="text-sm text-black/70 mt-3 whitespace-pre-wrap text-pretty">{e.description}</p>}
@@ -823,18 +849,18 @@ function EventSheet({ e, currency, ac, slug, signedIn, businessName, address, on
             <div className="flex gap-2 mt-4 overflow-x-auto scrollbar-thin pb-1 -mx-1 px-1">
               {photos.slice(1).map((url, i) => (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img key={url} src={url} alt={`Fotka ${i + 2}`} className="h-24 w-24 shrink-0 rounded-2xl object-cover border border-black/[0.06]" />
+                <img key={url} src={url} alt={t('Fotka {n}', { n: i + 2 })} className="h-24 w-24 shrink-0 rounded-2xl object-cover border border-black/[0.06]" />
               ))}
             </div>
           )}
 
           {menu.length > 0 && (
             <div className="mt-4 well bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">Co se bude podávat</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mb-2">{t('Co se bude podávat')}</p>
               <ul className="divide-y divide-black/[0.06]">
                 {menu.map((l: any, i: number) => (
                   <li key={i} className="py-1.5 flex items-baseline gap-3">
-                    <span className="min-w-0 flex-1">{l.board ? <>Platí celá naše nabídka „{l.name}" <span className="text-black/45">— mrkni do záložky Menu</span></> : l.name}</span>
+                    <span className="min-w-0 flex-1">{l.board ? <>{t('Platí celá naše nabídka „{nazev}“', { nazev: l.name })} <span className="text-black/45">{t('— mrkni do záložky Menu')}</span></> : l.name}</span>
                     {l.price != null && <span className="shrink-0 text-sm text-black/60 tabular-nums">{money(l.price)}</span>}
                   </li>
                 ))}
@@ -849,17 +875,17 @@ function EventSheet({ e, currency, ac, slug, signedIn, businessName, address, on
                 ? 'tap-target inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition text-[#16181A]'
                 : btnPrimary}
               style={going ? { background: `${ac}40` } : undefined}>
-              {going ? '✋ Jdu — zrušit účast' : '✋ Přijdu'}
+              {going ? t('✋ Jdu — zrušit účast') : t('✋ Přijdu')}
             </button>
             <button disabled={busy} onClick={() => (follow ? setState({ follow: false, going: false }) : setState({ follow: true, going }))}
               className={btnQuiet} aria-pressed={follow}>
-              <Icon name="bell" size={15} className="shrink-0" />{follow ? 'Hlídám · zrušit' : 'Hlídat akci'}
+              <Icon name="bell" size={15} className="shrink-0" />{follow ? t('Hlídám · zrušit') : t('Hlídat akci')}
             </button>
           </div>
           <button onClick={saveIcs} className={`${btnQuiet} w-full mt-2`}>
-            <Icon name="calendarCheck" size={15} className="shrink-0" />Přidat do kalendáře (.ics)
+            <Icon name="calendarCheck" size={15} className="shrink-0" />{t('Přidat do kalendáře (.ics)')}
           </button>
-          {!signedIn && <p className="text-xs text-black/45 mt-2 text-center">Na „Přijdu" a hlídání se přihlas — připomínku pošleme den předem.</p>}
+          {!signedIn && <p className="text-xs text-black/45 mt-2 text-center">{t('Na „Přijdu“ a hlídání se přihlas — připomínku pošleme den předem.')}</p>}
           {msg && <p role="status" className="toast-in text-xs text-[#3E5406] bg-[#C8F542]/15 border border-[#C8F542]/35 rounded-xl px-3 py-2 mt-2 text-center">{msg}</p>}
         </div>
       </div>

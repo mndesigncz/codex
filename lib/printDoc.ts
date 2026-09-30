@@ -84,6 +84,16 @@ ${body}
  * to **musí** člověku říct, jinak klikne a nestane se nic.
  */
 export function openPrint(doc: PrintDoc): boolean {
+  // V nativním obalu tisk přes window.open/print nefunguje (WKWebView okno nepustí a print() nedělá nic).
+  // Dokument se nabídne jako soubor do systémového sdílecího listu, kde je „Vytisknout“.
+  // Dynamický import: tenhle soubor načítají i testy v Node.
+  if (typeof navigator !== 'undefined' && /Managero(App|Client)\//.test(navigator.userAgent)) {
+    import('./stahni').then(m => {
+      if (!m.muzeSdiletSoubor()) { window.dispatchEvent(new CustomEvent(m.UDALOST_NEJDE)); return; }
+      return m.ulozSoubor(`${m.bezpecnyNazev(doc.title, 'dokument')}.html`, printHtml(doc), 'text/html;charset=utf-8');
+    }).catch(() => { /* hlášení řeší ulozSoubor */ });
+    return true;
+  }
   const w = window.open('', '_blank', 'width=820,height=900');
   if (!w) return false;
   w.document.write(printHtml(doc));

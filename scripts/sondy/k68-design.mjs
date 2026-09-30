@@ -195,6 +195,9 @@ for (const reduced of [false, true]) {
   await upravit(p).click();
   await dokud(() => vUpravach(p), 1500);
   await p.waitForTimeout(600);
+  // Lišta úprav vjíždí animací (opacity): na zatíženém stroji dojede později než za 600 ms
+  // a rozjetý text by vyšel 1 : 1. Před měřením kontrastu se počká, až dobíhající animace doběhnou.
+  await p.waitForFunction(() => document.getAnimations().every(a => a.playState !== 'running' || a.effect?.getTiming().iterations === Infinity), null, { timeout: 10000 }).catch(() => {});
   if (!reduced) {
     const k = await kontrast(p);
     tvrdi('5: tmavý režim v úpravách — text plochy ≥ 4,5 : 1', k.length === 0, k.slice(0, 8).join(' | '));

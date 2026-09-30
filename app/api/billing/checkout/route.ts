@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { jazykPozadavku } from '@/lib/i18n/jazykPozadavku';
 import { createCheckout, NOT_CONFIGURED, stripe } from '@/lib/billing';
 import { verejnaHlaska } from '@/lib/verejnaChyba';
 
@@ -17,7 +18,7 @@ export async function POST(req: Request) {
   const plan = b.plan === 'max' ? 'max' : 'pro';
   const interval = b.interval === 'year' ? 'year' : 'month';
   try {
-    const out = await createCheckout(c.teamId, plan, interval, b.embedded ? 'embedded' : 'hosted');
+    const out = await createCheckout(c.teamId, plan, interval, b.embedded ? 'embedded' : 'hosted', await jazykPozadavku());
     return NextResponse.json(out);
   } catch (e: any) {
     return NextResponse.json({ error: verejnaHlaska(e, 'Pokladnu se nepodařilo otevřít.', '[billing] checkout') }, { status: 400 });

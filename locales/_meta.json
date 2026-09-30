@@ -1,0 +1,42 @@
+{
+  "poznamka": "Překlady napsal model, ne rodilý mluvčí. Před spuštěním dané země je musí projít člověk (zejména alergeny, platební a právní věty). Stav revize je per jazyk a sekce.",
+  "oslovení": {
+    "cs": "tykání v aplikaci, vykání v přihlášení a registraci (jako originál)",
+    "en": "neutrální",
+    "de": "hosté a zaměstnanci „du“; přihlášení, registrace, věty o alergenech a složení „Sie“ (veřejnost, právně citlivé)",
+    "sk": "hosté a zaměstnanci „ty“; přihlášení a registrace „vy“",
+    "pl": "bez Pan/Pani: tykání v imperativu u hostů a zaměstnanců, neutrální u přihlášení"
+  },
+  "revize": {
+    "en": {
+      "common": "strojový",
+      "auth": "strojový",
+      "klient-host": "strojový",
+      "api": "strojový"
+    },
+    "de": {
+      "common": "strojový",
+      "auth": "strojový",
+      "klient-host": "strojový",
+      "api": "strojový"
+    },
+    "sk": {
+      "common": "strojový",
+      "auth": "strojový",
+      "klient-host": "strojový",
+      "api": "strojový"
+    },
+    "pl": {
+      "common": "strojový",
+      "auth": "strojový",
+      "klient-host": "strojový",
+      "api": "strojový"
+    }
+  },
+  "nepreklada_se": [
+    "správa podniku (vedení)",
+    "superadmin",
+    "ceník a platební podmínky (právně citlivé)",
+    "obsah podniku (názvy položek, rolí, návodů)"
+  ]
+}

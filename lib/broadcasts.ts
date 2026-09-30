@@ -74,7 +74,7 @@ async function deliver(row: any): Promise<number> {
       title: String(row.title),
       body: row.body ? String(row.body) : undefined,
       link: linkFor(row.link_kind, p?.slug ?? null),
-      type: 'info', category: 'general',
+      type: 'info', category: 'novinky',
     });
   }
   await sql`UPDATE client_broadcasts SET recipients = ${ids.length} WHERE id = ${row.id}`;

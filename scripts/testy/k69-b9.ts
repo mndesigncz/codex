@@ -100,7 +100,7 @@ export default function ({ eq, ok }: Testy) {
   ok('Nastavení: bez ručního přepínače Toggle (SwitchRow)', !/function Toggle\b/.test(nast) && !nast.includes('<Toggle ') && (nast.match(/<SwitchRow /g) ?? []).length >= 5);
   ok('Nastavení: bez nativního confirm()', !/\bconfirm\(/.test(nast));
   ok('Nastavení: bez ručně psané limetky (primaryBtn, btn-accent)', !nast.includes('primaryBtn') && !nast.includes('btn-accent') && !/bg-\[#C8F542\](?!\/)/.test(nast));
-  ok('Nastavení: motiv přes Segmented, ne dvě limetkové volby', nast.includes('ariaLabel="Motiv aplikace"'));
+  ok('Nastavení: motiv přes Segmented, ne dvě limetkové volby', nast.includes('ariaLabel="Motiv aplikace"') || nast.includes("ariaLabel={t('Motiv aplikace')}"));
   ok('Nastavení: úspěch pokladny nese tón, ne „✓" v textu', !nast.includes('✓') && nast.includes("posMsg.ok ? 'note-ok' : 'note-danger'"));
   ok('Nastavení: preference směn bez emoji', !/🌅|🌆|🔄/.test(nast));
   ok('Nastavení: statistiky pokladny přes Stat/StatRow', (nast.match(/<Stat label=/g) ?? []).length === 4);

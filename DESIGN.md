@@ -329,6 +329,53 @@ Jediná plocha s vlastním vizuálním jazykem: světlé „tekuté sklo" — pa
 (`public/brand/landing/foto`, jedna vygenerovaná kampaň, ne fotobanka).
 Aplikace sama zůstává u klidnějšího `.glass-card`.
 
+### Produkt napřed: živá ukázka a nahrávky (kolo 75)
+
+Od kola 75 nese stránku produkt, ne fotka. Fotografie (níž) zůstaly jako
+doplněk, který říká „je to pro mě?"; že to funguje, říká aplikace sama.
+
+- **Hero je ukázka, kterou si člověk naklikne.** `components/landing/ukazka`
+  vkládá `/demo` (skutečná aplikace proti mock serveru v prohlížeči, viz
+  `lib/demo/README.md`) jako `<iframe>` do rámu zařízení. Z aplikace se do
+  balíku stránky nenaimportuje nic: izolaci stylů i skriptů dělá prohlížeč a
+  stránka drží jen rám, ovládání a coach marks.
+- **Plakát je v HTML hned, ukázka přijde po klidu.** Poster (skutečný snímek,
+  `public/brand/landing/rec/hero-prehled-*.webp`) je LCP a zůstává pod
+  iframem. `/demo` se načte, až je rám vidět a prohlížeč je v klidu, nebo hned při
+  prvním dotyku. S vypnutým pohybem a na úsporném přenosu (`saveData`, 2g) se
+  nespustí sama, čeká na tlačítko. Rám má pevný poměr stran a jeviště pevné
+  výšky (`.ld-stage`), takže přepnutí scény, role nebo zařízení nic neposune
+  (hlídá `skok`, CLS `k75-landing`).
+- **Komunikace je kontrakt, ne sdílený stav.** Stránka posílá `demo-scena`,
+  `demo-reset`, `demo-ping` a čeká na `demo-pripraveno`; přijímá jen z vlastního
+  původu a jen z okna toho iframe. `demo-akce` překládá na větu
+  (`REAKCE_NA_AKCI`), kterou řekne i odečítači (`role="status"`).
+- **Coach marks hledají prvek podle jména, ne podle souřadnic.** Kurzor a bublina
+  „klikni sem" se berou z polohy prvku uvnitř ukázky (stejný původ), takže
+  přežijí změnu rozložení aplikace; když prvek zmizí, zmizí i kurzor a nikdy
+  neukazuje do prázdna. Krok splní kliknutí do prvku (pozor: `e.target` patří do
+  jiného okna, `instanceof Node` by tu vždy selhal). Kroky jsou jen pro dvojice
+  scéna a role, které mají příběh.
+- **Nahrávky jsou z téže ukázky.** `scripts/nahravky/nahraj.mjs` (Playwright
+  `recordVideo`, viditelný kurzor a ripple kliku vložené init skriptem, myš po
+  zakřivené dráze, čas měřený hodinami) vyrobí pět smyček po 8 až 14 s
+  (mp4 h264, webm vp9, poster webp, 720p, bez zvuku, každé do 1,5 MB) do
+  `public/brand/landing/rec` a rozměry zapíše do `nahravky.generated.ts`.
+  Po změně vzhledu aplikace: `npm run landing:nahravky` proti běžícímu buildu.
+  Ve stránce jsou smyčky (`SmyckaVideo`) líné (stahují se těsně před příchodem do
+  obrazu a zastaví se mimo něj), s vypnutým pohybem zůstane poster, a jdou
+  zastavit (pravidlo 2.2.2).
+- **Pravidla textu hlídá `check-landing-obsah`:** žádné vymyšlené hodnocení,
+  citace ani čísla o zákaznících, žádné pomlčky jako interpunkce, čísla přes
+  `lib/czech.ts`. Tvrdí se jen to, co o produktu platí (30 dní, tým zdarma,
+  ceny z `lib/plan`). „Za 5 minut" se netvrdí, dokud průvodce prvním nastavením
+  není změřený. Roční sleva se počítá (12 × měsíc minus rok), přeškrtnutá
+  „srovnávací" cena nikdy nikdo neúčtovala a zmizela.
+- **Jedna plná limetka v kterémkoli výřezu.** Hero tlačítko, karta Pro
+  a závěrečná výzva jsou od sebe dost daleko; patička má inkoustové tlačítko.
+  Limetka uvnitř ukázky (jiný dokument) se nepočítá.
+- **Nový CSS mimo globals.css:** `components/landing/landing.css` (předpona `ld-`).
+
 Zásady, které přestavba v kole 35 zafixovala:
 
 - **Landing je světlý ostrov.** Krémové podklady nemají tmavou variantu;
@@ -1748,6 +1795,44 @@ průhledný panel kategorií zůstal přilepený přes seznam (Sklad, kolo 69).
 Obecně: cokoli uvnitř nástroje, co se měří nebo pozoruje, nesmí spoléhat
 na to, že při prvním vykreslení existuje. Vzor
 `components/employer/Inventory.tsx`.
+
+## Průvodce prvotním nastavením (kolo 73)
+
+Celoobrazovková trasa `/employer/start`, ne okno nad aplikací: obnovitelná
+adresa, žádný boční pás ani dok, které by rušily vyprávění. Stav žije v jednom
+sloupci `teams.onboarding` (JSONB), podniky z doby před průvodcem mají NULL
+a průvodce nikdy neuvidí. Nový vlastník (`stav = 'nove'`) se na něj přesměruje
+**na serveru** (`app/employer/overview/page.tsx`, bez záblesku aplikace);
+rozpracovaný a přeskočený se nepřesměrovává, vede na ně řádek „Dokončit
+nastavení podniku" v Prvních krocích a „Spustit znovu" v Nastavení → Tým.
+Brána je fail-open (`lib/pruvodce/brana.ts`): když se databáze nedá přečíst,
+aplikace jede jako dřív.
+
+- **Ukazuje, co aplikace umí.** Vlevo (na telefonu na požádání) běží **skutečná
+  aplikace**: veřejná ukázka `/demo` v rámu telefonu (`DemoOkno`), jedna instance
+  po celý průvodce, scéna se mění zprávou `demo-scena` podle zaostřeného cíle.
+  Data jsou vymyšlená a ukázka neposílá na server nic (mock server v prohlížeči,
+  viz `lib/demo/README.md`). Fotky jsou jen tam, kde ukázka nemá smysl (typ
+  podniku, doba), a mají rozměr, blur a popis (`components/pruvodce/foto.ts`).
+- **Autosave po každém kroku a krok se nepustí dál, dokud uložení neprojde**
+  (výpadek = `note-danger`, ne tiché ztracení). Nastavení se aplikuje najednou
+  na konci (`POST /api/onboarding/pouzit`): jen přidává (žádný `DELETE`, každý
+  `UPDATE` s týmem), každá operace ve vlastním `try`, opakované spuštění nic
+  nezdvojí (ledger `pouzito` + dedupe podle názvu). Cizí (ruční) Přehled,
+  otevírací doba, typy směn, pravidlo ani kasa se nepřepíšou.
+- **Finále je poctivé:** přehrává výsledky, které vrátil server (hotovo /
+  přeskočeno / nepovedlo se), a miniaturu Přehledu skládá z výsledného
+  rozložení. „Otevřít Přehled" je do konce animace zamčené.
+- **Jedna plná limetka** na obrazovku: tlačítko „Pokračovat". Vybrané dlaždice
+  a postup jsou inkoustové (`--pv-ink`, v tmavém režimu světlé); přepínač ve
+  Shrnutí je stav, ne akce. Pohyb jen `transform` a `opacity`, vše pod
+  `prefers-reduced-motion: no-preference` (`.pv-*` v `globals.css`).
+- Nepřidávat: menu ani položky skladu se zásobou (widget Docházející zásoby by je
+  ukázal jako kritické), jazyky, které nefungují, konfety, e-maily pozvaných do
+  `teams.onboarding` (jen jejich počet).
+- Ověření: `scripts/testy/k73-pruvodce.ts` (čistá logika, pojistky nad zdroji)
+  a sonda `scripts/sondy/k73-pruvodce.mjs` (1280 a 390 px, tmavý režim,
+  omezený pohyb, klávesnice, výpadek sítě, přerušení a pokračování).
 
 ## Anti-vzory (zdejší zákazy)
 

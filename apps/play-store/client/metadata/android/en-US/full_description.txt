@@ -1,0 +1,20 @@
+Managero client is an app for guests of cafés, bars and restaurants that use Managero. Everything you need at your favourite places is on your phone.
+
+WHAT IT DOES
+• Loyalty card: points, stamps and rewards for every venue in one place, with a QR code to show at the till. The card also opens without a connection.
+• Table reservations: pick a day, time and party size and see whether the venue confirmed it.
+• Order from your table: scan the QR code on the table and order without waiting for a server. You pay the staff, nothing is paid in the app.
+• Coupons and events: coupons, events and news from the places you visit.
+• Visit rating: tell the venue how you liked it.
+• Invite a friend: you both get points, if the venue offers it.
+• Notifications about a confirmed reservation and the status of your order. News and offers from venues only arrive if you explicitly allow them.
+
+HOW TO START
+Sign up with your e-mail, open a venue's page or scan its QR code and join its loyalty programme. The app works with venues that use Managero.
+
+NOTES
+• The app interface is currently available in Czech only.
+• You can delete your account and all your data inside the app at any time.
+• Venues manage their staff and operations in the separate Managero app.
+
+Support: podpora@managero.app

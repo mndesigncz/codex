@@ -1,0 +1,23 @@
+{
+  "app": "client",
+  "poznamka": "Snímky hostovské aplikace běží nad skutečnými trasami /client/* a mock API z apps/scripts/fixtury-klient.mjs (vymyšlené podniky, bez cizích fotek), s cookie role 'customer' z scripts/sondy/cookie-role.mjs. Do stránky se před načtením vloží stub window.Capacitor (isNativePlatform() = true), aby se vykreslilo, co host v aplikaci vidí. Google Play bere stejný seznam 'iphone' jen pro telefon; tablety Managero client nenabízí.",
+  "ua": "ManageroClient/1.0.0",
+  "hodiny": "2026-10-14T09:41:00+02:00",
+  "podnik": "kavarna-u-lipy",
+  "iphone": [
+    { "id": "karta",      "zdroj": "fixtury", "cesta": "/client/me",
+      "cs": "Jedna karta pro všechny podniky", "en-US": "One card for every place" },
+    { "id": "objednat",   "zdroj": "fixtury", "cesta": "/client/kavarna-u-lipy?tab=order&table=3&t=ukazka",
+      "cs": "Objednej od stolu", "en-US": "Order from your table" },
+    { "id": "rezervace",  "zdroj": "fixtury", "cesta": "/client/kavarna-u-lipy?tab=reserve",
+      "cs": "Rezervuj stůl na pár klepnutí", "en-US": "Book a table in a few taps" },
+    { "id": "vernost",    "zdroj": "fixtury", "cesta": "/client/kavarna-u-lipy?tab=loyalty",
+      "cs": "Razítka, body a kupony", "en-US": "Stamps, points and coupons" },
+    { "id": "podniky",    "zdroj": "fixtury", "cesta": "/client",
+      "cs": "Najdi podnik nebo naskenuj QR", "en-US": "Find a place or scan its QR" },
+    { "id": "akce",       "zdroj": "fixtury", "cesta": "/client/kavarna-u-lipy?tab=menu",
+      "cs": "Akce a novinky podniku", "en-US": "Events and news from the venue" },
+    { "id": "aktivita",   "zdroj": "fixtury", "cesta": "/client/me",
+      "cs": "Rezervace a objednávky po ruce", "en-US": "Your bookings and orders at hand" }
+  ]
+}

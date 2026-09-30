@@ -71,6 +71,7 @@ export const ZELENE = [
   'mobil',
   'modal',
   'modal2',
+  'obal-most',
   'odeslani',
   'odeslani2',
   'offline',
@@ -120,6 +121,10 @@ export const ZELENE = [
   'k70-povinne',
   'k71-role',
   'k74-demo',
+  'k77-obchody',
+  'k73-pruvodce',
+  'k76-jazyk',
+  'k75-landing',
 ];
 
 const MIMO = new Set(['spust', 'cookie-role', 'fixtury-k53', 'fixtury-navody', 'k68-spolecne', 'k69-mereni-jadro']);

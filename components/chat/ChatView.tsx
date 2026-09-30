@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Icon } from '@/components/Icons';
 import { EmptyState, SearchField, Button, Badge, Skeleton } from '../ui';
+import { Menu, type MenuItem } from '../ui/Menu';
+import NahlasitOkno from '../moderace/NahlasitOkno';
 import PollsStrip from './Polls';
 import NewConversation from './NewConversation';
 import {
@@ -288,6 +290,40 @@ function Thread({
   // odpovídalo ano).
   const { ma, nacteno } = useOpravneni();
   const jeVedeni = nacteno && ma('oznameni.spravovat');
+  // Moderace (Apple 1.2): nahlásit zprávu, zablokovat autora, smazat zprávu. Cizí zprávu
+  // smí smazat jen ten, kdo smí odebírat členy; server to hlídá stejným klíčem.
+  const moderator = nacteno && ma('tym.odebrat');
+  const [nahlasit, setNahlasit] = useState<number | null>(null);
+  const [moderaceZprava, setModeraceZprava] = useState('');
+  const zablokuj = async (m: ChatMessage) => {
+    setModeraceZprava('');
+    try {
+      const r = await fetch('/api/blocks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: m.senderId }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { setModeraceZprava(d.error || 'Zablokovat se nepodařilo.'); return; }
+      setMessages(prev => prev.filter(x => x.senderId !== m.senderId));
+      setModeraceZprava(`Uživatel ${m.senderName} je zablokovaný a jeho zprávy se nezobrazují. Odblokovat jde v Nastavení, Zabezpečení.`);
+    } catch { setModeraceZprava('Zablokovat se nepodařilo. Zkontrolujte připojení.'); }
+  };
+  const smazZpravu = async (m: ChatMessage) => {
+    setModeraceZprava('');
+    try {
+      const r = await fetch(`/api/conversations/${conv.id}/messages/${m.id}`, { method: 'DELETE' });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { setModeraceZprava(d.error || 'Zprávu se nepodařilo smazat.'); return; }
+      setMessages(prev => prev.filter(x => x.id !== m.id));
+    } catch { setModeraceZprava('Zprávu se nepodařilo smazat. Zkontrolujte připojení.'); }
+  };
+  const akceZpravy = (m: ChatMessage): MenuItem[] => {
+    const own = m.senderId === meId;
+    const out: MenuItem[] = [];
+    if (!own) {
+      out.push({ label: 'Nahlásit zprávu', icon: 'warning', onClick: () => setNahlasit(m.id) });
+      out.push({ label: 'Zablokovat autora', icon: 'lock', onClick: () => { void zablokuj(m); } });
+    }
+    if (own || moderator) out.push({ label: 'Smazat zprávu', icon: 'trash', danger: true, onClick: () => { void smazZpravu(m); } });
+    return out;
+  };
   const [text, setText] = useState('');
   // Rozepsaná zpráva je vázaná na kanál: přepnu jinam, vrátím se a mám ji
   // tam, kde byla. Banner se tu nevykresluje schválně — viz DESIGN.md:
@@ -452,6 +488,7 @@ function Thread({
                 own={m.senderId === meId}
                 dayShown
                 showSender={conv.type === 'team' && m.senderId !== meId && (newDay || prev?.senderId !== m.senderId)}
+                akce={akceZpravy(m)}
               />
             </div>
           );
@@ -474,6 +511,11 @@ function Thread({
         </div>
       )}
 
+      {moderaceZprava && <p role="status" className="px-3 pt-2 t-meta">{moderaceZprava}</p>}
+      {nahlasit != null && (
+        <NahlasitOkno kind="zprava" refId={nahlasit} onClose={() => setNahlasit(null)}
+          onDone={(z) => { setNahlasit(null); setModeraceZprava(z); }} />
+      )}
       {sendError && (
         <p className="px-3 pt-2 text-xs font-medium text-bad-ink flex items-center gap-1.5">
           <span aria-hidden><Icon name="warning" size={15} /></span> {sendError}
@@ -534,10 +576,13 @@ export function MessageBubble({
   own,
   showSender,
   dayShown = false,
+  akce,
 }: {
   msg: ChatMessage;
   own: boolean;
   showSender: boolean;
+  /** Nabídka u zprávy: nahlásit, zablokovat, smazat (moderace). Bez ní se nekreslí. */
+  akce?: MenuItem[];
   /**
    * Vlákno má nad každým dnem čáru s datem, takže bublina pod ní psala den
    * podruhé („Včera" v bublině hned pod oddělovačem VČERA). S touhle
@@ -550,6 +595,7 @@ export function MessageBubble({
       {showSender && (
         <span className="text-xs text-black/55 ml-3 mb-0.5">{msg.senderName}</span>
       )}
+      <div className={`group flex items-end gap-1 max-w-full ${own ? 'flex-row-reverse' : ''}`}>
       <div
         className={`max-w-[78%] px-4 py-2.5 ${
           own
@@ -597,6 +643,12 @@ export function MessageBubble({
         >
           {dayShown ? formatClock(msg.createdAt) : formatTime(msg.createdAt)}
         </div>
+      </div>
+      {akce && akce.length > 0 && (
+        // Na počítači se nabídka ukáže po najetí nebo fokusu, na dotykovém zařízení je vidět vždy.
+        <Menu items={akce} size="sm" label="Akce se zprávou" align={own ? 'left' : 'right'}
+          className="opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity" />
+      )}
       </div>
     </div>
   );

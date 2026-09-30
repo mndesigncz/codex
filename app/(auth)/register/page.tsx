@@ -21,6 +21,10 @@ import { LogoMark, Icon } from '@/components/Icons';
 import { PLAN_NAMES, PRICES, TRIAL_DAYS, priceLabel, type Interval, type PlanId } from '@/lib/plan';
 import { textPoRegistraci } from '@/lib/predplatneTexty';
 import { formatMoney } from '@/lib/money';
+import { useObal } from '@/components/ObalProvider';
+import PravniOdkazy from '@/components/pravni/PravniOdkazy';
+import JazykMenu from '@/components/ui/JazykMenu';
+import { useT } from '@/lib/i18n/client';
 
 // Pokladna se stahuje, až když má opravdu vyskočit. Kdo zakládá podnik na
 // tarifu Zdarma, nemá důvod táhnout Stripe.js.
@@ -29,7 +33,13 @@ const CheckoutModal = dynamic(() => import('@/components/CheckoutModal'), { ssr:
 const inputClass =
   'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm';
 
+// Překlad registrace (kolo 76). Formulář je přeložený, vykání jako v originálu
+// (německy „Sie“). Právně a platebně citlivá část zůstává ČESKY: výběr tarifu,
+// ceny, zkušební doba a věty po registraci o platbě (lib/predplatneTexty.ts) —
+// překlad by tvrdil něco o penězích, co musí schválit člověk. U cizího jazyka
+// pod výběrem tarifu proto stojí poznámka.
 export default function RegisterPage() {
+  const t = useT('auth');
   const [name, setName] = useState('');
   const [teamName, setTeamName] = useState('');
   const [email, setEmail] = useState('');
@@ -39,7 +49,11 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [joinCode, setJoinCode] = useState('');
   const [ref, setRef] = useState('');
-  const [plan, setPlan] = useState<PlanId>('pro');
+  const [planVyber, setPlan] = useState<PlanId>('pro');
+  // V nativní aplikaci se tarif nevolí a nenabízí (Apple 3.1.1, Google Play Billing):
+  // podnik vzniká na tarifu Zdarma, bez karty a bez ceny na obrazovce.
+  const { smiPlatby } = useObal();
+  const plan: PlanId = smiPlatby ? planVyber : 'free';
   const [interval, setIntervalPlanu] = useState<Interval>('month');
   const [pokladna, setPokladna] = useState(false);
   const [zaplaceno, setZaplaceno] = useState(false);
@@ -63,8 +77,8 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (password.length < 8) { setError('Heslo musí mít alespoň 8 znaků.'); return; }
-    if (password !== confirmPassword) { setError('Hesla se neshodují.'); return; }
+    if (password.length < 8) { setError(t('Heslo musí mít alespoň 8 znaků.')); return; }
+    if (password !== confirmPassword) { setError(t('Hesla se neshodují.')); return; }
 
     setIsLoading(true);
     try {
@@ -74,7 +88,7 @@ export default function RegisterPage() {
         body: JSON.stringify({ name, email, password, teamName, ref: ref || undefined }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error || 'Chyba při registraci.'); setIsLoading(false); return; }
+      if (!res.ok) { setError(data.error || t('Chyba při registraci.')); setIsLoading(false); return; }
       // Kód týmu se ukáže vždycky; přihlášení musí proběhnout dřív, než
       // se otevře pokladna — bez sezení by `/api/billing/checkout` vrátil 401.
       setJoinCode(data.joinCode);
@@ -85,7 +99,7 @@ export default function RegisterPage() {
       if (plan !== 'free' && prihlaseni?.ok) setPokladna(true);
       else if (plan !== 'free') setPrihlaseniSelhalo(true);
     } catch {
-      setError('Chyba serveru. Zkuste to prosím znovu.');
+      setError(t('Chyba serveru. Zkuste to prosím znovu.'));
       setIsLoading(false);
     }
   };
@@ -101,13 +115,13 @@ export default function RegisterPage() {
           <div className="flex justify-center mb-5"><LogoMark size={64} /></div>
           <div className="glass-card p-8">
             <div className="text-4xl mb-3">🎉</div>
-            <h1 className="text-2xl font-bold tracking-tight text-[#16181A] mb-2">Podnik vytvořen!</h1>
-            <p className="text-black/55 text-sm mb-2">Sdílejte tento kód se zaměstnanci — připojí se do vašeho týmu.</p>
+            <h1 className="text-2xl font-bold tracking-tight text-[#16181A] mb-2">{t('Podnik vytvořen!')}</h1>
+            <p className="text-black/55 text-sm mb-2">{t('Sdílejte tento kód se zaměstnanci — připojí se do vašeho týmu.')}</p>
 
             {/* Sdělení musí říkat pravdu o tom, co se stalo: nový podnik je na
                 tarifu Zdarma a zkouška Pro/Max běží až po zadání karty ve
                 Stripe pokladně (lib/predplatneTexty.ts). */}
-            {zaplaceno ? (
+            {!smiPlatby ? null : zaplaceno ? (
               <p className="text-xs text-[#5B7A08] bg-[#C8F542]/10 border border-[#C8F542]/25 rounded-xl px-3 py-2 mb-6 inline-flex items-center gap-1.5">
                 <Icon name="check" size={13} className="shrink-0" />
                 {textPoRegistraci({ plan, stav: 'aktivni', interval })}
@@ -119,7 +133,7 @@ export default function RegisterPage() {
             )}
 
             <div className="rounded-2xl bg-[#C8F542]/10 border border-[#C8F542]/25 p-6 mb-6">
-              <p className="text-xs uppercase tracking-[0.2em] text-black/45 mb-2">Kód týmu</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-black/45 mb-2">{t('Kód týmu')}</p>
               <p className="text-4xl font-bold tracking-[0.3em] text-[#5B7A08]">{joinCode}</p>
             </div>
 
@@ -127,7 +141,7 @@ export default function RegisterPage() {
               onClick={() => { router.push('/'); router.refresh(); }}
               className="w-full rounded-full bg-[#C8F542] text-black font-semibold py-3 hover:brightness-110 transition text-sm"
             >
-              Přejít do aplikace →
+              {t('Pokračovat k nastavení →')}
             </button>
 
             {/* Kdo pokladnu zavřel, se k ní dostane zpátky bez hledání
@@ -163,29 +177,31 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-[100dvh] flex items-center justify-center p-4">
+    <div className="relative min-h-[100dvh] flex items-center justify-center p-4">
+      {/* Přepínač jazyka: malá pilulka v rohu stránky. */}
+      <div className="absolute top-4 right-4 sm:top-6 sm:right-6"><JazykMenu /></div>
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-5"><LogoMark size={64} /></div>
-          <h1 className="text-3xl font-bold tracking-tight text-[#16181A] mb-2">Vytvořit podnik</h1>
-          <p className="text-black/45 text-sm">Registrace je určená pro provozovatele. Zaměstnanci se připojují kódem nebo pozvánkou.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-[#16181A] mb-2">{t('Vytvořit podnik')}</h1>
+          <p className="text-black/45 text-sm">{t('Registrace je určená pro provozovatele. Zaměstnanci se připojují kódem nebo pozvánkou.')}</p>
         </div>
 
         <div className="glass-card p-8">
           {/* Tarif se volí tady, ne až někde v Nastavení po týdnu používání.
               Kdo přišel z ceníku, má vybráno; kdo přišel z hlavičky, může
               přepnout. Karta se zadává až po založení účtu. */}
-          <fieldset className="mb-6">
-            <legend className="block text-xs uppercase tracking-wider text-black/45 mb-2.5">Tarif na začátek</legend>
+          {smiPlatby && <fieldset className="mb-6">
+            <legend className="block text-xs uppercase tracking-wider text-black/45 mb-2.5">Tarif na začátek</legend>{/* i18n-ok: tarif, cena a platba zůstávají česky */}
             <div className="grid grid-cols-3 gap-1.5">
-              {(['free', 'pro', 'max'] as const).map(t => (
-                <button key={t} type="button" onClick={() => setPlan(t)} aria-pressed={plan === t}
+              {(['free', 'pro', 'max'] as const).map(tp => (
+                <button key={tp} type="button" onClick={() => setPlan(tp)} aria-pressed={plan === tp}
                   className={`tap-target rounded-2xl px-2 py-2.5 text-center transition ${
-                    plan === t ? 'bg-[#16181A] text-white' : 'glass border border-black/10 text-black/65 hover:text-[#16181A]'
+                    plan === tp ? 'bg-[#16181A] text-white' : 'glass border border-black/10 text-black/65 hover:text-[#16181A]'
                   }`}>
-                  <span className="block text-sm font-bold">{PLAN_NAMES[t]}</span>
-                  <span className={`block text-[11px] ${plan === t ? 'text-white/60' : 'text-black/45'}`}>
-                    {t === 'free' ? 'do 3 lidí' : formatMoney(PRICES[t][interval === 'year' ? 'year' : 'month'], 'CZK')}
+                  <span className="block text-sm font-bold">{PLAN_NAMES[tp]}</span>
+                  <span className={`block text-[11px] ${plan === tp ? 'text-white/60' : 'text-black/45'}`}>
+                    {tp === 'free' ? 'do 3 lidí' /* i18n-ok: cena */ : formatMoney(PRICES[tp][interval === 'year' ? 'year' : 'month'], 'CZK')}
                   </span>
                 </button>
               ))}
@@ -196,46 +212,49 @@ export default function RegisterPage() {
                   {(['month', 'year'] as const).map(i => (
                     <button key={i} type="button" onClick={() => setIntervalPlanu(i)} aria-pressed={interval === i}
                       className={`tap-target-sm rounded-full px-3 py-1 text-xs font-semibold transition ${interval === i ? 'seg-on' : 'seg-off'}`}>
-                      {i === 'month' ? 'Měsíčně' : 'Ročně'}
+                      {i === 'month' ? 'Měsíčně' : 'Ročně'}{/* i18n-ok: cena */}
                     </button>
                   ))}
                 </div>
                 <p className="text-[11px] text-black/45 text-right">{TRIAL_DAYS} dní zdarma,<br />pak {priceLabel(plan, interval)}</p>
               </div>
             )}
-          </fieldset>
+            {t.jazyk !== 'cs' && <p className="t-meta mt-2.5">{t('Ceník a platební podmínky jsou zatím jen česky.')}</p>}
+          </fieldset>}
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label htmlFor="reg-jmeno" className="block text-xs uppercase tracking-wider text-black/45 mb-2">Vaše jméno</label>
-              <input id="reg-jmeno" autoComplete="name" type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Jan Novák" required className={inputClass} />
+              <label htmlFor="reg-jmeno" className="block text-xs uppercase tracking-wider text-black/45 mb-2">{t('Vaše jméno')}</label>
+              <input id="reg-jmeno" autoComplete="name" type="text" value={name} onChange={e => setName(e.target.value)} placeholder={t('Jan Novák')} required className={inputClass} />
             </div>
             <div>
-              <label htmlFor="reg-podnik" className="block text-xs uppercase tracking-wider text-black/45 mb-2">Název podniku</label>
-              <input id="reg-podnik" autoComplete="organization" type="text" value={teamName} onChange={e => setTeamName(e.target.value)} placeholder="Název podniku" className={inputClass} />
+              <label htmlFor="reg-podnik" className="block text-xs uppercase tracking-wider text-black/45 mb-2">{t('Název podniku')}</label>
+              <input id="reg-podnik" autoComplete="organization" type="text" value={teamName} onChange={e => setTeamName(e.target.value)} placeholder={t('Název podniku')} className={inputClass} />
             </div>
             <div>
-              <label htmlFor="reg-email" className="block text-xs uppercase tracking-wider text-black/45 mb-2">Email</label>
-              <input id="reg-email" autoComplete="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="vas@email.cz" required className={inputClass} />
+              <label htmlFor="reg-email" className="block text-xs uppercase tracking-wider text-black/45 mb-2">{t('Email')}</label>
+              <input id="reg-email" autoComplete="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={t('vas@email.cz')} required className={inputClass} />
             </div>
             <div>
-              <label htmlFor="reg-heslo" className="block text-xs uppercase tracking-wider text-black/45 mb-2">Heslo</label>
-              <input id="reg-heslo" autoComplete="new-password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Minimálně 8 znaků" required className={inputClass} />
+              <label htmlFor="reg-heslo" className="block text-xs uppercase tracking-wider text-black/45 mb-2">{t('Heslo')}</label>
+              <input id="reg-heslo" autoComplete="new-password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={t('Minimálně 8 znaků')} required className={inputClass} />
             </div>
             <div>
-              <label htmlFor="reg-heslo-znovu" className="block text-xs uppercase tracking-wider text-black/45 mb-2">Zopakuj heslo</label>
-              <input id="reg-heslo-znovu" autoComplete="new-password" type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Zadejte heslo znovu" required className={inputClass} />
+              <label htmlFor="reg-heslo-znovu" className="block text-xs uppercase tracking-wider text-black/45 mb-2">{t('Zopakuj heslo')}</label>
+              <input id="reg-heslo-znovu" autoComplete="new-password" type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder={t('Zadejte heslo znovu')} required className={inputClass} />
             </div>
 
             {error && <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 text-sm">{error}</div>}
 
             <button type="submit" disabled={isLoading} className="w-full py-3 rounded-full bg-[#C8F542] hover:brightness-110 disabled:opacity-50 text-black font-semibold transition text-sm active:scale-[0.98]">
-              {isLoading ? 'Vytváření…' : 'Vytvořit podnik'}
+              {isLoading ? t('Vytváření…') : t('Vytvořit podnik')}
             </button>
           </form>
 
+          <p className="mt-5 text-xs text-black/45 text-center text-pretty">Vytvořením účtu souhlasíte s <Link href="/podminky" className="underline underline-offset-2">Podmínkami užívání</Link> a berete na vědomí <Link href="/soukromi" className="underline underline-offset-2">Zásady ochrany osobních údajů</Link>.</p>{/* i18n-ok: právní věta zůstává česky */}
           <div className="mt-6 space-y-1.5 text-center text-sm">
-            <p className="text-black/45">Jste zaměstnanec? <Link href="/join" className="tap-target-sm inline-flex items-center text-[#5B7A08] hover:underline font-medium">Připojit se k týmu →</Link></p>
-            <p className="text-black/45">Už máte účet? <Link href="/login" className="tap-target-sm inline-flex items-center text-[#5B7A08] hover:underline font-medium">Přihlásit se</Link></p>
+            <p className="text-black/45">{t('Jste zaměstnanec?')} <Link href="/join" className="tap-target-sm inline-flex items-center text-[#5B7A08] hover:underline font-medium">{t('Připojit se k týmu →')}</Link></p>
+            <p className="text-black/45">{t('Už máte účet?')} <Link href="/login" className="tap-target-sm inline-flex items-center text-[#5B7A08] hover:underline font-medium">{t('Přihlásit se')}</Link></p>
+            <PravniOdkazy className="justify-center text-xs text-black/45" />
           </div>
         </div>
       </div>

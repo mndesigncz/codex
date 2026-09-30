@@ -36,8 +36,9 @@ export default function ({ eq, ok }: Testy) {
   eq('pohled: přehled nemá ?view (domů)', pohledScenyProRoli('prehled', 'vedeni'), null);
   eq('pohled: tým u zaměstnance nemá kam vést → domů', pohledScenyProRoli('tym', 'zamestnanec'), null);
   // Pohledy musí existovat v layoutech: překlep by ukázal přehled místo scény a nikdo by si nevšiml.
-  const vedeni = zdroj('components/employer/EmployerLayout.tsx');
-  const zamest = zdroj('components/employee/EmployeeLayout.tsx');
+  // Od kola 76 jsou výchozí pohledy obou layoutů v lib/navigace.ts (sdílí je i skládání navigace).
+  const vedeni = zdroj('components/employer/EmployerLayout.tsx') + zdroj('lib/navigace.ts');
+  const zamest = zdroj('components/employee/EmployeeLayout.tsx') + zdroj('lib/navigace.ts');
   for (const id of ID_SCEN) {
     const p = SCENY[id].pohled as Record<string, string>;
     if (p.vedeni) ok(`pohled vedení „${p.vedeni}" (scéna ${id}) zná EmployerLayout`, vedeni.includes(`id: '${p.vedeni}'`) || p.vedeni === 'team-settings');

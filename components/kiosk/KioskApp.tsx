@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
-import { signOut } from 'next-auth/react';
+import { odhlasit } from '@/lib/odhlaseni';
 import { Icon, LogoMark } from '../Icons';
 import PosTick from '../PosTick';
 import StaffInbox, { useStaffInbox } from '../client/StaffInbox';
@@ -15,6 +15,7 @@ import CashClosing from '../employee/CashClosing';
 import { UDALOST_CTENI_ZA } from '../employee/ZamekUzaverky';
 import MessengerDock from '../chat/MessengerDock';
 import { usePlan, ProBadge } from '../Pro';
+import { useObal } from '../ObalProvider';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { NavigaceKontext, useHodnotaNavigace } from '../widgety/NavigaceKontext';
 import { otevriPostupPoPrechodu } from '@/lib/otevriPostup';
@@ -62,6 +63,7 @@ interface KioskUser { id?: string | number; name: string; role: string; avatar?:
 export default function KioskApp({ user }: { user: KioskUser }) {
   // The shared tablet is a Pro feature. The gate explains instead of erroring.
   const { pro, loaded } = usePlan();
+  const { smiPlatby } = useObal();
   if (loaded && !pro) {
     return (
       <div className="min-h-[100dvh] flex items-center justify-center p-6">
@@ -71,7 +73,7 @@ export default function KioskApp({ user }: { user: KioskUser }) {
             <h1 className="text-xl font-bold tracking-tight text-[#16181A]">Kiosk režim</h1>
             <ProBadge />
           </div>
-          <p className="text-sm text-black/55">Sdílený tablet na prodejně — docházka, úkoly, sklad a uzávěrky pro celý tým — patří do plánu Pro. Zapíná se v Nastavení → Předplatné v účtu vedení.</p>
+          <p className="text-sm text-black/55">Sdílený tablet na prodejně — docházka, úkoly, sklad a uzávěrky pro celý tým — {smiPlatby ? 'patří do plánu Pro. Zapíná se v Nastavení → Předplatné v účtu vedení.' : 'tarif vašeho podniku nezahrnuje.'}</p>
         </div>
       </div>
     );
@@ -297,7 +299,7 @@ function KioskShell({ user }: { user: KioskUser }) {
         subtitle="Zařízení se vrátí na přihlašovací obrazovku a bude potřeba e-mail a heslo tabletového účtu. Odpíchnout se odsud do té doby nepůjde."
         footer={<>
           <Button variant="secondary" onClick={() => setConfirmSignOut(false)}>Zrušit</Button>
-          <Button variant="primary" icon="logout" onClick={() => signOut({ callbackUrl: '/login' })}>Odhlásit tablet</Button>
+          <Button variant="primary" icon="logout" onClick={() => odhlasit({ callbackUrl: '/login' })}>Odhlásit tablet</Button>
         </>}>
         <p className="t-meta text-pretty">
           Tohle není konec směny — na ten je tlačítko u jména nahoře.

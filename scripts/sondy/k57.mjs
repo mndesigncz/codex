@@ -1,31 +1,36 @@
-import { chromium } from 'playwright-core';
-const b = await chromium.launch({ executablePath: process.env.SONDY_CHROMIUM || undefined });
-const out = {};
-for (const [name, vp] of [['desk', { width: 1440, height: 900 }], ['mob', { width: 390, height: 844 }]]) {
+// Kolo 57 (přepsáno v kole 75): hlavička a navigace prodejní stránky.
+//
+// Dřív sonda měřila 3D stěnu obrazovek a autoplay záložky funkcí; obojí stránka
+// po přestavbě na živou ukázku nemá. Zůstává to, co hlavička pořád slibuje:
+//  - nahoře je lišta bez pozadí, po posunu dostane sklo (`.posunuto`),
+//  - tmavá pilulka v navigaci ví, která sekce je v obraze (jen od 768 px),
+//  - odkazy hlavičky vedou na sekce, které na stránce doopravdy jsou.
+import { browser, tvrdi, konec, BASE, OUT } from './k68-spolecne.mjs';
+
+const b = await browser();
+for (const [nazev, vp] of [['desk', { width: 1440, height: 900 }], ['mob', { width: 390, height: 844 }]]) {
   const ctx = await b.newContext({ viewport: vp, locale: 'cs-CZ', deviceScaleFactor: 1 });
   const p = await ctx.newPage();
-  await p.goto('http://localhost:3000/', { waitUntil: 'networkidle' });
-  await p.waitForTimeout(1200);
-  // stěna po scrollu do obrazu
-  const stena = p.locator('.stena').first();
-  await stena.scrollIntoViewIfNeeded(); await p.evaluate(() => window.scrollBy(0, 160)); await p.waitForTimeout(900);
-  await p.screenshot({ path: `shots/k57-${name}-stena.png` });
-  out[`${name}.header.posunuto`] = await p.locator('.lg-bar.posunuto').count();
-  // panel funkcí: výška zařízení přes všech 12 scén
-  const vysky = [];
-  const taby = p.getByRole('tab');
-  const n = await taby.count();
-  for (let i = 0; i < n; i++) {
-    await taby.nth(i).click(); await p.waitForTimeout(150);
-    const h = await p.locator('#fn-panel .zarizeni').first().evaluate(el => el.getBoundingClientRect().height);
-    const ph = await p.locator('#fn-panel').evaluate(el => el.getBoundingClientRect().height);
-    vysky.push([Math.round(h), Math.round(ph)]);
+  await p.goto(BASE + '/', { waitUntil: 'networkidle' });
+  await p.waitForTimeout(800);
+  tvrdi(`${nazev}: nahoře je lišta bez skla`, await p.locator('.lg-bar.posunuto').count() === 0);
+  await p.evaluate(() => window.scrollTo(0, 700));
+  await p.waitForTimeout(500);
+  tvrdi(`${nazev}: po posunu dostane lišta sklo`, await p.locator('.lg-bar.posunuto').count() === 1);
+  if (nazev === 'desk') {
+    for (const [id, label] of [['funkce', 'Funkce'], ['den', 'Jeden den'], ['zacatek', 'Jak začít'], ['cenik', 'Ceník'], ['otazky', 'Otázky']]) {
+      await p.evaluate(i => document.getElementById(i).scrollIntoView({ block: 'start' }), id);
+      await p.waitForTimeout(700);
+      const aktivni = await p.locator('header [data-on="true"]').first().textContent().catch(() => null);
+      tvrdi(`desk: u sekce #${id} svítí v navigaci „${label}"`, aktivni?.trim() === label, String(aktivni));
+    }
   }
-  out[`${name}.zarizeni[h,panel]`] = vysky;
-  await p.locator('#funkce').scrollIntoViewIfNeeded(); await p.waitForTimeout(500);
-  out[`${name}.nav.aktivni`] = await p.locator('header [data-on="true"]').textContent().catch(() => null);
-  await p.screenshot({ path: `shots/k57-${name}-funkce.png` });
+  for (const id of ['ukazka-okno', 'funkce', 'den', 'zacatek', 'cenik', 'otazky']) {
+    tvrdi(`${nazev}: sekce #${id}, na kterou míří hlavička, na stránce je`, await p.locator('#' + id).count() === 1);
+  }
+  await p.evaluate(() => document.getElementById('den').scrollIntoView({ block: 'start' }));
+  await p.waitForTimeout(900);
+  await p.screenshot({ path: OUT + `k57-${nazev}-den.png` });
   await ctx.close();
 }
-console.log(JSON.stringify(out, null, 1));
-await b.close();
+await konec();

@@ -3,6 +3,8 @@
 // Payments themselves (Stripe) come later; until PLAN_ENFORCED flips, nothing
 // is actually blocked — the matrix is shown, not enforced.
 
+import { czCount, DEN } from './czech.ts';
+
 export type PlanId = 'free' | 'pro' | 'max';
 export type Interval = 'month' | 'year';
 
@@ -141,7 +143,7 @@ export function planInfoOf(
 }
 
 export function czDays(n: number): string {
-  return `${n} ${n === 1 ? 'den' : n >= 2 && n <= 4 ? 'dny' : 'dní'}`;
+  return czCount(n, DEN);
 }
 
 export function planLabel(p: PlanInfo): string {

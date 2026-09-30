@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { jazykPozadavku } from '@/lib/i18n/jazykPozadavku';
 import { createPortal, NOT_CONFIGURED, stripe } from '@/lib/billing';
 import { verejnaHlaska } from '@/lib/verejnaChyba';
 
@@ -12,7 +13,7 @@ export async function POST() {
   if (jeOdpoved(c)) return c;
   if (!stripe()) return NextResponse.json({ error: NOT_CONFIGURED }, { status: 503 });
   try {
-    return NextResponse.json({ url: await createPortal(c.teamId) });
+    return NextResponse.json({ url: await createPortal(c.teamId, await jazykPozadavku()) });
   } catch (e: any) {
     return NextResponse.json({ error: verejnaHlaska(e, 'Portál se nepodařilo otevřít.', '[billing] portal') }, { status: 400 });
   }

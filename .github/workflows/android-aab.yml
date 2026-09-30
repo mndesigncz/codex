@@ -1,0 +1,114 @@
+# Sestaví podepsaný Android App Bundle (AAB) aplikací Managero a Managero client.
+#
+# NESPOUŠTÍ SE AUTOMATICKY: jen ručně (Actions > Android AAB > Run workflow). Bez secrets níž build
+# doběhne jako nepodepsaný (bundleRelease bez storeFile) a artefakt nejde nahrát do Play Console.
+# Jak vznikají secrets a upload klíč: docs/obchody/GOOGLE.md.
+#
+# Secrets (pro každou aplikaci zvlášť, APP = MANAGERO nebo CLIENT):
+#   ANDROID_KEYSTORE_B64_<APP>     base64 upload keystore (.jks)
+#   ANDROID_KEYSTORE_PASSWORD_<APP>, ANDROID_KEY_ALIAS_<APP>, ANDROID_KEY_PASSWORD_<APP>
+#   GOOGLE_SERVICES_JSON_B64_<APP> base64 google-services.json (Firebase, jen pro push přes FCM; bez něj push nefunguje)
+name: Android AAB
+
+on:
+  workflow_dispatch:
+    inputs:
+      aplikace:
+        description: 'Která aplikace'
+        type: choice
+        options: [managero, client, obe]
+        default: obe
+      verze:
+        description: 'versionName (prázdné = z apps/apps.json)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  aab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [managero, client]
+    steps:
+      - name: Přeskočit nevybranou aplikaci
+        id: vyber
+        run: |
+          if [ "${{ inputs.aplikace }}" = "obe" ] || [ "${{ inputs.aplikace }}" = "${{ matrix.app }}" ]; then echo "jet=1" >> "$GITHUB_OUTPUT"; fi
+
+      - uses: actions/checkout@v4
+        if: steps.vyber.outputs.jet == '1'
+
+      - uses: actions/setup-node@v4
+        if: steps.vyber.outputs.jet == '1'
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        if: steps.vyber.outputs.jet == '1'
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Závislosti obalu (mimo hlavní package.json)
+        if: steps.vyber.outputs.jet == '1'
+        working-directory: apps/${{ matrix.app }}
+        run: npm install --no-audit --no-fund
+
+      - name: Nativní projekt (cap add, pokud chybí) a úpravy
+        if: steps.vyber.outputs.jet == '1'
+        working-directory: apps/${{ matrix.app }}
+        run: |
+          node ../scripts/sync-www.mjs ${{ matrix.app }}
+          if [ ! -d android ]; then npx cap add android; fi
+          npx cap sync android
+          node ../scripts/ikony.mjs --jen=${{ matrix.app }}
+          npx @capacitor/assets generate --android --iconBackgroundColor '#C8F542' --splashBackgroundColor '#F3F4F0' --splashBackgroundColorDark '#0C0D0F'
+          node ../scripts/po-cap-add.mjs ${{ matrix.app }} android
+
+      - name: Upload klíč a Firebase z secrets
+        if: steps.vyber.outputs.jet == '1'
+        working-directory: apps/${{ matrix.app }}/android
+        env:
+          KS_B64: ${{ matrix.app == 'managero' && secrets.ANDROID_KEYSTORE_B64_MANAGERO || secrets.ANDROID_KEYSTORE_B64_CLIENT }}
+          GS_B64: ${{ matrix.app == 'managero' && secrets.GOOGLE_SERVICES_JSON_B64_MANAGERO || secrets.GOOGLE_SERVICES_JSON_B64_CLIENT }}
+        run: |
+          if [ -z "$KS_B64" ]; then echo "Chybí secret s upload klíčem (ANDROID_KEYSTORE_B64_*): nepodepsaný AAB Google Play nepřijme."; exit 1; fi
+          if [ -n "$KS_B64" ]; then echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"; echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"; fi
+          if [ -n "$GS_B64" ]; then echo "$GS_B64" | base64 -d > app/google-services.json; fi
+
+      - name: Sestavit AAB
+        if: steps.vyber.outputs.jet == '1'
+        working-directory: apps/${{ matrix.app }}/android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ matrix.app == 'managero' && secrets.ANDROID_KEYSTORE_PASSWORD_MANAGERO || secrets.ANDROID_KEYSTORE_PASSWORD_CLIENT }}
+          ANDROID_KEY_ALIAS: ${{ matrix.app == 'managero' && secrets.ANDROID_KEY_ALIAS_MANAGERO || secrets.ANDROID_KEY_ALIAS_CLIENT }}
+          ANDROID_KEY_PASSWORD: ${{ matrix.app == 'managero' && secrets.ANDROID_KEY_PASSWORD_MANAGERO || secrets.ANDROID_KEY_PASSWORD_CLIENT }}
+          # versionCode musí každým nahráním růst; číslo běhu s dvěma nulami nikdy neklesne.
+          VERSION_CODE: ${{ github.run_number }}00
+          VERSION_NAME: ${{ inputs.verze }}
+        run: |
+          if [ -z "$VERSION_NAME" ]; then unset VERSION_NAME; fi
+          chmod +x gradlew
+          ./gradlew bundleRelease --no-daemon
+
+      - name: Zkontrolovat sloučený manifest (oprávnění bez AD_ID)
+        if: steps.vyber.outputs.jet == '1'
+        working-directory: apps/${{ matrix.app }}/android
+        run: |
+          M=$(find app/build/intermediates -name AndroidManifest.xml -path '*release*' | head -1)
+          echo "Manifest: $M"
+          grep -o 'uses-permission[^/]*' "$M" | sort -u
+          if grep -q 'gms.permission.AD_ID' "$M"; then echo "V manifestu zůstalo AD_ID"; exit 1; fi
+
+      - uses: actions/upload-artifact@v4
+        if: steps.vyber.outputs.jet == '1'
+        with:
+          name: aab-${{ matrix.app }}
+          path: apps/${{ matrix.app }}/android/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+          retention-days: 14

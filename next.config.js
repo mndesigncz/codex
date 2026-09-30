@@ -26,9 +26,14 @@ function bezpecnostniHlavicky({ ramovatSam }) {
     { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
     // payment: vložená pokladna Stripe nabízí Apple Pay / Google Pay
     // přes Payment Request API ze svého rámu. Ukázka platby nemá.
+    // geolocation=(self): host objednávající od stolu se prokazuje polohou
+    // (BusinessPage, ověření vzdálenosti od podniku) a vedení si poloha podniku
+    // nastavuje v Client → Nastavení. S `geolocation=()` prohlížeč polohu
+    // zablokoval na celém webu a objednávání od stolu s ověřením polohy
+    // (výchozí order_geo = block) nešlo nikomu. Cizí rámy ji dál nedostanou.
     { key: 'Permissions-Policy', value: ramovatSam
       ? 'camera=(), microphone=(), geolocation=(), payment=()'
-      : 'camera=(self), microphone=(), geolocation=(), payment=(self "https://js.stripe.com" "https://checkout.stripe.com")' },
+      : 'camera=(self), microphone=(), geolocation=(self), payment=(self "https://js.stripe.com" "https://checkout.stripe.com")' },
     { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains' },
     // Poslední pojistka, kdyby se do stránky přece jen dostal cizí
     // skript: nemá odkud se načíst a nemá kam odeslat data.
@@ -87,6 +92,17 @@ const nextConfig = {
       {
         source: '/demo/:path*',
         headers: bezpecnostniHlavicky({ ramovatSam: true }),
+      },
+      {
+        // Ověření universal links (iOS) a app links (Android). Soubor apple-app-site-association
+        // nemá příponu, takže by se servíroval jako application/octet-stream, a Apple CDN ho
+        // pak odmítne. Musí jít přímo z www.managero.app bez přesměrování (middleware je nechytá,
+        // viz matcher v middleware.ts). Krátká cache: po doplnění Team ID a otisku se má projevit brzy.
+        source: '/.well-known/:soubor(apple-app-site-association|assetlinks.json)',
+        headers: [
+          { key: 'Content-Type', value: 'application/json' },
+          { key: 'Cache-Control', value: 'public, max-age=300' },
+        ],
       },
       {
         // Nahrané soubory se servírují z vlastní routy a mají tam ještě

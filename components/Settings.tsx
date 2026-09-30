@@ -7,6 +7,14 @@ import Billing from './Billing';
 import { Icon } from './Icons';
 import { EmptyState, Button, Skeleton, PageHeader, Segmented, SwitchRow, Badge, ListRow, Chip, Modal, Stat, StatRow, Label, hintsEnabled, setHintsEnabled, resetHints, dismissedCount } from './ui';
 import { useTheme } from './ThemeProvider';
+import { useObal } from './ObalProvider';
+import { jeNativni, nativniMost, stavNativnihoPushe } from '@/lib/nativni/most';
+import SmazatUcet from './ucet/SmazatUcet';
+import PravniOdkazy from './pravni/PravniOdkazy';
+import NahlasenyObsah from './moderace/NahlasenyObsah';
+import Zablokovani from './moderace/Zablokovani';
+import JazykKarta from './JazykKarta';
+import { useT } from '@/lib/i18n/client';
 import TeamManagement from './TeamManagement';
 import { dbTimeDayHM } from '@/lib/pragueTime';
 import { czCount } from '@/lib/czech';
@@ -24,7 +32,7 @@ const RoleEditor = dynamic(() => import('./role/RoleEditor'), { loading: () => <
 // Výchozí rozložení stránek (kolo 68) nese plochu s editorem úprav — taky až na otevření.
 const VychoziRozlozeni = dynamic(() => import('./widgety/VychoziRozlozeni'), { loading: () => <Skeleton className="h-48 rounded-3xl" /> });
 
-type SectionId = 'account' | 'app' | 'notifications' | 'security' | 'team' | 'billing' | 'audit' | 'pos' | 'roles' | 'stranky';
+type SectionId = 'account' | 'app' | 'notifications' | 'security' | 'team' | 'billing' | 'audit' | 'pos' | 'roles' | 'stranky' | 'nahlaseni';
 
 interface Props {
   user: { id: number; name: string; role: string; avatar?: string };
@@ -94,6 +102,8 @@ function relativeCzech(iso: string): string {
 export default function Settings({ user, initialTab, tabNonce }: Props) {
   const { update } = useSession();
   const { theme, setTheme } = useTheme();
+  const { jeObal, smiPlatby } = useObal();
+  const t = useT();
   const [zvolena, setZvolena] = useState<SectionId>(initialTab ?? 'account');
   // Přepnutí záložky odmontuje editor rolí — u rozepsané role se nejdřív zeptá.
   const straz = useStrazRole();
@@ -111,14 +121,16 @@ export default function Settings({ user, initialTab, tabNonce }: Props) {
   const { ma } = useOpravneni();
   const sections: { id: SectionId; label: string; icon: string; desc: string }[] = [
     { id: 'account', label: 'Účet', icon: 'settings', desc: 'Profil a osobní údaje' },
-    { id: 'app', label: 'Vzhled', icon: 'sun', desc: 'Světlý/tmavý režim a jazyk' },
+    { id: 'app', label: t('Vzhled'), icon: 'sun', desc: t('Světlý/tmavý režim a jazyk') },
     { id: 'notifications', label: 'Notifikace', icon: 'bell', desc: 'Centrum oznámení' },
     { id: 'security', label: 'Zabezpečení', icon: 'check', desc: 'Heslo' },
-    ...(isEmployer && ma('predplatne.zobrazit') ? [{ id: 'billing' as SectionId, label: 'Předplatné', icon: 'award', desc: 'Plán a fakturace' }] : []),
+    ...(isEmployer && smiPlatby && ma('predplatne.zobrazit') ? [{ id: 'billing' as SectionId, label: 'Předplatné', icon: 'award', desc: 'Plán a fakturace' }] : []),
     ...(isEmployer && ma('pokladna.stav') ? [{ id: 'pos' as SectionId, label: 'Pokladna', icon: 'trend', desc: 'Napojení Storyous' }] : []),
     ...(isEmployer && ma(['tym.role_spravovat', 'tym.role_prirazovat']) ? [{ id: 'roles' as SectionId, label: 'Role a oprávnění', icon: 'lock', desc: 'Kdo co v podniku smí' }] : []),
     // Výchozí plocha pro typ role nebo roli a zámky (spec §3.8); tablet stačí spravovat.
     ...(isEmployer && ma(['podnik.nastaveni', 'kiosk.spravovat']) ? [{ id: 'stranky' as SectionId, label: 'Stránky', icon: 'overview', desc: 'Výchozí plocha a zámky' }] : []),
+    // Moderace uživatelského obsahu (Apple 1.2): nahlášené zprávy a nápady vidí, kdo smí odebírat členy.
+    ...(ma('tym.odebrat') ? [{ id: 'nahlaseni' as SectionId, label: 'Nahlášený obsah', icon: 'warning', desc: 'Zprávy a nápady nahlášené týmem' }] : []),
     ...(isEmployer && ma('audit.zobrazit') ? [{ id: 'audit' as SectionId, label: 'Historie změn', icon: 'clock', desc: 'Kdo co kdy změnil' }] : []),
   ];
   // Záložka, na kterou role nemá, se nevykreslí, ani když na ni vede odkaz
@@ -231,8 +243,23 @@ export default function Settings({ user, initialTab, tabNonce }: Props) {
   // Notification preferences (localStorage)
   const [prefs, setPrefs] = useState<NotifPrefs>(DEFAULT_PREFS);
   // Push nabízíme jen tam, kde by opravdu fungoval (klíče v buildu + podporující prohlížeč).
+  const [pushNativniOdmitnuto, setPushNativniOdmitnuto] = useState(false);
   const [pushStav, setPushStav] = useState(() => stavPush(PUSH_NAKONFIGUROVAN, true));
-  useEffect(() => { setPushStav(stavPush(PUSH_NAKONFIGUROVAN, prohlizecUmiPush())); }, []);
+  useEffect(() => {
+    // V nativním obalu web push neexistuje (WKWebView nemá PushManager); rozhoduje nativní plugin.
+    if (jeNativni()) {
+      let zruseno = false;
+      Promise.all([stavNativnihoPushe(), nativniMost()]).then(([st, most]) => {
+        if (zruseno) return;
+        setPushStav(st === 'nedostupny' ? 'nepodporovano' : 'ok');
+        // Povolení v systému nestačí: uživatel mohl push v aplikaci vypnout (token je pak na serveru smazaný).
+        if (st === 'granted') setPrefs(prev => ({ ...prev, push: !most?.pushVypnuto() }));
+        if (st === 'denied') setPrefs(prev => ({ ...prev, push: false }));
+      });
+      return () => { zruseno = true; };
+    }
+    setPushStav(stavPush(PUSH_NAKONFIGUROVAN, prohlizecUmiPush()));
+  }, []);
 
   // Notification center
   const [notifs, setNotifs] = useState<Notif[]>([]);
@@ -305,6 +332,16 @@ export default function Settings({ user, initialTab, tabNonce }: Props) {
   };
 
   const togglePush = async (value: boolean) => {
+    // Nativní obal: systémový dialog a registrace tokenu; přepínač ukáže skutečný výsledek,
+    // ne přání (při odmítnutí se vrátí do vypnuto a řekne se, kde to povolit).
+    if (jeNativni()) {
+      const most = await nativniMost();
+      if (!value) { setPref('push', false); await most?.vypniPush(); return; }
+      const r = await most?.zapniPush() ?? 'nedostupny';
+      setPref('push', r === 'granted');
+      if (r === 'denied') setPushNativniOdmitnuto(true);
+      return;
+    }
     if (value && typeof window !== 'undefined' && 'Notification' in window) {
       try {
         const perm = Notification.permission === 'granted'
@@ -507,11 +544,11 @@ export default function Settings({ user, initialTab, tabNonce }: Props) {
                   Dřív dvě ruční volby, kde vybraná byla plná limetka. */}
               <section className="card p-6 space-y-4">
                 <div>
-                  <h2 className={cardTitle}>Vzhled</h2>
-                  <p className="t-meta mt-1">Vyberte světlý nebo tmavý motiv aplikace.</p>
+                  <h2 className={cardTitle}>{t('Vzhled')}</h2>
+                  <p className="t-meta mt-1">{t('Vyberte světlý nebo tmavý motiv aplikace.')}</p>
                 </div>
-                <Segmented ariaLabel="Motiv aplikace" value={theme === 'dark' ? 'dark' : 'light'} onChange={id => setTheme(id)}
-                  options={[{ id: 'light', label: 'Světlý', icon: 'sun' }, { id: 'dark', label: 'Tmavý', icon: 'moon' }]} />
+                <Segmented ariaLabel={t('Motiv aplikace')} value={theme === 'dark' ? 'dark' : 'light'} onChange={id => setTheme(id)}
+                  options={[{ id: 'light', label: t('Světlý'), icon: 'sun' }, { id: 'dark', label: t('Tmavý'), icon: 'moon' }]} />
               </section>
 
               {/* Nápovědy: zapnuto/vypnuto je přepínač, ne dvě limetkové volby. */}
@@ -535,15 +572,19 @@ export default function Settings({ user, initialTab, tabNonce }: Props) {
                 )}
               </section>
 
+              {/* Jazyk rozhraní: pět endonymů, vybraný nese fajfka (ne limetka), ukládá se hned. */}
               <section className="card p-6 space-y-4">
                 <div>
-                  <h2 className={cardTitle}>Jazyk</h2>
-                  <p className="t-meta mt-1">Jazyk rozhraní aplikace.</p>
+                  <h2 className={cardTitle}>{t('Jazyk')}</h2>
+                  <p className="t-meta mt-1">{t('Jazyk rozhraní aplikace.')}</p>
                 </div>
-                <ul className="list">
-                  <ListRow title="Čeština" right={<Chip size="sm">Výchozí</Chip>} />
-                </ul>
-                <p className="t-meta">Další jazyky připravujeme.</p>
+                <JazykKarta />
+              </section>
+
+              <section className="card p-6 space-y-3" aria-labelledby="nast-o-aplikaci">
+                <h2 id="nast-o-aplikaci" className={cardTitle}>O aplikaci</h2>
+                <p className="t-meta">Právní informace a kontakt na podporu.</p>
+                <PravniOdkazy className="text-sm" />
               </section>
             </div>
           ) : section === 'notifications' ? (
@@ -558,7 +599,9 @@ export default function Settings({ user, initialTab, tabNonce }: Props) {
               </div>
               <ul className="list">
                 {pushStav === 'ok' ? (
-                  <SwitchRow title="Push notifikace" hint="Povolte oznámení v tomto prohlížeči." checked={prefs.push} onChange={togglePush} />
+                  <SwitchRow title="Push notifikace" hint={pushNativniOdmitnuto
+                    ? 'Oznámení jsou v systému vypnutá. Povolte je v nastavení telefonu u aplikace Managero.'
+                    : jeObal ? 'Upozornění na směny, zprávy a sklad přímo v telefonu.' : 'Povolte oznámení v tomto prohlížeči.'} checked={prefs.push} onChange={togglePush} />
                 ) : (
                   // Bez klíčů nebo v prohlížeči bez podpory by přepínač nic neudělal — radši to řekneme.
                   <li className="py-3 min-h-[3.25rem]">
@@ -618,6 +661,7 @@ export default function Settings({ user, initialTab, tabNonce }: Props) {
             </section>
             </div>
           ) : section === 'security' ? (
+            <div>
             <form onSubmit={savePassword} className="card p-6 space-y-6">
               <div>
                 <h2 className={cardTitle}>Změna hesla</h2>
@@ -654,7 +698,12 @@ export default function Settings({ user, initialTab, tabNonce }: Props) {
                 <Button type="submit" variant="accent" block loading={savingPwd}>Změnit heslo</Button>
               </div>
             </form>
-          ) : section === 'billing' ? (
+            <Zablokovani />
+            <SmazatUcet jeHost={false} />
+            </div>
+          ) : section === 'nahlaseni' ? (
+            <NahlasenyObsah />
+          ) : section === 'billing' && smiPlatby ? (
             <Billing />
           ) : section === 'pos' ? (
             <section className="card p-6">

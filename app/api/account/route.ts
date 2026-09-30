@@ -3,6 +3,9 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import bcrypt from 'bcryptjs';
+import { hit, clear } from '@/lib/rateLimit';
+import { smazUcet, hesloSedi } from '@/lib/smazaniUctuDb';
+import { cistyJazyk } from '@/lib/i18n/config';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +31,8 @@ function serialize(u: any) {
     theme: u.theme ?? 'light',
     notifPrefs: { ...DEFAULT_NOTIF_PREFS, ...(u.notif_prefs ?? {}) },
     role: u.role,
+    // Jazyk aplikace; null = podle podniku (sloupec před migrací se tváří jako null).
+    lang: cistyJazyk(u.lang) ?? null,
   };
 }
 
@@ -47,6 +52,7 @@ export async function GET() {
       FROM users WHERE id = ${id}`;
   }
   if (!user) return NextResponse.json({ error: 'Uživatel nenalezen' }, { status: 404 });
+  try { const [l] = await sql`SELECT lang FROM users WHERE id = ${id}`; user.lang = l?.lang ?? null; } catch { /* sloupec ještě není */ }
 
   return NextResponse.json({ user: serialize(user) });
 }
@@ -56,7 +62,7 @@ export async function PATCH(request: Request) {
   if (!id) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
 
   const body = await request.json().catch(() => ({}));
-  const { name, avatar, phone, jobTitle, shiftPreference, theme, notifPrefs, currentPassword, newPassword } = body;
+  const { name, avatar, phone, jobTitle, shiftPreference, theme, notifPrefs, currentPassword, newPassword, lang } = body;
 
   // Password change flow
   if (currentPassword !== undefined || newPassword !== undefined) {
@@ -84,6 +90,16 @@ export async function PATCH(request: Request) {
   }
   if (theme !== undefined && theme !== 'light' && theme !== 'dark') {
     return NextResponse.json({ error: 'Neplatný motiv vzhledu.' }, { status: 400 });
+  }
+
+  // Jazyk aplikace (kolo 76): osobní věc účtu jako motiv, žádná brána oprávněním.
+  // Neplatná hodnota se ignoruje; `null` vrací jazyk podniku. Bez sloupce
+  // (před /api/init) se nic neuloží a jazyk zůstane v cookie zařízení.
+  if (lang !== undefined) {
+    try {
+      if (lang === null) await sql`UPDATE users SET lang = NULL WHERE id = ${id}`;
+      else if (cistyJazyk(lang)) await sql`UPDATE users SET lang = ${cistyJazyk(lang)!} WHERE id = ${id}`;
+    } catch { /* column not migrated yet — ignore until /api/init runs */ }
   }
 
   // Notification preferences — merged onto whatever is stored (partial updates ok).
@@ -121,5 +137,31 @@ export async function PATCH(request: Request) {
       FROM users WHERE id = ${id}`;
   }
 
+  try { const [l] = await sql`SELECT lang FROM users WHERE id = ${id}`; updated.lang = l?.lang ?? null; } catch { /* sloupec ještě není */ }
   return NextResponse.json({ ok: true, user: serialize(updated) });
+}
+
+// Smazání vlastního účtu (Apple 5.1.1(v), Google Play). Tělo: { password, smazatPodnik?, potvrzeni? }.
+// Pravidla (host, zaměstnanec, vlastník podniku) jsou v lib/smazaniUctu.ts.
+// Heslo se vyžaduje vždy: kdo najde odemčený telefon, účet smazat nesmí.
+export async function DELETE(request: Request) {
+  const id = await meId();
+  if (!id) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  const body = await request.json().catch(() => ({}));
+  const heslo = String(body?.password ?? '');
+  if (!heslo) return NextResponse.json({ error: 'Zadejte heslo.' }, { status: 400 });
+  // Pokusy o hádání hesla přes tenhle endpoint se počítají jako u přihlášení.
+  const gate = await hit(`smazani:${id}`, 5, 60 * 60, { failClosed: true });
+  if (!gate.ok) return NextResponse.json({ error: 'Příliš mnoho pokusů. Zkuste to později.' }, { status: 429 });
+  if (!(await hesloSedi(id, heslo))) return NextResponse.json({ error: 'Heslo není správné.' }, { status: 400 });
+  try {
+    const r = await smazUcet(id, { smazatPodnik: body?.smazatPodnik === true, potvrzeni: body?.potvrzeni ?? null, zDuvodu: 'aplikace' });
+    if (!r.ok) return NextResponse.json({ error: r.zprava, kod: r.kod, vlastnene: r.vlastnene }, { status: r.status });
+    await clear(`smazani:${id}`);
+    return NextResponse.json({ ok: true, smazanePodniky: r.smazanePodniky, varovani: r.varovani });
+  } catch (e) {
+    console.error('smazání účtu selhalo', e);
+    // Kroky jsou opakovatelné; člověk to může zkusit znovu.
+    return NextResponse.json({ error: 'Účet se nepodařilo smazat. Zkuste to znovu, nebo napište podpoře.' }, { status: 500 });
+  }
 }

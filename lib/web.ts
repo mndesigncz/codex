@@ -13,12 +13,13 @@ export const SITE_POPIS =
   'Správa malého podniku v jedné aplikaci: rozvrh směn a docházka, uzávěrky, sklad a receptury, úkoly, chat i věrnostní program pro hosty. Zdarma do 3 lidí.';
 
 /** Trasy, které mají mít vlastní záznam v sitemap.xml a smějí do vyhledávačů. */
-export const VEREJNE_TRASY = ['/', '/register', '/client'] as const;
+export const VEREJNE_TRASY = ['/', '/register', '/client', '/soukromi', '/podminky', '/podpora', '/smazat-ucet'] as const;
 
 /** Předpony, které vyhledávače nemají procházet (přihlášená část, tablet, správa, ukázka, API). */
 export const SOUKROME_PREDPONY = [
   '/api/', '/employer', '/employee', '/kiosk', '/admin', '/demo', '/s/', '/join', '/login',
   '/pozastaveno', '/client/me', '/client/login', '/client/register',
+  '/zapomenute-heslo', '/nove-heslo', '/client/zapomenute-heslo', '/client/nove-heslo',
 ] as const;
 
 /**
@@ -32,5 +33,6 @@ export const OG_ZAKLAD = {
   siteName: SITE_NAZEV,
   title: SITE_TITULEK,
   description: SITE_POPIS,
-  images: [{ url: '/brand/hero-counter.webp', width: 1600, height: 900, alt: 'Pult kavárny — Managero drží směny, sklad a uzávěrky pohromadě' }],
+  // Karta 1200×630 ze skutečného snímku aplikace (scripts/landing-og.mjs); poměr 1,91:1 je to, co sítě ořezávají nejméně.
+  images: [{ url: '/brand/landing/og.png', width: 1200, height: 630, alt: 'Aplikace Managero s přehledem dne: tržba, kdo je na směně, úkoly a docházející zásoby' }],
 };

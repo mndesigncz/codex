@@ -18,6 +18,8 @@
 // přepnutí na živé klíče by checkout padal na „No such customer". Rozhodnutí
 // jsou v billingPravidla.ts (čistá, s testy), tady je jejich provedení.
 
+import { stripeLocale } from './i18n/config';
+import { jazykPodniku } from './i18n/jazykPozadavku';
 import Stripe from 'stripe';
 import { clenoveSOpravnenim } from './opravneniDb';
 import { neon } from '@neondatabase/serverless';
@@ -192,7 +194,8 @@ export async function ensureCustomer(teamId: number): Promise<string> {
     name: String(t.name ?? `Podnik ${teamId}`),
     email: t.owner_email ?? undefined,
     metadata: { teamId: String(teamId), app: 'managero' },
-    preferred_locales: ['cs'],
+    // Jazyk podniku (kolo 76); před migrací sloupce a bez nastavení čeština.
+    preferred_locales: [stripeLocale(await jazykPodniku(teamId))],
   });
   // Uloží se jen do prázdného místa: dvě souběžné pokladny by jinak každá
   // založily zákazníka a jedna z nich by přepsala druhou.
@@ -240,7 +243,7 @@ async function sZakaznikem<T>(teamId: number, akce: (customer: string) => Promis
 // do našeho okna (components/CheckoutModal.tsx). Karta ani v jednom případě
 // neprojde naším kódem.
 export type CheckoutMode = 'hosted' | 'embedded';
-export async function createCheckout(teamId: number, plan: PaidPlan, interval: Interval, mode: CheckoutMode = 'hosted'): Promise<{ url?: string; clientSecret?: string }> {
+export async function createCheckout(teamId: number, plan: PaidPlan, interval: Interval, mode: CheckoutMode = 'hosted', jazyk?: string): Promise<{ url?: string; clientSecret?: string }> {
   const s = stripe(); if (!s) throw new Error(NOT_CONFIGURED);
   // Nejdřív srovnat s účtem Stripe: předplatné ze sandboxu nesmí po přepnutí
   // na živé klíče blokovat pokladnu hláškou „podnik už předplatné má".
@@ -264,7 +267,7 @@ export async function createCheckout(teamId: number, plan: PaidPlan, interval: I
     // zákazníka podle toho, co člověk vyplní v pokladně.
     tax_id_collection: { enabled: true },
     customer_update: { name: 'auto', address: 'auto' },
-    locale: 'cs',
+    locale: stripeLocale(jazyk),
     subscription_data: {
       metadata: { teamId: String(teamId), plan },
       ...(trial ? {
@@ -308,7 +311,8 @@ async function portalConfiguration(s: Stripe): Promise<string> {
     byProduct.set(pid, [...(byProduct.get(pid) ?? []), p.id]);
   }
   const conf = await s.billingPortal.configurations.create({
-    business_profile: { headline: 'Managero — správa předplatného' },
+    // Neutrální: konfigurace portálu je jedna pro všechny jazyky zákazníků.
+    business_profile: { headline: 'Managero' },
     features: {
       invoice_history: { enabled: true },
       payment_method_update: { enabled: true },
@@ -325,11 +329,11 @@ async function portalConfiguration(s: Stripe): Promise<string> {
   return conf.id;
 }
 
-export async function createPortal(teamId: number): Promise<string> {
+export async function createPortal(teamId: number, jazyk?: string): Promise<string> {
   const s = stripe(); if (!s) throw new Error(NOT_CONFIGURED);
   const configuration = await portalConfiguration(s);
   const session = await sZakaznikem(teamId, customer => s.billingPortal.sessions.create({
-    customer, configuration, locale: 'cs',
+    customer, configuration, locale: stripeLocale(jazyk) as any,
     return_url: `${appUrl()}/employer/overview?view=settings&tab=billing`,
   }));
   return session.url;

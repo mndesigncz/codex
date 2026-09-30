@@ -160,18 +160,12 @@ export function buildIcs(events: IcsEvent[], prodId = '-//Managero//CS', now: Da
   return lines.map(foldLine).join('\r\n') + '\r\n';
 }
 
-/** Stažení souboru v prohlížeči. */
-export function downloadIcs(filename: string, ics: string) {
-  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  // Safari stahuje jen z odkazu, který je v dokumentu.
-  a.style.display = 'none';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  // Okamžité uvolnění stažení v některých prohlížečích utne.
-  setTimeout(() => URL.revokeObjectURL(url), 10000);
+/**
+ * Stažení souboru v prohlížeči; v nativním obalu sdílecí list („Přidat do kalendáře“).
+ * `<a download>` z blobu by ve WKWebView neudělalo nic, proto to jde přes lib/stahni.
+ * Dynamický import: tenhle soubor načítají i testy přímo v Node a ty prohlížečové API nemají.
+ */
+export async function downloadIcs(filename: string, ics: string) {
+  const { ulozSoubor } = await import('./stahni');
+  return ulozSoubor(filename, ics, 'text/calendar;charset=utf-8');
 }

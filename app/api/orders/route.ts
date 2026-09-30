@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { sendOrderEmail } from '@/lib/email';
+import { jazykPodniku } from '@/lib/i18n/jazykPozadavku';
 import { neon } from '@neondatabase/serverless';
 import { ensureProductionTasks } from '@/lib/production';
 import { tymyCiselniku } from '@/lib/tenant';
@@ -105,7 +106,7 @@ export async function POST(req: NextRequest) {
           const text = items.map((i: any) => `• ${i.name} — ${i.qty} ${i.unit ?? ''}`.trim()).join('\n');
           // Odpověď dodavatele musí dojít do podniku, ne odesílací službě.
           const replyTo = (me?.email as string | undefined) || null;
-          const res = await sendOrderEmail(sup.email, team?.name ?? 'Podnik', text, b.note ?? null, replyTo);
+          const res = await sendOrderEmail(sup.email, team?.name ?? 'Podnik', text, b.note ?? null, replyTo, await jazykPodniku(c.teamId));
           if (res.sent) {
             await sql`UPDATE orders SET email_sent_at = NOW() WHERE id = ${row.id}`;
             emailed = true;
