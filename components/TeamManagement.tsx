@@ -37,10 +37,11 @@ import NavigaceNastaveni from './NavigaceNastaveni';
 import { JAZYKY, JAZYK_NAZEV, cistyJazyk } from '@/lib/i18n/config';
 import { ZEME, PREDVOLBY_ZEMI, predvolbaProZemi, navrhNastaveni } from '@/lib/i18n/zeme';
 import { useSymbol } from './CurrencyProvider';
-import { czCount } from '@/lib/czech';
 import { apiMessage, okJson } from '@/lib/api';
 import { obsahujeNekde } from '@/lib/hledani';
 import { useOpravneni } from './role/useOpravneni';
+import { useT, type PrekladFn } from '@/lib/i18n/client';
+import { useLocale } from './employer/jazyk';
 
 interface Member {
   id: number;
@@ -101,11 +102,11 @@ interface Invitation {
 interface DataTymu { team: Team | null; members: Member[] }
 
 function vyberTym(raw: any): DataTymu {
-  if (!raw || typeof raw !== 'object') throw new Error('Tým přišel v nečekaném tvaru.');
+  if (!raw || typeof raw !== 'object') throw new Error('Tým přišel v nečekaném tvaru.'); // i18n-ok
   return { team: raw.team ?? null, members: Array.isArray(raw.members) ? raw.members : [] };
 }
 function vyberPozvanky(raw: any): Invitation[] {
-  if (!raw || !Array.isArray(raw.invitations)) throw new Error('Pozvánky přišly v nečekaném tvaru.');
+  if (!raw || !Array.isArray(raw.invitations)) throw new Error('Pozvánky přišly v nečekaném tvaru.'); // i18n-ok
   return raw.invitations;
 }
 function vyberRole(raw: any): VolbaRole[] {
@@ -122,27 +123,28 @@ function vyberRole(raw: any): VolbaRole[] {
  * (nebo je role smazaná), zůstane starý popisek podle typu účtu — raději
  * méně přesně než vymyšlený název.
  */
-function nazevRole(m: Member, role: VolbaRole[]): string {
+function nazevRole(t: PrekladFn, m: Member, role: VolbaRole[]): string {
   if (m.role_nazev) return m.role_nazev;
   const v = roleClena(m);
   const r = v ? role.find(x => hodnotaRole(x) === v) : null;
-  return r?.nazev ?? (m.role === 'employer' ? 'Vedoucí' : 'Zaměstnanec');
+  return r?.nazev ?? (m.role === 'employer' ? t('Vedoucí') : t('Zaměstnanec'));
 }
 
-const STAV_POZVANKY: Record<string, { label: string; tone: 'ok' | 'bad' | 'info' }> = {
-  accepted: { label: 'Přijato', tone: 'ok' },
-  expired: { label: 'Vypršelo', tone: 'bad' },
-  declined: { label: 'Odmítnuto', tone: 'bad' },
-  revoked: { label: 'Zrušeno', tone: 'bad' },
-  pending: { label: 'Čeká', tone: 'info' },
-};
+const stavPozvanky = (t: PrekladFn): Record<string, { label: string; tone: 'ok' | 'bad' | 'info' }> => ({
+  accepted: { label: t('Přijato'), tone: 'ok' },
+  expired: { label: t('Vypršelo'), tone: 'bad' },
+  declined: { label: t('Odmítnuto'), tone: 'bad' },
+  revoked: { label: t('Zrušeno'), tone: 'bad' },
+  pending: { label: t('Čeká'), tone: 'info' },
+});
 
-type Sekce = 'lide' | 'podnik' | 'uzaverka' | 'sdileni' | 'tablet' | 'integrace';
+type Sekce = 'lide' | 'podnik' | 'uzaverka' | 'sdileni' | 'tablet' | 'integrace'; // i18n-ok (id záložek)
 const JSON_HLAVICKA = { 'Content-Type': 'application/json' };
-const LIDI = { one: 'člověk', few: 'lidi', many: 'lidí' };
-const POZVANEK = { one: 'pozvánka', few: 'pozvánky', many: 'pozvánek' };
+
 
 export default function TeamManagement({ user }: { user: { id: number; name: string; role: string; avatar?: string } }) {
+  const loc = useLocale();
+  const t = useT('tym');
   const symbol = useSymbol();
   // Co smí přihlášený v tomhle podniku (kolo 67). Akce, na které nemá,
   // se neukazují: tlačítko, které vždycky skončí 403, je jen past.
@@ -183,20 +185,20 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       return true;
     } catch (e) {
       if (puvodni) data.set(puvodni);
-      chyba(apiMessage(e, 'Nastavení se nepodařilo uložit.'));
+      chyba(apiMessage(e, t('Nastavení se nepodařilo uložit.')));
       return false;
     }
   };
 
   // ---- Sekce nástroje ----
   const sekce: { id: Sekce; label: string }[] = [
-    { id: 'lide', label: 'Lidé' },
+    { id: 'lide', label: t('Lidé') },
     // Podnik je vždy: nese i kartu organizace (ta se ukáže sama, jen když podnik v nějaké je).
-    { id: 'podnik', label: 'Podnik' },
-    ...(ma('uzaverky.nastaveni') ? [{ id: 'uzaverka' as const, label: 'Uzávěrka' }] : []),
-    ...(ma('sdileni.spravovat') ? [{ id: 'sdileni' as const, label: 'Sdílení' }] : []),
-    ...(ma(['kiosk.spravovat', 'dochazka.piny']) ? [{ id: 'tablet' as const, label: 'Tablet' }] : []),
-    ...(ma('integrace.spravovat') ? [{ id: 'integrace' as const, label: 'Integrace' }] : []),
+    { id: 'podnik', label: t('Podnik') },
+    ...(ma('uzaverky.nastaveni') ? [{ id: 'uzaverka' as const, label: t('Uzávěrka') }] : []),
+    ...(ma('sdileni.spravovat') ? [{ id: 'sdileni' as const, label: t('Sdílení') }] : []),
+    ...(ma(['kiosk.spravovat', 'dochazka.piny']) ? [{ id: 'tablet' as const, label: t('Tablet') }] : []), // i18n-ok (id)
+    ...(ma('integrace.spravovat') ? [{ id: 'integrace' as const, label: t('Integrace') }] : []),
   ];
   const [zvolena, setZvolena] = useState<Sekce>('lide');
   const aktivni: Sekce = sekce.some(s => s.id === zvolena) ? zvolena : 'lide';
@@ -225,7 +227,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
   // proti Vedení nemá nic navíc, takže vedoucí dál spravuje i jiné vedoucí
   // (jako před rolemi). Bez načtené vlastní role rozhoduje server.
   const vejdeSe = (sada: string[]) => mojeRole == null || sada.every(k => ma(k));
-  const zamekRole = (r: VolbaRole): string | null => (vlastnik || vejdeSe(r.opravneni) ? null : 'víc než tvoje role');
+  const zamekRole = (r: VolbaRole): string | null => (vlastnik || vejdeSe(r.opravneni) ? null : t('víc než tvoje role'));
   // Sada člena z výběru rolí (podle role_klic / role_id ze serveru); když ji
   // neznám (role se nenačetly), tlačítka nechám a rozhodne server.
   const sadaClena = (m: Member): string[] | null => {
@@ -272,11 +274,11 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
         } : {}),
       })) });
       setUprava(null);
-      flash('Změny člena jsou uložené.');
+      flash(t('Změny člena jsou uložené.'));
       obnovTym();
     } catch (e) {
       // 403 říká server česky a přesně („Roli Vedení dává a bere jen vlastník…").
-      setChybaClena(apiMessage(e, 'Změny se nepodařilo uložit.'));
+      setChybaClena(apiMessage(e, t('Změny se nepodařilo uložit.')));
     } finally {
       setUkladamClena(false);
     }
@@ -289,10 +291,10 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       await fetch(`/api/teams/members?userId=${odebrat.id}`, { method: 'DELETE' }).then(okJson);
       const puvodni = data.data;
       if (puvodni) data.set({ ...puvodni, members: puvodni.members.filter(x => x.id !== odebrat.id) });
-      flash(`${odebrat.name} už v týmu není.`);
+      flash(t('{jmeno} už v týmu není.', { jmeno: odebrat.name }));
       obnovTym();
     } catch (e) {
-      chyba(apiMessage(e, 'Člena se nepodařilo odebrat.'));
+      chyba(apiMessage(e, t('Člena se nepodařilo odebrat.')));
     } finally {
       setOdebiram(false);
       setOdebrat(null);
@@ -342,7 +344,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
     // Nábor na sezónu = šest brigádníků naráz: jde vložit celý seznam
     // oddělený čárkou, středníkem, mezerou nebo řádky.
     const seznam = Array.from(new Set(emaily.split(/[\s,;]+/).map(x => x.trim()).filter(Boolean)));
-    if (seznam.length === 0) { setChybaPozvani('Napiš aspoň jeden e-mail.'); return; }
+    if (seznam.length === 0) { setChybaPozvani(t('Napiš aspoň jeden e-mail.')); return; }
     setZvu(true);
     try {
       if (seznam.length === 1) {
@@ -353,9 +355,9 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
           // S tokenem okno ukáže odkaz k přeposlání; bez něj (pozvánku poslal server
           // e-mailem a odkaz nevrátil) by zůstal prázdný formulář bez odezvy.
           if (d.token) setPosledni({ email: seznam[0], token: d.token, emailSent: !!d.emailSent, emailError: d.emailError ?? null });
-          else { setPozvat(false); flash(`Pozvánka odešla na ${seznam[0]}.`); }
+          else { setPozvat(false); flash(t('Pozvánka odešla na {email}.', { email: seznam[0] })); }
         } catch (e) {
-          setChybaPozvani(apiMessage(e, 'Pozvánku se nepodařilo odeslat.'));
+          setChybaPozvani(apiMessage(e, t('Pozvánku se nepodařilo odeslat.')));
         }
         return;
       }
@@ -368,14 +370,14 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       }
       if (hotove.length > 0) {
         setEmaily(selhane.map(f => f.email).join(', '));
-        flash(`Pozváno ${czCount(hotove.length, LIDI)}. Odkazy najdeš v čekajících pozvánkách.`);
+        flash(t('Pozváno {n, plural, one {# člověk} few {# lidi} other {# lidí}}. Odkazy najdeš v čekajících pozvánkách.', { n: hotove.length }));
         obnovTym();
         if (selhane.length === 0) setPozvat(false);
       }
       if (selhane.length > 0) {
         setChybaPozvani(selhane.length === seznam.length
-          ? (selhane[0].proc || 'Pozvánky se nepodařilo odeslat.')
-          : `${czCount(selhane.length, POZVANEK)} neprošla: ${selhane.map(f => f.email).join(', ')}${selhane[0].proc ? ` — ${selhane[0].proc}` : ''}`);
+          ? (selhane[0].proc || t('Pozvánky se nepodařilo odeslat.'))
+          : t('{n, plural, one {# pozvánka} few {# pozvánky} other {# pozvánek}} neprošla: {seznam}{proc}', { n: selhane.length, seznam: selhane.map(f => f.email).join(', '), proc: selhane[0].proc ? ` — ${selhane[0].proc}` : '' }));
       }
     } finally {
       setZvu(false);
@@ -390,10 +392,10 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
     try {
       await fetch(`/api/invitations?id=${zrusit.id}`, { method: 'DELETE' }).then(okJson);
       pozvankyData.set(p => (p ?? []).map(x => (x.id === zrusit.id ? { ...x, status: 'revoked' } : x)));
-      flash('Pozvánka je zrušená, odkaz už neplatí.');
+      flash(t('Pozvánka je zrušená, odkaz už neplatí.'));
       obnovTym();
     } catch (e) {
-      chyba(apiMessage(e, 'Pozvánku se nepodařilo zrušit.'));
+      chyba(apiMessage(e, t('Pozvánku se nepodařilo zrušit.')));
     } finally {
       setRusim(false);
       setZrusit(null);
@@ -406,10 +408,10 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       const d = await fetch('/api/teams', { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify({ regenerateCode: true }) }).then(okJson);
       const puvodni = data.data;
       if (puvodni?.team && d?.team?.join_code) data.set({ ...puvodni, team: { ...puvodni.team, join_code: d.team.join_code } });
-      flash('Nový kód platí, starý už ne.');
+      flash(t('Nový kód platí, starý už ne.'));
       obnovTym();
     } catch (e) {
-      chyba(apiMessage(e, 'Nový kód se nepodařilo vygenerovat.'));
+      chyba(apiMessage(e, t('Nový kód se nepodařilo vygenerovat.')));
     } finally {
       setGeneruji(false);
     }
@@ -422,7 +424,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
     const n = (nazev ?? '').trim();
     if (!n) return;
     setUkladamNazev(true);
-    if (await patchTym({ name: n }, { name: n }, 'Název podniku je uložený.')) setNazev(null);
+    if (await patchTym({ name: n }, { name: n }, t('Název podniku je uložený.'))) setNazev(null);
     setUkladamNazev(false);
   };
   const [cilMezd, setCilMezd] = useState<string | null>(null);
@@ -441,32 +443,33 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       <div className="px-5 pt-5 space-y-3">
         <h2 id="tym-lide-t" className="t-card flex items-center gap-2">
           <Icon name="users" size={17} className="shrink-0 text-black/40" />
-          Lidé v podniku
-          {data.data && <Chip tone="muted" size="sm">{members.length.toLocaleString('cs-CZ')}</Chip>}
+          
+          {t('Lidé v podniku')}
+          {data.data && <Chip tone="muted" size="sm">{members.length.toLocaleString(loc)}</Chip>}
         </h2>
         {/* Nad osm lidí se v seznamu hledalo Ctrl+F v prohlížeči. */}
         {members.length > 8 && (
-          <SearchField value={hledat} onChange={setHledat} storageKey="tym" placeholder="Hledat člena — jméno, pozice…" ariaLabel="Hledat člena týmu" />
+          <SearchField value={hledat} onChange={setHledat} storageKey="tym" placeholder={t('Hledat člena — jméno, pozice…')} ariaLabel={t('Hledat člena týmu')} />
         )}
       </div>
       <div className="px-5 pb-3 pt-1">
         {zobrazeni.length === 0 ? (
-          <p className="t-meta py-4">Nikdo neodpovídá hledání.</p>
+          <p className="t-meta py-4">{t('Nikdo neodpovídá hledání.')}</p>
         ) : (
           <ul className="list">
             {zobrazeni.map(m => {
               const owner = m.id === team?.owner_id;
               const menu: MenuItem[] = [
-                ...(smiProfil ? [{ label: 'Profil', icon: 'user', onClick: () => otevriProfil(m.id) }] : []),
-                ...(smiOdebrat && !owner && !nadeMnou(m) && m.id !== user.id ? [{ label: 'Odebrat z týmu', icon: 'minus', danger: true, onClick: () => setOdebrat(m) }] : []),
+                ...(smiProfil ? [{ label: t('Profil'), icon: 'user', onClick: () => otevriProfil(m.id) }] : []),
+                ...(smiOdebrat && !owner && !nadeMnou(m) && m.id !== user.id ? [{ label: t('Odebrat z týmu'), icon: 'minus', danger: true, onClick: () => setOdebrat(m) }] : []),
               ];
               const upravit = smiUpravitClena && !owner && !nadeMnou(m);
               const akce = (
                 <>
-                  {upravit && <Button variant="secondary" size="sm" onClick={() => otevriUpravu(m)} aria-label={`Upravit: ${m.name}`}>Upravit</Button>}
+                  {upravit && <Button variant="secondary" size="sm" onClick={() => otevriUpravu(m)} aria-label={`Upravit: ${m.name}`}>{t('Upravit')}</Button>}
                   {menu.length > 1 || (menu.length === 1 && upravit)
-                    ? <Menu size="sm" label={`Další akce: ${m.name}`} items={menu} />
-                    : menu.length === 1 ? <Button variant="secondary" size="sm" onClick={menu[0].onClick}>{menu[0].label === 'Profil' ? 'Profil' : 'Odebrat'}</Button> : null}
+                    ? <Menu size="sm" label={t('Další akce: {jmeno}', { jmeno: m.name })} items={menu} />
+                    : menu.length === 1 ? <Button variant="secondary" size="sm" onClick={menu[0].onClick}>{menu[0].label === t('Profil') ? t('Profil') : t('Odebrat')}</Button> : null}
                 </>
               );
               return (
@@ -475,10 +478,10 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                   title={m.name}
                   meta={[m.job_title, m.email].filter(Boolean).join(' · ')}
                   right={<>
-                    {owner ? <Chip tone="ink" size="sm">Vlastník</Chip> : <Chip tone="muted" size="sm">{nazevRole(m, role)}</Chip>}
+                    {owner ? <Chip tone="ink" size="sm">{t('Vlastník')}</Chip> : <Chip tone="muted" size="sm">{nazevRole(t, m, role)}</Chip>}
                     {m.aktivni_jinde && (
-                      <span className="hidden sm:inline-flex" title="Je členem i jiného podniku a je tam právě přepnutý. Tady zůstává v seznamu, rozvrhu i ve mzdách.">
-                        <Chip tone="muted" size="sm">Právě v jiném podniku</Chip>
+                      <span className="hidden sm:inline-flex" title={t('Je členem i jiného podniku a je tam právě přepnutý. Tady zůstává v seznamu, rozvrhu i ve mzdách.')}>
+                        <Chip tone="muted" size="sm">{t('Právě v jiném podniku')}</Chip>
                       </span>
                     )}
                   </>}
@@ -502,20 +505,21 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <h2 id="tym-pozvanky-t" className="t-card flex items-center gap-2">
           <Icon name="mail" size={17} className="shrink-0 text-black/40" />
-          Pozvánky
+          
+          {t('Pozvánky')}
         </h2>
-        <Button variant="ghost" size="sm" icon="refresh" loading={generuji} onClick={novyKod}>Nový kód</Button>
+        <Button variant="ghost" size="sm" icon="refresh" loading={generuji} onClick={novyKod}>{t('Nový kód')}</Button>
       </div>
-      <p className="t-meta mt-1 text-pretty">Člověk se připojí kódem na stránce /join, nebo odkazem z pozvánky. Nový kód zneplatní ten starý.</p>
+      <p className="t-meta mt-1 text-pretty">{t('Člověk se připojí kódem na stránce /join, nebo odkazem z pozvánky. Nový kód zneplatní ten starý.')}</p>
       {pozvankyData.error ? (
-        <ErrorState compact title="Pozvánky se nenačetly" detail={pozvankyData.error} onRetry={pozvankyData.reload} className="mt-2" />
+        <ErrorState compact title={t('Pozvánky se nenačetly')} detail={pozvankyData.error} onRetry={pozvankyData.reload} className="mt-2" />
       ) : invitations.length === 0 ? (
         pozvankyData.loading ? <Skeleton className="h-10 mt-3" />
-          : <EmptyState illustration="tym" title="Zatím žádná pozvánka" hint="Pošli kód nebo odkaz — člověk se připojí za minutu a hned vidí rozvrh." compact />
+          : <EmptyState illustration="tym" title={t('Zatím žádná pozvánka')} hint={t('Pošli kód nebo odkaz — člověk se připojí za minutu a hned vidí rozvrh.')} compact />
       ) : (
         <ul className="list mt-2">
           {invitations.map(inv => {
-            const stav = STAV_POZVANKY[inv.status] ?? STAV_POZVANKY.pending;
+            const stav = stavPozvanky(t)[inv.status] ?? stavPozvanky(t).pending;
             const ceka = inv.status === 'pending';
             return (
               <ListRow key={inv.id}
@@ -525,10 +529,10 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                 actions={ceka ? <>
                   {inv.token && (
                     <Button variant="secondary" size="sm" icon={zkopirovano === inv.token ? 'check' : 'copy'} onClick={() => kopiruj(odkazPozvanky(inv.token), inv.token!)}>
-                      {zkopirovano === inv.token ? 'Zkopírováno' : 'Odkaz'}
+                      {zkopirovano === inv.token ? t('Zkopírováno') : t('Odkaz')}
                     </Button>
                   )}
-                  <Button variant="ghost" size="sm" onClick={() => setZrusit(inv)} aria-label={`Zrušit pozvánku: ${inv.email}`}>Zrušit</Button>
+                  <Button variant="ghost" size="sm" onClick={() => setZrusit(inv)} aria-label={t('Zrušit pozvánku: {email}', { email: inv.email })}>{t('Zrušit')}</Button>
                 </> : undefined}
               />
             );
@@ -543,23 +547,23 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       {ma('podnik.nastaveni') && (
         <Card aria-labelledby="tym-nazev-t">
           <h2 id="tym-nazev-t" className="t-card flex items-center gap-2">
-            <Icon name="tag" size={17} className="shrink-0 text-black/40" /> Název podniku
+            <Icon name="tag" size={17} className="shrink-0 text-black/40" />  {t('Název podniku')}
           </h2>
           {nazev !== null ? (
             <div className="mt-3 flex flex-col sm:flex-row gap-2">
               <Field id="tym-nazev" className="flex-1">
-                <Input id="tym-nazev" aria-label="Název podniku" value={nazev} onChange={e => setNazev(e.target.value)}
+                <Input id="tym-nazev" aria-label={t('Název podniku')} value={nazev} onChange={e => setNazev(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') void ulozNazev(); }} />
               </Field>
               <div className="flex gap-2">
-                <Button variant="primary" loading={ukladamNazev} onClick={ulozNazev}>Uložit</Button>
-                <Button variant="secondary" onClick={() => setNazev(null)}>Zrušit</Button>
+                <Button variant="primary" loading={ukladamNazev} onClick={ulozNazev}>{t('Uložit')}</Button>
+                <Button variant="secondary" onClick={() => setNazev(null)}>{t('Zrušit')}</Button>
               </div>
             </div>
           ) : (
             <div className="mt-2 flex items-center justify-between gap-3 flex-wrap">
               <p className="t-section min-w-0 line-clamp-2">{team.name}</p>
-              <Button variant="secondary" icon="pencil" onClick={() => setNazev(team.name)}>Přejmenovat</Button>
+              <Button variant="secondary" icon="pencil" onClick={() => setNazev(team.name)}>{t('Přejmenovat')}</Button>
             </div>
           )}
         </Card>
@@ -567,54 +571,54 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       {/* Provoz podniku podle oprávnění (kolo 67) — bez nich by každá změna skončila „nepodařilo se uložit". */}
       {ma(['podnik.nastaveni', 'finance.nastaveni']) && <Card aria-labelledby="tym-provoz-t">
         <h2 id="tym-provoz-t" className="t-card flex items-center gap-2">
-          <Icon name="settings" size={17} className="shrink-0 text-black/40" /> Provoz podniku
+          <Icon name="settings" size={17} className="shrink-0 text-black/40" />  {t('Provoz podniku')}
         </h2>
-        <p className="t-meta mt-1">Měna, formát čísel a cíle — přizpůsob aplikaci svému podniku.</p>
+        <p className="t-meta mt-1">{t('Měna, formát čísel a cíle — přizpůsob aplikaci svému podniku.')}</p>
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field id="tym-mena" label="Měna">
+          <Field id="tym-mena" label={t('Měna')}>
             <Select id="tym-mena" value={team.currency ?? 'CZK'} disabled={ukladam === 'biz'}
-              onChange={e => prepni('biz', { currency: e.target.value }, { currency: e.target.value }, 'Nastavení provozu je uložené.')}>
+              onChange={e => prepni('biz', { currency: e.target.value }, { currency: e.target.value }, t('Nastavení provozu je uložené.'))}>
               {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.label}</option>)}
             </Select>
           </Field>
-          <Field id="tym-jazyk" label="Formát čísel a měny">
+          <Field id="tym-jazyk" label={t('Formát čísel a měny')}>
             <Select id="tym-jazyk" value={team.locale ?? 'cs-CZ'} disabled={ukladam === 'biz'}
-              onChange={e => prepni('biz', { locale: e.target.value }, { locale: e.target.value }, 'Nastavení provozu je uložené.')}>
+              onChange={e => prepni('biz', { locale: e.target.value }, { locale: e.target.value }, t('Nastavení provozu je uložené.'))}>
               {LOCALES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
             </Select>
           </Field>
-          <Field id="tym-tyden" label="Začátek týdne">
+          <Field id="tym-tyden" label={t('Začátek týdne')}>
             <Select id="tym-tyden" value={String(team.week_start ?? 1)} disabled={ukladam === 'biz'}
-              onChange={e => prepni('biz', { weekStart: Number(e.target.value) }, { week_start: Number(e.target.value) }, 'Nastavení provozu je uložené.')}>
-              <option value="1">Pondělí</option>
-              <option value="0">Neděle</option>
+              onChange={e => prepni('biz', { weekStart: Number(e.target.value) }, { week_start: Number(e.target.value) }, t('Nastavení provozu je uložené.'))}>
+              <option value="1">{t('Pondělí')}</option>
+              <option value="0">{t('Neděle')}</option>
             </Select>
           </Field>
           {/* Lokalizace podniku (kolo 76): země jen předvyplňuje návrhy, nic nezamyká a nic netvrdí o právu. */}
-          <Field id="tym-zeme" label="Země" hint="Návrh podle země. Zkontroluj si to s účetním.">
+          <Field id="tym-zeme" label={t('Země')} hint={t('Návrh podle země. Zkontroluj si to s účetním.')}>
             <Select id="tym-zeme" value={team.country ?? ''} disabled={ukladam === 'biz'}
-              onChange={e => prepni('biz', { country: e.target.value || null }, { country: e.target.value || null }, 'Nastavení provozu je uložené.')}>
-              <option value="">Nevybráno</option>
+              onChange={e => prepni('biz', { country: e.target.value || null }, { country: e.target.value || null }, t('Nastavení provozu je uložené.'))}>
+              <option value="">{t('Nevybráno')}</option>
               {ZEME.map(z => <option key={z} value={z}>{PREDVOLBY_ZEMI[z].nazev}</option>)}
             </Select>
           </Field>
-          <Field id="tym-jazyk-podniku" label="Jazyk podniku" hint="Výchozí jazyk nových členů, e-mailů dodavatelům a lístku pro hosty.">
+          <Field id="tym-jazyk-podniku" label={t('Jazyk podniku')} hint={t('Výchozí jazyk nových členů, e-mailů dodavatelům a lístku pro hosty.')}>
             <Select id="tym-jazyk-podniku" value={cistyJazyk(team.default_lang) ?? 'cs'} disabled={ukladam === 'biz'}
-              onChange={e => prepni('biz', { defaultLang: e.target.value }, { default_lang: e.target.value }, 'Nastavení provozu je uložené.')}>
+              onChange={e => prepni('biz', { defaultLang: e.target.value }, { default_lang: e.target.value }, t('Nastavení provozu je uložené.'))}>
               {JAZYKY.map(j => <option key={j} value={j} lang={j}>{JAZYK_NAZEV[j]}</option>)}
             </Select>
           </Field>
-          <Field id="tym-cas" label="Formát času">
+          <Field id="tym-cas" label={t('Formát času')}>
             <Select id="tym-cas" value={team.time_format === '12' ? '12' : '24'} disabled={ukladam === 'biz'}
-              onChange={e => prepni('biz', { timeFormat: e.target.value }, { time_format: e.target.value }, 'Nastavení provozu je uložené.')}>
-              <option value="24">24 hodin (14:30)</option>
-              <option value="12">12 hodin (2:30 PM)</option>
+              onChange={e => prepni('biz', { timeFormat: e.target.value }, { time_format: e.target.value }, t('Nastavení provozu je uložené.'))}>
+              <option value="24">{t('24 hodin (14:30)')}</option>
+              <option value="12">{t('12 hodin (2:30 PM)')}</option>
             </Select>
           </Field>
-          <Field id="tym-pasmo" label="Časové pásmo" hint="Pro Česko, Slovensko, Německo, Rakousko a Polsko je stejné jako v Praze. Jiná pásma aplikace zatím nepodporuje.">
-            <Input id="tym-pasmo" readOnly value="Střední Evropa (Praha, Berlín, Varšava)" />
+          <Field id="tym-pasmo" label={t('Časové pásmo')} hint={t('Pro Česko, Slovensko, Německo, Rakousko a Polsko je stejné jako v Praze. Jiná pásma aplikace zatím nepodporuje.')}>
+            <Input id="tym-pasmo" readOnly value={t('Střední Evropa (Praha, Berlín, Varšava)')} />
           </Field>
-          <Field id="tym-cil" label="Cíl mzdových nákladů (%)" hint="Podíl mezd na tržbách — Mzdy za období ukážou, jestli jste v cíli.">
+          <Field id="tym-cil" label={t('Cíl mzdových nákladů (%)')} hint={t('Podíl mezd na tržbách — Mzdy za období ukážou, jestli jste v cíli.')}>
             <Input id="tym-cil" type="number" inputMode="numeric" min={0} max={100} placeholder="30" disabled={ukladam === 'biz'}
               value={cilMezd ?? (team.labor_target_pct != null ? String(team.labor_target_pct) : '')}
               onChange={e => setCilMezd(e.target.value)}
@@ -622,15 +626,15 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                 if (cilMezd === null) return;
                 const v = cilMezd.trim() === '' ? null : Math.max(0, Math.min(100, Math.round(Number(cilMezd))));
                 setCilMezd(null);
-                if ((team.labor_target_pct ?? null) !== v) void prepni('biz', { laborTargetPct: v }, { labor_target_pct: v }, 'Nastavení provozu je uložené.');
+                if ((team.labor_target_pct ?? null) !== v) void prepni('biz', { laborTargetPct: v }, { labor_target_pct: v }, t('Nastavení provozu je uložené.'));
               }} />
           </Field>
         </div>
         {/* Průvodce prvotním nastavením jde spustit znovu; nic nepřepíše, jen přidá. Smí jen vlastník. */}
         {isOwner && (
-          <ul className="list mt-3" aria-label="Průvodce nastavením">
-            <ListRow title="Průvodce nastavením" meta="Znovu projdi typ podniku, otevírací dobu a cíle. Nic nepřepíše, jen přidá."
-              actions={<a href="/employer/start?znovu=1" className="btn btn-secondary btn-sm">Spustit znovu</a>} />
+          <ul className="list mt-3" aria-label={t('Průvodce nastavením')}>
+            <ListRow title={t('Průvodce nastavením')} meta={t('Znovu projdi typ podniku, otevírací dobu a cíle. Nic nepřepíše, jen přidá.')}
+              actions={<a href="/employer/start?znovu=1" className="btn btn-secondary btn-sm">{t('Spustit znovu')}</a>} />
           </ul>
         )}
         {/* Předvyplnění podle země: ukáže, co navrhne, a změní to až po kliknutí. DPH jen jako informace k ověření; appka z něj nic nepočítá. */}
@@ -641,17 +645,18 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
           const shoda = (team.currency ?? 'CZK') === n.currency && (team.locale ?? 'cs-CZ') === n.locale && (team.week_start ?? 1) === n.weekStart
             && (cistyJazyk(team.default_lang) ?? 'cs') === n.defaultLang && (team.time_format === '12' ? '12' : '24') === n.timeFormat;
           return (
-            <div className="well mt-4 p-4 space-y-2" role="group" aria-label="Návrh podle země">
-              <p className="text-sm font-semibold text-[#16181A]">Návrh pro zemi {p.nazev}</p>
+            <div className="well mt-4 p-4 space-y-2" role="group" aria-label={t('Návrh podle země')}>
+              <p className="text-sm font-semibold text-[#16181A]">{t('Návrh pro zemi {zeme}', { zeme: p.nazev })}</p>
               <p className="t-meta text-pretty">
-                Jazyk {JAZYK_NAZEV[p.jazyk]}, měna {p.mena}, formát čísel {p.locale}, týden od {p.zacatekTydne === 1 ? 'pondělí' : 'neděle'}, {p.hodiny} hodin.
-                Sazby DPH {p.dph.map(d => `${d.sazba} %`).join(' / ')} (návrh k ověření, aplikace z nich nic nepočítá).
+                {t('Jazyk {jazyk}, měna {mena}, formát čísel {locale}, týden od {den}, {hodiny} hodin.', { jazyk: JAZYK_NAZEV[p.jazyk], mena: p.mena, locale: p.locale, den: p.zacatekTydne === 1 ? t('pondělí') : t('neděle'), hodiny: p.hodiny })}{' '}
+                {t('Sazby DPH {sazby} (návrh k ověření, aplikace z nich nic nepočítá).', { sazby: p.dph.map(d => `${d.sazba} %`).join(' / ') })}
               </p>
               {shoda
-                ? <p className="t-meta">Nastavení už návrhu odpovídá.</p>
+                ? <p className="t-meta">{t('Nastavení už návrhu odpovídá.')}</p>
                 : <Button variant="secondary" size="sm" loading={ukladam === 'biz'}
-                    onClick={() => prepni('biz', n, { default_lang: n.defaultLang, currency: n.currency, locale: n.locale, week_start: n.weekStart, time_format: n.timeFormat, timezone: n.timezone }, 'Návrh podle země je použitý.')}>
-                    Předvyplnit podle země
+                    onClick={() => prepni('biz', n, { default_lang: n.defaultLang, currency: n.currency, locale: n.locale, week_start: n.weekStart, time_format: n.timeFormat, timezone: n.timezone }, t('Návrh podle země je použitý.'))}>
+                    
+                    {t('Předvyplnit podle země')}
                   </Button>}
             </div>
           );
@@ -665,37 +670,37 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
   const uzaverka = team && (
     <Card aria-labelledby="tym-vyplaty-t">
       <h2 id="tym-vyplaty-t" className="t-card flex items-center gap-2">
-        <Icon name="receipt" size={17} className="shrink-0 text-black/40" /> Výplaty a uzávěrka
+        <Icon name="receipt" size={17} className="shrink-0 text-black/40" />  {t('Výplaty a uzávěrka')}
       </h2>
-      <p className="t-meta mt-1">Nastavení, které ovlivňuje denní uzávěrku zaměstnanců.</p>
+      <p className="t-meta mt-1">{t('Nastavení, které ovlivňuje denní uzávěrku zaměstnanců.')}</p>
       <ul className="list mt-2">
-        <SwitchRow title="Výplaty denně v hotovosti" hint="Když je zapnuto, zaměstnanci v uzávěrce vyplní i kolik si dnes vyplatili z kasy."
+        <SwitchRow title={t('Výplaty denně v hotovosti')} hint={t('Když je zapnuto, zaměstnanci v uzávěrce vyplní i kolik si dnes vyplatili z kasy.')}
           checked={!!team.pay_daily_cash} disabled={ukladam === 'pay'}
-          onChange={v => prepni('pay', { payDailyCash: v }, { pay_daily_cash: v }, v ? 'Denní výplata v hotovosti je zapnutá.' : 'Denní výplata v hotovosti je vypnutá.')} />
+          onChange={v => prepni('pay', { payDailyCash: v }, { pay_daily_cash: v }, v ? t('Denní výplata v hotovosti je zapnutá.') : t('Denní výplata v hotovosti je vypnutá.'))} />
         <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
           <label htmlFor="tym-kasa" className="min-w-0 flex-1 basis-60">
-            <span className="block text-sm font-semibold text-[#16181A]">Stav kasy po směně</span>
-            <span className="block text-xs text-black/45 mt-0.5 text-pretty">Kolik hotovosti má v kase zůstat pro další směnu. Uzávěrka pak sama spočítá, kolik odložit ven.</span>
+            <span className="block text-sm font-semibold text-[#16181A]">{t('Stav kasy po směně')}</span>
+            <span className="block text-xs text-black/45 mt-0.5 text-pretty">{t('Kolik hotovosti má v kase zůstat pro další směnu. Uzávěrka pak sama spočítá, kolik odložit ven.')}</span>
           </label>
           <div className="flex items-center gap-2">
             <Input id="tym-kasa" type="number" inputMode="numeric" min={0} placeholder="nenastaveno" className="!w-32 text-right tabular-nums"
               value={kasa ?? (team.drawer_float != null ? String(team.drawer_float) : '')} onChange={e => setKasa(e.target.value)} />
             <span className="t-meta">{symbol}</span>
             {kasa !== null && (
-              <Button variant="primary" size="sm" loading={ukladam === 'kasa'} onClick={async () => {
+              <Button variant="primary" size="sm" loading={ukladam === 'kasa' /* i18n-ok (id) */} onClick={async () => {
                 const v = kasa === '' ? null : parseInt(kasa, 10);
-                await prepni('kasa', { drawerFloat: v }, { drawer_float: v }, 'Cílový stav kasy je uložený.');
+                await prepni('kasa' /* i18n-ok (id) */, { drawerFloat: v }, { drawer_float: v }, t('Cílový stav kasy je uložený.'));
                 setKasa(null);
-              }}>Uložit</Button>
+              }}>{t('Uložit')}</Button>
             )}
           </div>
         </li>
-        <SwitchRow title="Tým vidí rozvrh ostatních" hint="Zaměstnanci uvidí, kdo má kdy směnu — jen jména a časy, žádné sazby. Když vypneš, uvidí každý jen sebe."
+        <SwitchRow title={t('Tým vidí rozvrh ostatních')} hint={t('Zaměstnanci uvidí, kdo má kdy směnu — jen jména a časy, žádné sazby. Když vypneš, uvidí každý jen sebe.')}
           checked={team.show_team_schedule !== false} disabled={ukladam === 'rozvrh'}
-          onChange={v => prepni('rozvrh', { showTeamSchedule: v }, { show_team_schedule: v }, v ? 'Tým teď vidí, kdo má kdy směnu.' : 'Zaměstnanci vidí jen svoje směny.')} />
-        <SwitchRow title="Uzávěrka jen po směně" hint="Zaměstnanec může odeslat uzávěrku jen za den, kdy měl naplánovanou směnu."
+          onChange={v => prepni('rozvrh', { showTeamSchedule: v }, { show_team_schedule: v }, v ? t('Tým teď vidí, kdo má kdy směnu.') : t('Zaměstnanci vidí jen svoje směny.'))} />
+        <SwitchRow title={t('Uzávěrka jen po směně')} hint={t('Zaměstnanec může odeslat uzávěrku jen za den, kdy měl naplánovanou směnu.')}
           checked={team.closing_requires_shift !== false} disabled={ukladam === 'smena'}
-          onChange={v => prepni('smena', { closingRequiresShift: v }, { closing_requires_shift: v }, v ? 'Uzávěrka je vázaná na směnu.' : 'Uzávěrku může vyplnit kdokoli.')} />
+          onChange={v => prepni('smena', { closingRequiresShift: v }, { closing_requires_shift: v }, v ? t('Uzávěrka je vázaná na směnu.') : t('Uzávěrku může vyplnit kdokoli.'))} />
       </ul>
     </Card>
   );
@@ -704,9 +709,9 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
   if (data.loading) {
     obsah = <Card><div className="space-y-2">{[0, 1, 2, 3].map(i => <Skeleton key={i} className="h-12" />)}</div></Card>;
   } else if (data.error) {
-    obsah = <Card><ErrorState compact title="Tým se nepodařilo načíst" hint="Data jsou v pořádku — jen se je teď nepodařilo načíst." detail={data.error} onRetry={data.reload} /></Card>;
+    obsah = <Card><ErrorState compact title={t('Tým se nepodařilo načíst')} hint={t('Data jsou v pořádku — jen se je teď nepodařilo načíst.')} detail={data.error} onRetry={data.reload} /></Card>;
   } else if (!team) {
-    obsah = <Card><EmptyState illustration="tym" title="Zatím nemáš žádný tým" compact /></Card>;
+    obsah = <Card><EmptyState illustration="tym" title={t('Zatím nemáš žádný tým')} compact /></Card>;
   } else {
     obsah = (
       <>
@@ -714,7 +719,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
         {aktivni === 'podnik' && podnik}
         {aktivni === 'uzaverka' && uzaverka}
         {aktivni === 'sdileni' && <ShareSettings />}
-        {aktivni === 'tablet' && <KioskSettings />}
+        {aktivni === 'tablet' && <KioskSettings />} {/* i18n-ok (id) */}
         {aktivni === 'integrace' && <NoisiumConnect />}
       </>
     );
@@ -723,7 +728,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
   const nastroj = (
     <div className="space-y-4">
       {sekce.length > 1 && (
-        <Segmented ariaLabel="Sekce nastavení týmu" value={aktivni} onChange={setZvolena} options={sekce} />
+        <Segmented ariaLabel={t('Sekce nastavení týmu')} value={aktivni} onChange={setZvolena} options={sekce} />
       )}
       {obsah}
     </div>
@@ -739,56 +744,56 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       <PlochaWidgetu
         stranka="vedeni.tym"
         hlavicka={{
-          title: 'Tým',
-          subtitle: 'Lidé, role, pozvánky a pravidla podniku.',
+          title: t('Tým'),
+          subtitle: t('Lidé, role, pozvánky a pravidla podniku.'),
           hintId: 'teammanagement',
-          primary: smiPozvat && team ? <Button variant="accent" icon="plus" onClick={() => { setPosledni(null); setChybaPozvani(null); setPozvat(true); }}>Pozvat člena</Button> : undefined,
-          menu: smiPozvat && team?.join_code ? [{ label: `Kopírovat kód ${team.join_code}`, icon: 'copy', onClick: () => { void kopiruj(team.join_code ?? '', 'kod').then(ok => (ok ? flash('Kód pro připojení je ve schránce.') : chyba(`Schránka je zakázaná. Kód pro připojení: ${team.join_code}`))); } }] : undefined,
+          primary: smiPozvat && team ? <Button variant="accent" icon="plus" onClick={() => { setPosledni(null); setChybaPozvani(null); setPozvat(true); }}>{t('Pozvat člena')}</Button> : undefined,
+          menu: smiPozvat && team?.join_code ? [{ label: t('Kopírovat kód {kod}', { kod: team.join_code }), icon: 'copy', onClick: () => { void kopiruj(team.join_code ?? '', 'kod').then(ok => (ok ? flash(t('Kód pro připojení je ve schránce.')) : chyba(t('Schránka je zakázaná. Kód pro připojení: {kod}', { kod: team.join_code })))); } }] : undefined,
         }}
         nastroj={nastroj}
       />
 
       {pozvat && (
-        <Modal open onClose={zavriPozvani} size="md" title="Pozvat člena" subtitle="Pozvánka přijde e-mailem; odkaz můžeš poslat i sám."
+        <Modal open onClose={zavriPozvani} size="md" title={t('Pozvat člena')} subtitle={t('Pozvánka přijde e-mailem; odkaz můžeš poslat i sám.')}
           footer={posledni?.token ? (
-            <Button variant="primary" onClick={zavriPozvani}>Hotovo</Button>
+            <Button variant="primary" onClick={zavriPozvani}>{t('Hotovo')}</Button>
           ) : <>
-            <Button variant="secondary" onClick={zavriPozvani}>Zrušit</Button>
-            <Button variant="primary" icon="send" loading={zvu} onClick={odesliPozvanky}>Odeslat pozvánku</Button>
+            <Button variant="secondary" onClick={zavriPozvani}>{t('Zrušit')}</Button>
+            <Button variant="primary" icon="send" loading={zvu} onClick={odesliPozvanky}>{t('Odeslat pozvánku')}</Button>
           </>}>
           {posledni?.token ? (
             <div className="space-y-3">
-              <p className="text-sm text-[#16181A] font-semibold">Pošli tenhle odkaz: {posledni.email}</p>
+              <p className="text-sm text-[#16181A] font-semibold">{t('Pošli tenhle odkaz: {email}', { email: posledni.email })}</p>
               <p className="t-meta text-pretty">
                 {posledni.emailSent
-                  ? 'E-mail jsme odeslali, ale nemusí vždy dorazit — nejjistější je poslat odkaz přímo (WhatsApp, SMS…).'
+                  ? t('E-mail jsme odeslali, ale nemusí vždy dorazit — nejjistější je poslat odkaz přímo (WhatsApp, SMS…).')
                   : posledni.emailError
-                    ? `E-mail neodešel (${posledni.emailError}), takže pozvánku doruč sám — zkopíruj odkaz a pošli ho.`
-                    : 'E-mail není nastavený, takže pozvánku doruč sám — zkopíruj odkaz a pošli ho.'}
+                    ? t('E-mail neodešel ({chyba}), takže pozvánku doruč sám — zkopíruj odkaz a pošli ho.', { chyba: posledni.emailError })
+                    : t('E-mail není nastavený, takže pozvánku doruč sám — zkopíruj odkaz a pošli ho.')}
               </p>
               <div className="flex items-center gap-2">
-                <Input readOnly aria-label="Odkaz pozvánky" value={odkazPozvanky(posledni.token)} onFocus={e => e.currentTarget.select()} className="font-mono text-xs" />
+                <Input readOnly aria-label={t('Odkaz pozvánky')} value={odkazPozvanky(posledni.token)} onFocus={e => e.currentTarget.select()} className="font-mono text-xs" />
                 <Button variant="secondary" size="sm" icon={zkopirovano === posledni.token ? 'check' : 'copy'} onClick={() => kopiruj(odkazPozvanky(posledni.token), posledni.token!)}>
-                  {zkopirovano === posledni.token ? 'Zkopírováno' : 'Kopírovat'}
+                  {zkopirovano === posledni.token ? t('Zkopírováno') : t('Kopírovat')}
                 </Button>
               </div>
             </div>
           ) : (
             <div className="space-y-3">
-              <Field id="tym-pozvat-emaily" label="E-mail" hint="Víc lidí naráz odděl čárkou nebo novým řádkem." error={chybaPozvani}>
+              <Field id="tym-pozvat-emaily" label={t('E-mail')} hint={t('Víc lidí naráz odděl čárkou nebo novým řádkem.')} error={chybaPozvani}>
                 <Textarea id="tym-pozvat-emaily" rows={2} value={emaily} onChange={e => setEmaily(e.target.value)} autoFocus />
               </Field>
-              <Field id="tym-pozvat-pozice" label="Pozice (nepovinné)">
+              <Field id="tym-pozvat-pozice" label={t('Pozice (nepovinné)')}>
                 <Input id="tym-pozvat-pozice" value={pozicePozvanky} onChange={e => setPozicePozvanky(e.target.value)} />
               </Field>
               {/* Pozvat jako vedení = přidělit roli; bez tym.role_prirazovat jde pozvat jen do výchozí role podniku. */}
               {smiPozvatVedeni && (
                 <div>
-                  <p className="field-label" id="tym-pozvat-role">Jako</p>
-                  <Segmented size="sm" ariaLabel="Role nového člena" value={rolePozvanky} onChange={setRolePozvanky}
-                    options={[{ id: 'employee', label: 'Zaměstnanec' }, { id: 'employer', label: 'Vedoucí' }]} />
+                  <p className="field-label" id="tym-pozvat-role">{t('Jako')}</p>
+                  <Segmented size="sm" ariaLabel={t('Role nového člena')} value={rolePozvanky} onChange={setRolePozvanky}
+                    options={[{ id: 'employee', label: t('Zaměstnanec') }, { id: 'employer', label: t('Vedoucí') }]} />
                   {rolePozvanky === 'employer' && (
-                    <p className="note note-wait mt-2 text-[13px]">Vedoucí má plný přístup: správa týmu, rozvrhy, sklad, uzávěrky i docházka.</p>
+                    <p className="note note-wait mt-2 text-[13px]">{t('Vedoucí má plný přístup: správa týmu, rozvrhy, sklad, uzávěrky i docházka.')}</p>
                   )}
                 </div>
               )}
@@ -798,33 +803,33 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       )}
 
       {uprava && (
-        <Modal open onClose={() => setUprava(null)} size="sm" title="Upravit člena" subtitle={uprava.m.name}
+        <Modal open onClose={() => setUprava(null)} size="sm" title={t('Upravit člena')} subtitle={uprava.m.name}
           footer={<>
-            <Button variant="secondary" onClick={() => setUprava(null)}>Zrušit</Button>
-            <Button variant="primary" icon="check" loading={ukladamClena} onClick={ulozClena}>Uložit</Button>
+            <Button variant="secondary" onClick={() => setUprava(null)}>{t('Zrušit')}</Button>
+            <Button variant="primary" icon="check" loading={ukladamClena} onClick={ulozClena}>{t('Uložit')}</Button>
           </>}>
           <div className="space-y-3">
-            <Field id="clen-role" label="Role"
-              hint={!smiPrirazovat ? 'Na přidělování rolí nemáš oprávnění.'
-                : volbyRole.length === 0 ? 'Role se nepodařilo načíst — zkus obrazovku otevřít znovu.'
-                : 'Co role smí, nastavíš v Nastavení → Role a oprávnění.'}>
+            <Field id="clen-role" label={t('Role')}
+              hint={!smiPrirazovat ? t('Na přidělování rolí nemáš oprávnění.')
+                : volbyRole.length === 0 ? t('Role se nepodařilo načíst — zkus obrazovku otevřít znovu.')
+                : t('Co role smí, nastavíš v Nastavení → Role a oprávnění.')}>
               {/* Role = sada oprávnění (kolo 67); co přidělit nesmím, je vidět, ale zamčené. */}
               <Select id="clen-role" value={uprava.role} disabled={!smiPrirazovat || volbyRole.length === 0}
                 onChange={e => setUprava(u => (u ? { ...u, role: e.target.value } : u))}>
-                {uprava.role === '' && <option value="">{nazevRole(uprava.m, role)} (beze změny)</option>}
-                <optgroup label="Přednastavené">{volbyRole.filter(r => r.id == null).map(r => volbaRole(r, uprava.m))}</optgroup>
+                {uprava.role === '' && <option value="">{t('{role} (beze změny)', { role: nazevRole(t, uprava.m, role) })}</option>}
+                <optgroup label={t('Přednastavené')}>{volbyRole.filter(r => r.id == null).map(r => volbaRole(r, uprava.m))}</optgroup>
                 {volbyRole.some(r => r.id != null) && (
-                  <optgroup label="Vlastní role">{volbyRole.filter(r => r.id != null).map(r => volbaRole(r, uprava.m))}</optgroup>
+                  <optgroup label={t('Vlastní role')}>{volbyRole.filter(r => r.id != null).map(r => volbaRole(r, uprava.m))}</optgroup>
                 )}
               </Select>
             </Field>
-            <Field id="clen-pozice" label="Pozice" hint={smiPozici ? undefined : 'Na úpravu pozice nemáš oprávnění.'}>
+            <Field id="clen-pozice" label={t('Pozice')} hint={smiPozici ? undefined : t('Na úpravu pozice nemáš oprávnění.')}>
               <Input id="clen-pozice" value={uprava.pozice} disabled={!smiPozici} onChange={e => setUprava(u => (u ? { ...u, pozice: e.target.value } : u))} />
             </Field>
-            <Field id="clen-sazba" label={`Hodinová sazba (${symbol}/h)`} error={chybaClena}
-              hint={smiSazbu ? 'Použije se pro mzdy v Docházce, Financích i uzávěrkách.' : 'Na úpravu sazeb nemáš oprávnění.'}>
+            <Field id="clen-sazba" label={t('Hodinová sazba ({mena}/h)', { mena: symbol })} error={chybaClena}
+              hint={smiSazbu ? t('Použije se pro mzdy v Docházce, Financích i uzávěrkách.') : t('Na úpravu sazeb nemáš oprávnění.')}>
               <Input id="clen-sazba" inputMode="numeric" disabled={!smiSazbu} value={uprava.sazba}
-                placeholder={uprava.m.hourly_rate == null && !ma('finance.mzdy') ? 'skrytá' : '0'}
+                placeholder={uprava.m.hourly_rate == null && !ma('finance.mzdy') ? t('skrytá') : '0'}
                 onChange={e => setUprava(u => (u ? { ...u, sazba: e.target.value.replace(/\D/g, '') } : u))} />
             </Field>
           </div>
@@ -832,22 +837,22 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
       )}
 
       {odebrat && (
-        <Modal open onClose={() => !odebiram && setOdebrat(null)} size="sm" title="Odebrat člena?" subtitle={odebrat.name}
+        <Modal open onClose={() => !odebiram && setOdebrat(null)} size="sm" title={t('Odebrat člena?')} subtitle={odebrat.name}
           footer={<>
-            <Button variant="secondary" onClick={() => setOdebrat(null)} disabled={odebiram}>Zrušit</Button>
-            <Button variant="danger-solid" loading={odebiram} onClick={potvrdOdebrani}>Odebrat</Button>
+            <Button variant="secondary" onClick={() => setOdebrat(null)} disabled={odebiram}>{t('Zrušit')}</Button>
+            <Button variant="danger-solid" loading={odebiram} onClick={potvrdOdebrani}>{t('Odebrat')}</Button>
           </>}>
-          <p className="text-sm text-black/70 text-pretty">{odebrat.name} ztratí přístup k podniku a zmizí z jeho konverzací. Docházka a uzávěrky zůstanou.</p>
+          <p className="text-sm text-black/70 text-pretty">{t('{jmeno} ztratí přístup k podniku a zmizí z jeho konverzací. Docházka a uzávěrky zůstanou.', { jmeno: odebrat.name })}</p>
         </Modal>
       )}
 
       {zrusit && (
-        <Modal open onClose={() => !rusim && setZrusit(null)} size="sm" title="Zrušit pozvánku?" subtitle={zrusit.email}
+        <Modal open onClose={() => !rusim && setZrusit(null)} size="sm" title={t('Zrušit pozvánku?')} subtitle={zrusit.email}
           footer={<>
-            <Button variant="secondary" onClick={() => setZrusit(null)} disabled={rusim}>Nechat</Button>
-            <Button variant="danger-solid" loading={rusim} onClick={potvrdZruseni}>Zrušit pozvánku</Button>
+            <Button variant="secondary" onClick={() => setZrusit(null)} disabled={rusim}>{t('Nechat')}</Button>
+            <Button variant="danger-solid" loading={rusim} onClick={potvrdZruseni}>{t('Zrušit pozvánku')}</Button>
           </>}>
-          <p className="text-sm text-black/70 text-pretty">Odkaz z pozvánky přestane platit. Kód pro připojení platí dál.</p>
+          <p className="text-sm text-black/70 text-pretty">{t('Odkaz z pozvánky přestane platit. Kód pro připojení platí dál.')}</p>
         </Modal>
       )}
 

@@ -18,6 +18,7 @@ import { Icon } from '../Icons';
 import { useResultKeys } from '@/lib/useResultKeys';
 import { okJson } from '@/lib/api';
 import { obsahujeNekde } from '@/lib/hledani';
+import { useT } from '@/lib/i18n/client';
 
 type Polozka = { id: number; name: string; unit?: string; category?: string | null; madeInHouse?: boolean };
 
@@ -27,6 +28,7 @@ export default function GuideItemLink({ itemId, items, onPick }: {
   items: Polozka[];
   onPick: (id: number | null) => void;
 }) {
+  const t = useT('navody');
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const vstup = useRef<HTMLInputElement>(null);
@@ -50,37 +52,37 @@ export default function GuideItemLink({ itemId, items, onPick }: {
 
   return (
     <div role="group" aria-labelledby={popisek}>
-      <p id={popisek} className="field-label">Vyrábíme podle něj (volitelné)</p>
+      <p id={popisek} className="field-label">{t('Vyrábíme podle něj (volitelné)')}</p>
       {itemId != null ? (
         <div className="space-y-1.5">
           <div className="well flex items-center gap-2 px-4 py-2.5">
             <Icon name="leaf" size={15} className="shrink-0 text-black/45" />
             <span className="min-w-0 flex-1 truncate text-sm text-[#16181A]">
-              {vybrana?.name ?? `Položka #${itemId}`}
+              {vybrana?.name ?? t('Položka #{id}', { id: itemId })}
             </span>
             <button type="button" onClick={() => { onPick(null); setOpen(false); }}
-              title="Zrušit vazbu" aria-label="Zrušit vazbu na skladovou položku"
+              title={t('Zrušit vazbu')} aria-label={t('Zrušit vazbu na skladovou položku')}
               className="shrink-0 btn-icon btn-icon-danger transition">
               <Icon name="close" size={13} />
             </button>
           </div>
           <p className="t-meta">
             {uzSeNevyrabi
-              ? 'Tahle položka už nemá zapnuté „vyrábíme sami“ — úkol na výrobu proto nevzniká.'
-              : 'Až bude docházet, směna dostane úkol s kroky z tohohle návodu.'}
+              ? t('Tahle položka už nemá zapnuté „vyrábíme sami“ — úkol na výrobu proto nevzniká.')
+              : t('Až bude docházet, směna dostane úkol s kroky z tohohle návodu.')}
           </p>
         </div>
       ) : open ? (
         <div className="well p-3 space-y-2">
           <input ref={vstup} autoFocus value={query} onChange={e => setQuery(e.target.value)}
             onKeyDown={keys.onInputKeyDown}
-            placeholder="Hledat mezi vlastní výrobou…"
+            placeholder={t('Hledat mezi vlastní výrobou…')}
             className="field w-full" />
           {nalezene.length === 0 && (
             <p className="t-meta">
               {vyrabene.length === 0
-                ? 'Žádná položka nemá zapnuté „vyrábíme sami“ — zapni to v detailu položky ve Skladu.'
-                : 'Nic takového mezi vlastní výrobou není.'}
+                ? t('Žádná položka nemá zapnuté „vyrábíme sami“ — zapni to v detailu položky ve Skladu.')
+                : t('Nic takového mezi vlastní výrobou není.')}
             </p>
           )}
           {nalezene.length > 0 && (
@@ -99,12 +101,12 @@ export default function GuideItemLink({ itemId, items, onPick }: {
             </div>
           )}
           <button type="button" onClick={() => setOpen(false)}
-            className="btn btn-ghost btn-sm">Zrušit</button>
+            className="btn btn-ghost btn-sm">{t('Zrušit')}</button>
         </div>
       ) : (
         <button type="button" onClick={() => setOpen(true)}
           className="btn btn-secondary btn-sm">
-          <Icon name="plus" size={15} /> Připojit ke skladové položce
+          <Icon name="plus" size={15} />  {t('Připojit ke skladové položce')}
         </button>
       )}
     </div>

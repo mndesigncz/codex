@@ -15,7 +15,11 @@
       "api": "strojový",
       "zamestnanec": "strojový",
       "kiosk": "strojový",
-      "chat": "strojový"
+      "chat": "strojový",
+      "sprava": "strojový",
+      "tym": "strojový",
+      "navody": "strojový",
+      "postupy": "strojový"
     },
     "de": {
       "common": "strojový",
@@ -24,7 +28,11 @@
       "api": "strojový",
       "zamestnanec": "strojový",
       "kiosk": "strojový",
-      "chat": "strojový"
+      "chat": "strojový",
+      "sprava": "strojový",
+      "tym": "strojový",
+      "navody": "strojový",
+      "postupy": "strojový"
     },
     "sk": {
       "common": "strojový",
@@ -33,7 +41,11 @@
       "api": "strojový",
       "zamestnanec": "strojový",
       "kiosk": "strojový",
-      "chat": "strojový"
+      "chat": "strojový",
+      "sprava": "strojový",
+      "tym": "strojový",
+      "navody": "strojový",
+      "postupy": "strojový"
     },
     "pl": {
       "common": "strojový",
@@ -42,7 +54,11 @@
       "api": "strojový",
       "zamestnanec": "strojový",
       "kiosk": "strojový",
-      "chat": "strojový"
+      "chat": "strojový",
+      "sprava": "strojový",
+      "tym": "strojový",
+      "navody": "strojový",
+      "postupy": "strojový"
     }
   },
   "nepreklada_se": [

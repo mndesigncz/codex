@@ -13,6 +13,6 @@ export default async function EmployeeLayout({ children }: { children: React.Rea
   const role = (session.user as any)?.role;
   if (role === 'employer') redirect('/employer/overview');
 
-  // Slovníky zaměstnanecké části jdou v prvním HTML, ať se v cizím jazyce nic nepřekreslí česky.
-  return <><Slovniky sekce={['zamestnanec', 'chat']} />{children}</>;
+  // Zaměstnanecké obrazovky plus návody, postupy a společné součásti správy: slovníky jdou v prvním HTML, ať se v cizím jazyce nic nepřekreslí česky.
+  return <><Slovniky sekce={['zamestnanec', 'chat', 'sprava', 'tym', 'navody', 'postupy']} />{children}</>;
 }

@@ -27,6 +27,7 @@ import PodnikSwitcher from '../PodnikSwitcher';
 import { Button } from '../ui';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { useHlavickaPrehledu } from '../useHlavickaPrehledu';
+import { useT } from '@/lib/i18n/client';
 
 export default function ToGoMode({ user, onExit, onOpenView }: {
   user: { name?: string };
@@ -39,6 +40,7 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
    */
   smiPohled?: (view: string) => boolean;
 }) {
+  const t = useT('sprava');
   const { title, subtitle } = useHlavickaPrehledu(user?.name);
 
   return (
@@ -46,9 +48,9 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
       {/* Chrom aplikace: značka, přepínač podniku (jen s víc podniky) a cesta do administrace. */}
       <div className="max-w-lg mx-auto w-full px-4 pt-[max(env(safe-area-inset-top),12px)] flex items-center gap-3">
         <LogoMark size={34} />
-        <span className="t-card flex-1 min-w-0 truncate">Managero</span>
+        <span className="t-card flex-1 min-w-0 truncate">{t('Managero')}</span>
         <PodnikSwitcher compact jenPrepinani onOverview={() => onOpenView('org')} />
-        <Button variant="secondary" size="sm" icon="swap" onClick={onExit}>Administrace</Button>
+        <Button variant="secondary" size="sm" icon="swap" onClick={onExit}>{t('Administrace')}</Button>
       </div>
       <div className="max-w-lg mx-auto w-full">
         <PlochaWidgetu stranka="vedeni.togo" hlavicka={{ title, subtitle: `TO GO · ${subtitle}` }} />
