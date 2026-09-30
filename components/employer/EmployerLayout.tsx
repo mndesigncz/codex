@@ -21,6 +21,7 @@ import ReceiptsPanel from './ReceiptsPanel';
 import MobileMoreSheet from '../MobileMoreSheet';
 import { ProfileLinkProvider } from './ProfileLinkProvider';
 import { usePlan, MaxGate } from '../Pro';
+import { useObal } from '../ObalProvider';
 import { TRIAL_DAYS } from '@/lib/plan';
 import { textZkousky } from '@/lib/predplatneTexty';
 import { useModal } from '@/lib/useModal';
@@ -136,7 +137,10 @@ interface Props {
 }
 
 export default function EmployerLayout({ user }: Props) {
-  const { plan } = usePlan();
+  const { plan: planPodniku } = usePlan();
+  // V obalu žádné bannery o tarifu, zkoušce a platbě (Apple 3.1.1): plán se tváří jako neznámý.
+  const { smiPlatby } = useObal();
+  const plan = smiPlatby ? planPodniku : null;
   const { ma, role, opravneni, nacteno } = useOpravneni();
   const smiPohled = (id: string) => { const k = KLICE_POHLEDU[id]; return k == null || ma(k); };
   const [currentView, setCurrentViewRaw] = useState('overview');

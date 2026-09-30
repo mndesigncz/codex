@@ -17,6 +17,7 @@ import { MAX_INSTANCI } from '@/lib/widgety/konstanty';
 import { obsahujeNekde } from '@/lib/hledani';
 import { Nahled } from '../Nahled';
 import { useNavigace } from '../NavigaceKontext';
+import { useObal } from '../../ObalProvider';
 
 const VELIKOST_SLOVNE: Record<Velikost, string> = { S: 'Malý', M: 'Střední', L: 'Velký' };
 
@@ -36,6 +37,7 @@ export default function GalerieWidgetu({ stranka, nabidka, tarifem, polozky, sch
   onZavrit: () => void;
 }) {
   const nav = useNavigace();
+  const { smiPlatby } = useObal();
   const [dotaz, setDotaz] = useState('');
   const [vybrany, setVybrany] = useState<DefiniceWidgetu | null>(null);
   const [velikost, setVelikost] = useState<Velikost>('M');
@@ -62,9 +64,10 @@ export default function GalerieWidgetu({ stranka, nabidka, tarifem, polozky, sch
       if (widgety.length) out.push({ id: o.id, nazev: o.nazev, widgety });
     }
     const sTarifem = tarifem.map(t => najdiWidget(t.widget)).filter((w): w is DefiniceWidgetu => !!w && sedi(w));
-    if (sTarifem.length) out.push({ id: 'tarif', nazev: 'S tarifem Pro nebo Max', widgety: sTarifem, tarifem: true });
+    // V obalu se widgety „s tarifem“ nenabízejí vůbec: výzva k tarifům je výzva k nákupu.
+    if (sTarifem.length && smiPlatby) out.push({ id: 'tarif', nazev: 'S tarifem Pro nebo Max', widgety: sTarifem, tarifem: true });
     return out;
-  }, [nabidka, tarifem, stranka, dotaz]);
+  }, [nabidka, tarifem, stranka, dotaz, smiPlatby]);
 
   const otevrit = (w: DefiniceWidgetu) => {
     setVybrany(w);

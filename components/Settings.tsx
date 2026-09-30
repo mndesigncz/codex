@@ -11,6 +11,8 @@ import { useObal } from './ObalProvider';
 import { jeNativni, stavNativnihoPushe, zapniNativniPush } from '@/lib/nativniMost';
 import SmazatUcet from './ucet/SmazatUcet';
 import PravniOdkazy from './pravni/PravniOdkazy';
+import NahlasenyObsah from './moderace/NahlasenyObsah';
+import Zablokovani from './moderace/Zablokovani';
 import TeamManagement from './TeamManagement';
 import { dbTimeDayHM } from '@/lib/pragueTime';
 import { czCount } from '@/lib/czech';
@@ -28,7 +30,7 @@ const RoleEditor = dynamic(() => import('./role/RoleEditor'), { loading: () => <
 // Výchozí rozložení stránek (kolo 68) nese plochu s editorem úprav — taky až na otevření.
 const VychoziRozlozeni = dynamic(() => import('./widgety/VychoziRozlozeni'), { loading: () => <Skeleton className="h-48 rounded-3xl" /> });
 
-type SectionId = 'account' | 'app' | 'notifications' | 'security' | 'team' | 'billing' | 'audit' | 'pos' | 'roles' | 'stranky';
+type SectionId = 'account' | 'app' | 'notifications' | 'security' | 'team' | 'billing' | 'audit' | 'pos' | 'roles' | 'stranky' | 'nahlaseni';
 
 interface Props {
   user: { id: number; name: string; role: string; avatar?: string };
@@ -123,6 +125,8 @@ export default function Settings({ user, initialTab, tabNonce }: Props) {
     ...(isEmployer && ma(['tym.role_spravovat', 'tym.role_prirazovat']) ? [{ id: 'roles' as SectionId, label: 'Role a oprávnění', icon: 'lock', desc: 'Kdo co v podniku smí' }] : []),
     // Výchozí plocha pro typ role nebo roli a zámky (spec §3.8); tablet stačí spravovat.
     ...(isEmployer && ma(['podnik.nastaveni', 'kiosk.spravovat']) ? [{ id: 'stranky' as SectionId, label: 'Stránky', icon: 'overview', desc: 'Výchozí plocha a zámky' }] : []),
+    // Moderace uživatelského obsahu (Apple 1.2): nahlášené zprávy a nápady vidí, kdo smí odebírat členy.
+    ...(ma('tym.odebrat') ? [{ id: 'nahlaseni' as SectionId, label: 'Nahlášený obsah', icon: 'warning', desc: 'Zprávy a nápady nahlášené týmem' }] : []),
     ...(isEmployer && ma('audit.zobrazit') ? [{ id: 'audit' as SectionId, label: 'Historie změn', icon: 'clock', desc: 'Kdo co kdy změnil' }] : []),
   ];
   // Záložka, na kterou role nemá, se nevykreslí, ani když na ni vede odkaz
@@ -691,8 +695,11 @@ export default function Settings({ user, initialTab, tabNonce }: Props) {
                 <Button type="submit" variant="accent" block loading={savingPwd}>Změnit heslo</Button>
               </div>
             </form>
+            <Zablokovani />
             <SmazatUcet jeHost={false} />
             </div>
+          ) : section === 'nahlaseni' ? (
+            <NahlasenyObsah />
           ) : section === 'billing' && smiPlatby ? (
             <Billing />
           ) : section === 'pos' ? (

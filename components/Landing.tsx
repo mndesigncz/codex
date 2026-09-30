@@ -12,6 +12,7 @@ import ForceLight from './landing/ForceLight';
 import LandingHeader from './landing/LandingHeader';
 import Naklon from './landing/Naklon';
 import Stena from './landing/Stena';
+import PravniOdkazy from './pravni/PravniOdkazy';
 import type { FotoId } from './landing/foto';
 
 // Prodejní stránka pro nepřihlášené — co Managero je, co umí a co stojí.
@@ -490,7 +491,8 @@ export default function Landing() {
           {/* Poctivost i tady: fotky nejsou snímky konkrétních zákazníků
               a stránka to nikde netvrdí. Napsat to je levnější než se toho
               jednou doprošovat. */}
-          <p className="mt-10 pt-6 border-t border-black/[0.06] text-xs text-black/40 max-w-2xl text-pretty">
+          <PravniOdkazy className="mt-8 text-sm text-black/55" />
+          <p className="mt-6 pt-6 border-t border-black/[0.06] text-xs text-black/40 max-w-2xl text-pretty">
             Fotografie na této stránce jsou ilustrační a nezobrazují konkrétní podniky ani
             zákazníky. Obrazovky aplikace jsou skutečné.
           </p>

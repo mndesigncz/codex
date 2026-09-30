@@ -25,3 +25,16 @@ export function jeZtlumeno(prefs: Record<string, unknown> | null | undefined, ca
   const v = (prefs ?? {})[CATEGORY_PREF[category]];
   return OPT_IN.has(category) ? v !== true : v === false;
 }
+
+/**
+ * Text nativního pushe pro oznámení o předplatném a platbě: bez ceny, bez odkazu
+ * a bez výzvy k zaplacení (Apple 3.1.1, Google Play Billing). Podstatu oznámení
+ * vedení najde na webu; aplikace jen řekne, že něco vyžaduje pozornost.
+ */
+export function neutralniProNativni<T extends { title: string; body?: string; link?: string; tag?: string }>(
+  payload: T,
+  typ?: string,
+): T {
+  if (typ !== 'billing') return payload;
+  return { ...payload, title: 'Upozornění k účtu podniku', body: 'Vedení podniku ho může vyřídit mimo aplikaci.', link: undefined };
+}

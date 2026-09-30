@@ -15,6 +15,7 @@ import CashClosing from '../employee/CashClosing';
 import { UDALOST_CTENI_ZA } from '../employee/ZamekUzaverky';
 import MessengerDock from '../chat/MessengerDock';
 import { usePlan, ProBadge } from '../Pro';
+import { useObal } from '../ObalProvider';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { NavigaceKontext, useHodnotaNavigace } from '../widgety/NavigaceKontext';
 import { otevriPostupPoPrechodu } from '@/lib/otevriPostup';
@@ -62,6 +63,7 @@ interface KioskUser { id?: string | number; name: string; role: string; avatar?:
 export default function KioskApp({ user }: { user: KioskUser }) {
   // The shared tablet is a Pro feature. The gate explains instead of erroring.
   const { pro, loaded } = usePlan();
+  const { smiPlatby } = useObal();
   if (loaded && !pro) {
     return (
       <div className="min-h-[100dvh] flex items-center justify-center p-6">
@@ -71,7 +73,7 @@ export default function KioskApp({ user }: { user: KioskUser }) {
             <h1 className="text-xl font-bold tracking-tight text-[#16181A]">Kiosk režim</h1>
             <ProBadge />
           </div>
-          <p className="text-sm text-black/55">Sdílený tablet na prodejně — docházka, úkoly, sklad a uzávěrky pro celý tým — patří do plánu Pro. Zapíná se v Nastavení → Předplatné v účtu vedení.</p>
+          <p className="text-sm text-black/55">Sdílený tablet na prodejně — docházka, úkoly, sklad a uzávěrky pro celý tým — {smiPlatby ? 'patří do plánu Pro. Zapíná se v Nastavení → Předplatné v účtu vedení.' : 'tarif vašeho podniku nezahrnuje.'}</p>
         </div>
       </div>
     );

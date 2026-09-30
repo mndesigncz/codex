@@ -1,6 +1,6 @@
 import webpush from 'web-push';
 import { neon } from '@neondatabase/serverless';
-import { jeZtlumeno, type NotifCategory } from './pushPravidla';
+import { jeZtlumeno, neutralniProNativni, type NotifCategory } from './pushPravidla';
 import { poslatNativne } from './nativniPush';
 
 export type { NotifCategory };
@@ -80,7 +80,9 @@ async function poslatWebPush(sql: any, userId: number, payload: PushPayload) {
 }
 
 /** Nativní push (APNs / FCM) na zařízení v obalu. Bez klíčů nebo před migrací je to no-op. */
-async function poslatNativniPush(sql: any, userId: number, payload: PushPayload) {
+async function poslatNativniPush(sql: any, userId: number, zdroj: PushPayload, typ?: string) {
+  // Oznámení o platbě se do obalu posílá neutrálně (bez výzvy, bez odkazu do pokladny).
+  const payload = neutralniProNativni(zdroj, typ);
   let zarizeni: any[] = [];
   try {
     zarizeni = await sql`SELECT token, app, platform, env FROM device_tokens WHERE user_id = ${userId}`;
@@ -121,7 +123,7 @@ export async function notifyUser(userId: number, payload: PushPayload & { type?:
 
   await Promise.all([
     poslatWebPush(sql, userId, payload).catch(e => console.error('web push selhal', e)),
-    poslatNativniPush(sql, userId, payload).catch(e => console.error('nativní push selhal', e)),
+    poslatNativniPush(sql, userId, payload, payload.type).catch(e => console.error('nativní push selhal', e)),
   ]);
 }
 
