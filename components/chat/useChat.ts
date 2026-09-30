@@ -2,6 +2,16 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { pragueToday, pragueDaySafe } from '@/lib/pragueTime';
+import { useT, type PrekladFn } from '@/lib/i18n/client';
+import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
+
+/**
+ * Překladač sekce `chat`. Pomocné funkce níž (čas, nahrávání) dostávají `t` od komponenty,
+ * ale sekci jim tady dává tenhle hook: bez něj by kontrola slovníků nevěděla, kam jejich věty patří.
+ */
+export function useChatT(): PrekladFn {
+  return useT('chat');
+}
 
 export interface ChatUser {
   id: number;
@@ -109,9 +119,12 @@ export async function markRead(conversationId: number): Promise<void> {
 
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
+/** Text, který server ukládá jako náhled zprávy s přílohou (data z API, ne věta uživatelského rozhraní). */
+export const TEXT_PRILOHA = 'Příloha'; // i18n-ok: hodnota z API
+
 /** Úspěch vrátí soubor, neúspěch důvod — server říká proč (typ, velikost),
  *  a „nezdařilo se" bez důvodu člověka nechá zkoušet totéž pořád dokola. */
-export async function uploadFile(file: File): Promise<UploadResult | { error: string }> {
+export async function uploadFile(file: File, t: PrekladFn): Promise<UploadResult | { error: string }> {
   const { compressImage } = await import('@/lib/clientImage');
   const prepared = await compressImage(file);
   const form = new FormData();
@@ -119,9 +132,9 @@ export async function uploadFile(file: File): Promise<UploadResult | { error: st
   // Stejný důvod jako u `sendMessage`: offline `fetch` vyhodí výjimku,
   // kterou volající nečeká, a nahrávání pak zůstane viset na „Nahrávám…".
   const res = await fetch('/api/upload', { method: 'POST', body: form }).catch(() => null);
-  if (!res) return { error: 'Nahrání se nezdařilo — zkontroluj připojení.' };
+  if (!res) return { error: t('Nahrání se nezdařilo — zkontroluj připojení.') };
   const d = await res.json().catch(() => null);
-  if (!res.ok || !d?.url) return { error: typeof d?.error === 'string' ? d.error : 'Nahrání souboru se nezdařilo.' };
+  if (!res.ok || !d?.url) return { error: typeof d?.error === 'string' ? d.error : t('Nahrání souboru se nezdařilo.') };
   return d as UploadResult;
 }
 
@@ -133,24 +146,24 @@ export async function uploadFile(file: File): Promise<UploadResult | { error: st
  * oddělovač „Včera" — dvě různé odpovědi na tutéž otázku v jedné obrazovce.
  * Zbytek aplikace kvůli tomu má `lib/pragueTime`; chat na něj byl zapomenutý.
  */
-export function formatTime(iso: string | null): string {
+export function formatTime(iso: string | null, t: PrekladFn): string {
   if (!iso) return '';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
   const key = pragueDaySafe(d);
   if (key === pragueToday()) {
-    return d.toLocaleTimeString('cs-CZ', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleTimeString(LOCALE_PRO_JAZYK[t.jazyk], { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit' });
   }
-  if (key === pragueToday(-1)) return 'Včera';
-  return d.toLocaleDateString('cs-CZ', { timeZone: 'Europe/Prague', day: 'numeric', month: 'numeric' });
+  if (key === pragueToday(-1)) return t('Včera');
+  return d.toLocaleDateString(LOCALE_PRO_JAZYK[t.jazyk], { timeZone: 'Europe/Prague', day: 'numeric', month: 'numeric' });
 }
 
 /** Jen hodina a minuta, pražsky. Ve vlákně s oddělovači dnů den říká čára. */
-export function formatClock(iso: string | null): string {
+export function formatClock(iso: string | null, t: PrekladFn): string {
   if (!iso) return '';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleTimeString('cs-CZ', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleTimeString(LOCALE_PRO_JAZYK[t.jazyk], { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit' });
 }
 
 /** Den zprávy jako klíč — pro oddělovače ve vlákně. Pražský, jako všude. */
@@ -159,14 +172,14 @@ export function dayKey(iso: string): string {
 }
 
 /** „Dnes" / „Včera" / „pondělí 14. 4." — hlavička dne ve vlákně. */
-export function dayLabel(iso: string): string {
+export function dayLabel(iso: string, t: PrekladFn): string {
   const key = dayKey(iso);
-  if (key === pragueToday()) return 'Dnes';
-  if (key === pragueToday(-1)) return 'Včera';
+  if (key === pragueToday()) return t('Dnes');
+  if (key === pragueToday(-1)) return t('Včera');
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
   const sameYear = key.slice(0, 4) === pragueToday().slice(0, 4);
-  return d.toLocaleDateString('cs-CZ', {
+  return d.toLocaleDateString(LOCALE_PRO_JAZYK[t.jazyk], {
     timeZone: 'Europe/Prague',
     weekday: 'long', day: 'numeric', month: 'numeric',
     ...(sameYear ? {} : { year: 'numeric' }),
