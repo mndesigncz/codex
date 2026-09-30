@@ -30,6 +30,8 @@ end
 
 platform :ios do
   before_all do
+    # Zástupná pole ({{PRAVNI_SUBJEKT}}, {{TEAM_ID}}) nesmí do obchodu: kontrola listingu ve vydávacím režimu.
+    sh('node', File.expand_path('scripts/kontrola-listingu.mjs', __dir__ + '/..'), '--release')
     app_store_connect_api_key(
       key_id:       ENV.fetch('ASC_KEY_ID'),
       issuer_id:    ENV.fetch('ASC_ISSUER_ID'),

@@ -19,7 +19,7 @@ const config: CapacitorConfig = {
   server: {
     url: app.vstupniUrl,
     cleartext: false,
-    allowNavigation: [spolecne.domena],
+    allowNavigation: [spolecne.domena, "managero.app"],
     errorPath: 'offline.html',
   },
   ios: {

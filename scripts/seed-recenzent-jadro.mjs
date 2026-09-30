@@ -86,6 +86,12 @@ export function kontrolaDatabaze({ url, argv = [] }) {
     throw new Error(`Skript zapisuje do databáze ${host}. Potvrď to: --db=${host}. Nespouštěj ho proti produkci, demo data patří do zkušební databáze.`);
   }
   if (potvrzeno !== host) throw new Error(`--db=${potvrzeno} neodpovídá hostiteli v DATABASE_URL (${host}).`);
+  // Produkce jen vědomě: recenzent obchodu se přihlašuje do produkční aplikace, takže demo podnik tam být MUSÍ,
+  // ale ať na to nikdo nenarazí omylem. Hostitele produkce lze pojmenovat v PRODUKCNI_DB_HOST.
+  const jeProdukce = process.env.VERCEL_ENV === 'production' || (process.env.PRODUKCNI_DB_HOST && process.env.PRODUKCNI_DB_HOST === host);
+  if (jeProdukce && arg(argv, 'produkce') !== 'ANO-ZALOZIT-DEMO') {
+    throw new Error(`${host} je produkční databáze. Demo podnik pro recenzenty tam založ jen vědomě: přidej --produkce=ANO-ZALOZIT-DEMO.`);
+  }
   return host;
 }
 

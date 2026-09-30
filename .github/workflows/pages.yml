@@ -103,6 +103,16 @@ jobs:
       # popisu pásma ukáže klient směnu o hodiny jinde.
       - name: Kalendář
         run: node scripts/check-ics.mjs
+      # Obchody: smazání účtu (Apple 5.1.1(v), Google Play), detekce obalu,
+      # ověření domény pro universal links a podklady listingu.
+      - name: Smazání účtu
+        run: node scripts/check-smazani.mjs
+      - name: Nativní obal
+        run: node scripts/check-obal.mjs
+      - name: Universal links (struktura)
+        run: node scripts/check-well-known.mjs
+      - name: Podklady obchodů
+        run: node apps/scripts/kontrola-listingu.mjs
       # `emails.send()` nevyhazuje výjimku — bez čtení `error` se odmítnutá
       # objednávka tváří jako odeslaná a vedoucí čeká na zboží.
       - name: Odesílání e-mailů

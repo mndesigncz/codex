@@ -93,7 +93,7 @@ Co `po-cap-add.mjs` doplní (nemusíš nic ručně v Info.plist):
 - `ITSAppUsesNonExemptEncryption = NO` (jen HTTPS z iOS, App Store Connect se pak u buildu neptá);
 - App Transport Security zapnuté bez výjimek;
 - **usage strings** česky a anglicky (`cs.lproj` a `en.lproj/InfoPlist.strings`): kamera, poloha při používání, Face ID,
-  a u Managero navíc mikrofon a fotky. Nic, co aplikace nepoužívá;
+  a u Managero navíc fotky. Nic, co aplikace nepoužívá;
 - `App.entitlements`: Push (`aps-environment`), Associated Domains `applinks:www.managero.app`, `webcredentials:www.managero.app`;
 - `PrivacyInfo.xcprivacy` (bez sledování, sbíraná data podle oddílu 7);
 - v Xcode projektu: soubory zařazené, `TARGETED_DEVICE_FAMILY` (client jen iPhone), iOS 15+, bez Mac Catalyst a Vision Pro, verze.
@@ -193,10 +193,10 @@ z prostředí při nahrání fastlanem; ručně je vyplníš v App Store Connect
 ano, uživatel a heslo, poznámky).
 
 Co musí existovat v datech (dělá se skriptem proti databázi, NE přes veřejný endpoint):
-- tým „Ukázková kavárna" s vlastníkem (manažer), zaměstnancem a kioskem, tarif nastavený ručně superadminem (aby recenzent
+- tým „Café Demo" s vlastníkem (manažer), zaměstnancem a kioskem, tarif nastavený ručně superadminem (aby recenzent
   viděl správu hostů), naplněný rozvrh, sklad, úkoly, chat;
-- hostovský podnik `ukazkova-kavarna`: zapnuté rezervace, objednávky a věrnost, `order_geo` vypnuto a QR nepovinné (recenzent není
-  v podniku), 2 až 3 stoly, menu, kampaň razítek, kupon, akce; **nezveřejněný v adresáři pro skutečné hosty**; host má členství
+- hostovský podnik `cafe-demo`: zapnuté rezervace, objednávky a věrnost, `order_geo` vypnuto a QR nepovinné (recenzent není
+  v podniku), 2 až 3 stoly, menu, kampaň razítek, kupon, akce; **v adresáři je vidět jako „Café Demo“ s popiskem „Ukázkový podnik“; po schválení obchodem ho vypni (client_profiles.enabled = false)**; host má členství
   (body, razítka, kupon, jedna rezervace);
 - tři účty s **různými e-maily** (employer, employee, customer), bez dvoufázového ověření. Hesla náhodná, po schválení změnit.
   Přihlašovací limit (10 pokusů na e-mail) recenzenta nezamkne, pokud heslo předem ověříš.

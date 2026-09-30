@@ -47,9 +47,6 @@ const POUZITI = {
     NSCameraUsageDescription: [
       'Kamera slouží k focení účtenek a skladových položek a ke skenování QR kódů věrnostních karet hostů.',
       "The camera is used to photograph receipts and stock items and to scan guests' loyalty card QR codes."],
-    NSMicrophoneUsageDescription: [
-      'Mikrofon se použije jen při natáčení videa nebo hlasové zprávy do chatu.',
-      'The microphone is used only when you record a video or voice message for chat.'],
     NSPhotoLibraryUsageDescription: [
       'Umožní vybrat fotku účtenky, položky nebo přílohu do chatu.',
       'Lets you choose a photo of a receipt, an item or a chat attachment.'],
@@ -75,7 +72,7 @@ const POUZITI = {
 
 // Kategorie pro PrivacyInfo.xcprivacy (shodné s tabulkou „App Privacy“ v docs/obchody/APPLE.md).
 const SBIRANA_DATA = {
-  managero: ['Name', 'EmailAddress', 'PhoneNumber', 'PhotosorVideos', 'AudioData', 'OtherUserContent', 'UserID', 'DeviceID', 'OtherFinancialInfo', 'PreciseLocation'],
+  managero: ['Name', 'EmailAddress', 'PhoneNumber', 'PhotosorVideos', 'OtherUserContent', 'UserID', 'DeviceID', 'OtherFinancialInfo', 'PreciseLocation'],
   client: ['Name', 'EmailAddress', 'PhoneNumber', 'OtherUserContent', 'UserID', 'DeviceID', 'PurchaseHistory', 'PreciseLocation'],
 }[KLIC];
 
@@ -302,6 +299,9 @@ ${cesty}
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Poloha jen v popředí: ověření polohy u stolu (client) a souřadnice podniku (Managero). -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 ${jeKlient
     ? `    <!-- Client skenuje QR přes Google Code Scanner, ten oprávnění ke kameře nepotřebuje. -->
     <uses-permission android:name="android.permission.CAMERA" tools:node="remove" />

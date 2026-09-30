@@ -29,7 +29,7 @@
       "kategorieApple": ["BUSINESS", "PRODUCTIVITY"],
       "kategoriePlay": "BUSINESS",
       "pushAplikace": "provoz",
-      "opravneni": { "kamera": true, "faceId": true, "mikrofon": true, "poloha": true, "fotky": true },
+      "opravneni": { "kamera": true, "faceId": true, "mikrofon": false, "poloha": true, "fotky": true },
       "barvy": {
         "pozadiIkony": "#C8F542",
         "splashSvetly": "#F3F4F0",

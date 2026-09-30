@@ -36,6 +36,8 @@ async function main() {
   const host = kontrolaDatabaze({ url, argv });
   const { hesla, vygenerovana } = nactiHesla({ argv, env: process.env, nahodne });
   const domena = (argv.find(a => a.startsWith('--domena=')) ?? '').slice(9) || VYCHOZI_DOMENA;
+  // Jen nedoručitelná doména: seed přepisuje heslo existujícího účtu se stejným e-mailem.
+  if (!/\.invalid$/.test(domena)) throw new Error('--domena musí končit na .invalid (demo účty nesmí mít skutečnou schránku).');
   const sql = neon(url);
 
   // Upsert podle přirozeného klíče: najít, jinak vložit. Objekty (jsonb) se posílají jako JSON s přetypováním.

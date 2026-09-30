@@ -6,12 +6,12 @@ Use the demo account in the Demo Account fields (guest role, pre-verified, no 2F
 Do not use a manager account of the other app here: this app will tell you that such an account belongs to the business app.
 
 DEMO VENUE
-"Ukázková kavárna" is a fictional demo venue. It is not listed in the public directory. On the first tab ("Podniky") tap "Zadat kód podniku" and enter:  ukazkova-kavarna
+"Café Demo" is a fictional demo venue. It appears in the venue list on the first tab ("Podniky") with the tagline "Ukázkový podnik pro vyzkoušení aplikace"; if it is not visible, tap "Zadat kód podniku" and enter: cafe-demo
 The demo account is already a member of the venue with points, stamps and one coupon.
 
 STEP BY STEP
 1. Karta tab: your QR code and 8-digit code, points, stamps, coupons per venue. The card also opens in airplane mode (cached).
-2. Open "Ukázková kavárna" > Rezervace: choose a day, time and number of guests, send. The status becomes "Čeká na potvrzení". A manager confirms it in the business app and the guest gets a push notification (needs a real device).
+2. Open "Café Demo" > Rezervace: choose a day, time and number of guests, send. The status becomes "Čeká na potvrzení". A manager confirms it in the business app and the guest gets a push notification (needs a real device).
 3. Open the venue > Objednat: the demo venue has the location and QR checks switched off, so you can order from anywhere. Add items and send. Payment is made with the staff after the meal; nothing is paid in the app.
 4. Věrnost: stamp campaigns and coupons. Stamps and points are added by staff at the till when they scan the guest QR code; guests cannot add them to themselves.
 5. Profil: notification switches, Zásady soukromí, Podmínky, Podpora, Odhlásit se and "Smazat účet" (account deletion inside the app).

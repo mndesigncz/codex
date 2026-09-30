@@ -5,7 +5,7 @@ HOW TO SIGN IN
 Demo credentials are in the Demo Account fields (manager role, sees everything). A second, employee-role account:
   e-mail:   {{REVIEW_MANAGERO_EMPLOYEE_USER}}
   password: {{REVIEW_MANAGERO_EMPLOYEE_PASSWORD}}
-Both accounts are pre-verified, have no 2FA and belong to a fictional venue "Ukázková kavárna". The data is reset before every submission.
+Both accounts are pre-verified, have no 2FA and belong to a fictional venue "Café Demo". The data is reset before every submission.
 There is no public sign-up for guests. Employees join a venue with an invitation code from their manager.
 
 WHERE TO FIND THINGS (manager account)

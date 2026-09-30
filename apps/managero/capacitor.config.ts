@@ -30,7 +30,7 @@ const config: CapacitorConfig = {
     url: app.vstupniUrl,
     cleartext: false,
     // Všechno mimo naši doménu (odkazy na dodavatele, mapy) se otevře v systému.
-    allowNavigation: [spolecne.domena],
+    allowNavigation: [spolecne.domena, "managero.app"],
     // Když se web při studeném startu nenačte, ukáže se www/offline.html místo bílé stránky.
     errorPath: 'offline.html',
   },
