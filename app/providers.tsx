@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import { SessionProvider as NextAuthSessionProvider } from 'next-auth/react';
 import PushManager from '@/components/PushManager';
 import ServiceWorker from '@/components/ServiceWorker';
-import NativeBridge from '@/components/NativeBridge';
+import NativeBridgeLoader from '@/components/NativeBridgeLoader';
 import UlozeniHlaska from '@/components/UlozeniHlaska';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { ProcedureProvider } from '@/components/procedures/ProcedureProvider';
@@ -22,7 +22,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         <ProcedureProvider>
           {!demo && <ServiceWorker />}
           {!demo && <PushManager />}
-          {!demo && <NativeBridge />}
+          {/* Nativní obal (ManageroApp/, ManageroClient/): push, sken, sdílení. Na webu se nic nestáhne. */}
+          {!demo && <NativeBridgeLoader />}
           <UlozeniHlaska />
           {children}
           <FloatingRunner />

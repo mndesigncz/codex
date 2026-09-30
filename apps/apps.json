@@ -1,0 +1,61 @@
+{
+  "_poznamka": "JEDINÝ zdroj pravdy o obou aplikacích pro iOS i Android. Čtou ho capacitor.config.ts, apps/scripts/*.mjs, fastlane a dokumentace. Identifikátory (bundle ID, applicationId) jsou po prvním nahrání do obchodu NEZMĚNITELNÉ. Rozhodnutí: app.managero.app a app.managero.client (označení 'provoz' z plan-app-host.md se v ID nepoužije), doména https://www.managero.app (apex managero.app jen přesměrovává na www, takže universal links a App Links musí mířit na www).",
+  "domena": "www.managero.app",
+  "origin": "https://www.managero.app",
+  "verze": "1.0.0",
+  "build": 1,
+  "android": {
+    "minSdk": 24,
+    "compileSdk": 36,
+    "targetSdk": 36,
+    "_sha256": "SHA-256 otisky podpisových certifikátů se doplní po prvním nahrání AAB (Play Console, App integrity) a generují se z nich assetlinks.json",
+    "sha256": { "managero": [], "client": [] }
+  },
+  "ios": {
+    "minVersion": "15.0"
+  },
+  "apps": {
+    "managero": {
+      "nazev": "Managero",
+      "popis": "Provozní aplikace pro vedení a zaměstnance kaváren, barů a restaurací",
+      "bundleId": "app.managero.app",
+      "applicationId": "app.managero.app",
+      "uaToken": "ManageroApp",
+      "vstupniUrl": "https://www.managero.app/employer/overview",
+      "vstupniCesta": "/employer/overview",
+      "urlSchema": "managero",
+      "linkCesty": ["/employer", "/employee", "/kiosk", "/join"],
+      "zarizeni": ["iphone", "ipad"],
+      "kategorieApple": ["BUSINESS", "PRODUCTIVITY"],
+      "kategoriePlay": "BUSINESS",
+      "pushAplikace": "provoz",
+      "opravneni": { "kamera": true, "faceId": true, "mikrofon": true, "poloha": true, "fotky": true },
+      "barvy": {
+        "pozadiIkony": "#C8F542",
+        "splashSvetly": "#F3F4F0",
+        "splashTmavy": "#0C0D0F"
+      }
+    },
+    "client": {
+      "nazev": "Managero client",
+      "popis": "Aplikace pro hosty: věrnostní karta, rezervace a objednávky od stolu",
+      "bundleId": "app.managero.client",
+      "applicationId": "app.managero.client",
+      "uaToken": "ManageroClient",
+      "vstupniUrl": "https://www.managero.app/client",
+      "vstupniCesta": "/client",
+      "urlSchema": "manageroclient",
+      "linkCesty": ["/client"],
+      "zarizeni": ["iphone"],
+      "kategorieApple": ["FOOD_AND_DRINK", "LIFESTYLE"],
+      "kategoriePlay": "FOOD_AND_DRINK",
+      "pushAplikace": "klient",
+      "opravneni": { "kamera": true, "faceId": true, "mikrofon": false, "poloha": true, "fotky": false },
+      "barvy": {
+        "pozadiIkony": "#16181A",
+        "splashSvetly": "#F3F4F0",
+        "splashTmavy": "#F3F4F0"
+      }
+    }
+  }
+}

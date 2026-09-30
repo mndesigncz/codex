@@ -1,0 +1,5 @@
+# Výchozí volby pro `fastlane supply` (Google Play). Bez tajemství: klíč servisního účtu se čte z prostředí
+# (PLAY_JSON_KEY_PATH, soubor MIMO repo), název balíčku a cesty dodávají lane v Fastfile podle aplikace.
+json_key(ENV['PLAY_JSON_KEY_PATH']) if ENV['PLAY_JSON_KEY_PATH']
+track('internal')                 # nikdy rovnou produkce; vyšší track jen přes lane *_closed a potvrzení v konzoli
+release_status('draft')           # koncept: vydání vždy potvrdí člověk

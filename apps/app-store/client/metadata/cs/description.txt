@@ -1,0 +1,32 @@
+Managero client je aplikace pro hosty kaváren, restaurací, bister a čajoven, které používají Managero. Věrnostní karta, rezervace a objednávky od stolu na jednom místě.
+
+KARTA
+• Jeden QR kód pro všechny podniky. Ukážeš ho u kasy a obsluha ti připíše razítko, body nebo kredit.
+• Karta se zobrazí i bez připojení, což se hodí tam, kde je špatný signál.
+• V každém podniku vidíš svoje body, razítka, kredit a kupony.
+
+NAJDI PODNIK
+• Naskenuj QR kód na stole nebo na pultu, nebo podnik vyhledej podle názvu či ulice.
+• Nabídka, otevírací doba, akce a novinky podniku.
+
+REZERVACE
+• Vyber den, čas a počet osob, potvrzení dorazí oznámením.
+• Potvrzenou rezervaci přidáš do kalendáře.
+
+OBJEDNÁNÍ OD STOLU
+• Naskenuj QR kód stolu, vyber z nabídky a pošli objednávku obsluze. Platí se u obsluhy, v aplikaci se neplatí.
+• Stav objednávky sleduješ přímo v aplikaci.
+• Podnik může chtít potvrdit, že sedíš na místě. Poloha se použije jen ve chvíli objednání.
+
+VĚRNOST
+• Razítkové kampaně, body a úrovně členství.
+• Kupony a promo kódy podniků.
+• Pozvi kamaráda, oba dostanete body (pokud to podnik nabízí).
+
+OZNÁMENÍ
+Potvrzení rezervace a stav objednávky ti přijdou jako oznámení. Novinky a akce podniků pošleme jen tehdy, když to výslovně povolíš, a jde to kdykoli vypnout.
+
+SOUKROMÍ
+Účet můžeš kdykoli smazat přímo v aplikaci v části Profil.
+
+Aplikace funguje u podniků, které používají Managero. Nenašel jsi svůj podnik? Řekni jim o nás.

@@ -1,0 +1,23 @@
+Managero je provozní aplikace pro kavárny, bary a restaurace. Vedení i zaměstnanci mají všechno důležité na jednom místě: na telefonu, na tabletu za barem i na počítači.
+
+CO UMÍ
+• Směny a rozvrh: sestavení rozvrhu, dostupnost týmu, výměny směn, žádosti o volno a přehled „moje směny“.
+• Docházka: příchody a odchody, přehled odpracovaných hodin.
+• Úkoly a postupy: denní úkoly, checklisty otevření a zavření, návody krok za krokem.
+• Sklad: stav zásob, příjem, inventura, nákupní seznam a objednávky u dodavatelů.
+• Receptury a menu: náklady na porci, menu podniku.
+• Uzávěrka: denní uzávěrka směny s kontrolou povinných věcí.
+• Chat a oznámení: týmový chat, přímé zprávy, oznámení a hlasování.
+• Odměny a nápady: bodové odměny za práci navíc a tabule nápadů na zlepšení provozu.
+• Kiosk: sdílený tablet za barem, kde se zaměstnanci hlásí klepnutím na své jméno.
+• Upozornění na směny, zprávy a docházející zboží. Každý druh upozornění jde vypnout.
+
+PRO KOHO
+Pro majitele a manažery, kteří chtějí mít provoz pod kontrolou, i pro baristy a kuchaře, kteří chtějí vědět, kdy pracují a co mají dělat.
+
+POZNÁMKY
+• Aplikace je zatím dostupná v češtině.
+• K přihlášení je potřeba účet podniku nebo pozvánka od vedení. Účet lze smazat přímo v aplikaci.
+• Hosté podniků používají samostatnou aplikaci Managero client.
+
+Podpora: podpora@managero.app

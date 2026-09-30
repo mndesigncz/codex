@@ -71,6 +71,7 @@ export const ZELENE = [
   'mobil',
   'modal',
   'modal2',
+  'obal-most',
   'odeslani',
   'odeslani2',
   'offline',

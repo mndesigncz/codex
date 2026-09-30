@@ -1,0 +1,28 @@
+Managero je provozní aplikace pro kavárny, restaurace, bistra a čajovny. Směny, docházka, sklad, receptury, úkoly a uzávěrky jsou na jednom místě a v telefonu každého člena týmu.
+
+PRO VEDENÍ
+• Rozvrh: generátor navrhne směny podle dostupnosti, vedení je projde a zveřejní jedním klepnutím.
+• Docházka a výdělek: kdo je právě na směně, kolik hodin má kdo odpracováno, žádosti o volno a o výměnu směny.
+• Uzávěrka: pokladna po bankovkách a rozdíl, který se nezamlčí. Uzávěrka zůstane zamčená, dokud se nesplní povinné úkoly.
+• Sklad a receptury: co dochází, co dokoupit a marže spočítaná ze surovin. Objednávku dodavateli odešle aplikace e-mailem.
+• Úkoly a postupy: checklisty pro otevření a zavření, návody krok za krokem přímo na směně.
+• Tým, role a oprávnění: kdo nemá vidět mzdy, ten je nevidí. Vlastní role s výběrem funkcí.
+• Více podniků: každá pobočka má vlastní rozvrh, sklad a uzávěrky, vedení vidí všechny pohromadě.
+• Správa hostů: rezervace, objednávky od stolu, věrnostní program, kupony, akce a novinky pro hosty v aplikaci Managero client.
+
+PRO ZAMĚSTNANCE
+• Moje směny, dostupnost a žádosti o volno.
+• Odškrtávání úkolů a postupů na směně.
+• Chat podniku, oznámení a ankety.
+• Odměny a nápady na zlepšení provozu.
+
+TABLET U BARU
+Kioskový režim pro sdílený iPad: klepnutí na jméno místo hesla, příchod a odchod, úkoly směny a uzávěrka. Sdílené zařízení nemá komu vyzradit heslo.
+
+OZNÁMENÍ
+Nová směna, změna rozvrhu, dochází zásoba, zpráva v chatu. Každou kategorii oznámení lze v nastavení vypnout.
+
+ÚČET
+K přihlášení potřebuješ účet podniku. Vedení podnik založí a tým pozve kódem nebo e-mailem. Aplikace je určená pro vedení a zaměstnance podniků, ne pro hosty. Hosté mají vlastní aplikaci Managero client.
+
+Data patří podniku. Účet lze smazat přímo v aplikaci.

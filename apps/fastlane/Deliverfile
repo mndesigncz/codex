@@ -1,0 +1,8 @@
+# Výchozí volby pro `fastlane deliver` (App Store Connect). Bez tajemství. Aplikaci, cesty a poznámky pro
+# recenzenta dodávají lane v Fastfile (apps/fastlane/Fastfile: <app>_metadata, <app>_listing, <app>_submit).
+submit_for_review(false)          # odeslání na kontrolu jen lane *_submit
+automatic_release(false)          # po schválení vydá člověk (nebo fázovaně v ASC)
+force(true)                       # bez HTML náhledu (CI, dlouhé sezení)
+precheck_include_in_app_purchases(false)   # žádné IAP
+skip_binary_upload(true)          # binárku nahrává lane *_beta (TestFlight), ne deliver
+run_precheck_before_submit(true)
