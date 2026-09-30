@@ -83,6 +83,8 @@ export default function MyShifts({ user }: Props) {
   }, [urlSmen]);
 
   const dnes = pragueToday();
+  // V češtině malými písmeny uprostřed věty („po 28. 9.“); cizí jazyky zkratku dne nelowercasují.
+  const denVeVete = (d: string) => (jazyk === 'cs' ? denKratce(d).toLowerCase() : denKratce(d));
   const denKratce = (d: string) => (d === dnes ? t('Dnes') : d === dayPlus(dnes, 1) ? t('Zítra') : fmtDatum(d, { jazyk, styl: 'denKratce' }));
   const nadchazejici = useMemo(() => nadchazejiciSmeny(smeny.data ?? [], dnes), [smeny.data, dnes]);
   // Směny, které už v burze visí (nabídnuté nebo převzaté a čekají) — podruhé nabídnout nejdou.
@@ -113,7 +115,7 @@ export default function MyShifts({ user }: Props) {
       });
       await okJson(res);
       obnovDataWidgetu(URL_BURZA);
-      setHotovo(t('Směna {den} je v burze. Kolegové dostali upozornění.', { den: denKratce(den(nabidnout.date)).toLowerCase() }));
+      setHotovo(t('Směna {den} je v burze. Kolegové dostali upozornění.', { den: denVeVete(den(nabidnout.date)) }));
       setNabidnout(null); setPoznamka('');
     } catch (e) {
       setChyba(apiMessage(e, t('Směnu se nepodařilo nabídnout — zkus to znovu.')));
@@ -158,7 +160,7 @@ export default function MyShifts({ user }: Props) {
                     value={`${hm(s.startTime ?? s.start_time)}–${hm(s.endTime ?? s.end_time)}`}
                     right={nabidnuto ? <Chip tone="info" size="sm">{t('V burze')}</Chip> : d === dnes ? <Chip tone="ok" size="sm">{t('Dnes')}</Chip> : undefined}
                     actions={smiBurza && !nabidnuto ? (
-                      <Menu size="sm" label={t('Další akce se směnou {den}', { den: denKratce(d).toLowerCase() })} items={[
+                      <Menu size="sm" label={t('Další akce se směnou {den}', { den: denVeVete(d) })} items={[
                         { label: t('Nabídnout do burzy…'), icon: 'handover', hint: t('Kolega si ji může vzít, vedení výměnu schválí.'), onClick: () => { setNabidnout(s); setPoznamka(''); setChyba(null); } },
                       ]} />
                     ) : undefined}

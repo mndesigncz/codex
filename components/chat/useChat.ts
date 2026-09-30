@@ -6,8 +6,9 @@ import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
 
 /**
- * Překladač sekce `chat`. Pomocné funkce níž (čas, nahrávání) dostávají `t` od komponenty,
- * ale sekci jim tady dává tenhle hook: bez něj by kontrola slovníků nevěděla, kam jejich věty patří.
+ * Překladač sekce `chat`. Nikde se nevolá: slouží jako ZNAČKA pro scripts/check-i18n.mjs, která
+ * sekci souboru bere z prvního `useT('…')`. Pomocné funkce níž (čas, nahrávání) dostávají `t`
+ * od komponenty, ale kontrola podle tohoto hooku ví, že jejich věty patří do `chat`. Nemazat.
  */
 export function useChatT(): PrekladFn {
   return useT('chat');

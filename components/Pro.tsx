@@ -10,6 +10,7 @@ import { slibZamku } from '@/lib/predplatneTexty';
 import { Icon } from './Icons';
 import { Modal, Button } from './ui';
 import { useObal } from './ObalProvider';
+import { useT } from '@/lib/i18n/client';
 
 // Pokladna se stahuje, až když má vyskočit — zamčená funkce ji většinou
 // nikdy nepotřebuje.
@@ -133,12 +134,13 @@ export function OdemknoutButton({ plan, className = '' }: { plan: 'pro' | 'max';
  * k nákupu mimo nákup v aplikaci).
  */
 export function Zamceno({ feature, className = '' }: { feature: string; className?: string }) {
+  const t = useT();
   return (
     <div className={`p-4 sm:p-6 max-w-xl mx-auto ${className}`}>
       <div className="card p-8 text-center space-y-3">
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-black/[0.05] text-black/50"><Icon name="lock" size={24} /></div>
         <h3 className="t-card">{feature}</h3>
-        <p className="text-sm text-black/55">Tuhle funkci tarif vašeho podniku nezahrnuje.</p>
+        <p className="text-sm text-black/55">{t('Tuhle funkci tarif vašeho podniku nezahrnuje.')}</p>
       </div>
     </div>
   );
@@ -158,6 +160,7 @@ export function MaxBadge({ className = '' }: { className?: string }) {
 export function MaxGate({ feature, children, benefit, employer = true }: {
   feature: string; benefit?: string; employer?: boolean; children: React.ReactNode;
 }) {
+  const t = useT();
   const { max } = usePlan();
   const { smiPlatby } = useObal();
   if (max) return <>{children}</>;
@@ -170,16 +173,16 @@ export function MaxGate({ feature, children, benefit, employer = true }: {
           <h3 className="t-card">{feature}</h3>
           <MaxBadge />
         </div>
-        <p className="text-sm text-black/55">{benefit ?? 'Tahle funkce patří do plánu Max.'}</p>
+        <p className="text-sm text-black/55">{benefit ?? t('Tahle funkce patří do plánu Max.')}</p>
         <ul className="text-left text-sm text-black/60 space-y-1 max-w-xs mx-auto">
           {MAX_EXTRAS.map(x => <li key={x} className="flex items-start gap-2"><Icon name="check" size={15} className="text-[#0A5CC0] shrink-0 mt-0.5" />{x}</li>)}
         </ul>
         {employer ? (
           <div className="flex justify-center"><OdemknoutButton plan="max" /></div>
         ) : (
-          <p className="text-xs text-black/40">Řekni vedení — Max se zapíná v Nastavení → Předplatné.</p>
+          <p className="text-xs text-black/40">{t('Řekni vedení — Max se zapíná v Nastavení → Předplatné.')}</p>
         )}
-        <p className="text-[11px] text-black/35">Max stojí {PRICES.max.month} Kč měsíčně za podnik.</p>
+        <p className="text-[11px] text-black/35">{t('Max stojí {cena} Kč měsíčně za podnik.', { cena: PRICES.max.month })}</p>
       </div>
     </div>
   );
@@ -203,6 +206,7 @@ export function ProGate({ feature, children, benefit, employer = true }: {
   employer?: boolean;
   children: React.ReactNode;
 }) {
+  const t = useT();
   const { pro } = usePlan();
   const { smiPlatby } = useObal();
   if (pro) return <>{children}</>;
@@ -216,14 +220,14 @@ export function ProGate({ feature, children, benefit, employer = true }: {
           <ProBadge />
         </div>
         <p className="text-sm text-black/55">
-          {benefit ?? 'Tahle funkce patří do plánu Pro.'}
+          {benefit ?? t('Tahle funkce patří do plánu Pro.')}
         </p>
         {employer ? (
           <div className="flex justify-center"><OdemknoutButton plan="pro" /></div>
         ) : (
-          <p className="text-xs text-black/40">Řekni vedení — Pro se zapíná v Nastavení → Předplatné.</p>
+          <p className="text-xs text-black/40">{t('Řekni vedení — Pro se zapíná v Nastavení → Předplatné.')}</p>
         )}
-        <p className="text-[11px] text-black/35">Pro stojí {PRO_PRICE.monthly} {PRO_PRICE.currency} {PRO_PRICE.per}.</p>
+        <p className="text-[11px] text-black/35">{t('Pro stojí {cena} {mena} měsíčně za podnik.', { cena: PRO_PRICE.monthly, mena: PRO_PRICE.currency })}</p>
       </div>
     </div>
   );
