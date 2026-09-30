@@ -55,4 +55,8 @@ Xcode, Gradle) se dělají zvlášť; tady je to, co musí umět server a web, a
 
 - Registrace hosta dál při existujícím e-mailu odpoví 409 (ověření e-mailem chybí); omezeno limitem podle IP.
 - Blokace skryje zprávy i vedení podniku (vedení lze nahlásit správci platformy).
+- Odkazy „otevřít jako host“ ve správě klienta (`window.open('/client/…')`) vedou v provozní aplikaci na zavřenou část webu
+  (brána je přesměruje na úvod). Obal je má otevírat v systémovém prohlížeči (`allowNavigation` jen pro stránky aplikace,
+  `lib/stahni.ts otevriVeSystemu`); veřejné stránky podniků jsou přístupné i bez přihlášení.
+- Účet vlastníka podniku se z webu (`/smazat-ucet`) nesmaže; to jde jen v aplikaci, kde se potvrzuje i smazání podniku.
 - `@capacitor/*` se do webu neimportuje; existenci pluginů (`window.Capacitor.Plugins`) při `server.url` je třeba ověřit na zařízení.
