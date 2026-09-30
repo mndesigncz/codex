@@ -24,6 +24,14 @@ export function zkratkyDnuOdNedele(jazyk: Jazyk = 'cs'): string[] {
   return [pondeli[6], ...pondeli.slice(0, 6)];
 }
 
+/** Názvy dnů od pondělí, s velkým písmenem („Pondělí", „Monday", „Montag"). Pořadí = klíč otevírací doby (0 = pondělí). */
+export function nazvyDnuDlouze(jazyk: Jazyk = 'cs'): string[] {
+  return [0, 1, 2, 3, 4, 5, 6].map(i => {
+    const s = fmtDenVTydnu(i, { jazyk, styl: 'dlouhy' });
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  });
+}
+
 /** „pondělí 5. 3." (den v týdnu + číselné datum) podle jazyka; `d` je místní datum. */
 export function denSCislem(d: Date, jazyk: Jazyk = 'cs'): string {
   return new Intl.DateTimeFormat(LOCALE_PRO_JAZYK[jazyk], { weekday: 'long', day: 'numeric', month: 'numeric' }).format(d);

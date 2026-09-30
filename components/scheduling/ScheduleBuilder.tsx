@@ -29,7 +29,8 @@
 // v sessionStorage.
 
 import { Fragment, useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
-import { zkratkyDnu, odsazeniMesice, zacatekTydne, type ZacatekTydne } from '@/lib/week';
+import { odsazeniMesice, zacatekTydne, type ZacatekTydne } from '@/lib/week';
+import { nazvyDnuDlouze, zkratkyDnuJazyk } from '@/lib/weekJazyk';
 import { useCurrency } from '@/components/CurrencyProvider';
 import { dayPrefLabel, prefAllowsSlot } from '@/lib/dayPrefs';
 import { openSpan, uncovered, typeFitsDay, toHM, urovenDiry } from '@/lib/coverage';
@@ -43,7 +44,11 @@ import { usePlan, UpgradeModal } from '../Pro';
 import { apiMessage, okJson } from '@/lib/api';
 import { openPrint, esc } from '@/lib/printDoc';
 import { ulozSoubor } from '@/lib/stahni';
-import { czCount, czForm, SMENA, DEN, HODINA, HODINU } from '@/lib/czech';
+import { useJazyk, useT, type PrekladFn } from '@/lib/i18n/client';
+import { tg } from '@/lib/i18n/stav';
+import { fmtDatum } from '@/lib/i18n/format';
+import type { Jazyk } from '@/lib/i18n/config';
+import { dnuTxt, hodinTxt, hodinuTxt, hodinyTextJ, prelozPopisStavu, rozsahVolnaJ, smenTxt, upozorneniTxt } from './texty';
 import { pragueToday } from '@/lib/pragueTime';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu } from '../widgety/useDataWidgetu';
@@ -192,10 +197,9 @@ interface Proposed {
   oteviraci?: boolean;
 }
 
-// `CZ_DAYS_FULL` se dál používá tam, kde index NENÍ sloupec mřížky, ale
+// `nazvyDnuDlouze` (lib/weekJazyk) se používá tam, kde index NENÍ sloupec mřížky, ale
 // klíč otevírací doby (0 = pondělí). Ten se nesmí přeskládat podle toho,
 // jak si podnik nastavil začátek týdne — posunulo by mu to otevírací dobu.
-const CZ_DAYS_FULL = ['Pondělí', 'Úterý', 'Středa', 'Čtvrtek', 'Pátek', 'Sobota', 'Neděle'];
 // Barvy typů = kategorie cat-dot-1…6 z globals.css (DP §6.9), ve stejném pořadí. Ukládá se dál
 // hex kvůli kompatibilitě se staršími typy a s API; kreslí se ale vždy třídou kategorie
 // (tridaTecky), takže „Odpolední" má v plánovači stejný odstín jako ve widgetech a Mých směnách.
@@ -209,11 +213,6 @@ const DEFAULT_TYPES = [
   { name: 'Ranní', startTime: '06:00', endTime: '14:00', color: '#C8F542' },
   { name: 'Odpolední', startTime: '14:00', endTime: '22:00', color: '#3B82F6' },
 ];
-const SHIFT_PRESETS: Record<string, { start: string; end: string; label: string }> = {
-  morning: { start: '08:00', end: '14:00', label: 'Ranní' },
-  afternoon: { start: '14:00', end: '22:00', label: 'Odpolední' },
-};
-const SHIFT_LABEL: Record<string, string> = { morning: 'Ranní', afternoon: 'Odpolední', flexible: 'Vlastní' };
 
 // Resolve a shift's display name + colour from the team's configured shift
 // types — matched by name first, then by exact times — so the calendar always
@@ -221,14 +220,15 @@ const SHIFT_LABEL: Record<string, string> = { morning: 'Ranní', afternoon: 'Odp
 function resolveShiftType(
   s: { type?: string; startTime?: string; endTime?: string },
   types: ShiftType[],
+  t: PrekladFn,
 ): { label: string; color: string } {
-  const byName = types.find((t) => t.name === s.type);
+  const byName = types.find((x) => x.name === s.type);
   if (byName) return { label: byName.name, color: byName.color || '#64748B' };
-  const byTime = types.find((t) => t.startTime === s.startTime && t.endTime === s.endTime);
+  const byTime = types.find((x) => x.startTime === s.startTime && x.endTime === s.endTime);
   if (byTime) return { label: byTime.name, color: byTime.color || '#64748B' };
-  const legacy = s.type ? SHIFT_LABEL[s.type] : undefined;
+  const legacy = s.type === 'morning' ? t('Ranní') : s.type === 'afternoon' ? t('Odpolední') : s.type === 'flexible' ? t('Vlastní') : undefined;
   if (legacy) return { label: legacy, color: s.type === 'morning' ? '#C8F542' : s.type === 'afternoon' ? '#3B82F6' : '#64748B' };
-  return { label: s.type || 'Směna', color: '#64748B' };
+  return { label: s.type || t('Směna'), color: '#64748B' };
 }
 
 // Opening hours are keyed 0=Mon..6=Sun; convert a 'YYYY-MM-DD' to that index.
@@ -248,22 +248,19 @@ function shiftMonth(month: string, delta: number) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function monthLabel(month: string) {
-  const [y, m] = month.split('-').map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
+function monthLabel(month: string, jazyk: Jazyk) {
+  return fmtDatum(`${month}-01`, { jazyk, styl: 'mesic' });
 }
 /** „3 směny, které už v měsíci jsou" — kolik uložených směn přepsání měsíce smaže. */
-function ulozeneVMesici(n: number) {
-  return `${czCount(n, SMENA)}, ${n === 1 ? 'která už v měsíci je' : 'které už v měsíci jsou'}`;
+function ulozeneVMesici(t: PrekladFn, n: number) {
+  return t('{n, plural, one {# směna, která už v měsíci je} few {# směny, které už v měsíci jsou} other {# směn, které už v měsíci jsou}}', { n });
 }
 /** „5. 10." — krátce do výčtu dnů. */
-function kratkeDatum(date: string) {
-  const [, m, d] = date.split('-').map(Number);
-  return `${d}. ${m}.`;
+function kratkeDatum(date: string, jazyk: Jazyk) {
+  return fmtDatum(date, { jazyk, styl: 'kratce' });
 }
-function dayLabel(date: string) {
-  const [y, m, d] = date.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' });
+function dayLabel(date: string, jazyk: Jazyk) {
+  return fmtDatum(date, { jazyk, styl: 'denDlouze' });
 }
 function buildGrid(month: string, zacatek: ZacatekTydne) {
   const [y, m] = month.split('-').map(Number);
@@ -278,13 +275,13 @@ function buildGrid(month: string, zacatek: ZacatekTydne) {
 }
 
 type Tab = 'rozvrh' | 'kalendar' | 'typy' | 'oteviraci' | 'pevne' | 'pravidla';
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'rozvrh', label: 'Rozvrh' },
-  { id: 'kalendar', label: 'Kalendář' },
-  { id: 'typy', label: 'Typy směn' },
-  { id: 'oteviraci', label: 'Otevírací doba' },
-  { id: 'pevne', label: 'Pevné dny' },
-  { id: 'pravidla', label: 'Pravidla' },
+const tabs = (t: PrekladFn): { id: Tab; label: string }[] => [
+  { id: 'rozvrh', label: t('Rozvrh') },
+  { id: 'kalendar', label: t('Kalendář') },
+  { id: 'typy', label: t('Typy směn') },
+  { id: 'oteviraci', label: t('Otevírací doba') },
+  { id: 'pevne', label: t('Pevné dny') },
+  { id: 'pravidla', label: t('Pravidla') },
 ];
 
 /** Žádost widgetu, která čekala na připojení plánovače (přechod z jiné stránky). */
@@ -296,10 +293,9 @@ function vezmiZadost(klic: string): string | null {
   } catch { return null; }
 }
 
-const TITULEK = 'Rozvrh';
-const PODTITULEK = 'Sestav měsíční rozvrh podle dostupnosti týmu.';
-
 export default function ScheduleBuilder({ onNavigate, user }: Props & { onNavigate?: (view: string, arg?: string) => void }) {
+  const t = useT('rozvrh');
+  const { jazyk } = useJazyk();
   // Začátek týdne si volí podnik; kalendáře vedle ho ctí taky.
   const zacatek = zacatekTydne(useCurrency().weekStart);
   const currentMonth = pragueToday().slice(0, 7);
@@ -371,14 +367,14 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
   const iso = (d: Date) => d.toISOString().slice(0, 10);
   const weekLabel = (mon: Date) => {
     const end = new Date(mon); end.setDate(end.getDate() + 6);
-    return `${mon.getDate()}. ${mon.getMonth() + 1}. – ${end.getDate()}. ${end.getMonth() + 1}.`;
+    return `${fmtDatum(iso(mon), { jazyk, styl: 'kratce' })} – ${fmtDatum(iso(end), { jazyk, styl: 'kratce' })}`;
   };
   const weekOptions = (back: number, fwd: number) => {
     const base = mondayOf(new Date());
     const out: { value: string; label: string }[] = [];
     for (let i = -back; i <= fwd; i++) {
       const m = new Date(base); m.setDate(m.getDate() + i * 7);
-      out.push({ value: iso(m), label: `${weekLabel(m)}${i === 0 ? ' (tento týden)' : ''}` });
+      out.push({ value: iso(m), label: `${weekLabel(m)}${i === 0 ? ` (${t('tento týden')})` : ''}` });
     }
     return out;
   };
@@ -562,7 +558,7 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
         ]);
         if (req !== reqRef.current) return;
         setShifts((Array.isArray(nData?.shifts) ? nData.shifts : []).map((s: any) => ({
-          id: s.id, employeeId: s.employeeId, employeeName: s.employeeName ?? 'Kolega', employeeAvatar: s.employeeAvatar ?? '',
+          id: s.id, employeeId: s.employeeId, employeeName: s.employeeName ?? t('Kolega'), employeeAvatar: s.employeeAvatar ?? '',
           date: denZ(s.date), startTime: hmZ(s.startTime), endTime: hmZ(s.endTime), type: s.type,
         })));
         setShiftTypes(stData.shiftTypes ?? []);
@@ -571,7 +567,7 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
       }
     } catch (e) {
       // Dřív console.error a prázdná mřížka — výpadek vypadal jako prázdný měsíc.
-      if (req === reqRef.current) setLoadError(apiMessage(e, 'Rozvrh se nenačetl.'));
+      if (req === reqRef.current) setLoadError(apiMessage(e, t('Rozvrh se nenačetl.')));
     } finally {
       if (req === reqRef.current) setLoading(false);
     }
@@ -659,10 +655,10 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
     if (cekaDostupnost == null || loading || loadError) return;
     const m = members.find(x => x.id === cekaDostupnost);
     setCekaDostupnost(null);
-    if (!m) { setBoardError('Ten člověk už v týmu není.'); return; }
+    if (!m) { setBoardError(t('Ten člověk už v týmu není.')); return; }
     // Bez dostupnost.upravit se okno otevře jen ke čtení: kdo skládá rozvrh, musí vidět,
     // které dny člověk nemůže a co vedení napsal do poznámky — upravit to ale nesmí.
-    if (!smiDostupnost) { setBoardError('Dostupnost týmu tvoje role nevidí.'); return; }
+    if (!smiDostupnost) { setBoardError(t('Dostupnost týmu tvoje role nevidí.')); return; }
     setEditAvail({ id: m.id, name: m.name, avatar: m.avatar ?? '' });
   }, [cekaDostupnost, loading, loadError, members, smiDostupnost]);
 
@@ -696,8 +692,8 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
           if (!res.ok) selhalo += 1;
         } catch { selhalo += 1; }
       }
-      if (selhalo > 0) setBoardError('Výchozí typy směn se nepodařilo založit celé. Doplň je v záložce Typy směn.');
-      await reloadTypes().catch(() => setBoardError('Typy směn se nenačetly.'));
+      if (selhalo > 0) setBoardError(t('Výchozí typy směn se nepodařilo založit celé. Doplň je v záložce Typy směn.'));
+      await reloadTypes().catch(() => setBoardError(t('Typy směn se nenačetly.')));
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, loading, shiftTypes.length, smiNastaveni]);
@@ -761,7 +757,8 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
 
   const chybaZ = async (res: Response | null, vychozi: string) => {
     const d = res ? await res.json().catch(() => ({} as any)) : {};
-    return (d as any)?.error || vychozi;
+    // Česká věta ze serveru se hledá ve slovníku `api`; co tam není, zůstane česky.
+    return (d as any)?.error ? tg((d as any).error) : vychozi;
   };
 
   const addShift = async (payload: { employeeId: number; date: string; startTime: string; endTime: string; type: string }) => {
@@ -771,7 +768,7 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
       body: JSON.stringify({ shifts: [payload] }),
     }).catch(() => null);
     if (res?.ok) { await poZmene(); return true; }
-    setBoardError(await chybaZ(res, 'Směnu se nepodařilo přidat.'));
+    setBoardError(await chybaZ(res, t('Směnu se nepodařilo přidat.')));
     return false;
   };
 
@@ -781,7 +778,7 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
     // bez znovunačtení (poZmene) by den, který smazáním osiřel, nedostal
     // červené „Nikdo neotevře“ a legenda by ukazovala starý stav.
     if (res?.ok) { setShifts((prev) => prev.filter((s) => s.id !== id)); await poZmene(); }
-    else setBoardError('Směnu se nepodařilo smazat.');
+    else setBoardError(t('Směnu se nepodařilo smazat.'));
   };
 
   const clearMonth = async () => {
@@ -791,7 +788,7 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
     setConfirmClear(false);
     // Znovunačtení srovná i díry a podobsazení (server je počítá z prázdného měsíce).
     if (res?.ok) { setShifts([]); await poZmene(); }
-    else setBoardError('Vymazání měsíce se nepodařilo.');
+    else setBoardError(t('Vymazání měsíce se nepodařilo.'));
   };
 
   // Publikovat při otevřeném návrhu: nejdřív uložit návrh (i s ručními
@@ -804,7 +801,7 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
     if (ukladaRef.current || publishing) return;
     if (preview) {
       if (preview.proposed.length === 0) {
-        setBoardError('Návrh je prázdný — přidej do něj směny, nebo ho zahoď, a pak publikuj.');
+        setBoardError(t('Návrh je prázdný — přidej do něj směny, nebo ho zahoď, a pak publikuj.'));
         return;
       }
       // Přepsání měsíce smaže i uložené směny a hned je publikuje — přepínač
@@ -824,13 +821,13 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
       if (res.ok) {
         const n = Number(d.notified) || 0;
         setPublishNote(n === 0
-          ? { text: 'V tomhle měsíci zatím nikdo nemá směnu — není komu dát vědět.', ok: false }
-          : { text: `Hotovo — rozvrh dostal${n === 1 ? '' : 'o'} ${czCount(n, { one: 'člověk', few: 'lidé', many: 'lidí' })} jako upozornění. Každá další změna se jim ukáže v Mých směnách.`, ok: true });
+          ? { text: t('V tomhle měsíci zatím nikdo nemá směnu — není komu dát vědět.'), ok: false }
+          : { text: t('Hotovo — rozvrh {n, plural, one {dostal # člověk} few {dostalo # lidé} other {dostalo # lidí}} jako upozornění. Každá další změna se jim ukáže v Mých směnách.', { n }), ok: true });
       } else {
-        setPublishNote({ text: d.error || 'Publikování se nepodařilo — zkus to znovu.', ok: false });
+        setPublishNote({ text: d.error ? tg(d.error) : t('Publikování se nepodařilo — zkus to znovu.'), ok: false });
       }
     } catch {
-      setPublishNote({ text: 'Publikování se nepodařilo — zkus to znovu.', ok: false });
+      setPublishNote({ text: t('Publikování se nepodařilo — zkus to znovu.'), ok: false });
     }
     setPublishing(false);
   };
@@ -845,9 +842,9 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
         body: JSON.stringify({ month }),
       });
       const d = await res.json().catch(() => ({}));
-      if (!res.ok) setBoardError(d.error || 'Kontrola se nepodařila.');
+      if (!res.ok) setBoardError(d.error ? tg(d.error) : t('Kontrola se nepodařila.'));
       else { setAdjust({ changes: d.changes ?? [], warnings: d.warnings ?? [] }); setAdjustSkipped(new Set()); }
-    } catch { setBoardError('Kontrola se nepodařila.'); }
+    } catch { setBoardError(t('Kontrola se nepodařila.')); }
     setAdjusting(false);
   };
 
@@ -862,14 +859,14 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
         body: JSON.stringify({ month, commit: true, changes: chosen }),
       });
       const d = await res.json().catch(() => ({}));
-      if (!res.ok) setBoardError(d.error || 'Úpravy se nepodařilo uložit.');
+      if (!res.ok) setBoardError(d.error ? tg(d.error) : t('Úpravy se nepodařilo uložit.'));
       else { setAdjust(null); await poZmene(); }
-    } catch { setBoardError('Úpravy se nepodařilo uložit.'); }
+    } catch { setBoardError(t('Úpravy se nepodařilo uložit.')); }
     setApplyingAdjust(false);
   };
 
   const copyWeek = async () => {
-    if (!copySrc || !copyDst || copySrc === copyDst) { setCopyMsg({ text: 'Vyber dva různé týdny.', ok: false }); return; }
+    if (!copySrc || !copyDst || copySrc === copyDst) { setCopyMsg({ text: t('Vyber dva různé týdny.'), ok: false }); return; }
     setCopying(true); setCopyMsg(null);
     try {
       // Zdrojový týden může ležet i mimo načtený měsíc — načtou se oba měsíce týdne.
@@ -888,18 +885,18 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
           const nd = new Date(sh.date + 'T12:00:00'); nd.setDate(nd.getDate() + offsetDays);
           return { employeeId: sh.employeeId, date: iso(nd), startTime: sh.startTime, endTime: sh.endTime, type: sh.type };
         });
-      if (toCreate.length === 0) { setCopyMsg({ text: 'Ve zdrojovém týdnu nejsou žádné směny.', ok: false }); setCopying(false); return; }
+      if (toCreate.length === 0) { setCopyMsg({ text: t('Ve zdrojovém týdnu nejsou žádné směny.'), ok: false }); setCopying(false); return; }
       const res = await fetch('/api/schedule', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ shifts: toCreate }),
       });
       if (res.ok) {
-        setCopyMsg({ text: `Hotovo — zkopírováno ${czCount(toCreate.length, SMENA)}.`, ok: true });
+        setCopyMsg({ text: t('Hotovo — zkopírováno {smen}.', { smen: smenTxt(t, toCreate.length) }), ok: true });
         await poZmene();
       } else {
-        setCopyMsg({ text: await chybaZ(res, 'Kopírování se nepodařilo.'), ok: false });
+        setCopyMsg({ text: await chybaZ(res, t('Kopírování se nepodařilo.')), ok: false });
       }
-    } catch (e) { setCopyMsg({ text: apiMessage(e, 'Kopírování se nepodařilo.'), ok: false }); }
+    } catch (e) { setCopyMsg({ text: apiMessage(e, t('Kopírování se nepodařilo.')), ok: false }); }
     setCopying(false);
   };
 
@@ -930,10 +927,10 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
           nahradit: typeof data.nahradit === 'boolean' ? data.nahradit : nahradit && smiMazat,
         });
       } else {
-        setPreview({ proposed: [], warnings: [data.error ?? 'Generování selhalo.'], gaps: [], understaffed: [] });
+        setPreview({ proposed: [], warnings: [data.error ? tg(data.error) : t('Generování selhalo.')], gaps: [], understaffed: [] });
       }
     } catch {
-      setPreview({ proposed: [], warnings: ['Generování selhalo.'], gaps: [], understaffed: [] });
+      setPreview({ proposed: [], warnings: [t('Generování selhalo.')], gaps: [], understaffed: [] });
     } finally {
       setGenerating(false);
     }
@@ -975,7 +972,7 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
         await poZmene();
         return true;
       }
-      setBoardError(await chybaZ(res, 'Uložení rozvrhu se nepodařilo — nic se nezměnilo, zkus to znovu.'));
+      setBoardError(await chybaZ(res, t('Uložení rozvrhu se nepodařilo — nic se nezměnilo, zkus to znovu.')));
       // Souběh: načíst, co teď v měsíci opravdu je (a novou verzi). Návrh
       // zůstává — vedení se podívá a uloží znovu vědomě.
       if (res?.status === 409) await poZmene();
@@ -1004,7 +1001,7 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
     const typ = shiftTypes.find((t) => t.name === payload.type);
     const novy: Proposed = {
       employeeId: payload.employeeId,
-      employeeName: clen?.name ?? 'Kolega',
+      employeeName: clen?.name ?? t('Kolega'),
       employeeAvatar: clen?.avatar ?? '',
       date: payload.date,
       startTime: payload.startTime,
@@ -1043,18 +1040,18 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
   // s otevřeným návrhem návrh (a s přepisem měsíce bez uložených směn),
   // jinak uložené směny. Dřív šlo počty lidí zjistit jen z widgetu
   // „Naplánované hodiny", který o návrhu neví.
-  const typUlozene = (s: Shift) => resolveShiftType(s, shiftTypes).label;
-  const typNavrhu = (p: Proposed) => p.shiftTypeName || resolveShiftType(p, shiftTypes).label;
+  const typUlozene = (s: Shift) => resolveShiftType(s, shiftTypes, t).label;
+  const typNavrhu = (p: Proposed) => p.shiftTypeName || resolveShiftType(p, shiftTypes, t).label;
   const smenyFiltru = useMemo<SmenaFiltru[]>(() => [
     ...(nahradiUlozene ? [] : shifts.map(s => ({
       employeeId: s.employeeId, jmeno: s.employeeName, avatar: s.employeeAvatar || null,
-      date: s.date, startTime: s.startTime, endTime: s.endTime, typ: resolveShiftType(s, shiftTypes).label,
+      date: s.date, startTime: s.startTime, endTime: s.endTime, typ: resolveShiftType(s, shiftTypes, t).label,
     }))),
     ...(preview?.proposed ?? []).map(p => ({
       employeeId: p.employeeId, jmeno: p.employeeName, avatar: p.employeeAvatar || null,
-      date: p.date, startTime: p.startTime, endTime: p.endTime, typ: p.shiftTypeName || resolveShiftType(p, shiftTypes).label,
+      date: p.date, startTime: p.startTime, endTime: p.endTime, typ: p.shiftTypeName || resolveShiftType(p, shiftTypes, t).label,
     })),
-  ], [nahradiUlozene, shifts, preview, shiftTypes]);
+  ], [nahradiUlozene, shifts, preview, shiftTypes, t]);
   const filtrAktivni = jeAktivni(filtr);
   // Lidé a typy filtrují směny; „jen díry" filtruje dny.
   const filtrujeSmeny = filtr.lide.length > 0 || filtr.typy.length > 0;
@@ -1070,7 +1067,7 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
     ...filtr.lide.filter(id => !lideMesice.some(c => c.id === id)).map(id => {
       const clen = members.find(m => Number(m.id) === id);
       const znamy = znamiRef.current.get(id);
-      return { id, jmeno: clen?.name || znamy?.jmeno || 'Bez jména', avatar: clen?.avatar ?? znamy?.avatar ?? null };
+      return { id, jmeno: clen?.name || znamy?.jmeno || t('Bez jména'), avatar: clen?.avatar ?? znamy?.avatar ?? null };
     }),
   ], [lideMesice, filtr.lide, members]);
   // Id, která ve filtru nemají co dělat — nejsou v týmu ani nemají směnu
@@ -1111,12 +1108,12 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [smenyFiltru, filtr, problemsByDate, drzeneDny],
   );
-  const popisAktivniho = filtrAktivni ? `Filtr: ${popisFiltru(filtr, jmenaFiltru, kratkaFiltru)} — ${popisVysledku(viditelnych, !!preview)}` : '';
+  const popisAktivniho = filtrAktivni ? t('Filtr: {popis} — {vysledek}', { popis: popisFiltru(filtr, jmenaFiltru, kratkaFiltru, t), vysledek: popisVysledku(viditelnych, !!preview, t) }) : '';
   // Hlášení pro odečítač: výsledek filtru, po vypnutí „Filtr vypnut".
   // Při načtení stránky mlčí (nic se nezměnilo, jen obnovil uložený stav).
   const bylFiltrRef = useRef(false);
   if (filtrAktivni) bylFiltrRef.current = true;
-  const stavFiltru = filtrAktivni ? popisAktivniho : bylFiltrRef.current ? 'Filtr vypnut, celý měsíc.' : '';
+  const stavFiltru = filtrAktivni ? popisAktivniho : bylFiltrRef.current ? t('Filtr vypnut, celý měsíc.') : '';
   // Pás typů má smysl od dvou typů (nebo když je co odkliknout / jsou díry).
   const ukazPasTypu = pasTypu.length >= 2 || filtr.typy.length > 0 || filtr.jenDiry || (problemDates.length > 0 && pasTypu.length >= 1);
   // Filtr se změnil a prvek s fokusem zmizel (Zrušit filtr i s lištou,
@@ -1143,7 +1140,7 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
       el.scrollIntoView({ block: 'start', behavior: klid ? 'auto' : 'smooth' });
     }
   };
-  const hintCelyMesic = filtrAktivni ? ' Vždy celý měsíc — filtr se nepoužije.' : '';
+  const hintCelyMesic = filtrAktivni ? ` ${t('Vždy celý měsíc — filtr se nepoužije.')}` : '';
   /** Přidání v okně dne: směnu, kterou filtr mřížky skryje, si zapamatovat na hlášku. */
   const pridejVOkne = async (x: { employeeId: number; date: string; startTime: string; endTime: string; type: string }) => {
     const ok = preview ? pridejDoNavrhu(x) : await addShift(x);
@@ -1157,10 +1154,10 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
     mimoFiltrRef.current = [];
     if (mimo.length === 0) return;
     const lide = [...new Set(mimo.map(m => m.employeeId))];
-    const jmeno = (id: number) => (members.find(m => Number(m.id) === id)?.name || znamiRef.current.get(id)?.jmeno || 'Kolega').split(/\s+/)[0];
+    const jmeno = (id: number) => (members.find(m => Number(m.id) === id)?.name || znamiRef.current.get(id)?.jmeno || t('Kolega')).split(/\s+/)[0];
     const text = mimo.length === 1
-      ? `Přidáno — ${jmeno(mimo[0].employeeId)} je mimo filtr`
-      : `Přidáno — ${czCount(mimo.length, SMENA)} mimo filtr`;
+      ? t('Přidáno — {jmeno} je mimo filtr', { jmeno: jmeno(mimo[0].employeeId) })
+      : t('Přidáno — {smen} mimo filtr', { smen: smenTxt(t, mimo.length) });
     setHlaskaFiltru({ text, id: Date.now(), ukazat: { lide, typy: [...new Set(mimo.map(m => m.typ))] } });
   };
   /** „Ukázat" v hlášce: přidat přidané lidi a typy do filtru, ať je směna v mřížce vidět. */
@@ -1172,7 +1169,7 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
 
   // ---- Export CSV ----
   const exportCsv = () => {
-    if (!pro) { setUpgradeFor('Export CSV'); return; }
+    if (!pro) { setUpgradeFor(t('Export CSV')); return; }
     // Tvar souboru řeší lib/rozvrhCsv, ať export a import spolu vždy sedí.
     const csv = sestavCsv(shifts);
     // V nativním obalu se soubor sdílí přes systémový list (lib/stahni), v prohlížeči stáhne.
@@ -1195,19 +1192,19 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
       const weekend = dt.getDay() === 0 || dt.getDay() === 6;
       return `<tr>
         <td style="white-space:nowrap${weekend ? ';font-weight:700' : ''}">
-          ${esc(dt.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' }))}
-          <div class="note">${esc(dt.toLocaleDateString('cs-CZ', { weekday: 'long' }))}</div>
+          ${esc(fmtDatum(d, { jazyk, styl: 'kratce' }))}
+          <div class="note">${esc(fmtDatum(d, { jazyk, styl: 'denvtydnu' }))}</div>
         </td>
-        <td>${list.map(x => `<div>${esc(x.employeeName || 'Neobsazeno')} — ${esc(x.startTime)}–${esc(x.endTime)}`
-          + `${x.type ? ` · ${esc(resolveShiftType(x, shiftTypes).label)}` : ''}</div>`).join('')}</td>
+        <td>${list.map(x => `<div>${esc(x.employeeName || t('Neobsazeno'))} — ${esc(x.startTime)}–${esc(x.endTime)}`
+          + `${x.type ? ` · ${esc(resolveShiftType(x, shiftTypes, t).label)}` : ''}</div>`).join('')}</td>
         <td class="num">${list.length}</td>
       </tr>`;
     }).join('');
     const ok = openPrint({
-      title: `Rozvrh — ${monthLabel(month)}`,
-      subtitle: `${czCount(shifts.length, SMENA)} · ${czCount(days.length, DEN)} se směnou`,
+      title: t('Rozvrh — {mesic}', { mesic: monthLabel(month, jazyk) }),
+      subtitle: t('{smeny} · {dny} se směnou', { smeny: smenTxt(t, shifts.length), dny: dnuTxt(t, days.length) }),
       body: `<table>
-        <thead><tr><th style="width:26mm">Den</th><th>Kdo a kdy</th><th class="num">Lidí</th></tr></thead>
+        <thead><tr><th style="width:26mm">${esc(t('Den'))}</th><th>${esc(t('Kdo a kdy'))}</th><th class="num">${esc(t('Lidí'))}</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>`,
     });
@@ -1233,7 +1230,7 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
         setImportPreview(null);
         await poZmene();
       } else {
-        setBoardError(await chybaZ(res, 'Import se nepodařilo uložit.'));
+        setBoardError(await chybaZ(res, t('Import se nepodařilo uložit.')));
       }
     } finally {
       setImporting(false);
@@ -1241,14 +1238,14 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
   };
 
   // ---- Hlavička, záložky, akce ----
-  const zalozky = TABS.filter(t => t.id === 'rozvrh'
-    || (t.id === 'kalendar' && smiKalendar)
-    || ((t.id === 'typy' || t.id === 'pevne' || t.id === 'pravidla') && smiNastaveni)
-    || (t.id === 'oteviraci' && (smiNastaveni || smiOteviraci)));
+  const zalozky = tabs(t).filter(z => z.id === 'rozvrh'
+    || (z.id === 'kalendar' && smiKalendar)
+    || ((z.id === 'typy' || z.id === 'pevne' || z.id === 'pravidla') && smiNastaveni)
+    || (z.id === 'oteviraci' && (smiNastaveni || smiOteviraci)));
   const aktivniTab: Tab = zalozky.some(z => z.id === tab) ? tab : 'rozvrh';
   const naRozvrhu = aktivniTab === 'rozvrh';
   const aside = zalozky.length > 1
-    ? <Segmented ariaLabel="Část rozvrhu" value={aktivniTab} onChange={(v) => setTab(v as Tab)} options={zalozky} />
+    ? <Segmented ariaLabel={t('Část rozvrhu')} value={aktivniTab} onChange={(v) => setTab(v as Tab)} options={zalozky} />
     : undefined;
 
   const menu: MenuItem[] = [];
@@ -1256,32 +1253,32 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
   // uložených směn. S otevřeným návrhem by je jeho uložení (výchozí
   // s přepsáním měsíce) vzápětí smazalo — stejná příčina jako u „Přidat
   // směnu" v okně dne. Proto do té doby nejdou.
-  const hintNavrh = 'Nejdřív ulož nebo zahoď návrh — jinak by jeho uložení tuhle změnu přepsalo.';
+  const hintNavrh = t('Nejdřív ulož nebo zahoď návrh — jinak by jeho uložení tuhle změnu přepsalo.');
   if (naRozvrhu && !loading && !loadError) {
     if (smiPublikovat) menu.push(preview
-      ? { label: 'Uložit návrh a publikovat', icon: 'send', onClick: () => { void publish(); }, disabled: committing || publishing, hint: `Návrh se uloží i s tvými úpravami a lidé dostanou upozornění.${hintCelyMesic}` }
-      : { label: 'Publikovat rozvrh', icon: 'send', onClick: () => { void publish(); }, disabled: publishing, hint: `Lidé dostanou upozornění, že je rozvrh hotový.${hintCelyMesic}` });
+      ? { label: t('Uložit návrh a publikovat'), icon: 'send', onClick: () => { void publish(); }, disabled: committing || publishing, hint: `${t('Návrh se uloží i s tvými úpravami a lidé dostanou upozornění.')}${hintCelyMesic}` }
+      : { label: t('Publikovat rozvrh'), icon: 'send', onClick: () => { void publish(); }, disabled: publishing, hint: `${t('Lidé dostanou upozornění, že je rozvrh hotový.')}${hintCelyMesic}` });
     if (smiUpravit) {
-      menu.push({ label: 'Upravit podle nových požadavků', icon: 'swap', onClick: runAdjust, disabled: !!preview || adjusting || shifts.length === 0,
-        hint: preview ? hintNavrh : 'Zkontroluje uložený rozvrh proti nejnovější dostupnosti.' });
-      menu.push({ label: 'Kopírovat týden…', icon: 'copy', disabled: !!preview, hint: preview ? hintNavrh : undefined,
+      menu.push({ label: t('Upravit podle nových požadavků'), icon: 'swap', onClick: runAdjust, disabled: !!preview || adjusting || shifts.length === 0,
+        hint: preview ? hintNavrh : t('Zkontroluje uložený rozvrh proti nejnovější dostupnosti.') });
+      menu.push({ label: t('Kopírovat týden…'), icon: 'copy', disabled: !!preview, hint: preview ? hintNavrh : undefined,
         onClick: () => { setCopyOpen(true); setCopyMsg(null); setCopySrc(''); setCopyDst(''); } });
-      menu.push({ label: 'Import CSV…', icon: 'upload', disabled: !!preview, hint: preview ? hintNavrh : undefined, onClick: () => fileRef.current?.click() });
+      menu.push({ label: t('Import CSV…'), icon: 'upload', disabled: !!preview, hint: preview ? hintNavrh : undefined, onClick: () => fileRef.current?.click() });
     }
     if (smiExport) {
       // Export a tisk berou vždy uložené směny celého měsíce (`shifts`), ne
       // to, co zrovna ukazuje filtr — soubor pro účetní ani papír na zeď
       // nesmí potichu vynechat lidi, které si plánovač zrovna skryl.
-      menu.push({ label: 'Export CSV', icon: 'download', onClick: exportCsv, disabled: shifts.length === 0, hint: hintCelyMesic.trim() || undefined });
-      menu.push({ label: 'Vytisknout rozvrh', icon: 'print', onClick: printSchedule, disabled: shifts.length === 0,
-        hint: `Na papír k baru — černobíle, s typem směny slovem.${hintCelyMesic}` });
+      menu.push({ label: t('Export CSV'), icon: 'download', onClick: exportCsv, disabled: shifts.length === 0, hint: hintCelyMesic.trim() || undefined });
+      menu.push({ label: t('Vytisknout rozvrh'), icon: 'print', onClick: printSchedule, disabled: shifts.length === 0,
+        hint: `${t('Na papír k baru — černobíle, s typem směny slovem.')}${hintCelyMesic}` });
     }
-    if (smiMazat) menu.push({ label: 'Vymazat měsíc…', icon: 'trash', onClick: () => setConfirmClear(true), danger: true,
-      hint: 'Smaže všechny směny tohoto měsíce. Potvrdíš to ještě jednou.' });
+    if (smiMazat) menu.push({ label: t('Vymazat měsíc…'), icon: 'trash', onClick: () => setConfirmClear(true), danger: true,
+      hint: t('Smaže všechny směny tohoto měsíce. Potvrdíš to ještě jednou.') });
   }
   const hlavicka = {
-    title: TITULEK,
-    subtitle: PODTITULEK,
+    title: t('Rozvrh'),
+    subtitle: t('Sestav měsíční rozvrh podle dostupnosti týmu.'),
     hintId: 'schedulebuilder',
     aside,
     // S otevřeným návrhem je hlavní akcí jeho uložení, ne nové generování:
@@ -1291,35 +1288,35 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
     primary: !naRozvrhu || loadError ? undefined
       : preview
         ? (smiPublikovat
-          ? <Button variant="accent" icon="send" onClick={() => { void publish(); }} loading={publishing} disabled={committing}>Uložit a publikovat</Button>
+          ? <Button variant="accent" icon="send" onClick={() => { void publish(); }} loading={publishing} disabled={committing}>{t('Uložit a publikovat')}</Button>
           : undefined)
         : smiGenerovat
-          ? <Button variant="accent" icon="bulb" onClick={() => zadejGenerovani(clearBeforeCommit)} loading={generating}>Vygenerovat rozvrh</Button>
+          ? <Button variant="accent" icon="bulb" onClick={() => zadejGenerovani(clearBeforeCommit)} loading={generating}>{t('Vygenerovat rozvrh')}</Button>
           : undefined,
     secondary: !naRozvrhu || loadError ? undefined
       : preview
         ? (smiGenerovat
-          ? <Button variant="secondary" icon="bulb" onClick={() => zadejGenerovani(clearBeforeCommit)} loading={generating} disabled={committing || publishing}>Vygenerovat znovu</Button>
+          ? <Button variant="secondary" icon="bulb" onClick={() => zadejGenerovani(clearBeforeCommit)} loading={generating} disabled={committing || publishing}>{t('Vygenerovat znovu')}</Button>
           : undefined)
         : smiPublikovat
-          ? <Button variant="secondary" icon="send" onClick={() => { void publish(); }} loading={publishing}>Publikovat</Button>
+          ? <Button variant="secondary" icon="send" onClick={() => { void publish(); }} loading={publishing}>{t('Publikovat')}</Button>
           : undefined,
     menu: menu.length ? menu : undefined,
   };
 
   // ---- Nástroj: měsíční plánovač ----
   const rychleMesice = [
-    { id: currentMonth, label: 'Tento měsíc' },
-    { id: nextMonth, label: 'Příští měsíc' },
+    { id: currentMonth, label: t('Tento měsíc') },
+    { id: nextMonth, label: t('Příští měsíc') },
   ];
   const nastroj = (
     <Card as="section" aria-labelledby="planovac-nadpis" className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="planovac-nadpis" className="t-card cz-sentence">{monthLabel(month)}</h2>
+        <h2 id="planovac-nadpis" className="t-card cz-sentence">{monthLabel(month, jazyk)}</h2>
         {/* Šipky pro libovolný měsíc, pilulky pro dva obvyklé (tento slouží i jako „zpět na dnešek"). */}
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <MonthNav value={month} onChange={(m) => { zmenMesic(m); }} />
-          <div className="flex gap-1.5" role="group" aria-label="Rychlý výběr měsíce">
+          <div className="flex gap-1.5" role="group" aria-label={t('Rychlý výběr měsíce')}>
             {rychleMesice.map(m => (
               <button key={m.id} type="button" aria-pressed={month === m.id} onClick={() => zmenMesic(m.id)}
                 className={`filter-pill tap-target-sm ${month === m.id ? 'seg-on' : 'seg-off glass'}`}>{m.label}</button>
@@ -1329,24 +1326,24 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
       </div>
 
       {!planovac && pripraveno && (
-        <p className="note note-info text-sm">Vidíš náhled rozvrhu týmu — jména a časy. Plánovat může vedení s přístupem k rozvrhu.</p>
+        <p className="note note-info text-sm">{t('Vidíš náhled rozvrhu týmu — jména a časy. Plánovat může vedení s přístupem k rozvrhu.')}</p>
       )}
       {printFailed && (
         <p className="note note-wait text-sm flex items-center justify-between gap-3">
-          <span className="cz-sentence">Tiskové okno prohlížeč zablokoval. Povol vyskakovací okna pro tuhle stránku a zkus to znovu.</span>
-          <Button variant="ghost" size="sm" iconOnly icon="close" aria-label="Zavřít" className="shrink-0 -my-1.5" onClick={() => setPrintFailed(false)} />
+          <span className="cz-sentence">{t('Tiskové okno prohlížeč zablokoval. Povol vyskakovací okna pro tuhle stránku a zkus to znovu.')}</span>
+          <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={t('Zavřít')} className="shrink-0 -my-1.5" onClick={() => setPrintFailed(false)} />
         </p>
       )}
       {boardError && (
         <p className="note note-danger text-sm font-medium flex items-center justify-between gap-3" role="alert">
           <span className="flex items-center gap-2"><Icon name="warning" size={16} className="shrink-0" /> {boardError}</span>
-          <Button variant="ghost" size="sm" iconOnly icon="close" aria-label="Zavřít" className="shrink-0 -my-1.5" onClick={() => setBoardError('')} />
+          <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={t('Zavřít')} className="shrink-0 -my-1.5" onClick={() => setBoardError('')} />
         </p>
       )}
       {publishNote && (
         <p className={`note ${publishNote.ok ? 'note-ok' : 'note-wait'} text-sm flex items-center justify-between gap-3`} role="status">
           <span>{publishNote.text}</span>
-          <Button variant="ghost" size="sm" iconOnly icon="close" aria-label="Zavřít" className="shrink-0 -my-1.5" onClick={() => setPublishNote(null)} />
+          <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={t('Zavřít')} className="shrink-0 -my-1.5" onClick={() => setPublishNote(null)} />
         </p>
       )}
 
@@ -1355,24 +1352,24 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
         <Well className="space-y-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h3 className="t-card flex items-center gap-2"><Icon name="sparkle" size={17} className="shrink-0 text-black/40" /> Úprava podle nových požadavků</h3>
+              <h3 className="t-card flex items-center gap-2"><Icon name="sparkle" size={17} className="shrink-0 text-black/40" /> {t('Úprava podle nových požadavků')}</h3>
               <p className="t-meta mt-0.5">
                 {adjust.changes.length === 0
-                  ? 'Všechno sedí — žádná směna není v rozporu s dostupností.'
-                  : `${czCount(adjust.changes.length, { one: 'navržená změna', few: 'navržené změny', many: 'navržených změn' })}. Odškrtni, co měnit nechceš.`}
+                  ? t('Všechno sedí — žádná směna není v rozporu s dostupností.')
+                  : t('{n, plural, one {# navržená změna} few {# navržené změny} other {# navržených změn}}. Odškrtni, co měnit nechceš.', { n: adjust.changes.length })}
               </p>
             </div>
-            <Button variant="ghost" size="sm" iconOnly icon="close" aria-label="Zavřít úpravu" className="shrink-0" onClick={() => setAdjust(null)} />
+            <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={t('Zavřít úpravu')} className="shrink-0" onClick={() => setAdjust(null)} />
           </div>
           {adjust.changes.length > 0 && (
             <>
               <ul className="list max-h-72 overflow-y-auto scrollbar-thin">
                 {adjust.changes.map((ch: any, i: number) => {
                   const vynechat = adjustSkipped.has(i);
-                  const datum = `${parseInt(ch.date.split('-')[2])}. ${parseInt(ch.date.split('-')[1])}.`;
+                  const datum = fmtDatum(ch.date, { jazyk, styl: 'kratce' });
                   return (
                     <li key={i} className={`flex items-center gap-3 py-2.5 ${vynechat ? 'opacity-45' : ''}`}>
-                      <SelectBox checked={!vynechat} label={`Použít změnu ${datum} ${ch.startTime}–${ch.endTime}`}
+                      <SelectBox checked={!vynechat} label={t('Použít změnu {datum} {od}–{do}', { datum, od: ch.startTime, do: ch.endTime })}
                         onChange={() => setAdjustSkipped(prev => {
                           const n = new Set(prev);
                           if (n.has(i)) n.delete(i); else n.add(i);
@@ -1385,7 +1382,7 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
                           {ch.action === 'reassign' ? (
                             <><Icon name="chevronRight" size={13} className="shrink-0 text-black/40" /><span className="font-medium text-[#16181A]">{ch.toName}</span></>
                           ) : (
-                            <Chip tone="bad" size="sm">zrušit — nikdo nemůže</Chip>
+                            <Chip tone="bad" size="sm">{t('zrušit — nikdo nemůže')}</Chip>
                           )}
                           {ch.reason && <span>· {ch.reason}</span>}
                         </p>
@@ -1402,12 +1399,12 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
               <div className="flex flex-wrap items-center gap-2">
                 <Button variant="primary" size="sm" icon="check" loading={applyingAdjust}
                   disabled={adjust.changes.length === adjustSkipped.size} onClick={applyAdjust}>
-                  Použít vybrané ({adjust.changes.length - adjustSkipped.size})
+                  {t('Použít vybrané ({n})', { n: adjust.changes.length - adjustSkipped.size })}
                 </Button>
-                <Button variant="secondary" size="sm" onClick={() => setAdjust(null)}>Zahodit</Button>
+                <Button variant="secondary" size="sm" onClick={() => setAdjust(null)}>{t('Zahodit')}</Button>
               </div>
               <p className="t-meta text-pretty">
-                Důvody vycházejí z uložené dostupnosti — když nesedí, oprav ji ve widgetu Dostupnost týmu. Dotčení lidé dostanou upozornění.
+                {t('Důvody vycházejí z uložené dostupnosti — když nesedí, oprav ji ve widgetu Dostupnost týmu. Dotčení lidé dostanou upozornění.')}
               </p>
             </>
           )}
@@ -1418,40 +1415,40 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
       {preview && (
         <Well className="space-y-3">
           <div className="min-w-0">
-            <h3 className="t-card flex items-center gap-2"><Icon name="sparkle" size={17} className="shrink-0 text-black/40" /> Navržený rozvrh</h3>
+            <h3 className="t-card flex items-center gap-2"><Icon name="sparkle" size={17} className="shrink-0 text-black/40" /> {t('Navržený rozvrh')}</h3>
             <p className="t-meta mt-0.5 text-pretty">
               {/* Jedna věta s jednou tečkou na konci — dřív „… upozornění. · 80 hodin." */}
               {[
-                czCount(preview.proposed.length, { one: 'navržená směna', few: 'navržené směny', many: 'navržených směn' }),
-                preview.warnings.length > 0 ? czCount(preview.warnings.length, { one: 'upozornění', few: 'upozornění', many: 'upozornění' }) : null,
-                preview.hodiny ? czCount(Math.round(preview.hodiny.celkem), HODINA) : null,
+                t('{n, plural, one {# navržená směna} few {# navržené směny} other {# navržených směn}}', { n: preview.proposed.length }),
+                preview.warnings.length > 0 ? upozorneniTxt(t, preview.warnings.length) : null,
+                preview.hodiny ? hodinTxt(t, Math.round(preview.hodiny.celkem)) : null,
               ].filter(Boolean).join(' · ')}.
-              {' '}Návrh je v mřížce přerušovaně.
-              {preview.upraveno ? ' Obsahuje tvoje ruční úpravy.' : ''}
-              {' '}Klepnutím na den návrh upravíš — uloží se přesně to, co tu vidíš.
+              {' '}{t('Návrh je v mřížce přerušovaně.')}
+              {preview.upraveno ? ` ${t('Obsahuje tvoje ruční úpravy.')}` : ''}
+              {' '}{t('Klepnutím na den návrh upravíš — uloží se přesně to, co tu vidíš.')}
             </p>
           </div>
           {povinneDny.length > 0 && (
             // Povinná díra = podnik se neotevře. Musí být vidět hned, ne až
             // jako řádek v seznamu upozornění.
             <div className="note note-danger" data-povinne-diry>
-              <p className="text-sm font-semibold flex items-center gap-1.5"><Icon name="warning" size={16} className="shrink-0" /> Nikdo neotevře — {czCount(povinneDny.length, DEN)} bez otevírací směny</p>
-              <p className="text-xs mt-0.5 text-pretty">Bez člověka na otevření se podnik ten den neotevře: {povinneDny.slice(0, 8).map((d) => kratkeDatum(d)).join(', ')}{povinneDny.length > 8 ? ' …' : ''}. Klepni na den a doplň někoho.</p>
+              <p className="text-sm font-semibold flex items-center gap-1.5"><Icon name="warning" size={16} className="shrink-0" /> {t('Nikdo neotevře — {dny} bez otevírací směny', { dny: dnuTxt(t, povinneDny.length) })}</p>
+              <p className="text-xs mt-0.5 text-pretty">{t('Bez člověka na otevření se podnik ten den neotevře: {dny}. Klepni na den a doplň někoho.', { dny: `${povinneDny.slice(0, 8).map((d) => kratkeDatum(d, jazyk)).join(', ')}${povinneDny.length > 8 ? ' …' : ''}` })}</p>
             </div>
           )}
           {problemDates.length > povinneDny.length && (
             <p className="t-meta text-pretty" data-zadouci-diry>
               <span aria-hidden className="inline-block h-2 w-2 rounded-full bg-wait mr-1.5 align-middle" />
-              {czCount(problemDates.length - povinneDny.length, DEN)} bez druhého člověka — otevře se, jen s menší obsluhou.
+              {t('{dny} bez druhého člověka — otevře se, jen s menší obsluhou.', { dny: dnuTxt(t, problemDates.length - povinneDny.length) })}
             </p>
           )}
           {preview.trzby && <SouhrnTrzeb trzby={preview.trzby} doporuceni={preview.doporuceni ?? []} hodiny={preview.hodiny} />}
           {preview.warnings.length > 0 && (
             <div className="note note-wait">
-              <p className="text-sm font-medium flex items-center gap-1.5"><Icon name="warning" size={16} className="shrink-0" /> Upozornění ({preview.warnings.length})</p>
+              <p className="text-sm font-medium flex items-center gap-1.5"><Icon name="warning" size={16} className="shrink-0" /> {t('Upozornění ({n})', { n: preview.warnings.length })}</p>
               <ul className="text-xs space-y-0.5 max-h-40 overflow-y-auto list-disc pl-4 mt-1">
                 {preview.warnings.slice(0, 40).map((w, i) => <li key={i}>{w}</li>)}
-                {preview.warnings.length > 40 && <li>…a dalších {preview.warnings.length - 40}</li>}
+                {preview.warnings.length > 40 && <li>{t('…a dalších {n}', { n: preview.warnings.length - 40 })}</li>}
               </ul>
             </div>
           )}
@@ -1459,19 +1456,19 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
             // Přepnutí platí hned: návrh se přegeneruje proti tomu, co v měsíci
             // zůstane (bez přepisu počítá s uloženými směnami jako s obsazenými).
             <ul className="list">
-              <SwitchRow checked={clearBeforeCommit} onChange={(v) => zadejGenerovani(v)} title="Nahradit uložené směny měsíce"
+              <SwitchRow checked={clearBeforeCommit} onChange={(v) => zadejGenerovani(v)} title={t('Nahradit uložené směny měsíce')}
                 hint={clearBeforeCommit
                   ? (shifts.length > 0
-                    ? `Uložením návrhu zmizí ${ulozeneVMesici(shifts.length)}.`
-                    : 'V měsíci zatím nic uloženého není.')
-                  : 'Návrh se přidá k uloženým směnám a počítá s nimi — nic se nesmaže.'} />
+                    ? t('Uložením návrhu zmizí {smeny}.', { smeny: ulozeneVMesici(t, shifts.length) })
+                    : t('V měsíci zatím nic uloženého není.'))
+                  : t('Návrh se přidá k uloženým směnám a počítá s nimi — nic se nesmaže.')} />
             </ul>
           )}
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="primary" size="sm" icon="check" loading={committing} disabled={preview.proposed.length === 0 || publishing} onClick={() => { void commitPreview(); }}>
-              Potvrdit a uložit
+              {t('Potvrdit a uložit')}
             </Button>
-            <Button variant="secondary" size="sm" disabled={committing || publishing} onClick={zahoditNavrh}>Zahodit náhled</Button>
+            <Button variant="secondary" size="sm" disabled={committing || publishing} onClick={zahoditNavrh}>{t('Zahodit náhled')}</Button>
           </div>
         </Well>
       )}
@@ -1482,7 +1479,7 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
           <Skeleton className="h-72" />
         </div>
       ) : loadError ? (
-        <ErrorState compact title="Rozvrh se nenačetl" onRetry={load} detail={loadError} />
+        <ErrorState compact title={t('Rozvrh se nenačetl')} onRetry={load} detail={loadError} />
       ) : (
         <div className="min-w-0">
           <StavFiltru text={stavFiltru} />
@@ -1496,7 +1493,7 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
           )}
           {ukazPasTypu && (
             <PasTypu typy={pasTypu} vybrane={filtr.typy} tecka={tridaTecky} navrh={!!preview}
-              onPrepni={(t) => setFiltr(f => ({ ...f, typy: prepni(f.typy, t) }))}
+              onPrepni={(nazev) => setFiltr(f => ({ ...f, typy: prepni(f.typy, nazev) }))}
               diry={problemDates.length > 0 || filtr.jenDiry ? problemDates.length : null}
               jenDiry={filtr.jenDiry} onJenDiry={() => setFiltr(f => ({ ...f, jenDiry: !f.jenDiry }))} />
           )}
@@ -1505,42 +1502,42 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
               <PrehledLidi v={vytizeniLidi} radky={radkyPrehledu} razeni={razeni} onRazeni={setRazeni}
                 otevreno={prehledOtevren} onOtevreno={setPrehledOtevren} vybrani={filtr.lide}
                 onVyber={vyberClovekaZPrehledu} navrh={!!preview} dostupnostViditelna={smiDostupnost}
-                bezFiltru={filtr.typy.length > 0 && filtr.jenDiry ? 'všechny typy a dny' : filtr.typy.length > 0 ? 'všechny typy směn' : filtr.jenDiry ? 'všechny dny' : null} />
+                bezFiltru={filtr.typy.length > 0 && filtr.jenDiry ? t('všechny typy a dny') : filtr.typy.length > 0 ? t('všechny typy směn') : filtr.jenDiry ? t('všechny dny') : null} />
             </div>
           )}
           {filtrAktivni && (
             <div className="mt-3">
-              <ListaFiltru popis={popisFiltru(filtr, jmenaFiltru, kratkaFiltru)} vysledek={popisVysledku(viditelnych, !!preview)} onZrusit={zrusFiltr} />
+              <ListaFiltru popis={popisFiltru(filtr, jmenaFiltru, kratkaFiltru, t)} vysledek={popisVysledku(viditelnych, !!preview, t)} onZrusit={zrusFiltr} />
             </div>
           )}
           </div>
-          <ul className="flex items-center gap-x-3 gap-y-1 t-meta flex-wrap mb-3 mt-3" aria-label="Legenda">
+          <ul className="flex items-center gap-x-3 gap-y-1 t-meta flex-wrap mb-3 mt-3" aria-label={t('Legenda')}>
             {/* Typy s tečkou ukazuje pás typů — v legendě by byly podruhé. */}
-            {!ukazPasTypu && shiftTypes.map((t) => (
-              <li key={t.id} className="flex items-center gap-1.5">
-                <span aria-hidden className={`h-2.5 w-2.5 rounded-full ${tridaTecky(t.color)}`} /> {t.name}
+            {!ukazPasTypu && shiftTypes.map((ty) => (
+              <li key={ty.id} className="flex items-center gap-1.5">
+                <span aria-hidden className={`h-2.5 w-2.5 rounded-full ${tridaTecky(ty.color)}`} /> {ty.name}
               </li>
             ))}
             {preview && (
-              <li className="flex items-center gap-1.5"><span aria-hidden className="h-2.5 w-2.5 rounded-full border border-dashed border-black/50 dark:border-white/50" /> Návrh</li>
+              <li className="flex items-center gap-1.5"><span aria-hidden className="h-2.5 w-2.5 rounded-full border border-dashed border-black/50 dark:border-white/50" /> {t('Návrh')}</li>
             )}
             {/* Dvě úrovně se liší barvou I tvarem: povinná = červený výstražný
                 trojúhelník, žádoucí = oranžová tečka (tokeny wait jako v okně dne
                 a ve widgetu Díry). Samotný odstín červené na telefonu a v tmavém
                 režimu nešel rozlišit. */}
             {povinneDny.length > 0 && (
-              <li className="flex items-center gap-1.5 text-bad-ink"><Icon name="warning" size={13} className="shrink-0" /> Nikdo neotevře</li>
+              <li className="flex items-center gap-1.5 text-bad-ink"><Icon name="warning" size={13} className="shrink-0" /> {t('Nikdo neotevře')}</li>
             )}
             {problemDates.length > povinneDny.length && (
-              <li className="flex items-center gap-1.5 text-wait-ink"><span aria-hidden className="h-2 w-2 rounded-full bg-wait" /> Chybí druhý člověk</li>
+              <li className="flex items-center gap-1.5 text-wait-ink"><span aria-hidden className="h-2 w-2 rounded-full bg-wait" /> {t('Chybí druhý člověk')}</li>
             )}
             {Object.keys(demand).length > 0 && (
-              <li className="flex items-center gap-1.5"><Icon name="users" size={13} className="shrink-0 text-black/45" /> Rezervovaní hosté</li>
+              <li className="flex items-center gap-1.5"><Icon name="users" size={13} className="shrink-0 text-black/45" /> {t('Rezervovaní hosté')}</li>
             )}
           </ul>
           {/* tabIndex -1: kam se vrátí fokus, když zmizí poslední prvek filtru. */}
-          <div ref={mrizkaRef} tabIndex={-1} aria-label="Mřížka rozvrhu" className="grid grid-cols-7 gap-1 sm:gap-1.5 mb-1.5 scroll-mt-4 outline-none">
-            {zkratkyDnu(zacatek).map((d) => (
+          <div ref={mrizkaRef} tabIndex={-1} aria-label={t('Mřížka rozvrhu')} className="grid grid-cols-7 gap-1 sm:gap-1.5 mb-1.5 scroll-mt-4 outline-none">
+            {zkratkyDnuJazyk(zacatek, jazyk).map((d) => (
               <div key={d} className="text-center text-[11px] font-medium text-black/35 py-1">{d}</div>
             ))}
           </div>
@@ -1572,9 +1569,9 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
               const problemTitle = problem
                 ? [
                     ...problem.gaps.map(g => jePovinna(g)
-                      ? `Nikdo neotevře — ${g.from}–${g.to} v podniku nikdo, podnik se neotevře`
-                      : `${g.from}–${g.to} v podniku nikdo — chybí druhý člověk`),
-                    ...problem.missing.map(m => `Neobsazená směna „${m.shiftTypeName}"`),
+                      ? t('Nikdo neotevře — {od}–{do} v podniku nikdo, podnik se neotevře', { od: g.from, do: g.to })
+                      : t('{od}–{do} v podniku nikdo — chybí druhý člověk', { od: g.from, do: g.to })),
+                    ...problem.missing.map(m => t('Neobsazená směna „{nazev}"', { nazev: m.shiftTypeName })),
                   ].join(' · ')
                 : undefined;
               return (
@@ -1583,7 +1580,7 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
                   type="button"
                   onClick={() => otevriDen(cell)}
                   title={problemTitle}
-                  aria-label={`${dayLabel(cell)}: ${czCount(dayShifts.length, SMENA)}${filtrujeSmeny ? ' podle filtru' : ''}${nahradiUlozene && dayShifts.length > 0 ? ' (uložením návrhu se nahradí)' : ''}${dayProposed.length > 0 ? `, v návrhu ${czCount(dayProposed.length, SMENA)}` : ''}${hole ? ', nikdo neotevře' : problem ? ', chybí druhý člověk' : ''}`}
+                  aria-label={`${dayLabel(cell, jazyk)}: ${smenTxt(t, dayShifts.length)}${filtrujeSmeny ? ` ${t('podle filtru')}` : ''}${nahradiUlozene && dayShifts.length > 0 ? ` (${t('uložením návrhu se nahradí')})` : ''}${dayProposed.length > 0 ? `, ${t('v návrhu {smen}', { smen: smenTxt(t, dayProposed.length) })}` : ''}${hole ? `, ${t('nikdo neotevře')}` : problem ? `, ${t('chybí druhý člověk')}` : ''}`}
                   data-dira={hole ? 'povinna' : problem ? 'zadouci' : undefined}
                   data-znacka-diry={znacka ? 'ano' : undefined}
                   className={`min-h-[84px] min-w-0 rounded-xl p-1 sm:p-1.5 text-left transition-colors flex flex-col gap-1 overflow-hidden border ${
@@ -1606,21 +1603,21 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
                   </span>
                   <span className="flex flex-col gap-1 min-w-0 overflow-hidden" aria-hidden>
                     {demand[cell]?.guests > 0 && (
-                      <span title={`${czCount(demand[cell].reservations, { one: 'rezervace', few: 'rezervace', many: 'rezervací' })} na ${czCount(demand[cell].guests, { one: 'hosta', few: 'hosty', many: 'hostů' })}`}
+                      <span title={t('{rez, plural, one {# rezervace} few {# rezervace} other {# rezervací}} na {hoste, plural, one {# hosta} few {# hosty} other {# hostů}}', { rez: demand[cell].reservations, hoste: demand[cell].guests })}
                         className="flex items-center gap-1 min-w-0 rounded-full px-1 py-0.5 text-[11px] font-semibold overflow-hidden bg-black/[0.06] text-black/70">
                         <Icon name="users" size={11} className="flex-shrink-0" />
                         <span className="truncate min-w-0 tabular-nums">{demand[cell].guests}</span>
                       </span>
                     )}
                     {(eventsByDate[cell] ?? []).map((ev: any) => (
-                      <span key={`e-${ev.id}`} title={`Akce: ${ev.title}${ev.startTime ? ` od ${ev.startTime}` : ''}`}
+                      <span key={`e-${ev.id}`} title={ev.startTime ? t('Akce: {nazev} od {cas}', { nazev: ev.title, cas: ev.startTime }) : t('Akce: {nazev}', { nazev: ev.title })}
                         className="flex items-center gap-1 min-w-0 rounded-full px-1 py-0.5 text-[11px] font-semibold overflow-hidden bg-info/15 text-info-ink">
                         <Icon name="calendarCheck" size={11} className="flex-shrink-0" />
                         <span className="truncate min-w-0">{ev.title}</span>
                       </span>
                     ))}
                     {dayShifts.slice(0, 3).map((s) => {
-                      const rt = resolveShiftType(s, shiftTypes);
+                      const rt = resolveShiftType(s, shiftTypes, t);
                       return (
                         <span key={s.id} title={`${s.employeeName} · ${rt.label} · ${s.startTime}–${s.endTime}`}
                           // Uložení návrhu tyhle směny přepíše — v mřížce proto ztlumené a přeškrtnuté,
@@ -1633,16 +1630,16 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
                         </span>
                       );
                     })}
-                    {dayShifts.length > 3 && <span className="text-[11px] text-black/45">+{dayShifts.length - 3} další</span>}
+                    {dayShifts.length > 3 && <span className="text-[11px] text-black/45">{t('+{n} další', { n: dayShifts.length - 3 })}</span>}
                     {dayProposed.slice(0, 3).map((p, idx) => (
                       <span key={`p-${idx}`}
-                        title={`Návrh: ${p.employeeName} · ${p.shiftTypeName} ${p.startTime}–${p.endTime}${(p as any).split ? ' (část směny)' : ''}`}
+                        title={`${t('Návrh')}: ${p.employeeName} · ${p.shiftTypeName} ${p.startTime}–${p.endTime}${(p as any).split ? ` (${t('část směny')})` : ''}`}
                         className="flex items-center gap-1 min-w-0 rounded-full px-1 py-0.5 text-[11px] font-medium overflow-hidden border border-dashed border-black/30 dark:border-white/40 text-black/70">
                         <span className="flex-shrink-0 inline-flex items-center gap-0.5"><Icon name="sparkle" size={11} />{p.employeeAvatar}</span>
                         <span className="truncate min-w-0">{p.startTime}</span>
                       </span>
                     ))}
-                    {dayProposed.length > 3 && <span className="text-[11px] text-black/45">+{dayProposed.length - 3} v návrhu</span>}
+                    {dayProposed.length > 3 && <span className="text-[11px] text-black/45">{t('+{n} v návrhu', { n: dayProposed.length - 3 })}</span>}
                   </span>
                 </button>
               );
@@ -1655,7 +1652,7 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
 
   const obsahZalozky = aktivniTab === 'kalendar' ? (
     <div className="space-y-3">
-      <p className="t-meta">Kdo kdy pracoval, kdo udělal uzávěrku a kde chybí.</p>
+      <p className="t-meta">{t('Kdo kdy pracoval, kdo udělal uzávěrku a kde chybí.')}</p>
       <ShiftCalendar />
     </div>
   ) : aktivniTab === 'typy' ? (
@@ -1675,11 +1672,11 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
       ) : (
         // Záložky nastavení widgety nemají: stejná hlavička, pod ní jen obsah záložky.
         <div className="space-y-6 pb-24 p-4 sm:p-6">
-          <PageHeader title={TITULEK} subtitle={PODTITULEK} aside={aside} />
+          <PageHeader title={t('Rozvrh')} subtitle={t('Sestav měsíční rozvrh podle dostupnosti týmu.')} aside={aside} />
           {loading && aktivniTab !== 'kalendar' && aktivniTab !== 'pravidla'
             ? <Skeleton className="h-64" />
             : loadError && aktivniTab !== 'kalendar' && aktivniTab !== 'pravidla'
-              ? <Card><ErrorState compact title="Nastavení rozvrhu se nenačetlo" onRetry={load} detail={loadError} /></Card>
+              ? <Card><ErrorState compact title={t('Nastavení rozvrhu se nenačetlo')} onRetry={load} detail={loadError} /></Card>
               : obsahZalozky}
         </div>
       )}
@@ -1689,7 +1686,7 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
         type="file"
         accept=".csv,text/csv"
         className="hidden"
-        aria-label="Soubor CSV s rozvrhem"
+        aria-label={t('Soubor CSV s rozvrhem')}
         onChange={(e) => {
           const f = e.target.files?.[0];
           if (f) handleFile(f);
@@ -1700,32 +1697,32 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
       {upgradeFor && <UpgradeModal feature={upgradeFor} onClose={() => setUpgradeFor(null)} />}
 
       {confirmClear && (
-        <Modal open onClose={() => setConfirmClear(false)} size="sm" title="Vymazat celý měsíc?" subtitle={<span className="cz-sentence">{monthLabel(month)}</span>}
+        <Modal open onClose={() => setConfirmClear(false)} size="sm" title={t('Vymazat celý měsíc?')} subtitle={<span className="cz-sentence">{monthLabel(month, jazyk)}</span>}
           footer={<>
-            <Button variant="secondary" onClick={() => setConfirmClear(false)}>Zrušit</Button>
-            <Button variant="danger-solid" icon="trash" loading={clearing} onClick={clearMonth}>Vymazat měsíc</Button>
+            <Button variant="secondary" onClick={() => setConfirmClear(false)}>{t('Zrušit')}</Button>
+            <Button variant="danger-solid" icon="trash" loading={clearing} onClick={clearMonth}>{t('Vymazat měsíc')}</Button>
           </>}>
-          <p className="text-sm text-black/60 text-pretty">Smaže {czCount(shifts.length, SMENA)} tohoto měsíce. Nejde to vzít zpět — lidé, kterým rozvrh přišel, ho ale v upozornění pořád mají.</p>
+          <p className="text-sm text-black/60 text-pretty">{t('Smaže {smeny} tohoto měsíce. Nejde to vzít zpět — lidé, kterým rozvrh přišel, ho ale v upozornění pořád mají.', { smeny: smenTxt(t, shifts.length) })}</p>
         </Modal>
       )}
 
       {copyOpen && (
-        <Modal open onClose={() => setCopyOpen(false)} size="sm" title="Kopírovat týden"
-          subtitle="Směny zdrojového týdne se naplánují do cílového — stejné dny, časy i lidi."
+        <Modal open onClose={() => setCopyOpen(false)} size="sm" title={t('Kopírovat týden')}
+          subtitle={t('Směny zdrojového týdne se naplánují do cílového — stejné dny, časy i lidi.')}
           footer={<>
-            <Button variant="secondary" onClick={() => setCopyOpen(false)}>Zrušit</Button>
-            <Button variant="primary" icon="copy" loading={copying} disabled={!copySrc || !copyDst} onClick={copyWeek}>Zkopírovat</Button>
+            <Button variant="secondary" onClick={() => setCopyOpen(false)}>{t('Zrušit')}</Button>
+            <Button variant="primary" icon="copy" loading={copying} disabled={!copySrc || !copyDst} onClick={copyWeek}>{t('Zkopírovat')}</Button>
           </>}>
           <div className="space-y-3">
-            <Field id="kopie-z" label="Zkopírovat týden">
+            <Field id="kopie-z" label={t('Zkopírovat týden')}>
               <Select id="kopie-z" value={copySrc} onChange={(e) => setCopySrc(e.target.value)}>
-                <option value="">Vyber týden…</option>
+                <option value="">{t('Vyber týden…')}</option>
                 {weekOptions(4, 0).map(w => <option key={w.value} value={w.value}>{w.label}</option>)}
               </Select>
             </Field>
-            <Field id="kopie-do" label="Do týdne">
+            <Field id="kopie-do" label={t('Do týdne')}>
               <Select id="kopie-do" value={copyDst} onChange={(e) => setCopyDst(e.target.value)}>
-                <option value="">Vyber týden…</option>
+                <option value="">{t('Vyber týden…')}</option>
                 {weekOptions(0, 5).map(w => <option key={w.value} value={w.value}>{w.label}</option>)}
               </Select>
             </Field>
@@ -1735,20 +1732,18 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
       )}
 
       {importPreview && (
-        <Modal open onClose={() => setImportPreview(null)} size="lg" title="Náhled importu"
-          subtitle={importPreview.rows.length ? `${czCount(importPreview.rows.length, { one: 'platná směna', few: 'platné směny', many: 'platných směn' })} k importu` : undefined}
+        <Modal open onClose={() => setImportPreview(null)} size="lg" title={t('Náhled importu')}
+          subtitle={importPreview.rows.length ? t('{n, plural, one {# platná směna} few {# platné směny} other {# platných směn}} k importu', { n: importPreview.rows.length }) : undefined}
           footer={<>
-            <Button variant="secondary" onClick={() => setImportPreview(null)}>Zrušit</Button>
+            <Button variant="secondary" onClick={() => setImportPreview(null)}>{t('Zrušit')}</Button>
             <Button variant="primary" icon="upload" loading={importing} disabled={importPreview.rows.length === 0} onClick={confirmImport}>
-              Importovat {czCount(importPreview.rows.length, SMENA)}
+              {t('Importovat {smeny}', { smeny: smenTxt(t, importPreview.rows.length) })}
             </Button>
           </>}>
           <div className="space-y-4">
             <Well className="t-meta">
-              Očekávaný formát: <code className="text-black/80">datum;zaměstnanec;od;do;typ</code> — např.{' '}
-              <code className="text-black/80">2026-08-03;anna@priklad.cz;08:00;14:00;morning</code>. Sloupec „zaměstnanec"
-              může být e-mail nebo jméno (i vedení), typ název typu směny nebo morning, afternoon, flexible. Soubor z Exportu CSV
-              jde načíst zpátky beze změny.
+              {t('Očekávaný formát:')} <code className="text-black/80">datum;zaměstnanec;od;do;typ</code> {t('— např.')}{' '}
+              <code className="text-black/80">2026-08-03;anna@priklad.cz;08:00;14:00;morning</code>. {t('Sloupec „zaměstnanec" může být e-mail nebo jméno (i vedení), typ název typu směny nebo morning, afternoon, flexible. Soubor z Exportu CSV jde načíst zpátky beze změny.')}
             </Well>
             {importPreview.rows.length > 0 && (
               <div className="rounded-2xl border border-black/[0.08] overflow-hidden">
@@ -1756,11 +1751,11 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
                   <table className="w-full min-w-[420px] text-xs">
                     <thead className="bg-black/[0.04] text-black/55">
                       <tr>
-                        <th className="text-left px-3 py-2">Datum</th>
-                        <th className="text-left px-3 py-2">Zaměstnanec</th>
-                        <th className="text-left px-3 py-2">Od</th>
-                        <th className="text-left px-3 py-2">Do</th>
-                        <th className="text-left px-3 py-2">Typ</th>
+                        <th className="text-left px-3 py-2">{t('Datum')}</th>
+                        <th className="text-left px-3 py-2">{t('Zaměstnanec')}</th>
+                        <th className="text-left px-3 py-2">{t('Od')}</th>
+                        <th className="text-left px-3 py-2">{t('Do')}</th>
+                        <th className="text-left px-3 py-2">{t('Typ')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-black/[0.06]">
@@ -1770,19 +1765,19 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
                           <td className="px-3 py-1.5">{r.employeeName}</td>
                           <td className="px-3 py-1.5 tabular-nums">{r.startTime}</td>
                           <td className="px-3 py-1.5 tabular-nums">{r.endTime}</td>
-                          <td className="px-3 py-1.5">{resolveShiftType(r, shiftTypes).label}</td>
+                          <td className="px-3 py-1.5">{resolveShiftType(r, shiftTypes, t).label}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-                {importPreview.rows.length > 40 && <p className="t-meta px-3 py-2">…a dalších {importPreview.rows.length - 40}</p>}
+                {importPreview.rows.length > 40 && <p className="t-meta px-3 py-2">{t('…a dalších {n}', { n: importPreview.rows.length - 40 })}</p>}
               </div>
             )}
             {importPreview.errors.length > 0 && (
               <div className="note note-danger">
                 <p className="text-sm font-medium flex items-center gap-1.5">
-                  <Icon name="warning" size={16} className="shrink-0" /> {czCount(importPreview.errors.length, { one: 'problém', few: 'problémy', many: 'problémů' })} (přeskočeno)
+                  <Icon name="warning" size={16} className="shrink-0" /> {t('{n, plural, one {# problém} few {# problémy} other {# problémů}} (přeskočeno)', { n: importPreview.errors.length })}
                 </p>
                 <ul className="text-xs space-y-0.5 max-h-32 overflow-y-auto list-disc pl-4 mt-1">
                   {importPreview.errors.slice(0, 20).map((e, i) => <li key={i}>{e}</li>)}
@@ -1794,58 +1789,58 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
       )}
 
       {cekaMesic && (
-        <Modal open onClose={() => setCekaMesic(null)} size="sm" title="Návrh není uložený"
-          subtitle={<span className="cz-sentence">{monthLabel(month)}</span>}
+        <Modal open onClose={() => setCekaMesic(null)} size="sm" title={t('Návrh není uložený')}
+          subtitle={<span className="cz-sentence">{monthLabel(month, jazyk)}</span>}
           footer={<>
             <Button variant="secondary" onClick={() => {
               const c = cekaMesic; setCekaMesic(null); setPreview(null); maNavrhRef.current = false;
               setMonth(c.mesic); if (c.den) setDayModal(c.den);
-            }}>Zahodit</Button>
+            }}>{t('Zahodit')}</Button>
             <Button variant="primary" icon="check" loading={committing} disabled={!preview || preview.proposed.length === 0}
               onClick={async () => {
                 const c = cekaMesic;
                 if (!(await commitPreview())) { setCekaMesic(null); return; }
                 setCekaMesic(null); maNavrhRef.current = false;
                 setMonth(c.mesic); if (c.den) setDayModal(c.den);
-              }}>Uložit a přepnout</Button>
+              }}>{t('Uložit a přepnout')}</Button>
           </>}>
           <p className="text-sm text-black/60 text-pretty">
-            Navržený rozvrh i s tvými úpravami je zatím jen tady v prohlížeči. Při přepnutí měsíce by se zahodil.
-            {nahradiUlozene && shifts.length > 0 ? ` Uložením zmizí ${ulozeneVMesici(shifts.length)}.` : ''}
+            {t('Navržený rozvrh i s tvými úpravami je zatím jen tady v prohlížeči. Při přepnutí měsíce by se zahodil.')}
+            {nahradiUlozene && shifts.length > 0 ? ` ${t('Uložením zmizí {smeny}.', { smeny: ulozeneVMesici(t, shifts.length) })}` : ''}
           </p>
         </Modal>
       )}
 
       {ptamSe && (
-        <Modal open onClose={() => setPtamSe(null)} size="sm" title="Návrh má tvoje úpravy"
-          subtitle={<span className="cz-sentence">{monthLabel(month)}</span>}
+        <Modal open onClose={() => setPtamSe(null)} size="sm" title={t('Návrh má tvoje úpravy')}
+          subtitle={<span className="cz-sentence">{monthLabel(month, jazyk)}</span>}
           footer={<>
-            <Button variant="secondary" onClick={() => setPtamSe(null)}>Nechat</Button>
+            <Button variant="secondary" onClick={() => setPtamSe(null)}>{t('Nechat')}</Button>
             <Button variant="danger-solid" onClick={() => {
               const a = ptamSe; setPtamSe(null);
               if (a.akce === 'zahodit') { setPreview(null); return; }
               setClearBeforeCommit(a.nahradit);
               void generate(a.nahradit);
-            }}>{ptamSe.akce === 'zahodit' ? 'Zahodit návrh' : 'Zahodit a vygenerovat znovu'}</Button>
+            }}>{ptamSe.akce === 'zahodit' ? t('Zahodit návrh') : t('Zahodit a vygenerovat znovu')}</Button>
           </>}>
           <p className="text-sm text-black/60 text-pretty">
             {ptamSe.akce === 'zahodit'
-              ? 'V návrhu jsou ruční úpravy (přidané nebo odebrané směny). Zahozením zmizí i ony.'
-              : 'Nové generování vytvoří návrh od začátku — ruční úpravy (přidané nebo odebrané směny) zmizí. Chceš-li je zachovat, návrh nejdřív ulož.'}
+              ? t('V návrhu jsou ruční úpravy (přidané nebo odebrané směny). Zahozením zmizí i ony.')
+              : t('Nové generování vytvoří návrh od začátku — ruční úpravy (přidané nebo odebrané směny) zmizí. Chceš-li je zachovat, návrh nejdřív ulož.')}
           </p>
         </Modal>
       )}
 
       {potvrdNahrazeni && (
-        <Modal open onClose={() => setPotvrdNahrazeni(false)} size="sm" title="Nahradit uložené směny?"
-          subtitle={<span className="cz-sentence">{monthLabel(month)}</span>}
+        <Modal open onClose={() => setPotvrdNahrazeni(false)} size="sm" title={t('Nahradit uložené směny?')}
+          subtitle={<span className="cz-sentence">{monthLabel(month, jazyk)}</span>}
           footer={<>
-            <Button variant="secondary" onClick={() => setPotvrdNahrazeni(false)}>Zrušit</Button>
-            <Button variant="primary" icon="send" loading={publishing} onClick={async () => { setPotvrdNahrazeni(false); await publish(true); }}>Nahradit a publikovat</Button>
+            <Button variant="secondary" onClick={() => setPotvrdNahrazeni(false)}>{t('Zrušit')}</Button>
+            <Button variant="primary" icon="send" loading={publishing} onClick={async () => { setPotvrdNahrazeni(false); await publish(true); }}>{t('Nahradit a publikovat')}</Button>
           </>}>
           <p className="text-sm text-black/60 text-pretty">
-            Uložením návrhu zmizí {ulozeneVMesici(shifts.length)}, a lidé hned dostanou rozvrh jen z návrhu.
-            {' '}Chceš-li je ponechat, vypni v náhledu „Nahradit uložené směny měsíce".
+            {t('Uložením návrhu zmizí {smeny}, a lidé hned dostanou rozvrh jen z návrhu.', { smeny: ulozeneVMesici(t, shifts.length) })}
+            {' '}{t('Chceš-li je ponechat, vypni v náhledu „Nahradit uložené směny měsíce".')}
           </p>
         </Modal>
       )}
@@ -1892,7 +1887,7 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
         />
       )}
       <Toast message={hlaskaFiltru?.text ?? null} id={hlaskaFiltru?.id} onClose={() => setHlaskaFiltru(null)}
-        action={hlaskaFiltru ? { label: 'Ukázat', onClick: () => { ukazPridane(hlaskaFiltru.ukazat); setHlaskaFiltru(null); } } : undefined} />
+        action={hlaskaFiltru ? { label: t('Ukázat'), onClick: () => { ukazPridane(hlaskaFiltru.ukazat); setHlaskaFiltru(null); } } : undefined} />
     </>
   );
 }
@@ -1908,13 +1903,14 @@ function SouhrnTrzeb({ trzby, doporuceni, hodiny }: {
   doporuceni: Doporuceni[];
   hodiny?: NahledGeneratoru['hodiny'];
 }) {
+  const t = useT('rozvrh');
   const { money } = useCurrency();
   if (trzby.stav !== 'ok') {
     const text = trzby.stav === 'bez_opravneni'
-      ? 'Počet lidí podle tržeb je zapnutý, ale na tržby nemáš oprávnění — generátor ho vynechal a řídil se jen otevírací směnou.'
+      ? t('Počet lidí podle tržeb je zapnutý, ale na tržby nemáš oprávnění — generátor ho vynechal a řídil se jen otevírací směnou.')
       : trzby.stav === 'bez_prahu'
-        ? 'Počet lidí podle tržeb je zapnutý, ale chybí práh — nastav ho v záložce Pravidla.'
-        : 'Počet lidí podle tržeb je zapnutý, ale za posledních 8 týdnů nejsou uzávěrky s tržbou — generátor se řídil jen otevírací směnou.';
+        ? t('Počet lidí podle tržeb je zapnutý, ale chybí práh — nastav ho v záložce Pravidla.')
+        : t('Počet lidí podle tržeb je zapnutý, ale za posledních 8 týdnů nejsou uzávěrky s tržbou — generátor se řídil jen otevírací směnou.');
     return <p className="note note-wait text-sm text-pretty" data-souhrn-trzeb={trzby.stav}>{text}</p>;
   }
   const jeden = doporuceni.filter((x) => jedenUplatnen(x));
@@ -1927,11 +1923,11 @@ function SouhrnTrzeb({ trzby, doporuceni, hodiny }: {
     <p className="t-meta flex items-start gap-1.5 text-pretty" data-souhrn-trzeb="ok">
       <Icon name="users" size={15} className="shrink-0 mt-0.5 text-black/40" />
       <span>
-        {jeden.length > 0 && <>Stačí jeden — {czCount(jeden.length, DEN)}, očekávaná tržba ~{money(prumerJeden)}. </>}
-        {dva.length > 0 && <>Dva lidé — {czCount(dva.length, DEN)} nad prahem {money(trzby.prah ?? 0)}. </>}
-        {nepokryje.length > 0 && <>{czCount(nepokryje.length, DEN)} by tržba stačila na jednoho, ale otevírací směna nepokryje celou otevírací dobu — proto dva. </>}
-        {jeden.length === 0 && dva.length === 0 && nepokryje.length === 0 && <>Na dny v tomhle měsíci nejsou tržby k porovnání s prahem. </>}
-        {hodiny && hodiny.usporaDoporucenim > 0 && <>Oproti dvěma lidem to ušetří ~{czCount(Math.round(hodiny.usporaDoporucenim), HODINU)}.</>}
+        {jeden.length > 0 && <>{t('Stačí jeden — {dny}, očekávaná tržba ~{trzba}.', { dny: dnuTxt(t, jeden.length), trzba: money(prumerJeden) })} </>}
+        {dva.length > 0 && <>{t('Dva lidé — {dny} nad prahem {prah}.', { dny: dnuTxt(t, dva.length), prah: money(trzby.prah ?? 0) })} </>}
+        {nepokryje.length > 0 && <>{t('{dny} by tržba stačila na jednoho, ale otevírací směna nepokryje celou otevírací dobu — proto dva.', { dny: dnuTxt(t, nepokryje.length) })} </>}
+        {jeden.length === 0 && dva.length === 0 && nepokryje.length === 0 && <>{t('Na dny v tomhle měsíci nejsou tržby k porovnání s prahem.')} </>}
+        {hodiny && hodiny.usporaDoporucenim > 0 && <>{t('Oproti dvěma lidem to ušetří ~{hodiny}.', { hodiny: hodinuTxt(t, Math.round(hodiny.usporaDoporucenim)) })}</>}
       </span>
     </p>
   );
@@ -1946,12 +1942,13 @@ function TeckaBarvy({ barva, className = '' }: { barva: string | null | undefine
   return <span aria-hidden className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${tridaTecky(barva)} ${className}`} />;
 }
 
-const NAZEV_BARVY: Record<string, string> = {
-  '#C8F542': 'limetková', '#0A84FF': 'modrá', '#8B5CF6': 'fialová', '#F59E0B': 'oranžová',
-  '#14B8A6': 'tyrkysová', '#EC4899': 'růžová',
-};
+const nazvyBarev = (t: PrekladFn): Record<string, string> => ({
+  '#C8F542': t('limetková'), '#0A84FF': t('modrá'), '#8B5CF6': t('fialová'), '#F59E0B': t('oranžová'),
+  '#14B8A6': t('tyrkysová'), '#EC4899': t('růžová'),
+});
 
 function ShiftTypesManager({ shiftTypes, onReload }: { shiftTypes: ShiftType[]; onReload: () => Promise<void> }) {
+  const t = useT('rozvrh');
   const [editing, setEditing] = useState<number | 'new' | null>(null);
   const [name, setName] = useState('');
   const [start, setStart] = useState('06:00');
@@ -1967,9 +1964,9 @@ function ShiftTypesManager({ shiftTypes, onReload }: { shiftTypes: ShiftType[]; 
     setEditing('new'); setName(''); setStart('06:00'); setEnd('14:00'); setColor(COLORS[0]);
     setStartsAtOpen(false); setEndsAtClose(false); setErr('');
   };
-  const beginEdit = (t: ShiftType) => {
-    setEditing(t.id); setName(t.name); setStart(t.startTime); setEnd(t.endTime); setColor(t.color ?? COLORS[0]);
-    setStartsAtOpen(!!t.startsAtOpen); setEndsAtClose(!!t.endsAtClose); setErr('');
+  const beginEdit = (ty: ShiftType) => {
+    setEditing(ty.id); setName(ty.name); setStart(ty.startTime); setEnd(ty.endTime); setColor(ty.color ?? COLORS[0]);
+    setStartsAtOpen(!!ty.startsAtOpen); setEndsAtClose(!!ty.endsAtClose); setErr('');
   };
 
   const save = async () => {
@@ -1984,13 +1981,13 @@ function ShiftTypesManager({ shiftTypes, onReload }: { shiftTypes: ShiftType[]; 
       if (!res.ok) {
         // Server umí říct, že typ spravuje jiný podnik organizace — ať to člověk vidí.
         const d = await res.json().catch(() => ({}));
-        setErr(d?.error || 'Typ směny se nepodařilo uložit.');
+        setErr(d?.error ? tg(d.error) : t('Typ směny se nepodařilo uložit.'));
         return;
       }
       setEditing(null);
       await onReload();
     } catch {
-      setErr('Nepodařilo se spojit se serverem.');
+      setErr(t('Nepodařilo se spojit se serverem.'));
     } finally {
       setBusy(false);
     }
@@ -2002,11 +1999,11 @@ function ShiftTypesManager({ shiftTypes, onReload }: { shiftTypes: ShiftType[]; 
     setBusy(true);
     try {
       const res = await fetch(`/api/shift-types/${smazat.id}`, { method: 'DELETE' });
-      if (!res.ok) setErr('Typ směny se nepodařilo smazat.');
+      if (!res.ok) setErr(t('Typ směny se nepodařilo smazat.'));
       setSmazat(null);
       await onReload();
     } catch {
-      setErr('Nepodařilo se spojit se serverem.');
+      setErr(t('Nepodařilo se spojit se serverem.'));
     } finally {
       setBusy(false);
     }
@@ -2025,30 +2022,30 @@ function ShiftTypesManager({ shiftTypes, onReload }: { shiftTypes: ShiftType[]; 
     <Card as="section" aria-labelledby="typy-smen" className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h2 id="typy-smen" className="t-section flex items-center gap-2 min-w-0">
-          <Icon name="clock" size={17} className="text-black/40 shrink-0" /><span className="truncate">Typy směn</span>
+          <Icon name="clock" size={17} className="text-black/40 shrink-0" /><span className="truncate">{t('Typy směn')}</span>
         </h2>
-        {editing !== 'new' && <Button variant="accent" size="sm" icon="plus" onClick={beginNew}>Přidat typ</Button>}
+        {editing !== 'new' && <Button variant="accent" size="sm" icon="plus" onClick={beginNew}>{t('Přidat typ')}</Button>}
       </div>
       {err && <p className="note note-danger text-sm" role="alert">{err}</p>}
 
       {shiftTypes.length === 0 && editing !== 'new' && (
-        <EmptyState illustration="smeny" title="Zatím žádné typy směn" hint="Ranní, odpolední, otvíračka — podle nich generátor obsazuje dny. Přidej první." compact />
+        <EmptyState illustration="smeny" title={t('Zatím žádné typy směn')} hint={t('Ranní, odpolední, otvíračka — podle nich generátor obsazuje dny. Přidej první.')} compact />
       )}
 
       {shiftTypes.length > 0 && (
         <ul className="list">
-          {shiftTypes.map((t) => editing === t.id ? (
-            <li key={t.id} className="py-3">{formular}</li>
+          {shiftTypes.map((ty) => editing === ty.id ? (
+            <li key={ty.id} className="py-3">{formular}</li>
           ) : (
-            <ListRow key={t.id}
-              lead={<span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-black/[0.035]"><TeckaBarvy barva={t.color} className="h-3 w-3" /></span>}
-              title={<>{t.name}{t.zOrganizace && <Chip tone="muted" size="sm" className="ml-2 align-middle">z organizace</Chip>}{t.sdileno && <Chip tone="info" size="sm" className="ml-2 align-middle">sdíleno</Chip>}</>}
-              meta={<>{t.startsAtOpen ? 'otevření' : t.startTime}–{t.endsAtClose ? 'zavření' : t.endTime}{t.zOrganizace && t.spravuje ? ` · spravuje: ${t.spravuje}` : ''}</>}
+            <ListRow key={ty.id}
+              lead={<span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-black/[0.035]"><TeckaBarvy barva={ty.color} className="h-3 w-3" /></span>}
+              title={<>{ty.name}{ty.zOrganizace && <Chip tone="muted" size="sm" className="ml-2 align-middle">{t('z organizace')}</Chip>}{ty.sdileno && <Chip tone="info" size="sm" className="ml-2 align-middle">{t('sdíleno')}</Chip>}</>}
+              meta={<>{ty.startsAtOpen ? t('otevření') : ty.startTime}–{ty.endsAtClose ? t('zavření') : ty.endTime}{ty.zOrganizace && ty.spravuje ? ` · ${t('spravuje: {podnik}', { podnik: ty.spravuje })}` : ''}</>}
               // Typ ze zdrojového podniku upraví jen jeho vedení — tlačítka by jen vracela 403.
-              actions={t.zOrganizace ? undefined : (
+              actions={ty.zOrganizace ? undefined : (
                 <>
-                  <Button variant="ghost" size="sm" iconOnly icon="pencil" aria-label={`Upravit typ ${t.name}`} onClick={() => beginEdit(t)} />
-                  <Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={`Smazat typ ${t.name}`} onClick={() => setSmazat(t)} />
+                  <Button variant="ghost" size="sm" iconOnly icon="pencil" aria-label={t('Upravit typ {nazev}', { nazev: ty.name })} onClick={() => beginEdit(ty)} />
+                  <Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={t('Smazat typ {nazev}', { nazev: ty.name })} onClick={() => setSmazat(ty)} />
                 </>
               )}
             />
@@ -2059,12 +2056,12 @@ function ShiftTypesManager({ shiftTypes, onReload }: { shiftTypes: ShiftType[]; 
       {editing === 'new' && formular}
 
       {smazat && (
-        <Modal open onClose={() => setSmazat(null)} size="sm" title={`Smazat typ „${smazat.name}"?`}
+        <Modal open onClose={() => setSmazat(null)} size="sm" title={t('Smazat typ „{nazev}"?', { nazev: smazat.name })}
           footer={<>
-            <Button variant="secondary" onClick={() => setSmazat(null)}>Zrušit</Button>
-            <Button variant="danger-solid" icon="trash" loading={busy} onClick={remove}>Smazat typ</Button>
+            <Button variant="secondary" onClick={() => setSmazat(null)}>{t('Zrušit')}</Button>
+            <Button variant="danger-solid" icon="trash" loading={busy} onClick={remove}>{t('Smazat typ')}</Button>
           </>}>
-          <p className="text-sm text-black/60 text-pretty">Naplánované směny tohoto typu zůstanou, ale ztratí barvu i název.</p>
+          <p className="text-sm text-black/60 text-pretty">{t('Naplánované směny tohoto typu zůstanou, ale ztratí barvu i název.')}</p>
         </Modal>
       )}
     </Card>
@@ -2079,35 +2076,37 @@ function TypeForm({
   setName: (v: string) => void; setStart: (v: string) => void; setEnd: (v: string) => void; setColor: (v: string) => void;
   setStartsAtOpen: (v: boolean) => void; setEndsAtClose: (v: boolean) => void; onSave: () => void; onCancel: () => void;
 }) {
+  const t = useT('rozvrh');
+  const NAZEV_BARVY = nazvyBarev(t);
   return (
     <Well className="space-y-3">
-      <Field id="typ-nazev" label="Název" hint="Třeba Ranní, Odpolední nebo Otvíračka.">
+      <Field id="typ-nazev" label={t('Název')} hint={t('Třeba Ranní, Odpolední nebo Otvíračka.')}>
         <Input id="typ-nazev" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} />
       </Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field id="typ-od" label="Od">
+        <Field id="typ-od" label={t('Od')}>
           {startsAtOpen
-            ? <p id="typ-od" className="t-meta py-3">Otevření podniku</p>
+            ? <p id="typ-od" className="t-meta py-3">{t('Otevření podniku')}</p>
             : <Input id="typ-od" type="time" value={start} onChange={(e) => setStart(e.target.value)} />}
         </Field>
-        <Field id="typ-do" label="Do">
+        <Field id="typ-do" label={t('Do')}>
           {endsAtClose
-            ? <p id="typ-do" className="t-meta py-3">Zavření podniku</p>
+            ? <p id="typ-do" className="t-meta py-3">{t('Zavření podniku')}</p>
             : <Input id="typ-do" type="time" value={end} onChange={(e) => setEnd(e.target.value)} />}
         </Field>
       </div>
       <div className="flex flex-col gap-2">
         <label className="flex items-center gap-2 text-sm text-black/70 cursor-pointer">
           <input type="checkbox" checked={startsAtOpen} onChange={(e) => setStartsAtOpen(e.target.checked)} className="h-4 w-4 accent-[#8FB811]" />
-          Začíná otevřením podniku
+          {t('Začíná otevřením podniku')}
         </label>
         <label className="flex items-center gap-2 text-sm text-black/70 cursor-pointer">
           <input type="checkbox" checked={endsAtClose} onChange={(e) => setEndsAtClose(e.target.checked)} className="h-4 w-4 accent-[#8FB811]" />
-          Končí zavřením podniku <span className="text-black/45">(do konce směny)</span>
+          {t('Končí zavřením podniku')} <span className="text-black/45">{t('(do konce směny)')}</span>
         </label>
       </div>
-      <div role="radiogroup" aria-label="Barva typu" className="space-y-1.5">
-        <p className="text-[13px] font-medium text-black/70" aria-hidden>Barva</p>
+      <div role="radiogroup" aria-label={t('Barva typu')} className="space-y-1.5">
+        <p className="text-[13px] font-medium text-black/70" aria-hidden>{t('Barva')}</p>
         <div className="flex flex-wrap gap-2">
           {COLORS.map((c) => (
             // Vybraná podle kategorie: starý typ uložený jako #3B82F6 je pořád „modrá".
@@ -2119,8 +2118,8 @@ function TypeForm({
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2 pt-1">
-        <Button variant="primary" size="sm" loading={busy} disabled={!name.trim()} onClick={onSave}>Uložit</Button>
-        <Button variant="secondary" size="sm" onClick={onCancel}>Zrušit</Button>
+        <Button variant="primary" size="sm" loading={busy} disabled={!name.trim()} onClick={onSave}>{t('Uložit')}</Button>
+        <Button variant="secondary" size="sm" onClick={onCancel}>{t('Zrušit')}</Button>
       </div>
     </Well>
   );
@@ -2136,6 +2135,9 @@ function OpeningHoursEditor({ value, onSaved, readOnly = false }: {
   /** Bez podnik.oteviraci_doba jen ke čtení — server by uložení odmítl. */
   readOnly?: boolean;
 }) {
+  const t = useT('rozvrh');
+  const { jazyk } = useJazyk();
+  const dnyTydne = nazvyDnuDlouze(jazyk);
   const norm = (v: Record<string, OpeningDay>) => {
     const out: Record<string, OpeningDay> = {};
     for (let d = 0; d <= 6; d++) {
@@ -2171,7 +2173,7 @@ function OpeningHoursEditor({ value, onSaved, readOnly = false }: {
       onSaved(d.openingHours ?? hours);
       setSaved(true);
     } catch (e) {
-      setErr(apiMessage(e, 'Otevírací dobu se nepodařilo uložit.'));
+      setErr(apiMessage(e, t('Otevírací dobu se nepodařilo uložit.')));
     } finally {
       setSaving(false);
     }
@@ -2180,25 +2182,25 @@ function OpeningHoursEditor({ value, onSaved, readOnly = false }: {
   return (
     <Card as="section" aria-labelledby="oteviraci-doba" className="space-y-4">
       <div>
-        <h2 id="oteviraci-doba" className="t-section flex items-center gap-2"><Icon name="clock" size={17} className="text-black/40 shrink-0" /> Otevírací doba</h2>
-        <p className="t-meta mt-0.5">Kdy má provoz otevřeno. Zavřené dny generátor přeskočí a díry hlídá jen v otevírací době.</p>
+        <h2 id="oteviraci-doba" className="t-section flex items-center gap-2"><Icon name="clock" size={17} className="text-black/40 shrink-0" /> {t('Otevírací doba')}</h2>
+        <p className="t-meta mt-0.5">{t('Kdy má provoz otevřeno. Zavřené dny generátor přeskočí a díry hlídá jen v otevírací době.')}</p>
       </div>
 
       <ul className="list">
-        {CZ_DAYS_FULL.map((label, d) => {
+        {dnyTydne.map((label, d) => {
           const day = hours[String(d)] ?? { open: '08:00', close: '20:00', closed: false };
           const idDne = `oteviraci-${d}`;
           return (
             <li key={d} className="flex items-center gap-3 py-3 flex-wrap min-h-[3.25rem]">
               <span id={idDne} className="w-24 text-[15px] font-medium text-[#16181A] truncate">{label}</span>
               <Switch checked={!day.closed} onChange={(on) => update(d, { closed: !on })} labelledBy={idDne} disabled={readOnly} />
-              <span className="t-meta w-20">{day.closed ? 'Zavřeno' : 'Otevřeno'}</span>
+              <span className="t-meta w-20">{day.closed ? t('Zavřeno') : t('Otevřeno')}</span>
               {!day.closed && (
                 <div className="flex items-center gap-2">
-                  <Input type="time" aria-label={`${label} — otevírá v`} value={day.open} disabled={readOnly}
+                  <Input type="time" aria-label={t('{den} — otevírá v', { den: label })} value={day.open} disabled={readOnly}
                     onChange={(e) => update(d, { open: e.target.value })} className="!w-auto" />
                   <span className="text-black/40" aria-hidden>–</span>
-                  <Input type="time" aria-label={`${label} — zavírá v`} value={day.close} disabled={readOnly}
+                  <Input type="time" aria-label={t('{den} — zavírá v', { den: label })} value={day.close} disabled={readOnly}
                     onChange={(e) => update(d, { close: e.target.value })} className="!w-auto" />
                 </div>
               )}
@@ -2209,11 +2211,11 @@ function OpeningHoursEditor({ value, onSaved, readOnly = false }: {
 
       {err && <p className="note note-danger text-sm" role="alert">{err}</p>}
       {readOnly ? (
-        <p className="t-meta">Otevírací dobu mění vedení s oprávněním k nastavení podniku.</p>
+        <p className="t-meta">{t('Otevírací dobu mění vedení s oprávněním k nastavení podniku.')}</p>
       ) : (
         <div className="flex flex-wrap items-center gap-3">
-          <Button variant="accent" icon="check" loading={saving} onClick={save}>Uložit otevírací dobu</Button>
-          {saved && <Chip tone="ok" icon="check">Uloženo</Chip>}
+          <Button variant="accent" icon="check" loading={saving} onClick={save}>{t('Uložit otevírací dobu')}</Button>
+          {saved && <Chip tone="ok" icon="check">{t('Uloženo')}</Chip>}
         </div>
       )}
     </Card>
@@ -2231,6 +2233,9 @@ function FixedAssignmentsManager({ employees, shiftTypes, assignments, onReload,
   assignments: FixedAssignment[];
   onReload: () => Promise<void>;
 }) {
+  const t = useT('rozvrh');
+  const { jazyk } = useJazyk();
+  const dnyTydne = nazvyDnuDlouze(jazyk);
   const [employeeId, setEmployeeId] = useState<number | ''>('');
   const [weekday, setWeekday] = useState<number>(0);
   const [shiftTypeId, setShiftTypeId] = useState<number | ''>('');
@@ -2252,7 +2257,7 @@ function FixedAssignmentsManager({ employees, shiftTypes, assignments, onReload,
       setShiftTypeId('');
       await onReload();
     } catch (e) {
-      setErr(apiMessage(e, 'Pevný den se nepodařilo přidat.'));
+      setErr(apiMessage(e, t('Pevný den se nepodařilo přidat.')));
     } finally {
       setBusy(false);
     }
@@ -2263,11 +2268,11 @@ function FixedAssignmentsManager({ employees, shiftTypes, assignments, onReload,
     setBusy(true); setErr('');
     try {
       const res = await fetch(`/api/fixed-assignments?id=${smazat.id}`, { method: 'DELETE' });
-      if (!res.ok) setErr('Přiřazení se nepodařilo smazat.');
+      if (!res.ok) setErr(t('Přiřazení se nepodařilo smazat.'));
       setSmazat(null);
       await onReload();
     } catch {
-      setErr('Nepodařilo se spojit se serverem.');
+      setErr(t('Nepodařilo se spojit se serverem.'));
     } finally {
       setBusy(false);
     }
@@ -2280,7 +2285,7 @@ function FixedAssignmentsManager({ employees, shiftTypes, assignments, onReload,
       body: JSON.stringify({ id: a.id, shiftTypeId: v }),
     }).catch(() => null);
     if (res?.ok) await onReload();
-    else setErr('Změnu se nepodařilo uložit.');
+    else setErr(t('Změnu se nepodařilo uložit.'));
   };
 
   const byWeekday = useMemo(() => {
@@ -2294,48 +2299,48 @@ function FixedAssignmentsManager({ employees, shiftTypes, assignments, onReload,
       {err && <p className="note note-danger text-sm" role="alert">{err}</p>}
       <Card as="section" aria-labelledby="pevny-den" className="space-y-4">
         <div>
-          <h2 id="pevny-den" className="t-section flex items-center gap-2"><Icon name="swap" size={17} className="text-black/40 shrink-0" /> Přidat pevný den</h2>
-          <p className="t-meta mt-0.5">Přiřaď člověka k opakujícímu se dni v týdnu. Generátor ho na ten den nasadí přednostně.</p>
+          <h2 id="pevny-den" className="t-section flex items-center gap-2"><Icon name="swap" size={17} className="text-black/40 shrink-0" /> {t('Přidat pevný den')}</h2>
+          <p className="t-meta mt-0.5">{t('Přiřaď člověka k opakujícímu se dni v týdnu. Generátor ho na ten den nasadí přednostně.')}</p>
         </div>
 
         {employees.length === 0 ? (
           // Holá věta je slepá ulička: prázdný stav má vést tam, kde se to spraví.
-          <EmptyState icon="users" compact title="Zatím nikdo v týmu"
-            hint="Pevné dny se přiřazují lidem — nejdřív je pozvi do týmu."
-            action={onNavigate ? <Button variant="secondary" icon="users" onClick={() => onNavigate('team-settings')}>Pozvat do týmu</Button> : undefined} />
+          <EmptyState icon="users" compact title={t('Zatím nikdo v týmu')}
+            hint={t('Pevné dny se přiřazují lidem — nejdřív je pozvi do týmu.')}
+            action={onNavigate ? <Button variant="secondary" icon="users" onClick={() => onNavigate('team-settings')}>{t('Pozvat do týmu')}</Button> : undefined} />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Field id="pevny-kdo" label="Kdo">
+            <Field id="pevny-kdo" label={t('Kdo')}>
               <Select id="pevny-kdo" value={employeeId} onChange={(e) => setEmployeeId(e.target.value === '' ? '' : parseInt(e.target.value))}>
-                <option value="">Vyber člověka…</option>
+                <option value="">{t('Vyber člověka…')}</option>
                 {employees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
               </Select>
             </Field>
-            <Field id="pevny-den-tydne" label="Den v týdnu">
+            <Field id="pevny-den-tydne" label={t('Den v týdnu')}>
               <Select id="pevny-den-tydne" value={weekday} onChange={(e) => setWeekday(parseInt(e.target.value))}>
-                {CZ_DAYS_FULL.map((label, d) => <option key={d} value={d}>{label}</option>)}
+                {dnyTydne.map((label, d) => <option key={d} value={d}>{label}</option>)}
               </Select>
             </Field>
-            <Field id="pevny-typ" label="Typ směny" hint="Nepovinné — bez něj libovolná směna.">
+            <Field id="pevny-typ" label={t('Typ směny')} hint={t('Nepovinné — bez něj libovolná směna.')}>
               <Select id="pevny-typ" value={shiftTypeId} onChange={(e) => setShiftTypeId(e.target.value === '' ? '' : parseInt(e.target.value))}>
-                <option value="">Libovolná</option>
-                {shiftTypes.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.startTime}–{t.endTime})</option>)}
+                <option value="">{t('Libovolná')}</option>
+                {shiftTypes.map((ty) => <option key={ty.id} value={ty.id}>{ty.name} ({ty.startTime}–{ty.endTime})</option>)}
               </Select>
             </Field>
             <div className="flex items-end">
-              <Button variant="accent" icon="plus" block loading={busy} disabled={!employeeId} onClick={add} className="sm:!w-full">Přidat pevný den</Button>
+              <Button variant="accent" icon="plus" block loading={busy} disabled={!employeeId} onClick={add} className="sm:!w-full">{t('Přidat pevný den')}</Button>
             </div>
           </div>
         )}
       </Card>
 
       <Card as="section" aria-labelledby="pevne-dny" className="space-y-3">
-        <h2 id="pevne-dny" className="t-section flex items-center gap-2"><Icon name="calendar" size={17} className="text-black/40 shrink-0" /> Pevné dny</h2>
+        <h2 id="pevne-dny" className="t-section flex items-center gap-2"><Icon name="calendar" size={17} className="text-black/40 shrink-0" /> {t('Pevné dny')}</h2>
         {assignments.length === 0 ? (
-          <EmptyState icon="calendar" title="Zatím žádné pevné dny" hint="Kdo chodí vždycky v pondělí, dostane pondělí — generátor to bere jako první." compact />
+          <EmptyState icon="calendar" title={t('Zatím žádné pevné dny')} hint={t('Kdo chodí vždycky v pondělí, dostane pondělí — generátor to bere jako první.')} compact />
         ) : (
           <div className="space-y-4">
-            {CZ_DAYS_FULL.map((label, d) => {
+            {dnyTydne.map((label, d) => {
               const list = byWeekday[d] ?? [];
               if (list.length === 0) return null;
               return (
@@ -2347,13 +2352,13 @@ function FixedAssignmentsManager({ employees, shiftTypes, assignments, onReload,
                         lead={<Avatar emoji={a.employeeAvatar} size="sm" />}
                         title={a.employeeName}
                         right={(
-                          <Select aria-label={`Typ směny — ${a.employeeName}, ${label.toLowerCase()}`} value={a.shiftTypeId ?? ''}
+                          <Select aria-label={t('Typ směny — {jmeno}, {den}', { jmeno: a.employeeName, den: label.toLowerCase() })} value={a.shiftTypeId ?? ''}
                             onChange={(e) => zmenTyp(a, e.target.value === '' ? null : parseInt(e.target.value))} className="!w-auto !py-2 text-sm">
-                            <option value="">Libovolná</option>
-                            {shiftTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                            <option value="">{t('Libovolná')}</option>
+                            {shiftTypes.map((ty) => <option key={ty.id} value={ty.id}>{ty.name}</option>)}
                           </Select>
                         )}
-                        actions={<Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={`Odebrat pevný den — ${a.employeeName}, ${label.toLowerCase()}`} onClick={() => setSmazat(a)} />}
+                        actions={<Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={t('Odebrat pevný den — {jmeno}, {den}', { jmeno: a.employeeName, den: label.toLowerCase() })} onClick={() => setSmazat(a)} />}
                       />
                     ))}
                   </ul>
@@ -2365,13 +2370,13 @@ function FixedAssignmentsManager({ employees, shiftTypes, assignments, onReload,
       </Card>
 
       {smazat && (
-        <Modal open onClose={() => setSmazat(null)} size="sm" title="Odebrat pevný den?"
-          subtitle={`${smazat.employeeName} · ${CZ_DAYS_FULL[smazat.weekday]?.toLowerCase() ?? ''}`}
+        <Modal open onClose={() => setSmazat(null)} size="sm" title={t('Odebrat pevný den?')}
+          subtitle={`${smazat.employeeName} · ${dnyTydne[smazat.weekday]?.toLowerCase() ?? ''}`}
           footer={<>
-            <Button variant="secondary" onClick={() => setSmazat(null)}>Zrušit</Button>
-            <Button variant="danger-solid" icon="trash" loading={busy} onClick={remove}>Odebrat</Button>
+            <Button variant="secondary" onClick={() => setSmazat(null)}>{t('Zrušit')}</Button>
+            <Button variant="danger-solid" icon="trash" loading={busy} onClick={remove}>{t('Odebrat')}</Button>
           </>}>
-          <p className="text-sm text-black/60 text-pretty">Z příštího generování rozvrhu vypadne. Už naplánované směny zůstanou.</p>
+          <p className="text-sm text-black/60 text-pretty">{t('Z příštího generování rozvrhu vypadne. Už naplánované směny zůstanou.')}</p>
         </Modal>
       )}
     </div>
@@ -2416,6 +2421,8 @@ function DayModal({
   /** Mřížka je vyfiltrovaná na lidi nebo typ — okno přesto ukazuje celý den. */
   filtrAktivni?: boolean;
 }) {
+  const t = useT('rozvrh');
+  const { jazyk } = useJazyk();
   const { money } = useCurrency();
   // Otevírací doba TOHO dne (klíč 0 = pondělí … 6 = neděle).
   const oh = openingHours[weekdayKey(date)] as OpeningDay | undefined;
@@ -2480,20 +2487,20 @@ function DayModal({
     if (!employeeId) return null;
     const emp = Number(employeeId);
     const sub = submissions.find((s) => s.employeeId === emp);
-    const empName = employees.find((e) => e.id === emp)?.name ?? 'Tenhle člověk';
+    const empName = employees.find((e) => e.id === emp)?.name ?? t('Tenhle člověk');
     const shiftCat = start < '12:00' ? 'morning' : 'afternoon';
     const dayPref = sub?.dayPreferences?.[date];
     const prefTypesForCheck = shiftTypes.map((t) => ({ id: t.id, name: t.name, start: t.startTime }));
     const slotTypeId = shiftTypes.find((t) => t.name === typeName)?.id ?? null;
     const prefBlocks = dayPref && dayPref !== 'off' && dayPref !== 'flexible'
       && !prefAllowsSlot(dayPref, { typeId: slotTypeId, start }, prefTypesForCheck);
-    if (unavailable.has(emp)) return `${empName} má tento den jako nedostupný (nebo schválené volno).`;
-    if (prefBlocks) return `${empName} má na tento den závaznou volbu „${dayPrefLabel(dayPref, prefTypesForCheck)}" — tahle směna jí neodpovídá.`;
+    if (unavailable.has(emp)) return t('{jmeno} má tento den jako nedostupný (nebo schválené volno).', { jmeno: empName });
+    if (prefBlocks) return t('{jmeno} má na tento den závaznou volbu „{volba}" — tahle směna jí neodpovídá.', { jmeno: empName, volba: prelozPopisStavu(t, dayPrefLabel(dayPref, prefTypesForCheck) ?? '') });
     if (!dayPref && sub?.preferredShift && sub.preferredShift !== 'flexible' && sub.preferredShift !== shiftCat) {
-      return `${empName} preferuje ${sub.preferredShift === 'morning' ? 'ranní' : 'odpolední'} směny.`;
+      return sub.preferredShift === 'morning' ? t('{jmeno} preferuje ranní směny.', { jmeno: empName }) : t('{jmeno} preferuje odpolední směny.', { jmeno: empName });
     }
     return null;
-  }, [employeeId, start, typeName, submissions, employees, shiftTypes, unavailable, date]);
+  }, [employeeId, start, typeName, submissions, employees, shiftTypes, unavailable, date, t]);
 
   // Druhá směna téhož člověka na překrývající se čas je vždycky omyl.
   const kolidujeRucne = !!employeeId && kolize(obsazene.filter((x) => x.employeeId === Number(employeeId)), { startTime: start, endTime: end });
@@ -2510,7 +2517,7 @@ function DayModal({
     }
   };
 
-  const nadpis = dayLabel(date);
+  const nadpis = dayLabel(date, jazyk);
   // S Týmem na den se přidává z řádku člověka. Formulář s vlastním časem je
   // pak jen doplněk pod rozbalením a jeho tlačítko je u něj — lepivá patička
   // s „Přidat do návrhu" mířila na vzdálený select pod dlouhým seznamem
@@ -2519,14 +2526,14 @@ function DayModal({
   const [vlastniCas, setVlastniCas] = useState(false);
   const tlacitkoPridat = (
     <Button variant="primary" icon="plus" loading={saving} disabled={!employeeId || employees.length === 0 || kolidujeRucne} onClick={save}>
-      {varovani ? 'Přesto přidat' : navrh ? 'Přidat do návrhu' : 'Přidat směnu'}
+      {varovani ? t('Přesto přidat') : navrh ? t('Přidat do návrhu') : t('Přidat směnu')}
     </Button>
   );
   return (
     <Modal open onClose={onClose} size="md" title={nadpis.charAt(0).toUpperCase() + nadpis.slice(1)}
-      subtitle={dayOpen ? `Otevřeno ${dayOpen}–${dayClose}` : oh?.closed ? 'Zavřeno' : undefined}
-      footer={readOnly || sTymem ? <Button variant="secondary" onClick={onClose}>Zavřít</Button> : <>
-        <Button variant="secondary" onClick={onClose}>Zavřít</Button>
+      subtitle={dayOpen ? t('Otevřeno {od}–{do}', { od: dayOpen, do: dayClose }) : oh?.closed ? t('Zavřeno') : undefined}
+      footer={readOnly || sTymem ? <Button variant="secondary" onClick={onClose}>{t('Zavřít')}</Button> : <>
+        <Button variant="secondary" onClick={onClose}>{t('Zavřít')}</Button>
         {tlacitkoPridat}
       </>}>
       <div className="space-y-5">
@@ -2535,7 +2542,7 @@ function DayModal({
           // (kdo už stojí, kdo může) — filtr by tu schoval právě ty, kým se díra zaplní.
           <p className="t-meta flex items-center gap-1.5" data-okno-bez-filtru>
             <Icon name="info" size={14} className="shrink-0 text-black/45" />
-            Okno ukazuje celý den — filtr platí jen pro mřížku.
+            {t('Okno ukazuje celý den — filtr platí jen pro mřížku.')}
           </p>
         )}
         {!readOnly && (dayGaps.length > 0 || missingHere.length > 0) && (
@@ -2543,12 +2550,12 @@ function DayModal({
           <div className={`note ${nikdoNeotevre ? 'note-danger' : 'note-wait'}`} data-dira={nikdoNeotevre ? 'povinna' : 'zadouci'}>
             <p className="text-sm font-semibold flex items-center gap-1.5">
               <Icon name="warning" size={16} className="shrink-0" />
-              {nikdoNeotevre ? 'Nikdo neotevře — podnik se ten den neotevře'
-                : lidiDne === 1 ? 'Druhá směna neobsazená — otevře se s jedním člověkem' : 'Směna neobsazená — otevře se i bez ní'}
+              {nikdoNeotevre ? t('Nikdo neotevře — podnik se ten den neotevře')
+                : lidiDne === 1 ? t('Druhá směna neobsazená — otevře se s jedním člověkem') : t('Směna neobsazená — otevře se i bez ní')}
             </p>
             <ul className="text-xs mt-1 space-y-0.5 list-disc pl-4">
-              {dayGaps.map((g, i) => <li key={`g-${i}`}>Od {toHM(g.start)} do {toHM(g.end)} není v podniku nikdo, přitom je otevřeno.</li>)}
-              {missingHere.map((n) => <li key={`m-${n}`}>Směna „{n}" nemá nikoho.</li>)}
+              {dayGaps.map((g, i) => <li key={`g-${i}`}>{t('Od {od} do {do} není v podniku nikdo, přitom je otevřeno.', { od: toHM(g.start), do: toHM(g.end) })}</li>)}
+              {missingHere.map((n) => <li key={`m-${n}`}>{t('Směna „{nazev}" nemá nikoho.', { nazev: n })}</li>)}
             </ul>
           </div>
         )}
@@ -2560,22 +2567,22 @@ function DayModal({
             <Icon name="users" size={15} className="shrink-0 mt-0.5 text-black/40" />
             <span>
               {doporuceni.nepokryjeJeden
-                ? <>Podle tržby by stačil 1 člověk (průměrná tržba v tento den v týdnu ~{money(doporuceni.trzba)}), ale otevírací směna nepokryje celou otevírací dobu — proto dva.</>
-                : <>Doporučení: {doporuceni.lidi === 1 ? '1 člověk' : '2 lidé'} · průměrná tržba v tento den v týdnu ~{money(doporuceni.trzba)}
-                  {doporuceni.usporaHodin > 0 ? ` · ušetří ${czCount(Math.round(doporuceni.usporaHodin), HODINU)}` : ''}</>}
+                ? <>{t('Podle tržby by stačil 1 člověk (průměrná tržba v tento den v týdnu ~{trzba}), ale otevírací směna nepokryje celou otevírací dobu — proto dva.', { trzba: money(doporuceni.trzba) })}</>
+                : <>{t('Doporučení: {n, plural, one {# člověk} few {# lidé} other {# lidí}} · průměrná tržba v tento den v týdnu ~{trzba}', { n: doporuceni.lidi, trzba: money(doporuceni.trzba) })}
+                  {doporuceni.usporaHodin > 0 ? ` · ${t('ušetří {hodiny}', { hodiny: hodinuTxt(t, Math.round(doporuceni.usporaHodin)) })}` : ''}</>}
             </span>
           </p>
         )}
 
         {events.length > 0 && (
           <div>
-            <p className="t-label mb-1">Akce</p>
+            <p className="t-label mb-1">{t('Akce')}</p>
             <ul className="list">
               {events.map((ev: any) => (
                 <ListRow key={ev.id}
                   lead={<span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-black/[0.035] text-black/55"><Icon name="calendarCheck" size={16} /></span>}
                   title={ev.title}
-                  meta={`${ev.startTime ? `${ev.startTime}${ev.endTime ? `–${ev.endTime}` : ''}` : 'celý den'}${ev.location ? ` · ${ev.location}` : ''}${ev.crewPeople?.length ? ` · na akci: ${ev.crewPeople.map((p: any) => p.name).join(', ')}` : ' · zatím bez obsazení'}`}
+                  meta={`${ev.startTime ? `${ev.startTime}${ev.endTime ? `–${ev.endTime}` : ''}` : t('celý den')}${ev.location ? ` · ${ev.location}` : ''}${ev.crewPeople?.length ? ` · ${t('na akci: {jmena}', { jmena: ev.crewPeople.map((p: any) => p.name).join(', ') })}` : ` · ${t('zatím bez obsazení')}`}`}
                 />
               ))}
             </ul>
@@ -2583,28 +2590,28 @@ function DayModal({
         )}
 
         <div>
-          <p className="t-label mb-1">Přiřazené směny</p>
+          <p className="t-label mb-1">{t('Přiřazené směny')}</p>
           {shifts.length > 0 && nahradiUlozene && (
-            <p className="t-meta mb-1 text-pretty">Uložením návrhu se tyhle směny smažou — je zapnuté vymazání stávajících směn měsíce.</p>
+            <p className="t-meta mb-1 text-pretty">{t('Uložením návrhu se tyhle směny smažou — je zapnuté vymazání stávajících směn měsíce.')}</p>
           )}
           {shifts.length === 0 ? (
-            <p className="t-meta">Na tento den zatím nikdo nemá směnu.</p>
+            <p className="t-meta">{t('Na tento den zatím nikdo nemá směnu.')}</p>
           ) : (
             // Směny, které uložení návrhu smaže: tlumí se jen jméno a typ
             // (token + přeškrtnutí) a stav řekne i Chip „zmizí". Dřív opacity
             // na celém seznamu ztlumila i aktivní tlačítko koše.
             <ul className="list">
               {shifts.map((s) => {
-                const rt = resolveShiftType(s, shiftTypes);
+                const rt = resolveShiftType(s, shiftTypes, t);
                 return (
                   <ListRow key={s.id}
                     lead={<Avatar emoji={s.employeeAvatar} size="sm" />}
                     title={nahradiUlozene ? <span className="line-through text-black/45">{s.employeeName}</span> : s.employeeName}
                     meta={<span className={`inline-flex items-center gap-1.5 ${nahradiUlozene ? 'line-through text-black/45' : ''}`}><TeckaBarvy barva={rt.color} className="h-2 w-2" />{rt.label}</span>}
                     value={`${s.startTime}–${s.endTime}`}
-                    right={nahradiUlozene ? <Chip tone="muted" size="sm">zmizí</Chip> : undefined}
+                    right={nahradiUlozene ? <Chip tone="muted" size="sm">{t('zmizí')}</Chip> : undefined}
                     actions={readOnly ? undefined : (
-                      <Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={`Odebrat směnu — ${s.employeeName}`} onClick={() => onRemove(s.id)} />
+                      <Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={t('Odebrat směnu — {jmeno}', { jmeno: s.employeeName })} onClick={() => onRemove(s.id)} />
                     )}
                   />
                 );
@@ -2616,18 +2623,18 @@ function DayModal({
         {/* Návrh generátoru pro tento den — kontrola, kterou ikonky v mřížce nedají. */}
         {proposed.length > 0 && (
           <div>
-            <p className="t-label">Navržené směny</p>
-            <p className="t-meta mb-1 text-pretty">Náhled, zatím neuloženo — uloží se přesně takhle tlačítkem „Potvrdit a uložit" nebo „Uložit a publikovat".</p>
+            <p className="t-label">{t('Navržené směny')}</p>
+            <p className="t-meta mb-1 text-pretty">{t('Náhled, zatím neuloženo — uloží se přesně takhle tlačítkem „Potvrdit a uložit" nebo „Uložit a publikovat".')}</p>
             <ul className="list">
               {proposed.map((p, idx) => (
                 <ListRow key={`prop-${idx}`}
                   lead={<Avatar emoji={p.employeeAvatar} size="sm" />}
                   title={p.employeeName}
-                  meta={<span className="inline-flex items-center gap-1.5">{p.color && <TeckaBarvy barva={p.color} className="h-2 w-2" />}{p.shiftTypeName || 'Směna'}</span>}
+                  meta={<span className="inline-flex items-center gap-1.5">{p.color && <TeckaBarvy barva={p.color} className="h-2 w-2" />}{p.shiftTypeName || t('Směna')}</span>}
                   value={`${p.startTime}–${p.endTime}`}
-                  right={<Chip tone="muted" size="sm" icon="sparkle">Návrh</Chip>}
+                  right={<Chip tone="muted" size="sm" icon="sparkle">{t('Návrh')}</Chip>}
                   actions={onRemoveProposed ? (
-                    <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={`Odebrat z návrhu — ${p.employeeName}`} onClick={() => onRemoveProposed(p)} />
+                    <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={t('Odebrat z návrhu — {jmeno}', { jmeno: p.employeeName })} onClick={() => onRemoveProposed(p)} />
                   ) : undefined}
                 />
               ))}
@@ -2643,60 +2650,60 @@ function DayModal({
 
         {!readOnly && sTymem && !vlastniCas && employees.length > 0 && (
           <div className="border-t border-black/[0.08] pt-3">
-            <Button variant="ghost" icon="clock" aria-expanded={false} onClick={() => setVlastniCas(true)}>Přidat s vlastním časem…</Button>
+            <Button variant="ghost" icon="clock" aria-expanded={false} onClick={() => setVlastniCas(true)}>{t('Přidat s vlastním časem…')}</Button>
           </div>
         )}
         {!readOnly && (!sTymem || vlastniCas || employees.length === 0) && (
           <div className="space-y-4 border-t border-black/[0.08] pt-4">
-            <h3 className="t-card flex items-center gap-2"><Icon name="plus" size={17} className="text-black/40 shrink-0" /> {navrh ? 'Přidat do návrhu' : 'Přidat směnu'}</h3>
+            <h3 className="t-card flex items-center gap-2"><Icon name="plus" size={17} className="text-black/40 shrink-0" /> {navrh ? t('Přidat do návrhu') : t('Přidat směnu')}</h3>
             {employees.length === 0 ? (
-              <EmptyState icon="users" compact title="Zatím nikdo v týmu"
-                hint="Směnu je komu přiřadit, až budou v týmu lidé."
-                action={onNavigate ? <Button variant="secondary" icon="users" onClick={() => onNavigate('team-settings')}>Pozvat do týmu</Button> : undefined} />
+              <EmptyState icon="users" compact title={t('Zatím nikdo v týmu')}
+                hint={t('Směnu je komu přiřadit, až budou v týmu lidé.')}
+                action={onNavigate ? <Button variant="secondary" icon="users" onClick={() => onNavigate('team-settings')}>{t('Pozvat do týmu')}</Button> : undefined} />
             ) : (
               <>
-                <Field id="den-kdo" label="Kdo">
+                <Field id="den-kdo" label={t('Kdo')}>
                   <Select id="den-kdo" value={employeeId} onChange={(e) => setEmployeeId(e.target.value === '' ? '' : parseInt(e.target.value))}>
-                    <option value="">Vyber člověka…</option>
+                    <option value="">{t('Vyber člověka…')}</option>
                     {employees.map((e) => {
                       const sub = submissions.find((s) => s.employeeId === e.id);
-                      const pozn = unavailable.has(e.id) ? ' — nemůže'
-                        : sub?.preferredShift && sub.preferredShift !== 'flexible' ? ` — preferuje ${sub.preferredShift === 'morning' ? 'ranní' : 'odpolední'}` : '';
+                      const pozn = unavailable.has(e.id) ? ` — ${t('nemůže')}`
+                        : sub?.preferredShift && sub.preferredShift !== 'flexible' ? ` — ${sub.preferredShift === 'morning' ? t('preferuje ranní') : t('preferuje odpolední')}` : '';
                       return <option key={e.id} value={e.id}>{e.name}{pozn}</option>;
                     })}
                   </Select>
                 </Field>
                 {kolidujeRucne
-                  ? <p className="note note-danger text-sm" role="alert">Tenhle člověk už ten den má směnu, která se s tímhle časem překrývá.</p>
+                  ? <p className="note note-danger text-sm" role="alert">{t('Tenhle člověk už ten den má směnu, která se s tímhle časem překrývá.')}</p>
                   : varovani && <p className="note note-wait text-sm" role="status">{varovani}</p>}
 
                 {shiftTypes.length > 0 && (
                   <div className="space-y-1.5">
-                    <p className="text-[13px] font-medium text-black/70" aria-hidden>Typ směny</p>
-                    <Segmented ariaLabel="Typ směny" value={typeName || VLASTNI_CAS}
+                    <p className="text-[13px] font-medium text-black/70" aria-hidden>{t('Typ směny')}</p>
+                    <Segmented ariaLabel={t('Typ směny')} value={typeName || VLASTNI_CAS}
                       onChange={(v) => {
                         if (v === VLASTNI_CAS) { pickCustom(); return; }
                         const t = shiftTypes.find(x => x.name === v);
                         if (t) applyShiftType(t);
                       }}
-                      options={[...shiftTypes.map(t => ({ id: t.name, label: t.name })), { id: VLASTNI_CAS, label: 'Vlastní čas' }]} />
+                      options={[...shiftTypes.map(ty => ({ id: ty.name, label: ty.name })), { id: VLASTNI_CAS, label: t('Vlastní čas') }]} />
                     {typeName !== '' && shiftTypes.find(t => t.name === typeName)?.endsAtClose && !dayClose && (
-                      <p className="text-xs text-wait-ink">Tento den je zavřeno — použije se výchozí konec typu.</p>
+                      <p className="text-xs text-wait-ink">{t('Tento den je zavřeno — použije se výchozí konec typu.')}</p>
                     )}
                   </div>
                 )}
 
                 <div className="grid grid-cols-2 gap-3">
-                  <Field id="den-od" label="Od">
+                  <Field id="den-od" label={t('Od')}>
                     <Input id="den-od" type="time" value={start} onChange={(e) => { setStart(e.target.value); pickCustom(); }} />
                   </Field>
-                  <Field id="den-do" label="Do">
+                  <Field id="den-do" label={t('Do')}>
                     <Input id="den-do" type="time" value={end} onChange={(e) => { setEnd(e.target.value); pickCustom(); }} />
                   </Field>
                 </div>
                 {sTymem && (
                   <div className="flex flex-wrap items-center justify-end gap-2">
-                    <Button variant="ghost" aria-expanded onClick={() => setVlastniCas(false)}>Sbalit</Button>
+                    <Button variant="ghost" aria-expanded onClick={() => setVlastniCas(false)}>{t('Sbalit')}</Button>
                     {tlacitkoPridat}
                   </div>
                 )}
@@ -2734,6 +2741,7 @@ function TymNaDen({
   readOnly: boolean;
   onAdd: (p: { employeeId: number; date: string; startTime: string; endTime: string; type: string }) => Promise<boolean>;
 }) {
+  const t = useT('rozvrh');
   const typyPref = useMemo(() => shiftTypes.map((t) => ({ id: t.id, name: t.name, start: t.startTime })), [shiftTypes]);
   // Nabízejí se typy, které se do otevírací doby dne vejdou; zavřený den
   // (nebo den, kam se nevejde nic) nabídne všechny — vedení ví, proč tam
@@ -2812,15 +2820,15 @@ function TymNaDen({
     setOtevreny(id);
   };
 
-  const pridej = async (e: Member, t: TypDne) => {
+  const pridej = async (e: Member, typ: TypDne) => {
     setPridavam(true); setChyba('');
     try {
-      const ok = await onAdd({ employeeId: e.id, date, startTime: t.od, endTime: t.do, type: t.name });
+      const ok = await onAdd({ employeeId: e.id, date, startTime: typ.od, endTime: typ.do, type: typ.name });
       if (ok) {
         setOtevreny(null);
-        setHlaska(`${e.name} — ${navrh ? 'přidáno do návrhu' : 'směna přidána'} · ${t.name} ${t.od}–${t.do}`);
+        setHlaska(navrh ? t('{jmeno} — přidáno do návrhu · {typ} {od}–{do}', { jmeno: e.name, typ: typ.name, od: typ.od, do: typ.do }) : t('{jmeno} — směna přidána · {typ} {od}–{do}', { jmeno: e.name, typ: typ.name, od: typ.od, do: typ.do }));
         fokusNaRadek(e.id);
-      } else setChyba('Nepřidalo se — zkus to znovu.');
+      } else setChyba(t('Nepřidalo se — zkus to znovu.'));
     } finally { setPridavam(false); }
   };
 
@@ -2829,14 +2837,14 @@ function TymNaDen({
   return (
     <section ref={sekceRef} aria-labelledby={`tym-den-${date}`}>
       <div className="flex items-baseline justify-between gap-3 mb-1">
-        <p id={`tym-den-${date}`} className="t-label">Tým na tento den</p>
-        <p className="t-meta tabular-nums">{pocetMuze > 0 ? czCount(pocetMuze, { one: 'člověk může', few: 'lidé můžou', many: 'lidí může' }) : 'další nikdo nemůže'}</p>
+        <p id={`tym-den-${date}`} className="t-label">{t('Tým na tento den')}</p>
+        <p className="t-meta tabular-nums">{pocetMuze > 0 ? t('{n, plural, one {# člověk může} few {# lidé můžou} other {# lidí může}}', { n: pocetMuze }) : t('další nikdo nemůže')}</p>
       </div>
       <p ref={hlaskaRef} tabIndex={-1} role="status" className={`t-meta flex items-center gap-1.5 outline-none ${hlaska ? 'mb-1' : 'sr-only'}`} data-hlaska-tym>
         {hlaska && <><Icon name="check" size={14} className="shrink-0 text-ok-ink" />{hlaska}</>}
       </p>
       {radky.length === 0 ? (
-        <p className="t-meta">V týmu zatím nikdo není.</p>
+        <p className="t-meta">{t('V týmu zatím nikdo není.')}</p>
       ) : (
         <ul className="list" data-tym-den>
           {radky.map((r) => {
@@ -2847,12 +2855,12 @@ function TymNaDen({
             // První řádek: směna a preference; poznámky pod ním zvlášť a zkrácené
             // na dva řádky, ať odstavcová poznámka nenatáhne okno přes celý telefon.
             const meta = [
-              r.maSmenu ? `má směnu ${smeny.map((x) => `${x.startTime}–${x.endTime}`).join(', ')}` : null,
-              info.preferuje,
+              r.maSmenu ? t('má směnu {casy}', { casy: smeny.map((x) => `${x.startTime}–${x.endTime}`).join(', ') }) : null,
+              info.preferuje ? prelozPopisStavu(t, info.preferuje) : null,
             ].filter(Boolean).join(' · ');
             const poznamky = [
-              info.poznamkaDne ? `k tomuto dni: „${info.poznamkaDne}“` : null,
-              info.poznamka ? `„${info.poznamka}“` : null,
+              info.poznamkaDne ? t('k tomuto dni: „{text}“', { text: info.poznamkaDne }) : null,
+              info.poznamka ? t('„{text}“', { text: info.poznamka }) : null,
             ].filter(Boolean).join(' · ');
             const vybrany = volneTypy.find((t) => t.name === typ) ?? volneTypy[0];
             // Omezení na jiný typ, než se právě vybírá — stejné varování jako ve formuláři.
@@ -2867,38 +2875,40 @@ function TymNaDen({
                     {meta && <span className="block whitespace-normal text-pretty">{meta}</span>}
                     {poznamky && <PoznamkaClena text={poznamky} />}
                   </> : undefined}
-                  right={<span data-stav={info.stav}><Chip tone={info.ton} size="sm">{info.popis}</Chip></span>}
+                  right={<span data-stav={info.stav}><Chip tone={info.ton} size="sm">{prelozPopisStavu(t, info.popis)}</Chip></span>}
                   actions={muzePridat ? (
                     <Button variant="secondary" size="sm" icon="plus" aria-expanded={otevreny === clen.id} data-pridat={clen.id}
-                      aria-label={`Přidat — ${clen.name}`} onClick={() => rozbal(clen.id, info, smeny)}>Přidat</Button>
+                      aria-label={t('Přidat — {jmeno}', { jmeno: clen.name })} onClick={() => rozbal(clen.id, info, smeny)}>{t('Přidat')}</Button>
                   ) : undefined}
                 />
                 {otevreny === clen.id && vybrany && (
                   <li className="py-3">
                     <div ref={wellRef}><Well className="space-y-3">
                       {volneTypy.length > 1 && (
-                        <Segmented ariaLabel={`Typ směny pro ${clen.name}`} size="sm" value={vybrany.name}
+                        <Segmented ariaLabel={t('Typ směny pro {jmeno}', { jmeno: clen.name })} size="sm" value={vybrany.name}
                           onChange={(v) => setTyp(v)} options={volneTypy.map((t) => ({ id: t.name, label: t.name }))} />
                       )}
-                      <p className="t-meta tabular-nums">{vybrany.name} · {vybrany.od}–{vybrany.do}{navrh ? ' · do návrhu' : ''}</p>
+                      <p className="t-meta tabular-nums">{vybrany.name} · {vybrany.od}–{vybrany.do}{navrh ? ` · ${t('do návrhu')}` : ''}</p>
                       {proti && (
                         <p className="note note-wait text-sm text-pretty" role="status">
                           {info.stav === 'volno'
-                            ? `${clen.name} má na tento den ${info.popis === 'dovolená' ? 'dovolenou' : info.popis}.`
-                            : `${clen.name} podle své dostupnosti tento den nemůže.`}
-                          {' '}Přidat jde, ale jen když je to domluvené.
+                            ? (info.popis === 'dovolená'
+                              ? t('{jmeno} má na tento den dovolenou.', { jmeno: clen.name })
+                              : t('{jmeno} má na tento den {popis}.', { jmeno: clen.name, popis: prelozPopisStavu(t, info.popis) }))
+                            : t('{jmeno} podle své dostupnosti tento den nemůže.', { jmeno: clen.name })}
+                          {' '}{t('Přidat jde, ale jen když je to domluvené.')}
                         </p>
                       )}
                       {!proti && mimoVolbu && (
                         <p className="note note-wait text-sm text-pretty" role="status">
-                          {clen.name} má na tento den v dostupnosti „{info.popis}“ — {vybrany.name} tomu neodpovídá.
+                          {t('{jmeno} má na tento den v dostupnosti „{popis}“ — {typ} tomu neodpovídá.', { jmeno: clen.name, popis: prelozPopisStavu(t, info.popis), typ: vybrany.name })}
                         </p>
                       )}
                       {chyba && <p className="note note-danger text-sm" role="alert">{chyba}</p>}
                       <div className="flex flex-wrap items-center justify-end gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => setOtevreny(null)}>Zrušit</Button>
+                        <Button variant="ghost" size="sm" onClick={() => setOtevreny(null)}>{t('Zrušit')}</Button>
                         <Button variant="primary" size="sm" icon="plus" loading={pridavam} onClick={() => pridej(clen, vybrany)}>
-                          {proti || mimoVolbu ? 'Přesto přidat' : navrh ? 'Přidat do návrhu' : 'Přidat směnu'}
+                          {proti || mimoVolbu ? t('Přesto přidat') : navrh ? t('Přidat do návrhu') : t('Přidat směnu')}
                         </Button>
                       </div>
                     </Well></div>
@@ -2915,6 +2925,7 @@ function TymNaDen({
 
 /** Poznámka člena v Týmu na den: dva řádky, delší se rozbalí na klepnutí. */
 function PoznamkaClena({ text }: { text: string }) {
+  const t = useT('rozvrh');
   const [cela, setCela] = useState(false);
   // Odhad podle délky: změřit přetečení by chtělo ResizeObserver na každý
   // řádek; dva řádky na telefonu pojmou zhruba 90 znaků.
@@ -2924,7 +2935,7 @@ function PoznamkaClena({ text }: { text: string }) {
       <span className={cela ? 'block' : 'line-clamp-2'}>{text}</span>
       {dlouha && (
         <Button variant="ghost" size="sm" className="-ml-2" aria-expanded={cela} onClick={() => setCela((v) => !v)}>
-          {cela ? 'Méně' : 'Celá poznámka'}
+          {cela ? t('Méně') : t('Celá poznámka')}
         </Button>
       )}
     </span>
@@ -2936,6 +2947,9 @@ function PoznamkaClena({ text }: { text: string }) {
 // ---------------------------------------------------------------------------
 
 function ScheduleRulesManager() {
+  const t = useT('rozvrh');
+  const { jazyk } = useJazyk();
+  const dnyTydne = nazvyDnuDlouze(jazyk);
   const [teamMax, setTeamMax] = useState<string>('');
   const [teamMaxHours, setTeamMaxHours] = useState<string>('');
   const [balance, setBalance] = useState(true);
@@ -2994,7 +3008,7 @@ function ScheduleRulesManager() {
         teamMax: d.teamMax != null ? String(d.teamMax) : '', teamMaxHours: d.teamMaxHours != null ? String(d.teamMaxHours) : '',
         balance: d.balanceShifts !== false, split: d.splitShifts === true, ov, hov, sok, tz,
       }));
-    }).catch((e) => setLoadErr(apiMessage(e, 'Pravidla se nenačetla.'))).finally(() => setLoading(false));
+    }).catch((e) => setLoadErr(apiMessage(e, t('Pravidla se nenačetla.')))).finally(() => setLoading(false));
   }, [tick]);
 
   const prahCislo = prah.trim() === '' ? null : Math.round(Number(prah));
@@ -3012,7 +3026,7 @@ function ScheduleRulesManager() {
   };
 
   const save = async () => {
-    if (prahChyba) { setPrahDotcen(true); setErr('Zadej práh tržby, nad kterým mají být dva lidé — nebo počet lidí podle tržeb vypni.'); return; }
+    if (prahChyba) { setPrahDotcen(true); setErr(t('Zadej práh tržby, nad kterým mají být dva lidé — nebo počet lidí podle tržeb vypni.')); return; }
     setSaving(true); setMsg(''); setErr('');
     try {
       const res = await fetch('/api/schedule/rules', {
@@ -3037,108 +3051,108 @@ function ScheduleRulesManager() {
       // Neuložené tržby zůstanou „neuložené" i v signálu u tlačítka.
       setUlozeno(d?.trzbyNeulozeny ? stavPravidel(ulozeneTrzby) : stavTed);
       if (d?.trzbyNeulozeny) {
-        setErr('Počet lidí podle tržeb se neuložil — databáze ho ještě nezná (spusť /api/init). Ostatní pravidla jsou uložená.');
+        setErr(t('Počet lidí podle tržeb se neuložil — databáze ho ještě nezná (spusť /api/init). Ostatní pravidla jsou uložená.'));
       } else {
         setUlozeneTrzby(trzbyTed);
-        setMsg('Uloženo. Pravidla se použijí při dalším generování rozvrhu.');
+        setMsg(t('Uloženo. Pravidla se použijí při dalším generování rozvrhu.'));
       }
       // Widget „Naplánované hodiny" ukazuje strop z pravidel.
       obnovDataWidgetu('/api/schedule/rules');
-    } catch (e) { setErr(apiMessage(e, 'Uložení se nepodařilo.')); }
+    } catch (e) { setErr(apiMessage(e, t('Uložení se nepodařilo.'))); }
     setSaving(false);
   };
 
   const teamLimit = teamMax === '' ? null : parseInt(teamMax);
 
   if (loading) return <Skeleton className="h-64 max-w-2xl" />;
-  if (loadErr) return <Card className="max-w-2xl"><ErrorState compact title="Pravidla se nenačetla" onRetry={() => setTick(t => t + 1)} detail={loadErr} /></Card>;
+  if (loadErr) return <Card className="max-w-2xl"><ErrorState compact title={t('Pravidla se nenačetla')} onRetry={() => setTick(t => t + 1)} detail={loadErr} /></Card>;
 
   return (
     <div className="space-y-5 max-w-2xl">
       <Card as="section" aria-labelledby="pravidla-dny" className="space-y-3">
-        <h2 id="pravidla-dny" className="t-section flex items-center gap-2"><Icon name="clock" size={17} className="text-black/40 shrink-0" /> Maximálně dní v řadě</h2>
+        <h2 id="pravidla-dny" className="t-section flex items-center gap-2"><Icon name="clock" size={17} className="text-black/40 shrink-0" /> {t('Maximálně dní v řadě')}</h2>
         <p className="t-meta text-pretty">
-          Kolik dní po sobě může někdo pracovat. Generátor po dosažení limitu naplánuje volno — a počítá i směny na přelomu měsíce.
+          {t('Kolik dní po sobě může někdo pracovat. Generátor po dosažení limitu naplánuje volno — a počítá i směny na přelomu měsíce.')}
         </p>
-        <Field id="pravidla-tym-dny" label="Pro celý tým">
+        <Field id="pravidla-tym-dny" label={t('Pro celý tým')}>
           <Select id="pravidla-tym-dny" value={teamMax} onChange={e => setTeamMax(e.target.value)} className="sm:!w-64">
-            <option value="">Bez omezení</option>
+            <option value="">{t('Bez omezení')}</option>
             {[2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14].map(n => (
-              <option key={n} value={n}>max {n} {n <= 4 ? 'dny' : 'dní'} po sobě</option>
+              <option key={n} value={n}>{t('max {n, plural, one {# den} few {# dny} other {# dní}} po sobě', { n })}</option>
             ))}
           </Select>
         </Field>
       </Card>
 
       <Card as="section" aria-labelledby="pravidla-hodiny" className="space-y-3">
-        <h2 id="pravidla-hodiny" className="t-section flex items-center gap-2"><Icon name="overview" size={17} className="text-black/40 shrink-0" /> Maximálně hodin za měsíc</h2>
+        <h2 id="pravidla-hodiny" className="t-section flex items-center gap-2"><Icon name="overview" size={17} className="text-black/40 shrink-0" /> {t('Maximálně hodin za měsíc')}</h2>
         <p className="t-meta text-pretty">
-          Strop hodin na osobu a měsíc — hodí se pro brigádníky (DPP) nebo úvazky. Generátor po dosažení limitu už směnu nepřidá.
+          {t('Strop hodin na osobu a měsíc — hodí se pro brigádníky (DPP) nebo úvazky. Generátor po dosažení limitu už směnu nepřidá.')}
         </p>
-        <Field id="pravidla-tym-hodiny" label="Pro celý tým (hodin za měsíc)" hint="Prázdné = bez omezení.">
+        <Field id="pravidla-tym-hodiny" label={t('Pro celý tým (hodin za měsíc)')} hint={t('Prázdné = bez omezení.')}>
           <Input id="pravidla-tym-hodiny" type="number" inputMode="numeric" min={8} max={400} value={teamMaxHours}
             onChange={e => setTeamMaxHours(e.target.value)} className="!w-full sm:!w-36" />
         </Field>
       </Card>
 
       <Card as="section" aria-labelledby="pravidla-generator">
-        <h2 id="pravidla-generator" className="t-section flex items-center gap-2"><Icon name="users" size={17} className="text-black/40 shrink-0" /> Generátor</h2>
+        <h2 id="pravidla-generator" className="t-section flex items-center gap-2"><Icon name="users" size={17} className="text-black/40 shrink-0" /> {t('Generátor')}</h2>
         <ul className="list mt-1">
-          <SwitchRow checked={balance} onChange={setBalance} title="Spravedlivé střídání"
-            hint="Přednost dostane ten, kdo má zatím méně směn, a střídá se, kdo s kým slouží. Nedostupnost a limity mají vždy přednost." />
-          <SwitchRow checked={split} onChange={setSplit} title="Dělení směn mezi dva lidi"
-            hint="Když směnu nemůže vzít nikdo celou, generátor ji rozpůlí — začátek jednomu, konec druhému. V náhledu jsou půlky označené." />
+          <SwitchRow checked={balance} onChange={setBalance} title={t('Spravedlivé střídání')}
+            hint={t('Přednost dostane ten, kdo má zatím méně směn, a střídá se, kdo s kým slouží. Nedostupnost a limity mají vždy přednost.')} />
+          <SwitchRow checked={split} onChange={setSplit} title={t('Dělení směn mezi dva lidi')}
+            hint={t('Když směnu nemůže vzít nikdo celou, generátor ji rozpůlí — začátek jednomu, konec druhému. V náhledu jsou půlky označené.')} />
           {/* Bez finance.trzby je přepínač vidět (ať je jasné, jestli je
               zapnutý), ale měnit ho nejde — práh prozrazuje tržby a bez
               oprávnění by generátor doporučení stejně vynechal. */}
-          <SwitchRow checked={podleTrzeb} onChange={prepniTrzby} title="Počet lidí podle tržeb" disabled={!trzbyInfo.smiTrzby}
+          <SwitchRow checked={podleTrzeb} onChange={prepniTrzby} title={t('Počet lidí podle tržeb')} disabled={!trzbyInfo.smiTrzby}
             hint={trzbyInfo.smiTrzby
-              ? 'Otevírací směnu generátor obsadí vždy. Pod prahem stačí jeden člověk na celý den (když ho otevírací směna pokryje), nad ním dva — podle průměrné tržby stejného dne za posledních 8 týdnů. Platí po uložení.'
-              : 'Zapnout a nastavit může jen někdo s přístupem k tržbám.'} />
+              ? t('Otevírací směnu generátor obsadí vždy. Pod prahem stačí jeden člověk na celý den (když ho otevírací směna pokryje), nad ním dva — podle průměrné tržby stejného dne za posledních 8 týdnů. Platí po uložení.')
+              : t('Zapnout a nastavit může jen někdo s přístupem k tržbám.')} />
         </ul>
         {podleTrzeb && (
           <Well className="mt-3 space-y-3" data-trzby-nastaveni>
             {trzbyInfo.smiTrzby ? (
-              <Field id="pravidla-prah" label={`Dva lidé, když průměrná tržba dne přesáhne (${symbol})`}
-                error={prahChyba && prahDotcen ? 'Zadej kladné číslo.' : undefined}
-                hint={trzbyInfo.navrhPrahu ? `Návrh z vašich tržeb: ${money(trzbyInfo.navrhPrahu)} — zhruba půlka dnů v týdnu je nad ním.` : 'Pod prahem stačí jeden člověk na celý den.'}>
+              <Field id="pravidla-prah" label={t('Dva lidé, když průměrná tržba dne přesáhne ({symbol})', { symbol })}
+                error={prahChyba && prahDotcen ? t('Zadej kladné číslo.') : undefined}
+                hint={trzbyInfo.navrhPrahu ? t('Návrh z vašich tržeb: {castka} — zhruba půlka dnů v týdnu je nad ním.', { castka: money(trzbyInfo.navrhPrahu) }) : t('Pod prahem stačí jeden člověk na celý den.')}>
                 <Input id="pravidla-prah" type="number" inputMode="numeric" min={1} value={prah}
                   onChange={e => setPrah(e.target.value)} onBlur={() => setPrahDotcen(true)} className="!w-full sm:!w-44" />
               </Field>
             ) : (
-              <p className="t-meta text-pretty">{trzbyInfo.prahNastaven ? 'Práh tržby je nastavený.' : 'Práh tržby zatím není nastavený.'} Hodnotu vidí jen ten, kdo smí vidět tržby.</p>
+              <p className="t-meta text-pretty">{trzbyInfo.prahNastaven ? t('Práh tržby je nastavený.') : t('Práh tržby zatím není nastavený.')} {t('Hodnotu vidí jen ten, kdo smí vidět tržby.')}</p>
             )}
             {!trzbyInfo.smiTrzby ? (
-              <p className="t-meta text-pretty">Doporučení spočítá generování u někoho, kdo tržby vidět smí — u tebe ho generátor vynechá a řekne to.</p>
+              <p className="t-meta text-pretty">{t('Doporučení spočítá generování u někoho, kdo tržby vidět smí — u tebe ho generátor vynechá a řekne to.')}</p>
             ) : trzbyInfo.dny && Object.keys(trzbyInfo.dny).length > 0 ? (
               <div>
-                <p className="t-label mb-1">Průměrná tržba podle dne v týdnu</p>
+                <p className="t-label mb-1">{t('Průměrná tržba podle dne v týdnu')}</p>
                 <ul className="list">
-                  {CZ_DAYS_FULL.map((nazev, i) => {
+                  {dnyTydne.map((nazev, i) => {
                     const d = trzbyInfo.dny?.[String(i)];
                     if (!d) return null;
                     const lidi = prahCislo && prahCislo > 0 ? (d.prumer > prahCislo ? 2 : 1) : null;
                     return (
-                      <ListRow key={nazev} title={nazev} meta={`z ${czCount(d.vzorek, DEN)}`}
+                      <ListRow key={nazev} title={nazev} meta={t('z {dny}', { dny: dnuTxt(t, d.vzorek) })}
                         value={`~${money(d.prumer)}`}
-                        right={lidi ? <Chip tone={lidi === 2 ? 'info' : 'muted'} size="sm">{lidi === 2 ? '2 lidé' : '1 člověk'}</Chip> : undefined} />
+                        right={lidi ? <Chip tone={lidi === 2 ? 'info' : 'muted'} size="sm">{t('{n, plural, one {# člověk} few {# lidé} other {# lidí}}', { n: lidi })}</Chip> : undefined} />
                     );
                   })}
                 </ul>
               </div>
             ) : (
-              <p className="t-meta text-pretty">Za posledních 8 týdnů nejsou uzávěrky s tržbou — dokud nebudou, generátor se řídí jen otevírací směnou.</p>
+              <p className="t-meta text-pretty">{t('Za posledních 8 týdnů nejsou uzávěrky s tržbou — dokud nebudou, generátor se řídí jen otevírací směnou.')}</p>
             )}
           </Well>
         )}
         {split && members.length > 0 && (
           <Well className="mt-3 space-y-1">
-            <p className="t-label">Komu se smí směna rozdělit</p>
+            <p className="t-label">{t('Komu se smí směna rozdělit')}</p>
             <ul className="list">
               {members.map(m => (
                 <SwitchRow key={m.id} checked={splitOks[m.id] !== false}
                   onChange={on => setSplitOks(o => ({ ...o, [m.id]: on }))}
-                  title={m.name} hint={splitOks[m.id] === false ? 'Jen celé směny' : undefined} />
+                  title={m.name} hint={splitOks[m.id] === false ? t('Jen celé směny') : undefined} />
               ))}
             </ul>
           </Well>
@@ -3146,16 +3160,16 @@ function ScheduleRulesManager() {
       </Card>
 
       <Card as="section" aria-labelledby="pravidla-vyjimky" className="space-y-3">
-        <h2 id="pravidla-vyjimky" className="t-section">Výjimky pro jednotlivce</h2>
-        <p className="t-meta text-pretty">Kdo to má jinak než tým — třeba brigádník, co chce co nejvíc směn v kuse, nebo někdo, komu tři dny stačí.</p>
+        <h2 id="pravidla-vyjimky" className="t-section">{t('Výjimky pro jednotlivce')}</h2>
+        <p className="t-meta text-pretty">{t('Kdo to má jinak než tým — třeba brigádník, co chce co nejvíc směn v kuse, nebo někdo, komu tři dny stačí.')}</p>
         <ul className="list">
           {members.map(m => {
             const v = overrides[m.id] ?? '';
-            const effective = v === '' ? (teamLimit != null ? `podle týmu (max ${teamLimit})` : 'bez omezení')
-              : v === '0' ? 'bez omezení' : `max ${v} po sobě`;
+            const effective = v === '' ? (teamLimit != null ? t('podle týmu (max {n})', { n: teamLimit }) : t('bez omezení'))
+              : v === '0' ? t('bez omezení') : t('max {n} po sobě', { n: v });
             const hv = hourOverrides[m.id] ?? '';
-            const effHours = hv === '' ? (teamMaxHours !== '' ? `podle týmu (${teamMaxHours} h)` : 'hodiny bez omezení')
-              : hv === '0' ? 'hodiny bez omezení' : `max ${hv} h za měsíc`;
+            const effHours = hv === '' ? (teamMaxHours !== '' ? t('podle týmu ({n} h)', { n: teamMaxHours }) : t('hodiny bez omezení'))
+              : hv === '0' ? t('hodiny bez omezení') : t('max {n} h za měsíc', { n: hv });
             return (
               <li key={m.id} className="flex items-center gap-3 py-3 flex-wrap">
                 <Avatar emoji={m.avatar} size="sm" />
@@ -3163,16 +3177,16 @@ function ScheduleRulesManager() {
                   <p className="text-[15px] font-medium text-[#16181A] truncate">{m.name}</p>
                   <p className="t-meta">{effective} · {effHours}</p>
                 </div>
-                <Field id={`vyjimka-dny-${m.id}`} label="Dní po sobě" className="w-40">
+                <Field id={`vyjimka-dny-${m.id}`} label={t('Dní po sobě')} className="w-40">
                   <Select id={`vyjimka-dny-${m.id}`} value={v} onChange={e => setOverrides(o => ({ ...o, [m.id]: e.target.value }))}>
-                    <option value="">Podle týmu</option>
-                    <option value="0">Bez omezení</option>
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14].map(n => <option key={n} value={n}>max {n} po sobě</option>)}
+                    <option value="">{t('Podle týmu')}</option>
+                    <option value="0">{t('Bez omezení')}</option>
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14].map(n => <option key={n} value={n}>{t('max {n} po sobě', { n })}</option>)}
                   </Select>
                 </Field>
-                <Field id={`vyjimka-hodiny-${m.id}`} label="Hodin za měsíc" className="w-32">
+                <Field id={`vyjimka-hodiny-${m.id}`} label={t('Hodin za měsíc')} className="w-32">
                   <Input id={`vyjimka-hodiny-${m.id}`} type="number" inputMode="numeric" min={0} max={400}
-                    value={hourOverrides[m.id] ?? ''} title="Prázdné = podle týmu, 0 = bez omezení"
+                    value={hourOverrides[m.id] ?? ''} title={t('Prázdné = podle týmu, 0 = bez omezení')}
                     onChange={e => setHourOverrides(o => ({ ...o, [m.id]: e.target.value }))} />
                 </Field>
               </li>
@@ -3187,8 +3201,8 @@ function ScheduleRulesManager() {
           limetkou") — přepínače se tu projeví až po uložení, a bez signálu
           šlo odejít s vypnutou funkcí v domnění, že je zapnutá. */}
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant={neulozeno ? 'accent' : 'secondary'} icon="check" loading={saving} onClick={save}>Uložit pravidla</Button>
-        {neulozeno && <span className="t-meta" data-neulozeno>Neuložené změny</span>}
+        <Button variant={neulozeno ? 'accent' : 'secondary'} icon="check" loading={saving} onClick={save}>{t('Uložit pravidla')}</Button>
+        {neulozeno && <span className="t-meta" data-neulozeno>{t('Neuložené změny')}</span>}
       </div>
     </div>
   );
@@ -3212,6 +3226,8 @@ function EditAvailabilityModal({ member, month, initial, shiftTypes = [], jenCis
   onSaved: () => void;
 }) {
   // Jeden stav na den: '' | 'off' | 'type:<id>' (staré 'morning'/'afternoon' zůstávají čitelné).
+  const t = useT('rozvrh');
+  const { jazyk } = useJazyk();
   const [days, setDays] = useState<Record<string, string>>(() => {
     const d: Record<string, string> = {};
     (initial?.unavailableDates ?? []).forEach((x) => { if (x.startsWith(month + '-')) d[x] = 'off'; });
@@ -3250,13 +3266,13 @@ function EditAvailabilityModal({ member, month, initial, shiftTypes = [], jenCis
     return TYPE_TONES[(idx < 0 ? 0 : idx) % TYPE_TONES.length];
   };
   const labelOf = (v: string) => {
-    if (v === 'off') return 'nemůže';
-    if (v === 'morning') return 'ranní';
-    if (v === 'afternoon') return 'odpo';
-    const t = shiftTypes.find((x) => `type:${x.id}` === v);
-    return (t?.name ?? 'směna').slice(0, 6).toLowerCase();
+    if (v === 'off') return t('nemůže', {}, 'kratce');
+    if (v === 'morning') return t('ranní', {}, 'kratce');
+    if (v === 'afternoon') return t('odpo', {}, 'kratce');
+    const ty = shiftTypes.find((x) => `type:${x.id}` === v);
+    return (ty?.name ?? t('směna')).slice(0, 6).toLowerCase();
   };
-  const cyklusSlovy = ['volno', 'nemůže', ...(shiftTypes.length ? shiftTypes.map(t => `jen ${t.name}`) : ['jen ranní', 'jen odpolední'])].join(', ');
+  const cyklusSlovy = [t('volno'), t('nemůže'), ...(shiftTypes.length ? shiftTypes.map(ty => t('jen {nazev}', { nazev: ty.name })) : [t('jen ranní'), t('jen odpolední')])].join(', ');
 
   const save = async () => {
     setSaving(true); setErr('');
@@ -3278,7 +3294,7 @@ function EditAvailabilityModal({ member, month, initial, shiftTypes = [], jenCis
       });
       await okJson(res);
       onSaved();
-    } catch (e) { setErr(apiMessage(e, 'Uložení se nepodařilo.')); }
+    } catch (e) { setErr(apiMessage(e, t('Uložení se nepodařilo.'))); }
     setSaving(false);
   };
 
@@ -3286,73 +3302,73 @@ function EditAvailabilityModal({ member, month, initial, shiftTypes = [], jenCis
   const volnoVMesici = volno
     .map((v) => ({ od: denZ(v.fromDate), do: denZ(v.toDate) }))
     .filter((v) => v.od && v.od.slice(0, 7) <= month && (v.do || v.od).slice(0, 7) >= month);
-  const PREFERENCE: Record<string, string> = { flexible: 'Flexibilní', morning: 'Ranní', afternoon: 'Odpolední' };
+  const PREFERENCE: Record<string, string> = { flexible: t('Flexibilní'), morning: t('Ranní'), afternoon: t('Odpolední') };
 
   if (jenCist) {
     // Náhled pro vedení bez dostupnost.upravit: všechno, co člověk zadal, bez možnosti to měnit.
     const zadano = Object.entries(days).filter(([, v]) => v).sort((a, b) => a[0].localeCompare(b[0]));
     return (
-      <Modal open onClose={onClose} size="md" title={`Dostupnost — ${member.name}`} subtitle={<span className="cz-sentence">{monthLabel(month)}</span>}
-        footer={<Button variant="secondary" onClick={onClose}>Zavřít</Button>}>
+      <Modal open onClose={onClose} size="md" title={t('Dostupnost — {jmeno}', { jmeno: member.name })} subtitle={<span className="cz-sentence">{monthLabel(month, jazyk)}</span>}
+        footer={<Button variant="secondary" onClick={onClose}>{t('Zavřít')}</Button>}>
         <div className="space-y-4">
           {!initial ? (
-            <p className="t-meta text-pretty">Dostupnost na tento měsíc zatím není zadaná.</p>
+            <p className="t-meta text-pretty">{t('Dostupnost na tento měsíc zatím není zadaná.')}</p>
           ) : (
             <>
               <div>
-                <p className="t-label mb-1">Dny</p>
-                {zadano.length === 0 ? <p className="t-meta">Žádný den není omezený — může kdykoli.</p> : (
+                <p className="t-label mb-1">{t('Dny')}</p>
+                {zadano.length === 0 ? <p className="t-meta">{t('Žádný den není omezený — může kdykoli.')}</p> : (
                   <ul className="list">
                     {zadano.map(([d, v]) => (
                       <li key={d} className="flex items-center justify-between gap-3 py-2 text-sm">
-                        <span className="cz-sentence tabular-nums">{new Date(`${d}T12:00:00Z`).toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric', timeZone: 'UTC' })}</span>
-                        <Chip size="sm" tone={v === 'off' ? 'bad' : 'muted'}><span className="cz-sentence">{v === 'off' ? 'nemůže' : (dayPrefLabel(v, shiftTypes.map((t) => ({ id: t.id, name: t.name, start: t.startTime }))) ?? labelOf(v))}</span></Chip>
+                        <span className="cz-sentence tabular-nums">{fmtDatum(d, { jazyk, styl: 'denKratce' })}</span>
+                        <Chip size="sm" tone={v === 'off' ? 'bad' : 'muted'}><span className="cz-sentence">{v === 'off' ? t('nemůže') : (prelozPopisStavu(t, dayPrefLabel(v, shiftTypes.map((ty) => ({ id: ty.id, name: ty.name, start: ty.startTime }))) ?? '') || labelOf(v))}</span></Chip>
                       </li>
                     ))}
                   </ul>
                 )}
               </div>
               <dl className="grid grid-cols-2 gap-3 text-sm">
-                <div><dt className="t-label">Preferuje</dt><dd className="mt-0.5">{PREFERENCE[preferred] ?? preferred}</dd></div>
-                <div><dt className="t-label">Max směn</dt><dd className="mt-0.5 tabular-nums">{maxShifts || 'bez limitu'}</dd></div>
+                <div><dt className="t-label">{t('Preferuje')}</dt><dd className="mt-0.5">{PREFERENCE[preferred] ?? preferred}</dd></div>
+                <div><dt className="t-label">{t('Max směn')}</dt><dd className="mt-0.5 tabular-nums">{maxShifts || t('bez limitu')}</dd></div>
               </dl>
               <div>
-                <p className="t-label mb-1">Poznámka pro vedení</p>
-                <p className="text-sm text-pretty whitespace-pre-line">{note.trim() || <span className="t-meta">Bez poznámky.</span>}</p>
+                <p className="t-label mb-1">{t('Poznámka pro vedení')}</p>
+                <p className="text-sm text-pretty whitespace-pre-line">{note.trim() || <span className="t-meta">{t('Bez poznámky.')}</span>}</p>
               </div>
             </>
           )}
           {volnoVMesici.length > 0 && (
             <div>
-              <p className="t-label mb-1">Schválené volno</p>
+              <p className="t-label mb-1">{t('Schválené volno')}</p>
               <ul className="space-y-1 text-sm tabular-nums">
-                {volnoVMesici.map((v, i) => <li key={i}>{rozsahVolna(v.od, v.do)}</li>)}
+                {volnoVMesici.map((v, i) => <li key={i}>{rozsahVolnaJ(v.od, v.do, jazyk)}</li>)}
               </ul>
             </div>
           )}
-          <p className="t-meta text-pretty">Upravit dostupnost za jiné může jen role s oprávněním k úpravě dostupnosti.</p>
+          <p className="t-meta text-pretty">{t('Upravit dostupnost za jiné může jen role s oprávněním k úpravě dostupnosti.')}</p>
         </div>
       </Modal>
     );
   }
 
   return (
-    <Modal open onClose={onClose} size="md" title={`Dostupnost — ${member.name}`} subtitle={<span className="cz-sentence">{monthLabel(month)}</span>}
+    <Modal open onClose={onClose} size="md" title={t('Dostupnost — {jmeno}', { jmeno: member.name })} subtitle={<span className="cz-sentence">{monthLabel(month, jazyk)}</span>}
       footer={<>
-        <Button variant="secondary" onClick={onClose}>Zrušit</Button>
-        <Button variant="primary" icon="send" loading={saving} onClick={save}>Uložit a upozornit</Button>
+        <Button variant="secondary" onClick={onClose}>{t('Zrušit')}</Button>
+        <Button variant="primary" icon="send" loading={saving} onClick={save}>{t('Uložit a upozornit')}</Button>
       </>}>
       <div className="space-y-4">
         <p className="t-meta text-pretty">
-          Klepnutím na den přepínáš: {cyklusSlovy}. Denní volby jsou pro generátor závazné — typy se berou z nastavení Typy směn.
+          {t('Klepnutím na den přepínáš: {cyklus}. Denní volby jsou pro generátor závazné — typy se berou z nastavení Typy směn.', { cyklus: cyklusSlovy })}
         </p>
         {volnoVMesici.length > 0 && (
-          <p className="note note-wait text-sm text-pretty">Schválené volno: {volnoVMesici.map((v) => rozsahVolna(v.od, v.do)).join(', ')}</p>
+          <p className="note note-wait text-sm text-pretty">{t('Schválené volno: {rozsahy}', { rozsahy: volnoVMesici.map((v) => rozsahVolnaJ(v.od, v.do, jazyk)).join(', ') })}</p>
         )}
 
         <div>
           <div className="grid grid-cols-7 gap-1 mb-1">
-            {zkratkyDnu(zacatek).map((d) => (
+            {zkratkyDnuJazyk(zacatek, jazyk).map((d) => (
               <span key={d} className="text-center text-[11px] font-medium text-black/35">{d}</span>
             ))}
           </div>
@@ -3363,7 +3379,7 @@ function EditAvailabilityModal({ member, month, initial, shiftTypes = [], jenCis
               const cislo = parseInt(cell.split('-')[2]);
               return (
                 <button key={cell} type="button" onClick={() => cycle(cell)}
-                  aria-label={`${cislo}. — ${v ? labelOf(v) : 'volno'}`}
+                  aria-label={`${cislo}. — ${v ? labelOf(v) : t('volno')}`}
                   className={`aspect-square rounded-xl border text-center flex flex-col items-center justify-center gap-0.5 transition-colors ${
                     v ? toneOf(v) : 'bg-black/[0.03] border-black/[0.08] text-black/60 hover:bg-black/[0.06]'
                   }`}>
@@ -3376,20 +3392,20 @@ function EditAvailabilityModal({ member, month, initial, shiftTypes = [], jenCis
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field id="dostupnost-preferuje" label="Preferuje celkově">
+          <Field id="dostupnost-preferuje" label={t('Preferuje celkově')}>
             <Select id="dostupnost-preferuje" value={preferred} onChange={(e) => setPreferred(e.target.value)}>
-              <option value="flexible">Flexibilní</option>
-              <option value="morning">Ranní</option>
-              <option value="afternoon">Odpolední</option>
+              <option value="flexible">{t('Flexibilní')}</option>
+              <option value="morning">{t('Ranní')}</option>
+              <option value="afternoon">{t('Odpolední')}</option>
             </Select>
           </Field>
-          <Field id="dostupnost-max" label="Max směn" hint="Prázdné = bez limitu.">
+          <Field id="dostupnost-max" label={t('Max směn')} hint={t('Prázdné = bez limitu.')}>
             <Input id="dostupnost-max" type="number" inputMode="numeric" min={1} max={31} value={maxShifts}
               onChange={(e) => setMaxShifts(e.target.value)} />
           </Field>
         </div>
 
-        <Field id="dostupnost-pozn" label="Poznámka">
+        <Field id="dostupnost-pozn" label={t('Poznámka')}>
           <Input id="dostupnost-pozn" value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} />
         </Field>
 
