@@ -28,7 +28,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: SITE_TITULEK,
     description: SITE_POPIS,
-    images: ['/brand/hero-counter.webp'],
+    images: ['/brand/landing/og.png'],
   },
 };
 

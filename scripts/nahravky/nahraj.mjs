@@ -301,10 +301,35 @@ async function nahraj(browser, s, tmp) {
   return { syrove, od, sec, chyby, z };
 }
 
+/**
+ * Plakáty hero ukázky: tvar první scény v rámu počítače a telefonu. Je to to, co
+ * návštěvník vidí dřív, než se načte živá ukázka (a co zůstane, když se nenačte),
+ * proto přesně stejné okno, v jakém pak ukázka poběží (viz components/landing/ukazka).
+ */
+async function plakatyHero(browser) {
+  const tvary = [
+    { id: 'hero-prehled-pocitac', okno: { width: 1100, height: 690 }, dsf: 1, sirka: 1100 },
+    { id: 'hero-prehled-telefon', okno: { width: 390, height: 780 }, dsf: 2, sirka: 780 },
+  ];
+  for (const t of tvary) {
+    const ctx = await browser.newContext({ viewport: t.okno, deviceScaleFactor: t.dsf, locale: 'cs-CZ' });
+    const p = await ctx.newPage();
+    await p.goto(BASE + '/demo?scena=prehled&role=vedeni&rezim=okno', { waitUntil: 'networkidle' });
+    await p.waitForFunction(() => (window.__demoUdalosti ?? []).some(u => u.typ === 'demo-pripraveno'), null, { timeout: 25000 });
+    await cekej(900);
+    const png = await p.screenshot();
+    await ctx.close();
+    const cil = VYSTUP + t.id + '.webp';
+    const info = await sharp(png).resize({ width: t.sirka }).webp({ quality: 80, effort: 5 }).toFile(cil);
+    console.log(`✓ plakát ${t.id}: ${info.width}x${info.height}, ${(info.size / 1024).toFixed(0)} kB`);
+  }
+}
+
 async function main() {
   const jen = process.argv.slice(2);
-  const vybrane = SCENARE.filter(s => !jen.length || jen.includes(s.id));
-  if (!vybrane.length) { console.error('Žádný scénář nevyhovuje: ' + jen.join(', ')); process.exit(2); }
+  const jenPlakaty = jen.length === 1 && jen[0] === 'plakaty';
+  const vybrane = jenPlakaty ? [] : SCENARE.filter(s => !jen.length || jen.includes(s.id));
+  if (!vybrane.length && !jenPlakaty) { console.error('Žádný scénář nevyhovuje: ' + jen.join(', ')); process.exit(2); }
   mkdirSync(VYSTUP, { recursive: true });
   const tmp = mkdtempSync(join(tmpdir(), 'managero-nahravky-'));
   const browser = await chromium.launch({ executablePath: process.env.SONDY_CHROMIUM || undefined });
@@ -330,6 +355,9 @@ async function main() {
       spadlo++;
       console.log(`✗ ${s.id}: ${String(e).split('\n')[0]}`);
     }
+  }
+  if (!jen.length || jenPlakaty) {
+    try { await plakatyHero(browser); } catch (e) { spadlo++; console.log(`✗ plakáty hero: ${String(e).split('\n')[0]}`); }
   }
   await browser.close();
   rmSync(tmp, { recursive: true, force: true });
