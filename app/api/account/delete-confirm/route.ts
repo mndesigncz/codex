@@ -2,15 +2,16 @@
 // náhledy odkazů v e-mailových klientech a antivirové skenery odkazy
 // otevírají (GET), a účet by zmizel bez vědomí člověka.
 //
-// Účet vlastníka podniku se tudy nesmaže: potřebuje výslovné rozhodnutí
-// o podniku (a platební údaje předplatného), a to se dělá v aplikaci po přihlášení.
+// Účet vlastníka podniku se smaže jen s výslovným rozhodnutím o podniku: druhým
+// krokem stejné stránky (odkaz + heslo + slovo SMAZAT). Kdo heslo nezná, nejdřív
+// si ho obnoví odkazem „Zapomenuté heslo“; samotný odkaz z e-mailu podnik nesmaže.
 
 import { NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { hit } from '@/lib/rateLimit';
 import { klientIp } from '@/lib/klientIp';
 import { hashTokenu, jePlatny, vypadaJakoToken } from '@/lib/jednorazovyToken';
-import { smazUcet } from '@/lib/smazaniUctuDb';
+import { smazUcet, hesloSedi } from '@/lib/smazaniUctuDb';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,16 +37,26 @@ export async function POST(request: Request) {
   if (!spotrebovan) return NextResponse.json({ error: NEPLATNY }, { status: 400 });
 
   try {
-    const r = await smazUcet(Number(spotrebovan.user_id), { smazatPodnik: false, zDuvodu: 'web' });
+    const userId = Number(spotrebovan.user_id);
+    const smazatPodnik = b?.smazatPodnik === true;
+    if (smazatPodnik) {
+      // Stejné pojistky jako DELETE /api/account: heslo a počítadlo pokusů.
+      const gate = await hit(`smazani:${userId}`, 5, 60 * 60, { failClosed: true });
+      if (!gate.ok || !(await hesloSedi(userId, String(b?.password ?? '')))) {
+        try { await sql`UPDATE account_delete_requests SET used_at = NULL WHERE token_hash = ${hash}`; } catch { /* nevadí */ }
+        return NextResponse.json(gate.ok ? { error: 'Heslo není správné.', kod: 'HESLO' } : { error: 'Příliš mnoho pokusů. Zkuste to později.' }, { status: gate.ok ? 400 : 429 });
+      }
+    }
+    const r = await smazUcet(userId, { smazatPodnik, potvrzeni: b?.potvrzeni ?? null, zDuvodu: 'web' });
     if (!r.ok) {
       // Odkaz se vrátí do hry, když se smazání nepovedlo z důvodu, který člověk může napravit.
       try { await sql`UPDATE account_delete_requests SET used_at = NULL WHERE token_hash = ${hash}`; } catch { /* nevadí */ }
       if (r.kod === 'VLASTNIK_S_CLENY' || r.kod === 'VLASTNIK_PODNIKU') {
-        return NextResponse.json({ error: 'Tenhle účet vlastní podnik. Smažte ho v aplikaci: Nastavení, Účet, Smazat účet. Tam potvrdíte i smazání podniku.', kod: r.kod }, { status: 409 });
+        return NextResponse.json({ error: r.zprava, kod: r.kod }, { status: 409 });
       }
       return NextResponse.json({ error: r.zprava, kod: r.kod }, { status: r.status });
     }
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, varovani: r.varovani });
   } catch (e) {
     console.error('smazání účtu z webu selhalo', e);
     try { await sql`UPDATE account_delete_requests SET used_at = NULL WHERE token_hash = ${hash}`; } catch { /* nevadí */ }

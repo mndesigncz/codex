@@ -268,9 +268,10 @@ function smazatCs(f: Firma): Dokument {
       { id: 'provoz', h: 'Co se smaže u zaměstnance a vedení', li: [
         'Jméno, e-mail, telefon, heslo, avatar, oznámení zařízení a členství v podnicích.',
         'Směny, docházka, uzávěrky a zprávy, které podnik vede jako správce, v podniku zůstanou kvůli jeho povinnostem (mzdy, účetnictví), ale bez vašeho jména: zobrazí se jako Smazaný uživatel.',
-        'Vlastník podniku: účet nejde smazat, dokud v podniku zůstávají další lidé, pokud nesmažete celý podnik. Smazání podniku zruší předplatné a odstraní všechna data podniku.',
+        'Vlastník podniku: účet nejde smazat, dokud v podniku zůstávají další lidé, pokud nesmažete celý podnik. Smazání podniku zruší předplatné, smaže zákazníka ve Stripe a odstraní všechna data podniku včetně nahraných souborů. Na webu stejný odkaz z e-mailu nabídne druhý krok: heslo a slovo SMAZAT.',
+        'Pozvánky s vaším e-mailem a soubory, které patří jen vám, se smažou. Text v protokolu akcí a v nahlášeních k vám se vymaže, PIN, hodinová sazba a limity směn se vynulují.',
       ] },
-      { id: 'kdy', h: 'Kdy a co zůstane', p: [`Smazání proběhne ihned po potvrzení. Zálohy u poskytovatelů se přepíšou nejpozději do 30 dnů. Zákonná evidence, kterou musíme zachovat (například záznamy o fakturaci podniku), zůstává v nezbytném rozsahu. Dotazy: ${f.emailPodpory}.`] },
+      { id: 'kdy', h: 'Kdy a co zůstane', p: [`Smazání proběhne ihned po potvrzení. Zálohy u poskytovatelů se přepíšou nejpozději do 30 dnů. Zákonná evidence, kterou musíme zachovat (záznamy o fakturaci podniku a faktury ve Stripe, bez vašich osobních údajů), zůstává v nezbytném rozsahu. Chat a návrhy, které jste sdíleli v podniku, zůstanou podniku jako zpráva od Smazaného uživatele. Dotazy: ${f.emailPodpory}.`] },
     ],
   };
 }
@@ -291,9 +292,10 @@ function smazatEn(f: Firma): Dokument {
       { id: 'provoz', h: 'What is deleted for staff and management', li: [
         'Name, email, phone, password, avatar, device notification tokens and business memberships.',
         'Shifts, attendance, closings and messages that the business keeps as controller stay in the business because of its obligations (payroll, accounting), but without your name: they appear as a deleted user.',
-        'Business owner: the account cannot be deleted while other people remain in the business, unless you delete the whole business. Deleting the business cancels the subscription and removes all business data.',
+        'Business owner: the account cannot be deleted while other people remain in the business, unless you delete the whole business. Deleting the business cancels the subscription, deletes the Stripe customer and removes all business data including uploaded files. On the web the same email link offers a second step: password and the word SMAZAT.',
+        'Invitations with your email and files that belong only to you are deleted. Free text about you in the action log and in reports is cleared; PIN, hourly rate and shift limits are reset.',
       ] },
-      { id: 'kdy', h: 'When, and what remains', p: [`Deletion happens right after confirmation. Backups at providers are overwritten within 30 days at the latest. Records we must keep by law (for example business billing records) remain to the extent necessary. Questions: ${f.emailPodpory}.`] },
+      { id: 'kdy', h: 'When, and what remains', p: [`Deletion happens right after confirmation. Backups at providers are overwritten within 30 days at the latest. Records we must keep by law (business billing records and Stripe invoices, without your personal data) remain to the extent necessary. Chat messages and suggestions you shared in a business stay with the business as a message from a deleted user. Questions: ${f.emailPodpory}.`] },
     ],
   };
 }

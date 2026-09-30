@@ -39,24 +39,53 @@ export const ZACHAZENI_TABULEK: Record<string, Zachazeni> = {
   push_subscriptions: 'smazat', device_tokens: 'smazat', notifications: 'smazat', password_resets: 'smazat',
   account_delete_requests: 'smazat', user_blocks: 'smazat', guide_reads: 'smazat', poll_votes: 'smazat',
   suggestion_votes: 'smazat', conversation_members: 'smazat', team_members: 'smazat', billing_interest: 'smazat',
-  rozlozeni_stranek: 'smazat',
+  rozlozeni_stranek: 'smazat', invitations: 'smazat',
   // host
   client_cards: 'smazat', client_memberships: 'smazat', client_loyalty_ledger: 'smazat', client_stamp_progress: 'smazat',
   client_coupon_claims: 'smazat', client_promo_uses: 'smazat', client_group_members: 'smazat', client_event_follows: 'smazat',
   client_reviews: 'smazat', client_bill_awards: 'smazat',
   client_reservations: 'upravit', client_orders: 'upravit',
+  // osobní text a soubory: řádek zůstává podniku, osobní obsah se maže (viz OSOBNI_UDAJE)
+  uploads: 'upravit', audit_log: 'upravit', content_reports: 'upravit',
   // záznamy podniku: anonymní autor, obsah patří podniku
   shifts: 'ponechat', shift_requests: 'ponechat', availability_requests: 'ponechat', shift_offers: 'ponechat',
   time_entries: 'ponechat', fixed_assignments: 'ponechat', time_off_requests: 'ponechat', shift_reviews: 'ponechat',
   shift_review_items: 'ponechat', reward_redemptions: 'ponechat', inventory_log: 'ponechat', inventory_reports: 'ponechat',
   inventory_items: 'ponechat', chat_messages: 'ponechat', messages: 'ponechat', procedure_runs: 'ponechat',
-  suggestions: 'ponechat', announcements: 'ponechat', uploads: 'ponechat', receipts: 'ponechat', audit_log: 'ponechat',
+  suggestions: 'ponechat', announcements: 'ponechat', receipts: 'ponechat',
   cash_closings: 'ponechat', orders: 'ponechat', events: 'ponechat', tasks: 'ponechat', planning_cards: 'ponechat',
   daily_reports: 'ponechat', recipes: 'ponechat', guides: 'ponechat', procedures: 'ponechat', polls: 'ponechat',
   stocktakes: 'ponechat', share_links: 'ponechat', menu_boards: 'ponechat', roles: 'ponechat', role_upravy: 'ponechat',
-  invitations: 'ponechat', pos_bills: 'ponechat', client_broadcasts: 'ponechat', content_reports: 'ponechat',
+  pos_bills: 'ponechat', client_broadcasts: 'ponechat',
   // vlastnictví: řeší se u podniku
   teams: 'tym', organizations: 'tym',
+};
+
+
+/**
+ * Tabulky s osobními údaji (e-mail, telefon, volný text, soubory, vazba na Stripe) a co se s nimi při smazání
+ * účtu děje. Pokrytí hlídá scripts/check-smazani.mjs: tabulka se sloupcem ze `SLOUPCE_OSOBNI_UDAJE`
+ * (scripts/ddl-schema.mjs) bez záznamu tady shodí CI.
+ *  smazat       — řádky osoby zmizí (kroky v planUzivatele)
+ *  anonymizovat — řádek zůstane, osobní obsah se vymaže nebo vazba přejde na anonymní účet
+ *  podnik       — údaje patří podniku a zmizí se smazáním podniku (planPodniku); kontakt na dodavatele není osoba účtu
+ *  ponechat     — zákonná evidence (účetnictví, fakturace, bezpečnostní protokol správce platformy), bez osobních údajů uživatele
+ */
+export type ZpusobOsobni = 'smazat' | 'anonymizovat' | 'podnik' | 'ponechat';
+export const OSOBNI_UDAJE: Record<string, { zpusob: ZpusobOsobni; co: string }> = {
+  users: { zpusob: 'anonymizovat', co: 'Jméno, e-mail, telefon, narozeniny, avatar, heslo, PIN, hodinová sazba, limity a preference směn, pozice, aktivní podnik a nastavení oznámení se přepíšou nebo vymažou; řádek zůstane pod anonymním jménem kvůli provozním záznamům podniku.' },
+  invitations: { zpusob: 'smazat', co: 'Pozvánky s e-mailem osoby (i pozvánky, které osoba rozeslala) se smažou včetně tokenu.' },
+  uploads: { zpusob: 'anonymizovat', co: 'Soubory osoby mimo podnik se smažou i s blobem; soubory v podniku (fotky účtenek, přílohy chatu) zůstanou podniku bez vazby na osobu a s obecným názvem. Soubory smazaného podniku se smažou i s blobem.' },
+  audit_log: { zpusob: 'anonymizovat', co: 'Záznamy o akcích zůstanou (kdo=anonymní účet, co, kdy); volný text `detail` k osobě se vymaže. Záznamy smazaného podniku zmizí s ním.' },
+  content_reports: { zpusob: 'anonymizovat', co: 'Nahlášení zůstanou pro moderaci; text podatele a opis nahlášeného obsahu osoby se vymaže.' },
+  teams: { zpusob: 'smazat', co: 'Smazáním podniku zmizí i stripe_customer_id a stripe_subscription_id; ve Stripe se zruší předplatné a smaže zákazník (chyba Stripe smazání neblokuje, vrací se jako varování a zapíše do protokolu).' },
+  organizations: { zpusob: 'smazat', co: 'Organizace (název firmy, sdílená nastavení) se smaže se smazáním posledního podniku v ní; prázdná organizace vlastníka se smaže vždy.' },
+  team_members: { zpusob: 'smazat', co: 'Členství v podniku včetně pozice a hodinové sazby se smaže.' },
+  menu_boards: { zpusob: 'podnik', co: 'PIN tabule s menu patří podniku (ne osobě) a maže se s ním.' },
+  suppliers: { zpusob: 'podnik', co: 'Kontakty na dodavatele patří podniku a mažou se s ním.' },
+  billing_events: { zpusob: 'ponechat', co: 'Id událostí Stripe bez osobních údajů; evidence fakturace podniku (zákon o účetnictví). Faktury samotné zůstávají ve Stripe.' },
+  referral_rewards: { zpusob: 'ponechat', co: 'Provize za doporučení, jen čísla podniků a částka; účetní záznam platformy.' },
+  admin_audit: { zpusob: 'ponechat', co: 'Bezpečnostní protokol zásahů správce platformy (actor je e-mail správce, ne dotčené osoby); správce se sám smazat nemůže.' },
 };
 
 /** Tabulky s `team_id`, které se mažou se smazáním podniku (kromě účetních záznamů platformy). */
@@ -142,6 +171,12 @@ export interface Krok {
 
 const volitelny = (popis: string, text: string, params: unknown[]): Krok => ({ text, params, povinny: false, popis });
 
+/** Sloupce `users`, které se při smazání vrátí do prázdné hodnoty (hodnota je literál SQL z konstanty). */
+export const RESET_SLOUPCU: [string, string][] = [
+  ['pin', 'NULL'], ['pin_hash', 'NULL'], ['hourly_rate', '0'], ['max_consecutive_days', 'NULL'], ['max_month_hours', 'NULL'],
+  ['split_shifts_ok', 'NULL'], ['shift_preference', `'flexible'`], ['job_title', 'NULL'], ['active_team_id', 'NULL'],
+];
+
 /** Kroky pro jednoho uživatele. Pořadí: nejdřív mazání, nakonec anonymizace řádku users. */
 export function planUzivatele(u: { id: number; email: string; role: string; hash: string; dnes: string }): Krok[] {
   const id = u.id;
@@ -161,6 +196,21 @@ export function planUzivatele(u: { id: number; email: string; role: string; hash
     k.push(volitelny('vymazat poznámky rezervací', `UPDATE client_reservations SET note = NULL WHERE customer_id = $1`, [id]));
     k.push(volitelny('vymazat poznámky objednávek', `UPDATE client_orders SET note = NULL WHERE customer_id = $1`, [id]));
   }
+  // Pozvánky s e-mailem osoby (a ty, které rozeslala): e-mail + token jsou osobní údaj.
+  k.push(volitelny('smazat pozvánky', `DELETE FROM invitations WHERE LOWER(email) = LOWER($2) OR invited_by = $1`, [id, u.email]));
+  // Soubory: bez podniku patří jen osobě (mažou se; blob maže smazUcet), v podniku zůstanou bez vazby na osobu.
+  k.push(volitelny('smazat soubory mimo podnik', `DELETE FROM uploads WHERE user_id = $1 AND team_id IS NULL`, [id]));
+  k.push(volitelny('odpojit soubory podniku od osoby', `UPDATE uploads SET user_id = NULL, name = 'Příloha' WHERE user_id = $1`, [id]));
+  // Protokol akcí: zůstane, vymaže se volný text. Záznam o samotném smazání (bez osobních údajů) se zachová.
+  k.push(volitelny('vymazat text protokolu', `UPDATE audit_log SET detail = NULL WHERE (user_id = $1 OR (entity = 'user' AND entity_id = $1))
+    AND action NOT IN ('ucet.smazan', 'podnik.smazan', 'ucet.stripe_chyba')`, [id]));
+  k.push(volitelny('vymazat text nahlášení podatele', `UPDATE content_reports SET detail = NULL WHERE reporter_id = $1`, [id]));
+  k.push(volitelny('vymazat opis nahlášeného obsahu', `UPDATE content_reports SET snapshot = NULL WHERE reported_user_id = $1`, [id]));
+  // Prázdná organizace vlastníka (po smazání jeho podniků) nemá smysl držet.
+  k.push(volitelny('smazat prázdné organizace vlastníka', `DELETE FROM organizations WHERE owner_id = $1
+    AND NOT EXISTS (SELECT 1 FROM teams WHERE organization_id = organizations.id)`, [id]));
+  // Mzdová sazba, PIN a limity jsou osobní údaje svázané s účtem. Po jednom sloupci: chybějící sloupec (před migrací) nic nezastaví.
+  for (const [sloupec, hodnota] of RESET_SLOUPCU) k.push(volitelny(`reset users.${sloupec}`, `UPDATE users SET ${sloupec} = ${hodnota} WHERE id = $1`, [id]));
   k.push(volitelny('odpojit pozvané hosty', `UPDATE users SET referred_by = NULL WHERE referred_by = $1`, [id]));
   const jmeno = u.role === 'customer' ? 'Smazaný host' : 'Smazaný uživatel';
   const anonymniEmail = `smazan-${id}@managero.invalid`;
@@ -190,6 +240,9 @@ export function planPodniku(teamId: number, vlastnikId: number): Krok[] {
   for (const t of TYMOVE_TABULKY) k.push(volitelny(`podnik: ${t}`, `DELETE FROM ${t} WHERE team_id = $1`, [teamId]));
   // Ostatní členové zůstanou bez podniku; jejich účty se nemažou.
   k.push(volitelny('podnik: uvolnit členy', `UPDATE users SET team_id = NULL WHERE team_id = $1 AND id <> $2`, [teamId, vlastnikId]));
+  // Organizace zanikne s posledním podnikem; jinak se jen odpojí (ostatní podniky ji dál používají).
+  k.push(volitelny('podnik: smazat prázdnou organizaci', `DELETE FROM organizations WHERE id = (SELECT organization_id FROM teams WHERE id = $1)
+    AND NOT EXISTS (SELECT 1 FROM teams WHERE organization_id = organizations.id AND id <> $1)`, [teamId]));
   k.push(volitelny('podnik: odpojit od organizace', `UPDATE teams SET organization_id = NULL WHERE id = $1`, [teamId]));
   k.push({ popis: 'podnik: smazat tým', povinny: true, text: `DELETE FROM teams WHERE id = $1`, params: [teamId] });
   return k;
