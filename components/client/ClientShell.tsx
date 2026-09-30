@@ -11,6 +11,8 @@ import { useEffect, useState } from 'react';
 import { Icon, LogoMark } from '../Icons';
 import { useTheme } from '../ThemeProvider';
 import { usePopover } from '@/lib/usePopover';
+import JazykMenu from '../ui/JazykMenu';
+import { useT } from '@/lib/i18n/client';
 
 export interface ClientUser { id: number; name: string; email: string }
 
@@ -25,6 +27,7 @@ export function Initials({ name, size = 36 }: { name: string; size?: number }) {
 }
 
 export default function ClientShell({ me, children }: { me: ClientUser | null; children: React.ReactNode }) {
+  const t = useT('klient-host');
   // Hostovská část je světlá i při tmavém motivu účtu (viz ThemeProvider).
   const { setForcedLight } = useTheme();
   useEffect(() => { setForcedLight(true); return () => setForcedLight(false); }, [setForcedLight]);
@@ -46,16 +49,18 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
               <LogoMark size={32} />
               <span className="hidden min-[360px]:inline font-bold tracking-tight leading-none">Managero <span className="hidden sm:inline text-black/45 font-semibold">client</span></span>
             </Link>
-            <nav className="ml-auto flex items-center gap-0.5 sm:gap-1 min-w-0" aria-label="Zákaznická navigace">
+            <nav className="ml-auto flex items-center gap-0.5 sm:gap-1 min-w-0" aria-label={t('Zákaznická navigace')}>
               {/* Na mobilu žijí záložky ve spodním docku jako ve zbytku
                   aplikace; nahoře zůstává jen značka a účet. Nepřihlášený
                   dock nemá, tak mu odkaz Podniky zůstává i na telefonu. */}
               <Link href="/client" aria-current={active('/client') && path === '/client' ? 'page' : undefined}
-                className={`${me ? 'hidden md:inline-block' : ''} tap-target-sm rounded-full px-3 sm:px-3.5 py-2 text-sm font-medium transition ${path === '/client' ? 'seg-on' : 'seg-off'}`}>Podniky</Link>
+                className={`${me ? 'hidden md:inline-block' : ''} tap-target-sm rounded-full px-3 sm:px-3.5 py-2 text-sm font-medium transition ${path === '/client' ? 'seg-on' : 'seg-off'}`}>{t('Podniky')}</Link>
               {me && (
                 <Link href="/client/me" aria-current={active('/client/me') ? 'page' : undefined}
-                  className={`hidden md:inline-block tap-target-sm rounded-full px-3 sm:px-3.5 py-2 text-sm font-medium transition ${active('/client/me') ? 'seg-on' : 'seg-off'}`}>Moje</Link>
+                  className={`hidden md:inline-block tap-target-sm rounded-full px-3 sm:px-3.5 py-2 text-sm font-medium transition ${active('/client/me') ? 'seg-on' : 'seg-off'}`}>{t('Moje')}</Link>
               )}
+              {/* Jazyk hosta: malá pilulka s globusem. Hostovská část je celá přeložená do všech pěti jazyků. */}
+              <JazykMenu className="ml-0.5 sm:ml-1" />
               {me ? (
                 <div className="relative ml-1" ref={pop.ref}>
                   <button ref={pop.triggerRef} onClick={() => setOpen(v => !v)}
@@ -74,13 +79,13 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
                       </div>
                       <button role="menuitem" onClick={() => signOut({ callbackUrl: '/client' })}
                         className="w-full text-left rounded-xl px-3 py-2 text-sm text-bad-ink hover:bg-bad/10 transition flex items-center gap-2">
-                        <Icon name="logout" size={16} /> Odhlásit se
+                        <Icon name="logout" size={16} /> {t('Odhlásit se')}
                       </button>
                     </div>
                   )}
                 </div>
               ) : (
-                <Link href="/client/login" className="tap-target-sm ml-0.5 sm:ml-1 rounded-full bg-[#C8F542] on-accent px-3.5 sm:px-4 py-2 text-sm font-semibold hover:brightness-105 active:scale-[0.98] transition whitespace-nowrap">Přihlásit</Link>
+                <Link href="/client/login" className="tap-target-sm ml-0.5 sm:ml-1 rounded-full bg-[#C8F542] on-accent px-3.5 sm:px-4 py-2 text-sm font-semibold hover:brightness-105 active:scale-[0.98] transition whitespace-nowrap">{t('Přihlásit')}</Link>
               )}
             </nav>
           </div>
@@ -89,17 +94,17 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
       <main className="flex-1 w-full mx-auto max-w-5xl px-4 sm:px-6 pt-6 sm:pt-10 pb-6 sm:pb-10">{children}</main>
       <footer className={`mx-auto max-w-5xl w-full px-4 sm:px-6 pt-8 ${me ? 'pb-28 md:pb-8' : 'pb-8'} text-xs text-black/45 flex flex-wrap items-center gap-x-4 gap-y-1`}>
         <span>Managero client</span>
-        <span>Rezervace, věrnost a objednávky pro podniky, kam chodíš.</span>
-        <Link href="/" className="tap-target-sm sm:ml-auto inline-flex items-center hover:text-black">Jsem podnik</Link>
+        <span>{t('Rezervace, věrnost a objednávky pro podniky, kam chodíš.')}</span>
+        <Link href="/" className="tap-target-sm sm:ml-auto inline-flex items-center hover:text-black">{t('Jsem podnik')}</Link>
       </footer>
 
       {/* Mobilní spodní dock — stejný jazyk jako administrace. */}
       {me && (
         <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),16px)]">
-          <nav className="dock-strong mx-auto max-w-md rounded-3xl px-2 py-2 flex items-center justify-around shadow-[0_10px_34px_rgba(25,35,15,0.16)]" aria-label="Spodní navigace">
+          <nav className="dock-strong mx-auto max-w-md rounded-3xl px-2 py-2 flex items-center justify-around shadow-[0_10px_34px_rgba(25,35,15,0.16)]" aria-label={t('Spodní navigace')}>
             {([
-              { href: '/client', label: 'Podniky', icon: 'location', on: path === '/client' || (!!path?.startsWith('/client/') && !path.startsWith('/client/me')) },
-              { href: '/client/me', label: 'Moje', icon: 'card', on: !!path?.startsWith('/client/me') },
+              { href: '/client', label: t('Podniky'), icon: 'location', on: path === '/client' || (!!path?.startsWith('/client/') && !path.startsWith('/client/me')) },
+              { href: '/client/me', label: t('Moje'), icon: 'card', on: !!path?.startsWith('/client/me') },
             ] as const).map(i => (
               <Link key={i.href} href={i.href} title={i.label}
                 className={`flex flex-col items-center gap-1 rounded-2xl px-6 py-1.5 transition duration-200 ${i.on ? 'text-[#16181A] -translate-y-0.5' : 'text-black/40'}`}>

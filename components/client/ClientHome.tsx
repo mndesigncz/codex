@@ -12,10 +12,12 @@ import { Initials } from './ClientShell';
 import { hoursLabel } from '@/lib/clientSlots';
 import { pragueToday } from '@/lib/pragueTime';
 import { okJson } from '@/lib/api';
+import { useT } from '@/lib/i18n/client';
 
 interface Biz { slug: string; name: string; tagline: string; address: string; coverUrl: string; hours: any; member: boolean; members: number; reservationsOn: boolean; orderingOn: boolean; loyaltyOn: boolean }
 
 export default function ClientHome() {
+  const t = useT('klient-host');
   const [q, setQ] = useState('');
   const [list, setList] = useState<Biz[] | null>(null);
   const [signedIn, setSignedIn] = useState(false);
@@ -23,12 +25,12 @@ export default function ClientHome() {
   const today = pragueToday();
 
   useEffect(() => {
-    const t = setTimeout(() => {
+    const casovac = setTimeout(() => {
       fetch(`/api/client/businesses?q=${encodeURIComponent(q)}`).then(okJson)
         .then(d => { setList(d.businesses ?? []); setSignedIn(!!d.signedIn); })
-        .catch(() => setErr('Seznam podniků se nenačetl. Zkus to za chvíli.'));
+        .catch(() => setErr(t('Seznam podniků se nenačetl. Zkus to za chvíli.')));
     }, q ? 250 : 0);
-    return () => clearTimeout(t);
+    return () => clearTimeout(casovac);
   }, [q]);
 
   const mine = (list ?? []).filter(b => b.member);
@@ -38,38 +40,38 @@ export default function ClientHome() {
     <div className="space-y-10 sm:space-y-14">
       <section className="grid grid-cols-1 md:grid-cols-[3fr_2fr] gap-8 md:gap-12 items-end">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-black/45 mb-3">Pro hosty</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-black/45 mb-3">{t('Pro hosty')}</p>
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tighter leading-[1.02] text-balance">
-            Kartička, rezervace a objednávka od stolu.
+            {t('Kartička, rezervace a objednávka od stolu.')}
           </h1>
           <p className="mt-3 text-base text-black/60 leading-relaxed max-w-[44ch] text-pretty">
-            Jeden účet pro všechny podniky, kam chodíš. Razítka a body sbíráš u kasy.
+            {t('Jeden účet pro všechny podniky, kam chodíš. Razítka a body sbíráš u kasy.')}
           </p>
           {!signedIn && (
             <div className="mt-6 flex flex-wrap gap-2">
               <Link href="/client/register" className="tap-target inline-flex items-center gap-2 btn btn-accent hover:brightness-105 active:scale-[0.98] transition">
-                <Icon name="plus" size={16} /> Založit účet
+                <Icon name="plus" size={16} /> {t('Založit účet')}
               </Link>
               <Link href="/client/login" className="tap-target inline-flex items-center gap-2 btn btn-secondary hover:bg-black/[0.05] active:scale-[0.98] transition">
-                Přihlásit se
+                {t('Přihlásit se')}
               </Link>
             </div>
           )}
         </div>
         <div className="md:justify-self-end w-full md:max-w-xs space-y-5">
           <div>
-            <label htmlFor="biz-q" className="block text-xs font-semibold text-black/55 mb-1.5">Najít podnik</label>
+            <label htmlFor="biz-q" className="block text-xs font-semibold text-black/55 mb-1.5">{t('Najít podnik')}</label>
             <div className="relative">
               <Icon name="search" size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black/40" />
-              <input id="biz-q" value={q} onChange={e => setQ(e.target.value)} placeholder="Název nebo ulice"
+              <input id="biz-q" value={q} onChange={e => setQ(e.target.value)} placeholder={t('Název nebo ulice')}
                 className="w-full rounded-full bg-white/70 border border-black/[0.08] pl-10 pr-4 py-3 text-sm placeholder-black/35 focus:border-[#C8F542]/60 focus:ring-2 focus:ring-[#C8F542]/25 focus:outline-none transition" />
             </div>
           </div>
           <ul className="glass-card p-4 space-y-2.5 text-sm">
-            {([['card', 'Kartička s QR', 'ukážeš u kasy, obsluha přidá razítko nebo body'], ['calendarCheck', 'Rezervace', 'stůl na den a hodinu, potvrzení přijde do telefonu'], ['cup', 'Objednávka od stolu', 'naskenuješ QR na stole, jde rovnou do kasy']] as const).map(([ic, t, h]) => (
-              <li key={t} className="flex items-start gap-3">
+            {([['card', t('Kartička s QR'), t('ukážeš u kasy, obsluha přidá razítko nebo body')], ['calendarCheck', t('Rezervace'), t('stůl na den a hodinu, potvrzení přijde do telefonu')], ['cup', t('Objednávka od stolu'), t('naskenuješ QR na stole, jde rovnou do kasy')]] as const).map(([ic, nadpis, h]) => (
+              <li key={nadpis} className="flex items-start gap-3">
                 <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#C8F542]/15 border border-[#C8F542]/30 text-[#5B7A08]"><Icon name={ic} size={15} /></span>
-                <span><span className="font-semibold">{t}</span><span className="block text-xs text-black/55 leading-snug">{h}</span></span>
+                <span><span className="font-semibold">{nadpis}</span><span className="block text-xs text-black/55 leading-snug">{h}</span></span>
               </li>
             ))}
           </ul>
@@ -85,12 +87,12 @@ export default function ClientHome() {
         </div>
       ) : (
         <>
-          {mine.length > 0 && <BizList title="Moje podniky" items={mine} today={today} />}
+          {mine.length > 0 && <BizList title={t('Moje podniky')} items={mine} today={today} />}
           {others.length > 0
-            ? <BizList title={mine.length ? 'Další podniky' : 'Podniky'} items={others} today={today} />
+            ? <BizList title={mine.length ? t('Další podniky') : t('Podniky')} items={others} today={today} />
             : mine.length === 0 && (
-              <EmptyState icon="location" title={q ? 'Nic takového tu není' : 'Zatím tu není žádný podnik'}
-                hint={q ? 'Zkus jiný název nebo ulici.' : 'Podniky se objeví, jakmile si Managero client zapnou.'} />
+              <EmptyState icon="location" title={q ? t('Nic takového tu není') : t('Zatím tu není žádný podnik')}
+                hint={q ? t('Zkus jiný název nebo ulici.') : t('Podniky se objeví, jakmile si Managero client zapnou.')} />
             )}
         </>
       )}
@@ -99,6 +101,7 @@ export default function ClientHome() {
 }
 
 function BizList({ title, items, today }: { title: string; items: Biz[]; today: string }) {
+  const t = useT('klient-host');
   return (
     <section>
       <h2 className="t-section mb-4">{title}</h2>
@@ -118,8 +121,8 @@ function BizList({ title, items, today }: { title: string; items: Biz[]; today: 
                 {!b.coverUrl && <Initials name={b.name} size={44} />}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
-                    {b.member && <span className="rounded-full bg-[#C8F542] on-accent px-2.5 py-0.5 text-[11px] font-semibold">Člen</span>}
-                    <span className={`text-[11px] inline-flex items-center gap-1 ${b.coverUrl ? 'text-white/70' : 'text-black/50'}`}><Icon name="clock" size={12} />Dnes {hoursLabel(b.hours, today)}</span>
+                    {b.member && <span className="rounded-full bg-[#C8F542] on-accent px-2.5 py-0.5 text-[11px] font-semibold">{t('Člen')}</span>}
+                    <span className={`text-[11px] inline-flex items-center gap-1 ${b.coverUrl ? 'text-white/70' : 'text-black/50'}`}><Icon name="clock" size={12} />{t('Dnes {hodiny}', { hodiny: hoursLabel(b.hours, today, cs => t(cs)) })}</span>
                     {b.members > 0 && <span className={`text-[11px] inline-flex items-center gap-1 ${b.coverUrl ? 'text-white/70' : 'text-black/50'}`}><Icon name="users" size={12} />{b.members}</span>}
                   </div>
                   <p className="text-xl font-bold tracking-tight leading-tight">{b.name}</p>
@@ -128,9 +131,9 @@ function BizList({ title, items, today }: { title: string; items: Biz[]; today: 
               </div>
               <div className={`mt-3 flex flex-wrap gap-1.5 text-xs`}>
                 {b.address && <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${b.coverUrl ? 'bg-white/15 text-white/90' : 'bg-black/[0.05] text-black/60'}`}><Icon name="location" size={12} />{b.address}</span>}
-                {b.reservationsOn && <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${b.coverUrl ? 'bg-white/15 text-white/90' : 'bg-[#C8F542]/15 text-[#5B7A08]'}`}><Icon name="calendarCheck" size={12} />Rezervace</span>}
-                {b.loyaltyOn && <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${b.coverUrl ? 'bg-white/15 text-white/90' : 'bg-[#C8F542]/15 text-[#5B7A08]'}`}><Icon name="gift" size={12} />Věrnost</span>}
-                {b.orderingOn && <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${b.coverUrl ? 'bg-white/15 text-white/90' : 'bg-[#C8F542]/15 text-[#5B7A08]'}`}><Icon name="cup" size={12} />Od stolu</span>}
+                {b.reservationsOn && <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${b.coverUrl ? 'bg-white/15 text-white/90' : 'bg-[#C8F542]/15 text-[#5B7A08]'}`}><Icon name="calendarCheck" size={12} />{t('Rezervace')}</span>}
+                {b.loyaltyOn && <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${b.coverUrl ? 'bg-white/15 text-white/90' : 'bg-[#C8F542]/15 text-[#5B7A08]'}`}><Icon name="gift" size={12} />{t('Věrnost')}</span>}
+                {b.orderingOn && <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${b.coverUrl ? 'bg-white/15 text-white/90' : 'bg-[#C8F542]/15 text-[#5B7A08]'}`}><Icon name="cup" size={12} />{t('Od stolu')}</span>}
               </div>
             </div>
           </Link>

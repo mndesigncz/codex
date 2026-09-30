@@ -4,6 +4,7 @@ import React from 'react';
 import { Icon } from '../Icons';
 import { useModal } from '@/lib/useModal';
 import { DiscardGuard } from './DiscardGuard';
+import { useT } from '@/lib/i18n/client';
 
 // Okno — jedno pro všechny.
 //
@@ -32,6 +33,7 @@ export function Modal({ open, onClose, title, subtitle, size = 'md', children, f
   footer?: React.ReactNode;
   className?: string;
 }) {
+  const t = useT();
   const modal = useModal(open, onClose, typeof title === 'string' ? title : undefined);
   if (!open) return null;
   const width = size === 'sm' ? 'max-w-sm' : size === 'lg' ? 'max-w-2xl' : 'max-w-md';
@@ -51,7 +53,7 @@ export function Modal({ open, onClose, title, subtitle, size = 'md', children, f
             <h3 className="t-section text-balance">{title}</h3>
             {subtitle && <p className="t-meta mt-1 text-pretty">{subtitle}</p>}
           </div>
-          <button type="button" onClick={modal.guard.attemptClose} aria-label="Zavřít"
+          <button type="button" onClick={modal.guard.attemptClose} aria-label={t('Zavřít')}
             className="btn-icon shrink-0 -mt-1 -mr-1"><Icon name="close" size={16} /></button>
         </div>
         <div className="px-6 pb-6 overflow-y-auto scrollbar-thin">{children}</div>

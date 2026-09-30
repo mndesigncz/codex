@@ -11,7 +11,7 @@
 
 import { LOCALE_PRO_JAZYK, type Jazyk } from './config.ts';
 
-export type StylDatumu = 'kratce' | 'dlouze' | 'mesic' | 'denvtydnu';
+export type StylDatumu = 'kratce' | 'dlouze' | 'mesic' | 'denvtydnu' | 'denDlouze' | 'denKratce' | 'cislo';
 
 const PASMO = 'Europe/Prague';
 
@@ -31,6 +31,11 @@ export function fmtDatum(d: Date | string | number, o: { jazyk: Jazyk; styl?: St
     dlouze: { day: 'numeric', month: 'long', year: 'numeric' },
     mesic: { month: 'long', year: 'numeric' },
     denvtydnu: { weekday: 'long' },
+    // „pátek 12. září“ pro nadpisy a „pá 12. 9.“ pro seznamy (dřív czDay v lib/clientSlots)
+    denDlouze: { weekday: 'long', day: 'numeric', month: 'long' },
+    denKratce: { weekday: 'short', day: 'numeric', month: 'numeric' },
+    // „11. 2. 2026“
+    cislo: { day: 'numeric', month: 'numeric', year: 'numeric' },
   };
   // Datum zadané jako „RRRR-MM-DD" je kalendářní den, ne okamžik: pásmo se
   // pro něj nesmí uplatnit, jinak by se v Praze posunul den kolem půlnoci.

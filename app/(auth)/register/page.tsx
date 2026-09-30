@@ -186,7 +186,7 @@ export default function RegisterPage() {
               Kdo přišel z ceníku, má vybráno; kdo přišel z hlavičky, může
               přepnout. Karta se zadává až po založení účtu. */}
           <fieldset className="mb-6">
-            <legend className="block text-xs uppercase tracking-wider text-black/45 mb-2.5">Tarif na začátek</legend>
+            <legend className="block text-xs uppercase tracking-wider text-black/45 mb-2.5">Tarif na začátek</legend>{/* i18n-ok: tarif, cena a platba zůstávají česky */}
             <div className="grid grid-cols-3 gap-1.5">
               {(['free', 'pro', 'max'] as const).map(tp => (
                 <button key={tp} type="button" onClick={() => setPlan(tp)} aria-pressed={plan === tp}
@@ -195,7 +195,7 @@ export default function RegisterPage() {
                   }`}>
                   <span className="block text-sm font-bold">{PLAN_NAMES[tp]}</span>
                   <span className={`block text-[11px] ${plan === tp ? 'text-white/60' : 'text-black/45'}`}>
-                    {tp === 'free' ? 'do 3 lidí' : formatMoney(PRICES[tp][interval === 'year' ? 'year' : 'month'], 'CZK')}
+                    {tp === 'free' ? 'do 3 lidí' /* i18n-ok: cena */ : formatMoney(PRICES[tp][interval === 'year' ? 'year' : 'month'], 'CZK')}
                   </span>
                 </button>
               ))}
@@ -206,7 +206,7 @@ export default function RegisterPage() {
                   {(['month', 'year'] as const).map(i => (
                     <button key={i} type="button" onClick={() => setIntervalPlanu(i)} aria-pressed={interval === i}
                       className={`tap-target-sm rounded-full px-3 py-1 text-xs font-semibold transition ${interval === i ? 'seg-on' : 'seg-off'}`}>
-                      {i === 'month' ? 'Měsíčně' : 'Ročně'}
+                      {i === 'month' ? 'Měsíčně' : 'Ročně'}{/* i18n-ok: cena */}
                     </button>
                   ))}
                 </div>

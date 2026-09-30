@@ -15,6 +15,9 @@ import { czForm, czCount, czVerb, POLOZKA, DEN } from '../../lib/czech.ts';
 import { czDays } from '../../lib/plan.ts';
 import { CURRENCIES } from '../../lib/money.ts';
 import { ALERGENY, KODY_ALERGENU, nazevAlergenu, cistiAlergeny } from '../../lib/alergeny.ts';
+import { RES_STATUS, hoursLabel, tierFor } from '../../lib/clientSlots.ts';
+import { NAV_TEXTY } from '../../lib/navigace.ts';
+import { statusMessage } from '../../lib/api.ts';
 
 const HRANICE = [0, 1, 2, 4, 5, 11, 12, 14, 21, 22, 25, 100, 101, 102, 1.5];
 
@@ -158,7 +161,7 @@ export default function ({ eq, ok }: Testy) {
         if (klic.startsWith('#')) continue; // katalog podle id: zdroj je v kódu
         const cs = klic.split('|')[0];
         if (JSON.stringify(jmenaVeZprave(cs)) !== JSON.stringify(jmenaVeZprave(String(hodnota)))) zlych.push(`${j}/${f}: parametry „${klic}“`);
-        if (/[<>&]/.test(String(hodnota))) zlych.push(`${j}/${f}: HTML ve zprávě „${klic}“`);
+        if (/<[a-z/!]|&[#a-z0-9]+;/i.test(String(hodnota))) zlych.push(`${j}/${f}: HTML ve zprávě „${klic}“`);
         for (const sel of pluralSelektory(String(hodnota))) {
           const potreba = j === 'pl' ? ['one', 'few', 'many', 'other'] : j === 'sk' ? ['one', 'few', 'other'] : ['one', 'other'];
           if (!potreba.every(p => sel.includes(p))) zlych.push(`${j}/${f}: plurál bez ${potreba.join('/')} „${klic}“`);
@@ -167,4 +170,39 @@ export default function ({ eq, ok }: Testy) {
     }
   }
   ok(`slovníky: ${pocet} překladů má stejné parametry, žádné HTML a plné plurály (${zlych.slice(0, 3).join('; ')})`, zlych.length === 0);
+
+  // ---- úplnost slovníků: všechny jazyky mají stejné klíče a pokrývají data z kódu ----
+  const nacti = (j: string, sekce: string) => JSON.parse(readFileSync(new URL(`../../locales/${j}/${sekce}.json`, import.meta.url), 'utf8')) as Record<string, string>;
+  const SEKCE = ['common', 'api', 'auth', 'klient-host'];
+  const rozdily: string[] = [];
+  for (const sk of SEKCE) {
+    const zaklad = Object.keys(nacti('en', sk)).sort();
+    for (const j of ['de', 'sk', 'pl']) {
+      const klice = Object.keys(nacti(j, sk)).sort();
+      if (JSON.stringify(klice) !== JSON.stringify(zaklad)) rozdily.push(`${j}/${sk}`);
+    }
+  }
+  ok(`slovníky: en/de/sk/pl mají v každé sekci stejné klíče (${rozdily.join(', ')})`, rozdily.length === 0);
+  const chybejici: string[] = [];
+  const vse = (j: string) => Object.assign({}, ...SEKCE.map(sk => nacti(j, sk)));
+  for (const j of ['en', 'de', 'sk', 'pl']) {
+    const sl = vse(j);
+    for (const t of NAV_TEXTY) if (!sl[`${t}|nav`]) chybejici.push(`${j}: nav ${t}`);
+    for (const st of Object.values(RES_STATUS)) if (!sl[st.label]) chybejici.push(`${j}: stav ${st.label}`);
+    for (const n of [0, 10, 25, 100]) { const l = tierFor(n, { platinumAt: 100 }).label; if (!sl[l]) chybejici.push(`${j}: úroveň ${l}`); }
+    for (const st of [401, 404, 429, 500]) if (!sl[statusMessage(st)]) chybejici.push(`${j}: hláška ${st}`);
+    for (const k of ['neuvedeno', 'zavřeno']) if (!sl[k]) chybejici.push(`${j}: ${k}`);
+    for (const k of Object.keys(sl)) if (sl[k].trim() === '') chybejici.push(`${j}: prázdný ${k}`);
+  }
+  ok(`slovníky pokrývají navigaci, stavy, úrovně a stavové hlášky (${chybejici.slice(0, 3).join('; ')})`, chybejici.length === 0);
+  eq('hoursLabel překládá přes předanou funkci', [hoursLabel(null, '2026-09-30', c => `[${c}]`), hoursLabel({ '2': { closed: true } }, '2026-09-30', c => `[${c}]`), hoursLabel({ '2': { open: '8:00', close: '20:00' } }, '2026-09-30')], ['[neuvedeno]', '[zavřeno]', '8:00–20:00']);
+  // rodné české věty klíčů: nikdo nepřeložil klíč jako „Kč“ apod. (čeština je zdroj, slovník ji jen mapuje)
+  ok('slovníky: klíč s českou větou má překlad odlišný od klíče (kromě jmen a zkratek)', ['en', 'de'].every(j => {
+    const sl = vse(j); const stejne = Object.keys(sl).filter(k => sl[k] === k && /\s/.test(k) && k.length > 12);
+    return stejne.length === 0;
+  }));
+  eq('czDay a fmtDatum (denDlouze/denKratce/cislo) dávají pro češtinu totéž', [
+    fmtDatum('2026-09-12', { jazyk: 'cs', styl: 'denDlouze' }), fmtDatum('2026-09-12', { jazyk: 'cs', styl: 'denKratce' }), fmtDatum('2026-02-11', { jazyk: 'cs', styl: 'cislo' }),
+  ], ['sobota 12. září', 'so 12. 9.', '11. 2. 2026']);
+  eq('měsíc zkratkou pro dlaždici akce (cs) jako dřívější MONTHS', [1, 2, 3, 6, 7, 9, 10].map(m => fmtMesic(m, { jazyk: 'cs', styl: 'kratky' })), ['led', 'úno', 'bře', 'čvn', 'čvc', 'zář', 'říj']);
 }

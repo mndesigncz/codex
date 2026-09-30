@@ -6,6 +6,7 @@
 
 import type { FloorPlan, MapTable } from '@/lib/floorplan';
 import { placedTables, tableBox, planIsEmpty } from '@/lib/floorplan';
+import { useT } from '@/lib/i18n/client';
 
 export type { MapTable };
 export { placedTables };
@@ -86,6 +87,7 @@ export function TableShape({ t, selected, hit, label }: {
 export default function TableMap({ tables, plan, selectedId, onPick, caption }: {
   tables: MapTable[]; plan?: FloorPlan | null; selectedId?: number | null; onPick?: (id: number) => void; caption?: string;
 }) {
+  const t = useT('klient-host');
   const placed = placedTables(tables);
   if (!placed.length && planIsEmpty(plan)) return null;
   const ratio = plan?.ratio && plan.ratio > 0 ? plan.ratio : 3 / 2;
@@ -93,11 +95,11 @@ export default function TableMap({ tables, plan, selectedId, onPick, caption }: 
     <figure className="m-0">
       <div className="relative w-full rounded-3xl border border-black/[0.08] bg-white/60 overflow-hidden"
         style={{ aspectRatio: String(ratio), backgroundImage: planIsEmpty(plan) ? 'radial-gradient(rgba(22,24,26,0.07) 1px, transparent 1px)' : undefined, backgroundSize: '18px 18px' }}
-        role={onPick ? 'radiogroup' : undefined} aria-label={onPick ? 'Vyber stůl na plánku' : 'Plánek stolů'}>
+        role={onPick ? 'radiogroup' : undefined} aria-label={onPick ? t('Vyber stůl na plánku') : t('Plánek stolů')}>
         <PlanCanvasContent plan={plan} />
-        {placed.map(t => (
-          <TableShape key={t.id} t={t} selected={t.id === selectedId}
-            hit={onPick ? { role: 'radio', 'aria-checked': t.id === selectedId, 'aria-label': `Stůl ${t.name} · ${t.seats} m.`, tabIndex: 0, onClick: () => onPick(t.id), onKeyDown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick(t.id); } } } : undefined} />
+        {placed.map(tb => (
+          <TableShape key={tb.id} t={tb} selected={tb.id === selectedId}
+            hit={onPick ? { role: 'radio', 'aria-checked': tb.id === selectedId, 'aria-label': t('Stůl {name} · {seats} míst', { name: tb.name, seats: tb.seats }), tabIndex: 0, onClick: () => onPick(tb.id), onKeyDown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick(tb.id); } } } : undefined} />
         ))}
       </div>
       {caption && <figcaption className="mt-1.5 text-xs text-black/50">{caption}</figcaption>}

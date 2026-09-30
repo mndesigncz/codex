@@ -176,6 +176,11 @@ jobs:
 
       - name: SQL podle gramatiky Postgresu
         run: node scripts/check-sql.mjs
+      # Česká věta je klíč ke slovníku: změníš ji a překlad se tiše ztratí.
+      # Hlídá chybějící a zastaralé překlady, parametry a plurály, natvrdo psané
+      # české texty v přeložených oblastech a počet 'cs-CZ' v kódu.
+      - name: Vícejazyčnost
+        run: node scripts/check-i18n.mjs
 
   sondy:
     name: Sondy v prohlížeči
