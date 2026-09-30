@@ -9,7 +9,7 @@ import { useT } from '@/lib/i18n/client';
 import type { PrekladFn } from '@/lib/i18n/client';
 import { apiMessage, okJson } from '@/lib/api';
 import type { IdScenyDema } from '@/lib/demo/sceny';
-import { vychoziDoba, POZICE } from '@/lib/pruvodce/predvolby';
+import { vychoziDoba } from '@/lib/pruvodce/predvolby';
 import { cistiDobu } from '@/lib/pruvodce/predvolby';
 import {
   CILE, jeKrok, krokPoObnoveni, krokyProOdpovedi, type Cil, type KrokId, type Odpovedi, type Tarif, type TypPodniku,
@@ -105,7 +105,7 @@ function zfinalizuj(krok: KrokId, o: Odpovedi, info: InfoPodniku): Odpovedi {
       mena: o.mena ?? info.currency, formatCisel: o.formatCisel ?? info.locale, zacatekTydne: o.zacatekTydne ?? (info.week_start === 0 ? 0 : 1),
     };
     case 'doba': return { ...o, doba: o.doba ?? vychoziDoba(o.typ) };
-    case 'tym': return { ...o, tym: { velikost: 'mali', ...o.tym, pozice: o.tym?.pozice ?? POZICE[o.typ ?? 'jine'] } };
+    case 'tym': return { ...o, tym: { velikost: 'mali', ...o.tym } };
     case 'cile': return { ...o, cile: vybraneCile(o) };
     case 'kasa': return { ...o, pokladna: o.pokladna ?? 'zadna', tablet: o.tablet === true };
     default: return o;

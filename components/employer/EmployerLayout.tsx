@@ -545,10 +545,10 @@ export default function EmployerLayout({ user }: Props) {
             ? 'pb-[84px] md:pb-4 overflow-hidden flex flex-col mx-2 my-2 md:m-4'
             : 'pb-36 md:pb-4 overflow-y-auto scrollbar-thin'}`}>
           {currentView === 'chat' ? (
-            <ErrorBoundary resetKey={currentView} title={`${title ?? 'Tahle část'} se nenačetla`}>{renderView()}</ErrorBoundary>
+            <ErrorBoundary resetKey={currentView} oblast={title}>{renderView()}</ErrorBoundary>
           ) : (
             <div className="mx-auto w-full max-w-7xl">
-              <ErrorBoundary resetKey={currentView} title={`${title ?? 'Tahle část'} se nenačetla`}>{renderView()}</ErrorBoundary>
+              <ErrorBoundary resetKey={currentView} oblast={title}>{renderView()}</ErrorBoundary>
             </div>
           )}
         </main>

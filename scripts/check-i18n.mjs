@@ -136,6 +136,24 @@ for (const n of [0, 10, 25, 100]) pridej('klient-host', tierFor(n, { platinumAt:
   const planPv = readFileSync('lib/pruvodce/plan.ts', 'utf8');
   for (const v of (planPv.match(/const NAZVY_OPERACI[^=]*=\s*\{([^}]*)\}/)?.[1] ?? '').matchAll(/:\s*'([^']+)'/g)) pridej('pruvodce', v[1], PV);
   pridej('pruvodce', 'Nejvýš šest dní v řadě', PV);
+  // Výchozí obsah, který průvodce zakládá v jazyce majitele (server ho překládá přes slovník pruvodce):
+  // pozice pozvaných, typy směn, kategorie skladu, postupy (název, popis, kroky), poznámky a počty výsledku.
+  const plan2 = await import('../lib/pruvodce/plan.ts');
+  for (const v of Object.values(predv.POZICE)) pridej('pruvodce', v, PV);
+  for (const typ of Object.keys(predv.POZICE)) {
+    for (const s of predv.navrhniSmeny(typ, predv.vychoziDoba(typ))) pridej('pruvodce', s.name, PV);
+    for (const k of predv.KATEGORIE_SKLADU[typ]) pridej('pruvodce', k, PV);
+    for (const p of predv.POSTUPY[typ]) { pridej('pruvodce', p.name, PV); pridej('pruvodce', p.description, PV); for (const k of p.kroky) pridej('pruvodce', k, PV); }
+  }
+  for (const v of Object.values(plan2.POZNAMKY)) pridej('pruvodce', v, PV);
+  for (const v of Object.values(plan2.POCTY)) pridej('pruvodce', v, PV);
+  for (const v of Object.values(plan2.KDE_V_NASTAVENI)) pridej('pruvodce', v, PV);
+  // Věty, které UI překládá podle textu z modulu (ne přes t('…') přímo).
+  {
+    const rz = await import('../components/role/rozepsano.ts');
+    pridej('spolecne', rz.CO_SE_ZAHODI_ROLE, 'components/role/rozepsano.ts');
+    pridej('spolecne', rz.CO_SE_ZAHODI_NAVRH, 'components/role/rozepsano.ts');
+  }
   // Předplatné: srovnání tarifů (popisky a textové buňky) a výčet toho, co přidává Max.
   const PL = 'lib/plan.ts (PLAN_FEATURES)';
   for (const f of plan.PLAN_FEATURES) {
@@ -153,12 +171,27 @@ const apiKlice = new Set();
 const apiZdroje = [];
 for (const dir of ['app/api/client']) for (const f of walk(dir)) if (!/\/(admin|staff|pos|img)\//.test(f)) apiZdroje.push(f);
 apiZdroje.push('lib/api.ts', 'lib/blokace.ts', 'middleware.ts', 'lib/client.ts');
+// Hlášky rout, které zobrazují společné komponenty (obnova hesla, smazání účtu, nahlášení, blokace, platby).
+apiZdroje.push(
+  'app/api/account/route.ts', 'app/api/account/heslo/route.ts', 'app/api/account/heslo/obnovit/route.ts',
+  'app/api/account/delete-confirm/route.ts', 'app/api/account/delete-request/route.ts',
+  'app/api/reports/route.ts', 'app/api/reports/[id]/route.ts', 'app/api/blocks/route.ts',
+  'app/api/billing/checkout/route.ts', 'app/api/billing/portal/route.ts', 'app/api/billing/status/route.ts', 'app/api/billing/upgrade/route.ts',
+  'lib/moderace.ts', 'lib/smazaniUctu.ts', 'lib/smazaniUctuDb.ts',
+);
 for (const f of apiZdroje) {
   if (!existsSync(f)) continue;
-  for (const m of readFileSync(f, 'utf8').matchAll(/(?:error|ZPRAVA_423)(?::|\s*=)\s*'((?:[^'\\]|\\.)*)'/g)) apiKlice.add(m[1].replace(/\\'/g, "'"));
+  for (const m of readFileSync(f, 'utf8').matchAll(/(?:error|ZPRAVA_423|NEPLATNY|zprava)(?::|\s*=)\s*'((?:[^'\\]|\\.)*)'/g)) apiKlice.add(m[1].replace(/\\'/g, "'"));
   for (const m of readFileSync(f, 'utf8').matchAll(/return '([^']+)';/g)) if (f === 'lib/api.ts') apiKlice.add(m[1]);
 }
 apiKlice.add('Načtení se nepovedlo.'); apiKlice.add('Server odpověděl {status}.');
+// Věty, které server vrací jako pole varování (smazání účtu) nebo jako záložní hlášku `verejnaHlaska(e, '…')`.
+for (const k of [
+  'Platby nejsou nastavené, předplatné a zákazníka ve Stripe nešlo zrušit. Napište podpoře, dokončíme to ručně.',
+  'Soubory v úložišti se nepodařilo smazat (úložiště není nastavené). Napište podpoře.',
+  'Některé nahrané soubory se nepodařilo smazat z úložiště. Napište podpoře, dokončíme to ručně.',
+  'Portál se nepodařilo otevřít.',
+]) apiKlice.add(k);
 // Zpráva, která nekončí větou (začátek sestavované věty „Vyber den od dneška do “), se nepřekládá.
 const apiPouzite = [...apiKlice].filter(k => !/\s$/.test(k) && /^[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ]/.test(k));
 
@@ -203,6 +236,21 @@ for (const s of sekce) {
       const potreba = j === 'pl' ? ['one', 'few', 'many', 'other'] : j === 'sk' ? ['one', 'few', 'other'] : ['one', 'other'];
       for (const bloky of pluralSelektory(v)) if (!potreba.every(p => bloky.includes(p))) chyby.push(`${j}/${s}: plurál bez tvarů ${potreba.join('/')} „${k}“`);
       if (cs.length < 25 && !/plural,/.test(cs + v) && v.length > cs.length * 2.5 && v.length > 14) varovani.push(`${j}/${s}: překlad „${v}“ je ${(v.length / cs.length).toFixed(1)}× delší než „${cs}“ (tlačítko na 390 px?)`);
+    }
+  }
+}
+// Stejný klíč se stejným českým zněním musí mít ve všech sekcích stejný překlad: sekce se slévají do jedné mapy
+// a vyhrává poslední načtená, takže by se text měnil podle toho, co stránka zrovna načetla. Jiný význam = kontext
+// (`t('Zrušit', undefined, 'rezervace')` → klíč `Zrušit|rezervace`).
+for (const j of JAZYKY) {
+  const videno = new Map();
+  for (const s of sekce) {
+    const slov = nacti(j, s);
+    if (!slov) continue;
+    for (const [k, v] of Object.entries(slov)) {
+      const d = videno.get(k);
+      if (d && d.v !== v) chyby.push(`${j}: klíč „${k}“ má v sekci ${d.s} jiný překlad než v sekci ${s} („${d.v}“ × „${v}“); sjednoť ho, nebo oddělí kontext`);
+      else if (!d) videno.set(k, { s, v });
     }
   }
 }
@@ -293,7 +341,7 @@ if (varovani.length) {
 }
 if (chyby.length) {
   console.error(`\ncheck-i18n: ${chyby.length} ${chyby.length === 1 ? 'chyba' : 'chyb'}\n`);
-  for (const c of chyby.slice(0, 60)) console.error('  ' + c);
+  for (const c of chyby.slice(0, Number(process.env.CHECK_MAX ?? 60))) console.error('  ' + c);
   if (chyby.length > 60) console.error(`  … a ${chyby.length - 60} dalších`);
   console.error('\nČeská věta je klíč: změníš-li ji v kódu, přenes překlad (--rename) nebo ho doplň ve všech jazycích.\n');
   process.exit(1);

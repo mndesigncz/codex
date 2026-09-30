@@ -12,6 +12,8 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { odhlasit } from '@/lib/odhlaseni';
 import { useT } from '@/lib/i18n/client';
+import { tg } from '@/lib/i18n/stav';
+import { vetaDopadu, type VlastnenyPodnik } from './dopadSmazani';
 
 interface Dopad { kod: string; zprava: string }
 
@@ -36,8 +38,8 @@ export default function SmazatUcet({ jeHost }: { jeHost: boolean }) {
       const d = await r.json().catch(() => ({}));
       if (r.ok) { await odhlasit({ callbackUrl: jeHost ? '/client' : '/login' }); return; }
       // Vlastník podniku: server řekl, co by se stalo, a čeká na výslovné potvrzení.
-      if (r.status === 409 && (d.kod === 'VLASTNIK_S_CLENY' || d.kod === 'VLASTNIK_PODNIKU')) { setDopad({ kod: d.kod, zprava: d.error }); return; }
-      setChyba(d.error || t('Účet se nepodařilo smazat.'));
+      if (r.status === 409 && (d.kod === 'VLASTNIK_S_CLENY' || d.kod === 'VLASTNIK_PODNIKU')) { setDopad({ kod: d.kod, zprava: vetaDopadu(t, d.kod, d.vlastnene as VlastnenyPodnik[] | undefined, String(d.error ?? '')) }); return; }
+      setChyba(d.error ? tg(d.error) : t('Účet se nepodařilo smazat.'));
     } catch {
       setChyba(t('Účet se nepodařilo smazat. Zkontrolujte připojení a zkuste to znovu.'));
     } finally { setBezi(false); }

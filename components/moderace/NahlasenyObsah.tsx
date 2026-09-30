@@ -9,6 +9,7 @@ import { Button, Chip, EmptyState, ErrorState, Skeleton } from '../ui';
 import { okJson } from '@/lib/api';
 import { nazevDuvodu } from '@/lib/moderace';
 import { useT } from '@/lib/i18n/client';
+import { tg } from '@/lib/i18n/stav';
 
 interface Nahlaseni {
   id: number; kind: 'zprava' | 'napad'; refId: number; reason: string; detail: string | null; snapshot: string | null;
@@ -38,7 +39,7 @@ export default function NahlasenyObsah() {
     try {
       const res = await fetch(`/api/reports/${r.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ akce }) });
       const d = await res.json().catch(() => ({}));
-      if (!res.ok) { setAkceChyba(d.error || t('Akci se nepodařilo provést.')); return; }
+      if (!res.ok) { setAkceChyba(d.error ? tg(d.error) : t('Akci se nepodařilo provést.')); return; }
       setRadky(prev => (prev ?? []).map(x => x.id === r.id ? { ...x, status: d.status } : x));
     } catch { setAkceChyba(t('Akci se nepodařilo provést. Zkontrolujte připojení.')); }
     finally { setBezi(null); }

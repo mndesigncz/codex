@@ -23,7 +23,8 @@ interface Pozvany { email: string; stav: Stav; odkaz?: string; zprava?: string }
 
 export default function Tym({ odp, zmen, info }: KrokProps) {
   const t = useT('pruvodce');
-  const pozice = odp.tym?.pozice ?? POZICE[odp.typ ?? 'jine'];
+  // Výchozí pozice se překládá jen pro zobrazení; do odpovědí se ukládá jen to, co člověk opravdu napsal.
+  const pozice = odp.tym?.pozice ?? t(POZICE[odp.typ ?? 'jine']);
   const [pole, setPole] = useState('');
   const [chybaPole, setChybaPole] = useState('');
   const [pozvani, setPozvani] = useState<Pozvany[]>([]);
@@ -33,7 +34,7 @@ export default function Tym({ odp, zmen, info }: KrokProps) {
   // Počet pozvaných (bez adres) se do odpovědí zapíše, až se stav pozvánek usadí.
   const pocet = pozvani.filter(p => p.stav === 'odeslano' || p.stav === 'odkaz').length;
   useEffect(() => {
-    if (pocet !== (odp.tym?.pozvanych ?? 0) && (pocet > 0 || pozvani.length > 0)) zmen({ tym: { ...odp.tym, pozice, pozvanych: pocet } });
+    if (pocet !== (odp.tym?.pozvanych ?? 0) && (pocet > 0 || pozvani.length > 0)) zmen({ tym: { ...odp.tym, pozvanych: pocet } });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pocet]);
 
@@ -74,10 +75,10 @@ export default function Tym({ odp, zmen, info }: KrokProps) {
   return (
     <div className="space-y-5">
       <div>
-        <span className="field-label">{t('Kolik vás bude')}</span>
+        <span className="field-label">{t('Kolik vás bude', undefined, 'tym')}</span>
         <Segmented ariaLabel={t('Velikost týmu')} size="sm" value={odp.tym?.velikost ?? 'mali'}
           options={VELIKOSTI_TYMU.map(v => ({ id: v, label: t(NAZEV_VELIKOSTI[v]) }))}
-          onChange={(v: VelikostTymu) => zmen({ tym: { ...odp.tym, pozice, velikost: v } })} />
+          onChange={(v: VelikostTymu) => zmen({ tym: { ...odp.tym, velikost: v } })} />
       </div>
 
       <Field id="pv-pozice" label={t('Pozice pozvaných')} hint={t('Jak se bude pozvaným říkat v týmu. Jde změnit u každého zvlášť.')}>

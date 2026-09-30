@@ -9,12 +9,22 @@
 
 import { PLAN_NAMES, TRIAL_DAYS, czDays, priceLabel, type Interval, type PlanId, type PlanInfo } from './plan.ts';
 
+export type DruhSlibuZamku = 'nenacteno' | 'jizMel' | 'zkouska';
+
+/** Který slib se dává: UI podle druhu vybírá přeloženou větu, nepřekládá se česká věta porovnáním textu. */
+export function druhSlibuZamku(v: { nacteno: boolean; hadSubscription: boolean }): DruhSlibuZamku {
+  // Dokud nevíme, jestli podnik předplatné měl, nic o zkoušce netvrdíme.
+  if (!v.nacteno) return 'nenacteno';
+  return v.hadSubscription ? 'jizMel' : 'zkouska';
+}
+
 /** Věta pod tlačítkem v okně zamčené funkce (UpgradeModal). */
 export function slibZamku(v: { nacteno: boolean; hadSubscription: boolean }): string {
-  // Dokud nevíme, jestli podnik předplatné měl, nic o zkoušce netvrdíme.
-  if (!v.nacteno) return 'Zrušit jde kdykoliv.';
-  if (v.hadSubscription) return 'Karta se strhne hned, zrušit jde kdykoliv — platí se do konce zaplaceného období.';
-  return `${TRIAL_DAYS} dní zdarma, zrušit jde kdykoliv.`;
+  switch (druhSlibuZamku(v)) {
+    case 'nenacteno': return 'Zrušit jde kdykoliv.';
+    case 'jizMel': return 'Karta se strhne hned, zrušit jde kdykoliv — platí se do konce zaplaceného období.';
+    default: return `${TRIAL_DAYS} dní zdarma, zrušit jde kdykoliv.`;
+  }
 }
 
 export type StavPoRegistraci = 'aktivni' | 'zdarma' | 'zavrenaPokladna';

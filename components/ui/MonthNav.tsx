@@ -4,7 +4,6 @@ import React from 'react';
 import { Icon } from '../Icons';
 import { useJazyk, useT } from '@/lib/i18n/client';
 import { fmtDatum } from '@/lib/i18n/format';
-import { aktualniJazyk } from '@/lib/i18n/stav';
 import type { Jazyk } from '@/lib/i18n/config';
 
 // Přepínač měsíce: ‹ Září 2026 ›.
@@ -24,7 +23,7 @@ export function posunMesic(mesic: string, o: number): string {
 }
 
 /** „2026-09" → „září 2026". Velké písmeno na začátku dodá `cz-sentence`, ne `capitalize` (to by zvětšilo každé slovo). */
-export function nazevMesice(mesic: string, jazyk: Jazyk = aktualniJazyk()): string {
+export function nazevMesice(mesic: string, jazyk: Jazyk): string {
   const [y, m] = mesic.split('-').map(Number);
   return fmtDatum(`${y}-${String(m).padStart(2, '0')}-01`, { jazyk, styl: 'mesic' });
 }

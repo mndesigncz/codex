@@ -6,11 +6,12 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { planInfoOf, isPro, isMax, PRO_PRICE, PRICES, PLAN_NAMES, MAX_EXTRAS, TRIAL_DAYS, type PlanInfo } from '@/lib/plan';
-import { slibZamku } from '@/lib/predplatneTexty';
+import { druhSlibuZamku } from '@/lib/predplatneTexty';
 import { Icon } from './Icons';
 import { Modal, Button } from './ui';
 import { useObal } from './ObalProvider';
 import { useT } from '@/lib/i18n/client';
+import { tg } from '@/lib/i18n/stav';
 
 // Pokladna se stahuje, až když má vyskočit — zamčená funkce ji většinou
 // nikdy nepotřebuje.
@@ -94,7 +95,7 @@ export function OdemknoutButton({ plan, className = '' }: { plan: 'pro' | 'max';
       const r = await fetch('/api/billing/upgrade', { method: 'POST' });
       const d = await r.json().catch(() => ({}));
       // Bez téhle kontroly by se oslavilo i to, co server odmítl.
-      if (!r.ok) throw new Error(d?.error || t('Přechod se nepodařil.'));
+      if (!r.ok) throw new Error(d?.error ? tg(d.error) : t('Přechod se nepodařil.'));
       setPrechod('hotovo');
       window.location.reload();
     } catch (e: any) {
@@ -186,7 +187,7 @@ export function MaxGate({ feature, children, benefit, employer = true }: {
         ) : (
           <p className="text-xs text-black/40">{t('Řekni vedení — Max se zapíná v Nastavení → Předplatné.')}</p>
         )}
-        <p className="text-[11px] text-black/35">{/* i18n-ok: cena zůstává česky */}Max stojí {PRICES.max.month} Kč měsíčně za podnik.</p>
+        <p className="text-[11px] text-black/35">{t('Max stojí {cena} Kč měsíčně za podnik.', { cena: PRICES.max.month })}</p>
       </div>
     </div>
   );
@@ -231,7 +232,7 @@ export function ProGate({ feature, children, benefit, employer = true }: {
         ) : (
           <p className="text-xs text-black/40">{t('Řekni vedení — Pro se zapíná v Nastavení → Předplatné.')}</p>
         )}
-        <p className="text-[11px] text-black/35">{/* i18n-ok: cena zůstává česky */}Pro stojí {PRO_PRICE.monthly} {PRO_PRICE.currency} {PRO_PRICE.per}.</p>
+        <p className="text-[11px] text-black/35">{t('Pro stojí {cena} Kč měsíčně za podnik.', { cena: PRO_PRICE.monthly })}</p>
       </div>
     </div>
   );
@@ -242,10 +243,10 @@ export function UpgradeModal({ feature, plan = 'pro', onClose }: { feature: stri
   const t = useT('spolecne');
   const { plan: info, loaded } = usePlan();
   const { smiPlatby } = useObal();
-  // Věta ze lib/predplatneTexty: pevné podoby se překládají, počet dní se doplní.
-  const slib = (s: string) => (s === 'Zrušit jde kdykoliv.' ? t('Zrušit jde kdykoliv.')
-    : s === 'Karta se strhne hned, zrušit jde kdykoliv — platí se do konce zaplaceného období.' ? t('Karta se strhne hned, zrušit jde kdykoliv — platí se do konce zaplaceného období.')
-      : s === `${TRIAL_DAYS} dní zdarma, zrušit jde kdykoliv.` ? t('{n} dní zdarma, zrušit jde kdykoliv.', { n: TRIAL_DAYS }) : s);
+  // Slib podle druhu z lib/predplatneTexty (ne podle porovnání české věty): věty jsou ve slovníku, počet dní se doplní.
+  const slib = (druh: ReturnType<typeof druhSlibuZamku>) => (druh === 'nenacteno' ? t('Zrušit jde kdykoliv.')
+    : druh === 'jizMel' ? t('Karta se strhne hned, zrušit jde kdykoliv — platí se do konce zaplaceného období.')
+      : t('{n} dní zdarma, zrušit jde kdykoliv.', { n: TRIAL_DAYS }));
   if (!smiPlatby) {
     return (
       <Modal open onClose={onClose} size="sm" title={feature} footer={<Button variant="secondary" onClick={onClose}>{t('Zavřít')}</Button>}>
@@ -265,7 +266,7 @@ export function UpgradeModal({ feature, plan = 'pro', onClose }: { feature: stri
         <p className="text-sm text-black/55">{t('Tuhle funkci odemyká plán {plan} ({cena}).', { plan: PLAN_NAMES[plan], cena: t('{castka} Kč měsíčně', { castka: PRICES[plan].month }) })}</p>
         {/* Zkouška zdarma je jen pro podnik, který předplatné ještě neměl —
             jinak by okno slibovalo 30 dní a pokladna strhla platbu hned. */}
-        <p className="text-xs text-black/40">{slib(slibZamku({ nacteno: loaded && !!info, hadSubscription: !!info?.hadSubscription }))}</p>
+        <p className="text-xs text-black/40">{slib(druhSlibuZamku({ nacteno: loaded && !!info, hadSubscription: !!info?.hadSubscription }))}</p>
       </div>
     </Modal>
   );

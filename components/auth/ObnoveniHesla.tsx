@@ -8,6 +8,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { LogoMark } from '../Icons';
 import { useT } from '@/lib/i18n/client';
+import { tg } from '@/lib/i18n/stav';
 
 // V hostovské části už limetku drží tlačítko Přihlásit v hlavičce (ClientShell): jediná plná
 // limetka na obrazovku, takže hlavní akce formuláře je tam tmavá.
@@ -38,7 +39,7 @@ export function ZapomenuteHesloForm({ klient }: { klient: boolean }) {
     try {
       const r = await fetch('/api/account/heslo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) setChyba(d.error || t('Žádost se nepodařilo odeslat.'));
+      if (!r.ok) setChyba(d.error ? tg(d.error) : t('Žádost se nepodařilo odeslat.'));
       else setHotovo(t('Pokud je e-mail v aplikaci, poslali jsme na něj odkaz pro nové heslo.'));
     } catch {
       setChyba(t('Žádost se nepodařilo odeslat. Zkontrolujte připojení.'));
@@ -82,7 +83,7 @@ export function NoveHesloForm({ klient, token }: { klient: boolean; token: strin
     try {
       const r = await fetch('/api/account/heslo/obnovit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, password: heslo }) });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) setChyba(d.error || t('Heslo se nepodařilo změnit.'));
+      if (!r.ok) setChyba(d.error ? tg(d.error) : t('Heslo se nepodařilo změnit.'));
       else setHotovo(true);
     } catch {
       setChyba(t('Heslo se nepodařilo změnit. Zkontrolujte připojení.'));

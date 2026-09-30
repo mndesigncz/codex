@@ -14,6 +14,7 @@ import {
 } from '@/lib/plan';
 import { okJson, apiMessage } from '@/lib/api';
 import { useJazyk, useT } from '@/lib/i18n/client';
+import { tg } from '@/lib/i18n/stav';
 import { fmtDatum } from '@/lib/i18n/format';
 import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
 
@@ -23,6 +24,15 @@ type Status = {
   subscription: { status: string | null; interval: string | null; price: string | null; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean; trialEnd: string | null } | null;
   referral: { code: string | null; link: string | null; thisMonth: number; limit: number; total: number; referredCount: number };
 };
+
+/**
+ * Věta s tučnou částí. Tučný text se do věty vloží jako parametr `{tucne}` a tady se obalí <strong>,
+ * takže překladatel vidí celou větu (pády, slovosled) a ve slovníku není žádné HTML.
+ */
+function VetaSTucnym({ veta, tucne, className }: { veta: (tucne: string) => string; tucne: string; className?: string }) {
+  const [pred, po] = veta('\u0001').split('\u0001');
+  return <>{pred}<strong className={className}>{tucne}</strong>{po}</>;
+}
 
 function Cell({ v }: { v: string | boolean }) {
   const t = useT('predplatne');
@@ -36,6 +46,8 @@ export default function Billing() {
   const { jazyk } = useJazyk();
   const czk = (n: number) => `${n.toLocaleString(LOCALE_PRO_JAZYK[jazyk])} Kč`;
   const date = (iso: string | null | undefined) => iso ? fmtDatum(iso, { jazyk, styl: 'dlouze' }) : '';
+  // „za 3 dny“ jako celek: předložka a pád se liší podle jazyka (DE „in 3 Tagen“), proto je v klíči i předložka.
+  const zaDny = (n: number) => t('za {n, plural, one {# den} few {# dny} other {# dní}}', { n });
   const dny = (n: number) => t('{n, plural, one {# den} few {# dny} other {# dní}}', { n });
   const nazevTarifu = (p: 'free' | 'pro' | 'max') => (p === 'free' ? t('Zdarma') : PLAN_NAMES[p]);
   const planLabel = (p: PlanInfo) => (p.trialing ? t('{plan} — zkušební, zbývá {dny}', { plan: nazevTarifu(p.effective), dny: dny(p.trialDaysLeft) }) : nazevTarifu(p.effective));
@@ -44,18 +56,19 @@ export default function Billing() {
   const [busy, setBusy] = useState('');
   const [interval, setInterval_] = useState<Interval>('month');
   const [copied, setCopied] = useState(false);
-  const [notice, setNotice] = useState('');
+  // Stav drží kód hlášky, ne přeloženou větu: překládá se při vykreslení, tedy vždy v aktuálním jazyce.
+  const [notice, setNotice] = useState<'' | 'success' | 'cancel' | 'upgrade' | 'upgradeSleva'>('');
   const [checkout, setCheckout] = useState<{ plan: 'pro' | 'max'; interval: Interval } | null>(null);
 
   const load = () => fetch('/api/billing/status').then(okJson)
-    .then(d => { if (d?.plan) setSt(d); else setErr(d?.error || t('Nepodařilo se načíst.')); })
+    .then(d => { if (d?.plan) setSt(d); else setErr(d?.error ? tg(d.error) : t('Nepodařilo se načíst.')); })
     .catch(e => setErr(apiMessage(e, t('Nepodařilo se načíst.'))));
   useEffect(() => {
     load();
     try {
       const q = new URLSearchParams(window.location.search);
-      if (q.get('billing') === 'success') setNotice(t('Díky! Předplatné je nastavené — stav se propíše během chvíle.'));
-      if (q.get('billing') === 'cancel') setNotice(t('Pokladna byla zavřená bez platby. Kdykoli to jde zkusit znovu.'));
+      if (q.get('billing') === 'success') setNotice('success');
+      if (q.get('billing') === 'cancel') setNotice('cancel');
     } catch { /* ignore */ }
   }, []);
 
@@ -64,11 +77,20 @@ export default function Billing() {
     try {
       const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body ?? {}) });
       const d = await res.json().catch(() => ({}));
-      if (!res.ok) { setErr(d.error || t('Nepodařilo se.')); setBusy(''); return; }
+      if (!res.ok) { setErr(d.error ? tg(d.error) : t('Nepodařilo se.')); setBusy(''); return; }
       if (d.url) { window.location.href = d.url; return; }
       setBusy(''); await load();
-      if (path.endsWith('/upgrade')) setNotice(d.discounted ? t('Přechod na Max hotový — se slevou 30 % na první platbu.') : t('Přechod na Max hotový.'));
+      if (path.endsWith('/upgrade')) setNotice(d.discounted ? 'upgradeSleva' : 'upgrade');
     } catch { setErr(t('Nepodařilo se.')); setBusy(''); }
+  };
+
+  const textHlasky = (k: 'success' | 'cancel' | 'upgrade' | 'upgradeSleva') => {
+    switch (k) {
+      case 'success': return t('Díky! Předplatné je nastavené — stav se propíše během chvíle.');
+      case 'cancel': return t('Pokladna byla zavřená bez platby. Kdykoli to jde zkusit znovu.');
+      case 'upgradeSleva': return t('Přechod na Max hotový — se slevou 30 % na první platbu.');
+      default: return t('Přechod na Max hotový.');
+    }
   };
 
   const plan = st?.plan;
@@ -109,8 +131,8 @@ export default function Billing() {
             <span className="block text-[13px] text-black/55">{t('za podnik, kdykoli zrušit')}</span></p>
         )}
         <p className="mt-3 text-sm text-black/60">
-          {p === 'pro' ? 'Neomezený tým, kiosk, odměny, exporty, měsíční přehled a sdílené menu ve vašich barvách.'
-            : 'Vše z Pro a k tomu Managero client (věrnost, rezervace, objednávky od stolu), pokladna Storyous a výroba vlastních produktů.'}
+          {p === 'pro' ? t('Neomezený tým, kiosk, odměny, exporty, měsíční přehled a sdílené menu ve vašich barvách.')
+            : t('Vše z Pro a k tomu Managero client (věrnost, rezervace, objednávky od stolu), pokladna Storyous a výroba vlastních produktů.')}
         </p>
         <div className="mt-auto pt-5">
           {isCurrent ? (
@@ -124,7 +146,7 @@ export default function Billing() {
               {canTrial ? t('Vyzkoušet {n} dní zdarma', { n: TRIAL_DAYS }) : t('Předplatit {plan}', { plan: PLAN_NAMES[p] })}
             </Button>
           )}
-          {!active && canTrial && <p className="mt-2 t-meta">Karta se zadá hned, první platba až po {TRIAL_DAYS} dnech. Zrušit jde kdykoli.</p>}
+          {!active && canTrial && <p className="mt-2 t-meta">{t('Karta se zadá hned, první platba až po {n} dnech. Zrušit jde kdykoli.', { n: TRIAL_DAYS })}</p>}
         </div>
       </div>
     );
@@ -135,9 +157,9 @@ export default function Billing() {
       {checkout && (
         <CheckoutModal plan={checkout.plan} interval={checkout.interval} trial={canTrial}
           onClose={() => setCheckout(null)}
-          onDone={() => { setCheckout(null); setNotice(t('Díky! Předplatné je nastavené — stav se propíše během chvíle.')); setTimeout(load, 1500); setTimeout(load, 6000); }} />
+          onDone={() => { setCheckout(null); setNotice('success'); setTimeout(load, 1500); setTimeout(load, 6000); }} />
       )}
-      {notice && <p className="note note-ok">{notice}</p>}
+      {notice && <p className="note note-ok">{textHlasky(notice)}</p>}
       {err && <p className="note note-danger">{err}</p>}
       {st && !st.configured && <p className="note note-wait">{t('Platby ještě nejsou zapnuté — chybí klíče Stripe v nastavení serveru.')}</p>}
 
@@ -158,8 +180,9 @@ export default function Billing() {
         )}
         {plan?.trialing && (
           <p className="note note-ok mt-4">
-            {t('Zkušební období končí za')} <strong>{dny(plan.trialDaysLeft)}</strong>
-            {st?.subscription ? t(' — potom se z karty strhne první platba.') : t(' — potom se podnik přepne na plán Zdarma, o data nepřijdete.')}
+            {st?.subscription
+              ? <VetaSTucnym tucne={zaDny(plan.trialDaysLeft)} veta={m => t('Zkušební období končí {tucne} — potom se z karty strhne první platba.', { tucne: m })} />
+              : <VetaSTucnym tucne={zaDny(plan.trialDaysLeft)} veta={m => t('Zkušební období končí {tucne} — potom se podnik přepne na plán Zdarma, o data nepřijdete.', { tucne: m })} />}
           </p>
         )}
         {plan?.cancelAt && (
@@ -167,7 +190,9 @@ export default function Billing() {
         )}
         {active && st?.subscription && !plan?.cancelAt && (
           <p className="t-meta mt-4">
-            {st.subscription.interval === 'year' ? t('Roční') : t('Měsíční')} {t('platba')} · {plan?.trialing ? t('další první platba {datum}.', { datum: date(st.subscription.currentPeriodEnd) }) : t('další platba {datum}.', { datum: date(st.subscription.currentPeriodEnd) })}
+            {st.subscription.interval === 'year'
+              ? (plan?.trialing ? t('Roční platba · další první platba {datum}.', { datum: date(st.subscription.currentPeriodEnd) }) : t('Roční platba · další platba {datum}.', { datum: date(st.subscription.currentPeriodEnd) }))
+              : (plan?.trialing ? t('Měsíční platba · další první platba {datum}.', { datum: date(st.subscription.currentPeriodEnd) }) : t('Měsíční platba · další platba {datum}.', { datum: date(st.subscription.currentPeriodEnd) }))}
           </p>
         )}
         {active && (
@@ -177,8 +202,8 @@ export default function Billing() {
           </div>
         )}
         {plan?.effective === 'free' && !plan.trialing && (
-          <p className="mt-4 text-sm text-black/60 well px-4 py-3">{/* i18n-ok: popis tarifů a podmínek zůstává česky */}
-            Plán <strong className="text-[#16181A]">Zdarma platí napořád</strong> — směny, uzávěrky, úkoly, chat i sklad bez omezení času, až 3 lidé v týmu.
+          <p className="mt-4 text-sm text-black/60 well px-4 py-3">
+            <VetaSTucnym className="text-[#16181A]" tucne={t('Zdarma platí napořád')} veta={m => t('Plán {tucne} — směny, uzávěrky, úkoly, chat i sklad bez omezení času, až 3 lidé v týmu.', { tucne: m })} />
           </p>
         )}
       </div>
@@ -209,7 +234,6 @@ export default function Billing() {
           <h3 className="t-section">{t('Tarify')}</h3>
           <Segmented size="sm" ariaLabel={t('Období')} value={interval} onChange={v => setInterval_(v as Interval)}
             options={[{ id: 'month', label: t('Měsíčně') }, { id: 'year', label: t('Ročně · výhodněji') }]} />
-          {jazyk !== 'cs' && <p className="basis-full t-meta">{t('Ceník a platební podmínky jsou zatím jen česky.')}</p>}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{priceCard('pro')}{priceCard('max')}</div>
       </div>
@@ -217,9 +241,9 @@ export default function Billing() {
       {/* Affiliate */}
       <div className="card p-6">
         <h3 className="t-card">{t('Doporučte Managero a získejte měsíc zdarma')}</h3>
-        <p className="t-meta mt-1">{/* i18n-ok: podmínky odměny zůstávají česky */}
-          Když se přes váš odkaz zaregistruje podnik a začne platit, odečteme vám cenu jednoho měsíce z další faktury.
-          Nejvýš {REFERRALS_PER_MONTH} podniky za měsíc, napořád.
+        <p className="t-meta mt-1">
+          {t('Když se přes váš odkaz zaregistruje podnik a začne platit, odečteme vám cenu jednoho měsíce z další faktury.')}{' '}
+          {t('Nejvýš {n, plural, one {# podnik} few {# podniky} other {# podniků}} za měsíc, napořád.', { n: REFERRALS_PER_MONTH })}
         </p>
         {st?.referral.link ? (
           <div className="mt-4 flex flex-col sm:flex-row gap-2">
@@ -259,7 +283,7 @@ export default function Billing() {
             </tbody>
           </table>
         </div>
-        <p className="mt-3 t-meta">{/* i18n-ok: ceny a podmínky zůstávají česky */}Ceny bez DPH. Fakturu se všemi náležitostmi vystaví Stripe a najdete ji v portálu.</p>
+        <p className="mt-3 t-meta">{t('Ceny bez DPH. Fakturu se všemi náležitostmi vystaví Stripe a najdete ji v portálu.')}</p>
       </div>
     </div>
   );

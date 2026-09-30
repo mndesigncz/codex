@@ -2,14 +2,37 @@
 
 import { Chip, Field, Input, Segmented, Select, Well } from '@/components/ui';
 import { useJazyk, useT } from '@/lib/i18n/client';
-import { CURRENCIES, LOCALES, formatMoney } from '@/lib/money';
+import { CURRENCIES, LOCALES, currencySymbol, formatMoney } from '@/lib/money';
 import { NAZEV_ZEME, ZEME, ZEME_ID, type Zeme } from '@/lib/pruvodce/typy';
-import { JAZYK_NAZEV } from '@/lib/i18n/config';
+import { JAZYK_NAZEV, type Jazyk } from '@/lib/i18n/config';
 import type { KrokProps } from './spolecne';
 
 // Název, adresa, země. Země předvyplní měnu, formát čísel a začátek týdne
 // (jde je přepsat); „Jiná země" nic nemění a měna se volí ručně. Jazyk je
 // dnes jen čeština, takže se nenabízí výběr, který by nic nedělal.
+
+const velke = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
+
+/** Název měny v jazyce aplikace. Čeština má ruční názvy z lib/money, ostatní jazyky je berou z Intl. */
+function nazevMeny(c: { code: string; label: string }, jazyk: Jazyk, format: string): string {
+  if (jazyk === 'cs') return c.label;
+  try {
+    const n = new Intl.DisplayNames([jazyk], { type: 'currency' }).of(c.code);
+    if (n && n !== c.code) return `${velke(n)} (${currencySymbol(c.code, format)})`;
+  } catch { /* starší prohlížeč: zůstane kód */ }
+  return c.code;
+}
+
+/** Formát čísel: jazyk vlastním jménem (endonym) a ukázka čísla; čeština má ruční popisky. */
+function nazevFormatu(l: { code: string; label: string }, jazyk: Jazyk): string {
+  if (jazyk === 'cs') return l.label;
+  try {
+    const n = new Intl.DisplayNames([l.code], { type: 'language' }).of(l.code);
+    const vzor = new Intl.NumberFormat(l.code, { minimumFractionDigits: 2 }).format(1500.5);
+    if (n) return `${velke(n)} — ${vzor}`;
+  } catch { /* zůstane ruční popisek */ }
+  return l.label;
+}
 
 export default function Podnik({ odp, zmen, info, chybaPole }: KrokProps) {
   const t = useT('pruvodce');
@@ -46,12 +69,12 @@ export default function Podnik({ odp, zmen, info, chybaPole }: KrokProps) {
         </Field>
         <Field id="pv-mena" label={t('Měna')}>
           <Select id="pv-mena" value={mena} onChange={e => zmen({ mena: e.target.value })}>
-            {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.label}</option>)}
+            {CURRENCIES.map(c => <option key={c.code} value={c.code}>{nazevMeny(c, jazyk, format)}</option>)}
           </Select>
         </Field>
         <Field id="pv-format" label={t('Formát čísel')}>
           <Select id="pv-format" value={format} onChange={e => zmen({ formatCisel: e.target.value })}>
-            {LOCALES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
+            {LOCALES.map(l => <option key={l.code} value={l.code}>{nazevFormatu(l, jazyk)}</option>)}
           </Select>
         </Field>
         <div className="min-w-0">
@@ -65,7 +88,8 @@ export default function Podnik({ odp, zmen, info, chybaPole }: KrokProps) {
         <p className="t-meta">{t('Takhle budou v aplikaci vypadat částky:')} <strong className="text-[#16181A]" data-ukazka-castky>{ukazka}</strong></p>
         <p className="flex items-center gap-2 t-meta">{t('Jazyk')} <Chip tone="ink" size="sm">{JAZYK_NAZEV[jazyk]}</Chip></p>
       </Well>
-      <p className="t-meta">{t('Další jazyky připravujeme. Měna a formát čísel se nastaví podle země a jde je změnit.')}</p>
+      {/* Věta o dalších jazycích jen v češtině: v přeloženém rozhraní by lhala. Zbytek říká podnadpis kroku. */}
+      {jazyk === 'cs' && <p className="t-meta">{t('Další jazyky připravujeme. Měna a formát čísel se nastaví podle země a jde je změnit.')}</p>}
     </div>
   );
 }

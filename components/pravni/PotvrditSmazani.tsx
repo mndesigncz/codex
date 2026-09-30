@@ -7,6 +7,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useT } from '@/lib/i18n/client';
+import { tg } from '@/lib/i18n/stav';
+import { vetaDopadu, type VlastnenyPodnik } from '@/components/ucet/dopadSmazani';
 
 export default function PotvrditSmazani({ token }: { token: string }) {
   const t = useT('spolecne');
@@ -23,8 +25,8 @@ export default function PotvrditSmazani({ token }: { token: string }) {
     try {
       const r = await fetch('/api/account/delete-confirm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, ...(podnik ? { smazatPodnik: true, password: heslo, potvrzeni } : {}) }) });
       const d = await r.json().catch(() => ({}));
-      if (r.status === 409 && (d.kod === 'VLASTNIK_S_CLENY' || d.kod === 'VLASTNIK_PODNIKU')) { setPodnik(String(d.error)); setStav('cekam'); return; }
-      if (!r.ok) { setChyba(d.error || t('Účet se nepodařilo smazat.')); setStav('cekam'); return; }
+      if (r.status === 409 && (d.kod === 'VLASTNIK_S_CLENY' || d.kod === 'VLASTNIK_PODNIKU')) { setPodnik(vetaDopadu(t, d.kod, d.vlastnene as VlastnenyPodnik[] | undefined, String(d.error ?? ''))); setStav('cekam'); return; }
+      if (!r.ok) { setChyba(d.error ? tg(d.error) : t('Účet se nepodařilo smazat.')); setStav('cekam'); return; }
       setVarovani(Array.isArray(d.varovani) ? d.varovani : []);
       setStav('hotovo');
     } catch {
@@ -38,7 +40,7 @@ export default function PotvrditSmazani({ token }: { token: string }) {
       <div className="card p-6 max-w-md w-full text-center">
         <h1 className="t-page">{t('Účet je smazaný')}</h1>
         <p className="t-meta mt-3 text-pretty">{t('Osobní údaje jsme odstranili. Děkujeme, že jste Managero používali.')}</p>
-        {varovani.map(v => <p key={v} role="status" className="note mt-3 text-pretty">{v}</p>)}
+        {varovani.map(v => <p key={v} role="status" className="note mt-3 text-pretty">{tg(v)}</p>)}
         <Link href="/" className="btn btn-secondary mt-6 tap-target">{t('Na úvod')}</Link>
       </div>
     );

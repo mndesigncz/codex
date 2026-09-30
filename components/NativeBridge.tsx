@@ -86,6 +86,16 @@ export default function NativeBridge() {
     return true;
   }, [obal]);
 
+  // Název Android kanálu se po změně jazyka přepíše (stejné id, nový název); jinak by zůstal v jazyce prvního spuštění.
+  useEffect(() => {
+    if (!obal || !posluchaceHotovo.current || platforma() !== 'android') return;
+    const PN = plugin('PushNotifications');
+    if (!PN) return;
+    void (async () => {
+      try { await PN.createChannel({ id: 'default', name: tRef.current('Upozornění'), importance: 4, visibility: 1 }); } catch { /* kanál nejde přepsat */ }
+    })();
+  }, [obal, t.jazyk]);
+
   const zapniPush = useCallback(async (): Promise<VysledekPushe> => {
     const PN = plugin('PushNotifications');
     if (!PN) return 'nedostupny';

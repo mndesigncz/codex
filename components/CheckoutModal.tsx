@@ -15,6 +15,7 @@ import { PLAN_NAMES, PRICES, TRIAL_DAYS, MAX_EXTRAS, type Interval } from '@/lib
 import { DiscardGuard } from './ui/DiscardGuard';
 import { useJazyk, useT } from '@/lib/i18n/client';
 import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
+import { tg } from '@/lib/i18n/stav';
 
 const stripePromise = new Map<string, Promise<Stripe | null>>();
 function stripeJs(jazyk: string): Promise<Stripe | null> | null {
@@ -57,7 +58,7 @@ export default function CheckoutModal({ plan, interval, trial, onClose, onDone }
           body: JSON.stringify({ plan, interval, embedded: !!js }),
         });
         const d = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(d.error || t('Pokladnu se nepodařilo otevřít.'));
+        if (!res.ok) throw new Error(d.error ? tg(d.error) : t('Pokladnu se nepodařilo otevřít.'));
         if (!alive) return;
         // Bez veřejného klíče: přesměrování na Stripe.
         if (!js || !d.clientSecret) {

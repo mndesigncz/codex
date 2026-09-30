@@ -9,6 +9,7 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { DUVODY, type DruhObsahu } from '@/lib/moderace';
 import { useT } from '@/lib/i18n/client';
+import { tg } from '@/lib/i18n/stav';
 
 export default function NahlasitOkno({ kind, refId, onClose, onDone }: {
   kind: DruhObsahu;
@@ -27,7 +28,7 @@ export default function NahlasitOkno({ kind, refId, onClose, onDone }: {
     try {
       const r = await fetch('/api/reports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, refId, reason: duvod, detail }) });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) { setChyba(d.error || t('Nahlášení se nepodařilo odeslat.')); return; }
+      if (!r.ok) { setChyba(d.error ? tg(d.error) : t('Nahlášení se nepodařilo odeslat.')); return; }
       onDone(t('Děkujeme, nahlášení uvidí vedení podniku.'));
     } catch {
       setChyba(t('Nahlášení se nepodařilo odeslat. Zkontrolujte připojení.'));

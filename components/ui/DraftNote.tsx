@@ -10,8 +10,11 @@ import { useT } from '@/lib/i18n/client';
 // nepozná, jestli to napsal on, nebo se to vzalo odjinud, a při odeslání
 // ho to překvapí. Proto jeden řádek nad formulářem a tlačítko, kterým se
 // koncept zahodí.
+/** Čeho se koncept týká. Typ hlídá překladač: nová podoba musí dostat vlastní větu níž (pády a rody), ne tichou česky zůstávající výjimku. */
+export type CoKonceptu = 'rozepsané' | 'rozepsanou žádost' | 'rozepsané oznámení' | 'rozepsaný úkol' | 'rozepsanou akci' | 'rozepsané rozeslání';
+
 /** Věta „Vrátili jsme ti … z minula." Známé podoby mají vlastní překlad (pády a rody se v cizích jazycích liší). */
-function vetaKonceptu(co: string, t: ReturnType<typeof useT>): string {
+function vetaKonceptu(co: CoKonceptu, t: ReturnType<typeof useT>): string {
   switch (co) {
     case 'rozepsané': return t('Vrátili jsme ti rozepsané z minula.');
     case 'rozepsanou žádost': return t('Vrátili jsme ti rozepsanou žádost z minula.');
@@ -19,14 +22,14 @@ function vetaKonceptu(co: string, t: ReturnType<typeof useT>): string {
     case 'rozepsaný úkol': return t('Vrátili jsme ti rozepsaný úkol z minula.');
     case 'rozepsanou akci': return t('Vrátili jsme ti rozepsanou akci z minula.');
     case 'rozepsané rozeslání': return t('Vrátili jsme ti rozepsané rozeslání z minula.');
-    default: return t('Vrátili jsme ti {co} z minula.', { co: t(co) });
+    default: { const nikdy: never = co; return nikdy; }
   }
 }
 
 export function DraftNote({ koncept, co = 'rozepsané' }: {
   koncept: Koncept;
   /** Čeho se koncept týká, v prvním pádě jednoslovně. */
-  co?: string;
+  co?: CoKonceptu;
 }) {
   const t = useT('spolecne');
   if (!koncept.obnoveno) return null;

@@ -32,25 +32,6 @@ const ODKAZY = (t: PrekladFn): Record<string, { titul: string; meta: string; hre
   provoz: { titul: t('Projdi první postup'), meta: t('Otevírání a zavírání s odškrtáváním.'), href: '/employer/overview?view=procedures' },
 });
 
-/** Poznámka k výsledku ze serveru: počty a pevné věty se překládají, ostatní zůstane, jak přišla. */
-function poznamkaVysledku(p: VysledekOperace, t: PrekladFn): string | undefined {
-  const n = p.pocet ?? 0;
-  if (p.poznamka && /^\d+ /.test(p.poznamka)) {
-    switch (p.klic) {
-      case 'smeny': return t('{n, plural, one {# typ směny} few {# typy směn} other {# typů směn}}', { n });
-      case 'sklad': return t('{n, plural, one {# kategorie} few {# kategorie} other {# kategorií}}', { n });
-      case 'postupy': return t('{n, plural, one {# postup} few {# postupy} other {# postupů}}', { n });
-      case 'prehled': return t('{n, plural, one {# widget} few {# widgety} other {# widgetů}}', { n });
-    }
-  }
-  switch (p.poznamka) {
-    case 'Už je nastavené.': return t('Už je nastavené.');
-    case 'Přehled už máte upravený, nechali jsme ho.': return t('Přehled už máte upravený, nechali jsme ho.');
-    case 'Adresu a zemi se zatím uložit nepodařilo, doplníš je v Nastavení.': return t('Adresu a zemi se zatím uložit nepodařilo, doplníš je v Nastavení.');
-    default: return p.poznamka;
-  }
-}
-
 export default function Hotovo({ faze, vysledek, chyba, odp, naHotovo }: {
   faze: FazeSestaveni;
   vysledek: VysledekSestaveni | null;
@@ -115,7 +96,7 @@ export default function Hotovo({ faze, vysledek, chyba, odp, naHotovo }: {
                     <span className={`block text-[15px] font-medium leading-snug ${ukazano ? 'text-[#16181A]' : 'text-black/45'}`}>
                       {ukazano && <span className="sr-only">{p.stav === 'ok' ? t('Hotovo') : t('Přeskočeno')}{': '}</span>}{t(p.nazev)}
                     </span>
-                    {ukazano && p.poznamka && <span className="mt-0.5 block text-[13px] leading-snug text-black/55 text-pretty">{poznamkaVysledku(p, t)}</span>}
+                    {ukazano && p.poznamka && <span className="mt-0.5 block text-[13px] leading-snug text-black/55 text-pretty">{p.poznamka}</span>}
                   </span>
                 </>
               )}

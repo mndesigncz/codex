@@ -48,7 +48,7 @@ export default function Shrnuti({ odp, zmen, info }: KrokProps) {
               title={p.titul} meta={p.popis} aside={<Chip tone="muted" size="sm">{t('Z odpovědí')}</Chip>} />
           ))}
           {radky.filter(r => r.klic !== 'prehled').map(r => (
-            <SwitchRow key={r.klic} title={t(r.nazev)} hint={t(r.popis)} checked={zapnuto(r.klic)} onChange={v => prepni(r.klic, v)} />
+            <SwitchRow key={r.klic} title={t(r.nazev)} hint={r.polozky.length ? r.polozky.map(x => t(x)).join(', ') : t(r.popis)} checked={zapnuto(r.klic)} onChange={v => prepni(r.klic, v)} />
           ))}
           {pocetWidgetu > 0 && (
             <SwitchRow title={t('Přehled podle tvých cílů')} hint={t('{n, plural, one {# widget} few {# widgety} other {# widgetů}} na úvodní obrazovce. Kdykoli ho přestavíš podržením.', { n: pocetWidgetu })}
