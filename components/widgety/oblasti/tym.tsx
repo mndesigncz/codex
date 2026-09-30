@@ -220,7 +220,7 @@ function Pozvanky({ velikost, nahled }: WidgetProps) {
     );
   }
   return (
-    <Widget nacteni={ceka ? CEKA : [tym, poz]}
+    <Widget nacteni={ceka ? CEKA : [tym, poz]} odkaz={{ popisek: 'Lidé', pohled: 'team-settings' }}
       doplnek={cekajici.length > 0 ? <Chip tone="info" size="sm">{cekajici.length.toLocaleString('cs-CZ')}</Chip> : undefined}>
       <Well className="flex items-center justify-between gap-3 flex-wrap">
         <div className="min-w-0">
