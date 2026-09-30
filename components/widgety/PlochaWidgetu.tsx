@@ -37,7 +37,7 @@ import { lineWidget, maCoNastavit, predstahni } from './registr';
 import { useRozlozeni, type Rozlozeni, type UdalostRozlozeni } from './useRozlozeni';
 import { usePodrzeni, vibruj, type Podrzeni } from './usePodrzeni';
 import { KontextoveMenu, type OtevreneMenu, type PolozkaMenu, type ZdrojMenu } from './KontextoveMenu';
-import { useSmi } from './NavigaceKontext';
+import { useNavigace, useSmi } from './NavigaceKontext';
 import { Pohyb, useTazeni } from './upravy/useTazeni';
 import { pustDucha } from './upravy/duch';
 
@@ -124,6 +124,10 @@ interface Obsluha {
   odebrat: (instance: string, pointerType: string) => void;
   znovu: (instance: string) => void;
   nahlasSkryti: (instance: string, skryto: boolean) => void;
+  nahlasVyrizeno: (instance: string, souhrn: string | null) => void;
+  rozbal: (instance: string) => void;
+  /** Klepnutí na kartu v klidu: naviguje na `cil` widgetu z katalogu. */
+  klikKlid: (e: React.MouseEvent<HTMLElement>, instance: string) => void;
 }
 
 interface PolozkaProps {
@@ -142,6 +146,8 @@ interface PolozkaProps {
   inkoust: boolean;
   pokus: number;
   nova: boolean;
+  /** Souhrn vyřízeného widgetu — kreslí se minimalizovaně (null = plný). */
+  mini: string | null;
   navodId: string;
   stranka: DefiniceStranky;
   nastroj: React.ReactNode;
