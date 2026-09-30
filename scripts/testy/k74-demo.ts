@@ -11,6 +11,7 @@ import type { Testy } from './_testy.ts';
 import { ID_SCEN, SCENY, jeRole, jeScena, nastaveniZAdresy, pohledScenyProRoli } from '../../lib/demo/sceny.ts';
 import { jeCestaDema } from '../../lib/demo/cesta.ts';
 import { dnyMesice, denVTydnu, mesic, posunDen } from '../../lib/demo/cas.ts';
+import { PametovyCookies } from '../../lib/demo/prostredi.ts';
 
 const zdroj = (cesta: string) => readFileSync(new URL(`../../${cesta}`, import.meta.url), 'utf8');
 /** Kód bez komentářů: komentáře popisují pravidla a pojistky by chytaly je. */
@@ -71,7 +72,9 @@ export default function ({ eq, ok }: Testy) {
   const mock = kod('lib/demo/mockApi.ts');
   ok('mock: cizí původ se odmítá', /origin !== window\.location\.origin[\s\S]{0,200}Promise\.reject/.test(mock));
   ok('mock: původní fetch se volá jen mimo /api/', /!url\.pathname\.startsWith\('\/api\/'\)\) return puvodniFetch/.test(mock));
-  ok('mock: service worker se v ukázce nikdy nezaregistruje', /serviceWorker\.register = /.test(mock));
+  ok('mock: service worker se v ukázce nikdy nezaregistruje', /kontejner\.register = \(\) => Promise\.reject/.test(mock));
+  ok('mock: instalace je idempotentní a vratná (vrací funkci pro návrat fetch, sendBeacon i service workeru)',
+    /if \(odinstalovatApi\) return odinstalovatApi/.test(mock) && /window\.fetch = nativniFetch/.test(mock) && /delete \(navigator as any\)\.sendBeacon|navigator\.sendBeacon = puvodni/.test(mock));
   const prov = kod('app/providers.tsx');
   ok('provider: v ukázce se nemontuje service worker ani push', /\{!demo && <ServiceWorker \/>\}/.test(prov) && /\{!demo && <PushManager \/>\}/.test(prov));
   const root = kod('components/demo/DemoRoot.tsx');
@@ -80,5 +83,27 @@ export default function ({ eq, ok }: Testy) {
   ok('kořen: zprávy ven jdou jen na vlastní původ', /postMessage\(z, window\.location\.origin\)/.test(kod('lib/demo/zpravy.ts')));
   const env = kod('lib/demo/prostredi.ts');
   ok('prostředí: localStorage i sessionStorage jsou jen v paměti stránky', /jmeno of \['localStorage', 'sessionStorage'\]/.test(env));
-  ok('ukázka nemá cookies', !/document\.cookie/.test(mock + env + root));
+  ok('prostředí: document.cookie je zastíněné paměťovým jarem (kiosk jinak píše skutečnou managero-kiosk-acting)',
+    /Object\.defineProperty\(document, 'cookie'/.test(env) && !/document\.cookie/.test(mock + root + env));
+  ok('prostředí: instalace je idempotentní a vratná', /if \(odinstalovat\) return odinstalovat/.test(env) && /delete \(document as any\)\.cookie/.test(env));
+  ok('prostředí: beforeunload aplikace neblokuje reset ukázky (zachytávací posluchač)', /addEventListener\('beforeunload', posluchac, true\)/.test(env) && /stopImmediatePropagation/.test(env));
+  ok('kořen: instalace nezávisí na adrese (initializer useState, efekt i rychlá cesta)',
+    /useState\(\(\) => \{ if \(typeof window !== 'undefined'\) pripravDemo\(\)/.test(root) && /const vratit = pripravDemo\(\)/.test(root) && /prisloKlientskouNavigaci\(\)/.test(root));
+  ok('kořen: klientská navigace vynutí plné načtení a při odchodu se vše vrátí', /window\.location\.reload\(\)/.test(root) && /vratit\(\);/.test(root));
+  const zaklad = kod('lib/demo/routy/zaklad.ts');
+  ok('odhlášení: /api/auth/signout vrací adresu ukázky (ne skutečné /login)', /\/api\/auth\/signout'\) return ok\(\{ url: adresaDema\(\) \}\)/.test(zaklad));
+  ok('předplatné: v ukázce chybí oprávnění predplatne.zobrazit (záložka se nevykreslí)', /OPRAVNENI_MIMO_UKAZKU = new Set\(\['predplatne\.zobrazit'\]\)/.test(zaklad));
+
+  // ---- cookie jar ukázky: chová se jako document.cookie ----
+  const jar = new PametovyCookies();
+  eq('cookie jar: prázdný', jar.get(), '');
+  jar.set('managero-kiosk-acting=2; path=/; max-age=3600; samesite=lax');
+  jar.set('a=b');
+  eq('cookie jar: zápis s atributy uloží jen dvojici jméno=hodnota', jar.get(), 'managero-kiosk-acting=2; a=b');
+  jar.set('managero-kiosk-acting=; path=/; max-age=0');
+  eq('cookie jar: max-age=0 smaže (tak kiosk maže identitu)', jar.get(), 'a=b');
+  jar.set('a=b; expires=Thu, 01 Jan 1970 00:00:00 GMT');
+  eq('cookie jar: prošlé expires smaže', jar.get(), '');
+  jar.set('bezRovnitka');
+  eq('cookie jar: zápis bez = se ignoruje (jméno je prázdné)', jar.get(), '');
 }

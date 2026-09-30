@@ -13,8 +13,12 @@ import { stranka as najdiStranku } from '@/lib/widgety/stranky';
 import { tvarOdpovedi, vyresRozlozeni, zVychozich } from '@/lib/widgety/rozlozeni';
 import type { Divak, PolozkaRozlozeni, RadekRozlozeni } from '@/lib/widgety/typy';
 import { ROZLOZENI_DEMA } from '../data/rozlozeni';
+import { casDnes, posunDen } from '../cas';
+import { detailAkce, popisAkce } from '@/lib/auditPopisky';
 
 const PLAN = planInfoOf({ plan: 'max', subscription_status: 'active', subscription_interval: 'month', had_subscription: true });
+
+const OPRAVNENI_MIMO_UKAZKU = new Set(['predplatne.zobrazit']);
 
 /** Role, za kterou je ukázka právě „přihlášená". */
 export function mojeRole(stav: DemoStav) {
@@ -25,7 +29,10 @@ export function mojeRole(stav: DemoStav) {
     nazev: klic === 'vedeni' ? 'Vlastník' : r.nazev,
     typ: r.typ as 'vedeni' | 'zamestnanec' | 'kiosk',
     jeVlastnik: klic === 'vedeni',
-    opravneni: r.opravneni,
+    // Předplatné a fakturace jsou prodej, ne ukázka provozu: záložka Nastavení →
+    // Předplatné (ceny, „Předplatit", odkaz na doporučení) se bez tohoto
+    // oprávnění nevykreslí a nic v ukázce nevede k platbě.
+    opravneni: r.opravneni.filter(k => !OPRAVNENI_MIMO_UKAZKU.has(k)),
   };
 }
 
@@ -63,6 +70,11 @@ const TYM = {
   drawer_float: null, dashboard_config: {}, levels_config: [], points_config: {}, currency: 'CZK', locale: 'cs-CZ',
 };
 
+/** Adresa právě běžící ukázky bez #fragmentu (next-auth při fragmentu načítá znovu). */
+function adresaDema(): string {
+  return typeof window === 'undefined' ? '/demo' : window.location.href.split('#')[0];
+}
+
 export const zaklad: Obsluha = (p, k) => {
   const s = k.stav;
   const { cesta, metoda } = p;
@@ -74,6 +86,10 @@ export const zaklad: Obsluha = (p, k) => {
   if (cesta.startsWith('/api/auth/')) {
     if (cesta === '/api/auth/csrf') return ok({ csrfToken: 'ukazka' });
     if (cesta === '/api/auth/providers') return ok({});
+    // Odhlášení: next-auth po odpovědi naviguje na `data.url` (jinak na
+    // callbackUrl = skutečné /login, které je nerámovatelné a leží mimo
+    // ukázku). Vrátí se adresa ukázky: načte se znovu a začne od výchozích dat.
+    if (cesta === '/api/auth/signout') return ok({ url: adresaDema() });
     return ok({ ok: true });
   }
 
@@ -165,7 +181,32 @@ export const zaklad: Obsluha = (p, k) => {
 
   // ---- Pokladna ----
   if (cesta === '/api/pos/summary') return ok(posSouhrn());
-  if (cesta === '/api/pos/status') return ok({ connected: true, placeName: NAZEV_PODNIKU, lastSyncAt: new Date().toISOString(), lastError: null, billsCount: 4210, itemsPending: 0 });
+  if (cesta === '/api/pos' && metoda === 'GET') {
+    return ok({ connected: true, placeName: NAZEV_PODNIKU, merchantId: 'ukazka', clientIdMasked: 'ukaz…0001' });
+  }
+  if (cesta === '/api/pos') return ok({ ok: true, placeName: NAZEV_PODNIKU });
+  if (cesta === '/api/pos/status') {
+    // Tvar `health()` z lib/posMirror: Nastavení → Pokladna z něj kreslí zdraví napojení.
+    if (metoda !== 'GET') return ok({ ok: true, bills: { ok: true, billsSeen: 0, billsChanged: 0, itemsPending: 0 } });
+    return ok({
+      connected: true, placeName: NAZEV_PODNIKU, merchantId: 'ukazka', clientIdMasked: 'ukaz…0001',
+      lastSyncAt: new Date().toISOString(), billsCursor: null, syncedFrom: posunDen(s.dnes, -400), lastError: null, lastErrorAt: null,
+      billsCount: 4210, itemsPending: 0, productsCount: 24, productsWithPrice: 24, menuSyncedAt: new Date().toISOString(),
+      webhookSecret: null, lastWebhookAt: null, stockId: null, firstDay: posunDen(s.dnes, -400), lastDay: s.dnes,
+      backfillUntil: posunDen(s.dnes, -400), historyComplete: true, webhookUrl: null,
+    });
+  }
+  // Historie změn: pár typických zásahů ze skutečné routy (label a detail už česky).
+  if (cesta === '/api/audit') {
+    const kdy = (dny: number, hm: string) => casDnes(hm, posunDen(s.dnes, -dny));
+    return ok({
+      entries: [
+        { id: 3, label: popisAkce('schedule.adjust'), detail: null, userName: clen(1).name, userAvatar: clen(1).avatar, createdAt: kdy(1, '18:12') },
+        { id: 2, label: popisAkce('inventory.create'), detail: 'Sirup lískový oříšek', userName: clen(1).name, userAvatar: clen(1).avatar, createdAt: kdy(2, '08:40') },
+        { id: 1, label: popisAkce('team.settings'), detail: detailAkce('team.settings', 'název, měna'), userName: clen(1).name, userAvatar: clen(1).avatar, createdAt: kdy(6, '19:05') },
+      ],
+    });
+  }
 
   return undefined;
 };

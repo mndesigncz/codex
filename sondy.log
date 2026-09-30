@@ -3,4 +3,5 @@
 > node scripts/sondy/spust.mjs
 
 ✓ b2 (4 s)
-✓ att (8 s)
+✓ att (7 s)
+✓ boundary (5 s)

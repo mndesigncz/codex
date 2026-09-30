@@ -131,7 +131,9 @@ export const uzaverky: Obsluha = (p, k) => {
         opening_cash: cislo(b.openingCash), cash_revenue: cislo(b.cashRevenue), card_revenue: cislo(b.cardRevenue),
         tips: cislo(b.tips), tips_card: cislo(b.tipsCard), expenses: cislo(b.expenses), cash_removed: cislo(b.cashRemoved),
         self_payout: cislo(b.selfPayout), closing_cash: cislo(b.closingCash), customers: cislo(b.customers),
-        notes: b.notes ? String(b.notes) : null, approved: opr.has('uzaverky.bez_schvaleni'),
+        notes: b.notes ? String(b.notes) : null,
+        // Jako skutečná routa: uzávěrka se směnou se schvaluje sama, bez směny čeká na vedení.
+        approved: opr.has('uzaverky.bez_schvaleni') || !!smena,
         movements: Array.isArray(b.movements) ? b.movements : [], denominations: b.denominations && typeof b.denominations === 'object' ? b.denominations : {},
         shiftEmployees: [autorId, ...spolu.filter((x: number) => x !== autorId)], final_removal: cislo(b.finalRemoval),
         created_at: new Date().toISOString(), handover: b.handover ?? null,

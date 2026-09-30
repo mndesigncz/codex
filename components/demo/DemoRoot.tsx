@@ -3,10 +3,18 @@
 // Kořen veřejné ukázky /demo: skutečná aplikace proti mock serveru v prohlížeči.
 //
 // Co se děje, v tomhle pořadí:
-//  1. Na úrovni modulu (před prvním vykreslením) se nainstaluje interceptor
-//     window.fetch a paměťové úložiště (lib/demo). Kořenový SessionProvider
-//     si sáhne na /api/auth/session až v efektu po připojení, takže už dostane
-//     odpověď z paměti, ne ze serveru.
+//  1. Před prvním vykreslením se IDEMPOTENTNĚ nainstaluje izolace (paměťové
+//     úložiště a cookies) a interceptor window.fetch (lib/demo). Nezáleží na
+//     adrese při vyhodnocení modulu: klientská navigace na /demo (Link,
+//     router.push) vyhodnotí modul dřív, než se adresa změní, a s podmínkou
+//     na pathname by ukázka volala skutečné API. Proto se instaluje i při
+//     vykreslení (useState) a v efektu; rychlá cesta na úrovni modulu jen
+//     zajistí, že při plném načtení /demo je izolace hotová ještě před
+//     rodičovskými providery. Kořenový SessionProvider si sáhne na
+//     /api/auth/session až v efektu, takže už dostane odpověď z paměti.
+//     Po klientské navigaci se navíc vynutí plné načtení (moduly a mezipaměti
+//     widgetů by jinak nesly data skutečné aplikace) a při odchodu klientskou
+//     navigací se vše vrátí zpět (odinstalace) a načte se cílová stránka.
 //  2. Podle ?role= a ?scena= se namontuje skutečné rozhraní: EmployerLayout
 //     (vedení), EmployeeLayout (zaměstnanec) nebo KioskApp (tablet). Stejné
 //     vrstvy jako ve skutečných stránkách (CurrencyProvider, PlanProvider),
@@ -25,19 +33,37 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { CurrencyProvider } from '../CurrencyProvider';
 import { PlanProvider } from '../Pro';
 import { useTheme } from '../ThemeProvider';
-import { instalujDemoApi, nastavHlasitele, nastavRoli, pocetBezicich, resetujDemo } from '@/lib/demo/mockApi';
+import { instalujDemoApi, nastavHlasitele, nastavRoli, pocetBezicich, resetujDemo, ulozStavProPrenos } from '@/lib/demo/mockApi';
 import { zalozProstredi } from '@/lib/demo/prostredi';
-import { posliRodici, rozeberZpravu } from '@/lib/demo/zpravy';
+import { posliRodici, rozeberZpravu, zopakujPripraveno } from '@/lib/demo/zpravy';
 import { jeCestaDema } from '@/lib/demo/cesta';
 import { nastaveniZAdresy, pohledScenyProRoli, type NastaveniDema, type RoleDema } from '@/lib/demo/sceny';
 import { KDO_JSEM, clen } from '@/lib/demo/data/lide';
 
-// Před prvním vykreslením: modul se vyhodnotí při načtení stránky, dřív než
-// React hydratuje strom, a tím i dřív než efekty kořenového SessionProvideru.
-if (typeof window !== 'undefined' && jeCestaDema(window.location.pathname)) {
-  zalozProstredi();
-  instalujDemoApi();
+/**
+ * Idempotentně připraví izolované prostředí a mock server; vrací funkci pro
+ * návrat. Volá se z modulu (rychlá cesta), z vykreslení i z efektu.
+ */
+function pripravDemo(): () => void {
+  const vratitProstredi = zalozProstredi();
+  const vratitApi = instalujDemoApi();
   nastavRoli(nastaveniZAdresy(window.location.search).role);
+  return () => { vratitApi(); vratitProstredi(); };
+}
+
+// Plné načtení /demo: hotovo ještě před hydratací rodičovských providerů.
+if (typeof window !== 'undefined' && jeCestaDema(window.location.pathname)) pripravDemo();
+
+/**
+ * Přišli jsme sem klientskou navigací? Záznam navigace v Performance API drží
+ * adresu dokumentu, který se skutečně načetl; pushState ji nemění. Když to
+ * není /demo, stránka nese moduly, mezipaměti i relaci skutečné aplikace.
+ */
+function prisloKlientskouNavigaci(): boolean {
+  try {
+    const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+    return !!nav && !jeCestaDema(new URL(nav.name).pathname);
+  } catch { return false; }
 }
 
 // Rozhraní se stahují až podle role: ukázka vedení nestahuje tablet ani zaměstnance.
@@ -80,6 +106,28 @@ export default function DemoRoot() {
   const [klic, setKlic] = useState(0);
   const nastaveniRef = useRef<NastaveniDema | null>(null);
   nastaveniRef.current = nastaveni;
+  // Před prvním vykreslením ukázky (initializer běží při renderu, dřív než
+  // jakýkoli efekt kořenového SessionProvideru): server nic nedělá.
+  useState(() => { if (typeof window !== 'undefined') pripravDemo(); return true; });
+  const nacitamZnovu = useRef(false);
+
+  // Vstup a odchod klientskou navigací (viz hlavička). Musí být první efekt:
+  // ostatní se při plném načtení nemají spustit.
+  useEffect(() => {
+    // Efekt běží znovu i po simulovaném odmontování (StrictMode): instalace je idempotentní.
+    const vratit = pripravDemo();
+    if (prisloKlientskouNavigaci()) {
+      nacitamZnovu.current = true;
+      window.location.reload();
+      return;
+    }
+    return () => {
+      vratit();
+      // Odchod klientskou navigací: adresa už je jiná; čisté načtení zahodí
+      // moduly a mezipaměti widgetů, které se plnily daty ukázky.
+      setTimeout(() => { if (!jeCestaDema(window.location.pathname)) window.location.reload(); }, 50);
+    };
+  }, []);
 
   // Světlý motiv vynucený: ukázka nemá tmavý režim a nesmí převzít volbu z aplikace.
   useEffect(() => {
@@ -95,6 +143,7 @@ export default function DemoRoot() {
 
   // První nastavení z adresy.
   useEffect(() => {
+    if (nacitamZnovu.current) return;
     const n = nastaveniZAdresy(window.location.search);
     nastavRoli(n.role);
     window.history.replaceState(null, '', adresaSPohledem(n));
@@ -130,11 +179,15 @@ export default function DemoRoot() {
       const z = rozeberZpravu(e);
       if (!z) return;
       if (z.typ === 'demo-reset') { reset(); return; }
+      // Rodič se přihlásil po nás (iframe se načetl dřív než jeho posluchač): zopakovat, co už víme.
+      if (z.typ === 'demo-ping') { zopakujPripraveno(); return; }
       const dosavadni = nastaveniRef.current;
       const n: NastaveniDema = { scena: z.scena, role: z.role ?? dosavadni?.role ?? nastaveniZAdresy(window.location.search).role, okno: dosavadni?.okno ?? false };
       // Jiná role = jiná relace, oprávnění i rozložení: čisté načtení.
       // Stejná role: stačí znovu namontovat rozhraní na jiný pohled.
       if (dosavadni && n.role !== dosavadni.role) {
+        // Nový modul by začal od výchozích dat: stav jde s sebou (window.name).
+        ulozStavProPrenos();
         window.location.assign(adresaSPohledem(n).replace(/[?&]view=[^&]*/, ''));
         return;
       }

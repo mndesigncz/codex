@@ -32,7 +32,7 @@ const PREDVOLBY: Record<string, string> = {
  * (`jmeno=hodnota; path=/; max-age=…; expires=…`), takže smazání přes
  * `max-age=0` nebo prošlé `expires` funguje; ostatní atributy ukázka nepotřebuje.
  */
-class PametovyCookies {
+export class PametovyCookies {
   private d = new Map<string, string>();
   get(): string { return Array.from(this.d, ([k, v]) => `${k}=${v}`).join('; '); }
   set(zapis: string): void {

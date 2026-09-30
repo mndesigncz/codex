@@ -2,24 +2,14 @@
 // účtenky, nápady, plánovací tabule. Čísla se skládají z uzávěrek ve stavu
 // (routy/uzaverky.ts), takže odeslaná uzávěrka změní i přehledy financí.
 
-import { ok, type Obsluha } from '../typy';
+import { chyba, ok, type Obsluha } from '../typy';
 import { NAZEV_PODNIKU, clen } from '../data/lide';
 import { posunDen } from '../cas';
 import type { DemoStav } from '../stav';
 import { posSouhrn } from './zaklad';
 import { formatMoney } from '@/lib/money';
-
-// Prodávané položky a jejich podíl na tržbě (součet 1). Ceny jsou ukázkové.
-const MENU: { productId: string; name: string; category: string; price: number; podil: number; naklad: number }[] = [
-  { productId: 'p1', name: 'Flat white', category: 'Káva', price: 79, podil: 0.22, naklad: 14 },
-  { productId: 'p2', name: 'Cappuccino', category: 'Káva', price: 69, podil: 0.17, naklad: 12 },
-  { productId: 'p3', name: 'Espresso', category: 'Káva', price: 55, podil: 0.09, naklad: 8 },
-  { productId: 'p4', name: 'Latte s příchutí', category: 'Káva', price: 85, podil: 0.12, naklad: 19 },
-  { productId: 'p5', name: 'Croissant máslový', category: 'Pečivo', price: 49, podil: 0.13, naklad: 18 },
-  { productId: 'p6', name: 'Domácí koláč', category: 'Pečivo', price: 59, podil: 0.11, naklad: 22 },
-  { productId: 'p7', name: 'Domácí limonáda', category: 'Nápoje', price: 59, podil: 0.09, naklad: 13 },
-  { productId: 'p8', name: 'Bagel se šunkou', category: 'Jídlo', price: 95, podil: 0.07, naklad: 38 },
-];
+import { czForm } from '@/lib/czech';
+import { MENU } from '../data/menu';
 
 const HODINY_PODIL = [0, 0, 0, 0, 0, 0, 0, 0.04, 0.1, 0.13, 0.11, 0.09, 0.1, 0.09, 0.07, 0.06, 0.07, 0.06, 0.05, 0.03, 0, 0, 0, 0];
 
@@ -72,20 +62,66 @@ export const finance: Obsluha = (p, k) => {
   if (cesta === '/api/pos/margins') {
     const mesic = q.get('month') ?? s.dnes.slice(0, 7);
     const tr = s.uzaverky.filter(u => u.shift_date.startsWith(mesic + '-')).reduce((a, u) => a + u.cash_revenue + u.card_revenue, 0) || 180000;
-    const items = MENU.map(m => { const revenue = Math.round(tr * m.podil / 10) * 10; return { productId: m.productId, name: m.name, category: m.category, qty: Math.round(revenue / m.price), revenue, cost: m.naklad, marginPct: Math.round((1 - m.naklad / m.price) * 100) }; });
-    const cogs = items.reduce((a, x) => a + x.qty * (x.cost ?? 0), 0);
+    // Náklad položky = suroviny z její receptury × cena za jednotku ve skladu; bez receptury náklad neznáme.
+    const naklad = (productId: string): number | null => {
+      const r = s.receptury[productId];
+      if (!r?.length) return null;
+      return Math.round(r.reduce((a, x) => a + x.amount * (s.zasoby.find(z => z.id === x.itemId)?.unitCost ?? 0), 0) * 100) / 100;
+    };
+    const items = MENU.map(m => {
+      const revenue = Math.round(tr * m.podil / 10) * 10;
+      const qty = Math.round(revenue / m.price);
+      const cost = naklad(m.productId);
+      return { productId: m.productId, name: m.name, category: m.category, qty, price: m.price, revenue, cost, margin: cost == null ? null : Math.round((m.price - cost) * qty), marginPct: cost == null ? null : Math.round((1 - cost / m.price) * 100) };
+    });
+    const sCenou = items.filter(x => x.cost != null);
+    const bez = items.filter(x => x.cost == null);
+    const revenueKnown = sCenou.reduce((a, x) => a + x.revenue, 0);
+    const cogs = Math.round(sCenou.reduce((a, x) => a + (x.cost ?? 0) * x.qty, 0));
+    const revenue = items.reduce((a, x) => a + x.revenue, 0);
+    const insights: { icon: string; tone: string; title: string; text: string }[] = [];
+    if (bez.length) insights.push({ icon: 'warning', tone: 'info', title: `Bez receptury: ${bez.length} ${czForm(bez.length, { one: 'položka', few: 'položky', many: 'položek' })} (${Math.round(bez.reduce((a, x) => a + x.revenue, 0) / revenue * 100)} % tržby)`, text: 'Doplň jim receptury, ať vidíš marži a sklad se odepisuje sám.' });
+    if (revenueKnown) insights.push({ icon: 'coins', tone: 'good', title: `Hrubá marže ${Math.round((revenueKnown - cogs) / revenueKnown * 100)} % na tom, co má recepturu`, text: 'Zdravé číslo. Drž ceny surovin pod kontrolou a hlídej, ať se nezvedne odpad.' });
     return ok({
       connected: true, ready: true, month: mesic, menuError: null,
-      totals: { revenue: tr, revenueKnown: tr, cogs, margin: tr - cogs, marginPct: Math.round((1 - cogs / tr) * 100), products: items.length, noRecipe: 0, noRecipeShare: 0 },
-      items, insights: [{ icon: 'trend', tone: 'good', title: 'Káva drží marži', text: 'Nápoje z kávy mají přes 80 % marže, pečivo kolem 60 %.' }],
+      totals: { revenue, revenueKnown, cogs, margin: revenueKnown - cogs, marginPct: revenueKnown ? Math.round((1 - cogs / revenueKnown) * 100) : null, products: items.length, noRecipe: bez.length, noRecipeShare: Math.round(bez.reduce((a, x) => a + x.revenue, 0) / revenue * 100) },
+      items, insights,
     });
   }
   if (cesta === '/api/pos/products') {
+    if (p.metoda === 'POST' || p.metoda === 'PATCH') {
+      // Uložení receptury (POST = celá, prázdná = smazat) a úprava jedné suroviny (PATCH: amount <= 0 odebere).
+      const b = p.telo ?? {};
+      const id = String(b.productId ?? '').trim();
+      if (!id) return chyba('Chybí produkt', 400);
+      if (p.metoda === 'POST') {
+        const ing = (Array.isArray(b.ingredients) ? b.ingredients : []).slice(0, 12)
+          .map((x: any) => ({ itemId: parseInt(x?.itemId), amount: Number(x?.amount) > 0 ? Number(x.amount) : 1 }))
+          .filter((x: { itemId: number }) => Number.isFinite(x.itemId) && s.zasoby.some(z => z.id === x.itemId));
+        if (ing.length) s.receptury[id] = ing; else delete s.receptury[id];
+      } else {
+        const itemId = parseInt(b.itemId);
+        const amount = Number(b.amount);
+        const stara = (s.receptury[id] ?? []).filter(x => x.itemId !== itemId);
+        if (Number.isFinite(itemId) && amount > 0) stara.push({ itemId, amount });
+        if (stara.length) s.receptury[id] = stara; else delete s.receptury[id];
+      }
+      k.hlas('receptura-ulozena', { id });
+      return ok({ ok: true });
+    }
+    if (p.metoda === 'DELETE') { delete s.receptury[String(q.get('productId') ?? '')]; return ok(); }
+    const recepty = MENU.filter(m => s.receptury[m.productId]?.length).map(m => ({
+      productId: m.productId, productName: m.name,
+      ingredients: s.receptury[m.productId].map(x => {
+        const z = s.zasoby.find(y => y.id === x.itemId);
+        return { itemId: x.itemId, amount: x.amount, itemName: z?.name ?? '', itemUnit: z?.unit ?? '', packageSize: null };
+      }),
+    }));
     return ok({
       connected: true,
-      products: MENU.map(m => ({ productId: m.productId, name: m.name, category: m.category, price: m.price })),
-      recipes: [],
-      unmapped: MENU.slice(0, 3).map(m => ({ productId: m.productId, productName: m.name, soldCount: Math.round(m.podil * 400) })),
+      products: MENU.map(m => ({ productId: m.productId, name: m.name, category: m.category, price: m.price, vatRate: 12 })),
+      recipes: recepty,
+      unmapped: MENU.filter(m => !s.receptury[m.productId]?.length).map(m => ({ productId: m.productId, productName: m.name, soldCount: Math.round(m.podil * 400) })),
     });
   }
   if (cesta === '/api/pos/insights') return ok({ hours: HODINY_PODIL.map(h => Math.round(180000 * h / 10) * 10), byWeekday: [] });
@@ -136,7 +172,6 @@ export const finance: Obsluha = (p, k) => {
     { id: 1, photoUrl: null, supplier: 'Pražírna Pod Věží', amount: 6200, note: 'Káva na dva týdny', createdAt: new Date(Date.now() - 2 * 86400000).toISOString(), authorName: clen(1).name },
   ] });
 
-  if (cesta === '/api/shift-reviews') return ok(q.get('month') ? { days: [] } : { date: q.get('date'), reviews: [], shifts: [] });
   if (cesta === '/api/suggestions') {
     return ok({
       isEmployer: s.role === 'vedeni', meId: s.role === 'vedeni' ? 1 : 3,

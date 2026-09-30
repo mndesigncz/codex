@@ -7,6 +7,7 @@ import { chyba, ok, type Obsluha } from '../typy';
 import { clen, KDO_JSEM } from '../data/lide';
 import type { DemoStav, Zasoba } from '../stav';
 import { mojeRole } from './zaklad';
+import { MENU } from '../data/menu';
 
 function stavZasoby(z: Zasoba): 'ok' | 'low' | 'critical' {
   if (z.quantity <= z.criticalQuantity) return 'critical';
@@ -123,38 +124,64 @@ export const sklad: Obsluha = (p, k) => {
     return ok({ ok: true });
   }
   if (cesta === '/api/orders') {
+    const tvarObj = (o: DemoStav['objednavky'][number]) => ({
+      id: o.id, supplier: o.supplier, items: o.items, totalCost: vidiCeny ? o.totalCost : null, status: o.status, note: o.note,
+      createdAt: o.createdAt, receivedAt: o.receivedAt, createdByName: clen(o.createdBy).name,
+    });
     if (metoda === 'GET') {
+      // Čekající nahoře, pak nejnovější (jako ORDER BY skutečné routy).
       return ok({
-        orders: s.objednavky.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(o => ({
-          id: o.id, supplier: o.supplier, items: o.items, totalCost: vidiCeny ? o.totalCost : null, status: o.status, note: o.note,
-          createdAt: o.createdAt, receivedAt: o.receivedAt, createdByName: clen(o.createdBy).name,
-        })),
+        orders: s.objednavky.slice().sort((a, b) => Number(b.status === 'ordered') - Number(a.status === 'ordered') || b.createdAt.localeCompare(a.createdAt)).map(tvarObj),
       });
     }
     if (metoda === 'POST') {
       const b = p.telo ?? {};
       const polozky = Array.isArray(b.items) ? b.items : [];
-      s.objednavky.push({ id: ++s.dalsiId, supplier: String(b.supplier ?? 'Dodavatel'), items: polozky, totalCost: null, status: 'ordered', note: b.note ?? null, createdAt: new Date().toISOString(), receivedAt: null, createdBy: meId });
+      const nova = { id: ++s.dalsiId, supplier: String(b.supplier ?? 'Dodavatel'), items: polozky, totalCost: null, status: 'ordered' as const, note: b.note ?? null, createdAt: new Date().toISOString(), receivedAt: null, createdBy: meId };
+      s.objednavky.push(nova);
       k.hlas('objednavka-odeslana', { supplier: b.supplier });
-      return ok({ ok: true });
+      // E-mail dodavateli v ukázce neodchází; `emailed: false` bez chyby = „jen zapsáno".
+      return ok({ ok: true, order: tvarObj(nova), emailed: false, emailError: null });
     }
     if (metoda === 'PATCH') {
-      const o = s.objednavky.find(x => x.id === Number(p.telo?.id));
-      if (o && p.telo?.status === 'received') {
-        o.status = 'received'; o.receivedAt = new Date().toISOString();
-        // Příjem objednávky naskladní: bez toho by zásoba zůstala „dochází" i po dodávce.
+      // Tělo skutečné routy: { id, action: 'received' | 'cancelled', totalCost? }.
+      const b = p.telo ?? {};
+      const akce = b.action ?? (b.status === 'received' || b.status === 'cancelled' ? b.status : null);
+      const o = s.objednavky.find(x => x.id === Number(b.id));
+      if (!o || (akce !== 'received' && akce !== 'cancelled')) return chyba(o ? 'Neplatný požadavek' : 'Objednávka nenalezena', o ? 400 : 404);
+      if (o.status !== 'ordered') return chyba('Objednávka už je vyřízená.', 409);
+      o.status = akce;
+      o.receivedAt = akce === 'received' ? new Date().toISOString() : null;
+      let naskladneno = 0;
+      if (akce === 'received') {
+        if (b.totalCost != null && b.totalCost !== '' && Number.isFinite(Number(b.totalCost))) o.totalCost = Number(b.totalCost);
+        // Příjem naskladní: bez toho by zásoba zůstala „dochází" i po dodávce.
         for (const it of o.items) {
-          const z = s.zasoby.find(x => x.id === it.itemId);
-          if (z) { const stara = z.quantity; z.quantity += it.qty; zapisPohyb(s, z, stara, z.quantity, 'Příjem objednávky', meId); }
+          const z = s.zasoby.find(x => x.id === it.itemId) ?? s.zasoby.find(x => x.name.toLowerCase() === it.name.toLowerCase());
+          if (z) { const stara = z.quantity; z.quantity += it.qty; z.updatedAt = new Date().toISOString(); z.updatedBy = meId; zapisPohyb(s, z, stara, z.quantity, `Příjem objednávky #${o.id}`, meId); naskladneno++; }
         }
         k.hlas('objednavka-prijata', { id: o.id });
       }
-      return ok({ ok: true });
+      return ok({ ok: true, order: tvarObj(o), restocked: naskladneno });
     }
+    if (metoda === 'DELETE') { s.objednavky = s.objednavky.filter(x => x.id !== Number(q.get('id'))); return ok(); }
   }
   if (cesta === '/api/stocktake') return ok({ open: null, history: [] });
   if (cesta === '/api/production') return ok({ toMake: [] });
-  if (cesta === '/api/pos/usage') return metoda === 'GET' && q.get('q') ? ok({ products: [] }) : ok({ usage: {} });
+  if (cesta === '/api/pos/usage') {
+    if (metoda === 'GET' && q.get('q')) {
+      // Hledání produktu z kasy pro přiřazení suroviny do receptury.
+      const dotaz = (q.get('q') ?? '').toLowerCase();
+      return ok({ products: MENU.filter(m => `${m.name} ${m.category}`.toLowerCase().includes(dotaz)).slice(0, 20).map(m => ({ productId: m.productId, name: m.name, category: m.category, price: m.price })) });
+    }
+    if (metoda === 'GET') {
+      // Kde se která surovina používá (mapa itemId → produkty), ze stejných receptur jako Receptury.
+      const usage: Record<string, { productId: string; productName: string | null; amount: number }[]> = {};
+      for (const m of MENU) for (const r of s.receptury[m.productId] ?? []) (usage[String(r.itemId)] ??= []).push({ productId: m.productId, productName: m.name, amount: r.amount });
+      return ok({ usage });
+    }
+    return ok({ ok: true });
+  }
   if (cesta === '/api/recipes') return ok({ recipes: [] });
 
   return undefined;

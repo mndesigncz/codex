@@ -140,7 +140,19 @@ export const lide: Obsluha = (p, k) => {
   if (cesta === '/api/employees') {
     return ok(LIDE.filter(l => l.role !== 'kiosk').map(l => ({ id: l.id, name: l.name, avatar: l.avatar, role: l.role, jobTitle: l.jobTitle, hourlyRate: opr.has('finance.mzdy') ? l.hourlyRate : 0 })));
   }
-  if (cesta === '/api/invitations') return ok({ invitations: [] });
+  if (cesta === '/api/invitations') {
+    if (metoda === 'POST') {
+      // Pozvánka se zapíše a objeví se v seznamu; e-mail v ukázce neodchází (`emailSent: false` bez chyby).
+      const email = String(p.telo?.email ?? '').trim().toLowerCase();
+      if (!email) return chyba('Email je povinný', 400);
+      const token = `ukazka-${s.dalsiId + 1}`;
+      s.pozvanky.unshift({ id: ++s.dalsiId, email, job_title: String(p.telo?.jobTitle || 'Barista'), status: 'pending', token, created_at: new Date().toISOString(), role: p.telo?.role === 'employer' ? 'employer' : 'employee' });
+      k.hlas('pozvanka-odeslana', { email });
+      return ok({ ok: true, token, emailSent: false, emailError: null });
+    }
+    if (metoda === 'DELETE') { s.pozvanky = s.pozvanky.filter(x => x.id !== Number(p.q.get('id'))); return ok(); }
+    return ok({ invitations: s.pozvanky });
+  }
 
   return undefined;
 };

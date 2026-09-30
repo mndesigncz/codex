@@ -19,30 +19,38 @@ Příklady: `/demo?scena=rozvrh&rezim=okno`, `/demo?scena=uzaverka&role=vedeni`.
 
 - `app/demo/{layout,page}.tsx`: veřejná trasa, `noindex`. Middleware ji nehlídá (jeho `matcher` zná jen `/api`, `/employer`, `/employee`, `/kiosk`, `/client`).
 - `next.config.js`: `/demo` má vlastní hlavičky (`X-Frame-Options: SAMEORIGIN`, `frame-ancestors 'self'`, zúžená CSP bez Stripe, `X-Robots-Tag`). Ostatní trasy zůstávají `DENY`. Obecné CSP má `frame-src 'self'`, aby prodejní stránka směla ukázku vložit.
-- `components/demo/DemoRoot.tsx`: kořen. Na úrovni modulu instaluje interceptor **před** prvním vykreslením; podle role namontuje rozhraní (bez `MigrationOnLoad` a `PosTick`), vynutí světlý motiv, řeší zprávy s rodičem.
+- `components/demo/DemoRoot.tsx`: kořen. Izolaci a interceptor instaluje **idempotentně před prvním vykreslením** (initializer `useState`, plus rychlá cesta na úrovni modulu při plném načtení a efekt); nezávisí na adrese při vyhodnocení modulu. Po klientské navigaci na `/demo` (Link, `router.push`) vynutí plné načtení (moduly a mezipaměti widgetů by nesly data skutečné aplikace), při odchodu klientskou navigací vše odinstaluje a načte cílovou stránku. Podle role namontuje rozhraní (bez `MigrationOnLoad` a `PosTick`), vynutí světlý motiv, řeší zprávy s rodičem.
 - `app/providers.tsx`: v ukázce nemontuje service worker ani push.
-- `lib/demo/mockApi.ts`: interceptor, směrování na handlery, `window.__demoReset`, `__demoStav()`, `__demoNezname`.
+- `lib/demo/mockApi.ts`: interceptor (instalace vrací funkci pro návrat), směrování na handlery, `window.__demoReset`, `__demoStav()`, `__demoNezname`, přenos stavu mezi rolemi přes `window.name`.
 - `lib/demo/routy/*.ts`: handlery po oblastech (`zaklad`, `lide`, `rozvrh`, `ukoly`, `uzaverky`, `sklad`, `komunikace`, `ostatni`, `finance`, `klient`) a `prazdne` (prázdný tvar pro neznámý endpoint).
 - `lib/demo/stav.ts`: stav v paměti a jeho výchozí data. Dny se počítají od dneška v Praze (`cas.ts`), žádné pevné datum.
 - `lib/demo/data/`: vymyšlený podnik „Kavárna U Lípy (ukázka)" (`lide.ts`), role a oprávnění (`role.json`, z fixtur sond), rozložení ploch (`rozlozeni.ts`).
-- `lib/demo/prostredi.ts`: úložiště jen v paměti (ukázka nesdílí `localStorage` s aplikací), zákaz vkládání cizích skriptů.
+- `lib/demo/prostredi.ts`: `localStorage`, `sessionStorage` **i `document.cookie`** jen v paměti (ukázka nesdílí úložiště ani cookies s aplikací; kiosk jinak píše skutečnou `managero-kiosk-acting`), zákaz vkládání cizích skriptů, potlačení dialogu `beforeunload`. Vše vratné.
 - `lib/demo/zpravy.ts`: `postMessage` s rodičem.
 
 ## Zprávy s rodičem (prodejní stránka)
 
 Všechny jen mezi stejnými původy (`event.origin` se ověřuje, ven se posílá na vlastní původ).
 
-Ven (z iframe): `{ typ: 'demo-pripraveno', scena, role, okno }` (aplikace se usadila),
+Ven (z iframe): `{ typ: 'demo-pripraveno', scena, role, okno }` (aplikace se usadila; posílá se po každé změně scény a na `demo-ping`),
 `{ typ: 'demo-akce', akce, detail }`. Akce: `ukol-odskrtnut`, `uzaverka-odemcena`,
 `uzaverka-odeslana`, `rozvrh-vygenerovan`, `rozvrh-ulozen`, `rozvrh-publikovan`,
 `sklad-upraveno`, `sklad-pridano`, `objednavka-odeslana`, `objednavka-prijata`,
 `hlaseni-skladu`, `oznameni-pridano`, `zprava-odeslana`, `prichod-zapsan`,
-`odchod-zapsan`, `ukol-pridan`, `navod-precten`, `uzaverka-schvalena`.
+`odchod-zapsan`, `ukol-pridan`, `navod-precten`, `uzaverka-schvalena`, `postup-spusten`,
+`postup-dokoncen`, `objednavka-hosta-prijata`, `pozvanka-odeslana`, `smena-ohodnocena`, `receptura-ulozena`.
 Události se navíc ukládají do `window.__demoUdalosti` (sondy, ladění).
 
 Dovnitř: `{ typ: 'demo-scena', scena, role? }` (stejná role = přepnutí bez načtení,
-jiná role = čisté načtení) a `{ typ: 'demo-reset' }` (nový stav a načtení stránky;
-mezipaměť dat widgetů žije v modulech, jinak by po resetu půl minuty ukazovala staré odpovědi).
+jiná role = načtení stránky, **stav ukázky jde s sebou** přes `window.name`, takže příběh
+„zaměstnanec odešle uzávěrku, vedení ji uvidí" drží), `{ typ: 'demo-reset' }` (nový stav a načtení
+stránky bez přenosu; mezipaměť dat widgetů žije v modulech, jinak by po resetu půl minuty ukazovala staré odpovědi)
+a `{ typ: 'demo-ping' }` (odpověď: znovu poslední `demo-pripraveno`).
+
+Kontrakt pro rodiče: iframe se načte obvykle dřív, než se rodič hydratuje, takže
+`demo-pripraveno` může přijít před jeho posluchačem. Rodič proto po připojení posluchače
+a po `iframe.onload` pošle `demo-ping` a **`demo-scena` posílá až po `demo-pripraveno`**
+(dřív poslaná zpráva by se ztratila).
 
 ## Jak přidat scénu
 
@@ -56,6 +64,9 @@ Nový endpoint: handler v příslušném souboru `routy/`, vrací `ok(...)` nebo
 ## Pravidla izolace
 
 - Na síť nesmí odejít žádné `/api/*`. Cizí původ `fetch` odmítne.
-- Žádné cookies, service worker, push, Stripe. `localStorage` a `sessionStorage` jen v paměti.
+- Žádné skutečné cookies, service worker, push, Stripe. `localStorage`, `sessionStorage` a `document.cookie` jen v paměti (sonda k74 D1 hlídá, že se skutečné úložiště nečte ani nezapisuje a že cookie `managero-kiosk-acting` skutečného tabletu přežije).
+- Instalace nezávisí na adrese a je vratná; klientská navigace na `/demo` a z něj vynutí plné načtení.
+- Odhlášení (`/api/auth/signout`) vrací adresu ukázky, ne skutečné `/login` (nerámovatelné, mimo ukázku).
+- Záložka Předplatné je skrytá (oprávnění `predplatne.zobrazit` v ukázce chybí): ukázka není prodej.
 - Vždy světlý motiv.
 - Vše v ukázce je vymyšlené a označené jako ukázka (název podniku nese „(ukázka)").

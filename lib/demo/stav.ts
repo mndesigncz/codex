@@ -8,6 +8,7 @@
 import { casDnes, dnes, dnyMesice, denVTydnu, mesic, posunDen } from './cas';
 import { LIDE, PRACUJICI, KDO_JSEM, clen } from './data/lide';
 import type { RoleDema } from './sceny';
+import { RECEPTURY_DEMA } from './data/menu';
 import type { PolozkaRozlozeni } from '@/lib/widgety/typy';
 
 export interface Smena {
@@ -49,8 +50,18 @@ export interface DostupnostDemo {
 }
 export interface ObjednavkaDemo {
   id: number; supplier: string; items: { name: string; qty: number; unit: string; itemId: number }[];
-  totalCost: number | null; status: 'ordered' | 'received'; note: string | null; createdAt: string; receivedAt: string | null; createdBy: number;
+  totalCost: number | null; status: 'ordered' | 'received' | 'cancelled'; note: string | null; createdAt: string; receivedAt: string | null; createdBy: number;
 }
+export interface BehPostupu {
+  id: number; procedureId: number; userId: number; checked: number[]; skipped: number[];
+  skipReasons: Record<string, unknown>; startedAt: string; completedAt: string | null; status: 'running' | 'completed';
+}
+export interface ObjednavkaHosta {
+  id: number; status: 'new' | 'confirmed' | 'done' | 'declined'; customerName: string; tableName: string | null;
+  items: { name: string; count: number; price: number }[]; total: number; createdAt: string; updatedAt: string;
+}
+export interface PozvankaDemo { id: number; email: string; job_title: string; status: 'pending'; token: string; created_at: string; role: 'employee' | 'employer' }
+export interface HodnoceniSmeny { employeeId: number; date: string; rating: number; note: string | null; points: number; flagged: boolean; createdAt: string }
 export interface ZpravaChatu { id: number; conversationId: number; userId: number; content: string; createdAt: string }
 
 export interface DemoStav {
@@ -80,6 +91,16 @@ export interface DemoStav {
   zaviraciPostupHotov: boolean;
   /** Přečtené povinné návody. */
   navodPrecten: boolean;
+  /** Objednávky hostů od stolu (příjem u obsluhy, widget na Přehledu a tabletu). */
+  objednavkyHostu: ObjednavkaHosta[];
+  /** Pozvánky do týmu odeslané v ukázce. */
+  pozvanky: PozvankaDemo[];
+  /** Hodnocení směn vedením (Odměny, widget Ohodnotit směny). */
+  hodnoceni: HodnoceniSmeny[];
+  /** Receptury: id produktu z kasy → suroviny skladu (množství na jeden prodej). */
+  receptury: Record<string, { itemId: number; amount: number }[]>;
+  /** Běhy postupů, které v ukázce někdo spustil (checklist v Runneru). */
+  behyPostupu: BehPostupu[];
   /** Sekvence pro nová id. */
   dalsiId: number;
   /** Oznámení vzniklá zápisem: chat, upozornění. */
@@ -100,6 +121,22 @@ const iso = (d: Date) => d.toISOString();
 const pred = (ms: number) => iso(new Date(Date.now() - ms));
 const MIN = 60_000;
 const HOD = 60 * MIN;
+
+/**
+ * Okamžik „před `ms`" v rozumné provozní době. Ukázku otevře návštěvník kdykoli
+ * a časy odvozené jen od „teď" by ve 3:50 dávaly zprávy z 02:05 pod hlavičkou
+ * DNES. Proto: ve dne (07:45–19:45) je to skutečně „před `ms`", ale nejdřív po
+ * otevření; v noci a brzo ráno se počítá od včerejšího večera, po zavíračce
+ * od dnešního.
+ */
+export function okamzik(ms: number, dnesDen: string = dnes()): string {
+  const ted = Date.now();
+  const otevreno = new Date(casDnes('07:45', dnesDen)).getTime();
+  const zavreno = new Date(casDnes('19:45', dnesDen)).getTime();
+  if (ted < otevreno) return iso(new Date(new Date(casDnes('19:30', posunDen(dnesDen, -1))).getTime() - ms));
+  if (ted > zavreno) return iso(new Date(zavreno - ms));
+  return iso(new Date(Math.max(ted - ms, otevreno)));
+}
 
 /** Typy směn: Ranní od otevření, Odpolední do zavření (generátor si časy dopočítá). */
 function typy(): TypSmenyDemo[] {
@@ -129,9 +166,15 @@ function smeny(dnesDen: string, t: TypSmenyDemo[], idOd: () => number): Smena[] 
     if (r === o) o = o === 6 ? 4 : 6;
     out.push({ id: idOd(), employeeId: r, date: d, startTime: rano.startTime, endTime: '14:00', type: rano.name });
     out.push({ id: idOd(), employeeId: o, date: d, startTime: '14:00', endTime: hod.close, type: odpo.name });
+    // Dnes péct chodí ráno i Petra: Přehled (Právě na směně, Dnešní směny) a
+    // docházka se řídí stejnými směnami a nikdo nemá příchod bez směny.
+    if (d === dnesDen && r !== 5 && o !== 5) out.push({ id: idOd(), employeeId: 5, date: d, startTime: rano.startTime, endTime: '14:00', type: rano.name });
   }
   return out;
 }
+
+/** Nikdy později než teď (splněný úkol nesmí být hotový v budoucnosti, když ukázku otevřou brzo ráno). */
+const nejdriv = (isoCas: string) => iso(new Date(Math.min(new Date(isoCas).getTime(), Date.now() - 5 * MIN)));
 
 function ukoly(dnesDen: string): UkolDemo[] {
   const zaklad = { description: null, createdBy: 1, priority: 'medium' as const, status: 'pending' as const, recurrence: null, seriesId: null, checklist: [], completedBy: null, completedAt: null, source: null, sourceMeta: null, requireBeforeClosing: false };
@@ -144,8 +187,8 @@ function ukoly(dnesDen: string): UkolDemo[] {
     { ...zaklad, id: 44, title: 'Vytřít podlahu v zázemí', assignedTo: null, dueDate: posunDen(dnesDen, -1) },
     { ...zaklad, id: 45, title: 'Zkontrolovat data trvanlivosti v lednici', assignedTo: 5, dueDate: posunDen(dnesDen, 1) },
     { ...zaklad, id: 46, title: 'Umýt výlohu a okna', assignedTo: 6, priority: 'low', dueDate: posunDen(dnesDen, 3) },
-    { ...zaklad, id: 47, title: 'Napéct ranní koláče', assignedTo: 5, dueDate: dnesDen, status: 'done', completedBy: 5, completedAt: casDnes('07:12', dnesDen) },
-    { ...zaklad, id: 48, title: 'Spočítat kasu při otevření', assignedTo: null, dueDate: dnesDen, status: 'done', completedBy: 2, completedAt: casDnes('07:38', dnesDen) },
+    { ...zaklad, id: 47, title: 'Napéct ranní koláče', assignedTo: 5, dueDate: dnesDen, status: 'done', completedBy: 5, completedAt: nejdriv(casDnes('07:12', dnesDen)) },
+    { ...zaklad, id: 48, title: 'Spočítat kasu při otevření', assignedTo: null, dueDate: dnesDen, status: 'done', completedBy: 2, completedAt: nejdriv(casDnes('07:38', dnesDen)) },
   ];
 }
 
@@ -173,7 +216,8 @@ function uzaverky(dnesDen: string, sm: Smena[], idOd: () => number): UzaverkaDem
       id: idOd(), created_by: odpo.employeeId, date: den, shift_date: den, shift_label: `${OTEVIRACI_DOBA[String((denVTydnu(den) + 6) % 7)].open}–${odpo.endTime}`,
       opening_cash: otevreni, cash_revenue: hot, card_revenue: kar, tips: sp, tips_card: 0,
       expenses: 0, cash_removed: hot - 1000, self_payout: 0, closing_cash: otevreni + hot + sp - (hot - 1000), customers: Math.round(kolik / 190), notes: pred === 3 ? 'Plná zahrádka, došly croissanty už v poledne.' : null,
-      approved: pred > 1, movements: [], denominations: {},
+      // Skutečná routa schvaluje sama uzávěrku se směnou; čeká jen ta bez směny (v ukázce žádná není).
+      approved: true, movements: [], denominations: {},
       shiftEmployees: rano && rano.employeeId !== odpo.employeeId ? [odpo.employeeId, rano.employeeId] : [odpo.employeeId],
       final_removal: 0, created_at: casDnes('20:15', den),
       // Předávka dne: to, co nastupující směna čte ráno na tabletu i na Přehledu.
@@ -192,7 +236,7 @@ function sklad(dnesDen: string): { kategorie: KategorieSkladu[]; zasoby: Zasoba[
     { id: 5, name: 'Nealko', position: 4, parentId: null },
     { id: 6, name: 'Provoz a drogerie', position: 5, parentId: null },
   ];
-  const kdy = casDnes('07:05', dnesDen);
+  const kdy = okamzik(3 * HOD, dnesDen);
   // [id, název, kat, množství, jednotka, min, kritické, max, dodavatel, cena]
   const r: [number, string, number, number, string, number, number, number, string, number][] = [
     [1, 'Espresso zrna „Domácí směs"', 1, 3, 'kg', 4, 2, 15, 'Pražírna Pod Věží', 620],
@@ -221,24 +265,31 @@ function sklad(dnesDen: string): { kategorie: KategorieSkladu[]; zasoby: Zasoba[
   };
 }
 
-function oznameni(): OznameniDemo[] {
+function oznameni(dnesDen: string): OznameniDemo[] {
+  // Pevné odpolední hodiny včera a před třemi dny: „před 26 h" od teď by v noci
+  // dalo oznámení napsané ve 02:35.
   return [
-    { id: 1, content: 'V pátek zavíráme už v 18:00 kvůli soukromé oslavě. Kdo chce navíc směnu, ať napíše Martě.', pinned: true, createdAt: pred(26 * HOD), authorId: 1 },
-    { id: 2, content: 'Od pondělí máme nového dodavatele koláčů, ceník najdete ve Skladu. Zkuste všechny druhy, ať víme, co doporučovat hostům.', pinned: true, createdAt: pred(3 * 24 * HOD), authorId: 1 },
+    { id: 1, content: 'V pátek zavíráme už v 18:00 kvůli soukromé oslavě. Kdo chce navíc směnu, ať napíše Martě.', pinned: true, createdAt: casDnes('16:20', posunDen(dnesDen, -1)), authorId: 1 },
+    { id: 2, content: 'Od pondělí máme nového dodavatele koláčů, ceník najdete ve Skladu. Zkuste všechny druhy, ať víme, co doporučovat hostům.', pinned: true, createdAt: casDnes('09:35', posunDen(dnesDen, -3)), authorId: 1 },
   ];
 }
 
-function pichacky(dnesDen: string, idOd: () => number): PricitanaPichacka[] {
-  // Příchody se počítají od „teď", ne od pevné hodiny: kdo ukázku otevře
-  // v jakoukoli dobu, vidí, že Tomáš je na směně už pár hodin a Eliška teprve přišla.
-  // Nejdřív po dnešní půlnoci: noční návštěvník by jinak viděl příchod „včera 23:14".
-  const odPulnoci = new Date(casDnes('00:05', dnesDen)).getTime();
-  const pozdeji = (ms: number) => iso(new Date(Math.max(Date.now() - ms, odPulnoci)));
-  const out: PricitanaPichacka[] = [
-    { id: idOd(), employeeId: 2, clockIn: pozdeji(3 * HOD + 14 * MIN), clockOut: null, source: 'kiosk', note: null },
-    { id: idOd(), employeeId: 5, clockIn: pozdeji(4 * HOD + 2 * MIN), clockOut: null, source: 'kiosk', note: null },
-    { id: idOd(), employeeId: 3, clockIn: pozdeji(52 * MIN), clockOut: null, source: 'app', note: null },
-  ];
+function pichacky(dnesDen: string, sm: Smena[], idOd: () => number): PricitanaPichacka[] {
+  // Příchod a odchod se odvozují ze SMĚN dneška (příchod = začátek směny plus pár
+  // minut, odchod až po jejím konci). Dřív šly od „teď": ve 21:30 pak měla Eliška
+  // (směna do 20:00) příchod 20:38 a Petra příchod bez směny. Kdo ukázku otevře
+  // před začátkem směny, ten člověk prostě ještě nepřišel.
+  const out: PricitanaPichacka[] = [];
+  const ted = Date.now();
+  for (const x of sm.filter(y => y.date === dnesDen)) {
+    const prichod = new Date(casDnes(x.startTime, dnesDen)).getTime() + ((x.employeeId * 3) % 7 + 1) * MIN;
+    if (prichod > ted) continue;
+    // Ranní směna odchází po svém konci. Odpolední zavírá a odchází až po uzávěrce
+    // (do půlnoci je tedy „na směně" od svého příchodu, i když ukázku někdo otevře
+    // ve 21:30): jinak by tablet a Přehled mezi 20:15 a 7:35 nikoho nedrželi.
+    const odchod = x.endTime <= '15:00' ? new Date(casDnes(x.endTime, dnesDen)).getTime() + (10 + x.employeeId) * MIN : Infinity;
+    out.push({ id: idOd(), employeeId: x.employeeId, clockIn: iso(new Date(prichod)), clockOut: odchod <= ted ? iso(new Date(odchod)) : null, source: x.employeeId === 3 ? 'app' : 'kiosk', note: null });
+  }
   // Historie minulých dnů (pro Docházku a odpracované hodiny).
   const hist: [number, number, string, string][] = [
     [1, 2, '07:24', '14:08'], [1, 3, '13:55', '20:10'], [2, 3, '07:28', '14:03'], [2, 4, '13:58', '20:05'],
@@ -286,25 +337,25 @@ export function vytvorStav(role: RoleDema): DemoStav {
     kategorie: s.kategorie,
     zasoby: s.zasoby,
     pohybySkladu: [
-      { id: idOd(), itemId: 3, oldQuantity: 14, newQuantity: 6, note: 'Spotřeba za den', createdAt: pred(5 * HOD), userId: 2 },
-      { id: idOd(), itemId: 9, oldQuantity: 24, newQuantity: 14, note: 'Ranní dodávka pečiva', createdAt: pred(4 * HOD), userId: 5 },
-      { id: idOd(), itemId: 1, oldQuantity: 5, newQuantity: 3, note: null, createdAt: pred(2 * HOD), userId: 3 },
+      { id: idOd(), itemId: 3, oldQuantity: 14, newQuantity: 6, note: 'Spotřeba za den', createdAt: okamzik(5 * HOD), userId: 2 },
+      { id: idOd(), itemId: 9, oldQuantity: 24, newQuantity: 14, note: 'Ranní dodávka pečiva', createdAt: okamzik(4 * HOD), userId: 5 },
+      { id: idOd(), itemId: 1, oldQuantity: 5, newQuantity: 3, note: null, createdAt: okamzik(2 * HOD), userId: 3 },
     ],
-    oznameni: oznameni(),
-    pichacky: pichacky(d, idOd),
+    oznameni: oznameni(d),
+    pichacky: pichacky(d, sm, idOd),
     volno: [
       { id: idOd(), employeeId: 6, fromDate: posunDen(d, 9), toDate: posunDen(d, 11), type: 'vacation', note: 'Svatba v rodině', status: 'pending', createdAt: pred(20 * HOD) },
       { id: idOd(), employeeId: 4, fromDate: posunDen(d, 4), toDate: posunDen(d, 4), type: 'other', note: 'Zkouška ve škole', status: 'approved', createdAt: pred(4 * 24 * HOD) },
     ],
     nabidky: [],
     zpravy: [
-      { id: idOd(), conversationId: 1, userId: 3, content: 'Dneska nám došel karamel, objednala jsem, ať to není na víkend problém.', createdAt: pred(2 * HOD) },
-      { id: idOd(), conversationId: 1, userId: 2, content: 'Super, díky. Kdo může v sobotu vzít odpolední navíc?', createdAt: pred(95 * MIN) },
-      { id: idOd(), conversationId: 1, userId: 6, content: 'Já můžu, mám volno.', createdAt: pred(40 * MIN) },
+      { id: idOd(), conversationId: 1, userId: 3, content: 'Dneska nám došel karamel, objednala jsem, ať to není na víkend problém.', createdAt: okamzik(2 * HOD) },
+      { id: idOd(), conversationId: 1, userId: 2, content: 'Super, díky. Kdo může v sobotu vzít odpolední navíc?', createdAt: okamzik(95 * MIN) },
+      { id: idOd(), conversationId: 1, userId: 6, content: 'Já můžu, mám volno.', createdAt: okamzik(40 * MIN) },
     ],
     dostupnost: dostupnost(d, idOd),
     hlaseniSkladu: [
-      { id: idOd(), items: [{ id: 7, name: 'Sirup karamel' }, { id: 5, name: 'Šlehačka 33 %' }], note: 'Karamel je na dně, šlehačka vydrží do večera.', status: 'new', authorId: 3, createdAt: pred(2 * HOD) },
+      { id: idOd(), items: [{ id: 7, name: 'Sirup karamel' }, { id: 5, name: 'Šlehačka 33 %' }], note: 'Karamel je na dně, šlehačka vydrží do večera.', status: 'new', authorId: 3, createdAt: okamzik(2 * HOD) },
     ],
     objednavky: [
       { id: idOd(), supplier: 'Pražírna Pod Věží', items: [{ name: 'Espresso zrna „Domácí směs"', qty: 10, unit: 'kg', itemId: 1 }], totalCost: 6200, status: 'ordered', note: 'Dodání ve čtvrtek dopoledne.', createdAt: pred(28 * HOD), receivedAt: null, createdBy: 1 },
@@ -313,9 +364,16 @@ export function vytvorStav(role: RoleDema): DemoStav {
     precteno: new Set(),
     zaviraciPostupHotov: true,
     navodPrecten: true,
+    behyPostupu: [],
+    objednavkyHostu: [
+      { id: 71, status: 'new', customerName: 'Jana D.', tableName: 'U okna', items: [{ name: 'Flat white', count: 2, price: 79 }, { name: 'Croissant máslový', count: 1, price: 49 }], total: 207, createdAt: okamzik(4 * MIN), updatedAt: okamzik(4 * MIN) },
+    ],
+    pozvanky: [],
+    hodnoceni: [],
+    receptury: Object.fromEntries(Object.entries(RECEPTURY_DEMA).map(([k, v]) => [k, v.map(x => ({ ...x }))])),
     dalsiId: id,
     notifikace: [
-      { id: 1, title: 'Nový úkol', body: 'Doplnit sirupy u baru', type: 'info', link: null, is_read: false, created_at: pred(3 * HOD) },
+      { id: 1, title: 'Nový úkol', body: 'Doplnit sirupy u baru', type: 'info', link: null, is_read: false, created_at: okamzik(3 * HOD) },
     ],
   };
   return stav;
