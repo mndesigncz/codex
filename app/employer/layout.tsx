@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
+import { Slovniky } from '@/lib/i18n/server';
 
 // Přihlášená část: nic z ní nemá být ve vyhledávači.
 export const metadata: Metadata = { robots: { index: false, follow: false } };
@@ -12,5 +13,5 @@ export default async function EmployerLayout({ children }: { children: React.Rea
   const role = (session.user as any)?.role;
   if (role !== 'employer') redirect('/employee/shifts');
 
-  return <>{children}</>;
+  return <><Slovniky sekce={['rozvrh', 'sklad']} />{children}</>;
 }

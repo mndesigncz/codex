@@ -11,6 +11,10 @@
 // Po odeslání se obnoví widget „Moje volno" (stejná data přes /api/timeoff?mine=1).
 
 import { useCallback, useEffect, useState } from 'react';
+import { useJazyk, useT } from '@/lib/i18n/client';
+import { fmtDatum } from '@/lib/i18n/format';
+import type { PrekladFn } from '@/lib/i18n/client';
+import type { Jazyk } from '@/lib/i18n/config';
 
 import { Button, Card, Chip, EmptyState, Field, Input, ListRow, Segmented } from '../ui';
 import { useDraft } from '@/lib/useDraft';
@@ -32,46 +36,32 @@ interface TimeOffRequestItem {
   employeeAvatar?: string | null;
 }
 
-const TYPE_OPTIONS: { id: TimeOffType; label: string }[] = [
-  { id: 'vacation', label: 'Dovolená' },
-  { id: 'sick', label: 'Nemoc' },
-  { id: 'other', label: 'Jiné' },
-];
+const typeLabels = (t: PrekladFn): Record<TimeOffType, string> => ({
+  vacation: t('Dovolená'),
+  sick: t('Nemoc'),
+  other: t('Jiné'),
+});
 
-const TYPE_LABELS: Record<TimeOffType, string> = {
-  vacation: 'Dovolená',
-  sick: 'Nemoc',
-  other: 'Jiné',
-};
+const statusMeta = (t: PrekladFn): Record<TimeOffStatus, { label: string; tone: 'wait' | 'ok' | 'bad' }> => ({
+  pending: { label: t('Čeká'), tone: 'wait' },
+  approved: { label: t('Schváleno'), tone: 'ok' },
+  rejected: { label: t('Zamítnuto'), tone: 'bad' },
+});
 
-const STATUS_META: Record<TimeOffStatus, { label: string; tone: 'wait' | 'ok' | 'bad' }> = {
-  pending: { label: 'Čeká', tone: 'wait' },
-  approved: { label: 'Schváleno', tone: 'ok' },
-  rejected: { label: 'Zamítnuto', tone: 'bad' },
-};
-
-function parseDate(s: string): Date {
-  const [y, m, d] = s.split('-').map(Number);
-  return new Date(y, m - 1, d);
-}
-
-function formatFull(d: Date): string {
-  return d.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', year: 'numeric' });
-}
-
-function formatRange(fromDate: string, toDate: string): string {
-  const from = parseDate(fromDate);
-  const to = parseDate(toDate);
-  if (fromDate === toDate) return formatFull(from);
-  if (from.getFullYear() === to.getFullYear()) {
-    const fromShort = from.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' });
-    return `${fromShort} – ${formatFull(to)}`;
-  }
-  return `${formatFull(from)} – ${formatFull(to)}`;
+function formatRange(fromDate: string, toDate: string, jazyk: Jazyk): string {
+  // Řetězec RRRR-MM-DD je kalendářní den (fmtDatum na něj nepoužije časové pásmo).
+  const full = (s: string) => fmtDatum(s, { jazyk, styl: 'cislo' });
+  if (fromDate === toDate) return full(fromDate);
+  if (fromDate.slice(0, 4) === toDate.slice(0, 4)) return `${fmtDatum(fromDate, { jazyk, styl: 'kratce' })} – ${full(toDate)}`;
+  return `${full(fromDate)} – ${full(toDate)}`;
 }
 
 
 export default function TimeOffRequest() {
+  const t = useT('rozvrh');
+  const { jazyk } = useJazyk();
+  const TYPE_LABELS = typeLabels(t);
+  const STATUS_META = statusMeta(t);
   const [requests, setRequests] = useState<TimeOffRequestItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [fromDate, setFromDate] = useState('');
@@ -111,11 +101,11 @@ export default function TimeOffRequest() {
   const submit = async () => {
     setError(null);
     if (!fromDate || !toDate) {
-      setError('Vyplň datum od i do.');
+      setError(t('Vyplň datum od i do.'));
       return;
     }
     if (fromDate > toDate) {
-      setError('Datum „Od" nesmí být později než datum „Do".');
+      setError(t('Datum „Od" nesmí být později než datum „Do".'));
       return;
     }
     setSubmitting(true);
@@ -126,7 +116,7 @@ export default function TimeOffRequest() {
         body: JSON.stringify({ fromDate, toDate, type, note: note.trim() || null }),
       });
       if (!res.ok) {
-        setError('Žádost se nepodařilo odeslat. Zkus to prosím znovu.');
+        setError(t('Žádost se nepodařilo odeslat. Zkus to prosím znovu.'));
         return;
       }
       koncept.hotovo();
@@ -137,7 +127,7 @@ export default function TimeOffRequest() {
       await load();
       obnovWidget();
     } catch {
-      setError('Žádost se nepodařilo odeslat. Zkus to prosím znovu.');
+      setError(t('Žádost se nepodařilo odeslat. Zkus to prosím znovu.'));
     } finally {
       setSubmitting(false);
     }
@@ -153,60 +143,60 @@ export default function TimeOffRequest() {
       obnovWidget();
     } catch {
       setRequests(prev);
-      setError('Žádost se nepodařilo zrušit — zkus to znovu.');
+      setError(t('Žádost se nepodařilo zrušit — zkus to znovu.'));
     }
   };
 
   return (
     <Card as="section" aria-labelledby="volno-nadpis" className="space-y-4">
       <div>
-        <h2 id="volno-nadpis" className="t-section">Dovolená a volno</h2>
-        <p className="t-meta mt-0.5">Požádej o volno — vedoucí dostane upozornění a žádost schválí.</p>
+        <h2 id="volno-nadpis" className="t-section">{t('Dovolená a volno')}</h2>
+        <p className="t-meta mt-0.5">{t('Požádej o volno — vedoucí dostane upozornění a žádost schválí.')}</p>
       </div>
 
       <div className="space-y-3">
         <DraftNote koncept={koncept} co="rozepsanou žádost" />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Field id="volno-od" label="Od">
+          <Field id="volno-od" label={t('Od')}>
             <Input id="volno-od" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="appearance-none min-w-0" />
           </Field>
-          <Field id="volno-do" label="Do">
+          <Field id="volno-do" label={t('Do')}>
             <Input id="volno-do" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="appearance-none min-w-0" />
           </Field>
         </div>
 
-        <Segmented ariaLabel="Typ volna" value={type} onChange={(v) => setType(v as TimeOffType)}
-          options={TYPE_OPTIONS.map(t => ({ id: t.id, label: t.label }))} />
+        <Segmented ariaLabel={t('Typ volna')} value={type} onChange={(v) => setType(v as TimeOffType)}
+          options={(['vacation', 'sick', 'other'] as TimeOffType[]).map(id => ({ id, label: TYPE_LABELS[id] }))} />
 
-        <Field id="volno-poznamka" label="Poznámka" hint="Nepovinné — třeba zkouška nebo svatba.">
+        <Field id="volno-poznamka" label={t('Poznámka')} hint={t('Nepovinné — třeba zkouška nebo svatba.')}>
           <Input id="volno-poznamka" type="text" value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} />
         </Field>
 
         {error && <p className="note note-danger text-sm" role="alert">{error}</p>}
 
-        <Button variant="primary" icon="send" block loading={submitting} onClick={submit}>Odeslat žádost</Button>
+        <Button variant="primary" icon="send" block loading={submitting} onClick={submit}>{t('Odeslat žádost')}</Button>
       </div>
 
       <div className="pt-3 border-t border-black/[0.06]">
-        <h3 className="t-card">Moje žádosti</h3>
+        <h3 className="t-card">{t('Moje žádosti')}</h3>
         {loading ? (
-          <p className="t-meta mt-2">Načítám…</p>
+          <p className="t-meta mt-2">{t('Načítám…')}</p>
         ) : loadErr ? (
           <p className="note note-danger text-sm mt-2 flex flex-wrap items-center justify-between gap-2" role="alert">
-            <span>Žádosti se nenačetly.</span>
-            <Button variant="secondary" size="sm" onClick={() => { setLoading(true); load(); }}>Zkusit znovu</Button>
+            <span>{t('Žádosti se nenačetly.')}</span>
+            <Button variant="secondary" size="sm" onClick={() => { setLoading(true); load(); }}>{t('Zkusit znovu')}</Button>
           </p>
         ) : requests.length === 0 ? (
-          <EmptyState illustration="volno" title="Zatím žádná žádost o volno" hint="Dovolená, doktor, zkoušky — napiš termín a vedení to uvidí v rozvrhu." compact />
+          <EmptyState illustration="volno" title={t('Zatím žádná žádost o volno')} hint={t('Dovolená, doktor, zkoušky — napiš termín a vedení to uvidí v rozvrhu.')} compact />
         ) : (
           <ul className="list">
             {requests.map((r) => (
               <ListRow key={r.id}
-                title={<span className="tabular-nums">{formatRange(r.fromDate, r.toDate)}</span>}
+                title={<span className="tabular-nums">{formatRange(r.fromDate, r.toDate, jazyk)}</span>}
                 meta={TYPE_LABELS[r.type]}
                 right={<Chip tone={STATUS_META[r.status].tone} size="sm">{STATUS_META[r.status].label}</Chip>}
                 actions={r.status === 'pending'
-                  ? <Button variant="ghost" size="sm" onClick={() => cancelRequest(r.id)}>Zrušit</Button>
+                  ? <Button variant="ghost" size="sm" onClick={() => cancelRequest(r.id)}>{t('Zrušit')}</Button>
                   : undefined}
               />
             ))}

@@ -9,6 +9,7 @@
 // sám — bez toho by člověk úkol splnil a zámek by svítil dál až do obnovení.
 
 import { Chip } from './ui';
+import { useT } from '@/lib/i18n/client';
 import { obnovDataWidgetu } from './widgety/useDataWidgetu';
 
 /** Adresa zámku uzávěrky (app/api/closings/povinne/route.ts). */
@@ -29,9 +30,10 @@ export function oznamZmenuPovinnych(): void {
 
 /** Štítek s zámkem u úkolu nebo návodu, bez kterého nejde odeslat uzávěrka. */
 export function ChipPredUzaverkou({ className = '' }: { className?: string }) {
+  const t = useT('rozvrh');
   return (
-    <span title="Dokud to nebude hotové, uzávěrka dne zůstane zamčená." className={`inline-flex ${className}`}>
-      <Chip tone="ink" size="sm" icon="lock">Před uzávěrkou</Chip>
+    <span title={t('Dokud to nebude hotové, uzávěrka dne zůstane zamčená.')} className={`inline-flex ${className}`}>
+      <Chip tone="ink" size="sm" icon="lock">{t('Před uzávěrkou')}</Chip>
     </span>
   );
 }

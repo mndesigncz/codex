@@ -14,7 +14,10 @@
 // jinak by na stránce byl dvakrát. Integrace kola 69 řádek z layoutu smaže.
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { zkratkyDnu, zacatekTydne } from '@/lib/week';
+import { zacatekTydne } from '@/lib/week';
+import { zkratkyDnuJazyk } from '@/lib/weekJazyk';
+import { useJazyk, useT } from '@/lib/i18n/client';
+import { fmtDatum } from '@/lib/i18n/format';
 import { Icon } from '../Icons';
 import { Avatar, Card, ErrorState, MonthNav, Skeleton, Well } from '../ui';
 import { useCurrency } from '../CurrencyProvider';
@@ -34,6 +37,8 @@ export default function ShiftCalendar({ scope, initialMonth }: { scope?: 'me'; i
 }
 
 function KalendarSmen({ initialMonth }: { initialMonth?: string }) {
+  const t = useT('rozvrh');
+  const { jazyk } = useJazyk();
   const { weekStart } = useCurrency();
   const [month, setMonth] = useState(initialMonth ?? pragueToday().slice(0, 7));
   const [days, setDays] = useState<Days>({});
@@ -51,14 +56,14 @@ function KalendarSmen({ initialMonth }: { initialMonth?: string }) {
       if (req !== reqRef.current) return;
       setDays(d.days && typeof d.days === 'object' ? d.days : {});
     } catch (e) {
-      if (req === reqRef.current) { setDays({}); setChyba(apiMessage(e, 'Kalendář se nenačetl.')); }
+      if (req === reqRef.current) { setDays({}); setChyba(apiMessage(e, t('Kalendář se nenačetl.'))); }
     }
     if (req === reqRef.current) setLoading(false);
-  }, [month]);
+  }, [month, t]);
   useEffect(() => { load(); }, [load]);
 
   const [y, m] = month.split('-').map(Number);
-  const wd = zkratkyDnu(zacatekTydne(weekStart));
+  const wd = zkratkyDnuJazyk(zacatekTydne(weekStart), jazyk);
   const firstDow = new Date(y, m - 1, 1).getDay();            // 0 = neděle … 6 = sobota
   const lead = (firstDow - weekStart + 7) % 7;
   const daysInMonth = new Date(y, m, 0).getDate();
@@ -77,16 +82,16 @@ function KalendarSmen({ initialMonth }: { initialMonth?: string }) {
         <MonthNav value={month} onChange={v => { setSel(null); setMonth(v); }} />
         {/* Legenda: stav nese tón (ok / bad), ne limetka — limetka bez záře by byla „stav" jen napůl. */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 t-meta">
-          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-ok" /> Uzávěrka hotová</span>
-          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-bad" /> Chybí uzávěrka</span>
-          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-black/20" /> Směna</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-ok" /> {t('Uzávěrka hotová')}</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-bad" /> {t('Chybí uzávěrka')}</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-black/20" /> {t('Směna')}</span>
         </div>
       </div>
 
       {loading ? (
         <Skeleton className="h-56" />
       ) : chyba ? (
-        <ErrorState compact title="Kalendář se nenačetl" onRetry={load} detail={chyba} />
+        <ErrorState compact title={t('Kalendář se nenačetl')} onRetry={load} detail={chyba} />
       ) : (
         <>
           <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
@@ -111,7 +116,7 @@ function KalendarSmen({ initialMonth }: { initialMonth?: string }) {
                   aria-pressed={day ? active : undefined}
                   // Jména lidí na směně patří do popisku tlačítka: v buňce jsou jen avatary
                   // a title odečítač ani dotyk nepřečte.
-                  aria-label={`${dnum}.${day?.missing ? ' — chybí uzávěrka' : day?.hasClosing ? ' — uzávěrka hotová' : ''}${day && day.onShift.length > 0 ? ` — na směně ${day.onShift.map(p => p.name).join(', ')}` : ''}`}
+                  aria-label={[`${dnum}.`, day?.missing ? t('chybí uzávěrka') : day?.hasClosing ? t('uzávěrka hotová') : '', day && day.onShift.length > 0 ? t('na směně {jmena}', { jmena: day.onShift.map(p => p.name).join(', ') }) : ''].filter(Boolean).join(' — ')}
                   className={`tap-target-sm aspect-square rounded-xl border p-1 flex flex-col items-center justify-start gap-0.5 transition-colors ${tone} ${active ? 'ring-2 ring-black/40 dark:ring-white/50' : ''} ${day ? 'cursor-pointer hover:border-black/20' : 'cursor-default'}`}>
                   <span className={`text-[11px] font-semibold leading-none mt-0.5 ${isToday ? 'text-[#16181A] underline underline-offset-2' : 'text-black/55'}`}>{dnum}</span>
                   {day && day.onShift.length > 0 && (
@@ -133,12 +138,12 @@ function KalendarSmen({ initialMonth }: { initialMonth?: string }) {
           {detail && sel && (
             <Well className="mt-4 space-y-3">
               <h3 className="t-card cz-sentence">
-                {new Date(sel + 'T12:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
+                {fmtDatum(sel, { jazyk, styl: 'denDlouze' })}
               </h3>
               <div>
-                <p className="t-label mb-1.5">Na směně</p>
+                <p className="t-label mb-1.5">{t('Na směně')}</p>
                 {detail.onShift.length === 0 ? (
-                  <p className="t-meta">Nikdo neměl směnu.</p>
+                  <p className="t-meta">{t('Nikdo neměl směnu.')}</p>
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
                     {detail.onShift.map(p => (
@@ -152,9 +157,9 @@ function KalendarSmen({ initialMonth }: { initialMonth?: string }) {
                 )}
               </div>
               <div>
-                <p className="t-label mb-1.5">Uzávěrku udělal</p>
+                <p className="t-label mb-1.5">{t('Uzávěrku udělal')}</p>
                 {detail.closedBy.length === 0 ? (
-                  <p className={detail.missing ? 'text-sm text-bad-ink font-medium' : 't-meta'}>{detail.missing ? 'Nikdo — uzávěrka chybí.' : 'Zatím nikdo.'}</p>
+                  <p className={detail.missing ? 'text-sm text-bad-ink font-medium' : 't-meta'}>{detail.missing ? t('Nikdo — uzávěrka chybí.') : t('Zatím nikdo.')}</p>
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
                     {detail.closedBy.map(p => (
