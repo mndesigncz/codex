@@ -386,7 +386,7 @@ function ReserveTab({ slug, b, me, today, signedIn, onDone }: { slug: string; b:
                     <span className={`inline-block mt-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${st.tone === 'ok' ? 'bg-[#C8F542]/25 text-[#3E5406]' : st.tone === 'wait' ? 'bg-wait/15 text-wait-ink' : 'bg-black/[0.06] text-black/60'}`}>{t(st.label)}</span>
                   </div>
                   {['requested', 'confirmed'].includes(r.status) && (
-                    <button onClick={() => setZrusitId(r.id)} className="tap-target-sm text-xs text-black/55 hover:text-bad-ink transition shrink-0">{t('Zrušit')}</button>
+                    <button onClick={() => setZrusitId(r.id)} className="tap-target-sm text-xs text-black/55 hover:text-bad-ink transition shrink-0">{t('Zrušit', undefined, 'rezervace')}</button>
                   )}
                 </li>
               );

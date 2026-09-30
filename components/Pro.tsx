@@ -3,14 +3,15 @@
 // Freemium building blocks: know the team's plan, badge Pro features, and
 // lock them kindly — the locked state SELLS the feature, it never hides it.
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { planInfoOf, isPro, isMax, PRO_PRICE, PRICES, PLAN_NAMES, priceLabel, MAX_EXTRAS, type PlanInfo } from '@/lib/plan';
-import { slibZamku } from '@/lib/predplatneTexty';
+import { planInfoOf, isPro, isMax, PRO_PRICE, PRICES, PLAN_NAMES, MAX_EXTRAS, TRIAL_DAYS, type PlanInfo } from '@/lib/plan';
+import { druhSlibuZamku } from '@/lib/predplatneTexty';
 import { Icon } from './Icons';
 import { Modal, Button } from './ui';
 import { useObal } from './ObalProvider';
 import { useT } from '@/lib/i18n/client';
+import { tg } from '@/lib/i18n/stav';
 
 // Pokladna se stahuje, až když má vyskočit — zamčená funkce ji většinou
 // nikdy nepotřebuje.
@@ -72,6 +73,9 @@ export function usePlan(): { plan: PlanInfo | null; pro: boolean; max: boolean; 
  * místo nabídky.
  */
 export function OdemknoutButton({ plan, className = '' }: { plan: 'pro' | 'max'; className?: string }) {
+  const t = useT('spolecne');
+  const tRef = useRef(t);
+  tRef.current = t;
   const { plan: info } = usePlan();
   // V nativní aplikaci se nic neodemyká ani nekupuje (Apple 3.1.1, Google Play Billing).
   const { smiPlatby } = useObal();
@@ -86,15 +90,16 @@ export function OdemknoutButton({ plan, className = '' }: { plan: 'pro' | 'max';
 
   const prejit = async () => {
     setPrechod('bezi'); setChyba('');
+    const t = tRef.current;
     try {
       const r = await fetch('/api/billing/upgrade', { method: 'POST' });
       const d = await r.json().catch(() => ({}));
       // Bez téhle kontroly by se oslavilo i to, co server odmítl.
-      if (!r.ok) throw new Error(d?.error || 'Přechod se nepodařil.');
+      if (!r.ok) throw new Error(d?.error ? tg(d.error) : t('Přechod se nepodařil.'));
       setPrechod('hotovo');
       window.location.reload();
     } catch (e: any) {
-      setChyba(String(e?.message ?? 'Přechod se nepodařil.'));
+      setChyba(String(e?.message ?? t('Přechod se nepodařil.')));
       setPrechod('ne');
     }
   };
@@ -110,8 +115,8 @@ export function OdemknoutButton({ plan, className = '' }: { plan: 'pro' | 'max';
         className={className}
       >
         {zmenaTarifu
-          ? `Přejít na ${PLAN_NAMES[plan]}${info?.maxOfferUntil ? ' −30 %' : ''}`
-          : `Odemknout ${PLAN_NAMES[plan]}`}
+          ? (info?.maxOfferUntil ? t('Přejít na {plan} −30 %', { plan: PLAN_NAMES[plan] }) : t('Přejít na {plan}', { plan: PLAN_NAMES[plan] }))
+          : t('Odemknout {plan}', { plan: PLAN_NAMES[plan] })}
       </Button>
       {chyba && <p className="text-bad-ink text-xs mt-2">{chyba}</p>}
       {pokladna && (
@@ -134,7 +139,7 @@ export function OdemknoutButton({ plan, className = '' }: { plan: 'pro' | 'max';
  * k nákupu mimo nákup v aplikaci).
  */
 export function Zamceno({ feature, className = '' }: { feature: string; className?: string }) {
-  const t = useT();
+  const t = useT('spolecne');
   return (
     <div className={`p-4 sm:p-6 max-w-xl mx-auto ${className}`}>
       <div className="card p-8 text-center space-y-3">
@@ -160,7 +165,7 @@ export function MaxBadge({ className = '' }: { className?: string }) {
 export function MaxGate({ feature, children, benefit, employer = true }: {
   feature: string; benefit?: string; employer?: boolean; children: React.ReactNode;
 }) {
-  const t = useT();
+  const t = useT('spolecne');
   const { max } = usePlan();
   const { smiPlatby } = useObal();
   if (max) return <>{children}</>;
@@ -175,14 +180,14 @@ export function MaxGate({ feature, children, benefit, employer = true }: {
         </div>
         <p className="text-sm text-black/55">{benefit ?? t('Tahle funkce patří do plánu Max.')}</p>
         <ul className="text-left text-sm text-black/60 space-y-1 max-w-xs mx-auto">
-          {MAX_EXTRAS.map(x => <li key={x} className="flex items-start gap-2"><Icon name="check" size={15} className="text-[#0A5CC0] shrink-0 mt-0.5" />{x}</li>)}
+          {MAX_EXTRAS.map(x => <li key={x} className="flex items-start gap-2"><Icon name="check" size={15} className="text-[#0A5CC0] shrink-0 mt-0.5" />{t(x)}</li>)}
         </ul>
         {employer ? (
           <div className="flex justify-center"><OdemknoutButton plan="max" /></div>
         ) : (
           <p className="text-xs text-black/40">{t('Řekni vedení — Max se zapíná v Nastavení → Předplatné.')}</p>
         )}
-        <p className="text-[11px] text-black/35">{t('Max stojí {cena} Kč měsíčně za podnik.', { cena: PRICES.max.month })}</p>
+        <p className="text-[11px] text-black/35">{t('Max stojí {cena} {mena} měsíčně za podnik.', { cena: PRICES.max.month })}</p>
       </div>
     </div>
   );
@@ -206,7 +211,7 @@ export function ProGate({ feature, children, benefit, employer = true }: {
   employer?: boolean;
   children: React.ReactNode;
 }) {
-  const t = useT();
+  const t = useT('spolecne');
   const { pro } = usePlan();
   const { smiPlatby } = useObal();
   if (pro) return <>{children}</>;
@@ -235,12 +240,17 @@ export function ProGate({ feature, children, benefit, employer = true }: {
 
 /** Okno pro zamčenou akci v řádku (třeba Export CSV na tarifu Zdarma). */
 export function UpgradeModal({ feature, plan = 'pro', onClose }: { feature: string; plan?: 'pro' | 'max'; onClose: () => void }) {
+  const t = useT('spolecne');
   const { plan: info, loaded } = usePlan();
   const { smiPlatby } = useObal();
+  // Slib podle druhu z lib/predplatneTexty (ne podle porovnání české věty): věty jsou ve slovníku, počet dní se doplní.
+  const slib = (druh: ReturnType<typeof druhSlibuZamku>) => (druh === 'nenacteno' ? t('Zrušit jde kdykoliv.')
+    : druh === 'jizMel' ? t('Karta se strhne hned, zrušit jde kdykoliv — platí se do konce zaplaceného období.')
+      : t('{n} dní zdarma, zrušit jde kdykoliv.', { n: TRIAL_DAYS }));
   if (!smiPlatby) {
     return (
-      <Modal open onClose={onClose} size="sm" title={feature} footer={<Button variant="secondary" onClick={onClose}>Zavřít</Button>}>
-        <p className="text-sm text-black/55 text-center">Tuhle funkci tarif vašeho podniku nezahrnuje.</p>
+      <Modal open onClose={onClose} size="sm" title={feature} footer={<Button variant="secondary" onClick={onClose}>{t('Zavřít')}</Button>}>
+        <p className="text-sm text-black/55 text-center">{t('Tuhle funkci tarif vašeho podniku nezahrnuje.')}</p>
       </Modal>
     );
   }
@@ -248,15 +258,15 @@ export function UpgradeModal({ feature, plan = 'pro', onClose }: { feature: stri
     <Modal open onClose={onClose} size="sm"
       title={<span className="flex items-center gap-2">{feature} {plan === 'max' ? <MaxBadge /> : <ProBadge />}</span>}
       footer={<>
-        <Button variant="secondary" onClick={onClose}>Zavřít</Button>
+        <Button variant="secondary" onClick={onClose}>{t('Zavřít')}</Button>
         <OdemknoutButton plan={plan} />
       </>}>
       <div className="text-center space-y-3">
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#C8F542]/15 text-[#5B7A08]"><Icon name="lock" size={20} /></div>
-        <p className="text-sm text-black/55">Tuhle funkci odemyká plán {PLAN_NAMES[plan]} ({priceLabel(plan, 'month')}).</p>
+        <p className="text-sm text-black/55">{t('Tuhle funkci odemyká plán {plan} ({cena}).', { plan: PLAN_NAMES[plan], cena: t('{castka} Kč měsíčně', { castka: PRICES[plan].month }) })}</p>
         {/* Zkouška zdarma je jen pro podnik, který předplatné ještě neměl —
             jinak by okno slibovalo 30 dní a pokladna strhla platbu hned. */}
-        <p className="text-xs text-black/40">{slibZamku({ nacteno: loaded && !!info, hadSubscription: !!info?.hadSubscription })}</p>
+        <p className="text-xs text-black/40">{slib(druhSlibuZamku({ nacteno: loaded && !!info, hadSubscription: !!info?.hadSubscription }))}</p>
       </div>
     </Modal>
   );

@@ -12,6 +12,7 @@ import React from 'react';
 import { Icon } from '../Icons';
 import { czCount, czVerb, type CzNoun } from '@/lib/czech';
 import { PlovouciLista } from './PlovouciLista';
+import { useJazyk, useT } from '@/lib/i18n/client';
 
 export interface BulkAction {
   label: string;
@@ -34,11 +35,12 @@ export function BulkBar({ count, totalLabel, onSelectAll, onExit, actions, note 
   /** Krátká věta pod lištou — třeba co se nepovedlo. */
   note?: React.ReactNode;
 }) {
+  const t = useT('spolecne');
   if (count === 0) return null;
   return (
-    <PlovouciLista label={`Vybráno ${count}`} note={note}>
+    <PlovouciLista label={t('Vybráno {n}', { n: count })} note={note}>
       <span className="text-sm font-semibold whitespace-nowrap px-1 tabular-nums">
-        {count} vybráno
+        {t('{n} vybráno', { n: count })}
       </span>
       {onSelectAll && totalLabel && (
         <button type="button" onClick={onSelectAll}
@@ -62,7 +64,7 @@ export function BulkBar({ count, totalLabel, onSelectAll, onExit, actions, note 
           {a.icon && <Icon name={a.icon} size={14} className="inline -mt-0.5 mr-1" />}{a.label}
         </button>
       ))}
-      <button type="button" onClick={onExit} aria-label="Zrušit výběr" title="Zrušit výběr"
+      <button type="button" onClick={onExit} aria-label={t('Zrušit výběr')} title={t('Zrušit výběr')}
         className="rounded-full w-7 h-7 flex items-center justify-center text-white/60 hover:text-white transition">
         <Icon name="close" size={15} />
       </button>
@@ -89,17 +91,21 @@ export function ApproveAllBar({ count, noun, onApproveAll, busy, note }: {
   busy?: boolean;
   note?: React.ReactNode;
 }) {
+  const t = useT('spolecne');
+  const { jazyk } = useJazyk();
   if (count < 2) return null;
   return (
     <div className="note note-wait flex flex-wrap items-center gap-3">
       <Icon name="inbox" size={17} className="shrink-0" />
       <span className="min-w-0 flex-1 text-sm font-medium">
-        {czCount(count, noun)} {czVerb(count, 'čeká', 'čekají')} na schválení.
+        {jazyk === 'cs'
+          ? <>{czCount(count, noun)} {czVerb(count, 'čeká', 'čekají')} na schválení.</>
+          : t('{n, plural, one {# položka čeká na schválení.} few {# položky čekají na schválení.} other {# položek čeká na schválení.}}', { n: count })}
       </span>
       {note && <span className="text-xs font-medium text-bad-ink">{note}</span>}
       <button type="button" onClick={onApproveAll} disabled={busy}
         className="tap-target-sm btn btn-primary btn-sm disabled:opacity-50 whitespace-nowrap">
-        {busy ? 'Schvaluji…' : `Schválit vše (${count})`}
+        {busy ? t('Schvaluji…') : t('Schválit vše ({n})', { n: count })}
       </button>
     </div>
   );

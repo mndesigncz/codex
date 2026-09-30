@@ -10,9 +10,11 @@ import { useT } from '@/lib/i18n/client';
 // nepozná, jestli to napsal on, nebo se to vzalo odjinud, a při odeslání
 // ho to překvapí. Proto jeden řádek nad formulářem a tlačítko, kterým se
 // koncept zahodí.
-// Celé věty, ne skládání z fragmentů: skloňování a slovosled cizích jazyků
-// nejde složit z českého 4. pádu. Neznámý druh spadne na původní českou větu.
-function veta(t: (k: string) => string, co: string): string {
+/** Čeho se koncept týká. Typ hlídá překladač: nová podoba musí dostat vlastní větu níž (pády a rody), ne tichou česky zůstávající výjimku. */
+export type CoKonceptu = 'rozepsané' | 'rozepsanou žádost' | 'rozepsané oznámení' | 'rozepsaný úkol' | 'rozepsanou akci' | 'rozepsané rozeslání';
+
+/** Věta „Vrátili jsme ti … z minula." Známé podoby mají vlastní překlad (pády a rody se v cizích jazycích liší). */
+function vetaKonceptu(co: CoKonceptu, t: ReturnType<typeof useT>): string {
   switch (co) {
     case 'rozepsané': return t('Vrátili jsme ti rozepsané z minula.');
     case 'rozepsanou žádost': return t('Vrátili jsme ti rozepsanou žádost z minula.');
@@ -20,24 +22,22 @@ function veta(t: (k: string) => string, co: string): string {
     case 'rozepsaný úkol': return t('Vrátili jsme ti rozepsaný úkol z minula.');
     case 'rozepsanou akci': return t('Vrátili jsme ti rozepsanou akci z minula.');
     case 'rozepsané rozeslání': return t('Vrátili jsme ti rozepsané rozeslání z minula.');
-    default: return `Vrátili jsme ti ${co} z minula.`;
+    default: { const nikdy: never = co; return nikdy; }
   }
 }
 
-export function DraftNote({ koncept, co = 'rozepsané', druh }: {
+export function DraftNote({ koncept, co = 'rozepsané' }: {
   koncept: Koncept;
-  /** Druh konceptu bez českého textu (zatím jen 'zadost'); má přednost před `co`. */
-  druh?: 'zadost';
-  /** Čeho se koncept týká (česky, ve 4. pádu); pro překlad se mapuje na celou větu. */
-  co?: string;
+  /** Čeho se koncept týká, v prvním pádě jednoslovně. */
+  co?: CoKonceptu;
 }) {
-  const t = useT();
+  const t = useT('spolecne');
   if (!koncept.obnoveno) return null;
   return (
     <div className="note note-info flex flex-wrap items-center justify-between gap-2" role="status">
       <span className="inline-flex items-center gap-2 min-w-0">
         <Icon name="refresh" size={14} className="shrink-0" />
-        {veta(t, druh === 'zadost' ? 'rozepsanou žádost' : co)}
+        {vetaKonceptu(co, t)}
       </span>
       <button type="button" onClick={koncept.zahodit}
         className="tap-target-sm shrink-0 font-semibold underline underline-offset-2">

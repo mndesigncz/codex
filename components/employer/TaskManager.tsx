@@ -355,7 +355,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
       {showForm && (
         <Card as="form" pad="lg" onSubmit={save} className="space-y-4" aria-labelledby={fid('nadpis')}>
           <h2 id={fid('nadpis')} className="t-section">{editingId ? t('Upravit úkol') : t('Nový úkol')}</h2>
-          <DraftNote koncept={koncept} co={t('rozepsaný úkol')} />
+          <DraftNote koncept={koncept} co="rozepsaný úkol" />{/* i18n-ok: druh konceptu je identifikátor, větu překládá DraftNote */}
           <Field id={fid('nazev')} label={t('Název úkolu')}>
             <Input id={fid('nazev')} value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder={t('Např. Umýt okna')} autoFocus maxLength={200} />
           </Field>

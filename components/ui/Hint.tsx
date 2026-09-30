@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Icon } from '../Icons';
+import { useT } from '@/lib/i18n/client';
 
 // Nápověda, která něco udělá a dá se umlčet.
 //
@@ -61,6 +62,7 @@ export function Hint({ id, tone = 'info', icon, title, children, action, classNa
   action?: { label: string; onClick?: () => void; href?: string };
   className?: string;
 }) {
+  const t = useT('spolecne');
   // Server nezná localStorage; kdybychom rovnou schovávali, hydratace
   // by neseděla. Proto se první vykreslení tváří „ukaž" a rozhodne se
   // až v prohlížeči.
@@ -100,8 +102,8 @@ export function Hint({ id, tone = 'info', icon, title, children, action, classNa
               </button>
         )}
       </div>
-      <button type="button" onClick={dismiss} aria-label="Tuhle radu už nezobrazovat"
-        title="Tuhle radu už nezobrazovat (vrátit jde v Nastavení → Vzhled)"
+      <button type="button" onClick={dismiss} aria-label={t('Tuhle radu už nezobrazovat')}
+        title={t('Tuhle radu už nezobrazovat (vrátit jde v Nastavení → Vzhled)')}
         className="tap-target-sm shrink-0 -mr-1 -mt-1 h-7 w-7 grid place-items-center rounded-full opacity-45 hover:opacity-100 transition">
         <Icon name="close" size={14} />
       </button>

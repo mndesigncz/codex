@@ -12,7 +12,7 @@ import {
   rezimZKlice, rezimZLivemode, rozhodniOZdroji, jeChybejiciZdroj, jeChybejiciZakaznik, jeSmazanyZakaznik,
   udalostPatriDoRezimu, vyhodnotPredplatne, nabidnoutTrial,
 } from '../../lib/billingPravidla.ts';
-import { slibZamku, textPoRegistraci, textZkousky } from '../../lib/predplatneTexty.ts';
+import { druhSlibuZamku, slibZamku, textPoRegistraci, textZkousky } from '../../lib/predplatneTexty.ts';
 
 export default function ({ eq, ok }: Testy) {
   // ---- e-mail ----
@@ -89,6 +89,7 @@ export default function ({ eq, ok }: Testy) {
   ok('slib zámku: nový podnik vidí 30 dní', slibZamku({ nacteno: true, hadSubscription: false }).includes('30 dní zdarma'));
   ok('slib zámku: kdo už předplatné měl, zkoušku nedostane', !/zdarma/.test(slibZamku({ nacteno: true, hadSubscription: true })) && /hned/.test(slibZamku({ nacteno: true, hadSubscription: true })));
   ok('slib zámku: dokud nevíme, nic neslibujeme', !/zdarma/.test(slibZamku({ nacteno: false, hadSubscription: false })));
+  ok('slib zámku: druh odpovídá větě', druhSlibuZamku({ nacteno: false, hadSubscription: true }) === 'nenacteno' && druhSlibuZamku({ nacteno: true, hadSubscription: true }) === 'jizMel' && druhSlibuZamku({ nacteno: true, hadSubscription: false }) === 'zkouska');
 
   const po = (plan: 'free' | 'pro' | 'max', stav: 'aktivni' | 'zdarma' | 'zavrenaPokladna') => textPoRegistraci({ plan, stav, interval: 'month' });
   ok('po registraci: bez karty nikdy „30 dní Pro zdarma"', !/30 dní.*zdarma.*Pro|Prvních 30/.test(po('free', 'zdarma')) && /Zdarma/.test(po('free', 'zdarma')));

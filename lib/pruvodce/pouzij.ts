@@ -11,25 +11,32 @@
 import { neon } from '@neondatabase/serverless';
 import { audit } from '../audit.ts';
 import { czCount, type CzNoun } from '../czech.ts';
+import { VYCHOZI, type Jazyk } from '../i18n/config.ts';
+import { preloz, type Hodnoty } from '../i18n/core.ts';
+import { nactiSekce } from '../i18n/slovniky.ts';
+import { vsechnySlovniky } from '../i18n/stav.ts';
 import { sanitizeSteps } from '../steps.ts';
 import { verejnaHlaska } from '../verejnaChyba.ts';
 import { nactiRadky, tarifPodniku, zapisRadek } from '../widgety/rozlozeniDb.ts';
 import { normalizujRozlozeni, zVychozich } from '../widgety/rozlozeni.ts';
 import { STRANKA as PREHLED } from '../widgety/stranky/vedeni.prehled.ts';
-import { KDE_V_NASTAVENI, sestavPlan, type Operace, type StavPodniku } from './plan.ts';
+import { KDE_V_NASTAVENI, POCTY, POZNAMKY, sestavPlan, type Operace, type Prekladac, type StavPodniku } from './plan.ts';
 import type { Onboarding, VysledekOperace } from './typy.ts';
 import { ulozStav } from './stav.ts';
 
 const sql = neon(process.env.DATABASE_URL!);
 
 const ROZSAH_PREHLEDU = 'typ:vedeni' as const;
-const POLOZKA: CzNoun = { one: 'položka', few: 'položky', many: 'položek' };
-const KATEGORIE: CzNoun = { one: 'kategorie', few: 'kategorie', many: 'kategorií' };
-const POSTUP: CzNoun = { one: 'postup', few: 'postupy', many: 'postupů' };
-const TYP_SMENY: CzNoun = { one: 'typ směny', few: 'typy směn', many: 'typů směn' };
-const WIDGET: CzNoun = { one: 'widget', few: 'widgety', many: 'widgetů' };
+/** Překladač pro jazyk majitele: hlášky a výchozí názvy (směny, kategorie, postupy) jdou v jeho jazyce. Čeština nic nenačítá. */
+export type PrekladacPruvodce = Prekladac & { (cs: string, hodnoty: Hodnoty): string };
+export async function prekladacPruvodce(jazyk: Jazyk = VYCHOZI): Promise<PrekladacPruvodce> {
+  if (jazyk === VYCHOZI) return ((cs: string, h?: Hodnoty) => preloz({}, VYCHOZI, cs, h)) as PrekladacPruvodce;
+  await nactiSekce(jazyk, ['pruvodce']);
+  return ((cs: string, h?: Hodnoty) => preloz(vsechnySlovniky(), jazyk, cs, h)) as PrekladacPruvodce;
+}
 
-const NEPOVEDLO = 'Založení selhalo.';
+const POLOZKA: CzNoun = { one: 'položka', few: 'položky', many: 'položek' };
+
 
 /** Co v podniku už je. Každý dotaz zvlášť: chybějící sloupec nesmí vzít ostatní zjištění. */
 export async function nactiStavPodniku(teamId: number): Promise<StavPodniku> {
@@ -53,7 +60,7 @@ export async function nactiStavPodniku(teamId: number): Promise<StavPodniku> {
 }
 
 /** Jedna operace. Vrací počet založených věcí; vyhazuje jen proto, že ji volá obal s try. */
-async function proved(op: Operace & { stav: 'provest' }, teamId: number, meId: number): Promise<{ pocet?: number; poznamka?: string; polozky?: { w: string; s: string }[] }> {
+async function proved(op: Operace & { stav: 'provest' }, teamId: number, meId: number, pr: PrekladacPruvodce): Promise<{ pocet?: number; poznamka?: string; polozky?: { w: string; s: string }[] }> {
   switch (op.klic) {
     case 'podnik': {
       const d = op.podnik;
@@ -70,7 +77,7 @@ async function proved(op: Operace & { stav: 'provest' }, teamId: number, meId: n
       let poznamka: string | undefined;
       try {
         await sql`UPDATE teams SET address = COALESCE(${d.adresa ?? null}::text, address), country = COALESCE(${d.zeme ?? null}::text, country) WHERE id = ${teamId}`;
-      } catch { poznamka = 'Adresu a zemi se zatím uložit nepodařilo, doplníš je v Nastavení.'; }
+      } catch { poznamka = pr(POZNAMKY.adresaNejde); }
       return { poznamka };
     }
     case 'doba':
@@ -93,7 +100,7 @@ async function proved(op: Operace & { stav: 'provest' }, teamId: number, meId: n
         }
         n++;
       }
-      return { pocet: n, poznamka: czCount(n, TYP_SMENY) };
+      return { pocet: n, poznamka: pr(POCTY.smeny, { n }) };
     }
     case 'pravidla':
       // Jen když je NULL: pravidlo, které člověk nastavil, se nepřepíše (druhá pojistka po plánu).
@@ -107,7 +114,7 @@ async function proved(op: Operace & { stav: 'provest' }, teamId: number, meId: n
           VALUES (${teamId}, ${nazev}, (SELECT COALESCE(MAX(position), -1) + 1 FROM inventory_categories WHERE team_id = ${teamId}))`;
         n++;
       }
-      return { pocet: n, poznamka: czCount(n, KATEGORIE) };
+      return { pocet: n, poznamka: pr(POCTY.sklad, { n }) };
     }
     case 'postupy': {
       let n = 0;
@@ -125,20 +132,20 @@ async function proved(op: Operace & { stav: 'provest' }, teamId: number, meId: n
         }
         n++;
       }
-      return { pocet: n, poznamka: czCount(n, POSTUP) };
+      return { pocet: n, poznamka: pr(POCTY.postupy, { n }) };
     }
     case 'prehled': {
       // Výstup jde stejnou normalizací jako každé rozložení: neplatné se zahodí.
       const polozky = normalizujRozlozeni(PREHLED, zVychozich(op.prehled));
       const radek = (await nactiRadky(teamId, PREHLED.id, null)).vychozi.find(r => r.rozsah === ROZSAH_PREHLEDU);
       // Cizí (ruční) řádek se nikdy nepřepíše; zdroj 'pruvodce' je jen návrh z dřívějška.
-      if (radek && radek.zdroj !== 'pruvodce') return { pocet: 0, poznamka: 'Přehled už máte upravený, nechali jsme ho.' };
+      if (radek && radek.zdroj !== 'pruvodce') return { pocet: 0, poznamka: pr(POZNAMKY.prehledUpraveny) };
       const verze = await zapisRadek({
         teamId, stranka: PREHLED.id, rozsah: ROZSAH_PREHLEDU, userId: null, polozky, zamceno: false,
         verze: radek ? radek.verze : 0, meId, zdroj: 'pruvodce',
       });
-      if (verze == null) throw new Error('Přehled se mezitím změnil jinde.');
-      return { pocet: polozky.length, poznamka: czCount(polozky.length, WIDGET), polozky: polozky.map(p => ({ w: p.widget, s: p.velikost })) };
+      if (verze == null) throw new Error(pr(POZNAMKY.prehledZmenen));
+      return { pocet: polozky.length, poznamka: pr(POCTY.prehled, { n: polozky.length }), polozky: polozky.map(p => ({ w: p.widget, s: p.velikost })) };
     }
     case 'kasa':
       await sql`UPDATE teams SET drawer_float = ${Math.round(op.hotovost)} WHERE id = ${teamId} AND drawer_float IS NULL`;
@@ -159,13 +166,14 @@ export interface VysledekPouziti {
  * vypnul (chodí z těla požadavku, ne z uložených odpovědí: poslední slovo má
  * to, co bylo na obrazovce Shrnutí).
  */
-export async function pouzijPruvodce(a: { teamId: number; meId: number; onboarding: Onboarding; vypnout?: string[] }): Promise<VysledekPouziti> {
+export async function pouzijPruvodce(a: { teamId: number; meId: number; onboarding: Onboarding; vypnout?: string[]; jazyk?: Jazyk }): Promise<VysledekPouziti> {
+  const pr = await prekladacPruvodce(a.jazyk);
   const odpovedi = { ...a.onboarding.odpovedi, polozky: { ...a.onboarding.odpovedi.polozky } };
   for (const k of a.vypnout ?? []) {
     if (k === 'smeny' || k === 'sklad' || k === 'postupy' || k === 'prehled' || k === 'pravidla') odpovedi.polozky[k] = false;
   }
   const stav = await nactiStavPodniku(a.teamId);
-  const plan = sestavPlan(odpovedi, stav, a.onboarding.pouzito);
+  const plan = sestavPlan(odpovedi, stav, a.onboarding.pouzito, pr);
   const pouzito = { ...a.onboarding.pouzito };
   const polozky: VysledekOperace[] = [];
   let widgetu = 0;
@@ -173,11 +181,11 @@ export async function pouzijPruvodce(a: { teamId: number; meId: number; onboardi
   for (const op of plan) {
     if (op.stav === 'preskocit') {
       // Přeskočeno, protože už to tam je (nebo to člověk nastavil sám): ledger se nemění.
-      polozky.push({ klic: op.klic, nazev: op.nazev, stav: 'preskoceno', poznamka: op.poznamka });
+      polozky.push({ klic: op.klic, nazev: op.nazev, stav: 'preskoceno', poznamka: op.poznamka ? pr(op.poznamka) : undefined });
       continue;
     }
     try {
-      const r = await proved(op, a.teamId, a.meId);
+      const r = await proved(op, a.teamId, a.meId, pr);
       pouzito[op.klic] = op.hash;
       if (op.klic === 'prehled') { widgetu = r.pocet ?? 0; polozkyPrehledu = r.polozky ?? []; }
       // Operace, která sama zjistila, že nemá co dělat (cizí Přehled), je přeskočená, ne „ok".
@@ -185,7 +193,7 @@ export async function pouzijPruvodce(a: { teamId: number; meId: number; onboardi
       polozky.push({ klic: op.klic, nazev: op.nazev, stav: sama ? 'preskoceno' : 'ok', pocet: r.pocet, poznamka: r.poznamka });
     } catch (e) {
       console.error('pruvodce.pouzij', op.klic, e);
-      polozky.push({ klic: op.klic, nazev: op.nazev, stav: 'chyba', poznamka: `${verejnaHlaska(e, NEPOVEDLO)} Nastavíš to ručně: ${KDE_V_NASTAVENI[op.klic]}.` });
+      polozky.push({ klic: op.klic, nazev: op.nazev, stav: 'chyba', poznamka: `${verejnaHlaska(e, pr(POZNAMKY.zalozeniSelhalo))} ${pr(POZNAMKY.rucne, { kde: pr(KDE_V_NASTAVENI[op.klic]) })}` });
     }
   }
   const ted = new Date().toISOString();

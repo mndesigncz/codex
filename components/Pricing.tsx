@@ -1,6 +1,8 @@
 'use client';
 
 // Ceník na landingu: tři tarify s přepínačem měsíc/rok a srovnání.
+// i18n: ceník, ceny a srovnání tarifů zůstávají česky (právně citlivé, projde je člověk);
+// překládají se jen ovládací prvky a v cizím jazyce je pod přepínačem věta o tom.
 // Klientská komponenta kvůli přepínači; texty a ceny bere z lib/plan,
 // aby seděly s Nastavením.
 //
@@ -16,9 +18,7 @@ import Link from 'next/link';
 import { Icon } from './Icons';
 import { Segmented } from './ui';
 import { PLAN_FEATURES, PLAN_NAMES, PRICES, TRIAL_DAYS } from '@/lib/plan';
-import { czCount, type CzNoun } from '@/lib/czech';
-
-const MESIC: CzNoun = { one: 'měsíc', few: 'měsíce', many: 'měsíců' };
+import { useJazyk, useT } from '@/lib/i18n/client';
 
 // Úspora se počítá, ne opisuje: 12 × měsíční cena mínus roční. Dřív tu stála
 // přeškrtnutá „srovnávací" cena (4 990 Kč), kterou nikdo nikdy neúčtoval, a štítek
@@ -29,14 +29,15 @@ const USPORA_MESICU = Math.floor(Math.min(uspora('pro') / PRICES.pro.month, uspo
 type Interval = 'month' | 'year';
 
 function Bunka({ v, zvyraznit = false }: { v: string | boolean; zvyraznit?: boolean }) {
+  const t = useT('predplatne');
   if (v === true) {
     return (
-      <span role="img" className={`inline-grid h-6 w-6 place-items-center rounded-full ${zvyraznit ? 'bg-[#C8F542] text-[#3E5406]' : 'bg-[#C8F542]/40 text-[#3E5406]'}`} aria-label="ano">
+      <span role="img" className={`inline-grid h-6 w-6 place-items-center rounded-full ${zvyraznit ? 'bg-[#C8F542] text-[#3E5406]' : 'bg-[#C8F542]/40 text-[#3E5406]'}`} aria-label={t('ano')}>
         <Icon name="check" size={13} />
       </span>
     );
   }
-  if (v === false) return <span role="img" className="inline-block h-1.5 w-1.5 rounded-full bg-black/15" aria-label="ne" />;
+  if (v === false) return <span role="img" className="inline-block h-1.5 w-1.5 rounded-full bg-black/15" aria-label={t('ne')} />;
   return <span className="text-xs font-semibold text-[#16181A]">{v}</span>;
 }
 
@@ -59,6 +60,8 @@ const KARTY: { id: 'free' | 'pro' | 'max'; veta: string; body: string[] }[] = [
 ];
 
 export default function Pricing() {
+  const t = useT('predplatne');
+  const { jazyk } = useJazyk();
   const [interval, setInterval_] = useState<Interval>('month');
   const cena = (p: 'pro' | 'max') => {
     const pr = PRICES[p];
@@ -79,8 +82,9 @@ export default function Pricing() {
             Zdarma napořád pro malý tým. Pro a Max si vyzkoušíte {TRIAL_DAYS} dní zdarma, karta se strhne až po měsíci.
           </p>
         </div>
-        <Segmented size="sm" ariaLabel="Období" value={interval} onChange={v => setInterval_(v as Interval)}
-          options={[{ id: 'month', label: 'Měsíčně' }, { id: 'year', label: `Ročně · ušetříte ${czCount(USPORA_MESICU, MESIC)}` }]} />
+        <Segmented size="sm" ariaLabel={t('Období')} value={interval} onChange={v => setInterval_(v as Interval)}
+          options={[{ id: 'month', label: t('Měsíčně') }, { id: 'year', label: t('Ročně · ušetříte {mesice}', { mesice: t('{n, plural, one {# měsíc} few {# měsíce} other {# měsíců}}', { n: USPORA_MESICU }) }) }]} />
+        {jazyk !== 'cs' && <p className="basis-full t-meta">{t('Ceník a platební podmínky jsou zatím jen česky.')}</p>}
       </div>
 
       {/* Karty. Pro je zvednutá a má stín — je to doporučená volba a má to
@@ -94,7 +98,7 @@ export default function Pricing() {
             <div key={k.id} className={`relative flex flex-col rounded-[2rem] p-7 ${
               pro ? 'lgx-strong md:-my-3 md:py-10 shadow-[0_30px_70px_rgba(25,35,15,0.16)] ring-2 ring-[#C8F542]' : 'lgx'
             }`}>
-              {pro && <span className="absolute top-5 right-5 chip chip-sm chip-ok uppercase tracking-wider">Doporučeno</span>}
+              {pro && <span className="absolute top-5 right-5 chip chip-sm chip-ok uppercase tracking-wider">{t('Doporučeno')}</span>}
               <p className="t-label text-black/45">{PLAN_NAMES[k.id]}</p>
               <p className="mt-2 text-4xl font-bold tracking-tight text-[#16181A] tabular-nums">{c ? c.hlavni : '0 Kč'}</p>
               <p className="text-xs text-black/55 mt-1">{c ? c.pod : 'navždy, až 3 lidé'}</p>
@@ -113,7 +117,7 @@ export default function Pricing() {
               <div className="mt-auto pt-7">
                 <Link href={k.id === 'free' ? '/register?plan=free' : `/register?plan=${k.id}&interval=${interval}`} className="flex rounded-full">
                   <span className={`btn w-full ${pro ? 'btn-accent' : max ? 'btn-primary' : 'btn-secondary'}`}>
-                    Zvolit {PLAN_NAMES[k.id]}
+                    {t('Zvolit {plan}', { plan: PLAN_NAMES[k.id] })}
                   </span>
                 </Link>
               </div>

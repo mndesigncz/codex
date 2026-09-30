@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { okJson } from '@/lib/api';
+import { useT } from '@/lib/i18n/client';
 
 // Načítání, které umí i selhat.
 //
@@ -28,6 +29,9 @@ export type LoadState<T> = {
 };
 
 export function useLoad<T>(url: string | null, pick: (raw: any) => T = (raw) => raw as T): LoadState<T> {
+  const t = useT('spolecne');
+  const tRef = useRef(t);
+  tRef.current = t;
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
@@ -35,16 +39,17 @@ export function useLoad<T>(url: string | null, pick: (raw: any) => T = (raw) => 
   useEffect(() => {
     if (!url) return;
     let alive = true;
+    const t = tRef.current;
     setError(null);
     (async () => {
       try {
         const r = await fetch(url);
-        if (!r.ok) throw new Error(`Server odpověděl ${r.status}`);
+        if (!r.ok) throw new Error(t('Server odpověděl {status}', { status: r.status }));
         const raw = await r.json();
         const value = pick(raw);
         if (alive) setData(value);
       } catch (e: any) {
-        if (alive) { setData(null); setError(e?.message || 'Načtení se nepovedlo'); }
+        if (alive) { setData(null); setError(e?.message || t('Načtení se nepovedlo')); }
       }
     })();
     return () => { alive = false; };
