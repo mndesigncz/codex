@@ -14,6 +14,11 @@
 import { jeAktivni } from './skladPrehled.ts';
 import { proHledani } from './hledani.ts';
 import { czCount, POLOZKA, type CzNoun } from './czech.ts';
+import { preloz } from './i18n/core.ts';
+
+/** Překladač věty (jako `t` z useT); bez něj se píše česky. */
+export type PrekladVety = (klic: string, hodnoty?: Record<string, string | number | null | undefined>) => string;
+const cesky: PrekladVety = (klic, hodnoty) => preloz({}, 'cs', klic, hodnoty);
 
 // ---------------------------------------------------------------------------
 // Receptury (GET /api/pos/products)
@@ -110,15 +115,16 @@ export function prodejeBezReceptury(d: DataReceptur, strop = Infinity): ProdejBe
 const UCTENKY: CzNoun = { one: 'účtenky', few: 'účtenek', many: 'účtenek' };
 
 /** Výsledek POST /api/pos/sync (N1) jako jedna česká věta pro Toast. */
-export function vetaOdpisu(raw: any): { text: string; chyba: boolean } {
-  if (!raw || typeof raw !== 'object') return { text: 'Odpis se nepodařil.', chyba: true };
-  if (raw.connected === false) return { text: 'Pokladna není připojená — není z čeho odepisovat.', chyba: true };
-  if (typeof raw.error === 'string') return { text: raw.error, chyba: true };
-  if (raw.throttled) return { text: 'Odpis právě běží z pokladny sám — zkus to za chvíli.', chyba: false };
+export function vetaOdpisu(raw: any, t: PrekladVety = cesky): { text: string; chyba: boolean } {
+  // Sekce slovníku pro kontrolu překladů: useT('sklad') (věty z t('…') v tomhle souboru patří do `sklad`).
+  if (!raw || typeof raw !== 'object') return { text: t('Odpis se nepodařil.'), chyba: true };
+  if (raw.connected === false) return { text: t('Pokladna není připojená — není z čeho odepisovat.'), chyba: true };
+  if (typeof raw.error === 'string') return { text: t(raw.error), chyba: true }; // věta ze serveru: slovník api
+  if (raw.throttled) return { text: t('Odpis právě běží z pokladny sám — zkus to za chvíli.'), chyba: false };
   const n = pole(raw.deducted).length;
   const uctenek = cislo(raw.processed);
-  if (!n) return { text: uctenek ? 'Prodeje prošly, ale nebylo co odepsat — položky nemají recepturu.' : 'Žádné nové prodeje k odepsání.', chyba: false };
-  return { text: `Odepsáno ze skladu: ${czCount(n, POLOZKA)} z ${czCount(uctenek, UCTENKY)}.`, chyba: false };
+  if (!n) return { text: uctenek ? t('Prodeje prošly, ale nebylo co odepsat — položky nemají recepturu.') : t('Žádné nové prodeje k odepsání.'), chyba: false };
+  return { text: t('Odepsáno ze skladu: {n, plural, one {# položka} few {# položky} other {# položek}} z {u, plural, one {# účtenky} few {# účtenek} other {# účtenek}}.', { n, u: uctenek }), chyba: false };
 }
 
 // ---------------------------------------------------------------------------

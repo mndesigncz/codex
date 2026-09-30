@@ -2,6 +2,8 @@
 
 import { Icon } from './Icons';
 import { Button } from './ui';
+import { useT, type PrekladFn } from '@/lib/i18n/client';
+import { tg } from '@/lib/i18n/stav';
 
 export type ChecklistItem = { text: string; done: boolean };
 
@@ -12,11 +14,25 @@ export const RECURRENCE_OPTIONS = [
   { value: 'weekly', label: 'Týdně' },
 ];
 
-export function recurrenceLabel(r?: string | null): string | null {
+/** Možnosti opakování v jazyce uživatele (RECURRENCE_OPTIONS výš zůstává česky pro kód, který `t` nemá). */
+export function recurrenceOptions(t: PrekladFn) {
+  return [
+    { value: '', label: t('Neopakovat') },
+    { value: 'daily', label: t('Denně') },
+    { value: 'weekdays', label: t('Pracovní dny') },
+    { value: 'weekly', label: t('Týdně') },
+  ];
+}
+
+/**
+ * Popisek opakování. Bez `t` se překládá podle jazyka aplikace (`tg`), takže
+ * i volající, který `t` nemá po ruce (seznamy úkolů), ukáže správný jazyk.
+ */
+export function recurrenceLabel(r?: string | null, t: (klic: string) => string = (klic) => tg(klic)): string | null {
   switch (r) {
-    case 'daily': return 'Denně';
-    case 'weekdays': return 'Pracovní dny';
-    case 'weekly': return 'Týdně';
+    case 'daily': return t('Denně');
+    case 'weekdays': return t('Pracovní dny');
+    case 'weekly': return t('Týdně');
     default: return null;
   }
 }
@@ -39,6 +55,7 @@ export function TaskChecklist({ items, onToggle, onToggleAll, velky = false }: {
    */
   onToggleAll?: (done: boolean) => void;
 }) {
+  const t = useT('rozvrh');
   if (!items || items.length === 0) return null;
   const done = items.filter(i => i.done).length;
   const pct = Math.round((done / items.length) * 100);
@@ -53,7 +70,7 @@ export function TaskChecklist({ items, onToggle, onToggleAll, velky = false }: {
         {/* Kolo 69: dřív ruční pilulka 11 px; tichá akce v řádku je ghost Button. */}
         {onToggleAll && items.length > 2 && (
           <Button variant="ghost" size="sm" className="shrink-0 -my-1" onClick={() => onToggleAll(!allDone)}>
-            {allDone ? 'Zrušit vše' : 'Odškrtnout vše'}
+            {allDone ? t('Zrušit vše') : t('Odškrtnout vše')}
           </Button>
         )}
       </div>

@@ -7,12 +7,15 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../Icons';
 import ShrinkageReport from './ShrinkageReport';
 import { okJson } from '@/lib/api';
-import { czCount, POLOZKA } from '@/lib/czech';
+import { tg } from '@/lib/i18n/stav';
+import { useJazyk, useT } from '@/lib/i18n/client';
+import { fmtDatum } from '@/lib/i18n/format';
+import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
+import { polozekTxt, rozdilTxt } from './texty';
 import { pocetDoPole, pocetZPole } from '@/lib/inventura';
 import { Button, Chip, ListRow, Modal, Skeleton } from '../ui';
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
-const fmt = (n: number) => round3(n).toLocaleString('cs-CZ', { maximumFractionDigits: 3 });
 
 type Row = {
   itemId: number; name: string; category: string | null; unit: string;
@@ -41,6 +44,9 @@ export default function StocktakeModal({ smiZahajit, smiDokoncit, smiZtraty, onC
   onClose: () => void;
   onApplied: () => void;
 }) {
+  const t = useT('sklad');
+  const { jazyk } = useJazyk();
+  const fmt = (n: number) => round3(n).toLocaleString(LOCALE_PRO_JAZYK[jazyk], { maximumFractionDigits: 3 });
   const [open, setOpen] = useState<Take | null>(null);
   const [history, setHistory] = useState<Take[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,8 +71,8 @@ export default function StocktakeModal({ smiZahajit, smiDokoncit, smiZtraty, onC
       setOpen(d.open ?? null);
       setHistory(Array.isArray(d.history) ? d.history : []);
       setDesetinne(d.mnozstviDesetinne === true);
-      if (d.notMigrated) setErr('Inventura bude dostupná po dokončení migrace (/api/init).');
-    } catch { setErr('Inventuru se nepodařilo načíst.'); }
+      if (d.notMigrated) setErr(t('Inventura bude dostupná po dokončení migrace (/api/init).'));
+    } catch { setErr(t('Inventuru se nepodařilo načíst.')); }
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
@@ -77,7 +83,7 @@ export default function StocktakeModal({ smiZahajit, smiDokoncit, smiZtraty, onC
     const res = await fetch('/api/stocktake', { method: 'POST' }).catch(() => null);
     setBusy(false);
     if (res?.ok) { const d = await res.json(); setOpen(d.open); }
-    else { const d = res ? await res.json().catch(() => ({})) : {}; setErr(d.error || 'Inventuru se nepodařilo zahájit.'); }
+    else { const d = res ? await res.json().catch(() => ({})) : {}; setErr(d.error ? tg(d.error) : t('Inventuru se nepodařilo zahájit.')); }
   };
 
   // Debounced batched save — counting is rapid-fire typing on a tablet.
@@ -92,7 +98,7 @@ export default function StocktakeModal({ smiZahajit, smiDokoncit, smiZtraty, onC
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: open!.id, counts, opens }),
       }).catch(() => null);
-      if (!res?.ok) setErr('Počty se neuložily — zkontroluj připojení.');
+      if (!res?.ok) setErr(t('Počty se neuložily — zkontroluj připojení.'));
       else setErr('');
     }, 600);
   };
@@ -155,10 +161,10 @@ export default function StocktakeModal({ smiZahajit, smiDokoncit, smiZtraty, onC
       await load();
       onApplied();
       setErr('');
-      setDoneMsg(`Hotovo — spočítáno: ${czCount(d.applied ?? 0, POLOZKA)}, zapsáno: ${czCount(d.diffs ?? 0, { one: 'rozdíl', few: 'rozdíly', many: 'rozdílů' })}.`);
+      setDoneMsg(t('Hotovo — spočítáno: {polozky}, zapsáno: {rozdily}.', { polozky: polozekTxt(t, d.applied ?? 0), rozdily: rozdilTxt(t, d.diffs ?? 0) }));
     } else {
       const d = res ? await res.json().catch(() => ({})) : {};
-      setErr(d.error || 'Dokončení se nepodařilo.');
+      setErr(d.error ? tg(d.error) : t('Dokončení se nepodařilo.'));
     }
   };
   const [doneMsg, setDoneMsg] = useState('');
@@ -179,24 +185,24 @@ export default function StocktakeModal({ smiZahajit, smiDokoncit, smiZtraty, onC
     if (!open) return [] as [string, Row[]][];
     const map = new Map<string, Row[]>();
     open.data.forEach(r => {
-      const k = r.category ?? 'Bez kategorie';
+      const k = r.category ?? t('Bez kategorie');
       (map.get(k) ?? map.set(k, []).get(k)!).push(r);
     });
     return Array.from(map.entries());
-  }, [open]);
+  }, [open, t]);
 
   const countedN = open ? open.data.filter(r => r.counted != null || r.countedOpen != null).length : 0;
   const diffN = open ? open.data.filter(r =>
     (r.counted != null && r.counted !== r.expected) ||
     (r.countedOpen != null && r.countedOpen !== (r.expectedOpen ?? 0))).length : 0;
 
-  const plural = (n: number) => czCount(n, { one: 'rozdíl', few: 'rozdíly', many: 'rozdílů' });
+  const plural = (n: number) => rozdilTxt(t, n);
 
   // Jedno okno z ui (DP §3.10) místo ručního překryvu; úvod bez karty v okně,
   // „Zahájit" je potvrzení v okně = primary, ne limetka.
   return (
-    <Modal open onClose={onClose} size="lg" title="Inventura skladu"
-      subtitle={open ? `Zahájena ${new Date(open.createdAt).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long' })}` : 'Spočítat skutečné stavy a zapsat rozdíly.'}>
+    <Modal open onClose={onClose} size="lg" title={t('Inventura skladu')}
+      subtitle={open ? t('Zahájena {datum}', { datum: new Date(open.createdAt).toLocaleDateString(LOCALE_PRO_JAZYK[jazyk], { day: 'numeric', month: 'long' }) }) : t('Spočítat skutečné stavy a zapsat rozdíly.')}>
       <div className="space-y-4">
         {err && <p className="note note-danger" role="alert">{err}</p>}
         {doneMsg && <p className="note note-ok" role="status">{doneMsg}</p>}
@@ -208,11 +214,11 @@ export default function StocktakeModal({ smiZahajit, smiDokoncit, smiZtraty, onC
         ) : !open ? (
           <div className="space-y-5">
             <div className="space-y-3">
-              <p className="t-meta">Projdi sklad položku po položce a spočítej skutečné stavy. Rozdíly proti evidenci se po potvrzení zapíšou a uloží do historie položek.</p>
+              <p className="t-meta">{t('Projdi sklad položku po položce a spočítej skutečné stavy. Rozdíly proti evidenci se po potvrzení zapíšou a uloží do historie položek.')}</p>
               {smiZahajit ? (
-                <Button variant="primary" icon="clipboard" onClick={start} loading={busy}>Zahájit inventuru</Button>
+                <Button variant="primary" icon="clipboard" onClick={start} loading={busy}>{t('Zahájit inventuru')}</Button>
               ) : (
-                <p className="t-meta">Inventuru zahajuje vedení — pak může počítat kdokoli.</p>
+                <p className="t-meta">{t('Inventuru zahajuje vedení — pak může počítat kdokoli.')}</p>
               )}
             </div>
             {smiZtraty && history.length > 0 && (
@@ -221,7 +227,7 @@ export default function StocktakeModal({ smiZahajit, smiDokoncit, smiZtraty, onC
 
             {history.length > 0 && (
               <section aria-labelledby="inventura-historie">
-                <p id="inventura-historie" className="t-label">Minulé inventury</p>
+                <p id="inventura-historie" className="t-label">{t('Minulé inventury')}</p>
                 <ul className="list mt-1">
                   {history.map(h => {
                     const counted = h.data.filter(r => r.counted != null || r.countedOpen != null);
@@ -232,9 +238,9 @@ export default function StocktakeModal({ smiZahajit, smiDokoncit, smiZtraty, onC
                     return (
                       <li key={h.id} className={vybrana ? 'bg-black/[0.04] rounded-xl' : ''}>
                         <ListRow as="div"
-                          title={h.completedAt ? new Date(h.completedAt).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}
-                          meta={`${counted.length} spočítáno`}
-                          right={<Chip tone={diffs.length ? 'wait' : 'ok'} size="sm">{diffs.length ? plural(diffs.length) : 'vše sedělo'}</Chip>}
+                          title={h.completedAt ? fmtDatum(h.completedAt, { jazyk, styl: 'dlouze' }) : '—'}
+                          meta={t('{n} spočítáno', { n: counted.length })}
+                          right={<Chip tone={diffs.length ? 'wait' : 'ok'} size="sm">{diffs.length ? plural(diffs.length) : t('vše sedělo')}</Chip>}
                           onClick={() => setSelected(h.id)} />
                       </li>
                     );
@@ -247,32 +253,32 @@ export default function StocktakeModal({ smiZahajit, smiDokoncit, smiZtraty, onC
           <div className="space-y-4">
             <div className="sticky top-0 z-10 glass-strong rounded-2xl px-4 py-3 flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-semibold text-[#16181A] tabular-nums" aria-live="polite">
-                {countedN}/{open.data.length} spočítáno
+                {t('{n}/{celkem} spočítáno', { n: countedN, celkem: open.data.length })}
                 {diffN > 0 && <span className="text-wait-ink"> · {plural(diffN)}</span>}
-                {neplatnych > 0 && <span className="text-bad-ink"> · {czCount(neplatnych, { one: 'pole k opravě', few: 'pole k opravě', many: 'polí k opravě' })}</span>}
+                {neplatnych > 0 && <span className="text-bad-ink"> · {t('{n, plural, one {# pole k opravě} few {# pole k opravě} other {# polí k opravě}}', { n: neplatnych })}</span>}
               </p>
               <div className="flex flex-wrap gap-2">
                 {smiZahajit && (
                   confirmCancel ? (
                     <>
-                      <Button variant="secondary" size="sm" onClick={() => setConfirmCancel(false)}>Nechat běžet</Button>
-                      <Button variant="danger-solid" size="sm" onClick={cancel}>Zahodit napočítané</Button>
+                      <Button variant="secondary" size="sm" onClick={() => setConfirmCancel(false)}>{t('Nechat běžet')}</Button>
+                      <Button variant="danger-solid" size="sm" onClick={cancel}>{t('Zahodit napočítané')}</Button>
                     </>
                   ) : (
-                    <Button variant="danger" size="sm" onClick={() => { setConfirmDone(false); setConfirmCancel(true); }}>Zrušit inventuru</Button>
+                    <Button variant="danger" size="sm" onClick={() => { setConfirmDone(false); setConfirmCancel(true); }}>{t('Zrušit inventuru')}</Button>
                   )
                 )}
                 {smiDokoncit && !confirmCancel && (
                   confirmDone ? (
                     <>
-                      <Button variant="secondary" size="sm" onClick={() => setConfirmDone(false)}>Ještě ne</Button>
+                      <Button variant="secondary" size="sm" onClick={() => setConfirmDone(false)}>{t('Ještě ne')}</Button>
                       <Button variant="danger-solid" size="sm" loading={busy} onClick={complete}>
-                        {diffN > 0 ? `Zapsat ${plural(diffN)}` : 'Zapsat'}
+                        {diffN > 0 ? t('Zapsat {rozdily}', { rozdily: plural(diffN) }) : t('Zapsat')}
                       </Button>
                     </>
                   ) : (
                     <Button variant="primary" size="sm" disabled={countedN === 0 || neplatnych > 0} onClick={() => setConfirmDone(true)}>
-                      Dokončit a zapsat
+                      {t('Dokončit a zapsat')}
                     </Button>
                   )
                 )}
@@ -294,10 +300,10 @@ export default function StocktakeModal({ smiZahajit, smiDokoncit, smiZtraty, onC
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                           <span className="w-full sm:w-auto sm:flex-1 min-w-0 text-sm text-[#16181A] truncate">{r.name}</span>
                           <span className="sm:hidden flex-1" />
-                          <span className="shrink-0 text-xs text-black/55 tabular-nums whitespace-nowrap">evid. {r.expected} {r.unit}</span>
+                          <span className="shrink-0 text-xs text-black/55 tabular-nums whitespace-nowrap">{t('evid. {mnozstvi} {jednotka}', { mnozstvi: r.expected, jednotka: r.unit })}</span>
                           <input
                             inputMode={desetinne ? 'decimal' : 'numeric'}
-                            aria-label={`Spočítáno — ${r.name} (${r.unit})`}
+                            aria-label={t('Spočítáno — {nazev} ({jednotka})', { nazev: r.name, jednotka: r.unit })}
                             aria-invalid={chybaPocet ? true : undefined}
                             value={texty['c' + r.itemId] ?? pocetDoPole(r.counted)}
                             onChange={e => setCount(r.itemId, e.target.value)}
@@ -310,22 +316,22 @@ export default function StocktakeModal({ smiZahajit, smiDokoncit, smiZtraty, onC
                         {chybaPocet && (
                           <p className="text-xs text-bad-ink mt-1" role="alert">
                             {chybaPocet === 'cele'
-                              ? `Tahle položka se eviduje v celých ${r.unit} — zapiš celé číslo. Desetiny jdou jen u položky s velikostí balení, jako zbytek v načatém.`
-                              : 'Zapiš číslo, třeba 2.'}
+                              ? t('Tahle položka se eviduje v celých {jednotka} — zapiš celé číslo. Desetiny jdou jen u položky s velikostí balení, jako zbytek v načatém.', { jednotka: r.unit })
+                              : t('Zapiš číslo, třeba 2.')}
                           </p>
                         )}
                         {pkg > 0 && (
                           <div className="flex items-center gap-3 pl-4 mt-1.5">
                             <span className="min-w-0 flex-1 text-xs text-black/55 truncate">
-                              Zbytek v načatém balení
-                              <span className="hidden sm:inline"> (z {pkg} {r.contentUnit || 'l'})</span>
+                              {t('Zbytek v načatém balení')}
+                              <span className="hidden sm:inline"> {t('(z {balení} {jednotka})', { 'balení': pkg, jednotka: r.contentUnit || 'l' })}</span>
                             </span>
                             <span className="shrink-0 text-xs text-black/55 tabular-nums whitespace-nowrap">
-                              evid. {fmt(r.expectedOpen ?? 0)} {r.contentUnit || ''}
+                              {t('evid. {mnozstvi} {jednotka}', { mnozstvi: fmt(r.expectedOpen ?? 0), jednotka: r.contentUnit || '' })}
                             </span>
                             <input
                               inputMode="decimal"
-                              aria-label={`Zbytek v načatém — ${r.name}`}
+                              aria-label={t('Zbytek v načatém — {nazev}', { nazev: r.name })}
                               aria-invalid={chybaZbytek ? true : undefined}
                               value={texty['o' + r.itemId] ?? pocetDoPole(r.countedOpen)}
                               onChange={e => setOpenAmount(r.itemId, e.target.value)}
@@ -336,7 +342,7 @@ export default function StocktakeModal({ smiZahajit, smiDokoncit, smiZtraty, onC
                             <Rozdil n={openDiff} text={openDiff == null ? '' : openDiff > 0 ? `+${fmt(openDiff)}` : fmt(openDiff)} />
                           </div>
                         )}
-                        {chybaZbytek && <p className="text-xs text-bad-ink mt-1 pl-4" role="alert">Zapiš číslo, třeba 0,68.</p>}
+                        {chybaZbytek && <p className="text-xs text-bad-ink mt-1 pl-4" role="alert">{t('Zapiš číslo, třeba 0,68.')}</p>}
                       </li>
                     );
                   })}
@@ -352,9 +358,10 @@ export default function StocktakeModal({ smiZahajit, smiDokoncit, smiZtraty, onC
 
 /** Rozdíl proti evidenci: sedí = ikona fajfky (dřív znak ✓), jinak číslo. */
 function Rozdil({ n, text }: { n: number | null; text: string }) {
+  const t = useT('sklad');
   return (
     <span className={`w-12 shrink-0 flex justify-end text-xs font-semibold tabular-nums ${n === 0 ? 'text-ok-ink' : 'text-wait-ink'}`}>
-      {n == null ? null : n === 0 ? <><Icon name="check" size={14} /><span className="sr-only">sedí</span></> : text}
+      {n == null ? null : n === 0 ? <><Icon name="check" size={14} /><span className="sr-only">{t('sedí')}</span></> : text}
     </span>
   );
 }

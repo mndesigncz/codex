@@ -13,6 +13,6 @@ export default async function EmployerLayout({ children }: { children: React.Rea
   const role = (session.user as any)?.role;
   if (role !== 'employer') redirect('/employee/shifts');
 
-  // Vedení používá správu podniku a i přeložené obrazovky zaměstnance, kiosku a chatu (Nastavení, náhledy).
-  return <><Slovniky sekce={['zamestnanec', 'kiosk', 'chat', 'sprava', 'tym', 'navody', 'postupy']} />{children}</>;
+  // Vedení používá správu podniku, rozvrh, sklad i přeložené obrazovky zaměstnance, kiosku a chatu (Nastavení, náhledy).
+  return <><Slovniky sekce={['zamestnanec', 'kiosk', 'chat', 'sprava', 'tym', 'navody', 'postupy', 'rozvrh', 'sklad']} />{children}</>;
 }
