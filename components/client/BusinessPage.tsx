@@ -15,6 +15,8 @@ import { useJazyk, useT } from '@/lib/i18n/client';
 import { fmtDatum, fmtDenVTydnu, fmtMesic } from '@/lib/i18n/format';
 import { pragueToday, dayPlus } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
+import { Modal } from '../ui/Modal';
+import { Button } from '../ui/Button';
 import { formatMoney, formatPrice, currencySymbol } from '@/lib/money';
 import { okJson, apiMessage } from '@/lib/api';
 import { buildIcs, downloadIcs } from '@/lib/ics';
@@ -138,7 +140,7 @@ export default function BusinessPage({ slug }: { slug: string }) {
               <div className={`rounded-2xl px-4 py-3 ${b.coverUrl ? 'bg-white/15 backdrop-blur' : ''}`}
                 style={b.coverUrl ? undefined : { background: `${accent}22`, border: `1px solid ${accent}66` }}>
                 <p className="text-[11px] uppercase tracking-wider opacity-70">{t(me.levelLabel ?? 'Člen')}{me.discount > 0 ? ` · ${t('sleva {n} %', { n: me.discount })}` : ''}</p>
-                <p className="text-lg font-bold tabular-nums leading-tight">{me.points} {t('b.')} <span className="opacity-60 font-medium text-sm">· {t('{stamps}/{target} razítek', { stamps: me.stamps, target: b.stampTarget || '–' })}</span></p>
+                <p className="text-lg font-bold tabular-nums leading-tight">{me.points} {t('b.')} {b.stampTarget > 0 && <span className="opacity-60 font-medium text-sm">· {t('{stamps}/{target} razítek', { stamps: me.stamps, target: b.stampTarget })}</span>}</p>
                 {me.credit > 0 && <p className="text-sm font-semibold tabular-nums leading-tight">{t('{castka} kreditu', { castka: formatMoney(me.credit, b.currency) })}</p>}
                 {me.nextTierAt && <p className="text-[11px] opacity-60 leading-snug">{t('do „{level}“ ještě {n, plural, one {# návštěva} few {# návštěvy} other {# návštěv}}', { level: t(me.nextTierLabel), n: Math.max(0, me.nextTierAt - me.visits) })}</p>}
               </div>
@@ -320,8 +322,9 @@ function ReserveTab({ slug, b, me, today, signedIn, onDone }: { slug: string; b:
       setBusy(false);
     }
   };
+  const [zrusitId, setZrusitId] = useState<number | null>(null);
   const cancel = async (id: number) => {
-    if (!confirm(t('Zrušit rezervaci?'))) return;
+    setZrusitId(null);
     try {
       const r = await fetch(`/api/client/reservations/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'cancelled' }) });
       if (r.ok) { onDone(t('Rezervace zrušena.')); return; }
@@ -383,7 +386,7 @@ function ReserveTab({ slug, b, me, today, signedIn, onDone }: { slug: string; b:
                     <span className={`inline-block mt-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${st.tone === 'ok' ? 'bg-[#C8F542]/25 text-[#3E5406]' : st.tone === 'wait' ? 'bg-wait/15 text-wait-ink' : 'bg-black/[0.06] text-black/60'}`}>{t(st.label)}</span>
                   </div>
                   {['requested', 'confirmed'].includes(r.status) && (
-                    <button onClick={() => cancel(r.id)} className="tap-target-sm text-xs text-black/55 hover:text-bad-ink transition shrink-0">{t('Zrušit')}</button>
+                    <button onClick={() => setZrusitId(r.id)} className="tap-target-sm text-xs text-black/55 hover:text-bad-ink transition shrink-0">{t('Zrušit')}</button>
                   )}
                 </li>
               );
@@ -391,6 +394,13 @@ function ReserveTab({ slug, b, me, today, signedIn, onDone }: { slug: string; b:
           </ul>
         ) : <p className="text-sm text-black/55">{t('Zatím žádná. První je hned vlevo.')}</p>}
       </aside>
+      <Modal open={zrusitId !== null} onClose={() => setZrusitId(null)} size="sm" title={t('Zrušit rezervaci?')}
+        footer={<>
+          <Button variant="secondary" onClick={() => setZrusitId(null)}>{t('Ponechat')}</Button>
+          <Button variant="danger" onClick={() => { if (zrusitId !== null) void cancel(zrusitId); }}>{t('Zrušit rezervaci')}</Button>
+        </>}>
+        <p className="text-sm text-black/65">{t('Podnik se o zrušení dozví a termín se uvolní.')}</p>
+      </Modal>
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { neon } from '@neondatabase/serverless';
 import { cashDifference, normalizeMovements } from '@/lib/closing';
-import { pragueToday } from '@/lib/pragueTime';
+import { pragueToday, pragueDaySafe } from '@/lib/pragueTime';
 import { wagesTotal } from '@/lib/wages';
 import { menaPodniku } from '@/lib/menaPodniku';
 
@@ -96,7 +96,7 @@ export async function GET(req: NextRequest) {
   } catch { /* not migrated */ }
   for (const r of receiptRows) {
     ledger.push({
-      date: String(r.created_at).slice(0, 10), kind: 'receipt',
+      date: pragueDaySafe(r.created_at), kind: 'receipt',
       label: r.supplier || 'Účtenka', amount: num(r.amount),
       receiptId: r.id, photoUrl: r.photo_url ?? null, note: r.note ?? null,
     });
@@ -138,7 +138,7 @@ export async function GET(req: NextRequest) {
         AND ((COALESCE(received_at, created_at) AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') < (${month + '-01'}::timestamp + INTERVAL '1 month')`;
     for (const o of orders as any[]) {
       ledger.push({
-        date: String(o.received_at ?? o.created_at).slice(0, 10), kind: 'order',
+        date: pragueDaySafe(o.received_at ?? o.created_at), kind: 'order',
         label: `Objednávka — ${o.supplier ?? 'dodavatel'}`, amount: num(o.total_cost),
       });
     }
