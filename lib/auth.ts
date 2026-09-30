@@ -11,6 +11,7 @@ import { normalizujEmail, poradiKandidatu } from './emailAdresa';
 import { generateJoinCode } from './team';
 import { jeSpravcePodleDb } from './superadminDb';
 import { zajistiClenstvi, clenstviUzivatele, prepniTym } from './tenant';
+import { obalZUserAgent, rolePatriDoObalu } from './obal';
 
 // Self-heal: an employer must always have a team. If theirs is missing
 // (e.g. after a DB issue), recreate/relink it on login so the app never
@@ -62,8 +63,18 @@ async function stavUzivatele(id: number, cerstve: boolean): Promise<{ role: stri
   if (!cerstve && c && Date.now() - c.at < STAV_TTL_MS) return c.v;
   try {
     const sql = neon(process.env.DATABASE_URL!);
-    const [u] = await sql`SELECT team_id, role FROM users WHERE id = ${id}`;
-    const v = u ? { role: String(u.role), teamId: u.team_id == null ? null : Number(u.team_id) } : 'smazan' as const;
+    // Smazaný (anonymizovaný) účet řádek v users má, ale nese `deleted_at`: pro
+    // relaci je to totéž co neexistující. Před migrací sloupec chybí — dotaz se
+    // pak opakuje bez něj, ať výpadek migrace neshodí čtení relace všem.
+    let u: any;
+    let smazan = false;
+    try {
+      [u] = await sql`SELECT team_id, role, deleted_at FROM users WHERE id = ${id}`;
+      smazan = !!u?.deleted_at;
+    } catch {
+      [u] = await sql`SELECT team_id, role FROM users WHERE id = ${id}`;
+    }
+    const v = u && !smazan ? { role: String(u.role), teamId: u.team_id == null ? null : Number(u.team_id) } : 'smazan' as const;
     if (stavCache.size > 5000) stavCache.clear();
     stavCache.set(id, { at: Date.now(), v });
     return v;
@@ -114,6 +125,14 @@ export const authOptions: NextAuthOptions = {
           if (await bcrypt.compare(credentials.password, kandidat.passwordHash)) { user = kandidat; break; }
         }
         if (!user) return null;
+        // Nativní obal: host patří do Managero client, ostatní do Managero. Kontrola
+        // je AŽ po správném hesle, takže jiný chybový kód než „špatné heslo“ dostane
+        // jen ten, kdo účet opravdu vlastní (nejde tak zjistit, které e-maily existují).
+        // Značka jen zužuje: bez ní (web) se nic nemění a falešná značka nic neodemkne.
+        const hlavicky = (req?.headers ?? {}) as Record<string, string | string[] | undefined>;
+        const ua = hlavicky['user-agent'];
+        const obal = obalZUserAgent(Array.isArray(ua) ? ua[0] : ua).obal;
+        if (!rolePatriDoObalu(obal, user.role)) throw new Error('OBAL_ROLE');
         await clear(`login:${email}`);
         let teamId: number | null = user.teamId ?? null;
         if (user.role === 'employer') {

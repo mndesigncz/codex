@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { signOut } from 'next-auth/react';
+import { odhlasit } from '@/lib/odhlaseni';
 import PodnikSwitcher from '../PodnikSwitcher';
 import { Icon, LogoMark } from '../Icons';
 import { Avatar, ErrorBoundary, MenuPanel, MenuItemButton } from '../ui';
@@ -220,7 +220,7 @@ export default function EmployeeLayout({ user }: Props) {
               className="absolute left-3 right-3 bottom-full mb-2 origin-bottom-left">
               <MenuItemButton label="Nastavení" icon="settings" onClick={openSettings} />
               <div role="separator" className="h-px bg-black/[0.06] my-1" />
-              <MenuItemButton label="Odhlásit se" icon="logout" danger onClick={() => signOut({ callbackUrl: '/login' })} />
+              <MenuItemButton label="Odhlásit se" icon="logout" danger onClick={() => odhlasit({ callbackUrl: '/login' })} />
             </MenuPanel>
           )}
           <button ref={ucet.triggerRef} type="button" onClick={() => setAccountOpen(v => !v)} onKeyDown={ucet.onTriggerKeyDown}
@@ -305,7 +305,7 @@ export default function EmployeeLayout({ user }: Props) {
         onSelect={setCurrentView}
         actions={[
           { label: 'Nastavení', icon: 'settings', onClick: openSettings },
-          { label: 'Odhlásit se', icon: 'logout', onClick: () => signOut({ callbackUrl: '/login' }), danger: true },
+          { label: 'Odhlásit se', icon: 'logout', onClick: () => odhlasit({ callbackUrl: '/login' }), danger: true },
         ]}
       />
     </div>

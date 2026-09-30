@@ -21,6 +21,7 @@ import { usePathname } from 'next/navigation';
 import {
   Avatar, Button, Card, Chip, EmptyState, ErrorState, Field, Input, Menu, Modal, Segmented, Skeleton, Textarea, Toast, type ChipTone, type MenuItem,
 } from './ui';
+import NahlasitOkno from './moderace/NahlasitOkno';
 import { PlochaWidgetu } from './widgety/PlochaWidgetu';
 import { useDataWidgetu, obnovDataWidgetu } from './widgety/useDataWidgetu';
 import { useSmi } from './widgety/NavigaceKontext';
@@ -93,6 +94,8 @@ export default function SuggestionsBoard() {
   const [editContent, setEditContent] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
   const [mazani, setMazani] = useState<Podnet | null>(null);
+  // Moderace (Apple 1.2): cizí podnět jde nahlásit vedení.
+  const [nahlasit, setNahlasit] = useState<number | null>(null);
   const [mazu, setMazu] = useState(false);
   const id = useId();
 
@@ -182,6 +185,7 @@ export default function SuggestionsBoard() {
     return [
       ...(doPlanovani && s.status !== 'planned' && s.status !== 'done'
         ? [{ label: 'Do plánování', icon: 'kanban', hint: 'Založí kartu na tabuli a označí podnět jako naplánovaný.', onClick: () => void sendToPlanning(s) }] : []),
+      ...(!mine ? [{ label: 'Nahlásit podnět', icon: 'warning', onClick: () => setNahlasit(s.id) }] : []),
       ...(mine ? [{ label: 'Upravit', icon: 'pencil', onClick: () => { setEditing(s); setEditTitle(s.title); setEditContent(s.content ?? ''); } }] : []),
       ...(spravuje || mine ? [{ label: 'Smazat podnět…', icon: 'trash', danger: true, onClick: () => setMazani(s) }] : []),
     ];
@@ -312,6 +316,10 @@ export default function SuggestionsBoard() {
             </Field>
           </div>
         </Modal>
+      )}
+      {nahlasit != null && (
+        <NahlasitOkno kind="napad" refId={nahlasit} onClose={() => setNahlasit(null)}
+          onDone={(z) => { setNahlasit(null); setZprava(z); }} />
       )}
       {mazani && (
         <Modal open onClose={() => setMazani(null)} title="Smazat podnět?" size="sm"

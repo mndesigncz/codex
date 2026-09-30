@@ -54,6 +54,7 @@ import { useOpravneni } from '../role/useOpravneni';
 import { NavigaceKontext, useNavigace } from '../widgety/NavigaceKontext';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
+import { otevriNaTisk } from '@/lib/stahni';
 
 type Tab = 'overview' | 'reservations' | 'orders' | 'tables' | 'menu' | 'events' | 'customers' | 'loyalty' | 'brand' | 'settings';
 
@@ -554,7 +555,7 @@ function StolyStranka({ oznam }: { oznam: Hlaska }) {
                   meta={`${czCount(Number(t.seats) || 0, MISTO)} · ${t.storyous_desk_id ? `kasa #${t.storyous_desk_id}` : 'jen u nás'}${t.active ? '' : ' · skrytý'}`}
                   actions={(tiskne || upravuje) ? (
                     <>
-                      {tiskne && <Button size="sm" variant="secondary" icon="print" onClick={() => window.open(`/api/client/admin/tables/qr?tableId=${t.id}`, '_blank')}>QR na stůl</Button>}
+                      {tiskne && <Button size="sm" variant="secondary" icon="print" onClick={() => otevriNaTisk(`/api/client/admin/tables/qr?tableId=${t.id}`, `qr-stul-${t.id}.html`)}>QR na stůl</Button>}
                       {upravuje && <Menu size="sm" label={`Další akce se stolem ${t.name}`} items={polozky} />}
                     </>
                   ) : undefined} />

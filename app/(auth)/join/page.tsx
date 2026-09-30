@@ -107,6 +107,7 @@ function JoinForm() {
             </button>
           </form>
 
+          <p className="mt-5 text-xs text-black/45 text-center text-pretty">Vytvořením účtu souhlasíte s <Link href="/podminky" className="underline underline-offset-2">Podmínkami užívání</Link> a berete na vědomí <Link href="/soukromi" className="underline underline-offset-2">Zásady ochrany osobních údajů</Link>.</p>
           <p className="text-center text-black/45 text-sm mt-6">
             Už máte účet? <Link href="/login" className="tap-target-sm inline-flex items-center text-[#5B7A08] hover:underline font-medium">Přihlásit se</Link>
           </p>

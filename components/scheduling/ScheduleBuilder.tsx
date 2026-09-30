@@ -42,6 +42,7 @@ import ShiftCalendar from './ShiftCalendar';
 import { usePlan, UpgradeModal } from '../Pro';
 import { apiMessage, okJson } from '@/lib/api';
 import { openPrint, esc } from '@/lib/printDoc';
+import { ulozSoubor } from '@/lib/stahni';
 import { czCount, czForm, SMENA, DEN, HODINA, HODINU } from '@/lib/czech';
 import { pragueToday } from '@/lib/pragueTime';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
@@ -1174,15 +1175,8 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
     if (!pro) { setUpgradeFor('Export CSV'); return; }
     // Tvar souboru řeší lib/rozvrhCsv, ať export a import spolu vždy sedí.
     const csv = sestavCsv(shifts);
-    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `rozvrh-${month}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    // V nativním obalu se soubor sdílí přes systémový list (lib/stahni), v prohlížeči stáhne.
+    void ulozSoubor(`rozvrh-${month}.csv`, '﻿' + csv, 'text/csv;charset=utf-8;');
   };
 
   // ---- Tisk na zeď ----

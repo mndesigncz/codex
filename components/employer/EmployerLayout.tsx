@@ -3,7 +3,7 @@
 import { useSession } from 'next-auth/react';
 
 import { useState, useEffect } from 'react';
-import { signOut } from 'next-auth/react';
+import { odhlasit } from '@/lib/odhlaseni';
 import PodnikSwitcher, { uklidKonceptu } from '../PodnikSwitcher';
 import { Icon, LogoMark } from '../Icons';
 import { Avatar, ErrorBoundary, MenuPanel, MenuItemButton, type MenuItem } from '../ui';
@@ -21,6 +21,7 @@ import ReceiptsPanel from './ReceiptsPanel';
 import MobileMoreSheet from '../MobileMoreSheet';
 import { ProfileLinkProvider } from './ProfileLinkProvider';
 import { usePlan, MaxGate } from '../Pro';
+import { useObal } from '../ObalProvider';
 import { TRIAL_DAYS } from '@/lib/plan';
 import { textZkousky } from '@/lib/predplatneTexty';
 import { useModal } from '@/lib/useModal';
@@ -136,7 +137,10 @@ interface Props {
 }
 
 export default function EmployerLayout({ user }: Props) {
-  const { plan } = usePlan();
+  const { plan: planPodniku } = usePlan();
+  // V obalu žádné bannery o tarifu, zkoušce a platbě (Apple 3.1.1): plán se tváří jako neznámý.
+  const { smiPlatby } = useObal();
+  const plan = smiPlatby ? planPodniku : null;
   const { ma, role, opravneni, nacteno } = useOpravneni();
   const smiPohled = (id: string) => { const k = KLICE_POHLEDU[id]; return k == null || ma(k); };
   const [currentView, setCurrentViewRaw] = useState('overview');
@@ -351,7 +355,7 @@ export default function EmployerLayout({ user }: Props) {
       className="absolute left-3 right-3 bottom-full mb-2 origin-bottom-left">
       {polozkyUctu.map(it => <MenuItemButton key={it.label} {...it} />)}
       <div role="separator" className="h-px bg-black/[0.06] my-1" />
-      <MenuItemButton label="Odhlásit se" icon="logout" danger onClick={() => signOut({ callbackUrl: '/login' })} />
+      <MenuItemButton label="Odhlásit se" icon="logout" danger onClick={() => odhlasit({ callbackUrl: '/login' })} />
     </MenuPanel>
   );
 
@@ -597,7 +601,7 @@ export default function EmployerLayout({ user }: Props) {
           // Správce platformy podle prostředí (SUPERADMIN_USER_IDS), ne podle role.
           ...(user.superadmin ? [{ label: 'Správa platformy', icon: 'lock', onClick: () => { window.location.assign('/admin'); } }] : []),
           ...(smiKlient ? [{ label: 'Managero client', icon: 'gift', onClick: () => { setMoreOpen(false); switchMode('client'); } }] : []),
-          { label: 'Odhlásit se', icon: 'logout', onClick: () => signOut({ callbackUrl: '/login' }), danger: true },
+          { label: 'Odhlásit se', icon: 'logout', onClick: () => odhlasit({ callbackUrl: '/login' }), danger: true },
         ]}
       />
     </div>

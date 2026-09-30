@@ -13,6 +13,7 @@ import { czDay, RES_STATUS, tierFor } from '@/lib/clientSlots';
 import { formatMoney } from '@/lib/money';
 import { okJson } from '@/lib/api';
 import { pragueDaySafe } from '@/lib/pragueTime';
+import UcetHosta from './UcetHosta';
 
 /** Datum z databáze česky („11. 2. 2026“) — přes pražský den, ne místní zónu telefonu hosta. */
 function denCesky(v: unknown): string {
@@ -183,6 +184,7 @@ export default function MyPage() {
       )}
 
       <ProfileForm me={d.me} onSaved={(me: any) => { setD({ ...d, me }); setFlash('Uloženo.'); }} />
+      <UcetHosta novinky={d.me?.novinky === true} onFlash={setFlash} />
     </div>
   );
 }

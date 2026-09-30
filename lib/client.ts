@@ -32,7 +32,15 @@ export async function customer(): Promise<Customer | null> {
   const session = await getServerSession(authOptions);
   const u = session?.user as any;
   if (!u?.id || u.role !== 'customer') return null;
-  const [row] = await sql`SELECT id, name, email FROM users WHERE id = ${parseInt(String(u.id))} AND role = 'customer'`;
+  const uid = parseInt(String(u.id));
+  let row: any;
+  try {
+    // Smazaný host (anonymizovaný řádek) už hostem není, i kdyby mu zbyl starý token.
+    [row] = await sql`SELECT id, name, email FROM users WHERE id = ${uid} AND role = 'customer' AND deleted_at IS NULL`;
+  } catch {
+    // Před migrací sloupec `deleted_at` neexistuje.
+    [row] = await sql`SELECT id, name, email FROM users WHERE id = ${uid} AND role = 'customer'`;
+  }
   return row ? { id: Number(row.id), name: String(row.name), email: String(row.email) } : null;
 }
 

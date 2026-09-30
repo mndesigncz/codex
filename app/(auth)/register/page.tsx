@@ -21,6 +21,8 @@ import { LogoMark, Icon } from '@/components/Icons';
 import { PLAN_NAMES, PRICES, TRIAL_DAYS, priceLabel, type Interval, type PlanId } from '@/lib/plan';
 import { textPoRegistraci } from '@/lib/predplatneTexty';
 import { formatMoney } from '@/lib/money';
+import { useObal } from '@/components/ObalProvider';
+import PravniOdkazy from '@/components/pravni/PravniOdkazy';
 
 // Pokladna se stahuje, až když má opravdu vyskočit. Kdo zakládá podnik na
 // tarifu Zdarma, nemá důvod táhnout Stripe.js.
@@ -39,7 +41,11 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [joinCode, setJoinCode] = useState('');
   const [ref, setRef] = useState('');
-  const [plan, setPlan] = useState<PlanId>('pro');
+  const [planVyber, setPlan] = useState<PlanId>('pro');
+  // V nativní aplikaci se tarif nevolí a nenabízí (Apple 3.1.1, Google Play Billing):
+  // podnik vzniká na tarifu Zdarma, bez karty a bez ceny na obrazovce.
+  const { smiPlatby } = useObal();
+  const plan: PlanId = smiPlatby ? planVyber : 'free';
   const [interval, setIntervalPlanu] = useState<Interval>('month');
   const [pokladna, setPokladna] = useState(false);
   const [zaplaceno, setZaplaceno] = useState(false);
@@ -107,7 +113,7 @@ export default function RegisterPage() {
             {/* Sdělení musí říkat pravdu o tom, co se stalo: nový podnik je na
                 tarifu Zdarma a zkouška Pro/Max běží až po zadání karty ve
                 Stripe pokladně (lib/predplatneTexty.ts). */}
-            {zaplaceno ? (
+            {!smiPlatby ? null : zaplaceno ? (
               <p className="text-xs text-[#5B7A08] bg-[#C8F542]/10 border border-[#C8F542]/25 rounded-xl px-3 py-2 mb-6 inline-flex items-center gap-1.5">
                 <Icon name="check" size={13} className="shrink-0" />
                 {textPoRegistraci({ plan, stav: 'aktivni', interval })}
@@ -175,7 +181,7 @@ export default function RegisterPage() {
           {/* Tarif se volí tady, ne až někde v Nastavení po týdnu používání.
               Kdo přišel z ceníku, má vybráno; kdo přišel z hlavičky, může
               přepnout. Karta se zadává až po založení účtu. */}
-          <fieldset className="mb-6">
+          {smiPlatby && <fieldset className="mb-6">
             <legend className="block text-xs uppercase tracking-wider text-black/45 mb-2.5">Tarif na začátek</legend>
             <div className="grid grid-cols-3 gap-1.5">
               {(['free', 'pro', 'max'] as const).map(t => (
@@ -203,7 +209,7 @@ export default function RegisterPage() {
                 <p className="text-[11px] text-black/45 text-right">{TRIAL_DAYS} dní zdarma,<br />pak {priceLabel(plan, interval)}</p>
               </div>
             )}
-          </fieldset>
+          </fieldset>}
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label htmlFor="reg-jmeno" className="block text-xs uppercase tracking-wider text-black/45 mb-2">Vaše jméno</label>
@@ -233,9 +239,11 @@ export default function RegisterPage() {
             </button>
           </form>
 
+          <p className="mt-5 text-xs text-black/45 text-center text-pretty">Vytvořením účtu souhlasíte s <Link href="/podminky" className="underline underline-offset-2">Podmínkami užívání</Link> a berete na vědomí <Link href="/soukromi" className="underline underline-offset-2">Zásady ochrany osobních údajů</Link>.</p>
           <div className="mt-6 space-y-1.5 text-center text-sm">
             <p className="text-black/45">Jste zaměstnanec? <Link href="/join" className="tap-target-sm inline-flex items-center text-[#5B7A08] hover:underline font-medium">Připojit se k týmu →</Link></p>
             <p className="text-black/45">Už máte účet? <Link href="/login" className="tap-target-sm inline-flex items-center text-[#5B7A08] hover:underline font-medium">Přihlásit se</Link></p>
+            <PravniOdkazy className="justify-center text-xs text-black/45" />
           </div>
         </div>
       </div>

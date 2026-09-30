@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import bcrypt from 'bcryptjs';
+import { hit, clear } from '@/lib/rateLimit';
+import { smazUcet, hesloSedi } from '@/lib/smazaniUctuDb';
 
 export const dynamic = 'force-dynamic';
 
@@ -122,4 +124,29 @@ export async function PATCH(request: Request) {
   }
 
   return NextResponse.json({ ok: true, user: serialize(updated) });
+}
+
+// Smazání vlastního účtu (Apple 5.1.1(v), Google Play). Tělo: { password, smazatPodnik?, potvrzeni? }.
+// Pravidla (host, zaměstnanec, vlastník podniku) jsou v lib/smazaniUctu.ts.
+// Heslo se vyžaduje vždy: kdo najde odemčený telefon, účet smazat nesmí.
+export async function DELETE(request: Request) {
+  const id = await meId();
+  if (!id) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
+  const body = await request.json().catch(() => ({}));
+  const heslo = String(body?.password ?? '');
+  if (!heslo) return NextResponse.json({ error: 'Zadejte heslo.' }, { status: 400 });
+  // Pokusy o hádání hesla přes tenhle endpoint se počítají jako u přihlášení.
+  const gate = await hit(`smazani:${id}`, 5, 60 * 60, { failClosed: true });
+  if (!gate.ok) return NextResponse.json({ error: 'Příliš mnoho pokusů. Zkuste to později.' }, { status: 429 });
+  if (!(await hesloSedi(id, heslo))) return NextResponse.json({ error: 'Heslo není správné.' }, { status: 400 });
+  try {
+    const r = await smazUcet(id, { smazatPodnik: body?.smazatPodnik === true, potvrzeni: body?.potvrzeni ?? null, zDuvodu: 'aplikace' });
+    if (!r.ok) return NextResponse.json({ error: r.zprava, kod: r.kod, vlastnene: r.vlastnene }, { status: r.status });
+    await clear(`smazani:${id}`);
+    return NextResponse.json({ ok: true, smazanePodniky: r.smazanePodniky });
+  } catch (e) {
+    console.error('smazání účtu selhalo', e);
+    // Kroky jsou opakovatelné; člověk to může zkusit znovu.
+    return NextResponse.json({ error: 'Účet se nepodařilo smazat. Zkuste to znovu, nebo napište podpoře.' }, { status: 500 });
+  }
 }

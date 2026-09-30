@@ -5,6 +5,8 @@ import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { LogoMark } from './Icons';
+import PravniOdkazy from './pravni/PravniOdkazy';
+import { HLASKA_ROLE_V_PROVOZU } from '@/lib/obal';
 
 import { Button } from './ui';
 export default function LoginForm() {
@@ -23,7 +25,8 @@ export default function LoginForm() {
     setIsLoading(true);
     try {
       const result = await signIn('credentials', { email, password, redirect: false });
-      if (result?.error) setError('Nesprávný email nebo heslo.');
+      // OBAL_ROLE vrací server jen po správném hesle: účet hosta v aplikaci pro podniky.
+      if (result?.error) setError(result.error === 'OBAL_ROLE' ? HLASKA_ROLE_V_PROVOZU : 'Nesprávný email nebo heslo.');
       else { router.push('/'); router.refresh(); }
     } catch {
       setError('Chyba při přihlášení.');
@@ -87,6 +90,7 @@ export default function LoginForm() {
                   {showPwd ? 'skrýt' : 'zobrazit'}
                 </button>
               </div>
+              <p className="mt-2 text-sm text-right"><Link href="/zapomenute-heslo" className="tap-target-sm inline-flex items-center text-[#5B7A08] hover:underline font-semibold">Zapomenuté heslo</Link></p>
             </div>
 
             {error && <div className="p-3.5 note note-danger text-sm">{error}</div>}
@@ -98,6 +102,7 @@ export default function LoginForm() {
 
           <div className="mt-8 pt-6 border-t border-black/[0.07] space-y-2 text-center text-sm">
             <p className="text-black/50">Provozujete podnik? <Link href="/register" className="tap-target-sm inline-flex items-center text-[#5B7A08] hover:underline font-semibold">Vytvořit účet</Link></p>
+            <PravniOdkazy className="justify-center text-xs text-black/45" />
             <p className="text-black/50">Máte kód týmu nebo pozvánku? <Link href="/join" className="tap-target-sm inline-flex items-center text-[#5B7A08] hover:underline font-semibold">Připojit se</Link></p>
           </div>
         </div>

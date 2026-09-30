@@ -9,7 +9,9 @@ import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { neon } from '@neondatabase/serverless';
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { authOptions } from '@/lib/auth';
+import { obalZHlavicek } from '@/lib/obal';
 import OdhlasitButton from '@/components/admin/OdhlasitButton';
 import PodnikSwitcher from '@/components/PodnikSwitcher';
 import SpravovatPredplatneButton from '@/components/SpravovatPredplatneButton';
@@ -20,6 +22,8 @@ export const dynamic = 'force-dynamic';
 export default async function Pozastaveno() {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect('/login');
+  // Portál předplatného se v nativní aplikaci nenabízí (Apple 3.1.1); správa zůstává na webu.
+  const vObalu = obalZHlavicek(await headers()) !== null;
   let jmeno: string | null = null, duvod: string | null = null, blokovano = false, platiSe = false;
   try {
     const sql = neon(process.env.DATABASE_URL!);
@@ -56,7 +60,7 @@ export default async function Pozastaveno() {
         <div className="mt-6 flex flex-wrap items-center gap-2.5">
           <OdhlasitButton />
           {/* Předplatné běží dál i při pozastavení — majitel ho musí umět zrušit. Portál pustí jen toho, kdo smí spravovat předplatné. */}
-          {platiSe && (session.user as { role?: string }).role === 'employer' && <SpravovatPredplatneButton />}
+          {platiSe && !vObalu && (session.user as { role?: string }).role === 'employer' && <SpravovatPredplatneButton />}
           {/* Kdo má i jiný podnik, přepne se do něj — přepínač se s jediným členstvím nekreslí. */}
           <PodnikSwitcher />
         </div>

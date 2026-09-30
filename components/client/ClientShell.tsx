@@ -6,11 +6,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { signOut } from 'next-auth/react';
+import { odhlasit } from '@/lib/odhlaseni';
 import { useEffect, useState } from 'react';
 import { Icon, LogoMark } from '../Icons';
 import { useTheme } from '../ThemeProvider';
 import { usePopover } from '@/lib/usePopover';
+import { useObal } from '../ObalProvider';
+import PravniOdkazy from '../pravni/PravniOdkazy';
 
 export interface ClientUser { id: number; name: string; email: string }
 
@@ -29,6 +31,9 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
   const { setForcedLight } = useTheme();
   useEffect(() => { setForcedLight(true); return () => setForcedLight(false); }, [setForcedLight]);
   const path = usePathname();
+  // V nativní aplikaci nesmí být odkaz na prodejní stránku (ceny, Stripe): Apple 3.1.1.
+  // Web ho má dál; obal dostane jen větu bez odkazu.
+  const { jeObal } = useObal();
   const [open, setOpen] = useState(false);
   // Účet se nezavíral vůbec: ani Escapem, ani kliknutím vedle. Jednou
   // otevřený zůstal viset přes stránku, dokud se na něj neklikalo znovu.
@@ -72,7 +77,11 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
                         <p className="text-sm font-semibold truncate">{me.name}</p>
                         <p className="text-xs text-black/50 truncate">{me.email}</p>
                       </div>
-                      <button role="menuitem" onClick={() => signOut({ callbackUrl: '/client' })}
+                      <Link role="menuitem" href="/client/me#ucet" onClick={() => setOpen(false)}
+                        className="w-full text-left rounded-xl px-3 py-2 text-sm hover:bg-black/[0.05] transition flex items-center gap-2">
+                        <Icon name="user" size={16} /> Účet a soukromí
+                      </Link>
+                      <button role="menuitem" onClick={() => odhlasit({ callbackUrl: '/client' })}
                         className="w-full text-left rounded-xl px-3 py-2 text-sm text-bad-ink hover:bg-bad/10 transition flex items-center gap-2">
                         <Icon name="logout" size={16} /> Odhlásit se
                       </button>
@@ -90,7 +99,10 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
       <footer className={`mx-auto max-w-5xl w-full px-4 sm:px-6 pt-8 ${me ? 'pb-28 md:pb-8' : 'pb-8'} text-xs text-black/45 flex flex-wrap items-center gap-x-4 gap-y-1`}>
         <span>Managero client</span>
         <span>Rezervace, věrnost a objednávky pro podniky, kam chodíš.</span>
-        <Link href="/" className="tap-target-sm sm:ml-auto inline-flex items-center hover:text-black">Jsem podnik</Link>
+        {jeObal
+          ? <span className="sm:ml-auto">Provozujete podnik? Používejte aplikaci Managero pro podniky.</span>
+          : <Link href="/" className="tap-target-sm sm:ml-auto inline-flex items-center hover:text-black">Jsem podnik</Link>}
+        <PravniOdkazy jen={['soukromi', 'podminky', 'podpora']} className="basis-full" />
       </footer>
 
       {/* Mobilní spodní dock — stejný jazyk jako administrace. */}

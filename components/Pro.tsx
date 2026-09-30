@@ -9,6 +9,7 @@ import { planInfoOf, isPro, isMax, PRO_PRICE, PRICES, PLAN_NAMES, priceLabel, MA
 import { slibZamku } from '@/lib/predplatneTexty';
 import { Icon } from './Icons';
 import { Modal, Button } from './ui';
+import { useObal } from './ObalProvider';
 
 // Pokladna se stahuje, až když má vyskočit — zamčená funkce ji většinou
 // nikdy nepotřebuje.
@@ -71,6 +72,8 @@ export function usePlan(): { plan: PlanInfo | null; pro: boolean; max: boolean; 
  */
 export function OdemknoutButton({ plan, className = '' }: { plan: 'pro' | 'max'; className?: string }) {
   const { plan: info } = usePlan();
+  // V nativní aplikaci se nic neodemyká ani nekupuje (Apple 3.1.1, Google Play Billing).
+  const { smiPlatby } = useObal();
   const [pokladna, setPokladna] = useState(false);
   const [prechod, setPrechod] = useState<'ne' | 'bezi' | 'hotovo'>('ne');
   const [chyba, setChyba] = useState('');
@@ -95,6 +98,7 @@ export function OdemknoutButton({ plan, className = '' }: { plan: 'pro' | 'max';
     }
   };
 
+  if (!smiPlatby) return null;
   return (
     <>
       <Button
@@ -123,7 +127,26 @@ export function OdemknoutButton({ plan, className = '' }: { plan: 'pro' | 'max';
   );
 }
 
+/**
+ * Zamčená funkce v nativní aplikaci: jen věcné oznámení. Žádná cena, žádné
+ * „odemknout“, žádný odkaz ani výčet toho, co tarif přidá (to by byla výzva
+ * k nákupu mimo nákup v aplikaci).
+ */
+export function Zamceno({ feature, className = '' }: { feature: string; className?: string }) {
+  return (
+    <div className={`p-4 sm:p-6 max-w-xl mx-auto ${className}`}>
+      <div className="card p-8 text-center space-y-3">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-black/[0.05] text-black/50"><Icon name="lock" size={24} /></div>
+        <h3 className="t-card">{feature}</h3>
+        <p className="text-sm text-black/55">Tuhle funkci tarif vašeho podniku nezahrnuje.</p>
+      </div>
+    </div>
+  );
+}
+
 export function MaxBadge({ className = '' }: { className?: string }) {
+  const { smiPlatby } = useObal();
+  if (!smiPlatby) return null;
   return (
     <span className={`inline-flex items-center gap-1 rounded-full bg-[#0A5CC0] text-white px-2 py-0.5 text-[11px] font-bold tracking-wide ${className}`}>
       MAX
@@ -136,7 +159,9 @@ export function MaxGate({ feature, children, benefit, employer = true }: {
   feature: string; benefit?: string; employer?: boolean; children: React.ReactNode;
 }) {
   const { max } = usePlan();
+  const { smiPlatby } = useObal();
   if (max) return <>{children}</>;
+  if (!smiPlatby) return <Zamceno feature={feature} />;
   return (
     <div className="p-4 sm:p-6 max-w-xl mx-auto">
       <div className="card p-8 text-center space-y-3">
@@ -161,6 +186,8 @@ export function MaxGate({ feature, children, benefit, employer = true }: {
 }
 
 export function ProBadge({ className = '' }: { className?: string }) {
+  const { smiPlatby } = useObal();
+  if (!smiPlatby) return null;
   return (
     <span className={`inline-flex items-center gap-1 rounded-full bg-[#16181A] text-[#C8F542] px-2 py-0.5 text-[11px] font-bold tracking-wide ${className}`}>
       PRO
@@ -177,7 +204,9 @@ export function ProGate({ feature, children, benefit, employer = true }: {
   children: React.ReactNode;
 }) {
   const { pro } = usePlan();
+  const { smiPlatby } = useObal();
   if (pro) return <>{children}</>;
+  if (!smiPlatby) return <Zamceno feature={feature} />;
   return (
     <div className="p-4 sm:p-6 max-w-xl mx-auto">
       <div className="glass-card p-8 text-center space-y-3">
@@ -203,6 +232,14 @@ export function ProGate({ feature, children, benefit, employer = true }: {
 /** Okno pro zamčenou akci v řádku (třeba Export CSV na tarifu Zdarma). */
 export function UpgradeModal({ feature, plan = 'pro', onClose }: { feature: string; plan?: 'pro' | 'max'; onClose: () => void }) {
   const { plan: info, loaded } = usePlan();
+  const { smiPlatby } = useObal();
+  if (!smiPlatby) {
+    return (
+      <Modal open onClose={onClose} size="sm" title={feature} footer={<Button variant="secondary" onClick={onClose}>Zavřít</Button>}>
+        <p className="text-sm text-black/55 text-center">Tuhle funkci tarif vašeho podniku nezahrnuje.</p>
+      </Modal>
+    );
+  }
   return (
     <Modal open onClose={onClose} size="sm"
       title={<span className="flex items-center gap-2">{feature} {plan === 'max' ? <MaxBadge /> : <ProBadge />}</span>}

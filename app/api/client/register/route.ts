@@ -33,9 +33,22 @@ export async function POST(request: Request) {
   // jen se nezapíše; odměna padá až při prvním členství ve společném podniku.
   let referredBy: number | null = null;
   if (b.ref) { try { referredBy = (await customerByCard(String(b.ref)))?.id ?? null; } catch { referredBy = null; } }
-  const [u] = await sql`
-    INSERT INTO users (name, email, password_hash, role, avatar, job_title, referred_by)
-    VALUES (${name}, ${email}, ${hash}, 'customer', '👤', 'Host', ${referredBy})
-    RETURNING id, name, email`;
+  // Souhlas s novinkami podniků je dobrovolný a bez zaškrtnutí NE (Apple 4.5.4, zákon 480/2004):
+  // ukládá se jen výslovné `true`, ne „cokoli truthy“. Čas souhlasu se zapisuje, ať je co doložit.
+  const novinky = b.novinky === true;
+  const prefs = JSON.stringify(novinky ? { novinky: true, novinkyAt: new Date().toISOString() } : { novinky: false });
+  let u: any;
+  try {
+    [u] = await sql`
+      INSERT INTO users (name, email, password_hash, role, avatar, job_title, referred_by, notif_prefs, terms_accepted_at)
+      VALUES (${name}, ${email}, ${hash}, 'customer', '👤', 'Host', ${referredBy}, ${prefs}::jsonb, NOW())
+      RETURNING id, name, email`;
+  } catch {
+    // Před migrací (sloupce notif_prefs a terms_accepted_at ještě nejsou): registrace nesmí spadnout.
+    [u] = await sql`
+      INSERT INTO users (name, email, password_hash, role, avatar, job_title, referred_by)
+      VALUES (${name}, ${email}, ${hash}, 'customer', '👤', 'Host', ${referredBy})
+      RETURNING id, name, email`;
+  }
   return NextResponse.json({ ok: true, user: u, referred: !!referredBy });
 }

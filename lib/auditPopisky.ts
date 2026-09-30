@@ -8,6 +8,13 @@
 export const AUDIT_POPISKY: Record<string, string> = {
   // podnik a lidé
   'team.settings': 'Změna nastavení podniku',
+  'ucet.smazan': 'Účet smazán jeho majitelem',
+  'podnik.smazan': 'Podnik smazán spolu s účtem vlastníka',
+  'nahlaseni.vytvoreno': 'Obsah nahlášen',
+  'nahlaseni.vyreseno': 'Nahlášení vyřízeno',
+  'uzivatel.zablokovan': 'Uživatel zablokován',
+  'uzivatel.odblokovan': 'Uživatel odblokován',
+  'zprava.smazana': 'Zpráva v chatu smazána',
   'team.switch': 'Přepnutí do jiného podniku',
   'team.create': 'Založen nový podnik',
   'team.create_account': 'Založen účet člena',

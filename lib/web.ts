@@ -13,12 +13,13 @@ export const SITE_POPIS =
   'Správa malého podniku v jedné aplikaci: rozvrh směn a docházka, uzávěrky, sklad a receptury, úkoly, chat i věrnostní program pro hosty. Zdarma do 3 lidí.';
 
 /** Trasy, které mají mít vlastní záznam v sitemap.xml a smějí do vyhledávačů. */
-export const VEREJNE_TRASY = ['/', '/register', '/client'] as const;
+export const VEREJNE_TRASY = ['/', '/register', '/client', '/soukromi', '/podminky', '/podpora', '/smazat-ucet'] as const;
 
 /** Předpony, které vyhledávače nemají procházet (přihlášená část, tablet, správa, ukázka, API). */
 export const SOUKROME_PREDPONY = [
   '/api/', '/employer', '/employee', '/kiosk', '/admin', '/demo', '/s/', '/join', '/login',
   '/pozastaveno', '/client/me', '/client/login', '/client/register',
+  '/zapomenute-heslo', '/nove-heslo', '/client/zapomenute-heslo', '/client/nove-heslo',
 ] as const;
 
 /**

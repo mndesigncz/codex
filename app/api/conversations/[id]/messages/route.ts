@@ -38,6 +38,13 @@ export async function GET(_request: Request, props: { params: Promise<{ id: stri
   // ale posledních 200 zpráv chronologicky. Vnitřní DESC + LIMIT trefí index
   // chat_messages(conversation_id, created_at DESC); vnější ASC vrátí pořadí,
   // které UI čeká (nejnovější dole).
+  // Zprávy zablokovaných autorů se blokujícímu nezobrazují (moderace, Apple 1.2).
+  // Před migrací tabulka user_blocks není: nic se neskrývá.
+  let zablokovani: number[] = [];
+  try {
+    const b = await sql`SELECT blocked_id FROM user_blocks WHERE blocker_id = ${me.id}`;
+    zablokovani = b.map((r: any) => Number(r.blocked_id));
+  } catch { /* před migrací */ }
   const messages = await sql`
     SELECT * FROM (
       SELECT
@@ -46,7 +53,7 @@ export async function GET(_request: Request, props: { params: Promise<{ id: stri
         u.name AS sender_name, u.avatar AS sender_avatar
       FROM chat_messages m
       JOIN users u ON u.id = m.sender_id
-      WHERE m.conversation_id = ${conversationId}
+      WHERE m.conversation_id = ${conversationId} AND NOT (m.sender_id = ANY(${zablokovani}))
       ORDER BY m.created_at DESC
       LIMIT 200
     ) t ORDER BY t.created_at ASC`;

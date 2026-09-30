@@ -24,6 +24,7 @@ import { Avatar, Button, Card, Chip, ErrorState, Field, Input, ListRow, Modal, S
 import { usePersonProfile } from './ProfileLinkProvider';
 import { useSymbol } from '../CurrencyProvider';
 import { usePlan, UpgradeModal } from '../Pro';
+import { ulozSoubor } from '@/lib/stahni';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useOpravneni } from '../role/useOpravneni';
@@ -220,11 +221,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
       ];
     });
     const csv = [hlava, ...radky].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n');
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
-    a.download = `dochazka-${dni}dni.csv`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+    void ulozSoubor(`dochazka-${dni}dni.csv`, '﻿' + csv, 'text/csv;charset=utf-8');
   };
 
   const pocet = zobrazene.length;

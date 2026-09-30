@@ -25,6 +25,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Avatar, Button, Card, Chip, EmptyState, ErrorState, ListRow, Skeleton } from '../ui';
 import { usePlan, UpgradeModal } from '../Pro';
+import { ulozSoubor } from '@/lib/stahni';
 import { diffReasonLabel, expectedCash, cashDifference, cashLeft, type ShiftPerson } from '@/lib/closing';
 import { useMoney } from '../CurrencyProvider';
 import CashClosing from '../employee/CashClosing';
@@ -72,12 +73,7 @@ function vezmiZadost(klic: string): string | null {
 
 function stahniCsv(radky: (string | number)[][], jmeno: string) {
   const csv = radky.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n');
-  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = jmeno;
-  a.click();
-  URL.revokeObjectURL(a.href);
+  void ulozSoubor(jmeno, '﻿' + csv, 'text/csv;charset=utf-8');
 }
 
 export default function ClosingsOverview() {

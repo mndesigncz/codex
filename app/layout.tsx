@@ -1,8 +1,11 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { GeistSans } from 'geist/font/sans';
 import { GeistMono } from 'geist/font/mono';
 import './globals.css';
 import { SessionProvider } from './providers';
+import { ObalProvider } from '@/components/ObalProvider';
+import { obalZHlavicek } from '@/lib/obal';
 import { SITE_URL, SITE_NAZEV, SITE_TITULEK, SITE_POPIS, OG_ZAKLAD } from '@/lib/web';
 
 // Jedno písmo s charakterem místo systémového fallbacku, který na každé
@@ -33,19 +36,26 @@ export const metadata: Metadata = {
 };
 
 export const viewport = {
+  // Bez `viewport-fit=cover` vrací env(safe-area-inset-*) nulu, takže dock a
+  // spodní listy v nativním obalu (iPhone s výřezem, Android edge-to-edge)
+  // sedí pod home indikátorem. Safe-area se v layoutech řeší přes env().
+  viewportFit: 'cover' as const,
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#C8F542' },
     { media: '(prefers-color-scheme: dark)', color: '#0C0D0F' },
   ],
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Nativní obal (lib/obal.ts): server ví, jestli běžíme v aplikaci, dřív než
+  // se vykreslí první znak, takže se v obalu nikdy neukáže cena ani odkaz na platbu.
+  const obal = obalZHlavicek(await headers());
   return (
-    <html lang="cs" className={`${sans.variable} ${mono.variable}`}>
+    <html lang="cs" className={`${sans.variable} ${mono.variable}`} data-obal={obal ?? undefined}>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -54,7 +64,7 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <SessionProvider>{children}</SessionProvider>
+        <ObalProvider obal={obal}><SessionProvider>{children}</SessionProvider></ObalProvider>
       </body>
     </html>
   );
