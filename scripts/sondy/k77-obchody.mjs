@@ -433,6 +433,8 @@ console.log('O7 Moderace');
   await zprava.getByRole('button', { name: 'Akce se zprávou' }).click();
   await p.getByRole('menuitem', { name: 'Zablokovat autora' }).click();
   await dokudVola(vola, v => v.path === '/api/blocks');
+  // Zpráva zmizí až po překreslení: počkat, ne zkontrolovat hned (na pomalém CI to byl závod).
+  await p.getByText('Super. Mám ráno objednat').first().waitFor({ state: 'detached', timeout: 4000 }).catch(() => {});
   tvrdi('chat: blokace autora odešla a jeho zprávy zmizí z vlákna', vola.some(v => v.path === '/api/blocks' && v.m === 'POST' && v.telo.userId === 2) && await p.getByText('Super. Mám ráno objednat').count() === 0);
   const jina = p.locator('div.group', { hasText: 'Zatím ne, počkáme na první závoz.' }).first();
   await jina.getByRole('button', { name: 'Akce se zprávou' }).click();

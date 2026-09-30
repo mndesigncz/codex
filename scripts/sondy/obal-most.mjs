@@ -91,7 +91,7 @@ console.log('Obal Managero client:');
   const post = push.find(x => x.metoda === 'POST');
   const telo = post ? JSON.parse(post.telo || '{}') : null;
   tvrdi('token šel na POST /api/native/push', !!post, 'nic neodešlo (session není přihlášená, nebo registrace selhala)');
-  tvrdi('tělo: token, platforma ios, aplikace klient', telo?.token === 'TOKEN-SONDA-123' && telo?.platform === 'ios' && telo?.app === 'klient', JSON.stringify(telo));
+  tvrdi('tělo: token, platforma ios, verze (aplikaci určuje server podle role)', telo?.token === 'TOKEN-SONDA-123' && telo?.platform === 'ios' && telo?.version === '1.0.0' && !('app' in telo), JSON.stringify(telo));
 
   await p.evaluate(() => { navigator.share({ title: 'Podnik', url: 'https://www.managero.app/client/x' }); navigator.vibrate(8); });
   await p.waitForTimeout(200);
