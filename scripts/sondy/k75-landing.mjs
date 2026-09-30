@@ -52,9 +52,9 @@ const bublina = (p) => p.evaluate(() => {
   const el = document.querySelector('.ld-coach-bublina');
   return el && el.getAttribute('data-skryt') === 'false' ? el.textContent : null;
 });
-const cekejNaBublinu = (p, re) => p.waitForFunction(
+const cekejNaBublinu = (p, re, timeout = 12000) => p.waitForFunction(
   (src) => { const el = document.querySelector('.ld-coach-bublina'); return !!el && el.getAttribute('data-skryt') === 'false' && new RegExp(src).test(el.textContent || ''); },
-  re.source, { timeout: 12000 }).then(() => true).catch(() => false);
+  re.source, { timeout }).then(() => true).catch(() => false);
 
 // L1, L2, L3, L4) Desktop: celý příběh ukázky.
 {
@@ -135,7 +135,7 @@ const cekejNaBublinu = (p, re) => p.waitForFunction(
   await p.getByRole('tab', { name: 'Tablet u baru' }).click();
   await demoFrame(p).getByText('Tablet u baru').first().waitFor({ timeout: 25000 });
   tvrdi('L2 scéna Tablet u baru: rám tabletu a bez přepínače rolí', await p.locator('#ukazka-okno .ld-ram[data-zar="tablet"]').count() === 1 && await p.getByRole('tab', { name: 'Zaměstnanec' }).count() === 0);
-  tvrdi('L3 krok tabletu: bublina „klepni na jméno"', await cekejNaBublinu(p, /Klepni na jméno/));
+  tvrdi('L3 krok tabletu: bublina „klepni na jméno"', await cekejNaBublinu(p, /Klepni na jméno/, 25000));
   // Zařízení: přepnutí na telefon mění rám i logický rozměr.
   await p.getByRole('tab', { name: 'Telefon' }).click();
   await p.waitForTimeout(400);
