@@ -2,6 +2,17 @@
 > managero@0.1.0 sondy
 > node scripts/sondy/spust.mjs
 
-✓ b2 (4 s)
-✓ att (7 s)
-✓ boundary (5 s)
+✗ att (19 s)
+✗ b2 (19 s)
+✗ barva (1 s)
+✗ boundary (1 s)
+✗ bulk (1 s)
+✗ chat (1 s)
+✗ chatdom (1 s)
+✗ chatgeom (1 s)
+✗ csp (1 s)
+✗ crash (1 s)
+✗ cta (1 s)
+✓ esc2 (13 s)
+✗ esc3 (7 s)
+✗ focus (1 s)
