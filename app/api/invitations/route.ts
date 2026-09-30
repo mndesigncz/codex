@@ -8,6 +8,7 @@ import { neon } from '@neondatabase/serverless';
 import { planInfoOf, PLAN_ENFORCED, canAddMember } from '@/lib/plan';
 import { generateInviteToken } from '@/lib/team';
 import { sendTeamInvitation } from '@/lib/email';
+import { jazykPodniku } from '@/lib/i18n/jazykPozadavku';
 import { normalizujEmail } from '@/lib/emailAdresa';
 import { smiPridatClena, pocetClenu } from '@/lib/tenant';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
@@ -126,7 +127,7 @@ export async function POST(request: Request) {
   // manual sharing. The email is a best-effort convenience on top.
   // `sendTeamInvitation` nevyhazuje — chybu vrací. Dřív se `emailSent`
   // nastavilo na `true` i tehdy, když Resend pozvánku odmítl.
-  const mail = await sendTeamInvitation(email, team.name, me.name, token);
+  const mail = await sendTeamInvitation(email, team.name, me.name, token, await jazykPodniku(team.id));
 
   return NextResponse.json({
     ok: true, token, path: `/join?token=${token}`,

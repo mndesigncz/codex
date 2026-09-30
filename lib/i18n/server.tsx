@@ -6,22 +6,14 @@
 // hostovských stránkách (klient) a v menu-akce.html, kde host nemá jiný způsob,
 // jak říct, čemu rozumí.
 
-import { cookies } from 'next/headers';
-import { COOKIE_JAZYKA, VYCHOZI, cistyJazyk, type Jazyk } from './config.ts';
+import { type Jazyk } from './config.ts';
+import { jazykPozadavku } from './jazykPozadavku.ts';
 import { preloz, prelozId, type Hodnoty } from './core.ts';
 import { nactiSekce, SEKCE_VZDY, type Sekce } from './slovniky.ts';
 import { vsechnySlovniky } from './stav.ts';
 import { ZapisSlovniky } from './client.tsx';
 
-export async function getJazyk(): Promise<Jazyk> {
-  try {
-    const c = await cookies();
-    return cistyJazyk(c.get(COOKIE_JAZYKA)?.value) ?? VYCHOZI;
-  } catch {
-    // Mimo požadavek (build, statické generování) není cookie: čeština.
-    return VYCHOZI;
-  }
-}
+export const getJazyk = jazykPozadavku;
 
 export interface ServerT {
   (klic: string, hodnoty?: Hodnoty, ctx?: string): string;

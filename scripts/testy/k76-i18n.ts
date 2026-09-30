@@ -18,6 +18,8 @@ import { ALERGENY, KODY_ALERGENU, nazevAlergenu, cistiAlergeny } from '../../lib
 import { RES_STATUS, hoursLabel, tierFor } from '../../lib/clientSlots.ts';
 import { NAV_TEXTY } from '../../lib/navigace.ts';
 import { statusMessage } from '../../lib/api.ts';
+import { EMAIL, emailText, sazejHtml } from '../../lib/i18n/email.ts';
+import { escHtml } from '../../lib/email.ts';
 
 const HRANICE = [0, 1, 2, 4, 5, 11, 12, 14, 21, 22, 25, 100, 101, 102, 1.5];
 
@@ -205,4 +207,11 @@ export default function ({ eq, ok }: Testy) {
     fmtDatum('2026-09-12', { jazyk: 'cs', styl: 'denDlouze' }), fmtDatum('2026-09-12', { jazyk: 'cs', styl: 'denKratce' }), fmtDatum('2026-02-11', { jazyk: 'cs', styl: 'cislo' }),
   ], ['sobota 12. září', 'so 12. 9.', '11. 2. 2026']);
   eq('měsíc zkratkou pro dlaždici akce (cs) jako dřívější MONTHS', [1, 2, 3, 6, 7, 9, 10].map(m => fmtMesic(m, { jazyk: 'cs', styl: 'kratky' })), ['led', 'úno', 'bře', 'čvn', 'čvc', 'zář', 'říj']);
+
+  // ---- e-maily v jazyce podniku ----
+  eq('e-mail: předmět objednávky česky a německy', [emailText('objednavkaPredmet', 'cs', { podnik: 'Café', datum: '1. 9.' }), emailText('objednavkaPredmet', 'de', { podnik: 'Café', datum: '1.9.' })], ['Objednávka — Café (1. 9.)', 'Bestellung — Café (1.9.)']);
+  ok('e-mail: každý text má všech pět jazyků a stejné {parametry}', Object.values(EMAIL).every((t: any) => JAZYKY.every(j => t[j]?.length > 3 && JSON.stringify(jmenaVeZprave(t[j])) === JSON.stringify(jmenaVeZprave(t.cs)))));
+  const vlozeni = sazejHtml('pozvankaText', 'de', { kdo: `<strong>${escHtml('<img src=x onerror=1>')}</strong>`, tym: `<strong>${escHtml('A&B')}</strong>` }, {}, escHtml);
+  ok('e-mail: jména se escapují, markup z kódu zůstane', !vlozeni.includes('<img') && vlozeni.includes('&lt;img') && vlozeni.includes('A&amp;B') && vlozeni.includes('<strong>') && vlozeni.includes('Sie'));
+  ok('e-mail: předmět s HTML ve jménu podniku zůstane prostý text (escapuje se až v HTML)', emailText('pozvankaPredmet', 'en', { tym: '<b>x</b>' }) === 'Invitation to the team <b>x</b>');
 }
