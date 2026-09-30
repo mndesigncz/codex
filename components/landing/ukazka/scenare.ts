@@ -86,7 +86,8 @@ const K = {
   ulozit: { najdi: podleJmena(/^Potvrdit a uložit/), text: 'Klikni sem: potvrdíš návrh' },
   publikovat: { najdi: podleJmena(/^Publikovat$/), text: 'Klikni sem: tým ho uvidí v telefonu' },
   povinne: { najdi: podleJmena(/^Hotovo: /), text: 'Klikni sem: poslední povinný úkol' },
-  jmeno: { najdi: podleJmena(/^Zapisovat jako /), text: 'Klepni na jméno, heslo netřeba' },
+  // Po 15:00 už ranní směna odešla a na tabletu není komu přepnout; „Další příchod“ existuje vždy a vede ke jménům.
+  jmeno: { najdi: podleJmena(/^(Zapisovat jako |Další příchod)/), text: 'Klepni na jméno, heslo netřeba' },
   ukoly: { najdi: podleJmena(/^Úkoly\b/), text: 'Klepni sem: úkoly na dnes' },
   ukol: { najdi: podleJmena(/^Vynést koš/), text: 'Klepni sem: odškrtni úkol' },
 } satisfies Record<string, KrokUkazky>;
