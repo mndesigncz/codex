@@ -44,7 +44,7 @@ export default function ConsumeControl({ itemId, unit, quickAmounts, onDone, onF
       // Ikona `minus` místo znaku „−" v popisku (kolo 69, audit Skladu).
       <Button variant="secondary" size="sm" icon="minus" title={t('Odepsat spotřebované množství')}
         onClick={e => { e.stopPropagation(); setOpen(true); }}>
-        Odpis
+        {t('Odpis')}
       </Button>
     );
   }
@@ -68,7 +68,7 @@ export default function ConsumeControl({ itemId, unit, quickAmounts, onDone, onF
       <Button variant="primary" size="sm" loading={saving}
         disabled={!(Number(amount.replace(',', '.')) > 0)}
         onClick={() => consume(Number(amount.replace(',', '.')))}>
-        Odepsat
+        {t('Odepsat')}
       </Button>
       <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={t('Zrušit odpis')} onClick={() => { setOpen(false); setAmount(''); }} />
     </div>
