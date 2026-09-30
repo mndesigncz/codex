@@ -10,7 +10,7 @@
 // pixelů (pod hysterezí) a puštění na kartě, tak končí clickem na <li> a
 // filtr „cíl je tlačítko" neprojde. Proto se fakta berou i ze STISKU.
 
-import { HYSTEREZE_PX } from './konstanty.ts';
+import { HYSTEREZE_PX, PODRZENI_MS } from './konstanty.ts';
 
 /** Prvky, které si klepnutí nechávají pro sebe (tlačítka, odkazy, pole…). */
 export const SELEKTOR_INTERAKTIVNI =
@@ -33,6 +33,8 @@ export interface StiskKlid {
   naInteraktivnim: boolean;
   /** V okamžiku stisku byl otevřený překryv (okno, menu, popover). */
   prekryto: boolean;
+  /** Čas stisku (ms). Dlouhý stisk není klepnutí — na tabletu, kde se podržením nic neděje, by jinak puštění odnavigovalo pryč. */
+  cas?: number;
 }
 
 /** Fakta o clicku, který se právě obsluhuje. */
@@ -43,6 +45,8 @@ export interface KlikKlid {
   naInteraktivnim: boolean;
   /** Cíl clicku je pozadí nebo panel překryvu (okno, menu). */
   vPrekryvu: boolean;
+  /** Čas clicku (ms), stejné hodiny jako `StiskKlid.cas`. */
+  cas?: number;
 }
 
 /**
@@ -54,6 +58,7 @@ export function smiKlepnutiNavigovat(stisk: StiskKlid | null, klik: KlikKlid, hy
   if (!stisk) return false;
   if (stisk.naInteraktivnim || stisk.prekryto) return false;
   if (klik.naInteraktivnim || klik.vPrekryvu) return false;
+  if (stisk.cas != null && klik.cas != null && klik.cas - stisk.cas >= PODRZENI_MS) return false;
   return Math.hypot(klik.x - stisk.x, klik.y - stisk.y) <= hystereze;
 }
 

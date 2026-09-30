@@ -9,7 +9,7 @@
 import { readFileSync } from 'node:fs';
 import type { Testy } from './_testy.ts';
 import { smiKlepnutiNavigovat, SELEKTOR_INTERAKTIVNI, SELEKTOR_PREKRYV, type KlikKlid, type StiskKlid } from '../../lib/widgety/klik.ts';
-import { HYSTEREZE_PX } from '../../lib/widgety/konstanty.ts';
+import { HYSTEREZE_PX, PODRZENI_MS } from '../../lib/widgety/konstanty.ts';
 
 const zdroj = (cesta: string) => readFileSync(new URL(`../../${cesta}`, import.meta.url), 'utf8');
 /** Kód bez komentářů — komentáře popisují, co se opravilo, a pojistky by chytaly je. */
@@ -21,6 +21,11 @@ const klik = (x: Partial<KlikKlid> = {}): KlikKlid => ({ x: 100, y: 100, naInter
 export default function ({ eq, ok }: Testy) {
   // ---- základ ----
   eq('čisté klepnutí na tělo karty naviguje', smiKlepnutiNavigovat(stisk(), klik()), true);
+  // Dlouhý stisk není klepnutí: na tabletu se podržením nic neděje a puštění by jinak odnavigovalo pryč.
+  eq('krátké klepnutí (200 ms) naviguje', smiKlepnutiNavigovat(stisk({ cas: 1000 }), klik({ cas: 1200 })), true);
+  eq('podržení 650 ms nenaviguje', smiKlepnutiNavigovat(stisk({ cas: 1000 }), klik({ cas: 1650 })), false);
+  eq('podržení přesně PODRZENI_MS nenaviguje', smiKlepnutiNavigovat(stisk({ cas: 1000 }), klik({ cas: 1000 + PODRZENI_MS })), false);
+  eq('bez časů (starý kód) se doba nehlídá', smiKlepnutiNavigovat(stisk(), klik()), true);
   eq('klik bez stisku (klávesnice, odečítač) nenaviguje', smiKlepnutiNavigovat(null, klik()), false);
   eq('drobný posun pod hysterezí pořád naviguje', smiKlepnutiNavigovat(stisk(), klik({ x: 103, y: 104 })), true);
   eq('posun přesně o hysterezi ještě projde', smiKlepnutiNavigovat(stisk(), klik({ x: 100 + HYSTEREZE_PX })), true);

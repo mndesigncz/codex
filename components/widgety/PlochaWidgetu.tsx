@@ -753,7 +753,7 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
       // Fakta o stisku se zjišťují TEĎ: pointerdown předchází mousedownu, který
       // zavře popover, i clicku, který zavře okno — později by překryv už nebyl vidět,
       // a tlačítko, na kterém stisk začal, může být do clicku odmontované.
-      stiskKlid.current = { x: e.clientX, y: e.clientY, naInteraktivnim: jeInteraktivniCil(e.target), prekryto: jePrekryvOtevreny(document) };
+      stiskKlid.current = { x: e.clientX, y: e.clientY, naInteraktivnim: jeInteraktivniCil(e.target), prekryto: jePrekryvOtevreny(document), cas: performance.now() };
       podrzeni.onPointerDown(e);
       return;
     }
@@ -1040,7 +1040,7 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
     // Interaktivní prvek si klik nechává (cíl clicku i cíl stisku), zavření okna
     // nebo popoveru klepnutím vedle nenaviguje, prst přes hysterezi není klepnutí.
     if (!smiKlepnutiNavigovat(stiskKlid.current, {
-      x: e.clientX, y: e.clientY, naInteraktivnim: jeInteraktivniCil(e.target), vPrekryvu: jeCilVPrekryvu(e.target),
+      x: e.clientX, y: e.clientY, naInteraktivnim: jeInteraktivniCil(e.target), vPrekryvu: jeCilVPrekryvu(e.target), cas: performance.now(),
     })) return;
     const pol = polozkyRef.current.find(x => x.id === instance);
     if (!pol || pol.widget === NASTROJ || bezOpravneni(pol)) return;

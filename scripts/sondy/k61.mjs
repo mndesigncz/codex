@@ -142,7 +142,7 @@ async function kontext(viewport) {
   await ctx.route('**/api/teams/switch', route => route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'V tomhle podniku nejsi členem.' }) }));
   await p.goto('http://localhost:3000/employer/overview?view=org', { waitUntil: 'networkidle' }); await p.waitForTimeout(1000);
   const pred = norm(await p.locator('main').innerText());
-  await p.getByRole('button', { name: 'Otevřít' }).first().click(); await p.waitForTimeout(600);
+  await p.getByRole('button', { name: 'Otevřít', exact: true }).first().click(); await p.waitForTimeout(600);
   const po = norm(await p.locator('main').innerText());
   tvrdi('přehled: chyba přepnutí se ukáže u seznamu', po.includes('v tomhle podniku nejsi členem'), po.slice(0, 160));
   tvrdi('přehled: čísla po chybě přepnutí nezmizí', pred.includes('kavárna') && po.includes('kavárna') && !po.includes('přehled se nenačetl'), po.slice(0, 160));
