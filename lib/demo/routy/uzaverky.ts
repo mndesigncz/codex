@@ -6,7 +6,7 @@
 
 import { chyba, ok, type Obsluha } from '../typy';
 import { KDO_JSEM, LIDE, clen } from '../data/lide';
-import { casDnes, posunDen } from '../cas';
+import { posunDen } from '../cas';
 import type { DemoStav, UzaverkaDemo } from '../stav';
 import { mojeRole } from './zaklad';
 import {
@@ -200,5 +200,3 @@ export const uzaverky: Obsluha = (p, k) => {
   }
   return undefined;
 };
-
-export { casDnes };

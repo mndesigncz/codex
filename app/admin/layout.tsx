@@ -7,7 +7,7 @@ import { authOptions } from '@/lib/auth';
 import { isSuperadminId } from '@/lib/superadmin';
 import AdminShell from '@/components/admin/AdminShell';
 
-export const metadata: Metadata = { title: 'Správa platformy · Managero' };
+export const metadata: Metadata = { title: 'Správa platformy · Managero', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {

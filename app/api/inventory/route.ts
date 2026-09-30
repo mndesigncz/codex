@@ -9,6 +9,8 @@ import { webovaUrl, souborUrl } from '@/lib/bezpecnaUrl';
 import { tymyCiselniku } from '@/lib/tenant';
 import { pozaduj, jeOdpoved, clenoveSOpravnenim } from '@/lib/opravneniDb';
 import { typNaUcet } from '@/lib/opravneni';
+import { cenaZDb, cenaZFormulare } from '@/lib/cena';
+import { cenaKZapisu } from '@/lib/cenaSloupce';
 
 export const dynamic = 'force-dynamic';
 
@@ -210,8 +212,9 @@ export async function GET() {
       batchYield: i.batchYield != null ? Number(i.batchYield) : null,
       productionLabel: i.productionLabel ?? null,
       buyFor: buyFor.get(Number(i.id)) ?? [],
+      // NUMERIC chodí z Neonu jako řetězec — klient s cenou počítá, takže číslo.
       // Null místo vynechání: klient s cenou počítá jako „nevyplněno".
-      ...(vidiCeny ? {} : { unitCost: null }),
+      unitCost: vidiCeny ? cenaZDb(i.unitCost) : null,
     };
   }));
 }
@@ -250,8 +253,11 @@ export async function POST(request: Request) {
   // Nákupní cenu nastaví jen `sklad.ceny_upravit`. Bez něj se pole tiše
   // zahodí, neodmítá se celý zápis: formulář návrhu (NewStockEntry) ho může
   // ještě posílat a barista u baru má položku zapsat i tak.
-  const unitCost = !c.role.opravneni.has('sklad.ceny_upravit') || body.unitCost === '' || body.unitCost == null
-    ? null : Math.max(0, Math.round(Number(body.unitCost)));
+  // Cena smí mít haléře (4,99 €); text, který cena není, se odmítne — dřív se
+  // tiše zaokrouhlil nebo uložil jako nula.
+  const cenaZadana = c.role.opravneni.has('sklad.ceny_upravit') ? cenaZFormulare(body.unitCost) : { ok: true as const, hodnota: null };
+  if (!cenaZadana.ok) return NextResponse.json({ error: 'Cena musí být číslo, třeba 4,99.' }, { status: 400 });
+  const unitCost = cenaZadana.hodnota;
 
   let item: any;
   try {
@@ -304,7 +310,9 @@ export async function POST(request: Request) {
 
   // unit_cost applied separately so a not-yet-migrated column can't fail the insert.
   if (unitCost !== null && Number.isFinite(unitCost)) {
-    try { await sql`UPDATE inventory_items SET unit_cost = ${unitCost} WHERE id = ${item.id}`; } catch { /* column not migrated yet */ }
+    // Haléře jen tam, kde je sloupec už NUMERIC (viz lib/cenaSloupce).
+    const uc = await cenaKZapisu('inventory_items.unit_cost', unitCost);
+    try { await sql`UPDATE inventory_items SET unit_cost = ${uc} WHERE id = ${item.id}`; } catch { /* column not migrated yet */ }
   }
 
   // Same treatment for the newer descriptive columns and the package size.

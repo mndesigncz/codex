@@ -13,8 +13,9 @@
 
 import { neon } from '@neondatabase/serverless';
 import { consumeContent, normalizeCategoryPackaging, stockStatus } from './packaging';
+import { sloupecJeDesetinny } from './cenaSloupce';
 import {
-  MAX_BATCHES, MAX_INGREDIENTS, availableOf, checklistFor, describe, fmtQty, planFor, recipeUnit, sizeOf, taskTitleFor,
+  MAX_BATCHES, MAX_INGREDIENTS, availableOf, checklistFor, chybiVJednotcePolozky, describe, fmtQty, planFor, recipeUnit, sizeOf, taskTitleFor,
   type StockRow,
 } from './productionPlan';
 export { availableOf, batchesNeeded, fmtQty, planFor, recipeUnit, taskTitleFor } from './productionPlan';
@@ -30,20 +31,33 @@ import { clenovePodniku, tymyCiselniku, vedeniPodniku } from './tenant';
 const sql = neon(process.env.DATABASE_URL!);
 
 /**
+ * Výrobní logika vidí i odložené (momentálně nevedeme) suroviny: receptura je
+ * dál používá, takže z plánu, checklistu a odpisu nesmí zmizet — bez řádku
+ * cukru obsluha vyrobí, sklad cukr neodepíše a nikdo se nedozví proč. Odložená
+ * je ale jen surovina; vyráběný produkt, který se nevede, úkol nedostává.
+ */
+const vyrabene = (stock: Map<number, StockRow>) => Array.from(stock.values()).filter(i => i.madeInHouse && !i.archived);
+const vyrabenaPolozka = (stock: Map<number, StockRow>, id: number) => {
+  const r = stock.get(id);
+  return r && !r.archived ? r : undefined;
+};
+
+/**
  * Celý sklad týmu se stavem, tak jak ho počítá obrazovka Sklad. Signatura
  * zůstává (teamId): balení kategorií sdílených z organizace (kolo 60) se
  * dohledá uvnitř, takže výroba, úkoly, přehled organizace i digest ho
  * dostanou bez další změny.
  */
-export async function teamStock(teamId: number): Promise<Map<number, StockRow>> {
+export async function teamStock(teamId: number, opts: { sArchivovanymi?: boolean } = {}): Promise<Map<number, StockRow>> {
   let rows: any[] = [];
+  const sArchivovanymi = opts.sArchivovanymi === true;
   try {
     rows = await sql`
       SELECT id, name, category, category_id, quantity, min_quantity, critical_quantity, max_quantity,
              unit, package_size, open_amount, content_unit,
-             made_in_house, batch_yield, batch_steps, production_label
+             made_in_house, batch_yield, batch_steps, production_label, archived
       FROM inventory_items
-      WHERE team_id = ${teamId} AND archived IS NOT TRUE AND (approved IS DISTINCT FROM FALSE)`;
+      WHERE team_id = ${teamId} AND (${sArchivovanymi} OR archived IS NOT TRUE) AND (approved IS DISTINCT FROM FALSE)`;
   } catch {
     return new Map(); // před migrací: výroba prostě neexistuje
   }
@@ -84,6 +98,7 @@ export async function teamStock(teamId: number): Promise<Map<number, StockRow>> 
       batchYield: i.batch_yield != null ? Number(i.batch_yield) : null,
       batchSteps: i.batch_steps ?? null,
       productionLabel: i.production_label ?? null,
+      archived: i.archived === true,
       packaging,
       status: 'ok',
     };
@@ -125,8 +140,8 @@ async function oldestEmployer(teamId: number): Promise<number | null> {
  * zásoba doplní jinak, úkol se zavře sám. Vrací počet nově založených úkolů.
  */
 export async function ensureProductionTasks(teamId: number, actorId?: number | null): Promise<{ created: number; open: number }> {
-  const stock = await teamStock(teamId);
-  const made = Array.from(stock.values()).filter(i => i.madeInHouse);
+  const stock = await teamStock(teamId, { sArchivovanymi: true });
+  const made = vyrabene(stock);
   if (made.length === 0) return { created: 0, open: 0 };
 
   const recipes = await recipesFor(teamId, made.map(i => i.id));
@@ -204,9 +219,13 @@ export async function ensureProductionTasks(teamId: number, actorId?: number | n
     try {
       await sql`DELETE FROM purchase_flags WHERE for_item_id = ${item.id}`;
       for (const m of plan.missing) {
+        // Vlajka nese počet balení (jednotka položky), ne obsah z receptury —
+        // viz chybiVJednotcePolozky. Nákupní seznam ji sčítá s limity položky.
+        const ing = stock.get(m.ingredientId);
+        const chybi = ing ? chybiVJednotcePolozky(m, ing) : m.missing;
         await sql`
           INSERT INTO purchase_flags (team_id, item_id, for_item_id, amount)
-          VALUES (${teamId}, ${m.ingredientId}, ${item.id}, ${m.missing})
+          VALUES (${teamId}, ${m.ingredientId}, ${item.id}, ${chybi})
           ON CONFLICT (item_id, for_item_id) DO UPDATE SET amount = EXCLUDED.amount`;
       }
     } catch { /* před migrací */ }
@@ -234,8 +253,8 @@ export async function ensureProductionTasks(teamId: number, actorId?: number | n
  * surovina je chyba počítání, ne záporný sklad.
  */
 export async function produceBatch(teamId: number, itemId: number, batches: number, userId: number | null, opts: { taskId?: number | null } = {}) {
-  const stock = await teamStock(teamId);
-  const item = stock.get(itemId);
+  const stock = await teamStock(teamId, { sArchivovanymi: true });
+  const item = vyrabenaPolozka(stock, itemId);
   if (!item) throw new Error('Položka nenalezena');
   if (!item.madeInHouse) throw new Error('Tahle položka není označená jako vlastní výroba');
   const n = Math.min(MAX_BATCHES, Math.max(1, Math.round(Number(batches) || 1)));
@@ -244,10 +263,12 @@ export async function produceBatch(teamId: number, itemId: number, batches: numb
 
   const writes: any[] = [];
   const consumed: { name: string; amount: number; unit: string; short: number }[] = [];
+  // INTEGER sloupec quantity by desetinný odpis suroviny odmítl a shodil celou transakci.
+  const celeKusy = !(await sloupecJeDesetinny('inventory_items.quantity'));
   for (const l of plan.lines) {
     const ing = stock.get(l.ingredientId)!;
     const size = sizeOf(ing);
-    const next = consumeContent({ quantity: ing.quantity, packageSize: size || null, openAmount: ing.openAmount }, l.need);
+    const next = consumeContent({ quantity: ing.quantity, packageSize: size || null, openAmount: ing.openAmount }, l.need, { celeKusy });
     writes.push(sql`
       UPDATE inventory_items SET quantity = ${next.quantity},
         open_amount = ${size > 0 ? next.openAmount : ing.openAmount}, updated_by = ${userId}, updated_at = NOW()
@@ -300,8 +321,8 @@ export async function produceBatch(teamId: number, itemId: number, batches: numb
 
 /** Otevřené výrobní úkoly týmu i s plánem — pro dashboardy a TO GO. */
 export async function openProduction(teamId: number) {
-  const stock = await teamStock(teamId);
-  const made = Array.from(stock.values()).filter(i => i.madeInHouse);
+  const stock = await teamStock(teamId, { sArchivovanymi: true });
+  const made = vyrabene(stock);
   if (made.length === 0) return [];
   const recipes = await recipesFor(teamId, made.map(i => i.id));
   let tasks: any[] = [];
@@ -312,7 +333,7 @@ export async function openProduction(teamId: number) {
       ORDER BY (priority = 'high') DESC, created_at`;
   } catch { return []; }
   return tasks.map((t: any) => {
-    const item = stock.get(Number(t.source_ref));
+    const item = vyrabenaPolozka(stock, Number(t.source_ref));
     if (!item) return null;
     const plan = planFor(item, recipes.get(item.id) ?? [], stock, Number(t.source_meta?.batches) || undefined);
     return {
@@ -333,8 +354,8 @@ export async function openProduction(teamId: number) {
 
 /** Výrobní receptura jedné položky pro editor (jakákoli role smí číst). */
 export async function recipeOf(teamId: number, itemId: number) {
-  const stock = await teamStock(teamId);
-  const item = stock.get(itemId);
+  const stock = await teamStock(teamId, { sArchivovanymi: true });
+  const item = vyrabenaPolozka(stock, itemId);
   if (!item) return null;
   const recipe = (await recipesFor(teamId, [itemId])).get(itemId) ?? [];
   const plan = planFor(item, recipe, stock);
@@ -357,8 +378,8 @@ export async function saveRecipe(teamId: number, itemId: number, input: {
   madeInHouse?: boolean; batchYield?: number | null; batchSteps?: string | null; productionLabel?: string | null;
   ingredients?: { ingredientId: number; amount: number }[];
 }, userId: number | null) {
-  const stock = await teamStock(teamId);
-  const item = stock.get(itemId);
+  const stock = await teamStock(teamId, { sArchivovanymi: true });
+  const item = vyrabenaPolozka(stock, itemId);
   if (!item) throw new Error('Položka nenalezena');
   const madeInHouse = input.madeInHouse === undefined ? item.madeInHouse : !!input.madeInHouse;
   const yieldQty = input.batchYield === undefined ? item.batchYield

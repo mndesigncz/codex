@@ -20,7 +20,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const ROOTS = ['app', 'components', 'lib'];
-const BASELINE = 52; // kolo 69 (B5b): účtenky přes useMoney/useSymbol místo „Kč"; B2: sazba v Týmu přes useSymbol; B4: cena v katalogu kasy přes useMoney; B8: kupony, věrnost a propojení Clientu přes useSymbol (−4); B8 po review: cena vlastní položky výjezdu bez „Kč" (−1)
+const BASELINE = 10; // kolo 72 (review): zbylé texty serveru (pos/insights, staff/scan, receipts, closings/[id]) přes menaPodniku (−17 z 27); předtím: // kolo 72 (audit Skladu): rady serveru přes menaPodniku, hostovská stránka přes formatMoney, pole cen přes useSymbol/usePrice (−25 z 52); kolo 69 (B5b): účtenky přes useMoney/useSymbol místo „Kč"; B2: sazba v Týmu přes useSymbol; B4: cena v katalogu kasy přes useMoney; B8: kupony, věrnost a propojení Clientu přes useSymbol (−4); B8 po review: cena vlastní položky výjezdu bez „Kč" (−1)
 
 // Kde je koruna v pořádku: vlastní formátovač a ceník předplatného.
 const ALLOW = [

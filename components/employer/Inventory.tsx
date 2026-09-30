@@ -43,11 +43,13 @@ import { type ItemDefaults, DEFAULT_FIELDS, mergeDefaults, hasDefaults } from '@
 import StocktakeModal from '../inventory/Stocktake';
 import ItemRecipeLinks from '../inventory/ItemRecipeLinks';
 import ProductionRecipe from '../inventory/ProductionRecipe';
-import { useMoney, useSymbol } from '../CurrencyProvider';
+import { useMoney, usePrice, useSymbol } from '../CurrencyProvider';
 import { czForm, czCount, czVerb, POLOZKA } from '@/lib/czech';
 import { okJson } from '@/lib/api';
 import { openPrint, esc } from '@/lib/printDoc';
 import { obsahujeNekde } from '@/lib/hledani';
+import { cenaDoPole, cenaZFormulare } from '@/lib/cena';
+import { pocetZPole } from '@/lib/inventura';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useSmi } from '../widgety/NavigaceKontext';
@@ -468,7 +470,7 @@ export default function Inventory({ initialCategory, onNavigate }: {
       unit: d.unit ?? emptyForm.unit,
       supplier: d.supplier ?? '',
       supplierUrl: d.supplierUrl ?? '',
-      unitCost: d.unitCost != null ? String(d.unitCost) : '',
+      unitCost: cenaDoPole(d.unitCost),
       packageSize: d.packageSize != null ? String(d.packageSize) : '',
       minQuantity: d.minQuantity != null ? String(d.minQuantity) : emptyForm.minQuantity,
       criticalQuantity: d.criticalQuantity != null ? String(d.criticalQuantity) : emptyForm.criticalQuantity,
@@ -498,7 +500,7 @@ export default function Inventory({ initialCategory, onNavigate }: {
   const openEdit = (i: Item) => {
     setFormErr('');
     setEditing(i);
-    setForm({ name: i.name, categoryId: i.categoryId ?? categories.find(c => c.name === i.category)?.id ?? null, quantity: String(i.quantity), minQuantity: String(i.minQuantity), criticalQuantity: String(i.criticalQuantity), maxQuantity: String(i.maxQuantity), unit: i.unit, supplier: i.supplier ?? '', supplierUrl: i.supplierUrl ?? '', unitCost: i.unitCost != null ? String(i.unitCost) : '', brand: i.brand ?? '', description: i.description ?? '', packageSize: i.packageSize != null ? String(i.packageSize) : '', contentUnit: i.contentUnit ?? '', openAmount: i.openAmount != null ? String(i.openAmount) : '', portions: Array.isArray((i as any).portions) ? (i as any).portions.map((p: any) => ({ name: String(p.name ?? ''), amount: String(p.amount ?? '') })) : [], archived: i.archived === true, hideFromOverview: i.hideFromOverview === true, highlight: i.highlight ?? '' });
+    setForm({ name: i.name, categoryId: i.categoryId ?? categories.find(c => c.name === i.category)?.id ?? null, quantity: String(i.quantity), minQuantity: String(i.minQuantity), criticalQuantity: String(i.criticalQuantity), maxQuantity: String(i.maxQuantity), unit: i.unit, supplier: i.supplier ?? '', supplierUrl: i.supplierUrl ?? '', unitCost: cenaDoPole(i.unitCost), brand: i.brand ?? '', description: i.description ?? '', packageSize: i.packageSize != null ? String(i.packageSize) : '', contentUnit: i.contentUnit ?? '', openAmount: i.openAmount != null ? String(i.openAmount) : '', portions: Array.isArray((i as any).portions) ? (i as any).portions.map((p: any) => ({ name: String(p.name ?? ''), amount: String(p.amount ?? '') })) : [], archived: i.archived === true, hideFromOverview: i.hideFromOverview === true, highlight: i.highlight ?? '' });
     setNewCatInline('');
     setItemLog([]); setLogOpen(false);
     if (smi('sklad.historie')) {
@@ -596,6 +598,10 @@ export default function Inventory({ initialCategory, onNavigate }: {
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Cena smí mít haléře (4,99 €); co cenou není, se nesmí tiše uložit jako
+    // nula — dřív parseInt z „4,99" udělal 4 a z „abc" nulu.
+    const cena = cenaZFormulare(form.unitCost);
+    if (!cena.ok) { setFormErr('Cena musí být číslo, třeba 4,99.'); return; }
     setSaving(true);
     const payload = {
       name: form.name,
@@ -604,7 +610,7 @@ export default function Inventory({ initialCategory, onNavigate }: {
       unit: form.unit, supplier: form.supplier, supplierUrl: form.supplierUrl,
       quantity: parseInt(form.quantity) || 0, minQuantity: parseInt(form.minQuantity) || 0,
       criticalQuantity: parseInt(form.criticalQuantity) || 0, maxQuantity: parseInt(form.maxQuantity) || 0,
-      unitCost: form.unitCost === '' ? null : parseInt(form.unitCost) || 0,
+      unitCost: cena.hodnota,
       brand: form.brand, description: form.description, archived: form.archived, hideFromOverview: form.hideFromOverview, highlight: form.highlight || null,
       packageSize: form.packageSize === '' ? null : dec(form.packageSize) || null,
       contentUnit: form.contentUnit || null,
@@ -1119,7 +1125,7 @@ export default function Inventory({ initialCategory, onNavigate }: {
             {ma('sklad.ceny_upravit') && (
               <Field id="sklad-f-cena" label="Cena za jednotku" hint="Slouží k výpočtu hodnoty zásob a marže.">
                 <div className="relative">
-                  <input id="sklad-f-cena" type="number" inputMode="numeric" value={form.unitCost} onChange={e => setForm(f => ({ ...f, unitCost: e.target.value }))} placeholder="0" className={`${inputClass} pr-12`} />
+                  <input id="sklad-f-cena" inputMode="decimal" value={form.unitCost} onChange={e => setForm(f => ({ ...f, unitCost: e.target.value }))} placeholder="0" className={`${inputClass} pr-12`} />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/55">{symbol}/{form.unit || 'ks'}</span>
                 </div>
               </Field>
@@ -1357,15 +1363,34 @@ function BulkEditModal({ count, categories, symbol, smiCenu, onClose, onApply }:
   const pole = BULK_FIELDS.filter(f => f.key !== 'unitCost' || smiCenu);
   const chosen = pole.filter(f => on[f.key]);
 
+  const [chyba, setChyba] = useState<string | null>(null);
+
   const apply = async () => {
-    setBusy(true);
     const patch: Record<string, any> = {};
+    const spatne: string[] = [];
     chosen.forEach(f => {
       const raw = values[f.key] ?? '';
       if (f.kind === 'category') { if (raw) patch.categoryId = Number(raw); return; }
-      if (f.kind === 'number') { if (raw !== '') patch[f.key] = Number(raw); return; }
+      // Textové pole s čárkou („0,7", „4,99"): Number('4,99') je NaN. Cenu server
+      // parsuje sám (lib/cena), tak jde dál jako text.
+      if (f.key === 'unitCost') { if (raw.trim() !== '') patch[f.key] = raw; return; }
+      if (f.kind === 'number') {
+        // Nečíslo („abc", „5 ks") se neposílá: NaN by v JSONu skončilo jako null
+        // a dřív z něj server udělal nulu pro všechny vybrané položky.
+        if (raw.trim() === '') return;
+        const p = pocetZPole(raw, true);
+        if (!p.ok || p.hodnota == null) { spatne.push(f.label); return; }
+        patch[f.key] = p.hodnota;
+        return;
+      }
       patch[f.key] = raw;   // empty string clears the field on purpose
     });
+    if (spatne.length) {
+      setChyba(`${spatne.join(', ')}: napiš číslo, třeba 12 nebo 0,5.`);
+      return;
+    }
+    setChyba(null);
+    setBusy(true);
     await onApply(patch);
     setBusy(false);
   };
@@ -1379,6 +1404,7 @@ function BulkEditModal({ count, categories, symbol, smiCenu, onClose, onApply }:
           {`Použít na ${czCount(count, POLOZKA)}`}
         </Button>
       </>}>
+      {chyba && <p className="note note-danger mb-3" role="alert">{chyba}</p>}
       <ul className="list">
         {pole.map(f => {
           const id = `sklad-hromadne-${f.key}`;
@@ -1406,7 +1432,7 @@ function BulkEditModal({ count, categories, symbol, smiCenu, onClose, onApply }:
                       className={`${inputClass} resize-none`} />
                   ) : (
                     <div className="relative">
-                      <input id={id} aria-label={f.label} type={f.kind === 'number' ? 'number' : f.kind === 'url' ? 'url' : 'text'}
+                      <input id={id} aria-label={f.label} type={f.kind === 'url' ? 'url' : 'text'}
                         inputMode={f.kind === 'number' ? 'decimal' : undefined}
                         value={values[f.key] ?? ''} onChange={e => setValues(v => ({ ...v, [f.key]: e.target.value }))}
                         placeholder={f.kind === 'text' || f.kind === 'url' ? 'Prázdné pole hodnotu smaže' : ''}
@@ -1520,6 +1546,8 @@ function GridView({ items, step, openEdit, remove, money, pk, setArchived, selec
   selecting: boolean; selected: Set<number>; onToggle: (id: number) => void;
   onConsumed: (updated: any) => void; onConsumeFail: () => void;
 }) {
+  // Nákupní cena balení smí mít haléře (4,99 €) — money() ji ukáže jako 5 €.
+  const cena = usePrice();
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
       {items.map(i => {
@@ -1576,7 +1604,7 @@ function GridView({ items, step, openEdit, remove, money, pk, setArchived, selec
                 {menu.length > 0 && <Menu size="sm" label={`Další akce: ${i.name}`} items={menu} />}
               </div>
             </div>
-            <p className="t-meta mt-2">Limit: {i.minQuantity} · kriticky: {i.criticalQuantity} {thresholdUnitLabel(pk(i), i.unit)}{i.unitCost ? ` · ${money(i.unitCost)}/${i.unit}` : ''}{i.updatedByName ? ` · ${relTime(i.updatedAt)} ${i.updatedByName}` : ''}</p>
+            <p className="t-meta mt-2">Limit: {i.minQuantity} · kriticky: {i.criticalQuantity} {thresholdUnitLabel(pk(i), i.unit)}{i.unitCost ? ` · ${cena(i.unitCost)}/${i.unit}` : ''}{i.updatedByName ? ` · ${relTime(i.updatedAt)} ${i.updatedByName}` : ''}</p>
           </Card>
         );
       })}

@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import { DEFAULT_CURRENCY, formatMoney, formatCost, makeMoney, currencySymbol } from '@/lib/money';
+import { DEFAULT_CURRENCY, formatMoney, formatCost, formatPrice, makeMoney, currencySymbol } from '@/lib/money';
 import { okJson } from '@/lib/api';
 
 type CurrencyCtx = {
@@ -12,6 +12,8 @@ type CurrencyCtx = {
   money: (n: number) => string;
   /** Pro částky pod jednotku měny — surovina v receptuře, kde „0 Kč" lže. */
   cost: (n: number) => string;
+  /** Cena zadaná člověkem (menu, cena balení): s haléři, jen když je má. */
+  price: (n: number) => string;
   symbol: string;
   loaded: boolean;
 };
@@ -22,6 +24,7 @@ const Ctx = createContext<CurrencyCtx>({
   laborTargetPct: null,
   money: (n: number) => formatMoney(n),
   cost: (n: number) => formatCost(n),
+  price: (n: number) => formatPrice(n),
   symbol: 'Kč',
   loaded: false,
 });
@@ -36,6 +39,7 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     laborTargetPct: null,
     money: (n: number) => formatMoney(n),
     cost: (n: number) => formatCost(n),
+    price: (n: number) => formatPrice(n),
     symbol: 'Kč',
     loaded: false,
   });
@@ -55,6 +59,7 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
           laborTargetPct: t.labor_target_pct ?? null,
           money: makeMoney({ currency, locale }),
           cost: (n: number) => formatCost(n, currency, locale),
+          price: (n: number) => formatPrice(n, currency, locale),
           symbol: currencySymbol(currency, locale),
           loaded: true,
         });
@@ -69,4 +74,5 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
 export const useCurrency = () => useContext(Ctx);
 export const useMoney = () => useContext(Ctx).money;
 export const useCost = () => useContext(Ctx).cost;
+export const usePrice = () => useContext(Ctx).price;
 export const useSymbol = () => useContext(Ctx).symbol;

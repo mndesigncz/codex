@@ -80,7 +80,7 @@ function radek(r: Record<string, unknown>): PodnikRadek {
  * tarif je spočítaná věc (trial, Stripe, ruční), ne sloupec. Při stovkách
  * podniků je to v pořádku; při desetitisících se to přepíše — ne dřív.
  */
-export async function listTeams(opts: { q?: string; stav?: StavPodniku | 'vse'; limit?: number; offset?: number } = {}) {
+export async function listTeams(opts: { q?: string; stav?: StavPodniku | 'vse'; limit?: number; offset?: number; /** Vrátit všechny nalezené (pro souhrny), ne stránku. */ vse?: boolean } = {}) {
   const q = (opts.q ?? '').trim();
   const limit = Math.min(Math.max(opts.limit ?? 50, 1), 200);
   const offset = Math.max(opts.offset ?? 0, 0);
@@ -94,7 +94,8 @@ export async function listTeams(opts: { q?: string; stav?: StavPodniku | 'vse'; 
       t.stripe_subscription_id, t.had_subscription,
       t.blocked_at, t.blocked_reason, t.admin_note,
       o.name AS owner_name, o.email AS owner_email,
-      (SELECT COUNT(*) FROM users u WHERE u.team_id = t.id AND u.role IN ('employer','employee')) AS members,
+      (SELECT COUNT(*) FROM users u LEFT JOIN team_members m ON m.user_id = u.id AND m.team_id = t.id
+        WHERE (m.user_id IS NOT NULL OR u.team_id = t.id) AND COALESCE(m.role, u.role) IN ('employer','employee')) AS members,
       (SELECT MAX(a.created_at) FROM audit_log a WHERE a.team_id = t.id) AS last_audit,
       (SELECT MAX(c.created_at) FROM cash_closings c WHERE c.team_id = t.id) AS last_closing
     FROM teams t LEFT JOIN users o ON o.id = t.owner_id
@@ -103,7 +104,7 @@ export async function listTeams(opts: { q?: string; stav?: StavPodniku | 'vse'; 
     LIMIT 2000`) as Record<string, unknown>[];
   let vse = rows.map(radek);
   if (opts.stav && opts.stav !== 'vse') vse = vse.filter(p => p.stav === opts.stav);
-  return { total: vse.length, teams: vse.slice(offset, offset + limit) };
+  return { total: vse.length, teams: opts.vse ? vse : vse.slice(offset, offset + limit) };
 }
 
 export async function getTeam(id: number) {
@@ -116,16 +117,20 @@ export async function getTeam(id: number) {
       t.stripe_subscription_id, t.had_subscription,
       t.blocked_at, t.blocked_reason, t.admin_note,
       o.name AS owner_name, o.email AS owner_email,
-      (SELECT COUNT(*) FROM users u WHERE u.team_id = t.id AND u.role IN ('employer','employee')) AS members,
+      (SELECT COUNT(*) FROM users u LEFT JOIN team_members m ON m.user_id = u.id AND m.team_id = t.id
+        WHERE (m.user_id IS NOT NULL OR u.team_id = t.id) AND COALESCE(m.role, u.role) IN ('employer','employee')) AS members,
       (SELECT MAX(a.created_at) FROM audit_log a WHERE a.team_id = t.id) AS last_audit,
       (SELECT MAX(c.created_at) FROM cash_closings c WHERE c.team_id = t.id) AS last_closing
     FROM teams t LEFT JOIN users o ON o.id = t.owner_id
     WHERE t.id = ${id}`) as Record<string, unknown>[];
   if (!r) throw new AdminError(404, 'Podnik s tímhle id neexistuje.');
+  // Členství NEBO zrcadlo (kolo 62), jako všude jinde: člen právě přepnutý do
+  // jiného podniku organizace v detailu původního podniku nesmí chybět.
   const members = await sql`
-    SELECT id, name, email, role, avatar, created_at FROM users
-    WHERE team_id = ${id} AND role IN ('employer','employee','kiosk')
-    ORDER BY role DESC, name ASC`;
+    SELECT u.id, u.name, u.email, COALESCE(m.role, u.role) AS role, u.avatar, u.created_at
+    FROM users u LEFT JOIN team_members m ON m.user_id = u.id AND m.team_id = ${id}
+    WHERE (m.user_id IS NOT NULL OR u.team_id = ${id}) AND COALESCE(m.role, u.role) IN ('employer','employee','kiosk')
+    ORDER BY COALESCE(m.role, u.role) DESC, u.name ASC`;
   const zasahy = await adminAudit({ teamId: id, limit: 30 });
   return {
     team: radek(r),
@@ -215,7 +220,9 @@ export async function adminAudit(opts: { teamId?: number; limit?: number } = {})
 }
 
 export async function overview() {
-  const { teams } = await listTeams({ limit: 200 });
+  // Souhrn počítá nad CELOU množinou (`vse`), ne nad první stránkou po 200:
+  // s 350 podniky by „Podniků“ uvázlo na 200 a starší placené by chyběly.
+  const { teams } = await listTeams({ vse: true });
   const pocet = (s: StavPodniku) => teams.filter(t => t.stav === s).length;
   const tyden = Date.now() - 7 * 86400000;
   return {

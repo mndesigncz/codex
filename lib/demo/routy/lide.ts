@@ -4,7 +4,6 @@
 
 import { chyba, ok, type Obsluha } from '../typy';
 import { LIDE, KDO_JSEM, clen } from '../data/lide';
-import { casDnes } from '../cas';
 import { mojeRole } from './zaklad';
 import type { DemoStav } from '../stav';
 

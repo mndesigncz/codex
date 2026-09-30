@@ -12,6 +12,13 @@ import { Skeleton, EmptyState } from '../ui';
 import { czDay, RES_STATUS, tierFor } from '@/lib/clientSlots';
 import { formatMoney } from '@/lib/money';
 import { okJson } from '@/lib/api';
+import { pragueDaySafe } from '@/lib/pragueTime';
+
+/** Datum z databáze česky („11. 2. 2026“) — přes pražský den, ne místní zónu telefonu hosta. */
+function denCesky(v: unknown): string {
+  const d = pragueDaySafe(v);
+  return d ? `${Number(d.slice(8, 10))}. ${Number(d.slice(5, 7))}. ${d.slice(0, 4)}` : '';
+}
 
 const input = 'field !py-2.5 text-sm';
 const label = 'field-label';
@@ -69,7 +76,7 @@ export default function MyPage() {
                         <p className="text-sm text-black/55 mt-0.5 flex items-center gap-1.5 flex-wrap">
                           {t.id !== 'bronze' && <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${t.id === 'gold' ? 'bg-[#C8F542]/30 text-[#3E5406]' : 'bg-black/[0.07] text-black/60'}`}>{t.label}</span>}
                           {t.discount > 0 && <span className="rounded-full bg-[#16181A] text-[#C8F542] px-2 py-0.5 text-[11px] font-bold">sleva {t.discount} %</span>}
-                          <span>{m.visits} {plural(m.visits, 'návštěva', 'návštěvy', 'návštěv')}{m.lastVisitAt ? ` · naposledy ${new Date(m.lastVisitAt).toLocaleDateString('cs-CZ')}` : ''}</span>
+                          <span>{m.visits} {plural(m.visits, 'návštěva', 'návštěvy', 'návštěv')}{m.lastVisitAt ? ` · naposledy ${denCesky(m.lastVisitAt)}` : ''}</span>
                         </p>
                       ); })()}
                     </div>

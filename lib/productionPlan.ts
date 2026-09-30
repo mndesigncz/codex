@@ -17,6 +17,8 @@ export interface StockRow {
   madeInHouse: boolean; batchYield: number | null; batchSteps: string | null; productionLabel: string | null;
   packaging: CategoryPackaging | null;
   status: StockStatus;
+  /** Odložená (momentálně nevedeme): jako surovina receptury zůstává vidět, jako výrobek úkol nedostává. */
+  archived?: boolean;
 }
 
 export interface RecipeLine {
@@ -26,6 +28,8 @@ export interface RecipeLine {
   /** kolik je potřeba na všechny dávky */
   need: number;
   missing: number;
+  /** Surovina je odložená (momentálně nevedeme) — do nákupního seznamu nepatří, text úkolu to musí říct. */
+  archived?: boolean;
 }
 
 export interface ProductionPlan {
@@ -81,6 +85,7 @@ export function planFor(item: StockRow, recipe: { ingredientId: number; amount: 
     lines.push({
       ingredientId: ing.id, name: ing.name, amount: r.amount, unit: recipeUnit(ing),
       available, need, missing: r3(Math.max(0, need - available)),
+      ...(ing.archived ? { archived: true } : {}),
     });
   }
   return {
@@ -88,6 +93,21 @@ export function planFor(item: StockRow, recipe: { ingredientId: number; amount: 
     yieldTotal: r3((item.batchYield && item.batchYield > 0 ? item.batchYield : 1) * n),
     lines, missing: lines.filter(l => l.missing > 0),
   };
+}
+
+/**
+ * Chybějící množství suroviny v jednotce POLOŽKY skladu, ne receptury.
+ *
+ * Řádek plánu počítá v jednotce receptury — u baleného zboží v obsahu (g, l),
+ * u kusovky ve vlastní jednotce. Nákupní vlajka (`purchase_flags.amount`) se ale
+ * čte v nákupním seznamu i při objednávce jako počet BALENÍ (`i.unit`). Když
+ * chybí na tři dávky 1 500 g cukru a balení je 1 000 g, patří do nákupu 1,5
+ * balení — dřív se do vlajky zapsalo 1 500 a objednávka dodavateli odešla na
+ * 1 500 kusů.
+ */
+export function chybiVJednotcePolozky(line: Pick<RecipeLine, 'missing'>, ingredient: StockRow): number {
+  const size = sizeOf(ingredient);
+  return size > 0 ? r3(line.missing / size) : line.missing;
 }
 
 export function taskTitleFor(item: StockRow): string {
@@ -124,7 +144,9 @@ export function describe(plan: ProductionPlan, navod?: NavodUkolu | null): strin
     lines.push('', `Suroviny na ${plan.batches === 1 ? 'jednu dávku' : czCount(plan.batches, { one: 'dávku', few: 'dávky', many: 'dávek' })}:`);
     for (const l of plan.lines) {
       const ok = l.missing <= 0;
-      lines.push(`• ${l.name} ${fmtQty(l.need)} ${l.unit} — ve skladu ${fmtQty(l.available)} ${l.unit} ${ok ? '✓' : `✗ chybí ${fmtQty(l.missing)} ${l.unit}, je v nákupním seznamu`}`);
+      lines.push(`• ${l.name} ${fmtQty(l.need)} ${l.unit} — ve skladu ${fmtQty(l.available)} ${l.unit} ${ok ? '✓' : l.archived
+        ? `✗ chybí ${fmtQty(l.missing)} ${l.unit}, položka je odložená (nevedeme) — vrať ji do skladu`
+        : `✗ chybí ${fmtQty(l.missing)} ${l.unit}, je v nákupním seznamu`}`);
     }
   }
   const postup = postupUkolu(plan, navod);

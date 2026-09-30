@@ -20,6 +20,7 @@ import {
 } from '@/lib/menu';
 import { normalizeMenuTheme, zeSdilenehoVzhledu, VYCHOZI_THEME } from '@/lib/menuTheme';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { cenaKZapisu } from '@/lib/cenaSloupce';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,7 +41,8 @@ async function meniCeny(boardId: number, sections: unknown): Promise<boolean> {
   for (const s of sections.slice(0, 40)) {
     for (const it of (Array.isArray((s as any)?.items) ? (s as any).items : []).slice(0, 100)) {
       if (!cleanText(it?.name, MAX_NAME)) continue;
-      const cena = cleanPrice(it?.price);
+      // Cena tak, jak ji unese sloupec — jinak by se i beze změny lišila od uložené.
+      const cena = (await cenaKZapisu('menu_items.price', cleanPrice(it?.price))) ?? 0;
       const puvodni = cenaPodleId.get(Number(it?.id));
       if (puvodni === undefined ? cena > 0 : puvodni !== cena) return true;
     }
@@ -336,7 +338,7 @@ export async function PUT(request: Request) {
       for (const it of (Array.isArray(s?.items) ? s.items : []).slice(0, 100)) {
         const nazev = cleanText(it?.name, MAX_NAME);
         if (!nazev) continue;
-        const cena = cleanPrice(it?.price);
+        const cena = (await cenaKZapisu('menu_items.price', cleanPrice(it?.price))) ?? 0;
         const popis = cleanText(it?.description, MAX_DESC) || null;
         const vyprodano = it?.soldOut === true;
         const pos = cleanText(it?.posProductId, 64) || null;

@@ -7,6 +7,11 @@ import { neon } from '@neondatabase/serverless';
 import { webovaUrl } from '@/lib/bezpecnaUrl';
 import { tymyCiselniku } from '@/lib/tenant';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { cenaZFormulare } from '@/lib/cena';
+import { cenaKZapisu } from '@/lib/cenaSloupce';
+import { uklidOdkazyNaPolozky } from '@/lib/skladOdkazy';
+import { ensureProductionTasks } from '@/lib/production';
+import { hromadneCislo } from '@/lib/inventura';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,10 +24,15 @@ function idsFrom(raw: any): number[] {
   )).slice(0, 500);
 }
 
+// `Number(null)` a `Number('')` jsou 0 — tiše by se zapsala nula všem vybraným
+// položkám. Nezadáno je proto vždy null, viz hromadneCislo.
 const num = (v: any) => {
+  if (v === null || v === undefined || v === '') return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 };
+
+const CISELNA_POLE = ['minQuantity', 'criticalQuantity', 'maxQuantity', 'packageSize'] as const;
 
 // Kolo 67: `sklad.upravit`; nákupní cenu navíc `sklad.ceny_upravit` — jinak
 // by šlo cenu obejít hromadnou úpravou. Chybí-li oprávnění k ceně, odmítne
@@ -39,6 +49,17 @@ export async function PATCH(request: Request) {
   const patch = body.patch ?? {};
   if (patch.unitCost !== undefined && !c.role.opravneni.has('sklad.ceny_upravit')) {
     return NextResponse.json({ error: 'Na nákupní ceny nemáš oprávnění.' }, { status: 403 });
+  }
+  // Cena se ověří dřív než cokoli se zapíše: odmítnutí uprostřed by nechalo
+  // půlku hromadné úpravy uloženou.
+  const zadanaCena = patch.unitCost !== undefined ? cenaZFormulare(patch.unitCost) : null;
+  if (zadanaCena && !zadanaCena.ok) return NextResponse.json({ error: 'Cena musí být číslo, třeba 4,99.' }, { status: 400 });
+  // Totéž pro čísla: nečíslo („abc", „5 ks") = 400 před prvním zápisem,
+  // ne nula pro až 500 položek. Prázdné/null znamená „nezadáno".
+  for (const k of CISELNA_POLE) {
+    if (patch[k] !== undefined && !hromadneCislo(patch[k]).ok) {
+      return NextResponse.json({ error: 'Limity a velikost balení musí být čísla, třeba 12 nebo 0,5.' }, { status: 400 });
+    }
   }
   const applied: string[] = [];
   const skipped: string[] = [];
@@ -86,7 +107,7 @@ export async function PATCH(request: Request) {
   }
 
   if (patch.minQuantity !== undefined) {
-    const v = num(patch.minQuantity);
+    const v = hromadneCislo(patch.minQuantity).hodnota;
     if (v != null) {
       await sql`UPDATE inventory_items SET min_quantity = ${Math.max(0, Math.round(v))} WHERE id = ANY(${ids}) AND team_id = ${me.teamId}`;
       applied.push('minQuantity');
@@ -94,7 +115,7 @@ export async function PATCH(request: Request) {
   }
 
   if (patch.criticalQuantity !== undefined) {
-    const v = num(patch.criticalQuantity);
+    const v = hromadneCislo(patch.criticalQuantity).hodnota;
     if (v != null) {
       await sql`UPDATE inventory_items SET critical_quantity = ${Math.max(0, Math.round(v))} WHERE id = ANY(${ids}) AND team_id = ${me.teamId}`;
       applied.push('criticalQuantity');
@@ -102,7 +123,7 @@ export async function PATCH(request: Request) {
   }
 
   if (patch.maxQuantity !== undefined) {
-    const v = num(patch.maxQuantity);
+    const v = hromadneCislo(patch.maxQuantity).hodnota;
     if (v != null) {
       await sql`UPDATE inventory_items SET max_quantity = ${Math.max(0, Math.round(v))} WHERE id = ANY(${ids}) AND team_id = ${me.teamId}`;
       applied.push('maxQuantity');
@@ -110,15 +131,16 @@ export async function PATCH(request: Request) {
   }
 
   if (patch.unitCost !== undefined) {
-    const v = patch.unitCost === null || patch.unitCost === '' ? null : num(patch.unitCost);
+    // Haléře (4,99 €) jen tam, kde je sloupec NUMERIC — viz lib/cenaSloupce.
+    const v = await cenaKZapisu('inventory_items.unit_cost', zadanaCena && zadanaCena.ok ? zadanaCena.hodnota : null);
     try {
-      await sql`UPDATE inventory_items SET unit_cost = ${v == null ? null : Math.max(0, Math.round(v))} WHERE id = ANY(${ids}) AND team_id = ${me.teamId}`;
+      await sql`UPDATE inventory_items SET unit_cost = ${v} WHERE id = ANY(${ids}) AND team_id = ${me.teamId}`;
       applied.push('unitCost');
     } catch { skipped.push('unitCost'); }
   }
 
   if (patch.packageSize !== undefined) {
-    const v = patch.packageSize === null || patch.packageSize === '' ? null : num(patch.packageSize);
+    const v = hromadneCislo(patch.packageSize).hodnota;   // null/prázdné = vymazat
     try {
       await sql`UPDATE inventory_items SET package_size = ${v == null || v <= 0 ? null : v} WHERE id = ANY(${ids}) AND team_id = ${me.teamId}`;
       applied.push('packageSize');
@@ -169,6 +191,15 @@ export async function DELETE(request: Request) {
   const ids = idsFrom(body.ids);
   if (ids.length === 0) return NextResponse.json({ error: 'Nevybrány žádné položky' }, { status: 400 });
 
-  await sql`DELETE FROM inventory_items WHERE id = ANY(${ids}) AND team_id = ${me.teamId}`;
-  return NextResponse.json({ ok: true, count: ids.length });
+  // Jen položky tohoto podniku — úklid odkazů i historie sahá na tabulky bez team_id.
+  const jeho = (await sql`SELECT id FROM inventory_items WHERE id = ANY(${ids}) AND team_id = ${me.teamId}`).map((r: any) => Number(r.id));
+  if (jeho.length) {
+    await sql`DELETE FROM inventory_log WHERE item_id = ANY(${jeho})`;
+    await sql`DELETE FROM inventory_items WHERE id = ANY(${jeho}) AND team_id = ${me.teamId}`;
+    // Mapování kasy, receptury, nákupní vlajky, návody a výrobní úkoly — viz lib/skladOdkazy.
+    await uklidOdkazyNaPolozky(me.teamId, jeho);
+    // Receptury, které smazané suroviny používaly, mění výrobní plán a nákup.
+    try { await ensureProductionTasks(me.teamId, null); } catch { /* před migrací */ }
+  }
+  return NextResponse.json({ ok: true, count: jeho.length });
 }

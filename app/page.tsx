@@ -2,6 +2,14 @@ import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import Landing from '@/components/Landing';
+import type { Metadata } from 'next';
+import { OG_ZAKLAD } from '@/lib/web';
+
+// Canonical jen tady: úvodní stránka je jediná, která se má z adresy sama vyhlásit za originál.
+export const metadata: Metadata = {
+  alternates: { canonical: '/' },
+  openGraph: { ...OG_ZAKLAD, url: '/' },
+};
 
 export default async function Home() {
   const session = await getServerSession(authOptions);

@@ -8,6 +8,7 @@ import { Icon } from '../Icons';
 import ShrinkageReport from './ShrinkageReport';
 import { okJson } from '@/lib/api';
 import { czCount, POLOZKA } from '@/lib/czech';
+import { pocetDoPole, pocetZPole } from '@/lib/inventura';
 import { Button, Chip, ListRow, Modal, Skeleton } from '../ui';
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
@@ -51,12 +52,19 @@ export default function StocktakeModal({ smiZahajit, smiDokoncit, smiZtraty, onC
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingCounts = useRef<Record<string, number | null>>({});
   const pendingOpens = useRef<Record<string, number | null>>({});
+  // Text, který člověk zrovna píše (klíč `c<id>` = počet, `o<id>` = zbytek
+  // v načatém). Pole se nesmí při každém úhozu překreslit z rozparsovaného
+  // čísla: z „0," by zmizela čárka a „0,68" by skončilo jako 68.
+  const [texty, setTexty] = useState<Record<string, string>>({});
+  // Smí se počet zapsat s desetinami? Rozhoduje sloupec ve skladu (server).
+  const [desetinne, setDesetinne] = useState(false);
 
   const load = async () => {
     try {
       const d = await fetch('/api/stocktake').then(okJson);
       setOpen(d.open ?? null);
       setHistory(Array.isArray(d.history) ? d.history : []);
+      setDesetinne(d.mnozstviDesetinne === true);
       if (d.notMigrated) setErr('Inventura bude dostupná po dokončení migrace (/api/init).');
     } catch { setErr('Inventuru se nepodařilo načíst.'); }
     setLoading(false);
@@ -89,9 +97,24 @@ export default function StocktakeModal({ smiZahajit, smiDokoncit, smiZtraty, onC
     }, 600);
   };
 
+  /** Proč se text v poli nedá zapsat (`cislo` = není číslo, `cele` = desetiny u počtu na celé); jinak null. */
+  const chybaPole = (klic: string): 'cislo' | 'cele' | null => {
+    const raw = texty[klic];
+    if (raw === undefined) return null;
+    const p = pocetZPole(raw, klic.startsWith('o') || desetinne);
+    return p.ok ? null : p.duvod;
+  };
+  const neplatnych = Object.keys(texty).filter(k => chybaPole(k) !== null).length;
+
   const setCount = (itemId: number, raw: string) => {
     if (!open) return;
-    const counted = raw === '' ? null : Math.max(0, Math.round(Number(raw) || 0));
+    setTexty(t => ({ ...t, ['c' + itemId]: raw }));
+    // Nečitelný text a desetiny tam, kde se počítá na celé, se NEposílají —
+    // dřív se tiše zaokrouhlily a inventura zapsala rozdíl, který neexistuje.
+    // Pole ukáže chybu a dokončit inventuru nejde, dokud se nespraví.
+    const p = pocetZPole(raw, desetinne);
+    if (!p.ok) return;
+    const counted = p.hodnota;
     setOpen(o => o && { ...o, data: o.data.map(r => r.itemId === itemId ? { ...r, counted } : r) });
     pendingCounts.current[String(itemId)] = counted;
     flush();
@@ -100,15 +123,23 @@ export default function StocktakeModal({ smiZahajit, smiDokoncit, smiZtraty, onC
   /** Zbytek v načatém balení — 0,68 l zůstane 0,68 l. */
   const setOpenAmount = (itemId: number, raw: string) => {
     if (!open) return;
-    const v = raw.replace(',', '.');
-    const countedOpen = v === '' ? null : Math.max(0, Math.round((Number(v) || 0) * 1000) / 1000);
+    setTexty(t => ({ ...t, ['o' + itemId]: raw }));
+    const p = pocetZPole(raw, true);
+    if (!p.ok) return;
+    const countedOpen = p.hodnota;
     setOpen(o => o && { ...o, data: o.data.map(r => r.itemId === itemId ? { ...r, countedOpen } : r) });
     pendingOpens.current[String(itemId)] = countedOpen;
     flush();
   };
 
+  /** Po opuštění pole se platný text nahradí normalizovaným číslem; chybný zůstane vidět. */
+  const opustPole = (klic: string) => {
+    if (chybaPole(klic) !== null) return;
+    setTexty(t => { const k = { ...t }; delete k[klic]; return k; });
+  };
+
   const complete = async () => {
-    if (!open) return;
+    if (!open || neplatnych > 0) return;
     setBusy(true); setErr('');
     // flush pending counts along with completion
     const res = await fetch('/api/stocktake', {
@@ -218,6 +249,7 @@ export default function StocktakeModal({ smiZahajit, smiDokoncit, smiZtraty, onC
               <p className="text-sm font-semibold text-[#16181A] tabular-nums" aria-live="polite">
                 {countedN}/{open.data.length} spočítáno
                 {diffN > 0 && <span className="text-wait-ink"> · {plural(diffN)}</span>}
+                {neplatnych > 0 && <span className="text-bad-ink"> · {czCount(neplatnych, { one: 'pole k opravě', few: 'pole k opravě', many: 'polí k opravě' })}</span>}
               </p>
               <div className="flex flex-wrap gap-2">
                 {smiZahajit && (
@@ -239,7 +271,7 @@ export default function StocktakeModal({ smiZahajit, smiDokoncit, smiZtraty, onC
                       </Button>
                     </>
                   ) : (
-                    <Button variant="primary" size="sm" disabled={countedN === 0} onClick={() => setConfirmDone(true)}>
+                    <Button variant="primary" size="sm" disabled={countedN === 0 || neplatnych > 0} onClick={() => setConfirmDone(true)}>
                       Dokončit a zapsat
                     </Button>
                   )
@@ -252,7 +284,9 @@ export default function StocktakeModal({ smiZahajit, smiDokoncit, smiZtraty, onC
                 <p className="t-label">{cat}</p>
                 <ul className="list mt-1">
                   {rows.map(r => {
-                    const diff = r.counted != null ? r.counted - r.expected : null;
+                    const diff = r.counted != null ? round3(r.counted - r.expected) : null;
+                    const chybaPocet = chybaPole('c' + r.itemId);
+                    const chybaZbytek = chybaPole('o' + r.itemId);
                     const pkg = Number(r.packageSize) || 0;
                     const openDiff = r.countedOpen != null ? round3(r.countedOpen - (r.expectedOpen ?? 0)) : null;
                     return (
@@ -262,15 +296,24 @@ export default function StocktakeModal({ smiZahajit, smiDokoncit, smiZtraty, onC
                           <span className="sm:hidden flex-1" />
                           <span className="shrink-0 text-xs text-black/55 tabular-nums whitespace-nowrap">evid. {r.expected} {r.unit}</span>
                           <input
-                            type="number" inputMode="numeric" min={0}
+                            inputMode={desetinne ? 'decimal' : 'numeric'}
                             aria-label={`Spočítáno — ${r.name} (${r.unit})`}
-                            value={r.counted ?? ''}
+                            aria-invalid={chybaPocet ? true : undefined}
+                            value={texty['c' + r.itemId] ?? pocetDoPole(r.counted)}
                             onChange={e => setCount(r.itemId, e.target.value)}
+                            onBlur={() => opustPole('c' + r.itemId)}
                             placeholder="—"
                             className="field !w-20 shrink-0 text-right tabular-nums"
                           />
-                          <Rozdil n={diff} text={diff == null ? '' : diff > 0 ? `+${diff}` : String(diff)} />
+                          <Rozdil n={diff} text={diff == null ? '' : diff > 0 ? `+${fmt(diff)}` : fmt(diff)} />
                         </div>
+                        {chybaPocet && (
+                          <p className="text-xs text-bad-ink mt-1" role="alert">
+                            {chybaPocet === 'cele'
+                              ? `Tahle položka se eviduje v celých ${r.unit} — zapiš celé číslo. Desetiny jdou jen u položky s velikostí balení, jako zbytek v načatém.`
+                              : 'Zapiš číslo, třeba 2.'}
+                          </p>
+                        )}
                         {pkg > 0 && (
                           <div className="flex items-center gap-3 pl-4 mt-1.5">
                             <span className="min-w-0 flex-1 text-xs text-black/55 truncate">
@@ -283,14 +326,17 @@ export default function StocktakeModal({ smiZahajit, smiDokoncit, smiZtraty, onC
                             <input
                               inputMode="decimal"
                               aria-label={`Zbytek v načatém — ${r.name}`}
-                              value={r.countedOpen ?? ''}
+                              aria-invalid={chybaZbytek ? true : undefined}
+                              value={texty['o' + r.itemId] ?? pocetDoPole(r.countedOpen)}
                               onChange={e => setOpenAmount(r.itemId, e.target.value)}
+                              onBlur={() => opustPole('o' + r.itemId)}
                               placeholder="—"
                               className="field !w-20 shrink-0 text-right tabular-nums"
                             />
                             <Rozdil n={openDiff} text={openDiff == null ? '' : openDiff > 0 ? `+${fmt(openDiff)}` : fmt(openDiff)} />
                           </div>
                         )}
+                        {chybaZbytek && <p className="text-xs text-bad-ink mt-1 pl-4" role="alert">Zapiš číslo, třeba 0,68.</p>}
                       </li>
                     );
                   })}

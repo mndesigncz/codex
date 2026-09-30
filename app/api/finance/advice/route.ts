@@ -21,6 +21,7 @@ import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { neon } from '@neondatabase/serverless';
 import { cashDifference } from '@/lib/closing';
 import { czCount } from '@/lib/czech';
+import { menaPodniku } from '@/lib/menaPodniku';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -45,7 +46,6 @@ interface Advice {
   evidence?: string;
 }
 
-const czk = (n: number) => `${Math.round(n).toLocaleString('cs-CZ')} Kč`;
 const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0);
 const num = (v: any) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 const WEEKDAYS = ['neděle', 'pondělí', 'úterý', 'středa', 'čtvrtek', 'pátek', 'sobota'];
@@ -68,6 +68,10 @@ export async function GET(req: NextRequest) {
   const c = await pozaduj('finance.analyza');
   if (jeOdpoved(c)) return c;
   const teamId = c.teamId;
+  // Částky v textech radí měnou podniku, ne natvrdo korunami (osm podporovaných
+  // měn); `czk` zůstává jako jméno, ať se nepřepisuje dvacet čtyři volání.
+  const mena = await menaPodniku(teamId);
+  const czk = mena.money;
   const skupiny = new Set<AdviceGroup>(['revenue', 'products', 'stock']);
   if (c.role.opravneni.has('finance.mzdy')) skupiny.add('people');
   if (c.role.opravneni.has('zakaznici.zobrazit')) skupiny.add('guests');
@@ -238,7 +242,7 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  if (diffAbs > 200) {
+  if (diffAbs > mena.prah(200)) {
     add({
       group: 'people', tone: 'warn', icon: 'warning',
       title: `Rozdíly v kase ±${czk(diffAbs)} za měsíc`,
@@ -500,7 +504,7 @@ export async function GET(req: NextRequest) {
   }
 
   const topSup = Array.from(bySupplier.entries()).sort((a, b) => b[1] - a[1])[0];
-  if (topSup && purchases > 0 && topSup[1] / purchases > 0.5 && topSup[1] > 2000) {
+  if (topSup && purchases > 0 && topSup[1] / purchases > 0.5 && topSup[1] > mena.prah(2000)) {
     const savings = Math.round(topSup[1] * 0.05);
     add({
       group: 'stock', tone: 'info', icon: 'box',

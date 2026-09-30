@@ -4,6 +4,7 @@ import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { getConnection } from '@/lib/storyous';
+import { menaPodniku } from '@/lib/menaPodniku';
 import { daySummaryFor } from '@/lib/posMirror';
 import { normalizeHandover, normalizeMovements } from '@/lib/closing';
 import { chybejiciPredUzaverkou } from '@/lib/povinnePredUzaverkouDb';
@@ -272,7 +273,7 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
         notes.push(`K tomuhle dni je uzávěrek ${siblings + 1}, takže se pokladna porovnává proti jejich součtu, ne proti téhle jedné.`);
       }
       if (s.other > 0) {
-        notes.push(`${Math.round(s.other).toLocaleString('cs-CZ')} Kč z pokladny má jiný způsob platby než hotovost nebo kartu — v uzávěrce pro to není kolonka, takže se to v rozdílu projeví.`);
+        notes.push(`${(await menaPodniku(teamId)).money(Math.round(s.other))} z pokladny má jiný způsob platby než hotovost nebo kartu — v uzávěrce pro to není kolonka, takže se to v rozdílu projeví.`);
       }
       if (s.tipsOther > 0) {
         notes.push('U části spropitného se nedá vyčíst, jestli přišlo hotově nebo kartou — počítá se zvlášť, ne odhadem do jedné strany.');

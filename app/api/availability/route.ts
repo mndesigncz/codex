@@ -126,12 +126,13 @@ export async function POST(req: Request) {
 
   const body = await req.json();
   const month: string = body.month;
-  const unavailableDates: string[] = Array.isArray(body.unavailableDates) ? body.unavailableDates : [];
   const preferredShift: string | null = body.preferredShift ?? null;
+  // Stejné meze jako u vedení (PATCH): 0 generátor čte jako „žádná směna“, ale
+  // přehled vytížení jako „bez limitu“, proto se nula a nesmysl berou jako bez limitu.
   const maxShifts: number | null =
     body.maxShifts === null || body.maxShifts === undefined || body.maxShifts === ''
       ? null
-      : parseInt(body.maxShifts);
+      : (Math.max(1, Math.min(31, parseInt(body.maxShifts) || 0)) || null);
   const note: string | null = body.note ?? null;
 
   if (!month || !/^\d{4}-\d{2}$/.test(month)) {
@@ -139,6 +140,11 @@ export async function POST(req: Request) {
   }
   // Až po kontrole měsíce: filtr potřebuje vědět, do kterého měsíce dny patří.
   const dayPreferences = await ocistiPreference(ctx.teamId, month, body.dayPreferences);
+  // Jako u vedení (PATCH): jen dny tohoto měsíce, bez duplicit, nejvýš 62.
+  // Dřív se pole ukládalo, jak přišlo — libovolné řetězce a tisíce položek.
+  const unavailableDates: string[] = Array.isArray(body.unavailableDates)
+    ? Array.from(new Set(body.unavailableDates.filter(vMesici(month)))).slice(0, 62) as string[]
+    : [];
 
   // delete existing for this employee+month, then insert
   await sql`

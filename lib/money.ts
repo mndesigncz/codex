@@ -78,6 +78,18 @@ export function formatCost(n: number, currency = 'CZK', locale = 'cs-CZ'): strin
   return formatMoney(n, currency, locale, d);
 }
 
+/**
+ * Cena položky (menu, nákupní cena balení): celé jednotky bez desetinných
+ * míst, ale s haléři tam, kde je cena má — 4,50 € se nesmí ukázat jako „5 €"
+ * ani jako „4,5 €". `formatMoney` zaokrouhluje na celé, protože většina částek
+ * v aplikaci jsou součty; ceny zadané člověkem se ale ukazují tak, jak byly
+ * zadány.
+ */
+export function formatPrice(n: number, currency = 'CZK', locale = 'cs-CZ'): string {
+  const halere = Math.round((Number(n) || 0) * 100);
+  return formatMoney(halere / 100, currency, locale, halere % 100 !== 0 ? 2 : 0);
+}
+
 // A bound formatter factory for a given team config.
 export function makeMoney(cfg: CurrencyConfig) {
   return (n: number) => formatMoney(n, cfg.currency, cfg.locale);

@@ -86,8 +86,8 @@ const bezPretecni = (p) => p.evaluate(() => document.documentElement.scrollWidth
       } catch { /* soukromé okno */ }
     },
   });
-  await ctx.emulateMedia({ colorScheme: 'dark' });
   const p = await ctx.newPage();
+  await p.emulateMedia({ colorScheme: 'dark' });
   await otevriDemo(p, '/demo?scena=prehled');
   tvrdi('D1 světlý motiv vynucený i při uloženém tmavém a tmavém systému', await p.evaluate(() => document.documentElement.getAttribute('data-theme') === 'light'));
   tvrdi('D1 žádné cookies', (await ctx.cookies()).length === 0 && (await p.evaluate(() => document.cookie)) === '');
@@ -136,9 +136,9 @@ const bezPretecni = (p) => p.evaluate(() => document.documentElement.scrollWidth
   const dnes = await p.evaluate(() => window.__demoStav().dnes);
   const vSeznamu = await dokud(() => p.evaluate((d) => window.__demoStav().uzaverky.some(u => u.shift_date === d && u.created_by === 3), dnes), 3000);
   tvrdi('D3 dnešní uzávěrka je uložená ve stavu ukázky', vSeznamu);
-  await p.waitForTimeout(800);
-  const tx = await p.locator('main').innerText();
-  tvrdi('D3 uzávěrka se objevila v seznamu (formulář už ji nenabízí)', /Středa 30\. září|Dnes|dnes/.test(tx) || !(await p.getByRole('button', { name: 'Odeslat uzávěrku' }).isVisible().catch(() => false)));
+  // V historii „Moje uzávěrky" je dnešní směna nahoře a čeká na schválení vedením.
+  tvrdi('D3 uzávěrka se objevila v seznamu (dnešní směna, čeká na schválení)',
+    await dokud(() => p.getByText('Čeká na schválení').first().isVisible().catch(() => false), 5000));
   tvrdi('D3 čistá konzole a nula požadavků na /api', chyby.length === 0 && api.length === 0, `${chyby.slice(0, 2).join(' | ')} ${api.slice(0, 2).join(',')}`);
   await p.screenshot({ path: OUT + 'k74-uzaverka-odeslana.png' });
   await ctx.close();

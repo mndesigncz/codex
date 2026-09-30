@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { idClenu } from '@/lib/tenant';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { platnyCas, platneDatum } from '@/lib/rozvrhCsv';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,9 +34,16 @@ export async function POST(req: Request) {
       errors.push(`Zaměstnanec #${employeeId} není v týmu`);
       continue;
     }
+    // Klient čas ověřuje, ale API je volatelné i mimo něj: nečitelný čas by v
+    // pokrytí tiše vypadl z výpočtu děr (toMinutes → null).
+    const od = platnyCas(r.startTime), doCasu = platnyCas(r.endTime);
+    if (!platneDatum(r.date) || !od || !doCasu) {
+      errors.push(`Přeskočen řádek s neplatným datem nebo časem: ${JSON.stringify(r)}`);
+      continue;
+    }
     await sql`
       INSERT INTO shifts (team_id, employee_id, date, start_time, end_time, type)
-      VALUES (${ctx.teamId}, ${employeeId}, ${r.date}, ${r.startTime}, ${r.endTime}, ${r.type ?? 'flexible'})`;
+      VALUES (${ctx.teamId}, ${employeeId}, ${r.date}, ${od}, ${doCasu}, ${String(r.type ?? 'flexible').slice(0, 60)})`;
     inserted++;
   }
   return NextResponse.json({ inserted, errors });

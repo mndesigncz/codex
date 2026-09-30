@@ -3,6 +3,7 @@
 
 import { ok, type Obsluha } from '../typy';
 import { posunDen } from '../cas';
+import { formatMoney } from '@/lib/money';
 
 const HOSTE = [
   { id: 101, name: 'Jana D.', email: 'jana@ukazka.example', points: 320, stamps: 6, visits: 18, joined_at: '2026-02-11', last_visit_at: -2, reservations: 7, open_coupons: 1 },
@@ -55,7 +56,7 @@ export const klient: Obsluha = (p, k) => {
     return ok({
       summary: { members: 148, newMembers30: 23, points: 18420, credit: 3150, stamps: 612, visits: 1840, couponsOpen: 9, couponsRedeemed: 47, pointsGiven30: 2310, pointsSpent30: 1180 },
       recent: [
-        { id: 1, customer_name: 'Jana D.', delta: 40, note: 'Útrata 400 Kč', created_at: new Date(Date.now() - 3 * 3600000).toISOString() },
+        { id: 1, customer_name: 'Jana D.', delta: 40, note: `Útrata ${formatMoney(400)}`, created_at: new Date(Date.now() - 3 * 3600000).toISOString() },
         { id: 2, customer_name: 'Tereza M.', delta: -120, note: 'Kupon: káva zdarma', created_at: new Date(Date.now() - 26 * 3600000).toISOString() },
       ],
       series: Array.from({ length: 14 }, (_, i) => ({ day: posunDen(s.dnes, i - 13), points_given: 60 + (i * 7) % 40, points_spent: 20 + (i * 5) % 25, new_members: i % 3, redeemed: i % 2 })),

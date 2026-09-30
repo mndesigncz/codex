@@ -1059,6 +1059,18 @@ někomu patří — mzda, podpis pod zavíracím postupem, „kdo to naskladnil"
 - **Kód měny není symbol.** V databázi se ukládá `CZK`, na obrazovku jde
   `Kč`. Starší podniky mají uložený symbol, takže `normalizeCurrency`
   je most mezi tím; `Intl` na symbol vyhodí výjimku.
+- **Cena zadaná člověkem má haléře, součet ne.** Cena položky v menu,
+  nákupní cena balení a cena příjmu jdou přes `lib/cena` (`cenaZFormulare`
+  z pole, `cenaZDb` z databáze — NUMERIC chodí z Neonu jako řetězec) a
+  zobrazují se přes `usePrice()` / `formatPrice`: „4,50 €" zůstane „4,50 €",
+  „49 Kč" zůstane „49 Kč". Pole ceny je textové (`inputMode="decimal"`),
+  ne `type="number"` a už vůbec ne `replace(/\D/g, '')` — z „4,50" by bylo
+  450. Sloupce jsou v DDL INTEGER, dokud někdo nespustí migraci na NUMERIC
+  (viz `lib/cenaSloupce`); do té doby se ukládá zaokrouhleně jako dřív.
+- **Texty ze serveru mluví měnou podniku.** Rady, poznámky a push z API
+  skládej přes `menaPodniku(teamId)` (`money`, `cost`, `price`, `prah`),
+  ne s `Kč` a `cs-CZ`. Práh v korunách („od 2 000 Kč je to varování") se
+  přepočítá `prah()` — 2 000 € by nebylo varování, ale katastrofa.
 
 ## Co se samo přepíná, nesmí měnit výšku
 

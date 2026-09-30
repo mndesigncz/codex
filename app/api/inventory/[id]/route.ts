@@ -10,6 +10,9 @@ import { webovaUrl } from '@/lib/bezpecnaUrl';
 import { tymyCiselniku } from '@/lib/tenant';
 import { pozaduj, jeOdpoved, clenoveSOpravnenim } from '@/lib/opravneniDb';
 import { typNaUcet } from '@/lib/opravneni';
+import { cenaZDb, cenaZFormulare } from '@/lib/cena';
+import { cenaKZapisu, sloupecJeDesetinny } from '@/lib/cenaSloupce';
+import { uklidOdkazyNaPolozky } from '@/lib/skladOdkazy';
 
 // Každý pohyb skladu srovná výrobní úkoly: docházející vlastní produkt dostane
 // úkol „vyrobit“, doplněný ho zavře, chybějící suroviny dostanou vlajku do nákupu.
@@ -123,6 +126,8 @@ async function mappedItemRaw(id: number, teamId: number | null, tymy: number[]) 
     if (!row) return row;
     const item: any = {
       ...row,
+      // NUMERIC chodí z Neonu jako řetězec.
+      unitCost: cenaZDb(row.unitCost),
       packageSize: row.packageSize != null ? Number(row.packageSize) : null,
       openAmount: row.openAmount != null ? Number(row.openAmount) : null,
     };
@@ -201,7 +206,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       quantity: oldQty,
       packageSize: item.package_size != null ? Number(item.package_size) : null,
       openAmount: oldOpen,
-    }, amount);
+    }, amount, { celeKusy: !(await sloupecJeDesetinny('inventory_items.quantity')) });
     try {
       await sql`
         UPDATE inventory_items
@@ -383,7 +388,11 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
 
   // unit_cost updated separately so a not-yet-migrated column can't fail the edit.
   if (body.unitCost !== undefined) {
-    const uc = body.unitCost === '' || body.unitCost === null ? null : Math.max(0, Math.round(Number(body.unitCost)));
+    // Haléře jen tam, kde je sloupec už NUMERIC (viz lib/cenaSloupce);
+    // text, který cena není, se neuloží jako nula.
+    const zadana = cenaZFormulare(body.unitCost);
+    if (!zadana.ok) return NextResponse.json({ error: 'Cena musí být číslo, třeba 4,99.' }, { status: 400 });
+    const uc = await cenaKZapisu('inventory_items.unit_cost', zadana.hodnota);
     try { await sql`UPDATE inventory_items SET unit_cost = ${uc} WHERE id = ${id}`; } catch { /* column not migrated yet */ }
   }
 
@@ -540,7 +549,12 @@ export async function DELETE(request: Request, props: { params: Promise<{ id: st
   }
   await sql`DELETE FROM inventory_log WHERE item_id = ${id}`;
   await sql`DELETE FROM inventory_items WHERE id = ${id}`;
+  // Kdo na položku ukazuje (mapování kasy, receptury, nákupní vlajky, návody,
+  // výrobní úkoly), musí o ní přestat vědět — viz lib/skladOdkazy.
+  await uklidOdkazyNaPolozky(me.teamId, [id]);
   audit(me.teamId, me.meId, 'inventory.delete', 'item', id);
+  // Receptura, která smazanou surovinu používala, mění plán výroby i nákup.
+  await afterStockChange(me.teamId);
 
   return NextResponse.json({ ok: true });
 }

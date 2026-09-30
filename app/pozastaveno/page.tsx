@@ -14,7 +14,7 @@ import OdhlasitButton from '@/components/admin/OdhlasitButton';
 import PodnikSwitcher from '@/components/PodnikSwitcher';
 import SpravovatPredplatneButton from '@/components/SpravovatPredplatneButton';
 
-export const metadata: Metadata = { title: 'Podnik je pozastavený' };
+export const metadata: Metadata = { title: 'Podnik je pozastavený', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
 
 export default async function Pozastaveno() {

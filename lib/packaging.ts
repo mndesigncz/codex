@@ -176,11 +176,19 @@ export function fmtAmount(n: number): string {
  * Never goes below zero; selling from an empty shelf is a counting error,
  * not negative stock.
  */
-export function consumeContent(item: PackagedItem, amount: number): { quantity: number; openAmount: number | null } {
+export function consumeContent(
+  item: PackagedItem,
+  amount: number,
+  // Sloupec `quantity` bývá v databázi ještě INTEGER (viz lib/cenaSloupce):
+  // desetinné číslo by zápis odmítl a u odpisu prodejů shodilo celou transakci.
+  // `celeKusy` proto u položky bez balení zaokrouhlí výsledek na celé.
+  opts?: { celeKusy?: boolean },
+): { quantity: number; openAmount: number | null } {
   const size = Number(item.packageSize) || 0;
   let qty = Math.max(0, Number(item.quantity) || 0);
   if (size <= 0) {
-    return { quantity: Math.max(0, round1(qty - amount)), openAmount: item.openAmount ?? null };
+    const zbyva = opts?.celeKusy ? Math.round(qty - amount) : round1(qty - amount);
+    return { quantity: Math.max(0, zbyva), openAmount: item.openAmount ?? null };
   }
   let open = Math.max(0, Number(item.openAmount) || 0);
   let left = amount;
@@ -209,4 +217,25 @@ export function openPct(item: PackagedItem): number {
 
 function round1(n: number): number {
   return Math.round(n * 10) / 10;
+}
+
+/**
+ * Odpis prodeje ze skladu: nejdřív načaté balení, pak se načne nové, nikdy
+ * pod nulu. Na rozdíl od `consumeContent` počítá na tři desetinná místa
+ * (0,7 l minus 0,02 l musí zůstat 0,68 — zaokrouhlení na desetiny by
+ * podniku vracelo 0,02 l při každém drinku). `celeKusy`: viz `consumeContent`
+ * — u položky bez balení a INTEGER sloupce se počet zaokrouhlí na celé, ať
+ * jeden neplatný zápis nesrazí odpis všech surovin a značky účtenek.
+ */
+export function odepsatProdej(qty: number, open: number, pkg: number, amount: number, celeKusy = false) {
+  if (pkg > 0) {
+    open -= amount;
+    while (open < 0 && qty > 0) { qty -= 1; open += pkg; }
+    if (open < 0) open = 0;
+    open = Math.round(open * 1000) / 1000;
+  } else {
+    const zbyva = celeKusy ? Math.round(qty - amount) : Math.round((qty - amount) * 1000) / 1000;
+    qty = Math.max(0, zbyva);
+  }
+  return { qty, open };
 }

@@ -2,7 +2,7 @@
 // jen tolik dat, aby widgety ukázaly obsah místo prázdného stavu.
 
 import { ok, type Obsluha } from '../typy';
-import { KDO_JSEM, LIDE, clen } from '../data/lide';
+import { KDO_JSEM, LIDE } from '../data/lide';
 import { posunDen } from '../cas';
 import { mojeRole } from './zaklad';
 

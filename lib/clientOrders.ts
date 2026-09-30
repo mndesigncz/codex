@@ -14,6 +14,8 @@ import { getConnection, createTableOrder, confirmTableOrder, tableOrderState, St
 import { notifyUser, notifyUsers } from './push';
 import { pragueToday, pragueDayOf, parseDbTime } from './pragueTime';
 import { createHmac } from 'crypto';
+import { naHalere } from './cena.ts';
+import { menaPodniku } from './menaPodniku';
 
 // ---- Ochrana: sedí host opravdu u stolu? ------------------------------------
 //
@@ -92,7 +94,7 @@ export async function buildLines(teamId: number, menuSlug: string | null, lines:
     out.push({ itemId: Number(r.id), name: String(r.name), price: Number(r.price) || 0, count, posProductId: r.pos_product_id ? String(r.pos_product_id) : null });
   }
   if (!out.length) return { lines: [], total: 0, error: 'Položky z nabídky nesedí, obnov stránku.' };
-  return { lines: out, total: out.reduce((a, l) => a + l.price * l.count, 0) };
+  return { lines: out, total: naHalere(out.reduce((a, l) => a + l.price * l.count, 0)) };
 }
 
 export const ORDER_FLOW: Record<string, string[]> = { new: ['confirmed', 'declined'], confirmed: ['done', 'declined'] };
@@ -243,7 +245,7 @@ export async function setOrderStatus(teamId: number, id: number, next: string): 
     const profile = await ensureProfile(teamId);
     if (profile.loyalty_on) {
       const pts = Math.floor(Number(o.total) / 100) * (Number(profile.points_per_100) || 0);
-      const points = pts > 0 ? await award(teamId, Number(o.customer_id), pts, 'order', `ord:${o.id}`, `Útrata ${o.total} Kč`) : null;
+      const points = pts > 0 ? await award(teamId, Number(o.customer_id), pts, 'order', `ord:${o.id}`, `Útrata ${(await menaPodniku(teamId)).price(Number(o.total))}`) : null;
       const [m] = await sql`SELECT last_visit_at FROM client_memberships WHERE customer_id = ${o.customer_id} AND team_id = ${teamId}`;
       // Ovladač vrací TIMESTAMP jako Date, ne text — porovnává se pražský den,
       // ne prvních deset znaků řetězce.
@@ -283,7 +285,8 @@ export async function applyPosState(teamId: number, order: any, st: string): Pro
 }
 
 export async function notifyNewOrder(teamId: number, customerName: string, tableName: string | null, total: number, id: number, posNote?: string | null) {
-  const kdo = `${customerName}${tableName ? ` · ${tableName}` : ''} · ${total} Kč`;
+  // Částka v měně podniku, ne natvrdo v korunách (eurová kavárna).
+  const kdo = `${customerName}${tableName ? ` · ${tableName}` : ''} · ${(await menaPodniku(teamId)).price(total)}`;
   // Příjemci = kdo vstoupí do Managero client (klient.prehled), protože
   // odkaz vede tam. Ne objednavky.vyridit: to má i barista a tablet, kteří
   // objednávku vidí v příjmu obsluhy a push na obrazovku vedení by jim

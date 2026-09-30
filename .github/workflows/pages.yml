@@ -123,6 +123,10 @@ jobs:
       # jen načte znovu a člověk nepozná, proč se nic nestalo.
       - name: Tiché změny
         run: node scripts/check-silent-mutation.mjs
+      # Akce, kterou kód zapíše do historie změn, musí mít český popisek
+      # (lib/auditPopisky.ts) — jinak vedení čte „team.switch“.
+      - name: Popisky historie změn
+        run: node scripts/check-audit-labels.mjs
       # Koncept leží v úložišti prohlížeče. Heslo, token ani číslo karty
       # tam nepatří — uchovat je není laskavost, ale bezpečnostní chyba.
       - name: Tajemství v konceptu

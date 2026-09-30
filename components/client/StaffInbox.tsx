@@ -25,7 +25,7 @@ import { RES_STATUS } from '@/lib/clientSlots';
 import { TON_REZERVACE, type StavRezervace } from '@/lib/klientPrehled';
 import { czCount, type CzNoun } from '@/lib/czech';
 import { dbTimeHM, parseDbTime } from '@/lib/pragueTime';
-import { useMoney } from '../CurrencyProvider';
+import { usePrice } from '../CurrencyProvider';
 import { okJson, apiMessage } from '@/lib/api';
 import { useOpravneni } from '../role/useOpravneni';
 
@@ -281,7 +281,8 @@ function RadekObjednavky({ o, busy, vyridi, onStav, onKasa, onOdmitnout }: {
   o: any; busy: boolean; vyridi: boolean;
   onStav?: (s: 'confirmed' | 'done') => void; onKasa?: () => void; onOdmitnout?: () => void;
 }) {
-  const money = useMoney();
+  // Cena z menu smí mít haléře (4,50 €) — money() by ji zaokrouhlilo na celé.
+  const cena = usePrice();
   const st = ORDER_STATUS[o.status] ?? ORDER_STATUS.new;
   const kasa = !o.storyous_order_id && o.status !== 'declined' && !!onKasa;
   const dalsi: MenuItem[] = vyridi ? [
@@ -299,12 +300,12 @@ function RadekObjednavky({ o, busy, vyridi, onStav, onKasa, onOdmitnout }: {
         </p>
         <ul className="mt-1.5 text-sm">
           {(o.items ?? []).map((l: any, i: number) => (
-            <li key={i} className="flex justify-between gap-3"><span><span className="font-semibold tabular-nums">{l.count}×</span> {l.name}</span><span className="tabular-nums text-black/60">{money(l.price * l.count)}</span></li>
+            <li key={i} className="flex justify-between gap-3"><span><span className="font-semibold tabular-nums">{l.count}×</span> {l.name}</span><span className="tabular-nums text-black/60">{cena(l.price * l.count)}</span></li>
           ))}
         </ul>
         {o.note && <p className="t-meta mt-1">„{o.note}"</p>}
         <div className="mt-2 flex items-center gap-1.5 flex-wrap">
-          <span className="font-bold tabular-nums mr-1">{money(o.total)}</span>
+          <span className="font-bold tabular-nums mr-1">{cena(o.total)}</span>
           <Chip tone={st.tone} size="sm">{st.label}</Chip>
           <Overeni o={o} />
           <StavKasy o={o} />

@@ -10,7 +10,7 @@ import { LIDE, KDO_JSEM, clen } from '../data/lide';
 import { OTEVIRACI_DOBA, type DemoStav, type Smena } from '../stav';
 import { mojeRole } from './zaklad';
 import { coverageGaps, missingSlots } from '@/lib/coverage';
-import { navrhniRozvrh, type ClovekGeneratoru, type NavrzenaSmena } from '@/lib/rozvrhGenerator';
+import { navrhniRozvrh, type ClovekGeneratoru } from '@/lib/rozvrhGenerator';
 
 /** Otisk uložených směn měsíce (jako md5 na serveru: souběh se pozná změnou). */
 function verzeMesice(s: DemoStav, mesic: string): string {

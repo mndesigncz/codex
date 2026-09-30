@@ -11,9 +11,11 @@ import TeamManagement from './TeamManagement';
 import { dbTimeDayHM } from '@/lib/pragueTime';
 import { czCount } from '@/lib/czech';
 import { okJson } from '@/lib/api';
+import { PUSH_NAKONFIGUROVAN, prohlizecUmiPush, stavPush } from '@/lib/pushKlient';
 import { useOpravneni } from './role/useOpravneni';
 import { useStrazRole, CO_SE_ZAHODI_ROLE } from './role/rozepsano';
 import { DiscardGuard } from './ui/DiscardGuard';
+import { ErrorState } from './ui/ErrorState';
 import dynamic from 'next/dynamic';
 
 // Editor rolí nese celý katalog oprávnění (přes sto šedesát položek
@@ -194,11 +196,17 @@ export default function Settings({ user, initialTab, tabNonce }: Props) {
       setPosMsg(d.error || 'Připojení se nepodařilo.');
     }
   };
-  useEffect(() => {
-    if (section !== 'audit' || auditEntries) return;
+  // Chyba načtení historie je chyba, ne prázdný seznam („Zatím žádný záznam“ by lhalo).
+  const [auditErr, setAuditErr] = useState(false);
+  const nactiAudit = () => {
+    setAuditErr(false);
     fetch('/api/audit').then(okJson)
       .then(d => setAuditEntries(Array.isArray(d.entries) ? d.entries : []))
-      .catch(() => setAuditEntries([]));
+      .catch(() => setAuditErr(true));
+  };
+  useEffect(() => {
+    if (section !== 'audit' || auditEntries) return;
+    nactiAudit();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section]);
 
@@ -222,6 +230,9 @@ export default function Settings({ user, initialTab, tabNonce }: Props) {
 
   // Notification preferences (localStorage)
   const [prefs, setPrefs] = useState<NotifPrefs>(DEFAULT_PREFS);
+  // Push nabízíme jen tam, kde by opravdu fungoval (klíče v buildu + podporující prohlížeč).
+  const [pushStav, setPushStav] = useState(() => stavPush(PUSH_NAKONFIGUROVAN, true));
+  useEffect(() => { setPushStav(stavPush(PUSH_NAKONFIGUROVAN, prohlizecUmiPush())); }, []);
 
   // Notification center
   const [notifs, setNotifs] = useState<Notif[]>([]);
@@ -546,7 +557,19 @@ export default function Settings({ user, initialTab, tabNonce }: Props) {
                 <p className="t-meta mt-1">Nastavte, o čem chcete být informováni.</p>
               </div>
               <ul className="list">
-                <SwitchRow title="Push notifikace" hint="Povolte oznámení v tomto prohlížeči." checked={prefs.push} onChange={togglePush} />
+                {pushStav === 'ok' ? (
+                  <SwitchRow title="Push notifikace" hint="Povolte oznámení v tomto prohlížeči." checked={prefs.push} onChange={togglePush} />
+                ) : (
+                  // Bez klíčů nebo v prohlížeči bez podpory by přepínač nic neudělal — radši to řekneme.
+                  <li className="py-3 min-h-[3.25rem]">
+                    <p className="text-sm font-semibold text-[#16181A]">Push notifikace</p>
+                    <p className="text-xs text-black/45 mt-0.5 text-pretty">
+                      {pushStav === 'nenakonfigurovano'
+                        ? 'V téhle instalaci zatím nejsou zapnuté. Upozornění najdeš v centru oznámení níže.'
+                        : 'Tenhle prohlížeč je nepodporuje. Na iPhonu je potřeba nejdřív přidat aplikaci na plochu. Upozornění najdeš v centru oznámení níže.'}
+                    </p>
+                  </li>
+                )}
                 <SwitchRow title="Nové zprávy" hint="Upozornění na nové zprávy v chatu." checked={prefs.messages} onChange={v => setPref('messages', v)} />
                 <SwitchRow title="Nízké zásoby" hint="Když skladová položka klesne pod limit." checked={prefs.lowStock} onChange={v => setPref('lowStock', v)} />
                 <SwitchRow title="Směny" hint="Změny v rozvrhu a nové směny." checked={prefs.shifts} onChange={v => setPref('shifts', v)} />
@@ -774,7 +797,9 @@ export default function Settings({ user, initialTab, tabNonce }: Props) {
             <section className="card p-6">
               <h2 className={cardTitle}>Historie změn</h2>
               <p className="t-meta mt-1 mb-4">Důležité zásahy v týmu — mazání, nastavení, odměny. Posledních 100 záznamů.</p>
-              {auditEntries === null ? (
+              {auditErr ? (
+                <ErrorState title="Historii změn se nepodařilo načíst" onRetry={nactiAudit} compact />
+              ) : auditEntries === null ? (
                 <div className="space-y-2" aria-busy="true" aria-label="Načítám historii">
                   {[0, 1, 2].map(i => <Skeleton key={i} className="h-10 w-full" />)}
                 </div>

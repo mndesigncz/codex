@@ -221,7 +221,7 @@ function sklad(dnesDen: string): { kategorie: KategorieSkladu[]; zasoby: Zasoba[
   };
 }
 
-function oznameni(dnesDen: string): OznameniDemo[] {
+function oznameni(): OznameniDemo[] {
   return [
     { id: 1, content: 'V pátek zavíráme už v 18:00 kvůli soukromé oslavě. Kdo chce navíc směnu, ať napíše Martě.', pinned: true, createdAt: pred(26 * HOD), authorId: 1 },
     { id: 2, content: 'Od pondělí máme nového dodavatele koláčů, ceník najdete ve Skladu. Zkuste všechny druhy, ať víme, co doporučovat hostům.', pinned: true, createdAt: pred(3 * 24 * HOD), authorId: 1 },
@@ -290,7 +290,7 @@ export function vytvorStav(role: RoleDema): DemoStav {
       { id: idOd(), itemId: 9, oldQuantity: 24, newQuantity: 14, note: 'Ranní dodávka pečiva', createdAt: pred(4 * HOD), userId: 5 },
       { id: idOd(), itemId: 1, oldQuantity: 5, newQuantity: 3, note: null, createdAt: pred(2 * HOD), userId: 3 },
     ],
-    oznameni: oznameni(d),
+    oznameni: oznameni(),
     pichacky: pichacky(d, idOd),
     volno: [
       { id: idOd(), employeeId: 6, fromDate: posunDen(d, 9), toDate: posunDen(d, 11), type: 'vacation', note: 'Svatba v rodině', status: 'pending', createdAt: pred(20 * HOD) },

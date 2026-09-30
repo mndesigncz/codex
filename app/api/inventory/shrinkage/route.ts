@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { menaPodniku } from '@/lib/menaPodniku';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,7 +34,7 @@ export interface ShrinkRow {
   sold: number | null;
   /** Podíl ztráty na tom, co se prodalo. */
   lossPct: number | null;
-  /** Hodnota rozdílu v Kč; záporná = chybí. */
+  /** Hodnota rozdílu v měně podniku; záporná = chybí. */
   value: number | null;
 }
 
@@ -44,6 +45,8 @@ export async function GET(req: NextRequest) {
   const c = await pozaduj('finance.ztraty');
   if (jeOdpoved(c)) return c;
   const teamId = c.teamId;
+  // Rady ukazují částky v měně podniku (osm podporovaných měn), ne natvrdo v korunách.
+  const mena = await menaPodniku(teamId);
 
   const idParam = new URL(req.url).searchParams.get('id');
   const wantId = idParam ? parseInt(idParam) : null;
@@ -136,15 +139,17 @@ export async function GET(req: NextRequest) {
   } else {
     if (lostValue < 0) {
       insights.push({
-        icon: 'warning', tone: -lostValue > 2000 ? 'warn' : 'info',
-        title: `Chybí zboží za ${Math.abs(lostValue).toLocaleString('cs-CZ')} Kč`,
+        icon: 'warning',
+        // Práh dva tisíce korun přepočtený na měnu podniku — 2 000 € by byla hrůza, ne varování.
+        tone: -lostValue > mena.prah(2000) ? 'warn' : 'info',
+        title: `Chybí zboží za ${mena.money(Math.abs(lostValue))}`,
         text: `${missing.length} položek je ve skutečnosti méně, než systém čekal. Typicky odpad, rozlití, chybějící receptura nebo neevidovaný odpis. Projdi je odshora — první tři dělají většinu částky.`,
       });
     }
     if (surplusValue > 0) {
       insights.push({
         icon: 'box', tone: 'info',
-        title: `Přebývá zboží za ${surplusValue.toLocaleString('cs-CZ')} Kč`,
+        title: `Přebývá zboží za ${mena.money(surplusValue)}`,
         text: `${surplus.length} položek je víc, než systém čekal. Nejčastěji nezapsaný příjem objednávky, nebo receptura, která odepisuje víc, než se opravdu používá.`,
       });
     }

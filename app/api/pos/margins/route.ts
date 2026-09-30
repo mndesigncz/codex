@@ -14,6 +14,7 @@ import { getConnection, menuProducts } from '@/lib/storyous';
 import { productsFromMirror, soldLines, type SoldLine } from '@/lib/posMirror';
 import { pragueToday } from '@/lib/pragueTime';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { menaPodniku } from '@/lib/menaPodniku';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -37,6 +38,8 @@ export async function GET(req: NextRequest) {
   const c = await pozaduj('finance.marze');
   if (jeOdpoved(c)) return c;
   const teamId = c.teamId;
+  // Texty rad ukazují částky v měně podniku, ne natvrdo v korunách.
+  const mena = await menaPodniku(teamId);
 
   const month = String(new URL(req.url).searchParams.get('month') ?? pragueToday().slice(0, 7));
   if (!/^\d{4}-\d{2}$/.test(month)) return NextResponse.json({ error: 'Neplatný měsíc' }, { status: 400 });
@@ -85,7 +88,9 @@ export async function GET(req: NextRequest) {
     // vyšší. Nadhodnocená marže je horší než žádná, tak radši přiznáme, že
     // nevíme, a řekneme u čeho.
     if (missing.length) return { cost: null, missing };
-    return { cost: Math.round(total), missing };
+    // Na haléře, ne na celé jednotky: náklad 0,62 € nesmí skončit jako 1 € (a marže
+    // o pár procent vedle), u koruny se nic nemění tak, že by to člověk viděl.
+    return { cost: Math.round(total * 100) / 100, missing };
   };
 
   // ---- menu prices ----
@@ -169,7 +174,7 @@ export async function GET(req: NextRequest) {
     insights.push({
       icon: 'warning', tone: 'warn',
       title: `Nejhorší marže: ${worst.name} (${worst.marginPct} %)`,
-      text: `Prodalo se ${worst.qty}×, suroviny stojí ${worst.cost} Kč z ceny ${worst.price} Kč. Zvaž cenu, gramáž nebo levnější surovinu.`,
+      text: `Prodalo se ${worst.qty}×, suroviny stojí ${mena.cost(worst.cost ?? 0)} z ceny ${mena.cost(worst.price ?? 0)}. Zvaž cenu, gramáž nebo levnější surovinu.`,
     });
   }
 
@@ -179,7 +184,7 @@ export async function GET(req: NextRequest) {
     insights.push({
       icon: 'award', tone: 'good',
       title: `Nejvíc vydělává: ${best.name}`,
-      text: `Za měsíc přineslo ${(best.margin ?? 0).toLocaleString('cs-CZ')} Kč nad náklady na suroviny (${best.qty}× prodáno). Tohle se vyplatí tlačit.`,
+      text: `Za měsíc přineslo ${mena.money(best.margin ?? 0)} nad náklady na suroviny (${best.qty}× prodáno). Tohle se vyplatí tlačit.`,
     });
   }
 

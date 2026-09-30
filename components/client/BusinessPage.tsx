@@ -13,7 +13,7 @@ import { onAccent } from '@/lib/floorplan';
 import { hoursLabel, slotsFor, czDay, DAY_NAMES, RES_STATUS } from '@/lib/clientSlots';
 import { pragueToday, dayPlus } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
-import { formatMoney, currencySymbol } from '@/lib/money';
+import { formatMoney, formatPrice, currencySymbol } from '@/lib/money';
 import { okJson, apiMessage } from '@/lib/api';
 import { buildIcs, downloadIcs } from '@/lib/ics';
 import { DiscardGuard } from '../ui/DiscardGuard';
@@ -134,7 +134,7 @@ export default function BusinessPage({ slug }: { slug: string }) {
                 style={b.coverUrl ? undefined : { background: `${accent}22`, border: `1px solid ${accent}66` }}>
                 <p className="text-[11px] uppercase tracking-wider opacity-70">{me.levelLabel ?? 'Člen'}{me.discount > 0 ? ` · sleva ${me.discount} %` : ''}</p>
                 <p className="text-lg font-bold tabular-nums leading-tight">{me.points} b. <span className="opacity-60 font-medium text-sm">· {me.stamps}/{b.stampTarget || '–'} razítek</span></p>
-                {me.credit > 0 && <p className="text-sm font-semibold tabular-nums leading-tight">{me.credit} Kč kreditu</p>}
+                {me.credit > 0 && <p className="text-sm font-semibold tabular-nums leading-tight">{formatMoney(me.credit, b.currency)} kreditu</p>}
                 {me.nextTierAt && <p className="text-[11px] opacity-60 leading-snug">do „{me.nextTierLabel}" ještě {Math.max(0, me.nextTierAt - me.visits)} návštěv</p>}
               </div>
             ) : (
@@ -161,7 +161,8 @@ function MenuTab({ menu, news, events, gallery, accent, tagline, address, descri
   // Dřív `currency === 'CZK' ? 'Kč' : currency`, takže eurová kavárna
   // ukazovala hostům „120 EUR" a dvanáct a půl tisíce jako „12500 Kč".
   const cur = currencySymbol(currency);
-  const money = (n: number) => formatMoney(n, currency);
+  // Ceny v menu smějí mít haléře (4,50 €) — formatMoney by je zaokrouhlil na celé.
+  const money = (n: number) => formatPrice(n, currency);
   const [evDetail, setEvDetail] = useState<any | null>(null);
   const ac = accent || '#C8F542';
   return (
@@ -455,14 +456,14 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
               <p className="text-sm text-black/60">Body</p>
               <p className="text-2xl font-bold tabular-nums">{me.points}</p>
             </div>
-            <p className="text-xs text-black/55 mt-1">{b.pointsPer100} bodů za každých 100 Kč útraty od stolu. Body jsou na kupony vpravo.</p>
+            <p className="text-xs text-black/55 mt-1">{b.pointsPer100} bodů za každých {formatMoney(100, b.currency)} útraty od stolu. Body jsou na kupony vpravo.</p>
             {b.cashbackPct > 0 && (
               <div className="mt-4 flex items-baseline justify-between gap-3 border-t border-black/[0.06] pt-4">
                 <div className="min-w-0">
                   <p className="text-sm text-black/60">Kredit</p>
                   <p className="text-xs text-black/55 mt-0.5">{b.cashbackPct} % z každé útraty se vrací jako kredit. Obsluha ho odečte u kasy.</p>
                 </div>
-                <p className="text-2xl font-bold tabular-nums shrink-0">{me.credit ?? 0} <span className="text-sm font-medium text-black/50">Kč</span></p>
+                <p className="text-2xl font-bold tabular-nums shrink-0">{formatMoney(me.credit ?? 0, b.currency)}</p>
               </div>
             )}
             {me.discount > 0 && (
@@ -584,7 +585,7 @@ function OrderTab({ slug, b, menu, tables, plan, signedIn, onDone }: { slug: str
   const [busy, setBusy] = useState(false);
   const [orders, setOrders] = useState<any[] | null>(null);
   const cur = currencySymbol(b.currency);
-  const money = (n: number) => formatMoney(n, b.currency);
+  const money = (n: number) => formatPrice(n, b.currency);
 
   const loadOrders = useCallback(() => fetch(`/api/client/b/${encodeURIComponent(slug)}/orders`).then(okJson).then(x => setOrders(x.orders ?? [])).catch(() => setOrders([])), [slug]);
   useEffect(() => { if (signedIn) loadOrders(); else setOrders([]); }, [signedIn, loadOrders]);
@@ -743,7 +744,7 @@ function EventSheet({ e, currency, ac, slug, signedIn, businessName, address, on
   e: any; currency: string; ac: string; slug: string; signedIn: boolean; businessName: string; address: string; onClose: () => void;
 }) {
   const m = useModal(true, onClose, `Akce ${e.title}`);
-  const money = (n: number) => formatMoney(n, currency);
+  const money = (n: number) => formatPrice(n, currency);
   // Sledování se drží lokálně, ať tlačítka reagují hned a bez načítání celé stránky.
   const [follow, setFollow] = useState<boolean>(e.myFollow === true);
   const [going, setGoing] = useState<boolean>(e.myGoing === true);

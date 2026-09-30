@@ -63,8 +63,6 @@ const TYM = {
   drawer_float: null, dashboard_config: {}, levels_config: [], points_config: {}, currency: 'CZK', locale: 'cs-CZ',
 };
 
-const RADKY_VYCHOZICH = (s: DemoStav): RadekRozlozeni[] => [];
-
 export const zaklad: Obsluha = (p, k) => {
   const s = k.stav;
   const { cesta, metoda } = p;

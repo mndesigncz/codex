@@ -7,6 +7,7 @@ import { NAZEV_PODNIKU, clen } from '../data/lide';
 import { posunDen } from '../cas';
 import type { DemoStav } from '../stav';
 import { posSouhrn } from './zaklad';
+import { formatMoney } from '@/lib/money';
 
 // Prodávané položky a jejich podíl na tržbě (součet 1). Ceny jsou ukázkové.
 const MENU: { productId: string; name: string; category: string; price: number; podil: number; naklad: number }[] = [
@@ -116,7 +117,7 @@ export const finance: Obsluha = (p, k) => {
       ],
       insights: [
         { icon: 'trend', title: 'Tržba roste', text: 'Proti minulému měsíci o 7 %, hlavně díky víkendům.', tone: 'good' },
-        { icon: 'coins', title: 'Kasa sedí', text: 'Za měsíc rozdíl −60 Kč celkem.', tone: 'info' },
+        { icon: 'coins', title: 'Kasa sedí', text: `Za měsíc rozdíl −${formatMoney(60)} celkem.`, tone: 'info' },
       ],
     });
   }
@@ -124,7 +125,7 @@ export const finance: Obsluha = (p, k) => {
     return ok({
       month: q.get('month') ?? s.dnes.slice(0, 7), prevMonth: '',
       advice: [
-        { group: 'revenue', tone: 'info', icon: 'calendar', title: 'Pondělí je nejslabší den', text: 'Průměr 14 600 Kč proti 26 100 Kč v sobotu.', action: 'Zkus pondělní nabídku na snídani.' },
+        { group: 'revenue', tone: 'info', icon: 'calendar', title: 'Pondělí je nejslabší den', text: `Průměr ${formatMoney(14600)} proti ${formatMoney(26100)} v sobotu.`, action: 'Zkus pondělní nabídku na snídani.' },
         { group: 'stock', tone: 'warn', icon: 'box', title: 'Ovesný nápoj se spotřebovává rychleji', text: 'Za týden o třetinu víc než dřív.' },
       ],
       blind: ['Marže u položek bez receptury se nedá spočítat.'], counts: { revenue: 1, products: 0, people: 0, stock: 1, guests: 0 },

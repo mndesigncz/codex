@@ -12,6 +12,8 @@ import { neon } from '@neondatabase/serverless';
 import { ensureProductionTasks } from '@/lib/production';
 import { tymyCiselniku } from '@/lib/tenant';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { cenaZDb, cenaZFormulare } from '@/lib/cena';
+import { cenaKZapisu } from '@/lib/cenaSloupce';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,7 +34,7 @@ function cleanItems(raw: any): OrderItem[] {
 }
 
 const shape = (r: any, sCenou: boolean) => ({
-  id: r.id, supplier: r.supplier, items: r.items ?? [], totalCost: sCenou ? r.total_cost : null,
+  id: r.id, supplier: r.supplier, items: r.items ?? [], totalCost: sCenou ? cenaZDb(r.total_cost) : null, // NUMERIC chodí jako řetězec
   status: r.status, note: r.note, createdAt: r.created_at, receivedAt: r.received_at,
   createdByName: r.created_by_name ?? null,
 });
@@ -138,9 +140,12 @@ export async function PATCH(req: NextRequest) {
   if (!order) return NextResponse.json({ error: 'Objednávka nenalezena' }, { status: 404 });
   if (order.status !== 'ordered') return NextResponse.json({ error: 'Objednávka už je vyřízená.' }, { status: 409 });
 
-  const totalCost = action === 'received' && b.totalCost !== undefined && b.totalCost !== null && b.totalCost !== ''
-    ? Math.max(0, Math.round(Number(b.totalCost)) || 0)
-    : null;
+  // Cena příjmu smí mít haléře (123,45 €); jen tam, kde je sloupec už NUMERIC
+  // (lib/cenaSloupce), jinak se zaokrouhlí na celé jako dřív. Text, který cena
+  // není, se odmítne — dřív se z něj tiše stala nula.
+  const zadanaCena = action === 'received' ? cenaZFormulare(b.totalCost) : { ok: true as const, hodnota: null };
+  if (!zadanaCena.ok) return NextResponse.json({ error: 'Cena musí být číslo, třeba 123,45.' }, { status: 400 });
+  const totalCost = await cenaKZapisu('orders.total_cost', zadanaCena.hodnota);
   if (totalCost != null && !c.role.opravneni.has('sklad.ceny_upravit')) {
     return NextResponse.json({ error: 'Nákupní cenu zapisuje jen ten, kdo smí měnit ceny. Přijmi zboží bez ní.' }, { status: 403 });
   }

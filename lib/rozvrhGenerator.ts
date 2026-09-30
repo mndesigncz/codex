@@ -190,6 +190,21 @@ function posunDen(date: string, o: number) {
 }
 const predchoziDen = (date: string) => posunDen(date, -1);
 const dalsiDen = (date: string) => posunDen(date, 1);
+
+/**
+ * Vejde se směna v `date` do limitu dní v řadě? Řada se počítá OBĚMA směry
+ * (dny před i po), protože směna doprostřed už obsazené řady ji spojí do
+ * jedné delší. Generátor i „Upravit podle nových požadavků“ (adjust) musí
+ * mít tutéž odpověď — adjust dřív koukal jen dozadu a pustil řadu přes limit.
+ */
+export function radaDniOk(pracovniDny: Set<string>, date: string, limit: number | null | undefined): boolean {
+  if (limit == null || pracovniDny.has(date)) return true;
+  let pred = 0, c = predchoziDen(date);
+  while (pracovniDny.has(c) && pred < 40) { pred++; c = predchoziDen(c); }
+  let po = 0; c = dalsiDen(date);
+  while (pracovniDny.has(c) && po < 40) { po++; c = dalsiDen(c); }
+  return pred + po + 1 <= limit;
+}
 function dnuVMesici(month: string) {
   const [y, m] = month.split('-').map(Number);
   return new Date(Date.UTC(y, m, 0)).getUTCDate();
@@ -340,17 +355,10 @@ export function navrhniRozvrh(vstup: VstupGeneratoru): VystupGeneratoru {
     while (e.workedDates.has(c) && n < 40) { n++; c = predchoziDen(c); }
     return n;
   };
-  const radaPo = (e: Stav, date: string) => {
-    let n = 0;
-    let c = dalsiDen(date);
-    while (e.workedDates.has(c) && n < 40) { n++; c = dalsiDen(c); }
-    return n;
-  };
   // Dny v řadě se počítají OBĚMA směry: druhý průchod doplňuje dny mezi už
   // obsazenými otvíračkami (a uložené směny můžou ležet i dál v měsíci),
   // takže pohled jen dozadu by pustil řadu delší, než je limit.
-  const odpocinekOk = (e: Stav, date: string) =>
-    e.maxConsecutive == null || e.workedDates.has(date) || rada(e, date) + radaPo(e, date) + 1 <= e.maxConsecutive;
+  const odpocinekOk = (e: Stav, date: string) => radaDniOk(e.workedDates, date, e.maxConsecutive);
   const hodinyOk = (e: Stav, h: number) => e.maxHours == null || e.assignedHours + h <= e.maxHours + 0.01;
   const vezmi = (e: Stav, date: string, h: number) => {
     e.assigned++; e.workedDates.add(date); e.assignedHours += h;

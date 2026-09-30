@@ -27,7 +27,7 @@ import { Icon } from '../Icons';
 import {
   Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Modal, PersonChip, Segmented, Select, Skeleton, Switch, Textarea, Toast, type ChipTone,
 } from '../ui';
-import { useMoney } from '../CurrencyProvider';
+import { useMoney, usePrice } from '../CurrencyProvider';
 import { EVENT_KINDS, EVENT_STATUSES, kindSpec, statusLabel } from '@/lib/events';
 import { pragueToday } from '@/lib/pragueTime';
 import { okJson } from '@/lib/api';
@@ -296,6 +296,8 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, oznam
   oznam: OznamAkce;
   onClose: () => void; onDeleted: () => void;
 }) {
+  // Cena položky menu smí mít haléře (4,50 €).
+  const cena = usePrice();
   const [checkTxt, setCheckTxt] = useState('');
   const [packSearch, setPackSearch] = useState('');
   const [menuPickOpen, setMenuPickOpen] = useState(false);
@@ -645,7 +647,7 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, oznam
                         {l.itemId != null && (l.pos
                           ? <Chip tone="ok" size="sm" icon="receipt">kasa</Chip>
                           : <Chip tone="wait" size="sm">bez kasy</Chip>)}
-                        {l.price != null && <span className="text-xs text-black/55 tabular-nums">{money(l.price)}</span>}
+                        {l.price != null && <span className="text-xs text-black/55 tabular-nums">{cena(l.price)}</span>}
                       </>}
                       actions={<Button size="sm" variant="ghost" iconOnly icon="close" aria-label={`Vyřadit ${l.name} z menu akce`}
                         onClick={() => patch(e.id, { menu: (e.menu ?? []).filter((_: any, j: number) => j !== i) })} />} />

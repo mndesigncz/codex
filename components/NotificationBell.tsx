@@ -70,14 +70,15 @@ export default function NotificationBell() {
   // Zavírání panelu drží společný `usePopover`: Escape, kliknutí mimo,
   // návrat fokusu na zvonek a šipky po oznámeních. Dřív uměl jen kliknutí
   // mimo — Escape nefungoval a klávesnicí se z panelu nedalo odejít.
-  // `onDismiss` zachovává původní chování: odchod mimo panel značí
-  // nepřečtená jako přečtená.
+  // Zavření panelu značí nepřečtená jako přečtená (viz efekt níž) — jedním
+  // místem pro všechny cesty ven. `onDismiss` z usePopover pokrývá jen klik
+  // mimo, takže po Escapu zůstával odznak „2 nové“ a stav závisel na tom,
+  // kterou cestou člověk panel zavřel.
   const unreadRef = useRef(unread);
   unreadRef.current = unread;
   const pop = usePopover(open, setOpen, {
     focusFirst: true,
     arrowKeys: true,
-    onDismiss: () => { if (unreadRef.current) markAllRead(); },
   });
   // Panel se na telefonu vejde na obrazovku i do výšky (useVejdiSe).
   const vejdiSe = useVejdiSe(pop.panelRef, { aktivni: open });
@@ -93,6 +94,14 @@ export default function NotificationBell() {
       setUnread(0);
     } catch { /* příště to srovná pravidelné načtení */ }
   };
+
+  // Otevřeno → zavřeno jakoukoli cestou (klik mimo, na zvonek, Escape) = přečteno.
+  const bylOtevreno = useRef(false);
+  useEffect(() => {
+    if (bylOtevreno.current && !open && unreadRef.current) markAllRead();
+    bylOtevreno.current = open;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const openNotif = async (n: Notif) => {
     try {
@@ -116,10 +125,9 @@ export default function NotificationBell() {
       <button
         ref={pop.triggerRef}
         onKeyDown={pop.onTriggerKeyDown}
-        aria-haspopup="menu" aria-expanded={open}
+        aria-haspopup="dialog" aria-expanded={open}
         onClick={() => {
           if (!open) loadFeedback();
-          else if (unread) markAllRead();
           setOpen(o => !o);
         }}
         className="relative rounded-full bg-black/[0.04] border border-black/[0.08] w-10 h-10 flex items-center justify-center text-black/60 hover:text-black transition-colors"
@@ -135,7 +143,7 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div ref={pop.panelRef} onKeyDown={pop.onPanelKeyDown} role="menu" style={vejdiSe}
+        <div ref={pop.panelRef} onKeyDown={pop.onPanelKeyDown} role="dialog" aria-label="Notifikace" style={vejdiSe}
           className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] glass-strong rounded-3xl overflow-hidden z-50 shadow-[0_16px_44px_rgba(25,35,15,0.18)]">
           <div className="px-4 py-3 border-b border-black/[0.07] flex items-center justify-between">
             <span className="font-bold text-[#16181A] text-sm">Notifikace</span>

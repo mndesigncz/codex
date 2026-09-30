@@ -9,6 +9,7 @@ import { pragueToday, pragueDayOf, parseDbTime } from '@/lib/pragueTime';
 import { audit } from '@/lib/audit';
 import { activeCampaigns, progressFor, addStamps, applyBillToCampaigns } from '@/lib/stamps';
 import { getConnection, billDetail } from '@/lib/storyous';
+import { menaPodniku } from '@/lib/menaPodniku';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
@@ -89,6 +90,8 @@ export async function POST(req: NextRequest) {
   const p = await ensureProfile(u.team_id);
   if (!p.loyalty_on) return NextResponse.json({ error: 'Podnik nemá věrnost zapnutou.' }, { status: 400 });
   await join(c.id, u.team_id);
+  // Zprávy obsluze i poznámky v paměti hosta jsou v měně podniku, ne v korunách.
+  const mena = await menaPodniku(u.team_id);
   let msg = '';
   if (action === 'stamp') {
     const before = await summary(u.team_id, c.id);
@@ -135,26 +138,26 @@ export async function POST(req: NextRequest) {
     parts.push(...st.lines);
     const pts = Math.floor(total / 100) * (Number(p.points_per_100) || 0);
     const back = Math.floor(total * (Number(p.cashback_pct) || 0) / 100);
-    if (pts > 0) { const points = await award(u.team_id, c.id, pts, 'manual', `bill:${billId}`, `Útrata ${total} Kč z účtenky`); parts.push(`+${pts} bodů (celkem ${points})`); }
+    if (pts > 0) { const points = await award(u.team_id, c.id, pts, 'manual', `bill:${billId}`, `Útrata ${mena.money(total)} z účtenky`); parts.push(`+${pts} bodů (celkem ${points})`); }
     // Cashback podle nastavení podniku: kredit v korunách, nebo body (Kartička).
     if (back > 0 && p.cashback_mode === 'points') {
-      const points = await award(u.team_id, c.id, back, 'cashback', `bill:${billId}`, `${p.cashback_pct} % z ${total} Kč v bodech`);
+      const points = await award(u.team_id, c.id, back, 'cashback', `bill:${billId}`, `${p.cashback_pct} % z ${mena.money(total)} v bodech`);
       parts.push(`+${back} bodů cashback (celkem ${points})`);
-    } else if (back > 0) { const credit = await awardCredit(u.team_id, c.id, back, 'cashback', `bill:${billId}`, `${p.cashback_pct} % z ${total} Kč`); parts.push(`+${back} Kč kreditu`); }
+    } else if (back > 0) { const credit = await awardCredit(u.team_id, c.id, back, 'cashback', `bill:${billId}`, `${p.cashback_pct} % z ${mena.money(total)}`); parts.push(`+${mena.money(back)} kreditu`); }
     if (!parts.length) parts.push('žádné pravidlo se netrefilo');
-    msg = `${c.name} · účtenka ${total} Kč: ${parts.join(' · ')}`;
+    msg = `${c.name} · účtenka ${mena.money(total)}: ${parts.join(' · ')}`;
   } else if (action === 'points') {
     const amount = Math.max(0, Math.min(100000, Math.round(Number(b.amount) || 0)));
     const pts = Math.floor(amount / 100) * (Number(p.points_per_100) || 0);
     const back = Math.floor(amount * (Number(p.cashback_pct) || 0) / 100);
     if (pts <= 0 && back <= 0) return NextResponse.json({ error: 'Z této částky nevychází žádný bod ani kredit.' }, { status: 400 });
     const parts: string[] = [];
-    if (pts > 0) { const points = await award(u.team_id, c.id, pts, 'manual', 'card', `Útrata ${amount} Kč u kasy`); parts.push(`+${pts} bodů (celkem ${points})`); }
+    if (pts > 0) { const points = await award(u.team_id, c.id, pts, 'manual', 'card', `Útrata ${mena.money(amount)} u kasy`); parts.push(`+${pts} bodů (celkem ${points})`); }
     if (back > 0 && p.cashback_mode === 'points') {
-      const points = await award(u.team_id, c.id, back, 'cashback', 'card', `${p.cashback_pct} % z útraty ${amount} Kč v bodech`);
+      const points = await award(u.team_id, c.id, back, 'cashback', 'card', `${p.cashback_pct} % z útraty ${mena.money(amount)} v bodech`);
       parts.push(`+${back} bodů cashback (celkem ${points})`);
-    } else if (back > 0) { const credit = await awardCredit(u.team_id, c.id, back, 'cashback', 'card', `${p.cashback_pct} % z útraty ${amount} Kč`); parts.push(`+${back} Kč kreditu (celkem ${credit})`); }
-    msg = `${c.name}: ${parts.join(', ')} za ${amount} Kč.`;
+    } else if (back > 0) { const credit = await awardCredit(u.team_id, c.id, back, 'cashback', 'card', `${p.cashback_pct} % z útraty ${mena.money(amount)}`); parts.push(`+${mena.money(back)} kreditu (celkem ${mena.money(Number(credit))})`); }
+    msg = `${c.name}: ${parts.join(', ')} za ${mena.money(amount)}.`;
   } else if (action === 'credit') {
     // Host platí kreditem: částka se odečte z jeho peněženky u podniku.
     const amount = Math.max(1, Math.min(100000, Math.round(Number(b.amount) || 0)));
@@ -163,9 +166,9 @@ export async function POST(req: NextRequest) {
     const credit = await spendCredit(u.team_id, c.id, amount, 'credit', 'card', `Uplatněno u kasy`);
     if (credit == null) {
       const m = await membership(c.id, u.team_id);
-      return NextResponse.json({ error: `${c.name} má kredit jen ${Number(m?.credit ?? 0)} Kč.` }, { status: 409 });
+      return NextResponse.json({ error: `${c.name} má kredit jen ${mena.money(Number(m?.credit ?? 0))}.` }, { status: 409 });
     }
-    msg = `${c.name}: uplatněno ${amount} Kč kreditu, zbývá ${credit} Kč.`;
+    msg = `${c.name}: uplatněno ${mena.money(amount)} kreditu, zbývá ${mena.money(Number(credit))}.`;
   } else {
     return NextResponse.json({ error: 'Neznámá akce' }, { status: 400 });
   }

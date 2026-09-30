@@ -2,30 +2,11 @@
 import { NextResponse } from 'next/server';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { neon } from '@neondatabase/serverless';
+import { popisAkce, detailAkce } from '@/lib/auditPopisky';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
-
-const LABELS: Record<string, string> = {
-  'closing.delete': 'Smazána uzávěrka',
-  'inventory.delete': 'Smazána položka skladu',
-  'schedule.clearMonth': 'Vymazán měsíc rozvrhu',
-  'team.settings': 'Změna nastavení týmu',
-  'supplier.create': 'Přidán dodavatel',
-  'supplier.delete': 'Smazán dodavatel',
-  'reward.create': 'Přidána odměna',
-  'reward.approved': 'Schválena odměna',
-  'reward.declined': 'Zamítnuta odměna',
-  'organization.kopie': 'Zkopírováno z jiného podniku',
-  'organization.kopie.zdroj': 'Zkopírováno do jiného podniku',
-  'role.create': 'Vytvořena role',
-  'role.update': 'Upravena role',
-  'role.delete': 'Smazána role',
-  'role.assign': 'Změněna role člena',
-  'role.system_update': 'Upravena přednastavená role',
-  'role.system_reset': 'Přednastavená role vrácena na výchozí',
-};
 
 export async function GET() {
   // Historie změn prozrazuje, kdo co mazal a měnil — jen s oprávněním,
@@ -42,12 +23,16 @@ export async function GET() {
     return NextResponse.json({
       entries: (rows as any[]).map(r => ({
         id: r.id,
-        label: LABELS[r.action] ?? r.action,
-        detail: r.detail ?? null,
+        label: popisAkce(r.action),
+        detail: detailAkce(r.action, r.detail),
         userName: r.user_name ?? 'Systém',
         userAvatar: r.user_avatar ?? '⚙️',
         createdAt: r.created_at,
       })),
     });
-  } catch { return NextResponse.json({ entries: [] }); }
+  } catch {
+    // Dřív { entries: [] }: výpadek databáze vypadal jako „zatím nic nezměněno“
+    // a klient ukázal prázdný stav, který není pravda. Chyba musí být chyba.
+    return NextResponse.json({ error: 'Historii změn se nepodařilo načíst.' }, { status: 500 });
+  }
 }

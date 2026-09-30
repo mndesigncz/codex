@@ -9,6 +9,7 @@ import { neon } from '@neondatabase/serverless';
 import { cashDifference, normalizeMovements } from '@/lib/closing';
 import { pragueToday } from '@/lib/pragueTime';
 import { wagesTotal } from '@/lib/wages';
+import { menaPodniku } from '@/lib/menaPodniku';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,6 +40,8 @@ export async function GET(req: NextRequest) {
   const c = await pozaduj('finance.zobrazit');
   if (jeOdpoved(c)) return c;
   const u = { team_id: c.teamId };
+  // Texty rad ukazují částky v měně podniku, ne natvrdo v korunách.
+  const mena = await menaPodniku(c.teamId);
   const mzdy = c.role.opravneni.has('finance.mzdy');
   const { searchParams } = new URL(req.url);
   const month = searchParams.get('month') ?? pragueToday().slice(0, 7);
@@ -288,15 +291,15 @@ export async function GET(req: NextRequest) {
     if (best.avg > 0 && worst.avg / best.avg < 0.6) {
       insights.push({
         icon: 'calendar', tone: 'info',
-        title: `Nejslabší den je ${WEEKDAYS[worst.wd]} (Ø ${Math.round(worst.avg).toLocaleString('cs-CZ')} Kč)`,
-        text: `Nejsilnější ${WEEKDAYS[best.wd]} dělá Ø ${Math.round(best.avg).toLocaleString('cs-CZ')} Kč. Slabý den unese kratší směnu, akci nebo speciální nabídku.`,
+        title: `Nejslabší den je ${WEEKDAYS[worst.wd]} (Ø ${mena.money(worst.avg)})`,
+        text: `Nejsilnější ${WEEKDAYS[best.wd]} dělá Ø ${mena.money(best.avg)}. Slabý den unese kratší směnu, akci nebo speciální nabídku.`,
       });
     }
   }
-  if (diffAbs > 200) {
+  if (diffAbs > mena.prah(200)) {
     insights.push({
       icon: 'warning', tone: 'warn',
-      title: `Rozdíly v kase za měsíc: ${diffSum >= 0 ? '+' : ''}${diffSum.toLocaleString('cs-CZ')} Kč (celkem ±${diffAbs.toLocaleString('cs-CZ')})`,
+      title: `Rozdíly v kase za měsíc: ${diffSum >= 0 ? '+' : ''}${mena.money(diffSum)} (celkem ±${mena.money(diffAbs)})`,
       text: 'Projdi uzávěrky s rozdílem v Přehledech — nejčastěji jde o nezapsaný výdaj nebo rozměňování. Počítání bankovek v uzávěrce rozdíly srazí.',
     });
   }
@@ -305,7 +308,7 @@ export async function GET(req: NextRequest) {
     supplierSums.set(r.label, (supplierSums.get(r.label) ?? 0) + r.amount);
   }
   const topSup = Array.from(supplierSums.entries()).sort((a, b) => b[1] - a[1])[0];
-  if (topSup && purchases > 0 && topSup[1] / purchases > 0.5 && topSup[1] > 1000) {
+  if (topSup && purchases > 0 && topSup[1] / purchases > 0.5 && topSup[1] > mena.prah(1000)) {
     insights.push({
       icon: 'box', tone: 'info',
       title: `${Math.round((topSup[1] / purchases) * 100)} % nákupů jde přes „${topSup[0]}"`,
@@ -325,14 +328,14 @@ export async function GET(req: NextRequest) {
   if (stockValue > 0 && revenue > 0 && stockValue > revenue * 0.5) {
     insights.push({
       icon: 'box', tone: 'warn',
-      title: `Ve skladu leží ${stockValue.toLocaleString('cs-CZ')} Kč`,
-      text: `Nejvíc drží ${stockTop.slice(0, 3).map((i) => `${i.name} (${i.value.toLocaleString('cs-CZ')} Kč)`).join(', ')}. Zvaž menší objednávky častěji — peníze ve skladu nevydělávají.`,
+      title: `Ve skladu leží ${mena.money(stockValue)}`,
+      text: `Nejvíc drží ${stockTop.slice(0, 3).map((i) => `${i.name} (${mena.money(i.value)})`).join(', ')}. Zvaž menší objednávky častěji — peníze ve skladu nevydělávají.`,
     });
   }
   if (tips > 0) {
     insights.push({
       icon: 'award', tone: 'good',
-      title: `Spropitné za měsíc: ${tips.toLocaleString('cs-CZ')} Kč`,
+      title: `Spropitné za měsíc: ${mena.money(tips)}`,
       text: 'Hezký signál spokojenosti hostů — propiš ho do odměn, ať ho tým vidí.',
     });
   }
@@ -340,7 +343,7 @@ export async function GET(req: NextRequest) {
   if (guest.offPos > 0) {
     insights.push({
       tone: 'warn', icon: 'warning',
-      title: `${guest.offPos}× objednávka od stolu nedotekla do pokladny (${guest.offPosTotal.toLocaleString('cs-CZ')} Kč)`,
+      title: `${guest.offPos}× objednávka od stolu nedotekla do pokladny (${mena.money(guest.offPosTotal)})`,
       text: 'Tyhle tržby nejsou v uzávěrce ani v pokladně. Spáruj stoly s pokladnou a doplň produktům položky z kasy, jinak čísla nesedí.',
     });
   }

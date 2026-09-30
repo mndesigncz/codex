@@ -12,6 +12,7 @@ import { neon } from '@neondatabase/serverless';
 import { audit } from '@/lib/audit';
 import { souborUrl } from '@/lib/bezpecnaUrl';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { menaPodniku } from '@/lib/menaPodniku';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,7 +65,7 @@ export async function POST(req: NextRequest) {
       VALUES (${u.team_id}, ${u.id}, ${photoUrl}, ${supplier}, ${amount}, ${note})
       RETURNING id, photo_url AS "photoUrl", supplier, amount, note, created_at AS "createdAt"`;
     audit(u.team_id, u.id, 'receipt.add', 'receipt', row.id,
-      `${supplier ?? 'Účtenka'}${amount ? ` · ${amount} Kč` : ''}`);
+      `${supplier ?? 'Účtenka'}${amount ? ` · ${(await menaPodniku(u.team_id)).money(amount)}` : ''}`);
     return NextResponse.json({ ok: true, receipt: row });
   } catch {
     return NextResponse.json({ error: 'Účtenky nejsou dostupné — spusť /api/init.' }, { status: 400 });

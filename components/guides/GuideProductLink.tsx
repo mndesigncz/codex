@@ -7,6 +7,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { Icon } from '../Icons';
+import { usePrice } from '../CurrencyProvider';
 import { useResultKeys } from '@/lib/useResultKeys';
 import { okJson } from '@/lib/api';
 
@@ -17,6 +18,7 @@ export default function GuideProductLink({ productId, productName, onPick }: {
   productName: string | null;
   onPick: (id: string | null, name: string | null) => void;
 }) {
+  const cena = usePrice();
   const popisek = useId();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -75,7 +77,7 @@ export default function GuideProductLink({ productId, productName, onPick }: {
                   className="w-full text-left px-1 py-2 hover:bg-black/[0.03] transition">
                   <span className="block text-sm text-[#16181A] truncate">{p.name}</span>
                   <span className="block t-meta truncate">
-                    {p.category || 'bez kategorie'}{p.price != null ? ` · ${p.price} Kč` : ''}
+                    {p.category || 'bez kategorie'}{p.price != null ? ` · ${cena(p.price)}` : ''}
                   </span>
                 </button>
               ))}

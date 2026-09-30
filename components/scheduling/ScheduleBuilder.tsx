@@ -49,6 +49,7 @@ import { obnovDataWidgetu } from '../widgety/useDataWidgetu';
 import { nactiTeamsMine, useOpravneni } from '../role/useOpravneni';
 import { nastavRozepsanyNavrh } from '../role/rozepsano';
 import { prepocitejDen, stavClenaDne, seradRadky, kolize, vychoziTyp, type StavClenaDne, type TypDne } from '@/lib/rozvrhDen';
+import { sestavCsv, rozeberCsv } from '@/lib/rozvrhCsv';
 import {
   KLIC_DEN, KLIC_DOSTUPNOST, UDALOST_DEN, UDALOST_DOSTUPNOST, UDALOST_ZMENA, den as denZ, hm as hmZ, posunMesice,
   kategorieBarvy, rozsahVolna,
@@ -1752,7 +1753,8 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
             <Well className="t-meta">
               Očekávaný formát: <code className="text-black/80">datum;zaměstnanec;od;do;typ</code> — např.{' '}
               <code className="text-black/80">2026-08-03;anna@priklad.cz;08:00;14:00;morning</code>. Sloupec „zaměstnanec"
-              může být e-mail nebo jméno, typ morning, afternoon nebo flexible.
+              může být e-mail nebo jméno (i vedení), typ název typu směny nebo morning, afternoon, flexible. Soubor z Exportu CSV
+              jde načíst zpátky beze změny.
             </Well>
             {importPreview.rows.length > 0 && (
               <div className="rounded-2xl border border-black/[0.08] overflow-hidden">

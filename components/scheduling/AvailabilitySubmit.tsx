@@ -23,6 +23,7 @@ import { Button, Card, Chip, ErrorState, Field, Input, MonthNav, PageHeader, Seg
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu } from '../widgety/useDataWidgetu';
 import { okJson } from '@/lib/api';
+import { pragueToday } from '@/lib/pragueTime';
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string; role?: string };
   /**
@@ -63,8 +64,10 @@ const OFF_META = {
   dot: 'bg-bad ring-1 ring-bad/50',
 };
 
-function ym(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+/** Následující měsíc k `RRRR-MM` (bez času zařízení, ať přechod roku nedělá potíže). */
+function dalsiMesic(month: string) {
+  const [y, m] = month.split('-').map(Number);
+  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
 }
 function buildGrid(month: string, zacatek: 0 | 1) {
   const [y, m] = month.split('-').map(Number);
@@ -81,9 +84,12 @@ function buildGrid(month: string, zacatek: 0 | 1) {
 }
 
 export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props) {
-  const now = new Date();
-  const currentMonth = ym(now);
-  const nextMonth = ym(new Date(now.getFullYear(), now.getMonth() + 1, 1));
+  // „Dnes“ a „tento měsíc“ podle Prahy, ne podle hodin zařízení: tablet v UTC
+  // nebo telefon na cestách by po pražské půlnoci nabízel jiný měsíc než
+  // Rozvrh a Moje směny (ty jedou přes pragueToday).
+  const dnes = pragueToday();
+  const currentMonth = dnes.slice(0, 7);
+  const nextMonth = dalsiMesic(currentMonth);
 
   const [month, setMonth] = useState(nextMonth);
   const [dayStates, setDayStates] = useState<Record<string, DayState>>({});
@@ -137,7 +143,7 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
   // Začátek týdne si volí podnik; dřív tu bylo pondělí natvrdo.
   const zacatek = zacatekTydne(useCurrency().weekStart);
   const grid = useMemo(() => buildGrid(month, zacatek), [month, zacatek]);
-  const todayStr = ym(now) === month ? `${month}-${String(now.getDate()).padStart(2, '0')}` : null;
+  const todayStr = currentMonth === month ? dnes : null;
 
   useEffect(() => {
     let active = true;
@@ -214,7 +220,8 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
           unavailableDates,
           dayPreferences,
           preferredShift,
-          maxShifts: maxShifts === '' ? null : parseInt(maxShifts),
+          // 0 by generátor četl jako „žádná směna“, přehled jako „bez limitu“ — prázdné = bez limitu.
+          maxShifts: maxShifts === '' || !(parseInt(maxShifts) > 0) ? null : parseInt(maxShifts),
           note: note.trim() || null,
         }),
       });
@@ -334,11 +341,11 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
               <p className="text-xs text-black/50">Obecně a nezávazně — denní volby v kalendáři mají přednost.</p>
             </div>
 
-            <Field id="dostupnost-max-smen" label="Maximální počet směn" hint="Nepovinné.">
+            <Field id="dostupnost-max-smen" label="Maximální počet směn" hint="Nepovinné — prázdné pole znamená bez limitu.">
               <Input
                 id="dostupnost-max-smen"
                 type="number" inputMode="numeric"
-                min={0}
+                min={1}
                 value={maxShifts}
                 onChange={(e) => { setMaxShifts(e.target.value); setConfirmed(false); }}
                 className="!w-full sm:!w-40"

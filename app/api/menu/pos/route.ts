@@ -24,6 +24,7 @@ import { VYCHOZI_THEME, zeSdilenehoVzhledu } from '@/lib/menuTheme';
 import { matchByName, sectionTitles, type PosCatalogItem } from '@/lib/menuPos';
 import { audit } from '@/lib/audit';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { cenaKZapisu } from '@/lib/cenaSloupce';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -162,7 +163,7 @@ export async function POST(request: Request) {
       if (pos >= MAX_ITEMS) { skippedFull++; continue; }
       await sql`
         INSERT INTO menu_items (section_id, name, price, description, sold_out, pos_product_id, position)
-        VALUES (${sectionId}, ${p.name.slice(0, 80)}, ${cleanPrice(p.price ?? 0)}, ${null}, ${false}, ${p.productId}, ${pos})`;
+        VALUES (${sectionId}, ${p.name.slice(0, 80)}, ${(await cenaKZapisu('menu_items.price', cleanPrice(p.price ?? 0))) ?? 0}, ${null}, ${false}, ${p.productId}, ${pos})`;
       pos++; added++;
     }
   }

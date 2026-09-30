@@ -101,9 +101,14 @@ export default function EmployeeLayout({ user }: Props) {
   // Proklik na KONKRÉTNÍ návod — z úkolu „Vyrobit X“ nebo z výrobní tabule.
   // Bez toho vede každý odkaz jen na seznam návodů.
   const [guideId, setGuideId] = useState<number | null>(null);
+  // Proklik z widgetu „Nepřečtené zprávy“ do konkrétního vlákna. Layout
+  // zaměstnance arg pro chat zahazoval (jen vedení ho předávalo), takže
+  // klepnutí na řádek skončilo na seznamu konverzací.
+  const [chatConvId, setChatConvId] = useState<number | null>(null);
   const navigate = (view: string, arg?: string) => {
     setInventoryCat(view === 'inventory' ? arg : undefined);
     setGuideId(view === 'guides' && arg ? Number(arg) : null);
+    setChatConvId(view === 'chat' && arg && /^\d+$/.test(arg) ? Number(arg) : null);
     // Proklik na KONKRÉTNÍ postup (zamčená uzávěrka, widget) — bez toho
     // skončil člověk na seznamu a hledal. Detail otevře událost, až se
     // Postupy připojí. Úkoly `arg` zatím nevyužijí (seznam je krátký).
@@ -138,7 +143,7 @@ export default function EmployeeLayout({ user }: Props) {
       case 'procedures':   return <Procedures user={user as any} />;
       case 'tasks':        return <Tasks user={user as any} />;
       case 'rewards':      return <MyRewards />;
-      case 'chat':         return <ChatView user={user as any} />;
+      case 'chat':         return <ChatView user={user as any} openConversationId={chatConvId} />;
       case 'guides':       return <Guides user={user as any} openGuideId={guideId} />;
       case 'suggestions':  return <SuggestionsBoard />;
       case 'settings':     return <Settings user={user as any} initialTab="account" />;

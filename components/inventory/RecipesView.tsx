@@ -455,7 +455,11 @@ function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, 
   const totalCost = cost.total;
 
   const menuPrice = products.find(p => p.productId === draft.productId)?.price ?? null;
-  const margin = cost.exact > 0 ? marginPct(menuPrice, cost.exact) : null;
+  // Surovina bez ceny je díra v součtu, ne nulový náklad: marže spočítaná jen
+  // z části nákladů je nafouknutá a podle marže se nastavují ceny. Seznam receptur
+  // ji z téhož důvodu skrývá (economyOf) — editor se musí chovat stejně, jinak
+  // u téže receptury svítí zelený pruh, který seznam neukázal.
+  const margin = cost.exact > 0 && cost.missingPrice === 0 ? marginPct(menuPrice, cost.exact) : null;
   const ready = draft.ingredients.filter(i => i.itemId && num(i.amount) > 0).length;
 
   return (
@@ -598,7 +602,9 @@ function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, 
         {/* Souhrn: co to stojí, co z toho zbude, a uložení na dosah. */}
         <Card as="div" className="space-y-4 lg:sticky lg:top-4">
           <Stat label="Suroviny na porci" value={totalCost > 0 ? money(totalCost) : '—'}
-            note={totalCost > 0 ? 'podle cen ve skladu' : 'doplň množství a ceny balení'} />
+            note={cost.missingPrice > 0
+              ? `chybí cena u ${czCount(cost.missingPrice, SUROVINA)} — součet je neúplný`
+              : totalCost > 0 ? 'podle cen ve skladu' : 'doplň množství a ceny balení'} />
 
           {menuPrice != null && (
             <Well className="space-y-1.5">
@@ -610,7 +616,7 @@ function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, 
                 <>
                   <div className="flex items-baseline justify-between gap-2 text-sm">
                     <span className="text-black/55">Zbyde na porci</span>
-                    <span className="font-semibold tabular-nums text-[#16181A]">{money(menuPrice - totalCost)}</span>
+                    <span className="font-semibold tabular-nums text-[#16181A]">{money(menuPrice - cost.exact)}</span>
                   </div>
                   <div className="h-1.5 rounded-full bg-black/[0.06] overflow-hidden mt-1.5" aria-hidden>
                     <div className={`h-full rounded-full ${margin >= 65 ? 'bg-[#C8F542]' : margin >= 45 ? 'bg-wait' : 'bg-bad'}`}

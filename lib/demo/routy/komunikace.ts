@@ -10,7 +10,7 @@ import { ID_POVINNEHO_NAVODU, ID_ZAVIRACIHO_POSTUPU } from './uzaverky';
 
 const ID_TYMOVEHO_CHATU = 1;
 
-function tvarOznameni(s: DemoStav, o: DemoStav['oznameni'][number]) {
+function tvarOznameni(o: DemoStav['oznameni'][number]) {
   const a = clen(o.authorId);
   return { id: o.id, content: o.content, pinned: o.pinned, createdAt: o.createdAt, authorName: a.name, authorAvatar: a.avatar };
 }
@@ -22,7 +22,7 @@ function konverzace(s: DemoStav, meId: number) {
   return [{ id: ID_TYMOVEHO_CHATU, type: 'team', name: 'Týmový chat', avatar: null, otherUserId: null, lastMessage: posledni?.content ?? null, lastTime: posledni?.createdAt ?? null, unreadCount: neprectene }];
 }
 
-const POSTUPY = (den: string) => [
+const POSTUPY = () => [
   { id: 1, name: 'Otevírací rutina', description: 'Co se dělá před otevřením.', icon: 'clock', color: '1', items: [{ text: 'Zapnout kávovar a mlýnek', emoji: '☕', minutes: 10 }, { text: 'Zkontrolovat mléko a ovesný nápoj' }, { text: 'Napéct ranní koláče' }, { text: 'Spočítat kasu při otevření' }], remindAt: null, remindDays: [], remindAnchor: 'open', requireBeforeClosing: false, approved: true, submittedBy: null },
   { id: 2, name: 'Kontrola lednic', description: 'Teplota a data trvanlivosti.', icon: 'box', color: '1', items: ['Změřit teplotu', 'Vyhodit prošlé'], remindAt: '14:00', remindDays: [], remindAnchor: 'time', requireBeforeClosing: false, approved: true, submittedBy: null },
   { id: ID_ZAVIRACIHO_POSTUPU, name: 'Zavírací postup', description: 'Večerní uzavření.', icon: 'check', color: '1', items: ['Uklidit bar a vyčistit kávovar', 'Spočítat kasu', 'Vypnout spotřebiče', 'Zamknout'], remindAt: null, remindDays: [], remindAnchor: 'close', requireBeforeClosing: true, approved: true, submittedBy: null },
@@ -44,7 +44,7 @@ export const komunikace: Obsluha = (p, k) => {
   if (cesta === '/api/announcements') {
     if (metoda === 'GET') {
       const seznam = s.oznameni.filter(o => o.pinned || opr.has('oznameni.spravovat')).sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.createdAt.localeCompare(a.createdAt));
-      return ok({ announcements: seznam.map(o => tvarOznameni(s, o)) });
+      return ok({ announcements: seznam.map(o => tvarOznameni(o)) });
     }
     if (metoda === 'POST') {
       const text = String(p.telo?.content ?? '').trim();
@@ -52,7 +52,7 @@ export const komunikace: Obsluha = (p, k) => {
       const novy = { id: ++s.dalsiId, content: text, pinned: true, createdAt: new Date().toISOString(), authorId: meId };
       s.oznameni.unshift(novy);
       k.hlas('oznameni-pridano', { id: novy.id });
-      return ok(tvarOznameni(s, novy));
+      return ok(tvarOznameni(novy));
     }
     if (metoda === 'PATCH') {
       const o = s.oznameni.find(x => x.id === Number(p.telo?.id));
@@ -109,7 +109,7 @@ export const komunikace: Obsluha = (p, k) => {
   // ---- Postupy a návody ----
   if (cesta === '/api/procedures') {
     if (metoda !== 'GET') return ok({ ok: true, id: ++s.dalsiId });
-    return ok({ procedures: POSTUPY(s.dnes), hasShiftToday: true, openingToday: { open: '07:30', close: '20:00', closed: false } });
+    return ok({ procedures: POSTUPY(), hasShiftToday: true, openingToday: { open: '07:30', close: '20:00', closed: false } });
   }
   if (cesta === '/api/procedures/runs') {
     if (metoda !== 'GET') return ok({ ok: true });
