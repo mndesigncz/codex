@@ -6,6 +6,6 @@ export const metadata: Metadata = { title: 'Tablet · Managero', robots: { index
 
 // Slovníky návodů a postupů: běží tu plovoucí běžec postupu, připomínky a návody u kroků.
 export default function KioskLayout({ children }: { children: React.ReactNode }) {
-  // Tablet sdílí s portálem zaměstnance uzávěrku, inventuru a chat a s vedením návody a postupy; slovníky jdou v prvním HTML.
-  return <><Slovniky sekce={['kiosk', 'zamestnanec', 'chat', 'navody', 'postupy']} />{children}</>;
+  // Tablet sdílí s portálem zaměstnance uzávěrku, inventuru a chat, s vedením návody a postupy a úkoly (sekce rozvrh); slovníky jdou v prvním HTML.
+  return <><Slovniky sekce={['kiosk', 'zamestnanec', 'chat', 'navody', 'postupy', 'rozvrh', 'sklad']} />{children}</>;
 }

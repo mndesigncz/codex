@@ -13,6 +13,11 @@
 
 import { czCount, SMENA, type CzNoun } from './czech.ts';
 import { delkaSmeny, minutyZ } from './rozvrhPrehled.ts';
+import { preloz } from './i18n/core.ts';
+
+/** Překladač věty (jako `t` z useT); bez něj se píše česky. */
+export type PrekladVety = (klic: string, hodnoty?: Record<string, string | number | null | undefined>) => string;
+const cesky: PrekladVety = (klic, hodnoty) => preloz({}, 'cs', klic, hodnoty);
 
 // ---------------------------------------------------------------------------
 // Stav filtru
@@ -270,25 +275,27 @@ const DALSI: CzNoun = { one: 'další', few: 'další', many: 'dalších' };
  * v posuvném pásu mimo obrazovku a lišta je jediné místo, kde je vidět,
  * KDO je vybraný. `kratce` = krátká jména z pásu (křestní, u shody celá).
  */
-export function popisFiltru(f: FiltrRozvrhu, jmena: Map<number, string>, kratce?: Map<number, string>): string {
+export function popisFiltru(f: FiltrRozvrhu, jmena: Map<number, string>, kratce?: Map<number, string>, t: PrekladVety = cesky): string {
+  // Sekce slovníku pro kontrolu překladů: useT('rozvrh') (věty z t('…') v tomhle souboru patří do `rozvrh`).
   const casti: string[] = [];
   const kratke = (id: number) => kratce?.get(id) ?? jmena.get(id) ?? null;
-  if (f.lide.length === 1) casti.push(jmena.get(f.lide[0]) ?? czCount(1, CLOVEK));
+  const clovek = (n: number) => t('{n, plural, one {# člověk} few {# lidé} other {# lidí}}', { n });
+  if (f.lide.length === 1) casti.push(jmena.get(f.lide[0]) ?? clovek(1));
   else if (f.lide.length > 1) {
     const znama = f.lide.map(kratke);
-    if (znama.some(j => j == null)) casti.push(czCount(f.lide.length, CLOVEK));
+    if (znama.some(j => j == null)) casti.push(clovek(f.lide.length));
     else if (f.lide.length <= 3) casti.push(znama.join(', '));
-    else casti.push(`${znama[0]} a ${czCount(f.lide.length - 1, DALSI)}`);
+    else casti.push(t('{jmeno} a {n, plural, one {# další} few {# další} other {# dalších}}', { jmeno: znama[0], n: f.lide.length - 1 }));
   }
   if (f.typy.length > 0 && f.typy.length <= 2) casti.push(f.typy.join(', '));
-  else if (f.typy.length > 2) casti.push(czCount(f.typy.length, TYP));
-  if (f.jenDiry) casti.push('jen dny s dírou');
+  else if (f.typy.length > 2) casti.push(t('{n, plural, one {# typ} few {# typy} other {# typů}}', { n: f.typy.length }));
+  if (f.jenDiry) casti.push(t('jen dny s dírou'));
   return casti.join(' · ');
 }
 
 /** „14 směn v návrhu" / „3 směny" — kolik toho filtr ukazuje. */
-export function popisVysledku(n: number, navrh: boolean): string {
-  return `${czCount(n, SMENA)}${navrh ? ' v návrhu' : ''}`;
+export function popisVysledku(n: number, navrh: boolean, t: PrekladVety = cesky): string {
+  return `${t('{n, plural, one {# směna} few {# směny} other {# směn}}', { n })}${navrh ? ` ${t('v návrhu')}` : ''}`;
 }
 
 // ---------------------------------------------------------------------------

@@ -107,6 +107,8 @@ function uzly(zprava: string): Uzel[] {
 
 const formatyCisel = new Map<string, Intl.NumberFormat>();
 function formatCisla(jazyk: Jazyk, n: number): string {
+  // Čeština (zdroj) drží původní zápis beze změny: „1000 směn", ne „1 000 směn" s nezlomitelnou mezerou.
+  if (jazyk === 'cs') return String(n);
   let f = formatyCisel.get(jazyk);
   if (!f) { f = new Intl.NumberFormat(LOCALE_PRO_JAZYK[jazyk]); formatyCisel.set(jazyk, f); }
   return f.format(n);

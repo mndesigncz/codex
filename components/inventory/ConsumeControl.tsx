@@ -6,6 +6,7 @@
 
 import { useState } from 'react';
 import { Button } from '../ui';
+import { useT } from '@/lib/i18n/client';
 
 export default function ConsumeControl({ itemId, unit, quickAmounts, onDone, onFail }: {
   itemId: number;
@@ -16,6 +17,7 @@ export default function ConsumeControl({ itemId, unit, quickAmounts, onDone, onF
   onDone: (updatedItem: any) => void;
   onFail?: () => void;
 }) {
+  const t = useT('sklad');
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState('');
   const [saving, setSaving] = useState(false);
@@ -26,7 +28,7 @@ export default function ConsumeControl({ itemId, unit, quickAmounts, onDone, onF
     try {
       const res = await fetch(`/api/inventory/${itemId}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ consume: value, note: `Ruční odpis −${value}${unit ? ` ${unit}` : ''}` }),
+        body: JSON.stringify({ consume: value, note: `Ruční odpis −${value}${unit ? ` ${unit}` : ''}` /* i18n-ok: poznámka se ukládá do historie skladu česky */ }),
       });
       if (res.ok) {
         const updated = await res.json().catch(() => null);
@@ -40,9 +42,9 @@ export default function ConsumeControl({ itemId, unit, quickAmounts, onDone, onF
   if (!open) {
     return (
       // Ikona `minus` místo znaku „−" v popisku (kolo 69, audit Skladu).
-      <Button variant="secondary" size="sm" icon="minus" title="Odepsat spotřebované množství"
+      <Button variant="secondary" size="sm" icon="minus" title={t('Odepsat spotřebované množství')}
         onClick={e => { e.stopPropagation(); setOpen(true); }}>
-        Odpis
+        {t('Odpis')}
       </Button>
     );
   }
@@ -58,17 +60,17 @@ export default function ConsumeControl({ itemId, unit, quickAmounts, onDone, onF
         autoFocus inputMode="decimal" value={amount}
         onChange={e => setAmount(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); consume(Number(amount.replace(',', '.'))); } }}
-        placeholder={unit ?? 'množství'}
-        aria-label={`Kolik odepsat${unit ? ` (${unit})` : ''}`}
+        placeholder={unit ?? t('množství')}
+        aria-label={unit ? t('Kolik odepsat ({unit})', { unit }) : t('Kolik odepsat')}
         className="field !w-20 !py-1.5 text-right tabular-nums"
       />
       {unit && <span className="text-xs text-black/55">{unit}</span>}
       <Button variant="primary" size="sm" loading={saving}
         disabled={!(Number(amount.replace(',', '.')) > 0)}
         onClick={() => consume(Number(amount.replace(',', '.')))}>
-        Odepsat
+        {t('Odepsat')}
       </Button>
-      <Button variant="ghost" size="sm" iconOnly icon="close" aria-label="Zrušit odpis" onClick={() => { setOpen(false); setAmount(''); }} />
+      <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={t('Zrušit odpis')} onClick={() => { setOpen(false); setAmount(''); }} />
     </div>
   );
 }

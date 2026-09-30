@@ -13,8 +13,8 @@
 import { useCallback, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Icon } from '../Icons';
 import { Avatar, Button, Chip, Segmented } from '../ui';
-import { czCount, czForm, SMENA, DEN } from '@/lib/czech';
-import { hodinyText } from '@/lib/rozvrhPrehled';
+import { useJazyk, useT, type PrekladFn } from '@/lib/i18n/client';
+import { dnuTxt, hodinyTextJ, smenSlovo, smenTxt, upozorneniTxt } from './texty';
 import type { ClovekPasu, RadekVytizeni, RazeniVytizeni, TypPasu, Vytizeni } from '@/lib/rozvrhFiltr';
 
 /** Šířka vyblednutí okraje pásu, když za ním ještě něco je (jako Segmented). */
@@ -85,18 +85,19 @@ export function PasLidi({ lide, vybrani, celkem, navrh, onPrepni, onVsichni }: {
   onPrepni: (id: number) => void;
   onVsichni: () => void;
 }) {
-  const vNavrhu = navrh ? ' v návrhu' : '';
+  const t = useT('rozvrh');
+  const vNavrhu = navrh ? ` ${t('v návrhu')}` : '';
   return (
-    <PosuvnyPas ariaLabel="Filtr podle lidí" data="lide">
+    <PosuvnyPas ariaLabel={t('Filtr podle lidí')} data="lide">
       <button type="button" aria-pressed={vybrani.length === 0} onClick={onVsichni}
-        aria-label={`Všichni, ${czCount(celkem, SMENA)}${vNavrhu}`} className={pilulka(vybrani.length === 0)}>
-        <span aria-hidden>Všichni</span><Pocet n={celkem} on={vybrani.length === 0} />
+        aria-label={`${t('Všichni')}, ${smenTxt(t, celkem)}${vNavrhu}`} className={pilulka(vybrani.length === 0)}>
+        <span aria-hidden>{t('Všichni')}</span><Pocet n={celkem} on={vybrani.length === 0} />
       </button>
       {lide.map(c => {
         const on = vybrani.includes(c.id);
         return (
           <button key={c.id} type="button" aria-pressed={on} onClick={() => onPrepni(c.id)} data-clovek={c.id}
-            aria-label={`${c.jmeno}, ${czCount(c.smen, SMENA)}${vNavrhu}`} title={c.jmeno}
+            aria-label={`${c.jmeno}, ${smenTxt(t, c.smen)}${vNavrhu}`} title={c.jmeno}
             // Avatar vlevo zmenší odsazení pilulky, ať kruh nesedí v díře.
             className={`${pilulka(on)} !pl-1.5`}>
             <Avatar emoji={c.avatar} name={c.jmeno} size="xs" ring={false} className={on ? '!bg-white/20 !text-white' : ''} />
@@ -121,24 +122,25 @@ export function PasTypu({ typy, vybrane, tecka, onPrepni, diry, jenDiry, onJenDi
   onJenDiry: () => void;
   navrh: boolean;
 }) {
+  const t = useT('rozvrh');
   return (
-    <PosuvnyPas ariaLabel="Filtr podle typu směny a dnů s dírou" data="typy">
-      {typy.map(t => {
-        const on = vybrane.includes(t.nazev);
+    <PosuvnyPas ariaLabel={t('Filtr podle typu směny a dnů s dírou')} data="typy">
+      {typy.map(ty => {
+        const on = vybrane.includes(ty.nazev);
         return (
-          <button key={t.nazev} type="button" aria-pressed={on} onClick={() => onPrepni(t.nazev)} data-typ={t.nazev}
-            aria-label={`${t.nazev}, ${czCount(t.smen, SMENA)}${navrh ? ' v návrhu' : ''}`} className={pilulka(on)}>
-            <span aria-hidden className={`h-2.5 w-2.5 shrink-0 rounded-full ${tecka(t.barva)}`} />
-            <span aria-hidden>{t.nazev}</span>
-            <Pocet n={t.smen} on={on} />
+          <button key={ty.nazev} type="button" aria-pressed={on} onClick={() => onPrepni(ty.nazev)} data-typ={ty.nazev}
+            aria-label={`${ty.nazev}, ${smenTxt(t, ty.smen)}${navrh ? ` ${t('v návrhu')}` : ''}`} className={pilulka(on)}>
+            <span aria-hidden className={`h-2.5 w-2.5 shrink-0 rounded-full ${tecka(ty.barva)}`} />
+            <span aria-hidden>{ty.nazev}</span>
+            <Pocet n={ty.smen} on={on} />
           </button>
         );
       })}
       {diry != null && (
         <button type="button" aria-pressed={jenDiry} onClick={onJenDiry} data-jen-diry
-          aria-label={`Jen dny s dírou, ${czCount(diry, DEN)}`} className={pilulka(jenDiry)}>
+          aria-label={`${t('Jen dny s dírou')}, ${dnuTxt(t, diry)}`} className={pilulka(jenDiry)}>
           <Icon name="warning" size={13} className="shrink-0" />
-          <span aria-hidden>Jen dny s dírou</span>
+          <span aria-hidden>{t('Jen dny s dírou')}</span>
           <Pocet n={diry} on={jenDiry} />
         </button>
       )}
@@ -154,16 +156,17 @@ export function PasTypu({ typy, vybrane, tecka, onPrepni, diry, jenDiry, onJenDi
 export function ListaFiltru({ popis, vysledek, onZrusit }: { popis: string; vysledek: string; onZrusit: () => void }) {
   // Bez aria-live: oblast vložená do stránky i s obsahem se neohlásí a při
   // změnách by se četla i věta o exportu. Výsledek hlásí StavFiltru.
+  const t = useT('rozvrh');
   return (
     <div className="note note-info text-sm flex flex-wrap items-center justify-between gap-x-3 gap-y-1" data-filtr-lista>
       <p className="min-w-0 text-pretty">
-        <span className="font-semibold">Filtr: {popis}</span>
+        <span className="font-semibold">{t('Filtr: {popis}', { popis })}</span>
         <span> — {vysledek}</span>
         {/* Export, tisk i publikování filtr nepoužijí — ať nikdo nečeká, že
             pošle jen směny Evy, a ostatním nepřijde rozvrh. */}
-        <span className="block text-xs mt-0.5">Export, tisk i publikování berou vždy celý měsíc.</span>
+        <span className="block text-xs mt-0.5">{t('Export, tisk i publikování berou vždy celý měsíc.')}</span>
       </p>
-      <Button variant="ghost" size="sm" icon="close" onClick={onZrusit} className="shrink-0 -my-1">Zrušit filtr</Button>
+      <Button variant="ghost" size="sm" icon="close" onClick={onZrusit} className="shrink-0 -my-1">{t('Zrušit filtr')}</Button>
     </div>
   );
 }
@@ -180,26 +183,27 @@ export function StavFiltru({ text }: { text: string }) {
 // „Co řešit", ne „Odchylka": majitel neví, že odchylka je nejlepší pohled
 // na problémy — řadí se nahoru nad max., kdo chce pracovat a nemá, pak
 // nejdál od průměru.
-const RAZENI: { id: RazeniVytizeni; label: string }[] = [
-  { id: 'smeny', label: 'Počet' },
-  { id: 'jmeno', label: 'Jméno' },
-  { id: 'odchylka', label: 'Co řešit' },
+const razeniMoznosti = (t: PrekladFn): { id: RazeniVytizeni; label: string }[] => [
+  { id: 'smeny', label: t('Počet') },
+  { id: 'jmeno', label: t('Jméno') },
+  { id: 'odchylka', label: t('Co řešit') },
 ];
 
 /** Text upozornění — stejný na chipu i v přístupném jménu řádku (i s číslem). */
-function textUpozorneni(u: RadekVytizeni['upozorneni'][number], r: RadekVytizeni): string {
-  if (u === 'nad_max') return `o ${czCount(r.smen - (r.max ?? 0), SMENA)} nad maximem`;
-  if (u === 'bez_smeny') return 'chce pracovat, nemá směnu';
-  return u === 'nad_prumerem' ? 'výrazně nad průměrem' : 'výrazně pod průměrem';
+function textUpozorneni(t: PrekladFn, u: RadekVytizeni['upozorneni'][number], r: RadekVytizeni): string {
+  if (u === 'nad_max') return t('o {smen} nad maximem', { smen: smenTxt(t, r.smen - (r.max ?? 0)) });
+  if (u === 'bez_smeny') return t('chce pracovat, nemá směnu');
+  return u === 'nad_prumerem' ? t('výrazně nad průměrem') : t('výrazně pod průměrem');
 }
 
 /** Upozornění řádku přehledu — stav (bad/wait), srovnání s průměrem jen info. */
 function Upozorneni({ r }: { r: RadekVytizeni }) {
+  const t = useT('rozvrh');
   if (r.upozorneni.length === 0) return null;
   return (
     <span className="flex flex-wrap gap-1">
       {r.upozorneni.map(u => (
-        <Chip key={u} tone={u === 'nad_max' ? 'bad' : u === 'bez_smeny' ? 'wait' : 'info'} size="sm">{textUpozorneni(u, r)}</Chip>
+        <Chip key={u} tone={u === 'nad_max' ? 'bad' : u === 'bez_smeny' ? 'wait' : 'info'} size="sm">{textUpozorneni(t, u, r)}</Chip>
       ))}
     </span>
   );
@@ -250,22 +254,28 @@ export function PrehledLidi({ v, radky, razeni, onRazeni, otevreno, onOtevreno, 
    */
   bezFiltru?: string | null;
 }) {
+  const t = useT('rozvrh');
+  const { jazyk } = useJazyk();
   const uid = useId();
   const [vse, setVse] = useState(false);
   const upozorneni = v.radky.filter(r => r.upozorneni.some(u => u === 'nad_max' || u === 'bez_smeny')).length;
   const souhrn = [
-    navrh ? 'v návrhu' : null,
+    navrh ? t('v návrhu') : null,
     bezFiltru || null,
     // „5,3 směny" — desetinné číslo bere v češtině vždy 2. pád jednotného čísla.
-    v.prumer > 0 ? `průměr ${hodinyText(v.prumer)} ${Number.isInteger(v.prumer) ? czForm(v.prumer, SMENA) : 'směny'} na člověka` : 'zatím bez směn',
-    upozorneni > 0 ? czCount(upozorneni, { one: 'upozornění', few: 'upozornění', many: 'upozornění' }) : null,
+    v.prumer > 0
+      ? (Number.isInteger(v.prumer)
+        ? t('průměr {h} {n, plural, one {směna} few {směny} other {směn}} na člověka', { h: hodinyTextJ(v.prumer, jazyk), n: v.prumer })
+        : t('průměr {h} směny na člověka', { h: hodinyTextJ(v.prumer, jazyk) }))
+      : t('zatím bez směn'),
+    upozorneni > 0 ? upozorneniTxt(t, upozorneni) : null,
   ].filter(Boolean).join(' · ');
   return (
     <section aria-labelledby={`${uid}-n`} className="rounded-2xl border border-black/[0.08]" data-prehled-lidi>
       <button type="button" aria-expanded={otevreno} aria-controls={`${uid}-o`} onClick={() => onOtevreno(!otevreno)}
         className="w-full min-h-[44px] flex items-center justify-between gap-3 px-3 py-2.5 text-left rounded-2xl hover:bg-black/[0.03]">
         <span className="min-w-0">
-          <span id={`${uid}-n`} className="block text-sm font-semibold text-[#16181A]">Směny podle lidí</span>
+          <span id={`${uid}-n`} className="block text-sm font-semibold text-[#16181A]">{t('Směny podle lidí')}</span>
           <span className="block t-meta text-pretty">{souhrn}</span>
         </span>
         <Icon name="chevron" size={18} className={`shrink-0 text-black/45 transition-transform duration-200 ${otevreno ? 'rotate-180' : ''}`} />
@@ -273,10 +283,10 @@ export function PrehledLidi({ v, radky, razeni, onRazeni, otevreno, onOtevreno, 
       {otevreno && (
         <div id={`${uid}-o`} className="px-3 pb-3 space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <Segmented ariaLabel="Řadit lidi podle" size="sm" value={razeni} onChange={onRazeni} options={RAZENI} />
+            <Segmented ariaLabel={t('Řadit lidi podle')} size="sm" value={razeni} onChange={onRazeni} options={razeniMoznosti(t)} />
             <p className="t-meta flex items-center gap-2">
-              <span className="inline-flex items-center gap-1"><span aria-hidden className="h-3 w-0.5 rounded-full bg-info" /> průměr</span>
-              {dostupnostViditelna && <span className="inline-flex items-center gap-1"><span aria-hidden className="h-3 w-0.5 rounded-full bg-wait" /> chce nejvýš</span>}
+              <span className="inline-flex items-center gap-1"><span aria-hidden className="h-3 w-0.5 rounded-full bg-info" /> {t('průměr')}</span>
+              {dostupnostViditelna && <span className="inline-flex items-center gap-1"><span aria-hidden className="h-3 w-0.5 rounded-full bg-wait" /> {t('chce nejvýš')}</span>}
             </p>
           </div>
           <ul className="list" data-prehled-radky>
@@ -288,18 +298,23 @@ export function PrehledLidi({ v, radky, razeni, onRazeni, otevreno, onOtevreno, 
               // Vybraný zůstane vidět i za hranicí telefonu — jinak by nešel odkliknout.
               const skryt = !vse && i >= RADKU_NA_TELEFONU && !vybran;
               // Strop platí na měsíc (formulář dostupnosti je za měsíc).
-              const strop = r.max != null ? `chce nejvýš ${czCount(r.max, SMENA)} za měsíc` : null;
+              const strop = r.max != null ? t('chce nejvýš {smen} za měsíc', { smen: smenTxt(t, r.max) }) : null;
               const meta = [
-                `${hodinyText(r.hodiny)} h`,
-                r.vikend > 0 ? `${r.vikend}× víkend` : null,
-                v.zavreniZname && r.zaviraci > 0 ? `${r.zaviraci}× zavírá` : null,
+                `${hodinyTextJ(r.hodiny, jazyk)} h`,
+                r.vikend > 0 ? t('{n}× víkend', { n: r.vikend }) : null,
+                v.zavreniZname && r.zaviraci > 0 ? t('{n}× zavírá', { n: r.zaviraci }) : null,
                 strop,
               ].filter(Boolean).join(' · ');
               return (
                 <li key={r.id} data-radek-clovek={r.id} className={skryt ? 'max-sm:hidden' : undefined}>
                   {/* Klepnutí na člověka vyfiltruje mřížku jen na něj. */}
                   <button type="button" onClick={() => onVyber(r.id)} aria-pressed={vybran}
-                    aria-label={`${r.jmeno}: ${czCount(r.smen, SMENA)}, ${hodinyText(r.hodiny)} h${strop ? `, ${strop}` : ''}${r.upozorneni.length ? `, ${r.upozorneni.map(u => textUpozorneni(u, r)).join(', ')}` : ''}. ${jediny ? `Zrušit filtr na ${r.jmeno}.` : 'Ukázat v rozvrhu jen tyhle směny, všech typů.'}`}
+                    aria-label={t('{jmeno}: {smen}, {h} h{strop}{upoz}. {akce}', {
+                      jmeno: r.jmeno, smen: smenTxt(t, r.smen), h: hodinyTextJ(r.hodiny, jazyk),
+                      strop: strop ? `, ${strop}` : '',
+                      upoz: r.upozorneni.length ? `, ${r.upozorneni.map(u => textUpozorneni(t, u, r)).join(', ')}` : '',
+                      akce: jediny ? t('Zrušit filtr na {jmeno}.', { jmeno: r.jmeno }) : t('Ukázat v rozvrhu jen tyhle směny, všech typů.'),
+                    })}
                     className={`w-full text-left flex items-start gap-3 py-2.5 px-1.5 -mx-1.5 rounded-xl ${vybran ? 'bg-black/[0.05]' : 'hover:bg-black/[0.03]'}`}>
                     <Avatar emoji={r.avatar} name={r.jmeno} size="sm" />
                     <span className="min-w-0 flex-1" aria-hidden>
@@ -307,7 +322,7 @@ export function PrehledLidi({ v, radky, razeni, onRazeni, otevreno, onOtevreno, 
                         <span className="font-medium text-[15px] leading-snug text-[#16181A] truncate">{r.jmeno}</span>
                         <span className="shrink-0 tabular-nums">
                           <span className="text-[15px] font-bold text-[#16181A]">{r.smen}</span>
-                          <span className="text-[13px] text-black/55"> {czForm(r.smen, SMENA)}</span>
+                          <span className="text-[13px] text-black/55"> {smenSlovo(t, r.smen)}</span>
                         </span>
                       </span>
                       <Pruh r={r} prumer={v.prumer} stupnice={v.stupnice} />
@@ -322,7 +337,7 @@ export function PrehledLidi({ v, radky, razeni, onRazeni, otevreno, onOtevreno, 
           {!vse && radky.length > RADKU_NA_TELEFONU && (
             // Jen na telefonu: na širší obrazovce se vejdou všichni vedle mřížky.
             <Button variant="ghost" size="sm" className="sm:hidden w-full" onClick={() => setVse(true)} data-ukazat-vsechny>
-              Ukázat všech {radky.length}
+              {t('Ukázat všech {n}', { n: radky.length })}
             </Button>
           )}
         </div>
