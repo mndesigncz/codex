@@ -97,12 +97,14 @@ export async function GET() {
 
     // Business/localization settings (defensive — safe defaults before migration).
     let biz = { currency: 'CZK', locale: 'cs-CZ', week_start: 1, labor_target_pct: null as number | null,
-                low_stock_default: 5, critical_stock_default: 2, business_type: null as string | null };
+                low_stock_default: 5, critical_stock_default: 2, business_type: null as string | null,
+                address: null as string | null, country: null as string | null };
     try {
       const [b] = await sql`
         SELECT currency, locale, week_start, labor_target_pct, low_stock_default, critical_stock_default, business_type
         FROM teams WHERE id = ${teamId}`;
       if (b) biz = {
+        ...biz,
         currency: b.currency || 'CZK',
         locale: b.locale || 'cs-CZ',
         week_start: b.week_start ?? 1,
@@ -111,6 +113,13 @@ export async function GET() {
         critical_stock_default: b.critical_stock_default ?? 2,
         business_type: b.business_type ?? null,
       };
+    } catch { /* columns not migrated yet */ }
+    // Adresa a země přibyly s průvodcem; vlastní dotaz, ať jejich chybějící sloupce
+    // (před /api/init) nevezmou ostatní nastavení.
+    try {
+      const [b] = await sql`SELECT address, country FROM teams WHERE id = ${teamId}`;
+      biz.address = b?.address ?? null;
+      biz.country = b?.country ?? null;
     } catch { /* columns not migrated yet */ }
 
     // Plan & trial — resolved server-side so every client agrees on the label.
@@ -186,7 +195,7 @@ export async function GET() {
 // půlka změny by vypadala jako úspěch (stejně jako teams/members).
 const POLE: Record<string, string> = {
   name: 'podnik.nastaveni', currency: 'podnik.nastaveni', locale: 'podnik.nastaveni', weekStart: 'podnik.nastaveni',
-  businessType: 'podnik.nastaveni', dashboardConfig: 'podnik.nastaveni', showTeamSchedule: 'podnik.nastaveni',
+  businessType: 'podnik.nastaveni', address: 'podnik.nastaveni', country: 'podnik.nastaveni', dashboardConfig: 'podnik.nastaveni', showTeamSchedule: 'podnik.nastaveni',
   regenerateCode: 'tym.pozvat',
   payDailyCash: 'uzaverky.nastaveni', drawerFloat: 'uzaverky.nastaveni', closingRequiresShift: 'uzaverky.nastaveni',
   payoutFromRegister: 'uzaverky.nastaveni', tipsInDrawer: 'uzaverky.nastaveni',
@@ -203,7 +212,7 @@ export async function PATCH(request: Request) {
   const { name, regenerateCode, payDailyCash, closingRequiresShift, payoutFromRegister, tipsInDrawer, dashboardConfig,
           showTeamSchedule,
           levelsConfig, pointsConfig,
-          currency, locale, weekStart, laborTargetPct, lowStockDefault, criticalStockDefault, businessType } = body ?? {};
+          currency, locale, weekStart, laborTargetPct, lowStockDefault, criticalStockDefault, businessType, address, country } = body ?? {};
 
   const poslane = Object.keys(body ?? {}).filter(k => body[k] !== undefined && k in POLE);
   const chybi = [...new Set(poslane.map(k => POLE[k]))].filter(k => !c.role.opravneni.has(k));
@@ -272,6 +281,12 @@ export async function PATCH(request: Request) {
     if (Number.isFinite(criticalStockDefault)) await sql`UPDATE teams SET critical_stock_default = ${criticalStockDefault} WHERE id = ${team.id}`;
     if (typeof businessType === 'string') await sql`UPDATE teams SET business_type = ${businessType} WHERE id = ${team.id}`;
   } catch { /* columns not migrated yet — ignore until /api/init runs */ }
+
+  // Adresa a země mají vlastní try: před migrací sloupce chybí a nesmí to vzít ostatní nastavení.
+  try {
+    if (typeof address === 'string') await sql`UPDATE teams SET address = ${address.trim().slice(0, 200) || null} WHERE id = ${team.id}`;
+    if (typeof country === 'string') await sql`UPDATE teams SET country = ${country.trim().slice(0, 20) || null} WHERE id = ${team.id}`;
+  } catch { /* columns not migrated yet */ }
 
   let joinCode: string | undefined;
   if (regenerateCode) {

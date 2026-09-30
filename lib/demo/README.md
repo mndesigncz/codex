@@ -15,6 +15,11 @@ odpovídá z paměti (`lib/demo/stav.ts`).
 
 Příklady: `/demo?scena=rozvrh&rezim=okno`, `/demo?scena=uzaverka&role=vedeni`.
 
+Ukázku vkládá i průvodce prvotním nastavením (`components/pruvodce/DemoOkno.tsx`,
+`/employer/start`): jeden iframe `?rezim=okno&role=vedeni` v rámu telefonu (390 × 760
+zmenšené `transform: scale`), scéna se mění zprávou `demo-scena` po `demo-pripraveno`.
+Nová scéna tedy zdarma přibude i tam, když ji někdo přiřadí cíli v `lib/pruvodce/typy.ts`.
+
 ## Kde co je
 
 - `app/demo/{layout,page}.tsx`: veřejná trasa, `noindex`. Middleware ji nehlídá (jeho `matcher` zná jen `/api`, `/employer`, `/employee`, `/kiosk`, `/client`).

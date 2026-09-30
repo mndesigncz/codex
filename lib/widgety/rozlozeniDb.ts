@@ -137,13 +137,21 @@ export async function odpovedRozlozeni(c: Kontext, stranka: DefiniceStranky): Pr
 export async function zapisRadek(a: {
   teamId: number; stranka: string; rozsah: Rozsah; userId: number | null;
   polozky: PolozkaRozlozeni[]; zamceno: boolean; verze: number; meId: number;
+  /** Odkud řádek je (průvodce: 'pruvodce'). Ruční zápis ho bez zdroje vynuluje. */
+  zdroj?: string | null;
 }): Promise<number | null> {
   const json = JSON.stringify(a.polozky);
+  const zdroj = a.zdroj ?? null;
+  // Řádek ze zdroje 'pruvodce' je jen návrh: jakmile ho kdokoli uloží ručně,
+  // zdroj se vynuluje a průvodce ho už nikdy nepřepíše. Ostatní zdroje
+  // (dashboard_config z migrace) se ručním zápisem nemění jako dřív.
   const rows = await sql`
-    INSERT INTO rozlozeni_stranek (team_id, stranka, rozsah, user_id, polozky, zamceno, verze, upravil, updated_at)
-    VALUES (${a.teamId}, ${a.stranka}, ${a.rozsah}, ${a.userId}, ${json}::jsonb, ${a.zamceno}, 1, ${a.meId}, NOW())
+    INSERT INTO rozlozeni_stranek (team_id, stranka, rozsah, user_id, polozky, zamceno, verze, upravil, zdroj, updated_at)
+    VALUES (${a.teamId}, ${a.stranka}, ${a.rozsah}, ${a.userId}, ${json}::jsonb, ${a.zamceno}, 1, ${a.meId}, ${zdroj}, NOW())
     ON CONFLICT (team_id, stranka, rozsah) DO UPDATE
       SET polozky = EXCLUDED.polozky, zamceno = EXCLUDED.zamceno, upravil = EXCLUDED.upravil,
+          zdroj = CASE WHEN EXCLUDED.zdroj IS NOT NULL THEN EXCLUDED.zdroj
+                       WHEN rozlozeni_stranek.zdroj = 'pruvodce' THEN NULL ELSE rozlozeni_stranek.zdroj END,
           verze = rozlozeni_stranek.verze + 1, updated_at = NOW()
       WHERE rozlozeni_stranek.verze = ${a.verze}
     RETURNING verze` as any[];
