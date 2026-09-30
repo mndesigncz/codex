@@ -32,6 +32,9 @@ const num = (v: any) => {
   return Number.isFinite(n) ? n : null;
 };
 
+// Ověřené číslo, nebo null (nezadáno) — neplatné hodnoty se odmítly už před zápisy.
+const cislo = (v: unknown) => { const r = hromadneCislo(v); return r.ok ? r.hodnota : null; };
+
 const CISELNA_POLE = ['minQuantity', 'criticalQuantity', 'maxQuantity', 'packageSize'] as const;
 
 // Kolo 67: `sklad.upravit`; nákupní cenu navíc `sklad.ceny_upravit` — jinak
@@ -107,7 +110,7 @@ export async function PATCH(request: Request) {
   }
 
   if (patch.minQuantity !== undefined) {
-    const v = hromadneCislo(patch.minQuantity).hodnota;
+    const v = cislo(patch.minQuantity);
     if (v != null) {
       await sql`UPDATE inventory_items SET min_quantity = ${Math.max(0, Math.round(v))} WHERE id = ANY(${ids}) AND team_id = ${me.teamId}`;
       applied.push('minQuantity');
@@ -115,7 +118,7 @@ export async function PATCH(request: Request) {
   }
 
   if (patch.criticalQuantity !== undefined) {
-    const v = hromadneCislo(patch.criticalQuantity).hodnota;
+    const v = cislo(patch.criticalQuantity);
     if (v != null) {
       await sql`UPDATE inventory_items SET critical_quantity = ${Math.max(0, Math.round(v))} WHERE id = ANY(${ids}) AND team_id = ${me.teamId}`;
       applied.push('criticalQuantity');
@@ -123,7 +126,7 @@ export async function PATCH(request: Request) {
   }
 
   if (patch.maxQuantity !== undefined) {
-    const v = hromadneCislo(patch.maxQuantity).hodnota;
+    const v = cislo(patch.maxQuantity);
     if (v != null) {
       await sql`UPDATE inventory_items SET max_quantity = ${Math.max(0, Math.round(v))} WHERE id = ANY(${ids}) AND team_id = ${me.teamId}`;
       applied.push('maxQuantity');
@@ -140,7 +143,7 @@ export async function PATCH(request: Request) {
   }
 
   if (patch.packageSize !== undefined) {
-    const v = hromadneCislo(patch.packageSize).hodnota;   // null/prázdné = vymazat
+    const v = cislo(patch.packageSize);   // null/prázdné = vymazat
     try {
       await sql`UPDATE inventory_items SET package_size = ${v == null || v <= 0 ? null : v} WHERE id = ANY(${ids}) AND team_id = ${me.teamId}`;
       applied.push('packageSize');

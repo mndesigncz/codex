@@ -96,7 +96,11 @@ const POLE_NASTAVENI: Record<string, string> = {
 
 /** Seznam změněných polí česky: „název, měna“. Neznámé pole se vynechá, ne vypíše syrově. */
 export function popisPoliNastaveni(pole: string[]): string {
-  const cesky = pole.map(k => POLE_NASTAVENI[k]).filter((x): x is string => !!x);
+  // Idempotentní: už přeložený název („název") projde beze změny. Nové záznamy
+  // se do auditu zapisují česky (app/api/teams) a při čtení procházejí tímhle
+  // znovu — bez toho by je filtr jako „neznámé klíče" vyřadil celé.
+  const ceskeNazvy = new Set(Object.values(POLE_NASTAVENI));
+  const cesky = pole.map(k => POLE_NASTAVENI[k] ?? (ceskeNazvy.has(k) ? k : undefined)).filter((x): x is string => !!x);
   return [...new Set(cesky)].join(', ').slice(0, 200);
 }
 

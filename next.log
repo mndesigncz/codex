@@ -1,0 +1,7 @@
+   ▲ Next.js 15.5.26
+   - Local:        http://localhost:3400
+   - Network:      http://192.0.2.2:3400
+
+ ✓ Starting...
+ ✓ Ready in 458ms
+<claude-code-hint v="1" type="plugin" value="stripe@claude-plugins-official" />
