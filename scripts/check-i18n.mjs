@@ -37,7 +37,7 @@ import { RES_STATUS, tierFor } from '../lib/clientSlots.ts';
 const JAZYKY = ['en', 'de', 'sk', 'pl'];
 const ROOTS = ['app', 'components', 'lib'];
 /** Kolik `'cs-CZ'` je v kódu mimo výjimky. Klesá s každou dávkou migrace na lib/i18n/format; nesmí růst. */
-const BASELINE_CS_CZ = 259; // +3: výchozí čeština průvodce a předvolby zemí, cena na (zatím české) prodejní stránce
+const BASELINE_CS_CZ = 248; // +3: výchozí čeština průvodce a předvolby zemí, cena na (zatím české) prodejní stránce
 /** Natvrdo psané české řetězce v přeložených souborech (soubor → kolik). Nesmí růst; klesá s dalšími dávkami. */
 const BASELINE_NATVRDO = {};
 
@@ -103,7 +103,7 @@ for (const root of ROOTS) for (const f of walk(root)) {
   }
   // Ráčna natvrdo psaných textů hlídá jen plně přeložené oblasti (host, přihlášení); slupka aplikace
   // (layouty, Nastavení) je přeložená jen zčásti a tvoří ji většinou česká správa.
-  if ((nalezeno || RE_SEKCE.test(src)) && (sek === 'auth' || sek === 'klient-host')) prelozeneSoubory.add(rel);
+  if ((nalezeno || RE_SEKCE.test(src)) && (sek === 'auth' || sek === 'klient-host' || sek === 'zamestnanec' || sek === 'kiosk' || sek === 'chat')) prelozeneSoubory.add(rel);
 }
 
 // Data, která se překládají podle textu a v kódu nejsou jako `t('…')` (volání je nepřímé).

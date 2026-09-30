@@ -12,7 +12,10 @@ import { pridejSlovnik } from './stav.ts';
 import type { Slovnik } from './core.ts';
 
 /** Sekce slovníků. `common` a `api` jdou s každou stránkou, ostatní přibírá ta, která je potřebuje. */
-export const SEKCE = ['common', 'api', 'auth', 'klient-host'] as const;
+export const SEKCE = [
+  'common', 'api', 'auth', 'klient-host',
+  'zamestnanec', 'kiosk', 'chat',
+] as const;
 export type Sekce = (typeof SEKCE)[number];
 export const SEKCE_VZDY: readonly Sekce[] = ['common', 'api'];
 

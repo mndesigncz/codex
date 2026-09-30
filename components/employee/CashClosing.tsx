@@ -22,7 +22,7 @@ import { Avatar, Button, Chip, Modal, PageHeader, Segmented, SwitchRow } from '.
 import {
   Closing, expectedCash, cashDifference, expectedCashLines,
   type Movement, type MovementKind, MOVEMENT_KINDS, movementLabel, sumMovements,
-  DIFF_REASONS, explainDifference,
+  DIFF_REASONS, type ExpectedInput,
   type DenominationCounts, denominationsFor, sumDenominations, hasDenominations,
 } from '@/lib/closing';
 import { useCurrency, useMoney, useSymbol } from '../CurrencyProvider';
@@ -34,10 +34,12 @@ import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu } from '../widgety/useDataWidgetu';
 import { useSmi } from '../widgety/NavigaceKontext';
 import { KLIC_VYPLNIT, UDALOST_VYPLNIT } from '@/lib/uzaverkyPrehled';
-import { czCount } from '@/lib/czech';
+import { useJazyk, useT, type PrekladFn } from '@/lib/i18n/client';
+import { fmtDatum } from '@/lib/i18n/format';
+import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
 import type { PovinnaPolozka } from '@/lib/povinnePredUzaverkou';
 import { UDALOST_ZMENA_POVINNYCH } from '../PredUzaverkou';
-import { ZamekUzaverky, URL_POVINNE, VEC, vyberStavZamku, stavZOdmitnuti, type StavZamku } from './ZamekUzaverky';
+import { ZamekUzaverky, URL_POVINNE, vyberStavZamku, stavZOdmitnuti, type StavZamku } from './ZamekUzaverky';
 
 const inputClass =
   'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm';
@@ -74,6 +76,76 @@ const emptyForm = (): FormState => ({
 
 const n = (s: string) => Math.round(Number(s)) || 0;
 
+// Popisky z lib/closing (movementLabel, DIFF_REASONS, expectedCashLines, explainDifference) jsou
+// české věty. Překládají se tady podle druhu / id, ať lib a jeho testy zůstanou beze změny.
+const popisekPohybu = (t: PrekladFn, kind: MovementKind): string => {
+  switch (kind) {
+    case 'expense': return t('Výdaj z kasy');
+    case 'removal': return t('Odloženo ven');
+    case 'payout': return t('Výplata z kasy');
+    case 'deposit': return t('Vklad do kasy');
+    default: return movementLabel(kind);
+  }
+};
+const napovedaPohybu = (t: PrekladFn, kind: MovementKind): string | undefined => {
+  switch (kind) {
+    case 'expense': return t('Nákup, poplatek…');
+    case 'removal': return t('Do trezoru, odvod');
+    case 'payout': return t('Vyplaceno komu');
+    case 'deposit': return t('Doplnění drobných');
+    default: return undefined;
+  }
+};
+const popisekDuvodu = (t: PrekladFn, id: string): { label: string; hint?: string } | null => {
+  switch (id) {
+    case 'miscount': return { label: t('Přepočítáno špatně'), hint: t('Přepočítali jsme a bylo to jinak.') };
+    case 'unrecorded_expense': return { label: t('Zapomenutý výdaj'), hint: t('Něco se platilo z kasy a nezapsalo se.') };
+    case 'wrong_revenue': return { label: t('Špatně zadaná tržba'), hint: t('Hotovost/karta se někde přehodily.') };
+    case 'tips': return { label: t('Spropitné'), hint: t('Zůstalo v kase, nebo se z ní vzalo.') };
+    case 'change': return { label: t('Rozměňování'), hint: t('Rozměnili jsme si z kasy.') };
+    case 'refund': return { label: t('Vráceno zákazníkovi'), hint: t('Reklamace, storno.') };
+    case 'opening_wrong': return { label: t('Jiný počáteční stav'), hint: t('Kasa nezačínala tím, co je zapsané.') };
+    case 'unknown': return { label: t('Nevíme'), hint: t('Nepodařilo se dohledat.') };
+    default: return null;
+  }
+};
+const popisekRadkuKasy = (t: PrekladFn, label: string): string => {
+  const m: Record<string, string> = { 'Kasa na začátku': t('Kasa na začátku'), 'Tržba hotově': t('Tržba hotově'), 'Spropitné hotově v kase': t('Spropitné hotově v kase'), 'Výdaje z kasy': t('Výdaje z kasy'), 'Odloženo ven': t('Odloženo ven'), 'Moje výplata': t('Moje výplata') }; // i18n-ok: klíče jsou české popisky řádků z lib/closing
+  return m[label] ?? label;
+};
+/** Stejné nápovědy jako explainDifference v lib/closing, jen přeložené. */
+function vysvetliRozdil(t: PrekladFn, diff: number, c: ExpectedInput & { card_revenue?: number; final_removal?: number | null }, movements: Movement[]): string[] {
+  const out: string[] = [];
+  const d = Math.round(diff);
+  if (d === 0) return out;
+  const abs = Math.abs(d);
+  const hit = (v: number | undefined) => v != null && v !== 0 && Math.round(v) === abs;
+  if (hit(c.tips)) {
+    out.push(d > 0
+      ? t('Přebytek přesně odpovídá spropitnému — nezůstalo omylem v kase? Pak zapni „Spropitné zůstává v kase".')
+      : t('Manko přesně odpovídá spropitnému — nevzalo se z kasy, aniž by to bylo zapsané?'));
+  }
+  if (hit(c.self_payout)) {
+    out.push(d > 0
+      ? t('Přebytek přesně odpovídá výplatě — nevyplácelo se nakonec z kasy?')
+      : t('Manko přesně odpovídá výplatě — nevyplatilo se z kasy dvakrát?'));
+  }
+  if (hit(c.opening_cash)) out.push(t('Rozdíl přesně odpovídá počátečnímu stavu — nezačínala kasa jinou částkou?'));
+  if (hit(c.card_revenue)) out.push(t('Rozdíl přesně odpovídá tržbě kartou — nespletla se hotovost s kartou?'));
+  if (d < 0 && hit(Number(c.final_removal) || 0)) {
+    out.push(t('Manko přesně odpovídá odvodu na konci — nezadal se stav kasy až po odložení ven? Kasa se počítá před odvodem.'));
+  }
+  movements.forEach(m => {
+    if (hit(m.amount)) {
+      out.push(t('Rozdíl přesně odpovídá pohybu „{pohyb}" — není započítaný dvakrát?', { pohyb: popisekPohybu(t, m.kind) + (m.note ? ` – ${m.note}` : '') }));
+    }
+  });
+  if (out.length === 0 && abs % 100 === 0) {
+    out.push(t('Rozdíl je celá stovka — často jde o rozměňování nebo přehlédnutou bankovku.'));
+  }
+  return out.slice(0, 3);
+}
+
 /**
  * Counting the drawer the way people actually count it: how many of each note
  * and coin. The app does the adding — an arithmetic slip stops masquerading as
@@ -86,6 +158,7 @@ function DrawerCounter({ denomSet, counts, onChange, money, symbol }: {
   money: (n: number) => string;
   symbol: string;
 }) {
+  const t = useT('zamestnanec');
   const setCount = (denom: number, raw: string) => {
     const next = { ...counts };
     const v = Math.max(0, Math.round(Number(raw)));
@@ -110,7 +183,7 @@ function DrawerCounter({ denomSet, counts, onChange, money, symbol }: {
                 {fmtDenom(d)} <span className="text-[11px] font-medium text-black/35">{symbol}</span>
               </span>
               <div className="flex items-center gap-1 ml-auto">
-                <button type="button" onClick={() => bump(d, -1)} disabled={cnt <= 0} aria-label={`Ubrat ${fmtDenom(d)} ${symbol}`}
+                <button type="button" onClick={() => bump(d, -1)} disabled={cnt <= 0} aria-label={t('Ubrat {hodnota} {mena}', { hodnota: fmtDenom(d), mena: symbol })}
                   className="rounded-xl glass w-9 h-9 flex items-center justify-center text-lg leading-none text-black/60 hover:text-black disabled:opacity-25 active:scale-95 transition">−</button>
                 <input
                   type="number" inputMode="numeric" min={0}
@@ -118,12 +191,12 @@ function DrawerCounter({ denomSet, counts, onChange, money, symbol }: {
                   onChange={e => setCount(d, e.target.value)}
                   /* Počítadlo bankovek: bez jména je to pro odečítač jen
                      „číselné pole" v řadě dvanácti stejných. */
-                  aria-label={`Počet kusů ${fmtDenom(d)} ${symbol}`}
+                  aria-label={t('Počet kusů {hodnota} {mena}', { hodnota: fmtDenom(d), mena: symbol })}
                   placeholder="0"
                   className="w-14 h-9 text-center field rounded-xl border border-black/[0.08] text-sm font-semibold text-[#16181A] tabular-nums placeholder-black/25 focus:border-[#C8F542]/50 focus:outline-none"
                 />
                 {/* Plus bylo limetkové — dvanáct limetek pod sebou vedle jediné hlavní akce. */}
-                <button type="button" onClick={() => bump(d, 1)} aria-label={`Přidat ${fmtDenom(d)} ${symbol}`}
+                <button type="button" onClick={() => bump(d, 1)} aria-label={t('Přidat {hodnota} {mena}', { hodnota: fmtDenom(d), mena: symbol })}
                   className="rounded-xl glass w-9 h-9 flex items-center justify-center text-lg leading-none text-black/60 hover:text-black active:scale-95 transition">+</button>
               </div>
               <span className={`w-20 shrink-0 text-right text-xs tabular-nums ${cnt > 0 ? 'text-[#5B7A08] font-semibold' : 'text-black/20'}`}>
@@ -135,7 +208,7 @@ function DrawerCounter({ denomSet, counts, onChange, money, symbol }: {
       </div>
       {/* Součet už není druhá inkoustová plocha — ta je v obsahu jen jedna (Očekáváno v kase). */}
       <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-[var(--surface-line)]">
-        <span className="text-sm font-semibold text-[#16181A]">Napočítáno v kase</span>
+        <span className="text-sm font-semibold text-[#16181A]">{t('Napočítáno v kase')}</span>
         <span className="text-lg font-bold tabular-nums text-[#16181A]">{money(sumDenominations(counts))}</span>
       </div>
     </div>
@@ -153,6 +226,7 @@ function MovementEditor({ movements, setMovements, payDailyCash, money, symbol }
   money: (n: number) => string;
   symbol: string;
 }) {
+  const t = useT('zamestnanec');
   const [kind, setKind] = useState<MovementKind>('expense');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
@@ -169,8 +243,8 @@ function MovementEditor({ movements, setMovements, payDailyCash, money, symbol }
   return (
     <div className="well p-4 space-y-3">
       <div className="flex items-baseline justify-between gap-2 flex-wrap">
-        <p className="text-sm font-semibold text-[#16181A]">Pohyby v kase</p>
-        <p className="t-meta">Rozepiš, co se z kasy bralo — vedení pak vidí za co.</p>
+        <p className="text-sm font-semibold text-[#16181A]">{t('Pohyby v kase')}</p>
+        <p className="t-meta">{t('Rozepiš, co se z kasy bralo — vedení pak vidí za co.')}</p>
       </div>
 
       {movements.length > 0 && (
@@ -179,13 +253,13 @@ function MovementEditor({ movements, setMovements, payDailyCash, money, symbol }
             const spec = MOVEMENT_KINDS.find(k => k.kind === m.kind);
             return (
               <div key={i} className="flex items-center gap-2.5 py-2">
-                <Chip tone={spec?.sign === 1 ? 'ok' : 'muted'} size="sm" className="shrink-0">{movementLabel(m.kind)}</Chip>
+                <Chip tone={spec?.sign === 1 ? 'ok' : 'muted'} size="sm" className="shrink-0">{popisekPohybu(t, m.kind)}</Chip>
                 <span className="min-w-0 flex-1 truncate text-sm text-black/60">{m.note || '—'}</span>
                 <span className="shrink-0 text-sm font-semibold text-[#16181A] tabular-nums">
                   {spec?.sign === 1 ? '+' : '−'}{money(m.amount)}
                 </span>
                 <button type="button" onClick={() => setMovements(movements.filter((_, idx) => idx !== i))}
-                  aria-label={`Odebrat pohyb ${movementLabel(m.kind)}`}
+                  aria-label={t('Odebrat pohyb {druh}', { druh: popisekPohybu(t, m.kind) })}
                   className="shrink-0 btn-icon btn-icon-danger"><Icon name="close" size={15} /></button>
               </div>
             );
@@ -196,9 +270,9 @@ function MovementEditor({ movements, setMovements, payDailyCash, money, symbol }
       <div className="flex flex-wrap gap-1.5">
         {kinds.map(k => (
           <button key={k.kind} type="button" onClick={() => setKind(k.kind)}
-            title={k.hint} aria-pressed={kind === k.kind}
+            title={napovedaPohybu(t, k.kind)} aria-pressed={kind === k.kind}
             className={`filter-pill tap-target-sm ${kind === k.kind ? 'seg-on' : 'seg-off glass'}`}>
-            {k.label}
+            {popisekPohybu(t, k.kind)}
           </button>
         ))}
       </div>
@@ -207,19 +281,19 @@ function MovementEditor({ movements, setMovements, payDailyCash, money, symbol }
         <div className="relative w-32 shrink-0">
           <input type="number" inputMode="numeric" value={amount} onChange={e => setAmount(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
-            aria-label={`Částka pohybu v ${symbol}`}
+            aria-label={t('Částka pohybu v {mena}', { mena: symbol })}
             placeholder="0"
             className={`${inputClass} py-2 pr-10 tabular-nums`} />
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-black/35">{symbol}</span>
         </div>
         <input value={note} onChange={e => setNote(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
-          aria-label="Za co byl pohyb v kase"
-          placeholder={MOVEMENT_KINDS.find(k => k.kind === kind)?.hint ?? 'Za co'}
+          aria-label={t('Za co byl pohyb v kase')}
+          placeholder={napovedaPohybu(t, kind) ?? t('Za co')}
           className={`${inputClass} py-2 flex-1 min-w-[8rem]`} />
         {/* Vedlejší akce: limetka patří jen „Odeslat uzávěrku" (DP §4 D). */}
         <Button variant="secondary" size="sm" icon="plus" onClick={add} disabled={!amount} className="shrink-0 grow sm:grow-0 justify-center">
-          Přidat
+          {t('Přidat')}
         </Button>
       </div>
     </div>
@@ -312,13 +386,14 @@ export default function CashClosing(props: PropsUzaverky) {
 }
 
 function StrankaUzaverky({ user }: { user: PropsUzaverky['user'] }) {
+  const t = useT('zamestnanec');
   const smi = useSmi();
   // Kdo má jen předávku (kuchař), formulář nedostane — zůstane mu plocha
   // s předávkou (poznámka katalogu). Formulář by mu API stejně neodeslalo.
   return (
     <PlochaWidgetu
       stranka="zamestnanec.uzaverka"
-      hlavicka={{ title: 'Uzávěrka', subtitle: 'Spočítej kasu na konci směny — tržby se předvyplní z pokladny.', hintId: 'cashclosing' }}
+      hlavicka={{ title: t('Uzávěrka'), subtitle: t('Spočítej kasu na konci směny — tržby se předvyplní z pokladny.'), hintId: 'cashclosing' }}
       nastroj={smi('uzaverky.vytvorit') ? <FormularUzaverky user={user} vPlose /> : null}
     />
   );
@@ -328,6 +403,9 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
   /** Nástroj plochy: hlavičku kreslí plocha, výzvu a historii widgety. */
   vPlose?: boolean;
 }) {
+  const t = useT('zamestnanec');
+  const { jazyk } = useJazyk();
+  const denKratce = (d: string) => fmtDatum(d, { jazyk, styl: 'denKratce' });
   const [closings, setClosings] = useState<Closing[]>([]);
   // Návod připnutý k uzávěrce („Připnout k uzávěrce" v Návodech). Ukazuje se
   // u kroku „Kontrola kasy" — jediného místa v aplikaci, kde vzniká manko.
@@ -561,10 +639,13 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
     if (typeof r.tipsInDrawer === 'boolean') setTipsInDrawer(r.tipsInDrawer);
     // Na tabletu jmenovitě, ať si případný další u baru hned všimne, že
     // rozepsaná kasa není jeho.
-    setMsg(r.tablet === true && typeof r.jmeno === 'string' && r.jmeno
-      ? `Rozepsaná uzávěrka za ${r.jmeno} je zpátky — pokud nejsi ${r.jmeno}, vyber svou směnu a začni znovu.`
-      : 'Rozepsanou uzávěrku máš zpátky — pokračuj, kde jsi skončil(a).');
-    setTimeout(() => setMsg(m => (m.startsWith('Rozepsanou') ? '' : m)), 6000);
+    const jmenovite = r.tablet === true && typeof r.jmeno === 'string' && r.jmeno;
+    const zprava = jmenovite
+      ? t('Rozepsaná uzávěrka za {jmeno} je zpátky — pokud nejsi {jmeno}, vyber svou směnu a začni znovu.', { jmeno: r.jmeno })
+      : t('Rozepsanou uzávěrku máš zpátky — pokračuj, kde jsi skončil(a).');
+    setMsg(zprava);
+    // Jmenovité upozornění na tabletu zůstává; obecná zpráva po chvíli zmizí.
+    if (!jmenovite) setTimeout(() => setMsg(m => (m === zprava ? '' : m)), 6000);
   };
 
   useEffect(() => {
@@ -689,7 +770,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
     ? 0
     : Math.max(0, n(form.closingCash) - n(leaveCash));
   const leaveTooHigh = leaveCash !== '' && form.closingCash !== '' && n(leaveCash) > n(form.closingCash);
-  const hints = diff == null || diff === 0 ? [] : explainDifference(diff, { ...preview, final_removal: finalRemoval }, movements);
+  const hints = diff == null || diff === 0 ? [] : vysvetliRozdil(t, diff, { ...preview, final_removal: finalRemoval }, movements);
 
   useEffect(() => {
     if (!form.date) return;
@@ -777,8 +858,8 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
   const submit = (e: React.FormEvent) => {
     e.preventDefault(); setErr(''); setMsg('');
     if (zamceno && !povinne!.smiObejit) { setPulzZamku(x => x + 1); return; }
-    if (form.closingCash === '') { setErr('Zadej skutečný stav kasy na konci směny.'); return; }
-    if (leaveTooHigh) { setErr('V kase nemůže zůstat víc, než kolik jsi napočítal/a. Uprav odvod na konci směny.'); return; }
+    if (form.closingCash === '') { setErr(t('Zadej skutečný stav kasy na konci směny.')); return; }
+    if (leaveTooHigh) { setErr(t('V kase nemůže zůstat víc, než kolik jsi napočítal/a. Uprav odvod na konci směny.')); return; }
     // Kdo smí obejít (uzaverky.obejit_postupy), dostane otázku, ne zámek.
     if (zamceno) { setPotvrditPostupy(true); return; }
     pokracuj();
@@ -821,15 +902,17 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
       });
       if (res.ok) {
         const d = await res.json().catch(() => ({}));
-        const forCoworkers = includedCoworkers.length > 0 ? ' i za kolegy' : '';
+        const zaKolegy = includedCoworkers.length > 0;
         // Kdo se zapomněl odpíchnout, to musí slyšet teď, ne ráno z nočního
         // úklidu. Server jim poslal i push; tady je to pro toho, kdo stojí u
         // obrazovky a zrovna odeslal.
         const neodpichnuti: { name: string }[] = Array.isArray(d.openClockIns) ? d.openClockIns : [];
         const dovetek = neodpichnuti.length
-          ? ` Nezapomeň se odpíchnout${neodpichnuti.length > 1 ? ` (${neodpichnuti.map(o => o.name).join(', ')})` : ''} — jinak se směna uzavře podle času uzávěrky.`
+          ? ' ' + (neodpichnuti.length > 1
+            ? t('Nezapomeň se odpíchnout ({jmena}) — jinak se směna uzavře podle času uzávěrky.', { jmena: neodpichnuti.map(o => o.name).join(', ') })
+            : t('Nezapomeň se odpíchnout — jinak se směna uzavře podle času uzávěrky.'))
           : '';
-        setMsg((d.approved === false ? 'Uzávěrka odeslána ke schválení vedení.' : `Uzávěrka byla odeslána${forCoworkers}.`) + dovetek);
+        setMsg((d.approved === false ? t('Uzávěrka odeslána ke schválení vedení.') : zaKolegy ? t('Uzávěrka byla odeslána i za kolegy.') : t('Uzávěrka byla odeslána.')) + dovetek);
         // Widgety na ploše (Moje uzávěrka, Moje uzávěrky, Předávka) čtou tytéž URL.
         obnovDataWidgetu('/api/closings');
         obnovDataWidgetu('/api/closings/handover');
@@ -856,10 +939,10 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
           setPulzZamku(x => x + 1);
           setPovinneTik(x => x + 1);
         } else {
-          setErr(d.error || 'Uzávěrku se nepodařilo odeslat.');
+          setErr(d.error || t('Uzávěrku se nepodařilo odeslat.'));
         }
       }
-    } catch { setErr('Chyba serveru.'); }
+    } catch { setErr(t('Chyba serveru.')); }
     setSubmitting(false);
   };
 
@@ -888,7 +971,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
   return (
     <div className={vPlose ? 'space-y-4' : 'p-4 sm:p-6 space-y-5 sm:space-y-6'}>
       {/* Na ploše hlavičku kreslí plocha (jediný h1); tablet a vedení ji mají tady. */}
-      {!vPlose && <PageHeader hintId="cashclosing" title="Uzávěrka" subtitle="Spočítej kasu na konci směny — tržby se předvyplní z pokladny." />}
+      {!vPlose && <PageHeader hintId="cashclosing" title={t('Uzávěrka')} subtitle={t('Spočítej kasu na konci směny — tržby se předvyplní z pokladny.')} />}
       {msg && (
         <p className="note note-ok text-sm flex items-center gap-2" role="status">
           <Icon name="check" size={17} className="shrink-0" /> {msg}
@@ -912,16 +995,16 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 className="t-section flex items-center gap-2">
-                <Icon name="coins" size={17} className="shrink-0 text-black/40" /> Uzávěrka směny
+                <Icon name="coins" size={17} className="shrink-0 text-black/40" /> {t('Uzávěrka směny')}
               </h2>
-              <p className="t-meta mt-1">Projdi čtyři kroky — na konci ti spočítáme, jestli kasa sedí.</p>
+              <p className="t-meta mt-1">{t('Projdi čtyři kroky — na konci ti spočítáme, jestli kasa sedí.')}</p>
             </div>
           </div>
           <div className="mt-5 flex items-center gap-2">
-            {['Kasa', 'Tržby', 'Výdaje', 'Kontrola'].map((lbl, i) => (
+            {[t('Kasa'), t('Tržby'), t('Výdaje'), t('Kontrola')].map((lbl, i) => (
               <div key={lbl} className="flex items-center gap-2 flex-1 last:flex-initial min-w-0">
-                <button type="button" onClick={() => scrollToStep(i)} title={`Přejít na krok ${lbl}`}
-                  aria-label={i === totalSteps - 1 && zamceno ? `Přejít na krok ${lbl} (uzávěrka je zamčená)` : `Přejít na krok ${lbl}`}
+                <button type="button" onClick={() => scrollToStep(i)} title={t('Přejít na krok {krok}', { krok: lbl })}
+                  aria-label={i === totalSteps - 1 && zamceno ? t('Přejít na krok {krok} (uzávěrka je zamčená)', { krok: lbl }) : t('Přejít na krok {krok}', { krok: lbl })}
                   className="tap-target-sm flex items-center gap-2 shrink-0 group">
                   {/* Poslední krok (odeslání) nese zámek, dokud chybí povinné věci. */}
                   {i === totalSteps - 1 && zamceno ? (
@@ -955,14 +1038,14 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
             // rozmazání: blur v obsahu je zákaz a plná barva čte stejně.
             className="sticky top-2 z-20 w-full flex items-center justify-between gap-3 rounded-2xl bg-[#16181A] px-4 py-2.5 text-white shadow-[shadow:var(--shadow-float)] active:scale-[0.99] transition-transform">
             {/* Na 390 px se vedle zámku a rozdílu nevejde celý popisek — zkrátí se, čísla ne. */}
-            <span className="min-w-0 truncate text-left text-xs font-medium text-white/70">Očekáváno<span className="hidden sm:inline"> v kase</span></span>
+            <span className="min-w-0 truncate text-left text-xs font-medium text-white/70">{t('Očekáváno')}<span className="hidden sm:inline"> {t('v kase')}</span></span>
             <span className="flex shrink-0 items-center gap-2.5">
               {/* Zámek slovem a ikonou, ne tónovaným chipem — ten je na
                   inkoustovém pásu nečitelný (viz rozdíl níž). */}
               {zamceno && (
                 <span className="shrink-0 inline-flex items-center gap-1 text-xs font-semibold text-white/85">
-                  <Icon name="lock" size={12} className="shrink-0" /><span className="hidden sm:inline">Zamčeno ·</span> {chybiPovinne.length}
-                  <span className="sr-only"> — {czCount(chybiPovinne.length, VEC)} chybí</span>
+                  <Icon name="lock" size={12} className="shrink-0" /><span className="hidden sm:inline">{t('Zamčeno ·')}</span> {chybiPovinne.length}
+                  <span className="sr-only"> — {t('{n, plural, one {# věc} few {# věci} other {# věcí}} chybí', { n: chybiPovinne.length })}</span>
                 </span>
               )}
               <span className="text-base font-bold tabular-nums">{money(expected)}</span>
@@ -971,7 +1054,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
                   vedle hlavní akce je zákaz. Stav nese slovo (sedí / přebytek / manko). */}
               {diff !== null && (
                 <span className="shrink-0 text-xs font-semibold tabular-nums text-white/85">
-                  {diff === 0 ? 'Sedí' : `${diff > 0 ? 'Přebytek +' : 'Manko '}${money(diff)}`}
+                  {diff === 0 ? t('Sedí') : diff > 0 ? t('Přebytek +{castka}', { castka: money(diff) }) : t('Manko {castka}', { castka: money(diff) })}
                 </span>
               )}
             </span>
@@ -983,58 +1066,53 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
         {/* Nabízí se jen akce dne, za který se uzávěrka dělá — dřív tu visel
             seznam všech akcí historie a „ten den je akce" nešlo poznat. */}
         {evsToday.length > 0 && (
-            <div className="well p-4 space-y-2.5" role="radiogroup" aria-label="Za co je tahle uzávěrka">
-              <p className="text-sm font-semibold text-[#16181A] flex items-center gap-1.5"><Icon name="calendarCheck" size={15} className="shrink-0 text-black/40" /> {evsToday.length === 1 ? `Ten den se koná akce: ${evsToday[0].title}` : 'Ten den se konají akce'}</p>
+            <div className="well p-4 space-y-2.5" role="radiogroup" aria-label={t('Za co je tahle uzávěrka')}>
+              <p className="text-sm font-semibold text-[#16181A] flex items-center gap-1.5"><Icon name="calendarCheck" size={15} className="shrink-0 text-black/40" /> {evsToday.length === 1 ? t('Ten den se koná akce: {nazev}', { nazev: evsToday[0].title }) : t('Ten den se konají akce')}</p>
               <p className="t-meta">
-                Výjezd s vlastní kasou má uzávěrku zvlášť („Za akci") a s kasou podniku se
-                nemíchá. U akce u nás stačí běžná uzávěrka podniku — kolik z tržby spadlo
-                do okna akce se po uložení rozepíše samo (z účtenek pokladny).
+                {t('Výjezd s vlastní kasou má uzávěrku zvlášť („Za akci") a s kasou podniku se nemíchá. U akce u nás stačí běžná uzávěrka podniku — kolik z tržby spadlo do okna akce se po uložení rozepíše samo (z účtenek pokladny).')}
               </p>
               <div className="flex flex-wrap gap-1.5">
                 <button type="button" role="radio" aria-checked={eventId === ''} onClick={() => setEventId('')}
                   className={`filter-pill tap-target-sm ${eventId === '' ? 'seg-on' : 'seg-off glass'}`}>
-                  Uzávěrka podniku
+                  {t('Uzávěrka podniku')}
                 </button>
                 {evsToday.map(ev => (
                   <button key={ev.id} type="button" role="radio" aria-checked={eventId === ev.id} onClick={() => setEventId(ev.id)}
                     className={`filter-pill tap-target-sm ${eventId === ev.id ? 'seg-on' : 'seg-off glass'}`}>
-                    Za akci: {ev.title}
+                    {t('Za akci: {nazev}', { nazev: ev.title })}
                   </button>
                 ))}
               </div>
             </div>
         )}
 
-        <Step refCb={el => { stepRefs.current[0] = el; }} icon="clock" title="Kasa na začátku"
-          subtitle="Kolik bylo v kase, když směna začala.">
+        <Step refCb={el => { stepRefs.current[0] = el; }} icon="clock" title={t('Kasa na začátku')}
+          subtitle={t('Kolik bylo v kase, když směna začala.')}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="min-w-0 space-y-2">
-              {field('Kasa na začátku', 'openingCash', {
+              {field(t('Kasa na začátku'), 'openingCash', {
                 hint: carry
-                  ? `Předchozí směna (${new Date(carry.date + 'T00:00:00').toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}${carry.label ? `, ${carry.label}` : ''}) skončila s ${money(carry.amount)}.`
-                  : 'Počáteční stav hotovosti v kase.',
+                  ? t('Předchozí směna ({den}) skončila s {castka}.', { den: fmtDatum(carry.date, { jazyk, styl: 'kratce' }) + (carry.label ? `, ${carry.label}` : ''), castka: money(carry.amount) })
+                  : t('Počáteční stav hotovosti v kase.'),
               })}
               {closings.some(c => c.date === form.date) && (
                 <p className="note note-wait text-[13px]">
-                  Za tenhle den už uzávěrka existuje. Pokračuj, jen když zavíráš další směnu téhož dne.
+                  {t('Za tenhle den už uzávěrka existuje. Pokračuj, jen když zavíráš další směnu téhož dne.')}
                 </p>
               )}
               {gapDays.length > 0 && gapDays.every(d => d < form.date) && (
                 <p role="alert" className="note note-danger text-[13px]">
-                  Mezi poslední uzávěrkou a dneškem chybí uzávěrka za{' '}
-                  {gapDays.map(d => new Date(d + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'numeric' })).join(', ')}.
-                  Hotovost z té směny je v kase, ale do dnešní tržby nepatří — nejdřív dopiš tu chybějící,
-                  jinak dnešek vyjde s přebytkem, který není jeho.
+                  {t('Mezi poslední uzávěrkou a dneškem chybí uzávěrka za {dny}. Hotovost z té směny je v kase, ale do dnešní tržby nepatří — nejdřív dopiš tu chybějící, jinak dnešek vyjde s přebytkem, který není jeho.', { dny: gapDays.map(d => `${fmtDatum(d, { jazyk, styl: 'denvtydnu' })} ${fmtDatum(d, { jazyk, styl: 'kratce' })}`).join(', ') })}
                 </p>
               )}
               {carry && (
                 <div className="flex items-center gap-2 flex-wrap">
                   {n(form.openingCash) === Math.round(carry.amount) ? (
-                    <Chip tone="ok" size="sm" icon="check">Převzato z předchozí směny</Chip>
+                    <Chip tone="ok" size="sm" icon="check">{t('Převzato z předchozí směny')}</Chip>
                   ) : (
                     <Button variant="secondary" size="sm"
                       onClick={() => setForm(f => ({ ...f, openingCash: String(Math.round(carry.amount)) }))}>
-                      Převzít {money(carry.amount)} z předchozí směny
+                      {t('Převzít {castka} z předchozí směny', { castka: money(carry.amount) })}
                     </Button>
                   )}
                 </div>
@@ -1045,7 +1123,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
                 {/* Stejné pilulky jako u zaměstnance (DP §3.8): vybráno = inkoust, nikdy
                     limetka, a žádná bílá karta v kartě formuláře. aria-pressed řekne
                     čtečce, která směna je vybraná. */}
-                <p id="uzaverka-smena-kiosk" className="field-label">Kterou směnu uzavíráš?</p>
+                <p id="uzaverka-smena-kiosk" className="field-label">{t('Kterou směnu uzavíráš?')}</p>
                 <div className="flex flex-wrap gap-2" role="group" aria-labelledby="uzaverka-smena-kiosk">
                   {eligible.map(s => {
                     const active = form.date === s.date && selEmployee === (s.employeeId ?? null);
@@ -1059,7 +1137,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
                       >
                         {s.employeeName && <Avatar emoji={s.employeeAvatar} size="sm" />}
                         {s.employeeName ? `${s.employeeName} · ` : ''}
-                        {new Date(s.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })}
+                        {denKratce(s.date)}
                         <span className="font-normal opacity-70"> · {s.startTime}–{s.endTime}</span>
                       </button>
                     );
@@ -1069,19 +1147,19 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
             ) : isEmployer ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 min-w-0">
                 <div className="min-w-0">
-                  <label className="field-label">Za koho</label>
-                  <select value={selEmployee ?? ''} aria-label="Kdo byl na směně" onChange={e => setSelEmployee(e.target.value ? Number(e.target.value) : null)}
+                  <label className="field-label">{t('Za koho')}</label>
+                  <select value={selEmployee ?? ''} aria-label={t('Kdo byl na směně')} onChange={e => setSelEmployee(e.target.value ? Number(e.target.value) : null)}
                     className={`${inputClass} appearance-none min-w-0 h-[46px]`} style={{ WebkitAppearance: 'none' }}>
                     {members.map(m => (
-                      <option key={m.id} value={m.id}>{m.avatar ? `${m.avatar} ` : ''}{m.name}{m.id === meId ? ' (já)' : ''}</option>
+                      <option key={m.id} value={m.id}>{m.avatar ? `${m.avatar} ` : ''}{m.name}{m.id === meId ? ` ${t('(já)')}` : ''}</option>
                     ))}
                   </select>
                 </div>
                 <div className="min-w-0">
-                  <label className="field-label">Datum</label>
+                  <label className="field-label">{t('Datum')}</label>
                   {/* appearance-none + min-w-0: iOS date inputs have an intrinsic
                       width and overflow the card without it */}
-                  <input type="date" aria-label="Datum uzávěrky" value={form.date} onChange={set('date')}
+                  <input type="date" aria-label={t('Datum uzávěrky')} value={form.date} onChange={set('date')}
                     className={`${inputClass} appearance-none min-w-0 h-[46px] text-left`}
                     style={{ WebkitAppearance: 'none' }} />
                 </div>
@@ -1100,7 +1178,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
                           onClick={() => pickShift(s)}
                           className={`filter-pill tap-target-sm cz-sentence ${active ? 'seg-on' : 'seg-off glass'}`}
                         >
-                          {new Date(s.date + 'T00:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })}
+                          {denKratce(s.date)}
                           <span className="font-normal opacity-70"> · {s.startTime}–{s.endTime}</span>
                         </button>
                       );
@@ -1108,10 +1186,10 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
                   </div>
                 )}
                 <div>
-                  <label className="field-label">Datum</label>
+                  <label className="field-label">{t('Datum')}</label>
                   {/* appearance-none + min-w-0: iOS date inputs have an intrinsic
                       width and overflow the card without it */}
-                  <input type="date" aria-label="Datum uzávěrky" value={form.date} onChange={set('date')}
+                  <input type="date" aria-label={t('Datum uzávěrky')} value={form.date} onChange={set('date')}
                     className={`${inputClass} appearance-none min-w-0 h-[46px] text-left`}
                     style={{ WebkitAppearance: 'none' }} />
                 </div>
@@ -1121,16 +1199,16 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
         </Step>
 
         {/* Step 2 — revenue */}
-        <Step refCb={el => { stepRefs.current[1] = el; }} icon="trend" title="Tržby"
-          subtitle="Co za směnu přišlo — hotově, kartou a spropitné.">
+        <Step refCb={el => { stepRefs.current[1] = el; }} icon="trend" title={t('Tržby')}
+          subtitle={t('Co za směnu přišlo — hotově, kartou a spropitné.')}>
           {pos && (
             <div className="well p-4 mb-1">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm font-semibold text-[#16181A] min-w-0">
-                  <Icon name="card" size={15} className="inline -mt-0.5 mr-1.5 shrink-0 text-black/40" /> Pokladna {pos.placeName ? `(${pos.placeName})` : 'Storyous'}
-                  <span className="font-normal text-black/50"> · {pos.bills} účtenek · hotově {money(pos.cash)} · kartou {money(pos.card)}{pos.other > 0 ? ` · jinak ${money(pos.other)}` : ''}{pos.tips > 0 ? ` · spropitné ${money(pos.tips)}` : ''}
+                  <Icon name="card" size={15} className="inline -mt-0.5 mr-1.5 shrink-0 text-black/40" /> {t('Pokladna')} {pos.placeName ? `(${pos.placeName})` : 'Storyous'}
+                  <span className="font-normal text-black/50"> · {t('{n, plural, one {# účtenka} few {# účtenky} other {# účtenek}}', { n: pos.bills })} · {t('hotově')} {money(pos.cash)} · {t('kartou')} {money(pos.card)}{pos.other > 0 ? ` · ${t('jinak')} ${money(pos.other)}` : ''}{pos.tips > 0 ? ` · ${t('spropitné')} ${money(pos.tips)}` : ''}
                     {pos.tips > 0 && (pos.tipsCard > 0 || pos.tipsCash > 0)
-                      ? ` (hotově ${money(pos.tipsCash ?? 0)} · kartou ${money(pos.tipsCard ?? 0)}${(pos.tipsOther ?? 0) > 0 ? ` · nerozlišeno ${money(pos.tipsOther)}` : ''})`
+                      ? ` (${t('hotově')} ${money(pos.tipsCash ?? 0)} · ${t('kartou')} ${money(pos.tipsCard ?? 0)}${(pos.tipsOther ?? 0) > 0 ? ` · ${t('nerozlišeno')} ${money(pos.tipsOther)}` : ''})`
                       : ''}</span>
                 </p>
                 <Button variant="primary" size="sm"
@@ -1142,35 +1220,35 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
                     tipsCard: pos.tipsCard != null && pos.tipsCard > 0 ? String(pos.tipsCard) : f.tipsCard,
                   }))}
                   className="shrink-0">
-                  Předvyplnit z pokladny
+                  {t('Předvyplnit z pokladny')}
                 </Button>
               </div>
             </div>
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {field('Tržba hotově', 'cashRevenue', { hint: 'Hotovost přijatá do kasy.' })}
-            {field('Tržba kartou', 'cardRevenue', { hint: 'Nejde do kasy — jen evidence.' })}
-            {field('Spropitné celkem', 'tips', {
+            {field(t('Tržba hotově'), 'cashRevenue', { hint: t('Hotovost přijatá do kasy.') })}
+            {field(t('Tržba kartou'), 'cardRevenue', { hint: t('Nejde do kasy — jen evidence.') })}
+            {field(t('Spropitné celkem'), 'tips', {
               hint: tipsInDrawer
-                ? 'Hotovostní část zůstává v kase a počítá se k očekávanému stavu.'
-                : 'Bereš ho stranou — očekávaný stav kasy neovlivní.',
+                ? t('Hotovostní část zůstává v kase a počítá se k očekávanému stavu.')
+                : t('Bereš ho stranou — očekávaný stav kasy neovlivní.'),
             })}
-            {field('Z toho kartou', 'tipsCard', {
-              hint: 'Do kasy se nedostane — jen evidence. Zbytek bereme jako hotovost.',
+            {field(t('Z toho kartou'), 'tipsCard', {
+              hint: t('Do kasy se nedostane — jen evidence. Zbytek bereme jako hotovost.'),
             })}
-            {field('Zákazníků (volitelné)', 'customers', { unit: null, placeholder: 'počet' })}
+            {field(t('Zákazníků (volitelné)'), 'customers', { unit: null, placeholder: t('počet') })}
           </div>
           <Toggle
-            title="Spropitné v hotovosti zůstává v kase"
-            hint="Zapni, když spropitné fyzicky leží v kase — jinak by se pokaždé ukazoval falešný přebytek."
+            title={t('Spropitné v hotovosti zůstává v kase')}
+            hint={t('Zapni, když spropitné fyzicky leží v kase — jinak by se pokaždé ukazoval falešný přebytek.')}
             on={tipsInDrawer}
             onChange={setTipsInDrawer}
           />
         </Step>
 
         {/* Step 3 — expenses & payouts */}
-        <Step refCb={el => { stepRefs.current[2] = el; }} icon="box" title="Výdaje a odvody"
-          subtitle="Co z kasy odešlo během směny.">
+        <Step refCb={el => { stepRefs.current[2] = el; }} icon="box" title={t('Výdaje a odvody')}
+          subtitle={t('Co z kasy odešlo během směny.')}>
           <MovementEditor
             movements={movements} setMovements={setMovements}
             payDailyCash={payDailyCash} money={money} symbol={symbol}
@@ -1178,20 +1256,20 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {!hasMoved('expense') && !hasMoved('deposit')
-              && field('Výdaje z kasy', 'expenses', { hint: 'Nákupy apod. placené z kasy.' })}
-            {!hasMoved('removal') && field('Odloženo ven', 'cashRemoved', { hint: 'Do trezoru / odvod.' })}
-            {payDailyCash && !hasMoved('payout') && field('Moje výplata dnes', 'selfPayout', {
+              && field(t('Výdaje z kasy'), 'expenses', { hint: t('Nákupy apod. placené z kasy.') })}
+            {!hasMoved('removal') && field(t('Odloženo ven'), 'cashRemoved', { hint: t('Do trezoru / odvod.') })}
+            {payDailyCash && !hasMoved('payout') && field(t('Moje výplata dnes'), 'selfPayout', {
               hint: payoutFromRegister
-                ? 'Vyplaceno z kasy — odečte se z očekávaného stavu.'
-                : 'Vyplaceno bokem (ne z kasy) — očekávaný stav kasy neovlivní.',
+                ? t('Vyplaceno z kasy — odečte se z očekávaného stavu.')
+                : t('Vyplaceno bokem (ne z kasy) — očekávaný stav kasy neovlivní.'),
             })}
           </div>
           {payDailyCash && (
             <Toggle
-              title="Výplatu beru z kasy"
+              title={t('Výplatu beru z kasy')}
               hint={payoutFromRegister
-                ? 'Zapnuto — výplata se odečte z očekávaného stavu kasy.'
-                : 'Vypnuto — bereš ji bokem, kasy se netýká.'}
+                ? t('Zapnuto — výplata se odečte z očekávaného stavu kasy.')
+                : t('Vypnuto — bereš ji bokem, kasy se netýká.')}
               on={payoutFromRegister}
               onChange={setPayoutFromRegister}
             />
@@ -1207,9 +1285,9 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
                 <Icon name="users" size={20} className="text-black/55" />
               </span>
               <div className="min-w-0 flex-1">
-                <h3 className="t-card">Byl někdo další na směně?</h3>
+                <h3 className="t-card">{t('Byl někdo další na směně?')}</h3>
                 <p className="t-meta mt-0.5">
-                  Zaškrtni kolegy a uzavři to i za ně{payDailyCash ? ' i s výplatou' : ''}. Kdo neměl směnu, tomu se automaticky přidá a dostane stejný čas jako ty (vedení pak může upravit).
+                  {payDailyCash ? t('Zaškrtni kolegy a uzavři to i za ně i s výplatou.') : t('Zaškrtni kolegy a uzavři to i za ně.')} {t('Kdo neměl směnu, tomu se automaticky přidá a dostane stejný čas jako ty (vedení pak může upravit).')}
                 </p>
               </div>
             </div>
@@ -1234,7 +1312,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
                         <span className="block text-sm font-semibold text-[#16181A] truncate">{cw.name}</span>
                         {cw.hadShift
                           ? <span className="block t-meta tabular-nums">{cw.startTime}–{cw.endTime}</span>
-                          : <span className="block text-[13px] text-wait-ink">bez naplánované směny — přidá se</span>}
+                          : <span className="block text-[13px] text-wait-ink">{t('bez naplánované směny — přidá se')}</span>}
                       </span>
                     </button>
                     {on && payDailyCash && (
@@ -1243,8 +1321,8 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
                           type="number" inputMode="numeric"
                           value={sel?.payout ?? ''}
                           onChange={e => setCoworkerSel(s => ({ ...s, [cw.id]: { on: true, payout: e.target.value } }))}
-                          aria-label={`Výplata pro ${cw.name} v ${symbol}`}
-                          placeholder="výplata" className={`${inputClass} pr-9 !py-2.5 text-sm`} />
+                          aria-label={t('Výplata pro {jmeno} v {mena}', { jmeno: cw.name, mena: symbol })}
+                          placeholder={t('výplata')} className={`${inputClass} pr-9 !py-2.5 text-sm`} />
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-black/45">{symbol}</span>
                       </div>
                     )}
@@ -1256,32 +1334,32 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
         )}
 
         {/* Step 4 — the climax: expected vs counted */}
-        <Step refCb={el => { stepRefs.current[3] = el; }} icon="check" title="Kontrola kasy"
-          subtitle="Spočítej hotovost v kase a porovnej s očekáváním."
+        <Step refCb={el => { stepRefs.current[3] = el; }} icon="check" title={t('Kontrola kasy')}
+          subtitle={t('Spočítej hotovost v kase a porovnej s očekáváním.')}
           guide={navodUzaverky}>
           {/* The arithmetic spelled out — no mystery number to argue with. */}
           <div className="well px-4 py-3.5 space-y-1.5">
             {expectedLines.map(l => (
               <div key={l.label} className="flex items-center justify-between gap-3 text-[13px]">
-                <span className="text-black/50 min-w-0 truncate">{l.label}</span>
+                <span className="text-black/50 min-w-0 truncate">{popisekRadkuKasy(t, l.label)}</span>
                 <span className="text-black/70 tabular-nums shrink-0 whitespace-nowrap">
                   {l.sign < 0 ? '− ' : '+ '}{money(l.amount)}
                 </span>
               </div>
             ))}
             <div className="flex items-center justify-between gap-3 pt-2.5 mt-1 border-t border-black/[0.08]">
-              <span className="text-sm font-semibold text-[#16181A] min-w-0">Očekávaný stav kasy</span>
+              <span className="text-sm font-semibold text-[#16181A] min-w-0">{t('Očekávaný stav kasy')}</span>
               <span className="text-lg font-bold tracking-tight text-[#16181A] tabular-nums shrink-0 whitespace-nowrap">{money(expected)}</span>
             </div>
           </div>
 
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3 flex-wrap">
-              <p id="uzaverka-kasa-konec" className="field-label !mb-0">Skutečný stav kasy na konci *</p>
+              <p id="uzaverka-kasa-konec" className="field-label !mb-0">{t('Skutečný stav kasy na konci *')}</p>
               {denomSet.length > 0 && (
-                <Segmented size="sm" ariaLabel="Jak kasu spočítáš" value={countMode ? 'bankovky' : 'celkem'}
+                <Segmented size="sm" ariaLabel={t('Jak kasu spočítáš')} value={countMode ? 'bankovky' : 'celkem'}
                   onChange={v => setCountMode(v === 'bankovky')}
-                  options={[{ id: 'celkem', label: 'Zadat celkem' }, { id: 'bankovky', label: 'Spočítat bankovky' }]} />
+                  options={[{ id: 'celkem', label: t('Zadat celkem') }, { id: 'bankovky', label: t('Spočítat bankovky') }]} />
               )}
             </div>
 
@@ -1298,13 +1376,13 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
                     }));
                   }} />
                 <p className="t-meta">
-                  Napiš ke každé bankovce a minci, kolik jich v kase je — součet se doplní sám.
+                  {t('Napiš ke každé bankovce a minci, kolik jich v kase je — součet se doplní sám.')}
                 </p>
               </>
             ) : (
               <div className="relative">
                 <input type="number" inputMode="numeric" required value={form.closingCash} onChange={set('closingCash')}
-                  aria-label={`Skutečný stav kasy v ${symbol}`}
+                  aria-label={t('Skutečný stav kasy v {mena}', { mena: symbol })}
                   placeholder="0" className={`${inputClass} pr-12 !py-4 text-base font-semibold`} />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/35">{symbol}</span>
               </div>
@@ -1312,13 +1390,13 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
           </div>
 
           {diff === null ? (
-            <p className="t-meta text-center py-1">Zadej skutečný stav a hned uvidíš výsledek.</p>
+            <p className="t-meta text-center py-1">{t('Zadej skutečný stav a hned uvidíš výsledek.')}</p>
           ) : (
             // Výsledek je stav, ne ozdoba: tón `note` podle toho, jestli kasa sedí.
             <div role="status" className={`note flex flex-wrap items-center justify-between gap-2 ${diff === 0 ? 'note-ok' : diff > 0 ? 'note-info' : 'note-danger'}`}>
               <span className="flex items-center gap-2 font-semibold">
                 <Icon name={diff === 0 ? 'check' : diff > 0 ? 'trend' : 'warning'} size={18} />
-                {diff === 0 ? 'Kasa sedí' : diff > 0 ? 'Přebytek v kase' : 'Manko v kase'}
+                {diff === 0 ? t('Kasa sedí') : diff > 0 ? t('Přebytek v kase') : t('Manko v kase')}
               </span>
               <span className="text-lg font-bold tabular-nums whitespace-nowrap">{diff > 0 ? '+' : ''}{money(diff)}</span>
             </div>
@@ -1327,7 +1405,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
           {/* When it doesn't match: say why, so the employer isn't left guessing. */}
           {diff !== null && diff !== 0 && (
             <div className="well p-4 space-y-3">
-              <p className="text-sm font-semibold text-[#16181A]">Čím to nejspíš je?</p>
+              <p className="text-sm font-semibold text-[#16181A]">{t('Čím to nejspíš je?')}</p>
 
               {hints.length > 0 && (
                 <div className="space-y-1.5">
@@ -1340,18 +1418,21 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
               )}
 
               <div className="flex flex-wrap gap-1.5">
-                {DIFF_REASONS.map(r => (
-                  <button key={r.id} type="button" title={r.hint} aria-pressed={diffReason === r.id}
+                {DIFF_REASONS.map(r => {
+                  const popis = popisekDuvodu(t, r.id) ?? r;
+                  return (
+                  <button key={r.id} type="button" title={popis.hint} aria-pressed={diffReason === r.id}
                     onClick={() => setDiffReason(diffReason === r.id ? '' : r.id)}
                     className={`filter-pill tap-target-sm ${diffReason === r.id ? 'seg-on' : 'seg-off glass'}`}>
-                    {r.label}
+                    {popis.label}
                   </button>
-                ))}
+                  );
+                })}
               </div>
 
               <textarea value={diffNote} onChange={e => setDiffNote(e.target.value)} rows={2}
-                aria-label="Co se stalo s kasou"
-                placeholder="Co se stalo — vlastními slovy (nepovinné)"
+                aria-label={t('Co se stalo s kasou')}
+                placeholder={t('Co se stalo — vlastními slovy (nepovinné)')}
                 className={`${inputClass} resize-none py-2`} />
             </div>
           )}
@@ -1362,15 +1443,15 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
           {form.closingCash !== '' && (
             <div className="well p-4 space-y-3">
               <div>
-                <p className="text-sm font-semibold text-[#16181A]">Odvod na konci směny</p>
+                <p className="text-sm font-semibold text-[#16181A]">{t('Odvod na konci směny')}</p>
                 <p className="t-meta mt-0.5">
                   {drawerFloat != null
-                    ? `Podnik má nastavený stav kasy ${drawerFloat.toLocaleString('cs-CZ')} ${symbol} — kolik odložit, spočítám tak, aby v kase zůstalo přesně tolik. Číslo můžeš upravit.`
-                    : 'Napiš, kolik v kase necháváš pro další směnu — kolik odložit spočítám. Nech prázdné, pokud v kase zůstává všechno.'}
+                    ? t('Podnik má nastavený stav kasy {castka} {mena} — kolik odložit, spočítám tak, aby v kase zůstalo přesně tolik. Číslo můžeš upravit.', { castka: new Intl.NumberFormat(LOCALE_PRO_JAZYK[jazyk]).format(drawerFloat), mena: symbol })
+                    : t('Napiš, kolik v kase necháváš pro další směnu — kolik odložit spočítám. Nech prázdné, pokud v kase zůstává všechno.')}
                 </p>
               </div>
               <div>
-                <label htmlFor="uzaverka-nechavas" className="field-label">V kase necháváš</label>
+                <label htmlFor="uzaverka-nechavas" className="field-label">{t('V kase necháváš')}</label>
                 <div className="relative">
                   <input id="uzaverka-nechavas" type="number" inputMode="numeric" value={leaveCash}
                     onChange={e => setLeaveCash(e.target.value)}
@@ -1381,20 +1462,20 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
               </div>
               {leaveTooHigh ? (
                 <p className="text-[13px] note note-danger px-3 py-2">
-                  V kase je napočítáno jen {money(n(form.closingCash))} — nemůže v ní zůstat víc.
+                  {t('V kase je napočítáno jen {castka} — nemůže v ní zůstat víc.', { castka: money(n(form.closingCash)) })}
                 </p>
               ) : leaveCash !== '' && finalRemoval > 0 ? (
                 // Dřív druhá inkoustová plocha; číslo stačí tučně na bílém podkladu.
                 <div className="flex items-center justify-between gap-3 rounded-2xl bg-white border border-[var(--surface-line)] px-4 py-3">
                   <span className="text-sm font-medium flex items-center gap-2 min-w-0 text-[#16181A]">
-                    <Icon name="swap" size={16} className="shrink-0 text-black/40" /> Odlož ven (trezor / odvod)
+                    <Icon name="swap" size={16} className="shrink-0 text-black/40" /> {t('Odlož ven (trezor / odvod)')}
                   </span>
                   <span className="text-lg font-bold tabular-nums shrink-0 whitespace-nowrap text-[#16181A]">{money(finalRemoval)}</span>
                 </div>
               ) : leaveCash !== '' ? (
-                <p className="t-meta">V kase zůstává všechno — žádný odvod.</p>
+                <p className="t-meta">{t('V kase zůstává všechno — žádný odvod.')}</p>
               ) : (
-                <p className="t-meta">Nech prázdné, pokud v kase zůstává všechno.</p>
+                <p className="t-meta">{t('Nech prázdné, pokud v kase zůstává všechno.')}</p>
               )}
             </div>
           )}
@@ -1407,17 +1488,17 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
             <div className="well px-4 py-3">
               <p className="t-meta">
                 {povinne.duvodVolna === 'akce'
-                  ? 'Uzávěrka za akci — povinné věci podniku se u ní neřeší.'
+                  ? t('Uzávěrka za akci — povinné věci podniku se u ní neřeší.')
                   : isSelf
-                    ? 'Tenhle den nemáš směnu — uzávěrku můžeš odeslat a vedení ji potvrdí.'
-                    : 'Tenhle člověk ten den nemá směnu — povinné věci uzávěrku neblokují.'}
+                    ? t('Tenhle den nemáš směnu — uzávěrku můžeš odeslat a vedení ji potvrdí.')
+                    : t('Tenhle člověk ten den nemá směnu — povinné věci uzávěrku neblokují.')}
               </p>
             </div>
           )}
 
           {todayRuns.length > 0 && (
             <div className="well p-4 mt-3">
-              <p className="t-label mb-2">Dnešní postupy</p>
+              <p className="t-label mb-2">{t('Dnešní postupy')}</p>
               <div className="flex flex-wrap gap-1.5">
                 {todayRuns.map((r: any) => {
                   const missing = Math.max(0, (Number(r.total_items) || 0)
@@ -1427,13 +1508,13 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
                   return (
                     <Chip key={r.id} tone={running || missing > 0 ? 'wait' : 'ok'} icon={r.procedure_icon || 'clipboard'}>
                       {r.procedure_name}
-                      {running ? ' · běží' : missing > 0 ? ` · ${missing} nedokončeno` : ' · hotovo'}
+                      {running ? ` · ${t('běží')}` : missing > 0 ? ` · ${t('{n} nedokončeno', { n: missing })}` : ` · ${t('hotovo')}`}
                     </Chip>
                   );
                 })}
               </div>
               {todayRuns.some((r: any) => r.status === 'running') && (
-                <p className="text-[13px] text-wait-ink mt-2">Postup ještě běží — dokonči ho, ať se do hodnocení nezapíše jako nedodělaný.</p>
+                <p className="text-[13px] text-wait-ink mt-2">{t('Postup ještě běží — dokonči ho, ať se do hodnocení nezapíše jako nedodělaný.')}</p>
               )}
             </div>
           )}
@@ -1441,33 +1522,33 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
           {mzda && !mzda.wage.noEntries && (
             <div className="well p-4 space-y-2 mt-3">
               <p className="t-label flex items-center gap-1.5">
-                <Icon name="clock" size={13} className="shrink-0" /> Tvoje směna
+                <Icon name="clock" size={13} className="shrink-0" /> {t('Tvoje směna')}
               </p>
               {mzda.wage.suspicious ? (
                 <p className="text-sm text-bad-ink">
-                  Příchod je otevřený déle než den — to je zapomenuté odpíchnutí, ne odpracovaný čas. Mzdu spočítáme, až ho vedení opraví.
+                  {t('Příchod je otevřený déle než den — to je zapomenuté odpíchnutí, ne odpracovaný čas. Mzdu spočítáme, až ho vedení opraví.')}
                 </p>
               ) : (
                 <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
                   <p className="text-sm text-[#16181A]">
-                    Odpracováno <span className="font-bold tabular-nums">{hodinyMinuty(mzda.wage.ms)}</span>
-                    {mzda.wage.open && <span className="text-black/45"> (do teď — příchod je otevřený)</span>}
+                    {t('Odpracováno')} <span className="font-bold tabular-nums">{hodinyMinuty(mzda.wage.ms)}</span>
+                    {mzda.wage.open && <span className="text-black/45"> ({t('do teď — příchod je otevřený')})</span>}
                   </p>
                   {mzda.wage.rate > 0 ? (
                     <p className="text-sm text-[#16181A]">
                       × {mzda.wage.rate} {symbol}/h = <span className="font-bold tabular-nums">{money(mzda.wage.earned)}</span>
                     </p>
                   ) : (
-                    <p className="text-sm text-black/45">Hodinovku ti vedení zatím nenastavilo.</p>
+                    <p className="text-sm text-black/45">{t('Hodinovku ti vedení zatím nenastavilo.')}</p>
                   )}
                 </div>
               )}
               <p className="text-[13px] text-black/55">
-                Body za dnešek: <span className="font-semibold text-ok-ink tabular-nums">+{mzda.points.total}</span>
+                {t('Body za dnešek:')} <span className="font-semibold text-ok-ink tabular-nums">+{mzda.points.total}</span>
                 <span className="text-black/45">
-                  {' '}— {mzda.points.closingPts} za uzávěrku
-                  {mzda.points.tasks > 0 ? `, ${mzda.points.taskPts} za ${mzda.points.tasks === 1 ? 'úkol' : mzda.points.tasks < 5 ? 'úkoly' : 'úkolů'}` : ''}
-                  {mzda.points.procedures > 0 ? `, ${mzda.points.procPts} za ${mzda.points.procedures === 1 ? 'postup' : mzda.points.procedures < 5 ? 'postupy' : 'postupů'}` : ''}
+                  {' '}— {t('{body} za uzávěrku', { body: mzda.points.closingPts })}
+                  {mzda.points.tasks > 0 ? `, ${t('{body} za {n, plural, one {úkol} few {úkoly} other {úkolů}}', { body: mzda.points.taskPts, n: mzda.points.tasks })}` : ''}
+                  {mzda.points.procedures > 0 ? `, ${t('{body} za {n, plural, one {postup} few {postupy} other {postupů}}', { body: mzda.points.procPts, n: mzda.points.procedures })}` : ''}
                 </span>
               </p>
             </div>
@@ -1475,25 +1556,25 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
 
           <div className="well p-4 space-y-2.5 mt-3">
             <div>
-              <p className="t-label flex items-center gap-1.5"><Icon name="handover" size={13} className="shrink-0" /> Předávka pro další směnu</p>
-              <p className="t-meta mt-0.5">Nepovinné — uvidí ji tým na přehledu a tabletu.</p>
+              <p className="t-label flex items-center gap-1.5"><Icon name="handover" size={13} className="shrink-0" /> {t('Předávka pro další směnu')}</p>
+              <p className="t-meta mt-0.5">{t('Nepovinné — uvidí ji tým na přehledu a tabletu.')}</p>
             </div>
             <input value={hoTodo} onChange={e => setHoTodo(e.target.value)} maxLength={500}
-              aria-label="Předávka: co zbývá dodělat"
-              placeholder="Co zbývá dodělat…"
+              aria-label={t('Předávka: co zbývá dodělat')}
+              placeholder={t('Co zbývá dodělat…')}
               className={inputClass} />
             <input value={hoRunningOut} onChange={e => setHoRunningOut(e.target.value)} maxLength={500}
-              aria-label="Předávka: co dochází nebo je potřeba objednat"
-              placeholder="Co dochází / objednat…"
+              aria-label={t('Předávka: co dochází nebo je potřeba objednat')}
+              placeholder={t('Co dochází / objednat…')}
               className={inputClass} />
             <input value={hoMessage} onChange={e => setHoMessage(e.target.value)} maxLength={500}
-              aria-label="Předávka: vzkaz pro další směnu"
-              placeholder="Vzkaz pro další směnu…"
+              aria-label={t('Předávka: vzkaz pro další směnu')}
+              placeholder={t('Vzkaz pro další směnu…')}
               className={inputClass} />
           </div>
 
-          <label htmlFor="uzaverka-poznamka" className="field-label mt-4 block">Poznámka</label>
-          <textarea id="uzaverka-poznamka" value={form.notes} onChange={set('notes')} rows={2} placeholder="Cokoliv důležitého k předání…" className={`${inputClass} resize-none`} />
+          <label htmlFor="uzaverka-poznamka" className="field-label mt-4 block">{t('Poznámka')}</label>
+          <textarea id="uzaverka-poznamka" value={form.notes} onChange={set('notes')} rows={2} placeholder={t('Cokoliv důležitého k předání…')} className={`${inputClass} resize-none`} />
         </div>
 
         {/* Jediná limetka obrazovky (DP §4 D) — dřív tmavá, zatímco limetku nesl vedlejší „Přidat".
@@ -1510,11 +1591,11 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
             onClick={povinne!.smiObejit ? undefined : (e: React.MouseEvent) => { e.preventDefault(); setErr(''); setPulzZamku(x => x + 1); }}
             className={povinne!.smiObejit ? '' : 'opacity-45 cursor-not-allowed shadow-none'}
             aria-describedby="zamek-uzaverky-titulek">
-            {povinne!.smiObejit ? 'Odeslat i bez povinných věcí' : 'Uzávěrka je zamčená'}
+            {povinne!.smiObejit ? t('Odeslat i bez povinných věcí') : t('Uzávěrka je zamčená')}
           </Button>
         ) : (
           <Button type="submit" variant="accent" size="lg" block iconAfter="check" loading={submitting}>
-            Odeslat uzávěrku
+            {t('Odeslat uzávěrku')}
           </Button>
         )}
       </form>
@@ -1526,15 +1607,15 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
           goes to management for approval. */}
       {showConfirm && (
         <Modal open onClose={() => setShowConfirm(false)} size="sm"
-          title="Nejsi na směně v tento den"
-          subtitle="Uzávěrku můžeš odeslat, ale půjde vedení ke schválení."
+          title={t('Nejsi na směně v tento den')}
+          subtitle={t('Uzávěrku můžeš odeslat, ale půjde vedení ke schválení.')}
           footer={<>
-            <Button variant="secondary" onClick={() => setShowConfirm(false)}>Zrušit</Button>
-            <Button variant="primary" icon="send" loading={submitting} onClick={doSubmit}>Odeslat ke schválení</Button>
+            <Button variant="secondary" onClick={() => setShowConfirm(false)}>{t('Zrušit')}</Button>
+            <Button variant="primary" icon="send" loading={submitting} onClick={doSubmit}>{t('Odeslat ke schválení')}</Button>
           </>}>
           <div className="flex items-start gap-3 note note-wait">
             <Icon name="warning" size={17} className="shrink-0 mt-0.5" />
-            <p className="text-sm">Vedení uvidí, že uzávěrku poslal někdo mimo rozpis, a potvrdí ji.</p>
+            <p className="text-sm">{t('Vedení uvidí, že uzávěrku poslal někdo mimo rozpis, a potvrdí ji.')}</p>
           </div>
         </Modal>
       )}
@@ -1543,22 +1624,22 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
           vědomě, s výčtem toho, co chybí. Dřív jen vedení a jen postupy. */}
       {potvrditPostupy && (
         <Modal open onClose={() => setPotvrditPostupy(false)} size="sm"
-          title="Povinné věci nejsou hotové"
-          subtitle={`Chybí ${czCount(chybiPovinne.length, VEC)}.`}
+          title={t('Povinné věci nejsou hotové')}
+          subtitle={t('Chybí {n, plural, one {# věc} few {# věci} other {# věcí}}.', { n: chybiPovinne.length })}
           footer={<>
-            <Button variant="secondary" onClick={() => setPotvrditPostupy(false)}>Zrušit</Button>
-            <Button variant="primary" icon="send" loading={submitting} onClick={pokracuj}>Odeslat přesto</Button>
+            <Button variant="secondary" onClick={() => setPotvrditPostupy(false)}>{t('Zrušit')}</Button>
+            <Button variant="primary" icon="send" loading={submitting} onClick={pokracuj}>{t('Odeslat přesto')}</Button>
           </>}>
           <ul className="list">
             {chybiPovinne.map(p => (
               <li key={`${p.typ}:${p.id}`} className="list-row !min-h-0 !py-2">
                 <Icon name={p.typ === 'postup' ? (p.ikona || 'clipboard') : p.typ === 'ukol' ? 'calendarCheck' : 'book'} size={16} className="shrink-0 text-black/45" />
                 <span className="t-card min-w-0 flex-1 text-pretty">{p.nazev}</span>
-                <span className="t-meta shrink-0">{p.typ === 'postup' ? 'Postup' : p.typ === 'ukol' ? 'Úkol' : 'Návod'}</span>
+                <span className="t-meta shrink-0">{p.typ === 'postup' ? t('Postup') : p.typ === 'ukol' ? t('Úkol') : t('Návod')}</span>
               </li>
             ))}
           </ul>
-          <p className="t-meta mt-3 text-pretty">Uzávěrka se odešle, i když tyhle věci zatím nikdo nedokončil.</p>
+          <p className="t-meta mt-3 text-pretty">{t('Uzávěrka se odešle, i když tyhle věci zatím nikdo nedokončil.')}</p>
         </Modal>
       )}
     </div>
