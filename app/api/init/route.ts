@@ -613,6 +613,11 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS low_stock_default INTEGER DEFAULT 5`);
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS critical_stock_default INTEGER DEFAULT 2`);
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS business_type TEXT`);
+    // Průvodce prvotním nastavením (lib/pruvodce): stav a odpovědi v jednom JSONB,
+    // plus adresa a země podniku. NULL = podnik z doby před průvodcem, ten ho neuvidí.
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS onboarding JSONB`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS address TEXT`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS country TEXT`);
     // per-team dashboard customization: { employer: {widgetId:false}, employee: {...} }
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS dashboard_config JSONB DEFAULT '{}'`);
 

@@ -20,6 +20,8 @@ const css = readFileSync('app/globals.css', 'utf8');
 // Zůstávají světlé i v tmavém režimu, takže inkoust je na nich v pořádku.
 const SVETLE_OSTROVY = new Set([
   'on-accent', 'on-accent-muted', 'panel-light', 'btn-accent', 'chip-ink',
+  // Závěs před živou ukázkou (průvodce): ukázka je vždy ve světlém motivu, takže závěs nad ní taky.
+  'pv-zarizeni-zaves',
 ]);
 
 // Barvy odvozené od inkoustu a limetky — ty, co se v tmavém režimu mění.

@@ -98,6 +98,13 @@ export async function POST(request: Request) {
      }
     }
 
+    // Nový podnik dostane průvodce prvotním nastavením. Mimo INSERT týmu a v try:
+    // před migrací sloupec chybí a registrace kvůli tomu nesmí spadnout, průvodce
+    // se pak prostě nespustí (podnik se chová jako dosud).
+    try {
+      await sql`UPDATE teams SET onboarding = ${JSON.stringify({ v: 1, stav: 'nove', zacato: new Date().toISOString() })}::jsonb WHERE id = ${team.id}`;
+    } catch { /* onboarding column not migrated yet */ }
+
     // Link owner to team
     await sql`UPDATE users SET team_id = ${team.id} WHERE id = ${user.id}`;
 

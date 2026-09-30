@@ -1,0 +1,139 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import { Chip, ListRow } from '@/components/ui';
+import { Icon } from '@/components/Icons';
+import { TRIAL_DAYS } from '@/lib/plan';
+import { czCount } from '@/lib/czech';
+import { doporucenyTarif } from '@/lib/pruvodce/plan';
+import { widget as najdiWidget } from '@/lib/widgety/katalog';
+import type { Odpovedi } from '@/lib/pruvodce/typy';
+import type { VysledekSestaveni } from './spolecne';
+
+// Finále. Je POCTIVÉ: přehrává seznam výsledků, který vrátil server
+// (hotovo / přeskočeno / nepovedlo se), ne vymyšlený postup. Řádky se po
+// jednom (160 ms) přepnou z prázdného kolečka na výsledek, pak na miniaturu
+// Přehledu přiletí dílky přesně podle výsledného rozložení (60 ms po sobě).
+// Teprve potom se odemkne „Otevřít Přehled" — dřív by se dalo odejít
+// uprostřed. Při omezeném pohybu se všechno ukáže hotové najednou.
+// Bez konfet a bez zvuku: klidný papírový tón aplikace to nesnese.
+
+const KROK_RADKU_MS = 160;
+const KROK_DILU_MS = 60;
+
+export type FazeSestaveni = 'bezi' | 'hotovo' | 'chyba';
+
+const ODKAZY: Record<string, { titul: string; meta: string; href: string }> = {
+  rozvrh: { titul: 'Naplánuj první směny', meta: 'Rozvrh podle dostupnosti týmu.', href: '/employer/overview?view=shifts' },
+  sklad: { titul: 'Přidej první věci do skladu', meta: 'Uvidíš, co dochází a co dokoupit.', href: '/employer/overview?view=inventory' },
+  uzaverky: { titul: 'Zapiš první uzávěrku', meta: 'Kasa se spočítá po bankovkách.', href: '/employer/overview?view=reports' },
+  provoz: { titul: 'Projdi první postup', meta: 'Otevírání a zavírání s odškrtáváním.', href: '/employer/overview?view=procedures' },
+};
+
+export default function Hotovo({ faze, vysledek, chyba, odp, naHotovo }: {
+  faze: FazeSestaveni;
+  vysledek: VysledekSestaveni | null;
+  chyba: string;
+  odp: Odpovedi;
+  /** Animace doběhla: odemkne „Otevřít Přehled". */
+  naHotovo: () => void;
+}) {
+  const [radku, setRadku] = useState(0);
+  const [dilu, setDilu] = useState(0);
+  const dobehlo = useRef(false);
+  const polozky = vysledek?.polozky ?? [];
+  const dily = vysledek?.prehled.polozky ?? [];
+
+  useEffect(() => {
+    if (faze !== 'hotovo' || !vysledek) return;
+    const omezeno = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const hotovo = () => { if (!dobehlo.current) { dobehlo.current = true; naHotovo(); } };
+    if (omezeno) { setRadku(polozky.length); setDilu(dily.length); hotovo(); return; }
+    // Řetěz časovačů: nejdřív řádky po 160 ms, pak dílky po 60 ms, nakonec odemknutí.
+    let casovac: ReturnType<typeof setTimeout>;
+    const krok = (r: number, d: number) => {
+      if (r < polozky.length) { setRadku(r + 1); casovac = setTimeout(() => krok(r + 1, d), KROK_RADKU_MS); return; }
+      if (d < dily.length) { setDilu(d + 1); casovac = setTimeout(() => krok(r, d + 1), KROK_DILU_MS); return; }
+      hotovo();
+    };
+    casovac = setTimeout(() => krok(0, 0), KROK_RADKU_MS);
+    return () => clearTimeout(casovac);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [faze, vysledek]);
+
+  const tarif = doporucenyTarif(odp);
+  const dalsi = (odp.cile?.length ? odp.cile : ['rozvrh', 'sklad', 'uzaverky']).filter(c => ODKAZY[c]).slice(0, 3);
+
+  if (faze === 'chyba') {
+    return <p role="alert" className="note note-danger text-[13px]" data-sestaveni-chyba>{chyba || 'Podnik se nepodařilo sestavit.'} Nic se nezahodilo, stačí to zkusit znovu.</p>;
+  }
+
+  return (
+    <div>
+      <p className="sr-only" aria-live="polite">{faze === 'hotovo' && radku >= polozky.length ? 'Podnik je připravený.' : 'Sestavuji tvůj podnik.'}</p>
+      <h2 className="t-section">{faze === 'bezi' || radku < polozky.length ? 'Sestavuji tvůj podnik…' : 'Hotovo, tohle se povedlo'}</h2>
+      <ul className="list mt-2" aria-label="Výsledky sestavení" aria-busy={faze === 'bezi'} data-vysledky>
+        {faze === 'bezi' && <li className="list-row"><span aria-hidden className="h-5 w-5 shrink-0 rounded-full border-2 border-black/15" /><span className="t-meta">Zakládám, co sis vybral…</span></li>}
+        {polozky.map((p, i) => {
+          const ukazano = i < radku;
+          return (
+            <li key={p.klic} className="list-row" data-vysledek={p.klic} data-stav={ukazano ? p.stav : 'ceka'}>
+              {p.stav === 'chyba' && ukazano ? (
+                <div className="note note-wait w-full text-[13px]">
+                  <strong>{p.nazev}</strong>: tohle jsme nestihli. {p.poznamka}
+                </div>
+              ) : (
+                <>
+                  <span aria-hidden className={`grid h-5 w-5 shrink-0 place-items-center rounded-full ${
+                    !ukazano ? 'border-2 border-black/15' : p.stav === 'ok' ? 'bg-[#C8F542] on-accent' : 'bg-black/[0.08] text-black/55'}`}>
+                    {ukazano && (p.stav === 'ok' ? <Icon name="check" size={12} strokeWidth={2.6} motion="draw" /> : <Icon name="minus" size={12} strokeWidth={2.6} />)}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className={`block text-[15px] font-medium leading-snug ${ukazano ? 'text-[#16181A]' : 'text-black/45'}`}>
+                      {ukazano && <span className="sr-only">{p.stav === 'ok' ? 'Hotovo: ' : 'Přeskočeno: '}</span>}{p.nazev}
+                    </span>
+                    {ukazano && p.poznamka && <span className="mt-0.5 block text-[13px] leading-snug text-black/55 text-pretty">{p.poznamka}</span>}
+                  </span>
+                </>
+              )}
+            </li>
+          );
+        })}
+        {faze === 'hotovo' && polozky.length === 0 && <li className="list-row"><span className="t-meta">Nebylo co zakládat, podnik zůstal, jak byl.</span></li>}
+      </ul>
+
+      {dily.length > 0 && (
+        <div className="mt-5">
+          <p className="t-label mb-2">Tvůj Přehled · {czCount(dily.length, { one: 'widget', few: 'widgety', many: 'widgetů' })}</p>
+          <div className="pv-mini" data-mini-prehled aria-hidden>
+            {dily.map((d, i) => {
+              const def = najdiWidget(d.w);
+              const vidno = i < dilu;
+              return (
+                <span key={`${d.w}-${i}`} className="pv-dil" data-v={d.s} data-w={d.w}
+                  data-skryto={vidno ? undefined : ''} data-pristi={vidno ? '' : undefined}>
+                  {def?.nazev ?? d.w}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {faze === 'hotovo' && radku >= polozky.length && (
+        <div className="mt-6 rise-in">
+          <h2 className="t-section">Co dál</h2>
+          <ul className="list mt-1" aria-label="Co dál">
+            {dalsi.map(c => (
+              <ListRow key={c} title={ODKAZY[c].titul} meta={ODKAZY[c].meta} href={ODKAZY[c].href} lead={<Icon name="chevronRight" size={16} className="text-black/40" />} />
+            ))}
+            <ListRow title={tarif === 'zdarma' ? 'Zdarma ti zatím stačí' : `Vyzkoušet ${tarif === 'max' ? 'Max' : 'Pro'} ${TRIAL_DAYS} dní zdarma`}
+              meta={tarif === 'max' ? 'Hosté a napojení pokladny.' : tarif === 'pro' ? 'Tablet u baru, větší tým a přehledy.' : 'Tarif můžeš změnit kdykoli v Nastavení.'}
+              href={tarif === 'zdarma' ? undefined : '/employer/overview?view=settings'}
+              right={<Chip tone={tarif === 'zdarma' ? 'ok' : 'muted'} size="sm">{tarif === 'zdarma' ? 'Zdarma' : tarif === 'max' ? 'Max' : 'Pro'}</Chip>} />
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
