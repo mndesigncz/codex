@@ -46,7 +46,7 @@ export default function Shrnuti({ odp, zmen, info }: KrokProps) {
         <ul className="list" aria-label="Co se nastaví">
           {pevne.map(p => (
             <ListRow key={p.id} lead={<span aria-hidden className="grid h-9 w-9 place-items-center rounded-full bg-black/[0.05] text-[#16181A]"><Icon name={p.ikona} size={18} /></span>}
-              title={p.titul} meta={p.popis} right={<Chip tone="muted" size="sm">Z odpovědí</Chip>} />
+              title={p.titul} meta={p.popis} aside={<Chip tone="muted" size="sm">Z odpovědí</Chip>} />
           ))}
           {radky.filter(r => r.klic !== 'prehled').map(r => (
             <SwitchRow key={r.klic} title={r.nazev} hint={r.popis} checked={zapnuto(r.klic)} onChange={v => prepni(r.klic, v)} />

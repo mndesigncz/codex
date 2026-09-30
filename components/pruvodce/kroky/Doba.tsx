@@ -41,16 +41,17 @@ export default function Doba({ odp, zmen, chybaPole }: KrokProps) {
           const d = doba[klic];
           const po = minuty(d.close) <= minuty(d.open);
           return (
-            <li key={klic} className="list-row flex-wrap !items-center gap-x-3 gap-y-1.5">
-              <span className="w-[5.5rem] shrink-0 text-[15px] font-medium text-[#16181A]">{den}</span>
-              <span className={`flex min-w-0 flex-1 items-center gap-2 ${d.closed ? 'opacity-50' : ''}`}>
+            <li key={klic} className="list-row flex-wrap !items-center gap-x-3 gap-y-2">
+              <span className="min-w-0 flex-1 text-[15px] font-medium text-[#16181A] sm:w-[5.5rem] sm:flex-none">{den}</span>
+              {/* Na telefonu jsou časy na vlastním řádku pod dnem (dvě pole a „až" se vedle názvu dne nevejdou). */}
+              <span className={`order-last flex basis-full items-center gap-2 sm:order-none sm:basis-auto sm:flex-1 ${d.closed ? 'opacity-50' : ''}`}>
                 <label htmlFor={`pv-od-${i}`} className="sr-only">{den} otevíráme v</label>
                 <input id={`pv-od-${i}`} type="time" value={d.open} disabled={d.closed} onChange={e => zmenDen(klic, { open: e.target.value })}
-                  className="field !h-10 !w-[6.75rem] !px-2.5 text-center text-sm tabular-nums" />
+                  className="field !h-10 !w-[7.25rem] !px-2.5 text-center text-sm tabular-nums" />
                 <span aria-hidden className="text-black/40">až</span>
                 <label htmlFor={`pv-do-${i}`} className="sr-only">{den} zavíráme v</label>
                 <input id={`pv-do-${i}`} type="time" value={d.close} disabled={d.closed} onChange={e => zmenDen(klic, { close: e.target.value })}
-                  className="field !h-10 !w-[6.75rem] !px-2.5 text-center text-sm tabular-nums" />
+                  className="field !h-10 !w-[7.25rem] !px-2.5 text-center text-sm tabular-nums" />
               </span>
               <button type="button" aria-pressed={d.closed} onClick={() => zmenDen(klic, { closed: !d.closed })}
                 className={`tap-target-sm shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ${d.closed ? 'seg-on' : 'seg-off glass'}`}>

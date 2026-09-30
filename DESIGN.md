@@ -1749,6 +1749,44 @@ Obecně: cokoli uvnitř nástroje, co se měří nebo pozoruje, nesmí spoléhat
 na to, že při prvním vykreslení existuje. Vzor
 `components/employer/Inventory.tsx`.
 
+## Průvodce prvotním nastavením (kolo 73)
+
+Celoobrazovková trasa `/employer/start`, ne okno nad aplikací: obnovitelná
+adresa, žádný boční pás ani dok, které by rušily vyprávění. Stav žije v jednom
+sloupci `teams.onboarding` (JSONB), podniky z doby před průvodcem mají NULL
+a průvodce nikdy neuvidí. Nový vlastník (`stav = 'nove'`) se na něj přesměruje
+**na serveru** (`app/employer/overview/page.tsx`, bez záblesku aplikace);
+rozpracovaný a přeskočený se nepřesměrovává, vede na ně řádek „Dokončit
+nastavení podniku" v Prvních krocích a „Spustit znovu" v Nastavení → Tým.
+Brána je fail-open (`lib/pruvodce/brana.ts`): když se databáze nedá přečíst,
+aplikace jede jako dřív.
+
+- **Ukazuje, co aplikace umí.** Vlevo (na telefonu na požádání) běží **skutečná
+  aplikace**: veřejná ukázka `/demo` v rámu telefonu (`DemoOkno`), jedna instance
+  po celý průvodce, scéna se mění zprávou `demo-scena` podle zaostřeného cíle.
+  Data jsou vymyšlená a ukázka neposílá na server nic (mock server v prohlížeči,
+  viz `lib/demo/README.md`). Fotky jsou jen tam, kde ukázka nemá smysl (typ
+  podniku, doba), a mají rozměr, blur a popis (`components/pruvodce/foto.ts`).
+- **Autosave po každém kroku a krok se nepustí dál, dokud uložení neprojde**
+  (výpadek = `note-danger`, ne tiché ztracení). Nastavení se aplikuje najednou
+  na konci (`POST /api/onboarding/pouzit`): jen přidává (žádný `DELETE`, každý
+  `UPDATE` s týmem), každá operace ve vlastním `try`, opakované spuštění nic
+  nezdvojí (ledger `pouzito` + dedupe podle názvu). Cizí (ruční) Přehled,
+  otevírací doba, typy směn, pravidlo ani kasa se nepřepíšou.
+- **Finále je poctivé:** přehrává výsledky, které vrátil server (hotovo /
+  přeskočeno / nepovedlo se), a miniaturu Přehledu skládá z výsledného
+  rozložení. „Otevřít Přehled" je do konce animace zamčené.
+- **Jedna plná limetka** na obrazovku: tlačítko „Pokračovat". Vybrané dlaždice
+  a postup jsou inkoustové (`--pv-ink`, v tmavém režimu světlé); přepínač ve
+  Shrnutí je stav, ne akce. Pohyb jen `transform` a `opacity`, vše pod
+  `prefers-reduced-motion: no-preference` (`.pv-*` v `globals.css`).
+- Nepřidávat: menu ani položky skladu se zásobou (widget Docházející zásoby by je
+  ukázal jako kritické), jazyky, které nefungují, konfety, e-maily pozvaných do
+  `teams.onboarding` (jen jejich počet).
+- Ověření: `scripts/testy/k73-pruvodce.ts` (čistá logika, pojistky nad zdroji)
+  a sonda `scripts/sondy/k73-pruvodce.mjs` (1280 a 390 px, tmavý režim,
+  omezený pohyb, klávesnice, výpadek sítě, přerušení a pokračování).
+
 ## Anti-vzory (zdejší zákazy)
 
 Karta v kartě; víc než jedna limetková akce na obrazovce; ručně psané

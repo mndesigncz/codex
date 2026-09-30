@@ -190,6 +190,8 @@ async function overKrok(p, popis, { cislo } = {}) {
   tvrdi(`P1 ${popis}: právě jedna plná limetka`, lim.length === 1, JSON.stringify(lim));
   const bt = await tlacitkaBezTypu(p);
   tvrdi(`P1 ${popis}: tlačítka mají type`, bt.length === 0, JSON.stringify(bt));
+  const mimoKartu = await p.evaluate(() => { const f = document.querySelector('.pv-paticka'); if (!f) return ['bez patičky']; const r = f.getBoundingClientRect(); return [...f.querySelectorAll('button')].filter(b => { const x = b.getBoundingClientRect(); return x.right > r.right - 8 || x.left < r.left + 8; }).map(b => b.textContent?.trim()); });
+  tvrdi(`P1 ${popis}: tlačítka patičky jsou uvnitř karty`, mimoKartu.length === 0, JSON.stringify(mimoKartu));
   const mala = await malaTlacitka(p);
   tvrdi(`P1 ${popis}: dotykové cíle ≥ 36 px`, mala.length === 0, JSON.stringify(mala.slice(0, 5)));
 }

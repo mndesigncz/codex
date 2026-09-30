@@ -215,6 +215,11 @@ export default function ({ eq, ok }: Testy) {
     && /info\.stav === null \|\| info\.stav === 'hotovo'\) && !znovu/.test(kod('app/employer/start/page.tsx')));
   ok('„Spustit znovu" v Nastavení vidí jen vlastník a vede na /employer/start?znovu=1', /isOwner && \([\s\S]{0,300}\/employer\/start\?znovu=1/.test(kod('components/TeamManagement.tsx')));
   ok('První kroky připomínají nedokončený průvodce jen ve stavech rozpracovano a preskoceno', /onboarding\.data === 'rozpracovano' \|\| onboarding\.data === 'preskoceno'/.test(kod('components/widgety/oblasti/obecne.tsx')));
+  // Barvy: jen tokeny a dvě hodnoty značky (inkoust a limetka), které používá celá aplikace.
+  const souboryUI = ['Pruvodce', 'Kulisa', 'FotoKroku', 'DemoOkno', 'kroky/Vitej', 'kroky/Typ', 'kroky/Podnik', 'kroky/Doba', 'kroky/Tym', 'kroky/Cile', 'kroky/Kasa', 'kroky/Shrnuti', 'kroky/Hotovo'];
+  const syrove = souboryUI.flatMap(f => [...kod(`components/pruvodce/${f}.tsx`).matchAll(/#[0-9A-Fa-f]{3,8}\b/g)].map(m => `${f}: ${m[0]}`)).filter(x => !/#16181A|#C8F542/i.test(x));
+  ok('komponenty průvodce nemají syrové barvy mimo inkoust a limetku', syrove.length === 0);
+  ok('komponenty průvodce nepoužívají transition-all ani blur mimo plovoucí lištu', souboryUI.every(f => !/transition-all|backdrop-blur/.test(kod(`components/pruvodce/${f}.tsx`))));
   ok('PUT /api/onboarding má omezení četnosti', /hit\(`onboarding:/.test(kod('app/api/onboarding/route.ts')));
   ok('POST /api/onboarding/pouzit má omezení četnosti', /hit\(`onboarding-pouzit:/.test(kod('app/api/onboarding/pouzit/route.ts')));
   const pouzij = kod('lib/pruvodce/pouzij.ts');

@@ -406,9 +406,9 @@ export default function Pruvodce({ jmeno, znovu }: { jmeno: string; znovu: boole
     </>
   ) : (
     <>
-      {index > 0 && <Button variant="ghost" onClick={zpet} disabled={uklada}>Zpět</Button>}
+      {index > 0 && <Button variant="ghost" className="!px-3 sm:!px-5" onClick={zpet} disabled={uklada}>Zpět</Button>}
       <span className="flex-1" />
-      {PRESKOCITELNE.includes(krok) && <Button variant="ghost" onClick={() => void dal(true)} disabled={uklada}>Přeskočit</Button>}
+      {PRESKOCITELNE.includes(krok) && <Button variant="ghost" className="!px-3 sm:!px-5" onClick={() => void dal(true)} disabled={uklada}>Přeskočit</Button>}
       <Button variant="accent" type="submit" form={ID_FORMULARE} loading={uklada} className="flex-1 sm:flex-none" iconAfter={krok === 'shrnuti' ? undefined : 'chevronRight'}>
         {krok === 'vitej' ? 'Začít' : krok === 'shrnuti' ? 'Sestavit podnik' : 'Pokračovat'}
       </Button>
