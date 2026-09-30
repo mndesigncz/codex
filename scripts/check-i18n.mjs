@@ -37,7 +37,7 @@ import { RES_STATUS, tierFor } from '../lib/clientSlots.ts';
 const JAZYKY = ['en', 'de', 'sk', 'pl'];
 const ROOTS = ['app', 'components', 'lib'];
 /** Kolik `'cs-CZ'` je v kódu mimo výjimky. Klesá s každou dávkou migrace na lib/i18n/format; nesmí růst. */
-const BASELINE_CS_CZ = 259; // +3: výchozí čeština průvodce a předvolby zemí, cena na (zatím české) prodejní stránce
+const BASELINE_CS_CZ = 254; // +3: výchozí čeština průvodce a předvolby zemí, cena na (zatím české) prodejní stránce
 /** Natvrdo psané české řetězce v přeložených souborech (soubor → kolik). Nesmí růst; klesá s dalšími dávkami. */
 const BASELINE_NATVRDO = {};
 
@@ -116,6 +116,38 @@ for (const n of [0, 10, 25, 100]) pridej('klient-host', tierFor(n, { platinumAt:
   const m = bp.match(/const ORDER_LABEL[^=]*=\s*\{([^}]*)\}/);
   if (m) for (const v of m[1].matchAll(/:\s*'([^']+)'/g)) pridej('klient-host', v[1], 'BusinessPage.tsx (ORDER_LABEL)');
 }
+// Texty z datových tabulek, které komponenty překládají podle textu (`t(data.nazev)`):
+// průvodce (lib/pruvodce, foto.ts), předplatné (lib/plan), důvody nahlášení (lib/moderace).
+{
+  const typy = await import('../lib/pruvodce/typy.ts');
+  const predv = await import('../lib/pruvodce/predvolby.ts');
+  const foto = await import('../components/pruvodce/foto.ts');
+  const plan = await import('../lib/plan.ts');
+  const moder = await import('../lib/moderace.ts');
+  const PV = 'lib/pruvodce (tabulky průvodce)';
+  for (const d of typy.TYPY) { pridej('pruvodce', d.nazev, PV); pridej('pruvodce', d.veta, PV); }
+  for (const c of typy.CILE) { pridej('pruvodce', c.nazev, PV); pridej('pruvodce', c.veta, PV); pridej('pruvodce', c.ukazka, PV); }
+  for (const v of Object.values(typy.NAZEV_ZEME)) pridej('pruvodce', v, PV);
+  for (const v of Object.values(typy.NAZEV_VELIKOSTI)) pridej('pruvodce', v, PV);
+  for (const p of predv.PREDVOLBY_DOBY) { pridej('pruvodce', p.nazev, PV); pridej('pruvodce', p.popis, PV); }
+  for (const d of predv.DNY_DLOUHE) pridej('pruvodce', d, PV);
+  for (const f of Object.values(foto.FOTKY)) pridej('pruvodce', f.alt, PV);
+  // Shrnutí a finále: názvy operací a řádků (lib/pruvodce/plan.ts) a věta o pravidlech rozvrhu.
+  const planPv = readFileSync('lib/pruvodce/plan.ts', 'utf8');
+  for (const v of (planPv.match(/const NAZVY_OPERACI[^=]*=\s*\{([^}]*)\}/)?.[1] ?? '').matchAll(/:\s*'([^']+)'/g)) pridej('pruvodce', v[1], PV);
+  pridej('pruvodce', 'Nejvýš šest dní v řadě', PV);
+  // Předplatné: srovnání tarifů (popisky a textové buňky) a výčet toho, co přidává Max.
+  const PL = 'lib/plan.ts (PLAN_FEATURES)';
+  for (const f of plan.PLAN_FEATURES) {
+    for (const s of ['predplatne']) {
+      pridej(s, f.label, PL);
+      for (const v of [f.free, f.pro, f.max]) if (typeof v === 'string') pridej(s, v, PL);
+    }
+  }
+  for (const x of plan.MAX_EXTRAS) { pridej('spolecne', x, PL); pridej('predplatne', x, PL); }
+  for (const d of moder.DUVODY) pridej('spolecne', d.nazev, 'lib/moderace.ts (DUVODY)');
+}
+
 // Hlášky serveru: věty v `error: '…'` hostovských rout, statusMessage a blokace/middleware.
 const apiKlice = new Set();
 const apiZdroje = [];

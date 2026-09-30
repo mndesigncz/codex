@@ -112,7 +112,7 @@ export default function ({ eq, ok }: Testy) {
   const bill = bezKomentaru(precti('components/Billing.tsx'));
   ok('Předplatné: nejvýš jedna tónovaná karta tarifu (card-info u tarifu pryč)', !bill.includes("p === 'pro' ? 'card-accent' : 'card-info'"));
   ok('Předplatné: ceny 28 px, ne text-3xl', !bill.includes('text-3xl'));
-  ok('Předplatné: měsíce zdarma přes czCount', bill.includes('czCount(st.referral.total, MESIC)'));
+  ok('Předplatné: měsíce zdarma přes plurál slovníku', bill.includes('{n, plural, one {# měsíc} few {# měsíce} other {# měsíců}}') && bill.includes('n: st.referral.total'));
 
   const sheet = bezKomentaru(precti('components/MobileMoreSheet.tsx'));
   ok('Další (telefon): štítek skupiny je t-label', sheet.includes('<p className="px-1 pb-1 t-label">'));

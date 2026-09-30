@@ -17,6 +17,7 @@ import {
   uloz, zjistiObalUa, type KlicObalu, type NativniApi, type VysledekPushe,
 } from '@/lib/nativni/most';
 import { mistniCesta } from '@/lib/bezpecnaUrl';
+import { useT } from '@/lib/i18n/client';
 
 // Jediný vlastník klíče tokenu a volby „push vypnut“ (ostatní kód volá window.manageroNative).
 const KLIC_TOKENU = 'managero-push-token';
@@ -47,6 +48,9 @@ async function smazToken() {
 }
 
 export default function NativeBridge() {
+  const t = useT('spolecne');
+  const tRef = useRef(t);
+  tRef.current = t;
   const { status } = useSession();
   const cesta = usePathname();
   const kiosk = jeKioskCesta(cesta);
@@ -74,7 +78,8 @@ export default function NativeBridge() {
         if (c) window.location.assign(c);
       });
       if (platforma() === 'android') {
-        try { await PN.createChannel({ id: 'default', name: 'Upozornění', importance: 4, visibility: 1 }); } catch { /* kanál už je */ }
+        const t = tRef.current;
+        try { await PN.createChannel({ id: 'default', name: t('Upozornění'), importance: 4, visibility: 1 }); } catch { /* kanál už je */ }
       }
     }
     await PN.register();
@@ -126,11 +131,12 @@ export default function NativeBridge() {
   const odemkni = useCallback(async () => {
     const BA = plugin('BiometricAuth');
     if (!BA) { setZamceno(false); return; }
+    const t = tRef.current;
     try {
       await BA.authenticate({
-        reason: obal === 'client' ? 'Odemkni svou kartu a rezervace' : 'Odemkni data podniku',
-        cancelTitle: 'Zrušit', allowDeviceCredential: true,
-        androidTitle: 'Odemknout aplikaci', iosFallbackTitle: 'Zadat kód zařízení',
+        reason: obal === 'client' ? t('Odemkni svou kartu a rezervace') : t('Odemkni data podniku'),
+        cancelTitle: t('Zrušit'), allowDeviceCredential: true,
+        androidTitle: t('Odemknout aplikaci'), iosFallbackTitle: t('Zadat kód zařízení'),
       });
       setZamceno(false);
     } catch { /* zrušeno: přehled zůstane zamčený, jde to zkusit znovu tlačítkem */ }
@@ -227,9 +233,10 @@ export default function NativeBridge() {
         if (!PR) return false;
         // Zapnutí se nejdřív ověří: kdo nemá nastavený Face ID ani kód, nesmí se zamknout ven.
         if (zap) {
+          const t = tRef.current;
           try {
             if (!BA || !(await BA.checkBiometry()).isAvailable) return false;
-            await BA.authenticate({ reason: 'Potvrď zapnutí zámku', allowDeviceCredential: true, cancelTitle: 'Zrušit' });
+            await BA.authenticate({ reason: t('Potvrď zapnutí zámku'), allowDeviceCredential: true, cancelTitle: t('Zrušit') });
           } catch { return false; }
         }
         await PR.set({ key: 'zamek', value: zap ? '1' : '0' });
@@ -288,31 +295,31 @@ export default function NativeBridge() {
   return (
     <>
       {nabidkaPush && !zamceno && (
-        <div role="dialog" aria-label="Zapnout upozornění"
+        <div role="dialog" aria-label={t('Zapnout upozornění')}
           className="fixed inset-x-0 z-[60] px-4 pointer-events-none"
           style={{ bottom: 'max(env(safe-area-inset-bottom), 16px)' }}>
           <div className="pointer-events-auto mx-auto max-w-md rounded-[var(--r-card)] border border-[var(--surface-line)] bg-[var(--surface)] p-4 shadow-[shadow:var(--shadow-float)]">
-            <p className="text-sm font-semibold">Zapnout upozornění?</p>
+            <p className="text-sm font-semibold">{t('Zapnout upozornění?')}</p>
             <p className="mt-1 text-sm text-black/60">
               {obal === 'client'
-                ? 'Dáme ti vědět o potvrzené rezervaci a stavu objednávky. Novinky a akce podniků posíláme jen s tvým výslovným souhlasem. Systém se zeptá ještě jednou.'
-                : 'Dáme vědět o nové směně, zprávě a docházejícím zboží. Jednotlivé druhy jdou vypnout v Nastavení. Systém se zeptá ještě jednou.'}
+                ? t('Dáme ti vědět o potvrzené rezervaci a stavu objednávky. Novinky a akce podniků posíláme jen s tvým výslovným souhlasem. Systém se zeptá ještě jednou.')
+                : t('Dáme vědět o nové směně, zprávě a docházejícím zboží. Jednotlivé druhy jdou vypnout v Nastavení. Systém se zeptá ještě jednou.')}
             </p>
             <div className="mt-3 flex gap-2">
-              <Button variant="primary" size="sm" onClick={async () => { setNabidkaPush(false); await zapniPush(); }}>Zapnout</Button>
-              <Button variant="ghost" size="sm" onClick={() => { uloz(KLIC_ODLOZENO, String(Date.now())); setNabidkaPush(false); }}>Teď ne</Button>
+              <Button variant="primary" size="sm" onClick={async () => { setNabidkaPush(false); await zapniPush(); }}>{t('Zapnout')}</Button>
+              <Button variant="ghost" size="sm" onClick={() => { uloz(KLIC_ODLOZENO, String(Date.now())); setNabidkaPush(false); }}>{t('Teď ne')}</Button>
             </div>
           </div>
         </div>
       )}
       {zamceno && (
         // Zamykací obrazovka není okno (nevyjíždí zdola, nejde zavřít), zakrývá celou aplikaci.
-        <div role="dialog" aria-modal="true" aria-label="Aplikace je zamčená"
+        <div role="dialog" aria-modal="true" aria-label={t('Aplikace je zamčená')}
           style={{ position: 'fixed', inset: 0, zIndex: 2147483000 }}
           className="flex flex-col items-center justify-center gap-4 bg-[var(--bg)] px-6 text-center">
-          <p className="text-lg font-semibold">Aplikace je zamčená</p>
-          <p className="max-w-xs text-sm text-black/60">Odemkni ji Face ID, otiskem nebo kódem zařízení.</p>
-          <Button variant="accent" onClick={() => void odemkni()}>Odemknout</Button>
+          <p className="text-lg font-semibold">{t('Aplikace je zamčená')}</p>
+          <p className="max-w-xs text-sm text-black/60">{t('Odemkni ji Face ID, otiskem nebo kódem zařízení.')}</p>
+          <Button variant="accent" onClick={() => void odemkni()}>{t('Odemknout')}</Button>
         </div>
       )}
     </>

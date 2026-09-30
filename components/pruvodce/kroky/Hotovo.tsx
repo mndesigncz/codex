@@ -4,10 +4,12 @@ import { useEffect, useRef, useState } from 'react';
 import { Chip, ListRow } from '@/components/ui';
 import { Icon } from '@/components/Icons';
 import { TRIAL_DAYS } from '@/lib/plan';
-import { czCount } from '@/lib/czech';
+import { useT } from '@/lib/i18n/client';
 import { doporucenyTarif } from '@/lib/pruvodce/plan';
 import { widget as najdiWidget } from '@/lib/widgety/katalog';
 import type { Odpovedi } from '@/lib/pruvodce/typy';
+import type { PrekladFn } from '@/lib/i18n/client';
+import type { VysledekOperace } from '@/lib/pruvodce/typy';
 import type { VysledekSestaveni } from './spolecne';
 
 // Finále. Je POCTIVÉ: přehrává seznam výsledků, který vrátil server
@@ -23,12 +25,31 @@ const KROK_DILU_MS = 60;
 
 export type FazeSestaveni = 'bezi' | 'hotovo' | 'chyba';
 
-const ODKAZY: Record<string, { titul: string; meta: string; href: string }> = {
-  rozvrh: { titul: 'Naplánuj první směny', meta: 'Rozvrh podle dostupnosti týmu.', href: '/employer/overview?view=shifts' },
-  sklad: { titul: 'Přidej první věci do skladu', meta: 'Uvidíš, co dochází a co dokoupit.', href: '/employer/overview?view=inventory' },
-  uzaverky: { titul: 'Zapiš první uzávěrku', meta: 'Kasa se spočítá po bankovkách.', href: '/employer/overview?view=reports' },
-  provoz: { titul: 'Projdi první postup', meta: 'Otevírání a zavírání s odškrtáváním.', href: '/employer/overview?view=procedures' },
-};
+const ODKAZY = (t: PrekladFn): Record<string, { titul: string; meta: string; href: string }> => ({
+  rozvrh: { titul: t('Naplánuj první směny'), meta: t('Rozvrh podle dostupnosti týmu.'), href: '/employer/overview?view=shifts' },
+  sklad: { titul: t('Přidej první věci do skladu'), meta: t('Uvidíš, co dochází a co dokoupit.'), href: '/employer/overview?view=inventory' },
+  uzaverky: { titul: t('Zapiš první uzávěrku'), meta: t('Kasa se spočítá po bankovkách.'), href: '/employer/overview?view=reports' },
+  provoz: { titul: t('Projdi první postup'), meta: t('Otevírání a zavírání s odškrtáváním.'), href: '/employer/overview?view=procedures' },
+});
+
+/** Poznámka k výsledku ze serveru: počty a pevné věty se překládají, ostatní zůstane, jak přišla. */
+function poznamkaVysledku(p: VysledekOperace, t: PrekladFn): string | undefined {
+  const n = p.pocet ?? 0;
+  if (p.poznamka && /^\d+ /.test(p.poznamka)) {
+    switch (p.klic) {
+      case 'smeny': return t('{n, plural, one {# typ směny} few {# typy směn} other {# typů směn}}', { n });
+      case 'sklad': return t('{n, plural, one {# kategorie} few {# kategorie} other {# kategorií}}', { n });
+      case 'postupy': return t('{n, plural, one {# postup} few {# postupy} other {# postupů}}', { n });
+      case 'prehled': return t('{n, plural, one {# widget} few {# widgety} other {# widgetů}}', { n });
+    }
+  }
+  switch (p.poznamka) {
+    case 'Už je nastavené.': return t('Už je nastavené.');
+    case 'Přehled už máte upravený, nechali jsme ho.': return t('Přehled už máte upravený, nechali jsme ho.');
+    case 'Adresu a zemi se zatím uložit nepodařilo, doplníš je v Nastavení.': return t('Adresu a zemi se zatím uložit nepodařilo, doplníš je v Nastavení.');
+    default: return p.poznamka;
+  }
+}
 
 export default function Hotovo({ faze, vysledek, chyba, odp, naHotovo }: {
   faze: FazeSestaveni;
@@ -38,6 +59,8 @@ export default function Hotovo({ faze, vysledek, chyba, odp, naHotovo }: {
   /** Animace doběhla: odemkne „Otevřít Přehled". */
   naHotovo: () => void;
 }) {
+  const t = useT('pruvodce');
+  const odkazy = ODKAZY(t);
   const [radku, setRadku] = useState(0);
   const [dilu, setDilu] = useState(0);
   const dobehlo = useRef(false);
@@ -62,25 +85,25 @@ export default function Hotovo({ faze, vysledek, chyba, odp, naHotovo }: {
   }, [faze, vysledek]);
 
   const tarif = doporucenyTarif(odp);
-  const dalsi = (odp.cile?.length ? odp.cile : ['rozvrh', 'sklad', 'uzaverky']).filter(c => ODKAZY[c]).slice(0, 3);
+  const dalsi = (odp.cile?.length ? odp.cile : ['rozvrh', 'sklad', 'uzaverky']).filter(c => odkazy[c]).slice(0, 3);
 
   if (faze === 'chyba') {
-    return <p role="alert" className="note note-danger text-[13px]" data-sestaveni-chyba>{chyba || 'Podnik se nepodařilo sestavit.'} Nic se nezahodilo, stačí to zkusit znovu.</p>;
+    return <p role="alert" className="note note-danger text-[13px]" data-sestaveni-chyba>{chyba || t('Podnik se nepodařilo sestavit.')} {t('Nic se nezahodilo, stačí to zkusit znovu.')}</p>;
   }
 
   return (
     <div>
-      <p className="sr-only" aria-live="polite">{faze === 'hotovo' && radku >= polozky.length ? 'Podnik je připravený.' : 'Sestavuji tvůj podnik.'}</p>
-      <h2 className="t-section">{faze === 'bezi' || radku < polozky.length ? 'Sestavuji tvůj podnik…' : 'Hotovo, tohle se povedlo'}</h2>
-      <ul className="list mt-2" aria-label="Výsledky sestavení" aria-busy={faze === 'bezi'} data-vysledky>
-        {faze === 'bezi' && <li className="list-row"><span aria-hidden className="h-5 w-5 shrink-0 rounded-full border-2 border-black/15" /><span className="t-meta">Zakládám, co sis vybral…</span></li>}
+      <p className="sr-only" aria-live="polite">{faze === 'hotovo' && radku >= polozky.length ? t('Podnik je připravený.') : t('Sestavuji tvůj podnik.')}</p>
+      <h2 className="t-section">{faze === 'bezi' || radku < polozky.length ? t('Sestavuji tvůj podnik…') : t('Hotovo, tohle se povedlo')}</h2>
+      <ul className="list mt-2" aria-label={t('Výsledky sestavení')} aria-busy={faze === 'bezi'} data-vysledky>
+        {faze === 'bezi' && <li className="list-row"><span aria-hidden className="h-5 w-5 shrink-0 rounded-full border-2 border-black/15" /><span className="t-meta">{t('Zakládám, co sis vybral…')}</span></li>}
         {polozky.map((p, i) => {
           const ukazano = i < radku;
           return (
             <li key={p.klic} className="list-row" data-vysledek={p.klic} data-stav={ukazano ? p.stav : 'ceka'}>
               {p.stav === 'chyba' && ukazano ? (
                 <div className="note note-wait w-full text-[13px]">
-                  <strong>{p.nazev}</strong>: tohle jsme nestihli. {p.poznamka}
+                  <strong>{t(p.nazev)}</strong>{': '}{t('tohle jsme nestihli.')} {p.poznamka}
                 </div>
               ) : (
                 <>
@@ -90,21 +113,21 @@ export default function Hotovo({ faze, vysledek, chyba, odp, naHotovo }: {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className={`block text-[15px] font-medium leading-snug ${ukazano ? 'text-[#16181A]' : 'text-black/45'}`}>
-                      {ukazano && <span className="sr-only">{p.stav === 'ok' ? 'Hotovo: ' : 'Přeskočeno: '}</span>}{p.nazev}
+                      {ukazano && <span className="sr-only">{p.stav === 'ok' ? t('Hotovo') : t('Přeskočeno')}{': '}</span>}{t(p.nazev)}
                     </span>
-                    {ukazano && p.poznamka && <span className="mt-0.5 block text-[13px] leading-snug text-black/55 text-pretty">{p.poznamka}</span>}
+                    {ukazano && p.poznamka && <span className="mt-0.5 block text-[13px] leading-snug text-black/55 text-pretty">{poznamkaVysledku(p, t)}</span>}
                   </span>
                 </>
               )}
             </li>
           );
         })}
-        {faze === 'hotovo' && polozky.length === 0 && <li className="list-row"><span className="t-meta">Nebylo co zakládat, podnik zůstal, jak byl.</span></li>}
+        {faze === 'hotovo' && polozky.length === 0 && <li className="list-row"><span className="t-meta">{t('Nebylo co zakládat, podnik zůstal, jak byl.')}</span></li>}
       </ul>
 
       {dily.length > 0 && (
         <div className="mt-5">
-          <p className="t-label mb-2">Tvůj Přehled · {czCount(dily.length, { one: 'widget', few: 'widgety', many: 'widgetů' })}</p>
+          <p className="t-label mb-2">{t('Tvůj Přehled · {n, plural, one {# widget} few {# widgety} other {# widgetů}}', { n: dily.length })}</p>
           <div className="pv-mini" data-mini-prehled aria-hidden>
             {dily.map((d, i) => {
               const def = najdiWidget(d.w);
@@ -122,15 +145,15 @@ export default function Hotovo({ faze, vysledek, chyba, odp, naHotovo }: {
 
       {faze === 'hotovo' && radku >= polozky.length && (
         <div className="mt-6 rise-in">
-          <h2 className="t-section">Co dál</h2>
-          <ul className="list mt-1" aria-label="Co dál">
+          <h2 className="t-section">{t('Co dál')}</h2>
+          <ul className="list mt-1" aria-label={t('Co dál')}>
             {dalsi.map(c => (
-              <ListRow key={c} title={ODKAZY[c].titul} meta={ODKAZY[c].meta} href={ODKAZY[c].href} lead={<Icon name="chevronRight" size={16} className="text-black/40" />} />
+              <ListRow key={c} title={odkazy[c].titul} meta={odkazy[c].meta} href={odkazy[c].href} lead={<Icon name="chevronRight" size={16} className="text-black/40" />} />
             ))}
-            <ListRow title={tarif === 'zdarma' ? 'Zdarma ti zatím stačí' : `Vyzkoušet ${tarif === 'max' ? 'Max' : 'Pro'} ${TRIAL_DAYS} dní zdarma`}
-              meta={tarif === 'max' ? 'Hosté a napojení pokladny.' : tarif === 'pro' ? 'Tablet u baru, větší tým a přehledy.' : 'Tarif můžeš změnit kdykoli v Nastavení.'}
+            <ListRow title={tarif === 'zdarma' ? t('Zdarma ti zatím stačí') : t('Vyzkoušet {tarif} {n} dní zdarma', { tarif: tarif === 'max' ? 'Max' : 'Pro', n: TRIAL_DAYS })}
+              meta={tarif === 'max' ? t('Hosté a napojení pokladny.') : tarif === 'pro' ? t('Tablet u baru, větší tým a přehledy.') : t('Tarif můžeš změnit kdykoli v Nastavení.')}
               href={tarif === 'zdarma' ? undefined : '/employer/overview?view=settings'}
-              right={<Chip tone={tarif === 'zdarma' ? 'ok' : 'muted'} size="sm">{tarif === 'zdarma' ? 'Zdarma' : tarif === 'max' ? 'Max' : 'Pro'}</Chip>} />
+              right={<Chip tone={tarif === 'zdarma' ? 'ok' : 'muted'} size="sm">{tarif === 'zdarma' ? t('Zdarma') : tarif === 'max' ? 'Max' : 'Pro'}</Chip>} />
           </ul>
         </div>
       )}

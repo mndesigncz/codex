@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { ErrorState } from './ErrorState';
+import { useT } from '@/lib/i18n/client';
 
 // Pojistka kolem každé obrazovky.
 //
@@ -22,6 +23,23 @@ type Props = {
 };
 type State = { error: Error | null };
 
+/** Obsah chybové karty: třída nemůže použít hook, takže překládá tahle malá komponenta. */
+function ChybaSekce({ title, detail, onRetry }: { title?: string; detail: string; onRetry: () => void }) {
+  const t = useT('spolecne');
+  return (
+    <div className="px-6 py-4 w-full max-w-3xl mx-auto">
+      <div className="card">
+        <ErrorState
+          title={title ? t(title) : t('Tahle část se nenačetla')}
+          hint={t('Ostatní části aplikace fungují dál. Zkus to načíst znovu — rozdělaná práce jinde zůstává.')}
+          onRetry={onRetry}
+          detail={detail}
+        />
+      </div>
+    </div>
+  );
+}
+
 export class ErrorBoundary extends React.Component<Props, State> {
   state: State = { error: null };
 
@@ -40,18 +58,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   render() {
     if (!this.state.error) return this.props.children;
-    return (
-      <div className="px-6 py-4 w-full max-w-3xl mx-auto">
-        <div className="card">
-          <ErrorState
-            title={this.props.title ?? 'Tahle část se nenačetla'}
-            hint="Ostatní části aplikace fungují dál. Zkus to načíst znovu — rozdělaná práce jinde zůstává."
-            onRetry={() => this.setState({ error: null })}
-            detail={this.state.error.message}
-          />
-        </div>
-      </div>
-    );
+    return <ChybaSekce title={this.props.title} detail={this.state.error.message} onRetry={() => this.setState({ error: null })} />;
   }
 }
 

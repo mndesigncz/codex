@@ -11,10 +11,12 @@ import { useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { odhlasit } from '@/lib/odhlaseni';
+import { useT } from '@/lib/i18n/client';
 
 interface Dopad { kod: string; zprava: string }
 
 export default function SmazatUcet({ jeHost }: { jeHost: boolean }) {
+  const t = useT('spolecne');
   const [otevreno, setOtevreno] = useState(false);
   const [heslo, setHeslo] = useState('');
   const [potvrzeni, setPotvrzeni] = useState('');
@@ -35,9 +37,9 @@ export default function SmazatUcet({ jeHost }: { jeHost: boolean }) {
       if (r.ok) { await odhlasit({ callbackUrl: jeHost ? '/client' : '/login' }); return; }
       // Vlastník podniku: server řekl, co by se stalo, a čeká na výslovné potvrzení.
       if (r.status === 409 && (d.kod === 'VLASTNIK_S_CLENY' || d.kod === 'VLASTNIK_PODNIKU')) { setDopad({ kod: d.kod, zprava: d.error }); return; }
-      setChyba(d.error || 'Účet se nepodařilo smazat.');
+      setChyba(d.error || t('Účet se nepodařilo smazat.'));
     } catch {
-      setChyba('Účet se nepodařilo smazat. Zkontrolujte připojení a zkuste to znovu.');
+      setChyba(t('Účet se nepodařilo smazat. Zkontrolujte připojení a zkuste to znovu.'));
     } finally { setBezi(false); }
   };
 
@@ -45,33 +47,33 @@ export default function SmazatUcet({ jeHost }: { jeHost: boolean }) {
 
   return (
     <section aria-labelledby="h-smazat-ucet" className="mt-10 pt-6 border-t border-black/[0.08]">
-      <h2 id="h-smazat-ucet" className="t-section">Smazat účet</h2>
+      <h2 id="h-smazat-ucet" className="t-section">{t('Smazat účet')}</h2>
       <p className="t-meta mt-1.5 max-w-[60ch] text-pretty">
         {jeHost
-          ? 'Smaže se profil, věrnostní karta, členství, body, razítka, kupony a hodnocení. Nejde to vrátit. Budoucí rezervace se zruší, vyřízené objednávky zůstanou u podniku bez vašeho jména.'
-          : 'Smaže se váš přístup, osobní údaje a členství v podnicích. Směny, docházka a uzávěrky zůstanou podniku bez vašeho jména. Nejde to vrátit.'}
+          ? t('Smaže se profil, věrnostní karta, členství, body, razítka, kupony a hodnocení. Nejde to vrátit. Budoucí rezervace se zruší, vyřízené objednávky zůstanou u podniku bez vašeho jména.')
+          : t('Smaže se váš přístup, osobní údaje a členství v podnicích. Směny, docházka a uzávěrky zůstanou podniku bez vašeho jména. Nejde to vrátit.')}
       </p>
       <div className="mt-4">
-        <Button variant="danger" icon="trash" onClick={() => setOtevreno(true)}>Smazat účet</Button>
+        <Button variant="danger" icon="trash" onClick={() => setOtevreno(true)}>{t('Smazat účet')}</Button>
       </div>
 
-      <Modal open={otevreno} onClose={zavrit} size="sm" title={dopad ? 'Smazat i podnik?' : 'Opravdu smazat účet?'}
-        subtitle={dopad ? undefined : 'Potvrďte to svým heslem. Nejde to vrátit.'}
+      <Modal open={otevreno} onClose={zavrit} size="sm" title={dopad ? t('Smazat i podnik?') : t('Opravdu smazat účet?')}
+        subtitle={dopad ? undefined : t('Potvrďte to svým heslem. Nejde to vrátit.')}
         footer={<>
-          <Button variant="secondary" onClick={zavrit}>Ne, nechat</Button>
-          <Button variant="danger-solid" loading={bezi} disabled={!kSmazani} onClick={smazat}>{dopad ? 'Smazat podnik i účet' : 'Smazat účet'}</Button>
+          <Button variant="secondary" onClick={zavrit}>{t('Ne, nechat')}</Button>
+          <Button variant="danger-solid" loading={bezi} disabled={!kSmazani} onClick={smazat}>{dopad ? t('Smazat podnik i účet') : t('Smazat účet')}</Button>
         </>}>
         <div className="grid gap-4">
           {dopad && <p role="alert" className="note note-danger text-pretty">{dopad.zprava}</p>}
           <div>
-            <label htmlFor="sm-heslo" className="field-label">Heslo</label>
+            <label htmlFor="sm-heslo" className="field-label">{t('Heslo')}</label>
             <input id="sm-heslo" type="password" autoComplete="current-password" value={heslo} onChange={e => setHeslo(e.target.value)} className="field" />
           </div>
           {dopad && (
             <div>
-              <label htmlFor="sm-potvrzeni" className="field-label">Napište SMAZAT</label>
+              <label htmlFor="sm-potvrzeni" className="field-label">{t('Napište SMAZAT')}</label>
               <input id="sm-potvrzeni" autoComplete="off" autoCapitalize="characters" value={potvrzeni} onChange={e => setPotvrzeni(e.target.value)} className="field" />
-              <p className="mt-1.5 t-meta">Zruší se předplatné a smažou se všechna data podniku. Zálohu si stáhněte předem.</p>
+              <p className="mt-1.5 t-meta">{t('Zruší se předplatné a smažou se všechna data podniku. Zálohu si stáhněte předem.')}</p>
             </div>
           )}
           {chyba && <p role="alert" className="note note-danger">{chyba}</p>}

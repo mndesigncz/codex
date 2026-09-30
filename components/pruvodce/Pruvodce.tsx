@@ -5,6 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Modal } from '@/components/ui';
 import { LogoMark } from '@/components/Icons';
+import { useT } from '@/lib/i18n/client';
+import type { PrekladFn } from '@/lib/i18n/client';
 import { apiMessage, okJson } from '@/lib/api';
 import type { IdScenyDema } from '@/lib/demo/sceny';
 import { vychoziDoba, POZICE } from '@/lib/pruvodce/predvolby';
@@ -43,17 +45,17 @@ const DemoOkno = dynamic(() => import('./DemoOkno'), { ssr: false });
 
 interface Nacteno { stav: string; krok: string | null; odpovedi: Odpovedi; podnik: { name: string; currency: string; locale: string; week_start: number }; plan: { effective: string }; kod: string | null; pocty: { pozvanek: number } }
 
-const NADPISY: Record<KrokId, (jmeno: string) => { nadpis: string; pod?: string }> = {
-  vitej: j => ({ nadpis: j ? `Vítej, ${j}` : 'Vítej', pod: 'Nastavíme podnik podle toho, jak pracuješ. Zabere to asi čtyři minuty, kdykoli můžeš přerušit a nic se neztratí.' }),
-  typ: () => ({ nadpis: 'Jaký podnik vedeš?', pod: 'Podle toho předvyplníme otevírací dobu, směny a sklad. Všechno půjde změnit.' }),
-  podnik: () => ({ nadpis: 'Jak se jmenuje a kde stojí?', pod: 'Měna a formát čísel se nastaví podle země, jde je změnit.' }),
-  doba: () => ({ nadpis: 'Kdy máte otevřeno?', pod: 'Podle toho se počítají směny a pokrytí obsazení.' }),
-  tym: () => ({ nadpis: 'Kdo s tebou pracuje?', pod: 'Pozvi lidi hned, nebo jim pošli kód pro připojení. Jde to i později.' }),
-  cile: () => ({ nadpis: 'Co chceš mít pod kontrolou?', pod: 'Přehled si podle toho poskládáme. Kdykoli ho přestavíš podržením.' }),
-  kasa: () => ({ nadpis: 'Jak zavíráte kasu?', pod: 'Pár údajů, ať je první uzávěrka hotová za minutu.' }),
-  shrnuti: () => ({ nadpis: 'Tohle ti nastavíme', pod: 'Nic ti nepřepíšeme ani nesmažeme, jen přidáme.' }),
-  hotovo: () => ({ nadpis: 'Podnik je připravený', pod: 'Všechno jde v aplikaci dál upravit.' }),
-};
+const NADPISY = (t: PrekladFn): Record<KrokId, (jmeno: string) => { nadpis: string; pod?: string }> => ({
+  vitej: j => ({ nadpis: j ? t('Vítej, {jmeno}', { jmeno: j }) : t('Vítej'), pod: t('Nastavíme podnik podle toho, jak pracuješ. Zabere to asi čtyři minuty, kdykoli můžeš přerušit a nic se neztratí.') }),
+  typ: () => ({ nadpis: t('Jaký podnik vedeš?'), pod: t('Podle toho předvyplníme otevírací dobu, směny a sklad. Všechno půjde změnit.') }),
+  podnik: () => ({ nadpis: t('Jak se jmenuje a kde stojí?'), pod: t('Měna a formát čísel se nastaví podle země, jde je změnit.') }),
+  doba: () => ({ nadpis: t('Kdy máte otevřeno?'), pod: t('Podle toho se počítají směny a pokrytí obsazení.') }),
+  tym: () => ({ nadpis: t('Kdo s tebou pracuje?'), pod: t('Pozvi lidi hned, nebo jim pošli kód pro připojení. Jde to i později.') }),
+  cile: () => ({ nadpis: t('Co chceš mít pod kontrolou?'), pod: t('Přehled si podle toho poskládáme. Kdykoli ho přestavíš podržením.') }),
+  kasa: () => ({ nadpis: t('Jak zavíráte kasu?'), pod: t('Pár údajů, ať je první uzávěrka hotová za minutu.') }),
+  shrnuti: () => ({ nadpis: t('Tohle ti nastavíme'), pod: t('Nic ti nepřepíšeme ani nesmažeme, jen přidáme.') }),
+  hotovo: () => ({ nadpis: t('Podnik je připravený'), pod: t('Všechno jde v aplikaci dál upravit.') }),
+});
 
 /** Kroky, které jde přeskočit (vítání, shrnutí a finále ne). */
 const PRESKOCITELNE: readonly KrokId[] = ['typ', 'podnik', 'doba', 'tym', 'cile', 'kasa'];
@@ -110,14 +112,17 @@ function zfinalizuj(krok: KrokId, o: Odpovedi, info: InfoPodniku): Odpovedi {
   }
 }
 
-function zKroku(krok: KrokId, o: Odpovedi): { pole: string; text: string } | null {
-  if (krok === 'typ' && !o.typ) return { pole: 'typ', text: 'Vyber typ podniku, nebo krok přeskoč.' };
-  if (krok === 'podnik' && !(o.nazev ?? '').trim()) return { pole: 'nazev', text: 'Napiš název podniku.' };
-  if (krok === 'doba' && o.doba && !cistiDobu(o.doba)) return { pole: 'doba', text: 'Aspoň jeden den musí být otevřeno.' };
+function zKroku(krok: KrokId, o: Odpovedi, t: PrekladFn): { pole: string; text: string } | null {
+  if (krok === 'typ' && !o.typ) return { pole: 'typ', text: t('Vyber typ podniku, nebo krok přeskoč.') };
+  if (krok === 'podnik' && !(o.nazev ?? '').trim()) return { pole: 'nazev', text: t('Napiš název podniku.') };
+  if (krok === 'doba' && o.doba && !cistiDobu(o.doba)) return { pole: 'doba', text: t('Aspoň jeden den musí být otevřeno.') };
   return null;
 }
 
 export default function Pruvodce({ jmeno, znovu }: { jmeno: string; znovu: boolean }) {
+  const t = useT('pruvodce');
+  const tRef = useRef(t);
+  tRef.current = t;
   const router = useRouter();
   const [faze, setFaze] = useState<'nacitam' | 'chyba' | 'ok'>('nacitam');
   const [chybaNacteni, setChybaNacteni] = useState('');
@@ -173,7 +178,8 @@ export default function Pruvodce({ jmeno, znovu }: { jmeno: string; znovu: boole
       setKrok(pokracovat);
       setFaze('ok');
     } catch (e) {
-      setChybaNacteni(apiMessage(e, 'Průvodce se nepodařilo načíst. Zkontroluj připojení a zkus to znovu.'));
+      const t = tRef.current;
+      setChybaNacteni(apiMessage(e, t('Průvodce se nepodařilo načíst. Zkontroluj připojení a zkus to znovu.')));
       setFaze('chyba');
     }
   }, [router, znovu]);
@@ -239,7 +245,7 @@ export default function Pruvodce({ jmeno, znovu }: { jmeno: string; znovu: boole
       nova = { ...odp, preskoceno: [...new Set([...(odp.preskoceno ?? []), krok])] };
     } else {
       const fin = zfinalizuj(krok, odp, info);
-      const vad = zKroku(krok, fin);
+      const vad = zKroku(krok, fin, t);
       if (vad) { setChybaPole(vad); return; }
       nova = { ...fin, preskoceno: (fin.preskoceno ?? []).filter(k => k !== krok) };
     }
@@ -253,7 +259,7 @@ export default function Pruvodce({ jmeno, znovu }: { jmeno: string; znovu: boole
       setOdp(nova);
       jdiNa(dalsi, 1);
     } catch (e) {
-      setChyba(apiMessage(e, 'Odpovědi se neuložily. Zkontroluj připojení a zkus to znovu.'));
+      setChyba(apiMessage(e, t('Odpovědi se neuložily. Zkontroluj připojení a zkus to znovu.')));
     } finally { setUklada(false); }
   };
 
@@ -269,7 +275,7 @@ export default function Pruvodce({ jmeno, znovu }: { jmeno: string; znovu: boole
       await uloz(nova, 'shrnuti');
       setOdp(nova);
     } catch (e) {
-      setChyba(apiMessage(e, 'Odpovědi se neuložily. Zkontroluj připojení a zkus to znovu.'));
+      setChyba(apiMessage(e, t('Odpovědi se neuložily. Zkontroluj připojení a zkus to znovu.')));
       setUklada(false);
       return;
     }
@@ -293,7 +299,7 @@ export default function Pruvodce({ jmeno, znovu }: { jmeno: string; znovu: boole
       setVysledek(d);
       setSestaveni('hotovo');
     } catch (e) {
-      setChybaSestaveni(apiMessage(e, 'Podnik se nepodařilo sestavit. Zkontroluj připojení a zkus to znovu.'));
+      setChybaSestaveni(apiMessage(e, t('Podnik se nepodařilo sestavit. Zkontroluj připojení a zkus to znovu.')));
       setSestaveni('chyba');
     }
   };
@@ -307,7 +313,7 @@ export default function Pruvodce({ jmeno, znovu }: { jmeno: string; znovu: boole
       await uloz(odp, krok, 'preskoceno');
       router.push('/employer/overview');
     } catch (e) {
-      setChyba(`${apiMessage(e, 'Odpovědi se neuložily.')} Klepneš-li na Dokončit později ještě jednou, odejdeš i bez uložení.`);
+      setChyba(t('{chyba} Klepneš-li na Dokončit později ještě jednou, odejdeš i bez uložení.', { chyba: apiMessage(e, t('Odpovědi se neuložily.')) }));
       setSelhaloPozdeji(true);
       setUklada(false);
     }
@@ -320,13 +326,13 @@ export default function Pruvodce({ jmeno, znovu }: { jmeno: string; znovu: boole
         <div className="w-full max-w-sm text-center">
           <div className="mb-4 flex justify-center"><LogoMark size={48} /></div>
           {faze === 'nacitam' ? (
-            <p className="t-meta" role="status" aria-busy="true">Načítám průvodce…</p>
+            <p className="t-meta" role="status" aria-busy="true">{t('Načítám průvodce…')}</p>
           ) : (
             <div>
               <p role="alert" className="note note-danger text-left text-[13px]">{chybaNacteni}</p>
               <div className="mt-4 flex justify-center gap-2">
-                <Button variant="accent" onClick={() => void nacti()}>Zkusit znovu</Button>
-                <Button variant="ghost" onClick={() => router.push('/employer/overview')}>Přejít do aplikace</Button>
+                <Button variant="accent" onClick={() => void nacti()}>{t('Zkusit znovu')}</Button>
+                <Button variant="ghost" onClick={() => router.push('/employer/overview')}>{t('Přejít do aplikace')}</Button>
               </div>
             </div>
           )}
@@ -335,7 +341,7 @@ export default function Pruvodce({ jmeno, znovu }: { jmeno: string; znovu: boole
     );
   }
 
-  const { nadpis, pod } = NADPISY[krok](jmeno);
+  const { nadpis, pod } = NADPISY(t)[krok](jmeno);
   const v = vizualKroku(krok, odp, fokus);
   const scenaVidet = v.scena;
   const krokProps: KrokProps = { odp, zmen, info, chybaPole };
@@ -348,7 +354,7 @@ export default function Pruvodce({ jmeno, znovu }: { jmeno: string; znovu: boole
       {jeDesktop && posledniScena && (
         <div hidden={!scenaVidet} data-ukazka-desktop>
           <DemoOkno scena={posledniScena} maxVyska={demoMaxVyska} />
-          <p className="t-meta mt-2 text-center">Ukázka s vymyšlenými daty. Zkus si v ní klepat.</p>
+          <p className="t-meta mt-2 text-center">{t('Ukázka s vymyšlenými daty. Zkus si v ní klepat.')}</p>
         </div>
       )}
       {(!jeDesktop || !scenaVidet) && (
@@ -362,12 +368,12 @@ export default function Pruvodce({ jmeno, znovu }: { jmeno: string; znovu: boole
   const ukazkaTelefon = !jeDesktop && scenaVidet ? (
     <div className="mt-4">
       <Button variant="secondary" size="sm" icon="play" aria-expanded={ukazkaNaTelefonu} onClick={() => setUkazkaNaTelefonu(o => !o)}>
-        {ukazkaNaTelefonu ? 'Skrýt živou ukázku' : 'Ukázat na živo, jak to vypadá'}
+        {ukazkaNaTelefonu ? t('Skrýt živou ukázku') : t('Ukázat na živo, jak to vypadá')}
       </Button>
       {ukazkaNaTelefonu && posledniScena && (
         <div className="mt-3" data-ukazka-telefon>
           <DemoOkno scena={posledniScena} />
-          <p className="t-meta mt-2 text-center">Ukázka s vymyšlenými daty.</p>
+          <p className="t-meta mt-2 text-center">{t('Ukázka s vymyšlenými daty.')}</p>
         </div>
       )}
     </div>
@@ -393,25 +399,25 @@ export default function Pruvodce({ jmeno, znovu }: { jmeno: string; znovu: boole
     <>
       {sestaveni === 'chyba' ? (
         <>
-          <Button variant="ghost" onClick={() => jdiNa('shrnuti', -1)}>Zpět na shrnutí</Button>
+          <Button variant="ghost" onClick={() => jdiNa('shrnuti', -1)}>{t('Zpět na shrnutí')}</Button>
           <span className="flex-1" />
-          <Button variant="accent" className="flex-1 sm:flex-none" onClick={() => void proved(odp)}>Zkusit znovu</Button>
+          <Button variant="accent" className="flex-1 sm:flex-none" onClick={() => void proved(odp)}>{t('Zkusit znovu')}</Button>
         </>
       ) : (
         <>
           <span className="flex-1" />
           <Button variant="accent" className="flex-1 sm:flex-none" disabled={!animaceHotova} aria-busy={!animaceHotova}
-            onClick={() => window.location.assign('/employer/overview')}>Otevřít Přehled</Button>
+            onClick={() => window.location.assign('/employer/overview')}>{t('Otevřít Přehled')}</Button>
         </>
       )}
     </>
   ) : (
     <>
-      {index > 0 && <Button variant="ghost" className="!px-3 sm:!px-5" onClick={zpet} disabled={uklada}>Zpět</Button>}
+      {index > 0 && <Button variant="ghost" className="!px-3 sm:!px-5" onClick={zpet} disabled={uklada}>{t('Zpět')}</Button>}
       <span className="flex-1" />
-      {PRESKOCITELNE.includes(krok) && <Button variant="ghost" className="!px-3 sm:!px-5" onClick={() => void dal(true)} disabled={uklada}>Přeskočit</Button>}
+      {PRESKOCITELNE.includes(krok) && <Button variant="ghost" className="!px-3 sm:!px-5" onClick={() => void dal(true)} disabled={uklada}>{t('Přeskočit')}</Button>}
       <Button variant="accent" type="submit" form={ID_FORMULARE} loading={uklada} className="flex-1 sm:flex-none" iconAfter={krok === 'shrnuti' ? undefined : 'chevronRight'}>
-        {krok === 'vitej' ? 'Začít' : krok === 'shrnuti' ? 'Sestavit podnik' : 'Pokračovat'}
+        {krok === 'vitej' ? t('Začít') : krok === 'shrnuti' ? t('Sestavit podnik') : t('Pokračovat')}
       </Button>
     </>
   );
@@ -427,13 +433,13 @@ export default function Pruvodce({ jmeno, znovu }: { jmeno: string; znovu: boole
         {telo}
         {podminkaSprava}
       </Kulisa>
-      <Modal open={potvrdit} onClose={() => setPotvrdit(false)} size="sm" title="Dokončit později?"
-        subtitle="Co sis vyplnil, se uloží. K průvodci se vrátíš z Přehledu nebo z Nastavení."
+      <Modal open={potvrdit} onClose={() => setPotvrdit(false)} size="sm" title={t('Dokončit později?')}
+        subtitle={t('Co sis vyplnil, se uloží. K průvodci se vrátíš z Přehledu nebo z Nastavení.')}
         footer={<>
-          <Button variant="secondary" onClick={() => setPotvrdit(false)}>Zůstat</Button>
-          <Button variant="primary" onClick={() => void pozdeji()}>Dokončit později</Button>
+          <Button variant="secondary" onClick={() => setPotvrdit(false)}>{t('Zůstat')}</Button>
+          <Button variant="primary" onClick={() => void pozdeji()}>{t('Dokončit později')}</Button>
         </>}>
-        <p className="t-meta">Nic se nezahodí a nic se zatím nezaložilo.</p>
+        <p className="t-meta">{t('Nic se nezahodí a nic se zatím nezaložilo.')}</p>
       </Modal>
     </>
   );

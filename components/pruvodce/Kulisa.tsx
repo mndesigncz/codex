@@ -3,6 +3,7 @@
 import type { ReactNode, RefObject } from 'react';
 import { Button, Card } from '@/components/ui';
 import { LogoMark } from '@/components/Icons';
+import { useT } from '@/lib/i18n/client';
 
 // Rám průvodce: hlavička s postupem, vizuál (fotka nebo živá ukázka) a karta
 // s otázkou. Je to jediná nová „věc" průvodce — kroky se skládají ze
@@ -42,18 +43,19 @@ export default function Kulisa({
   /** Enter v poli nebo tlačítko „Pokračovat" (submit formuláře kroku). */
   naOdeslani: () => void;
 }) {
+  const t = useT('pruvodce');
   return (
     <div className="min-h-[100dvh] pb-6" data-pruvodce data-krok={klic}>
       <header className="mx-auto flex max-w-6xl items-center gap-3 px-4 pb-3 pt-4 sm:gap-4">
         <span className="shrink-0"><LogoMark size={32} /></span>
         <div className="min-w-0 flex-1">
-          <p className="t-label" aria-live="polite" data-krok-x-z-y>Krok {cislo} z {celkem}</p>
-          <div className="pv-postup mt-1.5" role="progressbar" aria-label="Postup nastavením" aria-valuemin={0} aria-valuemax={celkem} aria-valuenow={cislo}
+          <p className="t-label" aria-live="polite" data-krok-x-z-y>{t('Krok {cislo} z {celkem}', { cislo, celkem })}</p>
+          <div className="pv-postup mt-1.5" role="progressbar" aria-label={t('Postup nastavením')} aria-valuemin={0} aria-valuemax={celkem} aria-valuenow={cislo}
             style={{ ['--podil' as string]: cislo / celkem }}>
             <span />
           </div>
         </div>
-        <Button variant="ghost" size="sm" onClick={pozdeji} loading={pozdejiBezi}>Dokončit později</Button>
+        <Button variant="ghost" size="sm" onClick={pozdeji} loading={pozdejiBezi}>{t('Dokončit později')}</Button>
       </header>
 
       <div className="mx-auto grid max-w-6xl gap-5 px-4 lg:grid-cols-12 lg:gap-10">

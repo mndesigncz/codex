@@ -12,25 +12,37 @@
       "common": "strojový",
       "auth": "strojový",
       "klient-host": "strojový",
-      "api": "strojový"
+      "api": "strojový",
+      "pruvodce": "strojový",
+      "spolecne": "strojový",
+      "predplatne": "strojový"
     },
     "de": {
       "common": "strojový",
       "auth": "strojový",
       "klient-host": "strojový",
-      "api": "strojový"
+      "api": "strojový",
+      "pruvodce": "strojový",
+      "spolecne": "strojový",
+      "predplatne": "strojový"
     },
     "sk": {
       "common": "strojový",
       "auth": "strojový",
       "klient-host": "strojový",
-      "api": "strojový"
+      "api": "strojový",
+      "pruvodce": "strojový",
+      "spolecne": "strojový",
+      "predplatne": "strojový"
     },
     "pl": {
       "common": "strojový",
       "auth": "strojový",
       "klient-host": "strojový",
-      "api": "strojový"
+      "api": "strojový",
+      "pruvodce": "strojový",
+      "spolecne": "strojový",
+      "predplatne": "strojový"
     }
   },
   "nepreklada_se": [
