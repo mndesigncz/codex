@@ -5,6 +5,7 @@ import { SessionProvider as NextAuthSessionProvider } from 'next-auth/react';
 import PushManager from '@/components/PushManager';
 import ServiceWorker from '@/components/ServiceWorker';
 import NativeBridge from '@/components/NativeBridge';
+import UlozeniHlaska from '@/components/UlozeniHlaska';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { ProcedureProvider } from '@/components/procedures/ProcedureProvider';
 import FloatingRunner from '@/components/procedures/FloatingRunner';
@@ -22,6 +23,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           {!demo && <ServiceWorker />}
           {!demo && <PushManager />}
           {!demo && <NativeBridge />}
+          <UlozeniHlaska />
           {children}
           <FloatingRunner />
         </ProcedureProvider>

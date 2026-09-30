@@ -17,6 +17,7 @@ import { Button, Card, Field, Input, Segmented, Skeleton, SwitchRow } from '../u
 import { QR_DEFAULT, QR_SHEETS, QR_STYLES, contrast, normalizeQrDesign, type QrDesign } from '@/lib/qrDesign';
 import { okJson } from '@/lib/api';
 import { okText } from '@/lib/api';
+import { otevriNaTisk } from '@/lib/stahni';
 
 /** Barvy, které se na papíře osvědčí. Vlastní odstín jde nastavit vedle. */
 const INKS = ['#16181A', '#3E5406', '#0A5FC4', '#7A2E12', '#5B2A7A', '#0F5C52'];
@@ -92,7 +93,7 @@ export default function QrDesigner({ toast, tables, smiUlozit = true }: { toast:
   };
   const print = (all: boolean) => {
     const qs = all ? 'all=1' : `tableId=${first?.id}`;
-    window.open(`/api/client/admin/tables/qr?${qs}&design=${encodeURIComponent(JSON.stringify(d))}`, '_blank');
+    otevriNaTisk(`/api/client/admin/tables/qr?${qs}&design=${encodeURIComponent(JSON.stringify(d))}`, all ? 'qr-stoly.html' : `qr-stul-${first?.id}.html`);
   };
 
   // Sourozenecké sekce (tahle a Plánek podniku) musí vypadat stejně: dřív

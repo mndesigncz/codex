@@ -16,6 +16,7 @@ import QRCode from 'qrcode';
 import { Icon } from '../Icons';
 import { Button, Card, Chip, Field, Input, Menu, Modal, Segmented, Select, Skeleton, Switch, Toast, Well } from '../ui';
 import { usePlan, ProBadge, UpgradeModal } from '../Pro';
+import { ulozZAdresy, jeObalKlient } from '@/lib/stahni';
 import {
   type ShareLink, type ShareTheme, DEFAULT_THEME, THEME_PRESETS, normalizeTheme,
 } from '@/lib/share';
@@ -272,7 +273,8 @@ export default function ShareSettings() {
           footer={<>
             <Button variant="secondary" onClick={() => setQrFor(null)}>Zavřít</Button>
             {qrData && (
-              <a href={qrData} download="qr-nabidka.png" className="btn btn-primary">
+              <a href={qrData} download="qr-nabidka.png" className="btn btn-primary"
+                onClick={ev => { if (jeObalKlient()) { ev.preventDefault(); void ulozZAdresy(qrData, 'qr-nabidka.png'); } }}>
                 <Icon name="download" size={17} />Stáhnout PNG
               </a>
             )}

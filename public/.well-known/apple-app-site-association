@@ -1,0 +1,28 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["{{TEAM_ID}}.app.managero.client"],
+        "components": [
+          { "/": "/client" },
+          { "/": "/client/*" }
+        ]
+      },
+      {
+        "appIDs": ["{{TEAM_ID}}.app.managero.app"],
+        "components": [
+          { "/": "/employer/*" },
+          { "/": "/employee/*" },
+          { "/": "/kiosk*" },
+          { "/": "/join*" },
+          { "/": "/login" },
+          { "/": "/zapomenute-heslo" },
+          { "/": "/nove-heslo*" }
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["{{TEAM_ID}}.app.managero.app", "{{TEAM_ID}}.app.managero.client"]
+  }
+}

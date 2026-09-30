@@ -100,6 +100,7 @@ function relativeCzech(iso: string): string {
 export default function Settings({ user, initialTab, tabNonce }: Props) {
   const { update } = useSession();
   const { theme, setTheme } = useTheme();
+  const { jeObal, smiPlatby } = useObal();
   const [zvolena, setZvolena] = useState<SectionId>(initialTab ?? 'account');
   // Přepnutí záložky odmontuje editor rolí — u rozepsané role se nejdřív zeptá.
   const straz = useStrazRole();
@@ -240,7 +241,6 @@ export default function Settings({ user, initialTab, tabNonce }: Props) {
   const [prefs, setPrefs] = useState<NotifPrefs>(DEFAULT_PREFS);
   // Push nabízíme jen tam, kde by opravdu fungoval (klíče v buildu + podporující prohlížeč).
   const [pushNativniOdmitnuto, setPushNativniOdmitnuto] = useState(false);
-  const { jeObal, smiPlatby } = useObal();
   const [pushStav, setPushStav] = useState(() => stavPush(PUSH_NAKONFIGUROVAN, true));
   useEffect(() => {
     // V nativním obalu web push neexistuje (WKWebView nemá PushManager); rozhoduje nativní plugin.

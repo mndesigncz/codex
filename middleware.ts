@@ -23,7 +23,7 @@ import { obalZUserAgent, rozhodniObal } from '@/lib/obal';
 // (apple-app-site-association, assetlinks.json) nesmí projít žádným přesměrováním.
 export const config = {
   matcher: [
-    '/', '/login', '/register', '/join', '/zapomenute-heslo', '/nove-heslo', '/s/:path*', '/demo/:path*', '/admin/:path*', '/pozastaveno',
+    '/', '/login', '/register', '/join', '/zapomenute-heslo', '/nove-heslo', '/s/:path*', '/admin/:path*', '/pozastaveno',
     '/api/:path*', '/employer/:path*', '/employee/:path*', '/kiosk/:path*', '/client/:path*',
   ],
 };

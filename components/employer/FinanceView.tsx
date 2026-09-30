@@ -22,6 +22,7 @@ import { useMemo, useState } from 'react';
 import { Icon } from '../Icons';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 import { usePlan, UpgradeModal } from '../Pro';
+import { ulozSoubor, ulozZAdresy, jeObalKlient } from '@/lib/stahni';
 import {
   Button, Card, EmptyState, ErrorState, Field, Input, ListRow, Modal, MonthNav, SearchField, Section,
   Segmented, Select, Skeleton, SwitchRow, Well,
@@ -124,11 +125,8 @@ function ExportDialog({ mesic, onClose }: { mesic: string; onClose: () => void }
       const rows: string[][] = [];
       for (const mo of mesice) rows.push(...radkyCsv(mo, await fetch(urlFinanci(mo)).then(okJson), o, symbol));
       const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(o.sep)).join('\n');
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
-      a.download = mesice.length === 1 ? `finance-${mesice[0]}.csv` : `finance-${mesice[0]}-az-${mesice[mesice.length - 1]}.csv`;
-      a.click();
-      URL.revokeObjectURL(a.href);
+      const nazev = mesice.length === 1 ? `finance-${mesice[0]}.csv` : `finance-${mesice[0]}-az-${mesice[mesice.length - 1]}.csv`;
+      await ulozSoubor(nazev, '﻿' + csv, 'text/csv;charset=utf-8');
       onClose();
     } catch {
       setChyba('Data pro export se nepodařilo načíst. Zkus to znovu.');
@@ -256,7 +254,9 @@ function KnihaVydaju({ mesic }: { mesic: string }) {
       <Modal open={!!detail} onClose={() => setDetail(null)} size="md" title={detail?.label ?? 'Účtenka'}
         subtitle={detail ? `${dlouze(detail.date)} · ${money(detail.amount)}` : undefined}
         footer={detail?.photoUrl ? (
-          <a href={detail.photoUrl} download={`uctenka-${detail.date}.jpg`} className="btn btn-primary">
+          // V obalu `download` z odkazu nic neudělá: fotka jde přes lib/stahni (sdílecí list).
+          <a href={detail.photoUrl} download={`uctenka-${detail.date}.jpg`} className="btn btn-primary"
+            onClick={ev => { if (jeObalKlient()) { ev.preventDefault(); void ulozZAdresy(detail.photoUrl!, `uctenka-${detail.date}.jpg`); } }}>
             <Icon name="download" size={18} /> Stáhnout fotku
           </a>
         ) : undefined}>

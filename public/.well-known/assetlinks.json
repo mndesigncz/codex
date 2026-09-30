@@ -1,0 +1,18 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.managero.app",
+      "sha256_cert_fingerprints": ["{{SHA256}}"]
+    }
+  },
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.managero.client",
+      "sha256_cert_fingerprints": ["{{SHA256}}"]
+    }
+  }
+]
