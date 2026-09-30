@@ -306,10 +306,14 @@ ok('svg: příliš velký soubor vyhodí chybu', threwBig);
   ok('ics: celodenní má DTSTART jako datum', has(cely, 'DTSTART;VALUE=DATE:20261231'));
   ok('ics: a končí dalším dnem, i přes rok', has(cely, 'DTEND;VALUE=DATE:20270101'));
 
-  // Konec před začátkem by kalendář nakreslil pozpátku.
+  // Noční směna přes půlnoc: konec je následující den, jinak by v kalendáři nic neblokovala.
   const pozpatku = buildIcs([{ uid: 'e3', date: '2026-05-05', startTime: '22:00', endTime: '06:00', summary: 'Noční' }], '-//x//CS', NOW);
-  ok('ics: konec před začátkem se vynechá', !pozpatku.includes('DTEND;TZID'));
+  ok('ics: noční směna končí následující den', has(pozpatku, 'DTEND;TZID=Europe/Prague:20260506T060000'));
   ok('ics: začátek zůstane', has(pozpatku, 'DTSTART;TZID=Europe/Prague:20260505T220000'));
+  const silvestr = buildIcs([{ uid: 'e5', date: '2026-12-31', startTime: '20:00', endTime: '02:00', summary: 'Silvestr' }], '-//x//CS', NOW);
+  ok('ics: noční přes konec roku', has(silvestr, 'DTEND;TZID=Europe/Prague:20270101T020000'));
+  const stejne = buildIcs([{ uid: 'e6', date: '2026-05-05', startTime: '08:00', endTime: '08:00', summary: 'Nula' }], '-//x//CS', NOW);
+  ok('ics: konec rovný začátku se vynechá', !stejne.includes('DTEND;TZID'));
 
   // Nepoužitelné datum by jen rozbilo soubor.
   const spatne = buildIcs([{ uid: 'e4', date: 'zítra', summary: 'Nic' }], '-//x//CS', NOW);

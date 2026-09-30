@@ -53,6 +53,10 @@ export default function ({ eq, ok }: Testy) {
   ok('klikKlid rozhoduje přes smiKlepnutiNavigovat', plocha.includes('smiKlepnutiNavigovat('));
   ok('stisk v klidu ukládá cíl stisku i otevřený překryv', /naInteraktivnim: jeInteraktivniCil\(e\.target\), prekryto: jePrekryvOtevreny\(document\)/.test(plocha));
 
+  ok('výměna karty pod fokusem: plocha si pamatuje prvek s fokusem i po jeho odmontování', plocha.includes('posledniFokus') && plocha.includes('!stopa.el.isConnected'));
+  ok('výměna karty pod fokusem: fokus se vrací na nadpis karty a hlásí odečítači', plocha.includes("[data-w-titulek]") && plocha.includes('widget minimalizován') && plocha.includes('widget rozbalen'));
+  ok('obě podoby karty mají nadpis s tabIndex -1 (cíl fokusu)', (kod('components/widgety/Widget.tsx').match(/data-w-titulek=""\s+tabIndex=\{-1\}/g) ?? []).length === 2);
+
   // ---- availability API: automaticky vzniklé směny nejsou plán ----
   const api = kod('app/api/availability/route.ts');
   const dotaz = api.split('\n').find(r => r.includes('COUNT(*)') && r.includes('FROM shifts')) ?? '';

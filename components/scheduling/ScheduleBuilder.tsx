@@ -775,7 +775,10 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
 
   const removeShift = async (id: number) => {
     const res = await fetch(`/api/schedule?id=${id}`, { method: 'DELETE' }).catch(() => null);
-    if (res?.ok) { setShifts((prev) => prev.filter((s) => s.id !== id)); obnovWidgety(); }
+    // Mřížka se hned zbaví směny, ale díry a podobsazení počítá server —
+    // bez znovunačtení (poZmene) by den, který smazáním osiřel, nedostal
+    // červené „Nikdo neotevře“ a legenda by ukazovala starý stav.
+    if (res?.ok) { setShifts((prev) => prev.filter((s) => s.id !== id)); await poZmene(); }
     else setBoardError('Směnu se nepodařilo smazat.');
   };
 
@@ -784,7 +787,8 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
     const res = await fetch(`/api/schedule?month=${month}`, { method: 'DELETE' }).catch(() => null);
     setClearing(false);
     setConfirmClear(false);
-    if (res?.ok) { setShifts([]); obnovWidgety(); }
+    // Znovunačtení srovná i díry a podobsazení (server je počítá z prázdného měsíce).
+    if (res?.ok) { setShifts([]); await poZmene(); }
     else setBoardError('Vymazání měsíce se nepodařilo.');
   };
 
@@ -1167,18 +1171,8 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
   // ---- Export CSV ----
   const exportCsv = () => {
     if (!pro) { setUpgradeFor('Export CSV'); return; }
-    // Středník, ne čárka: český Excel čte čárku jako desetinnou a soubor
-    // oddělený čárkami naveze celý měsíc do jednoho sloupce. Import si poradí
-    // s obojím (`splitLine` níž).
-    const header = 'datum;zaměstnanec;od;do;typ';
-    const lines = shifts
-      .slice()
-      .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime))
-      .map((s) => {
-        const name = /[";\n]/.test(s.employeeName) ? `"${s.employeeName.replace(/"/g, '""')}"` : s.employeeName;
-        return `${s.date};${name};${s.startTime};${s.endTime};${s.type}`;
-      });
-    const csv = [header, ...lines].join('\n');
+    // Tvar souboru řeší lib/rozvrhCsv, ať export a import spolu vždy sedí.
+    const csv = sestavCsv(shifts);
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -1226,58 +1220,9 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
   };
 
   // ---- Import CSV ----
-  const splitLine = (line: string) => {
-    const out: string[] = [];
-    let cur = '';
-    let inQ = false;
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      if (inQ) {
-        if (ch === '"' && line[i + 1] === '"') {
-          cur += '"';
-          i++;
-        } else if (ch === '"') inQ = false;
-        else cur += ch;
-      } else if (ch === '"') inQ = true;
-      else if (ch === ',' || ch === ';') out.push(cur), (cur = '');
-      else cur += ch;
-    }
-    out.push(cur);
-    return out.map((c) => c.trim());
-  };
-
   const handleFile = async (file: File) => {
-    const text = await file.text();
-    const lines = text.replace(/^﻿/, '').split(/\r?\n/).filter((l) => l.trim() !== '');
-    if (lines.length === 0) {
-      setImportPreview({ rows: [], errors: ['Soubor je prázdný.'] });
-      return;
-    }
-    const startIdx = /datum/i.test(lines[0]) ? 1 : 0;
-    const rows: any[] = [];
-    const errors: string[] = [];
-    for (let i = startIdx; i < lines.length; i++) {
-      const cols = splitLine(lines[i]);
-      const [date, who, start, end, type] = cols;
-      if (!date || !who || !start || !end) {
-        errors.push(`Řádek ${i + 1}: neúplný (${lines[i]})`);
-        continue;
-      }
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-        errors.push(`Řádek ${i + 1}: neplatné datum „${date}" (očekává RRRR-MM-DD)`);
-        continue;
-      }
-      const key = who.toLowerCase();
-      const emp = employees.find((e) => e.email.toLowerCase() === key || e.name.toLowerCase() === key);
-      if (!emp) {
-        errors.push(`Řádek ${i + 1}: zaměstnanec „${who}" není v týmu`);
-        continue;
-      }
-      const normType =
-        type && ['morning', 'afternoon', 'flexible'].includes(type.toLowerCase()) ? type.toLowerCase() : 'flexible';
-      rows.push({ employeeId: emp.id, employeeName: emp.name, date, startTime: start, endTime: end, type: normType });
-    }
-    setImportPreview({ rows, errors });
+    // Na směnu jde zaměstnanec i vedení a export píše obojí — import proto hledá mezi `assignable`.
+    setImportPreview(rozeberCsv(await file.text(), assignable));
   };
 
   const confirmImport = async () => {

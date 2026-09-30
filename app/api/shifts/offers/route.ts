@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
     await notifyUsers(mates, {
       title: '🔄 Volná směna v burze',
       body: `${c.name ?? 'Kolega'} nabízí směnu ${shift.date}. Vezmi si ji, pokud můžeš.`,
-      type: 'shift', category: 'shift', link: '/employee/shifts?view=availability',
+      type: 'shift', category: 'shift', link: '/employee/shifts?view=my-shifts',
     });
   } catch { /* best-effort */ }
 
@@ -116,7 +116,7 @@ export async function PATCH(req: NextRequest) {
       await notifyUser(o.offered_by, {
         title: 'Někdo si bere tvou směnu',
         body: `${c.name ?? 'Kolega'} si chce vzít směnu ${o.date}. Čeká na schválení vedení.`,
-        type: 'shift', category: 'shift', link: '/employee/shifts?view=availability',
+        type: 'shift', category: 'shift', link: '/employee/shifts?view=my-shifts',
       });
       // Kdo smí výměny schvalovat (kolo 67) — podle členství, ať schválení
       // nečeká na vedoucího přepnutého jinam.
@@ -136,7 +136,7 @@ export async function PATCH(req: NextRequest) {
     if (o.status === 'approved') return NextResponse.json({ error: 'Schválenou výměnu nelze zrušit.' }, { status: 400 });
     await sql`UPDATE shift_offers SET status = 'cancelled' WHERE id = ${id}`;
     if (o.claimed_by) {
-      try { await notifyUser(o.claimed_by, { title: 'Nabídka stažena', body: `Kolega stáhl směnu ${o.date} z burzy.`, type: 'shift', category: 'shift', link: '/employee/shifts?view=availability' }); } catch {}
+      try { await notifyUser(o.claimed_by, { title: 'Nabídka stažena', body: `Kolega stáhl směnu ${o.date} z burzy.`, type: 'shift', category: 'shift', link: '/employee/shifts?view=my-shifts' }); } catch {}
     }
     return NextResponse.json({ ok: true });
   }
@@ -147,7 +147,7 @@ export async function PATCH(req: NextRequest) {
 
     if (action === 'reject') {
       await sql`UPDATE shift_offers SET status = 'open', claimed_by = NULL WHERE id = ${id}`;
-      try { await notifyUser(o.claimed_by, { title: 'Výměna zamítnuta', body: `Vedení zamítlo převzetí směny ${o.date}.`, type: 'shift', category: 'shift', link: '/employee/shifts?view=availability' }); } catch {}
+      try { await notifyUser(o.claimed_by, { title: 'Výměna zamítnuta', body: `Vedení zamítlo převzetí směny ${o.date}.`, type: 'shift', category: 'shift', link: '/employee/shifts?view=my-shifts' }); } catch {}
       return NextResponse.json({ ok: true });
     }
 
@@ -155,8 +155,8 @@ export async function PATCH(req: NextRequest) {
     await sql`UPDATE shifts SET employee_id = ${o.claimed_by} WHERE id = ${o.shift_id} AND team_id = ${c.teamId}`;
     await sql`UPDATE shift_offers SET status = 'approved' WHERE id = ${id}`;
     try {
-      await notifyUser(o.claimed_by, { title: '✅ Směna je tvoje', body: `Vedení schválilo převzetí směny ${o.date}.`, type: 'shift', category: 'shift', link: '/employee/shifts?view=availability' });
-      await notifyUser(o.offered_by, { title: 'Směna předána', body: `Tvá směna ${o.date} byla předána kolegovi.`, type: 'shift', category: 'shift', link: '/employee/shifts?view=availability' });
+      await notifyUser(o.claimed_by, { title: '✅ Směna je tvoje', body: `Vedení schválilo převzetí směny ${o.date}.`, type: 'shift', category: 'shift', link: '/employee/shifts?view=my-shifts' });
+      await notifyUser(o.offered_by, { title: 'Směna předána', body: `Tvá směna ${o.date} byla předána kolegovi.`, type: 'shift', category: 'shift', link: '/employee/shifts?view=my-shifts' });
     } catch { /* best-effort */ }
     return NextResponse.json({ ok: true });
   }
