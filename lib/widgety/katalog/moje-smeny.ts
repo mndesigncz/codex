@@ -21,6 +21,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     opravneni: { vse: [], nektere: [] },
     tarif: 'zdarma',
     kostra: { S: 'text', M: 'text' },
+    cil: { pohled: 'my-shifts' },
     stav: 'hotovo',
   },
   // Data: GET /api/shifts?employeeId=<já>
@@ -37,6 +38,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['vedeni.moje_smeny', 'zamestnanec.moje_smeny'],
     opravneni: { vse: [], nektere: [] },
     tarif: 'zdarma',
+    cil: { pohled: 'my-shifts' },
     stav: 'hotovo',
   },
   // Data: GET /api/shifts?employeeId=<já> → [{…, rating}] — hodnocení vlastních směn vrací od kola 69
@@ -54,6 +56,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['vedeni.moje_smeny', 'zamestnanec.moje_smeny'],
     opravneni: { vse: [], nektere: [] },
     tarif: 'zdarma',
+    cil: { pohled: 'my-shifts' },
     stav: 'hotovo',
   },
   // Data: GET /api/timeoff?mine=1 → requests[] (vždy jen vlastní, i vedení s volno.zobrazit)
@@ -70,6 +73,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['vedeni.moje_smeny', 'zamestnanec.moje_smeny', 'zamestnanec.dostupnost'],
     opravneni: { vse: [], nektere: [] },
     tarif: 'zdarma',
+    cil: { pohled: 'my-shifts' },
     stav: 'hotovo',
   },
 ];

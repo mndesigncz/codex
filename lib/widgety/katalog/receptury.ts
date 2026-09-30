@@ -19,6 +19,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['vedeni.receptury'],
     opravneni: { vse: ['receptury.zobrazit'], nektere: [] },
     tarif: 'max',
+    cil: { pohled: 'recipes' },
     stav: 'hotovo',
   },
   // Data: GET /api/pos/products → unmapped[{productId,productName,soldCount}]
@@ -35,6 +36,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['vedeni.sklad', 'vedeni.receptury'],
     opravneni: { vse: ['receptury.zobrazit'], nektere: [], pole: { 'akce:doplnit_recepturu': 'receptury.upravit' } },
     tarif: 'max',
+    cil: { pohled: 'recipes' },
     stav: 'hotovo',
   },
 ];

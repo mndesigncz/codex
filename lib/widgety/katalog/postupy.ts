@@ -36,6 +36,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
       pole: { 'akce:spustit': 'postupy.spoustet' },
     },
     tarif: 'zdarma',
+    cil: { pohled: 'procedures' },
     stav: 'hotovo',
   },
   // Data: GET /api/procedures/runs →
@@ -62,6 +63,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: '5',
       },
     ],
+    cil: { pohled: 'procedures' },
     stav: 'hotovo',
   },
   // Data: GET /api/procedures/runs → runs[{skipped_items,skip_reasons,procedure_name,user_name}]
@@ -87,6 +89,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: '7_dni',
       },
     ],
+    cil: { pohled: 'procedures' },
     stav: 'hotovo',
   },
   // Data: GET /api/procedures → procedures[{id,name,icon,color}]; GET /api/procedures/runs (poslední dokončení)
@@ -118,6 +121,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['vedeni.postupy'],
     opravneni: { vse: ['postupy.schvalovat'], nektere: [] },
     tarif: 'zdarma',
+    cil: { pohled: 'procedures' },
     stav: 'hotovo',
   },
   // Data: GET /api/procedures → procedures[{remindAt,remindDays,remindAnchor}], openingToday, hasShiftToday
@@ -133,6 +137,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['vedeni.postupy', 'zamestnanec.postupy'],
     opravneni: { vse: ['postupy.zobrazit'], nektere: [] },
     tarif: 'zdarma',
+    cil: { pohled: 'procedures' },
     stav: 'hotovo',
   },
 ];

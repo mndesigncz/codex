@@ -33,7 +33,7 @@ import dynamic from 'next/dynamic';
 import { Button, Chip, ListRow, Menu, Modal, MonthNav, Stat, StatRow, posunMesic } from '../../ui';
 import { Icon } from '../../Icons';
 import type { KomponentaWidgetu, Navigace, WidgetProps } from '@/lib/widgety/typy';
-import { Widget, type StavNacteni } from '../Widget';
+import { Widget, useVyrizeno, type StavNacteni } from '../Widget';
 import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
 import { useNavigace, useSmi } from '../NavigaceKontext';
 import { useOpravneni } from '../../role/useOpravneni';
@@ -352,6 +352,10 @@ function KeSchvaleni({ velikost, nahled }: WidgetProps) {
   const [mazat, setMazat] = useState<RadekUzaverky | null>(null);
   const [chyba, setChyba] = useState<string | null>(null);
   const cekaji = useMemo(() => keSchvaleni(data.data?.radky ?? []), [data.data]);
+
+  // Prázdná fronta = vyřízeno: plocha widget v klidu minimalizuje (kolo 71).
+  // Hook musí běžet před podmíněným návratem, jinak by se rozjelo pořadí hooků.
+  useVyrizeno(ok && data.data != null && cekaji.length === 0, 'Nic nečeká na schválení');
 
   if (!ok && !ceka) return <Widget prazdno={null} />;
 

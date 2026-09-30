@@ -32,6 +32,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'tento',
       },
     ],
+    cil: { pohled: 'org' },
     stav: 'hotovo',
   },
 ];

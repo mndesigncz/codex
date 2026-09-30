@@ -31,6 +31,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     tarif: 'zdarma',
     nastaveni: [{ klic: 'dnes', nazev: 'Počítat i dnešek', typ: 'prepinac', vychozi: false }],
     kostra: { S: 'cislo', M: 'seznam', L: 'seznam' },
+    cil: { pohled: 'reports' },
     stav: 'hotovo',
   },
   // Data: GET /api/closings → closings[approved=false && !covered_by]{author_name,date,…}; rozdíl: lib/closing
@@ -52,6 +53,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     },
     tarif: 'zdarma',
     kostra: { S: 'cislo', M: 'seznam' },
+    cil: { pohled: 'reports' },
     stav: 'hotovo',
   },
   // Data: GET /api/closings →
@@ -97,6 +99,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
       },
     ],
     kostra: { S: 'cislo', M: 'cislo', L: 'cislo' },
+    cil: { pohled: 'reports' },
     stav: 'hotovo',
   },
   // Data: GET /api/closings → closings[] → lib/closing cashDifference() po uzávěrce (ne covered_by); měsíc
@@ -137,6 +140,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
       },
     ],
     kostra: { S: 'cislo', M: 'cislo' },
+    cil: { pohled: 'reports' },
     stav: 'hotovo',
   },
   // Data: GET /api/closings → closings[] (součet cash_revenue+card_revenue po dnech)
@@ -153,6 +157,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     opravneni: { vse: ['uzaverky.zobrazit_vse', 'finance.trzby'], nektere: [] },
     tarif: 'pro',
     kostra: { M: 'cislo', L: 'cislo' },
+    cil: { pohled: 'reports' },
     stav: 'hotovo',
   },
   // Data: doporučený zdroj: GET /api/finance?month → summary{revenue,purchases,wagesWorked,wagesCash,gross};
@@ -182,6 +187,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
       },
     ],
     kostra: { M: 'cislo', L: 'cislo' },
+    cil: { pohled: 'reports' },
     stav: 'hotovo',
   },
   // Data: GET /api/closings/calendar?month[&scope=me] →
@@ -216,6 +222,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
       },
     ],
     kostra: { M: 'graf', L: 'graf' },
+    cil: { pohled: 'reports' },
     stav: 'hotovo',
   },
   // Data: GET /api/closings/handover → handover{todo,runningOut,message}, date, authorName
@@ -231,6 +238,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['zamestnanec.domu', 'vedeni.uzaverky', 'zamestnanec.uzaverka', 'kiosk.smena'],
     opravneni: { vse: ['uzaverky.predavka'], nektere: [] },
     tarif: 'zdarma',
+    cil: { pohled: 'closing' },
     stav: 'hotovo',
   },
   // Data: GET /api/closings → eligibleShifts[{id,date,startTime,endTime}]
@@ -247,6 +255,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     opravneni: { vse: ['uzaverky.vytvorit'], nektere: [] },
     tarif: 'zdarma',
     kostra: { S: 'cislo', M: 'text' },
+    cil: { pohled: 'closing' },
     stav: 'hotovo',
   },
   // Data: GET /api/closings → closings[] (bez uzaverky.zobrazit_vse jen vlastní)
@@ -271,6 +280,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: '3',
       },
     ],
+    cil: { pohled: 'closing' },
     stav: 'hotovo',
   },
 ];

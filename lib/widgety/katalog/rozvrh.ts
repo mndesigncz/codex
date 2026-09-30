@@ -43,6 +43,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'dnes',
       },
     ],
+    cil: { pohled: 'shifts' },
     stav: 'hotovo',
   },
   // Data: GET /api/availability?month → submissions[{employeeId,employeeName,unavailableDates}]; GET /api/teams
@@ -74,6 +75,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'pristi',
       },
     ],
+    cil: { pohled: 'shifts' },
     stav: 'hotovo',
   },
   // Data: GET /api/schedule?month → gaps[{date,from,to,minutes}], understaffed[{date,shiftTypeName}]
@@ -98,6 +100,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'tento',
       },
     ],
+    cil: { pohled: 'shifts' },
     stav: 'hotovo',
   },
   // Data: GET /api/schedule?month → demand{datum:{reservations,guests}}
@@ -122,6 +125,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'tento',
       },
     ],
+    cil: { pohled: 'shifts' },
     stav: 'hotovo',
   },
   // Data: GET /api/timeoff → requests[{employeeName,fromDate,toDate,type,status}]
@@ -141,6 +145,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
       pole: { typ: 'volno.zobrazit', 'akce:schvalit_zamitnout': 'volno.schvalovat' },
     },
     tarif: 'zdarma',
+    cil: { pohled: 'shifts' },
     stav: 'hotovo',
   },
   // Data: GET /api/shifts/offers → offers[{status,date,startTime,endTime,offeredByName,claimedByName}]
@@ -160,6 +165,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
       pole: { 'akce:prevzit_nabidnout': 'rozvrh.burza', 'akce:schvalit': 'rozvrh.vymeny_schvalovat' },
     },
     tarif: 'zdarma',
+    cil: { pohled: 'my-shifts' },
     stav: 'hotovo',
   },
   // Data: GET /api/schedule?month → shifts[{employeeId,employeeName,startTime,endTime}]; limit:
@@ -185,6 +191,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'tento',
       },
     ],
+    cil: { pohled: 'shifts' },
     stav: 'hotovo',
   },
   // Data: GET /api/shifts?team=1&month → enabled, shifts[{employeeName,date,startTime,endTime,typeLabel,isMine}]
@@ -211,6 +218,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'tyden',
       },
     ],
+    cil: { pohled: 'my-shifts' },
     stav: 'hotovo',
   },
   // Data: GET /api/availability?month=<příští> → null = nezadáno
@@ -228,6 +236,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     opravneni: { vse: [], nektere: [] },
     tarif: 'zdarma',
     kostra: { S: 'text', M: 'text' },
+    cil: { pohled: 'availability' },
     stav: 'hotovo',
   },
 ];

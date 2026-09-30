@@ -19,6 +19,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['vedeni.planovani', 'vedeni.napady'],
     opravneni: { vse: ['planovani.zobrazit'], nektere: [] },
     tarif: 'zdarma',
+    cil: { pohled: 'planning' },
     stav: 'hotovo',
   },
   // Data: GET /api/planning → [column=review]{title,description}
@@ -34,6 +35,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['vedeni.planovani'],
     opravneni: { vse: ['planovani.zobrazit'], nektere: [], pole: { 'akce:presunout': 'planovani.upravit' } },
     tarif: 'zdarma',
+    cil: { pohled: 'planning' },
     stav: 'hotovo',
   },
 ];

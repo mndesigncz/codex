@@ -33,6 +33,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         vychozi: 'nove',
       },
     ],
+    cil: { pohled: 'suggestions' },
     stav: 'hotovo',
   },
   // Data: GET /api/suggestions → suggestions[status=new]
@@ -48,6 +49,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['vedeni.planovani', 'vedeni.napady'],
     opravneni: { vse: ['napady.spravovat'], nektere: [] },
     tarif: 'zdarma',
+    cil: { pohled: 'suggestions' },
     stav: 'hotovo',
   },
 ];

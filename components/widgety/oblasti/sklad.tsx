@@ -41,7 +41,7 @@ import { useMoney } from '../../CurrencyProvider';
 import type { ToMake } from '../../inventory/ProductionBoard';
 import NewStockEntry from '../../inventory/NewStockEntry';
 import StocktakeModal from '../../inventory/Stocktake';
-import { Widget, useWidget, type StavNacteni } from '../Widget';
+import { Widget, useVyrizeno, useWidget, type StavNacteni } from '../Widget';
 import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
 import { useNavigace, useSmi } from '../NavigaceKontext';
 
@@ -234,6 +234,14 @@ function Dochazi({ velikost, nastaveni, nahled }: WidgetProps<NastaveniDochazi>)
 
   const kritickych = polozky.filter(p => p.kriticke).length;
   const dochazi = polozky.length - kritickych;
+
+  // Nic nedochází = vyřízeno: plocha widget v klidu minimalizuje (kolo 71).
+  // Prázdný sklad NENÍ vyřízeno (to je nezačaté nastavení podniku) a se
+  // zvolenou kategorií se čeká i na seznam kategorií (bez něj se nefiltruje).
+  useVyrizeno(
+    sklad.data != null && sklad.data.length > 0 && !ztracena && (katId == null || kategorie.data != null) && polozky.length === 0,
+    nastaveni.jen_kriticke ? 'Nic není kriticky málo' : vybrana ? `V kategorii ${vybrana.nazev} je všeho dost` : 'Zásoby jsou v pořádku',
+  );
 
   // Odkaz vede do vybrané kategorie (Sklad ji hledá podle jména), jinak na celý sklad.
   const smiSklad = nav.smiPohled('inventory');

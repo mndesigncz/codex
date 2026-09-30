@@ -78,6 +78,8 @@ export function Nahled({ widget: id, velikost, nastaveni, schematicky = false, l
   const kontext = useMemo<KontextWidgetu>(() => ({
     instance: `nahled-${idZWidgetu(id)}-${velikost.toLowerCase()}`,
     velikost, definice: def, nahled: true, upravy: false, inkoust: false, nahlasSkryti: bezAkce,
+    // Náhled se nikdy neminimalizuje — v galerii má být vidět celý obsah.
+    nahlasVyrizeno: bezAkce, mini: null, rozbal: bezAkce,
   }), [id, velikost, def]);
   const nav = useNavigace();
   // Odkazy se v náhledu kreslí (vidíš, kam widget vede), ale nikam nevedou.

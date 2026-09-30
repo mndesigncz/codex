@@ -76,7 +76,17 @@ export async function GET(req: Request) {
       status: r.status,
       createdAt: r.created_at,
     }));
-    return NextResponse.json({ submissions });
+    // Kolik směn je na měsíc naplánováno: widget Dostupnost týmu z toho
+    // odvozuje „vyřízeno" (všichni zadali a rozvrh na měsíc už existuje).
+    // Zveřejnění rozvrhu se nikde neukládá (publish jen rozešle upozornění),
+    // takže počet směn je nejbližší poctivý ukazatel — a jede s odpovědí,
+    // kterou widget stejně čte, ať neposílá dotaz navíc.
+    let naplanovanoSmen = 0;
+    try {
+      const [n] = await sql`SELECT COUNT(*)::int AS n FROM shifts WHERE team_id = ${ctx.teamId} AND date LIKE ${month + '-%'}`;
+      naplanovanoSmen = Number(n?.n) || 0;
+    } catch { /* bez počtu zůstane 0 — widget se jen neminimalizuje */ }
+    return NextResponse.json({ submissions, naplanovanoSmen });
   }
 
   // employee — own submission

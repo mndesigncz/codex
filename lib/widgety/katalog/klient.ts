@@ -35,6 +35,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     },
     tarif: 'max',
     kostra: { M: 'cislo', L: 'cislo' },
+    cil: { pohled: 'klient:loyalty' },
     stav: 'hotovo',
   },
   // Data: GET /api/client/admin/reservations?range=today →
@@ -60,6 +61,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     },
     tarif: 'max',
     kostra: { S: 'cislo', M: 'seznam', L: 'seznam' },
+    cil: { pohled: 'klient:reservations' },
     stav: 'hotovo',
   },
   // Data: GET /api/client/staff/inbox → orders[], reservations[] (s rezervace.zobrazit), newCount, stuck, pos.
@@ -76,6 +78,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['zamestnanec.domu', 'vedeni.klient', 'vedeni.klient_rezervace', 'kiosk.smena'],
     opravneni: { vse: ['objednavky.zobrazit'], nektere: [], pole: { 'akce:vyridit': 'objednavky.vyridit', 'akce:karta': 'vernost.karta' } },
     tarif: 'max',
+    cil: { pohled: 'klient:orders' },
     stav: 'hotovo',
   },
   // Data: GET /api/client/admin/reviews → reviews[{rating,note,created_at,customer_name}], count, avg, dist[5]
@@ -92,6 +95,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     opravneni: { vse: ['zakaznici.recenze'], nektere: [] },
     tarif: 'max',
     kostra: { S: 'cislo', M: 'seznam' },
+    cil: { pohled: 'klient:overview' },
     stav: 'hotovo',
   },
   // Data: GET /api/client/admin/summary → members, newMembers30; GET /api/client/admin/customers?sort=&limit=5
@@ -122,6 +126,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
       },
     ],
     kostra: { S: 'cislo', M: 'seznam' },
+    cil: { pohled: 'klient:customers' },
     stav: 'hotovo',
   },
   // Data: GET /api/client/admin/loyalty →
@@ -140,6 +145,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     opravneni: { vse: ['vernost.zobrazit'], nektere: [] },
     tarif: 'max',
     kostra: { M: 'cislo', L: 'graf' },
+    cil: { pohled: 'klient:loyalty' },
     stav: 'hotovo',
   },
   // Data: GET /api/client/admin/summary → setup{enabled,menu,tables,tablesPaired,pos,location,loyaltyOn,…}
@@ -160,6 +166,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     },
     tarif: 'max',
     kostra: { M: 'seznam' },
+    cil: { pohled: 'klient:overview' },
     stav: 'hotovo',
   },
 ];
