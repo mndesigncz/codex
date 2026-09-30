@@ -374,15 +374,20 @@ console.log('O6 Reset hesla a O8 souhlas s novinkami');
   const prepinac = q.getByRole('switch', { name: 'Novinky a akce od podniků' });
   tvrdi('souhlas s novinkami: v profilu je vypnutý, dokud ho host nezapne', await prepinac.count() === 1 && (await prepinac.getAttribute('aria-checked')) === 'false');
   await prepinac.click();
-  await dokudVola(patche.map(x => ({ path: 'p', telo: x })), () => patche.length > 0);
+  await dokudVola(patche, () => true);
   await prepinac.click();
-  await dokudVola(patche.map(x => ({ path: 'p', telo: x })), () => patche.length > 1);
+  await dokudVola(patche, (v, i) => i >= 1);
   tvrdi('souhlas s novinkami: zapnutí i odhlášení se uloží (novinky true, pak false)', patche[0]?.novinky === true && patche[1]?.novinky === false, JSON.stringify(patche));
   await ctx2.close();
 }
+/** Počká (nejdéle `ms`), až některý prvek pole splní podmínku; podmínka dostane prvek a jeho pořadí. */
 async function dokudVola(pole, podminka, ms = 4000) {
   const konecCasu = Date.now() + ms;
-  while (Date.now() < konecCasu) { if (pole.some(podminka) || podminka()) return; await new Promise(r => setTimeout(r, 60)); }
+  while (Date.now() < konecCasu) {
+    if (pole.some((v, i) => podminka(v, i))) return true;
+    await new Promise(r => setTimeout(r, 60));
+  }
+  return false;
 }
 
 // ---------------------------------------------------------------------------
