@@ -48,6 +48,10 @@ export function emaily(domena = VYCHOZI_DOMENA) {
  * skript skončí chybou: výchozí heslo v repu by byl průšvih.
  * `nahodne` je funkce (délka) → řetězec, ať je jádro deterministické v testech.
  */
+/**
+ * @param {{ argv?: string[], env?: Record<string, string | undefined>, nahodne?: (n: number) => string }} vstup
+ * @returns {{ hesla: { provoz: string, zamestnanec: string, host: string }, vygenerovana: boolean }}
+ */
 export function nactiHesla({ argv = [], env = {}, nahodne }) {
   const spolecne = arg(argv, 'heslo') ?? env.RECENZENT_HESLO;
   const z = (role, envKlic) => arg(argv, `heslo-${role}`) ?? env[envKlic] ?? spolecne;
@@ -64,7 +68,7 @@ export function nactiHesla({ argv = [], env = {}, nahodne }) {
     }
     if (!hesloStaci(hesla[role])) throw new Error(`Heslo účtu „${role}“ musí mít aspoň ${MIN_DELKA_HESLA} znaků.`);
   }
-  return { hesla, vygenerovana };
+  return { hesla: /** @type {any} */ (hesla), vygenerovana };
 }
 
 /**
@@ -72,6 +76,7 @@ export function nactiHesla({ argv = [], env = {}, nahodne }) {
  * `--db=<hostitel>` musí přesně odpovídat hostiteli v DATABASE_URL. Tím se nedá spustit
  * naslepo proti té databázi, která zrovna sedí v prostředí (.env.local obvykle míří na produkci).
  */
+/** @param {{ url?: string, argv?: string[] }} vstup */
 export function kontrolaDatabaze({ url, argv = [] }) {
   if (!url) throw new Error('Chybí DATABASE_URL.');
   let host;
@@ -99,6 +104,10 @@ export function dnyDopredu(dnes, n = 14) {
  * Naplní demo podnik. `db` musí umět:
  *   upsert(tabulka, klic, hodnoty, jenPriVytvoreni?) → id   (najde podle klíče, jinak vloží)
  * `hash(heslo)` vrací bcrypt otisk, `dnes` je den (RRRR-MM-DD), `kod()` náhodný kód týmu a karty.
+ */
+/**
+ * @param {{ upsert: (tabulka: string, klic: Record<string, unknown>, hodnoty: Record<string, unknown>, jenPriVytvoreni?: Record<string, unknown>) => Promise<number | null> }} db
+ * @param {{ hesla: { provoz: string, zamestnanec: string, host: string }, hash: (h: string) => Promise<string>, dnes: string, domena?: string, kod: (n: number) => string }} volby
  */
 export async function seed(db, { hesla, hash, dnes, domena = VYCHOZI_DOMENA, kod }) {
   const ml = emaily(domena);

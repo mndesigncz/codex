@@ -8,6 +8,10 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { LogoMark } from '../Icons';
 
+// V hostovské části už limetku drží tlačítko Přihlásit v hlavičce (ClientShell): jediná plná
+// limetka na obrazovku, takže hlavní akce formuláře je tam tmavá.
+const hlavniTlacitko = (klient: boolean) => (klient ? 'btn btn-primary' : 'btn btn-accent');
+
 function Obal({ klient, children }: { klient: boolean; children: React.ReactNode }) {
   const karta = <div className="card p-6 sm:p-8 max-w-md w-full">{children}</div>;
   if (klient) return <div className="grid place-items-start md:place-items-center pt-2">{karta}</div>;
@@ -52,7 +56,7 @@ export function ZapomenuteHesloForm({ klient }: { klient: boolean }) {
             <input id="zh-email" type="email" autoComplete="email" inputMode="email" required value={email} onChange={e => setEmail(e.target.value)} className="field" />
           </div>
           {chyba && <p role="alert" className="note note-danger">{chyba}</p>}
-          <button type="submit" disabled={busy || !email.trim()} className="btn btn-accent tap-target disabled:opacity-50">{busy ? 'Posílám…' : 'Poslat odkaz'}</button>
+          <button type="submit" disabled={busy || !email.trim()} className={`${hlavniTlacitko(klient)} tap-target disabled:opacity-50`}>{busy ? 'Posílám…' : 'Poslat odkaz'}</button>
         </form>
       )}
       <p className="mt-5 text-sm text-center"><Link href={login} className="tap-target-sm inline-flex items-center font-semibold underline-offset-2 hover:underline">Zpět na přihlášení</Link></p>
@@ -88,7 +92,7 @@ export function NoveHesloForm({ klient, token }: { klient: boolean; token: strin
       {hotovo ? (
         <>
           <p role="status" className="note note-ok mt-5">Heslo je změněné. Můžete se přihlásit.</p>
-          <Link href={login} className="btn btn-accent tap-target mt-5 w-full">Přihlásit se</Link>
+          <Link href={login} className={`${hlavniTlacitko(klient)} tap-target mt-5 w-full`}>Přihlásit se</Link>
         </>
       ) : (
         <form onSubmit={odeslat} className="mt-5 grid gap-4" noValidate>
@@ -98,7 +102,7 @@ export function NoveHesloForm({ klient, token }: { klient: boolean; token: strin
             <p className="mt-1.5 t-meta">Aspoň 8 znaků.</p>
           </div>
           {chyba && <p role="alert" className="note note-danger">{chyba}</p>}
-          <button type="submit" disabled={busy || !heslo} className="btn btn-accent tap-target disabled:opacity-50">{busy ? 'Ukládám…' : 'Nastavit heslo'}</button>
+          <button type="submit" disabled={busy || !heslo} className={`${hlavniTlacitko(klient)} tap-target disabled:opacity-50`}>{busy ? 'Ukládám…' : 'Nastavit heslo'}</button>
         </form>
       )}
     </Obal>

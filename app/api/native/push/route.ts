@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
 
 const TOKEN = /^[A-Za-z0-9:_.\-]{32,4096}$/;
 
-export function platformaZTela(v: unknown): 'ios' | 'android' | null {
+function platformaZTela(v: unknown): 'ios' | 'android' | null {
   return v === 'ios' || v === 'android' ? v : null;
 }
 
