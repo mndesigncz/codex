@@ -23,7 +23,7 @@ import CategoryStockView from '../inventory/CategoryStockView';
 import { normalizeCategoryPackaging } from '@/lib/packaging';
 import { packagingSourceOf, branchTracksOpen, findById, matcher } from '@/lib/categoryTree';
 import CategoryNav from '../inventory/CategoryNav';
-import { czCount, POLOZKA } from '@/lib/czech';
+import { useT } from '@/lib/i18n/client';
 import { obsahuje } from '@/lib/hledani';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
@@ -69,6 +69,7 @@ function statusOf(i: InventoryItem): 'ok' | 'low' | 'critical' {
 const statusRank = { critical: 0, low: 1, ok: 2 } as const;
 
 export default function InventoryReport({ initialCategory }: Props) {
+  const t = useT('zamestnanec');
   const sklad = useDataWidgetu<InventoryItem[]>(URL_SKLAD, pole);
   const kat = useDataWidgetu<any[]>(URL_KATEGORIE, pole);
   const [items, setItems] = useState<InventoryItem[]>([]);
@@ -133,17 +134,17 @@ export default function InventoryReport({ initialCategory }: Props) {
       const res = await fetch(`/api/inventory/${item.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quantity: newQty, note: 'Úprava stavu zaměstnancem' }),
+        body: JSON.stringify({ quantity: newQty, note: 'Úprava stavu zaměstnancem' }), // i18n-ok: poznámka do historie skladu
       });
       if (!res.ok) throw new Error();
       const updated = await res.json().catch(() => null);
       setItems(prev => prev.map(x => x.id === item.id ? { ...x, ...(updated ?? { quantity: newQty }) } : x));
       setDraft(prev => { const n = { ...prev }; delete n[item.id]; return n; });
-      setZprava({ text: `${item.name}: uloženo ${newQty} ${item.unit}.` });
+      setZprava({ text: t('{nazev}: uloženo {n} {jednotka}.', { nazev: item.name, n: newQty, jednotka: item.unit }) });
       // Docházející zásoby a další widgety na ploše ať vidí nový stav hned.
       obnovDataWidgetu(URL_SKLAD);
     } catch {
-      setZprava({ text: 'Množství se nepodařilo uložit — zkus to znovu.', ton: 'bad' });
+      setZprava({ text: t('Množství se nepodařilo uložit — zkus to znovu.'), ton: 'bad' });
     } finally {
       setSavingId(null);
     }
@@ -164,13 +165,13 @@ export default function InventoryReport({ initialCategory }: Props) {
     try {
       const res = await fetch(`/api/inventory/${item.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ archived, note: archived ? 'Označeno „nevedeme"' : 'Vráceno do skladu' }),
+        body: JSON.stringify({ archived, note: archived ? 'Označeno „nevedeme"' : 'Vráceno do skladu' }), // i18n-ok: poznámka do historie skladu
       });
       if (!res.ok) throw new Error();
       obnovDataWidgetu(URL_SKLAD);
     } catch {
       setItems(prev => prev.map(x => x.id === item.id ? { ...x, archived: !archived } : x));
-      setZprava({ text: 'Změnu se nepodařilo uložit.', ton: 'bad' });
+      setZprava({ text: t('Změnu se nepodařilo uložit.'), ton: 'bad' });
     }
   };
 
@@ -178,8 +179,8 @@ export default function InventoryReport({ initialCategory }: Props) {
     const st = statusOf(item);
     const dirty = isDirty(item);
     const menu: MenuItem[] = [
-      ...(smiZapsat ? [{ label: item.archived ? 'Máme zpátky' : 'Momentálně nevedeme', icon: 'archive', onClick: () => setParked(item, item.archived !== true) }] : []),
-      ...(item.supplierUrl ? [{ label: 'Objednat u dodavatele', icon: 'external', onClick: () => { window.open(item.supplierUrl, '_blank', 'noopener'); } }] : []),
+      ...(smiZapsat ? [{ label: item.archived ? t('Máme zpátky') : t('Momentálně nevedeme'), icon: 'archive', onClick: () => setParked(item, item.archived !== true) }] : []),
+      ...(item.supplierUrl ? [{ label: t('Objednat u dodavatele'), icon: 'external', onClick: () => { window.open(item.supplierUrl, '_blank', 'noopener'); } }] : []),
     ];
     return (
       <li key={item.id}>
@@ -191,29 +192,29 @@ export default function InventoryReport({ initialCategory }: Props) {
           // nevešel a Uložit s menu skončily mimo obrazovku. Barvu stavu nese
           // tečka vlevo, slovo tónovaný text.
           meta={(st !== 'ok' || item.approved === false || item.description || item.category) ? <>
-            {st !== 'ok' && <span className={`font-medium ${st === 'critical' ? 'text-bad-ink' : 'text-wait-ink'}`}>{st === 'critical' ? 'kriticky' : 'dochází'}</span>}
-            {item.approved === false && <span className="font-medium text-wait-ink">{st !== 'ok' ? ' · ' : ''}čeká na potvrzení</span>}
+            {st !== 'ok' && <span className={`font-medium ${st === 'critical' ? 'text-bad-ink' : 'text-wait-ink'}`}>{st === 'critical' ? t('kriticky') : t('dochází')}</span>}
+            {item.approved === false && <span className="font-medium text-wait-ink">{st !== 'ok' ? ' · ' : ''}{t('čeká na potvrzení')}</span>}
             {(item.description || item.category) && <>{st !== 'ok' || item.approved === false ? ' · ' : ''}{item.description || item.category}</>}
           </> : undefined}
           actions={smiZapsat ? <>
             <span className="flex items-center gap-1">
-              <Button variant="secondary" size="sm" iconOnly icon="minus" aria-label={`Ubrat — ${item.name}`} onClick={() => setQty(item.id, qtyOf(item) - 1)} />
+              <Button variant="secondary" size="sm" iconOnly icon="minus" aria-label={t('Ubrat — {nazev}', { nazev: item.name })} onClick={() => setQty(item.id, qtyOf(item) - 1)} />
               <input
                 type="number" inputMode="numeric"
                 // Bez popisku odečítač přečte jen „číslo" a člověk neví, čeho.
-                aria-label={`Množství — ${item.name}${item.unit ? ` (${item.unit})` : ''}`}
+                aria-label={item.unit ? t('Množství — {nazev} ({jednotka})', { nazev: item.name, jednotka: item.unit }) : t('Množství — {nazev}', { nazev: item.name })}
                 value={qtyOf(item)}
                 onChange={e => setQty(item.id, parseInt(e.target.value) || 0)}
                 className="field !w-16 !px-2 text-center tabular-nums"
               />
-              <Button variant="secondary" size="sm" iconOnly icon="plus" aria-label={`Přidat — ${item.name}`} onClick={() => setQty(item.id, qtyOf(item) + 1)} />
+              <Button variant="secondary" size="sm" iconOnly icon="plus" aria-label={t('Přidat — {nazev}', { nazev: item.name })} onClick={() => setQty(item.id, qtyOf(item) + 1)} />
               <span className="text-xs text-black/55 w-6">{item.unit}</span>
             </span>
             {/* Uložit je `primary` jen s rozepsanou změnou — limetka na obrazovce
                 je jedna a v řádku nikdy (DP §3.1). */}
             <Button variant={dirty ? 'primary' : 'secondary'} size="sm" disabled={!dirty} loading={savingId === item.id}
-              onClick={() => save(item)}>Uložit</Button>
-            {menu.length > 0 && <Menu size="sm" label={`Další akce: ${item.name}`} items={menu} />}
+              onClick={() => save(item)}>{t('Uložit')}</Button>
+            {menu.length > 0 && <Menu size="sm" label={t('Další akce: {nazev}', { nazev: item.name })} items={menu} />}
           </> : (
             <span className="text-sm font-medium tabular-nums">{item.quantity} {item.unit}</span>
           )}
@@ -231,7 +232,7 @@ export default function InventoryReport({ initialCategory }: Props) {
             current={openCat}
             onNavigate={setOpenCat}
             countOf={countIn}
-            rootLabel="Zbytky"
+            rootLabel={t('Zbytky')}
           />
           {openCat != null && openPackaging && (() => {
             const inCat = matcher(allCats as any, openCat);
@@ -252,31 +253,31 @@ export default function InventoryReport({ initialCategory }: Props) {
         <div className="px-5 pt-5 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 id="sklad-zam-seznam" className="t-card flex items-center gap-2">
-              {showParked ? 'Momentálně nevedeme' : 'Všechny položky'}
-              {sklad.data && <Chip tone="muted" size="sm">{filtered.length.toLocaleString('cs-CZ')}</Chip>}
+              {showParked ? t('Momentálně nevedeme') : t('Všechny položky')}
+              {sklad.data && <Chip tone="muted" size="sm">{filtered.length}</Chip>}
             </h2>
             {(parkedCount > 0 || showParked) && (
               <button type="button" aria-pressed={showParked} onClick={() => setShowParked(v => !v)}
                 className={`filter-pill tap-target-sm ${showParked ? 'seg-on' : 'seg-off glass'}`}>
-                Nevedeme · {parkedCount}
+                {t('Nevedeme · {n}', { n: parkedCount })}
               </button>
             )}
           </div>
           <SearchField value={search} onChange={setSearch}
-            placeholder="Hledat položku…" ariaLabel="Hledat ve skladu" storageKey="inventory-employee"
-            suggestions={Array.from(new Set(items.map(i => i.category).filter(Boolean))).slice(0, 6).map(c => ({ label: String(c), hint: 'kategorie' }))} />
+            placeholder={t('Hledat položku…')} ariaLabel={t('Hledat ve skladu')} storageKey="inventory-employee"
+            suggestions={Array.from(new Set(items.map(i => i.category).filter(Boolean))).slice(0, 6).map(c => ({ label: String(c), hint: t('kategorie') }))} />
         </div>
         <div className="px-5 pb-2">
           {sklad.error && !sklad.data ? (
-            <ErrorState compact title="Sklad se nenačetl" onRetry={sklad.reload} detail={sklad.error} className="!py-6" />
+            <ErrorState compact title={t('Sklad se nenačetl')} onRetry={sklad.reload} detail={sklad.error} className="!py-6" />
           ) : loading ? (
             <div className="space-y-2 py-3" aria-busy>
               <Skeleton className="h-12" /><Skeleton className="h-12" /><Skeleton className="h-12 w-2/3" />
             </div>
           ) : filtered.length === 0 ? (
             items.length === 0
-              ? <EmptyState compact illustration="sklad" title="Sklad je zatím prázdný" hint="Položky zakládá vedení. Když něco přivezeš, zapiš to widgetem Zapsat novou věc." className="!py-6" />
-              : <EmptyState compact icon="search" title="Nic neodpovídá hledání" hint="Zkus jiné slovo nebo zruš filtr." className="!py-6" />
+              ? <EmptyState compact illustration="sklad" title={t('Sklad je zatím prázdný')} hint={t('Položky zakládá vedení. Když něco přivezeš, zapiš to widgetem Zapsat novou věc.')} className="!py-6" />
+              : <EmptyState compact icon="search" title={t('Nic neodpovídá hledání')} hint={t('Zkus jiné slovo nebo zruš filtr.')} className="!py-6" />
           ) : (
             <ul className="list">{filtered.map(radek)}</ul>
           )}
@@ -290,8 +291,8 @@ export default function InventoryReport({ initialCategory }: Props) {
       <PlochaWidgetu
         stranka="zamestnanec.sklad"
         hlavicka={{
-          title: 'Sklad',
-          subtitle: sklad.data ? `${czCount(items.filter(i => i.archived !== true).length, POLOZKA)} · uprav stav, když něco dochází` : 'Uprav stav, když něco dochází — vedení dostane upozornění.',
+          title: t('Sklad'),
+          subtitle: sklad.data ? t('{n, plural, one {# položka} few {# položky} other {# položek}} · uprav stav, když něco dochází', { n: items.filter(i => i.archived !== true).length }) : t('Uprav stav, když něco dochází — vedení dostane upozornění.'),
           hintId: 'inventoryreport',
         }}
         nastroj={nastroj}

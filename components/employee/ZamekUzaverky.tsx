@@ -16,7 +16,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../Icons';
 import { Button, Card } from '../ui';
 import { okJson, apiMessage } from '@/lib/api';
-import { czCount, type CzNoun } from '@/lib/czech';
+import { useT } from '@/lib/i18n/client';
 import type { PovinnaPolozka, TypPovinne } from '@/lib/povinnePredUzaverkou';
 import { URL_POSTUPY, vyberPostupy, jeSchvaleny } from '@/lib/postupyPrehled';
 import { vyberUkoly, type Ukol } from '@/lib/ukolyPrehled';
@@ -45,7 +45,7 @@ export interface StavZamku {
 /** Nečekaný tvar je chyba (formulář pak nezamyká), ne „nic nechybí". */
 export function vyberStavZamku(raw: any): StavZamku {
   if (!raw || typeof raw !== 'object' || !Array.isArray(raw.vsechny) || !Array.isArray(raw.polozky)) {
-    throw new Error('Povinné věci přišly v nečekaném tvaru.');
+    throw new Error('Povinné věci přišly v nečekaném tvaru.'); // i18n-ok: technická hláška
   }
   const vsechny = raw.vsechny as PovinnaPolozka[];
   return {
@@ -85,13 +85,7 @@ export function stavZOdmitnuti(predtim: StavZamku | null, chybi: PovinnaPolozka[
   };
 }
 
-export const VEC: CzNoun = { one: 'věc', few: 'věci', many: 'věcí' };
-
-const SKUPINY: { typ: TypPovinne; nadpis: string }[] = [
-  { typ: 'postup', nadpis: 'Postupy' },
-  { typ: 'ukol', nadpis: 'Úkoly' },
-  { typ: 'navod', nadpis: 'Návody' },
-];
+const SKUPINY: TypPovinne[] = ['postup', 'ukol', 'navod'];
 
 const ikonaPolozky = (p: PovinnaPolozka) =>
   p.typ === 'postup' ? (p.ikona || 'clipboard') : p.typ === 'ukol' ? 'calendarCheck' : 'book';
@@ -113,6 +107,7 @@ export function ZamekUzaverky({ stav, actingAs, naTabletu = false, proKoho, onZm
   /** Roste, když někdo zkusil odeslat zamčenou uzávěrku — zámek se ukáže a zazvoní. */
   pulz: number;
 }) {
+  const t = useT('zamestnanec');
   const nav = useNavigace();
   const smi = useSmi();
   const { active, startRun, starting } = useProcedures();
@@ -137,9 +132,9 @@ export function ZamekUzaverky({ stav, actingAs, naTabletu = false, proKoho, onZm
   const aktivniId = active?.id ?? null;
   useEffect(() => {
     if (bezelo.current !== null && aktivniId === null) {
-      const t = setTimeout(onZmena, 500);
+      const casovac = setTimeout(onZmena, 500);
       bezelo.current = aktivniId;
-      return () => clearTimeout(t);
+      return () => clearTimeout(casovac);
     }
     bezelo.current = aktivniId;
   }, [aktivniId, onZmena]);
@@ -172,7 +167,7 @@ export function ZamekUzaverky({ stav, actingAs, naTabletu = false, proKoho, onZm
     return (
       <p className={`note note-ok text-sm flex items-center gap-2 ${praveOdemceno ? 'rise-in' : ''}`} role="status">
         <Icon name="check" size={17} className="shrink-0" motion={praveOdemceno ? 'pop' : undefined} />
-        Vše povinné je hotové — uzávěrka je odemčená.
+        {t('Vše povinné je hotové — uzávěrka je odemčená.')}
       </p>
     );
   }
@@ -239,22 +234,22 @@ export function ZamekUzaverky({ stav, actingAs, naTabletu = false, proKoho, onZm
       obnovDataWidgetu('/api/tasks');
       onZmena();
     } catch (e) {
-      setChyba(apiMessage(e, 'Úkol se nepodařilo odškrtnout.'));
+      setChyba(apiMessage(e, t('Úkol se nepodařilo odškrtnout.')));
     }
     setOdskrtavam(null);
   };
 
   const napoveda = (p: PovinnaPolozka): string | null => {
     if (p.typ === 'postup') {
-      if (bezi(p)) return 'Běží — dokonči ho v okně postupu.';
-      if (spustitelny(p) && !jinyBezi(p)) return 'Klepnutím spustíš tady.';
-      if (jinyBezi(p) && active) return `Nejdřív dokonči běžící postup ${active.name}.`;
-      return 'Otevře se v Postupech.';
+      if (bezi(p)) return t('Běží — dokonči ho v okně postupu.');
+      if (spustitelny(p) && !jinyBezi(p)) return t('Klepnutím spustíš tady.');
+      if (jinyBezi(p) && active) return t('Nejdřív dokonči běžící postup {nazev}.', { nazev: active.name });
+      return t('Otevře se v Postupech.');
     }
-    if (cteniZaJinehoBezTabletu(p)) return 'Přečtení potvrdí ten, za koho zavíráš — na tabletu nebo ve svém účtu.';
-    if (cizi(p)) return `Čeká na: ${p.kdo || 'kolegu'} — odškrtne ho ve svém účtu.`;
-    if (p.typ === 'ukol') return p.kdo ? `Pro: ${p.kdo}` : null;
-    return actingAs != null ? 'Potvrď, že návod přečetl ten, za koho zavíráš.' : 'Přečti a potvrď, že máš přečteno.';
+    if (cteniZaJinehoBezTabletu(p)) return t('Přečtení potvrdí ten, za koho zavíráš — na tabletu nebo ve svém účtu.');
+    if (cizi(p)) return t('Čeká na: {kdo} — odškrtne ho ve svém účtu.', { kdo: p.kdo || t('kolegu') });
+    if (p.typ === 'ukol') return p.kdo ? t('Pro: {kdo}', { kdo: p.kdo }) : null;
+    return actingAs != null ? t('Potvrď, že návod přečetl ten, za koho zavíráš.') : t('Přečti a potvrď, že máš přečteno.');
   };
 
   // Hlavní akce jen na to, co jde udělat odsud — ne na kolegův úkol.
@@ -272,26 +267,27 @@ export function ZamekUzaverky({ stav, actingAs, naTabletu = false, proKoho, onZm
           <Icon key={pulz} name="lock" size={24} motion="ring" />
         </span>
         <div className="min-w-0 flex-1">
-          <h2 id="zamek-uzaverky-titulek" className="t-card">Uzávěrka je zamčená</h2>
+          <h2 id="zamek-uzaverky-titulek" className="t-card">{t('Uzávěrka je zamčená')}</h2>
           <p className="t-meta mt-0.5 text-pretty">
             {mojeChybi.length > 0
-              ? <>Nejdřív dokonči {czCount(zbyva, VEC)}. Pak se odemkne sama.</>
-              : <>Zbývá {czCount(zbyva, VEC)} — odsud to nesplníš: čeká na kolegy ze směny nebo na toho, za koho zavíráš. Až to dokončí, odemkne se sama.</>}
+              ? <>{t('Nejdřív dokonči {n, plural, one {# věc} few {# věci} other {# věcí}}. Pak se odemkne sama.', { n: zbyva })}</>
+              : <>{t('Zbývá {n, plural, one {# věc} few {# věci} other {# věcí}} — odsud to nesplníš: čeká na kolegy ze směny nebo na toho, za koho zavíráš. Až to dokončí, odemkne se sama.', { n: zbyva })}</>}
           </p>
         </div>
       </div>
 
       {stav.celkem > 1 && (
         <div className="space-y-1.5">
-          <p className="t-meta tabular-nums">Hotovo {stav.hotovo} z {stav.celkem}</p>
+          <p className="t-meta tabular-nums">{t('Hotovo {hotovo} z {celkem}', { hotovo: stav.hotovo, celkem: stav.celkem })}</p>
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/[0.06]" role="progressbar"
-            aria-valuenow={stav.hotovo} aria-valuemin={0} aria-valuemax={stav.celkem} aria-label="Hotové povinné věci">
+            aria-valuenow={stav.hotovo} aria-valuemin={0} aria-valuemax={stav.celkem} aria-label={t('Hotové povinné věci')}>
             <div className="h-full rounded-full bg-ok transition-[width] duration-500 ease-out" style={{ width: `${pct}%` }} />
           </div>
         </div>
       )}
 
-      {SKUPINY.map(({ typ, nadpis }) => {
+      {SKUPINY.map(typ => {
+        const nadpis = typ === 'postup' ? t('Postupy') : typ === 'ukol' ? t('Úkoly') : t('Návody');
         const vSkupine = stav.vsechny.filter(p => p.typ === typ);
         if (vSkupine.length === 0) return null;
         return (
@@ -310,7 +306,7 @@ export function ZamekUzaverky({ stav, actingAs, naTabletu = false, proKoho, onZm
                   return (
                     <li key={`${p.typ}:${p.id}`} className="list-row !min-h-0 !py-2">
                       {kruh}
-                      <span className="t-meta min-w-0 flex-1 truncate"><span className="sr-only">Hotovo: </span>{p.nazev}</span>
+                      <span className="t-meta min-w-0 flex-1 truncate"><span className="sr-only">{t('Hotovo')}: </span>{p.nazev}</span>
                     </li>
                   );
                 }
@@ -354,8 +350,8 @@ export function ZamekUzaverky({ stav, actingAs, naTabletu = false, proKoho, onZm
                     )}
                     {odskrtnutelny(p) && (
                       <Button size="sm" variant="secondary" icon="check" loading={odskrtavam === p.id}
-                        onClick={() => hotovo(p)} aria-label={`Hotovo: ${p.nazev}`}>
-                        Hotovo
+                        onClick={() => hotovo(p)} aria-label={t('Hotovo: {nazev}', { nazev: p.nazev })}>
+                        {t('Hotovo')}
                       </Button>
                     )}
                   </li>
@@ -373,15 +369,15 @@ export function ZamekUzaverky({ stav, actingAs, naTabletu = false, proKoho, onZm
         <Button ref={hlavniRef} variant="accent" size="lg" block iconAfter="chevronRight"
           loading={starting && !!spustitelny(prvni)} disabled={bezi(prvni)}
           onClick={() => otevri(prvni)} className="!w-full min-w-0">
-          <span className="min-w-0 truncate">Dokončit: {prvni.nazev}</span>
+          <span className="min-w-0 truncate">{t('Dokončit: {nazev}', { nazev: prvni.nazev })}</span>
         </Button>
       )}
       {stav.smiObejit && (
         <p className="t-meta text-pretty">
           {/* Na tabletu jde o právo člověka, za kterého se zavírá (smiObejitPovinne). */}
           {actingAs != null
-            ? 'Podle své role smí tenhle člověk odeslat uzávěrku i tak — při odeslání se ještě zeptáme.'
-            : 'Máš právo odeslat uzávěrku i tak — při odeslání se tě ještě zeptáme.'}
+            ? t('Podle své role smí tenhle člověk odeslat uzávěrku i tak — při odeslání se ještě zeptáme.')
+            : t('Máš právo odeslat uzávěrku i tak — při odeslání se tě ještě zeptáme.')}
         </p>
       )}
     </Card>

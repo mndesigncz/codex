@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
 import { odhlasit } from '@/lib/odhlaseni';
 import { Icon, LogoMark } from '../Icons';
 import PosTick from '../PosTick';
@@ -20,19 +20,22 @@ import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { NavigaceKontext, useHodnotaNavigace } from '../widgety/NavigaceKontext';
 import { otevriPostupPoPrechodu } from '@/lib/otevriPostup';
 import type { PohledNavigace } from '@/lib/widgety/typy';
+import { useJazyk, useT } from '@/lib/i18n/client';
+import { fmtDatum } from '@/lib/i18n/format';
+import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
 import {
   KioskShiftProvider, KioskShiftGate, WhoIsWorking, ActivePersonChip,
   useKioskShift, useNow,
 } from './KioskShiftGate';
 
 const TABS = [
-  { id: 'shift',      label: 'Směna',    icon: 'clock' },
-  { id: 'tasks',      label: 'Úkoly',    icon: 'check' },
-  { id: 'procedures', label: 'Postupy',  icon: 'clipboard' },
-  { id: 'inventory',  label: 'Sklad',    icon: 'box' },
-  { id: 'orders',     label: 'Objednávky', icon: 'cup' },
-  { id: 'closing',    label: 'Uzávěrka', icon: 'trend' },
-  { id: 'guides',     label: 'Návody',   icon: 'book' },
+  { id: 'shift',      icon: 'clock' },
+  { id: 'tasks',      icon: 'check' },
+  { id: 'procedures', icon: 'clipboard' },
+  { id: 'inventory',  icon: 'box' },
+  { id: 'orders',     icon: 'cup' },
+  { id: 'closing',    icon: 'trend' },
+  { id: 'guides',     icon: 'book' },
 ] as const;
 
 type IdZalozky = (typeof TABS)[number]['id'];
@@ -51,16 +54,11 @@ const POHLED_NA_ZALOZKU: Record<string, IdZalozky> = {
   guides: 'guides',
 };
 
-// Seznam pohledů pro widget Odkaz (výběr cíle): jen záložky, kam z plochy
-// vede cesta, pod id, kterému widgety rozumí.
-const POHLEDY_TABLETU: PohledNavigace[] = Object.entries(POHLED_NA_ZALOZKU).map(([pohled, zalozka]) => {
-  const t = TABS.find(x => x.id === zalozka)!;
-  return { id: pohled, label: t.label, icon: t.icon };
-});
 
 interface KioskUser { id?: string | number; name: string; role: string; avatar?: string }
 
 export default function KioskApp({ user }: { user: KioskUser }) {
+  const t = useT('kiosk');
   // The shared tablet is a Pro feature. The gate explains instead of erroring.
   const { pro, loaded } = usePlan();
   const { smiPlatby } = useObal();
@@ -70,10 +68,10 @@ export default function KioskApp({ user }: { user: KioskUser }) {
         <div className="glass-card p-10 max-w-md text-center space-y-3">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#C8F542]/15 text-[#5B7A08]"><Icon name="lock" size={28} /></div>
           <div className="flex items-center justify-center gap-2">
-            <h1 className="text-xl font-bold tracking-tight text-[#16181A]">Kiosk režim</h1>
+            <h1 className="text-xl font-bold tracking-tight text-[#16181A]">{t('Kiosk režim')}</h1>
             <ProBadge />
           </div>
-          <p className="text-sm text-black/55">Sdílený tablet na prodejně — docházka, úkoly, sklad a uzávěrky pro celý tým — {smiPlatby ? 'patří do plánu Pro. Zapíná se v Nastavení → Předplatné v účtu vedení.' : 'tarif vašeho podniku nezahrnuje.'}</p>
+          <p className="text-sm text-black/55">{smiPlatby ? t('Sdílený tablet na prodejně — docházka, úkoly, sklad a uzávěrky pro celý tým — patří do plánu Pro. Zapíná se v Nastavení → Předplatné v účtu vedení.') : t('Sdílený tablet na prodejně — docházka, úkoly, sklad a uzávěrky pro celý tým — tarif vašeho podniku nezahrnuje.')}</p>
         </div>
       </div>
     );
@@ -88,6 +86,26 @@ export default function KioskApp({ user }: { user: KioskUser }) {
 }
 
 function KioskShell({ user }: { user: KioskUser }) {
+  const t = useT('kiosk');
+  const { jazyk } = useJazyk();
+  const nazevZalozky = (id: IdZalozky): string => {
+    switch (id) {
+      case 'shift': return t('Směna');
+      case 'tasks': return t('Úkoly');
+      case 'procedures': return t('Postupy');
+      case 'inventory': return t('Sklad');
+      case 'orders': return t('Objednávky');
+      case 'closing': return t('Uzávěrka');
+      default: return t('Návody');
+    }
+  };
+  // Seznam pohledů pro widget Odkaz (výběr cíle): jen záložky, kam z plochy
+  // vede cesta, pod id, kterému widgety rozumí.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const pohledyTabletu: PohledNavigace[] = useMemo(() => Object.entries(POHLED_NA_ZALOZKU).map(([pohled, zalozka]) => {
+    const zal = TABS.find(x => x.id === zalozka)!;
+    return { id: pohled, label: nazevZalozky(zalozka), icon: zal.icon };
+  }), [t]);
   const { active, onShift, selectPerson, requireActive } = useKioskShift();
   const [tab, setTab] = useState<IdZalozky>('shift');
   const [confirmSignOut, setConfirmSignOut] = useState(false);
@@ -153,7 +171,7 @@ function KioskShell({ user }: { user: KioskUser }) {
     setTab(zalozka);
   }, []);
   const smiPohledTabletu = useCallback((pohled: string) => pohled in POHLED_NA_ZALOZKU, []);
-  const navigaceWidgetu = useHodnotaNavigace(navigujZWidgetu, smiPohledTabletu, POHLEDY_TABLETU, []);
+  const navigaceWidgetu = useHodnotaNavigace(navigujZWidgetu, smiPohledTabletu, pohledyTabletu, [pohledyTabletu]);
   // The real kiosk session user — used where the surface is shared/read-only.
   const kioskUser = { id: user.id ?? 0, name: user.name, role: 'kiosk', avatar: user.avatar ?? '📟' } as any;
   // Work surfaces run under the person currently selected on the tablet.
@@ -174,9 +192,10 @@ function KioskShell({ user }: { user: KioskUser }) {
     return () => { document.body.classList.remove('kiosk-surface'); };
   }, []);
 
-  const clock = now ? new Date(now).toLocaleTimeString('cs-CZ', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit' }) : '—:—';
+  const clock = now ? new Date(now).toLocaleTimeString(LOCALE_PRO_JAZYK[jazyk], { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit' }) : '—:—';
   // Datum musí jít stejným pásmem jako hodiny: tablet v UTC by ve 0:30 pražského času ukázal půlnoční hodiny a včerejší datum.
-  const dateStr = now ? new Date(now).toLocaleDateString('cs-CZ', { timeZone: 'Europe/Prague', weekday: 'long', day: 'numeric', month: 'long' }) : '\u00a0';
+  const dateStr = now ? fmtDatum(now, { jazyk, styl: 'denDlouze' }) : '\u00a0';
+  const popisekObjednavek = t('Nové objednávky: {n}', { n: newOrders });
 
   return (
     <NavigaceKontext.Provider value={navigaceWidgetu}>
@@ -185,7 +204,7 @@ function KioskShell({ user }: { user: KioskUser }) {
           a hodiny v hlavičce tabletu. Pro odečítač obrazovky ale obrazovka
           jméno mít musí. Směna má vlastní h1 v hlavičce plochy, tam by
           byl druhý (DP T6: právě jeden h1). */}
-      {tab !== 'shift' && <h1 className="sr-only">Kiosk — {user.name}</h1>}
+      {tab !== 'shift' && <h1 className="sr-only">{t('Kiosk — {jmeno}', { jmeno: user.name })}</h1>}
       {/* Header */}
       {/* Kiosk běží hlavně na tabletu, ale na úzkém displeji se jméno mačkalo
           mezi značku a velké hodiny na 28 px. Identita si vezme celý řádek
@@ -204,7 +223,7 @@ function KioskShell({ user }: { user: KioskUser }) {
           {/* Odhlášení tabletu je pro obsluhu slepá ulička: e-mail ani heslo
               zařízení nikdo z baru nezná, takže jedno ťuknutí znamená tablet
               mimo provoz do příchodu vedení. Proto se ptáme. */}
-          <Button variant="secondary" iconOnly icon="logout" aria-label="Odhlásit tablet" title="Odhlásit tablet"
+          <Button variant="secondary" iconOnly icon="logout" aria-label={t('Odhlásit tablet')} title={t('Odhlásit tablet')}
             className="shrink-0" onClick={() => setConfirmSignOut(true)} />
         </div>
       </header>
@@ -223,12 +242,12 @@ function KioskShell({ user }: { user: KioskUser }) {
               tab === t.id ? 'seg-on' : 'seg-off glass'
             }`}>
             <Icon key={tab === t.id ? 'on' : 'off'} name={t.icon} size={17}
-              className="i-lead" motion={tab === t.id ? 'pop' : undefined} /> {t.label}
+              className="i-lead" motion={tab === t.id ? 'pop' : undefined} /> {nazevZalozky(t.id)}
             {/* Jeden odznak jako v doku a na zvonku (DP §3.20): inkoust
                 s limetkovým číslem, ne ručně limetková pilulka. Na vybrané
                 (inkoustové) záložce odliší odznak prstenec plochy. */}
             {t.id === 'orders' && (
-              <Badge count={newOrders} max={99} className="ml-0.5" label={`Nové objednávky: ${newOrders}`} />
+              <Badge count={newOrders} max={99} className="ml-0.5" label={popisekObjednavek} />
             )}
           </button>
         ))}
@@ -247,10 +266,10 @@ function KioskShell({ user }: { user: KioskUser }) {
                 stranka="kiosk.smena"
                 rezim="jen-cteni"
                 hlavicka={{
-                  title: 'Směna',
+                  title: t('Směna'),
                   subtitle: zamceno
-                    ? 'Tablet je zamčený — widgety se odemknou, jakmile se někdo odpíchne.'
-                    : 'Kdo je na směně a co dnes čeká.',
+                    ? t('Tablet je zamčený — widgety se odemknou, jakmile se někdo odpíchne.')
+                    : t('Kdo je na směně a co dnes čeká.'),
                 }}
                 nastroj={<WhoIsWorkingOrLock />}
               />
@@ -295,14 +314,14 @@ function KioskShell({ user }: { user: KioskUser }) {
       <MessengerDock user={kioskUser} />
 
       <Modal open={confirmSignOut} onClose={() => setConfirmSignOut(false)} size="sm"
-        title="Odhlásit tablet?"
-        subtitle="Zařízení se vrátí na přihlašovací obrazovku a bude potřeba e-mail a heslo tabletového účtu. Odpíchnout se odsud do té doby nepůjde."
+        title={t('Odhlásit tablet?')}
+        subtitle={t('Zařízení se vrátí na přihlašovací obrazovku a bude potřeba e-mail a heslo tabletového účtu. Odpíchnout se odsud do té doby nepůjde.')}
         footer={<>
-          <Button variant="secondary" onClick={() => setConfirmSignOut(false)}>Zrušit</Button>
-          <Button variant="primary" icon="logout" onClick={() => odhlasit({ callbackUrl: '/login' })}>Odhlásit tablet</Button>
+          <Button variant="secondary" onClick={() => setConfirmSignOut(false)}>{t('Zrušit')}</Button>
+          <Button variant="primary" icon="logout" onClick={() => odhlasit({ callbackUrl: '/login' })}>{t('Odhlásit tablet')}</Button>
         </>}>
         <p className="t-meta text-pretty">
-          Tohle není konec směny — na ten je tlačítko u jména nahoře.
+          {t('Tohle není konec směny — na ten je tlačítko u jména nahoře.')}
         </p>
       </Modal>
     </div>
@@ -416,6 +435,7 @@ function ZapisPodJmenem({ children }: { children: (zamceno: boolean) => React.Re
  * Když je na směně jeden člověk, není co splést a tohle se nikdy neukáže.
  */
 function WhoFirst({ children }: { children: React.ReactNode }) {
+  const t = useT('kiosk');
   const { active, onShift, requireActive } = useKioskShift();
   if (active || onShift.length === 0) return <>{children}</>;
   return (
@@ -424,13 +444,13 @@ function WhoFirst({ children }: { children: React.ReactNode }) {
         <div className="mx-auto h-16 w-16 rounded-3xl bg-wait/20 text-wait-ink grid place-items-center">
           <Icon name="user" size={30} />
         </div>
-        <h2 className="t-page mt-5">Kdo teď u tabletu stojí?</h2>
+        <h2 className="t-page mt-5">{t('Kdo teď u tabletu stojí?')}</h2>
         <p className="text-black/50 mt-2.5 max-w-sm mx-auto text-pretty">
-          Na směně je vás víc. Ať se práce zapíše pod správné jméno, ťukni na sebe.
+          {t('Na směně je vás víc. Ať se práce zapíše pod správné jméno, ťukni na sebe.')}
         </p>
         {/* Jediná akce obrazovky → jediná limetka (DP §3.1), velikost lg pro tablet. */}
         <Button variant="accent" size="lg" icon="user" className="mt-7" onClick={() => { void requireActive(); }}>
-          Vybrat sebe
+          {t('Vybrat sebe')}
         </Button>
       </div>
     </div>

@@ -13,6 +13,7 @@ import {
 import { packagingSourceOf, branchTracksOpen, childrenOfId, findById, matcher } from '@/lib/categoryTree';
 import CategoryNav from '../inventory/CategoryNav';
 import { Button } from '../ui';
+import { useT } from '@/lib/i18n/client';
 
 interface Item {
   id: number;
@@ -37,6 +38,7 @@ export default function KioskPackagedStock({ items, categories, onChanged, onFoc
   /** True while a category is open, so the tab can hide everything else. */
   onFocusChange?: (focused: boolean) => void;
 }) {
+  const t = useT('kiosk');
   const [openCat, setOpenCat] = useState<number | null>(null);
   const [sweeping, setSweeping] = useState(false);
   // Parked items step aside but must stay reachable — the same person who said
@@ -107,7 +109,7 @@ export default function KioskPackagedStock({ items, categories, onChanged, onFoc
           countOf={countIn}
           alertOf={alertsIn}
           size="touch"
-          rootLabel="Zbytky"
+          rootLabel={t('Zbytky')}
         />
 
         {(parkedCount > 0 || showParked) && (
@@ -115,7 +117,7 @@ export default function KioskPackagedStock({ items, categories, onChanged, onFoc
             className={`w-full rounded-2xl px-5 py-3 text-sm font-semibold min-h-[48px] transition active:scale-[0.99] ${
               showParked ? 'seg-on' : 'seg-off glass'
             }`}>
-            {showParked ? 'Zpět na to, co máme' : `Co nevedeme (${parkedCount})`}
+            {showParked ? t('Zpět na to, co máme') : t('Co nevedeme ({n})', { n: parkedCount })}
           </button>
         )}
 
@@ -123,14 +125,14 @@ export default function KioskPackagedStock({ items, categories, onChanged, onFoc
           // Jediná plná limetka obrazovky (DP §3.1): stupně škály níž jsou stav, ne akce,
           // a označují se inkoustem jako vybraná pilulka.
           <Button variant="accent" size="lg" icon="play" block className="w-full min-h-[56px]" onClick={() => setSweeping(true)}>
-            Projít vše ({list.length})
+            {t('Projít vše ({n})', { n: list.length })}
           </Button>
         )}
 
         {direct.length === 0 ? (
           subs.length === 0 && (
             <div className="glass-card p-8 text-center text-black/45">
-              {showParked ? 'Tady nic odloženého není.' : 'V této kategorii zatím nic není.'}
+              {showParked ? t('Tady nic odloženého není.') : t('V této kategorii zatím nic není.')}
             </div>
           )
         ) : (
@@ -146,7 +148,7 @@ export default function KioskPackagedStock({ items, categories, onChanged, onFoc
 
   return (
     <section className="space-y-2.5">
-      <p className="t-label">Zápis zbytků</p>
+      <p className="t-label">{t('Zápis zbytků')}</p>
       <CategoryNav
         categories={navCats}
         current={null}
@@ -154,7 +156,7 @@ export default function KioskPackagedStock({ items, categories, onChanged, onFoc
         countOf={countIn}
         alertOf={alertsIn}
         size="touch"
-        rootLabel="Zbytky"
+        rootLabel={t('Zbytky')}
       />
     </section>
   );
@@ -169,7 +171,7 @@ async function save(item: Item, patch: { quantity?: number; openAmount?: number 
   try {
     const res = await fetch(`/api/inventory/${item.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...patch, note: 'Zápis zbytků na tabletu' }),
+      body: JSON.stringify({ ...patch, note: 'Zápis zbytků na tabletu' }), // i18n-ok: poznámka do historie skladu
     });
     return res.ok;
   } catch { return false; }
@@ -179,6 +181,7 @@ async function save(item: Item, patch: { quantity?: number; openAmount?: number 
 function ItemRow({ item, packaging, onChanged }: {
   item: Item; packaging: CategoryPackaging; onChanged: (i: Item) => void;
 }) {
+  const t = useT('kiosk');
   const sized = withSize(item, packaging);
   const size = sized.packageSize;
   const unit = packaging.contentUnit;
@@ -210,7 +213,7 @@ function ItemRow({ item, packaging, onChanged }: {
         </p>
         {/* Víc odložených položek pod sebou = víc limetek; „Máme zpátky" je běžná akce. */}
         <Button variant="secondary" size="lg" icon="check" disabled={busy} className="min-h-[48px]" onClick={() => apply({ archived: false })}>
-          Máme zpátky
+          {t('Máme zpátky')}
         </Button>
       </div>
     );
@@ -221,11 +224,11 @@ function ItemRow({ item, packaging, onChanged }: {
       <div className="glass-card p-4 flex items-center justify-between gap-3 flex-wrap">
         <div className="min-w-0">
           <p className="t-card !text-base truncate">{item.name}</p>
-          <p className="text-sm text-wait-ink mt-1">Chybí velikost balení — doplní ji vedení ve skladu.</p>
+          <p className="text-sm text-wait-ink mt-1">{t('Chybí velikost balení — doplní ji vedení ve skladu.')}</p>
         </div>
         <button onClick={() => apply({ archived: true })} disabled={busy}
           className="inline-flex items-center gap-1.5 rounded-full glass border border-black/10 px-4 py-2.5 text-sm font-semibold text-black/55 min-h-[48px] disabled:opacity-40">
-          <Icon name="warning" size={15} /> Nevedeme
+          <Icon name="warning" size={15} /> {t('Nevedeme')}
         </button>
       </div>
     );
@@ -246,13 +249,13 @@ function ItemRow({ item, packaging, onChanged }: {
           {item.description && <p className="text-xs text-black/50 line-clamp-2">{item.description}</p>}
           <p className="text-sm text-black/45 tabular-nums">
             {formatStock(sized, unit, item.unit)}
-            <span className="text-black/25"> · balení {fmtAmount(size)} {unit}</span>
+            <span className="text-black/25"> · {t('balení')} {fmtAmount(size)} {unit}</span>
           </p>
         </div>
-        {saved && <span className="text-sm font-semibold text-ok-ink shrink-0 flex items-center gap-1" role="status"><Icon name="check" size={15} /> Uloženo</span>}
+        {saved && <span className="text-sm font-semibold text-ok-ink shrink-0 flex items-center gap-1" role="status"><Icon name="check" size={15} /> {t('Uloženo')}</span>}
         {failed && (
           <span className="text-sm font-bold text-bad-ink shrink-0 flex items-center gap-1">
-            <Icon name="warning" size={15} /> Neuloženo
+            <Icon name="warning" size={15} /> {t('Neuloženo')}
           </span>
         )}
       </div>
@@ -268,14 +271,14 @@ function ItemRow({ item, packaging, onChanged }: {
         <button onClick={() => apply({ quantity: item.quantity - 1, openAmount: size })}
           disabled={item.quantity <= 0 || busy}
           className="inline-flex items-center gap-2 rounded-full glass border border-black/10 px-4 py-2.5 text-sm font-semibold text-[#16181A] min-h-[48px] disabled:opacity-40 active:scale-[0.97] transition">
-          <Icon name="plus" size={16} /> Otevřít další balení
+          <Icon name="plus" size={16} /> {t('Otevřít další balení')}
         </button>
         <span className="text-sm text-black/40">
-          Zavřených: <strong className="text-black/60 tabular-nums">{item.quantity}</strong>
+          {t('Zavřených:')} <strong className="text-black/60 tabular-nums">{item.quantity}</strong>
         </span>
         <button onClick={() => apply({ archived: true })} disabled={busy}
           className="inline-flex items-center gap-1.5 rounded-full glass border border-black/10 px-4 py-2.5 text-sm font-semibold text-black/55 min-h-[48px] disabled:opacity-40 active:scale-[0.97] transition">
-          <Icon name="warning" size={15} /> Nevedeme
+          <Icon name="warning" size={15} /> {t('Nevedeme')}
         </button>
       </div>
     </div>
@@ -323,6 +326,7 @@ function SweepMode({ category, packaging, items, onChanged, onDone }: {
   onChanged: (i: Item) => void;
   onDone: () => void;
 }) {
+  const t = useT('kiosk');
   const [idx, setIdx] = useState(0);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(0);
@@ -339,14 +343,14 @@ function SweepMode({ category, packaging, items, onChanged, onDone }: {
           <Icon name="check" size={30} />
         </span>
         <div>
-          <p className="text-xl font-bold tracking-tight text-[#16181A]">Hotovo</p>
+          <p className="text-xl font-bold tracking-tight text-[#16181A]">{t('Hotovo')}</p>
           <p className="text-sm text-black/45 mt-1">
-            Zapsáno {done} z {items.length} v kategorii {category}.
+            {t('Zapsáno {done} z {celkem} v kategorii {kategorie}.', { done, celkem: items.length, kategorie: category })}
           </p>
         </div>
         <button onClick={onDone}
           className="btn btn-primary btn-lg min-h-[48px] active:scale-[0.97] transition">
-          Zpět na seznam
+          {t('Zpět na seznam')}
         </button>
       </section>
     );
@@ -366,7 +370,7 @@ function SweepMode({ category, packaging, items, onChanged, onDone }: {
     if (!ok) {
       // Stay on this item — advancing would hide that nothing was written.
       onChanged(item);
-      setErr('Nepodařilo se uložit — zkus to prosím znovu.');
+      setErr(t('Nepodařilo se uložit — zkus to prosím znovu.'));
       return;
     }
     setErr('');
@@ -382,7 +386,7 @@ function SweepMode({ category, packaging, items, onChanged, onDone }: {
     setBusy(false);
     if (!ok) {
       onChanged(item);
-      setErr('Nepodařilo se uložit — zkus to prosím znovu.');
+      setErr(t('Nepodařilo se uložit — zkus to prosím znovu.'));
       return;
     }
     setErr('');
@@ -395,7 +399,7 @@ function SweepMode({ category, packaging, items, onChanged, onDone }: {
       <div className="flex items-center justify-between gap-3">
         <button onClick={onDone}
           className="inline-flex items-center gap-2 rounded-full glass border border-black/10 px-4 py-2.5 text-sm font-semibold text-[#16181A] min-h-[48px] active:scale-[0.97] transition">
-          <Icon name="chevron" size={16} className="rotate-90" /> Ukončit
+          <Icon name="chevron" size={16} className="rotate-90" /> {t('Ukončit')}
         </button>
         <p className="text-sm font-semibold text-black/45 tabular-nums">{idx + 1} / {items.length}</p>
       </div>
@@ -411,7 +415,7 @@ function SweepMode({ category, packaging, items, onChanged, onDone }: {
           {item.brand && <p className="text-base text-black/45 mt-0.5">{item.brand}</p>}
           {item.description && <p className="text-sm text-black/50 mt-1">{item.description}</p>}
           <p className="text-sm text-black/45 mt-1 tabular-nums">
-            Teď: {formatStock(sized, packaging.contentUnit, item.unit)}
+            {t('Teď:')} {formatStock(sized, packaging.contentUnit, item.unit)}
           </p>
         </div>
 
@@ -423,7 +427,7 @@ function SweepMode({ category, packaging, items, onChanged, onDone }: {
 
         {size <= 0 ? (
           <p className="text-center text-wait-ink text-sm">
-            Chybí velikost balení — tuhle položku zatím zapsat nejde.
+            {t('Chybí velikost balení — tuhle položku zatím zapsat nejde.')}
           </p>
         ) : (
           <StepButtons steps={steps} current={current} unit={packaging.contentUnit} busy={busy}
@@ -433,26 +437,26 @@ function SweepMode({ category, packaging, items, onChanged, onDone }: {
         <div className="flex items-center justify-center gap-2 flex-wrap">
           <button onClick={park} disabled={busy}
             className="inline-flex items-center gap-1.5 rounded-full glass border border-black/10 px-5 py-3 text-sm font-semibold text-black/55 min-h-[48px] disabled:opacity-40 active:scale-[0.97] transition">
-            <Icon name="warning" size={15} /> Nevedeme
+            <Icon name="warning" size={15} /> {t('Nevedeme')}
           </button>
           <button onClick={() => setIdx(i => i + 1)} disabled={busy}
             className="rounded-full glass border border-black/10 px-5 py-3 text-sm font-semibold text-black/55 min-h-[48px] disabled:opacity-40 active:scale-[0.97] transition">
-            Přeskočit
+            {t('Přeskočit')}
           </button>
           {idx > 0 && (
             <button onClick={() => setIdx(i => i - 1)} disabled={busy}
               className="rounded-full glass border border-black/10 px-5 py-3 text-sm font-semibold text-black/55 min-h-[48px] disabled:opacity-40 active:scale-[0.97] transition">
-              Zpět na předchozí
+              {t('Zpět na předchozí')}
             </button>
           )}
         </div>
       </div>
 
       <p className="text-center text-xs text-black/35">
-        Zbývá {items.length - idx - 1} · zapsáno {done}
+        {t('Zbývá {zbyva} · zapsáno {done}', { zbyva: items.length - idx - 1, done })}
         {(() => {
           const eff = size > 0 ? effectivePackages(sized) : item.quantity;
-          return eff <= item.criticalQuantity ? ' · tahle položka dochází' : '';
+          return eff <= item.criticalQuantity ? ` · ${t('tahle položka dochází')}` : '';
         })()}
       </p>
     </section>
