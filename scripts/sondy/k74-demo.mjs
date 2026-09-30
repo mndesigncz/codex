@@ -320,7 +320,7 @@ const bezPretecni = (p) => p.evaluate(() => document.documentElement.scrollWidth
   await p.evaluate(() => window.__okno.postMessage({ typ: 'demo-scena', scena: 'sklad' }, '*'));
   await okno.waitForTimeout(1500);
   const nadpis = (await okno.locator('main').innerText()).slice(0, 200);
-  tvrdi('D8 zprávu z cizího původu ukázka ignoruje (scéna se nezměnila)', /Dobré (ráno|dopoledne|odpoledne|večer)|Přehled/.test(nadpis) && !/16 položek/.test(nadpis), nadpis.slice(0, 80));
+  tvrdi('D8 zprávu z cizího původu ukázka ignoruje (scéna se nezměnila)', /Dobr[éý] (ráno|dopoledne|odpoledne|večer|den)|Přehled/.test(nadpis) && !/16 položek/.test(nadpis), nadpis.slice(0, 80));
   await ctx.close();
   cizi.close();
 }
