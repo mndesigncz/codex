@@ -40,6 +40,18 @@ if (aasa) {
   if (release && /\{\{/.test(JSON.stringify(aasa))) chyby.push('AASA: zbývá zástupné pole {{TEAM_ID}} (--release)');
 }
 
+// Jediný zdroj pravdy je apps/apps.json (linkCesty): commitnutý AASA musí být přesně to, co z něj vygeneruje
+// apps/scripts/well-known.mjs (jen s {{TEAM_ID}} místo skutečného Team ID). Jinak by se cesty iOS a Androidu rozešly.
+if (aasa) {
+  try {
+    const { execFileSync } = await import('node:child_process');
+    const vygenerovano = JSON.parse(execFileSync('node', ['apps/scripts/well-known.mjs', 'aasa', 'AAAAAAAAAA'], { encoding: 'utf8' }).replaceAll('AAAAAAAAAA', '{{TEAM_ID}}'));
+    const ted = JSON.stringify(aasa);
+    if (!release && JSON.stringify(vygenerovano) !== ted && !/\{\{/.test(ted)) { /* po doplnění Team ID se porovnává jen struktura níže */ }
+    else if (JSON.stringify(vygenerovano) !== ted) chyby.push('AASA: public/.well-known/apple-app-site-association neodpovídá apps/apps.json; obnov: node apps/scripts/well-known.mjs aasa AAAAAAAAAA | sed "s/AAAAAAAAAA/{{TEAM_ID}}/g" > public/.well-known/apple-app-site-association');
+  } catch (e) { chyby.push(`AASA: generátor apps/scripts/well-known.mjs selhal (${String(e.message).split('\n')[0]})`); }
+}
+
 const links = json('public/.well-known/assetlinks.json');
 if (links) {
   const balicky = links.map(x => x.target?.package_name);

@@ -64,7 +64,7 @@ nepřijímá push.
 
 ```bash
 cd apps/managero                        # potom client
-npm install
+npm ci
 npm run ikony && npm run pridej-android # cap add android + úpravy
 npm run assety && node ../scripts/po-cap-add.mjs managero android
 cd android && ANDROID_KEYSTORE_PATH=/cesta/managero-upload.jks ANDROID_KEYSTORE_PASSWORD=… ANDROID_KEY_ALIAS=… ANDROID_KEY_PASSWORD=… ./gradlew bundleRelease

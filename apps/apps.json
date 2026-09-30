@@ -24,7 +24,7 @@
       "vstupniUrl": "https://www.managero.app/employer/overview",
       "vstupniCesta": "/employer/overview",
       "urlSchema": "managero",
-      "linkCesty": ["/employer", "/employee", "/kiosk", "/join"],
+      "linkCesty": ["/employer", "/employee", "/kiosk", "/join", "/login", "/zapomenute-heslo", "/nove-heslo"],
       "zarizeni": ["iphone", "ipad"],
       "kategorieApple": ["BUSINESS", "PRODUCTIVITY"],
       "kategoriePlay": "BUSINESS",
