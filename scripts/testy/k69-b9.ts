@@ -74,7 +74,7 @@ export default function ({ eq, ok }: Testy) {
   // ---- KioskShiftGate ----
   const gate = bezKomentaru(precti('components/kiosk/KioskShiftGate.tsx'));
   ok('KioskShiftGate: „Kdo teď pracuje" je karta s .list, ne karty lidí v kartě', /<Card as="section"[\s\S]*?<ul className="list mt-3">/.test(gate) && !gate.includes("'glass-card hover:bg-black/[0.03]'"));
-  ok('KioskShiftGate: kdo se zapisuje = stavový chip, ne limetkový rámeček', gate.includes('<Chip tone="ok" icon="check">Zapisuje se</Chip>') && !gate.includes('ring-[#C8F542]/35'));
+  ok('KioskShiftGate: kdo se zapisuje = stavový chip, ne limetkový rámeček', gate.includes("<Chip tone=\"ok\" icon=\"check\">{t('Zapisuje se')}</Chip>") && !gate.includes('ring-[#C8F542]/35'));
   ok('KioskShiftGate: zamykací obrazovka má h2 (h1 patří obrazovce)', !/<h1\b/.test(gate));
   ok('KioskShiftGate: hlavní akce zamčeného tabletu je Button accent', gate.includes('<Button variant="accent" size="lg" icon="play"'));
   ok('KioskShiftGate: bez ručních štítků verzálkami a „✓" v textu', !/uppercase tracking-\[0\.1[24]em\]/.test(gate) && !gate.includes('zaznamenán ✓'));
@@ -90,9 +90,9 @@ export default function ({ eq, ok }: Testy) {
   ok('chat: nepřečtené přes Badge v seznamu i v doku', chat.includes('<Badge count={conv.unreadCount}') && dock.includes('<Badge count={c.unreadCount}') && dock.includes('<Badge count={totalUnread}'));
   ok('chat: plovoucí tlačítko je inkoustové (chrom-inkoust)', dock.includes('fab-chat chrom-inkoust'));
   ok('chat: bez vlastní animace chatDockIn a stínu 50 % černé', !dock.includes('chatDockIn') && !dock.includes('rgba(0,0,0,0.5)'));
-  ok('ankety: uzavření oknem, ne confirm()', !/\bconfirm\(/.test(polls) && polls.includes('title="Uzavřít anketu?"'));
+  ok('ankety: uzavření oknem, ne confirm()', !/\bconfirm\(/.test(polls) && polls.includes("title={t('Uzavřít anketu?')}"));
   ok('ankety: můj hlas ikonou, ne znakem „●"', !polls.includes('●') && polls.includes('<Icon name="check" size={13}'));
-  ok('ankety: počet hlasů přes czCount', polls.includes('czCount(p.total, HLAS)'));
+  ok('ankety: počet hlasů přes plurál překladače', polls.includes("{n, plural, one {# hlas} few {# hlasy} other {# hlasů}}") && polls.includes('{ n: p.total }'));
 
   // ---- nastavení ----
   const nast = bezKomentaru(precti('components/Settings.tsx'));
@@ -106,7 +106,7 @@ export default function ({ eq, ok }: Testy) {
   ok('Nastavení: statistiky pokladny přes Stat/StatRow', (nast.match(/<Stat label=/g) ?? []).length === 4);
 
   const kset = bezKomentaru(precti('components/KioskSettings.tsx'));
-  ok('Tabletový účet: pole s popiskem (Field), ne jen placeholder', kset.includes('label="E-mail tabletu"'));
+  ok('Tabletový účet: pole s popiskem (Field), ne jen placeholder', kset.includes("label={t('E-mail tabletu')}"));
   ok('Tabletový účet: lidé v .list s Avatar, PIN jako chip', kset.includes('<ul className="list">') && kset.includes('<Chip tone="ok" size="sm" icon="lock">PIN</Chip>') && !kset.includes("?? '👤'"));
 
   const bill = bezKomentaru(precti('components/Billing.tsx'));
@@ -129,11 +129,11 @@ export default function ({ eq, ok }: Testy) {
   ok('Tablet: hlášení přes sdílený Toast, ne ruční limetkový proužek', brana.includes('<Toast ') && !brana.includes('text-[#5B7A08]') && !brana.includes('border-[#C8F542]/40'));
   ok('Tablet: přepínač osoby je MenuPanel s usePopover, aria-expanded a aria-checked', brana.includes('<MenuPanel') && brana.includes('usePopover(open, setOpen')
     && brana.includes('aria-expanded={canSwitch ? open : undefined}') && brana.includes('aria-checked={vybrany}') && !brana.includes("? 'bg-[#C8F542]/20'"));
-  ok('Tablet: PIN bez znaku ⌫, smazání je ikona s aria-label', !brana.includes('⌫') && brana.includes('aria-label="Smazat číslici"'));
+  ok('Tablet: PIN bez znaku ⌫, smazání je ikona s aria-label', !brana.includes('⌫') && brana.includes("aria-label={t('Smazat číslici')}"));
   ok('Tablet: PunchDialog je <Modal>, ne ruční překryv', !brana.includes('modal-overlay') && /export function PunchDialog[\s\S]*<Modal open/.test(brana));
 
   const pollsR = bezKomentaru(precti('components/chat/Polls.tsx'));
-  ok('Anketa: otázka a možnosti mají viditelný popisek (Field), ne jen placeholder', pollsR.includes('label="Otázka"') && pollsR.includes('label={`Možnost ${i + 1}`}') && !pollsR.includes('placeholder="Otázka ankety…"'));
+  ok('Anketa: otázka a možnosti mají viditelný popisek (Field), ne jen placeholder', pollsR.includes("label={t('Otázka')}") && pollsR.includes("label={t('Možnost {n}', { n: i + 1 })}") && !pollsR.includes('placeholder="Otázka ankety…"'));
 
   ok('Nastavení: odpojení pokladny kontroluje res.ok', /method: 'DELETE' \}\)\.catch\(\(\) => null\);\s*if \(!res\?\.ok\)/.test(nast));
 }
