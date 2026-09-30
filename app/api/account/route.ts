@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import bcrypt from 'bcryptjs';
+import { cistyJazyk } from '@/lib/i18n/config';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +29,8 @@ function serialize(u: any) {
     theme: u.theme ?? 'light',
     notifPrefs: { ...DEFAULT_NOTIF_PREFS, ...(u.notif_prefs ?? {}) },
     role: u.role,
+    // Jazyk aplikace; null = podle podniku (sloupec před migrací se tváří jako null).
+    lang: cistyJazyk(u.lang) ?? null,
   };
 }
 
@@ -47,6 +50,7 @@ export async function GET() {
       FROM users WHERE id = ${id}`;
   }
   if (!user) return NextResponse.json({ error: 'Uživatel nenalezen' }, { status: 404 });
+  try { const [l] = await sql`SELECT lang FROM users WHERE id = ${id}`; user.lang = l?.lang ?? null; } catch { /* sloupec ještě není */ }
 
   return NextResponse.json({ user: serialize(user) });
 }
@@ -56,7 +60,7 @@ export async function PATCH(request: Request) {
   if (!id) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 });
 
   const body = await request.json().catch(() => ({}));
-  const { name, avatar, phone, jobTitle, shiftPreference, theme, notifPrefs, currentPassword, newPassword } = body;
+  const { name, avatar, phone, jobTitle, shiftPreference, theme, notifPrefs, currentPassword, newPassword, lang } = body;
 
   // Password change flow
   if (currentPassword !== undefined || newPassword !== undefined) {
@@ -84,6 +88,16 @@ export async function PATCH(request: Request) {
   }
   if (theme !== undefined && theme !== 'light' && theme !== 'dark') {
     return NextResponse.json({ error: 'Neplatný motiv vzhledu.' }, { status: 400 });
+  }
+
+  // Jazyk aplikace (kolo 76): osobní věc účtu jako motiv, žádná brána oprávněním.
+  // Neplatná hodnota se ignoruje; `null` vrací jazyk podniku. Bez sloupce
+  // (před /api/init) se nic neuloží a jazyk zůstane v cookie zařízení.
+  if (lang !== undefined) {
+    try {
+      if (lang === null) await sql`UPDATE users SET lang = NULL WHERE id = ${id}`;
+      else if (cistyJazyk(lang)) await sql`UPDATE users SET lang = ${cistyJazyk(lang)!} WHERE id = ${id}`;
+    } catch { /* column not migrated yet — ignore until /api/init runs */ }
   }
 
   // Notification preferences — merged onto whatever is stored (partial updates ok).
@@ -121,5 +135,6 @@ export async function PATCH(request: Request) {
       FROM users WHERE id = ${id}`;
   }
 
+  try { const [l] = await sql`SELECT lang FROM users WHERE id = ${id}`; updated.lang = l?.lang ?? null; } catch { /* sloupec ještě není */ }
   return NextResponse.json({ ok: true, user: serialize(updated) });
 }

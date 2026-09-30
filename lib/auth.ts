@@ -11,6 +11,7 @@ import { normalizujEmail, poradiKandidatu } from './emailAdresa';
 import { generateJoinCode } from './team';
 import { jeSpravcePodleDb } from './superadminDb';
 import { zajistiClenstvi, clenstviUzivatele, prepniTym } from './tenant';
+import { cistyJazyk } from './i18n/config';
 
 // Self-heal: an employer must always have a team. If theirs is missing
 // (e.g. after a DB issue), recreate/relink it on login so the app never
@@ -135,6 +136,14 @@ export const authOptions: NextAuthOptions = {
         // Správce platformy se rozhodne tady, podle databáze, a jede v tokenu.
         // Klient si token nepřepíše; obnovuje se jen z databáze (níž).
         const superadmin = await jeSpravcePodleDb(user.id);
+        // Jazyk aplikace (kolo 76): zvlášť a defenzivně, sloupec `users.lang`
+        // před migrací není a přihlášení kvůli němu selhat nesmí.
+        let lang: string | undefined;
+        try {
+          const sqlJ = neon(process.env.DATABASE_URL!);
+          const [l] = await sqlJ`SELECT lang FROM users WHERE id = ${user.id}`;
+          lang = cistyJazyk(l?.lang);
+        } catch { /* sloupec ještě není */ }
         return {
           id: String(user.id),
           name: user.name,
@@ -144,6 +153,7 @@ export const authOptions: NextAuthOptions = {
           jobTitle: user.jobTitle ?? 'Barista',
           teamId,
           superadmin,
+          lang,
         } as any;
       },
     }),
@@ -156,6 +166,7 @@ export const authOptions: NextAuthOptions = {
         token.jobTitle = (user as any).jobTitle;
         token.teamId = (user as any).teamId;
         token.superadmin = (user as any).superadmin === true;
+        token.lang = cistyJazyk((user as any).lang);
       }
       // session.update() volá PROHLÍŽEČ. Smí proto obnovit jen to, co je
       // kosmetické — jméno a avatar. Příslušnost k týmu odsud přijímat nelze:
@@ -164,6 +175,8 @@ export const authOptions: NextAuthOptions = {
       if (trigger === 'update' && session?.user) {
         if (session.user.name) token.name = session.user.name;
         if ((session.user as any).avatar) token.avatar = (session.user as any).avatar;
+        // Jazyk je kosmetika jako jméno a avatar; neplatná hodnota se zahodí.
+        if ((session.user as any).lang !== undefined) token.lang = cistyJazyk((session.user as any).lang);
       }
       // Role a tým se berou z databáze při KAŽDÉM čtení relace, ne jen když
       // prohlížeč sám zavolá update(). Token platí 30 dní a asi 68 rout čte
@@ -200,6 +213,7 @@ export const authOptions: NextAuthOptions = {
         // Správce platformy z tokenu — rozhodl se při přihlášení podle databáze
         // (role vedení, e-mail ze seznamu, bez dvojníka). Klient ho nezmění.
         (session.user as any).superadmin = token.superadmin === true;
+        (session.user as any).lang = cistyJazyk(token.lang);
       }
       return session;
     },

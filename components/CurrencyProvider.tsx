@@ -3,6 +3,9 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { DEFAULT_CURRENCY, formatMoney, formatCost, formatPrice, makeMoney, currencySymbol } from '@/lib/money';
 import { okJson } from '@/lib/api';
+import { cistyJazyk, type Jazyk } from '@/lib/i18n/config';
+import { cistaZeme, type Zeme } from '@/lib/i18n/zeme';
+import { normalizujNavKonfig, type NavKonfig } from '@/lib/navigace';
 
 type CurrencyCtx = {
   currency: string;
@@ -16,6 +19,23 @@ type CurrencyCtx = {
   price: (n: number) => string;
   symbol: string;
   loaded: boolean;
+  // Lokalizace podniku (kolo 76). Před migrací sloupců jsou to výchozí hodnoty,
+  // tedy dnešní chování: jazyk podniku čeština, bez země, 24 h, bez vlastní navigace.
+  /** Jazyk podniku (teams.default_lang): výchozí pro nové členy, e-maily dodavatelům a lístek. */
+  defaultLang: Jazyk;
+  country: Zeme | null;
+  /** '24' | '12' */
+  timeFormat: '24' | '12';
+  timezone: string;
+  /** Přizpůsobení navigace (teams.nav_config); null = výchozí. */
+  navConfig: NavKonfig | null;
+  /** Znovu načte nastavení podniku (po uložení v Nastavení týmu). */
+  obnov: () => void;
+};
+
+const LOKALIZACE_VYCHOZI = {
+  defaultLang: 'cs' as Jazyk, country: null as Zeme | null, timeFormat: '24' as '24' | '12',
+  timezone: 'Europe/Prague', navConfig: null as NavKonfig | null, obnov: () => {},
 };
 
 const Ctx = createContext<CurrencyCtx>({
@@ -27,6 +47,7 @@ const Ctx = createContext<CurrencyCtx>({
   price: (n: number) => formatPrice(n),
   symbol: 'Kč',
   loaded: false,
+  ...LOKALIZACE_VYCHOZI,
 });
 
 // Fetches the team's currency/locale once and exposes a bound money() formatter.
@@ -42,7 +63,9 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     price: (n: number) => formatPrice(n),
     symbol: 'Kč',
     loaded: false,
+    ...LOKALIZACE_VYCHOZI,
   });
+  const [nacteni, setNacteni] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,11 +85,17 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
           price: (n: number) => formatPrice(n, currency, locale),
           symbol: currencySymbol(currency, locale),
           loaded: true,
+          defaultLang: cistyJazyk(t.default_lang) ?? 'cs',
+          country: cistaZeme(t.country) ?? null,
+          timeFormat: t.time_format === '12' ? '12' : '24',
+          timezone: typeof t.timezone === 'string' && t.timezone ? t.timezone : 'Europe/Prague',
+          navConfig: normalizujNavKonfig(t.nav_config),
+          obnov: () => setNacteni(n => n + 1),
         });
       } catch { /* keep defaults */ }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [nacteni]);
 
   return <Ctx.Provider value={cfg}>{children}</Ctx.Provider>;
 }

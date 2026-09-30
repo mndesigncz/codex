@@ -92,6 +92,7 @@ const POLE_NASTAVENI: Record<string, string> = {
   payoutFromRegister: 'výplaty z kasy', tipsInDrawer: 'spropitné v kase', laborTargetPct: 'cíl mzdových nákladů',
   levelsConfig: 'úrovně odměn', pointsConfig: 'body odměn', lowStockDefault: 'výchozí nízký stav',
   criticalStockDefault: 'výchozí kritický stav',
+  country: 'země', defaultLang: 'jazyk podniku', timeFormat: 'formát času', timezone: 'časové pásmo', navConfig: 'navigace aplikace',
 };
 
 /** Seznam změněných polí česky: „název, měna“. Neznámé pole se vynechá, ne vypíše syrově. */

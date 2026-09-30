@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { LogoMark } from '@/components/Icons';
 import { TRIAL_DAYS } from '@/lib/plan';
+import JazykMenu from '@/components/ui/JazykMenu';
 
 // Hlavička prodejní stránky.
 //
@@ -102,6 +103,9 @@ export default function LandingHeader() {
           </nav>
 
           <div className="flex items-center gap-1.5 shrink-0">
+            {/* Jen pilulka s globusem. Od 640 px: na telefonu se lišta s logem a dvěma tlačítky
+                nevejde, jazyk se tam volí na přihlášení a registraci (cookie platí všude). */}
+            <span className="hidden sm:block"><JazykMenu /></span>
             <Link href="/login" className="btn btn-ghost btn-sm !px-3 whitespace-nowrap">Přihlásit</Link>
             <Link href="/register" className="btn btn-primary btn-sm whitespace-nowrap">
               <span className="sm:hidden">Vyzkoušet</span>

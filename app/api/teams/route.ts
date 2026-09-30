@@ -9,6 +9,9 @@ import { planInfoOf } from '@/lib/plan';
 import { clenovePodniku } from '@/lib/tenant';
 import { roleClena, pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { roleZTypu } from '@/lib/opravneni';
+import { cistyJazyk } from '@/lib/i18n/config';
+import { cistaZeme, PREDVOLBY_ZEMI } from '@/lib/i18n/zeme';
+import { normalizujNavKonfig } from '@/lib/navigace';
 
 export const dynamic = 'force-dynamic';
 
@@ -113,6 +116,20 @@ export async function GET() {
       };
     } catch { /* columns not migrated yet */ }
 
+    // Lokalizace podniku (kolo 76): jazyk, země, formát času, pásmo, navigace.
+    // Zvlášť a defenzivně: před migrací sloupců se všechno chová jako dřív.
+    let lokalizace: Record<string, unknown> = { default_lang: 'cs', country: null, time_format: '24', timezone: 'Europe/Prague', nav_config: null };
+    try {
+      const [l] = await sql`SELECT country, default_lang, timezone, time_format, nav_config FROM teams WHERE id = ${teamId}`;
+      if (l) lokalizace = {
+        default_lang: cistyJazyk(l.default_lang) ?? 'cs',
+        country: cistaZeme(l.country) ?? null,
+        time_format: l.time_format === '12' ? '12' : '24',
+        timezone: l.timezone || 'Europe/Prague',
+        nav_config: normalizujNavKonfig(l.nav_config),
+      };
+    } catch { /* columns not migrated yet */ }
+
     // Plan & trial — resolved server-side so every client agrees on the label.
     let planRow: any = null;
     try {
@@ -171,7 +188,7 @@ export async function GET() {
     return NextResponse.json({
       planInfo,
       pinnedShare,
-      team: { ...team, pay_daily_cash: payDailyCash, closing_requires_shift: closingRequiresShift, show_team_schedule: showTeamSchedule, payout_from_register: payoutFromRegister, tips_in_drawer: tipsInDrawer, drawer_float: drawerFloat, dashboard_config: dashboardConfig, levels_config: levelsConfig, points_config: pointsConfig, ...biz },
+      team: { ...team, pay_daily_cash: payDailyCash, closing_requires_shift: closingRequiresShift, show_team_schedule: showTeamSchedule, payout_from_register: payoutFromRegister, tips_in_drawer: tipsInDrawer, drawer_float: drawerFloat, dashboard_config: dashboardConfig, levels_config: levelsConfig, points_config: pointsConfig, ...biz, ...lokalizace },
       members,
       isOwner: team?.owner_id === me.id,
     });
@@ -187,6 +204,7 @@ export async function GET() {
 const POLE: Record<string, string> = {
   name: 'podnik.nastaveni', currency: 'podnik.nastaveni', locale: 'podnik.nastaveni', weekStart: 'podnik.nastaveni',
   businessType: 'podnik.nastaveni', dashboardConfig: 'podnik.nastaveni', showTeamSchedule: 'podnik.nastaveni',
+  country: 'podnik.nastaveni', defaultLang: 'podnik.nastaveni', timeFormat: 'podnik.nastaveni', timezone: 'podnik.nastaveni', navConfig: 'podnik.nastaveni',
   regenerateCode: 'tym.pozvat',
   payDailyCash: 'uzaverky.nastaveni', drawerFloat: 'uzaverky.nastaveni', closingRequiresShift: 'uzaverky.nastaveni',
   payoutFromRegister: 'uzaverky.nastaveni', tipsInDrawer: 'uzaverky.nastaveni',
@@ -203,7 +221,8 @@ export async function PATCH(request: Request) {
   const { name, regenerateCode, payDailyCash, closingRequiresShift, payoutFromRegister, tipsInDrawer, dashboardConfig,
           showTeamSchedule,
           levelsConfig, pointsConfig,
-          currency, locale, weekStart, laborTargetPct, lowStockDefault, criticalStockDefault, businessType } = body ?? {};
+          currency, locale, weekStart, laborTargetPct, lowStockDefault, criticalStockDefault, businessType,
+          country, defaultLang, timeFormat, timezone, navConfig } = body ?? {};
 
   const poslane = Object.keys(body ?? {}).filter(k => body[k] !== undefined && k in POLE);
   const chybi = [...new Set(poslane.map(k => POLE[k]))].filter(k => !c.role.opravneni.has(k));
@@ -272,6 +291,29 @@ export async function PATCH(request: Request) {
     if (Number.isFinite(criticalStockDefault)) await sql`UPDATE teams SET critical_stock_default = ${criticalStockDefault} WHERE id = ${team.id}`;
     if (typeof businessType === 'string') await sql`UPDATE teams SET business_type = ${businessType} WHERE id = ${team.id}`;
   } catch { /* columns not migrated yet — ignore until /api/init runs */ }
+
+  // Lokalizace podniku (kolo 76). Každé pole samostatně a defenzivně: před
+  // migrací sloupců se prostě neuloží. Země jen předvyplňuje návrhy, nic nezamyká;
+  // neznámá země se neuloží. Pásmo se přijme jen z předvoleb podporovaných zemí
+  // (všechna leží v CET/CEST jako Praha): jiné pásmo by bez refaktoru času
+  // (plán §9) rozjelo obchodní den, proto ho API odmítne tiše ignorovat.
+  try {
+    if (country === null || country === '') await sql`UPDATE teams SET country = NULL WHERE id = ${team.id}`;
+    else if (cistaZeme(country)) await sql`UPDATE teams SET country = ${cistaZeme(country)!} WHERE id = ${team.id}`;
+    if (cistyJazyk(defaultLang)) await sql`UPDATE teams SET default_lang = ${cistyJazyk(defaultLang)!} WHERE id = ${team.id}`;
+    if (timeFormat === '24' || timeFormat === '12') await sql`UPDATE teams SET time_format = ${timeFormat} WHERE id = ${team.id}`;
+    if (typeof timezone === 'string' && Object.values(PREDVOLBY_ZEMI).some(p => p.pasmo === timezone)) {
+      await sql`UPDATE teams SET timezone = ${timezone} WHERE id = ${team.id}`;
+    }
+  } catch { /* columns not migrated yet — ignore until /api/init runs */ }
+  // Přizpůsobení navigace: jen preference, ne oprávnění (lib/navigace.ts).
+  // Prázdná nebo výchozí konfigurace se uloží jako NULL = dnešní navigace.
+  if (navConfig !== undefined) {
+    try {
+      const k = navConfig === null ? null : normalizujNavKonfig(navConfig);
+      await sql`UPDATE teams SET nav_config = ${k ? JSON.stringify(k) : null}::jsonb WHERE id = ${team.id}`;
+    } catch { /* column not migrated yet */ }
+  }
 
   let joinCode: string | undefined;
   if (regenerateCode) {

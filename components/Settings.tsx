@@ -7,6 +7,8 @@ import Billing from './Billing';
 import { Icon } from './Icons';
 import { EmptyState, Button, Skeleton, PageHeader, Segmented, SwitchRow, Badge, ListRow, Chip, Modal, Stat, StatRow, Label, hintsEnabled, setHintsEnabled, resetHints, dismissedCount } from './ui';
 import { useTheme } from './ThemeProvider';
+import JazykKarta from './JazykKarta';
+import { useT } from '@/lib/i18n/client';
 import TeamManagement from './TeamManagement';
 import { dbTimeDayHM } from '@/lib/pragueTime';
 import { czCount } from '@/lib/czech';
@@ -94,6 +96,7 @@ function relativeCzech(iso: string): string {
 export default function Settings({ user, initialTab, tabNonce }: Props) {
   const { update } = useSession();
   const { theme, setTheme } = useTheme();
+  const t = useT();
   const [zvolena, setZvolena] = useState<SectionId>(initialTab ?? 'account');
   // Přepnutí záložky odmontuje editor rolí — u rozepsané role se nejdřív zeptá.
   const straz = useStrazRole();
@@ -111,7 +114,7 @@ export default function Settings({ user, initialTab, tabNonce }: Props) {
   const { ma } = useOpravneni();
   const sections: { id: SectionId; label: string; icon: string; desc: string }[] = [
     { id: 'account', label: 'Účet', icon: 'settings', desc: 'Profil a osobní údaje' },
-    { id: 'app', label: 'Vzhled', icon: 'sun', desc: 'Světlý/tmavý režim a jazyk' },
+    { id: 'app', label: t('Vzhled'), icon: 'sun', desc: t('Světlý/tmavý režim a jazyk') },
     { id: 'notifications', label: 'Notifikace', icon: 'bell', desc: 'Centrum oznámení' },
     { id: 'security', label: 'Zabezpečení', icon: 'check', desc: 'Heslo' },
     ...(isEmployer && ma('predplatne.zobrazit') ? [{ id: 'billing' as SectionId, label: 'Předplatné', icon: 'award', desc: 'Plán a fakturace' }] : []),
@@ -507,11 +510,11 @@ export default function Settings({ user, initialTab, tabNonce }: Props) {
                   Dřív dvě ruční volby, kde vybraná byla plná limetka. */}
               <section className="card p-6 space-y-4">
                 <div>
-                  <h2 className={cardTitle}>Vzhled</h2>
-                  <p className="t-meta mt-1">Vyberte světlý nebo tmavý motiv aplikace.</p>
+                  <h2 className={cardTitle}>{t('Vzhled')}</h2>
+                  <p className="t-meta mt-1">{t('Vyberte světlý nebo tmavý motiv aplikace.')}</p>
                 </div>
-                <Segmented ariaLabel="Motiv aplikace" value={theme === 'dark' ? 'dark' : 'light'} onChange={id => setTheme(id)}
-                  options={[{ id: 'light', label: 'Světlý', icon: 'sun' }, { id: 'dark', label: 'Tmavý', icon: 'moon' }]} />
+                <Segmented ariaLabel={t('Motiv aplikace')} value={theme === 'dark' ? 'dark' : 'light'} onChange={id => setTheme(id)}
+                  options={[{ id: 'light', label: t('Světlý'), icon: 'sun' }, { id: 'dark', label: t('Tmavý'), icon: 'moon' }]} />
               </section>
 
               {/* Nápovědy: zapnuto/vypnuto je přepínač, ne dvě limetkové volby. */}
@@ -535,15 +538,13 @@ export default function Settings({ user, initialTab, tabNonce }: Props) {
                 )}
               </section>
 
+              {/* Jazyk rozhraní: pět endonymů, vybraný nese fajfka (ne limetka), ukládá se hned. */}
               <section className="card p-6 space-y-4">
                 <div>
-                  <h2 className={cardTitle}>Jazyk</h2>
-                  <p className="t-meta mt-1">Jazyk rozhraní aplikace.</p>
+                  <h2 className={cardTitle}>{t('Jazyk')}</h2>
+                  <p className="t-meta mt-1">{t('Jazyk rozhraní aplikace.')}</p>
                 </div>
-                <ul className="list">
-                  <ListRow title="Čeština" right={<Chip size="sm">Výchozí</Chip>} />
-                </ul>
-                <p className="t-meta">Další jazyky připravujeme.</p>
+                <JazykKarta />
               </section>
             </div>
           ) : section === 'notifications' ? (
