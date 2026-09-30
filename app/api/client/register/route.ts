@@ -20,7 +20,7 @@ export async function POST(request: Request) {
   const gate = await hit(`client-register:${email}`, 5, 15 * 60);
   if (!gate.ok) return NextResponse.json({ error: 'Příliš mnoho pokusů. Zkus to za čtvrt hodiny.' }, { status: 429 });
 
-  const [existing] = await sql`SELECT id FROM users WHERE email = ${email}`;
+  const [existing] = await sql`SELECT id FROM users WHERE lower(email) = ${email} LIMIT 1`;
   if (existing) return NextResponse.json({ error: 'Tenhle e-mail už je zaregistrovaný. Přihlas se.' }, { status: 409 });
   const hash = await bcrypt.hash(password, 12);
   // Kód od kamaráda (kód jeho kartičky). Špatný kód registraci neshodí —

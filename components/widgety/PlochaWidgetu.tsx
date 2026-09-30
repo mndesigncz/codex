@@ -31,6 +31,7 @@ import { filtrujViditelne, inkoustovaInstance, maOpravneniNaWidget, presun, sNas
 import { rozvrhni, sloupcuProSirku, type Sloupcu } from '@/lib/widgety/mrizka';
 import { delkaKyvu, fazeKyvu, idZWidgetu, uhelKyvu } from '@/lib/widgety/hash';
 import { HYSTEREZE_PX, NASTROJ, TOAST_S_AKCI_MS } from '@/lib/widgety/konstanty';
+import { jeCilVPrekryvu, jeInteraktivniCil, jePrekryvOtevreny, smiKlepnutiNavigovat, type StiskKlid } from '@/lib/widgety/klik';
 import { PLAN_ENFORCED } from '@/lib/plan';
 import { KontextWidgetuCtx, KostraWidgetu, PojistkaWidgetu, SchematickyWidget, type KontextWidgetu } from './Widget';
 import { lineWidget, maCoNastavit, predstahni } from './registr';
@@ -384,11 +385,24 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
    * „Upravit" trefí nadpis, protože tlačítko po prvním kliku zmizelo.
    */
   const posledniOperace = useRef(0);
+  /**
+   * Poslední prvek s fokusem uvnitř karty widgetu (id instance + prvek). Widget, který
+   * se vyřídí, odmontuje tlačítko s fokusem dřív, než to plocha stihne zjistit
+   * (data → prázdný stav → až pak efekt „vyřízeno"), takže `document.activeElement`
+   * je v tu chvíli už <body>. Z téhle stopy se pozná, že fokus nesl odmontovaný prvek.
+   */
+  const posledniFokus = useRef<{ id: string; el: Element } | null>(null);
+  /** Instance, jejíž karta se vyměnila pod fokusem (minimalizace, „Ukázat celý widget") — viz efekt „po výměně karty". */
+  const fokusPoVymene = useRef<string | null>(null);
   /** Fokus na widget až po zavření okna — viz efekt „po zavření okna" níž. */
   const fokusPoOkne = useRef<string | null>(null);
   const posledniDotyk = useRef(0);
-  /** Bod stisku v klidu: klepnutí, které od něj ujelo přes hysterezi, není klepnutí (tah, rolování). */
-  const stiskKlid = useRef<{ x: number; y: number } | null>(null);
+  /**
+   * Stisk v klidu: bod (klepnutí, které od něj ujelo přes hysterezi, není
+   * klepnutí — tah, rolování), jestli začal na interaktivním prvku a jestli
+   * byl v tu chvíli otevřený překryv. Click se posuzuje i podle stisku, viz lib/widgety/klik.ts.
+   */
+  const stiskKlid = useRef<StiskKlid | null>(null);
   /** Kdy se zavřelo kontextové menu — klik, který ho zavřel, nesmí navigovat. */
   const zavreniMenu = useRef(0);
 
@@ -425,6 +439,9 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
   const nazevPolozky = useCallback((p: PolozkaRozlozeni | undefined) =>
     !p ? '' : p.widget === NASTROJ ? stranka?.nastroj?.nazev ?? 'Hlavní část stránky' : najdiWidget(p.widget)?.nazev ?? p.widget, [stranka]);
   const nazevId = (id: string) => nazevPolozky(polozkyRef.current.find(p => p.id === id));
+  // Obsluha položek je stabilní (memo) — jméno se čte přes ref, ne přes uzávěru.
+  const nazevIdRef = useRef(nazevId);
+  nazevIdRef.current = nazevId;
 
   // ---- Drobnosti ----
 
@@ -732,7 +749,14 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
 
   const onPointerDownKorene = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === 'touch') posledniDotyk.current = Date.now();
-    if (!upravy) { stiskKlid.current = { x: e.clientX, y: e.clientY }; podrzeni.onPointerDown(e); return; }
+    if (!upravy) {
+      // Fakta o stisku se zjišťují TEĎ: pointerdown předchází mousedownu, který
+      // zavře popover, i clicku, který zavře okno — později by překryv už nebyl vidět,
+      // a tlačítko, na kterém stisk začal, může být do clicku odmontované.
+      stiskKlid.current = { x: e.clientX, y: e.clientY, naInteraktivnim: jeInteraktivniCil(e.target), prekryto: jePrekryvOtevreny(document) };
+      podrzeni.onPointerDown(e);
+      return;
+    }
     const cil = e.target as Element;
     // „Klepnutí mimo" ukončí úpravy: mezera mřížky, pruh pod ní nebo hlavička —
     // ne widget, buňka „+", lišta, okno, menu ani toast (spec §4.4).
@@ -741,11 +765,19 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
     mimo.current = !tesnePoOperaci && (cil === koren.current || cil === mrizka.current || vHlavicce) ? { x: e.clientX, y: e.clientY } : null;
   };
   const onClickKorene = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Kořen dostává click až po <li> (probublání), takže stisk je spotřebovaný:
+    // click bez vlastního stisku (klávesnice, odečítač) nesmí navigovat podle starého.
+    stiskKlid.current = null;
     const m = mimo.current;
     mimo.current = null;
     if (!m || !upravy || vychoziRezim) return;
     if (Math.hypot(e.clientX - m.x, e.clientY - m.y) > HYSTEREZE_PX) return;
     ukonciUpravy();
+  };
+  // Stopa fokusu pro `fokusVKarte`: fokus mimo kartu widgetu ji maže.
+  const onFocusKorene = (e: React.FocusEvent<HTMLDivElement>) => {
+    const li = (e.target as Element).closest<HTMLElement>('li[data-instance]');
+    posledniFokus.current = li?.dataset.instance ? { id: li.dataset.instance, el: e.target } : null;
   };
   const onContextMenuKorene = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!upravy) { podrzeni.onContextMenu(e); return; }
@@ -823,6 +855,20 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
     if (f === 'prvni') { mrizka.current?.querySelector<HTMLElement>(':scope > li[data-instance]:not([hidden])')?.focus(); return; }
     const li = najdiLi(f);
     if (li && document.activeElement !== li) li.focus({ preventScroll: !!k });
+  });
+
+  // Po výměně plné karty za minimalizovanou a zpět: fokus, který nesla odmontovaná
+  // karta (tlačítko „Schválit", „Ukázat celý widget"), by spadl na <body>. Vrací se
+  // na nadpis nové karty (tabIndex -1, mimo Tab) — li v klidu tabIndex mít nesmí
+  // (sonda k68-klavesnice 5). Zůstalo-li tlačítko v DOM (výměna se nekonala),
+  // fokus se nechá, kde je.
+  useLayoutEffect(() => {
+    const id = fokusPoVymene.current;
+    if (!id) return;
+    fokusPoVymene.current = null;
+    const li = najdiLi(id);
+    if (!li || li.contains(document.activeElement)) return;
+    li.querySelector<HTMLElement>('[data-w-titulek]')?.focus({ preventScroll: true });
   });
 
   // Po zavření okna (přidání z galerie, uložení nastavení): fokus na widget.
@@ -929,8 +975,39 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
   const rozbaleneRef = useRef(rozbalene);
   rozbaleneRef.current = rozbalene;
 
+  /**
+   * Výměna plné karty za minimalizovanou (a zpět) odmontuje tlačítko, které
+   * mohlo nést fokus („Schválit", „Ukázat celý widget"): fokus by spadl na
+   * <body> a uživatel klávesnice nebo odečítače by přišel o místo. Před
+   * výměnou se proto zjistí, jestli fokus je uvnitř karty; po překreslení ho
+   * efekt „po výměně karty" vrátí na nadpis nové karty.
+   */
+  const fokusVKarte = useCallback((id: string) => {
+    const li = najdiLi(id);
+    if (!li) return false;
+    const a = document.activeElement;
+    const stopa = posledniFokus.current;
+    // Fokus je uvnitř karty, nebo ho nesl prvek, který zmizel z DOM (fokus pak spadl na <body>).
+    const odmontovany = stopa?.id === id && !stopa.el.isConnected && (!a || a === document.body);
+    const uvnitr = li.contains(a) || odmontovany;
+    if (odmontovany) posledniFokus.current = null;
+    if (uvnitr) fokusPoVymene.current = id;
+    return uvnitr;
+  }, [najdiLi]);
+
   const nahlasVyrizeno = useCallback((id: string, souhrn: string | null) => {
     if ((vyrizeneRef.current.get(id) ?? null) === souhrn) return;
+    // Uživatel, který widget právě obsluhoval (fokus uvnitř), o změně karty
+    // nic nevidí ani neslyší — dostane hlášení a fokus na nové kartě. Když
+    // widget hlásí „vyřízeno" sám při načtení stránky, fokus v něm není a
+    // plocha mlčí (jinak by se při každém otevření přečetly všechny minimalizace).
+    const drziFokus = fokusVKarte(id);
+    // Minimalizace je vidět jen v klidu a u widgetu, který uživatel nerozbalil.
+    const viditelnaVymena = !upravyRef.current && !rozbaleneRef.current.has(id);
+    if (drziFokus && viditelnaVymena) {
+      const nazev = nazevIdRef.current(id);
+      oznam(souhrn == null ? `${nazev}: zase je co řešit, widget je rozbalený.` : `${nazev}: vyřízeno, widget minimalizován. ${souhrn}`);
+    }
     // Výměna plné karty za nízkou přeskládá mřížku — FLIP změří stav před tím.
     pripravFlip();
     setVyrizene(prev => {
@@ -938,16 +1015,17 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
       if (souhrn == null) n.delete(id); else n.set(id, souhrn);
       return n;
     });
-  }, [pripravFlip]);
+  }, [pripravFlip, fokusVKarte, oznam]);
 
   const rozbal = useCallback((id: string) => {
     if (rozbaleneRef.current.has(id)) return;
+    if (fokusVKarte(id)) oznam(`${nazevIdRef.current(id)}: widget rozbalen.`);
     pripravFlip();
     const n = new Set(rozbaleneRef.current);
     n.add(id);
     try { sessionStorage.setItem(klicRozbaleni, JSON.stringify([...n])); } catch { /* soukromé okno */ }
     setRozbalene(n);
-  }, [pripravFlip, klicRozbaleni]);
+  }, [pripravFlip, fokusVKarte, oznam, klicRozbaleni]);
 
   /**
    * Klepnutí na kartu v klidu → navigace na cíl widgetu z katalogu. Nesmí se
@@ -959,10 +1037,11 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
     if (upravyRef.current || menuRef.current || oknoRef.current || tahne()) return;
     // Klik, který právě zavřel kontextové menu (klepnutí vedle), nenaviguje.
     if (performance.now() - zavreniMenu.current < KLID_PO_OPERACI_MS) return;
-    const cilE = e.target as Element;
-    if (cilE.closest('button, a, input, select, textarea, label, [contenteditable="true"], [data-bez-podrzeni], [data-plocha-chrom]')) return;
-    const s = stiskKlid.current;
-    if (!s || Math.hypot(e.clientX - s.x, e.clientY - s.y) > HYSTEREZE_PX) return;
+    // Interaktivní prvek si klik nechává (cíl clicku i cíl stisku), zavření okna
+    // nebo popoveru klepnutím vedle nenaviguje, prst přes hysterezi není klepnutí.
+    if (!smiKlepnutiNavigovat(stiskKlid.current, {
+      x: e.clientX, y: e.clientY, naInteraktivnim: jeInteraktivniCil(e.target), vPrekryvu: jeCilVPrekryvu(e.target),
+    })) return;
     const pol = polozkyRef.current.find(x => x.id === instance);
     if (!pol || pol.widget === NASTROJ || bezOpravneni(pol)) return;
     const cil = najdiWidget(pol.widget)?.cil;
@@ -1076,6 +1155,7 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
       className={`plocha space-y-6 pb-24 ${vychoziRezim ? '' : 'p-4 sm:p-6'}`}
       onPointerDown={onPointerDownKorene}
       onClick={onClickKorene}
+      onFocus={onFocusKorene}
       onContextMenu={onContextMenuKorene}
       onKeyDown={onKeyDownKorene}
     >

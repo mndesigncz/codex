@@ -96,10 +96,14 @@ const SKUPINY: { typ: TypPovinne; nadpis: string }[] = [
 const ikonaPolozky = (p: PovinnaPolozka) =>
   p.typ === 'postup' ? (p.ikona || 'clipboard') : p.typ === 'ukol' ? 'calendarCheck' : 'book';
 
-export function ZamekUzaverky({ stav, actingAs, proKoho, onZmena, predOdchodem, pulz }: {
+export function ZamekUzaverky({ stav, actingAs, naTabletu = false, proKoho, onZmena, predOdchodem, pulz }: {
   stav: StavZamku | null;
-  /** Za koho se úkol odškrtne (tablet: člověk, za kterého se zavírá). */
+  /** Za koho se zavírá (tablet i vedení „vyplnit za"), jinak null. */
   actingAs: number | null;
+  /** Formulář běží na tabletu. Jen tablet smí potvrdit přečtení návodu za jiného
+   *  (POST /api/guides/[id] mimo tablet actingAs ignoruje) — vedení, které zavírá
+   *  za zaměstnance, by čtečkou potvrdilo přečtení sebe, ne jeho. */
+  naTabletu?: boolean;
   /** Čí je uzávěrka — úkol přidělený někomu jinému z osádky je „čeká na kolegu". */
   proKoho: number | null;
   /** Něco se tu udělalo — ať formulář stav načte znovu. */
@@ -188,11 +192,16 @@ export function ZamekUzaverky({ stav, actingAs, proKoho, onZmena, predOdchodem, 
     return !!u && u.status !== 'done' && u.checklist.length === 0 && u.source !== 'production';
   };
   const odkazJde = (p: PovinnaPolozka) => nav.smiPohled(p.odkaz.pohled);
+  // Vedení zavírá „za jiného": návod za něj potvrdit nejde (server bere čtenáře jen
+  // na tabletu), čtečka by potvrdila přečtení vedoucího a zámek by zůstal
+  // zamčený. Řádek je proto jen informace — přečte to ten člověk sám.
+  const cteniZaJinehoBezTabletu = (p: PovinnaPolozka) => p.typ === 'navod' && actingAs != null && !naTabletu;
   // Úkol kolegy ze směny: server ho do zámku počítá (osádka), ale v Úkolech ho
   // zaměstnanec bez širších práv nevidí — klik by vedl do prázdna a formulář
   // by se zbytečně odmontoval. Kdo ho v seznamu úkolů má (vedení), otevře ho.
   const cizi = (p: PovinnaPolozka) =>
-    p.typ === 'ukol' && p.kdoId != null && p.kdoId !== proKoho && !ukolPodleId.has(p.id);
+    (p.typ === 'ukol' && p.kdoId != null && p.kdoId !== proKoho && !ukolPodleId.has(p.id))
+    || cteniZaJinehoBezTabletu(p);
 
   const otevri = (p: PovinnaPolozka) => {
     setChyba('');
@@ -221,7 +230,9 @@ export function ZamekUzaverky({ stav, actingAs, proKoho, onZmena, predOdchodem, 
     try {
       await fetch('/api/tasks', {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: p.id, status: 'done', ...(actingAs != null ? { actingAs } : {}) }),
+        // `den` = den uzávěrky: server podle něj pozná tablet zavírající za člověka,
+        // který už není odpíchnutý (dohánění včerejška), a úkol mu připíše.
+        body: JSON.stringify({ id: p.id, status: 'done', ...(actingAs != null ? { actingAs, den: stav?.den || undefined } : {}) }),
       }).then(okJson);
       // Seznam úkolů a widgety na ploše čtou tutéž URL; formulář se
       // přepočítá přes onZmena (událost by ho jen zavolala podruhé).
@@ -240,9 +251,10 @@ export function ZamekUzaverky({ stav, actingAs, proKoho, onZmena, predOdchodem, 
       if (jinyBezi(p) && active) return `Nejdřív dokonči běžící postup ${active.name}.`;
       return 'Otevře se v Postupech.';
     }
+    if (cteniZaJinehoBezTabletu(p)) return 'Přečtení potvrdí ten, za koho zavíráš — na tabletu nebo ve svém účtu.';
     if (cizi(p)) return `Čeká na: ${p.kdo || 'kolegu'} — odškrtne ho ve svém účtu.`;
     if (p.typ === 'ukol') return p.kdo ? `Pro: ${p.kdo}` : null;
-    return 'Přečti a potvrď, že máš přečteno.';
+    return actingAs != null ? 'Potvrď, že návod přečetl ten, za koho zavíráš.' : 'Přečti a potvrď, že máš přečteno.';
   };
 
   // Hlavní akce jen na to, co jde udělat odsud — ne na kolegův úkol.
@@ -264,7 +276,7 @@ export function ZamekUzaverky({ stav, actingAs, proKoho, onZmena, predOdchodem, 
           <p className="t-meta mt-0.5 text-pretty">
             {mojeChybi.length > 0
               ? <>Nejdřív dokonči {czCount(zbyva, VEC)}. Pak se odemkne sama.</>
-              : <>Zbývá {czCount(zbyva, VEC)} na kolezích ze směny. Až je odškrtnou, odemkne se sama.</>}
+              : <>Zbývá {czCount(zbyva, VEC)} — odsud to nesplníš: čeká na kolegy ze směny nebo na toho, za koho zavíráš. Až to dokončí, odemkne se sama.</>}
           </p>
         </div>
       </div>

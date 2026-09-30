@@ -71,6 +71,7 @@ export interface DemoStav {
   zpravy: ZpravaChatu[];
   dostupnost: DostupnostDemo[];
   objednavky: ObjednavkaDemo[];
+  hlaseniSkladu: { id: number; items: { id: number; name: string }[]; note: string | null; status: 'new' | 'done'; authorId: number; createdAt: string }[];
   /** Osobní rozložení ploch, které si člověk v ukázce upravil (stránka → položky). */
   rozlozeni?: Record<string, { polozky: PolozkaRozlozeni[]; verze: number }>;
   /** Přečtené konverzace (id → přečteno). */
@@ -302,6 +303,9 @@ export function vytvorStav(role: RoleDema): DemoStav {
       { id: idOd(), conversationId: 1, userId: 6, content: 'Já můžu, mám volno.', createdAt: pred(40 * MIN) },
     ],
     dostupnost: dostupnost(d, idOd),
+    hlaseniSkladu: [
+      { id: idOd(), items: [{ id: 7, name: 'Sirup karamel' }, { id: 5, name: 'Šlehačka 33 %' }], note: 'Karamel je na dně, šlehačka vydrží do večera.', status: 'new', authorId: 3, createdAt: pred(2 * HOD) },
+    ],
     objednavky: [
       { id: idOd(), supplier: 'Pražírna Pod Věží', items: [{ name: 'Espresso zrna „Domácí směs"', qty: 10, unit: 'kg', itemId: 1 }], totalCost: 6200, status: 'ordered', note: 'Dodání ve čtvrtek dopoledne.', createdAt: pred(28 * HOD), receivedAt: null, createdBy: 1 },
       { id: idOd(), supplier: 'Makro', items: [{ name: 'Sirup karamel', qty: 4, unit: 'ks', itemId: 7 }, { name: 'Ovesný nápoj barista', qty: 24, unit: 'l', itemId: 4 }], totalCost: 1908, status: 'received', note: null, createdAt: pred(9 * 24 * HOD), receivedAt: pred(8 * 24 * HOD), createdBy: 1 },

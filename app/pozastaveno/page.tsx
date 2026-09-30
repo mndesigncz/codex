@@ -12,6 +12,7 @@ import type { Metadata } from 'next';
 import { authOptions } from '@/lib/auth';
 import OdhlasitButton from '@/components/admin/OdhlasitButton';
 import PodnikSwitcher from '@/components/PodnikSwitcher';
+import SpravovatPredplatneButton from '@/components/SpravovatPredplatneButton';
 
 export const metadata: Metadata = { title: 'Podnik je pozastavený' };
 export const dynamic = 'force-dynamic';
@@ -19,13 +20,13 @@ export const dynamic = 'force-dynamic';
 export default async function Pozastaveno() {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect('/login');
-  let jmeno: string | null = null, duvod: string | null = null, blokovano = false;
+  let jmeno: string | null = null, duvod: string | null = null, blokovano = false, platiSe = false;
   try {
     const sql = neon(process.env.DATABASE_URL!);
     const meId = parseInt(String((session.user as { id?: string }).id));
     const [t] = await sql`
-      SELECT t.name, t.blocked_at, t.blocked_reason FROM users u JOIN teams t ON t.id = u.team_id WHERE u.id = ${meId}`;
-    if (t) { jmeno = t.name; duvod = t.blocked_reason ?? null; blokovano = !!t.blocked_at; }
+      SELECT t.name, t.blocked_at, t.blocked_reason, t.stripe_subscription_id FROM users u JOIN teams t ON t.id = u.team_id WHERE u.id = ${meId}`;
+    if (t) { jmeno = t.name; duvod = t.blocked_reason ?? null; blokovano = !!t.blocked_at; platiSe = !!t.stripe_subscription_id; }
   } catch { /* bez databáze se ukáže obecná verze */ }
   // Kdo sem přišel omylem (podnik už je obnovený), jde zpátky do aplikace.
   if (!blokovano && jmeno) redirect('/');
@@ -54,6 +55,8 @@ export default async function Pozastaveno() {
         </p>
         <div className="mt-6 flex flex-wrap items-center gap-2.5">
           <OdhlasitButton />
+          {/* Předplatné běží dál i při pozastavení — majitel ho musí umět zrušit. Portál pustí jen toho, kdo smí spravovat předplatné. */}
+          {platiSe && (session.user as { role?: string }).role === 'employer' && <SpravovatPredplatneButton />}
           {/* Kdo má i jiný podnik, přepne se do něj — přepínač se s jediným členstvím nekreslí. */}
           <PodnikSwitcher />
         </div>

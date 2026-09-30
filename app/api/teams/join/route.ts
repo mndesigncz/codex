@@ -9,13 +9,17 @@ import { vychoziRolePodniku, typUctu, zapisRoliClenstvi } from '../_role';
 import { linkNewMember } from '@/lib/chat';
 import { hit } from '@/lib/rateLimit';
 import { klientIp } from '@/lib/klientIp';
+import { normalizujEmail } from '@/lib/emailAdresa';
 
 export const dynamic = 'force-dynamic';
 
 // Employee joins an existing team using its join code.
 export async function POST(request: Request) {
   try {
-    const { name, email, password, joinCode } = await request.json();
+    const b = await request.json();
+    const { name, password, joinCode } = b;
+    // Oříznutý e-mail malými písmeny — stejně jako při registraci a přihlášení.
+    const email = normalizujEmail(b.email);
 
     if (!name || !email || !password || !joinCode) {
       return NextResponse.json({ error: 'Všechna pole jsou povinná' }, { status: 400 });
@@ -45,7 +49,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Tým je na plánu Zdarma plný (3 členové). Vedení může přejít na Pro v Nastavení → Předplatné.' }, { status: 403 });
     }
 
-    const existing = await sql`SELECT id FROM users WHERE email = ${email}`;
+    const existing = await sql`SELECT id FROM users WHERE lower(email) = ${email}`;
     if (existing.length > 0) {
       return NextResponse.json({ error: 'Tento email je již zaregistrován' }, { status: 409 });
     }

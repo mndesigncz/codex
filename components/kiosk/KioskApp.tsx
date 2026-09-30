@@ -173,7 +173,8 @@ function KioskShell({ user }: { user: KioskUser }) {
   }, []);
 
   const clock = now ? new Date(now).toLocaleTimeString('cs-CZ', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit' }) : '—:—';
-  const dateStr = now ? new Date(now).toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' }) : '\u00a0';
+  // Datum musí jít stejným pásmem jako hodiny: tablet v UTC by ve 0:30 pražského času ukázal půlnoční hodiny a včerejší datum.
+  const dateStr = now ? new Date(now).toLocaleDateString('cs-CZ', { timeZone: 'Europe/Prague', weekday: 'long', day: 'numeric', month: 'long' }) : '\u00a0';
 
   return (
     <NavigaceKontext.Provider value={navigaceWidgetu}>
@@ -213,14 +214,11 @@ function KioskShell({ user }: { user: KioskUser }) {
       <nav className="mt-5 flex gap-1.5 flex-wrap sm:flex-wrap overflow-x-auto sm:overflow-x-visible scrollbar-thin -mx-1 px-1">
         {TABS.map(t => (
           // aria-current: odečítač musí říct, na které obrazovce obsluha je —
-          // třída seg-on je jen pro oko. V tmavém režimu je .seg-on inkoust na
-          // skoro stejně tmavém podkladu a vybraná záložka působila slabší než
-          // nevybrané se skleněnou výplní; světlá linka (ring, bez posunu
-          // rozměru) ji vrátí dopředu, dokud globals.css nemá tmavou .seg-on.
+          // třída seg-on je jen pro oko (v tmavém režimu ji odliší světlý okraj v globals.css).
           <button key={t.id} type="button" onClick={() => setTab(t.id)}
             aria-current={tab === t.id ? 'page' : undefined}
             className={`inline-flex items-center gap-2 px-5 py-3 rounded-full text-sm font-semibold whitespace-nowrap shrink-0 min-h-[48px] transition active:scale-[0.97] ${
-              tab === t.id ? 'seg-on dark:ring-1 dark:ring-white/30' : 'seg-off glass'
+              tab === t.id ? 'seg-on' : 'seg-off glass'
             }`}>
             <Icon key={tab === t.id ? 'on' : 'off'} name={t.icon} size={17}
               className="i-lead" motion={tab === t.id ? 'pop' : undefined} /> {t.label}

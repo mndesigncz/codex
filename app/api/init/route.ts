@@ -96,6 +96,21 @@ export async function GET(request: Request) {
       )`);
     await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS team_id INTEGER`);
     await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS theme TEXT DEFAULT 'light'`);
+    // E-mail účtu se ukládá oříznutý a malými písmeny (lib/emailAdresa.ts).
+    // Existující účty se převedou, ale JEN ty, které nemají dvojníka lišícího
+    // se velikostí písmen — dva skutečné účty („Jan@x" a „jan@x") se tiše
+    // nesloučí ani nepřejmenují, přihlášení si s nimi poradí samo (zkusí oba
+    // podle hesla). Krok je idempotentní.
+    await ddl(sql`
+      UPDATE users u SET email = lower(btrim(u.email))
+      WHERE u.email <> lower(btrim(u.email))
+        AND NOT EXISTS (
+          SELECT 1 FROM users o WHERE o.id <> u.id AND lower(btrim(o.email)) = lower(btrim(u.email))
+        )`);
+    // Unikát bez ohledu na velikost písmen. Padne, dokud existují dvojníci —
+    // to je záměr (fail-open: aplikace běží dál, jen bez pojistky v databázi);
+    // duplicity se hlásí v migFailDetail a řeší je člověk.
+    await ddl(sql`CREATE UNIQUE INDEX IF NOT EXISTS users_email_lower ON users (lower(email))`);
 
     // ---- Invitations ----
     await ddl(sql`
@@ -679,6 +694,12 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS referral_rewarded BOOLEAN DEFAULT FALSE`);
     await ddl(sql`CREATE UNIQUE INDEX IF NOT EXISTS teams_referral_code ON teams (referral_code) WHERE referral_code IS NOT NULL`);
     await ddl(sql`CREATE INDEX IF NOT EXISTS teams_stripe_customer ON teams (stripe_customer_id)`);
+    // Režim Stripe ('live' | 'test'), do kterého patří uložené stripe_customer_id
+    // a stripe_subscription_id. Sandbox a živý účet mají oddělené zákazníky
+    // i předplatná; bez značky by po přepnutí klíčů checkout padal na
+    // „No such customer" (lib/billing.ts → ensureCustomer). NULL = záznam
+    // z doby před značkou, ověří se jedním dotazem na Stripe.
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS stripe_mode TEXT`);
     // Týmy z doby před platbami měly Pro se vším (client, pokladna, výroba) —
     // to je dnes Max. Bez předplatného ve Stripe zůstávají na Max napořád.
     await ddl(sql`UPDATE teams SET plan = 'max' WHERE plan = 'pro' AND stripe_subscription_id IS NULL AND had_subscription IS NOT TRUE`);
@@ -690,6 +711,12 @@ export async function GET(request: Request) {
         team_id INTEGER,
         created_at TIMESTAMP DEFAULT NOW()
       )`);
+    // Událost se nejdřív „zabere" (created_at), po zpracování se označí
+    // (done_at). Zabraná a nedokončená událost (funkci mezitím zabil timeout)
+    // se po pár minutách zpracuje znovu — bez toho by se navždy přeskočila.
+    await ddl(sql`ALTER TABLE billing_events ADD COLUMN IF NOT EXISTS done_at TIMESTAMP`);
+    // Události zpracované před zavedením done_at jsou hotové.
+    await ddl(sql`UPDATE billing_events SET done_at = created_at WHERE done_at IS NULL AND created_at < NOW() - INTERVAL '1 day'`);
     // Měsíc zdarma za doporučený podnik, který poprvé zaplatil.
     await ddl(sql`
       CREATE TABLE IF NOT EXISTS referral_rewards (

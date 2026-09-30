@@ -22,11 +22,29 @@ const PREDVOLBY: Record<string, string> = {
   'managero-hint-plocha-upravy': '1',
 };
 
+/**
+ * Cizí skripty se v ukázce nevkládají. Balíček `@stripe/stripe-js` si při
+ * importu (Nastavení → Předplatné) přidá <script src="https://js.stripe.com/…">
+ * do <head>; ukázka nemá s platbami nic společného a CSP by ho stejně odmítla
+ * s chybou v konzoli. Tichá obrana v prohlížeči je čistší než chybová hláška.
+ */
+function zakazCiziSkripty(): void {
+  const jeCizi = (n: Node) => {
+    if (!(n instanceof HTMLScriptElement) || !n.src) return false;
+    try { return new URL(n.src, window.location.href).origin !== window.location.origin; } catch { return false; }
+  };
+  for (const cil of [HTMLHeadElement.prototype, HTMLBodyElement.prototype] as Node[]) {
+    const puvodni = cil.appendChild;
+    cil.appendChild = function <T extends Node>(this: Node, n: T): T { return jeCizi(n) ? n : puvodni.call(this, n) as T; };
+  }
+}
+
 let hotovo = false;
 
 export function zalozProstredi(): void {
   if (typeof window === 'undefined' || hotovo) return;
   hotovo = true;
+  try { zakazCiziSkripty(); } catch { /* bez ochrany zůstane CSP */ }
   for (const jmeno of ['localStorage', 'sessionStorage'] as const) {
     try {
       const u = new PametovyUloziste();

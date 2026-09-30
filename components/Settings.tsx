@@ -27,6 +27,8 @@ type SectionId = 'account' | 'app' | 'notifications' | 'security' | 'team' | 'bi
 interface Props {
   user: { id: number; name: string; role: string; avatar?: string };
   initialTab?: SectionId;
+  /** Roste, kdykoli si někdo výslovně vyžádá záložku (banner předplatného) — i když je Nastavení už otevřené. */
+  tabNonce?: number;
 }
 
 interface Account {
@@ -87,13 +89,18 @@ function relativeCzech(iso: string): string {
   return new Date(iso).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', year: 'numeric' });
 }
 
-export default function Settings({ user, initialTab }: Props) {
+export default function Settings({ user, initialTab, tabNonce }: Props) {
   const { update } = useSession();
   const { theme, setTheme } = useTheme();
   const [zvolena, setZvolena] = useState<SectionId>(initialTab ?? 'account');
   // Přepnutí záložky odmontuje editor rolí — u rozepsané role se nejdřív zeptá.
   const straz = useStrazRole();
   const setSection = (id: SectionId) => { if (id !== zvolena) straz.pokus(() => setZvolena(id)); };
+  // Odkaz na záložku, když je Nastavení už otevřené: useState výše si initialTab
+  // přečte jen při prvním vykreslení.
+  useEffect(() => { if (tabNonce && initialTab) setSection(initialTab); },
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [tabNonce]);
   const [account, setAccount] = useState<Account | null>(null);
   const [loading, setLoading] = useState(true);
   const isEmployer = (account?.role ?? user.role) === 'employer';
@@ -120,7 +127,6 @@ export default function Settings({ user, initialTab }: Props) {
   // klíčem jako pohled Nastavení týmu, ať se jeho chování nemění.
   const povolena = sections.some(s => s.id === zvolena) || (zvolena === 'team' && isEmployer && ma('tym.zobrazit'));
   const section: SectionId = povolena ? zvolena : 'account';
-  const [interestSent, setInterestSent] = useState(false);
   // Stav nápověd se čte až v prohlížeči — server localStorage nezná.
   const [hintsOn, setHintsOn] = useState(true);
   const [hintsHidden, setHintsHidden] = useState(0);

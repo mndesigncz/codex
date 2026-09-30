@@ -234,6 +234,20 @@ export function konecSmeny(dnes: string, start: string | null | undefined, konec
 }
 
 /**
+ * Návrh času odchodu při ručním ukončení zapomenutého příchodu: plánovaný konec
+ * směny (i přes půlnoc), pokud leží mezi příchodem a teď a ne dál než 24 h od
+ * příchodu (dnešní plán se nesmí přilepit ke včerejšímu zapomenutému příchodu).
+ * Jinak (bez plánu, směna ještě běží) teď — budoucí odchod by nedával smysl.
+ * Proč jedna funkce pro widgety i nástroj Docházky: kdo odešel v 16:00 a vedoucí
+ * ho zavírá v 19:00, nesmí mít ve mzdě tři hodiny navíc — a to, zda se zeptá
+ * widget, nebo seznam záznamů, na tom nemá záležet.
+ */
+export function navrhOdchodu(od: Date, konec: Date | null, ted: number): { cas: Date; zPlanu: boolean } {
+  if (konec && konec.getTime() > od.getTime() && konec.getTime() <= ted && konec.getTime() - od.getTime() <= 24 * 3600_000) return { cas: konec, zPlanu: true };
+  return { cas: new Date(ted), zPlanu: false };
+}
+
+/**
  * Kdo je napíchnutý déle, než měl: plánovaná směna už skončila (a příchod
  * byl před jejím koncem), nebo bez plánu běží příchod déle než 12 h.
  * Server zapomenuté odchody v noci zavírá sám (autoCloseEntry) — widget

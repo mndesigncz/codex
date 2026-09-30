@@ -5,7 +5,7 @@ import { Icon } from '../Icons';
 import { Avatar, Button, Card, Chip, EmptyState, ErrorState, ListRow, MenuPanel, Modal, Toast } from '../ui';
 import { usePopover } from '@/lib/usePopover';
 import { parseDbTime, dbTimeHM } from '@/lib/pragueTime';
-import { nextActiveId, IDLE_MS } from '@/lib/kioskIdentity';
+import { nextActiveId, IDLE_MS, ACTING_MAX_AGE_S, ACTING_OBNOVA_MS, obnovitCookie } from '@/lib/kioskIdentity';
 
 export interface RosterMember {
   id: number;
@@ -32,9 +32,10 @@ const LS_ACTIVE_OLD = 'pangea-kiosk-active';
 const ACTING_COOKIE = 'managero-kiosk-acting';
 // Šestnáct hodin tu bývalo „jedna dlouhá směna". Jenže tablet u baru není
 // něčí telefon: identita v něm nedrží proto, že ji člověk potvrdil, ale
-// proto, že nikdo nesáhl na tlačítko. Hodina, obnovovaná každým dotykem,
-// odpovídá tomu, jak dlouho u tabletu opravdu někdo stojí.
-const ACTING_MAX_AGE = 60 * 60;
+// proto, že nikdo nesáhl na tlačítko. Hodina je pojistka pro zavřený tablet;
+// dokud je stránka otevřená a někoho drží, cookie se obnovuje (dotykem
+// i časovačem níž), aby zápisy bez actingAs nespadly na účet tabletu.
+const ACTING_MAX_AGE = ACTING_MAX_AGE_S;
 // Práh nečinnosti a celé pravidlo „kdo se zapisuje" žijí v `lib/kioskIdentity`,
 // ať se dají otestovat bez prohlížeče.
 
@@ -120,6 +121,14 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
   const [loadFailed, setLoadFailed] = useState(false);
   /** Kdy se naposled někdo tabletu dotkl — podle toho se pozná nečinnost. */
   const touchedAt = useRef(0);
+  /** Kdy se naposled zapsala cookie identity a pro koho — dotyky ji obnovují nanejvýš po půl minutě. */
+  const cookieZapsana = useRef(0);
+  const activeIdRef = useRef<number | null>(null);
+  activeIdRef.current = activeId;
+  const zapisCookie = useCallback((id: number | null) => {
+    cookieZapsana.current = Date.now();
+    writeActingCookie(id);
+  }, []);
 
   const reload = useCallback(async () => {
     try {
@@ -182,7 +191,14 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
   // něj nikdo nesáhl — ne proto, že by ho někdo potvrdil. Po deseti minutách
   // je pravděpodobnější, že u něj stojí někdo jiný.
   useEffect(() => {
-    const bump = () => { touchedAt.current = Date.now(); };
+    const bump = () => {
+      const t = Date.now();
+      touchedAt.current = t;
+      // Obnova cookie ještě před požadavkem, který dotyk spustí: po hodině
+      // ticha (jediný člověk na směně, nikdo nic nezapisoval) by jinak první
+      // zápis bez actingAs spadl na účet tabletu.
+      if (activeIdRef.current != null && obnovitCookie(cookieZapsana.current, t)) zapisCookie(activeIdRef.current);
+    };
     bump();
     window.addEventListener('pointerdown', bump, true);
     window.addEventListener('keydown', bump, true);
@@ -190,7 +206,7 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
       window.removeEventListener('pointerdown', bump, true);
       window.removeEventListener('keydown', bump, true);
     };
-  }, []);
+  }, [zapisCookie]);
   useEffect(() => {
     if (onShift.length < 2 || activeId == null) return;
     const t = setInterval(() => {
@@ -206,8 +222,18 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
       if (activeId != null) localStorage.setItem(LS_ACTIVE, String(activeId));
       else localStorage.removeItem(LS_ACTIVE);
     } catch { /* ignore */ }
-    writeActingCookie(activeId);
-  }, [hydrated, activeId]);
+    zapisCookie(activeId);
+  }, [hydrated, activeId, zapisCookie]);
+
+  // Cookie zrcadlí, koho tablet drží: dokud někoho drží, obnovuje se sama.
+  // Dřív se zapsala jen při změně osoby, a tak po hodině vypršela, i když
+  // hlavička dál psala „Zapisuje se jako …" — postupy, ±1 ve skladu a zbytky
+  // pak tiše šly na účet tabletu.
+  useEffect(() => {
+    if (!hydrated || activeId == null) return;
+    const t = setInterval(() => zapisCookie(activeIdRef.current), ACTING_OBNOVA_MS);
+    return () => clearInterval(t);
+  }, [hydrated, activeId, zapisCookie]);
 
   const active = useMemo<ActivePerson | null>(() => {
     const m = onShift.find(x => x.id === activeId);

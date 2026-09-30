@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { Icon } from './Icons';
-import { Avatar, Button, Chip, EmptyState, Field, ListRow } from './ui';
-import { okJson } from '@/lib/api';
+import { Avatar, Button, Chip, EmptyState, ErrorState, Field, ListRow, Skeleton } from './ui';
+import { useOpravneni } from './role/useOpravneni';
+import { ApiError, apiMessage, okJson } from '@/lib/api';
 
 const inputClass =
   'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm';
@@ -20,18 +21,43 @@ export default function KioskSettings() {
   const [err, setErr] = useState('');
   const [open, setOpen] = useState(false);
   const [pins, setPins] = useState<Record<number, string>>({});
+  // Účet tabletu spravuje kiosk.spravovat, PINy dochazka.piny — sekce Tým → Tablet
+  // se otevře oběma, ale server druhou polovinu jinak odmítne (403). Kdo má jen PINy,
+  // formulář přihlášení tabletu nedostane, kdo jen účet, PINy ne.
+  const { ma } = useOpravneni();
+  const smiUcet = ma('kiosk.spravovat');
+  const smiPiny = ma('dochazka.piny');
+  // Načtení se nesmí tvářit jako „nic tu není": dřív `.catch(() => ({}))` udělal
+  // z 403 nebo výpadku sítě neexistující účet tabletu („Vytvořit tabletový
+  // účet") a prázdný tým („Zatím nikdo v týmu"). Každá polovina má svůj stav.
+  const [nacitam, setNacitam] = useState(true);
+  const [chybaUctu, setChybaUctu] = useState<string | null>(null);
+  const [chybaLidi, setChybaLidi] = useState<string | null>(null);
+  const [lidiZakazano, setLidiZakazano] = useState(false);
 
   const load = async () => {
-    try {
-      const [k, a] = await Promise.all([
-        fetch('/api/kiosk').then(okJson).catch(() => ({})),
-        fetch('/api/attendance').then(okJson).catch(() => ({})),
-      ]);
-      if (k?.kiosk) { setKiosk(k.kiosk); setEmail(k.kiosk.email); }
-      setMembers(Array.isArray(a?.roster) ? a.roster : []);
-    } catch { /* ignore */ }
+    setNacitam(true);
+    const [k, a] = await Promise.allSettled([
+      smiUcet ? fetch('/api/kiosk').then(okJson) : Promise.resolve(null),
+      smiPiny ? fetch('/api/attendance').then(okJson) : Promise.resolve(null),
+    ]);
+    if (k.status === 'fulfilled') {
+      setChybaUctu(null);
+      if (k.value?.kiosk) { setKiosk(k.value.kiosk); setEmail(k.value.kiosk.email); }
+    } else setChybaUctu(apiMessage(k.reason, 'Tabletový účet se nepodařilo načíst.'));
+    if (a.status === 'fulfilled') {
+      const roster = a.value?.roster;
+      if (a.value && !Array.isArray(roster)) setChybaLidi('Seznam lidí přišel v nečekaném tvaru.');
+      else { setChybaLidi(null); setMembers(Array.isArray(roster) ? roster : []); }
+      setLidiZakazano(false);
+    } else {
+      setChybaLidi(apiMessage(a.reason, 'Seznam lidí se nepodařilo načíst.'));
+      setLidiZakazano(a.reason instanceof ApiError && (a.reason.status === 401 || a.reason.status === 403));
+    }
+    setNacitam(false);
   };
-  useEffect(() => { load(); }, []);
+  // Po načtení oprávnění se ptá znovu: dřív než přijdou, `ma` říká „ano" všemu.
+  useEffect(() => { load(); }, [smiUcet, smiPiny]);
 
   const flash = (m: string) => { setMsg(m); setErr(''); setTimeout(() => setMsg(''), 3500); };
 
@@ -73,7 +99,9 @@ export default function KioskSettings() {
             <Icon name="clipboard" size={17} className="shrink-0 text-black/40" /> Tabletový účet (píchačky)
           </h3>
           <p className="t-meta mt-1">
-            {kiosk ? `Připojeno — ${kiosk.email}` : 'Sdílené zařízení na provozovně, kde se zaměstnanci odpíchávají na směnu.'}
+            {kiosk ? `Připojeno — ${kiosk.email}`
+              : chybaUctu ? 'Stav tabletového účtu se nenačetl.'
+              : 'Sdílené zařízení na provozovně, kde se zaměstnanci odpíchávají na směnu.'}
           </p>
         </div>
         <Icon name="chevron" size={18} className={`text-black/35 shrink-0 mt-1 transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -84,6 +112,11 @@ export default function KioskSettings() {
           {msg && <div role="status" className="p-3 note note-ok text-sm">{msg}</div>}
           {err && <div role="alert" className="p-3 note note-danger text-sm">{err}</div>}
 
+          {smiUcet && (nacitam ? (
+            <div className="space-y-2" aria-busy="true"><Skeleton className="h-12" /><Skeleton className="h-12" /></div>
+          ) : chybaUctu ? (
+            <ErrorState compact title="Tabletový účet se nenačetl" hint="Formulář neukážu, ať omylem nezaložíš druhý účet." detail={chybaUctu} onRetry={load} />
+          ) : (
           <form onSubmit={saveAccount} className="space-y-3">
             <p className="t-label">Přihlášení tabletu</p>
             <p className="t-meta -mt-1">Na tabletu se přihlásíš tímto e-mailem a heslem. Otevře se režim píchaček.</p>
@@ -101,13 +134,20 @@ export default function KioskSettings() {
               {kiosk ? 'Uložit změny' : 'Vytvořit tabletový účet'}
             </Button>
           </form>
+          ))}
 
-          <div className="h-px bg-black/[0.06]" />
+          {smiUcet && smiPiny && <div className="h-px bg-black/[0.06]" />}
 
+          {smiPiny && (
           <div className="space-y-2.5">
             <p className="t-label">PIN pro odpíchnutí (nepovinné)</p>
             <p className="t-meta -mt-1">Když zaměstnanci nastavíš PIN, na tabletu ho zadá při příchodu — nikdo se nepodepíše za něj.</p>
-            {members.length === 0 ? (
+            {nacitam ? (
+              <div className="space-y-2" aria-busy="true"><Skeleton className="h-12" /><Skeleton className="h-12" /><Skeleton className="h-12" /></div>
+            ) : chybaLidi ? (
+              <ErrorState compact title="Seznam lidí se nenačetl" detail={chybaLidi} onRetry={load}
+                hint={lidiZakazano ? 'Seznam lidí vidí jen role s oprávněním k docházce nebo k tabletu. Požádej vedení, ať ti ho doplní.' : undefined} />
+            ) : members.length === 0 ? (
               <EmptyState icon="users" compact title="Zatím nikdo v týmu"
                 hint="Na tabletu se odpíchnou lidé, které pozveš v Nastavení týmu." />
             ) : (
@@ -133,6 +173,7 @@ export default function KioskSettings() {
               </ul>
             )}
           </div>
+          )}
         </div>
       )}
     </div>

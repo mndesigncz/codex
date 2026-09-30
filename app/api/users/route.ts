@@ -3,6 +3,7 @@ import { pridejClenstvi, pocetClenu } from '@/lib/tenant';
 import { neon } from '@neondatabase/serverless';
 import bcrypt from 'bcryptjs';
 import { sendInvitationEmail } from '@/lib/email';
+import { normalizujEmail } from '@/lib/emailAdresa';
 import { planInfoOf, canAddMember, MEMBER_LIMIT_MSG } from '@/lib/plan';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { smiPriraditRoli } from '@/lib/opravneni';
@@ -61,12 +62,14 @@ export async function POST(req: NextRequest) {
   } catch { /* plan columns not migrated — no limit */ }
 
   const body = await req.json().catch(() => ({}));
-  const { name, email, password, avatar, phone, jobTitle, sendInvite } = body;
+  const { name, password, avatar, phone, jobTitle, sendInvite } = body;
+  // E-mail účtu je vždy oříznutý a malými písmeny (lib/emailAdresa.ts).
+  const email = normalizujEmail(body.email);
   if (!name || !email || !password) {
     return NextResponse.json({ error: 'Chybí jméno, e-mail nebo heslo' }, { status: 400 });
   }
 
-  const [existing] = await sql`SELECT id FROM users WHERE email = ${email}`;
+  const [existing] = await sql`SELECT id FROM users WHERE lower(email) = ${email} LIMIT 1`;
   if (existing) return NextResponse.json({ error: 'Účet s tímto e-mailem už existuje' }, { status: 409 });
 
   const passwordHash = await bcrypt.hash(String(password), 10);

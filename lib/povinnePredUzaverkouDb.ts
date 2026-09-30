@@ -172,7 +172,8 @@ export async function urciKontextUzaverky(c: Kontext, b: VstupUzaverky): Promise
 }
 
 /**
- * Za koho smí tablet potvrdit přečtení návodu (GET i POST /api/guides/[id]).
+ * Za koho smí tablet potvrdit přečtení návodu (GET i POST /api/guides/[id])
+ * a odškrtnout povinný úkol v zámku (PATCH /api/tasks s `den`).
  * Jedno pravidlo pro zámek i potvrzení, jinak by zámek chtěl přečtení, které
  * tablet neumí zapsat:
  * - odpíchnutý člověk (resolveActingUser — jako úkoly a postupy), NEBO
@@ -183,7 +184,7 @@ export async function urciKontextUzaverky(c: Kontext, b: VstupUzaverky): Promise
  *   z vlastního telefonu, a kdo telefon nemá, natrvalo.
  * Vrací id člověka, nebo null. Při chybě dotazu null (nic se nepotvrdí).
  */
-export async function ctenarNaTabletu(c: Kontext, chtene: unknown, den: unknown, req?: Request): Promise<number | null> {
+export async function ctenarNaTabletu(c: Pick<Kontext, 'meId' | 'teamId'>, chtene: unknown, den: unknown, req?: Request): Promise<number | null> {
   const kdo = await resolveActingUser(c.meId, 'kiosk', c.teamId, chtene, req);
   if (kdo !== c.meId) return kdo;
   const id = parseInt(String(chtene ?? ''), 10);

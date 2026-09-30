@@ -71,6 +71,8 @@ export function vObdobi(den: string, obdobi: ObdobiSouhrnu, dnes: string): boole
 
 const num = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 const skryty = (c: RadekUzaverky) => c.trzbaSkryta === true || c.cash_revenue == null || c.closing_cash == null;
+/** Přišla uzávěrka bez tržby (role bez finance.trzby)? Počítat z ní znamená NaN → falešné „Manko 0 Kč". */
+export const maSkrytouTrzbu = skryty;
 
 // ---------------------------------------------------------------------------
 // Souhrn (čtyři čísla z bývalých dlaždic)

@@ -4,8 +4,10 @@ import LoginForm from '@/components/LoginForm';
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-[100dvh] bg-[#0D0D0D] flex items-center justify-center">
-        <div className="text-[#8E8E93] text-sm">Načítání...</div>
+      // Stejné pozadí a barvy jako přihlášení samotné (tokeny, ne tvrdá černá):
+      // jinak při pomalém načtení problikla černá obrazovka a skočilo se do světlé.
+      <div className="min-h-[100dvh] flex items-center justify-center">
+        <p role="status" className="t-meta">Načítání…</p>
       </div>
     }>
       <LoginForm />

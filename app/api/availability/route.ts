@@ -81,9 +81,14 @@ export async function GET(req: Request) {
     // Zveřejnění rozvrhu se nikde neukládá (publish jen rozešle upozornění),
     // takže počet směn je nejbližší poctivý ukazatel — a jede s odpovědí,
     // kterou widget stejně čte, ať neposílá dotaz navíc.
+    // Směny s auto_created se nepočítají: vznikají samy z příchodu na směnu
+    // a z uzávěrky (ne z plánování), takže by jedno ranní píchnutí „naplánovalo"
+    // měsíc, na který nikdo rozvrh nesestavil, a widget by lhal, že je vyřízeno.
+    // `IS NOT TRUE` bere i NULL ze starých řádků; na stroji před migrací sloupec
+    // chybí, dotaz spadne do catch a widget se konzervativně neminimalizuje.
     let naplanovanoSmen = 0;
     try {
-      const [n] = await sql`SELECT COUNT(*)::int AS n FROM shifts WHERE team_id = ${ctx.teamId} AND date LIKE ${month + '-%'}`;
+      const [n] = await sql`SELECT COUNT(*)::int AS n FROM shifts WHERE team_id = ${ctx.teamId} AND date LIKE ${month + '-%'} AND auto_created IS NOT TRUE`;
       naplanovanoSmen = Number(n?.n) || 0;
     } catch { /* bez počtu zůstane 0 — widget se jen neminimalizuje */ }
     return NextResponse.json({ submissions, naplanovanoSmen });

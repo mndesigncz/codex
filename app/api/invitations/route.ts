@@ -8,6 +8,7 @@ import { neon } from '@neondatabase/serverless';
 import { planInfoOf, PLAN_ENFORCED, canAddMember } from '@/lib/plan';
 import { generateInviteToken } from '@/lib/team';
 import { sendTeamInvitation } from '@/lib/email';
+import { normalizujEmail } from '@/lib/emailAdresa';
 import { smiPridatClena, pocetClenu } from '@/lib/tenant';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { smiPriraditRoli } from '@/lib/opravneni';
@@ -58,7 +59,10 @@ export async function GET() {
 export async function POST(request: Request) {
   const c = await pozaduj('tym.pozvat');
   if (jeOdpoved(c)) return c;
-  const { email, jobTitle, role } = await request.json();
+  const telo = await request.json();
+  const { jobTitle, role } = telo;
+  // Pozvánka nese e-mail v normalizovaném tvaru, ať se s účtem najde bez ohledu na velikost písmen.
+  const email = normalizujEmail(telo.email);
   if (!email) return NextResponse.json({ error: 'Email je povinný' }, { status: 400 });
 
   const sql = neon(process.env.DATABASE_URL!);
@@ -85,7 +89,7 @@ export async function POST(request: Request) {
   const typPrijeti = invRole === 'employer' ? 'employer' : typUctu(await vychoziRolePodniku(Number(team.id)));
   // Existující účet jde pozvat do DALŠÍHO podniku (přijetí mu přidá členství).
   // Nejde pozvat tablet ani hosta, a nejde pozvat někoho, kdo už tu je.
-  const [existingUser] = await sql`SELECT id, role, team_id FROM users WHERE email = ${email}`;
+  const [existingUser] = await sql`SELECT id, role, team_id FROM users WHERE lower(email) = ${email} ORDER BY id LIMIT 1`;
   if (existingUser) {
     if (existingUser.role === 'kiosk' || existingUser.role === 'customer') {
       return NextResponse.json({ error: 'Tenhle e-mail patří tabletu nebo hostovi — do týmu ho pozvat nejde.' }, { status: 409 });

@@ -53,3 +53,26 @@ export function nextActiveId({ prev, onShift, idleFor, idleMs = IDLE_MS }: Ident
 export function needsWho(active: number | null, onShift: number[]): boolean {
   return active == null && onShift.length > 0;
 }
+
+// ---------------------------------------------------------------------------
+// Cookie „kdo u tabletu stojí"
+// ---------------------------------------------------------------------------
+//
+// Server ji čte u zápisů, které si tělo skládají samy (dokončení postupu,
+// ±1 ve skladu, zápis zbytků). Platí hodinu — ale dřív se zapsala jen při
+// ZMĚNĚ vybrané osoby. Jediný člověk na směně se za celou směnu nezměnil, po
+// hodině cookie vypršela a tablet dál v hlavičce psal „Zapisuje se jako
+// Martin", zatímco záznamy šly tiše na účet tabletu. Cookie proto zrcadlí
+// stav v prohlížeči: dokud si tablet někoho pamatuje, obnovuje se.
+
+/** Platnost cookie — pojistka, aby identita nepřežila zavřený tablet. */
+export const ACTING_MAX_AGE_S = 60 * 60;
+/** Jak často se cookie obnoví, dokud tablet někoho drží (řádově míň než platnost). */
+export const ACTING_OBNOVA_MS = 5 * 60 * 1000;
+/** Nejčastěji se obnovuje při dotyku — víc než jednou za půl minuty nemá smysl. */
+export const ACTING_DOTYK_MS = 30 * 1000;
+
+/** Má se cookie znovu zapsat? `posledniZapis` = kdy se psala naposled (0 = nikdy). */
+export function obnovitCookie(posledniZapis: number, ted: number, odstupMs: number = ACTING_DOTYK_MS): boolean {
+  return posledniZapis <= 0 || ted - posledniZapis >= odstupMs;
+}

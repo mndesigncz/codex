@@ -719,6 +719,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
    třídy je jiné. Přesně takhle tu už jednou vypadl stupeň /65 a opravil
    se zvlášť; tohle je zbytek téže řady. Hlídá to `check-dark-classes`. */
 :root[data-theme="dark"] .seg-off{ color:rgba(237,242,228,0.62); }
+/* Vybraná pilulka: inkoust #16181A na tmavém podkladu (26,28,31) splývá s nevybranými
+   skleněnými. Světlý vnitřní okraj (box-shadow, žádný posun rozměru) ji vrací dopředu
+   všude — záložky tabletu, filtry Úkolů i kategorie Skladu. */
+:root[data-theme="dark"] .seg-on{ box-shadow: inset 0 0 0 1px rgba(255,255,255,0.30); }
 @media (hover: hover) { :root[data-theme="dark"] .seg-off:hover{ color:#EDF2E4; background:rgba(255,255,255,0.08); } }
 :root[data-theme="dark"] .btn-icon{
   background:rgba(255,255,255,0.08); color:rgba(237,242,228,0.62);

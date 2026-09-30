@@ -46,7 +46,7 @@ import { obnovDataWidgetu, useDataWidgetu } from './widgety/useDataWidgetu';
 import { useOpravneni } from './role/useOpravneni';
 import { oznamZmenuPovinnych, ChipPredUzaverkou } from './PredUzaverkou';
 import {
-  URL_NAVODY, URL_CTENARI, UDALOST_OTEVRIT_NAVOD, vyberNavody, poctyKategorii, kdyUpraveno, type NavodApi,
+  URL_NAVODY, URL_CTENARI, UDALOST_OTEVRIT_NAVOD, vyberNavody, vyberNavodyOsoby, urlNavoduZa, sloucStavCteni, poctyKategorii, kdyUpraveno, type NavodApi,
 } from '@/lib/navodyPrehled';
 
 interface User {
@@ -199,7 +199,14 @@ export default function Guides({ user, ticksFor, openGuideId, zaKoho, vyberKoho 
 
   const navody = useDataWidgetu(URL_NAVODY, vyberNavody);
   const kategorie = useDataWidgetu(URL_KATEGORIE, vyberKategorie);
-  const guides = navody.data ?? [];
+  // Tablet: stav čtení v seznamu patří člověku u tabletu, ne účtu tabletu (ten
+  // nemá nikdy přečteno, protože se potvrzuje pod člověka). Ptá se zvlášť.
+  const urlOsoby = tablet ? urlNavoduZa(zaKoho) : null;
+  const navodyOsoby = useDataWidgetu(urlOsoby, vyberNavodyOsoby);
+  const guides = useMemo(
+    () => (tablet ? sloucStavCteni(navody.data ?? [], navodyOsoby.data, zaKoho?.id) : (navody.data ?? [])),
+    [tablet, navody.data, navodyOsoby.data, zaKoho?.id],
+  );
   const categories = kategorie.data ?? [];
 
   const [activeCat, setActiveCat] = useState<number | 'all'>('all');
@@ -219,7 +226,10 @@ export default function Guides({ user, ticksFor, openGuideId, zaKoho, vyberKoho 
   const [kopieOpen, setKopieOpen] = useState(false);
   const { jine: jinePodniky, cil: nazevPodniku } = useJinePodniky(smiVytvorit);
 
-  const reloadGuides = useCallback(() => { obnovDataWidgetu(URL_NAVODY); obnovDataWidgetu(URL_CTENARI); }, []);
+  const reloadGuides = useCallback(() => {
+    obnovDataWidgetu(URL_NAVODY); obnovDataWidgetu(URL_CTENARI);
+    if (urlOsoby) obnovDataWidgetu(urlOsoby);
+  }, [urlOsoby]);
   const reloadCategories = useCallback(() => { obnovDataWidgetu(URL_KATEGORIE); }, []);
 
   const catById = useMemo(() => {

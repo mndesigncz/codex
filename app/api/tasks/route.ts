@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { resolveActingUser } from '@/lib/kioskActing';
+import { ctenarNaTabletu } from '@/lib/povinnePredUzaverkouDb';
 import { ensureProductionTasks, produceBatch } from '@/lib/production';
 import { pragueToday } from '@/lib/pragueTime';
 import { sazebnikBodu } from '@/lib/mzdaSmeny';
@@ -506,7 +507,16 @@ export async function PATCH(req: NextRequest) {
   // Record who completed it (cleared when re-opened). On the shared tablet the
   // completion is attributed to the person currently using it, so their points
   // land on the right account. Falls back if the column isn't there yet.
-  const effectiveId = await resolveActingUser(c.meId, c.role, c.teamId, b.actingAs, req);
+  let effectiveId = await resolveActingUser(c.meId, c.role, c.teamId, b.actingAs, req);
+  // Zámek uzávěrky na tabletu zavírá i za člověka, který už není odpíchnutý
+  // (dohánění včerejšího dne). resolveActingUser ho nepustí (chce otevřený
+  // příchod) a úkol by se tiše připsal účtu tabletu — body by propadly. Stejné
+  // pravidlo jako u přečtení návodu: člen s uzaverky.vytvorit, který měl v den
+  // uzávěrky (`den`) směnu. Bez `den` se nic nemění.
+  if (effectiveId === c.meId && c.role === 'kiosk' && b.actingAs != null && b.den != null) {
+    const zaKoho = await ctenarNaTabletu({ meId: c.meId, teamId: c.teamId }, b.actingAs, b.den, req);
+    if (zaKoho != null) effectiveId = zaKoho;
+  }
   let row: any;
   const done = b.status === 'done';
   // Výrobní úkol: odškrtnutí = vyrobeno. Dávka se naskladní a suroviny odepíšou

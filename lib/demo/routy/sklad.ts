@@ -71,7 +71,23 @@ export const sklad: Obsluha = (p, k) => {
     });
     return ok(rows);
   }
-  if (cesta === '/api/inventory/reports') return ok({ reports: [] });
+  if (cesta === '/api/inventory/reports') {
+    if (metoda === 'POST') {
+      const b = p.telo ?? {};
+      const polozky = Array.isArray(b.items) ? b.items : [];
+      s.hlaseniSkladu.unshift({ id: ++s.dalsiId, items: polozky, note: b.note ?? null, status: 'new', authorId: meId, createdAt: new Date().toISOString() });
+      k.hlas('hlaseni-skladu', { polozek: polozky.length });
+      return ok({ ok: true });
+    }
+    if (metoda === 'PATCH') {
+      const r = s.hlaseniSkladu.find(x => x.id === Number(p.telo?.id));
+      if (r) r.status = p.telo?.status === 'done' ? 'done' : 'new';
+      return ok({ ok: true });
+    }
+    return ok({
+      reports: s.hlaseniSkladu.map(r => ({ id: r.id, items: JSON.stringify(r.items), note: r.note, status: r.status, author_name: clen(r.authorId).name, author_avatar: clen(r.authorId).avatar, created_at: r.createdAt })),
+    });
+  }
   if (cesta === '/api/inventory/shrinkage') return ok({ ready: false });
   if (/^\/api\/inventory\/\d+$/.test(cesta)) {
     const z = s.zasoby.find(x => x.id === Number(cesta.split('/').pop()));

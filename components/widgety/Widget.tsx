@@ -121,6 +121,12 @@ export interface ObalWidgetuProps {
   children?: React.ReactNode;
 }
 
+/**
+ * Nadpis karty přijímá fokus programově (tabIndex -1, mimo Tab): plocha ho tam
+ * vrací po výměně plné karty za minimalizovanou a zpět. Prstenec jen pro klávesnici.
+ */
+const FOKUS_TITULKU = 'rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)]';
+
 /** Vypnutý dotaz (useDataWidgetu s url null) nesmí držet widget na kostře. */
 const jeVypnuto = (s: StavNacteni) => s.vypnuto === true;
 
@@ -207,7 +213,9 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, ton, nac
           <Icon name="check" size={14} strokeWidth={2.5} />
         </span>
         <div className="relative min-w-0 flex-1">
-          <h2 id={idTitulku} className="t-card truncate">{nazev}</h2>
+          {/* tabIndex -1 + data-w-titulek: cíl fokusu po výměně karet (plocha sem vrátí
+              fokus, když klávesnicí ovládané tlačítko, které ho neslo, zmizelo z DOM). */}
+          <h2 id={idTitulku} data-w-titulek="" tabIndex={-1} className={`t-card truncate ${FOKUS_TITULKU}`}>{nazev}</h2>
           <p className="t-meta truncate">{k.mini}</p>
         </div>
         <Button variant="ghost" size="sm" icon="chevron" aria-label={`Ukázat celý widget ${nazev}`}
@@ -254,7 +262,7 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, ton, nac
         {/* Malá karta je na telefonu široká ~171 px a na název zbývá ~125 px:
             „Docházející zásoby" by skončil jako „Docházející zá…" a číslo pod
             ním by nemělo jméno. U S proto dva řádky, ikona u prvního. */}
-        <h2 id={idTitulku} className={`t-card flex ${S ? 'items-start' : 'items-center'} gap-2 min-w-0 ${inkoust ? '!text-white' : ''}`}>
+        <h2 id={idTitulku} data-w-titulek="" tabIndex={-1} className={`t-card flex ${S ? 'items-start' : 'items-center'} gap-2 min-w-0 ${FOKUS_TITULKU} ${inkoust ? '!text-white' : ''}`}>
           {/* Ikona v limetkové dlaždičce: jemný akcent hlavičky (kolo 71). Tónovaná
               průhledností (bg-ok/15) — plná limetka je vyhrazená akci (DP T3)
               a v tmavém režimu by svítila. Na inkoustové ploše bílá s průhledností. */}
