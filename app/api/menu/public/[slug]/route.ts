@@ -13,10 +13,14 @@ export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-export async function GET(_request: Request, props: { params: Promise<{ slug: string }> }) {
+export async function GET(request: Request, props: { params: Promise<{ slug: string }> }) {
   const params = await props.params;
   const slug = cleanSlug(params.slug);
   if (!slug) return NextResponse.json({ error: 'Neplatná adresa menu' }, { status: 400 });
+  // Jazyk hosta (?lang=en). Neznámý nebo nenabízený jazyk není chyba: lístek
+  // se ukáže ve svém výchozím jazyce (publicShape). Jazyk je součástí adresy,
+  // takže service worker i cache mají pro každý jazyk vlastní záznam.
+  const lang = new URL(request.url).searchParams.get('lang');
 
   try {
     // Když je stejný slug u víc týmů, rozhoduje ten nejstarší — slug je
@@ -24,12 +28,24 @@ export async function GET(_request: Request, props: { params: Promise<{ slug: st
     // Sloupce se vypisují schválně. `SELECT *` sem tahá i to, co host
     // nemá co vidět (PIN), a navíc cokoliv, co v tabulce zbylo z dřívějška —
     // veřejné čtení pak závisí na sloupcích, o kterých ani neví.
-    const [board] = await sql`
-      SELECT id, slug, name, eyebrow, title, note,
-             wifi_ssid, wifi_password, currency, enabled, theme, updated_at, team_id
-      FROM menu_boards
-      WHERE slug = ${slug} AND enabled IS NOT FALSE
-      ORDER BY id LIMIT 1`;
+    // Sloupce jazyků (kolo 76) se čtou zvlášť a defenzivně: před /api/init
+    // nejsou a lístek se musí ukázat jako dřív, jen česky.
+    let board: any;
+    try {
+      [board] = await sql`
+        SELECT id, slug, name, eyebrow, title, note,
+               wifi_ssid, wifi_password, currency, enabled, theme, updated_at, team_id, langs, i18n
+        FROM menu_boards
+        WHERE slug = ${slug} AND enabled IS NOT FALSE
+        ORDER BY id LIMIT 1`;
+    } catch {
+      [board] = await sql`
+        SELECT id, slug, name, eyebrow, title, note,
+               wifi_ssid, wifi_password, currency, enabled, theme, updated_at, team_id
+        FROM menu_boards
+        WHERE slug = ${slug} AND enabled IS NOT FALSE
+        ORDER BY id LIMIT 1`;
+    }
     // Pozastavený podnik nemá ani veřejné menu — host vidí totéž, co když
     // menu neexistuje. `team_id` se ven neposílá (níž se vypisují sloupce).
     if (board && (await podnikJePozastaveny(board.team_id))) {
@@ -69,18 +85,43 @@ export async function GET(_request: Request, props: { params: Promise<{ slug: st
       }, { status: 404 });
     }
 
-    const sections = await sql`
-      SELECT id, title, column_no, position
-      FROM menu_sections WHERE board_id = ${board.id} ORDER BY position, id`;
-    const items = sections.length
-      ? await sql`
-          SELECT id, section_id, name, price, description, sold_out, pos_product_id, position
-          FROM menu_items
-          WHERE section_id IN (SELECT id FROM menu_sections WHERE board_id = ${board.id})
-          ORDER BY position, id`
-      : [];
+    let sections: any[];
+    let items: any[];
+    try {
+      sections = await sql`
+        SELECT id, title, column_no, position, i18n
+        FROM menu_sections WHERE board_id = ${board.id} ORDER BY position, id` as any[];
+      items = sections.length
+        ? await sql`
+            SELECT id, section_id, name, price, description, sold_out, pos_product_id, position, allergens, tags, i18n
+            FROM menu_items
+            WHERE section_id IN (SELECT id FROM menu_sections WHERE board_id = ${board.id})
+            ORDER BY position, id` as any[]
+        : [];
+    } catch {
+      sections = await sql`
+        SELECT id, title, column_no, position
+        FROM menu_sections WHERE board_id = ${board.id} ORDER BY position, id` as any[];
+      items = sections.length
+        ? await sql`
+            SELECT id, section_id, name, price, description, sold_out, pos_product_id, position
+            FROM menu_items
+            WHERE section_id IN (SELECT id FROM menu_sections WHERE board_id = ${board.id})
+            ORDER BY position, id` as any[]
+        : [];
+    }
 
-    const data = publicShape(buildBoard(board, sections as any[], items as any[]));
+    // Ceny se píšou podle locale podniku (všichni hosté vidí tutéž částku stejně);
+    // bez sloupce nebo bez podniku se vezme locale jazyka lístku.
+    let locale: string | undefined;
+    let currency: string | undefined;
+    try {
+      const [t] = await sql`SELECT locale, currency FROM teams WHERE id = ${board.team_id}`;
+      if (t?.locale) locale = String(t.locale);
+      if (t?.currency) currency = String(t.currency);
+    } catch { /* sloupec ještě není */ }
+
+    const data = publicShape(buildBoard(board, sections, items), lang, { locale, currency });
     return NextResponse.json(data, {
       // Ceny a vyprodáno se během akce mění — nikde se to nesmí zaseknout v cache.
       headers: { 'Cache-Control': 'no-store, max-age=0' },

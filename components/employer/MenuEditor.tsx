@@ -40,6 +40,12 @@ import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu } from '../widgety/useDataWidgetu';
 import { useOpravneni } from '../role/useOpravneni';
 import { UDALOST_MENU_ZAPNUTO } from '../widgety/oblasti/menu';
+import JazykyListku from './menu/JazykyListku';
+import PrekladListku from './menu/PrekladListku';
+import AlergenyPicker from './menu/AlergenyPicker';
+import { STITKY } from '@/lib/alergeny';
+import type { Jazyk } from '@/lib/i18n/config';
+import type { JazykyListku as Langs, Preklady } from '@/lib/menu';
 
 interface Item {
   id?: number;
@@ -48,8 +54,12 @@ interface Item {
   description?: string | null;
   soldOut: boolean;
   posProductId?: string | null;
+  /** Kódy alergenů 1–14; prázdné = nevyplněno (ne „bez alergenů"). */
+  allergens?: number[];
+  tags?: string[];
+  i18n?: Preklady<'name' | 'description'>;
 }
-interface Section { id?: number; title: string; column: 1 | 2; items: Item[]; }
+interface Section { id?: number; title: string; column: 1 | 2; items: Item[]; i18n?: Preklady<'title'>; }
 interface Board {
   id: number; slug: string; name: string;
   eyebrow: string | null; title: string | null; note: string | null;
@@ -57,6 +67,9 @@ interface Board {
   currency: string; enabled: boolean; hasPin?: boolean;
   theme: MenuTheme;
   sections: Section[];
+  /** Jazyky lístku a překlady hlavičky (kolo 76). Starší server je neposílá: pak jen čeština. */
+  langs?: Langs;
+  i18n?: Preklady<'eyebrow' | 'title' | 'note'>;
 }
 interface PosProduct { productId: string; name: string; category: string; price: number | null; }
 
@@ -99,6 +112,10 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
   const [vzhledOtevren, setVzhledOtevren] = useState(false);
   const [potvrzeni, setPotvrzeni] = useState<Potvrzeni>(null);
   const [noveMenu, setNoveMenu] = useState<string | null>(null);
+  /* Jazyk, který se právě překládá; null = výchozí jazyk lístku (běžná editace). */
+  const [jazykEditace, setJazykEditace] = useState<Jazyk | null>(null);
+  /* Okno s alergeny a štítky jedné položky. */
+  const [alergenyOtevreno, setAlergenyOtevreno] = useState<{ si: number; ii: number } | null>(null);
   /* Ukládá se až tlačítkem, takže je potřeba dát najevo, že něco čeká. */
   const [neulozeno, setNeulozeno] = useState(false);
   /*
@@ -581,6 +598,8 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
     const setT = (fn: (x: MenuTheme) => void) =>
       upravit((b) => { const kop = normalizeMenuTheme(b.theme); fn(kop); b.theme = kop; });
     const zamceno = !smiUpravit;
+    /* Přepnuté menu nemusí nabízet jazyk, který se překládal v předchozím: pak běžná editace. */
+    const editace: Jazyk | null = jazykEditace && board.langs && jazykEditace !== board.langs.vychozi && board.langs.nabizet.includes(jazykEditace) ? jazykEditace : null;
 
     nastroj = (
       <div className="space-y-4">
@@ -709,6 +728,16 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
               </div>
             </>
           )}
+        </Card>
+
+        <Card>
+          <JazykyListku
+            langs={board.langs ?? { vychozi: 'cs', nabizet: ['cs'] }}
+            upravLangs={(nove) => upravit((b) => { b.langs = nove; })}
+            editace={editace}
+            setEditace={setJazykEditace}
+            deska={board}
+            zamceno={zamceno} />
         </Card>
 
         <Card className="space-y-4">
@@ -856,7 +885,20 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
           </Card>
         )}
 
-        {board.sections.map((s, si) => (
+        {/* Alergeny: host u položky bez vyplněných alergenů nic neuvidí, proto se vyplněnost hlídá nahlas. */}
+        {!editace && (() => {
+          const vse = board.sections.flatMap(x => x.items);
+          const s = vse.filter(i => (i.allergens?.length ?? 0) > 0).length;
+          return s > 0 && s < vse.length ? (
+            <p className="note note-info" role="status">
+              Alergeny jsou vyplněné u {s} z {czCount(vse.length, POLOZKA)}. U ostatních host nic neuvidí, jen pod lístkem větu, ať se zeptá obsluhy.
+            </p>
+          ) : null;
+        })()}
+
+        {editace ? (
+          <PrekladListku deska={board as any} jazyk={editace} upravit={upravit as any} zamceno={zamceno} uid={uid} />
+        ) : board.sections.map((s, si) => (
           <Card key={s.id ?? `nova-${si}`} as="section" aria-label={`Sekce ${s.title || si + 1}`} className="space-y-3">
             <div className="flex items-center gap-2 flex-wrap">
               <Input aria-label="Název sekce menu" className="flex-1 min-w-[8rem] font-semibold" value={s.title} maxLength={80} disabled={zamceno}
@@ -927,6 +969,11 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
                             {!zamceno && <Button variant="secondary" size="sm" onClick={() => otevritVyber(si, ii)}>Spárovat</Button>}
                           </>
                         ))}
+                        <Button variant="ghost" size="sm" onClick={() => setAlergenyOtevreno({ si, ii })}
+                          aria-label={`Alergeny a štítky — ${it.name || 'nová položka'}`}>
+                          {(it.allergens?.length ?? 0) > 0 ? `Alergeny: ${it.allergens!.join(', ')}` : 'Alergeny'}
+                        </Button>
+                        {(it.tags ?? []).map(k => <Chip key={k} size="sm">{(STITKY as any)[k]?.cs ?? k}</Chip>)}
                         <span className="flex-1" />
                         {!zamceno && (
                           <span className="flex items-center gap-2">
@@ -990,7 +1037,7 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
         ))}
 
         <Card className="space-y-3">
-          {!zamceno && (
+          {!zamceno && !editace && (
             <Button variant="secondary" size="sm" icon="plus"
               onClick={() => upravit((b) => { b.sections.push({ title: 'Nová sekce', column: 1, items: [] }); })}>
               Sekce
@@ -1030,6 +1077,20 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
   const okna = (
     <>
       {kopieOkno}
+      <Modal open={alergenyOtevreno != null && !!board?.sections[alergenyOtevreno.si]?.items[alergenyOtevreno.ii]} onClose={() => setAlergenyOtevreno(null)} size="md"
+        title="Alergeny a štítky"
+        subtitle={alergenyOtevreno && board ? (board.sections[alergenyOtevreno.si]?.items[alergenyOtevreno.ii]?.name || 'Nová položka') : undefined}
+        footer={<Button variant="primary" onClick={() => setAlergenyOtevreno(null)}>Hotovo</Button>}>
+        {alergenyOtevreno && board?.sections[alergenyOtevreno.si]?.items[alergenyOtevreno.ii] && (() => {
+          const { si, ii } = alergenyOtevreno;
+          const it = board.sections[si].items[ii];
+          return (
+            <AlergenyPicker alergeny={it.allergens ?? []} stitky={it.tags ?? []} disabled={!smiUpravit}
+              onAlergeny={(kody) => upravit((b) => { b.sections[si].items[ii].allergens = kody; })}
+              onStitky={(kody) => upravit((b) => { b.sections[si].items[ii].tags = kody; })} />
+          );
+        })()}
+      </Modal>
       <Modal open={noveMenu != null} onClose={() => setNoveMenu(null)} size="sm" title="Nové menu" subtitle="Založí se prázdné, s vlastní adresou."
         footer={<>
           <Button variant="secondary" onClick={() => setNoveMenu(null)}>Zrušit</Button>
