@@ -6,7 +6,7 @@
 
 import { readFileSync } from 'node:fs';
 import type { Testy } from './_testy.ts';
-import { aplikaceVServeru, cestaZOdkazu, cestaZQr, jeKioskCesta, kodKarty, zjistiObalUa } from '../../lib/nativni/most.ts';
+import { cestaZOdkazu, cestaZQr, jeKioskCesta, kodKarty, zjistiObalUa } from '../../lib/nativni/most.ts';
 
 export default function ({ eq, ok }: Testy) {
   // ---- značka v User-Agentu ----
@@ -16,7 +16,7 @@ export default function ({ eq, ok }: Testy) {
   eq('ManageroClient = hosté', zjistiObalUa(`${safari} ManageroClient/1.0.0 (build 1)`), { obal: 'client', verze: '1.0.0', build: 1 });
   eq('značka bez buildu', zjistiObalUa('x ManageroClient/2.0'), { obal: 'client', verze: '2.0', build: null });
   eq('prázdný UA', zjistiObalUa(null), { obal: null, verze: null, build: null });
-  eq('jména aplikací v tabulce zařízení', [aplikaceVServeru('managero'), aplikaceVServeru('client')], ['provoz', 'klient']);
+  eq('obě značky v UA: platí přísnější (host), stejně jako na serveru', zjistiObalUa(`${safari} ManageroApp/1.0.0 ManageroClient/1.0.0`).obal, 'client');
 
   // ---- universal links a App Links ----
   eq('odkaz na podnik', cestaZOdkazu('https://www.managero.app/client/kavarna-u-lipy?tab=order&table=3&t=abc'), '/client/kavarna-u-lipy?tab=order&table=3&t=abc');

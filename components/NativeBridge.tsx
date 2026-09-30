@@ -13,40 +13,30 @@ import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Button } from './ui';
 import {
-  aplikaceVServeru, cestaZOdkazu, cestaZQr, jeKioskCesta, jeNativni, nacti, platforma, plugin,
-  uloz, zjistiObalUa, type KlicObalu,
+  cestaZOdkazu, cestaZQr, jeKioskCesta, jeNativni, nacti, platforma, plugin,
+  uloz, zjistiObalUa, type KlicObalu, type NativniApi, type VysledekPushe,
 } from '@/lib/nativni/most';
 import { mistniCesta } from '@/lib/bezpecnaUrl';
 
+// Jediný vlastník klíče tokenu a volby „push vypnut“ (ostatní kód volá window.manageroNative).
 const KLIC_TOKENU = 'managero-push-token';
+const KLIC_PUSH_VYPNUTO = 'managero-push-vypnuto';
 const KLIC_ODLOZENO = 'managero-push-odlozeno';
 const ODLOZENI_MS = 14 * 24 * 3600 * 1000; // „Teď ne“ se znovu neptá dva týdny
 const ZAMEK_PO_MS = 60_000;                // zámek po minutě v pozadí
 
-export interface NativniApi {
-  obal: KlicObalu;
-  /** Otevře nativní skener, vrátí obsah QR, nebo null (zrušeno / nejde). */
-  skenujQr: () => Promise<string | null>;
-  /** Naskenuje QR podniku, stolu nebo kód podniku a otevře ho v aplikaci. Vrací false, když QR není náš. */
-  skenujAOtevri: () => Promise<boolean>;
-  sdilej: (d: { title?: string; text?: string; url?: string }) => Promise<boolean>;
-  haptika: (druh?: 'lehka' | 'stredni' | 'uspech' | 'chyba') => void;
-  /** Vyžádá si povolení k upozorněním (volat až z kontextu, ne při startu). */
-  zapniPush: () => Promise<boolean>;
-  zamek: { dostupny: () => Promise<boolean>; zapnuto: () => Promise<boolean>; nastav: (zap: boolean) => Promise<boolean> };
-}
-declare global { interface Window { manageroNative?: NativniApi } }
-
 /** Registrace tokenu na serveru; selže tiše (endpoint může před nasazením serveru chybět). */
-async function posliToken(token: string, obal: KlicObalu, verze: string | null) {
+// Aplikaci (managero / client) určuje server podle role účtu, ne podle těla požadavku.
+async function posliToken(token: string, verze: string | null) {
   try {
     const r = await fetch('/api/native/push', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, platform: platforma(), app: aplikaceVServeru(obal), appVersion: verze }),
+      body: JSON.stringify({ token, platform: platforma(), version: verze }),
     });
     if (r.ok) uloz(KLIC_TOKENU, token);
   } catch { /* server ještě nezná endpoint nebo není síť: zkusí se při dalším startu */ }
 }
+const pushVypnuto = (): boolean => nacti(KLIC_PUSH_VYPNUTO) === '1';
 async function smazToken() {
   const token = nacti(KLIC_TOKENU);
   if (!token) return;
@@ -72,7 +62,10 @@ export default function NativeBridge() {
     if (!PN || !obal) return false;
     if (!posluchaceHotovo.current) {
       posluchaceHotovo.current = true;
-      PN.addListener('registration', (t: { value: string }) => { void posliToken(t.value, obal, ua.current.verze); });
+      PN.addListener('registration', (t: { value: string }) => {
+        // Zavolal-li uživatel mezitím vypnutí, token se na server nedostane.
+        if (!pushVypnuto()) void posliToken(t.value, ua.current.verze);
+      });
       PN.addListener('registrationError', () => { /* bez push se dá žít */ });
       PN.addListener('pushNotificationReceived', (n: unknown) => window.dispatchEvent(new CustomEvent('managero:push-prijato', { detail: n })));
       PN.addListener('pushNotificationActionPerformed', (a: { notification?: { data?: { link?: string } } }) => {
@@ -88,21 +81,29 @@ export default function NativeBridge() {
     return true;
   }, [obal]);
 
-  const zapniPush = useCallback(async () => {
+  const zapniPush = useCallback(async (): Promise<VysledekPushe> => {
     const PN = plugin('PushNotifications');
-    if (!PN) return false;
+    if (!PN) return 'nedostupny';
     try {
       let p = await PN.checkPermissions();
       if (p.receive === 'prompt' || p.receive === 'prompt-with-rationale') p = await PN.requestPermissions();
-      if (p.receive !== 'granted') return false;
-      return await registruj();
-    } catch { return false; }
+      if (p.receive === 'denied') return 'denied';
+      if (p.receive !== 'granted') return 'prompt';
+      uloz(KLIC_PUSH_VYPNUTO, null);
+      return (await registruj()) ? 'granted' : 'chyba';
+    } catch { return 'chyba'; }
   }, [registruj]);
+
+  const vypniPush = useCallback(async () => {
+    uloz(KLIC_PUSH_VYPNUTO, '1');
+    await smazToken();
+  }, []);
 
   useEffect(() => {
     if (!obal) return;
-    if (status === 'unauthenticated') { void smazToken(); return; }
-    if (status !== 'authenticated' || kiosk) return;
+    // Po odhlášení už je relace pryč (DELETE by dostal 401); token maže odhlasitPush před signOut.
+    if (status === 'unauthenticated') { uloz(KLIC_TOKENU, null); return; }
+    if (status !== 'authenticated' || kiosk || pushVypnuto()) return;
     const PN = plugin('PushNotifications');
     if (!PN) return;
     let zrusene = false;
@@ -236,7 +237,7 @@ export default function NativeBridge() {
       },
     };
 
-    window.manageroNative = { obal, skenujQr, skenujAOtevri, sdilej, haptika, zapniPush, zamek };
+    window.manageroNative = { obal, skenujQr, skenujAOtevri, sdilej, haptika, zapniPush, vypniPush, pushVypnuto, odhlasitPush: smazToken, zamek };
     window.dispatchEvent(new Event('managero:nativni-pripraveno'));
 
     // Universal links a App Links: stejný host → cesta v aplikaci, jiný host se ignoruje.
@@ -281,7 +282,7 @@ export default function NativeBridge() {
       if (Haptics) (navigator as any).vibrate = puvodniVibrate;
       delete window.manageroNative;
     };
-  }, [obal, zapniPush]);
+  }, [obal, zapniPush, vypniPush]);
 
   if (!obal) return null;
   return (

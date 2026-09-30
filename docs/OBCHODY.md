@@ -34,7 +34,7 @@ Xcode, Gradle) se dělají zvlášť; tady je to, co musí umět server a web, a
    demo účty `scripts/seed-recenzent.mjs`.
 7. **Hlavičky a okraje**: `Permissions-Policy: geolocation=(self)` (objednávání od stolu), `viewport-fit=cover` a horní okraj v obalu.
 8. **`.well-known`**: `apple-app-site-association` (application/json, bez přesměrování, disjunktní cesty obou aplikací) a `assetlinks.json`.
-9. **WebView**: `lib/stahni.ts` (soubory, tisk) a `lib/nativniMost.ts` (push, odkazy) s návratem na webové chování.
+9. **WebView**: `lib/stahni.ts` (soubory, tisk) a `lib/nativni/most.ts` + `components/NativeBridge.tsx` (push, odkazy) s návratem na webové chování.
 
 ## Co musí udělat člověk
 

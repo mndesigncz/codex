@@ -8,7 +8,7 @@ import { Icon } from './Icons';
 import { EmptyState, Button, Skeleton, PageHeader, Segmented, SwitchRow, Badge, ListRow, Chip, Modal, Stat, StatRow, Label, hintsEnabled, setHintsEnabled, resetHints, dismissedCount } from './ui';
 import { useTheme } from './ThemeProvider';
 import { useObal } from './ObalProvider';
-import { jeNativni, stavNativnihoPushe, zapniNativniPush } from '@/lib/nativniMost';
+import { jeNativni, nativniMost, stavNativnihoPushe } from '@/lib/nativni/most';
 import SmazatUcet from './ucet/SmazatUcet';
 import PravniOdkazy from './pravni/PravniOdkazy';
 import NahlasenyObsah from './moderace/NahlasenyObsah';
@@ -246,10 +246,11 @@ export default function Settings({ user, initialTab, tabNonce }: Props) {
     // V nativním obalu web push neexistuje (WKWebView nemá PushManager); rozhoduje nativní plugin.
     if (jeNativni()) {
       let zruseno = false;
-      stavNativnihoPushe().then(st => {
+      Promise.all([stavNativnihoPushe(), nativniMost()]).then(([st, most]) => {
         if (zruseno) return;
         setPushStav(st === 'nedostupny' ? 'nepodporovano' : 'ok');
-        if (st === 'granted') setPrefs(prev => ({ ...prev, push: true }));
+        // Povolení v systému nestačí: uživatel mohl push v aplikaci vypnout (token je pak na serveru smazaný).
+        if (st === 'granted') setPrefs(prev => ({ ...prev, push: !most?.pushVypnuto() }));
         if (st === 'denied') setPrefs(prev => ({ ...prev, push: false }));
       });
       return () => { zruseno = true; };
@@ -331,8 +332,9 @@ export default function Settings({ user, initialTab, tabNonce }: Props) {
     // Nativní obal: systémový dialog a registrace tokenu; přepínač ukáže skutečný výsledek,
     // ne přání (při odmítnutí se vrátí do vypnuto a řekne se, kde to povolit).
     if (jeNativni()) {
-      if (!value) { setPref('push', false); return; }
-      const r = await zapniNativniPush(true);
+      const most = await nativniMost();
+      if (!value) { setPref('push', false); await most?.vypniPush(); return; }
+      const r = await most?.zapniPush() ?? 'nedostupny';
       setPref('push', r === 'granted');
       if (r === 'denied') setPushNativniOdmitnuto(true);
       return;

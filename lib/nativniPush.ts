@@ -125,13 +125,16 @@ export async function poslatApns(cfg: ApnsKonfigurace, zarizeni: NativniZarizeni
 
 // ---- FCM (HTTP v1) ---------------------------------------------------------------
 
+/** Kanál, který NativeBridge na Androidu 8+ vytváří (components/NativeBridge); FCM zpráva do něj musí mířit. */
+export const ANDROID_KANAL = 'default';
+
 export function sestavFcmZpravu(token: string, z: NativniZprava): Record<string, unknown> {
   return {
     message: {
       token,
       notification: { title: z.title.slice(0, 120), ...(z.body ? { body: z.body.slice(0, 240) } : {}) },
       data: { link: z.link ?? '/', ...(z.tag ? { tag: z.tag } : {}) },
-      android: { priority: 'HIGH', notification: { ...(z.tag ? { tag: z.tag } : {}), sound: 'default' } },
+      android: { priority: 'HIGH', notification: { channel_id: ANDROID_KANAL, ...(z.tag ? { tag: z.tag } : {}), sound: 'default' } },
     },
   };
 }

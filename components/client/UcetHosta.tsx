@@ -11,7 +11,7 @@ import { useEffect, useState } from 'react';
 import { SwitchRow } from '../ui';
 import PravniOdkazy from '../pravni/PravniOdkazy';
 import SmazatUcet from '../ucet/SmazatUcet';
-import { jeNativni, stavNativnihoPushe, zapniNativniPush } from '@/lib/nativniMost';
+import { jeNativni, nativniMost, stavNativnihoPushe } from '@/lib/nativni/most';
 
 export default function UcetHosta({ novinky, onFlash }: { novinky: boolean; onFlash: (m: string) => void }) {
   const [souhlas, setSouhlas] = useState(novinky);
@@ -22,7 +22,7 @@ export default function UcetHosta({ novinky, onFlash }: { novinky: boolean; onFl
   useEffect(() => {
     if (!jeNativni()) return;
     setNativni(true);
-    stavNativnihoPushe().then(s => { setPushZapnut(s === 'granted'); setPushOdmitnut(s === 'denied'); });
+    Promise.all([stavNativnihoPushe(), nativniMost()]).then(([s, most]) => { setPushZapnut(s === 'granted' && !most?.pushVypnuto()); setPushOdmitnut(s === 'denied'); });
   }, []);
 
   const zmenSouhlas = async (v: boolean) => {
@@ -32,7 +32,7 @@ export default function UcetHosta({ novinky, onFlash }: { novinky: boolean; onFl
       if (!r.ok) throw new Error();
       onFlash(v ? 'Novinky od podniků zapnuté.' : 'Novinky od podniků vypnuté.');
       // Souhlas s novinkami dává smysl jen s povolenými oznámeními: zeptáme se hned, v kontextu.
-      if (v && nativni && !pushZapnut) { const p = await zapniNativniPush(true); setPushZapnut(p === 'granted'); setPushOdmitnut(p === 'denied'); }
+      if (v && nativni && !pushZapnut) { const p = (await (await nativniMost())?.zapniPush()) ?? 'nedostupny'; setPushZapnut(p === 'granted'); setPushOdmitnut(p === 'denied'); }
     } catch {
       // Nepovedlo se uložit: přepínač se vrátí, ať neukazuje souhlas, který server nezná.
       setSouhlas(!v);
@@ -41,8 +41,13 @@ export default function UcetHosta({ novinky, onFlash }: { novinky: boolean; onFl
   };
 
   const zmenPush = async (v: boolean) => {
-    if (!v) { setPushZapnut(false); onFlash('Vypněte oznámení v nastavení telefonu u aplikace Managero client.'); return; }
-    const p = await zapniNativniPush(true);
+    if (!v) {
+      // Smaže token na serveru: oznámení přestanou chodit hned (systémové povolení zůstává, jde znovu zapnout).
+      setPushZapnut(false); await (await nativniMost())?.vypniPush();
+      onFlash('Upozornění v telefonu vypnutá.');
+      return;
+    }
+    const p = (await (await nativniMost())?.zapniPush()) ?? 'nedostupny';
     setPushZapnut(p === 'granted'); setPushOdmitnut(p === 'denied');
   };
 

@@ -16,9 +16,11 @@ import {
 import { jeZtlumeno, neutralniProNativni, CATEGORY_PREF, OPT_IN } from '../../lib/pushPravidla.ts';
 import {
   apnsJwt, sestavApnsPayload, sestavFcmZpravu, apnsKonfigurace, fcmKonfigurace, apnsTokenNeplatny, fcmTokenNeplatny,
-  poslatApns, poslatFcm, poslatNativne, topicPro, nativniPushNastaven, BUNDLE_ID, normalizujPem, type Doprava,
+  poslatApns, poslatFcm, poslatNativne, ANDROID_KANAL, topicPro, nativniPushNastaven, BUNDLE_ID, normalizujPem, type Doprava,
 } from '../../lib/nativniPush.ts';
-import { mistniCestaZOdkazu } from '../../lib/nativniMost.ts';
+import { mistniCesta } from '../../lib/bezpecnaUrl.ts';
+import { zjistiObalUa } from '../../lib/nativni/most.ts';
+import { existsSync, readFileSync } from 'node:fs';
 import { bezpecnyNazev } from '../../lib/nazevSouboru.ts';
 import { firma, chybejiciUdaje, jeEmail, ZASTUPNA } from '../../lib/firma.ts';
 import { dokument, KLICE_DOKUMENTU } from '../../lib/pravni/texty.ts';
@@ -177,10 +179,22 @@ export default async function ({ eq, ok }: Testy) {
   ok('FCM: token se získá jednou a zprávy jdou na v1 endpoint projektu', fcmVolani.filter(u => u.includes('oauth2')).length === 1 && fcmVolani.some(u => u.includes('/v1/projects/projekt/messages:send')));
 
   // ---- odkazy z obalu: jen naše doména a místní cesta ----
-  eq('odkaz: místní cesta projde', mistniCestaZOdkazu('/client/cafe-demo?tab=order&table=3'), '/client/cafe-demo?tab=order&table=3');
-  eq('odkaz: naše doména projde', mistniCestaZOdkazu('https://www.managero.app/client/me?x=1#a'), '/client/me?x=1#a');
-  eq('odkaz: cizí doména a schémata ne', [mistniCestaZOdkazu('https://evil.example/client'), mistniCestaZOdkazu('http://www.managero.app/x'), mistniCestaZOdkazu('javascript:alert(1)'), mistniCestaZOdkazu('//evil.example/x'), mistniCestaZOdkazu(null)], [null, null, null, null, null]);
-  eq('odkaz: apex bez www ne (přesměrovává, universal link by nezabral)', mistniCestaZOdkazu('https://managero.app/client'), null);
+  eq('odkaz: místní cesta projde', mistniCesta('/client/cafe-demo?tab=order&table=3', '/'), '/client/cafe-demo?tab=order&table=3');
+  eq('odkaz: cizí doména, schémata a //host ne', [mistniCesta('https://evil.example/client', '/'), mistniCesta('javascript:alert(1)', '/'), mistniCesta('//evil.example/x', '/'), mistniCesta(null, '/')], ['/', '/', '/', '/']);
+
+  // ---- jediný most: klient bere detekci z lib/obal.ts, push má jednoho vlastníka ----
+  eq('most: detekce obalu v klientovi je ta ze serveru', [UA_PROVOZ, UA_KLIENT, UA_WEB, `${UA_PROVOZ} ManageroClient/1.0.0`].map(ua => zjistiObalUa(ua)), [UA_PROVOZ, UA_KLIENT, UA_WEB, `${UA_PROVOZ} ManageroClient/1.0.0`].map(ua => obalZUserAgent(ua)));
+  ok('most: starý lib/nativniMost.ts neexistuje', !existsSync('lib/nativniMost.ts'));
+  const zdroj = (p: string) => readFileSync(p, 'utf8');
+  const KLICE = /managero-(native-)?push-(token|vypnuto)/;
+  const vlastnici = ['components/NativeBridge.tsx', 'components/Settings.tsx', 'components/client/UcetHosta.tsx', 'lib/odhlaseni.ts', 'lib/stahni.ts', 'lib/nativni/most.ts'].filter(p => KLICE.test(zdroj(p)));
+  eq('most: klíč tokenu a volby push zná jen NativeBridge', vlastnici, ['components/NativeBridge.tsx']);
+  ok('most: addListener(registration) jen v NativeBridge', !/addListener\('registration'/.test(zdroj('lib/nativni/most.ts')) && /addListener\('registration'/.test(zdroj('components/NativeBridge.tsx')));
+  ok('most: odhlášení volá odhlasitPush mostu', /odhlasitPush\(\)/.test(zdroj('lib/odhlaseni.ts')));
+  ok('most: Nastavení i účet hosta při vypnutí volají vypniPush', /vypniPush\(\)/.test(zdroj('components/Settings.tsx')) && /vypniPush\(\)/.test(zdroj('components/client/UcetHosta.tsx')));
+  const tok = 'x'.repeat(64);
+  eq('fcm: zpráva míří do kanálu, který obal na Androidu vytváří', (sestavFcmZpravu(tok, { title: 'a' }) as any).message.android.notification.channel_id, ANDROID_KANAL);
+  ok('fcm: kanál je stejný jako createChannel v NativeBridge', zdroj('components/NativeBridge.tsx').includes(`id: '${ANDROID_KANAL}'`));
 
   // ---- název souboru ----
   eq('soubor: lomítka a zakázané znaky pryč', bezpecnyNazev('../../etc/passwd'), '..-..-etc-passwd');

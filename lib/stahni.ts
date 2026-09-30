@@ -13,7 +13,7 @@
 // kontext relace, takže tisk v obalu jde stejnou cestou: dokument se sdílí jako
 // soubor (HTML), ze sdílecího listu se dá vytisknout.
 
-import { jeNativni, plugin } from './nativniMost';
+import { jeNativni, plugin } from './nativni/most';
 import { obalZUserAgent } from './obal';
 import { bezpecnyNazev } from './nazevSouboru';
 

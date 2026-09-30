@@ -11,22 +11,16 @@
 // k autorizaci (kdokoli si ji pošle), tady slouží jen k tomu, aby se nativní kód
 // vůbec načetl.
 
-export type KlicObalu = 'managero' | 'client';
+import { obalZUserAgent, type Obal, type RozpoznanyObal } from '../obal.ts';
 
-export interface ObalZUa { obal: KlicObalu | null; verze: string | null; build: number | null }
+export type KlicObalu = Exclude<Obal, null>;
+export type ObalZUa = RozpoznanyObal;
 
-/** Zrcadlí lib/obal.ts (serverová brána); po sloučení obou větví je možné sjednotit. */
-export function zjistiObalUa(ua: string | null | undefined): ObalZUa {
-  const s = String(ua ?? '');
-  const m = /Managero(App|Client)\/([\d.]+)(?: \(build (\d+)\))?/.exec(s);
-  if (!m) return { obal: null, verze: null, build: null };
-  return { obal: m[1] === 'App' ? 'managero' : 'client', verze: m[2], build: m[3] ? Number(m[3]) : null };
-}
-
-/** Jak se aplikace jmenuje na serveru v tabulce zařízení (`device_tokens.app`, viz plan-app-host.md 4.3). */
-export function aplikaceVServeru(obal: KlicObalu): 'provoz' | 'klient' {
-  return obal === 'managero' ? 'provoz' : 'klient';
-}
+/**
+ * Značka obalu z User-Agentu. Jediná implementace je v lib/obal.ts (server ji používá
+ * pro bránu tras), klient ji jen přebírá, aby se UI a brána nikdy neshodly.
+ */
+export const zjistiObalUa: (ua: string | null | undefined) => ObalZUa = obalZUserAgent;
 
 // Hostitelé, jejichž odkazy obal otevře sám. Apex jen přesměrovává na www, ale vytištěné
 // QR kódy ho mohou obsahovat, takže ho čteme (a navigujeme už na stejný původ stránky).
@@ -117,4 +111,59 @@ export function uloz(klic: string, hodnota: string | null): void {
 }
 export function nacti(klic: string): string | null {
   try { return localStorage.getItem(klic); } catch { return null; }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Veřejné API mostu. Listenery pluginů, token zařízení a volbu „push vypnut“ vlastní výhradně
+// components/NativeBridge (vystaví je jako `window.manageroNative`); ostatní kód volá tohle.
+// ---------------------------------------------------------------------------------------------
+
+export type StavPovoleni = 'granted' | 'denied' | 'prompt' | 'nedostupny';
+export type VysledekPushe = StavPovoleni | 'chyba';
+
+export interface NativniApi {
+  obal: KlicObalu;
+  /** Otevře nativní skener, vrátí obsah QR, nebo null (zrušeno / nejde). */
+  skenujQr: () => Promise<string | null>;
+  /** Naskenuje QR podniku, stolu nebo kód podniku a otevře ho v aplikaci. Vrací false, když QR není náš. */
+  skenujAOtevri: () => Promise<boolean>;
+  sdilej: (d: { title?: string; text?: string; url?: string }) => Promise<boolean>;
+  haptika: (druh?: 'lehka' | 'stredni' | 'uspech' | 'chyba') => void;
+  /** Zapne push: povolení (systémový dialog), registrace tokenu, zrušení volby „vypnuto“. Volat z kontextu. */
+  zapniPush: () => Promise<VysledekPushe>;
+  /** Vypne push: smaže token tohoto zařízení na serveru a zabrání automatické registraci. */
+  vypniPush: () => Promise<void>;
+  /** Uživatel push vypnul (automatická registrace je potlačená). */
+  pushVypnuto: () => boolean;
+  /** Před odhlášením: smaže token na serveru (dokud je relace platná). Volbu „vypnuto“ nemění. */
+  odhlasitPush: () => Promise<void>;
+  zamek: { dostupny: () => Promise<boolean>; zapnuto: () => Promise<boolean>; nastav: (zap: boolean) => Promise<boolean> };
+}
+declare global { interface Window { manageroNative?: NativniApi } }
+
+/** Stav systémového povolení k upozorněním (jen čte plugin, nic neregistruje). */
+export async function stavNativnihoPushe(): Promise<StavPovoleni> {
+  const p = plugin('PushNotifications');
+  if (!jeNativni() || !p) return 'nedostupny';
+  try {
+    const r = await p.checkPermissions();
+    const s = String(r?.receive ?? 'prompt');
+    return s === 'granted' ? 'granted' : s === 'denied' ? 'denied' : 'prompt';
+  } catch { return 'nedostupny'; }
+}
+
+/**
+ * Počká, až NativeBridge (načítá se líně po startu) vystaví `window.manageroNative`.
+ * Mimo obal nebo po vypršení času vrací null a volající spadne na webové chování.
+ */
+export function nativniMost(cekatMs = 4000): Promise<NativniApi | null> {
+  if (typeof window === 'undefined') return Promise.resolve(null);
+  if (window.manageroNative) return Promise.resolve(window.manageroNative);
+  if (!jeNativni() && !zjistiObalUa(navigator.userAgent).obal) return Promise.resolve(null);
+  return new Promise(resolve => {
+    const hotovo = (v: NativniApi | null) => { clearTimeout(t); window.removeEventListener('managero:nativni-pripraveno', naUdalost); resolve(v); };
+    const naUdalost = () => hotovo(window.manageroNative ?? null);
+    const t = setTimeout(() => hotovo(window.manageroNative ?? null), cekatMs);
+    window.addEventListener('managero:nativni-pripraveno', naUdalost);
+  });
 }
