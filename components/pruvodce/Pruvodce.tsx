@@ -166,7 +166,8 @@ export default function Pruvodce({ jmeno, znovu }: { jmeno: string; znovu: boole
       if (!o.nazev && podnik.name) o.nazev = podnik.name;
       setInfo(inf);
       setOdp(o);
-      ulozeno.current = JSON.stringify(d.odpovedi);
+      // Předvyplněný název není „rozepsané": Escape na začátku průvodce se nemá ptát.
+      ulozeno.current = JSON.stringify(o);
       const navrat = znovu && d.stav === 'hotovo';
       const pokracovat = !navrat && jeKrok(d.krok) ? krokPoObnoveni({ v: 1, stav: 'rozpracovano', krok: d.krok, odpovedi: o, pouzito: {} }) : 'vitej';
       setKrok(pokracovat);

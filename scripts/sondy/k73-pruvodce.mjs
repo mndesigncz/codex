@@ -378,6 +378,9 @@ function eq(popis, dostal, cekano) { tvrdi(popis, JSON.stringify(dostal) === JSO
   const { ctx, p, stav } = await kontext();
   await p.goto(BASE + '/employer/start', { waitUntil: 'domcontentloaded' });
   await cekejNaH1(p, /^Vítej/);
+  await p.keyboard.press('Escape');
+  await p.waitForTimeout(300);
+  tvrdi('P6: Escape na začátku (nic rozepsaného, jen předvyplněný název) se neptá', await p.getByRole('dialog').count() === 0);
   await dal(p, /Jaký podnik vedeš/);
   // Tab vstoupí do skupiny jednou, šipky přesouvají výběr
   await p.locator('[data-typ="kavarna"]').focus();
