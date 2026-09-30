@@ -32,7 +32,7 @@ const walk = (dir) => {
     if (name === 'node_modules' || name === '.next' || name.startsWith('.')) continue;
     const file = join(dir, name);
     if (statSync(file).isDirectory()) { walk(file); continue; }
-    if (!/\.(tsx|ts|html)$/.test(file)) continue;
+    if (!/\.(tsx|ts|html|json)$/.test(file)) continue;
     const lines = readFileSync(file, 'utf8').split('\n');
     lines.forEach((line, i) => {
       const code = line.trimStart();
@@ -81,6 +81,8 @@ walk('lib');
 // protože všechny chodily jen za `.ts` a `.tsx`. Pokrytí kontroly je
 // součást kontroly: co neprojde, to se nekontroluje.
 walk('public');
+// Slovníky (kolo 76): překlad je text, který host čte, takže platí totéž co pro kód.
+walk('locales');
 
 if (hits.length) {
   console.error('\nText mluví o jednom konkrétním typu podniku.');

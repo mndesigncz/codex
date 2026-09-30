@@ -609,6 +609,19 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'CZK'`);
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS locale TEXT DEFAULT 'cs-CZ'`);
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS week_start INTEGER DEFAULT 1`); // 1 = Monday, 0 = Sunday
+    // ---- Vícejazyčnost a lokalizace podniku (kolo 76) ----
+    // Všechno idempotentní a čtené defenzivně: před touhle migrací se aplikace
+    // chová jako dřív (čeština, Praha, 24 h). `country` jen předvyplňuje návrhy,
+    // nic nezamyká. `vat_rates` a `labor_rules` zatím nic nečte (jen číselníky do
+    // budoucna); `nav_config` řídí přizpůsobení navigace (lib/navigace.ts).
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS country TEXT`);                      // ISO 3166-1 alfa-2: CZ, SK, DE, AT, PL
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS default_lang TEXT DEFAULT 'cs'`);    // cs|en|de|sk|pl
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS timezone TEXT DEFAULT 'Europe/Prague'`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS time_format TEXT DEFAULT '24'`);     // '24' | '12'
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS vat_rates JSONB`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS labor_rules JSONB`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS nav_config JSONB`);
+    await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT`);                          // null = podle podniku
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS labor_target_pct INTEGER`);      // target labor cost as % of revenue
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS low_stock_default INTEGER DEFAULT 5`);
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS critical_stock_default INTEGER DEFAULT 2`);
@@ -819,6 +832,15 @@ export async function GET(request: Request) {
     // Vzhled menu (barvy, logo, písma, prvky na pozadí). Prázdné = vzhled
     // zapečený ve stránce, takže staré menu vypadá dál stejně.
     await ddl(sql`ALTER TABLE menu_boards ADD COLUMN IF NOT EXISTS theme JSONB`);
+    // Jazyky lístku (kolo 76): `langs` = {"vychozi":"cs","nabizet":["cs","en"]},
+    // `i18n` = {"en":{"title":…}} u desky, sekce i položky. Alergeny jsou kódy
+    // 1–14 podle nařízení EU 1169/2011, `tags` jsou štítky jako 'vegan'.
+    await ddl(sql`ALTER TABLE menu_boards ADD COLUMN IF NOT EXISTS langs JSONB`);
+    await ddl(sql`ALTER TABLE menu_boards ADD COLUMN IF NOT EXISTS i18n JSONB`);
+    await ddl(sql`ALTER TABLE menu_sections ADD COLUMN IF NOT EXISTS i18n JSONB`);
+    await ddl(sql`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS i18n JSONB`);
+    await ddl(sql`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS allergens SMALLINT[]`);
+    await ddl(sql`ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS tags TEXT[]`);
     // A closing belongs to the whole shift, not just its author.
     await ddl(sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS shift_employees JSONB DEFAULT '[]'`);
     // Business day the closing belongs to. A night shift ending at 02:00 files

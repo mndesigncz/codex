@@ -3,6 +3,7 @@
 import React from 'react';
 import { Icon } from '../Icons';
 import { Badge } from './Badge';
+import { useT } from '@/lib/i18n/client';
 
 // Spodní dok na telefonu — jeden pro administraci, zaměstnance i Managero
 // client (kolo 69, balík B8; jediný nový soubor v zamčeném components/ui).
@@ -37,6 +38,7 @@ export function Dock({ items, activeId, onSelect, more, label }: {
   /** Název navigace pro odečítač. */
   label: string;
 }) {
+  const t = useT();
   return (
     <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),16px)]">
       <nav className="dock-strong mx-auto max-w-md rounded-3xl px-2 py-2 flex items-center justify-around shadow-[0_10px_34px_rgba(25,35,15,0.16)]" aria-label={label}>
@@ -57,10 +59,10 @@ export function Dock({ items, activeId, onSelect, more, label }: {
           );
         })}
         {more && (
-          <button type="button" onClick={more.onClick} title="Více"
+          <button type="button" onClick={more.onClick} title={t('Více')}
             className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition duration-[var(--dur-2)] ease-[var(--ease-out-soft)] ${more.active ? 'text-[#16181A]' : 'text-black/40'}`}>
             <Icon name="menu" size={22} />
-            <span className="text-[11px] leading-none font-medium">Více</span>
+            <span className="text-[11px] leading-none font-medium">{t('Více')}</span>
           </button>
         )}
       </nav>

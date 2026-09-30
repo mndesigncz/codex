@@ -1,4 +1,6 @@
 import { Resend } from 'resend';
+import { emailText, sazejHtml } from './i18n/email.ts';
+import { LOCALE_PRO_JAZYK, type Jazyk } from './i18n/config.ts';
 
 // E-mail, o kterém aplikace ví, jestli odešel.
 //
@@ -165,19 +167,19 @@ export async function sendAccountDeleteEmail(to: string, name: string, cesta: st
   });
 }
 
-export async function sendTeamInvitation(to: string, teamName: string, inviterName: string, token: string): Promise<SendResult> {
+export async function sendTeamInvitation(to: string, teamName: string, inviterName: string, token: string, jazyk: Jazyk = 'cs'): Promise<SendResult> {
   const url = `${APP_URL()}/join?token=${encodeURIComponent(token)}`;
   return send({
     label: 'Managero',
     to,
-    subject: `Pozvánka do týmu ${teamName}`,
+    subject: emailText('pozvankaPredmet', jazyk, { tym: teamName }),
     html: `
       <div style="font-family: -apple-system, sans-serif; max-width: 500px; margin: 0 auto; padding: 32px; background: #0A0A0C; color: white; border-radius: 20px;">
-        <h1 style="color: #C8F542; font-size: 26px;">Pozvánka do týmu</h1>
-        <p style="color: rgba(235,235,245,0.6);"><strong style="color:white;">${escHtml(inviterName)}</strong> vás zve do týmu <strong style="color:white;">${escHtml(teamName)}</strong> v aplikaci pro správu podniku.</p>
-        <p style="color: rgba(235,235,245,0.6);">Klikněte na tlačítko níže a vytvořte si účet zaměstnance.</p>
-        <a href="${escHtml(url)}" style="display: inline-block; margin-top: 12px; background: #C8F542; color: black; padding: 14px 28px; border-radius: 999px; text-decoration: none; font-weight: bold;">Přijmout pozvánku →</a>
-        <p style="color: rgba(235,235,245,0.35); font-size: 12px; margin-top: 24px;">Pokud tlačítko nefunguje, otevřete: ${escHtml(url)}</p>
+        <h1 style="color: #C8F542; font-size: 26px;">${escHtml(emailText('pozvankaNadpis', jazyk))}</h1>
+        <p style="color: rgba(235,235,245,0.6);">${sazejHtml('pozvankaText', jazyk, { kdo: `<strong style="color:white;">${escHtml(inviterName)}</strong>`, tym: `<strong style="color:white;">${escHtml(teamName)}</strong>` }, {}, escHtml)}</p>
+        <p style="color: rgba(235,235,245,0.6);">${escHtml(emailText('pozvankaPokyn', jazyk))}</p>
+        <a href="${escHtml(url)}" style="display: inline-block; margin-top: 12px; background: #C8F542; color: black; padding: 14px 28px; border-radius: 999px; text-decoration: none; font-weight: bold;">${escHtml(emailText('pozvankaTlacitko', jazyk))}</a>
+        <p style="color: rgba(235,235,245,0.35); font-size: 12px; margin-top: 24px;">${escHtml(emailText('pozvankaOdkaz', jazyk, { url }))}</p>
       </div>
     `,
   });
@@ -208,21 +210,22 @@ export async function sendOrderEmail(
   orderText: string,
   note?: string | null,
   replyTo?: string | null,
+  jazyk: Jazyk = 'cs',
 ): Promise<SendResult> {
   return send({
     label: `Managero — ${businessName}`,
     to,
     replyTo: replyTo ?? null,
-    subject: `Objednávka — ${businessName} (${new Date().toLocaleDateString('cs-CZ')})`,
+    subject: emailText('objednavkaPredmet', jazyk, { podnik: businessName, datum: new Date().toLocaleDateString(LOCALE_PRO_JAZYK[jazyk]) }),
     html: `
       <div style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto; padding: 28px;">
-        <h2 style="margin: 0 0 4px;">Objednávka — ${escHtml(businessName)}</h2>
-        <p style="color: #666; margin: 0 0 20px;">Odesláno z aplikace Managero.</p>
+        <h2 style="margin: 0 0 4px;">${escHtml(emailText('objednavkaNadpis', jazyk, { podnik: businessName }))}</h2>
+        <p style="color: #666; margin: 0 0 20px;">${escHtml(emailText('objednavkaOdeslano', jazyk))}</p>
         <pre style="background: #F6F7F2; border-radius: 12px; padding: 18px; font-family: inherit; font-size: 15px; line-height: 1.6; white-space: pre-wrap;">${escHtml(orderText)}</pre>
         ${note ? `<p style="color: #444;">${escHtml(note)}</p>` : ''}
         <p style="color: #999; font-size: 13px;">${replyTo
-          ? `Odpovězte prosím na tento e-mail s potvrzením a termínem dodání — odpověď dorazí na ${escHtml(replyTo)}.`
-          : 'Potvrzení a termín dodání pošlete prosím na kontakt podniku.'}</p>
+          ? escHtml(emailText('objednavkaOdpoved', jazyk, { adresa: replyTo }))
+          : escHtml(emailText('objednavkaBezOdpovedi', jazyk))}</p>
       </div>
     `,
   });

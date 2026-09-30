@@ -185,7 +185,7 @@ li{transition:opacity .25s ease}
 li[data-out="1"]{opacity:.45}
 li[data-out="1"] .name{text-decoration:line-through;text-decoration-thickness:1px}
 li[data-out="1"] .name::after{
-  content:"vyprodáno";display:inline-block;text-decoration:none;vertical-align:.14em;
+  content:var(--t-vyprodano,"vyprodáno");display:inline-block;text-decoration:none;vertical-align:.14em;
   margin-left:.55em;padding:.2em .7em .16em;
   border:1px solid currentColor;border-radius:999px;color:var(--fg-soft);
   font-size:.4em;font-weight:600;letter-spacing:.16em;text-transform:uppercase;
@@ -306,6 +306,99 @@ footer b{font-family:var(--display);font-weight:400;color:var(--accent);font-siz
   .divider{width:auto;height:1px;align-self:auto}
   .desc{max-width:none}
 }
+
+/* Symbol před číslem (en-GB: €3.50) nese odstup na druhé straně. */
+.price small.pred{margin-left:0;margin-right:.22em}
+
+/* ---------- Jazyk hosta: pilulka s globusem, alergeny, filtr ----------
+   Stránka je statická a má vlastní styl (tokeny aplikace tu nejsou), barvy bere
+   z :root, tedy z vzhledu podniku. Cíle mají 44 px jako zbytek stránky. */
+.jazyk{
+  position:fixed;z-index:7;
+  top:calc(env(safe-area-inset-top) + 8px);right:calc(env(safe-area-inset-right) + 8px);
+}
+.jazyk[hidden]{display:none}
+.jazyk > button{
+  -webkit-appearance:none;appearance:none;cursor:pointer;position:relative;
+  height:32px;padding:0 12px;border-radius:999px;
+  border:1px solid var(--rule);background:var(--shade);color:var(--fg-soft);
+  font-family:var(--body);font-size:14px;font-weight:600;letter-spacing:.08em;line-height:1;
+  display:inline-flex;align-items:center;gap:6px;
+}
+.jazyk > button::before{content:'';position:absolute;inset:-7px -4px}
+.jazyk > button svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.jazyk > button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.jazyk-menu{
+  position:absolute;top:calc(100% + 8px);right:0;min-width:180px;padding:6px;
+  border-radius:14px;background:var(--bg);border:1px solid var(--rule);
+  box-shadow:0 12px 32px rgba(0,0,0,.2);display:none;
+}
+.jazyk.open .jazyk-menu{display:block}
+.jazyk-menu button{
+  -webkit-appearance:none;appearance:none;cursor:pointer;
+  display:flex;width:100%;align-items:center;justify-content:space-between;gap:12px;
+  min-height:44px;padding:0 12px;border:0;border-radius:10px;background:none;
+  color:var(--fg);font-family:var(--body);font-size:16px;font-weight:500;text-align:left;
+}
+.jazyk-menu button:hover{background:var(--shade)}
+.jazyk-menu button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.jazyk-menu button[aria-checked="true"]{font-weight:700}
+.jazyk-menu button svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;visibility:hidden}
+.jazyk-menu button[aria-checked="true"] svg{visibility:visible}
+/* Na cedulích (iPad, velká obrazovka) pilulka sedí vlevo od ovládání obsluhy
+   a po chvíli bez dotyku bledne jako ono; na telefonu hosta zůstává vidět vždycky. */
+@media (min-width:641px) and (min-height:481px){
+  .jazyk{right:calc(env(safe-area-inset-right) + 100px);opacity:.5;transition:opacity .5s ease}
+  .jazyk.idle{opacity:.06}
+  .jazyk.open,.jazyk:focus-within{opacity:1}
+}
+
+/* štítky jídel a alergeny u položky */
+.stitek{
+  display:inline-block;vertical-align:.12em;margin-left:.5em;padding:.15em .6em .12em;
+  border:1px solid var(--rule);border-radius:999px;color:var(--fg-soft);
+  font-size:max(11px, .42em);font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+}
+.alg{
+  font-size:max(11px, calc(clamp(11px,2.2vh,18px) * var(--fit)));
+  color:var(--fg-soft);line-height:1.35;margin-top:calc(clamp(2px,.5vh,6px) * var(--fit));
+}
+.alg b{font-weight:600;color:var(--fg)}
+.legenda{
+  max-width:1200px;margin-inline:auto;width:100%;
+  font-size:max(11px, calc(clamp(9px,1.6vh,14px) * var(--fit)));color:var(--fg-soft);line-height:1.5;
+}
+.legenda[hidden]{display:none}
+.legenda b{color:var(--fg);font-weight:600}
+.legenda .chybi{display:block;margin-top:.4em}
+/* Filtr „bez alergenu“ je pomůcka pro telefon hosta; na cedulích by jen zabíral místo. */
+.filtr{display:none;width:100%;max-width:760px;text-align:left}
+.filtr[hidden]{display:none!important}
+.filtr summary{
+  cursor:pointer;list-style:none;min-height:44px;display:flex;align-items:center;justify-content:center;gap:.5em;
+  font-size:15px;font-weight:600;color:var(--fg);
+}
+.filtr summary::-webkit-details-marker{display:none}
+.filtr summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:10px}
+.filtr-napoveda{font-size:14px;color:var(--fg-soft);margin:2px 0 8px;text-align:center}
+.filtr-chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.filtr-chips button{
+  -webkit-appearance:none;appearance:none;cursor:pointer;min-height:44px;padding:0 14px;border-radius:999px;
+  border:1px solid var(--rule);background:var(--shade);color:var(--fg);font-family:var(--body);font-size:15px;font-weight:500;
+}
+.filtr-chips button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.filtr-chips button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.filtr-zrusit{
+  -webkit-appearance:none;appearance:none;cursor:pointer;display:block;margin:10px auto 0;min-height:44px;padding:0 14px;
+  border:0;background:none;color:var(--fg-soft);font-family:var(--body);font-size:14px;text-decoration:underline;
+}
+li[hidden],section[hidden]{display:none!important}
+@media (max-width:640px), (max-height:480px){
+  .filtr{display:block}
+  .alg{font-size:clamp(13px,3.4vw,16px)}
+  .legenda{font-size:clamp(12px,3.2vw,14px)}
+}
+@media print{ .jazyk,.filtr{display:none!important} }
 @media (prefers-reduced-motion:reduce){
   *{transition:none!important;animation:none!important}
 }
@@ -324,9 +417,14 @@ footer b{font-family:var(--display);font-weight:400;color:var(--accent);font-siz
     <div class="logo" id="logo" role="img" aria-label="Logo podniku"></div>
     <p class="eyebrow" id="eyebrow"></p>
     <h1 id="title"></h1>
+    <!-- Filtr „bez alergenu“: jen na telefonu a jen když má aspoň jedna položka vyplněné alergeny. -->
+    <div class="filtr" id="filtr" hidden></div>
   </header>
 
   <div class="cols" id="cols"></div>
+
+  <!-- Legenda alergenů v jazyce hosta; jen když je u nějaké položky vyplněný. -->
+  <div class="legenda" id="legenda" hidden></div>
 
   <footer>
     <div class="qr">
@@ -339,6 +437,16 @@ footer b{font-family:var(--display);font-weight:400;color:var(--accent);font-siz
 </div>
 
 <div class="stav" id="stav" role="status" aria-live="polite"></div>
+
+<!-- Přepínač jazyka hosta. Kreslí se, jen když lístek nabízí víc než jeden jazyk.
+     Bez vlajek: vlajka není jazyk. Názvy jazyků jsou endonymy a nepřekládají se. -->
+<div class="jazyk" id="jazyk" hidden>
+  <button type="button" id="jazyk-btn" aria-haspopup="menu" aria-expanded="false">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z"/></svg>
+    <span id="jazyk-kod">CS</span>
+  </button>
+  <div class="jazyk-menu" id="jazyk-menu" role="menu"></div>
+</div>
 
 <div class="tools" id="tools">
   <button id="btn-mode" type="button" title="Den / noc" aria-label="Přepnout den / noc">
@@ -364,6 +472,7 @@ const ZALOHA = {
   eyebrow: "Venkovní akce",
   title:   "Speciální nabídka",
   mena:    "Kč",
+  menaKod: "CZK", locale: "cs-CZ", desetiny: 0,
 
   /* sloupec: 1 = vlevo, 2 = vpravo (na výšku se sloupce poskládají pod sebe) */
   sekce: [
@@ -410,6 +519,126 @@ const ZALOHA = {
 };
 /* ====================== KONEC NASTAVENÍ ====================== */
 
+
+/* ---------- Jazyky stránky ----------
+   Pět jazyků, stejných jako v aplikaci. Tady je slovník OBALU stránky (popisky,
+   hlášky, alergeny); názvy a popisy jídel i věty o alergenech posílá server
+   v jazyce, který host zvolil (`?lang=`). Stránka je statická a musí přežít
+   výpadek sítě, proto je slovník přímo v ní.
+   Tón: hostům a obsluze tykání (německy „du“), u věty o alergenech a složení
+   formální „Sie“ (právně citlivé, text posílá server). Překlady jsou strojové
+   a čekají na kontrolu rodilým mluvčím. */
+const JAZYKY = ['cs', 'en', 'de', 'sk', 'pl'];
+const JAZYK_NAZEV = { cs: 'Čeština', en: 'English', de: 'Deutsch', sk: 'Slovenčina', pl: 'Polski' };
+const KLIC_JAZYKA = 'managero-host-lang';
+
+const UI = {
+  cs: {
+    titulek: 'Venkovní menu', logo: 'Logo podniku', jazyk: 'Jazyk',
+    qrPopisek: 'Menu do mobilu', qrPodtitul: 'Naskenuj a odnes si ho s sebou',
+    vyprodano: 'vyprodáno', heslo: 'heslo', poznamka: '*Alergeny a složení na vyžádání u obsluhy',
+    alergeny: 'Alergeny', bezAlergenu: 'Bez alergenu', filtrNapoveda: 'Skrýt položky, které obsahují:',
+    filtrZrusit: 'Zrušit výběr', filtrNeuplne: 'Položky bez vyplněných alergenů zůstávají vidět.',
+    alergenyNeuplne: 'U některých položek alergeny nejsou vyplněny — zeptejte se obsluhy.',
+    denNoc: 'Přepnout den / noc', celaObrazovka: 'Celá obrazovka',
+    zruseno: 'Zrušeno', spatnyPin: 'Nesprávný PIN', bezSpojeni: 'Beze spojení — neuloženo',
+    oznacenoVyprodano: 'Označeno jako vyprodané', zpetVNabidce: 'Zpátky v nabídce',
+    pinOtazka: 'PIN menu pro označení vyprodaného:',
+    zalohaVyprodano: 'Menu běží ze zálohy — vyprodáno teď nejde uložit',
+    nacitam: 'Načítám z aplikace…', aktualni: 'Menu je aktuální', neodpovida: 'Aplikace neodpovídá',
+    zalohaHlas: 'Zobrazuje se záložní nabídka — menu „{slug}“ v aplikaci není. Otevři adresu, kterou ukazuje Kasa & sklad → Menu.',
+    prazdneHlas: 'Menu „{slug}“ je v aplikaci prázdné — zobrazuje se záložní nabídka.'
+  },
+  en: {
+    titulek: 'Outdoor menu', logo: 'Business logo', jazyk: 'Language',
+    qrPopisek: 'Menu on your phone', qrPodtitul: 'Scan it and take it with you',
+    vyprodano: 'sold out', heslo: 'password', poznamka: '*Allergens and ingredients on request from our staff',
+    alergeny: 'Allergens', bezAlergenu: 'Allergen filter', filtrNapoveda: 'Hide items that contain:',
+    filtrZrusit: 'Clear selection', filtrNeuplne: 'Items without allergen information stay visible.',
+    alergenyNeuplne: 'Allergens are not filled in for some items — please ask our staff.',
+    denNoc: 'Switch day / night', celaObrazovka: 'Full screen',
+    zruseno: 'Cancelled', spatnyPin: 'Wrong PIN', bezSpojeni: 'No connection — not saved',
+    oznacenoVyprodano: 'Marked as sold out', zpetVNabidce: 'Back on the menu',
+    pinOtazka: 'Menu PIN to mark an item sold out:',
+    zalohaVyprodano: 'The menu is running from backup — sold out can\'t be saved right now',
+    nacitam: 'Loading from the app…', aktualni: 'Menu is up to date', neodpovida: 'The app is not responding',
+    zalohaHlas: 'Showing the backup menu — there is no menu “{slug}” in the app. Open the address shown in Cash & stock → Menu.',
+    prazdneHlas: 'The menu “{slug}” is empty in the app — showing the backup menu.'
+  },
+  de: {
+    titulek: 'Speisekarte', logo: 'Logo des Betriebs', jazyk: 'Sprache',
+    qrPopisek: 'Karte aufs Handy', qrPodtitul: 'Scannen und einfach mitnehmen',
+    vyprodano: 'ausverkauft', heslo: 'Passwort', poznamka: '*Allergene und Zutaten auf Anfrage beim Service',
+    alergeny: 'Allergene', bezAlergenu: 'Allergenfilter', filtrNapoveda: 'Artikel ausblenden, die enthalten:',
+    filtrZrusit: 'Auswahl aufheben', filtrNeuplne: 'Artikel ohne Allergenangaben bleiben sichtbar.',
+    alergenyNeuplne: 'Bei manchen Artikeln sind die Allergene nicht angegeben – bitte fragen Sie das Servicepersonal.',
+    denNoc: 'Tag / Nacht umschalten', celaObrazovka: 'Vollbild',
+    zruseno: 'Abgebrochen', spatnyPin: 'Falsche PIN', bezSpojeni: 'Keine Verbindung – nicht gespeichert',
+    oznacenoVyprodano: 'Als ausverkauft markiert', zpetVNabidce: 'Wieder im Angebot',
+    pinOtazka: 'Karten-PIN zum Markieren als ausverkauft:',
+    zalohaVyprodano: 'Die Karte läuft aus der Sicherung – „ausverkauft“ kann gerade nicht gespeichert werden',
+    nacitam: 'Lade aus der App …', aktualni: 'Karte ist aktuell', neodpovida: 'Die App antwortet nicht',
+    zalohaHlas: 'Es wird die Ersatzkarte angezeigt – in der App gibt es keine Karte „{slug}“. Öffne die Adresse, die unter Kasse & Lager → Menü angezeigt wird.',
+    prazdneHlas: 'Die Karte „{slug}“ ist in der App leer – es wird die Ersatzkarte angezeigt.'
+  },
+  sk: {
+    titulek: 'Vonkajšie menu', logo: 'Logo podniku', jazyk: 'Jazyk',
+    qrPopisek: 'Menu do mobilu', qrPodtitul: 'Naskenuj a odnes si ho so sebou',
+    vyprodano: 'vypredané', heslo: 'heslo', poznamka: '*Alergény a zloženie na požiadanie u obsluhy',
+    alergeny: 'Alergény', bezAlergenu: 'Filter alergénov', filtrNapoveda: 'Skryť položky, ktoré obsahujú:',
+    filtrZrusit: 'Zrušiť výber', filtrNeuplne: 'Položky bez vyplnených alergénov zostávajú viditeľné.',
+    alergenyNeuplne: 'Pri niektorých položkách nie sú alergény vyplnené — opýtajte sa obsluhy.',
+    denNoc: 'Prepnúť deň / noc', celaObrazovka: 'Celá obrazovka',
+    zruseno: 'Zrušené', spatnyPin: 'Nesprávny PIN', bezSpojeni: 'Bez spojenia — neuložené',
+    oznacenoVyprodano: 'Označené ako vypredané', zpetVNabidce: 'Späť v ponuke',
+    pinOtazka: 'PIN menu na označenie vypredaného:',
+    zalohaVyprodano: 'Menu beží zo zálohy — vypredané sa teraz nedá uložiť',
+    nacitam: 'Načítavam z aplikácie…', aktualni: 'Menu je aktuálne', neodpovida: 'Aplikácia neodpovedá',
+    zalohaHlas: 'Zobrazuje sa záložná ponuka — menu „{slug}“ v aplikácii nie je. Otvor adresu, ktorú ukazuje Kasa a sklad → Menu.',
+    prazdneHlas: 'Menu „{slug}“ je v aplikácii prázdne — zobrazuje sa záložná ponuka.'
+  },
+  pl: {
+    titulek: 'Menu plenerowe', logo: 'Logo lokalu', jazyk: 'Język',
+    qrPopisek: 'Menu na telefon', qrPodtitul: 'Zeskanuj i zabierz je ze sobą',
+    vyprodano: 'wyprzedane', heslo: 'hasło', poznamka: '*Alergeny i skład na życzenie u obsługi',
+    alergeny: 'Alergeny', bezAlergenu: 'Filtr alergenów', filtrNapoveda: 'Ukryj pozycje, które zawierają:',
+    filtrZrusit: 'Wyczyść wybór', filtrNeuplne: 'Pozycje bez podanych alergenów pozostają widoczne.',
+    alergenyNeuplne: 'Przy niektórych pozycjach nie podano alergenów — prosimy zapytać obsługę.',
+    denNoc: 'Przełącz dzień / noc', celaObrazovka: 'Pełny ekran',
+    zruseno: 'Anulowano', spatnyPin: 'Błędny PIN', bezSpojeni: 'Brak połączenia — nie zapisano',
+    oznacenoVyprodano: 'Oznaczono jako wyprzedane', zpetVNabidce: 'Znów w ofercie',
+    pinOtazka: 'PIN menu do oznaczenia jako wyprzedane:',
+    zalohaVyprodano: 'Menu działa z kopii zapasowej — wyprzedania teraz nie da się zapisać',
+    nacitam: 'Wczytuję z aplikacji…', aktualni: 'Menu jest aktualne', neodpovida: 'Aplikacja nie odpowiada',
+    zalohaHlas: 'Wyświetlana jest zapasowa oferta — w aplikacji nie ma menu „{slug}”. Otwórz adres pokazany w Kasa i magazyn → Menu.',
+    prazdneHlas: 'Menu „{slug}” jest w aplikacji puste — wyświetlana jest oferta zapasowa.'
+  }
+};
+
+function cistyJazyk(v){
+  const k = String(v == null ? '' : v).toLowerCase().slice(0, 2);
+  return JAZYKY.indexOf(k) >= 0 ? k : null;
+}
+
+/* Jazyk, o který host žádá: ?lang= → jeho dřívější volba → jazyk prohlížeče → čeština.
+   Server ho ověří proti jazykům, které lístek nabízí (`jazyky.zvoleny`). */
+function pozadovanyJazyk(){
+  const q = cistyJazyk(new URLSearchParams(location.search).get('lang'));
+  if (q) return q;
+  try { const s = cistyJazyk(localStorage.getItem(KLIC_JAZYKA)); if (s) return s; } catch (e) {}
+  const n = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language];
+  for (let i = 0; i < n.length; i++) { const j = cistyJazyk(n[i]); if (j) return j; }
+  return 'cs';
+}
+
+let JAZYK = pozadovanyJazyk();   // jazyk obalu stránky; po odpovědi serveru ho srovná `jazyky.zvoleny`
+
+function T(klic, vars){
+  let t = (UI[JAZYK] && UI[JAZYK][klic]) || UI.cs[klic] || '';
+  if (vars) for (const k in vars) t = t.split('{' + k + '}').join(vars[k]);
+  return t;
+}
+
 /* Které menu se má zobrazit — /menu-akce.html?menu=<slug>, jinak „akce“. */
 const SLUG = (new URLSearchParams(location.search).get('menu') || 'akce')
   .toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 40) || 'akce';
@@ -430,30 +659,66 @@ function cz(s){ return esc(s).replace(/(^|[\s(])([aikosuvzAIKOSUVZ])\s+/g, '$1$2
 /* cena s haléři jen tam, kde je má: 4,50 (ne 4.5 ani 5), ale 49 zůstane 49 */
 function cena(n){ n = Number(n) || 0; return Number.isInteger(n) ? String(n) : n.toFixed(2).replace('.', ','); }
 
+/* Cena podle locale podniku a kódu měny (Intl): „49 Kč“, „3,50 €“, „3,50 zł“.
+   Symbol zůstává malý vedle čísla, jak to stránka kreslila vždycky; stojí před
+   číslem nebo za ním podle zvyku měny. Když Intl měnu nezná, vrátí se dřívější
+   zápis (číslo + text měny z aplikace). */
+function cenaHtml(n){
+  n = Number(n) || 0;
+  try {
+    const kod = MENU.menaKod || 'CZK';
+    const loc = MENU.locale || 'cs-CZ';
+    const des = Number.isInteger(n) ? (MENU.desetiny || 0) : 2;
+    const cislo = new Intl.NumberFormat(loc, { minimumFractionDigits: des, maximumFractionDigits: des }).format(n);
+    const casti = new Intl.NumberFormat(loc, { style: 'currency', currency: kod, minimumFractionDigits: des, maximumFractionDigits: des }).formatToParts(n);
+    const iM = casti.findIndex(c => c.type === 'currency');
+    if (iM < 0) throw new Error('bez symbolu');
+    const pred = iM < casti.findIndex(c => c.type === 'integer');
+    const symbol = '<small' + (pred ? ' class="pred"' : '') + '>' + esc(casti[iM].value) + '</small>';
+    return pred ? symbol + esc(cislo) : esc(cislo) + symbol;
+  } catch (e) {
+    return cena(n) + '<small>' + esc(MENU.mena) + '</small>';
+  }
+}
+
 function render(){
+  aplikujUI();
+  document.title = MENU.title || T('titulek');
   $('eyebrow').textContent = MENU.eyebrow || '';
   $('title').textContent   = MENU.title || '';
-  $('note').textContent    = MENU.poznamka || '';
+  /* Poznámka: živá data mají text z aplikace (už přeložený serverem), záloha má
+     výchozí větu v jazyce hosta. Věta o alergenech jde za ní, když je u položek vyplňují. */
+  const pozn = zivaData ? [MENU.poznamka, MENU.alergenyPoznamka].filter(Boolean).join(' ') : T('poznamka');
+  $('note').textContent = pozn;
 
   $('qr-text').innerHTML = MENU.qr
-    ? '<b>' + cz(MENU.qr.popisek) + '</b><span>' + cz(MENU.qr.podtitul) + '</span>'
+    ? '<b>' + cz(T('qrPopisek')) + '</b><span>' + cz(T('qrPodtitul')) + '</span>'
     : '';
 
   $('wifi').innerHTML = MENU.wifi
-    ? '<b>WIFI</b><span>' + esc(MENU.wifi.sit) + '<br>heslo: ' + esc(MENU.wifi.heslo) + '</span>'
+    ? '<b>WIFI</b><span>' + esc(MENU.wifi.sit) + '<br>' + esc(T('heslo')) + ': ' + esc(MENU.wifi.heslo) + '</span>'
     : '';
 
+  const nazvyAlg = MENU.alergenyNazvy || {};
+  const nazvyStitku = MENU.stitkyNazvy || {};
   const cols = { 1: [], 2: [] };
   MENU.sekce.forEach((s, si) => {
     const items = s.polozky.map((p, pi) => {
       const key = si + '-' + pi;
-      return '<li data-key="' + key + '"' + (p.vyprodano ? ' data-vyprodano="1"' : '') + '>' +
+      const alg = Array.isArray(p.alergeny) ? p.alergeny : [];
+      /* Položka bez vyplněných alergenů nezobrazí NIC: prázdné pole neznamená „bez alergenů“. */
+      const algHtml = alg.length
+        ? '<p class="alg"><b>' + esc(T('alergeny')) + ':</b> ' + alg.map(k => '<span title="' + esc(nazvyAlg[k] || '') + '">' + esc(k) + '</span>').join(', ') + '</p>'
+        : '';
+      const stitky = (Array.isArray(p.stitky) ? p.stitky : []).map(k => '<span class="stitek">' + esc(nazvyStitku[k] || k) + '</span>').join('');
+      return '<li data-key="' + key + '"' + (p.vyprodano ? ' data-vyprodano="1"' : '') + (alg.length ? ' data-alg="' + alg.join(',') + '"' : '') + '>' +
         '<div class="row">' +
-          '<span class="name">' + cz(p.name) + '</span>' +
+          '<span class="name">' + cz(p.name) + stitky + '</span>' +
           '<span class="dots" aria-hidden="true"></span>' +
-          '<span class="price">' + cena(p.price) + '<small>' + esc(MENU.mena) + '</small></span>' +
+          '<span class="price">' + cenaHtml(p.price) + '</span>' +
         '</div>' +
         (p.desc ? '<p class="desc">' + cz(p.desc) + '</p>' : '') +
+        algHtml +
       '</li>';
     }).join('');
     const html = '<section><h2>' + esc(s.nadpis) + '</h2><div class="rule"><i></i></div><ul>' + items + '</ul></section>';
@@ -464,6 +729,134 @@ function render(){
     '<div class="divider" aria-hidden="true"></div>' +
     '<div class="col">' + cols[2].join('') + '</div>';
   applySoldOut();
+  vykresliAlergeny();
+  vykresliJazyky();
+  pouzijFiltr();
+}
+
+/* ---------- alergeny: legenda a filtr „bez …“ ---------- */
+const FILTR = new Set();
+let filtrKlic = '';
+
+function vykresliAlergeny(){
+  const nazvy = MENU.alergenyNazvy || {};
+  const kody = Object.keys(nazvy).map(Number).sort((a, b) => a - b);
+  const leg = $('legenda'), fil = $('filtr');
+  if (!zivaData || !kody.length) {
+    leg.hidden = true; leg.innerHTML = ''; fil.hidden = true; fil.innerHTML = ''; filtrKlic = ''; FILTR.clear();
+    return;
+  }
+  leg.hidden = false;
+  leg.innerHTML = '<b>' + esc(T('alergeny')) + ':</b> ' +
+    kody.map(k => '<span>' + k + ' ' + esc(nazvy[k]) + '</span>').join(' · ') +
+    (MENU.alergenyNeuplne ? '<span class="chybi">' + esc(T('alergenyNeuplne')) + '</span>' : '');
+
+  /* Filtr se nepřekresluje při každém obnovení dat (po minutě): rozbalené okno
+     a výběr by zmizely. Nový obsah je potřeba jen při změně kódů nebo jazyka. */
+  const klic = JAZYK + '|' + kody.join(',') + '|' + (MENU.alergenyNeuplne ? 1 : 0);
+  if (klic === filtrKlic) return;
+  filtrKlic = klic;
+  fil.hidden = false;
+  fil.innerHTML = '<details' + (FILTR.size ? ' open' : '') + '><summary>' + esc(T('bezAlergenu')) + '</summary>' +
+    '<p class="filtr-napoveda">' + esc(T('filtrNapoveda')) + (MENU.alergenyNeuplne ? ' ' + esc(T('filtrNeuplne')) : '') + '</p>' +
+    '<div class="filtr-chips">' +
+    kody.map(k => '<button type="button" data-k="' + k + '" aria-pressed="' + (FILTR.has(k) ? 'true' : 'false') + '">' + k + ' · ' + esc(nazvy[k]) + '</button>').join('') +
+    '</div><button type="button" class="filtr-zrusit">' + esc(T('filtrZrusit')) + '</button></details>';
+  fil.querySelectorAll('.filtr-chips button').forEach(b => b.addEventListener('click', () => {
+    const k = Number(b.dataset.k);
+    if (FILTR.has(k)) FILTR.delete(k); else FILTR.add(k);
+    b.setAttribute('aria-pressed', FILTR.has(k) ? 'true' : 'false');
+    pouzijFiltr();
+  }));
+  fil.querySelector('.filtr-zrusit').addEventListener('click', () => {
+    FILTR.clear();
+    fil.querySelectorAll('.filtr-chips button').forEach(b => b.setAttribute('aria-pressed', 'false'));
+    pouzijFiltr();
+  });
+}
+
+/* Skryje položky, které obsahují některý z vybraných alergenů. Položky bez vyplněných
+   alergenů zůstávají: o nich se nedá tvrdit nic, proto je pod legendou věta „zeptejte se obsluhy“. */
+function pouzijFiltr(){
+  document.querySelectorAll('#cols li').forEach(li => {
+    const a = (li.dataset.alg || '').split(',').filter(Boolean).map(Number);
+    li.hidden = a.some(k => FILTR.has(k));
+  });
+  document.querySelectorAll('#cols section').forEach(sec => {
+    sec.hidden = sec.querySelectorAll('li:not([hidden])').length === 0;
+  });
+  fit();
+}
+
+/* ---------- přepínač jazyka ---------- */
+let jazykyKlic = '';
+function vykresliJazyky(){
+  const box = $('jazyk');
+  const nab = (MENU.jazyky && Array.isArray(MENU.jazyky.nabizet)) ? MENU.jazyky.nabizet.filter(j => JAZYKY.indexOf(j) >= 0) : [];
+  /* Jeden jazyk = není z čeho vybírat, pilulka se nekreslí. */
+  if (!zivaData || nab.length < 2) { box.hidden = true; box.classList.remove('open'); jazykyKlic = ''; return; }
+  box.hidden = false;
+  $('jazyk-kod').textContent = JAZYK.toUpperCase();
+  $('jazyk-btn').setAttribute('aria-label', T('jazyk') + ': ' + JAZYK_NAZEV[JAZYK]);
+  const klic = JAZYK + '|' + nab.join(',');
+  if (klic === jazykyKlic) return;
+  jazykyKlic = klic;
+  $('jazyk-menu').setAttribute('aria-label', T('jazyk'));
+  $('jazyk-menu').innerHTML = nab.map(j =>
+    '<button type="button" role="menuitemradio" lang="' + j + '" data-j="' + j + '" aria-checked="' + (j === JAZYK ? 'true' : 'false') + '">' +
+      '<span>' + esc(JAZYK_NAZEV[j]) + '</span>' +
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>' +
+    '</button>').join('');
+  $('jazyk-menu').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { zavriJazyky(true); nastavJazyk(b.dataset.j); }));
+}
+
+function otevriJazyky(){
+  const box = $('jazyk');
+  box.classList.add('open');
+  $('jazyk-btn').setAttribute('aria-expanded', 'true');
+  const vybrany = $('jazyk-menu').querySelector('[aria-checked="true"]') || $('jazyk-menu').querySelector('button');
+  if (vybrany) vybrany.focus();
+}
+function zavriJazyky(vratFokus){
+  $('jazyk').classList.remove('open');
+  $('jazyk-btn').setAttribute('aria-expanded', 'false');
+  if (vratFokus) $('jazyk-btn').focus();
+}
+$('jazyk-btn').addEventListener('click', () => { $('jazyk').classList.contains('open') ? zavriJazyky(false) : otevriJazyky(); });
+$('jazyk-btn').addEventListener('keydown', e => {
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); otevriJazyky(); }
+});
+$('jazyk-menu').addEventListener('keydown', e => {
+  const polozky = Array.from($('jazyk-menu').querySelectorAll('button'));
+  const i = polozky.indexOf(document.activeElement);
+  if (e.key === 'Escape') { e.preventDefault(); zavriJazyky(true); }
+  else if (e.key === 'ArrowDown') { e.preventDefault(); polozky[(i + 1) % polozky.length].focus(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); polozky[(i - 1 + polozky.length) % polozky.length].focus(); }
+  else if (e.key === 'Home') { e.preventDefault(); polozky[0].focus(); }
+  else if (e.key === 'End') { e.preventDefault(); polozky[polozky.length - 1].focus(); }
+  else if (e.key === 'Tab') zavriJazyky(false);
+});
+document.addEventListener('pointerdown', e => { if (!e.target.closest('#jazyk')) zavriJazyky(false); });
+
+/* Volba hosta: uložit, zapsat do adresy (odkaz se dá sdílet v jazyce) a načíst lístek znovu. */
+function nastavJazyk(j){
+  if (!cistyJazyk(j)) return;
+  JAZYK = j;
+  try { localStorage.setItem(KLIC_JAZYKA, j); } catch (e) {}
+  try { const u = new URL(location.href); u.searchParams.set('lang', j); history.replaceState(null, '', u.toString()); } catch (e) {}
+  render();
+  stahni();
+}
+
+/* Popisky a hlášky obalu stránky v jazyce hosta. */
+function aplikujUI(){
+  const r = document.documentElement;
+  r.lang = JAZYK;
+  r.style.setProperty('--t-vyprodano', '"' + T('vyprodano').replace(/"/g, '') + '"');
+  $('logo').setAttribute('aria-label', T('logo'));
+  const bm = $('btn-mode'), bf = $('btn-full');
+  if (bm) { bm.title = T('denNoc'); bm.setAttribute('aria-label', T('denNoc')); }
+  if (bf) { bf.title = T('celaObrazovka'); bf.setAttribute('aria-label', T('celaObrazovka')); }
 }
 
 /* ---------- vyprodáno: podrž prst na položce ----------
@@ -502,18 +895,18 @@ async function prepnout(polozka){
   let vysledek = await oznacit(polozka, nove, ulozenyPin()).catch(() => false);
 
   if (vysledek === 'pin') {
-    const zadany = prompt('PIN menu pro označení vyprodaného:');
-    if (!zadany) { toast('Zrušeno'); return; }
+    const zadany = prompt(T('pinOtazka'));
+    if (!zadany) { toast(T('zruseno')); return; }
     vysledek = await oznacit(polozka, nove, zadany.trim()).catch(() => false);
     if (vysledek === true) zapamatujPin(zadany.trim());
-    else if (vysledek === 'pin') { toast('Nesprávný PIN'); return; }
+    else if (vysledek === 'pin') { toast(T('spatnyPin')); return; }
   }
 
-  if (vysledek !== true) { toast('Beze spojení — neuloženo'); return; }
+  if (vysledek !== true) { toast(T('bezSpojeni')); return; }
 
   polozka.vyprodano = nove;
   render();
-  toast(nove ? 'Označeno jako vyprodané' : 'Zpátky v nabídce');
+  toast(nove ? T('oznacenoVyprodano') : T('zpetVNabidce'));
   if (navigator.vibrate) navigator.vibrate(12);
 }
 
@@ -531,7 +924,7 @@ function startPress(e){
   pressed = li;
   pressTimer = setTimeout(() => {
     pressTimer = null;
-    if (!zivaData) { toast('Menu běží ze zálohy — vyprodáno teď nejde uložit'); return; }
+    if (!zivaData) { toast(T('zalohaVyprodano')); return; }
     const polozka = polozkaPodleKlice(li.dataset.key);
     if (polozka && polozka.id) prepnout(polozka);
   }, 700);
@@ -548,8 +941,8 @@ document.addEventListener('contextmenu', e => { if (e.target.closest('#cols')) e
 let logoTimer = null;
 $('logo').addEventListener('pointerdown', () => {
   logoTimer = setTimeout(() => {
-    toast('Načítám z aplikace…');
-    stahni().then(ok => toast(ok ? 'Menu je aktuální' : 'Aplikace neodpovídá'));
+    toast(T('nacitam'));
+    stahni().then(ok => toast(ok ? T('aktualni') : T('neodpovida')));
   }, 1200);
 });
 ['pointerup','pointercancel','pointerleave'].forEach(ev =>
@@ -613,8 +1006,9 @@ document.addEventListener('pointerdown', () => { if (!lock) keepAwake(); }, { pa
 let idleTimer;
 function wake(){
   $('tools').classList.remove('idle');
+  $('jazyk').classList.remove('idle');
   clearTimeout(idleTimer);
-  idleTimer = setTimeout(() => $('tools').classList.add('idle'), 6000);
+  idleTimer = setTimeout(() => { $('tools').classList.add('idle'); $('jazyk').classList.add('idle'); }, 6000);
 }
 ['pointerdown','pointermove'].forEach(ev => document.addEventListener(ev, wake, { passive: true }));
 wake();
@@ -736,19 +1130,20 @@ function hlas(text){
 
 async function stahni(){
   try {
-    const r = await fetch('/api/menu/public/' + SLUG, { cache: 'no-store', credentials: 'same-origin' });
+    /* Jazyk je součástí adresy: service worker i cache mají pro každý jazyk vlastní záznam. */
+    const r = await fetch('/api/menu/public/' + SLUG + '?lang=' + encodeURIComponent(JAZYK), { cache: 'no-store', credentials: 'same-origin' });
     if (!r.ok) {
       /* 404 není výpadek sítě, ale špatná adresa: menu s tímhle slugem
          v aplikaci není. Bez téhle hlášky se tiše ukazuje záloha a vypadá
          to, jako by se úpravy v aplikaci neukládaly. */
       if (r.status === 404 && !zivaData) {
-        hlas('Zobrazuje se záložní nabídka — menu „' + SLUG + '“ v aplikaci není. Otevři adresu, kterou ukazuje Kasa & sklad → Menu.');
+        hlas(T('zalohaHlas', { slug: SLUG }));
       }
       return false;
     }
     const data = await r.json();
     if (!data || !Array.isArray(data.sekce) || !data.sekce.length) {
-      if (!zivaData) hlas('Menu „' + SLUG + '“ je v aplikaci prázdné — zobrazuje se záložní nabídka.');
+      if (!zivaData) hlas(T('prazdneHlas', { slug: SLUG }));
       return false;
     }
     hlas('');
@@ -756,6 +1151,9 @@ async function stahni(){
     /* Popisky u QR aplikace nezná — ty si necháme ze zálohy. */
     MENU = Object.assign({}, ZALOHA, data, { qr: ZALOHA.qr });
     zivaData = true;
+    /* Server ví, které jazyky lístek nabízí: obal stránky se srovná s tím, co poslal
+       (český lístek, který host otevřel s anglickým prohlížečem, zůstane celý česky). */
+    if (data.jazyky && cistyJazyk(data.jazyky.zvoleny)) JAZYK = data.jazyky.zvoleny;
     nasadVzhled(data.vzhled);
     render();
     fit();

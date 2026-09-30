@@ -33,6 +33,9 @@ import { PlochaWidgetu } from './widgety/PlochaWidgetu';
 import { useDataWidgetu } from './widgety/useDataWidgetu';
 import { obnovTym } from './widgety/oblasti/tym';
 import { CURRENCIES, LOCALES } from '@/lib/money';
+import NavigaceNastaveni from './NavigaceNastaveni';
+import { JAZYKY, JAZYK_NAZEV, cistyJazyk } from '@/lib/i18n/config';
+import { ZEME, PREDVOLBY_ZEMI, predvolbaProZemi, navrhNastaveni } from '@/lib/i18n/zeme';
 import { useSymbol } from './CurrencyProvider';
 import { czCount } from '@/lib/czech';
 import { apiMessage, okJson } from '@/lib/api';
@@ -78,6 +81,11 @@ interface Team {
   week_start?: number;
   labor_target_pct?: number | null;
   business_type?: string | null;
+  // Lokalizace podniku (kolo 76); starší server je neposílá.
+  country?: string | null;
+  default_lang?: string;
+  time_format?: string;
+  timezone?: string;
 }
 
 interface Invitation {
@@ -569,7 +577,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
               {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.label}</option>)}
             </Select>
           </Field>
-          <Field id="tym-jazyk" label="Formát čísel (jazyk)">
+          <Field id="tym-jazyk" label="Formát čísel a měny">
             <Select id="tym-jazyk" value={team.locale ?? 'cs-CZ'} disabled={ukladam === 'biz'}
               onChange={e => prepni('biz', { locale: e.target.value }, { locale: e.target.value }, 'Nastavení provozu je uložené.')}>
               {LOCALES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
@@ -581,6 +589,30 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
               <option value="1">Pondělí</option>
               <option value="0">Neděle</option>
             </Select>
+          </Field>
+          {/* Lokalizace podniku (kolo 76): země jen předvyplňuje návrhy, nic nezamyká a nic netvrdí o právu. */}
+          <Field id="tym-zeme" label="Země" hint="Návrh podle země. Zkontroluj si to s účetním.">
+            <Select id="tym-zeme" value={team.country ?? ''} disabled={ukladam === 'biz'}
+              onChange={e => prepni('biz', { country: e.target.value || null }, { country: e.target.value || null }, 'Nastavení provozu je uložené.')}>
+              <option value="">Nevybráno</option>
+              {ZEME.map(z => <option key={z} value={z}>{PREDVOLBY_ZEMI[z].nazev}</option>)}
+            </Select>
+          </Field>
+          <Field id="tym-jazyk-podniku" label="Jazyk podniku" hint="Výchozí jazyk nových členů, e-mailů dodavatelům a lístku pro hosty.">
+            <Select id="tym-jazyk-podniku" value={cistyJazyk(team.default_lang) ?? 'cs'} disabled={ukladam === 'biz'}
+              onChange={e => prepni('biz', { defaultLang: e.target.value }, { default_lang: e.target.value }, 'Nastavení provozu je uložené.')}>
+              {JAZYKY.map(j => <option key={j} value={j} lang={j}>{JAZYK_NAZEV[j]}</option>)}
+            </Select>
+          </Field>
+          <Field id="tym-cas" label="Formát času">
+            <Select id="tym-cas" value={team.time_format === '12' ? '12' : '24'} disabled={ukladam === 'biz'}
+              onChange={e => prepni('biz', { timeFormat: e.target.value }, { time_format: e.target.value }, 'Nastavení provozu je uložené.')}>
+              <option value="24">24 hodin (14:30)</option>
+              <option value="12">12 hodin (2:30 PM)</option>
+            </Select>
+          </Field>
+          <Field id="tym-pasmo" label="Časové pásmo" hint="Pro Česko, Slovensko, Německo, Rakousko a Polsko je stejné jako v Praze. Jiná pásma aplikace zatím nepodporuje.">
+            <Input id="tym-pasmo" readOnly value="Střední Evropa (Praha, Berlín, Varšava)" />
           </Field>
           <Field id="tym-cil" label="Cíl mzdových nákladů (%)" hint="Podíl mezd na tržbách — Mzdy za období ukážou, jestli jste v cíli.">
             <Input id="tym-cil" type="number" inputMode="numeric" min={0} max={100} placeholder="30" disabled={ukladam === 'biz'}
@@ -601,7 +633,31 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
               actions={<a href="/employer/start?znovu=1" className="btn btn-secondary btn-sm">Spustit znovu</a>} />
           </ul>
         )}
+        {/* Předvyplnění podle země: ukáže, co navrhne, a změní to až po kliknutí. DPH jen jako informace k ověření; appka z něj nic nepočítá. */}
+        {(() => {
+          const p = predvolbaProZemi(team.country);
+          const n = navrhNastaveni(team.country);
+          if (!p || !n) return null;
+          const shoda = (team.currency ?? 'CZK') === n.currency && (team.locale ?? 'cs-CZ') === n.locale && (team.week_start ?? 1) === n.weekStart
+            && (cistyJazyk(team.default_lang) ?? 'cs') === n.defaultLang && (team.time_format === '12' ? '12' : '24') === n.timeFormat;
+          return (
+            <div className="well mt-4 p-4 space-y-2" role="group" aria-label="Návrh podle země">
+              <p className="text-sm font-semibold text-[#16181A]">Návrh pro zemi {p.nazev}</p>
+              <p className="t-meta text-pretty">
+                Jazyk {JAZYK_NAZEV[p.jazyk]}, měna {p.mena}, formát čísel {p.locale}, týden od {p.zacatekTydne === 1 ? 'pondělí' : 'neděle'}, {p.hodiny} hodin.
+                Sazby DPH {p.dph.map(d => `${d.sazba} %`).join(' / ')} (návrh k ověření, aplikace z nich nic nepočítá).
+              </p>
+              {shoda
+                ? <p className="t-meta">Nastavení už návrhu odpovídá.</p>
+                : <Button variant="secondary" size="sm" loading={ukladam === 'biz'}
+                    onClick={() => prepni('biz', n, { default_lang: n.defaultLang, currency: n.currency, locale: n.locale, week_start: n.weekStart, time_format: n.timeFormat, timezone: n.timezone }, 'Návrh podle země je použitý.')}>
+                    Předvyplnit podle země
+                  </Button>}
+            </div>
+          );
+        })()}
       </Card>}
+      {ma('podnik.nastaveni') && <NavigaceNastaveni />}
       <OrganizationSettings />
     </>
   );

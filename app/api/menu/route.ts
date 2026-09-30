@@ -16,8 +16,10 @@ import { neon } from '@neondatabase/serverless';
 import bcrypt from 'bcryptjs';
 import {
   buildBoard, cleanText, cleanPrice, cleanSlug, cleanColumn, cleanPin,
+  cleanLangs, cleanI18n, POLE_DESKY, POLE_SEKCE, POLE_POLOZKY, MAX_DESKA_I18N, MAX_SEKCE_I18N, MAX_POLOZKA_I18N,
   MAX_NAME, MAX_DESC, SEED_BOARD, DEFAULT_CURRENCY,
 } from '@/lib/menu';
+import { cistiAlergeny, cistiStitky } from '@/lib/alergeny';
 import { normalizeMenuTheme, zeSdilenehoVzhledu, VYCHOZI_THEME } from '@/lib/menuTheme';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { cenaKZapisu } from '@/lib/cenaSloupce';
@@ -285,6 +287,21 @@ export async function PUT(request: Request) {
       updated_at = NOW()
     WHERE id = ${id}`;
 
+  // ---- jazyky lístku a překlady hlavičky (kolo 76) ----
+  // Zvlášť a defenzivně: před /api/init sloupce nejsou a uložení lístku kvůli
+  // nim selhat nesmí. Zapisuje se jen to, co klient poslal; starší záložka, která
+  // `langs` ani `i18n` nezná, překlady nesmaže.
+  let langsDesky = cleanLangs(board.langs);
+  if (Object.prototype.hasOwnProperty.call(body ?? {}, 'langs')) langsDesky = cleanLangs(body.langs);
+  try {
+    if (Object.prototype.hasOwnProperty.call(body ?? {}, 'langs')) {
+      await sql`UPDATE menu_boards SET langs = ${JSON.stringify(langsDesky)}::jsonb WHERE id = ${id}`;
+    }
+    if (Object.prototype.hasOwnProperty.call(body ?? {}, 'i18n')) {
+      await sql`UPDATE menu_boards SET i18n = ${JSON.stringify(cleanI18n(body.i18n, POLE_DESKY, MAX_DESKA_I18N, langsDesky.vychozi))}::jsonb WHERE id = ${id}`;
+    }
+  } catch { /* sloupce ještě nejsou */ }
+
   // ---- vzhled ----
   if (body?.theme && typeof body.theme === 'object') {
     await sql`
@@ -329,6 +346,11 @@ export async function PUT(request: Request) {
       }
       sp++;
       ponechatSekce.push(sectionId);
+      if (Object.prototype.hasOwnProperty.call(s ?? {}, 'i18n')) {
+        try {
+          await sql`UPDATE menu_sections SET i18n = ${JSON.stringify(cleanI18n(s.i18n, POLE_SEKCE, MAX_SEKCE_I18N, langsDesky.vychozi))}::jsonb WHERE id = ${sectionId}`;
+        } catch { /* sloupec ještě není */ }
+      }
 
       const stareP = await sql`SELECT id FROM menu_items WHERE section_id = ${sectionId}` as any[];
       const znameP = new Set(stareP.map((r: any) => Number(r.id)));
@@ -358,6 +380,19 @@ export async function PUT(request: Request) {
         }
         ip++;
         ponechatP.push(itemId);
+        // Alergeny, štítky a překlady položky (kolo 76). Kódy mimo 1–14 a neznámé
+        // štítky se zahodí; překlad je jen text a nikdy nezasáhne cenu ani vyprodáno.
+        // Zapisuje se, jen když to klient poslal: starší záložka alergeny nesmaže.
+        const maAlergeny = Object.prototype.hasOwnProperty.call(it ?? {}, 'allergens');
+        const maStitky = Object.prototype.hasOwnProperty.call(it ?? {}, 'tags');
+        const maPreklad = Object.prototype.hasOwnProperty.call(it ?? {}, 'i18n');
+        if (maAlergeny || maStitky || maPreklad) {
+          try {
+            if (maAlergeny) await sql`UPDATE menu_items SET allergens = ${cistiAlergeny(it.allergens)}::smallint[] WHERE id = ${itemId}`;
+            if (maStitky) await sql`UPDATE menu_items SET tags = ${cistiStitky(it.tags)}::text[] WHERE id = ${itemId}`;
+            if (maPreklad) await sql`UPDATE menu_items SET i18n = ${JSON.stringify(cleanI18n(it.i18n, POLE_POLOZKY, MAX_POLOZKA_I18N, langsDesky.vychozi))}::jsonb WHERE id = ${itemId}`;
+          } catch { /* sloupce ještě nejsou */ }
+        }
       }
 
       for (const stary of Array.from(znameP)) {

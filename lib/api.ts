@@ -20,6 +20,8 @@
 // vezme `error` z těla odpovědi, když tam je. `apiMessage` pak z čehokoli
 // chyceného udělá českou větu, kterou jde ukázat člověku.
 
+import { tg } from './i18n/stav.ts';
+
 /** Chyba s HTTP stavem — obrazovka podle něj může rozlišit 403 od výpadku. */
 export class ApiError extends Error {
   status: number;
@@ -36,7 +38,8 @@ export function statusMessage(status: number): string {
   if (status === 404) return 'Tohle už neexistuje.';
   if (status === 429) return 'Moc rychle po sobě. Zkus to za chvíli.';
   if (status >= 500) return 'Server právě nestíhá.';
-  return `Server odpověděl ${status}.`;
+  // Jediná věta s číslem: parametr se dosadí až po překladu, proto `tg` a ne šablona.
+  return tg('Server odpověděl {status}.', { status });
 }
 
 /**
@@ -66,12 +69,15 @@ export async function okText(r: Response): Promise<string> {
 
 /** Česká věta z čehokoli, co spadlo — ať už ze serveru, nebo ze sítě. */
 export function apiMessage(e: unknown, fallback = 'Načtení se nepovedlo.'): string {
-  if (e instanceof ApiError) return e.message;
+  // Jediný výstup chyby k člověku, proto se tu překládá: česká věta ze serveru
+  // nebo z `statusMessage` se hledá ve slovníku `api` (jazyk uživatele, pro
+  // hosta jazyk hosta). Věta, která ve slovníku není (třeba s číslem), zůstane česky.
+  if (e instanceof ApiError) return tg(e.message);
   const m = (e as any)?.message;
   // `TypeError: Failed to fetch` je výpadek spojení, ne odpověď serveru;
   // anglická hláška z prohlížeče člověku nic neřekne.
-  if (typeof m === 'string' && m && !/fetch|network|load failed/i.test(m)) return m;
-  return fallback;
+  if (typeof m === 'string' && m && !/fetch|network|load failed/i.test(m)) return tg(m);
+  return tg(fallback);
 }
 
 /** Vypadlo spojení (na rozdíl od odpovědi, kterou server poslal)? */

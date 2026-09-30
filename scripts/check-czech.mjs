@@ -16,7 +16,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const ROOTS = ['app', 'components', 'lib'];
-const ALLOW = new Set(['lib/czech.ts', 'lib/plan.ts', 'scripts/check-czech.mjs']);
+const ALLOW = new Set(['lib/czech.ts', 'lib/plan.ts', 'lib/i18n/plural.ts', 'scripts/check-czech.mjs']);
 
 // Opsané rozmezí 2–4 — pravidlo má být jen na jednom místě.
 const COPIED = /\b[a-zA-Z_$][\w$]*\s*>=\s*2\s*&&\s*[a-zA-Z_$][\w$]*\s*<=\s*4\b/;

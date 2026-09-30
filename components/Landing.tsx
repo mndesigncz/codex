@@ -146,7 +146,9 @@ function Zkusit({ className = '' }: { className?: string }) {
 
 export default function Landing() {
   return (
-    <div className="relative min-h-[100dvh] overflow-x-clip">
+    // lang="cs": obsah prodejní stránky je zatím jen česky (překlad přijde s prefixy /en, /de
+    // kvůli SEO), takže ho odečítač musí číst česky, i když má člověk v cookie jiný jazyk rozhraní.
+    <div lang="cs" className="relative min-h-[100dvh] overflow-x-clip">
       <ForceLight />
       {/* Barevné skvrny pod sklem — celá stránka stojí na jedné vrstvě pozadí. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[130vh] overflow-hidden" aria-hidden>

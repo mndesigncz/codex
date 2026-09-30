@@ -6,7 +6,7 @@
    mění, takže obnovení stránky musí spolehlivě přinést novou verzi. Cache je
    tu pro případ, že venku vypadne wifi — ne pro rychlost. */
 
-const CACHE = 'pangea-menu-v1';
+const CACHE = 'managero-menu-v2';  // v2: adresy lístku nesou ?lang=, starý záznam je bez jazyka
 const STRANKA = '/menu-akce.html';
 const ASSETS = [STRANKA, '/menu.webmanifest', '/menu-icon-180.png', '/menu-icon-192.png', '/menu-icon-512.png'];
 const TIMEOUT = 3500;

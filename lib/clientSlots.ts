@@ -11,11 +11,14 @@ export function dayKey(dateStr: string): string {
 
 export const DAY_NAMES = ['pondělí', 'úterý', 'středa', 'čtvrtek', 'pátek', 'sobota', 'neděle'];
 
-/** „8:00–20:00", „zavřeno" nebo „neuvedeno". */
-export function hoursLabel(hours: OpeningHours | null | undefined, dateStr: string): string {
+/**
+ * „8:00–20:00", „zavřeno" nebo „neuvedeno". `t` je překladová funkce (česká věta
+ * → text v jazyce hosta); bez ní česky, jako dřív.
+ */
+export function hoursLabel(hours: OpeningHours | null | undefined, dateStr: string, t: (cs: string) => string = cs => cs): string {
   const d = hours?.[dayKey(dateStr)];
-  if (!d) return 'neuvedeno';
-  if (d.closed || !d.open || !d.close) return 'zavřeno';
+  if (!d) return t('neuvedeno');
+  if (d.closed || !d.open || !d.close) return t('zavřeno');
   return `${d.open}–${d.close}`;
 }
 

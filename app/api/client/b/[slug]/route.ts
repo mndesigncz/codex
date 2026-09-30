@@ -8,6 +8,7 @@ import { sql, customer, profileBySlug, publicProfile, membership } from '@/lib/c
 import { activeCampaigns, progressFor } from '@/lib/stamps';
 import { shapeCoupon, windowOk, ageFrom, TIER_LABELS } from '@/lib/coupons';
 import { pragueToday, pragueHM } from '@/lib/pragueTime';
+import { buildBoard, publicShape } from '@/lib/menu';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -17,31 +18,61 @@ export const fetchCache = 'force-no-store';
  * bez id produktu z pokladny — to si objednávka dohledá podle id položky).
  * Tvar drží stránka hosta i objednávka: sections[].items[].
  */
-async function menuFor(teamId: number, menuSlug: string | null) {
+async function menuFor(teamId: number, menuSlug: string | null, lang: string | null) {
   try {
-    const [board] = menuSlug
-      ? await sql`SELECT id, slug, name, currency FROM menu_boards WHERE team_id = ${teamId} AND slug = ${menuSlug} AND enabled IS NOT FALSE ORDER BY id LIMIT 1`
-      : await sql`SELECT id, slug, name, currency FROM menu_boards WHERE team_id = ${teamId} AND enabled IS NOT FALSE ORDER BY id LIMIT 1`;
+    // Sloupce jazyků, alergenů a překladů (kolo 76) zvlášť a defenzivně: před
+    // /api/init nejsou a nabídka se musí ukázat jako dřív, jen česky a bez alergenů.
+    const nactiDesku = async (nove: boolean) => {
+      if (nove) {
+        return menuSlug
+          ? await sql`SELECT id, slug, name, currency, langs, i18n FROM menu_boards WHERE team_id = ${teamId} AND slug = ${menuSlug} AND enabled IS NOT FALSE ORDER BY id LIMIT 1`
+          : await sql`SELECT id, slug, name, currency, langs, i18n FROM menu_boards WHERE team_id = ${teamId} AND enabled IS NOT FALSE ORDER BY id LIMIT 1`;
+      }
+      return menuSlug
+        ? await sql`SELECT id, slug, name, currency FROM menu_boards WHERE team_id = ${teamId} AND slug = ${menuSlug} AND enabled IS NOT FALSE ORDER BY id LIMIT 1`
+        : await sql`SELECT id, slug, name, currency FROM menu_boards WHERE team_id = ${teamId} AND enabled IS NOT FALSE ORDER BY id LIMIT 1`;
+    };
+    let rows: any[];
+    try { rows = await nactiDesku(true) as any[]; } catch { rows = await nactiDesku(false) as any[]; }
+    const board = rows[0];
     if (!board) return null;
-    const sections = await sql`SELECT id, title, position FROM menu_sections WHERE board_id = ${board.id} ORDER BY position, id` as any[];
-    const items = await sql`
-      SELECT i.id, i.section_id, i.name, i.price, i.description, i.sold_out, i.position
-      FROM menu_items i JOIN menu_sections s ON s.id = i.section_id
-      WHERE s.board_id = ${board.id} ORDER BY i.position, i.id` as any[];
+    let sections: any[];
+    let items: any[];
+    try {
+      sections = await sql`SELECT id, title, position, i18n FROM menu_sections WHERE board_id = ${board.id} ORDER BY position, id` as any[];
+      items = await sql`
+        SELECT i.id, i.section_id, i.name, i.price, i.description, i.sold_out, i.position, i.allergens, i.tags, i.i18n
+        FROM menu_items i JOIN menu_sections s ON s.id = i.section_id
+        WHERE s.board_id = ${board.id} ORDER BY i.position, i.id` as any[];
+    } catch {
+      sections = await sql`SELECT id, title, position FROM menu_sections WHERE board_id = ${board.id} ORDER BY position, id` as any[];
+      items = await sql`
+        SELECT i.id, i.section_id, i.name, i.price, i.description, i.sold_out, i.position
+        FROM menu_items i JOIN menu_sections s ON s.id = i.section_id
+        WHERE s.board_id = ${board.id} ORDER BY i.position, i.id` as any[];
+    }
+    // Překlad, alergeny a věty o nich řeší jedno místo (lib/menu publicShape), stejné jako
+    // u veřejného lístku: host vidí v obou stejnou pravdu. Jazyk mimo nabízené = výchozí jazyk lístku.
+    const deska = buildBoard(board, sections, items);
+    const pub = publicShape(deska, lang);
     return {
       slug: board.slug, name: board.name, currency: board.currency ?? 'Kč',
-      sections: sections.map(sec => ({
-        id: Number(sec.id), title: String(sec.title),
-        items: items.filter(i => Number(i.section_id) === Number(sec.id)).map(i => ({
-          id: Number(i.id), name: String(i.name), price: Number(i.price) || 0,
-          description: i.description ?? '', soldOut: !!i.sold_out,
+      sections: pub.sekce.map((sec, si) => ({
+        id: deska.sections[si].id, title: sec.nadpis,
+        items: sec.polozky.map(p => ({
+          id: p.id, name: p.name, price: Number(p.price) || 0,
+          description: p.desc ?? '', soldOut: !!p.vyprodano,
+          ...('alergeny' in p ? { alergeny: (p as any).alergeny } : {}),
         })),
       })),
+      alergenyNazvy: pub.alergenyNazvy,
+      alergenyPoznamka: pub.alergenyPoznamka,
+      alergenyNeuplne: pub.alergenyNeuplne,
     };
   } catch { return null; }
 }
 
-export async function GET(_req: Request, props: { params: Promise<{ slug: string }> }) {
+export async function GET(req: Request, props: { params: Promise<{ slug: string }> }) {
   const params = await props.params;
   const p = await profileBySlug(params.slug);
   if (!p) return NextResponse.json({ error: 'Podnik nenalezen' }, { status: 404 });
@@ -50,7 +81,7 @@ export async function GET(_req: Request, props: { params: Promise<{ slug: string
   const today = pragueToday();
 
   const [menu, tables, coupons] = await Promise.all([
-    menuFor(teamId, p.menu_slug ?? null),
+    menuFor(teamId, p.menu_slug ?? null, new URL(req.url).searchParams.get('lang')),
     p.ordering_on ? sql`SELECT id, name, seats, map_x, map_y, map_w, map_h, map_shape, map_rot FROM client_tables WHERE team_id = ${teamId} AND active = TRUE ORDER BY position, id` : Promise.resolve([]),
     p.loyalty_on ? sql`SELECT * FROM client_coupons
                        WHERE team_id = ${teamId} AND active = TRUE AND kind = 'offer' AND (valid_until IS NULL OR valid_until >= ${today})

@@ -8,6 +8,8 @@
 // Pravidlo bylo v repu třikrát opsané (Sklad, CategoryNav, plán). Tohle je
 // to jedno místo.
 
+import { vyberTvar } from './i18n/plural.ts';
+
 export interface CzNoun {
   /** 1 */
   one: string;
@@ -19,10 +21,10 @@ export interface CzNoun {
 
 /** Správný tvar podstatného jména pro daný počet, bez čísla. */
 export function czForm(n: number, w: CzNoun): string {
-  const abs = Math.abs(n);
-  if (abs === 1) return w.one;
-  if (abs >= 2 && abs <= 4) return w.few;
-  return w.many;
+  // Tenký obal nad společným výběrem tvaru (lib/i18n/plural.ts): výstup je
+  // stejný jako dřív, jen pravidlo žije v jednom místě pro všech pět jazyků.
+  // `many` tady znamená „0 a 5+", v plural.ts je to kategorie `other`.
+  return vyberTvar('cs', n, { one: w.one, few: w.few, other: w.many });
 }
 
 /** Počet i tvar dohromady: „3 položky". */

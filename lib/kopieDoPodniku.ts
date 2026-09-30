@@ -352,6 +352,9 @@ async function kopieMenu({ z, nazevZdroje, teamId, meId, ids }: ZadaniKopie): Pr
                       ${jeho.map(it => (it.description ?? null) as string | null)}::text[], ${jeho.map((_, i) => i)}::int[])
                AS x(name, price, description, position)`;
       }
+      // Překlady lístku, alergeny a štítky patří zdrojovému podniku a nekopírují se:
+      // kopie by je nesla bez kontroly, a u alergenů je to právně citlivé. Říct to nahlas.
+      poznamky.push('Překlady lístku, alergeny a štítky se nekopírují — doplň je v nové kopii.');
       poznamky.push(`Menu je po zkopírování vypnuté a má novou adresu /menu-akce.html?menu=${slug} — zapni ho, až projdeš ceny.`);
       audit(teamId, meId, 'organization.kopie', 'menu', noveId, `Z podniku „${nazevZdroje}": ${nazev}`);
       vysledky.push({ id, noveId, nazev, poznamky });

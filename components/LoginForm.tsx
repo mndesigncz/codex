@@ -9,7 +9,12 @@ import PravniOdkazy from './pravni/PravniOdkazy';
 import { HLASKA_ROLE_V_PROVOZU } from '@/lib/obal';
 
 import { Button } from './ui';
+import JazykMenu from './ui/JazykMenu';
+import { useT } from '@/lib/i18n/client';
 export default function LoginForm() {
+  // Texty přihlášení: vykání jako v českém originálu (německy „Sie“), protože jde
+  // o veřejný vstup do aplikace, stejně jako registrace.
+  const t = useT('auth');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPwd, setShowPwd] = useState(false);
@@ -26,10 +31,10 @@ export default function LoginForm() {
     try {
       const result = await signIn('credentials', { email, password, redirect: false });
       // OBAL_ROLE vrací server jen po správném hesle: účet hosta v aplikaci pro podniky.
-      if (result?.error) setError(result.error === 'OBAL_ROLE' ? HLASKA_ROLE_V_PROVOZU : 'Nesprávný email nebo heslo.');
+      if (result?.error) setError(result.error === 'OBAL_ROLE' ? HLASKA_ROLE_V_PROVOZU : t('Nesprávný email nebo heslo.'));
       else { router.push('/'); router.refresh(); }
     } catch {
-      setError('Chyba při přihlášení.');
+      setError(t('Chyba při přihlášení.'));
     } finally {
       setIsLoading(false);
     }
@@ -55,55 +60,57 @@ export default function LoginForm() {
           </div>
           <div className="relative">
             <h2 className="text-3xl font-bold tracking-tight text-white leading-snug text-balance">
-              Směny, kasa a sklad<br />na jednom místě.
+              {t('Směny, kasa a sklad na jednom místě.')}
             </h2>
-            <p className="text-white/70 text-sm mt-2">Pro kavárny, restaurace a malé podniky.</p>
+            <p className="text-white/70 text-sm mt-2">{t('Pro kavárny, restaurace a malé podniky.')}</p>
           </div>
         </div>
 
         {/* Right — form */}
-        <div className="p-8 sm:p-12 flex flex-col justify-center bg-white">
+        <div className="relative p-8 sm:p-12 flex flex-col justify-center bg-white">
+          {/* Přepínač jazyka: malá pilulka v rohu formuláře, na telefonu vedle loga. */}
+          <div className="absolute top-4 right-4 sm:top-6 sm:right-6"><JazykMenu /></div>
           <div className="md:hidden flex items-center gap-2.5 mb-8">
             <LogoMark size={38} />
             <span className="font-bold text-[#16181A] tracking-tight">Managero</span>
           </div>
 
-          <h1 className="text-3xl font-bold tracking-tight text-[#16181A]">Přihlásit se</h1>
-          <p className="text-black/45 text-sm mt-1.5 mb-8">Zadejte své údaje pro vstup do systému.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-[#16181A]">{t('Přihlásit se')}</h1>
+          <p className="text-black/45 text-sm mt-1.5 mb-8">{t('Zadejte své údaje pro vstup do systému.')}</p>
 
           {justRegistered && (
             <div className="p-4 rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/30 text-[#5B7A08] text-sm mb-6">
-              Účet byl vytvořen. Nyní se můžete přihlásit.
+              {t('Účet byl vytvořen. Nyní se můžete přihlásit.')}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label htmlFor="login-email" className="block text-sm font-medium text-[#16181A] mb-1.5">Email</label>
-              <input id="login-email" autoComplete="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="vas@email.cz" required className={inputClass} />
+              <label htmlFor="login-email" className="block text-sm font-medium text-[#16181A] mb-1.5">{t('Email')}</label>
+              <input id="login-email" autoComplete="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={t('vas@email.cz')} required className={inputClass} />
             </div>
             <div>
-              <label htmlFor="login-heslo" className="block text-sm font-medium text-[#16181A] mb-1.5">Heslo</label>
+              <label htmlFor="login-heslo" className="block text-sm font-medium text-[#16181A] mb-1.5">{t('Heslo')}</label>
               <div className="relative">
-                <input id="login-heslo" autoComplete="current-password" type={showPwd ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="Zadejte heslo" required className={`${inputClass} pr-12`} />
+                <input id="login-heslo" autoComplete="current-password" type={showPwd ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder={t('Zadejte heslo')} required className={`${inputClass} pr-12`} />
                 <button type="button" onClick={() => setShowPwd(v => !v)} aria-pressed={showPwd} className="tap-target absolute right-3 top-1/2 -translate-y-1/2 text-black/35 hover:text-black/60 text-sm">
-                  {showPwd ? 'skrýt' : 'zobrazit'}
+                  {showPwd ? t('skrýt') : t('zobrazit')}
                 </button>
               </div>
-              <p className="mt-2 text-sm text-right"><Link href="/zapomenute-heslo" className="tap-target-sm inline-flex items-center text-[#5B7A08] hover:underline font-semibold">Zapomenuté heslo</Link></p>
+              <p className="mt-2 text-sm text-right"><Link href="/zapomenute-heslo" className="tap-target-sm inline-flex items-center text-[#5B7A08] hover:underline font-semibold">{t('Zapomenuté heslo')}</Link></p>
             </div>
 
             {error && <div className="p-3.5 note note-danger text-sm">{error}</div>}
 
             <Button type="submit" variant="accent" size="lg" loading={isLoading} className="w-full">
-              Přihlásit se
+              {t('Přihlásit se')}
             </Button>
           </form>
 
           <div className="mt-8 pt-6 border-t border-black/[0.07] space-y-2 text-center text-sm">
-            <p className="text-black/50">Provozujete podnik? <Link href="/register" className="tap-target-sm inline-flex items-center text-[#5B7A08] hover:underline font-semibold">Vytvořit účet</Link></p>
+            <p className="text-black/50">{t('Provozujete podnik?')} <Link href="/register" className="tap-target-sm inline-flex items-center text-[#5B7A08] hover:underline font-semibold">{t('Vytvořit účet')}</Link></p>
             <PravniOdkazy className="justify-center text-xs text-black/45" />
-            <p className="text-black/50">Máte kód týmu nebo pozvánku? <Link href="/join" className="tap-target-sm inline-flex items-center text-[#5B7A08] hover:underline font-semibold">Připojit se</Link></p>
+            <p className="text-black/50">{t('Máte kód týmu nebo pozvánku?')} <Link href="/join" className="tap-target-sm inline-flex items-center text-[#5B7A08] hover:underline font-semibold">{t('Připojit se')}</Link></p>
           </div>
         </div>
       </div>
