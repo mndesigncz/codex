@@ -80,7 +80,7 @@ Nativní projekty (`apps/*/ios`, `apps/*/android`) se NEcommitují, vznikají na
 
 ```bash
 cd apps/managero          # potom totéž v apps/client
-npm install               # Capacitor 8 a pluginy (mimo hlavní package.json webu)
+npm ci                    # Capacitor 8 a pluginy (mimo hlavní package.json webu)
 npm run ikony             # ikony, splash, grafika (z apps/_shared/assets/src/*.svg)
 npm run pridej-ios        # = sync-www + npx cap add ios + po-cap-add (Info.plist, entitlements, privacy manifest…)
 npm run assety            # npx @capacitor/assets generate: nahraje ikony a splash do Xcode projektu

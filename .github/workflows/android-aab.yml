@@ -57,7 +57,7 @@ jobs:
       - name: Závislosti obalu (mimo hlavní package.json)
         if: steps.vyber.outputs.jet == '1'
         working-directory: apps/${{ matrix.app }}
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Nativní projekt (cap add, pokud chybí) a úpravy
         if: steps.vyber.outputs.jet == '1'

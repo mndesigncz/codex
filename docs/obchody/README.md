@@ -59,7 +59,7 @@ tlačítko „Naskenovat kód" v hostovské aplikaci.
 
 ```bash
 node apps/scripts/kontrola-listingu.mjs           # texty, ikony, snímky
-cd apps/client && npm install && npm run pridej-ios     # na Macu; pridej-android kdekoli s Javou 21
+cd apps/client && npm ci && npm run pridej-ios     # na Macu; pridej-android kdekoli s Javou 21
 ```
 
 Dál: `APPLE.md`, `GOOGLE.md`. Kdyby tě zajímalo, proč je to zrovna takhle, jsou podrobné plány v historii sezení

@@ -2,27 +2,73 @@
   "applinks": {
     "details": [
       {
-        "appIDs": ["{{TEAM_ID}}.app.managero.client"],
+        "appIDs": [
+          "{{TEAM_ID}}.app.managero.client"
+        ],
         "components": [
-          { "/": "/client" },
-          { "/": "/client/*" }
+          {
+            "/": "/client"
+          },
+          {
+            "/": "/client/*"
+          }
         ]
       },
       {
-        "appIDs": ["{{TEAM_ID}}.app.managero.app"],
+        "appIDs": [
+          "{{TEAM_ID}}.app.managero.app"
+        ],
         "components": [
-          { "/": "/employer/*" },
-          { "/": "/employee/*" },
-          { "/": "/kiosk*" },
-          { "/": "/join*" },
-          { "/": "/login" },
-          { "/": "/zapomenute-heslo" },
-          { "/": "/nove-heslo*" }
+          {
+            "/": "/employer"
+          },
+          {
+            "/": "/employer/*"
+          },
+          {
+            "/": "/employee"
+          },
+          {
+            "/": "/employee/*"
+          },
+          {
+            "/": "/kiosk"
+          },
+          {
+            "/": "/kiosk/*"
+          },
+          {
+            "/": "/join"
+          },
+          {
+            "/": "/join/*"
+          },
+          {
+            "/": "/login"
+          },
+          {
+            "/": "/login/*"
+          },
+          {
+            "/": "/zapomenute-heslo"
+          },
+          {
+            "/": "/zapomenute-heslo/*"
+          },
+          {
+            "/": "/nove-heslo"
+          },
+          {
+            "/": "/nove-heslo/*"
+          }
         ]
       }
     ]
   },
   "webcredentials": {
-    "apps": ["{{TEAM_ID}}.app.managero.app", "{{TEAM_ID}}.app.managero.client"]
+    "apps": [
+      "{{TEAM_ID}}.app.managero.app",
+      "{{TEAM_ID}}.app.managero.client"
+    ]
   }
 }
