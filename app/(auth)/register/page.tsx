@@ -127,7 +127,7 @@ export default function RegisterPage() {
               onClick={() => { router.push('/'); router.refresh(); }}
               className="w-full rounded-full bg-[#C8F542] text-black font-semibold py-3 hover:brightness-110 transition text-sm"
             >
-              Přejít do aplikace →
+              Pokračovat k nastavení →
             </button>
 
             {/* Kdo pokladnu zavřel, se k ní dostane zpátky bez hledání

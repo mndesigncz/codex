@@ -11,7 +11,8 @@ import type { KrokProps } from './spolecne';
 // (role="radiogroup"): šipky přesouvají výběr, mezerník a Enter vybírají,
 // tab vstoupí do skupiny jednou (na vybranou, jinak na první dlaždici).
 // Vybraná dlaždice má inkoustový obrys a fajfku, ne limetku — na obrazovce
-// je jediná limetka, tlačítko „Pokračovat".
+// je jediná limetka, tlačítko „Pokračovat". „Jiný podnik" nemá fotku a je
+// jako jediný na celou šířku řady, ať v mřížce nezůstane osamocená dlaždice.
 
 export default function Typ({ odp, zmen, chybaPole }: KrokProps) {
   const vybrany = odp.typ;
@@ -34,9 +35,10 @@ export default function Typ({ odp, zmen, chybaPole }: KrokProps) {
   return (
     <div>
       <div role="radiogroup" aria-label="Typ podniku" aria-describedby={chybaPole?.pole === 'typ' ? 'pv-typ-chyba' : undefined}
-        className={`grid grid-cols-2 gap-3 sm:grid-cols-3`}>
+        className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {TYPY.map((t, i) => {
           const on = vybrany === t.id;
+          const foto = t.foto ? FOTKY[t.foto] : null;
           return (
             <button
               key={t.id}
@@ -49,29 +51,29 @@ export default function Typ({ odp, zmen, chybaPole }: KrokProps) {
               data-tlumit={vybrany && !on ? 'true' : undefined}
               onClick={() => vybrat(t.id)}
               onKeyDown={e => naKlavesu(e, i)}
-              className="pv-dlazdice tap-target"
+              className={`pv-dlazdice tap-target ${foto ? '' : 'col-span-2 flex items-center gap-3 p-3 sm:col-span-3'}`}
             >
-              <span className="relative block aspect-[4/3] overflow-hidden bg-black/[0.05]">
-                {t.foto ? (
+              {foto ? (
+                <span className="relative block aspect-[4/3] overflow-hidden bg-black/[0.05]">
                   <Image
-                    src={FOTKY[t.foto].src}
+                    src={foto.src}
                     alt=""
-                    width={FOTKY[t.foto].w}
-                    height={FOTKY[t.foto].h}
+                    width={foto.w}
+                    height={foto.h}
                     sizes="(min-width: 1024px) 200px, 45vw"
                     placeholder="blur"
-                    blurDataURL={FOTKY[t.foto].blur}
+                    blurDataURL={foto.blur}
                     className="pv-dlazdice-foto h-full w-full object-cover"
                   />
-                ) : (
-                  <span className="grid h-full w-full place-items-center text-black/45"><Icon name="sparkle" size={28} /></span>
-                )}
-                {on && <span className="pv-fajfka" aria-hidden><Icon name="check" size={14} strokeWidth={2.6} /></span>}
-              </span>
-              <span className="block px-3 pb-3 pt-2.5">
+                </span>
+              ) : (
+                <span aria-hidden className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-black/[0.05] text-[#16181A]"><Icon name="sparkle" size={20} /></span>
+              )}
+              <span className={`block min-w-0 ${foto ? 'px-3 pb-3 pt-2.5' : 'flex-1'}`}>
                 <span className="t-card block">{t.nazev}</span>
                 <span className="t-meta mt-0.5 block text-pretty">{t.veta}</span>
               </span>
+              {on && <span className="pv-fajfka" aria-hidden><Icon name="check" size={14} strokeWidth={2.6} /></span>}
             </button>
           );
         })}

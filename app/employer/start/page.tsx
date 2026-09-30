@@ -19,8 +19,8 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
   const id = Number((session?.user as any)?.id);
   const info = await infoOBrane(id);
   if (info) {
-    // Ne-vlastník, podnik bez průvodce (z doby před ním) a hotový průvodce (bez „Spustit znovu") sem nepatří.
-    if (!info.vlastnik || info.stav === null || (info.stav === 'hotovo' && !znovu)) redirect('/employer/overview');
+    // Ne-vlastník a hotový průvodce nebo podnik z doby před ním (obojí bez „Spustit znovu") sem nepatří.
+    if (!info.vlastnik || ((info.stav === null || info.stav === 'hotovo') && !znovu)) redirect('/employer/overview');
   }
   const cele = String(session?.user?.name ?? '').trim();
   const jmeno = cele.split(/\s+/)[0] ?? '';

@@ -153,7 +153,7 @@ export default function Pruvodce({ jmeno, znovu }: { jmeno: string; znovu: boole
     setFaze('nacitam');
     setChybaNacteni('');
     try {
-      const d = await okJson(await fetch('/api/onboarding')) as Nacteno;
+      const d = await okJson(await fetch(znovu ? '/api/onboarding?znovu=1' : '/api/onboarding')) as Nacteno;
       // Podnik bez průvodce, cizí člen nebo hotový průvodce: tady není co dělat.
       if (d.stav === 'nedostupny' || (d.stav === 'hotovo' && !znovu)) { router.replace('/employer/overview'); return; }
       const podnik = d.podnik;
@@ -222,11 +222,11 @@ export default function Pruvodce({ jmeno, znovu }: { jmeno: string; znovu: boole
   const uloz = useCallback(async (nova: Odpovedi, dalsiKrok: KrokId, stav: 'rozpracovano' | 'preskoceno' = 'rozpracovano') => {
     const res = await fetch('/api/onboarding', {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ krok: dalsiKrok, stav, odpovedi: nova }),
+      body: JSON.stringify({ krok: dalsiKrok, stav, odpovedi: nova, ...(znovu ? { znovu: true } : {}) }),
     });
     await okJson(res);
     ulozeno.current = JSON.stringify(nova);
-  }, []);
+  }, [znovu]);
 
   const jdiNa = (k: KrokId, s: 1 | -1) => { setSmer(s); setKrok(k); setChyba(''); setChybaPole(null); };
 

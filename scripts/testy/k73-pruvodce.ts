@@ -210,6 +210,11 @@ export default function ({ eq, ok }: Testy) {
     ok(`${cesta}: brána pozaduj(`, /pozaduj\('podnik\.nastaveni'\)/.test(k));
     ok(`${cesta}: hlídá vlastníka`, /vlastnikId !== c\.meId|vlastnikId === c\.meId/.test(k));
   }
+  ok('podnik z doby před průvodcem ho dostane jen na výslovné „Spustit znovu" (GET ?znovu=1, PUT znovu: true)',
+    /searchParams\.get\('znovu'\) === '1'/.test(kod('app/api/onboarding/route.ts')) && /telo\.znovu === true/.test(kod('app/api/onboarding/route.ts'))
+    && /info\.stav === null \|\| info\.stav === 'hotovo'\) && !znovu/.test(kod('app/employer/start/page.tsx')));
+  ok('„Spustit znovu" v Nastavení vidí jen vlastník a vede na /employer/start?znovu=1', /isOwner && \([\s\S]{0,300}\/employer\/start\?znovu=1/.test(kod('components/TeamManagement.tsx')));
+  ok('První kroky připomínají nedokončený průvodce jen ve stavech rozpracovano a preskoceno', /onboarding\.data === 'rozpracovano' \|\| onboarding\.data === 'preskoceno'/.test(kod('components/widgety/oblasti/obecne.tsx')));
   ok('PUT /api/onboarding má omezení četnosti', /hit\(`onboarding:/.test(kod('app/api/onboarding/route.ts')));
   ok('POST /api/onboarding/pouzit má omezení četnosti', /hit\(`onboarding-pouzit:/.test(kod('app/api/onboarding/pouzit/route.ts')));
   const pouzij = kod('lib/pruvodce/pouzij.ts');

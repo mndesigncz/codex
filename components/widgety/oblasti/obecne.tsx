@@ -286,6 +286,9 @@ const ID_KROKY = 'prehled.prvni_kroky';
 /** Klíč z dřívějšího Přehledu: kdo si kroky skryl, nechce je vidět ani na ploše. */
 const KLIC_SKRYTO_STARY = 'managero-onboarding-dismissed';
 
+/** Kroky, jejichž data se ještě načítají: řádek průvodce se ukáže až s nimi, ať seznam neposkakuje. */
+const nacitaSeKroky = (kroky: { s: { loading: boolean } }[]) => kroky.some(k => k.s.loading);
+
 function PrvniKroky({ velikost }: WidgetProps) {
   const smi = useSmi();
   const nav = useNavigace();
@@ -302,6 +305,13 @@ function PrvniKroky({ velikost }: WidgetProps) {
     raw => (Array.isArray(raw?.shifts) ? raw.shifts : seznam(raw)).length);
   const sklad = useDataWidgetu<number>(smiKrok('sklad') ? '/api/inventory' : null, raw => seznam(raw).length);
   const uzaverka = useDataWidgetu<number>(smiKrok('uzaverka') ? '/api/closings' : null, raw => seznam(raw?.closings).length);
+  // Průvodce prvotním nastavením: přerušený nebo rozdělaný se tu připomene jako první řádek.
+  // GET /api/onboarding vrací ostatním členům a podnikům bez průvodce 200 se stavem
+  // `nedostupny`, takže se tu ptá každý, kdo smí nastavení podniku. Dotaz je doplněk:
+  // když selže, řádek prostě není (seznam kroků se kvůli němu nerozbije).
+  const onboarding = useDataWidgetu<string | null>(!skryto && smi('podnik.nastaveni') ? '/api/onboarding' : null,
+    raw => (raw && typeof raw === 'object' && !Array.isArray(raw) && typeof raw.stav === 'string' ? raw.stav : null));
+  const nedokonceno = onboarding.data === 'rozpracovano' || onboarding.data === 'preskoceno';
 
   const L = velikost === 'L';
   const kroky = [
@@ -319,9 +329,16 @@ function PrvniKroky({ velikost }: WidgetProps) {
       onClick: !done && nav.smiPohled(k.pohled) ? () => nav.onNavigate(k.pohled) : undefined,
     };
   });
+  if (nedokonceno && !nacitaSeKroky(kroky)) {
+    polozky.unshift({
+      id: 'nastaveni', label: 'Dokončit nastavení podniku', done: false,
+      hint: L ? 'Průvodce se zeptá na typ podniku, otevírací dobu a cíle a podle toho poskládá Přehled.' : undefined,
+      onClick: () => window.location.assign('/employer/start'),
+    });
+  }
   const hotovo = polozky.filter(p => p.done).length;
   const nacitaSe = kroky.some(k => k.s.loading);
-  const vseHotovo = !nacitaSe && kroky.every(k => !k.s.error) && hotovo === polozky.length;
+  const vseHotovo = !nacitaSe && kroky.every(k => !k.s.error) && hotovo === polozky.length && !nedokonceno;
 
   return (
     <Widget nacteni={ceka ? CEKA : kroky.map(k => k.s)}

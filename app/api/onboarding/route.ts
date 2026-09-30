@@ -21,13 +21,17 @@ export const dynamic = 'force-dynamic';
 
 const NEDOSTUPNY = { stav: 'nedostupny' as const };
 
-export async function GET() {
+export async function GET(request: Request) {
   const c = await pozaduj('podnik.nastaveni');
   if (jeOdpoved(c)) return c;
+  const znovu = new URL(request.url).searchParams.get('znovu') === '1';
   try {
     const s = await nactiStav(c.teamId);
-    // Před migrací, starý podnik (NULL) i ne-vlastník: průvodce tu není.
-    if (!s.dostupne || !s.onboarding || s.vlastnikId !== c.meId) return NextResponse.json(NEDOSTUPNY);
+    // Před migrací a ne-vlastník: průvodce tu není. Starý podnik (NULL) ho nemá, dokud ho
+    // vlastník sám nespustí („Spustit znovu"): pak dostane čistý záznam ve stavu `hotovo`,
+    // ze kterého se první uložený krok přepne na rozpracované.
+    if (!s.dostupne || s.vlastnikId !== c.meId) return NextResponse.json(NEDOSTUPNY);
+    if (!s.onboarding && !znovu) return NextResponse.json(NEDOSTUPNY);
     const [podnik, plan] = await Promise.all([nactiPodnik(c.teamId), teamPlanInfo(c.teamId)]);
     let clenu = 0; let pozvanek = 0;
     try { clenu = await pocetClenu(c.teamId); } catch { /* jen informace */ }
@@ -37,7 +41,7 @@ export async function GET() {
       pozvanek = Number(r?.n ?? 0);
     } catch { /* jen informace */ }
     const { join_code, ...bezKodu } = podnik;
-    const o = s.onboarding;
+    const o: Onboarding = s.onboarding ?? { v: 1, stav: 'hotovo', odpovedi: {}, pouzito: {} };
     return NextResponse.json({
       stav: o.stav, krok: o.krok ?? null, odpovedi: o.odpovedi, pouzito: o.pouzito,
       podnik: bezKodu, plan: { effective: plan.effective },
@@ -64,9 +68,11 @@ export async function PUT(request: Request) {
 
   try {
     const s = await nactiStav(c.teamId);
-    if (!s.dostupne || !s.onboarding) return NextResponse.json({ error: 'Průvodce pro tenhle podnik není k dispozici.' }, { status: 404 });
+    if (!s.dostupne) return NextResponse.json({ error: 'Průvodce pro tenhle podnik není k dispozici.' }, { status: 404 });
     if (s.vlastnikId !== c.meId) return NextResponse.json({ error: 'Průvodce nastavením smí vést jen vlastník podniku.' }, { status: 403 });
-    const dosavadni = s.onboarding;
+    // Podnik z doby před průvodcem ho má jen na výslovné „Spustit znovu" vlastníka (`znovu: true`).
+    const dosavadni: Onboarding | null = s.onboarding ?? (telo.znovu === true ? { v: 1, stav: 'hotovo', odpovedi: {}, pouzito: {} } : null);
+    if (!dosavadni) return NextResponse.json({ error: 'Průvodce pro tenhle podnik není k dispozici.' }, { status: 404 });
     let odpovedi = slouciOdpovedi(dosavadni.odpovedi, cistiOdpovedi(telo.odpovedi));
     odpovedi = odeberKlice(odpovedi, telo.odpovedi);
     const ted = new Date().toISOString();

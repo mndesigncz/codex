@@ -13,7 +13,8 @@ import { chromium } from 'playwright-core';
 import { readFileSync, existsSync, readdirSync, mkdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 
-export const BASE = 'http://localhost:3000';
+// Adresa serveru: SONDY_ZAKLAD (např. build v kopii na jiném portu), jinak localhost:3000.
+export const BASE = process.env.SONDY_ZAKLAD ?? 'http://localhost:3000';
 export const DIR = new URL('./fixtury/', import.meta.url).pathname;
 export const OUT = new URL('./shots/', import.meta.url).pathname;
 mkdirSync(OUT, { recursive: true });

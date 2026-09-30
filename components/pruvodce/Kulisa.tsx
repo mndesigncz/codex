@@ -71,8 +71,9 @@ export default function Kulisa({
                 {children}
               </form>
             </div>
-            {/* Lepkavá patička: na telefonu u spodního okraje, pod klávesnicí se pole nepřekryje. */}
-            <div className="pv-paticka sticky bottom-0 -mx-6 mt-6 flex items-center gap-2 border-t border-black/[0.07] bg-[var(--surface)] px-6 pt-3 sm:-mx-7 sm:px-7 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:px-0 lg:pb-0 lg:pt-0">
+            {/* Lepkavá patička: hlavní tlačítko má být vidět i v dlouhém kroku (Doba, finále),
+                na telefonu u spodního okraje; pod klávesnicí se pole nepřekryje. */}
+            <div className="pv-paticka sticky bottom-0 z-[1] -mx-6 mt-6 -mb-6 flex items-center gap-2 rounded-b-[var(--r-lg)] border-t border-black/[0.07] bg-[var(--surface)] px-6 pt-3 sm:-mx-7 sm:-mb-7 sm:px-7">
               {paticka}
             </div>
           </Card>

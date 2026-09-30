@@ -1573,7 +1573,7 @@ input[type='search']::-webkit-search-decoration {
 .pv-dlazdice:focus-visible { outline: 2px solid var(--pv-ink); outline-offset: 2px; }
 .pv-dlazdice .pv-dlazdice-foto { opacity: 0.88; }
 .pv-dlazdice[aria-checked="true"] .pv-dlazdice-foto { opacity: 1; }
-.pv-dlazdice[data-tlumit="true"] { opacity: 0.7; }
+.pv-dlazdice[data-tlumit="true"] .pv-dlazdice-foto { opacity: 0.7; }
 .pv-fajfka { position: absolute; top: 0.5rem; right: 0.5rem; display: grid; place-items: center; height: 1.5rem; width: 1.5rem; border-radius: 9999px; background: var(--pv-ink); color: var(--surface); }
 @media (prefers-reduced-motion: no-preference) {
   .pv-dlazdice { transition: box-shadow var(--dur-2) ease, opacity var(--dur-2) ease; }

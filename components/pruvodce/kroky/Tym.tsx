@@ -133,7 +133,7 @@ export default function Tym({ odp, zmen, info }: KrokProps) {
         <Well className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="t-label">Kód pro připojení</p>
-            <p className="mt-1 text-2xl font-bold tracking-[0.25em] text-[#16181A]" data-kod>{info.kod}</p>
+            <p className="mt-1 text-[28px] font-bold leading-tight tracking-[0.25em] text-[#16181A]" data-kod>{info.kod}</p>
             <p className="t-meta mt-1">Kdo ho zadá na stránce Připojit se k týmu, přidá se k tobě.</p>
           </div>
           <Button variant="secondary" size="sm" icon={zkopirovano === 'kod' ? 'check' : 'copy'} onClick={() => void zkopiruj(info.kod!, 'kod')}>

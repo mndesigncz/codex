@@ -594,6 +594,13 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
               }} />
           </Field>
         </div>
+        {/* Průvodce prvotním nastavením jde spustit znovu; nic nepřepíše, jen přidá. Smí jen vlastník. */}
+        {isOwner && (
+          <ul className="list mt-3" aria-label="Průvodce nastavením">
+            <ListRow title="Průvodce nastavením" meta="Znovu projdi typ podniku, otevírací dobu a cíle. Nic nepřepíše, jen přidá."
+              actions={<a href="/employer/start?znovu=1" className="btn btn-secondary btn-sm">Spustit znovu</a>} />
+          </ul>
+        )}
       </Card>}
       <OrganizationSettings />
     </>

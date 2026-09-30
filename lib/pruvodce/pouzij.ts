@@ -29,7 +29,7 @@ const POSTUP: CzNoun = { one: 'postup', few: 'postupy', many: 'postupů' };
 const TYP_SMENY: CzNoun = { one: 'typ směny', few: 'typy směn', many: 'typů směn' };
 const WIDGET: CzNoun = { one: 'widget', few: 'widgety', many: 'widgetů' };
 
-const NEPOVEDLO = 'Tohle se nepovedlo.';
+const NEPOVEDLO = 'Založení selhalo.';
 
 /** Co v podniku už je. Každý dotaz zvlášť: chybějící sloupec nesmí vzít ostatní zjištění. */
 export async function nactiStavPodniku(teamId: number): Promise<StavPodniku> {
