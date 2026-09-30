@@ -112,7 +112,8 @@ export function I18nProvider({ jazyk: pocatecni, slovniky, children }: {
 
   const pozadej = useCallback((sekce: Sekce) => {
     pozadovane.add(sekce);
-    if (jazyk !== 'cs') nactiSekce(jazyk, [sekce]);
+    // Sekce z kořenového layoutu už v prohlížeči jsou: zbytečné stahování chunku by jen přidalo požadavek.
+    if (jazyk !== 'cs' && !SEKCE_VZDY.includes(sekce)) nactiSekce(jazyk, [sekce]);
   }, [jazyk]);
 
   const hodnota = useMemo<Ctx>(() => {

@@ -320,6 +320,12 @@ for (const [f, n] of Object.entries(natvrdoZmereno)) {
   else if (n < povoleno) chyby.push(`${f}: natvrdo psaných řetězců ubylo (${n} místo ${povoleno}); sniž BASELINE_NATVRDO, ať ráčna drží`);
 }
 
+// 4a. Kořenový layout posílá klientovi VŠECHNY sekce (SEKCE_VZDY = SEKCE). Slovníky se na serveru sdílejí mezi požadavky,
+// takže jakákoli menší sada nechá SSR přeložit větu, kterou prohlížeč nemá: chyba hydratace #418 a probliknutí češtiny.
+{
+  const src = readFileSync('lib/i18n/slovniky.ts', 'utf8');
+  if (!/export const SEKCE_VZDY[^=]*=\s*SEKCE\s*;/.test(src)) chyby.push('lib/i18n/slovniky.ts: SEKCE_VZDY musí být přesně SEKCE (viz komentář u SEKCE_VZDY: jiná sada rozjede SSR a hydrataci)');
+}
 // 4b. Sekce správy (sprava, tym, navody, postupy) se v aplikaci slévají do jednoho slovníku
 // (pozdější přepisuje dřívější). Stejný klíč s jinou hodnotou v jiné sekci by se proto ukázal
 // v jiném významu podle pořadí načtení; dvojí význam patří do klíče s kontextem (`t('Odložit', {}, 'sklad')`).

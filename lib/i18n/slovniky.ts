@@ -11,7 +11,7 @@ import { retezJazyku, type Jazyk } from './config.ts';
 import { pridejSlovnik } from './stav.ts';
 import type { Slovnik } from './core.ts';
 
-/** Sekce slovníků. `common` a `api` jdou s každou stránkou, ostatní přibírá ta, která je potřebuje. */
+/** Sekce slovníků. */
 export const SEKCE = [
   'common', 'api', 'auth', 'klient-host',
   'zamestnanec', 'kiosk', 'chat',
@@ -20,7 +20,17 @@ export const SEKCE = [
   'spolecne', 'pruvodce', 'predplatne',
 ] as const;
 export type Sekce = (typeof SEKCE)[number];
-export const SEKCE_VZDY: readonly Sekce[] = ['common', 'api', 'spolecne'];
+/**
+ * Sekce, které jdou s KAŽDOU stránkou (kořenový layout) a tedy jsou už i v prohlížeči: všechny.
+ *
+ * Proč ne jen ty, které stránka potřebuje: slovníky se na serveru ukládají do sdíleného stavu procesu
+ * (lib/i18n/stav.ts) a ten přežije požadavek. SSR pak přeložilo větu z sekce, kterou si do procesu
+ * nahrál úplně jiný dřívější požadavek, zatímco prohlížeč dostal jen sekce své stránky a vykreslil
+ * češtinu: chyba hydratace #418 a probliknutí češtiny u každého cizího jazyka (v CI ji ukázala sonda
+ * k78-spolecne, až když před ní běžely jiné stránky). Server i prohlížeč proto musí mít stejnou sadu.
+ * Čeština nenačítá nic. Velikost: ~95 kB gzip na jazyk; záložní jazyk jde jen pro chybějící klíče.
+ */
+export const SEKCE_VZDY: readonly Sekce[] = SEKCE;
 
 const rozpracovano = new Map<string, Promise<Slovnik>>();
 
@@ -50,7 +60,10 @@ export async function nactiSekce(jazyk: Jazyk, sekce: readonly Sekce[]): Promise
     const casti = await Promise.all(sekce.map(s => nactiSoubor(j, s)));
     const sloucene: Slovnik = Object.assign({}, ...casti);
     pridejSlovnik(j, sloucene);
-    out[j] = sloucene;
+    // Záložní jazyk (de → en) klientovi stačí jen pro věty, které zvolený jazyk nemá: zbytek by
+    // payload zdvojnásobil a nikdy se nepoužije.
+    const hlavni = out[jazyk] ?? sloucene;
+    out[j] = j === jazyk ? sloucene : Object.fromEntries(Object.entries(sloucene).filter(([k]) => !(k in hlavni)));
   }
   return out;
 }
