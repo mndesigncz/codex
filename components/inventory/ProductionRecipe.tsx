@@ -20,6 +20,9 @@ import { useResultKeys } from '@/lib/useResultKeys';
 import { okJson } from '@/lib/api';
 import { obsahuje } from '@/lib/hledani';
 import ProductionGuideLink from './ProductionGuideLink';
+import { tg } from '@/lib/i18n/stav';
+import { useJazyk, useT } from '@/lib/i18n/client';
+import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
 
 export interface RecipeLine {
   ingredientId: number; name: string; amount: number; unit: string;
@@ -36,7 +39,6 @@ export interface ProductionInfo {
 type Pickable = { id: number; name: string; unit: string; contentUnit?: string | null; packageSize?: number | null; category?: string };
 
 const dec = (v: string) => Number(String(v).replace(',', '.')) || 0;
-const fmt = (n: number) => n.toLocaleString('cs-CZ', { maximumFractionDigits: 3 });
 
 export default function ProductionRecipe({ item, items, onSaved }: {
   item: { id: number; name: string; unit: string };
@@ -44,6 +46,10 @@ export default function ProductionRecipe({ item, items, onSaved }: {
   items: Pickable[];
   onSaved?: (info: ProductionInfo) => void;
 }) {
+  const t = useT('sklad');
+  const { jazyk } = useJazyk();
+  // Bez oddělovače tisíců: číslo se z pole čte zpátky (dec) a mezera by ho rozbila.
+  const fmt = useCallback((n: number) => n.toLocaleString(LOCALE_PRO_JAZYK[jazyk], { maximumFractionDigits: 3, useGrouping: false }), [jazyk]);
   const [info, setInfo] = useState<ProductionInfo | null>(null);
   const [on, setOn] = useState(false);
   const [yieldStr, setYieldStr] = useState('');
@@ -72,7 +78,7 @@ export default function ProductionRecipe({ item, items, onSaved }: {
       setSteps(d.batchSteps ?? '');
       setLines((d.ingredients ?? []).map((l: RecipeLine) => ({ ingredientId: l.ingredientId, name: l.name, unit: l.unit, amount: fmt(l.amount) })));
     }).catch(() => {});
-  }, [item.id]);
+  }, [item.id, fmt]);
 
   useEffect(() => {
     let alive = true;
@@ -111,10 +117,10 @@ export default function ProductionRecipe({ item, items, onSaved }: {
         }),
       });
       const d = await res.json().catch(() => ({}));
-      if (!res.ok) { setErr(d.error || 'Uložení se nepodařilo.'); setBusy(false); return; }
+      if (!res.ok) { setErr(d.error ? tg(d.error) : t('Uložení se nepodařilo.')); setBusy(false); return; }
       setInfo(d); setSaved(true); onSaved?.(d);
       setTimeout(() => setSaved(false), 2000);
-    } catch { setErr('Uložení se nepodařilo.'); }
+    } catch { setErr(t('Uložení se nepodařilo.')); }
     setBusy(false);
   };
 
@@ -129,15 +135,14 @@ export default function ProductionRecipe({ item, items, onSaved }: {
     <Well className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 id={`${uid}-t`} className="t-card flex items-center gap-2">
-          <Icon name="leaf" size={17} className="shrink-0 text-black/40" /> Vyrábíme sami
+          <Icon name="leaf" size={17} className="shrink-0 text-black/40" /> {t('Vyrábíme sami')}
         </h3>
         <Switch checked={on} onChange={toggle} disabled={busy} labelledBy={`${uid}-t`} />
       </div>
 
       {!on && (
         <p className="t-meta">
-          Zapni u limonády, ice tea, sirupu nebo pečiva, co si děláte sami. Místo nákupního
-          seznamu pak při docházejícím stavu dostane směna úkol „vyrobit“ s recepturou.
+          {t('Zapni u limonády, ice tea, sirupu nebo pečiva, co si děláte sami. Místo nákupního seznamu pak při docházejícím stavu dostane směna úkol „vyrobit“ s recepturou.')}
         </p>
       )}
 
@@ -145,7 +150,7 @@ export default function ProductionRecipe({ item, items, onSaved }: {
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <Label htmlFor={`${uid}-davka`}>Jedna dávka vyrobí</Label>
+              <Label htmlFor={`${uid}-davka`}>{t('Jedna dávka vyrobí')}</Label>
               <div className="flex items-center gap-2">
                 <Input id={`${uid}-davka`} inputMode="decimal" value={yieldStr} onChange={e => setYieldStr(e.target.value)} onBlur={() => save()}
                   placeholder="5" className="text-center" />
@@ -153,16 +158,16 @@ export default function ProductionRecipe({ item, items, onSaved }: {
               </div>
             </div>
             <div>
-              <Label htmlFor={`${uid}-ukol`}>Název úkolu pro směnu</Label>
+              <Label htmlFor={`${uid}-ukol`}>{t('Název úkolu pro směnu')}</Label>
               <Input id={`${uid}-ukol`} value={label} onChange={e => setLabel(e.target.value)} onBlur={() => save()}
-                placeholder={`Vyrobit ${item.name}`} />
+                placeholder={`Vyrobit ${item.name}` /* i18n-ok: výchozí název úkolu zakládá server česky */} />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <p id={`${uid}-sur`} className="t-label">Suroviny na jednu dávku</p>
+            <p id={`${uid}-sur`} className="t-label">{t('Suroviny na jednu dávku')}</p>
             {lines.length === 0 && (
-              <p className="t-meta">Zatím bez surovin — úkol vznikne i tak, jen bez kontroly skladu.</p>
+              <p className="t-meta">{t('Zatím bez surovin — úkol vznikne i tak, jen bez kontroly skladu.')}</p>
             )}
             {lines.length > 0 && (
               <ul className="list" aria-labelledby={`${uid}-sur`}>
@@ -171,15 +176,15 @@ export default function ProductionRecipe({ item, items, onSaved }: {
                   const short = a && a.missing > 0;
                   return (
                     <ListRow key={l.ingredientId} title={l.name}
-                      meta={a ? <span className={short ? 'text-bad-ink' : undefined}>ve skladu {fmt(a.available)} {a.unit}</span> : undefined}
+                      meta={a ? <span className={short ? 'text-bad-ink' : undefined}>{t('ve skladu {mnozstvi} {jednotka}', { mnozstvi: fmt(a.available), jednotka: a.unit })}</span> : undefined}
                       actions={<>
                         <Input value={l.amount} inputMode="decimal"
                           onChange={e => setLines(ls => ls.map(x => x.ingredientId === l.ingredientId ? { ...x, amount: e.target.value } : x))}
                           onBlur={() => save()}
-                          aria-label={`Množství ${l.name} (${l.unit})`}
+                          aria-label={t('Množství {nazev} ({jednotka})', { nazev: l.name, jednotka: l.unit })}
                           className="!w-20 text-right tabular-nums" />
                         <span className="text-[13px] text-black/55 w-8">{l.unit}</span>
-                        <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={`Odebrat ${l.name}`}
+                        <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={t('Odebrat {nazev}', { nazev: l.name })}
                           onClick={() => { const radky = lines.filter(x => x.ingredientId !== l.ingredientId); setLines(radky); save({ radky }); }} />
                       </>} />
                   );
@@ -188,8 +193,8 @@ export default function ProductionRecipe({ item, items, onSaved }: {
             )}
             <div className="relative">
               <Input ref={ingInput} value={query} onChange={e => setQuery(e.target.value)}
-                onKeyDown={ingKeys.onInputKeyDown} aria-label="Přidat surovinu ze skladu"
-                placeholder="Přidat surovinu ze skladu…" />
+                onKeyDown={ingKeys.onInputKeyDown} aria-label={t('Přidat surovinu ze skladu')}
+                placeholder={t('Přidat surovinu ze skladu…')} />
               {found.length > 0 && (
                 <div ref={ingList} onKeyDown={ingKeys.onListKeyDown}
                   className="absolute z-10 left-0 right-0 mt-1 card p-1 shadow-[shadow:var(--shadow-float)] max-h-48 overflow-y-auto scrollbar-thin">
@@ -198,7 +203,7 @@ export default function ProductionRecipe({ item, items, onSaved }: {
                       onClick={() => { setLines(ls => [...ls, { ingredientId: p.id, name: p.name, unit: unitOf(p), amount: '' }]); setQuery(''); }}
                       className="w-full text-left px-3 py-2 rounded-xl hover:bg-black/[0.04] transition-colors">
                       <span className="block text-sm text-[#16181A] truncate">{p.name}</span>
-                      <span className="block text-[13px] text-black/55 truncate">{p.category || 'bez kategorie'} · {unitOf(p)}</span>
+                      <span className="block text-[13px] text-black/55 truncate">{p.category || t('bez kategorie')} · {unitOf(p)}</span>
                     </button>
                   ))}
                 </div>
@@ -218,14 +223,13 @@ export default function ProductionRecipe({ item, items, onSaved }: {
 
           <div>
             <Label htmlFor={`${uid}-postup`}>
-              {maNavodSKroky ? 'Postup (návod ho přebíjí)' : 'Postup (řádek = krok v úkolu)'}
+              {maNavodSKroky ? t('Postup (návod ho přebíjí)') : t('Postup (řádek = krok v úkolu)')}
             </Label>
             <Textarea id={`${uid}-postup`} value={steps} onChange={e => setSteps(e.target.value)} onBlur={() => save()} rows={3}
-              placeholder={'Nakrájet citrony\nSvařit sirup s vodou\nNechat vychladnout a stočit'} className="text-sm" />
+              placeholder={[t('Nakrájet citrony'), t('Svařit sirup s vodou'), t('Nechat vychladnout a stočit')].join('\n')} className="text-sm" />
             {maNavodSKroky && (
               <p className="t-meta mt-1">
-                Kroky do úkolu jdou z návodu „{info?.guideTitle}“. Tenhle text zůstane uložený,
-                ale obsluha ho neuvidí — použije se, až vazbu na návod zrušíš.
+                {t('Kroky do úkolu jdou z návodu „{nazev}“. Tenhle text zůstane uložený, ale obsluha ho neuvidí — použije se, až vazbu na návod zrušíš.', { nazev: info?.guideTitle ?? '' })}
               </p>
             )}
           </div>
@@ -233,11 +237,11 @@ export default function ProductionRecipe({ item, items, onSaved }: {
           <div className="flex items-center justify-between gap-2 t-meta">
             <span>
               {info?.status && info.status !== 'ok'
-                ? `Dochází — směna má úkol „${info.taskTitle}“ (${info.batches}× dávka).`
-                : 'Když bude docházet, směna dostane úkol s touhle recepturou.'}
+                ? t('Dochází — směna má úkol „{nazev}“ ({n}× dávka).', { nazev: info.taskTitle, n: info.batches })
+                : t('Když bude docházet, směna dostane úkol s touhle recepturou.')}
             </span>
             <span className="shrink-0 inline-flex items-center gap-1" aria-live="polite">
-              {busy ? 'Ukládám…' : saved ? <><Icon name="check" size={13} className="text-ok-ink" /><span className="text-ok-ink">Uloženo</span></> : ''}
+              {busy ? t('Ukládám…') : saved ? <><Icon name="check" size={13} className="text-ok-ink" /><span className="text-ok-ink">{t('Uloženo')}</span></> : ''}
             </span>
           </div>
         </>

@@ -127,6 +127,7 @@ export const ZELENE = [
   'k75-landing',
   'k78-zamestnanec',
   'k78-sprava',
+  'k78-rozvrh-sklad',
 ];
 
 const MIMO = new Set(['spust', 'cookie-role', 'fixtury-k53', 'fixtury-navody', 'k68-spolecne', 'k69-mereni-jadro']);

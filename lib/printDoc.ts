@@ -17,6 +17,8 @@
 //   zavřené.            Dřív se v takovém případě nestalo vůbec nic: člověk
 //                       klikl na „Vytisknout" a koukal na obrazovku.
 
+import { LOCALE_PRO_JAZYK, VYCHOZI, type Jazyk } from './i18n/config.ts';
+
 /** Text do HTML. Escapuje se i `&`, jinak se „R&D" rozpadne na entitu. */
 export function esc(value: unknown): string {
   return String(value ?? '')
@@ -64,18 +66,23 @@ export interface PrintDoc {
   body: string;
   /** Jméno podniku do patičky, ať je poznat, odkud papír je. */
   business?: string | null;
+  /** Jazyk výtisku (`<html lang>` a formát času v patičce). Bez něj čeština. */
+  jazyk?: Jazyk;
+  /** Věta patičky s časem tisku; bez ní česká „vytištěno … z aplikace Managero“. */
+  paticka?: (cas: string) => string;
 }
 
 /** Celý dokument jako řetězec. Oddělené od okna, ať jde otestovat. */
-export function printHtml({ title, subtitle, body, business }: PrintDoc, now: Date = new Date()): string {
-  const stamp = now.toLocaleString('cs-CZ', { timeZone: 'Europe/Prague' });
-  return `<!doctype html><html lang="cs"><head><meta charset="utf-8">
+export function printHtml({ title, subtitle, body, business, jazyk = VYCHOZI, paticka }: PrintDoc, now: Date = new Date()): string {
+  const stamp = now.toLocaleString(LOCALE_PRO_JAZYK[jazyk], { timeZone: 'Europe/Prague' });
+  const veta = paticka ? paticka(stamp) : `vytištěno ${stamp} z aplikace Managero`;
+  return `<!doctype html><html lang="${jazyk}"><head><meta charset="utf-8">
 <title>${esc(title)}</title><style>${STYLE}</style></head>
 <body>
 <h1>${esc(title)}</h1>
 ${subtitle ? `<p class="meta">${esc(subtitle)}</p>` : ''}
 ${body}
-<p class="foot">${business ? esc(business) + ' · ' : ''}vytištěno ${esc(stamp)} z aplikace Managero</p>
+<p class="foot">${business ? esc(business) + ' · ' : ''}${esc(veta)}</p>
 </body></html>`;
 }
 

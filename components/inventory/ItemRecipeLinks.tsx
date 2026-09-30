@@ -17,12 +17,14 @@ import { usePrice } from '../CurrencyProvider';
 import { Button, Input, Label, ListRow, Well } from '../ui';
 import { useResultKeys } from '@/lib/useResultKeys';
 import { okJson } from '@/lib/api';
+import { tg } from '@/lib/i18n/stav';
+import { useJazyk, useT } from '@/lib/i18n/client';
+import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
 
 type Link = { productId: string; productName: string | null; amount: number };
 type Product = { productId: string; name: string; category?: string | null; price?: number | null };
 
 const dec = (v: string) => Number(String(v).replace(',', '.')) || 0;
-const fmt = (n: number) => n.toLocaleString('cs-CZ', { maximumFractionDigits: 3 });
 
 export default function ItemRecipeLinks({ item, links, unitLabel, onChanged, onOpenRecipe }: {
   item: { id: number; name: string };
@@ -34,6 +36,9 @@ export default function ItemRecipeLinks({ item, links, unitLabel, onChanged, onO
 }) {
   // Cena produktu z kasy smí mít haléře.
   const money = usePrice();
+  const t = useT('sklad');
+  const { jazyk } = useJazyk();
+  const fmt = (n: number) => n.toLocaleString(LOCALE_PRO_JAZYK[jazyk], { maximumFractionDigits: 3, useGrouping: false });
   const uid = useId();
   const [adding, setAdding] = useState(false);
   const [query, setQuery] = useState('');
@@ -57,7 +62,7 @@ export default function ItemRecipeLinks({ item, links, unitLabel, onChanged, onO
       try {
         const d = await fetch(`/api/pos/usage?q=${encodeURIComponent(q)}`).then(okJson);
         setFound(Array.isArray(d.products) ? d.products : []);
-        if (d.error) setErr(d.error);
+        if (d.error) setErr(tg(d.error));
       } catch { setFound([]); }
     }, 300);
     return () => { if (timer.current) clearTimeout(timer.current); };
@@ -71,18 +76,18 @@ export default function ItemRecipeLinks({ item, links, unitLabel, onChanged, onO
         body: JSON.stringify({ productId, productName, itemId: item.id, amount: value }),
       });
       const d = await res.json().catch(() => ({}));
-      if (!res.ok) { setErr(d.error || 'Uložení se nepodařilo.'); setBusy(''); return false; }
+      if (!res.ok) { setErr(d.error ? tg(d.error) : t('Uložení se nepodařilo.')); setBusy(''); return false; }
       const rest = links.filter(l => l.productId !== productId);
       onChanged(value > 0 ? [...rest, { productId, productName, amount: value }] : rest);
       setBusy('');
       return true;
-    } catch { setErr('Uložení se nepodařilo.'); setBusy(''); return false; }
+    } catch { setErr(t('Uložení se nepodařilo.')); setBusy(''); return false; }
   };
 
   const confirmAdd = async () => {
     if (!picked) return;
     const v = dec(amount);
-    if (!(v > 0)) { setErr('Kolik téhle suroviny jde na jednu porci?'); return; }
+    if (!(v > 0)) { setErr(t('Kolik téhle suroviny jde na jednu porci?')); return; }
     if (await send(picked.productId, picked.name, v)) {
       // Picker zůstává otevřený. Jedna surovina jde typicky do několika
       // položek menu (mléko do latté, cappuccina, flat white) a zavírat
@@ -96,14 +101,14 @@ export default function ItemRecipeLinks({ item, links, unitLabel, onChanged, onO
   return (
     <Well className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="t-card">Používá se v kase{links.length > 0 ? ` (${links.length}×)` : ''}</h3>
+        <h3 className="t-card">{links.length > 0 ? t('Používá se v kase ({n}×)', { n: links.length }) : t('Používá se v kase')}</h3>
         {!adding && (
-          <Button variant="secondary" size="sm" icon="plus" onClick={() => { setAdding(true); setErr(''); }}>Přidat do receptury</Button>
+          <Button variant="secondary" size="sm" icon="plus" onClick={() => { setAdding(true); setErr(''); }}>{t('Přidat do receptury')}</Button>
         )}
       </div>
 
       {links.length === 0 && !adding && (
-        <p className="t-meta">Zatím v žádné receptuře. Dokud tam nebude, prodej téhle suroviny sklad neodepíše.</p>
+        <p className="t-meta">{t('Zatím v žádné receptuře. Dokud tam nebude, prodej téhle suroviny sklad neodepíše.')}</p>
       )}
 
       {links.length > 0 && (
@@ -112,7 +117,7 @@ export default function ItemRecipeLinks({ item, links, unitLabel, onChanged, onO
             <ListRow key={l.productId} title={l.productName ?? l.productId}
               actions={<>
                 <Input
-                  defaultValue={fmt(l.amount)} inputMode="decimal" aria-label={`Množství na porci — ${l.productName ?? l.productId} (${unitLabel})`}
+                  defaultValue={fmt(l.amount)} inputMode="decimal" aria-label={t('Množství na porci — {nazev} ({jednotka})', { nazev: l.productName ?? l.productId, jednotka: unitLabel })}
                   onBlur={e => {
                     const v = dec(e.target.value);
                     if (v > 0 && v !== l.amount) send(l.productId, l.productName, v);
@@ -121,11 +126,11 @@ export default function ItemRecipeLinks({ item, links, unitLabel, onChanged, onO
                 />
                 <span className="text-[13px] text-black/55 w-8">{unitLabel}</span>
                 {onOpenRecipe && (
-                  <Button variant="ghost" size="sm" iconOnly icon="clipboard" aria-label={`Otevřít recepturu ${l.productName ?? l.productId}`}
+                  <Button variant="ghost" size="sm" iconOnly icon="clipboard" aria-label={t('Otevřít recepturu {nazev}', { nazev: l.productName ?? l.productId })}
                     onClick={() => onOpenRecipe(l.productId)} />
                 )}
                 <Button variant="ghost" size="sm" iconOnly icon="close" disabled={busy === l.productId}
-                  aria-label={`Odebrat z receptury ${l.productName ?? l.productId}`} onClick={() => send(l.productId, l.productName, 0)} />
+                  aria-label={t('Odebrat z receptury {nazev}', { nazev: l.productName ?? l.productId })} onClick={() => send(l.productId, l.productName, 0)} />
               </>} />
           ))}
         </ul>
@@ -140,24 +145,24 @@ export default function ItemRecipeLinks({ item, links, unitLabel, onChanged, onO
                 {picked.category ? <span className="text-black/55"> · {picked.category}</span> : null}
               </p>
               <div className="flex flex-wrap items-center gap-2">
-                <Label htmlFor={`${uid}-porce`} className="!mb-0">Na jednu porci jde</Label>
+                <Label htmlFor={`${uid}-porce`} className="!mb-0">{t('Na jednu porci jde')}</Label>
                 <Input id={`${uid}-porce`} autoFocus inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); confirmAdd(); } }}
                   placeholder="0,04" className="!w-24 text-center" />
                 <span className="text-[13px] text-black/55">{unitLabel}</span>
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="primary" size="sm" loading={!!busy} onClick={confirmAdd}>Přidat</Button>
-                <Button variant="ghost" size="sm" onClick={() => { setPicked(null); setAmount(''); }}>Zpět na hledání</Button>
+                <Button variant="primary" size="sm" loading={!!busy} onClick={confirmAdd}>{t('Přidat')}</Button>
+                <Button variant="ghost" size="sm" onClick={() => { setPicked(null); setAmount(''); }}>{t('Zpět na hledání')}</Button>
               </div>
             </>
           ) : (
             <>
               <Input ref={searchRef} autoFocus value={query} onChange={e => setQuery(e.target.value)}
-                onKeyDown={keys.onInputKeyDown} aria-label="Hledat položku v kase"
-                placeholder="Hledat položku v kase…" />
+                onKeyDown={keys.onInputKeyDown} aria-label={t('Hledat položku v kase')}
+                placeholder={t('Hledat položku v kase…')} />
               {query.trim().length >= 2 && found.length === 0 && (
-                <p className="t-meta">Nic takového v menu není.</p>
+                <p className="t-meta">{t('Nic takového v menu není.')}</p>
               )}
               {found.length > 0 && (
                 <div ref={pickList} onKeyDown={keys.onListKeyDown}
@@ -167,13 +172,13 @@ export default function ItemRecipeLinks({ item, links, unitLabel, onChanged, onO
                       className="w-full text-left px-1 py-2 hover:bg-black/[0.04] transition-colors">
                       <span className="block text-sm text-[#16181A] truncate">{p.name}</span>
                       <span className="block text-[13px] text-black/55 truncate">
-                        {p.category || 'bez kategorie'}{p.price != null ? ` · ${money(p.price)}` : ''}
+                        {p.category || t('bez kategorie')}{p.price != null ? ` · ${money(p.price)}` : ''}
                       </span>
                     </button>
                   ))}
                 </div>
               )}
-              <Button variant="ghost" size="sm" onClick={() => { setAdding(false); setQuery(''); setFound([]); setErr(''); }}>Zrušit</Button>
+              <Button variant="ghost" size="sm" onClick={() => { setAdding(false); setQuery(''); setFound([]); setErr(''); }}>{t('Zrušit', undefined, 'dialog')}</Button>
             </>
           )}
         </div>
@@ -182,7 +187,7 @@ export default function ItemRecipeLinks({ item, links, unitLabel, onChanged, onO
       {err && <p className="note note-danger" role="alert">{err}</p>}
 
       {links.length > 0 && (
-        <p className="t-meta">Změna velikosti balení nebo ceny se propíše do marží těchhle položek.</p>
+        <p className="t-meta">{t('Změna velikosti balení nebo ceny se propíše do marží těchhle položek.')}</p>
       )}
     </Well>
   );

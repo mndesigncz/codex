@@ -10,5 +10,5 @@ export const metadata: Metadata = {
 };
 
 export default function DemoLayout({ children }: { children: React.ReactNode }) {
-  return <><Slovniky sekce={['zamestnanec', 'kiosk', 'chat']} />{children}</>;
+  return <><Slovniky sekce={['zamestnanec', 'kiosk', 'chat', 'sprava', 'tym', 'navody', 'postupy', 'rozvrh', 'sklad']} />{children}</>;
 }

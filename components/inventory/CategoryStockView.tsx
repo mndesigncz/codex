@@ -14,6 +14,8 @@ import {
 } from '@/lib/packaging';
 import ConsumeControl from './ConsumeControl';
 import { obsahuje, obsahujeNekde } from '@/lib/hledani';
+import { useJazyk, useT, type PrekladFn } from '@/lib/i18n/client';
+import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
 
 export interface StockItem {
   id: number;
@@ -41,30 +43,31 @@ function ItemControls({ item, onStep, onEditItem, onRemoveItem }: {
   onEditItem?: (item: StockItem) => void;
   onRemoveItem?: (item: StockItem) => void;
 }) {
+  const t = useT('sklad');
   return (
     <div className="mt-3 flex items-center justify-between gap-2 flex-wrap">
       {onStep ? (
         <div className="flex items-center gap-1.5">
-          <Button variant="secondary" size="sm" iconOnly icon="minus" aria-label={`Ubrat zavřené balení — ${item.name}`}
+          <Button variant="secondary" size="sm" iconOnly icon="minus" aria-label={t('Ubrat zavřené balení — {nazev}', { nazev: item.name })}
             disabled={item.quantity <= 0} onClick={() => onStep(item, -1)} />
           <span className="text-[15px] font-semibold text-[#16181A] tabular-nums min-w-[3.5rem] text-center">
             {item.quantity} <span className="text-xs font-medium text-black/55">{item.unit}</span>
           </span>
-          <Button variant="secondary" size="sm" iconOnly icon="plus" aria-label={`Přidat zavřené balení — ${item.name}`}
+          <Button variant="secondary" size="sm" iconOnly icon="plus" aria-label={t('Přidat zavřené balení — {nazev}', { nazev: item.name })}
             onClick={() => onStep(item, 1)} />
         </div>
       ) : <span />}
       <div className="flex items-center gap-1">
         {item.supplierUrl && (
           <a href={item.supplierUrl} target="_blank" rel="noopener" className="btn btn-secondary btn-sm">
-            <Icon name="external" size={15} /> Objednat
+            <Icon name="external" size={15} /> {t('Objednat')}
           </a>
         )}
         {onEditItem && (
-          <Button variant="ghost" size="sm" iconOnly icon="pencil" aria-label={`Upravit ${item.name}`} onClick={() => onEditItem(item)} />
+          <Button variant="ghost" size="sm" iconOnly icon="pencil" aria-label={t('Upravit {nazev}', { nazev: item.name })} onClick={() => onEditItem(item)} />
         )}
         {onRemoveItem && (
-          <Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={`Smazat ${item.name}`} onClick={() => onRemoveItem(item)} />
+          <Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={t('Smazat {nazev}', { nazev: item.name })} onClick={() => onRemoveItem(item)} />
         )}
       </div>
     </div>
@@ -79,12 +82,13 @@ function ParkButton({ item, busy, onToggle, className = '' }: {
   onToggle: (item: StockItem, archived: boolean) => void;
   className?: string;
 }) {
+  const t = useT('sklad');
   const parked = item.archived === true;
   // „Máme zpátky" je primary, ne limetka — limetka je na obrazovce jedna (DP §3.1).
   return (
     <Button variant={parked ? 'primary' : 'secondary'} size="sm" icon={parked ? 'check' : 'archive'}
       loading={busy} onClick={() => onToggle(item, !parked)} className={className}>
-      {parked ? 'Máme zpátky' : 'Nevedeme'}
+      {parked ? t('Máme zpátky') : t('Nevedeme')}
     </Button>
   );
 }
@@ -94,8 +98,21 @@ const TONE = {
   low: { bar: 'bg-wait', chip: 'wait' },
   ok: { bar: 'bg-ok', chip: 'ok' },
 } as const;
-const stavChip = (st: 'ok' | 'low' | 'critical') =>
-  st === 'ok' ? null : <Chip tone={TONE[st].chip} size="sm" className="shrink-0">{st === 'critical' ? 'Kriticky' : 'Dochází'}</Chip>;
+function StavChip({ st }: { st: 'ok' | 'low' | 'critical' }) {
+  const t = useT('sklad');
+  return st === 'ok' ? null : <Chip tone={TONE[st].chip} size="sm" className="shrink-0">{st === 'critical' ? t('Kriticky') : t('Dochází')}</Chip>;
+}
+
+/** Popisek stupně načatého balení: výchozí stupnice se překládá, vlastní názvy zůstávají. */
+function krokStupnice(t: PrekladFn, label: string): string {
+  switch (label) {
+    case 'Plná': return t('Plná');
+    case 'Půl': return t('Půl');
+    case 'Dochází': return t('Dochází');
+    case 'Prázdná': return t('Prázdná');
+    default: return label;
+  }
+}
 
 export default function CategoryStockView({
   category, packaging, items, canEdit, onChanged, onEditItem, onRemoveItem, onStep,
@@ -111,6 +128,8 @@ export default function CategoryStockView({
   onRemoveItem?: (item: StockItem) => void;
   onStep?: (item: StockItem, delta: number) => void;
 }) {
+  const t = useT('sklad');
+  const { jazyk } = useJazyk();
   const hasControls = Boolean(onStep || onEditItem || onRemoveItem);
   // Parked items are hidden until asked for — they aren't on the shelf.
   const [showParked, setShowParked] = useState(false);
@@ -136,9 +155,9 @@ export default function CategoryStockView({
       .sort((a, b) => {
         // Emptiest first while writing, alphabetical while browsing.
         if (mode === 'edit') return effectivePackages(a) - effectivePackages(b);
-        return a.name.localeCompare(b.name, 'cs');
+        return a.name.localeCompare(b.name, LOCALE_PRO_JAZYK[jazyk]);
       });
-  }, [items, search, mode, showParked]);
+  }, [items, search, mode, showParked, jazyk]);
 
   // When a parent category is open, its subcategories keep their own heading so
   // the list stays readable instead of merging into one long block.
@@ -152,9 +171,9 @@ export default function CategoryStockView({
     return Array.from(map.entries()).sort(([a], [b]) => {
       if (a === category) return -1;
       if (b === category) return 1;
-      return a.localeCompare(b, 'cs');
+      return a.localeCompare(b, LOCALE_PRO_JAZYK[jazyk]);
     });
-  }, [list, category]);
+  }, [list, category, jazyk]);
   const showHeadings = groups.length > 1;
 
   const sizeOf = (i: StockItem) => Number(i.packageSize) || packaging.defaultPackageSize || 0;
@@ -182,7 +201,7 @@ export default function CategoryStockView({
     try {
       const res = await fetch(`/api/inventory/${item.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ archived, note: archived ? 'Označeno „nevedeme"' : 'Vráceno do skladu' }),
+        body: JSON.stringify({ archived, note: archived ? 'Označeno „nevedeme"' : 'Vráceno do skladu' /* i18n-ok: poznámka se ukládá do historie skladu česky */ }),
       });
       if (res.ok) {
         onChanged({ ...item, archived } as StockItem);
@@ -207,32 +226,32 @@ export default function CategoryStockView({
       {/* Mode switch + category total */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         {canEdit ? (
-          <Segmented ariaLabel="Režim" value={mode} onChange={setMode}
-            options={[{ id: 'view', label: 'Přehled' }, { id: 'edit', label: 'Zápis zbytků' }]} />
+          <Segmented ariaLabel={t('Režim')} value={mode} onChange={setMode}
+            options={[{ id: 'view', label: t('Přehled') }, { id: 'edit', label: t('Zápis zbytků') }]} />
         ) : <span />}
         <div className="flex items-center gap-3 flex-wrap">
           {unit && !showParked && (
             <span className="text-sm text-black/55">
-              Celkem v kategorii <strong className="text-[#16181A] tabular-nums">{fmtAmount(totalOfCategory)} {unit}</strong>
+              {t('Celkem v kategorii')} <strong className="text-[#16181A] tabular-nums">{fmtAmount(totalOfCategory)} {unit}</strong>
             </span>
           )}
           {(parkedCount > 0 || showParked) && (
             <button type="button" aria-pressed={showParked} onClick={() => setShowParked(v => !v)}
               className={`filter-pill tap-target-sm ${showParked ? 'seg-on' : 'seg-off glass'}`}>
-              Nevedeme · {parkedCount}
+              {t('Nevedeme · {n}', { n: parkedCount })}
             </button>
           )}
         </div>
       </div>
 
       {items.length > 6 && (
-        <SearchField value={search} onChange={setSearch} placeholder={`Hledat v ${category}…`} ariaLabel={`Hledat v kategorii ${category}`}
+        <SearchField value={search} onChange={setSearch} placeholder={t('Hledat v {kategorie}…', { kategorie: category })} ariaLabel={t('Hledat v kategorii {kategorie}', { kategorie: category })}
           storageKey={`stock-${category}`} inputClassName="!py-2.5 text-sm" />
       )}
 
       {list.length === 0 ? (
         <div className="card">
-          <EmptyState compact icon={search ? 'search' : 'box'} title={search ? 'Nic nenalezeno' : `V kategorii ${category} zatím nic není`} />
+          <EmptyState compact icon={search ? 'search' : 'box'} title={search ? t('Nic nenalezeno') : t('V kategorii {kategorie} zatím nic není', { kategorie: category })} />
         </div>
       ) : mode === 'view' ? (
         <div className="space-y-5">
@@ -255,7 +274,7 @@ export default function CategoryStockView({
                           {i.name}
                           {i.brand && <span className="ml-1.5 font-normal text-black/55">{i.brand}</span>}
                         </h3>
-                        {stavChip(st)}
+                        <StavChip st={st} />
                       </div>
                       {i.description && <p className="t-meta mt-1 line-clamp-2">{i.description}</p>}
                       <p className="text-sm text-black/55 mt-1 tabular-nums">
@@ -266,11 +285,11 @@ export default function CategoryStockView({
                           <div className="mt-2.5 h-2 w-full rounded-full bg-black/[0.06] overflow-hidden">
                             <div className={`h-full rounded-full ${TONE[st].bar} transition-[width]`} style={{ width: `${pct}%` }} />
                           </div>
-                          <p className="t-meta mt-1">Načaté balení: {pct} %</p>
+                          <p className="t-meta mt-1">{t('Načaté balení: {pct} %', { pct })}</p>
                         </>
                       )}
                       <p className="t-meta mt-1.5">
-                        Limit: {i.minQuantity} · kriticky: {i.criticalQuantity} {thresholdUnitLabel(packaging, i.unit)}
+                        {t('Limit: {min} · kriticky: {krit} {jednotka}', { min: i.minQuantity, krit: i.criticalQuantity, jednotka: thresholdUnitLabel(packaging, i.unit) })}
                       </p>
                       {canEdit && (
                         <ParkButton item={i} busy={savingId === i.id} onToggle={setParked} className="mt-2.5" />
@@ -305,26 +324,26 @@ export default function CategoryStockView({
                     </h3>
                     <p className="t-meta tabular-nums mt-0.5">
                       {formatStock({ ...i, packageSize: size }, unit, i.unit)}
-                      {size > 0 && <> · balení {fmtAmount(size)} {unit}</>}
+                      {size > 0 && <> · {t('balení {velikost} {jednotka}', { velikost: fmtAmount(size), jednotka: unit ?? '' })}</>}
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                     {savedId === i.id && (
                       <span className="text-xs font-medium text-ok-ink flex items-center gap-1" role="status">
-                        <Icon name="check" size={13} /> Uloženo
+                        <Icon name="check" size={13} /> {t('Uloženo')}
                       </span>
                     )}
                     {failedId === i.id && (
                       <span className="text-xs font-semibold text-bad-ink flex items-center gap-1">
-                        <Icon name="warning" size={13} /> Neuloženo
+                        <Icon name="warning" size={13} /> {t('Neuloženo')}
                       </span>
                     )}
-                    {stavChip(st)}
+                    <StavChip st={st} />
                     {onEditItem && (
-                      <Button variant="ghost" size="sm" iconOnly icon="pencil" aria-label={`Upravit ${i.name}`} onClick={() => onEditItem(i)} />
+                      <Button variant="ghost" size="sm" iconOnly icon="pencil" aria-label={t('Upravit {nazev}', { nazev: i.name })} onClick={() => onEditItem(i)} />
                     )}
                     {onRemoveItem && (
-                      <Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={`Smazat ${i.name}`} onClick={() => onRemoveItem(i)} />
+                      <Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={t('Smazat {nazev}', { nazev: i.name })} onClick={() => onRemoveItem(i)} />
                     )}
                   </div>
                 </div>
@@ -336,14 +355,14 @@ export default function CategoryStockView({
                 ) : size <= 0 ? (
                   <>
                     <p className="text-xs text-wait-ink mt-2">
-                      Chybí velikost balení — doplň ji u položky ve skladu.
+                      {t('Chybí velikost balení — doplň ji u položky ve skladu.')}
                     </p>
                     <ParkButton item={i} busy={savingId === i.id} onToggle={setParked} className="mt-2.5" />
                   </>
                 ) : (
                   <>
                     {/* Vybraný stupeň je inkoustová pilulka (DP §3.8) — dřív limetka, jako by šlo o akci. */}
-                    <div className="flex flex-wrap gap-1.5 mt-3" role="group" aria-label={`Kolik zbývá v načatém — ${i.name}`}>
+                    <div className="flex flex-wrap gap-1.5 mt-3" role="group" aria-label={t('Kolik zbývá v načatém — {nazev}', { nazev: i.name })}>
                       {steps.map(s => {
                         const active = Math.abs(current - s.amount) < 0.05;
                         return (
@@ -355,7 +374,7 @@ export default function CategoryStockView({
                             disabled={savingId === i.id}
                             className={`filter-pill tap-target-sm disabled:opacity-50 ${active ? 'seg-on' : 'seg-off glass'}`}
                           >
-                            {s.label}
+                            {krokStupnice(t, s.label)}
                             <span className="ml-1.5 text-xs tabular-nums opacity-70">
                               {fmtAmount(s.amount)}{unit}
                             </span>
@@ -381,26 +400,26 @@ export default function CategoryStockView({
                       <Button variant="secondary" size="sm" icon="plus"
                         onClick={() => openNext(i)}
                         disabled={i.quantity <= 0 || savingId === i.id}
-                        title={i.quantity <= 0 ? 'Není žádné zavřené balení' : undefined}>
-                        Otevřít další balení
+                        title={i.quantity <= 0 ? t('Není žádné zavřené balení') : undefined}>
+                        {t('Otevřít další balení')}
                       </Button>
                       {onStep ? (
                         <span className="inline-flex items-center gap-1.5 t-meta">
-                          Zavřených:
-                          <Button variant="secondary" size="sm" iconOnly icon="minus" aria-label={`Ubrat zavřené balení — ${i.name}`}
+                          {t('Zavřených:')}
+                          <Button variant="secondary" size="sm" iconOnly icon="minus" aria-label={t('Ubrat zavřené balení — {nazev}', { nazev: i.name })}
                             disabled={i.quantity <= 0} onClick={() => onStep(i, -1)} />
                           <strong className="text-[#16181A] tabular-nums w-6 text-center text-sm">{i.quantity}</strong>
-                          <Button variant="secondary" size="sm" iconOnly icon="plus" aria-label={`Přidat zavřené balení — ${i.name}`}
+                          <Button variant="secondary" size="sm" iconOnly icon="plus" aria-label={t('Přidat zavřené balení — {nazev}', { nazev: i.name })}
                             onClick={() => onStep(i, 1)} />
                         </span>
                       ) : (
                         <span className="t-meta">
-                          Zavřených: <strong className="text-[#16181A] tabular-nums">{i.quantity}</strong>
+                          {t('Zavřených:')} <strong className="text-[#16181A] tabular-nums">{i.quantity}</strong>
                         </span>
                       )}
                       {i.supplierUrl && (
                         <a href={i.supplierUrl} target="_blank" rel="noopener" className="btn btn-secondary btn-sm">
-                          <Icon name="external" size={15} /> Objednat
+                          <Icon name="external" size={15} /> {t('Objednat')}
                         </a>
                       )}
                     </div>
