@@ -23,7 +23,7 @@ export function ErrorState({ title, hint, onRetry, detail, compact = false, clas
   compact?: boolean;
   className?: string;
 }) {
-  const t = useT();
+  const t = useT('spolecne');
   return (
     <div className={`flex flex-col items-center text-center ${compact ? 'py-6 px-4' : 'py-12 px-6'} ${className}`}>
       <div className={`${compact ? 'h-12 w-12' : 'h-16 w-16'} rounded-2xl bg-[#DC2626]/10 text-[#991B1B] flex items-center justify-center mb-4`}>

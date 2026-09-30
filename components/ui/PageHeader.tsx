@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Icon } from '../Icons';
 import { Menu, type MenuItem } from './Menu';
+import { useT } from '@/lib/i18n/client';
 
 // Hlavička obrazovky — jedna pro všechny.
 //
@@ -44,6 +45,7 @@ export function PageHeader({ title, subtitle, hintId, primary, secondary, menu, 
   aside?: React.ReactNode;
   className?: string;
 }) {
+  const t = useT('spolecne');
   // Server localStorage nezná, tak se první vykreslení tváří „ukaž"
   // a schová se až v prohlížeči — jinak by neseděla hydratace.
   const [subtitleHidden, setSubtitleHidden] = useState(false);
@@ -78,8 +80,8 @@ export function PageHeader({ title, subtitle, hintId, primary, secondary, menu, 
               {hintId && (
                 <button type="button"
                   onClick={() => { try { localStorage.setItem('managero-hint-' + hintId, '1'); } catch { /* soukromý režim */ } setSubtitleHidden(true); }}
-                  aria-label="Skrýt tenhle popis"
-                  title="Skrýt tenhle popis (vrátit jde v Nastavení → Vzhled)"
+                  aria-label={t('Skrýt tenhle popis')}
+                  title={t('Skrýt tenhle popis (vrátit jde v Nastavení → Vzhled)')}
                   className="tap-target-sm ml-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full align-[-2px] opacity-0 focus-visible:opacity-100 group-hover:opacity-50 hover:!opacity-100 transition">
                   <Icon name="close" size={11} />
                 </button>

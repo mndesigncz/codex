@@ -37,7 +37,7 @@ import { RES_STATUS, tierFor } from '../lib/clientSlots.ts';
 const JAZYKY = ['en', 'de', 'sk', 'pl'];
 const ROOTS = ['app', 'components', 'lib'];
 /** Kolik `'cs-CZ'` je v kódu mimo výjimky. Klesá s každou dávkou migrace na lib/i18n/format; nesmí růst. */
-const BASELINE_CS_CZ = 164; // +3: výchozí čeština průvodce a předvolby zemí, cena na (zatím české) prodejní stránce
+const BASELINE_CS_CZ = 159; // +3: výchozí čeština průvodce a předvolby zemí, cena na (zatím české) prodejní stránce
 /** Natvrdo psané české řetězce v přeložených souborech (soubor → kolik). Nesmí růst; klesá s dalšími dávkami. */
 const BASELINE_NATVRDO = {};
 
@@ -117,6 +117,56 @@ for (const n of [0, 10, 25, 100]) pridej('klient-host', tierFor(n, { platinumAt:
   const m = bp.match(/const ORDER_LABEL[^=]*=\s*\{([^}]*)\}/);
   if (m) for (const v of m[1].matchAll(/:\s*'([^']+)'/g)) pridej('klient-host', v[1], 'BusinessPage.tsx (ORDER_LABEL)');
 }
+// Texty z datových tabulek, které komponenty překládají podle textu (`t(data.nazev)`):
+// průvodce (lib/pruvodce, foto.ts), předplatné (lib/plan), důvody nahlášení (lib/moderace).
+{
+  const typy = await import('../lib/pruvodce/typy.ts');
+  const predv = await import('../lib/pruvodce/predvolby.ts');
+  const foto = await import('../components/pruvodce/foto.ts');
+  const plan = await import('../lib/plan.ts');
+  const moder = await import('../lib/moderace.ts');
+  const PV = 'lib/pruvodce (tabulky průvodce)';
+  for (const d of typy.TYPY) { pridej('pruvodce', d.nazev, PV); pridej('pruvodce', d.veta, PV); }
+  for (const c of typy.CILE) { pridej('pruvodce', c.nazev, PV); pridej('pruvodce', c.veta, PV); pridej('pruvodce', c.ukazka, PV); }
+  for (const v of Object.values(typy.NAZEV_ZEME)) pridej('pruvodce', v, PV);
+  for (const v of Object.values(typy.NAZEV_VELIKOSTI)) pridej('pruvodce', v, PV);
+  for (const p of predv.PREDVOLBY_DOBY) { pridej('pruvodce', p.nazev, PV); pridej('pruvodce', p.popis, PV); }
+  for (const d of predv.DNY_DLOUHE) pridej('pruvodce', d, PV);
+  for (const f of Object.values(foto.FOTKY)) pridej('pruvodce', f.alt, PV);
+  // Shrnutí a finále: názvy operací a řádků (lib/pruvodce/plan.ts) a věta o pravidlech rozvrhu.
+  const planPv = readFileSync('lib/pruvodce/plan.ts', 'utf8');
+  for (const v of (planPv.match(/const NAZVY_OPERACI[^=]*=\s*\{([^}]*)\}/)?.[1] ?? '').matchAll(/:\s*'([^']+)'/g)) pridej('pruvodce', v[1], PV);
+  pridej('pruvodce', 'Nejvýš šest dní v řadě', PV);
+  // Výchozí obsah, který průvodce zakládá v jazyce majitele (server ho překládá přes slovník pruvodce):
+  // pozice pozvaných, typy směn, kategorie skladu, postupy (název, popis, kroky), poznámky a počty výsledku.
+  const plan2 = await import('../lib/pruvodce/plan.ts');
+  for (const v of Object.values(predv.POZICE)) pridej('pruvodce', v, PV);
+  for (const typ of Object.keys(predv.POZICE)) {
+    for (const s of predv.navrhniSmeny(typ, predv.vychoziDoba(typ))) pridej('pruvodce', s.name, PV);
+    for (const k of predv.KATEGORIE_SKLADU[typ]) pridej('pruvodce', k, PV);
+    for (const p of predv.POSTUPY[typ]) { pridej('pruvodce', p.name, PV); pridej('pruvodce', p.description, PV); for (const k of p.kroky) pridej('pruvodce', k, PV); }
+  }
+  for (const v of Object.values(plan2.POZNAMKY)) pridej('pruvodce', v, PV);
+  for (const v of Object.values(plan2.POCTY)) pridej('pruvodce', v, PV);
+  for (const v of Object.values(plan2.KDE_V_NASTAVENI)) pridej('pruvodce', v, PV);
+  // Věty, které UI překládá podle textu z modulu (ne přes t('…') přímo).
+  {
+    const rz = await import('../components/role/rozepsano.ts');
+    pridej('spolecne', rz.CO_SE_ZAHODI_ROLE, 'components/role/rozepsano.ts');
+    pridej('spolecne', rz.CO_SE_ZAHODI_NAVRH, 'components/role/rozepsano.ts');
+  }
+  // Předplatné: srovnání tarifů (popisky a textové buňky) a výčet toho, co přidává Max.
+  const PL = 'lib/plan.ts (PLAN_FEATURES)';
+  for (const f of plan.PLAN_FEATURES) {
+    for (const s of ['predplatne']) {
+      pridej(s, f.label, PL);
+      for (const v of [f.free, f.pro, f.max]) if (typeof v === 'string') pridej(s, v, PL);
+    }
+  }
+  for (const x of plan.MAX_EXTRAS) { pridej('spolecne', x, PL); pridej('predplatne', x, PL); }
+  for (const d of moder.DUVODY) pridej('spolecne', d.nazev, 'lib/moderace.ts (DUVODY)');
+}
+
 // Hlášky serveru: věty v `error: '…'` hostovských rout, statusMessage a blokace/middleware.
 const apiKlice = new Set();
 const apiVynechat = new Set();
@@ -128,14 +178,29 @@ for (const dir of ['schedule', 'inventory', 'stocktake', 'shift-types', 'fixed-a
   if (existsSync(cesta)) for (const f of walk(cesta)) apiZdroje.push(f);
 }
 apiZdroje.push('lib/api.ts', 'lib/blokace.ts', 'middleware.ts', 'lib/client.ts');
+// Hlášky rout, které zobrazují společné komponenty (obnova hesla, smazání účtu, nahlášení, blokace, platby).
+apiZdroje.push(
+  'app/api/account/route.ts', 'app/api/account/heslo/route.ts', 'app/api/account/heslo/obnovit/route.ts',
+  'app/api/account/delete-confirm/route.ts', 'app/api/account/delete-request/route.ts',
+  'app/api/reports/route.ts', 'app/api/reports/[id]/route.ts', 'app/api/blocks/route.ts',
+  'app/api/billing/checkout/route.ts', 'app/api/billing/portal/route.ts', 'app/api/billing/status/route.ts', 'app/api/billing/upgrade/route.ts',
+  'lib/moderace.ts', 'lib/smazaniUctu.ts', 'lib/smazaniUctuDb.ts',
+);
 for (const f of apiZdroje) {
   if (!existsSync(f)) continue;
-  for (const m of readFileSync(f, 'utf8').matchAll(/(?:error|ZPRAVA_423)(?::|\s*=)\s*'((?:[^'\\]|\\.)*)'/g)) apiKlice.add(m[1].replace(/\\'/g, "'"));
+  for (const m of readFileSync(f, 'utf8').matchAll(/(?:error|ZPRAVA_423|NEPLATNY|zprava)(?::|\s*=)\s*'((?:[^'\\]|\\.)*)'/g)) apiKlice.add(m[1].replace(/\\'/g, "'"));
   // Věta se šablonou `${…}` se nepřekládá (jméno by se dosadilo do cizího textu); hláška o /api/init je pro správce.
   for (const m of readFileSync(f, 'utf8').matchAll(/error:\s*'((?:[^'\\]|\\.)*)'/g)) if (/\/api\/init/.test(m[1])) apiVynechat.add(m[1].replace(/\\'/g, "'"));
   for (const m of readFileSync(f, 'utf8').matchAll(/return '([^']+)';/g)) if (f === 'lib/api.ts') apiKlice.add(m[1]);
 }
 apiKlice.add('Načtení se nepovedlo.'); apiKlice.add('Server odpověděl {status}.');
+// Věty, které server vrací jako pole varování (smazání účtu) nebo jako záložní hlášku `verejnaHlaska(e, '…')`.
+for (const k of [
+  'Platby nejsou nastavené, předplatné a zákazníka ve Stripe nešlo zrušit. Napište podpoře, dokončíme to ručně.',
+  'Soubory v úložišti se nepodařilo smazat (úložiště není nastavené). Napište podpoře.',
+  'Některé nahrané soubory se nepodařilo smazat z úložiště. Napište podpoře, dokončíme to ručně.',
+  'Portál se nepodařilo otevřít.',
+]) apiKlice.add(k);
 // Zpráva, která nekončí větou (začátek sestavované věty „Vyber den od dneška do “), se nepřekládá.
 const apiPouzite = [...apiKlice].filter(k => !apiVynechat.has(k) && !/\s$/.test(k) && /^[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ]/.test(k));
 
@@ -255,6 +320,12 @@ for (const [f, n] of Object.entries(natvrdoZmereno)) {
   else if (n < povoleno) chyby.push(`${f}: natvrdo psaných řetězců ubylo (${n} místo ${povoleno}); sniž BASELINE_NATVRDO, ať ráčna drží`);
 }
 
+// 4a. Kořenový layout posílá klientovi VŠECHNY sekce (SEKCE_VZDY = SEKCE). Slovníky se na serveru sdílejí mezi požadavky,
+// takže jakákoli menší sada nechá SSR přeložit větu, kterou prohlížeč nemá: chyba hydratace #418 a probliknutí češtiny.
+{
+  const src = readFileSync('lib/i18n/slovniky.ts', 'utf8');
+  if (!/export const SEKCE_VZDY[^=]*=\s*SEKCE\s*;/.test(src)) chyby.push('lib/i18n/slovniky.ts: SEKCE_VZDY musí být přesně SEKCE (viz komentář u SEKCE_VZDY: jiná sada rozjede SSR a hydrataci)');
+}
 // 4b. Sekce správy (sprava, tym, navody, postupy) se v aplikaci slévají do jednoho slovníku
 // (pozdější přepisuje dřívější). Stejný klíč s jinou hodnotou v jiné sekci by se proto ukázal
 // v jiném významu podle pořadí načtení; dvojí význam patří do klíče s kontextem (`t('Odložit', {}, 'sklad')`).
@@ -324,7 +395,7 @@ if (varovani.length) {
 }
 if (chyby.length) {
   console.error(`\ncheck-i18n: ${chyby.length} ${chyby.length === 1 ? 'chyba' : 'chyb'}\n`);
-  for (const c of chyby.slice(0, 60)) console.error('  ' + c);
+  for (const c of chyby.slice(0, Number(process.env.CHECK_MAX ?? 60))) console.error('  ' + c);
   if (chyby.length > 60) console.error(`  … a ${chyby.length - 60} dalších`);
   console.error('\nČeská věta je klíč: změníš-li ji v kódu, přenes překlad (--rename) nebo ho doplň ve všech jazycích.\n');
   process.exit(1);

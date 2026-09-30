@@ -1,4 +1,6 @@
 import React from 'react';
+import { useJazyk, useT } from '@/lib/i18n/client';
+import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
 
 // Sloupky bez os — tvar týdne nebo měsíce na jeden pohled (TO GO, Věrnost,
 // tržby po dnech). Tři obrazovky si je kreslily samy, každá jinou barvou
@@ -40,13 +42,15 @@ export function BarSpark({ data, label, highlight, height = 48, surface = 'card'
   showLabels?: boolean;
   className?: string;
 }) {
+  const t = useT('spolecne');
+  const { jazyk } = useJazyk();
   const max = data.reduce((m, d) => Math.max(m, d.value ?? 0), 0);
   const ink = surface === 'ink';
   return (
     <div role="group" aria-label={label} className={`${ink ? 'spark-inkoust' : ''} ${className}`}>
       <ul className="sr-only">
         {data.map((d, i) => (
-          <li key={i}>{d.tip ?? `${d.label ? `${d.label}: ` : ''}${d.value == null ? 'bez dat' : d.value.toLocaleString('cs-CZ')}`}</li>
+          <li key={i}>{d.tip ?? `${d.label ? `${d.label}: ` : ''}${d.value == null ? t('bez dat') : d.value.toLocaleString(LOCALE_PRO_JAZYK[jazyk])}`}</li>
         ))}
       </ul>
       <div aria-hidden className="flex items-end gap-[3px]" style={{ height }}>

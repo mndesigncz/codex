@@ -251,7 +251,7 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
               (jinak ho nafouknou a tah po pozadí posune celé rozvržení). */}
           <main className="relative flex-1 overflow-y-auto scrollbar-thin pb-36 md:pb-4">
             <div className="mx-auto w-full max-w-7xl">
-              <ErrorBoundary resetKey={tab} title={`${aktivni.label}: tahle část se nenačetla`}>
+              <ErrorBoundary resetKey={tab} zalozka={aktivni.label}>
                 {tab === 'overview' && <PrehledClientu zapnuto={souhrn?.zapnuto ?? null} slug={souhrn?.slug ?? null} prejdi={prejdi} />}
                 {tab === 'reservations' && <RezervaceStranka oznam={oznam} onZmena={obnovSouhrn} otevriHosta={moje.some(t => t.id === 'customers') ? otevriHosta : undefined} />}
                 {tab === 'orders' && <ObjednavkyStranka oznam={oznam} onZmena={obnovSouhrn} />}

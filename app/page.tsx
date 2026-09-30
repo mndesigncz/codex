@@ -7,6 +7,9 @@ import type { Metadata } from 'next';
 import { OG_ZAKLAD } from '@/lib/web';
 import { obalZHlavicek, HLASKA_ROLE_V_PROVOZU } from '@/lib/obal';
 import SpatnaRole from '@/components/auth/SpatnaRole';
+import { getJazyk } from '@/lib/i18n/server';
+import { ZapisSlovniky } from '@/lib/i18n/client';
+import { nactiSekce } from '@/lib/i18n/slovniky';
 
 // Canonical jen tady: úvodní stránka je jediná, která se má z adresy sama vyhlásit za originál.
 export const metadata: Metadata = {
@@ -22,7 +25,10 @@ export default async function Home() {
   if (!session) {
     if (obal) redirect('/login');
     // Logged-out visitors get the storefront, not a login wall.
-    return <Landing />;
+    // Slovník ceníku se zapíše před vykreslením Landing (důvod v app/employer/start/page.tsx).
+    const jazyk = await getJazyk();
+    const slovniky = jazyk === 'cs' ? null : await nactiSekce(jazyk, ['predplatne']);
+    return <>{slovniky && <ZapisSlovniky sekce={['predplatne']} slovniky={slovniky} />}<Landing /></>;
   }
   const role = (session.user as any)?.role;
   // Host v aplikaci pro podniky: přesměrování na /client by brána vrátila zpět (smyčka).

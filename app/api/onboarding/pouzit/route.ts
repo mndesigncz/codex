@@ -5,6 +5,7 @@ import { verejnaHlaska } from '@/lib/verejnaChyba';
 import { nactiStav } from '@/lib/pruvodce/stav';
 import { pouzijPruvodce } from '@/lib/pruvodce/pouzij';
 import { POLOZKY_ID } from '@/lib/pruvodce/typy';
+import { jazykPozadavku } from '@/lib/i18n/jazykPozadavku';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
     const s = await nactiStav(c.teamId);
     if (!s.dostupne || !s.onboarding) return NextResponse.json({ error: 'Průvodce pro tenhle podnik není k dispozici.' }, { status: 404 });
     if (s.vlastnikId !== c.meId) return NextResponse.json({ error: 'Průvodce nastavením smí vést jen vlastník podniku.' }, { status: 403 });
-    const v = await pouzijPruvodce({ teamId: c.teamId, meId: c.meId, onboarding: s.onboarding, vypnout });
+    const v = await pouzijPruvodce({ teamId: c.teamId, meId: c.meId, onboarding: s.onboarding, vypnout, jazyk: await jazykPozadavku() });
     return NextResponse.json({ polozky: v.polozky, prehled: v.prehled });
   } catch (e) {
     return NextResponse.json({ error: verejnaHlaska(e, 'Podnik se nepodařilo sestavit. Zkus to znovu.', 'onboarding pouzit') }, { status: 500 });

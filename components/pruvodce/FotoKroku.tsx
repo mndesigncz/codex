@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
+import { useT } from '@/lib/i18n/client';
 import { FOTKY, type IdFotky } from './foto';
 
 // Fotka kroku v rámu. Při změně `id` se nová fotka prolne přes starou
@@ -19,6 +20,7 @@ export default function FotoKroku({ id, pomer = 'aspect-[16/9] lg:aspect-[4/3]',
   priority?: boolean;
   className?: string;
 }) {
+  const t = useT('pruvodce');
   // Dvě vrstvy: `a` a `b`; svítí ta, na kterou ukazuje `zap`. Přepnutí jen
   // prohodí, která svítí, takže se mění výhradně opacity.
   const [vrstvy, setVrstvy] = useState<{ a: IdFotky; b: IdFotky; zap: 'a' | 'b' }>({ a: id, b: id, zap: 'a' });
@@ -38,7 +40,7 @@ export default function FotoKroku({ id, pomer = 'aspect-[16/9] lg:aspect-[4/3]',
           <div key={k} className="pv-foto-vrstva" data-zap={zap ? '' : undefined} aria-hidden={zap ? undefined : true}>
             <Image
               src={fk.src}
-              alt={zap ? fk.alt : ''}
+              alt={zap ? t(fk.alt) : ''}
               width={fk.w}
               height={fk.h}
               sizes="(min-width: 1024px) 480px, 100vw"

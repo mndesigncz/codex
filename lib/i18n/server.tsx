@@ -35,6 +35,9 @@ export async function getT(sekce: readonly Sekce[] = SEKCE_VZDY, jazyk?: Jazyk):
 export async function Slovniky({ sekce }: { sekce: Sekce[] }) {
   const jazyk = await getJazyk();
   if (jazyk === 'cs') return null;
-  const slovniky = await nactiSekce(jazyk, sekce);
-  return <ZapisSlovniky sekce={sekce} slovniky={slovniky} />;
+  // Kořenový layout posílá všechny sekce (viz SEKCE_VZDY); sem zbývá jen to, co by přibylo navíc.
+  const chybi = sekce.filter(s => !SEKCE_VZDY.includes(s));
+  if (!chybi.length) return null;
+  const slovniky = await nactiSekce(jazyk, chybi);
+  return <ZapisSlovniky sekce={chybi} slovniky={slovniky} />;
 }

@@ -5,6 +5,7 @@ import { Icon } from '../Icons';
 import { Button, type ButtonSize } from './Button';
 import { usePopover } from '@/lib/usePopover';
 import { useVejdiSe } from '@/lib/useVejdiSe';
+import { useT } from '@/lib/i18n/client';
 
 // Přetékající menu „···".
 //
@@ -108,7 +109,7 @@ export function MenuItemButton({ label, icon, hint, danger, disabled, onClick, c
   );
 }
 
-export function Menu({ items, label = 'Další akce', size = 'md', align = 'right', icon = 'more', className = '' }: {
+export function Menu({ items, label, size = 'md', align = 'right', icon = 'more', className = '' }: {
   items: MenuItem[];
   label?: string;
   size?: ButtonSize;
@@ -116,6 +117,7 @@ export function Menu({ items, label = 'Další akce', size = 'md', align = 'righ
   icon?: string;
   className?: string;
 }) {
+  const t = useT('spolecne');
   const [open, setOpen] = useState(false);
   // Escape, kliknutí mimo, návrat fokusu na tlačítko a pohyb šipkami řeší
   // společný `usePopover` — stejně jako v panelu oznámení a v účtu.
@@ -128,7 +130,7 @@ export function Menu({ items, label = 'Další akce', size = 'md', align = 'righ
     <div ref={pop.ref} className={`relative shrink-0 ${className}`}>
       <Button
         ref={pop.triggerRef}
-        variant="secondary" size={size} iconOnly icon={icon} aria-label={label}
+        variant="secondary" size={size} iconOnly icon={icon} aria-label={label ?? t('Další akce')}
         aria-haspopup="menu" aria-expanded={open}
         onClick={() => setOpen(v => !v)}
         onKeyDown={pop.onTriggerKeyDown}

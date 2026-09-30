@@ -52,7 +52,7 @@ export async function POST(request: Request) {
       // Odkaz se vrátí do hry, když se smazání nepovedlo z důvodu, který člověk může napravit.
       try { await sql`UPDATE account_delete_requests SET used_at = NULL WHERE token_hash = ${hash}`; } catch { /* nevadí */ }
       if (r.kod === 'VLASTNIK_S_CLENY' || r.kod === 'VLASTNIK_PODNIKU') {
-        return NextResponse.json({ error: r.zprava, kod: r.kod }, { status: 409 });
+        return NextResponse.json({ error: r.zprava, kod: r.kod, vlastnene: r.vlastnene }, { status: 409 });
       }
       return NextResponse.json({ error: r.zprava, kod: r.kod }, { status: r.status });
     }

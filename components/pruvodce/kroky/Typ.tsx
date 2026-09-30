@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { useRef } from 'react';
 import { Icon } from '@/components/Icons';
+import { useT } from '@/lib/i18n/client';
 import { TYPY, type TypPodniku } from '@/lib/pruvodce/typy';
 import { FOTKY } from '../foto';
 import type { KrokProps } from './spolecne';
@@ -15,10 +16,11 @@ import type { KrokProps } from './spolecne';
 // jako jediný na celou šířku řady, ať v mřížce nezůstane osamocená dlaždice.
 
 export default function Typ({ odp, zmen, chybaPole }: KrokProps) {
+  const t = useT('pruvodce');
   const vybrany = odp.typ;
   const refy = useRef<(HTMLButtonElement | null)[]>([]);
-  const vybrat = (t: TypPodniku) => zmen({ typ: t });
-  const aktivniIndex = Math.max(0, TYPY.findIndex(t => t.id === vybrany));
+  const vybrat = (typ: TypPodniku) => zmen({ typ });
+  const aktivniIndex = Math.max(0, TYPY.findIndex(x => x.id === vybrany));
 
   const naKlavesu = (e: React.KeyboardEvent, i: number) => {
     let dalsi = i;
@@ -34,22 +36,22 @@ export default function Typ({ odp, zmen, chybaPole }: KrokProps) {
 
   return (
     <div>
-      <div role="radiogroup" aria-label="Typ podniku" aria-describedby={chybaPole?.pole === 'typ' ? 'pv-typ-chyba' : undefined}
+      <div role="radiogroup" aria-label={t('Typ podniku')} aria-describedby={chybaPole?.pole === 'typ' ? 'pv-typ-chyba' : undefined}
         className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {TYPY.map((t, i) => {
-          const on = vybrany === t.id;
-          const foto = t.foto ? FOTKY[t.foto] : null;
+        {TYPY.map((d, i) => {
+          const on = vybrany === d.id;
+          const foto = d.foto ? FOTKY[d.foto] : null;
           return (
             <button
-              key={t.id}
+              key={d.id}
               ref={el => { refy.current[i] = el; }}
               type="button"
               role="radio"
               aria-checked={on}
               tabIndex={i === aktivniIndex ? 0 : -1}
-              data-typ={t.id}
+              data-typ={d.id}
               data-tlumit={vybrany && !on ? 'true' : undefined}
-              onClick={() => vybrat(t.id)}
+              onClick={() => vybrat(d.id)}
               onKeyDown={e => naKlavesu(e, i)}
               className={`pv-dlazdice tap-target ${foto ? '' : 'col-span-2 flex items-center gap-3 p-3 sm:col-span-3'}`}
             >
@@ -70,8 +72,8 @@ export default function Typ({ odp, zmen, chybaPole }: KrokProps) {
                 <span aria-hidden className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-black/[0.05] text-[#16181A]"><Icon name="sparkle" size={20} /></span>
               )}
               <span className={`block min-w-0 ${foto ? 'px-3 pb-3 pt-2.5' : 'flex-1'}`}>
-                <span className="t-card block">{t.nazev}</span>
-                <span className="t-meta mt-0.5 block text-pretty">{t.veta}</span>
+                <span className="t-card block">{t(d.nazev)}</span>
+                <span className="t-meta mt-0.5 block text-pretty">{t(d.veta)}</span>
               </span>
               {on && <span className="pv-fajfka" aria-hidden><Icon name="check" size={14} strokeWidth={2.6} /></span>}
             </button>

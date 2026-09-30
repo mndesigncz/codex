@@ -2,6 +2,9 @@
 
 import React from 'react';
 import { Icon } from '../Icons';
+import { useJazyk, useT } from '@/lib/i18n/client';
+import { fmtDatum } from '@/lib/i18n/format';
+import type { Jazyk } from '@/lib/i18n/config';
 
 // Přepínač měsíce: ‹ Září 2026 ›.
 //
@@ -20,9 +23,9 @@ export function posunMesic(mesic: string, o: number): string {
 }
 
 /** „2026-09" → „září 2026". Velké písmeno na začátku dodá `cz-sentence`, ne `capitalize` (to by zvětšilo každé slovo). */
-export function nazevMesice(mesic: string): string {
+export function nazevMesice(mesic: string, jazyk: Jazyk): string {
   const [y, m] = mesic.split('-').map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
+  return fmtDatum(`${y}-${String(m).padStart(2, '0')}-01`, { jazyk, styl: 'mesic' });
 }
 
 /**
@@ -38,6 +41,8 @@ export function MonthNav({ value, onChange, min, max, className = '' }: {
   max?: string;
   className?: string;
 }) {
+  const t = useT('spolecne');
+  const { jazyk } = useJazyk();
   // „RRRR-MM" se dá porovnávat jako text — nuly na začátku drží pořadí.
   const naZacatku = !!min && value <= min;
   const naKonci = !!max && value >= max;
@@ -46,22 +51,22 @@ export function MonthNav({ value, onChange, min, max, className = '' }: {
   // prohlížeč odfokusuje a Tab pak začíná od začátku stránky).
   const zamcena = 'aria-disabled:opacity-40 aria-disabled:cursor-not-allowed aria-disabled:active:scale-100';
   return (
-    <div role="group" aria-label="Měsíc"
+    <div role="group" aria-label={t('Měsíc')}
       className={`flex items-center gap-1 glass rounded-full p-1 min-w-0 w-full sm:w-fit ${className}`}>
       <button type="button" onClick={() => { if (!naZacatku) onChange(posunMesic(value, -1)); }}
         aria-disabled={naZacatku || undefined}
-        aria-label="Předchozí měsíc" className={`tap-target btn-icon ${zamcena}`}>
+        aria-label={t('Předchozí měsíc')} className={`tap-target btn-icon ${zamcena}`}>
         <Icon name="chevronRight" size={16} className="rotate-180" />
       </button>
       {/* aria-live: po přepnutí odečítač řekne nový měsíc, jinak by po
           stisku šipky bylo ticho a člověk by nevěděl, kde je. */}
       <span aria-live="polite"
         className="px-2 min-w-0 sm:min-w-[9rem] flex-1 text-center text-sm font-semibold cz-sentence text-[#16181A] truncate tabular-nums">
-        {nazevMesice(value)}
+        {nazevMesice(value, jazyk)}
       </span>
       <button type="button" onClick={() => { if (!naKonci) onChange(posunMesic(value, 1)); }}
         aria-disabled={naKonci || undefined}
-        aria-label="Další měsíc" className={`tap-target btn-icon ${zamcena}`}>
+        aria-label={t('Další měsíc')} className={`tap-target btn-icon ${zamcena}`}>
         <Icon name="chevronRight" size={16} />
       </button>
     </div>
