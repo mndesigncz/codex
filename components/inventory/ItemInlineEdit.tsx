@@ -135,7 +135,7 @@ export default function ItemInlineEdit({ item, onSaved, onClose }: {
 
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="primary" loading={saving} onClick={save}>{t('Uložit položku')}</Button>
-        <Button variant="secondary" disabled={saving} onClick={onClose}>{t('Zrušit')}</Button>
+        <Button variant="secondary" disabled={saving} onClick={onClose}>{t('Zrušit', undefined, 'dialog')}</Button>
       </div>
     </div>
   );

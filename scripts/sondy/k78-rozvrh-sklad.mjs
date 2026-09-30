@@ -1,9 +1,8 @@
-// Kolo 78 — vícejazyčnost: Rozvrh a Sklad (plánovač, Dostupnost, Receptury).
+// Kolo 78 — vícejazyčnost: Rozvrh a Sklad (plánovač, Receptury).
 //
 // Tvrdí (němčina a angličtina, telefon 390 × 844, světlý i tmavý režim):
 //  • Rozvrh vedení (nástroj plánovače): nadpis, hlavní akce, záložky, legenda a okno dne jsou
 //    v jazyce uživatele, bez českých slov obalu v nástroji, bez vodorovného přetečení;
-//  • Dostupnost zaměstnance: kalendář, volby dne a odeslání přeložené, dny v týdnu podle jazyka;
 //  • Receptury: nástroj (hledání, filtr kategorií, editor) přeložený, bez přetečení;
 //  • tmavý režim: text nástroje je čitelný (kontrast vůči ploše ≥ 3 : 1, nic nezmizelo);
 //  • čeština zůstává beze změny (nadpisy, tlačítka, záložky).
@@ -52,28 +51,24 @@ const podvrh = ({ mineId = 15 } = {}) => (req, json) => {
 };
 
 const FIX_ROZVRH = nacti('k69-b1-rozlozeni-rozvrh');
-const FIX_DOST = nacti('k69-b1-rozlozeni-dostupnost');
 const FIX_RECEPTURY = JSON_FIX('k69-b4-rozlozeni-receptury');
 const ROZVRH = '/employer/overview?view=shifts';
-const DOSTUPNOST = '/employee/shifts?view=availability';
 const RECEPTURY = '/employer/recipes';
 const TEL = { width: 390, height: 844 };
 
 const JAZYKY = {
   de: {
     nadpis: 'Dienstplan', generovat: 'Dienstplan erstellen', zalozky: ['Dienstplan', 'Schichtarten', 'Öffnungszeiten'],
-    dostupnostNadpis: 'Verfügbarkeit', odeslat: 'Verfügbarkeit senden', dostupnostTyp: 'Kalender',
     receptury: 'Rezepte', den: 'Tag',
   },
   en: {
     nadpis: 'Schedule', generovat: 'Generate schedule', zalozky: ['Schedule', 'Shift types', 'Opening hours'],
-    dostupnostNadpis: 'Availability', odeslat: 'Send availability', dostupnostTyp: 'Calendar',
     receptury: 'Recipes', den: 'Day',
   },
 };
 // Česká slova obalu, která se v cizím jazyce v nástroji nesmí objevit. Obsah podniku (jména typů směn,
 // jména lidí, položky menu) je záměrně česky a do seznamu nepatří.
-const CESKA_SLOVA = ['Vygenerovat', 'Publikovat', 'Směny podle', 'Uložit', 'Zrušit', 'Zavřít', 'Otevírací doba', 'Pevné dny', 'Typy směn', 'Dostupnost', 'Odeslat', 'Kalendář', 'Receptury', 'Hledat', 'Jen bez receptury', 'Poznámka'];
+const CESKA_SLOVA = ['Vygenerovat', 'Publikovat', 'Směny podle', 'Uložit', 'Zrušit', 'Zavřít', 'Otevírací doba', 'Pevné dny', 'Typy směn', 'Kalendář', 'Receptury', 'Hledat', 'Jen bez receptury', 'Poznámka'];
 
 const preteka = (p) => p.evaluate(() => ({ doc: document.documentElement.scrollWidth, okno: window.innerWidth }));
 const textNastroje = (p, selektor) => p.locator(selektor).first().evaluate(el => el.innerText);
@@ -169,29 +164,6 @@ for (const [kod, T] of Object.entries(JAZYKY)) {
     const k = await kontrastTextu(p, 'section[aria-labelledby="planovac-nadpis"]');
     tvrdi(`${kod}: Rozvrh v tmavém režimu — text nástroje je čitelný (≥ 3 : 1)`, k.pocet > 10 && k.nejhorsi >= 3, JSON.stringify(k));
     await p.screenshot({ path: `${OUT}k78-rozvrh-${kod}-tmavy.png` });
-    await ctx.close();
-  }
-  // --- Dostupnost zaměstnance
-  {
-    const BARISTA = roleMine('barista');
-    for (const [viewport, mobil, nazev] of [[{ width: 1280, height: 950 }, false, 'desktop'], [TEL, true, '390 px']]) {
-      const { ctx, p } = await zaloz({ jazyk: kod, viewport, mobil, role: 'employee', fix: FIX_DOST, mineData: BARISTA });
-      await otevri(p, DOSTUPNOST, 'zamestnanec.dostupnost');
-      tvrdi(`${kod}: Dostupnost (${nazev}) — nadpis „${T.dostupnostNadpis}“ a tlačítko „${T.odeslat}“`, await p.getByRole('heading', { level: 1, name: T.dostupnostNadpis }).isVisible() && await p.getByRole('button', { name: T.odeslat }).isVisible());
-      const txt = await textNastroje(p, '[data-plocha] li[data-widget="nastroj"]');
-      tvrdi(`${kod}: Dostupnost (${nazev}) — nástroj bez českých slov obalu`, ceskeSlova(txt).length === 0, ceskeSlova(txt).join(', '));
-      const pt = await preteka(p);
-      tvrdi(`${kod}: Dostupnost (${nazev}) bez vodorovného přetečení`, pt.doc <= pt.okno + 1, JSON.stringify(pt));
-      if (!mobil) {
-        const dny = await p.locator('[data-plocha] li[data-widget="nastroj"] .grid-cols-7').first().innerText();
-        tvrdi(`${kod}: Dostupnost — dny v týdnu podle jazyka (ne Po/Út/St)`, !/\bPo\b.*\bÚt\b/s.test(dny), dny.slice(0, 40));
-      }
-      await ctx.close();
-    }
-    const { ctx, p } = await zaloz({ jazyk: kod, viewport: { width: 1280, height: 950 }, role: 'employee', fix: FIX_DOST, mineData: BARISTA, tmavy: true });
-    await otevri(p, DOSTUPNOST, 'zamestnanec.dostupnost');
-    const k = await kontrastTextu(p, '[data-plocha] li[data-widget="nastroj"]');
-    tvrdi(`${kod}: Dostupnost v tmavém režimu — text je čitelný (≥ 3 : 1)`, k.pocet > 10 && k.nejhorsi >= 3, JSON.stringify(k));
     await ctx.close();
   }
   // --- Receptury (Sklad)

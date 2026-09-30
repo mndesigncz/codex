@@ -337,7 +337,7 @@ export default function RecipesView({ openProductId, onNavigate }: RecipesViewPr
     nastroj = (
       <div className="space-y-4">
         {sklad.error && <p className="note note-wait" role="status">{t('Sklad se nenačetl — marže a suroviny teď nespočítám.')} {sklad.error}</p>}
-        {d.chyba && <p className="note note-danger" role="alert">{d.chyba}</p>}
+        {d.chyba && <p className="note note-danger" role="alert">{t(d.chyba)}</p>}
         {/* Procházení menu — hledání, jen chybějící, kategorie */}
         <div className="flex flex-wrap gap-2 items-center">
           <SearchField className="flex-1 min-w-[200px]" value={search} onChange={setSearch}
@@ -663,7 +663,7 @@ function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, 
 
       <Modal open={mazani} onClose={() => setMazani(false)} size="sm" title={t('Smazat recepturu?')}
         footer={<>
-          <Button variant="secondary" onClick={() => setMazani(false)}>{t('Zrušit')}</Button>
+          <Button variant="secondary" onClick={() => setMazani(false)}>{t('Zrušit', undefined, 'dialog')}</Button>
           <Button variant="danger-solid" loading={saving} onClick={() => { setMazani(false); save(true); }}>{t('Smazat recepturu')}</Button>
         </>}>
         <p className="t-meta">{t('Prodeje „{nazev}" se pak ze skladu přestanou odepisovat, dokud recepturu znovu nesložíš.', { nazev: draft.productName })}</p>

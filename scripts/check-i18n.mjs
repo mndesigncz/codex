@@ -37,7 +37,7 @@ import { RES_STATUS, tierFor } from '../lib/clientSlots.ts';
 const JAZYKY = ['en', 'de', 'sk', 'pl'];
 const ROOTS = ['app', 'components', 'lib'];
 /** Kolik `'cs-CZ'` je v kódu mimo výjimky. Klesá s každou dávkou migrace na lib/i18n/format; nesmí růst. */
-const BASELINE_CS_CZ = 237; // (rozvrh+sklad: -22) +3: výchozí čeština průvodce a předvolby zemí, cena na (zatím české) prodejní stránce
+const BASELINE_CS_CZ = 238; // (rozvrh+sklad: -22) +3: výchozí čeština průvodce a předvolby zemí, cena na (zatím české) prodejní stránce; +2: AvailabilitySubmit a TimeOffRequest vrácené wt1 (přeloží je tam a sníží), -1: lib/printDoc přes LOCALE_PRO_JAZYK
 /** Natvrdo psané české řetězce v přeložených souborech (soubor → kolik). Nesmí růst; klesá s dalšími dávkami. */
 const BASELINE_NATVRDO = {};
 
@@ -118,17 +118,25 @@ for (const n of [0, 10, 25, 100]) pridej('klient-host', tierFor(n, { platinumAt:
 }
 // Hlášky serveru: věty v `error: '…'` hostovských rout, statusMessage a blokace/middleware.
 const apiKlice = new Set();
+const apiVynechat = new Set();
 const apiZdroje = [];
 for (const dir of ['app/api/client']) for (const f of walk(dir)) if (!/\/(admin|staff|pos|img)\//.test(f)) apiZdroje.push(f);
+// Rozvrh, sklad, inventura, receptury a pokladní zásoby: komponenty ukazují `error` z těchhle rout přes tg().
+for (const dir of ['schedule', 'inventory', 'stocktake', 'shift-types', 'fixed-assignments', 'recipes', 'production', 'pos/usage', 'pos/sync', 'pos/products', 'opening-hours', 'closings']) {
+  const cesta = `app/api/${dir}`;
+  if (existsSync(cesta)) for (const f of walk(cesta)) apiZdroje.push(f);
+}
 apiZdroje.push('lib/api.ts', 'lib/blokace.ts', 'middleware.ts', 'lib/client.ts');
 for (const f of apiZdroje) {
   if (!existsSync(f)) continue;
   for (const m of readFileSync(f, 'utf8').matchAll(/(?:error|ZPRAVA_423)(?::|\s*=)\s*'((?:[^'\\]|\\.)*)'/g)) apiKlice.add(m[1].replace(/\\'/g, "'"));
+  // Věta se šablonou `${…}` se nepřekládá (jméno by se dosadilo do cizího textu); hláška o /api/init je pro správce.
+  for (const m of readFileSync(f, 'utf8').matchAll(/error:\s*'((?:[^'\\]|\\.)*)'/g)) if (/\/api\/init/.test(m[1])) apiVynechat.add(m[1].replace(/\\'/g, "'"));
   for (const m of readFileSync(f, 'utf8').matchAll(/return '([^']+)';/g)) if (f === 'lib/api.ts') apiKlice.add(m[1]);
 }
 apiKlice.add('Načtení se nepovedlo.'); apiKlice.add('Server odpověděl {status}.');
 // Zpráva, která nekončí větou (začátek sestavované věty „Vyber den od dneška do “), se nepřekládá.
-const apiPouzite = [...apiKlice].filter(k => !/\s$/.test(k) && /^[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ]/.test(k));
+const apiPouzite = [...apiKlice].filter(k => !apiVynechat.has(k) && !/\s$/.test(k) && /^[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ]/.test(k));
 
 // ---------------------------------------------------------------------------
 // Slovníky
@@ -171,6 +179,21 @@ for (const s of sekce) {
       const potreba = j === 'pl' ? ['one', 'few', 'many', 'other'] : j === 'sk' ? ['one', 'few', 'other'] : ['one', 'other'];
       for (const bloky of pluralSelektory(v)) if (!potreba.every(p => bloky.includes(p))) chyby.push(`${j}/${s}: plurál bez tvarů ${potreba.join('/')} „${k}“`);
       if (cs.length < 25 && !/plural,/.test(cs + v) && v.length > cs.length * 2.5 && v.length > 14) varovani.push(`${j}/${s}: překlad „${v}“ je ${(v.length / cs.length).toFixed(1)}× delší než „${cs}“ (tlačítko na 390 px?)`);
+    }
+  }
+}
+// Slovník za běhu je plochý (věta → překlad bez ohledu na sekci): stejná česká věta ve dvou
+// sekcích musí mít stejný překlad, jinak vyhraje ta, která se načetla dřív. Jiný význam = jiný kontext:
+// t('Zrušit', undefined, 'dialog').
+for (const j of JAZYKY) {
+  const videno = new Map();
+  for (const s of sekce) {
+    const slov = nacti(j, s);
+    if (!slov) continue;
+    for (const [k, v] of Object.entries(slov)) {
+      const dr = videno.get(k);
+      if (!dr) videno.set(k, [s, JSON.stringify(v)]);
+      else if (dr[1] !== JSON.stringify(v)) chyby.push(`${j}: věta „${k}“ má v sekci ${dr[0]} a ${s} jiný překlad (${dr[1]} × ${JSON.stringify(v)}); sjednoť, nebo dej jednomu z použití kontext t('…', undefined, 'ctx')`);
     }
   }
 }

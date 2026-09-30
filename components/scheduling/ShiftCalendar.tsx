@@ -48,6 +48,9 @@ function KalendarSmen({ initialMonth }: { initialMonth?: string }) {
 
   // Rychlé ťukání do šipek pouští dotazy přes sebe; kreslit smí jen ten nejnovější.
   const reqRef = useRef(0);
+  // `t` mění identitu, kdykoli se dotáhne další sekce slovníku; načítání se kvůli tomu opakovat nesmí.
+  const tRef = useRef(t);
+  tRef.current = t;
   const load = useCallback(async () => {
     const req = ++reqRef.current;
     setLoading(true); setChyba(null);
@@ -56,10 +59,10 @@ function KalendarSmen({ initialMonth }: { initialMonth?: string }) {
       if (req !== reqRef.current) return;
       setDays(d.days && typeof d.days === 'object' ? d.days : {});
     } catch (e) {
-      if (req === reqRef.current) { setDays({}); setChyba(apiMessage(e, t('Kalendář se nenačetl.'))); }
+      if (req === reqRef.current) { setDays({}); const t = tRef.current; setChyba(apiMessage(e, t('Kalendář se nenačetl.'))); }
     }
     if (req === reqRef.current) setLoading(false);
-  }, [month, t]);
+  }, [month]);
   useEffect(() => { load(); }, [load]);
 
   const [y, m] = month.split('-').map(Number);

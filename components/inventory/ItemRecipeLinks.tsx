@@ -178,7 +178,7 @@ export default function ItemRecipeLinks({ item, links, unitLabel, onChanged, onO
                   ))}
                 </div>
               )}
-              <Button variant="ghost" size="sm" onClick={() => { setAdding(false); setQuery(''); setFound([]); setErr(''); }}>{t('Zrušit')}</Button>
+              <Button variant="ghost" size="sm" onClick={() => { setAdding(false); setQuery(''); setFound([]); setErr(''); }}>{t('Zrušit', undefined, 'dialog')}</Button>
             </>
           )}
         </div>

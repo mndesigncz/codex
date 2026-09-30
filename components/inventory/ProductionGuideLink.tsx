@@ -124,7 +124,7 @@ export default function ProductionGuideLink({ itemId, itemName, guideId, guideTi
               ))}
             </div>
           )}
-          <Button variant="ghost" size="sm" onClick={() => { setOpen(false); setQuery(''); }}>{t('Zrušit')}</Button>
+          <Button variant="ghost" size="sm" onClick={() => { setOpen(false); setQuery(''); }}>{t('Zrušit', undefined, 'dialog')}</Button>
         </div>
       ) : (
         <Button variant="secondary" size="sm" icon="plus" onClick={() => setOpen(true)}>{t('Připojit návod')}</Button>

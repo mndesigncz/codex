@@ -161,7 +161,7 @@ export default function TaskWeekBoard({ tasks, weekStart, onComplete, labelFor, 
             >
               <div className="flex items-center justify-between gap-2 px-1">
                 <h3 className="t-card truncate">
-                  {WD[d.getDay()]} <span className="text-black/45 font-normal tabular-nums">{d.getDate()}.&nbsp;{d.getMonth() + 1}.</span>
+                  {WD[d.getDay()]} <span className="text-black/45 font-normal tabular-nums">{fmtDatum(ymd(d), { jazyk, styl: 'kratce' })}</span>
                 </h3>
                 <span className="flex items-center gap-1.5 shrink-0">
                   {isToday && <Chip tone="ink" size="sm">{t('dnes')}</Chip>}
@@ -186,7 +186,7 @@ export default function TaskWeekBoard({ tasks, weekStart, onComplete, labelFor, 
       </div>
 
       <Modal open={presouvany != null} onClose={() => setPresouvany(null)} size="sm" title={t('Přesunout úkol')} subtitle={presouvany?.title}
-        footer={<Button variant="secondary" onClick={() => setPresouvany(null)}>{t('Zrušit')}</Button>}>
+        footer={<Button variant="secondary" onClick={() => setPresouvany(null)}>{t('Zrušit', undefined, 'dialog')}</Button>}>
         {presouvany && (
           <div className="grid gap-2" role="group" aria-label={t('Den, na který úkol přesunout')}>
             {days.map(d => {

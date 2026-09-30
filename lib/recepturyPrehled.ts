@@ -119,7 +119,7 @@ export function vetaOdpisu(raw: any, t: PrekladVety = cesky): { text: string; ch
   // Sekce slovníku pro kontrolu překladů: useT('sklad') (věty z t('…') v tomhle souboru patří do `sklad`).
   if (!raw || typeof raw !== 'object') return { text: t('Odpis se nepodařil.'), chyba: true };
   if (raw.connected === false) return { text: t('Pokladna není připojená — není z čeho odepisovat.'), chyba: true };
-  if (typeof raw.error === 'string') return { text: raw.error, chyba: true };
+  if (typeof raw.error === 'string') return { text: t(raw.error), chyba: true }; // věta ze serveru: slovník api
   if (raw.throttled) return { text: t('Odpis právě běží z pokladny sám — zkus to za chvíli.'), chyba: false };
   const n = pole(raw.deducted).length;
   const uctenek = cislo(raw.processed);

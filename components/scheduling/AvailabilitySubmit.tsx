@@ -16,15 +16,13 @@
 // Po odeslání se obnoví widget „Zadej dostupnost" (stejná URL).
 
 import { useState, useEffect, useMemo } from 'react';
-import { odsazeniMesice, zacatekTydne } from '@/lib/week';
-import { zkratkyDnuJazyk } from '@/lib/weekJazyk';
-import { useJazyk, useT } from '@/lib/i18n/client';
+import { zkratkyDnu, odsazeniMesice, zacatekTydne } from '@/lib/week';
 import { useCurrency } from '@/components/CurrencyProvider';
 
 import { Button, Card, Chip, ErrorState, Field, Input, MonthNav, PageHeader, Segmented, Skeleton, Textarea } from '../ui';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu } from '../widgety/useDataWidgetu';
-import { apiMessage, okJson } from '@/lib/api';
+import { okJson } from '@/lib/api';
 import { pragueToday } from '@/lib/pragueTime';
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string; role?: string };
@@ -38,6 +36,12 @@ interface Props {
 
 type DayState = string; // 'available' | 'off' | legacy 'morning'/'afternoon' | 'type:<id>'
 
+const SHIFTS = [
+  { id: 'morning', label: 'Ranní' },
+  { id: 'afternoon', label: 'Odpolední' },
+  { id: 'flexible', label: 'Flexibilní' },
+];
+
 // One tone per shift type, cycled by position — the day choices mirror the
 // team's OWN shift types, nothing is hard-coded to "ranní/odpolední".
 // Kategoriální paleta z globals.css — tytéž odstíny jako v Rozvrhu, ať
@@ -50,10 +54,12 @@ const TYPE_TONES = [
   { cls: 'cat-5', dot: 'cat-dot-5 ring-1 ring-black/10' },
 ];
 const AVAILABLE_META = {
+  label: 'Dostupný',
   cls: 'bg-black/[0.03] border-black/10 text-[#16181A] hover:bg-black/[0.06]',
   dot: 'bg-black/15 ring-1 ring-black/20 dark:ring-white/25',
 };
 const OFF_META = {
+  label: 'Nemůžu',
   cls: 'bg-bad/20 border-bad/40 text-bad-ink line-through hover:bg-bad/30',
   dot: 'bg-bad ring-1 ring-bad/50',
 };
@@ -78,8 +84,6 @@ function buildGrid(month: string, zacatek: 0 | 1) {
 }
 
 export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props) {
-  const t = useT('rozvrh');
-  const { jazyk } = useJazyk();
   // „Dnes“ a „tento měsíc“ podle Prahy, ne podle hodin zařízení: tablet v UTC
   // nebo telefon na cestách by po pražské půlnoci nabízel jiný měsíc než
   // Rozvrh a Moje směny (ty jedou přes pragueToday).
@@ -124,15 +128,15 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
     [types],
   );
   const metaOf = (st: DayState) => {
-    if (st === 'available') return { ...AVAILABLE_META, label: t('Dostupný') };
-    if (st === 'off') return { ...OFF_META, label: t('Nemůžu') };
-    if (st === 'morning') return { ...TYPE_TONES[0], label: t('Jen ranní') };
-    if (st === 'afternoon') return { ...TYPE_TONES[1], label: t('Jen odpolední') };
+    if (st === 'available') return AVAILABLE_META;
+    if (st === 'off') return OFF_META;
+    if (st === 'morning') return { ...TYPE_TONES[0], label: 'Jen ranní' };
+    if (st === 'afternoon') return { ...TYPE_TONES[1], label: 'Jen odpolední' };
     const id = parseInt(st.slice(5));
-    const idx = types.findIndex((ty) => ty.id === id);
+    const idx = types.findIndex((t) => t.id === id);
     return {
       ...TYPE_TONES[(idx < 0 ? 0 : idx) % TYPE_TONES.length],
-      label: t('Jen {nazev}', { nazev: types.find((ty) => ty.id === id)?.name ?? t('směna') }),
+      label: `Jen ${types.find((t) => t.id === id)?.name ?? 'směna'}`,
     };
   };
 
@@ -228,10 +232,10 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
         obnovDataWidgetu(`/api/availability?month=${month}&mine=1`);
       } else {
         const d = await res.json().catch(() => ({}));
-        setErr(apiMessage(new Error(d.error || ''), t('Dostupnost se nepodařilo odeslat.')));
+        setErr(d.error || 'Dostupnost se nepodařilo odeslat.');
       }
     } catch {
-      setErr(t('Nepodařilo se spojit se serverem.'));
+      setErr('Nepodařilo se spojit se serverem.');
     } finally {
       setSaving(false);
     }
@@ -247,19 +251,19 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
     return c;
   }, [grid, dayStates]);
 
-  // Němčina píše podstatná jména velkým, proto se tam popisky nezmenšují.
-  const popisCyklu = stateList.map((st) => jazyk === 'de' ? metaOf(st).label : metaOf(st).label.toLowerCase()).join(', ');
+  const popisCyklu = stateList.map((st) => metaOf(st).label.toLowerCase()).join(', ');
   const nastroj = (
     <Card as="section" aria-labelledby="dostupnost-kalendar" className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="dostupnost-kalendar" className="t-card">{t('Kalendář dostupnosti')}</h2>
+        <h2 id="dostupnost-kalendar" className="t-card">Kalendář dostupnosti</h2>
         {/* Do minulosti nejde — dostupnost na uplynulý měsíc nemá smysl. */}
         <MonthNav value={month} onChange={setMonth} min={currentMonth} />
       </div>
 
       {typesErr && (
         <p className="note note-wait cz-sentence">
-          {t('Typy směn se nenačetly, takže klepání zatím nabízí jen ráno a odpoledne. Jestli si tým vede vlastní typy, načti stránku znovu — ať vybíráš z těch svých.')}
+          Typy směn se nenačetly, takže klepání zatím nabízí jen ráno a odpoledne.
+          Jestli si tým vede vlastní typy, načti stránku znovu — ať vybíráš z těch svých.
         </p>
       )}
 
@@ -272,14 +276,14 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
         // Raději nic než prázdná mřížka, která vypadá jako „můžu všechny dny".
         <ErrorState
           compact
-          title={t('Dostupnost se nenačetla')}
-          hint={t('Dokud nevíme, co jsi poslal/a dřív, nejde to odeslat znovu — přepsalo by to původní dostupnost prázdnou.')}
+          title="Dostupnost se nenačetla"
+          hint="Dokud nevíme, co jsi poslal/a dřív, nejde to odeslat znovu — přepsalo by to původní dostupnost prázdnou."
           onRetry={() => setReloadKey(k => k + 1)}
         />
       ) : (
         <>
           <div>
-            <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 t-meta mb-2" aria-label={t('Legenda')}>
+            <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 t-meta mb-2" aria-label="Legenda">
               {stateList.map((st) => (
                 <li key={st} className="flex items-center gap-1.5">
                   <span aria-hidden className={`h-2.5 w-2.5 rounded-full ${metaOf(st).dot}`} /> {metaOf(st).label}
@@ -287,10 +291,10 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
               ))}
             </ul>
             <p className="t-meta mb-3 text-pretty">
-              {t('Klepnutím na den přepínáš: {cyklus}. Denní volby jsou závazné — „Jen …" a „Nemůžu" generátor vždy dodrží.', { cyklus: popisCyklu })}
+              Klepnutím na den přepínáš: {popisCyklu}. Denní volby jsou závazné — „Jen …" a „Nemůžu" generátor vždy dodrží.
             </p>
             <div className="grid grid-cols-7 gap-1 sm:gap-1.5 mb-1.5">
-              {zkratkyDnuJazyk(zacatek, jazyk).map((d) => (
+              {zkratkyDnu(zacatek).map((d) => (
                 <div key={d} className="text-center text-[11px] font-medium text-black/35 py-1">
                   {d}
                 </div>
@@ -331,17 +335,13 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
           <div className="space-y-4 pt-4 border-t border-black/[0.06]">
             {/* Segmented nemá pole, ke kterému by šel <label> — jméno nese role="group" s aria-label. */}
             <div className="space-y-1.5">
-              <p className="text-[13px] font-medium text-black/70" aria-hidden>{t('Preferovaná směna')}</p>
-              <Segmented ariaLabel={t('Preferovaná směna')} value={preferredShift} onChange={(v) => { setPreferredShift(v); setConfirmed(false); }}
-                options={[
-                  { id: 'morning', label: t('Ranní') },
-                  { id: 'afternoon', label: t('Odpolední') },
-                  { id: 'flexible', label: t('Flexibilní') },
-                ]} />
-              <p className="text-xs text-black/50">{t('Obecně a nezávazně — denní volby v kalendáři mají přednost.')}</p>
+              <p className="text-[13px] font-medium text-black/70" aria-hidden>Preferovaná směna</p>
+              <Segmented ariaLabel="Preferovaná směna" value={preferredShift} onChange={(v) => { setPreferredShift(v); setConfirmed(false); }}
+                options={SHIFTS.map(s => ({ id: s.id, label: s.label }))} />
+              <p className="text-xs text-black/50">Obecně a nezávazně — denní volby v kalendáři mají přednost.</p>
             </div>
 
-            <Field id="dostupnost-max-smen" label={t('Maximální počet směn')} hint={t('Nepovinné — prázdné pole znamená bez limitu.')}>
+            <Field id="dostupnost-max-smen" label="Maximální počet směn" hint="Nepovinné — prázdné pole znamená bez limitu.">
               <Input
                 id="dostupnost-max-smen"
                 type="number" inputMode="numeric"
@@ -352,7 +352,7 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
               />
             </Field>
 
-            <Field id="dostupnost-poznamka" label={t('Poznámka pro vedení')} hint={t('Nepovinné — třeba víkendy ano, ve středu škola.')}>
+            <Field id="dostupnost-poznamka" label="Poznámka pro vedení" hint="Nepovinné — třeba víkendy ano, ve středu škola.">
               <Textarea
                 id="dostupnost-poznamka"
                 value={note}
@@ -368,11 +368,11 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
             {/* Jako sekce pod plochou Mých směn vedení (h2) není hlavní akcí
                 obrazovky — limetku tam má „Hotovo“ v úpravách. Tmavá. */}
             <Button variant={headingLevel === 'h2' ? 'primary' : 'accent'} icon="send" block loading={saving} disabled={loadFailed} onClick={submit}
-              title={loadFailed ? t('Nejdřív je potřeba načíst, co jsi poslal/a dřív.') : undefined}>
-              {existing ? t('Aktualizovat dostupnost') : t('Odeslat dostupnost')}
+              title={loadFailed ? 'Nejdřív je potřeba načíst, co jsi poslal/a dřív.' : undefined}>
+              {existing ? 'Aktualizovat dostupnost' : 'Odeslat dostupnost'}
             </Button>
-            {confirmed && <Chip tone="ok" icon="check">{t('Uloženo')}</Chip>}
-            {existing && !confirmed && <span className="t-meta">{t('Dostupnost už jsi odeslal/a — můžeš ji upravit.')}</span>}
+            {confirmed && <Chip tone="ok" icon="check">Uloženo</Chip>}
+            {existing && !confirmed && <span className="t-meta">Dostupnost už jsi odeslal/a — můžeš ji upravit.</span>}
           </div>
         </>
       )}
@@ -384,7 +384,7 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
     return (
       <PlochaWidgetu
         stranka="zamestnanec.dostupnost"
-        hlavicka={{ title: t('Dostupnost'), subtitle: t('Dej vedení vědět, kdy můžeš pracovat — podle toho sestaví rozvrh.'), hintId: 'availabilitysubmit' }}
+        hlavicka={{ title: 'Dostupnost', subtitle: 'Dej vedení vědět, kdy můžeš pracovat — podle toho sestaví rozvrh.', hintId: 'availabilitysubmit' }}
         nastroj={nastroj}
       />
     );
@@ -393,7 +393,7 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
     // Bez max-w-3xl: sekce stojí v Mých směnách vedení pod plochou, která jde přes celou
     // šířku — užší sloupec by na desktopu nesedl na okraje karet nad ním.
     <section className="p-4 sm:p-6 space-y-6 w-full">
-      <PageHeader as="h2" title={t('Dostupnost')} subtitle={t('Kdy můžeš pracovat — podle toho se skládá rozvrh.')} />
+      <PageHeader as="h2" title="Dostupnost" subtitle="Kdy můžeš pracovat — podle toho se skládá rozvrh." />
       {nastroj}
     </section>
   );

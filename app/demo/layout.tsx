@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Slovniky } from '@/lib/i18n/server';
 
 // Ukázka je veřejná (bez přihlášení), ale ne pro vyhledávače: je to vložená
 // součást prodejní stránky s vymyšlenými daty, ne samostatný obsah.
@@ -9,5 +10,5 @@ export const metadata: Metadata = {
 };
 
 export default function DemoLayout({ children }: { children: React.ReactNode }) {
-  return children;
+  return <><Slovniky sekce={['rozvrh', 'sklad']} />{children}</>;
 }

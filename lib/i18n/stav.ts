@@ -20,13 +20,18 @@ export function vsechnySlovniky(): Slovniky {
   return slovniky;
 }
 
-/** Přidá sekci ke slovníku jazyka. Vrací true, když se něco změnilo. */
+/**
+ * Přidá sekci ke slovníku jazyka. Vrací true, když se něco změnilo.
+ * Slovník je plochý: věta, která už ve slovníku je, se nepřepisuje (přepis by zvedl verzi,
+ * `t` by změnilo identitu a překreslilo by se vše; stejná věta musí mít v každé sekci stejný
+ * překlad, to hlídá check-i18n).
+ */
 export function pridejSlovnik(jazyk: Jazyk, sekce: Slovnik): boolean {
   if (jazyk === 'cs') return false;
   const cil = (slovniky[jazyk] ??= {});
   let zmena = false;
   for (const k of Object.keys(sekce)) {
-    if (cil[k] !== sekce[k]) { cil[k] = sekce[k]; zmena = true; }
+    if (!(k in cil)) { cil[k] = sekce[k]; zmena = true; }
   }
   if (zmena) { verze++; for (const p of Array.from(posluchaci)) p(); }
   return zmena;

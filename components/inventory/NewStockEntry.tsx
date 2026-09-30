@@ -232,7 +232,7 @@ export default function NewStockEntry({
             {UNITS.map(u => (
               <button key={u} type="button" onClick={() => setUnit(u)} aria-pressed={unit === u}
                 className={`filter-pill tap-target-sm whitespace-nowrap ${big ? '!text-sm sm:!text-base sm:!px-4 sm:!py-2.5' : ''} ${unit === u ? 'seg-on' : 'seg-off glass'}`}>
-                {u}
+                {u === 'balení' ? t('balení') : u}
               </button>
             ))}
           </div>
@@ -296,7 +296,7 @@ export default function NewStockEntry({
           {t('Uložit a přidat další')}
         </Button>
         {onCancel && (
-          <Button variant="ghost" size={big ? 'lg' : 'md'} disabled={saving} onClick={onCancel}>{t('Zrušit')}</Button>
+          <Button variant="ghost" size={big ? 'lg' : 'md'} disabled={saving} onClick={onCancel}>{t('Zrušit', undefined, 'dialog')}</Button>
         )}
       </div>
       <p className="t-meta">

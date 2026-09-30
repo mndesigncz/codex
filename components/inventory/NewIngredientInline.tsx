@@ -184,7 +184,7 @@ export default function NewIngredientInline({ categories, onCreated, onCancel }:
         </button>
         <button type="button" onClick={onCancel} disabled={saving}
           className="rounded-full glass px-4 py-2.5 text-sm font-semibold text-black/55 hover:text-black transition">
-          {t('Zrušit')}
+          {t('Zrušit', undefined, 'dialog')}
         </button>
       </div>
     </div>
