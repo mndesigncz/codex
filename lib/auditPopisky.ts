@@ -9,6 +9,7 @@ export const AUDIT_POPISKY: Record<string, string> = {
   // podnik a lidé
   'team.settings': 'Změna nastavení podniku',
   'ucet.smazan': 'Účet smazán jeho majitelem',
+  'ucet.stripe_chyba': 'Smazání účtu: Stripe se nepodařilo uklidit, dokončit ručně',
   'podnik.smazan': 'Podnik smazán spolu s účtem vlastníka',
   'nahlaseni.vytvoreno': 'Obsah nahlášen',
   'nahlaseni.vyreseno': 'Nahlášení vyřízeno',

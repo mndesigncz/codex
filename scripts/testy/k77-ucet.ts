@@ -10,7 +10,7 @@ import { createHash } from 'node:crypto';
 import type { Testy } from './_testy.ts';
 import {
   rozhodniSmazani, planUzivatele, planPodniku, anonymizaceBezMigrace, proved, jeChybejiciObjekt,
-  ZACHAZENI_TABULEK, TYMOVE_TABULKY, TYMOVE_PONECHAT, TYMOVE_NEPRIME, POTVRZENI_PODNIKU, type Krok,
+  ZACHAZENI_TABULEK, OSOBNI_UDAJE, RESET_SLOUPCU, TYMOVE_TABULKY, TYMOVE_PONECHAT, TYMOVE_NEPRIME, POTVRZENI_PODNIKU, type Krok,
 } from '../../lib/smazaniUctu.ts';
 import {
   hashTokenu, novyToken, vypadaJakoToken, jePlatny, vyprseni, hesloStaci, cestaObnoveniHesla, RESET_PLATNOST_MIN,
@@ -18,7 +18,7 @@ import {
 import {
   platneNahlaseni, vyfiltrujZablokovane, smiSmazatZpravu, smiZablokovat, stavPoAkci, opisObsahu, nazevDuvodu, DUVODY,
 } from '../../lib/moderace.ts';
-import { nactiSchema, SLOUPCE_NA_UZIVATELE } from '../ddl-schema.mjs';
+import { nactiSchema, SLOUPCE_NA_UZIVATELE, SLOUPCE_OSOBNI_UDAJE } from '../ddl-schema.mjs';
 import {
   seed, nactiHesla, kontrolaDatabaze, emaily, dnyDopredu, hesloStaci as hesloRecenzenta, DEMO_TYM, DEMO_SLUG, MIN_DELKA_HESLA,
 } from '../seed-recenzent-jadro.mjs';
@@ -79,6 +79,36 @@ export default async function ({ eq, ok }: Testy) {
   ok('podnik: nakonec povinně smaže tým a uvolní ostatní členy', pp.at(-1)!.povinny && /DELETE FROM teams WHERE id = \$1/.test(pp.at(-1)!.text) && pp.some(k => /UPDATE users SET team_id = NULL WHERE team_id = \$1 AND id <> \$2/.test(k.text)));
   ok('podnik: účetní záznamy platformy (fakturace) se nemažou', !pp.some(k => /billing_events|referral_rewards|admin_audit/.test(k.text)));
   ok('podnik: každý dotaz je omezený na tenhle podnik (parametr $1)', pp.filter(k => /DELETE FROM/.test(k.text)).every(k => /\$1/.test(k.text)));
+
+
+  // ---- osobní údaje mimo users: každá tabulka má zacházení a skutečný krok ----
+  const vsechnyKroky = [...planUzivatele({ id: 9, email: 'Eva@X.cz', role: 'employer', hash: '!x', dnes: '2026-09-30' }), ...planPodniku(3, 9)];
+  const kMaKrok = (t: string) => vsechnyKroky.some(k => new RegExp(`(FROM|UPDATE)\\s+${t}\\b`).test(k.text));
+  const osobniBez: string[] = [];
+  for (const [tabulka, sloupce] of schema) {
+    if (tabulka !== 'users' && [...sloupce].some(c => SLOUPCE_OSOBNI_UDAJE.test(c)) && !(tabulka in OSOBNI_UDAJE)) osobniBez.push(tabulka);
+  }
+  eq('osobní údaje: každá tabulka s e-mailem, telefonem, volným textem, souborem nebo Stripe má zacházení', osobniBez, []);
+  eq('osobní údaje: zacházení neodkazuje na neexistující tabulky', Object.keys(OSOBNI_UDAJE).filter(t => !schema.has(t)), []);
+  eq('osobní údaje: co se slibuje smazat nebo anonymizovat, má v plánu krok', Object.entries(OSOBNI_UDAJE).filter(([t, d]) => d.zpusob !== 'ponechat' && t !== 'users' && !kMaKrok(t)).map(([t]) => t), []);
+  eq('osobní údaje: účetní záznamy platformy plán nemění', Object.entries(OSOBNI_UDAJE).filter(([t, d]) => d.zpusob === 'ponechat' && kMaKrok(t)).map(([t]) => t), []);
+  ok('osobní údaje: každé zacházení je popsané', Object.values(OSOBNI_UDAJE).every(d => d.co.length >= 20));
+  const vlastnik = planUzivatele({ id: 9, email: 'Eva@X.cz', role: 'employer', hash: '!x', dnes: '2026-09-30' });
+  const krok = (re: RegExp) => vlastnik.find(k => re.test(k.text));
+  const pozv = krok(/DELETE FROM invitations/);
+  ok('smazání: pozvánky se mažou podle e-mailu (bez ohledu na velikost písmen) i podle pozvávajícího', !!pozv && /LOWER\(email\) = LOWER\(\$2\)/.test(pozv.text) && /invited_by = \$1/.test(pozv.text) && pozv.params[1] === 'Eva@X.cz');
+  ok('smazání: soubory mimo podnik se mažou, soubory podniku se odpojí od osoby a přejmenují', !!krok(/DELETE FROM uploads WHERE user_id = \$1 AND team_id IS NULL/) && !!krok(/UPDATE uploads SET user_id = NULL, name = /));
+  ok('smazání: volný text protokolu a nahlášení se vymaže, záznam o smazání zůstane', !!krok(/UPDATE audit_log SET detail = NULL[\s\S]*NOT IN \('ucet\.smazan', 'podnik\.smazan', 'ucet\.stripe_chyba'\)/) && !!krok(/UPDATE content_reports SET detail = NULL WHERE reporter_id/) && !!krok(/UPDATE content_reports SET snapshot = NULL WHERE reported_user_id/));
+  for (const c of ['pin', 'pin_hash', 'hourly_rate', 'max_consecutive_days', 'max_month_hours', 'job_title', 'active_team_id', 'shift_preference', 'split_shifts_ok']) {
+    ok(`smazání: users.${c} se vynuluje samostatným volitelným krokem`, RESET_SLOUPCU.some(([s]) => s === c) && vlastnik.some(k => !k.povinny && new RegExp(`UPDATE users SET ${c} = `).test(k.text)) && schema.get('users')!.has(c));
+  }
+  ok('smazání: mzdová sazba se nuluje na 0, ne na NULL', vlastnik.some(k => /UPDATE users SET hourly_rate = 0 WHERE/.test(k.text)));
+  ok('smazání: všechny kroky před anonymizací zůstávají volitelné i s novými kroky', vlastnik.slice(0, -1).every(k => !k.povinny) && vlastnik.at(-1)!.povinny);
+  ok('smazání: prázdná organizace vlastníka se smaže', !!krok(/DELETE FROM organizations WHERE owner_id = \$1[\s\S]*NOT EXISTS/));
+  const orgKrok = pp.findIndex(k => /DELETE FROM organizations/.test(k.text));
+  ok('podnik: organizace se maže s posledním podnikem, před odpojením a před smazáním týmu', orgKrok >= 0 && /NOT EXISTS \(SELECT 1 FROM teams WHERE organization_id = organizations\.id AND id <> \$1\)/.test(pp[orgKrok].text)
+    && orgKrok < pp.findIndex(k => /SET organization_id = NULL/.test(k.text)) && orgKrok < pp.findIndex(k => /DELETE FROM teams WHERE id/.test(k.text)) && !pp[orgKrok].povinny);
+  ok('podnik: soubory a protokol podniku se mažou s ním', ['uploads', 'audit_log', 'content_reports', 'invitations'].every(t => pp.some(k => new RegExp(`DELETE FROM ${t} WHERE team_id`).test(k.text))));
 
   // ---- provádění: přeskočí chybějící tabulku, jinou chybu nepřežije ----
   const zapsano: string[] = [];

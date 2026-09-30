@@ -143,7 +143,7 @@ export async function DELETE(request: Request) {
     const r = await smazUcet(id, { smazatPodnik: body?.smazatPodnik === true, potvrzeni: body?.potvrzeni ?? null, zDuvodu: 'aplikace' });
     if (!r.ok) return NextResponse.json({ error: r.zprava, kod: r.kod, vlastnene: r.vlastnene }, { status: r.status });
     await clear(`smazani:${id}`);
-    return NextResponse.json({ ok: true, smazanePodniky: r.smazanePodniky });
+    return NextResponse.json({ ok: true, smazanePodniky: r.smazanePodniky, varovani: r.varovani });
   } catch (e) {
     console.error('smazání účtu selhalo', e);
     // Kroky jsou opakovatelné; člověk to může zkusit znovu.

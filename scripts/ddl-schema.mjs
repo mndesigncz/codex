@@ -27,3 +27,6 @@ export function nactiSchema(text = readFileSync(new URL('../app/api/init/route.t
 
 /** Sloupce, které odkazují na uživatele (kdo co vytvořil, komu co patří). */
 export const SLOUPCE_NA_UZIVATELE = /^(user_id|customer_id|employee_id|sender_id|author_id|reported_by|offered_by|claimed_by|assigned_to|decided_by|reviewed_by|updated_by|invited_by|blocker_id|blocked_id|reporter_id|reported_user_id|resolved_by|sent_by|upravil|created_by|completed_by|approved_by|covered_by|submitted_by|referred_by|created_by_id|paid_by_id|owner_id)$/;
+
+/** Sloupce s osobními údaji mimo `users` (kontakt, volný text, soubor, Stripe, mzdová sazba). Tabulka s takovým sloupcem musí být v OSOBNI_UDAJE (lib/smazaniUctu.ts). */
+export const SLOUPCE_OSOBNI_UDAJE = /^(email|phone|birthday|snapshot|detail|blob_path|stripe_customer_id|stripe_subscription_id|pin|pin_hash|hourly_rate)$/;

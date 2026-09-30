@@ -9,6 +9,7 @@ import bcrypt from 'bcryptjs';
 import { audit } from './audit';
 import { pragueToday } from './pragueTime';
 import { jeSpravcePodleDb } from './superadminDb';
+import { del } from '@vercel/blob';
 import { stripe } from './billing';
 import { zneplatniStav } from './auth';
 import {
@@ -17,7 +18,7 @@ import {
 } from './smazaniUctu';
 
 export type VysledekSmazani =
-  | { ok: true; smazanePodniky: number }
+  | { ok: true; smazanePodniky: number; varovani: string[] }
   | { ok: false; status: number; kod: string; zprava: string; vlastnene?: VlastnenyPodnik[] };
 
 const sql = () => neon(process.env.DATABASE_URL!);
@@ -46,26 +47,69 @@ export async function vlastnenePodniky(userId: number): Promise<VlastnenyPodnik[
   return out;
 }
 
-async function zrusPredplatne(teamIds: number[]): Promise<string | null> {
-  if (!teamIds.length) return null;
+const STRIPE_PRAZDNO = /resource_missing|No such (subscription|customer)/i;
+
+/**
+ * Stripe před smazáním podniku: zruší předplatné a smaže zákazníka (e-mail, jméno, platební metody).
+ * Chyba Stripe smazání NEBLOKUJE (osobní údaje v naší databázi se mažou vždy); zapíše se do logu, do
+ * protokolu (id zákazníka, aby podpora mohla dokončit ručně) a vrátí se jako varování. Faktury a platby
+ * zůstávají ve Stripe jako účetní evidence.
+ */
+export async function uklidStripe(teamIds: number[], userId: number): Promise<string[]> {
+  if (!teamIds.length) return [];
   const s = sql();
   let rows: any[] = [];
-  try { rows = await s`SELECT id, stripe_subscription_id FROM teams WHERE id = ANY(${teamIds}) AND stripe_subscription_id IS NOT NULL` as any[]; }
-  catch { return null; }
-  if (!rows.length) return null;
+  try { rows = await s`SELECT id, stripe_customer_id, stripe_subscription_id FROM teams WHERE id = ANY(${teamIds}) AND (stripe_subscription_id IS NOT NULL OR stripe_customer_id IS NOT NULL)` as any[]; }
+  catch { return []; }
+  if (!rows.length) return [];
+  const varovani: string[] = [];
   const st = stripe();
-  if (!st) return 'Předplatné nejde zrušit, platby nejsou nastavené. Zkuste to později nebo napište podpoře.';
+  if (!st) {
+    console.error('smazání účtu: Stripe není nastavený, předplatné a zákazník zůstávají', rows.map(r => r.stripe_customer_id));
+    await zapisStripeChybu(userId, rows.map(r => String(r.stripe_customer_id ?? r.stripe_subscription_id)).join(','));
+    return ['Platby nejsou nastavené, předplatné a zákazníka ve Stripe nešlo zrušit. Napište podpoře, dokončíme to ručně.'];
+  }
+  const selhalo = async (co: string, id: string, e: any) => {
+    if (STRIPE_PRAZDNO.test(`${e?.code ?? ''} ${e?.message ?? ''}`)) return; // už neexistuje: hotovo
+    console.error(`smazání účtu: ${co} ve Stripe selhalo`, id, e);
+    await zapisStripeChybu(userId, `${co}:${id}`);
+    varovani.push(`Ve Stripe se nepodařilo ${co === 'zrušení předplatného' ? 'zrušit předplatné' : 'smazat zákazníka'}. Účet je smazaný; napište podpoře, dokončíme to ručně.`);
+  };
   for (const r of rows) {
-    try { await st.subscriptions.cancel(String(r.stripe_subscription_id)); }
-    catch (e: any) {
-      // Už zrušené nebo neexistující předplatné smazání nebrání.
-      if (e?.code === 'resource_missing' || /No such subscription/i.test(String(e?.message))) continue;
-      console.error('smazání účtu: zrušení předplatného selhalo', e);
-      // Data podniku se nemažou, dokud by se mu dál strhávaly peníze.
-      return 'Předplatné podniku se nepodařilo zrušit, účet zůstal beze změny. Zkuste to za chvíli.';
+    if (r.stripe_subscription_id) {
+      try { await st.subscriptions.cancel(String(r.stripe_subscription_id)); }
+      catch (e) { await selhalo('zrušení předplatného', String(r.stripe_subscription_id), e); }
+    }
+    if (r.stripe_customer_id) {
+      try { await st.customers.del(String(r.stripe_customer_id)); }
+      catch (e) { await selhalo('smazání zákazníka', String(r.stripe_customer_id), e); }
     }
   }
-  return null;
+  return varovani;
+}
+
+/** Id Stripe objektu (není osobní údaj) se při chybě uloží do protokolu; bez něj by zákazník po smazání teams nešel dohledat. */
+async function zapisStripeChybu(userId: number, detail: string) {
+  await audit(null, userId, 'ucet.stripe_chyba', 'user', userId, detail.slice(0, 250));
+}
+
+/** Soubory (blob) osoby mimo podnik a soubory smazaných podniků. Čte se PŘED mazáním řádků. */
+async function blobyKeSmazani(userId: number, teamIds: number[]): Promise<string[]> {
+  try {
+    const rows = await sql()`SELECT blob_path FROM uploads WHERE blob_path IS NOT NULL
+      AND ((team_id IS NULL AND user_id = ${userId}) OR team_id = ANY(${teamIds}))` as any[];
+    return rows.map(r => String(r.blob_path));
+  } catch { return []; }
+}
+
+async function smazBloby(cesty: string[]): Promise<string[]> {
+  if (!cesty.length) return [];
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return ['Soubory v úložišti se nepodařilo smazat (úložiště není nastavené). Napište podpoře.'];
+  try { await del(cesty); return []; }
+  catch (e) {
+    console.error('smazání účtu: smazání souborů z úložiště selhalo', cesty, e);
+    return ['Některé nahrané soubory se nepodařilo smazat z úložiště. Napište podpoře, dokončíme to ručně.'];
+  }
 }
 
 /**
@@ -82,10 +126,9 @@ export async function smazUcet(userId: number, volby: { smazatPodnik?: boolean; 
   if (!r.ok) return { ok: false, status: r.status, kod: r.kod, zprava: r.zprava, vlastnene };
 
   const prvniTym = r.smazatPodniky[0] ?? (u.team_id == null ? null : Number(u.team_id));
-  if (r.smazatPodniky.length) {
-    const chyba = await zrusPredplatne(r.smazatPodniky);
-    if (chyba) return { ok: false, status: 502, kod: 'PREDPLATNE', zprava: chyba };
-  }
+  // Stripe ještě před mazáním (ID leží v teams). Selhání smazání neblokuje, vrátí se jako varování; opakování je bezpečné.
+  const stripeVarovani = await uklidStripe(r.smazatPodniky, userId);
+  const bloby = await blobyKeSmazani(userId, r.smazatPodniky);
 
   // Protokol PŘED smazáním, dokud je co popsat; po smazání podniku by zápis s jeho team_id visel ve vzduchu.
   await audit(r.smazatPodniky.length ? null : prvniTym, userId, r.smazatPodniky.length ? 'podnik.smazan' : 'ucet.smazan', 'user', userId,
@@ -106,7 +149,7 @@ export async function smazUcet(userId: number, volby: { smazatPodnik?: boolean; 
     await proved(exec, [anonymizaceBezMigrace({ id: userId, role: String(u.role), hash })]);
   }
   zneplatniStav(userId);
-  return { ok: true, smazanePodniky: r.smazatPodniky.length };
+  return { ok: true, smazanePodniky: r.smazatPodniky.length, varovani: [...stripeVarovani, ...(await smazBloby(bloby))] };
 }
 
 /** Ověření hesla pro smazání: stejná odpověď u špatného hesla i u chybějícího účtu. */
