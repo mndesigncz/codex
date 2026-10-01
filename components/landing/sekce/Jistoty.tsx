@@ -1,31 +1,26 @@
-import { Icon } from '@/components/Icons';
-import Reveal from '../Reveal';
 import { JISTOTY } from '../obsah';
 
-// Jistoty: věci, na které se majitel ptá dřív než na cenu. Jeden panel, šest
-// položek (sudý počet: v mřížce po dvou ani po třech nezůstane osiřelá buňka).
+// Jistoty: věci, na které se majitel ptá dřív než na cenu. Šest položek na
+// vlasové mřížce, bez ikonových dlaždic a bez karet: nadpis a věta, nic, co by
+// hrálo důležitější roli než text. Sudý počet: ve dvou ani třech sloupcích
+// nezůstane osiřelá buňka.
 export default function Jistoty() {
   return (
-    <section id="jistoty" className="relative max-w-6xl mx-auto px-5 sm:px-8 pb-16 sm:pb-24" aria-labelledby="nadpis-jistoty">
-      <div className="max-w-xl">
-        <h2 id="nadpis-jistoty" className="text-2xl sm:text-4xl font-bold tracking-tight text-[#16181A]">Než se zeptáš na cenu</h2>
-        <p className="mt-3 text-base text-black/60 text-pretty">Věci, kvůli kterým podniky software mění a kvůli kterým ho zase opouštějí.</p>
-      </div>
-      <Reveal>
-        <ul className="mt-10 lgx rounded-[2rem] p-6 sm:p-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-9 list-none">
+    <section id="jistoty" className="ld-sekce" aria-labelledby="nadpis-jistoty">
+      <div className="ld-obsah">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-x-16 gap-y-6 items-end">
+          <h2 id="nadpis-jistoty" className="ld-h2">Než se zeptáš na cenu</h2>
+          <p className="ld-perex max-w-[40ch]">Věci, kvůli kterým podniky software mění a kvůli kterým ho zase opouštějí.</p>
+        </div>
+        <ul className="mt-14 sm:mt-20 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-10 list-none">
           {JISTOTY.map(j => (
-            <li key={j.title} className="flex items-start gap-4">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#C8F542]/25 text-[#5B7A08]">
-                <Icon name={j.icon} size={20} aria-hidden />
-              </span>
-              <div>
-                <h3 className="text-lg font-bold tracking-tight text-[#16181A]">{j.title}</h3>
-                <p className="mt-1.5 text-sm text-black/60 leading-relaxed text-pretty">{j.text}</p>
-              </div>
+            <li key={j.title} className="border-t border-[color:var(--ld-linka-2)] pt-7 pb-12">
+              <h3 className="text-xl font-semibold tracking-tight">{j.title}</h3>
+              <p className="ld-text mt-3 max-w-[38ch]">{j.text}</p>
             </li>
           ))}
         </ul>
-      </Reveal>
+      </div>
     </section>
   );
 }

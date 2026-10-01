@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import Foto from '../Foto';
 import SmyckaVideo from '../SmyckaVideo';
 import { DEN_MOMENTY } from '../obsah';
 import { NAHRAVKY } from '../nahravky';
@@ -9,61 +8,74 @@ import { NAHRAVKY } from '../nahravky';
 // Jeden den s podnikem: pět okamžiků od otevření po uzávěrku, každý s nahrávkou
 // ovládání skutečné aplikace.
 //
-// Od 1024 px jedna sticky kompozice: vlevo pět kroků, vpravo jeden rám, ve kterém
-// se podle kroku u středu obrazovky přepíná smyčka (ne cik-cak fotka/text, ne pět
-// stejných karet). Aktivní krok určuje IntersectionObserver; neaktivní smyčky se
-// nestahují. Pod 1024 px má každý okamžik vlastní smyčku pod textem.
-// Fotka je tu jen malý doplněk: říká, kde se to děje, nahrávka, co se děje.
+// Vlevo osa dne: velké časy, které se rozsvítí, jakmile jimi den projde, a linka,
+// která se při scrollu plní limetkou od 7:30 k právě čtenému okamžiku. Vpravo
+// (od 1024 px) jeden přilepený rám, ve kterém se přepíná smyčka podle kroku
+// u středu okna; neaktivní smyčky se nestahují. Pod 1024 px má každý okamžik
+// vlastní smyčku pod textem.
 export default function DenSPodnikem() {
   const [aktivni, setAktivni] = useState(0);
+  const [prosle, setProsle] = useState(0);
   const koren = useRef<HTMLDivElement>(null);
+  const osa = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const el = koren.current;
-    if (!el || !('IntersectionObserver' in window)) return;
-    const kroky = Array.from(el.querySelectorAll<HTMLElement>('[data-krok]'));
-    // Pás uprostřed okna: krok, který jím prochází, je aktivní.
-    const io = new IntersectionObserver(zaznamy => {
-      for (const z of zaznamy) if (z.isIntersecting) setAktivni(Number((z.target as HTMLElement).dataset.krok));
-    }, { rootMargin: '-42% 0px -42% 0px' });
-    kroky.forEach(k => io.observe(k));
-    return () => io.disconnect();
+    const o = osa.current;
+    if (!el || !o) return;
+    let snimek = 0;
+    const pocitej = () => {
+      snimek = 0;
+      const stred = window.innerHeight * 0.5;
+      const kroky = Array.from(el.querySelectorAll<HTMLElement>('[data-krok]'));
+      let akt = 0; let pr = 0;
+      kroky.forEach((k, i) => {
+        const r = k.getBoundingClientRect();
+        if (r.top <= stred) { akt = i; pr = i + 1; }
+      });
+      setAktivni(akt);
+      setProsle(pr);
+      const r = o.getBoundingClientRect();
+      const plneni = Math.min(1, Math.max(0, (stred - r.top) / r.height));
+      o.style.setProperty('--plneni', plneni.toFixed(4));
+    };
+    const naScroll = () => { if (!snimek) snimek = requestAnimationFrame(pocitej); };
+    pocitej();
+    window.addEventListener('scroll', naScroll, { passive: true });
+    window.addEventListener('resize', naScroll);
+    return () => { window.removeEventListener('scroll', naScroll); window.removeEventListener('resize', naScroll); if (snimek) cancelAnimationFrame(snimek); };
   }, []);
 
   const zkus = (scena: string) => () => window.dispatchEvent(new CustomEvent('managero:ukazka', { detail: { scena } }));
 
   return (
-    <section id="den" className="relative scroll-mt-24 pb-16 sm:pb-24" aria-labelledby="nadpis-den">
-      <div className="max-w-6xl mx-auto px-5 sm:px-8">
-        <div className="max-w-xl">
-          <h2 id="nadpis-den" className="text-2xl sm:text-4xl font-bold tracking-tight text-[#16181A]">Jeden den s Managerem</h2>
-          <p className="mt-3 text-base text-black/60 text-pretty">Od otevření po uzávěrku. Nahrávky jsou ze skutečné aplikace, s vymyšlenými daty.</p>
+    <section id="den" className="ld-sekce" aria-labelledby="nadpis-den">
+      <div className="ld-obsah">
+        <div className="max-w-[40rem]">
+          <h2 id="nadpis-den" className="ld-h2">Jeden den s Managerem</h2>
+          <p className="ld-perex mt-5">Od otevření po uzávěrku. Nahrávky jsou ze skutečné aplikace, s vymyšlenými daty.</p>
         </div>
 
-        <div ref={koren} className="ld-den mt-10 grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] gap-x-14" data-aktivni={aktivni}>
+        <div ref={koren} className="ld-den mt-14 sm:mt-20 grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-x-16" data-aktivni={aktivni}>
+          <div ref={osa} className="ld-den-osa">
+          <span className="ld-den-plneni" aria-hidden />
           <ol className="list-none">
             {DEN_MOMENTY.map((m, i) => (
-              <li key={m.cas} data-krok={i} className="py-8 lg:py-12 lg:min-h-[17rem] border-t border-black/[0.08] first:border-t-0 first:pt-0">
-                <div className="flex items-start gap-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                      <span className="chip chip-ink tabular-nums">{m.cas}</span>
-                      <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-[#16181A]">{m.title}</h3>
-                    </div>
-                    <p className="mt-3 text-sm sm:text-base text-black/60 leading-relaxed text-pretty max-w-[46ch]">{m.text}</p>
-                  </div>
-                  <Foto id={m.foto} pomer="aspect-[4/5]" className="hidden sm:block w-24 shrink-0" sizes="96px" paralax={false} />
-                </div>
+              <li key={m.cas} data-krok={i} data-prosly={i < prosle ? 'true' : 'false'} className="ld-den-krok py-10 lg:py-0">
+                <p className="ld-cas ld-cislo"><time>{m.cas}</time></p>
+                <h3 className="ld-h3 mt-4">{m.title}</h3>
+                <p className="ld-text mt-3 max-w-[42ch]">{m.text}</p>
                 {/* Telefon a tablet: smyčka přímo pod okamžikem. */}
-                <div className="mt-6 lg:hidden">
+                <div className="mt-8 lg:hidden">
                   <SmyckaVideo id={m.nahravka} onZkusit={zkus(NAHRAVKY[m.nahravka].scena)} />
                 </div>
               </li>
             ))}
           </ol>
+          </div>
 
           <div className="hidden lg:block">
-            <div className="sticky top-24 h-[36rem]">
+            <div className="sticky top-[calc(50vh-19rem)] h-[38rem]">
               {DEN_MOMENTY.map((m, i) => (
                 <div key={m.nahravka} data-scena={i} inert={aktivni !== i}
                   className="absolute inset-0 flex items-center justify-center">

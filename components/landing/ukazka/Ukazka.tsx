@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Segmented } from '@/components/ui/Segmented';
+import Prepinac from '../Prepinac';
 import {
   jeIdSceny, krokyPro, LOGICKY_ROZMER, REAKCE_NA_AKCI, ROLE_UKAZKY, SCENY_UKAZKY, ZARIZENI_UKAZKY,
   type IdSceny, type RoleUkazky, type ZarizeniUkazky,
@@ -196,8 +196,9 @@ export default function Ukazka({ pocatecniScena = 'prehled' }: { pocatecniScena?
       const x = (r.left + r.width / 2) * skala;
       const y = (r.top + r.height / 2) * skala;
       const bw = Math.min(W * 0.7, 240, k.text.length * 7 + 28);
-      const podNim = y + (r.height / 2) * skala + 18 + 44 < H;
-      const by = podNim ? y + (r.height / 2) * skala + 14 : Math.max(8, y - (r.height / 2) * skala - 14 - 44);
+      // Bublina radši nad prvkem: kurzor pod ní pak na prvek ukazuje zhora a nepřekrývá ho.
+      const nadNim = y - (r.height / 2) * skala - 14 - 44 > 8;
+      const by = nadNim ? y - (r.height / 2) * skala - 14 - 36 : y + (r.height / 2) * skala + 14;
       const bx = Math.min(Math.max(8, x - bw / 2), W - bw - 8);
       setCoach(p => (p && Math.abs(p.x - x) < 0.5 && Math.abs(p.y - y) < 0.5 && p.text === k.text && Math.abs(p.bx - bx) < 0.5 ? p : { x, y, bx, by, text: k.text }));
     };
@@ -244,10 +245,20 @@ export default function Ukazka({ pocatecniScena = 'prehled' }: { pocatecniScena?
   // ať se s ukázkou nemusí sdílet stav ani importovat komponenta.
   const zvolRef = useRef(zvolScenu);
   zvolRef.current = zvolScenu;
+  // Jeviště, které jede se stránkou, přepíná scénu potichu (`tichy`): ukázka
+  // je v tu chvíli vidět, takže se nikam neroluje, a stejná scéna se znovu
+  // nenačítá, ať člověku nezahodí, co si v ní právě naklikal.
+  const scenaRef = useRef(scena);
+  scenaRef.current = scena;
   useEffect(() => {
     const h = (e: Event) => {
-      const id = (e as CustomEvent<{ scena?: unknown }>).detail?.scena;
+      const d = (e as CustomEvent<{ scena?: unknown; tichy?: unknown }>).detail;
+      const id = d?.scena;
       if (!jeIdSceny(id)) return;
+      if (d?.tichy) {
+        if (id !== scenaRef.current) zvolRef.current(id);
+        return;
+      }
       zvolRef.current(id);
       const bezPohybu = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       korenRef.current?.scrollIntoView({ behavior: bezPohybu ? 'auto' : 'smooth', block: 'start' });
@@ -262,38 +273,28 @@ export default function Ukazka({ pocatecniScena = 'prehled' }: { pocatecniScena?
     : popisScena.zkus);
 
   return (
-    <div ref={korenRef} id="ukazka-okno" className="relative max-w-6xl mx-auto px-5 sm:px-8 pb-12 sm:pb-16 scroll-mt-24"
+    <div ref={korenRef} id="ukazka-okno" className="relative scroll-mt-20"
       onPointerDownCapture={() => aktivuj()} onFocusCapture={() => aktivuj()}>
-      {/* Ovládání. Do mountu je neviditelné (visibility zachová místo, takže
-          se po hydrataci nic neposune) a bez skriptu by stejně nic nedělalo. */}
-      <div className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-3 ${mounted ? '' : 'invisible'}`} aria-hidden={!mounted}>
-        <Segmented size="sm" ariaLabel="Scéna ukázky" value={scena} onChange={zvolScenu}
-          options={SCENY_UKAZKY.map(s => ({ id: s.id, label: s.label }))} />
-        <div className="flex flex-wrap items-center gap-2">
-          {scena !== 'kiosk' && (
-            <Segmented size="sm" ariaLabel="Role v ukázce" value={scenaVeZvoleneRoli as RoleUkazky} onChange={zvolRoli}
-              options={ROLE_UKAZKY} />
-          )}
-          <div className="hidden md:block">
-            <Segmented size="sm" ariaLabel="Zařízení" value={ucinne} onChange={(v) => { setZar(v as ZarizeniUkazky); aktivuj(); }}
-              options={ZARIZENI_UKAZKY} />
-          </div>
-          <button type="button" onClick={zacitZnovu} className="btn btn-secondary btn-sm">Začít znovu</button>
-        </div>
+      {/* Přepínač scén nad rámem. Do mountu neviditelný (visibility drží místo,
+          po hydrataci se nic neposune), bez skriptu by nic nedělal. */}
+      <div className={`flex justify-center ${mounted ? '' : 'invisible'}`} aria-hidden={!mounted}>
+        <Prepinac popis="Scéna ukázky" hodnota={scena} onZmena={zvolScenu}
+          moznosti={SCENY_UKAZKY.map(s => ({ id: s.id, label: s.label }))} />
       </div>
 
-      <a href="#funkce" className="sr-only focus:not-sr-only focus:absolute focus:z-10 focus:mt-2 btn btn-secondary btn-sm">Přeskočit ukázku</a>
+      <a href="#funkce" className="sr-only focus:not-sr-only focus:absolute focus:z-10 focus:mt-2 ld-btn ld-btn-sm ld-btn-svetle">Přeskočit ukázku</a>
 
-      <section aria-label="Ukázka aplikace s vymyšlenými daty" aria-busy={faze === 'nacita'} className="mt-5 ld-okno">
+      <section aria-label="Ukázka aplikace s vymyšlenými daty" aria-busy={faze === 'nacita'} className="relative mt-4 ld-okno">
+        <div className="ld-svetlo" aria-hidden />
         <div className="ld-stage">
-        {/* Na telefonu vždy `auto` (= rám telefonu z CSS): zvolené „zařízení" se tam nenabízí,
-            a scéna, která by chtěla počítač, by jinak rozbalila široký rám do úzkého okna. */}
+        {/* Na telefonu vždy `auto` (= rám telefonu z CSS): scéna, která chce
+            počítač, by jinak rozbalila široký rám do úzkého okna. */}
         <div className="ld-ram" data-zar={mobil || zar === 'auto' ? 'auto' : zar}>
           <div ref={obrazovka} className="ld-obrazovka">
             {/* Plakát: skutečný snímek první scény, v HTML hned (LCP). Pod iframem zůstává. */}
             <picture>
               <source media="(max-width: 767px)" srcSet="/brand/landing/rec/hero-prehled-telefon.webp" />
-              <img src="/brand/landing/rec/hero-prehled-pocitac.webp" alt="" width={1100} height={690}
+              <img src="/brand/landing/rec/hero-prehled-pocitac.webp" alt="" width={2420} height={1518}
                 fetchPriority="high" decoding="async" draggable={false} />
             </picture>
 
@@ -311,7 +312,7 @@ export default function Ukazka({ pocatecniScena = 'prehled' }: { pocatecniScena?
                 style={coach ? { ['--x' as string]: `${coach.x}px`, ['--y' as string]: `${coach.y}px` } : undefined}>
                 <span className="ld-coach-kruh" />
                 <svg width="26" height="26" viewBox="0 0 28 28" className="relative">
-                  <path d="M5 3l16 9.2-7 1.9-3.6 6.6z" fill="var(--ink)" stroke="#fff" strokeWidth="1.6" strokeLinejoin="round" />
+                  <path d="M5 3l16 9.2-7 1.9-3.6 6.6z" fill="#16181A" stroke="#fff" strokeWidth="1.6" strokeLinejoin="round" />
                 </svg>
               </div>
               <div className="ld-coach-bublina" data-skryt={coach ? 'false' : 'true'}
@@ -319,7 +320,7 @@ export default function Ukazka({ pocatecniScena = 'prehled' }: { pocatecniScena?
                 {coach?.text}
               </div>
               {reakce && (
-                <div className="absolute left-1/2 top-3 -translate-x-1/2 max-w-[88%] rounded-full bg-[var(--ink)] px-3.5 py-2 text-[0.8125rem] font-semibold text-white shadow-[shadow:var(--shadow-float)] text-center">
+                <div className="absolute left-1/2 top-3 -translate-x-1/2 max-w-[88%] rounded-full bg-[#16181A] px-3.5 py-2 text-[0.8125rem] font-semibold text-white shadow-[0_10px_28px_-8px_rgba(0,0,0,0.5)] text-center">
                   {reakce}
                 </div>
               )}
@@ -327,15 +328,15 @@ export default function Ukazka({ pocatecniScena = 'prehled' }: { pocatecniScena?
 
             {/* Ukázka se sama nespouští (vypnutý pohyb, úsporný přenos): tlačítko. */}
             {faze === 'plakat' && mounted && rucni && (
-              <div className="absolute inset-0 z-[4] grid place-items-center bg-white/40">
-                <button type="button" onClick={() => aktivuj()} className="btn btn-primary btn-lg">Spustit živou ukázku</button>
+              <div className="absolute inset-0 z-[4] grid place-items-center bg-[#16181A]/35">
+                <button type="button" onClick={() => aktivuj()} className="ld-btn ld-btn-svetle">Spustit živou ukázku</button>
               </div>
             )}
             {faze === 'nacita' && !videt && (
-              <p className="absolute bottom-3 left-1/2 z-[4] -translate-x-1/2 rounded-full bg-[var(--ink)] px-3 py-1.5 text-xs font-semibold text-white">Načítám ukázku</p>
+              <p className="absolute bottom-3 left-1/2 z-[4] -translate-x-1/2 rounded-full bg-[#16181A] px-3 py-1.5 text-xs font-semibold text-white">Načítám ukázku</p>
             )}
             {faze === 'selhalo' && (
-              <div className="absolute inset-0 z-[4] grid place-items-center bg-white/70 p-4 text-center">
+              <div className="absolute inset-0 z-[4] grid place-items-center bg-[#F3F4F0]/80 p-4 text-center">
                 <div>
                   <p className="text-sm font-semibold text-[#16181A]">Ukázka se nenačetla.</p>
                   <p className="mt-1 text-sm text-black/60">Podívej se na nahrávky níž, nebo to zkus znovu.</p>
@@ -350,11 +351,25 @@ export default function Ukazka({ pocatecniScena = 'prehled' }: { pocatecniScena?
         </div>
         </div>
 
-        <div className="mt-4 flex flex-col items-start gap-y-2 lg:flex-row lg:justify-between lg:gap-x-4">
-          {/* Výška na dva (na telefonu čtyři) řádky: věty se mezi scénami liší délkou a
-              každé přepnutí by jinak posunulo všechno pod ukázkou. */}
-          <p role="status" aria-live="polite" className="max-w-[60ch] min-h-[5rem] sm:min-h-[2.75rem] text-sm text-black/65 text-pretty">{vetaDole}</p>
-          <span className="chip chip-muted shrink-0">Ukázková data, nic se neukládá ani neodesílá</span>
+        {/* Pod rámem: co si tu zkusit (a co se právě stalo), vpravo role,
+            zařízení a začít znovu. Výška na dva (na telefonu čtyři) řádky:
+            věty se liší délkou a přepnutí by jinak posunulo stránku. */}
+        <div className="ld-dok-utlum mt-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
+          <div className="min-w-0">
+            <p role="status" aria-live="polite" className="max-w-[58ch] min-h-[5rem] sm:min-h-[2.75rem] text-[0.9375rem] leading-snug text-[color:var(--ld-text-2)] text-pretty">{vetaDole}</p>
+            <p className="mt-1.5 text-xs text-[color:var(--ld-text-3)]">Ukázková data, nic se neukládá ani neodesílá</p>
+          </div>
+          <div className={`flex flex-wrap items-center gap-2 shrink-0 ${mounted ? '' : 'invisible'}`} aria-hidden={!mounted}>
+            {scena !== 'kiosk' && (
+              <Prepinac ton="tichy" velikost="sm" popis="Role v ukázce" hodnota={scenaVeZvoleneRoli as RoleUkazky} onZmena={zvolRoli}
+                moznosti={ROLE_UKAZKY} />
+            )}
+            <div className="hidden md:block">
+              <Prepinac ton="tichy" velikost="sm" popis="Zařízení" hodnota={ucinne} onZmena={(v) => { setZar(v as ZarizeniUkazky); aktivuj(); }}
+                moznosti={ZARIZENI_UKAZKY} />
+            </div>
+            <button type="button" onClick={zacitZnovu} className="ld-btn ld-btn-sm ld-btn-obrys">Začít znovu</button>
+          </div>
         </div>
       </section>
     </div>

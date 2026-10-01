@@ -110,16 +110,16 @@ export default function SmyckaVideo({ id, velky = false, priorita = false, povol
         </div>
       </div>
       {/* Úsporný režim: poctivě řekni, proč se nic nehýbe. */}
-      {uspora && ruc === null && <p className="mt-2 text-center text-xs text-black/55">Nahrávka se nepřehrává sama. Spustíš ji tlačítkem pod rámem.</p>}
+      {uspora && ruc === null && <p className="mt-2 text-center text-xs text-[color:var(--ld-text-3)]">Nahrávka se nepřehrává sama. Spustíš ji tlačítkem pod rámem.</p>}
       {/* Ovládání mimo obraz: tlačítko přes aplikaci by zakrývalo, co se právě ukazuje. */}
       <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-        <button type="button" onClick={prepni} className="btn btn-ghost btn-sm inline-flex items-center gap-2">
+        <button type="button" onClick={prepni} className="ld-btn ld-btn-sm text-[color:var(--ld-text-2)] hover:text-[color:var(--ld-papir)]">
           <svg width="12" height="12" viewBox="0 0 14 14" aria-hidden fill="currentColor">
             {bezi ? <path d="M3 2h2.6v10H3zM8.4 2H11v10H8.4z" /> : <path d="M4 2.2v9.6L11.6 7z" />}
           </svg>
           {bezi ? 'Pozastavit' : 'Přehrát'}
         </button>
-        {onZkusit && <button type="button" onClick={onZkusit} className="btn btn-secondary btn-sm">Zkus to sám v ukázce</button>}
+        {onZkusit && <button type="button" onClick={onZkusit} className="ld-btn ld-btn-sm ld-btn-obrys">Zkus to sám v ukázce</button>}
       </div>
     </figure>
   );

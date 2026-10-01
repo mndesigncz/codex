@@ -10,7 +10,6 @@ import { czCount, czForm, DEN, type CzNoun } from '@/lib/czech';
 import { LIMITS, TRIAL_DAYS } from '@/lib/plan';
 import type { IconName } from '@/components/Icons';
 import type { IdNahravky } from './nahravky';
-import type { FotoId } from './foto';
 import type { IdSceny } from './ukazka/scenare';
 
 const CLOVEK_DO: CzNoun = { one: 'člověka', few: 'lidí', many: 'lidí' };
@@ -21,9 +20,7 @@ export const ZDARMA_VETA = `Tým do ${ZDARMA_CLENU} ${czForm(ZDARMA_CLENU, CLOVE
 
 export const HERO = {
   h1: 'Směny, sklad a uzávěrka bez Excelu a bez WhatsAppu.',
-  podtitulek:
-    'Managero je aplikace pro kavárny, restaurace a bary. Rozvrh, docházka, sklad, uzávěrky a úkoly jsou na jednom místě a v telefonu celého týmu. Ukázka níž je skutečná aplikace: zkus si ji sám.',
-  druhe: 'Vyzkoušet přímo tady',
+  podtitulek: 'Ukázka níž je skutečná aplikace. Zkus si ji sám.',
   mikro: `Registrace bez karty. ${ZDARMA_VETA}`,
 };
 
@@ -39,7 +36,7 @@ export interface Funkce {
 export const FUNKCE: Funkce[] = [
   { icon: 'calendar', title: 'Rozvrh a směny', scena: 'rozvrh',
     text: 'Generátor navrhne směny podle dostupnosti. Kolize řekne dřív, než rozvrh zveřejníš.' },
-  { icon: 'clock', title: 'Docházka',
+  { icon: 'clock', title: 'Docházka', scena: 'kiosk',
     text: 'Příchod klepnutím na telefonu nebo tabletu. Hodiny a mzdové náklady se sečtou samy.' },
   { icon: 'coins', title: 'Uzávěrky', scena: 'uzaverka',
     text: 'Kasa po bankovkách. Rozdíl se nezamlčí ani nezaokrouhlí a povinné věci uzávěrku drží zamčenou.' },
@@ -47,7 +44,7 @@ export const FUNKCE: Funkce[] = [
     text: 'Minima a nákupní seznam. Objednávka pro dodavatele jde rovnou z aplikace.' },
   { icon: 'cup', title: 'Receptury',
     text: 'Cena receptury spočítaná ze surovin na gramy a marže na první pohled.' },
-  { icon: 'clipboard', title: 'Úkoly a postupy',
+  { icon: 'clipboard', title: 'Úkoly a postupy', scena: 'uzaverka',
     text: 'Otevírací a zavírací postupy, úkoly i návody pro nováčky. Co je povinné, hlídá aplikace.' },
   { icon: 'chat', title: 'Týmový chat',
     text: 'Kanály, přímé zprávy a ankety. Důležitá věc nezapadne ve skupině.' },
@@ -63,19 +60,18 @@ export interface Moment {
   title: string;
   text: string;
   nahravka: IdNahravky;
-  foto: FotoId;
 }
 
 export const DEN_MOMENTY: Moment[] = [
-  { cas: '7:30', title: 'Otevření bez přemýšlení', nahravka: 'kiosk', foto: 'v2-majitel',
+  { cas: '7:30', title: 'Otevření bez přemýšlení', nahravka: 'kiosk',
     text: 'Otevírací postup a úkoly se odškrtávají na tabletu u baru. Stačí klepnout na jméno, žádné heslo.' },
-  { cas: '9:00', title: 'Rozvrh, který má tým v telefonu', nahravka: 'rozvrh', foto: 'v2-tym',
+  { cas: '9:00', title: 'Rozvrh, který má tým v telefonu', nahravka: 'rozvrh',
     text: 'Rozvrh se nechá navrhnout podle dostupnosti lidí. Po publikování ho má každý v telefonu i v kalendáři.' },
-  { cas: '11:00', title: 'Sklad se hlídá sám', nahravka: 'sklad', foto: 'v2-sklad',
+  { cas: '11:00', title: 'Sklad se hlídá sám', nahravka: 'sklad',
     text: 'Když něco dochází, nákupní seznam je poskládaný. Objednávky pro dodavatele vzniknou jedním kliknutím.' },
-  { cas: '16:00', title: 'Majitel v kapse', nahravka: 'togo', foto: 'v2-telefon',
+  { cas: '16:00', title: 'Majitel v kapse', nahravka: 'togo',
     text: 'Přehled dne, docházející zásoby i rozvrh v telefonu. Pár ťuknutí, i když nejste v podniku.' },
-  { cas: '22:00', title: 'Uzávěrka, která sedí', nahravka: 'ukol-uzaverka', foto: 'v2-uzaverka',
+  { cas: '22:00', title: 'Uzávěrka, která sedí', nahravka: 'ukol-uzaverka',
     text: 'Uzávěrka se neodemkne, dokud nejsou hotové povinné věci. Kasa se počítá po bankovkách a každý rozdíl má vysvětlení.' },
 ];
 
@@ -104,14 +100,8 @@ export const KROKY: { n: string; icon: IconName; title: string; text: string }[]
     text: 'Generátor rozvrh navrhne podle dostupnosti, ty ho projdeš a zveřejníš. Od té chvíle nikdo nevolá, kdy má zítra.' },
 ];
 
-export const TYPY_PODNIKU: { id: FotoId; label: string }[] = [
-  { id: 'podnik-kavarna', label: 'Kavárna' },
-  { id: 'podnik-restaurace', label: 'Restaurace' },
-  { id: 'podnik-bar', label: 'Bar' },
-  { id: 'podnik-pekarna', label: 'Pekárna' },
-  { id: 'podnik-caj', label: 'Čaj a nápoje' },
-  { id: 'podnik-foodtruck', label: 'Food truck' },
-];
+// Typy podniků, ze kterých se vybírá v prvním kroku průvodce nastavením.
+export const TYPY_PODNIKU: string[] = ['Kavárna', 'Restaurace', 'Bar', 'Pekárna', 'Čaj a nápoje', 'Food truck'];
 
 // ——— Jistoty ——————————————————————————————————————————————
 export const JISTOTY: { icon: IconName; title: string; text: string }[] = [
@@ -138,4 +128,4 @@ export const FAQ: { q: string; a: string }[] = [
 ];
 
 export const PATICKA_POCTIVOST =
-  'Fotografie na této stránce jsou ilustrační a nezobrazují konkrétní podniky ani zákazníky. Obrazovky a nahrávky jsou ze skutečné aplikace, data v nich jsou vymyšlená.';
+  'Obrazovky, ukázka i nahrávky na této stránce jsou ze skutečné aplikace. Data v nich jsou vymyšlená a nepatří žádnému podniku ani zákazníkovi.';

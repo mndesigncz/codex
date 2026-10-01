@@ -1,59 +1,48 @@
 import Link from 'next/link';
 import { Icon } from '@/components/Icons';
-import Foto from '../Foto';
-import Reveal from '../Reveal';
 import { KROKY, TYPY_PODNIKU } from '../obsah';
 
-// Jak začít: tři kroky v jednom panelu s linkou. Tři stejné karty vedle sebe
-// jsou nejčastější šablona na webu; číslo je velké a tlumené, aby pořadí bylo
-// vidět, ne aby křičelo. Vpravo typy podniků, ze kterých se vybírá v prvním kroku
-// (stejné fotky jako v průvodci nastavením).
+// Jak začít: tři kroky vedle sebe na jedné lince, jako kolejnice, po které
+// se jede zleva doprava. Pořadí tu nese informaci (nejdřív podnik, pak tým,
+// pak rozvrh), proto jsou čísla velká; ikony ani karty nejsou potřeba.
+// Pod prvním krokem typy podniků, ze kterých se v průvodci vybírá.
 //
 // Čas se tu záměrně neslibuje číslem: „za 5 minut" tvrdit, dokud průvodce není
-// změřený, by bylo vymyšlené. Stojí tu, co se dá ověřit: tři kroky, jeden kód,
-// bez schůzky a bez implementace.
+// změřený, by bylo vymyšlené.
 export default function JakZacit() {
   return (
-    <section id="zacatek" className="relative max-w-6xl mx-auto px-5 sm:px-8 pb-16 sm:pb-24 scroll-mt-24" aria-labelledby="nadpis-zacatek">
-      <div className="max-w-xl">
-        <h2 id="nadpis-zacatek" className="text-2xl sm:text-4xl font-bold tracking-tight text-[#16181A]">Jak se začíná</h2>
-        <p className="mt-3 text-base text-black/60 text-pretty">Tři kroky. Bez schůzky, bez implementace a bez toho, aby se celý tým musel něco učit.</p>
-      </div>
-      <Reveal>
-        <div className="mt-10 grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] gap-10 lg:gap-14 items-start">
-          <ol className="list-none relative">
-            {KROKY.map((k, i) => (
-              <li key={k.n} className="relative flex gap-5 pb-9 last:pb-0">
-                {/* Linka mezi kroky. */}
-                {i < KROKY.length - 1 && <span className="absolute left-[1.4rem] top-12 bottom-1 w-px bg-black/[0.12]" aria-hidden />}
-                <span className="relative z-[1] flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#16181A] text-sm font-bold text-white tabular-nums">{k.n}</span>
-                <div className="pt-0.5">
-                  <h3 className="text-lg font-bold tracking-tight text-[#16181A] flex items-center gap-2">
-                    {k.title}
-                    <Icon name={k.icon} size={17} className="text-[#5B7A08]" aria-hidden />
-                  </h3>
-                  <p className="mt-1.5 text-sm sm:text-base text-black/60 leading-relaxed text-pretty max-w-[44ch]">{k.text}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
-
-          <div>
-            <p className="t-label text-black/50">V prvním kroku si vybereš typ podniku</p>
-            <ul className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3 list-none">
-              {TYPY_PODNIKU.map(t => (
-                <li key={t.id}>
-                  <Foto id={t.id} pomer="aspect-[4/3]" sizes="(max-width: 640px) 44vw, 14rem" paralax={false} />
-                  <p className="mt-1.5 text-sm font-semibold text-[#16181A]">{t.label}</p>
-                </li>
-              ))}
-            </ul>
-            <Link href="/register" className="pressable mt-6 btn btn-primary btn-lg inline-flex w-full sm:w-auto items-center justify-center gap-2 active:scale-[0.97]">
-              Založit podnik <Icon name="chevron" size={15} className="-rotate-90" />
-            </Link>
-          </div>
+    <section id="zacatek" className="ld-sekce" aria-labelledby="nadpis-zacatek">
+      <div className="ld-obsah">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-x-16 gap-y-6 items-end">
+          <h2 id="nadpis-zacatek" className="ld-h2">Jak se začíná</h2>
+          <p className="ld-perex max-w-[40ch]">Tři kroky. Bez schůzky, bez implementace a bez toho, aby se celý tým musel něco učit.</p>
         </div>
-      </Reveal>
+
+        <ol className="mt-14 sm:mt-20 grid grid-cols-1 md:grid-cols-3 gap-x-10 list-none border-t border-[color:var(--ld-linka-2)]">
+          {KROKY.map((k, i) => (
+            <li key={k.n} className="relative pt-8 pb-10 md:pb-0 border-b md:border-b-0 border-[color:var(--ld-linka)]">
+              {/* Bod na lince: tady krok začíná. */}
+              <span className="absolute -top-[5px] left-0 h-[9px] w-[9px] rounded-full bg-[color:var(--ld-papir)]" aria-hidden />
+              <p className="ld-cislo text-[clamp(3rem,5vw,4.5rem)] font-bold leading-none tracking-[-0.04em] text-[rgba(243,244,240,0.3)]" aria-hidden>{k.n}</p>
+              <h3 className="ld-h3 mt-6">{k.title}</h3>
+              <p className="ld-text mt-3 max-w-[36ch]">{k.text}</p>
+              {i === 0 && (
+                <ul className="mt-6 flex flex-wrap gap-2 list-none" aria-label="Typy podniků v prvním kroku">
+                  {TYPY_PODNIKU.map(t => (
+                    <li key={t} className="rounded-full px-3 py-1.5 text-[0.8125rem] font-medium text-[color:var(--ld-text-2)] shadow-[inset_0_0_0_1px_var(--ld-linka-2)]">{t}</li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          ))}
+        </ol>
+
+        <div className="mt-14">
+          <Link href="/register" className="ld-btn ld-btn-svetle w-full sm:w-auto">
+            Založit podnik <Icon name="chevron" size={15} className="ld-sipka -rotate-90" aria-hidden />
+          </Link>
+        </div>
+      </div>
     </section>
   );
 }
