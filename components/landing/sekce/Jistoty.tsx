@@ -1,4 +1,5 @@
 import { Icon } from '@/components/Icons';
+import { formatMoney } from '@/lib/money';
 import VObraze from '../VObraze';
 import { JISTOTY } from '../obsah';
 
@@ -87,7 +88,7 @@ function Mena() {
       </div>
       <div className="mt-2.5 flex items-center justify-between text-[11px]">
         <span className="font-semibold">Tržba dnes</span>
-        <span className="ld-cislo font-bold">16 480 Kč</span>
+        <span className="ld-cislo font-bold">{formatMoney(16480, 'CZK')}</span>
       </div>
     </div>
   );

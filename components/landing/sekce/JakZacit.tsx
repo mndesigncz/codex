@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Icon } from '@/components/Icons';
 import VObraze from '../VObraze';
 import { KROKY, TYPY_PODNIKU } from '../obsah';
+import { zkratkyDnu } from '@/lib/week';
 
 // Jak začít: tři kroky, a u každého malá obrazovka, ve které se ten krok
 // opravdu stane. Na jevišti svítí jen aplikace, takže i tady nese sdělení
@@ -15,7 +16,6 @@ import { KROKY, TYPY_PODNIKU } from '../obsah';
 
 const KOD = ['K', '7', 'M', '2', 'Q', 'X'];
 const PRIPOJENI = [{ jmeno: 'Petra Marešová', emoji: '🧑‍🍳' }, { jmeno: 'Tomáš Dvořák', emoji: '🧔' }, { jmeno: 'Eliška Nováková', emoji: '👩' }];
-const DNY = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];
 // Směny v týdnu: [den od, den do) a barva typu směny (barvy směn z aplikace).
 const RADKY: { jmeno: string; smeny: { od: number; do: number; barva: string }[] }[] = [
   { jmeno: 'Eliška', smeny: [{ od: 0, do: 2, barva: '#C8F542' }, { od: 4, do: 6, barva: '#FCD34D' }] },
@@ -71,7 +71,7 @@ function ObrazovkaRozvrh() {
       </div>
       <div className="ld-tyden mt-3" role="img" aria-label="Rozvrh na týden se směnami tří lidí">
         <span />
-        {DNY.map(d => <span key={d} className="ld-tyden-den">{d}</span>)}
+        {zkratkyDnu(1).map(d => <span key={d} className="ld-tyden-den">{d}</span>)}
         {RADKY.map((r, ri) => (
           <div key={r.jmeno} className="contents">
             <span className="ld-tyden-jmeno">{r.jmeno}</span>
