@@ -5,7 +5,7 @@ import { HERO } from '../obsah';
 // vidět. Velká věta, jedno limetkové tlačítko a pod ním, co to stojí na začátku.
 export default function ZaverecneCta() {
   return (
-    <section className="ld-sekce pb-[var(--ld-rytmus)]" aria-labelledby="nadpis-cta">
+    <section className="ld-sekce ld-zaver pb-[var(--ld-rytmus)]" data-radek="22:00" aria-labelledby="nadpis-cta">
       <div className="ld-obsah relative text-center">
         <div className="ld-svetlo !top-[-10%]" aria-hidden />
         <h2 id="nadpis-cta" className="ld-h1 mx-auto max-w-[13em]">Zítřejší směna už může viset v aplikaci.</h2>

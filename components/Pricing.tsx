@@ -65,9 +65,9 @@ export default function Pricing() {
   const mesicne = (p: 'pro' | 'max') => `${Math.round(PRICES[p][interval === 'year' ? 'year' : 'month'] / (interval === 'year' ? 12 : 1))} Kč/měs`;
 
   return (
-    <section id="cenik" className="ld-sekce" aria-labelledby="nadpis-cenik">
+    <section id="cenik" className="ld-sekce" data-radek="Ceník" aria-labelledby="nadpis-cenik">
       <div className="ld-obsah">
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-x-16 gap-y-6 items-end">
+        <div className="ld-split grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-x-16 gap-y-6 items-end">
           <h2 id="nadpis-cenik" className="ld-h2">Jednoduchý ceník</h2>
           <div className="flex flex-col items-start gap-5">
             <p className="ld-perex max-w-[40ch]">
@@ -81,7 +81,7 @@ export default function Pricing() {
 
         {/* Tarify. Pro je jediná světlá karta: na jevišti svítí jen to, co
             doporučujeme, stejně jako nahoře svítí jen aplikace. */}
-        <div className="mt-14 sm:mt-20 grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-5 items-stretch">
+        <div className="ld-tarify mt-14 sm:mt-20 grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-5 items-stretch">
           {KARTY.map(k => {
             const pro = k.id === 'pro';
             const c = k.id === 'free' ? null : cena(k.id);
@@ -119,7 +119,7 @@ export default function Pricing() {
         {/* Srovnání: od 768 px tabulka se sloupcem Pro podbarveným v celé výšce,
             na telefonu seznam (u každé funkce tři tarify pod sebou), protože tři
             sloupce v 390 px by uřízly Max. */}
-        <div className="mt-16">
+        <div className="ld-bunka mt-16">
           <h3 className="text-lg font-semibold tracking-tight">Srovnání tarifů</h3>
           <table className="ld-srovnani mt-6 hidden md:table w-full text-[0.9375rem] border-separate border-spacing-0">
             <thead>

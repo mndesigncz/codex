@@ -12,15 +12,15 @@ import { MISTO, MISTO_PATA } from '../obsah';
 // sloupce skládají pod sebe a každá buňka nese svůj štítek.
 export default function MistoCeho() {
   return (
-    <section id="misto" className="ld-sekce" aria-labelledby="nadpis-misto">
+    <section id="misto" className="ld-sekce" data-radek="Místo čeho" aria-labelledby="nadpis-misto">
       <div className="ld-limetka py-[clamp(4.5rem,9vw,8.5rem)]">
         <div className="ld-obsah">
-          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-x-16 gap-y-6 items-end">
+          <div className="ld-split grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-x-16 gap-y-6 items-end">
             <h2 id="nadpis-misto" className="ld-h2">Excel, WhatsApp a sešit, nebo Managero</h2>
             <p className="text-[clamp(1.0625rem,1.5vw,1.375rem)] leading-snug text-[rgba(22,24,26,0.78)] max-w-[40ch] text-pretty">Managero se neměří tím, kolik toho umí, ale tím, co po jeho zapnutí z provozu zmizí.</p>
           </div>
 
-          <div role="table" aria-label="Dnešní řešení a Managero" className="mt-14">
+          <div role="table" aria-label="Dnešní řešení a Managero" className="ld-bunka mt-14">
             <div role="row" className="sr-only md:not-sr-only md:grid md:grid-cols-[10rem_minmax(0,1fr)_minmax(0,1fr)] md:gap-x-10 pb-4">
               <div role="columnheader" className="text-sm font-semibold text-[rgba(22,24,26,0.72)]">Oblast</div>
               <div role="columnheader" className="text-sm font-semibold text-[rgba(22,24,26,0.72)]">Dnes: Excel, WhatsApp, sešit</div>
@@ -40,7 +40,7 @@ export default function MistoCeho() {
             ))}
           </div>
 
-          <div className="mt-12 grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-x-16 gap-y-3">
+          <div className="ld-split mt-12 grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-x-16 gap-y-3">
             <p className="text-lg font-bold tracking-tight text-pretty lg:col-start-2">{MISTO_PATA.hlavni}</p>
             <p className="text-[0.9375rem] text-[rgba(22,24,26,0.74)] text-pretty lg:col-start-2">{MISTO_PATA.vedlejsi}</p>
           </div>

@@ -11,14 +11,14 @@ import { KROKY, TYPY_PODNIKU } from '../obsah';
 // změřený, by bylo vymyšlené.
 export default function JakZacit() {
   return (
-    <section id="zacatek" className="ld-sekce" aria-labelledby="nadpis-zacatek">
+    <section id="zacatek" className="ld-sekce" data-radek="Začátek" aria-labelledby="nadpis-zacatek">
       <div className="ld-obsah">
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-x-16 gap-y-6 items-end">
+        <div className="ld-split grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-x-16 gap-y-6 items-end">
           <h2 id="nadpis-zacatek" className="ld-h2">Jak se začíná</h2>
           <p className="ld-perex max-w-[40ch]">Tři kroky. Bez schůzky, bez implementace a bez toho, aby se celý tým musel něco učit.</p>
         </div>
 
-        <ol className="mt-14 sm:mt-20 grid grid-cols-1 md:grid-cols-3 gap-x-10 list-none border-t border-[color:var(--ld-linka-2)]">
+        <ol className="ld-split ld-kroky mt-14 sm:mt-20 grid grid-cols-1 md:grid-cols-3 gap-x-10 list-none border-t border-[color:var(--ld-linka-2)]">
           {KROKY.map((k, i) => (
             <li key={k.n} className="relative pt-8 pb-10 md:pb-0 border-b md:border-b-0 border-[color:var(--ld-linka)]">
               {/* Bod na lince: tady krok začíná. */}
@@ -37,7 +37,7 @@ export default function JakZacit() {
           ))}
         </ol>
 
-        <div className="mt-14">
+        <div className="ld-bunka mt-14">
           <Link href="/register" className="ld-btn ld-btn-svetle w-full sm:w-auto">
             Založit podnik <Icon name="chevron" size={15} className="ld-sipka -rotate-90" aria-hidden />
           </Link>

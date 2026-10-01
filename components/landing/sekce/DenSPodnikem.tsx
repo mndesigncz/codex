@@ -49,14 +49,14 @@ export default function DenSPodnikem() {
   const zkus = (scena: string) => () => window.dispatchEvent(new CustomEvent('managero:ukazka', { detail: { scena } }));
 
   return (
-    <section id="den" className="ld-sekce" aria-labelledby="nadpis-den">
+    <section id="den" className="ld-sekce" data-radek="Den" aria-labelledby="nadpis-den">
       <div className="ld-obsah">
-        <div className="max-w-[40rem]">
+        <div className="ld-bunka max-w-[40rem]">
           <h2 id="nadpis-den" className="ld-h2">Jeden den s Managerem</h2>
           <p className="ld-perex mt-5">Od otevření po uzávěrku. Nahrávky jsou ze skutečné aplikace, s vymyšlenými daty.</p>
         </div>
 
-        <div ref={koren} className="ld-den mt-14 sm:mt-20 grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-x-16" data-aktivni={aktivni}>
+        <div ref={koren} className="ld-den ld-split mt-14 sm:mt-20 grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-x-16" data-aktivni={aktivni}>
           <div ref={osa} className="ld-den-osa">
           <span className="ld-den-plneni" aria-hidden />
           <ol className="list-none">

@@ -5,8 +5,8 @@ import { FAQ } from '../obsah';
 // Rozbalení je plynulé tam, kde prohlížeč umí animovat výšku na auto.
 export default function Faq() {
   return (
-    <section id="otazky" className="ld-sekce" aria-labelledby="nadpis-otazky">
-      <div className="ld-obsah grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-x-16 gap-y-10">
+    <section id="otazky" className="ld-sekce" data-radek="Otázky" aria-labelledby="nadpis-otazky">
+      <div className="ld-obsah"><div className="ld-split grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-x-16 gap-y-10">
         <div>
           <div className="lg:sticky lg:top-28">
             <h2 id="nadpis-otazky" className="ld-h2">Časté otázky</h2>
@@ -24,6 +24,7 @@ export default function Faq() {
             </details>
           ))}
         </div>
+      </div>
       </div>
     </section>
   );

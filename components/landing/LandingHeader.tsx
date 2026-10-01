@@ -79,7 +79,7 @@ export default function LandingHeader() {
         <nav ref={nav} aria-label="Sekce stránky" className="relative hidden lg:flex items-center gap-0.5">
           {pilulka && (
             <span aria-hidden
-              className="absolute top-0 bottom-0 rounded-full bg-[rgb(var(--ld-fg)/0.1)] pointer-events-none motion-safe:transition-[transform,width] motion-safe:duration-300 motion-safe:ease-out"
+              className="absolute top-0 bottom-0 rounded-full bg-[rgb(var(--ld-fg)/0.08)] pointer-events-none motion-safe:transition-[transform,width] motion-safe:duration-300 motion-safe:ease-out"
               style={{ transform: `translateX(${pilulka.x}px)`, width: pilulka.w }} />
           )}
           {ODKAZY.map(o => {
@@ -95,9 +95,8 @@ export default function LandingHeader() {
 
         <div className="flex items-center gap-1 sm:gap-2 shrink-0">
           <Link href="/login" className="rounded-full px-3 py-2 text-[0.9375rem] font-medium text-[color:var(--ld-papir)] hover:text-white whitespace-nowrap">Přihlásit</Link>
-          {/* Limetkové jen nahoře: po posunu přijdou další hlavní akce (karta Pro, závěr)
-              a v jednom výřezu smí svítit jen jedna. */}
-          <Link href="/register" className={`whitespace-nowrap ${posunuto ? 'ld-btn ld-btn-sm ld-btn-svetle !h-9' : 'btn btn-accent btn-sm'}`}>
+          {/* Inkoustové: limetka patří hlavní akci v hero, a v jednom výřezu smí svítit jen jedna. */}
+          <Link href="/register" className="whitespace-nowrap ld-btn ld-btn-sm ld-btn-svetle !h-9">
             <span className="sm:hidden">Vyzkoušet</span>
             <span className="hidden sm:inline">Vyzkoušet {TRIAL_DAYS} dní zdarma</span>
           </Link>

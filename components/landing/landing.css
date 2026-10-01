@@ -386,3 +386,100 @@ html:has(.ld-root) body::after { display: none; }
 @media (max-width: 767px) {
   .ld-prepinac-polozka { padding: 0.5rem 0.875rem; font-size: 0.875rem; }
 }
+
+/* ================================================================
+   Svět „Rozvrh jako mřížka" (data-svet="mrizka")
+   Stránka je rozvrh z aplikace: papírová plocha, vlevo sloupec řádků
+   (časy a názvy z `data-radek`), vpravo dvanáct sloupců vymezených
+   vlasovými linkami. Obsah sedí v buňkách téže mřížky, okraje a šířky
+   tedy nemůžou ujet. Den stránky začíná v 7:30 a končí ve 22:00.
+   ================================================================ */
+.ld-root[data-svet="mrizka"] {
+  --ld-bg: 243 244 240;
+  --ld-fg: 22 24 26;
+  --ld-linka: rgb(var(--ld-fg) / 0.08);
+  --ld-linka-2: rgb(var(--ld-fg) / 0.16);
+  --ld-text-2: rgb(var(--ld-fg) / 0.68);
+  --ld-text-3: rgb(var(--ld-fg) / 0.58);
+  --ld-rail: 0px;
+  --ld-bunka: 0px;
+  --ld-rytmus: clamp(4.5rem, 7vw, 7rem);
+}
+html:has(.ld-root[data-svet="mrizka"]), html:has(.ld-root[data-svet="mrizka"]) body { background: #F3F4F0; }
+@media (min-width: 1024px) {
+  .ld-root[data-svet="mrizka"] { --ld-rail: 7rem; --ld-bunka: 1.25rem; }
+}
+
+/* Linky mřížky: přes celé okno, pod obsahem. */
+.ld-linky { position: fixed; inset: 0; z-index: 0; pointer-events: none; display: none; }
+.ld-linky-sit {
+  height: 100%; margin-inline: auto;
+  max-width: calc(var(--ld-sirka) + 2 * var(--ld-okraj));
+  padding-left: calc(var(--ld-okraj) + var(--ld-rail)); padding-right: var(--ld-okraj);
+  display: grid; grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+.ld-linky-sit > span { border-left: 1px solid var(--ld-linka); }
+.ld-linky-sit > span:last-child { border-right: 1px solid var(--ld-linka); }
+@media (min-width: 1024px) { .ld-root[data-svet="mrizka"] .ld-linky { display: block; } }
+.ld-root[data-svet="mrizka"] main, .ld-root[data-svet="mrizka"] footer, .ld-root[data-svet="mrizka"] header { position: relative; z-index: 1; }
+.ld-root[data-svet="mrizka"] header { z-index: 40; }
+
+/* Řádky: vodorovná linka přes celou šířku, štítek řádku v levém sloupci. */
+.ld-root[data-svet="mrizka"] .ld-sekce { position: relative; border-top: 1px solid var(--ld-linka-2); padding-top: var(--ld-rytmus); padding-bottom: 1rem; }
+.ld-root[data-svet="mrizka"] .ld-sekce-tesna { padding-top: 2.5rem; border-top-color: var(--ld-linka); }
+.ld-root[data-svet="mrizka"] .ld-hero-m { border-top: 0; padding-top: clamp(3rem, 5vw, 5rem); padding-bottom: clamp(2.5rem, 4vw, 4rem); }
+@media (min-width: 1024px) {
+  .ld-root[data-svet="mrizka"] .ld-obsah { padding-left: calc(var(--ld-okraj) + var(--ld-rail)); }
+  .ld-root[data-svet="mrizka"] .ld-sekce[data-radek]::before {
+    content: attr(data-radek);
+    position: absolute;
+    left: max(var(--ld-okraj), calc(50% - var(--ld-sirka) / 2));
+    top: calc(var(--ld-rytmus) + 0.35rem);
+    width: calc(var(--ld-rail) - 1rem);
+    font-size: 0.875rem; font-weight: 600; line-height: 1.3; letter-spacing: -0.005em;
+    color: var(--ld-text-3);
+    font-variant-numeric: tabular-nums;
+  }
+  .ld-root[data-svet="mrizka"] .ld-sekce-tesna[data-radek]::before { top: 2.85rem; }
+  .ld-root[data-svet="mrizka"] .ld-hero-m[data-radek]::before { top: clamp(3.4rem, 5.4vw, 5.5rem); }
+  /* „Teď": řádek, kde den stránky začíná, má čas v limetkové pilulce jako v rozvrhu. */
+  .ld-root[data-svet="mrizka"] .ld-sekce[data-ted]::before {
+    width: auto; padding: 0.3rem 0.65rem; border-radius: 9999px;
+    background: var(--ld-lime); color: #16181A; font-size: 1rem; font-weight: 700;
+  }
+  .ld-root[data-svet="mrizka"] .ld-zaver[data-radek]::before {
+    width: auto; padding: 0.3rem 0.65rem; border-radius: 9999px;
+    background: #16181A; color: #F3F4F0; font-size: 1rem; font-weight: 700;
+  }
+
+  /* Buňky: obsah od linky odsazený vždy stejně; mřížky bez mezer, ať sloupce
+     sedí přesně na linkách (dělení 5:7 je pět a sedm sloupců). */
+  .ld-root[data-svet="mrizka"] .ld-bunka,
+  .ld-root[data-svet="mrizka"] .ld-split > * { padding-inline: var(--ld-bunka); }
+  .ld-root[data-svet="mrizka"] .ld-split { column-gap: 0 !important; }
+  .ld-root[data-svet="mrizka"] .ld-split-hero { grid-template-columns: minmax(0, 8fr) minmax(0, 4fr); }
+  .ld-root[data-svet="mrizka"] .ld-split-hero > :last-child { border-left: 1px solid var(--ld-linka-2); padding-bottom: 0.5rem; }
+  .ld-root[data-svet="mrizka"] .ld-tarify { gap: 0; }
+  .ld-root[data-svet="mrizka"] .ld-tarify > .ld-tarif { border-radius: 0; box-shadow: none; border-top: 1px solid var(--ld-linka-2); border-bottom: 1px solid var(--ld-linka-2); }
+}
+
+.ld-root[data-svet="mrizka"] .ld-h1-m { font-size: clamp(2.5rem, 5.1vw, 7rem); line-height: 0.98; letter-spacing: -0.045em; text-wrap: balance; }
+.ld-typ-m { font-weight: 700; font-size: clamp(1.25rem, 1.7vw, 1.75rem); letter-spacing: -0.025em; }
+
+/* Ukázka v mřížce: bílá buňka s inkoustovou hranou, ne zařízení na jevišti. */
+.ld-root[data-svet="mrizka"] #ukazka-okno > div:first-child { justify-content: flex-start; }
+.ld-root[data-svet="mrizka"] .ld-ram {
+  background: #fff;
+  box-shadow: inset 0 0 0 1px rgb(22 24 26 / 0.16), 0 30px 70px -40px rgb(22 24 26 / 0.35);
+}
+.ld-root[data-svet="mrizka"] .ld-ram[data-zar="pocitac"], .ld-root[data-svet="mrizka"] .ld-ram[data-zar="auto"] { padding: 6px; border-radius: 1.1rem; }
+@media (max-width: 767px) { .ld-root[data-svet="mrizka"] .ld-ram[data-zar="auto"] { padding: 7px; border-radius: 2.4rem; } }
+.ld-root[data-svet="mrizka"] .ld-svetlo { display: none; }
+.ld-root[data-svet="mrizka"] .ld-stage { justify-content: flex-start; }
+.ld-root[data-svet="mrizka"] .ld-zaver .ld-obsah { text-align: left; }
+.ld-root[data-svet="mrizka"] .ld-zaver .ld-obsah > * { margin-inline: 0; padding-inline: var(--ld-bunka); }
+.ld-root[data-svet="mrizka"] .ld-zaver .ld-obsah > div.flex { justify-content: flex-start; }
+.ld-root[data-svet="mrizka"] .ld-den-osa::before { background: var(--ld-linka-2); }
+.ld-root[data-svet="mrizka"] .ld-cas { color: rgb(var(--ld-fg) / 0.22); }
+.ld-root[data-svet="mrizka"] .ld-typ { color: rgb(var(--ld-fg) / 0.2); }
+.ld-root[data-svet="mrizka"] .ld-tarif[data-tarif="pro"] { box-shadow: none; }
