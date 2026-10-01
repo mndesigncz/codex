@@ -257,5 +257,9 @@
   "— mrkni do záložky Menu": "— zajrzyj do zakładki Menu",
   "✋ Jdu — zrušit účast": "✋ Idę — anuluj udział",
   "✋ Přijdu": "✋ Przyjdę",
-  "✋ {n, plural, one {# člověk jde} few {# lidi jdou} other {# lidí jde}}": "✋ {n, plural, one {# osoba idzie} few {# osoby idą} many {# osób idzie} other {# osoby idą}}"
+  "✋ {n, plural, one {# člověk jde} few {# lidi jdou} other {# lidí jde}}": "✋ {n, plural, one {# osoba idzie} few {# osoby idą} many {# osób idzie} other {# osoby idą}}",
+  "sleva {n} % ({skupina})": "zniżka {n} % ({skupina})",
+  "do „{level}“ ještě {castka}": "do „{level}” jeszcze {castka}",
+  "Jako člen skupiny „{skupina}“ máš u nás slevu {n} %.": "Jako członek grupy „{skupina}” masz u nas zniżkę {n} %.",
+  "Do „{level}“ ti zbývá {castka}.": "Do „{level}” brakuje ci {castka}."
 }

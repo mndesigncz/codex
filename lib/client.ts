@@ -138,6 +138,8 @@ export function publicProfile(p: any) {
       silverDiscount: Number(p.silver_discount) || 0,
       goldDiscount: Number(p.gold_discount) || 0,
       platinumDiscount: Number(p.platinum_discount) || 0,
+      tierBy: p.tier_by === 'spend' ? 'spend' : 'visits',
+      silverSpend: Number(p.silver_spend) || 0, goldSpend: Number(p.gold_spend) || 0, platinumSpend: Number(p.platinum_spend) || 0,
     },
     cashbackPct: Number(p.cashback_pct) || 0,
     stampTarget: Number(p.stamp_target) || 0,

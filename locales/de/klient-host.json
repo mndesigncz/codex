@@ -257,5 +257,9 @@
   "— mrkni do záložky Menu": "— schau in den Reiter Menü",
   "✋ Jdu — zrušit účast": "✋ Ich komme – Zusage zurückziehen",
   "✋ Přijdu": "✋ Ich komme",
-  "✋ {n, plural, one {# člověk jde} few {# lidi jdou} other {# lidí jde}}": "✋ {n, plural, one {# Person kommt} other {# Personen kommen}}"
+  "✋ {n, plural, one {# člověk jde} few {# lidi jdou} other {# lidí jde}}": "✋ {n, plural, one {# Person kommt} other {# Personen kommen}}",
+  "sleva {n} % ({skupina})": "{n} % Rabatt ({skupina})",
+  "do „{level}“ ještě {castka}": "noch {castka} bis „{level}“",
+  "Jako člen skupiny „{skupina}“ máš u nás slevu {n} %.": "Als Mitglied der Gruppe „{skupina}“ bekommst du bei uns {n} % Rabatt.",
+  "Do „{level}“ ti zbývá {castka}.": "Bis „{level}“ fehlen dir noch {castka}."
 }
