@@ -337,8 +337,12 @@ const zalozka = (p, nazev) => p.locator('nav').getByRole('button', { name: new R
   // přepínače tři a stránka to říká — slibovat zapnutí, které nic neudělá, je horší než ho nenabízet.
   await dokud(() => zpravy.isVisible(), 1500);
   const maPush = await p.getByRole('switch', { name: 'Push notifikace' }).count() === 1;
-  tvrdi('S3: přepínače notifikací (SwitchRow): 4 s push, 3 bez nakonfigurovaného pushe', await zpravy.isVisible()
-    && await p.getByRole('switch').count() === (maPush ? 4 : 3), `${await p.getByRole('switch').count()}× push=${maPush}`);
+  // Kolo 73: kategorií je víc než tři (úkoly, uzávěrky, rezervace, volno) a přibyly tiché hodiny a denní souhrn,
+  // takže se nepočítají přepínače; hlídá se, že původní tři kategorie jsou přepínače (SwitchRow) a že se push
+  // nabízí jen s nakonfigurovanými klíči (dokud přepínač „Push notifikace“ není, text to říká).
+  const puvodni = await Promise.all(['Nové zprávy', 'Nízké zásoby', 'Směny'].map(n => p.getByRole('switch', { name: new RegExp(n) }).count()));
+  tvrdi('S3: přepínače notifikací (SwitchRow): zprávy, zásoby a směny jsou přepínače; push jen s klíči', await zpravy.isVisible()
+    && puvodni.every(n => n === 1) && await p.getByRole('switch').count() >= (maPush ? 4 : 3), `${await p.getByRole('switch').count()}× push=${maPush} ${puvodni}`);
   const pred = await zpravy.getAttribute('aria-checked');
   await zpravy.click();
   tvrdi('S3: přepnutí „Nové zprávy" změní stav a uloží notifPrefs', await dokud(async () => (await zpravy.getAttribute('aria-checked')) !== pred, 1000)
