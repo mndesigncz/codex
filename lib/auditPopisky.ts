@@ -24,6 +24,8 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'kiosk.pin': 'Změna PINu člena',
   'rozlozeni.vychozi': 'Změna výchozího rozložení stránky',
   'onboarding.apply': 'Průvodce nastavením podniku založil předvolby',
+  'klient.import': 'Import členů z jiné aplikace',
+  'klient.import.vraceni': 'Import členů vrácen',
   // role
   'role.create': 'Vytvořena role',
   'role.update': 'Upravena role',

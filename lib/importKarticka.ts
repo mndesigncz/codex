@@ -210,7 +210,7 @@ export function prevedRadky(radky: string[][], mapovani: Mapovani): VysledekRozb
       const n = parseCislo(hrube);
       if (n === null) { upozorneni.push({ radek, text: `${POLE.find(p => p.id === f)?.popis ?? f}: „${hrube.slice(0, 30)}“ není číslo, zapsáno 0.` }); return 0; }
       if (n < 0) { upozorneni.push({ radek, text: `${POLE.find(p => p.id === f)?.popis ?? f}: záporná hodnota ${hrube.slice(0, 20)}, zapsáno 0.` }); return 0; }
-      if (n > MAX_HODNOTA) { upozorneni.push({ radek, text: `${POLE.find(p => p.id === f)?.popis ?? f}: hodnota ${hrube.slice(0, 20)} je nad ${MAX_HODNOTA.toLocaleString('cs-CZ')}, zapsáno 0.` }); return 0; }
+      if (n > MAX_HODNOTA) { upozorneni.push({ radek, text: `${POLE.find(p => p.id === f)?.popis ?? f}: hodnota ${hrube.slice(0, 20)} je nad ${MAX_HODNOTA} (milion), zapsáno 0.` }); return 0; }
       if (f === 'kredit' && n !== Math.round(n)) upozorneni.push({ radek, text: `Kredit ${hrube.slice(0, 20)} zaokrouhlen na celé koruny.` });
       return Math.round(n);
     };
