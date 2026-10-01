@@ -11,6 +11,7 @@ import { shapeCoupon, windowOk, ageFrom, TIER_LABELS } from '@/lib/coupons';
 import { pragueToday, pragueHM } from '@/lib/pragueTime';
 import { buildBoard, publicShape, menaListku } from '@/lib/menu';
 import { menaZRadku } from '@/lib/mena';
+import { aktivniBannery } from '@/lib/clientBanners';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -218,5 +219,7 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
     // cost_points nechává starý název — stránka hosta ho už čte.
     return { ...s, cost_points: s.costPoints, valid_until: s.validUntil, blocked };
   });
-  return NextResponse.json({ business: publicProfile(p), menu, tables, plan, coupons: shapedCoupons, news, events, stampCampaigns, me: mine, signedIn: !!me, today });
+  // Promo bannery podniku (max 5, aktivní a v platnosti). Obsah je data podniku.
+  const banners = await aktivniBannery(teamId, today);
+  return NextResponse.json({ business: publicProfile(p), menu, tables, plan, coupons: shapedCoupons, news, events, stampCampaigns, banners, me: mine, signedIn: !!me, today });
 }
