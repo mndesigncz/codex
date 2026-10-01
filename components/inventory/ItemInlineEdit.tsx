@@ -11,6 +11,7 @@ import { useId, useState } from 'react';
 import { Icon } from '../Icons';
 import { useCost, useSymbol } from '../CurrencyProvider';
 import { cenaDoPole, cenaZFormulare } from '@/lib/cena';
+import { vyznamCeny, cenaZaRozumnouJednotku } from '@/lib/jednotky';
 import { Button, Field, Input, Label } from '../ui';
 import { tg } from '@/lib/i18n/stav';
 import { useT } from '@/lib/i18n/client';
@@ -45,6 +46,14 @@ export default function ItemInlineEdit({ item, onSaved, onClose }: {
   const perUnit = num(packageSize) > 0 && num(unitCost) > 0
     ? num(unitCost) / num(packageSize) : null;
 
+  // Cena za gram nebo mililitr je zlomek haléře, který nikdo nevyčte: ukáže se za kg / l.
+  const vychazi = perUnit != null ? cenaZaRozumnouJednotku(perUnit, contentUnit || item.contentUnit || item.effectiveContentUnit) : null;
+
+  // Pole ceny je cena BALENÍ, když položka velikost balení má (vlastní, nebo z kategorie),
+  // jinak cena jednotky; popisek i přípona se řídí tím a přepnou se při změně velikosti.
+  const cenaZaBaleni = vyznamCeny(packageSize || item.effectivePackageSize) === 'baleni';
+  const jednotkaCeny = String(item.unit || 'ks');
+
   const save = async () => {
     // Cena smí mít haléře; text, který cena není, se neuloží jako nula.
     const cena = cenaZFormulare(unitCost);
@@ -64,7 +73,9 @@ export default function ItemInlineEdit({ item, onSaved, onClose }: {
         body: JSON.stringify(payload),
       });
       if (res.ok) {
-        onSaved({ ...item, ...payload });
+        // Hotové zděděné balení z API po změně neplatí — ať se čtenáři vrátí na vlastní hodnoty.
+        const { effectivePackageSize: _a, effectiveContentUnit: _b, ...vlastni } = item;
+        onSaved({ ...vlastni, ...payload });
         onClose();
       } else {
         const d = await res.json().catch(() => ({}));
@@ -95,14 +106,14 @@ export default function ItemInlineEdit({ item, onSaved, onClose }: {
           <Input id={`${uid}-jednotka`} value={contentUnit} onChange={e => setContentUnit(e.target.value)}
             placeholder={t('l / kg / ks')} />
         </Field>
-        <Field id={`${uid}-cena`} label={t('Cena za balení')}>
+        <Field id={`${uid}-cena`} label={cenaZaBaleni ? t('Cena za balení') : t('Cena za jednotku')}>
           <Input id={`${uid}-cena`} value={unitCost} onChange={e => setUnitCost(e.target.value)}
-            inputMode="decimal" placeholder={symbol} />
+            inputMode="decimal" placeholder={cenaZaBaleni ? symbol : `${symbol}/${jednotkaCeny}`} />
         </Field>
       </div>
       {perUnit != null && (
         <p className="t-meta">
-          {t('Vychází na')} <b className="text-[#16181A]">{cost(perUnit)}</b> {t('za {jednotka}', { jednotka: contentUnit || t('jednotku') })}.
+          {t('Vychází na')} <b className="text-[#16181A]">{cost(vychazi!.cena)}</b> {t('za {jednotka}', { jednotka: vychazi!.jednotka || t('jednotku') })}.
         </p>
       )}
 

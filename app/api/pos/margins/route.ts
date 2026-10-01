@@ -15,6 +15,8 @@ import { productsFromMirror, soldLines, type SoldLine } from '@/lib/posMirror';
 import { pragueToday } from '@/lib/pragueTime';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { menaPodniku } from '@/lib/menaPodniku';
+import { nactiBaleniKategorii, baleniRadku } from '@/lib/baleniKategorii';
+import { ingredientCost } from '@/lib/recipeCost';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -59,11 +61,13 @@ export async function GET(req: NextRequest) {
   // ---- recipes and what the ingredients cost ----
   const recipeRows = await sql`
     SELECT m.product_id AS "productId", m.item_id AS "itemId", m.amount_per_sale::float AS amount,
-           i.name AS "itemName", i.unit_cost AS "unitCost", i.package_size::float AS "packageSize"
+           i.name AS "itemName", i.unit_cost AS "unitCost", i.package_size::float AS "packageSize",
+           i.content_unit AS "contentUnit", i.category AS "category", i.category_id AS "categoryId"
     FROM pos_product_map m
     JOIN inventory_items i ON i.id = m.item_id
     WHERE m.team_id = ${teamId}`;
 
+  const baleniKat = await nactiBaleniKategorii(teamId);
   const recipeByProduct = new Map<string, any[]>();
   for (const r of recipeRows as any[]) {
     const list = recipeByProduct.get(r.productId) ?? [];
@@ -80,9 +84,11 @@ export async function GET(req: NextRequest) {
     const missing: string[] = [];
     for (const r of rows) {
       const unitCost = Number(r.unitCost) || 0;
-      const pkg = Number(r.packageSize) || 0;
+      // Velikost balení zděděná z kategorie platí jako vlastní; bez ní by se
+      // cena celé lahve počítala jako cena jedné porce.
+      const pkg = baleniRadku(r, baleniKat).packageSize ?? 0;
       if (unitCost <= 0) { missing.push(r.itemName); continue; }
-      total += pkg > 0 ? (unitCost / pkg) * Number(r.amount) : unitCost * Number(r.amount);
+      total += ingredientCost(unitCost, pkg, Number(r.amount));
     }
     // Chybí-li cena byť jedné suroviny, náklad by vyšel nižší, než je — a marže
     // vyšší. Nadhodnocená marže je horší než žádná, tak radši přiznáme, že

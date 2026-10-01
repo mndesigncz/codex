@@ -28,6 +28,8 @@ import { widget } from '@/lib/widgety/katalog';
 import { apiMessage, okJson } from '@/lib/api';
 import { pragueToday } from '@/lib/pragueTime';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
+import { aktualniJazyk } from '@/lib/i18n/stav';
+import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
 import {
   KLIC_NAKUP, KLIC_UPRAVIT, UDALOST_NAKUP, UDALOST_UPRAVIT,
   chybiUdaje, cekajiciObjednavky, historieObjednavek, hodnotaZasob, utrataZaMesic, jeAktivni, nakupniSeznam, podstrom, poDodavatelich,
@@ -53,9 +55,11 @@ const URL_SKLAD = '/api/inventory';
 const URL_KATEGORIE = '/api/inventory/categories';
 
 const seznam = (x: unknown): any[] => (Array.isArray(x) ? x : []);
-const cislo = (n: number) => n.toLocaleString('cs-CZ');
+// Čísla se píšou podle zvoleného jazyka (v němčině „1.250“, v angličtině „1,250“),
+// ne napevno česky; `aktualniJazyk` je jazyk prohlížeče aplikace i mimo hook.
+const cislo = (n: number) => n.toLocaleString(LOCALE_PRO_JAZYK[aktualniJazyk()]);
 /** Množství skladu: až tři desetinná místa (0,125 kg), celé bez čárky. */
-const mnozstvi = (n: number) => n.toLocaleString('cs-CZ', { maximumFractionDigits: 3 });
+const mnozstvi = (n: number) => n.toLocaleString(LOCALE_PRO_JAZYK[aktualniJazyk()], { maximumFractionDigits: 3 });
 /** „…a další 2" / „…a dalších 5" — strop seznamu se nesmí zamlčet (DP §3.6). */
 const aDalsich = (n: number, t: PrekladFn) => t('…a {n, plural, one {# další} few {# další} other {# dalších}}', { n });
 

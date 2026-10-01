@@ -34,6 +34,8 @@ import {
   CONTENT_UNITS, type ScaleStep, type CategoryPackaging,
 } from '@/lib/packaging';
 import ConsumeControl from '../inventory/ConsumeControl';
+import { vyznamCeny, jednotkaSnesDesetiny } from '@/lib/jednotky';
+import { pocetDoPole } from '@/lib/inventura';
 import {
   buildTree, flattenTree, scopeIds, pathOfId, childrenOfId, possibleParents,
   packagingSourceOf, ancestryOfId, findById, matcher, type TreeNode,
@@ -60,6 +62,7 @@ import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { useLocale } from './jazyk';
 
 const URL_SKLAD = '/api/inventory';
+const URL_FORMAT = '/api/inventory/format';
 const URL_KATEGORIE = '/api/inventory/categories';
 
 
@@ -223,6 +226,10 @@ export default function Inventory({ initialCategory, onNavigate }: {
   const [showCats, setShowCats] = useState(false);
   const [editing, setEditing] = useState<Item | null>(null);
   const [form, setForm] = useState(emptyForm);
+  // Množství a prahy jsou v databázi INTEGER, dokud se sloupce nepřevedou na NUMERIC;
+  // desetiny (2,5 kg) se nabídnou jen tam, kde je sloupec unese, a jen u kg / l
+  // (g, ml a kusy zůstávají celé).
+  const sloupce = useDataWidgetu<{ mnozstvi: boolean; prahy: boolean }>(URL_FORMAT, raw => ({ mnozstvi: raw?.mnozstvi === true, prahy: raw?.prahy === true }));
   const [saving, setSaving] = useState(false);
   const [formErr, setFormErr] = useState('');
   const money = useMoney();
@@ -499,7 +506,7 @@ export default function Inventory({ initialCategory, onNavigate }: {
   const openEdit = (i: Item) => {
     setFormErr('');
     setEditing(i);
-    setForm({ name: i.name, categoryId: i.categoryId ?? categories.find(c => c.name === i.category)?.id ?? null, quantity: String(i.quantity), minQuantity: String(i.minQuantity), criticalQuantity: String(i.criticalQuantity), maxQuantity: String(i.maxQuantity), unit: i.unit, supplier: i.supplier ?? '', supplierUrl: i.supplierUrl ?? '', unitCost: cenaDoPole(i.unitCost), brand: i.brand ?? '', description: i.description ?? '', packageSize: i.packageSize != null ? String(i.packageSize) : '', contentUnit: i.contentUnit ?? '', openAmount: i.openAmount != null ? String(i.openAmount) : '', portions: Array.isArray((i as any).portions) ? (i as any).portions.map((p: any) => ({ name: String(p.name ?? ''), amount: String(p.amount ?? '') })) : [], archived: i.archived === true, hideFromOverview: i.hideFromOverview === true, highlight: i.highlight ?? '' });
+    setForm({ name: i.name, categoryId: i.categoryId ?? categories.find(c => c.name === i.category)?.id ?? null, quantity: pocetDoPole(i.quantity), minQuantity: pocetDoPole(i.minQuantity), criticalQuantity: pocetDoPole(i.criticalQuantity), maxQuantity: pocetDoPole(i.maxQuantity), unit: i.unit, supplier: i.supplier ?? '', supplierUrl: i.supplierUrl ?? '', unitCost: cenaDoPole(i.unitCost), brand: i.brand ?? '', description: i.description ?? '', packageSize: i.packageSize != null ? String(i.packageSize) : '', contentUnit: i.contentUnit ?? '', openAmount: i.openAmount != null ? String(i.openAmount) : '', portions: Array.isArray((i as any).portions) ? (i as any).portions.map((p: any) => ({ name: String(p.name ?? ''), amount: String(p.amount ?? '') })) : [], archived: i.archived === true, hideFromOverview: i.hideFromOverview === true, highlight: i.highlight ?? '' });
     setNewCatInline('');
     setItemLog([]); setLogOpen(false);
     if (smi('sklad.historie')) {
@@ -601,14 +608,24 @@ export default function Inventory({ initialCategory, onNavigate }: {
     // nula — dřív parseInt z „4,99" udělal 4 a z „abc" nulu.
     const cena = cenaZFormulare(form.unitCost);
     if (!cena.ok) { setFormErr(t('Cena musí být číslo, třeba 4,99.')); return; }
+    // Množství a prahy: české číslo s čárkou i tečkou; kde se počítá na celé, desetina je chyba, ne tiché zaokrouhlení.
+    const cisla = { quantity: 0, minQuantity: 0, criticalQuantity: 0, maxQuantity: 0 };
+    for (const [klic, text, desetinne] of [
+      ['quantity', form.quantity, desMnozstvi], ['minQuantity', form.minQuantity, desPrahy],
+      ['criticalQuantity', form.criticalQuantity, desPrahy], ['maxQuantity', form.maxQuantity, desPrahy],
+    ] as const) {
+      const p = pocetZPole(text, desetinne);
+      if (!p.ok) { setFormErr(p.duvod === 'cele' ? t('Tahle jednotka se eviduje v celých číslech — zapiš celé číslo.') : t('Množství a limity musí být čísla.')); return; }
+      cisla[klic] = p.hodnota ?? 0;
+    }
     setSaving(true);
     const payload = {
       name: form.name,
       category: findById(categories, form.categoryId)?.name ?? '',
       categoryId: form.categoryId,
       unit: form.unit, supplier: form.supplier, supplierUrl: form.supplierUrl,
-      quantity: parseInt(form.quantity) || 0, minQuantity: parseInt(form.minQuantity) || 0,
-      criticalQuantity: parseInt(form.criticalQuantity) || 0, maxQuantity: parseInt(form.maxQuantity) || 0,
+      quantity: cisla.quantity, minQuantity: cisla.minQuantity,
+      criticalQuantity: cisla.criticalQuantity, maxQuantity: cisla.maxQuantity,
       unitCost: cena.hodnota,
       brand: form.brand, description: form.description, archived: form.archived, hideFromOverview: form.hideFromOverview, highlight: form.highlight || null,
       packageSize: form.packageSize === '' ? null : dec(form.packageSize) || null,
@@ -901,6 +918,12 @@ export default function Inventory({ initialCategory, onNavigate }: {
 
   const idFormulare = 'sklad-polozka-formular';
   const jednotkaPrahu = thresholdUnitLabel(pk(form), form.unit || 'ks');
+  const cenaZaBaleni = vyznamCeny(form.packageSize || pk(form)?.defaultPackageSize) === 'baleni';
+  const desMnozstvi = sloupce.data?.mnozstvi === true && jednotkaSnesDesetiny(form.unit);
+  // Prahy se počítají v jednotce položky, nebo obsahu (gramy jsou celé) — to říká `jednotkaPrahu`.
+  const desPrahy = sloupce.data?.prahy === true && jednotkaSnesDesetiny(jednotkaPrahu);
+  // Krok ± u množství: o jedničku, v desetinném poli bez plovoucí chyby, s českou čárkou.
+  const krokMnozstvi = (delta: number) => setForm(f => ({ ...f, quantity: pocetDoPole(Math.max(0, (dec(f.quantity)) + delta)) }));
 
   return (
     <>
@@ -1021,18 +1044,18 @@ export default function Inventory({ initialCategory, onNavigate }: {
                 <label htmlFor="sklad-f-q" className="field-label">{t('Aktuální množství')}</label>
                 <div className="flex items-center gap-2">
                   <Button type="button" variant="secondary" size="sm" iconOnly icon="minus" aria-label={t('Ubrat')}
-                    onClick={() => setForm(f => ({ ...f, quantity: String(Math.max(0, (parseInt(f.quantity) || 0) - 1)) }))} />
-                  <input id="sklad-f-q" type="number" inputMode="numeric" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
+                    onClick={() => krokMnozstvi(-1)} />
+                  <input id="sklad-f-q" inputMode={desMnozstvi ? 'decimal' : 'numeric'} value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
                     className={`${inputClass} flex-1 min-w-0 text-center tabular-nums`} />
                   <Button type="button" variant="secondary" size="sm" iconOnly icon="plus" aria-label={t('Přidat')}
-                    onClick={() => setForm(f => ({ ...f, quantity: String(Math.max(0, (parseInt(f.quantity) || 0) + 1)) }))} />
+                    onClick={() => krokMnozstvi(1)} />
                 </div>
               </div>
               <Field id="sklad-f-jednotka" label={t('Jednotka')}>
                 <input id="sklad-f-jednotka" value={form.unit} onChange={e => setForm(f => ({ ...f, unit: e.target.value }))} placeholder="ks" className={inputClass} />
               </Field>
               <Field id="sklad-f-max" label={t('Max. množství')}>
-                <input id="sklad-f-max" type="number" inputMode="numeric" value={form.maxQuantity} onChange={e => setForm(f => ({ ...f, maxQuantity: e.target.value }))} className={inputClass} />
+                <input id="sklad-f-max" inputMode={desPrahy ? 'decimal' : 'numeric'} value={form.maxQuantity} onChange={e => setForm(f => ({ ...f, maxQuantity: e.target.value }))} className={inputClass} />
               </Field>
             </div>
 
@@ -1102,14 +1125,14 @@ export default function Inventory({ initialCategory, onNavigate }: {
               <div>
                 <label htmlFor="sklad-f-min" className="field-label flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-wait" aria-hidden /> {t('Upozornit při')}</label>
                 <div className="relative">
-                  <input id="sklad-f-min" type="number" inputMode="numeric" value={form.minQuantity} onChange={e => setForm(f => ({ ...f, minQuantity: e.target.value }))} className={`${inputClass} pr-14`} />
+                  <input id="sklad-f-min" inputMode={desPrahy ? 'decimal' : 'numeric'} value={form.minQuantity} onChange={e => setForm(f => ({ ...f, minQuantity: e.target.value }))} className={`${inputClass} pr-14`} />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/55">{jednotkaPrahu}</span>
                 </div>
               </div>
               <div>
                 <label htmlFor="sklad-f-krit" className="field-label flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-bad" aria-hidden /> {t('Kriticky málo při')}</label>
                 <div className="relative">
-                  <input id="sklad-f-krit" type="number" inputMode="numeric" value={form.criticalQuantity} onChange={e => setForm(f => ({ ...f, criticalQuantity: e.target.value }))} className={`${inputClass} pr-14`} />
+                  <input id="sklad-f-krit" inputMode={desPrahy ? 'decimal' : 'numeric'} value={form.criticalQuantity} onChange={e => setForm(f => ({ ...f, criticalQuantity: e.target.value }))} className={`${inputClass} pr-14`} />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/55">{jednotkaPrahu}</span>
                 </div>
               </div>
@@ -1123,11 +1146,14 @@ export default function Inventory({ initialCategory, onNavigate }: {
 
           <section className="space-y-3" aria-labelledby="sklad-f-dodavatel">
             <p id="sklad-f-dodavatel" className="t-label">{t('Dodavatel · volitelné')}</p>
+            {/* Pole znamená cenu BALENÍ, když má položka velikost balení (vlastní nebo
+                z kategorie), jinak cenu jednotky — popisek i přípona se řídí tím, co
+                právě znamená, a při změně velikosti balení se přepnou (lib/recipeCost). */}
             {ma('sklad.ceny_upravit') && (
-              <Field id="sklad-f-cena" label={t('Cena za jednotku')} hint={t('Slouží k výpočtu hodnoty zásob a marže.')}>
+              <Field id="sklad-f-cena" label={cenaZaBaleni ? t('Cena za balení') : t('Cena za jednotku')} hint={t('Slouží k výpočtu hodnoty zásob a marže.')}>
                 <div className="relative">
-                  <input id="sklad-f-cena" inputMode="decimal" value={form.unitCost} onChange={e => setForm(f => ({ ...f, unitCost: e.target.value }))} placeholder="0" className={`${inputClass} pr-12`} />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/55">{symbol}/{form.unit || 'ks'}</span>
+                  <input id="sklad-f-cena" inputMode="decimal" value={form.unitCost} onChange={e => setForm(f => ({ ...f, unitCost: e.target.value }))} placeholder="0" className={`${inputClass} pr-14`} />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/55">{cenaZaBaleni ? symbol : `${symbol}/${form.unit || 'ks'}`}</span>
                 </div>
               </Field>
             )}
@@ -1344,7 +1370,8 @@ const bulkFields = (t: PrekladFn): { key: string; label: string; kind: 'text' | 
   { key: 'minQuantity', label: t('Upozornit při'), kind: 'number' },
   { key: 'criticalQuantity', label: t('Kriticky málo při'), kind: 'number' },
   { key: 'maxQuantity', label: t('Max. množství'), kind: 'number' },
-  { key: 'unitCost', label: t('Cena za jednotku'), kind: 'number' },
+  // Hromadně se mění položky s balením i bez: pole je u nich cena balení, jinak jednotky.
+  { key: 'unitCost', label: t('Cena (za balení, jinak za jednotku)'), kind: 'number' },
   { key: 'supplier', label: t('Dodavatel'), kind: 'text' },
   { key: 'supplierUrl', label: t('Odkaz na objednání'), kind: 'url' },
 ];
@@ -2160,13 +2187,16 @@ function DefaultsEditor({ category, inherited, onSaved }: {
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState('');
+  // Výchozí cena je cena balení, když kategorie předvyplňuje i velikost balení (vlastní nebo zděděnou).
+  const cenaZaBaleni = vyznamCeny(values.packageSize || (inherited as any).packageSize) === 'baleni';
 
   const save = async () => {
     setBusy(true); setSaved(false); setErr('');
     const payload: Record<string, any> = {};
     DEFAULT_FIELDS.forEach(f => {
       const v = values[f.key]?.trim();
-      if (v) payload[f.key] = f.kind === 'number' ? Number(v) : v;
+      // Česká čárka: type="number" ji nepustí, proto textové pole a převod tady.
+      if (v) payload[f.key] = f.kind === 'number' ? Number(v.replace(',', '.')) : v;
     });
     try {
       const res = await fetch(`/api/inventory/categories/${category.id}`, {
@@ -2190,14 +2220,14 @@ function DefaultsEditor({ category, inherited, onSaved }: {
           const fromParent = (inherited as any)[f.key];
           const id = `sklad-predvyplneni-${category.id}-${f.key}`;
           return (
-            <Field key={f.key} id={id} label={f.label} className={f.kind === 'multiline' ? 'sm:col-span-2' : ''}
+            <Field key={f.key} id={id} label={f.key === 'unitCost' ? (cenaZaBaleni ? t('Cena za balení') : t('Cena za jednotku')) : f.label} className={f.kind === 'multiline' ? 'sm:col-span-2' : ''}
               hint={fromParent != null && !values[f.key] ? t('Zdědí se z nadřazené kategorie.') : undefined}>
               {f.kind === 'multiline' ? (
                 <textarea id={id} rows={2} value={values[f.key]} onChange={e => setValues(v => ({ ...v, [f.key]: e.target.value }))}
                   placeholder={fromParent != null ? String(fromParent) : f.hint}
                   className={`${inputClass} resize-none`} />
               ) : (
-                <input id={id} type={f.kind === 'number' ? 'number' : f.kind === 'url' ? 'url' : 'text'}
+                <input id={id} type={f.kind === 'url' ? 'url' : 'text'}
                   inputMode={f.kind === 'number' ? 'decimal' : undefined}
                   value={values[f.key]} onChange={e => setValues(v => ({ ...v, [f.key]: e.target.value }))}
                   placeholder={fromParent != null ? String(fromParent) : f.hint}

@@ -22,6 +22,7 @@ import { neon } from '@neondatabase/serverless';
 import { cashDifference } from '@/lib/closing';
 import { czCount } from '@/lib/czech';
 import { menaPodniku } from '@/lib/menaPodniku';
+import { hodnotaZasobTymu } from '@/lib/hodnotaZasobDb';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -522,12 +523,13 @@ export async function GET(req: NextRequest) {
     const items = await sql`
       SELECT name, quantity::float AS qty, unit_cost
       FROM inventory_items WHERE team_id = ${teamId} AND (approved IS NULL OR approved = TRUE)`;
-    let stockValue = 0;
+    // Hodnota zásob je jedna funkce pro Finance, Sklad i tuhle radu (lib/hodnotaZasobDb):
+    // s načatými baleními, bez archivovaných. Dřív se tu počítalo quantity × unit_cost
+    // samo a rada ukazovala jiné číslo než Finance.
+    const stockValue = (await hodnotaZasobTymu(teamId))?.hodnota ?? 0;
     const noCost: string[] = [];
     for (const i of items as any[]) {
-      const c = num(i.unit_cost);
-      if (c <= 0) { if (num(i.qty) > 0) noCost.push(i.name); continue; }
-      stockValue += Math.max(0, num(i.qty)) * c;
+      if (num(i.unit_cost) <= 0 && num(i.qty) > 0) noCost.push(i.name);
     }
     if (stockValue > 0 && revenue > 0 && stockValue > revenue * 0.4) {
       add({

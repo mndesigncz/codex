@@ -23,6 +23,7 @@ import ProductionGuideLink from './ProductionGuideLink';
 import { tg } from '@/lib/i18n/stav';
 import { useJazyk, useT } from '@/lib/i18n/client';
 import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
+import { jednotkaPolozky } from '@/lib/packaging';
 
 export interface RecipeLine {
   ingredientId: number; name: string; amount: number; unit: string;
@@ -36,7 +37,7 @@ export interface ProductionInfo {
   /** Návod připnutý k téhle položce — z něj jdou kroky do úkolu „Vyrobit X“. */
   guideId?: number | null; guideTitle?: string | null; guideSteps?: number;
 }
-type Pickable = { id: number; name: string; unit: string; contentUnit?: string | null; packageSize?: number | null; category?: string };
+type Pickable = { id: number; name: string; unit: string; contentUnit?: string | null; packageSize?: number | null; effectiveContentUnit?: string | null; effectivePackageSize?: number | null; category?: string };
 
 const dec = (v: string) => Number(String(v).replace(',', '.')) || 0;
 
@@ -89,7 +90,8 @@ export default function ProductionRecipe({ item, items, onSaved }: {
   const nactiZnovu = () => { nacti(() => true, true); };
   const maNavodSKroky = !!info?.guideId && (info.guideSteps ?? 0) > 0;
 
-  const unitOf = (p: Pickable) => (Number(p.packageSize) > 0 ? (p.contentUnit ?? p.unit) : p.unit);
+  // Jednotka receptury včetně obsahu zděděného z kategorie (jako recipeUnit na serveru).
+  const unitOf = (p: Pickable) => jednotkaPolozky(p);
   const found = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (q.length < 2) return [];

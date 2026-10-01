@@ -8,14 +8,47 @@
 // v databázi jsou stovky starých návodů a přepisovat je migrací kvůli
 // nepovinnému poli by bylo riskantnější než je při čtení normalizovat.
 
+import { prevedMnozstvi } from './jednotky.ts';
+
 export interface GuideStep {
   text: string;
   /** Skladová položka, když je krok zároveň surovinou. */
   itemId?: number | null;
-  /** Množství v jednotce, ve které je položka vedená. */
+  /** Množství v jednotce, ve které je položka vedená (podle něj se odepisuje a počítá receptura). */
   amount?: number | null;
-  /** Jednotka jen pro zobrazení — pravdu drží položka. */
+  /** Jednotka, v níž se množství zadávalo a zobrazuje (ml, cl, dl…). */
   unit?: string | null;
+  /**
+   * Množství tak, jak bylo zadáno, v jednotce `unit` (20 při „20 ml“).
+   * Přítomnost pole říká, že `amount` už je převedené do jednotky položky.
+   * Staré kroky ho nemají: tam je `amount` bráno beze změny jako množství
+   * v jednotce položky (jak se to vždy odepisovalo) a `unit` je jen popisek.
+   */
+  zadano?: number | null;
+}
+
+/**
+ * Hodnoty kroku po zadání množství: `amount` převedené do jednotky položky,
+ * `zadano` a `unit` tak, jak je uživatel napsal. Bez položky (nevíme, do čeho
+ * převádět) se nic nepřevádí.
+ */
+export function mnozstviKroku(zadano: number | null, unit: string | null, jednotkaPolozky: string | null): Pick<GuideStep, 'amount' | 'unit' | 'zadano'> {
+  if (zadano == null || !(zadano > 0)) return { amount: null, unit, zadano: null };
+  const amount = jednotkaPolozky && unit ? prevedMnozstvi(zadano, unit, jednotkaPolozky) : zadano;
+  return { amount, unit, zadano };
+}
+
+/** Co ukázat v poli kroku: zadané číslo a jeho jednotka (u starých kroků uložené číslo a jednotka tak, jak jsou). */
+export function zadaneMnozstvi(step: GuideStep, jednotkaPolozky: string | null): { hodnota: number | null; unit: string | null } {
+  if (step.zadano != null) return { hodnota: step.zadano, unit: step.unit ?? jednotkaPolozky };
+  return { hodnota: step.amount ?? null, unit: step.unit ?? jednotkaPolozky };
+}
+
+/** Text množství kroku („20 ml“) — z toho, co uživatel zadal; u starých kroků z uloženého čísla. */
+export function popisMnozstviKroku(step: GuideStep): string {
+  const n = step.zadano ?? step.amount;
+  if (n == null) return '';
+  return `${String(n).replace('.', ',')} ${step.unit ?? ''}`.trim();
 }
 
 /** Přijme starý řetězec i nový objekt a vrátí vždy stejný tvar. */
@@ -39,6 +72,10 @@ export function normalizeSteps(input: any): GuideStep[] {
       step.amount = Number.isFinite(amount) && amount > 0 ? Math.round(amount * 1e6) / 1e6 : null;
       const unit = raw.unit == null ? '' : String(raw.unit).trim().slice(0, 12);
       step.unit = unit || null;
+      const zadano = Number(String(raw.zadano ?? '').replace(',', '.'));
+      if (raw.zadano != null && raw.zadano !== '' && Number.isFinite(zadano) && zadano > 0 && step.amount != null) {
+        step.zadano = Math.round(zadano * 1e6) / 1e6;
+      }
     }
     out.push(step);
   }
