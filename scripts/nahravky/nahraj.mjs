@@ -308,7 +308,7 @@ async function nahraj(browser, s, tmp) {
  */
 async function plakatyHero(browser) {
   const tvary = [
-    { id: 'hero-prehled-pocitac', okno: { width: 1100, height: 690 }, dsf: 1, sirka: 1100 },
+    { id: 'hero-prehled-pocitac', okno: { width: 1100, height: 690 }, dsf: 2.2, sirka: 2420 },
     { id: 'hero-prehled-telefon', okno: { width: 390, height: 780 }, dsf: 2, sirka: 780 },
   ];
   for (const t of tvary) {

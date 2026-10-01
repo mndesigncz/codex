@@ -1,21 +1,34 @@
-import { Icon } from '@/components/Icons';
-import { FAQ } from '../obsah';
+'use client';
 
-// Časté otázky: nativní <details>, funguje bez skriptu i s klávesnicí.
+import { useT } from '@/lib/i18n/client';
+import { TRIAL_DAYS } from '@/lib/plan';
+import { FAQ, FAQ_NADPIS } from '../obsah';
+
+// Časté otázky: nativní <details>, funguje bez skriptu i s klávesnicí. Nadpis
+// vlevo stojí, otázky vpravo jedou; jedna vlasová linka mezi nimi, žádné karty.
+// Rozbalení je plynulé tam, kde prohlížeč umí animovat výšku na auto.
 export default function Faq() {
+  const t = useT('landing');
   return (
-    <section id="otazky" className="relative max-w-3xl mx-auto px-5 sm:px-8 pb-16 sm:pb-24 scroll-mt-24" aria-labelledby="nadpis-otazky">
-      <h2 id="nadpis-otazky" className="text-2xl sm:text-3xl font-bold tracking-tight text-[#16181A]">Časté otázky</h2>
-      <div className="mt-6 space-y-3">
-        {FAQ.map(f => (
-          <details key={f.q} className="lgx rounded-3xl px-6 py-4 group">
-            <summary className="cursor-pointer list-none flex items-center justify-between gap-3 text-sm sm:text-base font-semibold text-[#16181A] tap-target">
-              {f.q}
-              <Icon name="chevron" size={16} className="text-black/40 transition-transform group-open:rotate-180 shrink-0" aria-hidden />
-            </summary>
-            <p className="mt-3 text-sm text-black/60 leading-relaxed text-pretty">{f.a}</p>
-          </details>
-        ))}
+    <section id="otazky" className="ld-sekce" aria-labelledby="nadpis-otazky">
+      <div className="ld-obsah grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-x-16 gap-y-10">
+        <div>
+          <div className="lg:sticky lg:top-28">
+            <h2 id="nadpis-otazky" className="ld-h2">{t(FAQ_NADPIS.nadpis)}</h2>
+            <p className="ld-text mt-5 max-w-[34ch]">{t(FAQ_NADPIS.perex)}</p>
+          </div>
+        </div>
+        <div>
+          {FAQ.map(f => (
+            <details key={f.q} className="ld-otazka group">
+              <summary className="flex min-h-[4.25rem] items-center justify-between gap-6 py-5 text-[1.0625rem] font-semibold tracking-tight">
+                {t(f.q)}
+                <span className="ld-plus text-[color:var(--ld-text-2)]" aria-hidden />
+              </summary>
+              <p className="ld-text pb-7 pr-10 max-w-[62ch]">{t(f.a, { n: TRIAL_DAYS })}</p>
+            </details>
+          ))}
+        </div>
       </div>
     </section>
   );

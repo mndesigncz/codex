@@ -1,50 +1,52 @@
-import { Icon } from '@/components/Icons';
-import Reveal from '../Reveal';
-import { MISTO, MISTO_PATA } from '../obsah';
+'use client';
 
-// Excel a WhatsApp vs Managero: nejpoctivější prodejní argument, jaký stránka
-// má. Nevyjmenovává funkce, ukazuje, co konkrétně z provozu zmizí. Pruh přes
-// celou šířku v tónu limetky říká, že je to jiný druh sdělení než seznam funkcí.
+import { Icon } from '@/components/Icons';
+import { useT } from '@/lib/i18n/client';
+import { MISTO, MISTO_NADPIS, MISTO_PATA } from '../obsah';
+
+// Excel, WhatsApp a sešit vs Managero: nejpoctivější prodejní argument, jaký
+// stránka má. Nevyjmenovává funkce, ukazuje, co z provozu zmizí.
 //
-// Tabulka je skutečná tabulka (role="table"), ne mřížka bez významu: odečítač
-// oznámí sloupce. Na telefonu se sloupce skládají pod sebe a každá buňka nese
-// svůj štítek, protože tři sloupce v 390 px by nikdo nepřečetl.
+// Jediná limetková plocha na celé stránce. Po dlouhém inkoustovém jevišti je to
+// přestávka, která říká „tohle je jiný druh sdělení" dřív, než se čte. Dnešek je
+// přeškrtnutý jen tenkou linkou přes text, ne přes celou buňku: má se dát dočíst.
+//
+// Je to skutečná tabulka (role="table"), odečítač oznámí sloupce. Na telefonu se
+// sloupce skládají pod sebe a každá buňka nese svůj štítek.
 export default function MistoCeho() {
+  const t = useT('landing');
   return (
-    <section id="misto" className="relative pb-16 sm:pb-24" aria-labelledby="nadpis-misto">
-      <div className="bg-[#C8F542]/15 py-14 sm:py-20">
-        <div className="max-w-6xl mx-auto px-5 sm:px-8">
-          <div className="max-w-xl">
-            <h2 id="nadpis-misto" className="text-2xl sm:text-4xl font-bold tracking-tight text-[#16181A]">Excel, WhatsApp a sešit, nebo Managero</h2>
-            <p className="mt-3 text-base text-black/60 text-pretty">Managero se neměří tím, kolik toho umí, ale tím, co po jeho zapnutí z provozu zmizí.</p>
+    <section id="misto" className="ld-sekce" aria-labelledby="nadpis-misto">
+      <div className="ld-limetka py-[clamp(4.5rem,9vw,8.5rem)]">
+        <div className="ld-obsah">
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-x-16 gap-y-6 items-end">
+            <h2 id="nadpis-misto" className="ld-h2">{t(MISTO_NADPIS.nadpis)}</h2>
+            <p className="text-[clamp(1.0625rem,1.5vw,1.375rem)] leading-snug text-[rgba(22,24,26,0.78)] max-w-[40ch] text-pretty">{t(MISTO_NADPIS.perex)}</p>
           </div>
 
-          <Reveal>
-            <div role="table" aria-label="Dnešní řešení a Managero" className="ld-srov mt-10">
-              <div role="row" className="sr-only sm:not-sr-only sm:grid sm:grid-cols-[9rem_minmax(0,1fr)_minmax(0,1fr)] sm:gap-x-8 pb-3 border-b border-black/[0.12]">
-                <div role="columnheader" className="t-label text-black/50">Oblast</div>
-                <div role="columnheader" className="t-label text-black/50">Dnes: Excel, WhatsApp, sešit</div>
-                <div role="columnheader" className="t-label text-[#3E5406]">S Managerem</div>
-              </div>
-              {MISTO.map(m => (
-                <div role="row" key={m.tema} className="py-5 sm:grid sm:grid-cols-[9rem_minmax(0,1fr)_minmax(0,1fr)] sm:gap-x-8 border-b border-black/[0.08]">
-                  <div role="rowheader" className="text-base font-bold tracking-tight text-[#16181A]">{m.tema}</div>
-                  <div role="cell" className="mt-2 sm:mt-0 flex items-start gap-2.5 text-sm text-black/55">
-                    <Icon name="close" size={15} className="mt-0.5 shrink-0 text-black/35" aria-hidden />
-                    <span><span className="sm:hidden font-semibold text-black/45">Dnes: </span>{m.dnes}</span>
-                  </div>
-                  <div role="cell" className="mt-2 sm:mt-0 flex items-start gap-2.5 text-base font-semibold text-[#16181A]">
-                    <Icon name="check" size={17} className="mt-0.5 shrink-0 text-[#5B7A08]" aria-hidden />
-                    <span><span className="sm:hidden font-semibold text-[#3E5406]">S Managerem: </span>{m.managero}</span>
-                  </div>
-                </div>
-              ))}
+          <div role="table" aria-label={t(MISTO_NADPIS.tabulka)} className="mt-14">
+            <div role="row" className="sr-only md:not-sr-only md:grid md:grid-cols-[10rem_minmax(0,1fr)_minmax(0,1fr)] md:gap-x-10 pb-4">
+              <div role="columnheader" className="text-sm font-semibold text-[rgba(22,24,26,0.72)]">{t(MISTO_NADPIS.oblast)}</div>
+              <div role="columnheader" className="text-sm font-semibold text-[rgba(22,24,26,0.72)]">{t(MISTO_NADPIS.dnes)}</div>
+              <div role="columnheader" className="text-sm font-semibold">{t(MISTO_NADPIS.sManagerem)}</div>
             </div>
-          </Reveal>
+            {MISTO.map(m => (
+              <div role="row" key={m.tema} className="ld-srov-radek py-6 md:grid md:grid-cols-[10rem_minmax(0,1fr)_minmax(0,1fr)] md:gap-x-10">
+                <div role="rowheader" className="text-lg font-bold tracking-tight">{t(m.tema)}</div>
+                <div role="cell" className="ld-srov-dnes mt-2 md:mt-0 text-[0.9375rem] leading-relaxed text-pretty">
+                  <span className="md:hidden font-semibold">{t(MISTO_NADPIS.dnesKratce)} </span><span className="ld-skrt">{t(m.dnes)}</span>
+                </div>
+                <div role="cell" className="mt-2 md:mt-0 flex items-start gap-2.5 text-[1.0625rem] leading-snug font-semibold text-pretty">
+                  <Icon name="check" size={18} className="mt-0.5 shrink-0" aria-hidden />
+                  <span><span className="md:hidden">{t(MISTO_NADPIS.sManageremKratce)} </span>{t(m.managero)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
 
-          <div className="mt-8 max-w-2xl">
-            <p className="text-base font-semibold text-[#16181A] text-pretty">{MISTO_PATA.hlavni}</p>
-            <p className="mt-2 text-sm text-black/55 text-pretty">{MISTO_PATA.vedlejsi}</p>
+          <div className="mt-12 grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-x-16 gap-y-3">
+            <p className="text-lg font-bold tracking-tight text-pretty lg:col-start-2">{t(MISTO_PATA.hlavni)}</p>
+            <p className="text-[0.9375rem] text-[rgba(22,24,26,0.74)] text-pretty lg:col-start-2">{t(MISTO_PATA.vedlejsi)}</p>
           </div>
         </div>
       </div>

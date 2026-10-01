@@ -37,7 +37,7 @@ import { RES_STATUS, tierFor } from '../lib/clientSlots.ts';
 const JAZYKY = ['en', 'de', 'sk', 'pl'];
 const ROOTS = ['app', 'components', 'lib'];
 /** Kolik `'cs-CZ'` je v kódu mimo výjimky. Klesá s každou dávkou migrace na lib/i18n/format; nesmí růst. */
-const BASELINE_CS_CZ = 138; // +3: výchozí čeština průvodce a předvolby zemí, cena na (zatím české) prodejní stránce
+const BASELINE_CS_CZ = 136; // −2: ceník na prodejní stránce formátuje ceny podle jazyka (kolo 79)
 /** Natvrdo psané české řetězce v přeložených souborech (soubor → kolik). Nesmí růst; klesá s dalšími dávkami. */
 const BASELINE_NATVRDO = {};
 
@@ -172,6 +172,18 @@ for (const n of [0, 10, 25, 100]) pridej('klient-host', tierFor(n, { platinumAt:
   }
   for (const x of plan.MAX_EXTRAS) { pridej('spolecne', x, PL); pridej('predplatne', x, PL); }
   for (const d of moder.DUVODY) pridej('spolecne', d.nazev, 'lib/moderace.ts (DUVODY)');
+}
+
+// Prodejní stránka: texty z components/landing/obsah.ts a ze scén živé ukázky se kreslí přes
+// `t(data.text)` ze slovníku landing; popisy nahrávek (pro odečítač) taky.
+{
+  const ob = await import('../components/landing/obsah.ts');
+  const sc = await import('../components/landing/ukazka/scenare.ts');
+  const LD = 'components/landing (obsah.ts, scenare.ts, nahravky.ts)';
+  for (const x of ob.vsechnyTexty()) pridej('landing', x, LD);
+  for (const x of sc.vsechnyTextyUkazky()) pridej('landing', x, LD);
+  const nahr = readFileSync('components/landing/nahravky.ts', 'utf8');
+  for (const m of nahr.matchAll(/popis:\s*'([^']+)'/g)) pridej('landing', m[1], LD);
 }
 
 // Katalog widgetů a stránek s plochou: texty z dat se v UI překládají podle textu (`t(definice.nazev)`),

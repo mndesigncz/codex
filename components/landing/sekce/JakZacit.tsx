@@ -1,59 +1,136 @@
+'use client';
+
 import Link from 'next/link';
 import { Icon } from '@/components/Icons';
-import Foto from '../Foto';
-import Reveal from '../Reveal';
-import { KROKY, TYPY_PODNIKU } from '../obsah';
+import VObraze from '../VObraze';
+import { KROKY, MINI, TYPY_PODNIKU, ZACATEK_NADPIS } from '../obsah';
+import { useJazyk, useT } from '@/lib/i18n/client';
+import { fmtDenVTydnu } from '@/lib/i18n/format';
+import { zkratkyDnu } from '@/lib/week';
 
-// Jak začít: tři kroky v jednom panelu s linkou. Tři stejné karty vedle sebe
-// jsou nejčastější šablona na webu; číslo je velké a tlumené, aby pořadí bylo
-// vidět, ne aby křičelo. Vpravo typy podniků, ze kterých se vybírá v prvním kroku
-// (stejné fotky jako v průvodci nastavením).
+// Jak začít: tři kroky, a u každého malá obrazovka, ve které se ten krok
+// opravdu stane. Na jevišti svítí jen aplikace, takže i tady nese sdělení
+// světlá obrazovka, ne odstavec: typ podniku se vybere, kód se naťuká a tým
+// se připojí, rozvrh se vyplní a zveřejní. Přehraje se jednou, když sekce
+// přijede do obrazu, a zůstane v koncovém stavu (bez skriptu a s vypnutým
+// pohybem je vidět rovnou konec). Lidé a kód jsou z ukázkových dat.
 //
 // Čas se tu záměrně neslibuje číslem: „za 5 minut" tvrdit, dokud průvodce není
-// změřený, by bylo vymyšlené. Stojí tu, co se dá ověřit: tři kroky, jeden kód,
-// bez schůzky a bez implementace.
-export default function JakZacit() {
-  return (
-    <section id="zacatek" className="relative max-w-6xl mx-auto px-5 sm:px-8 pb-16 sm:pb-24 scroll-mt-24" aria-labelledby="nadpis-zacatek">
-      <div className="max-w-xl">
-        <h2 id="nadpis-zacatek" className="text-2xl sm:text-4xl font-bold tracking-tight text-[#16181A]">Jak se začíná</h2>
-        <p className="mt-3 text-base text-black/60 text-pretty">Tři kroky. Bez schůzky, bez implementace a bez toho, aby se celý tým musel něco učit.</p>
-      </div>
-      <Reveal>
-        <div className="mt-10 grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] gap-10 lg:gap-14 items-start">
-          <ol className="list-none relative">
-            {KROKY.map((k, i) => (
-              <li key={k.n} className="relative flex gap-5 pb-9 last:pb-0">
-                {/* Linka mezi kroky. */}
-                {i < KROKY.length - 1 && <span className="absolute left-[1.4rem] top-12 bottom-1 w-px bg-black/[0.12]" aria-hidden />}
-                <span className="relative z-[1] flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#16181A] text-sm font-bold text-white tabular-nums">{k.n}</span>
-                <div className="pt-0.5">
-                  <h3 className="text-lg font-bold tracking-tight text-[#16181A] flex items-center gap-2">
-                    {k.title}
-                    <Icon name={k.icon} size={17} className="text-[#5B7A08]" aria-hidden />
-                  </h3>
-                  <p className="mt-1.5 text-sm sm:text-base text-black/60 leading-relaxed text-pretty max-w-[44ch]">{k.text}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
+// změřený, by bylo vymyšlené.
 
-          <div>
-            <p className="t-label text-black/50">V prvním kroku si vybereš typ podniku</p>
-            <ul className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3 list-none">
-              {TYPY_PODNIKU.map(t => (
-                <li key={t.id}>
-                  <Foto id={t.id} pomer="aspect-[4/3]" sizes="(max-width: 640px) 44vw, 14rem" paralax={false} />
-                  <p className="mt-1.5 text-sm font-semibold text-[#16181A]">{t.label}</p>
-                </li>
+const KOD = ['K', '7', 'M', '2', 'Q', 'X'];
+const PRIPOJENI = [{ jmeno: 'Petra Marešová', emoji: '🧑‍🍳', zena: true }, { jmeno: 'Tomáš Dvořák', emoji: '🧔', zena: false }, { jmeno: 'Eliška Nováková', emoji: '👩', zena: true }];
+// Směny v týdnu: [den od, den do) a barva typu směny (barvy směn z aplikace).
+const RADKY: { jmeno: string; smeny: { od: number; do: number; barva: string }[] }[] = [
+  { jmeno: 'Eliška', smeny: [{ od: 0, do: 2, barva: '#C8F542' }, { od: 4, do: 6, barva: '#FCD34D' }] },
+  { jmeno: 'Petra', smeny: [{ od: 1, do: 4, barva: '#7DD3FC' }, { od: 5, do: 7, barva: '#C8F542' }] },
+  { jmeno: 'Tomáš', smeny: [{ od: 2, do: 5, barva: '#FCD34D' }] },
+];
+
+function ObrazovkaTyp() {
+  const t = useT('landing');
+  return (
+    <div className="ld-mini">
+      <p className="ld-mini-titul">{t(MINI.typ)}</p>
+      <ul className="mt-3 grid grid-cols-2 gap-1.5 list-none">
+        {TYPY_PODNIKU.map((typ, i) => (
+          <li key={typ} className={`ld-mini-dlazdice ${i === 0 ? 'ld-vyber' : ''}`}>
+            <span className="truncate">{t(typ)}</span>
+            {i === 0 && <span className="ld-vyber-fajfka" aria-hidden><Icon name="check" size={11} /></span>}
+          </li>
+        ))}
+      </ul>
+      <div className="ld-mini-tlacitko mt-3">{t(MINI.pokracovat)}</div>
+    </div>
+  );
+}
+
+function ObrazovkaKod() {
+  const t = useT('landing');
+  return (
+    <div className="ld-mini">
+      <p className="ld-mini-titul">{t(MINI.kod)}</p>
+      <p className="mt-2 flex gap-1" aria-label={t(MINI.kodPopis, { kod: KOD.join('') })}>
+        {KOD.map((z, i) => (
+          <span key={i} className="ld-kod-znak" style={{ ['--i' as string]: i }}>{z}</span>
+        ))}
+      </p>
+      <ul className="mt-4 space-y-1.5 list-none">
+        {PRIPOJENI.map((p, i) => (
+          <li key={p.jmeno} className="ld-pripojeni" style={{ ['--i' as string]: i }}>
+            <span className="ld-mini-avatar" aria-hidden>{p.emoji}</span>
+            <span className="min-w-0 flex-1 truncate">{p.jmeno}</span>
+            <span className="ld-mini-chip">{t(p.zena ? MINI.pripojena : MINI.pripojen)}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function ObrazovkaRozvrh() {
+  const t = useT('landing');
+  const { jazyk } = useJazyk();
+  return (
+    <div className="ld-mini">
+      <div className="flex items-center justify-between gap-2">
+        <p className="ld-mini-titul">{t(MINI.rozvrh)}</p>
+        <span className="ld-zverejneno"><Icon name="check" size={11} aria-hidden /> {t(MINI.zverejneno)}</span>
+      </div>
+      <div className="ld-tyden mt-3" role="img" aria-label={t(MINI.rozvrhPopis)}>
+        <span />
+        {zkratkyDnu(1).map((d, i) => <span key={d} className="ld-tyden-den">{fmtDenVTydnu(i, { jazyk, styl: 'kratky' })}</span>)}
+        {RADKY.map((r, ri) => (
+          <div key={r.jmeno} className="contents">
+            <span className="ld-tyden-jmeno">{r.jmeno}</span>
+            <div className="ld-tyden-radek">
+              {r.smeny.map((s, si) => (
+                <span key={si} className="ld-smena"
+                  style={{ gridColumn: `${s.od + 1} / ${s.do + 1}`, background: s.barva, ['--i' as string]: ri * 2 + si }} />
               ))}
-            </ul>
-            <Link href="/register" className="pressable mt-6 btn btn-primary btn-lg inline-flex w-full sm:w-auto items-center justify-center gap-2 active:scale-[0.97]">
-              Založit podnik <Icon name="chevron" size={15} className="-rotate-90" />
-            </Link>
+            </div>
           </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const OBRAZOVKY = [ObrazovkaTyp, ObrazovkaKod, ObrazovkaRozvrh];
+
+export default function JakZacit() {
+  const t = useT('landing');
+  return (
+    <section id="zacatek" className="ld-sekce" aria-labelledby="nadpis-zacatek">
+      <div className="ld-obsah">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-x-16 gap-y-6 items-end">
+          <h2 id="nadpis-zacatek" className="ld-h2">{t(ZACATEK_NADPIS.nadpis)}</h2>
+          <p className="ld-perex max-w-[40ch]">{t(ZACATEK_NADPIS.perex)}</p>
         </div>
-      </Reveal>
+
+        <VObraze as="ol" className="ld-kroky mt-14 sm:mt-20 grid grid-cols-1 md:grid-cols-3 gap-x-6 lg:gap-x-8 gap-y-14 list-none">
+          {KROKY.map((k, i) => {
+            const Obrazovka = OBRAZOVKY[i];
+            return (
+              <li key={k.n} className="ld-krok relative" style={{ ['--k' as string]: i }}>
+                <Obrazovka />
+                <div className="mt-8 flex items-baseline gap-4">
+                  <span className="ld-krok-cislo ld-cislo" aria-hidden>{k.n}</span>
+                  <h3 className="ld-h3">{t(k.title)}</h3>
+                </div>
+                <p className="ld-text mt-3 max-w-[36ch]">{t(k.text)}</p>
+              </li>
+            );
+          })}
+        </VObraze>
+
+        <div className="mt-14 flex flex-col sm:flex-row sm:items-center gap-4">
+          <Link href="/register" className="ld-btn ld-btn-svetle w-full sm:w-auto">
+            {t(ZACATEK_NADPIS.tlacitko)} <Icon name="chevron" size={15} className="ld-sipka -rotate-90" aria-hidden />
+          </Link>
+          <p className="ld-meta">{t(ZACATEK_NADPIS.karta)}</p>
+        </div>
+      </div>
     </section>
   );
 }

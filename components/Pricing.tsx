@@ -1,24 +1,18 @@
 'use client';
 
 // Ceník na landingu: tři tarify s přepínačem měsíc/rok a srovnání.
-// i18n: ceník, ceny a srovnání tarifů zůstávají česky (právně citlivé, projde je člověk);
-// překládají se jen ovládací prvky a v cizím jazyce je pod přepínačem věta o tom.
-// Klientská komponenta kvůli přepínači; texty a ceny bere z lib/plan,
-// aby seděly s Nastavením.
-//
-// Srovnání bylo holá tabulka: třináct řádků, tři sloupce, fajfky
-// a pomlčky. Správné, ale nic neříkalo o tom, KTERÝ sloupec si má člověk
-// vybrat. Teď: řádky ve skupinách (provoz / pro rostoucí podnik / pro
-// hosty / napojení), sloupec Pro podbarvený v celé výšce jako jeden pruh,
-// v hlavičce cena vedle jména, fajfka v limetkovém kolečku a „nemá"
-// jako tečka, ne pomlčka, která na malém písmu vypadá jako škrt.
+// Celý ceník se překládá (slovník predplatne) a ceny se formátují podle jazyka
+// stránky; měna zůstává koruna, protože tak účtuje Stripe. Texty a ceny bere
+// z lib/plan, aby seděly s Nastavením. Mluví jazykem jeviště (landing.css).
 
 import { useState } from 'react';
 import Link from 'next/link';
 import { Icon } from './Icons';
-import { Segmented } from './ui';
+import Prepinac from './landing/Prepinac';
 import { PLAN_FEATURES, PLAN_NAMES, PRICES, TRIAL_DAYS } from '@/lib/plan';
 import { useJazyk, useT } from '@/lib/i18n/client';
+import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
+import { formatMoney } from '@/lib/money';
 
 // Úspora se počítá, ne opisuje: 12 × měsíční cena mínus roční. Dřív tu stála
 // přeškrtnutá „srovnávací" cena (4 990 Kč), kterou nikdo nikdy neúčtoval, a štítek
@@ -28,151 +22,204 @@ const USPORA_MESICU = Math.floor(Math.min(uspora('pro') / PRICES.pro.month, uspo
 
 type Interval = 'month' | 'year';
 
-function Bunka({ v, zvyraznit = false }: { v: string | boolean; zvyraznit?: boolean }) {
+function Bunka({ v, svetle = false }: { v: string | boolean; svetle?: boolean }) {
   const t = useT('predplatne');
   if (v === true) {
     return (
-      <span role="img" className={`inline-grid h-6 w-6 place-items-center rounded-full ${zvyraznit ? 'bg-[#C8F542] text-[#3E5406]' : 'bg-[#C8F542]/40 text-[#3E5406]'}`} aria-label={t('ano')}>
-        <Icon name="check" size={13} />
+      <span role="img" className={`ld-tarif-tecka ${svetle ? 'bg-[#C8F542] text-[#16181A]' : 'bg-[rgb(var(--ld-fg)/0.12)] text-[color:var(--ld-papir)]'}`} aria-label={t('ano')}>
+        <Icon name="check" size={12} />
       </span>
     );
   }
-  if (v === false) return <span role="img" className="inline-block h-1.5 w-1.5 rounded-full bg-black/15" aria-label={t('ne')} />;
-  return <span className="text-xs font-semibold text-[#16181A]">{v}</span>;
+  if (v === false) return <span role="img" className="inline-block h-1.5 w-1.5 rounded-full bg-[rgb(var(--ld-fg)/0.22)]" aria-label={t('ne')} />;
+  return <span className="text-xs font-semibold">{t(v)}</span>;
 }
+
+type Prekladac = ReturnType<typeof useT>;
 
 // Skupiny srovnání. Podle textu řádku, ne podle pořadí: když se v lib/plan
 // přidá funkce, spadne do správné skupiny sama; co nesedí nikam, jde
-// do poslední.
-const SKUPINY: { nazev: string; sedi: (label: string) => boolean }[] = [
-  { nazev: 'Provoz', sedi: l => /Členů|Směny|Úkoly|Uzávěrky|Sklad/.test(l) },
-  { nazev: 'Pro rostoucí podnik', sedi: l => /Kiosk|Hodnocení|CSV|Měsíční/.test(l) },
-  { nazev: 'Pro hosty', sedi: l => /menu|client/i.test(l) },
-  { nazev: 'Napojení a výroba', sedi: () => true },
+// do poslední. Řádky se třídí podle české věty (klíče), překládá se až při kreslení.
+const SKUPINY: { id: string; sedi: (label: string) => boolean }[] = [
+  { id: 'provoz', sedi: l => /Členů|Směny|Úkoly|Uzávěrky|Sklad/.test(l) },
+  { id: 'rust', sedi: l => /Kiosk|Hodnocení|CSV|Měsíční/.test(l) },
+  { id: 'hoste', sedi: l => /menu|client/i.test(l) },
+  { id: 'napojeni', sedi: () => true },
 ];
 const skupiny = SKUPINY.map(sk => ({ ...sk, radky: [] as typeof PLAN_FEATURES }));
 for (const f of PLAN_FEATURES) skupiny.find(sk => sk.sedi(f.label))!.radky.push(f);
+const nazevSkupiny = (t: Prekladac, id: string) =>
+  id === 'provoz' ? t('Provoz') : id === 'rust' ? t('Pro rostoucí podnik') : id === 'hoste' ? t('Pro hosty') : t('Napojení a výroba');
 
-const KARTY: { id: 'free' | 'pro' | 'max'; veta: string; body: string[] }[] = [
-  { id: 'free', veta: 'Základ pro malý tým, a napořád zdarma.', body: ['Směny, docházka a žádosti', 'Úkoly, návody a chat', 'Uzávěrky a sklad'] },
-  { id: 'pro', veta: 'Všechno bez limitů pro jeden podnik.', body: ['Neomezený tým', 'Kiosk pro tablet za barem', 'Odměny, exporty a měsíční přehled'] },
-  { id: 'max', veta: 'Vše z Pro a k tomu druhá půlka: hosté.', body: ['Věrnost, rezervace a objednávky od stolu', 'Napojení na pokladnu Storyous', 'Výroba vlastních produktů'] },
-];
+// Čím se tarify liší, spočítané z PLAN_FEATURES: Zdarma ukazuje, co má (u textových
+// hodnot i s hodnotou), Pro a Max jen to, co přidávají nad tarif pod sebou.
+function rozdily(t: Prekladac) {
+  const hodnota = (f: (typeof PLAN_FEATURES)[number], id: 'free' | 'pro' | 'max') =>
+    typeof f[id] === 'string' ? t('{funkce}: {hodnota}', { funkce: t(f.label), hodnota: t(String(f[id])).toLowerCase() }) : t(f.label);
+  return [
+    { id: 'free' as const, nadpis: t('Zdarma obsahuje'), polozky: PLAN_FEATURES.filter(f => f.free !== false).map(f => hodnota(f, 'free')) },
+    { id: 'pro' as const, nadpis: t('Pro přidává'), polozky: PLAN_FEATURES.filter(f => f.pro !== false && f.pro !== f.free).map(f => hodnota(f, 'pro')) },
+    { id: 'max' as const, nadpis: t('Max přidává k Pro'), polozky: PLAN_FEATURES.filter(f => f.max !== false && f.max !== f.pro).map(f => hodnota(f, 'max')) },
+  ];
+}
+
+function karty(t: Prekladac): { id: 'free' | 'pro' | 'max'; veta: string; body: string[] }[] {
+  return [
+    { id: 'free', veta: t('Základ pro malý tým, a napořád zdarma.'), body: [t('Směny, docházka a žádosti'), t('Úkoly, návody a chat'), t('Uzávěrky a sklad')] },
+    { id: 'pro', veta: t('Všechno bez limitů pro jeden podnik.'), body: [t('Neomezený tým'), t('Tablet u baru v režimu kiosku'), t('Odměny, exporty a měsíční přehled')] },
+    { id: 'max', veta: t('Vše z Pro, a k tomu druhá půlka: hosté.'), body: [t('Věrnost, rezervace a objednávky od stolu'), t('Napojení na pokladnu Storyous'), t('Výroba vlastních produktů')] },
+  ];
+}
 
 export default function Pricing() {
   const t = useT('predplatne');
   const { jazyk } = useJazyk();
   const [interval, setInterval_] = useState<Interval>('month');
+  const kc = (n: number) => formatMoney(n, 'CZK', LOCALE_PRO_JAZYK[jazyk]);
   const cena = (p: 'pro' | 'max') => {
     const pr = PRICES[p];
     return interval === 'year'
-      ? { hlavni: `${pr.year.toLocaleString('cs-CZ')} Kč`, pod: 'ročně za podnik', usetrite: `${uspora(p).toLocaleString('cs-CZ')} Kč` }
-      : { hlavni: `${pr.month} Kč`, pod: 'měsíčně za podnik', usetrite: null };
+      ? { hlavni: kc(pr.year), pod: t('ročně za podnik'), usetrite: kc(uspora(p)) }
+      : { hlavni: kc(pr.month), pod: t('měsíčně za podnik'), usetrite: null };
   };
-  const mesicne = (p: 'pro' | 'max') => `${Math.round(PRICES[p][interval === 'year' ? 'year' : 'month'] / (interval === 'year' ? 12 : 1))} Kč/měs`;
+  const mesicne = (p: 'pro' | 'max') => kc(Math.round(PRICES[p].year / 12));
+  const KARTY = karty(t);
+  const ROZDILY = rozdily(t);
 
   return (
-    <section id="cenik" className="relative max-w-6xl mx-auto px-5 sm:px-8 pb-16 sm:pb-24 scroll-mt-24">
-      {/* Nadpis vlevo nad souměrnými kartami — stránka drží těžiště vlevo od
-          hero až dolů, ceník se nevrací do středu jako u šablon. */}
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="max-w-xl">
-          <h2 className="text-2xl sm:text-4xl font-bold tracking-tight text-[#16181A]">Jednoduchý ceník</h2>
-          <p className="mt-3 text-base text-black/55 text-pretty">
-            Zdarma napořád pro malý tým. Pro a Max si vyzkoušíte {TRIAL_DAYS} dní zdarma, karta se strhne až po měsíci.
-          </p>
+    <section id="cenik" className="ld-sekce" aria-labelledby="nadpis-cenik">
+      <div className="ld-obsah">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-x-16 gap-y-6 items-end">
+          <h2 id="nadpis-cenik" className="ld-h2">{t('Jednoduchý ceník')}</h2>
+          <div className="flex flex-col items-start gap-5">
+            <p className="ld-perex max-w-[40ch]">
+              {t('Zdarma napořád pro malý tým. Pro a Max si vyzkoušíš na {n, plural, one {# den} few {# dny} other {# dní}} zdarma a první platba přijde až po nich.', { n: TRIAL_DAYS })}
+            </p>
+            <Prepinac ton="tichy" velikost="sm" popis={t('Období')} hodnota={interval} onZmena={v => setInterval_(v as Interval)}
+              moznosti={[{ id: 'month', label: t('Měsíčně') }, { id: 'year', label: t('Ročně · ušetříš {mesice}', { mesice: t('{n, plural, one {# měsíc} few {# měsíce} other {# měsíců}}', { n: USPORA_MESICU }) }) }]} />
+          </div>
         </div>
-        <Segmented size="sm" ariaLabel={t('Období')} value={interval} onChange={v => setInterval_(v as Interval)}
-          options={[{ id: 'month', label: t('Měsíčně') }, { id: 'year', label: t('Ročně · ušetříte {mesice}', { mesice: t('{n, plural, one {# měsíc} few {# měsíce} other {# měsíců}}', { n: USPORA_MESICU }) }) }]} />
-        {jazyk !== 'cs' && <p className="basis-full t-meta">{t('Ceník a platební podmínky jsou zatím jen česky.')}</p>}
-      </div>
 
-      {/* Karty. Pro je zvednutá a má stín — je to doporučená volba a má to
-          být vidět dřív, než člověk dočte cenu. */}
-      <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5 items-stretch">
-        {KARTY.map(k => {
-          const pro = k.id === 'pro';
-          const max = k.id === 'max';
-          const c = k.id === 'free' ? null : cena(k.id);
-          return (
-            <div key={k.id} className={`relative flex flex-col rounded-[2rem] p-7 ${
-              pro ? 'lgx-strong md:-my-3 md:py-10 shadow-[0_30px_70px_rgba(25,35,15,0.16)] ring-2 ring-[#C8F542]' : 'lgx'
-            }`}>
-              {pro && <span className="absolute top-5 right-5 chip chip-sm chip-ok uppercase tracking-wider">{t('Doporučeno')}</span>}
-              <p className="t-label text-black/45">{PLAN_NAMES[k.id]}</p>
-              <p className="mt-2 text-4xl font-bold tracking-tight text-[#16181A] tabular-nums">{c ? c.hlavni : '0 Kč'}</p>
-              <p className="text-xs text-black/55 mt-1">{c ? c.pod : 'navždy, až 3 lidé'}</p>
-              {c?.usetrite && <p className="text-xs text-black/55">Ušetříte {c.usetrite} oproti měsíčnímu placení, vychází na {mesicne(k.id as 'pro' | 'max')}</p>}
-              <p className="mt-4 text-sm font-semibold text-[#16181A] text-pretty">{k.veta}</p>
-              <ul className="mt-4 space-y-2 text-sm text-black/65">
-                {k.body.map(b => (
-                  <li key={b} className="flex items-start gap-2.5">
-                    <span className="mt-0.5 inline-grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[#C8F542]/40 text-[#3E5406]"><Icon name="check" size={12} /></span>
-                    <span>{b}</span>
-                  </li>
-                ))}
-              </ul>
-              {/* Odsazení nese obal, ne odkaz: prstenec fokusu obkresluje odkaz,
-                  a tak má sedět těsně kolem pilulky, ne kolem prázdného místa nad ní. */}
-              <div className="mt-auto pt-7">
-                <Link href={k.id === 'free' ? '/register?plan=free' : `/register?plan=${k.id}&interval=${interval}`} className="flex rounded-full">
-                  <span className={`btn w-full ${pro ? 'btn-accent' : max ? 'btn-primary' : 'btn-secondary'}`}>
-                    {t('Zvolit {plan}', { plan: PLAN_NAMES[k.id] })}
-                  </span>
-                </Link>
+        {/* Tarify. Pro je jediná světlá karta: na jevišti svítí jen to, co
+            doporučujeme, stejně jako nahoře svítí jen aplikace. */}
+        <div className="mt-14 sm:mt-20 grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-5 items-stretch">
+          {KARTY.map(k => {
+            const pro = k.id === 'pro';
+            const c = k.id === 'free' ? null : cena(k.id);
+            return (
+              <div key={k.id} data-tarif={k.id} className="ld-tarif relative flex flex-col p-7 lg:p-8">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-lg font-semibold tracking-tight">{t(PLAN_NAMES[k.id])}</h3>
+                  {pro && <span className="rounded-full bg-[color:var(--ld-ink)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--ld-papir)]">{t('Doporučeno')}</span>}
+                </div>
+                <p className="mt-6 ld-cislo text-[clamp(2.5rem,3.6vw,3.25rem)] font-bold leading-none tracking-[-0.035em]">{c ? c.hlavni : kc(0)}</p>
+                <p className={`mt-2 text-sm ${pro ? 'text-[color:rgb(var(--ld-bg)/0.62)]' : 'text-[color:var(--ld-text-3)]'}`}>{c ? c.pod : t('napořád, až pro 3 lidi')}</p>
+                {c?.usetrite && <p className={`text-sm ${pro ? 'text-[color:rgb(var(--ld-bg)/0.62)]' : 'text-[color:var(--ld-text-3)]'}`}>{t('Ušetříš {castka} oproti měsíčnímu placení, vychází na {mesicne} měsíčně.', { castka: c.usetrite, mesicne: mesicne(k.id as 'pro' | 'max') })}</p>}
+                <p className="mt-6 text-[0.9375rem] font-semibold text-pretty">{k.veta}</p>
+                <ul className={`mt-4 space-y-2.5 text-[0.9375rem] ${pro ? 'text-[color:rgb(var(--ld-bg)/0.72)]' : 'text-[color:var(--ld-text-2)]'}`}>
+                  {k.body.map(b => (
+                    <li key={b} className="flex items-start gap-2.5">
+                      <span className={`ld-tarif-tecka mt-0.5 ${pro ? 'bg-[#C8F542] text-[#16181A]' : 'bg-[rgb(var(--ld-fg)/0.12)] text-[color:var(--ld-papir)]'}`}><Icon name="check" size={11} /></span>
+                      <span>{b}</span>
+                    </li>
+                  ))}
+                </ul>
+                {/* Odsazení nese obal, ne odkaz: prstenec fokusu má sedět těsně kolem pilulky. */}
+                <div className="mt-auto pt-8">
+                  <Link href={k.id === 'free' ? '/register?plan=free' : `/register?plan=${k.id}&interval=${interval}`} className="flex rounded-full">
+                    <span className={pro ? 'btn btn-accent w-full' : 'ld-btn ld-btn-obrys w-full'}>
+                      {t('Zvolit {plan}', { plan: t(PLAN_NAMES[k.id]) })}
+                    </span>
+                  </Link>
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
 
-      {/* Srovnání. První sloupec drží na místě, když se tabulka na telefonu
-          posouvá — jinak člověk vidí tři fajfky a neví, k čemu patří. */}
-      <div className="lgx rounded-[2rem] p-3 sm:p-6 mt-8 overflow-x-auto">
-        <table className="srov w-full text-sm min-w-[36rem] border-separate border-spacing-0">
-          <thead>
-            <tr>
-              <th className="sticky left-0 z-[1] bg-white/85 md:bg-transparent text-left t-label text-black/45 py-3 pl-3 pr-3 rounded-l-2xl">Funkce</th>
-              <th className="py-3 px-3 w-28 text-left">
-                <p className="t-label text-black/45">Zdarma</p>
-                <p className="mt-0.5 text-sm font-bold text-[#16181A] tabular-nums">0 Kč</p>
-              </th>
-              <th className="srov-pro py-3 px-3 w-36 text-left">
-                <p className="t-label text-[#5B7A08]">Pro</p>
-                <p className="mt-0.5 text-sm font-bold text-[#16181A] tabular-nums">{cena('pro').hlavni}</p>
-              </th>
-              <th className="py-3 px-3 w-36 text-left">
-                <p className="t-label text-[#0A5CC0]">Max</p>
-                <p className="mt-0.5 text-sm font-bold text-[#16181A] tabular-nums">{cena('max').hlavni}</p>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {skupiny.filter(sk => sk.radky.length).map(sk => (
-              <SkupinaRadku key={sk.nazev} nazev={sk.nazev} radky={sk.radky} />
+        {/* Srovnání: tabulka o třinácti řádcích byla suchá a většinu řádků mají
+            všechny tarify stejně. Nahoře proto jen to, čím se tarify liší
+            (počítá se z lib/plan, ne opisuje), celá tabulka je pod rozbalením. */}
+        <div className="mt-16">
+          <h3 className="text-lg font-semibold tracking-tight">{t('Čím se tarify liší')}</h3>
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-5">
+            {ROZDILY.map(r => (
+              <div key={r.id} className="ld-rozdil">
+                <p className="text-sm font-semibold text-[color:var(--ld-text-3)]">{r.nadpis}</p>
+                <ul className="mt-4 space-y-3 list-none">
+                  {r.polozky.map(f => (
+                    <li key={f} className="flex items-start gap-3 text-[0.9375rem] leading-snug">
+                      <span className={`ld-tarif-tecka mt-px ${r.id === 'pro' ? 'bg-[#C8F542] text-[#16181A]' : 'bg-[rgb(var(--ld-fg)/0.12)] text-[color:var(--ld-papir)]'}`}><Icon name={r.id === 'free' ? 'check' : 'plus'} size={11} /></span>
+                      <span>{f}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ))}
-          </tbody>
-        </table>
-        <p className="mt-4 px-3 text-[11px] text-black/40">Ceny bez DPH. Doporučte Managero dalšímu podniku a získejte měsíc zdarma, až tři za měsíc.</p>
+          </div>
+
+          <details className="ld-otazka ld-cela-tabulka mt-8">
+            <summary className="flex min-h-[3.5rem] items-center justify-between gap-6 py-4 text-[0.9375rem] font-semibold">
+              {t('Celé srovnání, {n, plural, one {# řádek} few {# řádky} other {# řádků}}', { n: PLAN_FEATURES.length })}
+              <span className="ld-plus text-[color:var(--ld-text-2)]" aria-hidden />
+            </summary>
+            <table className="ld-srovnani mt-2 mb-6 hidden md:table w-full text-[0.9375rem] border-separate border-spacing-0">
+              <thead>
+                <tr>
+                  <th className="text-left text-sm font-semibold text-[color:var(--ld-text-3)] py-4 pr-4 border-t-0" scope="col">{t('Funkce')}</th>
+                  <th scope="col" className="py-4 px-4 w-36 text-left border-t-0 text-sm font-semibold text-[color:var(--ld-text-2)]">{t(PLAN_NAMES.free)}</th>
+                  <th scope="col" className="ld-sloupec-pro rounded-t-2xl py-4 px-4 w-40 text-left border-t-0 text-sm font-semibold">Pro</th>
+                  <th scope="col" className="py-4 px-4 w-40 text-left border-t-0 text-sm font-semibold text-[color:var(--ld-text-2)]">Max</th>
+                </tr>
+              </thead>
+              <tbody>
+                {skupiny.filter(sk => sk.radky.length).map(sk => (
+                  <SkupinaRadku key={sk.id} nazev={nazevSkupiny(t, sk.id)} radky={sk.radky} />
+                ))}
+              </tbody>
+            </table>
+            <div className="md:hidden mb-6">
+              {skupiny.filter(sk => sk.radky.length).map(sk => (
+                <div key={sk.id} className="mt-6">
+                  <p className="text-sm font-semibold text-[color:var(--ld-text-3)]">{nazevSkupiny(t, sk.id)}</p>
+                  <ul className="mt-2 list-none">
+                    {sk.radky.map(f => (
+                      <li key={f.label} className="border-t border-[color:var(--ld-linka)] py-3.5">
+                        <p className="text-[0.9375rem]">{t(f.label)}</p>
+                        <div className="mt-2.5 grid grid-cols-3 gap-2 text-xs text-[color:var(--ld-text-3)]">
+                          {(['free', 'pro', 'max'] as const).map(id => (
+                            <span key={id} className="flex items-center gap-2">{t(PLAN_NAMES[id])} <Bunka v={f[id]} svetle={id === 'pro'} /></span>
+                          ))}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </details>
+          <p className="ld-meta mt-6">{t('Ceny jsou bez DPH. Doporuč Managero dalšímu podniku a dostaneš měsíc zdarma, nejvýš tři za měsíc.')}</p>
+        </div>
       </div>
     </section>
   );
 }
 
 function SkupinaRadku({ nazev, radky }: { nazev: string; radky: typeof PLAN_FEATURES }) {
+  const t = useT('predplatne');
   return (
     <>
       <tr>
-        <th scope="rowgroup" colSpan={2} className="sticky left-0 z-[1] bg-white/85 md:bg-transparent text-left pt-5 pb-1.5 pl-3 pr-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-black/40">{nazev}</th>
-        <td className="srov-pro pt-5 pb-1.5" aria-hidden />
-        <td className="pt-5 pb-1.5" aria-hidden />
+        <th scope="rowgroup" colSpan={2} className="text-left pt-8 pb-2 pr-4 text-sm font-semibold text-[color:var(--ld-text-3)] border-t-0">{nazev}</th>
+        <td className="ld-sloupec-pro pt-8 pb-2 border-t-0" aria-hidden />
+        <td className="pt-8 pb-2 border-t-0" aria-hidden />
       </tr>
       {radky.map(f => (
-        <tr key={f.label} className="group">
-          <th scope="row" className="sticky left-0 z-[1] bg-white/85 md:bg-transparent text-left font-normal text-[#16181A] py-2.5 pl-3 pr-3 border-t border-black/[0.05]">{f.label}</th>
-          <td className="py-2.5 px-3 border-t border-black/[0.05]"><Bunka v={f.free} /></td>
-          <td className="srov-pro py-2.5 px-3 border-t border-black/[0.05]"><Bunka v={f.pro} zvyraznit /></td>
-          <td className="py-2.5 px-3 border-t border-black/[0.05]"><Bunka v={f.max} /></td>
+        <tr key={f.label}>
+          <th scope="row" className="text-left font-normal py-3.5 pr-4">{t(f.label)}</th>
+          <td className="py-3.5 px-4"><Bunka v={f.free} /></td>
+          <td className="ld-sloupec-pro py-3.5 px-4"><Bunka v={f.pro} svetle /></td>
+          <td className="py-3.5 px-4"><Bunka v={f.max} /></td>
         </tr>
       ))}
     </>

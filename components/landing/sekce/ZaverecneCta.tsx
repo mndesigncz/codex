@@ -1,24 +1,25 @@
-import Foto from '../Foto';
-import Reveal from '../Reveal';
-import Zkusit from '../Zkusit';
+'use client';
 
-// Závěrečná výzva: tmavý blok s fotkou týmu. Jediné místo na stránce, kde je
-// text na fotce, proto je pod ním plné ztmavení a kontrast se měří sondou cta.
+import Zkusit from '../Zkusit';
+import { useT } from '@/lib/i18n/client';
+import { LIMITS } from '@/lib/plan';
+import { ZAVER, ZDARMA_VETA } from '../obsah';
+
+// Závěrečná výzva: stejné jeviště jako nahoře, jen bez aplikace, ta už byla
+// vidět. Velká věta, jedno limetkové tlačítko a pod ním, co to stojí na začátku.
 export default function ZaverecneCta() {
+  const t = useT('landing');
   return (
-    <section className="relative max-w-6xl mx-auto px-5 sm:px-8 pb-20" aria-labelledby="nadpis-cta">
-      <Reveal>
-        <div className="relative rounded-[2rem] overflow-hidden">
-          <Foto id="tym" pomer="aspect-[4/5] sm:aspect-[21/9]" sizes="(max-width: 1280px) 92vw, 72rem" paralax={false} prekryv="scrim" />
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-5 sm:px-12 py-10">
-            <h2 id="nadpis-cta" className="text-2xl sm:text-4xl font-bold tracking-tight text-white text-balance">Zítřejší směna už může viset v aplikaci.</h2>
-            <p className="mt-3 text-base text-white/80 max-w-md text-pretty">Registrace bez karty. Tým se připojí jedním kódem a hned vidí, kdy jde do práce.</p>
-            <div className="mt-7 w-full sm:w-auto flex justify-center">
-              <Zkusit />
-            </div>
-          </div>
+    <section className="ld-sekce pb-[var(--ld-rytmus)]" aria-labelledby="nadpis-cta">
+      <div className="ld-obsah relative text-center">
+        <div className="ld-svetlo !top-[-10%]" aria-hidden />
+        <h2 id="nadpis-cta" className="ld-h1 mx-auto max-w-[13em]">{t(ZAVER.nadpis)}</h2>
+        <p className="ld-perex mx-auto mt-6 max-w-[42ch]">{t(ZAVER.perex)}</p>
+        <div className="mt-10 flex justify-center">
+          <Zkusit />
         </div>
-      </Reveal>
+        <p className="ld-meta mx-auto mt-5 max-w-[46ch]">{t(ZDARMA_VETA, { n: LIMITS.free.members ?? 0 })}</p>
+      </div>
     </section>
   );
 }

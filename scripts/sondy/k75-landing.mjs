@@ -283,7 +283,7 @@ const cekejNaBublinu = (p, re, timeout = 12000) => p.waitForFunction(
   } catch (e) { ldInfo = String(e); }
   tvrdi(`L10 JSON-LD SoftwareApplication: tři nabídky z lib/plan (${ldInfo}) a žádné hodnocení`, ldOk, ldInfo);
   const pat = await p.locator('footer').innerText();
-  tvrdi('L10 patička říká, že fotky jsou ilustrační a data v obrazovkách vymyšlená', /ilustrační/.test(pat) && /vymyšlená/.test(pat));
+  tvrdi('L10 patička říká, že obrazovky jsou ze skutečné aplikace a data v nich vymyšlená', /skutečné aplikace/.test(pat) && /vymyšlená/.test(pat));
   const cenik = await p.locator('#cenik').innerText();
   tvrdi('L10 ceník neukazuje vymyšlenou přeškrtnutou cenu', (await p.locator('#cenik s, #cenik del').count()) === 0 && !/2 měsíce zdarma/.test(cenik));
   await ctx.close();

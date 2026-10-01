@@ -5,6 +5,7 @@ import { generateJoinCode } from '@/lib/team';
 import { hit } from '@/lib/rateLimit';
 import { klientIp } from '@/lib/klientIp';
 import { normalizujEmail, vypadaJakoEmail } from '@/lib/emailAdresa';
+import { CILE_ID, TYPY_ID, VELIKOSTI_TYMU, type Odpovedi } from '@/lib/pruvodce/typy';
 
 export const dynamic = 'force-dynamic';
 
@@ -101,8 +102,13 @@ export async function POST(request: Request) {
     // Nový podnik dostane průvodce prvotním nastavením. Mimo INSERT týmu a v try:
     // před migrací sloupec chybí a registrace kvůli tomu nesmí spadnout, průvodce
     // se pak prostě nespustí (podnik se chová jako dosud).
+    // Odpovědi z cesty registrace (typ, název, velikost týmu, cíle) jdou rovnou
+    // do průvodce: ten na ně naváže krokem „podnik" a znovu se neptá. Přijímá
+    // se jen to, co průvodce zná; cokoli jiného z požadavku se zahodí.
+    const odpovedi = odpovediZCesty(b.odpovedi);
+    const zCesty = Object.keys(odpovedi).length > 0;
     try {
-      await sql`UPDATE teams SET onboarding = ${JSON.stringify({ v: 1, stav: 'nove', zacato: new Date().toISOString() })}::jsonb WHERE id = ${team.id}`;
+      await sql`UPDATE teams SET onboarding = ${JSON.stringify({ v: 1, stav: 'nove', ...(zCesty ? { krok: 'podnik' } : {}), zacato: new Date().toISOString(), odpovedi, pouzito: {} })}::jsonb WHERE id = ${team.id}`;
     } catch { /* onboarding column not migrated yet */ }
 
     // Link owner to team
@@ -118,4 +124,22 @@ export async function POST(request: Request) {
     console.error('Register error:', error);
     return NextResponse.json({ error: 'Chyba serveru' }, { status: 500 });
   }
+}
+
+/** Odpovědi z cesty registrace, očištěné na to, co průvodce zná. */
+function odpovediZCesty(v: unknown): Odpovedi {
+  if (!v || typeof v !== 'object') return {};
+  const o = v as Record<string, unknown>;
+  const out: Odpovedi = {};
+  if (typeof o.typ === 'string' && (TYPY_ID as readonly string[]).includes(o.typ)) out.typ = o.typ as Odpovedi['typ'];
+  if (typeof o.nazev === 'string' && o.nazev.trim()) out.nazev = o.nazev.trim().slice(0, 80);
+  const tym = o.tym as Record<string, unknown> | undefined;
+  if (tym && typeof tym.velikost === 'string' && (VELIKOSTI_TYMU as readonly string[]).includes(tym.velikost)) {
+    out.tym = { velikost: tym.velikost as NonNullable<Odpovedi['tym']>['velikost'] };
+  }
+  if (Array.isArray(o.cile)) {
+    const cile = [...new Set(o.cile.filter((c): c is string => typeof c === 'string' && (CILE_ID as readonly string[]).includes(c)))];
+    if (cile.length) out.cile = cile as Odpovedi['cile'];
+  }
+  return out;
 }

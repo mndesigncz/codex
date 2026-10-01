@@ -33,7 +33,8 @@ export default function ({ ok }: Testy) {
   // ---- landing: hlavička ----
   const hlavicka = cti('components/landing/LandingHeader.tsx');
   ok('landing: menu sekcí až od lg (na md se nevejde)', /<nav ref=\{nav\}[^>]*className="relative hidden lg:flex /.test(hlavicka) && !/hidden md:flex/.test(hlavicka));
-  ok('landing: dlouhé tlačítko „Vyzkoušet … zdarma" jen tam, kde se vejde', hlavicka.includes('hidden sm:inline lg:hidden xl:inline'));
+  // Hlavička prodejní stránky je od kola 79 přepracovaná: dlouhý popisek tlačítka je jen od sm (na telefonu krátké „Vyzkoušet“).
+  ok('landing: na telefonu krátké tlačítko, dlouhé až od sm', hlavicka.includes('sm:hidden') && /hidden sm:inline/.test(hlavicka));
 
   // ---- uzávěrka: bankovky ----
   const uzaverka = cti('components/employee/CashClosing.tsx');

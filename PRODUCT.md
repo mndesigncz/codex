@@ -50,6 +50,23 @@ nejvýš tři za měsíc. Ceny hledáme podle `lookup_key` (pro_monthly…), env
 na Max napořád. Platby hostů v Managero client zůstávají mimo rozsah — host
 platí u obsluhy.
 
+**Registrace je cesta, tarif až na konci** (`/register`,
+`components/registrace/Cesta.tsx`): typ podniku → název → velikost týmu →
+cíle → krátké čtení odpovědí zpátky → účet (jméno, e-mail, heslo) → volba
+tarifu s doporučením podle odpovědí (`doporucenyTarif`, nebo `?plan=` z ceníku).
+Zdarma jde bez karty; Pro a Max otevřou vloženou pokladnu Stripe se zkušební
+dobou: předplatné je ve Stripe hned aktivní (`trialing`), karta uložená a první
+platba se strhne sama po 30 dnech. Odpovědi se uloží do `teams.onboarding`
+a průvodce nastavením začne krokem „podnik". V nativním obalu krok tarifu
+chybí (hlídá `check-obal`), sondy `trial` a `k77-obchody`.
+
+**Jazyk podle země** (kolo 79): kdo si jazyk nezvolil (cookie `managero-lang`),
+dostane ho podle země z hlavičky Vercelu `x-vercel-ip-country`
+(`jazykZeZeme` v `lib/i18n/config.ts`): CZ čeština, SK slovenština, PL polština,
+DE/AT/CH/LI/LU němčina, zbytek světa angličtina; bez hlavičky čeština. Prodejní
+stránka má vlastní slovník `landing` (texty v `components/landing/obsah.ts`),
+celý ceník i krok tarifu v registraci se překládají; účtuje se dál v CZK.
+
 ## Jak se měří kvalita
 
 Každé kolo: tsc, čtyři guardy (čas, desetinná pole, šířky, kontrast),

@@ -1,152 +1,513 @@
-/* Prodejní stránka: styly, které nepatří do globals.css.
+/* Prodejní stránka „Živé jeviště": styly, které nepatří do globals.css.
 
-   Proč zvláštní soubor: globals.css je sdílený s celou aplikací a mění se
-   souběžně v jiných větvích; prodejní stránka si tu nese jen to, co potřebuje
-   ona (rámy zařízení, ukázka, coach marks, nahrávky). Všechny třídy mají
-   předponu ld-. Barvy jsou tokeny z globals.css (--ink, --lime, --surface,
-   --shadow-*), ne holé hexy: když se paleta změní, změní se i tady. */
+   Stránka je inkoustové jeviště a jediné světlé plochy na ní jsou obrazovky
+   skutečné aplikace. Limetka patří hlavní akci, aktivnímu stavu a kurzoru
+   ukázky, nic jiného nesvítí. Všechny třídy mají předponu ld-; barvy jsou
+   tokeny značky (inkoust, papír, limetka), ne nové odstíny.
+
+   Jedna šířka obsahu (--ld-sirka) a jeden svislý rytmus (--ld-rytmus) pro
+   všechny sekce: stará stránka měla pět různých šířek a rozestupy od oka. */
+
+.ld-root {
+  /* Dvě barvy jako trojice RGB: --ld-bg je plocha stránky, --ld-fg písmo
+     a linky. Jeviště je inkoustové (papír na inkoustu), mřížka to otočí;
+     komponenty sekcí jsou pro oba světy stejné. */
+  --ld-bg: 22 24 26;
+  --ld-fg: 243 244 240;
+  --ld-ink: rgb(var(--ld-bg));
+  --ld-papir: rgb(var(--ld-fg));
+  --ld-text-2: rgb(var(--ld-fg) / 0.66);
+  --ld-text-3: rgb(var(--ld-fg) / 0.5);
+  --ld-linka: rgb(var(--ld-fg) / 0.1);
+  --ld-linka-2: rgb(var(--ld-fg) / 0.18);
+  --ld-lime: #C8F542;
+  --ld-sirka: 74rem;
+  --ld-okraj: clamp(1.25rem, 4vw, 3rem);
+  --ld-rytmus: clamp(6rem, 12vw, 11rem);
+  --ld-ease: cubic-bezier(0.23, 1, 0.32, 1);
+  position: relative;
+  background: var(--ld-ink);
+  color: var(--ld-papir);
+  min-height: 100dvh;
+  overflow-x: clip;
+}
+/* Nad 1440 px roste celá stránka úměrně s oknem (rem je 1/90 šířky), jinak
+   by na velkém monitoru zůstala malá uprostřed a jeviště by ztratilo měřítko. */
+@media (min-width: 1441px) { html:has(.ld-root) { font-size: min(1.1111vw, 180%); } }
+
+/* Přetažení za okraj stránky (Safari, trackpad) ukazuje inkoust, ne papír aplikace. */
+html:has(.ld-root), html:has(.ld-root) body { background: #16181A; }
+/* Zrno aplikace (body::after) je stavěné na světlý papír; na inkoustu by šumělo přes všechno. */
+html:has(.ld-root) body::after { display: none; }
+
+.ld-root ::selection { background: var(--ld-lime); color: #16181A; }
+.ld-root :focus-visible { outline: 2px solid var(--ld-lime); outline-offset: 3px; border-radius: 0.5rem; }
+.ld-root a, .ld-root button { -webkit-tap-highlight-color: transparent; }
+
+.ld-obsah { width: 100%; max-width: calc(var(--ld-sirka) + 2 * var(--ld-okraj)); margin-inline: auto; padding-inline: var(--ld-okraj); }
+.ld-sekce { padding-top: var(--ld-rytmus); scroll-margin-top: 4rem; }
+
+/* ——— Typografie ———————————————————————————————————————————————— */
+.ld-h1 {
+  font-weight: 700;
+  font-size: clamp(2.35rem, 3.95vw, 6.25rem);
+  line-height: 1.02;
+  letter-spacing: -0.038em;
+  text-wrap: balance;
+}
+.ld-h2 {
+  font-weight: 700;
+  font-size: clamp(2rem, 3.6vw, 3.75rem);
+  line-height: 1.04;
+  letter-spacing: -0.034em;
+  text-wrap: balance;
+}
+.ld-h3 { font-weight: 650; font-size: clamp(1.375rem, 1.9vw, 1.875rem); line-height: 1.12; letter-spacing: -0.022em; }
+.ld-perex { font-size: clamp(1.0625rem, 1.5vw, 1.5rem); line-height: 1.45; color: var(--ld-text-2); text-wrap: pretty; }
+.ld-text { font-size: 1rem; line-height: 1.6; color: var(--ld-text-2); text-wrap: pretty; }
+.ld-meta { font-size: 0.875rem; line-height: 1.5; color: var(--ld-text-3); text-wrap: pretty; }
+.ld-cislo { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+
+/* ——— Tlačítka na jevišti ——————————————————————————————————————— */
+.ld-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  height: 3rem; padding-inline: 1.5rem; border-radius: 9999px;
+  font-weight: 600; font-size: 0.9375rem; white-space: nowrap;
+  transition: background-color 200ms var(--ld-ease), color 200ms var(--ld-ease), transform 120ms var(--ld-ease);
+}
+.ld-btn:active { transform: scale(0.97); }
+.ld-btn-sm { height: 2.5rem; padding-inline: 1.125rem; font-size: 0.875rem; }
+.ld-btn-svetle { background: var(--ld-papir); color: var(--ld-ink); }
+.ld-btn-obrys { color: var(--ld-papir); box-shadow: inset 0 0 0 1px var(--ld-linka-2); }
+@media (hover: hover) {
+  .ld-btn-svetle:hover { background: #fff; }
+  .ld-btn-obrys:hover { background: rgb(var(--ld-fg) / 0.06); }
+}
+.ld-sipka { transition: transform 220ms var(--ld-ease); }
+@media (hover: hover) { a:hover > .ld-sipka, button:hover > .ld-sipka { transform: translateX(3px); } }
+
+/* ——— Hlavička ————————————————————————————————————————————————— */
+.ld-lista { transition: background-color 260ms var(--ld-ease), box-shadow 260ms var(--ld-ease); }
+.ld-lista[data-posunuto="true"] {
+  /* Plná, ne sklo: pod lištou projíždí i limetková plocha a sklo by ji
+     protáhlo do lišty jako olivový závoj. */
+  background: rgb(var(--ld-bg));
+  box-shadow: 0 1px 0 var(--ld-linka);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .ld-lista[data-posunuto="true"] { background: var(--ld-ink); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
+/* Výběr jazyka je komponenta aplikace (světlý motiv); na jevišti dostane světlé písmo. */
+.ld-jazyk .chip { color: var(--ld-text-2) !important; background: transparent !important; box-shadow: inset 0 0 0 1px var(--ld-linka-2) !important; border-color: transparent !important; }
+.ld-jazyk .chip:hover { color: var(--ld-papir) !important; }
+
+/* ——— Přepínač na jevišti (scény, role, zařízení) ——————————————————— */
+.ld-prepinac {
+  display: inline-flex; max-width: 100%; min-width: 0;
+  border-radius: 9999px; box-shadow: inset 0 0 0 1px rgb(var(--ld-fg) / 0.22);
+}
+.ld-prepinac-pas {
+  position: relative; display: flex; gap: 0.125rem; padding: 0.25rem;
+  min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
+  border-radius: 9999px;
+}
+.ld-prepinac-pas::-webkit-scrollbar { display: none; }
+.ld-prepinac-pilulka {
+  position: absolute; left: 0; top: 0; border-radius: 9999px; pointer-events: none;
+  background: var(--ld-lime);
+}
+.ld-prepinac[data-ton="tichy"] .ld-prepinac-pilulka { background: rgb(var(--ld-fg) / 0.14); }
+@media (prefers-reduced-motion: no-preference) {
+  .ld-prepinac-pilulka { transition: transform 300ms var(--ld-ease), width 300ms var(--ld-ease); }
+}
+.ld-prepinac-polozka {
+  position: relative; z-index: 1; flex-shrink: 0;
+  min-height: 1.75rem; padding: 0.25rem 1.4rem; border-radius: 9999px;
+  font-size: 0.875rem; font-weight: 550; white-space: nowrap; color: rgb(var(--ld-fg) / 0.86);
+  transition: color 220ms var(--ld-ease);
+}
+.ld-prepinac-polozka[aria-selected="true"] { color: #16181A; }
+.ld-prepinac[data-ton="tichy"] .ld-prepinac-polozka[aria-selected="true"] { color: var(--ld-papir); }
+.ld-prepinac[data-velikost="sm"] .ld-prepinac-polozka { min-height: 2rem; padding: 0.375rem 0.875rem; font-size: 0.8125rem; }
+@media (hover: hover) { .ld-prepinac-polozka[aria-selected="false"]:hover { color: var(--ld-papir); } }
 
 /* ——— Rám zařízení ——————————————————————————————————————————————
-   Jeden rám pro živou ukázku i pro smyčky, ať telefon vypadá jako telefon
-   všude. `data-zar` určuje poměr stran; u ukázky navíc existuje `auto`:
-   počítač od 768 px, pod tím telefon (stejné rozhodnutí, jaké pak udělá
-   skript, takže se při hydrataci nic nepřeskládá). */
+   Jeden rám pro živou ukázku i pro nahrávky. Tenký inkoustový rám se
+   světlejší hranou: na inkoustovém jevišti ho dělá hrana, ne tloušťka.
+   `data-zar` určuje poměr stran; ukázka má navíc `auto` (počítač od 768 px,
+   pod tím telefon, stejné rozhodnutí jako skript, takže hydratace nic
+   nepřeskládá). */
 .ld-ram {
   position: relative;
   margin-inline: auto;
   width: 100%;
-  padding: 7px;
-  background: var(--ink);
-  border-radius: 1.35rem;
-  box-shadow: var(--shadow-float);
+  padding: clamp(6px, 0.55vw, 14px);
+  background: #0E1012;
+  border-radius: clamp(1rem, 1.35vw, 2rem);
+  box-shadow:
+    inset 0 0 0 1px rgb(var(--ld-fg) / 0.16),
+    0 40px 120px -30px rgba(0, 0, 0, 0.7);
 }
-.ld-ram[data-zar="telefon"] { max-width: 19rem; padding: 9px; border-radius: 2.4rem; }
-.ld-ram[data-zar="tablet"] { max-width: 44rem; padding: 10px; border-radius: 1.9rem; }
-.ld-ram[data-zar="pocitac"] { max-width: 64rem; }
-/* Malé rámy ve smyčkách Dne s podnikem. */
+.ld-ram[data-zar="telefon"] { max-width: 19rem; padding: 9px; border-radius: 2.5rem; }
+.ld-ram[data-zar="tablet"] { max-width: 46rem; padding: 11px; border-radius: 2rem; }
+.ld-ram[data-zar="pocitac"], .ld-ram[data-zar="auto"] { max-width: none; padding: clamp(8px, 1.3vw, 2.5rem); border-radius: clamp(1.1rem, 1.9vw, 3rem); }
 .ld-ram-m[data-zar="telefon"] { max-width: 15rem; }
 .ld-ram-m[data-zar="tablet"] { max-width: 34rem; }
-.ld-ram-m[data-zar="pocitac"] { max-width: 40rem; }
+.ld-ram-m[data-zar="pocitac"] { max-width: 42rem; }
 
 .ld-obrazovka {
   position: relative;
   overflow: hidden;
-  background: var(--surface);
-  border-radius: 0.9rem;
-  /* Poměr stran drží místo dřív, než cokoli dorazí (CLS 0). */
+  background: #F3F4F0;
+  border-radius: clamp(0.6rem, 0.8vw, 1.25rem);
   aspect-ratio: var(--ld-pomer, 1100 / 690);
 }
-.ld-ram[data-zar="telefon"] .ld-obrazovka { border-radius: 1.75rem; }
-.ld-ram[data-zar="tablet"] .ld-obrazovka { border-radius: 1.2rem; }
+.ld-ram[data-zar="telefon"] .ld-obrazovka { border-radius: 1.9rem; --ld-pomer: 390 / 780; }
+.ld-ram[data-zar="tablet"] .ld-obrazovka { border-radius: 1.3rem; --ld-pomer: 1024 / 768; }
 .ld-ram[data-zar="pocitac"] .ld-obrazovka { --ld-pomer: 1100 / 690; }
-.ld-ram[data-zar="telefon"] .ld-obrazovka { --ld-pomer: 390 / 780; }
-.ld-ram[data-zar="tablet"] .ld-obrazovka { --ld-pomer: 1024 / 768; }
-
-/* Ukázka bez zvoleného zařízení: počítač, na telefonu telefon. */
-.ld-ram[data-zar="auto"] { max-width: 64rem; }
 .ld-ram[data-zar="auto"] .ld-obrazovka { --ld-pomer: 1100 / 690; }
 @media (max-width: 767px) {
-  .ld-ram[data-zar="auto"] { max-width: 19rem; padding: 9px; border-radius: 2.4rem; }
-  .ld-ram[data-zar="auto"] .ld-obrazovka { --ld-pomer: 390 / 780; border-radius: 1.75rem; }
+  .ld-ram[data-zar="auto"] { max-width: 19rem; padding: 9px; border-radius: 2.5rem; }
+  .ld-ram[data-zar="auto"] .ld-obrazovka { --ld-pomer: 390 / 780; border-radius: 1.9rem; }
 }
 
 .ld-obrazovka > img,
 .ld-obrazovka > video,
 .ld-obrazovka > picture,
-.ld-obrazovka > picture > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.ld-obrazovka > picture > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; }
 
 /* iframe má logický rozměr zařízení a zmenšuje se transformací: aplikace uvnitř
-   je tedy opravdu rozložená na 1100 (390, 1024) px, ne stlačená na 340. */
+   je opravdu rozložená na 1100 (390, 1024) px, ne stlačená. */
 .ld-iframe {
-  position: absolute;
-  left: 0; top: 0;
-  border: 0;
+  position: absolute; left: 0; top: 0; border: 0;
   transform-origin: 0 0;
   transform: scale(var(--ld-skala, 1));
-  background: var(--surface);
+  background: #F3F4F0;
   opacity: 0;
 }
 .ld-iframe[data-hotovo="true"] { opacity: 1; }
 @media (prefers-reduced-motion: no-preference) {
-  .ld-iframe { transition: opacity 260ms var(--ease-out, ease-out); }
+  .ld-iframe { transition: opacity 260ms var(--ld-ease); }
 }
 
-/* Jeviště rámu: od 768 px drží výšku rámu počítače, ať přepnutí na telefon nebo
-   tablet (jsou nižší) nezkrátí stránku a obsah pod ukázkou neposkočí. Výška se
-   počítá z šířky okna ukázky (cqw), protože poměr stran rámu je pevný. */
+/* Jeviště rámu drží výšku rámu počítače, ať přepnutí na telefon nebo tablet
+   nezkrátí stránku (CLS 0, hlídá sonda k75). */
 .ld-okno { container-type: inline-size; }
 @media (min-width: 768px) {
   .ld-stage {
-    display: flex; align-items: center; justify-content: center;
-    /* Větší z rámu počítače a rámu telefonu (37 rem: telefon je vysoký, i když je úzký). */
-    min-height: max(calc(min(100cqw, 64rem) * 0.6273 + 14px), 37rem);
+    display: flex; align-items: flex-start; justify-content: center;
+    min-height: max(calc(100cqw * 0.6273 + 1vw + 6px), 37rem);
   }
   .ld-stage > .ld-ram { flex: 0 1 100%; }
   .ld-stage > .ld-ram[data-zar="telefon"] { flex-basis: 19rem; }
-  .ld-stage > .ld-ram[data-zar="tablet"] { flex-basis: 44rem; }
+  .ld-stage > .ld-ram[data-zar="tablet"] { flex-basis: 46rem; }
 }
 
+/* Světlo pod jevištěm: obrazovka aplikace je jediný zdroj světla, a to
+   se rozlévá po inkoustu pod ní. Ne svatozář kolem rámu, ale odlesk
+   na podlaze, který se drží jeviště. */
+.ld-svetlo {
+  position: absolute; left: 50%; top: 18%; width: 120%; height: 90%;
+  transform: translateX(-50%);
+  background: radial-gradient(50% 50% at 50% 50%, rgba(200, 245, 66, 0.11), rgba(200, 245, 66, 0.035) 45%, transparent 72%);
+  pointer-events: none; z-index: -1;
+}
+@media (prefers-reduced-transparency: reduce) { .ld-svetlo { display: none; } }
+
 /* ——— Coach marks ————————————————————————————————————————————
-   Kurzor a bublina leží nad iframem a nezachytávají dotyky (pointer-events:
-   none), takže se jimi dá proklikávat. Polohu nastavuje skript z polohy prvku
-   uvnitř ukázky. Pohyb je jen tam, kde ho člověk nevypnul. */
+   Kurzor a bublina leží nad iframem a nezachytávají dotyky. Polohu nastavuje
+   skript z polohy prvku uvnitř ukázky. Limetka: na světlé obrazovce aplikace
+   je to jediná věc, kam se má oko podívat. */
 .ld-coach { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
 .ld-coach-kurzor {
-  position: absolute; left: 0; top: 0;
-  width: 26px; height: 26px;
+  position: absolute; left: 0; top: 0; width: 26px; height: 26px;
   transform: translate(var(--x, 50%), var(--y, 50%));
   filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.35));
 }
 .ld-coach-kurzor[data-skryt="true"], .ld-coach-bublina[data-skryt="true"] { opacity: 0; }
 @media (prefers-reduced-motion: no-preference) {
-  .ld-coach-kurzor { transition: transform 720ms cubic-bezier(0.23, 1, 0.32, 1), opacity 180ms ease-out; }
-  .ld-coach-bublina { transition: transform 720ms cubic-bezier(0.23, 1, 0.32, 1), opacity 180ms ease-out; }
-  .ld-coach-kruh { animation: ld-puls 1.7s cubic-bezier(0.23, 1, 0.32, 1) infinite; }
+  .ld-coach-kurzor { transition: transform 720ms var(--ld-ease), opacity 180ms ease-out; }
+  .ld-coach-bublina { transition: transform 720ms var(--ld-ease), opacity 180ms ease-out; }
+  .ld-coach-kruh { animation: ld-puls 1.7s var(--ld-ease) infinite; }
 }
 .ld-coach-kruh {
-  position: absolute; left: -10px; top: -10px; width: 20px; height: 20px;
+  position: absolute; left: -14px; top: -14px; width: 28px; height: 28px;
   border-radius: 9999px;
-  border: 2px solid var(--ink);
-  background: color-mix(in srgb, var(--lime) 55%, transparent);
+  border: 2px solid var(--ld-lime);
+  background: rgba(200, 245, 66, 0.28);
 }
-@keyframes ld-puls { 0% { transform: scale(0.6); opacity: 1; } 70%, 100% { transform: scale(2.4); opacity: 0; } }
+@keyframes ld-puls { 0% { transform: scale(0.7); opacity: 1; } 70%, 100% { transform: scale(2.2); opacity: 0; } }
 .ld-coach-bublina {
   position: absolute; left: 0; top: 0;
   transform: translate(var(--bx, 0px), var(--by, 0px));
-  max-width: min(15rem, 70%);
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--r-md);
-  background: var(--ink);
-  color: #fff;
-  font-size: 0.8125rem;
-  line-height: 1.3;
-  font-weight: 600;
-  box-shadow: var(--shadow-float);
+  max-width: min(16rem, 72%);
+  padding: 0.5rem 0.8rem;
+  border-radius: 0.75rem;
+  background: var(--ld-lime);
+  color: #16181A;
+  font-size: 0.8125rem; line-height: 1.3; font-weight: 650;
+  box-shadow: 0 10px 28px -8px rgba(22, 24, 26, 0.45);
 }
 
+/* ——— Jeviště, které jede s návštěvníkem ———————————————————————————
+   Od 1024 px a bez omezeného pohybu: blok ukázky (přepínač + rám + věta)
+   je přilepený přes hero, „pro koho" i funkce. Skript počítá postup --p
+   (0 v hero, 1 když přijde první funkce) a cíl --tx/--s z pravého sloupce;
+   rám pak couvne do pravého sloupce a funkce vlevo ho přepínají. Pod
+   1024 px a s omezeným pohybem se nic nepřilepuje: ukázka stojí v hero
+   a funkce mají vlastní tlačítko „Ukaž v ukázce". */
+.ld-jev { position: relative; }
+.ld-dok { position: relative; z-index: 2; width: 100%; margin-inline: auto; }
+@media (min-width: 768px) { .ld-dok { width: min(88vw, 84rem); } }
+@media (min-width: 1024px) { .ld-dok { width: min(63vw, 84rem); } }
+.ld-jev-sloupce { position: relative; z-index: 1; }
+@media (min-width: 1024px) and (prefers-reduced-motion: no-preference) {
+  .ld-jev[data-pohyb="true"] .ld-dok {
+    position: sticky;
+    top: var(--ld-dok-top, 6rem);
+    transform-origin: 50% 0;
+    transform:
+      translateX(calc(var(--p, 0) * var(--ld-tx, 0px)))
+      scale(calc(1 - var(--p, 0) * (1 - var(--ld-s, 1))));
+    will-change: transform;
+  }
+  .ld-jev[data-pohyb="true"] .ld-jev-sloupce { display: grid; grid-template-columns: minmax(0, 0.42fr) minmax(0, 0.58fr); column-gap: 4rem; }
+  .ld-jev[data-pohyb="true"] .ld-jev-pravy { position: relative; }
+  /* Věta pod rámem a přepínač role/zařízení se při ústupu do sloupce ztiší. */
+  .ld-jev[data-pohyb="true"] .ld-dok-utlum { opacity: calc(1 - var(--p, 0) * 0.35); }
+}
 
-/* ——— Den s podnikem: aktivní krok určuje IntersectionObserver ——— */
-/* Telefon ve sticky rámu nesmí být vyšší než rám (36 rem). */
-.ld-den .ld-ram[data-zar="telefon"] { max-width: 15rem; }
-.ld-den [data-krok] { transition: opacity 240ms ease-out; }
+/* Pro koho: slova se rozsvěcují, jak jimi prochází střed okna. */
+.ld-typy { list-style: none; }
+.ld-typ {
+  font-weight: 700; letter-spacing: -0.035em; line-height: 1.04;
+  font-size: clamp(2.25rem, 4.6vw, 4.75rem);
+  color: rgb(var(--ld-fg) / 0.22);
+  transition: color 420ms var(--ld-ease);
+}
+.ld-typ[data-svetlo="true"] { color: var(--ld-papir); }
+@media (prefers-reduced-motion: reduce) { .ld-typ { color: var(--ld-papir); transition: none; } }
+
+/* Funkce v levém sloupci: aktivní je ta, kterou prochází střed okna. */
+.ld-funkce-polozka { border-top: 1px solid var(--ld-linka); }
+@media (min-width: 1024px) and (prefers-reduced-motion: no-preference) {
+  .ld-jev[data-pohyb="true"] .ld-funkce-polozka {
+    min-height: 50vh; display: flex; flex-direction: column; justify-content: center;
+    opacity: 0.32; transition: opacity 360ms var(--ld-ease);
+  }
+  .ld-jev[data-pohyb="true"] .ld-funkce-polozka[data-aktivni="true"] { opacity: 1; }
+  .ld-jev[data-pohyb="true"] .ld-ukaz-tlacitko { display: none; }
+}
+.ld-ve-ukazce { display: none; }
+@media (min-width: 1024px) and (prefers-reduced-motion: no-preference) {
+  .ld-jev[data-pohyb="true"] .ld-ve-ukazce { display: inline-flex; }
+}
+.ld-tecka { width: 0.5rem; height: 0.5rem; border-radius: 9999px; background: var(--ld-lime); flex-shrink: 0; }
+
+/* ——— Jeden den: osa dne a smyčka vpravo ——————————————————————————— */
+.ld-den-osa { position: relative; }
+.ld-den-osa::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 1px; background: var(--ld-linka-2);
+}
+.ld-den-plneni {
+  position: absolute; left: 0; top: 0; width: 1px; height: 100%;
+  background: var(--ld-lime);
+  transform-origin: 0 0; transform: scaleY(var(--plneni, 0));
+}
+@media (prefers-reduced-motion: no-preference) { .ld-den-plneni { transition: transform 160ms linear; } }
+.ld-den-krok { position: relative; padding-left: clamp(1.5rem, 3vw, 3rem); }
+.ld-den-krok::before {
+  content: ""; position: absolute; left: -4px; top: 0.85rem; width: 9px; height: 9px; border-radius: 9999px;
+  background: var(--ld-ink); box-shadow: inset 0 0 0 1.5px var(--ld-linka-2);
+  transition: background-color 300ms var(--ld-ease), box-shadow 300ms var(--ld-ease);
+}
+.ld-den-krok[data-prosly="true"]::before { background: var(--ld-lime); box-shadow: none; }
+.ld-cas {
+  font-weight: 700; letter-spacing: -0.04em; line-height: 1;
+  font-size: clamp(2.75rem, 5vw, 5rem);
+  color: rgb(var(--ld-fg) / 0.28);
+  transition: color 320ms var(--ld-ease);
+}
+.ld-den-krok[data-prosly="true"] .ld-cas { color: var(--ld-papir); }
 @media (min-width: 1024px) {
-  .ld-den [data-krok] { opacity: 0.45; }
-  .ld-den[data-aktivni="0"] [data-krok="0"],
-  .ld-den[data-aktivni="1"] [data-krok="1"],
-  .ld-den[data-aktivni="2"] [data-krok="2"],
-  .ld-den[data-aktivni="3"] [data-krok="3"],
-  .ld-den[data-aktivni="4"] [data-krok="4"] { opacity: 1; }
-  .ld-den [data-scena] { opacity: 0; pointer-events: none; }
+  .ld-den-krok { min-height: 54vh; display: flex; flex-direction: column; justify-content: center; }
+  .ld-den [data-scena] { opacity: 0; pointer-events: none; transition: opacity 320ms var(--ld-ease); }
   .ld-den[data-aktivni="0"] [data-scena="0"],
   .ld-den[data-aktivni="1"] [data-scena="1"],
   .ld-den[data-aktivni="2"] [data-scena="2"],
   .ld-den[data-aktivni="3"] [data-scena="3"],
   .ld-den[data-aktivni="4"] [data-scena="4"] { opacity: 1; pointer-events: auto; }
-  .ld-den [data-scena] { transition: opacity 320ms ease-out; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .ld-den [data-krok], .ld-den [data-scena] { transition: none; }
+  .ld-den [data-scena], .ld-cas, .ld-den-krok::before { transition: none; }
+}
+.ld-den .ld-ram[data-zar="telefon"] { max-width: 16rem; }
+
+/* ——— Místo čeho: jediná limetková plocha na stránce ———————————————— */
+.ld-limetka { background: var(--ld-lime); color: #16181A; }
+.ld-limetka ::selection { background: #16181A; color: var(--ld-lime); }
+.ld-limetka :focus-visible { outline-color: var(--ld-ink); }
+.ld-srov-radek { border-top: 1px solid rgba(22, 24, 26, 0.16); }
+.ld-srov-radek:last-child { border-bottom: 1px solid rgba(22, 24, 26, 0.16); }
+.ld-srov-dnes { color: rgba(22, 24, 26, 0.74); }
+.ld-srov-dnes .ld-skrt { text-decoration: line-through; text-decoration-color: rgba(22, 24, 26, 0.35); text-decoration-thickness: 1px; }
+
+/* ——— Ceník —————————————————————————————————————————————————— */
+.ld-tarif { border-radius: 1.75rem; box-shadow: inset 0 0 0 1px var(--ld-linka); }
+.ld-tarif[data-tarif="pro"] { background: var(--ld-papir); color: var(--ld-ink); box-shadow: 0 40px 100px -40px rgba(200, 245, 66, 0.35); }
+.ld-tarif-tecka { width: 1.25rem; height: 1.25rem; border-radius: 9999px; display: inline-grid; place-items: center; flex-shrink: 0; }
+.ld-srovnani th, .ld-srovnani td { border-top: 1px solid var(--ld-linka); }
+.ld-srovnani .ld-sloupec-pro { background: rgb(var(--ld-fg) / 0.045); }
+
+/* ——— Otázky ————————————————————————————————————————————————— */
+.ld-otazka { border-top: 1px solid var(--ld-linka); }
+.ld-otazka:last-child { border-bottom: 1px solid var(--ld-linka); }
+.ld-otazka summary { list-style: none; cursor: pointer; }
+.ld-otazka summary::-webkit-details-marker { display: none; }
+.ld-plus { position: relative; width: 1rem; height: 1rem; flex-shrink: 0; }
+.ld-plus::before, .ld-plus::after {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 100%; height: 1.5px; background: currentColor;
+  transform: translate(-50%, -50%); transition: transform 260ms var(--ld-ease);
+}
+.ld-plus::after { transform: translate(-50%, -50%) rotate(90deg); }
+.ld-otazka[open] .ld-plus::after { transform: translate(-50%, -50%) rotate(0deg); }
+.ld-otazka-odpoved { display: grid; grid-template-rows: 1fr; }
+@supports (interpolate-size: allow-keywords) {
+  .ld-otazka { interpolate-size: allow-keywords; }
+  .ld-otazka::details-content { height: 0; overflow: clip; transition: height 320ms var(--ld-ease), content-visibility 320ms allow-discrete; }
+  .ld-otazka[open]::details-content { height: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ld-otazka::details-content { transition: none; }
 }
 
-/* ——— Srovnání „Dnes / S Managerem" ——————————————————————————— */
-.ld-srov th, .ld-srov td { text-align: left; vertical-align: top; }
+/* ——— Pás pod hlavičkou na telefonu: přepínač scén se posouvá prstem ——— */
+@media (max-width: 767px) {
+  .ld-prepinac-polozka { padding: 0.5rem 0.875rem; font-size: 0.875rem; }
+}
+
+/* ——— Malé obrazovky aplikace (Jak začít, Jistoty) ————————————————
+   Stejný materiál jako ukázka nahoře: papír aplikace na inkoustu, bílé
+   dlaždice, inkoustové písmo, limetka jen na vybraném. Písmo je drobné
+   schválně (je to obrazovka v obrazovce), ale nikdy pod 11 px. */
+.ld-mini {
+  position: relative; overflow: hidden;
+  padding: 1rem; border-radius: 1.1rem;
+  background: #F3F4F0; color: #16181A;
+  font-size: 12px; line-height: 1.35;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5), 0 30px 60px -30px rgba(0, 0, 0, 0.6);
+  min-height: 15.5rem;
+}
+.ld-mini-nizka { min-height: 0; padding: 0.875rem; }
+.ld-mini-titul { font-weight: 650; font-size: 13px; }
+.ld-mini-chip { flex-shrink: 0; border-radius: 9999px; padding: 2px 8px; font-size: 11px; font-weight: 600; background: rgba(22, 24, 26, 0.06); color: rgba(22, 24, 26, 0.7); }
+.ld-mini-avatar { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 9999px; background: #fff; box-shadow: 0 0 0 1px rgba(22, 24, 26, 0.08); font-size: 12px; flex-shrink: 0; }
+.ld-mini-tlacitko { display: grid; place-items: center; height: 30px; border-radius: 9999px; background: #16181A; color: #F3F4F0; font-weight: 600; font-size: 12px; }
+
+/* Krok 1: výběr typu podniku */
+.ld-mini-dlazdice {
+  position: relative; display: flex; align-items: center; gap: 6px;
+  height: 34px; padding: 0 10px; border-radius: 10px;
+  background: #fff; box-shadow: 0 0 0 1px rgba(22, 24, 26, 0.07); font-weight: 550;
+  transition: background-color 260ms var(--ld-ease), color 260ms var(--ld-ease);
+}
+.ld-vyber { background: #16181A; color: #F3F4F0; }
+.ld-vyber-fajfka { margin-left: auto; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 9999px; background: var(--ld-lime); color: #16181A; }
+
+/* Krok 2: kód a připojení */
+.ld-kod-znak {
+  display: grid; place-items: center; width: 30px; height: 38px; border-radius: 8px;
+  background: #fff; box-shadow: 0 0 0 1px rgba(22, 24, 26, 0.08);
+  font-weight: 700; font-size: 18px; letter-spacing: 0; font-variant-numeric: tabular-nums;
+}
+.ld-pripojeni { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 8px; border-radius: 10px; background: #fff; font-weight: 550; }
+.ld-pripojeni .ld-mini-chip { background: rgba(200, 245, 66, 0.35); color: #3E5406; }
+
+/* Krok 3: rozvrh na týden */
+.ld-tyden { display: grid; grid-template-columns: 3.4rem repeat(7, minmax(0, 1fr)); row-gap: 6px; align-items: center; }
+.ld-tyden-den { text-align: center; font-size: 11px; font-weight: 600; color: rgba(22, 24, 26, 0.55); }
+.ld-tyden-jmeno { font-weight: 600; font-size: 11px; }
+.ld-tyden-radek {
+  grid-column: 2 / -1; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); column-gap: 3px;
+  height: 26px; border-radius: 8px; background: #fff; padding: 3px;
+}
+.ld-smena { border-radius: 6px; transform-origin: 0 50%; }
+.ld-zverejneno {
+  display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
+  border-radius: 9999px; padding: 3px 8px; font-size: 11px; font-weight: 650;
+  background: var(--ld-lime); color: #16181A;
+}
+
+/* Kroky na kolejnici: linka nad obrazovkami se při příjezdu protáhne zleva. */
+.ld-kroky { position: relative; }
+.ld-krok-cislo { font-weight: 700; font-size: 1.125rem; color: var(--ld-text-3); }
+
+/* ——— Jistoty: mozaika ——————————————————————————————————————— */
+.ld-jistota { padding: 0.875rem 0.875rem 1.75rem; border-radius: 1.6rem; background: rgb(var(--ld-fg) / 0.035); box-shadow: inset 0 0 0 1px var(--ld-linka); }
+.ld-jistota > h3, .ld-jistota > p { padding-inline: 0.75rem; }
+.ld-soubor { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px; border-radius: 9px; background: #fff; font-weight: 550; }
+.ld-soubor + .ld-soubor { margin-top: 5px; }
+.ld-role { display: grid; grid-template-columns: 1fr 4.2rem 4.2rem; align-items: center; height: 30px; padding: 0 8px; border-radius: 9px; background: #fff; }
+.ld-role + .ld-role { margin-top: 4px; }
+.ld-role-hlava { background: transparent; height: 20px; font-size: 11px; font-weight: 600; color: rgba(22, 24, 26, 0.55); }
+.ld-role > span:not(:first-child) { justify-self: center; }
+.ld-role-ano, .ld-role-ne { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 9999px; }
+.ld-role-ano { background: rgba(200, 245, 66, 0.55); color: #3E5406; }
+.ld-role-ne { background: rgba(22, 24, 26, 0.07); color: rgba(22, 24, 26, 0.55); }
+.ld-jmeno { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 64px; border-radius: 12px; background: #fff; font-weight: 600; font-size: 11px; transition: background-color 260ms var(--ld-ease), color 260ms var(--ld-ease); }
+.ld-jmeno-tuk { background: #16181A; color: #F3F4F0; }
+.ld-offline { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 12px; background: #FFF6DB; color: #5A4300; box-shadow: inset 0 0 0 1px rgba(160, 120, 0, 0.18); }
+.ld-offline .text-black\/60 { color: rgba(90, 67, 0, 0.8); }
+.ld-offline-tecka { margin-top: 4px; width: 8px; height: 8px; border-radius: 9999px; background: #D99A00; flex-shrink: 0; }
+.ld-mena { display: inline-flex; padding: 3px; border-radius: 9999px; background: #fff; box-shadow: 0 0 0 1px rgba(22, 24, 26, 0.08); font-weight: 600; font-size: 11px; }
+.ld-mena > span { padding: 4px 10px; border-radius: 9999px; color: rgba(22, 24, 26, 0.6); }
+.ld-mena > .ld-mena-on { background: #16181A; color: #F3F4F0; }
+.ld-zamek { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; border-radius: 9999px; padding: 3px 8px; font-size: 11px; font-weight: 650; background: #16181A; color: #F3F4F0; }
+.ld-ukol { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 8px; border-radius: 9px; background: #fff; font-weight: 550; }
+.ld-ukol-box { display: grid; place-items: center; width: 16px; height: 16px; border-radius: 5px; box-shadow: inset 0 0 0 1.5px rgba(22, 24, 26, 0.25); }
+.ld-ukol-hotovo { color: rgba(22, 24, 26, 0.55); }
+.ld-ukol-hotovo .ld-ukol-box { background: var(--ld-lime); box-shadow: none; color: #16181A; }
+
+/* ——— Přehrání malých obrazovek ————————————————————————————————
+   `ceka` = výchozí stav před přehráním, `hraje` = animace do koncového
+   stavu, `hotovo` (výchozí ze serveru) = rovnou konec. Každý krok startuje
+   o kus později (--k), uvnitř kroku jdou věci po sobě (--i). */
+@media (prefers-reduced-motion: no-preference) {
+  [data-v-obraze="ceka"] .ld-krok, [data-v-obraze="ceka"] .ld-jistota { opacity: 0; transform: translateY(24px); }
+  [data-v-obraze="hraje"] .ld-krok, [data-v-obraze="hraje"] .ld-jistota {
+    animation: ld-prijezd 700ms var(--ld-ease) both; animation-delay: calc(var(--k, 0) * 140ms);
+  }
+  @keyframes ld-prijezd { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+
+  /* Krok 1: Kavárna se vybere. */
+  [data-v-obraze="ceka"] .ld-vyber { background: #fff; color: #16181A; }
+  [data-v-obraze="ceka"] .ld-vyber-fajfka { opacity: 0; transform: scale(0.6); }
+  [data-v-obraze="hraje"] .ld-vyber { animation: ld-vybrat 1ms linear both; animation-delay: 900ms; }
+  [data-v-obraze="hraje"] .ld-vyber-fajfka { animation: ld-pop 320ms var(--ld-ease) both; animation-delay: 950ms; }
+  @keyframes ld-vybrat { from { background: #fff; color: #16181A; } to { background: #16181A; color: #F3F4F0; } }
+  @keyframes ld-pop { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: none; } }
+
+  /* Krok 2: kód se naťuká, pak se připojují lidé. */
+  [data-v-obraze="ceka"] .ld-kod-znak, [data-v-obraze="ceka"] .ld-pripojeni { opacity: 0; }
+  [data-v-obraze="hraje"] .ld-kod-znak { animation: ld-pop 260ms var(--ld-ease) both; animation-delay: calc(700ms + var(--i) * 110ms); }
+  [data-v-obraze="hraje"] .ld-pripojeni { animation: ld-prijezd 520ms var(--ld-ease) both; animation-delay: calc(1600ms + var(--i) * 380ms); }
+
+  /* Krok 3: směny se natáhnou, pak se rozvrh zveřejní. */
+  [data-v-obraze="ceka"] .ld-smena { transform: scaleX(0); }
+  [data-v-obraze="ceka"] .ld-zverejneno { opacity: 0; }
+  [data-v-obraze="hraje"] .ld-smena { animation: ld-natazeni 520ms var(--ld-ease) both; animation-delay: calc(900ms + var(--i) * 150ms); }
+  [data-v-obraze="hraje"] .ld-zverejneno { animation: ld-pop 360ms var(--ld-ease) both; animation-delay: 2100ms; }
+  @keyframes ld-natazeni { from { transform: scaleX(0); } to { transform: none; } }
+
+  /* Jistoty: řádky uvnitř obrazovek po sobě; na tabletu se klepne na jméno. */
+  [data-v-obraze="ceka"] .ld-soubor, [data-v-obraze="ceka"] .ld-role:not(.ld-role-hlava) { opacity: 0; }
+  [data-v-obraze="hraje"] .ld-soubor, [data-v-obraze="hraje"] .ld-role:not(.ld-role-hlava) {
+    animation: ld-prijezd 480ms var(--ld-ease) both; animation-delay: calc(var(--k, 0) * 140ms + 500ms + var(--i) * 160ms);
+  }
+  [data-v-obraze="ceka"] .ld-jmeno-tuk { background: #fff; color: #16181A; }
+  [data-v-obraze="hraje"] .ld-jmeno-tuk { animation: ld-vybrat 1ms linear both; animation-delay: 1500ms; }
+}
+.ld-rozdil { padding: 1.5rem; border-radius: 1.5rem; box-shadow: inset 0 0 0 1px var(--ld-linka); }
+.ld-cela-tabulka summary { color: var(--ld-text-2); }
+.ld-cela-tabulka[open] summary { color: var(--ld-papir); }
