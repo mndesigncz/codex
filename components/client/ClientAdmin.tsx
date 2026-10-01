@@ -24,6 +24,7 @@
 //    jednou při připojení, a proklik z widgetu by nikam nevedl.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useTheme } from '../ThemeProvider';
 import { Icon, LogoMark } from '../Icons';
 import {
@@ -55,6 +56,10 @@ import { NavigaceKontext, useNavigace } from '../widgety/NavigaceKontext';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
 import { otevriNaTisk } from '@/lib/stahni';
+
+// Nastavení účtu v okně: stejná obrazovka jako v administraci (profil, vzhled a jazyk, oznámení, zabezpečení),
+// jen se stahuje až při otevření, ať ho Client nenese s každým načtením.
+const NastaveniUctu = dynamic(() => import('../Settings'), { loading: () => <div className="flex items-center justify-center h-48"><div className="spinner" /></div> });
 
 type Tab = 'overview' | 'reservations' | 'orders' | 'tables' | 'menu' | 'events' | 'customers' | 'loyalty' | 'brand' | 'settings';
 
@@ -122,7 +127,7 @@ const vyberSouhrnSkorapky = (raw: any): SouhrnSkorapky => ({
   objednavkyNove: Number(raw?.orders?.new) || 0,
 });
 
-export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () => void; initialTab?: string; user?: { id?: string } }) {
+export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () => void; initialTab?: string; user?: { id?: string | number; name?: string; role?: string; avatar?: string } }) {
   const { ma } = useOpravneni();
   const moje = TABS.filter(t => !t.klice || ma(t.klice));
   const klicMoje = moje.map(t => t.id).join(',');
@@ -158,6 +163,7 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
   // Jméno hosta z rezervace otevře Zákazníky s předvyplněným hledáním.
   const [hledatHosta, setHledatHosta] = useState('');
   const [moreOpen, setMoreOpen] = useState(false);
+  const [ucetOtevren, setUcetOtevren] = useState(false);
   const prejdi = useCallback((t: Tab) => { setVolba(t); setMoreOpen(false); }, []);
   const otevriHosta = useCallback((q: string) => { setHledatHosta(q); prejdi('customers'); }, [prejdi]);
   const strankaProHosty = () => { if (souhrn?.slug) window.open(`/client/${souhrn.slug}`, '_blank'); };
@@ -230,8 +236,18 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
             </nav>
             <div className="nav-fade" aria-hidden="true" />
           </div>
-          <div className="p-2.5 border-t border-black/[0.07]">
+          <div className="p-2.5 border-t border-black/[0.07] space-y-2">
             <Button variant="secondary" size="sm" icon="external" block disabled={!souhrn?.slug} onClick={strankaProHosty}>Stránka pro hosty</Button>
+            {/* Účet dole v menu: klepnutí otevře Nastavení v okně (profil, jazyk a vzhled, oznámení, heslo). */}
+            <button type="button" onClick={() => setUcetOtevren(true)} aria-haspopup="dialog"
+              className="w-full flex items-center gap-2.5 rounded-2xl px-2.5 py-2 text-left seg-off transition duration-200">
+              <span className="w-8 h-8 rounded-full bg-black/[0.06] flex items-center justify-center text-base shrink-0" aria-hidden="true">{user?.avatar || '👤'}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold leading-tight truncate">{user?.name || 'Účet'}</span>
+                <span className="block t-meta leading-tight truncate">Účet a nastavení</span>
+              </span>
+              <Icon name="settings" size={18} className="shrink-0 i-lead" />
+            </button>
           </div>
         </aside>
 
@@ -286,9 +302,17 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
           onSelect={id => prejdi(id as Tab)}
           actions={[
             { label: 'Stránka pro hosty', icon: 'external', onClick: () => { setMoreOpen(false); strankaProHosty(); } },
+            { label: 'Účet a nastavení', icon: 'settings', onClick: () => { setMoreOpen(false); setUcetOtevren(true); } },
             { label: 'Zpět do administrace', icon: 'arrowLeft', onClick: onExit },
           ]}
         />
+        {ucetOtevren && (
+          <Modal open onClose={() => setUcetOtevren(false)} size="lg" title="Účet a nastavení" subtitle="Profil, jazyk a vzhled, oznámení a zabezpečení">
+            {user && user.id !== undefined
+              ? <NastaveniUctu user={{ id: Number(user.id), name: user.name ?? '', role: user.role ?? 'employer', avatar: user.avatar }} initialTab="account" />
+              : <EmptyState icon="settings" title="Účet se nenačetl" hint="Obnovte stránku a zkuste to znovu." />}
+          </Modal>
+        )}
         <Toast message={hlaska?.text ?? null} tone={hlaska?.ton} onClose={() => setHlaska(null)} />
       </div>
     </NavigaceKontext.Provider>
