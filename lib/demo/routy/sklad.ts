@@ -58,6 +58,8 @@ export const sklad: Obsluha = (p, k) => {
       return ok(tvar(s, nova, vidiCeny));
     }
   }
+  // Ukázka drží množství celá (jako sloupec před migrací na NUMERIC): formulář položky nenabídne desetiny.
+  if (cesta === '/api/inventory/format') return ok({ mnozstvi: false, prahy: false });
   if (cesta === '/api/inventory/bulk') return ok({ ok: true });
   if (cesta === '/api/inventory/categories') {
     if (metoda === 'GET') return ok(s.kategorie.map(c => ({ ...c, zOrganizace: false, sdileno: false, spravuje: null, tracksOpen: false, contentUnit: null, defaultPackageSize: null, thresholdUnit: 'package', defaults: null, scale: null, hideFromOverview: false })));

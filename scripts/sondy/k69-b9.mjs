@@ -330,8 +330,8 @@ const zalozka = (p, nazev) => p.locator('nav').getByRole('button', { name: new R
   await p.getByRole('button', { name: /Vzhled/ }).filter({ visible: true }).first().click();
   tvrdi('S2: motiv je Segmented (tablist), ne dvě limetkové volby', await dokud(() => p.getByRole('tab', { name: 'Tmavý' }).isVisible(), 1500) && await p.locator(LIMETKA).count() === 0);
   tvrdi('S2: nápovědy jako přepínač', await p.getByRole('switch', { name: /Zobrazovat nápovědy/ }).isVisible());
-  // Zvonek v hlavičce se jmenuje taky „Notifikace" — sekce má i popisek „Centrum oznámení".
-  await p.getByRole('button', { name: /Notifikace\s*Centrum oznámení/ }).filter({ visible: true }).first().click();
+  // Zvonek v hlavičce se jmenuje taky „Notifikace" — sekce má i popisek „Upozornění a centrum oznámení".
+  await p.getByRole('button', { name: /Notifikace\s*Upozornění a centrum oznámení/ }).filter({ visible: true }).first().click();
   const zpravy = p.getByRole('switch', { name: /Nové zprávy/ });
   // Push se nabízí jen tam, kde jsou nastavené VAPID klíče (NEXT_PUBLIC_VAPID_PUBLIC_KEY); bez nich jsou
   // přepínače tři a stránka to říká — slibovat zapnutí, které nic neudělá, je horší než ho nenabízet.
