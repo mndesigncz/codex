@@ -25,6 +25,8 @@
   "Kategorie nemůže být vlastní nadřazenou": "Kategoria nie może być własną kategorią nadrzędną",
   "Kategorie nenalezena": "Nie znaleziono kategorii",
   "Kategorii nejde zanořit pod vlastní podkategorii": "Kategorii nie można zagnieździć pod jej własną podkategorią",
+  "Kupon nenalezen": "Nie znaleziono kuponu",
+  "Kupon už je uplatněný": "Kupon został już wykorzystany",
   "Kupon už neplatí.": "Ten kupon już nie obowiązuje.",
   "Kód už je vyčerpaný.": "Ten kod został już wykorzystany.",
   "Limity a velikost balení musí být čísla, třeba 12 nebo 0,5.": "Limity i wielkość opakowania muszą być liczbami, np. 12 lub 0,5.",

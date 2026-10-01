@@ -136,12 +136,24 @@ export default function MyPage() {
               <p className="text-sm text-black/55 mt-1 mb-3">{t('Kód ukaž obsluze u kasy.')}</p>
               <ul className="space-y-2">
                 {open.map((c: any) => (
-                  <li key={c.id} className="rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 px-4 py-3 flex items-center gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold leading-tight truncate">{c.title}</p>
-                      <p className="text-xs text-black/55 truncate">{c.business}</p>
+                  <li key={c.id} className="rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold leading-tight truncate">{c.title}</p>
+                        <p className="text-xs text-black/55 truncate">{c.business}</p>
+                      </div>
+                      <p className="font-mono font-bold tracking-widest text-lg shrink-0">{c.code}</p>
                     </div>
-                    <p className="font-mono font-bold tracking-widest text-lg shrink-0">{c.code}</p>
+                    {/* QR „managero:coupon:<kód>“: obsluha ho načte skenerem místo opisování. Obrázek se stáhne až po rozbalení. */}
+                    <details className="mt-2 group/qr">
+                      <summary className="tap-target-sm inline-flex items-center gap-1.5 text-sm font-semibold text-black/60 cursor-pointer hover:text-black list-none">
+                        <Icon name="chevron" size={15} className="transition-transform group-open/qr:rotate-180" />{t('Ukázat QR kód')}
+                      </summary>
+                      <div className="mt-2 rounded-2xl bg-white p-3 w-40 h-40 mx-auto">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={`/api/client/coupons/${c.id}/qr`} alt={t('QR kód kuponu {kod}', { kod: c.code })} loading="lazy" className="w-full h-full" />
+                      </div>
+                    </details>
                   </li>
                 ))}
               </ul>

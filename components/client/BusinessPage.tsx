@@ -21,6 +21,7 @@ import { formatMoney, formatPrice, currencySymbol } from '@/lib/money';
 import { okJson, apiMessage } from '@/lib/api';
 import { buildIcs, downloadIcs } from '@/lib/ics';
 import { DiscardGuard } from '../ui/DiscardGuard';
+import PromoBanners from './PromoBanners';
 
 type Tab = 'menu' | 'reserve' | 'order' | 'loyalty';
 
@@ -151,6 +152,9 @@ export default function BusinessPage({ slug }: { slug: string }) {
           </div>
         </div>
       </section>
+
+      {/* Promo bannery podniku: akce a oznámení (data podniku, nepřekládají se). */}
+      {(d.banners?.length ?? 0) > 0 && <PromoBanners banners={d.banners} accent={accent} loyaltyOn={!!b.loyaltyOn} onGoTab={setTab} />}
 
       {flash && <p role="status" className="toast-in rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 text-[#3E5406] text-sm px-4 py-3">{flash}</p>}
 

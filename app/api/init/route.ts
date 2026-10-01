@@ -1903,6 +1903,24 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_shape TEXT`);
     await ddl(sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_rot INTEGER`);
 
+    // Kolo 74: promo bannery podniku (akce a oznámení nahoře na stránce hosta).
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS client_banners (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        text TEXT NOT NULL DEFAULT '',
+        image_url TEXT,
+        link_kind TEXT NOT NULL DEFAULT 'none',
+        link_ref TEXT,
+        active BOOLEAN NOT NULL DEFAULT TRUE,
+        valid_since TEXT,
+        valid_until TEXT,
+        position INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_banners_team_idx ON client_banners (team_id, position)`);
+
     // ---- Sdílené číselníky (kolo 60) ----
     // Řádek číselníku patří dál svému podniku; sdílení je jen ve čtení
     // (lib/tenant.ts tymyCiselniku). `origin_id` dostane kopie, která vznikla

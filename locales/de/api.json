@@ -25,6 +25,8 @@
   "Kategorie nemůže být vlastní nadřazenou": "Eine Kategorie kann nicht ihre eigene übergeordnete Kategorie sein",
   "Kategorie nenalezena": "Kategorie nicht gefunden",
   "Kategorii nejde zanořit pod vlastní podkategorii": "Eine Kategorie kann nicht unter ihrer eigenen Unterkategorie liegen",
+  "Kupon nenalezen": "Gutschein nicht gefunden",
+  "Kupon už je uplatněný": "Der Gutschein wurde bereits eingelöst",
   "Kupon už neplatí.": "Dieser Gutschein ist nicht mehr gültig.",
   "Kód už je vyčerpaný.": "Dieser Code ist aufgebraucht.",
   "Limity a velikost balení musí být čísla, třeba 12 nebo 0,5.": "Grenzwerte und Packungsgröße müssen Zahlen sein, z. B. 12 oder 0,5.",
