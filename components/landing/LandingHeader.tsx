@@ -79,7 +79,7 @@ export default function LandingHeader() {
         <nav ref={nav} aria-label="Sekce stránky" className="relative hidden lg:flex items-center gap-0.5">
           {pilulka && (
             <span aria-hidden
-              className="absolute top-0 bottom-0 rounded-full bg-[rgba(243,244,240,0.1)] pointer-events-none motion-safe:transition-[transform,width] motion-safe:duration-300 motion-safe:ease-out"
+              className="absolute top-0 bottom-0 rounded-full bg-[rgb(var(--ld-fg)/0.1)] pointer-events-none motion-safe:transition-[transform,width] motion-safe:duration-300 motion-safe:ease-out"
               style={{ transform: `translateX(${pilulka.x}px)`, width: pilulka.w }} />
           )}
           {ODKAZY.map(o => {

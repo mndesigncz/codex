@@ -23,7 +23,7 @@ export default function JakZacit() {
             <li key={k.n} className="relative pt-8 pb-10 md:pb-0 border-b md:border-b-0 border-[color:var(--ld-linka)]">
               {/* Bod na lince: tady krok začíná. */}
               <span className="absolute -top-[5px] left-0 h-[9px] w-[9px] rounded-full bg-[color:var(--ld-papir)]" aria-hidden />
-              <p className="ld-cislo text-[clamp(3rem,5vw,4.5rem)] font-bold leading-none tracking-[-0.04em] text-[rgba(243,244,240,0.3)]" aria-hidden>{k.n}</p>
+              <p className="ld-cislo text-[clamp(3rem,5vw,4.5rem)] font-bold leading-none tracking-[-0.04em] text-[rgb(var(--ld-fg)/0.3)]" aria-hidden>{k.n}</p>
               <h3 className="ld-h3 mt-6">{k.title}</h3>
               <p className="ld-text mt-3 max-w-[36ch]">{k.text}</p>
               {i === 0 && (

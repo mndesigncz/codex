@@ -25,12 +25,12 @@ function Bunka({ v, svetle = false }: { v: string | boolean; svetle?: boolean })
   const t = useT('predplatne');
   if (v === true) {
     return (
-      <span role="img" className={`ld-tarif-tecka ${svetle ? 'bg-[#C8F542] text-[#16181A]' : 'bg-[rgba(243,244,240,0.12)] text-[#F3F4F0]'}`} aria-label={t('ano')}>
+      <span role="img" className={`ld-tarif-tecka ${svetle ? 'bg-[#C8F542] text-[#16181A]' : 'bg-[rgb(var(--ld-fg)/0.12)] text-[color:var(--ld-papir)]'}`} aria-label={t('ano')}>
         <Icon name="check" size={12} />
       </span>
     );
   }
-  if (v === false) return <span role="img" className="inline-block h-1.5 w-1.5 rounded-full bg-[rgba(243,244,240,0.22)]" aria-label={t('ne')} />;
+  if (v === false) return <span role="img" className="inline-block h-1.5 w-1.5 rounded-full bg-[rgb(var(--ld-fg)/0.22)]" aria-label={t('ne')} />;
   return <span className="text-xs font-semibold">{v}</span>;
 }
 
@@ -89,16 +89,16 @@ export default function Pricing() {
               <div key={k.id} data-tarif={k.id} className="ld-tarif relative flex flex-col p-7 lg:p-8">
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="text-lg font-semibold tracking-tight">{PLAN_NAMES[k.id]}</h3>
-                  {pro && <span className="rounded-full bg-[#16181A] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#F3F4F0]">{t('Doporučeno')}</span>}
+                  {pro && <span className="rounded-full bg-[color:var(--ld-ink)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--ld-papir)]">{t('Doporučeno')}</span>}
                 </div>
                 <p className="mt-6 ld-cislo text-[clamp(2.5rem,3.6vw,3.25rem)] font-bold leading-none tracking-[-0.035em]">{c ? c.hlavni : '0 Kč'}</p>
-                <p className={`mt-2 text-sm ${pro ? 'text-black/60' : 'text-[color:var(--ld-text-3)]'}`}>{c ? c.pod : 'navždy, až 3 lidé'}</p>
-                {c?.usetrite && <p className={`text-sm ${pro ? 'text-black/60' : 'text-[color:var(--ld-text-3)]'}`}>Ušetříte {c.usetrite} oproti měsíčnímu placení, vychází na {mesicne(k.id as 'pro' | 'max')}</p>}
+                <p className={`mt-2 text-sm ${pro ? 'text-[color:rgb(var(--ld-bg)/0.62)]' : 'text-[color:var(--ld-text-3)]'}`}>{c ? c.pod : 'navždy, až 3 lidé'}</p>
+                {c?.usetrite && <p className={`text-sm ${pro ? 'text-[color:rgb(var(--ld-bg)/0.62)]' : 'text-[color:var(--ld-text-3)]'}`}>Ušetříte {c.usetrite} oproti měsíčnímu placení, vychází na {mesicne(k.id as 'pro' | 'max')}</p>}
                 <p className="mt-6 text-[0.9375rem] font-semibold text-pretty">{k.veta}</p>
-                <ul className={`mt-4 space-y-2.5 text-[0.9375rem] ${pro ? 'text-black/70' : 'text-[color:var(--ld-text-2)]'}`}>
+                <ul className={`mt-4 space-y-2.5 text-[0.9375rem] ${pro ? 'text-[color:rgb(var(--ld-bg)/0.72)]' : 'text-[color:var(--ld-text-2)]'}`}>
                   {k.body.map(b => (
                     <li key={b} className="flex items-start gap-2.5">
-                      <span className={`ld-tarif-tecka mt-0.5 ${pro ? 'bg-[#C8F542] text-[#16181A]' : 'bg-[rgba(243,244,240,0.12)] text-[#F3F4F0]'}`}><Icon name="check" size={11} /></span>
+                      <span className={`ld-tarif-tecka mt-0.5 ${pro ? 'bg-[#C8F542] text-[#16181A]' : 'bg-[rgb(var(--ld-fg)/0.12)] text-[color:var(--ld-papir)]'}`}><Icon name="check" size={11} /></span>
                       <span>{b}</span>
                     </li>
                   ))}
