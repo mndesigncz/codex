@@ -6,7 +6,7 @@
   "Cena musí být číslo, třeba 4,99.": "The price must be a number, e.g. 4.99.",
   "Cena v kase": "Price at the till",
   "Cena za balení": "Price per package",
-  "Cena za kus": "Price per piece",
+  "Cena za jednotku": "Price per unit",
   "Chybí": "Missing",
   "Chybí velikost balení — doplň ji u položky ve skladu.": "The package size is missing — add it on the item in stock.",
   "Chybí velikost balení — porce ani cenu nespočítám.": "The package size is missing — I can’t calculate portions or cost.",

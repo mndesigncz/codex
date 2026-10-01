@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { notifyUsers } from '@/lib/push';
-import { normalizeCategoryPackaging, stockStatus, type CategoryPackaging } from '@/lib/packaging';
+import { normalizeCategoryPackaging, stockStatus, efektivniBaleni, type CategoryPackaging } from '@/lib/packaging';
 import { resolveActingUser } from '@/lib/kioskActing';
 import { audit } from '@/lib/audit';
 import { packagingSourceOf } from '@/lib/categoryTree';
@@ -10,7 +10,8 @@ import { tymyCiselniku } from '@/lib/tenant';
 import { pozaduj, jeOdpoved, clenoveSOpravnenim } from '@/lib/opravneniDb';
 import { typNaUcet } from '@/lib/opravneni';
 import { cenaZDb, cenaZFormulare } from '@/lib/cena';
-import { cenaKZapisu } from '@/lib/cenaSloupce';
+import { cenaKZapisu, skladDesetinny } from '@/lib/cenaSloupce';
+import { mnozstviKZapisu } from '@/lib/inventura';
 
 export const dynamic = 'force-dynamic';
 
@@ -197,11 +198,23 @@ export async function GET() {
     };
     const packaging = (i.categoryId != null ? packagingById.get(Number(i.categoryId)) : undefined)
       ?? packagingByName.get(i.category) ?? null;
+    // Efektivní balení (vlastní, jinak z kategorie) — jedno rozhodnutí v efektivniBaleni;
+    // klient dostane hotové a nemusí kategorie dohledávat sám.
+    const baleni = efektivniBaleni(item, packaging);
     const sized = packaging
-      ? { ...item, packageSize: item.packageSize ?? packaging.defaultPackageSize }
+      ? { ...item, packageSize: baleni.packageSize }
       : item;
     return {
       ...item,
+      // Syrové `packageSize` a `contentUnit` zůstávají to, co je v položce
+      // vyplněné (formulář je upravuje); čtení za nimi jde přes tyhle dvě.
+      // NUMERIC (po migraci na desetinná množství) chodí z Neonu jako řetězec — klient s množstvím počítá.
+      quantity: Number(i.quantity) || 0,
+      minQuantity: Number(i.minQuantity) || 0,
+      criticalQuantity: Number(i.criticalQuantity) || 0,
+      maxQuantity: Number(i.maxQuantity) || 0,
+      effectivePackageSize: baleni.packageSize,
+      effectiveContentUnit: baleni.contentUnit,
       categoryId: i.categoryId != null ? Number(i.categoryId) : null,
       brand: i.brand ?? null,
       description: i.description ?? null,
@@ -242,10 +255,13 @@ export async function POST(request: Request) {
   if (!name) return NextResponse.json({ error: 'Název je povinný' }, { status: 400 });
 
   const category = body.category ?? '';
-  const quantity = Number(body.quantity) || 0;
-  const minQuantity = Number(body.minQuantity) || 0;
-  const criticalQuantity = Number(body.criticalQuantity) || 0;
-  const maxQuantity = Number(body.maxQuantity) || 0;
+  // Desetiny jen tam, kde je sloupec NUMERIC (lib/cenaSloupce); jinak se zaokrouhlí na celé
+  // místo chyby databáze.
+  const des = await skladDesetinny();
+  const quantity = mnozstviKZapisu(body.quantity, des.mnozstvi);
+  const minQuantity = mnozstviKZapisu(body.minQuantity, des.prahy);
+  const criticalQuantity = mnozstviKZapisu(body.criticalQuantity, des.prahy);
+  const maxQuantity = mnozstviKZapisu(body.maxQuantity, des.prahy);
   const unit = body.unit ?? 'ks';
   const supplier = body.supplier ?? null;
   const supplierUrl = webovaUrl(body.supplierUrl);

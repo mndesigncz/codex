@@ -70,11 +70,14 @@ export default function ({ eq, ok }: Testy) {
   ]);
   eq('hodnota (N8): s podílem načatého balení, bez archivovaných, zaokrouhleno po položkách', [h.hodnota, h.top.map(t => t.nazev)], [2050, ['Káva', 'Víno']]);
   eq('hodnota: kolik aktivních položek nemá cenu (dolní odhad)', h.bezCeny, 1);
-  // Vzorec musí sedět se serverem Financí — kdyby se tam změnil, tenhle test to řekne.
+  // Finance i rada „Ve skladu leží…" musí brát číslo ze stejné funkce jako Sklad
+  // (kolo 73: rada počítala quantity × unit_cost sama a lišila se od Financí).
   const finance = readFileSync(new URL('../../app/api/finance/route.ts', import.meta.url), 'utf8');
-  ok('hodnota (N8): /api/finance počítá stejně (archived IS NOT TRUE, podíl načatého, Math.round po položce)',
-    finance.includes('archived IS NOT TRUE') && /openShare = pkg > 0 \? Math\.max\(0, num\(i\.open_amount\)\) \/ pkg/.test(finance)
-    && finance.includes('Math.round((Math.max(0, num(i.quantity)) + openShare) * num(i.unit_cost))'));
+  const rada = readFileSync(new URL('../../app/api/finance/advice/route.ts', import.meta.url), 'utf8');
+  const zasobyDb = readFileSync(new URL('../../lib/hodnotaZasobDb.ts', import.meta.url), 'utf8');
+  ok('hodnota (N8): /api/finance počítá přes hodnotaZasobTymu', finance.includes('hodnotaZasobTymu(') && !finance.includes('openShare'));
+  ok('hodnota (N8): rada ve Financích počítá přes hodnotaZasobTymu', rada.includes('hodnotaZasobTymu(') && !/stockValue \+= /.test(rada));
+  ok('hodnota (N8): hodnotaZasobTymu volá hodnotaZasob', zasobyDb.includes('hodnotaZasob(rows.map'));
 
   // ---- N4: suroviny bez ceny nebo balení ----
   const usage = { [String(sklad[0].id)]: [{}, {}], [String(sklad[1].id)]: [{}], '999': [{}] };

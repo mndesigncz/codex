@@ -113,7 +113,8 @@ export async function GET(req: NextRequest) {
       qtyDiff,
       openDiff,
       diff,
-      diffUnit: pkg > 0 ? (d.contentUnit || 'l') : (d.unit ?? 'ks'),
+      // Záloha je jednotka položky, ne litr: gramová položka bez uložené jednotky obsahu se nesmí vykázat v litrech.
+      diffUnit: pkg > 0 ? (d.contentUnit || d.unit || 'ks') : (d.unit ?? 'ks'),
       sold,
       lossPct: sold && sold > 0 && diff < 0 ? Math.round((-diff / sold) * 100) : null,
       value: perUnit != null ? Math.round(perUnit * diff) : null,

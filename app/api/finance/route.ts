@@ -10,6 +10,7 @@ import { cashDifference, normalizeMovements } from '@/lib/closing';
 import { pragueToday, pragueDaySafe } from '@/lib/pragueTime';
 import { wagesTotal } from '@/lib/wages';
 import { menaPodniku } from '@/lib/menaPodniku';
+import { hodnotaZasobTymu } from '@/lib/hodnotaZasobDb';
 
 export const dynamic = 'force-dynamic';
 
@@ -230,27 +231,14 @@ export async function GET(req: NextRequest) {
   // ---- Stock value: money sitting on the shelves. ----
   let stockValue = 0; let stockTop: { name: string; value: number }[] = [];
   try {
-    const items = await sql`
-      SELECT name, quantity, unit_cost, package_size, open_amount FROM inventory_items
-      WHERE team_id = ${u.team_id} AND unit_cost IS NOT NULL AND archived IS NOT TRUE`;
-    const valued = (items as any[])
-      // Načatá lahev je pořád majetek. quantity drží jen zapečetěná balení,
-      // zbytek v otevřeném se počítá jeho podílem z ceny balení.
-      .map((i) => {
-        const pkg = num(i.package_size);
-        const openShare = pkg > 0 ? Math.max(0, num(i.open_amount)) / pkg : 0;
-        return {
-          name: i.name,
-          value: Math.round((Math.max(0, num(i.quantity)) + openShare) * num(i.unit_cost)),
-        };
-      })
-      .filter((i) => i.value > 0)
-      .sort((a, b) => b.value - a.value);
-    stockValue = valued.reduce((s, i) => s + i.value, 0);
-    // N8 (kolo 69): pět nejdražších položek jde i do odpovědi. Dřív se počítaly jen pro
-    // postřeh níž a zahazovaly se, takže widget Hodnota zásob by si je musel spočítat
-    // znovu jinak (Sklad bere i archivované a bez načatých balení) — dvě čísla za totéž.
-    stockTop = valued.slice(0, 5);
+    // Jedna funkce pro Finance, Sklad i rady (lib/hodnotaZasobDb → hodnotaZasob).
+    // N8 (kolo 69): pět nejdražších položek jde i do odpovědi, ať si widget Hodnota
+    // zásob nepočítá znovu jinak — dvě čísla za totéž.
+    const h = await hodnotaZasobTymu(u.team_id);
+    if (h) {
+      stockValue = h.hodnota;
+      stockTop = h.top.map(x => ({ name: x.nazev, value: x.hodnota }));
+    }
   } catch { /* ignore */ }
 
   // ---- Advice, computed from the month's own numbers. ----

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/client';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { benefitLabel, conditionBadges, windowOk } from '@/lib/coupons';
+import { menaPodniku } from '@/lib/menaPodniku';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -32,7 +33,9 @@ export async function POST(req: NextRequest) {
   const done = await sql`UPDATE client_coupon_claims SET redeemed_at = NOW() WHERE id = ${cl.id} AND redeemed_at IS NULL RETURNING id`;
   if (!done.length) return NextResponse.json({ error: 'Kupon byl právě uplatněn.', title: cl.title }, { status: 409 });
   // Výhoda a podmínky pro obsluhu: co odečíst a co zkontrolovat (útrata, 18+).
-  const benefit = benefitLabel(cl);
-  const badges = conditionBadges(cl);
+  // Částky v měně podniku, ne natvrdo v korunách.
+  const castka = (await menaPodniku(u.team_id)).money;
+  const benefit = benefitLabel(cl, castka);
+  const badges = conditionBadges(cl, castka);
   return NextResponse.json({ ok: true, title: cl.title, customer: cl.customer_name, benefit, badges });
 }

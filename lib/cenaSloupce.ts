@@ -28,7 +28,9 @@ const sql = neon(process.env.DATABASE_URL!);
 type Sloupec =
   | 'inventory_items.unit_cost' | 'orders.total_cost' | 'menu_items.price' | 'client_orders.total'
   // Množství skladu: v DDL INTEGER; inventura podle něj pozná, jestli smí přijmout 2,35 kg.
-  | 'inventory_items.quantity';
+  | 'inventory_items.quantity'
+  // Prahy hlídání zásob (upozornit / kriticky málo / maximum): také INTEGER.
+  | 'inventory_items.min_quantity' | 'inventory_items.critical_quantity' | 'inventory_items.max_quantity';
 
 // „Ano" se pamatuje napořád (zpět na INTEGER nikdo sloupec nevrací); „ne" jen
 // minutu, aby migrace provedená za provozu zabrala bez restartu procesu.
@@ -53,4 +55,27 @@ export async function sloupecJeDesetinny(sloupec: Sloupec): Promise<boolean> {
 /** Hodnota připravená k zápisu do sloupce (viz `cenaProSloupec`). */
 export async function cenaKZapisu(sloupec: Sloupec, hodnota: number | null): Promise<number | null> {
   return cenaProSloupec(hodnota, await sloupecJeDesetinny(sloupec));
+}
+
+/**
+ * Smí sklad evidovat množství a prahy s desetinami (2,5 kg)? Množství i prahy
+ * jsou v DDL INTEGER; formulář položky desetiny nabídne jen tam, kde je sloupec
+ * migrovaný — jinak by uložení spadlo na chybě databáze. Migrace (jednorázově
+ * v konzoli Neonu; INTEGER → NUMERIC nic neztrácí a je idempotentní):
+ *
+ *   ALTER TABLE inventory_items ALTER COLUMN quantity          TYPE NUMERIC(12,3);
+ *   ALTER TABLE inventory_items ALTER COLUMN min_quantity      TYPE NUMERIC(12,3);
+ *   ALTER TABLE inventory_items ALTER COLUMN critical_quantity TYPE NUMERIC(12,3);
+ *   ALTER TABLE inventory_items ALTER COLUMN max_quantity      TYPE NUMERIC(12,3);
+ *   ALTER TABLE inventory_log   ALTER COLUMN old_quantity      TYPE NUMERIC(12,3);
+ *   ALTER TABLE inventory_log   ALTER COLUMN new_quantity      TYPE NUMERIC(12,3);
+ */
+export async function skladDesetinny(): Promise<{ mnozstvi: boolean; prahy: boolean }> {
+  const [mnozstvi, min, krit, max] = await Promise.all([
+    sloupecJeDesetinny('inventory_items.quantity'),
+    sloupecJeDesetinny('inventory_items.min_quantity'),
+    sloupecJeDesetinny('inventory_items.critical_quantity'),
+    sloupecJeDesetinny('inventory_items.max_quantity'),
+  ]);
+  return { mnozstvi, prahy: min && krit && max };
 }

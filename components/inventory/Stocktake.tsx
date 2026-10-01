@@ -324,10 +324,10 @@ export default function StocktakeModal({ smiZahajit, smiDokoncit, smiZtraty, onC
                           <div className="flex items-center gap-3 pl-4 mt-1.5">
                             <span className="min-w-0 flex-1 text-xs text-black/55 truncate">
                               {t('Zbytek v načatém balení')}
-                              <span className="hidden sm:inline"> {t('(z {balení} {jednotka})', { 'balení': pkg, jednotka: r.contentUnit || 'l' })}</span>
+                              <span className="hidden sm:inline"> {t('(z {balení} {jednotka})', { 'balení': pkg, jednotka: r.contentUnit || r.unit })}</span>
                             </span>
                             <span className="shrink-0 text-xs text-black/55 tabular-nums whitespace-nowrap">
-                              {t('evid. {mnozstvi} {jednotka}', { mnozstvi: fmt(r.expectedOpen ?? 0), jednotka: r.contentUnit || '' })}
+                              {t('evid. {mnozstvi} {jednotka}', { mnozstvi: fmt(r.expectedOpen ?? 0), jednotka: r.contentUnit || r.unit })}
                             </span>
                             <input
                               inputMode="decimal"

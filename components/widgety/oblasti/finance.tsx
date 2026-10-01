@@ -39,6 +39,8 @@ import {
   kamSlyPenize, mzdyMesice, podilMezd, urlFinanci, vyberFinance, zmenaProti as zmena, type FinanceMesice,
 } from '@/lib/financeWidgety';
 import { useT } from '@/lib/i18n/client';
+import { aktualniJazyk } from '@/lib/i18n/stav';
+import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
 import { pragueDaySafe, pragueToday } from '@/lib/pragueTime';
 import { useMoney } from '../../CurrencyProvider';
 import { Button, Chip, ListRow, Modal, Stat, StatRow } from '../../ui';
@@ -518,7 +520,7 @@ function ZtratyWidget({ velikost }: WidgetProps) {
 
   const radek = (r: RadekZtraty) => (
     <ListRow key={r.id} title={r.name}
-      meta={`${r.diff > 0 ? '+' : '−'}${Math.abs(r.diff).toLocaleString('cs-CZ')} ${r.unit}${r.lossPct != null ? ` · ${t('{pct} % z prodaného', { pct: r.lossPct })}` : ''}`}
+      meta={`${r.diff > 0 ? '+' : '−'}${Math.abs(r.diff).toLocaleString(LOCALE_PRO_JAZYK[aktualniJazyk()], { maximumFractionDigits: 3 })} ${r.unit}${r.lossPct != null ? ` · ${t('{pct} % z prodaného', { pct: r.lossPct })}` : ''}`}
       value={r.value != null ? <span className="tabular-nums">{r.value > 0 ? '+' : '−'}{money(Math.abs(r.value))}</span> : <span className="text-black/45">{t('bez ceny')}</span>} />
   );
 

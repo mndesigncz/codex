@@ -35,7 +35,7 @@ export default function ({ eq, ok }: Testy) {
   eq('odpis: celé kusy se nikdy nedostanou pod nulu', odepsatProdej(1, 0, 0, 5, true).qty, 0);
   eq('odpis: načaté balení dál drží tři desetinná místa i při celých kusech', odepsatProdej(2, 0.7, 1, 0.02, true), { qty: 2, open: 0.68 });
   eq('odpis: consumeContent s celými kusy', consumeContent({ quantity: 10, packageSize: null, openAmount: null }, 0.25, { celeKusy: true }).quantity, 10);
-  eq('odpis: consumeContent bez příznaku jako dřív', consumeContent({ quantity: 10, packageSize: null, openAmount: null }, 0.25).quantity, 9.8);
+  eq('odpis: consumeContent bez příznaku drží desetinný sloupec přesně (9,75, ne 9,8)', consumeContent({ quantity: 10, packageSize: null, openAmount: null }, 0.25).quantity, 9.75);
 
   // Prodeje po produktech jsou v téže transakci jako značky účtenek; zápis po
   // transakci s tichým catch nechával při pádu tržby natrvalo chybět.

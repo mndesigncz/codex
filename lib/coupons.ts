@@ -11,52 +11,15 @@
 import { sql } from './client';
 import { pragueToday, pragueHM } from './pragueTime';
 import type { TierId } from './clientSlots';
+import { TIER_LABELS, TIER_RANK, intList, tierList, benefitLabel, conditionBadges, type FormatCastky } from './kuponyPopisky';
+export { TIER_LABELS, benefitLabel, conditionBadges };
+export type { FormatCastky };
 
 export const BENEFITS = ['text', 'percent', 'amount', 'free_item', 'xy'] as const;
 export type BenefitKind = typeof BENEFITS[number];
 
-export const TIER_LABELS: Record<string, string> = {
-  bronze: 'Člen', silver: 'Stříbrný host', gold: 'Zlatý host', platinum: 'Platinový host',
-};
-const TIER_RANK: Record<string, number> = { bronze: 0, silver: 1, gold: 2, platinum: 3 };
-
-function intList(raw: any): number[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.map((x: any) => Number(x)).filter(n => Number.isFinite(n) && n > 0).slice(0, 50);
-}
-function tierList(raw: any): string[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.map(String).filter(t => t in TIER_RANK).slice(0, 4);
-}
-
-/** Krátký popisek výhody pro obsluhu i hosta: „Sleva 15 %", „−50 Kč", „2+1". */
-export function benefitLabel(c: any): string {
-  const kind = String(c.benefit_kind ?? 'text');
-  if (kind === 'percent' && Number(c.percent_off) > 0) return `Sleva ${Number(c.percent_off)} %`;
-  if (kind === 'amount' && Number(c.amount_off) > 0) return `Sleva ${Number(c.amount_off)} Kč`;
-  if (kind === 'free_item') return 'Položka zdarma';
-  if (kind === 'xy' && Number(c.xy_buy) > 0) return `${Number(c.xy_buy)}+${Math.max(1, Number(c.xy_free) || 1)} zdarma`;
-  return '';
-}
-
-/** Štítky podmínek, které mají viset na kartě kuponu (host i obsluha). */
-export function conditionBadges(c: any): string[] {
-  const out: string[] = [];
-  if (Number(c.min_order_value) > 0) out.push(`od ${Number(c.min_order_value)} Kč útraty`);
-  const tiers = tierList(c.target_tiers);
-  if (tiers.length) out.push(`jen ${tiers.map(t => TIER_LABELS[t]).join(' / ')}`);
-  const days = intList(c.days_of_week);
-  if (days.length && days.length < 7) {
-    const NAMES = ['', 'po', 'út', 'st', 'čt', 'pá', 'so', 'ne'];
-    out.push(days.map(d => NAMES[d] ?? '').filter(Boolean).join(', '));
-  }
-  if (c.hour_from && c.hour_till) out.push(`${c.hour_from}–${c.hour_till}`);
-  if (c.adult_only === true) out.push('18+');
-  return out;
-}
-
 /** Veřejný tvar kuponu pro editor i stránku hosta (camelCase, bez balastu). */
-export function shapeCoupon(r: any) {
+export function shapeCoupon(r: any, castka?: FormatCastky) {
   return {
     id: Number(r.id), title: String(r.title), description: String(r.description ?? ''),
     costPoints: Number(r.cost_points) || 0, active: r.active !== false,
@@ -71,7 +34,7 @@ export function shapeCoupon(r: any) {
     daysOfWeek: intList(r.days_of_week), hourFrom: r.hour_from ?? null, hourTill: r.hour_till ?? null,
     adultOnly: r.adult_only === true, welcome: r.welcome === true,
     validSince: r.valid_since ?? null, validUntil: r.valid_until ?? null,
-    benefit: benefitLabel(r), badges: conditionBadges(r),
+    benefit: benefitLabel(r, castka), badges: conditionBadges(r, castka),
   };
 }
 

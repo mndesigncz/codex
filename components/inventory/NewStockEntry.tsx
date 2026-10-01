@@ -14,6 +14,7 @@ import { useSymbol } from '../CurrencyProvider';
 import { cenaDoPole } from '@/lib/cena';
 import { ancestryOfId, flattenTree } from '@/lib/categoryTree';
 import { mergeDefaults, type ItemDefaults } from '@/lib/itemDefaults';
+import { vyznamCeny } from '@/lib/jednotky';
 import { okJson } from '@/lib/api';
 import { useOpravneni } from '../role/useOpravneni';
 import { tg } from '@/lib/i18n/stav';
@@ -58,6 +59,7 @@ export default function NewStockEntry({
   const [packageSize, setPackageSize] = useState('');
   const [unitCost, setUnitCost] = useState('');
   const symbol = useSymbol();
+  const cenaZaBaleni = vyznamCeny(packageSize) === 'baleni';
   const [supplier, setSupplier] = useState('');
   const [more, setMore] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -257,9 +259,10 @@ export default function NewStockEntry({
           </div>
           {smiCenu && (
             <div>
-              <label htmlFor="nova-vec-cena" className={label}>{t('Cena za kus')}</label>
+              {/* Cena BALENÍ, když je zadaná velikost balení, jinak cena jednotky — jako všude ve skladu. */}
+              <label htmlFor="nova-vec-cena" className={label}>{cenaZaBaleni ? t('Cena za balení') : t('Cena za jednotku')}</label>
               <input id="nova-vec-cena" inputMode="decimal" value={unitCost}
-                onChange={e => setUnitCost(e.target.value)} className={field} placeholder={symbol} />
+                onChange={e => setUnitCost(e.target.value)} className={field} placeholder={cenaZaBaleni ? symbol : `${symbol}/${unit}`} />
             </div>
           )}
           <div>

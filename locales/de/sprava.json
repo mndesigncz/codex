@@ -56,6 +56,8 @@
   "Cena musí být číslo, třeba 4,99.": "Der Preis muss eine Zahl sein, z. B. 4,99.",
   "Cena v bodech": "Preis in Punkten",
   "Cena za jednotku": "Preis pro Einheit",
+  "Cena za balení": "Preis pro Packung",
+  "Cena (za balení, jinak za jednotku)": "Preis (pro Packung, sonst pro Einheit)",
   "Cena — {nazev} ({mena})": "Preis — {nazev} ({mena})",
   "Chybí položka? Uprav nabídku v Menu": "Ein Artikel fehlt? Bearbeite das Angebot unter Karte",
   "Chybí uzávěrka": "Fehlender Kassenabschluss",
@@ -1462,5 +1464,7 @@
   "„{nazev}\" zmizí z tabule. Vrátit to nepůjde.": "„{nazev}“ verschwindet vom Board. Das lässt sich nicht rückgängig machen.",
   "„{nazev}\" zmizí ze seznamu i z přehledu týmu.": "„{nazev}“ verschwindet aus der Liste und aus der Teamübersicht.",
   "„{nazev}“ přidáno, ale kasa u něj nedala cenu — doplň ji ručně.": "„{nazev}“ wurde hinzugefügt, aber die Kasse hat dafür keinen Preis geliefert — trag ihn manuell nach.",
-  "…a dalších {n}": "…und {n} weitere"
+  "…a dalších {n}": "…und {n} weitere",
+  "Tahle jednotka se eviduje v celých číslech — zapiš celé číslo.": "Diese Einheit wird in ganzen Zahlen geführt – gib eine ganze Zahl ein.",
+  "Množství a limity musí být čísla.": "Menge und Grenzwerte müssen Zahlen sein."
 }

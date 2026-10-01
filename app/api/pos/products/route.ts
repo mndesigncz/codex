@@ -12,6 +12,8 @@ import { getConnection, menuProducts } from '@/lib/storyous';
 import { productsFromMirror } from '@/lib/posMirror';
 import { audit } from '@/lib/audit';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { nactiBaleniKategorii, baleniRadku } from '@/lib/baleniKategorii';
+import { jednotkaMnozstvi } from '@/lib/jednotky';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,17 +45,23 @@ export async function GET() {
     rows = await sql`
       SELECT m.product_id AS "productId", m.product_name AS "productName",
              m.item_id AS "itemId", m.amount_per_sale AS "amountPerSale",
-             i.name AS "itemName", COALESCE(i.content_unit, i.unit) AS "itemUnit", i.package_size AS "packageSize"
+             i.name AS "itemName", i.unit AS "unit", i.content_unit AS "contentUnit", i.package_size AS "packageSize",
+             i.category AS "category", i.category_id AS "categoryId"
       FROM pos_product_map m
       LEFT JOIN inventory_items i ON i.id = m.item_id
       WHERE m.team_id = ${u.team_id}`;
   } catch { /* not migrated */ }
+  // Velikost balení a jednotka obsahu se dědí z kategorie, když je položka nemá vlastní.
+  const baleniKat = await nactiBaleniKategorii(u.team_id);
   const grouped = new Map<string, any>();
   for (const r of rows) {
+    const baleni = baleniRadku(r, baleniKat);
     const g = grouped.get(r.productId) ?? { productId: r.productId, productName: r.productName, ingredients: [] };
     g.ingredients.push({
       itemId: r.itemId, amount: Number(r.amountPerSale) || 1,
-      itemName: r.itemName, itemUnit: r.itemUnit, packageSize: r.packageSize != null ? Number(r.packageSize) : null,
+      itemName: r.itemName,
+      itemUnit: r.itemName == null ? null : jednotkaMnozstvi({ unit: r.unit, ...baleni }),
+      packageSize: baleni.packageSize,
     });
     grouped.set(r.productId, g);
   }

@@ -6,6 +6,8 @@
 // počítalo „co dochází", „co koupit" a „kolik leží na regálech" samo a čísla
 // se rozjela (N7, N8) — proto jeden výpočet tady.
 
+import { baleniPolozky } from './packaging.ts';
+
 // ---------------------------------------------------------------------------
 // Předávání mezi widgetem a nástrojem
 // ---------------------------------------------------------------------------
@@ -45,6 +47,9 @@ export interface PolozkaSkladu {
   supplier?: string | null;
   unitCost?: number | null;
   packageSize?: number | null;
+  /** Hotové balení se zděděním z kategorie (posílá /api/inventory); bez něj platí `packageSize`. */
+  effectivePackageSize?: number | null;
+  effectiveContentUnit?: string | null;
   openAmount?: number | null;
   archived?: boolean;
   approved?: boolean | null;
@@ -171,7 +176,7 @@ export function hodnotaZasob(items: readonly PolozkaSkladu[]): HodnotaZasob {
   for (const i of items) {
     if (i.archived === true) continue;
     if (i.unitCost == null) { if (i.approved !== false) bezCeny++; continue; }
-    const baleni = num(i.packageSize);
+    const baleni = num(baleniPolozky(i).packageSize);
     const podil = baleni > 0 ? Math.max(0, num(i.openAmount)) / baleni : 0;
     const hodnota = Math.round((Math.max(0, num(i.quantity)) + podil) * num(i.unitCost));
     if (hodnota > 0) oceneno.push({ nazev: i.name, hodnota });
@@ -201,7 +206,7 @@ export function chybiUdaje(items: readonly PolozkaSkladu[], usage: Record<string
     .filter(({ produktu }) => produktu > 0)
     .map(({ i, produktu }) => {
       const cena = num(i.unitCost) > 0;
-      const baleni = num(i.packageSize) > 0;
+      const baleni = num(baleniPolozky(i).packageSize) > 0;
       return { id: i.id, nazev: i.name, produktu, chybi: (!cena && !baleni ? 'cena i balení' : !cena ? 'cena' : 'velikost balení') as ChybiUdaj, ok: cena && baleni };
     })
     .filter(r => !r.ok)

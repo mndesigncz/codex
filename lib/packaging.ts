@@ -36,7 +36,9 @@ export const DEFAULT_SCALE: Scale = {
   ],
 };
 
-export const CONTENT_UNITS = ['g', 'kg', 'ml', 'l', 'ks'] as const;
+// Jednotky obsahu jsou společné s převody množství (lib/jednotky.ts).
+import { CONTENT_UNITS, jednotkaMnozstvi } from './jednotky.ts';
+export { CONTENT_UNITS };
 
 /**
  * What the min/critical thresholds are counted in. 'package' keeps the original
@@ -102,14 +104,14 @@ export function resolveSteps(scale: Scale, packageSize: number): { label: string
     label: s.label,
     amount: scale.kind === 'absolute'
       ? Math.min(s.value ?? 0, packageSize)
-      : round1((packageSize * (s.pct ?? 0)) / 100),
+      : round3((packageSize * (s.pct ?? 0)) / 100),
   }));
 }
 
 /** Total content across sealed packages plus the open remainder. */
 export function totalContent(item: PackagedItem): number {
   const size = Number(item.packageSize) || 0;
-  return round1(Math.max(0, item.quantity) * size + (Number(item.openAmount) || 0));
+  return round3(Math.max(0, item.quantity) * size + (Number(item.openAmount) || 0));
 }
 
 /**
@@ -119,7 +121,7 @@ export function totalContent(item: PackagedItem): number {
 export function effectivePackages(item: PackagedItem): number {
   const size = Number(item.packageSize) || 0;
   if (size <= 0) return item.quantity;
-  return round1(item.quantity + (Number(item.openAmount) || 0) / size);
+  return round3(item.quantity + (Number(item.openAmount) || 0) / size);
 }
 
 export type StockStatus = 'ok' | 'low' | 'critical';
@@ -164,9 +166,9 @@ export function formatStock(item: PackagedItem, unit: string | null, packageWord
   return `${sealed} + ${fmtAmount(open)} ${unit}`;
 }
 
+/** Množství s českou čárkou, nejvýš tři desetinná místa (0,68 l zůstane „0,68"). */
 export function fmtAmount(n: number): string {
-  const r = round1(n);
-  return Number.isInteger(r) ? String(r) : r.toFixed(1).replace('.', ',');
+  return String(round3(n)).replace('.', ',');
 }
 
 /**
@@ -187,17 +189,59 @@ export function consumeContent(
   const size = Number(item.packageSize) || 0;
   let qty = Math.max(0, Number(item.quantity) || 0);
   if (size <= 0) {
-    const zbyva = opts?.celeKusy ? Math.round(qty - amount) : round1(qty - amount);
+    const zbyva = opts?.celeKusy ? Math.round(qty - amount) : round3(qty - amount);
     return { quantity: Math.max(0, zbyva), openAmount: item.openAmount ?? null };
   }
   let open = Math.max(0, Number(item.openAmount) || 0);
   let left = amount;
   while (left > 0) {
-    if (open >= left) { open = round1(open - left); left = 0; break; }
-    left = round1(left - open); open = 0;
+    if (open >= left) { open = round3(open - left); left = 0; break; }
+    left = round3(left - open); open = 0;
     if (qty > 0) { qty -= 1; open = size; } else break;
   }
   return { quantity: qty, openAmount: open };
+}
+
+/**
+ * Efektivní velikost balení a jednotka obsahu položky: vlastní hodnota, jinak
+ * zděděná z kategorie (inventory_categories.default_package_size / content_unit).
+ * JEDINÉ místo, které to rozhoduje — odpis, náklady, inventura, receptury
+ * i API skladu se mají ptát tady, ne číst `package_size` ze sloupce.
+ * Velikost 0 nebo záporná se bere jako nevyplněná.
+ */
+export function efektivniBaleni(
+  item: { packageSize?: number | string | null; contentUnit?: string | null },
+  packaging?: { defaultPackageSize?: number | null; contentUnit?: string | null } | null,
+): { packageSize: number | null; contentUnit: string | null } {
+  const vlastni = Number(item?.packageSize);
+  const zKategorie = Number(packaging?.defaultPackageSize);
+  const size = Number.isFinite(vlastni) && vlastni > 0 ? vlastni
+    : Number.isFinite(zKategorie) && zKategorie > 0 ? zKategorie : null;
+  const unit = String(item?.contentUnit ?? '').trim() || String(packaging?.contentUnit ?? '').trim() || null;
+  return { packageSize: size, contentUnit: unit };
+}
+
+/**
+ * Balení položky tak, jak ho klient dostane z /api/inventory: ta posílá vedle
+ * syrových polí (`packageSize`, `contentUnit` — to, co je v položce vyplněné
+ * a co se upravuje ve formuláři) i hotové `effectivePackageSize` /
+ * `effectiveContentUnit` se zděděním z kategorie. Bez nich (položka z jiného
+ * zdroje) se spadne na vlastní hodnoty.
+ */
+export function baleniPolozky(item: any): { packageSize: number | null; contentUnit: string | null } {
+  if (item && (item.effectivePackageSize !== undefined || item.effectiveContentUnit !== undefined)) {
+    const size = Number(item.effectivePackageSize);
+    return {
+      packageSize: Number.isFinite(size) && size > 0 ? size : null,
+      contentUnit: String(item.effectiveContentUnit ?? '').trim() || null,
+    };
+  }
+  return efektivniBaleni(item ?? {}, null);
+}
+
+/** Jednotka, v níž je množství u položky vedené (receptury, kroky návodů, odpisy). */
+export function jednotkaPolozky(item: any): string {
+  return jednotkaMnozstvi({ unit: item?.unit, ...baleniPolozky(item) });
 }
 
 /** The unit partial amounts are measured in — the item's own setting wins. */
@@ -215,8 +259,12 @@ export function openPct(item: PackagedItem): number {
   return Math.max(0, Math.min(100, Math.round(((Number(item.openAmount) || 0) / size) * 100)));
 }
 
-function round1(n: number): number {
-  return Math.round(n * 10) / 10;
+// Zaokrouhlení jen na tři desetinná místa: stačí k odstranění chyby plovoucí
+// čárky (0,7 − 0,02 = 0,6799999…), ale neztrácí přesnost u l a kg
+// (0,68 l zůstane 0,68; dřív zaokrouhlení na desetiny vrátilo 0,7 a nic se
+// neodečetlo). U ml a g jsou čísla celá a zůstávají celá.
+function round3(n: number): number {
+  return Math.round(n * 1000) / 1000;
 }
 
 /**
