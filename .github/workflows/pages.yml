@@ -51,6 +51,10 @@ jobs:
       # zamýšlenou a pole se roztáhne přes vedlejší sloupec.
       - name: Soupeřící šířky
         run: node scripts/check-width-clash.mjs
+      # Řádek z pevných šířek (w-16 + počítadlo + w-20), který se nevejde do
+      # telefonu 320 px: poslední sloupec se uřízne nebo přeteče přes kartu.
+      - name: Pevné šířky v řádku
+        run: node scripts/check-pevne-sirky.mjs
       # Šedý text pod 55 % a písmo pod 11 px se na baru ve dne nepřečte.
       # Kontrast se měří v prohlížeči; tohle hlídá jen to, co je vidět ze zdroje.
       - name: Čitelnost textu
