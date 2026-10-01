@@ -38,9 +38,12 @@ import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
 import { useNavigace, useSmi } from '../NavigaceKontext';
 import { useOpravneni } from '../../role/useOpravneni';
 import { useCurrency, useMoney } from '../../CurrencyProvider';
-import { czCount, czForm, DEN, type CzNoun } from '@/lib/czech';
+import { useJazyk, useT, type PrekladFn } from '@/lib/i18n/client';
+import { fmtDatum } from '@/lib/i18n/format';
+import type { Jazyk } from '@/lib/i18n/config';
+import { zkratkyDnuJazyk } from '@/lib/weekJazyk';
 import { pragueDaySafe, pragueToday } from '@/lib/pragueTime';
-import { zkratkyDnu, zacatekTydne } from '@/lib/week';
+import { zacatekTydne } from '@/lib/week';
 import { apiMessage, okJson } from '@/lib/api';
 import {
   KLIC_DEN, KLIC_VYPLNIT, UDALOST_DEN, UDALOST_VYPLNIT, DNY_V_TYDNU,
@@ -70,15 +73,20 @@ const CEKA: StavNacteni = { data: null, error: null, loading: true, reload: () =
 /** Den z databáze: „2026-09-26" i ISO s časem; jinak pražský den z časové značky. */
 const den = (v: unknown): string => (/^\d{4}-\d{2}-\d{2}/.test(String(v ?? '')) ? String(v).slice(0, 10) : pragueDaySafe(v));
 const hm = (t: unknown) => String(t ?? '').slice(0, 5);
-const denVetou = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' });
-const denKratce = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' });
-function kdyVetou(d: string): string {
-  if (d === pragueToday()) return 'dnes';
-  if (d === pragueToday(-1)) return 'včera';
-  return denVetou(d);
+const denVetou = (d: string, jazyk: Jazyk) => fmtDatum(d, { jazyk, styl: 'denDlouze' });
+const denKratce = (d: string, jazyk: Jazyk) => fmtDatum(d, { jazyk, styl: 'denKratce' });
+function kdyVetou(d: string, t: PrekladFn): string {
+  if (d === pragueToday()) return t('dnes');
+  if (d === pragueToday(-1)) return t('včera');
+  return denVetou(d, t.jazyk);
 }
 const cislo = (n: number) => n.toLocaleString('cs-CZ');
-const UZAVERKA: CzNoun = { one: 'uzávěrka', few: 'uzávěrky', many: 'uzávěrek' };
+// Počty a tvary podstatných jmen přes plurály slovníku (dřív czCount/czForm s českými tvary).
+const uzaverekPocet = (t: PrekladFn, n: number) => t('{n, plural, one {# uzávěrka} few {# uzávěrky} other {# uzávěrek}}', { n });
+const uzaverekTvar = (t: PrekladFn, n: number) => t('{n, plural, one {uzávěrka} few {uzávěrky} other {uzávěrek}}', { n });
+const smenaPocet = (t: PrekladFn, n: number) => t('{n, plural, one {# neuzavřená směna} few {# neuzavřené směny} other {# neuzavřených směn}}', { n });
+const smenaTvar = (t: PrekladFn, n: number) => t('{n, plural, one {neuzavřená směna} few {neuzavřené směny} other {neuzavřených směn}}', { n });
+const denTvar = (t: PrekladFn, n: number) => t('{n, plural, one {den} few {dny} other {dní}}', { n });
 
 /** Ikona v jamce 36 px jako `lead` řádku (DP §3.6). */
 function Jamka({ ikona }: { ikona: string }) {
@@ -91,13 +99,15 @@ function Jamka({ ikona }: { ikona: string }) {
 
 /** Rozdíl kasy jako stav: sedí / přebytek / manko (tón nese stav, ne ozdobu). */
 function RozdilChip({ rozdil, money }: { rozdil: number; money: (n: number) => string }) {
-  if (rozdil === 0) return <Chip tone="ok" size="sm">Sedí</Chip>;
+  const t = useT('widgety');
+  if (rozdil === 0) return <Chip tone="ok" size="sm">{t('Sedí')}</Chip>;
   return <Chip tone={rozdil > 0 ? 'info' : 'bad'} size="sm">{rozdil > 0 ? '+' : ''}{money(rozdil)}</Chip>;
 }
 
 /** „…a dalších N" pod useknutým seznamem (DP §3.6: tichý strop seznamu je zákaz). */
 function ADalsich({ n }: { n: number }) {
-  return n > 0 ? <p className="t-meta mt-2">…a dalších {cislo(n)}</p> : null;
+  const t = useT('widgety');
+  return n > 0 ? <p className="t-meta mt-2">{t('…a dalších {n}', { n: cislo(n) })}</p> : null;
 }
 
 /**
@@ -121,7 +131,7 @@ interface SeznamUzaverek {
   raw: any;
 }
 function vyberSeznam(raw: any): SeznamUzaverek {
-  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.closings)) throw new Error('Uzávěrky přišly v nečekaném tvaru.');
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.closings)) throw new Error('Uzávěrky přišly v nečekaném tvaru.'); // i18n-ok: věta jde přes apiMessage, ten ji překládá
   return { radky: raw.closings, meId: typeof raw.meId === 'number' ? raw.meId : null, payDailyCash: raw.payDailyCash === true, raw };
 }
 const URL_SEZNAM = '/api/closings';
@@ -139,7 +149,7 @@ interface Predavka {
 }
 
 function vyberPredavku(raw: any): Predavka | null {
-  if (!raw || typeof raw !== 'object' || !('handover' in raw)) throw new Error('Předávka přišla v nečekaném tvaru.');
+  if (!raw || typeof raw !== 'object' || !('handover' in raw)) throw new Error('Předávka přišla v nečekaném tvaru.'); // i18n-ok: překládá apiMessage
   const h = raw.handover;
   if (!h || typeof h !== 'object') return null;
   const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
@@ -149,13 +159,14 @@ function vyberPredavku(raw: any): Predavka | null {
 }
 
 /** Pořadí řádků: co udělat, co dokoupit, pak vzkaz — tak, jak je formulář uzávěrky vyplňuje. */
-const RADKY_PREDAVKY: { klic: 'todo' | 'runningOut' | 'message'; ikona: string; popisek: string }[] = [
-  { klic: 'todo', ikona: 'check', popisek: 'Co dodělat' },
-  { klic: 'runningOut', ikona: 'box', popisek: 'Co dochází' },
-  { klic: 'message', ikona: 'chat', popisek: 'Vzkaz' },
+const RADKY_PREDAVKY: { klic: 'todo' | 'runningOut' | 'message'; ikona: string }[] = [
+  { klic: 'todo', ikona: 'check' },
+  { klic: 'runningOut', ikona: 'box' },
+  { klic: 'message', ikona: 'chat' },
 ];
 
 function PredavkaWidget({ velikost }: WidgetProps) {
+  const t = useT('widgety');
   const { ok, ceka } = useBrana(['uzaverky.predavka']);
   // „Žádná předávka" (handover: null) je platná odpověď, ne načítání: useDataWidgetu
   // čte data === null jako „ještě nedorazilo", proto obal { p }.
@@ -165,9 +176,9 @@ function PredavkaWidget({ velikost }: WidgetProps) {
   // Bez oprávnění ho plocha vůbec nepřipojí; kdyby přece, nesmí tvrdit „nic nepředala".
   if (!ok && !ceka) return <Widget prazdno={null} />;
 
-  const od = p ? [p.autor && `Od: ${p.autor}`, p.den && kdyVetou(p.den)].filter(Boolean).join(' · ') : '';
+  const od = p ? [p.autor && t('Od: {autor}', { autor: p.autor }), p.den && kdyVetou(p.den, t)].filter(Boolean).join(' · ') : '';
   return (
-    <Widget nacteni={ceka ? CEKA : data} prazdno={p || ceka ? undefined : <p className="t-meta">Minulá směna nic nepředala.</p>}>
+    <Widget nacteni={ceka ? CEKA : data} prazdno={p || ceka ? undefined : <p className="t-meta">{t('Minulá směna nic nepředala.')}</p>}>
       {p && (
         <>
           {od && <p className="t-meta cz-sentence">{od}</p>}
@@ -178,7 +189,7 @@ function PredavkaWidget({ velikost }: WidgetProps) {
                 // Text předávky se zalamuje (ListRow jinak řádek zkracuje) — ve střední
                 // velikosti nejvýš na čtyři řádky, ve velké celý.
                 title={<span className={`whitespace-normal text-pretty ${velikost === 'L' ? '' : 'line-clamp-4'}`}>{p[r.klic]}</span>}
-                meta={r.popisek}
+                meta={r.klic === 'todo' ? t('Co dodělat') : r.klic === 'runningOut' ? t('Co dochází') : t('Vzkaz')}
               />
             ))}
           </ul>
@@ -195,7 +206,7 @@ function PredavkaWidget({ velikost }: WidgetProps) {
 interface NeuzavrenaSmena { id: number; den: string; od: string; do: string }
 
 function vyberNeuzavrene(raw: any): { smeny: NeuzavrenaSmena[]; zaJineho: boolean } {
-  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.eligibleShifts)) throw new Error('Uzávěrky přišly v nečekaném tvaru.');
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.eligibleShifts)) throw new Error('Uzávěrky přišly v nečekaném tvaru.'); // i18n-ok: věta jde přes apiMessage, ten ji překládá
   return {
     smeny: raw.eligibleShifts.map((s: any, i: number) => ({ id: Number(s.id ?? i), den: den(s.date), od: hm(s.startTime), do: hm(s.endTime) })),
     // `isEmployer` = smí zavírat za jiné s volným datem; takovému API vlastní seznam nevrací.
@@ -203,9 +214,8 @@ function vyberNeuzavrene(raw: any): { smeny: NeuzavrenaSmena[]; zaJineho: boolea
   };
 }
 
-const SMENA_NEUZAVRENA: CzNoun = { one: 'neuzavřená směna', few: 'neuzavřené směny', many: 'neuzavřených směn' };
-
 function MojeUzaverka({ velikost, nahled }: WidgetProps) {
+  const t = useT('widgety');
   const { ok, ceka } = useBrana(['uzaverky.vytvorit']);
   const smi = useSmi();
   const nav = useNavigace();
@@ -226,7 +236,7 @@ function MojeUzaverka({ velikost, nahled }: WidgetProps) {
   const muze = !nahled && nav.smiPohled(pohled);
   const vyplnitDen = (d: string) => predejNastroji(nav, UDALOST_VYPLNIT, KLIC_VYPLNIT, d, pohled);
   const vyplnit = muze ? (
-    <Button variant="primary" size="sm" icon="coins" onClick={() => vyplnitDen(smeny[0]?.den ?? pragueToday())}>Vyplnit</Button>
+    <Button variant="primary" size="sm" icon="coins" onClick={() => vyplnitDen(smeny[0]?.den ?? pragueToday())}>{t('Vyplnit')}</Button>
   ) : null;
   const S = velikost === 'S';
   const n = smeny.length;
@@ -235,28 +245,28 @@ function MojeUzaverka({ velikost, nahled }: WidgetProps) {
   let prazdno: ReactNode | undefined;
   if (zaJineho) {
     telo = S ? (
-      <p className="t-meta text-pretty">Uzávěrku vyplníš za kteroukoli směnu.</p>
+      <p className="t-meta text-pretty">{t('Uzávěrku vyplníš za kteroukoli směnu.')}</p>
     ) : (
       <div className="space-y-3">
-        <p className="t-meta text-pretty">Uzávěrku vyplníš za kteroukoli směnu a den — i za kolegu.</p>
+        <p className="t-meta text-pretty">{t('Uzávěrku vyplníš za kteroukoli směnu a den — i za kolegu.')}</p>
         {vyplnit}
       </div>
     );
   } else if (n === 0) {
-    prazdno = <p className="t-meta text-pretty">{S ? 'Uzávěrky máš hotové.' : 'Uzávěrky máš hotové. Na konci směny ji vyplníš tady.'}</p>;
+    prazdno = <p className="t-meta text-pretty">{S ? t('Uzávěrky máš hotové.') : t('Uzávěrky máš hotové. Na konci směny ji vyplníš tady.')}</p>;
   } else if (S) {
-    telo = <Stat label="Chybí" value={cislo(n)} note={czForm(n, SMENA_NEUZAVRENA)} />;
+    telo = <Stat label={t('Chybí')} value={cislo(n)} note={smenaTvar(t, n)} />;
   } else {
     telo = (
       <div className="space-y-3">
         <p className="text-[15px] font-medium leading-snug text-[#16181A] text-pretty">
-          {n === 1 ? 'Vyplň uzávěrku ze své směny.' : `Máš ${czCount(n, SMENA_NEUZAVRENA)}.`}
+          {n === 1 ? t('Vyplň uzávěrku ze své směny.') : t('Máš {pocet}.', { pocet: smenaPocet(t, n) })}
         </p>
         {/* Řádek vede rovnou do formuláře na ten den (dřív jen obecný proklik). */}
         <ul className="list">
           {smeny.slice(0, 5).map(s => (
             <li key={`${s.id}-${s.den}`}>
-              <ListRow as="div" title={<span className="cz-sentence block truncate">{denVetou(s.den)}</span>}
+              <ListRow as="div" title={<span className="cz-sentence block truncate">{denVetou(s.den, t.jazyk)}</span>}
                 value={s.od ? `${s.od}–${s.do}` : undefined}
                 chevron={muze}
                 onClick={muze ? () => vyplnitDen(s.den) : undefined} />
@@ -285,11 +295,12 @@ function MojeUzaverka({ velikost, nahled }: WidgetProps) {
 // ---------------------------------------------------------------------------
 
 function Chybejici({ velikost, nastaveni, nahled }: WidgetProps<{ dnes?: boolean }>) {
+  const t = useT('widgety');
   const { ok, ceka } = useBrana(['uzaverky.zobrazit_vse']);
   const smi = useSmi();
   const nav = useNavigace();
   const data = useDataWidgetu(ok ? URL_SEZNAM : null, raw => {
-    if (!raw || typeof raw !== 'object') throw new Error('Uzávěrky přišly v nečekaném tvaru.');
+    if (!raw || typeof raw !== 'object') throw new Error('Uzávěrky přišly v nečekaném tvaru.'); // i18n-ok: věta jde přes apiMessage, ten ji překládá
     return raw as { missingClosings?: unknown; missingToday?: unknown };
   });
   const dnes = pragueToday();
@@ -310,23 +321,23 @@ function Chybejici({ velikost, nastaveni, nahled }: WidgetProps<{ dnes?: boolean
       nacteni={ceka ? CEKA : data}
       doplnek={dny.length > 0 && !S ? <Chip tone="bad" size="sm">{cislo(dny.length)}</Chip> : undefined}
       otevrit={S && muze && vse[0] ? () => vyplnit(vse[0].date) : undefined}
-      prazdno={vse.length === 0 ? <p className="t-meta text-pretty">{S ? 'Nic nechybí.' : 'Za posledních 30 dní nic nechybí.'}</p> : undefined}
+      prazdno={vse.length === 0 ? <p className="t-meta text-pretty">{S ? t('Nic nechybí.') : t('Za posledních 30 dní nic nechybí.')}</p> : undefined}
     >
       {S ? (
-        <Stat label="Chybí" value={cislo(dny.length)} note={dnesni ? `${czForm(dny.length, DEN)} · dnes čeká` : czForm(dny.length, DEN)} />
+        <Stat label={t('Chybí')} value={cislo(dny.length)} note={dnesni ? `${denTvar(t, dny.length)} · ${t('dnes čeká')}` : denTvar(t, dny.length)} />
       ) : (
         <>
-          {velikost === 'L' && <p className="t-meta text-pretty">Tyhle dny někdo pracoval, ale uzávěrku nikdo neudělal. Stačí jedna za celou směnu.</p>}
+          {velikost === 'L' && <p className="t-meta text-pretty">{t('Tyhle dny někdo pracoval, ale uzávěrku nikdo neudělal. Stačí jedna za celou směnu.')}</p>}
           <ul className="list">
             {vse.slice(0, limit).map(d => (
               <li key={d.date}>
                 <ListRow as="div"
-                  title={<span className="cz-sentence block truncate">{d.dnesni ? `Dnes · ${denVetou(d.date)}` : denVetou(d.date)}</span>}
+                  title={<span className="cz-sentence block truncate">{d.dnesni ? `${t('Dnes')} · ${denVetou(d.date, t.jazyk)}` : denVetou(d.date, t.jazyk)}</span>}
                   // Lidé textem: PersonChipy v meta se na telefonu zalamovaly a řádek odtrhl šipku.
                   meta={d.employees.length > 0
                     ? `${d.employees.slice(0, 3).map(e => e.name).join(', ')}${d.employees.length > 3 ? ` +${d.employees.length - 3}` : ''}`
                     : undefined}
-                  right={d.dnesni ? <Chip tone="wait" size="sm">Čeká</Chip> : undefined}
+                  right={d.dnesni ? <Chip tone="wait" size="sm">{t('Čeká')}</Chip> : undefined}
                   chevron={muze}
                   onClick={muze ? () => vyplnit(d.date) : undefined} />
               </li>
@@ -344,6 +355,7 @@ function Chybejici({ velikost, nastaveni, nahled }: WidgetProps<{ dnes?: boolean
 // ---------------------------------------------------------------------------
 
 function KeSchvaleni({ velikost, nahled }: WidgetProps) {
+  const t = useT('widgety');
   const { ok, ceka } = useBrana(['uzaverky.zobrazit_vse']);
   const smi = useSmi();
   const money = useMoney();
@@ -355,7 +367,7 @@ function KeSchvaleni({ velikost, nahled }: WidgetProps) {
 
   // Prázdná fronta = vyřízeno: plocha widget v klidu minimalizuje (kolo 71).
   // Hook musí běžet před podmíněným návratem, jinak by se rozjelo pořadí hooků.
-  useVyrizeno(ok && data.data != null && cekaji.length === 0, 'Nic nečeká na schválení');
+  useVyrizeno(ok && data.data != null && cekaji.length === 0, t('Nic nečeká na schválení'));
 
   if (!ok && !ceka) return <Widget prazdno={null} />;
 
@@ -373,7 +385,7 @@ function KeSchvaleni({ velikost, nahled }: WidgetProps) {
       obnovDataWidgetu(URL_SEZNAM);
       setMazat(null);
     } catch (e) {
-      setChyba(apiMessage(e, metoda === 'PATCH' ? 'Uzávěrka se neschválila.' : 'Uzávěrka se nesmazala.'));
+      setChyba(apiMessage(e, metoda === 'PATCH' ? t('Uzávěrka se neschválila.') : t('Uzávěrka se nesmazala.')));
     }
     setPracuji(null);
   };
@@ -383,10 +395,10 @@ function KeSchvaleni({ velikost, nahled }: WidgetProps) {
     <Widget
       nacteni={ceka ? CEKA : data}
       doplnek={cekaji.length > 0 && !S ? <Chip tone="wait" size="sm">{cislo(cekaji.length)}</Chip> : undefined}
-      prazdno={cekaji.length === 0 ? <p className="t-meta">Nic nečeká na schválení.</p> : undefined}
+      prazdno={cekaji.length === 0 ? <p className="t-meta">{t('Nic nečeká na schválení.')}</p> : undefined}
     >
       {S ? (
-        <Stat label="Čeká" value={cislo(cekaji.length)} note={czForm(cekaji.length, UZAVERKA)} />
+        <Stat label={t('Čeká')} value={cislo(cekaji.length)} note={uzaverekTvar(t, cekaji.length)} />
       ) : (
         <>
           {chyba && <p className="note note-danger text-sm mb-2" role="alert">{chyba}</p>}
@@ -395,18 +407,18 @@ function KeSchvaleni({ velikost, nahled }: WidgetProps) {
               const r = smiRozdil ? rozdilUzaverky(c) : null;
               return (
                 <ListRow key={c.id}
-                  title={c.author_name ?? 'Neznámý'}
-                  meta={<span className="cz-sentence">{denKratce(denUzaverky(c))} · odesláno bez směny</span>}
+                  title={c.author_name ?? t('Neznámý')}
+                  meta={<span className="cz-sentence">{denKratce(denUzaverky(c), t.jazyk)} · {t('odesláno bez směny')}</span>}
                   right={r != null ? <RozdilChip rozdil={r} money={money} /> : undefined}
                   actions={(smiSchvalit || smiMazat) ? (
                     <>
                       {smiSchvalit && (
                         <Button variant="primary" size="sm" icon="check" loading={pracuji === c.id && !mazat}
-                          onClick={() => zapis(c, 'PATCH')}>Schválit</Button>
+                          onClick={() => zapis(c, 'PATCH')}>{t('Schválit')}</Button>
                       )}
                       {smiMazat && (
-                        <Menu size="sm" label={`Další akce s uzávěrkou od ${c.author_name ?? 'neznámého'}`}
-                          items={[{ label: 'Smazat uzávěrku…', icon: 'trash', danger: true, hint: 'Nenávratně smaže odeslané hodnoty.', onClick: () => setMazat(c) }]} />
+                        <Menu size="sm" label={t('Další akce s uzávěrkou od {jmeno}', { jmeno: c.author_name ?? t('neznámého') })}
+                          items={[{ label: t('Smazat uzávěrku…'), icon: 'trash', danger: true, hint: t('Nenávratně smaže odeslané hodnoty.'), onClick: () => setMazat(c) }]} />
                       )}
                     </>
                   ) : undefined}
@@ -418,13 +430,13 @@ function KeSchvaleni({ velikost, nahled }: WidgetProps) {
         </>
       )}
       {mazat && (
-        <Modal open onClose={() => setMazat(null)} size="sm" title="Smazat uzávěrku?"
-          subtitle={`${mazat.author_name ?? 'Neznámý'} · ${denVetou(denUzaverky(mazat))}`}
+        <Modal open onClose={() => setMazat(null)} size="sm" title={t('Smazat uzávěrku?')}
+          subtitle={`${mazat.author_name ?? t('Neznámý')} · ${denVetou(denUzaverky(mazat), t.jazyk)}`}
           footer={<>
-            <Button variant="secondary" onClick={() => setMazat(null)}>Zrušit</Button>
-            <Button variant="danger-solid" icon="trash" loading={pracuji === mazat.id} onClick={() => zapis(mazat, 'DELETE')}>Smazat</Button>
+            <Button variant="secondary" onClick={() => setMazat(null)}>{t('Zrušit', undefined, 'dialog')}</Button>
+            <Button variant="danger-solid" icon="trash" loading={pracuji === mazat.id} onClick={() => zapis(mazat, 'DELETE')}>{t('Smazat')}</Button>
           </>}>
-          <p className="text-sm text-black/60">Odeslané hodnoty se nenávratně smažou. Autor pak může uzávěrku vyplnit znovu.</p>
+          <p className="text-sm text-black/60">{t('Odeslané hodnoty se nenávratně smažou. Autor pak může uzávěrku vyplnit znovu.')}</p>
         </Modal>
       )}
     </Widget>
@@ -436,9 +448,10 @@ function KeSchvaleni({ velikost, nahled }: WidgetProps) {
 // ---------------------------------------------------------------------------
 
 type Metrika = 'trzba' | 'odvedeno' | 'vyplaceno' | 'spropitne' | 'rozdil_kasy';
-const NAZEV_OBDOBI: Record<ObdobiSouhrnu, string> = { tento_mesic: 'tento měsíc', minuly_mesic: 'minulý měsíc', vse: 'celkem' };
+const nazevObdobi = (t: PrekladFn, o: ObdobiSouhrnu): string => (o === 'tento_mesic' ? t('tento měsíc') : o === 'minuly_mesic' ? t('minulý měsíc') : t('celkem'));
 
 function Souhrn({ velikost, nastaveni }: WidgetProps<{ obdobi?: ObdobiSouhrnu; metrika?: Metrika }>) {
+  const t = useT('widgety');
   const { ok, ceka } = useBrana(['uzaverky.zobrazit_vse', 'finance.trzby']);
   const money = useMoney();
   const data = useDataWidgetu(ok ? URL_SEZNAM : null, vyberSeznam);
@@ -452,34 +465,34 @@ function Souhrn({ velikost, nastaveni }: WidgetProps<{ obdobi?: ObdobiSouhrnu; m
   const vyplata = data.data?.payDailyCash === true;
   const rozdil = s ? <span className={s.rozdil === 0 ? '' : s.rozdil > 0 ? 'text-info-ink' : 'text-bad-ink'}>{s.rozdil > 0 ? '+' : ''}{money(s.rozdil)}</span> : null;
   const cisla: Record<Metrika, { label: string; value: ReactNode; note?: string }> = s ? {
-    trzba: { label: 'Tržba', value: money(s.trzba), note: `z toho kartou ${money(s.kartou)}` },
-    odvedeno: { label: 'Odvedeno', value: money(s.odvedeno), note: 'odloženo ven a odvody' },
-    vyplaceno: { label: 'Vyplaceno', value: money(s.vyplaceno), note: 'v hotovosti z kasy' },
-    spropitne: { label: 'Spropitné', value: money(s.spropitne) },
-    rozdil_kasy: { label: 'Rozdíl kasy', value: rozdil, note: 'manko a přebytek dohromady' },
+    trzba: { label: t('Tržba'), value: money(s.trzba), note: t('z toho kartou {castka}', { castka: money(s.kartou) }) },
+    odvedeno: { label: t('Odvedeno'), value: money(s.odvedeno), note: t('odloženo ven a odvody') },
+    vyplaceno: { label: t('Vyplaceno'), value: money(s.vyplaceno), note: t('v hotovosti z kasy') },
+    spropitne: { label: t('Spropitné'), value: money(s.spropitne) },
+    rozdil_kasy: { label: t('Rozdíl kasy'), value: rozdil, note: t('manko a přebytek dohromady') },
   } : ({} as any);
   const metrika = nastaveni.metrika ?? 'trzba';
-  const obdobiNote = `${NAZEV_OBDOBI[obdobi]} · ${czCount(s?.pocet ?? 0, UZAVERKA)}`;
+  const obdobiNote = `${nazevObdobi(t, obdobi)} · ${uzaverekPocet(t, s?.pocet ?? 0)}`;
   // Třetí číslo podle toho, jak podnik platí: denní výplata z kasy, nebo spropitné.
   const treti: Metrika = vyplata ? 'vyplaceno' : 'spropitne';
 
   return (
     <Widget nacteni={ceka ? CEKA : data} kostra="cislo"
-      prazdno={s && s.pocet === 0 ? <p className="t-meta">Za {NAZEV_OBDOBI[obdobi] === 'celkem' ? 'celé období' : NAZEV_OBDOBI[obdobi]} zatím žádná uzávěrka.</p> : undefined}>
+      prazdno={s && s.pocet === 0 ? <p className="t-meta">{obdobi === 'vse' ? t('Za celé období zatím žádná uzávěrka.') : obdobi === 'minuly_mesic' ? t('Za minulý měsíc zatím žádná uzávěrka.') : t('Za tento měsíc zatím žádná uzávěrka.')}</p> : undefined}>
       {s && (velikost === 'S' ? (
-        <Stat label={cisla[metrika].label} value={cisla[metrika].value} note={NAZEV_OBDOBI[obdobi]} />
+        <Stat label={cisla[metrika].label} value={cisla[metrika].value} note={nazevObdobi(t, obdobi)} />
       ) : velikost === 'M' ? (
         <StatRow>
-          <Stat label="Tržba" value={money(s.trzba)} note={obdobiNote} />
-          <Stat label="Rozdíl kasy" value={rozdil} note="manko a přebytek" />
+          <Stat label={t('Tržba')} value={money(s.trzba)} note={obdobiNote} />
+          <Stat label={t('Rozdíl kasy')} value={rozdil} note={t('manko a přebytek')} />
         </StatRow>
       ) : (
         <div className="space-y-2">
           <StatRow>
-            <Stat label="Tržba" value={money(s.trzba)} note={cisla.trzba.note} />
-            <Stat label="Odvedeno" value={money(s.odvedeno)} note="odloženo ven a odvody" />
+            <Stat label={t('Tržba')} value={money(s.trzba)} note={cisla.trzba.note} />
+            <Stat label={t('Odvedeno')} value={money(s.odvedeno)} note={t('odloženo ven a odvody')} />
             <Stat label={cisla[treti].label} value={cisla[treti].value} note={cisla[treti].note} />
-            <Stat label="Rozdíl kasy" value={rozdil} note="manko a přebytek" />
+            <Stat label={t('Rozdíl kasy')} value={rozdil} note={t('manko a přebytek')} />
           </StatRow>
           <p className="t-meta cz-sentence">{obdobiNote}</p>
         </div>
@@ -493,6 +506,7 @@ function Souhrn({ velikost, nastaveni }: WidgetProps<{ obdobi?: ObdobiSouhrnu; m
 // ---------------------------------------------------------------------------
 
 function RozdilPokladny({ velikost, nastaveni }: WidgetProps<{ obdobi?: '7_dni' | 'tento_mesic'; prah?: number }>) {
+  const t = useT('widgety');
   const { ok, ceka } = useBrana(['uzaverky.zobrazit_vse', 'finance.trzby']);
   const smi = useSmi();
   const money = useMoney();
@@ -506,29 +520,28 @@ function RozdilPokladny({ velikost, nastaveni }: WidgetProps<{ obdobi?: '7_dni' 
 
   // Jméno u rozdílu je citlivější než číslo (kdo „dělá manko") — jen s finance.trzby_lide.
   const jmena = smi('finance.trzby_lide');
-  const nazevObdobi = obdobi === '7_dni' ? 'za 7 dní' : 'tento měsíc';
+  const nazevObd = obdobi === '7_dni' ? t('za 7 dní') : t('tento měsíc');
   const barva = (n: number) => (n === 0 ? '' : n > 0 ? 'text-info-ink' : 'text-bad-ink');
   const hodnota = r ? <span className={barva(r.soucet)}>{r.soucet > 0 ? '+' : ''}{money(r.soucet)}</span> : null;
-  const MIMO: CzNoun = { one: 'den nad práh', few: 'dny nad práh', many: 'dní nad práh' };
 
   return (
     <Widget nacteni={ceka ? CEKA : data} kostra="cislo"
-      prazdno={r && r.porovnano === 0 ? <p className="t-meta">Za {obdobi === '7_dni' ? 'posledních 7 dní' : 'tento měsíc'} zatím žádná uzávěrka.</p> : undefined}>
+      prazdno={r && r.porovnano === 0 ? <p className="t-meta">{obdobi === '7_dni' ? t('Za posledních 7 dní zatím žádná uzávěrka.') : t('Za tento měsíc zatím žádná uzávěrka.')}</p> : undefined}>
       {r && (velikost === 'S' ? (
-        <Stat label="Součet" value={hodnota} note={nazevObdobi} />
+        <Stat label={t('Součet')} value={hodnota} note={nazevObd} />
       ) : (
         <div className="space-y-3">
           <StatRow>
-            <Stat label="Součet" value={hodnota} note={nazevObdobi} />
-            <Stat label="Absolutně" value={money(r.absolutne)} note={czCount(r.dny.length, MIMO)} />
+            <Stat label={t('Součet')} value={hodnota} note={nazevObd} />
+            <Stat label={t('Absolutně')} value={money(r.absolutne)} note={t('{n, plural, one {# den nad práh} few {# dny nad práh} other {# dní nad práh}}', { n: r.dny.length })} />
           </StatRow>
           {r.dny.length === 0 ? (
-            <p className="t-meta">Kasa seděla — žádný den nepřesáhl práh {money(prah)}.</p>
+            <p className="t-meta">{t('Kasa seděla — žádný den nepřesáhl práh {prah}.', { prah: money(prah) })}</p>
           ) : (
             <>
               <ul className="list">
                 {r.dny.slice(0, 5).map(d => (
-                  <ListRow key={d.den} title={<span className="cz-sentence block truncate">{denVetou(d.den)}</span>}
+                  <ListRow key={d.den} title={<span className="cz-sentence block truncate">{denVetou(d.den, t.jazyk)}</span>}
                     meta={jmena && d.autor ? d.autor : undefined}
                     right={<RozdilChip rozdil={d.rozdil} money={money} />} />
                 ))}
@@ -547,26 +560,27 @@ function RozdilPokladny({ velikost, nastaveni }: WidgetProps<{ obdobi?: '7_dni' 
 // ---------------------------------------------------------------------------
 
 function Trendy({ velikost }: WidgetProps) {
+  const t = useT('widgety');
   const { ok, ceka } = useBrana(['uzaverky.zobrazit_vse', 'finance.trzby']);
   const money = useMoney();
   const data = useDataWidgetu(ok ? URL_SEZNAM : null, vyberSeznam);
-  const t = useMemo(() => (data.data ? trendyTrzeb(data.data.radky, pragueToday()) : null), [data.data]);
+  const tr = useMemo(() => (data.data ? trendyTrzeb(data.data.radky, pragueToday()) : null), [data.data]);
 
   if (!ok && !ceka) return <Widget prazdno={null} />;
-  if (t?.skryto) return <Widget prazdno={null} />;
+  if (tr?.skryto) return <Widget prazdno={null} />;
 
-  const zmena = t?.zmena == null ? '—' : `${t.zmena >= 0 ? '+' : '−'}${Math.abs(Math.round(t.zmena))} %`;
-  const tonZmeny = t?.zmena == null ? '' : t.zmena >= 0 ? 'text-ok-ink' : 'text-bad-ink';
+  const zmena = tr?.zmena == null ? '—' : `${tr.zmena >= 0 ? '+' : '−'}${Math.abs(Math.round(tr.zmena))} %`;
+  const tonZmeny = tr?.zmena == null ? '' : tr.zmena >= 0 ? 'text-ok-ink' : 'text-bad-ink';
 
   return (
     <Widget nacteni={ceka ? CEKA : data} kostra="cislo"
-      prazdno={data.data && !t ? <p className="t-meta text-pretty">Trend půjde spočítat, až budou uzávěrky aspoň ze čtyř dní.</p> : undefined}>
-      {t && (
+      prazdno={data.data && !tr ? <p className="t-meta text-pretty">{t('Trend půjde spočítat, až budou uzávěrky aspoň ze čtyř dní.')}</p> : undefined}>
+      {tr && (
         <StatRow>
-          <Stat label="Tento týden" value={money(t.tentoTyden)} note="od pondělí do dneška" />
-          <Stat label="Proti minulému" value={<span className={tonZmeny}>{zmena}</span>} note={`stejné dny: ${money(t.minulyTyden)}`} />
-          {velikost === 'L' && <Stat label="Nejsilnější den" value={<span className="cz-sentence inline-block">{DNY_V_TYDNU[t.nejsilnejsiDen]}</span>} note={`průměr ${money(t.prumerNejsilnejsiho)}`} />}
-          {velikost === 'L' && <Stat label="Rekordní den" value={money(t.rekord)} note={t.rekordDen ? new Date(`${t.rekordDen}T12:00:00`).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' }) : undefined} />}
+          <Stat label={t('Tento týden')} value={money(tr.tentoTyden)} note={t('od pondělí do dneška')} />
+          <Stat label={t('Proti minulému')} value={<span className={tonZmeny}>{zmena}</span>} note={t('stejné dny: {castka}', { castka: money(tr.minulyTyden) })} />
+          {velikost === 'L' && <Stat label={t('Nejsilnější den')} value={<span className="cz-sentence inline-block">{t(DNY_V_TYDNU[tr.nejsilnejsiDen]) /* i18n-ok: klíče jsou české názvy dnů z lib/uzaverkyPrehled */}</span>} note={t('průměr {castka}', { castka: money(tr.prumerNejsilnejsiho) })} />}
+          {velikost === 'L' && <Stat label={t('Rekordní den')} value={money(tr.rekord)} note={tr.rekordDen ? fmtDatum(tr.rekordDen, { jazyk: t.jazyk, styl: 'dlouze' }) : undefined} />}
         </StatRow>
       )}
     </Widget>
@@ -580,6 +594,7 @@ function Trendy({ velikost }: WidgetProps) {
 interface MesicFinanci { trzby: number; nakupy: number; mzdy: number; vysledek: number; mzdySkryte: boolean }
 
 function MesicVCislech({ velikost, nastaveni }: WidgetProps<{ mesic?: 'tento' | 'minuly' }>) {
+  const t = useT('widgety');
   const { ok, ceka } = useBrana(['finance.zobrazit', 'finance.mzdy']);
   const money = useMoney();
   const { laborTargetPct } = useCurrency();
@@ -589,7 +604,7 @@ function MesicVCislech({ velikost, nastaveni }: WidgetProps<{ mesic?: 'tento' | 
   // z kasy. Dřív tu byly jen přijaté objednávky a čísla se s Financemi rozcházela.
   const data = useDataWidgetu<MesicFinanci>(ok ? `/api/finance?month=${mesic}` : null, raw => {
     const s = raw?.summary;
-    if (!s || typeof s !== 'object') throw new Error('Finance přišly v nečekaném tvaru.');
+    if (!s || typeof s !== 'object') throw new Error('Finance přišly v nečekaném tvaru.'); // i18n-ok: překládá apiMessage
     const n = (v: unknown) => Number(v) || 0;
     // Mzdy jako Finance: vyšší z odpracovaného a vyplaceného (jinak by se denní výplata počítala dvakrát nebo vůbec).
     const mzdy = Math.max(n(s.wagesWorked), n(s.wagesCash));
@@ -603,20 +618,20 @@ function MesicVCislech({ velikost, nastaveni }: WidgetProps<{ mesic?: 'tento' | 
   const nadCilem = podil != null && laborTargetPct != null && podil > laborTargetPct;
   const vysledek = f ? <span className={f.vysledek >= 0 ? 'text-ok-ink' : 'text-bad-ink'}>{f.vysledek >= 0 ? '+' : '−'}{money(Math.abs(f.vysledek))}</span> : null;
   const podilText = podil == null ? '—' : `${Math.round(podil)} %`;
-  const cil = laborTargetPct != null ? `cíl ${laborTargetPct} %` : 'mzdy z tržeb';
+  const cil = laborTargetPct != null ? t('cíl {n} %', { n: laborTargetPct }) : t('mzdy z tržeb');
 
   return (
     <Widget nacteni={ceka ? CEKA : data} kostra="cislo"
-      prazdno={f && f.trzby === 0 && f.nakupy === 0 && f.mzdy === 0 ? <p className="t-meta">Za tenhle měsíc zatím nejsou čísla.</p> : undefined}>
+      prazdno={f && f.trzby === 0 && f.nakupy === 0 && f.mzdy === 0 ? <p className="t-meta">{t('Za tenhle měsíc zatím nejsou čísla.')}</p> : undefined}>
       {f && (
         <div className="space-y-2">
           <StatRow>
-            <Stat label="Výsledek" value={vysledek} note="orientačně, bez DPH" />
-            <Stat label="Podíl mezd" value={<span className={nadCilem ? 'text-bad-ink' : ''}>{podilText}</span>} note={cil} />
-            {velikost === 'L' && <Stat label="Tržby" value={money(f.trzby)} />}
-            {velikost === 'L' && <Stat label="Mzdy a nákupy" value={`−${money(f.mzdy + f.nakupy)}`} note={`mzdy ${money(f.mzdy)} · nákupy ${money(f.nakupy)}`} />}
+            <Stat label={t('Výsledek')} value={vysledek} note={t('orientačně, bez DPH')} />
+            <Stat label={t('Podíl mezd')} value={<span className={nadCilem ? 'text-bad-ink' : ''}>{podilText}</span>} note={cil} />
+            {velikost === 'L' && <Stat label={t('Tržby')} value={money(f.trzby)} />}
+            {velikost === 'L' && <Stat label={t('Mzdy a nákupy')} value={`−${money(f.mzdy + f.nakupy)}`} note={`${t('mzdy {castka}', { castka: money(f.mzdy) })} · ${t('nákupy {castka}', { castka: money(f.nakupy) })}`} />}
           </StatRow>
-          <p className="t-meta cz-sentence">{new Date(`${mesic}-01T12:00:00`).toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' })}</p>
+          <p className="t-meta cz-sentence">{fmtDatum(`${mesic}-01`, { jazyk: t.jazyk, styl: 'mesic' })}</p>
         </div>
       )}
     </Widget>
@@ -633,17 +648,16 @@ const TECKA: Record<StavDne, string> = {
   ceka: 'bg-wait',
   nic: 'bg-transparent',
 };
-const POPIS_STAVU: Record<StavDne, string> = {
-  hotovo: 'uzávěrka hotová',
-  chybi: 'chybí uzávěrka',
-  ceka: 'uzávěrka zatím nevyplněná',
-  nic: 'bez směny',
-};
+const popisStavu = (t: PrekladFn, st: StavDne): string => (
+  st === 'hotovo' ? t('uzávěrka hotová') : st === 'chybi' ? t('chybí uzávěrka') : st === 'ceka' ? t('uzávěrka zatím nevyplněná') : t('bez směny')
+);
 
 /** „12,4k" — buňka dne je malá, celá částka se do ní nevejde (celá je v popisku). */
 const kratce = (n: number) => (n >= 10000 ? `${Math.round(n / 1000)}k` : n >= 1000 ? `${(n / 1000).toFixed(1).replace('.', ',')}k` : String(Math.round(n)));
 
 function Kalendar({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: 'tento' | 'minuly'; rozsah?: 'moje' | 'tym' }>) {
+  const t = useT('widgety');
+  const { jazyk } = useJazyk();
   const smi = useSmi();
   const nav = useNavigace();
   const money = useMoney();
@@ -660,7 +674,7 @@ function Kalendar({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: 'tento'
   // Tablet kalendář nemá (sdílená obrazovka) — server mu vrací prázdno, neptáme se.
   const tablet = role?.typ === 'kiosk';
   const data = useDataWidgetu(!ceka && !tablet ? `/api/closings/calendar?month=${mesic}${tym ? '' : '&scope=me'}` : null, raw => {
-    if (!raw || typeof raw !== 'object' || typeof raw.days !== 'object') throw new Error('Kalendář přišel v nečekaném tvaru.');
+    if (!raw || typeof raw !== 'object' || typeof raw.days !== 'object') throw new Error('Kalendář přišel v nečekaném tvaru.'); // i18n-ok: překládá apiMessage
     return raw.days as Record<string, DenKalendare>;
   });
 
@@ -677,7 +691,7 @@ function Kalendar({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: 'tento'
   const dny = data.data ?? {};
   const dnes = pragueToday();
   const bunky = bunkyMesice(mesic, zacatekTydne(weekStart));
-  const zkratky = zkratkyDnu(zacatekTydne(weekStart));
+  const zkratky = zkratkyDnuJazyk(zacatekTydne(weekStart), jazyk);
   const vMesici = Object.keys(dny).filter(d => d.slice(0, 7) === mesic);
   const hotovych = vMesici.filter(d => dny[d].hasClosing).length;
   const chybi = vMesici.filter(d => stavDne(dny[d], d, dnes) === 'chybi').length;
@@ -689,14 +703,14 @@ function Kalendar({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: 'tento'
       <div className="flex flex-wrap items-center justify-between gap-2">
         <MonthNav value={mesic} onChange={m => setMesic(m)} max={tento} />
         <p className="t-meta tabular-nums">
-          {czCount(hotovych, UZAVERKA)}
-          {chybi > 0 && <span className="text-bad-ink font-semibold"> · {chybi} chybí</span>}
-          {trzba > 0 && !M && <span> · tržba {money(trzba)}</span>}
+          {uzaverekPocet(t, hotovych)}
+          {chybi > 0 && <span className="text-bad-ink font-semibold"> · {t('{n} chybí', { n: chybi })}</span>}
+          {trzba > 0 && !M && <span> · {t('tržba {castka}', { castka: money(trzba) })}</span>}
         </p>
       </div>
       {/* Žádné role=grid: slibovalo by řádky a šipky, které tu nejsou. Každý den nese
           celé datum a stav v popisku, zkratky dnů jsou jen pro oko. */}
-      <div className="mt-3 grid grid-cols-7 gap-1 sm:gap-1.5" role="group" aria-label="Uzávěrky po dnech">
+      <div className="mt-3 grid grid-cols-7 gap-1 sm:gap-1.5" role="group" aria-label={t('Uzávěrky po dnech')}>
         {zkratky.map(z => <div key={z} aria-hidden className="text-center text-[11px] font-semibold text-black/45 pb-1">{z}</div>)}
         {bunky.map((d, i) => {
           if (!d) return <div key={`p${i}`} aria-hidden />;
@@ -705,7 +719,7 @@ function Kalendar({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: 'tento'
           const cisloDne = Number(d.slice(8, 10));
           const vybranyDen = vybrany === d;
           const revenue = Number(den?.revenue) || 0;
-          const popis = `${cisloDne}. ${Number(d.slice(5, 7))}. — ${POPIS_STAVU[stav]}${stav === 'hotovo' && revenue > 0 ? `, tržba ${money(revenue)}` : ''}${den?.onShift?.length ? `, na směně ${den.onShift.map(p => p.name).join(', ')}` : ''}`;
+          const popis = `${cisloDne}. ${Number(d.slice(5, 7))}. — ${popisStavu(t, stav)}${stav === 'hotovo' && revenue > 0 ? `, ${t('tržba {castka}', { castka: money(revenue) })}` : ''}${den?.onShift?.length ? `, ${t('na směně {lidi}', { lidi: den.onShift.map(p => p.name).join(', ') })}` : ''}`;
           const obsah = (
             <>
               {/* Vybraný den = inkoustová pilulka čísla (chip-ink má tmavou variantu);
@@ -735,9 +749,9 @@ function Kalendar({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: 'tento'
         })}
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 t-meta">
-        <span className="flex items-center gap-1.5"><span aria-hidden className={`h-2 w-2 rounded-full ${TECKA.hotovo}`} /> Hotová</span>
-        <span className="flex items-center gap-1.5"><span aria-hidden className={`h-2 w-2 rounded-full ${TECKA.chybi}`} /> Chybí</span>
-        <span className="flex items-center gap-1.5"><span aria-hidden className={`h-2 w-2 rounded-full ${TECKA.ceka}`} /> Čeká</span>
+        <span className="flex items-center gap-1.5"><span aria-hidden className={`h-2 w-2 rounded-full ${TECKA.hotovo}`} /> {t('Hotová')}</span>
+        <span className="flex items-center gap-1.5"><span aria-hidden className={`h-2 w-2 rounded-full ${TECKA.chybi}`} /> {t('Chybí')}</span>
+        <span className="flex items-center gap-1.5"><span aria-hidden className={`h-2 w-2 rounded-full ${TECKA.ceka}`} /> {t('Čeká')}</span>
       </div>
     </Widget>
   );
@@ -752,6 +766,7 @@ function Kalendar({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: 'tento'
 const ClosingDetail = dynamic(() => import('../../employer/ClosingDetail'), { ssr: false });
 
 function MojeHistorie({ velikost, nastaveni, nahled }: WidgetProps<{ pocet?: string }>) {
+  const t = useT('widgety');
   const { ok, ceka } = useBrana(['uzaverky.vytvorit']);
   const money = useMoney();
   const data = useDataWidgetu(ok ? URL_SEZNAM : null, vyberSeznam);
@@ -774,17 +789,17 @@ function MojeHistorie({ velikost, nastaveni, nahled }: WidgetProps<{ pocet?: str
   const radek = (c: RadekUzaverky) => {
     const r = rozdilUzaverky(c);
     const castky = [
-      `hotově ${money(Number(c.cash_revenue) || 0)}`,
-      `kartou ${money(Number(c.card_revenue) || 0)}`,
-      (Number(c.cash_removed) || 0) > 0 ? `odloženo ${money(Number(c.cash_removed))}` : null,
-      vyplata && (Number(c.self_payout) || 0) > 0 ? `výplata ${money(Number(c.self_payout))}` : null,
+      t('hotově {castka}', { castka: money(Number(c.cash_revenue) || 0) }),
+      t('kartou {castka}', { castka: money(Number(c.card_revenue) || 0) }),
+      (Number(c.cash_removed) || 0) > 0 ? t('odloženo {castka}', { castka: money(Number(c.cash_removed)) }) : null,
+      vyplata && (Number(c.self_payout) || 0) > 0 ? t('výplata {castka}', { castka: money(Number(c.self_payout)) }) : null,
     ].filter(Boolean).join(' · ');
     return (
       <ListRow key={c.id}
-        title={<span className="cz-sentence block truncate">{denVetou(denUzaverky(c))}{c.shift_label ? ` · ${c.shift_label}` : ''}</span>}
+        title={<span className="cz-sentence block truncate">{denVetou(denUzaverky(c), t.jazyk)}{c.shift_label ? ` · ${c.shift_label}` : ''}</span>}
         meta={castky}
         right={(c.approved === false || r != null) ? <>
-          {c.approved === false && <Chip tone="wait" size="sm">Čeká na schválení</Chip>}
+          {c.approved === false && <Chip tone="wait" size="sm">{t('Čeká na schválení')}</Chip>}
           {r != null && <RozdilChip rozdil={r} money={money} />}
         </> : undefined}
         chevron={!!otevri}
@@ -796,16 +811,16 @@ function MojeHistorie({ velikost, nastaveni, nahled }: WidgetProps<{ pocet?: str
 
   return (
     <Widget nacteni={ceka ? CEKA : data}
-      prazdno={moje.length === 0 ? <p className="t-meta text-pretty">Zatím žádná uzávěrka. Po směně ji vyplníš ve formuláři na téhle stránce.</p> : undefined}>
+      prazdno={moje.length === 0 ? <p className="t-meta text-pretty">{t('Zatím žádná uzávěrka. Po směně ji vyplníš ve formuláři na téhle stránce.')}</p> : undefined}>
       <ul className="list">{moje.slice(0, pocet).map(radek)}</ul>
       {zbyva > 0 && (nahled ? <ADalsich n={zbyva} /> : (
         <Button variant="ghost" size="sm" className="mt-2" onClick={() => setVse(true)}>
-          Zobrazit všechny ({cislo(moje.length)})
+          {t('Zobrazit všechny ({n})', { n: cislo(moje.length) })}
         </Button>
       ))}
       {vse && (
-        <Modal open onClose={() => setVse(false)} size="lg" title="Moje uzávěrky"
-          subtitle={czCount(moje.length, UZAVERKA)}>
+        <Modal open onClose={() => setVse(false)} size="lg" title={t('Moje uzávěrky')}
+          subtitle={uzaverekPocet(t, moje.length)}>
           <ul className="list">{moje.map(radek)}</ul>
         </Modal>
       )}

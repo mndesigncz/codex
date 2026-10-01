@@ -20,7 +20,9 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
 import { widget } from '@/lib/widgety/katalog';
-import { czCount, czForm, SMENA } from '@/lib/czech';
+import { useJazyk, useT, type PrekladFn } from '@/lib/i18n/client';
+import { fmtDatum } from '@/lib/i18n/format';
+import type { Jazyk } from '@/lib/i18n/config';
 import { apiMessage, okJson } from '@/lib/api';
 import { bezSazby, cekajiciPozvanky, hodinyMinuty, roleSPocty, type ClenTymu, type Pozvanka } from '@/lib/dochazkaPrehled';
 import { Avatar, Button, Chip, Field, Input, ListRow, Modal, Stat, StatRow, Well } from '../../ui';
@@ -35,7 +37,7 @@ type Klic = string | readonly string[];
 
 const seznam = (x: unknown): any[] => (Array.isArray(x) ? x : []);
 const cislo = (n: number) => n.toLocaleString('cs-CZ');
-const aDalsich = (n: number) => `…a ${czForm(n, { one: 'další', few: 'další', many: 'dalších' })} ${cislo(n)}`;
+const aDalsich = (t: PrekladFn, n: number) => t('…a {n, plural, one {# další} few {# další} other {# dalších}}', { n });
 
 /** Klíč části widgetu z katalogu (`opravneni.pole`) — jeden zdroj pravdy s galerií a serverem. */
 function klicCasti(idWidgetu: string, cast: string): Klic | null {
@@ -66,7 +68,7 @@ interface Clen {
   jmeno: string;
   avatar: string | null;
   vedeni: boolean;
-  role: string;
+  role: string | null;
   pozice: string | null;
   telefon: string | null;
   jinde: boolean;
@@ -78,7 +80,8 @@ function vyberCleny(raw: any): Clen[] {
     jmeno: String(m.name ?? ''),
     avatar: typeof m.avatar === 'string' ? m.avatar : null,
     vedeni: m.role === 'employer',
-    role: String(m.role_nazev ?? (m.role === 'employer' ? 'Vedení' : 'Zaměstnanec')),
+    // Chybějící název role se doplní až při vykreslení (překlad).
+    role: m.role_nazev != null ? String(m.role_nazev) : null,
     pozice: typeof m.job_title === 'string' && m.job_title.trim() ? m.job_title.trim() : null,
     telefon: typeof m.phone === 'string' && m.phone.trim() ? m.phone.trim() : null,
     // Člen je právě přepnutý v jiném podniku organizace (kolo 62) — tady je dál členem.
@@ -87,6 +90,7 @@ function vyberCleny(raw: any): Clen[] {
 }
 
 function Tym({ velikost }: WidgetProps) {
+  const t = useT('widgety');
   const smi = useSmi();
   const nav = useNavigace();
   const otevriProfil = usePersonProfile();
@@ -103,18 +107,19 @@ function Tym({ velikost }: WidgetProps) {
     return (
       <Widget nacteni={ceka ? CEKA : data}
         otevrit={nav.smiPohled('team-settings') ? () => nav.onNavigate('team-settings') : undefined}>
-        <Stat label="Lidí v týmu" value={cislo(clenove.length)} note={veVedeni > 0 ? `${cislo(veVedeni)} ve vedení` : undefined} />
+        <Stat label={t('Lidí v týmu')} value={cislo(clenove.length)} note={veVedeni > 0 ? t('{n} ve vedení', { n: cislo(veVedeni) }) : undefined} />
       </Widget>
     );
   }
   return (
-    <Widget nacteni={ceka ? CEKA : data} odkaz={{ popisek: 'Lidé', pohled: 'team-settings' }}
+    <Widget nacteni={ceka ? CEKA : data} odkaz={{ popisek: t('Lidé'), pohled: 'team-settings' }}
       doplnek={clenove.length > 0 ? <Chip tone="muted" size="sm">{cislo(clenove.length)}</Chip> : undefined}
-      prazdno={clenove.length === 0 ? <p className="t-meta">V týmu zatím nikdo není.</p> : undefined}>
+      prazdno={clenove.length === 0 ? <p className="t-meta">{t('V týmu zatím nikdo není.')}</p> : undefined}>
       <ul className="list">
         {clenove.slice(0, 5).map(c => {
-          const meta = [c.role, c.pozice && c.pozice !== c.role ? c.pozice : null, kontakty ? c.telefon : null].filter(Boolean).join(' · ');
-          const jinde = c.jinde ? <Chip tone="muted" size="sm">V jiném podniku</Chip> : undefined;
+          const role = c.role ?? (c.vedeni ? t('Vedení') : t('Zaměstnanec'));
+          const meta = [role, c.pozice && c.pozice !== role ? c.pozice : null, kontakty ? c.telefon : null].filter(Boolean).join(' · ');
+          const jinde = c.jinde ? <Chip tone="muted" size="sm">{t('V jiném podniku')}</Chip> : undefined;
           return profil && otevriProfil ? (
             // Klikací řádek ve vlastním <li>, jinak by .list nad ním nekreslil linku (DP §3.6).
             <li key={c.id}>
@@ -126,7 +131,7 @@ function Tym({ velikost }: WidgetProps) {
           );
         })}
       </ul>
-      {clenove.length > 5 && <p className="t-meta mt-2">{aDalsich(clenove.length - 5)}</p>}
+      {clenove.length > 5 && <p className="t-meta mt-2">{aDalsich(t, clenove.length - 5)}</p>}
     </Widget>
   );
 }
@@ -151,30 +156,26 @@ export function obnovTym(): void {
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(UDALOST_TYM));
 }
 
-const LIDI = { one: 'člověk', few: 'lidé', many: 'lidí' };
-const POZVANEK = { one: 'čekající pozvánka', few: 'čekající pozvánky', many: 'čekajících pozvánek' };
-const ROLI_BEZ = { one: 'role zatím nemá', few: 'role zatím nemají', many: 'rolí zatím nemá' };
-
 /** „dnes", „včera", „před 5 dny" — stáří pozvánky. */
-function stari(iso: string | undefined): string {
+function stari(t: PrekladFn, iso: string | undefined): string {
   const d = iso ? new Date(iso) : null;
   if (!d || Number.isNaN(d.getTime())) return '';
   const dni = Math.floor((Date.now() - d.getTime()) / 86_400_000);
-  if (dni <= 0) return 'dnes';
-  if (dni === 1) return 'včera';
-  return `před ${dni.toLocaleString('cs-CZ')} ${czForm(dni, { one: 'dnem', few: 'dny', many: 'dny' })}`;
+  if (dni <= 0) return t('dnes');
+  if (dni === 1) return t('včera');
+  return t('před {n, plural, one {# dnem} few {# dny} other {# dny}}', { n: dni });
 }
 
 // ---------------------------------------------------------------------------
 // Pozvánky
 // ---------------------------------------------------------------------------
 
-function vyberKod(raw: any): { kod: string | null } {
-  if (!raw || typeof raw !== 'object') throw new Error('Tým přišel v nečekaném tvaru.');
+function vyberKod(raw: any, t: PrekladFn): { kod: string | null } {
+  if (!raw || typeof raw !== 'object') throw new Error(t('Tým přišel v nečekaném tvaru.'));
   return { kod: typeof raw.team?.join_code === 'string' && raw.team.join_code ? raw.team.join_code : null };
 }
-function vyberPozvanky(raw: any): Pozvanka[] {
-  if (!raw || !Array.isArray(raw.invitations)) throw new Error('Pozvánky přišly v nečekaném tvaru.');
+function vyberPozvanky(raw: any, t: PrekladFn): Pozvanka[] {
+  if (!raw || !Array.isArray(raw.invitations)) throw new Error(t('Pozvánky přišly v nečekaném tvaru.'));
   return raw.invitations;
 }
 
@@ -185,14 +186,15 @@ function vyberPozvanky(raw: any): Pozvanka[] {
  * ani nepošle; bez klíče se widget nepřipojí a dotazy neodejdou.
  */
 function Pozvanky({ velikost, nahled }: WidgetProps) {
+  const t = useT('widgety');
   const { ok, ceka } = useBrana(widget('tym.pozvanky')?.opravneni.vse ?? ['tym.pozvat']);
-  const tym = useDataWidgetu(ok ? URL_TYM : null, vyberKod);
-  const poz = useDataWidgetu(ok ? '/api/invitations' : null, vyberPozvanky);
+  const tym = useDataWidgetu(ok ? URL_TYM : null, raw => vyberKod(raw, t));
+  const poz = useDataWidgetu(ok ? '/api/invitations' : null, raw => vyberPozvanky(raw, t));
   const [zkopirovano, setZkopirovano] = useState(false);
   useEffect(() => {
     if (!zkopirovano) return;
-    const t = setTimeout(() => setZkopirovano(false), 2000);
-    return () => clearTimeout(t);
+    const casovac = setTimeout(() => setZkopirovano(false), 2000);
+    return () => clearTimeout(casovac);
   }, [zkopirovano]);
   if (!ok && !ceka) return <Widget prazdno={null} />;
 
@@ -203,8 +205,8 @@ function Pozvanky({ velikost, nahled }: WidgetProps) {
     try { await navigator.clipboard.writeText(kod); setZkopirovano(true); } catch { /* schránka zakázaná — kód je vidět */ }
   };
   const tlacitko = kod && !nahled ? (
-    <Button variant="secondary" size="sm" icon={zkopirovano ? 'check' : 'copy'} onClick={kopiruj} aria-label={`Kopírovat kód ${kod}`}>
-      {zkopirovano ? 'Zkopírováno' : 'Kopírovat'}
+    <Button variant="secondary" size="sm" icon={zkopirovano ? 'check' : 'copy'} onClick={kopiruj} aria-label={t('Kopírovat kód {kod}', { kod })}>
+      {zkopirovano ? t('Zkopírováno') : t('Kopírovat')}
     </Button>
   ) : null;
 
@@ -212,35 +214,35 @@ function Pozvanky({ velikost, nahled }: WidgetProps) {
     return (
       <Widget nacteni={ceka ? CEKA : [tym, poz]}>
         <div className="space-y-2.5">
-          <Stat label="Kód pro připojení" value={<span className="font-mono tracking-[0.12em]">{kod ?? '—'}</span>}
-            note={cekajici.length > 0 ? czCount(cekajici.length, POZVANEK) : 'nikdo nečeká'} />
+          <Stat label={t('Kód pro připojení')} value={<span className="font-mono tracking-[0.12em]">{kod ?? '—'}</span>}
+            note={cekajici.length > 0 ? t('{n, plural, one {# čekající pozvánka} few {# čekající pozvánky} other {# čekajících pozvánek}}', { n: cekajici.length }) : t('nikdo nečeká')} />
           {tlacitko}
         </div>
       </Widget>
     );
   }
   return (
-    <Widget nacteni={ceka ? CEKA : [tym, poz]} odkaz={{ popisek: 'Lidé', pohled: 'team-settings' }}
+    <Widget nacteni={ceka ? CEKA : [tym, poz]} odkaz={{ popisek: t('Lidé'), pohled: 'team-settings' }}
       doplnek={cekajici.length > 0 ? <Chip tone="info" size="sm">{cekajici.length.toLocaleString('cs-CZ')}</Chip> : undefined}>
       <Well className="flex items-center justify-between gap-3 flex-wrap">
         <div className="min-w-0">
-          <p className="t-label">Kód pro připojení</p>
+          <p className="t-label">{t('Kód pro připojení')}</p>
           <p className="mt-1 font-mono text-[1.75rem] leading-none font-bold tracking-[0.12em] text-[#16181A] break-all">{kod ?? '—'}</p>
         </div>
         {tlacitko}
       </Well>
       {cekajici.length === 0 ? (
-        <p className="t-meta mt-3">Žádná pozvánka nečeká na přijetí.</p>
+        <p className="t-meta mt-3">{t('Žádná pozvánka nečeká na přijetí.')}</p>
       ) : (
         <>
           <ul className="list mt-2">
             {cekajici.slice(0, 4).map(p => (
               <ListRow key={p.id} title={<span className="break-all sm:break-normal">{p.email}</span>}
-                meta={[p.job_title, stari(p.created_at)].filter(Boolean).join(' · ')}
-                right={<Chip tone="info" size="sm">Čeká</Chip>} />
+                meta={[p.job_title, stari(t, p.created_at)].filter(Boolean).join(' · ')}
+                right={<Chip tone="info" size="sm">{t('Čeká')}</Chip>} />
             ))}
           </ul>
-          {cekajici.length > 4 && <p className="t-meta mt-2">{aDalsich(cekajici.length - 4)}</p>}
+          {cekajici.length > 4 && <p className="t-meta mt-2">{aDalsich(t, cekajici.length - 4)}</p>}
         </>
       )}
     </Widget>
@@ -251,31 +253,32 @@ function Pozvanky({ velikost, nahled }: WidgetProps) {
 // Role v podniku
 // ---------------------------------------------------------------------------
 
-function vyberRole(raw: any) {
-  if (!raw || typeof raw !== 'object' || (!Array.isArray(raw.system) && !Array.isArray(raw.vlastni))) throw new Error('Role přišly v nečekaném tvaru.');
+function vyberRole(raw: any, t: PrekladFn) {
+  if (!raw || typeof raw !== 'object' || (!Array.isArray(raw.system) && !Array.isArray(raw.vlastni))) throw new Error(t('Role přišly v nečekaném tvaru.'));
   return roleSPocty(seznam(raw.system), seznam(raw.vlastni));
 }
 
 function Role(_: WidgetProps) {
+  const t = useT('widgety');
   const smi = useSmi();
   const { ok, ceka } = useBrana(widget('tym.role')?.opravneni.nektere ?? ['tym.zobrazit', 'tym.role_prirazovat', 'tym.role_spravovat']);
-  const data = useDataWidgetu(ok ? '/api/roles' : null, vyberRole);
+  const data = useDataWidgetu(ok ? '/api/roles' : null, raw => vyberRole(raw, t));
   if (!ok && !ceka) return <Widget prazdno={null} />;
   const radky = data.data?.radky ?? [];
   const prazdnych = data.data?.prazdnych ?? 0;
   // Editor rolí je v Nastavení → Role a oprávnění a ukazuje se jen s těmito klíči.
-  const odkaz = smi(['tym.role_spravovat', 'tym.role_prirazovat']) ? { popisek: 'Role', pohled: 'settings', arg: 'roles' } : undefined;
+  const odkaz = smi(['tym.role_spravovat', 'tym.role_prirazovat']) ? { popisek: t('Role'), pohled: 'settings', arg: 'roles' } : undefined;
   return (
     <Widget nacteni={ceka ? CEKA : data} odkaz={odkaz}
-      prazdno={radky.length === 0 ? <p className="t-meta">Zatím nikdo nemá přidělenou roli.</p> : undefined}>
+      prazdno={radky.length === 0 ? <p className="t-meta">{t('Zatím nikdo nemá přidělenou roli.')}</p> : undefined}>
       <ul className="list">
         {radky.slice(0, 6).map(r => (
-          <ListRow key={r.klic} title={r.nazev} meta={r.vlastni ? 'vlastní role' : 'přednastavená'}
-            value={czCount(r.pocet, LIDI)} />
+          <ListRow key={r.klic} title={r.nazev} meta={r.vlastni ? t('vlastní role') : t('přednastavená')}
+            value={t('{n, plural, one {# člověk} few {# lidé} other {# lidí}}', { n: r.pocet })} />
         ))}
       </ul>
-      {radky.length > 6 && <p className="t-meta mt-2">{aDalsich(radky.length - 6)}</p>}
-      {prazdnych > 0 && <p className="t-meta mt-2">{prazdnych.toLocaleString('cs-CZ')} {czForm(prazdnych, ROLI_BEZ)} nikoho.</p>}
+      {radky.length > 6 && <p className="t-meta mt-2">{aDalsich(t, radky.length - 6)}</p>}
+      {prazdnych > 0 && <p className="t-meta mt-2">{t('{n, plural, one {# role zatím nemá} few {# role zatím nemají} other {# rolí zatím nemá}} nikoho.', { n: prazdnych })}</p>}
     </Widget>
   );
 }
@@ -284,14 +287,15 @@ function Role(_: WidgetProps) {
 // Chybí sazba
 // ---------------------------------------------------------------------------
 
-function vyberBezSazby(raw: any): ClenTymu[] {
-  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.members)) throw new Error('Tým přišel v nečekaném tvaru.');
+function vyberBezSazby(raw: any, t: PrekladFn): ClenTymu[] {
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.members)) throw new Error(t('Tým přišel v nečekaném tvaru.'));
   const vlastnik = Number(raw.team?.owner_id);
   return bezSazby(raw.members, Number.isFinite(vlastnik) ? vlastnik : null);
 }
 
 /** Okno „Nastavit sazbu" — jedno pole, uloží hned (PATCH /api/teams/members). */
 function OknoSazby({ clen, onZavrit }: { clen: ClenTymu; onZavrit: () => void }) {
+  const t = useT('widgety');
   const symbol = useSymbol();
   const [sazba, setSazba] = useState('');
   const [pise, setPise] = useState(false);
@@ -299,7 +303,7 @@ function OknoSazby({ clen, onZavrit }: { clen: ClenTymu; onZavrit: () => void })
   const idPole = `sazba-${clen.id}`;
   const uloz = async () => {
     const n = parseInt(sazba, 10);
-    if (!(n > 0)) { setChyba('Zadej sazbu větší než nula.'); return; }
+    if (!(n > 0)) { setChyba(t('Zadej sazbu větší než nula.')); return; }
     setPise(true); setChyba(null);
     try {
       await fetch('/api/teams/members', {
@@ -308,7 +312,7 @@ function OknoSazby({ clen, onZavrit }: { clen: ClenTymu; onZavrit: () => void })
       obnovTym();
       onZavrit();
     } catch (e) {
-      setChyba(apiMessage(e, 'Sazbu se nepodařilo uložit.'));
+      setChyba(apiMessage(e, t('Sazbu se nepodařilo uložit.')));
     } finally {
       setPise(false);
     }
@@ -316,12 +320,12 @@ function OknoSazby({ clen, onZavrit }: { clen: ClenTymu; onZavrit: () => void })
   if (typeof document === 'undefined') return null;
   // Přes portál: karta widgetu může mít transformaci a `fixed` by se kreslilo do ní.
   return createPortal(
-    <Modal open onClose={onZavrit} size="sm" title="Nastavit sazbu" subtitle={clen.name}
+    <Modal open onClose={onZavrit} size="sm" title={t('Nastavit sazbu')} subtitle={clen.name}
       footer={<>
-        <Button variant="secondary" onClick={onZavrit}>Zrušit</Button>
-        <Button variant="primary" loading={pise} onClick={uloz}>Uložit sazbu</Button>
+        <Button variant="secondary" onClick={onZavrit}>{t('Zrušit')}</Button>
+        <Button variant="primary" loading={pise} onClick={uloz}>{t('Uložit sazbu')}</Button>
       </>}>
-      <Field id={idPole} label={`Hodinová sazba (${symbol}/h)`} hint="Použije se pro mzdy v Docházce, Financích i uzávěrkách." error={chyba}>
+      <Field id={idPole} label={t('Hodinová sazba ({symbol}/h)', { symbol })} hint={t('Použije se pro mzdy v Docházce, Financích i uzávěrkách.')} error={chyba}>
         <Input id={idPole} inputMode="numeric" value={sazba} autoFocus onChange={e => setSazba(e.target.value.replace(/\D/g, ''))}
           onKeyDown={e => { if (e.key === 'Enter') void uloz(); }} />
       </Field>
@@ -331,23 +335,24 @@ function OknoSazby({ clen, onZavrit }: { clen: ClenTymu; onZavrit: () => void })
 }
 
 function BezSazby({ velikost, nahled }: WidgetProps) {
+  const t = useT('widgety');
   const smi = useSmi();
   const nav = useNavigace();
   const { ok, ceka } = useBrana(widget('tym.bez_sazby')?.opravneni.vse ?? ['finance.mzdy']);
-  const data = useDataWidgetu(ok ? URL_TYM : null, vyberBezSazby);
+  const data = useDataWidgetu(ok ? URL_TYM : null, raw => vyberBezSazby(raw, t));
   const [nastavit, setNastavit] = useState<ClenTymu | null>(null);
   if (!ok && !ceka) return <Widget prazdno={null} />;
   const lide = data.data ?? [];
   // Nastavit je akce z katalogu (akce:nastavit_sazbu → finance.sazby_upravit).
   const k = klicCasti('tym.bez_sazby', 'akce:nastavit_sazbu');
   const smiNastavit = !nahled && !!k && smi(k);
-  const prazdno = lide.length === 0 ? <p className="t-meta">Sazbu má nastavenou každý.</p> : undefined;
+  const prazdno = lide.length === 0 ? <p className="t-meta">{t('Sazbu má nastavenou každý.')}</p> : undefined;
 
   if (velikost === 'S') {
     return (
       <Widget nacteni={ceka ? CEKA : data} prazdno={prazdno}
         otevrit={!nahled && nav.smiPohled('team-settings') ? () => nav.onNavigate('team-settings') : undefined}>
-        <Stat label="Bez sazby" value={lide.length.toLocaleString('cs-CZ')} note="jejich mzdy se nepočítají" />
+        <Stat label={t('Bez sazby')} value={lide.length.toLocaleString('cs-CZ')} note={t('jejich mzdy se nepočítají')} />
       </Widget>
     );
   }
@@ -357,11 +362,11 @@ function BezSazby({ velikost, nahled }: WidgetProps) {
         doplnek={lide.length > 0 ? <Chip tone="wait" size="sm">{lide.length.toLocaleString('cs-CZ')}</Chip> : undefined}>
         <ul className="list">
           {lide.slice(0, 5).map(m => (
-            <ListRow key={m.id} lead={<Avatar emoji={m.avatar} size="sm" />} title={m.name ?? 'Bez jména'} meta={m.job_title ?? undefined}
-              actions={smiNastavit ? <Button variant="secondary" size="sm" onClick={() => setNastavit(m)} aria-label={`Nastavit sazbu: ${m.name ?? ''}`}>Nastavit</Button> : undefined} />
+            <ListRow key={m.id} lead={<Avatar emoji={m.avatar} size="sm" />} title={m.name ?? t('Bez jména')} meta={m.job_title ?? undefined}
+              actions={smiNastavit ? <Button variant="secondary" size="sm" onClick={() => setNastavit(m)} aria-label={t('Nastavit sazbu: {jmeno}', { jmeno: m.name ?? '' })}>{t('Nastavit')}</Button> : undefined} />
           ))}
         </ul>
-        {lide.length > 5 && <p className="t-meta mt-2">{aDalsich(lide.length - 5)}</p>}
+        {lide.length > 5 && <p className="t-meta mt-2">{aDalsich(t, lide.length - 5)}</p>}
       </Widget>
       {nastavit && <OknoSazby clen={nastavit} onZavrit={() => setNastavit(null)} />}
     </>
@@ -380,12 +385,12 @@ interface ProfilData {
   punctuality?: { checked: number; late: number } | null;
 }
 
-function vyberProfil(raw: any): ProfilData {
-  if (!raw || typeof raw !== 'object' || !raw.employee || !raw.month) throw new Error('Profil přišel v nečekaném tvaru.');
+function vyberProfil(raw: any, t: PrekladFn): ProfilData {
+  if (!raw || typeof raw !== 'object' || !raw.employee || !raw.month) throw new Error(t('Profil přišel v nečekaném tvaru.'));
   return raw;
 }
 
-const denKratce = (s: string) => new Date(String(s).slice(0, 10) + 'T12:00:00').toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' });
+const denKratce = (s: string, jazyk: Jazyk) => fmtDatum(String(s).slice(0, 10), { jazyk, styl: 'denKratce' });
 
 /**
  * Jeden člověk na ploše (nastavení „Člen"). Sazba jen s finance.mzdy,
@@ -393,15 +398,17 @@ const denKratce = (s: string) => new Date(String(s).slice(0, 10) + 'T12:00:00').
  * se na to přesto nespoléhá (pole katalogu).
  */
 function ProfilClena({ velikost, nastaveni, nahled }: WidgetProps<{ clen?: number | string | null }>) {
+  const t = useT('widgety');
+  const { jazyk } = useJazyk();
   const smi = useSmi();
   const money = useMoney();
   const otevriProfil = usePersonProfile();
   const { ok, ceka } = useBrana(widget('tym.profil_clena')?.opravneni.vse ?? ['tym.profil']);
   const id = Number(nastaveni.clen);
   const maClena = Number.isFinite(id) && id > 0;
-  const data = useDataWidgetu(ok && maClena ? `/api/employees/${id}` : null, vyberProfil);
+  const data = useDataWidgetu(ok && maClena ? `/api/employees/${id}` : null, raw => vyberProfil(raw, t));
   if (!ok && !ceka) return <Widget prazdno={null} />;
-  if (!maClena) return <Widget prazdno={<p className="t-meta text-pretty">Vyber člena v nastavení widgetu.</p>} />;
+  if (!maClena) return <Widget prazdno={<p className="t-meta text-pretty">{t('Vyber člena v nastavení widgetu.')}</p>} />;
 
   const p = data.data;
   const e = p?.employee;
@@ -414,31 +421,31 @@ function ProfilClena({ velikost, nastaveni, nahled }: WidgetProps<{ clen?: numbe
           <div className="flex items-center gap-3 min-w-0">
             <Avatar emoji={e.avatar} size="md" />
             <div className="min-w-0 flex-1">
-              <p className="t-meta truncate">{[e.jobTitle || 'Člen týmu', sazba, smi('tym.kontakty') ? e.phone : null].filter(Boolean).join(' · ')}</p>
-              <p className="text-[13px] text-black/55">{p.standing.levelName} · {p.standing.points.toLocaleString('cs-CZ')} b</p>
+              <p className="t-meta truncate">{[e.jobTitle || t('Člen týmu'), sazba, smi('tym.kontakty') ? e.phone : null].filter(Boolean).join(' · ')}</p>
+              <p className="text-[13px] text-black/55">{p.standing.levelName} · {t('{n} b', { n: p.standing.points.toLocaleString('cs-CZ') })}</p>
             </div>
             {!nahled && otevriProfil && (
-              <Button variant="secondary" size="sm" onClick={() => otevriProfil(e.id)}>Profil</Button>
+              <Button variant="secondary" size="sm" onClick={() => otevriProfil(e.id)}>{t('Profil')}</Button>
             )}
           </div>
           <StatRow>
-            <Stat label="Odpracováno" value={hodinyMinuty(p.month.hoursMs)} note="tento měsíc" />
-            <Stat label="Směny" value={p.month.shifts.toLocaleString('cs-CZ')} note="tento měsíc" />
+            <Stat label={t('Odpracováno')} value={hodinyMinuty(p.month.hoursMs)} note={t('tento měsíc')} />
+            <Stat label={t('Směny')} value={p.month.shifts.toLocaleString('cs-CZ')} note={t('tento měsíc')} />
             {doch && doch.checked > 0 && (
-              <Stat label="Včas" value={`${(doch.checked - doch.late).toLocaleString('cs-CZ')}/${doch.checked.toLocaleString('cs-CZ')}`} note="za 30 dní" />
+              <Stat label={t('Včas')} value={`${(doch.checked - doch.late).toLocaleString('cs-CZ')}/${doch.checked.toLocaleString('cs-CZ')}`} note={t('za 30 dní')} />
             )}
           </StatRow>
           {velikost === 'L' && (
-            p.shifts.upcoming.length === 0 ? <p className="t-meta">Žádná naplánovaná směna.</p> : (
+            p.shifts.upcoming.length === 0 ? <p className="t-meta">{t('Žádná naplánovaná směna.')}</p> : (
               <div>
-                <p className="t-label mb-1">Nadcházející směny</p>
+                <p className="t-label mb-1">{t('Nadcházející směny')}</p>
                 <ul className="list">
                   {p.shifts.upcoming.slice(0, 5).map(s => (
-                    <ListRow key={s.id} title={<span className="cz-sentence">{denKratce(s.date)}</span>}
+                    <ListRow key={s.id} title={<span className="cz-sentence">{denKratce(s.date, jazyk)}</span>}
                       value={`${String(s.startTime ?? '').slice(0, 5)}–${String(s.endTime ?? '').slice(0, 5)}`} />
                   ))}
                 </ul>
-                {p.shifts.upcoming.length > 5 && <p className="t-meta mt-2">{czCount(p.shifts.upcoming.length, SMENA)} celkem</p>}
+                {p.shifts.upcoming.length > 5 && <p className="t-meta mt-2">{t('{n, plural, one {# směna} few {# směny} other {# směn}} celkem', { n: p.shifts.upcoming.length })}</p>}
               </div>
             )
           )}

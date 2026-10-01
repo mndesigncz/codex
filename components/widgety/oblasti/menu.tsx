@@ -24,7 +24,7 @@ import { createPortal } from 'react-dom';
 import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
 import { widget } from '@/lib/widgety/katalog';
 import { apiMessage, okJson } from '@/lib/api';
-import { czCount, czForm, POLOZKA } from '@/lib/czech';
+import { useT, type PrekladFn } from '@/lib/i18n/client';
 import {
   hlavniDeska, nesparovano, pocetVyprodanych, radkyVyprodano, vyberMenu, wifiMenu,
   UDALOST_VYPRODANO, URL_MENU, URL_VYPRODANO, type DataMenu, type DeskaMenu, type RadekVyprodano,
@@ -79,15 +79,16 @@ const cestaMenu = (slug: string) => `/menu-akce.html?menu=${encodeURIComponent(s
 // Stav menu
 // ---------------------------------------------------------------------------
 
-function metaDesky(d: DeskaMenu): string {
-  const casti = [`/${d.slug}`, czCount(d.polozek, POLOZKA)];
-  if (d.bezCeny > 0) casti.push(`${cislo(d.bezCeny)} bez ceny`);
+function metaDesky(d: DeskaMenu, t: PrekladFn): string {
+  const casti = [`/${d.slug}`, t('{n, plural, one {# položka} few {# položky} other {# položek}}', { n: d.polozek })];
+  if (d.bezCeny > 0) casti.push(t('{n} bez ceny', { n: cislo(d.bezCeny) }));
   const n = nesparovano(d);
-  if (n > 0) casti.push(`${cislo(n)} bez vazby na kasu`);
+  if (n > 0) casti.push(t('{n} bez vazby na kasu', { n: cislo(n) }));
   return casti.join(' · ');
 }
 
 function StavMenu({ velikost, nahled }: WidgetProps) {
+  const t = useT('widgety');
   const smi = useSmi();
   const def = widget('menu.stav');
   const { ok, ceka } = useBrana('menu.stav');
@@ -107,16 +108,16 @@ function StavMenu({ velikost, nahled }: WidgetProps) {
       }).then(okJson);
       window.dispatchEvent(new CustomEvent(UDALOST_MENU_ZAPNUTO, { detail: { id: d.id, enabled: true } }));
       obnovMenu();
-      zprava.ok(`Menu „${d.nazev}" je zveřejněné.`);
+      zprava.ok(t('Menu „{nazev}" je zveřejněné.', { nazev: d.nazev }));
     } catch (e) {
-      zprava.chyba(apiMessage(e, 'Menu se nepodařilo zveřejnit.'));
+      zprava.chyba(apiMessage(e, t('Menu se nepodařilo zveřejnit.')));
     } finally { setPracuji(null); }
   };
 
   const prazdno = data.data?.nezmigrovano
-    ? <p className="t-meta">Tabulky pro menu ještě nejsou v databázi.</p>
+    ? <p className="t-meta">{t('Tabulky pro menu ještě nejsou v databázi.')}</p>
     : data.data && desky.length === 0
-      ? <EmptyState compact icon="clipboard" title="Zatím žádné menu" hint="Založ ho v editoru — z pokladny nebo z dnešní nabídky." />
+      ? <EmptyState compact icon="clipboard" title={t('Zatím žádné menu')} hint={t('Založ ho v editoru — z pokladny nebo z dnešní nabídky.')} />
       : undefined;
 
   if (velikost === 'S') {
@@ -125,11 +126,11 @@ function StavMenu({ velikost, nahled }: WidgetProps) {
         {hlavni && (
           <div className="space-y-2">
             <Chip tone={hlavni.zapnuto ? 'ok' : 'muted'} icon={hlavni.zapnuto ? 'check' : 'close'}>
-              {hlavni.zapnuto ? 'Hosté ho vidí' : 'Vypnuté'}
+              {hlavni.zapnuto ? t('Hosté ho vidí') : t('Vypnuté')}
             </Chip>
-            <p className="t-meta truncate">{hlavni.nazev} · {czCount(hlavni.polozek, POLOZKA)}</p>
+            <p className="t-meta truncate">{hlavni.nazev} · {t('{n, plural, one {# položka} few {# položky} other {# položek}}', { n: hlavni.polozek })}</p>
             {!hlavni.zapnuto && smiZverejnit && (
-              <Button variant="secondary" size="sm" loading={pracuji === hlavni.id} onClick={() => zverejnit(hlavni)}>Zveřejnit</Button>
+              <Button variant="secondary" size="sm" loading={pracuji === hlavni.id} onClick={() => zverejnit(hlavni)}>{t('Zveřejnit')}</Button>
             )}
           </div>
         )}
@@ -146,27 +147,27 @@ function StavMenu({ velikost, nahled }: WidgetProps) {
       <div className="flex flex-col sm:flex-row gap-4">
         <ul className="list min-w-0 flex-1">
           {zobrazeno.map(d => (
-            <ListRow key={d.id} title={d.nazev} meta={metaDesky(d)}
-              right={<Chip tone={d.zapnuto ? 'ok' : 'muted'} size="sm">{d.zapnuto ? 'zveřejněné' : 'vypnuté'}</Chip>}
+            <ListRow key={d.id} title={d.nazev} meta={metaDesky(d, t)}
+              right={<Chip tone={d.zapnuto ? 'ok' : 'muted'} size="sm">{d.zapnuto ? t('zveřejněné') : t('vypnuté')}</Chip>}
               actions={!d.zapnuto && smiZverejnit
-                ? <Button variant="secondary" size="sm" loading={pracuji === d.id} onClick={() => zverejnit(d)}>Zveřejnit</Button>
+                ? <Button variant="secondary" size="sm" loading={pracuji === d.id} onClick={() => zverejnit(d)}>{t('Zveřejnit')}</Button>
                 : undefined} />
           ))}
         </ul>
         {qr && (
           // QR se vydá jen pro zapnuté menu (server ho jinak odmítne) — u vypnutého by byl rozbitý obrázek.
           <div className="shrink-0 flex sm:flex-col items-center gap-3">
-            <img src={`/api/menu/public/${encodeURIComponent(qr.slug)}/qr`} alt={`QR kód menu ${qr.nazev}`} width={96} height={96}
+            <img src={`/api/menu/public/${encodeURIComponent(qr.slug)}/qr`} alt={t('QR kód menu {nazev}', { nazev: qr.nazev })} width={96} height={96}
               className="h-24 w-24 rounded-xl bg-white p-1.5 border border-black/[0.08]" />
             {!nahled && (
               <a href={cestaMenu(qr.slug)} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">
-                <Icon name="external" size={15} className="shrink-0" />Otevřít
+                <Icon name="external" size={15} className="shrink-0" />{t('Otevřít')}
               </a>
             )}
           </div>
         )}
       </div>
-      {desky.length > zobrazeno.length && <p className="t-meta mt-2">…a {czCount(desky.length - zobrazeno.length, { one: 'další menu', few: 'další menu', many: 'dalších menu' })}</p>}
+      {desky.length > zobrazeno.length && <p className="t-meta mt-2">{t('…a {n, plural, one {# další menu} few {# další menu} other {# dalších menu}}', { n: desky.length - zobrazeno.length })}</p>}
       {zprava.toast}
     </Widget>
   );
@@ -177,6 +178,7 @@ function StavMenu({ velikost, nahled }: WidgetProps) {
 // ---------------------------------------------------------------------------
 
 function Vyprodano({ velikost, nahled }: WidgetProps) {
+  const t = useT('widgety');
   const smi = useSmi();
   const def = widget('menu.vyprodano');
   const { ok, ceka } = useBrana('menu.vyprodano');
@@ -204,22 +206,22 @@ function Vyprodano({ velikost, nahled }: WidgetProps) {
       // Obě adresy: `data.set` platí jen v téhle instanci, sdílená mezipaměť URL_VYPRODANO by
       // jinak další instanci (návrat na stránku, Domů zaměstnance) 30 s ukazovala starý stav.
       obnovMenu();
-      zprava.ok(soldOut ? `${r.nazev}: vyprodáno` : `${r.nazev}: zpátky v nabídce`);
+      zprava.ok(soldOut ? t('{nazev}: vyprodáno', { nazev: r.nazev }) : t('{nazev}: zpátky v nabídce', { nazev: r.nazev }));
     } catch (e) {
       zmen(!soldOut);
-      zprava.chyba(apiMessage(e, 'Vyprodáno se nepodařilo uložit.'));
+      zprava.chyba(apiMessage(e, t('Vyprodáno se nepodařilo uložit.')));
     }
   };
 
   const prazdno = data.data?.nezmigrovano
-    ? <p className="t-meta">Tabulky pro menu ještě nejsou v databázi.</p>
-    : zadneZapnute ? <p className="t-meta">Žádné zveřejněné menu s položkami — není co označit.</p> : undefined;
+    ? <p className="t-meta">{t('Tabulky pro menu ještě nejsou v databázi.')}</p>
+    : zadneZapnute ? <p className="t-meta">{t('Žádné zveřejněné menu s položkami — není co označit.')}</p> : undefined;
 
   if (velikost === 'S') {
     return (
       <Widget nacteni={ceka ? CEKA : data} kostra="cislo" prazdno={prazdno}>
-        <Stat label="Teď vyprodáno" value={cislo(vyprodanych)}
-          note={vyprodanych === 0 ? 'všechno je v nabídce' : `${czForm(vyprodanych, POLOZKA)} v menu`} />
+        <Stat label={t('Teď vyprodáno')} value={cislo(vyprodanych)}
+          note={vyprodanych === 0 ? t('všechno je v nabídce') : t('{n, plural, one {položka} few {položky} other {položek}} v menu', { n: vyprodanych })} />
         {zprava.toast}
       </Widget>
     );
@@ -232,21 +234,21 @@ function Vyprodano({ velikost, nahled }: WidgetProps) {
     <Widget nacteni={ceka ? CEKA : data} kostra="seznam" prazdno={prazdno}
       doplnek={vyprodanych > 0 ? <Chip tone="bad" size="sm">{cislo(vyprodanych)}</Chip> : undefined}>
       {smiPrepnout && (
-        <SearchField value={dotaz} onChange={setDotaz} placeholder="Najít položku a označit…" ariaLabel="Najít položku menu" className="mb-2" />
+        <SearchField value={dotaz} onChange={setDotaz} placeholder={t('Najít položku a označit…')} ariaLabel={t('Najít položku menu')} className="mb-2" />
       )}
       {radky.length === 0 ? (
-        <p className="t-meta">{dotaz ? 'V menu nic takového není.' : smiPrepnout ? 'Nic není vyprodané. Až něco dojde, najdi to a přepni.' : 'Nic není vyprodané.'}</p>
+        <p className="t-meta">{dotaz ? t('V menu nic takového není.') : smiPrepnout ? t('Nic není vyprodané. Až něco dojde, najdi to a přepni.') : t('Nic není vyprodané.')}</p>
       ) : (
         <ul className="list">
           {radky.slice(0, strop).map(r => (
             <ListRow key={`${r.slug}-${r.id}`} title={r.nazev} meta={viceMenu ? `${r.menu} · ${r.sekce}` : r.sekce}
               right={smiPrepnout
-                ? <Switch checked={r.vyprodano} label={`Vyprodáno: ${r.nazev}`} onChange={v => prepnout(r, v)} />
-                : <Chip tone="bad" size="sm">vyprodáno</Chip>} />
+                ? <Switch checked={r.vyprodano} label={t('Vyprodáno: {nazev}', { nazev: r.nazev })} onChange={v => prepnout(r, v)} />
+                : <Chip tone="bad" size="sm">{t('vyprodáno')}</Chip>} />
           ))}
         </ul>
       )}
-      {radky.length > strop && <p className="t-meta mt-2">…a {czCount(radky.length - strop, { one: 'další', few: 'další', many: 'dalších' })}{dotaz ? '' : ' vyprodané'}</p>}
+      {radky.length > strop && <p className="t-meta mt-2">{dotaz ? t('…a {n, plural, one {# další} few {# další} other {# dalších}}', { n: radky.length - strop }) : t('…a {n, plural, one {# další} few {# další} other {# dalších}} vyprodané', { n: radky.length - strop })}</p>}
       {zprava.toast}
     </Widget>
   );
@@ -257,6 +259,7 @@ function Vyprodano({ velikost, nahled }: WidgetProps) {
 // ---------------------------------------------------------------------------
 
 function Wifi({ nahled }: WidgetProps) {
+  const t = useT('widgety');
   const { ok, ceka } = useBrana('menu.wifi');
   const data = useDataWidgetu<DataMenu>(ok ? URL_MENU : null, vyberMenu);
   const [zkopirovano, setZkopirovano] = useState(false);
@@ -275,20 +278,20 @@ function Wifi({ nahled }: WidgetProps) {
 
   return (
     <Widget nacteni={ceka ? CEKA : data} kostra="text"
-      prazdno={data.data && !d ? <p className="t-meta">Wi-Fi zatím není vyplněná — doplníš ji v editoru menu.</p> : undefined}>
+      prazdno={data.data && !d ? <p className="t-meta">{t('Wi-Fi zatím není vyplněná — doplníš ji v editoru menu.')}</p> : undefined}>
       {d && (
         <div className="space-y-1.5 min-w-0">
-          <p className="t-meta truncate">Síť <span className="font-semibold text-[#16181A]">{d.wifiSsid}</span></p>
+          <p className="t-meta truncate">{t('Síť')} <span className="font-semibold text-[#16181A]">{d.wifiSsid}</span></p>
           {d.wifiHeslo ? (
             <div className="flex items-center gap-1 min-w-0">
-              <code className="font-mono text-[15px] font-semibold text-[#16181A] truncate min-w-0" aria-label={`Heslo ${d.wifiHeslo}`}>{d.wifiHeslo}</code>
+              <code className="font-mono text-[15px] font-semibold text-[#16181A] truncate min-w-0" aria-label={t('Heslo {heslo}', { heslo: d.wifiHeslo })}>{d.wifiHeslo}</code>
               {!nahled && (
                 <Button variant="ghost" size="sm" iconOnly icon={zkopirovano ? 'check' : 'copy'} onClick={kopirovat}
-                  aria-label={zkopirovano ? 'Heslo zkopírováno' : 'Zkopírovat heslo Wi-Fi'} className="shrink-0" />
+                  aria-label={zkopirovano ? t('Heslo zkopírováno') : t('Zkopírovat heslo Wi-Fi')} className="shrink-0" />
               )}
-              <span className="sr-only" aria-live="polite">{zkopirovano ? 'Heslo zkopírováno' : ''}</span>
+              <span className="sr-only" aria-live="polite">{zkopirovano ? t('Heslo zkopírováno') : ''}</span>
             </div>
-          ) : <p className="t-meta">bez hesla</p>}
+          ) : <p className="t-meta">{t('bez hesla')}</p>}
         </div>
       )}
     </Widget>

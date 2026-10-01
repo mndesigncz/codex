@@ -39,7 +39,7 @@ import { useOpravneni } from '../../role/useOpravneni';
 import { apiMessage, okJson } from '@/lib/api';
 import { oznamZmenuPovinnych, ChipPredUzaverkou } from '../../PredUzaverkou';
 import { pragueToday, pragueHM } from '@/lib/pragueTime';
-import { czCount, czForm, DEN, type CzNoun } from '@/lib/czech';
+import { useT, type PrekladFn } from '@/lib/i18n/client';
 import {
   vyberUkoly, vRozsahu, poTerminu, podleLidi, splnenoDnes, jeCiziUkol, povinnePrvni, type Ukol, type RozsahUkolu,
 } from '@/lib/ukolyPrehled';
@@ -63,20 +63,20 @@ export const KLIC_FILTRU_UKOLU = 'managero-ukoly-filtr';
 const RELACE_NACITA: StavNacteni = { data: null, error: null, loading: true, reload: () => {} };
 const CEKA: StavNacteni = { data: null, error: null, loading: true, reload: () => {} };
 
-export const UKOL: CzNoun = { one: 'úkol', few: 'úkoly', many: 'úkolů' };
 const cislo = (n: number) => n.toLocaleString('cs-CZ');
-const aDalsich = (n: number) => `…a dalších ${cislo(n)}`;
+const aDalsich = (n: number, t: PrekladFn) => t('…a dalších {n}', { n: cislo(n) });
 
 /**
  * Id přihlášeného — „moje" úkoly jsou ty s `assignedTo` = já. Kontrakt widgetu
  * uživatele nenese; do načtení relace drží `stav` widget na kostře.
  */
 export function useJa(): { id: number | null; stav: StavNacteni | null } {
+  const t = useT('widgety');
   const { data, status, update } = useSession();
   if (status === 'loading') return { id: null, stav: RELACE_NACITA };
   const id = Number((data?.user as { id?: unknown } | undefined)?.id);
   if (Number.isFinite(id) && id > 0) return { id, stav: null };
-  return { id: null, stav: { data: null, error: 'Nevím, kdo je přihlášený — obnov stránku.', loading: false, reload: () => { void update(); } } };
+  return { id: null, stav: { data: null, error: t('Nevím, kdo je přihlášený — obnov stránku.'), loading: false, reload: () => { void update(); } } };
 }
 
 /**
@@ -129,6 +129,8 @@ export function Zaskrtnuti({ hotovo, nazev, onClick, zamceno, ceka }: { hotovo: 
  * tabletu, proto tam widget jen čte.
  */
 function useOdskrtavani(data: StavDat<Ukol[]>, ja: number | null, nahled: boolean) {
+  const t = useT('widgety');
+  const chybaUlozeni = t('Úkol se nepodařilo uložit — zkus to znovu.');
   const smi = useSmi();
   const { role } = useOpravneni();
   const [chyba, setChyba] = useState<string | null>(null);
@@ -155,7 +157,7 @@ function useOdskrtavani(data: StavDat<Ukol[]>, ja: number | null, nahled: boolea
       return true;
     } catch (e) {
       data.set(prev => (prev ?? []).map(x => (x.id === t.id ? { ...x, status: t.status } : x)));
-      setChyba(apiMessage(e, 'Úkol se nepodařilo uložit — zkus to znovu.'));
+      setChyba(apiMessage(e, chybaUlozeni));
       return false;
     } finally {
       setProbiha(p => { const n = new Set(p); n.delete(t.id); return n; });
@@ -169,6 +171,7 @@ function useOdskrtavani(data: StavDat<Ukol[]>, ja: number | null, nahled: boolea
 // ---------------------------------------------------------------------------
 
 function UkolyDnes({ velikost, nastaveni, nahled }: WidgetProps<{ rozsah?: string }>) {
+  const t = useT('widgety');
   const ja = useJa();
   const smi = useSmi();
   const nav = useNavigace();
@@ -200,18 +203,23 @@ function UkolyDnes({ velikost, nastaveni, nahled }: WidgetProps<{ rozsah?: strin
   const L = velikost === 'L';
   const zobrazene = L ? radky : radky.slice(0, 5);
   const dnes = pragueToday();
+  // Překlady mimo smyčku: v ní je `t` úkol.
+  const proKohokoli = t('Pro kohokoli');
+  const termin = (d: string) => t('termín {datum}', { datum: denKratce(d) });
+  const vyroba = t('výroba — naskladní dávku');
+  const poTerminuStitek = t('Po termínu');
 
   return (
     <Widget
       nacteni={ja.stav ?? data}
       doplnek={!S && zbyva > 0 ? <Chip tone={poTerminuN > 0 ? 'bad' : 'muted'} size="sm">{cislo(zbyva)}</Chip> : undefined}
-      odkaz={S ? undefined : { popisek: 'Úkoly', pohled: 'tasks' }}
+      odkaz={S ? undefined : { popisek: t('Úkoly'), pohled: 'tasks' }}
       otevrit={S && !nahled && nav.smiPohled('tasks') ? () => nav.onNavigate('tasks') : undefined}
-      prazdno={(S ? zbyva === 0 : radky.length === 0) ? <p className="t-meta">Na dnešek nic nezbývá.</p> : undefined}
+      prazdno={(S ? zbyva === 0 : radky.length === 0) ? <p className="t-meta">{t('Na dnešek nic nezbývá.')}</p> : undefined}
     >
       {S ? (
-        <Stat label="Zbývá" value={cislo(zbyva)}
-          note={poTerminuN > 0 ? <span className="text-bad-ink">{cislo(poTerminuN)} po termínu</span> : 'na dnešek'} />
+        <Stat label={t('Zbývá')} value={cislo(zbyva)}
+          note={poTerminuN > 0 ? <span className="text-bad-ink">{t('{n} po termínu', { n: cislo(poTerminuN) })}</span> : t('na dnešek')} />
       ) : (
         <>
           <ul className="list">
@@ -219,11 +227,11 @@ function UkolyDnes({ velikost, nastaveni, nahled }: WidgetProps<{ rozsah?: strin
               const hotovo = t.status === 'done';
               const pozde = !!t.dueDate && t.dueDate < dnes;
               const meta = [
-                t.assignedTo == null ? 'Pro kohokoli'
+                t.assignedTo == null ? proKohokoli
                   : rozsah === 'tym' && t.assignedTo !== ja.id ? t.assigneeName : null,
-                pozde ? `termín ${denKratce(t.dueDate!)}` : null,
+                pozde ? termin(t.dueDate!) : null,
                 // Odškrtnutí výrobního úkolu naskladní dávku a odepíše suroviny (API).
-                t.source === 'production' ? 'výroba — naskladní dávku' : null,
+                t.source === 'production' ? vyroba : null,
               ].filter(Boolean).join(' · ');
               return (
                 <ListRow key={t.id}
@@ -231,13 +239,13 @@ function UkolyDnes({ velikost, nastaveni, nahled }: WidgetProps<{ rozsah?: strin
                     onClick={() => { setOdskrtnute(p => new Set(p).add(t.id)); void o.prepni(t); }} />}
                   title={<span className={hotovo ? 'text-black/45' : undefined}>{t.title}</span>}
                   meta={meta || undefined}
-                  right={pozde && !hotovo ? <Chip tone="bad" size="sm">Po termínu</Chip>
+                  right={pozde && !hotovo ? <Chip tone="bad" size="sm">{poTerminuStitek}</Chip>
                     : t.requireBeforeClosing && !hotovo ? <ChipPredUzaverkou /> : undefined}
                 />
               );
             })}
           </ul>
-          {!L && radky.length > 5 && <p className="t-meta mt-2">{aDalsich(radky.length - 5)}</p>}
+          {!L && radky.length > 5 && <p className="t-meta mt-2">{aDalsich(radky.length - 5, t)}</p>}
           {o.chyba && <p className="note note-danger mt-3" role="alert">{o.chyba}</p>}
         </>
       )}
@@ -250,6 +258,7 @@ function UkolyDnes({ velikost, nastaveni, nahled }: WidgetProps<{ rozsah?: strin
 // ---------------------------------------------------------------------------
 
 function PoTerminu({ velikost, nahled }: WidgetProps) {
+  const t = useT('widgety');
   const ja = useJa();
   const smi = useSmi();
   const nav = useNavigace();
@@ -265,29 +274,29 @@ function PoTerminu({ velikost, nahled }: WidgetProps) {
 
   // Nic po termínu = vyřízeno: plocha widget v klidu minimalizuje (kolo 71).
   // Jen nad načtenými daty — během načítání a po chybě se nesmí minimalizovat.
-  useVyrizeno(data.data != null && vse.length === 0, 'Nic není po termínu');
+  useVyrizeno(data.data != null && vse.length === 0, t('Nic není po termínu'));
 
   return (
     <Widget
       nacteni={ja.stav ?? data}
       doplnek={!S && vse.length > 0 ? <Chip tone="bad" size="sm">{cislo(vse.length)}</Chip> : undefined}
-      odkaz={S ? undefined : { popisek: 'Úkoly', pohled: 'tasks' }}
+      odkaz={S ? undefined : { popisek: t('Úkoly'), pohled: 'tasks' }}
       otevrit={S && !nahled && nav.smiPohled('tasks') ? () => nav.onNavigate('tasks') : undefined}
-      prazdno={vse.length === 0 ? <p className="t-meta">Nic není po termínu.</p> : undefined}
+      prazdno={vse.length === 0 ? <p className="t-meta">{t('Nic není po termínu.')}</p> : undefined}
     >
       {S ? (
-        <Stat label="Po termínu" value={cislo(vse.length)}
-          note={celyTym ? (moje > 0 ? `${cislo(moje)} tvoje` : 'v celém týmu') : 'tvoje a pro kohokoli'} />
+        <Stat label={t('Po termínu')} value={cislo(vse.length)}
+          note={celyTym ? (moje > 0 ? t('{n} tvoje', { n: cislo(moje) }) : t('v celém týmu')) : t('tvoje a pro kohokoli')} />
       ) : (
         <>
           <ul className="list">
-            {vse.slice(0, 5).map(t => (
-              <ListRow key={t.id} title={t.title}
-                meta={[t.assignedTo == null ? 'Pro kohokoli' : t.assignedTo === ja.id ? 'Ty' : (t.assigneeName ?? 'Bez jména'), `termín ${denKratce(t.dueDate!)}`].join(' · ')}
-                right={<Chip tone="bad" size="sm">{czCount(dniZpozdeni(t.dueDate!, dnes), DEN)}</Chip>} />
+            {vse.slice(0, 5).map(u => (
+              <ListRow key={u.id} title={u.title}
+                meta={[u.assignedTo == null ? t('Pro kohokoli') : u.assignedTo === ja.id ? t('Ty') : (u.assigneeName ?? t('Bez jména')), t('termín {datum}', { datum: denKratce(u.dueDate!) })].join(' · ')}
+                right={<Chip tone="bad" size="sm">{t('{n, plural, one {# den} few {# dny} other {# dní}}', { n: dniZpozdeni(u.dueDate!, dnes) })}</Chip>} />
             ))}
           </ul>
-          {vse.length > 5 && <p className="t-meta mt-2">{aDalsich(vse.length - 5)}</p>}
+          {vse.length > 5 && <p className="t-meta mt-2">{aDalsich(vse.length - 5, t)}</p>}
         </>
       )}
     </Widget>
@@ -304,6 +313,7 @@ function dniZpozdeni(termin: string, dnes: string): number {
 // ---------------------------------------------------------------------------
 
 function PodleLidi({ nahled }: WidgetProps) {
+  const t = useT('widgety');
   const nav = useNavigace();
   const { ok, ceka } = useBrana('ukoly.podle_lidi');
   const data = useDataWidgetu<Ukol[]>(ok ? URL_UKOLY : null, vyberUkoly);
@@ -315,20 +325,20 @@ function PodleLidi({ nahled }: WidgetProps) {
     <Widget
       nacteni={ceka ? CEKA : data}
       kostra="seznam"
-      odkaz={{ popisek: 'Úkoly', pohled: 'tasks' }}
-      prazdno={lide.length === 0 ? <p className="t-meta">Nikdo nemá nic rozpracovaného.</p> : undefined}
+      odkaz={{ popisek: t('Úkoly'), pohled: 'tasks' }}
+      prazdno={lide.length === 0 ? <p className="t-meta">{t('Nikdo nemá nic rozpracovaného.')}</p> : undefined}
     >
       <ul className="list">
         {lide.slice(0, 6).map(r => (
           <li key={r.id ?? 'volne'}>
             <ListRow as="div" title={r.jmeno}
-              meta={r.poTerminu > 0 ? <span className="text-bad-ink">{cislo(r.poTerminu)} po termínu</span> : 'nic po termínu'}
-              value={cislo(r.aktivni)} valueMeta={czForm(r.aktivni, UKOL)}
+              meta={r.poTerminu > 0 ? <span className="text-bad-ink">{t('{n} po termínu', { n: cislo(r.poTerminu) })}</span> : t('nic po termínu')}
+              value={cislo(r.aktivni)} valueMeta={t('{n, plural, one {úkol} few {úkoly} other {úkolů}}', { n: r.aktivni })}
               onClick={klikaci ? () => filtrujUkoly(nav, r.id) : undefined} />
           </li>
         ))}
       </ul>
-      {lide.length > 6 && <p className="t-meta mt-2">{aDalsich(lide.length - 6)}</p>}
+      {lide.length > 6 && <p className="t-meta mt-2">{aDalsich(lide.length - 6, t)}</p>}
     </Widget>
   );
 }
@@ -338,6 +348,9 @@ function PodleLidi({ nahled }: WidgetProps) {
 // ---------------------------------------------------------------------------
 
 function Tyden({ nahled }: WidgetProps) {
+  const t = useT('widgety');
+  const chybaPresunuText = t('Úkol se nepodařilo přesunout.');
+  const proKohokoli = t('Pro kohokoli');
   const ja = useJa();
   const smi = useSmi();
   const def = widget('ukoly.tyden');
@@ -360,19 +373,19 @@ function Tyden({ nahled }: WidgetProps) {
       if (t.requireBeforeClosing) oznamZmenuPovinnych();
     } catch (e) {
       data.set(prev => (prev ?? []).map(x => (x.id === t.id ? { ...x, dueDate: t.dueDate } : x)));
-      setChybaPresunu(apiMessage(e, 'Úkol se nepodařilo přesunout.'));
+      setChybaPresunu(apiMessage(e, chybaPresunuText));
     }
   };
 
   const podle = (t: { id: number }) => ukoly.find(x => x.id === t.id);
   return (
-    <Widget nacteni={ja.stav ?? data} kostra="graf" odkaz={{ popisek: 'Úkoly', pohled: 'tasks' }}>
+    <Widget nacteni={ja.stav ?? data} kostra="graf" odkaz={{ popisek: t('Úkoly'), pohled: 'tasks' }}>
       <TaskWeekBoard tasks={ukoly} weekStart={weekStart}
         // Budoucí úkol se odškrtnout nedá — v nástroji by se ptal „Tohle není dnešní úkol",
         // widget okno nemá, tak ho radši nepustí (splní se v den termínu nebo v Úkolech).
         canComplete={t => { const u = podle(t); return !!u && o.smiOdskrtnout(u) && (!u.dueDate || u.dueDate <= dnes); }}
         onComplete={(t, hotovo) => { const u = podle(t); if (u) void o.prepni(u, hotovo); }}
-        labelFor={t => { const u = podle(t); return !u ? '' : u.assignedTo == null ? 'Pro kohokoli' : celyTym && u.assignedTo !== ja.id ? (u.assigneeName ?? '') : ''; }}
+        labelFor={t => { const u = podle(t); return !u ? '' : u.assignedTo == null ? proKohokoli : celyTym && u.assignedTo !== ja.id ? (u.assigneeName ?? '') : ''; }}
         onMove={nahled ? undefined : (t, datum) => { const u = podle(t); if (u) void presun(u, datum); }}
         canMove={t => { const u = podle(t); return !!u && (u.createdBy === ja.id || presunCizi); }} />
       {(o.chyba || chybaPresunu) && <p className="note note-danger mt-3" role="alert">{o.chyba ?? chybaPresunu}</p>}
@@ -385,6 +398,7 @@ function Tyden({ nahled }: WidgetProps) {
 // ---------------------------------------------------------------------------
 
 function SplnenoDnes({ velikost }: WidgetProps) {
+  const t = useT('widgety');
   const { ok, ceka } = useBrana('ukoly.splneno_dnes');
   const data = useDataWidgetu<Ukol[]>(ok ? URL_UKOLY : null, vyberUkoly);
   const dnes = pragueToday();
@@ -397,20 +411,20 @@ function SplnenoDnes({ velikost }: WidgetProps) {
     <Widget
       nacteni={ceka ? CEKA : data}
       doplnek={!S && hotove.length > 0 ? <Chip tone="ok" size="sm">{cislo(hotove.length)}</Chip> : undefined}
-      odkaz={S ? undefined : { popisek: 'Úkoly', pohled: 'tasks' }}
-      prazdno={hotove.length === 0 ? <p className="t-meta">Dnes zatím nikdo nic nesplnil.</p> : undefined}
+      odkaz={S ? undefined : { popisek: t('Úkoly'), pohled: 'tasks' }}
+      prazdno={hotove.length === 0 ? <p className="t-meta">{t('Dnes zatím nikdo nic nesplnil.')}</p> : undefined}
     >
       {S ? (
-        <Stat label="Splněno" value={cislo(hotove.length)}
-          note={posledni ? `naposledy ${posledni.completedByName ?? 'někdo'} v ${cas(posledni)}` : undefined} />
+        <Stat label={t('Splněno')} value={cislo(hotove.length)}
+          note={posledni ? t('naposledy {kdo} v {cas}', { kdo: posledni.completedByName ?? t('někdo'), cas: cas(posledni) }) : undefined} />
       ) : (
         <>
           <ul className="list">
-            {hotove.slice(0, 5).map(t => (
-              <ListRow key={t.id} title={t.title} meta={t.completedByName ?? 'Bez jména'} value={cas(t)} />
+            {hotove.slice(0, 5).map(u => (
+              <ListRow key={u.id} title={u.title} meta={u.completedByName ?? t('Bez jména')} value={cas(u)} />
             ))}
           </ul>
-          {hotove.length > 5 && <p className="t-meta mt-2">{aDalsich(hotove.length - 5)}</p>}
+          {hotove.length > 5 && <p className="t-meta mt-2">{aDalsich(hotove.length - 5, t)}</p>}
         </>
       )}
     </Widget>

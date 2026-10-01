@@ -81,6 +81,13 @@ if (args[0] === '--rename') {
 }
 
 // ---------------------------------------------------------------------------
+let _wz;
+function widgetyZdroj(klic) {
+  _wz ??= [...walk('components/widgety'), 'lib/rozvrhPrehled.ts', 'lib/procedureScoring.ts'].map(f => readFileSync(f, 'utf8')).join('\n');
+  const k = klic.split('|')[0];
+  return _wz.includes(`'${k.replace(/'/g, "\\'")}'`) || _wz.includes(`"${k}"`) || _wz.includes(`\`${k}\``);
+}
+
 // Klíče z kódu
 
 const RE_SEKCE = /\buseT\(\s*'([a-z-]+)'\s*\)/;
@@ -257,7 +264,9 @@ for (const s of sekce) {
     if (!slov) { if (vKodu.size) hlas(`chybí celý soubor locales/${j}/${s}.json (${vKodu.size} vět)`); continue; }
     const klice = new Set(Object.keys(slov));
     const chybejici = [...vKodu].filter(k => !klice.has(k));
-    const zastarale = [...klice].filter(k => !vKodu.has(k));
+    // Widgety překládají část vět nepřímo (`t(proměnná)` nad tabulkami textů v komponentách): klíč, který stojí
+    // v uvozovkách někde v components/widgety, se za zastaralý nepovažuje.
+    const zastarale = [...klice].filter(k => !vKodu.has(k) && !(s === 'widgety' && widgetyZdroj(k)));
     for (const k of chybejici) {
       const podobna = zastarale.map(z => [z, podobnost(z, k)]).sort((a, b) => b[1] - a[1])[0];
       hlas(`chybí překlad „${k}“${podobna && podobna[1] > 0.6 ? `\n      ↳ změněná věta? ve slovníku je „${podobna[0]}“ (${Math.round(podobna[1] * 100)} %); přenes ji: --rename "${podobna[0]}" "${k}"` : ''}`);

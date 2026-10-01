@@ -56,7 +56,8 @@ import { useOpravneni } from '../../role/useOpravneni';
 import { useCurrency, useMoney } from '../../CurrencyProvider';
 import { usePersonProfile } from '../../employer/ProfileLinkProvider';
 import { apiMessage, okJson } from '@/lib/api';
-import { czCount, czForm, DEN } from '@/lib/czech';
+import { useJazyk, useT, type PrekladFn } from '@/lib/i18n/client';
+import { fmtMesic } from '@/lib/i18n/format';
 import { dbTimeDayHM, dbTimeHM, parseDbTime, pragueDayOf, pragueToday } from '@/lib/pragueTime';
 import {
   ZAPOMENUTY_MS, dnesVPodniku, konecSmeny, navrhOdchodu as navrhOdchoduPlan, hodinyMinuty, mujMesic, mzdyZaObdobi, obdobiDni, otevrenePrichody, podilMezd,
@@ -96,8 +97,8 @@ interface Dochazka { roster: ClenRosteru[]; entries: ZaznamDochazky[] }
 const URL_DNES = '/api/attendance?days=1';
 
 /** Odpověď bez rosteru je nečekaný tvar (chyba widgetu), ne „nikdo není na směně". */
-function vyberDochazku(raw: any): Dochazka {
-  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.roster)) throw new Error('Docházka přišla v nečekaném tvaru.');
+function vyberDochazku(raw: any, t: PrekladFn): Dochazka {
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.roster)) throw new Error(t('Docházka přišla v nečekaném tvaru.'));
   return { roster: raw.roster, entries: Array.isArray(raw.entries) ? raw.entries : [] };
 }
 
@@ -126,11 +127,12 @@ const RELACE_NACITA: StavNacteni = { data: null, error: null, loading: true, rel
  * hledají právě podle id. `stav` drží widget na kostře, dokud se relace načítá.
  */
 function useJa(): { id: number | null; stav: StavNacteni | null } {
+  const t = useT('widgety');
   const { data, status, update } = useSession();
   if (status === 'loading') return { id: null, stav: RELACE_NACITA };
   const id = Number((data?.user as { id?: unknown } | undefined)?.id);
   if (Number.isFinite(id) && id > 0) return { id, stav: null };
-  return { id: null, stav: { data: null, error: 'Nevím, kdo je přihlášený — obnov stránku.', loading: false, reload: () => { void update(); } } };
+  return { id: null, stav: { data: null, error: t('Nevím, kdo je přihlášený — obnov stránku.'), loading: false, reload: () => { void update(); } } };
 }
 
 /** „Teď", které se obnovuje, jen dokud něco běží — stopky nemají tikat na ploše, kde nic neběží. */
@@ -154,14 +156,14 @@ function stopky(ms: number, sekundy: boolean): string {
 }
 
 /** „3 h 12 min", „45 min", „2 dny a 3 h" — délka slovy pro řádek a upozornění. */
-function delkaSlovy(ms: number): string {
+function delkaSlovy(t: PrekladFn, ms: number): string {
   const min = Math.max(0, Math.floor(ms / 60000));
   const h = Math.floor(min / 60);
   if (h >= 24) {
     const dnu = Math.floor(h / 24);
-    return `${czCount(dnu, DEN)} a ${h - dnu * 24} h`;
+    return t('{dnu, plural, one {# den} few {# dny} other {# dní}} a {h} h', { dnu, h: h - dnu * 24 });
   }
-  return h > 0 ? `${h} h ${String(min % 60).padStart(2, '0')} min` : `${min} min`;
+  return h > 0 ? t('{h} h {min} min', { h, min: String(min % 60).padStart(2, '0') }) : t('{min} min', { min });
 }
 
 /** Od kdy: dnešek jen časem, starší příchod i s datem (zapomenutý odchod z minula). */
@@ -179,9 +181,10 @@ const JSON_HLAVICKA = { 'Content-Type': 'application/json' };
 // ---------------------------------------------------------------------------
 
 function Pichacky({ velikost, nahled }: WidgetProps) {
+  const t = useT('widgety');
   const ja = useJa();
   const smi = useSmi();
-  const data = useDataWidgetu<Dochazka>(ja.id != null ? URL_DNES : null, vyberDochazku);
+  const data = useDataWidgetu<Dochazka>(ja.id != null ? URL_DNES : null, raw => vyberDochazku(raw, t));
   const [pise, setPise] = useState(false);
   const [chyba, setChyba] = useState<string | null>(null);
   const [pripomenUzaverku, setPripomenUzaverku] = useState(false);
@@ -213,7 +216,7 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
       if (akce === 'out' && d?.closingDone === false && smi('uzaverky.vytvorit')) setPripomenUzaverku(true);
       data.reload();
     } catch (e) {
-      setChyba(apiMessage(e, 'Píchnutí se nepovedlo. Zkus to znovu.'));
+      setChyba(apiMessage(e, t('Píchnutí se nepovedlo. Zkus to znovu.')));
     } finally {
       setPise(false);
     }
@@ -221,14 +224,14 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
 
   const tlacitko = (
     <Button variant="primary" size="sm" block icon={naSmene ? 'logout' : 'clock'} loading={pise} onClick={pichni}
-      aria-label={naSmene ? 'Odpíchnout odchod' : 'Odpíchnout příchod'}>
-      {S ? (naSmene ? 'Odchod' : 'Příchod') : naSmene ? 'Odpíchnout odchod' : 'Odpíchnout příchod'}
+      aria-label={naSmene ? t('Odpíchnout odchod') : t('Odpíchnout příchod')}>
+      {S ? (naSmene ? t('Odchod') : t('Příchod')) : naSmene ? t('Odpíchnout odchod') : t('Odpíchnout příchod')}
     </Button>
   );
   const hlaseni = (
     <>
       {chyba && <p className="note note-danger !px-3 !py-2 text-[13px]" role="alert">{chyba}</p>}
-      {pripomenUzaverku && <p className="t-meta" role="status">Směna skončila. Nezapomeň vyplnit uzávěrku.</p>}
+      {pripomenUzaverku && <p className="t-meta" role="status">{t('Směna skončila. Nezapomeň vyplnit uzávěrku.')}</p>}
     </>
   );
 
@@ -236,17 +239,17 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
     <Widget
       nacteni={ja.stav ?? data}
       // V malém se chip vedle titulku nevejde (titulek by se zkrátil) — stav tam nese tělo.
-      doplnek={S ? undefined : zapomenuty ? <Chip tone="wait" size="sm">Zapomenutý odchod</Chip>
-        : naSmene ? <Chip tone="ok" size="sm">Na směně</Chip> : undefined}
+      doplnek={S ? undefined : zapomenuty ? <Chip tone="wait" size="sm">{t('Zapomenutý odchod')}</Chip>
+        : naSmene ? <Chip tone="ok" size="sm">{t('Na směně')}</Chip> : undefined}
     >
       {S ? (
         <div className="space-y-2.5">
           {zapomenuty ? (
-            <p className="note note-wait !px-3 !py-2 text-[13px]">Běží od {odKdy(openSince)}</p>
+            <p className="note note-wait !px-3 !py-2 text-[13px]">{t('Běží od {cas}', { cas: odKdy(openSince) })}</p>
           ) : naSmene ? (
-            <Stat label={`Příchod ${dbTimeHM(openSince)}`} value={stopky(bezi, false)} />
+            <Stat label={t('Příchod {cas}', { cas: dbTimeHM(openSince) })} value={stopky(bezi, false)} />
           ) : (
-            <p className="t-meta">Teď nejsi na směně.</p>
+            <p className="t-meta">{t('Teď nejsi na směně.')}</p>
           )}
           {hlaseni}
           {tlacitko}
@@ -255,13 +258,13 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
         <div className="space-y-3">
           {zapomenuty ? (
             <p className="note note-wait">
-              Příchod běží od {odKdy(openSince)} — to je {delkaSlovy(bezi)}. Odpíchni odchod, ať docházka sedí.
+              {t('Příchod běží od {cas} — to je {delka}. Odpíchni odchod, ať docházka sedí.', { cas: odKdy(openSince), delka: delkaSlovy(t, bezi) })}
             </p>
           ) : naSmene ? (
             // „Na směně" už říká chip u titulku — štítek čísla nese čas příchodu.
-            <Stat label={`Příchod ${dbTimeHM(openSince)}`} value={stopky(bezi, true)} />
+            <Stat label={t('Příchod {cas}', { cas: dbTimeHM(openSince) })} value={stopky(bezi, true)} />
           ) : (
-            <p className="t-meta text-pretty">Odpíchni si příchod, až začneš pracovat — čas se začne počítat hned.</p>
+            <p className="t-meta text-pretty">{t('Odpíchni si příchod, až začneš pracovat — čas se začne počítat hned.')}</p>
           )}
           {hlaseni}
           {tlacitko}
@@ -279,10 +282,11 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
 const PILULEK_M = 8;
 
 function PraveNaSmene({ velikost, nahled }: WidgetProps) {
+  const t = useT('widgety');
   const brana = useBrana(['dochazka.zobrazit', 'dochazka.tablet']);
   const smi = useSmi();
   const nav = useNavigace();
-  const data = useDataWidgetu<Dochazka>(brana ? URL_DNES : null, vyberDochazku);
+  const data = useDataWidgetu<Dochazka>(brana ? URL_DNES : null, raw => vyberDochazku(raw, t));
   const [ukoncit, setUkoncit] = useState<ClenRosteru | null>(null);
   // Na samotné Docházce odkaz „Docházka“ nikam nevede — stránka dá období přes kontext.
   const naDochazce = useContext(ObdobiStrankyDochazky) != null;
@@ -306,7 +310,7 @@ function PraveNaSmene({ velikost, nahled }: WidgetProps) {
   let telo: ReactNode;
   if (velikost === 'S') {
     telo = (
-      <Stat label="Teď" value={pocet} note={
+      <Stat label={t('Teď')} value={pocet} note={
         <span className="inline-flex items-center align-middle">
           <span className="flex -space-x-1.5" aria-hidden>
             {lide.slice(0, 4).map(({ r }) => (
@@ -321,14 +325,14 @@ function PraveNaSmene({ velikost, nahled }: WidgetProps) {
   } else if (!L) {
     telo = (
       <>
-        <ul className="flex flex-wrap gap-2" aria-label="Kdo je na směně">
+        <ul className="flex flex-wrap gap-2" aria-label={t('Kdo je na směně')}>
           {lide.slice(0, PILULEK_M).map(({ r, od }) => (
             <li key={r.id} className="min-w-0 max-w-full">
-              <PersonChip name={r.name ?? 'Bez jména'} avatar={r.avatar} tone={jeZapomenuty(od) ? 'wait' : 'ok'} meta={`od ${odKdy(r.openSince)}`} />
+              <PersonChip name={r.name ?? t('Bez jména')} avatar={r.avatar} tone={jeZapomenuty(od) ? 'wait' : 'ok'} meta={t('od {cas}', { cas: odKdy(r.openSince) })} />
             </li>
           ))}
         </ul>
-        {n > PILULEK_M && <p className="t-meta mt-3">…a dalších {(n - PILULEK_M).toLocaleString('cs-CZ')}</p>}
+        {n > PILULEK_M && <p className="t-meta mt-3">{aDalsich(t, n - PILULEK_M)}</p>}
       </>
     );
   } else {
@@ -336,18 +340,18 @@ function PraveNaSmene({ velikost, nahled }: WidgetProps) {
       <ul className="list">
         {lide.map(({ r, od }) => {
           const zapomenuty = ted - od.getTime() > ZAPOMENUTY_MS;
-          const smena = r.shiftStart ? `směna ${hm(r.shiftStart)}–${hm(r.shiftEnd)}` : 'bez plánované směny';
+          const smena = r.shiftStart ? t('směna {cas}', { cas: `${hm(r.shiftStart)}–${hm(r.shiftEnd)}` }) : t('bez plánované směny');
           return (
             <ListRow key={r.id}
               lead={<Avatar emoji={r.avatar} size="sm" />}
-              title={r.name ?? 'Bez jména'}
-              meta={`příchod ${odKdy(r.openSince)} · ${smena}`}
-              value={zapomenuty ? undefined : delkaSlovy(ted - od.getTime())}
-              right={zapomenuty ? <Chip tone="wait" size="sm">Zapomenutý odchod?</Chip> : undefined}
+              title={r.name ?? t('Bez jména')}
+              meta={t('příchod {cas} · {smena}', { cas: odKdy(r.openSince), smena })}
+              value={zapomenuty ? undefined : delkaSlovy(t, ted - od.getTime())}
+              right={zapomenuty ? <Chip tone="wait" size="sm">{t('Zapomenutý odchod?')}</Chip> : undefined}
               actions={smiUkoncit && r.openEntryId ? (
                 <Button variant="secondary" size="sm" onClick={() => setUkoncit(r)}
-                  aria-label={`Ukončit směnu: ${r.name ?? 'bez jména'}`}>
-                  Ukončit
+                  aria-label={t('Ukončit směnu: {jmeno}', { jmeno: r.name ?? t('bez jména') })}>
+                  {t('Ukončit')}
                 </Button>
               ) : undefined}
             />
@@ -362,9 +366,9 @@ function PraveNaSmene({ velikost, nahled }: WidgetProps) {
       <Widget
         nacteni={data}
         doplnek={velikost !== 'S' && n > 0 ? <Chip tone="muted" size="sm">{pocet}</Chip> : undefined}
-        odkaz={velikost === 'S' || naDochazce ? undefined : { popisek: 'Docházka', pohled: 'attendance' }}
+        odkaz={velikost === 'S' || naDochazce ? undefined : { popisek: t('Docházka'), pohled: 'attendance' }}
         otevrit={velikost === 'S' && !nahled && nav.smiPohled('attendance') ? () => nav.onNavigate('attendance') : undefined}
-        prazdno={n === 0 ? <p className="t-meta">Teď není nikdo napíchnutý.</p> : undefined}
+        prazdno={n === 0 ? <p className="t-meta">{t('Teď není nikdo napíchnutý.')}</p> : undefined}
       >
         {telo}
       </Widget>
@@ -377,7 +381,7 @@ function PraveNaSmene({ velikost, nahled }: WidgetProps) {
         const od = parseDbTime(ukoncit.openSince);
         const plan = od ? navrhOdchodu(od, konecSmeny(pragueToday(), ukoncit.shiftStart, ukoncit.shiftEnd)) : { cas: new Date(), zPlanu: false };
         return (
-          <OknoUkonceni jmeno={ukoncit.name ?? 'Bez jména'} entryId={ukoncit.openEntryId} navrh={plan.cas} zPlanu={plan.zPlanu}
+          <OknoUkonceni jmeno={ukoncit.name ?? t('Bez jména')} entryId={ukoncit.openEntryId} navrh={plan.cas} zPlanu={plan.zPlanu}
             onZavrit={() => setUkoncit(null)} onHotovo={() => { setUkoncit(null); obnovDochazku(); }} />
         );
       })()}
@@ -420,9 +424,7 @@ export function obnovDochazku(): void {
   for (const d of new Set([1, 7, 30, 90, dnuMesice])) obnovDataWidgetu(urlDni(d));
 }
 
-const SMEN: { one: string; few: string; many: string } = { one: 'směna', few: 'směny', many: 'směn' };
-const LIDI: { one: string; few: string; many: string } = { one: 'člověk', few: 'lidé', many: 'lidí' };
-const aDalsich = (n: number) => `…a ${czForm(n, { one: 'další', few: 'další', many: 'dalších' })} ${n.toLocaleString('cs-CZ')}`;
+const aDalsich = (t: PrekladFn, n: number) => t('…a {n, plural, one {# další} few {# další} other {# dalších}}', { n });
 
 /** Datum na vstup datetime-local v místním čase prohlížeče. */
 function doVstupu(d: Date): string {
@@ -443,19 +445,20 @@ function navrhOdchodu(od: Date, konec: Date | null): { cas: Date; zPlanu: boolea
 function OknoUkonceni({ jmeno, entryId, navrh, zPlanu, onHotovo, onZavrit }: {
   jmeno: string; entryId: number; navrh: Date; zPlanu: boolean; onHotovo: () => void; onZavrit: () => void;
 }) {
+  const t = useT('widgety');
   const [cas, setCas] = useState(() => doVstupu(navrh));
   const [pise, setPise] = useState(false);
   const [chyba, setChyba] = useState<string | null>(null);
   const idPole = `ukoncit-${entryId}`;
   const uloz = async () => {
     const d = new Date(cas);
-    if (!cas || Number.isNaN(d.getTime())) { setChyba('Vyplň čas odchodu.'); return; }
+    if (!cas || Number.isNaN(d.getTime())) { setChyba(t('Vyplň čas odchodu.')); return; }
     setPise(true); setChyba(null);
     try {
       await fetch('/api/attendance', { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify({ id: entryId, clockOut: d.toISOString() }) }).then(okJson);
       onHotovo();
     } catch (e) {
-      setChyba(apiMessage(e, 'Příchod se nepodařilo ukončit.'));
+      setChyba(apiMessage(e, t('Příchod se nepodařilo ukončit.')));
     } finally {
       setPise(false);
     }
@@ -463,12 +466,12 @@ function OknoUkonceni({ jmeno, entryId, navrh, zPlanu, onHotovo, onZavrit }: {
   if (typeof document === 'undefined') return null;
   // Přes portál: karta widgetu může mít transformaci a `fixed` by se kreslilo do ní.
   return createPortal(
-    <Modal open onClose={onZavrit} size="sm" title="Ukončit příchod" subtitle={jmeno}
+    <Modal open onClose={onZavrit} size="sm" title={t('Ukončit příchod')} subtitle={jmeno}
       footer={<>
-        <Button variant="secondary" onClick={onZavrit}>Zrušit</Button>
-        <Button variant="primary" loading={pise} onClick={uloz}>Uložit odchod</Button>
+        <Button variant="secondary" onClick={onZavrit}>{t('Zrušit')}</Button>
+        <Button variant="primary" loading={pise} onClick={uloz}>{t('Uložit odchod')}</Button>
       </>}>
-      <Field id={idPole} label="Odchod" hint={zPlanu ? 'Předvyplněný je plánovaný konec směny. Uprav ho, jestli odešel jindy.' : 'Plánovanou směnu nemá, předvyplněný je aktuální čas. Uprav ho, jestli odešel dřív.'} error={chyba}>
+      <Field id={idPole} label={t('Odchod')} hint={zPlanu ? t('Předvyplněný je plánovaný konec směny. Uprav ho, jestli odešel jindy.') : t('Plánovanou směnu nemá, předvyplněný je aktuální čas. Uprav ho, jestli odešel dřív.')} error={chyba}>
         <Input id={idPole} type="datetime-local" value={cas} onChange={e => setCas(e.target.value)} />
       </Field>
     </Modal>,
@@ -480,8 +483,6 @@ function OknoUkonceni({ jmeno, entryId, navrh, zPlanu, onHotovo, onZavrit }: {
 // Odpracováno a Můj výdělek (vlastní měsíc)
 // ---------------------------------------------------------------------------
 
-const ZAZNAMU_BEZ: { one: string; few: string; many: string } = { one: 'záznamu', few: 'záznamů', many: 'záznamů' };
-
 /**
  * Vlastní záznamy za tento měsíc. S dochazka.zobrazit vrací API záznamy
  * CELÉHO týmu za tolik dní, kolik se řekne (vlastní se z nich vyberou podle
@@ -491,6 +492,8 @@ const ZAZNAMU_BEZ: { one: string; few: string; many: string } = { one: 'záznamu
  * záznamů — hodiny z toho nespočítáme (`bezZaznamu`).
  */
 function useMujMesic(zapnuto: boolean) {
+  const t = useT('widgety');
+  const { jazyk } = useJazyk();
   const ja = useJa();
   const { nacteno, ma } = useOpravneni();
   const dnes = pragueToday();
@@ -499,34 +502,35 @@ function useMujMesic(zapnuto: boolean) {
   const bezZaznamu = nacteno && !ma('dochazka.zobrazit') && ma('dochazka.tablet');
   const dnuMesice = Number(dnes.slice(8, 10)) + 1;
   const url = !zapnuto || ja.id == null || bezZaznamu ? null : tymova ? urlDni(dnuMesice) : URL_DNES;
-  const data = useDataWidgetu<Dochazka>(url, vyberDochazku);
+  const data = useDataWidgetu<Dochazka>(url, raw => vyberDochazku(raw, t));
   const vlastni = useMemo(() => (data.data?.entries ?? []).filter(e => ja.id != null && Number(e.employeeId) === ja.id), [data.data, ja.id]);
   const ted = useTed(vlastni.some(e => !e.clockOut), 60_000);
   const sazbaRaw = ja.id != null ? (data.data?.roster.find(r => Number(r.id) === ja.id) as ClenRosteruB2 | undefined)?.hourlyRate : undefined;
   const sazba = Number(sazbaRaw) > 0 ? Number(sazbaRaw) : null;
   const s = useMemo(() => mujMesic(vlastni, ja.id ?? -1, mesic, ted, sazba), [vlastni, ja.id, mesic, ted, sazba]);
-  const [r, m] = mesic.split('-').map(Number);
-  const nazevMesice = new Date(r, m - 1, 1).toLocaleDateString('cs-CZ', { month: 'long' });
+  const m = Number(mesic.slice(5, 7));
+  const nazevMesice = fmtMesic(m, { jazyk });
   return { ja, data, s, sazba, sazbaZnama: sazbaRaw !== undefined && sazbaRaw !== null, bezZaznamu, nazevMesice };
 }
 
 type ClenRosteruB2 = ClenRosteru & { hourlyRate?: number | null };
 
 function Odpracovano(_: WidgetProps) {
+  const t = useT('widgety');
   const { ja, data, s, bezZaznamu, nazevMesice } = useMujMesic(true);
   const minut = Math.floor(s.ms / 60000);
   const h = Math.floor(minut / 60);
   const min = minut % 60;
-  const poznamka = s.zapomenuty ? <Chip tone="wait" size="sm">Zapomenutý odchod</Chip>
-    : s.vynechano > 0 ? `bez ${s.vynechano.toLocaleString('cs-CZ')} ${czForm(s.vynechano, ZAZNAMU_BEZ)} nad 24 h`
-    : s.bezi ? 'včetně běžící směny' : 'podle píchaček';
+  const poznamka = s.zapomenuty ? <Chip tone="wait" size="sm">{t('Zapomenutý odchod')}</Chip>
+    : s.vynechano > 0 ? t('bez {n, plural, one {# záznamu} few {# záznamů} other {# záznamů}} nad 24 h', { n: s.vynechano })
+    : s.bezi ? t('včetně běžící směny') : t('podle píchaček');
 
   return (
     <Widget
       nacteni={ja.stav ?? data}
-      prazdno={bezZaznamu ? <p className="t-meta text-pretty">S touhle rolí se hodiny z píchaček nedají spočítat.</p> : undefined}
+      prazdno={bezZaznamu ? <p className="t-meta text-pretty">{t('S touhle rolí se hodiny z píchaček nedají spočítat.')}</p> : undefined}
     >
-      <Stat label={nazevMesice} value={h.toLocaleString('cs-CZ')} unit={min > 0 ? `h ${min} min` : 'h'} note={poznamka} />
+      <Stat label={nazevMesice} value={h.toLocaleString('cs-CZ')} unit={min > 0 ? t('h {min} min', { min }) : t('h', undefined, 'hodiny')} note={poznamka} />
     </Widget>
   );
 }
@@ -538,19 +542,20 @@ function Odpracovano(_: WidgetProps) {
  * bez oprávnění ho plocha nepřipojí a dotaz neodejde.
  */
 function MujVydelek(_: WidgetProps) {
+  const t = useT('widgety');
   const brana = useBrana(['finance.moje_mzda', 'finance.mzdy']);
   const money = useMoney();
   const { ja, data, s, sazba, sazbaZnama, bezZaznamu, nazevMesice } = useMujMesic(brana);
   if (!brana) return <Widget prazdno={null} />;
   const minut = Math.floor(s.ms / 60000);
-  const hodiny = `${Math.floor(minut / 60)} h${minut % 60 > 0 ? ` ${minut % 60} min` : ''}`;
-  const prazdno = bezZaznamu ? <p className="t-meta text-pretty">S touhle rolí se hodiny z píchaček nedají spočítat.</p>
-    : sazbaZnama && sazba == null ? <p className="t-meta text-pretty">Hodinovou sazbu ti zatím nikdo nenastavil.</p>
+  const hodiny = minut % 60 > 0 ? t('{h} h {min} min', { h: Math.floor(minut / 60), min: minut % 60 }) : t('{h} h', { h: Math.floor(minut / 60) });
+  const prazdno = bezZaznamu ? <p className="t-meta text-pretty">{t('S touhle rolí se hodiny z píchaček nedají spočítat.')}</p>
+    : sazbaZnama && sazba == null ? <p className="t-meta text-pretty">{t('Hodinovou sazbu ti zatím nikdo nenastavil.')}</p>
     : undefined;
   return (
     <Widget nacteni={ja.stav ?? data} prazdno={prazdno}>
       <Stat label={nazevMesice} value={money(s.mzda ?? 0)}
-        note={s.zapomenuty ? <Chip tone="wait" size="sm">Zapomenutý odchod</Chip> : `${hodiny}${s.bezi ? ' · běží' : ''}`} />
+        note={s.zapomenuty ? <Chip tone="wait" size="sm">{t('Zapomenutý odchod')}</Chip> : `${hodiny}${s.bezi ? ` · ${t('běží')}` : ''}`} />
     </Widget>
   );
 }
@@ -559,14 +564,15 @@ function MujVydelek(_: WidgetProps) {
 // Mzdy za období
 // ---------------------------------------------------------------------------
 
-const NAZEV_DNI = (dni: number) => `${dni.toLocaleString('cs-CZ')} ${czForm(dni, DEN)}`;
+const nazevDni = (t: PrekladFn, dni: number) => t('{n, plural, one {# den} few {# dny} other {# dní}}', { n: dni });
 
-function vyberUzaverky(raw: any): UzaverkaTrzby[] {
-  if (!raw || !Array.isArray(raw.closings)) throw new Error('Uzávěrky přišly v nečekaném tvaru.');
+function vyberUzaverky(raw: any, t: PrekladFn): UzaverkaTrzby[] {
+  if (!raw || !Array.isArray(raw.closings)) throw new Error(t('Uzávěrky přišly v nečekaném tvaru.'));
   return raw.closings;
 }
 
 function MzdyZaObdobi({ velikost, nastaveni }: WidgetProps<{ obdobi?: string }>) {
+  const t = useT('widgety');
   const brana = useBranaVse(['dochazka.zobrazit', 'finance.mzdy']);
   const smi = useSmi();
   const money = useMoney();
@@ -577,8 +583,8 @@ function MzdyZaObdobi({ velikost, nastaveni }: WidgetProps<{ obdobi?: string }>)
   // jen vlastní uzávěrky (bez příznaku trzbaSkryta) a 2 z 30 uzávěrek by
   // udělaly z 25 % „240 % · Nad cílem".
   const podil = M && smi('finance.trzby') && smi('uzaverky.zobrazit_vse');
-  const data = useDataWidgetu<Dochazka>(brana ? urlDni(dni) : null, vyberDochazku);
-  const trzbyData = useDataWidgetu<UzaverkaTrzby[]>(brana && podil ? '/api/closings' : null, vyberUzaverky);
+  const data = useDataWidgetu<Dochazka>(brana ? urlDni(dni) : null, raw => vyberDochazku(raw, t));
+  const trzbyData = useDataWidgetu<UzaverkaTrzby[]>(brana && podil ? '/api/closings' : null, raw => vyberUzaverky(raw, t));
   const ted = useTed(!!data.data?.entries.some(e => !e.clockOut), 60_000);
   const mzdy = useMemo(() => data.data ? mzdyZaObdobi(data.data.entries, ted, sazbyZRosteru(data.data.roster as ClenRosteruB2[])) : null, [data.data, ted]);
   const trzby = useMemo(() => {
@@ -591,22 +597,22 @@ function MzdyZaObdobi({ velikost, nastaveni }: WidgetProps<{ obdobi?: string }>)
   const pct = mzdy && trzby && !trzby.skryto ? podilMezd(mzdy.celkem, trzby.trzby) : null;
   const nad = pct != null && laborTargetPct != null && pct > laborTargetPct;
   const poznamkaMezd = mzdy && mzdy.bezSazby > 0
-    ? `bez sazby: ${czCount(mzdy.bezSazby, LIDI)}`
-    : `za ${NAZEV_DNI(dni)}`;
+    ? t('bez sazby: {n, plural, one {# člověk} few {# lidé} other {# lidí}}', { n: mzdy.bezSazby })
+    : t('za {n, plural, one {# den} few {# dny} other {# dní}}', { n: dni });
   return (
     <Widget nacteni={[data, trzbyData]}
-      odkaz={naStrance ? undefined : { popisek: 'Docházka', pohled: 'attendance' }}>
+      odkaz={naStrance ? undefined : { popisek: t('Docházka'), pohled: 'attendance' }}>
       {!M ? (
-        <Stat label={`Mzdy · ${NAZEV_DNI(dni)}`} value={money(mzdy?.celkem ?? 0)} note={mzdy && mzdy.bezSazby > 0 ? poznamkaMezd : undefined} />
+        <Stat label={t('Mzdy · {obdobi}', { obdobi: nazevDni(t, dni) })} value={money(mzdy?.celkem ?? 0)} note={mzdy && mzdy.bezSazby > 0 ? poznamkaMezd : undefined} />
       ) : (
         <StatRow>
-          <Stat label="Mzdové náklady" value={money(mzdy?.celkem ?? 0)} note={poznamkaMezd} />
+          <Stat label={t('Mzdové náklady')} value={money(mzdy?.celkem ?? 0)} note={poznamkaMezd} />
           {podil && (
-            <Stat label="Podíl na tržbách"
+            <Stat label={t('Podíl na tržbách')}
               value={pct != null ? pct.toLocaleString('cs-CZ', { maximumFractionDigits: 1 }) : '—'} unit={pct != null ? '%' : undefined}
-              note={pct == null ? (trzby?.skryto ? 'tržby nevidíš celé' : 'za období nejsou tržby')
-                : laborTargetPct != null ? <Chip tone={nad ? 'bad' : 'ok'} size="sm">{nad ? 'Nad cílem' : 'V cíli'} {laborTargetPct.toLocaleString('cs-CZ')} %</Chip>
-                : 'z tržeb za období'} />
+              note={pct == null ? (trzby?.skryto ? t('tržby nevidíš celé') : t('za období nejsou tržby'))
+                : laborTargetPct != null ? <Chip tone={nad ? 'bad' : 'ok'} size="sm">{nad ? t('Nad cílem') : t('V cíli')} {laborTargetPct.toLocaleString('cs-CZ')} %</Chip>
+                : t('z tržeb za období')} />
           )}
         </StatRow>
       )}
@@ -627,6 +633,7 @@ function useBranaVse(klice: readonly string[]): boolean {
 const RADKU_M = 5;
 
 function SouhrnHodin({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: string; razeni?: RazeniSouhrnu }>) {
+  const t = useT('widgety');
   const brana = useBranaVse(['dochazka.zobrazit']);
   const smi = useSmi();
   const money = useMoney();
@@ -637,7 +644,7 @@ function SouhrnHodin({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: str
   const vychoziRazeni: RazeniSouhrnu = nastaveni.razeni === 'mzda' && !vidiMzdy ? 'hodiny' : nastaveni.razeni ?? 'hodiny';
   const [razeni, setRazeni] = useState<RazeniSouhrnu>(vychoziRazeni);
   useEffect(() => { setRazeni(vychoziRazeni); }, [vychoziRazeni]);
-  const data = useDataWidgetu<Dochazka>(brana ? urlDni(dni) : null, vyberDochazku);
+  const data = useDataWidgetu<Dochazka>(brana ? urlDni(dni) : null, raw => vyberDochazku(raw, t));
   const ted = useTed(!!data.data?.entries.some(e => !e.clockOut), 60_000);
   const radky = useMemo(() => {
     if (!data.data) return [];
@@ -651,20 +658,20 @@ function SouhrnHodin({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: str
   const profil = !nahled && !!otevriProfil && smi('tym.profil');
   const zobrazene = L ? radky : radky.slice(0, RADKU_M);
   const moznosti = [
-    { id: 'hodiny' as const, label: 'Hodiny' },
-    ...(vidiMzdy ? [{ id: 'mzda' as const, label: 'Mzda' }] : []),
-    { id: 'jmeno' as const, label: 'Jméno' },
+    { id: 'hodiny' as const, label: t('Hodiny') },
+    ...(vidiMzdy ? [{ id: 'mzda' as const, label: t('Mzda') }] : []),
+    { id: 'jmeno' as const, label: t('Jméno') },
   ];
   return (
     <Widget nacteni={data}
-      doplnek={radky.length > 0 ? <Chip tone="muted" size="sm">{NAZEV_DNI(dni)}</Chip> : undefined}
-      prazdno={radky.length === 0 ? <p className="t-meta">Za {NAZEV_DNI(dni)} nikdo nic neodpíchl.</p> : undefined}>
+      doplnek={radky.length > 0 ? <Chip tone="muted" size="sm">{nazevDni(t, dni)}</Chip> : undefined}
+      prazdno={radky.length === 0 ? <p className="t-meta">{t('Za {n, plural, one {# den} few {# dny} other {# dní}} nikdo nic neodpíchl.', { n: dni })}</p> : undefined}>
       {L && radky.length > 2 && (
-        <Segmented size="sm" ariaLabel="Řadit souhrn" value={razeni} onChange={v => setRazeni(v)} options={moznosti} className="mb-2" />
+        <Segmented size="sm" ariaLabel={t('Řadit souhrn')} value={razeni} onChange={v => setRazeni(v)} options={moznosti} className="mb-2" />
       )}
       <ul className="list">
         {zobrazene.map(r => {
-          const meta = [czCount(r.pocet, SMEN), r.bezi ? 'právě běží' : null, r.vynechano > 0 ? `${r.vynechano.toLocaleString('cs-CZ')}× bez odchodu` : null].filter(Boolean).join(' · ');
+          const meta = [t('{n, plural, one {# směna} few {# směny} other {# směn}}', { n: r.pocet }), r.bezi ? t('právě běží') : null, r.vynechano > 0 ? t('{n}× bez odchodu', { n: r.vynechano.toLocaleString('cs-CZ') }) : null].filter(Boolean).join(' · ');
           const radek = {
             lead: <Avatar emoji={r.avatar} size="sm" />,
             title: r.jmeno,
@@ -677,7 +684,7 @@ function SouhrnHodin({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: str
           ) : <ListRow key={r.id} {...radek} />;
         })}
       </ul>
-      {!L && radky.length > RADKU_M && <p className="t-meta mt-2">{aDalsich(radky.length - RADKU_M)}</p>}
+      {!L && radky.length > RADKU_M && <p className="t-meta mt-2">{aDalsich(t, radky.length - RADKU_M)}</p>}
     </Widget>
   );
 }
@@ -687,9 +694,10 @@ function SouhrnHodin({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: str
 // ---------------------------------------------------------------------------
 
 function DlouhePrichody({ velikost, nahled }: WidgetProps) {
+  const t = useT('widgety');
   const brana = useBranaVse(['dochazka.zobrazit']);
   const smi = useSmi();
-  const data = useDataWidgetu<Dochazka>(brana ? URL_DNES : null, vyberDochazku);
+  const data = useDataWidgetu<Dochazka>(brana ? URL_DNES : null, raw => vyberDochazku(raw, t));
   const ted = useTed(brana, 60_000);
   const [ukoncit, setUkoncit] = useState<OtevrenyPrichod | null>(null);
   const seznam = useMemo(() => (data.data ? otevrenePrichody(data.data.roster, ted, pragueToday()) : []), [data.data, ted]);
@@ -701,9 +709,9 @@ function DlouhePrichody({ velikost, nahled }: WidgetProps) {
     <>
       <Widget nacteni={data}
         doplnek={velikost !== 'S' && n > 0 ? <Chip tone="wait" size="sm">{n.toLocaleString('cs-CZ')}</Chip> : undefined}
-        prazdno={n === 0 ? <p className="t-meta text-pretty">Nikdo není napíchnutý déle, než měl.</p> : undefined}>
+        prazdno={n === 0 ? <p className="t-meta text-pretty">{t('Nikdo není napíchnutý déle, než měl.')}</p> : undefined}>
         {velikost === 'S' ? (
-          <Stat label="Déle než plán" value={n.toLocaleString('cs-CZ')} note={`nejdéle o ${delkaSlovy(seznam[0]?.pres ?? 0)}`} />
+          <Stat label={t('Déle než plán')} value={n.toLocaleString('cs-CZ')} note={t('nejdéle o {delka}', { delka: delkaSlovy(t, seznam[0]?.pres ?? 0) })} />
         ) : (
           <>
             <ul className="list">
@@ -711,15 +719,15 @@ function DlouhePrichody({ velikost, nahled }: WidgetProps) {
                 <ListRow key={o.id}
                   lead={<Avatar emoji={o.avatar} size="sm" />}
                   title={o.jmeno}
-                  meta={`příchod ${odKdy(o.od.toISOString())} · ${o.planDo ? `plán do ${o.planDo}` : 'bez plánované směny'}`}
-                  right={<Chip tone="wait" size="sm">+{delkaSlovy(o.pres)}</Chip>}
+                  meta={t('příchod {cas} · {smena}', { cas: odKdy(o.od.toISOString()), smena: o.planDo ? t('plán do {cas}', { cas: o.planDo }) : t('bez plánované směny') })}
+                  right={<Chip tone="wait" size="sm">+{delkaSlovy(t, o.pres)}</Chip>}
                   actions={smiUkoncit && o.openEntryId ? (
-                    <Button variant="secondary" size="sm" onClick={() => setUkoncit(o)} aria-label={`Ukončit příchod: ${o.jmeno}`}>Ukončit</Button>
+                    <Button variant="secondary" size="sm" onClick={() => setUkoncit(o)} aria-label={t('Ukončit příchod: {jmeno}', { jmeno: o.jmeno })}>{t('Ukončit')}</Button>
                   ) : undefined}
                 />
               ))}
             </ul>
-            {n > RADKU_M && <p className="t-meta mt-2">{aDalsich(n - RADKU_M)}</p>}
+            {n > RADKU_M && <p className="t-meta mt-2">{aDalsich(t, n - RADKU_M)}</p>}
           </>
         )}
       </Widget>
@@ -737,22 +745,23 @@ function DlouhePrichody({ velikost, nahled }: WidgetProps) {
 
 const RADKU_DNES = 6;
 
-function chipDne(r: RadekDne): ReactNode {
+function chipDne(r: RadekDne, t: PrekladFn): ReactNode {
   const od = r.prichod ? dbTimeHM(r.prichod) : null;
   switch (r.stav) {
-    case 'na_smene': return <Chip tone="ok" size="sm">od {od}</Chip>;
-    case 'bez_planu': return <Chip tone="info" size="sm">od {od} · bez plánu</Chip>;
-    case 'nedorazil': return <Chip tone="wait" size="sm">Bez příchodu</Chip>;
-    case 'ceka': return <Chip tone="muted" size="sm">Začíná {r.plan?.slice(0, 5)}</Chip>;
-    case 'odesel': return <Chip tone="muted" size="sm">Odpíchnuto</Chip>;
-    default: return <Chip tone="muted" size="sm">Po směně</Chip>;
+    case 'na_smene': return <Chip tone="ok" size="sm">{t('od {cas}', { cas: od })}</Chip>;
+    case 'bez_planu': return <Chip tone="info" size="sm">{t('od {cas} · bez plánu', { cas: od })}</Chip>;
+    case 'nedorazil': return <Chip tone="wait" size="sm">{t('Bez příchodu')}</Chip>;
+    case 'ceka': return <Chip tone="muted" size="sm">{t('Začíná {cas}', { cas: r.plan?.slice(0, 5) })}</Chip>;
+    case 'odesel': return <Chip tone="muted" size="sm">{t('Odpíchnuto')}</Chip>;
+    default: return <Chip tone="muted" size="sm">{t('Po směně')}</Chip>;
   }
 }
 
 function DnesVPodniku(_: WidgetProps) {
+  const t = useT('widgety');
   const brana = useBrana(['dochazka.zobrazit', 'dochazka.tablet']);
   const smi = useSmi();
-  const data = useDataWidgetu<Dochazka>(brana ? URL_DNES : null, vyberDochazku);
+  const data = useDataWidgetu<Dochazka>(brana ? URL_DNES : null, raw => vyberDochazku(raw, t));
   const ted = useTed(brana, 60_000);
   // Dnešní záznamy (kdo už odešel) má jen dochazka.zobrazit; tablet ne.
   const seZaznamy = smi('dochazka.zobrazit');
@@ -761,15 +770,15 @@ function DnesVPodniku(_: WidgetProps) {
   const chybi = radky.filter(r => r.stav === 'nedorazil').length;
   return (
     <Widget nacteni={data}
-      doplnek={chybi > 0 ? <Chip tone="wait" size="sm">{chybi.toLocaleString('cs-CZ')} bez příchodu</Chip> : undefined}
-      prazdno={radky.length === 0 ? <p className="t-meta">Dnes nemá nikdo naplánovanou směnu.</p> : undefined}>
+      doplnek={chybi > 0 ? <Chip tone="wait" size="sm">{t('{n} bez příchodu', { n: chybi.toLocaleString('cs-CZ') })}</Chip> : undefined}
+      prazdno={radky.length === 0 ? <p className="t-meta">{t('Dnes nemá nikdo naplánovanou směnu.')}</p> : undefined}>
       <ul className="list">
         {radky.slice(0, RADKU_DNES).map(r => (
           <ListRow key={r.id} lead={<Avatar emoji={r.avatar} size="sm" />} title={r.jmeno}
-            meta={r.plan ? `směna ${r.plan}` : 'bez plánované směny'} right={chipDne(r)} />
+            meta={r.plan ? t('směna {cas}', { cas: r.plan }) : t('bez plánované směny')} right={chipDne(r, t)} />
         ))}
       </ul>
-      {radky.length > RADKU_DNES && <p className="t-meta mt-2">{aDalsich(radky.length - RADKU_DNES)}</p>}
+      {radky.length > RADKU_DNES && <p className="t-meta mt-2">{aDalsich(t, radky.length - RADKU_DNES)}</p>}
     </Widget>
   );
 }

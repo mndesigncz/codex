@@ -24,7 +24,7 @@ import { obnovDataWidgetu, useDataWidgetu, type StavDat } from '../useDataWidget
 import { useNavigace, useSmi } from '../NavigaceKontext';
 import { useOpravneni } from '../../role/useOpravneni';
 import { apiMessage, okJson } from '@/lib/api';
-import { czCount, type CzNoun } from '@/lib/czech';
+import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { vyberPodnety, nejzadanejsi, novePodnety, prepniHlas, type DataPodnetu, type Podnet, type StavPodnetu } from '@/lib/ukolyPrehled';
 
 /** Tutéž adresu čte seznam podnětů (SuggestionsBoard) — jeden dotaz na stránku. */
@@ -32,7 +32,7 @@ export const URL_NAPADY = '/api/suggestions';
 /** Tabule Plánování (oblasti/planovani.tsx) — tady jen adresa, ať se oblast nestahuje s touhle. */
 const URL_PLANOVANI = '/api/planning';
 
-export const HLAS: CzNoun = { one: 'hlas', few: 'hlasy', many: 'hlasů' };
+const hlasy = (t: PrekladFn, n: number) => t('{n, plural, one {# hlas} few {# hlasy} other {# hlasů}}', { n });
 const CEKA: StavNacteni = { data: null, error: null, loading: true, reload: () => {} };
 const cislo = (n: number) => n.toLocaleString('cs-CZ');
 const JSON_HLAVICKA = { 'Content-Type': 'application/json' };
@@ -51,9 +51,10 @@ function useBrana(id: string): { ok: boolean; ceka: boolean } {
  * pilulka (vybráno = inkoust, DP §0 tah 1), ne limetka — limetka je akce.
  */
 export function Hlas({ podnet, onClick, zamceno }: { podnet: Podnet; onClick: () => void; zamceno?: boolean }) {
+  const t = useT('widgety');
   return (
     <button type="button" onClick={onClick} disabled={zamceno} aria-pressed={podnet.hasVoted}
-      aria-label={`${podnet.hasVoted ? 'Zrušit podporu' : 'Podpořit'}: ${podnet.title} (${czCount(podnet.votes, HLAS)})`}
+      aria-label={t('{akce}: {nazev} ({hlasy})', { akce: podnet.hasVoted ? t('Zrušit podporu') : t('Podpořit'), nazev: podnet.title, hlasy: hlasy(t, podnet.votes) })}
       className={`tap-target shrink-0 flex flex-col items-center justify-center w-11 h-11 rounded-2xl border transition-colors disabled:cursor-default ${
         podnet.hasVoted ? 'bg-[#16181A] border-[#16181A] text-white' : 'bg-white border-black/[0.08] text-black/55 hover:border-black/20'}`}>
       <Icon name="chevron" size={14} strokeWidth={2.4} className="rotate-180" />
@@ -64,6 +65,7 @@ export function Hlas({ podnet, onClick, zamceno }: { podnet: Podnet; onClick: ()
 
 /** Hlasování z widgetu: hned v UI, se srovnáním po odpovědi a vrácením při chybě. */
 function useHlasovani(data: StavDat<DataPodnetu>) {
+  const t = useT('widgety');
   const [chyba, setChyba] = useState<string | null>(null);
   const hlasuj = async (s: Podnet) => {
     setChyba(null);
@@ -73,7 +75,7 @@ function useHlasovani(data: StavDat<DataPodnetu>) {
       data.reload();
     } catch (e) {
       data.set(prev => (prev ? { ...prev, podnety: prepniHlas(prev.podnety, s.id) } : prev!));
-      setChyba(apiMessage(e, 'Hlas se nepodařilo uložit.'));
+      setChyba(apiMessage(e, t('Hlas se nepodařilo uložit.')));
     }
   };
   return { chyba, hlasuj };
@@ -84,18 +86,19 @@ function useHlasovani(data: StavDat<DataPodnetu>) {
 // ---------------------------------------------------------------------------
 
 function Nejzadanejsi({ nastaveni, nahled }: WidgetProps<{ stav?: string }>) {
+  const t = useT('widgety');
   const { ok, ceka } = useBrana('napady.nejzadanejsi');
   const data = useDataWidgetu<DataPodnetu>(ok ? URL_NAPADY : null, vyberPodnety);
   const stav: StavPodnetu = (['nove', 'naplanovane', 'vse'] as const).includes(nastaveni.stav as StavPodnetu) ? nastaveni.stav as StavPodnetu : 'nove';
   const top = data.data ? nejzadanejsi(data.data.podnety, stav) : [];
   const h = useHlasovani(data);
-  const prazdnaVeta = stav === 'naplanovane' ? 'Nic není naplánované.' : 'Zatím žádný nápad — přidej ho v Nápadech.';
+  const prazdnaVeta = stav === 'naplanovane' ? t('Nic není naplánované.') : t('Zatím žádný nápad — přidej ho v Nápadech.');
 
   return (
     <Widget
       nacteni={ceka ? CEKA : data}
       kostra="seznam"
-      odkaz={{ popisek: 'Nápady', pohled: 'suggestions' }}
+      odkaz={{ popisek: t('Nápady'), pohled: 'suggestions' }}
       prazdno={data.data && top.length === 0 ? <p className="t-meta">{prazdnaVeta}</p> : undefined}
     >
       <ul className="list">
@@ -104,7 +107,7 @@ function Nejzadanejsi({ nastaveni, nahled }: WidgetProps<{ stav?: string }>) {
             lead={<Hlas podnet={s} zamceno={nahled} onClick={() => void h.hlasuj(s)} />}
             title={s.title}
             meta={s.authorName ?? undefined}
-            right={stav === 'vse' && s.status === 'planned' ? <Chip tone="info" size="sm">Naplánováno</Chip> : undefined} />
+            right={stav === 'vse' && s.status === 'planned' ? <Chip tone="info" size="sm">{t('Naplánováno')}</Chip> : undefined} />
         ))}
       </ul>
       {h.chyba && <p className="note note-danger mt-3" role="alert">{h.chyba}</p>}
@@ -117,6 +120,7 @@ function Nejzadanejsi({ nastaveni, nahled }: WidgetProps<{ stav?: string }>) {
 // ---------------------------------------------------------------------------
 
 function Nove({ velikost, nahled }: WidgetProps) {
+  const t = useT('widgety');
   const smi = useSmi();
   const nav = useNavigace();
   const { ok, ceka } = useBrana('napady.nove');
@@ -139,7 +143,7 @@ function Nove({ velikost, nahled }: WidgetProps) {
       // Nová karta na tabuli: srovná widgety Plánování i tabuli, jsou-li na obrazovce.
       if (doPlanovani) obnovDataWidgetu(URL_PLANOVANI);
     } catch (e) {
-      setChyba(apiMessage(e, 'Podnět se nepodařilo naplánovat.'));
+      setChyba(apiMessage(e, t('Podnět se nepodařilo naplánovat.')));
     } finally {
       setProbiha(null);
     }
@@ -149,13 +153,13 @@ function Nove({ velikost, nahled }: WidgetProps) {
     <Widget
       nacteni={ceka ? CEKA : data}
       doplnek={!S && nove.length > 0 ? <Chip tone="wait" size="sm">{cislo(nove.length)}</Chip> : undefined}
-      odkaz={S ? undefined : { popisek: 'Nápady', pohled: 'suggestions' }}
+      odkaz={S ? undefined : { popisek: t('Nápady'), pohled: 'suggestions' }}
       otevrit={S && !nahled && nav.smiPohled('suggestions') ? () => nav.onNavigate('suggestions') : undefined}
-      prazdno={data.data && nove.length === 0 ? <p className="t-meta">Nic nečeká na posouzení.</p> : undefined}
+      prazdno={data.data && nove.length === 0 ? <p className="t-meta">{t('Nic nečeká na posouzení.')}</p> : undefined}
     >
       {S ? (
-        <Stat label="Čeká na posouzení" value={cislo(nove.length)}
-          note={nove[0] ? `nejstarší od ${nove[0].authorName ?? 'někoho z týmu'}` : undefined} />
+        <Stat label={t('Čeká na posouzení')} value={cislo(nove.length)}
+          note={nove[0] ? t('nejstarší od {kdo}', { kdo: nove[0].authorName ?? t('někoho z týmu') }) : undefined} />
       ) : (
         <>
           <ul className="list">
@@ -163,17 +167,17 @@ function Nove({ velikost, nahled }: WidgetProps) {
               <ListRow key={s.id}
                 lead={<Avatar emoji={s.authorAvatar ?? undefined} size="sm" />}
                 title={s.title}
-                meta={[s.authorName, s.votes > 0 ? czCount(s.votes, HLAS) : null].filter(Boolean).join(' · ') || undefined}
+                meta={[s.authorName, s.votes > 0 ? hlasy(t, s.votes) : null].filter(Boolean).join(' · ') || undefined}
                 actions={nahled ? undefined : (
                   <Button variant="secondary" size="sm" icon={doPlanovani ? 'kanban' : 'calendar'} loading={probiha === s.id}
                     disabled={probiha != null && probiha !== s.id} onClick={() => naplanuj(s)}
-                    aria-label={`${doPlanovani ? 'Do plánování' : 'Naplánovat'}: ${s.title}`}>
-                    {doPlanovani ? 'Do plánování' : 'Naplánovat'}
+                    aria-label={t('{akce}: {nazev}', { akce: doPlanovani ? t('Do plánování') : t('Naplánovat'), nazev: s.title })}>
+                    {doPlanovani ? t('Do plánování') : t('Naplánovat')}
                   </Button>
                 )} />
             ))}
           </ul>
-          {nove.length > 5 && <p className="t-meta mt-2">…a {czCount(nove.length - 5, { one: 'další podnět', few: 'další podněty', many: 'dalších podnětů' })}</p>}
+          {nove.length > 5 && <p className="t-meta mt-2">{t('…a {n, plural, one {# další podnět} few {# další podněty} other {# dalších podnětů}}', { n: nove.length - 5 })}</p>}
           {chyba && <p className="note note-danger mt-3" role="alert">{chyba}</p>}
         </>
       )}

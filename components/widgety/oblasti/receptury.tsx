@@ -19,7 +19,7 @@
 
 import type { KomponentaWidgetu, Navigace, WidgetProps } from '@/lib/widgety/typy';
 import { widget } from '@/lib/widgety/katalog';
-import { czForm, POLOZKA, type CzNoun } from '@/lib/czech';
+import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { pokryti, prodejeBezReceptury, vyberReceptury, type DataReceptur } from '@/lib/recepturyPrehled';
 import { Button, Chip, EmptyState, ListRow, Stat, StatRow } from '../../ui';
 import { useOpravneni } from '../../role/useOpravneni';
@@ -35,8 +35,7 @@ const URL_SKLAD = '/api/inventory';
 export const UDALOST_OTEVRIT_RECEPTURU = 'managero:otevrit-recepturu';
 
 const cislo = (n: number) => n.toLocaleString('cs-CZ');
-const aDalsich = (n: number) => `…a ${czForm(n, { one: 'další', few: 'další', many: 'dalších' })} ${cislo(n)}`;
-const PRODEJ: CzNoun = { one: 'prodej', few: 'prodeje', many: 'prodejů' };
+const aDalsich = (n: number, t: PrekladFn) => t('…a {n, plural, one {# další} few {# další} other {# dalších}}', { n });
 
 /** „Ještě nevíme, jestli smí": kostra a žádný dotaz. */
 const CEKA: StavNacteni = { data: null, error: null, loading: true, reload: () => {} };
@@ -67,12 +66,13 @@ function otevriRecepturu(nav: Navigace, productId: string, nazev: string) {
 
 /** Nepřipojená pokladna: bez ní receptury nemají z čeho brát. */
 function BezPokladny({ nahled }: { nahled: boolean }) {
+  const t = useT('widgety');
   const nav = useNavigace();
   const smiNastavit = nav.smiPohled('settings') && !nahled;
   return (
-    <EmptyState compact icon="receipt" title="Pokladna není připojená"
-      hint="Receptury se skládají k položkám z kasy. Propoj ji v Nastavení."
-      action={smiNastavit ? <Button variant="secondary" size="sm" onClick={() => nav.onNavigate('settings', 'pos')}>Nastavit pokladnu</Button> : undefined} />
+    <EmptyState compact icon="receipt" title={t('Pokladna není připojená')}
+      hint={t('Receptury se skládají k položkám z kasy. Propoj ji v Nastavení.')}
+      action={smiNastavit ? <Button variant="secondary" size="sm" onClick={() => nav.onNavigate('settings', 'pos')}>{t('Nastavit pokladnu')}</Button> : undefined} />
   );
 }
 
@@ -81,6 +81,7 @@ function BezPokladny({ nahled }: { nahled: boolean }) {
 // ---------------------------------------------------------------------------
 
 function Pokryti({ velikost, nahled }: WidgetProps) {
+  const t = useT('widgety');
   const smi = useSmi();
   const { ok, ceka } = useBrana('receptury.pokryti');
   const data = useDataWidgetu<DataReceptur>(ok ? URL_RECEPTURY : null, vyberReceptury);
@@ -96,19 +97,19 @@ function Pokryti({ velikost, nahled }: WidgetProps) {
       nacteni={ceka ? CEKA : data}
       kostra={velikost === 'S' ? 'cislo' : 'seznam'}
       prazdno={d && !d.propojeno ? <BezPokladny nahled={nahled} /> : d && d.produkty.length === 0
-        ? <p className="t-meta">{d.chyba ?? 'Katalog kasy je zatím prázdný.'}</p> : undefined}
+        ? <p className="t-meta">{d.chyba ?? t('Katalog kasy je zatím prázdný.')}</p> : undefined}
     >
       {p && (velikost === 'S' ? (
-        <Stat label="Pokryto" value={`${p.procento ?? 0} %`} note={`${cislo(p.sRecepturou)} z ${cislo(p.produktu)} položek menu`} />
+        <Stat label={t('Pokryto')} value={`${p.procento ?? 0} %`} note={t('{a} z {b} položek menu', { a: cislo(p.sRecepturou), b: cislo(p.produktu) })} />
       ) : (
         // Tři čísla v M (dvě buňky mřížky): štítky a poznámky krátké, jinak se na
         // 1280 px ořízly na „Pokryto recept…" a „ze skladu se neod…".
         <StatRow>
-          <Stat label="Pokryto" value={`${p.procento ?? 0} %`} note={`${cislo(p.sRecepturou)} z ${cislo(p.produktu)} položek`} />
-          <Stat label="Bez receptury" value={cislo(p.prodavaSeBez)}
-            note={p.prodavaSeBez > 0 ? <span className="text-wait-ink">neodepíšou se</span> : 'vše se odepisuje'} />
+          <Stat label={t('Pokryto')} value={`${p.procento ?? 0} %`} note={t('{a} z {b} položek', { a: cislo(p.sRecepturou), b: cislo(p.produktu) })} />
+          <Stat label={t('Bez receptury')} value={cislo(p.prodavaSeBez)}
+            note={p.prodavaSeBez > 0 ? <span className="text-wait-ink">{t('neodepíšou se')}</span> : t('vše se odepisuje')} />
           {p.polozekSkladu != null && (
-            <Stat label="Ve skladu" value={cislo(p.polozekSkladu)} note={czForm(p.polozekSkladu, POLOZKA)} />
+            <Stat label={t('Ve skladu')} value={cislo(p.polozekSkladu)} note={t('{n, plural, one {položka} few {položky} other {položek}}', { n: p.polozekSkladu })} />
           )}
         </StatRow>
       ))}
@@ -121,6 +122,7 @@ function Pokryti({ velikost, nahled }: WidgetProps) {
 // ---------------------------------------------------------------------------
 
 function BezReceptury({ velikost, nahled }: WidgetProps) {
+  const t = useT('widgety');
   const nav = useNavigace();
   const smi = useSmi();
   const def = widget('receptury.bez_receptury');
@@ -143,20 +145,20 @@ function BezReceptury({ velikost, nahled }: WidgetProps) {
       prazdno={d && !d.propojeno ? null : d && d.chyba
         ? <p className="t-meta">{d.chyba}</p>
         : d && vse.length === 0
-          ? <p className="t-meta">Všechno, co se na kase prodává, má recepturu — sklad se odepisuje sám.</p> : undefined}
+          ? <p className="t-meta">{t('Všechno, co se na kase prodává, má recepturu — sklad se odepisuje sám.')}</p> : undefined}
     >
       <ul className="list">
         {vse.slice(0, strop).map(u => (
           <li key={u.productId}>
             <ListRow as="div" title={u.productName}
-              meta={smiDoplnit ? 'Doplnit recepturu' : 'bez receptury'}
-              value={`${cislo(u.prodano)}×`} valueMeta={czForm(u.prodano, PRODEJ)}
+              meta={smiDoplnit ? t('Doplnit recepturu') : t('bez receptury')}
+              value={`${cislo(u.prodano)}×`} valueMeta={t('{n, plural, one {prodej} few {prodeje} other {prodejů}}', { n: u.prodano })}
               onClick={smiDoplnit ? () => otevriRecepturu(nav, u.productId, u.productName) : undefined} />
           </li>
         ))}
       </ul>
-      {vse.length > strop && <p className="t-meta mt-2">{aDalsich(vse.length - strop)}</p>}
-      <p className="t-meta mt-2">Tyhle prodeje se ze skladu neodepíšou, dokud položka nemá recepturu.</p>
+      {vse.length > strop && <p className="t-meta mt-2">{aDalsich(vse.length - strop, t)}</p>}
+      <p className="t-meta mt-2">{t('Tyhle prodeje se ze skladu neodepíšou, dokud položka nemá recepturu.')}</p>
     </Widget>
   );
 }

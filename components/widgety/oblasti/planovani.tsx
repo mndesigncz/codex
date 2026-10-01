@@ -22,13 +22,12 @@ import { useDataWidgetu } from '../useDataWidgetu';
 import { useSmi } from '../NavigaceKontext';
 import { useOpravneni } from '../../role/useOpravneni';
 import { apiMessage, okJson } from '@/lib/api';
-import { czCount, type CzNoun } from '@/lib/czech';
+import { useT } from '@/lib/i18n/client';
 import { vyberKarty, souhrnPlanu, kartySloupce, type KartaPlanu } from '@/lib/ukolyPrehled';
 
 /** Tutéž adresu čte tabule Plánování (PlanningBoard) — jeden dotaz na stránku. */
 export const URL_PLANOVANI = '/api/planning';
 
-export const KARTA: CzNoun = { one: 'karta', few: 'karty', many: 'karet' };
 const CEKA: StavNacteni = { data: null, error: null, loading: true, reload: () => {} };
 const cislo = (n: number) => n.toLocaleString('cs-CZ');
 
@@ -46,6 +45,7 @@ function useBrana(id: string): { ok: boolean; ceka: boolean } {
 // ---------------------------------------------------------------------------
 
 function Souhrn({ velikost }: WidgetProps) {
+  const t = useT('widgety');
   const { ok, ceka } = useBrana('planovani.souhrn');
   const data = useDataWidgetu<KartaPlanu[]>(ok ? URL_PLANOVANI : null, vyberKarty);
   const k = data.data ? souhrnPlanu(data.data) : null;
@@ -55,19 +55,19 @@ function Souhrn({ velikost }: WidgetProps) {
     <Widget
       nacteni={ceka ? CEKA : data}
       kostra={S ? 'cislo' : 'text'}
-      odkaz={S ? undefined : { popisek: 'Plánování', pohled: 'planning' }}
-      prazdno={data.data && data.data.length === 0 ? <p className="t-meta">Tabule je zatím prázdná.</p> : undefined}
+      odkaz={S ? undefined : { popisek: t('Plánování'), pohled: 'planning' }}
+      prazdno={data.data && data.data.length === 0 ? <p className="t-meta">{t('Tabule je zatím prázdná.')}</p> : undefined}
     >
       {k && (S ? (
         // Malý: co se hýbe — rozpracované a to, co čeká na rozhodnutí.
-        <Stat label="Rozpracováno" value={cislo(k.in_progress)}
-          note={k.review > 0 ? <span className="text-wait-ink">{cislo(k.review)} ke schválení</span> : 'nic ke schválení'} />
+        <Stat label={t('Rozpracováno')} value={cislo(k.in_progress)}
+          note={k.review > 0 ? <span className="text-wait-ink">{t('{n} ke schválení', { n: cislo(k.review) })}</span> : t('nic ke schválení')} />
       ) : (
         <StatRow>
-          <Stat label="Nápady" value={cislo(k.ideas)} />
-          <Stat label="Rozpracováno" value={cislo(k.in_progress)} />
-          <Stat label="Ke schválení" value={cislo(k.review)} note={k.review > 0 ? <span className="text-wait-ink">čeká</span> : undefined} />
-          <Stat label="Hotovo" value={cislo(k.done)} />
+          <Stat label={t('Nápady')} value={cislo(k.ideas)} />
+          <Stat label={t('Rozpracováno')} value={cislo(k.in_progress)} />
+          <Stat label={t('Ke schválení')} value={cislo(k.review)} note={k.review > 0 ? <span className="text-wait-ink">{t('čeká')}</span> : undefined} />
+          <Stat label={t('Hotovo')} value={cislo(k.done)} />
         </StatRow>
       ))}
     </Widget>
@@ -79,6 +79,7 @@ function Souhrn({ velikost }: WidgetProps) {
 // ---------------------------------------------------------------------------
 
 function KeSchvaleni({ nahled }: WidgetProps) {
+  const t = useT('widgety');
   const smi = useSmi();
   const def = widget('planovani.ke_schvaleni');
   const { ok, ceka } = useBrana('planovani.ke_schvaleni');
@@ -102,7 +103,7 @@ function KeSchvaleni({ nahled }: WidgetProps) {
       data.reload();
     } catch (e) {
       data.set(prev => (prev ?? []).map(x => (x.id === c.id ? c : x)));
-      setChyba(apiMessage(e, 'Kartu se nepodařilo přesunout.'));
+      setChyba(apiMessage(e, t('Kartu se nepodařilo přesunout.')));
     } finally {
       setProbiha(null);
     }
@@ -113,8 +114,8 @@ function KeSchvaleni({ nahled }: WidgetProps) {
       nacteni={ceka ? CEKA : data}
       kostra="seznam"
       doplnek={fronta.length > 0 ? <Chip tone="wait" size="sm">{cislo(fronta.length)}</Chip> : undefined}
-      odkaz={{ popisek: 'Plánování', pohled: 'planning' }}
-      prazdno={data.data && fronta.length === 0 ? <p className="t-meta">Nic nečeká na schválení.</p> : undefined}
+      odkaz={{ popisek: t('Plánování'), pohled: 'planning' }}
+      prazdno={data.data && fronta.length === 0 ? <p className="t-meta">{t('Nic nečeká na schválení.')}</p> : undefined}
     >
       <ul className="list">
         {fronta.slice(0, 5).map(c => (
@@ -125,15 +126,15 @@ function KeSchvaleni({ nahled }: WidgetProps) {
               // Obal drží obě ovládání u pravého okraje i tam, kde .list-actions natahuje první dítě.
               <span className="flex items-center justify-end gap-1">
                 <Button variant="ghost" size="sm" icon="check" loading={probiha === c.id} disabled={probiha != null && probiha !== c.id}
-                  onClick={() => presun(c, 'done')} aria-label={`Schválit kartu ${c.title}`}>Schválit</Button>
-                <Menu size="sm" label={`Další akce s kartou ${c.title}`} items={[
-                  { label: 'Vrátit do Rozpracováno', icon: 'undo', disabled: probiha != null, onClick: () => presun(c, 'in_progress') },
+                  onClick={() => presun(c, 'done')} aria-label={t('Schválit kartu {nazev}', { nazev: c.title })}>{t('Schválit')}</Button>
+                <Menu size="sm" label={t('Další akce s kartou {nazev}', { nazev: c.title })} items={[
+                  { label: t('Vrátit do Rozpracováno'), icon: 'undo', disabled: probiha != null, onClick: () => presun(c, 'in_progress') },
                 ]} />
               </span>
             ) : undefined} />
         ))}
       </ul>
-      {fronta.length > 5 && <p className="t-meta mt-2">…a {czCount(fronta.length - 5, { one: 'další karta', few: 'další karty', many: 'dalších karet' })}</p>}
+      {fronta.length > 5 && <p className="t-meta mt-2">{t('…a {n, plural, one {# další karta} few {# další karty} other {# dalších karet}}', { n: fronta.length - 5 })}</p>}
       {chyba && <p className="note note-danger mt-3" role="alert">{chyba}</p>}
     </Widget>
   );

@@ -26,8 +26,8 @@ import { createPortal } from 'react-dom';
 import type { DefiniceWidgetu, KomponentaWidgetu, Navigace, WidgetProps } from '@/lib/widgety/typy';
 import { widget } from '@/lib/widgety/katalog';
 import { apiMessage, okJson } from '@/lib/api';
-import { POLOZKA, czCount, czForm, type CzNoun } from '@/lib/czech';
 import { pragueToday } from '@/lib/pragueTime';
+import { useT, type PrekladFn } from '@/lib/i18n/client';
 import {
   KLIC_NAKUP, KLIC_UPRAVIT, UDALOST_NAKUP, UDALOST_UPRAVIT,
   chybiUdaje, cekajiciObjednavky, historieObjednavek, hodnotaZasob, utrataZaMesic, jeAktivni, nakupniSeznam, podstrom, poDodavatelich,
@@ -57,28 +57,23 @@ const cislo = (n: number) => n.toLocaleString('cs-CZ');
 /** Množství skladu: až tři desetinná místa (0,125 kg), celé bez čárky. */
 const mnozstvi = (n: number) => n.toLocaleString('cs-CZ', { maximumFractionDigits: 3 });
 /** „…a další 2" / „…a dalších 5" — strop seznamu se nesmí zamlčet (DP §3.6). */
-const aDalsich = (n: number) => `…a ${czForm(n, { one: 'další', few: 'další', many: 'dalších' })} ${cislo(n)}`;
-
-const SUROVINA: CzNoun = { one: 'surovina', few: 'suroviny', many: 'surovin' };
-const HLASENI: CzNoun = { one: 'hlášení', few: 'hlášení', many: 'hlášení' };
-const OBJEDNAVKA: CzNoun = { one: 'objednávka', few: 'objednávky', many: 'objednávek' };
-const NAVRH: CzNoun = { one: 'návrh', few: 'návrhy', many: 'návrhů' };
+const aDalsich = (n: number, t: PrekladFn) => t('…a {n, plural, one {# další} few {# další} other {# dalších}}', { n });
 
 /** Položky skladu z odpovědi /api/inventory (surově, filtruje se až v komponentě podle nastavení). */
 const vyberSklad = (raw: unknown): PolozkaSkladu[] => seznam(raw) as PolozkaSkladu[];
 
 /** „před 5 min", „před 2 h", „před 3 dny" — pro řádky, kde přesný čas nic neřekne. */
-function pred(iso: string | null | undefined): string {
+function pred(iso: string | null | undefined, t: PrekladFn): string {
   if (!iso) return '';
-  const t = new Date(iso).getTime();
-  if (!Number.isFinite(t)) return '';
-  const min = Math.round((Date.now() - t) / 60000);
-  if (min < 1) return 'právě teď';
-  if (min < 60) return `před ${min} min`;
+  const ms = new Date(iso).getTime();
+  if (!Number.isFinite(ms)) return '';
+  const min = Math.round((Date.now() - ms) / 60000);
+  if (min < 1) return t('právě teď');
+  if (min < 60) return t('před {n} min', { n: min });
   const h = Math.round(min / 60);
-  if (h < 24) return `před ${h} h`;
+  if (h < 24) return t('před {n} h', { n: h });
   const dny = Math.round(h / 24);
-  return `před ${czCount(dny, { one: 'dnem', few: 'dny', many: 'dny' })}`;
+  return t('před {n, plural, one {# dnem} few {# dny} other {# dny}}', { n: dny });
 }
 
 const datumKratce = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', year: 'numeric' }) : '');
@@ -122,17 +117,18 @@ function NadPlochou({ children }: { children: React.ReactNode }) {
 function Potvrzeni({ titulek, text, akce, onPotvrdit, onZavrit }: {
   titulek: string; text: string; akce: string; onPotvrdit: () => Promise<void>; onZavrit: () => void;
 }) {
+  const t = useT('widgety');
   const [pracuji, setPracuji] = useState(false);
   const [chyba, setChyba] = useState('');
   return (
     <NadPlochou>
       <Modal open onClose={onZavrit} size="sm" title={titulek}
         footer={<>
-          <Button variant="secondary" onClick={onZavrit}>Zrušit</Button>
+          <Button variant="secondary" onClick={onZavrit}>{t('Zrušit', undefined, 'dialog')}</Button>
           <Button variant="danger-solid" loading={pracuji} onClick={async () => {
             setPracuji(true); setChyba('');
             try { await onPotvrdit(); onZavrit(); }
-            catch (e) { setChyba(apiMessage(e, 'Nepodařilo se to uložit.')); setPracuji(false); }
+            catch (e) { setChyba(apiMessage(e, t('Nepodařilo se to uložit.'))); setPracuji(false); }
           }}>{akce}</Button>
         </>}>
         <p className="t-meta">{text}</p>
@@ -210,6 +206,7 @@ const idKategorie = (v: unknown): number | null =>
   v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v);
 
 function Dochazi({ velikost, nastaveni, nahled }: WidgetProps<NastaveniDochazi>) {
+  const t = useT('widgety');
   const nav = useNavigace();
   const { ok, ceka } = useBrana('sklad.dochazi');
   const katId = idKategorie(nastaveni.kategorie);
@@ -240,7 +237,7 @@ function Dochazi({ velikost, nastaveni, nahled }: WidgetProps<NastaveniDochazi>)
   // zvolenou kategorií se čeká i na seznam kategorií (bez něj se nefiltruje).
   useVyrizeno(
     sklad.data != null && sklad.data.length > 0 && !ztracena && (katId == null || kategorie.data != null) && polozky.length === 0,
-    nastaveni.jen_kriticke ? 'Nic není kriticky málo' : vybrana ? `V kategorii ${vybrana.nazev} je všeho dost` : 'Zásoby jsou v pořádku',
+    nastaveni.jen_kriticke ? t('Nic není kriticky málo') : vybrana ? t('V kategorii {nazev} je všeho dost', { nazev: vybrana.nazev }) : t('Zásoby jsou v pořádku'),
   );
 
   // Odkaz vede do vybrané kategorie (Sklad ji hledá podle jména), jinak na celý sklad.
@@ -248,11 +245,11 @@ function Dochazi({ velikost, nastaveni, nahled }: WidgetProps<NastaveniDochazi>)
   const doSkladu = (kat?: string | null) => { if (!nahled && smiSklad) nav.onNavigate('inventory', kat ?? undefined); };
 
   const prazdno = ztracena
-    ? <p className="t-meta">Vybraná kategorie už ve skladu není. Vyber jinou v nastavení widgetu.</p>
+    ? <p className="t-meta">{t('Vybraná kategorie už ve skladu není. Vyber jinou v nastavení widgetu.')}</p>
     : sklad.data && sklad.data.length === 0
-      ? <p className="t-meta">Ve skladu zatím nic není.</p>
+      ? <p className="t-meta">{t('Ve skladu zatím nic není.')}</p>
       : sklad.data && polozky.length === 0
-        ? <p className="t-meta">{nastaveni.jen_kriticke ? 'Nic není kriticky málo.' : vybrana ? `V kategorii ${vybrana.nazev} je všeho dost.` : 'Zásoby jsou v pořádku.'}</p>
+        ? <p className="t-meta">{nastaveni.jen_kriticke ? t('Nic není kriticky málo.') : vybrana ? t('V kategorii {nazev} je všeho dost.', { nazev: vybrana.nazev }) : t('Zásoby jsou v pořádku.')}</p>
         : undefined;
 
   if (velikost === 'S') {
@@ -266,8 +263,8 @@ function Dochazi({ velikost, nastaveni, nahled }: WidgetProps<NastaveniDochazi>)
         {/* Malý widget = jedno číslo (DP §3.5). Kriticky málo má přednost,
             zbytek jde do poznámky; bez kritických ukáže, kolik dochází. */}
         {kritickych > 0
-          ? <Stat label="Kriticky málo" value={cislo(kritickych)} note={dochazi > 0 ? `dochází dalších ${cislo(dochazi)}` : undefined} />
-          : <Stat label="Dochází" value={cislo(dochazi)} note={czForm(dochazi, POLOZKA)} />}
+          ? <Stat label={t('Kriticky málo')} value={cislo(kritickych)} note={dochazi > 0 ? t('dochází dalších {n}', { n: cislo(dochazi) }) : undefined} />
+          : <Stat label={t('Dochází')} value={cislo(dochazi)} note={t('{n, plural, one {položka} few {položky} other {položek}}', { n: dochazi })} />}
       </Widget>
     );
   }
@@ -296,7 +293,7 @@ function Dochazi({ velikost, nastaveni, nahled }: WidgetProps<NastaveniDochazi>)
   const skupiny: { nazev: string; polozky: Polozka[] }[] = [];
   if (velikost === 'L') {
     for (const p of ukazat) {
-      const nazev = p.kategorie ?? 'Bez kategorie';
+      const nazev = p.kategorie ?? t('Bez kategorie');
       const s = skupiny.find(x => x.nazev === nazev);
       if (s) s.polozky.push(p); else skupiny.push({ nazev, polozky: [p] });
     }
@@ -309,7 +306,7 @@ function Dochazi({ velikost, nastaveni, nahled }: WidgetProps<NastaveniDochazi>)
       doplnek={polozky.length > 0 ? <Chip tone={kritickych > 0 ? 'bad' : 'wait'} size="sm">{cislo(polozky.length)}</Chip> : undefined}
       // Popisek odkazu je jméno cíle (DP §5.1): s vybranou kategorií její
       // jméno — dvě instance pro dvě kategorie se tak na ploše rozliší.
-      odkaz={{ popisek: vybrana?.nazev ?? 'Sklad', pohled: 'inventory', arg: vybrana?.nazev }}
+      odkaz={{ popisek: vybrana?.nazev ?? t('Sklad'), pohled: 'inventory', arg: vybrana?.nazev }}
       prazdno={prazdno}
     >
       {velikost === 'L' ? (
@@ -324,7 +321,7 @@ function Dochazi({ velikost, nastaveni, nahled }: WidgetProps<NastaveniDochazi>)
       ) : (
         <ul className="list">{ukazat.map(p => radek(p, !vybrana))}</ul>
       )}
-      {polozky.length > strop && <p className="t-meta mt-2">{aDalsich(polozky.length - strop)}</p>}
+      {polozky.length > strop && <p className="t-meta mt-2">{aDalsich(polozky.length - strop, t)}</p>}
     </Widget>
   );
 }
@@ -336,6 +333,7 @@ function Dochazi({ velikost, nastaveni, nahled }: WidgetProps<NastaveniDochazi>)
 type NastaveniNakupu = { dodavatel: string | number | null; jen_kriticke: boolean };
 
 function NakupniSeznam({ velikost, nastaveni, nahled }: WidgetProps<NastaveniNakupu>) {
+  const t = useT('widgety');
   const nav = useNavigace();
   const smi = useSmi();
   const money = useMoney();
@@ -358,7 +356,7 @@ function NakupniSeznam({ velikost, nastaveni, nahled }: WidgetProps<NastaveniNak
   const radek = (r: (typeof radky)[number], sDodavatelem: boolean) => {
     const meta = [
       sDodavatelem ? r.dodavatel : null,
-      r.naVyrobu.length > 0 ? `na výrobu: ${r.naVyrobu.join(', ')}` : null,
+      r.naVyrobu.length > 0 ? t('na výrobu: {suroviny}', { suroviny: r.naVyrobu.join(', ') }) : null,
     ].filter(Boolean).join(' · ');
     return (
       <ListRow key={r.id} title={r.nazev} meta={meta || undefined}
@@ -372,16 +370,16 @@ function NakupniSeznam({ velikost, nastaveni, nahled }: WidgetProps<NastaveniNak
       nacteni={ceka ? CEKA : sklad}
       kostra="seznam"
       doplnek={radky.length > 0 ? <Chip tone={radky.some(r => r.kriticke) ? 'bad' : 'wait'} size="sm">{cislo(radky.length)}</Chip> : undefined}
-      odkaz={{ popisek: 'Sklad', pohled: 'inventory' }}
+      odkaz={{ popisek: t('Sklad'), pohled: 'inventory' }}
       prazdno={sklad.data && radky.length === 0
-        ? <p className="t-meta">{dodavatel ? `Od dodavatele ${dodavatel} teď nic nechybí.` : 'Není co kupovat — všechno je nad limitem.'}</p>
+        ? <p className="t-meta">{dodavatel ? t('Od dodavatele {dodavatel} teď nic nechybí.', { dodavatel }) : t('Není co kupovat — všechno je nad limitem.')}</p>
         : undefined}
     >
       {L ? (
         <div className="space-y-4">
           {poDodavatelich(ukazat).map(s => (
-            <section key={s.dodavatel ?? '-'} aria-label={s.dodavatel ?? 'Bez dodavatele'}>
-              <p className="t-label">{s.dodavatel ?? 'Bez dodavatele'}</p>
+            <section key={s.dodavatel ?? '-'} aria-label={s.dodavatel ?? t('Bez dodavatele')}>
+              <p className="t-label">{s.dodavatel ?? t('Bez dodavatele')}</p>
               <ul className="list mt-1">{s.radky.map(r => radek(r, false))}</ul>
             </section>
           ))}
@@ -389,14 +387,14 @@ function NakupniSeznam({ velikost, nastaveni, nahled }: WidgetProps<NastaveniNak
       ) : (
         <ul className="list">{ukazat.map(r => radek(r, !dodavatel))}</ul>
       )}
-      {radky.length > strop && <p className="t-meta mt-2">{aDalsich(radky.length - strop)}</p>}
+      {radky.length > strop && <p className="t-meta mt-2">{aDalsich(radky.length - strop, t)}</p>}
       {(L || smiObjednat) && (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          {L && smiCeny && odhad > 0 ? <p className="t-meta">Odhad nákupu {money(odhad)}</p> : <span />}
+          {L && smiCeny && odhad > 0 ? <p className="t-meta">{t('Odhad nákupu {castka}', { castka: money(odhad) })}</p> : <span />}
           {smiObjednat && (
             <Button variant="secondary" size="sm" icon="cart"
               onClick={() => { if (!nahled) pozadejSklad(nav, UDALOST_NAKUP, KLIC_NAKUP, { dodavatel }); }}>
-              Objednat
+              {t('Objednat')}
             </Button>
           )}
         </div>
@@ -417,6 +415,7 @@ const vyberHodnotuFinanci = (raw: any): HodnotaZasob => ({
 });
 
 function HodnotaZasobW({ velikost, nahled }: WidgetProps) {
+  const t = useT('widgety');
   const nav = useNavigace();
   const smi = useSmi();
   const money = useMoney();
@@ -430,19 +429,19 @@ function HodnotaZasobW({ velikost, nahled }: WidgetProps) {
   const finance = useDataWidgetu<HodnotaZasob>(ok && !zeSkladu ? `/api/finance?month=${pragueToday().slice(0, 7)}` : null, vyberHodnotuFinanci);
   const data = zeSkladu ? sklad.data : finance.data;
   const smiSklad = nav.smiPohled('inventory');
-  const note = data && data.bezCeny > 0 ? `${czCount(data.bezCeny, POLOZKA)} bez ceny` : 'podle nákupních cen';
+  const note = data && data.bezCeny > 0 ? t('{n, plural, one {# položka} few {# položky} other {# položek}} bez ceny', { n: data.bezCeny }) : t('podle nákupních cen');
 
   return (
     <Widget
       nacteni={ceka ? CEKA : [sklad, finance]}
       kostra={velikost === 'S' ? 'cislo' : 'seznam'}
       otevrit={velikost === 'S' && smiSklad && !nahled ? () => nav.onNavigate('inventory') : undefined}
-      odkaz={velikost === 'M' ? { popisek: 'Sklad', pohled: 'inventory' } : undefined}
-      prazdno={data && data.hodnota === 0 ? <p className="t-meta">Položky zatím nemají nákupní cenu.</p> : undefined}
+      odkaz={velikost === 'M' ? { popisek: t('Sklad'), pohled: 'inventory' } : undefined}
+      prazdno={data && data.hodnota === 0 ? <p className="t-meta">{t('Položky zatím nemají nákupní cenu.')}</p> : undefined}
     >
       {data && (
         <>
-          <Stat label="Na regálech" value={money(data.hodnota)} note={note} />
+          <Stat label={t('Na regálech')} value={money(data.hodnota)} note={note} />
           {velikost === 'M' && data.top.length > 0 && (
             <ul className="list mt-2">
               {data.top.slice(0, 3).map(t => <ListRow key={t.nazev} title={t.nazev} value={money(t.hodnota)} />)}
@@ -467,6 +466,7 @@ const schvalNavrh = (id: number) => fetch(`/api/inventory/${id}`, {
 const zamitniNavrh = (id: number) => fetch(`/api/inventory/${id}`, { method: 'DELETE' }).then(okJson);
 
 function Navrhy({ velikost, nahled }: WidgetProps) {
+  const t = useT('widgety');
   const nav = useNavigace();
   const smi = useSmi();
   const { upravy } = useWidget();
@@ -493,16 +493,16 @@ function Navrhy({ velikost, nahled }: WidgetProps) {
     setPracuji(null);
     obnovSklad();
     const selhalo = vysledky.filter(v => v.status === 'rejected').length;
-    if (selhalo) z.chyba(selhalo === ids.length ? 'Schválení se nepodařilo.' : `${selhalo} z ${cislo(ids.length)} se neuložilo — zkus to znovu.`);
-    else { z.ok(ids.length > 1 ? `Schváleno: ${czCount(ids.length, NAVRH)}.` : 'Schváleno — položka je ve skladu.'); vyber.exit(); }
+    if (selhalo) z.chyba(selhalo === ids.length ? t('Schválení se nepodařilo.') : t('{selhalo} z {celkem} se neuložilo — zkus to znovu.', { selhalo, celkem: cislo(ids.length) }));
+    else { z.ok(ids.length > 1 ? t('Schváleno: {n, plural, one {# návrh} few {# návrhy} other {# návrhů}}.', { n: ids.length }) : t('Schváleno — položka je ve skladu.')); vyber.exit(); }
   };
   const zamitni = async (polozky: PolozkaSkladu[]) => {
     const vysledky = await Promise.allSettled(polozky.map(x => zamitniNavrh(x.id)));
     obnovSklad();
     const selhalo = vysledky.filter(v => v.status === 'rejected').length;
-    if (selhalo === polozky.length) throw new Error('Zamítnutí se nepodařilo.');
-    if (selhalo) z.chyba(`${selhalo} z ${cislo(polozky.length)} se nezamítlo — zkus to znovu.`);
-    else z.ok(polozky.length > 1 ? `Zamítnuto: ${czCount(polozky.length, NAVRH)}.` : 'Návrh zamítnut.');
+    if (selhalo === polozky.length) throw new Error(t('Zamítnutí se nepodařilo.'));
+    if (selhalo) z.chyba(t('{selhalo} z {celkem} se nezamítlo — zkus to znovu.', { selhalo, celkem: cislo(polozky.length) }));
+    else z.ok(polozky.length > 1 ? t('Zamítnuto: {n, plural, one {# návrh} few {# návrhy} other {# návrhů}}.', { n: polozky.length }) : t('Návrh zamítnut.'));
     vyber.exit();
   };
 
@@ -510,7 +510,7 @@ function Navrhy({ velikost, nahled }: WidgetProps) {
     return (
       <Widget nacteni={ceka ? CEKA : data} kostra="cislo" prazdno={data.data && navrhy.length === 0 ? null : undefined}
         otevrit={nav.smiPohled('inventory') && !nahled ? () => nav.onNavigate('inventory') : undefined}>
-        <Stat label="Čeká na schválení" value={cislo(navrhy.length)} note={czForm(navrhy.length, NAVRH)} />
+        <Stat label={t('Čeká na schválení')} value={cislo(navrhy.length)} note={t('{n, plural, one {návrh} few {návrhy} other {návrhů}}', { n: navrhy.length })} />
       </Widget>
     );
   }
@@ -521,7 +521,7 @@ function Navrhy({ velikost, nahled }: WidgetProps) {
         nacteni={ceka ? CEKA : data}
         kostra="seznam"
         doplnek={navrhy.length > 0 ? <Chip tone="wait" size="sm">{cislo(navrhy.length)}</Chip> : undefined}
-        odkaz={{ popisek: 'Sklad', pohled: 'inventory' }}
+        odkaz={{ popisek: t('Sklad'), pohled: 'inventory' }}
         // Nic nečeká = dobrá zpráva; v klidu se karta nekreslí (dřív taky ne).
         prazdno={data.data && navrhy.length === 0 ? null : undefined}
       >
@@ -530,9 +530,9 @@ function Navrhy({ velikost, nahled }: WidgetProps) {
             <li key={p.id}>
               <ListRow as="div"
                 lead={vyber.selecting ? (
-                  <SelectBox checked={vyber.has(p.id)} onChange={() => vyber.toggle(p.id)} label={`Vybrat návrh — ${p.name}`} />
+                  <SelectBox checked={vyber.has(p.id)} onChange={() => vyber.toggle(p.id)} label={t('Vybrat návrh — {nazev}', { nazev: p.name })} />
                 ) : p.photoUrl ? (
-                  <a href={p.photoUrl} target="_blank" rel="noreferrer" className="block shrink-0" aria-label={`Fotka: ${p.name}`}>
+                  <a href={p.photoUrl} target="_blank" rel="noreferrer" className="block shrink-0" aria-label={t('Fotka: {nazev}', { nazev: p.name })}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={p.photoUrl} alt="" className="h-9 w-9 rounded-xl object-cover" />
                   </a>
@@ -542,29 +542,29 @@ function Navrhy({ velikost, nahled }: WidgetProps) {
                 title={p.name}
                 meta={[
                   `${mnozstvi(Number(p.quantity) || 0)} ${p.unit ?? ''}`.trim(),
-                  p.category || 'bez kategorie',
-                  p.submittedByName ? `zapsal/a ${p.submittedByName}` : 'zapsal někdo z týmu',
+                  p.category || t('bez kategorie'),
+                  p.submittedByName ? t('zapsal/a {jmeno}', { jmeno: p.submittedByName }) : t('zapsal někdo z týmu'),
                 ].join(' · ')}
                 actions={vyber.selecting ? undefined : <>
                   {smiSchvalit && (
                     <Button variant="primary" size="sm" loading={pracuji === p.id} disabled={pracuji != null}
-                      onClick={() => { if (!nahled) void schval([p.id]); }}>Schválit</Button>
+                      onClick={() => { if (!nahled) void schval([p.id]); }}>{t('Schválit')}</Button>
                   )}
                   {smiZamitnout && (
                     <Button variant="danger" size="sm" disabled={pracuji != null}
-                      onClick={() => { if (!nahled) setZamitam([p]); }}>Zamítnout</Button>
+                      onClick={() => { if (!nahled) setZamitam([p]); }}>{t('Zamítnout')}</Button>
                   )}
                 </>}
               />
             </li>
           ))}
         </ul>
-        {navrhy.length > strop && <p className="t-meta mt-2">{aDalsich(navrhy.length - strop)}</p>}
+        {navrhy.length > strop && <p className="t-meta mt-2">{aDalsich(navrhy.length - strop, t)}</p>}
         {/* „Vybrat víc" se ukáže, až je co vybírat (DP §3.19). */}
         {(smiSchvalit || smiZamitnout) && navrhy.length > 1 && !vyber.selecting && (
           <div className="mt-3 flex justify-end">
             <Button variant="secondary" size="sm" icon="check" disabled={pracuji != null}
-              onClick={() => { if (!nahled) vyber.start(); }}>Vybrat víc</Button>
+              onClick={() => { if (!nahled) vyber.start(); }}>{t('Vybrat víc')}</Button>
           </div>
         )}
       </Widget>
@@ -572,19 +572,19 @@ function Navrhy({ velikost, nahled }: WidgetProps) {
         <NadPlochou>
           <BulkBar
             count={vyber.count}
-            totalLabel={`Vybrat vše (${navrhy.length})`}
+            totalLabel={t('Vybrat vše ({n})', { n: navrhy.length })}
             onSelectAll={() => vyber.selectAll(navrhy.map(p => p.id))}
             onExit={vyber.exit}
             actions={[
-              ...(smiSchvalit ? [{ label: 'Schválit', primary: true, onClick: () => { void schval(Array.from(vyber.selected)); } }] : []),
-              ...(smiZamitnout ? [{ label: 'Zamítnout', danger: true, onClick: () => setZamitam(navrhy.filter(p => vyber.has(p.id))) }] : []),
+              ...(smiSchvalit ? [{ label: t('Schválit'), primary: true, onClick: () => { void schval(Array.from(vyber.selected)); } }] : []),
+              ...(smiZamitnout ? [{ label: t('Zamítnout'), danger: true, onClick: () => setZamitam(navrhy.filter(p => vyber.has(p.id))) }] : []),
             ]}
           />
         </NadPlochou>
       )}
       {zamitam && zamitam.length > 0 && (
-        <Potvrzeni titulek={zamitam.length === 1 ? `Zamítnout „${zamitam[0].name}"?` : `Zamítnout ${czCount(zamitam.length, NAVRH)}?`} akce="Zamítnout"
-          text="Návrh se smaže ze skladu. Kdo ho zapsal, ho uvidí zmizet."
+        <Potvrzeni titulek={zamitam.length === 1 ? t('Zamítnout „{nazev}"?', { nazev: zamitam[0].name }) : t('Zamítnout {n, plural, one {# návrh} few {# návrhy} other {# návrhů}}?', { n: zamitam.length })} akce={t('Zamítnout')}
+          text={t('Návrh se smaže ze skladu. Kdo ho zapsal, ho uvidí zmizet.')}
           onZavrit={() => setZamitam(null)}
           onPotvrdit={() => zamitni(zamitam)} />
       )}
@@ -600,6 +600,7 @@ function Navrhy({ velikost, nahled }: WidgetProps) {
 const URL_HLASENI = '/api/inventory/reports';
 
 function HlaseniW({ velikost, nahled }: WidgetProps) {
+  const t = useT('widgety');
   const nav = useNavigace();
   const { ok, ceka } = useBrana('sklad.hlaseni');
   const data = useDataWidgetu<Hlaseni[]>(ok ? URL_HLASENI : null, vyberHlaseni);
@@ -615,9 +616,9 @@ function HlaseniW({ velikost, nahled }: WidgetProps) {
       }).then(okJson);
       data.set(prev => (prev ?? []).map(x => (x.id === h.id ? { ...x, nove: false } : x)));
       obnovDataWidgetu(URL_HLASENI);
-      z.ok('Hlášení vyřízeno.');
+      z.ok(t('Hlášení vyřízeno.'));
     } catch (e) {
-      z.chyba(apiMessage(e, 'Nepodařilo se to uložit.'));
+      z.chyba(apiMessage(e, t('Nepodařilo se to uložit.')));
     }
     setPracuji(null);
   };
@@ -626,7 +627,7 @@ function HlaseniW({ velikost, nahled }: WidgetProps) {
     return (
       <Widget nacteni={ceka ? CEKA : data} kostra="cislo"
         otevrit={nav.smiPohled('inventory') && !nahled ? () => nav.onNavigate('inventory') : undefined}>
-        <Stat label="Nevyřízeno" value={cislo(nova.length)} note={nova.length === 0 ? 'vše vyřízeno' : `${czForm(nova.length, HLASENI)} od týmu`} />
+        <Stat label={t('Nevyřízeno')} value={cislo(nova.length)} note={nova.length === 0 ? t('vše vyřízeno') : t('{n, plural, one {hlášení} few {hlášení} other {hlášení}} od týmu', { n: nova.length })} />
       </Widget>
     );
   }
@@ -638,25 +639,25 @@ function HlaseniW({ velikost, nahled }: WidgetProps) {
         nacteni={ceka ? CEKA : data}
         kostra="seznam"
         doplnek={nova.length > 0 ? <Chip tone="wait" size="sm">{cislo(nova.length)}</Chip> : undefined}
-        odkaz={{ popisek: 'Sklad', pohled: 'inventory' }}
-        prazdno={data.data && nova.length === 0 ? <p className="t-meta">Žádné nové hlášení — tým nic nehlásí.</p> : undefined}
+        odkaz={{ popisek: t('Sklad'), pohled: 'inventory' }}
+        prazdno={data.data && nova.length === 0 ? <p className="t-meta">{t('Žádné nové hlášení — tým nic nehlásí.')}</p> : undefined}
       >
         <ul className="list">
           {nova.slice(0, strop).map(h => (
             <li key={h.id}>
               <ListRow as="div"
                 lead={<Avatar emoji={h.avatar} name={h.autor} size="sm" />}
-                title={h.polozky.length > 0 ? h.polozky.join(', ') : 'Bez položek'}
-                meta={[h.autor, pred(h.kdy), h.poznamka ? `„${h.poznamka}"` : null].filter(Boolean).join(' · ')}
+                title={h.polozky.length > 0 ? h.polozky.join(', ') : t('Bez položek')}
+                meta={[h.autor, pred(h.kdy, t), h.poznamka ? `„${h.poznamka}"` : null].filter(Boolean).join(' · ')}
                 actions={
                   <Button variant="primary" size="sm" loading={pracuji === h.id} disabled={pracuji != null}
-                    onClick={() => { if (!nahled) void vyrizeno(h); }}>Vyřízeno</Button>
+                    onClick={() => { if (!nahled) void vyrizeno(h); }}>{t('Vyřízeno')}</Button>
                 }
               />
             </li>
           ))}
         </ul>
-        {nova.length > strop && <p className="t-meta mt-2">{aDalsich(nova.length - strop)}</p>}
+        {nova.length > strop && <p className="t-meta mt-2">{aDalsich(nova.length - strop, t)}</p>}
       </Widget>
       {z.toast}
     </>
@@ -683,6 +684,7 @@ function OknoPrijmu({ o, smiCenu, onPrijmout, onZrusit, onZavrit }: {
   onZrusit: () => void;
   onZavrit: () => void;
 }) {
+  const t = useT('widgety');
   const money = useMoney();
   const [cena, setCena] = useState('');
   const [pracuji, setPracuji] = useState(false);
@@ -693,37 +695,37 @@ function OknoPrijmu({ o, smiCenu, onPrijmout, onZrusit, onZavrit }: {
     if (spatne) return;
     setPracuji(true); setChyba('');
     try { await onPrijmout(castka); onZavrit(); }
-    catch (e) { setChyba(apiMessage(e, 'Příjem se nepodařil.')); setPracuji(false); }
+    catch (e) { setChyba(apiMessage(e, t('Příjem se nepodařil.'))); setPracuji(false); }
   };
   return (
     <NadPlochou>
       <Modal open onClose={onZavrit} size="sm"
-        title={o.dodavatel ? `Přišlo od ${o.dodavatel}?` : 'Přišla objednávka?'}
-        subtitle={`Objednáno ${pred(o.vytvoreno)}${o.autor ? ` · ${o.autor}` : ''}`}
+        title={o.dodavatel ? t('Přišlo od {dodavatel}?', { dodavatel: o.dodavatel }) : t('Přišla objednávka?')}
+        subtitle={`${t('Objednáno {kdy}', { kdy: pred(o.vytvoreno, t) })}${o.autor ? ` · ${o.autor}` : ''}`}
         footer={<>
-          <Button variant="secondary" disabled={pracuji} onClick={onZavrit}>Zavřít</Button>
-          <Button variant="primary" loading={pracuji} disabled={spatne} onClick={potvrdit}>Přijmout a naskladnit</Button>
+          <Button variant="secondary" disabled={pracuji} onClick={onZavrit}>{t('Zavřít')}</Button>
+          <Button variant="primary" loading={pracuji} disabled={spatne} onClick={potvrdit}>{t('Přijmout a naskladnit')}</Button>
         </>}>
         <div className="space-y-4">
-          <ul className="list" aria-label="Položky objednávky">
+          <ul className="list" aria-label={t('Položky objednávky')}>
             {o.polozky.map((p, i) => (
               <ListRow key={i} title={p.nazev} value={`${mnozstvi(p.mnozstvi)} ${p.jednotka}`.trim()} />
             ))}
           </ul>
           {smiCenu && (
-            <Field id={`sklad-prijem-cena-${o.id}`} label="Celková cena (nepovinné)"
-              hint={spatne ? undefined : 'Z ceny počítají Finance výdaje za zboží.'}
-              error={spatne ? 'Zadej částku, například 1 250.' : undefined}>
-              <Input id={`sklad-prijem-cena-${o.id}`} inputMode="decimal" value={cena} placeholder={`např. ${money(1250)}`}
+            <Field id={`sklad-prijem-cena-${o.id}`} label={t('Celková cena (nepovinné)')}
+              hint={spatne ? undefined : t('Z ceny počítají Finance výdaje za zboží.')}
+              error={spatne ? t('Zadej částku, například 1 250.') : undefined}>
+              <Input id={`sklad-prijem-cena-${o.id}`} inputMode="decimal" value={cena} placeholder={t('např. {castka}', { castka: money(1250) })}
                 onChange={e => setCena(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void potvrdit(); } }} />
             </Field>
           )}
-          <p className="t-meta">Přijetí přičte objednané množství ke skladu.</p>
+          <p className="t-meta">{t('Přijetí přičte objednané množství ke skladu.')}</p>
           {chyba && <p className="note note-danger" role="alert">{chyba}</p>}
           {/* Zrušení je destruktivní a vzácné — stranou pod obsahem, ne vedle
               hlavní akce v patičce (na telefonu by se tři tlačítka nevešla). */}
-          <Button variant="danger" size="sm" icon="close" disabled={pracuji} onClick={onZrusit}>Zrušit objednávku…</Button>
+          <Button variant="danger" size="sm" icon="close" disabled={pracuji} onClick={onZrusit}>{t('Zrušit objednávku…')}</Button>
         </div>
       </Modal>
     </NadPlochou>
@@ -731,6 +733,7 @@ function OknoPrijmu({ o, smiCenu, onPrijmout, onZrusit, onZavrit }: {
 }
 
 function Objednavky({ velikost, nahled }: WidgetProps) {
+  const t = useT('widgety');
   const nav = useNavigace();
   const smi = useSmi();
   const money = useMoney();
@@ -767,21 +770,23 @@ function Objednavky({ velikost, nahled }: WidgetProps) {
   const prijmout = async (o: Objednavka, cena: number | null) => {
     const d = await zmen(o, 'received', cena);
     const n = typeof d?.restocked === 'number' ? d.restocked : o.polozky.length;
-    z.ok(`Přijato${o.dodavatel ? ` od ${o.dodavatel}` : ''} — naskladněno ${czCount(n, POLOZKA)}.`);
+    z.ok(o.dodavatel
+      ? t('Přijato od {dodavatel} — naskladněno {n, plural, one {# položka} few {# položky} other {# položek}}.', { dodavatel: o.dodavatel, n })
+      : t('Přijato — naskladněno {n, plural, one {# položka} few {# položky} other {# položek}}.', { n }));
   };
   const smazat = async (o: Objednavka) => {
     const res = await fetch(`${URL_OBJEDNAVKY}?id=${o.id}`, { method: 'DELETE' });
     await okJson(res);
     obnovDataWidgetu(URL_OBJEDNAVKY);
     obnovDataWidgetu('/api/finance');
-    z.ok('Objednávka smazána z historie.');
+    z.ok(t('Objednávka smazána z historie.'));
   };
 
   if (velikost === 'S') {
     return (
       <Widget nacteni={ceka ? CEKA : data} kostra="cislo"
         otevrit={nav.smiPohled('inventory') && !nahled ? () => nav.onNavigate('inventory') : undefined}>
-        <Stat label="Čeká na příjem" value={cislo(cekajici.length)} note={cekajici.length === 0 ? 'nic nečeká' : czForm(cekajici.length, OBJEDNAVKA)} />
+        <Stat label={t('Čeká na příjem')} value={cislo(cekajici.length)} note={cekajici.length === 0 ? t('nic nečeká') : t('{n, plural, one {objednávka} few {objednávky} other {objednávek}}', { n: cekajici.length })} />
       </Widget>
     );
   }
@@ -797,16 +802,16 @@ function Objednavky({ velikost, nahled }: WidgetProps) {
         nacteni={ceka ? CEKA : data}
         kostra="seznam"
         doplnek={cekajici.length > 0 ? <Chip tone="muted" size="sm">{cislo(cekajici.length)}</Chip> : undefined}
-        odkaz={{ popisek: 'Sklad', pohled: 'inventory' }}
+        odkaz={{ popisek: t('Sklad'), pohled: 'inventory' }}
         // Prázdno jen ve středním: velký má pod tím historii a útratu.
-        prazdno={!L && data.data && cekajici.length === 0 ? <p className="t-meta">Žádná objednávka nečeká na příjem.</p> : undefined}
+        prazdno={!L && data.data && cekajici.length === 0 ? <p className="t-meta">{t('Žádná objednávka nečeká na příjem.')}</p> : undefined}
       >
-        {cekajici.length === 0 && L && <p className="t-meta">Žádná objednávka nečeká na příjem.</p>}
+        {cekajici.length === 0 && L && <p className="t-meta">{t('Žádná objednávka nečeká na příjem.')}</p>}
         <ul className="list">
           {cekajici.slice(0, strop).map(o => {
             const obsah = L
               ? o.polozky.map(p => `${p.nazev} ${mnozstvi(p.mnozstvi)} ${p.jednotka}`.trim()).join(', ')
-              : czCount(o.polozky.length, POLOZKA);
+              : t('{n, plural, one {# položka} few {# položky} other {# položek}}', { n: o.polozky.length });
             return (
               <li key={o.id}>
                 {/* Přijmout je v řádku i ve středním widgetu — výchozí Sklad vedení
@@ -814,50 +819,50 @@ function Objednavky({ velikost, nahled }: WidgetProps) {
                     (dřív tlačítko „Přišlo" přímo na stránce). Zrušit je v okně
                     příjmu, ať řádek nese nejvýš jednu akci a vejde se na telefon. */}
                 <ListRow as="div"
-                  title={o.dodavatel ?? 'Bez dodavatele'}
-                  meta={[pred(o.vytvoreno), obsah].filter(Boolean).join(' · ')}
+                  title={o.dodavatel ?? t('Bez dodavatele')}
+                  meta={[pred(o.vytvoreno, t), obsah].filter(Boolean).join(' · ')}
                   value={smiCenu && o.cena != null ? money(o.cena) : undefined}
                   actions={smiPrijmout ? (
-                    <Button variant="primary" size="sm" onClick={() => { if (!nahled) setPrijimam(o); }}>Přijmout</Button>
+                    <Button variant="primary" size="sm" onClick={() => { if (!nahled) setPrijimam(o); }}>{t('Přijmout')}</Button>
                   ) : undefined}
                 />
               </li>
             );
           })}
         </ul>
-        {cekajici.length > strop && <p className="t-meta mt-2">{aDalsich(cekajici.length - strop)}</p>}
+        {cekajici.length > strop && <p className="t-meta mt-2">{aDalsich(cekajici.length - strop, t)}</p>}
         {L && utrata > 0 && (
-          <p className="t-meta mt-3">Tento měsíc utraceno za zboží: <span className="font-semibold text-[#16181A] tabular-nums">{money(utrata)}</span></p>
+          <p className="t-meta mt-3">{t('Tento měsíc utraceno za zboží:')} <span className="font-semibold text-[#16181A] tabular-nums">{money(utrata)}</span></p>
         )}
         {L && hist.length > 0 && (
           <div className="mt-3">
             <Button variant="ghost" size="sm" iconAfter="chevron" aria-expanded={ukazHistorii}
               className={ukazHistorii ? '[&>svg]:rotate-180' : ''}
               onClick={() => setUkazHistorii(v => !v)}>
-              Historie ({cislo(hist.length)})
+              {t('Historie ({n})', { n: cislo(hist.length) })}
             </Button>
             {ukazHistorii && (
               <>
-                <ul className="list mt-1" aria-label="Historie objednávek">
+                <ul className="list mt-1" aria-label={t('Historie objednávek')}>
                   {hist.slice(0, stropHistorie).map(o => (
                     <li key={o.id}>
                       <ListRow as="div"
-                        title={o.dodavatel ?? 'Bez dodavatele'}
+                        title={o.dodavatel ?? t('Bez dodavatele')}
                         meta={<>
-                          <span className={o.stav === 'received' ? 'text-ok-ink' : 'text-bad-ink'}>{o.stav === 'received' ? 'Přijato' : 'Zrušeno'}</span>
+                          <span className={o.stav === 'received' ? 'text-ok-ink' : 'text-bad-ink'}>{o.stav === 'received' ? t('Přijato') : t('Zrušeno')}</span>
                           {` · ${datumKratce(o.prijata ?? o.vytvoreno)}`}
                         </>}
                         value={smiCenu && o.cena != null && o.cena > 0 ? money(o.cena) : undefined}
                         actions={smiMazat ? (
                           <Button variant="ghost" size="sm" iconOnly icon="trash" className="tap-target-sm"
-                            aria-label={`Smazat z historie: ${o.dodavatel ?? 'objednávka bez dodavatele'} ${datumKratce(o.prijata ?? o.vytvoreno)}`}
+                            aria-label={t('Smazat z historie: {kdo} {datum}', { kdo: o.dodavatel ?? t('objednávka bez dodavatele'), datum: datumKratce(o.prijata ?? o.vytvoreno) })}
                             onClick={() => { if (!nahled) setMazu(o); }} />
                         ) : undefined}
                       />
                     </li>
                   ))}
                 </ul>
-                {hist.length > stropHistorie && <p className="t-meta mt-2">{aDalsich(hist.length - stropHistorie)}</p>}
+                {hist.length > stropHistorie && <p className="t-meta mt-2">{aDalsich(hist.length - stropHistorie, t)}</p>}
               </>
             )}
           </div>
@@ -870,14 +875,14 @@ function Objednavky({ velikost, nahled }: WidgetProps) {
           onZavrit={() => setPrijimam(null)} />
       )}
       {rusim && (
-        <Potvrzeni titulek={`Zrušit objednávku${rusim.dodavatel ? ` u ${rusim.dodavatel}` : ''}?`} akce="Zrušit objednávku"
-          text="Nic se nenaskladní. Dodavateli dej vědět sám — aplikace mu nic neposílá."
+        <Potvrzeni titulek={rusim.dodavatel ? t('Zrušit objednávku u {dodavatel}?', { dodavatel: rusim.dodavatel }) : t('Zrušit objednávku?')} akce={t('Zrušit objednávku')}
+          text={t('Nic se nenaskladní. Dodavateli dej vědět sám — aplikace mu nic neposílá.')}
           onZavrit={() => setRusim(null)}
-          onPotvrdit={async () => { await zmen(rusim, 'cancelled'); z.ok('Objednávka zrušena.'); }} />
+          onPotvrdit={async () => { await zmen(rusim, 'cancelled'); z.ok(t('Objednávka zrušena.')); }} />
       )}
       {mazu && (
-        <Potvrzeni titulek="Smazat objednávku z historie?" akce="Smazat"
-          text={mazu.stav === 'received' && mazu.cena ? 'Zmizí i z výdajů ve Financích. Naskladněné zboží ve skladu zůstane.' : 'Záznam zmizí z historie. Sklad se nemění.'}
+        <Potvrzeni titulek={t('Smazat objednávku z historie?')} akce={t('Smazat')}
+          text={mazu.stav === 'received' && mazu.cena ? t('Zmizí i z výdajů ve Financích. Naskladněné zboží ve skladu zůstane.') : t('Záznam zmizí z historie. Sklad se nemění.')}
           onZavrit={() => setMazu(null)}
           onPotvrdit={() => smazat(mazu)} />
       )}
@@ -893,6 +898,7 @@ function Objednavky({ velikost, nahled }: WidgetProps) {
 const vyberUsage = (raw: any): Record<string, unknown[]> => (raw?.usage && typeof raw.usage === 'object' ? raw.usage : {});
 
 function ChybiUdaje({ velikost, nahled }: WidgetProps) {
+  const t = useT('widgety');
   const nav = useNavigace();
   const smi = useSmi();
   const def = widget('sklad.chybi_udaje');
@@ -901,6 +907,7 @@ function ChybiUdaje({ velikost, nahled }: WidgetProps) {
   // chybějící cenu u každé suroviny z receptur.
   const { ok, ceka } = useBrana('sklad.chybi_udaje');
   const sklad = useDataWidgetu<PolozkaSkladu[]>(ok ? URL_SKLAD : null, vyberSklad);
+  const CHYBI_TEXT: Record<string, string> = { 'cena i balení': t('cena i balení'), 'cena': t('cena'), 'velikost balení': t('velikost balení') }; // i18n-ok: klíče jsou české popisky z lib/skladPrehled
   const usage = useDataWidgetu<Record<string, unknown[]>>(ok ? '/api/pos/usage' : null, vyberUsage);
   const radky = useMemo(() => chybiUdaje(sklad.data ?? [], usage.data), [sklad.data, usage.data]);
   const smiDoplnit = smi(pole(def, 'akce:doplnit') ?? ['sklad.upravit', 'sklad.ceny_upravit']) && nav.smiPohled('inventory');
@@ -910,7 +917,7 @@ function ChybiUdaje({ velikost, nahled }: WidgetProps) {
     return (
       <Widget nacteni={ceka ? CEKA : [sklad, usage]} kostra="cislo" prazdno={hotovo && radky.length === 0 ? null : undefined}
         otevrit={nav.smiPohled('inventory') && !nahled ? () => nav.onNavigate('inventory') : undefined}>
-        <Stat label="K doplnění" value={cislo(radky.length)} note={czForm(radky.length, SUROVINA)} />
+        <Stat label={t('K doplnění')} value={cislo(radky.length)} note={t('{n, plural, one {surovina} few {suroviny} other {surovin}}', { n: radky.length })} />
       </Widget>
     );
   }
@@ -921,7 +928,7 @@ function ChybiUdaje({ velikost, nahled }: WidgetProps) {
       nacteni={ceka ? CEKA : [sklad, usage]}
       kostra="seznam"
       doplnek={radky.length > 0 ? <Chip tone="wait" size="sm">{cislo(radky.length)}</Chip> : undefined}
-      odkaz={{ popisek: 'Sklad', pohled: 'inventory' }}
+      odkaz={{ popisek: t('Sklad'), pohled: 'inventory' }}
       // Všechno doplněné = dobrá zpráva, karta se v klidu nekreslí (jako dřív blok).
       prazdno={hotovo && radky.length === 0 ? null : undefined}
     >
@@ -930,15 +937,15 @@ function ChybiUdaje({ velikost, nahled }: WidgetProps) {
           <li key={r.id}>
             <ListRow as="div" title={r.nazev}
               meta={<>
-                <span className="font-medium text-wait-ink">chybí {r.chybi}</span>
-                {` · kasa ho používá v ${czCount(r.produktu, { one: 'produktu', few: 'produktech', many: 'produktech' })}`}
+                <span className="font-medium text-wait-ink">{t('chybí {co}', { co: CHYBI_TEXT[r.chybi] })}</span>
+                {` · ${t('kasa ho používá v {n, plural, one {# produktu} few {# produktech} other {# produktech}}', { n: r.produktu })}`}
               </>}
               onClick={smiDoplnit && !nahled ? () => pozadejSklad(nav, UDALOST_UPRAVIT, KLIC_UPRAVIT, { id: r.id }) : undefined} />
           </li>
         ))}
       </ul>
-      {radky.length > strop && <p className="t-meta mt-2">{aDalsich(radky.length - strop)}</p>}
-      <p className="t-meta mt-2">Dokud chybí, nespočítá se marže produktů, které je používají, a odpis nebere z načatého balení.</p>
+      {radky.length > strop && <p className="t-meta mt-2">{aDalsich(radky.length - strop, t)}</p>}
+      <p className="t-meta mt-2">{t('Dokud chybí, nespočítá se marže produktů, které je používají, a odpis nebere z načatého balení.')}</p>
     </Widget>
   );
 }
@@ -950,6 +957,7 @@ function ChybiUdaje({ velikost, nahled }: WidgetProps) {
 type NastaveniPohybu = { druh: DruhPohybu };
 
 function PosledniPohyby({ velikost, nastaveni }: WidgetProps<NastaveniPohybu>) {
+  const t = useT('widgety');
   const { ok, ceka } = useBrana('sklad.posledni_pohyby');
   const data = useDataWidgetu<Pohyb[]>(ok ? '/api/inventory/log' : null, raw => vyberPohyby(raw));
   const druh: DruhPohybu = nastaveni.druh === 'rucni' || nastaveni.druh === 'prodej_z_kasy' ? nastaveni.druh : 'vse';
@@ -958,23 +966,23 @@ function PosledniPohyby({ velikost, nastaveni }: WidgetProps<NastaveniPohybu>) {
   const zmena = (p: Pohyb) => {
     // Pohyb jen v načatém balení (odpis 0,04 l z lahve): počet kusů se nezmění.
     const n = p.zmena !== 0 ? p.zmena : p.zmenaNacate ?? 0;
-    return `${n > 0 ? '+' : n < 0 ? '−' : ''}${mnozstvi(Math.abs(n))}${p.zmena === 0 && p.zmenaNacate != null ? ' z načatého' : ` ${p.jednotka}`}`;
+    return `${n > 0 ? '+' : n < 0 ? '−' : ''}${mnozstvi(Math.abs(n))}${p.zmena === 0 && p.zmenaNacate != null ? ` ${t('z načatého')}` : ` ${p.jednotka}`}`;
   };
 
   return (
     <Widget
       nacteni={ceka ? CEKA : data}
       kostra="seznam"
-      prazdno={data.data && pohyby.length === 0 ? <p className="t-meta">Zatím žádné pohyby.</p> : undefined}
+      prazdno={data.data && pohyby.length === 0 ? <p className="t-meta">{t('Zatím žádné pohyby.')}</p> : undefined}
     >
       <ul className="list">
         {pohyby.slice(0, strop).map(p => (
           <ListRow key={p.id} title={p.polozka}
-            meta={[p.kdo ?? (p.zKasy ? 'kasa' : null), pred(p.kdy), p.poznamka].filter(Boolean).join(' · ')}
+            meta={[p.kdo ?? (p.zKasy ? t('kasa') : null), pred(p.kdy, t), p.poznamka].filter(Boolean).join(' · ')}
             value={<span className={p.zmena > 0 ? 'text-ok-ink' : undefined}>{zmena(p)}</span>} />
         ))}
       </ul>
-      {pohyby.length > strop && <p className="t-meta mt-2">{aDalsich(pohyby.length - strop)}</p>}
+      {pohyby.length > strop && <p className="t-meta mt-2">{aDalsich(pohyby.length - strop, t)}</p>}
     </Widget>
   );
 }
@@ -986,6 +994,7 @@ function PosledniPohyby({ velikost, nastaveni }: WidgetProps<NastaveniPohybu>) {
 const URL_INVENTURA = '/api/stocktake';
 
 function Inventura({ velikost, nahled }: WidgetProps) {
+  const t = useT('widgety');
   const smi = useSmi();
   const { upravy } = useWidget();
   const def = widget('sklad.inventura');
@@ -1000,8 +1009,8 @@ function Inventura({ velikost, nahled }: WidgetProps) {
   const zavri = () => { setOkno(false); data.reload(); };
 
   const akce = s && (s.bezi
-    ? <Button variant="secondary" size="sm" icon="clipboard" onClick={otevri}>Pokračovat v počítání</Button>
-    : smiZahajit ? <Button variant="secondary" size="sm" icon="clipboard" onClick={otevri}>Zahájit inventuru</Button> : null);
+    ? <Button variant="secondary" size="sm" icon="clipboard" onClick={otevri}>{t('Pokračovat v počítání')}</Button>
+    : smiZahajit ? <Button variant="secondary" size="sm" icon="clipboard" onClick={otevri}>{t('Zahájit inventuru')}</Button> : null);
 
   return (
     <>
@@ -1013,23 +1022,23 @@ function Inventura({ velikost, nahled }: WidgetProps) {
       >
         {s && (velikost === 'S' ? (
           s.bezi
-            ? <Stat label="Inventura běží" value={`${cislo(s.spocitano)}/${cislo(s.celkem)}`} note="spočítáno" />
-            : <Stat label="Poslední inventura" value={s.posledni ? datumKratce(s.posledni) : 'Zatím žádná'} />
+            ? <Stat label={t('Inventura běží')} value={`${cislo(s.spocitano)}/${cislo(s.celkem)}`} note={t('spočítáno')} />
+            : <Stat label={t('Poslední inventura')} value={s.posledni ? datumKratce(s.posledni) : t('Zatím žádná')} />
         ) : (
           <div className="space-y-3">
             {s.bezi ? (
               <>
                 <p className="text-[15px] text-[#16181A]">
-                  Běží inventura · spočítáno <span className="font-semibold tabular-nums">{cislo(s.spocitano)} z {cislo(s.celkem)}</span>
+                  {t('Běží inventura · spočítáno')} <span className="font-semibold tabular-nums">{t('{spocitano} z {celkem}', { spocitano: cislo(s.spocitano), celkem: cislo(s.celkem) })}</span>
                 </p>
-                <div className="h-2 rounded-full bg-black/[0.06] overflow-hidden" role="progressbar" aria-label="Spočítáno"
+                <div className="h-2 rounded-full bg-black/[0.06] overflow-hidden" role="progressbar" aria-label={t('Spočítáno')}
                   aria-valuemin={0} aria-valuemax={s.celkem} aria-valuenow={s.spocitano}>
                   <div className="h-full rounded-full bg-[#16181A]" style={{ width: `${s.celkem ? Math.round((s.spocitano / s.celkem) * 100) : 0}%` }} />
                 </div>
-                <p className="t-meta">Zahájena {pred(s.zahajena)}.{smiDokoncit ? ' Po spočítání zapiš rozdíly do skladu.' : ' Rozdíly do skladu zapíše vedení.'}</p>
+                <p className="t-meta">{t('Zahájena {kdy}.', { kdy: pred(s.zahajena, t) })}{smiDokoncit ? ` ${t('Po spočítání zapiš rozdíly do skladu.')}` : ` ${t('Rozdíly do skladu zapíše vedení.')}`}</p>
               </>
             ) : (
-              <p className="t-meta">{s.posledni ? `Poslední inventura byla ${datumKratce(s.posledni)}.` : 'Inventura ještě nebyla.'}{smiZahajit ? '' : ' Zahajuje ji vedení.'}</p>
+              <p className="t-meta">{s.posledni ? t('Poslední inventura byla {datum}.', { datum: datumKratce(s.posledni) }) : t('Inventura ještě nebyla.')}{smiZahajit ? '' : ` ${t('Zahajuje ji vedení.')}`}</p>
             )}
             {akce && <div>{akce}</div>}
           </div>
@@ -1049,6 +1058,7 @@ function Inventura({ velikost, nahled }: WidgetProps) {
 // ---------------------------------------------------------------------------
 
 function ZapsatNovou({ velikost, nahled }: WidgetProps) {
+  const t = useT('widgety');
   const smi = useSmi();
   const { upravy } = useWidget();
   const { ok, ceka } = useBrana('sklad.zapsat_novou');
@@ -1063,20 +1073,20 @@ function ZapsatNovou({ velikost, nahled }: WidgetProps) {
       <Widget nacteni={ceka ? CEKA : undefined} kostra="text">
         <div className={velikost === 'S' ? 'flex flex-col justify-end h-full' : 'space-y-3'}>
           {velikost === 'M' && (
-            <p className="t-meta">Přišlo zboží? Vyfoť ho a napiš kolik.{navrh ? ' Vedení zápis jen potvrdí.' : ''}</p>
+            <p className="t-meta">{t('Přišlo zboží? Vyfoť ho a napiš kolik.')}{navrh ? ` ${t('Vedení zápis jen potvrdí.')}` : ''}</p>
           )}
           <Button variant="secondary" size="sm" icon="plus" className={velikost === 'S' ? 'w-full justify-center' : ''}
             onClick={() => { if (!nahled) setOkno(true); }}>
-            Zapsat novou věc
+            {t('Zapsat novou věc')}
           </Button>
         </div>
       </Widget>
       {okno && (
         <NadPlochou>
-          <Modal open onClose={() => setOkno(false)} size="md" title="Nová věc do skladu"
-            subtitle={navrh ? 'Počítá se hned, vedení ji jen potvrdí.' : 'Položka se hned objeví ve skladu.'}>
+          <Modal open onClose={() => setOkno(false)} size="md" title={t('Nová věc do skladu')}
+            subtitle={navrh ? t('Počítá se hned, vedení ji jen potvrdí.') : t('Položka se hned objeví ve skladu.')}>
             <NewStockEntry
-              onSaved={() => { setOkno(false); obnovSklad(); z.ok(navrh ? 'Zapsáno do skladu — vedení to potvrdí.' : 'Zapsáno do skladu.'); }}
+              onSaved={() => { setOkno(false); obnovSklad(); z.ok(navrh ? t('Zapsáno do skladu — vedení to potvrdí.') : t('Zapsáno do skladu.')); }}
               onCancel={() => setOkno(false)} />
           </Modal>
         </NadPlochou>
@@ -1091,6 +1101,7 @@ function ZapsatNovou({ velikost, nahled }: WidgetProps) {
 // ---------------------------------------------------------------------------
 
 function OknoNahlasit({ onClose, onOdeslano }: { onClose: () => void; onOdeslano: (n: number) => void }) {
+  const t = useT('widgety');
   const sklad = useDataWidgetu<PolozkaSkladu[]>(URL_SKLAD, vyberSklad);
   const [hledat, setHledat] = useState('');
   const [vybrane, setVybrane] = useState<number[]>([]);
@@ -1120,34 +1131,34 @@ function OknoNahlasit({ onClose, onOdeslano }: { onClose: () => void; onOdeslano
       }).then(okJson);
       onOdeslano(vybrane.length);
     } catch (e) {
-      setChyba(apiMessage(e, 'Hlášení se nepodařilo odeslat.'));
+      setChyba(apiMessage(e, t('Hlášení se nepodařilo odeslat.')));
       setPracuji(false);
     }
   };
 
   return (
-    <Modal open onClose={onClose} size="md" title="Nahlásit chybějící" subtitle="Vedení dostane upozornění se seznamem."
+    <Modal open onClose={onClose} size="md" title={t('Nahlásit chybějící')} subtitle={t('Vedení dostane upozornění se seznamem.')}
       footer={<>
-        <Button variant="secondary" onClick={onClose}>Zrušit</Button>
+        <Button variant="secondary" onClick={onClose}>{t('Zrušit', undefined, 'dialog')}</Button>
         <Button variant="primary" loading={pracuji} disabled={vybrane.length === 0} onClick={odeslat}>
-          {vybrane.length > 0 ? `Odeslat (${czCount(vybrane.length, POLOZKA)})` : 'Odeslat hlášení'}
+          {vybrane.length > 0 ? t('Odeslat ({n, plural, one {# položka} few {# položky} other {# položek}})', { n: vybrane.length }) : t('Odeslat hlášení')}
         </Button>
       </>}>
       <div className="space-y-4">
-        <SearchField value={hledat} onChange={setHledat} placeholder="Hledat položku…" ariaLabel="Hledat položku k nahlášení" />
+        <SearchField value={hledat} onChange={setHledat} placeholder={t('Hledat položku…')} ariaLabel={t('Hledat položku k nahlášení')} />
         {sklad.error ? (
-          <p className="note note-danger" role="alert">Sklad se nenačetl. Zavři okno a zkus to znovu.</p>
+          <p className="note note-danger" role="alert">{t('Sklad se nenačetl. Zavři okno a zkus to znovu.')}</p>
         ) : sklad.data == null ? (
-          <p className="t-meta">Načítám sklad…</p>
+          <p className="t-meta">{t('Načítám sklad…')}</p>
         ) : polozky.length === 0 ? (
-          <p className="t-meta">Nic neodpovídá hledání.</p>
+          <p className="t-meta">{t('Nic neodpovídá hledání.')}</p>
         ) : (
-          <ul className="list max-h-72 overflow-y-auto scrollbar-thin" aria-label="Položky">
+          <ul className="list max-h-72 overflow-y-auto scrollbar-thin" aria-label={t('Položky')}>
             {polozky.slice(0, 60).map(p => {
               const stav = stavZasoby(p);
               return (
                 <ListRow key={p.id}
-                  lead={<SelectBox checked={vybrane.includes(p.id)} onChange={() => prepni(p.id)} label={`Nahlásit ${p.name}`} />}
+                  lead={<SelectBox checked={vybrane.includes(p.id)} onChange={() => prepni(p.id)} label={t('Nahlásit {nazev}', { nazev: p.name })} />}
                   title={p.name} meta={p.category || undefined}
                   right={stav !== 'ok'
                     ? <Chip tone={stav === 'critical' ? 'bad' : 'wait'} size="sm" className="tabular-nums">{mnozstvi(Number(p.quantity) || 0)} {p.unit ?? ''}</Chip>
@@ -1156,7 +1167,7 @@ function OknoNahlasit({ onClose, onOdeslano }: { onClose: () => void; onOdeslano
             })}
           </ul>
         )}
-        <Field id="sklad-nahlasit-poznamka" label="Poznámka (volitelné)">
+        <Field id="sklad-nahlasit-poznamka" label={t('Poznámka (volitelné)')}>
           <Textarea id="sklad-nahlasit-poznamka" rows={2} value={poznamka} onChange={e => setPoznamka(e.target.value)} />
         </Field>
         {chyba && <p className="note note-danger" role="alert">{chyba}</p>}
@@ -1166,6 +1177,7 @@ function OknoNahlasit({ onClose, onOdeslano }: { onClose: () => void; onOdeslano
 }
 
 function Nahlasit({ velikost, nahled }: WidgetProps) {
+  const t = useT('widgety');
   const { upravy } = useWidget();
   const { ok, ceka } = useBrana('sklad.nahlasit');
   // M ukáže, co dochází (sdílený dotaz se skladem), S je jen tlačítko.
@@ -1182,20 +1194,20 @@ function Nahlasit({ velikost, nahled }: WidgetProps) {
           {velikost === 'M' && (
             <p className="t-meta">
               {nizke.length > 0
-                ? `Dochází ${czCount(nizke.length, POLOZKA)}: ${nizke.slice(0, 3).map(p => p.name).join(', ')}${nizke.length > 3 ? '…' : ''}`
-                : 'Něco došlo? Vyber, co chybí, a vedení dostane upozornění.'}
+                ? t('Dochází {n, plural, one {# položka} few {# položky} other {# položek}}: {seznam}', { n: nizke.length, seznam: `${nizke.slice(0, 3).map(p => p.name).join(', ')}${nizke.length > 3 ? '…' : ''}` })
+                : t('Něco došlo? Vyber, co chybí, a vedení dostane upozornění.')}
             </p>
           )}
           <Button variant="secondary" size="sm" icon="send" className={velikost === 'S' ? 'w-full justify-center' : ''}
             onClick={() => { if (!nahled) setOkno(true); }}>
-            Nahlásit chybějící
+            {t('Nahlásit chybějící')}
           </Button>
         </div>
       </Widget>
       {okno && (
         <NadPlochou>
           <OknoNahlasit onClose={() => setOkno(false)}
-            onOdeslano={n => { setOkno(false); z.ok(`Nahlášeno: ${czCount(n, POLOZKA)}. Vedení dostalo upozornění.`); }} />
+            onOdeslano={n => { setOkno(false); z.ok(t('Nahlášeno: {n, plural, one {# položka} few {# položky} other {# položek}}. Vedení dostalo upozornění.', { n })); }} />
         </NadPlochou>
       )}
       {z.toast}
@@ -1210,6 +1222,7 @@ function Nahlasit({ velikost, nahled }: WidgetProps) {
 type NastaveniKategorie = { kategorie: number | string | null };
 
 function StavKategorie({ velikost, nastaveni, nahled }: WidgetProps<NastaveniKategorie>) {
+  const t = useT('widgety');
   const nav = useNavigace();
   const { ok, ceka } = useBrana('sklad.stav_kategorie');
   const katId = idKategorie(nastaveni.kategorie);
@@ -1224,9 +1237,9 @@ function StavKategorie({ velikost, nastaveni, nahled }: WidgetProps<NastaveniKat
   const doKategorie = () => { if (!nahled && smiSklad && vybrana) nav.onNavigate('inventory', vybrana.nazev); };
 
   const prazdno = katId == null
-    ? <p className="t-meta">Vyber kategorii v nastavení widgetu.</p>
+    ? <p className="t-meta">{t('Vyber kategorii v nastavení widgetu.')}</p>
     : kategorie.data && !vybrana
-      ? <p className="t-meta">Vybraná kategorie už ve skladu není. Vyber jinou v nastavení widgetu.</p>
+      ? <p className="t-meta">{t('Vybraná kategorie už ve skladu není. Vyber jinou v nastavení widgetu.')}</p>
       : undefined;
 
   if (velikost === 'S') {
@@ -1234,8 +1247,8 @@ function StavKategorie({ velikost, nastaveni, nahled }: WidgetProps<NastaveniKat
       <Widget titulek={vybrana?.nazev} nacteni={ceka ? CEKA : [sklad, kategorie]} kostra="cislo"
         otevrit={vybrana && smiSklad && !nahled ? doKategorie : undefined} prazdno={prazdno}>
         {souhrn && (souhrn.kriticke > 0
-          ? <Stat label="Kriticky málo" value={cislo(souhrn.kriticke)} note={`z ${czCount(souhrn.polozek, POLOZKA)}`} />
-          : <Stat label="Dochází" value={cislo(souhrn.dochazi)} note={`z ${czCount(souhrn.polozek, POLOZKA)}`} />)}
+          ? <Stat label={t('Kriticky málo')} value={cislo(souhrn.kriticke)} note={t('z {n, plural, one {# položky} few {# položek} other {# položek}}', { n: souhrn.polozek })} />
+          : <Stat label={t('Dochází')} value={cislo(souhrn.dochazi)} note={t('z {n, plural, one {# položky} few {# položek} other {# položek}}', { n: souhrn.polozek })} />)}
       </Widget>
     );
   }
@@ -1247,9 +1260,9 @@ function StavKategorie({ velikost, nastaveni, nahled }: WidgetProps<NastaveniKat
       nacteni={ceka ? CEKA : [sklad, kategorie]}
       kostra="seznam"
       doplnek={souhrn && souhrn.nizke.length > 0 ? <Chip tone={souhrn.kriticke > 0 ? 'bad' : 'wait'} size="sm">{cislo(souhrn.nizke.length)}</Chip> : undefined}
-      odkaz={vybrana ? { popisek: 'Otevřít', pohled: 'inventory', arg: vybrana.nazev } : undefined}
+      odkaz={vybrana ? { popisek: t('Otevřít'), pohled: 'inventory', arg: vybrana.nazev } : undefined}
       prazdno={prazdno ?? (souhrn && souhrn.nizke.length === 0
-        ? <p className="t-meta">{souhrn.polozek === 0 ? 'V kategorii zatím nic není.' : `Všeho je dost (${czCount(souhrn.polozek, POLOZKA)}).`}</p>
+        ? <p className="t-meta">{souhrn.polozek === 0 ? t('V kategorii zatím nic není.') : t('Všeho je dost ({n, plural, one {# položka} few {# položky} other {# položek}}).', { n: souhrn.polozek })}</p>
         : undefined)}
     >
       {souhrn && (
@@ -1260,7 +1273,7 @@ function StavKategorie({ velikost, nastaveni, nahled }: WidgetProps<NastaveniKat
                 right={<Chip tone={p.kriticke ? 'bad' : 'wait'} size="sm" className="tabular-nums">{mnozstvi(p.mnozstvi)} {p.jednotka}</Chip>} />
             ))}
           </ul>
-          {souhrn.nizke.length > strop && <p className="t-meta mt-2">{aDalsich(souhrn.nizke.length - strop)}</p>}
+          {souhrn.nizke.length > strop && <p className="t-meta mt-2">{aDalsich(souhrn.nizke.length - strop, t)}</p>}
         </>
       )}
     </Widget>
@@ -1276,13 +1289,14 @@ const MAX_DAVEK = 10;
 
 const vyberVyrobu = (raw: any): ToMake[] => seznam(raw?.toMake);
 
-function metaVyroby(e: ToMake): string {
-  const casti = [`${cislo(e.batches)}× dávka`, `zbývá ${mnozstvi(e.item.available)} ${e.item.recipeUnit}`];
-  if (e.lines.length > 0) casti.push(e.ready ? 'suroviny jsou' : `chybí ${czCount(e.missing.length, SUROVINA)}`);
+function metaVyroby(e: ToMake, t: PrekladFn): string {
+  const casti = [t('{n}× dávka', { n: cislo(e.batches) }), t('zbývá {mnozstvi} {jednotka}', { mnozstvi: mnozstvi(e.item.available), jednotka: e.item.recipeUnit })];
+  if (e.lines.length > 0) casti.push(e.ready ? t('suroviny jsou') : t('chybí {n, plural, one {# surovina} few {# suroviny} other {# surovin}}', { n: e.missing.length }));
   return casti.join(' · ');
 }
 
 function OknoVyrobeno({ polozka, onClose, onHotovo }: { polozka: ToMake; onClose: () => void; onHotovo: (zprava: string) => void }) {
+  const t = useT('widgety');
   const [davek, setDavek] = useState(Math.max(1, Math.min(MAX_DAVEK, polozka.batches || 1)));
   const [pracuji, setPracuji] = useState(false);
   const [chyba, setChyba] = useState('');
@@ -1297,34 +1311,38 @@ function OknoVyrobeno({ polozka, onClose, onHotovo }: { polozka: ToMake; onClose
         body: JSON.stringify({ batches: davek, taskId: polozka.taskId }),
       }).then(okJson);
       const pridano = Number(d?.added);
-      onHotovo(`${item.name}: ${Number.isFinite(pridano) ? `+${mnozstvi(pridano)} ${d?.unit ?? item.unit} ` : ''}naskladněno${seznam(d?.consumed).length ? ', suroviny odepsány' : ''}.`);
+      const odepsano = seznam(d?.consumed).length > 0;
+      const hodnoty = { nazev: item.name, pridano: Number.isFinite(pridano) ? `+${mnozstvi(pridano)} ${d?.unit ?? item.unit}` : '' };
+      onHotovo(Number.isFinite(pridano)
+        ? (odepsano ? t('{nazev}: {pridano} naskladněno, suroviny odepsány.', hodnoty) : t('{nazev}: {pridano} naskladněno.', hodnoty))
+        : (odepsano ? t('{nazev}: naskladněno, suroviny odepsány.', hodnoty) : t('{nazev}: naskladněno.', hodnoty)));
     } catch (e) {
-      setChyba(apiMessage(e, 'Nepodařilo se zapsat.'));
+      setChyba(apiMessage(e, t('Nepodařilo se zapsat.')));
       setPracuji(false);
     }
   };
 
   return (
-    <Modal open onClose={onClose} size="md" title={`Vyrobeno: ${item.name}`} subtitle="Naskladní se dávka a suroviny se odepíšou."
+    <Modal open onClose={onClose} size="md" title={t('Vyrobeno: {nazev}', { nazev: item.name })} subtitle={t('Naskladní se dávka a suroviny se odepíšou.')}
       footer={<>
-        <Button variant="secondary" onClick={onClose}>Zrušit</Button>
-        <Button variant="primary" onClick={potvrdit} loading={pracuji}>Vyrobeno, naskladnit</Button>
+        <Button variant="secondary" onClick={onClose}>{t('Zrušit', undefined, 'dialog')}</Button>
+        <Button variant="primary" onClick={potvrdit} loading={pracuji}>{t('Vyrobeno, naskladnit')}</Button>
       </>}>
       <div className="space-y-4">
         <Well pad="md" className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="t-label">Dávek</p>
+            <p className="t-label">{t('Dávek')}</p>
             <p className="t-meta mt-0.5">
               {polozka.batchYield
-                ? `${mnozstvi(polozka.batchYield)} ${item.unit} na dávku, celkem +${mnozstvi(polozka.batchYield * davek)} ${item.unit}`
+                ? t('{davka} {jednotka} na dávku, celkem +{celkem} {jednotka}', { davka: mnozstvi(polozka.batchYield), jednotka: item.unit, celkem: mnozstvi(polozka.batchYield * davek) })
                 : `+${cislo(davek)} ${item.unit}`}
             </p>
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            <Button variant="secondary" size="sm" iconOnly icon="minus" aria-label="Méně dávek"
+            <Button variant="secondary" size="sm" iconOnly icon="minus" aria-label={t('Méně dávek')}
               disabled={davek <= 1} onClick={() => setDavek(b => Math.max(1, b - 1))} />
             <span className="w-10 text-center text-[18px] font-semibold tabular-nums" aria-live="polite">{davek}</span>
-            <Button variant="secondary" size="sm" iconOnly icon="plus" aria-label="Více dávek"
+            <Button variant="secondary" size="sm" iconOnly icon="plus" aria-label={t('Více dávek')}
               disabled={davek >= MAX_DAVEK} onClick={() => setDavek(b => Math.min(MAX_DAVEK, b + 1))} />
           </div>
         </Well>
@@ -1336,14 +1354,14 @@ function OknoVyrobeno({ polozka, onClose, onHotovo }: { polozka: ToMake; onClose
               const chybi = odepise > l.available;
               return (
                 <ListRow key={l.ingredientId} title={l.name}
-                  meta={`odepíše se ${mnozstvi(odepise)} ${l.unit} · ve skladu ${mnozstvi(l.available)} ${l.unit}`}
-                  right={<Chip tone={chybi ? 'bad' : 'ok'} size="sm">{chybi ? 'nestačí' : 'je'}</Chip>} />
+                  meta={t('odepíše se {odepise} {jednotka} · ve skladu {sklad} {jednotka}', { odepise: mnozstvi(odepise), jednotka: l.unit, sklad: mnozstvi(l.available) })}
+                  right={<Chip tone={chybi ? 'bad' : 'ok'} size="sm">{chybi ? t('nestačí') : t('je')}</Chip>} />
               );
             })}
           </ul>
         )}
         {nestaci.length > 0 && (
-          <p className="note note-wait text-[13px]">Některé suroviny nestačí. Jestli se vyrobilo i tak, sklad se u nich jen vynuluje — přesné množství doplň u položky.</p>
+          <p className="note note-wait text-[13px]">{t('Některé suroviny nestačí. Jestli se vyrobilo i tak, sklad se u nich jen vynuluje — přesné množství doplň u položky.')}</p>
         )}
         {chyba && <p className="note note-danger" role="alert">{chyba}</p>}
       </div>
@@ -1353,6 +1371,7 @@ function OknoVyrobeno({ polozka, onClose, onHotovo }: { polozka: ToMake; onClose
 
 /** Rozbalený detail ve velkém widgetu: suroviny a postup (návod má přednost před textem). */
 function DetailVyroby({ e, nahled }: { e: ToMake; nahled: boolean }) {
+  const t = useT('widgety');
   const nav = useNavigace();
   const smiNavod = !!e.guideId && nav.smiPohled('guides');
   return (
@@ -1363,8 +1382,8 @@ function DetailVyroby({ e, nahled }: { e: ToMake; nahled: boolean }) {
             <li key={l.ingredientId} className="flex items-center gap-2 text-[13px]">
               <Icon name={l.missing > 0 ? 'close' : 'check'} size={14} className={`shrink-0 ${l.missing > 0 ? 'text-bad-ink' : 'text-ok-ink'}`} />
               <span className="min-w-0 flex-1 truncate text-[#16181A]">{l.name} {mnozstvi(l.need)} {l.unit}</span>
-              <span className="shrink-0 text-black/55 tabular-nums">ve skladu {mnozstvi(l.available)} {l.unit}</span>
-              <span className="sr-only">{l.missing > 0 ? 'chybí' : 'je'}</span>
+              <span className="shrink-0 text-black/55 tabular-nums">{t('ve skladu {mnozstvi} {jednotka}', { mnozstvi: mnozstvi(l.available), jednotka: l.unit })}</span>
+              <span className="sr-only">{l.missing > 0 ? t('chybí') : t('je')}</span>
             </li>
           ))}
         </ul>
@@ -1374,18 +1393,19 @@ function DetailVyroby({ e, nahled }: { e: ToMake; nahled: boolean }) {
       {smiNavod ? (
         <Button variant="secondary" size="sm" icon="book"
           onClick={() => { if (!nahled) nav.onNavigate('guides', String(e.guideId)); }}>
-          {e.guideTitle ? `Návod: ${e.guideTitle}` : 'Otevřít návod'}
+          {e.guideTitle ? t('Návod: {nazev}', { nazev: e.guideTitle }) : t('Otevřít návod')}
         </Button>
       ) : e.steps ? (
         <p className="text-[13px] text-black/60 whitespace-pre-wrap">{e.steps}</p>
       ) : e.lines.length === 0 ? (
-        <p className="t-meta">Bez receptury — vedení ji nastaví u položky ve skladu.</p>
+        <p className="t-meta">{t('Bez receptury — vedení ji nastaví u položky ve skladu.')}</p>
       ) : null}
     </Well>
   );
 }
 
 function KVyrobe({ velikost, nahled }: WidgetProps) {
+  const t = useT('widgety');
   const { upravy } = useWidget();
   const { ok, ceka } = useBrana('vyroba.k_vyrobe');
   const data = useDataWidgetu<ToMake[]>(ok ? '/api/production' : null, vyberVyrobu);
@@ -1415,7 +1435,7 @@ function KVyrobe({ velikost, nahled }: WidgetProps) {
         nacteni={ceka ? CEKA : data}
         kostra="seznam"
         doplnek={seznamVyroby.length > 0 ? <Chip tone="muted" size="sm">{cislo(seznamVyroby.length)}</Chip> : undefined}
-        odkaz={{ popisek: 'Úkoly', pohled: 'tasks' }}
+        odkaz={{ popisek: t('Úkoly'), pohled: 'tasks' }}
         // Není co vyrábět = dobrá zpráva a dřív se karta nekreslila vůbec;
         // v klidu tak zůstane, v úpravách ukáže „Teď tu nic není."
         prazdno={data.data && seznamVyroby.length === 0 ? null : undefined}
@@ -1424,19 +1444,19 @@ function KVyrobe({ velikost, nahled }: WidgetProps) {
           {ukazat.map(e => {
             const otevreno = L && rozbaleno === e.taskId;
             const vyrobeno = (
-              <Button variant="secondary" size="sm" onClick={() => { if (!nahled) setOkno(e); }}>Vyrobeno</Button>
+              <Button variant="secondary" size="sm" onClick={() => { if (!nahled) setOkno(e); }}>{t('Vyrobeno')}</Button>
             );
             return (
               <li key={e.taskId}>
                 <ListRow
                   as="div"
                   title={e.title}
-                  meta={metaVyroby(e)}
-                  right={L ? <Chip tone={e.ready ? 'ok' : 'wait'} size="sm">{e.ready ? 'lze vyrobit' : 'do nákupu'}</Chip> : undefined}
+                  meta={metaVyroby(e, t)}
+                  right={L ? <Chip tone={e.ready ? 'ok' : 'wait'} size="sm">{e.ready ? t('lze vyrobit') : t('do nákupu')}</Chip> : undefined}
                   actions={L ? (
                     <>
                       <Button variant="ghost" size="sm" iconOnly icon="chevron"
-                        aria-label={otevreno ? `Skrýt postup: ${e.title}` : `Ukázat postup: ${e.title}`}
+                        aria-label={otevreno ? t('Skrýt postup: {nazev}', { nazev: e.title }) : t('Ukázat postup: {nazev}', { nazev: e.title })}
                         aria-expanded={otevreno}
                         className={otevreno ? '[&_svg]:rotate-180' : ''}
                         onClick={() => setRozbaleno(otevreno ? null : e.taskId)} />
@@ -1449,7 +1469,7 @@ function KVyrobe({ velikost, nahled }: WidgetProps) {
             );
           })}
         </ul>
-        {seznamVyroby.length > strop && <p className="t-meta mt-2">{aDalsich(seznamVyroby.length - strop)}</p>}
+        {seznamVyroby.length > strop && <p className="t-meta mt-2">{aDalsich(seznamVyroby.length - strop, t)}</p>}
       </Widget>
       {okno && (
         <NadPlochou>
