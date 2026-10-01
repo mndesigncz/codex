@@ -51,7 +51,7 @@ export const FUNKCE: Funkce[] = [
     text: 'Otevírací a zavírací postupy, úkoly i návody pro nováčky. Co je povinné, hlídá aplikace.' },
   { icon: 'chat', title: 'Týmový chat',
     text: 'Kanály, přímé zprávy a ankety. Důležitá věc nezapadne ve skupině.' },
-  { icon: 'play', title: 'Tablet u baru', scena: 'kiosk',
+  { icon: 'grid', title: 'Tablet u baru', scena: 'kiosk',
     text: 'Sdílený tablet bez hesel: klepnutí na jméno a člověk zapisuje sám sebe.' },
 ];
 
@@ -95,12 +95,12 @@ export const MISTO_PATA = {
 };
 
 // ——— Jak začít ————————————————————————————————————————————
-export const KROKY: { n: string; icon: IconName; title: string; text: string }[] = [
-  { n: '1', icon: 'plus', title: 'Založ podnik',
+export const KROKY: { n: string; title: string; text: string }[] = [
+  { n: '1', title: 'Založ podnik',
     text: 'Název, měna, typ podniku a otevírací doba. Bez schůzky s obchodníkem a bez implementace.' },
-  { n: '2', icon: 'users', title: 'Pozvi tým jedním kódem',
+  { n: '2', title: 'Pozvi tým jedním kódem',
     text: 'Kód nebo pozvánka e-mailem. Lidé se připojí z vlastního telefonu a nic neinstalují.' },
-  { n: '3', icon: 'calendar', title: 'Pověs první rozvrh',
+  { n: '3', title: 'Pověs první rozvrh',
     text: 'Generátor rozvrh navrhne podle dostupnosti, ty ho projdeš a zveřejníš. Od té chvíle nikdo nevolá, kdy má zítra.' },
 ];
 
@@ -118,8 +118,8 @@ export const JISTOTY: { icon: IconName; title: string; text: string }[] = [
   { icon: 'archive', title: 'Data jsou vaše', text: 'Export kdykoli: rozvrh, docházka i finance ve formátu, který účetní otevře. Nic se nemaže ani po konci předplatného.' },
   { icon: 'lock', title: 'Každý vidí jen své', text: 'Vlastník, manažer, brigádník. Kdo nemá vidět mzdy, nevidí je, ani omylem přes odkaz.' },
   { icon: 'key', title: 'Tablet u baru bez hesel', text: 'Klepnutí na jméno místo přihlášení. Sdílené zařízení nemá komu vyzradit heslo, když žádné nemá.' },
-  { icon: 'warning', title: 'Výpadek wifi nelže', text: 'Aplikace řekne, co neprošlo, rozepsané nezahodí a po návratu spojení to dopíše. Starý stav nevydává za nový.' },
-  { icon: 'coins', title: 'Česky, koruny i eura', text: 'Měnu podniku si zvolíte a menu, uzávěrky i přehledy počítají v ní. Host vidí ceny v měně podniku.' },
+  { icon: 'refresh', title: 'Výpadek wifi nelže', text: 'Aplikace řekne, co neprošlo, rozepsané nezahodí a po návratu spojení to dopíše. Starý stav nevydává za nový.' },
+  { icon: 'globe', title: 'Česky, koruny i eura', text: 'Měnu podniku si zvolíte a menu, uzávěrky i přehledy počítají v ní. Host vidí ceny v měně podniku.' },
   { icon: 'check', title: 'Nic se nezapomene', text: 'Povinné věci před uzávěrkou drží uzávěrku zamčenou, dokud nejsou hotové. Nikdo ji neodešle napůl.' },
 ];
 

@@ -11,7 +11,7 @@ export default function Zkusit({ className = '', tichy = false }: { className?: 
   return (
     <Link href="/register"
       className={`pressable w-full sm:w-auto btn ${tichy ? 'btn-primary' : 'btn-accent'} btn-lg active:scale-[0.97] inline-flex items-center justify-center gap-2 ${className}`}>
-      {ZKUSIT_ZDARMA} <Icon name="chevron" size={15} className="-rotate-90" />
+      {ZKUSIT_ZDARMA} <Icon name="chevron" size={15} className="ld-sipka -rotate-90" />
     </Link>
   );
 }

@@ -126,10 +126,17 @@ export default function Pricing() {
         })}
       </div>
 
-      {/* Srovnání. První sloupec drží na místě, když se tabulka na telefonu
-          posouvá — jinak člověk vidí tři fajfky a neví, k čemu patří. */}
-      <div className="lgx rounded-[2rem] p-3 sm:p-6 mt-8 overflow-x-auto">
-        <table className="srov w-full text-sm min-w-[36rem] border-separate border-spacing-0">
+      {/* Srovnání. Od 640 px tabulka; na telefonu seznam, kde má název funkce
+          celý řádek a tři tarify pod ním vlastní sloupce. Dřív se i na telefonu
+          kreslila tabulka široká 36 rem s posuvem do strany: Pro bylo useknuté,
+          Max nebyl vidět vůbec a nic neříkalo, že se dá posunout. */}
+      <div className="lgx rounded-[2rem] p-3 sm:p-6 mt-8">
+        <MobilniSrovnani hlavicka={[
+          { nazev: PLAN_NAMES.free, cena: '0 Kč' },
+          { nazev: PLAN_NAMES.pro, cena: cena('pro').hlavni },
+          { nazev: PLAN_NAMES.max, cena: cena('max').hlavni },
+        ]} />
+        <table className="srov hidden sm:table w-full text-sm border-separate border-spacing-0">
           <thead>
             <tr>
               <th className="sticky left-0 z-[1] bg-white/85 md:bg-transparent text-left t-label text-black/45 py-3 pl-3 pr-3 rounded-l-2xl">Funkce</th>
@@ -142,7 +149,7 @@ export default function Pricing() {
                 <p className="mt-0.5 text-sm font-bold text-[#16181A] tabular-nums">{cena('pro').hlavni}</p>
               </th>
               <th className="py-3 px-3 w-36 text-left">
-                <p className="t-label text-[#0A5CC0]">Max</p>
+                <p className="t-label text-[#16181A]">Max</p>
                 <p className="mt-0.5 text-sm font-bold text-[#16181A] tabular-nums">{cena('max').hlavni}</p>
               </th>
             </tr>
@@ -156,6 +163,42 @@ export default function Pricing() {
         <p className="mt-4 px-3 text-[11px] text-black/40">Ceny bez DPH. Doporučte Managero dalšímu podniku a získejte měsíc zdarma, až tři za měsíc.</p>
       </div>
     </section>
+  );
+}
+
+function MobilniSrovnani({ hlavicka }: { hlavicka: { nazev: string; cena: string }[] }) {
+  return (
+    <div className="sm:hidden">
+      {/* Hlavička tarifů jede s člověkem dolů, ať u třetí skupiny ví, který sloupec je který. */}
+      <div className="sticky top-[4.75rem] z-[2] -mx-1 grid grid-cols-3 gap-2 rounded-2xl bg-white/90 px-3 py-2.5 shadow-[0_6px_18px_rgba(25,35,15,0.08)] backdrop-blur" aria-hidden>
+        {hlavicka.map((h, i) => (
+          <div key={h.nazev} className={i === 1 ? 'rounded-xl bg-[#C8F542]/30 -my-1 py-1 px-2' : 'px-2'}>
+            <p className={`t-label ${i === 1 ? 'text-[#3E5406]' : 'text-black/50'}`}>{h.nazev}</p>
+            <p className="text-xs font-bold text-[#16181A] tabular-nums">{h.cena}</p>
+          </div>
+        ))}
+      </div>
+      {skupiny.filter(sk => sk.radky.length).map(sk => (
+        <div key={sk.nazev} className="mt-5 px-2">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-black/40">{sk.nazev}</p>
+          <ul className="mt-1 list-none">
+            {sk.radky.map(f => (
+              <li key={f.label} className="border-t border-black/[0.05] py-3">
+                <p className="text-sm text-[#16181A] text-pretty">{f.label}</p>
+                <div className="mt-2 grid grid-cols-3 gap-2">
+                  {([['free', f.free], ['pro', f.pro], ['max', f.max]] as const).map(([id, v]) => (
+                    <div key={id} className={`flex items-center px-2 ${id === 'pro' ? 'rounded-lg bg-[#C8F542]/15 py-1' : ''}`}>
+                      <span className="sr-only">{PLAN_NAMES[id]}: </span>
+                      <Bunka v={v} zvyraznit={id === 'pro'} />
+                    </div>
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
   );
 }
 

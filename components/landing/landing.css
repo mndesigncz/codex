@@ -150,3 +150,85 @@
 
 /* ——— Srovnání „Dnes / S Managerem" ——————————————————————————— */
 .ld-srov th, .ld-srov td { text-align: left; vertical-align: top; }
+
+/* ——— Osa dne (Jeden den s Managerem, od 1024 px) ——————————————————
+   Linka vlevo od kroků: šedá kolej, přes ni limetková výplň až k aktivnímu
+   času (--osa v pixelech bez jednotky měří DenSPodnikem; výplň je 1 px vysoká a škáluje se). Body na koleji u každého kroku; prošlé
+   kroky mají bod vybarvený. Výplň roste transformací, ne výškou: scale je
+   levný a jde přerušit, když člověk scrolluje tam a zpět. */
+.ld-den-osa::before,
+.ld-den-osa::after,
+.ld-den-bod { display: none; }
+@media (min-width: 1024px) {
+  .ld-den-osa::before,
+  .ld-den-osa::after {
+    content: "";
+    display: block;
+    position: absolute;
+    left: -1.75rem;
+    top: 1rem;
+    width: 2px;
+    border-radius: 2px;
+  }
+  .ld-den-osa::before { bottom: 0; background: rgba(22, 24, 26, 0.08); }
+  .ld-den-osa::after {
+    height: 1px;
+    background: #c8f542;
+    transform-origin: 0 0;
+    transform: scaleY(var(--osa, 0));
+  }
+  .ld-den-bod {
+    display: block;
+    position: absolute;
+    left: calc(-1.75rem - 4px);
+    top: calc(3rem + 1rem - 5px);
+    width: 10px; height: 10px;
+    border-radius: 9999px;
+    background: var(--bg, #f3f4f0);
+    border: 2px solid rgba(22, 24, 26, 0.18);
+    z-index: 1;
+  }
+  .ld-den-osa > li:first-child .ld-den-bod { top: calc(1rem - 5px); }
+  .ld-den-osa > li[data-prosel="true"] .ld-den-bod { border-color: #5b7a08; background: #c8f542; }
+  @media (prefers-reduced-motion: no-preference) {
+    .ld-den-osa::after { transition: transform 520ms cubic-bezier(0.23, 1, 0.32, 1); }
+    .ld-den-bod { transition: background-color 240ms ease-out, border-color 240ms ease-out, transform 240ms cubic-bezier(0.23, 1, 0.32, 1); }
+    .ld-den-osa > li[data-prosel="true"] .ld-den-bod { transform: scale(1.15); }
+  }
+}
+
+/* ——— Funkce a Jistoty: ikona reaguje na myš ————————————————————
+   Jen pod jemným ukazatelem: na dotyku by se hover „přilepil" po klepnutí. */
+@media (hover: hover) and (pointer: fine) {
+  .ld-funkce-ikona { transition: background-color 200ms ease, color 200ms ease, transform 200ms cubic-bezier(0.23, 1, 0.32, 1); }
+  .ld-funkce > li:hover .ld-funkce-ikona { background: rgba(200, 245, 66, 0.55); color: #3e5406; transform: translateY(-2px); }
+}
+
+/* ——— Šipka v tlačítku popojede pod myší ——————————————————————— */
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .ld-sipka { transition: transform 180ms cubic-bezier(0.23, 1, 0.32, 1); }
+  a:hover > .ld-sipka { transform: translateX(3px) rotate(-90deg); }
+}
+
+/* ——— Časté otázky: plynulé rozbalení ————————————————————————
+   ::details-content a interpolate-size umí zatím jen část prohlížečů; ostatní
+   otevřou odpověď hned, což je v pořádku. Ikona v kolečku se pod myší ztmaví. */
+.ld-faq summary::-webkit-details-marker { display: none; }
+@media (hover: hover) and (pointer: fine) {
+  .ld-faq-ikona { transition: background-color 200ms ease, color 200ms ease; }
+  .ld-faq summary:hover .ld-faq-ikona { background: rgba(22, 24, 26, 0.08); color: var(--ink, #16181a); }
+}
+.ld-faq details[open] .ld-faq-ikona { background: var(--ink, #16181a); color: #fff; }
+@supports (interpolate-size: allow-keywords) {
+  @media (prefers-reduced-motion: no-preference) {
+    .ld-faq { interpolate-size: allow-keywords; }
+    .ld-faq details::details-content {
+      block-size: 0;
+      overflow: clip;
+      opacity: 0;
+      transition: block-size 320ms cubic-bezier(0.23, 1, 0.32, 1), opacity 240ms ease-out, content-visibility 320ms allow-discrete;
+    }
+    .ld-faq details[open]::details-content { block-size: auto; opacity: 1; }
+  }
+}
+

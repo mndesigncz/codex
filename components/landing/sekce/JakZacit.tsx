@@ -4,7 +4,10 @@ import Foto from '../Foto';
 import Reveal from '../Reveal';
 import { KROKY, TYPY_PODNIKU } from '../obsah';
 
-// Jak začít: tři kroky v jednom panelu s linkou. Tři stejné karty vedle sebe
+// Jak začít: tři kroky v jednom panelu s linkou. Za nadpisy kroků dřív stály
+// ikony (plus, lidé, kalendář): tři různé značky bez významu vedle čísla, které
+// pořadí už říká, a stránka vypadala jako skládačka.
+// Tři stejné karty vedle sebe
 // jsou nejčastější šablona na webu; číslo je velké a tlumené, aby pořadí bylo
 // vidět, ne aby křičelo. Vpravo typy podniků, ze kterých se vybírá v prvním kroku
 // (stejné fotky jako v průvodci nastavením).
@@ -28,10 +31,7 @@ export default function JakZacit() {
                 {i < KROKY.length - 1 && <span className="absolute left-[1.4rem] top-12 bottom-1 w-px bg-black/[0.12]" aria-hidden />}
                 <span className="relative z-[1] flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#16181A] text-sm font-bold text-white tabular-nums">{k.n}</span>
                 <div className="pt-0.5">
-                  <h3 className="text-lg font-bold tracking-tight text-[#16181A] flex items-center gap-2">
-                    {k.title}
-                    <Icon name={k.icon} size={17} className="text-[#5B7A08]" aria-hidden />
-                  </h3>
+                  <h3 className="text-lg font-bold tracking-tight text-[#16181A]">{k.title}</h3>
                   <p className="mt-1.5 text-sm sm:text-base text-black/60 leading-relaxed text-pretty max-w-[44ch]">{k.text}</p>
                 </div>
               </li>
@@ -49,7 +49,7 @@ export default function JakZacit() {
               ))}
             </ul>
             <Link href="/register" className="pressable mt-6 btn btn-primary btn-lg inline-flex w-full sm:w-auto items-center justify-center gap-2 active:scale-[0.97]">
-              Založit podnik <Icon name="chevron" size={15} className="-rotate-90" />
+              Založit podnik <Icon name="chevron" size={15} className="ld-sipka -rotate-90" />
             </Link>
           </div>
         </div>

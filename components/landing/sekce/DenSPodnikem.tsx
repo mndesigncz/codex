@@ -14,9 +14,33 @@ import { NAHRAVKY } from '../nahravky';
 // stejných karet). Aktivní krok určuje IntersectionObserver; neaktivní smyčky se
 // nestahují. Pod 1024 px má každý okamžik vlastní smyčku pod textem.
 // Fotka je tu jen malý doplněk: říká, kde se to děje, nahrávka, co se děje.
+//
+// Od 1024 px vede kroky svislá osa dne: tenká linka vlevo se při scrollu plní
+// limetkou až k aktivnímu času. Říká „kde v dni jsem" stejně jako pilulka
+// v hlavičce říká „kde na stránce jsem"; výška se měří z polohy kroku, protože
+// kroky nejsou stejně vysoké.
 export default function DenSPodnikem() {
   const [aktivni, setAktivni] = useState(0);
+  const [osa, setOsa] = useState(0);
   const koren = useRef<HTMLDivElement>(null);
+  const seznam = useRef<HTMLOListElement>(null);
+
+  // Osa dne: konec výplně na středu časového štítku aktivního kroku.
+  useEffect(() => {
+    const ol = seznam.current;
+    if (!ol) return;
+    const mer = () => {
+      const stitek = ol.querySelector<HTMLElement>(`[data-krok="${aktivni}"] .chip`);
+      if (!stitek) return;
+      const a = ol.getBoundingClientRect();
+      const b = stitek.getBoundingClientRect();
+      setOsa(Math.max(0, b.top - a.top + b.height / 2));
+    };
+    mer();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(mer) : null;
+    ro?.observe(ol);
+    return () => ro?.disconnect();
+  }, [aktivni]);
 
   useEffect(() => {
     const el = koren.current;
@@ -41,9 +65,10 @@ export default function DenSPodnikem() {
         </div>
 
         <div ref={koren} className="ld-den mt-10 grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] gap-x-14" data-aktivni={aktivni}>
-          <ol className="list-none">
+          <ol ref={seznam} className="ld-den-osa list-none relative" style={{ ['--osa' as string]: Math.max(0, Math.round(osa - 16)) }}>
             {DEN_MOMENTY.map((m, i) => (
-              <li key={m.cas} data-krok={i} className="py-8 lg:py-12 lg:min-h-[17rem] border-t border-black/[0.08] first:border-t-0 first:pt-0">
+              <li key={m.cas} data-krok={i} data-prosel={i <= aktivni ? 'true' : undefined} className="relative py-8 lg:py-12 lg:min-h-[17rem] border-t border-black/[0.08] first:border-t-0 first:pt-0">
+                <span className="ld-den-bod" aria-hidden />
                 <div className="flex items-start gap-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
