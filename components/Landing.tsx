@@ -10,6 +10,7 @@ import Faq from './landing/sekce/Faq';
 import ZaverecneCta from './landing/sekce/ZaverecneCta';
 import Paticka from './landing/sekce/Paticka';
 import { jsonLdRetezec } from './landing/seo';
+import { getT } from '@/lib/i18n/server';
 import './landing/landing.css';
 
 // Prodejní stránka pro nepřihlášené: co Managero je, co umí a co stojí.
@@ -26,13 +27,15 @@ import './landing/landing.css';
 //
 // ForceLight: aplikace v ukázce i tokeny tlačítek zůstávají ve světlém motivu;
 // tma stránky je jeviště z landing.css, ne tmavý motiv aplikace.
-export default function Landing() {
+export default async function Landing() {
+  // Jazyk stránky: přepínač (cookie), jinak země návštěvníka (lib/i18n/jazykPozadavku.ts).
+  const t = await getT(['landing']);
   return (
-    <div lang="cs" className="ld-root">
+    <div lang={t.jazyk} className="ld-root">
       <ForceLight />
       {/* Přeskočit: klávesnice nemá projít hlavičku, ukázku a funkce, aby se dostala k ceně. */}
-      <a href="#ukazka-okno" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 ld-btn ld-btn-sm ld-btn-svetle">Přeskočit na ukázku</a>
-      <a href="#cenik" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 ld-btn ld-btn-sm ld-btn-svetle">Přeskočit na ceník</a>
+      <a href="#ukazka-okno" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 ld-btn ld-btn-sm ld-btn-svetle">{t('Přeskočit na ukázku')}</a>
+      <a href="#cenik" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 ld-btn ld-btn-sm ld-btn-svetle">{t('Přeskočit na ceník')}</a>
 
       <LandingHeader />
 

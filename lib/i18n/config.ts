@@ -101,3 +101,20 @@ export function jazykZAccept(hlavicka: string | null | undefined, povolene: read
  * u nich ukáže poznámku „zatím strojový" (plán §3, `_meta.json`).
  */
 export const STROJOVY_PREKLAD: readonly Jazyk[] = ['en', 'de', 'sk', 'pl'];
+
+/**
+ * Jazyk podle země návštěvníka (dvoupísmenný kód ISO, na Vercelu z hlavičky
+ * `x-vercel-ip-country`). Platí jen pro toho, kdo si jazyk ještě nezvolil:
+ * volba v přepínači (cookie) má vždy přednost. Česko, Slovensko a Polsko mají
+ * vlastní jazyk, německy mluvící země němčinu, zbytek světa angličtinu.
+ * Bez známé země (lokální vývoj, sondy) undefined, a tedy čeština.
+ */
+export function jazykZeZeme(zeme: string | null | undefined): Jazyk | undefined {
+  const z = (zeme ?? '').trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(z) || z === 'XX' || z === 'T1') return undefined;
+  if (z === 'CZ') return 'cs';
+  if (z === 'SK') return 'sk';
+  if (z === 'PL') return 'pl';
+  if (z === 'DE' || z === 'AT' || z === 'CH' || z === 'LI' || z === 'LU') return 'de';
+  return 'en';
+}

@@ -60,6 +60,13 @@ platba se strhne sama po 30 dnech. Odpovědi se uloží do `teams.onboarding`
 a průvodce nastavením začne krokem „podnik". V nativním obalu krok tarifu
 chybí (hlídá `check-obal`), sondy `trial` a `k77-obchody`.
 
+**Jazyk podle země** (kolo 79): kdo si jazyk nezvolil (cookie `managero-lang`),
+dostane ho podle země z hlavičky Vercelu `x-vercel-ip-country`
+(`jazykZeZeme` v `lib/i18n/config.ts`): CZ čeština, SK slovenština, PL polština,
+DE/AT/CH/LI/LU němčina, zbytek světa angličtina; bez hlavičky čeština. Prodejní
+stránka má vlastní slovník `landing` (texty v `components/landing/obsah.ts`),
+celý ceník i krok tarifu v registraci se překládají; účtuje se dál v CZK.
+
 ## Jak se měří kvalita
 
 Každé kolo: tsc, čtyři guardy (čas, desetinná pole, šířky, kontrast),

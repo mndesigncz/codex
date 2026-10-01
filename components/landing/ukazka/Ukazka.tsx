@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Prepinac from '../Prepinac';
+import { useT } from '@/lib/i18n/client';
 import {
   jeIdSceny, krokyPro, LOGICKY_ROZMER, REAKCE_NA_AKCI, ROLE_UKAZKY, SCENY_UKAZKY, ZARIZENI_UKAZKY,
   type IdSceny, type RoleUkazky, type ZarizeniUkazky,
@@ -42,6 +43,10 @@ function uspornyRezim(): boolean {
 interface PoziceCoach { x: number; y: number; bx: number; by: number; text: string }
 
 export default function Ukazka({ pocatecniScena = 'prehled' }: { pocatecniScena?: IdSceny }) {
+  const t = useT('landing');
+  // Posluchač zpráv z ukázky se registruje jednou; věty překládá přes aktuální `t`.
+  const tRef = useRef(t);
+  tRef.current = t;
   const uvod = SCENY_UKAZKY.find(s => s.id === pocatecniScena) ?? SCENY_UKAZKY[0];
   const [mounted, setMounted] = useState(false);
   const [mobil, setMobil] = useState(false);
@@ -70,7 +75,7 @@ export default function Ukazka({ pocatecniScena = 'prehled' }: { pocatecniScena?
   const ucinne: ZarizeniUkazky = mobil ? 'telefon' : zar === 'auto' ? 'pocitac' : zar;
   const logicky = LOGICKY_ROZMER[ucinne];
   const popisScena = SCENY_UKAZKY.find(s => s.id === scena) ?? SCENY_UKAZKY[0];
-  const kroky = krokyPro(scena, role);
+  const kroky = krokyPro(scena, role, t);
   const hotovo = faze === 'pripraveno' && kroky.length > 0 && krok >= kroky.length;
 
   const sestavAdresu = (s: IdSceny, r: RoleUkazky) => `/demo?scena=${s}&role=${r}&rezim=okno`;
@@ -144,7 +149,7 @@ export default function Ukazka({ pocatecniScena = 'prehled' }: { pocatecniScena?
         const a = aktualni.current;
         if (d.scena !== a.scena || d.role !== a.role) posli({ typ: 'demo-scena', scena: a.scena, role: a.role });
       } else if (d.typ === 'demo-akce' && typeof d.akce === 'string') {
-        const veta = REAKCE_NA_AKCI[d.akce];
+        const veta = REAKCE_NA_AKCI[d.akce] ? tRef.current(REAKCE_NA_AKCI[d.akce]) : undefined;
         if (!veta) return;
         const ted = Date.now();
         // Jedna akce přijde víckrát (čtyři objednávky): jedna věta, ne čtyři.
@@ -269,8 +274,8 @@ export default function Ukazka({ pocatecniScena = 'prehled' }: { pocatecniScena?
 
   const scenaVeZvoleneRoli = scena === 'kiosk' ? 'kiosk' : role;
   const vetaDole = reakce ?? (hotovo
-    ? 'Tohle všechno je celá aplikace. Projdi si ji klidně dál, nebo začni znovu.'
-    : popisScena.zkus);
+    ? t('Tohle všechno je celá aplikace. Projdi si ji klidně dál, nebo začni znovu.')
+    : t(popisScena.zkus));
 
   return (
     <div ref={korenRef} id="ukazka-okno" className="relative scroll-mt-20"
@@ -278,13 +283,13 @@ export default function Ukazka({ pocatecniScena = 'prehled' }: { pocatecniScena?
       {/* Přepínač scén nad rámem. Do mountu neviditelný (visibility drží místo,
           po hydrataci se nic neposune), bez skriptu by nic nedělal. */}
       <div className={`flex justify-center ${mounted ? '' : 'invisible'}`} aria-hidden={!mounted}>
-        <Prepinac popis="Scéna ukázky" hodnota={scena} onZmena={zvolScenu}
-          moznosti={SCENY_UKAZKY.map(s => ({ id: s.id, label: s.label }))} />
+        <Prepinac popis={t('Scéna ukázky')} hodnota={scena} onZmena={zvolScenu}
+          moznosti={SCENY_UKAZKY.map(s => ({ id: s.id, label: t(s.label) }))} />
       </div>
 
-      <a href="#funkce" className="sr-only focus:not-sr-only focus:absolute focus:z-10 focus:mt-2 ld-btn ld-btn-sm ld-btn-svetle">Přeskočit ukázku</a>
+      <a href="#funkce" className="sr-only focus:not-sr-only focus:absolute focus:z-10 focus:mt-2 ld-btn ld-btn-sm ld-btn-svetle">{t('Přeskočit ukázku')}</a>
 
-      <section aria-label="Ukázka aplikace s vymyšlenými daty" aria-busy={faze === 'nacita'} className="relative mt-4 ld-okno">
+      <section aria-label={t('Ukázka aplikace s vymyšlenými daty')} aria-busy={faze === 'nacita'} className="relative mt-4 ld-okno">
         <div className="ld-svetlo" aria-hidden />
         <div className="ld-stage">
         {/* Na telefonu vždy `auto` (= rám telefonu z CSS): scéna, která chce
@@ -299,7 +304,7 @@ export default function Ukazka({ pocatecniScena = 'prehled' }: { pocatecniScena?
             </picture>
 
             {src && faze !== 'selhalo' && (
-              <iframe key={klic} ref={iframe} src={src} title="Živá ukázka aplikace Managero s vymyšlenými daty"
+              <iframe key={klic} ref={iframe} src={src} title={t('Živá ukázka aplikace Managero s vymyšlenými daty')}
                 className="ld-iframe" data-hotovo={videt ? 'true' : 'false'}
                 style={{ width: logicky.w, height: logicky.h, ['--ld-skala' as string]: skala }}
                 referrerPolicy="same-origin"
@@ -329,20 +334,20 @@ export default function Ukazka({ pocatecniScena = 'prehled' }: { pocatecniScena?
             {/* Ukázka se sama nespouští (vypnutý pohyb, úsporný přenos): tlačítko. */}
             {faze === 'plakat' && mounted && rucni && (
               <div className="absolute inset-0 z-[4] grid place-items-center bg-[#16181A]/35">
-                <button type="button" onClick={() => aktivuj()} className="ld-btn ld-btn-svetle">Spustit živou ukázku</button>
+                <button type="button" onClick={() => aktivuj()} className="ld-btn ld-btn-svetle">{t('Spustit živou ukázku')}</button>
               </div>
             )}
             {faze === 'nacita' && !videt && (
-              <p className="absolute bottom-3 left-1/2 z-[4] -translate-x-1/2 rounded-full bg-[#16181A] px-3 py-1.5 text-xs font-semibold text-white">Načítám ukázku</p>
+              <p className="absolute bottom-3 left-1/2 z-[4] -translate-x-1/2 rounded-full bg-[#16181A] px-3 py-1.5 text-xs font-semibold text-white">{t('Načítám ukázku')}</p>
             )}
             {faze === 'selhalo' && (
               <div className="absolute inset-0 z-[4] grid place-items-center bg-[#F3F4F0]/80 p-4 text-center">
                 <div>
-                  <p className="text-sm font-semibold text-[#16181A]">Ukázka se nenačetla.</p>
-                  <p className="mt-1 text-sm text-black/60">Podívej se na nahrávky níž, nebo to zkus znovu.</p>
+                  <p className="text-sm font-semibold text-[#16181A]">{t('Ukázka se nenačetla.')}</p>
+                  <p className="mt-1 text-sm text-black/60">{t('Podívej se na nahrávky níž, nebo to zkus znovu.')}</p>
                   <div className="mt-3 flex flex-wrap justify-center gap-2">
-                    <button type="button" onClick={nactiZnovu} className="btn btn-primary btn-sm">Načíst znovu</button>
-                    <a href="#den" className="btn btn-secondary btn-sm">Nahrávky</a>
+                    <button type="button" onClick={nactiZnovu} className="btn btn-primary btn-sm">{t('Načíst znovu')}</button>
+                    <a href="#den" className="btn btn-secondary btn-sm">{t('Nahrávky')}</a>
                   </div>
                 </div>
               </div>
@@ -357,18 +362,18 @@ export default function Ukazka({ pocatecniScena = 'prehled' }: { pocatecniScena?
         <div className="ld-dok-utlum mt-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
           <div className="min-w-0">
             <p role="status" aria-live="polite" className="max-w-[58ch] min-h-[5rem] sm:min-h-[2.75rem] text-[0.9375rem] leading-snug text-[color:var(--ld-text-2)] text-pretty">{vetaDole}</p>
-            <p className="mt-1.5 text-xs text-[color:var(--ld-text-3)]">Ukázková data, nic se neukládá ani neodesílá</p>
+            <p className="mt-1.5 text-xs text-[color:var(--ld-text-3)]">{t('Ukázková data, nic se neukládá ani neodesílá')}</p>
           </div>
           <div className={`flex flex-wrap items-center gap-2 shrink-0 ${mounted ? '' : 'invisible'}`} aria-hidden={!mounted}>
             {scena !== 'kiosk' && (
-              <Prepinac ton="tichy" velikost="sm" popis="Role v ukázce" hodnota={scenaVeZvoleneRoli as RoleUkazky} onZmena={zvolRoli}
-                moznosti={ROLE_UKAZKY} />
+              <Prepinac ton="tichy" velikost="sm" popis={t('Role v ukázce')} hodnota={scenaVeZvoleneRoli as RoleUkazky} onZmena={zvolRoli}
+                moznosti={ROLE_UKAZKY.map(r => ({ id: r.id, label: t(r.label) }))} />
             )}
             <div className="hidden md:block">
-              <Prepinac ton="tichy" velikost="sm" popis="Zařízení" hodnota={ucinne} onZmena={(v) => { setZar(v as ZarizeniUkazky); aktivuj(); }}
-                moznosti={ZARIZENI_UKAZKY} />
+              <Prepinac ton="tichy" velikost="sm" popis={t('Zařízení')} hodnota={ucinne} onZmena={(v) => { setZar(v as ZarizeniUkazky); aktivuj(); }}
+                moznosti={ZARIZENI_UKAZKY.map(z => ({ id: z.id, label: t(z.label) }))} />
             </div>
-            <button type="button" onClick={zacitZnovu} className="ld-btn ld-btn-sm ld-btn-obrys">Začít znovu</button>
+            <button type="button" onClick={zacitZnovu} className="ld-btn ld-btn-sm ld-btn-obrys">{t('Začít znovu')}</button>
           </div>
         </div>
       </section>

@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import SmyckaVideo from '../SmyckaVideo';
-import { DEN_MOMENTY } from '../obsah';
+import { useT } from '@/lib/i18n/client';
+import { DEN_MOMENTY, DEN_NADPIS } from '../obsah';
 import { NAHRAVKY } from '../nahravky';
 
 // Jeden den s podnikem: pět okamžiků od otevření po uzávěrku, každý s nahrávkou
@@ -14,6 +15,7 @@ import { NAHRAVKY } from '../nahravky';
 // u středu okna; neaktivní smyčky se nestahují. Pod 1024 px má každý okamžik
 // vlastní smyčku pod textem.
 export default function DenSPodnikem() {
+  const t = useT('landing');
   const [aktivni, setAktivni] = useState(0);
   const [prosle, setProsle] = useState(0);
   const koren = useRef<HTMLDivElement>(null);
@@ -52,8 +54,8 @@ export default function DenSPodnikem() {
     <section id="den" className="ld-sekce" aria-labelledby="nadpis-den">
       <div className="ld-obsah">
         <div className="max-w-[40rem]">
-          <h2 id="nadpis-den" className="ld-h2">Jeden den s Managerem</h2>
-          <p className="ld-perex mt-5">Od otevření po uzávěrku. Nahrávky jsou ze skutečné aplikace, s vymyšlenými daty.</p>
+          <h2 id="nadpis-den" className="ld-h2">{t(DEN_NADPIS.nadpis)}</h2>
+          <p className="ld-perex mt-5">{t(DEN_NADPIS.perex)}</p>
         </div>
 
         <div ref={koren} className="ld-den mt-14 sm:mt-20 grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-x-16" data-aktivni={aktivni}>
@@ -63,8 +65,8 @@ export default function DenSPodnikem() {
             {DEN_MOMENTY.map((m, i) => (
               <li key={m.cas} data-krok={i} data-prosly={i < prosle ? 'true' : 'false'} className="ld-den-krok py-10 lg:py-0">
                 <p className="ld-cas ld-cislo"><time>{m.cas}</time></p>
-                <h3 className="ld-h3 mt-4">{m.title}</h3>
-                <p className="ld-text mt-3 max-w-[42ch]">{m.text}</p>
+                <h3 className="ld-h3 mt-4">{t(m.title)}</h3>
+                <p className="ld-text mt-3 max-w-[42ch]">{t(m.text)}</p>
                 {/* Telefon a tablet: smyčka přímo pod okamžikem. */}
                 <div className="mt-8 lg:hidden">
                   <SmyckaVideo id={m.nahravka} onZkusit={zkus(NAHRAVKY[m.nahravka].scena)} />

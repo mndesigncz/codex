@@ -31,6 +31,7 @@ import { PLAN_NAMES, PRICES, TRIAL_DAYS, type Interval, type PlanId } from '@/li
 import { formatMoney } from '@/lib/money';
 import { pragueToday } from '@/lib/pragueTime';
 import { fmtDatum } from '@/lib/i18n/format';
+import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
 import { CILE, NAZEV_VELIKOSTI, TYPY, VELIKOSTI_TYMU, type Cil, type TypPodniku, type VelikostTymu } from '@/lib/pruvodce/typy';
 import { doporucenyTarif } from '@/lib/pruvodce/plan';
 import './cesta.css';
@@ -155,7 +156,8 @@ export default function Cesta() {
   const potvrditTarif = () => { if (plan === 'free') doAplikace(); else setPokladna(true); };
 
   // Den, kdy se karta poprvé strhne: dnes v Praze plus zkušební doba.
-  const prvniPlatba = useMemo(() => fmtDatum(pragueToday(TRIAL_DAYS), { jazyk: 'cs', styl: 'dlouze' }), []);
+  const prvniPlatba = useMemo(() => fmtDatum(pragueToday(TRIAL_DAYS), { jazyk: t.jazyk, styl: 'dlouze' }), [t.jazyk]);
+  const kc = (n: number) => formatMoney(n, 'CZK', LOCALE_PRO_JAZYK[t.jazyk]);
 
   const typPopis = typ ? tp(nazevTypu(typ)) : '';
 
@@ -298,22 +300,32 @@ export default function Cesta() {
               <button type="submit" disabled={odesila || prihlaseniSelhalo || !jmeno.trim() || !email.trim() || heslo.length < 8} className="cs-dal mt-6">
                 {odesila ? t('Zakládám podnik…') : t('Založit podnik')}
               </button>
-              <p className="mt-4 text-xs text-black/55 text-pretty">Založením účtu souhlasíš s <Link href="/podminky" className="underline underline-offset-2">Podmínkami užívání</Link> a bereš na vědomí <Link href="/soukromi" className="underline underline-offset-2">Zásady ochrany osobních údajů</Link>.</p>{/* i18n-ok: právní věta zůstává česky */}
+              {t.jazyk === 'cs' ? (
+                <p className="mt-4 text-xs text-black/55 text-pretty">Založením účtu souhlasíš s <Link href="/podminky" className="underline underline-offset-2">Podmínkami užívání</Link> a bereš na vědomí <Link href="/soukromi" className="underline underline-offset-2">Zásady ochrany osobních údajů</Link>.</p>/* i18n-ok: česká právní věta s odkazy jen pro češtinu */
+              ) : (
+                <p className="mt-4 text-xs text-black/55 text-pretty">
+                  {t('Založením účtu souhlasíš s podmínkami užívání a bereš na vědomí zásady ochrany osobních údajů.')}{' '}
+                  <Link href="/en/podminky" className="underline underline-offset-2">{t('Podmínky užívání')}</Link> · <Link href="/en/soukromi" className="underline underline-offset-2">{t('Zásady ochrany osobních údajů')}</Link>
+                </p>
+              )}
             </form>
           )}
 
           {krok === 'tarif' && (
             <>
-              <h1 ref={nadpis} tabIndex={-1} className="cs-otazka">{nazev.trim() ? `Podnik ${nazev.trim()} je založený.` : 'Podnik je založený.'}<br />Jak chceš začít?</h1>{/* i18n-ok: tarif a platba zůstávají česky */}
-              {t.jazyk !== 'cs' && <p className="cs-pod">{t('Ceník a platební podmínky jsou zatím jen česky.')}</p>}
+              <h1 ref={nadpis} tabIndex={-1} className="cs-otazka">
+                {nazev.trim() ? t('Podnik {nazev} je založený.', { nazev: nazev.trim() }) : t('Podnik je založený.')}<br />{t('Jak chceš začít?')}
+              </h1>
               <p className="cs-pod">{doporuceny === 'free'
-                ? 'Na to, co chceš řešit, ti Zdarma zatím stačí. Pro nebo Max si můžeš vyzkoušet kdykoli později.' // i18n-ok
-                : `Podle toho, co chceš řešit, doporučujeme ${PLAN_NAMES[doporuceny]}: ${doporuceny === 'max' ? 'hosté a napojení pokladny' : 'větší tým, tablet u baru a přehledy'}. Prvních ${TRIAL_DAYS} dní zdarma.`}</p>{/* i18n-ok */}
+                ? t('Na to, co chceš řešit, ti Zdarma zatím stačí. Pro nebo Max si můžeš vyzkoušet kdykoli později.')
+                : doporuceny === 'max'
+                  ? t('Podle toho, co chceš řešit, doporučujeme Max: hosté a napojení pokladny. Prvních {n, plural, one {# den} few {# dny} other {# dní}} zdarma.', { n: TRIAL_DAYS })
+                  : t('Podle toho, co chceš řešit, doporučujeme Pro: větší tým, tablet u baru a přehledy. Prvních {n, plural, one {# den} few {# dny} other {# dní}} zdarma.', { n: TRIAL_DAYS })}</p>
 
               <div className="mt-6 flex justify-center">
-                <div className="cs-interval" role="group" aria-label="Období platby">{/* i18n-ok: tarif a platba zůstávají česky */}
+                <div className="cs-interval" role="group" aria-label={t('Období platby')}>
                   {(['month', 'year'] as const).map(i => (
-                    <button key={i} type="button" aria-pressed={interval === i} onClick={() => setIntervalPlanu(i)}>{/* i18n-ok */}{i === 'month' ? 'Měsíčně' : 'Ročně'}</button>
+                    <button key={i} type="button" aria-pressed={interval === i} onClick={() => setIntervalPlanu(i)}>{i === 'month' ? t('Měsíčně') : t('Ročně')}</button>
                   ))}
                 </div>
               </div>
@@ -328,17 +340,21 @@ export default function Cesta() {
                         <span className="cs-tarif-kruh" aria-hidden />
                         <span className="min-w-0 flex-1">
                           <span className="flex flex-wrap items-center gap-2">
-                            <span className="cs-volba-nazev">{PLAN_NAMES[p]}</span>
-                            {p === doporuceny && <span className="cs-doporuceno">Doporučeno</span>}{/* i18n-ok */}
-                            {p !== 'free' && <span className="cs-zdarma">{TRIAL_DAYS} dní zdarma</span>}
+                            <span className="cs-volba-nazev">{t(PLAN_NAMES[p])}</span>
+                            {p === doporuceny && <span className="cs-doporuceno">{t('Doporučeno')}</span>}
+                            {p !== 'free' && <span className="cs-zdarma">{t('{n, plural, one {# den} few {# dny} other {# dní}} zdarma', { n: TRIAL_DAYS })}</span>}
                           </span>
                           <span className="cs-volba-veta">
-                            {p === 'free' ? 'Tým do 3 lidí, směny, úkoly, uzávěrky a sklad. Bez karty.' : p === 'pro' ? 'Neomezený tým, tablet u baru, odměny, exporty a měsíční přehled.' : 'Vše z Pro, a k tomu hosté: věrnost, rezervace, objednávky od stolu a pokladna Storyous.'}{/* i18n-ok */}
+                            {p === 'free'
+                              ? t('Tým do 3 lidí, směny, úkoly, uzávěrky a sklad. Bez karty.')
+                              : p === 'pro'
+                                ? t('Neomezený tým, tablet u baru, odměny, exporty a měsíční přehled.')
+                                : t('Vše z Pro, a k tomu hosté: věrnost, rezervace, objednávky od stolu a pokladna Storyous.')}
                           </span>
                         </span>
                         <span className="cs-tarif-cena">
-                          {formatMoney(cena ?? 0, 'CZK')}
-                          <span>{cena == null ? 'napořád' : interval === 'year' ? 'ročně' : 'měsíčně'}</span>{/* i18n-ok */}
+                          {kc(cena ?? 0)}
+                          <span>{cena == null ? t('napořád') : interval === 'year' ? t('ročně') : t('měsíčně')}</span>
                         </span>
                       </button>
                     </li>
@@ -348,14 +364,16 @@ export default function Cesta() {
 
               <div className="cs-shrnuti-platby mt-6">
                 {plan === 'free'
-                  ? <p>{/* i18n-ok */}Dnes ani později nic neplatíš. Placený tarif si zapneš kdykoli v Nastavení.</p>
-                  : <p>{/* i18n-ok */}<strong>Dnes zaplatíš {formatMoney(0, 'CZK')}.</strong> Kartu zadáš teď a předplatné běží hned. První platbu {formatMoney(PRICES[plan][interval === 'year' ? 'year' : 'month'], 'CZK')} strhneme {prvniPlatba}, pak {interval === 'year' ? 'jednou ročně' : 'každý měsíc'}. Když ho do té doby zrušíš, nezaplatíš nic. Zrušit jde kdykoli v Nastavení, jedním klikem.</p>}
+                  ? <p>{t('Dnes ani později nic neplatíš. Placený tarif si zapneš kdykoli v Nastavení.')}</p>
+                  : <p><strong>{t('Dnes zaplatíš {castka}.', { castka: kc(0) })}</strong> {interval === 'year'
+                      ? t('Kartu zadáš teď a předplatné běží hned. První platbu {castka} strhneme {datum}, pak jednou ročně. Když ho do té doby zrušíš, nezaplatíš nic. Zrušit jde kdykoli v Nastavení, jedním klikem.', { castka: kc(PRICES[plan].year), datum: prvniPlatba })
+                      : t('Kartu zadáš teď a předplatné běží hned. První platbu {castka} strhneme {datum}, pak každý měsíc. Když ho do té doby zrušíš, nezaplatíš nic. Zrušit jde kdykoli v Nastavení, jedním klikem.', { castka: kc(PRICES[plan].month), datum: prvniPlatba })}</p>}
               </div>
               <button type="button" onClick={potvrditTarif} className="cs-dal cs-dal-limetka mt-5">
-                {plan === 'free' ? 'Pokračovat zdarma' : `Vyzkoušet ${PLAN_NAMES[plan]} ${TRIAL_DAYS} dní zdarma`}{/* i18n-ok */}
+                {plan === 'free' ? t('Pokračovat zdarma') : t('Vyzkoušet {plan} na {n, plural, one {# den} few {# dny} other {# dní}} zdarma', { plan: t(PLAN_NAMES[plan]), n: TRIAL_DAYS })}
               </button>
               {plan !== 'free' && (
-                <button type="button" onClick={doAplikace} className="cs-odkaz mt-3">{/* i18n-ok */}Teď ne, pokračovat na Zdarma</button>
+                <button type="button" onClick={doAplikace} className="cs-odkaz mt-3">{t('Teď ne, pokračovat na Zdarma')}</button>
               )}
             </>
           )}
