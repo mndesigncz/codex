@@ -186,6 +186,12 @@ for (const n of [0, 10, 25, 100]) pridej('klient-host', tierFor(n, { platinumAt:
     v(st.nazev);
     if (st.nastroj) { v(st.nastroj.nazev); v(st.nastroj.popis); }
   }
+  // Názvy rozsahů rozložení (lib/widgety/rozlozeniDb.ts NAZEV_TYPU) a systémové role se překládají podle textu.
+  for (const x of ['Celé vedení', 'Všichni zaměstnanci', 'Všechny tablety']) pridej('widgety', x, 'lib/widgety/rozlozeniDb.ts (NAZEV_TYPU)');
+  const ok = await import('../lib/opravneniKatalog.ts');
+  for (const r of ok.SYSTEMOVE_ROLE) v(r.nazev);
+  // Hlášky hooků widgetů jdou přes apiMessage → slovník `api`.
+  for (const x of ['Rozložení se nenačetlo.', 'Rozložení se nepodařilo uložit.', 'Výchozí rozložení se nepodařilo obnovit.', 'Data se nenačetla.', 'Data mají nečekaný tvar.']) pridej('api', x, 'components/widgety/useRozlozeni.ts, useDataWidgetu.ts');
 }
 
 // Hlášky serveru: věty v `error: '…'` hostovských rout, statusMessage a blokace/middleware.
