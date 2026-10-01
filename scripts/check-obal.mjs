@@ -32,7 +32,7 @@ const POVOLENE = {
   'components/Billing.tsx': 'Nastavení → Předplatné; Settings.tsx ji v obalu nevykreslí (smiPlatby)',
   'components/CheckoutModal.tsx': 'pokladna; otevře ji jen OdemknoutButton / registrace, které v obalu nejsou',
   'components/SpravovatPredplatneButton.tsx': 'stránka pozastaveno ji v obalu nevykreslí',
-  'app/(auth)/register/page.tsx': 'registrace: v obalu jen tarif Zdarma a žádná pokladna (smiPlatby)',
+  'components/registrace/Cesta.tsx': 'cesta registrace: v obalu bez kroku tarifu a bez pokladny (smiPlatby)',
 };
 
 for (const dir of ['app', 'components', 'lib']) {
@@ -57,7 +57,7 @@ const vyzaduje = (soubor, vzor, proc) => {
 vyzaduje('components/Pro.tsx', /useObal/, 'zámky funkcí musí v obalu ukazovat neutrální text (useObal), ne cenu a odemknutí');
 vyzaduje('components/Pro.tsx', /Zamceno/, 'chybí neutrální zamčená funkce bez ceny a výzvy');
 vyzaduje('components/Settings.tsx', /smiPlatby[\s\S]*<Billing/, 'Nastavení musí v obalu schovat Předplatné (smiPlatby před <Billing/>)');
-vyzaduje('app/(auth)/register/page.tsx', /smiPlatby/, 'registrace musí v obalu schovat volbu tarifu a pokladnu');
+vyzaduje('components/registrace/Cesta.tsx', /smiPlatby \? \[\.\.\.OTAZKY, 'sestavuji', 'ucet', 'tarif'\]/, 'cesta registrace musí v obalu vynechat krok tarifu (a tím pokladnu)');
 vyzaduje('components/employer/EmployerLayout.tsx', /smiPlatby/, 'bannery o předplatném a zkoušce se v obalu nesmějí ukázat');
 vyzaduje('components/client/ClientShell.tsx', /jeObal/, 'odkaz „Jsem podnik“ (prodejní stránka) se v obalu nesmí ukázat');
 vyzaduje('app/page.tsx', /obalZHlavicek[\s\S]*redirect\('\/login'\)/, 'úvodní stránka s cenami se v obalu nesmí vykreslit (přesměrování na přihlášení)');

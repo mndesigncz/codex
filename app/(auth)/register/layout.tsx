@@ -19,5 +19,5 @@ export const metadata: Metadata = {
 // Metadata (titulek, popis pro vyhledávač) zůstávají česky: registrace je prodejní vstup
 // a její cizojazyčná podoba přijde s prodejní stránkou (plán vícejazyčnosti §9 bod 4).
 export default function RegisterLayout({ children }: { children: React.ReactNode }) {
-  return <><Slovniky sekce={['auth', 'predplatne']} />{children}</>;
+  return <><Slovniky sekce={['auth', 'predplatne', 'pruvodce']} />{children}</>;
 }

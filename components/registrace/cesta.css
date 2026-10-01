@@ -1,0 +1,117 @@
+/* Cesta registrace: světlý svět aplikace (Managero 2), jedna otázka na
+   obrazovku. Bílé volby se stínem karty, vybraná je inkoustová (stav, ne
+   akce), limetka jen na hlavním tlačítku posledního kroku. Předpona cs-. */
+
+html:has(.cs-root) { background: var(--bg); }
+.cs-root { min-height: 100dvh; display: flex; flex-direction: column; color: var(--ink); }
+
+.cs-lista { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 88%, transparent); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+@media (prefers-reduced-transparency: reduce) { .cs-lista { background: var(--bg); -webkit-backdrop-filter: none; backdrop-filter: none; } }
+.cs-lista-obsah { max-width: 40rem; margin-inline: auto; padding: 0.75rem 1rem; display: flex; align-items: center; gap: 1rem; }
+.cs-zpet { display: grid; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: 9999px; flex-shrink: 0; color: var(--ink); }
+@media (hover: hover) { button.cs-zpet:hover { background: rgba(22, 24, 26, 0.06); } }
+.cs-postup { flex: 1; height: 6px; border-radius: 9999px; background: rgba(22, 24, 26, 0.08); overflow: hidden; }
+.cs-postup > span { display: block; height: 100%; border-radius: inherit; background: var(--ink); transform-origin: 0 50%; }
+@media (prefers-reduced-motion: no-preference) { .cs-postup > span { transition: transform 420ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)); } }
+.cs-prihlasit { flex-shrink: 0; font-size: 0.9375rem; font-weight: 600; padding: 0.5rem 0.25rem; color: rgba(22, 24, 26, 0.7); }
+@media (hover: hover) { .cs-prihlasit:hover { color: var(--ink); } }
+
+.cs-obsah { flex: 1; width: 100%; max-width: 40rem; margin-inline: auto; padding: 2rem 1rem 3rem; }
+@media (min-width: 640px) { .cs-obsah { padding-top: 4rem; } }
+
+.cs-otazka { font-size: clamp(1.75rem, 4.6vw, 2.5rem); line-height: 1.08; font-weight: 700; letter-spacing: -0.03em; text-wrap: balance; outline: none; }
+.cs-pod { margin-top: 0.75rem; font-size: 1.0625rem; line-height: 1.5; color: rgba(22, 24, 26, 0.64); text-wrap: pretty; }
+
+/* Krok přijede ze strany, kterou se jde (dál zprava, zpět zleva). */
+@media (prefers-reduced-motion: no-preference) {
+  .cs-krok { animation: cs-prijezd 360ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)) both; }
+  .cs-krok[data-smer="-1"] { animation-name: cs-prijezd-zpet; }
+  @keyframes cs-prijezd { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+  @keyframes cs-prijezd-zpet { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: none; } }
+}
+
+/* Volby */
+.cs-volby { display: grid; gap: 0.625rem; list-style: none; }
+@media (min-width: 640px) { .cs-volby-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.cs-volba {
+  position: relative; width: 100%; height: 100%; min-height: 4.5rem;
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 0.2rem;
+  padding: 0.95rem 3rem 0.95rem 1.1rem; text-align: left;
+  border-radius: var(--r-md, 14px); background: var(--surface, #fff);
+  box-shadow: var(--shadow-card), inset 0 0 0 1px rgba(22, 24, 26, 0.06);
+  transition: background-color 200ms var(--ease-out), color 200ms var(--ease-out), transform 120ms var(--ease-out);
+}
+.cs-volba-radek { min-height: 3.75rem; }
+.cs-volba-nazev { font-weight: 650; font-size: 1.0625rem; letter-spacing: -0.01em; }
+.cs-volba-veta { font-size: 0.875rem; color: rgba(22, 24, 26, 0.6); line-height: 1.35; }
+.cs-volba-ikona { display: grid; place-items: center; width: 2.1rem; height: 2.1rem; margin-bottom: 0.35rem; border-radius: 10px; background: rgba(22, 24, 26, 0.05); }
+.cs-volba-tarif { position: absolute; top: 0.85rem; right: 2.9rem; border-radius: 9999px; padding: 1px 8px; font-size: 11px; font-weight: 650; background: rgba(22, 24, 26, 0.07); color: rgba(22, 24, 26, 0.7); }
+.cs-volba-znacka {
+  position: absolute; top: 50%; right: 1rem; transform: translateY(-50%) scale(0.6); opacity: 0;
+  display: grid; place-items: center; width: 1.375rem; height: 1.375rem; border-radius: 9999px;
+  background: var(--lime); color: var(--ink);
+  transition: opacity 180ms var(--ease-out), transform 220ms var(--ease-out);
+}
+.cs-volba[aria-pressed="true"] { background: var(--ink); color: #fff; }
+.cs-volba[aria-pressed="true"] .cs-volba-veta { color: rgba(255, 255, 255, 0.66); }
+.cs-volba[aria-pressed="true"] .cs-volba-ikona { background: rgba(255, 255, 255, 0.12); }
+.cs-volba[aria-pressed="true"] .cs-volba-tarif { background: rgba(255, 255, 255, 0.14); color: rgba(255, 255, 255, 0.8); }
+.cs-volba[aria-pressed="true"] .cs-volba-znacka { opacity: 1; transform: translateY(-50%) scale(1); }
+@media (hover: hover) { .cs-volba[aria-pressed="false"]:hover { box-shadow: var(--shadow-float), inset 0 0 0 1px rgba(22, 24, 26, 0.1); } }
+.cs-volba:active { transform: scale(0.985); }
+
+/* Pole a tlačítka */
+.cs-popisek { display: block; margin-bottom: 0.4rem; font-size: 0.875rem; font-weight: 550; color: rgba(22, 24, 26, 0.72); }
+.cs-pole {
+  width: 100%; height: 3.5rem; padding: 0 1.1rem; border-radius: var(--r-md, 14px);
+  background: var(--surface, #fff); font-size: 1.0625rem; color: var(--ink);
+  box-shadow: inset 0 0 0 1px rgba(22, 24, 26, 0.12); outline: none;
+  transition: box-shadow 160ms var(--ease-out);
+}
+.cs-pole::placeholder { color: rgba(22, 24, 26, 0.38); }
+.cs-pole:focus { box-shadow: inset 0 0 0 1.5px var(--ink), 0 0 0 4px color-mix(in srgb, var(--lime) 45%, transparent); }
+.cs-ukaz { position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); padding: 0.5rem 0.75rem; border-radius: 9999px; font-size: 0.875rem; font-weight: 600; color: rgba(22, 24, 26, 0.7); }
+@media (hover: hover) { .cs-ukaz:hover { background: rgba(22, 24, 26, 0.06); color: var(--ink); } }
+
+.cs-dal {
+  display: flex; align-items: center; justify-content: center; width: 100%; height: 3.5rem;
+  border-radius: 9999px; background: var(--ink); color: #fff; font-weight: 650; font-size: 1.0625rem;
+  transition: opacity 160ms var(--ease-out), transform 120ms var(--ease-out);
+}
+.cs-dal:disabled { opacity: 0.35; cursor: not-allowed; }
+.cs-dal:not(:disabled):active { transform: scale(0.98); }
+.cs-dal-limetka { background: var(--lime); color: var(--ink); }
+.cs-odkaz { display: block; width: 100%; padding: 0.75rem; text-align: center; font-size: 0.9375rem; font-weight: 600; color: rgba(22, 24, 26, 0.66); }
+@media (hover: hover) { .cs-odkaz:hover { color: var(--ink); } }
+
+/* Sestavování: odpovědi se přečtou zpátky, řádek po řádku. */
+.cs-cteni { list-style: none; display: grid; gap: 0.6rem; }
+.cs-cteni li { display: flex; align-items: center; gap: 0.75rem; font-size: 1.125rem; font-weight: 600; }
+.cs-cteni-znacka { display: grid; place-items: center; width: 1.6rem; height: 1.6rem; border-radius: 9999px; background: var(--lime); color: var(--ink); flex-shrink: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .cs-cteni li { animation: cs-radek 420ms var(--ease-out) both; animation-delay: calc(350ms + var(--i) * 360ms); }
+  @keyframes cs-radek { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+}
+
+/* Tarif */
+.cs-interval { display: inline-flex; padding: 4px; border-radius: 9999px; background: var(--surface, #fff); box-shadow: inset 0 0 0 1px rgba(22, 24, 26, 0.08); }
+.cs-interval button { padding: 0.45rem 1.1rem; border-radius: 9999px; font-size: 0.9375rem; font-weight: 600; color: rgba(22, 24, 26, 0.6); }
+.cs-interval button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+.cs-tarif {
+  width: 100%; display: flex; align-items: center; gap: 1rem; padding: 1.1rem 1.1rem; text-align: left;
+  border-radius: var(--r-lg, 20px); background: var(--surface, #fff);
+  box-shadow: var(--shadow-card), inset 0 0 0 1px rgba(22, 24, 26, 0.06);
+  transition: box-shadow 200ms var(--ease-out);
+}
+.cs-tarif[aria-pressed="true"] { box-shadow: var(--shadow-float), inset 0 0 0 2px var(--ink); }
+.cs-tarif-kruh { width: 1.375rem; height: 1.375rem; border-radius: 9999px; flex-shrink: 0; box-shadow: inset 0 0 0 1.5px rgba(22, 24, 26, 0.3); transition: box-shadow 200ms var(--ease-out); }
+.cs-tarif[aria-pressed="true"] .cs-tarif-kruh { box-shadow: inset 0 0 0 6.5px var(--ink); }
+.cs-tarif .cs-volba-veta { display: block; margin-top: 0.3rem; }
+.cs-tarif-cena { flex-shrink: 0; text-align: right; font-weight: 700; font-size: 1.125rem; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.cs-tarif-cena > span { display: block; font-size: 0.8125rem; font-weight: 500; color: rgba(22, 24, 26, 0.55); }
+.cs-doporuceno { border-radius: 9999px; padding: 1px 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; background: var(--ink); color: #fff; }
+.cs-zdarma { border-radius: 9999px; padding: 1px 8px; font-size: 11px; font-weight: 650; background: color-mix(in srgb, var(--lime) 45%, transparent); color: #3E5406; }
+.cs-shrnuti-platby { padding: 1rem 1.1rem; border-radius: var(--r-md, 14px); background: rgba(22, 24, 26, 0.035); font-size: 0.9375rem; line-height: 1.5; color: rgba(22, 24, 26, 0.75); text-wrap: pretty; }
+.cs-shrnuti-platby strong { color: var(--ink); }
+
+.cs-pata { max-width: 40rem; width: 100%; margin-inline: auto; padding: 0 1rem 2rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; font-size: 0.9375rem; color: rgba(22, 24, 26, 0.64); }
