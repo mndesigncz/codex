@@ -169,7 +169,7 @@ function HosteAVernost({ velikost }: WidgetProps) {
     }
     if (vidi.hodnoceni) {
       cisla.push(
-        <Stat key="hodnoceni" label={t('Hodnocení')}
+        <Stat key="hodnoceni" label={t('Hodnocení', undefined, 'widgety')}
           value={s.prumer != null ? s.prumer.toLocaleString('cs-CZ', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '–'}
           unit={s.prumer != null ? '/ 5' : undefined}
           note={s.nizkych7 > 0

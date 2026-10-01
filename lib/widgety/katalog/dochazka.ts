@@ -138,7 +138,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         klic: 'razeni',
         nazev: 'Řadit',
         typ: 'vyber',
-        moznosti: [{ id: 'hodiny', nazev: 'Hodiny' }, { id: 'mzda', nazev: 'Mzda' }, { id: 'jmeno', nazev: 'Jméno' }],
+        moznosti: [{ id: 'hodiny', nazev: 'Odpracované hodiny' }, { id: 'mzda', nazev: 'Mzda' }, { id: 'jmeno', nazev: 'Jméno' }],
         vychozi: 'hodiny',
       },
     ],

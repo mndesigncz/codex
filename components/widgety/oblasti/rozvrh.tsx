@@ -1030,7 +1030,7 @@ function Vymeny({ velikost, nahled }: WidgetProps) {
       default: return {
         lead: <Avatar emoji={o.offeredByAvatar} size="sm" />,
         meta: o.status === 'claimed' ? t('Bere si ji {bere} — čeká na vedení', { bere }) : t('Tvoje nabídka — čeká na zájemce'),
-        actions: piseSe ? <Button variant="ghost" size="sm" disabled={pracuji.has(o.id)} onClick={() => akceRadku(o.id, 'cancel')}>{t('Stáhnout')}</Button> : undefined,
+        actions: piseSe ? <Button variant="ghost" size="sm" disabled={pracuji.has(o.id)} onClick={() => akceRadku(o.id, 'cancel')}>{t('Stáhnout', undefined, 'widgety')}</Button> : undefined,
       };
     }
   };

@@ -217,7 +217,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         klic: 'rozsah',
         nazev: 'Čí dny',
         typ: 'vyber',
-        moznosti: [{ id: 'moje', nazev: 'Moje' }, { id: 'tym', nazev: 'Tým', opravneni: 'uzaverky.zobrazit_vse' }],
+        moznosti: [{ id: 'moje', nazev: 'Moje uzávěrky' }, { id: 'tym', nazev: 'Tým', opravneni: 'uzaverky.zobrazit_vse' }],
         vychozi: 'tym',
       },
     ],

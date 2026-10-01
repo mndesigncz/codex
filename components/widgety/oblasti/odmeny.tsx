@@ -644,7 +644,7 @@ function druhPolozky(t: PrekladFn, druh: string): string {
     case 'task': return t('Úkol');
     case 'procedure': return t('Postup');
     case 'closing': return t('Uzávěrka');
-    default: return t('Hodnocení');
+    default: return t('Hodnocení', undefined, 'widgety');
   }
 }
 

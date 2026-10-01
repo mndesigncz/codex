@@ -849,7 +849,7 @@ function Objednavky({ velikost, nahled }: WidgetProps) {
                       <ListRow as="div"
                         title={o.dodavatel ?? t('Bez dodavatele')}
                         meta={<>
-                          <span className={o.stav === 'received' ? 'text-ok-ink' : 'text-bad-ink'}>{o.stav === 'received' ? t('Přijato') : t('Zrušeno')}</span>
+                          <span className={o.stav === 'received' ? 'text-ok-ink' : 'text-bad-ink'}>{o.stav === 'received' ? t('Přijato', undefined, 'widgety') : t('Zrušeno')}</span>
                           {` · ${datumKratce(o.prijata ?? o.vytvoreno)}`}
                         </>}
                         value={smiCenu && o.cena != null && o.cena > 0 ? money(o.cena) : undefined}

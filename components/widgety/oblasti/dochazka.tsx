@@ -658,7 +658,7 @@ function SouhrnHodin({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: str
   const profil = !nahled && !!otevriProfil && smi('tym.profil');
   const zobrazene = L ? radky : radky.slice(0, RADKU_M);
   const moznosti = [
-    { id: 'hodiny' as const, label: t('Hodiny') },
+    { id: 'hodiny' as const, label: t('Hodiny', undefined, 'widgety') },
     ...(vidiMzdy ? [{ id: 'mzda' as const, label: t('Mzda') }] : []),
     { id: 'jmeno' as const, label: t('Jméno') },
   ];

@@ -267,7 +267,7 @@ function Role(_: WidgetProps) {
   const radky = data.data?.radky ?? [];
   const prazdnych = data.data?.prazdnych ?? 0;
   // Editor rolí je v Nastavení → Role a oprávnění a ukazuje se jen s těmito klíči.
-  const odkaz = smi(['tym.role_spravovat', 'tym.role_prirazovat']) ? { popisek: t('Role'), pohled: 'settings', arg: 'roles' } : undefined;
+  const odkaz = smi(['tym.role_spravovat', 'tym.role_prirazovat']) ? { popisek: t('Role', undefined, 'widgety'), pohled: 'settings', arg: 'roles' } : undefined;
   return (
     <Widget nacteni={ceka ? CEKA : data} odkaz={odkaz}
       prazdno={radky.length === 0 ? <p className="t-meta">{t('Zatím nikdo nemá přidělenou roli.')}</p> : undefined}>
