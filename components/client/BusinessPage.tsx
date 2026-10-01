@@ -21,6 +21,7 @@ import { formatMoney, formatPrice, currencySymbol } from '@/lib/money';
 import { okJson, apiMessage } from '@/lib/api';
 import { buildIcs, downloadIcs } from '@/lib/ics';
 import { DiscardGuard } from '../ui/DiscardGuard';
+import MamPoukaz from './MamPoukaz';
 
 type Tab = 'menu' | 'reserve' | 'order' | 'loyalty';
 
@@ -545,6 +546,7 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
           </div>
           {promoErr && <p role="alert" className="mt-2 text-sm text-bad-ink">{promoErr}</p>}
         </form>
+        <div className="mt-5 border-t border-black/[0.06] pt-4"><MamPoukaz slug={slug} /></div>
       </section>
       <section>
         <h2 className="t-section mb-3">{t('Kupony za body')}</h2>
