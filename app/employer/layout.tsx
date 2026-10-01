@@ -15,5 +15,5 @@ export default async function EmployerLayout({ children }: { children: React.Rea
 
   // Vedení používá správu podniku, rozvrh, sklad, předplatné (Nastavení → Předplatné, zámky Pro/Max, platební okno) i přeložené obrazovky
   // zaměstnance, kiosku a chatu; slovníky jdou v prvním HTML, ať se v cizím jazyce nic nepřekreslí česky.
-  return <><Slovniky sekce={['zamestnanec', 'kiosk', 'chat', 'sprava', 'tym', 'navody', 'postupy', 'rozvrh', 'sklad', 'spolecne', 'predplatne']} />{children}</>;
+  return <><Slovniky sekce={['zamestnanec', 'kiosk', 'chat', 'sprava', 'tym', 'navody', 'postupy', 'rozvrh', 'sklad', 'spolecne', 'predplatne', 'widgety']} />{children}</>;
 }

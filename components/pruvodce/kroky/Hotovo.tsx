@@ -116,7 +116,7 @@ export default function Hotovo({ faze, vysledek, chyba, odp, naHotovo }: {
               return (
                 <span key={`${d.w}-${i}`} className="pv-dil" data-v={d.s} data-w={d.w}
                   data-skryto={vidno ? undefined : ''} data-pristi={vidno ? '' : undefined}>
-                  {def?.nazev ?? d.w}
+                  {def ? t(def.nazev) : d.w}
                 </span>
               );
             })}

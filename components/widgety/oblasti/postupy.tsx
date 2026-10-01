@@ -31,7 +31,9 @@ import { useNavigace, useSmi } from '../NavigaceKontext';
 import { useOpravneni } from '../../role/useOpravneni';
 import { useProcedures } from '../../procedures/ProcedureProvider';
 import DetailPrubehu from '../../procedures/DetailPrubehu';
-import { czCount, czForm, type CzNoun } from '@/lib/czech';
+import { useJazyk, useT, type PrekladFn } from '@/lib/i18n/client';
+import { fmtDatum } from '@/lib/i18n/format';
+import type { Jazyk } from '@/lib/i18n/config';
 import { parseDbTime, dbTimeHM, pragueHM, pragueToday } from '@/lib/pragueTime';
 import { parseSteps, totalMinutes, fmtMinutes } from '@/lib/steps';
 import { skipReasonLabel } from '@/lib/procedureScoring';
@@ -68,9 +70,8 @@ function Radek({ onClick, ...p }: ComponentProps<typeof ListRow>) {
   return onClick ? <li><ListRow as="div" {...p} onClick={onClick} /></li> : <ListRow {...p} />;
 }
 
-const NAVRH: CzNoun = { one: 'návrh', few: 'návrhy', many: 'návrhů' };
-const KROK: CzNoun = { one: 'krok', few: 'kroky', many: 'kroků' };
-const PRESKOCENI: CzNoun = { one: 'přeskočení', few: 'přeskočení', many: 'přeskočení' };
+const navrhyTvar = (t: PrekladFn, n: number) => t('{n, plural, one {návrh} few {návrhy} other {návrhů}}', { n });
+const krokyText = (t: PrekladFn, n: number) => t('{n, plural, one {# krok} few {# kroky} other {# kroků}}', { n });
 
 /** Ikona v jamce 36 px jako `lead` řádku (DP §3.6). */
 function Jamka({ ikona }: { ikona: string }) {
@@ -83,18 +84,20 @@ function Jamka({ ikona }: { ikona: string }) {
 
 /** „…a dalších N" pod useknutým seznamem (DP §3.6: tichý strop seznamu je zákaz). */
 function ADalsich({ n }: { n: number }) {
-  return n > 0 ? <p className="t-meta mt-2">…a dalších {n.toLocaleString('cs-CZ')}</p> : null;
+  const t = useT('widgety');
+  return n > 0 ? <p className="t-meta mt-2">{t('…a dalších {n}', { n: n.toLocaleString('cs-CZ') })}</p> : null;
 }
 
 /** Kdy průběh skončil: „dnes 7:40", jinak „12. 3. 7:40" (pražský den, ne den prohlížeče). */
-export function kdyPrubehu(iso: string | null | undefined): string {
+export function kdyPrubehu(iso: string | null | undefined, t: PrekladFn, jazyk: Jazyk): string {
   if (!iso) return '';
   const d = parseDbTime(iso);
   if (!d) return '';
   const den = (x: Date) => x.toLocaleDateString('en-CA', { timeZone: 'Europe/Prague' });
-  if (den(d) === pragueToday()) return `dnes ${dbTimeHM(d)}`;
-  if (den(d) === pragueToday(-1)) return `včera ${dbTimeHM(d)}`;
-  return `${d.toLocaleDateString('cs-CZ', { timeZone: 'Europe/Prague', day: 'numeric', month: 'numeric' })} ${dbTimeHM(d)}`;
+  const cas = dbTimeHM(d);
+  if (den(d) === pragueToday()) return t('dnes {cas}', { cas });
+  if (den(d) === pragueToday(-1)) return t('včera {cas}', { cas });
+  return `${fmtDatum(d, { jazyk, styl: 'kratce' })} ${cas}`;
 }
 
 /**
@@ -143,6 +146,7 @@ async function schvalPostupy(ids: number[]): Promise<number> {
 // ---------------------------------------------------------------------------
 
 function PovinneDnes({ velikost, nahled }: WidgetProps) {
+  const t = useT('widgety');
   const { ok, ceka } = useBrana(['postupy.zobrazit'], ['uzaverky.vytvorit', 'postupy.prubehy_tymu']);
   const smi = useSmi();
   const { active, startRun, starting } = useProcedures();
@@ -169,13 +173,13 @@ function PovinneDnes({ velikost, nahled }: WidgetProps) {
       otevrit={S && smiSpustit && prvni ? () => spust(prvni.id) : undefined}
     >
       {S ? (
-        <Stat label="Hotovo" value={`${seznam.length - cekaji.length} z ${seznam.length}`}
+        <Stat label={t('Hotovo')} value={t('{a} z {b}', { a: seznam.length - cekaji.length, b: seznam.length })}
           // „Postupy hotové“, ne „Uzávěrka může jít“: uzávěrku mohou zamykat i povinné úkoly a návody,
           // o kterých tenhle widget neví — tvrdit povolení vedle zámku uzávěrky by lhalo.
-          note={cekaji.length === 0 ? 'Postupy hotové' : `čeká ${czCount(cekaji.length, { one: 'postup', few: 'postupy', many: 'postupů' })}`} />
+          note={cekaji.length === 0 ? t('Postupy hotové') : t('{n, plural, one {čeká # postup} few {čeká # postupy} other {čeká # postupů}}', { n: cekaji.length })} />
       ) : (
         <>
-          {cekaji.length > 0 && <p className="t-meta text-pretty">Bez nich nepůjde odeslat uzávěrka.</p>}
+          {cekaji.length > 0 && <p className="t-meta text-pretty">{t('Bez nich nepůjde odeslat uzávěrka.')}</p>}
           <ul className="list">
             {seznam.map(p => {
               const bezi = active?.procedureId === p.id;
@@ -184,10 +188,10 @@ function PovinneDnes({ velikost, nahled }: WidgetProps) {
                 <Radek key={p.id}
                   lead={<Jamka ikona={p.ikona} />}
                   title={p.nazev}
-                  meta={p.hotovo ? (p.kdo ? `Dokončil(a) ${p.kdo}` : 'Dnes dokončeno') : klik ? 'Klepnutím spustíš' : undefined}
-                  right={p.hotovo ? <Chip tone="ok" size="sm" icon="check">Hotovo</Chip>
-                    : bezi ? <Chip tone="info" size="sm">Probíhá</Chip>
-                    : <Chip tone="wait" size="sm">Čeká</Chip>}
+                  meta={p.hotovo ? (p.kdo ? t('Dokončil(a) {kdo}', { kdo: p.kdo }) : t('Dnes dokončeno')) : klik ? t('Klepnutím spustíš') : undefined}
+                  right={p.hotovo ? <Chip tone="ok" size="sm" icon="check">{t('Hotovo')}</Chip>
+                    : bezi ? <Chip tone="info" size="sm">{t('Probíhá')}</Chip>
+                    : <Chip tone="wait" size="sm">{t('Čeká')}</Chip>}
                   chevron={false}
                   onClick={klik} />
               );
@@ -204,6 +208,8 @@ function PovinneDnes({ velikost, nahled }: WidgetProps) {
 // ---------------------------------------------------------------------------
 
 function PosledniPrubehy({ velikost, nastaveni, nahled }: WidgetProps<{ pocet?: string }>) {
+  const t = useT('widgety');
+  const { jazyk } = useJazyk();
   // Vlastní průběhy vidí každý (API bez postupy.prubehy_tymu vrací jen je), tým jen s polem.
   const { ok, ceka } = useBrana([]);
   const smi = useSmi();
@@ -225,9 +231,9 @@ function PosledniPrubehy({ velikost, nastaveni, nahled }: WidgetProps<{ pocet?: 
 
   return (
     <Widget
-      titulek={tym ? undefined : 'Moje průběhy'}
+      titulek={tym ? undefined : t('Moje průběhy')}
       nacteni={ceka ? CEKA : behy}
-      prazdno={radky.length === 0 ? <p className="t-meta text-pretty">{tym ? 'Zatím nikdo žádný postup neprošel.' : 'Zatím jsi žádný postup neprošel.'}</p> : undefined}
+      prazdno={radky.length === 0 ? <p className="t-meta text-pretty">{tym ? t('Zatím nikdo žádný postup neprošel.') : t('Zatím jsi žádný postup neprošel.')}</p> : undefined}
     >
       <ul className="list">
         {radky.map(r => {
@@ -236,12 +242,12 @@ function PosledniPrubehy({ velikost, nastaveni, nahled }: WidgetProps<{ pocet?: 
             <Radek key={r.id}
               lead={tym ? <Avatar emoji={r.avatar} size="sm" /> : <Jamka ikona="clipboard" />}
               title={r.nazev}
-              meta={[tym ? r.kdo : null, r.hotovo ? kdyPrubehu(r.kdy) : 'probíhá'].filter(Boolean).join(' · ')}
+              meta={[tym ? r.kdo : null, r.hotovo ? kdyPrubehu(r.kdy, t, jazyk) : t('probíhá')].filter(Boolean).join(' · ')}
               value={r.hotovo ? delka(r.sekund) || undefined : undefined}
               right={!r.hotovo
                 ? <Chip tone="info" size="sm">{r.odskrtano}/{r.celkem}</Chip>
                 : r.nedokonceno > 0
-                  ? <Chip tone="wait" size="sm" icon="warning">{L ? `${r.nedokonceno} nedokončeno` : r.nedokonceno}</Chip>
+                  ? <Chip tone="wait" size="sm" icon="warning">{L ? t('{n} nedokončeno', { n: r.nedokonceno }) : r.nedokonceno}</Chip>
                   : undefined}
               chevron={false}
               onClick={detailOk ? () => setDetail(surovy(r.id)) : undefined} />
@@ -250,7 +256,7 @@ function PosledniPrubehy({ velikost, nastaveni, nahled }: WidgetProps<{ pocet?: 
       </ul>
       {detail && (
         <DetailPrubehu prubeh={detail} kroky={kroky(detail.procedure_id != null ? Number(detail.procedure_id) : null)}
-          kdy={kdyPrubehu(detail.completed_at || detail.started_at)} onClose={() => setDetail(null)} />
+          kdy={kdyPrubehu(detail.completed_at || detail.started_at, t, jazyk)} onClose={() => setDetail(null)} />
       )}
     </Widget>
   );
@@ -261,6 +267,7 @@ function PosledniPrubehy({ velikost, nastaveni, nahled }: WidgetProps<{ pocet?: 
 // ---------------------------------------------------------------------------
 
 function PreskoceneKroky({ nastaveni }: WidgetProps<{ obdobi?: string }>) {
+  const t = useT('widgety');
   const { ok, ceka } = useBrana(['postupy.prubehy_tymu']);
   const behy = useDataWidgetu(ok ? URL_PRUBEHY : null, vyberPrubehy);
   const postupy = useDataWidgetu(ok ? URL_POSTUPY : null, vyberPostupy);
@@ -273,15 +280,15 @@ function PreskoceneKroky({ nastaveni }: WidgetProps<{ obdobi?: string }>) {
   return (
     <Widget
       nacteni={ceka ? CEKA : [behy, postupy]}
-      prazdno={radky.length === 0 ? <p className="t-meta text-pretty">Za posledních {dni} dní se žádný krok nepřeskočil.</p> : undefined}
+      prazdno={radky.length === 0 ? <p className="t-meta text-pretty">{t('Za posledních {dni} dní se žádný krok nepřeskočil.', { dni })}</p> : undefined}
     >
       <ul className="list">
         {radky.slice(0, LIMIT).map(k => (
           <ListRow key={`${k.postupId ?? k.postup}-${k.index}`}
             title={k.krok}
-            meta={[k.postup, k.duvod ? skipReasonLabel(k.duvod) : null, k.lide.length ? k.lide.slice(0, 2).join(', ') + (k.lide.length > 2 ? ` +${k.lide.length - 2}` : '') : null].filter(Boolean).join(' · ')}
+            meta={[k.postup, k.duvod ? t(skipReasonLabel(k.duvod)) : null, k.lide.length ? k.lide.slice(0, 2).join(', ') + (k.lide.length > 2 ? ` +${k.lide.length - 2}` : '') : null].filter(Boolean).join(' · ')}
             value={`${k.pocet}×`}
-            valueMeta={czForm(k.pocet, PRESKOCENI)} />
+            valueMeta={t('přeskočení')} />
         ))}
       </ul>
       <ADalsich n={radky.length - Math.min(radky.length, LIMIT)} />
@@ -294,6 +301,8 @@ function PreskoceneKroky({ nastaveni }: WidgetProps<{ obdobi?: string }>) {
 // ---------------------------------------------------------------------------
 
 function SpustitPostup({ velikost, nastaveni, nahled }: WidgetProps<{ postup?: number | string | null }>) {
+  const t = useT('widgety');
+  const { jazyk } = useJazyk();
   const { ok, ceka } = useBrana(['postupy.spoustet']);
   const { active, startRun, starting } = useProcedures();
   useObnovaPoPrubehu();
@@ -313,8 +322,8 @@ function SpustitPostup({ velikost, nastaveni, nahled }: WidgetProps<{ postup?: n
   const naposledy = p && M ? posledniDokonceni(behy.data ?? [], p.id) : null;
 
   let prazdno: ReactNode | undefined;
-  if (!Number.isFinite(id) || id <= 0) prazdno = <p className="t-meta text-pretty">Vyber postup v nastavení widgetu.</p>;
-  else if (postupy.data && !p) prazdno = <p className="t-meta text-pretty">Postup už neexistuje. Vyber jiný v nastavení widgetu.</p>;
+  if (!Number.isFinite(id) || id <= 0) prazdno = <p className="t-meta text-pretty">{t('Vyber postup v nastavení widgetu.')}</p>;
+  else if (postupy.data && !p) prazdno = <p className="t-meta text-pretty">{t('Postup už neexistuje. Vyber jiný v nastavení widgetu.')}</p>;
 
   return (
     <Widget
@@ -328,13 +337,13 @@ function SpustitPostup({ velikost, nastaveni, nahled }: WidgetProps<{ postup?: n
       {p && (
         <div className={M ? 'space-y-3' : ''}>
           <p className="t-meta">
-            {czCount(kroky.length, KROK)}{min > 0 ? ` · ${fmtMinutes(min)}` : ''}
+            {krokyText(t, kroky.length)}{min > 0 ? ` · ${fmtMinutes(min)}` : ''}
           </p>
           {M && naposledy && (
-            <p className="t-meta cz-sentence">Naposledy {kdyPrubehu(naposledy.completed_at || naposledy.started_at)}{naposledy.user_name ? ` · ${naposledy.user_name}` : ''}</p>
+            <p className="t-meta cz-sentence">{t('Naposledy {kdy}', { kdy: kdyPrubehu(naposledy.completed_at || naposledy.started_at, t, jazyk) })}{naposledy.user_name ? ` · ${naposledy.user_name}` : ''}</p>
           )}
-          {bezi && <Chip tone="info" size="sm" className={M ? '' : 'mt-2'}>Probíhá</Chip>}
-          {M && smi && <Button variant="primary" size="sm" icon="play" loading={starting} onClick={spust}>Spustit</Button>}
+          {bezi && <Chip tone="info" size="sm" className={M ? '' : 'mt-2'}>{t('Probíhá')}</Chip>}
+          {M && smi && <Button variant="primary" size="sm" icon="play" loading={starting} onClick={spust}>{t('Spustit')}</Button>}
         </div>
       )}
     </Widget>
@@ -346,6 +355,7 @@ function SpustitPostup({ velikost, nastaveni, nahled }: WidgetProps<{ postup?: n
 // ---------------------------------------------------------------------------
 
 function NavrhyPostupu({ velikost, nahled }: WidgetProps) {
+  const t = useT('widgety');
   const { ok, ceka } = useBrana(['postupy.schvalovat']);
   const nav = useNavigace();
   const postupy = useDataWidgetu(ok ? URL_POSTUPY : null, vyberPostupy);
@@ -359,9 +369,9 @@ function NavrhyPostupu({ velikost, nahled }: WidgetProps) {
     setPracuji(true); setChyba(null);
     try {
       const selhalo = await schvalPostupy(navrhy.map(p => p.id));
-      if (selhalo) setChyba(`${czCount(selhalo, NAVRH)} se neschválilo. Zkus to znovu.`);
+      if (selhalo) setChyba(t('{n, plural, one {# návrh se neschválil.} few {# návrhy se neschválily.} other {# návrhů se neschválilo.}} Zkus to znovu.', { n: selhalo }));
     } catch (e) {
-      setChyba(apiMessage(e, 'Návrhy se neschválily.'));
+      setChyba(apiMessage(e, t('Návrhy se neschválily.')));
     }
     setPracuji(false);
   };
@@ -376,7 +386,7 @@ function NavrhyPostupu({ velikost, nahled }: WidgetProps) {
       otevrit={S && !nahled && navrhy[0] ? () => otevriPostup(nav, navrhy[0].id) : undefined}
     >
       {S ? (
-        <Stat label="Čeká" value={navrhy.length.toLocaleString('cs-CZ')} note={czForm(navrhy.length, NAVRH)} />
+        <Stat label={t('Čeká')} value={navrhy.length.toLocaleString('cs-CZ')} note={navrhyTvar(t, navrhy.length)} />
       ) : (
         <div className="space-y-3">
           {chyba && <p className="note note-danger text-sm" role="alert">{chyba}</p>}
@@ -385,14 +395,14 @@ function NavrhyPostupu({ velikost, nahled }: WidgetProps) {
               <Radek key={p.id}
                 lead={<Jamka ikona={p.icon || 'clipboard'} />}
                 title={p.name}
-                meta={czCount(parseSteps(p.items).length, KROK)}
+                meta={krokyText(t, parseSteps(p.items).length)}
                 onClick={nahled ? undefined : () => otevriPostup(nav, p.id)} />
             ))}
           </ul>
           <ADalsich n={navrhy.length - Math.min(navrhy.length, 5)} />
           {!nahled && (
             <Button variant="primary" size="sm" icon="check" loading={pracuji} onClick={schval}>
-              {navrhy.length > 1 ? `Schválit vše (${navrhy.length})` : 'Schválit'}
+              {navrhy.length > 1 ? t('Schválit vše ({n})', { n: navrhy.length }) : t('Schválit')}
             </Button>
           )}
         </div>
@@ -405,9 +415,10 @@ function NavrhyPostupu({ velikost, nahled }: WidgetProps) {
 // Připomínky dnes
 // ---------------------------------------------------------------------------
 
-const KOTVA: Record<'time' | 'open' | 'close', string> = { time: 'V pevný čas', open: 'Při otevření', close: 'Při zavření' };
+const kotvaText = (t: PrekladFn, k: 'time' | 'open' | 'close'): string => ({ time: t('V pevný čas'), open: t('Při otevření'), close: t('Při zavření') })[k];
 
 function PripominkyDnes(_props: WidgetProps) {
+  const t = useT('widgety');
   const { ok, ceka } = useBrana(['postupy.zobrazit']);
   const { role } = useOpravneni();
   const postupy = useDataWidgetu(ok ? URL_POSTUPY : null, vyberPostupy);
@@ -423,15 +434,15 @@ function PripominkyDnes(_props: WidgetProps) {
     <Widget
       nacteni={ceka ? CEKA : postupy}
       prazdno={radky.length === 0
-        ? <p className="t-meta text-pretty">{d?.oteviraciDoba.closed ? 'Dnes je zavřeno, žádný postup nepřipomíná.' : 'Dnes žádný postup nepřipomíná.'}</p>
+        ? <p className="t-meta text-pretty">{d?.oteviraciDoba.closed ? t('Dnes je zavřeno, žádný postup nepřipomíná.') : t('Dnes žádný postup nepřipomíná.')}</p>
         : undefined}
     >
-      {bezSmeny && <p className="t-meta text-pretty">Upozornění chodí jen tomu, kdo má dnes směnu.</p>}
+      {bezSmeny && <p className="t-meta text-pretty">{t('Upozornění chodí jen tomu, kdo má dnes směnu.')}</p>}
       <ul className="list">
         {radky.map(r => (
           <ListRow key={r.id}
             title={<span className={r.minula ? 'text-black/45' : undefined}>{r.nazev}</span>}
-            meta={r.kotva === 'time' ? (r.minula ? 'Už proběhla' : undefined) : KOTVA[r.kotva]}
+            meta={r.kotva === 'time' ? (r.minula ? t('Už proběhla') : undefined) : kotvaText(t, r.kotva)}
             value={<span className={`tabular-nums ${r.minula ? 'text-black/45' : ''}`}>{r.cas}</span>} />
         ))}
       </ul>

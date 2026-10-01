@@ -155,7 +155,7 @@ export default function ({ eq, ok }: Testy) {
   // ---- review B7 ----
   // Fronta žádostí se neusekne na pět: velký widget ji ukáže celou a „Vybrat vše" bere celou frontu.
   ok('review: Žádosti o odměny umí L (celá fronta)', !!widget('odmeny.zadosti')?.velikosti.includes('L'));
-  ok('review: „Vybrat vše" počítá z celé fronty, ne z viditelných', /totalLabel=\{`Vybrat vše \(\$\{cislo\(fronta\.length\)\}\)`\}/.test(oblast)
+  ok('review: „Vybrat vše" počítá z celé fronty, ne z viditelných', /totalLabel=\{t\('Vybrat vše \(\{pocet\}\)', \{ pocet: cislo\(fronta\.length\) \}\)\}/.test(oblast)
     && /selectAll\(fronta\.map/.test(oblast));
   // Odkaz „Odměny ›" na stránce Odměny by vedl na tutéž stránku: obě plochy to widgetům řeknou.
   ok('review: widgety nemají natvrdo odkaz „Odměny" (jen přes useOdkazOdmeny)', !/popisek: 'Odměny', pohled: 'rewards' \}\}/.test(oblast));

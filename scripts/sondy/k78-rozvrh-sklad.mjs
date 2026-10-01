@@ -126,7 +126,7 @@ for (const [kod, T] of Object.entries(JAZYKY)) {
     await otevri(p, ROZVRH, 'vedeni.rozvrh');
     const nastroj = 'section[aria-labelledby="planovac-nadpis"]';
     tvrdi(`${kod}: <html lang="${kod}">`, await p.evaluate(() => document.documentElement.lang) === kod);
-    tvrdi(`${kod}: Rozvrh — nadpis „${T.nadpis}“ a hlavní akce „${T.generovat}“`, await p.getByRole('heading', { level: 1, name: T.nadpis }).isVisible() && await p.getByRole('button', { name: T.generovat }).isVisible());
+    tvrdi(`${kod}: Rozvrh — nadpis „${T.nadpis}“ a hlavní akce „${T.generovat}“`, await p.getByRole('heading', { level: 1, name: T.nadpis }).isVisible() && await p.getByRole('button', { name: T.generovat }).first().isVisible());
     for (const z of T.zalozky) tvrdi(`${kod}: Rozvrh — záložka „${z}“`, await p.getByRole('tab', { name: z, exact: true }).first().isVisible().catch(() => false));
     const txt = await textNastroje(p, nastroj);
     tvrdi(`${kod}: Rozvrh — nástroj bez českých slov obalu`, ceskeSlova(txt).length === 0, ceskeSlova(txt).join(', '));
@@ -148,7 +148,7 @@ for (const [kod, T] of Object.entries(JAZYKY)) {
     await otevri(p, ROZVRH, 'vedeni.rozvrh');
     let pt = await preteka(p);
     tvrdi(`${kod}: Rozvrh na 390 px bez vodorovného přetečení`, pt.doc <= pt.okno + 1, JSON.stringify(pt));
-    await p.getByRole('button', { name: T.generovat }).click();
+    await p.getByRole('button', { name: T.generovat }).first().click();
     await p.waitForTimeout(1200);
     pt = await preteka(p);
     tvrdi(`${kod}: Rozvrh s návrhem na 390 px bez přetečení`, pt.doc <= pt.okno + 1, JSON.stringify(pt));

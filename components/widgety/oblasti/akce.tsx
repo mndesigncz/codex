@@ -29,7 +29,7 @@ import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
 import { widget } from '@/lib/widgety/katalog';
 import { dayPlus, pragueToday } from '@/lib/pragueTime';
 import { apiMessage } from '@/lib/api';
-import { czCount, type CzNoun } from '@/lib/czech';
+import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { akceKPriprave, posledniProbehla, prepniBod, vyberAkceSouhrn, vysledekAkce } from '@/lib/klientPrehled';
 import { useMoney } from '../../CurrencyProvider';
 import { Chip, ListRow, PersonChip, Stat, StatRow } from '../../ui';
@@ -62,7 +62,8 @@ const CEKA: StavNacteni = { data: null, error: null, loading: true, reload: () =
  */
 export const NaStranceAkci = createContext(false);
 function useOdkazAkce(): { popisek: string; pohled: string } | undefined {
-  return useContext(NaStranceAkci) ? undefined : { popisek: 'Akce', pohled: 'events' };
+  const t = useT('widgety');
+  return useContext(NaStranceAkci) ? undefined : { popisek: t('Akce'), pohled: 'events' };
 }
 
 // ---------------------------------------------------------------------------
@@ -107,23 +108,24 @@ function vyberAkce(raw: any): Akce[] {
 }
 
 /** Datum akce větou: „dnes", „zítra", jinak „čtvrtek 2. října" (malým — velké dodá cz-sentence). */
-function denAkce(datum: string, dnes: string): string {
-  if (datum === dnes) return 'dnes';
-  if (datum === dayPlus(dnes, 1)) return 'zítra';
+function denAkce(datum: string, dnes: string, t: PrekladFn): string {
+  if (datum === dnes) return t('dnes');
+  if (datum === dayPlus(dnes, 1)) return t('zítra');
   // Poledne, ne půlnoc: datum bez času se tak nepřehoupne do vedlejšího dne v žádné zóně.
   const d = new Date(`${datum}T12:00:00`);
   return Number.isNaN(d.getTime()) ? datum : d.toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
-function kdyAKde(a: Akce, dnes: string): string {
+function kdyAKde(a: Akce, dnes: string, t: PrekladFn): string {
   const cas = a.startTime ? (a.endTime ? `${a.startTime}–${a.endTime}` : a.startTime) : null;
-  return [denAkce(a.date, dnes), cas, a.location].filter(Boolean).join(' · ');
+  return [denAkce(a.date, dnes, t), cas, a.location].filter(Boolean).join(' · ');
 }
 
 /** První písmeno velké — pro meta řádek seznamu, kam se cz-sentence nedá dát bez rozbití ořezu. */
 const sVelkym = (s: string) => s.charAt(0).toLocaleUpperCase('cs-CZ') + s.slice(1);
 
 function NejblizsiAkce({ velikost, nastaveni }: WidgetProps<{ pocet?: unknown }>) {
+  const t = useT('widgety');
   const { data: session } = useSession();
   const { role } = useOpravneni();
   const { ok, ceka } = useBrana(widget('akce.nejblizsi')?.opravneni.vse ?? ['akce.zobrazit']);
@@ -143,21 +145,21 @@ function NejblizsiAkce({ velikost, nastaveni }: WidgetProps<{ pocet?: unknown }>
     <Widget nacteni={ceka ? CEKA : data} odkaz={odkaz}
       // Tři akce jsou seznam i ve střední velikosti — kostra má mít tvar toho, co přijde.
       kostra={kolik === 3 ? 'seznam' : undefined}
-      prazdno={nadchazejici.length === 0 ? <p className="t-meta">Žádná akce v plánu.</p> : undefined}>
+      prazdno={nadchazejici.length === 0 ? <p className="t-meta">{t('Žádná akce v plánu.')}</p> : undefined}>
       {kolik === 1 && nadchazejici[0] ? (() => {
         const a = nadchazejici[0];
         return (
           <div className="min-w-0 space-y-3">
             <div className="min-w-0">
               <p className="text-[15px] font-semibold leading-snug text-[#16181A] text-balance">{a.title}</p>
-              <p className="t-meta mt-0.5 cz-sentence">{kdyAKde(a, dnes)}</p>
+              <p className="t-meta mt-0.5 cz-sentence">{kdyAKde(a, dnes, t)}</p>
               {velikost === 'L' && a.description && <p className="mt-2 text-sm text-black/70 line-clamp-2 text-pretty">{a.description}</p>}
             </div>
             {/* Chip nezalamuje — krátká věta, ať se na telefonu vejde. */}
-            {jsem(a) && <Chip tone="ok" size="sm" icon="check">Jsi v obsluze</Chip>}
+            {jsem(a) && <Chip tone="ok" size="sm" icon="check">{t('Jsi v obsluze')}</Chip>}
             {a.crewPeople.length > 0 && (
               <div>
-                <p className="t-label">Obsluha</p>
+                <p className="t-label">{t('Obsluha')}</p>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {a.crewPeople.map(p => (
                     <PersonChip key={p.id} name={p.name} avatar={p.avatar} size="sm" tone={meId === p.id ? 'ok' : 'muted'} />
@@ -170,10 +172,10 @@ function NejblizsiAkce({ velikost, nastaveni }: WidgetProps<{ pocet?: unknown }>
       })() : (
         <ul className="list">
           {nadchazejici.map(a => (
-            <ListRow key={a.id} title={a.title} meta={sVelkym(kdyAKde(a, dnes))}
+            <ListRow key={a.id} title={a.title} meta={sVelkym(kdyAKde(a, dnes, t))}
               right={jsem(a)
-                ? <Chip tone="ok" size="sm">Jsi v obsluze</Chip>
-                : a.crewPeople.length > 0 ? <Chip tone="muted" size="sm">{a.crewPeople.length} v obsluze</Chip> : undefined} />
+                ? <Chip tone="ok" size="sm">{t('Jsi v obsluze')}</Chip>
+                : a.crewPeople.length > 0 ? <Chip tone="muted" size="sm">{t('{n} v obsluze', { n: a.crewPeople.length })}</Chip> : undefined} />
           ))}
         </ul>
       )}
@@ -186,9 +188,9 @@ function NejblizsiAkce({ velikost, nastaveni }: WidgetProps<{ pocet?: unknown }>
 // ---------------------------------------------------------------------------
 
 const ID_CHECKLIST = 'akce.checklist';
-const BOD: CzNoun = { one: 'bod', few: 'body', many: 'bodů' };
 
 function PripravaAkce(_: WidgetProps) {
+  const t = useT('widgety');
   const smi = useSmi();
   const { nahled } = useWidget();
   const { ok, ceka } = useBrana(widget(ID_CHECKLIST)?.opravneni.vse ?? ['akce.zobrazit']);
@@ -215,10 +217,10 @@ function PripravaAkce(_: WidgetProps) {
       const res = await fetch(`/api/events/${akce.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ checklist: novy }),
       });
-      if (!res.ok) { const x = await res.json().catch(() => ({})); throw new Error(typeof x?.error === 'string' ? x.error : 'Uložení se nepodařilo.'); }
+      if (!res.ok) { const x = await res.json().catch(() => ({})); throw new Error(typeof x?.error === 'string' ? x.error : t('Uložení se nepodařilo.')); }
     } catch (e) {
       setMistni(null);
-      setChyba(apiMessage(e, 'Spojení se serverem selhalo.'));
+      setChyba(apiMessage(e, t('Spojení se serverem selhalo.')));
     } finally {
       reload();
       obnovDataWidgetu('/api/events');
@@ -228,13 +230,13 @@ function PripravaAkce(_: WidgetProps) {
   return (
     <Widget nacteni={ceka ? CEKA : data} odkaz={odkaz}
       doplnek={akce && zbyva > 0 ? <Chip tone="muted" size="sm">{zbyva}</Chip> : undefined}
-      prazdno={data.data && !akce ? <p className="t-meta">Žádná nadcházející akce s přípravou.</p> : undefined}>
+      prazdno={data.data && !akce ? <p className="t-meta">{t('Žádná nadcházející akce s přípravou.')}</p> : undefined}>
       {akce && (
         <div className="space-y-3">
-          <p className="t-meta cz-sentence">{akce.nazev} · {denAkce(akce.datum, dnes)}{akce.zacatek ? ` v ${akce.zacatek}` : ''}</p>
+          <p className="t-meta cz-sentence">{akce.nazev} · {denAkce(akce.datum, dnes, t)}{akce.zacatek ? ` ${t('v {cas}', { cas: akce.zacatek })}` : ''}</p>
           {chyba && <p className="note note-danger" role="alert">{chyba}</p>}
-          {zbyva === 0 && <p className="note note-ok" role="status">Všechno připravené.</p>}
-          <ul className="list" aria-label={`Příprava: ${akce.nazev}`}>
+          {zbyva === 0 && <p className="note note-ok" role="status">{t('Všechno připravené.')}</p>}
+          <ul className="list" aria-label={t('Příprava: {nazev}', { nazev: akce.nazev })}>
             {body.map((c, i) => (
               <li key={i} className="list-row">
                 <label className={`flex min-w-0 flex-1 items-start gap-3 ${odskrta ? 'cursor-pointer' : ''}`}>
@@ -245,7 +247,7 @@ function PripravaAkce(_: WidgetProps) {
               </li>
             ))}
           </ul>
-          {!odskrta && !nahled && zbyva > 0 && <p className="t-meta">Zbývá {czCount(zbyva, BOD)}. Odškrtávat může, kdo má přípravu akcí na starosti.</p>}
+          {!odskrta && !nahled && zbyva > 0 && <p className="t-meta">{t('Zbývá {n, plural, one {# bod} few {# body} other {# bodů}}. Odškrtávat může, kdo má přípravu akcí na starosti.', { n: zbyva })}</p>}
         </div>
       )}
     </Widget>
@@ -257,9 +259,9 @@ function PripravaAkce(_: WidgetProps) {
 // ---------------------------------------------------------------------------
 
 const ID_VYSLEDEK = 'akce.vysledek';
-const UZAVERKA: CzNoun = { one: 'uzávěrka', few: 'uzávěrky', many: 'uzávěrek' };
 
 function VysledekAkce({ velikost }: WidgetProps) {
+  const t = useT('widgety');
   const money = useMoney();
   const nav = useNavigace();
   const { ok, ceka } = useBrana(widget(ID_VYSLEDEK)?.opravneni.vse ?? ['akce.zobrazit', 'akce.finance']);
@@ -267,7 +269,7 @@ function VysledekAkce({ velikost }: WidgetProps) {
   const dnes = pragueToday();
   const a = posledniProbehla(data.data ?? [], dnes);
   const vysledek = a ? vysledekAkce(a) : null;
-  const prazdno = data.data && !a ? <p className="t-meta">Zatím žádná proběhlá akce s tržbou nebo náklady.</p> : undefined;
+  const prazdno = data.data && !a ? <p className="t-meta">{t('Zatím žádná proběhlá akce s tržbou nebo náklady.')}</p> : undefined;
   const tonVysledku = vysledek == null ? undefined : vysledek >= 0 ? 'text-ok-ink' : 'text-bad-ink';
   const castka = vysledek == null ? '–' : `${vysledek > 0 ? '+' : ''}${money(vysledek)}`;
   const odkaz = useOdkazAkce();
@@ -277,7 +279,7 @@ function VysledekAkce({ velikost }: WidgetProps) {
     return (
       <Widget nacteni={ceka ? CEKA : data} prazdno={prazdno}
         otevrit={!naAkcich && nav.smiPohled('events') ? () => nav.onNavigate('events') : undefined}>
-        {a && <Stat label="Výsledek" value={<span className={tonVysledku}>{castka}</span>} note={a.nazev} />}
+        {a && <Stat label={t('Výsledek')} value={<span className={tonVysledku}>{castka}</span>} note={a.nazev} />}
       </Widget>
     );
   }
@@ -285,13 +287,13 @@ function VysledekAkce({ velikost }: WidgetProps) {
     <Widget nacteni={ceka ? CEKA : data} prazdno={prazdno} odkaz={odkaz}>
       {a && (
         <div className="space-y-3">
-          <p className="t-meta cz-sentence">{a.nazev} · {denAkce(a.datum, dnes)}</p>
+          <p className="t-meta cz-sentence">{a.nazev} · {denAkce(a.datum, dnes, t)}</p>
           <StatRow>
-            <Stat label="Tržba" value={a.trzba == null ? '–' : money(a.trzba)}
-              note={a.uzaverek > 0 ? `${czCount(a.uzaverek, UZAVERKA)} za akci` : 'zapsaná ručně'} />
-            <Stat label="Náklady" value={a.naklady == null ? '–' : money(a.naklady)} />
-            <Stat label="Výsledek" value={<span className={tonVysledku}>{castka}</span>}
-              note={vysledek == null ? undefined : <span className="inline-flex items-center gap-1"><Icon name="trend" size={13} className={vysledek < 0 ? 'rotate-180' : ''} />{vysledek >= 0 ? 'v plusu' : 've ztrátě'}</span>} />
+            <Stat label={t('Tržba')} value={a.trzba == null ? '–' : money(a.trzba)}
+              note={a.uzaverek > 0 ? t('{n, plural, one {# uzávěrka} few {# uzávěrky} other {# uzávěrek}} za akci', { n: a.uzaverek }) : t('zapsaná ručně')} />
+            <Stat label={t('Náklady')} value={a.naklady == null ? '–' : money(a.naklady)} />
+            <Stat label={t('Výsledek')} value={<span className={tonVysledku}>{castka}</span>}
+              note={vysledek == null ? undefined : <span className="inline-flex items-center gap-1"><Icon name="trend" size={13} className={vysledek < 0 ? 'rotate-180' : ''} />{vysledek >= 0 ? t('v plusu') : t('ve ztrátě')}</span>} />
           </StatRow>
         </div>
       )}

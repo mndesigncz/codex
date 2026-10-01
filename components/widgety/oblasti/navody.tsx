@@ -26,7 +26,7 @@ import { Widget, type StavNacteni } from '../Widget';
 import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
 import { useNavigace } from '../NavigaceKontext';
 import { useOpravneni } from '../../role/useOpravneni';
-import { czCount, czForm, type CzNoun } from '@/lib/czech';
+import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { apiMessage, okJson } from '@/lib/api';
 import {
   URL_NAVODY, URL_CTENARI, UDALOST_OTEVRIT_NAVOD,
@@ -51,11 +51,21 @@ const CEKA: StavNacteni = { data: null, error: null, loading: true, reload: () =
 function Radek({ onClick, ...p }: ComponentProps<typeof ListRow>) {
   return onClick ? <li><ListRow as="div" {...p} onClick={onClick} /></li> : <ListRow {...p} />;
 }
-const NAVOD: CzNoun = { one: 'návod', few: 'návody', many: 'návodů' };
-const NAVRH: CzNoun = { one: 'návrh', few: 'návrhy', many: 'návrhů' };
+const navodyTvar = (t: PrekladFn, n: number) => t('{n, plural, one {návod} few {návody} other {návodů}}', { n });
+const navrhyTvar = (t: PrekladFn, n: number) => t('{n, plural, one {návrh} few {návrhy} other {návrhů}}', { n });
 
 function ADalsich({ n }: { n: number }) {
-  return n > 0 ? <p className="t-meta mt-2">…a dalších {n.toLocaleString('cs-CZ')}</p> : null;
+  const t = useT('widgety');
+  return n > 0 ? <p className="t-meta mt-2">{t('…a dalších {n}', { n: n.toLocaleString('cs-CZ') })}</p> : null;
+}
+
+/** Datum úpravy: „dnes“ a „včera“ se překládají, ostatní je datum. */
+function useKdyUpraveno(): (iso: string | null | undefined) => string {
+  const t = useT('widgety');
+  return iso => {
+    const k = kdyUpraveno(iso);
+    return k === 'dnes' || k === 'včera' ? t(k) : k;
+  };
 }
 
 /**
@@ -73,6 +83,7 @@ export function otevriNavodZWidgetu(nav: Navigace, id: number): void {
 // ---------------------------------------------------------------------------
 
 function PovinneCteni({ velikost, nahled }: WidgetProps) {
+  const t = useT('widgety');
   const { ok, ceka } = useBrana(['navody.zobrazit']);
   const nav = useNavigace();
   const data = useDataWidgetu(ok ? URL_NAVODY : null, vyberNavody);
@@ -87,10 +98,10 @@ function PovinneCteni({ velikost, nahled }: WidgetProps) {
       nacteni={ceka ? CEKA : data}
       doplnek={!S && seznam.length > 0 ? <Chip tone="wait" size="sm">{seznam.length}</Chip> : undefined}
       otevrit={S && muze && seznam[0] ? () => otevriNavodZWidgetu(nav, seznam[0].id) : undefined}
-      prazdno={seznam.length === 0 ? <p className="t-meta text-pretty">{S ? 'Vše přečteno.' : 'Povinné čtení máš hotové.'}</p> : undefined}
+      prazdno={seznam.length === 0 ? <p className="t-meta text-pretty">{S ? t('Vše přečteno.') : t('Povinné čtení máš hotové.')}</p> : undefined}
     >
       {S ? (
-        <Stat label="Zbývá" value={seznam.length.toLocaleString('cs-CZ')} note={czForm(seznam.length, NAVOD)} />
+        <Stat label={t('Zbývá')} value={seznam.length.toLocaleString('cs-CZ')} note={navodyTvar(t, seznam.length)} />
       ) : (
         <>
           <ul className="list">
@@ -111,6 +122,7 @@ function PovinneCteni({ velikost, nahled }: WidgetProps) {
 // ---------------------------------------------------------------------------
 
 function KdoNecetl({ velikost, nahled }: WidgetProps) {
+  const t = useT('widgety');
   const { ok, ceka } = useBrana(['navody.povinne_cteni']);
   const nav = useNavigace();
   const data = useDataWidgetu(ok ? URL_CTENARI : null, vyberCtenare);
@@ -126,7 +138,7 @@ function KdoNecetl({ velikost, nahled }: WidgetProps) {
     <Widget
       nacteni={ceka ? CEKA : data}
       doplnek={chybi > 0 ? <Chip tone="wait" size="sm">{chybi}</Chip> : undefined}
-      prazdno={radky.length === 0 ? <p className="t-meta text-pretty">Žádný návod není povinné čtení.</p> : undefined}
+      prazdno={radky.length === 0 ? <p className="t-meta text-pretty">{t('Žádný návod není povinné čtení.')}</p> : undefined}
     >
       <ul className="list">
         {radky.slice(0, limit).map(r => {
@@ -136,10 +148,10 @@ function KdoNecetl({ velikost, nahled }: WidgetProps) {
             <Radek key={r.id}
               title={r.title}
               // Jména jen ve velké velikosti — ve střední by se řádek lámal na telefonu.
-              meta={L && !vsichni && jmena.length ? `Chybí: ${jmena.slice(0, 4).join(', ')}${jmena.length > 4 ? ` +${jmena.length - 4}` : ''}` : undefined}
-              value={<span className="tabular-nums">{r.precetlo} z {r.celkem}</span>}
-              valueMeta="přečetlo"
-              right={vsichni ? <Chip tone="ok" size="sm" icon="check">Všichni</Chip> : undefined}
+              meta={L && !vsichni && jmena.length ? t('Chybí: {jmena}', { jmena: `${jmena.slice(0, 4).join(', ')}${jmena.length > 4 ? ` +${jmena.length - 4}` : ''}` }) : undefined}
+              value={<span className="tabular-nums">{t('{a} z {b}', { a: r.precetlo, b: r.celkem })}</span>}
+              valueMeta={t('přečetlo')}
+              right={vsichni ? <Chip tone="ok" size="sm" icon="check">{t('Všichni')}</Chip> : undefined}
               chevron={false}
               onClick={muze ? () => otevriNavodZWidgetu(nav, r.id) : undefined} />
           );
@@ -155,22 +167,24 @@ function KdoNecetl({ velikost, nahled }: WidgetProps) {
 // ---------------------------------------------------------------------------
 
 function NoveUpravene({ nastaveni, nahled }: WidgetProps<{ pocet?: string }>) {
+  const t = useT('widgety');
   const { ok, ceka } = useBrana(['navody.zobrazit']);
   const nav = useNavigace();
   const data = useDataWidgetu(ok ? URL_NAVODY : null, vyberNavody);
   const pocet = Math.min(10, Math.max(1, Number(nastaveni.pocet) || 5));
   const seznam = useMemo(() => noveUpravene(data.data ?? [], pocet), [data.data, pocet]);
+  const kdyTxt = useKdyUpraveno();
 
   if (!ok && !ceka) return <Widget prazdno={null} />;
 
   const muze = !nahled && nav.smiPohled('guides');
   return (
     <Widget nacteni={ceka ? CEKA : data}
-      prazdno={seznam.length === 0 ? <p className="t-meta text-pretty">Zatím tu nejsou žádné návody.</p> : undefined}>
+      prazdno={seznam.length === 0 ? <p className="t-meta text-pretty">{t('Zatím tu nejsou žádné návody.')}</p> : undefined}>
       <ul className="list">
         {seznam.map(g => (
           <Radek key={g.id} title={g.title} meta={g.excerpt || undefined}
-            aside={kdyUpraveno(g.updatedAt)}
+            aside={kdyTxt(g.updatedAt)}
             onClick={muze ? () => otevriNavodZWidgetu(nav, g.id) : undefined} />
         ))}
       </ul>
@@ -183,10 +197,12 @@ function NoveUpravene({ nastaveni, nahled }: WidgetProps<{ pocet?: string }>) {
 // ---------------------------------------------------------------------------
 
 function NavrhyNavodu({ velikost, nahled }: WidgetProps) {
+  const t = useT('widgety');
   const { ok, ceka } = useBrana(['navody.schvalovat']);
   const nav = useNavigace();
   const data = useDataWidgetu(ok ? URL_NAVODY : null, vyberNavody);
   const navrhy = useMemo(() => navrhyNavodu(data.data ?? []), [data.data]);
+  const kdyTxt = useKdyUpraveno();
   const [pracuji, setPracuji] = useState(false);
   const [chyba, setChyba] = useState<string | null>(null);
 
@@ -202,9 +218,9 @@ function NavrhyNavodu({ velikost, nahled }: WidgetProps) {
         await okJson(res);
       });
       obnovDataWidgetu(URL_NAVODY);
-      if (failed.length) setChyba(`${czCount(failed.length, NAVRH)} se neschválilo. Zkus to znovu.`);
+      if (failed.length) setChyba(t('{n, plural, one {# návrh se neschválil.} few {# návrhy se neschválily.} other {# návrhů se neschválilo.}} Zkus to znovu.', { n: failed.length }));
     } catch (e) {
-      setChyba(apiMessage(e, 'Návrhy se neschválily.'));
+      setChyba(apiMessage(e, t('Návrhy se neschválily.')));
     }
     setPracuji(false);
   };
@@ -220,20 +236,20 @@ function NavrhyNavodu({ velikost, nahled }: WidgetProps) {
       otevrit={S && muze && navrhy[0] ? () => otevriNavodZWidgetu(nav, navrhy[0].id) : undefined}
     >
       {S ? (
-        <Stat label="Čeká" value={navrhy.length.toLocaleString('cs-CZ')} note={czForm(navrhy.length, NAVRH)} />
+        <Stat label={t('Čeká')} value={navrhy.length.toLocaleString('cs-CZ')} note={navrhyTvar(t, navrhy.length)} />
       ) : (
         <div className="space-y-3">
           {chyba && <p className="note note-danger text-sm" role="alert">{chyba}</p>}
           <ul className="list">
             {navrhy.slice(0, 5).map(g => (
-              <Radek key={g.id} title={g.title} meta={g.excerpt || undefined} aside={kdyUpraveno(g.updatedAt)}
+              <Radek key={g.id} title={g.title} meta={g.excerpt || undefined} aside={kdyTxt(g.updatedAt)}
                 onClick={muze ? () => otevriNavodZWidgetu(nav, g.id) : undefined} />
             ))}
           </ul>
           <ADalsich n={navrhy.length - Math.min(navrhy.length, 5)} />
           {!nahled && (
             <Button variant="primary" size="sm" icon="check" loading={pracuji} onClick={schval}>
-              {navrhy.length > 1 ? `Schválit vše (${navrhy.length})` : 'Schválit'}
+              {navrhy.length > 1 ? t('Schválit vše ({n})', { n: navrhy.length }) : t('Schválit')}
             </Button>
           )}
         </div>
@@ -247,6 +263,7 @@ function NavrhyNavodu({ velikost, nahled }: WidgetProps) {
 // ---------------------------------------------------------------------------
 
 function KUzaverce({ nahled }: WidgetProps) {
+  const t = useT('widgety');
   const { ok, ceka } = useBrana(['navody.zobrazit']);
   const nav = useNavigace();
   const data = useDataWidgetu(ok ? URL_NAVODY : null, vyberNavody);
@@ -265,7 +282,7 @@ function KUzaverce({ nahled }: WidgetProps) {
       {g && (
         <div>
           <p className="text-[15px] font-medium leading-snug text-[#16181A] line-clamp-2 text-pretty">{g.title}</p>
-          <p className="t-meta mt-1">Co dělat, když kasa nesedí</p>
+          <p className="t-meta mt-1">{t('Co dělat, když kasa nesedí')}</p>
         </div>
       )}
     </Widget>

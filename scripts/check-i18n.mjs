@@ -37,7 +37,7 @@ import { RES_STATUS, tierFor } from '../lib/clientSlots.ts';
 const JAZYKY = ['en', 'de', 'sk', 'pl'];
 const ROOTS = ['app', 'components', 'lib'];
 /** Kolik `'cs-CZ'` je v kódu mimo výjimky. Klesá s každou dávkou migrace na lib/i18n/format; nesmí růst. */
-const BASELINE_CS_CZ = 159; // +3: výchozí čeština průvodce a předvolby zemí, cena na (zatím české) prodejní stránce
+const BASELINE_CS_CZ = 141; // +3: výchozí čeština průvodce a předvolby zemí, cena na (zatím české) prodejní stránce
 /** Natvrdo psané české řetězce v přeložených souborech (soubor → kolik). Nesmí růst; klesá s dalšími dávkami. */
 const BASELINE_NATVRDO = {};
 
@@ -81,6 +81,13 @@ if (args[0] === '--rename') {
 }
 
 // ---------------------------------------------------------------------------
+let _wz;
+function widgetyZdroj(klic) {
+  _wz ??= [...walk('components/widgety'), 'lib/rozvrhPrehled.ts', 'lib/procedureScoring.ts'].map(f => readFileSync(f, 'utf8')).join('\n');
+  const k = klic.split('|')[0];
+  return _wz.includes(`'${k.replace(/'/g, "\\'")}'`) || _wz.includes(`"${k}"`) || _wz.includes(`\`${k}\``);
+}
+
 // Klíče z kódu
 
 const RE_SEKCE = /\buseT\(\s*'([a-z-]+)'\s*\)/;
@@ -167,6 +174,33 @@ for (const n of [0, 10, 25, 100]) pridej('klient-host', tierFor(n, { platinumAt:
   for (const d of moder.DUVODY) pridej('spolecne', d.nazev, 'lib/moderace.ts (DUVODY)');
 }
 
+// Katalog widgetů a stránek s plochou: texty z dat se v UI překládají podle textu (`t(definice.nazev)`),
+// takže v kódu nejsou jako `t('…')` a bez téhle ruční extrakce by je kontrola neviděla.
+{
+  const kat = await import('../lib/widgety/katalog/index.ts');
+  const str = await import('../lib/widgety/stranky/index.ts');
+  const KW = 'lib/widgety/katalog (nazev, popis, nastaveni)';
+  const v = (x) => { if (typeof x === 'string' && /\p{L}/u.test(x)) pridej('widgety', x, KW); };
+  for (const o of kat.OBLASTI) v(o.nazev);
+  for (const w of kat.KATALOG_WIDGETU) {
+    v(w.nazev); v(w.popis);
+    for (const n of w.nastaveni ?? []) {
+      v(n.nazev); v(n.napoveda); v(n.jednotka); v(n.prazdne);
+      for (const m of n.moznosti ?? []) v(m.nazev);
+    }
+  }
+  for (const st of str.STRANKY) {
+    v(st.nazev);
+    if (st.nastroj) { v(st.nastroj.nazev); v(st.nastroj.popis); }
+  }
+  // Názvy rozsahů rozložení (lib/widgety/rozlozeniDb.ts NAZEV_TYPU) a systémové role se překládají podle textu.
+  for (const x of ['Celé vedení', 'Všichni zaměstnanci', 'Všechny tablety']) pridej('widgety', x, 'lib/widgety/rozlozeniDb.ts (NAZEV_TYPU)');
+  const ok = await import('../lib/opravneniKatalog.ts');
+  for (const r of ok.SYSTEMOVE_ROLE) v(r.nazev);
+  // Hlášky hooků widgetů jdou přes apiMessage → slovník `api`.
+  for (const x of ['Rozložení se nenačetlo.', 'Rozložení se nepodařilo uložit.', 'Výchozí rozložení se nepodařilo obnovit.', 'Data se nenačetla.', 'Data mají nečekaný tvar.']) pridej('api', x, 'components/widgety/useRozlozeni.ts, useDataWidgetu.ts');
+}
+
 // Hlášky serveru: věty v `error: '…'` hostovských rout, statusMessage a blokace/middleware.
 const apiKlice = new Set();
 const apiVynechat = new Set();
@@ -230,7 +264,9 @@ for (const s of sekce) {
     if (!slov) { if (vKodu.size) hlas(`chybí celý soubor locales/${j}/${s}.json (${vKodu.size} vět)`); continue; }
     const klice = new Set(Object.keys(slov));
     const chybejici = [...vKodu].filter(k => !klice.has(k));
-    const zastarale = [...klice].filter(k => !vKodu.has(k));
+    // Widgety překládají část vět nepřímo (`t(proměnná)` nad tabulkami textů v komponentách): klíč, který stojí
+    // v uvozovkách někde v components/widgety, se za zastaralý nepovažuje.
+    const zastarale = [...klice].filter(k => !vKodu.has(k) && !(s === 'widgety' && widgetyZdroj(k)));
     for (const k of chybejici) {
       const podobna = zastarale.map(z => [z, podobnost(z, k)]).sort((a, b) => b[1] - a[1])[0];
       hlas(`chybí překlad „${k}“${podobna && podobna[1] > 0.6 ? `\n      ↳ změněná věta? ve slovníku je „${podobna[0]}“ (${Math.round(podobna[1] * 100)} %); přenes ji: --rename "${podobna[0]}" "${k}"` : ''}`);

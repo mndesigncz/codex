@@ -8,7 +8,7 @@
 // kreslí se líně, až se položka přiblíží k oknu, a data sdílí s plochou.
 // Výběr otevře detail v tomtéž okně (velikost + náhled), ne druhé okno.
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Button, Chip, Modal, SearchField, Segmented, Well } from '../../ui';
 import { MaxBadge, ProBadge } from '../../Pro';
 import type { DefiniceStranky, DefiniceWidgetu, PolozkaRozlozeni, Tarif, Velikost } from '@/lib/widgety/typy';
@@ -18,8 +18,9 @@ import { obsahujeNekde } from '@/lib/hledani';
 import { Nahled } from '../Nahled';
 import { useNavigace } from '../NavigaceKontext';
 import { useObal } from '../../ObalProvider';
+import { useT, type PrekladFn } from '@/lib/i18n/client';
 
-const VELIKOST_SLOVNE: Record<Velikost, string> = { S: 'Malý', M: 'Střední', L: 'Velký' };
+const velikostSlovne = (t: PrekladFn): Record<Velikost, string> => ({ S: t('Malý'), M: t('Střední'), L: t('Velký') });
 
 interface Skupina { id: string; nazev: string; widgety: DefiniceWidgetu[]; tarifem?: boolean }
 
@@ -37,6 +38,10 @@ export default function GalerieWidgetu({ stranka, nabidka, tarifem, polozky, sch
   onZavrit: () => void;
 }) {
   const nav = useNavigace();
+  const t = useT('widgety');
+  const slovne = velikostSlovne(t);
+  /** Název oblasti v jazyce uživatele (hledání i řazení jede nad přeloženým textem). */
+  const tOblast = useCallback((id: string) => { const o = najdiOblast(id); return o ? t(o.nazev) : undefined; }, [t]);
   const { smiPlatby } = useObal();
   const [dotaz, setDotaz] = useState('');
   const [vybrany, setVybrany] = useState<DefiniceWidgetu | null>(null);
@@ -55,19 +60,19 @@ export default function GalerieWidgetu({ stranka, nabidka, tarifem, polozky, sch
     const doporucene = stranka.doporucene.filter(id => vNabidce.has(id)).map(id => najdiWidget(id)!);
     const jeDoporuceny = new Set(doporucene.map(w => w.id));
     const hleda = dotaz.trim().length > 0;
-    const sedi = (w: DefiniceWidgetu) => !hleda || obsahujeNekde(dotaz, w.nazev, w.popis, najdiOblast(w.oblast)?.nazev);
+    const sedi = (w: DefiniceWidgetu) => !hleda || obsahujeNekde(dotaz, t(w.nazev), t(w.popis), tOblast(w.oblast));
     const out: Skupina[] = [];
     // Při hledání by „Doporučené" jen zdvojovalo výsledky pod jejich oblastí.
-    if (!hleda && doporucene.length) out.push({ id: 'doporucene', nazev: 'Doporučené pro tuto stránku', widgety: doporucene });
+    if (!hleda && doporucene.length) out.push({ id: 'doporucene', nazev: t('Doporučené pro tuto stránku'), widgety: doporucene });
     for (const o of OBLASTI) {
       const widgety = defs.filter(w => w.oblast === o.id && (hleda || !jeDoporuceny.has(w.id)) && sedi(w));
-      if (widgety.length) out.push({ id: o.id, nazev: o.nazev, widgety });
+      if (widgety.length) out.push({ id: o.id, nazev: t(o.nazev), widgety });
     }
     const sTarifem = tarifem.map(t => najdiWidget(t.widget)).filter((w): w is DefiniceWidgetu => !!w && sedi(w));
     // V obalu se widgety „s tarifem“ nenabízejí vůbec: výzva k tarifům je výzva k nákupu.
-    if (sTarifem.length && smiPlatby) out.push({ id: 'tarif', nazev: 'S tarifem Pro nebo Max', widgety: sTarifem, tarifem: true });
+    if (sTarifem.length && smiPlatby) out.push({ id: 'tarif', nazev: t('S tarifem Pro nebo Max'), widgety: sTarifem, tarifem: true });
     return out;
-  }, [nabidka, tarifem, stranka, dotaz, smiPlatby]);
+  }, [nabidka, tarifem, stranka, dotaz, smiPlatby, t, tOblast]);
 
   const otevrit = (w: DefiniceWidgetu) => {
     setVybrany(w);
@@ -75,18 +80,18 @@ export default function GalerieWidgetu({ stranka, nabidka, tarifem, polozky, sch
   };
 
   if (vybrany) {
-    const nazevOblasti = najdiOblast(vybrany.oblast)?.nazev;
+    const nazevOblasti = tOblast(vybrany.oblast);
     return (
-      <Modal open onClose={onZavrit} size="lg" title={vybrany.nazev} subtitle={nazevOblasti}
+      <Modal open onClose={onZavrit} size="lg" title={t(vybrany.nazev)} subtitle={nazevOblasti}
         footer={<>
-          <Button variant="ghost" icon="chevron" className="[&>svg]:rotate-90" onClick={() => setVybrany(null)}>Zpět</Button>
-          <Button variant="primary" icon="plus" onClick={() => onPridat(vybrany.id, velikost)}>Přidat widget</Button>
+          <Button variant="ghost" icon="chevron" className="[&>svg]:rotate-90" onClick={() => setVybrany(null)}>{t('Zpět')}</Button>
+          <Button variant="primary" icon="plus" onClick={() => onPridat(vybrany.id, velikost)}>{t('Přidat widget')}</Button>
         </>}>
         <div className="space-y-4">
-          <p className="t-meta text-pretty">{vybrany.popis}</p>
+          <p className="t-meta text-pretty">{t(vybrany.popis)}</p>
           {vybrany.velikosti.length > 1 && (
-            <Segmented size="sm" ariaLabel="Velikost" value={velikost} onChange={setVelikost}
-              options={vybrany.velikosti.map(v => ({ id: v, label: VELIKOST_SLOVNE[v] }))} />
+            <Segmented size="sm" ariaLabel={t('Velikost')} value={velikost} onChange={setVelikost}
+              options={vybrany.velikosti.map(v => ({ id: v, label: slovne[v] }))} />
           )}
           <Well pad="sm">
             <Nahled widget={vybrany.id} velikost={velikost} schematicky={schematicky} className="max-h-[22rem]" />
@@ -97,13 +102,13 @@ export default function GalerieWidgetu({ stranka, nabidka, tarifem, polozky, sch
   }
 
   return (
-    <Modal open onClose={onZavrit} size="lg" title="Přidat widget" subtitle={stranka.nazev}>
+    <Modal open onClose={onZavrit} size="lg" title={t('Přidat widget')} subtitle={t(stranka.nazev)}>
       <div className="space-y-5">
         <div data-transient="">
-          <SearchField value={dotaz} onChange={setDotaz} storageKey="galerie-widgetu" ariaLabel="Hledat widget" placeholder="Hledat widget…" />
+          <SearchField value={dotaz} onChange={setDotaz} storageKey="galerie-widgetu" ariaLabel={t('Hledat widget')} placeholder={t('Hledat widget…')} />
         </div>
         {skupiny.length === 0 && (
-          <p className="t-meta">{dotaz.trim() ? 'Takový widget tu není. Zkus jiné slovo.' : 'Na tuhle stránku teď nic dalšího nejde přidat.'}</p>
+          <p className="t-meta">{dotaz.trim() ? t('Takový widget tu není. Zkus jiné slovo.') : t('Na tuhle stránku teď nic dalšího nejde přidat.')}</p>
         )}
         {skupiny.map(s => (
           <section key={s.id} aria-labelledby={`galerie-${s.id}`} className="space-y-2.5">
@@ -124,24 +129,24 @@ export default function GalerieWidgetu({ stranka, nabidka, tarifem, polozky, sch
                     </Well>
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="t-card">{w.nazev}</p>
-                        <p id={idPopisu} className="t-meta mt-0.5 text-pretty">{w.popis}</p>
+                        <p className="t-card">{t(w.nazev)}</p>
+                        <p id={idPopisu} className="t-meta mt-0.5 text-pretty">{t(w.popis)}</p>
                       </div>
-                      {naPlose && <Chip tone="muted" size="sm" className="shrink-0">Na ploše</Chip>}
+                      {naPlose && <Chip tone="muted" size="sm" className="shrink-0">{t('Na ploše')}</Chip>}
                       {tarif && (tarif === 'max' ? <MaxBadge className="shrink-0" /> : <ProBadge className="shrink-0" />)}
                     </div>
                     {tarif ? (
                       // Místo přidání cesta k tarifům — widget, který by na ploše nešel, se nepřidává.
                       <Button variant="ghost" size="sm" iconAfter="chevronRight" className="self-start -ml-2"
                         onClick={() => { onZavrit(); nav.onNavigate('settings', 'billing'); }}>
-                        Zobrazit tarify
+                        {t('Zobrazit tarify')}
                       </Button>
                     ) : (
                       <button type="button"
-                        aria-label={w.nazev}
+                        aria-label={t(w.nazev)}
                         aria-describedby={idPopisu}
                         aria-disabled={naPlose || undefined}
-                        title={naPlose ? 'Tenhle widget už na ploše je a víckrát být nemůže.' : undefined}
+                        title={naPlose ? t('Tenhle widget už na ploše je a víckrát být nemůže.') : undefined}
                         onClick={() => { if (!naPlose) otevrit(w); }}
                         className={`absolute inset-0 rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)] ${naPlose ? 'cursor-default' : ''}`} />
                     )}

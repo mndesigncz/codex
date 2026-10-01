@@ -38,7 +38,7 @@ import { createPortal } from 'react-dom';
 import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
 import { widget } from '@/lib/widgety/katalog';
 import { ZDROJE_FRONT } from '@/lib/widgety/katalog/obecne';
-import { czCount, czForm, czVerb, POLOZKA, type CzNoun } from '@/lib/czech';
+import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { dbTimeDayHM, parseDbTime } from '@/lib/pragueTime';
 import { useDraft } from '@/lib/useDraft';
 import { Icon } from '../../Icons';
@@ -59,8 +59,8 @@ type Klic = string | readonly string[];
 
 const seznam = (x: unknown): any[] => (Array.isArray(x) ? x : []);
 const cislo = (n: number) => n.toLocaleString('cs-CZ');
-/** „…a další 2" / „…a dalších 5" — strop seznamu se nesmí zamlčet (DP §3.6). */
-const aDalsich = (n: number) => `…a ${czForm(n, { one: 'další', few: 'další', many: 'dalších' })} ${cislo(n)}`;
+/** „…a dalších 5" — strop seznamu se nesmí zamlčet (DP §3.6). */
+const aDalsich = (t: PrekladFn, n: number) => t('…a dalších {n}', { n: cislo(n) });
 
 /** Klíč části widgetu z katalogu (`opravneni.pole`) — jeden zdroj pravdy s galerií a serverem. */
 function klicCasti(idWidgetu: string, cast: string): Klic | null {
@@ -116,8 +116,8 @@ type IdFronty =
 
 interface Fronta {
   id: IdFronty;
-  /** Tvar po číslovce: „1 žádost o volno", „3 žádosti o volno", „5 žádostí o volno". */
-  slovo: CzNoun;
+  /** Počet i tvar po číslovce: „1 žádost o volno", „3 žádosti o volno", „5 žádostí o volno". */
+  text: (t: PrekladFn, n: number) => string;
   ikona: string;
   /** Kam proklik vede — na obrazovku, kde se o frontě rozhoduje. */
   pohled: string;
@@ -128,7 +128,7 @@ interface Fronta {
 const FRONTY: readonly Fronta[] = [
   {
     id: 'volno', ikona: 'calendar', pohled: 'shifts',
-    slovo: { one: 'žádost o volno', few: 'žádosti o volno', many: 'žádostí o volno' },
+    text: (t, n) => t('{n, plural, one {# žádost o volno} few {# žádosti o volno} other {# žádostí o volno}}', { n }),
     // Bez volno.zobrazit vrací server jen vlastní žádosti (isEmployer: false).
     // Ty nejsou k rozhodnutí — dřív se tak ukazovaly a proklik vedl do Rozvrhu,
     // kde člověk nic schválit nemohl.
@@ -136,54 +136,54 @@ const FRONTY: readonly Fronta[] = [
   },
   {
     id: 'vymeny', ikona: 'swap', pohled: 'shifts',
-    slovo: { one: 'výměna směny', few: 'výměny směn', many: 'výměn směn' },
+    text: (t, n) => t('{n, plural, one {# výměna směny} few {# výměny směn} other {# výměn směn}}', { n }),
     // `isEmployer` tu znamená „smí schvalovat" — zabraná výměna čeká jen na toho, kdo ji potvrdí.
     pocet: raw => (raw?.isEmployer === false ? 0 : seznam(raw?.offers).filter(o => o?.status === 'claimed').length),
   },
   {
     id: 'uzaverky', ikona: 'trend', pohled: 'reports',
-    slovo: { one: 'uzávěrka ke schválení', few: 'uzávěrky ke schválení', many: 'uzávěrek ke schválení' },
+    text: (t, n) => t('{n, plural, one {# uzávěrka ke schválení} few {# uzávěrky ke schválení} other {# uzávěrek ke schválení}}', { n }),
     // Uzávěrka pokrytá jinou (covered_by) se neschvaluje zvlášť.
     pocet: raw => seznam(raw?.closings).filter(c => c?.approved === false && !c?.covered_by).length,
   },
   {
     id: 'navrhy_skladu', ikona: 'box', pohled: 'inventory',
-    slovo: { one: 'návrh do skladu', few: 'návrhy do skladu', many: 'návrhů do skladu' },
+    text: (t, n) => t('{n, plural, one {# návrh do skladu} few {# návrhy do skladu} other {# návrhů do skladu}}', { n }),
     pocet: raw => seznam(raw).filter(i => i?.approved === false && i?.archived !== true).length,
   },
   {
     id: 'hlaseni', ikona: 'bell', pohled: 'inventory',
-    slovo: { one: 'hlášení ze skladu', few: 'hlášení ze skladu', many: 'hlášení ze skladu' },
+    text: (t, n) => t('{n, plural, one {# hlášení ze skladu} few {# hlášení ze skladu} other {# hlášení ze skladu}}', { n }),
     pocet: raw => seznam(raw?.reports).filter(r => r?.status !== 'done').length,
   },
   {
     id: 'odmeny', ikona: 'award', pohled: 'rewards',
-    slovo: { one: 'žádost o odměnu', few: 'žádosti o odměnu', many: 'žádostí o odměnu' },
+    text: (t, n) => t('{n, plural, one {# žádost o odměnu} few {# žádosti o odměnu} other {# žádostí o odměnu}}', { n }),
     pocet: raw => seznam(raw?.redemptions).filter(r => r?.status === 'pending').length,
   },
   {
     id: 'postupy', ikona: 'clipboard', pohled: 'procedures',
-    slovo: { one: 'návrh postupu', few: 'návrhy postupů', many: 'návrhů postupů' },
+    text: (t, n) => t('{n, plural, one {# návrh postupu} few {# návrhy postupů} other {# návrhů postupů}}', { n }),
     pocet: raw => seznam(raw?.procedures).filter(p => p?.approved === false).length,
   },
   {
     id: 'navody', ikona: 'book', pohled: 'guides',
-    slovo: { one: 'návrh návodu', few: 'návrhy návodů', many: 'návrhů návodů' },
+    text: (t, n) => t('{n, plural, one {# návrh návodu} few {# návrhy návodů} other {# návrhů návodů}}', { n }),
     pocet: raw => seznam(raw?.guides).filter(g => g?.approved === false).length,
   },
   {
     id: 'rezervace', ikona: 'calendarCheck', pohled: 'klient:reservations',
-    slovo: { one: 'rezervace ke schválení', few: 'rezervace ke schválení', many: 'rezervací ke schválení' },
+    text: (t, n) => t('{n, plural, one {# rezervace ke schválení} few {# rezervace ke schválení} other {# rezervací ke schválení}}', { n }),
     pocet: raw => seznam(raw?.reservations).filter(r => r?.status === 'requested').length,
   },
   {
     id: 'objednavky', ikona: 'cup', pohled: 'klient:orders',
-    slovo: { one: 'objednávka od stolu', few: 'objednávky od stolu', many: 'objednávek od stolu' },
+    text: (t, n) => t('{n, plural, one {# objednávka od stolu} few {# objednávky od stolu} other {# objednávek od stolu}}', { n }),
     pocet: raw => Number(raw?.newCount) || 0,
   },
   {
     id: 'slaba_hodnoceni', ikona: 'star', pohled: 'klient:customers',
-    slovo: { one: 'slabé hodnocení za týden', few: 'slabá hodnocení za týden', many: 'slabých hodnocení za týden' },
+    text: (t, n) => t('{n, plural, one {# slabé hodnocení za týden} few {# slabá hodnocení za týden} other {# slabých hodnocení za týden}}', { n }),
     pocet: raw => Number(raw?.reviews?.low7) || 0,
   },
 ];
@@ -199,6 +199,7 @@ function useFronta(f: Fronta, zapnuto: boolean) {
 }
 
 function CekaNaTebe({ nastaveni }: WidgetProps<{ fronty?: unknown }>) {
+  const t = useT('widgety');
   const smi = useSmi();
   const nav = useNavigace();
   const { ceka } = useBrana([]);
@@ -250,15 +251,15 @@ function CekaNaTebe({ nastaveni }: WidgetProps<{ fronty?: unknown }>) {
         // a odečítač by po titulku řekl jen „pět". Vidící dostanou „5 čeká",
         // odečítač celou větu se skloněným podstatným jménem (stejně jako Badge).
         <Chip tone="wait" size="sm">
-          <span aria-hidden>{celkem} čeká</span>
-          <span className="sr-only">Celkem {czCount(celkem, POLOZKA)} {czVerb(celkem, 'čeká', 'čekají')}</span>
+          <span aria-hidden>{t('{n} čeká', { n: celkem })}</span>
+          <span className="sr-only">{t('{n, plural, one {Celkem # položka čeká} few {Celkem # položky čekají} other {Celkem # položek čeká}}', { n: celkem })}</span>
         </Chip>
       ) : undefined}>
       <div className="space-y-3">
         {cekaji.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {cekaji.map(({ f, s }) => {
-              const text = czCount(s.data ?? 0, f.slovo);
+              const text = f.text(t, s.data ?? 0);
               // Proklik jen tam, kam divák smí; jinak číslo zůstane jako stav, bez odkazu.
               return nav.smiPohled(f.pohled)
                 ? <Button key={f.id} variant="secondary" size="sm" icon={f.ikona} onClick={() => nav.onNavigate(f.pohled)}>{text}</Button>
@@ -268,9 +269,9 @@ function CekaNaTebe({ nastaveni }: WidgetProps<{ fronty?: unknown }>) {
         )}
         {selhane.length > 0 && !vsechnoSelhalo && (
           <p className="note note-wait text-[13px]">
-            Nenačetly se: {selhane.map(x => NAZVY_FRONT.get(x.f.id) ?? x.f.id).join(', ')}.{' '}
+            {t('Nenačetly se: {seznam}.', { seznam: selhane.map(x => t(NAZVY_FRONT.get(x.f.id) ?? x.f.id)).join(', ') })}{' '}
             <button type="button" onClick={() => selhane.forEach(x => x.s.reload())}
-              className="tap-target-sm font-semibold underline underline-offset-2">Zkusit znovu</button>
+              className="tap-target-sm font-semibold underline underline-offset-2">{t('Zkusit znovu')}</button>
           </p>
         )}
       </div>
@@ -290,6 +291,7 @@ const KLIC_SKRYTO_STARY = 'managero-onboarding-dismissed';
 const nacitaSeKroky = (kroky: { s: { loading: boolean } }[]) => kroky.some(k => k.s.loading);
 
 function PrvniKroky({ velikost }: WidgetProps) {
+  const t = useT('widgety');
   const smi = useSmi();
   const nav = useNavigace();
   const { ceka } = useBrana([]);
@@ -315,10 +317,10 @@ function PrvniKroky({ velikost }: WidgetProps) {
 
   const L = velikost === 'L';
   const kroky = [
-    { id: 'tym', s: tym, pohled: 'team-settings', label: 'Přidat prvního zaměstnance', hint: 'Kód pro připojení nebo pozvánku najdeš v Nastavení týmu.' },
-    { id: 'smeny', s: smeny, pohled: 'shifts', label: 'Naplánovat první směny', hint: 'Rozvrh sestavíš ručně, nebo podle dostupnosti týmu.' },
-    { id: 'sklad', s: sklad, pohled: 'inventory', label: 'Založit sklad', hint: 'Kategorie a položky — pak uvidíš, co dochází.' },
-    { id: 'uzaverka', s: uzaverka, pohled: 'reports', label: 'Vyplnit první uzávěrku', hint: 'Na konci směny se spočítá kasa a vedení ji uvidí hned.' },
+    { id: 'tym', s: tym, pohled: 'team-settings', label: t('Přidat prvního zaměstnance'), hint: t('Kód pro připojení nebo pozvánku najdeš v Nastavení týmu.') },
+    { id: 'smeny', s: smeny, pohled: 'shifts', label: t('Naplánovat první směny'), hint: t('Rozvrh sestavíš ručně, nebo podle dostupnosti týmu.') },
+    { id: 'sklad', s: sklad, pohled: 'inventory', label: t('Založit sklad'), hint: t('Kategorie a položky — pak uvidíš, co dochází.') },
+    { id: 'uzaverka', s: uzaverka, pohled: 'reports', label: t('Vyplnit první uzávěrku'), hint: t('Na konci směny se spočítá kasa a vedení ji uvidí hned.') },
   ].filter(k => !k.s.vypnuto);
   const polozky: ChecklistItem[] = kroky.map(k => {
     const done = (k.s.data ?? 0) > 0;
@@ -331,8 +333,8 @@ function PrvniKroky({ velikost }: WidgetProps) {
   });
   if (nedokonceno && !nacitaSeKroky(kroky)) {
     polozky.unshift({
-      id: 'nastaveni', label: 'Dokončit nastavení podniku', done: false,
-      hint: L ? 'Průvodce se zeptá na typ podniku, otevírací dobu a cíle a podle toho poskládá Přehled.' : undefined,
+      id: 'nastaveni', label: t('Dokončit nastavení podniku'), done: false,
+      hint: L ? t('Průvodce se zeptá na typ podniku, otevírací dobu a cíle a podle toho poskládá Přehled.') : undefined,
       onClick: () => window.location.assign('/employer/start'),
     });
   }
@@ -356,16 +358,17 @@ function PrvniKroky({ velikost }: WidgetProps) {
 /** Ikona podle druhu cíle, když si člověk žádnou nevybral (stejně jako v nastavení widgetu). */
 const IKONA_DRUHU: Record<CilOdkazu['druh'], string> = { pohled: 'overview', kategorie: 'box', postup: 'clipboard', navod: 'book' };
 
-function popisCile(cil: CilOdkazu): string {
+function popisCile(cil: CilOdkazu, t: PrekladFn): string {
   switch (cil.druh) {
-    case 'pohled': return 'Záložka';
-    case 'kategorie': return `Sklad · ${cil.nazev}`;
-    case 'postup': return 'Postup';
-    case 'navod': return 'Návod';
+    case 'pohled': return t('Záložka');
+    case 'kategorie': return t('Sklad · {nazev}', { nazev: cil.nazev });
+    case 'postup': return t('Postup');
+    case 'navod': return t('Návod');
   }
 }
 
 function Odkaz({ velikost, nastaveni }: WidgetProps<{ cil?: unknown; popisek?: unknown; ikona?: unknown }>) {
+  const t = useT('widgety');
   const nav = useNavigace();
   const { upravy, nahled } = useWidget();
   const cil = rozeberCil(nastaveni.cil);
@@ -377,21 +380,21 @@ function Odkaz({ velikost, nastaveni }: WidgetProps<{ cil?: unknown; popisek?: u
   const popisek = vlastni || zaznam?.label
     || (cil?.druh === 'kategorie' ? cil.nazev : null)
     || ((cil?.druh === 'postup' || cil?.druh === 'navod') ? cil.nazev : null)
-    || 'Odkaz';
+    || t('Odkaz');
   const ikona = (typeof nastaveni.ikona === 'string' && nastaveni.ikona) || zaznam?.icon || IKONA_DRUHU[cil?.druh ?? 'pohled'];
 
   let prazdno: React.ReactNode | null | undefined;
   if (!cil) {
     prazdno = (
       <p className="t-meta">
-        {upravy ? 'Klepni na widget a vyber, kam má vést.'
-          : nahled ? 'Vybereš, kam vede — záložku, kategorii skladu, postup nebo návod.'
-          : 'Kam vede, vybereš v úpravách stránky.'}
+        {upravy ? t('Klepni na widget a vyber, kam má vést.')
+          : nahled ? t('Vybereš, kam vede — záložku, kategorii skladu, postup nebo návod.')
+          : t('Kam vede, vybereš v úpravách stránky.')}
       </p>
     );
   } else if (!smi) {
     // V klidu se nekreslí vůbec; v úpravách musí jít najít a odebrat, tak řekne proč.
-    prazdno = upravy || nahled ? <p className="t-meta">Na tenhle cíl tvoje role nemá.</p> : null;
+    prazdno = upravy || nahled ? <p className="t-meta">{t('Na tenhle cíl tvoje role nemá.')}</p> : null;
   }
 
   return (
@@ -399,7 +402,7 @@ function Odkaz({ velikost, nastaveni }: WidgetProps<{ cil?: unknown; popisek?: u
       otevrit={smi && kam ? () => nav.onNavigate(kam.pohled, kam.arg) : undefined}>
       {cil && (
         <p className="t-meta flex min-w-0 items-center gap-1">
-          <span className={velikost === 'S' ? 'truncate' : 'min-w-0'}>{popisCile(cil)}</span>
+          <span className={velikost === 'S' ? 'truncate' : 'min-w-0'}>{popisCile(cil, t)}</span>
           <Icon name="chevronRight" size={16} className="shrink-0 text-black/40" />
         </p>
       )}
@@ -424,6 +427,7 @@ function vyberSdileni(raw: any): { sdileni: Sdileni | null } {
 
 /** QR sdílené stránky (jen velký widget): hosté si ji načtou telefonem přímo z obrazovky. */
 function QrNabidky({ adresa }: { adresa: string }) {
+  const t = useT('widgety');
   const [plna, setPlna] = useState('');
   const [obrazek, setObrazek] = useState<string | null>(null);
   useEffect(() => {
@@ -440,10 +444,10 @@ function QrNabidky({ adresa }: { adresa: string }) {
     <Well className="mt-3 flex items-center gap-4">
       {obrazek
         // eslint-disable-next-line @next/next/no-img-element
-        ? <img src={obrazek} alt="QR kód sdílené stránky" width={128} height={128} className="h-32 w-32 shrink-0 rounded-xl" />
+        ? <img src={obrazek} alt={t('QR kód sdílené stránky')} width={128} height={128} className="h-32 w-32 shrink-0 rounded-xl" />
         : <Skeleton className="h-32 w-32 shrink-0" />}
       <div className="min-w-0">
-        <p className="text-sm text-black/70 text-pretty">Hosté si kód načtou telefonem. Nebo jim pošli odkaz:</p>
+        <p className="text-sm text-black/70 text-pretty">{t('Hosté si kód načtou telefonem. Nebo jim pošli odkaz:')}</p>
         <p className="mt-1 text-[13px] font-medium text-[#16181A] break-all select-all">{plna}</p>
       </div>
     </Well>
@@ -451,6 +455,7 @@ function QrNabidky({ adresa }: { adresa: string }) {
 }
 
 function PripnutaNabidka({ velikost }: WidgetProps) {
+  const t = useT('widgety');
   const smi = useSmi();
   const nav = useNavigace();
   const { ok, ceka } = useBrana([]);
@@ -460,18 +465,18 @@ function PripnutaNabidka({ velikost }: WidgetProps) {
   // Sdílení se spravuje v Nastavení týmu — odkaz jen s klíčem i s přístupem na tu obrazovku.
   const spravuje = !!klic && smi(klic) && nav.smiPohled('team-settings');
   const S = velikost === 'S';
-  const nazev = s ? (s.title?.trim() || (s.kind === 'guides' ? 'Naše nabídka' : 'Co máme skladem')) : '';
+  const nazev = s ? (s.title?.trim() || (s.kind === 'guides' ? t('Naše nabídka') : t('Co máme skladem'))) : '';
   const adresa = s ? `/s/${encodeURIComponent(s.token)}` : '';
 
   let prazdno: React.ReactNode | null | undefined;
   if (!s) {
     // Kdo sdílení nespravuje, s prázdným widgetem nic neudělá — v klidu se nekreslí.
     prazdno = !spravuje ? null
-      : S ? <p className="t-meta">Nic není připnuté.</p>
+      : S ? <p className="t-meta">{t('Nic není připnuté.')}</p>
       : (
-        <EmptyState compact icon="external" title="Nic není připnuté"
-          hint="Připni sdílenou stránku a tým ji tu otevře jedním ťuknutím."
-          action={<Button variant="secondary" size="sm" onClick={() => nav.onNavigate('team-settings')}>Nastavit sdílení</Button>} />
+        <EmptyState compact icon="external" title={t('Nic není připnuté')}
+          hint={t('Připni sdílenou stránku a tým ji tu otevře jedním ťuknutím.')}
+          action={<Button variant="secondary" size="sm" onClick={() => nav.onNavigate('team-settings')}>{t('Nastavit sdílení')}</Button>} />
       );
   }
 
@@ -487,12 +492,12 @@ function PripnutaNabidka({ velikost }: WidgetProps) {
         <>
           <ul className="list">
             <ListRow lead={<JamkaIkony ikona={s.kind === 'guides' ? 'book' : 'box'} />}
-              title={nazev} meta="Sdílená stránka pro zákazníky"
+              title={nazev} meta={t('Sdílená stránka pro zákazníky')}
               // Odkaz do nové karty je <a> s třídami tlačítka — ne <span>, který
               // vypadal jako tlačítko uvnitř klikací karty (audit Přehledu).
               actions={(
                 <a href={adresa} target="_blank" rel="noreferrer" className="btn btn-primary btn-sm">
-                  Otevřít<Icon name="external" size={15} className="shrink-0" />
+                  {t('Otevřít')}<Icon name="external" size={15} className="shrink-0" />
                 </a>
               )} />
           </ul>
@@ -539,6 +544,7 @@ function vyberOznameni(raw: any): Oznameni[] {
  * v AnnouncementsManager (stejný klíč, takže se neztratí ani při přechodu).
  */
 function NoveOznameni({ nahled, okno }: { nahled: boolean; okno?: { onClose: () => void } }) {
+  const t = useT('widgety');
   const [text, setText] = useState('');
   const [doChatu, setDoChatu] = useState(false);
   const [ukladam, setUkladam] = useState(false);
@@ -560,14 +566,14 @@ function NoveOznameni({ nahled, okno }: { nahled: boolean; okno?: { onClose: () 
         body: JSON.stringify({ content: obsah, postToChat: doChatu }),
       });
       const d = await res.json().catch(() => ({}));
-      if (!res.ok || !d?.ok) { setChyba(typeof d?.error === 'string' ? d.error : 'Oznámení se nepodařilo připnout.'); return; }
+      if (!res.ok || !d?.ok) { setChyba(typeof d?.error === 'string' ? d.error : t('Oznámení se nepodařilo připnout.')); return; }
       koncept.hotovo();
       setText('');
       setDoChatu(false);
       obnovDataWidgetu(URL_OZNAMENI);
       okno?.onClose();
     } catch {
-      setChyba('Oznámení se nepodařilo připnout — zkontroluj připojení.');
+      setChyba(t('Oznámení se nepodařilo připnout — zkontroluj připojení.'));
     } finally {
       setUkladam(false);
     }
@@ -576,21 +582,21 @@ function NoveOznameni({ nahled, okno }: { nahled: boolean; okno?: { onClose: () 
   const pole = (
     <div className="space-y-3">
       <DraftNote koncept={koncept} co="rozepsané oznámení" />
-      <Field id={`${id}-text`} label="Nové oznámení" hint="Připnuté oznámení uvidí celý tým a přijde mu upozornění.">
+      <Field id={`${id}-text`} label={t('Nové oznámení')} hint={t('Připnuté oznámení uvidí celý tým a přijde mu upozornění.')}>
         <Textarea id={`${id}-text`} rows={okno ? 4 : 2} maxLength={MAX_OZNAMENI} value={text}
           onChange={e => setText(e.target.value)} />
       </Field>
-      <SwitchRow as="div" className="!py-1" title="Poslat i do týmového chatu" checked={doChatu} onChange={setDoChatu} />
+      <SwitchRow as="div" className="!py-1" title={t('Poslat i do týmového chatu')} checked={doChatu} onChange={setDoChatu} />
       {chyba && <p className="note note-danger" role="alert">{chyba}</p>}
     </div>
   );
 
   if (okno) {
     return (
-      <Modal open onClose={okno.onClose} size="md" title="Nové oznámení" subtitle="Nástěnka"
+      <Modal open onClose={okno.onClose} size="md" title={t('Nové oznámení')} subtitle={t('Nástěnka')}
         footer={<>
-          <Button variant="secondary" onClick={okno.onClose}>Zrušit</Button>
-          <Button variant="primary" loading={ukladam} disabled={!text.trim()} onClick={pripnout}>Připnout oznámení</Button>
+          <Button variant="secondary" onClick={okno.onClose}>{t('Zrušit', undefined, 'dialog')}</Button>
+          <Button variant="primary" loading={ukladam} disabled={!text.trim()} onClick={pripnout}>{t('Připnout oznámení')}</Button>
         </>}>
         {pole}
       </Modal>
@@ -601,7 +607,7 @@ function NoveOznameni({ nahled, okno }: { nahled: boolean; okno?: { onClose: () 
       {pole}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
         <span className="t-meta tabular-nums">{cislo(text.length)}/{cislo(MAX_OZNAMENI)}</span>
-        <Button variant="primary" size="sm" block loading={ukladam} disabled={!text.trim()} onClick={pripnout}>Připnout oznámení</Button>
+        <Button variant="primary" size="sm" block loading={ukladam} disabled={!text.trim()} onClick={pripnout}>{t('Připnout oznámení')}</Button>
       </div>
     </div>
   );
@@ -617,22 +623,23 @@ function UpravaOznameni({ oznameni, onClose, onUlozit }: {
   const [ukladam, setUkladam] = useState(false);
   const [chyba, setChyba] = useState<string | null>(null);
   const id = useId();
+  const t = useT('widgety');
   const ulozit = async () => {
-    const t = text.trim();
-    if (!t || ukladam) return;
+    const obsah = text.trim();
+    if (!obsah || ukladam) return;
     setUkladam(true);
-    const e = await onUlozit(t);
+    const e = await onUlozit(obsah);
     setUkladam(false);
     if (e) setChyba(e); else onClose();
   };
   return (
-    <Modal open onClose={onClose} size="sm" title="Upravit oznámení"
+    <Modal open onClose={onClose} size="sm" title={t('Upravit oznámení')}
       footer={<>
-        <Button variant="secondary" onClick={onClose}>Zrušit</Button>
-        <Button variant="primary" loading={ukladam} disabled={!text.trim()} onClick={ulozit}>Uložit</Button>
+        <Button variant="secondary" onClick={onClose}>{t('Zrušit', undefined, 'dialog')}</Button>
+        <Button variant="primary" loading={ukladam} disabled={!text.trim()} onClick={ulozit}>{t('Uložit')}</Button>
       </>}>
       <div className="space-y-3">
-        <Field id={`${id}-text`} label="Text oznámení">
+        <Field id={`${id}-text`} label={t('Text oznámení')}>
           <Textarea id={`${id}-text`} rows={5} maxLength={MAX_OZNAMENI} value={text} autoFocus onChange={e => setText(e.target.value)} />
         </Field>
         {chyba && <p className="note note-danger" role="alert">{chyba}</p>}
@@ -642,6 +649,7 @@ function UpravaOznameni({ oznameni, onClose, onUlozit }: {
 }
 
 function Nastenka({ velikost, nastaveni, nahled }: WidgetProps<{ archiv?: unknown }>) {
+  const t = useT('widgety');
   const smi = useSmi();
   const { ok, ceka } = useBrana([]);
   const klic = klicCasti(ID_NASTENKA, 'akce:spravovat');
@@ -671,12 +679,12 @@ function Nastenka({ velikost, nastaveni, nahled }: WidgetProps<{ archiv?: unknow
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        return typeof d?.error === 'string' ? d.error : 'Uložení se nepodařilo.';
+        return typeof d?.error === 'string' ? d.error : t('Uložení se nepodařilo.');
       }
       obnovDataWidgetu(URL_OZNAMENI);
       return null;
     } catch {
-      return 'Uložení se nepodařilo — zkontroluj připojení.';
+      return t('Uložení se nepodařilo — zkontroluj připojení.');
     }
   };
   const prepnoutPripnuti = async (a: Oznameni) => {
@@ -692,12 +700,12 @@ function Nastenka({ velikost, nastaveni, nahled }: WidgetProps<{ archiv?: unknow
       const res = await fetch(`${URL_OZNAMENI}?id=${mazu.id}`, { method: 'DELETE' });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        setChyba(typeof d?.error === 'string' ? d.error : 'Oznámení se nepodařilo smazat.');
+        setChyba(typeof d?.error === 'string' ? d.error : t('Oznámení se nepodařilo smazat.'));
       } else {
         obnovDataWidgetu(URL_OZNAMENI);
       }
     } catch {
-      setChyba('Oznámení se nepodařilo smazat — zkontroluj připojení.');
+      setChyba(t('Oznámení se nepodařilo smazat — zkontroluj připojení.'));
     } finally {
       setMazani(false);
       setMazu(null);
@@ -705,12 +713,12 @@ function Nastenka({ velikost, nastaveni, nahled }: WidgetProps<{ archiv?: unknow
   };
 
   const akceRadku = (a: Oznameni): MenuItem[] => [
-    { label: 'Upravit…', icon: 'pencil', onClick: () => setUpravuji(a) },
+    { label: t('Upravit…'), icon: 'pencil', onClick: () => setUpravuji(a) },
     a.pinned
-      ? { label: 'Odepnout', icon: 'pin', hint: 'Tým ho přestane vidět, zůstane v archivu.', onClick: () => { void prepnoutPripnuti(a); } }
-      : { label: 'Znovu připnout', icon: 'pin', onClick: () => { void prepnoutPripnuti(a); } },
+      ? { label: t('Odepnout'), icon: 'pin', hint: t('Tým ho přestane vidět, zůstane v archivu.'), onClick: () => { void prepnoutPripnuti(a); } }
+      : { label: t('Znovu připnout'), icon: 'pin', onClick: () => { void prepnoutPripnuti(a); } },
     // Nebezpečné červeně a na konci; vede na potvrzení, protože se nedá vrátit.
-    { label: 'Smazat…', icon: 'trash', danger: true, onClick: () => setMazu(a) },
+    { label: t('Smazat…'), icon: 'trash', danger: true, onClick: () => setMazu(a) },
   ];
 
   const radek = (a: Oznameni) => (
@@ -720,10 +728,10 @@ function Nastenka({ velikost, nastaveni, nahled }: WidgetProps<{ archiv?: unknow
       // `line-clamp` si nastavuje vlastní display, proto ne zároveň s `block` (ten by ořez přebil).
       title={<span className={`whitespace-pre-wrap break-words ${M ? 'line-clamp-3' : 'block'}`}>{a.content}</span>}
       meta={[a.authorName, dbTimeDayHM(a.createdAt)].filter(Boolean).join(' · ')}
-      right={!a.pinned ? <Chip tone="muted" size="sm">Odepnuto</Chip> : undefined}
+      right={!a.pinned ? <Chip tone="muted" size="sm">{t('Odepnuto')}</Chip> : undefined}
       // Na telefonu se akce odlomí na vlastní řádek a jediné „···" by skončilo vlevo pod
       // textem; obal ho drží u pravého okraje jako v ostatních řádcích.
-      actions={spravuje ? <div className="flex justify-end"><Menu size="sm" label={`Další akce s oznámením: ${a.content.length > 40 ? `${a.content.slice(0, 40)}…` : a.content}`} items={akceRadku(a)} /></div> : undefined} />
+      actions={spravuje ? <div className="flex justify-end"><Menu size="sm" label={t('Další akce s oznámením: {text}', { text: a.content.length > 40 ? `${a.content.slice(0, 40)}…` : a.content })} items={akceRadku(a)} /></div> : undefined} />
   );
 
   const nicNevisi = pripnuta.length === 0 && odepnuta.length === 0;
@@ -733,15 +741,18 @@ function Nastenka({ velikost, nastaveni, nahled }: WidgetProps<{ archiv?: unknow
     prazdno = null;
   } else if (nicNevisi && M) {
     prazdno = (
-      <EmptyState compact icon="pin" title="Nástěnka je prázdná" hint="Připni oznámení a celý tým ho uvidí."
-        action={<Button variant="secondary" size="sm" icon="plus" onClick={() => setPisu(true)}>Nové oznámení</Button>} />
+      <EmptyState compact icon="pin" title={t('Nástěnka je prázdná')} hint={t('Připni oznámení a celý tým ho uvidí.')}
+        action={<Button variant="secondary" size="sm" icon="plus" onClick={() => setPisu(true)}>{t('Nové oznámení')}</Button>} />
     );
   }
 
   const radkyM = [...pripnuta, ...odepnuta];
+  // Chyba z výběru dat je česká věta bez přístupu k t — přeloží se až tady.
+  const nacteniData: StavNacteni = data.error === 'Nástěnka přišla v nečekaném tvaru.'
+    ? { ...data, error: t('Nástěnka přišla v nečekaném tvaru.') } : data;
   return (
     <>
-      <Widget nacteni={ceka ? CEKA : data} prazdno={prazdno}
+      <Widget nacteni={ceka ? CEKA : nacteniData} prazdno={prazdno}
         doplnek={pripnuta.length > 0 ? <Chip tone="muted" size="sm">{cislo(pripnuta.length)}</Chip> : undefined}>
         <div className="space-y-4">
           {spravuje && !M && <NoveOznameni nahled={nahled} />}
@@ -749,19 +760,19 @@ function Nastenka({ velikost, nastaveni, nahled }: WidgetProps<{ archiv?: unknow
           {M ? (
             <>
               <ul className="list">{radkyM.slice(0, 5).map(radek)}</ul>
-              {radkyM.length > 5 && <p className="t-meta">{aDalsich(radkyM.length - 5)}</p>}
+              {radkyM.length > 5 && <p className="t-meta">{aDalsich(t, radkyM.length - 5)}</p>}
               {/* Střední nástěnka nemá místo na formulář — jediné tlačítko těla otevře okno.
                   Jedna položka v nabídce „···" v hlavičce by vedle „···" řádků jen mátla. */}
-              {spravuje && <Button variant="secondary" size="sm" icon="plus" onClick={() => setPisu(true)}>Nové oznámení</Button>}
+              {spravuje && <Button variant="secondary" size="sm" icon="plus" onClick={() => setPisu(true)}>{t('Nové oznámení')}</Button>}
             </>
           ) : (
             <>
               {pripnuta.length > 0
                 ? <ul className="list">{pripnuta.map(radek)}</ul>
-                : <p className="t-meta">Na nástěnce zatím nic nevisí.</p>}
+                : <p className="t-meta">{t('Na nástěnce zatím nic nevisí.')}</p>}
               {odepnuta.length > 0 && (
                 <div>
-                  <p className="t-label">Odepnutá</p>
+                  <p className="t-label">{t('Odepnutá')}</p>
                   <ul className="list mt-1">{odepnuta.map(radek)}</ul>
                 </div>
               )}
@@ -776,18 +787,18 @@ function Nastenka({ velikost, nastaveni, nahled }: WidgetProps<{ archiv?: unknow
       )}
       {upravuji && !nahled && (
         <NadPlochou>
-          <UpravaOznameni oznameni={upravuji} onClose={() => setUpravuji(null)} onUlozit={t => zapis(upravuji, { content: t })} />
+          <UpravaOznameni oznameni={upravuji} onClose={() => setUpravuji(null)} onUlozit={txt => zapis(upravuji, { content: txt })} />
         </NadPlochou>
       )}
       {mazu && !nahled && (
         <NadPlochou>
-          <Modal open onClose={() => setMazu(null)} size="sm" title="Smazat oznámení?"
+          <Modal open onClose={() => setMazu(null)} size="sm" title={t('Smazat oznámení?')}
             footer={<>
-              <Button variant="secondary" onClick={() => setMazu(null)}>Zrušit</Button>
-              <Button variant="danger-solid" loading={mazani} onClick={smazat}>Smazat</Button>
+              <Button variant="secondary" onClick={() => setMazu(null)}>{t('Zrušit', undefined, 'dialog')}</Button>
+              <Button variant="danger-solid" loading={mazani} onClick={smazat}>{t('Smazat')}</Button>
             </>}>
             <p className="text-sm text-black/70 text-pretty">
-              Oznámení zmizí z nástěnky i z archivu a vrátit ho nepůjde. Když ho má tým jen přestat vidět, stačí ho odepnout.
+              {t('Oznámení zmizí z nástěnky i z archivu a vrátit ho nepůjde. Když ho má tým jen přestat vidět, stačí ho odepnout.')}
             </p>
           </Modal>
         </NadPlochou>
@@ -810,8 +821,6 @@ interface Vlakno {
   neprectenych: number;
 }
 
-const VLAKNO: CzNoun = { one: 'vlákno', few: 'vlákna', many: 'vláken' };
-
 function vyberVlakna(raw: any): Vlakno[] {
   const radky = Array.isArray(raw?.conversations) ? raw.conversations : seznam(raw);
   return radky.map((c: any) => ({
@@ -827,6 +836,7 @@ function vyberVlakna(raw: any): Vlakno[] {
 }
 
 function NeprecteneZpravy({ velikost }: WidgetProps) {
+  const t = useT('widgety');
   const nav = useNavigace();
   const { ok, ceka } = useBrana(widget('chat.neprectene')?.opravneni.vse ?? ['chat.pouzivat']);
   const data = useDataWidgetu(ok ? '/api/conversations' : null, vyberVlakna);
@@ -839,27 +849,27 @@ function NeprecteneZpravy({ velikost }: WidgetProps) {
       <Widget nacteni={ceka ? CEKA : data}
         // S jedním nepřečteným vláknem vede proklik rovnou do něj, jinak na seznam konverzací.
         otevrit={doChatu ? () => nav.onNavigate('chat', vlakna.length === 1 ? String(vlakna[0].id) : undefined) : undefined}>
-        <Stat label="Nepřečtených" value={cislo(celkem)} note={celkem === 0 ? 'Vše přečteno' : czCount(vlakna.length, VLAKNO)} />
+        <Stat label={t('Nepřečtených')} value={cislo(celkem)} note={celkem === 0 ? t('Vše přečteno') : t('{n, plural, one {# vlákno} few {# vlákna} other {# vláken}}', { n: vlakna.length })} />
       </Widget>
     );
   }
   return (
-    <Widget nacteni={ceka ? CEKA : data} odkaz={{ popisek: 'Chat', pohled: 'chat' }}
+    <Widget nacteni={ceka ? CEKA : data} odkaz={{ popisek: t('Chat', undefined, 'nav'), pohled: 'chat' }}
       doplnek={celkem > 0 ? <Chip tone="info" size="sm">{cislo(celkem)}</Chip> : undefined}
-      prazdno={vlakna.length === 0 ? <p className="t-meta">Všechno máš přečtené.</p> : undefined}>
+      prazdno={vlakna.length === 0 ? <p className="t-meta">{t('Všechno máš přečtené.')}</p> : undefined}>
       <ul className="list">
         {vlakna.slice(0, 3).map(v => (
           // Klikací řádek ve vlastním <li>, jinak by .list nad ním nekreslil linku (DP §3.6).
           <li key={v.id}>
             <ListRow as="div"
               lead={v.tym ? <JamkaIkony ikona="users" /> : <Avatar emoji={v.avatar} name={v.nazev} size="sm" />}
-              title={v.nazev} meta={v.posledni ?? 'Příloha'}
+              title={v.nazev} meta={v.posledni ?? t('Příloha')}
               right={<Chip tone="info" size="sm">{cislo(v.neprectenych)}</Chip>}
               onClick={doChatu ? () => nav.onNavigate('chat', String(v.id)) : undefined} />
           </li>
         ))}
       </ul>
-      {vlakna.length > 3 && <p className="t-meta mt-2">{aDalsich(vlakna.length - 3)}</p>}
+      {vlakna.length > 3 && <p className="t-meta mt-2">{aDalsich(t, vlakna.length - 3)}</p>}
     </Widget>
   );
 }

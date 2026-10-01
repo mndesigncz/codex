@@ -14,5 +14,5 @@ export default async function EmployeeLayout({ children }: { children: React.Rea
   if (role === 'employer') redirect('/employer/overview');
 
   // Zaměstnanecké obrazovky plus návody, postupy, rozvrh, sklad a společné součásti správy: slovníky jdou v prvním HTML, ať se nic nepřekreslí česky.
-  return <><Slovniky sekce={['zamestnanec', 'chat', 'sprava', 'tym', 'navody', 'postupy', 'rozvrh', 'sklad']} />{children}</>;
+  return <><Slovniky sekce={['zamestnanec', 'chat', 'sprava', 'tym', 'navody', 'postupy', 'rozvrh', 'sklad', 'widgety']} />{children}</>;
 }
