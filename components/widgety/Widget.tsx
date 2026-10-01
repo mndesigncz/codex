@@ -19,6 +19,7 @@ import { Button, Card, ErrorState, Menu, Skeleton, type MenuItem } from '../ui';
 import type { LoadState } from '../ui/useLoad';
 import type { DefiniceWidgetu, Kostra, Velikost } from '@/lib/widgety/typy';
 import { kostraWidgetu } from '@/lib/widgety/rozlozeni';
+import { useT } from '@/lib/i18n/client';
 import { useNavigace } from './NavigaceKontext';
 
 export type { WidgetProps } from '@/lib/widgety/typy';
@@ -167,7 +168,9 @@ function KostraTela({ tvar, velikost }: { tvar: Kostra; velikost: Velikost }) {
 export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, ton, nacteni, kostra, prazdno, children }: ObalWidgetuProps) {
   const k = useWidget();
   const nav = useNavigace();
-  const nazev = titulek ?? k.definice?.nazev ?? '';
+  const t = useT('widgety');
+  // Název z katalogu se překládá při vykreslení; vlastní titulek (odkaz, výjimky) se bere, jak je.
+  const nazev = titulek ?? (k.definice ? t(k.definice.nazev) : '');
   const S = k.velikost === 'S';
   const inkoust = k.inkoust && !S;
 
@@ -203,9 +206,9 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, ton, nac
   // je připojená a hlásí, kdyby zase bylo co řešit.
   if (k.mini != null && !k.upravy && !k.nahled) {
     return (
-      <Card as="section" pad="sm" aria-label={`${nazev} — vyřízeno`} className="relative min-w-0 flex items-center gap-3">
+      <Card as="section" pad="sm" aria-label={t('{nazev} — vyřízeno', { nazev })} className="relative min-w-0 flex items-center gap-3">
         {smiCil && (
-          <button type="button" onClick={otevriCil} aria-label={`Otevřít ${nazev}`}
+          <button type="button" onClick={otevriCil} aria-label={t('Otevřít {nazev}', { nazev })}
             className="absolute inset-0 rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)]" />
         )}
         {/* Fajfka bez záře: stav, ne akce (DP T3) — proto ne .dot-ok (ten má prstenec) a žádný button.on-accent. */}
@@ -218,7 +221,7 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, ton, nac
           <h2 id={idTitulku} data-w-titulek="" tabIndex={-1} className={`t-card truncate ${FOKUS_TITULKU}`}>{nazev}</h2>
           <p className="t-meta truncate">{k.mini}</p>
         </div>
-        <Button variant="ghost" size="sm" icon="chevron" aria-label={`Ukázat celý widget ${nazev}`}
+        <Button variant="ghost" size="sm" icon="chevron" aria-label={t('Ukázat celý widget {nazev}', { nazev })}
           className="relative shrink-0 -my-1 -mr-2" onClick={k.rozbal} />
       </Card>
     );
@@ -226,8 +229,8 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, ton, nac
 
   let obsah: React.ReactNode;
   if (nacitam) obsah = <KostraTela tvar={kostra ?? kostraWidgetu(k.definice, k.velikost)} velikost={k.velikost} />;
-  else if (chyba) obsah = <ErrorState compact title="Widget se nenačetl" onRetry={zkusitZnovu} detail={chyba} className="!py-3" />;
-  else if (prazdno === null) obsah = <p className="t-meta">Teď tu nic není.</p>;
+  else if (chyba) obsah = <ErrorState compact title={t('Widget se nenačetl')} onRetry={zkusitZnovu} detail={chyba} className="!py-3" />;
+  else if (prazdno === null) obsah = <p className="t-meta">{t('Teď tu nic není.')}</p>;
   else if (prazdno !== undefined) obsah = prazdno;
   else obsah = children;
 
@@ -280,20 +283,20 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, ton, nac
           </Button>
         )}
         {!odkaz && akce && akce.length > 0 && (
-          <Menu size="sm" label={`Další akce: ${nazev}`} items={akce} className="-my-1.5 -mr-2" />
+          <Menu size="sm" label={t('Další akce: {nazev}', { nazev })} items={akce} className="-my-1.5 -mr-2" />
         )}
         {/* Jemná nápověda navigovatelné karty: chevron jen tam, kde v hlavičce
             není odkaz ani „···" — a zároveň klávesová cesta (Enter naviguje),
             protože <li> v klidu tabIndex nemá (sonda k68-klavesnice 5). */}
         {klepnutelna && !vidiOdkaz && !(akce && akce.length > 0) && (
-          <Button variant="ghost" size="sm" icon="chevronRight" aria-label={`Otevřít ${nazev}`}
+          <Button variant="ghost" size="sm" icon="chevronRight" aria-label={t('Otevřít {nazev}', { nazev })}
             className={`shrink-0 -my-1.5 -mr-2 ${inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : ''}`}
             onClick={otevriCil} />
         )}
       </div>
       <div className={`relative mt-3 flex-1 min-h-0 ${S ? 'flex flex-col justify-end' : ''}`}>{obsah}</div>
       {otevrit && (
-        <button type="button" onClick={otevrit} aria-label={`Otevřít ${nazev}`}
+        <button type="button" onClick={otevrit} aria-label={t('Otevřít {nazev}', { nazev })}
           className="absolute inset-0 rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)]" />
       )}
     </Card>
@@ -322,10 +325,11 @@ export function KostraWidgetu() {
  */
 export function SchematickyWidget() {
   const k = useWidget();
+  const t = useT('widgety');
   const pruhu = k.velikost === 'S' ? 1 : k.velikost === 'M' ? 2 : 3;
   return (
     <Widget>
-      <p className="t-meta line-clamp-2">{k.definice?.popis}</p>
+      <p className="t-meta line-clamp-2">{k.definice ? t(k.definice.popis) : null}</p>
       <div className="mt-3 space-y-2" aria-hidden>
         {Array.from({ length: pruhu }, (_, i) => (
           <div key={i} className={`h-8 rounded-xl bg-black/[0.05] ${pruhu > 1 && i === pruhu - 1 ? 'w-2/3' : ''}`} />
@@ -342,6 +346,7 @@ export function SchematickyWidget() {
  */
 export function Chybi() {
   const k = useWidget();
+  const t = useT('widgety');
   const vyvoj = process.env.NODE_ENV === 'development';
   const { nahlasSkryti } = k;
   useEffect(() => {
@@ -352,12 +357,12 @@ export function Chybi() {
   if (vyvoj) {
     return (
       <Widget>
-        <ErrorState compact title="Widget chybí" hint={`Oblast nemá komponentu pro ${k.definice?.id ?? 'tenhle widget'}.`} className="!py-3" />
+        <ErrorState compact title={t('Widget chybí')} hint={t('Oblast nemá komponentu pro {widget}.', { widget: k.definice?.id ?? t('tenhle widget') })} className="!py-3" />
       </Widget>
     );
   }
   if (!k.upravy && !k.nahled) return null;
-  return <Widget prazdno={<p className="t-meta">Tenhle widget se teď nedá zobrazit.</p>} />;
+  return <Widget prazdno={<p className="t-meta">{t('Tenhle widget se teď nedá zobrazit.')}</p>} />;
 }
 
 /**
@@ -386,10 +391,16 @@ export class PojistkaWidgetu extends React.Component<
 
   render() {
     if (!this.state.chyba) return this.props.children;
-    return (
-      <Widget>
-        <ErrorState compact title="Widget se nenačetl" onRetry={this.props.onZnovu} detail={this.state.chyba.message} className="!py-3" />
-      </Widget>
-    );
+    return <ZaloznaChyba onZnovu={this.props.onZnovu} detail={this.state.chyba.message} />;
   }
+}
+
+/** Záloha pojistky: třída nemá hooky, překlad dodá tahle malá komponenta. */
+function ZaloznaChyba({ onZnovu, detail }: { onZnovu: () => void; detail: string }) {
+  const t = useT('widgety');
+  return (
+    <Widget>
+      <ErrorState compact title={t('Widget se nenačetl')} onRetry={onZnovu} detail={detail} className="!py-3" />
+    </Widget>
+  );
 }

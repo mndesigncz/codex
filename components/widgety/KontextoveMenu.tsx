@@ -18,6 +18,7 @@ import { useLayoutEffect, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MenuPanel, MenuItemButton, type MenuItem } from '../ui';
 import { usePopover } from '@/lib/usePopover';
+import { useT } from '@/lib/i18n/client';
 
 export type ZdrojMenu = 'mys' | 'dotyk' | 'klavesnice';
 
@@ -48,6 +49,7 @@ export function KontextoveMenu({ menu, polozky, nazev, onZavrit }: {
   nazev: string;
   onZavrit: () => void;
 }) {
+  const t = useT('widgety');
   const zavritRef = useRef(onZavrit);
   zavritRef.current = onZavrit;
   const fokusRef = useRef<HTMLElement | null>(menu.fokusZpet);
@@ -113,7 +115,7 @@ export function KontextoveMenu({ menu, polozky, nazev, onZavrit }: {
       <MenuPanel
         ref={pop.panelRef}
         onKeyDown={pop.onPanelKeyDown}
-        aria-label={`Nabídka widgetu ${nazev}`}
+        aria-label={t('Nabídka widgetu {nazev}', { nazev })}
         direction={poloha?.nahoru ? 'up' : 'down'}
         // Polohu u prstu počítá tohle menu samo (i s okrajem obrazovky).
         vejdiSe={false}

@@ -12,6 +12,7 @@ import { useState } from 'react';
 import { Icon } from '../../Icons';
 import { PlovouciLista, MenuPanel, MenuItemButton, type MenuItem } from '../../ui';
 import { usePopover } from '@/lib/usePopover';
+import { useT } from '@/lib/i18n/client';
 
 export default function ListaUprav({ open, popisek, onPridat, onHotovo, menu, neulozeno, onZkusitZnovu }: {
   open: boolean;
@@ -25,19 +26,20 @@ export default function ListaUprav({ open, popisek, onPridat, onHotovo, menu, ne
   neulozeno: boolean;
   onZkusitZnovu: () => void;
 }) {
+  const t = useT('widgety');
   const [menuOtevreno, setMenuOtevreno] = useState(false);
   const pop = usePopover(menuOtevreno, setMenuOtevreno, { focusFirst: true, arrowKeys: true });
 
   return (
     <div data-plocha-chrom="">
       <PlovouciLista
-        label="Úpravy stránky"
+        label={t('Úpravy stránky')}
         open={open}
         animate
         note={neulozeno ? (
-          <>Neuloženo ·{' '}
+          <>{t('Neuloženo')} ·{' '}
             <button type="button" onClick={onZkusitZnovu} className="tap-target-sm font-semibold underline underline-offset-2 hover:no-underline">
-              Zkusit znovu
+              {t('Zkusit znovu')}
             </button>
           </>
         ) : undefined}
@@ -45,11 +47,11 @@ export default function ListaUprav({ open, popisek, onPridat, onHotovo, menu, ne
         <span className="text-sm font-semibold whitespace-nowrap px-1 hidden sm:inline">{popisek}</span>
         <button type="button" onClick={onPridat}
           className="tap-target-sm rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium hover:bg-white/20 transition whitespace-nowrap">
-          <Icon name="plus" size={14} className="inline -mt-0.5 mr-1" />Přidat widget
+          <Icon name="plus" size={14} className="inline -mt-0.5 mr-1" />{t('Přidat widget')}
         </button>
         {menu.length > 0 && (
           <div ref={pop.ref} className="relative">
-            <button ref={pop.triggerRef} type="button" aria-label="Další možnosti úprav" aria-haspopup="menu" aria-expanded={menuOtevreno}
+            <button ref={pop.triggerRef} type="button" aria-label={t('Další možnosti úprav')} aria-haspopup="menu" aria-expanded={menuOtevreno}
               onClick={() => setMenuOtevreno(v => !v)} onKeyDown={pop.onTriggerKeyDown}
               className="tap-target-sm h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 grid place-items-center transition">
               <Icon name="more" size={16} />
@@ -68,7 +70,7 @@ export default function ListaUprav({ open, popisek, onPridat, onHotovo, menu, ne
           </div>
         )}
         <button type="button" onClick={onHotovo} className="btn btn-accent btn-sm tap-target-sm whitespace-nowrap">
-          Hotovo
+          {t('Hotovo')}
         </button>
       </PlovouciLista>
     </div>
