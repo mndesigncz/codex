@@ -41,3 +41,23 @@ export function poradiKandidatu<T extends KandidatUctu>(zadany: unknown, kandida
     })
     .slice(0, max);
 }
+
+/**
+ * Prostý text z HTML e-mailu. Schránky (a spamové filtry) čekají u každé zprávy i textovou
+ * část; e-mail jen s HTML bez ní se hodnotí hůř a v čtečkách bez HTML je prázdný.
+ * Odkazy zůstanou jako „popisek (adresa)“, ať se dá odkaz opsat i bez tlačítka.
+ */
+export function htmlNaText(html: string): string {
+  return html
+    .replace(/<(style|script)[\s\S]*?<\/\1>/gi, '')
+    .replace(/<a\s[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi, (_m, url: string, label: string) => {
+      const popisek = label.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+      const adresa = url.replace(/&amp;/g, '&');
+      return popisek && popisek !== adresa ? `${popisek}: ${adresa}` : adresa;
+    })
+    .replace(/<\s*(br|\/p|\/div|\/h[1-6]|\/tr|\/li)\s*\/?>/gi, '\n')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')
+    .replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n')
+    .trim();
+}

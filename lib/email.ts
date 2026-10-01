@@ -1,6 +1,7 @@
 import { Resend } from 'resend';
 import { emailText, sazejHtml } from './i18n/email.ts';
 import { LOCALE_PRO_JAZYK, type Jazyk } from './i18n/config.ts';
+import { htmlNaText } from './emailAdresa.ts';
 
 // E-mail, o kterém aplikace ví, jestli odešel.
 //
@@ -85,6 +86,7 @@ async function send({ label, to, subject, html, replyTo, attachments }: SendArgs
       to,
       subject,
       html,
+      text: htmlNaText(html),
       ...(replyTo ? { replyTo } : {}),
       ...(attachments ? { attachments } : {}),
     });
