@@ -326,7 +326,7 @@ export async function PATCH(_req: Request, props: { params: Promise<{ id: string
     return NextResponse.json({ error: 'Schválení není dostupné (chybí migrace).' }, { status: 400 });
   }
   try {
-    await notifyUser(row.created_by, { title: 'Uzávěrka schválena ✓', body: 'Vedení schválilo tvou uzávěrku.', type: 'info', link: '/employee/shifts?view=closing' });
+    await notifyUser(row.created_by, { title: 'Uzávěrka schválena ✓', body: 'Vedení schválilo tvou uzávěrku.', type: 'info', category: 'closing', link: '/employee/shifts?view=closing' });
   } catch { /* best-effort */ }
   return NextResponse.json({ ok: true });
 }

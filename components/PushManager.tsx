@@ -2,17 +2,11 @@
 
 import { useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-
-function urlBase64ToUint8Array(base64String: string) {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const raw = atob(base64);
-  const output = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i++) output[i] = raw.charCodeAt(i);
-  return output;
-}
+import { pushVypnutoNaZarizeni, vypniPushProhlizece, zapniPushProhlizece } from '@/lib/pushProhlizec';
 
 // Registers the service worker and subscribes the logged-in user to web push.
+// Kdo si na tomhle zařízení upozornění vypnul (Nastavení → Notifikace), odběr nedostane
+// zpátky při každém otevření: značka zařízení ho místo zakládání ruší.
 export default function PushManager() {
   const { status } = useSession();
 
@@ -21,43 +15,9 @@ export default function PushManager() {
     const vapid = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
     if (!vapid) return;
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
-
-    let cancelled = false;
-    (async () => {
-      try {
-        // Registraci zakládá <ServiceWorker/>, ať offline skořápka funguje
-        // i bez klíče pro notifikace. Tady se na ni jen počká — ale ne
-        // donekonečna: když registrace neprojde, `ready` se nesplní nikdy
-        // a tenhle průběh by tiše visel do zavření záložky.
-        const reg = await Promise.race([
-          navigator.serviceWorker.ready,
-          new Promise<null>((res) => setTimeout(() => res(null), 10000)),
-        ]);
-        if (!reg) return;
-        if (Notification.permission === 'denied') return;
-        if (Notification.permission === 'default') {
-          const perm = await Notification.requestPermission();
-          if (perm !== 'granted') return;
-        }
-        if (cancelled) return;
-        let sub = await reg.pushManager.getSubscription();
-        if (!sub) {
-          sub = await reg.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(vapid),
-          });
-        }
-        await fetch('/api/push/subscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(sub),
-        });
-      } catch (e) {
-        // Non-fatal — push just won't be active
-      }
-    })();
-
-    return () => { cancelled = true; };
+    // Vypnuto výslovně: odběr se nezakládá a ten, co tu ještě je, se zruší.
+    if (pushVypnutoNaZarizeni()) { void vypniPushProhlizece(); return; }
+    void zapniPushProhlizece(vapid);
   }, [status]);
 
   return null;

@@ -33,7 +33,7 @@ import { apiMessage, okJson } from '@/lib/api';
 import { buildIcs, downloadIcs } from '@/lib/ics';
 import { dayPlus, pragueToday } from '@/lib/pragueTime';
 import { useJazyk, useT } from '@/lib/i18n/client';
-import { fmtDatum } from '@/lib/i18n/format';
+import { fmtDatum, fmtHM } from '@/lib/i18n/format';
 import {
   UDALOST_ZMENA, den, hm, kategorieBarvy, nadchazejiciSmeny, popisekTypu,
   type MojeSmena, type NabidkaSmeny,
@@ -157,7 +157,7 @@ export default function MyShifts({ user }: Props) {
                       <span aria-hidden className={`inline-block h-2 w-2 rounded-full align-middle mr-1.5 ${kat ? `cat-dot-${kat}` : 'bg-black/15'}`} />
                       {popisekTypu(s)}
                     </>}
-                    value={`${hm(s.startTime ?? s.start_time)}–${hm(s.endTime ?? s.end_time)}`}
+                    value={`${fmtHM(s.startTime ?? s.start_time)}–${fmtHM(s.endTime ?? s.end_time)}`}
                     right={nabidnuto ? <Chip tone="info" size="sm">{t('V burze')}</Chip> : d === dnes ? <Chip tone="ok" size="sm">{t('Dnes')}</Chip> : undefined}
                     actions={smiBurza && !nabidnuto ? (
                       <Menu size="sm" label={t('Další akce se směnou {den}', { den: denVeVete(d) })} items={[
@@ -195,7 +195,7 @@ export default function MyShifts({ user }: Props) {
       />
       {nabidnout && (
         <Modal open onClose={() => setNabidnout(null)} size="sm" title={t('Nabídnout směnu do burzy')}
-          subtitle={<span className="cz-sentence">{denKratce(den(nabidnout.date))} · {hm(nabidnout.startTime ?? nabidnout.start_time)}–{hm(nabidnout.endTime ?? nabidnout.end_time)}</span>}
+          subtitle={<span className="cz-sentence">{denKratce(den(nabidnout.date))} · {fmtHM(nabidnout.startTime ?? nabidnout.start_time)}–{fmtHM(nabidnout.endTime ?? nabidnout.end_time)}</span>}
           footer={<>
             <Button variant="secondary" onClick={() => setNabidnout(null)}>{t('Zrušit')}</Button>
             <Button variant="primary" icon="handover" loading={odesilam} onClick={odeslatNabidku}>{t('Nabídnout')}</Button>

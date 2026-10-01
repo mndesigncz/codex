@@ -1,11 +1,12 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { DEFAULT_CURRENCY, formatMoney, formatCost, formatPrice, makeMoney, currencySymbol } from '@/lib/money';
 import { okJson } from '@/lib/api';
 import { cistyJazyk, type Jazyk } from '@/lib/i18n/config';
 import { cistaZeme, type Zeme } from '@/lib/i18n/zeme';
 import { normalizujNavKonfig, type NavKonfig } from '@/lib/navigace';
+import { nastavTymovyFormat, osobniFormaty, posluchejFormaty, prepisDesetinny, ucinneHodiny, ucinnyZacatekTydne } from '@/lib/i18n/osobniFormaty';
 
 type CurrencyCtx = {
   currency: string;
@@ -97,7 +98,28 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     return () => { cancelled = true; };
   }, [nacteni]);
 
-  return <Ctx.Provider value={cfg}>{children}</Ctx.Provider>;
+  // Formát času a začátek týdne podniku se předají do sdílené logiky formátování (dbTimeHM, fmtDatum…),
+  // kde se potkají s osobní volbou.
+  useEffect(() => { if (cfg.loaded) nastavTymovyFormat(cfg.timeFormat, cfg.weekStart); }, [cfg.loaded, cfg.timeFormat, cfg.weekStart]);
+
+  // Osobní formáty (Nastavení → Jazyk a region) přebíjejí podnik na JEDNOM místě, tady:
+  // kdo čte useCurrency()/useMoney(), dostane už výsledek. Změna se projeví hned (odběr níž).
+  const [verzeFormatu, setVerzeFormatu] = useState(0);
+  useEffect(() => posluchejFormaty(() => setVerzeFormatu(v => v + 1)), []);
+  const hodnota = useMemo<CurrencyCtx>(() => {
+    const o = osobniFormaty();
+    const des = o.desetinny;
+    const bez = (f: (n: number) => string) => (des === 'auto' ? f : (n: number) => prepisDesetinny(f(n), cfg.locale, des));
+    return {
+      ...cfg,
+      weekStart: ucinnyZacatekTydne(o, cfg.weekStart),
+      timeFormat: ucinneHodiny(o, cfg.timeFormat) === 12 ? '12' : '24',
+      money: bez(cfg.money), cost: bez(cfg.cost), price: bez(cfg.price),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cfg, verzeFormatu]);
+
+  return <Ctx.Provider value={hodnota}>{children}</Ctx.Provider>;
 }
 
 export const useCurrency = () => useContext(Ctx);

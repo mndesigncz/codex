@@ -6,6 +6,7 @@ import PushManager from '@/components/PushManager';
 import ServiceWorker from '@/components/ServiceWorker';
 import NativeBridgeLoader from '@/components/NativeBridgeLoader';
 import UlozeniHlaska from '@/components/UlozeniHlaska';
+import NastaveniSync from '@/components/NastaveniSync';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { ProcedureProvider } from '@/components/procedures/ProcedureProvider';
 import FloatingRunner from '@/components/procedures/FloatingRunner';
@@ -31,6 +32,8 @@ export function SessionProvider({ children, jazyk, slovniky }: { children: React
             {/* Nativní obal (ManageroApp/, ManageroClient/): push, sken, sdílení. Na webu se nic nestáhne. */}
             {!demo && <NativeBridgeLoader />}
             <UlozeniHlaska />
+            {/* Jazyk, motiv a osobní formáty z účtu na zařízení, které je ještě nemá (components/NastaveniSync.tsx). */}
+            <NastaveniSync />
             {children}
             <FloatingRunner />
           </ProcedureProvider>

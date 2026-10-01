@@ -46,7 +46,7 @@ import { openPrint, esc } from '@/lib/printDoc';
 import { ulozSoubor } from '@/lib/stahni';
 import { useJazyk, useT, type PrekladFn } from '@/lib/i18n/client';
 import { tg } from '@/lib/i18n/stav';
-import { fmtDatum } from '@/lib/i18n/format';
+import { fmtDatum, fmtHM } from '@/lib/i18n/format';
 import type { Jazyk } from '@/lib/i18n/config';
 import { dnuTxt, hodinTxt, hodinuTxt, hodinyTextJ, prelozPopisStavu, rozsahVolnaJ, smenTxt, upozorneniTxt } from './texty';
 import { pragueToday } from '@/lib/pragueTime';
@@ -1630,24 +1630,24 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
                     {dayShifts.slice(0, 3).map((s) => {
                       const rt = resolveShiftType(s, shiftTypes, t);
                       return (
-                        <span key={s.id} title={`${s.employeeName} · ${rt.label} · ${s.startTime}–${s.endTime}`}
+                        <span key={s.id} title={`${s.employeeName} · ${rt.label} · ${fmtHM(s.startTime)}–${fmtHM(s.endTime)}`}
                           // Uložení návrhu tyhle směny přepíše — v mřížce proto ztlumené a přeškrtnuté,
                           // ať je vidět, co zůstane. Tlumí se tokenem (text-black/45 hlídá kontrola
                           // kontrastu), ne opacity: ta na 11 px srazila kontrast asi na 2 : 1.
                           className={`flex items-center gap-1 min-w-0 rounded-full px-1 py-0.5 text-[11px] font-medium overflow-hidden bg-black/[0.05] ${nahradiUlozene ? 'line-through text-black/45' : 'text-black/70'}`}>
                           <span className={`h-2 w-2 rounded-full flex-shrink-0 ${tridaTecky(rt.color)}`} />
                           <span className="flex-shrink-0">{s.employeeAvatar}</span>
-                          <span className="truncate min-w-0">{s.startTime}</span>
+                          <span className="truncate min-w-0">{fmtHM(s.startTime)}</span>
                         </span>
                       );
                     })}
                     {dayShifts.length > 3 && <span className="text-[11px] text-black/45">{t('+{n} další', { n: dayShifts.length - 3 })}</span>}
                     {dayProposed.slice(0, 3).map((p, idx) => (
                       <span key={`p-${idx}`}
-                        title={`${t('Návrh')}: ${p.employeeName} · ${p.shiftTypeName} ${p.startTime}–${p.endTime}${(p as any).split ? ` (${t('část směny')})` : ''}`}
+                        title={`${t('Návrh')}: ${p.employeeName} · ${p.shiftTypeName} ${fmtHM(p.startTime)}–${fmtHM(p.endTime)}${(p as any).split ? ` (${t('část směny')})` : ''}`}
                         className="flex items-center gap-1 min-w-0 rounded-full px-1 py-0.5 text-[11px] font-medium overflow-hidden border border-dashed border-black/30 dark:border-white/40 text-black/70">
                         <span className="flex-shrink-0 inline-flex items-center gap-0.5"><Icon name="sparkle" size={11} />{p.employeeAvatar}</span>
-                        <span className="truncate min-w-0">{p.startTime}</span>
+                        <span className="truncate min-w-0">{fmtHM(p.startTime)}</span>
                       </span>
                     ))}
                     {dayProposed.length > 3 && <span className="text-[11px] text-black/45">{t('+{n} v návrhu', { n: dayProposed.length - 3 })}</span>}
@@ -1774,8 +1774,8 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
                         <tr key={i} className="text-black/80">
                           <td className="px-3 py-1.5 tabular-nums">{r.date}</td>
                           <td className="px-3 py-1.5">{r.employeeName}</td>
-                          <td className="px-3 py-1.5 tabular-nums">{r.startTime}</td>
-                          <td className="px-3 py-1.5 tabular-nums">{r.endTime}</td>
+                          <td className="px-3 py-1.5 tabular-nums">{fmtHM(r.startTime)}</td>
+                          <td className="px-3 py-1.5 tabular-nums">{fmtHM(r.endTime)}</td>
                           <td className="px-3 py-1.5">{resolveShiftType(r, shiftTypes, t).label}</td>
                         </tr>
                       ))}
@@ -2051,7 +2051,7 @@ function ShiftTypesManager({ shiftTypes, onReload }: { shiftTypes: ShiftType[]; 
             <ListRow key={ty.id}
               lead={<span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-black/[0.035]"><TeckaBarvy barva={ty.color} className="h-3 w-3" /></span>}
               title={<>{ty.name}{ty.zOrganizace && <Chip tone="muted" size="sm" className="ml-2 align-middle">{t('z organizace')}</Chip>}{ty.sdileno && <Chip tone="info" size="sm" className="ml-2 align-middle">{t('sdíleno')}</Chip>}</>}
-              meta={<>{ty.startsAtOpen ? t('otevření') : ty.startTime}–{ty.endsAtClose ? t('zavření') : ty.endTime}{ty.zOrganizace && ty.spravuje ? ` · ${t('spravuje: {podnik}', { podnik: ty.spravuje })}` : ''}</>}
+              meta={<>{ty.startsAtOpen ? t('otevření') : fmtHM(ty.startTime)}–{ty.endsAtClose ? t('zavření') : fmtHM(ty.endTime)}{ty.zOrganizace && ty.spravuje ? ` · ${t('spravuje: {podnik}', { podnik: ty.spravuje })}` : ''}</>}
               // Typ ze zdrojového podniku upraví jen jeho vedení — tlačítka by jen vracela 403.
               actions={ty.zOrganizace ? undefined : (
                 <>
@@ -2619,7 +2619,7 @@ function DayModal({
                     lead={<Avatar emoji={s.employeeAvatar} size="sm" />}
                     title={nahradiUlozene ? <span className="line-through text-black/45">{s.employeeName}</span> : s.employeeName}
                     meta={<span className={`inline-flex items-center gap-1.5 ${nahradiUlozene ? 'line-through text-black/45' : ''}`}><TeckaBarvy barva={rt.color} className="h-2 w-2" />{rt.label}</span>}
-                    value={`${s.startTime}–${s.endTime}`}
+                    value={`${fmtHM(s.startTime)}–${fmtHM(s.endTime)}`}
                     right={nahradiUlozene ? <Chip tone="muted" size="sm">{t('zmizí')}</Chip> : undefined}
                     actions={readOnly ? undefined : (
                       <Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={t('Odebrat směnu — {jmeno}', { jmeno: s.employeeName })} onClick={() => onRemove(s.id)} />
@@ -2642,7 +2642,7 @@ function DayModal({
                   lead={<Avatar emoji={p.employeeAvatar} size="sm" />}
                   title={p.employeeName}
                   meta={<span className="inline-flex items-center gap-1.5">{p.color && <TeckaBarvy barva={p.color} className="h-2 w-2" />}{p.shiftTypeName || t('Směna')}</span>}
-                  value={`${p.startTime}–${p.endTime}`}
+                  value={`${fmtHM(p.startTime)}–${fmtHM(p.endTime)}`}
                   right={<Chip tone="muted" size="sm" icon="sparkle">{t('Návrh')}</Chip>}
                   actions={onRemoveProposed ? (
                     <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={t('Odebrat z návrhu — {jmeno}', { jmeno: p.employeeName })} onClick={() => onRemoveProposed(p)} />

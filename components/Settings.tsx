@@ -5,21 +5,23 @@ import { useSession } from 'next-auth/react';
 import { planInfoOf, type PlanInfo } from '@/lib/plan';
 import Billing from './Billing';
 import { Icon } from './Icons';
-import { EmptyState, Button, Skeleton, PageHeader, Segmented, SwitchRow, Badge, ListRow, Chip, Modal, Stat, StatRow, Label, hintsEnabled, setHintsEnabled, resetHints, dismissedCount } from './ui';
-import { useTheme } from './ThemeProvider';
+import { EmptyState, Button, Skeleton, PageHeader, Segmented, Badge, Chip, Modal, Stat, StatRow, Label } from './ui';
 import { useObal } from './ObalProvider';
-import { jeNativni, nativniMost, stavNativnihoPushe } from '@/lib/nativni/most';
-import SmazatUcet from './ucet/SmazatUcet';
 import PravniOdkazy from './pravni/PravniOdkazy';
 import NahlasenyObsah from './moderace/NahlasenyObsah';
 import Zablokovani from './moderace/Zablokovani';
-import JazykKarta from './JazykKarta';
 import { useT } from '@/lib/i18n/client';
+import SekceVzhled from './settings/SekceVzhled';
+import SekceJazyk from './settings/SekceJazyk';
+import SekceOznameni from './settings/SekceOznameni';
+import SekceData from './settings/SekceData';
+import SekceZkratky from './settings/SekceZkratky';
+import SekcePodnik from './settings/SekcePodnik';
+import { zalozkaNastaveni, type SectionId } from '@/lib/nastaveniZalozky';
 import TeamManagement from './TeamManagement';
 import { dbTimeDayHM } from '@/lib/pragueTime';
 import { czCount } from '@/lib/czech';
 import { okJson } from '@/lib/api';
-import { PUSH_NAKONFIGUROVAN, prohlizecUmiPush, stavPush } from '@/lib/pushKlient';
 import { useOpravneni } from './role/useOpravneni';
 import { useStrazRole, CO_SE_ZAHODI_ROLE } from './role/rozepsano';
 import { DiscardGuard } from './ui/DiscardGuard';
@@ -31,8 +33,6 @@ import dynamic from 'next/dynamic';
 const RoleEditor = dynamic(() => import('./role/RoleEditor'), { loading: () => <div className="flex items-center justify-center h-48"><div className="spinner" /></div> });
 // Výchozí rozložení stránek (kolo 68) nese plochu s editorem úprav — taky až na otevření.
 const VychoziRozlozeni = dynamic(() => import('./widgety/VychoziRozlozeni'), { loading: () => <Skeleton className="h-48 rounded-3xl" /> });
-
-type SectionId = 'account' | 'app' | 'notifications' | 'security' | 'team' | 'billing' | 'audit' | 'pos' | 'roles' | 'stranky' | 'nahlaseni';
 
 interface Props {
   user: { id: number; name: string; role: string; avatar?: string };
@@ -49,7 +49,7 @@ interface Account {
   phone?: string;
   jobTitle?: string;
   shiftPreference?: string;
-  theme?: 'light' | 'dark';
+  theme?: 'light' | 'dark' | 'system';
   role: string;
 }
 
@@ -79,10 +79,6 @@ const typeIcon: Record<string, string> = {
 const UCTENKA = { one: 'účtenka', few: 'účtenky', many: 'účtenek' };
 const POLOZKA = { one: 'položka', few: 'položky', many: 'položek' };
 
-const NOTIF_PREFS_KEY = 'managero-notif-prefs';
-const DEFAULT_PREFS = { push: false, messages: true, lowStock: true, shifts: true };
-type NotifPrefs = typeof DEFAULT_PREFS;
-
 function relativeCzech(iso: string): string {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return '';
@@ -101,16 +97,15 @@ function relativeCzech(iso: string): string {
 
 export default function Settings({ user, initialTab, tabNonce }: Props) {
   const { update } = useSession();
-  const { theme, setTheme } = useTheme();
-  const { jeObal, smiPlatby } = useObal();
+  const { smiPlatby } = useObal();
   const t = useT();
-  const [zvolena, setZvolena] = useState<SectionId>(initialTab ?? 'account');
+  const [zvolena, setZvolena] = useState<SectionId>(zalozkaNastaveni(initialTab) ?? 'account');
   // Přepnutí záložky odmontuje editor rolí — u rozepsané role se nejdřív zeptá.
   const straz = useStrazRole();
   const setSection = (id: SectionId) => { if (id !== zvolena) straz.pokus(() => setZvolena(id)); };
   // Odkaz na záložku, když je Nastavení už otevřené: useState výše si initialTab
   // přečte jen při prvním vykreslení.
-  useEffect(() => { if (tabNonce && initialTab) setSection(initialTab); },
+  useEffect(() => { const z = zalozkaNastaveni(initialTab); if (tabNonce && z) setSection(z); },
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [tabNonce]);
   const [account, setAccount] = useState<Account | null>(null);
@@ -120,18 +115,24 @@ export default function Settings({ user, initialTab, tabNonce }: Props) {
   // vidí totéž co dřív; Provozní nebo Účetní jen to, co mu server dovolí.
   const { ma } = useOpravneni();
   const sections: { id: SectionId; label: string; icon: string; desc: string }[] = [
-    { id: 'account', label: 'Účet', icon: 'settings', desc: 'Profil a osobní údaje' },
-    { id: 'app', label: t('Vzhled'), icon: 'sun', desc: t('Světlý/tmavý režim a jazyk') },
-    { id: 'notifications', label: 'Notifikace', icon: 'bell', desc: 'Centrum oznámení' },
-    { id: 'security', label: 'Zabezpečení', icon: 'check', desc: 'Heslo' },
-    ...(isEmployer && smiPlatby && ma('predplatne.zobrazit') ? [{ id: 'billing' as SectionId, label: 'Předplatné', icon: 'award', desc: 'Plán a fakturace' }] : []),
-    ...(isEmployer && ma('pokladna.stav') ? [{ id: 'pos' as SectionId, label: 'Pokladna', icon: 'trend', desc: 'Napojení Storyous' }] : []),
-    ...(isEmployer && ma(['tym.role_spravovat', 'tym.role_prirazovat']) ? [{ id: 'roles' as SectionId, label: 'Role a oprávnění', icon: 'lock', desc: 'Kdo co v podniku smí' }] : []),
+    { id: 'account', label: t('Účet'), icon: 'settings', desc: t('Profil a osobní údaje') },
+    // Jazyk má vlastní viditelnou záložku (dřív byl schovaný ve Vzhledu): jazyk aplikace a osobní formáty.
+    { id: 'jazyk', label: t('Jazyk a region'), icon: 'globe', desc: t('Jazyk, čas a formáty') },
+    { id: 'app', label: t('Vzhled'), icon: 'sun', desc: t('Motiv, písmo a pohyb') },
+    { id: 'notifications', label: t('Notifikace'), icon: 'bell', desc: t('Upozornění a centrum oznámení') },
+    { id: 'security', label: t('Zabezpečení'), icon: 'check', desc: t('Heslo') },
+    { id: 'privacy', label: t('Data a soukromí'), icon: 'archive', desc: t('Stažení dat a smazání účtu') },
+    { id: 'zkratky', label: t('Klávesové zkratky'), icon: 'menu', desc: t('Co umí klávesnice') },
+    ...(isEmployer && smiPlatby && ma('predplatne.zobrazit') ? [{ id: 'billing' as SectionId, label: t('Předplatné'), icon: 'award', desc: t('Plán a fakturace') }] : []),
+    // Profil podniku (kolo 73): název, typ, adresa, IČO a DIČ, výchozí prahy skladu.
+    ...(isEmployer && ma('podnik.nastaveni') ? [{ id: 'podnik' as SectionId, label: t('Profil podniku'), icon: 'receipt', desc: t('Údaje a prahy skladu') }] : []),
+    ...(isEmployer && ma('pokladna.stav') ? [{ id: 'pos' as SectionId, label: t('Pokladna'), icon: 'trend', desc: t('Napojení Storyous') }] : []),
+    ...(isEmployer && ma(['tym.role_spravovat', 'tym.role_prirazovat']) ? [{ id: 'roles' as SectionId, label: t('Role a oprávnění'), icon: 'lock', desc: t('Kdo co v podniku smí') }] : []),
     // Výchozí plocha pro typ role nebo roli a zámky (spec §3.8); tablet stačí spravovat.
-    ...(isEmployer && ma(['podnik.nastaveni', 'kiosk.spravovat']) ? [{ id: 'stranky' as SectionId, label: 'Stránky', icon: 'overview', desc: 'Výchozí plocha a zámky' }] : []),
+    ...(isEmployer && ma(['podnik.nastaveni', 'kiosk.spravovat']) ? [{ id: 'stranky' as SectionId, label: t('Stránky'), icon: 'overview', desc: t('Výchozí plocha a zámky') }] : []),
     // Moderace uživatelského obsahu (Apple 1.2): nahlášené zprávy a nápady vidí, kdo smí odebírat členy.
-    ...(ma('tym.odebrat') ? [{ id: 'nahlaseni' as SectionId, label: 'Nahlášený obsah', icon: 'warning', desc: 'Zprávy a nápady nahlášené týmem' }] : []),
-    ...(isEmployer && ma('audit.zobrazit') ? [{ id: 'audit' as SectionId, label: 'Historie změn', icon: 'clock', desc: 'Kdo co kdy změnil' }] : []),
+    ...(ma('tym.odebrat') ? [{ id: 'nahlaseni' as SectionId, label: t('Nahlášený obsah'), icon: 'warning', desc: t('Zprávy a nápady nahlášené týmem') }] : []),
+    ...(isEmployer && ma('audit.zobrazit') ? [{ id: 'audit' as SectionId, label: t('Historie změn'), icon: 'clock', desc: t('Kdo co kdy změnil') }] : []),
   ];
   // Záložka, na kterou role nemá, se nevykreslí, ani když na ni vede odkaz
   // (Receptury → „Nastavit pokladnu", banner předplatného) nebo když se
@@ -141,10 +142,6 @@ export default function Settings({ user, initialTab, tabNonce }: Props) {
   // klíčem jako pohled Nastavení týmu, ať se jeho chování nemění.
   const povolena = sections.some(s => s.id === zvolena) || (zvolena === 'team' && isEmployer && ma('tym.zobrazit'));
   const section: SectionId = povolena ? zvolena : 'account';
-  // Stav nápověd se čte až v prohlížeči — server localStorage nezná.
-  const [hintsOn, setHintsOn] = useState(true);
-  const [hintsHidden, setHintsHidden] = useState(0);
-  useEffect(() => { setHintsOn(hintsEnabled()); setHintsHidden(dismissedCount()); }, [section]);
   const [auditEntries, setAuditEntries] = useState<any[] | null>(null);
   // POS (Storyous) connection form.
   const [posStatus, setPosStatus] = useState<any | null>(null);
@@ -240,27 +237,6 @@ export default function Settings({ user, initialTab, tabNonce }: Props) {
   const [pwdMsg, setPwdMsg] = useState('');
   const [pwdErr, setPwdErr] = useState('');
 
-  // Notification preferences (localStorage)
-  const [prefs, setPrefs] = useState<NotifPrefs>(DEFAULT_PREFS);
-  // Push nabízíme jen tam, kde by opravdu fungoval (klíče v buildu + podporující prohlížeč).
-  const [pushNativniOdmitnuto, setPushNativniOdmitnuto] = useState(false);
-  const [pushStav, setPushStav] = useState(() => stavPush(PUSH_NAKONFIGUROVAN, true));
-  useEffect(() => {
-    // V nativním obalu web push neexistuje (WKWebView nemá PushManager); rozhoduje nativní plugin.
-    if (jeNativni()) {
-      let zruseno = false;
-      Promise.all([stavNativnihoPushe(), nativniMost()]).then(([st, most]) => {
-        if (zruseno) return;
-        setPushStav(st === 'nedostupny' ? 'nepodporovano' : 'ok');
-        // Povolení v systému nestačí: uživatel mohl push v aplikaci vypnout (token je pak na serveru smazaný).
-        if (st === 'granted') setPrefs(prev => ({ ...prev, push: !most?.pushVypnuto() }));
-        if (st === 'denied') setPrefs(prev => ({ ...prev, push: false }));
-      });
-      return () => { zruseno = true; };
-    }
-    setPushStav(stavPush(PUSH_NAKONFIGUROVAN, prohlizecUmiPush()));
-  }, []);
-
   // Notification center
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [notifsLoading, setNotifsLoading] = useState(false);
@@ -287,19 +263,9 @@ export default function Settings({ user, initialTab, tabNonce }: Props) {
           setPhone(u.phone ?? '');
           setJobTitle(u.jobTitle ?? '');
           setShiftPreference(u.shiftPreference ?? 'flexible');
-          // Category prefs live on the server (synced across devices); push
-          // stays a per-browser toggle tied to the actual subscription.
-          if ((u as any).notifPrefs) setPrefs(p => ({ ...p, ...(u as any).notifPrefs }));
         }
       })
       .finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(NOTIF_PREFS_KEY);
-      if (raw) setPrefs({ ...DEFAULT_PREFS, ...JSON.parse(raw) });
-    } catch { /* ignore */ }
   }, []);
 
   const loadNotifs = () => {
@@ -315,44 +281,6 @@ export default function Settings({ user, initialTab, tabNonce }: Props) {
     if (section === 'notifications' && !notifsLoaded) loadNotifs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section]);
-
-  const setPref = (key: keyof NotifPrefs, value: boolean) => {
-    setPrefs(prev => {
-      const next = { ...prev, [key]: value };
-      try { localStorage.setItem(NOTIF_PREFS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
-      return next;
-    });
-    // Category prefs (not the browser-only push toggle) persist to the server.
-    if (key !== 'push') {
-      fetch('/api/account', {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notifPrefs: { [key]: value } }),
-      }).catch(() => { /* best-effort; localStorage keeps the optimistic value */ });
-    }
-  };
-
-  const togglePush = async (value: boolean) => {
-    // Nativní obal: systémový dialog a registrace tokenu; přepínač ukáže skutečný výsledek,
-    // ne přání (při odmítnutí se vrátí do vypnuto a řekne se, kde to povolit).
-    if (jeNativni()) {
-      const most = await nativniMost();
-      if (!value) { setPref('push', false); await most?.vypniPush(); return; }
-      const r = await most?.zapniPush() ?? 'nedostupny';
-      setPref('push', r === 'granted');
-      if (r === 'denied') setPushNativniOdmitnuto(true);
-      return;
-    }
-    if (value && typeof window !== 'undefined' && 'Notification' in window) {
-      try {
-        const perm = Notification.permission === 'granted'
-          ? 'granted'
-          : await Notification.requestPermission();
-        setPref('push', perm === 'granted');
-        return;
-      } catch { /* ignore */ }
-    }
-    setPref('push', value);
-  };
 
   const saveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -434,14 +362,14 @@ export default function Settings({ user, initialTab, tabNonce }: Props) {
 
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-6">
-      <PageHeader title="Nastavení" subtitle="Spravujte svůj profil, aplikaci, oznámení a zabezpečení." />
+      <PageHeader title={t('Nastavení')} subtitle={t('Spravujte svůj profil, jazyk, vzhled, oznámení a zabezpečení.')} />
       <DiscardGuard guard={straz.guard} what={CO_SE_ZAHODI_ROLE} />
 
       {/* Telefon: sekce jako posuvný pás filtrových pilulek. Dřív ruční
           pilulky bez náznaku, že pás pokračuje — poslední byla useknutá.
           Segmented umí přetečení s měkkým okrajem sám. */}
       <div className="md:hidden">
-        <Segmented ariaLabel="Sekce nastavení" value={section} onChange={id => setSection(id)}
+        <Segmented ariaLabel={t('Sekce nastavení')} value={section} onChange={id => setSection(id)}
           options={sections.map(s => ({ id: s.id, label: s.label, icon: s.icon, count: s.id === 'notifications' && unreadCount > 0 ? unreadCount : undefined }))} />
       </div>
 
@@ -459,7 +387,7 @@ export default function Settings({ user, initialTab, tabNonce }: Props) {
                 <span className={`block text-xs truncate ${section === s.id ? 'text-white/60' : 'text-black/55'}`}>{s.desc}</span>
               </span>
               {s.id === 'notifications' && (
-                <Badge count={unreadCount} label={`Nepřečtená oznámení: ${unreadCount}`} />
+                <Badge count={unreadCount} label={t('Nepřečtená oznámení: {n}', { n: unreadCount })} />
               )}
             </button>
           ))}
@@ -538,86 +466,20 @@ export default function Settings({ user, initialTab, tabNonce }: Props) {
                 <Button type="submit" variant="accent" block loading={savingProfile}>Uložit změny</Button>
               </div>
             </form>
+          ) : section === 'jazyk' ? (
+            <SekceJazyk />
           ) : section === 'app' ? (
             <div className="space-y-6">
-              {/* Vzhled: přepínač motivu je Segmented (vybráno = inkoust).
-                  Dřív dvě ruční volby, kde vybraná byla plná limetka. */}
-              <section className="card p-6 space-y-4">
-                <div>
-                  <h2 className={cardTitle}>{t('Vzhled')}</h2>
-                  <p className="t-meta mt-1">{t('Vyberte světlý nebo tmavý motiv aplikace.')}</p>
-                </div>
-                <Segmented ariaLabel={t('Motiv aplikace')} value={theme === 'dark' ? 'dark' : 'light'} onChange={id => setTheme(id)}
-                  options={[{ id: 'light', label: t('Světlý'), icon: 'sun' }, { id: 'dark', label: t('Tmavý'), icon: 'moon' }]} />
-              </section>
-
-              {/* Nápovědy: zapnuto/vypnuto je přepínač, ne dvě limetkové volby. */}
-              <section className="card p-6 space-y-4">
-                <h2 className={cardTitle}>Nápovědy</h2>
-                <ul className="list">
-                  <SwitchRow title="Zobrazovat nápovědy"
-                    hint="Krátké rady u obrazovek. Jednotlivou radu zavřeš křížkem a už se neukáže — tady je můžeš všechny vrátit nebo vypnout úplně."
-                    checked={hintsOn} onChange={v => { setHintsEnabled(v); setHintsOn(v); }} />
-                </ul>
-                {hintsHidden > 0 && (
-                  <div className="flex items-center justify-between gap-4 flex-wrap">
-                    <p className="t-meta">
-                      Zavřených rad: <span className="tabular-nums font-semibold">{hintsHidden}</span>
-                    </p>
-                    <Button variant="secondary" size="sm" icon="refresh"
-                      onClick={() => { resetHints(); setHintsHidden(0); setHintsOn(true); }}>
-                      Zobrazit znovu všechny
-                    </Button>
-                  </div>
-                )}
-              </section>
-
-              {/* Jazyk rozhraní: pět endonymů, vybraný nese fajfka (ne limetka), ukládá se hned. */}
-              <section className="card p-6 space-y-4">
-                <div>
-                  <h2 className={cardTitle}>{t('Jazyk')}</h2>
-                  <p className="t-meta mt-1">{t('Jazyk rozhraní aplikace.')}</p>
-                </div>
-                <JazykKarta />
-              </section>
-
+              <SekceVzhled />
               <section className="card p-6 space-y-3" aria-labelledby="nast-o-aplikaci">
-                <h2 id="nast-o-aplikaci" className={cardTitle}>O aplikaci</h2>
-                <p className="t-meta">Právní informace a kontakt na podporu.</p>
+                <h2 id="nast-o-aplikaci" className={cardTitle}>{t('O aplikaci')}</h2>
+                <p className="t-meta">{t('Právní informace a kontakt na podporu.')}</p>
                 <PravniOdkazy className="text-sm" />
               </section>
             </div>
           ) : section === 'notifications' ? (
             <div className="space-y-6">
-            {/* Předvolby: sdílený SwitchRow v jedné kartě s .list (DP §3.20).
-                Starý ruční přepínač měl knoflík bez `left` — vypnutý
-                vypadal jako zapnutý. */}
-            <section className="card p-6 space-y-2">
-              <div>
-                <h2 className={cardTitle}>Předvolby notifikací</h2>
-                <p className="t-meta mt-1">Nastavte, o čem chcete být informováni.</p>
-              </div>
-              <ul className="list">
-                {pushStav === 'ok' ? (
-                  <SwitchRow title="Push notifikace" hint={pushNativniOdmitnuto
-                    ? 'Oznámení jsou v systému vypnutá. Povolte je v nastavení telefonu u aplikace Managero.'
-                    : jeObal ? 'Upozornění na směny, zprávy a sklad přímo v telefonu.' : 'Povolte oznámení v tomto prohlížeči.'} checked={prefs.push} onChange={togglePush} />
-                ) : (
-                  // Bez klíčů nebo v prohlížeči bez podpory by přepínač nic neudělal — radši to řekneme.
-                  <li className="py-3 min-h-[3.25rem]">
-                    <p className="text-sm font-semibold text-[#16181A]">Push notifikace</p>
-                    <p className="text-xs text-black/45 mt-0.5 text-pretty">
-                      {pushStav === 'nenakonfigurovano'
-                        ? 'V téhle instalaci zatím nejsou zapnuté. Upozornění najdeš v centru oznámení níže.'
-                        : 'Tenhle prohlížeč je nepodporuje. Na iPhonu je potřeba nejdřív přidat aplikaci na plochu. Upozornění najdeš v centru oznámení níže.'}
-                    </p>
-                  </li>
-                )}
-                <SwitchRow title="Nové zprávy" hint="Upozornění na nové zprávy v chatu." checked={prefs.messages} onChange={v => setPref('messages', v)} />
-                <SwitchRow title="Nízké zásoby" hint="Když skladová položka klesne pod limit." checked={prefs.lowStock} onChange={v => setPref('lowStock', v)} />
-                <SwitchRow title="Směny" hint="Změny v rozvrhu a nové směny." checked={prefs.shifts} onChange={v => setPref('shifts', v)} />
-              </ul>
-            </section>
+            <SekceOznameni />
 
             <section className="card p-6 space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
@@ -699,8 +561,13 @@ export default function Settings({ user, initialTab, tabNonce }: Props) {
               </div>
             </form>
             <Zablokovani />
-            <SmazatUcet jeHost={false} />
             </div>
+          ) : section === 'privacy' ? (
+            <SekceData />
+          ) : section === 'zkratky' ? (
+            <SekceZkratky />
+          ) : section === 'podnik' ? (
+            <SekcePodnik />
           ) : section === 'nahlaseni' ? (
             <NahlasenyObsah />
           ) : section === 'billing' && smiPlatby ? (

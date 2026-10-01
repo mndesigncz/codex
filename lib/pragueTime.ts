@@ -3,6 +3,8 @@
 // through these helpers — new Date().toISOString() flips to the wrong day
 // between midnight and ~2:00 Prague time.
 
+import { aktualniDatumVolba, aktualniHodiny, datumVTvaru, hmVTvaru } from './i18n/osobniFormaty.ts';
+
 const dayFmt = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Europe/Prague', year: 'numeric', month: '2-digit', day: '2-digit',
 });
@@ -99,16 +101,28 @@ export function parseDbTime(v: string | Date | null | undefined): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-/** Pražské "HH:MM" z databázového času. '—' pro nečitelnou hodnotu. */
+/**
+ * Pražské "HH:MM" z databázového času. '—' pro nečitelnou hodnotu.
+ * Hodiny se řídí osobní volbou, jinak formátem času podniku (lib/i18n/osobniFormaty.ts);
+ * na serveru a bez volby je to 24hodinové „HH:MM" jako dřív.
+ */
 export function dbTimeHM(v: string | Date | null | undefined): string {
   const d = parseDbTime(v);
-  return d ? d.toLocaleTimeString('cs-CZ', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit' }) : '—';
+  if (!d) return '—';
+  const hm = d.toLocaleTimeString('cs-CZ', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit' });
+  return hmVTvaru(hm, aktualniHodiny());
 }
 
-/** Pražské "d. M. HH:MM" z databázového času. */
+/** Pražské "d. M. HH:MM" z databázového času (hodiny a pořadí data podle osobní volby). */
 export function dbTimeDayHM(v: string | Date | null | undefined): string {
   const d = parseDbTime(v);
-  return d ? d.toLocaleString('cs-CZ', {
-    timeZone: 'Europe/Prague', day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit',
-  }) : '—';
+  if (!d) return '—';
+  const volba = aktualniDatumVolba();
+  if (aktualniHodiny() === 24 && volba === 'auto') {
+    return d.toLocaleString('cs-CZ', {
+      timeZone: 'Europe/Prague', day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
+  }
+  const den = dayFmt.format(d).split('-').map(Number); // RRRR-MM-DD v Praze
+  return `${datumVTvaru(den[0], den[1], den[2], volba === 'auto' ? 'dmy' : volba, true)} ${dbTimeHM(d)}`;
 }
