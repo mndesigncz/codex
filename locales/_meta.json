@@ -24,7 +24,8 @@
       "sklad": "strojový",
       "pruvodce": "strojový",
       "spolecne": "strojový",
-      "predplatne": "strojový"
+      "predplatne": "strojový",
+      "widgety": "strojový"
     },
     "de": {
       "common": "strojový",
@@ -42,7 +43,8 @@
       "sklad": "strojový",
       "pruvodce": "strojový",
       "spolecne": "strojový",
-      "predplatne": "strojový"
+      "predplatne": "strojový",
+      "widgety": "strojový"
     },
     "sk": {
       "common": "strojový",
@@ -60,7 +62,8 @@
       "sklad": "strojový",
       "pruvodce": "strojový",
       "spolecne": "strojový",
-      "predplatne": "strojový"
+      "predplatne": "strojový",
+      "widgety": "strojový"
     },
     "pl": {
       "common": "strojový",
@@ -78,7 +81,8 @@
       "sklad": "strojový",
       "pruvodce": "strojový",
       "spolecne": "strojový",
-      "predplatne": "strojový"
+      "predplatne": "strojový",
+      "widgety": "strojový"
     }
   },
   "nepreklada_se": [

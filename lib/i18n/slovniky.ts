@@ -17,7 +17,7 @@ export const SEKCE = [
   'zamestnanec', 'kiosk', 'chat',
   'sprava', 'tym', 'navody', 'postupy',
   'rozvrh', 'sklad',
-  'spolecne', 'pruvodce', 'predplatne',
+  'spolecne', 'pruvodce', 'predplatne', 'widgety',
 ] as const;
 export type Sekce = (typeof SEKCE)[number];
 /**
