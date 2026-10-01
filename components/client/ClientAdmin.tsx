@@ -59,6 +59,7 @@ import { otevriNaTisk } from '@/lib/stahni';
 
 // Nastavení účtu v okně: stejná obrazovka jako v administraci (profil, vzhled a jazyk, oznámení, zabezpečení),
 // jen se stahuje až při otevření, ať ho Client nenese s každým načtením.
+const ImportKartickaOkno = dynamic(() => import('./ImportKartickaOkno'), { ssr: false });
 const NastaveniUctu = dynamic(() => import('../Settings'), { loading: () => <div className="flex items-center justify-center h-48"><div className="spinner" /></div> });
 
 type Tab = 'overview' | 'reservations' | 'orders' | 'tables' | 'menu' | 'events' | 'customers' | 'loyalty' | 'brand' | 'settings';
@@ -685,6 +686,9 @@ function Clenove({ oznam, hledat = '' }: { oznam: Hlaska; hledat?: string }) {
   // role se zakaznici.skupiny bez vernost.zobrazit jinde hosta do skupiny nepřidá.
   const meniSkupiny = smi('zakaznici.skupiny');
   const rozbali = vidiDenik || meniSkupiny;
+  // Přechod z jiné věrnostní aplikace (Kartička): jen s oprávněním Import členů.
+  const smiImport = smi('zakaznici.import');
+  const [importOtevren, setImportOtevren] = useState(false);
   const [q, setQ] = useState(hledat);
   useEffect(() => { setQ(hledat); }, [hledat]);
   // Hledání se ptá serveru (výsledky přes 500 členů) — s krátkou prodlevou, ať se neptá na každé písmeno.
@@ -718,11 +722,13 @@ function Clenove({ oznam, hledat = '' }: { oznam: Hlaska; hledat?: string }) {
       <div className="flex items-center gap-3 flex-wrap">
         <SearchField className="w-full max-w-sm" value={q} onChange={setQ} storageKey="hoste" placeholder="Jméno nebo e-mail" ariaLabel="Hledat zákazníka" />
         {d && <p className="t-meta tabular-nums">{czCount(d.total, CLEN)}</p>}
+        {smiImport && <Button size="sm" variant="secondary" icon="upload" className="sm:ml-auto" onClick={() => setImportOtevren(true)}>Přecházíte z Kartičky?</Button>}
       </div>
       {error ? <ErrorState title="Členové se nenačetli" onRetry={reload} detail={error} />
         : d === null ? <PageSkel />
         : d.customers.length === 0 ? (
-          <Card><EmptyState icon="users" compact title={q ? 'Nikdo takový' : 'Zatím žádní členové'} hint={q ? undefined : 'Přidají se sami na tvé stránce pro hosty.'} /></Card>
+          <Card><EmptyState icon="users" compact title={q ? 'Nikdo takový' : 'Zatím žádní členové'} hint={q ? undefined : smiImport ? 'Přidají se sami na tvé stránce pro hosty. Máte členy v Kartičce? Můžete je přenést i s body a razítky.' : 'Přidají se sami na tvé stránce pro hosty.'}
+            action={!q && smiImport ? <Button size="sm" variant="secondary" icon="upload" onClick={() => setImportOtevren(true)}>Přenést z Kartičky</Button> : undefined} /></Card>
         ) : (
           <Card pad="none">
             <ul className="list px-5">
@@ -749,6 +755,7 @@ function Clenove({ oznam, hledat = '' }: { oznam: Hlaska; hledat?: string }) {
             </ul>
           </Card>
         )}
+      {importOtevren && <ImportKartickaOkno open onClose={() => setImportOtevren(false)} oznam={oznam} onHotovo={reload} />}
       {upravuji && (
         <Modal open onClose={() => setUpravuji(null)} size="sm" title={`Body pro ${upravuji.c.name}`}
           subtitle={`Teď má ${upravuji.c.points.toLocaleString('cs-CZ')} b.`}
