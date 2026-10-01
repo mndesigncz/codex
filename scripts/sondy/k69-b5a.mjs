@@ -77,7 +77,9 @@ const bezPreteceni = (p) => p.evaluate(() => document.documentElement.scrollWidt
   tvrdi('V N9: …ale starší den bez uzávěrky ano (s lidmi na směně)', textChyb.includes('Petr Novák'), textChyb.slice(0, 200));
   tvrdi('V: Ke schválení ukazuje Petra se „Schválit" (primary, ne limetka)', await widgetLi(p, 'uzaverky.ke_schvaleni').getByRole('button', { name: 'Schválit' }).count() === 1
     && await widgetLi(p, 'uzaverky.ke_schvaleni').locator('button.on-accent').count() === 0);
-  tvrdi('V: Souhrn má čísla (Tržba) a žádnou dlaždici s ručním štítkem', (await widgetLi(p, 'uzaverky.souhrn').innerText()).includes('TRŽBA') || (await widgetLi(p, 'uzaverky.souhrn').innerText()).includes('Tržba'));
+  // Prvního dne v měsíci jsou všechny fixtury (včera a dřív) z minulého měsíce, takže souhrn „tento měsíc" právem hlásí prázdno.
+  const textSouhrnu = await widgetLi(p, 'uzaverky.souhrn').innerText();
+  tvrdi('V: Souhrn má čísla (Tržba) a žádnou dlaždici s ručním štítkem', textSouhrnu.includes('TRŽBA') || textSouhrnu.includes('Tržba') || (DNY.VCERA.slice(0, 7) !== MESIC && textSouhrnu.includes('zatím žádná uzávěrka')), textSouhrnu.slice(0, 120));
 
   await p.screenshot({ path: OUT + 'k69-b5a-uzaverky-desk.png', fullPage: true });
 
