@@ -7,7 +7,7 @@
 // a texty nesmí slibovat zkoušku, kterou Stripe nedá.
 
 import type { Testy } from './_testy.ts';
-import { normalizujEmail, vypadaJakoEmail, poradiKandidatu } from '../../lib/emailAdresa.ts';
+import { normalizujEmail, vypadaJakoEmail, poradiKandidatu, htmlNaText } from '../../lib/emailAdresa.ts';
 import {
   rezimZKlice, rezimZLivemode, rozhodniOZdroji, jeChybejiciZdroj, jeChybejiciZakaznik, jeSmazanyZakaznik,
   udalostPatriDoRezimu, vyhodnotPredplatne, nabidnoutTrial,
@@ -103,4 +103,10 @@ export default function ({ eq, ok }: Testy) {
   ok('banner: skloňuje dny', /zbývá 3 dny/.test(banner({ trialDaysLeft: 3 })) && /zbývá 1 den,/.test(banner({ trialDaysLeft: 1 })));
   ok('banner: starý trial bez karty', /Kliknutím zjistíte/.test(banner({ subscriptionStatus: null })));
   ok('banner: Max se jmenuje Max', /Zkoušíte Max/.test(banner({ effective: 'max' })));
+  // E-mail jen s HTML bez textové části hůř prochází spamovým filtrem; text musí nést i odkaz z tlačítka.
+  {
+    const t = htmlNaText('<div><h1>Nové heslo</h1><p>Odkaz platí hodinu.</p><a href="https://www.managero.app/nove-heslo?token=abc&amp;x=1" style="x">Nastavit nové heslo</a><p>Tom &amp; Jerry</p></div>');
+    ok('e-mail: textová část nese odkaz z tlačítka i s popiskem', t.includes('Nastavit nové heslo: https://www.managero.app/nove-heslo?token=abc&x=1'));
+    ok('e-mail: textová část nemá značky a rozpozná entity', !/[<>]/.test(t) && t.includes('Tom & Jerry') && t.includes('Nové heslo'));
+  }
 }
