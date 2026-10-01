@@ -12,6 +12,7 @@ import { useCallback, useEffect, useId, useState } from 'react';
 import { Button, Field, Modal, Select, SwitchRow } from '../../ui';
 import type { DefiniceStranky, OdpovedVychozi, PolozkaRozlozeni, Rozsah } from '@/lib/widgety/typy';
 import { apiMessage, okJson } from '@/lib/api';
+import { useT } from '@/lib/i18n/client';
 
 export default function UlozitVychozi({ stranka, polozky, onUlozeno, onZavrit }: {
   stranka: DefiniceStranky;
@@ -21,6 +22,7 @@ export default function UlozitVychozi({ stranka, polozky, onUlozeno, onZavrit }:
   onZavrit: () => void;
 }) {
   const uid = useId();
+  const t = useT('widgety');
   const [rozsah, setRozsah] = useState<Rozsah>(`typ:${stranka.rozhrani}`);
   const [info, setInfo] = useState<OdpovedVychozi | null>(null);
   const [chybaNacteni, setChybaNacteni] = useState<string | null>(null);
@@ -37,7 +39,7 @@ export default function UlozitVychozi({ stranka, polozky, onUlozeno, onZavrit }:
     fetch(url(r), { cache: 'no-store' })
       .then(okJson)
       .then((d: OdpovedVychozi) => { setInfo(d); setZamceno(d.zamceno === true); })
-      .catch(e => setChybaNacteni(apiMessage(e, 'Výchozí rozložení se nenačetlo.')));
+      .catch(e => setChybaNacteni(apiMessage(e, t('Výchozí rozložení se nenačetlo.'))));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stranka.id]);
   useEffect(() => { nacti(rozsah); }, [rozsah, nacti]);
@@ -55,12 +57,12 @@ export default function UlozitVychozi({ stranka, polozky, onUlozeno, onZavrit }:
       if (res.ok) { onUlozeno(); return; }
       if (res.status === 409) {
         if (d?.aktualni) setInfo(d.aktualni);
-        setChyba('Výchozí rozložení se mezitím změnilo jinde. Zkontroluj volby a ulož znovu.');
+        setChyba(t('Výchozí rozložení se mezitím změnilo jinde. Zkontroluj volby a ulož znovu.'));
         return;
       }
-      setChyba(typeof d?.error === 'string' && d.error ? d.error : 'Výchozí rozložení se nepodařilo uložit.');
+      setChyba(typeof d?.error === 'string' && d.error ? t(d.error) : t('Výchozí rozložení se nepodařilo uložit.'));
     } catch {
-      setChyba('Nepodařilo se spojit se serverem. Zkus to znovu.');
+      setChyba(t('Nepodařilo se spojit se serverem. Zkus to znovu.'));
     } finally {
       setUkladam(false);
     }
@@ -69,28 +71,28 @@ export default function UlozitVychozi({ stranka, polozky, onUlozeno, onZavrit }:
   const rozsahy = info?.rozsahy ?? [];
   const idVyberu = `${uid}-pro-koho`;
   return (
-    <Modal open onClose={onZavrit} size="sm" title="Uložit jako výchozí"
+    <Modal open onClose={onZavrit} size="sm" title={t('Uložit jako výchozí')}
       footer={<>
-        <Button variant="secondary" onClick={onZavrit}>Zrušit</Button>
-        <Button variant="primary" onClick={ulozit} loading={ukladam} disabled={!info}>Uložit výchozí</Button>
+        <Button variant="secondary" onClick={onZavrit}>{t('Zrušit', undefined, 'dialog')}</Button>
+        <Button variant="primary" onClick={ulozit} loading={ukladam} disabled={!info}>{t('Uložit výchozí')}</Button>
       </>}>
       <div className="space-y-4">
-        <Field id={idVyberu} label="Pro koho">
+        <Field id={idVyberu} label={t('Pro koho')}>
           <Select id={idVyberu} value={rozsah} onChange={e => setRozsah(e.target.value as Rozsah)} disabled={!rozsahy.length}>
             {rozsahy.length
-              ? rozsahy.map(r => <option key={r.id} value={r.id}>{`${r.nazev} (${r.clenu})`}</option>)
-              : <option value={rozsah}>Načítám…</option>}
+              ? rozsahy.map(r => <option key={r.id} value={r.id}>{`${r.id.startsWith('role:#') ? r.nazev : t(r.nazev)} (${r.clenu})`}</option>)
+              : <option value={rozsah}>{t('Načítám…')}</option>}
           </Select>
         </Field>
-        <SwitchRow as="div" title="Zamknout — ostatní si stránku nepřestaví"
-          hint="Svoje úpravy dostanou zpátky, až zámek zrušíš." checked={zamceno} onChange={setZamceno} />
-        <p className="note note-info">Každý uvidí jen widgety, na které má oprávnění.</p>
+        <SwitchRow as="div" title={t('Zamknout — ostatní si stránku nepřestaví')}
+          hint={t('Svoje úpravy dostanou zpátky, až zámek zrušíš.')} checked={zamceno} onChange={setZamceno} />
+        <p className="note note-info">{t('Každý uvidí jen widgety, na které má oprávnění.')}</p>
         {/* Kopie při zápisu (spec §8): kdo si stránku upravil, výchozí bez zámku neuvidí. */}
-        <p className="t-meta text-pretty">Kdo si stránku už upravil po svém, uvidí nové výchozí, až dá „Obnovit výchozí rozložení" — nebo když ho zamkneš.</p>
+        <p className="t-meta text-pretty">{t('Kdo si stránku už upravil po svém, uvidí nové výchozí, až dá „Obnovit výchozí rozložení" — nebo když ho zamkneš.')}</p>
         {chybaNacteni && (
           <p className="note note-danger flex items-center justify-between gap-3" role="alert">
             <span>{chybaNacteni}</span>
-            <Button variant="secondary" size="sm" icon="refresh" onClick={() => nacti(rozsah)}>Zkusit znovu</Button>
+            <Button variant="secondary" size="sm" icon="refresh" onClick={() => nacti(rozsah)}>{t('Zkusit znovu')}</Button>
           </p>
         )}
         {chyba && <p className="note note-danger" role="alert">{chyba}</p>}

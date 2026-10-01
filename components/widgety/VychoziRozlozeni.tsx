@@ -18,26 +18,31 @@ import { stranka as najdiStranku, strankyRozhrani } from '@/lib/widgety/stranky'
 import { jeSpravceStranky } from '@/lib/widgety/rozlozeni';
 import { apiMessage, okJson } from '@/lib/api';
 import { parseDbTime } from '@/lib/pragueTime';
+import { useT, type PrekladFn } from '@/lib/i18n/client';
+import { fmtDatum } from '@/lib/i18n/format';
 import { useOpravneni } from '../role/useOpravneni';
 import { PlochaWidgetu } from './PlochaWidgetu';
 import { useRozlozeni } from './useRozlozeni';
 
-const SKUPINY: { rozhrani: Rozhrani; nazev: string }[] = [
-  { rozhrani: 'vedeni', nazev: 'Vedení' },
-  { rozhrani: 'zamestnanec', nazev: 'Zaměstnanci' },
-  { rozhrani: 'kiosk', nazev: 'Tablet' },
-];
-const NAZEV_SKUPINY: Record<Rozhrani, string> = { vedeni: 'Vedení', zamestnanec: 'Zaměstnanci', kiosk: 'Tablet' };
+const SKUPINY: readonly Rozhrani[] = ['vedeni', 'zamestnanec', 'kiosk'];
+
+/** Název skupiny stránek (typ rozhraní). */
+function nazevSkupiny(t: PrekladFn, rozhrani: Rozhrani): string {
+  if (rozhrani === 'vedeni') return t('Vedení');
+  if (rozhrani === 'zamestnanec') return t('Zaměstnanci');
+  return t('Tablet');
+}
 
 /** „Upraveno 12. 9. · zamčeno" — datum v pražském čase, věta bez velkého písmene uprostřed. */
-function popisVychoziho(d: OdpovedVychozi): string {
-  if (d.zdroj === 'aplikace') return 'Výchozí z aplikace';
+function popisVychoziho(d: OdpovedVychozi, t: PrekladFn): string {
+  if (d.zdroj === 'aplikace') return t('Výchozí z aplikace');
   const kdy = parseDbTime(d.upraveno);
-  const datum = kdy ? kdy.toLocaleDateString('cs-CZ', { timeZone: 'Europe/Prague', day: 'numeric', month: 'numeric' }) : null;
-  return [datum ? `Upraveno ${datum}` : 'Upraveno', d.zamceno ? 'zamčeno' : null].filter(Boolean).join(' · ');
+  const datum = kdy ? fmtDatum(kdy, { jazyk: t.jazyk, styl: 'kratce' }) : null;
+  return [datum ? t('Upraveno {datum}', { datum }) : t('Upraveno'), d.zamceno ? t('zamčeno') : null].filter(Boolean).join(' · ');
 }
 
 function RadekStranky({ stranka, onUpravit }: { stranka: DefiniceStranky; onUpravit: () => void }) {
+  const t = useT('widgety');
   const [info, setInfo] = useState<OdpovedVychozi | null>(null);
   const [chyba, setChyba] = useState<string | null>(null);
   useEffect(() => {
@@ -45,39 +50,40 @@ function RadekStranky({ stranka, onUpravit }: { stranka: DefiniceStranky; onUpra
     fetch(`/api/rozlozeni/vychozi?stranka=${encodeURIComponent(stranka.id)}&rozsah=${encodeURIComponent(`typ:${stranka.rozhrani}`)}`, { cache: 'no-store' })
       .then(okJson)
       .then(d => { if (zije) setInfo(d); })
-      .catch(e => { if (zije) setChyba(apiMessage(e, 'Stav se nenačetl.')); });
+      .catch(e => { if (zije) setChyba(apiMessage(e, t('Stav se nenačetl.'))); });
     return () => { zije = false; };
   }, [stranka.id, stranka.rozhrani]);
   return (
     <ListRow
-      title={stranka.nazev}
-      meta={info ? popisVychoziho(info) : chyba ?? 'Načítám…'}
-      actions={<Button variant="secondary" size="sm" onClick={onUpravit}>Upravit</Button>}
+      title={t(stranka.nazev)}
+      meta={info ? popisVychoziho(info, t) : chyba ?? t('Načítám…')}
+      actions={<Button variant="secondary" size="sm" onClick={onUpravit}>{t('Upravit')}</Button>}
     />
   );
 }
 
 function EditorVychoziho({ stranka, onZpet }: { stranka: DefiniceStranky; onZpet: () => void }) {
   const uid = useId();
+  const t = useT('widgety');
   const [rozsah, setRozsah] = useState<Rozsah>(`typ:${stranka.rozhrani}`);
   const r = useRozlozeni(stranka.id, { rozsah });
   const zpet = () => { void r.ulozHned().finally(onZpet); };
   const idVyberu = `${uid}-pro-koho`;
   return (
     <div className="space-y-5">
-      <Button variant="ghost" size="sm" icon="chevron" className="-ml-2 [&>svg]:rotate-90" onClick={zpet}>Zpět na stránky</Button>
+      <Button variant="ghost" size="sm" icon="chevron" className="-ml-2 [&>svg]:rotate-90" onClick={zpet}>{t('Zpět na stránky')}</Button>
       <div className="grid gap-4 sm:grid-cols-2 items-end">
-        <Field id={idVyberu} label="Pro koho" hint="Role má přednost před typem: kdo má výchozí pro svou roli, dostane to.">
+        <Field id={idVyberu} label={t('Pro koho')} hint={t('Role má přednost před typem: kdo má výchozí pro svou roli, dostane to.')}>
           <Select id={idVyberu} value={rozsah} onChange={e => setRozsah(e.target.value as Rozsah)} disabled={!r.rozsahy.length}>
             {r.rozsahy.length
-              ? r.rozsahy.map(x => <option key={x.id} value={x.id}>{`${x.nazev} (${x.clenu})`}</option>)
-              : <option value={rozsah}>Načítám…</option>}
+              ? r.rozsahy.map(x => <option key={x.id} value={x.id}>{`${x.id.startsWith('role:#') ? x.nazev : t(x.nazev)} (${x.clenu})`}</option>)
+              : <option value={rozsah}>{t('Načítám…')}</option>}
           </Select>
         </Field>
       </div>
       <Card pad="none" className="px-5">
         <ul className="list">
-          <SwitchRow title="Zamknout" hint="Ostatní si stránku nepřestaví. Svoje úpravy dostanou zpátky, až zámek zrušíš."
+          <SwitchRow title={t('Zamknout', undefined, 'rozlozeni')} hint={t('Ostatní si stránku nepřestaví. Svoje úpravy dostanou zpátky, až zámek zrušíš.')}
             checked={r.zamceno} disabled={r.nacteni !== 'ok'} onChange={r.nastavZamceno} />
         </ul>
       </Card>
@@ -88,8 +94,8 @@ function EditorVychoziho({ stranka, onZpet }: { stranka: DefiniceStranky; onZpet
         onHotovo={onZpet}
         hlavicka={{
           as: 'h2',
-          title: `${stranka.nazev} · ${NAZEV_SKUPINY[stranka.rozhrani]}`,
-          subtitle: 'Widgety jsou jen schematicky — každý v nich uvidí svoje data a jen to, na co má oprávnění.',
+          title: `${t(stranka.nazev)} · ${nazevSkupiny(t, stranka.rozhrani)}`,
+          subtitle: t('Widgety jsou jen schematicky — každý v nich uvidí svoje data a jen to, na co má oprávnění.'),
         }}
       />
     </div>
@@ -98,6 +104,7 @@ function EditorVychoziho({ stranka, onZpet }: { stranka: DefiniceStranky; onZpet
 
 export default function VychoziRozlozeni() {
   const { opravneni, nacteno } = useOpravneni();
+  const t = useT('widgety');
   const [upravuji, setUpravuji] = useState<IdStranky | null>(null);
   const upravovana = upravuji ? najdiStranku(upravuji) : undefined;
   if (upravovana) return <EditorVychoziho stranka={upravovana} onZpet={() => setUpravuji(null)} />;
@@ -105,23 +112,23 @@ export default function VychoziRozlozeni() {
   // Do načtení oprávnění se nic nenabízí — vedení se správou podniku vidí vše,
   // správce tabletu jen tablet (server by jinou stránku odmítl 403).
   const skupiny = SKUPINY
-    .filter(s => nacteno && jeSpravceStranky(opravneni, { rozhrani: s.rozhrani }))
-    .map(s => ({ ...s, stranky: strankyRozhrani(s.rozhrani, true) }))
+    .filter(rozhrani => nacteno && jeSpravceStranky(opravneni, { rozhrani }))
+    .map(rozhrani => ({ rozhrani, stranky: strankyRozhrani(rozhrani, true) }))
     .filter(s => s.stranky.length > 0);
 
   return (
     <div className="space-y-5">
-      <PageHeader as="h2" title="Rozložení stránek"
-        subtitle="Výchozí plocha pro nové lidi a tablet. Každý si ji pak upraví po svém, pokud ji nezamkneš." />
+      <PageHeader as="h2" title={t('Rozložení stránek')}
+        subtitle={t('Výchozí plocha pro nové lidi a tablet. Každý si ji pak upraví po svém, pokud ji nezamkneš.')} />
       {!nacteno ? (
         <Card><div className="space-y-3"><Skeleton className="h-5 w-40 rounded-full" /><Skeleton className="h-10" /><Skeleton className="h-10" /></div></Card>
       ) : skupiny.length === 0 ? (
-        <p className="t-meta">Zatím tu není žádná stránka, jejíž plochu bys mohl nastavit.</p>
+        <p className="t-meta">{t('Zatím tu není žádná stránka, jejíž plochu bys mohl nastavit.')}</p>
       ) : (
         <Card pad="none" className="px-5">
           {skupiny.map((s, i) => (
             <section key={s.rozhrani} aria-labelledby={`stranky-${s.rozhrani}`} className={i > 0 ? 'border-t border-[var(--surface-line)]' : ''}>
-              <h3 id={`stranky-${s.rozhrani}`} className="t-label pt-4 pb-1">{s.nazev}</h3>
+              <h3 id={`stranky-${s.rozhrani}`} className="t-label pt-4 pb-1">{nazevSkupiny(t, s.rozhrani)}</h3>
               <ul className="list">
                 {s.stranky.map(st => <RadekStranky key={st.id} stranka={st} onUpravit={() => setUpravuji(st.id)} />)}
               </ul>

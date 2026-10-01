@@ -12,6 +12,7 @@ import { useId, useMemo, useState } from 'react';
 import { Button, Field, Input, Segmented, Select, SwitchRow } from '../../ui';
 import type { MoznostNastaveni, PoleNastaveni as Pole, Smi, ZdrojNastaveni } from '@/lib/widgety/typy';
 import { MAX_POPISEK_ODKAZU } from '@/lib/widgety/konstanty';
+import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { useDataWidgetu } from '../useDataWidgetu';
 import { navigaceCile, rozeberCil, slozCil, useNavigace, type CilOdkazu } from '../NavigaceKontext';
 import { viditelneMoznosti } from '../registr';
@@ -52,11 +53,11 @@ const ZDROJE: Record<Exclude<ZdrojNastaveni, 'pohledy'>, { url: string; klic: st
 };
 
 /** Ikony dlaždice-odkazu: dvanáct předvoleb z Icons.tsx (spec §2.3) a jejich jména pro odečítač. */
-export const IKONY_ODKAZU: readonly { id: string; nazev: string }[] = [
-  { id: 'overview', nazev: 'Přehled' }, { id: 'calendar', nazev: 'Kalendář' }, { id: 'box', nazev: 'Krabice' },
-  { id: 'check', nazev: 'Fajfka' }, { id: 'clipboard', nazev: 'Podložka' }, { id: 'book', nazev: 'Kniha' },
-  { id: 'trend', nazev: 'Graf' }, { id: 'coins', nazev: 'Mince' }, { id: 'users', nazev: 'Lidé' },
-  { id: 'chat', nazev: 'Bublina' }, { id: 'cup', nazev: 'Hrnek' }, { id: 'star', nazev: 'Hvězda' },
+export const ikonyOdkazu = (t: PrekladFn): readonly { id: string; nazev: string }[] => [
+  { id: 'overview', nazev: t('Přehled') }, { id: 'calendar', nazev: t('Kalendář') }, { id: 'box', nazev: t('Krabice') },
+  { id: 'check', nazev: t('Fajfka') }, { id: 'clipboard', nazev: t('Podložka') }, { id: 'book', nazev: t('Kniha') },
+  { id: 'trend', nazev: t('Graf') }, { id: 'coins', nazev: t('Mince') }, { id: 'users', nazev: t('Lidé') },
+  { id: 'chat', nazev: t('Bublina') }, { id: 'cup', nazev: t('Hrnek') }, { id: 'star', nazev: t('Hvězda') },
 ];
 
 /** Výchozí ikona podle druhu cíle, když si člověk žádnou nevybral. */
@@ -71,8 +72,10 @@ export function PoleNastaveni({ pole, hodnoty, onZmena, smi }: {
   smi: Smi;
 }) {
   const uid = useId();
+  const t = useT('widgety');
   const id = `${uid}-${pole.klic}`;
-  const napoveda = pole.napoveda;
+  const nazevPole = t(pole.nazev);
+  const napoveda = pole.napoveda ? t(pole.napoveda) : undefined;
 
   switch (pole.typ) {
     case 'vyber': {
@@ -81,17 +84,17 @@ export function PoleNastaveni({ pole, hodnoty, onZmena, smi }: {
       // Do čtyř voleb přepínač (vidíš všechny naráz), víc voleb do výběru.
       if (moznosti.length <= 4) {
         return (
-          <Field label={pole.nazev} hint={napoveda}>
-            <Segmented size="sm" ariaLabel={pole.nazev} value={hodnota}
+          <Field label={nazevPole} hint={napoveda}>
+            <Segmented size="sm" ariaLabel={nazevPole} value={hodnota}
               onChange={v => onZmena({ [pole.klic]: v })}
-              options={moznosti.map(m => ({ id: m.id, label: m.nazev }))} />
+              options={moznosti.map(m => ({ id: m.id, label: t(m.nazev) }))} />
           </Field>
         );
       }
       return (
-        <Field id={id} label={pole.nazev} hint={napoveda}>
+        <Field id={id} label={nazevPole} hint={napoveda}>
           <Select id={id} value={hodnota} onChange={e => onZmena({ [pole.klic]: e.target.value })}>
-            {moznosti.map(m => <option key={m.id} value={m.id}>{m.nazev}</option>)}
+            {moznosti.map(m => <option key={m.id} value={m.id}>{t(m.nazev)}</option>)}
           </Select>
         </Field>
       );
@@ -101,8 +104,8 @@ export function PoleNastaveni({ pole, hodnoty, onZmena, smi }: {
     case 'cislo': {
       const hodnota = typeof hodnoty[pole.klic] === 'number' ? (hodnoty[pole.klic] as number) : pole.vychozi;
       return (
-        <Field id={id} label={pole.jednotka ? `${pole.nazev} (${pole.jednotka})` : pole.nazev}
-          hint={napoveda ?? `Od ${pole.min} do ${pole.max}.`}>
+        <Field id={id} label={pole.jednotka ? `${nazevPole} (${t(pole.jednotka)})` : nazevPole}
+          hint={napoveda ?? t('Od {min} do {max}.', { min: pole.min, max: pole.max })}>
           <Input id={id} type="number" inputMode="numeric" min={pole.min} max={pole.max} step={pole.krok ?? 1}
             className="!w-full sm:!w-32" value={Number.isFinite(hodnota) ? hodnota : ''}
             onChange={e => {
@@ -114,13 +117,13 @@ export function PoleNastaveni({ pole, hodnoty, onZmena, smi }: {
     }
     case 'prepinac':
       return (
-        <SwitchRow as="div" title={pole.nazev} hint={napoveda} className="!py-1"
+        <SwitchRow as="div" title={nazevPole} hint={napoveda} className="!py-1"
           checked={hodnoty[pole.klic] === true} onChange={v => onZmena({ [pole.klic]: v })} />
       );
     case 'text': {
       const hodnota = typeof hodnoty[pole.klic] === 'string' ? (hodnoty[pole.klic] as string) : pole.vychozi;
       return (
-        <Field id={id} label={pole.nazev} hint={napoveda}>
+        <Field id={id} label={nazevPole} hint={napoveda}>
           <Input id={id} value={hodnota} maxLength={pole.maxDelka} onChange={e => onZmena({ [pole.klic]: e.target.value })} />
         </Field>
       );
@@ -139,6 +142,7 @@ export default PoleNastaveni;
 function PoleVicevyber({ pole, hodnoty, onZmena, smi }: {
   pole: Extract<Pole, { typ: 'vicevyber' }>; hodnoty: Hodnoty; onZmena: (z: Hodnoty) => void; smi: Smi;
 }) {
+  const t = useT('widgety');
   const moznosti = viditelneMoznosti(pole.moznosti, smi);
   const ulozeno = hodnoty[pole.klic];
   const vybrane: string[] = Array.isArray(ulozeno) ? ulozeno.filter((x): x is string => typeof x === 'string')
@@ -151,11 +155,11 @@ function PoleVicevyber({ pole, hodnoty, onZmena, smi }: {
   };
   return (
     <fieldset className="min-w-0">
-      <legend className="field-label">{pole.nazev}</legend>
-      {pole.napoveda && <p className="t-meta -mt-1 mb-1">{pole.napoveda}</p>}
+      <legend className="field-label">{t(pole.nazev)}</legend>
+      {pole.napoveda && <p className="t-meta -mt-1 mb-1">{t(pole.napoveda)}</p>}
       <ul className="list">
         {moznosti.map(m => (
-          <SwitchRow key={m.id} title={m.nazev} checked={vybrane.includes(m.id)} onChange={v => prepni(m, v)} />
+          <SwitchRow key={m.id} title={t(m.nazev)} checked={vybrane.includes(m.id)} onChange={v => prepni(m, v)} />
         ))}
       </ul>
     </fieldset>
@@ -166,6 +170,7 @@ function PoleZdroj({ pole, hodnoty, onZmena, smi, id }: {
   pole: Extract<Pole, { typ: 'zdroj' }>; hodnoty: Hodnoty; onZmena: (z: Hodnoty) => void; smi: Smi; id: string;
 }) {
   const nav = useNavigace();
+  const t = useT('widgety');
   const zdroj = pole.zdroj === 'pohledy' ? null : ZDROJE[pole.zdroj];
   // Na možnosti se ptá jen ten, komu je server dá — jinak by pole skončilo 403.
   const smiZdroj = !!zdroj && (zdroj.klic == null || smi(zdroj.klic));
@@ -175,31 +180,31 @@ function PoleZdroj({ pole, hodnoty, onZmena, smi, id }: {
     : data.data ?? [];
   const hodnota = hodnoty[pole.klic];
   const vybrano = hodnota == null ? '' : String(hodnota);
-  const prazdne = pole.prazdne ?? 'Nic nevybráno';
+  const prazdne = pole.prazdne ? t(pole.prazdne) : t('Nic nevybráno');
   if (pole.zdroj !== 'pohledy' && !smiZdroj) return null;
   if (data.error) {
     return (
-      <Field label={pole.nazev}>
+      <Field label={t(pole.nazev)}>
         <p className="note note-danger flex items-center justify-between gap-3" role="alert">
-          <span>Možnosti se nenačetly.</span>
-          <Button variant="secondary" size="sm" icon="refresh" onClick={data.reload}>Zkusit znovu</Button>
+          <span>{t('Možnosti se nenačetly.')}</span>
+          <Button variant="secondary" size="sm" icon="refresh" onClick={data.reload}>{t('Zkusit znovu')}</Button>
         </p>
       </Field>
     );
   }
   return (
-    <Field id={id} label={pole.nazev} hint={pole.napoveda}>
+    <Field id={id} label={t(pole.nazev)} hint={pole.napoveda ? t(pole.napoveda) : undefined}>
       <Select id={id} value={vybrano} disabled={data.loading}
         onChange={e => {
           const v = e.target.value;
           const volba = volby.find(x => String(x.id) === v);
           onZmena({ [pole.klic]: v === '' ? null : volba ? volba.id : v });
         }}>
-        <option value="">{data.loading ? 'Načítám…' : prazdne}</option>
+        <option value="">{data.loading ? t('Načítám…') : prazdne}</option>
         {volby.map(v => <option key={String(v.id)} value={String(v.id)}>{v.nazev}</option>)}
         {/* Uložená volba, která už neexistuje (smazaná kategorie), se neztratí potichu. */}
         {vybrano && !data.loading && !volby.some(v => String(v.id) === vybrano) && (
-          <option value={vybrano}>Už neexistuje</option>
+          <option value={vybrano}>{t('Už neexistuje')}</option>
         )}
       </Select>
     </Field>
@@ -215,13 +220,14 @@ function PoleOdkazu({ hodnoty, onZmena, smi, idZaklad }: {
   hodnoty: Hodnoty; onZmena: (z: Hodnoty) => void; smi: Smi; idZaklad: string;
 }) {
   const nav = useNavigace();
+  const t = useT('widgety');
   const cil = rozeberCil(hodnoty.cil);
   const druhy = useMemo(() => ([
-    { id: 'pohled', label: 'Záložka' },
-    ...(nav.smiPohled('inventory') && smi('sklad.zobrazit') ? [{ id: 'kategorie', label: 'Kategorie skladu' }] : []),
-    ...(nav.smiPohled('procedures') && smi('postupy.zobrazit') ? [{ id: 'postup', label: 'Postup' }] : []),
-    ...(nav.smiPohled('guides') && smi('navody.zobrazit') ? [{ id: 'navod', label: 'Návod' }] : []),
-  ] as { id: CilOdkazu['druh']; label: string }[]), [nav, smi]);
+    { id: 'pohled', label: t('Záložka') },
+    ...(nav.smiPohled('inventory') && smi('sklad.zobrazit') ? [{ id: 'kategorie', label: t('Kategorie skladu') }] : []),
+    ...(nav.smiPohled('procedures') && smi('postupy.zobrazit') ? [{ id: 'postup', label: t('Postup') }] : []),
+    ...(nav.smiPohled('guides') && smi('navody.zobrazit') ? [{ id: 'navod', label: t('Návod') }] : []),
+  ] as { id: CilOdkazu['druh']; label: string }[]), [nav, smi, t]);
   const [druh, setDruh] = useState<CilOdkazu['druh']>(cil && druhy.some(d => d.id === cil.druh) ? cil.druh : 'pohled');
 
   const kategorie = useDataWidgetu<Volba[]>(druh === 'kategorie' ? ZDROJE['sklad.kategorie'].url : null, raw =>
@@ -261,28 +267,28 @@ function PoleOdkazu({ hodnoty, onZmena, smi, idZaklad }: {
   return (
     <div className="space-y-4">
       {druhy.length > 1 && (
-        <Field label="Kam vede">
-          <Segmented size="sm" ariaLabel="Kam vede" value={druh}
+        <Field label={t('Kam vede')}>
+          <Segmented size="sm" ariaLabel={t('Kam vede')} value={druh}
             onChange={d => { setDruh(d); onZmena({ cil: undefined }); }}
             options={druhy} />
         </Field>
       )}
-      <Field id={idCile} label={druh === 'pohled' ? 'Záložka' : druh === 'kategorie' ? 'Kategorie' : druh === 'postup' ? 'Postup' : 'Návod'}
-        hint={cilNavigace && !nav.smiPohled(cilNavigace.pohled) ? 'Na tuhle část aplikace tvoje role nemá — dlaždice se nezobrazí.' : undefined}>
+      <Field id={idCile} label={druh === 'pohled' ? t('Záložka') : druh === 'kategorie' ? t('Kategorie') : druh === 'postup' ? t('Postup') : t('Návod')}
+        hint={cilNavigace && !nav.smiPohled(cilNavigace.pohled) ? t('Na tuhle část aplikace tvoje role nemá — dlaždice se nezobrazí.') : undefined}>
         <Select id={idCile} value={vybrano} disabled={nacitam} onChange={e => vyberCil(e.target.value)}>
-          <option value="">{nacitam ? 'Načítám…' : 'Vyber…'}</option>
+          <option value="">{nacitam ? t('Načítám…') : t('Vyber…')}</option>
           {volby.map(v => <option key={String(v.id)} value={String(v.id)}>{v.nazev}</option>)}
         </Select>
       </Field>
-      <Field id={idPopisku} label="Popisek" hint={`Nejvýš ${MAX_POPISEK_ODKAZU} znaků.`}>
+      <Field id={idPopisku} label={t('Popisek')} hint={t('Nejvýš {n, plural, one {# znak} few {# znaky} other {# znaků}}.', { n: MAX_POPISEK_ODKAZU })}>
         <Input id={idPopisku} value={popisek} maxLength={MAX_POPISEK_ODKAZU} onChange={e => onZmena({ popisek: e.target.value })} />
       </Field>
       <fieldset className="min-w-0">
-        <legend className="field-label">Ikona</legend>
+        <legend className="field-label">{t('Ikona')}</legend>
         <div className="flex flex-wrap gap-1.5">
-          {IKONY_ODKAZU.map(i => (
+          {ikonyOdkazu(t).map(i => (
             // Vybraná ikona je inkoustová pilulka — „vybráno" vypadá v celé aplikaci stejně.
-            <Button key={i.id} size="sm" iconOnly icon={i.id} aria-label={`Ikona: ${i.nazev}`} aria-pressed={ikona === i.id}
+            <Button key={i.id} size="sm" iconOnly icon={i.id} aria-label={t('Ikona: {nazev}', { nazev: i.nazev })} aria-pressed={ikona === i.id}
               variant={ikona === i.id ? 'primary' : 'ghost'} onClick={() => onZmena({ ikona: i.id })} />
           ))}
         </div>

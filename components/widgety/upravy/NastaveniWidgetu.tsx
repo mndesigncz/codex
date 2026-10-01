@@ -11,11 +11,13 @@ import { useMemo, useState } from 'react';
 import { Button, Field, Modal, Segmented, Well } from '../../ui';
 import type { DefiniceWidgetu, PolozkaRozlozeni, Smi, Tarif, Velikost } from '@/lib/widgety/typy';
 import { sNastavenimVychozimi, vycistiNastaveni } from '@/lib/widgety/rozlozeni';
+import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { Nahled } from '../Nahled';
 import { viditelnaPole } from '../registr';
 import { PoleNastaveni } from './PoleNastaveni';
 
-export const VELIKOST_SLOVNE: Record<Velikost, string> = { S: 'Malý', M: 'Střední', L: 'Velký' };
+/** Jména velikostí; `t` dodá volající (překlad závisí na jazyce). */
+export const velikostSlovne = (t: PrekladFn): Record<Velikost, string> => ({ S: t('Malý'), M: t('Střední'), L: t('Velký') });
 
 export default function NastaveniWidgetu({ polozka, definice, schematicky, smi, tarif, onUlozit, onZavrit }: {
   polozka: PolozkaRozlozeni;
@@ -28,6 +30,8 @@ export default function NastaveniWidgetu({ polozka, definice, schematicky, smi, 
   onUlozit: (velikost: Velikost, nastaveni: Record<string, unknown>) => void;
   onZavrit: () => void;
 }) {
+  const t = useT('widgety');
+  const slovne = velikostSlovne(t);
   const [velikost, setVelikost] = useState<Velikost>(polozka.velikost);
   const [hodnoty, setHodnoty] = useState<Record<string, unknown>>(() => sNastavenimVychozimi(definice.nastaveni, polozka.nastaveni));
   const pole = useMemo(() => viditelnaPole(definice, smi, tarif), [definice, smi, tarif]);
@@ -37,19 +41,19 @@ export default function NastaveniWidgetu({ polozka, definice, schematicky, smi, 
   const ulozit = () => onUlozit(velikost, vycistiNastaveni(definice.nastaveni, hodnoty));
 
   return (
-    <Modal open onClose={onZavrit} size="md" title={definice.nazev} subtitle="Nastavení widgetu"
+    <Modal open onClose={onZavrit} size="md" title={t(definice.nazev)} subtitle={t('Nastavení widgetu')}
       footer={<>
-        <Button variant="secondary" onClick={onZavrit}>Zrušit</Button>
-        <Button variant="primary" onClick={ulozit}>Uložit</Button>
+        <Button variant="secondary" onClick={onZavrit}>{t('Zrušit', undefined, 'dialog')}</Button>
+        <Button variant="primary" onClick={ulozit}>{t('Uložit')}</Button>
       </>}>
       <div className="space-y-5">
         <Well pad="sm">
           <Nahled widget={definice.id} velikost={velikost} nastaveni={nahledHodnot} schematicky={schematicky} className="max-h-72" />
         </Well>
         {definice.velikosti.length > 1 && (
-          <Field label="Velikost">
-            <Segmented size="sm" ariaLabel="Velikost" value={velikost} onChange={setVelikost}
-              options={definice.velikosti.map(v => ({ id: v, label: VELIKOST_SLOVNE[v] }))} />
+          <Field label={t('Velikost')}>
+            <Segmented size="sm" ariaLabel={t('Velikost')} value={velikost} onChange={setVelikost}
+              options={definice.velikosti.map(v => ({ id: v, label: slovne[v] }))} />
           </Field>
         )}
         {pole.map(p => (
