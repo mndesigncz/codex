@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Icon } from '../Icons';
 import { Badge } from './Badge';
 import { useT } from '@/lib/i18n/client';
@@ -39,9 +39,26 @@ export function Dock({ items, activeId, onSelect, more, label }: {
   label: string;
 }) {
   const t = useT();
+  const nav = useRef<HTMLElement>(null);
+  // Dok zapisuje na :root `--dok-vyska` (vzdálenost své horní hrany od spodku okna + 8 px). Toast si z ní bere
+  // spodní odsazení (`.toast-misto` v globals.css): dřív seděl 16 px nad hranou a celé tři vteřiny zakrýval
+  // položky dolní navigace, takže se na ně nedalo klepnout. Od md je dok skrytý a proměnná se odstraní.
+  useEffect(() => {
+    const el = nav.current;
+    if (!el) return;
+    const root = document.documentElement;
+    const zapis = () => {
+      const r = el.getBoundingClientRect();
+      if (r.height === 0) root.style.removeProperty('--dok-vyska');
+      else root.style.setProperty('--dok-vyska', `${Math.round(window.innerHeight - r.top + 8)}px`);
+    };
+    zapis();
+    window.addEventListener('resize', zapis);
+    return () => { window.removeEventListener('resize', zapis); root.style.removeProperty('--dok-vyska'); };
+  }, []);
   return (
     <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),16px)]">
-      <nav className="dock-strong mx-auto max-w-md rounded-3xl px-2 py-2 flex items-center justify-around shadow-[0_10px_34px_rgba(25,35,15,0.16)]" aria-label={label}>
+      <nav ref={nav} className="dock-strong mx-auto max-w-md rounded-3xl px-2 py-2 flex items-center justify-around shadow-[0_10px_34px_rgba(25,35,15,0.16)]" aria-label={label}>
         {items.map(item => {
           const on = item.id === activeId;
           return (

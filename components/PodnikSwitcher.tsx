@@ -76,7 +76,7 @@ export default function PodnikSwitcher({ compact = false, canCreate = false, jen
     if (!chybaSeznamu) return null;
     return (
       <button type="button" onClick={() => setPokus(p => p + 1)} title="Seznam podniků se nenačetl — zkusit znovu"
-        className={`flex items-center gap-2 rounded-2xl text-bad-ink transition ${compact ? 'p-2 justify-center' : 'px-3 py-2 w-full text-left'} hover:bg-black/[0.05]`}>
+        className={`flex items-center gap-2 rounded-2xl text-bad-ink transition ${compact ? 'tap-target p-2 justify-center' : 'px-3 py-2 w-full text-left'} hover:bg-black/[0.05]`}>
         <Icon name="box" size={18} className="shrink-0" />
         {!compact && <span className="text-sm font-semibold truncate">Podniky se nenačetly · zkusit znovu</span>}
       </button>
@@ -119,7 +119,7 @@ export default function PodnikSwitcher({ compact = false, canCreate = false, jen
     <div ref={pop.ref} className="relative">
       <button ref={pop.triggerRef} type="button" onClick={() => setOpen(v => !v)} onKeyDown={pop.onTriggerKeyDown} aria-haspopup="menu" aria-expanded={open}
         title={aktivni ? `Podnik: ${aktivni.teamName}` : 'Podnik'}
-        className={`flex items-center gap-2 rounded-2xl transition ${compact ? 'p-2 justify-center' : 'px-3 py-2 w-full text-left'} hover:bg-black/[0.05] ${open ? 'bg-black/[0.06]' : ''}`}>
+        className={`flex items-center gap-2 rounded-2xl transition ${compact ? 'tap-target p-2 justify-center' : 'px-3 py-2 w-full text-left'} hover:bg-black/[0.05] ${open ? 'bg-black/[0.06]' : ''}`}>
         <Icon name="box" size={18} className="shrink-0 text-black/50" />
         {!compact && (
           <>

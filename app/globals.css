@@ -474,8 +474,9 @@ input::-webkit-date-and-time-value { text-align: left; }
    takže „Widget odebrán · Vrátit" nikdy neleží přes „Hotovo" — na monitoru
    seděly oba 24 px nad hranou a toast lištu zakrýval. Bez lišty proměnná
    chybí a platí dosavadní odsazení. Když lišta odjede, toast za ní klidně
-   sjede dolů; při omezeném pohybu rovnou. */
-.toast-misto { bottom: max(var(--lista-vyska, 0px), env(safe-area-inset-bottom, 0px), 16px); }
+   sjede dolů; při omezeném pohybu rovnou. Na telefonu stejně tak `--dok-vyska`
+   (spodní dok, zapisuje ji components/ui/Dock): toast sedí nad ním, ne přes něj. */
+.toast-misto { bottom: max(var(--lista-vyska, 0px), var(--dok-vyska, 0px), env(safe-area-inset-bottom, 0px), 16px); }
 @media (min-width: 768px) {
   .toast-misto { bottom: max(var(--lista-vyska, 0px), 1.5rem); }
 }
