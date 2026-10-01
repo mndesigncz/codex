@@ -1,15 +1,19 @@
 // Jazyk požadavku a jazyk podniku pro serverové routy (bez Reactu, ať routa netáhne klientské moduly).
 //
-// Jazyk požadavku = cookie `managero-lang` (nastavuje přepínač), jinak čeština.
+// Jazyk požadavku = cookie `managero-lang` (nastavuje přepínač), jinak země
+// návštěvníka z hlavičky Vercelu (`x-vercel-ip-country`, jazykZeZeme), jinak čeština.
 // Jazyk podniku = `teams.default_lang`; před migrací sloupce a při chybě čeština.
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { neon } from '@neondatabase/serverless';
-import { COOKIE_JAZYKA, VYCHOZI, cistyJazyk, type Jazyk } from './config.ts';
+import { COOKIE_JAZYKA, VYCHOZI, cistyJazyk, jazykZeZeme, type Jazyk } from './config.ts';
 
 export async function jazykPozadavku(): Promise<Jazyk> {
   try {
     const c = await cookies();
-    return cistyJazyk(c.get(COOKIE_JAZYKA)?.value) ?? VYCHOZI;
+    const zvoleny = cistyJazyk(c.get(COOKIE_JAZYKA)?.value);
+    if (zvoleny) return zvoleny;
+    const h = await headers();
+    return jazykZeZeme(h.get('x-vercel-ip-country')) ?? VYCHOZI;
   } catch {
     return VYCHOZI; // mimo požadavek (build) cookie není
   }

@@ -4,34 +4,21 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { LogoMark } from '@/components/Icons';
 import { TRIAL_DAYS } from '@/lib/plan';
-import JazykMenu from '@/components/ui/JazykMenu';
+import { useT } from '@/lib/i18n/client';
+import { NAVIGACE, ZKUSIT_ZDARMA } from './obsah';
 
 // Hlavička prodejní stránky.
 //
-// Dřív to byla skleněná pilulka `.lgx` přes celou šířku — a její bílý
-// rámeček na limetkové skvrně hero svítil jako prstenec. Na screenshotu
-// z telefonu to byl první prvek, kterého si oko všimlo, a nebyl to ani
-// nadpis, ani tlačítko.
-//
-// Teď: nahoře na stránce lišta NEMÁ pozadí — sedí přímo na hero. Sklo
-// dostane až po posunu, kdy pod ní začne projíždět obsah a je co
-// rozmazávat. Rámeček je inkoustový a slabý, ne bílý.
-//
-// Navigace ví, kde na stránce člověk je: tmavá pilulka přejíždí na
-// položku sekce, která je právě v obraze — stejný pohyb jako v přepínači
-// pohledů v aplikaci. Není to hračka: na dlouhé stránce je to jediná
-// odpověď na „kde jsem".
+// Nahoře na stránce lišta nemá pozadí, sedí přímo na jevišti. Inkoustové
+// sklo dostane až po posunu, kdy pod ní začne projíždět obsah (sklo patří
+// plovoucímu chromu, DESIGN.md). Navigace ví, kde na stránce člověk je:
+// tichá pilulka přejíždí na sekci, která je v obraze. Na dlouhé stránce je
+// to jediná odpověď na „kde jsem".
 
-const ODKAZY: { id: string; label: string }[] = [
-  { id: 'ukazka-okno', label: 'Ukázka' },
-  { id: 'funkce', label: 'Funkce' },
-  { id: 'den', label: 'Jeden den' },
-  { id: 'zacatek', label: 'Jak začít' },
-  { id: 'cenik', label: 'Ceník' },
-  { id: 'otazky', label: 'Otázky' },
-];
+const ODKAZY = NAVIGACE;
 
 export default function LandingHeader() {
+  const t = useT('landing');
   const [posunuto, setPosunuto] = useState(false);
   const [aktivni, setAktivni] = useState<string | null>(null);
   const nav = useRef<HTMLElement>(null);
@@ -78,41 +65,38 @@ export default function LandingHeader() {
   return (
     <>
     <div ref={hlidka} className="h-6 -mb-6 pointer-events-none" aria-hidden />
-    <header className="sticky top-0 z-40">
-      <div className="max-w-6xl mx-auto px-3 sm:px-5 pt-3">
-        <div className={`lg-bar rounded-full pl-3 pr-2 sm:pl-4 sm:pr-2.5 py-2 flex items-center justify-between gap-3 ${posunuto ? 'posunuto' : ''}`}>
-          <Link href="/" className="flex items-center gap-2.5 min-w-0 rounded-full" aria-label="Managero, na začátek stránky">
-            <LogoMark size={30} />
-            <span className="text-lg font-bold tracking-tight text-[#16181A] truncate">Managero</span>
+    <header className="ld-lista sticky top-0 z-40" data-posunuto={posunuto ? 'true' : 'false'}>
+      <div className="flex h-[4.25rem] items-center justify-between gap-4 px-[max(1.25rem,2.4vw)]">
+        <Link href="/" className="flex items-center gap-2.5 min-w-0 rounded-lg" aria-label={t('Managero, na začátek stránky')}>
+          <LogoMark size={32} />
+          <span className="text-lg font-bold tracking-tight text-[color:var(--ld-papir)]">Managero</span>
+        </Link>
+
+        <nav ref={nav} aria-label={t('Sekce stránky')} className="relative hidden lg:flex items-center gap-0.5">
+          {pilulka && (
+            <span aria-hidden
+              className="absolute top-0 bottom-0 rounded-full bg-[rgb(var(--ld-fg)/0.1)] pointer-events-none motion-safe:transition-[transform,width] motion-safe:duration-300 motion-safe:ease-out"
+              style={{ transform: `translateX(${pilulka.x}px)`, width: pilulka.w }} />
+          )}
+          {ODKAZY.map(o => {
+            const on = aktivni === o.id;
+            return (
+              <a key={o.id} href={`#${o.id}`} data-on={on ? 'true' : undefined} aria-current={on ? 'true' : undefined}
+                className={`relative z-[1] rounded-full px-3.5 py-2 text-[0.9375rem] font-medium whitespace-nowrap transition-colors duration-300 ${on ? 'text-[color:var(--ld-papir)]' : 'text-[color:var(--ld-text-2)] hover:text-[color:var(--ld-papir)]'}`}>
+                {t(o.label)}
+              </a>
+            );
+          })}
+        </nav>
+
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+          <Link href="/login" className="rounded-full px-3 py-2 text-[0.9375rem] font-medium text-[color:var(--ld-papir)] hover:text-white whitespace-nowrap">{t('Přihlásit')}</Link>
+          {/* Limetkové jen nahoře: po posunu přijdou další hlavní akce (karta Pro, závěr)
+              a v jednom výřezu smí svítit jen jedna. */}
+          <Link href="/register" className={`whitespace-nowrap ${posunuto ? 'ld-btn ld-btn-sm ld-btn-svetle !h-9' : 'btn btn-accent btn-sm'}`}>
+            <span className="sm:hidden">{t('Vyzkoušet')}</span>
+            <span className="hidden sm:inline">{t(ZKUSIT_ZDARMA, { n: TRIAL_DAYS })}</span>
           </Link>
-
-          <nav ref={nav} aria-label="Sekce stránky" className="relative hidden md:flex items-center gap-0.5">
-            {pilulka && (
-              <span aria-hidden
-                className="absolute top-0 bottom-0 rounded-full bg-[#16181A] pointer-events-none motion-safe:transition-[transform,width] motion-safe:duration-300 motion-safe:ease-out"
-                style={{ transform: `translateX(${pilulka.x}px)`, width: pilulka.w }} />
-            )}
-            {ODKAZY.map(o => {
-              const on = aktivni === o.id;
-              return (
-                <a key={o.id} href={`#${o.id}`} data-on={on ? 'true' : undefined}
-                  className={`relative z-[1] rounded-full px-3.5 py-2 text-sm font-medium whitespace-nowrap transition-colors duration-300 ${on ? 'text-white' : 'text-black/60 hover:text-[#16181A]'}`}>
-                  {o.label}
-                </a>
-              );
-            })}
-          </nav>
-
-          <div className="flex items-center gap-1.5 shrink-0">
-            {/* Jen pilulka s globusem. Od 640 px: na telefonu se lišta s logem a dvěma tlačítky
-                nevejde, jazyk se tam volí na přihlášení a registraci (cookie platí všude). */}
-            <span className="hidden sm:block"><JazykMenu /></span>
-            <Link href="/login" className="btn btn-ghost btn-sm !px-3 whitespace-nowrap">Přihlásit</Link>
-            <Link href="/register" className="btn btn-primary btn-sm whitespace-nowrap">
-              <span className="sm:hidden">Vyzkoušet</span>
-              <span className="hidden sm:inline">Vyzkoušet {TRIAL_DAYS} dní zdarma</span>
-            </Link>
-          </div>
         </div>
       </div>
     </header>

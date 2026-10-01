@@ -22,6 +22,7 @@
 //  O11 Tmavý režim: právní stránky jsou čitelné.
 import { readFileSync, existsSync } from 'node:fs';
 import { browser, tvrdi, konec, BASE, DIR, tokenPro, fixtura, VLASTNIK } from './k68-spolecne.mjs';
+import { kUctu, vyplnUcet } from './cesta-registrace.mjs';
 
 const UA_ZAKLAD = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148';
 const UA_PROVOZ = `${UA_ZAKLAD} ManageroApp/1.0.0 (build 1)`;
@@ -147,10 +148,20 @@ console.log('O3 Platby');
     tvrdi('provoz: úvodní stránka končí na přihlášení, ne na prodejní stránce', p.url().endsWith('/login'), p.url());
     tvrdi('provoz: přihlášení bez ceny a bez Stripe', !ZAKAZANO.test(await text(p)), (await text(p)).slice(0, 120));
     tvrdi('provoz: přihlášení má Zapomenuté heslo a právní odkazy', await p.getByRole('link', { name: 'Zapomenuté heslo' }).count() === 1 && await p.getByRole('link', { name: 'Zásady ochrany osobních údajů' }).count() === 1 && await p.getByRole('link', { name: 'Podmínky užívání' }).count() === 1);
+    // Cesta registrace: v obalu otázky a účet, žádný krok tarifu ani cena (po účtu rovnou průvodce).
+    await p.route('**/api/register', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, joinCode: 'ABCD12' }) }));
+    await p.route('**/api/auth/callback/**', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ url: BASE + '/' }) }));
     await p.goto(BASE + '/register', { waitUntil: 'networkidle' });
-    const t = await text(p);
-    tvrdi('provoz: registrace bez volby tarifu a bez cen', !ZAKAZANO.test(t) && await p.getByText('Tarif na začátek').count() === 0, t.slice(0, 160));
+    let t = await text(p);
+    tvrdi('provoz: začátek registrace bez cen a tarifů', !ZAKAZANO.test(t), t.slice(0, 160));
+    await kUctu(p);
+    t = await text(p);
+    tvrdi('provoz: krok účtu bez cen a tarifů', !ZAKAZANO.test(t), t.slice(0, 160));
     tvrdi('provoz: registrace odkazuje na podmínky a zásady', /Podmínkami užívání/.test(t) && /Zásady ochrany osobních údajů/.test(t));
+    await vyplnUcet(p);
+    await p.getByRole('button', { name: 'Založit podnik' }).click();
+    await p.waitForURL(u => !u.pathname.startsWith('/register'), { timeout: 20000 }).catch(() => {});
+    tvrdi('provoz: po účtu žádný tarif, rovnou průvodce', !p.url().includes('/register') && await p.getByText('Jak chceš začít?').count() === 0, p.url());
     await ctx.close();
   }
   // Web: prodejní stránka a tarif v registraci zůstávají.
@@ -159,8 +170,14 @@ console.log('O3 Platby');
     await p.goto(BASE + '/', { waitUntil: 'networkidle' });
     tvrdi('web: úvodní stránka s ceníkem zůstává', /Ceník/.test(await text(p)));
     tvrdi('web: patička prodejní stránky má právní odkazy', await p.getByRole('link', { name: 'Zásady ochrany osobních údajů' }).count() >= 1);
+    await p.route('**/api/register', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, joinCode: 'ABCD12' }) }));
+    await p.route('**/api/auth/callback/**', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ url: BASE + '/' }) }));
     await p.goto(BASE + '/register', { waitUntil: 'networkidle' });
-    tvrdi('web: registrace nabízí volbu tarifu', await p.getByText('Tarif na začátek').count() === 1);
+    await kUctu(p);
+    await vyplnUcet(p);
+    await p.getByRole('button', { name: 'Založit podnik' }).click();
+    await p.getByText('Jak chceš začít?').waitFor({ timeout: 15000 }).catch(() => {});
+    tvrdi('web: registrace končí volbou tarifu', await p.getByText('Jak chceš začít?').count() === 1 && await p.locator('.cs-tarif').count() === 3);
     await ctx.close();
   }
   // Nastavení vedení v obalu: bez předplatného; na webu s ním.
