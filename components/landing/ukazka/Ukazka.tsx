@@ -359,9 +359,9 @@ export default function Ukazka({ pocatecniScena = 'prehled' }: { pocatecniScena?
         {/* Pod rámem: co si tu zkusit (a co se právě stalo), vpravo role,
             zařízení a začít znovu. Výška na dva (na telefonu čtyři) řádky:
             věty se liší délkou a přepnutí by jinak posunulo stránku. */}
-        <div className="ld-dok-utlum mt-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
+        <div className="ld-dok-utlum mt-5 flex flex-col gap-4 lg:min-h-[8rem] lg:flex-row lg:items-start lg:justify-between lg:gap-8">
           <div className="min-w-0">
-            <p role="status" aria-live="polite" className="max-w-[58ch] min-h-[5rem] sm:min-h-[2.75rem] text-[0.9375rem] leading-snug text-[color:var(--ld-text-2)] text-pretty">{vetaDole}</p>
+            <p role="status" aria-live="polite" className="max-w-[58ch] min-h-[5rem] sm:min-h-[5rem] text-[0.9375rem] leading-snug text-[color:var(--ld-text-2)] text-pretty">{vetaDole}</p>
             <p className="mt-1.5 text-xs text-[color:var(--ld-text-3)]">{t('Ukázková data, nic se neukládá ani neodesílá')}</p>
           </div>
           <div className={`flex flex-wrap items-center gap-2 shrink-0 ${mounted ? '' : 'invisible'}`} aria-hidden={!mounted}>
