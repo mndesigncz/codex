@@ -89,10 +89,10 @@ html:has(.ld-root) body::after { display: none; }
 /* ——— Hlavička ————————————————————————————————————————————————— */
 .ld-lista { transition: background-color 260ms var(--ld-ease), box-shadow 260ms var(--ld-ease); }
 .ld-lista[data-posunuto="true"] {
-  background: rgb(var(--ld-bg) / 0.92);
+  /* Plná, ne sklo: pod lištou projíždí i limetková plocha a sklo by ji
+     protáhlo do lišty jako olivový závoj. */
+  background: rgb(var(--ld-bg));
   box-shadow: 0 1px 0 var(--ld-linka);
-  -webkit-backdrop-filter: blur(16px) saturate(140%);
-  backdrop-filter: blur(16px) saturate(140%);
 }
 @media (prefers-reduced-transparency: reduce) {
   .ld-lista[data-posunuto="true"] { background: var(--ld-ink); -webkit-backdrop-filter: none; backdrop-filter: none; }
@@ -386,3 +386,128 @@ html:has(.ld-root) body::after { display: none; }
 @media (max-width: 767px) {
   .ld-prepinac-polozka { padding: 0.5rem 0.875rem; font-size: 0.875rem; }
 }
+
+/* ——— Malé obrazovky aplikace (Jak začít, Jistoty) ————————————————
+   Stejný materiál jako ukázka nahoře: papír aplikace na inkoustu, bílé
+   dlaždice, inkoustové písmo, limetka jen na vybraném. Písmo je drobné
+   schválně (je to obrazovka v obrazovce), ale nikdy pod 11 px. */
+.ld-mini {
+  position: relative; overflow: hidden;
+  padding: 1rem; border-radius: 1.1rem;
+  background: #F3F4F0; color: #16181A;
+  font-size: 12px; line-height: 1.35;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5), 0 30px 60px -30px rgba(0, 0, 0, 0.6);
+  min-height: 15.5rem;
+}
+.ld-mini-nizka { min-height: 0; padding: 0.875rem; }
+.ld-mini-titul { font-weight: 650; font-size: 13px; }
+.ld-mini-chip { flex-shrink: 0; border-radius: 9999px; padding: 2px 8px; font-size: 11px; font-weight: 600; background: rgba(22, 24, 26, 0.06); color: rgba(22, 24, 26, 0.7); }
+.ld-mini-avatar { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 9999px; background: #fff; box-shadow: 0 0 0 1px rgba(22, 24, 26, 0.08); font-size: 12px; flex-shrink: 0; }
+.ld-mini-tlacitko { display: grid; place-items: center; height: 30px; border-radius: 9999px; background: #16181A; color: #F3F4F0; font-weight: 600; font-size: 12px; }
+
+/* Krok 1: výběr typu podniku */
+.ld-mini-dlazdice {
+  position: relative; display: flex; align-items: center; gap: 6px;
+  height: 34px; padding: 0 10px; border-radius: 10px;
+  background: #fff; box-shadow: 0 0 0 1px rgba(22, 24, 26, 0.07); font-weight: 550;
+  transition: background-color 260ms var(--ld-ease), color 260ms var(--ld-ease);
+}
+.ld-vyber { background: #16181A; color: #F3F4F0; }
+.ld-vyber-fajfka { margin-left: auto; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 9999px; background: var(--ld-lime); color: #16181A; }
+
+/* Krok 2: kód a připojení */
+.ld-kod-znak {
+  display: grid; place-items: center; width: 30px; height: 38px; border-radius: 8px;
+  background: #fff; box-shadow: 0 0 0 1px rgba(22, 24, 26, 0.08);
+  font-weight: 700; font-size: 18px; letter-spacing: 0; font-variant-numeric: tabular-nums;
+}
+.ld-pripojeni { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 8px; border-radius: 10px; background: #fff; font-weight: 550; }
+.ld-pripojeni .ld-mini-chip { background: rgba(200, 245, 66, 0.35); color: #3E5406; }
+
+/* Krok 3: rozvrh na týden */
+.ld-tyden { display: grid; grid-template-columns: 3.4rem repeat(7, minmax(0, 1fr)); row-gap: 6px; align-items: center; }
+.ld-tyden-den { text-align: center; font-size: 11px; font-weight: 600; color: rgba(22, 24, 26, 0.55); }
+.ld-tyden-jmeno { font-weight: 600; font-size: 11px; }
+.ld-tyden-radek {
+  grid-column: 2 / -1; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); column-gap: 3px;
+  height: 26px; border-radius: 8px; background: #fff; padding: 3px;
+}
+.ld-smena { border-radius: 6px; transform-origin: 0 50%; }
+.ld-zverejneno {
+  display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
+  border-radius: 9999px; padding: 3px 8px; font-size: 11px; font-weight: 650;
+  background: var(--ld-lime); color: #16181A;
+}
+
+/* Kroky na kolejnici: linka nad obrazovkami se při příjezdu protáhne zleva. */
+.ld-kroky { position: relative; }
+.ld-krok-cislo { font-weight: 700; font-size: 1.125rem; color: var(--ld-text-3); }
+
+/* ——— Jistoty: mozaika ——————————————————————————————————————— */
+.ld-jistota { padding: 0.875rem 0.875rem 1.75rem; border-radius: 1.6rem; background: rgb(var(--ld-fg) / 0.035); box-shadow: inset 0 0 0 1px var(--ld-linka); }
+.ld-jistota > h3, .ld-jistota > p { padding-inline: 0.75rem; }
+.ld-soubor { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px; border-radius: 9px; background: #fff; font-weight: 550; }
+.ld-soubor + .ld-soubor { margin-top: 5px; }
+.ld-role { display: grid; grid-template-columns: 1fr 4.2rem 4.2rem; align-items: center; height: 30px; padding: 0 8px; border-radius: 9px; background: #fff; }
+.ld-role + .ld-role { margin-top: 4px; }
+.ld-role-hlava { background: transparent; height: 20px; font-size: 11px; font-weight: 600; color: rgba(22, 24, 26, 0.55); }
+.ld-role > span:not(:first-child) { justify-self: center; }
+.ld-role-ano, .ld-role-ne { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 9999px; }
+.ld-role-ano { background: rgba(200, 245, 66, 0.55); color: #3E5406; }
+.ld-role-ne { background: rgba(22, 24, 26, 0.07); color: rgba(22, 24, 26, 0.55); }
+.ld-jmeno { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 64px; border-radius: 12px; background: #fff; font-weight: 600; font-size: 11px; transition: background-color 260ms var(--ld-ease), color 260ms var(--ld-ease); }
+.ld-jmeno-tuk { background: #16181A; color: #F3F4F0; }
+.ld-offline { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 12px; background: #FFF6DB; color: #5A4300; box-shadow: inset 0 0 0 1px rgba(160, 120, 0, 0.18); }
+.ld-offline .text-black\/60 { color: rgba(90, 67, 0, 0.8); }
+.ld-offline-tecka { margin-top: 4px; width: 8px; height: 8px; border-radius: 9999px; background: #D99A00; flex-shrink: 0; }
+.ld-mena { display: inline-flex; padding: 3px; border-radius: 9999px; background: #fff; box-shadow: 0 0 0 1px rgba(22, 24, 26, 0.08); font-weight: 600; font-size: 11px; }
+.ld-mena > span { padding: 4px 10px; border-radius: 9999px; color: rgba(22, 24, 26, 0.6); }
+.ld-mena > .ld-mena-on { background: #16181A; color: #F3F4F0; }
+.ld-zamek { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; border-radius: 9999px; padding: 3px 8px; font-size: 11px; font-weight: 650; background: #16181A; color: #F3F4F0; }
+.ld-ukol { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 8px; border-radius: 9px; background: #fff; font-weight: 550; }
+.ld-ukol-box { display: grid; place-items: center; width: 16px; height: 16px; border-radius: 5px; box-shadow: inset 0 0 0 1.5px rgba(22, 24, 26, 0.25); }
+.ld-ukol-hotovo { color: rgba(22, 24, 26, 0.55); }
+.ld-ukol-hotovo .ld-ukol-box { background: var(--ld-lime); box-shadow: none; color: #16181A; }
+
+/* ——— Přehrání malých obrazovek ————————————————————————————————
+   `ceka` = výchozí stav před přehráním, `hraje` = animace do koncového
+   stavu, `hotovo` (výchozí ze serveru) = rovnou konec. Každý krok startuje
+   o kus později (--k), uvnitř kroku jdou věci po sobě (--i). */
+@media (prefers-reduced-motion: no-preference) {
+  [data-v-obraze="ceka"] .ld-krok, [data-v-obraze="ceka"] .ld-jistota { opacity: 0; transform: translateY(24px); }
+  [data-v-obraze="hraje"] .ld-krok, [data-v-obraze="hraje"] .ld-jistota {
+    animation: ld-prijezd 700ms var(--ld-ease) both; animation-delay: calc(var(--k, 0) * 140ms);
+  }
+  @keyframes ld-prijezd { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+
+  /* Krok 1: Kavárna se vybere. */
+  [data-v-obraze="ceka"] .ld-vyber { background: #fff; color: #16181A; }
+  [data-v-obraze="ceka"] .ld-vyber-fajfka { opacity: 0; transform: scale(0.6); }
+  [data-v-obraze="hraje"] .ld-vyber { animation: ld-vybrat 1ms linear both; animation-delay: 900ms; }
+  [data-v-obraze="hraje"] .ld-vyber-fajfka { animation: ld-pop 320ms var(--ld-ease) both; animation-delay: 950ms; }
+  @keyframes ld-vybrat { from { background: #fff; color: #16181A; } to { background: #16181A; color: #F3F4F0; } }
+  @keyframes ld-pop { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: none; } }
+
+  /* Krok 2: kód se naťuká, pak se připojují lidé. */
+  [data-v-obraze="ceka"] .ld-kod-znak, [data-v-obraze="ceka"] .ld-pripojeni { opacity: 0; }
+  [data-v-obraze="hraje"] .ld-kod-znak { animation: ld-pop 260ms var(--ld-ease) both; animation-delay: calc(700ms + var(--i) * 110ms); }
+  [data-v-obraze="hraje"] .ld-pripojeni { animation: ld-prijezd 520ms var(--ld-ease) both; animation-delay: calc(1600ms + var(--i) * 380ms); }
+
+  /* Krok 3: směny se natáhnou, pak se rozvrh zveřejní. */
+  [data-v-obraze="ceka"] .ld-smena { transform: scaleX(0); }
+  [data-v-obraze="ceka"] .ld-zverejneno { opacity: 0; }
+  [data-v-obraze="hraje"] .ld-smena { animation: ld-natazeni 520ms var(--ld-ease) both; animation-delay: calc(900ms + var(--i) * 150ms); }
+  [data-v-obraze="hraje"] .ld-zverejneno { animation: ld-pop 360ms var(--ld-ease) both; animation-delay: 2100ms; }
+  @keyframes ld-natazeni { from { transform: scaleX(0); } to { transform: none; } }
+
+  /* Jistoty: řádky uvnitř obrazovek po sobě; na tabletu se klepne na jméno. */
+  [data-v-obraze="ceka"] .ld-soubor, [data-v-obraze="ceka"] .ld-role:not(.ld-role-hlava) { opacity: 0; }
+  [data-v-obraze="hraje"] .ld-soubor, [data-v-obraze="hraje"] .ld-role:not(.ld-role-hlava) {
+    animation: ld-prijezd 480ms var(--ld-ease) both; animation-delay: calc(var(--k, 0) * 140ms + 500ms + var(--i) * 160ms);
+  }
+  [data-v-obraze="ceka"] .ld-jmeno-tuk { background: #fff; color: #16181A; }
+  [data-v-obraze="hraje"] .ld-jmeno-tuk { animation: ld-vybrat 1ms linear both; animation-delay: 1500ms; }
+}
+.ld-rozdil { padding: 1.5rem; border-radius: 1.5rem; box-shadow: inset 0 0 0 1px var(--ld-linka); }
+.ld-cela-tabulka summary { color: var(--ld-text-2); }
+.ld-cela-tabulka[open] summary { color: var(--ld-papir); }

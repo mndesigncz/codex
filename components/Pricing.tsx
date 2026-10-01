@@ -46,6 +46,16 @@ const SKUPINY: { nazev: string; sedi: (label: string) => boolean }[] = [
 const skupiny = SKUPINY.map(sk => ({ ...sk, radky: [] as typeof PLAN_FEATURES }));
 for (const f of PLAN_FEATURES) skupiny.find(sk => sk.sedi(f.label))!.radky.push(f);
 
+// Čím se tarify liší, spočítané z PLAN_FEATURES: Zdarma ukazuje, co má (u textových
+// hodnot i s hodnotou), Pro a Max jen to, co přidávají nad tarif pod sebou.
+const hodnota = (f: (typeof PLAN_FEATURES)[number], id: 'free' | 'pro' | 'max') =>
+  typeof f[id] === 'string' ? `${f.label}: ${String(f[id]).toLowerCase()}` : f.label;
+const ROZDILY: { id: 'free' | 'pro' | 'max'; nadpis: string; polozky: string[] }[] = [
+  { id: 'free', nadpis: 'Zdarma obsahuje', polozky: PLAN_FEATURES.filter(f => f.free !== false).map(f => hodnota(f, 'free')) },
+  { id: 'pro', nadpis: 'Pro přidává', polozky: PLAN_FEATURES.filter(f => f.pro !== false && f.pro !== f.free).map(f => hodnota(f, 'pro')) },
+  { id: 'max', nadpis: 'Max přidává k Pro', polozky: PLAN_FEATURES.filter(f => f.max !== false && f.max !== f.pro).map(f => hodnota(f, 'max')) },
+];
+
 const KARTY: { id: 'free' | 'pro' | 'max'; veta: string; body: string[] }[] = [
   { id: 'free', veta: 'Základ pro malý tým, a napořád zdarma.', body: ['Směny, docházka a žádosti', 'Úkoly, návody a chat', 'Uzávěrky a sklad'] },
   { id: 'pro', veta: 'Všechno bez limitů pro jeden podnik.', body: ['Neomezený tým', 'Kiosk pro tablet za barem', 'Odměny, exporty a měsíční přehled'] },
@@ -116,55 +126,67 @@ export default function Pricing() {
           })}
         </div>
 
-        {/* Srovnání: od 768 px tabulka se sloupcem Pro podbarveným v celé výšce,
-            na telefonu seznam (u každé funkce tři tarify pod sebou), protože tři
-            sloupce v 390 px by uřízly Max. */}
+        {/* Srovnání: tabulka o třinácti řádcích byla suchá a většinu řádků mají
+            všechny tarify stejně. Nahoře proto jen to, čím se tarify liší
+            (počítá se z lib/plan, ne opisuje), celá tabulka je pod rozbalením. */}
         <div className="mt-16">
-          <h3 className="text-lg font-semibold tracking-tight">Srovnání tarifů</h3>
-          <table className="ld-srovnani mt-6 hidden md:table w-full text-[0.9375rem] border-separate border-spacing-0">
-            <thead>
-              <tr>
-                <th className="text-left text-sm font-semibold text-[color:var(--ld-text-3)] py-4 pr-4 border-t-0" scope="col">Funkce</th>
-                <th scope="col" className="py-4 px-4 w-36 text-left border-t-0">
-                  <span className="block text-sm font-semibold text-[color:var(--ld-text-2)]">Zdarma</span>
-                  <span className="block mt-0.5 font-bold ld-cislo">0 Kč</span>
-                </th>
-                <th scope="col" className="ld-sloupec-pro rounded-t-2xl py-4 px-4 w-40 text-left border-t-0">
-                  <span className="block text-sm font-semibold text-[color:var(--ld-papir)]">Pro</span>
-                  <span className="block mt-0.5 font-bold ld-cislo">{cena('pro').hlavni}</span>
-                </th>
-                <th scope="col" className="py-4 px-4 w-40 text-left border-t-0">
-                  <span className="block text-sm font-semibold text-[color:var(--ld-text-2)]">Max</span>
-                  <span className="block mt-0.5 font-bold ld-cislo">{cena('max').hlavni}</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {skupiny.filter(sk => sk.radky.length).map(sk => (
-                <SkupinaRadku key={sk.nazev} nazev={sk.nazev} radky={sk.radky} />
-              ))}
-            </tbody>
-          </table>
-
-          <div className="md:hidden mt-4">
-            {skupiny.filter(sk => sk.radky.length).map(sk => (
-              <div key={sk.nazev} className="mt-6">
-                <p className="text-sm font-semibold text-[color:var(--ld-text-3)]">{sk.nazev}</p>
-                <ul className="mt-2 list-none">
-                  {sk.radky.map(f => (
-                    <li key={f.label} className="border-t border-[color:var(--ld-linka)] py-3.5">
-                      <p className="text-[0.9375rem]">{f.label}</p>
-                      <div className="mt-2.5 grid grid-cols-3 gap-2 text-xs text-[color:var(--ld-text-3)]">
-                        {(['free', 'pro', 'max'] as const).map(id => (
-                          <span key={id} className="flex items-center gap-2">{PLAN_NAMES[id]} <Bunka v={f[id]} svetle={id === 'pro'} /></span>
-                        ))}
-                      </div>
+          <h3 className="text-lg font-semibold tracking-tight">Čím se tarify liší</h3>
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-5">
+            {ROZDILY.map(r => (
+              <div key={r.id} className="ld-rozdil">
+                <p className="text-sm font-semibold text-[color:var(--ld-text-3)]">{r.nadpis}</p>
+                <ul className="mt-4 space-y-3 list-none">
+                  {r.polozky.map(f => (
+                    <li key={f} className="flex items-start gap-3 text-[0.9375rem] leading-snug">
+                      <span className={`ld-tarif-tecka mt-px ${r.id === 'pro' ? 'bg-[#C8F542] text-[#16181A]' : 'bg-[rgb(var(--ld-fg)/0.12)] text-[color:var(--ld-papir)]'}`}><Icon name={r.id === 'free' ? 'check' : 'plus'} size={11} /></span>
+                      <span>{f}</span>
                     </li>
                   ))}
                 </ul>
               </div>
             ))}
           </div>
+
+          <details className="ld-otazka ld-cela-tabulka mt-8">
+            <summary className="flex min-h-[3.5rem] items-center justify-between gap-6 py-4 text-[0.9375rem] font-semibold">
+              Celé srovnání, všech {PLAN_FEATURES.length} řádků
+              <span className="ld-plus text-[color:var(--ld-text-2)]" aria-hidden />
+            </summary>
+            <table className="ld-srovnani mt-2 mb-6 hidden md:table w-full text-[0.9375rem] border-separate border-spacing-0">
+              <thead>
+                <tr>
+                  <th className="text-left text-sm font-semibold text-[color:var(--ld-text-3)] py-4 pr-4 border-t-0" scope="col">Funkce</th>
+                  <th scope="col" className="py-4 px-4 w-36 text-left border-t-0 text-sm font-semibold text-[color:var(--ld-text-2)]">Zdarma</th>
+                  <th scope="col" className="ld-sloupec-pro rounded-t-2xl py-4 px-4 w-40 text-left border-t-0 text-sm font-semibold">Pro</th>
+                  <th scope="col" className="py-4 px-4 w-40 text-left border-t-0 text-sm font-semibold text-[color:var(--ld-text-2)]">Max</th>
+                </tr>
+              </thead>
+              <tbody>
+                {skupiny.filter(sk => sk.radky.length).map(sk => (
+                  <SkupinaRadku key={sk.nazev} nazev={sk.nazev} radky={sk.radky} />
+                ))}
+              </tbody>
+            </table>
+            <div className="md:hidden mb-6">
+              {skupiny.filter(sk => sk.radky.length).map(sk => (
+                <div key={sk.nazev} className="mt-6">
+                  <p className="text-sm font-semibold text-[color:var(--ld-text-3)]">{sk.nazev}</p>
+                  <ul className="mt-2 list-none">
+                    {sk.radky.map(f => (
+                      <li key={f.label} className="border-t border-[color:var(--ld-linka)] py-3.5">
+                        <p className="text-[0.9375rem]">{f.label}</p>
+                        <div className="mt-2.5 grid grid-cols-3 gap-2 text-xs text-[color:var(--ld-text-3)]">
+                          {(['free', 'pro', 'max'] as const).map(id => (
+                            <span key={id} className="flex items-center gap-2">{PLAN_NAMES[id]} <Bunka v={f[id]} svetle={id === 'pro'} /></span>
+                          ))}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </details>
           <p className="ld-meta mt-6">Ceny bez DPH. Doporučte Managero dalšímu podniku a získejte měsíc zdarma, až tři za měsíc.</p>
         </div>
       </div>
