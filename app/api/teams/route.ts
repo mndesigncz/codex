@@ -12,6 +12,7 @@ import { roleZTypu } from '@/lib/opravneni';
 import { cistyJazyk } from '@/lib/i18n/config';
 import { cistaZeme, PREDVOLBY_ZEMI } from '@/lib/i18n/zeme';
 import { normalizujNavKonfig } from '@/lib/navigace';
+import { cistyIco, cistyDic, cistyPrah, pragySedi } from '@/lib/podnikProfil';
 
 export const dynamic = 'force-dynamic';
 
@@ -101,7 +102,7 @@ export async function GET() {
     // Business/localization settings (defensive — safe defaults before migration).
     let biz = { currency: 'CZK', locale: 'cs-CZ', week_start: 1, labor_target_pct: null as number | null,
                 low_stock_default: 5, critical_stock_default: 2, business_type: null as string | null,
-                address: null as string | null, country: null as string | null };
+                address: null as string | null, country: null as string | null, ico: null as string | null, dic: null as string | null, ico_dic_ok: false };
     try {
       const [b] = await sql`
         SELECT currency, locale, week_start, labor_target_pct, low_stock_default, critical_stock_default, business_type
@@ -123,6 +124,14 @@ export async function GET() {
       const [b] = await sql`SELECT address, country FROM teams WHERE id = ${teamId}`;
       biz.address = b?.address ?? null;
       biz.country = b?.country ?? null;
+    } catch { /* columns not migrated yet */ }
+    // IČO a DIČ (kolo 73): taky zvlášť, sloupce přibydou až s DDL.
+    try {
+      // sql.query (ne šablona): sloupce teams.ico a teams.dic přibudou až s DDL z poznámky ke kolu 73; do té doby je kontrola schématu (check-sql) nezná.
+      const [b] = await sql.query('SELECT ico, dic FROM teams WHERE id = $1', [teamId]);
+      biz.ico = b?.ico ?? null;
+      biz.dic = b?.dic ?? null;
+      biz.ico_dic_ok = true;
     } catch { /* columns not migrated yet */ }
 
     // Lokalizace podniku (kolo 76): jazyk, země, formát času, pásmo, navigace.
@@ -212,7 +221,7 @@ export async function GET() {
 // půlka změny by vypadala jako úspěch (stejně jako teams/members).
 const POLE: Record<string, string> = {
   name: 'podnik.nastaveni', currency: 'podnik.nastaveni', locale: 'podnik.nastaveni', weekStart: 'podnik.nastaveni',
-  businessType: 'podnik.nastaveni', address: 'podnik.nastaveni', dashboardConfig: 'podnik.nastaveni', showTeamSchedule: 'podnik.nastaveni',
+  businessType: 'podnik.nastaveni', address: 'podnik.nastaveni', ico: 'podnik.nastaveni', dic: 'podnik.nastaveni', dashboardConfig: 'podnik.nastaveni', showTeamSchedule: 'podnik.nastaveni',
   country: 'podnik.nastaveni', defaultLang: 'podnik.nastaveni', timeFormat: 'podnik.nastaveni', timezone: 'podnik.nastaveni', navConfig: 'podnik.nastaveni',
   regenerateCode: 'tym.pozvat',
   payDailyCash: 'uzaverky.nastaveni', drawerFloat: 'uzaverky.nastaveni', closingRequiresShift: 'uzaverky.nastaveni',
@@ -231,13 +240,29 @@ export async function PATCH(request: Request) {
           showTeamSchedule,
           levelsConfig, pointsConfig,
           currency, locale, weekStart, laborTargetPct, lowStockDefault, criticalStockDefault, businessType, address,
-          country, defaultLang, timeFormat, timezone, navConfig } = body ?? {};
+          country, defaultLang, timeFormat, timezone, navConfig, ico, dic } = body ?? {};
 
   const poslane = Object.keys(body ?? {}).filter(k => body[k] !== undefined && k in POLE);
   const chybi = [...new Set(poslane.map(k => POLE[k]))].filter(k => !c.role.opravneni.has(k));
   if (chybi.length) return NextResponse.json({ error: 'Na tuhle změnu nastavení nemáš oprávnění.' }, { status: 403 });
   if (!poslane.length && !c.role.opravneni.has('podnik.nastaveni')) {
     return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
+  }
+
+  // Údaje, které by šly na doklad, se ověří dřív, než se cokoli uloží (půlka změny by vypadala jako úspěch).
+  if (ico !== undefined && cistyIco(ico) === undefined) {
+    return NextResponse.json({ error: 'IČO není platné. Má mít osm číslic se správnou kontrolní číslicí.' }, { status: 400 });
+  }
+  if (dic !== undefined && cistyDic(dic) === undefined) {
+    return NextResponse.json({ error: 'DIČ není platné. Začíná kódem země a má jen písmena a číslice, třeba CZ12345678.' }, { status: 400 });
+  }
+  for (const [pole, hodnota] of [['lowStockDefault', lowStockDefault], ['criticalStockDefault', criticalStockDefault]] as const) {
+    if (hodnota !== undefined && cistyPrah(hodnota) === undefined) {
+      return NextResponse.json({ error: pole === 'lowStockDefault' ? 'Práh nízkých zásob musí být celé číslo od nuly.' : 'Práh kritických zásob musí být celé číslo od nuly.' }, { status: 400 });
+    }
+  }
+  if (lowStockDefault !== undefined && criticalStockDefault !== undefined && !pragySedi(cistyPrah(lowStockDefault)!, cistyPrah(criticalStockDefault)!)) {
+    return NextResponse.json({ error: 'Kritický práh nesmí být vyšší než práh nízkých zásob.' }, { status: 400 });
   }
 
   // Aktivní podnik z databáze (pozaduj), nikdy z těla ani z tokenu.
@@ -296,14 +321,22 @@ export async function PATCH(request: Request) {
     if (typeof locale === 'string' && locale) await sql`UPDATE teams SET locale = ${locale} WHERE id = ${team.id}`;
     if (weekStart === 0 || weekStart === 1) await sql`UPDATE teams SET week_start = ${weekStart} WHERE id = ${team.id}`;
     if (laborTargetPct === null || Number.isFinite(laborTargetPct)) await sql`UPDATE teams SET labor_target_pct = ${laborTargetPct} WHERE id = ${team.id}`;
-    if (Number.isFinite(lowStockDefault)) await sql`UPDATE teams SET low_stock_default = ${lowStockDefault} WHERE id = ${team.id}`;
-    if (Number.isFinite(criticalStockDefault)) await sql`UPDATE teams SET critical_stock_default = ${criticalStockDefault} WHERE id = ${team.id}`;
+    if (Number.isFinite(lowStockDefault)) await sql`UPDATE teams SET low_stock_default = ${cistyPrah(lowStockDefault)} WHERE id = ${team.id}`;
+    if (Number.isFinite(criticalStockDefault)) await sql`UPDATE teams SET critical_stock_default = ${cistyPrah(criticalStockDefault)} WHERE id = ${team.id}`;
     if (typeof businessType === 'string') await sql`UPDATE teams SET business_type = ${businessType} WHERE id = ${team.id}`;
   } catch { /* columns not migrated yet — ignore until /api/init runs */ }
 
   // Adresa má vlastní try: před migrací sloupec chybí a nesmí to vzít ostatní nastavení.
   try {
     if (typeof address === 'string') await sql`UPDATE teams SET address = ${address.trim().slice(0, 200) || null} WHERE id = ${team.id}`;
+  } catch { /* column not migrated yet */ }
+  // IČO a DIČ: každé zvlášť a defenzivně (sloupce teams.ico, teams.dic přibudou až s DDL).
+  // Tvar už se ověřil výš; prázdná hodnota údaj smaže.
+  try {
+    if (ico !== undefined) await sql.query('UPDATE teams SET ico = $1 WHERE id = $2', [cistyIco(ico) ?? null, team.id]);
+  } catch { /* column not migrated yet */ }
+  try {
+    if (dic !== undefined) await sql.query('UPDATE teams SET dic = $1 WHERE id = $2', [cistyDic(dic) ?? null, team.id]);
   } catch { /* column not migrated yet */ }
   // Lokalizace podniku (kolo 76). Každé pole samostatně a defenzivně: před
   // migrací sloupců se prostě neuloží. Země jen předvyplňuje návrhy, nic nezamyká;

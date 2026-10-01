@@ -15,6 +15,8 @@ import { COOKIE_JAZYKA, KLIC_JAZYKA_HOSTA, VYCHOZI, cistyJazyk, jazykZAccept, ty
 import { preloz, prelozId, type Hodnoty, type Slovnik } from './core.ts';
 import { nactiSekce, SEKCE_VZDY, type Sekce } from './slovniky.ts';
 import { nastavAktualniJazyk, pridejSlovnik, posluchejSlovniky, vsechnySlovniky } from './stav.ts';
+import { posluchejFormaty } from './osobniFormaty.ts';
+import { jeJazykVyslovny } from './synchronizace.ts';
 
 export interface PrekladFn {
   (klic: string, hodnoty?: Hodnoty, ctx?: string): string;
@@ -26,7 +28,12 @@ export interface PrekladFn {
 interface Ctx {
   jazyk: Jazyk;
   t: PrekladFn;
-  setJazyk: (j: Jazyk, o?: { ulozit?: boolean }) => Promise<void>;
+  /**
+   * `ulozit` (výchozí ano): uloží jazyk i na účet. `vyslovne` (výchozí = `ulozit`): je to
+   * výslovná volba člověka na tomhle zařízení, takže ji jazyk z účtu při přihlášení nepřebije.
+   * Automatická volba (jazyk prohlížeče hosta, jazyk převzatý z účtu) má `ulozit: false`.
+   */
+  setJazyk: (j: Jazyk, o?: { ulozit?: boolean; vyslovne?: boolean }) => Promise<void>;
   /** Sekce se načetla pro zvolený jazyk (pro cs vždy true). */
   pozadej: (sekce: Sekce) => void;
 }
@@ -46,6 +53,20 @@ export function cteniCookieJazyka(): Jazyk | undefined {
   if (typeof document === 'undefined') return undefined;
   const m = document.cookie.match(new RegExp('(?:^|;\\s*)' + COOKIE_JAZYKA + '=([^;]*)'));
   return cistyJazyk(m?.[1]);
+}
+
+/** Značka „jazyk na tomhle zařízení se nastavil sám" (z prohlížeče hosta nebo z účtu), ne rukou člověka. */
+const KLIC_JAZYK_AUTO = 'managero-lang-auto';
+
+/**
+ * Zvolil si člověk jazyk na tomhle zařízení sám? Cookie je k tomu nutná; starší zařízení
+ * (cookie z doby před touhle značkou) se berou jako výslovná, protože se to už nedá poznat.
+ * Jen prohlížeč.
+ */
+export function jazykZarizeniVyslovny(): boolean {
+  let auto = false;
+  try { auto = localStorage.getItem(KLIC_JAZYK_AUTO) === '1'; } catch { /* bez úložiště: cookie rozhoduje sama */ }
+  return jeJazykVyslovny(cteniCookieJazyka(), auto);
 }
 
 function zapisCookie(j: Jazyk) {
@@ -74,32 +95,41 @@ export function I18nProvider({ jazyk: pocatecni, slovniky, children }: {
   // Zapsat dřív, než se vykreslí potomci: SSR i hydratace pak vidí překlady hned.
   if (slovniky) for (const j of Object.keys(slovniky) as Jazyk[]) pridejSlovnik(j, slovniky[j]!);
   const router = useRouter();
-  const { status } = useSession();
+  const { status, update: obnovRelaci } = useSession();
   const [jazyk, setJazykStav] = useState<Jazyk>(pocatecni);
   const [verze, setVerze] = useState(0);
   nastavAktualniJazyk(jazyk);
 
   useEffect(() => posluchejSlovniky(() => setVerze(v => v + 1)), []);
+  // Osobní formát času/data nebo formát podniku se změnil: překreslí se všichni, kdo formátují (jako u nové sekce slovníku).
+  useEffect(() => posluchejFormaty(() => setVerze(v => v + 1)), []);
   // Server po router.refresh() pošle nový pocatecni jazyk: srovná se stav.
   useEffect(() => { setJazykStav(pocatecni); }, [pocatecni]);
 
   const prihlasen = useRef(false);
   prihlasen.current = status === 'authenticated';
 
-  const setJazyk = useCallback(async (novy: Jazyk, o?: { ulozit?: boolean }) => {
+  const setJazyk = useCallback(async (novy: Jazyk, o?: { ulozit?: boolean; vyslovne?: boolean }) => {
     await nactiSekce(novy, Array.from(pozadovane));
     zapisCookie(novy);
-    try { localStorage.setItem(KLIC_JAZYKA_HOSTA, novy); } catch { /* soukromé okno */ }
+    try {
+      localStorage.setItem(KLIC_JAZYKA_HOSTA, novy);
+      if (o?.vyslovne ?? o?.ulozit !== false) localStorage.removeItem(KLIC_JAZYK_AUTO);
+      else localStorage.setItem(KLIC_JAZYK_AUTO, '1');
+    } catch { /* soukromé okno */ }
     document.documentElement.lang = novy;
     nastavAktualniJazyk(novy);
     setJazykStav(novy);
     if (o?.ulozit !== false && prihlasen.current) {
       // Uložení na účet je doplněk: bez sloupce `users.lang` (před /api/init) nebo
       // bez sítě zůstane jazyk aspoň v cookie tohoto zařízení.
-      fetch('/api/account', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lang: novy }) }).catch(() => {});
+      fetch('/api/account', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lang: novy }) })
+        // Token nese jazyk taky: ať relace nenese starý, dokud se člověk neodhlásí.
+        .then(r => { if (r.ok) return obnovRelaci({ user: { lang: novy } }); })
+        .catch(() => {});
     }
     router.refresh();
-  }, [router]);
+  }, [router, obnovRelaci]);
 
   // Hostovské stránky: ?lang=, pak jazyk prohlížeče, dokud host nezvolil sám.
   useEffect(() => {

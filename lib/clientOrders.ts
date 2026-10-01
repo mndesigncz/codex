@@ -296,7 +296,7 @@ export async function notifyNewOrder(teamId: number, customerName: string, table
     if (ids.length) await notifyUsers(ids, {
       title: posNote ? 'Objednávka není v pokladně' : 'Nová objednávka od stolu',
       body: posNote ? `${kdo} — ${posNote}` : kdo,
-      link: '/employer/overview?mode=client&tab=orders', type: posNote ? 'warning' : 'info', category: 'general',
+      link: '/employer/overview?mode=client&tab=orders', type: posNote ? 'warning' : 'info', category: 'booking',
     });
   } catch { /* oznámení je best-effort */ }
   void id;

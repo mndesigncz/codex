@@ -9,7 +9,7 @@
 //  • hostovská stránka podniku: přepnutí přes pilulku (cookie, <html lang>, žádná česká
 //    slova obalu v angličtině), automatický jazyk z prohlížeče, německé texty bez přetečení;
 //  • aplikace: přepnutí z listu „Více“ (PATCH /api/account s jazykem, německé popisky docku
-//    se vejdou), karta Jazyk v Nastavení → Vzhled i v tmavém režimu.
+//    se vejdou), karta Jazyk v Nastavení → Jazyk a region i v tmavém režimu.
 //
 // Čas dne se neuplatní: lístek i stránka podniku dostávají pevné fixtury a nic tu nezávisí
 // na hodinách (připomínky postupů předem označuje `kontext` v k68-spolecne).
@@ -252,14 +252,14 @@ const text = (p) => p.evaluate(() => document.body.innerText.replace(/\s+/g, ' '
 for (const [tmavy, nazev] of [[false, 'světlý'], [true, 'tmavý']]) {
   const { ctx, p } = await kontext({ viewport: { width: 1280, height: 900 }, tmavy });
   await p.goto(BASE + '/employer/overview?view=settings', { waitUntil: 'networkidle' });
-  await p.getByRole('button', { name: /Vzhled/ }).first().click();
+  await p.getByRole('button', { name: /Jazyk a region/ }).first().click();
   const skupina = p.getByRole('radiogroup', { name: 'Jazyk' });
   await skupina.waitFor({ timeout: 10000 });
   const radia = await skupina.getByRole('radio').evaluateAll(els => els.map(e => ({ t: e.textContent.replace(/\s+/g, ' ').trim(), on: e.getAttribute('aria-checked') })));
-  tvrdi(`Nastavení → Vzhled (${nazev}): karta Jazyk má pět jazyků a vybranou češtinu`, radia.length === 5 && radia[0].on === 'true' && radia.filter(r => r.on === 'true').length === 1, JSON.stringify(radia));
+  tvrdi(`Nastavení → Jazyk a region (${nazev}): karta Jazyk má pět jazyků a vybranou češtinu`, radia.length === 5 && radia[0].on === 'true' && radia.filter(r => r.on === 'true').length === 1, JSON.stringify(radia));
   // vybraný řádek nese fajfku, ne limetku: nikde v kartě není plná limetková výplň
   const limetka = await skupina.evaluate(el => Array.from(el.querySelectorAll('*')).filter(e => { const c = getComputedStyle(e).backgroundColor; return c === 'rgb(200, 245, 66)'; }).length);
-  tvrdi(`Nastavení → Vzhled (${nazev}): v kartě Jazyk není plná limetka`, limetka === 0, String(limetka));
+  tvrdi(`Nastavení → Jazyk a region (${nazev}): v kartě Jazyk není plná limetka`, limetka === 0, String(limetka));
   await p.screenshot({ path: `${OUT}k76-nastaveni-${tmavy ? 'tmavy' : 'svetly'}.png` });
   await ctx.close();
 }

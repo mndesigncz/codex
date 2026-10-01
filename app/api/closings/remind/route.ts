@@ -61,6 +61,7 @@ export async function GET(request: Request) {
           title: '📊 Nezapomeň na uzávěrku',
           body: 'Tvoje směna skončila — vyplň prosím uzávěrku kasy.',
           type: 'warning',
+          category: 'closing',
           link: '/employee/shifts?view=closing',
         });
         reminded++;
@@ -90,6 +91,7 @@ export async function GET(request: Request) {
             title: '⚠️ Uzávěrky ke schválení',
             body: `${t.n} ${t.n === 1 ? 'uzávěrka čeká' : t.n <= 4 ? 'uzávěrky čekají' : 'uzávěrek čeká'} na tvoje schválení.`,
             type: 'warning',
+            category: 'closing',
             link: '/employer/overview?view=reports',
           });
           nudgedEmployers++;

@@ -187,11 +187,11 @@ export default async function ({ eq, ok }: Testy) {
   ok('most: starý lib/nativniMost.ts neexistuje', !existsSync('lib/nativniMost.ts'));
   const zdroj = (p: string) => readFileSync(p, 'utf8');
   const KLICE = /managero-(native-)?push-(token|vypnuto)/;
-  const vlastnici = ['components/NativeBridge.tsx', 'components/Settings.tsx', 'components/client/UcetHosta.tsx', 'lib/odhlaseni.ts', 'lib/stahni.ts', 'lib/nativni/most.ts'].filter(p => KLICE.test(zdroj(p)));
+  const vlastnici = ['components/NativeBridge.tsx', 'components/Settings.tsx', 'components/settings/SekceOznameni.tsx', 'components/client/UcetHosta.tsx', 'lib/odhlaseni.ts', 'lib/stahni.ts', 'lib/nativni/most.ts'].filter(p => KLICE.test(zdroj(p)));
   eq('most: klíč tokenu a volby push zná jen NativeBridge', vlastnici, ['components/NativeBridge.tsx']);
   ok('most: addListener(registration) jen v NativeBridge', !/addListener\('registration'/.test(zdroj('lib/nativni/most.ts')) && /addListener\('registration'/.test(zdroj('components/NativeBridge.tsx')));
   ok('most: odhlášení volá odhlasitPush mostu', /odhlasitPush\(\)/.test(zdroj('lib/odhlaseni.ts')));
-  ok('most: Nastavení i účet hosta při vypnutí volají vypniPush', /vypniPush\(\)/.test(zdroj('components/Settings.tsx')) && /vypniPush\(\)/.test(zdroj('components/client/UcetHosta.tsx')));
+  ok('most: Nastavení (Notifikace) i účet hosta při vypnutí volají vypniPush', /vypniPush\(\)/.test(zdroj('components/settings/SekceOznameni.tsx')) && /vypniPush\(\)/.test(zdroj('components/client/UcetHosta.tsx')));
   const tok = 'x'.repeat(64);
   eq('fcm: zpráva míří do kanálu, který obal na Androidu vytváří', (sestavFcmZpravu(tok, { title: 'a' }) as any).message.android.notification.channel_id, ANDROID_KANAL);
   ok('fcm: kanál je stejný jako createChannel v NativeBridge', zdroj('components/NativeBridge.tsx').includes(`id: '${ANDROID_KANAL}'`));

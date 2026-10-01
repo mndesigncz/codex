@@ -54,7 +54,7 @@ import { obnovOpravneni, useOpravneni } from '../../role/useOpravneni';
 import { apiMessage, okJson } from '@/lib/api';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { tg, aktualniJazyk } from '@/lib/i18n/stav';
-import { fmtDatum, fmtMesic } from '@/lib/i18n/format';
+import { fmtDatum, fmtHM, fmtMesic } from '@/lib/i18n/format';
 import { parseDbTime, pragueDayOf, pragueHM, pragueToday } from '@/lib/pragueTime';
 import {
   KLIC_DEN, KLIC_DOSTUPNOST, UDALOST_DEN, UDALOST_DOSTUPNOST, UDALOST_ZMENA,
@@ -130,7 +130,7 @@ function ADalsich({ n }: { n: number }) {
 }
 
 /** Čas směny: „08:00–16:00". */
-const casSmeny = (od: unknown, doCasu: unknown) => (hm(od) ? `${hm(od)}–${hm(doCasu)}` : '');
+const casSmeny = (od: unknown, doCasu: unknown) => (hm(od) ? `${fmtHM(od)}–${fmtHM(doCasu)}` : '');
 
 // Typ směny nese kategorie (cat-dot-1…6), ne stavová barva (lib/rozvrhPrehled).
 const katBarvy = kategorieBarvy;

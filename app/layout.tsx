@@ -74,7 +74,7 @@ export default async function RootLayout({
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var p=location.pathname;var c=p==='/'||p==='/demo'||p.indexOf('/demo/')===0||p==='/client'||p.indexOf('/client/')===0||/[?&]mode=client(&|$)/.test(location.search);var t=c?null:(localStorage.getItem('managero-theme')||localStorage.getItem('pangea-theme'));if(t==='dark'&&!c)document.documentElement.setAttribute('data-theme','dark');}catch(e){}`,
+            __html: `try{var p=location.pathname;var c=p==='/'||p==='/demo'||p.indexOf('/demo/')===0||p==='/client'||p.indexOf('/client/')===0||/[?&]mode=client(&|$)/.test(location.search);var h=document.documentElement;var t=c?null:(localStorage.getItem('managero-theme')||localStorage.getItem('pangea-theme')||localStorage.getItem('managero-theme-server'));if(t==='system')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if(t==='dark'&&!c)h.setAttribute('data-theme','dark');var v=JSON.parse(localStorage.getItem('managero-vzhled')||'{}');if(v.hustota==='kompaktni')h.setAttribute('data-density','compact');if(v.pismo==='vetsi')h.setAttribute('data-fontsize','large');if(v.pismo==='nejvetsi')h.setAttribute('data-fontsize','xlarge');if(v.pohyb===true)h.setAttribute('data-motion','reduce');if(v.kontrast===true)h.setAttribute('data-contrast','high');}catch(e){}`,
           }}
         />
       </head>

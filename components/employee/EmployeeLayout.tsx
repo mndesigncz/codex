@@ -24,6 +24,7 @@ import { useOpravneni } from '../role/useOpravneni';
 import BezOpravneni from '../role/BezOpravneni';
 import { NavigaceKontext, useHodnotaNavigace } from '../widgety/NavigaceKontext';
 import { otevriPostupPoPrechodu } from '@/lib/otevriPostup';
+import { zalozkaNastaveni } from '@/lib/nastaveniZalozky';
 
 // Pohledy se stahují až při otevření — viz EmployerLayout. Zaměstnanec
 // otevře za směnu obvykle dvě obrazovky; stahovat kvůli tomu uzávěrku,
@@ -83,6 +84,8 @@ export default function EmployeeLayout({ user }: Props) {
     const p = new URLSearchParams(window.location.search);
     const v = p.get('view');
     if (v && (byId[v] || v === 'settings')) setCurrentView(v);
+    // Odkaz na konkrétní záložku Nastavení: `?view=settings&tab=jazyk` (neznámá záložka se zahodí).
+    if (v === 'settings') setSettingsTab(zalozkaNastaveni(p.get('tab')));
     const g = Number(p.get('guide'));
     if (v === 'guides' && Number.isFinite(g) && g > 0) setGuideId(g);
   }, []);
@@ -95,7 +98,12 @@ export default function EmployeeLayout({ user }: Props) {
   // zaměstnance arg pro chat zahazoval (jen vedení ho předávalo), takže
   // klepnutí na řádek skončilo na seznamu konverzací.
   const [chatConvId, setChatConvId] = useState<number | null>(null);
+  // Záložka Nastavení z odkazu nebo z widgetu; nonce říká otevřenému Nastavení, že si ji někdo vyžádal znovu.
+  const [settingsTab, setSettingsTab] = useState<ReturnType<typeof zalozkaNastaveni>>();
+  const [settingsNonce, setSettingsNonce] = useState(0);
   const navigate = (view: string, arg?: string) => {
+    setSettingsTab(view === 'settings' ? zalozkaNastaveni(arg) : undefined);
+    if (view === 'settings') setSettingsNonce(n => n + 1);
     setInventoryCat(view === 'inventory' ? arg : undefined);
     setGuideId(view === 'guides' && arg ? Number(arg) : null);
     setChatConvId(view === 'chat' && arg && /^\d+$/.test(arg) ? Number(arg) : null);
@@ -114,7 +122,7 @@ export default function EmployeeLayout({ user }: Props) {
   const [moreOpen, setMoreOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const ucet = usePopover(accountOpen, setAccountOpen, { focusFirst: true, arrowKeys: true });
-  const openSettings = () => { setCurrentView('settings'); setAccountOpen(false); setMoreOpen(false); };
+  const openSettings = () => { setSettingsTab(undefined); setCurrentView('settings'); setAccountOpen(false); setMoreOpen(false); };
 
   const renderView = () => {
     if (!smiPohled(currentView)) return <BezOpravneni onZpet={() => setCurrentView('home')} />;
@@ -136,7 +144,7 @@ export default function EmployeeLayout({ user }: Props) {
       case 'chat':         return <ChatView user={user as any} openConversationId={chatConvId} />;
       case 'guides':       return <Guides user={user as any} openGuideId={guideId} />;
       case 'suggestions':  return <SuggestionsBoard />;
-      case 'settings':     return <Settings user={user as any} initialTab="account" />;
+      case 'settings':     return <Settings user={user as any} initialTab={settingsTab ?? 'account'} tabNonce={settingsNonce} />;
       default:             return <EmployeeDashboard user={user} />;
     }
   };

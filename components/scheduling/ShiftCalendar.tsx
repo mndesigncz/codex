@@ -17,7 +17,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { zacatekTydne } from '@/lib/week';
 import { zkratkyDnuJazyk } from '@/lib/weekJazyk';
 import { useJazyk, useT } from '@/lib/i18n/client';
-import { fmtDatum } from '@/lib/i18n/format';
+import { fmtDatum, fmtHM } from '@/lib/i18n/format';
 import { Icon } from '../Icons';
 import { Avatar, Card, ErrorState, MonthNav, Skeleton, Well } from '../ui';
 import { useCurrency } from '../CurrencyProvider';
@@ -152,7 +152,7 @@ function KalendarSmen({ initialMonth }: { initialMonth?: string }) {
                     {detail.onShift.map(p => (
                       <PersonLink key={p.id} id={p.id} className={`chip ${p.hadClosing ? 'chip-ok' : detail.missing ? 'chip-bad' : 'chip-muted'}`}>
                         <Avatar emoji={p.avatar} size="xs" ring={false} className="!h-5 !w-5" /> {p.name}
-                        {p.startTime && <span className="opacity-60 tabular-nums">{p.startTime}–{p.endTime}</span>}
+                        {p.startTime && <span className="opacity-60 tabular-nums">{fmtHM(p.startTime)}–{fmtHM(p.endTime)}</span>}
                         {p.hadClosing && <Icon name="check" size={13} className="shrink-0" />}
                       </PersonLink>
                     ))}

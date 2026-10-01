@@ -39,7 +39,7 @@ import { useNavigace } from '../NavigaceKontext';
 import { pragueHM, pragueToday } from '@/lib/pragueTime';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { tg, aktualniJazyk } from '@/lib/i18n/stav';
-import { fmtDatum } from '@/lib/i18n/format';
+import { fmtDatum, fmtHM } from '@/lib/i18n/format';
 import {
   den as denZ, denKratce as denKratceCs, dnuVolna, hodinyText, kategorieBarvy, minuleSmeny, mojeCisla, popisekTypu,
   TYP_VOLNA, zadostiVolna, type ZadostVolna,
@@ -227,7 +227,7 @@ function MinuleSmeny({ velikost }: WidgetProps) {
           return (
             <ListRow key={s.id}
               title={<span className="cz-sentence">{denKratceRadek(denZ(s.date), dnes, t)}</span>}
-              meta={<><span aria-hidden className={`inline-block h-2 w-2 rounded-full align-middle mr-1.5 ${kat ? `cat-dot-${kat}` : 'bg-black/15'}`} />{t(popisekTypu(s))} · <span className="tabular-nums">{hm(s.startTime ?? s.start_time)}–{hm(s.endTime ?? s.end_time)}</span></>}
+              meta={<><span aria-hidden className={`inline-block h-2 w-2 rounded-full align-middle mr-1.5 ${kat ? `cat-dot-${kat}` : 'bg-black/15'}`} />{t(popisekTypu(s))} · <span className="tabular-nums">{fmtHM(s.startTime ?? s.start_time)}–{fmtHM(s.endTime ?? s.end_time)}</span></>}
               right={s.rating ? <Chip tone="ok" size="sm" icon="star">{s.rating}/5</Chip> : <Chip tone="muted" size="sm">{t('Bez hodnocení')}</Chip>}
             />
           );

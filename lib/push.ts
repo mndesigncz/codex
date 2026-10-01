@@ -1,6 +1,7 @@
 import webpush from 'web-push';
 import { neon } from '@neondatabase/serverless';
-import { jeZtlumeno, neutralniProNativni, type NotifCategory } from './pushPravidla';
+import { jeZtlumeno, jeVTichychHodinach, neutralniProNativni, type NotifCategory } from './pushPravidla';
+import { pragueHM } from './pragueTime';
 import { poslatNativne } from './nativniPush';
 
 export type { NotifCategory };
@@ -30,15 +31,14 @@ interface PushPayload {
   tag?: string;
 }
 
-// Has this user opted OUT of a given category (or, u opt-in kategorií, NOT opted in)?
-async function categoryMuted(sql: any, userId: number, category?: NotifCategory): Promise<boolean> {
-  if (!category || category === 'general') return false;
+// Preference oznámení člověka (users.notif_prefs). null = sloupec ještě není (před migrací)
+// nebo dotaz selhal: běžné kategorie se pak doručí jako dřív, opt-in (novinky) ne.
+async function nactiPrefs(sql: any, userId: number): Promise<Record<string, unknown> | null> {
   try {
     const [row] = await sql`SELECT notif_prefs FROM users WHERE id = ${userId}`;
-    return jeZtlumeno(row?.notif_prefs ?? {}, category);
+    return (row?.notif_prefs ?? {}) as Record<string, unknown>;
   } catch {
-    // Před migrací sloupec není: běžné kategorie se doručí jako dřív, opt-in (novinky) ne.
-    return jeZtlumeno({}, category);
+    return null;
   }
 }
 
@@ -111,7 +111,8 @@ export async function notifyUser(userId: number, payload: PushPayload & { type?:
   const sql = neon(process.env.DATABASE_URL!);
 
   // Respect the user's category preferences — a muted category is fully skipped.
-  if (await categoryMuted(sql, userId, payload.category)) return;
+  const prefs = await nactiPrefs(sql, userId);
+  if (jeZtlumeno(prefs ?? {}, payload.category)) return;
 
   try {
     await sql`
@@ -120,6 +121,10 @@ export async function notifyUser(userId: number, payload: PushPayload & { type?:
   } catch (e) {
     console.error('notification insert failed', e);
   }
+
+  // Tiché hodiny (Nastavení → Notifikace): oznámení zůstalo v centru oznámení, ale telefon
+  // ani prohlížeč se neozve. Hodiny se berou na pražské zdi, jako všude v aplikaci.
+  if (prefs && jeVTichychHodinach(prefs, pragueHM())) return;
 
   await Promise.all([
     poslatWebPush(sql, userId, payload).catch(e => console.error('web push selhal', e)),
