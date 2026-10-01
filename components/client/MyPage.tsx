@@ -14,6 +14,7 @@ import { formatMoney } from '@/lib/money';
 import { okJson } from '@/lib/api';
 import { pragueDaySafe } from '@/lib/pragueTime';
 import UcetHosta from './UcetHosta';
+import MamPoukaz from './MamPoukaz';
 import { useJazyk, useT } from '@/lib/i18n/client';
 import { fmtDatum } from '@/lib/i18n/format';
 import type { Jazyk } from '@/lib/i18n/config';
@@ -118,6 +119,12 @@ export default function MyPage() {
             action={<Link href="/client" className="tap-target inline-flex items-center gap-2 btn btn-accent hover:brightness-105 transition">{t('Vybrat podnik')}</Link>} />
         )}
       </section>
+
+      {d.memberships?.length > 0 && (
+        <section className="max-w-md">
+          <MamPoukaz podniky={d.memberships.map((m: any) => ({ slug: m.slug, name: m.name }))} />
+        </section>
+      )}
 
       {(upcoming.length > 0 || open.length > 0) && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10 items-start">

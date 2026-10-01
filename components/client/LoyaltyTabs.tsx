@@ -19,7 +19,7 @@
 //    která vypadala jako skutečný průběh.
 // Oprávnění: pravidla a úrovně mění jen vernost.pravidla, kartičky
 // vernost.kampane, kupony kupony.spravovat, uplatnit kód kupony.uplatnit,
-// skupiny hostů zakaznici.skupiny.
+// skupiny hostů zakaznici.skupiny, dárkové poukazy poukazy.* (komponenta Poukazy).
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -35,22 +35,25 @@ import { apiMessage, okJson } from '@/lib/api';
 import { obsahuje } from '@/lib/hledani';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { useOpravneni } from '../role/useOpravneni';
+import Poukazy from './Poukazy';
 
 // Věrnost měla šest podzáložek pod deseti hlavními — šestnáct sourozenců
 // nad sebou. „Body" a „Slevy a úrovně" jsou jedna věc (co host nasbírá a co
 // za to má) a „Kupony" s „Promo kódy" taky (co host uplatní).
-export type LoyaltySub = 'overview' | 'points' | 'stamps' | 'coupons';
+export type LoyaltySub = 'overview' | 'points' | 'stamps' | 'coupons' | 'vouchers';
 export const LOYALTY_SUBS: { id: LoyaltySub; label: string }[] = [
   { id: 'overview', label: 'Přehled' },
   { id: 'points', label: 'Body a úrovně' },
   { id: 'stamps', label: 'Razítka' },
   { id: 'coupons', label: 'Kupony a kódy' },
+  { id: 'vouchers', label: 'Poukazy' },
 ];
 const KLIC_CASTI: Record<LoyaltySub, readonly string[]> = {
   overview: ['vernost.zobrazit'],
   points: ['vernost.zobrazit'],
   stamps: ['vernost.zobrazit'],
   coupons: ['kupony.spravovat', 'kupony.uplatnit'],
+  vouchers: ['poukazy.zobrazit', 'poukazy.uplatnit'],
 };
 const FORM_BODY = 'vernost-body';
 
@@ -794,6 +797,7 @@ const POPIS_CASTI: Record<LoyaltySub, string> = {
   points: 'Za co host dostane body, kolik se mu vrátí jako kredit, a jaké úrovně a slevy si tím odemyká.',
   stamps: 'Razítkové kartičky — za návštěvy, za vybrané položky, nebo za útratu. Klidně víc najednou.',
   coupons: 'Co host uplatní: kupony se slevou v % i v měně podniku, X+Y, cílením a limity — a promo kódy na leták nebo účtenku.',
+  vouchers: 'Dárkové poukazy s jedinečným kódem a QR: peněžní hodnota, platnost, uplatnění po částech u kasy a tisk.',
 };
 
 export default function LoyaltyTabs({ toast, promos }: { toast: (m: string) => void; promos: React.ReactNode }) {
@@ -807,6 +811,7 @@ export default function LoyaltyTabs({ toast, promos }: { toast: (m: string) => v
     : sub === 'points' ? <BodyAUrovne toast={toast} setUkladam={setUkladam} />
     : sub === 'stamps' ? <Stamps toast={toast} />
     : sub === 'coupons' ? <div className="space-y-4"><Coupons toast={toast} />{promos}</div>
+    : sub === 'vouchers' ? <Poukazy toast={toast} />
     : null;
   return (
     <PlochaWidgetu

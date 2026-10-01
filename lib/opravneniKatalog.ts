@@ -1341,6 +1341,32 @@ export const KATALOG: Opravneni[] = [
   "vyzaduje": []
  },
  {
+  "id": "poukazy.zobrazit",
+  "oblast": "Zákazníci a menu",
+  "nazev": "Vidět dárkové poukazy",
+  "popis": "Seznam dárkových poukazů s kódy, zůstatky, platností a historií uplatnění.",
+  "citlivost": "střední",
+  "vyzaduje": []
+ },
+ {
+  "id": "poukazy.spravovat",
+  "oblast": "Zákazníci a menu",
+  "nazev": "Vydávat a rušit dárkové poukazy",
+  "popis": "Založit poukaz nebo dávku poukazů, zrušit je, prodloužit platnost, vrátit omylem uplatněnou částku a exportovat kódy. Poukaz je peněžní hodnota: zapisuje se do auditu.",
+  "citlivost": "vysoká",
+  "vyzaduje": [
+   "poukazy.zobrazit"
+  ]
+ },
+ {
+  "id": "poukazy.uplatnit",
+  "oblast": "Zákazníci a menu",
+  "nazev": "Uplatnit dárkový poukaz",
+  "popis": "U kasy zadat nebo naskenovat kód poukazu a odečíst z něj část nebo celý zůstatek. Zapisuje se do auditu.",
+  "citlivost": "střední",
+  "vyzaduje": []
+ },
+ {
   "id": "menu.zobrazit",
   "oblast": "Zákazníci a menu",
   "nazev": "Vidět menu v administraci",
@@ -1682,6 +1708,9 @@ export const SYSTEMOVE_ROLE: SystemovaRole[] = [
    "postupy.upravit",
    "postupy.vytvorit",
    "postupy.zobrazit",
+   "poukazy.spravovat",
+   "poukazy.uplatnit",
+   "poukazy.zobrazit",
    "predplatne.spravovat",
    "predplatne.zobrazit",
    "receptury.upravit",
