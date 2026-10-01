@@ -167,10 +167,10 @@
     position: absolute;
     left: -1.75rem;
     top: 1rem;
-    width: 2px;
-    border-radius: 2px;
+    width: 3px;
+    border-radius: 3px;
   }
-  .ld-den-osa::before { bottom: 0; background: rgba(22, 24, 26, 0.08); }
+  .ld-den-osa::before { bottom: 0; background: rgba(22, 24, 26, 0.1); }
   .ld-den-osa::after {
     height: 1px;
     background: #c8f542;
@@ -180,7 +180,7 @@
   .ld-den-bod {
     display: block;
     position: absolute;
-    left: calc(-1.75rem - 4px);
+    left: calc(-1.75rem - 3.5px);
     top: calc(3rem + 1rem - 5px);
     width: 10px; height: 10px;
     border-radius: 9999px;
