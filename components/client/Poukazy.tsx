@@ -14,7 +14,8 @@ import { Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Moda
 import { SearchField } from '../ui/SearchField';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 import { useOpravneni } from '../role/useOpravneni';
-import { apiMessage } from '@/lib/api';
+import { apiMessage, okJson } from '@/lib/api';
+import { czCount } from '@/lib/czech';
 import { dbTimeDayHM, pragueToday, dayPlus } from '@/lib/pragueTime';
 import { HLASKA_NEJDE_ULOZIT, ulozSoubor } from '@/lib/stahni';
 import { openPrint } from '@/lib/printDoc';
@@ -46,10 +47,12 @@ async function vytisknout(poukazy: KartaPoukazu[], podnik: string): Promise<bool
   const qr: Record<string, string> = {};
   for (const p of poukazy) qr[p.code] = await QR.toString(p.code, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' });
   return openPrint({
-    title: poukazy.length === 1 ? `Dárkový poukaz ${poukazy[0].code}` : `Dárkové poukazy (${poukazy.length})`,
+    title: poukazy.length === 1 ? `Dárkový poukaz ${poukazy[0].code}` : `Dárkové poukazy: ${czCount(poukazy.length, POUKAZ)}`,
     body: poukazyKartyHtml(poukazy, podnik, qr), business: podnik,
   });
 }
+
+const POUKAZ = { one: 'poukaz', few: 'poukazy', many: 'poukazů' };
 
 export default function Poukazy({ toast }: { toast: (m: string) => void }) {
   const { ma } = useOpravneni();
@@ -73,7 +76,7 @@ export default function Poukazy({ toast }: { toast: (m: string) => void }) {
 
   useEffect(() => {
     // Název podniku na kartu poukazu.
-    fetch('/api/client/admin/profile').then(r => r.json()).then(d => { const n = d?.profile?.team_name ?? d?.profile?.name; if (n) setPodnik(String(n)); }).catch(() => {});
+    fetch('/api/client/admin/profile').then(okJson).then(d => { const n = d?.profile?.team_name ?? d?.profile?.name; if (n) setPodnik(String(n)); }).catch(() => {});
   }, []);
   useEffect(() => { const t = setTimeout(() => { setHledej(q); setStrana(1); }, 250); return () => clearTimeout(t); }, [q]);
 
@@ -203,7 +206,7 @@ function NovyPoukaz({ toast, onZavrit, onHotovo }: { toast: (m: string) => void;
     setBusy(true); setErr('');
     try {
       const d = await j('/api/client/admin/vouchers', { method: 'POST', body: JSON.stringify({ value: h, count: n, validUntil: platnost || null, recipient: komu, buyer: kupujici, note: poznamka }) });
-      toast(n === 1 ? 'Poukaz založen.' : `Založeno ${n} poukazů.`);
+      toast(n === 1 ? 'Poukaz založen.' : `Založeno: ${czCount(n, POUKAZ)}.`);
       onHotovo(d.poukazy);
     } catch (e2) { setErr(apiMessage(e2, 'Poukaz se nepodařilo založit.')); }
     setBusy(false);
@@ -248,7 +251,7 @@ function Vytvorene({ poukazy, podnik, toast, onZavrit, onOtevri }: { poukazy: Po
     setTisk(false);
   };
   return (
-    <Modal open onClose={onZavrit} title={poukazy.length === 1 ? 'Poukaz je hotový' : `Hotovo: ${poukazy.length} poukazů`} subtitle="Kódy najdeš kdykoli v seznamu poukazů."
+    <Modal open onClose={onZavrit} title={poukazy.length === 1 ? 'Poukaz je hotový' : `Hotovo: ${czCount(poukazy.length, POUKAZ)}`} subtitle="Kódy najdeš kdykoli v seznamu poukazů."
       footer={<>
         <Button variant="secondary" onClick={onZavrit}>Zavřít</Button>
         <Button variant="primary" icon="print" loading={tisk} onClick={tiskni}>{poukazy.length === 1 ? 'Vytisknout poukaz' : 'Vytisknout všechny'}</Button>
