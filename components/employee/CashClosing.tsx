@@ -179,11 +179,11 @@ function DrawerCounter({ denomSet, counts, onChange, money, symbol }: {
           const cnt = counts[String(d)] ?? 0;
           return (
             <div key={d} className={`flex items-center gap-2 px-3 py-1.5 ${cnt > 0 ? 'bg-[#C8F542]/[0.07]' : ''}`}>
-              <span className="w-16 shrink-0 text-sm font-semibold text-[#16181A] tabular-nums">
+              <span className="min-w-16 shrink-0 text-sm font-semibold text-[#16181A] tabular-nums whitespace-nowrap">
                 {fmtDenom(d)} <span className="text-[11px] font-medium text-black/35">{symbol}</span>
                 {/* Na telefonu (do 640 px) mezisoučet pod nominálem: popisek 64 + počítadlo 136 + mezisoučet 80
                     nedá dohromady víc než ~330 px, do 320 px širokého okna se nevejde a uřízl se. */}
-                {cnt > 0 && <span className={`block sm:hidden text-[11px] leading-tight font-semibold tabular-nums text-[#5B7A08]`}>{money(d * cnt)}</span>}
+                {cnt > 0 && <span className={`block sm:hidden text-[11px] leading-tight font-semibold tabular-nums text-[#5B7A08] whitespace-nowrap`}>{money(d * cnt)}</span>}
               </span>
               <div className="flex items-center gap-1 ml-auto">
                 <button type="button" onClick={() => bump(d, -1)} disabled={cnt <= 0} aria-label={t('Ubrat {hodnota} {mena}', { hodnota: fmtDenom(d), mena: symbol })}

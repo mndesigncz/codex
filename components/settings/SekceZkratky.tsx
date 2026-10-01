@@ -52,9 +52,9 @@ export default function SekceZkratky() {
           <h3 className="t-label">{s.nazev}</h3>
           <ul className="list">
             {s.zkratky.map((z, i) => (
-              <li key={i} className="flex items-start justify-between gap-4 py-2.5">
+              <li key={i} className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1.5 sm:gap-4 py-2.5">
                 <span className="min-w-0 text-sm text-[#16181A] text-pretty">{z.co}</span>
-                <span className="flex flex-wrap justify-end gap-1.5 shrink-0 max-w-[50%]">
+                <span className="flex flex-wrap sm:justify-end gap-1.5 sm:shrink-0 sm:max-w-[50%]">
                   {z.klavesy.map(k => <kbd key={k} className="rounded-lg border border-black/15 bg-black/[0.04] px-2 py-0.5 text-xs font-semibold tabular-nums text-[#16181A] whitespace-nowrap">{k}</kbd>)}
                 </span>
               </li>

@@ -296,7 +296,7 @@
   "Účet je smazaný": "Account deleted",
   "Účet se nepodařilo smazat.": "The account couldn't be deleted.",
   "Účet se nepodařilo smazat. Zkontrolujte připojení a zkuste to znovu.": "The account couldn't be deleted. Check your connection and try again.",
-  "Čas se bere na hodinách podniku. Okno může přecházet přes půlnoc, třeba od {od} do {do}.": "Times follow the business clock. The window can span midnight, for example from {od} to {do}.",
+  "Čas se bere podle pražských hodin. Okno může přecházet přes půlnoc, třeba od {od} do {do}.": "Times follow Prague time. The window can span midnight, for example from {od} to {do}.",
   "Čas, datum, týden a čísla podle tebe. Výchozí je nastavení podniku a jazyka; tady ho přepíšeš jen pro sebe.": "Time, date, week and numbers your way. The default follows the business and language settings; here you override it just for yourself.",
   "Čeká": "Pending",
   "Čárka (1 234,5)": "Comma (1 234,5)",

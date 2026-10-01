@@ -62,7 +62,7 @@ export async function GET() {
   ]);
 
   const ted = new Date();
-  const dokument = sestavExport({ ucet, nastaveni, clenstvi, smeny, dochazka, volno, dostupnost, zpravy }, ted);
+  const dokument = sestavExport({ ucet, nastaveni, clenstvi, smeny, dochazka, volno, dostupnost, zpravy }, ted, STROP);
   return new NextResponse(JSON.stringify(dokument, null, 2), {
     status: 200,
     headers: {

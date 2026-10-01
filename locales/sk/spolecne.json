@@ -296,7 +296,7 @@
   "Účet je smazaný": "Účet je zmazaný",
   "Účet se nepodařilo smazat.": "Účet sa nepodarilo zmazať.",
   "Účet se nepodařilo smazat. Zkontrolujte připojení a zkuste to znovu.": "Účet sa nepodarilo zmazať. Skontrolujte pripojenie a skúste to znova.",
-  "Čas se bere na hodinách podniku. Okno může přecházet přes půlnoc, třeba od {od} do {do}.": "Čas sa berie podľa hodín podniku. Okno môže prechádzať cez polnoc, napríklad od {od} do {do}.",
+  "Čas se bere podle pražských hodin. Okno může přecházet přes půlnoc, třeba od {od} do {do}.": "Čas sa berie podľa pražského času. Okno môže prechádzať cez polnoc, napríklad od {od} do {do}.",
   "Čas, datum, týden a čísla podle tebe. Výchozí je nastavení podniku a jazyka; tady ho přepíšeš jen pro sebe.": "Čas, dátum, týždeň a čísla podľa teba. Predvolené je nastavenie podniku a jazyka; tu ho prepíšeš len pre seba.",
   "Čeká": "Čaká",
   "Čárka (1 234,5)": "Čiarka (1 234,5)",

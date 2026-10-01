@@ -1152,8 +1152,8 @@ export default function Inventory({ initialCategory, onNavigate }: {
             {ma('sklad.ceny_upravit') && (
               <Field id="sklad-f-cena" label={cenaZaBaleni ? t('Cena za balení') : t('Cena za jednotku')} hint={t('Slouží k výpočtu hodnoty zásob a marže.')}>
                 <div className="relative">
-                  <input id="sklad-f-cena" inputMode="decimal" value={form.unitCost} onChange={e => setForm(f => ({ ...f, unitCost: e.target.value }))} placeholder="0" className={`${inputClass} pr-14`} />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/55">{cenaZaBaleni ? symbol : `${symbol}/${form.unit || 'ks'}`}</span>
+                  <input id="sklad-f-cena" inputMode="decimal" value={form.unitCost} onChange={e => setForm(f => ({ ...f, unitCost: e.target.value }))} placeholder="0" className={`${inputClass} ${cenaZaBaleni ? 'pr-16' : 'pr-24'}`} />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/55 max-w-[5.5rem] truncate pointer-events-none">{cenaZaBaleni ? symbol : `${symbol}/${form.unit || 'ks'}`}</span>
                 </div>
               </Field>
             )}

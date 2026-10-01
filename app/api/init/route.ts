@@ -1784,6 +1784,9 @@ export async function GET(request: Request) {
         PRIMARY KEY (group_id, customer_id)
       )`);
     await ddl(sql`CREATE INDEX IF NOT EXISTS client_group_members_customer ON client_group_members (team_id, customer_id)`);
+    // Profil podniku v Nastavení: IČO a DIČ (volitelné).
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS ico TEXT`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS dic TEXT`);
     // Import členů z jiné aplikace (Kartička a podobné). Stejné příkazy jsou v lib/importKartickaDb.ts
     // (zajistiTabulkyImportu) — import tak funguje i dřív, než někdo po nasazení otevře /api/init.
     await ddl(sql`

@@ -204,7 +204,7 @@ export default function SekceOznameni() {
               onChange={e => { if (e.target.value) void uloz({ ticho: { ...ticho, do: e.target.value } }); }} />
           </div>
         </div>
-        <p className="t-meta">{t('Čas se bere na hodinách podniku. Okno může přecházet přes půlnoc, třeba od {od} do {do}.', { od: VYCHOZI_TICHO.od, do: VYCHOZI_TICHO.do })}</p>
+        <p className="t-meta">{t('Čas se bere podle pražských hodin. Okno může přecházet přes půlnoc, třeba od {od} do {do}.', { od: VYCHOZI_TICHO.od, do: VYCHOZI_TICHO.do })}</p>
       </section>
 
       {maSouhrn && (

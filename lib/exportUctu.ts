@@ -22,11 +22,13 @@ export interface SekceExportu {
 export const VERZE_EXPORTU = 1;
 
 /** Sestaví dokument. Sekce, kterou se nepodařilo načíst (tabulka ještě není), je v `nedostupne`, ne tiše prázdná. */
-export function sestavExport(sekce: SekceExportu, vytvoreno: Date = new Date()) {
+export function sestavExport(sekce: SekceExportu, vytvoreno: Date = new Date(), strop: number | null = null) {
   const ucet = sekce.ucet
     ? Object.fromEntries(POLE_PROFILU.filter(k => k in sekce.ucet!).map(k => [k, sekce.ucet![k]]))
     : null;
   const nedostupne = (Object.keys(sekce) as (keyof SekceExportu)[]).filter(k => sekce[k] === null);
+  // Sekce, která narazila na strop řádků: soubor jinak vypadá úplný, přestože je ořezaný (GDPR export nesmí mlčet).
+  const oriznute = strop === null ? [] : (Object.keys(sekce) as (keyof SekceExportu)[]).filter(k => { const v = sekce[k]; return Array.isArray(v) && v.length >= strop; });
   return {
     aplikace: 'Managero',
     verze: VERZE_EXPORTU,
@@ -41,6 +43,7 @@ export function sestavExport(sekce: SekceExportu, vytvoreno: Date = new Date()) 
     dostupnost: sekce.dostupnost ?? [],
     zpravy: sekce.zpravy ?? [],
     nedostupne,
+    oriznute,
   };
 }
 

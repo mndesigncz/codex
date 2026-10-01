@@ -296,7 +296,7 @@
   "Účet je smazaný": "Konto gelöscht",
   "Účet se nepodařilo smazat.": "Das Konto konnte nicht gelöscht werden.",
   "Účet se nepodařilo smazat. Zkontrolujte připojení a zkuste to znovu.": "Das Konto konnte nicht gelöscht werden. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
-  "Čas se bere na hodinách podniku. Okno může přecházet přes půlnoc, třeba od {od} do {do}.": "Die Uhrzeit richtet sich nach der Uhr des Betriebs. Das Zeitfenster kann über Mitternacht gehen, zum Beispiel von {od} bis {do}.",
+  "Čas se bere podle pražských hodin. Okno může přecházet přes půlnoc, třeba od {od} do {do}.": "Die Uhrzeit richtet sich nach der Prager Zeit. Das Zeitfenster kann über Mitternacht gehen, zum Beispiel von {od} bis {do}.",
   "Čas, datum, týden a čísla podle tebe. Výchozí je nastavení podniku a jazyka; tady ho přepíšeš jen pro sebe.": "Zeit, Datum, Woche und Zahlen so, wie du es magst. Standard sind die Einstellungen von Betrieb und Sprache; hier überschreibst du sie nur für dich.",
   "Čeká": "Ausstehend",
   "Čárka (1 234,5)": "Komma (1 234,5)",

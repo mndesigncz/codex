@@ -70,7 +70,13 @@ export function ThemeProvider({ children, initial }: { children: React.ReactNode
   }, []);
 
   const theme: Theme = volba === 'system' ? (systemTmavy ? 'dark' : 'light') : volba;
-  useEffect(() => { apply(forcedLight ? 'light' : theme); }, [forcedLight, theme]);
+  // Motiv na <html> se bere přímo z matchMedia, ne ze stavu `systemTmavy`: ten se nastaví až v efektu výš
+  // a první průchod by přepsal tmavý motiv z inline skriptu na světlý (krátké zablikání při volbě „podle systému“).
+  useEffect(() => {
+    const zSystemu = volba === 'system' && typeof window !== 'undefined' && window.matchMedia
+      ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme;
+    apply(forcedLight ? 'light' : zSystemu);
+  }, [forcedLight, theme, volba]);
 
   const setTheme = (t: VolbaMotivu, o?: { naUcet?: boolean }) => {
     setVolba(t);
