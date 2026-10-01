@@ -263,3 +263,28 @@ export function chybyJakoCsv(chyby: ChybaRadku[]): string {
   const p = (v: string) => (/[";\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
   return ['radek;duvod;hodnota', ...chyby.map(c => [String(c.radek), p(c.duvod), p(c.hodnota ?? '')].join(';'))].join('\n');
 }
+
+/**
+ * Řádek z těla požadavku: API je volatelné i mimo náš formulář, takže se nevěří ničemu (typy, meze, e-mail).
+ * Neplatný řádek vrátí null; čísla se ořežou do mezí a zaokrouhlí.
+ */
+export function ocistiRadek(raw: any, poradi: number): RadekImportu | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const email = normalizujEmail(raw.email);
+  if (!email || !vypadaJakoEmail(email) || email.length > 120) return null;
+  const cele = (v: unknown) => { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.min(MAX_HODNOTA, Math.max(0, n)) : 0; };
+  const text = (v: unknown, max: number) => { const s = String(v ?? '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, max); return s || null; };
+  const datum = (v: unknown) => { const s = String(v ?? '').trim(); return /^\d{4}-\d{2}-\d{2}$/.test(s) && platneDatum(s) ? s : null; };
+  const tel = text(raw.telefon, 20);
+  return {
+    radek: Number.isFinite(Number(raw.radek)) ? Math.round(Number(raw.radek)) : poradi,
+    jmeno: text(raw.jmeno, 80) ?? email.split('@')[0],
+    email,
+    telefon: tel && cistiTelefon(tel) ? cistiTelefon(tel) : null,
+    narozeniny: datum(raw.narozeniny),
+    razitka: cele(raw.razitka), body: cele(raw.body), kredit: cele(raw.kredit), navstevy: cele(raw.navstevy),
+    posledniNavsteva: datum(raw.posledniNavsteva),
+    skupina: text(raw.skupina, 60),
+    cisloKarty: text(raw.cisloKarty, 40),
+  };
+}

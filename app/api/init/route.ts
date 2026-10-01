@@ -1784,6 +1784,31 @@ export async function GET(request: Request) {
         PRIMARY KEY (group_id, customer_id)
       )`);
     await ddl(sql`CREATE INDEX IF NOT EXISTS client_group_members_customer ON client_group_members (team_id, customer_id)`);
+    // Import členů z jiné aplikace (Kartička a podobné). Stejné příkazy jsou v lib/importKartickaDb.ts
+    // (zajistiTabulkyImportu) — import tak funguje i dřív, než někdo po nasazení otevře /api/init.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS client_importy (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        zdroj TEXT NOT NULL DEFAULT 'karticka',
+        soubor TEXT,
+        vytvoril INTEGER,
+        hash TEXT,
+        kampan_id INTEGER,
+        pocty JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_at TIMESTAMP DEFAULT NOW(),
+        vraceno_at TIMESTAMP
+      )`);
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS client_import_clenove (
+        import_id INTEGER NOT NULL,
+        customer_id INTEGER NOT NULL,
+        novy_ucet BOOLEAN NOT NULL DEFAULT FALSE,
+        nove_clenstvi BOOLEAN NOT NULL DEFAULT FALSE,
+        pred JSONB,
+        PRIMARY KEY (import_id, customer_id)
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_importy_team ON client_importy (team_id, created_at)`);
     // Platina: čtvrtá úroveň nad Zlatým hostem. 0 = vypnuto.
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS platinum_at INTEGER NOT NULL DEFAULT 0`);
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS platinum_discount INTEGER NOT NULL DEFAULT 0`);

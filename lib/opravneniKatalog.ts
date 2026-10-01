@@ -1214,6 +1214,17 @@ export const KATALOG: Opravneni[] = [
   ]
  },
  {
+  "id": "zakaznici.import",
+  "oblast": "Zákazníci a menu",
+  "nazev": "Import členů z jiné aplikace",
+  "popis": "Nahrát členy a jejich body, kredit a razítka z Kartičky nebo jiného souboru (zakládá účty hostů a nastavuje zůstatky) a import vrátit.",
+  "citlivost": "vysoká",
+  "vyzaduje": [
+   "zakaznici.zobrazit",
+   "zakaznici.kontakty"
+  ]
+ },
+ {
   "id": "zakaznici.recenze",
   "oblast": "Zákazníci a menu",
   "nazev": "Hodnocení od hostů",
@@ -1742,6 +1753,7 @@ export const SYSTEMOVE_ROLE: SystemovaRole[] = [
    "volno.zobrazit",
    "vyroba.receptura",
    "vyroba.vyrabet",
+   "zakaznici.import",
    "zakaznici.kontakty",
    "zakaznici.recenze",
    "zakaznici.skupiny",

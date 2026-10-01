@@ -43,7 +43,7 @@ export const ZACHAZENI_TABULEK: Record<string, Zachazeni> = {
   // host
   client_cards: 'smazat', client_memberships: 'smazat', client_loyalty_ledger: 'smazat', client_stamp_progress: 'smazat',
   client_coupon_claims: 'smazat', client_promo_uses: 'smazat', client_group_members: 'smazat', client_event_follows: 'smazat',
-  client_reviews: 'smazat', client_bill_awards: 'smazat',
+  client_reviews: 'smazat', client_bill_awards: 'smazat', client_import_clenove: 'smazat',
   client_reservations: 'upravit', client_orders: 'upravit',
   // osobní text a soubory: řádek zůstává podniku, osobní obsah se maže (viz OSOBNI_UDAJE)
   uploads: 'upravit', audit_log: 'upravit', content_reports: 'upravit',
@@ -99,7 +99,7 @@ export const TYMOVE_TABULKY = [
   'pos_unmapped', 'pos_bills', 'pos_bill_items', 'pos_products', 'item_recipes', 'purchase_flags', 'client_profiles', 'client_tables',
   'client_memberships', 'client_reservations', 'client_orders', 'client_coupons', 'client_coupon_claims', 'client_loyalty_ledger',
   'client_stamp_progress', 'client_stamp_campaigns', 'client_bill_awards', 'client_groups', 'client_group_members', 'client_reviews',
-  'client_broadcasts', 'client_promos', 'rozlozeni_stranek', 'content_reports',
+  'client_broadcasts', 'client_promos', 'rozlozeni_stranek', 'content_reports', 'client_importy',
 ];
 /** Tabulky s `team_id`, které se při smazání podniku ZÁMĚRNĚ nemažou: účetní záznamy platformy (fakturace, provize). */
 export const TYMOVE_PONECHAT = ['billing_events', 'referral_rewards', 'admin_audit'];
@@ -116,6 +116,7 @@ export const TYMOVE_NEPRIME: { tabulka: string; kde: string }[] = [
   { tabulka: 'suggestion_votes', kde: 'suggestion_id IN (SELECT id FROM suggestions WHERE team_id = $1)' },
   { tabulka: 'client_event_follows', kde: 'event_id IN (SELECT id FROM events WHERE team_id = $1)' },
   { tabulka: 'client_promo_uses', kde: 'promo_id IN (SELECT id FROM client_promos WHERE team_id = $1)' },
+  { tabulka: 'client_import_clenove', kde: 'import_id IN (SELECT id FROM client_importy WHERE team_id = $1)' },
 ];
 
 // ---- Rozhodnutí -------------------------------------------------------------------
@@ -190,7 +191,7 @@ export function planUzivatele(u: { id: number; email: string; role: string; hash
     [[`login:${u.email}`, `client-register:${u.email}`, `reset:${u.email}`, `smazani:${id}`]]));
   if (u.role === 'customer') {
     for (const t of ['client_cards', 'client_memberships', 'client_loyalty_ledger', 'client_stamp_progress', 'client_coupon_claims',
-      'client_promo_uses', 'client_group_members', 'client_event_follows', 'client_reviews', 'client_bill_awards']) del(t, 'customer_id');
+      'client_promo_uses', 'client_group_members', 'client_event_follows', 'client_reviews', 'client_bill_awards', 'client_import_clenove']) del(t, 'customer_id');
     // Budoucí rezervace se zruší (podnik s nimi nepočítá s anonymem), minulým zmizí poznámka.
     k.push(volitelny('zrušit budoucí rezervace', `UPDATE client_reservations SET status = 'cancelled', note = NULL WHERE customer_id = $1 AND date >= $2 AND status IN ('requested', 'confirmed')`, [id, u.dnes]));
     k.push(volitelny('vymazat poznámky rezervací', `UPDATE client_reservations SET note = NULL WHERE customer_id = $1`, [id]));
