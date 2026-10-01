@@ -9,7 +9,8 @@ import { Initials } from './ClientShell';
 import Link from 'next/link';
 import { Icon } from '../Icons';
 import { Skeleton, EmptyState } from '../ui';
-import { RES_STATUS, tierFor } from '@/lib/clientSlots';
+import { RES_STATUS, tierForMember } from '@/lib/clientSlots';
+import { efektivniSleva } from '@/lib/slevy';
 import { formatMoney } from '@/lib/money';
 import { okJson } from '@/lib/api';
 import { pragueDaySafe } from '@/lib/pragueTime';
@@ -78,10 +79,10 @@ export default function MyPage() {
                     <Initials name={m.name} size={40} />
                     <div className="min-w-0 flex-1">
                       <p className="text-lg font-bold tracking-tight leading-tight truncate">{m.name}</p>
-                      {(() => { const lv = tierFor(Number(m.visits), m.tiers); return (
+                      {(() => { const lv = tierForMember({ visits: Number(m.visits), spend: Number(m.spend) }, m.tiers); const sl = efektivniSleva({ uroven: lv, skupiny: m.groupDiscounts }); return (
                         <p className="text-sm text-black/55 mt-0.5 flex items-center gap-1.5 flex-wrap">
                           {lv.id !== 'bronze' && <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${lv.id === 'gold' ? 'bg-[#C8F542]/30 text-[#3E5406]' : 'bg-black/[0.07] text-black/60'}`}>{t(lv.label)}</span>}
-                          {lv.discount > 0 && <span className="rounded-full bg-[#16181A] text-[#C8F542] px-2 py-0.5 text-[11px] font-bold">{t('sleva {n} %', { n: lv.discount })}</span>}
+                          {sl.pct > 0 && <span className="rounded-full bg-[#16181A] text-[#C8F542] px-2 py-0.5 text-[11px] font-bold">{sl.zdroj === 'skupina' && sl.nazev ? t('sleva {n} % ({skupina})', { n: sl.pct, skupina: sl.nazev }) : t('sleva {n} %', { n: sl.pct })}</span>}
                           <span>{t('{n, plural, one {# návštěva} few {# návštěvy} other {# návštěv}}', { n: m.visits })}{m.lastVisitAt ? ` · ${t('naposledy {datum}', { datum: denCesky(m.lastVisitAt, jazyk) })}` : ''}</span>
                         </p>
                       ); })()}

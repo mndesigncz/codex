@@ -141,10 +141,10 @@ export default function BusinessPage({ slug }: { slug: string }) {
             {me?.member ? (
               <div className={`rounded-2xl px-4 py-3 ${b.coverUrl ? 'bg-white/15 backdrop-blur' : ''}`}
                 style={b.coverUrl ? undefined : { background: `${accent}22`, border: `1px solid ${accent}66` }}>
-                <p className="text-[11px] uppercase tracking-wider opacity-70">{t(me.levelLabel ?? 'Člen')}{me.discount > 0 ? ` · ${t('sleva {n} %', { n: me.discount })}` : ''}</p>
+                <p className="text-[11px] uppercase tracking-wider opacity-70">{t(me.levelLabel ?? 'Člen')}{me.discount > 0 ? ` · ${me.discountSource === 'skupina' && me.discountName ? t('sleva {n} % ({skupina})', { n: me.discount, skupina: me.discountName }) : t('sleva {n} %', { n: me.discount })}` : ''}</p>
                 <p className="text-lg font-bold tabular-nums leading-tight">{me.points} {t('b.')} {b.stampTarget > 0 && <span className="opacity-60 font-medium text-sm">· {t('{stamps}/{target} razítek', { stamps: me.stamps, target: b.stampTarget })}</span>}</p>
                 {me.credit > 0 && <p className="text-sm font-semibold tabular-nums leading-tight">{t('{castka} kreditu', { castka: formatMoney(me.credit, b.currency) })}</p>}
-                {me.nextTierAt && <p className="text-[11px] opacity-60 leading-snug">{t('do „{level}“ ještě {n, plural, one {# návštěva} few {# návštěvy} other {# návštěv}}', { level: t(me.nextTierLabel), n: Math.max(0, me.nextTierAt - me.visits) })}</p>}
+                {me.nextTierAt && <p className="text-[11px] opacity-60 leading-snug">{me.nextTierUnit === 'spend' ? t('do „{level}“ ještě {castka}', { level: t(me.nextTierLabel), castka: formatMoney(Math.max(0, me.nextTierAt - (me.spend ?? 0)), b.currency) }) : t('do „{level}“ ještě {n, plural, one {# návštěva} few {# návštěvy} other {# návštěv}}', { level: t(me.nextTierLabel), n: Math.max(0, me.nextTierAt - me.visits) })}</p>}
               </div>
             ) : (
               <button onClick={join} disabled={joining} className="tap-target w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold hover:brightness-105 active:scale-[0.98] disabled:opacity-60 transition"
@@ -502,7 +502,12 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
             )}
             {me.discount > 0 && (
               <p className="mt-4 rounded-2xl bg-[#16181A] text-[#C8F542] px-3.5 py-2.5 text-sm font-semibold">
-                {t('Jako „{level}“ máš u nás slevu {n} %.', { level: t(me.levelLabel), n: me.discount })}{me.nextTierAt ? ` ${t('Do „{level}“ ti zbývá {n, plural, one {# návštěva} few {# návštěvy} other {# návštěv}}.', { level: t(me.nextTierLabel), n: Math.max(0, me.nextTierAt - me.visits) })}` : ''}
+                {me.discountSource === 'skupina' && me.discountName
+                  ? t('Jako člen skupiny „{skupina}“ máš u nás slevu {n} %.', { skupina: me.discountName, n: me.discount })
+                  : t('Jako „{level}“ máš u nás slevu {n} %.', { level: t(me.levelLabel), n: me.discount })}
+                {me.nextTierAt ? ` ${me.nextTierUnit === 'spend'
+                  ? t('Do „{level}“ ti zbývá {castka}.', { level: t(me.nextTierLabel), castka: formatMoney(Math.max(0, me.nextTierAt - (me.spend ?? 0)), b.currency) })
+                  : t('Do „{level}“ ti zbývá {n, plural, one {# návštěva} few {# návštěvy} other {# návštěv}}.', { level: t(me.nextTierLabel), n: Math.max(0, me.nextTierAt - me.visits) })}` : ''}
               </p>
             )}
             {me.claims?.length > 0 && (

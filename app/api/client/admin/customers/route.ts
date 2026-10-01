@@ -1,6 +1,8 @@
 // Členové podniku: kdo chodí, kolik má bodů a razítek, kdy byl naposledy.
 import { NextRequest, NextResponse } from 'next/server';
-import { sql } from '@/lib/client';
+import { sql, ensureProfile } from '@/lib/client';
+import { tierForMember, tierRulesFromProfile } from '@/lib/clientSlots';
+import { efektivniSleva } from '@/lib/slevy';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
@@ -28,6 +30,7 @@ export async function GET(req: NextRequest) {
   const nejnovejsi = razeni === 'nejnovejsi';
   const rows = await sql`
     SELECT m.customer_id AS id, us.name, us.email, m.points, m.stamps, m.visits, m.joined_at, m.last_visit_at,
+           COALESCE((to_jsonb(m)->>'spend')::int, 0) AS spend,
            (SELECT COUNT(*)::int FROM client_reservations r WHERE r.customer_id = m.customer_id AND r.team_id = m.team_id) AS reservations,
            (SELECT COUNT(*)::int FROM client_coupon_claims c WHERE c.customer_id = m.customer_id AND c.team_id = m.team_id AND c.redeemed_at IS NULL) AS open_coupons
     FROM client_memberships m JOIN users us ON us.id = m.customer_id
@@ -44,6 +47,28 @@ export async function GET(req: NextRequest) {
     FROM client_memberships m JOIN users us ON us.id = m.customer_id
     WHERE m.team_id = ${u.team_id}
       AND (${q} = '' OR LOWER(us.name) LIKE ${like} ESCAPE '\\' OR (${kontakty} AND LOWER(us.email) LIKE ${like} ESCAPE '\\'))` as any[];
-  const customers = kontakty ? rows : rows.map(({ email: _e, ...r }) => r);
+  // Úroveň podle režimu podniku a efektivní sleva (nejvyšší z úrovně a slev skupin).
+  const pravidla = tierRulesFromProfile(await ensureProfile(u.team_id));
+  const ids = rows.map(r => Number(r.id));
+  const skupinyBy = new Map<number, { name: string; discount: number }[]>();
+  if (ids.length) {
+    try {
+      const sk = await sql`
+        SELECT gm.customer_id, g.name, g.discount_pct FROM client_group_members gm
+        JOIN client_groups g ON g.id = gm.group_id AND g.team_id = gm.team_id
+        WHERE gm.team_id = ${u.team_id} AND g.discount_pct > 0 AND gm.customer_id = ANY(${ids})` as any[];
+      for (const r of sk) {
+        const c = Number(r.customer_id);
+        if (!skupinyBy.has(c)) skupinyBy.set(c, []);
+        skupinyBy.get(c)!.push({ name: String(r.name), discount: Number(r.discount_pct) || 0 });
+      }
+    } catch { /* před migrací */ }
+  }
+  const obohacene = rows.map(r => {
+    const t = tierForMember({ visits: r.visits, spend: r.spend }, pravidla);
+    const s = efektivniSleva({ uroven: t, skupiny: skupinyBy.get(Number(r.id)) });
+    return { ...r, level: t.id, level_label: t.label, discount: s.pct, discount_source: s.zdroj, discount_name: s.nazev };
+  });
+  const customers = kontakty ? obohacene : obohacene.map(({ email: _e, ...r }) => r);
   return NextResponse.json({ customers, total: cnt?.total ?? rows.length });
 }

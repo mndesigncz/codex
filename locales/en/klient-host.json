@@ -268,5 +268,9 @@
   "— mrkni do záložky Menu": "— check the Menu tab",
   "✋ Jdu — zrušit účast": "✋ I'm coming — cancel",
   "✋ Přijdu": "✋ I'll come",
-  "✋ {n, plural, one {# člověk jde} few {# lidi jdou} other {# lidí jde}}": "✋ {n, plural, one {# person is going} other {# people are going}}"
+  "✋ {n, plural, one {# člověk jde} few {# lidi jdou} other {# lidí jde}}": "✋ {n, plural, one {# person is going} other {# people are going}}",
+  "sleva {n} % ({skupina})": "{n} % off ({skupina})",
+  "do „{level}“ ještě {castka}": "{castka} more to reach “{level}”",
+  "Jako člen skupiny „{skupina}“ máš u nás slevu {n} %.": "As a member of “{skupina}” you get {n} % off with us.",
+  "Do „{level}“ ti zbývá {castka}.": "You need {castka} more to reach “{level}”."
 }

@@ -86,6 +86,7 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'client.profile': 'Změna veřejné stránky podniku',
   'client.broadcast': 'Odeslána zpráva členům věrnostního programu',
   'client.card': 'Změna na věrnostní kartě',
+  'client.spend': 'Úprava útraty člena (úrovně podle útraty)',
   'client.order': 'Změněn stav objednávky hosta',
   'client.order.pos': 'Objednávka hosta předána do kasy',
   // předplatné

@@ -117,9 +117,9 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
           {hit.member && (hit.discount > 0 || hit.credit > 0 || hit.levelLabel !== 'Člen') && (
             <div className="flex flex-wrap items-center gap-1.5">
               {hit.levelLabel && hit.levelLabel !== 'Člen' && <Chip tone={hit.tier === 'silver' ? 'muted' : 'ink'} size="sm">{hit.levelLabel}</Chip>}
-              {hit.discount > 0 && <Chip tone="ok" size="sm">Sleva {hit.discount} %</Chip>}
+              {hit.discount > 0 && <Chip tone="ok" size="sm">Sleva {hit.discount} %{hit.discountSource === 'skupina' && hit.discountName ? ` (${hit.discountName})` : ''}</Chip>}
               {hit.credit > 0 && <Chip tone="ok" size="sm" icon="card">Kredit {money(hit.credit)}</Chip>}
-              {hit.nextTierAt && <span className="t-meta">do „{hit.nextTierLabel}" ještě {czCount(Math.max(0, hit.nextTierAt - hit.visits), NAVSTEVA)}</span>}
+              {hit.nextTierAt && <span className="t-meta">do „{hit.nextTierLabel}" ještě {hit.nextTierUnit === 'spend' ? money(Math.max(0, hit.nextTierAt - (hit.spend ?? 0))) : czCount(Math.max(0, hit.nextTierAt - hit.visits), NAVSTEVA)}</span>}
             </div>
           )}
           {hit.campaigns?.length > 0 && (

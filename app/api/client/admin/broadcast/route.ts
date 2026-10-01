@@ -1,6 +1,7 @@
 // Zpráva členům: novinka, akce, sezónní nabídka. Přijde jako oznámení
 // v aplikaci a push na telefon. Umí počkat na naplánovaný čas, mířit na
 // publikum (úrovně, skupiny, spáči) a vzít hosta na konkrétní místo.
+import { tierThresholds, tierRulesFromProfile } from '@/lib/clientSlots';
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/client';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
@@ -38,16 +39,21 @@ export async function GET() {
     WHERE b.team_id = ${u.team_id} AND (b.status IS NULL OR b.status <> 'cancelled')
     ORDER BY COALESCE(b.scheduled_at, b.sent_at) DESC LIMIT 50`;
   // Velikosti publik pro výběr: úrovně z prahů podniku, skupiny s počty.
-  const [p] = await sql`SELECT silver_at, gold_at, platinum_at FROM client_profiles WHERE team_id = ${u.team_id}`;
-  const silverAt = Math.max(1, Number(p?.silver_at) || 10);
-  const goldAt = Math.max(silverAt + 1, Number(p?.gold_at) || 25);
-  const platinumAt = Number(p?.platinum_at) > 0 ? Math.max(goldAt + 1, Number(p?.platinum_at)) : 0;
-  const [c] = await sql`
+  const [p] = await sql`SELECT * FROM client_profiles WHERE team_id = ${u.team_id}`;
+  const th = tierThresholds(tierRulesFromProfile(p));
+  const platinumAt = th.platinum;
+  const [c] = th.by === 'spend' ? await sql`
     SELECT COUNT(*)::int AS members,
            COUNT(*) FILTER (WHERE last_visit_at IS NULL OR last_visit_at < NOW() - INTERVAL '30 days')::int AS quiet,
-           COUNT(*) FILTER (WHERE visits >= ${silverAt})::int AS silver,
-           COUNT(*) FILTER (WHERE visits >= ${goldAt})::int AS gold,
-           COUNT(*) FILTER (WHERE visits >= ${platinumAt > 0 ? platinumAt : goldAt})::int AS platinum
+           COUNT(*) FILTER (WHERE spend >= ${th.silver})::int AS silver,
+           COUNT(*) FILTER (WHERE spend >= ${th.gold})::int AS gold,
+           COUNT(*) FILTER (WHERE spend >= ${platinumAt > 0 ? platinumAt : th.gold})::int AS platinum
+    FROM client_memberships WHERE team_id = ${u.team_id}` as any[] : await sql`
+    SELECT COUNT(*)::int AS members,
+           COUNT(*) FILTER (WHERE last_visit_at IS NULL OR last_visit_at < NOW() - INTERVAL '30 days')::int AS quiet,
+           COUNT(*) FILTER (WHERE visits >= ${th.silver})::int AS silver,
+           COUNT(*) FILTER (WHERE visits >= ${th.gold})::int AS gold,
+           COUNT(*) FILTER (WHERE visits >= ${platinumAt > 0 ? platinumAt : th.gold})::int AS platinum
     FROM client_memberships WHERE team_id = ${u.team_id}` as any[];
   let groups: any[] = [];
   try {

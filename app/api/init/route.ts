@@ -1969,6 +1969,15 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_shape TEXT`);
     await ddl(sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_rot INTEGER`);
 
+    // Kolo 74: úrovně podle útraty a slevové skupiny s vlastní slevou.
+    // Stejné příkazy jsou v lib/urovneDb.ts (zajistiUrovne) — věrnost funguje i před spuštěním /api/init.
+    await ddl(sql`ALTER TABLE client_memberships ADD COLUMN IF NOT EXISTS spend INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS tier_by TEXT NOT NULL DEFAULT 'visits'`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS silver_spend INTEGER NOT NULL DEFAULT 5000`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS gold_spend INTEGER NOT NULL DEFAULT 15000`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS platinum_spend INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_groups ADD COLUMN IF NOT EXISTS discount_pct INTEGER NOT NULL DEFAULT 0`);
+
     // ---- Sdílené číselníky (kolo 60) ----
     // Řádek číselníku patří dál svému podniku; sdílení je jen ve čtení
     // (lib/tenant.ts tymyCiselniku). `origin_id` dostane kopie, která vznikla

@@ -3,10 +3,18 @@
 // mění členy (add/remove), DELETE maže skupinu i členství v ní.
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/client';
+import { zajistiUrovne } from '@/lib/urovneDb';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
+
+/** Sleva skupiny z těla požadavku: celé 0–100, nebo null, když ji požadavek neposílá. */
+function slevaZTela(v: unknown): number | null {
+  if (v === undefined || v === null || v === '') return null;
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : null;
+}
 
 export async function GET(req: NextRequest) {
   const ctx = await pozaduj('zakaznici.zobrazit');
@@ -14,7 +22,8 @@ export async function GET(req: NextRequest) {
   const u = { id: ctx.meId, team_id: ctx.teamId };
   try {
     const groups = await sql`
-      SELECT g.id, g.name, (SELECT COUNT(*)::int FROM client_group_members gm WHERE gm.group_id = g.id) AS members
+      SELECT g.id, g.name, COALESCE((to_jsonb(g)->>'discount_pct')::int, 0) AS discount_pct,
+             (SELECT COUNT(*)::int FROM client_group_members gm WHERE gm.group_id = g.id) AS members
       FROM client_groups g WHERE g.team_id = ${u.team_id} ORDER BY g.name, g.id` as any[];
     // Detail jedné skupiny: kdo v ní je (pro správu členů v Zákaznících).
     const params = new URL(req.url).searchParams;
@@ -47,6 +56,12 @@ export async function POST(req: NextRequest) {
   const [dup] = await sql`SELECT id FROM client_groups WHERE team_id = ${u.team_id} AND LOWER(name) = ${name.toLowerCase()}`;
   if (dup) return NextResponse.json({ error: 'Skupina s tímhle názvem už existuje.' }, { status: 409 });
   const [g] = await sql`INSERT INTO client_groups (team_id, name) VALUES (${u.team_id}, ${name}) RETURNING id, name`;
+  const sleva = slevaZTela(b.discount_pct);
+  if (sleva != null && sleva > 0) {
+    await zajistiUrovne();
+    await sql`UPDATE client_groups SET discount_pct = ${sleva} WHERE id = ${g.id} AND team_id = ${u.team_id}`;
+    g.discount_pct = sleva;
+  }
   return NextResponse.json({ ok: true, group: g });
 }
 
@@ -62,6 +77,12 @@ export async function PATCH(req: NextRequest) {
     const name = String(b.name).trim().slice(0, 60);
     if (!name) return NextResponse.json({ error: 'Zadej název skupiny.' }, { status: 400 });
     await sql`UPDATE client_groups SET name = ${name} WHERE id = ${id}`;
+  }
+  // Vlastní procentní sleva skupiny (0–100); člen ve víc skupinách bere nejvyšší, ne součet.
+  const sleva = slevaZTela(b.discount_pct);
+  if (sleva != null) {
+    await zajistiUrovne();
+    await sql`UPDATE client_groups SET discount_pct = ${sleva} WHERE id = ${id} AND team_id = ${u.team_id}`;
   }
   // Členy smí měnit jen na vlastní členy podniku — cizí id se tiše zahodí.
   const ids = (raw: any) => Array.isArray(raw) ? raw.map((x: any) => Math.round(Number(x))).filter((n: number) => n > 0).slice(0, 500) : [];
