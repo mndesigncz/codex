@@ -39,6 +39,8 @@ interface Props {
   initialTab?: SectionId;
   /** Roste, kdykoli si někdo výslovně vyžádá záložku (banner předplatného) — i když je Nastavení už otevřené. */
   tabNonce?: number;
+  /** Uvnitř okna (účet v menu Managero client): bez vlastní hlavičky a bez okrajů, okno má svůj nadpis. */
+  vOkne?: boolean;
 }
 
 interface Account {
@@ -95,7 +97,7 @@ function relativeCzech(iso: string): string {
   return new Date(iso).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', year: 'numeric' });
 }
 
-export default function Settings({ user, initialTab, tabNonce }: Props) {
+export default function Settings({ user, initialTab, tabNonce, vOkne = false }: Props) {
   const { update } = useSession();
   const { smiPlatby } = useObal();
   const t = useT();
@@ -361,8 +363,8 @@ export default function Settings({ user, initialTab, tabNonce }: Props) {
   const unreadCount = notifs.filter(n => !n.is_read).length;
 
   return (
-    <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-6">
-      <PageHeader title={t('Nastavení')} subtitle={t('Spravujte svůj profil, jazyk, vzhled, oznámení a zabezpečení.')} />
+    <div className={vOkne ? 'space-y-4' : 'p-4 sm:p-6 max-w-5xl mx-auto space-y-6'}>
+      {!vOkne && <PageHeader title={t('Nastavení')} subtitle={t('Spravujte svůj profil, jazyk, vzhled, oznámení a zabezpečení.')} />}
       <DiscardGuard guard={straz.guard} what={CO_SE_ZAHODI_ROLE} />
 
       {/* Telefon: sekce jako posuvný pás filtrových pilulek. Dřív ruční

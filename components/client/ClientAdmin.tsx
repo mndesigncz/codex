@@ -310,7 +310,7 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
         {ucetOtevren && (
           <Modal open onClose={() => setUcetOtevren(false)} size="lg" title="Účet a nastavení" subtitle="Profil, jazyk a vzhled, oznámení a zabezpečení">
             {user && user.id !== undefined
-              ? <NastaveniUctu user={{ id: Number(user.id), name: user.name ?? '', role: user.role ?? 'employer', avatar: user.avatar }} initialTab="account" />
+              ? <NastaveniUctu user={{ id: Number(user.id), name: user.name ?? '', role: user.role ?? 'employer', avatar: user.avatar }} initialTab="account" vOkne />
               : <EmptyState icon="settings" title="Účet se nenačetl" hint="Obnovte stránku a zkuste to znovu." />}
           </Modal>
         )}
