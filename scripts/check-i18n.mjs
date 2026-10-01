@@ -167,6 +167,27 @@ for (const n of [0, 10, 25, 100]) pridej('klient-host', tierFor(n, { platinumAt:
   for (const d of moder.DUVODY) pridej('spolecne', d.nazev, 'lib/moderace.ts (DUVODY)');
 }
 
+// Katalog widgetů a stránek s plochou: texty z dat se v UI překládají podle textu (`t(definice.nazev)`),
+// takže v kódu nejsou jako `t('…')` a bez téhle ruční extrakce by je kontrola neviděla.
+{
+  const kat = await import('../lib/widgety/katalog/index.ts');
+  const str = await import('../lib/widgety/stranky/index.ts');
+  const KW = 'lib/widgety/katalog (nazev, popis, nastaveni)';
+  const v = (x) => { if (typeof x === 'string' && /\p{L}/u.test(x)) pridej('widgety', x, KW); };
+  for (const o of kat.OBLASTI) v(o.nazev);
+  for (const w of kat.KATALOG_WIDGETU) {
+    v(w.nazev); v(w.popis);
+    for (const n of w.nastaveni ?? []) {
+      v(n.nazev); v(n.napoveda); v(n.jednotka); v(n.prazdne);
+      for (const m of n.moznosti ?? []) v(m.nazev);
+    }
+  }
+  for (const st of str.STRANKY) {
+    v(st.nazev);
+    if (st.nastroj) { v(st.nastroj.nazev); v(st.nastroj.popis); }
+  }
+}
+
 // Hlášky serveru: věty v `error: '…'` hostovských rout, statusMessage a blokace/middleware.
 const apiKlice = new Set();
 const apiVynechat = new Set();
