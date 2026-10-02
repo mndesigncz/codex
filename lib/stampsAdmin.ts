@@ -169,7 +169,7 @@ export async function stornoPosledni(o: { teamId: number; campaignId: number; cu
   if (Number(posl.completions) > 0) {
     const [uplatneno] = await sql`
       SELECT 1 AS ano FROM client_coupon_claims cl JOIN client_coupons cp ON cp.id = cl.coupon_id
-      WHERE cp.team_id = ${o.teamId} AND cp.stamp_event_id = ${Number(posl.id)} AND cl.redeemed_at IS NOT NULL LIMIT 1`;
+      WHERE cp.team_id = ${o.teamId} AND (cl.stamp_event_id = ${Number(posl.id)} OR cp.stamp_event_id = ${Number(posl.id)}) AND cl.redeemed_at IS NOT NULL LIMIT 1`;
     if (uplatneno) return je('Odměnu z té karty host už uplatnil, storno nejde.', 409);
   }
   const vysl = await sCasem({
@@ -190,7 +190,9 @@ export async function stornoPosledni(o: { teamId: number; campaignId: number; cu
   // ref dostane příponu, ať jde za stejnou účtenku/návštěvu razítko připsat znovu.
   await sql`UPDATE client_stamp_events SET undone_at = NOW(), ref = CASE WHEN ref IS NULL THEN NULL ELSE ref || ':storno' END WHERE id = ${Number(posl.id)}`;
   if (Number(posl.completions) > 0) {
-    await sql`DELETE FROM client_coupon_claims WHERE team_id = ${o.teamId} AND coupon_id IN (SELECT id FROM client_coupons WHERE team_id = ${o.teamId} AND stamp_event_id = ${Number(posl.id)})`;
+    // Nárok vzniklý touhle akcí zmizí; řádek kuponu kampaně zůstává (sdílí ho další nároky). Starší kupony
+    // s vazbou na událost (jeden řádek na dokončení) se mažou celé.
+    await sql`DELETE FROM client_coupon_claims WHERE team_id = ${o.teamId} AND (stamp_event_id = ${Number(posl.id)} OR coupon_id IN (SELECT id FROM client_coupons WHERE team_id = ${o.teamId} AND stamp_event_id = ${Number(posl.id)}))`;
     await sql`DELETE FROM client_coupons WHERE team_id = ${o.teamId} AND stamp_event_id = ${Number(posl.id)}`;
   }
   const veta = `${c.name}: stornována poslední akce (${Number(posl.delta) > 0 ? '+' : ''}${posl.delta}), zpět ${Number(posl.before_stamps)}/${c.required_stamps}`;
@@ -198,6 +200,54 @@ export async function stornoPosledni(o: { teamId: number; campaignId: number; cu
     INSERT INTO client_loyalty_ledger (team_id, customer_id, delta, kind, ref, note, staff_id)
     VALUES (${o.teamId}, ${o.customerId}, 0, 'manual', 'razitka', ${veta}, ${o.staffId})`;
   return { ok: true, razitek: Number(posl.before_stamps), veta };
+}
+
+/**
+ * Storno poslední akce s razítky u hosta napříč kampaněmi (tlačítko u kasy). Akce z jedné účtenky,
+ * která dala razítka víc kampaním, se vrací společně. Razítko za návštěvu (ref „card:…“) po stornu
+ * uvolní i denní zámek návštěvy, ať jde razítko dát znovu. Body a kredit z účtenky storno nemění.
+ */
+export async function stornoPosledniAkce(o: { teamId: number; customerId: number; staffId: number }): Promise<{ ok: true; veta: string } | ChybaAkce> {
+  await zajistiRazitka();
+  const [posl] = await sql`
+    SELECT id, campaign_id, ref FROM client_stamp_events
+    WHERE team_id = ${o.teamId} AND customer_id = ${o.customerId} AND undone_at IS NULL AND delta <> 0 AND kind IN ('earn', 'manual')
+    ORDER BY id DESC LIMIT 1`;
+  if (!posl) return je('Není co stornovat — host nemá žádnou akci s razítky.', 404);
+  const ref = posl.ref ? String(posl.ref) : null;
+  // Účtenka dala razítka po krocích s různou příponou (bill:ID, bill:ID:den) — do skupiny patří všechny.
+  const zaklad = ref && ref.startsWith('bill:') ? ref.split(':').slice(0, 2).join(':') : ref;
+  const skupina = zaklad
+    ? (await sql`
+        SELECT id, campaign_id FROM client_stamp_events
+        WHERE team_id = ${o.teamId} AND customer_id = ${o.customerId} AND undone_at IS NULL AND delta <> 0 AND kind IN ('earn', 'manual')
+          AND (ref = ${zaklad} OR ref LIKE ${zaklad + ':%'}) AND id <= ${Number(posl.id)}
+        ORDER BY id DESC`) as any[]
+    : [posl];
+  const vety: string[] = [];
+  for (const e of skupina) {
+    const r = await stornoPosledni({ teamId: o.teamId, campaignId: Number(e.campaign_id), customerId: o.customerId, ocekavanaUdalost: Number(e.id), staffId: o.staffId });
+    if ('chyba' in r) return vety.length ? je(`${vety.join('; ')} — dál to nešlo: ${r.chyba}`, r.status) : r;
+    vety.push(r.veta);
+  }
+  if (ref && ref.startsWith('card:')) {
+    // Návštěva z téhle akce se nepočítá a host může razítko dostat znovu ještě dnes.
+    await sql`UPDATE client_memberships SET visits = GREATEST(0, visits - 1), last_visit_at = NULL WHERE customer_id = ${o.customerId} AND team_id = ${o.teamId}`;
+  }
+  return { ok: true, veta: vety.join('; ') };
+}
+
+/** Poslední akce s razítky u hosta pro tlačítko Storno u kasy (jen to, co jde stornovat). */
+export async function posledniAkceRazitek(teamId: number, customerId: number): Promise<{ note: string; at: string } | null> {
+  try {
+    await zajistiRazitka();
+    const [e] = await sql`
+      SELECT e.delta, e.created_at, c.name FROM client_stamp_events e JOIN client_stamp_campaigns c ON c.id = e.campaign_id
+      WHERE e.team_id = ${teamId} AND e.customer_id = ${customerId} AND e.undone_at IS NULL AND e.delta <> 0 AND e.kind IN ('earn', 'manual')
+      ORDER BY e.id DESC LIMIT 1`;
+    if (!e) return null;
+    return { note: `${e.name}: ${Number(e.delta) > 0 ? '+' : ''}${Number(e.delta)}`, at: (parseDbTime(e.created_at) ?? new Date()).toISOString() };
+  } catch { return null; }
 }
 
 // ---- seznam kampaní: duplikace, řazení, stav ----------------------------------------
@@ -211,11 +261,13 @@ export async function duplikujKampan(teamId: number, id: number): Promise<number
     INSERT INTO client_stamp_campaigns (
       team_id, name, description, conditions, active, status, valid_since, valid_till, required_stamps, rule_type,
       stamp_items, excluded_items, min_value, min_value_multiple, one_per_order, reward_title, reward_items,
-      days_to_finish, days_to_redeem, repeat_mode, stack_cards, max_completions, daily_cap, days_of_week, hour_from, hour_till, position)
+      days_to_finish, days_to_redeem, repeat_mode, stack_cards, max_completions, daily_cap, days_of_week, hour_from, hour_till,
+      stamp_sections, excluded_sections, combinable, card_color, card_icon, card_image, position)
     VALUES (
       ${teamId}, ${jmeno}, ${c.description}, ${c.conditions}, FALSE, 'draft', ${c.valid_since}, ${c.valid_till}, ${c.required_stamps}, ${c.rule_type},
       ${JSON.stringify(c.stamp_items)}::jsonb, ${JSON.stringify(c.excluded_items)}::jsonb, ${c.min_value}, ${c.min_value_multiple}, ${c.one_per_order}, ${c.reward_title}, ${JSON.stringify(c.reward_items)}::jsonb,
       ${c.days_to_finish}, ${c.days_to_redeem}, ${c.repeat_mode}, ${c.stack_cards}, ${c.max_completions}, ${c.daily_cap}, ${JSON.stringify(c.days_of_week)}::jsonb, ${c.hour_from}, ${c.hour_till},
+      ${JSON.stringify(c.stamp_sections)}::jsonb, ${JSON.stringify(c.excluded_sections)}::jsonb, ${c.combinable}, ${c.card_color}, ${c.card_icon}, ${c.card_image},
       (SELECT COALESCE(MAX(position), 0) + 1 FROM client_stamp_campaigns WHERE team_id = ${teamId}))
     RETURNING id`;
   return Number(r.id);

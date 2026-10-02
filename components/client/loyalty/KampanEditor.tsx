@@ -2,7 +2,8 @@
 
 // Editor razítkové kampaně: základ, za co se razítko dává (položky, kategorie,
 // vyloučené), odměna, limity, kdy platí a vzhled karty s živým náhledem
-// pohledem hosta. Ukládá se jako koncept nebo rovnou jako běžící kampaň.
+// pohledem hosta. Ukládá se jako koncept nebo rovnou jako běžící kampaň; stav
+// (pozastavená, archiv) se mění v seznamu kartiček.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Card, Chip, Field, Input, ListRow, Modal, Segmented, SwitchRow, Textarea, Well } from '../../ui';
@@ -12,30 +13,31 @@ import { okJson } from '@/lib/api';
 import { obsahuje } from '@/lib/hledani';
 import { useResultKeys } from '@/lib/useResultKeys';
 import { IKONY_KARTY, DNY_TYDNE, popisOkna, type KartaHosta } from '@/lib/razitkaPravidla';
+import { overKampan, type Stav } from '@/lib/stampsPlan';
 import KartaRazitek from './KartaRazitek';
 
 export interface Odkaz { itemId: number; name: string }
 export interface OdkazSekce { sectionId: number; name: string }
 
 export interface FormKampane {
-  id: number | null; name: string; description: string; conditions: string; active: boolean; draft: boolean;
+  id: number | null; name: string; description: string; conditions: string; status: Stav;
   validSince: string; validTill: string; requiredStamps: number; ruleType: string;
   stampItems: Odkaz[]; stampSections: OdkazSekce[]; excludedItems: Odkaz[]; excludedSections: OdkazSekce[];
   minValue: string; minValueMultiple: boolean; onePerOrder: boolean;
   rewardTitle: string; rewardItems: Odkaz[];
   daysToFinish: number; daysToRedeem: number; repeatMode: string; stackCards: boolean;
-  maxCompletions: number; dailyCap: number; validDays: number[]; hourFrom: string; hourTill: string;
+  maxCompletions: number; dailyCap: number; daysOfWeek: number[]; hourFrom: string; hourTill: string;
   combinable: boolean; cardColor: string; cardIcon: string; cardImage: string;
 }
 
 export const prazdnaKampan = (): FormKampane => ({
-  id: null, name: '', description: '', conditions: '', active: true, draft: false,
+  id: null, name: '', description: '', conditions: '', status: 'draft',
   validSince: '', validTill: '', requiredStamps: 10, ruleType: 'visit',
   stampItems: [], stampSections: [], excludedItems: [], excludedSections: [],
   minValue: '', minValueMultiple: false, onePerOrder: false,
   rewardTitle: '', rewardItems: [],
   daysToFinish: 0, daysToRedeem: 0, repeatMode: 'immediately', stackCards: true,
-  maxCompletions: 0, dailyCap: 0, validDays: [], hourFrom: '', hourTill: '',
+  maxCompletions: 0, dailyCap: 0, daysOfWeek: [], hourFrom: '', hourTill: '',
   combinable: true, cardColor: '', cardIcon: '', cardImage: '',
 });
 
@@ -43,7 +45,7 @@ export const prazdnaKampan = (): FormKampane => ({
 export function kampanDoFormulare(c: any): FormKampane {
   return {
     id: c.id, name: c.name ?? '', description: c.description ?? '', conditions: c.conditions ?? '',
-    active: c.active !== false, draft: c.draft === true,
+    status: (['active', 'draft', 'paused', 'archived'].includes(c.status) ? c.status : (c.active === false ? 'paused' : 'active')) as Stav,
     validSince: c.valid_since ? String(c.valid_since).slice(0, 10) : '', validTill: c.valid_till ? String(c.valid_till).slice(0, 10) : '',
     requiredStamps: Number(c.required_stamps) || 10, ruleType: c.rule_type ?? 'visit',
     stampItems: c.stampItems ?? [], stampSections: c.stampSections ?? [], excludedItems: c.excludedItems ?? [], excludedSections: c.excludedSections ?? [],
@@ -52,7 +54,7 @@ export function kampanDoFormulare(c: any): FormKampane {
     daysToFinish: Number(c.days_to_finish) || 0, daysToRedeem: Number(c.days_to_redeem) || 0,
     repeatMode: c.repeat_mode ?? 'immediately', stackCards: c.stack_cards !== false,
     maxCompletions: Number(c.max_completions) || 0, dailyCap: Number(c.daily_cap) || 0,
-    validDays: Array.isArray(c.valid_days) ? c.valid_days.map(Number) : [], hourFrom: c.hour_from ?? '', hourTill: c.hour_till ?? '',
+    daysOfWeek: Array.isArray(c.days_of_week) ? c.days_of_week.map(Number) : [], hourFrom: c.hour_from ?? '', hourTill: c.hour_till ?? '',
     combinable: c.combinable !== false, cardColor: c.card_color ?? '', cardIcon: c.card_icon ?? '', cardImage: c.card_image ?? '',
   };
 }
@@ -158,14 +160,15 @@ export function VyberKategorii({ sections, value, onChange, label: lb, hint }: {
 
 /** Karta tak, jak ji uvidí host, ze současného stavu formuláře. */
 function nahledKarty(f: FormKampane): KartaHosta {
-  const okno = f.validDays.length > 0 || (f.hourFrom && f.hourTill);
+  const okno = f.daysOfWeek.length > 0 || (f.hourFrom && f.hourTill);
   return {
     id: f.id ?? 0, name: f.name, description: f.description, conditions: f.conditions,
     required: f.requiredStamps, reward: f.rewardTitle, rewardItems: f.rewardItems.map(x => x.name), ruleType: f.ruleType as any,
     stamps: Math.min(3, Math.max(0, f.requiredStamps - 1)), completed: 0,
     color: f.cardColor || null, icon: f.cardIcon || null, image: f.cardImage || null,
-    okno: okno ? { days: f.validDays, from: f.hourFrom && f.hourTill ? f.hourFrom : null, till: f.hourFrom && f.hourTill ? f.hourTill : null } : null,
+    okno: okno ? { days: f.daysOfWeek, from: f.hourFrom && f.hourTill ? f.hourFrom : null, till: f.hourFrom && f.hourTill ? f.hourTill : null } : null,
     expired: false, expiredStamps: 0, finishBy: null, daysLeft: null, nextCardFrom: null, finishedForever: false, validTill: f.validTill || null,
+    limit: f.repeatMode === 'one_time' ? 1 : f.maxCompletions,
   };
 }
 
@@ -200,12 +203,14 @@ export default function KampanEditor({ form, onChange, onZpet, onUlozit, busy, c
   }, []);
 
   const zpet = () => { if (rozepsano) setPotvrdZpet(true); else onZpet(); };
-  const okno = popisOkna({ valid_days: f.validDays, hour_from: f.hourFrom || null, hour_till: f.hourTill || null });
+  const okno = popisOkna({ days_of_week: f.daysOfWeek, hour_from: f.hourFrom || null, hour_till: f.hourTill || null });
   const nahled = useMemo(() => nahledKarty(f), [f]);
-  const jeKoncept = f.draft || f.id == null;
+  const jeKoncept = f.status === 'draft' || f.id == null;
+  // Stejná validace jako na serveru (lib/stampsPlan) — chyba se ukáže hned, bez cesty na server.
+  const chybaFormulare = (() => { const v = overKampan({ ...f, minValue: f.minValue === '' ? null : Number(f.minValue) }); return 'chyba' in v ? v.chyba : ''; })();
 
   return (
-    <form className="space-y-4" onSubmit={e => { e.preventDefault(); onUlozit(f.draft ? 'koncept' : 'ulozit'); }}>
+    <form className="space-y-4" onSubmit={e => { e.preventDefault(); if (!chybaFormulare) onUlozit(jeKoncept ? 'koncept' : 'ulozit'); }}>
       <Button type="button" variant="ghost" size="sm" icon="undo" onClick={zpet}>Zpět na kartičky</Button>
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_20rem] gap-4 items-start">
         <Card className="space-y-5 min-w-0">
@@ -323,9 +328,9 @@ export default function KampanEditor({ form, onChange, onZpet, onUlozit, busy, c
               <p className="field-label">Dny v týdnu</p>
               <div className="flex flex-wrap gap-1.5" role="group" aria-label="Dny v týdnu, kdy se razítko dává">
                 {DNY_TYDNE.map((d, i) => {
-                  const den = i + 1; const on = f.validDays.includes(den);
+                  const den = i + 1; const on = f.daysOfWeek.includes(den);
                   return (
-                    <button key={d} type="button" aria-pressed={on} onClick={() => set({ validDays: on ? f.validDays.filter(x => x !== den) : [...f.validDays, den].sort((a, b) => a - b) })}
+                    <button key={d} type="button" aria-pressed={on} onClick={() => set({ daysOfWeek: on ? f.daysOfWeek.filter(x => x !== den) : [...f.daysOfWeek, den].sort((a, b) => a - b) })}
                       className={`filter-pill tap-target-sm ${on ? 'seg-on' : 'seg-off glass'}`}>{d}</button>
                   );
                 })}
@@ -380,13 +385,13 @@ export default function KampanEditor({ form, onChange, onZpet, onUlozit, busy, c
             </div>
           </section>
 
-          {chyba && <p role="alert" className="note note-danger">{chyba}</p>}
+          {(chybaFormulare || chyba) && <p role="alert" className="note note-danger">{chybaFormulare || chyba}</p>}
           <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
             <Button type="button" variant="secondary" onClick={zpet}>Zrušit</Button>
-            {jeKoncept && <Button type="button" variant="secondary" loading={busy === 'koncept'} onClick={() => onUlozit('koncept')}>Uložit jako koncept</Button>}
+            {jeKoncept && <Button type="button" variant="secondary" loading={busy === 'koncept'} disabled={!!chybaFormulare} onClick={() => onUlozit('koncept')}>Uložit jako koncept</Button>}
             {jeKoncept
-              ? <Button type="button" variant="primary" loading={busy === 'spustit'} onClick={() => onUlozit('spustit')}>{f.id ? 'Uložit a spustit' : 'Založit a spustit'}</Button>
-              : <Button type="submit" variant="primary" loading={busy === 'ulozit'}>Uložit kartičku</Button>}
+              ? <Button type="button" variant="primary" loading={busy === 'spustit'} disabled={!!chybaFormulare} onClick={() => onUlozit('spustit')}>{f.id ? 'Uložit a spustit' : 'Založit a spustit'}</Button>
+              : <Button type="submit" variant="primary" loading={busy === 'ulozit'} disabled={!!chybaFormulare}>Uložit kartičku</Button>}
           </div>
         </Card>
         <aside className="lg:sticky lg:top-4 space-y-2" aria-label="Náhled karty">

@@ -19,6 +19,13 @@ export function zajistiRazitka(): Promise<void> {
       await sql`ALTER TABLE client_stamp_campaigns ADD COLUMN IF NOT EXISTS hour_from TEXT`;
       await sql`ALTER TABLE client_stamp_campaigns ADD COLUMN IF NOT EXISTS hour_till TEXT`;
       await sql`ALTER TABLE client_stamp_campaigns ADD COLUMN IF NOT EXISTS excluded_items JSONB NOT NULL DEFAULT '[]'`;
+      // Kategorie nabídky (razítko za celou kategorii, vyloučená kategorie), kombinovatelnost a vzhled karty.
+      await sql`ALTER TABLE client_stamp_campaigns ADD COLUMN IF NOT EXISTS stamp_sections JSONB NOT NULL DEFAULT '[]'`;
+      await sql`ALTER TABLE client_stamp_campaigns ADD COLUMN IF NOT EXISTS excluded_sections JSONB NOT NULL DEFAULT '[]'`;
+      await sql`ALTER TABLE client_stamp_campaigns ADD COLUMN IF NOT EXISTS combinable BOOLEAN NOT NULL DEFAULT TRUE`;
+      await sql`ALTER TABLE client_stamp_campaigns ADD COLUMN IF NOT EXISTS card_color TEXT`;
+      await sql`ALTER TABLE client_stamp_campaigns ADD COLUMN IF NOT EXISTS card_icon TEXT`;
+      await sql`ALTER TABLE client_stamp_campaigns ADD COLUMN IF NOT EXISTS card_image TEXT`;
       // Dřív vypnutá kampaň = active FALSE; teď je to stav „pozastaveno". Idempotentní.
       await sql`UPDATE client_stamp_campaigns SET status = 'paused' WHERE active = FALSE AND status = 'active'`;
       // Průběh hosta: rev hlídá souběžné zápisy, expired_* je zpráva o propadlé kartě.
@@ -55,6 +62,8 @@ export function zajistiRazitka(): Promise<void> {
       // Kupon za plnou kartu ví, ze které kampaně a z které události vzešel.
       await sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS campaign_id INTEGER`;
       await sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS stamp_event_id INTEGER`;
+      // Odměna za kartu je jeden řádek kuponu na kampaň; nárok si pamatuje, z které události vznikl (storno).
+      await sql`ALTER TABLE client_coupon_claims ADD COLUMN IF NOT EXISTS stamp_event_id INTEGER`;
       // Deník věrnosti: kdo to u kasy připsal.
       await sql`ALTER TABLE client_loyalty_ledger ADD COLUMN IF NOT EXISTS staff_id INTEGER`;
       // Guard účtenky: done_at prázdné = připisování se rozběhlo a nedoběhlo; kroky už hotové se při opakování přeskočí.
@@ -77,6 +86,16 @@ export function zajistiRazitka(): Promise<void> {
         )`;
       await sql`CREATE UNIQUE INDEX IF NOT EXISTS client_scan_actions_key ON client_scan_actions (team_id, idem_key) WHERE idem_key IS NOT NULL`;
       await sql`CREATE UNIQUE INDEX IF NOT EXISTS client_scan_actions_fp ON client_scan_actions (team_id, customer_id, fingerprint, bucket)`;
+      // Stejný klíč akce (Idempotency-Key) dvakrát = jedna akce; druhé volání dostane tutéž odpověď (lib/idempotence.ts).
+      await sql`
+        CREATE TABLE IF NOT EXISTS client_kasa_idem (
+          team_id INTEGER NOT NULL,
+          idem_key TEXT NOT NULL,
+          response JSONB,
+          status INTEGER,
+          created_at TIMESTAMP DEFAULT NOW(),
+          PRIMARY KEY (team_id, idem_key)
+        )`;
     })().catch(e => { pripraveno = null; throw e; });
   }
   return pripraveno;

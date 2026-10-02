@@ -92,7 +92,7 @@ export default async function ({ eq, ok }: Testy) {
   ok('denní strop: vyčerpaný se nepřipíše', !capC.ok && capC.duvod.includes('Denní limit'));
   ok('denní strop: ruční připsání ho obejde', planAdd(cap, stav(), 5, kontext({ dnesPripsano: 2, rucne: true })).ok);
   const cd = planAdd({ ...PRAVIDLO, repeat_mode: 'one_week' }, stav({ completed: 1, last_completed_at: dnuPred(2) }), 1, kontext());
-  ok('pauza mezi kartami: za 2 dny z 7 ještě ne', !cd.ok && cd.duvod.includes('5 d'));
+  ok('pauza mezi kartami: za 2 dny z 7 ještě ne (kalendářně: od 12. 10.)', !cd.ok && cd.duvod.includes('12. 10. 2026'));
   ok('pauza mezi kartami: po týdnu jde', planAdd({ ...PRAVIDLO, repeat_mode: 'one_week' }, stav({ completed: 1, last_completed_at: dnuPred(8) }), 1, kontext()).ok);
 
   // ---- ruční odebrání ----

@@ -92,7 +92,7 @@ export default function ({ eq, ok }: Testy) {
   const bp = zdroj('components/client/BusinessPage.tsx');
   ok('stránka podniku: legacy „x/10“ se při kampaních skryje', bp.includes('b.stampTarget > 0 && !(me.campaigns?.length)'));
   ok('stránka podniku: platnost kuponu přes PlatnostKuponu', bp.includes('<PlatnostKuponu validUntil={c.valid_until}'));
-  ok('stránka podniku: poznámky ke kartě (vyprší, kdy, limit) přes RazitkaPoznamky', bp.includes('<RazitkaPoznamky cp={cp} />'));
+  ok('stránka podniku: karta (vyprší, kdy, limit, vzhled) přes KartaRazitek', bp.includes('<KartaRazitek karta={cp} />'));
   ok('stránka podniku: pravidla z nastavení podniku', bp.includes('<HostPravidla b={b}'));
   ok('stránka podniku: historie jen pro přihlášeného', bp.includes('{signedIn && <HostHistorie slug={slug}'));
   ok('stránka podniku: bannery posílají statistiku', bp.includes('slug={slug} />') && bp.includes('<PromoBanners banners={d.banners}'));
@@ -100,6 +100,6 @@ export default function ({ eq, ok }: Testy) {
   ok('Moje: historie napříč podniky', my.includes('<HostHistorie showBusiness />'));
   ok('Moje: platnost kuponu', my.includes('<PlatnostKuponu validUntil={c.valid_until}'));
   const api = zdroj('app/api/client/b/[slug]/route.ts');
-  ok('API podniku: kdy karta vyprší jde z hostKarta', api.includes('expiresAt: k.expiresAt'));
+  ok('API podniku: kdy karta vyprší jde z kartaProHosta (dosbírat do, propadlá razítka)', api.includes('kartaProHosta(c,') && api.includes('endedCampaigns'));
   ok('API podniku: platnost kuponu v seznamu vyzvednutých', api.includes('c.title, c.valid_until FROM client_coupon_claims'));
 }

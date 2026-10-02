@@ -1298,7 +1298,7 @@ export const KATALOG: Opravneni[] = [
   "id": "vernost.upravit_body",
   "oblast": "Zákazníci a menu",
   "nazev": "Ručně upravit body",
-  "popis": "Připsat nebo odebrat body či razítka členovi (i hromadně skupině). Zapisuje se do auditu.",
+  "popis": "Připsat nebo odebrat body členovi. Zapisuje se do auditu.",
   "citlivost": "střední",
   "vyzaduje": [
    "vernost.zobrazit"

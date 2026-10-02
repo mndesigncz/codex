@@ -6,7 +6,8 @@ import { normalizePlan } from '@/lib/floorplan';
 import { tierForMember, tierRulesFromProfile } from '@/lib/clientSlots';
 import { slevaClena } from '@/lib/urovneDb';
 import { sql, customer, profileBySlug, publicProfile, membership } from '@/lib/client';
-import { activeCampaigns, progressFor, hostKarta } from '@/lib/stamps';
+import { activeCampaigns, progressFor, skonceneKampane, jmenaPolozek, prubehHosta } from '@/lib/stamps';
+import { kartaProHosta } from '@/lib/razitkaPravidla';
 import { shapeCoupon, windowOk, ageFrom, TIER_LABELS } from '@/lib/coupons';
 import { pragueToday, pragueHM } from '@/lib/pragueTime';
 import { buildBoard, publicShape, menaListku } from '@/lib/menu';
@@ -96,7 +97,6 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
   ]);
 
   let mine: any = null;
-  let endedCampaigns: any[] = [];
   let myBirthday: string | null = null;
   if (me) {
     const m = await membership(me.id, teamId);
@@ -113,26 +113,17 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
     const sleva = await slevaClena(teamId, me.id, tier);
     const myCamps = await activeCampaigns(teamId, today);
     const myProg = myCamps.length ? await progressFor(teamId, me.id) : new Map();
-    // Jména položek odměny (jeden dotaz) a skončené kartičky, na kterých host něco měl: ať ví, proč karta zmizela.
     const odmenaJmena = await jmenaPolozek(Array.from(new Set(myCamps.flatMap(c => c.reward_items.map(x => x.itemId)))));
-    endedCampaigns = await skonceneKampane(teamId, me.id, today);
+    // Skončené kartičky, na kterých host něco měl: ať ví, proč karta zmizela.
+    const endedCampaigns = await skonceneKampane(teamId, me.id, today);
     mine = {
       member: !!m, points: Number(m?.points ?? 0), stamps: Number(m?.stamps ?? 0), visits: Number(m?.visits ?? 0),
       credit: Number(m?.credit ?? 0),
       spend: Number(m?.spend ?? 0), tierBy: tier.unit,
       level: tier.id, levelLabel: tier.label, discount: sleva.pct, discountSource: sleva.zdroj, discountName: sleva.nazev,
       nextTierAt: tier.nextAt, nextTierLabel: tier.nextLabel, nextTierUnit: tier.unit,
-      campaigns: myCamps.map(c => {
-        const k = hostKarta(c, myProg.get(c.id));
-        return {
-          id: c.id, name: c.name, description: c.description, required: c.required_stamps,
-          reward: c.reward_title, stamps: k.stamps, completed: k.completed,
-          // Kdy karta vyprší a zpráva o propadlé kartě (host se to dozví při otevření stránky).
-          expiresAt: k.expiresAt, expiredCount: k.expiredCount, expiredAt: k.expiredAt,
-          maxCompletions: c.max_completions, daysOfWeek: c.days_of_week, hourFrom: c.hour_from, hourTill: c.hour_till,
-          oneTime: c.repeat_mode === 'one_time',
-        };
-      }),
+      campaigns: myCamps.map(c => kartaProHosta(c, myProg.has(c.id) ? prubehHosta(myProg.get(c.id)) : null, c.reward_items.map(x => odmenaJmena.get(x.itemId)).filter((x): x is string => !!x))),
+      endedCampaigns,
       reservations, claims,
     };
     // Body, kterým brzy vyprší platnost (jen když podnik propadání používá).
@@ -209,10 +200,9 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
   // Kartičky podniku vidí i nepřihlášený host — je to lákadlo k registraci.
   let stampCampaigns: any[] = [];
   try {
-    stampCampaigns = (await activeCampaigns(teamId, today)).map(c => ({
-      id: c.id, name: c.name, description: c.description, required: c.required_stamps, reward: c.reward_title,
-      daysOfWeek: c.days_of_week, hourFrom: c.hour_from, hourTill: c.hour_till, maxCompletions: c.max_completions,
-    }));
+    const aktivni = await activeCampaigns(teamId, today);
+    const jm = await jmenaPolozek(Array.from(new Set(aktivni.flatMap(c => c.reward_items.map(x => x.itemId)))));
+    stampCampaigns = aktivni.map(c => kartaProHosta(c, null, c.reward_items.map(x => jm.get(x.itemId)).filter((x): x is string => !!x)));
   } catch { stampCampaigns = []; }
 
   let news: any[] = [];
@@ -252,8 +242,5 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
       bonus = { name: bn.nazev, multiplier: bn.nasobic, stampBonus: bn.razitka, until: konec == null ? null : `${String(konec).padStart(2, '0')}:00` };
     }
   }
-  // Jakmile podnik má kampaně, jednoduché razítko (stamp_target) neplatí a host ho nesmí vidět jako zamrzlé počítadlo.
-  const verejny = publicProfile(p);
-  if (await maKampane(teamId)) verejny.stampTarget = 0;
-  return NextResponse.json({ business: verejny, bonus, menu, tables, plan, coupons: shapedCoupons, news, events, stampCampaigns, banners, me: mine, signedIn: !!me, today });
+  return NextResponse.json({ business: publicProfile(p), bonus, menu, tables, plan, coupons: shapedCoupons, news, events, stampCampaigns, banners, me: mine, signedIn: !!me, today });
 }

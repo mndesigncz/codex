@@ -1,7 +1,7 @@
 // Razítkové kampaně (po vzoru Kartičky). Podnik jich má libovolně vedle sebe
 // — „10+1 dýmka", „5+1 čaj" — každá s vlastním pravidlem:
 //   · visit      … jedno razítko za návštěvu (nejvýš jedno denně na kampaň)
-//   · products   … razítko za každý kus vybrané položky nebo kategorie na účtence
+//   · products   … razítko za každý kus vybrané položky nabídky na účtence
 //   · min_value  … razítko za útratu nad částku (volitelně za každý násobek)
 // Plná karta se promění v kupon s kódem (stejný mechanismus jako dosud) a
 // karta se točí dál podle repeat_mode. Zdrojem položek je účtenka ze Storyous
@@ -15,8 +15,9 @@
 import { sql, couponCode } from './client';
 import { zajistiRazitka } from './stampsSchema';
 import { pragueToday, pragueDayOf, pragueHM, dayPlus, parseDbTime } from './pragueTime';
-import { planAdd, sCasem, vyprselaKarta, vyprsiKdy, RAZITKO, type StavKarty, type Stav } from './stampsPlan';
+import { planAdd, platiTed, sCasem, vyprselaKarta, vyprsiKdy, RAZITKO, type StavKarty, type Stav } from './stampsPlan';
 import { czForm } from './czech';
+import { normalizujSekce, spocitejRazitka, vyberKampane, type OdkazSekce, type PrubehHosta, type RadekUctu } from './razitkaPravidla';
 
 export interface StampCampaign {
   id: number; team_id: number; name: string; description: string; conditions: string;
@@ -26,10 +27,15 @@ export interface StampCampaign {
   min_value: number | null; min_value_multiple: boolean;
   one_per_order: boolean; reward_title: string; reward_items: { itemId: number }[];
   days_to_finish: number; days_to_redeem: number;
-  repeat_mode: OpakovaniKarty;
+  repeat_mode: 'immediately' | 'one_day' | 'one_week' | 'one_month' | 'one_time';
   stack_cards: boolean; position: number;
   max_completions: number; daily_cap: number; days_of_week: number[];
   hour_from: string | null; hour_till: string | null;
+  /** Celé kategorie nabídky, které dávají razítko / jsou vyloučené (vedle jednotlivých položek). */
+  stamp_sections: OdkazSekce[]; excluded_sections: OdkazSekce[];
+  /** false = kampaň si účtenku bere sama a ostatní z ní razítko nedostanou. */
+  combinable: boolean;
+  card_color: string | null; card_icon: string | null; card_image: string | null;
 }
 
 export function normalizeItemRefs(raw: any): { itemId: number }[] {
@@ -63,21 +69,74 @@ export function shapeCampaign(r: any): StampCampaign {
     max_completions: Math.max(0, Number(r.max_completions) || 0), daily_cap: Math.max(0, Number(r.daily_cap) || 0),
     days_of_week: Array.isArray(r.days_of_week) ? r.days_of_week.map(Number).filter((d: number) => d >= 1 && d <= 7) : [],
     hour_from: r.hour_from ? String(r.hour_from) : null, hour_till: r.hour_till ? String(r.hour_till) : null,
+    stamp_sections: normalizujSekce(r.stamp_sections), excluded_sections: normalizujSekce(r.excluded_sections),
+    combinable: r.combinable !== false,
+    card_color: r.card_color ? String(r.card_color) : null, card_icon: r.card_icon ? String(r.card_icon) : null,
+    card_image: r.card_image ? String(r.card_image) : null,
   };
 }
 
-/** Kampaně platné právě teď podle dat: běží (ne koncept, ne pozastavená, ne archivovaná) a jsou v okně od–do. */
+/** Kampaně platné právě teď (aktivní + v případném okně od–do). */
 export async function activeCampaigns(teamId: number, today: string): Promise<StampCampaign[]> {
   try {
     await zajistiRazitka();
     const rows = await sql`
       SELECT * FROM client_stamp_campaigns
-      WHERE team_id = ${teamId} AND active = TRUE AND draft = FALSE AND archived_at IS NULL
+      WHERE team_id = ${teamId} AND active = TRUE
         AND (valid_since IS NULL OR valid_since <= ${today})
         AND (valid_till IS NULL OR valid_till >= ${today})
       ORDER BY position, id`;
     return (rows as any[]).map(shapeCampaign);
   } catch { return []; }
+}
+
+/** Skončené kampaně, ve kterých host něco měl (pro vysvětlení, proč karta zmizela). Koncepty se hostovi neukazují. */
+export async function skonceneKampane(teamId: number, customerId: number, today: string): Promise<{ id: number; name: string; validTill: string | null; stamps: number; completed: number; duvod: 'ended' | 'archived' | 'paused' }[]> {
+  try {
+    await zajistiRazitka();
+    const rows = await sql`
+      SELECT c.*, p.stamps AS p_stamps, p.completed AS p_completed FROM client_stamp_campaigns c
+      JOIN client_stamp_progress p ON p.campaign_id = c.id AND p.customer_id = ${customerId}
+      WHERE c.team_id = ${teamId} AND c.status <> 'draft' AND (p.stamps > 0 OR p.completed > 0)
+      ORDER BY c.position, c.id` as any[];
+    const out: { id: number; name: string; validTill: string | null; stamps: number; completed: number; duvod: 'ended' | 'archived' | 'paused' }[] = [];
+    for (const r of rows) {
+      const c = shapeCampaign(r);
+      const duvod = c.status === 'archived' ? 'archived' : c.status === 'paused' ? 'paused' : (c.valid_till && c.valid_till < today ? 'ended' : null);
+      if (duvod) out.push({ id: c.id, name: c.name, validTill: c.valid_till, stamps: Number(r.p_stamps) || 0, completed: Number(r.p_completed) || 0, duvod });
+    }
+    return out;
+  } catch { return []; }
+}
+
+/** Jména položek nabídky (odměna kampaně) podle ID. Bez ohledu na podnik: ID jsou jedinečná a jména z veřejné nabídky. */
+export async function jmenaPolozek(ids: number[]): Promise<Map<number, string>> {
+  if (!ids.length) return new Map();
+  try {
+    const rows = await sql`SELECT id, name FROM menu_items WHERE id = ANY(${ids})`;
+    return new Map((rows as any[]).map(r => [Number(r.id), String(r.name)]));
+  } catch { return new Map(); }
+}
+
+/**
+ * Má podnik kampaň „za návštěvu“ (v jakémkoli stavu)? Pak razítko za návštěvu řídí kampaně a jednoduché razítko
+ * podle stamp_target (staré počítadlo na členství) neplatí — jinak by běžela dvě počítadla vedle sebe, i když je
+ * kampaň právě pozastavená nebo skončená. Podnik jen s kampaněmi za položky nebo útratu jednoduché razítko dál používá.
+ */
+export async function maKampane(teamId: number): Promise<boolean> {
+  try {
+    await zajistiRazitka();
+    const [r] = await sql`SELECT 1 AS x FROM client_stamp_campaigns WHERE team_id = ${teamId} AND rule_type = 'visit' LIMIT 1`;
+    return !!r;
+  } catch { return false; }
+}
+
+/** Kampaně „za návštěvu“, které běží (podle dat), a které z nich dávají razítko právě teď (den v týdnu, hodiny). */
+export async function navstevniKampane(teamId: number, today: string): Promise<{ vse: StampCampaign[]; platne: StampCampaign[]; proc: string | null }> {
+  const vse = (await activeCampaigns(teamId, today)).filter(c => c.rule_type === 'visit');
+  const dow = isoDow(today); const hhmm = pragueHM();
+  const platne = vse.filter(c => platiTed(c, dow, hhmm).plati);
+  return { vse, platne, proc: vse.length && !platne.length ? platiTed(vse[0], dow, hhmm).duvod || null : null };
 }
 
 /** ISO den v týdnu (1 = pondělí … 7 = neděle) pro pražský den YYYY-MM-DD. */
@@ -141,6 +200,15 @@ export async function progressFor(teamId: number, customerId: number): Promise<M
   } catch { return new Map(); }
 }
 
+/** Průběh hosta z řádku databáze ve tvaru pro hostovskou kartu (lib/razitkaPravidla.ts). */
+export function prubehHosta(r: any): PrubehHosta {
+  return {
+    stamps: Number(r?.stamps ?? 0), completed: Number(r?.completed ?? 0),
+    started_at: parseDbTime(r?.started_at), last_completed_at: parseDbTime(r?.last_completed_at),
+    expired_count: Number(r?.expired_count ?? 0),
+  };
+}
+
 /** Co o kartě ví host: stav, kdy vyprší, zpráva o propadlé kartě. */
 export function hostKarta(c: StampCampaign, row: any) {
   const s = stavZRadku(row);
@@ -171,17 +239,52 @@ export interface MoznostiRazitek {
   druh?: 'earn' | 'manual';
 }
 
-/** Kupon za plnou kartu: kupon i nárok jedním příkazem, ať nevznikne kupon bez nároku. */
+/** Text odměny pro popis kuponu: název kampaně a případné položky odměny. */
+async function popisOdmeny(c: StampCampaign): Promise<string> {
+  let polozky = '';
+  const ids = c.reward_items.map(x => x.itemId);
+  if (ids.length) {
+    try {
+      const rows = await sql`
+        SELECT mi.name FROM menu_items mi
+        JOIN menu_sections ms ON ms.id = mi.section_id
+        JOIN menu_boards mb ON mb.id = ms.board_id AND mb.team_id = ${c.team_id}
+        WHERE mi.id = ANY(${ids}) ORDER BY mi.name`;
+      const jmena = (rows as any[]).map(r => String(r.name));
+      if (jmena.length) polozky = ` Odměna: ${jmena.join(', ')}.`;
+    } catch { /* nabídka bez migrace */ }
+  }
+  return `Za plnou kartu „${c.name}“.${polozky}`;
+}
+
+/**
+ * Odměna za plnou kartu: jeden řádek kuponu na kampaň a lhůtu uplatnění (dřív každé dokončení
+ * vyrobilo vlastní řádek a seznam kuponů zarostl) a pro hosta nárok s kódem. Název a popis kuponu se při
+ * dalším dokončení srovnají s aktuálním nastavením kampaně. Nárok nese id události, ze které vznikl (storno).
+ */
 async function vydejOdmenu(c: StampCampaign, customerId: number, eventId: number | null) {
   // Lhůta se počítá od pražského dne, ne z UTC — po noční by jinak platila o den míň.
   const validUntil = c.days_to_redeem > 0 ? dayPlus(pragueToday(), c.days_to_redeem) : null;
+  const titul = c.reward_title || `Odměna — ${c.name}`;
+  const popis = await popisOdmeny(c);
+  const [ex] = await sql`
+    SELECT id FROM client_coupons
+    WHERE team_id = ${c.team_id} AND campaign_id = ${c.id} AND kind = 'stamps' AND valid_until IS NOT DISTINCT FROM ${validUntil}::text
+    ORDER BY id LIMIT 1`;
+  let kuponId: number;
+  if (ex) {
+    await sql`UPDATE client_coupons SET title = ${titul}, description = ${popis} WHERE id = ${ex.id}`;
+    kuponId = Number(ex.id);
+  } else {
+    const [k] = await sql`
+      INSERT INTO client_coupons (team_id, title, description, cost_points, active, kind, valid_until, campaign_id)
+      VALUES (${c.team_id}, ${titul}, ${popis}, 0, TRUE, 'stamps', ${validUntil}, ${c.id})
+      RETURNING id`;
+    kuponId = Number(k.id);
+  }
   await sql`
-    WITH k AS (
-      INSERT INTO client_coupons (team_id, title, description, cost_points, active, kind, valid_until, campaign_id, stamp_event_id)
-      VALUES (${c.team_id}, ${c.reward_title || `Odměna — ${c.name}`}, ${'Za plnou kartu „' + c.name + '“.'}, 0, TRUE, 'stamps', ${validUntil}, ${c.id}, ${eventId})
-      RETURNING id)
-    INSERT INTO client_coupon_claims (coupon_id, customer_id, team_id, code)
-    SELECT id, ${customerId}, ${c.team_id}, ${couponCode()} FROM k`;
+    INSERT INTO client_coupon_claims (coupon_id, customer_id, team_id, code, stamp_event_id)
+    VALUES (${kuponId}, ${customerId}, ${c.team_id}, ${couponCode()}, ${eventId})`;
 }
 
 const razitekTvar = (n: number) => czForm(n, RAZITKO);
@@ -307,23 +410,27 @@ export interface PolozkaUctu { productId: string | null; qty: number; price?: nu
 
 /**
  * Razítka z účtenky nebo ručně zadané útraty: spočítá zásah pravidel všech
- * produktových kampaní podle položek (productId, qty, cena) a připíše je.
- * Párování jde přes nabídku podniku (menu_items.pos_product_id). Ruční položky
- * (`rucniPolozky`: itemId nabídky + počet) se berou přímo, bez pokladny.
- * Útrata z ruční částky bez položek spouští jen pravidlo „za útratu".
+ * produktových kampaní podle položek (productId, qty, cena), vybere, které
+ * účtenku dostanou (kombinovatelnost) a připíše je. Položka i celá kategorie
+ * nabídky může razítko dávat, nebo být vyloučená. Párování jde přes nabídku
+ * podniku (menu_items.pos_product_id). Ruční položky (`rucniPolozky`: itemId
+ * nabídky + počet) se berou přímo, bez pokladny. Útrata z ruční částky bez
+ * položek spouští jen pravidlo „za útratu".
  */
 export async function applyBillToCampaigns(
   teamId: number, customerId: number, today: string,
   bill: { billId: string; total: number; items: PolozkaUctu[]; rucniPolozky?: { itemId: number; qty: number }[] },
   opt: MoznostiRazitek = {},
-): Promise<{ lines: string[]; anything: boolean }> {
+): Promise<{ lines: string[]; anything: boolean; expired: number; lost: number }> {
   const campaigns = (await activeCampaigns(teamId, today)).filter(c => c.rule_type !== 'visit');
-  if (!campaigns.length) return out;
+  if (!campaigns.length) return { lines: [], anything: false, expired: 0, lost: 0 };
 
-  // Jedním dotazem: které itemId nabídky odpovídají produktům z účtenky.
-  const wanted = Array.from(new Set(campaigns.flatMap(c => [...c.stamp_items, ...c.excluded_items].map(i => i.itemId))));
-  let posByItem = new Map<number, string>();
-  if (wanted.length) {
+  // Jedním dotazem: položky nabídky podle pokladního ID i podle ID (ruční položky) s jejich kategorií.
+  const posIds = Array.from(new Set(bill.items.map(i => i.productId).filter((x): x is string => !!x)));
+  const itemIds = Array.from(new Set((bill.rucniPolozky ?? []).map(r => r.itemId).filter(x => x > 0)));
+  const byPos = new Map<string, { itemId: number; sectionId: number }>();
+  const byId = new Map<number, { itemId: number; sectionId: number }>();
+  if (posIds.length || itemIds.length) {
     try {
       const rows = await sql`
         SELECT mi.id, mi.section_id, mi.pos_product_id FROM menu_items mi
@@ -337,151 +444,30 @@ export async function applyBillToCampaigns(
       }
     } catch { /* nabídka bez migrace */ }
   }
-  const qtyByProduct = new Map<string, number>();
-  const hodnotaByProduct = new Map<string, number>();
+  const radky: RadekUctu[] = [];
   for (const it of bill.items) {
-    if (!it.productId) continue;
-    const q = Math.max(0, Math.round(it.qty));
-    qtyByProduct.set(it.productId, (qtyByProduct.get(it.productId) ?? 0) + q);
-    if (it.price != null && Number.isFinite(it.price)) hodnotaByProduct.set(it.productId, (hodnotaByProduct.get(it.productId) ?? 0) + it.price * q);
+    const v = it.productId ? byPos.get(it.productId) : null;
+    const qty = Math.max(0, Math.round(it.qty));
+    radky.push({ itemId: v?.itemId ?? null, sectionId: v?.sectionId ?? null, qty, price: it.price != null && Number.isFinite(it.price) ? it.price * qty : null });
   }
-  const rucne = new Map<number, number>();
-  for (const r of bill.rucniPolozky ?? []) rucne.set(r.itemId, (rucne.get(r.itemId) ?? 0) + Math.max(0, Math.round(r.qty)));
+  for (const r of bill.rucniPolozky ?? []) {
+    const v = byId.get(r.itemId);
+    if (v) radky.push({ itemId: v.itemId, sectionId: v.sectionId, qty: Math.max(0, Math.round(r.qty)), price: null });
+  }
 
-  const zasahy: { c: StampCampaign; count: number }[] = [];
-  for (const c of campaigns) {
-    let count = 0;
-    if (c.rule_type === 'products') {
-      for (const ref2 of c.stamp_items) {
-        const pos = posByItem.get(ref2.itemId);
-        if (pos) count += qtyByProduct.get(pos) ?? 0;
-        count += rucne.get(ref2.itemId) ?? 0;
-      }
-      if (c.one_per_order) count = Math.min(count, 1);
-    } else if (c.rule_type === 'min_value') {
-      // Vyloučené položky (dárkové karty, pečivo…) se z částky odečtou.
-      let hodnota = bill.total;
-      for (const ex of c.excluded_items) {
-        const pos = posByItem.get(ex.itemId);
-        if (pos) hodnota -= hodnotaByProduct.get(pos) ?? 0;
-      }
-      hodnota = Math.max(0, hodnota);
-      const min = Math.max(1, Number(c.min_value) || 0);
-      if (hodnota >= min) count = c.min_value_multiple ? Math.floor(hodnota / min) : 1;
-    }
-    if (count <= 0) continue;
+  const lines: string[] = [];
+  let anything = false; let expired = 0; let lost = 0;
+  const zasahy = campaigns.map(c => ({ c, count: spocitejRazitka(c, { total: bill.total, radky }).count }));
+  const { vybrane, vynechane } = vyberKampane(zasahy);
+  for (const v of vynechane) lines.push(`${v.c.name}: účtenku už dostala karta „${vybrane[0].c.name}“ (kampaně se nekombinují).`);
+  for (const { c, count } of vybrane) {
     // Bonusová akce přidá razítka navíc jen kampaním, kterým účtenka razítko dala.
     const navic = Math.max(0, opt.razitka ?? 0);
     const r = await addStamps(c, customerId, count + navic, `bill:${bill.billId}`, { ...opt, poznamka: navic > 0 ? opt.poznamka : '' });
     if (r.already) continue;
     if (!r.skipped) anything = true;
+    expired += r.expired ?? 0; lost += r.dropped ?? 0;
     lines.push(vetaVysledku(c, r));
   }
-  const { vybrane, vynechane } = vyberKampane(zasahy);
-  for (const v of vynechane) out.lines.push(`${v.c.name}: účtenku už dostala karta „${vybrane[0].c.name}“ (kampaně se nekombinují).`);
-  for (const { c, count } of vybrane) {
-    // Jedna účtenka smí do jedné kampaně jen jednou (dvojí načtení, ruční opakování).
-    const [uz] = await sql`
-      SELECT id FROM client_stamp_events WHERE team_id = ${teamId} AND campaign_id = ${c.id} AND customer_id = ${customerId}
-        AND ref = ${`bill:${bill.billId}`} AND undone_at IS NULL AND delta > 0 LIMIT 1`;
-    if (uz) { out.lines.push(`${c.name}: z téhle účtenky už razítka dostala.`); continue; }
-    // Bonusová akce přidá razítka navíc jen kampaním, kterým účtenka razítko dala.
-    const r = await addStamps(c, customerId, count + Math.max(0, bonus.razitka), `bill:${bill.billId}`, bonus.razitka > 0 ? bonus.poznamka : '',
-      { kind: opt.kind ?? 'bill', staffId: opt.staffId ?? null, amount: bill.total });
-    out.expiredCount += r.expiredCount; out.lost += r.lost; out.codes.push(...r.codes);
-    if (r.skipped) { out.lines.push(`${c.name}: ${r.skipped}`); continue; }
-    out.anything = true;
-    let line = r.completions > 0
-      ? `${c.name}: karta dokončena${r.completions > 1 ? ` ${r.completions}×` : ''} — odměna je v kuponech`
-      : `${c.name}: +${r.added} (${r.stamps}/${c.required_stamps})`;
-    if (r.expiredCount > 0) line += ` · rozdělaná karta vypršela, propadlo ${r.expiredCount} ${CZ_RAZITKO(r.expiredCount)}`;
-    if (r.lost > 0) line += ` · ${r.lost} ${CZ_RAZITKO(r.lost)} se nevešlo`;
-    out.lines.push(line);
-  }
-  return out;
-}
-
-/**
- * Má podnik kampaň „za návštěvu“ (v jakémkoli stavu)? Pak razítko za návštěvu řídí kampaně a jednoduché
- * razítko podle stamp_target (staré počítadlo na členství) neplatí — jinak by běžela dvě počítadla vedle sebe.
- * Podnik jen s kampaněmi za položky nebo útratu jednoduché razítko za návštěvu dál používá.
- */
-export async function maKampane(teamId: number): Promise<boolean> {
-  try {
-    await zajistiRazitka();
-    const [r] = await sql`SELECT 1 AS x FROM client_stamp_campaigns WHERE team_id = ${teamId} AND rule_type = 'visit' LIMIT 1`;
-    return !!r;
-  } catch { return false; }
-}
-
-/** Kampaně „za návštěvu“, které běží (podle dat) a které z nich platí právě teď (den v týdnu, hodiny). */
-export async function navstevniKampane(teamId: number, today: string): Promise<{ vse: StampCampaign[]; platne: StampCampaign[]; proc: string | null }> {
-  const vse = (await activeCampaigns(teamId, today)).filter(c => c.rule_type === 'visit');
-  const platne = vse.filter(c => platiTed(c).ok);
-  return { vse, platne, proc: vse.length && !platne.length ? (platiTed(vse[0]).proc ?? null) : null };
-}
-
-/** Razítko za návštěvu všem platným kampaním „za návštěvu“. Denní zámek návštěvy hlídá volající (stampVisit). */
-export async function razitkaZaNavstevu(teamId: number, customerId: number, ref: string, extra: number, note: string, staffId: number | null): Promise<{
-  parts: string[]; rewarded: boolean; stamps: number; expiredCount: number; lost: number;
-}> {
-  const { vse } = await navstevniKampane(teamId, pragueToday());
-  const out = { parts: [] as string[], rewarded: false, stamps: 0, expiredCount: 0, lost: 0 };
-  for (const vc of vse) {
-    const okno = platiTed(vc);
-    if (!okno.ok) { out.parts.push(`${vc.name}: ${okno.proc}`); continue; }
-    const r = await addStamps(vc, customerId, 1 + Math.max(0, extra), ref, note, { kind: 'visit', staffId });
-    out.expiredCount += r.expiredCount; out.lost += r.lost;
-    if (r.skipped) { out.parts.push(`${vc.name}: ${r.skipped}`); continue; }
-    if (r.completions > 0) out.rewarded = true;
-    if (out.stamps === 0) out.stamps = r.stamps;
-    let t = r.completions > 0 ? `${vc.name}: karta plná — odměna je v kuponech` : `${vc.name}: ${r.stamps}/${vc.required_stamps}`;
-    if (r.expiredCount > 0) t += ` (rozdělaná karta vypršela, propadlo ${r.expiredCount} ${CZ_RAZITKO(r.expiredCount)})`;
-    if (r.lost > 0) t += ` (${r.lost} ${CZ_RAZITKO(r.lost)} se nevešlo)`;
-    out.parts.push(t);
-  }
-  return out;
-}
-
-// ---- Správa a přehledy (admin) -------------------------------------------------------------------
-
-/** Statistiky jedné kampaně: odměny, doba sbírání, top hosté, výnosnost a rozpad po dnech. */
-export async function statistikyKampane(teamId: number, campaignId: number, today: string) {
-  await zajistiRazitka();
-  const [souhrn] = await sql`
-    SELECT COUNT(*)::int AS hostu, COALESCE(SUM(stamps), 0)::int AS otevrena, COALESCE(SUM(completed), 0)::int AS dokonceno,
-           COALESCE(SUM(expired_stamps), 0)::int AS propadla
-    FROM client_stamp_progress WHERE team_id = ${teamId} AND campaign_id = ${campaignId}`;
-  const [odmeny] = await sql`
-    SELECT COUNT(*)::int AS vydano,
-           COUNT(cl.redeemed_at)::int AS uplatneno,
-           COUNT(*) FILTER (WHERE cl.redeemed_at IS NULL AND c.valid_until IS NOT NULL AND c.valid_until < ${today})::int AS propadlo
-    FROM client_coupon_claims cl JOIN client_coupons c ON c.id = cl.coupon_id
-    WHERE cl.team_id = ${teamId} AND c.campaign_id = ${campaignId} AND c.kind = 'stamps'`;
-  const doby = await sql`
-    SELECT took_days FROM client_stamp_events
-    WHERE team_id = ${teamId} AND campaign_id = ${campaignId} AND completions > 0 AND undone_at IS NULL AND took_days IS NOT NULL`;
-  const top = await sql`
-    SELECT u.name, p.completed, p.stamps FROM client_stamp_progress p JOIN users u ON u.id = p.customer_id
-    WHERE p.team_id = ${teamId} AND p.campaign_id = ${campaignId} AND (p.completed > 0 OR p.stamps > 0)
-    ORDER BY p.completed DESC, p.stamps DESC, u.name LIMIT 10`;
-  const [vynos] = await sql`
-    SELECT COALESCE(SUM(amount), 0)::numeric AS utrata, COUNT(*) FILTER (WHERE amount IS NOT NULL)::int AS ucty
-    FROM client_stamp_events WHERE team_id = ${teamId} AND campaign_id = ${campaignId} AND kind IN ('bill', 'points') AND undone_at IS NULL`;
-  const dny = await sql`
-    SELECT ((created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Prague')::date)::text AS den,
-           COALESCE(SUM(delta) FILTER (WHERE delta > 0), 0)::int AS razitka,
-           COALESCE(SUM(completions), 0)::int AS dokonceno,
-           COUNT(DISTINCT customer_id)::int AS hostu
-    FROM client_stamp_events
-    WHERE team_id = ${teamId} AND campaign_id = ${campaignId} AND undone_at IS NULL AND created_at >= NOW() - INTERVAL '30 days'
-    GROUP BY 1 ORDER BY 1`;
-  return {
-    hostu: Number(souhrn?.hostu) || 0, otevrenaRazitka: Number(souhrn?.otevrena) || 0, dokonceno: Number(souhrn?.dokonceno) || 0, propadlaRazitka: Number(souhrn?.propadla) || 0,
-    odmenyVydane: Number(odmeny?.vydano) || 0, odmenyUplatnene: Number(odmeny?.uplatneno) || 0, odmenyPropadle: Number(odmeny?.propadlo) || 0,
-    prumernaDobaDni: prumerDni((doby as any[]).map(r => Number(r.took_days))),
-    topHoste: (top as any[]).map(r => ({ jmeno: String(r.name), dokonceno: Number(r.completed) || 0, razitka: Number(r.stamps) || 0 })),
-    utrataZUctu: Number(vynos?.utrata) || 0, uctu: Number(vynos?.ucty) || 0,
-    poDnech: (dny as any[]).map(r => ({ den: String(r.den), razitka: Number(r.razitka) || 0, dokonceno: Number(r.dokonceno) || 0, hostu: Number(r.hostu) || 0 })),
-  };
+  return { lines, anything, expired, lost };
 }

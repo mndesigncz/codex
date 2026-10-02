@@ -100,7 +100,7 @@ export const TYMOVE_TABULKY = [
   'role_upravy', 'polls', 'audit_log', 'events', 'pos_connections', 'pos_product_map', 'pos_sales', 'pos_processed_bills',
   'pos_unmapped', 'pos_bills', 'pos_bill_items', 'pos_products', 'item_recipes', 'purchase_flags', 'client_profiles', 'client_tables',
   'client_memberships', 'client_reservations', 'client_orders', 'client_coupons', 'client_coupon_claims', 'client_loyalty_ledger',
-  'client_stamp_progress', 'client_stamp_events', 'client_scan_actions', 'client_stamp_campaigns', 'client_bill_awards', 'client_groups', 'client_group_members', 'client_reviews',
+  'client_stamp_progress', 'client_stamp_events', 'client_scan_actions', 'client_kasa_idem', 'client_stamp_campaigns', 'client_bill_awards', 'client_groups', 'client_group_members', 'client_reviews',
   'client_broadcasts', 'client_member_notes', 'client_promos', 'client_banners', 'client_banner_stats', 'rozlozeni_stranek', 'content_reports', 'client_importy', 'client_vouchers', 'client_voucher_uses', 'client_bonus_rules',
 ];
 /** Tabulky s `team_id`, které se při smazání podniku ZÁMĚRNĚ nemažou: účetní záznamy platformy (fakturace, provize). */

@@ -8,8 +8,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { BarSpark, Button, Chip, EmptyState, ErrorState, ListRow, Modal, Segmented, Skeleton, Stat, StatRow, type MenuItem } from '../../ui';
 import { czCount, type CzNoun } from '@/lib/czech';
 import { apiMessage, okJson } from '@/lib/api';
-import { STAV_NAZEV } from './RazitkaNastaveni';
 import type { Stav } from '@/lib/stampsPlan';
+
+export const STAV_NAZEV: Record<Stav, string> = { active: 'Běží', draft: 'Koncept', paused: 'Pozastavená', archived: 'Archiv' };
 
 const HOST: CzNoun = { one: 'host', few: 'hosté', many: 'hostů' };
 const DEN: CzNoun = { one: 'den', few: 'dny', many: 'dní' };
@@ -40,7 +41,7 @@ export function podleFiltru<T extends { status?: string }>(list: T[], f: FiltrSt
   return list.filter(c => (f === 'all' ? c.status !== 'archived' : (c.status ?? 'active') === f));
 }
 
-export function useRazitkaAkce(opt: { reload: () => void; toast: (m: string) => void; meni: boolean; upravit: (c: any) => void; smazat: (c: any) => void }) {
+export function useRazitkaAkce(opt: { reload: () => void; toast: (m: string) => void; meni: boolean; upravit: (c: any) => void; smazat: (c: any) => void; rucne?: (c: any) => void }) {
   const { reload, toast, meni } = opt;
   const [stat, setStat] = useState<any | null>(null);
 
@@ -53,7 +54,11 @@ export function useRazitkaAkce(opt: { reload: () => void; toast: (m: string) => 
   /** Položky menu „···" u řádku kartičky. `i` a `n` = pořadí v celém seznamu (řazení nahoru/dolů). */
   const polozky = (c: any, i: number, n: number): MenuItem[] => {
     const out: MenuItem[] = [{ label: 'Statistika…', icon: 'chart', onClick: () => setStat(c) }];
+    if (opt.rucne && (c.status ?? 'active') !== 'archived') out.push({ label: 'Razítka ručně…', icon: 'plus', hint: 'Připsat nebo odebrat jednomu hostovi, vybraným hostům nebo celé skupině.', onClick: () => opt.rucne!(c) });
     if (!meni) return out;
+    // Export nese e-maily členů, proto jen pro toho, kdo kampaně spravuje.
+    out.push({ label: 'Exportovat hosty (CSV)', icon: 'download', onClick: () => { window.location.assign(`/api/client/admin/stamps?export=${c.id}`); } });
+    out.push({ label: 'Exportovat deník razítek (CSV)', icon: 'download', onClick: () => { window.location.assign(`/api/client/admin/stamps?export=${c.id}&udalosti=1`); } });
     out.push({ label: 'Upravit…', icon: 'pencil', onClick: () => opt.upravit(c) });
     out.push({ label: 'Duplikovat', icon: 'copy', hint: 'Kopie vznikne jako koncept bez hostů.', onClick: () => { void spust('Kopírování', () => posli('/api/client/admin/stamps/akce', { action: 'duplicate', id: c.id }), `Kopie „${c.name}“ je mezi koncepty.`); } });
     if (i > 0) out.push({ label: 'Posunout výš', onClick: () => { void spust('Řazení', () => posli('/api/client/admin/stamps/akce', { action: 'move', id: c.id, dir: 'up' }), 'Pořadí změněno.'); } });

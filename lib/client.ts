@@ -321,22 +321,18 @@ export async function spendCredit(teamId: number, customerId: number, amountCzk:
  * platí staré jednoduché razítko: po dosažení cíle se vynuluje a vznikne kupon.
  * `already` = dnes už návštěvu měl (nic se nezměnilo). `lines` jsou věty pro obsluhu.
  * `extra` jsou razítka navíc z bonusové akce (stejné připsání, žádný druhý řádek), `note` jejich popis do deníku.
- *
- * Razítka řídí kampaně (lib/stamps.ts). Jakmile podnik nějakou kampaň má, staré
- * počítadlo na členství se nezvyšuje a nevydává vlastní odměnu (dřív běžely dva
- * počítadla vedle sebe) a návštěva dá razítko všem kampaním „za návštěvu“, které
- * teď platí. Bez kampaní funguje jednoduché razítko podle stamp_target jako dřív.
  */
-export async function stampVisit(teamId: number, customerId: number, profile: any, ref?: string, extra = 0, note = '', staffId?: number | null): Promise<{ stamps: number; rewarded: boolean; already?: boolean; lines?: string[] }> {
+export async function stampVisit(teamId: number, customerId: number, profile: any, ref?: string, extra = 0, note = '', staffId?: number | null): Promise<{ stamps: number; rewarded: boolean; already?: boolean; lines?: string[]; expired?: number; lost?: number }> {
   await join(customerId, teamId);
-  const { maKampane, razitkaZaNavstevu } = await import('./stamps');
-  const kampane = await maKampane(teamId);
-  const target = kampane ? 0 : (Number(profile?.stamp_target) || 0);
+  const target = Number(profile?.stamp_target) || 0;
   const navic = Math.max(0, Math.trunc(Number(extra)) || 0);
   // Dynamický import: lib/stamps importuje tenhle soubor.
-  const { activeCampaigns, addStamps, vetaVysledku } = await import('./stamps');
+  const { activeCampaigns, addStamps, vetaVysledku, maKampane } = await import('./stamps');
   const camps = await activeCampaigns(teamId, pragueToday());
-  const legacy = camps.length === 0;
+  // Jakmile podnik má kartičku „za návštěvu“ (i pozastavenou), staré počítadlo na členství neběží a nevydává
+  // vlastní odměnu — dřív běžela dvě počítadla vedle sebe a host viděl „37/10“. Kartičky za položky nebo
+  // za útratu staré razítko za návštěvu neřídí.
+  const legacy = !(await maKampane(teamId));
   // Razítko nejvýš jedno za pražský den. Podmínka je přímo v UPDATE, takže dva
   // rychlé pokusy neprojdou oba — dřív se „už dnes byl" kontrolovalo zvlášť a
   // dalo se to dvojklikem obejít (dvě razítka, dvě návštěvy, dvakrát odměna).
@@ -356,16 +352,17 @@ export async function stampVisit(teamId: number, customerId: number, profile: an
   await import('./urovnePostup').then(x => x.oznamPostupUrovne(teamId, customerId, { navstev: 1 })).catch(() => {});
   if (!legacy) {
     const den = pragueToday();
-    const lines: string[] = []; let rewarded = false; let first = 0;
+    const lines: string[] = []; let rewarded = false; let first = 0; let expired = 0; let lost = 0;
     for (const vc of camps.filter(x => x.rule_type === 'visit')) {
       // ref s dnem: i kdyby zámek výš selhal, jedinečný index razítka na kampaň a den nepustí podruhé.
       const r = await addStamps(vc, customerId, 1 + navic, `${ref ?? 'visit'}:${den}`, { staffId, poznamka: navic > 0 ? note : '' });
       if (r.completions > 0) rewarded = true;
       if (!first) first = r.stamps;
+      expired += r.expired ?? 0; lost += r.dropped ?? 0;
       lines.push(vetaVysledku(vc, r));
     }
     obnovPenezenku(teamId, customerId);
-    return { stamps: first, rewarded, lines };
+    return { stamps: first, rewarded, lines, expired, lost };
   }
   let stamps = Number(m?.stamps ?? 0);
   let rewarded = false;

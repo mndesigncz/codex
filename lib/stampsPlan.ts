@@ -8,8 +8,9 @@
 //  · overKampan    … jedna validace pro POST i PATCH (server je pravda, UI jen radí).
 //  · rozpadPoDnech … doplní dny bez razítka nulou pro graf statistiky.
 
-import { dayPlus } from './pragueTime.ts';
+import { dayPlus, pragueDayOf } from './pragueTime.ts';
 import { czForm, type CzNoun } from './czech.ts';
+import { BARVA_RE, IKONY_KARTY, czDatum, dalsiKartaOd, normalizujSekce, type OdkazSekce } from './razitkaPravidla.ts';
 
 export type Stav = 'active' | 'draft' | 'paused' | 'archived';
 export const STAVY: Stav[] = ['active', 'draft', 'paused', 'archived'];
@@ -79,7 +80,6 @@ export function platiTed(p: Pick<PravidloKarty, 'days_of_week' | 'hour_from' | '
   return { plati: true, duvod: '' };
 }
 
-const REPEAT_DNY: Record<string, number> = { immediately: 0, one_day: 1, one_week: 7, one_month: 30 };
 const DEN_MS = 86400000;
 
 /** Vyprší rozdělaná karta? Počítá se od ZAČÁTKU karty (první razítko), ne od posledního. */
@@ -119,11 +119,10 @@ export function planAdd(p: PravidloKarty, s: StavKarty, count: number, k: Kontex
   if (p.max_completions > 0 && s.completed >= p.max_completions) {
     return konec(`Host už kartu dokončil ${s.completed}× — víc jich podnik nedává.`);
   }
-  const cd = REPEAT_DNY[p.repeat_mode] ?? 0;
-  if (!k.rucne && cd > 0 && s.last_completed_at) {
-    const od = (k.now.getTime() - s.last_completed_at.getTime()) / DEN_MS;
-    if (od < cd) return konec(`Další karta jde sbírat za ${Math.ceil(cd - od)} d.`);
-  }
+  // Pauza po dokončení je kalendářní (pražský den): po dni od dalšího dne, po týdnu o 7 dní,
+  // po měsíci od 1. dne dalšího měsíce — ne „za 30 dní“.
+  const dalsiOd = k.rucne ? null : dalsiKartaOd(p.repeat_mode as any, s.last_completed_at);
+  if (dalsiOd && pragueDayOf(k.now) < dalsiOd) return konec(`Další karta jde sbírat od ${czDatum(dalsiOd)}.`);
 
   let pridat = count;
   let zahozeno = 0;
@@ -203,6 +202,8 @@ export interface PoleKampane {
   reward_title: string; reward_items: { itemId: number }[]; days_to_finish: number; days_to_redeem: number;
   repeat_mode: string; stack_cards: boolean; max_completions: number; daily_cap: number;
   days_of_week: number[]; hour_from: string | null; hour_till: string | null;
+  stamp_sections: OdkazSekce[]; excluded_sections: OdkazSekce[]; combinable: boolean;
+  card_color: string | null; card_icon: string | null; card_image: string | null;
 }
 
 function odkazy(raw: any): { itemId: number }[] {
@@ -266,7 +267,8 @@ export function overKampan(b: any): { f: PoleKampane } | { chyba: string } {
   if (hf && hf === ht) return { chyba: 'Hodiny „od“ a „do“ nesmí být stejné.' };
 
   const stamp_items = odkazy(b?.stampItems);
-  if (rule_type === 'products' && !stamp_items.length) return { chyba: 'Vyber položky, za které se razítko připisuje.' };
+  const stamp_sections = normalizujSekce(b?.stampSections);
+  if (rule_type === 'products' && !stamp_items.length && !stamp_sections.length) return { chyba: 'Vyber položky nebo kategorie, za které se razítko připisuje.' };
   let min_value: number | null = null;
   if (b?.minValue != null && b.minValue !== '') {
     const m = Number(b.minValue);
@@ -276,7 +278,15 @@ export function overKampan(b: any): { f: PoleKampane } | { chyba: string } {
   if (rule_type === 'min_value' && !min_value) return { chyba: 'Zadej minimální útratu pro razítko.' };
   const min_value_multiple = b?.minValueMultiple === true && rule_type === 'min_value';
   const excluded = odkazy(b?.excludedItems);
-  if (excluded.length && rule_type !== 'min_value') return { chyba: 'Vyloučené položky se uplatní jen u pravidla „za útratu“ (odečtou se z částky).' };
+  const excluded_sections = normalizujSekce(b?.excludedSections);
+  if ((excluded.length || excluded_sections.length) && rule_type === 'visit') return { chyba: 'Vyloučené položky a kategorie se uplatní u pravidla „za položky“ nebo „za útratu“ (odečtou se z částky).' };
+
+  const cardColor = String(b?.cardColor ?? '').trim();
+  if (cardColor && !BARVA_RE.test(cardColor)) return { chyba: 'Barvu karty zadej jako #RRGGBB.' };
+  const cardIcon = String(b?.cardIcon ?? '').trim();
+  if (cardIcon && !(IKONY_KARTY as readonly string[]).includes(cardIcon)) return { chyba: 'Neznámá ikona karty.' };
+  const cardImage = typeof b?.cardImage === 'string' ? b.cardImage.trim().slice(0, 500) : '';
+  if (cardImage && !/^(https:\/\/|\/api\/client\/img\/)/.test(cardImage)) return { chyba: 'Obrázek karty musí být odkaz začínající na https://.' };
 
   const status = (b?.status == null || b?.status === '') ? (b?.active === false ? 'paused' : 'active') : String(b.status);
   if (!STAVY.includes(status as Stav)) return { chyba: 'Neznámý stav kampaně.' };
@@ -287,13 +297,15 @@ export function overKampan(b: any): { f: PoleKampane } | { chyba: string } {
       conditions: String(b?.conditions ?? '').trim().slice(0, 600),
       status: status as Stav, active: status === 'active',
       valid_since: od, valid_till: do_,
-      required_stamps: nums.required_stamps as number, rule_type, stamp_items, excluded_items: excluded,
+      required_stamps: nums.required_stamps as number, rule_type, stamp_items, stamp_sections, excluded_items: excluded, excluded_sections,
       min_value, min_value_multiple, one_per_order: b?.onePerOrder === true && rule_type === 'products',
       reward_title: String(b?.rewardTitle ?? '').trim().slice(0, 160), reward_items: odkazy(b?.rewardItems),
       days_to_finish: nums.days_to_finish as number, days_to_redeem: nums.days_to_redeem as number,
       repeat_mode, stack_cards: b?.stackCards !== false,
       max_completions: nums.max_completions as number, daily_cap: nums.daily_cap as number,
       days_of_week: dny, hour_from: hf, hour_till: ht,
+      combinable: b?.combinable !== false,
+      card_color: cardColor ? cardColor.toLowerCase() : null, card_icon: cardIcon || null, card_image: cardImage || null,
     },
   };
 }

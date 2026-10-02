@@ -23,7 +23,7 @@ import { buildIcs, downloadIcs } from '@/lib/ics';
 import { DiscardGuard } from '../ui/DiscardGuard';
 import MamPoukaz from './MamPoukaz';
 import PromoBanners from './PromoBanners';
-import RazitkaPoznamky from './loyalty/RazitkaHost';
+import KartaRazitek, { SkonceneKarticky } from './loyalty/KartaRazitek';
 import HostHistorie from './loyalty/HostHistorie';
 import HostPravidla from './loyalty/HostPravidla';
 import { PlatnostKuponu } from './loyalty/HostPlatnost';
@@ -503,20 +503,7 @@ function LoyaltyTab({ slug, b, me, today, campaigns, coupons, signedIn, onDone }
             {(me.campaigns ?? []).length > 0 ? (
               <ul className="mt-4 space-y-4">
                 {me.campaigns.map((cp: any) => (
-                  <li key={cp.id} id={`karta-${cp.id}`}>
-                    <div className="flex items-baseline justify-between gap-3">
-                      <p className="text-sm font-semibold min-w-0 truncate">{cp.name}</p>
-                      <p className="text-sm font-semibold tabular-nums shrink-0">{cp.stamps} / {cp.required}</p>
-                    </div>
-                    {cp.description && <p className="text-xs text-black/55 mt-0.5">{cp.description}</p>}
-                    <RazitkaPoznamky cp={cp} />
-                    <div className="mt-2 grid gap-1.5" style={{ gridTemplateColumns: `repeat(${Math.min(cp.required, 10)}, minmax(0, 1fr))` }} aria-hidden>
-                      {Array.from({ length: Math.min(cp.required, 20) }).map((_, i) => (
-                        <span key={i} className={`h-8 rounded-lg border ${i < cp.stamps ? 'bg-[#C8F542] border-[#C8F542]' : 'bg-white/60 border-black/[0.08]'}`} />
-                      ))}
-                    </div>
-                    {cp.reward && <p className="mt-2 text-xs text-black/55">{t('Za plnou kartu:')} <strong className="text-black/80">{cp.reward}</strong>{cp.completed > 0 ? ` · ${t('dokončeno {n}×', { n: cp.completed })}` : ''}</p>}
-                  </li>
+                  <li key={cp.id} id={`karta-${cp.id}`}><KartaRazitek karta={cp} /></li>
                 ))}
               </ul>
             ) : target > 0 && (
@@ -583,14 +570,7 @@ function LoyaltyTab({ slug, b, me, today, campaigns, coupons, signedIn, onDone }
             {campaigns.length > 0 && (
               <ul className="mt-4 space-y-3">
                 {campaigns.map((cp: any) => (
-                  <li key={cp.id} className="well bg-white px-4 py-3">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <p className="text-sm font-semibold min-w-0 truncate">{cp.name}</p>
-                      <p className="text-xs text-black/50 tabular-nums shrink-0">{t('{n} razítek', { n: cp.required })}</p>
-                    </div>
-                    <p className="text-xs text-black/55 mt-0.5">{cp.description || (cp.reward ? `${t('Za plnou kartu:')} ${cp.reward}` : '')}</p>
-                    <RazitkaPoznamky cp={cp} />
-                  </li>
+                  <li key={cp.id} className="well bg-white px-4 py-3"><KartaRazitek karta={cp} clen={false} /></li>
                 ))}
               </ul>
             )}

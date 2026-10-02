@@ -77,7 +77,8 @@ export default function KartaRazitek({ karta, clen = true, nahled = false }: { k
       {clen && k.expired && <p role="status" className={`mt-1.5 text-xs font-semibold ${maVzhled ? '' : 'text-wait-ink'}`}>{t('Rozdělaná karta vypršela, {n, plural, one {# razítko propadlo} few {# razítka propadla} other {# razítek propadlo}}. Další razítko začne novou kartu.', { n: k.expiredStamps })}</p>}
       {clen && !k.expired && k.finishBy && k.stamps > 0 && <p className={`mt-1.5 text-xs ${maVzhled ? '' : 'text-wait-ink'}`}>{k.daysLeft === 0 ? t('Dosbírej kartu dnes, jinak razítka propadnou.') : t('Dosbírej kartu do {datum}, jinak razítka propadnou.', { datum: datum(k.finishBy) })}</p>}
       {clen && k.nextCardFrom && <p className={`mt-1.5 text-xs ${slabsi}`}>{t('Další kartu jde sbírat od {datum}.', { datum: datum(k.nextCardFrom) })}</p>}
-      {clen && k.finishedForever && <p className={`mt-1.5 text-xs ${slabsi}`}>{t('Tuhle kartu už máš dokončenou, další se nesbírá.')}</p>}
+      {clen && k.finishedForever && <p className={`mt-1.5 text-xs ${slabsi}`}>{k.limit > 1 ? t('Limit karet je splněný ({n}×).', { n: k.limit }) : t('Tuhle kartu už máš dokončenou, další se nesbírá.')}</p>}
+      {!k.finishedForever && k.limit > 0 && <p className={`mt-1.5 text-xs ${slabsi}`}>{k.limit === 1 ? t('Tuhle kartu jde dokončit jen jednou.') : t('Tuhle kartu jde dokončit nejvýš {n}×.', { n: k.limit })}</p>}
       {k.validTill && <p className={`mt-1.5 text-xs ${slabsi}`}>{t('Kartička platí do {datum}.', { datum: datum(k.validTill) })}</p>}
       {k.conditions && (
         <details className="mt-2 text-xs">

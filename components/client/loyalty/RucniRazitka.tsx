@@ -55,9 +55,9 @@ export default function RucniRazitka({ kampan, onZavrit, onHotovo }: {
     if (!hotovoKOdeslani || busy) return;
     setBusy(true); setChyba('');
     try {
-      const body: any = { action: 'manual', campaignId: kampan.id, delta: rezim === 'pridat' ? n : -n, reason: duvod.trim() };
+      const body: any = { action: 'bulk', campaignId: kampan.id, delta: rezim === 'pridat' ? n : -n, reason: duvod.trim() };
       if (komu === 'host') body.customerIds = hoste.map(h => h.id); else body.groupId = Number(skupina);
-      const r = await fetch('/api/client/admin/stamps', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const r = await fetch('/api/client/admin/stamps/member', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error || 'Nepovedlo se.');
       if ((d.preskoceno ?? []).length === 0 || (komu === 'host' && hoste.length === 1)) {
@@ -74,7 +74,7 @@ export default function RucniRazitka({ kampan, onZavrit, onHotovo }: {
     if (hoste.length !== 1 || busy) return;
     setBusy(true); setChyba('');
     try {
-      const r = await fetch('/api/client/admin/stamps', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'storno', customerId: hoste[0].id, campaignId: kampan.id }) });
+      const r = await fetch('/api/client/admin/stamps/member', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'undo', customerId: hoste[0].id, campaignId: kampan.id }) });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error || 'Nepovedlo se.');
       onHotovo(`${hoste[0].name}: ${d.message}`);

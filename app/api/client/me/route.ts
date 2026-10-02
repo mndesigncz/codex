@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sql, customer, publicProfile } from '@/lib/client';
 import { dispatchDueBroadcasts } from '@/lib/broadcasts';
 import { pragueToday } from '@/lib/pragueTime';
-import { shapeCampaign, jmenaPolozek, prubehZRadku } from '@/lib/stamps';
+import { shapeCampaign, jmenaPolozek, prubehHosta } from '@/lib/stamps';
 import { zajistiRazitka } from '@/lib/stampsSchema';
 import { kartaProHosta } from '@/lib/razitkaPravidla';
 
@@ -48,7 +48,7 @@ export async function GET() {
     if (teamIds.length) {
       await zajistiRazitka();
       [campaignRows, progRows] = await Promise.all([
-        sql`SELECT * FROM client_stamp_campaigns WHERE team_id = ANY(${teamIds}) AND active = TRUE AND draft = FALSE AND archived_at IS NULL
+        sql`SELECT * FROM client_stamp_campaigns WHERE team_id = ANY(${teamIds}) AND active = TRUE
              AND (valid_since IS NULL OR valid_since <= ${today}) AND (valid_till IS NULL OR valid_till >= ${today})
              ORDER BY position, id` as any,
         sql`SELECT * FROM client_stamp_progress WHERE customer_id = ${me.id}` as any,
@@ -81,7 +81,7 @@ export async function GET() {
     if (!campsByTeam.has(t)) campsByTeam.set(t, []);
     const c = shapeCampaign(r);
     const pr = progBy.get(c.id);
-    campsByTeam.get(t)!.push(kartaProHosta(c, pr ? prubehZRadku(pr) : null, c.reward_items.map(x => odmenaJmena.get(x.itemId)).filter((x): x is string => !!x)));
+    campsByTeam.get(t)!.push(kartaProHosta(c, pr ? prubehHosta(pr) : null, c.reward_items.map(x => odmenaJmena.get(x.itemId)).filter((x): x is string => !!x)));
   }
   return NextResponse.json({
     me: { ...(profile ?? me), novinky },
