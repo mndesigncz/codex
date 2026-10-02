@@ -287,5 +287,11 @@
   "— mrkni do záložky Menu": "— schau in den Reiter Menü",
   "✋ Jdu — zrušit účast": "✋ Ich komme – Zusage zurückziehen",
   "✋ Přijdu": "✋ Ich komme",
-  "✋ {n, plural, one {# člověk jde} few {# lidi jdou} other {# lidí jde}}": "✋ {n, plural, one {# Person kommt} other {# Personen kommen}}"
+  "✋ {n, plural, one {# člověk jde} few {# lidi jdou} other {# lidí jde}}": "✋ {n, plural, one {# Person kommt} other {# Personen kommen}}",
+  "Karta vypršela a razítka propadla ({n}). Začínáš znovu.": "Deine Karte ist abgelaufen, die Stempel sind verfallen ({n}). Du fängst neu an.",
+  "Dosbírej do {datum}, pak karta vyprší.": "Sammle bis {datum}, danach läuft die Karte ab.",
+  "Razítko dostaneš jen {kdy}.": "Einen Stempel bekommst du nur {kdy}.",
+  "Limit karet je splněný ({n}×).": "Kartenlimit erreicht ({n}×).",
+  "Tuhle kartu jde dokončit jen jednou.": "Diese Karte kann nur einmal abgeschlossen werden.",
+  "Tuhle kartu jde dokončit nejvýš {n}×.": "Diese Karte kann höchstens {n}× abgeschlossen werden."
 }

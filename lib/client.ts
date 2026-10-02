@@ -214,15 +214,22 @@ export type LedgerKind = 'visit' | 'order' | 'manual' | 'coupon' | 'welcome' | '
  * Připíše (nebo odečte) body a zapíše to do deníku. Body nikdy nejdou pod
  * nulu — kupon za víc, než host má, se prostě nedá vzít.
  */
-export async function award(teamId: number, customerId: number, delta: number, kind: LedgerKind, ref?: string | null, note?: string | null): Promise<number> {
+export async function award(teamId: number, customerId: number, delta: number, kind: LedgerKind, ref?: string | null, note?: string | null, staffId?: number | null): Promise<number> {
   await join(customerId, teamId);
   const [m] = await sql`
     UPDATE client_memberships SET points = GREATEST(0, points + ${delta})
     WHERE customer_id = ${customerId} AND team_id = ${teamId}
     RETURNING points`;
-  await sql`
-    INSERT INTO client_loyalty_ledger (team_id, customer_id, delta, kind, ref, note)
-    VALUES (${teamId}, ${customerId}, ${delta}, ${kind}, ${ref ?? null}, ${note ?? null})`;
+  // Sloupec staff_id vzniká v lib/stampsSchema (volající s obsluhou ho zajistí); bez obsluhy se na něj nesahá.
+  if (staffId) {
+    await sql`
+      INSERT INTO client_loyalty_ledger (team_id, customer_id, delta, kind, ref, note, staff_id)
+      VALUES (${teamId}, ${customerId}, ${delta}, ${kind}, ${ref ?? null}, ${note ?? null}, ${staffId})`;
+  } else {
+    await sql`
+      INSERT INTO client_loyalty_ledger (team_id, customer_id, delta, kind, ref, note)
+      VALUES (${teamId}, ${customerId}, ${delta}, ${kind}, ${ref ?? null}, ${note ?? null})`;
+  }
   return Number(m?.points ?? 0);
 }
 
@@ -251,7 +258,7 @@ export async function spendPoints(teamId: number, customerId: number, cost: numb
  * awardCredit(+/-) zůstává na přičítání; na odečet je tohle, protože
  * GREATEST(0, ...) tam přečerpání jen skrývalo. Vrací nový zůstatek, nebo null.
  */
-export async function spendCredit(teamId: number, customerId: number, amountCzk: number, kind: LedgerKind, ref?: string | null, note?: string | null): Promise<number | null> {
+export async function spendCredit(teamId: number, customerId: number, amountCzk: number, kind: LedgerKind, ref?: string | null, note?: string | null, staffId?: number | null): Promise<number | null> {
   await join(customerId, teamId);
   const amt = Math.round(amountCzk);
   const [m] = await sql`
@@ -259,21 +266,37 @@ export async function spendCredit(teamId: number, customerId: number, amountCzk:
     WHERE customer_id = ${customerId} AND team_id = ${teamId} AND credit >= ${amt}
     RETURNING credit`;
   if (!m) return null;
-  await sql`
-    INSERT INTO client_loyalty_ledger (team_id, customer_id, delta, credit_delta, kind, ref, note)
-    VALUES (${teamId}, ${customerId}, 0, ${-amt}, ${kind}, ${ref ?? null}, ${note ?? null})`;
+  if (staffId) {
+    await sql`
+      INSERT INTO client_loyalty_ledger (team_id, customer_id, delta, credit_delta, kind, ref, note, staff_id)
+      VALUES (${teamId}, ${customerId}, 0, ${-amt}, ${kind}, ${ref ?? null}, ${note ?? null}, ${staffId})`;
+  } else {
+    await sql`
+      INSERT INTO client_loyalty_ledger (team_id, customer_id, delta, credit_delta, kind, ref, note)
+      VALUES (${teamId}, ${customerId}, 0, ${-amt}, ${kind}, ${ref ?? null}, ${note ?? null})`;
+  }
   return Number(m.credit);
 }
 
-/** Návštěva: +1 razítko, +1 návštěva; po dosažení cíle se razítka vynulují a vznikne kupon na odměnu. */
-export async function stampVisit(teamId: number, customerId: number, profile: any, ref?: string): Promise<{ stamps: number; rewarded: boolean; already?: boolean }> {
+/**
+ * Návštěva: +1 návštěva a denní zámek. Odměnu řídí kampaně, když nějaké běží
+ * (každá „za návštěvu" dostane razítko a starý čítač membership.stamps se
+ * NEhýbe — dřív běžely dva čítače vedle sebe a host viděl „37/10"). Bez kampaní
+ * platí staré jednoduché razítko: po dosažení cíle se vynuluje a vznikne kupon.
+ * `already` = dnes už návštěvu měl (nic se nezměnilo). `lines` jsou věty pro obsluhu.
+ */
+export async function stampVisit(teamId: number, customerId: number, profile: any, ref?: string, staffId?: number | null): Promise<{ stamps: number; rewarded: boolean; already?: boolean; lines?: string[] }> {
   await join(customerId, teamId);
   const target = Number(profile?.stamp_target) || 0;
+  // Dynamický import: lib/stamps importuje tenhle soubor.
+  const { activeCampaigns, addStamps, vetaVysledku } = await import('./stamps');
+  const camps = await activeCampaigns(teamId, pragueToday());
+  const legacy = camps.length === 0;
   // Razítko nejvýš jedno za pražský den. Podmínka je přímo v UPDATE, takže dva
   // rychlé pokusy neprojdou oba — dřív se „už dnes byl" kontrolovalo zvlášť a
   // dalo se to dvojklikem obejít (dvě razítka, dvě návštěvy, dvakrát odměna).
   const [m] = await sql`
-    UPDATE client_memberships SET stamps = stamps + 1, visits = visits + 1, last_visit_at = NOW()
+    UPDATE client_memberships SET stamps = stamps + ${legacy ? 1 : 0}, visits = visits + 1, last_visit_at = NOW()
     WHERE customer_id = ${customerId} AND team_id = ${teamId}
       AND (last_visit_at IS NULL OR
            (last_visit_at AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Prague')::date
@@ -283,6 +306,18 @@ export async function stampVisit(teamId: number, customerId: number, profile: an
     // Dnes už razítko má — vrátí se aktuální stav beze změny.
     const [cur] = await sql`SELECT stamps FROM client_memberships WHERE customer_id = ${customerId} AND team_id = ${teamId}`;
     return { stamps: Number(cur?.stamps ?? 0), rewarded: false, already: true };
+  }
+  if (!legacy) {
+    const den = pragueToday();
+    const lines: string[] = []; let rewarded = false; let first = 0;
+    for (const vc of camps.filter(x => x.rule_type === 'visit')) {
+      // ref s dnem: i kdyby zámek výš selhal, jedinečný index razítka na kampaň a den nepustí podruhé.
+      const r = await addStamps(vc, customerId, 1, `${ref ?? 'visit'}:${den}`, { staffId });
+      if (r.completions > 0) rewarded = true;
+      if (!first) first = r.stamps;
+      lines.push(vetaVysledku(vc, r));
+    }
+    return { stamps: first, rewarded, lines };
   }
   let stamps = Number(m?.stamps ?? 0);
   let rewarded = false;
@@ -394,14 +429,20 @@ export async function awardBirthdays(): Promise<number> {
  * Kredit z útraty (cashback). Na rozdíl od bodů se utrácí přímo v korunách
  * u kasy, takže se drží v členství zvlášť a v deníku má vlastní sloupec.
  */
-export async function awardCredit(teamId: number, customerId: number, deltaCzk: number, kind: LedgerKind, ref?: string | null, note?: string | null): Promise<number> {
+export async function awardCredit(teamId: number, customerId: number, deltaCzk: number, kind: LedgerKind, ref?: string | null, note?: string | null, staffId?: number | null): Promise<number> {
   await join(customerId, teamId);
   const [m] = await sql`
     UPDATE client_memberships SET credit = GREATEST(0, credit + ${Math.round(deltaCzk)})
     WHERE customer_id = ${customerId} AND team_id = ${teamId} RETURNING credit`;
-  await sql`
-    INSERT INTO client_loyalty_ledger (team_id, customer_id, delta, credit_delta, kind, ref, note)
-    VALUES (${teamId}, ${customerId}, 0, ${Math.round(deltaCzk)}, ${kind}, ${ref ?? null}, ${note ?? null})`;
+  if (staffId) {
+    await sql`
+      INSERT INTO client_loyalty_ledger (team_id, customer_id, delta, credit_delta, kind, ref, note, staff_id)
+      VALUES (${teamId}, ${customerId}, 0, ${Math.round(deltaCzk)}, ${kind}, ${ref ?? null}, ${note ?? null}, ${staffId})`;
+  } else {
+    await sql`
+      INSERT INTO client_loyalty_ledger (team_id, customer_id, delta, credit_delta, kind, ref, note)
+      VALUES (${teamId}, ${customerId}, 0, ${Math.round(deltaCzk)}, ${kind}, ${ref ?? null}, ${note ?? null})`;
+  }
   return Number(m?.credit ?? 0);
 }
 

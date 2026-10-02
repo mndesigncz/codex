@@ -23,6 +23,7 @@ import { buildIcs, downloadIcs } from '@/lib/ics';
 import { DiscardGuard } from '../ui/DiscardGuard';
 import MamPoukaz from './MamPoukaz';
 import PromoBanners from './PromoBanners';
+import RazitkaPoznamky from './loyalty/RazitkaHost';
 
 type Tab = 'menu' | 'reserve' | 'order' | 'loyalty';
 
@@ -143,7 +144,7 @@ export default function BusinessPage({ slug }: { slug: string }) {
               <div className={`rounded-2xl px-4 py-3 ${b.coverUrl ? 'bg-white/15 backdrop-blur' : ''}`}
                 style={b.coverUrl ? undefined : { background: `${accent}22`, border: `1px solid ${accent}66` }}>
                 <p className="text-[11px] uppercase tracking-wider opacity-70">{t(me.levelLabel ?? 'Člen')}{me.discount > 0 ? ` · ${me.discountSource === 'skupina' && me.discountName ? t('sleva {n} % ({skupina})', { n: me.discount, skupina: me.discountName }) : t('sleva {n} %', { n: me.discount })}` : ''}</p>
-                <p className="text-lg font-bold tabular-nums leading-tight">{me.points} {t('b.')} {b.stampTarget > 0 && <span className="opacity-60 font-medium text-sm">· {t('{stamps}/{target} razítek', { stamps: me.stamps, target: b.stampTarget })}</span>}</p>
+                <p className="text-lg font-bold tabular-nums leading-tight">{me.points} {t('b.')} {b.stampTarget > 0 && !(me.campaigns ?? []).length && <span className="opacity-60 font-medium text-sm">· {t('{stamps}/{target} razítek', { stamps: me.stamps, target: b.stampTarget })}</span>}</p>
                 {me.credit > 0 && <p className="text-sm font-semibold tabular-nums leading-tight">{t('{castka} kreditu', { castka: formatMoney(me.credit, b.currency) })}</p>}
                 {me.nextTierAt && <p className="text-[11px] opacity-60 leading-snug">{me.nextTierUnit === 'spend' ? t('do „{level}“ ještě {castka}', { level: t(me.nextTierLabel), castka: formatMoney(Math.max(0, me.nextTierAt - (me.spend ?? 0)), b.currency) }) : t('do „{level}“ ještě {n, plural, one {# návštěva} few {# návštěvy} other {# návštěv}}', { level: t(me.nextTierLabel), n: Math.max(0, me.nextTierAt - me.visits) })}</p>}
               </div>
@@ -467,6 +468,7 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
                       <p className="text-sm font-semibold tabular-nums shrink-0">{cp.stamps} / {cp.required}</p>
                     </div>
                     {cp.description && <p className="text-xs text-black/55 mt-0.5">{cp.description}</p>}
+                    <RazitkaPoznamky cp={cp} />
                     <div className="mt-2 grid gap-1.5" style={{ gridTemplateColumns: `repeat(${Math.min(cp.required, 10)}, minmax(0, 1fr))` }} aria-hidden>
                       {Array.from({ length: Math.min(cp.required, 20) }).map((_, i) => (
                         <span key={i} className={`h-8 rounded-lg border ${i < cp.stamps ? 'bg-[#C8F542] border-[#C8F542]' : 'bg-white/60 border-black/[0.08]'}`} />
@@ -541,6 +543,7 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
                       <p className="text-xs text-black/50 tabular-nums shrink-0">{t('{n} razítek', { n: cp.required })}</p>
                     </div>
                     <p className="text-xs text-black/55 mt-0.5">{cp.description || (cp.reward ? `${t('Za plnou kartu:')} ${cp.reward}` : '')}</p>
+                    <RazitkaPoznamky cp={cp} />
                   </li>
                 ))}
               </ul>

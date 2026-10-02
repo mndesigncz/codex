@@ -36,6 +36,9 @@ import { obsahuje } from '@/lib/hledani';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { useOpravneni } from '../role/useOpravneni';
 import Poukazy from './Poukazy';
+import { RAZITKA_DEFAULTY, razitkaZRadku, RazitkaDalsiNastaveni, RazitkaNahled } from './loyalty/RazitkaNastaveni';
+import { podleFiltru, RazitkaFiltr, StavChip, useRazitkaAkce, type FiltrStavu } from './loyalty/RazitkaAkce';
+import { overKampan } from '@/lib/stampsPlan';
 
 // Věrnost měla šest podzáložek pod deseti hlavními — šestnáct sourozenců
 // nad sebou. „Body" a „Slevy a úrovně" jsou jedna věc (co host nasbírá a co
@@ -390,6 +393,7 @@ const blankCampaign = () => ({
   stampItems: [] as { itemId: number; name: string }[], minValue: '', minValueMultiple: false,
   onePerOrder: false, rewardTitle: '', rewardItems: [] as { itemId: number; name: string }[],
   daysToFinish: 0, daysToRedeem: 0, repeatMode: 'immediately', stackCards: true,
+  ...RAZITKA_DEFAULTY,
 });
 
 function campaignToForm(c: any) {
@@ -403,6 +407,7 @@ function campaignToForm(c: any) {
     rewardTitle: c.reward_title ?? '', rewardItems: c.rewardItems ?? [],
     daysToFinish: Number(c.days_to_finish) || 0, daysToRedeem: Number(c.days_to_redeem) || 0,
     repeatMode: c.repeat_mode ?? 'immediately', stackCards: c.stack_cards !== false,
+    ...razitkaZRadku(c),
   };
 }
 
@@ -453,6 +458,12 @@ function ItemPicker({ items, value, onChange, label: lb, hint }: {
   );
 }
 
+/** Chyba ve formuláři kartičky (česká věta), nebo prázdný řetězec. */
+function chybaFormulare(f: ReturnType<typeof blankCampaign>): string {
+  const v = overKampan({ ...f, minValue: f.minValue === '' ? null : Number(f.minValue) });
+  return 'chyba' in v ? v.chyba : '';
+}
+
 function Stamps({ toast }: { toast: (m: string) => void }) {
   const meni = useOpravneni().ma('vernost.kampane');
   const money = useMoney();
@@ -478,6 +489,9 @@ function Stamps({ toast }: { toast: (m: string) => void }) {
 
   const save = async () => {
     if (!form) return;
+    // Stejná validace jako na serveru (lib/stampsPlan) — chyba se ukáže hned, bez cesty na server.
+    const chyba = chybaFormulare(form);
+    if (chyba) { toast(chyba); return; }
     setBusy('save');
     try {
       const body = JSON.stringify({ ...form, minValue: form.minValue === '' ? null : Number(form.minValue) });
@@ -486,16 +500,12 @@ function Stamps({ toast }: { toast: (m: string) => void }) {
     } catch (e) { toast(apiMessage(e, 'Kartičku se nepodařilo uložit.')); }
     setBusy('');
   };
-  const toggle = async (c: any) => {
-    setBusy('toggle:' + c.id);
-    try { await j('/api/client/admin/stamps', { method: 'PATCH', body: JSON.stringify({ ...campaignToForm(c), active: !c.active }) }); load(); }
-    catch (e) { toast(apiMessage(e, 'Změna se nepovedla.')); }
-    setBusy('');
-  };
   const del = async (c: any) => {
     try { await j(`/api/client/admin/stamps?id=${c.id}`, { method: 'DELETE' }); toast('Kartička smazána.'); setForm(null); load(); }
     catch (e) { toast(apiMessage(e, 'Kartičku se nepodařilo smazat.')); }
   };
+  const [filtr, setFiltr] = useState<FiltrStavu>('all');
+  const akce = useRazitkaAkce({ reload: load, toast, meni, upravit: c => setForm(campaignToForm(c)), smazat: c => setMazu(c) });
 
   if (list === null) return <Kostra />;
 
@@ -555,6 +565,9 @@ function Stamps({ toast }: { toast: (m: string) => void }) {
               <SwitchRow title="Přebytek razítek se přenáší do další karty" checked={f.stackCards} onChange={v => set({ stackCards: v })} />
             </ul>
           </div>
+          <RazitkaDalsiNastaveni f={f} set={set}
+            vylouceno={<ItemPicker items={items} value={f.excludedItems} onChange={v => set({ excludedItems: v })} label="Vyloučené položky"
+              hint="Jejich cena se z útraty odečte, než se porovná s minimem (třeba dárkové karty). Počítá se jen u účtenky z pokladny." />} />
           <div className="border-t border-black/[0.06] pt-4">
             <div className="grid grid-cols-2 gap-4 max-w-sm">
               <Field id="sc-since" label="Platí od"><Input id="sc-since" type="date" value={f.validSince} onChange={e => set({ validSince: e.target.value })} /></Field>
@@ -562,9 +575,11 @@ function Stamps({ toast }: { toast: (m: string) => void }) {
             </div>
             <p className="t-meta mt-1.5">Prázdné = běží pořád. Hodí se pro sezónní kartičky.</p>
           </div>
+          <div className="border-t border-black/[0.06] pt-4"><RazitkaNahled f={f} /></div>
           <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+            {chybaFormulare(f) && <p role="alert" className="text-sm text-bad-ink mr-auto min-w-0">{chybaFormulare(f)}</p>}
             <Button variant="secondary" onClick={() => setForm(null)}>Zrušit</Button>
-            <Button variant="primary" loading={busy === 'save'} onClick={save}>{f.id ? 'Uložit kartičku' : 'Založit kartičku'}</Button>
+            <Button variant="primary" loading={busy === 'save'} disabled={!!chybaFormulare(f)} onClick={save}>{f.id ? 'Uložit kartičku' : 'Založit kartičku'}</Button>
           </div>
         </Card>
       </div>
@@ -578,31 +593,32 @@ function Stamps({ toast }: { toast: (m: string) => void }) {
         <p className="t-meta max-w-[60ch]">Kartiček může běžet víc vedle sebe — třeba „10+1 dýmka" a „5+1 čaj". Razítka z účtenky připisuje obsluha u kasy jedním klepnutím.</p>
         {meni && <Button variant="secondary" icon="plus" onClick={() => setForm(blankCampaign())}>Nová kartička</Button>}
       </div>
+      <RazitkaFiltr list={list} value={filtr} onChange={setFiltr} />
       {list.length === 0 ? (
         <Card><EmptyState icon="check" title="Zatím žádná kartička" hint="Založ první — třeba „každá desátá dýmka zdarma“. Hosté ji uvidí na tvé stránce hned." compact /></Card>
+      ) : podleFiltru(list, filtr).length === 0 ? (
+        <Card><EmptyState icon="check" title="V téhle skupině nic není" hint="Vyber jinou skupinu nahoře, nebo založ novou kartičku." compact /></Card>
       ) : (
         <Card pad="none">
           <ul className="list px-5">
-            {list.map((c: any) => (
-              <ListRow key={c.id} className={c.active ? '' : 'opacity-60'} title={c.name}
+            {podleFiltru(list, filtr).map((c: any) => (
+              <ListRow key={c.id} className={c.active ? '' : 'opacity-60'} title={<span className="flex items-center gap-2 min-w-0"><span className="truncate">{c.name}</span><StavChip stav={c.status} /></span>}
                 meta={[
                   `${czCount(Number(c.required_stamps) || 0, RAZITKO)} ${RULE_NAME[c.rule_type] ?? ''}${c.rule_type === 'products' && c.stampItems?.length ? `: ${c.stampItems.map((x: any) => x.name).join(', ')}` : ''}${c.rule_type === 'min_value' && c.min_value ? ` od ${money(c.min_value)}` : ''}`,
                   `odměna ${c.reward_title || '—'}`,
-                  `${czCount(Number(c.collectors) || 0, HOST)} sbírá · ${c.completions}× dokončeno`,
+                  `${czCount(Number(c.collectors) || 0, HOST)} sbírá · ${c.completions}× dokončeno${c.rewardsIssued ? ` · uplatněno ${c.rewardsRedeemed} z ${c.rewardsIssued}` : ''}`,
                 ].join(' · ')}
-                actions={meni ? (
+                actions={
                   <>
-                    <Switch checked={!!c.active} disabled={busy === 'toggle:' + c.id} onChange={() => { void toggle(c); }} label={`Běží: ${c.name}`} />
-                    <Menu size="sm" label={`Další akce s kartičkou ${c.name}`} items={[
-                      { label: 'Upravit…', icon: 'pencil', onClick: () => setForm(campaignToForm(c)) },
-                      { label: 'Smazat…', icon: 'trash', danger: true, onClick: () => setMazu(c) },
-                    ]} />
+                    {meni && c.status !== 'archived' && <Switch checked={!!c.active} onChange={() => { void akce.prepni(c); }} label={`Běží: ${c.name}`} />}
+                    <Menu size="sm" label={`Další akce s kartičkou ${c.name}`} items={akce.polozky(c, list.findIndex((x: any) => x.id === c.id), list.length)} />
                   </>
-                ) : <Chip tone={c.active ? 'ok' : 'muted'} size="sm">{c.active ? 'Běží' : 'Vypnutá'}</Chip>} />
+                } />
             ))}
           </ul>
         </Card>
       )}
+      {akce.okna}
       <p className="t-meta max-w-[75ch]">Razítka připíše obsluha u kasy: buď „razítko za návštěvu", nebo výběrem účtenky hosta — z jejích položek se pravidla vyhodnotí sama. Za plnou kartu dostane host kupon s kódem.</p>
       {mazu && (
         <Smazat title={`Smazat kartičku „${mazu.name}"?`} onZavrit={() => setMazu(null)} onPotvrdit={() => { void del(mazu); }}

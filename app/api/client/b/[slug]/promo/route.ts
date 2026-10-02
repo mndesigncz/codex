@@ -18,11 +18,20 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
   const teamId = Number(p.team_id);
   const [promo] = await sql`SELECT * FROM client_promos WHERE code = ${code} AND team_id = ${teamId} AND active = TRUE`;
   if (!promo || (promo.valid_until && String(promo.valid_until) < pragueToday())) return NextResponse.json({ error: 'Tenhle kód neplatí.' }, { status: 404 });
-  if (promo.max_uses && Number(promo.uses) >= Number(promo.max_uses)) return NextResponse.json({ error: 'Kód už je vyčerpaný.' }, { status: 409 });
   await join(me.id, teamId);
+  // Místo se zabere atomicky jedním UPDATE s podmínkou — dva hosté naráz u posledního
+  // kusu nepřečerpají limit (dřív se max_uses četlo zvlášť a uses se zvyšovalo až po zápisu).
+  const [misto] = await sql`
+    UPDATE client_promos SET uses = uses + 1
+    WHERE id = ${promo.id} AND (COALESCE(max_uses, 0) = 0 OR uses < max_uses)
+    RETURNING id`;
+  if (!misto) return NextResponse.json({ error: 'Kód už je vyčerpaný.' }, { status: 409 });
   try { await sql`INSERT INTO client_promo_uses (promo_id, customer_id) VALUES (${promo.id}, ${me.id})`; }
-  catch { return NextResponse.json({ error: 'Tenhle kód už jsi použil.' }, { status: 409 }); }
-  await sql`UPDATE client_promos SET uses = uses + 1 WHERE id = ${promo.id}`;
+  catch {
+    // Tenhle host kód už použil — zabrané místo se vrací.
+    await sql`UPDATE client_promos SET uses = GREATEST(0, uses - 1) WHERE id = ${promo.id}`;
+    return NextResponse.json({ error: 'Tenhle kód už jsi použil.' }, { status: 409 });
+  }
   let points: number | null = null;let coupon: string | null = null;
   if (Number(promo.points) > 0) points = await award(teamId, me.id, Number(promo.points), 'manual', `promo:${promo.code}`, `Promo kód ${promo.title}`);
   if (promo.coupon_id) {
