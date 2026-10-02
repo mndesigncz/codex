@@ -114,6 +114,8 @@ async function behy(viewport, mobil) {
     tvrdi(`${jmeno} blokace: nejdřív potvrzení v okně`, await dokud(() => blok.isVisible(), 1500));
     await blok.getByRole('button', { name: 'Zablokovat', exact: true }).click();
     tvrdi(`${jmeno} blokace: pošle PATCH { blocked: true }`, await dokud(() => stav.z.patch.some(x => x.blocked === true && x.id === 101), 2500), JSON.stringify(stav.z.patch));
+    // Po blokaci se detail zavře a seznam načte znovu; teprve potom jde otevřít další (jinak by „Deník“ trefil jiný řádek).
+    await p.getByRole('button', { name: 'Skrýt', exact: true }).waitFor({ state: 'detached', timeout: 4000 });
     await p.getByRole('button', { name: 'Deník' }).first().click();
     await p.getByRole('button', { name: 'Odebrat z klubu' }).first().click();
     const smaz = p.getByRole('dialog', { name: /Odebrat .* z klubu/ });
@@ -121,6 +123,7 @@ async function behy(viewport, mobil) {
     await smaz.getByRole('button', { name: 'Odebrat z klubu', exact: true }).click();
     tvrdi(`${jmeno} odebrání: pošle DELETE s id člena`, await dokud(() => stav.z.del.some(d => /id=101/.test(d)), 2500), JSON.stringify(stav.z.del));
 
+    await p.getByRole('button', { name: 'Skrýt', exact: true }).waitFor({ state: 'detached', timeout: 4000 });
     await p.getByRole('button', { name: 'Deník' }).first().click();
     await p.getByRole('button', { name: 'Celá historie' }).first().click();
     tvrdi(`${jmeno} historie: přehled i část Návštěvy se načtou`, await dokud(async () => (await p.getByRole('tab', { name: 'Návštěvy' }).count()) > 0, 3000));
