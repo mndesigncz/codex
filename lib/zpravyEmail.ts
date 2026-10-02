@@ -86,14 +86,3 @@ export function sestavEmailZpravy(v: VstupEmailu): { subject: string; html: stri
     </div>`;
   return { subject: predmetZpravy(v.title, v.zkusebni), html };
 }
-
-// ---- Příloha kuponu a promo kódu ----------------------------------------------------------
-
-/** Promo kód do těla push zprávy (e-mail ho má v rámečku): kratší text, kód na konci. */
-export function telesoSKodem(body: string | null | undefined, promoKod: string | null | undefined): string | undefined {
-  const b = (body ?? '').trim();
-  const k = (promoKod ?? '').trim();
-  if (!k) return b || undefined;
-  const dohromady = b ? `${b} Kód: ${k}` : `Kód: ${k}`;
-  return dohromady.slice(0, 300);
-}

@@ -95,12 +95,12 @@ export default async function ({ eq, ok }: Testy) {
   eq('novinky: odhlášený host zprávu nedostane', jeZtlumeno({ novinky: false }, 'novinky'), true);
   eq('novinky: jen výslovné true zprávu pustí (ne řetězec, ne 1)', [jeZtlumeno({ novinky: true }, 'novinky'), jeZtlumeno({ novinky: 'true' }, 'novinky'), jeZtlumeno({ novinky: 1 }, 'novinky')], [false, true, true]);
   eq('novinky: ostatní kategorie to neovlivní', [jeZtlumeno({ novinky: false }, 'message'), jeZtlumeno({ messages: false }, 'message')], [false, true]);
-  ok('doručení: zpráva i „Chybíš nám" jdou v kategorii novinky (respektují odhlášení)', /category: 'novinky'/.test(lib) && /category: 'novinky'/.test(precti('lib/reaktivace.ts')));
+  ok('doručení: zpráva i „Chybíš nám" jdou v kategorii novinky (respektují odhlášení)', /category: 'novinky'/.test(lib) && /dorucClenovi/.test(precti('lib/reaktivace.ts')) && /category: 'novinky'/.test(precti('lib/automatizaceDb.ts')));
   const push = precti('lib/push.ts');
   ok('push: vypnutá kategorie nevytvoří ani oznámení v aplikaci (return před INSERT)', push.indexOf('if (jeZtlumeno(prefs ?? {}, payload.category)) return false;') > 0 && push.indexOf('if (jeZtlumeno(prefs ?? {}, payload.category)) return false;') < push.indexOf('INSERT INTO notifications'));
   ok('push: rozeslání jde po dávkách a chyba jednoho hosta nezastaví ostatní', /PUSH_SOUBEZNE = 20/.test(push) && /\.catch\(e => \{ console\.error\('notifyUser selhal'/.test(push));
-  ok('dosah: UI i server počítají, kolik z publika má zapnuté novinky', /notif_prefs->>'novinky' = 'true'/.test(lib) && /dosah=/.test(precti('components/client/loyalty/ZpravyRozeslani.tsx')));
-  ok('doručeno a zdrženo se zapíše k zprávě (recipients, muted)', /SET recipients = \$\{r\.doruceno\}, muted = \$\{r\.ztlumeno\}/.test(lib));
+  ok('dosah: UI i server počítají, kolik z publika má zapnuté novinky', /dosahZpravy\(prijemci, kanal\)/.test(lib) && /prefs\?\.novinky !== true/.test(precti('lib/zpravyKanaly.ts')) && /dosah=/.test(precti('components/client/loyalty/ZpravyRozeslani.tsx')));
+  ok('doručeno a zdrženo se zapíše k zprávě (recipients, muted)', /recipients = \$\{r\.doruceno\}, muted = \$\{r\.ztlumeno\}/.test(lib));
 
   // ---- zkouška sobě, úprava, zrušení ----
   ok('zkouška: neposílá se v kategorii novinky (správce s vypnutými novinkami ji dostane) a nespotřebuje slot', /Bez kategorie „novinky“/.test(lib) && !/vezmiSlot/.test(lib.slice(lib.indexOf('export async function zkusebniZprava'))));

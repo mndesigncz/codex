@@ -24,12 +24,14 @@ function preskoceniVeta(p: Vysledek['preskoceno']): string {
   return casti.length ? `Přeskočí se: ${casti.join(', ')}.` : '';
 }
 
-export default function KuponyOdeslat({ kupon, groups, onZavrit, oznam, onHotovo }: {
+export default function KuponyOdeslat({ kupon, groups, onZavrit, oznam, onHotovo, hostIds }: {
   kupon: any; groups: any[]; onZavrit: () => void; oznam: (m: string) => void; onHotovo: () => void;
+  /** Hosté vybraní předem (z hromadného výběru v seznamu členů): výběr komu se pak neukazuje. */
+  hostIds?: number[];
 }) {
-  const [druh, setDruh] = useState<'vsichni' | 'skupina' | 'hoste'>('vsichni');
+  const [druh, setDruh] = useState<'vsichni' | 'skupina' | 'hoste'>(hostIds ? 'hoste' : 'vsichni');
   const [skupinaId, setSkupinaId] = useState<string>(groups[0] ? String(groups[0].id) : '');
-  const [vybrani, setVybrani] = useState<{ id: number; name: string }[]>([]);
+  const [vybrani, setVybrani] = useState<{ id: number; name: string }[]>(hostIds ? hostIds.map(id => ({ id, name: '' })) : []);
   const [hledej, setHledej] = useState('');
   const [nalezeni, setNalezeni] = useState<{ id: number; name: string }[]>([]);
   const [zprava, setZprava] = useState('');
@@ -56,7 +58,7 @@ export default function KuponyOdeslat({ kupon, groups, onZavrit, oznam, onHotovo
 
   // Hledání hosta podle jména (krátká prodleva, ať se nevolá na každé písmeno).
   useEffect(() => {
-    if (druh !== 'hoste') return;
+    if (druh !== 'hoste' || hostIds) return;
     const n = ++pozHledani.current;
     const t = setTimeout(() => {
       j(`/api/client/admin/coupons/send?q=${encodeURIComponent(hledej)}`)
@@ -64,7 +66,7 @@ export default function KuponyOdeslat({ kupon, groups, onZavrit, oznam, onHotovo
         .catch(e => setChyba(apiMessage(e, 'Hosty se nepodařilo načíst.')));
     }, 250);
     return () => clearTimeout(t);
-  }, [hledej, druh]);
+  }, [hledej, druh, hostIds]);
 
   const posli = async () => {
     setBusy(true); setChyba('');
@@ -86,14 +88,16 @@ export default function KuponyOdeslat({ kupon, groups, onZavrit, oznam, onHotovo
         </Button>
       </>}>
       <div className="space-y-4">
-        <Segmented options={[{ id: 'vsichni', label: 'Všem členům' }, { id: 'skupina', label: 'Skupině' }, { id: 'hoste', label: 'Vybraným hostům' }]}
-          value={druh} onChange={setDruh} size="sm" ariaLabel="Komu kupon poslat" />
+        {hostIds
+          ? <p className="text-sm text-black/70">Kupon dostanou hosté, které jsi vybral v seznamu členů ({czCount(hostIds.length, HOST)}).</p>
+          : <Segmented options={[{ id: 'vsichni', label: 'Všem členům' }, { id: 'skupina', label: 'Skupině' }, { id: 'hoste', label: 'Vybraným hostům' }]}
+              value={druh} onChange={setDruh} size="sm" ariaLabel="Komu kupon poslat" />}
         {druh === 'skupina' && (groups.length === 0
           ? <p className="t-meta">Zatím nemáš žádnou skupinu hostů. Založíš ji v Body a úrovně, hosty do ní přidáš v Zákaznících.</p>
           : <Field id="od-sk" label="Skupina"><Select id="od-sk" value={skupinaId} onChange={e => setSkupinaId(e.target.value)}>
               {groups.map((g: any) => <option key={g.id} value={g.id}>{g.name} ({g.members})</option>)}
             </Select></Field>)}
-        {druh === 'hoste' && (
+        {druh === 'hoste' && !hostIds && (
           <div className="space-y-2">
             {vybrani.length > 0 && (
               <div className="flex flex-wrap gap-1.5">

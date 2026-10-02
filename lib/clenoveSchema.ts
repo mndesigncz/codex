@@ -10,17 +10,10 @@ let pripraveno: Promise<void> | null = null;
 export function zajistiSchemaClenu(): Promise<void> {
   if (!pripraveno) {
     pripraveno = (async () => {
-      await sql`ALTER TABLE client_groups ADD COLUMN IF NOT EXISTS description TEXT`;
-      await sql`ALTER TABLE client_groups ADD COLUMN IF NOT EXISTS color TEXT`;
       await sql`ALTER TABLE client_groups ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT FALSE`;
-      await sql`ALTER TABLE client_groups ADD COLUMN IF NOT EXISTS rule TEXT`;
-      await sql`ALTER TABLE client_groups ADD COLUMN IF NOT EXISTS discount_pct INTEGER NOT NULL DEFAULT 0`;
       await sql`ALTER TABLE client_memberships ADD COLUMN IF NOT EXISTS blocked BOOLEAN NOT NULL DEFAULT FALSE`;
       await sql`ALTER TABLE client_memberships ADD COLUMN IF NOT EXISTS blocked_at TIMESTAMP`;
-      await sql`ALTER TABLE client_memberships ADD COLUMN IF NOT EXISTS note TEXT`;
       await sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS channels TEXT NOT NULL DEFAULT 'push'`;
-      await sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS coupon_id INTEGER`;
-      await sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS promo_code TEXT`;
       await sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS audience_ids JSONB`;
       await sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS prijemci JSONB`;
       await sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS push_count INTEGER NOT NULL DEFAULT 0`;
@@ -29,7 +22,6 @@ export function zajistiSchemaClenu(): Promise<void> {
       await sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS no_consent INTEGER NOT NULL DEFAULT 0`;
       await sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS email_total INTEGER NOT NULL DEFAULT 0`;
       await sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS email_pos INTEGER NOT NULL DEFAULT 0`;
-      await sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS link_kind TEXT`;
       await sql`
         CREATE TABLE IF NOT EXISTS client_automatizace (
           team_id INTEGER NOT NULL,

@@ -6,6 +6,7 @@ import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { zajistiSchemaClenu } from '@/lib/clenoveSchema';
 import { radkyProSkupinu, sparujSClenyPodniku } from '@/lib/clenoveSeznam';
 import { audit } from '@/lib/audit';
+import { normalizujPravidla } from '@/lib/clenoveFiltr';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -20,9 +21,9 @@ export async function POST(req: NextRequest) {
   await zajistiSchemaClenu();
   const b = await req.json().catch(() => ({}));
   const gid = Math.round(Number(b.skupina));
-  const [g] = await sql`SELECT id, name, rule, archived FROM client_groups WHERE id = ${gid} AND team_id = ${ctx.teamId}`;
+  const [g] = await sql`SELECT id, name, rules, archived FROM client_groups WHERE id = ${gid} AND team_id = ${ctx.teamId}`;
   if (!g) return NextResponse.json({ error: 'Skupina nenalezena.' }, { status: 404 });
-  if (g.rule) return NextResponse.json({ error: 'Členy dynamické skupiny počítá pravidlo, ručně se neupravují.' }, { status: 400 });
+  if (normalizujPravidla(g.rules)) return NextResponse.json({ error: 'Členy dynamické skupiny počítá pravidlo, ručně se neupravují.' }, { status: 400 });
   if (g.archived) return NextResponse.json({ error: 'Skupina je v archivu. Nejdřív ji vrať z archivu.' }, { status: 400 });
   const text = String(b.text ?? '');
   if (!text.trim()) return NextResponse.json({ error: 'Vlož seznam nebo vyber soubor CSV.' }, { status: 400 });

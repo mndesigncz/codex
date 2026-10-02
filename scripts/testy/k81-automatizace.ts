@@ -94,7 +94,7 @@ export default function ({ eq, ok }: Testy) {
   ok('API: dny a body „Chybíš nám“ jen s právem na pravidla věrnosti', db.includes('muzePravidla') && route.includes("has('vernost.pravidla')"));
   ok('API: jména členů v deníku jen s právem vidět členy', route.includes("has('zakaznici.zobrazit')"));
   const ui = precti('components/client/loyalty/Automatizace.tsx');
-  ok('rozhraní: každé pravidlo má vypínač, náhled, zkoušku a deník', ['SwitchRow', 'NahledZpravy', 'Poslat zkoušku sobě', 'Co odešlo'].every(x => ui.includes(x)));
+  ok('rozhraní: každé pravidlo má vypínač, náhled, zkoušku a deník', ['SwitchRow', 'ZpravyNahled', 'Poslat zkoušku sobě', 'Co odešlo'].every(x => ui.includes(x)));
   ok('rozhraní: uvítací série má až tři zprávy s dny', ui.includes('MAX_KROKU_UVITANI') && ui.includes('Za kolik dní po přidání'));
   const admin = precti('components/client/ClientAdmin.tsx');
   ok('rozhraní: Automatizace jsou část Zákazníků za oprávněním zpráv', admin.includes("id: 'automations', label: 'Automatizace', klic: 'zakaznici.zpravy'"));

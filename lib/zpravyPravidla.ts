@@ -4,6 +4,8 @@
 // a v app/api/client/admin/broadcast/route.ts.
 
 import { jeSegment } from './segmenty.ts';
+import { ctiKombinaci } from './skupinyPravidla.ts';
+import { jeKanal, type KanalyZpravy } from './zpravyKanaly.ts';
 import { dayPlus, pragueDayOf, pragueMomentOf } from './pragueTime.ts';
 
 /** Kolik zpráv smí podnik poslat za pražský den. Počítá se při ODESLÁNÍ, ne při plánování. */
@@ -21,8 +23,9 @@ export const AUDIENCES = ['all', 'quiet', 'tier:silver', 'tier:gold', 'tier:plat
 export const LINKS = ['page', 'loyalty', 'order', 'me'] as const;
 export type LinkKind = typeof LINKS[number];
 
+/** Publikum: úroveň, segment, skupina, nebo kombinace segmentů a skupin (`mix:and|quiet:60|!tier:gold`). */
 export function jePlatnePublikum(a: string): boolean {
-  return (AUDIENCES as readonly string[]).includes(a) || jeSegment(a) || /^group:\d+$/.test(a) || a === 'gold';
+  return (AUDIENCES as readonly string[]).includes(a) || jeSegment(a) || /^group:\d+$/.test(a) || a === 'gold' || !!ctiKombinaci(a, { skupiny: true });
 }
 
 export interface VstupZpravy {
@@ -30,6 +33,8 @@ export interface VstupZpravy {
   body: string;
   audience: string;
   linkKind: LinkKind;
+  /** Kudy zpráva jde: oznámení v aplikaci, e-mail, nebo obojí. */
+  channels: KanalyZpravy;
   /** Naplánovaný čas, nebo null = hned. */
   scheduledAt: Date | null;
   couponId: number | null;
@@ -74,10 +79,12 @@ export function zkontrolujZpravu(b: Record<string, unknown>, ted: number = Date.
     // Čas, který už nastal (nebo nastane za chvíli), je odeslání hned.
     if (at.getTime() <= ted + PLANOVANI_MIN_MS) at = null;
   }
+  if (b.channels !== undefined && !jeKanal(b.channels)) return { chyba: 'Tenhle kanál neznám. Vyber oznámení, e-mail, nebo obojí.' };
+  const channels: KanalyZpravy = jeKanal(b.channels) ? b.channels : 'push';
   const couponId = idZTela(b.couponId);
   const promoId = idZTela(b.promoId);
   if (couponId && promoId) return { chyba: 'Ke zprávě jde připojit kupon, nebo promo kód, ne obojí.' };
-  return { data: { title, body, audience: b.audience === undefined ? 'all' : aud, linkKind: (couponId || promoId) && linkKind === 'page' ? 'loyalty' : linkKind, scheduledAt: at, couponId, promoId } };
+  return { data: { title, body, audience: b.audience === undefined ? 'all' : aud, linkKind: (couponId || promoId) && linkKind === 'page' ? 'loyalty' : linkKind, channels, scheduledAt: at, couponId, promoId } };
 }
 
 /** Kolik zpráv ještě smí dnes odejít. */

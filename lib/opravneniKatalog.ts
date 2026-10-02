@@ -1237,7 +1237,7 @@ export const KATALOG: Opravneni[] = [
   "id": "zakaznici.sprava_clenu",
   "oblast": "Zákazníci a menu",
   "nazev": "Správa členů",
-  "popis": "Poznámky u členů, blokace člena, sloučení duplicit a odebrání člena z klubu (členovi zmizí body, razítka a kupony).",
+  "popis": "Blokace člena, sloučení duplicit a odebrání člena z klubu (členovi zmizí body, razítka a kupony).",
   "citlivost": "vysoká",
   "vyzaduje": [
    "zakaznici.zobrazit"

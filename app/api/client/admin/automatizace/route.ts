@@ -7,7 +7,7 @@ import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { zajistiSchemaClenu } from '@/lib/clenoveSchema';
 import { nactiAutomatizace, ulozAutomatizaci, logAutomatizace, poctyAutomatizace } from '@/lib/automatizaceDb';
 import { jeDruhAutomatizace, zpravaAutomatizace } from '@/lib/automatizace';
-import { posliZkousku } from '@/lib/broadcasts';
+import { zkusebniZprava } from '@/lib/broadcasts';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
   const zdroj = b.druh === 'uvitani' ? cfg?.kroky?.[krok] : cfg;
   const zprava = zpravaAutomatizace(b.druh, cfg, { jmeno: 'Jano', podnik: 'váš podnik', dny: Number(cfg?.dny) || undefined, body: Number(cfg?.body_bodu) || 0 }, krok);
   if (!zprava) return NextResponse.json({ error: 'Zpráva potřebuje nadpis.' }, { status: 400 });
-  const r = await posliZkousku(ctx.teamId, ctx.meId, { title: zprava.title, body: zprava.body, audience: 'all', channels: 'push+email', linkKind: 'loyalty', couponId: zdroj?.kuponId ?? null });
-  if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 });
+  const r = await zkusebniZprava(ctx.meId, ctx.teamId, { title: zprava.title, body: zprava.body, audience: 'all', channels: 'push+email', linkKind: 'loyalty', scheduledAt: null, couponId: zdroj?.kuponId ?? null, promoId: null });
+  if (!r.ok) return NextResponse.json({ error: r.chyba }, { status: 400 });
   return NextResponse.json({ ok: true, ...r.v });
 }

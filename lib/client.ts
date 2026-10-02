@@ -17,6 +17,7 @@ import { googleKonfig } from './walletKonfig';
 import { pragueToday } from './pragueTime';
 import { slotsFor as _slotsFor } from './clientSlots';
 import { MAX_ZUSTATEK, uvitaciBody } from './bodyPravidla';
+import { automatizaceUdalost } from './automatizaceHaky';
 
 // Veřejné routy hosta (podnik podle adresy, seznam podniků) sahají do
 // databáze dřív, než se dotknou session. Next.js na Vercelu takové volání
@@ -231,6 +232,14 @@ function obnovPenezenku(teamId: number, customerId: number): void {
   import('./walletDb').then(m => m.obnovKartuVPenezence(teamId, customerId)).catch(() => {});
 }
 
+/** Je člen v podniku blokovaný? Před migrací sloupce (nebo při chybě) ne. */
+export async function jeClenBlokovan(teamId: number, customerId: number): Promise<boolean> {
+  try {
+    const [r] = await sql`SELECT blocked FROM client_memberships WHERE team_id = ${teamId} AND customer_id = ${customerId}`;
+    return r?.blocked === true;
+  } catch { return false; }
+}
+
 export type LedgerKind = 'visit' | 'order' | 'manual' | 'coupon' | 'welcome' | 'birthday' | 'referral' | 'cashback' | 'credit' | 'expire' | 'reactivation' | 'storno';
 
 /**
@@ -243,6 +252,11 @@ export type LedgerKind = 'visit' | 'order' | 'manual' | 'coupon' | 'welcome' | '
  */
 export async function awardDetail(teamId: number, customerId: number, delta: number, kind: LedgerKind, ref?: string | null, note?: string | null, staffId?: number | null): Promise<{ points: number; change: number }> {
   await join(customerId, teamId);
+  // Blokovaný člen body nesbírá (odečet projde, ať jde přečerpaný účet vyrovnat).
+  if (delta > 0 && await jeClenBlokovan(teamId, customerId)) {
+    const [cur] = await sql`SELECT points FROM client_memberships WHERE customer_id = ${customerId} AND team_id = ${teamId}`;
+    return { points: Number(cur?.points ?? 0), change: 0 };
+  }
   const d = Math.max(-MAX_ZUSTATEK, Math.min(MAX_ZUSTATEK, Math.round(Number(delta) || 0)));
   const [m] = await sql`
     WITH stary AS (
@@ -360,6 +374,8 @@ export async function stampVisit(teamId: number, customerId: number, profile: an
     const [cur] = await sql`SELECT stamps FROM client_memberships WHERE customer_id = ${customerId} AND team_id = ${teamId}`;
     return { stamps: Number(cur?.stamps ?? 0), rewarded: false, already: true };
   }
+  // Po první návštěvě (Automatizace): jen když je to opravdu první návštěva člena v podniku.
+  if (Number(m?.visits) === 1) automatizaceUdalost('prvni_navsteva', teamId, customerId, 'prvni');
   // Přešel host touhle návštěvou na vyšší úroveň (podle návštěv)? Pak mu přijde oznámení.
   await import('./urovnePostup').then(x => x.oznamPostupUrovne(teamId, customerId, { navstev: 1 })).catch(() => {});
   if (!legacy) {

@@ -5,15 +5,18 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Select, Skeleton, SwitchRow, Textarea, useLoad } from '../../ui';
-import { czCount } from '@/lib/czech';
+import { czCount, type CzNoun } from '@/lib/czech';
 import {
   DEFINICE, ZASTUPNE_ZNACKY, ZNACKY_PRAVIDLA, STAVY_LOGU, MAX_KROKU_UVITANI, MAX_NADPIS, MAX_TEXT, MAX_DEN_UVITANI,
   vychoziKonfigurace, zpravaAutomatizace, shrnutiPravidla, type DruhAutomatizace,
 } from '@/lib/automatizace';
 import { apiMessage } from '@/lib/api';
 import { dbTimeDayHM } from '@/lib/pragueTime';
-import { BOD, DEN, j, type Hlaska } from './spolecne';
-import NahledZpravy from './NahledZpravy';
+import { j, type Hlaska } from '../import/typy';
+import ZpravyNahled from './ZpravyNahled';
+
+const BOD: CzNoun = { one: 'bod', few: 'body', many: 'bodů' };
+const DEN: CzNoun = { one: 'den', few: 'dny', many: 'dní' };
 
 interface Pravidlo { druh: DruhAutomatizace; enabled: boolean; config: any; enabled_at: string | null }
 interface Kupon { id: number; title: string }
@@ -201,7 +204,7 @@ function PravidloKarta({ pravidlo, pocty, kupony, muzePravidla, oznam, podnik, o
       {zdroj && (
         <div className="grid gap-2">
           <p className="t-label">Jak to uvidí host</p>
-          <NahledZpravy podnik={podnik} title={nahled?.title ?? ''} body={nahled?.body} kuponNazev={kupon} oznameni email />
+          <ZpravyNahled nazev={podnik} title={nahled?.title ?? ''} body={nahled?.body ?? ''} priloha={kupon ? { kupon: { title: kupon } } : null} linkKind="loyalty" email />
           {profilovePole && Number(cfg.body_bodu) > 0 && <p className="t-meta">Dárek: {czCount(Number(cfg.body_bodu), BOD)}.</p>}
         </div>
       )}

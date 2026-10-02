@@ -43,7 +43,7 @@ async function nactiHosty(teamId: number, couponId: number, pub: Publikum) {
  * (náhled před odesláním). Kupon musí být zveřejněný: koncept ani archiv se nerozesílá.
  */
 export async function posliKupon(
-  teamId: number, kupon: any, pub: Publikum, opt: { zkouska: boolean; zprava?: string; slug?: string | null },
+  teamId: number, kupon: any, pub: Publikum, opt: { zkouska: boolean; zprava?: string; slug?: string | null; ticho?: boolean },
 ): Promise<VysledekRozeslani> {
   const dnes = pragueToday();
   const hoste = await nactiHosty(teamId, Number(kupon.id), pub);
@@ -68,7 +68,7 @@ export async function posliKupon(
     if (!vlozeno.length) { await vratKus(Number(kupon.id)).catch(() => {}); vys.preskoceno.drzi += 1; continue; }
     vys.poslano += 1;
     // Oznámení je doplněk: když se nepošle, host kupon stejně najde v Moje → Kupony.
-    notifyUser(Number(h.customer_id), {
+    if (!opt.ticho) notifyUser(Number(h.customer_id), {
       title: `Nový kupon: ${String(kupon.title).slice(0, 60)}`,
       body: (opt.zprava || '').trim().slice(0, 140) || 'Najdeš ho v Moje → Kupony.',
       link: opt.slug ? `/client/${opt.slug}?tab=loyalty` : '/client/me', type: 'success',

@@ -68,18 +68,7 @@ export async function claimBlocker(
   if (groups.length) {
     const rows = await sql`
       SELECT 1 FROM client_group_members WHERE team_id = ${teamId} AND customer_id = ${customerId} AND group_id = ANY(${groups}) LIMIT 1`;
-    if (!rows.length) {
-      // Dynamická skupina nemá řádky členů: člena určuje pravidlo (nepřišel dva měsíce, narozeniny…).
-      let dynamicky = false;
-      try {
-        const dyn = await sql`SELECT rule FROM client_groups WHERE team_id = ${teamId} AND id = ANY(${groups}) AND rule IS NOT NULL` as any[];
-        if (dyn.length) {
-          const { idsPodlePravidla } = await import('./broadcasts');
-          for (const g of dyn) { if ((await idsPodlePravidla(teamId, String(g.rule))).includes(customerId)) { dynamicky = true; break; } }
-        }
-      } catch { dynamicky = false; }
-      if (!dynamicky) return 'Kupon je jen pro vybranou skupinu hostů.';
-    }
+    if (!rows.length) return 'Kupon je jen pro vybranou skupinu hostů.';
   }
   if (c.adult_only === true) {
     const age = ageFrom(ctx.birthday, pragueToday());

@@ -297,10 +297,9 @@ export function sestavCsvClenu(rows: RadekExportu[], sEmailem: boolean, sKredite
 
 // ---- Hromadné akce ----------------------------------------------------------------
 
-export const HROMADNE_AKCE = ['group', 'points', 'message', 'coupon'] as const;
+/** Akce nad výběrem, které řeší tenhle endpoint. Kupon vybraným jde přes okno posílání kuponů (coupons/send). */
+export const HROMADNE_AKCE = ['group', 'points', 'message'] as const;
 export type HromadnaAkce = typeof HROMADNE_AKCE[number];
-/** Akce, které ještě nejsou hotové (kupon řeší jiný okruh); server na ně odpoví srozumitelně. */
-export const AKCE_PRIPRAVUJE: readonly HromadnaAkce[] = ['coupon'];
 
 /** Bonus bodů hromadně: celé číslo 1 až 10 000 (záporné odečítání dělá jen úprava jednoho hosta). */
 export function chybaBonusu(delta: unknown): string | null {

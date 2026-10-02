@@ -16,7 +16,7 @@ Sloučení: kupony a promo kódy vznikly paralelně ve dvou větvích (kolo 77 W
 | K2 kupon vázaný na položku nabídky | HOTOVO | `menu_item_id`, `benefitLabel` („Zdarma: …", „Sleva 20 % na …"); `k81-kupony.ts` | Select „Platí jen na položku"; položka se ověřuje na tým. |
 | K2 X+Y strukturovaně | HOTOVO | `xy_buy`, `xy_free` | Typ „X+Y", dvě čísla, volitelně vázané na položku. |
 | K3 poslat kupon hostovi / skupině / segmentu | HOTOVO | `coupons/send/route.ts`, `KuponyOdeslat.tsx`, `lib/kuponyRozeslani.ts` | „Poslat hostům…" v nabídce kuponu a „Poslat kupon…" u členů. Respektuje cílení, 18+ a limity; kdo kupon drží, se přeskočí. |
-| K3 výběr více členů zaškrtnutím | HOTOVO | akce „Kupon vybraným" v seznamu členů předává `hostIds` | Zaškrtni členy → Další akce → Kupon vybraným. |
+| K3 výběr více členů zaškrtnutím | HOTOVO | lišta výběru v Zákaznících → Členové (`dalsiAkce` v `ClenoveSprava.tsx`), `KuponVybranym.tsx` předá vybrané hosty do `KuponyOdeslat.tsx` (`hostIds`), zápis dělá `coupons/send` a `lib/kuponyRozeslani.ts`; `k81-clenove.ts` | Zaškrtni členy (nebo „Vybrat vše podle filtru“, nejvýš 200) → Kupon → vyber kupon → zkouška ukáže, kdo ho dostane a koho se přeskočí → Poslat. |
 | K4 koncept / naplánováno / archiv | HOTOVO | `draft`, `archived_at`, `stavKuponu` | „Uložit jako koncept" (host nevidí), „Platí od" v budoucnu = naplánováno, Archivovat / Vrátit z archivu. Vydané kódy z archivu dál platí. |
 | K4 duplikovat | HOTOVO | `duplikujKupon` | Nabídka → Duplikovat; kopie je koncept a není uvítací. |
 | K4 historie změn | HOTOVO | `coupons/historie/route.ts`, `KuponyHistorie.tsx`, `popisZmen` (před → po); `k81-kupony.ts` | Nabídka → Historie změn: kdo, kdy a co přepsal („cena: 100 b. → 150 b."). |

@@ -262,3 +262,17 @@ export async function sendVoucherEmail(to: string, businessName: string, obsah: 
   const jmeno = businessName.replace(/[<>"\r\n]/g, '').trim().slice(0, 60) || 'podnik';
   return send({ label: `Managero — ${jmeno}`, to, replyTo: replyTo ?? null, subject: obsah.subject, html: obsah.html });
 }
+
+/**
+ * Zpráva členům klubu e-mailem (rozesílka, automatizace). Hlavičky List-Unsubscribe (včetně
+ * jednoho kliknutí) nechají poštovní klienty nabídnout „Odhlásit“ vedle odesílatele; bez nich
+ * lidé klikají na „Spam“ a to poškozuje doručitelnost všem podnikům.
+ */
+export async function sendNovinkyEmail(
+  to: string, label: string, subject: string, html: string, odhlasitUrl: string, replyTo?: string | null,
+): Promise<SendResult> {
+  return send({
+    label, to, subject, html, replyTo,
+    headers: { 'List-Unsubscribe': `<${odhlasitUrl}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
+  });
+}

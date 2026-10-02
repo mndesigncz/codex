@@ -1,30 +1,32 @@
 // Hromadné akce nad výběrem členů: přidat do skupiny / odebrat ze skupiny, bonus bodů,
 // zpráva vybraným. Výběr je buď seznam id (zaškrtnutí), nebo „všichni, kdo splňují
 // filtr" (server si je vybere sám stejnou funkcí jako seznam). Každá akce nese klíč
-// z prohlížeče: dvojklik ani opakované odeslání nic nezdvojí. Kupon vybraným řeší
-// jiný okruh; akce `coupon` je tu připravená a zatím odpovídá srozumitelnou chybou.
+// z prohlížeče: dvojklik ani opakované odeslání nic nezdvojí. Kupon vybraným jde
+// jinudy: lišta výběru otevře okno posílání kuponů (coupons/send). Blokovaný člen
+// nedostane ani body, ani zprávu.
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/client';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { audit } from '@/lib/audit';
+import { zajistiSchemaClenu } from '@/lib/clenoveSchema';
 import { hit } from '@/lib/rateLimit';
 import { odesliZpravu, nactiPrilohu } from '@/lib/broadcasts';
 import { zkontrolujZpravu } from '@/lib/zpravyPravidla';
 import { czCount } from '@/lib/czech';
 import { nactiClenyTymu, zajistiClenove, kontextFiltru } from '@/lib/clenoveDb';
 import {
-  HROMADNE_AKCE, AKCE_PRIPRAVUJE, HROMADNA_MAX, BONUS_CELKEM_MAX, normalizujFiltr, splnujeFiltr, chybaBonusu, normalizujKlicAkce, PRAZDNY_FILTR,
+  HROMADNE_AKCE, HROMADNA_MAX, BONUS_CELKEM_MAX, normalizujFiltr, splnujeFiltr, chybaBonusu, normalizujKlicAkce, PRAZDNY_FILTR,
 } from '@/lib/clenoveFiltr';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 const KLIC_AKCE: Record<string, string> = {
-  group: 'zakaznici.skupiny', points: 'vernost.upravit_body', message: 'zakaznici.zpravy', coupon: 'kupony.spravovat',
+  group: 'zakaznici.skupiny', points: 'vernost.upravit_body', message: 'zakaznici.zpravy',
 };
 
 export async function POST(req: NextRequest) {
-  const ctx = await pozaduj(['zakaznici.skupiny', 'vernost.upravit_body', 'zakaznici.zpravy', 'kupony.spravovat']);
+  const ctx = await pozaduj(['zakaznici.skupiny', 'vernost.upravit_body', 'zakaznici.zpravy']);
   if (jeOdpoved(ctx)) return ctx;
   const u = { id: ctx.meId, team_id: ctx.teamId };
   const b = await req.json().catch(() => ({}));
@@ -33,12 +35,10 @@ export async function POST(req: NextRequest) {
   if (!ctx.role.opravneni.has(KLIC_AKCE[akce])) return NextResponse.json({ error: 'Tuhle akci nad hosty nemáš povolenou.' }, { status: 403 });
   // Výběr hostů předpokládá seznam členů.
   if (!ctx.role.opravneni.has('zakaznici.zobrazit')) return NextResponse.json({ error: 'Členy klubu nemáš povoleno vidět.' }, { status: 403 });
-  if ((AKCE_PRIPRAVUJE as readonly string[]).includes(akce)) {
-    return NextResponse.json({ error: 'Posílání kuponů vybraným hostům se připravuje. Zatím kupon pošli zprávou celé skupině.' }, { status: 501 });
-  }
   const klic = normalizujKlicAkce(b.key);
   if (!klic) return NextResponse.json({ error: 'Chybí klíč akce. Obnov stránku a zkus to znovu.' }, { status: 400 });
   await zajistiClenove();
+  await zajistiSchemaClenu();
 
   // ---- výběr hostů ----
   let ids: number[] = [];
@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
     const r = await sql`
       WITH u AS (
         UPDATE client_memberships SET points = points + ${delta}
-        WHERE team_id = ${u.team_id} AND customer_id = ANY(${ids})
+        WHERE team_id = ${u.team_id} AND customer_id = ANY(${ids}) AND blocked = FALSE
         RETURNING customer_id
       )
       INSERT INTO client_loyalty_ledger (team_id, customer_id, delta, kind, ref, note)

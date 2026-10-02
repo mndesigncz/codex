@@ -12,7 +12,8 @@
 // aniž by se stav mezitím nezměnil. Opakované připsání téhož (kampaň, host, ref)
 // hlídá jedinečný index deníku razítek.
 
-import { sql, couponCode } from './client';
+import { sql, couponCode, jeClenBlokovan } from './client';
+import { automatizaceUdalost } from './automatizaceHaky';
 import { zajistiRazitka } from './stampsSchema';
 import { pragueToday, pragueDayOf, pragueHM, dayPlus, parseDbTime } from './pragueTime';
 import { planAdd, platiTed, sCasem, vyprselaKarta, vyprsiKdy, RAZITKO, type StavKarty, type Stav } from './stampsPlan';
@@ -302,6 +303,7 @@ export async function addStamps(
   c: StampCampaign, customerId: number, count: number, ref: string, opt: MoznostiRazitek = {},
 ): Promise<VysledekRazitek> {
   if (count <= 0) return { added: 0, stamps: 0, completions: 0 };
+  if (await jeClenBlokovan(c.team_id, customerId)) return { added: 0, stamps: 0, completions: 0, skipped: 'Člen je zablokovaný, razítka nesbírá.' };
   await zajistiRazitka();
   await sql`
     INSERT INTO client_stamp_progress (campaign_id, customer_id, team_id)
@@ -377,6 +379,8 @@ export async function addStamps(
     WHERE id = ${eventId}`;
   // Každé dokončení = kupon s kódem (host ho ukáže u kasy).
   for (let i = 0; i < p.dokonceni; i++) await vydejOdmenu(c, customerId, eventId);
+  // Po dokončení karty (Automatizace): jedna zpráva na každé dokončení, klíč nese kampaň a pořadí.
+  for (let i = 0; i < p.dokonceni; i++) automatizaceUdalost('dokoncena_karta', c.team_id, customerId, `karta:${c.id}:${s.completed + i + 1}`);
 
   const pozn = [
     p.dokonceni > 0 ? `${c.name}: +${p.pridano} ${razitekTvar(p.pridano)}, karta dokončena${p.dokonceni > 1 ? ` ${p.dokonceni}×` : ''}`

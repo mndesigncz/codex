@@ -5,11 +5,15 @@
 
 import { useEffect, useState } from 'react';
 import { Button, EmptyState, ErrorState, ListRow, Modal, Skeleton, Chip } from '../../ui';
-import { czCount } from '@/lib/czech';
+import { czCount, type CzNoun } from '@/lib/czech';
 import { telefonCitelne, popisSlouceni } from '@/lib/clenoveSeznam';
 import { apiMessage, okJson } from '@/lib/api';
-import { cislo, NAVSTEVA, denCesky, j, type Hlaska } from './spolecne';
+import { j, type Hlaska } from '../import/typy';
+import { denCesky } from './datum';
 import Potvrdit from './Potvrdit';
+
+const NAVSTEVA: CzNoun = { one: 'návštěva', few: 'návštěvy', many: 'návštěv' };
+const cislo = (n: number) => n.toLocaleString('cs');
 
 interface ClenDup { id: number; name: string; email: string | null; phone: string | null; points: number; visits: number; joined_at: string; last_visit_at: string | null }
 interface SkupinaDup { duvod: 'telefon' | 'email' | 'jmeno'; clenove: ClenDup[] }
@@ -74,9 +78,7 @@ export default function Duplicity({ oznam, onZavrit, onSlouceno }: { oznam: Hlas
         )}
       {potvrdit && (
         <Potvrdit title="Sloučit členy?" akce="Sloučit" busy={busy} onZavrit={() => setPotvrdit(null)} onPotvrdit={() => { void slouc(); }}
-          text={`${potvrdit.duplicita.name} se sloučí do ${potvrdit.hlavni.name}. ${popisSlouceni(
-            { points: potvrdit.hlavni.points, stamps: 0, visits: potvrdit.hlavni.visits, spend: 0, credit: 0, joined_at: null, last_visit_at: null, note: null },
-            { points: potvrdit.duplicita.points, stamps: 0, visits: potvrdit.duplicita.visits, spend: 0, credit: 0, joined_at: null, last_visit_at: null, note: null })}. Deník, kupony, rezervace, objednávky a skupiny přejdou na ${potvrdit.hlavni.name}. Člen ${potvrdit.duplicita.name} přijde o členství v klubu (jeho účet hosta zůstane). Zpět to nejde.`} />
+          text={`${potvrdit.duplicita.name} se sloučí do ${potvrdit.hlavni.name}. ${popisSlouceni(potvrdit.hlavni, potvrdit.duplicita)}. Deník, kupony, poznámky, rezervace, objednávky a skupiny přejdou na ${potvrdit.hlavni.name}. Člen ${potvrdit.duplicita.name} přijde o členství v klubu (jeho účet hosta zůstane). Zpět to nejde.`} />
       )}
     </Modal>
   );

@@ -1,30 +1,15 @@
-// Kolo 81 — skupiny členů: údaje (název, popis, barva), dynamická pravidla a kombinace podmínek.
-// Čisté funkce z lib/skupinyPravidla.ts, plus kontrola, že API skupin je opravdu zapojené (oprávnění, audit, archiv).
+// Kolo 81 — kombinace segmentů v publiku zpráv a doplňky skupin (archiv, přidání z CSV).
+// Čisté funkce z lib/skupinyPravidla.ts, plus kontrola zapojení. Údaje skupiny, dynamická pravidla a
+// filtry členů testuje k81-clenove.ts.
 
 import { readFileSync } from 'node:fs';
 import type { Testy } from './_testy.ts';
-import {
-  overMetaSkupiny, overPravidloSkupiny, ctiKombinaci, zapisKombinaci, sloucMnoziny, stitekKombinace, platnaCast, popisPravidlaSkupiny,
-  jeBarvaSkupiny, jeRucniAktivni, MAX_NAZEV_SKUPINY, MAX_POPIS_SKUPINY, BARVY_SKUPIN,
-} from '../../lib/skupinyPravidla.ts';
+import { ctiKombinaci, zapisKombinaci, sloucMnoziny, stitekKombinace, platnaCast } from '../../lib/skupinyPravidla.ts';
+import { jePlatnePublikum } from '../../lib/zpravyPravidla.ts';
 
 const precti = (cesta: string) => readFileSync(new URL(`../../${cesta}`, import.meta.url), 'utf8');
 
 export default function ({ eq, ok }: Testy) {
-  // ---- údaje skupiny ----
-  const m1 = overMetaSkupiny({ name: '  Štam   gasti ', description: ' Chodí denně ', color: '3' });
-  ok('meta: název se zhutní a ořízne', m1.ok && m1.meta.name === 'Štam gasti');
-  ok('meta: popis a barva projdou', m1.ok && m1.meta.description === 'Chodí denně' && m1.meta.color === '3');
-  eq('meta: prázdný název je chyba', overMetaSkupiny({ name: '   ' }), { ok: false, error: 'Zadej název skupiny.' });
-  eq('meta: neznámá barva je chyba', overMetaSkupiny({ name: 'A', color: '9' }).ok, false);
-  const m2 = overMetaSkupiny({ color: '' }, { name: 'Stará', description: 'Popis', color: '2' });
-  ok('meta: PATCH jen s barvou nepřepíše název ani popis, prázdná barva ji zruší', m2.ok && m2.meta.name === 'Stará' && m2.meta.description === 'Popis' && m2.meta.color === null);
-  const m3 = overMetaSkupiny({ name: 'x'.repeat(200), description: 'y'.repeat(500) });
-  ok('meta: délky se ořežou na limit', m3.ok && m3.meta.name.length === MAX_NAZEV_SKUPINY && (m3.meta.description ?? '').length === MAX_POPIS_SKUPINY);
-  ok('meta: popis lze smazat prázdným řetězcem', (() => { const r = overMetaSkupiny({ description: '' }, { name: 'A', description: 'Starý' }); return r.ok && r.meta.description === null; })());
-  eq('barvy: šest, 1 až 6', BARVY_SKUPIN.map(b => b.id), ['1', '2', '3', '4', '5', '6']);
-  ok('barva: 0 a 7 neplatí', !jeBarvaSkupiny('0') && !jeBarvaSkupiny('7') && jeBarvaSkupiny('6'));
-
   // ---- zápis kombinace ----
   eq('kombinace: zápis', zapisKombinaci('and', ['quiet:60', '!tier:gold']), 'mix:and|quiet:60|!tier:gold');
   eq('kombinace: čtení and se zápornou částí', ctiKombinaci('mix:and|quiet:60|!tier:gold'), { rezim: 'and', casti: ['quiet:60', '!tier:gold'] });
@@ -51,34 +36,20 @@ export default function ({ eq, ok }: Testy) {
   ok('popisek: kombinace česky', stitekKombinace({ rezim: 'and', casti: ['quiet:60', '!tier:gold'] }).includes('ne zlatí hosté') && stitekKombinace({ rezim: 'and', casti: ['quiet:60', '!tier:gold'] }).includes('zároveň'));
   ok('popisek: or říká „nebo“', stitekKombinace({ rezim: 'or', casti: ['quiet', 'birthday:month'] }).includes(' nebo '));
   ok('popisek: skupina se jménem', stitekKombinace({ rezim: 'or', casti: ['group:3', 'quiet'] }, { 3: 'Štamgasti' }).includes('Štamgasti'));
-  eq('pravidlo skupiny: bez pravidla', popisPravidlaSkupiny(null), null);
-  ok('pravidlo skupiny: jedna podmínka', (popisPravidlaSkupiny('quiet:60') ?? '').startsWith('Dynamická: '));
-  ok('pravidlo skupiny: kombinace', (popisPravidlaSkupiny('mix:and|quiet|tier:gold') ?? '').includes('zároveň'));
 
-  // ---- ověření pravidla z těla požadavku ----
-  eq('pravidlo: prázdné = ruční skupina', overPravidloSkupiny(''), { ok: true, rule: null });
-  eq('pravidlo: jedna podmínka', overPravidloSkupiny('near:points'), { ok: true, rule: 'near:points' });
-  eq('pravidlo: kombinace', overPravidloSkupiny('mix:or|quiet|birthday:month'), { ok: true, rule: 'mix:or|quiet|birthday:month' });
-  eq('pravidlo: odkaz na skupinu se odmítne (žádné smyčky)', overPravidloSkupiny('group:3').ok, false);
-  eq('pravidlo: kombinace s odkazem na skupinu se odmítne', overPravidloSkupiny('mix:and|quiet|group:3').ok, false);
-  eq('pravidlo: nesmysl se odmítne', overPravidloSkupiny('kdykoli').ok, false);
-  ok('ruční aktivní: bez pravidla a bez archivu', jeRucniAktivni({ rule: null, archived: false }) && !jeRucniAktivni({ rule: 'quiet' }) && !jeRucniAktivni({ archived: true }));
+  // ---- publikum zprávy ----
+  ok('publikum: kombinace je platné publikum zprávy, nesmyslná ne', jePlatnePublikum('mix:and|quiet:60|!tier:gold') && jePlatnePublikum('mix:or|quiet|group:3') && !jePlatnePublikum('mix:and|quiet') && !jePlatnePublikum('kdykoli'));
 
-  // ---- zapojení API ----
+  // ---- zapojení ----
   const groups = precti('app/api/client/admin/groups/route.ts');
   ok('API skupin: změny jen s oprávněním skupin', (groups.match(/pozaduj\('zakaznici\.skupiny'\)/g) ?? []).length >= 3);
-  ok('API skupin: přejmenování, popis, barva, archiv a pravidlo jdou přes PATCH', ['overMetaSkupiny', 'archived', 'overPravidloSkupiny'].every(x => groups.includes(x)));
-  ok('API skupin: změny se zapisují do historie', groups.includes("'client.skupina'"));
-  ok('API skupin: dynamická skupina nemá ruční členy ani slevu', groups.includes('Členy dynamické skupiny počítá pravidlo') && groups.includes('Dynamická skupina nemůže mít slevu'));
-  ok('API skupin: export členů do CSV', groups.includes("format') === 'csv'") || groups.includes("'csv'"));
+  ok('API skupin: archiv jde přes PATCH a zapisuje se do historie', groups.includes("typeof b.archived === 'boolean'") && groups.includes("'client.group'"));
   const imp = precti('app/api/client/admin/groups/import/route.ts');
   ok('import do skupiny: potřebuje i kontakty (jinak by šlo hádat e-maily)', imp.includes("'zakaznici.kontakty'"));
-  ok('import do skupiny: bez potvrzení jen náhled', imp.includes('b.potvrdit === true'));
+  ok('import do skupiny: bez potvrzení jen náhled, zápis jde do historie změn', imp.includes('b.potvrdit === true') && imp.includes("'client.skupina.import'"));
   const broadcasts = precti('lib/broadcasts.ts');
-  ok('zprávy: dynamická skupina se řeší pravidlem', broadcasts.includes('idsPodlePravidla'));
   ok('zprávy: blokovaní se z publika vyřazují', broadcasts.includes('blokovaniIds'));
-  const kupony = precti('lib/coupons.ts');
-  ok('kupony: cílení na dynamickou skupinu se vyhodnotí pravidlem', kupony.includes('idsPodlePravidla'));
+  ok('zprávy: archivované skupiny se v nabídce publika neukazují', precti('app/api/client/admin/broadcast/route.ts').includes('.filter(g => !g.archived)'));
   const init = precti('app/api/init/route.ts');
-  ok('schéma: sloupce skupin jsou v init', ['description TEXT', 'color TEXT', 'archived BOOLEAN', 'rule TEXT'].every(x => init.includes(`client_groups ADD COLUMN IF NOT EXISTS ${x}`)));
+  ok('schéma: archiv skupin je v init', init.includes('client_groups ADD COLUMN IF NOT EXISTS archived BOOLEAN'));
 }

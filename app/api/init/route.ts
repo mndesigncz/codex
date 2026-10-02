@@ -6,6 +6,7 @@ import { awardBirthdays } from '@/lib/client';
 import { propadniBody } from '@/lib/propadaniBoduDb';
 import { propadniKredit, oznamPoklesyUrovni } from '@/lib/bodyPravidlaDb';
 import { odesliChybisNam } from '@/lib/reaktivace';
+import { spustAutomatizaceCron } from '@/lib/automatizaceDb';
 import { pripomenPoukazy } from '@/lib/poukazyPrehledDb';
 import { checkCron } from '@/lib/cronAuth';
 import { hit } from '@/lib/rateLimit';
@@ -1894,6 +1895,44 @@ export async function GET(request: Request) {
         created_at TIMESTAMP DEFAULT NOW()
       )`);
     await ddl(sql`CREATE INDEX IF NOT EXISTS client_member_notes_customer ON client_member_notes (team_id, customer_id)`);
+    // Kolo 81: archiv skupin, blokace člena, e-mailový kanál zpráv (fronta a počty doručení) a automatizace
+    // zpráv s deníkem odeslání. Stejné příkazy jsou v lib/clenoveSchema.ts.
+    await ddl(sql`ALTER TABLE client_groups ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT FALSE`);
+    await ddl(sql`ALTER TABLE client_memberships ADD COLUMN IF NOT EXISTS blocked BOOLEAN NOT NULL DEFAULT FALSE`);
+    await ddl(sql`ALTER TABLE client_memberships ADD COLUMN IF NOT EXISTS blocked_at TIMESTAMP`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS channels TEXT NOT NULL DEFAULT 'push'`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS audience_ids JSONB`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS prijemci JSONB`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS push_count INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS email_sent INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS email_failed INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS no_consent INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS email_total INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS email_pos INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS client_automatizace (
+        team_id INTEGER NOT NULL,
+        kind TEXT NOT NULL,
+        enabled BOOLEAN NOT NULL DEFAULT FALSE,
+        config JSONB NOT NULL DEFAULT '{}'::jsonb,
+        enabled_at TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT NOW(),
+        PRIMARY KEY (team_id, kind)
+      )`);
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS client_automatizace_log (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        kind TEXT NOT NULL,
+        customer_id INTEGER NOT NULL,
+        ref TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'odeslano',
+        channels TEXT,
+        note TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE (team_id, kind, customer_id, ref)
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_automatizace_log_team ON client_automatizace_log (team_id, created_at)`);
     // Profil podniku v Nastavení: IČO a DIČ (volitelné).
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS ico TEXT`);
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS dic TEXT`);
@@ -2502,7 +2541,7 @@ export async function GET(request: Request) {
       // (hlášky Postgresu, názvy indexů a omezení, jméno databáze) jen cron —
       // vedení kteréhokoli podniku je dřív dostávalo do prohlížeče.
       migFails: migFails.length,
-      ...(zCronu ? { closingIndex, closingIndexes, closingConstraints, birthdays, propadleBody, propadlyKredit, poklesyUrovni, reactivations, migFailDetail: migFails.slice(0, 10) } : {}),
+      ...(zCronu ? { closingIndex, closingIndexes, closingConstraints, birthdays, propadleBody, propadlyKredit, poklesyUrovni, reactivations, automatizace, migFailDetail: migFails.slice(0, 10) } : {}),
     });
   } catch (error) {
     console.error('Init error:', error);

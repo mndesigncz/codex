@@ -41,6 +41,9 @@ import LoyaltyTabs, { LOYALTY_SUBS, type LoyaltySub } from './LoyaltyTabs';
 import PrechodZKarticky, { PRECHOD_TLACITKO, PRECHOD_OTAZKA, PRECHOD_POPIS, useImportKarticky } from './PrechodZKarticky';
 import ClenoveSprava from './loyalty/ClenoveSprava';
 import ZpravyRozeslani from './loyalty/ZpravyRozeslani';
+import Automatizace from './loyalty/Automatizace';
+import KuponVybranym from './loyalty/KuponVybranym';
+import type { VyberHostu } from './loyalty/ClenoveHromadne';
 import MenuEditor from '../employer/MenuEditor';
 import EventsView from '../employer/EventsView';
 import { czDay, RES_STATUS } from '@/lib/clientSlots';
@@ -665,11 +668,17 @@ function ZakazniciStranka({ oznam, hledat }: { oznam: Hlaska; hledat: string }) 
   const casti = CASTI_ZAKAZNIKU.filter(c => ma(c.klic));
   const [volba, setVolba] = useState<CastZakazniku>('members');
   const cast = casti.find(c => c.id === volba) ?? casti[0] ?? null;
+  // Kupon vybraným členům: akce v liště výběru, okno posílání kuponů je z části Kupony.
+  const [kuponVyber, setKuponVyber] = useState<VyberHostu | null>(null);
+  const dalsiAkce = ma('kupony.spravovat') ? (vyber: VyberHostu) => [{ label: 'Kupon', icon: 'tag', onClick: () => setKuponVyber(vyber) }] : undefined;
   const nastroj = !cast ? null
-    : cast.id === 'members' ? <ClenoveSprava oznam={oznam} hledat={hledat} />
+    : cast.id === 'members' ? <ClenoveSprava oznam={oznam} hledat={hledat} dalsiAkce={dalsiAkce} />
     : cast.id === 'reviews' ? <Recenze />
+    : cast.id === 'automations' ? <Automatizace oznam={oznam} />
     : <ZpravyRozeslani oznam={oznam} />;
   return (
+    <>
+    {kuponVyber && <KuponVybranym vyber={kuponVyber} oznam={oznam} onZavrit={() => setKuponVyber(null)} onHotovo={() => setKuponVyber(null)} />}
     <PlochaWidgetu
       stranka="vedeni.klient_zakaznici"
       hlavicka={{
@@ -682,6 +691,7 @@ function ZakazniciStranka({ oznam, hledat }: { oznam: Hlaska; hledat: string }) 
       }}
       nastroj={nastroj}
     />
+    </>
   );
 }
 

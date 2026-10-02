@@ -1,67 +1,49 @@
 'use client';
 
-// Detail člena pod řádkem seznamu: poznámka, skupiny, blokace, odebrání z klubu a celá historie
-// po částech (návštěvy, body, útraty, kupony, razítka podle kampaní, objednávky, poukazy).
+// Správa člena a jeho celá historie pod řádkem seznamu (doplněk detailu v ClenoveDetail.tsx):
+// blokace, odebrání z klubu a historie po částech (návštěvy, body, útraty, kupony, razítka
+// podle kampaní, objednávky, poukazy). Správa jen se zakaznici.sprava_clenu, historie s vernost.zobrazit.
 
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Chip, EmptyState, ErrorState, Field, ListRow, Segmented, Skeleton, Textarea, Well } from '../../ui';
-import { useOpravneni } from '../../role/useOpravneni';
+import { Button, Chip, EmptyState, ErrorState, ListRow, Segmented, Skeleton } from '../../ui';
 import { useMoney } from '../../CurrencyProvider';
-import { czCount } from '@/lib/czech';
+import { czCount, type CzNoun } from '@/lib/czech';
 import { DRUHY_DENIKU, zbyvaDoUrovne, zbyvaDoOdmeny } from '@/lib/clenPrehled';
-import { telefonCitelne } from '@/lib/clenoveSeznam';
 import type { Tier } from '@/lib/clientSlots';
 import { apiMessage, okJson } from '@/lib/api';
 import { dbTimeDayHM } from '@/lib/pragueTime';
-import { cislo, BOD, NAVSTEVA, denCesky, j, type Hlaska } from './spolecne';
+import { j, type Hlaska } from '../import/typy';
+import { denCesky } from './datum';
 import Potvrdit from './Potvrdit';
+
+const BOD: CzNoun = { one: 'bod', few: 'body', many: 'bodů' };
+const NAVSTEVA: CzNoun = { one: 'návštěva', few: 'návštěvy', many: 'návštěv' };
+const cislo = (n: number) => n.toLocaleString('cs');
 
 type Cast = 'prehled' | 'navstevy' | 'body' | 'utraty' | 'kupony' | 'razitka' | 'objednavky' | 'poukazy';
 const STAV_OBJEDNAVKY: Record<string, string> = { new: 'nová', accepted: 'přijatá', preparing: 'v přípravě', ready: 'hotová', done: 'vyřízená', served: 'vyřízená', cancelled: 'zrušená', rejected: 'odmítnutá', confirmed: 'přijatá' };
 
-export interface ClenProDetail { id: number; name: string; email?: string | null; phone?: string | null; note?: string | null; blocked?: boolean }
+export interface ClenProSpravu { id: number; name: string; blocked?: boolean }
 
-export default function ClenDetail({ clen, oznam, vidiDenik, onZmena }: { clen: ClenProDetail; oznam: Hlaska; vidiDenik: boolean; onZmena: () => void }) {
-  const { ma: smi } = useOpravneni();
+/** Historie člena: přepínač částí a stránkovaný výpis. */
+export function HistorieClena({ customerId }: { customerId: number }) {
   const [cast, setCast] = useState<Cast>('prehled');
   return (
-    <Well className="mb-3 space-y-4">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-        {clen.phone ? <a className="underline underline-offset-2" href={`tel:${clen.phone}`} aria-label={`Zavolat ${clen.name}`}>{telefonCitelne(clen.phone)}</a> : null}
-        {clen.email ? <a className="underline underline-offset-2 break-all" href={`mailto:${clen.email}`}>{clen.email}</a> : null}
-        {!clen.phone && !clen.email && <span className="t-meta">Kontakt vidí jen ten, kdo má oprávnění ke kontaktům hostů.</span>}
-      </div>
-      <SpravaClena clen={clen} oznam={oznam} muze={smi('zakaznici.sprava_clenu')} onZmena={onZmena} />
-      <SkupinyClena customerId={clen.id} oznam={oznam} prazdne={!vidiDenik} />
-      {vidiDenik && (
-        <>
-          <Segmented size="sm" ariaLabel="Část historie člena" value={cast} onChange={setCast}
-            options={[
-              { id: 'prehled', label: 'Přehled' }, { id: 'navstevy', label: 'Návštěvy' }, { id: 'body', label: 'Body' }, { id: 'utraty', label: 'Útraty' },
-              { id: 'razitka', label: 'Razítka' }, { id: 'kupony', label: 'Kupony' }, { id: 'objednavky', label: 'Objednávky' }, { id: 'poukazy', label: 'Poukazy' },
-            ]} />
-          <Historie customerId={clen.id} cast={cast} />
-        </>
-      )}
-    </Well>
+    <div className="space-y-3">
+      <Segmented size="sm" ariaLabel="Část historie člena" value={cast} onChange={setCast}
+        options={[
+          { id: 'prehled', label: 'Přehled' }, { id: 'navstevy', label: 'Návštěvy' }, { id: 'body', label: 'Body' }, { id: 'utraty', label: 'Útraty' },
+          { id: 'razitka', label: 'Razítka' }, { id: 'kupony', label: 'Kupony' }, { id: 'objednavky', label: 'Objednávky' }, { id: 'poukazy', label: 'Poukazy' },
+        ]} />
+      <Historie customerId={customerId} cast={cast} />
+    </div>
   );
 }
 
-// ---- Poznámka, blokace a odebrání -------------------------------------------------------------
-
-function SpravaClena({ clen, oznam, muze, onZmena }: { clen: ClenProDetail; oznam: Hlaska; muze: boolean; onZmena: () => void }) {
-  const [poznamka, setPoznamka] = useState(clen.note ?? '');
-  const [ulozeno, setUlozeno] = useState(clen.note ?? '');
-  const [ukladam, setUkladam] = useState(false);
+/** Blokace a odebrání člena z klubu (s potvrzením). */
+export function SpravaClena({ clen, oznam, onZmena }: { clen: ClenProSpravu; oznam: Hlaska; onZmena: () => void }) {
   const [potvrzeni, setPotvrzeni] = useState<'blokovat' | 'odblokovat' | 'smazat' | null>(null);
   const [busy, setBusy] = useState(false);
-  useEffect(() => { setPoznamka(clen.note ?? ''); setUlozeno(clen.note ?? ''); }, [clen.id, clen.note]);
-  const uloz = async () => {
-    setUkladam(true);
-    try { const r = await j('/api/client/admin/customers', { method: 'PATCH', body: JSON.stringify({ id: clen.id, note: poznamka }) }); setUlozeno(r.note ?? ''); oznam(poznamka.trim() ? 'Poznámka je uložená.' : 'Poznámka je smazaná.'); onZmena(); }
-    catch (err) { oznam(apiMessage(err, 'Poznámku se nepodařilo uložit.'), 'bad'); }
-    setUkladam(false);
-  };
   const blokuj = async (blocked: boolean) => {
     setBusy(true);
     try { await j('/api/client/admin/customers', { method: 'PATCH', body: JSON.stringify({ id: clen.id, blocked }) }); oznam(blocked ? `${clen.name} je zablokovaný.` : `${clen.name} je odblokovaný.`); setPotvrzeni(null); onZmena(); }
@@ -74,21 +56,12 @@ function SpravaClena({ clen, oznam, muze, onZmena }: { clen: ClenProDetail; ozna
     catch (err) { oznam(apiMessage(err, 'Člena se nepodařilo odebrat.'), 'bad'); }
     setBusy(false);
   };
-  if (!muze) return clen.note ? <p className="text-sm text-black/70 whitespace-pre-line"><span className="t-label block">Poznámka</span>{clen.note}</p> : null;
   return (
-    <div className="grid gap-3">
-      <Field id={`clen-pozn-${clen.id}`} label="Poznámka" hint={`Vidí ji jen vedení. Třeba alergie, oblíbený čaj, domluva. ${poznamka.length} z 500 znaků.`}>
-        <Textarea id={`clen-pozn-${clen.id}`} rows={2} maxLength={500} value={poznamka} onChange={e => setPoznamka(e.target.value)}
-          onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && poznamka !== ulozeno) { e.preventDefault(); void uloz(); } }} />
-      </Field>
-      <div className="flex gap-2 flex-wrap items-center">
-        <Button size="sm" variant="secondary" loading={ukladam} disabled={poznamka === ulozeno} onClick={() => { void uloz(); }}>Uložit poznámku</Button>
-        <span className="flex-1" />
-        {clen.blocked
-          ? <Button size="sm" variant="secondary" onClick={() => setPotvrzeni('odblokovat')}>Odblokovat</Button>
-          : <Button size="sm" variant="ghost" icon="lock" onClick={() => setPotvrzeni('blokovat')}>Zablokovat</Button>}
-        <Button size="sm" variant="danger" icon="trash" onClick={() => setPotvrzeni('smazat')}>Odebrat z klubu</Button>
-      </div>
+    <div className="flex gap-2 flex-wrap items-center">
+      {clen.blocked
+        ? <Button size="sm" variant="secondary" onClick={() => setPotvrzeni('odblokovat')}>Odblokovat</Button>
+        : <Button size="sm" variant="ghost" icon="lock" onClick={() => setPotvrzeni('blokovat')}>Zablokovat</Button>}
+      <Button size="sm" variant="danger" icon="trash" onClick={() => setPotvrzeni('smazat')}>Odebrat z klubu</Button>
       {potvrzeni === 'blokovat' && (
         <Potvrdit title={`Zablokovat ${clen.name}?`} akce="Zablokovat" busy={busy} onZavrit={() => setPotvrzeni(null)} onPotvrdit={() => { void blokuj(true); }}
           text="Blokovanému členovi se nepřipisují body ani razítka, nedostává zprávy a u kasy se zobrazí upozornění. Co už nasbíral, mu zůstane. Odblokovat ho jde kdykoli." />
@@ -99,51 +72,8 @@ function SpravaClena({ clen, oznam, muze, onZmena }: { clen: ClenProDetail; ozna
       )}
       {potvrzeni === 'smazat' && (
         <Potvrdit title={`Odebrat ${clen.name} z klubu?`} akce="Odebrat z klubu" busy={busy} onZavrit={() => setPotvrzeni(null)} onPotvrdit={() => { void smaz(); }}
-          text="Zmizí jeho body, razítka, kupony, deník a skupiny v tomhle podniku. Účet hosta zůstane (může být členem jinde) a stejně tak rezervace a objednávky. Vzít to zpět nejde, jen ho znovu přidat s nulou. Jen potřebuješ-li ho umlčet, zvol raději blokaci." />
+          text="Zmizí jeho body, razítka, kupony, deník, poznámky a skupiny v tomhle podniku. Účet hosta zůstane (může být členem jinde) a stejně tak rezervace a objednávky. Vzít to zpět nejde, jen ho znovu přidat s nulou. Jen potřebuješ-li ho umlčet, zvol raději blokaci." />
       )}
-    </div>
-  );
-}
-
-// ---- Skupiny člena -------------------------------------------------------------------------------
-
-function SkupinyClena({ customerId, oznam, prazdne = false }: { customerId: number; oznam: Hlaska; prazdne?: boolean }) {
-  const { ma: smi } = useOpravneni();
-  const meni = smi('zakaznici.skupiny');
-  const [skupiny, setSkupiny] = useState<{ id: number; name: string; rule: string | null; archived: boolean; color: string | null }[] | null>(null);
-  const [moje, setMoje] = useState<number[]>([]);
-  const [busy, setBusy] = useState(0);
-  const load = useCallback(() => fetch(`/api/client/admin/groups?customerId=${customerId}`).then(okJson)
-    .then(d => { setSkupiny(d.groups ?? []); setMoje(d.customerGroupIds ?? []); }).catch(() => setSkupiny([])), [customerId]);
-  useEffect(() => { void load(); }, [load]);
-  if (skupiny === null) return prazdne ? <Skeleton className="h-8" /> : null;
-  // Archivované a dynamické skupiny se tady nepřepínají: do archivu se nepřidává a dynamické plní pravidlo.
-  const k_vyberu = skupiny.filter(g => !g.archived || moje.includes(g.id));
-  if (k_vyberu.length === 0) return prazdne ? <p className="t-meta">Zatím žádné skupiny. Založíš je ve Věrnosti.</p> : null;
-  const prepni = async (g: { id: number; name: string }) => {
-    const je = moje.includes(g.id);
-    setBusy(g.id);
-    try {
-      await j('/api/client/admin/groups', { method: 'PATCH', body: JSON.stringify({ id: g.id, [je ? 'remove' : 'add']: [customerId] }) });
-      setMoje(je ? moje.filter(x => x !== g.id) : [...moje, g.id]);
-    } catch (err) { oznam(apiMessage(err, 'Skupinu se nepodařilo změnit.'), 'bad'); }
-    setBusy(0);
-  };
-  return (
-    <div>
-      <p className="t-label mb-1.5">Skupiny</p>
-      <div className="flex flex-wrap items-center gap-1.5">
-        {k_vyberu.map(g => {
-          const dyn = !!g.rule;
-          return (
-            <button key={g.id} type="button" onClick={() => { void prepni(g); }} disabled={!meni || dyn || g.archived || busy === g.id} aria-pressed={moje.includes(g.id)}
-              title={dyn ? 'Dynamická skupina: členy počítá pravidlo' : g.archived ? 'Skupina je v archivu' : undefined}
-              className={`filter-pill tap-target-sm ${moje.includes(g.id) ? 'seg-on' : 'seg-off glass'}`}>
-              {g.name}{dyn ? ' · dyn.' : ''}
-            </button>
-          );
-        })}
-      </div>
     </div>
   );
 }

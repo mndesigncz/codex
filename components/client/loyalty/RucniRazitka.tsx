@@ -35,7 +35,7 @@ export default function RucniRazitka({ kampan, onZavrit, onHotovo }: {
 
   useEffect(() => {
     if (komu !== 'skupina' || skupiny.length) return;
-    fetch('/api/client/admin/groups').then(okJson).then(d => setSkupiny(d.groups ?? [])).catch(e => setChyba(apiMessage(e, 'Skupiny se nepodařilo načíst.')));
+    fetch('/api/client/admin/groups').then(okJson).then(d => setSkupiny((d.groups ?? []).filter((g: any) => !g.archived))).catch(e => setChyba(apiMessage(e, 'Skupiny se nepodařilo načíst.')));
   }, [komu, skupiny.length]);
   useEffect(() => {
     const dotaz = q.trim();
