@@ -209,6 +209,15 @@ const paths: Record<string, React.ReactNode> = {
       <path d="M9.5 8h5M9.5 11.5h3.5" />
     </>
   ),
+  // Bon se značkou: zaoblený vršek, utržený zubatý spodek, součet a za ním
+  // tečka. Ikona uzávěrek (sedí = „a tečka"); stejný tvar jako app ikona.
+  bon: (
+    <>
+      <path d="M8 3h8a1.5 1.5 0 0 1 1.5 1.5v16l-1.375-1.25-1.375 1.25-1.375-1.25L12 20.5l-1.375-1.25-1.375 1.25-1.375-1.25L6.5 20.5v-16A1.5 1.5 0 0 1 8 3Z" />
+      <path d="M9.5 7.5h5M9.5 13.5h3.4" />
+      <circle cx="15.2" cy="13.5" r="1.05" fill="currentColor" stroke="none" />
+    </>
+  ),
   camera: (
     <>
       <path d="M3.5 8.5A1.5 1.5 0 0 1 5 7h2.3l1.4-2h6.6l1.4 2H19a1.5 1.5 0 0 1 1.5 1.5V18a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 18V8.5Z" />
@@ -391,48 +400,75 @@ export function Icon({ name, size = 22, strokeWidth = 1.7, className = '', motio
   );
 }
 
-// Managero brand mark — glossy 3D squircle with a lime→emerald gradient and a
-// centered glass bookmark. Matches the app icon / favicon.
-export function LogoMark({ size = 40 }: { size?: number }) {
+// Značka Managero — bon a tečka (kolo „Bon", 2026-10). Dvě kopie téhož bonu:
+// `managero` (provoz a tým) grafitová dlaždice, kouřové sklo, bon nakloněný
+// doprava; `client` (hosté) papírová dlaždice, mléčné sklo, nakloněný doleva.
+// Limetková tečka za součtem je jediná barva značky. Dvě optické velikosti:
+// do 48 px jen součet a větší tečka (řádky by se slily), nad 48 px celý bon.
+// Zdroj geometrie: apps/_shared/assets/src/*.svg (stejná čísla).
+// `animace` přehraje „tisk" (bon vyjede, součet doběhne, tečka cvakne) jednou
+// při mountu; jen pod prefers-reduced-motion: no-preference (globals.css .logo-tisk).
+export function LogoMark({ size = 40, app = 'managero', animace = false }: {
+  size?: number; app?: 'managero' | 'client'; animace?: boolean;
+}) {
   // useId, ne globální čítač: čítač na serveru (roste s každým požadavkem) a v prohlížeči se rozejde
   // a React pak kvůli rozdílným id gradientů zahodí celý server-vykreslený strom (chyba hydratace #418).
   const u = 'lm' + React.useId().replace(/:/g, '');
-  const bm = 'M44 38 Q44 34 48 34 H72 Q76 34 76 38 V86.5 Q76 89 73.6 87.5 L60 79 L46.4 87.5 Q44 89 44 86.5 Z';
+  const tmava = app === 'managero';
+  const mala = size <= 48;
+  // Geometrie v poli 120 (dlaždice 10–110), čísla z apps/scripts zdrojů.
+  const g = mala
+    ? { x0: 39, x1: 81, y0: 25, y1: 96, r: 6, zuby: 4, hloubka: 6, bar: [46.5, 65, 17, 7] as const, tecka: 4.4, mezera: 3.2, radky: [] as [number, number, number][] }
+    : { x0: 43, x1: 77, y0: 28, y1: 92.5, r: 4.6, zuby: 6, hloubka: 4, bar: [49.3, 71, 15.5, 5] as const, tecka: 3, mezera: 3, radky: [[49.3, 40.5, 17], [49.3, 46, 12]] as [number, number, number][] };
+  const tw = (g.x1 - g.x0) / g.zuby;
+  const zuby = Array.from({ length: g.zuby }, (_, i) =>
+    `L${(g.x1 - (i + 0.5) * tw).toFixed(2)},${g.y1 - g.hloubka} L${(g.x1 - (i + 1) * tw).toFixed(2)},${g.y1}`).join(' ');
+  const bon = `M${g.x0 + g.r},${g.y0} H${g.x1 - g.r} Q${g.x1},${g.y0} ${g.x1},${g.y0 + g.r} V${g.y1} ${zuby} V${g.y0 + g.r} Q${g.x0},${g.y0} ${g.x0 + g.r},${g.y0} Z`;
+  const [bx, by, bw, bh] = g.bar;
+  const tx = bx + bw + g.mezera + g.tecka, ty = by + bh / 2;
+  const cara = tmava ? '#ffffff' : '#16181A';
   return (
-    <svg width={size} height={size} viewBox="0 0 120 120" fill="none" aria-label="Managero" className="flex-shrink-0">
+    <svg width={size} height={size} viewBox="0 0 120 120" fill="none" aria-label={tmava ? 'Managero' : 'Managero client'}
+      className={'flex-shrink-0' + (animace ? ' logo-tisk' : '')}>
       <defs>
-        <linearGradient id={`${u}g`} x1="34" y1="8" x2="86" y2="112" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#EEFFB4" /><stop offset="0.38" stopColor="#C8F542" />
-          <stop offset="0.72" stopColor="#79D06B" /><stop offset="1" stopColor="#2FA968" />
+        <linearGradient id={`${u}d`} x1="0.25" y1="0" x2="0.75" y2="1">
+          {tmava
+            ? <><stop stopColor="#2E3236" /><stop offset="0.55" stopColor="#1A1C1F" /><stop offset="1" stopColor="#0E0F11" /></>
+            : <><stop stopColor="#F6F7F3" /><stop offset="0.55" stopColor="#EAECE6" /><stop offset="1" stopColor="#DADED4" /></>}
         </linearGradient>
-        <linearGradient id={`${u}m`} x1="60" y1="34" x2="60" y2="88" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#ffffff" /><stop offset="1" stopColor="#EDF3F6" />
+        <linearGradient id={`${u}s`} x1="0" y1="0" x2="0.3" y2="1">
+          {tmava
+            ? <><stop stopColor="#ffffff" stopOpacity={mala ? 0.5 : 0.34} /><stop offset="1" stopColor="#ffffff" stopOpacity={mala ? 0.26 : 0.12} /></>
+            : <><stop stopColor="#ffffff" /><stop offset="1" stopColor="#F3F5F1" /></>}
         </linearGradient>
-        <linearGradient id={`${u}s`} x1="44" y1="34" x2="70" y2="82" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#ffffff" stopOpacity="0.9" /><stop offset="0.5" stopColor="#ffffff" stopOpacity="0.16" /><stop offset="1" stopColor="#ffffff" stopOpacity="0" />
-        </linearGradient>
-        <radialGradient id={`${u}t`} cx="50" cy="20" r="46" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#ffffff" stopOpacity="0.5" /><stop offset="1" stopColor="#ffffff" stopOpacity="0" />
+        <radialGradient id={`${u}t`} cx="0.36" cy="0.32" r="0.72">
+          <stop stopColor="#F1FFC4" /><stop offset="0.45" stopColor="#C8F542" /><stop offset="1" stopColor="#9DCC22" />
         </radialGradient>
         <clipPath id={`${u}c`}><rect x="10" y="10" width="100" height="100" rx="27" /></clipPath>
-        <clipPath id={`${u}mc`}><path d={bm} /></clipPath>
-        <filter id={`${u}ms`} x="-40%" y="-40%" width="180%" height="200%">
-          <feDropShadow dx="0" dy="2.4" stdDeviation="2.2" floodColor="#0c2b16" floodOpacity="0.3" />
+        <filter id={`${u}f`} x="-30%" y="-30%" width="160%" height="170%">
+          <feDropShadow dx="0" dy="2.6" stdDeviation={tmava ? 3 : 3.2} floodColor={tmava ? '#000' : '#1c2416'} floodOpacity={tmava ? 0.55 : 0.22} />
         </filter>
       </defs>
-      <rect x="10" y="10" width="100" height="100" rx="27" fill="#17181B" />
-      <rect x="10" y="10" width="100" height="100" rx="27" fill={`url(#${u}g)`} />
-      <g clipPath={`url(#${u}c)`}>
-        <rect x="10" y="10" width="100" height="100" fill={`url(#${u}t)`} />
-        <rect x="10.8" y="10.8" width="98.4" height="98.4" rx="26.3" fill="none" stroke="#ffffff" strokeOpacity="0.35" strokeWidth="1.1" />
+      <g className="lt-dlazdice">
+        <rect x="10" y="10" width="100" height="100" rx="27" fill={`url(#${u}d)`} />
+        <rect x="10.5" y="10.5" width="99" height="99" rx="26.5" fill="none" stroke={tmava ? '#ffffff' : '#16181A'} strokeOpacity={tmava ? 0.1 : 0.07} />
       </g>
-      <g filter={`url(#${u}ms)`}>
-        <path d={bm} fill={`url(#${u}m)`} fillOpacity="0.96" />
-        <g clipPath={`url(#${u}mc)`}>
-          <path d="M44 34 H64 L50 62 V90 H44 Z" fill={`url(#${u}s)`} />
-          <rect x="40" y="34" width="40" height="13" fill="#ffffff" fillOpacity="0.55" />
+      <g clipPath={`url(#${u}c)`}>
+        <g transform={`rotate(${tmava ? 4 : -4} 60 61)`}>
+          <g className="lt-bon">
+            <path d={bon} fill={`url(#${u}s)`} filter={`url(#${u}f)`} />
+            <path d={bon} fill="none" stroke={cara} strokeOpacity={tmava ? 0.75 : 0.08} strokeWidth="0.9" />
+          </g>
+          {g.radky.map(([x, y, w], i) => (
+            <rect key={i} className="lt-radek" style={{ animationDelay: `${650 + i * 60}ms` }}
+              x={x} y={y} width={w} height="2.4" rx="1.2" fill={cara} fillOpacity={tmava ? 0.38 : 0.24} />
+          ))}
+          <rect className="lt-soucet" x={bx} y={by} width={bw} height={bh} rx={bh / 2} fill={cara} fillOpacity={tmava ? 0.95 : 1} />
+          <g className="lt-tecka">
+            <circle cx={tx} cy={ty} r={g.tecka} fill={`url(#${u}t)`} />
+            <circle cx={tx - g.tecka * 0.3} cy={ty - g.tecka * 0.34} r={g.tecka * 0.3} fill="#ffffff" fillOpacity="0.7" />
+          </g>
         </g>
-        <path d="M49 35.4 H71" stroke="#ffffff" strokeOpacity="0.95" strokeWidth="1.6" strokeLinecap="round" />
       </g>
     </svg>
   );

@@ -15,6 +15,7 @@ export { ListRow } from './ListRow';
 export { Stat, StatRow } from './Stat';
 export { Section } from './Section';
 export { Toast } from './Toast';
+export { Tecka } from './Tecka';
 export { SearchField } from './SearchField';
 export { ErrorState } from './ErrorState';
 export { ErrorBoundary } from './ErrorBoundary';

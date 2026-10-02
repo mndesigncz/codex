@@ -16,7 +16,7 @@ const PREDPONA = 'managero-skorapka-';
 // instalaci, takže beze změny názvu by zařízení, která ji už mají, ukazovala
 // starý text napořád — a spoléhat se na to, že si na zvýšení někdo vzpomene,
 // je horší než to nechat spočítat. Otisk hlídá `check-offline-cache`.
-const CACHE = PREDPONA + '2f348bba';
+const CACHE = PREDPONA + '578886a4';
 const OFFLINE = '/offline.html';
 
 self.addEventListener('install', (event) => {

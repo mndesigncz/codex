@@ -31,7 +31,7 @@
       "pushAplikace": "managero",
       "opravneni": { "kamera": true, "faceId": true, "mikrofon": false, "poloha": true, "fotky": true },
       "barvy": {
-        "pozadiIkony": "#C8F542",
+        "pozadiIkony": "#16181A",
         "splashSvetly": "#F3F4F0",
         "splashTmavy": "#0C0D0F"
       }
@@ -52,7 +52,7 @@
       "pushAplikace": "client",
       "opravneni": { "kamera": true, "faceId": true, "mikrofon": false, "poloha": true, "fotky": false },
       "barvy": {
-        "pozadiIkony": "#16181A",
+        "pozadiIkony": "#EEF0EA",
         "splashSvetly": "#F3F4F0",
         "splashTmavy": "#F3F4F0"
       }

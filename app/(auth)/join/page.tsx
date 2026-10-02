@@ -74,7 +74,7 @@ function JoinForm() {
       <div className="absolute top-4 right-4 sm:top-6 sm:right-6"><JazykMenu /></div>
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="flex justify-center mb-5"><LogoMark size={64} /></div>
+          <div className="flex justify-center mb-5"><LogoMark size={64} animace /></div>
           <h1 className="text-3xl font-bold tracking-tight text-[#16181A] mb-2">
             {token ? t('Přijmout pozvánku') : t('Připojit se k týmu')}
           </h1>

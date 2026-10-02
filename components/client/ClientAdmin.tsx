@@ -196,7 +196,7 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
           <div className="flex items-center gap-2.5 py-3.5 px-3 border-b border-black/[0.07]">
             <Button variant="ghost" size="sm" iconOnly icon="arrowLeft" className="shrink-0"
               aria-label="Zpět do administrace" title="Zpět do administrace" onClick={onExit} />
-            <LogoMark size={32} />
+            <LogoMark size={32} app="client" />
             <div className="min-w-0">
               <p className="font-bold text-sm leading-tight tracking-tight">Managero</p>
               <p className="t-label mt-0.5">Client</p>
@@ -239,7 +239,7 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
           <header className="px-4 sm:px-6 pt-5 pb-1 flex items-center gap-2 sm:gap-3 flex-shrink-0">
             <Button variant="ghost" size="sm" iconOnly icon="arrowLeft" className="md:hidden shrink-0"
               aria-label="Zpět do administrace" title="Zpět do administrace" onClick={onExit} />
-            <div className="hidden min-[380px]:block md:hidden shrink-0"><LogoMark size={30} /></div>
+            <div className="hidden min-[380px]:block md:hidden shrink-0"><LogoMark size={30} app="client" /></div>
             <div className="flex-1 min-w-0">
               <h2 className="font-bold text-[#16181A] text-lg tracking-tight truncate">{aktivni.label}</h2>
             </div>

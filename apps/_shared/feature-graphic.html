@@ -9,13 +9,14 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; width: 1024px; height: 500px; overflow: hidden; font-family: Geist, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
 body { position: relative; display: flex; align-items: center; padding: 0 110px; gap: 64px; }
-body.managero { background: radial-gradient(90% 120% at 0% 0%, #EEFFB4 0%, #C8F542 45%, #79D06B 100%); color: var(--ink); }
-body.client { background: radial-gradient(80% 110% at 0% 0%, rgba(200,245,66,.30) 0%, rgba(200,245,66,0) 60%), linear-gradient(160deg, #23262A, #0C0D0F); color: var(--bg); }
+body.managero { background: linear-gradient(160deg, #F6F7F3, #E6E9E2); color: var(--ink); }
+body.client { background: linear-gradient(160deg, #23262A, #0C0D0F); color: var(--bg); }
 .dlazdice { flex: none; width: 240px; height: 240px; border-radius: 56px; overflow: hidden; box-shadow: 0 30px 60px -20px rgba(10,20,5,.45); }
 .dlazdice img { width: 100%; height: 100%; display: block; }
 h1 { margin: 0 0 14px; font-size: 64px; line-height: 1.02; letter-spacing: -0.035em; font-weight: 750; }
 p { margin: 0; font-size: 30px; line-height: 1.25; letter-spacing: -0.01em; opacity: .78; max-width: 460px; }
-body.client h1 em { font-style: normal; color: var(--lime); }
+/* Limetka jen jako tečka za nadpisem (značka Bon: „a tečka"). */
+h1::after { content: ''; display: inline-block; width: .2em; height: .2em; margin-left: .06em; border-radius: 50%; background: var(--lime); box-shadow: 0 0 0 2px rgba(22,24,26,.18); }
 </style>
 <body><div class="dlazdice"><img id="i" alt=""></div><div><h1 id="t"></h1><p id="s"></p></div>
 <script>

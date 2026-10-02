@@ -1,10 +1,13 @@
 // Ikony, launch screen a grafika pro obchody obou aplikací ze zdrojových SVG.
 //   node apps/scripts/ikony.mjs [--jen=managero|client]
 //
-// Zdroj: apps/_shared/assets/src/<app>.svg (viewBox 120; geometrie z LogoMark v components/Icons.tsx,
-// barvy z tokenů --lime a --ink v app/globals.css). Obě aplikace jsou odlišitelné barvou i siluetou:
-//   managero  limetková dlaždice s bílou záložkou
-//   client    tmavá dlaždice s limetkovou záložkou a vyraženým razítkem (prstenec)
+// Zdroj (kolo „Bon", 2026-10): dvě kopie téhož bonu, limetka jen jako tečka za součtem.
+//   apps/_shared/assets/src/<app>-hero.png  1024 skleněný render (Higgsfield) — iOS ikona, Google Play, splash
+//   apps/_shared/assets/src/<app>.svg       vektor (viewBox 120, plná plocha; geometrie = LogoMark
+//                                           v components/Icons.tsx) — Android adaptivní vrstvy a monochrom
+//   managero  grafitová plocha, kouřový bon nakloněný doprava
+//   client    papírová plocha, mléčný bon nakloněný doleva
+// Bez hero renderu se vše bere z vektoru jako dřív.
 //
 // Výstup v apps/<app>/assets/:
 //   icon-only.png           1024×1024, plné pozadí, BEZ alfa a BEZ zaoblení (iOS maskuje sám; vstup @capacitor/assets)
@@ -18,7 +21,7 @@
 // Play varianty se kopírují i do apps/play-store/<app>/metadata/android/<locale>/images/.
 import sharp from 'sharp';
 import { chromium } from 'playwright-core';
-import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { APPS, GEIST, argumenty, chromiumCesta, KLICE, spolecne } from './_spolecne.mjs';
 
@@ -32,6 +35,9 @@ const TEXTY = {
   client: { cs: ['Managero client', 'Karta, rezervace a objednávky od stolu'], 'en-US': ['Managero client', 'Loyalty card, booking and table orders'] },
 };
 const svgOf = (app) => readFileSync(`${APPS}/_shared/assets/src/${app}.svg`);
+// Skleněný render tam, kde se ikona ukazuje celá (iOS, Play, splash); vektor jako záloha.
+const heroOf = (app) => existsSync(`${APPS}/_shared/assets/src/${app}-hero.png`)
+  ? readFileSync(`${APPS}/_shared/assets/src/${app}-hero.png`) : null;
 
 const browser = await chromium.launch({ executablePath: chromiumCesta() });
 try {
@@ -39,11 +45,14 @@ try {
     const out = `${APPS}/${app}/assets`;
     mkdirSync(`${out}/android`, { recursive: true });
     const svg = svgOf(app);
+    const hero = heroOf(app);
+    // Plná ikona (s plochou): render, nebo vektor. `density` platí jen pro SVG.
+    const plna = () => hero ? sharp(hero) : sharp(svg, { density: 96 });
     const bez = svg.toString().replace(/<rect width="120" height="120"[^>]*\/>/g, ''); // jen motiv, bez pozadí
     const pozadi = spolecne.apps[app].barvy.pozadiIkony;
 
     // iOS: plné pozadí, žádná alfa, žádné zaoblení.
-    await sharp(svg, { density: 96 }).resize(1024, 1024).flatten({ background: '#000' }).removeAlpha().png().toFile(`${out}/icon-only.png`);
+    await plna().resize(1024, 1024).flatten({ background: '#000' }).removeAlpha().png().toFile(`${out}/icon-only.png`);
 
     // Android adaptivní ikona: popředí v kruhu 66 % + jednobarevné pozadí + monochrom.
     const motiv = async (px) => sharp(Buffer.from(bez), { density: 96 }).resize(px, px).png().toBuffer();
@@ -62,13 +71,13 @@ try {
     // Launch screen: dlaždice uprostřed na barvě pozadí aplikace (světlé / tmavé).
     for (const [nazev, barva] of [['splash', SPLASH[app].svetly], ['splash-dark', SPLASH[app].tmavy]]) {
       const maska = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="560" height="560"><rect width="560" height="560" rx="125" fill="#fff"/></svg>');
-      const tile = await sharp(svg, { density: 96 }).resize(560, 560).composite([{ input: maska, blend: 'dest-in' }]).png().toBuffer();
+      const tile = await plna().resize(560, 560).composite([{ input: maska, blend: 'dest-in' }]).png().toBuffer();
       await sharp({ create: { width: 2732, height: 2732, channels: 3, background: barva } })
         .composite([{ input: tile, gravity: 'center' }]).removeAlpha().png().toFile(`${out}/${nazev}.png`);
     }
 
     // Google Play: ikona 512 a feature graphic 1024×500 (obojí do metadat supply).
-    await sharp(svg, { density: 96 }).resize(512, 512).flatten({ background: '#000' }).removeAlpha().png().toFile(`${out}/play-icon-512.png`);
+    await plna().resize(512, 512).flatten({ background: '#000' }).removeAlpha().png().toFile(`${out}/play-icon-512.png`);
     const ctx = await browser.newContext({ viewport: { width: 1024, height: 500 }, deviceScaleFactor: 1 });
     const p = await ctx.newPage();
     const sablona = readFileSync(`${APPS}/_shared/feature-graphic.html`, 'utf8').replace('GEIST_URL', pathToFileURL(GEIST).href);

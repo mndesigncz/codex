@@ -18,7 +18,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Icon } from '../Icons';
-import { Avatar, Button, Chip, Modal, PageHeader, Segmented, SwitchRow } from '../ui';
+import { Avatar, Button, Chip, Modal, PageHeader, Segmented, SwitchRow, Tecka } from '../ui';
 import {
   Closing, expectedCash, cashDifference, expectedCashLines,
   type Movement, type MovementKind, MOVEMENT_KINDS, movementLabel, sumMovements,
@@ -449,6 +449,9 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
   const [submitting, setSubmitting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [msg, setMsg] = useState('');
+  // „A tečka": odeslaná uzávěrka, kde kasa sedí a nejde ke schválení.
+  // Jediná chvíle dne, kdy se značka ukáže v provozu (DESIGN.md › Značka).
+  const [sedi, setSedi] = useState(false);
   const [err, setErr] = useState('');
   const [coworkers, setCoworkers] = useState<Coworker[]>([]);
   const [coworkerSel, setCoworkerSel] = useState<Record<number, { on: boolean; payout: string }>>({});
@@ -912,7 +915,10 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
             ? t('Nezapomeň se odpíchnout ({jmena}) — jinak se směna uzavře podle času uzávěrky.', { jmena: neodpichnuti.map(o => o.name).join(', ') })
             : t('Nezapomeň se odpíchnout — jinak se směna uzavře podle času uzávěrky.'))
           : '';
-        setMsg((d.approved === false ? t('Uzávěrka odeslána ke schválení vedení.') : zaKolegy ? t('Uzávěrka byla odeslána i za kolegy.') : t('Uzávěrka byla odeslána.')) + dovetek);
+        const kasaSedi = diff === 0 && d.approved !== false;
+        setSedi(kasaSedi);
+        setMsg((kasaSedi ? t('Kasa sedí. A tečka.') + ' ' : '')
+          + (d.approved === false ? t('Uzávěrka odeslána ke schválení vedení.') : zaKolegy ? t('Uzávěrka byla odeslána i za kolegy.') : t('Uzávěrka byla odeslána.')) + dovetek);
         // Widgety na ploše (Moje uzávěrka, Moje uzávěrky, Předávka) čtou tytéž URL.
         obnovDataWidgetu('/api/closings');
         obnovDataWidgetu('/api/closings/handover');
@@ -929,7 +935,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
         setTipsInDrawer(teamTipsInDrawer);
         onSubmitted?.();
         await load();
-        setTimeout(() => setMsg(''), neodpichnuti.length ? 12000 : 4000);
+        setTimeout(() => { setMsg(''); setSedi(false); }, neodpichnuti.length ? 12000 : 4000);
       } else {
         const d = await res.json().catch(() => ({}));
         if (d?.kod === 'POVINNE_NESPLNENO' && Array.isArray(d.chybi) && d.chybi.length > 0) {
@@ -974,7 +980,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
       {!vPlose && <PageHeader hintId="cashclosing" title={t('Uzávěrka')} subtitle={t('Spočítej kasu na konci směny — tržby se předvyplní z pokladny.')} />}
       {msg && (
         <p className="note note-ok text-sm flex items-center gap-2" role="status">
-          <Icon name="check" size={17} className="shrink-0" /> {msg}
+          {sedi ? <Tecka className="text-[17px] mx-[3px]" /> : <Icon name="check" size={17} className="shrink-0" />} {msg}
         </p>
       )}
       {err && (

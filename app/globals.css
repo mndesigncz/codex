@@ -972,6 +972,40 @@ button:active:not(:disabled), .pressable:active { transition-duration: var(--dur
 }
 .i-lead { transition: transform var(--dur-1) var(--ease-out-soft); }
 
+/* ---------- Značka: tisk bonu a tečka (LogoMark animace, <Tecka />) ------ */
+/* Jen vzácné chvíle (přihlášení, pozvánka, „kasa sedí"), nikdy v hlavičce
+   při každém načtení. Jednorázová předem daná sekvence → CSS animace.
+   Křivka --ease-out, bez přestřelení; pod `reduce` se nic nehýbe
+   (pravidla jsou jen v no-preference), logo je rovnou hotové. */
+@keyframes lt-dlazdice { from { opacity: 0; transform: scale(0.96); } }
+@keyframes lt-bon {
+  /* opacity kvůli vlasové lince horní hrany, kterou nulový ořez ještě ukáže */
+  from { opacity: 0; clip-path: inset(-20% -20% 100% -20%); transform: translateY(-4%); }
+  20%  { opacity: 1; }
+  to   { opacity: 1; clip-path: inset(-20% -20% -20% -20%); transform: none; }
+}
+@keyframes lt-radek  { from { opacity: 0; transform: translateY(1.5px); } }
+@keyframes lt-soucet { from { opacity: 0; transform: scaleX(0); } 30% { opacity: 1; } }
+@keyframes tecka-cvak { from { opacity: 0; transform: scale(0.6); } }
+@media (prefers-reduced-motion: no-preference) {
+  .logo-tisk .lt-dlazdice, .logo-tisk .lt-bon, .logo-tisk .lt-radek,
+  .logo-tisk .lt-soucet, .logo-tisk .lt-tecka { transform-box: fill-box; }
+  .logo-tisk .lt-dlazdice { transform-origin: center; animation: lt-dlazdice var(--dur-3) var(--ease-out) 250ms both; }
+  .logo-tisk .lt-bon      { animation: lt-bon 420ms var(--ease-out) 370ms both; }
+  .logo-tisk .lt-radek    { animation: lt-radek 200ms var(--ease-out) both; }
+  .logo-tisk .lt-soucet   { transform-origin: left center; animation: lt-soucet 240ms var(--ease-out) 830ms both; }
+  .logo-tisk .lt-tecka    { transform-origin: center; animation: tecka-cvak 200ms var(--ease-out) 1100ms both; }
+  .tecka                  { animation: tecka-cvak 200ms var(--ease-out) 120ms both; }
+}
+/* Tečka mimo logo: limetka s vlasovou linkou inkoustu (limetka sama má na
+   bílé 1,3 : 1, linka ji drží viditelnou). Dekorace — význam nese text. */
+.tecka {
+  display: inline-block; flex-shrink: 0;
+  width: 0.62em; height: 0.62em; border-radius: 9999px;
+  background: radial-gradient(circle at 36% 32%, #F1FFC4 0%, var(--lime) 45%, #9DCC22 100%);
+  box-shadow: 0 0 0 1px rgb(22 24 26 / 0.22);
+}
+
 /* ---------- Typography: tracking is size-specific, never one value ------ */
 h1, .t-display { letter-spacing: -0.022em; line-height: 1.06; }
 h2, .t-title   { letter-spacing: -0.015em; line-height: 1.15; }

@@ -37,7 +37,7 @@
     box-shadow: 0 1px 2px rgba(0,0,0,0.05), 0 18px 48px -20px rgba(0,0,0,0.25);
   }
   .znak {
-    width: 56px; height: 56px; border-radius: 18px; background: var(--lime); color: #16181A;
+    width: 56px; height: 56px; border-radius: 18px; background: #16181A; color: #F3F4F0; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12);
     display: flex; align-items: center; justify-content: center; margin-bottom: 20px;
   }
   h1 { font-size: 1.5rem; line-height: 1.2; letter-spacing: -0.02em; margin: 0 0 10px; }

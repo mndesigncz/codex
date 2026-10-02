@@ -14,6 +14,51 @@ plochy bez stínu. Jedna limetková akce na obrazovce; tmavá inkoustová pro
 vybraný stav a sekundární akce. Sklo (blur) zůstává jen na plovoucí liště,
 docku a topbaru, nikde jinde.
 
+## Značka: bon a tečka (kolo „Bon", 2026-10)
+
+**Příběh.** Každý den v podniku končí papírkem: uzávěrkou, bonem, součtem
+na konci. Managero je místo, kam se ty papírky stěhují. Značka je proto
+**bon**: zaoblený vršek, utržený zubatý spodek, dvě slabé řádky, součet
+a za ním **limetková tečka**. Tečka je interpunkce, ne přepínač: „Kasa sedí.
+A tečka." Bon má navíc vždycky dvě kopie, jednu pro podnik a jednu pro
+hosta, a proto jsou appky dvě:
+
+| Appka | Plocha | Bon | Kde |
+|---|---|---|---|
+| Managero (provoz, tým) | grafit `#16181A` | kouřové sklo, náklon +4° | administrace, zaměstnanec, kiosk, přihlášení |
+| Managero client (hosté) | papír `#EEF0EA` | mléčné sklo, náklon −4° | `/client`, správa Managero client, obnova hesla |
+
+- `LogoMark` (`components/Icons.tsx`) bere `app="managero" | "client"`.
+  Do 48 px kreslí jen součet a větší tečku (řádky by se slily), nad 48 px
+  celý bon. Nepřebarvuje se, nerotuje, nedává se na jinou plochu.
+- **Limetka je ve značce jen tečka.** Žádné limetkové plochy ani přechody
+  kolem loga; limetka v UI dál patří jedné hlavní akci.
+- App ikony: skleněný render `apps/_shared/assets/src/<app>-hero.png` (iOS,
+  Play, splash, PWA), vektor `<app>.svg` pro Android vrstvy a monochrom.
+  Přegenerovat: `node apps/scripts/ikony.mjs`.
+- Ikona `bon` (sada `Icons`) je glyf uzávěrek v navigaci: stejný tvar,
+  tah 1,7, tečka jako plný kroužek v `currentColor`.
+
+**Tisk (animace loga).** `<LogoMark animace />` jednou přehraje: dlaždice
+(250 ms) → bon se vytiskne shora (370 ms, 420 ms) → řádky (650/710 ms) →
+součet doběhne zleva (830 ms, 240 ms) → tečka cvakne (1100 ms, 200 ms).
+Vše `--ease-out`, bez přestřelení, jen pod `prefers-reduced-motion:
+no-preference` (jinak je logo rovnou hotové). Jen vzácné chvíle:
+přihlášení, pozvánka do týmu. Nikdy v hlavičce aplikace, kterou člověk
+vidí desetkrát denně.
+
+**Tečka v provozu (`<Tecka />`).** Jediná chvíle dne, kdy se značka ukáže
+uvnitř práce: **odeslaná uzávěrka, kde kasa sedí a nejde ke schválení**.
+Místo fajfky stojí tečka a věta „Kasa sedí. A tečka." Nikde jinde, nikdy
+dvakrát na obrazovce, žádné konfety ani zvuk. Tečka je `aria-hidden`,
+význam nese text.
+
+**Hlas.** Tykáme, česky, bez vykřičníků, krátké věty. Mluvíme jako parťák
+od baru, ne jako systém: „Zadej e-mail a heslo.", ne „Zadejte své údaje pro
+vstup do systému." Hotovou věc říkáme tečkou, ne oslavou. Chyba říká, co
+se stalo a co teď. Slova: *směna, kasa, uzávěrka, bon, sedí, manko,
+přebytek, odpíchnout, předávka* — ne *záznam, entita, transakce, systém*.
+
 ## Tokeny (app/globals.css, `:root`)
 
 - Pozadí `--bg #F3F4F0` + `--bg-gradient` (dvě radiální světla). Zrno přes
@@ -1836,7 +1881,9 @@ aplikace jede jako dřív.
 
 ## Anti-vzory (zdejší zákazy)
 
-Karta v kartě; víc než jedna limetková akce na obrazovce; ručně psané
+Karta v kartě; víc než jedna limetková akce na obrazovce; limetková plocha
+nebo přechod kolem loga (limetka je ve značce jen tečka); animované logo
+v hlavičce aplikace; `<Tecka />` jinde než u uzávěrky, kde kasa sedí; ručně psané
 pilulky, panely a štítky místo `.btn`/`.note`/`.t-label`; nové rádiusy
 mimo tři tokeny; nové barvy mimo paletu; Title Case v češtině; `capitalize`
 na datech; `String(date).slice` a `toDateString()` místo pragueTime; písmo pod 11 px;

@@ -51,7 +51,7 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
                 se dala odrolovat do strany. Slovo „client" jde na telefonu pryč,
                 celý nápis až pod 360 px — logo zůstává vždy. */}
             <Link href="/client" className="flex items-center gap-2 shrink-0" aria-label="Managero client">
-              <LogoMark size={32} />
+              <LogoMark size={32} app="client" />
               <span className="hidden min-[360px]:inline font-bold tracking-tight leading-none">Managero <span className="hidden sm:inline text-black/45 font-semibold">client</span></span>
             </Link>
             <nav className="ml-auto flex items-center gap-0.5 sm:gap-1 min-w-0" aria-label={t('Zákaznická navigace')}>
