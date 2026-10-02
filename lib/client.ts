@@ -142,6 +142,7 @@ export function publicProfile(p: any) {
       silverSpend: Number(p.silver_spend) || 0, goldSpend: Number(p.gold_spend) || 0, platinumSpend: Number(p.platinum_spend) || 0,
     },
     cashbackPct: Number(p.cashback_pct) || 0,
+    pointsExpireDays: Math.max(0, Math.trunc(Number(p.points_expire_days)) || 0),
     stampTarget: Number(p.stamp_target) || 0,
     stampReward: p.stamp_reward ?? '',
     maxParty: Number(p.max_party) || 8,
@@ -208,7 +209,7 @@ async function maybeReferralReward(customerId: number, teamId: number): Promise<
   }).catch(() => {});
 }
 
-export type LedgerKind = 'visit' | 'order' | 'manual' | 'coupon' | 'welcome' | 'birthday' | 'referral' | 'cashback' | 'credit';
+export type LedgerKind = 'visit' | 'order' | 'manual' | 'coupon' | 'welcome' | 'birthday' | 'referral' | 'cashback' | 'credit' | 'expire';
 
 /**
  * Připíše (nebo odečte) body a zapíše to do deníku. Body nikdy nejdou pod
@@ -265,15 +266,19 @@ export async function spendCredit(teamId: number, customerId: number, amountCzk:
   return Number(m.credit);
 }
 
-/** Návštěva: +1 razítko, +1 návštěva; po dosažení cíle se razítka vynulují a vznikne kupon na odměnu. */
-export async function stampVisit(teamId: number, customerId: number, profile: any, ref?: string): Promise<{ stamps: number; rewarded: boolean; already?: boolean }> {
+/**
+ * Návštěva: +1 razítko, +1 návštěva; po dosažení cíle se razítka vynulují a vznikne kupon na odměnu.
+ * `extra` jsou razítka navíc z bonusové akce (stejné připsání, žádný druhý řádek), `note` jejich popis do deníku.
+ */
+export async function stampVisit(teamId: number, customerId: number, profile: any, ref?: string, extra = 0, note = ''): Promise<{ stamps: number; rewarded: boolean; already?: boolean }> {
   await join(customerId, teamId);
   const target = Number(profile?.stamp_target) || 0;
+  const navic = Math.max(0, Math.trunc(Number(extra)) || 0);
   // Razítko nejvýš jedno za pražský den. Podmínka je přímo v UPDATE, takže dva
   // rychlé pokusy neprojdou oba — dřív se „už dnes byl" kontrolovalo zvlášť a
   // dalo se to dvojklikem obejít (dvě razítka, dvě návštěvy, dvakrát odměna).
   const [m] = await sql`
-    UPDATE client_memberships SET stamps = stamps + 1, visits = visits + 1, last_visit_at = NOW()
+    UPDATE client_memberships SET stamps = stamps + ${1 + navic}, visits = visits + 1, last_visit_at = NOW()
     WHERE customer_id = ${customerId} AND team_id = ${teamId}
       AND (last_visit_at IS NULL OR
            (last_visit_at AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Prague')::date
@@ -287,8 +292,10 @@ export async function stampVisit(teamId: number, customerId: number, profile: an
   let stamps = Number(m?.stamps ?? 0);
   let rewarded = false;
   if (target > 0 && stamps >= target) {
-    await sql`UPDATE client_memberships SET stamps = 0 WHERE customer_id = ${customerId} AND team_id = ${teamId}`;
-    stamps = 0; rewarded = true;
+    // Přebytek z bonusu se přenáší na další kartu (bez bonusu je to vždy nula).
+    stamps = stamps - target;
+    await sql`UPDATE client_memberships SET stamps = ${stamps} WHERE customer_id = ${customerId} AND team_id = ${teamId}`;
+    rewarded = true;
     // Odměna za razítka je kupon, který host ukáže u kasy.
     const [coupon] = await sql`
       INSERT INTO client_coupons (team_id, title, description, cost_points, active, kind)
@@ -297,9 +304,9 @@ export async function stampVisit(teamId: number, customerId: number, profile: an
     await sql`
       INSERT INTO client_coupon_claims (coupon_id, customer_id, team_id, code)
       VALUES (${coupon.id}, ${customerId}, ${teamId}, ${couponCode()})`;
-    await sql`INSERT INTO client_loyalty_ledger (team_id, customer_id, delta, kind, ref, note) VALUES (${teamId}, ${customerId}, 0, 'visit', ${ref ?? null}, 'Razítka doplněna — odměna')`;
+    await sql`INSERT INTO client_loyalty_ledger (team_id, customer_id, delta, kind, ref, note) VALUES (${teamId}, ${customerId}, 0, 'visit', ${ref ?? null}, ${'Razítka doplněna — odměna' + note})`;
   } else {
-    await sql`INSERT INTO client_loyalty_ledger (team_id, customer_id, delta, kind, ref, note) VALUES (${teamId}, ${customerId}, 0, 'visit', ${ref ?? null}, 'Razítko za návštěvu')`;
+    await sql`INSERT INTO client_loyalty_ledger (team_id, customer_id, delta, kind, ref, note) VALUES (${teamId}, ${customerId}, 0, 'visit', ${ref ?? null}, ${'Razítko za návštěvu' + note})`;
   }
   return { stamps, rewarded };
 }
@@ -418,7 +425,7 @@ export async function loyaltySummary(teamId: number) {
     FROM client_coupon_claims WHERE team_id = ${teamId}` as any[];
   const [l] = await sql`
     SELECT COALESCE(SUM(delta) FILTER (WHERE delta > 0 AND created_at >= NOW() - INTERVAL '30 days'), 0)::int AS given30,
-           COALESCE(SUM(-delta) FILTER (WHERE delta < 0 AND created_at >= NOW() - INTERVAL '30 days'), 0)::int AS spent30
+           COALESCE(SUM(-delta) FILTER (WHERE delta < 0 AND kind <> 'expire' AND created_at >= NOW() - INTERVAL '30 days'), 0)::int AS spent30
     FROM client_loyalty_ledger WHERE team_id = ${teamId}` as any[];
   return {
     members: Number(m?.members) || 0, newMembers30: Number(m?.new30) || 0,

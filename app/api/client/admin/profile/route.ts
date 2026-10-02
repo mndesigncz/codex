@@ -6,6 +6,7 @@ import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { normalizeQrDesign } from '@/lib/qrDesign';
 import { audit } from '@/lib/audit';
 import { zajistiUrovne } from '@/lib/urovneDb';
+import { ulozPropadani, zajistiPropadani } from '@/lib/propadaniBoduDb';
 import { teamIsMax, MAX_ONLY_MSG } from '@/lib/planServer';
 
 export const dynamic = 'force-dynamic';
@@ -30,6 +31,7 @@ const POLE_OPRAVNENI: Record<string, string> = {
   platinum_at: 'vernost.pravidla', member_discount: 'vernost.pravidla', silver_discount: 'vernost.pravidla',
   tier_by: 'vernost.pravidla', silver_spend: 'vernost.pravidla', gold_spend: 'vernost.pravidla', platinum_spend: 'vernost.pravidla',
   gold_discount: 'vernost.pravidla', platinum_discount: 'vernost.pravidla', cashback_pct: 'vernost.pravidla', cashback_mode: 'vernost.pravidla',
+  points_expire_days: 'vernost.pravidla',
 };
 const NAZEV_SKUPINY: Record<string, string> = {
   'klient.nastaveni': 'nastavení stránky pro hosty', 'klient.vzhled': 'vzhled stránky pro hosty', 'vernost.pravidla': 'pravidla věrnosti',
@@ -44,6 +46,7 @@ export async function GET(req: NextRequest) {
   const u = { id: ctx.meId, team_id: ctx.teamId };
   // Sloupce úrovní podle útraty se zajistí dřív, ať je profil (SELECT *) vrátí.
   try { await zajistiUrovne(); } catch { /* bez nich platí návštěvy */ }
+  try { await zajistiPropadani(); } catch { /* bez nich body nepropadají */ }
   const p = await ensureProfile(u.team_id);
   const boards = await sql`
     SELECT b.slug, b.name,
@@ -152,6 +155,11 @@ export async function PUT(req: NextRequest) {
         gold_spend = ${num(b.gold_spend, Number(p.gold_spend) || 15000, 2, 100000000)},
         platinum_spend = ${num(b.platinum_spend, Number(p.platinum_spend) || 0, 0, 100000000)}
       WHERE team_id = ${u.team_id} RETURNING *`;
+  }
+  // Propadání bodů: zvlášť, ať uložení ostatních pravidel nezávisí na migraci.
+  if (b?.points_expire_days !== undefined) {
+    const r = await ulozPropadani(u.team_id, b.points_expire_days);
+    pFinal = { ...pFinal, points_expire_days: r.days, points_expire_since: r.since };
   }
   audit(u.team_id, u.id, 'client.profile', 'client', null, pFinal.enabled ? `zapnuto · /client/${pFinal.slug}` : 'vypnuto');
   return NextResponse.json({ ok: true, profile: pFinal, public: publicProfile({ ...pFinal, team_name: '', opening_hours: {} }), url: `${origin(req)}/client/${pFinal.slug}` });

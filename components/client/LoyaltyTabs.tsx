@@ -40,10 +40,11 @@ import Poukazy from './Poukazy';
 // Věrnost měla šest podzáložek pod deseti hlavními — šestnáct sourozenců
 // nad sebou. „Body" a „Slevy a úrovně" jsou jedna věc (co host nasbírá a co
 // za to má) a „Kupony" s „Promo kódy" taky (co host uplatní).
-export type LoyaltySub = 'overview' | 'points' | 'stamps' | 'coupons' | 'vouchers';
+export type LoyaltySub = 'overview' | 'points' | 'bonus' | 'stamps' | 'coupons' | 'vouchers';
 export const LOYALTY_SUBS: { id: LoyaltySub; label: string }[] = [
   { id: 'overview', label: 'Přehled' },
   { id: 'points', label: 'Body a úrovně' },
+  { id: 'bonus', label: 'Akce a bonusy' },
   { id: 'stamps', label: 'Razítka' },
   { id: 'coupons', label: 'Kupony a kódy' },
   { id: 'vouchers', label: 'Poukazy' },
@@ -51,6 +52,7 @@ export const LOYALTY_SUBS: { id: LoyaltySub; label: string }[] = [
 const KLIC_CASTI: Record<LoyaltySub, readonly string[]> = {
   overview: ['vernost.zobrazit'],
   points: ['vernost.zobrazit'],
+  bonus: ['vernost.zobrazit'],
   stamps: ['vernost.zobrazit'],
   coupons: ['kupony.spravovat', 'kupony.uplatnit'],
   vouchers: ['poukazy.zobrazit', 'poukazy.uplatnit'],
@@ -201,7 +203,7 @@ function BodyAUrovne({ toast, setUkladam }: { toast: (m: string) => void; setUkl
     setUkladam(true);
     try {
       const r = await j('/api/client/admin/profile', { method: 'PUT', body: JSON.stringify({
-        points_per_100: p.points_per_100, cashback_pct: p.cashback_pct, cashback_mode: p.cashback_mode, birthday_points: p.birthday_points, referral_points: p.referral_points,
+        points_per_100: p.points_per_100, cashback_pct: p.cashback_pct, cashback_mode: p.cashback_mode, birthday_points: p.birthday_points, referral_points: p.referral_points, points_expire_days: p.points_expire_days,
         silver_at: p.silver_at, gold_at: p.gold_at, platinum_at: p.platinum_at,
         tier_by: p.tier_by === 'spend' ? 'spend' : 'visits', silver_spend: p.silver_spend, gold_spend: p.gold_spend, platinum_spend: p.platinum_spend,
         member_discount: p.member_discount, silver_discount: p.silver_discount, gold_discount: p.gold_discount, platinum_discount: p.platinum_discount,
@@ -245,6 +247,15 @@ function BodyAUrovne({ toast, setUkladam }: { toast: (m: string) => void; setUkl
             {cislo('l-per100', `Bodů za 100 ${symbol}`, `Objednávka za 250 ${symbol} dá dvaapůlnásobek.`, 'points_per_100', 100)}
             {cislo('l-bday', 'Bodů k narozeninám', 'Dárek v den narozenin. 0 = nedávat.', 'birthday_points', 1000)}
             {cislo('l-ref', 'Bodů za pozvání', 'Pro oba, když kamarád poprvé přijde. 0 = vypnuto.', 'referral_points', 1000)}
+          </div>
+        </Card>
+        <Card className="space-y-4">
+          <div>
+            <h2 className="t-card">Propadání bodů</h2>
+            <p className="t-meta mt-0.5 max-w-[70ch]">Body, které host nevyužije, po čase propadnou. Odepisují se od nejstarších, nikdy víc, než kolik host má. Týden předem dostane upozornění. Zapnutí nic nesmaže zpětně: stáří se počítá od dne, kdy to zapneš.</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {cislo('l-expire', 'Propadnou po (dnech)', '0 = nikdy nepropadají.', 'points_expire_days', 3650)}
           </div>
         </Card>
         <Card className="space-y-4">
@@ -832,11 +843,159 @@ function Coupons({ toast }: { toast: (m: string) => void }) {
   );
 }
 
+// ---- Akce a bonusy ---------------------------------------------------------------
+
+const KRAT: CzNoun = { one: 'razítko navíc', few: 'razítka navíc', many: 'razítek navíc' };
+
+const blankBonus = () => ({
+  id: null as number | null, name: '', multiplier: '2', stampBonus: '0', days: [] as number[],
+  hourFrom: '0', hourTill: '24', validSince: '', validTill: '', active: true,
+});
+
+function bonusToForm(r: any) {
+  return {
+    id: r.id as number, name: r.name ?? '', multiplier: String(r.multiplier ?? 1), stampBonus: String(r.stampBonus ?? 0),
+    days: (r.days ?? []) as number[], hourFrom: String(r.hourFrom ?? 0), hourTill: String(r.hourTill ?? 24),
+    validSince: r.validSince ?? '', validTill: r.validTill ?? '', active: r.active !== false,
+  };
+}
+
+/** Řádek seznamu: co akce dělá a kdy platí. */
+function popisBonusu(r: any): string {
+  const co = [
+    r.multiplier > 1 ? `${String(r.multiplier).replace('.', ',')}× body` : '',
+    r.stampBonus > 0 ? czCount(r.stampBonus, KRAT) : '',
+  ].filter(Boolean).join(' + ');
+  const dny = r.days?.length ? r.days.map((d: number) => DOW.find(x => x.d === d)?.l).filter(Boolean).join(', ') : 'každý den';
+  const hodiny = r.hourFrom === 0 && r.hourTill === 24 ? 'celý den' : `${r.hourFrom}:00–${r.hourTill}:00`;
+  const okno = [r.validSince ? `od ${czDay(r.validSince)}` : '', r.validTill ? `do ${czDay(r.validTill)}` : ''].filter(Boolean).join(' ');
+  return [co, dny, hodiny, okno].filter(Boolean).join(' · ');
+}
+
+function BonusAkce({ toast }: { toast: (m: string) => void }) {
+  const meni = useOpravneni().ma('vernost.pravidla');
+  const [list, setList] = useState<any[] | null>(null);
+  const [bezi, setBezi] = useState<number[]>([]);
+  const [form, setForm] = useState<ReturnType<typeof blankBonus> | null>(null);
+  const [busy, setBusy] = useState('');
+  const [mazu, setMazu] = useState<any | null>(null);
+  const [chyba, setChyba] = useState('');
+  const load = useCallback(() => fetch('/api/client/admin/bonus-rules').then(okJson)
+    .then(d => { setList(d.rules ?? []); setBezi(d.nowActive ?? []); setChyba(''); })
+    .catch(e => { setList([]); setChyba(apiMessage(e, 'Akce se nenačetly.')); }), []);
+  useEffect(() => { load(); }, [load]);
+
+  const save = async () => {
+    if (!form) return;
+    setBusy('save');
+    try {
+      await j('/api/client/admin/bonus-rules', { method: form.id ? 'PATCH' : 'POST', body: JSON.stringify(form) });
+      toast(form.id ? 'Akce uložena.' : 'Akce založena.'); setForm(null); load();
+    } catch (e) { toast(apiMessage(e, 'Akci se nepodařilo uložit.')); }
+    setBusy('');
+  };
+  const toggle = async (r: any) => {
+    setBusy('toggle:' + r.id);
+    try { await j('/api/client/admin/bonus-rules', { method: 'PATCH', body: JSON.stringify({ id: r.id, active: !r.active }) }); load(); }
+    catch (e) { toast(apiMessage(e, 'Změna se nepovedla.')); }
+    setBusy('');
+  };
+  const del = async (r: any) => {
+    try { await j(`/api/client/admin/bonus-rules?id=${r.id}`, { method: 'DELETE' }); toast('Akce smazána.'); load(); }
+    catch (e) { toast(apiMessage(e, 'Akci se nepodařilo smazat.')); }
+  };
+
+  if (list === null) return <Kostra />;
+
+  if (form) {
+    const f = form; const set = (patch: Partial<typeof f>) => setForm({ ...f, ...patch });
+    const flip = (d: number) => set({ days: f.days.includes(d) ? f.days.filter(x => x !== d) : [...f.days, d] });
+    return (
+      <div className="space-y-4 max-w-3xl">
+        <Button variant="ghost" size="sm" icon="undo" onClick={() => setForm(null)}>Zpět na akce</Button>
+        <Card className="space-y-4">
+          <div>
+            <h2 className="t-card">{f.id ? `Upravit „${f.name || '…'}"` : 'Nová akce'}</h2>
+            <p className="t-meta mt-0.5 max-w-[70ch]">Platí samo podle dne a hodiny, v pražském čase. Bonus se připíše v jednom řádku s poznámkou, žádné dvojí připsání. Víc akcí najednou se nesčítá: platí ta nejvýhodnější.</p>
+          </div>
+          <Field id="ba-name" label="Název (uvidí ho host)"><Input id="ba-name" value={f.name} onChange={e => set({ name: e.target.value })} placeholder="Happy hour" maxLength={80} disabled={!meni} /></Field>
+          <div>
+            <p className="field-label">Co akce přidává</p>
+            <div className="flex flex-wrap items-end gap-4">
+              <Field id="ba-mult" label="Násobič bodů" hint="1 až 10. 1 = bez změny.">
+                <Input id="ba-mult" type="text" inputMode="decimal" className="!w-28 text-center" value={f.multiplier} onChange={e => set({ multiplier: e.target.value })} disabled={!meni} />
+              </Field>
+              <div className="flex flex-wrap gap-1.5 pb-1">
+                {['1.5', '2', '3'].map(m => <Volba key={m} on={Number(f.multiplier) === Number(m)} onClick={() => { if (meni) set({ multiplier: m }); }}>{m.replace('.', ',')}×</Volba>)}
+              </div>
+              <Field id="ba-stamp" label="Razítek navíc" hint="0 až 10. 0 = žádné.">
+                <Input id="ba-stamp" type="number" inputMode="numeric" min={0} max={10} className="!w-28 text-center" value={f.stampBonus} onChange={e => set({ stampBonus: e.target.value })} disabled={!meni} />
+              </Field>
+            </div>
+          </div>
+          <div className="border-t border-black/[0.06] pt-4 space-y-3">
+            <p className="field-label">Kdy platí</p>
+            <div className="flex flex-wrap gap-1.5">
+              {DOW.map(d => <Volba key={d.d} on={f.days.includes(d.d)} onClick={() => { if (meni) flip(d.d); }}>{d.l}</Volba>)}
+            </div>
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-end gap-4">
+              <Field id="ba-hf" label="Od hodiny"><Input id="ba-hf" type="number" inputMode="numeric" min={0} max={23} className="sm:!w-24 text-center" value={f.hourFrom} onChange={e => set({ hourFrom: e.target.value })} disabled={!meni} /></Field>
+              <Field id="ba-ht" label="Do hodiny"><Input id="ba-ht" type="number" inputMode="numeric" min={1} max={24} className="sm:!w-24 text-center" value={f.hourTill} onChange={e => set({ hourTill: e.target.value })} disabled={!meni} /></Field>
+              <Field id="ba-vs" label="Platí od"><Input id="ba-vs" type="date" value={f.validSince} onChange={e => set({ validSince: e.target.value })} disabled={!meni} /></Field>
+              <Field id="ba-vt" label="Platí do"><Input id="ba-vt" type="date" value={f.validTill} onChange={e => set({ validTill: e.target.value })} disabled={!meni} /></Field>
+            </div>
+            <p className="t-meta">Žádný den nevybraný = každý den. Hodiny 0 až 24 = celý den; akce do 18 končí v 18:00.</p>
+          </div>
+          <ul className="list">
+            <SwitchRow title="Akce je zapnutá" hint="Vypnutou akci si nechej v seznamu na příště." checked={f.active} onChange={v => { if (meni) set({ active: v }); }} disabled={!meni} />
+          </ul>
+          <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+            <Button variant="secondary" onClick={() => setForm(null)}>Zrušit</Button>
+            {meni && <Button variant="primary" loading={busy === 'save'} onClick={save}>{f.id ? 'Uložit akci' : 'Založit akci'}</Button>}
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 max-w-3xl">
+      {chyba && <p className="note note-wait">{chyba}</p>}
+      <Card pad="none" aria-labelledby="v-bonus">
+        <div className="flex items-center justify-between gap-3 px-5 pt-4">
+          <h2 id="v-bonus" className="t-card">Akce a bonusy</h2>
+          {meni && <Button size="sm" variant="secondary" icon="plus" onClick={() => setForm(blankBonus())}>Nová akce</Button>}
+        </div>
+        {list.length === 0 ? (
+          <div className="px-5 pb-5"><EmptyState icon="gift" title="Zatím žádná akce" hint={meni ? 'Založ třeba happy hour: dvojnásobné body ve všední dny od 14 do 17.' : 'Podnik zatím žádnou akci nemá.'} compact /></div>
+        ) : (
+          <ul className="list px-5">
+            {list.map((r: any) => (
+              <ListRow key={r.id} className={r.active ? '' : 'opacity-55'}
+                title={<span className="flex items-center gap-1.5 min-w-0"><span className="truncate">{r.name}</span>{bezi.includes(r.id) && <Chip tone="ok" size="sm">běží teď</Chip>}</span>}
+                meta={popisBonusu(r)}
+                actions={meni ? <>
+                  <Switch checked={!!r.active} disabled={busy === 'toggle:' + r.id} onChange={() => { void toggle(r); }} label={`Zapnutá: ${r.name}`} />
+                  <Menu size="sm" label={`Další akce s akcí ${r.name}`} items={[
+                    { label: 'Upravit…', icon: 'pencil', onClick: () => setForm(bonusToForm(r)) },
+                    { label: 'Smazat…', icon: 'trash', danger: true, onClick: () => setMazu(r) },
+                  ]} />
+                </> : undefined} />
+            ))}
+          </ul>
+        )}
+      </Card>
+      {mazu && <Smazat title={`Smazat akci „${mazu.name}"?`} text="Body, které už host dostal, mu zůstanou. Akce jen přestane platit." onZavrit={() => setMazu(null)} onPotvrdit={() => { void del(mazu); }} />}
+    </div>
+  );
+}
+
 // ---- Rozcestník (plocha stránky Věrnost) ---------------------------------------
 
 const POPIS_CASTI: Record<LoyaltySub, string> = {
   overview: 'Jak si věrnostní program vede a co se v něm poslední dobou dělo.',
   points: 'Za co host dostane body, kolik se mu vrátí jako kredit, a jaké úrovně a slevy si tím odemyká.',
+  bonus: 'Časově omezené akce: dvojnásobné body v happy hour, razítka navíc v úterý. Platí samy podle dne a hodiny.',
   stamps: 'Razítkové kartičky — za návštěvy, za vybrané položky, nebo za útratu. Klidně víc najednou.',
   coupons: 'Co host uplatní: kupony se slevou v % i v měně podniku, X+Y, cílením a limity — a promo kódy na leták nebo účtenku.',
   vouchers: 'Dárkové poukazy s jedinečným kódem a QR: peněžní hodnota, platnost, uplatnění po částech u kasy a tisk.',
@@ -851,6 +1010,7 @@ export default function LoyaltyTabs({ toast, promos }: { toast: (m: string) => v
   const [ukladam, setUkladam] = useState(false);
   const nastroj = sub === 'overview' ? <Overview toast={toast} />
     : sub === 'points' ? <BodyAUrovne toast={toast} setUkladam={setUkladam} />
+    : sub === 'bonus' ? <BonusAkce toast={toast} />
     : sub === 'stamps' ? <Stamps toast={toast} />
     : sub === 'coupons' ? <div className="space-y-4"><Coupons toast={toast} />{promos}</div>
     : sub === 'vouchers' ? <Poukazy toast={toast} />
