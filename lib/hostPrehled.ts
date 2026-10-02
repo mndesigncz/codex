@@ -91,6 +91,10 @@ export interface PravidlaPodniku {
   campaigns: { name: string; required: number; reward: string }[];
   /** Rozšířené věrnostní úrovně: odměna za návštěvy nebo útratu (jen když podnik nějakou slevu dává). */
   maUrovneSeSlevou: boolean;
+  /** Uvítací body nového člena, propadání kreditu a snížení úrovně po neaktivitě (nepovinné; nula = nezmiňuje se). */
+  welcomePoints?: number;
+  creditExpireDays?: number;
+  inactiveMonths?: number;
 }
 
 export type PravidloZisku =
@@ -100,7 +104,10 @@ export type PravidloZisku =
   | { druh: 'narozeniny'; body: number }
   | { druh: 'pozvanka'; body: number }
   | { druh: 'urovne' }
-  | { druh: 'propadani'; dny: number };
+  | { druh: 'propadani'; dny: number }
+  | { druh: 'uvitani'; body: number }
+  | { druh: 'propadani_kreditu'; dny: number }
+  | { druh: 'pokles_urovne'; mesice: number };
 
 /** Co host dělá, aby dostal body a odměny: jen to, co podnik opravdu zapnul (nulové hodnoty se nezmiňují). */
 export function pravidlaZisku(p: PravidlaPodniku): PravidloZisku[] {
@@ -115,6 +122,9 @@ export function pravidlaZisku(p: PravidlaPodniku): PravidloZisku[] {
   if (cele(p.referralPoints) > 0) out.push({ druh: 'pozvanka', body: cele(p.referralPoints) });
   if (p.maUrovneSeSlevou) out.push({ druh: 'urovne' });
   if (cele(p.pointsExpireDays) > 0) out.push({ druh: 'propadani', dny: cele(p.pointsExpireDays) });
+  if (cele(p.welcomePoints) > 0) out.push({ druh: 'uvitani', body: cele(p.welcomePoints) });
+  if (cele(p.creditExpireDays) > 0) out.push({ druh: 'propadani_kreditu', dny: cele(p.creditExpireDays) });
+  if (cele(p.inactiveMonths) > 0) out.push({ druh: 'pokles_urovne', mesice: cele(p.inactiveMonths) });
   return out;
 }
 

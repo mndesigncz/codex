@@ -4,7 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { awardBirthdays } from '@/lib/client';
 import { propadniBody } from '@/lib/propadaniBoduDb';
-import { propadniKredit, zkontrolujUrovneVsem } from '@/lib/bodyPravidlaDb';
+import { propadniKredit, oznamPoklesyUrovni } from '@/lib/bodyPravidlaDb';
 import { odesliChybisNam } from '@/lib/reaktivace';
 import { pripomenPoukazy } from '@/lib/poukazyPrehledDb';
 import { checkCron } from '@/lib/cronAuth';
@@ -2126,6 +2126,26 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS points_exclude_prepaid BOOLEAN NOT NULL DEFAULT TRUE`);
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS points_exclude_items JSONB NOT NULL DEFAULT '[]'`);
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS tier_inactive_months INTEGER NOT NULL DEFAULT 0`);
+    // Rozšíření pravidel: strop za den, vyloučené kategorie nabídky, násobič podle úrovně, uvítací body, propadání kreditu,
+    // přenesený zbytek útraty, oznámené snížení úrovně a to, co se za účtenku připsalo (storno zrušené nebo vrácené účtenky).
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS points_cap_per_day INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS points_exclude_sections JSONB NOT NULL DEFAULT '[]'`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS mult_silver NUMERIC(4,2) NOT NULL DEFAULT 1`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS mult_gold NUMERIC(4,2) NOT NULL DEFAULT 1`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS mult_platinum NUMERIC(4,2) NOT NULL DEFAULT 1`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS welcome_points INTEGER`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS credit_expire_days INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS credit_expire_since TEXT`);
+    await ddl(sql`ALTER TABLE client_memberships ADD COLUMN IF NOT EXISTS spend_rest INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_memberships ADD COLUMN IF NOT EXISTS tier_seen TEXT`);
+    await ddl(sql`ALTER TABLE client_bill_awards ADD COLUMN IF NOT EXISTS points INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_bill_awards ADD COLUMN IF NOT EXISTS credit INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_bill_awards ADD COLUMN IF NOT EXISTS spend INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_bill_awards ADD COLUMN IF NOT EXISTS rev_points INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_bill_awards ADD COLUMN IF NOT EXISTS rev_credit INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_bill_awards ADD COLUMN IF NOT EXISTS rev_spend INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_bill_awards ADD COLUMN IF NOT EXISTS reversed_at TIMESTAMP`);
+    await ddl(sql`ALTER TABLE client_bill_awards ADD COLUMN IF NOT EXISTS reversed_reason TEXT`);
     // Kolo 74: promo bannery podniku (akce a oznámení nahoře na stránce hosta).
     await ddl(sql`
       CREATE TABLE IF NOT EXISTS client_banners (
@@ -2365,61 +2385,13 @@ export async function GET(request: Request) {
     // úloha je idempotentní, opakované volání téhož dne nic nezdvojí.
     let propadleBody = { expired: 0, warned: 0 };
     try { propadleBody = await propadniBody(); } catch { /* nesmí shodit migrace */ }
-    // Poukazy: připomenutí konce platnosti podniku i obdarovaným (jednou za platnost, idempotentní).
-    try { await pripomenPoukazy(); } catch { /* nesmí shodit migrace */ }
-
-    // ---- Kolo 80: body, úrovně a cashback — rozšířená pravidla, verze, storno ----
-    // Vše idempotentní; kód, který tyhle sloupce čte, je před migrací fail-open (platí základní pravidla).
-    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS points_round TEXT NOT NULL DEFAULT 'floor100'`);
-    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS points_min_spend INTEGER NOT NULL DEFAULT 0`);
-    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS points_cap_bill INTEGER NOT NULL DEFAULT 0`);
-    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS points_cap_day INTEGER NOT NULL DEFAULT 0`);
-    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS points_excl_credit BOOLEAN NOT NULL DEFAULT FALSE`);
-    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS loyalty_excl_products JSONB NOT NULL DEFAULT '[]'`);
-    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS loyalty_excl_categories JSONB NOT NULL DEFAULT '[]'`);
-    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS mult_silver NUMERIC(4,2) NOT NULL DEFAULT 1`);
-    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS mult_gold NUMERIC(4,2) NOT NULL DEFAULT 1`);
-    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS mult_platinum NUMERIC(4,2) NOT NULL DEFAULT 1`);
-    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS tier_inactive_days INTEGER NOT NULL DEFAULT 0`);
-    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS credit_expire_days INTEGER NOT NULL DEFAULT 0`);
-    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS credit_expire_since TEXT`);
-    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS welcome_points INTEGER`);
-    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS loyalty_draft JSONB`);
-    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS loyalty_draft_at TIMESTAMP`);
-    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS rules_version INTEGER NOT NULL DEFAULT 1`);
-    // Přenesený zbytek pod 100 (zaokrouhlení „zbytek se přenáší") a naposledy oznámená úroveň člena.
-    await ddl(sql`ALTER TABLE client_memberships ADD COLUMN IF NOT EXISTS spend_rest INTEGER NOT NULL DEFAULT 0`);
-    await ddl(sql`ALTER TABLE client_memberships ADD COLUMN IF NOT EXISTS tier_seen TEXT`);
-    // Co za účtenku host dostal a co se už vrátilo (storno zrušené nebo refundované účtenky).
-    await ddl(sql`ALTER TABLE client_bill_awards ADD COLUMN IF NOT EXISTS points INTEGER NOT NULL DEFAULT 0`);
-    await ddl(sql`ALTER TABLE client_bill_awards ADD COLUMN IF NOT EXISTS credit INTEGER NOT NULL DEFAULT 0`);
-    await ddl(sql`ALTER TABLE client_bill_awards ADD COLUMN IF NOT EXISTS spend INTEGER NOT NULL DEFAULT 0`);
-    await ddl(sql`ALTER TABLE client_bill_awards ADD COLUMN IF NOT EXISTS rev_points INTEGER NOT NULL DEFAULT 0`);
-    await ddl(sql`ALTER TABLE client_bill_awards ADD COLUMN IF NOT EXISTS rev_credit INTEGER NOT NULL DEFAULT 0`);
-    await ddl(sql`ALTER TABLE client_bill_awards ADD COLUMN IF NOT EXISTS rev_spend INTEGER NOT NULL DEFAULT 0`);
-    await ddl(sql`ALTER TABLE client_bill_awards ADD COLUMN IF NOT EXISTS reversed_at TIMESTAMP`);
-    await ddl(sql`ALTER TABLE client_bill_awards ADD COLUMN IF NOT EXISTS reversed_reason TEXT`);
-    // Základ útraty u řádku deníku: přehledy, výnosnost a export.
-    await ddl(sql`ALTER TABLE client_loyalty_ledger ADD COLUMN IF NOT EXISTS amount INTEGER`);
-    // Verze pravidel: každá změna s rozdílem před/po a snímkem platných pravidel.
-    await ddl(sql`
-      CREATE TABLE IF NOT EXISTS client_rule_versions (
-        id SERIAL PRIMARY KEY,
-        team_id INTEGER NOT NULL,
-        version INTEGER NOT NULL,
-        rules JSONB NOT NULL DEFAULT '{}',
-        changes JSONB NOT NULL DEFAULT '[]',
-        source TEXT NOT NULL DEFAULT 'form',
-        note TEXT,
-        changed_by INTEGER,
-        created_at TIMESTAMP DEFAULT NOW()
-      )`);
-    await ddl(sql`CREATE INDEX IF NOT EXISTS client_rule_versions_team ON client_rule_versions (team_id, version)`);
-    // Denně: propadnutí kreditu (s upozorněním týden předem) a snížení úrovně po neaktivitě (s oznámením).
+    // Denně: propadnutí kreditu (s upozorněním týden předem) a oznámení o snížení úrovně po neaktivitě.
     let propadlyKredit = { expired: 0, warned: 0 };
     try { propadlyKredit = await propadniKredit(); } catch { /* nesmí shodit migrace */ }
-    let zmenyUrovni = 0;
-    try { zmenyUrovni = await zkontrolujUrovneVsem(); } catch { /* nesmí shodit migrace */ }
+    let poklesyUrovni = 0;
+    try { poklesyUrovni = await oznamPoklesyUrovni(); } catch { /* nesmí shodit migrace */ }
+    // Poukazy: připomenutí konce platnosti podniku i obdarovaným (jednou za platnost, idempotentní).
+    try { await pripomenPoukazy(); } catch { /* nesmí shodit migrace */ }
 
     // ---- Kolo 77: nativní obal a obchody (App Store, Google Play) ----
     // Vše idempotentní; kód, který tyhle tabulky čte, je před migrací fail-open.
@@ -2504,7 +2476,7 @@ export async function GET(request: Request) {
       // (hlášky Postgresu, názvy indexů a omezení, jméno databáze) jen cron —
       // vedení kteréhokoli podniku je dřív dostávalo do prohlížeče.
       migFails: migFails.length,
-      ...(zCronu ? { closingIndex, closingIndexes, closingConstraints, birthdays, propadleBody, propadlyKredit, zmenyUrovni, reactivations, migFailDetail: migFails.slice(0, 10) } : {}),
+      ...(zCronu ? { closingIndex, closingIndexes, closingConstraints, birthdays, propadleBody, propadlyKredit, poklesyUrovni, reactivations, migFailDetail: migFails.slice(0, 10) } : {}),
     });
   } catch (error) {
     console.error('Init error:', error);

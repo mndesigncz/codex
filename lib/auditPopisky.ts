@@ -117,6 +117,7 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'client.stamps.adjust': 'Ručně upravena razítka hosta',
   'client.stamps.undo': 'Stornována poslední akce s razítky hosta',
   'client.pravidla': 'Změna pravidel bodů a úrovní věrnosti',
+  'client.storno': 'Storno bodů a kreditu za zrušenou nebo vrácenou účtenku',
   'client.order': 'Změněn stav objednávky hosta',
   'client.order.pos': 'Objednávka hosta předána do kasy',
   // předplatné

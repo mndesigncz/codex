@@ -139,8 +139,8 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
       const castka = pk.propadne + pk.varovat;
       mine.creditExpiring = castka > 0 ? { amount: castka, till: pk.varovatDo ?? today } : null;
     }
-    // Úroveň snížená kvůli neaktivitě: host má vědět proč a co s tím.
-    mine.levelDegraded = !!tier.degraded;
+    // Úroveň dočasně snížená po neaktivitě: host se dozví proč.
+    mine.levelDegraded = !!tier.reduced;
   }
   // Novinky: poslední rozeslané zprávy členům rovnou na stránce podniku,
   // ať mají co číst i hosté bez zapnutých oznámení.

@@ -8,7 +8,7 @@ import { formatMoney } from '@/lib/money';
 import { pravidlaZisku, urovneSeSlevou, type PravidloZisku } from '@/lib/hostPrehled';
 
 export default function HostPravidla({ b, campaigns }: {
-  b: { pointsPer100: number; cashbackPct: number; pointsExpireDays: number; birthdayPoints?: number; referralPoints?: number; currency: string; tiers?: any };
+  b: { pointsPer100: number; cashbackPct: number; pointsExpireDays: number; creditExpireDays?: number; welcomePoints?: number; birthdayPoints?: number; referralPoints?: number; currency: string; tiers?: any };
   campaigns: { name: string; required: number; reward?: string }[];
 }) {
   const t = useT('klient-host');
@@ -17,6 +17,7 @@ export default function HostPravidla({ b, campaigns }: {
     birthdayPoints: b.birthdayPoints ?? 0, referralPoints: b.referralPoints ?? 0,
     campaigns: campaigns.map(c => ({ name: c.name, required: c.required, reward: c.reward ?? '' })),
     maUrovneSeSlevou: urovneSeSlevou(b.tiers),
+    welcomePoints: b.welcomePoints ?? 0, creditExpireDays: b.creditExpireDays ?? 0, inactiveMonths: b.tiers?.inactiveMonths ?? 0,
   });
   if (pravidla.length === 0) return null;
   const veta = (r: PravidloZisku): string => {
@@ -30,6 +31,9 @@ export default function HostPravidla({ b, campaigns }: {
       case 'pozvanka': return t('Za pozvaného kamaráda dostanete oba {n, plural, one {# bod} few {# body} other {# bodů}}.', { n: r.body });
       case 'urovne': return t('Čím častěji chodíš, tím vyšší úroveň a větší sleva.');
       case 'propadani': return t('Body, které nepoužiješ do {n, plural, one {# dne} few {# dnů} other {# dnů}}, propadnou.', { n: r.dny });
+      case 'uvitani': return t('Po připojení dostaneš {n, plural, one {# bod} few {# body} other {# bodů}} na uvítanou.', { n: r.body });
+      case 'propadani_kreditu': return t('Kredit, který nevyužiješ do {n, plural, one {# dne} few {# dnů} other {# dnů}}, propadne.', { n: r.dny });
+      case 'pokles_urovne': return t('Když dlouho nepřijdeš (po {n, plural, one {# měsíci} few {# měsících} other {# měsících}}), úroveň klesne o stupeň.', { n: r.mesice });
     }
   };
   return (

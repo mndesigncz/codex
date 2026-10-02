@@ -16,7 +16,7 @@ import { notifyUser } from './push';
 import { googleKonfig } from './walletKonfig';
 import { pragueToday } from './pragueTime';
 import { slotsFor as _slotsFor } from './clientSlots';
-import { MAX_ZUSTATEK } from './bodyPravidla';
+import { MAX_ZUSTATEK, uvitaciBody } from './bodyPravidla';
 
 // Veřejné routy hosta (podnik podle adresy, seznam podniků) sahají do
 // databáze dřív, než se dotknou session. Next.js na Vercelu takové volání
@@ -146,6 +146,8 @@ export function publicProfile(p: any) {
     },
     cashbackPct: Number(p.cashback_pct) || 0,
     pointsExpireDays: Math.max(0, Math.trunc(Number(p.points_expire_days)) || 0),
+    creditExpireDays: Math.max(0, Math.trunc(Number(p.credit_expire_days)) || 0),
+    welcomePoints: p.loyalty_on ? uvitaciBody(p) : 0,
     birthdayPoints: Math.max(0, Math.trunc(Number(p.birthday_points)) || 0),
     referralPoints: Math.max(0, Math.trunc(Number(p.referral_points)) || 0),
     stampTarget: Number(p.stamp_target) || 0,
@@ -224,23 +226,6 @@ function obnovPenezenku(teamId: number, customerId: number): void {
 }
 
 export type LedgerKind = 'visit' | 'order' | 'manual' | 'coupon' | 'welcome' | 'birthday' | 'referral' | 'cashback' | 'credit' | 'expire' | 'reactivation' | 'storno';
-
-let denikUtrataPripraven: Promise<void> | null = null;
-/** Sloupec `amount` (základ útraty) v deníku. Jednou za studený start; stejný příkaz je v app/api/init/route.ts. */
-export function zajistiDenikUtrata(): Promise<void> {
-  if (!denikUtrataPripraven) {
-    denikUtrataPripraven = (async () => {
-      await sql`ALTER TABLE client_loyalty_ledger ADD COLUMN IF NOT EXISTS amount INTEGER`;
-    })().catch(e => { denikUtrataPripraven = null; throw e; });
-  }
-  return denikUtrataPripraven;
-}
-
-/** Poznámka s dovětkem, když zůstatek nedovolil celou změnu (deník píše, co se opravdu stalo). */
-function poznamkaOmezeni(note: string | null | undefined, pozadovano: number, skutecne: number, jednotka: string): string | null {
-  if (pozadovano === skutecne) return note ?? null;
-  return `${note ? `${note} ` : ''}(požadováno ${pozadovano > 0 ? '+' : ''}${pozadovano} ${jednotka}, víc než zůstatek)`.slice(0, 250);
-}
 
 /**
  * Připíše (nebo odečte) body a zapíše to do deníku. Body nikdy nejdou pod nulu

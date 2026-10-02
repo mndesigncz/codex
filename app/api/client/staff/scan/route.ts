@@ -25,9 +25,9 @@ import { getConnection, billDetail } from '@/lib/storyous';
 import { menaPodniku } from '@/lib/menaPodniku';
 import { benefitLabel } from '@/lib/coupons';
 import { aktivniBonus } from '@/lib/bonusAkceDb';
-import { bodySBonusem, poznamkaRazitek, popisNasobice } from '@/lib/bonusAkce';
-import { odmenaZUctu } from '@/lib/bodyPravidlaDb';
-import { vetyOOmezeni, pravidlaBoduZProfilu } from '@/lib/bodyPravidla';
+import { poznamkaRazitek } from '@/lib/bonusAkce';
+import { odmenaZUctu, zapisZbytek, zapisPripsaneZaUctenku } from '@/lib/bodyPravidlaDb';
+import { vetyOOmezeni, pravidlaBoduZProfilu, castKreditem } from '@/lib/bodyPravidla';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
@@ -130,7 +130,7 @@ export async function GET(req: NextRequest) {
       SELECT b.bill_id, b.final_price, b.paid_at,
              EXISTS (SELECT 1 FROM client_bill_awards a WHERE a.team_id = b.team_id AND a.bill_id = b.bill_id AND a.done_at IS NOT NULL) AS awarded
       FROM pos_bills b
-      WHERE b.team_id = ${u.team_id} AND b.day = ${pragueToday()} AND b.final_price > 0
+      WHERE b.team_id = ${u.team_id} AND b.day = ${pragueToday()} AND b.final_price > 0 AND b.refunded = FALSE AND b.deleted = FALSE
       ORDER BY COALESCE(b.paid_at, b.created_at) DESC LIMIT 5` as any[];
   } catch { bills = []; }
   return NextResponse.json({
@@ -270,11 +270,11 @@ async function provedAkci(action: string, b: any, c: { id: number; name: string 
     // dokončí jen to, co chybí — nic se nezdvojí a účtenka není spotřebovaná naprázdno.
     const billId = String(b.billId ?? '').slice(0, 60);
     if (!billId) return NextResponse.json({ error: 'Vyber účtenku.' }, { status: 400 });
-    // Zrušená nebo vrácená účtenka věrnost nepřipíše (u už připsaných se body vrací samy po synchronizaci).
+    // Zrušená nebo vrácená účtenka věrnost nepřipíše (a kdyby ji připsala, storno by ji hned vzalo zpět).
     try {
-      const [bs] = await sql`SELECT refunded, deleted FROM pos_bills WHERE team_id = ${u.team_id} AND bill_id = ${billId}` as any[];
-      if (bs?.refunded || bs?.deleted) return NextResponse.json({ error: 'Tahle účtenka byla v pokladně zrušena nebo vrácena.' }, { status: 409 });
-    } catch { /* zrcadlo účtenek ještě není */ }
+      const [pb] = await sql`SELECT refunded, deleted FROM pos_bills WHERE team_id = ${u.team_id} AND bill_id = ${billId}` as any[];
+      if (pb && (pb.refunded === true || pb.deleted === true)) return NextResponse.json({ error: 'Tahle účtenka byla v pokladně zrušena nebo vrácena, věrnost se za ni nepřipisuje.' }, { status: 409 });
+    } catch { /* bez zrcadla účtenek se jen nezkontroluje */ }
     const guard = await sql`
       INSERT INTO client_bill_awards (team_id, bill_id, customer_id, done_at, kroky, staff_id)
       VALUES (${u.team_id}, ${billId}, ${c.id}, NULL, '', ${u.id})
@@ -320,11 +320,16 @@ async function provedAkci(action: string, b: any, c: { id: number; name: string 
         parts.push(...st.lines); sectiVysledek(st);
       });
       // Body a cashback podle pravidel podniku: zaokrouhlení, minimum, strop, kredit/poukaz a vyloučené položky.
-      const { odmena: od, pravidla: pr } = await odmenaZUctu(u.team_id, p, total, { predplaceno: b.prepaid, polozky: polozkyUctu });
-      const { body: pts, poznamka: bonusPozn } = bodySBonusem(od.points, bonus);
+      // Část zaplacená kreditem nebo poukazem: z ruční hodnoty obsluhy, jinak z rozpadu plateb v pokladně.
+      let predplaceno = Math.max(0, Math.round(Number(b.prepaid) || 0));
+      if (!predplaceno) {
+        try { const [pb] = await sql`SELECT other_methods FROM pos_bills WHERE team_id = ${u.team_id} AND bill_id = ${billId}` as any[]; predplaceno = castKreditem(pb?.other_methods); } catch { /* bez rozpadu plateb */ }
+      }
+      const { odmena: od, pravidla: pr, poznamka: bonusPozn } = await odmenaZUctu(u.team_id, p, total, { predplaceno, polozky: polozkyUctu, customerId: c.id, bonus });
+      const pts = od.points;
       const back = od.cashback;
       parts.push(...vetyOOmezeni(od, pr, mena.money));
-      if (pts > 0) await krok('points', async () => { const points = await award(u.team_id, c.id, pts, 'manual', `bill:${billId}`, `Útrata ${mena.money(total)} z účtenky${bonusPozn}`, u.id); parts.push(`+${pts} bodů${bonus.nasobic > 1 ? ` (${popisNasobice(bonus.nasobic)}, ${bonus.nazev})` : ''} (celkem ${points})`); });
+      if (pts > 0) await krok('points', async () => { const points = await award(u.team_id, c.id, pts, 'manual', `bill:${billId}`, `Útrata ${mena.money(total)} z účtenky${bonusPozn}`, u.id); parts.push(`+${pts} bodů${od.nasobicPopis ? ` (${od.nasobicPopis})` : ''} (celkem ${points})`); });
       // Cashback podle nastavení podniku: kredit v korunách, nebo body (Kartička).
       if (back > 0) {
         await krok('cashback', async () => {
@@ -336,6 +341,11 @@ async function provedAkci(action: string, b: any, c: { id: number; name: string 
       }
       // Útrata pro úrovně podle útraty se počítá z každé účtenky, i když nedala žádný bod.
       await krok('spend', async () => { await pripisUtratu(u.team_id, c.id, total); });
+      // Co přesně se za účtenku připsalo (pro storno zrušené nebo vrácené účtenky) a přenesený zbytek pod 100.
+      await krok('zapis', async () => {
+        await zapisPripsaneZaUctenku(u.team_id, billId, pts + (p.cashback_mode === 'points' ? back : 0), p.cashback_mode === 'points' ? 0 : back, total);
+        await zapisZbytek(u.team_id, c.id, pr, od);
+      });
       await sql`UPDATE client_bill_awards SET done_at = NOW() WHERE team_id = ${u.team_id} AND bill_id = ${billId}`;
       if (!parts.length) parts.push('žádné pravidlo se netrefilo');
       msg = `${c.name} · účtenka ${mena.money(total)}: ${parts.join(' · ')}`;
@@ -347,8 +357,8 @@ async function provedAkci(action: string, b: any, c: { id: number; name: string 
   } else if (action === 'points') {
     const amount = Math.max(0, Math.min(100000, Math.round(Number(b.amount) || 0)));
     const polozky = rucniPolozky(b.items);
-    const { odmena: od, pravidla: pr } = await odmenaZUctu(u.team_id, p, amount, { predplaceno: b.prepaid });
-    const { body: pts, poznamka: bonusPozn } = bodySBonusem(od.points, bonus);
+    const { odmena: od, pravidla: pr, poznamka: bonusPozn } = await odmenaZUctu(u.team_id, p, amount, { predplaceno: b.prepaid, customerId: c.id, bonus });
+    const pts = od.points;
     const back = od.cashback;
     const omezeni = vetyOOmezeni(od, pr, mena.money);
     const podleUtraty = p.tier_by === 'spend';
@@ -362,7 +372,8 @@ async function provedAkci(action: string, b: any, c: { id: number; name: string 
     if (!v.already && v.lines) { parts.push(...v.lines); sectiVysledek(v); }
     const st = await applyBillToCampaigns(u.team_id, c.id, pragueToday(), { billId: ref, total: amount, items: [], rucniPolozky: polozky }, { staffId: u.id, razitka: bonus.razitka, poznamka: poznamkaRazitek(bonus) });
     parts.push(...st.lines); sectiVysledek(st);
-    if (pts > 0) { const points = await award(u.team_id, c.id, pts, 'manual', ref, `Útrata ${mena.money(amount)} u kasy${bonusPozn}`, u.id); parts.push(`+${pts} bodů${bonus.nasobic > 1 ? ` (${popisNasobice(bonus.nasobic)}, ${bonus.nazev})` : ''} (celkem ${points})`); }
+    if (pts > 0) { const points = await award(u.team_id, c.id, pts, 'manual', ref, `Útrata ${mena.money(amount)} u kasy${bonusPozn}`, u.id); parts.push(`+${pts} bodů${od.nasobicPopis ? ` (${od.nasobicPopis})` : ''} (celkem ${points})`); }
+    if (amount > 0) await zapisZbytek(u.team_id, c.id, pr, od);
     if (back > 0 && p.cashback_mode === 'points') {
       const points = await award(u.team_id, c.id, back, 'cashback', ref, `${p.cashback_pct} % z útraty ${mena.money(amount)} v bodech`, u.id);
       parts.push(`+${back} bodů cashback (celkem ${points})`);
@@ -382,8 +393,6 @@ async function provedAkci(action: string, b: any, c: { id: number; name: string 
     }
     msg = `${c.name}: uplatněno ${mena.money(amount)} kreditu, zbývá ${mena.money(Number(credit))}.`;
   }
-  // Razítko za návštěvu mohlo posunout úroveň (podle návštěv): oznámení hostovi, jednou.
-  if (action !== 'credit') await zkontrolujUroven(u.team_id, c.id, p).catch(() => {});
   audit(u.team_id, u.id, 'client.card', 'client', c.id, msg);
   return NextResponse.json({ ok: true, message: msg, expiredCount, lost, customer: c, ...(await summary(u.team_id, c.id, p)) });
 }

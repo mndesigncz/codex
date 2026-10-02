@@ -40,7 +40,7 @@ import PrechodZKarticky, { useImportKarticky } from './PrechodZKarticky';
 import KampanEditor, { kampanDoFormulare, prazdnaKampan, type FormKampane } from './loyalty/KampanEditor';
 import RucniRazitka from './loyalty/RucniRazitka';
 import { podleFiltru, RazitkaFiltr, StavChip, useRazitkaAkce, type FiltrStavu } from './loyalty/RazitkaAkce';
-import { BodyDalsiPravidla, BodyNeaktivita } from './loyalty/BodyDalsiPravidla';
+import { BodyDalsiPravidla, BodyNeaktivita, BodyNasobiceKredit } from './loyalty/BodyDalsiPravidla';
 import { BodyNahled } from './loyalty/BodyNahled';
 import { BodyPrehledy } from './loyalty/BodyPrehledy';
 import { usePlan } from '../Pro';
@@ -249,7 +249,6 @@ function BodyAUrovne({ toast, setUkladam }: { toast: (m: string) => void; setUkl
   // Režim úrovní: z návštěv (výchozí), nebo z kumulované útraty. Prahy obou režimů
   // zůstávají uložené vedle sebe — přepnutí nic nemaže, jen mění, který platí.
   const podleUtraty = p.tier_by === 'spend';
-  const chybaPrahuUI = zkontrolujPrahy(p);
   const urovne: { id: string; name: string; atKey?: string; discKey: string; tone: 'muted' | 'ink'; hint: string }[] = [
     { id: 'bronze', name: 'Člen', discKey: 'member_discount', tone: 'muted', hint: podleUtraty ? 'Od první útraty.' : 'Od první návštěvy.' },
     { id: 'silver', name: 'Stříbrný host', atKey: podleUtraty ? 'silver_spend' : 'silver_at', discKey: 'silver_discount', tone: 'muted', hint: podleUtraty ? `Od jaké celkové útraty (v ${symbol}).` : 'Od kolika návštěv.' },
@@ -357,6 +356,7 @@ function BodyAUrovne({ toast, setUkladam }: { toast: (m: string) => void; setUkl
           <p className="t-meta">Sleva se nepočítá automaticky do pokladny — obsluha ji zadá sama. Nulová sleva znamená, že úroveň je jen odznak. Uvítacích 10 bodů dostane každý nový člen automaticky; ruční úpravu bodů a kreditu najdeš u hosta v Zákaznících.</p>
         </Card>
         <BodyNeaktivita p={p} setP={upravP} meni={meni} chyby={chyby} />
+        <BodyNasobiceKredit p={p} setP={upravP} meni={meni} chyby={chyby} />
       </form>
       {ma('zakaznici.zobrazit') && <ClenoveSkupiny toast={toast} />}
     </div>

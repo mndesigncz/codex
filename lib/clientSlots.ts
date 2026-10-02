@@ -1,8 +1,6 @@
 // Sdílené mezi serverem a prohlížečem: kdy se dá rezervovat a jak se čte
 // otevírací doba. Bez importů ze serveru, ať to jde i do klientské komponenty.
 
-import { pragueDayOf, pragueToday, parseDbTime } from './pragueTime.ts';
-
 export interface OpeningDay { open?: string | null; close?: string | null; closed?: boolean }
 export type OpeningHours = Record<string, OpeningDay>;
 

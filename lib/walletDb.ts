@@ -29,7 +29,7 @@ export async function dataKartyHosta(me: { id: number; name: string }, slug: str
   const m = await membership(me.id, Number(p.team_id));
   if (!m) return null;
   const pub = publicProfile(p);
-  const tier = tierForMember({ visits: Number(m.visits ?? 0), spend: Number(m.spend ?? 0), lastVisitAt: m.last_visit_at }, tierRulesFromProfile(p));
+  const tier = tierForMember({ visits: Number(m.visits ?? 0), spend: Number(m.spend ?? 0) }, tierRulesFromProfile(p));
   const logo = pub.logoUrl && /^https:\/\//.test(pub.logoUrl) ? pub.logoUrl : '';
   // Razítka: jakmile podnik má kampaně, počítadlo na členství neplatí (jediný zdroj pravdy jsou kampaně).
   // Na kartě je rozdělaná kampaň, případně první běžící.

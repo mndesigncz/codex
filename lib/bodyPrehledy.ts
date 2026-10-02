@@ -78,6 +78,14 @@ export interface PrehledBodu {
     members: number; points: number; credit: number; membersWithPoints: number; membersWithCredit: number;
     /** Odhad hodnoty jednoho bodu v měně podniku; null = nejde odhadnout. */
     pointValue: number | null; pointsValue: number | null;
+    /** Zůstatek nevyčerpaných dárkových poukazů (dluh podniku v penězích). */
+    poukazy: number; poukazuAktivnich: number;
+  };
+  /** Výnosnost za období: kolik útraty prošlo účtenkami s věrností a kolik stála odměna. */
+  vynosnost: {
+    utrata: number; ucty: number; cashbackKredit: number; cashbackBody: number; bodyRozdane: number; storno: number;
+    /** Odhad nákladu odměn v % z útraty (kredit + body × hodnota bodu); null, když nejde odhadnout. */
+    nakladPct: number | null;
   };
   zdroje: SouhrnZdroje[];
   top: { id: number; name: string; points: number; credit: number; visits: number; spend: number; lastVisitAt: string | null }[];
@@ -123,12 +131,43 @@ export async function prehledBodu(teamId: number, obdobi: { od: string; do: stri
       m.points DESC, m.customer_id
     LIMIT ${Math.max(1, Math.min(50, limit))}` as any[];
 
+  // Dárkové poukazy: nevyčerpaný zůstatek je stejný závazek jako kredit.
+  let poukazy = 0; let poukazuAktivnich = 0;
+  try {
+    const [pk] = await sql`
+      SELECT COALESCE(SUM(balance), 0)::float8 AS zustatek, COUNT(*)::int AS n FROM client_vouchers
+      WHERE team_id = ${teamId} AND status = 'active' AND balance > 0 AND (valid_until IS NULL OR valid_until >= ${pragueToday()}::date)` as any[];
+    poukazy = Number(pk?.zustatek) || 0; poukazuAktivnich = Number(pk?.n) || 0;
+  } catch { /* poukazy bez migrace */ }
+  // Výnosnost: útrata z účtenek s věrností (bez stornovaných) × cashback a rozdané body v období.
+  let utrata = 0; let ucty = 0; let cashbackKredit = 0; let cashbackBody = 0; let storno = 0;
+  try {
+    const [u] = await sql`
+      SELECT COALESCE(SUM(spend), 0)::float8 AS utrata, COUNT(*)::int AS n FROM client_bill_awards
+      WHERE team_id = ${teamId} AND done_at IS NOT NULL AND reversed_at IS NULL
+        AND (awarded_at AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Prague')::date BETWEEN ${obdobi.od}::date AND ${obdobi.do}::date` as any[];
+    utrata = Number(u?.utrata) || 0; ucty = Number(u?.n) || 0;
+    const [c] = await sql`
+      SELECT COALESCE(SUM(credit_delta) FILTER (WHERE kind = 'cashback'), 0)::float8 AS kredit,
+             COALESCE(SUM(delta) FILTER (WHERE kind = 'cashback'), 0)::float8 AS body,
+             COALESCE(-SUM(delta) FILTER (WHERE kind = 'storno' AND delta < 0), 0)::float8 AS storno
+      FROM client_loyalty_ledger
+      WHERE team_id = ${teamId} AND created_at >= (${obdobi.od}::date - 1)
+        AND (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Prague')::date BETWEEN ${obdobi.od}::date AND ${obdobi.do}::date` as any[];
+    cashbackKredit = Number(c?.kredit) || 0; cashbackBody = Number(c?.body) || 0; storno = Number(c?.storno) || 0;
+  } catch { /* sloupce účtenek před migrací */ }
+  const bodyRozdane = zdroje.reduce((a, r) => a + r.given, 0);
+  const naklad = cashbackKredit + (hodnota != null ? bodyRozdane * hodnota : 0);
+  const nakladPct = utrata > 0 && (hodnota != null || cashbackKredit > 0) ? Math.round((naklad / utrata) * 1000) / 10 : null;
+
   return {
     obdobi,
+    vynosnost: { utrata, ucty, cashbackKredit, cashbackBody, bodyRozdane, storno, nakladPct },
     zavazek: {
       members: Number(z?.members) || 0, points: body, credit: Number(z?.credit) || 0,
       membersWithPoints: Number(z?.with_points) || 0, membersWithCredit: Number(z?.with_credit) || 0,
       pointValue: hodnota, pointsValue: hodnota == null ? null : Math.round(body * hodnota),
+      poukazy, poukazuAktivnich,
     },
     zdroje,
     top: top.map(r => ({

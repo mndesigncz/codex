@@ -5,6 +5,8 @@
 // Víc pravidel najednou se nesčítá: bere se nejvyšší násobič a nejvyšší bonus
 // razítek, ať host nedostane nečekaně hodně. Bonus se uplatní uvnitř téhož
 // připsání (jeden řádek deníku s poznámkou), nikdy jako druhé připsání navíc.
+// Body z násobiče počítá jediné místo, spoctiOdmenu v lib/bodyPravidla.ts (vyšší z násobiče
+// bonusové akce a úrovně, před stropy).
 
 import { pragueDayOf, pragueHM } from './pragueTime.ts';
 import { czCount, type CzNoun } from './czech.ts';
@@ -149,13 +151,6 @@ export function popisNasobice(m: number): string {
 }
 
 const RAZITKO_NAVIC: CzNoun = { one: 'razítko navíc', few: 'razítka navíc', many: 'razítek navíc' };
-
-/** Body po bonusu (zaokrouhleně, nikdy míň než základ) a poznámka do deníku. */
-export function bodySBonusem(zaklad: number, b: Bonus): { body: number; poznamka: string } {
-  const z = Math.max(0, Math.trunc(Number(zaklad)) || 0);
-  if (z <= 0 || b.nasobic <= 1) return { body: z, poznamka: '' };
-  return { body: Math.max(z, Math.round(z * b.nasobic)), poznamka: ` — ${popisNasobice(b.nasobic)} (${b.nazev})` };
-}
 
 /** Poznámka k razítkům navíc: prázdná, když bonus razítka nedává. */
 export function poznamkaRazitek(b: Bonus): string {
