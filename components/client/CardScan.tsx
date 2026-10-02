@@ -25,6 +25,7 @@ import { formatujPriPsani, overKod, STAV_POPISEK, type StavPoukazu } from '@/lib
 import { useMoney, useSymbol } from '../CurrencyProvider';
 import { czCount, type CzNoun } from '@/lib/czech';
 import { rozpoznejQr } from '@/lib/kuponQr';
+import OdkazCtecka from './OdkazCtecka';
 
 const NAVSTEVA: CzNoun = { one: 'návštěva', few: 'návštěvy', many: 'návštěv' };
 const fmt = (raw: string) => { const c = raw.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8); return c.length > 4 ? `${c.slice(0, 4)}-${c.slice(4)}` : c; };
@@ -132,6 +133,7 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
       <div className="flex items-center gap-2 flex-wrap">
         <h3 id="h-scan" className="t-card flex items-center gap-2"><Icon name="card" size={17} className="text-black/40" />{rezim === 'poukaz' && smiPoukaz ? 'Dárkový poukaz' : 'Kartička hosta'}</h3>
         {smiPoukaz && !hit && <Segmented options={[{ id: 'karta', label: 'Karta' }, { id: 'poukaz', label: 'Poukaz' }]} value={rezim} onChange={v => { setRezim(v as 'karta' | 'poukaz'); setErr(''); setCam(false); }} size="sm" ariaLabel="Co se u kasy vyřizuje" />}
+        {!hit && !cp && <OdkazCtecka className="sm:ml-auto" />}
         {hit && <Button variant="ghost" size="sm" className="sm:ml-auto" onClick={reset}>Jiný host</Button>}
         {cp && !hit && <Button variant="ghost" size="sm" className="sm:ml-auto" onClick={reset}>Jiný kód</Button>}
       </div>

@@ -13,6 +13,7 @@ import { getServerSession } from 'next-auth';
 import { randomBytes } from 'crypto';
 import { authOptions } from './auth';
 import { notifyUser } from './push';
+import { googleKonfig } from './walletKonfig';
 import { pragueToday } from './pragueTime';
 import { slotsFor as _slotsFor } from './clientSlots';
 
@@ -209,6 +210,15 @@ async function maybeReferralReward(customerId: number, teamId: number): Promise<
   }).catch(() => {});
 }
 
+/**
+ * Po změně bodů či razítek obnoví kartu v Google Wallet. Bez konfigurace Google
+ * se nestane nic (ani dynamický import); chyba se nikdy nepropaguje.
+ */
+function obnovPenezenku(teamId: number, customerId: number): void {
+  if (!googleKonfig()) return;
+  import('./walletDb').then(m => m.obnovKartuVPenezence(teamId, customerId)).catch(() => {});
+}
+
 export type LedgerKind = 'visit' | 'order' | 'manual' | 'coupon' | 'welcome' | 'birthday' | 'referral' | 'cashback' | 'credit' | 'expire' | 'reactivation';
 
 /**
@@ -224,6 +234,7 @@ export async function award(teamId: number, customerId: number, delta: number, k
   await sql`
     INSERT INTO client_loyalty_ledger (team_id, customer_id, delta, kind, ref, note)
     VALUES (${teamId}, ${customerId}, ${delta}, ${kind}, ${ref ?? null}, ${note ?? null})`;
+  obnovPenezenku(teamId, customerId);
   return Number(m?.points ?? 0);
 }
 
@@ -243,6 +254,7 @@ export async function spendPoints(teamId: number, customerId: number, cost: numb
   await sql`
     INSERT INTO client_loyalty_ledger (team_id, customer_id, delta, kind, ref, note)
     VALUES (${teamId}, ${customerId}, ${-cost}, ${kind}, ${ref ?? null}, ${note ?? null})`;
+  obnovPenezenku(teamId, customerId);
   return Number(m.points);
 }
 
@@ -308,6 +320,7 @@ export async function stampVisit(teamId: number, customerId: number, profile: an
   } else {
     await sql`INSERT INTO client_loyalty_ledger (team_id, customer_id, delta, kind, ref, note) VALUES (${teamId}, ${customerId}, 0, 'visit', ${ref ?? null}, ${'Razítko za návštěvu' + note})`;
   }
+  obnovPenezenku(teamId, customerId);
   return { stamps, rewarded };
 }
 

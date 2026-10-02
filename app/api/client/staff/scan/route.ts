@@ -11,6 +11,7 @@ import { audit } from '@/lib/audit';
 import { activeCampaigns, progressFor, addStamps, applyBillToCampaigns } from '@/lib/stamps';
 import { getConnection, billDetail } from '@/lib/storyous';
 import { menaPodniku } from '@/lib/menaPodniku';
+import { benefitLabel } from '@/lib/coupons';
 import { aktivniBonus } from '@/lib/bonusAkceDb';
 import { bodySBonusem, poznamkaRazitek, popisNasobice } from '@/lib/bonusAkce';
 export const dynamic = 'force-dynamic';
@@ -19,7 +20,22 @@ export const fetchCache = 'force-no-store';
 /** Co obsluha u kasy potřebuje vidět: kdo to je, co má a na co má nárok. */
 async function summary(teamId: number, customerId: number, p?: any) {
   const m = await membership(customerId, teamId);
-  const claims = await sql`SELECT cl.code, c.title FROM client_coupon_claims cl JOIN client_coupons c ON c.id = cl.coupon_id WHERE cl.team_id = ${teamId} AND cl.customer_id = ${customerId} AND cl.redeemed_at IS NULL ORDER BY cl.claimed_at`;
+  const mena = await menaPodniku(teamId);
+  // Kupony čekající na uplatnění; `stamps` = odměna za plnou razítkovou kartu (hotová k vyzvednutí).
+  const claimRows = await sql`
+    SELECT cl.code, c.title, c.kind, c.valid_until, c.benefit_kind, c.percent_off, c.amount_off, c.xy_buy, c.xy_free
+    FROM client_coupon_claims cl JOIN client_coupons c ON c.id = cl.coupon_id
+    WHERE cl.team_id = ${teamId} AND cl.customer_id = ${customerId} AND cl.redeemed_at IS NULL ORDER BY cl.claimed_at` as any[];
+  const claims = claimRows.map(r => ({
+    code: String(r.code), title: String(r.title), kind: String(r.kind ?? 'offer'), fromStamps: r.kind === 'stamps',
+    validUntil: r.valid_until ?? null, benefit: benefitLabel(r, mena.money) || null,
+  }));
+  // Narozeniny dnes: stejné pravidlo jako denní dárek (měsíc a den z data narození, pražský den).
+  let birthdayToday = false;
+  try {
+    const [u] = await sql`SELECT birthday FROM users WHERE id = ${customerId}`;
+    birthdayToday = !!u?.birthday && String(u.birthday).slice(5, 10) === pragueToday().slice(5);
+  } catch { birthdayToday = false; }
   // Kupony za body, na které host právě teď dosáhne — obsluha je nabídne.
   const points = Number(m?.points ?? 0);
   const affordable = await sql`
@@ -37,8 +53,9 @@ async function summary(teamId: number, customerId: number, p?: any) {
     member: !!m, points, credit: Number(m?.credit ?? 0), stamps: Number(m?.stamps ?? 0), visits,
     campaigns: camps.map(c => ({
       id: c.id, name: c.name, required: c.required_stamps, ruleType: c.rule_type,
-      stamps: Number(prog.get(c.id)?.stamps ?? 0),
+      stamps: Number(prog.get(c.id)?.stamps ?? 0), reward: c.reward_title || null,
     })),
+    lastVisit: last ? last.toISOString() : null, birthdayToday,
     spend: Number(m?.spend ?? 0), tierBy: tier.unit,
     levelLabel: tier.label, tier: tier.id, discount: sleva.pct, discountSource: sleva.zdroj, discountName: sleva.nazev,
     tierDiscount: tier.discount,
@@ -93,6 +110,13 @@ export async function POST(req: NextRequest) {
   const p = await ensureProfile(u.team_id);
   if (!p.loyalty_on) return NextResponse.json({ error: 'Podnik nemá věrnost zapnutou.' }, { status: 400 });
   await join(c.id, u.team_id);
+  // Čtečka u kasy: host není členem podniku, obsluha ho jedním klepnutím přidá (bez razítka a bodů).
+  if (action === 'join') {
+    const x = await summary(u.team_id, c.id, p);
+    const zprava = `${c.name} je teď členem.`;
+    audit(u.team_id, u.id, 'client.card', 'client', c.id, zprava);
+    return NextResponse.json({ ok: true, message: zprava, customer: c, ...x });
+  }
   // Zprávy obsluze i poznámky v paměti hosta jsou v měně podniku, ne v korunách.
   const mena = await menaPodniku(u.team_id);
   // Bonusová akce (Happy hour) platí v okamžiku načtení; uplatní se uvnitř téhož připsání.
