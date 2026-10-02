@@ -151,5 +151,9 @@
   "Zpráva už neexistuje.": "Táto správa už neexistuje.",
   "Záznam nenalezen": "Záznam sa nenašiel",
   "Účet neexistuje.": "Účet neexistuje.",
-  "Účet se nepodařilo smazat. Zkuste to znovu, nebo napište podpoře.": "Účet sa nepodarilo zmazať. Skúste to znova alebo napíšte podpore."
+  "Účet se nepodařilo smazat. Zkuste to znovu, nebo napište podpoře.": "Účet sa nepodarilo zmazať. Skúste to znova alebo napíšte podpore.",
+  "Kupon už došel.": "Tento kupón je vypredaný.",
+  "Kupon k tomuhle kódu už neplatí.": "Kupón k tomuto kódu už neplatí.",
+  "Kupon z tohoto kódu už došel.": "Kupón z tohto kódu už došiel.",
+  "Kód se nepodařilo uplatnit. Zkus to znovu.": "Kód sa nepodarilo uplatniť. Skús to znova."
 }

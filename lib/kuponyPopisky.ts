@@ -21,16 +21,28 @@ export function tierList(raw: any): string[] {
  * eurové kavárny nečte „Sleva 50 Kč".
  */
 export type FormatCastky = (n: number) => string;
-const VCH_KORUNY: FormatCastky = n => `${n} Kč`;
+export const VCH_KORUNY: FormatCastky = n => `${n} Kč`;
 
 /** Krátký popisek výhody pro obsluhu i hosta: „Sleva 15 %", „−50 Kč", „2+1". */
 export function benefitLabel(c: any, castka: FormatCastky = VCH_KORUNY): string {
   const kind = String(c.benefit_kind ?? 'text');
-  if (kind === 'percent' && Number(c.percent_off) > 0) return `Sleva ${Number(c.percent_off)} %`;
-  if (kind === 'amount' && Number(c.amount_off) > 0) return `Sleva ${castka(Number(c.amount_off))}`;
-  if (kind === 'free_item') return 'Položka zdarma';
-  if (kind === 'xy' && Number(c.xy_buy) > 0) return `${Number(c.xy_buy)}+${Math.max(1, Number(c.xy_free) || 1)} zdarma`;
+  // Kupon vázaný na položku nabídky: výhoda se týká jen jí („Sleva 20 % na Matchu").
+  const item = String(c.item_name ?? '').trim();
+  const na = item ? ` na ${item}` : '';
+  if (kind === 'percent' && Number(c.percent_off) > 0) return `Sleva ${Number(c.percent_off)} %${na}`;
+  if (kind === 'amount' && Number(c.amount_off) > 0) return `Sleva ${castka(Number(c.amount_off))}${na}`;
+  if (kind === 'free_item') return item ? `Zdarma: ${item}` : 'Položka zdarma';
+  if (kind === 'xy' && Number(c.xy_buy) > 0) return `${Number(c.xy_buy)}+${Math.max(1, Number(c.xy_free) || 1)} zdarma${na}`;
   return '';
+}
+
+/** Vyloučené kategorie a položky jako text pro štítek („mimo Víno, Pivo"). */
+export function vyloucenoText(c: any): string {
+  const kat = Array.isArray(c.excluded_categories) ? c.excluded_categories.map(String).filter(Boolean) : [];
+  const pol = Array.isArray(c.excluded_item_names) ? c.excluded_item_names.map(String).filter(Boolean) : [];
+  const vse = [...kat, ...pol];
+  if (!vse.length) return '';
+  return `mimo ${vse.slice(0, 3).join(', ')}${vse.length > 3 ? ` a ${vse.length - 3} další` : ''}`;
 }
 
 /** Štítky podmínek, které mají viset na kartě kuponu (host i obsluha). */
@@ -46,5 +58,7 @@ export function conditionBadges(c: any, castka: FormatCastky = VCH_KORUNY): stri
   }
   if (c.hour_from && c.hour_till) out.push(`${c.hour_from}–${c.hour_till}`);
   if (c.adult_only === true) out.push('18+');
+  const mimo = vyloucenoText(c);
+  if (mimo) out.push(mimo);
   return out;
 }

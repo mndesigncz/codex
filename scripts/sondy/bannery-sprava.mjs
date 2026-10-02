@@ -112,7 +112,10 @@ for (const sirka of [1280, 390]) {
   tvrdi(`${L}: náhled nic neuplatnil`, !volani.some(v => v.redeem && !v.redeem.preview));
   tvrdi(`${L}: bez vodorovného scrollu`, await bezPreteceni(p));
   await p.screenshot({ path: new URL(`./shots/bannery-kupon-${sirka}.png`, import.meta.url).pathname }).catch(() => {});
+  // Od kola 81 se uplatňuje v okně s náhledem (útrata, věk): Uplatnit na kartě otevře okno a v něm se potvrdí.
   await p.getByRole('button', { name: 'Uplatnit', exact: true }).click();
+  await p.getByTestId('kupon-uplatnit').waitFor({ timeout: 4000 });
+  await p.getByRole('dialog').getByRole('button', { name: 'Uplatnit', exact: true }).click();
   await p.waitForTimeout(400);
   const ucast = volani.filter(v => v.redeem && !v.redeem.preview);
   tvrdi(`${L}: Uplatnit pošle POST jednou, s kódem ABC-DEF`, ucast.length === 1 && ucast[0].redeem.code === 'ABC-DEF', JSON.stringify(ucast));
@@ -136,7 +139,7 @@ for (const sirka of [1280, 390]) {
   await pole.fill('ABCD1234'); await pole.press('Enter');
   await p.waitForTimeout(300);
   tvrdi(`${L}: osmimístný kód jde dál jako karta hosta (staff/scan)`, volani.some(v => v.scan?.includes('ABCD1234')), JSON.stringify(volani.map(v => v.scan)));
-  tvrdi(`${L}: karta nespustila uplatnění kuponu`, volani.filter(v => v.redeem).length === 4);
+  tvrdi(`${L}: karta nespustila uplatnění kuponu`, volani.filter(v => v.redeem).length === 5);
   tvrdi(`${L}: bez chyb v konzoli`, chyby.length === 0, chyby.slice(0, 3).join(' | '));
   await ctx.close();
 }

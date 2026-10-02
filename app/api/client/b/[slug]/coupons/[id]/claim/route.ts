@@ -6,18 +6,20 @@ import { sql, customer, profileBySlug, membership, spendPoints, couponCode, awar
 import { pragueToday } from '@/lib/pragueTime';
 import { tierForMember, tierRulesFromProfile } from '@/lib/clientSlots';
 import { claimBlocker } from '@/lib/coupons';
+import { zajistiKupony, vydejKod } from '@/lib/kuponyDb';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 export async function POST(_req: Request, props: { params: Promise<{ slug: string; id: string }> }) {
   const params = await props.params;
+  await zajistiKupony();
   const me = await customer();
   if (!me) return NextResponse.json({ error: 'Přihlas se jako host.' }, { status: 401 });
   const p = await profileBySlug(params.slug);
   if (!p || !p.loyalty_on) return NextResponse.json({ error: 'Podnik nenalezen' }, { status: 404 });
   const teamId = Number(p.team_id);
-  const [c] = await sql`SELECT * FROM client_coupons WHERE id = ${parseInt(params.id, 10)} AND team_id = ${teamId} AND active = TRUE AND kind = 'offer'`;
+  const [c] = await sql`SELECT * FROM client_coupons WHERE id = ${parseInt(params.id, 10)} AND team_id = ${teamId} AND active = TRUE AND status = 'live' AND kind = 'offer'`;
   // Jen nabídkové kupony: odměny za razítka (kind 'stamps') vznikají dokončením karty, ne klepnutím.
   if (!c || (c.valid_until && String(c.valid_until) < pragueToday())) return NextResponse.json({ error: 'Kupon už neplatí.' }, { status: 404 });
   const m = await membership(me.id, teamId);
@@ -40,14 +42,13 @@ export async function POST(_req: Request, props: { params: Promise<{ slug: strin
     if (after == null) return NextResponse.json({ error: 'Body ti mezitím nevyšly. Zkus to znovu.' }, { status: 409 });
     points = after;
   }
-  // Vložení hlídá, že host nemá otevřený stejný kupon (dvojklik nevydá druhý kód).
-  const vlozeno = await sql`
-    INSERT INTO client_coupon_claims (coupon_id, customer_id, team_id, code)
-    SELECT ${c.id}, ${me.id}, ${teamId}, ${code}
-    WHERE NOT EXISTS (SELECT 1 FROM client_coupon_claims WHERE coupon_id = ${c.id} AND customer_id = ${me.id} AND redeemed_at IS NULL)
-    RETURNING id`;
-  if (!vlozeno.length) {
+  // Rezervace kusu (limit kusů) a vložení kódu jedním krokem; hlídá, že host nemá otevřený stejný kupon
+  // (dvojklik nevydá druhý kód). Když kus došel nebo kód nevznikl, body se vrátí.
+  const vydano = await vydejKod({ teamId, couponId: Number(c.id), customerId: me.id, kod: code, zdroj: 'points', bezOtevreneho: true })
+    .catch(async (e) => { if (cost > 0) await award(teamId, me.id, cost, 'coupon', `vraceni:${code}`, `Vráceno: ${c.title}`); throw e; });
+  if (!vydano.ok) {
     if (cost > 0) await award(teamId, me.id, cost, 'coupon', `vraceni:${code}`, `Vráceno: ${c.title}`);
+    if (vydano.duvod === 'vycerpano') return NextResponse.json({ error: 'Kupon už došel.' }, { status: 409 });
     return NextResponse.json({ error: 'Tenhle kupon už máš vyzvednutý — ukaž ho u kasy.' }, { status: 409 });
   }
   return NextResponse.json({ ok: true, code, points });
