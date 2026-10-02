@@ -2,7 +2,7 @@
 // Kupon může mít podmínky (úroveň, skupina, okno, limity, 18+) — rozhoduje
 // stejná logika jako na stránce podniku (lib/coupons.claimBlocker).
 import { NextResponse } from 'next/server';
-import { sql, customer, profileBySlug, membership, spendPoints, couponCode } from '@/lib/client';
+import { sql, customer, profileBySlug, membership, spendPoints, couponCode, award } from '@/lib/client';
 import { pragueToday } from '@/lib/pragueTime';
 import { tierForMember, tierRulesFromProfile } from '@/lib/clientSlots';
 import { claimBlocker } from '@/lib/coupons';
@@ -17,7 +17,8 @@ export async function POST(_req: Request, props: { params: Promise<{ slug: strin
   const p = await profileBySlug(params.slug);
   if (!p || !p.loyalty_on) return NextResponse.json({ error: 'Podnik nenalezen' }, { status: 404 });
   const teamId = Number(p.team_id);
-  const [c] = await sql`SELECT * FROM client_coupons WHERE id = ${parseInt(params.id, 10)} AND team_id = ${teamId} AND active = TRUE`;
+  const [c] = await sql`SELECT * FROM client_coupons WHERE id = ${parseInt(params.id, 10)} AND team_id = ${teamId} AND active = TRUE AND kind = 'offer'`;
+  // Jen nabídkové kupony: odměny za razítka (kind 'stamps') vznikají dokončením karty, ne klepnutím.
   if (!c || (c.valid_until && String(c.valid_until) < pragueToday())) return NextResponse.json({ error: 'Kupon už neplatí.' }, { status: 404 });
   const m = await membership(me.id, teamId);
   if (!m) return NextResponse.json({ error: 'Nejdřív se staň členem podniku.' }, { status: 400 });
@@ -39,6 +40,15 @@ export async function POST(_req: Request, props: { params: Promise<{ slug: strin
     if (after == null) return NextResponse.json({ error: 'Body ti mezitím nevyšly. Zkus to znovu.' }, { status: 409 });
     points = after;
   }
-  await sql`INSERT INTO client_coupon_claims (coupon_id, customer_id, team_id, code) VALUES (${c.id}, ${me.id}, ${teamId}, ${code})`;
+  // Vložení hlídá, že host nemá otevřený stejný kupon (dvojklik nevydá druhý kód).
+  const vlozeno = await sql`
+    INSERT INTO client_coupon_claims (coupon_id, customer_id, team_id, code)
+    SELECT ${c.id}, ${me.id}, ${teamId}, ${code}
+    WHERE NOT EXISTS (SELECT 1 FROM client_coupon_claims WHERE coupon_id = ${c.id} AND customer_id = ${me.id} AND redeemed_at IS NULL)
+    RETURNING id`;
+  if (!vlozeno.length) {
+    if (cost > 0) await award(teamId, me.id, cost, 'coupon', `vraceni:${code}`, `Vráceno: ${c.title}`);
+    return NextResponse.json({ error: 'Tenhle kupon už máš vyzvednutý — ukaž ho u kasy.' }, { status: 409 });
+  }
   return NextResponse.json({ ok: true, code, points });
 }
