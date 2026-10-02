@@ -249,6 +249,7 @@ function BodyAUrovne({ toast, setUkladam }: { toast: (m: string) => void; setUkl
   // Režim úrovní: z návštěv (výchozí), nebo z kumulované útraty. Prahy obou režimů
   // zůstávají uložené vedle sebe — přepnutí nic nemaže, jen mění, který platí.
   const podleUtraty = p.tier_by === 'spend';
+  const chybaPrahuUI = zkontrolujPrahy(p);
   const urovne: { id: string; name: string; atKey?: string; discKey: string; tone: 'muted' | 'ink'; hint: string }[] = [
     { id: 'bronze', name: 'Člen', discKey: 'member_discount', tone: 'muted', hint: podleUtraty ? 'Od první útraty.' : 'Od první návštěvy.' },
     { id: 'silver', name: 'Stříbrný host', atKey: podleUtraty ? 'silver_spend' : 'silver_at', discKey: 'silver_discount', tone: 'muted', hint: podleUtraty ? `Od jaké celkové útraty (v ${symbol}).` : 'Od kolika návštěv.' },

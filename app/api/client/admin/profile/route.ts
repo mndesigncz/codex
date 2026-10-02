@@ -15,6 +15,8 @@ import {
 } from '@/lib/bodyPravidla';
 import { menaPodniku } from '@/lib/menaPodniku';
 import { teamIsMax, MAX_ONLY_MSG } from '@/lib/planServer';
+import { zkontrolujPrahy } from '@/lib/bodyPravidla';
+import { zaznamenejZmenuProfilu, zajistiBodyPravidla } from '@/lib/bodyPravidlaDb';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -106,6 +108,15 @@ export async function PUT(req: NextRequest) {
   if (slug !== cur.slug) {
     const [clash] = await sql`SELECT team_id FROM client_profiles WHERE slug = ${slug} AND team_id <> ${u.team_id}`;
     if (clash) return NextResponse.json({ error: 'Tuhle adresu už používá jiný podnik.' }, { status: 409 });
+  }
+  // Prahy úrovní: server je dřív potichu „opravoval" (zlato nad stříbrem), takže uložená hodnota
+  // nesedela s tím, co vedení zadalo. Teď je to srozumitelná chyba, stejná jako v obrazovce.
+  if (['tier_by', 'silver_at', 'gold_at', 'platinum_at', 'silver_spend', 'gold_spend', 'platinum_spend'].some(k => b?.[k] !== undefined)) {
+    const sloucene: Record<string, any> = {};
+    for (const k of ['tier_by', 'silver_at', 'gold_at', 'platinum_at', 'silver_spend', 'gold_spend', 'platinum_spend']) sloucene[k] = b?.[k] !== undefined ? b[k] : cur[k];
+    if (sloucene.tier_by !== 'spend') sloucene.tier_by = 'visits';
+    const chyba = zkontrolujPrahy(sloucene);
+    if (chyba) return NextResponse.json({ error: chyba }, { status: 400 });
   }
   // „|| d" bralo nulu jako nevyplněno — narozeninové body (0 = nedávat),
   // body za útratu i cíl razítek pak nešly vypnout.

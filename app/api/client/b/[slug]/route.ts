@@ -16,6 +16,7 @@ import { aktivniBannery, kontextHosta } from '@/lib/clientBanners';
 import { aktivniBonus } from '@/lib/bonusAkceDb';
 import { dokdyDnes } from '@/lib/bonusAkce';
 import { planClena } from '@/lib/propadaniBoduDb';
+import { planKreditu } from '@/lib/bodyPravidlaDb';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -132,6 +133,14 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
       const body = pl.propadne + pl.varovat;
       mine.expiring = body > 0 ? { points: body, till: pl.varovatDo ?? today } : null;
     }
+    // Kredit, kterému brzy vyprší platnost (jen když podnik propadání kreditu používá).
+    if (p.loyalty_on && Number(p.credit_expire_days) > 0) {
+      const pk = await planKreditu(teamId, me.id, p);
+      const castka = pk.propadne + pk.varovat;
+      mine.creditExpiring = castka > 0 ? { amount: castka, till: pk.varovatDo ?? today } : null;
+    }
+    // Úroveň snížená kvůli neaktivitě: host má vědět proč a co s tím.
+    mine.levelDegraded = !!tier.degraded;
   }
   // Novinky: poslední rozeslané zprávy členům rovnou na stránce podniku,
   // ať mají co číst i hosté bez zapnutých oznámení.

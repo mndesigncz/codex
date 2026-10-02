@@ -7,10 +7,10 @@
 // Hotová objednávka připíše body za útratu a razítko za návštěvu (nejvýš
 // jedno denně, ať tři čaje nejsou tři návštěvy).
 
-import { pripisUtratu } from './urovneDb';
+import { odmenZaUtratu, zkontrolujUroven } from './bodyPravidlaDb';
 import { aktivniBonus } from './bonusAkceDb';
-import { bodySBonusem, poznamkaRazitek } from './bonusAkce';
-import { sql, award, stampVisit, ensureProfile } from './client';
+import { poznamkaRazitek } from './bonusAkce';
+import { sql, stampVisit, ensureProfile } from './client';
 import { clenoveSOpravnenim } from './opravneniDb';
 import { normName } from './menuPos';
 import { getConnection, createTableOrder, confirmTableOrder, tableOrderState, StoryousError } from './storyous';
@@ -261,9 +261,8 @@ export async function setOrderStatus(teamId: number, id: number, next: string): 
       const last = parseDbTime(m?.last_visit_at);
       const visitedToday = !!last && pragueDayOf(last) === pragueToday();
       const stamp = visitedToday ? null : await stampVisit(teamId, Number(o.customer_id), profile, `ord:${o.id}`, bonus.razitka, poznamkaRazitek(bonus));
-      // Útrata pro úrovně podle útraty: hotová objednávka se započte jednou
-      // (do „done" se z ORDER_FLOW dá přejít jen jednou).
-      await pripisUtratu(teamId, Number(o.customer_id), Number(o.total));
+      // Návštěva mohla posunout úroveň (podle návštěv): oznámení hostovi, jednou.
+      await zkontrolujUroven(teamId, Number(o.customer_id), profile).catch(() => {});
       loyalty = { points, pts, stamp };
     }
   }

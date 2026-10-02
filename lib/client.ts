@@ -223,7 +223,24 @@ function obnovPenezenku(teamId: number, customerId: number): void {
   import('./walletDb').then(m => m.obnovKartuVPenezence(teamId, customerId)).catch(() => {});
 }
 
-export type LedgerKind = 'visit' | 'order' | 'manual' | 'coupon' | 'welcome' | 'birthday' | 'referral' | 'cashback' | 'credit' | 'expire' | 'reactivation';
+export type LedgerKind = 'visit' | 'order' | 'manual' | 'coupon' | 'welcome' | 'birthday' | 'referral' | 'cashback' | 'credit' | 'expire' | 'reactivation' | 'storno';
+
+let denikUtrataPripraven: Promise<void> | null = null;
+/** Sloupec `amount` (základ útraty) v deníku. Jednou za studený start; stejný příkaz je v app/api/init/route.ts. */
+export function zajistiDenikUtrata(): Promise<void> {
+  if (!denikUtrataPripraven) {
+    denikUtrataPripraven = (async () => {
+      await sql`ALTER TABLE client_loyalty_ledger ADD COLUMN IF NOT EXISTS amount INTEGER`;
+    })().catch(e => { denikUtrataPripraven = null; throw e; });
+  }
+  return denikUtrataPripraven;
+}
+
+/** Poznámka s dovětkem, když zůstatek nedovolil celou změnu (deník píše, co se opravdu stalo). */
+function poznamkaOmezeni(note: string | null | undefined, pozadovano: number, skutecne: number, jednotka: string): string | null {
+  if (pozadovano === skutecne) return note ?? null;
+  return `${note ? `${note} ` : ''}(požadováno ${pozadovano > 0 ? '+' : ''}${pozadovano} ${jednotka}, víc než zůstatek)`.slice(0, 250);
+}
 
 /**
  * Připíše (nebo odečte) body a zapíše to do deníku. Body nikdy nejdou pod nulu
@@ -522,7 +539,7 @@ export async function loyaltySummary(teamId: number) {
     FROM client_coupon_claims WHERE team_id = ${teamId}` as any[];
   const [l] = await sql`
     SELECT COALESCE(SUM(delta) FILTER (WHERE delta > 0 AND created_at >= NOW() - INTERVAL '30 days'), 0)::int AS given30,
-           COALESCE(SUM(-delta) FILTER (WHERE delta < 0 AND kind <> 'expire' AND created_at >= NOW() - INTERVAL '30 days'), 0)::int AS spent30
+           COALESCE(SUM(-delta) FILTER (WHERE delta < 0 AND kind NOT IN ('expire', 'storno') AND created_at >= NOW() - INTERVAL '30 days'), 0)::int AS spent30
     FROM client_loyalty_ledger WHERE team_id = ${teamId}` as any[];
   return {
     members: Number(m?.members) || 0, newMembers30: Number(m?.new30) || 0,

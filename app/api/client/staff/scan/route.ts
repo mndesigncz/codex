@@ -270,6 +270,11 @@ async function provedAkci(action: string, b: any, c: { id: number; name: string 
     // dokončí jen to, co chybí — nic se nezdvojí a účtenka není spotřebovaná naprázdno.
     const billId = String(b.billId ?? '').slice(0, 60);
     if (!billId) return NextResponse.json({ error: 'Vyber účtenku.' }, { status: 400 });
+    // Zrušená nebo vrácená účtenka věrnost nepřipíše (u už připsaných se body vrací samy po synchronizaci).
+    try {
+      const [bs] = await sql`SELECT refunded, deleted FROM pos_bills WHERE team_id = ${u.team_id} AND bill_id = ${billId}` as any[];
+      if (bs?.refunded || bs?.deleted) return NextResponse.json({ error: 'Tahle účtenka byla v pokladně zrušena nebo vrácena.' }, { status: 409 });
+    } catch { /* zrcadlo účtenek ještě není */ }
     const guard = await sql`
       INSERT INTO client_bill_awards (team_id, bill_id, customer_id, done_at, kroky, staff_id)
       VALUES (${u.team_id}, ${billId}, ${c.id}, NULL, '', ${u.id})
@@ -377,6 +382,8 @@ async function provedAkci(action: string, b: any, c: { id: number; name: string 
     }
     msg = `${c.name}: uplatněno ${mena.money(amount)} kreditu, zbývá ${mena.money(Number(credit))}.`;
   }
+  // Razítko za návštěvu mohlo posunout úroveň (podle návštěv): oznámení hostovi, jednou.
+  if (action !== 'credit') await zkontrolujUroven(u.team_id, c.id, p).catch(() => {});
   audit(u.team_id, u.id, 'client.card', 'client', c.id, msg);
   return NextResponse.json({ ok: true, message: msg, expiredCount, lost, customer: c, ...(await summary(u.team_id, c.id, p)) });
 }

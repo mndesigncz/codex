@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
   const [m] = await sql`SELECT * FROM client_memberships WHERE team_id = ${u.team_id} AND customer_id = ${cid}` as any[];
   if (!m) return NextResponse.json({ error: 'Tenhle host není členem podniku.' }, { status: 404 });
   const profil = await ensureProfile(u.team_id);
-  const uroven = tierForMember({ visits: m.visits, spend: m.spend }, tierRulesFromProfile(profil));
+  const uroven = tierForMember({ visits: m.visits, spend: m.spend, lastVisitAt: m.last_visit_at }, tierRulesFromProfile(profil));
   const kampane = await sql`
     SELECT c.name, c.required_stamps, c.reward_title, p.stamps
     FROM client_stamp_progress p JOIN client_stamp_campaigns c ON c.id = p.campaign_id

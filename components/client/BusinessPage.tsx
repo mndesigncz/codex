@@ -150,6 +150,8 @@ export default function BusinessPage({ slug }: { slug: string }) {
                 <p className="text-lg font-bold tabular-nums leading-tight">{me.points} {t('b.')} {b.stampTarget > 0 && !(me.campaigns?.length) && <span className="opacity-60 font-medium text-sm">· {t('{stamps}/{target} razítek', { stamps: me.stamps, target: b.stampTarget })}</span>}</p>
                 {me.expiring && <p className="text-[11px] font-semibold leading-snug">{t('{n, plural, one {# bod propadne} few {# body propadnou} other {# bodů propadne}} do {kdy}', { n: me.expiring.points, kdy: denKratce(me.expiring.till) })}</p>}
                 {me.credit > 0 && <p className="text-sm font-semibold tabular-nums leading-tight">{t('{castka} kreditu', { castka: formatMoney(me.credit, b.currency) })}</p>}
+                {me.creditExpiring && <p className="text-[11px] font-semibold leading-snug">{t('Kredit {castka} propadne do {kdy}', { castka: formatMoney(me.creditExpiring.amount, b.currency), kdy: denKratce(me.creditExpiring.till) })}</p>}
+                {me.levelDegraded && <p className="text-[11px] opacity-70 leading-snug">{t('Úroveň je dočasně snížená, dlouho jsme tě neviděli. Stačí přijít.')}</p>}
                 {me.nextTierAt && <p className="text-[11px] opacity-60 leading-snug">{me.nextTierUnit === 'spend' ? t('do „{level}“ ještě {castka}', { level: t(me.nextTierLabel), castka: formatMoney(Math.max(0, me.nextTierAt - (me.spend ?? 0)), b.currency) }) : t('do „{level}“ ještě {n, plural, one {# návštěva} few {# návštěvy} other {# návštěv}}', { level: t(me.nextTierLabel), n: Math.max(0, me.nextTierAt - me.visits) })}</p>}
               </div>
             ) : (

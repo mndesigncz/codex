@@ -362,4 +362,8 @@
   "Limit karet je splněný ({n}×).": "Limit kariet je splnený ({n}×).",
   "Tuhle kartu jde dokončit jen jednou.": "Túto kartu ide dokončiť len raz.",
   "Tuhle kartu jde dokončit nejvýš {n}×.": "Túto kartu ide dokončiť najviac {n}×."
+  "Kredit, který nevyužiješ, propadá po {n, plural, one {# dni} few {# dnech} other {# dnech}}.": "Kredit, ktorý nevyužiješ, prepadne po {n, plural, one {# dni} few {# dňoch} other {# dňoch}}.",
+  "Kredit {castka} propadne do {kdy}": "Kredit {castka} prepadne do {kdy}",
+  "Úroveň klesá o stupeň po {n, plural, one {# dni} few {# dnech} other {# dnech}} bez návštěvy.": "Úroveň klesne o stupeň po {n, plural, one {# dni} few {# dňoch} other {# dňoch}} bez návštevy.",
+  "Úroveň je dočasně snížená, dlouho jsme tě neviděli. Stačí přijít.": "Úroveň je dočasne znížená, dlho sme ťa nevideli. Stačí prísť."
 }

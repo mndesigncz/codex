@@ -362,4 +362,8 @@
   "Limit karet je splněný ({n}×).": "Card limit reached ({n}×).",
   "Tuhle kartu jde dokončit jen jednou.": "This card can only be completed once.",
   "Tuhle kartu jde dokončit nejvýš {n}×.": "This card can be completed at most {n}×."
+  "Kredit, který nevyužiješ, propadá po {n, plural, one {# dni} few {# dnech} other {# dnech}}.": "Credit you don't use expires after {n, plural, one {# day} other {# days}}.",
+  "Kredit {castka} propadne do {kdy}": "Credit {castka} expires on {kdy}",
+  "Úroveň klesá o stupeň po {n, plural, one {# dni} few {# dnech} other {# dnech}} bez návštěvy.": "Your level drops one step after {n, plural, one {# day} other {# days}} without a visit.",
+  "Úroveň je dočasně snížená, dlouho jsme tě neviděli. Stačí přijít.": "Your level is temporarily lowered because we haven't seen you for a while. Just drop by."
 }

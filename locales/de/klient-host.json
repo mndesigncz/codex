@@ -362,4 +362,8 @@
   "Limit karet je splněný ({n}×).": "Kartenlimit erreicht ({n}×).",
   "Tuhle kartu jde dokončit jen jednou.": "Diese Karte kann nur einmal abgeschlossen werden.",
   "Tuhle kartu jde dokončit nejvýš {n}×.": "Diese Karte kann höchstens {n}× abgeschlossen werden."
+  "Kredit, který nevyužiješ, propadá po {n, plural, one {# dni} few {# dnech} other {# dnech}}.": "Guthaben, das du nicht einlöst, verfällt nach {n, plural, one {# Tag} other {# Tagen}}.",
+  "Kredit {castka} propadne do {kdy}": "Guthaben {castka} verfällt am {kdy}",
+  "Úroveň klesá o stupeň po {n, plural, one {# dni} few {# dnech} other {# dnech}} bez návštěvy.": "Dein Status sinkt nach {n, plural, one {# Tag} other {# Tagen}} ohne Besuch um eine Stufe.",
+  "Úroveň je dočasně snížená, dlouho jsme tě neviděli. Stačí přijít.": "Dein Status ist vorübergehend gesenkt, weil wir dich länger nicht gesehen haben. Komm einfach vorbei."
 }
