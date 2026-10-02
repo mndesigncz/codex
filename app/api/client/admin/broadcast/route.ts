@@ -17,6 +17,7 @@ import { pragueToday } from '@/lib/pragueTime';
 import { zajistiClenove } from '@/lib/clenoveDb';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
+export const maxDuration = 60;
 
 /** Skupina v publiku musí patřit podniku; kupon a promo kód smí připojit jen ten, kdo je spravuje. */
 async function zkontrolujCile(teamId: number, data: VstupZpravy, smiPrilohy: boolean): Promise<NextResponse | null> {
@@ -86,18 +87,13 @@ export async function GET(req: NextRequest) {
            COUNT(*) FILTER (WHERE spend >= ${th.silver})::int AS silver,
            COUNT(*) FILTER (WHERE spend >= ${th.gold})::int AS gold,
            COUNT(*) FILTER (WHERE spend >= ${platinumAt > 0 ? platinumAt : th.gold})::int AS platinum
-    FROM client_memberships WHERE team_id = ${u.team_id}` as any[] : await sql`
+    FROM client_memberships WHERE team_id = ${u.team_id} AND blocked = FALSE` as any[] : await sql`
     SELECT COUNT(*)::int AS members,
            COUNT(*) FILTER (WHERE visits >= ${th.silver})::int AS silver,
            COUNT(*) FILTER (WHERE visits >= ${th.gold})::int AS gold,
            COUNT(*) FILTER (WHERE visits >= ${platinumAt > 0 ? platinumAt : th.gold})::int AS platinum
-    FROM client_memberships WHERE team_id = ${u.team_id}` as any[];
-  let groups: any[] = [];
-  try {
-    groups = await sql`
-      SELECT g.id, g.name, (SELECT COUNT(*)::int FROM client_group_members gm WHERE gm.group_id = g.id) AS members
-      FROM client_groups g WHERE g.team_id = ${u.team_id} ORDER BY g.name` as any[];
-  } catch { groups = []; }
+    FROM client_memberships WHERE team_id = ${u.team_id} AND blocked = FALSE` as any[];
+  const groups = (await skupinyKVyberu(u.team_id)).filter(g => !g.archived);
   const segments = await segmentyPocty(u.team_id);
   // Kupony a promo kódy k připojení: jen vybrat existující; jen pro toho, kdo je spravuje.
   const smiPrilohy = ctx.role.opravneni.has('kupony.spravovat');
@@ -133,7 +129,6 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const ctx = await pozaduj('zakaznici.zpravy');
   if (jeOdpoved(ctx)) return ctx;
-  const u = { id: ctx.meId, team_id: ctx.teamId };
   const b = await req.json().catch(() => ({}));
   const k = zkontrolujZpravu(b);
   if ('chyba' in k) return NextResponse.json({ error: k.chyba }, { status: 400 });

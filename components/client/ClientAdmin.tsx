@@ -651,11 +651,12 @@ function StolyStranka({ oznam }: { oznam: Hlaska }) {
 
 // ---- Zákazníci ------------------------------------------------------------------
 
-type CastZakazniku = 'members' | 'reviews' | 'messages';
+type CastZakazniku = 'members' | 'reviews' | 'messages' | 'automations';
 const CASTI_ZAKAZNIKU: { id: CastZakazniku; label: string; klic: string; popis: string }[] = [
   { id: 'members', label: 'Členové', klic: 'zakaznici.zobrazit', popis: 'Kdo se k podniku přidal, kolik má bodů a razítek, deník změn.' },
   { id: 'reviews', label: 'Hodnocení', klic: 'zakaznici.recenze', popis: 'Host dostane po hotové rezervaci nebo objednávce výzvu k hodnocení. Slabé hodnocení (1 až 2 hvězdy) ti přijde jako oznámení.' },
-  { id: 'messages', label: 'Zprávy členům', klic: 'zakaznici.zpravy', popis: 'Novinka, akce nebo sezónní nabídka pro všechny členy. Přijde jako oznámení v aplikaci a push na telefon. Nejvýš pět za den.' },
+  { id: 'messages', label: 'Zprávy členům', klic: 'zakaznici.zpravy', popis: 'Novinka, akce nebo nabídka pro členy: oznámení v aplikaci a push, nebo e-mail. Nejvýš pět za den.' },
+  { id: 'automations', label: 'Automatizace', klic: 'zakaznici.zpravy', popis: 'Zprávy, které odejdou samy: uvítání, po první návštěvě, po dokončení karty, k narozeninám a „Chybíš nám“.' },
 ];
 
 function ZakazniciStranka({ oznam, hledat }: { oznam: Hlaska; hledat: string }) {

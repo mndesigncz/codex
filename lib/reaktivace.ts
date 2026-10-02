@@ -12,7 +12,8 @@
 // stejně jako zprávy členům: řeší to notifyUser.
 
 import { sql } from './client';
-import { notifyUser } from './push';
+import { dorucClenovi, zapisDoLogu, nactiAutomatizace } from './automatizaceDb';
+import { zpravaAutomatizace } from './automatizace';
 import { maDostatChybisNam, refChybisNam, textChybisNam, REAKTIVACE_OKNO_DNI } from './segmenty';
 
 let pripraveno: Promise<void> | null = null;
@@ -31,14 +32,18 @@ export function zajistiReaktivaci(): Promise<void> {
 /** Projde podniky se zapnutým pravidlem a pošle „Chybíš nám“. Vrací počet oslovených hostů. */
 export async function odesliChybisNam(now: Date = new Date()): Promise<number> {
   await zajistiReaktivaci();
+  // Vlastní text a kupon z nastavení Automatizací (bez nich platí výchozí věta níž); načte se jednou na podnik.
+  const nastaveni = new Map<number, any>();
   const kandidati = await sql`
-    SELECT m.customer_id, m.team_id, p.reactivation_days, p.reactivation_points, p.slug,
+    SELECT m.customer_id, m.team_id, p.reactivation_days, p.reactivation_points, p.slug, us.name AS member_name,
            COALESCE(t.name, 'u nás') AS team_name,
            to_char(m.last_visit_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS last_visit
     FROM client_memberships m
     JOIN client_profiles p ON p.team_id = m.team_id AND p.enabled = TRUE AND p.loyalty_on = TRUE AND p.reactivation_days > 0
     LEFT JOIN teams t ON t.id = m.team_id
+    JOIN users us ON us.id = m.customer_id
     WHERE m.last_visit_at IS NOT NULL
+      AND m.blocked = FALSE
       AND m.last_visit_at <= NOW() - make_interval(days => p.reactivation_days)
       AND m.last_visit_at > NOW() - make_interval(days => p.reactivation_days + ${REAKTIVACE_OKNO_DNI})
       AND NOT EXISTS (
@@ -66,10 +71,18 @@ export async function odesliChybisNam(now: Date = new Date()): Promise<number> {
       if (body > 0) {
         await sql`UPDATE client_memberships SET points = points + ${body} WHERE team_id = ${teamId} AND customer_id = ${customerId}`;
       }
-      const text = textChybisNam(String(r.team_name), dni, body);
-      notifyUser(customerId, {
-        ...text, link: r.slug ? `/client/${r.slug}?tab=loyalty` : '/client/me', type: 'info', category: 'novinky',
-      }).catch(() => {});
+      let text = textChybisNam(String(r.team_name), dni, body);
+      let kuponId: number | null = null;
+      try {
+        if (!nastaveni.has(teamId)) nastaveni.set(teamId, (await nactiAutomatizace(teamId)).find(x => x.druh === 'chybis_nam')?.config ?? null);
+        const cfg = nastaveni.get(teamId);
+        // Text, kupon a {dny}/{body} z nastavení Automatizací; bez nich platí původní věta.
+        const vlastni = cfg ? zpravaAutomatizace('chybis_nam', cfg, { jmeno: String(r.member_name ?? ''), podnik: String(r.team_name), dny: dni, body }) : null;
+        if (vlastni) text = vlastni;
+        kuponId = cfg?.kuponId ?? null;
+      } catch { /* bez nastavení platí výchozí věta */ }
+      const v = await dorucClenovi({ teamId, customerId, title: text.title, body: text.body, kuponId });
+      await zapisDoLogu(teamId, 'chybis_nam', customerId, ref, v.status, v.channels || null);
       n++;
     } catch { /* další host; jedna chyba nesmí zastavit ostatní */ }
   }

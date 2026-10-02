@@ -2382,6 +2382,9 @@ export async function GET(request: Request) {
     // (a volitelně body). Pravidlo je volitelné (reactivation_days, 0 = vypnuto).
     let reactivations = 0;
     try { reactivations = await odesliChybisNam(); } catch { /* nesmí shodit migrace */ }
+    // Automatizace zpráv (uvítací série, narozeninový kupon): denní průchod; ostatní jdou hned při události.
+    let automatizace = 0;
+    try { automatizace = await spustAutomatizaceCron(); } catch { /* nesmí shodit migrace */ }
 
     // ---- Kolo 73: propadání bodů a bonusové akce věrnosti ----
     // Propadání: po kolika dnech body propadnou (0 = nikdy) a od kdy se stáří počítá.

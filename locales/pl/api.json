@@ -162,4 +162,9 @@
   "Kupony došly.": "Kupony się skończyły.",
   "Odměna tohoto kódu už není k dispozici.": "Nagroda za ten kod nie jest już dostępna.",
   "Kupony z tohoto kódu už došly.": "Kupony z tego kodu już się skończyły."
+  "Odkaz na odhlášení není platný.": "Link do wypisania nie jest prawidłowy.",
+  "Odhlášení se nepodařilo načíst. Zkus to znovu.": "Nie udało się wczytać wypisania. Spróbuj ponownie.",
+  "Moc pokusů za sebou. Zkus to za chvíli.": "Zbyt wiele prób z rzędu. Spróbuj za chwilę.",
+  "Odhlášení se nepodařilo uložit. Zkus to znovu.": "Nie udało się zapisać wypisania. Spróbuj ponownie.",
+  "Tvůj účet je v tomhle podniku zablokovaný. Obrať se na obsluhu.": "Twoje konto jest w tym lokalu zablokowane. Zwróć się do obsługi."
 }

@@ -162,4 +162,9 @@
   "Kupony došly.": "The coupons are all gone.",
   "Odměna tohoto kódu už není k dispozici.": "This code's reward is no longer available.",
   "Kupony z tohoto kódu už došly.": "The coupons for this code have run out."
+  "Odkaz na odhlášení není platný.": "The unsubscribe link is not valid.",
+  "Odhlášení se nepodařilo načíst. Zkus to znovu.": "Couldn't load the unsubscribe page. Try again.",
+  "Moc pokusů za sebou. Zkus to za chvíli.": "Too many attempts in a row. Try again in a moment.",
+  "Odhlášení se nepodařilo uložit. Zkus to znovu.": "Couldn't save the unsubscribe. Try again.",
+  "Tvůj účet je v tomhle podniku zablokovaný. Obrať se na obsluhu.": "Your account is blocked at this business. Please ask the staff."
 }

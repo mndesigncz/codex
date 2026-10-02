@@ -190,6 +190,8 @@ export async function join(customerId: number, teamId: number): Promise<any> {
       const { grantWelcomeCoupons } = await import('./coupons');
       await grantWelcomeCoupons(teamId, customerId, couponCode);
     } catch { /* uvítací kupony nesmí shodit vstup do podniku */ }
+    // Uvítací série (Automatizace): první zpráva hned, další přijdou z denního průchodu.
+    automatizaceUdalost('uvitani', teamId, customerId, 'krok:0');
   }
   return m;
 }
@@ -330,6 +332,10 @@ export async function spendCredit(teamId: number, customerId: number, amountCzk:
  */
 export async function stampVisit(teamId: number, customerId: number, profile: any, ref?: string, extra = 0, note = '', staffId?: number | null): Promise<{ stamps: number; rewarded: boolean; already?: boolean; lines?: string[]; expired?: number; lost?: number }> {
   await join(customerId, teamId);
+  if (await jeClenBlokovan(teamId, customerId)) {
+    const [cur] = await sql`SELECT stamps FROM client_memberships WHERE customer_id = ${customerId} AND team_id = ${teamId}`;
+    return { stamps: Number(cur?.stamps ?? 0), rewarded: false, already: true };
+  }
   const target = Number(profile?.stamp_target) || 0;
   const navic = Math.max(0, Math.trunc(Number(extra)) || 0);
   // Dynamický import: lib/stamps importuje tenhle soubor.
@@ -348,7 +354,7 @@ export async function stampVisit(teamId: number, customerId: number, profile: an
       AND (last_visit_at IS NULL OR
            (last_visit_at AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Prague')::date
              < (NOW() AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Prague')::date)
-    RETURNING stamps`;
+    RETURNING stamps, visits`;
   if (!m) {
     // Dnes už razítko má — vrátí se aktuální stav beze změny.
     const [cur] = await sql`SELECT stamps FROM client_memberships WHERE customer_id = ${customerId} AND team_id = ${teamId}`;
@@ -377,6 +383,7 @@ export async function stampVisit(teamId: number, customerId: number, profile: an
     stamps = stamps - target;
     await sql`UPDATE client_memberships SET stamps = ${stamps} WHERE customer_id = ${customerId} AND team_id = ${teamId}`;
     rewarded = true;
+    automatizaceUdalost('dokoncena_karta', teamId, customerId, `karta:0:${Date.now()}`);
     // Odměna za razítka je kupon, který host ukáže u kasy.
     const [coupon] = await sql`
       INSERT INTO client_coupons (team_id, title, description, cost_points, active, kind)
@@ -463,11 +470,17 @@ export async function awardBirthdays(): Promise<number> {
       AND NOT EXISTS (
         SELECT 1 FROM client_loyalty_ledger l
         WHERE l.team_id = m.team_id AND l.customer_id = m.customer_id AND l.kind = 'birthday' AND l.ref = ${'bday:' + year})` as any[];
+  // Podniky s zapnutým narozeninovým kuponem v Automatizacích posílají vlastní zprávu; tahle by byla druhá.
+  let vlastniZprava = new Set<number>();
+  try {
+    const a = await sql`SELECT team_id FROM client_automatizace WHERE enabled = TRUE AND kind = 'narozeniny_kupon'` as any[];
+    vlastniZprava = new Set(a.map(x => Number(x.team_id)));
+  } catch { /* před migrací */ }
   let n = 0;
   for (const r of rows) {
     try {
       await award(Number(r.team_id), Number(r.customer_id), Number(r.birthday_points), 'birthday', `bday:${year}`, 'Dárek k narozeninám');
-      notifyUser(Number(r.customer_id), {
+      if (!vlastniZprava.has(Number(r.team_id))) notifyUser(Number(r.customer_id), {
         title: `Všechno nejlepší! ${r.birthday_points} bodů od ${r.team_name}`,
         body: 'Dárek k narozeninám máš na kartičce.',
         link: r.slug ? `/client/${r.slug}?tab=loyalty` : '/client/me', type: 'success',

@@ -211,6 +211,10 @@ async function pripis(req: NextRequest, u: { id: number; team_id: number }, c: {
     return NextResponse.json({ ok: true, message: r.message, customer: c, ...(await summary(u.team_id, c.id, p)) });
   }
   await join(c.id, u.team_id);
+  // Zablokovaný člen u kasy nic nesbírá ani neutrácí; obsluha se dozví proč a poznámku najde ve správě členů.
+  if (await jeZablokovan(u.team_id, c.id)) {
+    return NextResponse.json({ error: `${c.name} je ve věrnostním programu zablokovaný. Body ani razítka se mu nepřipisují.` }, { status: 403 });
+  }
   // Čtečka u kasy: host není členem podniku, obsluha ho jedním klepnutím přidá (bez razítka a bodů).
   if (action === 'join') {
     const x = await summary(u.team_id, c.id, p);

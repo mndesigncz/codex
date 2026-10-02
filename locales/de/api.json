@@ -162,4 +162,9 @@
   "Kupony došly.": "Die Gutscheine sind vergriffen.",
   "Odměna tohoto kódu už není k dispozici.": "Die Belohnung dieses Codes ist nicht mehr verfügbar.",
   "Kupony z tohoto kódu už došly.": "Die Gutscheine zu diesem Code sind aufgebraucht."
+  "Odkaz na odhlášení není platný.": "Der Abmeldelink ist nicht gültig.",
+  "Odhlášení se nepodařilo načíst. Zkus to znovu.": "Die Abmeldung konnte nicht geladen werden. Versuch es noch einmal.",
+  "Moc pokusů za sebou. Zkus to za chvíli.": "Zu viele Versuche hintereinander. Versuch es gleich noch einmal.",
+  "Odhlášení se nepodařilo uložit. Zkus to znovu.": "Die Abmeldung konnte nicht gespeichert werden. Versuch es noch einmal.",
+  "Tvůj účet je v tomhle podniku zablokovaný. Obrať se na obsluhu.": "Dein Konto ist in diesem Betrieb gesperrt. Wende dich an das Personal."
 }
