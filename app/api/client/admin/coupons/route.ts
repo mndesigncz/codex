@@ -17,7 +17,8 @@ export const fetchCache = 'force-no-store';
 export async function GET() {
   const ctx = await pozaduj('kupony.spravovat');
   if (jeOdpoved(ctx)) return ctx;
-  const u = { id: ctx.meId, team_id: ctx.teamId };
+  await zajistiKupony();
+  const teamId = ctx.teamId;
   const rows = await sql`
     SELECT c.*, (SELECT COUNT(*)::int FROM client_coupon_claims cl WHERE cl.coupon_id = c.id) AS claimed,
            (SELECT COUNT(*)::int FROM client_coupon_claims cl WHERE cl.coupon_id = c.id AND cl.redeemed_at IS NOT NULL) AS redeemed
@@ -27,23 +28,29 @@ export async function GET() {
   try {
     groups = await sql`
       SELECT g.id, g.name, (SELECT COUNT(*)::int FROM client_group_members gm WHERE gm.group_id = g.id) AS members
-      FROM client_groups g WHERE g.team_id = ${u.team_id} ORDER BY g.name, g.id` as any[];
+      FROM client_groups g WHERE g.team_id = ${teamId} ORDER BY g.name, g.id` as any[];
   } catch { groups = []; }
   const groupName = new Map((groups as any[]).map((g: any) => [Number(g.id), String(g.name)]));
   // Částky v popiscích výhod jsou v měně podniku, ne natvrdo v korunách.
-  const castka = (await menaPodniku(u.team_id)).money;
-  const coupons = (rows as any[]).map(r => ({
-    ...shapeCoupon(r, castka),
-    claimed: Number(r.claimed) || 0, redeemed: Number(r.redeemed) || 0,
-    targetGroupNames: (shapeCoupon(r).targetGroups).map(id => groupName.get(id) ?? `#${id}`),
-  }));
-  return NextResponse.json({ coupons, groups });
+  const castka = (await menaPodniku(teamId)).money;
+  const coupons = bohate.map(r => {
+    const s = shapeCoupon(r, castka);
+    return {
+      ...s,
+      stav: stavKuponu({ ...r, issued: r.issued ?? r.claimed }, dnes),
+      claimed: Number(r.claimed) || 0, redeemed: Number(r.redeemed) || 0, openClaims: Number(r.open_claims) || 0,
+      issued: r.issued == null ? Number(r.claimed) || 0 : Number(r.issued),
+      targetGroupNames: s.targetGroups.map(id => groupName.get(id) ?? `#${id}`),
+    };
+  });
+  return NextResponse.json({ coupons, groups, polozky });
 }
 
 export async function POST(req: NextRequest) {
   const ctx = await pozaduj('kupony.spravovat');
   if (jeOdpoved(ctx)) return ctx;
-  const u = { id: ctx.meId, team_id: ctx.teamId };
+  await zajistiKupony();
+  const teamId = ctx.teamId;
   const b = await req.json().catch(() => ({}));
   const f = normalizujKupon(b);
   const bad = zkontrolujKupon(f, b);
@@ -65,7 +72,8 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const ctx = await pozaduj('kupony.spravovat');
   if (jeOdpoved(ctx)) return ctx;
-  const u = { id: ctx.meId, team_id: ctx.teamId };
+  await zajistiKupony();
+  const teamId = ctx.teamId;
   const b = await req.json().catch(() => ({}));
   const id = parseInt(String(b.id), 10);
   const [cur] = await sql`SELECT * FROM client_coupons WHERE id = ${id} AND team_id = ${u.team_id} AND kind = 'offer'`;

@@ -57,7 +57,8 @@ async function nactiClenySegmentu(teamId: number): Promise<{ clenove: ClenSegmen
   } catch { /* bez kampaní nikdo blízko není */ }
   let cenyKuponu: number[] = [];
   try {
-    const kp = await sql`SELECT cost_points FROM client_coupons WHERE team_id = ${teamId} AND active = TRUE AND cost_points > 0` as any[];
+    await zajistiKupony().catch(() => {});
+    const kp = await sql`SELECT cost_points FROM client_coupons WHERE team_id = ${teamId} AND active = TRUE AND status = 'live' AND kind = 'offer' AND cost_points > 0` as any[];
     cenyKuponu = kp.map(r => Number(r.cost_points));
   } catch { cenyKuponu = []; }
   const dnes = pragueToday();

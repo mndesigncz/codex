@@ -159,4 +159,8 @@
   "Kupony došly.": "Kupony się skończyły.",
   "Odměna tohoto kódu už není k dispozici.": "Nagroda za ten kod nie jest już dostępna.",
   "Kupony z tohoto kódu už došly.": "Kupony z tego kodu już się skończyły."
+  "Kupon už došel.": "Ten kupon został wyprzedany.",
+  "Kupon k tomuhle kódu už neplatí.": "Kupon do tego kodu już nie obowiązuje.",
+  "Kupon z tohoto kódu už došel.": "Kupon z tego kodu się skończył.",
+  "Kód se nepodařilo uplatnit. Zkus to znovu.": "Nie udało się zrealizować kodu. Spróbuj ponownie."
 }

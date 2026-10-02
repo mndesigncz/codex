@@ -36,6 +36,7 @@ function castkaUctenky(v: unknown): { hodnota: number | null } | { chyba: string
 export async function POST(req: NextRequest) {
   const ctx = await pozaduj('kupony.uplatnit');
   if (jeOdpoved(ctx)) return ctx;
+  await zajistiKupony();
   const u = { id: ctx.meId, team_id: ctx.teamId };
   const b = await req.json().catch(() => ({}));
   // `code` může být ručně zadaný kód, nebo text z QR (payload kuponu); `payload` je alias pro skener.

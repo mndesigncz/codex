@@ -68,6 +68,8 @@ export default function CteckaKasa() {
   const [potvrzeni, setPotvrzeni] = useState<{ text: string; ok: boolean } | null>(null);
   const [historie, setHistorie] = useState<ZaznamHistorie[]>([]);
   const [busy, setBusy] = useState('');
+  // Kupon, který chce útratu (min. útrata) nebo ověření věku (18+), se dokončí v okně KuponUplatnit.
+  const [uplatnuji, setUplatnuji] = useState<{ kod: string; jen: boolean } | null>(null);
   const [castka, setCastka] = useState('');
   const [poukazCastka, setPoukazCastka] = useState('');
   const [rucne, setRucne] = useState('');
@@ -326,7 +328,10 @@ export default function CteckaKasa() {
       if (jenPoukazanyKupon) setFaze({ druh: 'ceka' });
       else setFaze(f => f.druh === 'host' ? { ...f, data: { ...f.data, openCoupons: (f.data.openCoupons ?? []).filter((c: any) => c.code !== kod) } } : f);
       ohlas(text, true); zapis(text, true);
-    } catch (e) { ohlas(chyba(e, 'kupon'), false); }
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 422) setUplatnuji({ kod, jen: jenPoukazanyKupon });
+      else ohlas(chyba(e, 'kupon'), false);
+    }
     setBusy('');
   };
   const uplatniPoukaz = async (hodnota: number) => {
@@ -580,6 +585,14 @@ export default function CteckaKasa() {
             ))}
           </ul>
         </div>
+      )}
+      {uplatnuji && (
+        <KuponUplatnit kod={uplatnuji.kod} onZavrit={() => { setUplatnuji(null); pole.current?.focus(); }}
+          onHotovo={text => {
+            if (uplatnuji.jen) setFaze({ druh: 'ceka' });
+            else setFaze(f => f.druh === 'host' ? { ...f, data: { ...f.data, openCoupons: (f.data.openCoupons ?? []).filter((c: any) => c.code !== uplatnuji.kod) } } : f);
+            ohlas(text, true); zapis(text, true);
+          }} />
       )}
     </div>
   );

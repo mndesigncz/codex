@@ -37,6 +37,8 @@ import MobileMoreSheet from '../MobileMoreSheet';
 import FloorPlanEditor from './FloorPlanEditor';
 import QrDesigner from './QrDesigner';
 import BrandTab from './BrandTab';
+import PromoKody from './loyalty/PromoKody';
+import KuponyOdeslat from './loyalty/KuponyOdeslat';
 import LoyaltyTabs, { LOYALTY_SUBS, type LoyaltySub } from './LoyaltyTabs';
 import PrechodZKarticky, { PRECHOD_TLACITKO, PRECHOD_OTAZKA, PRECHOD_POPIS, useImportKarticky } from './PrechodZKarticky';
 import ClenoveSprava from './loyalty/ClenoveSprava';
