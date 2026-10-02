@@ -306,5 +306,11 @@
   "— mrkni do záložky Menu": "— check the Menu tab",
   "✋ Jdu — zrušit účast": "✋ I'm coming — cancel",
   "✋ Přijdu": "✋ I'll come",
-  "✋ {n, plural, one {# člověk jde} few {# lidi jdou} other {# lidí jde}}": "✋ {n, plural, one {# person is going} other {# people are going}}"
+  "✋ {n, plural, one {# člověk jde} few {# lidi jdou} other {# lidí jde}}": "✋ {n, plural, one {# person is going} other {# people are going}}",
+  "Karta vypršela a razítka propadla ({n}). Začínáš znovu.": "Your card expired and the stamps are gone ({n}). You start over.",
+  "Dosbírej do {datum}, pak karta vyprší.": "Collect by {datum}, then the card expires.",
+  "Razítko dostaneš jen {kdy}.": "You only get a stamp {kdy}.",
+  "Limit karet je splněný ({n}×).": "Card limit reached ({n}×).",
+  "Tuhle kartu jde dokončit jen jednou.": "This card can only be completed once.",
+  "Tuhle kartu jde dokončit nejvýš {n}×.": "This card can be completed at most {n}×."
 }

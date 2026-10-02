@@ -56,6 +56,7 @@ import {
   type Rezervace, type StavRezervace,
 } from '@/lib/klientPrehled';
 import { useOpravneni } from '../role/useOpravneni';
+import RazitkaClen from './loyalty/RazitkaClen';
 import { NavigaceKontext, useNavigace } from '../widgety/NavigaceKontext';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
@@ -814,6 +815,7 @@ function DenikClena({ customerId, oznam, vidiDenik }: { customerId: number; ozna
   return (
     <Well className="mb-3 space-y-3">
       <SkupinyClena customerId={customerId} oznam={oznam} prazdne={!vidiDenik} />
+      {vidiDenik && <RazitkaClen customerId={customerId} oznam={oznam} />}
       {!vidiDenik ? null
         : pr === null ? <Skeleton className="h-10" />
         : (

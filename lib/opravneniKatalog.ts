@@ -1285,6 +1285,16 @@ export const KATALOG: Opravneni[] = [
   ]
  },
  {
+  "id": "vernost.razitka_upravit",
+  "oblast": "Zákazníci a menu",
+  "nazev": "Ručně upravit razítka hosta",
+  "popis": "Připsat nebo odebrat razítka hostovi z okna člena (s důvodem) a stornovat poslední akci s razítky. Zapisuje se do auditu.",
+  "citlivost": "střední",
+  "vyzaduje": [
+   "vernost.zobrazit"
+  ]
+ },
+ {
   "id": "vernost.kredit_upravit",
   "oblast": "Zákazníci a menu",
   "nazev": "Ručně upravit kredit (peníze hosta)",
@@ -1776,6 +1786,7 @@ export const SYSTEMOVE_ROLE: SystemovaRole[] = [
    "vernost.kredit_upravit",
    "vernost.platba_kreditem",
    "vernost.pravidla",
+   "vernost.razitka_upravit",
    "vernost.upravit_body",
    "vernost.zobrazit",
    "volno.schvalovat",

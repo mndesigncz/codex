@@ -129,7 +129,8 @@ export default function ({ eq, ok }: Testy) {
   ok('propadání: odpis jde do deníku s ref exp:<den> a upozornění s warn:<den>', zdroj('lib/propadaniBoduDb.ts').includes('`exp:${dnes}`') && zdroj('lib/propadaniBoduDb.ts').includes('`warn:${dnes}`'));
 
   const scan = zdroj('app/api/client/staff/scan/route.ts');
-  ok('bonus: kartička u kasy (razítko, účtenka, částka) bonus uplatňuje', (scan.match(/bodySBonusem\(/g) ?? []).length === 2 && scan.includes('1 + bonus.razitka') && scan.includes('stampVisit(u.team_id, c.id, p, \'card\', bonus.razitka') && /applyBillToCampaigns\([^\n]*razitka: bonus\.razitka/.test(scan));
+  const client = zdroj('lib/client.ts');
+  ok('bonus: kartička u kasy (razítko, účtenka, částka) bonus uplatňuje', (scan.match(/bodySBonusem\(/g) ?? []).length === 2 && client.includes('1 + navic') && scan.includes('stampVisit(u.team_id, c.id, p, \'card\', bonus.razitka') && /applyBillToCampaigns\([^\n]*razitka: bonus\.razitka/.test(scan));
   ok('bonus: hotová objednávka od stolu bonus uplatňuje', zdroj('lib/clientOrders.ts').includes('bodySBonusem(zaklad, bonus)') && zdroj('lib/clientOrders.ts').includes('bonus.razitka'));
   ok('bonus: návštěva z rezervace dává razítka navíc', zdroj('app/api/client/admin/reservations/route.ts').includes('bonus.razitka'));
   ok('bonus: stránka podniku hostovi ukazuje běžící akci', zdroj('app/api/client/b/[slug]/route.ts').includes('aktivniBonus(teamId)') && zdroj('components/client/BusinessPage.tsx').includes('<BonusPruh'));

@@ -306,5 +306,11 @@
   "— mrkni do záložky Menu": "— mrkni do záložky Menu",
   "✋ Jdu — zrušit účast": "✋ Idem — zrušiť účasť",
   "✋ Přijdu": "✋ Prídem",
-  "✋ {n, plural, one {# člověk jde} few {# lidi jdou} other {# lidí jde}}": "✋ {n, plural, one {# človek ide} few {# ľudia idú} other {# ľudí ide}}"
+  "✋ {n, plural, one {# člověk jde} few {# lidi jdou} other {# lidí jde}}": "✋ {n, plural, one {# človek ide} few {# ľudia idú} other {# ľudí ide}}",
+  "Karta vypršela a razítka propadla ({n}). Začínáš znovu.": "Karta vypršala a pečiatky prepadli ({n}). Začínaš odznova.",
+  "Dosbírej do {datum}, pak karta vyprší.": "Zbieraj do {datum}, potom karta vyprší.",
+  "Razítko dostaneš jen {kdy}.": "Pečiatku dostaneš len {kdy}.",
+  "Limit karet je splněný ({n}×).": "Limit kariet je splnený ({n}×).",
+  "Tuhle kartu jde dokončit jen jednou.": "Túto kartu ide dokončiť len raz.",
+  "Tuhle kartu jde dokončit nejvýš {n}×.": "Túto kartu ide dokončiť najviac {n}×."
 }
