@@ -26,7 +26,7 @@ Sloučení: kupony a promo kódy vznikly paralelně ve dvou větvích (kolo 77 W
 | K6 export CSV kuponů a vydaných kódů | HOTOVO | `kuponyCsv`, `claimyCsv`, `GET ?export=kupony|claimy`; `k81-kupony.ts` | Katalog → export (středník, BOM pro Excel, ochrana proti vzorcům, částky v měně podniku). Promo kódy mají vlastní export. |
 | K6 dávková generace a úprava promo kódů | HOTOVO | `promoKody.ts`, `promos/route.ts`, `promos/[id]` | „Dávka kódů": předpona + počet (až 200); úprava a smazání nepoužitých kódů. |
 | K7 náhled pohledem hosta | HOTOVO | `KuponyNahled.tsx` | V editoru vpravo a v nabídce kuponu. |
-| K8 redeem kontroluje min. útratu a 18+ | HOTOVO | `varovaniUplatneni`, `KuponyUplatnit.tsx` | Okno při uplatnění: kupon, držitel, podmínky, útrata a varování; u 18+ obsluha potvrdí doklad. |
+| K8 redeem kontroluje min. útratu a 18+ | HOTOVO | `varovaniUplatneni`, `KuponUplatnitOkno.tsx` (záložka Kupony i čtečky u kasy `CardScan.tsx`, `CteckaKasa.tsx`) | Okno při uplatnění: kupon, držitel, podmínky, útrata a varování; u 18+ obsluha potvrdí doklad. Čtečka u kasy otevře totéž okno, když server řekne, že kupon chce potvrdit (409 `needsConfirm`). |
 | K9 noční okno hodin (22–02) | HOTOVO | `windowOk`, `hodinyOk` | Hodiny „od" větší než „do" platí přes půlnoc. |
 | K9 uvítací kupon | HOTOVO | `grantWelcomeCoupons`, `coupons/send` | Nový člen dostane uvítací kupony, na které má nárok; stávajícím členům ho pošleš ručně. |
 | K10 promo kód prochází claimBlocker, atomické uses a kompenzace | HOTOVO | `promo/route.ts` (`ON CONFLICT DO NOTHING`, podmíněný UPDATE, `vratPouziti`) | Host bez nároku na kupon z kódu kód nespotřebuje; pád po cestě vrátí použití i vydaný kód. |

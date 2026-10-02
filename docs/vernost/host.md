@@ -8,7 +8,7 @@ do en, de, sk, pl (`locales/*/klient-host.json`, `api.json`).
 | H1 historie bodů, razítek a kuponů s platností | HOTOVO | `api/client/me/historie`, `HostHistorie.tsx`, test `w5-host` |
 | H2 platnost kuponů v seznamech | HOTOVO | `HostPlatnost.tsx` („Vyprší za N dní“), test `w5-host` |
 | H2 kdy propadnou body | HOTOVO | stránka podniku (W5) a nově i seznam podniků v Moje (`expiring` v `api/client/me`) |
-| H2 doba na dokončení karty, zpráva o propadlé kartě | HOTOVO | `RazitkaHost.tsx`; nově i v Moje (`api/client/me` čte přes `progressFor`, takže karta s prošlým časem se vynuluje a host se to dozví) |
+| H2 doba na dokončení karty, zpráva o propadlé kartě | HOTOVO | `KartaRazitek.tsx` (jedna karta pro stránku podniku, sdílený popis z `kartaProHosta`); stejné věty („Dosbírej kartu do…“, „Rozdělaná karta vypršela, N razítek propadlo“) i v Moje (`MyPage.tsx`; `api/client/me` čte přes `kartaProHosta`, takže karta s prošlým časem se vynuluje a host se to dozví); sondy `w5-host-bannery`, `w6-poukazy-bannery` |
 | H3 jak získat body (z pravidel) | HOTOVO | `HostPravidla.tsx` + `lib/hostPrehled.ts`; nově zná body za objednávky (vypnuté), za rezervaci a za nákup poukazu, test `w6-host-kasa` |
 | H4 wallet pass, zvětšený QR | HOTOVO | vlna D (`KartaNastroje.tsx`, test `d2-wallet`) |
 | H4 offline karta | HOTOVO | `lib/offlineKarta.ts`: kód a QR se při načtení Moje uloží do telefonu, `public/offline.html` je ukáže bez sítě; kontrola tvaru kódu i SVG na obou místech, smazání při odhlášení; test `w6-host-kasa` |

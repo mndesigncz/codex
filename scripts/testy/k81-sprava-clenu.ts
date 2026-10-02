@@ -93,7 +93,7 @@ export default function ({ eq, ok }: Testy) {
   const kat = precti('lib/opravneniKatalog.ts');
   ok('oprávnění: správa členů je v katalogu a ve vedení', kat.includes('"id": "zakaznici.sprava_clenu"') && kat.includes('"zakaznici.sprava_clenu",\n   "zakaznici.zobrazit"'));
   const role = precti('scripts/sondy/fixtury/roles.json');
-  ok('oprávnění: je ve fixtuře rolí právě jednou', (role.match(/zakaznici\.sprava_clenu/g) ?? []).length === 1);
+  ok('oprávnění: je ve fixtuře rolí u vedení i u vlastníka, vždy jednou', (role.match(/zakaznici\.sprava_clenu/g) ?? []).length === 2 && (role.match(/"zakaznici\.sprava_clenu",?\s*\n\s*"zakaznici\.zobrazit"/g) ?? []).length === 2);
   const init = precti('app/api/init/route.ts');
   ok('schéma: blokace člena a archiv skupiny jsou v init', ['blocked BOOLEAN', 'blocked_at TIMESTAMP'].every(x => init.includes(`client_memberships ADD COLUMN IF NOT EXISTS ${x}`)) && init.includes('client_groups ADD COLUMN IF NOT EXISTS archived BOOLEAN'));
   const imp = precti('app/api/client/admin/groups/import/route.ts');

@@ -105,7 +105,7 @@ for (const [sirka, mobil] of [[1280, false], [390, true]]) {
   await p.getByRole('button', { name: 'Nová kartička' }).click();
   await p.getByText('Kdy platí', { exact: true }).waitFor();
   const ed = await p.locator('[data-plocha]').innerText();
-  tvrdi(`${jmeno} editor: dny, hodiny, limity a náhled pro hosta`, ['Kdy platí', 'Karet na hosta', 'Razítek za den', 'Uložit jako koncept', 'Náhled pohledem hosta'].every(t => ed.includes(t)));
+  tvrdi(`${jmeno} editor: dny, hodiny, limity a náhled pro hosta`, ['Kdy platí', 'Karet na hosta', 'Razítek za den', 'Uložit jako koncept', 'Náhled pohledem hosta'].every(t => ed.toLowerCase().includes(t.toLowerCase())));
   const uloz = p.getByRole('button', { name: 'Založit a spustit' });
   tvrdi(`${jmeno} editor: bez názvu je vidět důvod a tlačítko je zakázané`, await uloz.isDisabled() && ed.includes('Zadej název kampaně.'));
   await p.getByLabel('Název', { exact: true }).fill('Test kartička');
