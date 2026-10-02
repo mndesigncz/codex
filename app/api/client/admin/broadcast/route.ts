@@ -5,7 +5,8 @@ import { tierThresholds, tierRulesFromProfile } from '@/lib/clientSlots';
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/client';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
-import { dispatchDueBroadcasts, sendNow, AUDIENCES } from '@/lib/broadcasts';
+import { dispatchDueBroadcasts, sendNow, AUDIENCES, segmentyPocty } from '@/lib/broadcasts';
+import { jeSegment } from '@/lib/segmenty';
 import { hit } from '@/lib/rateLimit';
 import { audit } from '@/lib/audit';
 export const dynamic = 'force-dynamic';
@@ -14,7 +15,7 @@ export const fetchCache = 'force-no-store';
 const LINKS = ['page', 'loyalty', 'order', 'me'];
 
 function validAudience(a: string): boolean {
-  return (AUDIENCES as readonly string[]).includes(a) || /^group:\d+$/.test(a) || a === 'gold';
+  return (AUDIENCES as readonly string[]).includes(a) || jeSegment(a) || /^group:\d+$/.test(a) || a === 'gold';
 }
 
 export async function GET() {
@@ -29,10 +30,10 @@ export async function GET() {
   const history = await sql`
     SELECT b.*,
       (SELECT COUNT(DISTINCT l.customer_id)::int FROM client_loyalty_ledger l
-        WHERE l.team_id = b.team_id AND l.created_at >= b.sent_at
+        WHERE l.team_id = b.team_id AND l.kind <> 'reactivation' AND l.created_at >= b.sent_at
           AND l.created_at < b.sent_at + INTERVAL '7 days') AS visits_after,
       (SELECT COUNT(DISTINCT l.customer_id)::int FROM client_loyalty_ledger l
-        WHERE l.team_id = b.team_id AND l.created_at >= b.sent_at - INTERVAL '7 days'
+        WHERE l.team_id = b.team_id AND l.kind <> 'reactivation' AND l.created_at >= b.sent_at - INTERVAL '7 days'
           AND l.created_at < b.sent_at) AS visits_before,
       (b.sent_at > NOW() - INTERVAL '7 days') AS still_running
     FROM client_broadcasts b
@@ -44,13 +45,11 @@ export async function GET() {
   const platinumAt = th.platinum;
   const [c] = th.by === 'spend' ? await sql`
     SELECT COUNT(*)::int AS members,
-           COUNT(*) FILTER (WHERE last_visit_at IS NULL OR last_visit_at < NOW() - INTERVAL '30 days')::int AS quiet,
            COUNT(*) FILTER (WHERE spend >= ${th.silver})::int AS silver,
            COUNT(*) FILTER (WHERE spend >= ${th.gold})::int AS gold,
            COUNT(*) FILTER (WHERE spend >= ${platinumAt > 0 ? platinumAt : th.gold})::int AS platinum
     FROM client_memberships WHERE team_id = ${u.team_id}` as any[] : await sql`
     SELECT COUNT(*)::int AS members,
-           COUNT(*) FILTER (WHERE last_visit_at IS NULL OR last_visit_at < NOW() - INTERVAL '30 days')::int AS quiet,
            COUNT(*) FILTER (WHERE visits >= ${th.silver})::int AS silver,
            COUNT(*) FILTER (WHERE visits >= ${th.gold})::int AS gold,
            COUNT(*) FILTER (WHERE visits >= ${platinumAt > 0 ? platinumAt : th.gold})::int AS platinum
@@ -61,9 +60,11 @@ export async function GET() {
       SELECT g.id, g.name, (SELECT COUNT(*)::int FROM client_group_members gm WHERE gm.group_id = g.id) AS members
       FROM client_groups g WHERE g.team_id = ${u.team_id} ORDER BY g.name` as any[];
   } catch { groups = []; }
+  const segments = await segmentyPocty(u.team_id);
   return NextResponse.json({
     history,
-    members: Number(c?.members) || 0, quiet: Number(c?.quiet) || 0,
+    members: Number(c?.members) || 0,
+    segments, quiet: segments.quiet ?? 0,
     silver: Number(c?.silver) || 0, gold: Number(c?.gold) || 0,
     platinum: platinumAt > 0 ? Number(c?.platinum) || 0 : null,
     groups,

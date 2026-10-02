@@ -1,4 +1,4 @@
-// Ručně spouštěná sonda průvodce „Přecházíte z aplikace Kartička?“ (components/client/ImportKartickaOkno.tsx).
+// Ručně spouštěná sonda průvodce „Přecházíš z Kartičky?“ (components/client/ImportKartickaOkno.tsx) a jeho vstupů v administraci.
 // Není v ZELENE ve spust.mjs (je v MIMO): API se podvrhuje, ale okno se otevírá tlačítkem v ClientAdmin
 // (Zákazníci → Členové), které přidává rodič; sonda ho hledá podle jména /Kartičk/.
 //
@@ -10,11 +10,12 @@
 // a v každém kroku měří: žádný vodorovný scroll stránky ani okna, tlačítko dalšího kroku je vidět a použitelné,
 // nejvýš jedna limetková akce, každý Select má popisek. Navíc velký soubor (1 200 členů, tři dávky) s Zrušit.
 import { readFileSync } from 'node:fs';
-import { kontext, konec, tvrdi, otevri, dotazyNa, DIR, OUT } from './k68-spolecne.mjs';
+import { kontext, konec, tvrdi, otevri, dotazyNa, fixtura, BASE, DIR, OUT } from './k68-spolecne.mjs';
 
 const nacti = (jmeno) => JSON.parse(readFileSync(DIR + jmeno + '.json', 'utf8'));
 const SOUBOR = DIR + 'import-karticka.csv';
 const ZAKAZNICI = '/employer/overview?mode=client&tab=customers';
+const CLIENT = (tab) => `/employer/overview?mode=client&tab=${tab}`;
 
 const NAHLED = { radku: 10, noveUcty: 8, existujiciHoste: 2, uzJsouClenove: 1, cizi: 1 };
 const HISTORIE = [
@@ -51,7 +52,13 @@ const podvrh = (req, json, stav) => {
   }
   if (path === '/api/client/admin/profile') {
     if (m === 'PUT') { s.puty.push(req.postDataJSON()); return json({ ok: true }); }
-    if (m === 'GET') return json({ profile: { cashback_pct: 2, cashback_mode: 'credit', points_per_100: 5, silver_at: 10, gold_at: 25 }, boards: [], url: '' });
+    if (m === 'GET') return json({ profile: { slug: 'kavarna', enabled: true, loyalty_on: true, cashback_pct: 2, cashback_mode: 'credit', points_per_100: 5, stamp_target: 10, stamp_reward: 'Káva zdarma', birthday_points: 50, referral_points: 0, silver_at: 10, gold_at: 25, opening_hours: {} }, boards: [], url: '' });
+  }
+  // Počet členů podle potřeby sondy: 0 = „Začni", 3 = výrazná karta, jinak z fixtury (148 = decentní řádek).
+  if (s.clenu !== undefined && m === 'GET' && path === '/api/client/admin/summary') return json({ ...fixtura('client_admin_summary'), members: s.clenu });
+  if (s.clenu !== undefined && m === 'GET' && path === '/api/client/admin/loyalty') {
+    const f = fixtura('client_admin_loyalty');
+    return json({ ...f, summary: { ...f.summary, members: s.clenu } });
   }
   return undefined;
 };
@@ -103,7 +110,9 @@ async function pruvodce(viewport, mobil) {
   await otevriOkno(p);
 
   // 1) Úvod
-  tvrdi(`${jmeno} úvod: nadpis „Přecházíte z aplikace Kartička?“`, await okno(p).getByRole('heading', { name: 'Přecházíte z aplikace Kartička?' }).count() === 1);
+  tvrdi(`${jmeno} úvod: nadpis „Přecházíš z Kartičky?“`, await okno(p).getByRole('heading', { name: 'Přecházíš z Kartičky?' }).count() === 1);
+  const uvodText = await okno(p).innerText();
+  tvrdi(`${jmeno} úvod: říká, co se nepřenese (kupony, poukazy, bannery, pravidla)`, /Co se nepřenese/.test(uvodText) && /kupony, promo kódy a dárkové poukazy/.test(uvodText) && /bannery/.test(uvodText));
   tvrdi(`${jmeno} úvod: bez souboru je Pokračovat zakázané`, await dalsi(p).isDisabled());
   tvrdi(`${jmeno} úvod: poctivě říká, že formát exportu Kartička nezveřejňuje`, /nezveřejňuje/.test(await okno(p).innerText()));
   await zmer(p, `${jmeno} úvod`);
@@ -116,7 +125,7 @@ async function pruvodce(viewport, mobil) {
   await dalsi(p).click();
 
   // 2) Sloupce
-  await okno(p).getByRole('heading', { name: 'Zkontrolujte sloupce' }).waitFor();
+  await okno(p).getByRole('heading', { name: 'Zkontroluj sloupce' }).waitFor();
   const email = okno(p).getByLabel('E-mail', { exact: true });
   tvrdi(`${jmeno} sloupce: sloupec E-mail je předvyplněný na pole E-mail`, await email.inputValue() === 'email');
   tvrdi(`${jmeno} sloupce: Číslo staré karty se rozpoznalo`, await okno(p).getByLabel('Číslo karty', { exact: true }).inputValue() === 'cisloKarty');
@@ -164,20 +173,25 @@ async function pruvodce(viewport, mobil) {
   await dalsi(p).click();
 
   // 4) Pravidla
-  await okno(p).getByRole('heading', { name: 'Přenést pravidla věrnosti' }).waitFor();
+  await okno(p).getByRole('heading', { name: 'Převzít pravidla věrnosti' }).waitFor();
   await okno(p).getByRole('spinbutton', { name: 'Cashback v %' }).waitFor();
-  tvrdi(`${jmeno} pravidla: ukazuje současnou hodnotu z profilu`, /Nyní: 2\./.test(await okno(p).innerText()));
-  tvrdi(`${jmeno} pravidla: bez zapnutého pole je „Použít pravidla“ zakázané`, await okno(p).getByRole('button', { name: 'Použít pravidla' }).isDisabled());
-  tvrdi(`${jmeno} pravidla: uvádí, že úroveň se počítá z návštěv`, /počítá z počtu návštěv/.test(await okno(p).innerText()));
+  const pole = (n) => okno(p).getByRole('spinbutton', { name: n });
+  tvrdi(`${jmeno} pravidla: formulář je předvyplněný z profilu (cashback 2, body 5, narozeniny 50, razítek 10, odměna)`,
+    await pole('Cashback v %').inputValue() === '2' && await okno(p).locator('#pravidlo-points_per_100').inputValue() === '5'
+    && await pole('Bodů k narozeninám').inputValue() === '50' && await pole('Razítek na kartě').inputValue() === '10'
+    && await okno(p).getByLabel('Odměna za plnou kartu').inputValue() === 'Káva zdarma');
+  tvrdi(`${jmeno} pravidla: beze změny je „Uložit pravidla“ zakázané`, await okno(p).getByRole('button', { name: 'Uložit pravidla' }).isDisabled());
+  const textKroku = await okno(p).innerText();
+  tvrdi(`${jmeno} pravidla: je tu seznam „Co přenést ručně“ s bannery, kupony, poukazy`, /Co přenést ručně/.test(textKroku) && /Bannery/.test(textKroku) && /Kupony a promo kódy/.test(textKroku) && /Dárkové poukazy/.test(textKroku));
   await zmer(p, `${jmeno} pravidla`);
-  await okno(p).getByRole('checkbox', { name: /Nastavit: Cashback v %/ }).check();
-  await okno(p).getByRole('spinbutton', { name: 'Cashback v %' }).fill('6');
-  await okno(p).getByRole('checkbox', { name: /Nastavit: Zlatá od návštěv/ }).check();
-  await okno(p).getByRole('spinbutton', { name: 'Zlatá od návštěv' }).fill('30');
-  await okno(p).getByRole('button', { name: 'Použít pravidla' }).click();
+  await pole('Bodů za pozvání').fill('25');
+  await pole('Cashback v %').fill('77');
+  tvrdi(`${jmeno} pravidla: cashback 77 % ukáže chybu a zakáže uložení`, await okno(p).getByText(/Povoleno 0 až 50/).count() === 1 && await okno(p).getByRole('button', { name: 'Uložit pravidla' }).isDisabled());
+  await pole('Cashback v %').fill('6');
+  await okno(p).getByRole('button', { name: 'Uložit pravidla' }).click();
   await okno(p).getByText('Uloženo.').waitFor();
   const put = stav.import.puty.at(-1);
-  tvrdi(`${jmeno} pravidla: PUT obsahuje jen zapnutá pole`, put && Object.keys(put).sort().join() === 'cashback_pct,gold_at' && put.cashback_pct === 6 && put.gold_at === 30, JSON.stringify(put));
+  tvrdi(`${jmeno} pravidla: PUT obsahuje jen změněná pole`, put && Object.keys(put).sort().join() === 'cashback_pct,referral_points' && put.cashback_pct === 6 && put.referral_points === 25, JSON.stringify(put));
   await p.screenshot({ path: `${OUT}import-karticka-${jmeno}-4-pravidla.png` });
   await dalsi(p).click();
 
@@ -231,6 +245,96 @@ async function pruvodce(viewport, mobil) {
   await ctx.close();
 }
 
+/** Vstupy do přechodu: Věrnost → Přehled (výrazná karta / decentní řádek), Přehled správy („Začni“), Zákazníci, Nastavení, odkazy z kroku Pravidla. */
+async function vstupy(viewport, mobil) {
+  const jmeno = `vstupy ${viewport.width}px`;
+  const bezScrollu = async (p, popis) => {
+    const x = await p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    tvrdi(`${jmeno} ${popis}: bez vodorovného scrollu stránky`, x <= 1, `${x}px`);
+  };
+  const tlacitko = (p) => p.getByRole('button', { name: 'Přenést z Kartičky' });
+  const otevriAZavri = async (p, popis) => {
+    await tlacitko(p).first().click();
+    await okno(p).waitFor({ timeout: 8000 });
+    await p.waitForTimeout(500);
+    tvrdi(`${jmeno} ${popis}: tlačítko otevře průvodce`, await okno(p).getByRole('heading', { name: 'Přecházíš z Kartičky?' }).count() === 1);
+    await zmer(p, `${jmeno} ${popis} okno`);
+    await okno(p).locator('button:not([aria-label])', { hasText: 'Zavřít' }).click();
+    await p.waitForTimeout(300);
+    tvrdi(`${jmeno} ${popis}: Zavřít okno zavře`, await p.locator('[role="dialog"]').count() === 0);
+  };
+  // Počet členů určuje, jestli je karta výrazná (do 5 členů) nebo decentní.
+  for (const [clenu, popis] of [[3, 'málo členů'], [148, 'hodně členů']]) {
+    const { ctx, p, stav, chyby } = await kontext({
+      viewport, mobil, fix: nacti('k69-b8-rozlozeni-vernost'),
+      dalsi: (req, json, st) => { st.import ??= { posty: [], nahledy: [], deletes: [], stamps: [], puty: [], zpozdeni: 0, selhat: new Set() }; st.import.clenu = clenu; return podvrh(req, json, st); },
+    });
+    await otevri(p, CLIENT('loyalty'), 'vedeni.klient_vernost');
+    const karta = p.locator(clenu <= 5 ? '[data-prechod="vyrazna"]' : '[data-prechod="decentni"]');
+    await karta.waitFor({ timeout: 8000 });
+    tvrdi(`${jmeno} Věrnost, ${popis}: ${clenu <= 5 ? 'výrazná karta' : 'decentní řádek'} s textem „Přecházíš z Kartičky?“`, /Přecházíš z Kartičky\?/.test(await karta.innerText()));
+    tvrdi(`${jmeno} Věrnost, ${popis}: ${clenu <= 5 ? 'jen výrazná' : 'jen decentní'} varianta`, await p.locator('[data-prechod]').count() === 1);
+    const r = await karta.boundingBox();
+    tvrdi(`${jmeno} Věrnost, ${popis}: karta se vejde do šířky okna`, r.x >= 0 && r.x + r.width <= viewport.width + 1, JSON.stringify(r));
+    await bezScrollu(p, `Věrnost, ${popis}`);
+    await p.screenshot({ path: `${OUT}import-karticka-${viewport.width}px-vstup-vernost-${clenu}.png` });
+    await otevriAZavri(p, `Věrnost, ${popis}`);
+    tvrdi(`${jmeno} Věrnost, ${popis}: bez chyb na stránce`, chyby.length === 0, chyby.slice(0, 3).join(' | '));
+    await ctx.close();
+  }
+  // Přehled správy: krok „Začni“ jen pro podnik bez členů.
+  for (const clenu of [0, 148]) {
+    const { ctx, p } = await kontext({
+      viewport, mobil, fix: nacti('k69-b8-rozlozeni-klient'),
+      dalsi: (req, json, st) => { st.import ??= { posty: [], nahledy: [], deletes: [], stamps: [], puty: [], zpozdeni: 0, selhat: new Set() }; st.import.clenu = clenu; return podvrh(req, json, st); },
+    });
+    await otevri(p, CLIENT('overview'), 'vedeni.klient');
+    await p.waitForTimeout(500);
+    const pocet = await p.locator('[data-prechod="vyrazna"]').count();
+    tvrdi(`${jmeno} Přehled správy, ${clenu} členů: ${clenu === 0 ? 'je krok „Začni“' : 'výzva se neukazuje'}`, pocet === (clenu === 0 ? 1 : 0), String(pocet));
+    if (clenu === 0) {
+      tvrdi(`${jmeno} Přehled správy: karta nese štítek „Začni“`, /Začni/.test(await p.locator('[data-prechod="vyrazna"]').innerText()));
+      await bezScrollu(p, 'Přehled správy');
+      await p.screenshot({ path: `${OUT}import-karticka-${viewport.width}px-vstup-prehled.png` });
+      await otevriAZavri(p, 'Přehled správy');
+    }
+    await ctx.close();
+  }
+  // Zákazníci → Členové a Nastavení.
+  {
+    const { ctx, p } = await kontext({ viewport, mobil, fix: nacti('k69-b8-rozlozeni-zakaznici'), dalsi: podvrh });
+    await otevri(p, ZAKAZNICI, 'vedeni.klient_zakaznici');
+    tvrdi(`${jmeno} Zákazníci: tlačítko „Přenést z Kartičky“ je v nástrojové liště`, await tlacitko(p).count() === 1);
+    await bezScrollu(p, 'Zákazníci');
+    await otevriAZavri(p, 'Zákazníci');
+    await p.goto(BASE + CLIENT('settings'), { waitUntil: 'networkidle' });
+    await p.getByRole('heading', { name: 'Přecházíš z Kartičky?' }).waitFor({ timeout: 10000 });
+    tvrdi(`${jmeno} Nastavení: karta „Přecházíš z Kartičky?“ s tlačítkem`, await tlacitko(p).count() === 1);
+    await bezScrollu(p, 'Nastavení');
+    await p.screenshot({ path: `${OUT}import-karticka-${viewport.width}px-vstup-nastaveni.png` });
+    await otevriAZavri(p, 'Nastavení');
+    await ctx.close();
+  }
+  // Odkazy z kroku Pravidla: okno se zavře a otevře se Věrnost → Kupony a kódy.
+  {
+    const { ctx, p } = await kontext({ viewport, mobil, fix: nacti('k69-b8-rozlozeni-zakaznici'), dalsi: podvrh });
+    await otevri(p, ZAKAZNICI, 'vedeni.klient_zakaznici');
+    await otevriOkno(p);
+    await p.locator('#import-soubor').setInputFiles(SOUBOR);
+    await okno(p).getByText(/Rozpoznáno/).waitFor();
+    await dalsi(p).click(); await dalsi(p).click();
+    await okno(p).getByText(/Nových účtů/).waitFor();
+    await dalsi(p).click();
+    await okno(p).getByRole('heading', { name: 'Převzít pravidla věrnosti' }).waitFor();
+    await okno(p).getByRole('button', { name: /Kupony a promo kódy/ }).click();
+    await p.waitForTimeout(500);
+    tvrdi(`${jmeno} odkaz „Kupony a promo kódy“: okno se zavřelo`, await p.locator('[role="dialog"]').count() === 0);
+    const vybrana = await p.getByRole('tab', { selected: true }).allInnerTexts();
+    tvrdi(`${jmeno} odkaz „Kupony a promo kódy“: otevřela se část Kupony a kódy`, vybrana.some(t => /Kupony a kódy/.test(t)), vybrana.join('|'));
+    await ctx.close();
+  }
+}
+
 /** Velký soubor: 1 200 členů = tři dávky, průběh „Import: 500 z 1 200“, Zrušit, chyba dávky a Zkusit znovu. */
 async function velky(viewport, mobil) {
   const { ctx, p, stav } = await kontext({ viewport, mobil, fix: nacti('k69-b8-rozlozeni-zakaznici'), dalsi: podvrh });
@@ -263,7 +367,7 @@ async function velky(viewport, mobil) {
   await okno(p).getByRole('button', { name: 'Zrušit' }).click();
   await okno(p).getByText(/Import zastaven/).first().waitFor({ timeout: 8000 });
   const t = await okno(p).innerText();
-  tvrdi(`${jmeno}: po Zrušit zůstává zapsané a jde vrátit`, /Import jste zastavili/.test(t) && await okno(p).getByRole('button', { name: 'Vrátit import' }).count() === 1);
+  tvrdi(`${jmeno}: po Zrušit zůstává zapsané a jde vrátit`, /Import jsi zastavil/.test(t) && await okno(p).getByRole('button', { name: 'Vrátit import' }).count() === 1);
   const poslední = stav.import.posty.at(-1);
   tvrdi(`${jmeno}: opakovaná dávka nese importId 77`, poslední.nastaveni.importId === 77, String(poslední.nastaveni.importId));
   tvrdi(`${jmeno}: dávky mají nejvýš 500 řádků`, stav.import.posty.every(x => x.radky.length <= 500));
@@ -274,4 +378,6 @@ async function velky(viewport, mobil) {
 await pruvodce({ width: 390, height: 844 }, true);
 await pruvodce({ width: 1280, height: 900 }, false);
 await velky({ width: 390, height: 844 }, true);
+await vstupy({ width: 390, height: 844 }, true);
+await vstupy({ width: 1280, height: 900 }, false);
 await konec();

@@ -77,7 +77,7 @@ const REPEAT_DAYS: Record<string, number> = { immediately: 0, one_day: 1, one_we
  * Vrací, co se stalo, ať to obsluha vidí lidsky.
  */
 export async function addStamps(
-  c: StampCampaign, customerId: number, count: number, ref: string,
+  c: StampCampaign, customerId: number, count: number, ref: string, poznamka = '',
 ): Promise<{ added: number; stamps: number; completions: number; skipped?: string }> {
   if (count <= 0) return { added: 0, stamps: 0, completions: 0 };
   const [curRow] = await sql`
@@ -142,7 +142,7 @@ export async function addStamps(
   await sql`
     INSERT INTO client_loyalty_ledger (team_id, customer_id, delta, kind, ref, note)
     VALUES (${c.team_id}, ${customerId}, 0, 'visit', ${ref},
-      ${completions > 0 ? `${c.name}: +${toAdd} razítek, karta dokončena${completions > 1 ? ` ${completions}×` : ''}` : `${c.name}: +${toAdd} ${toAdd === 1 ? 'razítko' : toAdd < 5 ? 'razítka' : 'razítek'} (${rest}/${c.required_stamps})`})`;
+      ${(completions > 0 ? `${c.name}: +${toAdd} razítek, karta dokončena${completions > 1 ? ` ${completions}×` : ''}` : `${c.name}: +${toAdd} ${toAdd === 1 ? 'razítko' : toAdd < 5 ? 'razítka' : 'razítek'} (${rest}/${c.required_stamps})`) + poznamka})`;
   return { added: toAdd, stamps: rest, completions };
 }
 
@@ -154,6 +154,7 @@ export async function addStamps(
 export async function applyBillToCampaigns(
   teamId: number, customerId: number, today: string,
   bill: { billId: string; total: number; items: { productId: string | null; qty: number }[] },
+  bonus: { razitka: number; poznamka: string } = { razitka: 0, poznamka: '' },
 ): Promise<{ lines: string[]; anything: boolean }> {
   const campaigns = (await activeCampaigns(teamId, today)).filter(c => c.rule_type !== 'visit');
   if (!campaigns.length) return { lines: [], anything: false };
@@ -192,7 +193,8 @@ export async function applyBillToCampaigns(
       if (min > 0 && bill.total >= min) count = c.min_value_multiple ? Math.floor(bill.total / min) : 1;
     }
     if (count <= 0) continue;
-    const r = await addStamps(c, customerId, count, `bill:${bill.billId}`);
+    // Bonusová akce přidá razítka navíc jen kampaním, kterým účtenka razítko dala.
+    const r = await addStamps(c, customerId, count + Math.max(0, bonus.razitka), `bill:${bill.billId}`, bonus.razitka > 0 ? bonus.poznamka : '');
     if (r.skipped) { lines.push(`${c.name}: ${r.skipped}`); continue; }
     anything = true;
     lines.push(r.completions > 0
