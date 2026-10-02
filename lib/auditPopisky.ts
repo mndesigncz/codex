@@ -98,6 +98,10 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'client.stamps.move': 'Změněno pořadí razítkových kartiček',
   'client.stamps.adjust': 'Ručně upravena razítka hosta',
   'client.stamps.undo': 'Stornována poslední akce s razítky hosta',
+  'client.points': 'Ruční úprava bodů hosta',
+  'client.credit': 'Ruční úprava kreditu hosta',
+  'client.pravidla': 'Změna pravidel bodů a úrovní věrnosti',
+  'client.export': 'Export deníku věrnosti do CSV',
   'client.order': 'Změněn stav objednávky hosta',
   'client.order.pos': 'Objednávka hosta předána do kasy',
   // předplatné

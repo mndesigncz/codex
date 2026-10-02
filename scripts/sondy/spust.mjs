@@ -111,6 +111,7 @@ export const ZELENE = [
   'k69-b6b',
   'k69-b7',
   'k69-b8',
+  'w2-body',
   'k69-b9',
   'k69-mereni-1',
   'k69-mereni-2',

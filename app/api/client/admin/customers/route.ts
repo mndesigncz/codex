@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
   const podleBodu = razeni === 'body';
   const nejnovejsi = razeni === 'nejnovejsi';
   const rows = await sql`
-    SELECT m.customer_id AS id, us.name, us.email, m.points, m.stamps, m.visits, m.joined_at, m.last_visit_at,
+    SELECT m.customer_id AS id, us.name, us.email, m.points, COALESCE(m.credit, 0) AS credit, m.stamps, m.visits, m.joined_at, m.last_visit_at,
            COALESCE((to_jsonb(m)->>'spend')::int, 0) AS spend,
            (SELECT COUNT(*)::int FROM client_reservations r WHERE r.customer_id = m.customer_id AND r.team_id = m.team_id) AS reservations,
            (SELECT COUNT(*)::int FROM client_coupon_claims c WHERE c.customer_id = m.customer_id AND c.team_id = m.team_id AND c.redeemed_at IS NULL) AS open_coupons
@@ -65,10 +65,13 @@ export async function GET(req: NextRequest) {
     } catch { /* před migrací */ }
   }
   const obohacene = rows.map(r => {
-    const t = tierForMember({ visits: r.visits, spend: r.spend }, pravidla);
+    const t = tierForMember({ visits: r.visits, spend: r.spend, lastVisitAt: r.last_visit_at }, pravidla);
     const s = efektivniSleva({ uroven: t, skupiny: skupinyBy.get(Number(r.id)) });
-    return { ...r, level: t.id, level_label: t.label, discount: s.pct, discount_source: s.zdroj, discount_name: s.nazev };
+    return { ...r, level: t.id, level_label: t.label, level_reduced: !!t.reduced, discount: s.pct, discount_source: s.zdroj, discount_name: s.nazev };
   });
-  const customers = kontakty ? obohacene : obohacene.map(({ email: _e, ...r }) => r);
+  // Kredit je peněžní zůstatek hosta — vidí ho jen ten, kdo smí do věrnosti (stejně jako deník).
+  const vidiKredit = ctx.role.opravneni.has('vernost.zobrazit');
+  const sKreditem = vidiKredit ? obohacene : obohacene.map(({ credit: _c, ...r }) => r);
+  const customers = kontakty ? sKreditem : sKreditem.map(({ email: _e, ...r }: any) => r);
   return NextResponse.json({ customers, total: cnt?.total ?? rows.length });
 }

@@ -21,6 +21,8 @@ import { menaPodniku } from '@/lib/menaPodniku';
 import { benefitLabel } from '@/lib/coupons';
 import { aktivniBonus } from '@/lib/bonusAkceDb';
 import { bodySBonusem, poznamkaRazitek, popisNasobice } from '@/lib/bonusAkce';
+import { odmenaZUctu } from '@/lib/bodyPravidlaDb';
+import { vetyOOmezeni, pravidlaBoduZProfilu } from '@/lib/bodyPravidla';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
@@ -51,7 +53,7 @@ async function summary(teamId: number, customerId: number, p?: any) {
     ORDER BY cost_points DESC LIMIT 5`;
   const last = parseDbTime(m?.last_visit_at);
   const visits = Number(m?.visits ?? 0);
-  const tier = tierForMember({ visits, spend: Number(m?.spend ?? 0) }, p ? tierRulesFromProfile(p) : null);
+  const tier = tierForMember({ visits, spend: Number(m?.spend ?? 0), lastVisitAt: m?.last_visit_at }, p ? tierRulesFromProfile(p) : null);
   // Sleva = nejvyšší z úrovně a slev skupin (nikdy součet); obsluha vidí i zdroj.
   const sleva = await slevaClena(teamId, customerId, tier);
   const camps = await activeCampaigns(teamId, pragueToday());
@@ -97,6 +99,7 @@ export async function GET(req: NextRequest) {
     rules: {
       pointsPer100: Number(p.points_per_100) || 0, stampTarget: Number(p.stamp_target) || 0,
       stampReward: p.stamp_reward, cashbackPct: Number(p.cashback_pct) || 0,
+      bodyPravidla: pravidlaBoduZProfilu(p),
     },
   });
 }
@@ -226,11 +229,13 @@ async function provedAkci(action: string, b: any, c: { id: number; name: string 
     try {
       const conn = await getConnection(u.team_id);
       let items: { productId: string | null; qty: number; price: number | null }[] = [];
+      let polozkyUctu: { productId: string | null; amount: number; price: number | null }[] = [];
       let total = Math.max(0, Math.round(Number(b.amount) || 0));
       if (conn) {
         try {
           const d = await billDetail(conn, billId);
           items = d.items.map(it => ({ productId: it.productId, qty: Number(it.amount) || 1, price: it.price }));
+          polozkyUctu = d.items.map(it => ({ productId: it.productId, amount: it.amount, price: it.price }));
           if (d.head?.finalPrice != null) total = Math.max(0, Math.round(Number(d.head.finalPrice)));
         } catch { /* detail nedostupný — zbude útrata */ }
       }
@@ -244,8 +249,11 @@ async function provedAkci(action: string, b: any, c: { id: number; name: string 
         const st = await applyBillToCampaigns(u.team_id, c.id, pragueToday(), { billId, total, items }, { staffId: u.id, razitka: bonus.razitka, poznamka: poznamkaRazitek(bonus) });
         parts.push(...st.lines);
       });
-      const { body: pts, poznamka: bonusPozn } = bodySBonusem(Math.floor(total / 100) * (Number(p.points_per_100) || 0), bonus);
-      const back = Math.floor(total * (Number(p.cashback_pct) || 0) / 100);
+      // Body a cashback podle pravidel podniku: zaokrouhlení, minimum, strop, kredit/poukaz a vyloučené položky.
+      const { odmena: od, pravidla: pr } = await odmenaZUctu(u.team_id, p, total, { predplaceno: b.prepaid, polozky: polozkyUctu });
+      const { body: pts, poznamka: bonusPozn } = bodySBonusem(od.points, bonus);
+      const back = od.cashback;
+      parts.push(...vetyOOmezeni(od, pr, mena.money));
       if (pts > 0) await krok('points', async () => { const points = await award(u.team_id, c.id, pts, 'manual', `bill:${billId}`, `Útrata ${mena.money(total)} z účtenky${bonusPozn}`, u.id); parts.push(`+${pts} bodů${bonus.nasobic > 1 ? ` (${popisNasobice(bonus.nasobic)}, ${bonus.nazev})` : ''} (celkem ${points})`); });
       // Cashback podle nastavení podniku: kredit v korunách, nebo body (Kartička).
       if (back > 0) {
@@ -269,13 +277,15 @@ async function provedAkci(action: string, b: any, c: { id: number; name: string 
   } else if (action === 'points') {
     const amount = Math.max(0, Math.min(100000, Math.round(Number(b.amount) || 0)));
     const polozky = rucniPolozky(b.items);
-    const { body: pts, poznamka: bonusPozn } = bodySBonusem(Math.floor(amount / 100) * (Number(p.points_per_100) || 0), bonus);
-    const back = Math.floor(amount * (Number(p.cashback_pct) || 0) / 100);
+    const { odmena: od, pravidla: pr } = await odmenaZUctu(u.team_id, p, amount, { predplaceno: b.prepaid });
+    const { body: pts, poznamka: bonusPozn } = bodySBonusem(od.points, bonus);
+    const back = od.cashback;
+    const omezeni = vetyOOmezeni(od, pr, mena.money);
     const podleUtraty = p.tier_by === 'spend';
     // Kampaně „za útratu" a „za položky" se spustí i z ruční částky a ručních položek.
     const kampane = (await activeCampaigns(u.team_id, pragueToday())).some(x => x.rule_type !== 'visit');
     if (amount <= 0 && !polozky.length) return NextResponse.json({ error: 'Zadej částku, nebo vyber položky.' }, { status: 400 });
-    if (pts <= 0 && back <= 0 && !podleUtraty && !kampane) return NextResponse.json({ error: 'Z této částky nevychází žádný bod ani kredit.' }, { status: 400 });
+    if (pts <= 0 && back <= 0 && !podleUtraty && !kampane) return NextResponse.json({ error: `Z této částky nevychází žádný bod ani kredit${omezeni.length ? ` (${omezeni.join('; ')})` : ''}.` }, { status: 400 });
     const parts: string[] = [];
     if (amount > 0) await pripisUtratu(u.team_id, c.id, amount);
     const v = await stampVisit(u.team_id, c.id, p, ref, 0, '', u.id);
@@ -288,8 +298,9 @@ async function provedAkci(action: string, b: any, c: { id: number; name: string 
       parts.push(`+${back} bodů cashback (celkem ${points})`);
     } else if (back > 0) { const credit = await awardCredit(u.team_id, c.id, back, 'cashback', ref, `${p.cashback_pct} % z útraty ${mena.money(amount)}`, u.id); parts.push(`+${mena.money(back)} kreditu (celkem ${mena.money(Number(credit))})`); }
     if (!parts.length) parts.push('útrata zapsána');
+    if (omezeni.length) parts.push(`(${omezeni.join('; ')})`);
     msg = `${c.name}: ${parts.join(', ')}${amount > 0 ? ` za ${mena.money(amount)}` : ''}.`;
-  } else {
+  } else if (action === 'credit') {
     // Host platí kreditem: částka se odečte z jeho peněženky u podniku.
     const amount = Math.max(1, Math.min(100000, Math.round(Number(b.amount) || 0)));
     // Atomicky: odečte se jen když kredit stačí. Dvojklik u kasy tak

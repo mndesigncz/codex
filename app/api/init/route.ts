@@ -2051,6 +2051,15 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS gold_spend INTEGER NOT NULL DEFAULT 15000`);
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS platinum_spend INTEGER NOT NULL DEFAULT 0`);
     await ddl(sql`ALTER TABLE client_groups ADD COLUMN IF NOT EXISTS discount_pct INTEGER NOT NULL DEFAULT 0`);
+    // Body a úrovně (W2): zaokrouhlení bodů, minimální útrata, strop na účtenku, kredit/poukaz bez bodů,
+    // vyloučené položky a snížení úrovně po neaktivitě. Stejné příkazy jsou v lib/bodyPravidlaDb.ts
+    // (zajistiBodyPravidla) — pravidla fungují i před spuštěním /api/init.
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS points_round TEXT NOT NULL DEFAULT 'sta'`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS points_min_spend INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS points_cap_per_bill INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS points_exclude_prepaid BOOLEAN NOT NULL DEFAULT TRUE`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS points_exclude_items JSONB NOT NULL DEFAULT '[]'`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS tier_inactive_months INTEGER NOT NULL DEFAULT 0`);
     // Kolo 74: promo bannery podniku (akce a oznámení nahoře na stránce hosta).
     await ddl(sql`
       CREATE TABLE IF NOT EXISTS client_banners (

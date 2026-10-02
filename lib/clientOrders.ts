@@ -19,6 +19,7 @@ import { pragueToday, pragueDayOf, parseDbTime } from './pragueTime';
 import { createHmac } from 'crypto';
 import { naHalere } from './cena.ts';
 import { menaPodniku } from './menaPodniku';
+import { odmenaZUctu } from './bodyPravidlaDb';
 
 // ---- Ochrana: sedí host opravdu u stolu? ------------------------------------
 //
@@ -251,8 +252,7 @@ export async function setOrderStatus(teamId: number, id: number, next: string): 
     if (profile.loyalty_on) {
       // Bonusová akce (Happy hour) se uplatní uvnitř téhož připsání, ne jako druhé.
       const bonus = await aktivniBonus(teamId);
-      const zaklad = Math.floor(Number(o.total) / 100) * (Number(profile.points_per_100) || 0);
-      const { body: pts, poznamka } = bodySBonusem(zaklad, bonus);
+      const { body: pts, poznamka } = bodySBonusem((await odmenaZUctu(teamId, profile, Number(o.total))).odmena.points, bonus);
       const points = pts > 0 ? await award(teamId, Number(o.customer_id), pts, 'order', `ord:${o.id}`, `Útrata ${(await menaPodniku(teamId)).price(Number(o.total))}${poznamka}`) : null;
       const [m] = await sql`SELECT last_visit_at FROM client_memberships WHERE customer_id = ${o.customer_id} AND team_id = ${teamId}`;
       // Ovladač vrací TIMESTAMP jako Date, ne text — porovnává se pražský den,

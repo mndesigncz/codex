@@ -41,6 +41,12 @@ import PrechodZKarticky, { useImportKarticky } from './PrechodZKarticky';
 import { RAZITKA_DEFAULTY, razitkaZRadku, RazitkaDalsiNastaveni, RazitkaNahled } from './loyalty/RazitkaNastaveni';
 import { podleFiltru, RazitkaFiltr, StavChip, useRazitkaAkce, type FiltrStavu } from './loyalty/RazitkaAkce';
 import { overKampan } from '@/lib/stampsPlan';
+import { BodyDalsiPravidla, BodyNeaktivita } from './loyalty/BodyDalsiPravidla';
+import { BodyNahled } from './loyalty/BodyNahled';
+import { BodyPrehledy } from './loyalty/BodyPrehledy';
+import { usePlan } from '../Pro';
+import { MAX_ONLY_MSG } from '@/lib/plan';
+import { validujPravidla, novaPolePravidel, MAX_PRAH_NAVSTEV, MAX_PRAH_UTRATY, MAX_BODU_ZA_100, MAX_CASHBACK_PCT } from '@/lib/bodyPravidla';
 
 // Věrnost měla šest podzáložek pod deseti hlavními — šestnáct sourozenců
 // nad sebou. „Body" a „Slevy a úrovně" jsou jedna věc (co host nasbírá a co
@@ -192,6 +198,7 @@ function Overview({ toast, oznam }: { toast: (m: string) => void; oznam: (text: 
           </ul>
         )}
       </Card>
+      <BodyPrehledy toast={toast} />
     </div>
   );
 }
@@ -206,28 +213,38 @@ function BodyAUrovne({ toast, setUkladam }: { toast: (m: string) => void; setUkl
   const meni = ma('vernost.pravidla');
   const symbol = useSymbol();
   const [dopocitavam, setDopocitavam] = useState(false);
+  const { max: maMax } = usePlan();
+  // Chyby kontroly pravidel podle polí (stejná funkce jako na serveru); mažou se, jakmile se pole změní.
+  const [chyby, setChyby] = useState<Record<string, string>>({});
   const { p, setP, reload: reloadProfile, error: profileError } = useProfile();
   if (profileError) return <ErrorState title="Věrnost se nenačetla" onRetry={reloadProfile} detail={profileError} />;
   if (!p) return <Kostra />;
+  const upravP = (n: any) => { setP(n); if (Object.keys(chyby).length) setChyby({}); };
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!meni) return;
+    // Tarif se vysvětluje před uložením (poznámka nahoře, tlačítko je zhasnuté); tohle je jen pojistka.
+    if (!maMax) { toast(MAX_ONLY_MSG); return; }
+    const telo = {
+      points_per_100: p.points_per_100, cashback_pct: p.cashback_pct, cashback_mode: p.cashback_mode, birthday_points: p.birthday_points, referral_points: p.referral_points, points_expire_days: p.points_expire_days,
+      silver_at: p.silver_at, gold_at: p.gold_at, platinum_at: p.platinum_at,
+      tier_by: p.tier_by === 'spend' ? 'spend' : 'visits', silver_spend: p.silver_spend, gold_spend: p.gold_spend, platinum_spend: p.platinum_spend,
+      member_discount: p.member_discount, silver_discount: p.silver_discount, gold_discount: p.gold_discount, platinum_discount: p.platinum_discount,
+      reactivation_days: p.reactivation_days ?? 0, reactivation_points: p.reactivation_points ?? 0,
+      ...novaPolePravidel(p),
+    };
+    const ch = validujPravidla(telo);
+    if (ch.length) { setChyby(Object.fromEntries(ch.map(c => [c.pole, c.text]))); toast(ch[0].text); return; }
     setUkladam(true);
     try {
-      const r = await j('/api/client/admin/profile', { method: 'PUT', body: JSON.stringify({
-        points_per_100: p.points_per_100, cashback_pct: p.cashback_pct, cashback_mode: p.cashback_mode, birthday_points: p.birthday_points, referral_points: p.referral_points, points_expire_days: p.points_expire_days,
-        silver_at: p.silver_at, gold_at: p.gold_at, platinum_at: p.platinum_at,
-        tier_by: p.tier_by === 'spend' ? 'spend' : 'visits', silver_spend: p.silver_spend, gold_spend: p.gold_spend, platinum_spend: p.platinum_spend,
-        member_discount: p.member_discount, silver_discount: p.silver_discount, gold_discount: p.gold_discount, platinum_discount: p.platinum_discount,
-        reactivation_days: p.reactivation_days ?? 0, reactivation_points: p.reactivation_points ?? 0,
-      }) });
+      const r = await j('/api/client/admin/profile', { method: 'PUT', body: JSON.stringify(telo) });
       setP(r.profile); toast('Pravidla bodů, úrovně a slevy uloženy.');
     } catch (err) { toast(apiMessage(err, 'Uložení se nepovedlo.')); }
     setUkladam(false);
   };
   const cislo = (id: string, lb: string, hint: string, key: string, max: number, min = 0) => (
-    <Field id={id} label={lb} hint={hint}>
-      <Input id={id} type="number" min={min} max={max} disabled={!meni} className="!w-28" value={p[key] ?? 0} onChange={e => setP({ ...p, [key]: e.target.value })} />
+    <Field id={id} label={lb} hint={hint} error={chyby[key]}>
+      <Input id={id} type="number" min={min} max={max} disabled={!meni} className="!w-28" value={p[key] ?? 0} onChange={e => upravP({ ...p, [key]: e.target.value })} />
     </Field>
   );
   // Režim úrovní: z návštěv (výchozí), nebo z kumulované útraty. Prahy obou režimů
@@ -249,19 +266,21 @@ function BodyAUrovne({ toast, setUkladam }: { toast: (m: string) => void; setUkl
   };
   return (
     <div className="space-y-4 max-w-3xl">
-      <form id={FORM_BODY} onSubmit={save} className="space-y-4">
+      <form id={FORM_BODY} onSubmit={save} noValidate className="space-y-4">
         {!meni && <p className="note note-wait">Pravidla věrnosti tu jen vidíš — měnit je může, kdo má na starosti věrnostní program.</p>}
+        {meni && !maMax && <p className="note note-wait" role="status">Pravidla věrnosti jde ukládat jen v plánu Max, takže tlačítko Uložit je zhasnuté. Plán změníš v Nastavení → Předplatné.</p>}
         <Card className="space-y-4">
           <div>
             <h2 className="t-card">Za co host dostane body</h2>
             <p className="t-meta mt-0.5 max-w-[70ch]">Body se sbírají samy: z objednávek od stolu, při načtení kartičky u kasy a při událostech níž. Utratí se za kupony.</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {cislo('l-per100', `Bodů za 100 ${symbol}`, `Objednávka za 250 ${symbol} dá dvaapůlnásobek.`, 'points_per_100', 100)}
+            {cislo('l-per100', `Bodů za 100 ${symbol}`, 'Kolik bodů dá každá celá stovka. Jak se zlomek stovky počítá, nastavíš níž.', 'points_per_100', MAX_BODU_ZA_100)}
             {cislo('l-bday', 'Bodů k narozeninám', 'Dárek v den narozenin. 0 = nedávat.', 'birthday_points', 1000)}
             {cislo('l-ref', 'Bodů za pozvání', 'Pro oba, když kamarád poprvé přijde. 0 = vypnuto.', 'referral_points', 1000)}
           </div>
         </Card>
+        <BodyDalsiPravidla p={p} setP={upravP} meni={meni} chyby={chyby} />
         <Card className="space-y-4">
           <div>
             <h2 className="t-card">Propadání bodů</h2>
@@ -277,11 +296,11 @@ function BodyAUrovne({ toast, setUkladam }: { toast: (m: string) => void; setUkl
             <p className="t-meta mt-0.5 max-w-[70ch]">Část útraty se hostovi vrací: buď jako kredit (obsluha ho odečte u kasy), nebo jako body.</p>
           </div>
           <div className="flex flex-wrap items-end gap-4">
-            {cislo('l-cash', 'Vrátit (%)', '0 = nepoužívat.', 'cashback_pct', 50)}
+            {cislo('l-cash', 'Vrátit (%)', '0 = nepoužívat.', 'cashback_pct', MAX_CASHBACK_PCT)}
             <div>
               <p className="field-label">V čem se vrací</p>
               <Segmented options={[{ id: 'credit', label: `Kredit v ${symbol}` }, { id: 'points', label: 'Body' }]}
-                value={p.cashback_mode === 'points' ? 'points' : 'credit'} onChange={v => { if (meni) setP({ ...p, cashback_mode: v }); }} size="sm" ariaLabel="Podoba cashbacku" />
+                value={p.cashback_mode === 'points' ? 'points' : 'credit'} onChange={v => { if (meni) upravP({ ...p, cashback_mode: v }); }} size="sm" ariaLabel="Podoba cashbacku" />
             </div>
           </div>
         </Card>
@@ -300,6 +319,7 @@ function BodyAUrovne({ toast, setUkladam }: { toast: (m: string) => void; setUkl
               : 'Vypnuto. Zprávy hostům můžeš posílat ručně v Zákaznících, ve Zprávách členům.'}
           </p>
         </Card>
+        <BodyNahled p={p} />
         <Card className="space-y-4">
           <div>
             <h2 className="t-card">Úrovně hostů a jejich sleva</h2>
@@ -308,7 +328,7 @@ function BodyAUrovne({ toast, setUkladam }: { toast: (m: string) => void; setUkl
           <div className="flex flex-wrap items-center gap-3">
             <p className="field-label !mb-0">Úrovně podle</p>
             <Segmented options={[{ id: 'visits', label: 'Návštěv' }, { id: 'spend', label: 'Útraty' }]}
-              value={podleUtraty ? 'spend' : 'visits'} onChange={v => { if (meni) setP({ ...p, tier_by: v }); }} size="sm" ariaLabel="Úrovně podle" />
+              value={podleUtraty ? 'spend' : 'visits'} onChange={v => { if (meni) upravP({ ...p, tier_by: v }); }} size="sm" ariaLabel="Úrovně podle" />
           </div>
           {podleUtraty && (
             <div className="flex flex-wrap items-center gap-3">
@@ -324,18 +344,19 @@ function BodyAUrovne({ toast, setUkladam }: { toast: (m: string) => void; setUkl
                   <p className="t-meta mt-1.5">{t.hint}</p>
                 </div>
                 {t.atKey ? (
-                  <Field id={`t-${t.id}`} label={podleUtraty ? `Útrata (${symbol})` : 'Návštěv'}>
-                    <Input id={`t-${t.id}`} type="number" min={t.id === 'platinum' ? 0 : 1} max={podleUtraty ? 100000000 : 2000} disabled={!meni} className={podleUtraty ? '!w-32' : '!w-24'} value={p[t.atKey] ?? 0} onChange={e => setP({ ...p, [t.atKey!]: e.target.value })} />
+                  <Field id={`t-${t.id}`} label={podleUtraty ? `Útrata (${symbol})` : 'Návštěv'} error={chyby[t.atKey]}>
+                    <Input id={`t-${t.id}`} type="number" min={t.id === 'platinum' ? 0 : 1} max={podleUtraty ? MAX_PRAH_UTRATY : MAX_PRAH_NAVSTEV} disabled={!meni} className={podleUtraty ? '!w-32' : '!w-24'} value={p[t.atKey] ?? 0} onChange={e => upravP({ ...p, [t.atKey!]: e.target.value })} />
                   </Field>
                 ) : <span className="hidden sm:block" />}
-                <Field id={`d-${t.id}`} label="Sleva %">
-                  <Input id={`d-${t.id}`} type="number" min={0} max={90} disabled={!meni} className="!w-24" value={p[t.discKey] ?? 0} onChange={e => setP({ ...p, [t.discKey]: e.target.value })} />
+                <Field id={`d-${t.id}`} label="Sleva %" error={chyby[t.discKey]}>
+                  <Input id={`d-${t.id}`} type="number" min={0} max={90} disabled={!meni} className="!w-24" value={p[t.discKey] ?? 0} onChange={e => upravP({ ...p, [t.discKey]: e.target.value })} />
                 </Field>
               </Well>
             ))}
           </ul>
-          <p className="t-meta">Sleva se nepočítá automaticky do pokladny — obsluha ji zadá sama. Nulová sleva znamená, že úroveň je jen odznak. Uvítacích 10 bodů dostane každý nový člen automaticky; ruční úpravu bodů najdeš u hosta v Zákaznících.</p>
+          <p className="t-meta">Sleva se nepočítá automaticky do pokladny — obsluha ji zadá sama. Nulová sleva znamená, že úroveň je jen odznak. Uvítacích 10 bodů dostane každý nový člen automaticky; ruční úpravu bodů a kreditu najdeš u hosta v Zákaznících.</p>
         </Card>
+        <BodyNeaktivita p={p} setP={upravP} meni={meni} chyby={chyby} />
       </form>
       {ma('zakaznici.zobrazit') && <Groups toast={toast} />}
     </div>
@@ -1054,6 +1075,7 @@ export default function LoyaltyTabs({ toast, promos, oznam, otevriCast }: {
   useEffect(() => { if (otevriCast) setVolba(otevriCast.id); }, [otevriCast]);
   const sub: LoyaltySub | null = casti.some(c => c.id === volba) ? volba : casti[0]?.id ?? null;
   const [ukladam, setUkladam] = useState(false);
+  const { max: maMax } = usePlan();
   const nastroj0 = sub === 'overview' ? <Overview toast={toast} oznam={oznam} />
     : sub === 'points' ? <BodyAUrovne toast={toast} setUkladam={setUkladam} />
     : sub === 'bonus' ? <BonusAkce toast={toast} />
@@ -1072,7 +1094,7 @@ export default function LoyaltyTabs({ toast, promos, oznam, otevriCast }: {
         subtitle: sub ? POPIS_CASTI[sub] : undefined,
         // Jediné „Uložit" pro body, cashback i úrovně (dřív tři limetky pod sebou).
         primary: sub === 'points' && ma('vernost.pravidla')
-          ? <Button type="submit" form={FORM_BODY} variant="accent" loading={ukladam}>Uložit</Button>
+          ? <Button type="submit" form={FORM_BODY} variant="accent" loading={ukladam} disabled={!maMax}>Uložit</Button>
           : undefined,
         aside: casti.length > 1 && sub
           ? <Segmented options={casti} value={sub} onChange={setVolba} size="sm" ariaLabel="Části věrnosti" />

@@ -1,10 +1,13 @@
 // Ruční úprava bodů (omluva, bonus, oprava) a deník člena.
 import { NextRequest, NextResponse } from 'next/server';
-import { sql, award, awardCredit, loyaltySummary, ensureProfile } from '@/lib/client';
+import { sql, awardDetail, awardCreditDetail, loyaltySummary, ensureProfile } from '@/lib/client';
 import { tierForMember, tierRulesFromProfile } from '@/lib/clientSlots';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { upravUtratu, dopocitejUtratu } from '@/lib/urovneDb';
 import { audit } from '@/lib/audit';
+import { radaPoDnech } from '@/lib/bodyPrehledy';
+import { cisloCs } from '@/lib/bodyPravidla';
+import { menaPodniku } from '@/lib/menaPodniku';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -22,24 +25,9 @@ export async function GET(req: NextRequest) {
       FROM client_loyalty_ledger l JOIN users us ON us.id = l.customer_id
       WHERE l.team_id = ${u.team_id} ORDER BY l.created_at DESC LIMIT 20`;
     // Statistiky za 31 dní (po vzoru Kartičky): po dnech, ať jde vidět rytmus
-    // týdne. Vše z dat, která už vedeme — deník, členství, kupony.
+    // týdne. Dny jsou pražské (ne UTC) a „členové u kasy" jsou jen skutečné návštěvy.
     let series: any[] = [];
-    try {
-      series = await sql`
-        WITH days AS (SELECT generate_series(CURRENT_DATE - 30, CURRENT_DATE, '1 day')::date AS d)
-        SELECT days.d::text AS day,
-          COALESCE((SELECT COUNT(DISTINCT l.customer_id) FROM client_loyalty_ledger l
-            WHERE l.team_id = ${u.team_id} AND l.created_at::date = days.d), 0)::int AS active,
-          COALESCE((SELECT SUM(l.delta) FROM client_loyalty_ledger l
-            WHERE l.team_id = ${u.team_id} AND l.created_at::date = days.d AND l.delta > 0), 0)::int AS points_given,
-          COALESCE((SELECT -SUM(l.delta) FROM client_loyalty_ledger l
-            WHERE l.team_id = ${u.team_id} AND l.created_at::date = days.d AND l.delta < 0), 0)::int AS points_spent,
-          COALESCE((SELECT COUNT(*) FROM client_memberships m
-            WHERE m.team_id = ${u.team_id} AND m.joined_at::date = days.d), 0)::int AS new_members,
-          COALESCE((SELECT COUNT(*) FROM client_coupon_claims cl
-            WHERE cl.team_id = ${u.team_id} AND cl.redeemed_at::date = days.d), 0)::int AS redeemed
-        FROM days ORDER BY days.d` as any[];
-    } catch { series = []; }
+    try { series = await radaPoDnech(u.team_id, 31); } catch { series = []; }
     return NextResponse.json({ summary: await loyaltySummary(u.team_id), recent, series });
   }
   const ledger = await sql`SELECT * FROM client_loyalty_ledger WHERE team_id = ${u.team_id} AND customer_id = ${cid} ORDER BY created_at DESC LIMIT 100`;
@@ -97,7 +85,7 @@ export async function POST(req: NextRequest) {
   const cid = parseInt(String(b.customerId), 10);
   const delta = Math.max(-100000, Math.min(100000, parseInt(String(b.delta), 10) || 0));
   if (!cid || !delta) return NextResponse.json({ error: 'Kolik bodů a komu?' }, { status: 400 });
-  const [m] = await sql`SELECT id FROM client_memberships WHERE customer_id = ${cid} AND team_id = ${u.team_id}`;
+  const [m] = await sql`SELECT id, points, credit FROM client_memberships WHERE customer_id = ${cid} AND team_id = ${u.team_id}`;
   if (!m) return NextResponse.json({ error: 'Tenhle host není členem podniku.' }, { status: 404 });
   const note = String(b.note ?? '').slice(0, 120) || null;
   // Ruční úprava kumulované útraty (oprava, převod z jiné aplikace). Do deníku jde řádek bez bodů.
@@ -110,11 +98,22 @@ export async function POST(req: NextRequest) {
     audit(u.team_id, u.id, 'client.spend', 'client', cid, `útrata ${delta > 0 ? '+' : ''}${delta} → ${spend}`);
     return NextResponse.json({ ok: true, spend });
   }
+  const [host] = await sql`SELECT name FROM users WHERE id = ${cid}`;
+  const jmeno = String(host?.name ?? `host ${cid}`);
+  const duvod = note ? ` — ${note}` : '';
   // Stejným koncovým bodem se dá upravit i kredit — obsluha ho u kasy odečítá.
   if (b.what === 'credit') {
-    const credit = await awardCredit(u.team_id, cid, delta, 'credit', null, note);
-    return NextResponse.json({ ok: true, credit });
+    const mena = await menaPodniku(u.team_id);
+    const mel = Number(m.credit) || 0;
+    // Odepsat víc, než host má, nejde: dřív se zůstatek potichu ořízl na nulu a deník lhal.
+    if (delta < 0 && -delta > mel) return NextResponse.json({ error: `${jmeno} má kredit jen ${mena.money(mel)}, víc odepsat nejde.` }, { status: 409 });
+    const r = await awardCreditDetail(u.team_id, cid, delta, 'credit', null, note);
+    audit(u.team_id, u.id, 'client.credit', 'client', cid, `${jmeno}: ${r.change > 0 ? '+' : ''}${mena.money(r.change)} (${mena.money(mel)} → ${mena.money(r.credit)})${duvod}`);
+    return NextResponse.json({ ok: true, credit: r.credit, change: r.change });
   }
-  const points = await award(u.team_id, cid, delta, 'manual', null, note);
-  return NextResponse.json({ ok: true, points });
+  const mel = Number(m.points) || 0;
+  if (delta < 0 && -delta > mel) return NextResponse.json({ error: `${jmeno} má jen ${cisloCs(mel)} b., víc odepsat nejde.` }, { status: 409 });
+  const r = await awardDetail(u.team_id, cid, delta, 'manual', null, note);
+  audit(u.team_id, u.id, 'client.points', 'client', cid, `${jmeno}: ${r.change > 0 ? '+' : ''}${r.change} b. (${mel} → ${r.points})${duvod}`);
+  return NextResponse.json({ ok: true, points: r.points, change: r.change });
 }

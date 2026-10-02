@@ -68,12 +68,14 @@ export interface TierRules {
   tierBy?: TierBy | string | null;
   /** Prahy v útratě (celé jednotky měny podniku); platí jen v režimu 'spend'. */
   silverSpend?: number; goldSpend?: number; platinumSpend?: number;
+  /** Po kolika měsících bez návštěvy se úroveň snižuje o stupeň (0 nebo chybí = nikdy). */
+  inactiveMonths?: number;
 }
 
 export type TierId = 'bronze' | 'silver' | 'gold' | 'platinum';
 
 /** `unit` říká, v čem je `nextAt`: návštěvy, nebo měna podniku. */
-export interface Tier { id: TierId; label: string; discount: number; nextAt: number | null; nextLabel: string | null; unit: TierBy }
+export interface Tier { id: TierId; label: string; discount: number; nextAt: number | null; nextLabel: string | null; unit: TierBy; /** Úroveň je snížená o stupeň, protože host dlouho nepřišel. */ reduced?: boolean }
 
 /** Režim úrovní podniku; cokoli jiného než 'spend' je 'visits'. */
 export function tierBy(r?: TierRules | null): TierBy {
@@ -115,9 +117,47 @@ export function tierFor(hodnota: number, r?: TierRules | null): Tier {
   return { id: 'bronze', label: 'Člen', discount: base, nextAt: silverAt, nextLabel: 'Stříbrný host', unit: by };
 }
 
-/** Úroveň člena s režimem podniku: z návštěv, nebo z útraty. Tohle volej všude, kde máš člena. */
-export function tierForMember(m: { visits?: number | string | null; spend?: number | string | null }, r?: TierRules | null): Tier {
-  return tierFor(tierBy(r) === 'spend' ? Number(m?.spend) || 0 : Number(m?.visits) || 0, r);
+/** Okamžik poslední návštěvy z Date, ISO řetězce, nebo textu z databáze („2026-08-29 22:22:01", bez zóny = UTC). */
+function casNavstevy(v: unknown): number | null {
+  if (v == null || v === '') return null;
+  if (v instanceof Date) return Number.isNaN(v.getTime()) ? null : v.getTime();
+  let s = String(v).trim();
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(s)) s = s.replace(' ', 'T');
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(s)) s += 'Z';
+  const t = Date.parse(s);
+  return Number.isNaN(t) ? null : t;
+}
+
+/**
+ * Je host po `mesice` měsících bez návštěvy? Bez zapnuté neaktivity (0) a bez zaznamenané
+ * návštěvy (nový člen, import) nikdy — úroveň se mu nesnižuje za něco, co nemáme zapsané.
+ */
+export function jeNeaktivni(posledniNavsteva: unknown, mesice: number, ted: number = Date.now()): boolean {
+  const m = Math.floor(Number(mesice) || 0);
+  if (m <= 0) return false;
+  const t = casNavstevy(posledniNavsteva);
+  if (t == null) return false;
+  const hranice = new Date(ted);
+  hranice.setUTCMonth(hranice.getUTCMonth() - m);
+  return t < hranice.getTime();
+}
+
+/** O stupeň nižší úroveň (platina → zlato → stříbro → člen); člen zůstává. Návštěvy ani útrata se nemění. */
+export function snizenaUroven(t: Tier, r?: TierRules | null): Tier {
+  const th = tierThresholds(r);
+  const nizsi = t.id === 'platinum' ? th.gold : t.id === 'gold' ? th.silver : t.id === 'silver' ? 0 : null;
+  if (nizsi == null) return t;
+  return { ...tierFor(nizsi, r), reduced: true };
+}
+
+/**
+ * Úroveň člena s režimem podniku: z návštěv, nebo z útraty. Tohle volej všude, kde máš člena.
+ * Když podnik snižuje úroveň po neaktivitě (`inactiveMonths`) a člen má `lastVisitAt`,
+ * vyjde o stupeň nižší — s další návštěvou se vrátí sama.
+ */
+export function tierForMember(m: { visits?: number | string | null; spend?: number | string | null; lastVisitAt?: unknown }, r?: TierRules | null): Tier {
+  const t = tierFor(tierBy(r) === 'spend' ? Number(m?.spend) || 0 : Number(m?.visits) || 0, r);
+  return jeNeaktivni(m?.lastVisitAt, Number(r?.inactiveMonths) || 0) ? snizenaUroven(t, r) : t;
 }
 
 /** Řádek client_profiles (snake_case z databáze) → pravidla úrovní. */
@@ -128,6 +168,7 @@ export function tierRulesFromProfile(p: any): TierRules {
     platinumDiscount: Number(p?.platinum_discount) || 0,
     tierBy: p?.tier_by === 'spend' ? 'spend' : 'visits',
     silverSpend: Number(p?.silver_spend) || 0, goldSpend: Number(p?.gold_spend) || 0, platinumSpend: Number(p?.platinum_spend) || 0,
+    inactiveMonths: Number(p?.tier_inactive_months) || 0,
   };
 }
 

@@ -39,6 +39,7 @@ import QrDesigner from './QrDesigner';
 import BrandTab from './BrandTab';
 import LoyaltyTabs, { LOYALTY_SUBS, type LoyaltySub } from './LoyaltyTabs';
 import PrechodZKarticky, { PRECHOD_TLACITKO, PRECHOD_OTAZKA, PRECHOD_POPIS, useImportKarticky } from './PrechodZKarticky';
+import { UpravaClenaOkno } from './loyalty/BodyUpravaClena';
 import MenuEditor from '../employer/MenuEditor';
 import EventsView from '../employer/EventsView';
 import { czDay, RES_STATUS } from '@/lib/clientSlots';
@@ -698,6 +699,7 @@ interface ClenRadek {
   id: number; name: string; email?: string; points: number; stamps: number; visits: number;
   joined_at: string; last_visit_at: string | null; reservations: number; open_coupons: number;
   // Úroveň podle režimu podniku a efektivní sleva (nejvyšší z úrovně a slev skupin) — počítá server.
+  credit?: number; level_reduced?: boolean;
   spend?: number; level?: string; level_label?: string; discount?: number; discount_source?: 'uroven' | 'skupina' | null; discount_name?: string | null;
 }
 
@@ -705,6 +707,7 @@ function Clenove({ oznam, hledat = '' }: { oznam: Hlaska; hledat?: string }) {
   const money = useMoney();
   const { ma: smi } = useOpravneni();
   const upravujeBody = smi('vernost.upravit_body');
+  const upravujeKredit = smi('vernost.kredit_upravit');
   const vidiDenik = smi('vernost.zobrazit');
   // Skupiny člena bydlí ve stejné jamce jako deník, ale nesmí na věrnosti záviset:
   // role se zakaznici.skupiny bez vernost.zobrazit jinde hosta do skupiny nepřidá.
@@ -723,24 +726,8 @@ function Clenove({ oznam, hledat = '' }: { oznam: Hlaska; hledat?: string }) {
   const imp = useImportKarticky(oznam, reload);
   const smiImport = imp.smi;
   const [otevreny, setOtevreny] = useState<number | null>(null);
-  const [upravuji, setUpravuji] = useState<{ c: ClenRadek; delta: string; poznamka: string; co: 'body' | 'utrata' } | null>(null);
-  const [ukladam, setUkladam] = useState(false);
+  const [upravuji, setUpravuji] = useState<ClenRadek | null>(null);
   const [verzeDeniku, setVerzeDeniku] = useState(0);
-
-  const ulozBody = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!upravuji) return;
-    const delta = parseInt(upravuji.delta, 10);
-    if (!delta) return;
-    setUkladam(true);
-    try {
-      const utrata = upravuji.co === 'utrata';
-      const r = await j('/api/client/admin/loyalty', { method: 'POST', body: JSON.stringify({ customerId: upravuji.c.id, delta, note: upravuji.poznamka, ...(utrata ? { what: 'spend' } : {}) }) });
-      oznam(utrata ? `${upravuji.c.name}: útrata teď ${money(r.spend)}.` : `${upravuji.c.name}: teď ${r.points} bodů.`);
-      setUpravuji(null); reload(); setVerzeDeniku(v => v + 1);
-    } catch (err) { oznam(apiMessage(err, 'Body se nepodařilo upravit.'), 'bad'); }
-    setUkladam(false);
-  };
 
   return (
     <div className="space-y-4">
@@ -762,14 +749,14 @@ function Clenove({ oznam, hledat = '' }: { oznam: Hlaska; hledat?: string }) {
                 return (
                   <li key={c.id}>
                     <ListRow as="div"
-                      title={<span className="flex items-center gap-2 min-w-0"><span className="truncate">{c.name}</span>{uroven.id !== 'bronze' && <Chip tone={uroven.id === 'silver' ? 'muted' : 'ink'} size="sm">{uroven.label}</Chip>}{Number(c.discount) > 0 && <Chip tone="ok" size="sm">{`Sleva ${c.discount} %${c.discount_source === 'skupina' && c.discount_name ? ` (${c.discount_name})` : ''}`}</Chip>}</span>}
+                      title={<span className="flex items-center gap-2 min-w-0"><span className="truncate">{c.name}</span>{uroven.id !== 'bronze' && <Chip tone={uroven.id === 'silver' ? 'muted' : 'ink'} size="sm">{uroven.label}</Chip>}{c.level_reduced && <Chip tone="wait" size="sm">snížená po pauze</Chip>}{Number(c.discount) > 0 && <Chip tone="ok" size="sm">{`Sleva ${c.discount} %${c.discount_source === 'skupina' && c.discount_name ? ` (${c.discount_name})` : ''}`}</Chip>}</span>}
                       meta={[c.email, `člen od ${denCesky(c.joined_at)}`, c.last_visit_at ? `naposledy ${denCesky(c.last_visit_at)}` : null].filter(Boolean).join(' · ')}
                       value={<>{c.points.toLocaleString('cs-CZ')} <span className="text-xs font-medium text-black/50">b.</span></>}
-                      valueMeta={`${c.stamps} raz. · ${c.visits} návšt.${Number(c.spend) > 0 ? ` · ${money(Number(c.spend))}` : ''}`}
+                      valueMeta={`${c.stamps} raz. · ${c.visits} návšt.${Number(c.credit) > 0 ? ` · kredit ${money(Number(c.credit))}` : ''}${Number(c.spend) > 0 ? ` · ${money(Number(c.spend))}` : ''}`}
                       aside={<>{c.reservations} rez.{c.open_coupons ? ` · ${c.open_coupons} kup.` : ''}</>}
-                      actions={(upravujeBody || rozbali) ? (
+                      actions={(upravujeBody || upravujeKredit || rozbali) ? (
                         <>
-                          {upravujeBody && <Button size="sm" variant="secondary" onClick={() => setUpravuji({ c, delta: '', poznamka: '', co: 'body' })} aria-label={`Upravit body: ${c.name}`}>Body ±</Button>}
+                          {(upravujeBody || upravujeKredit) && <Button size="sm" variant="secondary" onClick={() => setUpravuji(c)} aria-label={`Upravit body: ${c.name}`}>{upravujeBody ? 'Body ±' : 'Kredit ±'}</Button>}
                           {rozbali && <Button size="sm" variant="ghost" aria-expanded={otevreny === c.id} onClick={() => setOtevreny(otevreny === c.id ? null : c.id)}>{otevreny === c.id ? 'Skrýt' : vidiDenik ? 'Deník' : 'Skupiny'}</Button>}
                         </>
                       ) : undefined} />
@@ -782,23 +769,8 @@ function Clenove({ oznam, hledat = '' }: { oznam: Hlaska; hledat?: string }) {
         )}
       {imp.okno}
       {upravuji && (
-        <Modal open onClose={() => setUpravuji(null)} size="sm" title={`Body pro ${upravuji.c.name}`}
-          subtitle={upravuji.co === 'utrata' ? `Útrata teď ${money(Number(upravuji.c.spend) || 0)}` : `Teď má ${upravuji.c.points.toLocaleString('cs-CZ')} b.`}
-          footer={<>
-            <Button variant="secondary" onClick={() => setUpravuji(null)}>Zrušit</Button>
-            <Button type="submit" form="body-okno" variant="primary" loading={ukladam} disabled={!parseInt(upravuji.delta, 10)}>Uložit</Button>
-          </>}>
-          <form id="body-okno" onSubmit={ulozBody} className="space-y-4">
-            <Segmented options={[{ id: 'body', label: 'Body' }, { id: 'utrata', label: 'Útrata' }]} value={upravuji.co} onChange={v => setUpravuji({ ...upravuji, co: v as 'body' | 'utrata' })} size="sm" ariaLabel="Co upravit" />
-            <Field id="body-delta" label={upravuji.co === 'utrata' ? 'O kolik upravit útratu' : 'Kolik bodů'} hint={upravuji.co === 'utrata' ? 'Útrata určuje úroveň, když podnik počítá úrovně podle útraty. Kladné číslo přičte, záporné odečte.' : 'Kladné číslo přičte, záporné odečte.'}>
-              <Input id="body-delta" type="number" inputMode="numeric" autoFocus min={-100000} max={100000} className="!w-36"
-                value={upravuji.delta} onChange={e => setUpravuji({ ...upravuji, delta: e.target.value })} />
-            </Field>
-            <Field id="body-proc" label="Proč" hint="Uvidíš to v deníku člena. Nepovinné.">
-              <Textarea id="body-proc" rows={2} maxLength={200} value={upravuji.poznamka} onChange={e => setUpravuji({ ...upravuji, poznamka: e.target.value })} />
-            </Field>
-          </form>
-        </Modal>
+        <UpravaClenaOkno clen={upravuji} smiBody={upravujeBody} smiKredit={upravujeKredit} oznam={oznam}
+          onHotovo={() => { reload(); setVerzeDeniku(v => v + 1); }} onZavrit={() => setUpravuji(null)} />
       )}
     </div>
   );
