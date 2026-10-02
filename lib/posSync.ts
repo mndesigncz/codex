@@ -10,6 +10,7 @@ import { pragueToday, dayPlus } from './pragueTime';
 import { vedeniPodniku } from './tenant';
 import { odepsatProdej } from './packaging';
 import { sloupecJeDesetinny } from './cenaSloupce';
+import { nactiBaleniKategorii, baleniRadku } from './baleniKategorii';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -122,10 +123,11 @@ export async function runPosSync(teamId: number, userId: number | null, force = 
   const celeKusy = !(await sloupecJeDesetinny('inventory_items.quantity'));
   const itemIds = Array.from(totals.keys()).filter(id => Number.isFinite(id));
   const itemById = new Map<number, any>();
+  const baleniKat = await nactiBaleniKategorii(teamId);
   if (itemIds.length) {
     try {
       const rows = await sql`
-        SELECT id, name, quantity, open_amount, package_size
+        SELECT id, name, quantity, open_amount, package_size, content_unit, category, category_id
         FROM inventory_items WHERE id = ANY(${itemIds}) AND team_id = ${teamId}`;
       for (const it of rows as any[]) itemById.set(Number(it.id), it);
     } catch { /* tabulka chybí — odpisy se přeskočí */ }
@@ -135,7 +137,9 @@ export async function runPosSync(teamId: number, userId: number | null, force = 
     if (!(amount > 0)) continue;
     const it = itemById.get(itemId);
     if (!it) continue;
-    const pkg = Number(it.package_size) || 0;
+    // Velikost balení zděděná z kategorie platí jako vlastní — jinak by se prodej
+    // 0,02 l odepsal jako 0,02 celé lahve.
+    const pkg = baleniRadku(it, baleniKat).packageSize ?? 0;
     const oldQty = Number(it.quantity) || 0;
     const oldOpen = Number(it.open_amount) || 0;
     const next = odepsatProdej(oldQty, oldOpen, pkg, amount, celeKusy);

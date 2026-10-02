@@ -19,6 +19,7 @@ import { Button, Chip, EmptyState, ErrorState, ListRow, Modal, Segmented, Skelet
 import ShiftReviewModal from './ShiftReviewModal';
 import type { RewardLevel } from '@/lib/rewardLevels';
 import { apiMessage, okJson } from '@/lib/api';
+import { fmtHM } from '@/lib/i18n/format';
 import { useMoney } from '../CurrencyProvider';
 import { useOpravneni } from '../role/useOpravneni';
 import { hodinyMinuty } from '@/lib/dochazkaPrehled';
@@ -195,7 +196,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                     <h3 id="profil-nadchazejici" className="t-label mb-1">{t('Nadcházející ({n})', { n: p.shifts.upcoming.length })}</h3>
                     <ul className="list">
                       {p.shifts.upcoming.map(sh => (
-                        <ListRow key={sh.id} title={<span className="cz-sentence">{fmtDayLong(sh.date, loc)}</span>} value={`${hm(sh.startTime)}–${hm(sh.endTime)}`} />
+                        <ListRow key={sh.id} title={<span className="cz-sentence">{fmtDayLong(sh.date, loc)}</span>} value={`${fmtHM(sh.startTime)}–${fmtHM(sh.endTime)}`} />
                       ))}
                     </ul>
                   </section>
@@ -209,7 +210,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                       {p.shifts.recent.map(sh => (
                         <ListRow key={sh.id}
                           title={<span className="cz-sentence">{fmtDayLong(sh.date, loc)}</span>}
-                          meta={`${hm(sh.startTime)}–${hm(sh.endTime)}`}
+                          meta={`${fmtHM(sh.startTime)}–${fmtHM(sh.endTime)}`}
                           right={vidiHodnoceni ? (sh.reviewed ? <>
                             <Hvezdy n={sh.rating} />
                             {sh.flagged && <Chip tone="bad" size="sm" icon="warning">{t('Výtka')}</Chip>}

@@ -40,6 +40,9 @@ const STYLE = `
     color: #000; background: #fff; margin: 0;
     font-size: 11pt; line-height: 1.4;
   }
+  /* Dlouhé slovo bez mezer (název položky, adresa, e-mail) jinak roztáhne tabulku
+     za okraj papíru a pravé sloupce se při tisku uříznou. */
+  h1, h2, p, td, th, li { overflow-wrap: anywhere; }
   h1 { font-size: 16pt; margin: 0 0 2mm; letter-spacing: -0.01em; }
   .meta { color: #555; font-size: 9pt; margin: 0 0 6mm; }
   h2 { font-size: 12pt; margin: 6mm 0 2mm; padding-bottom: 1mm; border-bottom: 1px solid #000; }
@@ -55,6 +58,12 @@ const STYLE = `
   .foot { margin-top: 8mm; padding-top: 2mm; border-top: 1px solid #ddd; color: #777; font-size: 8.5pt; }
   .note { font-size: 10pt; color: #333; margin: 3mm 0 0; }
   @media print { .noprint { display: none !important; } }
+  /* Na telefonu (výtisk se v nativním obalu otevírá jako soubor) se široká tabulka
+     posouvá do strany sama, místo aby natáhla celou stránku. */
+  @media screen and (max-width: 700px) {
+    body { padding: 0 12px; }
+    table { display: block; overflow-x: auto; }
+  }
 `;
 
 export interface PrintDoc {
@@ -77,6 +86,7 @@ export function printHtml({ title, subtitle, body, business, jazyk = VYCHOZI, pa
   const stamp = now.toLocaleString(LOCALE_PRO_JAZYK[jazyk], { timeZone: 'Europe/Prague' });
   const veta = paticka ? paticka(stamp) : `vytištěno ${stamp} z aplikace Managero`;
   return `<!doctype html><html lang="${jazyk}"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)}</title><style>${STYLE}</style></head>
 <body>
 <h1>${esc(title)}</h1>

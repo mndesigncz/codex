@@ -474,8 +474,9 @@ input::-webkit-date-and-time-value { text-align: left; }
    takže „Widget odebrán · Vrátit" nikdy neleží přes „Hotovo" — na monitoru
    seděly oba 24 px nad hranou a toast lištu zakrýval. Bez lišty proměnná
    chybí a platí dosavadní odsazení. Když lišta odjede, toast za ní klidně
-   sjede dolů; při omezeném pohybu rovnou. */
-.toast-misto { bottom: max(var(--lista-vyska, 0px), env(safe-area-inset-bottom, 0px), 16px); }
+   sjede dolů; při omezeném pohybu rovnou. Na telefonu stejně tak `--dok-vyska`
+   (spodní dok, zapisuje ji components/ui/Dock): toast sedí nad ním, ne přes něj. */
+.toast-misto { bottom: max(var(--lista-vyska, 0px), var(--dok-vyska, 0px), env(safe-area-inset-bottom, 0px), 16px); }
 @media (min-width: 768px) {
   .toast-misto { bottom: max(var(--lista-vyska, 0px), 1.5rem); }
 }
@@ -1622,3 +1623,44 @@ html[data-obal] .jen-web { display: none !important; }
 
 /* Lepkavá patička s tlačítky: na telefonu u spodního okraje, pod klávesnicí se nepřekrývá s polem. */
 .pv-paticka { padding-bottom: max(0.75rem, env(safe-area-inset-bottom)); }
+
+/* ---------- Osobní vzhled zařízení (Nastavení → Vzhled, lib/vzhled.ts) ----------
+   Čtyři ruční volby jako data-atributy na <html>. Systémová nastavení
+   (prefers-reduced-motion, prefers-contrast) platí dál; ruční přepínač je
+   přidává, nic jim neubírá. Stejný přepínač nastavuje skript v app/layout.tsx
+   před prvním vykreslením. */
+
+/* Velikost písma: rem se škáluje s kořenem (Tailwind i většina komponent je v rem). */
+:root[data-fontsize="large"] { font-size: 112.5%; }
+:root[data-fontsize="xlarge"] { font-size: 125%; }
+
+/* Hustota „Kompaktní": řádky seznamů, karty a pole o něco těsněji. Dotykové cíle
+   zůstávají (min-height řádku 2.75 rem), takže se dá trefit i palcem. */
+:root[data-density="compact"] .list-row { padding-top: 0.4375rem; padding-bottom: 0.4375rem; min-height: 2.75rem; }
+:root[data-density="compact"] .card.p-6 { padding: 1.125rem; }
+:root[data-density="compact"] .card.p-5 { padding: 1rem; }
+:root[data-density="compact"] .field { padding-top: 0.4375rem; padding-bottom: 0.4375rem; }
+:root[data-density="compact"] .space-y-6 > * + * { margin-top: 1rem; }
+
+/* „Omezit pohyb" (ručně): totéž co prefers-reduced-motion: reduce, jen výslovně. */
+:root[data-motion="reduce"] *, :root[data-motion="reduce"] *::before, :root[data-motion="reduce"] *::after {
+  animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; animation-delay: 0ms !important;
+  transition-duration: 0.01ms !important; scroll-behavior: auto !important;
+}
+:root[data-motion="reduce"] .rise-in, :root[data-motion="reduce"] .stagger > * { animation: none !important; }
+:root[data-motion="reduce"] button:active:not(:disabled) { transform: none; opacity: 0.8; }
+:root[data-motion="reduce"] .shimmer { animation: none; background: rgba(0,0,0,0.05); }
+:root[data-motion="reduce"] .sc-sweep { opacity: 0; }
+
+/* „Vysoký kontrast" (ručně): totéž co prefers-contrast: more. */
+:root[data-contrast="high"] .glass, :root[data-contrast="high"] .glass-card,
+:root[data-contrast="high"] .card, :root[data-contrast="high"] .glass-strong { border-color: rgba(0,0,0,0.45); }
+:root[data-contrast="high"][data-theme="dark"] .glass,
+:root[data-contrast="high"][data-theme="dark"] .glass-card,
+:root[data-contrast="high"][data-theme="dark"] .card { border-color: rgba(255,255,255,0.5); }
+:root[data-contrast="high"] .card-accent { border-color: rgb(var(--ok-ink-rgb) / 0.7); }
+:root[data-contrast="high"] .card-wait { border-color: rgb(var(--wait-ink-rgb) / 0.7); }
+:root[data-contrast="high"] .card-danger { border-color: rgb(var(--bad-ink-rgb) / 0.7); }
+:root[data-contrast="high"] .card-info { border-color: rgb(var(--info-ink-rgb) / 0.7); }
+:root[data-contrast="high"] .field { border-color: rgba(22,24,26,0.55); }
+:root[data-contrast="high"][data-theme="dark"] .field { border-color: rgba(237,242,228,0.6); }

@@ -57,7 +57,7 @@ import { useCurrency, useMoney } from '../../CurrencyProvider';
 import { usePersonProfile } from '../../employer/ProfileLinkProvider';
 import { apiMessage, okJson } from '@/lib/api';
 import { useJazyk, useT, type PrekladFn } from '@/lib/i18n/client';
-import { fmtMesic } from '@/lib/i18n/format';
+import { fmtHM, fmtMesic } from '@/lib/i18n/format';
 import { dbTimeDayHM, dbTimeHM, parseDbTime, pragueDayOf, pragueToday } from '@/lib/pragueTime';
 import {
   ZAPOMENUTY_MS, dnesVPodniku, konecSmeny, navrhOdchodu as navrhOdchoduPlan, hodinyMinuty, mujMesic, mzdyZaObdobi, obdobiDni, otevrenePrichody, podilMezd,
@@ -340,7 +340,7 @@ function PraveNaSmene({ velikost, nahled }: WidgetProps) {
       <ul className="list">
         {lide.map(({ r, od }) => {
           const zapomenuty = ted - od.getTime() > ZAPOMENUTY_MS;
-          const smena = r.shiftStart ? t('směna {cas}', { cas: `${hm(r.shiftStart)}–${hm(r.shiftEnd)}` }) : t('bez plánované směny');
+          const smena = r.shiftStart ? t('směna {cas}', { cas: `${fmtHM(r.shiftStart)}–${fmtHM(r.shiftEnd)}` }) : t('bez plánované směny');
           return (
             <ListRow key={r.id}
               lead={<Avatar emoji={r.avatar} size="sm" />}

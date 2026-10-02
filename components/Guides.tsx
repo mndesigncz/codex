@@ -33,7 +33,7 @@ import {
 } from './ui';
 import StepTimeline from './procedures/StepTimeline';
 import { parseSteps } from '@/lib/steps';
-import { normalizeSteps, type GuideStep } from '@/lib/guideSteps';
+import { normalizeSteps, popisMnozstviKroku, type GuideStep } from '@/lib/guideSteps';
 import GuideStepIngredient from './guides/GuideStepIngredient';
 import GuideProductLink from './guides/GuideProductLink';
 import GuideItemLink from './guides/GuideItemLink';
@@ -782,7 +782,7 @@ function ReaderChecklist({ steps, guideId, ticksFor }: { steps: GuideStep[]; gui
         steps={parseSteps(steps.map(st => (
           // Gramáž patří ke kroku, ne do zvláštního seznamu — barista čte jeden řádek, ne dva.
           st.itemId != null && st.amount != null
-            ? `${st.text} — ${String(st.amount).replace('.', ',')} ${st.unit ?? ''}`.trim()
+            ? `${st.text} — ${popisMnozstviKroku(st)}`
             : st.text
         )))}
         statuses={Object.fromEntries(done.map((v, i) => [i, v ? 'done' : 'pending']))}

@@ -56,6 +56,8 @@
   "Cena musí být číslo, třeba 4,99.": "Cena musi być liczbą, np. 4,99.",
   "Cena v bodech": "Cena w punktach",
   "Cena za jednotku": "Cena za jednostkę",
+  "Cena za balení": "Cena za opakowanie",
+  "Cena (za balení, jinak za jednotku)": "Cena (za opakowanie, w przeciwnym razie za jednostkę)",
   "Cena — {nazev} ({mena})": "Cena — {nazev} ({mena})",
   "Chybí položka? Uprav nabídku v Menu": "Brakuje pozycji? Edytuj ofertę w Menu",
   "Chybí uzávěrka": "Brak zamknięcia kasy",
@@ -1462,5 +1464,7 @@
   "„{nazev}\" zmizí z tabule. Vrátit to nepůjde.": "„{nazev}” zniknie z tablicy. Nie będzie można tego cofnąć.",
   "„{nazev}\" zmizí ze seznamu i z přehledu týmu.": "„{nazev}” zniknie z listy i z przeglądu zespołu.",
   "„{nazev}“ přidáno, ale kasa u něj nedala cenu — doplň ji ručně.": "„{nazev}” dodano, ale kasa nie podała do niej ceny — uzupełnij ją ręcznie.",
-  "…a dalších {n}": "…i {n} więcej"
+  "…a dalších {n}": "…i {n} więcej",
+  "Tahle jednotka se eviduje v celých číslech — zapiš celé číslo.": "Ta jednostka jest ewidencjonowana w liczbach całkowitych — wpisz liczbę całkowitą.",
+  "Množství a limity musí být čísla.": "Ilość i limity muszą być liczbami."
 }

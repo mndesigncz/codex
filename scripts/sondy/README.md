@@ -18,3 +18,10 @@ build, `next start` bez databáze (API podvrhují fixtury) a `npm run sondy`.
 
 Mimo seznam ZELENE jsou `escape` a `dvakrat` — procházejí všechny obrazovky
 a trvají přes 4 minuty; pouštěj je ručně (`SONDY_LIMIT_MS=900000`).
+
+Průzkumy mimo spouštěč (`pruchod.mjs`, `pruchod-hloubka.mjs`) hlásí seznam k posouzení, ne ano/ne.
+`pruchod-hloubka.mjs` projde u každé obrazovky i vnitřní záložky, okna, listy a kebab menu na šířkách
+320 / 360 / 390 / 768 v češtině, němčině a polštině, světle i tmavě (`PH_JAZYKY`, `PH_SIRKY`, `PH_MOTIVY`,
+`PH_OBRAZOVKY` zužují; `PH_DATA=retezec|mezery` protáhne texty z API). Souběžné běhy se slučují:
+`node scripts/sondy/pruchod-hloubka.mjs --spoj a.json b.json`. Jeho nálezy, které se vracely, hlídá rychlá
+sonda `k73-sirky` a statická kontrola `scripts/check-pevne-sirky.mjs`.

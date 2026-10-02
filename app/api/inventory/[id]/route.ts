@@ -8,10 +8,12 @@ import { packagingSourceOf } from '@/lib/categoryTree';
 import { ensureProductionTasks } from '@/lib/production';
 import { webovaUrl } from '@/lib/bezpecnaUrl';
 import { tymyCiselniku } from '@/lib/tenant';
+import { nactiBaleniKategorii, baleniRadku } from '@/lib/baleniKategorii';
 import { pozaduj, jeOdpoved, clenoveSOpravnenim } from '@/lib/opravneniDb';
 import { typNaUcet } from '@/lib/opravneni';
 import { cenaZDb, cenaZFormulare } from '@/lib/cena';
-import { cenaKZapisu, sloupecJeDesetinny } from '@/lib/cenaSloupce';
+import { cenaKZapisu, sloupecJeDesetinny, skladDesetinny } from '@/lib/cenaSloupce';
+import { mnozstviKZapisu } from '@/lib/inventura';
 import { uklidOdkazyNaPolozky } from '@/lib/skladOdkazy';
 
 // Každý pohyb skladu srovná výrobní úkoly: docházející vlastní produkt dostane
@@ -202,9 +204,12 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     const authorId = await resolveActingUser(me.meId, me.role, me.teamId, body.actingAs, request);
     const oldQty = Number(item.quantity);
     const oldOpen = item.open_amount != null ? Number(item.open_amount) : null;
+    // Velikost balení zděděná z kategorie platí stejně jako vlastní — bez ní by
+    // se „odešlo 150 ml" odečetlo jako 150 celých lahví.
+    const baleni = baleniRadku(item, await nactiBaleniKategorii(me.teamId));
     const next = consumeContent({
       quantity: oldQty,
-      packageSize: item.package_size != null ? Number(item.package_size) : null,
+      packageSize: baleni.packageSize,
       openAmount: oldOpen,
     }, amount, { celeKusy: !(await sloupecJeDesetinny('inventory_items.quantity')) });
     try {
@@ -276,7 +281,8 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     // the tablet account — same attribution as tasks and procedure runs.
     const authorId = await resolveActingUser(me.meId, me.role, me.teamId, body.actingAs, request);
     const oldQty = Number(item.quantity);
-    const newQty = body.quantity !== undefined && body.quantity !== null ? Number(body.quantity) : oldQty;
+    const newQty = body.quantity !== undefined && body.quantity !== null
+      ? mnozstviKZapisu(body.quantity, (await skladDesetinny()).mnozstvi) : oldQty;
     const oldOpen = item.open_amount != null ? Number(item.open_amount) : null;
     const newOpen = body.openAmount !== undefined
       ? (body.openAmount === null ? null : Math.max(0, Number(body.openAmount) || 0))
@@ -361,10 +367,13 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
 
   const name = body.name !== undefined ? body.name : item.name;
   const category = body.category !== undefined ? body.category : item.category;
-  const quantity = body.quantity !== undefined ? Number(body.quantity) : Number(item.quantity);
-  const minQuantity = body.minQuantity !== undefined ? Number(body.minQuantity) : Number(item.min_quantity);
-  const criticalQuantity = body.criticalQuantity !== undefined ? Number(body.criticalQuantity) : Number(item.critical_quantity);
-  const maxQuantity = body.maxQuantity !== undefined ? Number(body.maxQuantity) : Number(item.max_quantity);
+  // Desetinné množství a prahy (2,5 kg) jen tam, kde je sloupec NUMERIC; INTEGER by zápis
+  // odmítl a uložení celé položky by spadlo. Formulář desetiny v tom případě ani nenabídne.
+  const des = await skladDesetinny();
+  const quantity = body.quantity !== undefined ? mnozstviKZapisu(body.quantity, des.mnozstvi) : Number(item.quantity);
+  const minQuantity = body.minQuantity !== undefined ? mnozstviKZapisu(body.minQuantity, des.prahy) : Number(item.min_quantity);
+  const criticalQuantity = body.criticalQuantity !== undefined ? mnozstviKZapisu(body.criticalQuantity, des.prahy) : Number(item.critical_quantity);
+  const maxQuantity = body.maxQuantity !== undefined ? mnozstviKZapisu(body.maxQuantity, des.prahy) : Number(item.max_quantity);
   const unit = body.unit !== undefined ? body.unit : item.unit;
   const supplier = body.supplier !== undefined ? body.supplier : item.supplier;
   const supplierUrl = body.supplierUrl !== undefined

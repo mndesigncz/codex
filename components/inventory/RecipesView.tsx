@@ -27,6 +27,8 @@ import NewIngredientInline from './NewIngredientInline';
 import { apiMessage, okJson } from '@/lib/api';
 import { recipeCost, ingredientCost, marginPct } from '@/lib/recipeCost';
 import { obsahujeNekde } from '@/lib/hledani';
+import { JEDNOTKY_RODIN, rodinaJednotky, faktorJednotky } from '@/lib/jednotky';
+import { baleniPolozky, jednotkaPolozky } from '@/lib/packaging';
 import { tg } from '@/lib/i18n/stav';
 import { useJazyk, useT } from '@/lib/i18n/client';
 import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
@@ -51,28 +53,13 @@ type Draft = { productId: string; productName: string; ingredients: Ingredient[]
 const VSE = 'Vše';
 const BEZ_KATEGORIE = 'Bez kategorie';
 
-/** Jednotky, ve kterých se dá zadávat, a jejich převod na základní (l / kg / ks). */
-const UNITS: Record<string, { label: string; toBase: number; base: string }[]> = {
-  l: [
-    { label: 'ml', toBase: 0.001, base: 'l' },
-    { label: 'cl', toBase: 0.01, base: 'l' },
-    { label: 'dl', toBase: 0.1, base: 'l' },
-    { label: 'l', toBase: 1, base: 'l' },
-  ],
-  kg: [
-    { label: 'g', toBase: 0.001, base: 'kg' },
-    { label: 'dkg', toBase: 0.01, base: 'kg' },
-    { label: 'kg', toBase: 1, base: 'kg' },
-  ],
-  ks: [{ label: 'ks', toBase: 1, base: 'ks' }],
-};
+/** Jednotky, ve kterých se dá zadávat, a jejich převod na základní (l / kg / ks) — společné s kroky návodů (lib/jednotky). */
+const UNITS = JEDNOTKY_RODIN;
 
-/** Do které rodiny jednotek položka patří — podle toho, co má napsané. */
+/** Do které rodiny jednotek položka patří — podle jednotky, v níž je vedená
+ *  (obsah u balených, včetně zděděného z kategorie). */
 function familyOf(item: any): 'l' | 'kg' | 'ks' {
-  const u = String(item?.contentUnit ?? item?.unit ?? '').toLowerCase();
-  if (['l', 'ml', 'cl', 'dl', 'litr'].includes(u)) return 'l';
-  if (['kg', 'g', 'dkg'].includes(u)) return 'kg';
-  return 'ks';
+  return rodinaJednotky(jednotkaPolozky(item));
 }
 
 /** Číslo z pole, které přijme i desetinnou čárku — píše se tak česky. */
@@ -83,9 +70,7 @@ const num = (s: string) => Number(String(s).replace(',', '.')) || 0;
  *  velikost balení a cena — jinak by se z tabáku vedeného v gramech
  *  odepisovalo tisíckrát míň, než se opravdu použije. */
 function itemFactor(item: any): number {
-  const u = String(item?.contentUnit ?? item?.unit ?? '').toLowerCase();
-  const fam = familyOf(item);
-  return UNITS[fam].find(o => o.label === u)?.toBase ?? 1;
+  return faktorJednotky(jednotkaPolozky(item));
 }
 
 /** Uložené množství (v jednotce položky) jako řádek editoru v jednotce, ve které to není samá nula (0,02 l → 20 ml). */
@@ -219,7 +204,7 @@ export default function RecipesView({ openProductId, onNavigate }: RecipesViewPr
     if (!r?.ingredients.length) return null;
     const rows = r.ingredients.map(ing => {
       const item = itemById.get(String(ing.itemId));
-      return { unitCost: Number(item?.unitCost) || 0, packageSize: Number(item?.packageSize) || 0, amount: Number(ing.amount) || 0 };
+      return { unitCost: Number(item?.unitCost) || 0, packageSize: baleniPolozky(item).packageSize ?? 0, amount: Number(ing.amount) || 0 };
     });
     // Jedna surovina bez ceny znamená, že součet není náklad receptury —
     // je to jen jeho část, a ta by marži nafoukla.
@@ -279,7 +264,7 @@ export default function RecipesView({ openProductId, onNavigate }: RecipesViewPr
   const yieldOf = (item: any, amountBase: number) => {
     if (!item || amountBase <= 0) return null;
     const amount = amountBase / itemFactor(item);
-    const pkg = Number(item.packageSize) || 0;
+    const pkg = baleniPolozky(item).packageSize ?? 0;
     const cost = Number(item.unitCost) || 0;
     const portions = pkg > 0 ? Math.floor(pkg / amount) : null;
     // Nezaokrouhluje se: pět gramů cukru za 25 Kč/kg je dvanáct haléřů
@@ -456,7 +441,7 @@ function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, 
     // recipeCost započte jako chybějící cenu a marže se neukáže nafouknutá.
     if (!item) return { unitCost: 0, packageSize: 0, amount: ing.itemId ? num(ing.amount) : 0 };
     const conv = UNITS[familyOf(item)].find(u => u.label === ing.unit)?.toBase ?? 1;
-    return { unitCost: Number(item.unitCost) || 0, packageSize: Number(item.packageSize) || 0, amount: (num(ing.amount) * conv) / itemFactor(item) };
+    return { unitCost: Number(item.unitCost) || 0, packageSize: baleniPolozky(item).packageSize ?? 0, amount: (num(ing.amount) * conv) / itemFactor(item) };
   });
   // Stejný výpočet jako v seznamu — editor a seznam ukazují u téže receptury totéž číslo.
   const cost = recipeCost(costRows);
@@ -553,7 +538,7 @@ function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, 
                   {item && (
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 t-meta">
                       {num(ing.amount) > 0 && (y?.portions != null
-                        ? <span>{t('Z balení ({velikost}) vyjde', { velikost: `${Number(item.packageSize).toLocaleString(LOCALE_PRO_JAZYK[jazyk])} ${item.contentUnit ?? item.unit}` })} <b className="font-semibold text-[#16181A] tabular-nums">{y.portions}×</b></span>
+                        ? <span>{t('Z balení ({velikost}) vyjde', { velikost: `${Number(baleniPolozky(item).packageSize).toLocaleString(LOCALE_PRO_JAZYK[jazyk])} ${jednotkaPolozky(item)}` })} <b className="font-semibold text-[#16181A] tabular-nums">{y.portions}×</b></span>
                         : <span className="text-wait-ink">{t('Chybí velikost balení — porce ani cenu nespočítám.')}</span>)}
                       {y?.perPortion != null && <span>{t('· surovina za porci')} <b className="font-semibold text-[#16181A] tabular-nums">{cena(y.perPortion)}</b></span>}
                       {num(ing.amount) > 0 && y?.perPortion == null && !(Number(item.unitCost) > 0) && <span className="text-wait-ink">{t('· chybí cena za balení')}</span>}

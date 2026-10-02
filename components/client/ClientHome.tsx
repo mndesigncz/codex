@@ -130,7 +130,7 @@ function BizList({ title, items, today }: { title: string; items: Biz[]; today: 
                 </div>
               </div>
               <div className={`mt-3 flex flex-wrap gap-1.5 text-xs`}>
-                {b.address && <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${b.coverUrl ? 'bg-white/15 text-white/90' : 'bg-black/[0.05] text-black/60'}`}><Icon name="location" size={12} />{b.address}</span>}
+                {b.address && <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 min-w-0 max-w-full ${b.coverUrl ? 'bg-white/15 text-white/90' : 'bg-black/[0.05] text-black/60'}`}><Icon name="location" size={12} className="shrink-0" /><span className="min-w-0 break-words">{b.address}</span></span>}
                 {b.reservationsOn && <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${b.coverUrl ? 'bg-white/15 text-white/90' : 'bg-[#C8F542]/15 text-[#5B7A08]'}`}><Icon name="calendarCheck" size={12} />{t('Rezervace')}</span>}
                 {b.loyaltyOn && <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${b.coverUrl ? 'bg-white/15 text-white/90' : 'bg-[#C8F542]/15 text-[#5B7A08]'}`}><Icon name="gift" size={12} />{t('Věrnost')}</span>}
                 {b.orderingOn && <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ${b.coverUrl ? 'bg-white/15 text-white/90' : 'bg-[#C8F542]/15 text-[#5B7A08]'}`}><Icon name="cup" size={12} />{t('Od stolu')}</span>}

@@ -16,6 +16,7 @@ import { pocetZPole } from '@/lib/inventura';
 import { sloupecJeDesetinny } from '@/lib/cenaSloupce';
 import { cenaZDb } from '@/lib/cena';
 import { ensureProductionTasks } from '@/lib/production';
+import { nactiBaleniKategorii, baleniRadku } from '@/lib/baleniKategorii';
 
 export const dynamic = 'force-dynamic';
 
@@ -80,7 +81,7 @@ export async function POST() {
     let items: any[];
     try {
       items = await sql`
-        SELECT id, name, category, quantity, unit, package_size, open_amount, content_unit, unit_cost
+        SELECT id, name, category, category_id, quantity, unit, package_size, open_amount, content_unit, unit_cost
         FROM inventory_items
         WHERE team_id = ${u.team_id} AND archived IS NOT TRUE AND (approved IS DISTINCT FROM FALSE)
         ORDER BY category ASC NULLS LAST, name ASC`;
@@ -90,13 +91,18 @@ export async function POST() {
         WHERE team_id = ${u.team_id}
         ORDER BY name ASC`;
     }
+    // Velikost balení a jednotka obsahu zděděné z kategorie: bez nich by se u
+    // láhve s balením z kategorie počítaly jen celé kusy a zbytek v načatém by
+    // v inventuře chyběl.
+    const baleniKat = await nactiBaleniKategorii(u.team_id);
     const data = (items as any[]).map(i => {
-      const pkg = Number(i.package_size) || 0;
+      const baleni = baleniRadku(i, baleniKat);
+      const pkg = baleni.packageSize ?? 0;
       return {
         itemId: Number(i.id), name: String(i.name), category: i.category ?? null,
         unit: i.unit ?? 'ks', expected: Number(i.quantity) || 0, counted: null,
         packageSize: pkg > 0 ? pkg : null,
-        contentUnit: i.content_unit ?? null,
+        contentUnit: baleni.contentUnit,
         expectedOpen: pkg > 0 ? Number(i.open_amount) || 0 : null,
         countedOpen: null,
         unitCost: cenaZDb(i.unit_cost),

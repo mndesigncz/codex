@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
+import { menaPodniku } from '@/lib/menaPodniku';
 import { pozaduj, jeOdpoved, clenoveSOpravnenim, type Kontext } from '@/lib/opravneniDb';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
-import { cashDifference, czk, normalizeMovements, normalizeDenominations, normalizeHandover, ShiftPerson } from '@/lib/closing';
+import { cashDifference, normalizeMovements, normalizeDenominations, normalizeHandover, ShiftPerson } from '@/lib/closing';
 import { dayPlus, pragueToday } from '@/lib/pragueTime';
 import { denSmeny, zavreneDnyTydne, smenaBezUzaverky } from '@/lib/staleShifts';
 import { mzdaZaSmenu } from '@/lib/mzdaSmeny';
@@ -578,6 +579,8 @@ export async function POST(request: Request) {
     if (employers.length) {
       const [author] = await sql`SELECT name FROM users WHERE id = ${actorId}`;
       const diff = cashDifference({ ...(row as any), tips_in_drawer: tipsInDrawer });
+      // Částka v měně podniku, ne natvrdo v korunách.
+      const czk = (await menaPodniku(c.teamId)).money;
       const verdict = diff === 0 ? 'kasa sedí' : diff > 0 ? `přebytek +${czk(diff)}` : `manko ${czk(diff)}`;
       const name = author?.name ?? 'Zaměstnanec';
       await Promise.allSettled(employers.map(eid => notifyUser(eid, {
@@ -586,6 +589,7 @@ export async function POST(request: Request) {
           ? `${name} odeslal uzávěrku (${row.date}) — ${verdict}.`
           : `${name} odeslal uzávěrku (${row.date}) bez směny — schval ji v Uzávěrkách.`,
         type: approved ? (diff < 0 ? 'warning' : 'info') : 'warning',
+        category: 'closing',
         link: '/employer/overview?view=reports',
       })));
     }
@@ -654,7 +658,7 @@ export async function POST(request: Request) {
 
         try {
           const [author] = await sql`SELECT name FROM users WHERE id = ${actorId}`;
-          await notifyUser(cid, { title: 'Uzávěrka za tebe', body: `${author?.name ?? 'Kolega'} vyplnil uzávěrku i za tebe (${shiftDate}).`, type: 'info', link: '/employee/shifts?view=closing' });
+          await notifyUser(cid, { title: 'Uzávěrka za tebe', body: `${author?.name ?? 'Kolega'} vyplnil uzávěrku i za tebe (${shiftDate}).`, type: 'info', category: 'closing', link: '/employee/shifts?view=closing' });
         } catch { /* best-effort */ }
       } catch { /* skip this coworker */ }
     }

@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
       title: 'Žádost o volno',
       body: `${jmeno}: ${from === to ? from : `${from} až ${to}`}`,
       type: 'info',
-      category: 'shift',
+      category: 'timeoff',
       link: '/employer/overview?view=shifts',
     });
   } catch { /* best-effort */ }
@@ -135,7 +135,7 @@ export async function PATCH(req: NextRequest) {
         : '🗓️ Upravený termín volna',
       body: `${row.from_date === row.to_date ? row.from_date : `${row.from_date} až ${row.to_date}`}${datesChanged && status ? ' (termín upraven vedením)' : ''}`,
       type: status === 'approved' ? 'info' : 'warning',
-      category: 'shift',
+      category: 'timeoff',
       link: '/employee/shifts?view=availability',
     });
   } catch { /* best-effort */ }
@@ -161,7 +161,7 @@ export async function DELETE(req: NextRequest) {
         await notifyUser(row.employee_id, {
           title: '🗓️ Volno zrušeno vedením',
           body: `${row.from_date === row.to_date ? row.from_date : `${row.from_date} až ${row.to_date}`} — kdyby to nesedělo, ozvi se vedení.`,
-          type: 'warning', category: 'shift', link: '/employee/shifts?view=availability',
+          type: 'warning', category: 'timeoff', link: '/employee/shifts?view=availability',
         });
       } catch { /* best-effort */ }
     }

@@ -19,7 +19,7 @@ export const fetchCache = 'force-no-store';
 async function upozorni(teamId: number, payload: { title: string; body?: string; link?: string; type?: string }) {
   try {
     const ids = await clenoveSOpravnenim(teamId, 'rezervace.schvalovat');
-    if (ids.length) await notifyUsers(ids, { ...payload, category: 'general' });
+    if (ids.length) await notifyUsers(ids, { ...payload, category: 'booking' });
   } catch { /* bez upozornění */ }
 }
 

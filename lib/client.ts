@@ -101,14 +101,14 @@ export async function profileBySlug(slug: string): Promise<any | null> {
   if (!s) return null;
   try {
     const [row] = await sql`
-      SELECT p.*, t.name AS team_name, t.opening_hours, t.share_theme, t.currency
+      SELECT p.*, t.name AS team_name, t.opening_hours, t.share_theme, t.currency, t.locale
       FROM client_profiles p JOIN teams t ON t.id = p.team_id
       WHERE p.slug = ${s} AND p.enabled = TRUE AND t.blocked_at IS NULL`;
     return row ?? null;
   } catch {
     // Databáze před migrací správy platformy: sloupec blocked_at ještě není.
     const [row] = await sql`
-      SELECT p.*, t.name AS team_name, t.opening_hours, t.share_theme, t.currency
+      SELECT p.*, t.name AS team_name, t.opening_hours, t.share_theme, t.currency, t.locale
       FROM client_profiles p JOIN teams t ON t.id = p.team_id
       WHERE p.slug = ${s} AND p.enabled = TRUE`;
     return row ?? null;

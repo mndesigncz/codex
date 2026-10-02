@@ -8,7 +8,8 @@ import { checkCron } from '@/lib/cronAuth';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser, notifyUsers } from '@/lib/push';
 import { sendDigestEmail } from '@/lib/email';
-import { cashDifference, czk } from '@/lib/closing';
+import { cashDifference } from '@/lib/closing';
+import { menaPodniku } from '@/lib/menaPodniku';
 import { pragueToday } from '@/lib/pragueTime';
 import { escHtml } from '@/lib/email';
 import { tymyCiselnikuHromadne } from '@/lib/tenant';
@@ -44,8 +45,17 @@ export async function GET(request: Request) {
       // (kolo 62) platí dál: kdo je přepnutý jinam, souhrn dostane.
       const ids = await clenoveSOpravnenim(Number(team.id), 'notifikace.denni_souhrn');
       if (!ids.length) continue;
-      const employers = await sql`SELECT id, email FROM users WHERE id = ANY(${ids}::int[])` as any[];
+      // Kdo si denní souhrn osobně vypnul (Nastavení → Notifikace, notif_prefs.digest = false), ho nedostane.
+      // Před migrací sloupce notif_prefs dostanou souhrn všichni jako dřív.
+      let employers: any[];
+      try {
+        employers = await sql`SELECT id, email FROM users WHERE id = ANY(${ids}::int[]) AND COALESCE(notif_prefs->>'digest', '') <> 'false'` as any[];
+      } catch {
+        employers = await sql`SELECT id, email FROM users WHERE id = ANY(${ids}::int[])` as any[];
+      }
       if (!employers.length) continue;
+      // Částky v souhrnu jsou v měně podniku (eurová kavárna nečte koruny).
+      const czk = (await menaPodniku(Number(team.id))).money;
 
       // --- closings today ---
       let closings: any[] = [];

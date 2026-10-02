@@ -40,7 +40,7 @@ export function ErrorState({ title, hint, onRetry, detail, compact = false, clas
       )}
       {detail && (
         <details className="mt-4 max-w-full">
-          <summary className="text-[11px] uppercase tracking-wider text-black/35 cursor-pointer select-none">{t('Technický detail')}</summary>
+          <summary className="text-[11px] uppercase tracking-wider text-black/35 cursor-pointer select-none py-3.5 -my-2.5">{t('Technický detail')}</summary>
           <p className="mt-2 text-[11px] text-black/45 font-mono break-all max-w-sm">{detail}</p>
         </details>
       )}

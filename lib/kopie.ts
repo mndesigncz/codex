@@ -59,7 +59,9 @@ export function premapujKroky(
     if (k.itemId == null) return { text: k.text };
     const nazev = nazvyZdroje.get(k.itemId);
     const noveId = premapujPodleNazvu(nazev, cil);
-    if (noveId != null) return { text: k.text, itemId: noveId, amount: k.amount ?? null, unit: k.unit ?? null };
+    if (noveId != null) // `zadano` se kopíruje s množstvím: bez něj by se krok četl jako starý
+    // (množství v jednotce položky pod popiskem jiné jednotky).
+    return { text: k.text, itemId: noveId, amount: k.amount ?? null, unit: k.unit ?? null, ...(k.zadano != null ? { zadano: k.zadano } : {}) };
     // Položka zdroje mohla být mezitím smazaná — pak ani nevíme, jak se jmenovala.
     poznamky.push(nazev
       ? `Krok „${kratce(k.text)}": surovina „${nazev}" v tomhle podniku není — odpojeno.`

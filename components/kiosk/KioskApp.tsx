@@ -7,6 +7,7 @@ import PosTick from '../PosTick';
 import StaffInbox, { useStaffInbox } from '../client/StaffInbox';
 import { Modal, Button, Badge } from '../ui';
 import KioskInventory from './KioskInventory';
+import KioskNastaveni from './KioskNastaveni';
 import KioskTasks from './KioskTasks';
 import Procedures from '../procedures/Procedures';
 import Guides from '../Guides';
@@ -21,7 +22,7 @@ import { NavigaceKontext, useHodnotaNavigace } from '../widgety/NavigaceKontext'
 import { otevriPostupPoPrechodu } from '@/lib/otevriPostup';
 import type { PohledNavigace } from '@/lib/widgety/typy';
 import { useJazyk, useT } from '@/lib/i18n/client';
-import { fmtDatum } from '@/lib/i18n/format';
+import { fmtDatum, fmtHM } from '@/lib/i18n/format';
 import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
 import {
   KioskShiftProvider, KioskShiftGate, WhoIsWorking, ActivePersonChip,
@@ -109,6 +110,7 @@ function KioskShell({ user }: { user: KioskUser }) {
   const { active, onShift, selectPerson, requireActive } = useKioskShift();
   const [tab, setTab] = useState<IdZalozky>('shift');
   const [confirmSignOut, setConfirmSignOut] = useState(false);
+  const [nastaveniOtevreno, setNastaveniOtevreno] = useState(false);
   // Počet nových objednávek od stolu do záložky — tablet na baru je první, kdo je má vidět.
   const inbox = useStaffInbox(true);
   const newOrders = Number(inbox.d?.newCount ?? 0);
@@ -192,7 +194,8 @@ function KioskShell({ user }: { user: KioskUser }) {
     return () => { document.body.classList.remove('kiosk-surface'); };
   }, []);
 
-  const clock = now ? new Date(now).toLocaleTimeString(LOCALE_PRO_JAZYK[jazyk], { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit' }) : '—:—';
+  // Hodiny jdou podle formátu času: osobní volba přebíjí podnik (teams.time_format), na tabletu tedy platí nastavení podniku.
+  const clock = now ? fmtHM(new Date(now).toLocaleTimeString(LOCALE_PRO_JAZYK[jazyk], { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit' })) : '—:—';
   // Datum musí jít stejným pásmem jako hodiny: tablet v UTC by ve 0:30 pražského času ukázal půlnoční hodiny a včerejší datum.
   const dateStr = now ? fmtDatum(now, { jazyk, styl: 'denDlouze' }) : '\u00a0';
   const popisekObjednavek = t('Nové objednávky: {n}', { n: newOrders });
@@ -223,6 +226,9 @@ function KioskShell({ user }: { user: KioskUser }) {
           {/* Odhlášení tabletu je pro obsluhu slepá ulička: e-mail ani heslo
               zařízení nikdo z baru nezná, takže jedno ťuknutí znamená tablet
               mimo provoz do příchodu vedení. Proto se ptáme. */}
+          {/* Nastavení tabletu (jazyk, motiv, písmo): jen ikona, ať obsluhu u baru nic nezdržuje. Platí jen pro tenhle tablet. */}
+          <Button variant="ghost" iconOnly icon="globe" aria-label={t('Nastavení tabletu')} title={t('Nastavení tabletu')}
+            className="shrink-0" onClick={() => setNastaveniOtevreno(true)} />
           <Button variant="secondary" iconOnly icon="logout" aria-label={t('Odhlásit tablet')} title={t('Odhlásit tablet')}
             className="shrink-0" onClick={() => setConfirmSignOut(true)} />
         </div>
@@ -312,6 +318,8 @@ function KioskShell({ user }: { user: KioskUser }) {
       )}
 
       <MessengerDock user={kioskUser} />
+
+      <KioskNastaveni open={nastaveniOtevreno} onClose={() => setNastaveniOtevreno(false)} />
 
       <Modal open={confirmSignOut} onClose={() => setConfirmSignOut(false)} size="sm"
         title={t('Odhlásit tablet?')}

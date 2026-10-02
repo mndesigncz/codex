@@ -56,3 +56,15 @@ export function hromadneCislo(v: unknown): { ok: true; hodnota: number | null } 
   const p = pocetZPole(v, true);
   return p.ok ? { ok: true, hodnota: p.hodnota } : { ok: false };
 }
+
+/**
+ * Množství nebo práh z těla požadavku připravené k zápisu do sloupce: tam, kde
+ * je NUMERIC, na tři desetinná místa; kde je ještě INTEGER, na celé číslo
+ * (databáze by desetinu odmítla). Nesmysl a záporné číslo je 0.
+ */
+export function mnozstviKZapisu(raw: unknown, desetinny: boolean): number {
+  const n = Number(String(raw ?? '').replace(',', '.'));
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  const v = Math.min(n, STROP);
+  return desetinny ? round3(v) : Math.round(v);
+}

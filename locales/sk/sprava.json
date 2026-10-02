@@ -56,6 +56,8 @@
   "Cena musí být číslo, třeba 4,99.": "Cena musí byť číslo, napríklad 4,99.",
   "Cena v bodech": "Cena v bodoch",
   "Cena za jednotku": "Cena za jednotku",
+  "Cena za balení": "Cena za balenie",
+  "Cena (za balení, jinak za jednotku)": "Cena (za balenie, inak za jednotku)",
   "Cena — {nazev} ({mena})": "Cena — {nazev} ({mena})",
   "Chybí položka? Uprav nabídku v Menu": "Chýba položka? Uprav ponuku v Menu",
   "Chybí uzávěrka": "Chýba uzávierka",
@@ -1462,5 +1464,7 @@
   "„{nazev}\" zmizí z tabule. Vrátit to nepůjde.": "„{nazev}“ zmizne z tabule. Vrátiť to nepôjde.",
   "„{nazev}\" zmizí ze seznamu i z přehledu týmu.": "„{nazev}“ zmizne zo zoznamu aj z prehľadu tímu.",
   "„{nazev}“ přidáno, ale kasa u něj nedala cenu — doplň ji ručně.": "„{nazev}“ pridané, ale pokladňa k nemu nedala cenu — doplň ju ručne.",
-  "…a dalších {n}": "…a ďalších {n}"
+  "…a dalších {n}": "…a ďalších {n}",
+  "Tahle jednotka se eviduje v celých číslech — zapiš celé číslo.": "Táto jednotka sa eviduje v celých číslach — zapíš celé číslo.",
+  "Množství a limity musí být čísla.": "Množstvo a limity musia byť čísla."
 }

@@ -125,7 +125,8 @@ export default function BusinessPage({ slug }: { slug: string }) {
               {b.tagline && <p className={`mt-1.5 text-base sm:text-lg leading-snug text-pretty max-w-[40ch] ${b.coverUrl ? 'text-white/85' : 'text-black/65'}`}>{b.tagline}</p>}
               <p className={`mt-2 text-sm flex flex-wrap items-center gap-x-3 gap-y-1 ${b.coverUrl ? 'text-white/75' : 'text-black/55'}`}>
                 <span className="inline-flex items-center gap-1.5"><Icon name="clock" size={15} />{t('Dnes {hodiny}', { hodiny: hoursLabel(b.hours, today, cs => t(cs)) })}</span>
-                {b.address && <span className="inline-flex items-center gap-1.5"><Icon name="location" size={15} />{b.address}</span>}
+                {/* Adresu píše podnik: dlouhé slovo bez mezer jinak přeteče přes okraj (rodič má overflow-hidden a text uřízne). */}
+                {b.address && <span className="inline-flex items-center gap-1.5 min-w-0 max-w-full"><Icon name="location" size={15} className="shrink-0" /><span className="min-w-0 break-words">{b.address}</span></span>}
               </p>
               {/* Tady dřív stály pilulky „Rezervovat / Objednat od stolu /
                   Kartička a kupony". Volaly přesně totéž co přepínač
@@ -257,7 +258,7 @@ function MenuTab({ menu, news, events, gallery, accent, tagline, address, descri
       <aside className="space-y-5 md:sticky md:top-24">
         {tagline && <p className="text-base font-semibold tracking-tight text-pretty">{tagline}</p>}
         {description && <p className="text-sm text-black/65 leading-relaxed text-pretty">{description}</p>}
-        {address && <p className="text-sm text-black/65 inline-flex items-center gap-1.5"><Icon name="location" size={15} className="text-black/45" />{address}</p>}
+        {address && <p className="text-sm text-black/65 inline-flex items-center gap-1.5 max-w-full"><Icon name="location" size={15} className="text-black/45 shrink-0" /><span className="min-w-0 break-words">{address}</span></p>}
         <div>
           {(news?.length ?? 0) > 0 && (
             <div className="mb-5">

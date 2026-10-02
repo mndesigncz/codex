@@ -56,6 +56,8 @@
   "Cena musí být číslo, třeba 4,99.": "The price must be a number, e.g. 4.99.",
   "Cena v bodech": "Price in points",
   "Cena za jednotku": "Price per unit",
+  "Cena za balení": "Price per package",
+  "Cena (za balení, jinak za jednotku)": "Price (per package, otherwise per unit)",
   "Cena — {nazev} ({mena})": "Price — {nazev} ({mena})",
   "Chybí položka? Uprav nabídku v Menu": "An item is missing? Edit the offer in Menu",
   "Chybí uzávěrka": "Missing closing",
@@ -1462,5 +1464,7 @@
   "„{nazev}\" zmizí z tabule. Vrátit to nepůjde.": "“{nazev}” will disappear from the board. This cannot be undone.",
   "„{nazev}\" zmizí ze seznamu i z přehledu týmu.": "“{nazev}” will disappear from the list and from the team overview.",
   "„{nazev}“ přidáno, ale kasa u něj nedala cenu — doplň ji ručně.": "“{nazev}” was added, but the register gave no price for it — fill it in manually.",
-  "…a dalších {n}": "…and {n} more"
+  "…a dalších {n}": "…and {n} more",
+  "Tahle jednotka se eviduje v celých číslech — zapiš celé číslo.": "This unit is tracked in whole numbers — enter a whole number.",
+  "Množství a limity musí být čísla.": "Quantity and limits must be numbers."
 }

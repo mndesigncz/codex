@@ -13,22 +13,18 @@ import type { GuideStep } from '@/lib/guideSteps';
 import NewIngredientInline from '../inventory/NewIngredientInline';
 import { useT } from '@/lib/i18n/client';
 import { useLocale } from '../employer/jazyk';
+import { baleniPolozky, jednotkaPolozky } from '@/lib/packaging';
+import { nabidkaJednotek } from '@/lib/jednotky';
+import { mnozstviKroku, zadaneMnozstvi } from '@/lib/guideSteps';
 
-/** Jednotky nabízené podle toho, v čem je položka vedená. */
-const UNIT_SETS: Record<string, string[]> = {
-  l: ['ml', 'cl', 'dl', 'l'],
-  kg: ['g', 'dkg', 'kg'],
-  ks: ['ks'],
+/** Číslo z textu pole (česká čárka i tečka); prázdné nebo nesmysl = nezadáno. */
+const dec = (v: string): number | null => {
+  const n = Number(String(v).trim().replace(',', '.'));
+  return v.trim() !== '' && Number.isFinite(n) && n > 0 ? n : null;
 };
 
-function familyOf(item: any): 'l' | 'kg' | 'ks' {
-  const u = String(item?.contentUnit ?? item?.unit ?? '').toLowerCase();
-  if (['l', 'ml', 'cl', 'dl', 'litr'].includes(u)) return 'l';
-  if (['kg', 'g', 'dkg'].includes(u)) return 'kg';
-  return 'ks';
-}
-
-const dec = (v: string) => Number(String(v).replace(',', '.')) || 0;
+/** Číslo do pole s českou čárkou. */
+const doPole = (n: number | null) => (n == null ? '' : String(n).replace('.', ','));
 
 export default function GuideStepIngredient({ step, items, categories, onChange, onItemCreated }: {
   step: GuideStep;
@@ -42,7 +38,18 @@ export default function GuideStepIngredient({ step, items, categories, onChange,
   const cena = usePrice();
   const [creating, setCreating] = useState(false);
   const item = items.find(i => String(i.id) === String(step.itemId));
-  const units = UNIT_SETS[familyOf(item)];
+  // Množství se ukládá v jednotce položky (v ní je balení, cena i stav skladu);
+  // zadat se dá v kterékoli jednotce téže rodiny a převede se.
+  const itemUnit = item ? jednotkaPolozky(item) : null;
+  const units = nabidkaJednotek(itemUnit);
+  const zadane = zadaneMnozstvi(step, itemUnit);
+  const [text, setText] = useState(doPole(zadane.hodnota));
+  // Pole drží vlastní text (jinak by „0," zmizelo čárku); z kroku se přebírá
+  // jen tehdy, když se hodnota změnila zvenčí.
+  const shown = (dec(text) ?? 0) === (zadane.hodnota ?? 0) ? text : doPole(zadane.hodnota);
+  const aktivniJednotka = zadane.unit ?? '';
+  const zapis = (n: number | null, unit: string | null) =>
+    onChange(mnozstviKroku(n, unit, itemUnit));
 
   if (creating) {
     return (
@@ -51,7 +58,7 @@ export default function GuideStepIngredient({ step, items, categories, onChange,
         onCancel={() => setCreating(false)}
         onCreated={(created) => {
           onItemCreated(created);
-          onChange({ itemId: created.id, unit: created.contentUnit ?? created.unit ?? null });
+          onChange({ itemId: created.id, ...mnozstviKroku(dec(text), jednotkaPolozky(created), jednotkaPolozky(created)) });
           setCreating(false);
         }}
       />
@@ -66,10 +73,9 @@ export default function GuideStepIngredient({ step, items, categories, onChange,
           value={step.itemId ?? ''}
           onChange={e => {
             const next = items.find(i => String(i.id) === e.target.value);
-            onChange({
-              itemId: e.target.value ? Number(e.target.value) : null,
-              unit: next ? (next.contentUnit ?? next.unit ?? null) : null,
-            });
+            // Jednotka se vrací na jednotku nové položky; zadané číslo zůstává.
+            const nextUnit = next ? jednotkaPolozky(next) : null;
+            onChange({ itemId: e.target.value ? Number(e.target.value) : null, ...mnozstviKroku(dec(text), nextUnit, nextUnit) });
           }}
           aria-label={t('Surovina ze skladu')}
           className="field flex-1 min-w-[160px] max-w-[22rem]">
@@ -78,16 +84,16 @@ export default function GuideStepIngredient({ step, items, categories, onChange,
         </select>
         <input
           inputMode="decimal"
-          value={step.amount == null ? '' : String(step.amount).replace('.', ',')}
-          onChange={e => onChange({ amount: e.target.value === '' ? null : dec(e.target.value) })}
+          value={shown}
+          onChange={e => { setText(e.target.value); zapis(dec(e.target.value), aktivniJednotka || itemUnit); }}
           placeholder="0,04"
           aria-label={t('Množství suroviny')}
           className="field !w-24 text-center tabular-nums"
         />
         <div className="flex gap-1">
           {units.map(u => (
-            <button key={u} type="button" onClick={() => onChange({ unit: u })} aria-pressed={(step.unit ?? '') === u}
-              className={`filter-pill tap-target ${(step.unit ?? '') === u ? 'seg-on' : 'seg-off glass'}`}>
+            <button key={u} type="button" onClick={() => zapis(dec(text), u)} aria-pressed={aktivniJednotka === u}
+              className={`filter-pill tap-target ${aktivniJednotka === u ? 'seg-on' : 'seg-off glass'}`}>
               {u}
             </button>
           ))}
@@ -105,9 +111,9 @@ export default function GuideStepIngredient({ step, items, categories, onChange,
           <Icon name="plus" size={13} />  {t('Sklad ji ještě nezná — založit')}
         </button>
       )}
-      {item && Number(item.packageSize) > 0 && (
+      {item && baleniPolozky(item).packageSize != null && (
         <p className="t-meta">
-          {t('Balení {mnozstvi} {jednotka}', { mnozstvi: Number(item.packageSize).toLocaleString(loc), jednotka: item.contentUnit ?? item.unit })}
+          {t('Balení {mnozstvi} {jednotka}', { mnozstvi: Number(baleniPolozky(item).packageSize).toLocaleString(loc), jednotka: itemUnit })}
           {Number(item.unitCost) > 0 ? ` · ${cena(Number(item.unitCost))}` : ` · ${t('cena chybí')}`}
         </p>
       )}

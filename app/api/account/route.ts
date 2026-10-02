@@ -6,6 +6,7 @@ import bcrypt from 'bcryptjs';
 import { hit, clear } from '@/lib/rateLimit';
 import { smazUcet, hesloSedi } from '@/lib/smazaniUctuDb';
 import { cistyJazyk } from '@/lib/i18n/config';
+import { cistePrefsUctu } from '@/lib/nastaveniUcet';
 
 export const dynamic = 'force-dynamic';
 
@@ -88,7 +89,7 @@ export async function PATCH(request: Request) {
   if (name !== undefined && String(name).trim() === '') {
     return NextResponse.json({ error: 'Jméno nesmí být prázdné.' }, { status: 400 });
   }
-  if (theme !== undefined && theme !== 'light' && theme !== 'dark') {
+  if (theme !== undefined && theme !== 'light' && theme !== 'dark' && theme !== 'system') {
     return NextResponse.json({ error: 'Neplatný motiv vzhledu.' }, { status: 400 });
   }
 
@@ -106,7 +107,7 @@ export async function PATCH(request: Request) {
   if (notifPrefs && typeof notifPrefs === 'object') {
     try {
       const [cur] = await sql`SELECT notif_prefs FROM users WHERE id = ${id}`;
-      const merged = { ...DEFAULT_NOTIF_PREFS, ...(cur?.notif_prefs ?? {}), ...notifPrefs };
+      const merged = { ...DEFAULT_NOTIF_PREFS, ...(cur?.notif_prefs ?? {}), ...cistePrefsUctu(notifPrefs) };
       await sql`UPDATE users SET notif_prefs = ${JSON.stringify(merged)}::jsonb WHERE id = ${id}`;
     } catch { /* column not migrated yet — ignore until /api/init runs */ }
   }

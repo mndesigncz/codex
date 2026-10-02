@@ -7,7 +7,7 @@
 // z widgetu na pohled, který tablet nezná, a návrat ručních kopií, které balík
 // nahradil sdílenými komponentami (confirm(), ruční přepínač, limetka v chatu).
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import type { Testy } from './_testy.ts';
 import { STRANKA } from '../../lib/widgety/stranky/kiosk.smena.ts';
 import { stranka } from '../../lib/widgety/stranky/index.ts';
@@ -96,11 +96,14 @@ export default function ({ eq, ok }: Testy) {
 
   // ---- nastavení ----
   const nast = bezKomentaru(precti('components/Settings.tsx'));
-  ok('Nastavení: PageHeader místo vlastní hlavičky', nast.includes('<PageHeader title="Nastavení"') && !nast.includes('<h1 className="t-page">'));
-  ok('Nastavení: bez ručního přepínače Toggle (SwitchRow)', !/function Toggle\b/.test(nast) && !nast.includes('<Toggle ') && (nast.match(/<SwitchRow /g) ?? []).length >= 5);
+  // Od kola 73 jsou sekce Nastavení ve vlastních souborech (components/settings/): přepínače a motiv hledáme ve všech.
+  const nastSekce = readdirSync('components/settings').filter(f => f.endsWith('.tsx')).map(f => bezKomentaru(precti(`components/settings/${f}`))).join('\n');
+  const nastCelek = nast + '\n' + nastSekce;
+  ok('Nastavení: PageHeader místo vlastní hlavičky', /<PageHeader title=(?:"Nastavení"|\{t\('Nastavení'\)\})/.test(nast) && !nast.includes('<h1 className="t-page">'));
+  ok('Nastavení: bez ručního přepínače Toggle (SwitchRow)', !/function Toggle\b/.test(nastCelek) && !nastCelek.includes('<Toggle ') && (nastCelek.match(/<SwitchRow /g) ?? []).length >= 5);
   ok('Nastavení: bez nativního confirm()', !/\bconfirm\(/.test(nast));
   ok('Nastavení: bez ručně psané limetky (primaryBtn, btn-accent)', !nast.includes('primaryBtn') && !nast.includes('btn-accent') && !/bg-\[#C8F542\](?!\/)/.test(nast));
-  ok('Nastavení: motiv přes Segmented, ne dvě limetkové volby', nast.includes('ariaLabel="Motiv aplikace"') || nast.includes("ariaLabel={t('Motiv aplikace')}"));
+  ok('Nastavení: motiv přes Segmented, ne dvě limetkové volby', nastCelek.includes('ariaLabel="Motiv aplikace"') || nastCelek.includes("ariaLabel={t('Motiv aplikace')}"));
   ok('Nastavení: úspěch pokladny nese tón, ne „✓" v textu', !nast.includes('✓') && nast.includes("posMsg.ok ? 'note-ok' : 'note-danger'"));
   ok('Nastavení: preference směn bez emoji', !/🌅|🌆|🔄/.test(nast));
   ok('Nastavení: statistiky pokladny přes Stat/StatRow', (nast.match(/<Stat label=/g) ?? []).length === 4);

@@ -32,8 +32,10 @@ const SIZE: Record<ButtonSize, string> = {
   lg: 'h-12 px-6 text-[15px] gap-2',
 };
 
-// Kulaté tlačítko jen s ikonou má stejné výšky, ale je čtvercové.
-const ICON_ONLY: Record<ButtonSize, string> = { sm: 'h-9 w-9 px-0', md: 'h-11 w-11 px-0', lg: 'h-12 w-12 px-0' };
+// Kulaté tlačítko jen s ikonou má stejné výšky, ale je čtvercové. `shrink-0`: vedle pole (`w-full`)
+// v řádku by se jinak smrštilo — na 320 px z 36 na 25 px široký „Vložit bod" a „Odebrat bod" v úkolu,
+// tedy ne čtverec a hůř trefitelné.
+const ICON_ONLY: Record<ButtonSize, string> = { sm: 'h-9 w-9 px-0 shrink-0', md: 'h-11 w-11 px-0 shrink-0', lg: 'h-12 w-12 px-0 shrink-0' };
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;

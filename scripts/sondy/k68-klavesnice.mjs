@@ -129,6 +129,8 @@ const odkaz = p.locator('[data-plocha] li[data-instance="pokladna-dnes"] button'
 if (await odkaz.count()) {
   await odkaz.focus();
   await p.keyboard.press('Shift+F10');
+  // Menu se vykreslí až po klávese: bez čekání se položky čtou dřív, než existují (občas []).
+  await p.getByRole('menu').getByRole('menuitem').first().waitFor({ timeout: 2000 }).catch(() => {});
   const t = (await p.getByRole('menu').getByRole('menuitem').allInnerTexts().catch(() => [])).map(s => s.trim());
   tvrdi('klid: Shift+F10 uvnitř widgetu otevře jeho menu', t.includes('Upravit stránku'), JSON.stringify(t));
   await p.keyboard.press('Escape');

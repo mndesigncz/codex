@@ -8,7 +8,8 @@ import { sql, customer, profileBySlug, publicProfile, membership } from '@/lib/c
 import { activeCampaigns, progressFor } from '@/lib/stamps';
 import { shapeCoupon, windowOk, ageFrom, TIER_LABELS } from '@/lib/coupons';
 import { pragueToday, pragueHM } from '@/lib/pragueTime';
-import { buildBoard, publicShape } from '@/lib/menu';
+import { buildBoard, publicShape, menaListku } from '@/lib/menu';
+import { menaZRadku } from '@/lib/mena';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -18,7 +19,7 @@ export const fetchCache = 'force-no-store';
  * bez id produktu z pokladny — to si objednávka dohledá podle id položky).
  * Tvar drží stránka hosta i objednávka: sections[].items[].
  */
-async function menuFor(teamId: number, menuSlug: string | null, lang: string | null) {
+async function menuFor(teamId: number, menuSlug: string | null, lang: string | null, currency?: string | null) {
   try {
     // Sloupce jazyků, alergenů a překladů (kolo 76) zvlášť a defenzivně: před
     // /api/init nejsou a nabídka se musí ukázat jako dřív, jen česky a bez alergenů.
@@ -54,9 +55,10 @@ async function menuFor(teamId: number, menuSlug: string | null, lang: string | n
     // Překlad, alergeny a věty o nich řeší jedno místo (lib/menu publicShape), stejné jako
     // u veřejného lístku: host vidí v obou stejnou pravdu. Jazyk mimo nabízené = výchozí jazyk lístku.
     const deska = buildBoard(board, sections, items);
-    const pub = publicShape(deska, lang);
+    const pub = publicShape(deska, lang, { currency: currency ?? undefined });
     return {
-      slug: board.slug, name: board.name, currency: board.currency ?? 'Kč',
+      slug: board.slug, name: board.name, // Měna podniku, ne výchozí „Kč" z desky (host eurové kavárny dřív viděl koruny).
+      currency: menaListku(board.currency, currency),
       sections: pub.sekce.map((sec, si) => ({
         id: deska.sections[si].id, title: sec.nadpis,
         items: sec.polozky.map(p => ({
@@ -81,7 +83,7 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
   const today = pragueToday();
 
   const [menu, tables, coupons] = await Promise.all([
-    menuFor(teamId, p.menu_slug ?? null, new URL(req.url).searchParams.get('lang')),
+    menuFor(teamId, p.menu_slug ?? null, new URL(req.url).searchParams.get('lang'), p.currency),
     p.ordering_on ? sql`SELECT id, name, seats, map_x, map_y, map_w, map_h, map_shape, map_rot FROM client_tables WHERE team_id = ${teamId} AND active = TRUE ORDER BY position, id` : Promise.resolve([]),
     p.loyalty_on ? sql`SELECT * FROM client_coupons
                        WHERE team_id = ${teamId} AND active = TRUE AND kind = 'offer' AND (valid_until IS NULL OR valid_until >= ${today})
@@ -201,8 +203,9 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
   // rovnou důvod, proč na kupon teď nedosáhne (okno, úroveň, 18+). Skupiny
   // a limity se doříkají až při vyzvednutí — bez dotazu na každý kupon.
   const hm = pragueHM();
+  const castkaPodniku = menaZRadku(p.currency, p.locale).money;
   const shapedCoupons = (coupons as any[]).map((r: any) => {
-    const s = shapeCoupon(r);
+    const s = shapeCoupon(r, castkaPodniku);
     let blocked: string | null = windowOk(r, { today, hm });
     if (!blocked && mine?.member && s.targetTiers.length && !s.targetTiers.includes(mine.level)) {
       blocked = `Jen pro ${s.targetTiers.map((t: string) => TIER_LABELS[t]).join(' / ')}.`;

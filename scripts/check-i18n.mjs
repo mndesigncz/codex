@@ -37,7 +37,7 @@ import { RES_STATUS, tierFor } from '../lib/clientSlots.ts';
 const JAZYKY = ['en', 'de', 'sk', 'pl'];
 const ROOTS = ['app', 'components', 'lib'];
 /** Kolik `'cs-CZ'` je v kódu mimo výjimky. Klesá s každou dávkou migrace na lib/i18n/format; nesmí růst. */
-const BASELINE_CS_CZ = 139; // −2: ceník na prodejní stránce formátuje ceny podle jazyka (kolo 79)
+const BASELINE_CS_CZ = 136; // −2: ceník na prodejní stránce formátuje ceny podle jazyka (kolo 79)
 /** Natvrdo psané české řetězce v přeložených souborech (soubor → kolik). Nesmí růst; klesá s dalšími dávkami. */
 const BASELINE_NATVRDO = {};
 

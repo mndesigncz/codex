@@ -50,7 +50,7 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
             {/* Na 320 px se značka, dvě záložky a účet do řádku nevešly a stránka
                 se dala odrolovat do strany. Slovo „client" jde na telefonu pryč,
                 celý nápis až pod 360 px — logo zůstává vždy. */}
-            <Link href="/client" className="flex items-center gap-2 shrink-0" aria-label="Managero client">
+            <Link href="/client" className="tap-target flex items-center gap-2 shrink-0" aria-label="Managero client">
               <LogoMark size={32} />
               <span className="hidden min-[360px]:inline font-bold tracking-tight leading-none">Managero <span className="hidden sm:inline text-black/45 font-semibold">client</span></span>
             </Link>

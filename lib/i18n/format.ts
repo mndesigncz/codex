@@ -10,6 +10,7 @@
 // aby se po refaktoru času (plán §9 bod 5) nemuselo sahat na volající.
 
 import { LOCALE_PRO_JAZYK, type Jazyk } from './config.ts';
+import { aktualniDatumVolba, aktualniHodiny, datumVTvaru, hmVTvaru, type DatumVolba } from './osobniFormaty.ts';
 
 export type StylDatumu = 'kratce' | 'dlouze' | 'mesic' | 'denvtydnu' | 'denDlouze' | 'denKratce' | 'cislo';
 
@@ -22,10 +23,18 @@ function naDatum(d: Date | string | number): Date {
   return new Date(d);
 }
 
-export function fmtDatum(d: Date | string | number, o: { jazyk: Jazyk; styl?: StylDatumu; pasmo?: string }): string {
+export function fmtDatum(d: Date | string | number, o: { jazyk: Jazyk; styl?: StylDatumu; pasmo?: string; datum?: DatumVolba }): string {
   const datum = naDatum(d);
   if (Number.isNaN(datum.getTime())) return '';
   const timeZone = o.pasmo ?? PASMO;
+  // Osobní pořadí dne a měsíce (Nastavení → Jazyk a region) platí pro číselná data; dlouhá („12. září") zůstávají podle jazyka.
+  const volbaData = o.datum ?? aktualniDatumVolba();
+  if (volbaData !== 'auto' && (o.styl === undefined || o.styl === 'kratce' || o.styl === 'cislo')) {
+    const jenDenZdroj = typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d);
+    const casti = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: 'numeric', day: 'numeric', timeZone: jenDenZdroj ? 'UTC' : timeZone }).formatToParts(datum);
+    const cislo = (t: string) => Number(casti.find(c => c.type === t)?.value);
+    return datumVTvaru(cislo('year'), cislo('month'), cislo('day'), volbaData, (o.styl ?? 'kratce') === 'kratce');
+  }
   const volby: Record<StylDatumu, Intl.DateTimeFormatOptions> = {
     kratce: { day: 'numeric', month: 'numeric' },
     dlouze: { day: 'numeric', month: 'long', year: 'numeric' },
@@ -43,9 +52,12 @@ export function fmtDatum(d: Date | string | number, o: { jazyk: Jazyk; styl?: St
   return new Intl.DateTimeFormat(LOCALE_PRO_JAZYK[o.jazyk], { ...volby[o.styl ?? 'kratce'], timeZone: jenDen ? 'UTC' : timeZone }).format(datum);
 }
 
-/** „14:30" nebo „2:30 PM". Vstup `HH:MM` se bere jako čas na hodinách podniku, bez převodu pásma. */
+/**
+ * „14:30" nebo „2:30 PM". Vstup `HH:MM` se bere jako čas na hodinách podniku, bez převodu pásma.
+ * Bez `hodiny` rozhoduje osobní volba, jinak formát času podniku (teams.time_format).
+ */
 export function fmtCas(v: Date | string, o: { jazyk: Jazyk; hodiny?: 12 | 24 }): string {
-  const h12 = o.hodiny === 12;
+  const h12 = (o.hodiny ?? aktualniHodiny()) === 12;
   let d: Date;
   let timeZone: string | undefined = PASMO;
   const m = typeof v === 'string' ? /^(\d{1,2}):(\d{2})/.exec(v) : null;
@@ -53,6 +65,14 @@ export function fmtCas(v: Date | string, o: { jazyk: Jazyk; hodiny?: 12 | 24 }):
   else d = v instanceof Date ? v : new Date(v);
   if (Number.isNaN(d.getTime())) return '';
   return new Intl.DateTimeFormat(LOCALE_PRO_JAZYK[o.jazyk], { hour: 'numeric', minute: '2-digit', hour12: h12, timeZone }).format(d);
+}
+
+/**
+ * Čas na zdi („08:00", „08:00:00") v hodinách, které má člověk zvolené (osobní volba přebíjí podnik).
+ * Jen pro ZOBRAZENÍ: logika (řazení, kolize směn) dál pracuje s 24hodinovým „HH:MM".
+ */
+export function fmtHM(v: unknown): string {
+  return hmVTvaru(v, aktualniHodiny());
 }
 
 /** Název dne; `idx` 0 = pondělí (úložná konvence otevírací doby), ne nedělní JS getDay(). */

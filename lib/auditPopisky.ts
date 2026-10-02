@@ -24,6 +24,8 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'kiosk.pin': 'Změna PINu člena',
   'rozlozeni.vychozi': 'Změna výchozího rozložení stránky',
   'onboarding.apply': 'Průvodce nastavením podniku založil předvolby',
+  'klient.import': 'Import členů z jiné aplikace',
+  'klient.import.vraceni': 'Import členů vrácen',
   // role
   'role.create': 'Vytvořena role',
   'role.update': 'Upravena role',
@@ -100,7 +102,7 @@ const POLE_NASTAVENI: Record<string, string> = {
   payDailyCash: 'denní výplata v hotovosti', drawerFloat: 'kasa na začátku', closingRequiresShift: 'uzávěrka jen ve směně',
   payoutFromRegister: 'výplaty z kasy', tipsInDrawer: 'spropitné v kase', laborTargetPct: 'cíl mzdových nákladů',
   levelsConfig: 'úrovně odměn', pointsConfig: 'body odměn', lowStockDefault: 'výchozí nízký stav',
-  criticalStockDefault: 'výchozí kritický stav', address: 'adresa',
+  criticalStockDefault: 'výchozí kritický stav', address: 'adresa', ico: 'IČO', dic: 'DIČ',
   country: 'země', defaultLang: 'jazyk podniku', timeFormat: 'formát času', timezone: 'časové pásmo', navConfig: 'navigace aplikace',
 };
 

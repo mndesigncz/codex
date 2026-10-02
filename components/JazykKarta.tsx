@@ -13,14 +13,18 @@ import { useJazyk, useT } from '@/lib/i18n/client';
 // aby odečítač řekl „jeden z pěti". Bez znovunačtení stránky: provider dotáhne
 // slovníky a přepne stav.
 
-export default function JazykKarta({ onZmena }: { onZmena?: (j: Jazyk) => void }) {
+export default function JazykKarta({ onZmena, jenZarizeni = false }: {
+  onZmena?: (j: Jazyk) => void;
+  /** Jazyk jen pro tohle zařízení (tablet u baru): nezapisuje se na účet, ale je to výslovná volba zařízení. */
+  jenZarizeni?: boolean;
+}) {
   const t = useT();
   const { jazyk, setJazyk } = useJazyk();
   const [zmeneno, setZmeneno] = useState(false);
 
   const vyber = async (j: Jazyk) => {
     if (j === jazyk) return;
-    await setJazyk(j);
+    await setJazyk(j, jenZarizeni ? { ulozit: false, vyslovne: true } : undefined);
     setZmeneno(true);
     onZmena?.(j);
   };

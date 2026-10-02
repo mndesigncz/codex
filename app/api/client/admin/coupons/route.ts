@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/client';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { BENEFITS, shapeCoupon } from '@/lib/coupons';
+import { menaPodniku } from '@/lib/menaPodniku';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -70,8 +71,10 @@ export async function GET() {
       FROM client_groups g WHERE g.team_id = ${u.team_id} ORDER BY g.name, g.id` as any[];
   } catch { groups = []; }
   const groupName = new Map((groups as any[]).map((g: any) => [Number(g.id), String(g.name)]));
+  // Částky v popiscích výhod jsou v měně podniku, ne natvrdo v korunách.
+  const castka = (await menaPodniku(u.team_id)).money;
   const coupons = (rows as any[]).map(r => ({
-    ...shapeCoupon(r),
+    ...shapeCoupon(r, castka),
     claimed: Number(r.claimed) || 0, redeemed: Number(r.redeemed) || 0,
     targetGroupNames: (shapeCoupon(r).targetGroups).map(id => groupName.get(id) ?? `#${id}`),
   }));
@@ -96,7 +99,7 @@ export async function POST(req: NextRequest) {
       ${f.xy_buy}, ${f.xy_free}, ${f.min_order_value}, ${JSON.stringify(f.target_tiers)}::jsonb, ${JSON.stringify(f.target_groups)}::jsonb, ${f.per_customer}, ${f.cooldown_days},
       ${f.days_of_week ? JSON.stringify(f.days_of_week) : null}::jsonb, ${f.hour_from}, ${f.hour_till}, ${f.adult_only}, ${f.welcome}, ${f.valid_since}, ${f.valid_until})
     RETURNING *`;
-  return NextResponse.json({ ok: true, coupon: shapeCoupon(c) });
+  return NextResponse.json({ ok: true, coupon: shapeCoupon(c, (await menaPodniku(u.team_id)).money) });
 }
 
 export async function PATCH(req: NextRequest) {
@@ -110,7 +113,7 @@ export async function PATCH(req: NextRequest) {
   // Rychlé přepnutí aktivity nechá zbytek kuponu na pokoji.
   if (b.title === undefined && b.active !== undefined) {
     const [c] = await sql`UPDATE client_coupons SET active = ${!!b.active} WHERE id = ${id} RETURNING *`;
-    return NextResponse.json({ ok: true, coupon: shapeCoupon(c) });
+    return NextResponse.json({ ok: true, coupon: shapeCoupon(c, (await menaPodniku(u.team_id)).money) });
   }
   const f = fields(b);
   const bad = checkBenefit(f);
@@ -127,7 +130,7 @@ export async function PATCH(req: NextRequest) {
       adult_only = ${f.adult_only}, welcome = ${f.welcome},
       valid_since = ${f.valid_since}, valid_until = ${f.valid_until}
     WHERE id = ${id} RETURNING *`;
-  return NextResponse.json({ ok: true, coupon: shapeCoupon(c) });
+  return NextResponse.json({ ok: true, coupon: shapeCoupon(c, (await menaPodniku(u.team_id)).money) });
 }
 
 export async function DELETE(req: NextRequest) {

@@ -294,7 +294,7 @@ console.log('O5 Smazání účtu');
   }
   // Vlastník podniku s dalšími členy: 409 → vysvětlení → SMAZAT → druhý DELETE s volbou podniku.
   {
-    const { ctx, p, smazani } = await ucet('employer', UA_PROVOZ, '/employer/overview?view=settings&tab=security', [
+    const { ctx, p, smazani } = await ucet('employer', UA_PROVOZ, '/employer/overview?view=settings&tab=privacy', [
       { status: 409, body: { kod: 'VLASTNIK_S_CLENY', error: 'V podniku „Kavárna“ jsou další lidé. Nejdřív předejte vedení, nebo smažte celý podnik i s účtem.' } },
       { status: 200, body: { ok: true, smazanePodniky: 1 } },
     ]);

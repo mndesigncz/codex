@@ -14,13 +14,13 @@ import { useState } from 'react';
 import { Icon } from '../Icons';
 import { useCost, useSymbol } from '../CurrencyProvider';
 import { cenaZFormulare } from '@/lib/cena';
+import { CONTENT_UNITS, vyznamCeny, cenaZaRozumnouJednotku } from '@/lib/jednotky';
 import { tg } from '@/lib/i18n/stav';
 import { useT } from '@/lib/i18n/client';
 
 const field =
   'w-full rounded-2xl bg-white/70 border border-black/[0.08] px-3.5 py-2.5 text-sm text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:outline-none';
 
-const CONTENT_UNITS = ['l', 'ml', 'kg', 'g', 'ks'];
 
 /** Číslo z pole, které snese i desetinnou čárku. */
 const dec = (v: string) => Number(String(v).replace(',', '.')) || 0;
@@ -49,6 +49,10 @@ export default function NewIngredientInline({ categories, onCreated, onCancel }:
 
   const perUnit = dec(packageSize) > 0 && dec(unitCost) > 0
     ? dec(unitCost) / dec(packageSize) : null;
+  // Cena za gram nebo mililitr je zlomek haléře, který nikdo nevyčte: ukáže se za kg / l.
+  const vychazi = perUnit != null ? cenaZaRozumnouJednotku(perUnit, contentUnit) : null;
+  // Cena BALENÍ, když je zadaná velikost balení, jinak cena jednotky (jako všude ve skladu).
+  const cenaZaBaleni = vyznamCeny(packageSize) === 'baleni';
 
   const save = async () => {
     if (!name.trim()) { setErr(t('Napiš, jak se surovina jmenuje.')); return; }
@@ -157,9 +161,9 @@ export default function NewIngredientInline({ categories, onCreated, onCancel }:
           </select>
         </label>
         <label className="space-y-1">
-          <span className="block text-[11px] font-semibold text-black/50">{t('Cena za balení')}</span>
+          <span className="block text-[11px] font-semibold text-black/50">{cenaZaBaleni ? t('Cena za balení') : t('Cena za jednotku')}</span>
           <input inputMode="decimal" value={unitCost} onChange={e => setUnitCost(e.target.value)}
-            placeholder={symbol} className={field} />
+            placeholder={cenaZaBaleni ? symbol : `${symbol}/${unit || 'ks'}`} className={field} />
         </label>
       </div>
 
@@ -171,7 +175,7 @@ export default function NewIngredientInline({ categories, onCreated, onCancel }:
           <span className="whitespace-nowrap">{unit || 'ks'}</span>
         </label>
         {perUnit != null && (
-          <span>{t('Vychází na')} <b className="text-[#16181A]">{cost(perUnit)}</b> {t('za {jednotka}', { jednotka: contentUnit || t('jednotku') })}.</span>
+          <span>{t('Vychází na')} <b className="text-[#16181A]">{cost(vychazi!.cena)}</b> {t('za {jednotka}', { jednotka: vychazi!.jednotka || t('jednotku') })}.</span>
         )}
       </div>
 
