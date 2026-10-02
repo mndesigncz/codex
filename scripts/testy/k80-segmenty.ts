@@ -128,7 +128,7 @@ export default function ({ eq, ok }: Testy) {
   const profil = precti('app/api/client/admin/profile/route.ts');
   ok('profil: pole pravidla patří pod vernost.pravidla', /reactivation_days: 'vernost\.pravidla'/.test(profil) && /reactivation_points: 'vernost\.pravidla'/.test(profil));
   const uloha = precti('lib/reaktivace.ts');
-  ok('úloha: idempotence přes deník (NOT EXISTS) a pravidlo z čisté funkce', /NOT EXISTS/.test(uloha) && /maDostatChybisNam/.test(uloha) && /category: 'novinky'/.test(uloha));
-  ok('zprávy: broadcast přijímá nové segmenty a deník účinku nepočítá Chybíš nám jako návštěvu', /jeSegment\(a\)/.test(precti('app/api/client/admin/broadcast/route.ts')) && /kind <> 'reactivation'/.test(precti('app/api/client/admin/broadcast/route.ts')));
+  ok('úloha: idempotence přes deník (NOT EXISTS) a pravidlo z čisté funkce', /NOT EXISTS/.test(uloha) && /maDostatChybisNam/.test(uloha) && /dorucClenovi/.test(uloha) && /category: 'novinky'/.test(precti('lib/automatizaceDb.ts')));
+  ok('zprávy: broadcast přijímá nové segmenty a deník účinku nepočítá Chybíš nám jako návštěvu', /jeSegment\(a\)/.test(precti('lib/broadcasts.ts')) && /l\.kind = 'visit'/.test(precti('app/api/client/admin/broadcast/route.ts')) && !/kind <> 'reactivation'/.test(precti('app/api/client/admin/broadcast/route.ts')));
   ok('audit: akce změny pravidla má popisek', /'client\.reaktivace'/.test(precti('lib/auditPopisky.ts')));
 }

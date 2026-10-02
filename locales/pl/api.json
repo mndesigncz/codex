@@ -151,5 +151,10 @@
   "Zpráva už neexistuje.": "Ta wiadomość już nie istnieje.",
   "Záznam nenalezen": "Nie znaleziono wpisu",
   "Účet neexistuje.": "To konto nie istnieje.",
-  "Účet se nepodařilo smazat. Zkuste to znovu, nebo napište podpoře.": "Nie udało się usunąć konta. Spróbuj ponownie lub napisz do pomocy technicznej."
+  "Účet se nepodařilo smazat. Zkuste to znovu, nebo napište podpoře.": "Nie udało się usunąć konta. Spróbuj ponownie lub napisz do pomocy technicznej.",
+  "Odkaz na odhlášení není platný.": "Link do wypisania nie jest prawidłowy.",
+  "Odhlášení se nepodařilo načíst. Zkus to znovu.": "Nie udało się wczytać wypisania. Spróbuj ponownie.",
+  "Moc pokusů za sebou. Zkus to za chvíli.": "Zbyt wiele prób z rzędu. Spróbuj za chwilę.",
+  "Odhlášení se nepodařilo uložit. Zkus to znovu.": "Nie udało się zapisać wypisania. Spróbuj ponownie.",
+  "Tvůj účet je v tomhle podniku zablokovaný. Obrať se na obsluhu.": "Twoje konto jest w tym lokalu zablokowane. Zwróć się do obsługi."
 }

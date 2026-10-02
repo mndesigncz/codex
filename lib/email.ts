@@ -67,6 +67,8 @@ interface SendArgs {
   /** Kam má chodit odpověď. U objednávky je to povinné, jinak se ptá do prázdna. */
   replyTo?: string | null;
   attachments?: { filename: string; content: string }[];
+  /** Vlastní hlavičky (List-Unsubscribe u hromadných zpráv). */
+  headers?: Record<string, string>;
 }
 
 /**
@@ -74,7 +76,7 @@ interface SendArgs {
  * `error`. Nikdy nevyhazuje: volající dostane `{ sent, error }`
  * a rozhodne se, co s tím říct člověku.
  */
-async function send({ label, to, subject, html, replyTo, attachments }: SendArgs): Promise<SendResult> {
+async function send({ label, to, subject, html, replyTo, attachments, headers }: SendArgs): Promise<SendResult> {
   const key = process.env.RESEND_API_KEY;
   if (!key) {
     // Bez klíče se nic neodešle. Tvrdit opak je horší než neodeslat.
@@ -89,6 +91,7 @@ async function send({ label, to, subject, html, replyTo, attachments }: SendArgs
       text: htmlNaText(html),
       ...(replyTo ? { replyTo } : {}),
       ...(attachments ? { attachments } : {}),
+      ...(headers ? { headers } : {}),
     });
     if (error) {
       console.error(`[email] ${subject} → ${to}: ${error.message ?? String(error)}`);
@@ -246,5 +249,19 @@ export async function sendDigestEmail(to: string, businessName: string, dateLabe
         <p style="color: #999; font-size: 12px; margin-top: 24px;">Denní souhrn chodí každý večer. Detaily najdete v aplikaci.</p>
       </div>
     `,
+  });
+}
+
+/**
+ * Zpráva členům klubu e-mailem (rozesílka, automatizace). Hlavičky List-Unsubscribe (včetně
+ * jednoho kliknutí) nechají poštovní klienty nabídnout „Odhlásit“ vedle odesílatele; bez nich
+ * lidé klikají na „Spam“ a to poškozuje doručitelnost všem podnikům.
+ */
+export async function sendNovinkyEmail(
+  to: string, label: string, subject: string, html: string, odhlasitUrl: string, replyTo?: string | null,
+): Promise<SendResult> {
+  return send({
+    label, to, subject, html, replyTo,
+    headers: { 'List-Unsubscribe': `<${odhlasitUrl}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
   });
 }

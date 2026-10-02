@@ -151,5 +151,10 @@
   "Zpráva už neexistuje.": "This message no longer exists.",
   "Záznam nenalezen": "Record not found",
   "Účet neexistuje.": "This account doesn't exist.",
-  "Účet se nepodařilo smazat. Zkuste to znovu, nebo napište podpoře.": "We couldn't delete the account. Try again or contact support."
+  "Účet se nepodařilo smazat. Zkuste to znovu, nebo napište podpoře.": "We couldn't delete the account. Try again or contact support.",
+  "Odkaz na odhlášení není platný.": "The unsubscribe link is not valid.",
+  "Odhlášení se nepodařilo načíst. Zkus to znovu.": "Couldn't load the unsubscribe page. Try again.",
+  "Moc pokusů za sebou. Zkus to za chvíli.": "Too many attempts in a row. Try again in a moment.",
+  "Odhlášení se nepodařilo uložit. Zkus to znovu.": "Couldn't save the unsubscribe. Try again.",
+  "Tvůj účet je v tomhle podniku zablokovaný. Obrať se na obsluhu.": "Your account is blocked at this business. Please ask the staff."
 }

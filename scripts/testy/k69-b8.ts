@@ -156,7 +156,9 @@ export default function ({ eq, ok }: Testy) {
   ok('ClientAdmin: souhrn (odznaky) se obnoví při změně záložky a periodicky', /minulaZalozka\.current = tab;\s*obnovSouhrn\(\)/.test(admin) && /setInterval\(\(\) => \{ if \(document\.visibilityState === 'visible'\) obnovSouhrn\(\)/.test(admin));
   ok('StaffInbox a widget Objednávky od stolu obnoví souhrn po změně objednávky', /onZmena\?\.\(\)/.test(precti('components/client/StaffInbox.tsx')) && /<StaffInbox onToast=\{t => oznam\(t\)\} onZmena=\{onZmena\} \/>/.test(admin)
     && /obnovDataWidgetu\('\/api\/client\/admin\/summary'\);\s*\}\s*\};\s*const vse = data\.data\?\.objednavky/.test(precti('components/widgety/oblasti/klient.tsx')));
-  ok('ClientAdmin: skupiny člena i bez vernost.zobrazit (deník bodů jen s ním)', /const rozbali = vidiDenik \|\| meniSkupiny/.test(admin) && /useLoad<any>\(vidiDenik \? /.test(admin));
+  // Kolo 81: seznam členů a detail jsou v components/client/loyalty (Clenove.tsx, ClenDetail.tsx).
+  const clenoveUi = precti('components/client/loyalty/Clenove.tsx'), clenDetail = precti('components/client/loyalty/ClenDetail.tsx');
+  ok('ClientAdmin: skupiny člena i bez vernost.zobrazit (deník bodů jen s ním)', /const rozbali = vidiDenik \|\| meniSkupiny/.test(clenoveUi) && /\{vidiDenik && \(/.test(clenDetail) && /<SkupinyClena customerId=\{clen\.id\} oznam=\{oznam\} prazdne=\{!vidiDenik\} \/>/.test(clenDetail));
 
   for (const l of ['components/employer/EmployerLayout.tsx', 'components/employee/EmployeeLayout.tsx']) {
     ok(`${l}: spodní dok je sdílený Dock`, /<Dock /.test(precti(l)) && !/dock-strong|glass-strong mx-auto max-w-md/.test(precti(l)));
@@ -165,5 +167,5 @@ export default function ({ eq, ok }: Testy) {
   // ---- API ----
   ok('N13: /api/client/admin/summary filtruje podle oprávnění', /souhrnPodleOpravneni\(/.test(precti('app/api/client/admin/summary/route.ts')));
   const zakaznici = precti('app/api/client/admin/customers/route.ts');
-  ok('API členů: řazení a strop pro widget (?sort=&limit=), bez nich beze změny', /CASE WHEN \$\{podleNavstev\} THEN m\.visits END DESC/.test(zakaznici) && /Math\.min\(500/.test(zakaznici));
+  ok('API členů: řazení a strop pro widget (?sort=&limit=), bez nich beze změny', /CASE WHEN \$\{razeni\} = 'navstevy' THEN m\.visits END DESC/.test(zakaznici) && /CASE WHEN \$\{razeni\} = 'body' THEN m\.points END DESC/.test(zakaznici) && /MAX_NA_STRANU|Math\.min\(500/.test(precti('lib/clenoveSeznam.ts')) && /get\('limit'\)|cti\(p, 'limit'\)/.test(precti('lib/clenoveSeznam.ts') + zakaznici));
 }

@@ -73,6 +73,27 @@ export const EMAIL = {
     de: 'Falls die Schaltfläche nicht funktioniert, öffnen Sie: {url}', sk: 'Ak tlačidlo nefunguje, otvorte: {url}',
     pl: 'Jeśli przycisk nie działa, otwórz: {url}',
   },
+  novinkyPaticka: {
+    cs: 'Tuhle zprávu dostáváš, protože jsi členem klubu {podnik} a souhlasil(a) jsi s novinkami.',
+    en: 'You are receiving this because you are a member of the {podnik} club and agreed to news.',
+    de: 'Du erhältst diese Nachricht, weil du Mitglied im Club {podnik} bist und Neuigkeiten zugestimmt hast.',
+    sk: 'Túto správu dostávaš, pretože si členom klubu {podnik} a súhlasil(a) si s novinkami.',
+    pl: 'Dostajesz tę wiadomość, bo jesteś członkiem klubu {podnik} i zgodziłeś(-aś) się na nowości.',
+  },
+  novinkyOdhlasit: {
+    cs: 'Odhlásit se z e-mailů', en: 'Unsubscribe from emails', de: 'Von E-Mails abmelden',
+    sk: 'Odhlásiť sa z e-mailov', pl: 'Wypisz się z e-maili',
+  },
+  novinkyKupon: {
+    cs: 'Kupon máš v aplikaci mezi kupony.', en: 'Your coupon is in the app, under coupons.', de: 'Dein Gutschein ist in der App unter Gutscheine.',
+    sk: 'Kupón máš v aplikácii medzi kupónmi.', pl: 'Kupon masz w aplikacji, w kuponach.',
+  },
+  novinkyPromo: {
+    cs: 'Promo kód: {kod}', en: 'Promo code: {kod}', de: 'Promo-Code: {kod}', sk: 'Promo kód: {kod}', pl: 'Kod promocyjny: {kod}',
+  },
+  novinkyOtevrit: {
+    cs: 'Otevřít', en: 'Open', de: 'Öffnen', sk: 'Otvoriť', pl: 'Otwórz',
+  },
 } satisfies Record<string, Texty>;
 
 export type KlicEmailu = keyof typeof EMAIL;

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { sql, customer, profileBySlug, join, award, couponCode } from '@/lib/client';
 import { pragueToday } from '@/lib/pragueTime';
 import { hit } from '@/lib/rateLimit';
+import { jeZablokovan } from '@/lib/clenoveDb';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export async function POST(req: Request, props: { params: Promise<{ slug: string }> }) {
@@ -19,6 +20,7 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
   const [promo] = await sql`SELECT * FROM client_promos WHERE code = ${code} AND team_id = ${teamId} AND active = TRUE`;
   if (!promo || (promo.valid_until && String(promo.valid_until) < pragueToday())) return NextResponse.json({ error: 'Tenhle kód neplatí.' }, { status: 404 });
   if (promo.max_uses && Number(promo.uses) >= Number(promo.max_uses)) return NextResponse.json({ error: 'Kód už je vyčerpaný.' }, { status: 409 });
+  if (await jeZablokovan(teamId, me.id)) return NextResponse.json({ error: 'Tvůj účet je v tomhle podniku zablokovaný. Obrať se na obsluhu.' }, { status: 403 });
   await join(me.id, teamId);
   try { await sql`INSERT INTO client_promo_uses (promo_id, customer_id) VALUES (${promo.id}, ${me.id})`; }
   catch { return NextResponse.json({ error: 'Tenhle kód už jsi použil.' }, { status: 409 }); }

@@ -12,13 +12,17 @@ import { SwitchRow } from '../ui';
 import PravniOdkazy from '../pravni/PravniOdkazy';
 import SmazatUcet from '../ucet/SmazatUcet';
 import { jeNativni, nativniMost, stavNativnihoPushe } from '@/lib/nativni/most';
+import { useT } from '@/lib/i18n/client';
 
-export default function UcetHosta({ novinky, onFlash }: { novinky: boolean; onFlash: (m: string) => void }) {
+export default function UcetHosta({ novinky, novinkyEmail = true, onFlash }: { novinky: boolean; novinkyEmail?: boolean; onFlash: (m: string) => void }) {
+  const t = useT('klient-host');
   const [souhlas, setSouhlas] = useState(novinky);
+  const [email, setEmail] = useState(novinkyEmail);
   const [pushZapnut, setPushZapnut] = useState(false);
   const [pushOdmitnut, setPushOdmitnut] = useState(false);
   const [nativni, setNativni] = useState(false);
   useEffect(() => { setSouhlas(novinky); }, [novinky]);
+  useEffect(() => { setEmail(novinkyEmail); }, [novinkyEmail]);
   useEffect(() => {
     if (!jeNativni()) return;
     setNativni(true);
@@ -30,13 +34,26 @@ export default function UcetHosta({ novinky, onFlash }: { novinky: boolean; onFl
     try {
       const r = await fetch('/api/client/me', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ novinky: v }) });
       if (!r.ok) throw new Error();
-      onFlash(v ? 'Novinky od podniků zapnuté.' : 'Novinky od podniků vypnuté.');
+      onFlash(v ? t('Novinky od podniků zapnuté.') : t('Novinky od podniků vypnuté.'));
       // Souhlas s novinkami dává smysl jen s povolenými oznámeními: zeptáme se hned, v kontextu.
       if (v && nativni && !pushZapnut) { const p = (await (await nativniMost())?.zapniPush()) ?? 'nedostupny'; setPushZapnut(p === 'granted'); setPushOdmitnut(p === 'denied'); }
     } catch {
       // Nepovedlo se uložit: přepínač se vrátí, ať neukazuje souhlas, který server nezná.
       setSouhlas(!v);
-      onFlash('Nastavení se nepodařilo uložit.');
+      onFlash(t('Nastavení se nepodařilo uložit.'));
+    }
+  };
+
+  // E-maily od podniků jdou vypnout zvlášť; oznámení v aplikaci zůstanou. Stejné dělá odkaz „Odhlásit“ v e-mailu.
+  const zmenEmail = async (v: boolean) => {
+    setEmail(v);
+    try {
+      const r = await fetch('/api/client/me', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ novinkyEmail: v }) });
+      if (!r.ok) throw new Error();
+      onFlash(v ? t('E-maily od podniků zapnuté.') : t('E-maily od podniků vypnuté.'));
+    } catch {
+      setEmail(!v);
+      onFlash(t('Nastavení se nepodařilo uložit.'));
     }
   };
 
@@ -44,7 +61,7 @@ export default function UcetHosta({ novinky, onFlash }: { novinky: boolean; onFl
     if (!v) {
       // Smaže token na serveru: oznámení přestanou chodit hned (systémové povolení zůstává, jde znovu zapnout).
       setPushZapnut(false); await (await nativniMost())?.vypniPush();
-      onFlash('Upozornění v telefonu vypnutá.');
+      onFlash(t('Upozornění v telefonu vypnutá.'));
       return;
     }
     const p = (await (await nativniMost())?.zapniPush()) ?? 'nedostupny';
@@ -53,14 +70,18 @@ export default function UcetHosta({ novinky, onFlash }: { novinky: boolean; onFl
 
   return (
     <section id="ucet" aria-labelledby="h-ucet-hosta" className="card p-4 sm:p-5 scroll-mt-24">
-      <h2 id="h-ucet-hosta" className="text-lg font-bold tracking-tight">Oznámení a soukromí</h2>
+      <h2 id="h-ucet-hosta" className="text-lg font-bold tracking-tight">{t('Oznámení a soukromí')}</h2>
       <ul className="list mt-2">
         {nativni && (
-          <SwitchRow title="Upozornění v telefonu" checked={pushZapnut} onChange={zmenPush}
-            hint={pushOdmitnut ? 'Oznámení jsou v systému vypnutá. Povolte je v nastavení telefonu.' : 'Potvrzení rezervace, stav objednávky.'} />
+          <SwitchRow title={t('Upozornění v telefonu')} checked={pushZapnut} onChange={zmenPush}
+            hint={pushOdmitnut ? t('Oznámení jsou v systému vypnutá. Povolte je v nastavení telefonu.') : t('Potvrzení rezervace, stav objednávky.')} />
         )}
-        <SwitchRow title="Novinky a akce od podniků" checked={souhlas} onChange={zmenSouhlas}
-          hint="Zprávy od podniků, kde jsi členem. Nepovinné, jen s tvým souhlasem a kdykoli jde vypnout." />
+        <SwitchRow title={t('Novinky a akce od podniků')} checked={souhlas} onChange={zmenSouhlas}
+          hint={t('Zprávy od podniků, kde jsi členem. Nepovinné, jen s tvým souhlasem a kdykoli jde vypnout.')} />
+        {souhlas && (
+          <SwitchRow title={t('E-maily od podniků')} checked={email} onChange={zmenEmail}
+            hint={t('Novinky ti přijdou i e-mailem. Odhlásit se jde i odkazem přímo v e-mailu.')} />
+        )}
       </ul>
       <PravniOdkazy className="mt-3 text-sm text-black/60" />
       <SmazatUcet jeHost />

@@ -151,5 +151,10 @@
   "Zpráva už neexistuje.": "Táto správa už neexistuje.",
   "Záznam nenalezen": "Záznam sa nenašiel",
   "Účet neexistuje.": "Účet neexistuje.",
-  "Účet se nepodařilo smazat. Zkuste to znovu, nebo napište podpoře.": "Účet sa nepodarilo zmazať. Skúste to znova alebo napíšte podpore."
+  "Účet se nepodařilo smazat. Zkuste to znovu, nebo napište podpoře.": "Účet sa nepodarilo zmazať. Skúste to znova alebo napíšte podpore.",
+  "Odkaz na odhlášení není platný.": "Odkaz na odhlásenie nie je platný.",
+  "Odhlášení se nepodařilo načíst. Zkus to znovu.": "Odhlásenie sa nepodarilo načítať. Skús to znova.",
+  "Moc pokusů za sebou. Zkus to za chvíli.": "Príliš veľa pokusov za sebou. Skús to o chvíľu.",
+  "Odhlášení se nepodařilo uložit. Zkus to znovu.": "Odhlásenie sa nepodarilo uložiť. Skús to znova.",
+  "Tvůj účet je v tomhle podniku zablokovaný. Obrať se na obsluhu.": "Tvoj účet je v tomto podniku zablokovaný. Obráť sa na obsluhu."
 }

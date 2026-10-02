@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { awardBirthdays } from '@/lib/client';
 import { propadniBody } from '@/lib/propadaniBoduDb';
 import { odesliChybisNam } from '@/lib/reaktivace';
+import { spustAutomatizaceCron } from '@/lib/automatizaceDb';
 import { checkCron } from '@/lib/cronAuth';
 import { hit } from '@/lib/rateLimit';
 import { zDashboardConfig } from '@/lib/widgety/migrace';
@@ -1982,6 +1983,50 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS gold_spend INTEGER NOT NULL DEFAULT 15000`);
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS platinum_spend INTEGER NOT NULL DEFAULT 0`);
     await ddl(sql`ALTER TABLE client_groups ADD COLUMN IF NOT EXISTS discount_pct INTEGER NOT NULL DEFAULT 0`);
+    // Kolo 81: skupiny (popis, barva, archiv, pravidlo), poznámka a blokace člena, e-mailový kanál zpráv,
+    // automatizace s deníkem odeslání. Stejné příkazy jsou v lib/clenoveSchema.ts.
+    await ddl(sql`ALTER TABLE client_groups ADD COLUMN IF NOT EXISTS description TEXT`);
+    await ddl(sql`ALTER TABLE client_groups ADD COLUMN IF NOT EXISTS color TEXT`);
+    await ddl(sql`ALTER TABLE client_groups ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT FALSE`);
+    await ddl(sql`ALTER TABLE client_groups ADD COLUMN IF NOT EXISTS rule TEXT`);
+    await ddl(sql`ALTER TABLE client_memberships ADD COLUMN IF NOT EXISTS blocked BOOLEAN NOT NULL DEFAULT FALSE`);
+    await ddl(sql`ALTER TABLE client_memberships ADD COLUMN IF NOT EXISTS blocked_at TIMESTAMP`);
+    await ddl(sql`ALTER TABLE client_memberships ADD COLUMN IF NOT EXISTS note TEXT`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS channels TEXT NOT NULL DEFAULT 'push'`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS coupon_id INTEGER`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS promo_code TEXT`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS audience_ids JSONB`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS prijemci JSONB`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS push_count INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS email_sent INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS email_failed INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS no_consent INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS email_total INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS email_pos INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS client_automatizace (
+        team_id INTEGER NOT NULL,
+        kind TEXT NOT NULL,
+        enabled BOOLEAN NOT NULL DEFAULT FALSE,
+        config JSONB NOT NULL DEFAULT '{}'::jsonb,
+        enabled_at TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT NOW(),
+        PRIMARY KEY (team_id, kind)
+      )`);
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS client_automatizace_log (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        kind TEXT NOT NULL,
+        customer_id INTEGER NOT NULL,
+        ref TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'odeslano',
+        channels TEXT,
+        note TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE (team_id, kind, customer_id, ref)
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_automatizace_log_team ON client_automatizace_log (team_id, created_at)`);
     // Kolo 74: promo bannery podniku (akce a oznámení nahoře na stránce hosta).
     await ddl(sql`
       CREATE TABLE IF NOT EXISTS client_banners (
@@ -2180,6 +2225,9 @@ export async function GET(request: Request) {
     // (a volitelně body). Pravidlo je volitelné (reactivation_days, 0 = vypnuto).
     let reactivations = 0;
     try { reactivations = await odesliChybisNam(); } catch { /* nesmí shodit migrace */ }
+    // Automatizace zpráv (uvítací série, narozeninový kupon): denní průchod; ostatní jdou hned při události.
+    let automatizace = 0;
+    try { automatizace = await spustAutomatizaceCron(); } catch { /* nesmí shodit migrace */ }
 
     // ---- Kolo 73: propadání bodů a bonusové akce věrnosti ----
     // Propadání: po kolika dnech body propadnou (0 = nikdy) a od kdy se stáří počítá.
@@ -2290,7 +2338,7 @@ export async function GET(request: Request) {
       // (hlášky Postgresu, názvy indexů a omezení, jméno databáze) jen cron —
       // vedení kteréhokoli podniku je dřív dostávalo do prohlížeče.
       migFails: migFails.length,
-      ...(zCronu ? { closingIndex, closingIndexes, closingConstraints, birthdays, propadleBody, reactivations, migFailDetail: migFails.slice(0, 10) } : {}),
+      ...(zCronu ? { closingIndex, closingIndexes, closingConstraints, birthdays, propadleBody, reactivations, automatizace, migFailDetail: migFails.slice(0, 10) } : {}),
     });
   } catch (error) {
     console.error('Init error:', error);

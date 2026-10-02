@@ -29,7 +29,7 @@ import { useTheme } from '../ThemeProvider';
 import { Icon, LogoMark } from '../Icons';
 import {
   Badge, BarSpark, Button, Card, Chip, EmptyState, ErrorBoundary, ErrorState, Field, Input, ListRow, Menu, Modal, PageHeader,
-  PersonChip, SearchField, Segmented, Select, Skeleton, Stat, Switch, SwitchRow, Textarea, Toast, Well, useLoad, type MenuItem,
+  PersonChip, Segmented, Select, Skeleton, Stat, Switch, SwitchRow, Toast, useLoad, type MenuItem,
 } from '../ui';
 import { Dock } from '../ui/Dock';
 import StaffInbox from './StaffInbox';
@@ -39,17 +39,15 @@ import QrDesigner from './QrDesigner';
 import BrandTab from './BrandTab';
 import LoyaltyTabs, { LOYALTY_SUBS, type LoyaltySub } from './LoyaltyTabs';
 import PrechodZKarticky, { PRECHOD_TLACITKO, PRECHOD_OTAZKA, PRECHOD_POPIS, useImportKarticky } from './PrechodZKarticky';
+import Clenove from './loyalty/Clenove';
+import Zpravy from './loyalty/Zpravy';
+import Automatizace from './loyalty/Automatizace';
 import MenuEditor from '../employer/MenuEditor';
 import EventsView from '../employer/EventsView';
 import { czDay, RES_STATUS } from '@/lib/clientSlots';
-import { useMoney } from '../CurrencyProvider';
 import { dbTimeDayHM, pragueDaySafe } from '@/lib/pragueTime';
 import { czCount, type CzNoun } from '@/lib/czech';
-import { SEGMENTY, jeSegment, stitekPublika } from '@/lib/segmenty';
-import { casovaOsa, zbyvaDoUrovne, zbyvaDoOdmeny, type UdalostOsy } from '@/lib/clenPrehled';
 import { apiMessage, okJson } from '@/lib/api';
-import { useDraft } from '@/lib/useDraft';
-import { DraftNote } from '../ui/DraftNote';
 import type { Navigace } from '@/lib/widgety/typy';
 import {
   TON_REZERVACE, hlavniKrok, klicPrechodu, muzeDo, poDnech, prumerCesky, vyberHodnoceni, vyberRezervace,
@@ -100,7 +98,6 @@ const URL_REZERVACE_DNES = '/api/client/admin/reservations?range=today';
 const JSON_HLAVICKA = { 'Content-Type': 'application/json' };
 
 const OSOBA: CzNoun = { one: 'osoba', few: 'osoby', many: 'osob' };
-const CLEN: CzNoun = { one: 'člen', few: 'členové', many: 'členů' };
 const MISTO: CzNoun = { one: 'místo', few: 'místa', many: 'míst' };
 const NOVA_OBJEDNAVKA: CzNoun = { one: 'nová objednávka', few: 'nové objednávky', many: 'nových objednávek' };
 const REZERVACE_KE_SCHVALENI: CzNoun = { one: 'rezervace k potvrzení', few: 'rezervace k potvrzení', many: 'rezervací k potvrzení' };
@@ -660,11 +657,12 @@ function StolyStranka({ oznam }: { oznam: Hlaska }) {
 
 // ---- Zákazníci ------------------------------------------------------------------
 
-type CastZakazniku = 'members' | 'reviews' | 'messages';
+type CastZakazniku = 'members' | 'reviews' | 'messages' | 'automations';
 const CASTI_ZAKAZNIKU: { id: CastZakazniku; label: string; klic: string; popis: string }[] = [
   { id: 'members', label: 'Členové', klic: 'zakaznici.zobrazit', popis: 'Kdo se k podniku přidal, kolik má bodů a razítek, deník změn.' },
   { id: 'reviews', label: 'Hodnocení', klic: 'zakaznici.recenze', popis: 'Host dostane po hotové rezervaci nebo objednávce výzvu k hodnocení. Slabé hodnocení (1 až 2 hvězdy) ti přijde jako oznámení.' },
-  { id: 'messages', label: 'Zprávy členům', klic: 'zakaznici.zpravy', popis: 'Novinka, akce nebo sezónní nabídka pro všechny členy. Přijde jako oznámení v aplikaci a push na telefon. Nejvýš pět za den.' },
+  { id: 'messages', label: 'Zprávy členům', klic: 'zakaznici.zpravy', popis: 'Novinka, akce nebo nabídka pro členy: oznámení v aplikaci a push, nebo e-mail. Nejvýš pět za den.' },
+  { id: 'automations', label: 'Automatizace', klic: 'zakaznici.zpravy', popis: 'Zprávy, které odejdou samy: uvítání, po první návštěvě, po dokončení karty, k narozeninám a „Chybíš nám“.' },
 ];
 
 function ZakazniciStranka({ oznam, hledat }: { oznam: Hlaska; hledat: string }) {
@@ -676,7 +674,8 @@ function ZakazniciStranka({ oznam, hledat }: { oznam: Hlaska; hledat: string }) 
   const nastroj = !cast ? null
     : cast.id === 'members' ? <Clenove oznam={oznam} hledat={hledat} />
     : cast.id === 'reviews' ? <Recenze />
-    : <Rozeslani oznam={oznam} />;
+    : cast.id === 'automations' ? <Automatizace oznam={oznam} />
+    : <Zpravy oznam={oznam} />;
   return (
     <PlochaWidgetu
       stranka="vedeni.klient_zakaznici"
@@ -690,195 +689,6 @@ function ZakazniciStranka({ oznam, hledat }: { oznam: Hlaska; hledat: string }) 
       }}
       nastroj={nastroj}
     />
-  );
-}
-
-interface ClenRadek {
-  id: number; name: string; email?: string; points: number; stamps: number; visits: number;
-  joined_at: string; last_visit_at: string | null; reservations: number; open_coupons: number;
-  // Úroveň podle režimu podniku a efektivní sleva (nejvyšší z úrovně a slev skupin) — počítá server.
-  spend?: number; level?: string; level_label?: string; discount?: number; discount_source?: 'uroven' | 'skupina' | null; discount_name?: string | null;
-}
-
-function Clenove({ oznam, hledat = '' }: { oznam: Hlaska; hledat?: string }) {
-  const money = useMoney();
-  const { ma: smi } = useOpravneni();
-  const upravujeBody = smi('vernost.upravit_body');
-  const vidiDenik = smi('vernost.zobrazit');
-  // Skupiny člena bydlí ve stejné jamce jako deník, ale nesmí na věrnosti záviset:
-  // role se zakaznici.skupiny bez vernost.zobrazit jinde hosta do skupiny nepřidá.
-  const meniSkupiny = smi('zakaznici.skupiny');
-  const rozbali = vidiDenik || meniSkupiny;
-  // Přechod z jiné věrnostní aplikace (Kartička): jen s oprávněním Import členů.
-  const [q, setQ] = useState(hledat);
-  useEffect(() => { setQ(hledat); }, [hledat]);
-  // Hledání se ptá serveru (výsledky přes 500 členů) — s krátkou prodlevou, ať se neptá na každé písmeno.
-  const [dotaz, setDotaz] = useState(hledat);
-  useEffect(() => { const t = setTimeout(() => setDotaz(q), q ? 250 : 0); return () => clearTimeout(t); }, [q]);
-  const { data: d, error, reload } = useLoad<{ customers: ClenRadek[]; total: number }>(
-    `/api/client/admin/customers?q=${encodeURIComponent(dotaz)}`,
-    raw => ({ customers: Array.isArray(raw?.customers) ? raw.customers : [], total: Number(raw?.total) || 0 }),
-  );
-  const imp = useImportKarticky(oznam, reload);
-  const smiImport = imp.smi;
-  const [otevreny, setOtevreny] = useState<number | null>(null);
-  const [upravuji, setUpravuji] = useState<{ c: ClenRadek; delta: string; poznamka: string; co: 'body' | 'utrata' } | null>(null);
-  const [ukladam, setUkladam] = useState(false);
-  const [verzeDeniku, setVerzeDeniku] = useState(0);
-
-  const ulozBody = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!upravuji) return;
-    const delta = parseInt(upravuji.delta, 10);
-    if (!delta) return;
-    setUkladam(true);
-    try {
-      const utrata = upravuji.co === 'utrata';
-      const r = await j('/api/client/admin/loyalty', { method: 'POST', body: JSON.stringify({ customerId: upravuji.c.id, delta, note: upravuji.poznamka, ...(utrata ? { what: 'spend' } : {}) }) });
-      oznam(utrata ? `${upravuji.c.name}: útrata teď ${money(r.spend)}.` : `${upravuji.c.name}: teď ${r.points} bodů.`);
-      setUpravuji(null); reload(); setVerzeDeniku(v => v + 1);
-    } catch (err) { oznam(apiMessage(err, 'Body se nepodařilo upravit.'), 'bad'); }
-    setUkladam(false);
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3 flex-wrap">
-        <SearchField className="w-full max-w-sm" value={q} onChange={setQ} storageKey="hoste" placeholder="Jméno nebo e-mail" ariaLabel="Hledat zákazníka" />
-        {d && <p className="t-meta tabular-nums">{czCount(d.total, CLEN)}</p>}
-        {smiImport && <Button size="sm" variant="secondary" icon="upload" className="sm:ml-auto" onClick={imp.otevri}>{PRECHOD_TLACITKO}</Button>}
-      </div>
-      {error ? <ErrorState title="Členové se nenačetli" onRetry={reload} detail={error} />
-        : d === null ? <PageSkel />
-        : d.customers.length === 0 ? (
-          <Card><EmptyState icon="users" compact title={q ? 'Nikdo takový' : 'Zatím žádní členové'} hint={q ? undefined : smiImport ? 'Přidají se sami na tvé stránce pro hosty. Máš členy v Kartičce? Přeneseš je i s body a razítky.' : 'Přidají se sami na tvé stránce pro hosty.'}
-            action={!q && smiImport ? <Button size="sm" variant="secondary" icon="upload" onClick={imp.otevri}>{PRECHOD_TLACITKO}</Button> : undefined} /></Card>
-        ) : (
-          <Card pad="none">
-            <ul className="list px-5">
-              {d.customers.map(c => {
-                const uroven = { id: c.level ?? 'bronze', label: c.level_label ?? 'Člen' };
-                return (
-                  <li key={c.id}>
-                    <ListRow as="div"
-                      title={<span className="flex items-center gap-2 min-w-0"><span className="truncate">{c.name}</span>{uroven.id !== 'bronze' && <Chip tone={uroven.id === 'silver' ? 'muted' : 'ink'} size="sm">{uroven.label}</Chip>}{Number(c.discount) > 0 && <Chip tone="ok" size="sm">{`Sleva ${c.discount} %${c.discount_source === 'skupina' && c.discount_name ? ` (${c.discount_name})` : ''}`}</Chip>}</span>}
-                      meta={[c.email, `člen od ${denCesky(c.joined_at)}`, c.last_visit_at ? `naposledy ${denCesky(c.last_visit_at)}` : null].filter(Boolean).join(' · ')}
-                      value={<>{c.points.toLocaleString('cs-CZ')} <span className="text-xs font-medium text-black/50">b.</span></>}
-                      valueMeta={`${c.stamps} raz. · ${c.visits} návšt.${Number(c.spend) > 0 ? ` · ${money(Number(c.spend))}` : ''}`}
-                      aside={<>{c.reservations} rez.{c.open_coupons ? ` · ${c.open_coupons} kup.` : ''}</>}
-                      actions={(upravujeBody || rozbali) ? (
-                        <>
-                          {upravujeBody && <Button size="sm" variant="secondary" onClick={() => setUpravuji({ c, delta: '', poznamka: '', co: 'body' })} aria-label={`Upravit body: ${c.name}`}>Body ±</Button>}
-                          {rozbali && <Button size="sm" variant="ghost" aria-expanded={otevreny === c.id} onClick={() => setOtevreny(otevreny === c.id ? null : c.id)}>{otevreny === c.id ? 'Skrýt' : vidiDenik ? 'Deník' : 'Skupiny'}</Button>}
-                        </>
-                      ) : undefined} />
-                    {otevreny === c.id && <DenikClena key={verzeDeniku} customerId={c.id} oznam={oznam} vidiDenik={vidiDenik} />}
-                  </li>
-                );
-              })}
-            </ul>
-          </Card>
-        )}
-      {imp.okno}
-      {upravuji && (
-        <Modal open onClose={() => setUpravuji(null)} size="sm" title={`Body pro ${upravuji.c.name}`}
-          subtitle={upravuji.co === 'utrata' ? `Útrata teď ${money(Number(upravuji.c.spend) || 0)}` : `Teď má ${upravuji.c.points.toLocaleString('cs-CZ')} b.`}
-          footer={<>
-            <Button variant="secondary" onClick={() => setUpravuji(null)}>Zrušit</Button>
-            <Button type="submit" form="body-okno" variant="primary" loading={ukladam} disabled={!parseInt(upravuji.delta, 10)}>Uložit</Button>
-          </>}>
-          <form id="body-okno" onSubmit={ulozBody} className="space-y-4">
-            <Segmented options={[{ id: 'body', label: 'Body' }, { id: 'utrata', label: 'Útrata' }]} value={upravuji.co} onChange={v => setUpravuji({ ...upravuji, co: v as 'body' | 'utrata' })} size="sm" ariaLabel="Co upravit" />
-            <Field id="body-delta" label={upravuji.co === 'utrata' ? 'O kolik upravit útratu' : 'Kolik bodů'} hint={upravuji.co === 'utrata' ? 'Útrata určuje úroveň, když podnik počítá úrovně podle útraty. Kladné číslo přičte, záporné odečte.' : 'Kladné číslo přičte, záporné odečte.'}>
-              <Input id="body-delta" type="number" inputMode="numeric" autoFocus min={-100000} max={100000} className="!w-36"
-                value={upravuji.delta} onChange={e => setUpravuji({ ...upravuji, delta: e.target.value })} />
-            </Field>
-            <Field id="body-proc" label="Proč" hint="Uvidíš to v deníku člena. Nepovinné.">
-              <Textarea id="body-proc" rows={2} maxLength={200} value={upravuji.poznamka} onChange={e => setUpravuji({ ...upravuji, poznamka: e.target.value })} />
-            </Field>
-          </form>
-        </Modal>
-      )}
-    </div>
-  );
-}
-
-/** Deník bodů a skupiny člena — jamka pod řádkem (dřív jamka s rámečkem navíc a ruční štítek verzálkami). */
-function DenikClena({ customerId, oznam, vidiDenik }: { customerId: number; oznam: Hlaska; vidiDenik: boolean }) {
-  const money = useMoney();
-  // Přehled hosta jen s vernost.zobrazit — bez něj by GET skončil 403 (widget bez oprávnění nevolá).
-  const { data: pr } = useLoad<any>(vidiDenik ? `/api/client/admin/loyalty?customerId=${customerId}&detail=1` : null,
-    raw => ({ ...raw, osa: casovaOsa({ ledger: raw?.ledger, claims: raw?.claims, vouchers: raw?.vouchers, orders: raw?.orders }, money), kampane: Array.isArray(raw?.kampane) ? raw.kampane : [] }));
-  const zbyva = pr?.uroven && pr?.clen ? zbyvaDoUrovne(pr.uroven, pr.uroven.unit === 'spend' ? pr.clen.spend : pr.clen.visits, money) : null;
-  const razitka = pr ? zbyvaDoOdmeny(pr.kampane) : [];
-  return (
-    <Well className="mb-3 space-y-3">
-      <SkupinyClena customerId={customerId} oznam={oznam} prazdne={!vidiDenik} />
-      {!vidiDenik ? null
-        : pr === null ? <Skeleton className="h-10" />
-        : (
-          <>
-            <div className="space-y-1">
-              <p className="text-sm font-medium">{pr.uroven?.label ?? 'Člen'} · {pr.clen.points} b.{pr.clen.credit > 0 ? ` · kredit ${money(pr.clen.credit)}` : ''}</p>
-              <p className="t-meta">
-                {pr.clen.last_visit_at ? `Naposledy tu byl ${denCesky(pr.clen.last_visit_at)}` : 'Zatím tu nebyl'}
-                {` · člen od ${denCesky(pr.clen.joined_at)} · ${czCount(pr.clen.visits, NAVSTEVA)}`}
-                {pr.clen.spend > 0 ? ` · celkem ${money(pr.clen.spend)}` : ''}
-              </p>
-              {zbyva && <p className="t-meta">{zbyva}</p>}
-              {razitka.map(r => <p key={r} className="t-meta">{r}</p>)}
-            </div>
-            {pr.osa.length === 0 ? <p className="t-meta">Zatím žádná historie.</p> : (
-              <ul className="list" aria-label="Časová osa hosta">
-                {pr.osa.map((u: UdalostOsy, i: number) => (
-                  <ListRow key={`${u.druh}-${u.at}-${i}`} title={u.titulek} meta={[dbTimeDayHM(u.at), u.meta].filter(Boolean).join(' · ')}
-                    right={<Chip tone="muted" size="sm">{POPISEK_DRUHU[u.druh]}</Chip>} />
-                ))}
-              </ul>
-            )}
-          </>
-        )}
-    </Well>
-  );
-}
-
-const NAVSTEVA: CzNoun = { one: 'návštěva', few: 'návštěvy', many: 'návštěv' };
-const POPISEK_DRUHU: Record<string, string> = { body: 'Body', kupon: 'Kupon', poukaz: 'Poukaz', objednavka: 'Objednávka' };
-
-/** Štítky skupin u člena: klepnutím se host do skupiny přidá / odebere. Jen se zakaznici.skupiny. */
-function SkupinyClena({ customerId, oznam, prazdne = false }: { customerId: number; oznam: Hlaska; prazdne?: boolean }) {
-  const { ma: smi } = useOpravneni();
-  const meni = smi('zakaznici.skupiny');
-  const [skupiny, setSkupiny] = useState<{ id: number; name: string }[] | null>(null);
-  const [moje, setMoje] = useState<number[]>([]);
-  const [busy, setBusy] = useState(0);
-  const load = useCallback(() => fetch(`/api/client/admin/groups?customerId=${customerId}`).then(okJson)
-    .then(d => { setSkupiny(d.groups ?? []); setMoje(d.customerGroupIds ?? []); }).catch(() => setSkupiny([])), [customerId]);
-  useEffect(() => { load(); }, [load]);
-  // Bez deníku je jamka jen pro skupiny — prázdná by jen zmizela, tak řekne proč.
-  if (skupiny === null) return prazdne ? <Skeleton className="h-8" /> : null;
-  if (skupiny.length === 0) return prazdne ? <p className="t-meta">Zatím žádné skupiny. Založíš je ve Věrnosti.</p> : null;
-  const prepni = async (g: { id: number; name: string }) => {
-    const je = moje.includes(g.id);
-    setBusy(g.id);
-    try {
-      await j('/api/client/admin/groups', { method: 'PATCH', body: JSON.stringify({ id: g.id, [je ? 'remove' : 'add']: [customerId] }) });
-      setMoje(je ? moje.filter(x => x !== g.id) : [...moje, g.id]);
-    } catch (err) { oznam(apiMessage(err, 'Skupinu se nepodařilo změnit.'), 'bad'); }
-    setBusy(0);
-  };
-  return (
-    <div>
-      <p className="t-label mb-1.5">Skupiny</p>
-      <div className="flex flex-wrap items-center gap-1.5">
-        {skupiny.map(g => (
-          <button key={g.id} type="button" onClick={() => { void prepni(g); }} disabled={!meni || busy === g.id} aria-pressed={moje.includes(g.id)}
-            className={`filter-pill tap-target-sm ${moje.includes(g.id) ? 'seg-on' : 'seg-off glass'}`}>
-            {g.name}
-          </button>
-        ))}
-      </div>
-    </div>
   );
 }
 
@@ -932,136 +742,6 @@ function Recenze() {
           })}
         </ul>
       </Card>
-    </div>
-  );
-}
-
-// ---- Zprávy členům --------------------------------------------------------------
-
-const PRAZDNA_ZPRAVA = { title: '', body: '', audience: 'all', linkKind: 'page', scheduledAt: '' };
-
-function Rozeslani({ oznam }: { oznam: Hlaska }) {
-  const [f, setF] = useState(PRAZDNA_ZPRAVA);
-  const [busy, setBusy] = useState(false);
-  const [potvrdit, setPotvrdit] = useState(false);
-  const [rusim, setRusim] = useState<any | null>(null);
-  // Rozeslání jde stovkám zákazníků, takže se text píše rozmyšleně —
-  // a o to víc mrzí, když ho spolkne přechod na jinou záložku.
-  const koncept = useDraft('rozeslani', f, setF, { vychozi: PRAZDNA_ZPRAVA });
-  const { data: d, error, reload } = useLoad<any>('/api/client/admin/broadcast', raw => ({ ...raw, history: Array.isArray(raw?.history) ? raw.history : [] }));
-  const target = !d ? 0 : jeSegment(f.audience) ? (d.segments?.[f.audience] ?? 0)
-    : f.audience === 'tier:silver' ? (d.silver ?? 0)
-    : f.audience === 'tier:gold' || f.audience === 'gold' ? (d.gold ?? 0)
-    : f.audience === 'tier:platinum' ? (d.platinum ?? 0)
-    : f.audience.startsWith('group:') ? (d.groups?.find((g: any) => `group:${g.id}` === f.audience)?.members ?? 0)
-    : (d.members ?? 0);
-  const segmentInfo = SEGMENTY.find(x => x.id === f.audience);
-  const naplanovano = !!f.scheduledAt && new Date(f.scheduledAt).getTime() > Date.now();
-  const odeslat = async () => {
-    setBusy(true);
-    try {
-      const r = await j('/api/client/admin/broadcast', { method: 'POST', body: JSON.stringify(f) });
-      oznam(r.scheduled ? 'Zpráva je naplánovaná — odejde ve svůj čas.' : `Odesláno ${czCount(r.broadcast.recipients, { one: 'členovi', few: 'členům', many: 'členům' })}.`);
-      koncept.hotovo(); setF(PRAZDNA_ZPRAVA); reload();
-    } catch (err) { oznam(apiMessage(err, 'Zprávu se nepodařilo odeslat.'), 'bad'); }
-    setBusy(false);
-  };
-  const zrusit = async (h: any) => {
-    try { await j(`/api/client/admin/broadcast?id=${h.id}`, { method: 'DELETE' }); oznam('Zpráva zrušena.'); reload(); }
-    catch (err) { oznam(apiMessage(err, 'Zprávu se nepodařilo zrušit.'), 'bad'); }
-  };
-  if (error) return <ErrorState title="Zprávy se nenačetly" onRetry={reload} detail={error} />;
-  if (!d) return <PageSkel />;
-  const komu = (a: string) => stitekPublika(a);
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-4 items-start">
-      <Card as="form" className="grid gap-4" onSubmit={(e: React.FormEvent) => { e.preventDefault(); if (f.title.trim() && target) setPotvrdit(true); }}>
-        <h2 className="t-card">Nová zpráva</h2>
-        <DraftNote koncept={koncept} co="rozepsané rozeslání" />
-        <Field id="bc-title" label="Nadpis"><Input id="bc-title" value={f.title} onChange={e => setF({ ...f, title: e.target.value })} placeholder="Nový čaj z jarní sklizně" maxLength={80} /></Field>
-        <Field id="bc-body" label="Text"><Textarea id="bc-body" value={f.body} onChange={e => setF({ ...f, body: e.target.value })} placeholder="Tento týden ochutnávka zdarma ke každé konvici." maxLength={300} rows={3} /></Field>
-        <Field id="bc-aud" label="Komu">
-          <Select id="bc-aud" value={f.audience} onChange={e => setF({ ...f, audience: e.target.value })}>
-            <option value="all">Všem členům ({d.members ?? 0})</option>
-            <optgroup label="Podle chování">
-              {SEGMENTY.map(x => <option key={x.id} value={x.id}>{x.label} ({d.segments?.[x.id] ?? 0})</option>)}
-            </optgroup>
-            <optgroup label="Podle úrovně">
-              <option value="tier:silver">Stříbrným a výš ({d.silver ?? 0})</option>
-              <option value="tier:gold">Zlatým a výš ({d.gold ?? 0})</option>
-              {d.platinum != null && <option value="tier:platinum">Platinovým hostům ({d.platinum})</option>}
-            </optgroup>
-            {(d.groups ?? []).length > 0 && (
-              <optgroup label="Podle skupiny">
-                {(d.groups ?? []).map((g: any) => <option key={g.id} value={`group:${g.id}`}>Skupina {g.name} ({g.members})</option>)}
-              </optgroup>
-            )}
-          </Select>
-        </Field>
-        <p className={target ? 'text-sm text-black/70' : 'note note-wait'} aria-live="polite">
-          {target
-            ? `Dostane to ${czCount(target, CLEN)}.${segmentInfo ? ` ${segmentInfo.popis}` : ''}`
-            : `Teď to nedostane nikdo, ve výběru jsou 0 členů.${segmentInfo ? ` ${segmentInfo.popis}` : ''} Zkus jiný výběr, nebo pošli zprávu všem členům.`}
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field id="bc-link" label="Kam zpráva vezme">
-            <Select id="bc-link" value={f.linkKind} onChange={e => setF({ ...f, linkKind: e.target.value })}>
-              <option value="page">Na stránku podniku</option>
-              <option value="loyalty">Na věrnost a kupony</option>
-              <option value="order">Na objednávku od stolu</option>
-              <option value="me">Na jeho kartičku (Moje)</option>
-            </Select>
-          </Field>
-          <Field id="bc-at" label="Odeslat (prázdné = hned)">
-            <Input id="bc-at" type="datetime-local" value={f.scheduledAt} onChange={e => setF({ ...f, scheduledAt: e.target.value })} />
-          </Field>
-        </div>
-        <p className="t-meta">Zpráva se objeví i v Novinkách na tvé stránce pro hosty. Naplánovaná odejde ve svůj čas a do té doby jde zrušit.</p>
-        <Button type="submit" variant="primary" icon="send" loading={busy} disabled={!target || !f.title.trim()}>
-          {naplanovano
-            ? `Naplánovat pro ${czCount(target, { one: 'člena', few: 'členy', many: 'členů' })}`
-            : `Poslat ${czCount(target, { one: 'členovi', few: 'členům', many: 'členům' })}`}
-        </Button>
-      </Card>
-      <Card pad="none" aria-labelledby="bc-odeslane">
-        <h2 id="bc-odeslane" className="t-card px-5 pt-4">Odeslané</h2>
-        {d.history.length === 0 ? (
-          <div className="px-5 pb-5"><EmptyState icon="mail" title="Zatím nic odeslaného" hint="První zpráva půjde všem, kdo se k podniku přidali." compact /></div>
-        ) : (
-          <>
-            <ul className="list px-5">
-              {d.history.map((h: any) => {
-                const po = Number(h.visits_after) || 0, pred = Number(h.visits_before) || 0, rozdil = po - pred;
-                const ucinek = h.status !== 'scheduled' && (po > 0 || pred > 0)
-                  ? `${h.still_running ? 'zatím ' : ''}${czCount(po, CLEN)} u kasy do 7 dní${pred > 0 ? `, předtím ${pred}` : ''}${rozdil !== 0 ? ` (${rozdil > 0 ? '+' : ''}${rozdil})` : ''}`
-                  : null;
-                return (
-                  <ListRow key={h.id} title={h.title}
-                    meta={[h.status === 'scheduled' ? `odejde ${dbTimeDayHM(h.scheduled_at)}` : `${dbTimeDayHM(h.sent_at)} · ${czCount(Number(h.recipients) || 0, CLEN)}`, komu(String(h.audience ?? '')), ucinek].filter(Boolean).join(' · ')}
-                    right={h.status === 'scheduled' ? <Chip tone="wait" size="sm">Naplánováno</Chip> : undefined}
-                    actions={h.status === 'scheduled' ? <Button size="sm" variant="ghost" onClick={() => setRusim(h)}>Zrušit</Button> : undefined} />
-                );
-              })}
-            </ul>
-            <p className="t-meta px-5 pb-4 pt-1">Srovnání sedmi dní po a před odesláním je nejpoctivější, co z našich dat jde. Neříká, že za návštěvu může zpráva — říká, jestli se po ní něco pohnulo.</p>
-          </>
-        )}
-      </Card>
-      {potvrdit && (
-        <Modal open onClose={() => setPotvrdit(false)} size="sm" title={naplanovano ? 'Naplánovat zprávu?' : 'Poslat zprávu?'}
-          footer={<>
-            <Button variant="secondary" onClick={() => setPotvrdit(false)}>Zrušit</Button>
-            <Button variant="primary" icon="send" onClick={() => { setPotvrdit(false); void odeslat(); }}>{naplanovano ? 'Naplánovat' : 'Poslat'}</Button>
-          </>}>
-          <p className="text-sm text-black/70 text-pretty">
-            „{f.title}" dostane {czCount(target, CLEN)}{naplanovano ? ` ${new Date(f.scheduledAt).toLocaleString('cs-CZ')}` : ' hned'}. Odeslanou zprávu už vzít zpátky nejde.
-          </p>
-        </Modal>
-      )}
-      {rusim && (
-        <Potvrzeni title="Zrušit naplánovanou zprávu?" akce="Zrušit zprávu" onZavrit={() => setRusim(null)}
-          text={`„${rusim.title}" neodejde. Text se nezachová.`} onPotvrdit={() => { void zrusit(rusim); }} />
-      )}
     </div>
   );
 }

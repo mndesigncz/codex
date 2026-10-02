@@ -134,7 +134,7 @@ export const ZELENE = [
   'ctecka',
 ];
 
-const MIMO = new Set(['spust', 'pruchod', 'cookie-role', 'fixtury-k53', 'fixtury-navody', 'k68-spolecne', 'k69-mereni-jadro', 'import-karticka', 'poukazy', 'urovne', 'bannery', 'bannery-sprava', 'pruchod-hloubka']);
+const MIMO = new Set(['spust', 'pruchod', 'cookie-role', 'fixtury-k53', 'fixtury-navody', 'k68-spolecne', 'k69-mereni-jadro', 'import-karticka', 'poukazy', 'urovne', 'bannery', 'bannery-sprava', 'pruchod-hloubka', 'k81-clenove-zpravy']);
 const vsechny = readdirSync(DIR).filter(f => f.endsWith('.mjs')).map(f => f.slice(0, -4)).filter(n => !MIMO.has(n)).sort();
 
 const args = process.argv.slice(2);

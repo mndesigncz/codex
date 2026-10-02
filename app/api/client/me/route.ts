@@ -37,7 +37,8 @@ export async function GET() {
   const [profile] = await sql`SELECT id, name, email, phone, birthday FROM users WHERE id = ${me.id}`;
   // Souhlas s novinkami podniků (opt-in): chybí-li nastavení nebo sloupec, je to NE.
   let novinky = false;
-  try { const [p] = await sql`SELECT notif_prefs FROM users WHERE id = ${me.id}`; novinky = p?.notif_prefs?.novinky === true; } catch { /* před migrací */ }
+  let novinkyEmail = true;
+  try { const [p] = await sql`SELECT notif_prefs FROM users WHERE id = ${me.id}`; novinky = p?.notif_prefs?.novinky === true; novinkyEmail = p?.notif_prefs?.novinkyEmail !== false; } catch { /* před migrací */ }
   // Razítkové kampaně všech mých podniků + můj průběh — dvě skupinové otázky.
   let campaignRows: any[] = []; let progRows: any[] = [];
   try {
@@ -80,7 +81,7 @@ export async function GET() {
     });
   }
   return NextResponse.json({
-    me: { ...(profile ?? me), novinky },
+    me: { ...(profile ?? me), novinky, novinkyEmail },
     memberships: memberships.map(m => ({ ...publicProfile(m), points: Number(m.points), stamps: Number(m.stamps), visits: Number(m.visits), spend: spendBy.get(Number(m.team_id)) ?? 0, groupDiscounts: skupinyBy.get(Number(m.team_id)) ?? [], credit: Number(m.credit ?? 0), lastVisitAt: m.last_visit_at, campaigns: campsByTeam.get(Number(m.team_id)) ?? [] })),
     reservations, orders, claims, today,
   });
@@ -103,6 +104,14 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'Nastavení se zatím nepodařilo uložit.' }, { status: 503 });
     }
   }
+  // E-maily od podniků jdou vypnout zvlášť (oznámení v aplikaci zůstanou): `novinkyEmail`. Odkaz „Odhlásit“ v e-mailu dělá totéž.
+  if (typeof b.novinkyEmail === 'boolean') {
+    try {
+      await sql`UPDATE users SET notif_prefs = COALESCE(notif_prefs, '{}'::jsonb) || jsonb_build_object('novinkyEmail', ${b.novinkyEmail}::boolean, 'novinkyEmailAt', ${new Date().toISOString()}::text) WHERE id = ${me.id}`;
+    } catch {
+      return NextResponse.json({ error: 'Nastavení se zatím nepodařilo uložit.' }, { status: 503 });
+    }
+  }
   // Ovladač neumí skládat úryvky SQL, proto COALESCE: null znamená „nech, jak je".
   const setBirthday = birthday !== null;
   await sql`UPDATE users SET
@@ -111,6 +120,7 @@ export async function PATCH(req: NextRequest) {
     WHERE id = ${me.id}`;
   const [u] = await sql`SELECT id, name, email, phone, birthday FROM users WHERE id = ${me.id}`;
   let novinky = false;
-  try { const [p] = await sql`SELECT notif_prefs FROM users WHERE id = ${me.id}`; novinky = p?.notif_prefs?.novinky === true; } catch { /* před migrací */ }
-  return NextResponse.json({ ok: true, me: { ...u, novinky } });
+  let novinkyEmail = true;
+  try { const [p] = await sql`SELECT notif_prefs FROM users WHERE id = ${me.id}`; novinky = p?.notif_prefs?.novinky === true; novinkyEmail = p?.notif_prefs?.novinkyEmail !== false; } catch { /* před migrací */ }
+  return NextResponse.json({ ok: true, me: { ...u, novinky, novinkyEmail } });
 }

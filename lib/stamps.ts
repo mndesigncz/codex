@@ -9,6 +9,8 @@
 
 import { sql, couponCode } from './client';
 import { pragueToday, dayPlus } from './pragueTime';
+import { automatizaceUdalost } from './automatizaceHaky';
+import { jeZablokovan } from './clenoveDb';
 
 export interface StampCampaign {
   id: number; team_id: number; name: string; description: string; conditions: string;
@@ -80,6 +82,7 @@ export async function addStamps(
   c: StampCampaign, customerId: number, count: number, ref: string, poznamka = '',
 ): Promise<{ added: number; stamps: number; completions: number; skipped?: string }> {
   if (count <= 0) return { added: 0, stamps: 0, completions: 0 };
+  if (await jeZablokovan(c.team_id, customerId)) return { added: 0, stamps: 0, completions: 0, skipped: 'Člen je zablokovaný, razítka nesbírá.' };
   const [curRow] = await sql`
     INSERT INTO client_stamp_progress (campaign_id, customer_id, team_id)
     VALUES (${c.id}, ${customerId}, ${c.team_id})
@@ -127,6 +130,8 @@ export async function addStamps(
       WHERE campaign_id = ${c.id} AND customer_id = ${customerId}`;
   }
 
+  // Po dokončení karty (Automatizace): jedna zpráva na každé dokončení, klíč nese kampaň a pořadí.
+  for (let i = 0; i < completions; i++) automatizaceUdalost('dokoncena_karta', c.team_id, customerId, `karta:${c.id}:${completedBefore + i + 1}`);
   // Každé dokončení = kupon s kódem (host ho ukáže u kasy).
   for (let i = 0; i < completions; i++) {
     // Lhůta se počítá od pražského dne, ne z UTC — po noční by jinak platila o den míň.

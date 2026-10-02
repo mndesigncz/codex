@@ -151,5 +151,10 @@
   "Zpráva už neexistuje.": "Diese Nachricht gibt es nicht mehr.",
   "Záznam nenalezen": "Eintrag nicht gefunden",
   "Účet neexistuje.": "Dieses Konto existiert nicht.",
-  "Účet se nepodařilo smazat. Zkuste to znovu, nebo napište podpoře.": "Das Konto konnte nicht gelöscht werden. Versuchen Sie es erneut oder schreiben Sie dem Support."
+  "Účet se nepodařilo smazat. Zkuste to znovu, nebo napište podpoře.": "Das Konto konnte nicht gelöscht werden. Versuchen Sie es erneut oder schreiben Sie dem Support.",
+  "Odkaz na odhlášení není platný.": "Der Abmeldelink ist nicht gültig.",
+  "Odhlášení se nepodařilo načíst. Zkus to znovu.": "Die Abmeldung konnte nicht geladen werden. Versuch es noch einmal.",
+  "Moc pokusů za sebou. Zkus to za chvíli.": "Zu viele Versuche hintereinander. Versuch es gleich noch einmal.",
+  "Odhlášení se nepodařilo uložit. Zkus to znovu.": "Die Abmeldung konnte nicht gespeichert werden. Versuch es noch einmal.",
+  "Tvůj účet je v tomhle podniku zablokovaný. Obrať se na obsluhu.": "Dein Konto ist in diesem Betrieb gesperrt. Wende dich an das Personal."
 }

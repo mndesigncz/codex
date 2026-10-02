@@ -9,6 +9,7 @@ import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { pragueToday, pragueDayOf, parseDbTime } from '@/lib/pragueTime';
 import { audit } from '@/lib/audit';
 import { activeCampaigns, progressFor, addStamps, applyBillToCampaigns } from '@/lib/stamps';
+import { jeZablokovan } from '@/lib/clenoveDb';
 import { getConnection, billDetail } from '@/lib/storyous';
 import { menaPodniku } from '@/lib/menaPodniku';
 import { benefitLabel } from '@/lib/coupons';
@@ -110,6 +111,10 @@ export async function POST(req: NextRequest) {
   const p = await ensureProfile(u.team_id);
   if (!p.loyalty_on) return NextResponse.json({ error: 'Podnik nemá věrnost zapnutou.' }, { status: 400 });
   await join(c.id, u.team_id);
+  // Zablokovaný člen u kasy nic nesbírá ani neutrácí; obsluha se dozví proč a poznámku najde ve správě členů.
+  if (await jeZablokovan(u.team_id, c.id)) {
+    return NextResponse.json({ error: `${c.name} je ve věrnostním programu zablokovaný. Body ani razítka se mu nepřipisují.` }, { status: 403 });
+  }
   // Čtečka u kasy: host není členem podniku, obsluha ho jedním klepnutím přidá (bez razítka a bodů).
   if (action === 'join') {
     const x = await summary(u.team_id, c.id, p);

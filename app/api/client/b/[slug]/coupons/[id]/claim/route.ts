@@ -22,6 +22,7 @@ export async function POST(_req: Request, props: { params: Promise<{ slug: strin
   if (!c || (c.valid_until && String(c.valid_until) < pragueToday())) return NextResponse.json({ error: 'Kupon už neplatí.' }, { status: 404 });
   const m = await membership(me.id, teamId);
   if (!m) return NextResponse.json({ error: 'Nejdřív se staň členem podniku.' }, { status: 400 });
+  if (m.blocked === true) return NextResponse.json({ error: 'Tvůj účet je v tomhle podniku zablokovaný. Obrať se na obsluhu.' }, { status: 403 });
   const tier = tierForMember({ visits: Number(m.visits ?? 0), spend: Number(m.spend ?? 0) }, tierRulesFromProfile(p));
   const [us] = await sql`SELECT birthday FROM users WHERE id = ${me.id}`;
   const blocked = await claimBlocker(c, teamId, me.id, { tierId: tier.id, birthday: us?.birthday ?? null });

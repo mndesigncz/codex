@@ -210,7 +210,7 @@ export default function MyPage() {
       )}
 
       <ProfileForm me={d.me} onSaved={(me: any) => { setD({ ...d, me }); setFlash(t('Uloženo.')); }} />
-      <UcetHosta novinky={d.me?.novinky === true} onFlash={setFlash} />
+      <UcetHosta novinky={d.me?.novinky === true} novinkyEmail={d.me?.novinkyEmail !== false} onFlash={setFlash} />
     </div>
   );
 }
