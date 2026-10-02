@@ -31,6 +31,9 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'klient.poukaz.vracen': 'Částka vrácena na dárkový poukaz',
   'klient.poukaz.zrusen': 'Dárkový poukaz zrušen',
   'klient.poukaz.upraven': 'Dárkový poukaz upraven',
+  'klient.poukaz.prodlouzeno': 'Platnost dárkových poukazů prodloužena',
+  'klient.poukaz.odeslan': 'Dárkový poukaz poslán e-mailem',
+  'klient.poukaz.limity': 'Změna limitů uplatnění dárkových poukazů',
   // role
   'role.create': 'Vytvořena role',
   'role.update': 'Upravena role',

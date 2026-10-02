@@ -7,8 +7,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { menaPodniku } from '@/lib/menaPodniku';
 import { pragueToday } from '@/lib/pragueTime';
-import { celaCastka, hodnotyDavky, jeDatum, poukazyCsv, DUVOD_TEXT, MAX_DAVKA } from '@/lib/poukazy';
-import { seznamPoukazu, poukazPodleId, historiePoukazu, vytvorPoukazy, zrusPoukaz, upravPoukaz, vratPoukaz } from '@/lib/poukazyDb';
+import { celaCastka, hodnotyDavky, jeDatum, poukazyCsv, normalizujLimity, overNovouPlatnost, idPoukazu, DUVOD_TEXT, MAX_DAVKA } from '@/lib/poukazy';
+import { emailObdarovaneho, vzkazDarce } from '@/lib/poukazyEmail';
+import { hit } from '@/lib/rateLimit';
+import { seznamPoukazu, poukazPodleId, historiePoukazu, vytvorPoukazy, zrusPoukaz, upravPoukaz, vratPoukaz, ulozLimity, nactiLimity } from '@/lib/poukazyDb';
+import { prehledPoukazu, prodlouzPoukazy, nahledProdlouzeni, odesliPoukaz } from '@/lib/poukazyPrehledDb';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -28,7 +31,21 @@ export async function GET(req: NextRequest) {
     if (jeden) {
       const poukaz = await poukazPodleId(ctx.teamId, jeden, dnes);
       if (!poukaz) return NextResponse.json({ error: 'Poukaz nenalezen.' }, { status: 404 });
-      return NextResponse.json({ poukaz, historie: await historiePoukazu(ctx.teamId, jeden) });
+      return NextResponse.json({ poukaz, historie: await historiePoukazu(ctx.teamId, jeden), limity: await nactiLimity(ctx.teamId) });
+    }
+    // Přehled závazku a měsíců (jen správci: jsou to čísla o penězích podniku).
+    if (u.get('prehled') === '1') {
+      if (!ctx.role.opravneni.has('poukazy.spravovat')) return NextResponse.json({ error: 'Na tohle nemáš v tomto podniku oprávnění.' }, { status: 403 });
+      return NextResponse.json({ ...(await prehledPoukazu(ctx.teamId, dnes)), dnes });
+    }
+    // Náhled hromadného prodloužení: kolik poukazů a na kolik peněz by se dotklo.
+    if (u.get('nahled') === 'prodlouzeni') {
+      if (!ctx.role.opravneni.has('poukazy.spravovat')) return NextResponse.json({ error: 'Na tohle nemáš v tomto podniku oprávnění.' }, { status: 403 });
+      const novy = overNovouPlatnost(u.get('novy'), dnes);
+      const doDne = u.get('doDne');
+      if (!novy.ok) return NextResponse.json({ error: novy.chyba }, { status: 400 });
+      if (!jeDatum(doDne)) return NextResponse.json({ error: 'Vyber, kterým poukazům končí platnost.' }, { status: 400 });
+      return NextResponse.json(await nahledProdlouzeni(ctx.teamId, dnes, novy.datum, doDne, u.get('propadle') === '1'));
     }
     if (u.get('export') === 'csv') {
       // Export nese všechny kódy najednou, a kdo kód zná, může s ním platit: jen správce.
@@ -74,13 +91,46 @@ export async function PATCH(req: NextRequest) {
   const b = await req.json().catch(() => ({}));
   const dnes = pragueToday();
   const poukazId = id(b.id);
-  if (!poukazId) return NextResponse.json({ error: 'Chybí poukaz.' }, { status: 400 });
+  // Hromadné prodloužení a nastavení nepatří jednomu poukazu; ostatní akce ano.
+  if (!poukazId && b.action !== 'extend' && b.action !== 'limits') return NextResponse.json({ error: 'Chybí poukaz.' }, { status: 400 });
   try {
-    if (b.action === 'void') {
+    if (b.action === 'void' && poukazId) {
       const p = await zrusPoukaz(ctx.teamId, ctx.meId, poukazId, dnes, b.note);
       if (!p) return NextResponse.json({ error: 'Poukaz nenalezen.' }, { status: 404 });
       return NextResponse.json({ ok: true, poukaz: p });
     }
+    // Hromadné prodloužení: vybraná id, nebo všem, kterým platnost končí do určitého dne. Jeden příkaz v databázi.
+    if (b.action === 'extend') {
+      const novy = overNovouPlatnost(b.validUntil, dnes);
+      if (!novy.ok) return NextResponse.json({ error: novy.chyba }, { status: 400 });
+      let rozsah: { ids: number[] } | { doDne: string; vcetnePropadlych: boolean };
+      if (b.ids != null) {
+        const ids = idPoukazu(b.ids);
+        if (!ids) return NextResponse.json({ error: 'Vyber poukazy k prodloužení (nejvýš 500).' }, { status: 400 });
+        rozsah = { ids };
+      } else {
+        if (!jeDatum(b.doDne)) return NextResponse.json({ error: 'Vyber, kterým poukazům končí platnost.' }, { status: 400 });
+        rozsah = { doDne: b.doDne, vcetnePropadlych: b.includeExpired === true };
+      }
+      return NextResponse.json({ ok: true, ...(await prodlouzPoukazy(ctx.teamId, ctx.meId, dnes, novy.datum, rozsah)) });
+    }
+    if (b.action === 'limits') {
+      const l = normalizujLimity(b.min, b.max);
+      if (!l.ok) return NextResponse.json({ error: l.chyba }, { status: 400 });
+      if (!(await ulozLimity(ctx.teamId, ctx.meId, l.limity))) return NextResponse.json({ error: 'Podnik nemá zapnutého klienta.' }, { status: 404 });
+      return NextResponse.json({ ok: true, limity: l.limity });
+    }
+    if (b.action === 'send') {
+      const email = emailObdarovaneho(b.email);
+      if (!email) return NextResponse.json({ error: 'Zadej platný e-mail obdarovaného.' }, { status: 400 });
+      const brana = await hit(`poukaz-email:${ctx.teamId}:${ctx.meId}`, 30, 60 * 60);
+      if (!brana.ok) return NextResponse.json({ error: 'Moc odeslaných e-mailů za hodinu. Zkus to za chvíli.' }, { status: 429 });
+      if (!poukazId) return NextResponse.json({ error: 'Chybí poukaz.' }, { status: 400 });
+      const r = await odesliPoukaz(ctx.teamId, ctx.meId, poukazId, email, vzkazDarce(b.message), dnes);
+      if (!r.ok) return NextResponse.json({ error: r.chyba }, { status: r.status });
+      return NextResponse.json({ ok: true, poukaz: await poukazPodleId(ctx.teamId, poukazId, dnes) });
+    }
+    if (!poukazId) return NextResponse.json({ error: 'Chybí poukaz.' }, { status: 400 });
     if (b.action === 'refund') {
       const castka = celaCastka(b.amount);
       if (castka == null) return NextResponse.json({ error: DUVOD_TEXT.necela }, { status: 400 });

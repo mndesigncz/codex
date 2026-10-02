@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { awardBirthdays } from '@/lib/client';
 import { propadniBody } from '@/lib/propadaniBoduDb';
 import { odesliChybisNam } from '@/lib/reaktivace';
+import { pripomenPoukazy } from '@/lib/poukazyPrehledDb';
 import { checkCron } from '@/lib/cronAuth';
 import { hit } from '@/lib/rateLimit';
 import { zDashboardConfig } from '@/lib/widgety/migrace';
@@ -1852,6 +1853,13 @@ export async function GET(request: Request) {
     await ddl(sql`CREATE INDEX IF NOT EXISTS client_vouchers_team ON client_vouchers (team_id, created_at DESC)`);
     await ddl(sql`CREATE UNIQUE INDEX IF NOT EXISTS client_voucher_uses_ref ON client_voucher_uses (voucher_id, ref) WHERE ref IS NOT NULL`);
     await ddl(sql`CREATE INDEX IF NOT EXISTS client_voucher_uses_voucher ON client_voucher_uses (voucher_id, created_at)`);
+    // Poukazy: e-mail obdarovaného, příznaky poslaných připomenutí konce platnosti a limity uplatnění (lib/poukazyDb.ts).
+    await ddl(sql`ALTER TABLE client_vouchers ADD COLUMN IF NOT EXISTS recipient_email TEXT`);
+    await ddl(sql`ALTER TABLE client_vouchers ADD COLUMN IF NOT EXISTS sent_at TIMESTAMP`);
+    await ddl(sql`ALTER TABLE client_vouchers ADD COLUMN IF NOT EXISTS expiry_notified_at DATE`);
+    await ddl(sql`ALTER TABLE client_vouchers ADD COLUMN IF NOT EXISTS expiry_mailed_at DATE`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS voucher_min_use INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS voucher_max_use INTEGER NOT NULL DEFAULT 0`);
     // Platina: čtvrtá úroveň nad Zlatým hostem. 0 = vypnuto.
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS platinum_at INTEGER NOT NULL DEFAULT 0`);
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS platinum_discount INTEGER NOT NULL DEFAULT 0`);
@@ -1999,6 +2007,21 @@ export async function GET(request: Request) {
         created_at TIMESTAMP DEFAULT NOW()
       )`);
     await ddl(sql`CREATE INDEX IF NOT EXISTS client_banners_team_idx ON client_banners (team_id, position)`);
+    // Bannery: cílení (všem / členům / nečlenům / úroveň / skupina), archiv a denní počítadla bez osobních údajů.
+    // Stejné příkazy jsou v lib/clientBanners.ts (zajistiTabulkuBanneru).
+    await ddl(sql`ALTER TABLE client_banners ADD COLUMN IF NOT EXISTS target_kind TEXT NOT NULL DEFAULT 'all'`);
+    await ddl(sql`ALTER TABLE client_banners ADD COLUMN IF NOT EXISTS target_ref TEXT`);
+    await ddl(sql`ALTER TABLE client_banners ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT FALSE`);
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS client_banner_stats (
+        banner_id INTEGER NOT NULL,
+        team_id INTEGER NOT NULL,
+        day DATE NOT NULL,
+        views INTEGER NOT NULL DEFAULT 0,
+        clicks INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (banner_id, day)
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_banner_stats_team ON client_banner_stats (team_id, day)`);
 
     // ---- Sdílené číselníky (kolo 60) ----
     // Řádek číselníku patří dál svému podniku; sdílení je jen ve čtení
@@ -2206,6 +2229,8 @@ export async function GET(request: Request) {
     // úloha je idempotentní, opakované volání téhož dne nic nezdvojí.
     let propadleBody = { expired: 0, warned: 0 };
     try { propadleBody = await propadniBody(); } catch { /* nesmí shodit migrace */ }
+    // Poukazy: připomenutí konce platnosti podniku i obdarovaným (jednou za platnost, idempotentní).
+    try { await pripomenPoukazy(); } catch { /* nesmí shodit migrace */ }
 
     // ---- Kolo 77: nativní obal a obchody (App Store, Google Play) ----
     // Vše idempotentní; kód, který tyhle tabulky čte, je před migrací fail-open.

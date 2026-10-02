@@ -20,11 +20,14 @@ import { dbTimeDayHM, pragueToday, dayPlus } from '@/lib/pragueTime';
 import { HLASKA_NEJDE_ULOZIT, ulozSoubor } from '@/lib/stahni';
 import { openPrint } from '@/lib/printDoc';
 import { poukazyKartyHtml, datumCesky, type KartaPoukazu } from '@/lib/poukazyTisk';
-import { formatujPriPsani, overKod, STAV_POPISEK, MAX_DAVKA, type StavPoukazu } from '@/lib/poukazy';
+import { formatujPriPsani, overKod, STAV_POPISEK, MAX_DAVKA, type StavPoukazu, type LimityUplatneni } from '@/lib/poukazy';
+import PoukazyPrehled from './loyalty/PoukazyPrehled';
+import PoukazyOdeslani from './loyalty/PoukazyOdeslani';
 
 interface PoukazRadek {
   id: number; code: string; value_amount: number; balance: number; currency: string; recipient_name: string | null; buyer_name: string | null;
   note: string | null; valid_until: string | null; status: string; created_at: string; stav: StavPoukazu;
+  recipient_email?: string | null; sent_at?: string | null;
 }
 interface Pouziti { id: number; kind: string; amount: number; balance_after: number | null; by_name: string | null; note: string | null; created_at: string }
 
@@ -73,6 +76,8 @@ export default function Poukazy({ toast }: { toast: (m: string) => void }) {
   const [hledam, setHledam] = useState(false);
   const [exportuji, setExportuji] = useState(false);
   const [podnik, setPodnik] = useState('Podnik');
+  // Změna poukazů (prodloužení, uplatnění v detailu) přepočítá i přehled nad seznamem.
+  const [obnovPrehled, setObnovPrehled] = useState(0);
 
   useEffect(() => {
     // Název podniku na kartu poukazu.
@@ -118,6 +123,7 @@ export default function Poukazy({ toast }: { toast: (m: string) => void }) {
 
   return (
     <div className="space-y-4">
+      {spravuje && <PoukazyPrehled toast={toast} obnov={obnovPrehled} onZmena={() => { void nacti(); }} />}
       <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-4 items-start">
         {uplatni && (
           <Card as="form" className="space-y-3" onSubmit={najdiKod}>
@@ -177,7 +183,7 @@ export default function Poukazy({ toast }: { toast: (m: string) => void }) {
 
       {novy && <NovyPoukaz toast={toast} onZavrit={() => setNovy(false)} onHotovo={r => { setNovy(false); setVytvorene(r); setStrana(1); void nacti(); }} />}
       {vytvorene && <Vytvorene poukazy={vytvorene} podnik={podnik} toast={toast} onZavrit={() => setVytvorene(null)} onOtevri={id => { setVytvorene(null); setDetailId(id); }} />}
-      {detailId != null && <Detail id={detailId} podnik={podnik} toast={toast} spravuje={spravuje} uplatni={uplatni} onZavrit={() => { setDetailId(null); void nacti(); }} onZmena={() => { void nacti(); }} />}
+      {detailId != null && <Detail id={detailId} podnik={podnik} toast={toast} spravuje={spravuje} uplatni={uplatni} onZavrit={() => { setDetailId(null); void nacti(); setObnovPrehled(n => n + 1); }} onZmena={() => { void nacti(); setObnovPrehled(n => n + 1); }} />}
     </div>
   );
 }
@@ -284,6 +290,7 @@ function Detail({ id, podnik, toast, spravuje, uplatni, onZavrit, onZmena }: {
   const [poznamka, setPoznamka] = useState('');
   const [rusim, setRusim] = useState(false);
   const [vracim, setVracim] = useState<Pouziti | null>(null);
+  const [limity, setLimity] = useState<LimityUplatneni | null>(null);
   // Jedna záměrná akce = jedno ref: opakování po výpadku sítě se neodečte dvakrát.
   const ref = useRef<string | null>(null);
   const novyRef = () => (ref.current ??= (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `r${Date.now()}${Math.random().toString(36).slice(2)}`));
@@ -291,7 +298,7 @@ function Detail({ id, podnik, toast, spravuje, uplatni, onZavrit, onZmena }: {
   const nacti = useCallback(async () => {
     try {
       const d = await j(`/api/client/admin/vouchers?id=${id}`);
-      setP(d.poukaz); setHist(d.historie ?? []); setChyba(null);
+      setP(d.poukaz); setHist(d.historie ?? []); setLimity(d.limity ?? null); setChyba(null);
       setPlatnost(d.poukaz.valid_until ?? ''); setPoznamka(d.poukaz.note ?? '');
     } catch (e) { setChyba(apiMessage(e, 'Poukaz se nepodařilo načíst.')); }
   }, [id]);
@@ -360,6 +367,7 @@ function Detail({ id, podnik, toast, spravuje, uplatni, onZavrit, onZmena }: {
                       <Button type="submit" variant="primary" icon="check" loading={busy === 'uplatnit'} disabled={!castkaOk}>Uplatnit</Button>
                       <Button type="button" variant="secondary" disabled={busy === 'uplatnit'} onClick={() => { setCastka(String(p.balance)); ref.current = null; void uplatniCastku(p.balance); }}>Celý zůstatek ({money(p.balance)})</Button>
                     </div>
+                    {limity && (limity.min > 0 || limity.max > 0) && <p className="t-meta">Nastavení podniku: {limity.min > 0 ? `nejméně ${money(limity.min)}` : 'bez dolního limitu'}, {limity.max > 0 ? `nejvýš ${money(limity.max)} najednou` : 'bez horního limitu'}. Celý zbytek jde uplatnit vždy.</p>}
                     <Input aria-label="Poznámka k uplatnění" value={poznamkaUplatneni} onChange={e => setPoznamkaUplatneni(e.target.value)} maxLength={200} placeholder="Poznámka (třeba číslo účtenky)" />
                   </>
                 ) : <p className="t-meta">{p.stav === 'expired' ? 'Platnost poukazu skončila. Správce ji může prodloužit.' : p.stav === 'used' ? 'Poukaz je vyčerpaný.' : 'Poukaz je zrušený.'}</p>}
@@ -386,6 +394,7 @@ function Detail({ id, podnik, toast, spravuje, uplatni, onZavrit, onZmena }: {
                 </div>
               </div>
             )}
+            {spravuje && p.stav === 'active' && <PoukazyOdeslani poukazId={p.id} ulozenyEmail={p.recipient_email ?? null} odeslano={p.sent_at ?? null} toast={toast} onHotovo={() => { void nacti(); onZmena(); }} />}
             {!spravuje && p.note && <p className="t-meta">{p.note}</p>}
 
             <div>

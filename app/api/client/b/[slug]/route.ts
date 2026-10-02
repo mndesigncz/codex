@@ -8,10 +8,10 @@ import { slevaClena } from '@/lib/urovneDb';
 import { sql, customer, profileBySlug, publicProfile, membership } from '@/lib/client';
 import { activeCampaigns, progressFor } from '@/lib/stamps';
 import { shapeCoupon, windowOk, ageFrom, TIER_LABELS } from '@/lib/coupons';
-import { pragueToday, pragueHM } from '@/lib/pragueTime';
+import { pragueToday, pragueHM, pragueDaySafe } from '@/lib/pragueTime';
 import { buildBoard, publicShape, menaListku } from '@/lib/menu';
 import { menaZRadku } from '@/lib/mena';
-import { aktivniBannery } from '@/lib/clientBanners';
+import { aktivniBannery, kontextHosta } from '@/lib/clientBanners';
 import { aktivniBonus } from '@/lib/bonusAkceDb';
 import { dokdyDnes } from '@/lib/bonusAkce';
 import { planClena } from '@/lib/propadaniBoduDb';
@@ -105,7 +105,7 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
       WHERE team_id = ${teamId} AND customer_id = ${me.id} AND date >= ${today} AND status NOT IN ('cancelled','declined','done')
       ORDER BY date, time`;
     const claims = await sql`
-      SELECT cl.id, cl.code, cl.claimed_at, cl.redeemed_at, c.title FROM client_coupon_claims cl JOIN client_coupons c ON c.id = cl.coupon_id
+      SELECT cl.id, cl.code, cl.claimed_at, cl.redeemed_at, c.title, c.valid_until FROM client_coupon_claims cl JOIN client_coupons c ON c.id = cl.coupon_id
       WHERE cl.team_id = ${teamId} AND cl.customer_id = ${me.id} AND cl.redeemed_at IS NULL ORDER BY cl.claimed_at DESC`;
     const tier = tierForMember({ visits: Number(m?.visits ?? 0), spend: Number(m?.spend ?? 0) }, tierRulesFromProfile(p));
     // Sleva = nejvyšší z úrovně a slev skupin; host vidí i odkud je.
@@ -122,6 +122,8 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
         id: c.id, name: c.name, description: c.description, required: c.required_stamps,
         reward: c.reward_title, stamps: Number(myProg.get(c.id)?.stamps ?? 0),
         completed: Number(myProg.get(c.id)?.completed ?? 0),
+        // Doba na dokončení: karta se nuluje, když od posledního razítka uplyne víc než `daysToFinish` dní.
+        daysToFinish: c.days_to_finish, lastStampDay: pragueDaySafe(myProg.get(c.id)?.last_stamp_at) || null,
       })),
       reservations, claims,
     };
@@ -229,7 +231,8 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
     return { ...s, cost_points: s.costPoints, valid_until: s.validUntil, blocked };
   });
   // Promo bannery podniku (max 5, aktivní a v platnosti). Obsah je data podniku.
-  const banners = await aktivniBannery(teamId, today);
+  // Cílení: člen vidí jiné bannery než nečlen; úroveň a skupiny se berou z hostova členství.
+  const banners = await aktivniBannery(teamId, today, await kontextHosta(teamId, me?.id ?? null, mine));
   // Bonusová akce, která právě běží („Dnes dvojnásobné body do 18:00"); text skládá stránka přes t().
   let bonus: any = null;
   if (p.loyalty_on) {

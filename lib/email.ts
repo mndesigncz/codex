@@ -248,3 +248,14 @@ export async function sendDigestEmail(to: string, businessName: string, dateLabe
     `,
   });
 }
+
+/**
+ * E-mail kolem dárkového poukazu (poukaz pro obdarovaného, připomenutí konce platnosti). Obsah skládá
+ * lib/poukazyEmail.ts; tady se jen odešle a přečte výsledek. `replyTo` je e-mail podniku, ať odpověď
+ * obdarovaného nepadá do prázdna.
+ */
+export async function sendVoucherEmail(to: string, businessName: string, obsah: { subject: string; html: string }, replyTo?: string | null): Promise<SendResult> {
+  // Jméno podniku jde do hlavičky „Od“: úhlové závorky a uvozovky by ji rozbily.
+  const jmeno = businessName.replace(/[<>"\r\n]/g, '').trim().slice(0, 60) || 'podnik';
+  return send({ label: `Managero — ${jmeno}`, to, replyTo: replyTo ?? null, subject: obsah.subject, html: obsah.html });
+}

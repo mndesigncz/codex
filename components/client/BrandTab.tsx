@@ -15,7 +15,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { onAccent, staciKontrast } from '@/lib/floorplan';
 import { Icon } from '../Icons';
 import { Button, Card, Field, Input, PageHeader, Skeleton, ErrorState, Textarea } from '../ui';
-import BannersEditor from './BannersEditor';
+import BanneryEditor from './loyalty/BanneryEditor';
 
 /** Předvolené barvy značky — podnik si může vybrat i vlastní. */
 const ACCENTS = ['#C8F542', '#E8A33D', '#D9644A', '#7C9A6B', '#4A7DBF', '#9B6BAE', '#16181A'];
@@ -195,7 +195,7 @@ export default function BrandTab({ toast, onChange }: { toast: (m: string) => vo
       </Card>
     </form>
     {/* Bannery se ukládají samy (vlastní tlačítka), proto stojí mimo formulář Vzhledu. */}
-    <BannersEditor toast={toast} upload={uploadImage} accent={p.accent || ''} />
+    <BanneryEditor toast={toast} upload={uploadImage} accent={p.accent || ''} />
     </div>
   );
 }

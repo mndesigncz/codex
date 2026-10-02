@@ -19,8 +19,36 @@ export interface PromoBanner {
 
 const DOBA_MS = 7000;
 
-export default function PromoBanners({ banners, accent, loyaltyOn, onGoTab }: {
+/**
+ * Statistika bez osobních údajů: banner se počítá jako zobrazený, když se ukáže, nejvýš jednou za
+ * návštěvu stránky (sessionStorage; bez něj jednou za načtení komponenty). Náhled v editoru
+ * (bez `slug`) nic neposílá. Výpadek sítě nic nerozbije: statistika není důležitější než stránka.
+ */
+function posliUdalost(slug: string | undefined, id: number, type: 'view' | 'click') {
+  if (!slug || id < 1) return;
+  try {
+    fetch(`/api/client/b/${encodeURIComponent(slug)}/banner-event`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, type }), keepalive: true,
+    }).catch(() => {});
+  } catch { /* bez statistiky se dá žít */ }
+}
+const videno = new Set<string>();
+function jednouZobrazen(slug: string | undefined, id: number) {
+  if (!slug) return;
+  const klic = `banner-view:${slug}:${id}`;
+  if (videno.has(klic)) return;
+  videno.add(klic);
+  try {
+    if (window.sessionStorage.getItem(klic)) return;
+    window.sessionStorage.setItem(klic, '1');
+  } catch { /* soukromé okno: stačí paměť stránky */ }
+  posliUdalost(slug, id, 'view');
+}
+
+export default function PromoBanners({ banners, accent, loyaltyOn, onGoTab, slug }: {
   banners: PromoBanner[]; accent: string; loyaltyOn: boolean; onGoTab: (tab: 'menu' | 'loyalty') => void;
+  /** Slug podniku zapíná statistiku zobrazení a prokliků; bez něj (náhled v editoru) se nic neposílá. */
+  slug?: string;
 }) {
   const t = useT('klient-host');
   const [i, setI] = useState(0);
@@ -44,8 +72,11 @@ export default function PromoBanners({ banners, accent, loyaltyOn, onGoTab }: {
     return () => clearTimeout(h);
   }, [i, n, mene, pauza, najeto]);
 
+  const idx = Math.min(i, Math.max(0, n - 1));
+  const idAktualniho = banners[idx]?.id ?? 0;
+  useEffect(() => { jednouZobrazen(slug, idAktualniho); }, [slug, idAktualniho]);
+
   if (n === 0) return null;
-  const idx = Math.min(i, n - 1);
   const go = (d: number) => setI(x => (x + d + n) % n);
 
   return (
@@ -55,7 +86,7 @@ export default function PromoBanners({ banners, accent, loyaltyOn, onGoTab }: {
       {banners.map((b, k) => (
         <div key={b.id} role="group" aria-roledescription={t('snímek')} aria-label={t('Oznámení {n} z {total}', { n: k + 1, total: n })}
           hidden={k !== idx} data-banner={b.id}>
-          <Slide b={b} accent={accent} loyaltyOn={loyaltyOn} onGoTab={onGoTab} />
+          <Slide b={b} accent={accent} loyaltyOn={loyaltyOn} onGoTab={onGoTab} onClick={() => posliUdalost(slug, b.id, 'click')} />
         </div>
       ))}
       {n > 1 && (
@@ -87,16 +118,21 @@ export default function PromoBanners({ banners, accent, loyaltyOn, onGoTab }: {
   );
 }
 
-function Slide({ b, accent, loyaltyOn, onGoTab }: { b: PromoBanner; accent: string; loyaltyOn: boolean; onGoTab: (tab: 'menu' | 'loyalty') => void }) {
+function Slide({ b, accent, loyaltyOn, onGoTab, onClick }: { b: PromoBanner; accent: string; loyaltyOn: boolean; onGoTab: (tab: 'menu' | 'loyalty') => void; onClick?: () => void }) {
   const t = useT('klient-host');
   const foto = !!b.imageUrl;
   const url = b.linkKind === 'url' ? httpsOdkaz(b.linkRef) : null;
-  const vnitrni = b.linkKind === 'menu' || b.linkKind === 'event' || (b.linkKind === 'coupon' && loyaltyOn);
-  const popisek = b.linkKind === 'menu' ? t('Otevřít nabídku') : b.linkKind === 'coupon' ? t('Ukázat kupony') : b.linkKind === 'event' ? t('Zobrazit akce') : t('Zjistit více');
+  const veVernosti = b.linkKind === 'coupon' || b.linkKind === 'campaign';
+  const vnitrni = b.linkKind === 'menu' || b.linkKind === 'event' || (veVernosti && loyaltyOn);
+  const popisek = b.linkKind === 'menu' ? t('Otevřít nabídku') : b.linkKind === 'coupon' ? (b.linkRef ? t('Ukázat kupon') : t('Ukázat kupony'))
+    : b.linkKind === 'campaign' ? t('Ukázat razítkovou kartu') : b.linkKind === 'event' ? t('Zobrazit akce') : t('Zjistit více');
   const otevri = () => {
-    if (b.linkKind === 'coupon') onGoTab('loyalty');
+    onClick?.();
+    if (veVernosti) onGoTab('loyalty');
     else onGoTab('menu');
-    if (b.linkKind === 'event') setTimeout(() => document.getElementById('h-events')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+    // Cíl na stránce (kupon, razítková karta, akce) se dohledá až po přepnutí záložky; chybí-li, zůstane se nahoře.
+    const cil = b.linkKind === 'event' ? 'h-events' : b.linkKind === 'coupon' && b.linkRef ? `kupon-${b.linkRef}` : b.linkKind === 'campaign' && b.linkRef ? `karta-${b.linkRef}` : null;
+    if (cil) setTimeout(() => document.getElementById(cil)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80);
   };
   const cta = 'tap-target inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold active:scale-[0.98] transition';
   return (
@@ -113,7 +149,7 @@ function Slide({ b, accent, loyaltyOn, onGoTab }: { b: PromoBanner; accent: stri
         {(url || vnitrni) && (
           <div className="mt-1">
             {url ? (
-              <a href={url} target="_blank" rel="noopener noreferrer nofollow" className={cta} style={{ background: accent, color: onAccent(accent) }}>
+              <a href={url} target="_blank" rel="noopener noreferrer nofollow" onClick={onClick} className={cta} style={{ background: accent, color: onAccent(accent) }}>
                 {popisek}<Icon name="external" size={14} />
               </a>
             ) : (
