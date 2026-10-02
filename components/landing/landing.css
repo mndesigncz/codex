@@ -197,7 +197,7 @@ html:has(.ld-root) body::after { display: none; }
 @media (min-width: 768px) {
   .ld-stage {
     display: flex; align-items: flex-start; justify-content: center;
-    min-height: max(calc(100cqw * 0.6273 + 1vw + 6px), 37rem);
+    min-height: max(calc(100cqw * 0.6273 + clamp(16px, 2.6vw, 5rem)), 37rem);
   }
   .ld-stage > .ld-ram { flex: 0 1 100%; }
   .ld-stage > .ld-ram[data-zar="telefon"] { flex-basis: 19rem; }
