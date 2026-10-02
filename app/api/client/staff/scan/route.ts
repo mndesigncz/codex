@@ -24,7 +24,6 @@ import { activeCampaigns, progressFor, applyBillToCampaigns, isoDow, prubehHosta
 import { getConnection, billDetail } from '@/lib/storyous';
 import { menaPodniku } from '@/lib/menaPodniku';
 import { benefitLabel } from '@/lib/coupons';
-import { zajistiKupony } from '@/lib/kuponyDb';
 import { aktivniBonus } from '@/lib/bonusAkceDb';
 import { poznamkaRazitek } from '@/lib/bonusAkce';
 import { odmenaZUctu, zapisZbytek, zapisPripsaneZaUctenku } from '@/lib/bodyPravidlaDb';
@@ -60,7 +59,8 @@ async function summary(teamId: number, customerId: number, p?: any) {
   const mena = await menaPodniku(teamId);
   // Kupony čekající na uplatnění; `stamps` = odměna za plnou razítkovou kartu (hotová k vyzvednutí).
   const claimRows = await sql`
-    SELECT cl.code, c.title, c.kind, c.valid_until, c.benefit_kind, c.percent_off, c.amount_off, c.xy_buy, c.xy_free
+    SELECT cl.code, c.title, c.kind, c.valid_until, c.benefit_kind, c.percent_off, c.amount_off, c.xy_buy, c.xy_free,
+           (SELECT mi.name FROM menu_items mi WHERE mi.id = c.menu_item_id) AS menu_item_name
     FROM client_coupon_claims cl JOIN client_coupons c ON c.id = cl.coupon_id
     WHERE cl.team_id = ${teamId} AND cl.customer_id = ${customerId} AND cl.redeemed_at IS NULL ORDER BY cl.claimed_at` as any[];
   const claims = claimRows.map(r => ({
@@ -75,10 +75,9 @@ async function summary(teamId: number, customerId: number, p?: any) {
   } catch { birthdayToday = false; }
   // Kupony za body, na které host právě teď dosáhne — obsluha je nabídne.
   const points = Number(m?.points ?? 0);
-  await zajistiKupony().catch(() => {});
   const affordable = await sql`
     SELECT id, title, cost_points FROM client_coupons
-    WHERE team_id = ${teamId} AND active = TRUE AND status = 'live' AND kind = 'offer' AND cost_points > 0 AND cost_points <= ${points}
+    WHERE team_id = ${teamId} AND active = TRUE AND kind = 'offer' AND draft = FALSE AND archived_at IS NULL AND cost_points > 0 AND cost_points <= ${points}
     ORDER BY cost_points DESC LIMIT 5`;
   const last = parseDbTime(m?.last_visit_at);
   const visits = Number(m?.visits ?? 0);

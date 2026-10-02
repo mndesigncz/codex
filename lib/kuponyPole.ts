@@ -12,6 +12,18 @@ const pos = (v: any, max: number): number | null => {
   return Number.isFinite(n) && n > 0 ? Math.min(max, n) : null;
 };
 
+function odkazyZTela(raw: any, klic: 'itemId' | 'sectionId'): { id: number; name: string }[] {
+  if (!Array.isArray(raw)) return [];
+  const videno = new Set<number>(); const out: { id: number; name: string }[] = [];
+  for (const x of raw) {
+    const id = Math.round(Number(x?.[klic]));
+    if (!Number.isInteger(id) || id <= 0 || videno.has(id)) continue;
+    videno.add(id); out.push({ id, name: String(x?.name ?? '').slice(0, 120) });
+    if (out.length >= 50) break;
+  }
+  return out;
+}
+
 export function normalizujKupon(b: any) {
   const days = Array.isArray(b.daysOfWeek)
     ? Array.from(new Set(b.daysOfWeek.map((x: any) => Math.round(Number(x))).filter((n: number) => n >= 1 && n <= 7))).sort() as number[]
@@ -39,6 +51,11 @@ export function normalizujKupon(b: any) {
     hour_till: HM_RE.test(String(b.hourTill)) ? String(b.hourTill) : null,
     adult_only: b.adultOnly === true,
     welcome: b.welcome === true,
+    /** Kupon vázaný na položku nabídky („Zdarma: Dezert dne“); id se na serveru ověřuje na tým. */
+    menu_item_id: pos(b.menuItemId, 2_000_000_000),
+    /** Vyloučené položky a kategorie: připomínka pro hosta i obsluhu, slevu z účtenky nikdo automaticky nepočítá. */
+    excluded_items: odkazyZTela(b.excludedItems, 'itemId').map(x => ({ itemId: x.id, name: x.name })),
+    excluded_sections: odkazyZTela(b.excludedSections, 'sectionId').map(x => ({ sectionId: x.id, name: x.name })),
     valid_since: DATE_RE.test(String(b.validSince)) ? String(b.validSince) : null,
     valid_until: DATE_RE.test(String(b.validUntil ?? b.valid_until)) ? String(b.validUntil ?? b.valid_until) : null,
   };

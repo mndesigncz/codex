@@ -159,8 +159,4 @@
   "Kupony došly.": "The coupons are all gone.",
   "Odměna tohoto kódu už není k dispozici.": "This code's reward is no longer available.",
   "Kupony z tohoto kódu už došly.": "The coupons for this code have run out."
-  "Kupon už došel.": "This coupon is sold out.",
-  "Kupon k tomuhle kódu už neplatí.": "The coupon for this code is no longer valid.",
-  "Kupon z tohoto kódu už došel.": "The coupon for this code has run out.",
-  "Kód se nepodařilo uplatnit. Zkus to znovu.": "We could not apply the code. Please try again."
 }

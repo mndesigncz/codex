@@ -23,26 +23,33 @@ export function tierList(raw: any): string[] {
 export type FormatCastky = (n: number) => string;
 export const VCH_KORUNY: FormatCastky = n => `${n} Kč`;
 
-/** Krátký popisek výhody pro obsluhu i hosta: „Sleva 15 %", „−50 Kč", „2+1". */
-export function benefitLabel(c: any, castka: FormatCastky = VCH_KORUNY): string {
-  const kind = String(c.benefit_kind ?? 'text');
-  // Kupon vázaný na položku nabídky: výhoda se týká jen jí („Sleva 20 % na Matchu").
-  const item = String(c.item_name ?? '').trim();
-  const na = item ? ` na ${item}` : '';
-  if (kind === 'percent' && Number(c.percent_off) > 0) return `Sleva ${Number(c.percent_off)} %${na}`;
-  if (kind === 'amount' && Number(c.amount_off) > 0) return `Sleva ${castka(Number(c.amount_off))}${na}`;
-  if (kind === 'free_item') return item ? `Zdarma: ${item}` : 'Položka zdarma';
-  if (kind === 'xy' && Number(c.xy_buy) > 0) return `${Number(c.xy_buy)}+${Math.max(1, Number(c.xy_free) || 1)} zdarma${na}`;
-  return '';
+/** Odkazy na položky a kategorie nabídky z JSONB sloupce: jen platná čísla, s názvem (když ho řádek nese). */
+export function odkazyList(raw: any, klic: 'itemId' | 'sectionId'): { id: number; name: string }[] {
+  const pole = typeof raw === 'string' ? (() => { try { return JSON.parse(raw); } catch { return []; } })() : raw;
+  if (!Array.isArray(pole)) return [];
+  const videno = new Set<number>(); const out: { id: number; name: string }[] = [];
+  for (const x of pole) {
+    const id = Math.round(Number(x?.[klic]));
+    if (!Number.isInteger(id) || id <= 0 || videno.has(id)) continue;
+    videno.add(id); out.push({ id, name: String(x?.name ?? '').slice(0, 120) });
+    if (out.length >= 50) break;
+  }
+  return out;
 }
 
-/** Vyloučené kategorie a položky jako text pro štítek („mimo Víno, Pivo"). */
-export function vyloucenoText(c: any): string {
-  const kat = Array.isArray(c.excluded_categories) ? c.excluded_categories.map(String).filter(Boolean) : [];
-  const pol = Array.isArray(c.excluded_item_names) ? c.excluded_item_names.map(String).filter(Boolean) : [];
-  const vse = [...kat, ...pol];
-  if (!vse.length) return '';
-  return `mimo ${vse.slice(0, 3).join(', ')}${vse.length > 3 ? ` a ${vse.length - 3} další` : ''}`;
+/**
+ * Krátký popisek výhody pro obsluhu i hosta: „Sleva 15 %", „−50 Kč", „2+1". Kupon vázaný na položku
+ * nabídky (`menu_item_name` z JOINu) jmenuje položku: „Zdarma: Dezert dne", „Sleva 20 % na Dezert dne".
+ */
+export function benefitLabel(c: any, castka: FormatCastky = VCH_KORUNY): string {
+  const kind = String(c.benefit_kind ?? 'text');
+  const polozka = c.menu_item_name ? String(c.menu_item_name) : '';
+  const na = polozka ? ` na ${polozka}` : '';
+  if (kind === 'percent' && Number(c.percent_off) > 0) return `Sleva ${Number(c.percent_off)} %${na}`;
+  if (kind === 'amount' && Number(c.amount_off) > 0) return `Sleva ${castka(Number(c.amount_off))}${na}`;
+  if (kind === 'free_item') return polozka ? `Zdarma: ${polozka}` : 'Položka zdarma';
+  if (kind === 'xy' && Number(c.xy_buy) > 0) return `${Number(c.xy_buy)}+${Math.max(1, Number(c.xy_free) || 1)} zdarma${polozka ? `: ${polozka}` : ''}`;
+  return '';
 }
 
 /** Štítky podmínek, které mají viset na kartě kuponu (host i obsluha). */
@@ -58,7 +65,7 @@ export function conditionBadges(c: any, castka: FormatCastky = VCH_KORUNY): stri
   }
   if (c.hour_from && c.hour_till) out.push(`${c.hour_from}–${c.hour_till}`);
   if (c.adult_only === true) out.push('18+');
-  const mimo = vyloucenoText(c);
-  if (mimo) out.push(mimo);
+  const vyloucene = [...odkazyList(c.excluded_items, 'itemId'), ...odkazyList(c.excluded_sections, 'sectionId')].map(x => x.name).filter(Boolean);
+  if (vyloucene.length) out.push(`mimo: ${vyloucene.slice(0, 3).join(', ')}${vyloucene.length > 3 ? ` a ${vyloucene.length - 3} dalších` : ''}`);
   return out;
 }

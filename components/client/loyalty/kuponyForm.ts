@@ -9,6 +9,9 @@ export type FormKupon = {
   minOrderValue: string; maxTotal: string; dailyLimit: string; targetTiers: string[]; targetGroups: number[];
   perCustomer: number; cooldownDays: number; daysOfWeek: number[]; hourFrom: string; hourTill: string;
   adultOnly: boolean; welcome: boolean; validSince: string; validUntil: string;
+  /** Kupon vázaný na položku nabídky (id, nebo prázdné) a vyloučené položky a kategorie (připomínka pro hosta i obsluhu). */
+  menuItemId: string;
+  excludedItems: { itemId: number; name: string }[]; excludedSections: { sectionId: number; name: string }[];
   /** Kolik kusů je už vydáno (jen u existujícího kuponu; ukazuje se u limitu). */
   issued: number;
 };
@@ -18,7 +21,7 @@ export const prazdnyKupon = (): FormKupon => ({
   benefitKind: 'percent', percentOff: '', amountOff: '', xyBuy: '', xyFree: '1',
   minOrderValue: '', maxTotal: '', dailyLimit: '', targetTiers: [], targetGroups: [],
   perCustomer: 0, cooldownDays: 0, daysOfWeek: [], hourFrom: '', hourTill: '',
-  adultOnly: false, welcome: false, validSince: '', validUntil: '', issued: 0,
+  adultOnly: false, welcome: false, validSince: '', validUntil: '', menuItemId: '', excludedItems: [], excludedSections: [], issued: 0,
 });
 
 export function kuponNaForm(c: any): FormKupon {
@@ -37,6 +40,8 @@ export function kuponNaForm(c: any): FormKupon {
     adultOnly: c.adultOnly === true, welcome: c.welcome === true,
     validSince: c.validSince ? String(c.validSince).slice(0, 10) : '',
     validUntil: c.validUntil ? String(c.validUntil).slice(0, 10) : '',
+    menuItemId: c.menuItemId == null ? '' : String(c.menuItemId),
+    excludedItems: c.excludedItems ?? [], excludedSections: c.excludedSections ?? [],
     issued: Number(c.issued) || 0,
   };
 }
@@ -61,3 +66,10 @@ export const TIER_VOLBY: { id: string; label: string }[] = [
   { id: 'gold', label: 'Zlatý' }, { id: 'platinum', label: 'Platinový' },
 ];
 export const DNY_TYDNE = [{ d: 1, l: 'Po' }, { d: 2, l: 'Út' }, { d: 3, l: 'St' }, { d: 4, l: 'Čt' }, { d: 5, l: 'Pá' }, { d: 6, l: 'So' }, { d: 7, l: 'Ne' }];
+
+/** Stažení souboru ze serveru (CSV): odkaz s `download`, ať se neotevírá nová karta. */
+export function stahni(url: string) {
+  const a = document.createElement('a');
+  a.href = url; a.download = ''; a.rel = 'noopener';
+  document.body.appendChild(a); a.click(); a.remove();
+}

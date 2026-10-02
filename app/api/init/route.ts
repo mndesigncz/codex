@@ -1858,23 +1858,6 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS adult_only BOOLEAN NOT NULL DEFAULT FALSE`);
     await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS welcome BOOLEAN NOT NULL DEFAULT FALSE`);
     await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS valid_since TEXT`);
-    // Kupony v plné síle (kolo 81): koncept/archiv, limity kusů a denních uplatnění,
-    // kupon vázaný na položku nabídky, vyloučené položky a kategorie, kdo a za kolik uplatnil.
-    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'live'`);
-    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS total_limit INTEGER`);
-    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS daily_limit INTEGER`);
-    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS issued INTEGER`);
-    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS redeem_day TEXT`);
-    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS redeem_count INTEGER NOT NULL DEFAULT 0`);
-    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS menu_item_id INTEGER`);
-    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS excluded_items JSONB NOT NULL DEFAULT '[]'`);
-    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS excluded_categories JSONB NOT NULL DEFAULT '[]'`);
-    await ddl(sql`ALTER TABLE client_coupon_claims ADD COLUMN IF NOT EXISTS redeemed_by INTEGER`);
-    await ddl(sql`ALTER TABLE client_coupon_claims ADD COLUMN IF NOT EXISTS redeemed_amount INTEGER`);
-    await ddl(sql`ALTER TABLE client_coupon_claims ADD COLUMN IF NOT EXISTS source TEXT`);
-    await ddl(sql`ALTER TABLE client_coupon_claims ADD COLUMN IF NOT EXISTS sent_by INTEGER`);
-    await ddl(sql`ALTER TABLE client_coupon_claims ADD COLUMN IF NOT EXISTS promo_id INTEGER`);
-    await ddl(sql`CREATE INDEX IF NOT EXISTS client_coupon_claims_coupon ON client_coupon_claims (coupon_id)`);
     // Ruční skupiny členů („štamgasti", „firemní akce") — cílení kuponů a zpráv.
     await ddl(sql`
       CREATE TABLE IF NOT EXISTS client_groups (
@@ -2057,6 +2040,10 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS daily_day TEXT`);
     await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS draft BOOLEAN NOT NULL DEFAULT FALSE`);
     await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS archived_at TIMESTAMP`);
+    // Kupon vázaný na položku nabídky a vyloučené položky a kategorie (připomínka pro hosta i obsluhu).
+    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS menu_item_id INTEGER`);
+    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS excluded_items JSONB NOT NULL DEFAULT '[]'`);
+    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS excluded_sections JSONB NOT NULL DEFAULT '[]'`);
     await ddl(sql`ALTER TABLE client_coupon_claims ADD COLUMN IF NOT EXISTS redeemed_by INTEGER`);
     await ddl(sql`ALTER TABLE client_coupon_claims ADD COLUMN IF NOT EXISTS order_value NUMERIC(12,2)`);
     await ddl(sql`ALTER TABLE client_coupon_claims ADD COLUMN IF NOT EXISTS source TEXT`);

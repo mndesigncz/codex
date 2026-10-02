@@ -14,7 +14,7 @@ import { pragueToday } from './pragueTime';
 import { pragueDow, ageFrom, windowOk, stavKuponu, kusyZbyva, jeVidetelnyHostum } from './kuponyPravidla';
 export { pragueDow, ageFrom, windowOk };
 import type { TierId } from './clientSlots';
-import { TIER_LABELS, TIER_RANK, intList, tierList, benefitLabel, conditionBadges, type FormatCastky } from './kuponyPopisky';
+import { TIER_LABELS, TIER_RANK, intList, tierList, odkazyList, benefitLabel, conditionBadges, type FormatCastky } from './kuponyPopisky';
 export { TIER_LABELS, benefitLabel, conditionBadges };
 export type { FormatCastky };
 
@@ -37,6 +37,9 @@ export function shapeCoupon(r: any, castka?: FormatCastky) {
     perCustomer: Number(r.per_customer) || 0, cooldownDays: Number(r.cooldown_days) || 0,
     daysOfWeek: intList(r.days_of_week), hourFrom: r.hour_from ?? null, hourTill: r.hour_till ?? null,
     adultOnly: r.adult_only === true, welcome: r.welcome === true,
+    menuItemId: r.menu_item_id == null ? null : Number(r.menu_item_id), menuItemName: r.menu_item_name ? String(r.menu_item_name) : null,
+    excludedItems: odkazyList(r.excluded_items, 'itemId').map(x => ({ itemId: x.id, name: x.name })),
+    excludedSections: odkazyList(r.excluded_sections, 'sectionId').map(x => ({ sectionId: x.id, name: x.name })),
     maxTotal: Number(r.max_total) > 0 ? Number(r.max_total) : null, issued: Number(r.issued) || 0, remaining: kusyZbyva(r),
     dailyLimit: Number(r.daily_limit) > 0 ? Number(r.daily_limit) : null,
     draft: r.draft === true, archived: !!r.archived_at, stav: stavKuponu(r, pragueToday()),
@@ -89,63 +92,10 @@ export async function claimBlocker(
 }
 
 /**
- * Rozešle kupon vybraným členům (poslat konkrétnímu hostovi, skupině, segmentu,
- * uvítací kupon pro stávající členy). Respektuje cílení kuponu (úrovně, skupiny,
- * 18+), limit na hosta a limit kusů; kdo už drží neuplatněný kód, nedostane druhý.
- * Vrací, komu kód přibyl, a kolik jich a proč se přeskočilo.
- */
-export async function rozesliKupon(
-  teamId: number, c: any, customerIds: number[],
-  o: { zdroj: 'send' | 'welcome'; poslal: number | null; makeCode: () => string },
-): Promise<{ komu: number[]; preskoceno: PreskoceniKuponu }> {
-  const skip: PreskoceniKuponu = { drzi: 0, cileni: 0, limit: 0, vycerpano: 0, neclen: 0 };
-  const ids = Array.from(new Set(customerIds.filter(n => Number.isFinite(n) && n > 0))).slice(0, 5000);
-  if (!ids.length) return { komu: [], preskoceno: skip };
-  const [profil] = await sql`SELECT * FROM client_profiles WHERE team_id = ${teamId}`;
-  const pravidla = tierRulesFromProfile(profil);
-  const clenove = await sql`
-    SELECT m.customer_id, m.visits, m.spend, us.birthday
-    FROM client_memberships m JOIN users us ON us.id = m.customer_id
-    WHERE m.team_id = ${teamId} AND m.customer_id = ANY(${ids})` as any[];
-  const groups = intList(c.target_groups);
-  const vSkupine = new Set<number>();
-  if (groups.length) {
-    const g = await sql`SELECT DISTINCT customer_id FROM client_group_members WHERE team_id = ${teamId} AND group_id = ANY(${groups}) AND customer_id = ANY(${ids})` as any[];
-    for (const r of g) vSkupine.add(Number(r.customer_id));
-  }
-  const drzi = new Map<number, { taken: number; open: boolean }>();
-  const st = await sql`
-    SELECT customer_id, COUNT(*)::int AS taken, BOOL_OR(redeemed_at IS NULL) AS open
-    FROM client_coupon_claims WHERE coupon_id = ${c.id} AND customer_id = ANY(${ids}) GROUP BY customer_id` as any[];
-  for (const r of st) drzi.set(Number(r.customer_id), { taken: Number(r.taken), open: r.open === true });
-  const jeClen = new Map(clenove.map(m => [Number(m.customer_id), m]));
-  const per = Number(c.per_customer) || 0;
-  const dnes = pragueToday();
-  const komu: number[] = [];
-  for (const id of ids) {
-    const m = jeClen.get(id);
-    if (!m) { skip.neclen += 1; continue; }
-    const tier = tierForMember({ visits: Number(m.visits ?? 0), spend: Number(m.spend ?? 0) }, pravidla);
-    if (cileniBlocker(c, { tierId: tier.id, birthday: m.birthday ?? null, today: dnes }) || (groups.length && !vSkupine.has(id))) { skip.cileni += 1; continue; }
-    const h = drzi.get(id);
-    // Uvítací kupon dostane člen jednou, i kdyby ten první už uplatnil.
-    if (h?.open || (o.zdroj === 'welcome' && h)) { skip.drzi += 1; continue; }
-    if (per > 0 && (h?.taken ?? 0) >= per) { skip.limit += 1; continue; }
-    const r = await vydejKod({ teamId, couponId: Number(c.id), customerId: id, kod: o.makeCode(), zdroj: o.zdroj, poslal: o.poslal, bezOtevreneho: true });
-    if (r.ok) komu.push(id);
-    else if (r.duvod === 'vycerpano') { skip.vycerpano += 1; break; }
-    else skip.drzi += 1;
-  }
-  return { komu, preskoceno: skip };
-}
-
-/**
- * Uvítací balíček: nový člen dostane kódy všech aktivních welcome kuponů, na které
- * má nárok (cílení na úrovně a skupiny, 18+, limit kusů, okno platnosti od–do).
+ * Uvítací balíček: nový člen dostane kódy všech aktivních welcome kuponů.
  * Volá se z join() při PRVNÍM vstupu do podniku; chyba nesmí vstup shodit.
  */
 export async function grantWelcomeCoupons(teamId: number, customerId: number, makeCode: () => string): Promise<number> {
-  await zajistiKupony();
   const today = pragueToday();
   const rows = await sql`
     SELECT * FROM client_coupons

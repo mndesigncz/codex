@@ -24,7 +24,6 @@ async function vratPouziti(promoId: number, customerId: number) {
 
 export async function POST(req: Request, props: { params: Promise<{ slug: string }> }) {
   const params = await props.params;
-  await zajistiKupony();
   const me = await customer();
   if (!me) return NextResponse.json({ error: 'Přihlas se jako host.' }, { status: 401 });
   const p = await profileBySlug(params.slug);
@@ -32,7 +31,7 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
   const gate = await hit(`client-promo:${me.id}`, 10, 3600);
   if (!gate.ok) return NextResponse.json({ error: 'Moc pokusů. Zkus to za hodinu.' }, { status: 429 });
   const b = await req.json().catch(() => ({}));
-  const code = cistyKod(b.code, 64);
+  const code = String(b.code ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   const teamId = Number(p.team_id);
   const [promo] = await sql`SELECT * FROM client_promos WHERE code = ${code} AND team_id = ${teamId} AND active = TRUE`;
   if (!promo || (promo.valid_until && String(promo.valid_until) < pragueToday())) return NextResponse.json({ error: 'Tenhle kód neplatí.' }, { status: 404 });

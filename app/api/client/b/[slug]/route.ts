@@ -9,8 +9,6 @@ import { sql, customer, profileBySlug, publicProfile, membership } from '@/lib/c
 import { activeCampaigns, progressFor, skonceneKampane, jmenaPolozek, prubehHosta } from '@/lib/stamps';
 import { kartaProHosta } from '@/lib/razitkaPravidla';
 import { shapeCoupon, windowOk, ageFrom, TIER_LABELS } from '@/lib/coupons';
-import { zajistiKupony, polozkyNabidky, obohatKupony } from '@/lib/kuponyDb';
-import { stavKuponu } from '@/lib/kuponyPravidla';
 import { pragueToday, pragueHM } from '@/lib/pragueTime';
 import { buildBoard, publicShape, menaListku } from '@/lib/menu';
 import { menaZRadku } from '@/lib/mena';
@@ -90,13 +88,11 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
   const teamId = Number(p.team_id);
   const me = await customer();
   const today = pragueToday();
-  // Sloupce kuponů navíc (koncept, limity, položka nabídky) před prvním dotazem na ně.
-  await zajistiKupony().catch(() => {});
 
   const [menu, tables, coupons] = await Promise.all([
     menuFor(teamId, p.menu_slug ?? null, new URL(req.url).searchParams.get('lang'), p.currency),
     p.ordering_on ? sql`SELECT id, name, seats, map_x, map_y, map_w, map_h, map_shape, map_rot FROM client_tables WHERE team_id = ${teamId} AND active = TRUE ORDER BY position, id` : Promise.resolve([]),
-    p.loyalty_on ? sql`SELECT * FROM client_coupons
+    p.loyalty_on ? sql`SELECT c.*, (SELECT mi.name FROM menu_items mi WHERE mi.id = c.menu_item_id) AS menu_item_name FROM client_coupons c
                        WHERE team_id = ${teamId} AND active = TRUE AND kind = 'offer' AND draft = FALSE AND archived_at IS NULL AND (valid_until IS NULL OR valid_until >= ${today})
                        ORDER BY cost_points, id` : Promise.resolve([]),
   ]);
@@ -228,8 +224,7 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
   // a limity se doříkají až při vyzvednutí — bez dotazu na každý kupon.
   const hm = pragueHM();
   const castkaPodniku = menaZRadku(p.currency, p.locale).money;
-  const polozkyKuponu = p.loyalty_on && (coupons as any[]).some((r: any) => r.menu_item_id != null || (Array.isArray(r.excluded_items) && r.excluded_items.length)) ? await polozkyNabidky(teamId) : [];
-  const shapedCoupons = obohatKupony(coupons as any[], polozkyKuponu).map((r: any) => {
+  const shapedCoupons = (coupons as any[]).map((r: any) => {
     const s = shapeCoupon(r, castkaPodniku);
     let blocked: string | null = windowOk(r, { today, hm });
     if (!blocked && s.remaining === 0) blocked = 'Kupony došly.';
