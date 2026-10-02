@@ -45,6 +45,8 @@ import { czDay, RES_STATUS } from '@/lib/clientSlots';
 import { useMoney } from '../CurrencyProvider';
 import { dbTimeDayHM, pragueDaySafe } from '@/lib/pragueTime';
 import { czCount, type CzNoun } from '@/lib/czech';
+import { SEGMENTY, jeSegment, stitekPublika } from '@/lib/segmenty';
+import { casovaOsa, zbyvaDoUrovne, zbyvaDoOdmeny, type UdalostOsy } from '@/lib/clenPrehled';
 import { apiMessage, okJson } from '@/lib/api';
 import { useDraft } from '@/lib/useDraft';
 import { DraftNote } from '../ui/DraftNote';
@@ -803,25 +805,45 @@ function Clenove({ oznam, hledat = '' }: { oznam: Hlaska; hledat?: string }) {
 
 /** Deník bodů a skupiny člena — jamka pod řádkem (dřív jamka s rámečkem navíc a ruční štítek verzálkami). */
 function DenikClena({ customerId, oznam, vidiDenik }: { customerId: number; oznam: Hlaska; vidiDenik: boolean }) {
-  // Deník bodů jen s vernost.zobrazit — bez něj by GET skončil 403 (widget bez oprávnění nevolá).
-  const { data: denik } = useLoad<any[]>(vidiDenik ? `/api/client/admin/loyalty?customerId=${customerId}` : null, raw => (Array.isArray(raw?.ledger) ? raw.ledger : []));
+  const money = useMoney();
+  // Přehled hosta jen s vernost.zobrazit — bez něj by GET skončil 403 (widget bez oprávnění nevolá).
+  const { data: pr } = useLoad<any>(vidiDenik ? `/api/client/admin/loyalty?customerId=${customerId}&detail=1` : null,
+    raw => ({ ...raw, osa: casovaOsa({ ledger: raw?.ledger, claims: raw?.claims, vouchers: raw?.vouchers, orders: raw?.orders }, money), kampane: Array.isArray(raw?.kampane) ? raw.kampane : [] }));
+  const zbyva = pr?.uroven && pr?.clen ? zbyvaDoUrovne(pr.uroven, pr.uroven.unit === 'spend' ? pr.clen.spend : pr.clen.visits, money) : null;
+  const razitka = pr ? zbyvaDoOdmeny(pr.kampane) : [];
   return (
     <Well className="mb-3 space-y-3">
       <SkupinyClena customerId={customerId} oznam={oznam} prazdne={!vidiDenik} />
       {!vidiDenik ? null
-        : denik === null ? <Skeleton className="h-10" />
-        : denik.length === 0 ? <p className="t-meta">Deník je prázdný.</p>
+        : pr === null ? <Skeleton className="h-10" />
         : (
-          <ul className="list">
-            {denik.map((l: any) => (
-              <ListRow key={l.id} title={l.note || l.kind} meta={dbTimeDayHM(l.created_at)}
-                value={<span className={Number(l.delta) > 0 ? 'text-ok-ink' : Number(l.delta) < 0 ? 'text-bad-ink' : 'text-black/45'}>{Number(l.delta) > 0 ? '+' : ''}{l.delta}</span>} />
-            ))}
-          </ul>
+          <>
+            <div className="space-y-1">
+              <p className="text-sm font-medium">{pr.uroven?.label ?? 'Člen'} · {pr.clen.points} b.{pr.clen.credit > 0 ? ` · kredit ${money(pr.clen.credit)}` : ''}</p>
+              <p className="t-meta">
+                {pr.clen.last_visit_at ? `Naposledy tu byl ${denCesky(pr.clen.last_visit_at)}` : 'Zatím tu nebyl'}
+                {` · člen od ${denCesky(pr.clen.joined_at)} · ${czCount(pr.clen.visits, NAVSTEVA)}`}
+                {pr.clen.spend > 0 ? ` · celkem ${money(pr.clen.spend)}` : ''}
+              </p>
+              {zbyva && <p className="t-meta">{zbyva}</p>}
+              {razitka.map(r => <p key={r} className="t-meta">{r}</p>)}
+            </div>
+            {pr.osa.length === 0 ? <p className="t-meta">Zatím žádná historie.</p> : (
+              <ul className="list" aria-label="Časová osa hosta">
+                {pr.osa.map((u: UdalostOsy, i: number) => (
+                  <ListRow key={`${u.druh}-${u.at}-${i}`} title={u.titulek} meta={[dbTimeDayHM(u.at), u.meta].filter(Boolean).join(' · ')}
+                    right={<Chip tone="muted" size="sm">{POPISEK_DRUHU[u.druh]}</Chip>} />
+                ))}
+              </ul>
+            )}
+          </>
         )}
     </Well>
   );
 }
+
+const NAVSTEVA: CzNoun = { one: 'návštěva', few: 'návštěvy', many: 'návštěv' };
+const POPISEK_DRUHU: Record<string, string> = { body: 'Body', kupon: 'Kupon', poukaz: 'Poukaz', objednavka: 'Objednávka' };
 
 /** Štítky skupin u člena: klepnutím se host do skupiny přidá / odebere. Jen se zakaznici.skupiny. */
 function SkupinyClena({ customerId, oznam, prazdne = false }: { customerId: number; oznam: Hlaska; prazdne?: boolean }) {
@@ -927,12 +949,13 @@ function Rozeslani({ oznam }: { oznam: Hlaska }) {
   // a o to víc mrzí, když ho spolkne přechod na jinou záložku.
   const koncept = useDraft('rozeslani', f, setF, { vychozi: PRAZDNA_ZPRAVA });
   const { data: d, error, reload } = useLoad<any>('/api/client/admin/broadcast', raw => ({ ...raw, history: Array.isArray(raw?.history) ? raw.history : [] }));
-  const target = !d ? 0 : f.audience === 'quiet' ? (d.quiet ?? 0)
+  const target = !d ? 0 : jeSegment(f.audience) ? (d.segments?.[f.audience] ?? 0)
     : f.audience === 'tier:silver' ? (d.silver ?? 0)
     : f.audience === 'tier:gold' || f.audience === 'gold' ? (d.gold ?? 0)
     : f.audience === 'tier:platinum' ? (d.platinum ?? 0)
     : f.audience.startsWith('group:') ? (d.groups?.find((g: any) => `group:${g.id}` === f.audience)?.members ?? 0)
     : (d.members ?? 0);
+  const segmentInfo = SEGMENTY.find(x => x.id === f.audience);
   const naplanovano = !!f.scheduledAt && new Date(f.scheduledAt).getTime() > Date.now();
   const odeslat = async () => {
     setBusy(true);
@@ -949,7 +972,7 @@ function Rozeslani({ oznam }: { oznam: Hlaska }) {
   };
   if (error) return <ErrorState title="Zprávy se nenačetly" onRetry={reload} detail={error} />;
   if (!d) return <PageSkel />;
-  const komu = (a: string) => (a === 'quiet' ? 'kdo dlouho nebyl' : a === 'gold' || a === 'tier:gold' ? 'zlatí hosté' : a === 'tier:silver' ? 'stříbrní a výš' : a === 'tier:platinum' ? 'platinoví' : a.startsWith('group:') ? 'skupina' : null);
+  const komu = (a: string) => stitekPublika(a);
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-4 items-start">
       <Card as="form" className="grid gap-4" onSubmit={(e: React.FormEvent) => { e.preventDefault(); if (f.title.trim() && target) setPotvrdit(true); }}>
@@ -960,13 +983,26 @@ function Rozeslani({ oznam }: { oznam: Hlaska }) {
         <Field id="bc-aud" label="Komu">
           <Select id="bc-aud" value={f.audience} onChange={e => setF({ ...f, audience: e.target.value })}>
             <option value="all">Všem členům ({d.members ?? 0})</option>
-            <option value="quiet">Kdo dlouho nebyl — 30 a víc dní ({d.quiet ?? 0})</option>
-            <option value="tier:silver">Stříbrným a výš ({d.silver ?? 0})</option>
-            <option value="tier:gold">Zlatým a výš ({d.gold ?? 0})</option>
-            {d.platinum != null && <option value="tier:platinum">Platinovým hostům ({d.platinum})</option>}
-            {(d.groups ?? []).map((g: any) => <option key={g.id} value={`group:${g.id}`}>Skupina {g.name} ({g.members})</option>)}
+            <optgroup label="Podle chování">
+              {SEGMENTY.map(x => <option key={x.id} value={x.id}>{x.label} ({d.segments?.[x.id] ?? 0})</option>)}
+            </optgroup>
+            <optgroup label="Podle úrovně">
+              <option value="tier:silver">Stříbrným a výš ({d.silver ?? 0})</option>
+              <option value="tier:gold">Zlatým a výš ({d.gold ?? 0})</option>
+              {d.platinum != null && <option value="tier:platinum">Platinovým hostům ({d.platinum})</option>}
+            </optgroup>
+            {(d.groups ?? []).length > 0 && (
+              <optgroup label="Podle skupiny">
+                {(d.groups ?? []).map((g: any) => <option key={g.id} value={`group:${g.id}`}>Skupina {g.name} ({g.members})</option>)}
+              </optgroup>
+            )}
           </Select>
         </Field>
+        <p className={target ? 'text-sm text-black/70' : 'note note-wait'} aria-live="polite">
+          {target
+            ? `Dostane to ${czCount(target, CLEN)}.${segmentInfo ? ` ${segmentInfo.popis}` : ''}`
+            : `Teď to nedostane nikdo, ve výběru jsou 0 členů.${segmentInfo ? ` ${segmentInfo.popis}` : ''} Zkus jiný výběr, nebo pošli zprávu všem členům.`}
+        </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field id="bc-link" label="Kam zpráva vezme">
             <Select id="bc-link" value={f.linkKind} onChange={e => setF({ ...f, linkKind: e.target.value })}>

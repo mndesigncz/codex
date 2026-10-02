@@ -62,6 +62,8 @@ const FORM_BODY = 'vernost-body';
 
 const RAZITKO: CzNoun = { one: 'razítko', few: 'razítka', many: 'razítek' };
 const HOST: CzNoun = { one: 'host', few: 'hosté', many: 'hostů' };
+const DEN: CzNoun = { one: 'den', few: 'dny', many: 'dní' };
+const BOD: CzNoun = { one: 'bod', few: 'body', many: 'bodů' };
 
 async function j(url: string, init?: RequestInit) {
   const r = await fetch(url, init ? { headers: { 'Content-Type': 'application/json' }, ...init } : undefined);
@@ -213,6 +215,7 @@ function BodyAUrovne({ toast, setUkladam }: { toast: (m: string) => void; setUkl
         silver_at: p.silver_at, gold_at: p.gold_at, platinum_at: p.platinum_at,
         tier_by: p.tier_by === 'spend' ? 'spend' : 'visits', silver_spend: p.silver_spend, gold_spend: p.gold_spend, platinum_spend: p.platinum_spend,
         member_discount: p.member_discount, silver_discount: p.silver_discount, gold_discount: p.gold_discount, platinum_discount: p.platinum_discount,
+        reactivation_days: p.reactivation_days ?? 0, reactivation_points: p.reactivation_points ?? 0,
       }) });
       setP(r.profile); toast('Pravidla bodů, úrovně a slevy uloženy.');
     } catch (err) { toast(apiMessage(err, 'Uložení se nepovedlo.')); }
@@ -277,6 +280,21 @@ function BodyAUrovne({ toast, setUkladam }: { toast: (m: string) => void; setUkl
                 value={p.cashback_mode === 'points' ? 'points' : 'credit'} onChange={v => { if (meni) setP({ ...p, cashback_mode: v }); }} size="sm" ariaLabel="Podoba cashbacku" />
             </div>
           </div>
+        </Card>
+        <Card className="space-y-4" aria-labelledby="l-auto">
+          <div>
+            <h2 id="l-auto" className="t-card">Automatizace: Chybíš nám</h2>
+            <p className="t-meta mt-0.5 max-w-[70ch]">Hostovi, který přestal chodit, přijde jednou oznámení, že nám chybí. Můžeš k němu přidat i dárkové body. Kdo je pryč o dva týdny a víc nad nastavený počet dnů, ho už nedostane, ať se neposílá starým spáčům. Respektuje nastavení oznámení hosta.</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {cislo('l-react-days', 'Po kolika dnech bez návštěvy', '0 = vypnuto. Například 30.', 'reactivation_days', 365)}
+            {cislo('l-react-pts', 'Dárkových bodů navíc', '0 = jen oznámení bez bodů.', 'reactivation_points', 1000)}
+          </div>
+          <p className="t-meta" aria-live="polite">
+            {Number(p.reactivation_days) > 0
+              ? `Zapnuto: host, který nebyl ${czCount(Number(p.reactivation_days), DEN)}, dostane oznámení${Number(p.reactivation_points) > 0 ? ` a ${czCount(Number(p.reactivation_points), BOD)}` : ''}. Jednou za každou odmlku.`
+              : 'Vypnuto. Zprávy hostům můžeš posílat ručně v Zákaznících, ve Zprávách členům.'}
+          </p>
         </Card>
         <Card className="space-y-4">
           <div>
