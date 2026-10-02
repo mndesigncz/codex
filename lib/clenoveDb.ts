@@ -5,6 +5,7 @@
 // prvním použití); stejné příkazy jsou v app/api/init/route.ts (blok „Kolo 81“).
 
 import { sql, ensureProfile } from './client';
+import { maKampane } from './stamps';
 import { tierForMember, tierRulesFromProfile } from './clientSlots';
 import { efektivniSleva } from './slevy';
 import { pragueToday } from './pragueTime';
@@ -69,10 +70,22 @@ export async function nactiZaklad(teamId: number): Promise<Omit<ClenTymu, 'level
       WHERE team_id = ${teamId} AND redeemed_at IS NULL GROUP BY customer_id
     ) oc ON oc.customer_id = m.customer_id
     WHERE m.team_id = ${teamId}` as any[];
+  // Razítka: s kampaněmi je zdrojem pravdy průběh kampaní, ne staré počítadlo na členství (dvojí počítadlo).
+  const razitkaBy = new Map<number, number>();
+  try {
+    if (await maKampane(teamId)) {
+      const sp = await sql`
+        SELECT p.customer_id, COALESCE(SUM(p.stamps), 0)::int AS s FROM client_stamp_progress p
+        JOIN client_stamp_campaigns c ON c.id = p.campaign_id AND c.active = TRUE
+        WHERE p.team_id = ${teamId} GROUP BY p.customer_id` as any[];
+      for (const r of sp) razitkaBy.set(Number(r.customer_id), Number(r.s) || 0);
+      for (const r of rows) if (!razitkaBy.has(Number(r.id))) razitkaBy.set(Number(r.id), 0);
+    }
+  } catch { /* před migrací zůstane počítadlo z členství */ }
   return rows.map(r => ({
     id: Number(r.id), name: String(r.name ?? ''), email: r.email ? String(r.email) : null,
     birthday: r.birthday ? String(r.birthday) : null,
-    points: Number(r.points) || 0, stamps: Number(r.stamps) || 0, visits: Number(r.visits) || 0,
+    points: Number(r.points) || 0, stamps: razitkaBy.size ? (razitkaBy.get(Number(r.id)) ?? 0) : (Number(r.stamps) || 0), visits: Number(r.visits) || 0,
     spend: Number(r.spend) || 0, credit: Number(r.credit) || 0,
     joined_at: r.joined_at ?? null, last_visit_at: r.last_visit_at ?? null,
     open_coupons: Number(r.open_coupons) || 0,

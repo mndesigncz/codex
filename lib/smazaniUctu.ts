@@ -193,7 +193,7 @@ export function planUzivatele(u: { id: number; email: string; role: string; hash
     [[`login:${u.email}`, `client-register:${u.email}`, `reset:${u.email}`, `smazani:${id}`]]));
   if (u.role === 'customer') {
     for (const t of ['client_cards', 'client_memberships', 'client_loyalty_ledger', 'client_stamp_progress', 'client_coupon_claims',
-      'client_promo_uses', 'client_group_members', 'client_event_follows', 'client_reviews', 'client_bill_awards', 'client_import_clenove', 'client_member_notes']) del(t, 'customer_id');
+      'client_promo_uses', 'client_group_members', 'client_event_follows', 'client_reviews', 'client_bill_awards', 'client_import_clenove', 'client_member_notes', 'client_stamp_events']) del(t, 'customer_id');
     // Budoucí rezervace se zruší (podnik s nimi nepočítá s anonymem), minulým zmizí poznámka.
     k.push(volitelny('zrušit budoucí rezervace', `UPDATE client_reservations SET status = 'cancelled', note = NULL WHERE customer_id = $1 AND date >= $2 AND status IN ('requested', 'confirmed')`, [id, u.dnes]));
     k.push(volitelny('vymazat poznámky rezervací', `UPDATE client_reservations SET note = NULL WHERE customer_id = $1`, [id]));

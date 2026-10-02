@@ -533,6 +533,7 @@ function LoyaltyTab({ slug, b, me, today, campaigns, coupons, signedIn, onDone }
                 <p className="mt-2 text-xs text-black/55">{t('Za {n, plural, one {# návštěvu} few {# návštěvy} other {# návštěv}}:', { n: target })} <strong className="text-black/80">{b.stampReward || t('odměna')}</strong>. {t('Razítko přibude, když podnik uzavře tvoji rezervaci nebo objednávku.')}</p>
               </div>
             )}
+            <SkonceneKarticky list={me.endedCampaigns ?? []} />
             <div className="mt-5 flex items-baseline justify-between gap-3 border-t border-black/[0.06] pt-4">
               <p className="text-sm text-black/60">{t('Body')}</p>
               <p className="text-2xl font-bold tabular-nums">{me.points}</p>

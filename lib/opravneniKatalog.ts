@@ -1288,7 +1288,7 @@ export const KATALOG: Opravneni[] = [
   "id": "vernost.kampane",
   "oblast": "Zákazníci a menu",
   "nazev": "Razítkové kampaně",
-  "popis": "Založit, upravit, aktivovat a smazat kampaně. Smazáním zmizí i nasbíraná razítka.",
+  "popis": "Založit, upravit, duplikovat, pozastavit, archivovat a smazat razítkové kampaně. Archiv nechá postup hostů, smazáním zmizí i nasbíraná razítka.",
   "citlivost": "střední",
   "vyzaduje": [
    "vernost.zobrazit"
@@ -1298,7 +1298,7 @@ export const KATALOG: Opravneni[] = [
   "id": "vernost.upravit_body",
   "oblast": "Zákazníci a menu",
   "nazev": "Ručně upravit body",
-  "popis": "Připsat nebo odebrat body členovi. Zapisuje se do auditu.",
+  "popis": "Připsat nebo odebrat body či razítka členovi (i hromadně skupině). Zapisuje se do auditu.",
   "citlivost": "střední",
   "vyzaduje": [
    "vernost.zobrazit"

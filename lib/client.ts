@@ -321,10 +321,17 @@ export async function spendCredit(teamId: number, customerId: number, amountCzk:
  * platí staré jednoduché razítko: po dosažení cíle se vynuluje a vznikne kupon.
  * `already` = dnes už návštěvu měl (nic se nezměnilo). `lines` jsou věty pro obsluhu.
  * `extra` jsou razítka navíc z bonusové akce (stejné připsání, žádný druhý řádek), `note` jejich popis do deníku.
+ *
+ * Razítka řídí kampaně (lib/stamps.ts). Jakmile podnik nějakou kampaň má, staré
+ * počítadlo na členství se nezvyšuje a nevydává vlastní odměnu (dřív běžely dva
+ * počítadla vedle sebe) a návštěva dá razítko všem kampaním „za návštěvu“, které
+ * teď platí. Bez kampaní funguje jednoduché razítko podle stamp_target jako dřív.
  */
 export async function stampVisit(teamId: number, customerId: number, profile: any, ref?: string, extra = 0, note = '', staffId?: number | null): Promise<{ stamps: number; rewarded: boolean; already?: boolean; lines?: string[] }> {
   await join(customerId, teamId);
-  const target = Number(profile?.stamp_target) || 0;
+  const { maKampane, razitkaZaNavstevu } = await import('./stamps');
+  const kampane = await maKampane(teamId);
+  const target = kampane ? 0 : (Number(profile?.stamp_target) || 0);
   const navic = Math.max(0, Math.trunc(Number(extra)) || 0);
   // Dynamický import: lib/stamps importuje tenhle soubor.
   const { activeCampaigns, addStamps, vetaVysledku } = await import('./stamps');

@@ -24,10 +24,23 @@ async function itemNames(teamId: number, ids: number[]) {
   return new Map((rows as any[]).map(r => [Number(r.id), String(r.name)]));
 }
 
-export async function GET() {
+async function sectionNames(teamId: number, ids: number[]) {
+  if (!ids.length) return new Map<number, string>();
+  const rows = await sql`
+    SELECT ms.id, ms.title FROM menu_sections ms
+    JOIN menu_boards mb ON mb.id = ms.board_id AND mb.team_id = ${teamId}
+    WHERE ms.id = ANY(${ids})`;
+  return new Map((rows as any[]).map(r => [Number(r.id), String(r.title)]));
+}
+
+const cislo = (v: unknown) => { const n = Math.round(Number(v)); return Number.isFinite(n) && n > 0 ? n : null; };
+
+export async function GET(req: NextRequest) {
   const ctx = await pozaduj('vernost.zobrazit');
   if (jeOdpoved(ctx)) return ctx;
   const u = { id: ctx.meId, team_id: ctx.teamId };
+  const q = req.nextUrl.searchParams;
+  const dnes = pragueToday();
   try {
     await zajistiRazitka();
     const [rows, stats, odmeny] = await Promise.all([
@@ -62,7 +75,7 @@ export async function GET() {
         rewardsRedeemed: Number(od?.uplatneno) || 0,
       };
     });
-    return NextResponse.json({ campaigns });
+    return NextResponse.json({ campaigns, today: dnes });
   } catch {
     return NextResponse.json({ campaigns: [], notMigrated: true });
   }

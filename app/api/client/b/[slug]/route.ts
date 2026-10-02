@@ -96,6 +96,7 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
   ]);
 
   let mine: any = null;
+  let endedCampaigns: any[] = [];
   let myBirthday: string | null = null;
   if (me) {
     const m = await membership(me.id, teamId);
@@ -112,6 +113,9 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
     const sleva = await slevaClena(teamId, me.id, tier);
     const myCamps = await activeCampaigns(teamId, today);
     const myProg = myCamps.length ? await progressFor(teamId, me.id) : new Map();
+    // Jména položek odměny (jeden dotaz) a skončené kartičky, na kterých host něco měl: ať ví, proč karta zmizela.
+    const odmenaJmena = await jmenaPolozek(Array.from(new Set(myCamps.flatMap(c => c.reward_items.map(x => x.itemId)))));
+    endedCampaigns = await skonceneKampane(teamId, me.id, today);
     mine = {
       member: !!m, points: Number(m?.points ?? 0), stamps: Number(m?.stamps ?? 0), visits: Number(m?.visits ?? 0),
       credit: Number(m?.credit ?? 0),
@@ -248,5 +252,8 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
       bonus = { name: bn.nazev, multiplier: bn.nasobic, stampBonus: bn.razitka, until: konec == null ? null : `${String(konec).padStart(2, '0')}:00` };
     }
   }
-  return NextResponse.json({ business: publicProfile(p), bonus, menu, tables, plan, coupons: shapedCoupons, news, events, stampCampaigns, banners, me: mine, signedIn: !!me, today });
+  // Jakmile podnik má kampaně, jednoduché razítko (stamp_target) neplatí a host ho nesmí vidět jako zamrzlé počítadlo.
+  const verejny = publicProfile(p);
+  if (await maKampane(teamId)) verejny.stampTarget = 0;
+  return NextResponse.json({ business: verejny, bonus, menu, tables, plan, coupons: shapedCoupons, news, events, stampCampaigns, banners, me: mine, signedIn: !!me, today });
 }

@@ -104,6 +104,8 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'client.kupon.odeslan': 'Kupon poslán hostům',
   'client.promo': 'Změna promo kódu (založení, dávka, úprava, smazání)',
   'client.card': 'Změna na věrnostní kartě',
+  'client.stamps': 'Změna razítkové kampaně (založení, úprava, archiv, smazání)',
+  'client.stamps.manual': 'Ruční úprava razítek hostů s důvodem',
   'client.bonus': 'Změna bonusové akce věrnostního programu',
   'client.spend': 'Úprava útraty člena (úrovně podle útraty)',
   'client.stamps.create': 'Založena razítková kartička',

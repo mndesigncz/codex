@@ -26,6 +26,28 @@ import { vetyOOmezeni, pravidlaBoduZProfilu } from '@/lib/bodyPravidla';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
+/**
+ * Položky nabídky, které dávají razítko v běžících kampaních (vybrané položky a položky vybraných
+ * kategorií, bez vyloučených) — obsluha je může zadat ručně, když účtenka v pokladně není.
+ */
+async function polozkyKampani(teamId: number, camps: StampCampaign[]): Promise<{ id: number; name: string }[]> {
+  const prod = camps.filter(c => c.rule_type === 'products');
+  if (!prod.length) return [];
+  const ids = Array.from(new Set(prod.flatMap(c => c.stamp_items.map(i => i.itemId))));
+  const sekce = Array.from(new Set(prod.flatMap(c => c.stamp_sections.map(i => i.sectionId))));
+  const vyloucene = new Set(prod.flatMap(c => c.excluded_items.map(i => i.itemId)));
+  if (!ids.length && !sekce.length) return [];
+  try {
+    const rows = await sql`
+      SELECT mi.id, mi.name FROM menu_items mi
+      JOIN menu_sections ms ON ms.id = mi.section_id
+      JOIN menu_boards mb ON mb.id = ms.board_id AND mb.team_id = ${teamId}
+      WHERE mi.id = ANY(${ids}) OR mi.section_id = ANY(${sekce})
+      ORDER BY mi.name LIMIT 80`;
+    return (rows as any[]).filter(r => !vyloucene.has(Number(r.id))).map(r => ({ id: Number(r.id), name: String(r.name) }));
+  } catch { return []; }
+}
+
 /** Co obsluha u kasy potřebuje vidět: kdo to je, co má a na co má nárok. */
 async function summary(teamId: number, customerId: number, p?: any) {
   const m = await membership(customerId, teamId);
@@ -56,8 +78,17 @@ async function summary(teamId: number, customerId: number, p?: any) {
   const tier = tierForMember({ visits, spend: Number(m?.spend ?? 0), lastVisitAt: m?.last_visit_at }, p ? tierRulesFromProfile(p) : null);
   // Sleva = nejvyšší z úrovně a slev skupin (nikdy součet); obsluha vidí i zdroj.
   const sleva = await slevaClena(teamId, customerId, tier);
-  const camps = await activeCampaigns(teamId, pragueToday());
+  const dnes = pragueToday();
+  const camps = await activeCampaigns(teamId, dnes);
   const prog = camps.length ? await progressFor(teamId, customerId) : new Map();
+  // Poslední akce s razítky (pro tlačítko Storno) a položky, které dávají razítko (pro ruční zadání).
+  let posledniAkce: { note: string; at: string } | null = null;
+  try {
+    await zajistiRazitka();
+    const [e] = await sql`SELECT note, created_at FROM client_stamp_events WHERE team_id = ${teamId} AND customer_id = ${customerId} AND undone_at IS NULL AND delta <> 0 ORDER BY id DESC LIMIT 1`;
+    if (e) posledniAkce = { note: String(e.note ?? 'Razítka'), at: (parseDbTime(e.created_at) ?? new Date()).toISOString() };
+  } catch { posledniAkce = null; }
+  const polozky = await polozkyKampani(teamId, camps);
   return {
     member: !!m, points, credit: Number(m?.credit ?? 0), stamps: Number(m?.stamps ?? 0), visits,
     campaigns: camps.map(c => ({
@@ -90,9 +121,11 @@ export async function GET(req: NextRequest) {
   let bills: any[] = [];
   try {
     bills = await sql`
-      SELECT bill_id, final_price, paid_at FROM pos_bills
-      WHERE team_id = ${u.team_id} AND day = ${pragueToday()} AND final_price > 0
-      ORDER BY COALESCE(paid_at, created_at) DESC LIMIT 5` as any[];
+      SELECT b.bill_id, b.final_price, b.paid_at,
+             EXISTS (SELECT 1 FROM client_bill_awards a WHERE a.team_id = b.team_id AND a.bill_id = b.bill_id) AS awarded
+      FROM pos_bills b
+      WHERE b.team_id = ${u.team_id} AND b.day = ${pragueToday()} AND b.final_price > 0
+      ORDER BY COALESCE(b.paid_at, b.created_at) DESC LIMIT 5` as any[];
   } catch { bills = []; }
   return NextResponse.json({
     customer: c, ...(await summary(u.team_id, c.id, p)), bills,
@@ -144,7 +177,7 @@ export async function POST(req: NextRequest) {
   const c = await customerByCard(String(b.code ?? ''));
   if (!c) return NextResponse.json({ error: 'Takovou kartičku neznáme.' }, { status: 404 });
   const action = String(b.action ?? '');
-  // Razítko a připsání z účtenky jsou běžná práce u kasy; body z ručně
+  // Razítko, storno a připsání z účtenky jsou běžná práce u kasy; body z ručně
   // zadané částky a placení kreditem hýbou penězi hosta, a tak mají svá
   // oprávnění. Kontroluje se dřív, než se host stane členem (join níž).
   const klic = action === 'points' ? 'vernost.body_z_castky' : action === 'credit' ? 'vernost.platba_kreditem' : 'vernost.karta';
@@ -191,6 +224,9 @@ async function provedAkci(action: string, b: any, c: { id: number; name: string 
   // Bonusová akce (Happy hour) platí v okamžiku načtení; uplatní se uvnitř téhož připsání.
   const bonus = await aktivniBonus(u.team_id);
   let msg = '';
+  // Co čtečka ukazuje navíc: vypršelé karty a razítka, která se nevešla.
+  let expiredCount = 0; let lost = 0;
+  const dnes = pragueToday();
   if (action === 'stamp') {
     // Návštěva + razítko každé kampani „za návštěvu" (nebo staré razítko, když kampaně nejsou).
     // Denní zámek je v jednom UPDATE — souběh dvou skenů proběhne jednou, druhý dostane already.
@@ -313,5 +349,5 @@ async function provedAkci(action: string, b: any, c: { id: number; name: string 
     msg = `${c.name}: uplatněno ${mena.money(amount)} kreditu, zbývá ${mena.money(Number(credit))}.`;
   }
   audit(u.team_id, u.id, 'client.card', 'client', c.id, msg);
-  return NextResponse.json({ ok: true, message: msg, customer: c, ...(await summary(u.team_id, c.id, p)) });
+  return NextResponse.json({ ok: true, message: msg, expiredCount, lost, customer: c, ...(await summary(u.team_id, c.id, p)) });
 }
