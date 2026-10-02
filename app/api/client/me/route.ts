@@ -3,6 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sql, customer, publicProfile } from '@/lib/client';
 import { dispatchDueBroadcasts } from '@/lib/broadcasts';
 import { pragueToday } from '@/lib/pragueTime';
+import { activeCampaigns, progressFor, hostKarta } from '@/lib/stamps';
+import { poukazyHosta } from '@/lib/poukazyHostDb';
+import { planClena } from '@/lib/propadaniBoduDb';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -38,19 +41,35 @@ export async function GET() {
   // Souhlas s novinkami podniků (opt-in): chybí-li nastavení nebo sloupec, je to NE.
   let novinky = false;
   try { const [p] = await sql`SELECT notif_prefs FROM users WHERE id = ${me.id}`; novinky = p?.notif_prefs?.novinky === true; } catch { /* před migrací */ }
-  // Razítkové kampaně všech mých podniků + můj průběh — dvě skupinové otázky.
-  let campaignRows: any[] = []; let progRows: any[] = [];
+  // Razítkové kampaně mých podniků + můj průběh. Čte se přes progressFor, takže rozdělaná karta, které
+  // vypršel čas, se tady vynuluje a host se dozví, že propadla (expiredCount); kdy vyprší, vidí v expiresAt.
+  const campsByTeam = new Map<number, any[]>();
   try {
-    const teamIds = memberships.map(m => Number(m.team_id));
-    if (teamIds.length) {
-      [campaignRows, progRows] = await Promise.all([
-        sql`SELECT * FROM client_stamp_campaigns WHERE team_id = ANY(${teamIds}) AND active = TRUE
-             AND (valid_since IS NULL OR valid_since <= ${today}) AND (valid_till IS NULL OR valid_till >= ${today})
-             ORDER BY position, id` as any,
-        sql`SELECT * FROM client_stamp_progress WHERE customer_id = ${me.id}` as any,
-      ]);
-    }
+    await Promise.all(memberships.map(async m => {
+      const teamId = Number(m.team_id);
+      const camps = await activeCampaigns(teamId, today);
+      if (!camps.length) return;
+      const prog = await progressFor(teamId, me.id);
+      campsByTeam.set(teamId, camps.map(c => {
+        const k = hostKarta(c, prog.get(c.id));
+        return {
+          id: c.id, name: c.name, required: Math.max(1, c.required_stamps || 1), reward: c.reward_title ?? '',
+          stamps: k.stamps, completed: k.completed, expiresAt: k.expiresAt, expiredCount: k.expiredCount, expiredAt: k.expiredAt,
+          maxCompletions: c.max_completions, oneTime: c.repeat_mode === 'one_time',
+          daysOfWeek: c.days_of_week, hourFrom: c.hour_from, hourTill: c.hour_till,
+        };
+      }));
+    }));
   } catch { /* před migrací */ }
+  // Body, kterým brzy vyprší platnost (jen u podniků, které propadání používají): host to vidí i v seznamu podniků.
+  const expiringBy = new Map<number, { points: number; till: string }>();
+  await Promise.all(memberships.filter(m => Number(m.points_expire_days) > 0).map(async m => {
+    try {
+      const pl = await planClena(Number(m.team_id), me.id, m);
+      const body = pl.propadne + pl.varovat;
+      if (body > 0) expiringBy.set(Number(m.team_id), { points: body, till: pl.varovatDo ?? today });
+    } catch { /* bez upozornění se dá žít */ }
+  }));
   // Útrata a slevy skupin po podnicích: samostatné dotazy, ať chybějící sloupec (před migrací) nic neshodí.
   const spendBy = new Map<number, number>();
   const skupinyBy = new Map<number, { name: string; discount: number }[]>();
@@ -69,20 +88,12 @@ export async function GET() {
       skupinyBy.get(t)!.push({ name: String(r.name), discount: Number(r.discount_pct) || 0 });
     }
   } catch { /* před migrací */ }
-  const progBy = new Map(progRows.map((r: any) => [Number(r.campaign_id), r]));
-  const campsByTeam = new Map<number, any[]>();
-  for (const r of campaignRows) {
-    const t = Number(r.team_id);
-    if (!campsByTeam.has(t)) campsByTeam.set(t, []);
-    campsByTeam.get(t)!.push({
-      id: Number(r.id), name: String(r.name), required: Math.max(1, Number(r.required_stamps) || 1),
-      reward: String(r.reward_title ?? ''), stamps: Number(progBy.get(Number(r.id))?.stamps ?? 0),
-    });
-  }
   return NextResponse.json({
     me: { ...(profile ?? me), novinky },
-    memberships: memberships.map(m => ({ ...publicProfile(m), points: Number(m.points), stamps: Number(m.stamps), visits: Number(m.visits), spend: spendBy.get(Number(m.team_id)) ?? 0, groupDiscounts: skupinyBy.get(Number(m.team_id)) ?? [], credit: Number(m.credit ?? 0), lastVisitAt: m.last_visit_at, campaigns: campsByTeam.get(Number(m.team_id)) ?? [] })),
+    memberships: memberships.map(m => ({ ...publicProfile(m), points: Number(m.points), stamps: Number(m.stamps), visits: Number(m.visits), spend: spendBy.get(Number(m.team_id)) ?? 0, groupDiscounts: skupinyBy.get(Number(m.team_id)) ?? [], credit: Number(m.credit ?? 0), lastVisitAt: m.last_visit_at, campaigns: campsByTeam.get(Number(m.team_id)) ?? [], expiring: expiringBy.get(Number(m.team_id)) ?? null })),
     reservations, orders, claims, today,
+    // Dárkové poukazy přiřazené mně (kód, zůstatek, platnost); bez jmen a poznámek z podniku.
+    poukazy: await poukazyHosta(me.id, today),
   });
 }
 

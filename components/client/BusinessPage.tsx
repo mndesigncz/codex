@@ -604,7 +604,7 @@ function LoyaltyTab({ slug, b, me, today, campaigns, coupons, signedIn, onDone }
           </div>
           {promoErr && <p role="alert" className="mt-2 text-sm text-bad-ink">{promoErr}</p>}
         </form>
-        <div className="mt-5 border-t border-black/[0.06] pt-4"><MamPoukaz slug={slug} /></div>
+        <div className="mt-5 border-t border-black/[0.06] pt-4"><MamPoukaz slug={slug} prihlasen={signedIn} /></div>
       </section>
       <section>
         <h2 className="t-section mb-3">{t('Kupony za body')}</h2>

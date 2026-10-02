@@ -238,7 +238,7 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
   });
   // Promo bannery podniku (max 5, aktivní a v platnosti). Obsah je data podniku.
   // Cílení: člen vidí jiné bannery než nečlen; úroveň a skupiny se berou z hostova členství.
-  const banners = await aktivniBannery(teamId, today, await kontextHosta(teamId, me?.id ?? null, mine));
+  const banners = await aktivniBannery(teamId, today, await kontextHosta(teamId, me?.id ?? null, mine), new URL(req.url).searchParams.get('lang'));
   // Bonusová akce, která právě běží („Dnes dvojnásobné body do 18:00"); text skládá stránka přes t().
   let bonus: any = null;
   if (p.loyalty_on) {

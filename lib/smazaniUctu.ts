@@ -198,6 +198,7 @@ export function planUzivatele(u: { id: number; email: string; role: string; hash
     k.push(volitelny('zrušit budoucí rezervace', `UPDATE client_reservations SET status = 'cancelled', note = NULL WHERE customer_id = $1 AND date >= $2 AND status IN ('requested', 'confirmed')`, [id, u.dnes]));
     k.push(volitelny('vymazat poznámky rezervací', `UPDATE client_reservations SET note = NULL WHERE customer_id = $1`, [id]));
     k.push(volitelny('vymazat poznámky objednávek', `UPDATE client_orders SET note = NULL WHERE customer_id = $1`, [id]));
+    k.push(volitelny('odpojit kupujícího od dárkových poukazů', `UPDATE client_vouchers SET buyer_customer_id = NULL WHERE buyer_customer_id = $1`, [id]));
     k.push(volitelny('odpojit dárkové poukazy od účtu', `UPDATE client_vouchers SET customer_id = NULL, recipient_name = NULL, recipient_email = NULL, buyer_name = NULL, note = NULL WHERE customer_id = $1`, [id]));
   }
   // Pozvánky s e-mailem osoby (a ty, které rozeslala): e-mail + token jsou osobní údaj.

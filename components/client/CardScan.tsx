@@ -39,6 +39,13 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
   const [hit, setHit] = useState<any | null>(null);
   const [amount, setAmount] = useState('');
   const [bill, setBill] = useState<string | null>(null);
+  // Z účtu zaplacené kreditem nebo poukazem (body z té části se nepočítají, pokud to podnik tak nastavil)
+  // a ručně zadané číslo účtenky (bez pokladny: jedno číslo věrnost připíše jen jednou).
+  const [predplaceno, setPredplaceno] = useState('');
+  const [uctenka, setUctenka] = useState('');
+  // Poslední akce (body, kredit) jde vrátit; tlačítko je vidět do dalšího hosta, server hlídá i čas.
+  const [stornoMozne, setStornoMozne] = useState(false);
+  const [stornoPtam, setStornoPtam] = useState(false);
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
   const [cam, setCam] = useState(false);
@@ -106,11 +113,25 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
   const act = async (action: 'stamp' | 'points' | 'credit' | 'bill') => {
     setBusy(action); setErr('');
     try {
-      const r = await fetch('/api/client/staff/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, action, amount: Number(amount) || 0, billId: action === 'bill' ? bill : undefined }) });
+      const r = await fetch('/api/client/staff/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+        code, action, amount: Number(amount) || 0, billId: action === 'bill' ? bill : undefined,
+        prepaid: action === 'points' || action === 'bill' ? Number(predplaceno) || 0 : undefined, receipt: action === 'points' ? uctenka.trim() || undefined : undefined,
+      }) });
       const x = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(x.error || 'Nepovedlo se.');
-      onToast(x.message); setHit((h: any) => ({ ...h, ...x })); setAmount(''); setBill(null); onChange?.();
+      onToast(x.message); setHit((h: any) => ({ ...h, ...x })); setAmount(''); setBill(null); setPredplaceno(''); setUctenka(''); setStornoMozne(!!x.stornoMozne); setStornoPtam(false); onChange?.();
     } catch (e: any) { setErr(e.message); }
+    setBusy('');
+  };
+  /** Storno poslední akce: vrátí body z částky a platbu kreditem (razítka se vracejí v detailu člena). */
+  const storno = async () => {
+    setBusy('undo'); setErr('');
+    try {
+      const r = await fetch('/api/client/staff/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, action: 'undo' }) });
+      const x = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(x.error || 'Nepovedlo se.');
+      onToast(x.message); setHit((h: any) => ({ ...h, ...x })); setStornoMozne(false); setStornoPtam(false); onChange?.();
+    } catch (e: any) { setErr(e.message); setStornoPtam(false); }
     setBusy('');
   };
   const redeem = async (couponCode: string) => {
@@ -124,7 +145,7 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
     } catch (e: any) { setErr(e.message); }
     setBusy('');
   };
-  const reset = () => { setHit(null); setCp(null); setCode(''); setErr(''); setAmount(''); setBill(null); };
+  const reset = () => { setHit(null); setCp(null); setCode(''); setErr(''); setAmount(''); setBill(null); setPredplaceno(''); setUctenka(''); setStornoMozne(false); setStornoPtam(false); };
 
   return (
     // Jamka, ne karta: kartička se kreslí uvnitř karty (widget Objednávky od
@@ -210,6 +231,38 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
               <Button type="submit" variant="secondary" loading={busy === 'points'} disabled={!hit.rules?.pointsPer100 || !amount}>Body</Button>
             </form>
           </div>
+          {hit.rules?.pointsPer100 > 0 && (
+            <details className="group/dopl">
+              <summary className="tap-target-sm inline-flex items-center gap-1.5 text-sm font-semibold text-black/60 cursor-pointer hover:text-black list-none">
+                <Icon name="chevron" size={15} className="transition-transform group-open/dopl:rotate-180" />K účtu: kredit nebo poukaz, číslo účtenky
+              </summary>
+              <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="sc-pred" className="field-label">Z toho zaplaceno kreditem nebo poukazem ({symbol})</label>
+                  <Input id="sc-pred" type="number" inputMode="numeric" min={0} step={1} value={predplaceno} onChange={e => setPredplaceno(e.target.value)} placeholder="0" className="!w-32" />
+                  <p className="t-meta mt-1">{hit.rules?.bodyPravidla?.excludePrepaid === false ? 'Podnik počítá body z celého účtu, i z části zaplacené poukazem.' : 'Z téhle části se body a cashback nepočítají.'}</p>
+                </div>
+                <div>
+                  <label htmlFor="sc-uct" className="field-label">Číslo účtenky (nepovinné)</label>
+                  <Input id="sc-uct" value={uctenka} maxLength={40} autoComplete="off" onChange={e => setUctenka(e.target.value)} placeholder="Třeba 2026/0412" className="!w-44" />
+                  <p className="t-meta mt-1">Bez pokladny: stejné číslo věrnost podruhé nepřipíše.</p>
+                </div>
+              </div>
+            </details>
+          )}
+          {stornoMozne && (
+            <div className="flex items-center gap-2 flex-wrap" role="group" aria-label="Storno poslední akce">
+              {!stornoPtam ? (
+                <Button type="button" size="sm" variant="ghost" onClick={() => setStornoPtam(true)}>Storno poslední akce</Button>
+              ) : (
+                <>
+                  <p className="t-meta">Vrátit body z částky nebo platbu kreditem? Razítka se tím nemění.</p>
+                  <Button type="button" size="sm" variant="danger-solid" loading={busy === 'undo'} onClick={storno}>Vrátit</Button>
+                  <Button type="button" size="sm" variant="secondary" disabled={busy === 'undo'} onClick={() => setStornoPtam(false)}>Ponechat</Button>
+                </>
+              )}
+            </div>
+          )}
           {hit.bills?.length > 0 && (
             <div>
               <p className="t-label mb-1.5">Dnešní účty z pokladny</p>
@@ -313,6 +366,9 @@ function PoukazKasa({ onToast, onChange, nativni, canScan }: { onToast: (m: stri
   const [kod, setKod] = useState('');
   const [p, setP] = useState<PoukazNahled | null>(null);
   const [castka, setCastka] = useState('');
+  // Nejnižší účet, od kterého jde poukaz uplatnit (nastavení podniku); obsluha pak zadá výši účtu.
+  const [minUtrata, setMinUtrata] = useState(0);
+  const [ucet, setUcet] = useState('');
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
   const [cam, setCam] = useState(false);
@@ -327,7 +383,7 @@ function PoukazKasa({ onToast, onChange, nativni, canScan }: { onToast: (m: stri
       const r = await fetch(`/api/client/admin/vouchers/redeem?code=${encodeURIComponent(k)}`);
       const x = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(x.error || 'Nepovedlo se.');
-      setP(x.poukaz); setKod(formatujPriPsani(k)); setCastka(''); ref.current = null;
+      setP(x.poukaz); setKod(formatujPriPsani(k)); setCastka(''); setUcet(''); setMinUtrata(Number(x.limity?.minUtrata) || 0); ref.current = null;
     } catch (e: any) { setErr(e.message); setP(null); }
     setBusy('');
   };
@@ -343,17 +399,20 @@ function PoukazKasa({ onToast, onChange, nativni, canScan }: { onToast: (m: stri
     if (!p) return;
     setBusy('uplatnit'); setErr('');
     try {
-      const r = await fetch('/api/client/admin/vouchers/redeem', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: p.code, amount: hodnota, ref: novyRef() }) });
+      const r = await fetch('/api/client/admin/vouchers/redeem', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: p.code, amount: hodnota, ref: novyRef(), bill: ucet === '' ? null : Number(ucet) }) });
       const x = await r.json().catch(() => ({}));
       if (!r.ok) { if (r.status < 500) ref.current = null; if (x.poukaz) setP(x.poukaz); throw new Error(x.error || 'Nepovedlo se.'); }
       ref.current = null;
-      onToast(x.opakovani ? `Už uplatněno: ${money(x.castka)}.` : `Uplatněno ${money(x.castka)}. Na poukazu zbývá ${money(x.poukaz.balance)}.`);
-      setP(x.poukaz); setCastka(''); onChange?.();
+      // Hned říkáme, co s body: z části účtu zaplacené poukazem se body nepočítají (nastavení podniku).
+      onToast(x.opakovani ? `Už uplatněno: ${money(x.castka)}.` : `Uplatněno ${money(x.castka)}. Na poukazu zbývá ${money(x.poukaz.balance)}.${x.bezBodu ? ` Při připsání bodů zadej ${money(x.castka)} jako zaplaceno poukazem.` : ''}`);
+      setP(x.poukaz); setCastka(''); setUcet(''); onChange?.();
     } catch (e: any) { setErr(e.message || 'Nepovedlo se.'); }
     setBusy('');
   };
   const cislo = Number(castka);
-  const castkaOk = !!p && Number.isInteger(cislo) && cislo >= 1 && cislo <= p.balance;
+  const potrebaUcet = minUtrata > 0;
+  const ucetOk = !potrebaUcet || (ucet !== '' && Number(ucet) >= minUtrata);
+  const castkaOk = !!p && Number.isInteger(cislo) && cislo >= 1 && cislo <= p.balance && ucetOk;
 
   return (
     <div className="space-y-3">
@@ -373,15 +432,22 @@ function PoukazKasa({ onToast, onChange, nativni, canScan }: { onToast: (m: stri
           </div>
           {p.stav === 'active' ? (
             <form onSubmit={e => { e.preventDefault(); if (castkaOk) void uplatni(cislo); }} className="flex flex-wrap items-center gap-2">
+              {potrebaUcet && (
+                <div className="basis-full">
+                  <Input aria-label={`Výše účtu v ${symbol}`} type="number" inputMode="numeric" min={0} step={1} value={ucet} onChange={e => { setUcet(e.target.value); ref.current = null; setErr(''); }}
+                    placeholder={`Účet alespoň ${minUtrata}`} className="!w-44 text-center" />
+                  <p className="t-meta mt-1">Poukaz jde uplatnit u účtu od {money(minUtrata)}. Zadej výši účtu.</p>
+                </div>
+              )}
               <Input aria-label={`Částka k uplatnění v ${symbol}`} type="number" inputMode="numeric" min={1} max={p.balance} step={1} value={castka}
                 onChange={e => { setCastka(e.target.value); ref.current = null; }} placeholder={`Max ${p.balance}`} className="!w-32 text-center" />
               <Button type="submit" variant="primary" icon="check" loading={busy === 'uplatnit'} disabled={!castkaOk}>Uplatnit</Button>
-              <Button type="button" variant="secondary" disabled={busy === 'uplatnit'} onClick={() => { setCastka(String(p.balance)); ref.current = null; void uplatni(p.balance); }}>Celý zůstatek</Button>
+              <Button type="button" variant="secondary" disabled={busy === 'uplatnit' || !ucetOk} onClick={() => { setCastka(String(p.balance)); ref.current = null; void uplatni(p.balance); }}>Celý zůstatek</Button>
             </form>
           ) : (
             <p className="t-meta">{p.stav === 'expired' ? 'Platnost poukazu skončila, uplatnit ho nejde. Prodloužit ho může správce.' : p.stav === 'used' ? 'Poukaz je vyčerpaný.' : 'Poukaz je zrušený.'}</p>
           )}
-          <Button variant="ghost" size="sm" onClick={() => { setP(null); setKod(''); setCastka(''); setErr(''); ref.current = null; }}>Jiný poukaz</Button>
+          <Button variant="ghost" size="sm" onClick={() => { setP(null); setKod(''); setCastka(''); setUcet(''); setMinUtrata(0); setErr(''); ref.current = null; }}>Jiný poukaz</Button>
         </div>
       )}
       {cam && !p && <Camera prijmi={prijmiPoukaz} onCode={c => { setCam(false); void najdi(c); }} onError={m => { setCam(false); setErr(m); }} />}

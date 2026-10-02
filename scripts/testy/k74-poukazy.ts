@@ -144,5 +144,5 @@ export default function ({ eq, ok }: Testy) {
   ok('karta: QR kód z dodaného SVG je vložen', html.includes('<svg id="qr1"></svg>'));
   ok('karta: hodnota v měně poukazu', /1\s?500\s?Kč/.test(html.replace(/\u00a0/g, ' ')) && html.includes('€'));
   ok('karta: platnost a „bez omezení“', html.includes('Platí do 31. 12. 2026') && html.includes('Bez omezení platnosti'));
-  eq('karta: dvě karty = dvě sekce', (html.match(/<section class="poukaz">/g) ?? []).length, 2);
+  eq('karta: dvě karty = dvě sekce', (html.match(/<section class="poukaz"[ >]/g) ?? []).length, 2);
 }

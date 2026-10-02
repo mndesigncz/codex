@@ -46,6 +46,7 @@ import { overKampan } from '@/lib/stampsPlan';
 import { BodyDalsiPravidla, BodyNeaktivita } from './loyalty/BodyDalsiPravidla';
 import { BodyNahled } from './loyalty/BodyNahled';
 import { BodyPrehledy } from './loyalty/BodyPrehledy';
+import BodyZdroje from './loyalty/BodyZdroje';
 import { usePlan } from '../Pro';
 import { MAX_ONLY_MSG } from '@/lib/plan';
 import { validujPravidla, novaPolePravidel, MAX_PRAH_NAVSTEV, MAX_PRAH_UTRATY, MAX_BODU_ZA_100, MAX_CASHBACK_PCT } from '@/lib/bodyPravidla';
@@ -360,6 +361,7 @@ function BodyAUrovne({ toast, setUkladam }: { toast: (m: string) => void; setUkl
         </Card>
         <BodyNeaktivita p={p} setP={upravP} meni={meni} chyby={chyby} />
       </form>
+      <BodyZdroje toast={toast} />
       {ma('zakaznici.zobrazit') && <ClenoveSkupiny toast={toast} />}
     </div>
   );

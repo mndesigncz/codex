@@ -8,6 +8,7 @@
 //  · duplikace (kopie je koncept, limit se hlídá ve stejném příkazu),
 //  · odkaz na konkrétní kupon nebo razítkovou kartu (musí patřit podniku),
 //  · přeřazení JEDNÍM příkazem (UPDATE ... FROM unnest) a jen s úplným seznamem id podniku,
+//  · plán s dny a hodinami (opakování) a jazykové mutace nadpisu a textu,
 //  · statistiku zobrazení a prokliků za 30 dní (součty z denních počítadel bez osobních údajů).
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/client';
@@ -15,6 +16,7 @@ import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { audit } from '@/lib/audit';
 import { pragueToday } from '@/lib/pragueTime';
 import { zajistiTabulkuBanneru, statistikyBanneru } from '@/lib/clientBanners';
+import { kdyTed } from '@/lib/banneryPlan';
 import { validujBanner, overPoradi, nadpisKopie, souhrnStatistik, MAX_BANNERU, type BannerHodnoty } from '@/lib/bannery';
 import { TIER_LABELS } from '@/lib/kuponyPopisky';
 
@@ -79,7 +81,7 @@ export async function GET() {
   ]);
   const souhrn = souhrnStatistik(stat);
   const statistiky = Object.fromEntries([...souhrn.entries()].map(([id, v]) => [id, v]));
-  return NextResponse.json({ banners, events, coupons, campaigns, groups, urovne: TIER_LABELS, statistiky, dniStatistiky: DNI_STATISTIKY, dnes: pragueToday() });
+  return NextResponse.json({ banners, events, coupons, campaigns, groups, urovne: TIER_LABELS, statistiky, dniStatistiky: DNI_STATISTIKY, dnes: pragueToday(), kdy: kdyTed() });
 }
 
 export async function POST(req: NextRequest) {
@@ -95,9 +97,10 @@ export async function POST(req: NextRequest) {
   // Limit se hlídá ve stejném příkazu jako vložení: dva souběžné požadavky nepřekročí MAX_BANNERU.
   // Archivované se do limitu nepočítají (archiv je přesně na staré bannery).
   const [row] = await sql`
-    INSERT INTO client_banners (team_id, title, text, image_url, link_kind, link_ref, active, valid_since, valid_until, position, target_kind, target_ref, archived)
+    INSERT INTO client_banners (team_id, title, text, image_url, link_kind, link_ref, active, valid_since, valid_until, position, target_kind, target_ref, archived, days_of_week, hour_from, hour_till, i18n)
     SELECT ${ctx.teamId}, ${h.title}, ${h.text}, ${h.image_url}, ${h.link_kind}, ${h.link_ref}, ${h.active}, ${h.valid_since}, ${h.valid_until},
-      (SELECT COALESCE(MAX(position), -1) + 1 FROM client_banners WHERE team_id = ${ctx.teamId}), ${h.target_kind}, ${h.target_ref}, ${h.archived}
+      (SELECT COALESCE(MAX(position), -1) + 1 FROM client_banners WHERE team_id = ${ctx.teamId}), ${h.target_kind}, ${h.target_ref}, ${h.archived},
+      ${JSON.stringify(h.days_of_week)}::jsonb, ${h.hour_from}, ${h.hour_till}, ${JSON.stringify(h.i18n)}::jsonb
     WHERE ${h.archived}::boolean OR (SELECT COUNT(*) FROM client_banners WHERE team_id = ${ctx.teamId} AND archived = FALSE) < ${MAX_BANNERU}
     RETURNING *`;
   if (!row) return NextResponse.json({ error: `Bannerů může být nejvýš ${MAX_BANNERU}. Smaž nebo archivuj nepotřebné.` }, { status: 409 });
@@ -132,9 +135,10 @@ export async function PATCH(req: NextRequest) {
   // Kopie: vypnutý banner (koncept) na konci seznamu; limit se hlídá ve stejném příkazu.
   if (b.action === 'duplicate') {
     const [row] = await sql`
-      INSERT INTO client_banners (team_id, title, text, image_url, link_kind, link_ref, active, valid_since, valid_until, position, target_kind, target_ref, archived)
+      INSERT INTO client_banners (team_id, title, text, image_url, link_kind, link_ref, active, valid_since, valid_until, position, target_kind, target_ref, archived, days_of_week, hour_from, hour_till, i18n)
       SELECT s.team_id, ${nadpisKopie(cur.title)}, s.text, s.image_url, s.link_kind, s.link_ref, FALSE, s.valid_since, s.valid_until,
-        (SELECT COALESCE(MAX(position), -1) + 1 FROM client_banners WHERE team_id = ${ctx.teamId}), s.target_kind, s.target_ref, FALSE
+        (SELECT COALESCE(MAX(position), -1) + 1 FROM client_banners WHERE team_id = ${ctx.teamId}), s.target_kind, s.target_ref, FALSE,
+        s.days_of_week, s.hour_from, s.hour_till, s.i18n
       FROM client_banners s WHERE s.id = ${id} AND s.team_id = ${ctx.teamId}
         AND (SELECT COUNT(*) FROM client_banners WHERE team_id = ${ctx.teamId} AND archived = FALSE) < ${MAX_BANNERU}
       RETURNING *`;
@@ -177,7 +181,8 @@ export async function PATCH(req: NextRequest) {
   const [row] = await sql`
     UPDATE client_banners SET title = ${h.title}, text = ${h.text}, image_url = ${h.image_url}, link_kind = ${h.link_kind},
       link_ref = ${h.link_ref}, active = ${h.active}, valid_since = ${h.valid_since}, valid_until = ${h.valid_until},
-      target_kind = ${h.target_kind}, target_ref = ${h.target_ref}
+      target_kind = ${h.target_kind}, target_ref = ${h.target_ref},
+      days_of_week = ${JSON.stringify(h.days_of_week)}::jsonb, hour_from = ${h.hour_from}, hour_till = ${h.hour_till}, i18n = ${JSON.stringify(h.i18n)}::jsonb
     WHERE id = ${id} AND team_id = ${ctx.teamId} RETURNING *`;
   audit(ctx.teamId, ctx.meId, 'client.banner', 'client_banner', id, `upraven: ${h.title}`);
   return NextResponse.json({ ok: true, banner: row });

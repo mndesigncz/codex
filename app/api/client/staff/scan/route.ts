@@ -23,6 +23,8 @@ import { aktivniBonus } from '@/lib/bonusAkceDb';
 import { bodySBonusem, poznamkaRazitek, popisNasobice } from '@/lib/bonusAkce';
 import { odmenaZUctu } from '@/lib/bodyPravidlaDb';
 import { vetyOOmezeni, pravidlaBoduZProfilu } from '@/lib/bodyPravidla';
+import { cisloUctenky, klicRucniUctenky } from '@/lib/kasaStorno';
+import { stornujPosledniAkci } from '@/lib/kasaStornoDb';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
@@ -151,10 +153,19 @@ export async function POST(req: NextRequest) {
   if (!ctx.role.opravneni.has(klic)) {
     return NextResponse.json({ error: action === 'credit' ? 'Platbu kreditem nemáš povolenou.' : action === 'points' ? 'Připisovat body z částky nemáš povoleno.' : 'Pracovat s kartičkou hosta nemáš povoleno.' }, { status: 403 });
   }
-  if (!['stamp', 'bill', 'points', 'credit', 'join'].includes(action)) return NextResponse.json({ error: 'Neznámá akce' }, { status: 400 });
+  if (!['stamp', 'bill', 'points', 'credit', 'join', 'undo'].includes(action)) return NextResponse.json({ error: 'Neznámá akce' }, { status: 400 });
   const p = await ensureProfile(u.team_id);
   if (!p.loyalty_on) return NextResponse.json({ error: 'Podnik nemá věrnost zapnutou.' }, { status: 400 });
   await zajistiRazitka();
+  // Storno poslední akce (body z částky, platba kreditem): vlastní zábor v databázi, takže ho neřeší pětisekundový
+  // otisk (ten by storno zapsal jako „poslední akci“ a další storno by vracelo storno).
+  if (action === 'undo') {
+    const mena = await menaPodniku(u.team_id);
+    const r = await stornujPosledniAkci(u.team_id, u.id, c.id, c.name, ctx.role.opravneni, mena.money);
+    if (!r.ok) return NextResponse.json({ error: r.chyba }, { status: r.status });
+    audit(u.team_id, u.id, 'client.card', 'client', c.id, r.message);
+    return NextResponse.json({ ok: true, message: r.message, customer: c, ...(await summary(u.team_id, c.id, p)), stornoMozne: false });
+  }
   await join(c.id, u.team_id);
   // Čtečka u kasy: host není členem podniku, obsluha ho jedním klepnutím přidá (bez razítka a bodů).
   if (action === 'join') {
@@ -165,6 +176,9 @@ export async function POST(req: NextRequest) {
   }
 
   // Idempotence: klíč z UI (volitelný) a otisk akce. Opakovaná akce se nepřipíše podruhé.
+  // Ručně zadané číslo účtenky (bez pokladny): jedno číslo věrnost připíše jen jednou. Chyba tvaru se hlásí hned.
+  const uctenka = action === 'points' ? cisloUctenky(b.receipt) : { ok: true as const, cislo: null };
+  if (!uctenka.ok) return NextResponse.json({ error: uctenka.chyba }, { status: 400 });
   const idemKey = String(req.headers.get('idempotency-key') ?? b.idemKey ?? '').trim().slice(0, 80) || null;
   const akceId = await zaberAkci(u.team_id, c.id, u.id, action, idemKey, otiskAkce(action, b));
   if (akceId == null) {
@@ -173,14 +187,29 @@ export async function POST(req: NextRequest) {
       customer: c, ...(await summary(u.team_id, c.id, p)),
     });
   }
+  // Strážce ručně zadané účtenky: jeden příkaz s ON CONFLICT, dvě obsluhy s týmž číslem se nepřipíšou obě.
+  const klicUctenky = uctenka.cislo ? klicRucniUctenky(uctenka.cislo) : null;
+  const uvolniUctenku = () => klicUctenky
+    ? sql`DELETE FROM client_bill_awards WHERE team_id = ${u.team_id} AND bill_id = ${klicUctenky} AND customer_id = ${c.id}`.catch(() => {})
+    : Promise.resolve();
+  if (klicUctenky) {
+    const g = await sql`
+      INSERT INTO client_bill_awards (team_id, bill_id, customer_id, staff_id) VALUES (${u.team_id}, ${klicUctenky}, ${c.id}, ${u.id})
+      ON CONFLICT (team_id, bill_id) DO NOTHING RETURNING bill_id`;
+    if (!g.length) {
+      await sql`DELETE FROM client_scan_actions WHERE id = ${akceId}`.catch(() => {});
+      return NextResponse.json({ error: 'Tahle účtenka už věrnost připsala.' }, { status: 409 });
+    }
+  }
   let res: NextResponse;
   try { res = await provedAkci(action, b, c, u, p, akceId); }
   catch (e) {
     await sql`DELETE FROM client_scan_actions WHERE id = ${akceId}`.catch(() => {});
+    await uvolniUctenku();
     throw e;
   }
   // Neúspěšná akce nic nespotřebovala — oprava vstupu (částka, účtenka) nesmí narazit na pětisekundový zámek.
-  if (res.status >= 400) await sql`DELETE FROM client_scan_actions WHERE id = ${akceId}`.catch(() => {});
+  if (res.status >= 400) { await sql`DELETE FROM client_scan_actions WHERE id = ${akceId}`.catch(() => {}); await uvolniUctenku(); }
   return res;
 }
 
@@ -313,5 +342,6 @@ async function provedAkci(action: string, b: any, c: { id: number; name: string 
     msg = `${c.name}: uplatněno ${mena.money(amount)} kreditu, zbývá ${mena.money(Number(credit))}.`;
   }
   audit(u.team_id, u.id, 'client.card', 'client', c.id, msg);
-  return NextResponse.json({ ok: true, message: msg, customer: c, ...(await summary(u.team_id, c.id, p)) });
+  // Body z částky a platbu kreditem jde hned vrátit (storno poslední akce); razítka a účtenka ne.
+  return NextResponse.json({ ok: true, message: msg, customer: c, ...(await summary(u.team_id, c.id, p)), stornoMozne: action === 'points' || action === 'credit' });
 }

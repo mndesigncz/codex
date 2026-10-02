@@ -70,6 +70,15 @@
     cursor: pointer;
   }
   button:active { transform: scale(0.98); }
+  .host-karta {
+    margin: 0 0 22px; padding: 16px; text-align: center;
+    border: 1px solid rgba(127,127,127,0.22); border-radius: 20px;
+  }
+  .host-karta h2 { font-size: 1rem; margin: 0 0 4px; }
+  .host-karta .qr { background: #fff; border-radius: 16px; padding: 12px; width: 180px; height: 180px; margin: 10px auto; }
+  .host-karta .qr svg { width: 100%; height: 100%; display: block; }
+  .host-karta .kod { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 1.25rem; font-weight: 700; letter-spacing: .14em; margin: 4px 0; opacity: 1; word-break: break-all; }
+  .host-karta p { margin: 0; font-size: 0.8125rem; }
   .stav {
     margin-top: 14px; text-align: center;
     font-size: 0.8125rem; opacity: 0.55; min-height: 1.2em;
@@ -90,6 +99,15 @@
 
     <h1>Nejsi připojený</h1>
     <p>Spojení se ztratilo, takže se Managero nedá načíst. Není to chyba aplikace ani tvoje.</p>
+    <!-- Offline kartička hosta: Moje ji při každém načtení uloží do telefonu (lib/offlineKarta.ts), tady se ukáže bez sítě. -->
+    <section class="host-karta" id="host-karta" aria-labelledby="host-karta-h" hidden>
+      <h2 id="host-karta-h">Tvoje kartička</h2>
+      <p id="host-karta-jmeno"></p>
+      <div class="qr" id="host-karta-qr" role="img" aria-label="QR kód kartičky"></div>
+      <p class="kod" id="host-karta-kod"></p>
+      <p>Uložená v tomhle telefonu: obsluha ji načte i bez připojení.</p>
+    </section>
+
     <ul>
       <li>Nic se neztratilo potichu: co neprošlo, to ti aplikace řekla.</li>
       <li>Rozepsané zůstává, dokud tuhle záložku nezavřeš.</li>
@@ -117,6 +135,24 @@
   }
 
   tlacitko.addEventListener('click', zkusit);
+
+  // Uložená kartička hosta. Kontrola tvaru je stejná jako v lib/offlineKarta.ts (hlídá ji test): kód jen
+  // z písmen, číslic a pomlček, QR jen z prvků svg/path/rect/g. Cokoli jiného se nezobrazí.
+  (function () {
+    try {
+      var raw = window.localStorage.getItem('managero-karta-v1');
+      if (!raw || raw.length > 122000) return;
+      var k = JSON.parse(raw);
+      var kod = String(k && k.code || '');
+      var svg = String(k && k.svg || '');
+      if (!/^[A-Z0-9-]{8,16}$/.test(kod) || svg.length > 120000) return;
+      if (!/^<svg(?:\s+(?:xmlns|viewBox|shape-rendering|fill|stroke|d|x|y|width|height|transform|stroke-width|fill-rule|clip-rule|opacity|fill-opacity|stroke-opacity|version)="[^"<>]*")*\s*>(?:<(?:path|rect)(?:\s+(?:xmlns|viewBox|shape-rendering|fill|stroke|d|x|y|width|height|transform|stroke-width|fill-rule|clip-rule|opacity|fill-opacity|stroke-opacity|version)="[^"<>]*")*\s*\/>|<g(?:\s+(?:xmlns|viewBox|shape-rendering|fill|stroke|d|x|y|width|height|transform|stroke-width|fill-rule|clip-rule|opacity|fill-opacity|stroke-opacity|version)="[^"<>]*")*\s*>|<\/g>)+<\/svg>\s*$/.test(svg)) return;
+      document.getElementById('host-karta-qr').innerHTML = svg;
+      document.getElementById('host-karta-kod').textContent = kod;
+      document.getElementById('host-karta-jmeno').textContent = String(k.name || '').slice(0, 80);
+      document.getElementById('host-karta').hidden = false;
+    } catch (e) { /* bez úložiště se ukáže jen obecná stránka */ }
+  })();
 
   // Návrat sítě je ta nejlepší chvíle na obnovení — obsluha u baru
   // nemá co koukat na tlačítko a čekat.

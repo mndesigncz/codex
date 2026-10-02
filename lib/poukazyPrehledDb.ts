@@ -151,7 +151,7 @@ export async function odesliPoukaz(teamId: number, userId: number, id: number, e
   if (p.stav !== 'active') return { ok: false, chyba: p.stav === 'void' ? 'Poukaz je zrušený.' : p.stav === 'used' ? 'Poukaz je už vyčerpaný.' : 'Platnost poukazu skončila. Nejdřív ji prodluž.', status: 409 };
   const podnik = await podnikProPoukaz(teamId);
   const obsah = emailPoukazu({
-    podnik: podnik.nazev, kod: p.code, castka: p.balance, mena: p.currency, platnost: p.valid_until, komu: p.recipient_name, vzkaz,
+    podnik: podnik.nazev, kod: p.code, castka: p.balance, mena: p.currency, platnost: p.valid_until, komu: p.recipient_name, vzkaz, design: p.design,
     odkaz: podnik.slug ? `${odkazovyZaklad()}/client/${podnik.slug}?tab=loyalty` : null,
   });
   const r = await sendVoucherEmail(email, podnik.nazev, obsah);
@@ -214,7 +214,7 @@ export async function pripomenPoukazy(dnes: string = pragueToday()): Promise<{ p
         AND valid_until BETWEEN ${dnes}::date AND ${dnes}::date + ${PRIPOMENUTI_DNI}::int AND expiry_mailed_at IS NULL
       LIMIT 500)
       AND expiry_mailed_at IS NULL
-    RETURNING id, team_id, code, balance, currency, to_char(valid_until, 'YYYY-MM-DD') AS valid_until, recipient_name, recipient_email` as any[];
+    RETURNING id, team_id, code, balance, currency, to_char(valid_until, 'YYYY-MM-DD') AS valid_until, recipient_name, recipient_email, design` as any[];
   const podniky = new Map<number, { nazev: string; slug: string | null }>();
   for (const r of kPoslani) {
     const teamId = Number(r.team_id);
@@ -223,7 +223,7 @@ export async function pripomenPoukazy(dnes: string = pragueToday()): Promise<{ p
       const pod = podniky.get(teamId)!;
       const zbyva = Math.round((Date.parse(`${r.valid_until}T12:00:00Z`) - Date.parse(`${dnes}T12:00:00Z`)) / 86400000);
       const obsah = emailPripominky({
-        podnik: pod.nazev, kod: String(r.code), castka: Number(r.balance), mena: String(r.currency), platnost: r.valid_until, komu: r.recipient_name ?? null,
+        podnik: pod.nazev, kod: String(r.code), castka: Number(r.balance), mena: String(r.currency), platnost: r.valid_until, komu: r.recipient_name ?? null, design: r.design ?? null,
         odkaz: pod.slug ? `${odkazovyZaklad()}/client/${pod.slug}?tab=loyalty` : null, zbyvaDni: zbyva,
       });
       const v = await sendVoucherEmail(String(r.recipient_email), pod.nazev, obsah);

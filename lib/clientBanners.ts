@@ -10,6 +10,7 @@
 import { sql } from './client';
 import { pragueToday } from './pragueTime';
 import { vyberAktivni, NEZNAMY_HOST, type HostKontext } from './bannery';
+import { kdyTed, prekladyZRadku, textProJazyk } from './banneryPlan';
 
 let pripraveno: Promise<void> | null = null;
 
@@ -36,6 +37,11 @@ export function zajistiTabulkuBanneru(): Promise<void> {
       await sql`ALTER TABLE client_banners ADD COLUMN IF NOT EXISTS target_kind TEXT NOT NULL DEFAULT 'all'`;
       await sql`ALTER TABLE client_banners ADD COLUMN IF NOT EXISTS target_ref TEXT`;
       await sql`ALTER TABLE client_banners ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT FALSE`;
+      // Plán (dny a hodiny) a jazykové mutace.
+      await sql`ALTER TABLE client_banners ADD COLUMN IF NOT EXISTS days_of_week JSONB NOT NULL DEFAULT '[]'`;
+      await sql`ALTER TABLE client_banners ADD COLUMN IF NOT EXISTS hour_from TEXT`;
+      await sql`ALTER TABLE client_banners ADD COLUMN IF NOT EXISTS hour_till TEXT`;
+      await sql`ALTER TABLE client_banners ADD COLUMN IF NOT EXISTS i18n JSONB NOT NULL DEFAULT '{}'`;
       await sql`
         CREATE TABLE IF NOT EXISTS client_banner_stats (
           banner_id INTEGER NOT NULL,
@@ -52,20 +58,25 @@ export function zajistiTabulkuBanneru(): Promise<void> {
 }
 
 /** Veřejný tvar banneru pro stránku hosta (jen to, co host smí vidět; cílení ani statistika ne). */
-export function tvarBanneru(r: any) {
+export function tvarBanneru(r: any, jazyk?: string | null) {
+  // Překlad do jazyka hosta; bez překladu hlavní (český) text.
+  const txt = textProJazyk({ title: String(r.title), text: String(r.text ?? '') }, prekladyZRadku(r.i18n), jazyk);
   return {
-    id: Number(r.id), title: String(r.title), text: String(r.text ?? ''),
+    id: Number(r.id), title: txt.title, text: txt.text,
     imageUrl: r.image_url ?? null, linkKind: String(r.link_kind ?? 'none'), linkRef: r.link_ref ?? null,
   };
 }
 
-/** Aktivní bannery podniku v platnosti k datu a pro tohoto hosta, nejvýš pět, podle pozice. Chyba databáze = žádné bannery. */
-export async function aktivniBannery(teamId: number, dnes: string, host: HostKontext = NEZNAMY_HOST) {
+/**
+ * Aktivní bannery podniku v platnosti k datu, v plánu (dny a hodiny, pražský čas) a pro tohoto hosta,
+ * nejvýš pět, podle pozice, v jazyce hosta. Chyba databáze = žádné bannery.
+ */
+export async function aktivniBannery(teamId: number, dnes: string, host: HostKontext = NEZNAMY_HOST, jazyk?: string | null, ted: Date = new Date()) {
   try {
     await zajistiTabulkuBanneru();
     const rows = await sql`
       SELECT * FROM client_banners WHERE team_id = ${teamId} AND active = TRUE AND archived = FALSE ORDER BY position, id` as any[];
-    return vyberAktivni(rows, dnes, undefined, host).map(tvarBanneru);
+    return vyberAktivni(rows, dnes, undefined, host, kdyTed(ted)).map(r => tvarBanneru(r, jazyk));
   } catch { return []; }
 }
 

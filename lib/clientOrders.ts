@@ -20,6 +20,7 @@ import { createHmac } from 'crypto';
 import { naHalere } from './cena.ts';
 import { menaPodniku } from './menaPodniku';
 import { odmenaZUctu } from './bodyPravidlaDb';
+import { bodyZObjednavky, zdrojeZProfilu } from './bodyZdroje';
 
 // ---- Ochrana: sedí host opravdu u stolu? ------------------------------------
 //
@@ -252,7 +253,8 @@ export async function setOrderStatus(teamId: number, id: number, next: string): 
     if (profile.loyalty_on) {
       // Bonusová akce (Happy hour) se uplatní uvnitř téhož připsání, ne jako druhé.
       const bonus = await aktivniBonus(teamId);
-      const zaklad = (await odmenaZUctu(teamId, profile, Number(o.total))).odmena.points;
+      // Nastavení „body za objednávky“ (Věrnost → Body): vypnuté objednávky body nedávají, razítko za návštěvu zůstává.
+      const zaklad = bodyZObjednavky(zdrojeZProfilu(profile), (await odmenaZUctu(teamId, profile, Number(o.total))).odmena.points);
       const { body: pts, poznamka } = bodySBonusem(zaklad, bonus);
       const points = pts > 0 ? await award(teamId, Number(o.customer_id), pts, 'order', `ord:${o.id}`, `Útrata ${(await menaPodniku(teamId)).price(Number(o.total))}${poznamka}`) : null;
       const [m] = await sql`SELECT last_visit_at FROM client_memberships WHERE customer_id = ${o.customer_id} AND team_id = ${teamId}`;

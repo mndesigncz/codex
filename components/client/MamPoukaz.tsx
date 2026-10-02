@@ -13,7 +13,7 @@ import { formatujPriPsani } from '@/lib/poukazy';
 
 interface Nalez { balance: number; value: number; currency: string; validUntil: string | null }
 
-export default function MamPoukaz({ slug, podniky }: { slug?: string; podniky?: { slug: string; name: string }[] }) {
+export default function MamPoukaz({ slug, podniky, prihlasen = false, onPridano }: { slug?: string; podniky?: { slug: string; name: string }[]; prihlasen?: boolean; onPridano?: () => void }) {
   const t = useT('klient-host');
   const { jazyk } = useJazyk();
   const [vybrany, setVybrany] = useState(slug ?? podniky?.[0]?.slug ?? '');
@@ -21,11 +21,13 @@ export default function MamPoukaz({ slug, podniky }: { slug?: string; podniky?: 
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [nalez, setNalez] = useState<Nalez | null>(null);
+  const [pridavam, setPridavam] = useState(false);
+  const [pridano, setPridano] = useState(false);
 
   const over = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!kod.trim() || !vybrany) return;
-    setBusy(true); setErr(''); setNalez(null);
+    setBusy(true); setErr(''); setNalez(null); setPridano(false);
     try {
       const r = await fetch(`/api/client/b/${encodeURIComponent(vybrany)}/voucher`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: kod }) });
       const d = await r.json().catch(() => ({}));
@@ -35,6 +37,21 @@ export default function MamPoukaz({ slug, podniky }: { slug?: string; podniky?: 
       setErr(t('Poukaz se teď nepodařilo ověřit. Zkus to za chvíli.'));
     } finally {
       setBusy(false);
+    }
+  };
+
+  // Přidání do aplikace: poukaz se pak ukáže v Moje i bez opisování kódu. Stejný kód jde přidat opakovaně.
+  const pridej = async () => {
+    setPridavam(true); setErr('');
+    try {
+      const r = await fetch(`/api/client/b/${encodeURIComponent(vybrany)}/voucher`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: kod, claim: true }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { setErr(d.error ? t(d.error) : t('Poukaz se nepodařilo přidat. Zkus to za chvíli.')); return; }
+      setPridano(true); onPridano?.();
+    } catch {
+      setErr(t('Poukaz se nepodařilo přidat. Zkus to za chvíli.'));
+    } finally {
+      setPridavam(false);
     }
   };
 
@@ -61,6 +78,10 @@ export default function MamPoukaz({ slug, podniky }: { slug?: string; podniky?: 
             {nalez.validUntil ? t('platí do {datum}', { datum: fmtDatum(nalez.validUntil, { jazyk, styl: 'cislo' }) }) : t('bez omezení platnosti')}
           </p>
           <p className="text-xs text-black/55 mt-1.5">{t('Poukaz uplatní obsluha u kasy: ukaž jí kód.')}</p>
+          {prihlasen && !pridano && (
+            <button type="button" onClick={pridej} disabled={pridavam} className="tap-target-sm mt-2 btn btn-secondary text-sm disabled:opacity-50">{pridavam ? '…' : t('Přidat do mé aplikace')}</button>
+          )}
+          {pridano && <p role="status" className="text-sm font-semibold mt-2">{t('Poukaz je v tvé aplikaci, najdeš ho v Moje.')}</p>}
         </div>
       )}
     </form>

@@ -5,7 +5,8 @@
 //  · co brzy propadne a co už propadlo,
 //  · prodané a uplatněné hodnoty po měsících (pražské měsíce, posledních 12),
 //  · hromadné prodloužení platnosti (náhled, kolika poukazů se to dotkne, pak potvrzení),
-//  · nastavení uplatnění: nejmenší a největší částka najednou.
+//  · nastavení uplatnění: nejmenší a největší částka najednou, nejnižší účet a body za nákup poukazu,
+//  · export pro účetnictví (měsíční souhrn a deník pohybů).
 // Čísla počítá server (lib/poukazyPrehledDb.ts); tady se jen ukazují. Komponenta správy: texty česky natvrdo.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -16,11 +17,12 @@ import { czCount, type CzNoun } from '@/lib/czech';
 import { fmtMesic } from '@/lib/i18n/format';
 import { dayPlus } from '@/lib/pragueTime';
 import { datumCesky } from '@/lib/poukazyTisk';
-import { normalizujLimity, overNovouPlatnost, jeDatum, type PrehledZavazku, type MesicPrehledu, type LimityUplatneni } from '@/lib/poukazy';
+import { normalizujLimity, overNovouPlatnost, jeDatum, type PrehledZavazku, type MesicPrehledu, type LimityUplatneni, type NastaveniPoukazu } from '@/lib/poukazy';
+import { PoukazyDalsiNastaveni, PoukazyUcetnictvi } from './PoukazyNastaveni';
 
 const POUKAZ: CzNoun = { one: 'poukaz', few: 'poukazy', many: 'poukazů' };
 
-interface Data { prehled: PrehledZavazku & { brzyDni: number }; mesice: MesicPrehledu[]; limity: LimityUplatneni; currency: string; dnes: string }
+interface Data { prehled: PrehledZavazku & { brzyDni: number }; mesice: MesicPrehledu[]; limity: LimityUplatneni; currency: string; dnes: string; nastaveni: NastaveniPoukazu; poukazBezBodu: boolean }
 
 async function j(url: string, init?: RequestInit) {
   const r = await fetch(url, init ? { headers: { 'Content-Type': 'application/json' }, ...init } : undefined);
@@ -96,6 +98,9 @@ export default function PoukazyPrehled({ toast, obnov, onZmena }: { toast: (m: s
       </div>
 
       <Limity limity={d.limity} toast={toast} onUlozeno={l => setD(x => x && { ...x, limity: l })} />
+      <PoukazyDalsiNastaveni key={`${d.nastaveni.minUtrata}-${d.nastaveni.bodyZaNakup}`} nastaveni={d.nastaveni} bezBodu={d.poukazBezBodu} toast={toast}
+        onUlozeno={n => setD(x => x && { ...x, nastaveni: n, limity: { ...x.limity, minUtrata: n.minUtrata } })} />
+      <PoukazyUcetnictvi toast={toast} />
 
       {prodluzit && <Prodlouzeni dnes={d.dnes} onZavrit={() => setProdluzit(false)}
         onHotovo={(n, presk) => {
