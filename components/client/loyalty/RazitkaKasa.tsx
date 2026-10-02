@@ -117,7 +117,7 @@ export function RucniPolozky({ polozky, busy, onPripsat }: {
   );
 }
 
-/** Storno poslední akce s razítky (s potvrzením). */
+/** Storno poslední akce u kasy (razítka, body z částky, platba kreditem; s potvrzením). */
 export function StornoRazitek({ posledni, busy, onStorno }: { posledni: { note: string; at: string } | null; busy: boolean; onStorno: () => void }) {
   const [ptam, setPtam] = useState(false);
   if (!posledni) return null;
@@ -127,13 +127,13 @@ export function StornoRazitek({ posledni, busy, onStorno }: { posledni: { note: 
         <p className="t-meta min-w-0 break-words">Poslední akce: {posledni.note}</p>
         <Button type="button" size="sm" variant="ghost" icon="undo" loading={busy} onClick={() => setPtam(true)}>Storno poslední akce</Button>
       </div>
-      <Modal open={ptam} onClose={() => setPtam(false)} size="sm" title="Stornovat poslední akci s razítky?"
+      <Modal open={ptam} onClose={() => setPtam(false)} size="sm" title="Stornovat poslední akci?"
         footer={<>
           <Button variant="secondary" onClick={() => setPtam(false)}>Ne, nechat</Button>
           <Button variant="danger-solid" onClick={() => { setPtam(false); onStorno(); }}>Stornovat</Button>
         </>}>
         <p className="text-sm text-black/70 text-pretty">{posledni.note}</p>
-        <p className="t-meta mt-2">Razítka se vrátí a neuplatněná odměna z té akce zmizí. Body a kredit z účtenky storno nemění.</p>
+        <p className="t-meta mt-2">Vrátí se razítka, body z částky a platba kreditem z té akce a neuplatněná odměna z ní zmizí. Účtenka z pokladny se z kasy vrátit nedá (zruší se v pokladně).</p>
       </Modal>
     </>
   );

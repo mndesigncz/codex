@@ -23,11 +23,14 @@ import { poukazyKartyHtml, datumCesky, type KartaPoukazu } from '@/lib/poukazyTi
 import { formatujPriPsani, overKod, STAV_POPISEK, MAX_DAVKA, type StavPoukazu, type LimityUplatneni } from '@/lib/poukazy';
 import PoukazyPrehled from './loyalty/PoukazyPrehled';
 import PoukazyOdeslani from './loyalty/PoukazyOdeslani';
+import VyberVzhledu from './loyalty/PoukazyVzhled';
+import { ClenVyber, PoukazHostSekce, type VybranyClen } from './loyalty/PoukazyHost';
 
 interface PoukazRadek {
   id: number; code: string; value_amount: number; balance: number; currency: string; recipient_name: string | null; buyer_name: string | null;
   note: string | null; valid_until: string | null; status: string; created_at: string; stav: StavPoukazu;
   recipient_email?: string | null; sent_at?: string | null;
+  design?: string; customer_id?: number | null; buyer_customer_id?: number | null; points_awarded?: number;
 }
 interface Pouziti { id: number; kind: string; amount: number; balance_after: number | null; by_name: string | null; note: string | null; created_at: string }
 
@@ -164,7 +167,7 @@ export default function Poukazy({ toast }: { toast: (m: string) => void }) {
             <ul className="list px-5 mt-2">
               {data.poukazy.map(p => (
                 <ListRow key={p.id} onClick={() => setDetailId(p.id)}
-                  title={<span className="flex items-center gap-2 min-w-0"><span className="font-mono tracking-wider truncate">{p.code}</span><Chip tone={TON[p.stav]} size="sm">{STAV_POPISEK[p.stav]}</Chip></span>}
+                  title={<span className="flex items-center gap-2 min-w-0"><span className="font-mono tracking-wider truncate">{p.code}</span><Chip tone={TON[p.stav]} size="sm">{STAV_POPISEK[p.stav]}</Chip>{p.customer_id != null && <Chip tone="info" size="sm">v aplikaci</Chip>}</span>}
                   meta={[p.recipient_name, p.valid_until ? `do ${datumCesky(p.valid_until)}` : 'bez omezení platnosti', p.note].filter(Boolean).join(' · ')}
                   value={money(p.balance)} valueMeta={p.balance !== p.value_amount ? `z ${money(p.value_amount)}` : undefined} />
               ))}
@@ -198,8 +201,12 @@ function NovyPoukaz({ toast, onZavrit, onHotovo }: { toast: (m: string) => void;
   const [komu, setKomu] = useState('');
   const [kupujici, setKupujici] = useState('');
   const [poznamka, setPoznamka] = useState('');
+  const [design, setDesign] = useState('klasik');
+  const [majitel, setMajitel] = useState<VybranyClen | null>(null);
+  const [kupujiciClen, setKupujiciClen] = useState<VybranyClen | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const money = useMoney();
   const dnes = pragueToday();
   const rok = (n: number) => { const d = new Date(`${dnes}T00:00:00Z`); d.setUTCFullYear(d.getUTCFullYear() + n); return d.toISOString().slice(0, 10); };
   const mesice = (n: number) => { const d = new Date(`${dnes}T00:00:00Z`); d.setUTCMonth(d.getUTCMonth() + n); return d.toISOString().slice(0, 10); };
@@ -211,8 +218,8 @@ function NovyPoukaz({ toast, onZavrit, onHotovo }: { toast: (m: string) => void;
     if (!Number.isInteger(n) || n < 1 || n > MAX_DAVKA) { setErr(`Počet kusů je 1 až ${MAX_DAVKA}.`); return; }
     setBusy(true); setErr('');
     try {
-      const d = await j('/api/client/admin/vouchers', { method: 'POST', body: JSON.stringify({ value: h, count: n, validUntil: platnost || null, recipient: komu, buyer: kupujici, note: poznamka }) });
-      toast(n === 1 ? 'Poukaz založen.' : `Založeno: ${czCount(n, POUKAZ)}.`);
+      const d = await j('/api/client/admin/vouchers', { method: 'POST', body: JSON.stringify({ value: h, count: n, validUntil: platnost || null, recipient: komu, buyer: kupujici, note: poznamka, design, customerId: n === 1 ? majitel?.id ?? null : null, buyerCustomerId: kupujiciClen?.id ?? null }) });
+      toast((n === 1 ? 'Poukaz založen.' : `Založeno: ${czCount(n, POUKAZ)}.`) + (d.body > 0 ? ` ${kupujiciClen?.name ?? 'Kupující'} dostal ${d.body} bodů za nákup.` : ''));
       onHotovo(d.poukazy);
     } catch (e2) { setErr(apiMessage(e2, 'Poukaz se nepodařilo založit.')); }
     setBusy(false);
@@ -239,6 +246,9 @@ function NovyPoukaz({ toast, onZavrit, onHotovo }: { toast: (m: string) => void;
         </div>
         <Field id="pn-komu" label="Obdarovaný (nepovinné)"><Input id="pn-komu" value={komu} onChange={e => setKomu(e.target.value)} maxLength={80} placeholder="Jana Nováková" /></Field>
         <Field id="pn-kupujici" label="Kupující (nepovinné)"><Input id="pn-kupujici" value={kupujici} onChange={e => setKupujici(e.target.value)} maxLength={80} /></Field>
+        <VyberVzhledu id="pn-vzhled" value={design} onChange={setDesign} hodnota={Number(hodnota) > 0 ? money(Number(hodnota)) : money(500)} />
+        {Number(pocet) <= 1 && <ClenVyber id="pn-majitel" label="Host v aplikaci (nepovinné)" hint="Člen, který poukaz uvidí v aplikaci v Moje. Piš jméno člena." value={majitel} onChange={setMajitel} />}
+        <ClenVyber id="pn-kupujici-clen" label="Kupující člen (nepovinné)" hint="Když podnik dává body za nákup poukazu, dostane je tenhle člen. Nastavení je v přehledu poukazů." value={kupujiciClen} onChange={setKupujiciClen} />
         <Field id="pn-poznamka" label="Poznámka (nepovinné)"><Textarea id="pn-poznamka" value={poznamka} onChange={e => setPoznamka(e.target.value)} maxLength={300} rows={2} placeholder="Třeba: zaplaceno převodem, k narozeninám" /></Field>
         {err && <p role="alert" className="note note-danger">{err}</p>}
       </form>
@@ -291,6 +301,9 @@ function Detail({ id, podnik, toast, spravuje, uplatni, onZavrit, onZmena }: {
   const [rusim, setRusim] = useState(false);
   const [vracim, setVracim] = useState<Pouziti | null>(null);
   const [limity, setLimity] = useState<LimityUplatneni | null>(null);
+  const [clen, setClen] = useState<string | null>(null);
+  const [kupujici, setKupujici] = useState<string | null>(null);
+  const [ucet, setUcet] = useState('');
   // Jedna záměrná akce = jedno ref: opakování po výpadku sítě se neodečte dvakrát.
   const ref = useRef<string | null>(null);
   const novyRef = () => (ref.current ??= (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `r${Date.now()}${Math.random().toString(36).slice(2)}`));
@@ -298,7 +311,7 @@ function Detail({ id, podnik, toast, spravuje, uplatni, onZavrit, onZmena }: {
   const nacti = useCallback(async () => {
     try {
       const d = await j(`/api/client/admin/vouchers?id=${id}`);
-      setP(d.poukaz); setHist(d.historie ?? []); setLimity(d.limity ?? null); setChyba(null);
+      setP(d.poukaz); setHist(d.historie ?? []); setLimity(d.limity ?? null); setClen(d.clen ?? null); setKupujici(d.kupujici ?? null); setChyba(null);
       setPlatnost(d.poukaz.valid_until ?? ''); setPoznamka(d.poukaz.note ?? '');
     } catch (e) { setChyba(apiMessage(e, 'Poukaz se nepodařilo načíst.')); }
   }, [id]);
@@ -308,10 +321,11 @@ function Detail({ id, podnik, toast, spravuje, uplatni, onZavrit, onZmena }: {
     if (!p) return;
     setBusy('uplatnit'); setErr('');
     try {
-      const d = await j('/api/client/admin/vouchers/redeem', { method: 'POST', body: JSON.stringify({ code: p.code, amount: hodnota, ref: novyRef(), note: poznamkaUplatneni }) });
+      const d = await j('/api/client/admin/vouchers/redeem', { method: 'POST', body: JSON.stringify({ code: p.code, amount: hodnota, ref: novyRef(), note: poznamkaUplatneni, bill: ucet === '' ? null : Number(ucet) }) });
       ref.current = null;
-      toast(d.opakovani ? `Už uplatněno: ${money(d.castka)}.` : `Uplatněno ${money(d.castka)}. Zbývá ${money(d.poukaz.balance)}.`);
-      setCastka(''); setPoznamkaUplatneni(''); await nacti(); onZmena();
+      // Obsluha hned ví, co s body: při platbě poukazem se z té části body nepočítají, pokud to podnik takhle nastavil.
+      toast(d.opakovani ? `Už uplatněno: ${money(d.castka)}.` : `Uplatněno ${money(d.castka)}. Zbývá ${money(d.poukaz.balance)}.${d.bezBodu ? ` Při připsání bodů zadej ${money(d.castka)} jako zaplaceno poukazem.` : ''}`);
+      setCastka(''); setUcet(''); setPoznamkaUplatneni(''); await nacti(); onZmena();
     } catch (e: any) {
       // Odpověď serveru (4xx) uzavírá pokus; výpadek sítě ref nechá, ať opakování nic neodečte podruhé.
       if (e?.status && e.status < 500) ref.current = null;
@@ -335,7 +349,8 @@ function Detail({ id, podnik, toast, spravuje, uplatni, onZavrit, onZmena }: {
 
   const mozeUplatnit = !!p && p.stav === 'active';
   const cislo = Number(castka);
-  const castkaOk = Number.isInteger(cislo) && cislo >= 1 && !!p && cislo <= p.balance;
+  const potrebaUcet = (limity?.minUtrata ?? 0) > 0;
+  const castkaOk = Number.isInteger(cislo) && cislo >= 1 && !!p && cislo <= p.balance && (!potrebaUcet || (ucet !== '' && Number(ucet) >= (limity?.minUtrata ?? 0)));
 
   return (
     <Modal open onClose={onZavrit} size="lg" title={p ? <span className="font-mono tracking-wider">{p.code}</span> : 'Poukaz'}>
@@ -365,8 +380,13 @@ function Detail({ id, podnik, toast, spravuje, uplatni, onZavrit, onZmena }: {
                       <Input aria-label={`Částka k uplatnění v ${symbol}`} type="number" inputMode="numeric" min={1} max={p.balance} step={1} value={castka}
                         onChange={e => { setCastka(e.target.value); ref.current = null; }} placeholder={`Max ${p.balance}`} className="!w-36 text-center" />
                       <Button type="submit" variant="primary" icon="check" loading={busy === 'uplatnit'} disabled={!castkaOk}>Uplatnit</Button>
-                      <Button type="button" variant="secondary" disabled={busy === 'uplatnit'} onClick={() => { setCastka(String(p.balance)); ref.current = null; void uplatniCastku(p.balance); }}>Celý zůstatek ({money(p.balance)})</Button>
+                      <Button type="button" variant="secondary" disabled={busy === 'uplatnit' || (potrebaUcet && (ucet === '' || Number(ucet) < (limity?.minUtrata ?? 0)))} onClick={() => { setCastka(String(p.balance)); ref.current = null; void uplatniCastku(p.balance); }}>Celý zůstatek ({money(p.balance)})</Button>
                     </div>
+                    {limity && (limity.minUtrata ?? 0) > 0 && (
+                      <Field id="pd-ucet" label={`Výše účtu (${symbol})`} hint={`Povinné: poukaz jde uplatnit u účtu od ${money(limity.minUtrata ?? 0)}.`}>
+                        <Input id="pd-ucet" type="number" inputMode="numeric" min={0} step={1} value={ucet} onChange={e => { setUcet(e.target.value); ref.current = null; }} placeholder={`Alespoň ${limity.minUtrata}`} className="!w-40" />
+                      </Field>
+                    )}
                     {limity && (limity.min > 0 || limity.max > 0) && <p className="t-meta">Nastavení podniku: {limity.min > 0 ? `nejméně ${money(limity.min)}` : 'bez dolního limitu'}, {limity.max > 0 ? `nejvýš ${money(limity.max)} najednou` : 'bez horního limitu'}. Celý zbytek jde uplatnit vždy.</p>}
                     <Input aria-label="Poznámka k uplatnění" value={poznamkaUplatneni} onChange={e => setPoznamkaUplatneni(e.target.value)} maxLength={200} placeholder="Poznámka (třeba číslo účtenky)" />
                   </>
@@ -394,6 +414,14 @@ function Detail({ id, podnik, toast, spravuje, uplatni, onZavrit, onZmena }: {
                 </div>
               </div>
             )}
+            {spravuje && p.stav !== 'void' && (
+              <div className="space-y-2 border-t border-[var(--surface-line)] pt-4">
+                <VyberVzhledu id="pd-vzhled" value={p.design ?? 'klasik'} hodnota={money(p.value_amount)} disabled={busy === 'vzhled'}
+                  onChange={v => { if (v !== (p.design ?? 'klasik')) void patch({ action: 'design', design: v }, 'Vzhled poukazu uložen.', 'vzhled'); }} />
+                <p className="t-meta">Vzhled se použije při tisku a v e-mailu obdarovanému.</p>
+              </div>
+            )}
+            {spravuje && p.stav !== 'void' && <PoukazHostSekce poukazId={p.id} clen={clen} kupujici={kupujici} body={p.points_awarded ?? 0} toast={toast} onHotovo={() => { void nacti(); onZmena(); }} />}
             {spravuje && p.stav === 'active' && <PoukazyOdeslani poukazId={p.id} ulozenyEmail={p.recipient_email ?? null} odeslano={p.sent_at ?? null} toast={toast} onHotovo={() => { void nacti(); onZmena(); }} />}
             {!spravuje && p.note && <p className="t-meta">{p.note}</p>}
 

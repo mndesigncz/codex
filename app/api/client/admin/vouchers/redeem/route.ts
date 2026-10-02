@@ -10,6 +10,7 @@ import { pragueToday } from '@/lib/pragueTime';
 import { hit } from '@/lib/rateLimit';
 import { overKod, celaCastka, textOdmitnuti, DUVOD_TEXT } from '@/lib/poukazy';
 import { poukazPodleKodu, historiePoukazu, uplatniPoukaz, nactiLimity } from '@/lib/poukazyDb';
+import { poukazBezBodu } from '@/lib/poukazyHostDb';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -45,12 +46,16 @@ export async function POST(req: NextRequest) {
   if (!brana.ok) return NextResponse.json({ error: 'Moc pokusů za hodinu. Zkus to za chvíli.' }, { status: 429 });
   try {
     const mena = (await menaPodniku(ctx.teamId)).currency;
-    const r = await uplatniPoukaz(ctx.teamId, ctx.meId, kod, castka, { ref: b.ref, note: b.note, mena, dnes: pragueToday() });
+    // Výše účtu (nepovinná, když podnik nežádá minimální útratu): celá útrata, ze které se poukaz odečítá.
+    const utrata = b.bill == null || b.bill === '' ? null : celaCastka(b.bill);
+    if (b.bill != null && b.bill !== '' && utrata == null) return NextResponse.json({ error: 'Výše účtu musí být celé číslo.' }, { status: 400 });
+    const r = await uplatniPoukaz(ctx.teamId, ctx.meId, kod, castka, { ref: b.ref, note: b.note, mena, dnes: pragueToday(), utrata });
     if (!r.ok) {
       const text = r.duvod === 'souboh' ? 'Poukaz se právě změnil. Načti ho znovu.' : textOdmitnuti(r.duvod, r.limity, mena);
       return NextResponse.json({ error: text, poukaz: r.poukaz }, { status: r.duvod === 'nenalezen' ? 404 : 409 });
     }
-    return NextResponse.json({ ok: true, poukaz: r.poukaz, castka: r.castka, opakovani: r.opakovani });
+    // Obsluha ví, co s body: při platbě poukazem se z té části body nepočítají (nastavení Kredit a poukaz bez bodů).
+    return NextResponse.json({ ok: true, poukaz: r.poukaz, castka: r.castka, opakovani: r.opakovani, bezBodu: await poukazBezBodu(ctx.teamId) });
   } catch (e) {
     console.error('[poukazy] uplatnění', e);
     return NextResponse.json({ error: 'Poukaz se nepodařilo uplatnit. Zkontroluj zůstatek a zkus to znovu: opakování téhož uplatnění se neodečte dvakrát.' }, { status: 500 });

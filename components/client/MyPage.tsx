@@ -13,11 +13,13 @@ import { RES_STATUS, tierForMember } from '@/lib/clientSlots';
 import { efektivniSleva } from '@/lib/slevy';
 import { formatMoney } from '@/lib/money';
 import { okJson } from '@/lib/api';
+import { ulozKartu } from '@/lib/offlineKarta';
 import { pragueDaySafe } from '@/lib/pragueTime';
 import UcetHosta from './UcetHosta';
 import KartaNastroje from './KartaNastroje';
 import MamPoukaz from './MamPoukaz';
 import HostHistorie from './loyalty/HostHistorie';
+import HostPoukazy from './loyalty/HostPoukazy';
 import { PlatnostKuponu } from './loyalty/HostPlatnost';
 import { useJazyk, useT } from '@/lib/i18n/client';
 import { fmtDatum } from '@/lib/i18n/format';
@@ -43,7 +45,8 @@ export default function MyPage() {
   const load = useCallback(() => fetch('/api/client/me').then(okJson).then(setD).catch(() => setErr(t('Nenačetlo se. Zkus obnovit stránku.'))), [t]);
   useEffect(() => {
     load();
-    fetch('/api/client/card').then(okJson).then(x => setCard(x?.code ? x : null)).catch(() => setCard(null));
+    // Kartička se uloží i do telefonu: bez připojení ji ukáže offline stránka (lib/offlineKarta.ts).
+    fetch('/api/client/card').then(okJson).then(x => { const k = x?.code ? x : null; setCard(k); if (k) ulozKartu(k); }).catch(() => setCard(null));
     fetch('/api/client/reviews').then(okJson).then(x => setPending(Array.isArray(x?.pending) ? x.pending : [])).catch(() => {});
   }, [load]);
   useEffect(() => { if (flash) { const t = setTimeout(() => setFlash(''), 4000); return () => clearTimeout(t); } }, [flash]);
@@ -93,6 +96,7 @@ export default function MyPage() {
                     </div>
                     <div className="shrink-0 text-right">
                       <p className="text-xl font-bold tabular-nums leading-tight">{m.points} <span className="text-sm font-medium text-black/50">{t('b.')}</span></p>
+                      {m.expiring && <p className="text-[11px] font-semibold leading-snug text-wait-ink">{t('{n, plural, one {# bod propadne} few {# body propadnou} other {# bodů propadne}} do {kdy}', { n: m.expiring.points, kdy: denCesky(m.expiring.till, jazyk) })}</p>}
                       {m.credit > 0 && <p className="text-sm font-semibold tabular-nums text-[#5B7A08] leading-tight">{t('{castka} kreditu', { castka: formatMoney(m.credit, m.currency) })}</p>}
                     </div>
                   </div>
@@ -125,9 +129,11 @@ export default function MyPage() {
         )}
       </section>
 
+      {(d.poukazy ?? []).length > 0 && <HostPoukazy poukazy={d.poukazy} />}
+
       {d.memberships?.length > 0 && (
         <section className="max-w-md">
-          <MamPoukaz podniky={d.memberships.map((m: any) => ({ slug: m.slug, name: m.name }))} />
+          <MamPoukaz podniky={d.memberships.map((m: any) => ({ slug: m.slug, name: m.name }))} prihlasen onPridano={load} />
         </section>
       )}
 

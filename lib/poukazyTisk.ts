@@ -3,6 +3,7 @@
 
 import { esc } from './printDoc.ts';
 import { formatMoney } from './money.ts';
+import { sablona } from './poukazySablony.ts';
 
 export interface KartaPoukazu {
   code: string;
@@ -11,6 +12,8 @@ export interface KartaPoukazu {
   /** `YYYY-MM-DD` nebo null (bez omezení). */
   valid_until: string | null;
   recipient_name?: string | null;
+  /** Šablona vzhledu (lib/poukazySablony); prázdné = klasik. */
+  design?: string | null;
 }
 
 const STYL = `<style>
@@ -21,6 +24,7 @@ const STYL = `<style>
   .poukaz .komu { font-size: 15px; margin: 0 0 10px; }
   .poukaz .qr { width: 168px; height: 168px; margin: 8px auto; }
   .poukaz .qr svg { width: 100%; height: 100%; display: block; }
+  .poukaz .pruh { height: 6px; border-radius: 3px; margin: -8px auto 14px; max-width: 120px; }
   .poukaz .kod { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 24px; letter-spacing: .14em; font-weight: 700; margin: 6px 0; word-break: break-all; }
   .poukaz .plati { font-size: 13px; color: #555; margin: 8px 0 0; }
 </style>`;
@@ -33,14 +37,19 @@ export function datumCesky(d: string): string {
 
 /** Tělo tiskového dokumentu: jedna karta na poukaz, karty se nerozdělují přes okraj stránky. */
 export function poukazyKartyHtml(karty: KartaPoukazu[], podnik: string, qr: Record<string, string>): string {
-  const html = karty.map(k => `<section class="poukaz">
+  const html = karty.map(k => {
+    const v = sablona(k.design);
+    // Barvy jsou pevné řetězce z tabulky šablon (nikdy vstup z formuláře), takže do stylu se nedostane nic cizího.
+    return `<section class="poukaz" style="border-color:${v.barva};background:${v.podklad};color:${v.barva}">
   <p class="pod">${esc(podnik)}</p>
-  <p class="nadpis">Dárkový poukaz</p>
+  <div class="pruh" style="background:${v.akcent}" aria-hidden="true"></div>
+  <p class="nadpis">${esc(v.nadpis)}</p>
   <p class="hodnota">${esc(formatMoney(k.value_amount, k.currency))}</p>
   ${k.recipient_name ? `<p class="komu">pro ${esc(k.recipient_name)}</p>` : ''}
   <div class="qr" role="img" aria-label="QR kód poukazu">${qr[k.code] ?? ''}</div>
   <p class="kod">${esc(k.code)}</p>
   <p class="plati">${k.valid_until ? `Platí do ${esc(datumCesky(k.valid_until))}` : 'Bez omezení platnosti'} · uplatní se u kasy</p>
-</section>`).join('\n');
+</section>`;
+  }).join('\n');
   return STYL + html;
 }

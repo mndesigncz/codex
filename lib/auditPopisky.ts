@@ -34,6 +34,11 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'klient.poukaz.prodlouzeno': 'Platnost dárkových poukazů prodloužena',
   'klient.poukaz.odeslan': 'Dárkový poukaz poslán e-mailem',
   'klient.poukaz.limity': 'Změna limitů uplatnění dárkových poukazů',
+  'klient.poukaz.nastaveni': 'Změna nastavení poukazů (nejnižší účet, body za nákup)',
+  'klient.poukaz.prirazen': 'Dárkový poukaz přiřazen hostovi v aplikaci',
+  'klient.poukaz.prevzat': 'Host si přidal dárkový poukaz do aplikace',
+  'klient.poukaz.odebran': 'Host odebral dárkový poukaz ze své aplikace',
+  'klient.body.zdroje': 'Změna bodů mimo kasu (objednávky, rezervace)',
   // role
   'role.create': 'Vytvořena role',
   'role.update': 'Upravena role',

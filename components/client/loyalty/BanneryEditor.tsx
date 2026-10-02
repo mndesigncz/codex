@@ -11,6 +11,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Icon } from '../../Icons';
 import { Button, Card, Chip, ErrorState, Field, Input, Select, Skeleton, Switch, SwitchRow, Textarea } from '../../ui';
 import PromoBanners from '../PromoBanners';
+import BanneryPlan from './BanneryPlan';
+import BanneryJazyky, { type PrekladyDraft } from './BanneryJazyky';
+import { popisPlanu, planZRadku, prekladyZRadku, pocetPrekladu, type Kdy } from '@/lib/banneryPlan';
 import { okJson, apiMessage } from '@/lib/api';
 import { czCount, type CzNoun } from '@/lib/czech';
 import { pragueToday } from '@/lib/pragueTime';
@@ -23,8 +26,12 @@ interface Row {
   id: number; title: string; text: string; image_url: string | null; link_kind: string; link_ref: string | null;
   active: boolean; valid_since: string | null; valid_until: string | null; position: number;
   target_kind?: string | null; target_ref?: string | null; archived?: boolean | null;
+  days_of_week?: unknown; hour_from?: string | null; hour_till?: string | null; i18n?: unknown;
 }
-const PRAZDNY = { title: '', text: '', image_url: '', link_kind: 'none', link_ref: '', valid_since: '', valid_until: '', active: true, target_kind: 'all', target_ref: '' };
+const PRAZDNY = {
+  title: '', text: '', image_url: '', link_kind: 'none', link_ref: '', valid_since: '', valid_until: '', active: true, target_kind: 'all', target_ref: '',
+  days_of_week: [] as number[], hour_from: '', hour_till: '', i18n: {} as PrekladyDraft,
+};
 type Draft = typeof PRAZDNY;
 
 const ZOBRAZENI: CzNoun = { one: 'zobrazení', few: 'zobrazení', many: 'zobrazení' };
@@ -41,6 +48,7 @@ export default function BanneryEditor({ toast, upload, accent }: { toast: (m: st
   const [urovne, setUrovne] = useState<Record<string, string>>({});
   const [stat, setStat] = useState<Record<string, SouhrnBanneru>>({});
   const [dni, setDni] = useState(30);
+  const [kdy, setKdy] = useState<Kdy | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [edit, setEdit] = useState<{ id: number | null; d: Draft } | null>(null);
   const [busy, setBusy] = useState('');
@@ -51,7 +59,7 @@ export default function BanneryEditor({ toast, upload, accent }: { toast: (m: st
     fetch('/api/client/admin/banners').then(okJson)
       .then(d => {
         setRows(d.banners ?? []); setEvents(d.events ?? []); setCoupons(d.coupons ?? []); setCampaigns(d.campaigns ?? []);
-        setGroups(d.groups ?? []); setUrovne(d.urovne ?? {}); setStat(d.statistiky ?? {}); setDni(d.dniStatistiky ?? 30);
+        setGroups(d.groups ?? []); setUrovne(d.urovne ?? {}); setStat(d.statistiky ?? {}); setDni(d.dniStatistiky ?? 30); setKdy(d.kdy ?? undefined);
       })
       .catch((e: any) => setError(apiMessage(e, 'Načtení se nepovedlo')));
   }, []);
@@ -128,16 +136,19 @@ export default function BanneryEditor({ toast, upload, accent }: { toast: (m: st
 
   if (error) return <ErrorState title="Bannery se nenačetly" onRetry={load} detail={error} />;
   if (!rows) return <Skeleton className="h-32" />;
-  const ukazuji = new Set(vyberAktivni(aktivni, dnes).map(r => r.id));
+  const ukazuji = new Set(vyberAktivni(aktivni, dnes, undefined, undefined, kdy).map(r => r.id));
   const nahled = edit && validujBanner(edit.d);
   const nazvy = { skupiny: Object.fromEntries(groups.map((g: any) => [Number(g.id), String(g.name)])), urovne };
   const upravit = (b: Row) => setEdit({ id: b.id, d: {
     title: b.title, text: b.text ?? '', image_url: b.image_url ?? '', link_kind: b.link_kind, link_ref: b.link_ref ?? '',
     valid_since: b.valid_since ?? '', valid_until: b.valid_until ?? '', active: b.active, target_kind: b.target_kind ?? 'all', target_ref: b.target_ref ?? '',
+    days_of_week: planZRadku(b).days_of_week, hour_from: planZRadku(b).hour_from ?? '', hour_till: planZRadku(b).hour_till ?? '', i18n: prekladyZRadku(b.i18n),
   } });
 
   const radek = (b: Row, i: number, pocet: number, vArchivu: boolean) => {
-    const proc = procNeukazuje(b, dnes);
+    const proc = procNeukazuje(b, dnes, kdy);
+    const plan = popisPlanu(planZRadku(b));
+    const jazyky = pocetPrekladu(prekladyZRadku(b.i18n));
     const skryty = !proc && !ukazuji.has(b.id);
     const s = stat[String(b.id)];
     return (
@@ -148,6 +159,8 @@ export default function BanneryEditor({ toast, upload, accent }: { toast: (m: st
             <span>{LINK_LABELS[b.link_kind as keyof typeof LINK_LABELS] ?? 'Bez odkazu'}</span>
             {(b.valid_since || b.valid_until) && <span className="tabular-nums">{b.valid_since ?? '…'} – {b.valid_until ?? '…'}</span>}
             {b.target_kind && b.target_kind !== 'all' && <Chip tone="info" size="sm">{popisCile(b, nazvy)}</Chip>}
+            {plan && <Chip tone="muted" size="sm">{plan}</Chip>}
+            {jazyky > 0 && <Chip tone="muted" size="sm">{`překlady: ${jazyky}`}</Chip>}
             {proc ? <Chip tone="muted" size="sm">{proc}</Chip>
               : skryty ? <Chip tone="wait" size="sm">nad limit {MAX_AKTIVNICH}</Chip>
               : <Chip tone="ok" size="sm">vidí se</Chip>}
@@ -286,6 +299,10 @@ export default function BanneryEditor({ toast, upload, accent }: { toast: (m: st
             <Field id="bn-do" label="Platí do" hint="Nepovinné. Po tomhle dni se banner sám přestane ukazovat."><Input id="bn-do" type="date" value={d.valid_until} onChange={e => nastav({ valid_until: e.target.value })} /></Field>
           </div>
 
+          <BanneryPlan value={{ days_of_week: d.days_of_week, hour_from: d.hour_from, hour_till: d.hour_till }} onChange={p => nastav(p)} />
+
+          <BanneryJazyky value={d.i18n} onChange={i18n => nastav({ i18n })} />
+
           <SwitchRow as="div" title="Ukazovat hostům" hint="Vypnuto = koncept: uložený, ale hostům se neukáže." checked={d.active} onChange={v => nastav({ active: v })} className="!py-0" />
 
           <div>
@@ -295,7 +312,7 @@ export default function BanneryEditor({ toast, upload, accent }: { toast: (m: st
                 <PromoBanners accent={accent || '#C8F542'} loyaltyOn onGoTab={() => {}}
                   banners={[{ id: -1, title: nahled.hodnoty.title, text: nahled.hodnoty.text, imageUrl: nahled.hodnoty.image_url, linkKind: nahled.hodnoty.link_kind, linkRef: nahled.hodnoty.link_ref }]} />
                 <p className="t-meta mt-2">Uvidí: {popisCile({ target_kind: nahled.hodnoty.target_kind, target_ref: nahled.hodnoty.target_ref }, nazvy).toLowerCase()}.
-                  {procNeukazuje({ id: 0, active: nahled.hodnoty.active, valid_since: nahled.hodnoty.valid_since, valid_until: nahled.hodnoty.valid_until }, dnes) ? ' Teď se ale hostům neukazuje (vypnutý nebo mimo platnost).' : ''}</p>
+                  {procNeukazuje({ id: 0, active: nahled.hodnoty.active, valid_since: nahled.hodnoty.valid_since, valid_until: nahled.hodnoty.valid_until, days_of_week: nahled.hodnoty.days_of_week, hour_from: nahled.hodnoty.hour_from, hour_till: nahled.hodnoty.hour_till }, dnes, kdy) ? ' Teď se ale hostům neukazuje (vypnutý, mimo platnost nebo mimo plán).' : ''}</p>
               </>
             ) : <p className="t-meta">{nahled && !nahled.ok ? nahled.chyba : ''}</p>}
           </div>

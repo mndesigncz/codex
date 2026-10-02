@@ -58,6 +58,14 @@ export async function zajistiTabulkyPoukazu(): Promise<void> {
   await sql`ALTER TABLE client_vouchers ADD COLUMN IF NOT EXISTS expiry_mailed_at DATE`;
   await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS voucher_min_use INTEGER NOT NULL DEFAULT 0`;
   await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS voucher_max_use INTEGER NOT NULL DEFAULT 0`;
+  // Úplnost: šablona vzhledu, vazba na hosta (majitel v aplikaci, kupující s body), nejnižší účet k uplatnění, body za nákup.
+  await sql`ALTER TABLE client_vouchers ADD COLUMN IF NOT EXISTS design TEXT NOT NULL DEFAULT 'klasik'`;
+  await sql`ALTER TABLE client_vouchers ADD COLUMN IF NOT EXISTS buyer_customer_id INTEGER`;
+  await sql`ALTER TABLE client_vouchers ADD COLUMN IF NOT EXISTS points_awarded INTEGER NOT NULL DEFAULT 0`;
+  await sql`ALTER TABLE client_vouchers ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMP`;
+  await sql`CREATE INDEX IF NOT EXISTS client_vouchers_customer ON client_vouchers (customer_id) WHERE customer_id IS NOT NULL`;
+  await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS voucher_min_bill INTEGER NOT NULL DEFAULT 0`;
+  await sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS voucher_points_per_100 INTEGER NOT NULL DEFAULT 0`;
   pripraveno = true;
 }
 
@@ -65,6 +73,10 @@ export interface Poukaz {
   id: number; code: string; value_amount: number; balance: number; currency: string;
   recipient_name: string | null; buyer_name: string | null; note: string | null; customer_id: number | null;
   recipient_email: string | null; sent_at: string | null;
+  /** Šablona vzhledu (tisk a e-mail). */
+  design: string;
+  /** Člen, kterému poukaz patří v aplikaci (vidí ho v Moje), a člen, který ho koupil (dostal body). */
+  buyer_customer_id: number | null; points_awarded: number;
   valid_until: string | null; status: string; created_at: string; stav: StavPoukazu;
 }
 
@@ -74,6 +86,8 @@ function naPoukaz(r: any, dnes: string): Poukaz {
     recipient_name: r.recipient_name ?? null, buyer_name: r.buyer_name ?? null, note: r.note ?? null,
     customer_id: r.customer_id != null ? Number(r.customer_id) : null,
     recipient_email: r.recipient_email ?? null, sent_at: r.sent_at ? String(r.sent_at) : null,
+    design: String(r.design ?? 'klasik'), buyer_customer_id: r.buyer_customer_id != null ? Number(r.buyer_customer_id) : null,
+    points_awarded: Number(r.points_awarded) || 0,
     valid_until: r.valid_until ? String(r.valid_until).slice(0, 10) : null, status: String(r.status), created_at: String(r.created_at),
   };
   return { ...p, stav: stavPoukazu(p, dnes) };
@@ -89,6 +103,12 @@ export interface NovePoukazy {
   recipient?: string | null;
   buyer?: string | null;
   note?: string | null;
+  /** Šablona vzhledu (lib/poukazySablony). */
+  design?: string | null;
+  /** Člen, kterému poukaz patří v aplikaci. */
+  customerId?: number | null;
+  /** Člen, který poukaz kupuje (dostane body za nákup, když je zapnuté). */
+  buyerCustomerId?: number | null;
 }
 
 /** Založí dávku poukazů s unikátními kódy. Kolize kódu (téměř nemožná) se dolosuje znovu. */
@@ -101,11 +121,12 @@ export async function vytvorPoukazy(teamId: number, userId: number, mena: string
     const kody = zbyva.map(() => generujKod());
     const hodnoty = zbyva.map(z => z.h);
     const radky = (await sql`
-      INSERT INTO client_vouchers (team_id, code, value_amount, balance, currency, recipient_name, buyer_name, note, valid_until, created_by)
-      SELECT ${teamId}, k.code, k.hodnota, k.hodnota, ${mena}, ${kratce(n.recipient, 80)}, ${kratce(n.buyer, 80)}, ${kratce(n.note, 300)}, ${n.validUntil}::date, ${userId}
+      INSERT INTO client_vouchers (team_id, code, value_amount, balance, currency, recipient_name, buyer_name, note, valid_until, created_by, design, customer_id, buyer_customer_id, claimed_at)
+      SELECT ${teamId}, k.code, k.hodnota, k.hodnota, ${mena}, ${kratce(n.recipient, 80)}, ${kratce(n.buyer, 80)}, ${kratce(n.note, 300)}, ${n.validUntil}::date, ${userId},
+        ${n.design || 'klasik'}, ${n.customerId ?? null}::int, ${n.buyerCustomerId ?? null}::int, CASE WHEN ${n.customerId ?? null}::int IS NULL THEN NULL ELSE NOW() END
       FROM unnest(${kody}::text[], ${hodnoty}::int[]) AS k(code, hodnota)
       ON CONFLICT (team_id, code) DO NOTHING
-      RETURNING id, team_id, code, value_amount, balance, currency, recipient_name, buyer_name, note, customer_id, recipient_email, sent_at,
+      RETURNING id, team_id, code, value_amount, balance, currency, recipient_name, buyer_name, note, customer_id, recipient_email, sent_at, design, buyer_customer_id, points_awarded,
         to_char(valid_until, 'YYYY-MM-DD') AS valid_until, status, created_by, created_at`) as any[];
     const zapsane = new Set(radky.map(r => String(r.code)));
     for (const r of radky) hotove.push(naPoukaz(r, dnes));
@@ -132,7 +153,7 @@ export async function seznamPoukazu(teamId: number, d: DotazSeznam, dnes: string
   const vzorKod = q ? `%${q.toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^DP(?=.)/, '')}%` : null;
   const stav = ['active', 'used', 'void', 'expired'].includes(String(d.stav)) ? String(d.stav) : null;
   const rows = (await sql`
-    SELECT id, team_id, code, value_amount, balance, currency, recipient_name, buyer_name, note, customer_id, recipient_email, sent_at,
+    SELECT id, team_id, code, value_amount, balance, currency, recipient_name, buyer_name, note, customer_id, recipient_email, sent_at, design, buyer_customer_id, points_awarded,
            to_char(valid_until, 'YYYY-MM-DD') AS valid_until, status, created_by, created_at, COUNT(*) OVER () AS celkem
     FROM client_vouchers
     WHERE team_id = ${teamId}
@@ -149,14 +170,14 @@ export async function seznamPoukazu(teamId: number, d: DotazSeznam, dnes: string
 
 export async function poukazPodleKodu(teamId: number, kod: string, dnes: string): Promise<Poukaz | null> {
   await zajistiTabulkyPoukazu();
-  const [r] = await sql`SELECT id, team_id, code, value_amount, balance, currency, recipient_name, buyer_name, note, customer_id, recipient_email, sent_at,
+  const [r] = await sql`SELECT id, team_id, code, value_amount, balance, currency, recipient_name, buyer_name, note, customer_id, recipient_email, sent_at, design, buyer_customer_id, points_awarded,
     to_char(valid_until, 'YYYY-MM-DD') AS valid_until, status, created_by, created_at FROM client_vouchers WHERE team_id = ${teamId} AND code = ${kod}`;
   return r ? naPoukaz(r, dnes) : null;
 }
 
 export async function poukazPodleId(teamId: number, id: number, dnes: string): Promise<Poukaz | null> {
   await zajistiTabulkyPoukazu();
-  const [r] = await sql`SELECT id, team_id, code, value_amount, balance, currency, recipient_name, buyer_name, note, customer_id, recipient_email, sent_at,
+  const [r] = await sql`SELECT id, team_id, code, value_amount, balance, currency, recipient_name, buyer_name, note, customer_id, recipient_email, sent_at, design, buyer_customer_id, points_awarded,
     to_char(valid_until, 'YYYY-MM-DD') AS valid_until, status, created_by, created_at FROM client_vouchers WHERE team_id = ${teamId} AND id = ${id}`;
   return r ? naPoukaz(r, dnes) : null;
 }
@@ -180,8 +201,11 @@ export async function historiePoukazu(teamId: number, voucherId: number): Promis
 export async function nactiLimity(teamId: number): Promise<LimityUplatneni> {
   try {
     await zajistiTabulkyPoukazu();
-    const [r] = await sql`SELECT voucher_min_use, voucher_max_use FROM client_profiles WHERE team_id = ${teamId}`;
-    return { min: Math.max(0, Math.trunc(Number(r?.voucher_min_use)) || 0), max: Math.max(0, Math.trunc(Number(r?.voucher_max_use)) || 0) };
+    const [r] = await sql`SELECT voucher_min_use, voucher_max_use, voucher_min_bill FROM client_profiles WHERE team_id = ${teamId}`;
+    return {
+      min: Math.max(0, Math.trunc(Number(r?.voucher_min_use)) || 0), max: Math.max(0, Math.trunc(Number(r?.voucher_max_use)) || 0),
+      minUtrata: Math.max(0, Math.trunc(Number(r?.voucher_min_bill)) || 0),
+    };
   } catch { return BEZ_LIMITU; }
 }
 
@@ -203,7 +227,7 @@ export type Vysledek =
 const jeDuplicita = (e: any) => /duplicate key|unique/i.test(String(e?.message ?? e)) || String(e?.code) === '23505';
 
 /** Uplatní `castka` z poukazu atomicky. `ref` dělá volání idempotentní (dvojklik, opakování po výpadku sítě). */
-export async function uplatniPoukaz(teamId: number, userId: number, kod: string, castka: number, o: { ref?: string | null; note?: string | null; mena?: string | null; dnes: string }): Promise<Vysledek> {
+export async function uplatniPoukaz(teamId: number, userId: number, kod: string, castka: number, o: { ref?: string | null; note?: string | null; mena?: string | null; dnes: string; utrata?: number | null }): Promise<Vysledek> {
   await zajistiTabulkyPoukazu();
   const p = await poukazPodleKodu(teamId, kod, o.dnes);
   const ref = kratce(o.ref, 80);
@@ -213,7 +237,7 @@ export async function uplatniPoukaz(teamId: number, userId: number, kod: string,
     if (u) return { ok: true, poukaz: p, castka: Number(u.amount), opakovani: true };
   }
   const limity = await nactiLimity(teamId);
-  const posudek = posudUplatneni(p, castka, o.dnes, o.mena, limity);
+  const posudek = posudUplatneni(p, castka, o.dnes, o.mena, limity, o.utrata);
   if (!posudek.ok || !p) return { ok: false, duvod: posudek.ok ? 'nenalezen' : posudek.duvod, poukaz: p ?? undefined, limity };
   try {
     const zapsano = (await sql`
@@ -231,7 +255,7 @@ export async function uplatniPoukaz(teamId: number, userId: number, kod: string,
     if (!zapsano.length) {
       // Mezitím ho někdo uplatnil, zrušil nebo mu skončila platnost: ukaž aktuální důvod.
       const ted = await poukazPodleKodu(teamId, kod, o.dnes);
-      const znovu = posudUplatneni(ted, castka, o.dnes, o.mena, limity);
+      const znovu = posudUplatneni(ted, castka, o.dnes, o.mena, limity, o.utrata);
       return { ok: false, duvod: znovu.ok ? 'souboh' : znovu.duvod, poukaz: ted ?? undefined, limity };
     }
   } catch (e) {

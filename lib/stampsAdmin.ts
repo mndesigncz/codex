@@ -203,51 +203,40 @@ export async function stornoPosledni(o: { teamId: number; campaignId: number; cu
 }
 
 /**
- * Storno poslední akce s razítky u hosta napříč kampaněmi (tlačítko u kasy). Akce z jedné účtenky,
- * která dala razítka víc kampaním, se vrací společně. Razítko za návštěvu (ref „card:…“) po stornu
- * uvolní i denní zámek návštěvy, ať jde razítko dát znovu. Body a kredit z účtenky storno nemění.
+ * Storno razítek z jedné akce u kasy: všechny neuplatněné zápisy s odkazem `ref` (nebo `ref:…`; jde zadat víc odkazů), každý jen
+ * když je v kampani poslední (jinak by se přepsala pozdější razítka). Vrací věty o tom, co se vrátilo,
+ * a chybu, když část nešla. Zápis do deníku a odměny řeší stornoPosledni.
  */
-export async function stornoPosledniAkce(o: { teamId: number; customerId: number; staffId: number }): Promise<{ ok: true; veta: string } | ChybaAkce> {
+export async function stornoPodleRef(o: { teamId: number; customerId: number; staffId: number; ref: string | string[] }): Promise<{ vety: string[]; chyba: string | null }> {
+  const refy = Array.isArray(o.ref) ? o.ref : [o.ref];
   await zajistiRazitka();
-  const [posl] = await sql`
-    SELECT id, campaign_id, ref FROM client_stamp_events
+  const udalosti = (await sql`
+    SELECT id, campaign_id FROM client_stamp_events
     WHERE team_id = ${o.teamId} AND customer_id = ${o.customerId} AND undone_at IS NULL AND delta <> 0 AND kind IN ('earn', 'manual')
-    ORDER BY id DESC LIMIT 1`;
-  if (!posl) return je('Není co stornovat — host nemá žádnou akci s razítky.', 404);
-  const ref = posl.ref ? String(posl.ref) : null;
-  // Účtenka dala razítka po krocích s různou příponou (bill:ID, bill:ID:den) — do skupiny patří všechny.
-  const zaklad = ref && ref.startsWith('bill:') ? ref.split(':').slice(0, 2).join(':') : ref;
-  const skupina = zaklad
-    ? (await sql`
-        SELECT id, campaign_id FROM client_stamp_events
-        WHERE team_id = ${o.teamId} AND customer_id = ${o.customerId} AND undone_at IS NULL AND delta <> 0 AND kind IN ('earn', 'manual')
-          AND (ref = ${zaklad} OR ref LIKE ${zaklad + ':%'}) AND id <= ${Number(posl.id)}
-        ORDER BY id DESC`) as any[]
-    : [posl];
+      AND (ref = ANY(${refy}) OR ref LIKE ANY(${refy.map(r => r + ':%')}))
+    ORDER BY id DESC`) as any[];
   const vety: string[] = [];
-  for (const e of skupina) {
+  for (const e of udalosti) {
     const r = await stornoPosledni({ teamId: o.teamId, campaignId: Number(e.campaign_id), customerId: o.customerId, ocekavanaUdalost: Number(e.id), staffId: o.staffId });
-    if ('chyba' in r) return vety.length ? je(`${vety.join('; ')} — dál to nešlo: ${r.chyba}`, r.status) : r;
+    if ('chyba' in r) return { vety, chyba: r.chyba };
     vety.push(r.veta);
   }
-  if (ref && ref.startsWith('card:')) {
-    // Návštěva z téhle akce se nepočítá a host může razítko dostat znovu ještě dnes.
-    await sql`UPDATE client_memberships SET visits = GREATEST(0, visits - 1), last_visit_at = NULL WHERE customer_id = ${o.customerId} AND team_id = ${o.teamId}`;
-  }
-  return { ok: true, veta: vety.join('; ') };
+  return { vety, chyba: null };
 }
 
-/** Poslední akce s razítky u hosta pro tlačítko Storno u kasy (jen to, co jde stornovat). */
-export async function posledniAkceRazitek(teamId: number, customerId: number): Promise<{ note: string; at: string } | null> {
-  try {
-    await zajistiRazitka();
-    const [e] = await sql`
-      SELECT e.delta, e.created_at, c.name FROM client_stamp_events e JOIN client_stamp_campaigns c ON c.id = e.campaign_id
-      WHERE e.team_id = ${teamId} AND e.customer_id = ${customerId} AND e.undone_at IS NULL AND e.delta <> 0 AND e.kind IN ('earn', 'manual')
-      ORDER BY e.id DESC LIMIT 1`;
-    if (!e) return null;
-    return { note: `${e.name}: ${Number(e.delta) > 0 ? '+' : ''}${Number(e.delta)}`, at: (parseDbTime(e.created_at) ?? new Date()).toISOString() };
-  } catch { return null; }
+/** Odkaz poslední návštěvy z kasy (razítko za návštěvu: `card:<den>`), nebo null. */
+export async function refPosledniNavstevy(teamId: number, customerId: number): Promise<string | null> {
+  await zajistiRazitka();
+  const [e] = await sql`
+    SELECT ref FROM client_stamp_events
+    WHERE team_id = ${teamId} AND customer_id = ${customerId} AND undone_at IS NULL AND delta <> 0 AND kind = 'earn' AND ref LIKE 'card:%'
+    ORDER BY id DESC LIMIT 1` as any[];
+  return e?.ref ? String(e.ref) : null;
+}
+
+/** Návštěva z téhle akce se nepočítá a host může razítko dostat znovu ještě dnes (uvolní denní zámek). */
+export async function vratNavstevu(teamId: number, customerId: number): Promise<void> {
+  await sql`UPDATE client_memberships SET visits = GREATEST(0, visits - 1), last_visit_at = NULL WHERE customer_id = ${customerId} AND team_id = ${teamId}`;
 }
 
 // ---- seznam kampaní: duplikace, řazení, stav ----------------------------------------

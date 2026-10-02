@@ -145,6 +145,10 @@ export function publicProfile(p: any) {
       inactiveMonths: Number(p.tier_inactive_months) || 0,
     },
     cashbackPct: Number(p.cashback_pct) || 0,
+    // Za co jsou body mimo kasu (stránka hosta z toho skládá „Jak získat body“).
+    pointsOrders: p.points_orders !== false,
+    pointsPerReservation: Math.max(0, Math.trunc(Number(p.points_per_reservation)) || 0),
+    voucherPointsPer100: Math.max(0, Math.trunc(Number(p.voucher_points_per_100)) || 0),
     pointsExpireDays: Math.max(0, Math.trunc(Number(p.points_expire_days)) || 0),
     creditExpireDays: Math.max(0, Math.trunc(Number(p.credit_expire_days)) || 0),
     welcomePoints: p.loyalty_on ? uvitaciBody(p) : 0,

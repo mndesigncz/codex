@@ -1821,6 +1821,8 @@ export async function GET(request: Request) {
         created_at TIMESTAMP DEFAULT NOW(),
         PRIMARY KEY (team_id, idem_key)
       )`);
+    // Storno poslední akce u kasy: vrácená akce se označí, ať ji nejde vrátit podruhé.
+    await ddl(sql`ALTER TABLE client_scan_actions ADD COLUMN IF NOT EXISTS undone_at TIMESTAMP`);
 
     // Migrace jednoduchého razítka: podnik se zapnutým stamp_target dostane
     // výchozí kampaň „za návštěvu" a rozsbíraná razítka členů se přenesou.
@@ -1965,6 +1967,18 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE client_vouchers ADD COLUMN IF NOT EXISTS expiry_mailed_at DATE`);
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS voucher_min_use INTEGER NOT NULL DEFAULT 0`);
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS voucher_max_use INTEGER NOT NULL DEFAULT 0`);
+    // Úplnost poukazů: šablona vzhledu, vazba na hosta (majitel v aplikaci, kupující s body), nejnižší účet k uplatnění, body za nákup.
+    await ddl(sql`ALTER TABLE client_vouchers ADD COLUMN IF NOT EXISTS design TEXT NOT NULL DEFAULT 'klasik'`);
+    await ddl(sql`ALTER TABLE client_vouchers ADD COLUMN IF NOT EXISTS buyer_customer_id INTEGER`);
+    await ddl(sql`ALTER TABLE client_vouchers ADD COLUMN IF NOT EXISTS points_awarded INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_vouchers ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMP`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_vouchers_customer ON client_vouchers (customer_id) WHERE customer_id IS NOT NULL`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS voucher_min_bill INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS voucher_points_per_100 INTEGER NOT NULL DEFAULT 0`);
+    // Body mimo kasu: objednávky od stolu (zapnout/vypnout) a pevný počet bodů za rezervaci, která proběhla.
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS points_orders BOOLEAN NOT NULL DEFAULT TRUE`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS points_per_reservation INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_reservations ADD COLUMN IF NOT EXISTS points_awarded INTEGER NOT NULL DEFAULT 0`);
     // Platina: čtvrtá úroveň nad Zlatým hostem. 0 = vypnuto.
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS platinum_at INTEGER NOT NULL DEFAULT 0`);
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS platinum_discount INTEGER NOT NULL DEFAULT 0`);
@@ -2172,6 +2186,11 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE client_banners ADD COLUMN IF NOT EXISTS target_kind TEXT NOT NULL DEFAULT 'all'`);
     await ddl(sql`ALTER TABLE client_banners ADD COLUMN IF NOT EXISTS target_ref TEXT`);
     await ddl(sql`ALTER TABLE client_banners ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT FALSE`);
+    // Plán (dny a hodiny, pražský čas) a jazykové mutace nadpisu a textu.
+    await ddl(sql`ALTER TABLE client_banners ADD COLUMN IF NOT EXISTS days_of_week JSONB NOT NULL DEFAULT '[]'`);
+    await ddl(sql`ALTER TABLE client_banners ADD COLUMN IF NOT EXISTS hour_from TEXT`);
+    await ddl(sql`ALTER TABLE client_banners ADD COLUMN IF NOT EXISTS hour_till TEXT`);
+    await ddl(sql`ALTER TABLE client_banners ADD COLUMN IF NOT EXISTS i18n JSONB NOT NULL DEFAULT '{}'`);
     await ddl(sql`
       CREATE TABLE IF NOT EXISTS client_banner_stats (
         banner_id INTEGER NOT NULL,

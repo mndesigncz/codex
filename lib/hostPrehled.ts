@@ -95,6 +95,11 @@ export interface PravidlaPodniku {
   welcomePoints?: number;
   creditExpireDays?: number;
   inactiveMonths?: number;
+  /** Body za objednávky od stolu (výchozí ano) a za rezervaci, která proběhla (0 = žádné). */
+  pointsOrders?: boolean;
+  pointsPerReservation?: number;
+  /** Bodů za každých 100 hodnoty koupeného dárkového poukazu (0 = žádné). */
+  voucherPointsPer100?: number;
 }
 
 export type PravidloZisku =
@@ -107,13 +112,20 @@ export type PravidloZisku =
   | { druh: 'propadani'; dny: number }
   | { druh: 'uvitani'; body: number }
   | { druh: 'propadani_kreditu'; dny: number }
-  | { druh: 'pokles_urovne'; mesice: number };
+  | { druh: 'pokles_urovne'; mesice: number }
+  | { druh: 'bez_objednavek' }
+  | { druh: 'rezervace'; body: number }
+  | { druh: 'poukaz'; body: number };
 
 /** Co host dělá, aby dostal body a odměny: jen to, co podnik opravdu zapnul (nulové hodnoty se nezmiňují). */
 export function pravidlaZisku(p: PravidlaPodniku): PravidloZisku[] {
   const out: PravidloZisku[] = [];
   const cele = (v: unknown) => Math.max(0, Math.trunc(Number(v)) || 0);
   if (cele(p.pointsPer100) > 0) out.push({ druh: 'body_za_utratu', body: cele(p.pointsPer100) });
+  // Host, který objednává od stolu, má vědět, že za to body nejsou (jinak by je čekal).
+  if (cele(p.pointsPer100) > 0 && p.pointsOrders === false) out.push({ druh: 'bez_objednavek' });
+  if (cele(p.pointsPerReservation) > 0) out.push({ druh: 'rezervace', body: cele(p.pointsPerReservation) });
+  if (cele(p.voucherPointsPer100) > 0) out.push({ druh: 'poukaz', body: cele(p.voucherPointsPer100) });
   for (const c of p.campaigns ?? []) {
     if (cele(c.required) > 0) out.push({ druh: 'razitka', nazev: String(c.name ?? ''), pocet: cele(c.required), odmena: String(c.reward ?? '') });
   }

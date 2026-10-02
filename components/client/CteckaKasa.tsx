@@ -297,7 +297,7 @@ export default function CteckaKasa() {
   };
 
   // ---- Akce u hosta ----
-  const akce = async (action: 'stamp' | 'points' | 'credit' | 'bill' | 'join' | 'storno' | 'items', extra: { amount?: number; billId?: string; items?: { itemId: number; qty: number }[] } = {}) => {
+  const akce = async (action: 'stamp' | 'points' | 'credit' | 'bill' | 'join' | 'undo' | 'items', extra: { amount?: number; billId?: string; items?: { itemId: number; qty: number }[] } = {}) => {
     if (faze.druh !== 'host') return;
     const kod = faze.kod;
     setBusy(action + (extra.billId ?? ''));
@@ -488,7 +488,7 @@ export default function CteckaKasa() {
             {h.member && (
               <>
                 <RucniPolozky polozky={h.polozky ?? []} busy={busy === 'items'} onPripsat={items => akce('items', { items })} />
-                <StornoRazitek posledni={h.posledniAkce ?? null} busy={busy === 'storno'} onStorno={() => akce('storno')} />
+                <StornoRazitek posledni={h.posledniAkce ?? null} busy={busy === 'undo'} onStorno={() => akce('undo')} />
               </>
             )}
             {!h.campaigns?.length && h.member && h.rules?.stampTarget > 0 && (

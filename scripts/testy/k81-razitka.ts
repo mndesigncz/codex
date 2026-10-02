@@ -156,7 +156,7 @@ export default function ({ eq, ok }: Testy) {
   ok('S10: peněženka, seznam členů i detail čtou razítka z kampaní', /maKampane/.test(zdroj('lib/walletDb.ts')) && /maKampane/.test(zdroj('lib/clenoveDb.ts')) && /kampane\.length \? kampane\.reduce/.test(zdroj('app/api/client/admin/loyalty/route.ts')));
 
   // R9, R7, R14 na straně serveru
-  ok('R9: storno poslední akce u kasy vrací kartu ze snímku, uvolní zámek návštěvy a ruší neuplatněné odměny', /stornoPosledniAkce/.test(scan) && /last_visit_at = NULL/.test(zdroj('lib/stampsAdmin.ts')) && /redeemed_at IS NOT NULL/.test(zdroj('lib/stampsAdmin.ts')));
+  ok('R9: storno poslední akce u kasy (jedno: body, kredit i razítka) vrací kartu ze snímku, uvolní zámek návštěvy a ruší neuplatněné odměny', /stornujPosledniAkci/.test(scan) && /stornoPodleRef/.test(zdroj('lib/kasaStornoDb.ts')) && /last_visit_at = NULL/.test(zdroj('lib/stampsAdmin.ts')) && /redeemed_at IS NOT NULL/.test(zdroj('lib/stampsAdmin.ts')));
   ok('R9: ruční připsání a odebrání má povinný důvod a vlastní oprávnění', /vernost\.razitka_upravit/.test(member) && /Napiš důvod/.test(zdroj('lib/stampsAdmin.ts')));
   ok('R9: hromadně přes skupinu nebo výběr, strop 200', /MAX_HROMADNE = 200/.test(member) && /groupId/.test(member) && /customerIds/.test(member));
   ok('R14: odměny nevytvářejí řádek kuponu na každé dokončení (jeden na kampaň a lhůtu, nárok nese událost)', /campaign_id = \$\{c\.id\} AND kind = 'stamps'/.test(stamps) && /stamp_event_id/.test(stamps));
