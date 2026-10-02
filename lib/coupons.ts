@@ -9,13 +9,17 @@
 // i stránka podniku se ptají stejné funkce, ať se pravidla nerozjedou.
 
 import { sql } from './client';
-import { pragueToday, pragueHM } from './pragueTime';
+import { rezervujKus, vratKus } from './kuponyKusy';
+import { pragueToday } from './pragueTime';
+import { pragueDow, ageFrom, windowOk, stavKuponu, kusyZbyva, jeVidetelnyHostum } from './kuponyPravidla';
+export { pragueDow, ageFrom, windowOk };
 import type { TierId } from './clientSlots';
 import { TIER_LABELS, TIER_RANK, intList, tierList, benefitLabel, conditionBadges, type FormatCastky } from './kuponyPopisky';
 export { TIER_LABELS, benefitLabel, conditionBadges };
 export type { FormatCastky };
 
-export const BENEFITS = ['text', 'percent', 'amount', 'free_item', 'xy'] as const;
+import { BENEFITS } from './kuponyPole';
+export { BENEFITS };
 export type BenefitKind = typeof BENEFITS[number];
 
 /** Veřejný tvar kuponu pro editor i stránku hosta (camelCase, bez balastu). */
@@ -33,36 +37,12 @@ export function shapeCoupon(r: any, castka?: FormatCastky) {
     perCustomer: Number(r.per_customer) || 0, cooldownDays: Number(r.cooldown_days) || 0,
     daysOfWeek: intList(r.days_of_week), hourFrom: r.hour_from ?? null, hourTill: r.hour_till ?? null,
     adultOnly: r.adult_only === true, welcome: r.welcome === true,
+    maxTotal: Number(r.max_total) > 0 ? Number(r.max_total) : null, issued: Number(r.issued) || 0, remaining: kusyZbyva(r),
+    dailyLimit: Number(r.daily_limit) > 0 ? Number(r.daily_limit) : null,
+    draft: r.draft === true, archived: !!r.archived_at, stav: stavKuponu(r, pragueToday()),
     validSince: r.valid_since ?? null, validUntil: r.valid_until ?? null,
     benefit: benefitLabel(r, castka), badges: conditionBadges(r, castka),
   };
-}
-
-/** Den v týdnu 1–7 (po = 1) pro pražské datum YYYY-MM-DD. */
-export function pragueDow(dateStr: string): number {
-  const d = new Date(`${dateStr}T12:00:00Z`);
-  return ((d.getUTCDay() + 6) % 7) + 1;
-}
-
-/** Věk z data narození (YYYY-MM-DD) k dnešku; null když datum chybí. */
-export function ageFrom(birthday: string | null | undefined, today: string): number | null {
-  if (!birthday || !/^\d{4}-\d{2}-\d{2}$/.test(String(birthday))) return null;
-  const b = String(birthday);
-  let age = Number(today.slice(0, 4)) - Number(b.slice(0, 4));
-  if (today.slice(5) < b.slice(5)) age -= 1;
-  return age;
-}
-
-/** Platí kupon právě teď (datum, den v týdnu, hodiny)? Vrací důvod, když ne. */
-export function windowOk(c: any, now: { today: string; hm: string } = { today: pragueToday(), hm: pragueHM() }): string | null {
-  if (c.valid_since && String(c.valid_since) > now.today) return `Platí až od ${String(c.valid_since)}.`;
-  if (c.valid_until && String(c.valid_until) < now.today) return 'Kupon už neplatí.';
-  const days = intList(c.days_of_week);
-  if (days.length && !days.includes(pragueDow(now.today))) return 'Dnes kupon neplatí.';
-  if (c.hour_from && c.hour_till && (now.hm < String(c.hour_from) || now.hm > String(c.hour_till))) {
-    return `Kupon platí jen ${c.hour_from}–${c.hour_till}.`;
-  }
-  return null;
 }
 
 /**
@@ -73,8 +53,10 @@ export async function claimBlocker(
   c: any, teamId: number, customerId: number,
   ctx: { tierId: TierId; birthday: string | null },
 ): Promise<string | null> {
+  if (!jeVidetelnyHostum(c)) return 'Kupon už není k dispozici.';
   const win = windowOk(c);
   if (win) return win;
+  if (kusyZbyva(c) === 0) return 'Kupony došly.';
   const tiers = tierList(c.target_tiers);
   if (tiers.length && !tiers.includes(ctx.tierId)) {
     return `Jen pro ${tiers.map(t => TIER_LABELS[t]).join(' / ')}.`;
@@ -115,14 +97,19 @@ export async function grantWelcomeCoupons(teamId: number, customerId: number, ma
   const rows = await sql`
     SELECT * FROM client_coupons
     WHERE team_id = ${teamId} AND active = TRUE AND welcome = TRUE AND kind = 'offer'
+      AND draft = FALSE AND archived_at IS NULL
       AND (valid_until IS NULL OR valid_until >= ${today})` as any[];
   let granted = 0;
   for (const c of rows) {
     const [dup] = await sql`SELECT id FROM client_coupon_claims WHERE coupon_id = ${c.id} AND customer_id = ${customerId}`;
     if (dup) continue;
-    await sql`
-      INSERT INTO client_coupon_claims (coupon_id, customer_id, team_id, code)
-      VALUES (${c.id}, ${customerId}, ${teamId}, ${makeCode()})`;
+    // Kus se rezervuje atomicky (limit kusů); když došly, host ho nedostane.
+    if (!(await rezervujKus(c.id))) continue;
+    try {
+      await sql`
+        INSERT INTO client_coupon_claims (coupon_id, customer_id, team_id, code, source)
+        VALUES (${c.id}, ${customerId}, ${teamId}, ${makeCode()}, 'welcome')`;
+    } catch { await vratKus(c.id); continue; }
     granted += 1;
   }
   return granted;

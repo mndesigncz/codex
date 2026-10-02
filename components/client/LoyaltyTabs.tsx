@@ -36,6 +36,7 @@ import { obsahuje } from '@/lib/hledani';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { useOpravneni } from '../role/useOpravneni';
 import Poukazy from './Poukazy';
+import Kupony from './loyalty/Kupony';
 import PrechodZKarticky, { useImportKarticky } from './PrechodZKarticky';
 
 // Věrnost měla šest podzáložek pod deseti hlavními — šestnáct sourozenců
@@ -648,41 +649,10 @@ function Stamps({ toast }: { toast: (m: string) => void }) {
 }
 
 // ---- Kupony ---------------------------------------------------------------------
-// Kupon v plné síle jako v Kartičce: výhoda (% / částka / zdarma / X+Y), komu
-// (úrovně, skupiny), kdy (dny, hodiny, od–do), jak často (limit, cooldown),
-// 18+ a uvítací kupon pro nové členy.
+// Kupony a promo kódy žijí v components/client/loyalty/Kupony*.tsx (katalog, editor, náhled, rozesílání, přehled).
 
-const TIER_OPTS: { id: string; label: string }[] = [
-  { id: 'bronze', label: 'Člen' }, { id: 'silver', label: 'Stříbrný' },
-  { id: 'gold', label: 'Zlatý' }, { id: 'platinum', label: 'Platinový' },
-];
 const DOW = [{ d: 1, l: 'Po' }, { d: 2, l: 'Út' }, { d: 3, l: 'St' }, { d: 4, l: 'Čt' }, { d: 5, l: 'Pá' }, { d: 6, l: 'So' }, { d: 7, l: 'Ne' }];
 
-const blankCoupon = () => ({
-  id: null as number | null, title: '', description: '', costPoints: 100, active: true,
-  benefitKind: 'percent', percentOff: '', amountOff: '', xyBuy: '', xyFree: '1',
-  minOrderValue: '', targetTiers: [] as string[], targetGroups: [] as number[],
-  perCustomer: 0, cooldownDays: 0, daysOfWeek: [] as number[], hourFrom: '', hourTill: '',
-  adultOnly: false, welcome: false, validSince: '', validUntil: '',
-});
-
-function couponToForm(c: any) {
-  return {
-    id: c.id, title: c.title ?? '', description: c.description ?? '',
-    costPoints: Number(c.costPoints) || 0, active: c.active !== false,
-    benefitKind: c.benefitKind ?? 'text',
-    percentOff: c.percentOff == null ? '' : String(c.percentOff),
-    amountOff: c.amountOff == null ? '' : String(c.amountOff),
-    xyBuy: c.xyBuy == null ? '' : String(c.xyBuy), xyFree: c.xyFree == null ? '1' : String(c.xyFree),
-    minOrderValue: c.minOrderValue == null ? '' : String(c.minOrderValue),
-    targetTiers: c.targetTiers ?? [], targetGroups: c.targetGroups ?? [],
-    perCustomer: Number(c.perCustomer) || 0, cooldownDays: Number(c.cooldownDays) || 0,
-    daysOfWeek: c.daysOfWeek ?? [], hourFrom: c.hourFrom ?? '', hourTill: c.hourTill ?? '',
-    adultOnly: c.adultOnly === true, welcome: c.welcome === true,
-    validSince: c.validSince ? String(c.validSince).slice(0, 10) : '',
-    validUntil: c.validUntil ? String(c.validUntil).slice(0, 10) : '',
-  };
-}
 
 /** Přepínací filtr (vícenásobný výběr) — filter-pill jako všude, vybraný inkoustový s bílým textem. */
 function Volba({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
@@ -690,180 +660,6 @@ function Volba({ on, onClick, children }: { on: boolean; onClick: () => void; ch
     <button type="button" onClick={onClick} aria-pressed={on} className={`filter-pill tap-target-sm ${on ? 'seg-on' : 'seg-off glass'}`}>
       {children}
     </button>
-  );
-}
-
-function Coupons({ toast }: { toast: (m: string) => void }) {
-  const spravuje = useOpravneni().ma('kupony.spravovat');
-  const uplatni = useOpravneni().ma('kupony.uplatnit');
-  const symbol = useSymbol();
-  const [list, setList] = useState<any[] | null>(null);
-  const [groups, setGroups] = useState<any[]>([]);
-  const [form, setForm] = useState<ReturnType<typeof blankCoupon> | null>(null);
-  const [code, setCode] = useState('');
-  const [busy, setBusy] = useState('');
-  const [mazu, setMazu] = useState<any | null>(null);
-  // Katalog kuponů čte jen správce (API chce kupony.spravovat); uplatnění kódu jde i bez něj.
-  const load = useCallback(() => {
-    if (!spravuje) { setList([]); return; }
-    fetch('/api/client/admin/coupons').then(okJson).then(d => { setList(d.coupons ?? []); setGroups(d.groups ?? []); }).catch(() => setList([]));
-  }, [spravuje]);
-  useEffect(() => { load(); }, [load]);
-
-  const save = async () => {
-    if (!form) return;
-    setBusy('save');
-    try {
-      await j('/api/client/admin/coupons', { method: form.id ? 'PATCH' : 'POST', body: JSON.stringify(form) });
-      toast(form.id ? 'Kupon uložen.' : 'Kupon založen.'); setForm(null); load();
-    } catch (e) { toast(apiMessage(e, 'Kupon se nepodařilo uložit.')); }
-    setBusy('');
-  };
-  const toggle = async (c: any) => {
-    setBusy('toggle:' + c.id);
-    try { await j('/api/client/admin/coupons', { method: 'PATCH', body: JSON.stringify({ id: c.id, active: !c.active }) }); load(); }
-    catch (e) { toast(apiMessage(e, 'Změna se nepovedla.')); }
-    setBusy('');
-  };
-  const del = async (c: any) => {
-    try { await j(`/api/client/admin/coupons?id=${c.id}`, { method: 'DELETE' }); toast('Kupon smazán.'); setForm(null); load(); }
-    catch (e) { toast(apiMessage(e, 'Kupon se nepodařilo smazat.')); }
-  };
-  const redeem = async (e: React.FormEvent) => {
-    e.preventDefault(); if (!code.trim()) return; setBusy('redeem');
-    try {
-      const r = await j('/api/client/admin/redeem', { method: 'POST', body: JSON.stringify({ code }) });
-      toast(`Uplatněno: ${r.title}${r.benefit ? ` (${r.benefit})` : ''} · ${r.customer}.${r.badges?.length ? ` Zkontroluj: ${r.badges.join(', ')}.` : ''}`);
-      setCode(''); load();
-    } catch (err) { toast(apiMessage(err, 'Kupon se nepodařilo uplatnit.')); }
-    setBusy('');
-  };
-
-  if (list === null) return <Kostra />;
-
-  // --- editor ---
-  if (form) {
-    const f = form; const set = (patch: Partial<typeof f>) => setForm({ ...f, ...patch });
-    const flip = <T,>(arr: T[], v: T) => (arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]);
-    return (
-      <div className="space-y-4 max-w-3xl">
-        <Button variant="ghost" size="sm" icon="undo" onClick={() => setForm(null)}>Zpět na kupony</Button>
-        <Card className="space-y-4">
-          <div>
-            <h2 className="t-card">{f.id ? `Upravit „${f.title || '…'}"` : 'Nový kupon'}</h2>
-            <p className="t-meta mt-0.5 max-w-[70ch]">Host si ho vezme za body na tvé stránce; dostane kód a obsluha ho uplatní u kasy.</p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_9rem] gap-4">
-            <Field id="cp-title" label="Název"><Input id="cp-title" value={f.title} onChange={e => set({ title: e.target.value })} placeholder="Dezert k čaji zdarma" maxLength={80} /></Field>
-            <Field id="cp-cost" label="Cena v bodech"><Input id="cp-cost" type="number" min={0} max={100000} value={f.costPoints} onChange={e => set({ costPoints: parseInt(e.target.value || '0', 10) })} /></Field>
-          </div>
-          <Field id="cp-desc" label="Popis"><Input id="cp-desc" value={f.description} onChange={e => set({ description: e.target.value })} placeholder="Jeden dezert z vitríny podle výběru." maxLength={200} /></Field>
-          <div>
-            <p className="field-label">Co kupon dává</p>
-            <Segmented options={[
-              { id: 'percent', label: 'Sleva %' }, { id: 'amount', label: `Sleva ${symbol}` }, { id: 'free_item', label: 'Zdarma' },
-              { id: 'xy', label: 'X+Y' }, { id: 'text', label: 'Vlastní' },
-            ]} value={f.benefitKind} onChange={v => set({ benefitKind: v })} size="sm" ariaLabel="Výhoda kuponu" />
-            <div className="mt-3 flex flex-wrap items-end gap-4">
-              {f.benefitKind === 'percent' && (
-                <Field id="cp-pct" label="Sleva %"><Input id="cp-pct" type="number" min={1} max={100} className="!w-24 text-center" value={f.percentOff} onChange={e => set({ percentOff: e.target.value })} placeholder="15" /></Field>
-              )}
-              {f.benefitKind === 'amount' && (
-                <Field id="cp-amt" label={`Sleva ${symbol}`}><Input id="cp-amt" type="number" min={1} max={100000} className="!w-24 text-center" value={f.amountOff} onChange={e => set({ amountOff: e.target.value })} placeholder="50" /></Field>
-              )}
-              {f.benefitKind === 'xy' && (<>
-                <Field id="cp-xb" label="Koupí (X)"><Input id="cp-xb" type="number" min={1} max={50} className="!w-24 text-center" value={f.xyBuy} onChange={e => set({ xyBuy: e.target.value })} placeholder="2" /></Field>
-                <Field id="cp-xf" label="Zdarma (Y)"><Input id="cp-xf" type="number" min={1} max={50} className="!w-24 text-center" value={f.xyFree} onChange={e => set({ xyFree: e.target.value })} /></Field>
-              </>)}
-              {f.benefitKind === 'free_item' && <p className="t-meta pb-2">Položka zdarma — co přesně, řekni v názvu kuponu.</p>}
-              {f.benefitKind === 'text' && <p className="t-meta pb-2">Výhoda je v názvu a popisu — obsluha ji vyřídí podle nich.</p>}
-              <Field id="cp-min" label={`Min. útrata (${symbol})`}><Input id="cp-min" type="number" min={0} max={100000} className="!w-28 text-center" value={f.minOrderValue} onChange={e => set({ minOrderValue: e.target.value })} placeholder="—" /></Field>
-            </div>
-          </div>
-          <div className="border-t border-black/[0.06] pt-4">
-            <p className="field-label">Pro koho platí</p>
-            <div className="flex flex-wrap gap-1.5">
-              {TIER_OPTS.map(t => <Volba key={t.id} on={f.targetTiers.includes(t.id)} onClick={() => set({ targetTiers: flip(f.targetTiers, t.id) })}>{t.label}</Volba>)}
-            </div>
-            {groups.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {groups.map((g: any) => <Volba key={g.id} on={f.targetGroups.includes(g.id)} onClick={() => set({ targetGroups: flip(f.targetGroups, g.id) })}>{g.name} ({g.members})</Volba>)}
-              </div>
-            )}
-            <p className="t-meta mt-1.5">Nic nevybráno = platí všem členům. Skupiny hostů se spravují v Body a úrovně.</p>
-          </div>
-          <div className="border-t border-black/[0.06] pt-4 space-y-3">
-            <p className="field-label">Kdy platí</p>
-            <div className="flex flex-wrap gap-1.5">
-              {DOW.map(d => <Volba key={d.d} on={f.daysOfWeek.includes(d.d)} onClick={() => set({ daysOfWeek: flip(f.daysOfWeek, d.d) })}>{d.l}</Volba>)}
-            </div>
-            <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-end gap-4">
-              <Field id="cp-hf" label="Od hodiny"><Input id="cp-hf" type="time" value={f.hourFrom} onChange={e => set({ hourFrom: e.target.value })} /></Field>
-              <Field id="cp-ht" label="Do hodiny"><Input id="cp-ht" type="time" value={f.hourTill} onChange={e => set({ hourTill: e.target.value })} /></Field>
-              <Field id="cp-vs" label="Platí od"><Input id="cp-vs" type="date" value={f.validSince} onChange={e => set({ validSince: e.target.value })} /></Field>
-              <Field id="cp-vu" label="Platí do"><Input id="cp-vu" type="date" value={f.validUntil} onChange={e => set({ validUntil: e.target.value })} /></Field>
-            </div>
-            <p className="t-meta">Žádný den nevybraný = platí každý den. Prázdné hodiny = celý den.</p>
-          </div>
-          <div className="border-t border-black/[0.06] pt-4 space-y-3">
-            <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-end gap-4">
-              <Field id="cp-per" label="Nejvýš na hosta"><Input id="cp-per" type="number" min={0} max={100} className="sm:!w-24 text-center" value={f.perCustomer} onChange={e => set({ perCustomer: parseInt(e.target.value || '0', 10) })} /></Field>
-              <Field id="cp-cd" label="Znovu až za (dní)"><Input id="cp-cd" type="number" min={0} max={365} className="sm:!w-24 text-center" value={f.cooldownDays} onChange={e => set({ cooldownDays: parseInt(e.target.value || '0', 10) })} /></Field>
-            </div>
-            <p className="t-meta">0 = bez omezení. Limit počítá vyzvednutí, cooldown čas od posledního.</p>
-            <ul className="list">
-              <SwitchRow title="Jen 18+" hint="Podle data narození v profilu hosta." checked={f.adultOnly} onChange={v => set({ adultOnly: v })} />
-              <SwitchRow title="Uvítací kupon" hint="Nový člen ho dostane sám při vstupu do podniku." checked={f.welcome} onChange={v => set({ welcome: v })} />
-            </ul>
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
-            <Button variant="secondary" onClick={() => setForm(null)}>Zrušit</Button>
-            <Button variant="primary" loading={busy === 'save'} onClick={save}>{f.id ? 'Uložit kupon' : 'Založit kupon'}</Button>
-          </div>
-        </Card>
-      </div>
-    );
-  }
-
-  // --- seznam + uplatnění ---
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-4 items-start">
-      {uplatni && (
-        <Card as="form" className="space-y-3" onSubmit={redeem}>
-          <h2 className="t-card">Uplatnit kupon</h2>
-          <p className="t-meta">Host ukáže kód ze své kartičky. Kupon jde uplatnit jednou; podmínky (útrata, 18+) připomene potvrzení.</p>
-          <Field id="c-code" label="Kód od hosta"><Input id="c-code" value={code} onChange={e => setCode(e.target.value.toUpperCase())} placeholder="ABC-123" className="font-mono tracking-widest" /></Field>
-          <Button type="submit" variant="primary" icon="check" loading={busy === 'redeem'} disabled={!code.trim()}>Uplatnit</Button>
-        </Card>
-      )}
-      {spravuje && (
-        <Card pad="none" aria-labelledby="v-kupony" className={uplatni ? '' : 'lg:col-span-2'}>
-          <div className="flex items-center justify-between gap-3 px-5 pt-4">
-            <h2 id="v-kupony" className="t-card">Katalog kuponů</h2>
-            <Button size="sm" variant="secondary" icon="plus" onClick={() => setForm(blankCoupon())}>Nový kupon</Button>
-          </div>
-          {list.length === 0 ? (
-            <div className="px-5 pb-5"><EmptyState icon="gift" title="Zatím žádný kupon" hint="Založ první — třeba slevu 15 % pro Zlaté hosty nebo uvítací dezert zdarma." compact /></div>
-          ) : (
-            <ul className="list px-5">
-              {list.map((c: any) => (
-                <ListRow key={c.id} className={c.active ? '' : 'opacity-55'}
-                  title={<span className="flex items-center gap-1.5 min-w-0"><span className="truncate">{c.title}</span>{c.benefit && <Chip tone="muted" size="sm">{c.benefit}</Chip>}{c.welcome && <Chip tone="muted" size="sm">uvítací</Chip>}</span>}
-                  meta={[c.costPoints > 0 ? `${c.costPoints} b.` : 'zdarma', ...(c.badges ?? []), c.validUntil ? `do ${czDay(c.validUntil)}` : null, `vzato ${c.claimed}×, uplatněno ${c.redeemed}×`].filter(Boolean).join(' · ')}
-                  actions={<>
-                    <Switch checked={!!c.active} disabled={busy === 'toggle:' + c.id} onChange={() => { void toggle(c); }} label={`Aktivní: ${c.title}`} />
-                    <Menu size="sm" label={`Další akce s kuponem ${c.title}`} items={[
-                      { label: 'Upravit…', icon: 'pencil', onClick: () => setForm(couponToForm(c)) },
-                      { label: 'Smazat…', icon: 'trash', danger: true, onClick: () => setMazu(c) },
-                    ]} />
-                  </>} />
-              ))}
-            </ul>
-          )}
-        </Card>
-      )}
-      {mazu && <Smazat title={`Smazat kupon „${mazu.title}"?`} text="Host, který si ho už vzal, ho uplatní i tak; nový už si ho nevezme." onZavrit={() => setMazu(null)} onPotvrdit={() => { void del(mazu); }} />}
-    </div>
   );
 }
 
@@ -1041,7 +837,7 @@ export default function LoyaltyTabs({ toast, promos, oznam, otevriCast }: {
     : sub === 'points' ? <BodyAUrovne toast={toast} setUkladam={setUkladam} />
     : sub === 'bonus' ? <BonusAkce toast={toast} />
     : sub === 'stamps' ? <Stamps toast={toast} />
-    : sub === 'coupons' ? <div className="space-y-4"><Coupons toast={toast} />{promos}</div>
+    : sub === 'coupons' ? <div className="space-y-4"><Kupony toast={toast} />{promos}</div>
     : sub === 'vouchers' ? <Poukazy toast={toast} />
     : null;
   return (

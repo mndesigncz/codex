@@ -1918,6 +1918,24 @@ export async function GET(request: Request) {
         used_at TIMESTAMP DEFAULT NOW(),
         PRIMARY KEY (promo_id, customer_id)
       )`);
+    // Kupony a promo kódy (W3): limity kusů a denní limit, koncept/archiv, kdo a za kolik kupon uplatnil.
+    // `issued` je počítadlo vydaných kusů: rezervuje se jedním UPDATE ... WHERE issued < max_total, takže souběh neprodá kus navíc.
+    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS max_total INTEGER`);
+    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS issued INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS daily_limit INTEGER`);
+    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS daily_count INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS daily_day TEXT`);
+    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS draft BOOLEAN NOT NULL DEFAULT FALSE`);
+    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS archived_at TIMESTAMP`);
+    await ddl(sql`ALTER TABLE client_coupon_claims ADD COLUMN IF NOT EXISTS redeemed_by INTEGER`);
+    await ddl(sql`ALTER TABLE client_coupon_claims ADD COLUMN IF NOT EXISTS order_value NUMERIC(12,2)`);
+    await ddl(sql`ALTER TABLE client_coupon_claims ADD COLUMN IF NOT EXISTS source TEXT`);
+    await ddl(sql`ALTER TABLE client_coupon_claims ADD COLUMN IF NOT EXISTS redeem_note TEXT`);
+    await ddl(sql`ALTER TABLE client_promos ADD COLUMN IF NOT EXISTS batch TEXT`);
+    // Počítadlo vydaných kusů u starších kuponů dopočítat z vydaných kódů (jen tam, kde je ještě nula).
+    await ddl(sql`
+      UPDATE client_coupons c SET issued = (SELECT COUNT(*) FROM client_coupon_claims cl WHERE cl.coupon_id = c.id)
+      WHERE c.issued = 0 AND EXISTS (SELECT 1 FROM client_coupon_claims cl WHERE cl.coupon_id = c.id)`);
     await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS birthday TEXT`);
     // Ochrana objednávek od stolu: QR na stole nese tajný kód stolu, host
     // posílá polohu, ověřené objednávky můžou jít rovnou do pokladny.

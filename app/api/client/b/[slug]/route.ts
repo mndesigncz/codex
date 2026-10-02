@@ -91,7 +91,7 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
     menuFor(teamId, p.menu_slug ?? null, new URL(req.url).searchParams.get('lang'), p.currency),
     p.ordering_on ? sql`SELECT id, name, seats, map_x, map_y, map_w, map_h, map_shape, map_rot FROM client_tables WHERE team_id = ${teamId} AND active = TRUE ORDER BY position, id` : Promise.resolve([]),
     p.loyalty_on ? sql`SELECT * FROM client_coupons
-                       WHERE team_id = ${teamId} AND active = TRUE AND kind = 'offer' AND (valid_until IS NULL OR valid_until >= ${today})
+                       WHERE team_id = ${teamId} AND active = TRUE AND kind = 'offer' AND draft = FALSE AND archived_at IS NULL AND (valid_until IS NULL OR valid_until >= ${today})
                        ORDER BY cost_points, id` : Promise.resolve([]),
   ]);
 
@@ -217,6 +217,7 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
   const shapedCoupons = (coupons as any[]).map((r: any) => {
     const s = shapeCoupon(r, castkaPodniku);
     let blocked: string | null = windowOk(r, { today, hm });
+    if (!blocked && s.remaining === 0) blocked = 'Kupony došly.';
     if (!blocked && mine?.member && s.targetTiers.length && !s.targetTiers.includes(mine.level)) {
       blocked = `Jen pro ${s.targetTiers.map((t: string) => TIER_LABELS[t]).join(' / ')}.`;
     }

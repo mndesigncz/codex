@@ -146,5 +146,8 @@
   "Zpráva už neexistuje.": "This message no longer exists.",
   "Záznam nenalezen": "Record not found",
   "Účet neexistuje.": "This account doesn't exist.",
-  "Účet se nepodařilo smazat. Zkuste to znovu, nebo napište podpoře.": "We couldn't delete the account. Try again or contact support."
+  "Účet se nepodařilo smazat. Zkuste to znovu, nebo napište podpoře.": "We couldn't delete the account. Try again or contact support.",
+  "Kupony došly.": "The coupons are all gone.",
+  "Odměna tohoto kódu už není k dispozici.": "This code's reward is no longer available.",
+  "Kupony z tohoto kódu už došly.": "The coupons for this code have run out."
 }
