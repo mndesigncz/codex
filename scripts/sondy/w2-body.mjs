@@ -77,6 +77,8 @@ const nastroj = (p) => p.locator('[data-plocha] li[data-widget="nastroj"]');
   await n.getByLabel('Z toho kreditem nebo poukazem').fill('0');
   await p.locator('[data-plocha]').getByRole('button', { name: 'Uložit', exact: true }).click();
   tvrdi('B7: oprava → PUT nese nová pole (zaokrouhlení, minimum, strop, pauza)', await dokud(() => (stav.profilPuty ?? []).some(b => b.points_round === 'nejblizsi' && 'points_min_spend' in b && 'points_cap_per_bill' in b && 'tier_inactive_months' in b && Array.isArray(b.points_exclude_items)), 2500), JSON.stringify(stav.profilPuty));
+  // Uložení přepíše formulář odpovědí serveru: dřív než se začne psát dál, musí potvrzení doběhnout.
+  await p.getByText('Pravidla bodů, úrovně a slevy uloženy.').first().waitFor({ timeout: 5000 });
   await n.getByLabel('Snížit po (měsících bez návštěvy)').fill('99');
   await p.locator('[data-plocha]').getByRole('button', { name: 'Uložit', exact: true }).click();
   tvrdi('B8: pauza 99 měsíců → rozsah v češtině, žádný další PUT', await dokud(async () => (await n.getByText(/povolený rozsah je 0 až 36/).count()) > 0, 2500) && (stav.profilPuty ?? []).length === 1, `${(stav.profilPuty ?? []).length} PUT · ${(await n.locator('[role=alert]').allInnerTexts()).join(' | ')} · hodnota ${await n.getByLabel('Snížit po (měsících bez návštěvy)').inputValue()}`);
