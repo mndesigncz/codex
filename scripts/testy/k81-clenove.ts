@@ -166,7 +166,7 @@ export default async function ({ eq, ok }: Testy) {
   const loyalty = precti('app/api/client/admin/loyalty/route.ts');
   ok('kredit a body: odečet přes atomické spendCredit / spendPoints a zápis do protokolu', /spendCredit\(u\.team_id/.test(loyalty) && /spendPoints\(u\.team_id/.test(loyalty) && /'client\.credit'/.test(loyalty) && /'client\.points'/.test(loyalty));
   const ui = precti('components/client/loyalty/ClenoveSprava.tsx');
-  ok('UI členů: úprava kreditu jen s vernost.kredit_upravit', /upravujeKredit = smi\('vernost\.kredit_upravit'\)/.test(ui) && /what: 'credit'/.test(ui));
+  ok('UI členů: úprava kreditu jen s vernost.kredit_upravit (okno BodyUpravaClena)', /upravujeKredit = smi\('vernost\.kredit_upravit'\)/.test(ui) && /<UpravaClenaOkno/.test(ui) && /what: 'credit'/.test(precti('components/client/loyalty/BodyUpravaClena.tsx')));
   ok('UI členů: slot pro akce jiného okruhu (kupon vybraným)', /dalsiAkce\?: \(vyber: VyberHostu\) => BulkAction\[\]/.test(ui));
   ok('UI členů: strop 500 je pryč, je „Načíst další"', /Načíst další/.test(ui) && !/limit=500/.test(ui));
 

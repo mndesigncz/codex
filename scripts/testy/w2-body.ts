@@ -125,7 +125,7 @@ export default async function ({ eq, ok }: Testy) {
   {
     const zdroj = bezKomentaru(precti('lib/client.ts'));
     ok('award: zůstatek a deník v jednom příkazu (FOR UPDATE), deník dostává skutečnou změnu', /FOR UPDATE/.test(zdroj)
-      && /VALUES \(\$\{teamId\}, \$\{customerId\}, \$\{change\}, \$\{kind\}/.test(zdroj) && /\$\{change\}, \$\{kind\}, \$\{ref \?\? null\}, \$\{note \?\? null\}\)`;\n  }\n  return \{ points: po/.test(zdroj));
+      && /VALUES \(\$\{teamId\}, \$\{customerId\}, \$\{change\}, \$\{kind\}/.test(zdroj) && /\$\{change\}, \$\{kind\}, \$\{ref \?\? null\}, \$\{note \?\? null\}(, \$\{staffId\})?\)`;/.test(zdroj) && /return \{ points: po/.test(zdroj));
     ok('award: starý příkaz GREATEST(0, points + delta) s plným delta v deníku je pryč', !/GREATEST\(0, points \+ \$\{delta\}\)/.test(zdroj) && !/GREATEST\(0, credit \+ /.test(zdroj));
     ok('award: součet se počítá v bigint (nepřeteče INTEGER)', /s\.points::bigint \+ \$\{d\}::bigint/.test(zdroj) && /s\.credit::bigint \+ \$\{d\}::bigint/.test(zdroj));
   }
@@ -270,7 +270,7 @@ export default async function ({ eq, ok }: Testy) {
     ok('ruční úprava: deník dostává skutečnou změnu (awardDetail / awardCreditDetail)', /awardDetail\(/.test(route) && /awardCreditDetail\(/.test(route));
     const okno = precti('components/client/loyalty/BodyUpravaClena.tsx');
     ok('člen: okno umí upravit kredit (what: credit) jen s oprávněním', /what: 'credit'/.test(okno) && /smiKredit/.test(okno));
-    const admin = bezKomentaru(precti('components/client/ClientAdmin.tsx'));
+    const admin = bezKomentaru(precti('components/client/loyalty/ClenoveSprava.tsx'));
     ok('člen: seznam hlídá vernost.kredit_upravit a používá nové okno', /smi\('vernost\.kredit_upravit'\)/.test(admin) && /<UpravaClenaOkno/.test(admin));
     const zakaznici = bezKomentaru(precti('app/api/client/admin/customers/route.ts'));
     ok('členové: kredit v seznamu jen s vernost.zobrazit', /vidiKredit = ctx\.role\.opravneni\.has\('vernost\.zobrazit'\)/.test(zakaznici));
@@ -293,7 +293,7 @@ export default async function ({ eq, ok }: Testy) {
     ok('objednávky: body přes odmenaZUctu', /odmenaZUctu\(teamId, profile/.test(objednavky) && !/Math\.floor\(Number\(o\.total\) \/ 100\)/.test(objednavky));
     ok('oznámení o postupu: po návštěvě i po útratě', /oznamPostupUrovne\(teamId, customerId, \{ navstev: 1 \}\)/.test(bezKomentaru(precti('lib/client.ts'))) && /oznamPostupUrovne\(teamId, customerId, \{ utrata: n \}\)/.test(bezKomentaru(precti('lib/urovneDb.ts'))));
     ok('úroveň po pauze: všechna místa s tierForMember předávají lastVisitAt', [
-      'app/api/client/b/[slug]/route.ts', 'app/api/client/b/[slug]/coupons/[id]/claim/route.ts', 'app/api/client/admin/customers/route.ts',
+      'app/api/client/b/[slug]/route.ts', 'app/api/client/b/[slug]/coupons/[id]/claim/route.ts', 'lib/clenoveDb.ts',
       'app/api/client/staff/scan/route.ts', 'components/client/MyPage.tsx',
     ].every(f => /lastVisitAt:/.test(precti(f))));
   }
