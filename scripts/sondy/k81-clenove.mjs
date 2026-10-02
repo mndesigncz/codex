@@ -66,6 +66,8 @@ const podvrh = (req, json, stav) => {
     stav.k.poznamky.push({ m, ...(req.postDataJSON() ?? {}) });
     return json({ ok: true });
   }
+  // Razítka člena v detailu (RazitkaClen): tenhle okruh je nezajímají, stačí prázdný stav.
+  if (path === '/api/client/admin/stamps/member') return json({ karty: [], udalosti: [] });
   if (path === '/api/client/admin/loyalty') {
     if (m === 'POST') { const b = req.postDataJSON(); stav.k.loyalty.push(b); return json({ ok: true, points: 10, credit: 200, spend: 1000 }); }
     return json({ ledger: [], claims: [], vouchers: [], orders: [], kampane: [], uroven: { id: 'bronze', label: 'Člen', unit: 'visits', nextAt: 10, nextLabel: 'Stříbrný host' }, clen: { points: 100, stamps: 0, visits: 3, spend: 0, credit: 150, joined_at: '2026-01-10T10:00:00Z', last_visit_at: null } });

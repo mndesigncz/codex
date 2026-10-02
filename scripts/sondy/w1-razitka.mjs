@@ -47,6 +47,8 @@ const podvrh = (req, json, stav) => {
   }
   if (path === '/api/client/admin/stamps/akce') { s.akce.push(req.postDataJSON()); return json({ ok: true, id: 10 }); }
   if (path === '/api/client/admin/stamps/stats') return json(STATISTIKA);
+  // Přehled hosta v detailu člena (časová osa, úroveň, razítka) — bez něj by jamka pod řádkem neměla co ukázat.
+  if (path === '/api/client/admin/loyalty' && m === 'GET') return json({ ledger: [], claims: [], vouchers: [], orders: [], kampane: [], uroven: { id: 'bronze', label: 'Člen', unit: 'visits', nextAt: 10, nextLabel: 'Stříbrný host' }, clen: { points: 100, stamps: 0, visits: 3, spend: 0, credit: 0, joined_at: '2026-01-10T10:00:00Z', last_visit_at: null } });
   if (path === '/api/client/admin/stamps/member') {
     if (m === 'GET') return json({
       karty: [{ campaignId: 1, nazev: 'Desátá dýmka zdarma', potrebnych: 10, razitek: 4, dokonceno: 1, stav: 'active',

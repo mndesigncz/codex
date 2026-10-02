@@ -135,7 +135,7 @@ const nastroj = (p) => p.locator('[data-plocha] li[data-widget="nastroj"]');
   const { ctx, p, stav, chyby } = await kontext({ fix: nacti('k69-b8-rozlozeni-zakaznici'), dalsi: podvrh });
   await otevri(p, CLIENT('customers'), 'vedeni.klient_zakaznici');
   const n = nastroj(p);
-  await n.getByRole('button', { name: 'Upravit body: Jana Dvořáková' }).click();
+  await n.getByRole('button', { name: 'Upravit body a kredit: Jana Dvořáková' }).click();
   const okno = p.getByRole('dialog');   // název okna se mění podle záložky (Body / Kredit / Útrata)
   await okno.getByText('Body pro Jana Dvořáková').waitFor({ timeout: 3000 });
   await okno.getByRole('tab', { name: 'Kredit', exact: true }).click();
