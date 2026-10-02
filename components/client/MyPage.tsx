@@ -17,6 +17,8 @@ import { pragueDaySafe } from '@/lib/pragueTime';
 import UcetHosta from './UcetHosta';
 import KartaNastroje from './KartaNastroje';
 import MamPoukaz from './MamPoukaz';
+import HostHistorie from './loyalty/HostHistorie';
+import { PlatnostKuponu } from './loyalty/HostPlatnost';
 import { useJazyk, useT } from '@/lib/i18n/client';
 import { fmtDatum } from '@/lib/i18n/format';
 import type { Jazyk } from '@/lib/i18n/config';
@@ -81,7 +83,7 @@ export default function MyPage() {
                     <Initials name={m.name} size={40} />
                     <div className="min-w-0 flex-1">
                       <p className="text-lg font-bold tracking-tight leading-tight truncate">{m.name}</p>
-                      {(() => { const lv = tierForMember({ visits: Number(m.visits), spend: Number(m.spend) }, m.tiers); const sl = efektivniSleva({ uroven: lv, skupiny: m.groupDiscounts }); return (
+                      {(() => { const lv = tierForMember({ visits: Number(m.visits), spend: Number(m.spend), lastVisitAt: m.lastVisitAt }, m.tiers); const sl = efektivniSleva({ uroven: lv, skupiny: m.groupDiscounts }); return (
                         <p className="text-sm text-black/55 mt-0.5 flex items-center gap-1.5 flex-wrap">
                           {lv.id !== 'bronze' && <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${lv.id === 'gold' ? 'bg-[#C8F542]/30 text-[#3E5406]' : 'bg-black/[0.07] text-black/60'}`}>{t(lv.label)}</span>}
                           {sl.pct > 0 && <span className="rounded-full bg-[#16181A] text-[#C8F542] px-2 py-0.5 text-[11px] font-bold">{sl.zdroj === 'skupina' && sl.nazev ? t('sleva {n} % ({skupina})', { n: sl.pct, skupina: sl.nazev }) : t('sleva {n} %', { n: sl.pct })}</span>}
@@ -151,6 +153,7 @@ export default function MyPage() {
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold leading-tight truncate">{c.title}</p>
                         <p className="text-xs text-black/55 truncate">{c.business}</p>
+                        <PlatnostKuponu validUntil={c.valid_until} today={d.today} className="block text-xs" />
                       </div>
                       <p className="font-mono font-bold tracking-widest text-lg shrink-0">{c.code}</p>
                     </div>
@@ -173,6 +176,8 @@ export default function MyPage() {
       )}
 
       {card?.code && <InviteCard code={card.code} onFlash={setFlash} />}
+
+      {d.memberships?.length > 0 && <HostHistorie showBusiness />}
 
       {(past.length > 0 || orders.length > 0) && (
         <details className="group">

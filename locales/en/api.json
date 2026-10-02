@@ -15,6 +15,7 @@
   "Google Wallet není zapnutý.": "Google Wallet is not enabled.",
   "Heslo musí mít alespoň 8 znaků.": "The password must be at least 8 characters long.",
   "Heslo není správné.": "Incorrect password.",
+  "Historii se teď nepodařilo načíst. Zkus to za chvíli.": "The history couldn't be loaded right now. Try again in a moment.",
   "Hlášení nenalezeno": "Report not found",
   "Hlášení se nepodařilo načíst": "The report couldn’t be loaded",
   "Hlášení se nepodařilo vytvořit": "The report couldn’t be created",
@@ -40,6 +41,7 @@
   "Moc pokusů najednou — chvilku počkej.": "Too many attempts at once — wait a moment.",
   "Moc pokusů. Zkus to za hodinu.": "Too many attempts. Try again in an hour.",
   "Moc pokusů. Zkus to za čtvrt hodiny.": "Too many attempts. Try again in a quarter of an hour.",
+  "Moc požadavků.": "Too many requests.",
   "Moc rychle po sobě. Zkus to za chvíli.": "Too fast in a row. Try again in a moment.",
   "Na dokončení inventury nemáš oprávnění.": "You don’t have permission to finish the stocktake.",
   "Na nákupní ceny nemáš oprávnění.": "You don’t have permission to see purchase prices.",
@@ -60,6 +62,7 @@
   "Neplatná akce": "Invalid action",
   "Neplatná data": "Invalid data",
   "Neplatná nadřazená kategorie": "Invalid parent category",
+  "Neplatná událost.": "Invalid event.",
   "Neplatné ID": "Invalid ID",
   "Neplatné datum": "Invalid date",
   "Neplatné množství": "Invalid quantity",
@@ -132,6 +135,7 @@
   "Tuhle návštěvu nejde hodnotit.": "This visit can't be rated.",
   "Tuhle rezervaci už zrušit nejde.": "This reservation can no longer be cancelled.",
   "Typ směny nenalezen": "Shift type not found",
+  "Událost se nepodařilo zapsat.": "The event couldn't be recorded.",
   "Uložení se nepodařilo": "Saving failed",
   "Uzávěrka nenalezena": "Closing not found",
   "Už jsi hodnotil.": "You've already rated this.",
@@ -151,5 +155,8 @@
   "Zpráva už neexistuje.": "This message no longer exists.",
   "Záznam nenalezen": "Record not found",
   "Účet neexistuje.": "This account doesn't exist.",
-  "Účet se nepodařilo smazat. Zkuste to znovu, nebo napište podpoře.": "We couldn't delete the account. Try again or contact support."
+  "Účet se nepodařilo smazat. Zkuste to znovu, nebo napište podpoře.": "We couldn't delete the account. Try again or contact support.",
+  "Kupony došly.": "The coupons are all gone.",
+  "Odměna tohoto kódu už není k dispozici.": "This code's reward is no longer available.",
+  "Kupony z tohoto kódu už došly.": "The coupons for this code have run out."
 }

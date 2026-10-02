@@ -107,12 +107,13 @@ async function poslatNativniPush(sql: any, userId: number, zdroj: PushPayload, t
 
 // Persist an in-app notification AND fire a push to all the user's devices
 // (web push i nativní APNs/FCM; větve jsou nezávislé, jedna nesmí zablokovat druhou).
-export async function notifyUser(userId: number, payload: PushPayload & { type?: string; category?: NotifCategory }) {
+// Vrací false, když host kategorii vypnul (oznámení se nevytvořilo ani neodeslalo), jinak true.
+export async function notifyUser(userId: number, payload: PushPayload & { type?: string; category?: NotifCategory }): Promise<boolean> {
   const sql = neon(process.env.DATABASE_URL!);
 
   // Respect the user's category preferences — a muted category is fully skipped.
   const prefs = await nactiPrefs(sql, userId);
-  if (jeZtlumeno(prefs ?? {}, payload.category)) return;
+  if (jeZtlumeno(prefs ?? {}, payload.category)) return false;
 
   try {
     await sql`
@@ -124,14 +125,25 @@ export async function notifyUser(userId: number, payload: PushPayload & { type?:
 
   // Tiché hodiny (Nastavení → Notifikace): oznámení zůstalo v centru oznámení, ale telefon
   // ani prohlížeč se neozve. Hodiny se berou na pražské zdi, jako všude v aplikaci.
-  if (prefs && jeVTichychHodinach(prefs, pragueHM())) return;
+  if (prefs && jeVTichychHodinach(prefs, pragueHM())) return true;
 
   await Promise.all([
     poslatWebPush(sql, userId, payload).catch(e => console.error('web push selhal', e)),
     poslatNativniPush(sql, userId, payload, payload.type).catch(e => console.error('nativní push selhal', e)),
   ]);
+  return true;
 }
 
-export async function notifyUsers(userIds: number[], payload: PushPayload & { type?: string; category?: NotifCategory }) {
-  await Promise.all(userIds.map((id) => notifyUser(id, payload)));
+/** Kolik oznámení se posílá souběžně: stovky členů naráz by zahltily spojení k databázi i k push službám. */
+export const PUSH_SOUBEZNE = 20;
+
+/** Pošle oznámení všem; vrací, kolika se dostalo a kolik hostů si kategorii vypnulo. Chyba jednoho nezastaví ostatní. */
+export async function notifyUsers(userIds: number[], payload: PushPayload & { type?: string; category?: NotifCategory }): Promise<{ doruceno: number; ztlumeno: number }> {
+  let doruceno = 0;
+  let ztlumeno = 0;
+  for (let i = 0; i < userIds.length; i += PUSH_SOUBEZNE) {
+    const davka = await Promise.all(userIds.slice(i, i + PUSH_SOUBEZNE).map(id => notifyUser(id, payload).catch(e => { console.error('notifyUser selhal', id, e); return null; })));
+    for (const r of davka) { if (r === true) doruceno += 1; else if (r === false) ztlumeno += 1; }
+  }
+  return { doruceno, ztlumeno };
 }

@@ -291,7 +291,7 @@ const OBSLUHA_CLIENTU = mine(['klient.prehled', 'rezervace.zobrazit', 'rezervace
   const nastroj = widgetLi(p, 'nastroj');
   let dialog = false;
   p.on('dialog', d => { dialog = true; void d.dismiss(); });
-  await nastroj.getByRole('button', { name: 'Upravit body: Jana Dvořáková' }).click();
+  await nastroj.getByRole('button', { name: 'Upravit body a kredit: Jana Dvořáková' }).click();
   const okno = p.getByRole('dialog', { name: 'Body pro Jana Dvořáková' });
   tvrdi('Z-B: úprava bodů v okně (ne prompt())', await dokud(() => okno.isVisible(), 1500) && !dialog);
   await okno.getByLabel('Kolik bodů').fill('50');

@@ -15,6 +15,7 @@
   "Google Wallet není zapnutý.": "Google Wallet ist nicht aktiviert.",
   "Heslo musí mít alespoň 8 znaků.": "Das Passwort muss mindestens 8 Zeichen lang sein.",
   "Heslo není správné.": "Das Passwort ist nicht korrekt.",
+  "Historii se teď nepodařilo načíst. Zkus to za chvíli.": "Der Verlauf konnte gerade nicht geladen werden. Versuche es gleich noch einmal.",
   "Hlášení nenalezeno": "Bericht nicht gefunden",
   "Hlášení se nepodařilo načíst": "Der Bericht konnte nicht geladen werden",
   "Hlášení se nepodařilo vytvořit": "Der Bericht konnte nicht erstellt werden",
@@ -40,6 +41,7 @@
   "Moc pokusů najednou — chvilku počkej.": "Zu viele Versuche auf einmal – warte einen Moment.",
   "Moc pokusů. Zkus to za hodinu.": "Zu viele Versuche. Versuche es in einer Stunde erneut.",
   "Moc pokusů. Zkus to za čtvrt hodiny.": "Zu viele Versuche. Versuche es in einer Viertelstunde erneut.",
+  "Moc požadavků.": "Zu viele Anfragen.",
   "Moc rychle po sobě. Zkus to za chvíli.": "Zu schnell hintereinander. Versuche es gleich noch einmal.",
   "Na dokončení inventury nemáš oprávnění.": "Du darfst die Inventur nicht abschließen.",
   "Na nákupní ceny nemáš oprávnění.": "Du hast keine Berechtigung für Einkaufspreise.",
@@ -60,6 +62,7 @@
   "Neplatná akce": "Ungültige Aktion",
   "Neplatná data": "Ungültige Daten",
   "Neplatná nadřazená kategorie": "Ungültige übergeordnete Kategorie",
+  "Neplatná událost.": "Ungültiges Ereignis.",
   "Neplatné ID": "Ungültige ID",
   "Neplatné datum": "Ungültiges Datum",
   "Neplatné množství": "Ungültige Menge",
@@ -132,6 +135,7 @@
   "Tuhle návštěvu nejde hodnotit.": "Diesen Besuch kann man nicht bewerten.",
   "Tuhle rezervaci už zrušit nejde.": "Diese Reservierung kann nicht mehr storniert werden.",
   "Typ směny nenalezen": "Schichttyp nicht gefunden",
+  "Událost se nepodařilo zapsat.": "Das Ereignis konnte nicht erfasst werden.",
   "Uložení se nepodařilo": "Speichern hat nicht geklappt",
   "Uzávěrka nenalezena": "Kassenabschluss nicht gefunden",
   "Už jsi hodnotil.": "Du hast schon bewertet.",
@@ -151,5 +155,8 @@
   "Zpráva už neexistuje.": "Diese Nachricht gibt es nicht mehr.",
   "Záznam nenalezen": "Eintrag nicht gefunden",
   "Účet neexistuje.": "Dieses Konto existiert nicht.",
-  "Účet se nepodařilo smazat. Zkuste to znovu, nebo napište podpoře.": "Das Konto konnte nicht gelöscht werden. Versuchen Sie es erneut oder schreiben Sie dem Support."
+  "Účet se nepodařilo smazat. Zkuste to znovu, nebo napište podpoře.": "Das Konto konnte nicht gelöscht werden. Versuchen Sie es erneut oder schreiben Sie dem Support.",
+  "Kupony došly.": "Die Gutscheine sind vergriffen.",
+  "Odměna tohoto kódu už není k dispozici.": "Die Belohnung dieses Codes ist nicht mehr verfügbar.",
+  "Kupony z tohoto kódu už došly.": "Die Gutscheine zu diesem Code sind aufgebraucht."
 }

@@ -6,12 +6,12 @@ import { normalizePlan } from '@/lib/floorplan';
 import { tierForMember, tierRulesFromProfile } from '@/lib/clientSlots';
 import { slevaClena } from '@/lib/urovneDb';
 import { sql, customer, profileBySlug, publicProfile, membership } from '@/lib/client';
-import { activeCampaigns, progressFor } from '@/lib/stamps';
+import { activeCampaigns, progressFor, hostKarta } from '@/lib/stamps';
 import { shapeCoupon, windowOk, ageFrom, TIER_LABELS } from '@/lib/coupons';
 import { pragueToday, pragueHM } from '@/lib/pragueTime';
 import { buildBoard, publicShape, menaListku } from '@/lib/menu';
 import { menaZRadku } from '@/lib/mena';
-import { aktivniBannery } from '@/lib/clientBanners';
+import { aktivniBannery, kontextHosta } from '@/lib/clientBanners';
 import { aktivniBonus } from '@/lib/bonusAkceDb';
 import { dokdyDnes } from '@/lib/bonusAkce';
 import { planClena } from '@/lib/propadaniBoduDb';
@@ -91,7 +91,7 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
     menuFor(teamId, p.menu_slug ?? null, new URL(req.url).searchParams.get('lang'), p.currency),
     p.ordering_on ? sql`SELECT id, name, seats, map_x, map_y, map_w, map_h, map_shape, map_rot FROM client_tables WHERE team_id = ${teamId} AND active = TRUE ORDER BY position, id` : Promise.resolve([]),
     p.loyalty_on ? sql`SELECT * FROM client_coupons
-                       WHERE team_id = ${teamId} AND active = TRUE AND kind = 'offer' AND (valid_until IS NULL OR valid_until >= ${today})
+                       WHERE team_id = ${teamId} AND active = TRUE AND kind = 'offer' AND draft = FALSE AND archived_at IS NULL AND (valid_until IS NULL OR valid_until >= ${today})
                        ORDER BY cost_points, id` : Promise.resolve([]),
   ]);
 
@@ -105,9 +105,9 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
       WHERE team_id = ${teamId} AND customer_id = ${me.id} AND date >= ${today} AND status NOT IN ('cancelled','declined','done')
       ORDER BY date, time`;
     const claims = await sql`
-      SELECT cl.id, cl.code, cl.claimed_at, cl.redeemed_at, c.title FROM client_coupon_claims cl JOIN client_coupons c ON c.id = cl.coupon_id
+      SELECT cl.id, cl.code, cl.claimed_at, cl.redeemed_at, c.title, c.valid_until FROM client_coupon_claims cl JOIN client_coupons c ON c.id = cl.coupon_id
       WHERE cl.team_id = ${teamId} AND cl.customer_id = ${me.id} AND cl.redeemed_at IS NULL ORDER BY cl.claimed_at DESC`;
-    const tier = tierForMember({ visits: Number(m?.visits ?? 0), spend: Number(m?.spend ?? 0) }, tierRulesFromProfile(p));
+    const tier = tierForMember({ visits: Number(m?.visits ?? 0), spend: Number(m?.spend ?? 0), lastVisitAt: m?.last_visit_at }, tierRulesFromProfile(p));
     // Sleva = nejvyšší z úrovně a slev skupin; host vidí i odkud je.
     const sleva = await slevaClena(teamId, me.id, tier);
     const myCamps = await activeCampaigns(teamId, today);
@@ -118,11 +118,17 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
       spend: Number(m?.spend ?? 0), tierBy: tier.unit,
       level: tier.id, levelLabel: tier.label, discount: sleva.pct, discountSource: sleva.zdroj, discountName: sleva.nazev,
       nextTierAt: tier.nextAt, nextTierLabel: tier.nextLabel, nextTierUnit: tier.unit,
-      campaigns: myCamps.map(c => ({
-        id: c.id, name: c.name, description: c.description, required: c.required_stamps,
-        reward: c.reward_title, stamps: Number(myProg.get(c.id)?.stamps ?? 0),
-        completed: Number(myProg.get(c.id)?.completed ?? 0),
-      })),
+      campaigns: myCamps.map(c => {
+        const k = hostKarta(c, myProg.get(c.id));
+        return {
+          id: c.id, name: c.name, description: c.description, required: c.required_stamps,
+          reward: c.reward_title, stamps: k.stamps, completed: k.completed,
+          // Kdy karta vyprší a zpráva o propadlé kartě (host se to dozví při otevření stránky).
+          expiresAt: k.expiresAt, expiredCount: k.expiredCount, expiredAt: k.expiredAt,
+          maxCompletions: c.max_completions, daysOfWeek: c.days_of_week, hourFrom: c.hour_from, hourTill: c.hour_till,
+          oneTime: c.repeat_mode === 'one_time',
+        };
+      }),
       reservations, claims,
     };
     // Body, kterým brzy vyprší platnost (jen když podnik propadání používá).
@@ -201,12 +207,13 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
   try {
     stampCampaigns = (await activeCampaigns(teamId, today)).map(c => ({
       id: c.id, name: c.name, description: c.description, required: c.required_stamps, reward: c.reward_title,
+      daysOfWeek: c.days_of_week, hourFrom: c.hour_from, hourTill: c.hour_till, maxCompletions: c.max_completions,
     }));
   } catch { stampCampaigns = []; }
 
   let news: any[] = [];
-  // Jen opravdu odeslané — naplánované zprávy nesmí do Novinek předčasně.
-  try { news = await sql`SELECT id, title, body, sent_at FROM client_broadcasts WHERE team_id = ${teamId} AND COALESCE(status, 'sent') = 'sent' ORDER BY sent_at DESC LIMIT 3` as any[]; } catch { news = []; }
+  // Jen opravdu odeslané — naplánované zprávy nesmí do Novinek předčasně. Zprávy skupině, úrovni nebo vybraným hostům jsou soukromé a na veřejnou stránku nepatří.
+  try { news = await sql`SELECT id, title, body, sent_at FROM client_broadcasts WHERE team_id = ${teamId} AND COALESCE(status, 'sent') = 'sent' AND COALESCE(audience, 'all') = 'all' ORDER BY sent_at DESC LIMIT 3` as any[]; } catch { news = []; }
   const plan = p.floorplan && p.ordering_on ? normalizePlan(p.floorplan) : null;
 
   // Kupony v plné síle: výhoda + štítky podmínek, a přihlášenému členovi
@@ -217,6 +224,7 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
   const shapedCoupons = (coupons as any[]).map((r: any) => {
     const s = shapeCoupon(r, castkaPodniku);
     let blocked: string | null = windowOk(r, { today, hm });
+    if (!blocked && s.remaining === 0) blocked = 'Kupony došly.';
     if (!blocked && mine?.member && s.targetTiers.length && !s.targetTiers.includes(mine.level)) {
       blocked = `Jen pro ${s.targetTiers.map((t: string) => TIER_LABELS[t]).join(' / ')}.`;
     }
@@ -229,7 +237,8 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
     return { ...s, cost_points: s.costPoints, valid_until: s.validUntil, blocked };
   });
   // Promo bannery podniku (max 5, aktivní a v platnosti). Obsah je data podniku.
-  const banners = await aktivniBannery(teamId, today);
+  // Cílení: člen vidí jiné bannery než nečlen; úroveň a skupiny se berou z hostova členství.
+  const banners = await aktivniBannery(teamId, today, await kontextHosta(teamId, me?.id ?? null, mine));
   // Bonusová akce, která právě běží („Dnes dvojnásobné body do 18:00"); text skládá stránka přes t().
   let bonus: any = null;
   if (p.loyalty_on) {

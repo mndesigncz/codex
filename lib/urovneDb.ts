@@ -13,6 +13,7 @@
 import { sql } from './client';
 import { efektivniSleva, type EfektivniSleva, type SlevaSkupiny } from './slevy';
 import { celaUtrata, MAX_UTRATA, type Tier } from './clientSlots';
+import { oznamPostupUrovne } from './urovnePostup';
 
 let pripraveno: Promise<void> | null = null;
 
@@ -41,6 +42,8 @@ export async function pripisUtratu(teamId: number, customerId: number, castka: u
       UPDATE client_memberships SET spend = LEAST(2000000000, spend + ${n})
       WHERE customer_id = ${customerId} AND team_id = ${teamId}
       RETURNING spend`;
+    // Přešel host touhle útratou na vyšší úroveň? Pak mu přijde oznámení.
+    if (m) await oznamPostupUrovne(teamId, customerId, { utrata: n });
     return m ? Number(m.spend) : null;
   } catch (e) {
     console.error('[urovne] útrata se nezapsala', e);

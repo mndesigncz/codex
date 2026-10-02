@@ -1204,6 +1204,26 @@ export const KATALOG: Opravneni[] = [
   ]
  },
  {
+  "id": "zakaznici.export",
+  "oblast": "Zákazníci a menu",
+  "nazev": "Export členů do CSV",
+  "popis": "Stáhnout seznam členů nebo členů skupiny jako soubor CSV. E-maily jsou v souboru jen se zakaznici.kontakty.",
+  "citlivost": "vysoká",
+  "vyzaduje": [
+   "zakaznici.zobrazit"
+  ]
+ },
+ {
+  "id": "zakaznici.poznamky",
+  "oblast": "Zákazníci a menu",
+  "nazev": "Interní poznámky k hostům",
+  "popis": "Číst a psát interní poznámky u člena klubu (alergie, oblíbený čaj, domluva). Host je nevidí.",
+  "citlivost": "střední",
+  "vyzaduje": [
+   "zakaznici.zobrazit"
+  ]
+ },
+ {
   "id": "zakaznici.skupiny",
   "oblast": "Zákazníci a menu",
   "nazev": "Skupiny členů",
@@ -1279,6 +1299,16 @@ export const KATALOG: Opravneni[] = [
   "oblast": "Zákazníci a menu",
   "nazev": "Ručně upravit body",
   "popis": "Připsat nebo odebrat body členovi. Zapisuje se do auditu.",
+  "citlivost": "střední",
+  "vyzaduje": [
+   "vernost.zobrazit"
+  ]
+ },
+ {
+  "id": "vernost.razitka_upravit",
+  "oblast": "Zákazníci a menu",
+  "nazev": "Ručně upravit razítka hosta",
+  "popis": "Připsat nebo odebrat razítka hostovi z okna člena (s důvodem) a stornovat poslední akci s razítky. Zapisuje se do auditu.",
   "citlivost": "střední",
   "vyzaduje": [
    "vernost.zobrazit"
@@ -1776,14 +1806,17 @@ export const SYSTEMOVE_ROLE: SystemovaRole[] = [
    "vernost.kredit_upravit",
    "vernost.platba_kreditem",
    "vernost.pravidla",
+   "vernost.razitka_upravit",
    "vernost.upravit_body",
    "vernost.zobrazit",
    "volno.schvalovat",
    "volno.zobrazit",
    "vyroba.receptura",
    "vyroba.vyrabet",
+   "zakaznici.export",
    "zakaznici.import",
    "zakaznici.kontakty",
+   "zakaznici.poznamky",
    "zakaznici.recenze",
    "zakaznici.skupiny",
    "zakaznici.zobrazit",

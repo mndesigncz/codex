@@ -54,6 +54,12 @@ const podvrh = (req, json, stav) => {
     if (m === 'GET') {
       const id = url.searchParams.get('id');
       s.dotazy.push(url.search);
+      // Přehled závazku a náhled hromadného prodloužení (W5).
+      if (url.searchParams.get('prehled') === '1') return json({
+        prehled: { zavazek: 3150, pocetPlatnych: 2, propadlo: 800, pocetPropadlych: 1, brzyPropadne: { pocet: 1, castka: 150 }, vJineMene: 0, brzyDni: 30 },
+        mesice: Array.from({ length: 12 }, (_, i) => { const d = new Date(Date.UTC(Number(DNES.slice(0, 4)), Number(DNES.slice(5, 7)) - 1 - (11 - i), 1)); return { mesic: d.toISOString().slice(0, 7), prodano: i === 11 ? 1800 : i === 9 ? 500 : 0, pocetProdanych: i === 11 ? 3 : i === 9 ? 1 : 0, uplatneno: i === 11 ? 350 : 0, vraceno: 0, cistoUplatneno: i === 11 ? 350 : 0 }; }),
+        limity: { min: 0, max: 0 }, currency: 'CZK', dnes: DNES });
+      if (url.searchParams.get('nahled') === 'prodlouzeni') return json({ pocet: 2, castka: 950 });
       if (id) { const p = POUKAZY.find(x => x.id === Number(id)); return p ? json({ poukaz: p.id === 2 ? { ...p, balance: s.zustatek, stav: s.zustatek > 0 ? 'active' : 'used' } : p, historie: p.id === 2 ? HISTORIE : [] }) : json({ error: 'Poukaz nenalezen.' }, 404); }
       const q = (url.searchParams.get('q') ?? '').toLowerCase();
       const st = url.searchParams.get('stav') ?? '';
@@ -79,6 +85,7 @@ const zmer = async (p, popis) => {
   tvrdi(`${popis}: bez vodorovného scrollu okna`, m.okno <= 1, `${m.okno}px`);
 };
 const okno = (p) => p.locator('[role="dialog"]').last();
+const s_pk = (_p, stav) => stav.pk;
 
 async function sprava(viewport, mobil) {
   const jm = `${viewport.width}px`;
@@ -96,6 +103,24 @@ async function sprava(viewport, mobil) {
   tvrdi(`${jm} seznam: zůstatek 150 Kč a „z 500 Kč“ u částečně uplatněného`, /150\s*Kč/.test(await p.locator('main, body').first().innerText()) && /z\s*500\s*Kč/.test(await p.locator('body').innerText()));
   await zmer(p, `${jm} seznam`);
   await p.screenshot({ path: `${OUT}poukazy-${jm}-1-seznam.png` });
+
+  // Přehled závazku, měsíce, nastavení uplatnění a hromadné prodloužení (W5).
+  await p.getByRole('heading', { name: 'Přehled poukazů' }).waitFor({ timeout: 8000 });
+  tvrdi(`${jm} přehled: závazek 3 150 Kč a propadlo 800 Kč`, /3\s*150\s*Kč/.test(await p.locator('body').innerText()) && /800\s*Kč/.test(await p.locator('body').innerText()));
+  tvrdi(`${jm} přehled: měsíc s prodejem je v seznamu`, await p.locator('[data-mesic]').count() === 12);
+  await zmer(p, `${jm} přehled`);
+  await p.getByRole('button', { name: /Prodloužit platnost/ }).click();
+  await okno(p).waitFor();
+  await okno(p).getByText(/Dotkne se 2 poukazy/).waitFor({ timeout: 5000 });
+  await zmer(p, `${jm} hromadné prodloužení`);
+  await okno(p).getByRole('button', { name: 'Prodloužit 2 poukazy' }).click();
+  await p.waitForTimeout(400);
+  tvrdi(`${jm} prodloužení: PATCH extend s doDne a novou platností`, s_pk(p, stav).patche.some(x => x.action === 'extend' && x.validUntil && x.doDne));
+  await p.getByLabel(/Nejmenší uplatnění/).fill('50');
+  await p.getByLabel(/Největší uplatnění/).fill('500');
+  await p.getByRole('button', { name: 'Uložit nastavení' }).click();
+  await p.waitForTimeout(300);
+  tvrdi(`${jm} nastavení uplatnění: PATCH limits`, s_pk(p, stav).patche.some(x => x.action === 'limits' && x.min === 50 && x.max === 500));
 
   // Hledání a filtr.
   await p.getByLabel('Hledat poukazy').fill('jana');

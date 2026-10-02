@@ -8,6 +8,12 @@ import { audit } from '@/lib/audit';
 import { zajistiUrovne } from '@/lib/urovneDb';
 import { ulozPropadani, zajistiPropadani } from '@/lib/propadaniBoduDb';
 import { zajistiReaktivaci } from '@/lib/reaktivace';
+import { zajistiBodyPravidla } from '@/lib/bodyPravidlaDb';
+import {
+  validujPravidla, POLE_PRAVIDEL, popisZmenyPravidel, vetaZmenPravidel, jeZaokrouhleni, vylouceneZProfilu,
+  MAX_PRAH_NAVSTEV, MAX_PRAH_UTRATY, MAX_MIN_UTRATA, MAX_STROP_BODU, MAX_MESICU_NEAKTIVITY,
+} from '@/lib/bodyPravidla';
+import { menaPodniku } from '@/lib/menaPodniku';
 import { teamIsMax, MAX_ONLY_MSG } from '@/lib/planServer';
 
 export const dynamic = 'force-dynamic';
@@ -34,7 +40,11 @@ const POLE_OPRAVNENI: Record<string, string> = {
   reactivation_days: 'vernost.pravidla', reactivation_points: 'vernost.pravidla',
   gold_discount: 'vernost.pravidla', platinum_discount: 'vernost.pravidla', cashback_pct: 'vernost.pravidla', cashback_mode: 'vernost.pravidla',
   points_expire_days: 'vernost.pravidla',
+  points_round: 'vernost.pravidla', points_min_spend: 'vernost.pravidla', points_cap_per_bill: 'vernost.pravidla',
+  points_exclude_prepaid: 'vernost.pravidla', points_exclude_items: 'vernost.pravidla', tier_inactive_months: 'vernost.pravidla',
 };
+/** Pole pravidel bodů, která žijí ve vlastním UPDATE (sloupce se zajišťují za běhu). */
+const POLE_BODU = ['points_round', 'points_min_spend', 'points_cap_per_bill', 'points_exclude_prepaid', 'points_exclude_items', 'tier_inactive_months'];
 const NAZEV_SKUPINY: Record<string, string> = {
   'klient.nastaveni': 'nastavení stránky pro hosty', 'klient.vzhled': 'vzhled stránky pro hosty', 'vernost.pravidla': 'pravidla věrnosti',
 };
@@ -50,6 +60,7 @@ export async function GET(req: NextRequest) {
   try { await zajistiUrovne(); } catch { /* bez nich platí návštěvy */ }
   try { await zajistiPropadani(); } catch { /* bez nich body nepropadají */ }
   try { await zajistiReaktivaci(); } catch { /* bez nich je „Chybíš nám“ vypnuté */ }
+  try { await zajistiBodyPravidla(); } catch { /* bez nich platí dosavadní výpočet bodů */ }
   const p = await ensureProfile(u.team_id);
   const boards = await sql`
     SELECT b.slug, b.name,
@@ -80,7 +91,16 @@ export async function PUT(req: NextRequest) {
   }
   // Tarif až po oprávnění — kdo na úpravu nemá právo, nemá co řešit tarif.
   if (!(await teamIsMax(u.team_id))) return NextResponse.json({ error: MAX_ONLY_MSG }, { status: 402 });
+  // Sloupce pravidel se zajistí dřív než čtení profilu, ať „před" v historii změn a výchozí hodnoty nejsou prázdné.
+  try { await zajistiUrovne(); await zajistiBodyPravidla(); } catch { /* bez nich se pravidla nových polí neuloží, ostatní ano */ }
   const cur = await ensureProfile(u.team_id);
+  // Pravidla věrnosti se kontrolují jako celek (prahy rostou, slevy neklesají) — stejnou funkcí jako formulář.
+  if (POLE_PRAVIDEL.some(k => b?.[k] !== undefined)) {
+    const spojene: Record<string, unknown> = {};
+    for (const k of POLE_PRAVIDEL) spojene[k] = b?.[k] !== undefined ? b[k] : (cur as any)[k];
+    const chyby = validujPravidla(spojene);
+    if (chyby.length) return NextResponse.json({ error: chyby[0].text, chyby }, { status: 400 });
+  }
   const slug = b.slug != null ? slugify(b.slug) : cur.slug;
   if (!slug) return NextResponse.json({ error: 'Adresa musí mít aspoň jedno písmeno nebo číslo.' }, { status: 400 });
   if (slug !== cur.slug) {
@@ -120,12 +140,12 @@ export async function PUT(req: NextRequest) {
       stamp_reward = ${String(b.stamp_reward ?? cur.stamp_reward ?? '').slice(0, 80)},
       birthday_points = ${num(b.birthday_points, Number(cur.birthday_points) || 0, 0, 1000)},
       referral_points = ${num(b.referral_points, Number(cur.referral_points) || 0, 0, 1000)},
-      silver_at = ${num(b.silver_at, Number(cur.silver_at) || 10, 1, 500)},
-      gold_at = ${num(b.gold_at, Number(cur.gold_at) || 25, 2, 1000)},
+      silver_at = ${num(b.silver_at, Number(cur.silver_at) || 10, 1, MAX_PRAH_NAVSTEV)},
+      gold_at = ${num(b.gold_at, Number(cur.gold_at) || 25, 2, MAX_PRAH_NAVSTEV)},
       member_discount = ${num(b.member_discount, Number(cur.member_discount) || 0, 0, 90)},
       silver_discount = ${num(b.silver_discount, Number(cur.silver_discount) || 0, 0, 90)},
       gold_discount = ${num(b.gold_discount, Number(cur.gold_discount) || 0, 0, 90)},
-      platinum_at = ${num(b.platinum_at, Number(cur.platinum_at) || 0, 0, 2000)},
+      platinum_at = ${num(b.platinum_at, Number(cur.platinum_at) || 0, 0, MAX_PRAH_NAVSTEV)},
       platinum_discount = ${num(b.platinum_discount, Number(cur.platinum_discount) || 0, 0, 90)},
       cashback_pct = ${num(b.cashback_pct, Number(cur.cashback_pct) || 0, 0, 50)},
       cashback_mode = ${['credit', 'points'].includes(String(b.cashback_mode)) ? String(b.cashback_mode) : (cur.cashback_mode ?? 'credit')},
@@ -154,9 +174,9 @@ export async function PUT(req: NextRequest) {
     [pFinal] = await sql`
       UPDATE client_profiles SET
         tier_by = ${b.tier_by !== undefined ? (b.tier_by === 'spend' ? 'spend' : 'visits') : (p.tier_by === 'spend' ? 'spend' : 'visits')},
-        silver_spend = ${num(b.silver_spend, Number(p.silver_spend) || 5000, 1, 100000000)},
-        gold_spend = ${num(b.gold_spend, Number(p.gold_spend) || 15000, 2, 100000000)},
-        platinum_spend = ${num(b.platinum_spend, Number(p.platinum_spend) || 0, 0, 100000000)}
+        silver_spend = ${num(b.silver_spend, Number(p.silver_spend) || 5000, 1, MAX_PRAH_UTRATY)},
+        gold_spend = ${num(b.gold_spend, Number(p.gold_spend) || 15000, 2, MAX_PRAH_UTRATY)},
+        platinum_spend = ${num(b.platinum_spend, Number(p.platinum_spend) || 0, 0, MAX_PRAH_UTRATY)}
       WHERE team_id = ${u.team_id} RETURNING *`;
   }
   // Propadání bodů: zvlášť, ať uložení ostatních pravidel nezávisí na migraci.
@@ -175,6 +195,22 @@ export async function PUT(req: NextRequest) {
     audit(u.team_id, u.id, 'client.reaktivace', 'client', null, Number(pFinal.reactivation_days) > 0
       ? `Chybíš nám po ${pFinal.reactivation_days} dnech · ${pFinal.reactivation_points} bodů` : 'Chybíš nám vypnuto');
   }
+  // Body bez stropu, minimum, zaokrouhlení, kredit a poukazy, vyloučené položky a snížení úrovně po neaktivitě.
+  if (POLE_BODU.some(k => b?.[k] !== undefined)) {
+    await zajistiBodyPravidla();
+    [pFinal] = await sql`
+      UPDATE client_profiles SET
+        points_round = ${jeZaokrouhleni(b.points_round) ? b.points_round : (jeZaokrouhleni(pFinal.points_round) ? pFinal.points_round : 'sta')},
+        points_min_spend = ${num(b.points_min_spend, Number(pFinal.points_min_spend) || 0, 0, MAX_MIN_UTRATA)},
+        points_cap_per_bill = ${num(b.points_cap_per_bill, Number(pFinal.points_cap_per_bill) || 0, 0, MAX_STROP_BODU)},
+        points_exclude_prepaid = ${b.points_exclude_prepaid != null ? !!b.points_exclude_prepaid : pFinal.points_exclude_prepaid !== false},
+        points_exclude_items = ${JSON.stringify(b.points_exclude_items !== undefined ? vylouceneZProfilu(b.points_exclude_items) : vylouceneZProfilu(pFinal.points_exclude_items))}::jsonb,
+        tier_inactive_months = ${num(b.tier_inactive_months, Number(pFinal.tier_inactive_months) || 0, 0, MAX_MESICU_NEAKTIVITY)}
+      WHERE team_id = ${u.team_id} RETURNING *`;
+  }
+  // Verze pravidel: co se změnilo, před → po, v historii změn.
+  const zmeny = popisZmenyPravidel(cur, pFinal, (await menaPodniku(u.team_id)).money);
+  if (zmeny.length) audit(u.team_id, u.id, 'client.pravidla', 'client', null, vetaZmenPravidel(zmeny));
   audit(u.team_id, u.id, 'client.profile', 'client', null, pFinal.enabled ? `zapnuto · /client/${pFinal.slug}` : 'vypnuto');
   return NextResponse.json({ ok: true, profile: pFinal, public: publicProfile({ ...pFinal, team_name: '', opening_hours: {} }), url: `${origin(req)}/client/${pFinal.slug}` });
 }

@@ -31,7 +31,7 @@ export async function GET() {
       WHERE o.customer_id = ${me.id} ORDER BY o.created_at DESC LIMIT 40` as any[];
   } catch { orders = []; }
   const claims = await sql`
-    SELECT cl.id, cl.code, cl.claimed_at, cl.redeemed_at, c.title, p.slug, COALESCE(NULLIF(t.share_theme->>'businessName',''), t.name) AS business
+    SELECT cl.id, cl.code, cl.claimed_at, cl.redeemed_at, c.title, c.valid_until, p.slug, COALESCE(NULLIF(t.share_theme->>'businessName',''), t.name) AS business
     FROM client_coupon_claims cl JOIN client_coupons c ON c.id = cl.coupon_id JOIN client_profiles p ON p.team_id = cl.team_id JOIN teams t ON t.id = cl.team_id
     WHERE cl.customer_id = ${me.id} ORDER BY cl.redeemed_at NULLS FIRST, cl.claimed_at DESC LIMIT 40`;
   const [profile] = await sql`SELECT id, name, email, phone, birthday FROM users WHERE id = ${me.id}`;

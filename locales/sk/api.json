@@ -15,6 +15,7 @@
   "Google Wallet není zapnutý.": "Google Wallet nie je zapnutý.",
   "Heslo musí mít alespoň 8 znaků.": "Heslo musí mať aspoň 8 znakov.",
   "Heslo není správné.": "Heslo nie je správne.",
+  "Historii se teď nepodařilo načíst. Zkus to za chvíli.": "Históriu sa teraz nepodarilo načítať. Skús to o chvíľu.",
   "Hlášení nenalezeno": "Hlásenie sa nenašlo",
   "Hlášení se nepodařilo načíst": "Hlásenie sa nepodarilo načítať",
   "Hlášení se nepodařilo vytvořit": "Hlásenie sa nepodarilo vytvoriť",
@@ -40,6 +41,7 @@
   "Moc pokusů najednou — chvilku počkej.": "Príliš veľa pokusov naraz — chvíľu počkaj.",
   "Moc pokusů. Zkus to za hodinu.": "Príliš veľa pokusov. Skús to o hodinu.",
   "Moc pokusů. Zkus to za čtvrt hodiny.": "Príliš veľa pokusov. Skús to o štvrť hodiny.",
+  "Moc požadavků.": "Priveľa požiadaviek.",
   "Moc rychle po sobě. Zkus to za chvíli.": "Príliš rýchlo za sebou. Skús to o chvíľu.",
   "Na dokončení inventury nemáš oprávnění.": "Na dokončenie inventúry nemáš oprávnenie.",
   "Na nákupní ceny nemáš oprávnění.": "Na nákupné ceny nemáš oprávnenie.",
@@ -60,6 +62,7 @@
   "Neplatná akce": "Neplatná akcia",
   "Neplatná data": "Neplatné údaje",
   "Neplatná nadřazená kategorie": "Neplatná nadradená kategória",
+  "Neplatná událost.": "Neplatná udalosť.",
   "Neplatné ID": "Neplatné ID",
   "Neplatné datum": "Neplatný dátum",
   "Neplatné množství": "Neplatné množstvo",
@@ -132,6 +135,7 @@
   "Tuhle návštěvu nejde hodnotit.": "Túto návštevu nejde hodnotiť.",
   "Tuhle rezervaci už zrušit nejde.": "Túto rezerváciu už zrušiť nejde.",
   "Typ směny nenalezen": "Typ zmeny sa nenašiel",
+  "Událost se nepodařilo zapsat.": "Udalosť sa nepodarilo zapísať.",
   "Uložení se nepodařilo": "Uloženie sa nepodarilo",
   "Uzávěrka nenalezena": "Uzávierka sa nenašla",
   "Už jsi hodnotil.": "Už si hodnotil.",
@@ -151,5 +155,8 @@
   "Zpráva už neexistuje.": "Táto správa už neexistuje.",
   "Záznam nenalezen": "Záznam sa nenašiel",
   "Účet neexistuje.": "Účet neexistuje.",
-  "Účet se nepodařilo smazat. Zkuste to znovu, nebo napište podpoře.": "Účet sa nepodarilo zmazať. Skúste to znova alebo napíšte podpore."
+  "Účet se nepodařilo smazat. Zkuste to znovu, nebo napište podpoře.": "Účet sa nepodarilo zmazať. Skúste to znova alebo napíšte podpore.",
+  "Kupony došly.": "Kupóny sa minuli.",
+  "Odměna tohoto kódu už není k dispozici.": "Odmena tohto kódu už nie je k dispozícii.",
+  "Kupony z tohoto kódu už došly.": "Kupóny z tohto kódu sa už minuli."
 }

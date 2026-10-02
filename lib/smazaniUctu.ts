@@ -41,9 +41,9 @@ export const ZACHAZENI_TABULEK: Record<string, Zachazeni> = {
   suggestion_votes: 'smazat', conversation_members: 'smazat', team_members: 'smazat', billing_interest: 'smazat',
   rozlozeni_stranek: 'smazat', invitations: 'smazat',
   // host
-  client_cards: 'smazat', client_memberships: 'smazat', client_loyalty_ledger: 'smazat', client_stamp_progress: 'smazat',
+  client_cards: 'smazat', client_memberships: 'smazat', client_loyalty_ledger: 'smazat', client_stamp_progress: 'smazat', client_stamp_events: 'smazat', client_scan_actions: 'smazat',
   client_coupon_claims: 'smazat', client_promo_uses: 'smazat', client_group_members: 'smazat', client_event_follows: 'smazat',
-  client_reviews: 'smazat', client_bill_awards: 'smazat', client_import_clenove: 'smazat',
+  client_reviews: 'smazat', client_bill_awards: 'smazat', client_import_clenove: 'smazat', client_member_notes: 'smazat',
   client_reservations: 'upravit', client_orders: 'upravit',
   // dárkový poukaz je závazek podniku: zůstane platný, jen se odpojí od účtu a vymažou se osobní texty (viz planUzivatele)
   client_vouchers: 'upravit',
@@ -100,8 +100,8 @@ export const TYMOVE_TABULKY = [
   'role_upravy', 'polls', 'audit_log', 'events', 'pos_connections', 'pos_product_map', 'pos_sales', 'pos_processed_bills',
   'pos_unmapped', 'pos_bills', 'pos_bill_items', 'pos_products', 'item_recipes', 'purchase_flags', 'client_profiles', 'client_tables',
   'client_memberships', 'client_reservations', 'client_orders', 'client_coupons', 'client_coupon_claims', 'client_loyalty_ledger',
-  'client_stamp_progress', 'client_stamp_campaigns', 'client_bill_awards', 'client_groups', 'client_group_members', 'client_reviews',
-  'client_broadcasts', 'client_promos', 'client_banners', 'rozlozeni_stranek', 'content_reports', 'client_importy', 'client_vouchers', 'client_voucher_uses', 'client_bonus_rules',
+  'client_stamp_progress', 'client_stamp_events', 'client_scan_actions', 'client_stamp_campaigns', 'client_bill_awards', 'client_groups', 'client_group_members', 'client_reviews',
+  'client_broadcasts', 'client_member_notes', 'client_promos', 'client_banners', 'client_banner_stats', 'rozlozeni_stranek', 'content_reports', 'client_importy', 'client_vouchers', 'client_voucher_uses', 'client_bonus_rules',
 ];
 /** Tabulky s `team_id`, které se při smazání podniku ZÁMĚRNĚ nemažou: účetní záznamy platformy (fakturace, provize). */
 export const TYMOVE_PONECHAT = ['billing_events', 'referral_rewards', 'admin_audit'];
@@ -193,12 +193,12 @@ export function planUzivatele(u: { id: number; email: string; role: string; hash
     [[`login:${u.email}`, `client-register:${u.email}`, `reset:${u.email}`, `smazani:${id}`]]));
   if (u.role === 'customer') {
     for (const t of ['client_cards', 'client_memberships', 'client_loyalty_ledger', 'client_stamp_progress', 'client_coupon_claims',
-      'client_promo_uses', 'client_group_members', 'client_event_follows', 'client_reviews', 'client_bill_awards', 'client_import_clenove']) del(t, 'customer_id');
+      'client_promo_uses', 'client_group_members', 'client_event_follows', 'client_reviews', 'client_bill_awards', 'client_import_clenove', 'client_member_notes']) del(t, 'customer_id');
     // Budoucí rezervace se zruší (podnik s nimi nepočítá s anonymem), minulým zmizí poznámka.
     k.push(volitelny('zrušit budoucí rezervace', `UPDATE client_reservations SET status = 'cancelled', note = NULL WHERE customer_id = $1 AND date >= $2 AND status IN ('requested', 'confirmed')`, [id, u.dnes]));
     k.push(volitelny('vymazat poznámky rezervací', `UPDATE client_reservations SET note = NULL WHERE customer_id = $1`, [id]));
     k.push(volitelny('vymazat poznámky objednávek', `UPDATE client_orders SET note = NULL WHERE customer_id = $1`, [id]));
-    k.push(volitelny('odpojit dárkové poukazy od účtu', `UPDATE client_vouchers SET customer_id = NULL, recipient_name = NULL, buyer_name = NULL, note = NULL WHERE customer_id = $1`, [id]));
+    k.push(volitelny('odpojit dárkové poukazy od účtu', `UPDATE client_vouchers SET customer_id = NULL, recipient_name = NULL, recipient_email = NULL, buyer_name = NULL, note = NULL WHERE customer_id = $1`, [id]));
   }
   // Pozvánky s e-mailem osoby (a ty, které rozeslala): e-mail + token jsou osobní údaj.
   k.push(volitelny('smazat pozvánky', `DELETE FROM invitations WHERE LOWER(email) = LOWER($2) OR invited_by = $1`, [id, u.email]));
