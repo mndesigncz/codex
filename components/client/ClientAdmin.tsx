@@ -62,6 +62,7 @@ import { NavigaceKontext, useNavigace } from '../widgety/NavigaceKontext';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
 import { otevriNaTisk } from '@/lib/stahni';
+import PromoKody from './loyalty/KuponyPromo';
 
 // Nastavení účtu v okně: stejná obrazovka jako v administraci (profil, vzhled a jazyk, oznámení, zabezpečení),
 // jen se stahuje až při otevření, ať ho Client nenese s každým načtením.
@@ -290,7 +291,7 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
                 {tab === 'menu' && <MenuEditor />}
                 {tab === 'events' && <EventsView user={(user ?? {}) as { id?: string }} oznam={oznam} />}
                 {tab === 'customers' && <ZakazniciStranka oznam={oznam} hledat={hledatHosta} />}
-                {tab === 'loyalty' && <LoyaltyTabs toast={t => oznam(t)} promos={<Promos oznam={oznam} />} oznam={oznam} otevriCast={castVernosti} />}
+                {tab === 'loyalty' && <LoyaltyTabs toast={t => oznam(t)} promos={<PromoKody oznam={oznam} />} oznam={oznam} otevriCast={castVernosti} />}
                 {tab === 'brand' && <div className="p-4 sm:p-6"><BrandTab toast={t => oznam(t)} onChange={obnovSouhrn} /></div>}
                 {tab === 'settings' && <div className="p-4 sm:p-6"><SettingsTab oznam={oznam} onChange={obnovSouhrn} /></div>}
               </ErrorBoundary>
@@ -1181,69 +1182,3 @@ function DataZKarticky({ oznam, onZmena }: { oznam: Hlaska; onZmena: () => void 
   );
 }
 
-// ---- Promo kódy -----------------------------------------------------------------
-
-const PRAZDNY_KOD = { code: '', title: '', points: 50, coupon_id: '', max_uses: '', valid_until: '' };
-
-function Promos({ oznam }: { oznam: Hlaska }) {
-  const spravuje = useOpravneni().ma('kupony.spravovat');
-  const { data: d, error, reload } = useLoad<{ promos: any[] }>(spravuje ? '/api/client/admin/promos' : null, raw => ({ promos: Array.isArray(raw?.promos) ? raw.promos : [] }));
-  const { data: kupony } = useLoad<any[]>(spravuje ? '/api/client/admin/coupons' : null, raw => (Array.isArray(raw?.coupons) ? raw.coupons.filter((c: any) => c.active) : []));
-  const [f, setF] = useState(PRAZDNY_KOD);
-  const [busy, setBusy] = useState(false);
-  if (!spravuje) return null;
-  const add = async (e: React.FormEvent) => {
-    e.preventDefault(); setBusy(true);
-    try { await j('/api/client/admin/promos', { method: 'POST', body: JSON.stringify(f) }); oznam(`Kód ${f.code.toUpperCase()} je aktivní.`); setF(PRAZDNY_KOD); reload(); }
-    catch (err) { oznam(apiMessage(err, 'Kód se nepodařilo vytvořit.'), 'bad'); }
-    setBusy(false);
-  };
-  const prepni = async (p: any) => {
-    try { await j('/api/client/admin/promos', { method: 'PATCH', body: JSON.stringify({ id: p.id, active: !p.active }) }); reload(); }
-    catch (err) { oznam(apiMessage(err, 'Změna se nepovedla.'), 'bad'); }
-  };
-  if (error) return <ErrorState title="Promo kódy se nenačetly" onRetry={reload} detail={error} />;
-  if (!d) return <PageSkel />;
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-4 items-start">
-      <Card as="form" className="grid gap-4" onSubmit={add}>
-        <h2 className="t-card">Nový promo kód</h2>
-        <div className="grid grid-cols-2 gap-4">
-          <Field id="pr-code" label="Kód"><Input id="pr-code" value={f.code} onChange={e => setF({ ...f, code: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16) })} placeholder="JARO26" className="font-mono tracking-widest" /></Field>
-          <Field id="pr-pts" label="Bodů"><Input id="pr-pts" type="number" min={0} max={10000} value={f.points} onChange={e => setF({ ...f, points: parseInt(e.target.value || '0', 10) })} /></Field>
-        </div>
-        <Field id="pr-title" label="Název"><Input id="pr-title" value={f.title} onChange={e => setF({ ...f, title: e.target.value })} placeholder="Jarní leták" maxLength={80} /></Field>
-        <Field id="pr-coupon" label="Kupon navíc">
-          <Select id="pr-coupon" value={f.coupon_id} onChange={e => setF({ ...f, coupon_id: e.target.value })}>
-            <option value="">Žádný</option>{(kupony ?? []).map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
-          </Select>
-        </Field>
-        <div className="grid grid-cols-2 gap-4">
-          <Field id="pr-max" label="Nejvýš použití"><Input id="pr-max" type="number" min={1} value={f.max_uses} onChange={e => setF({ ...f, max_uses: e.target.value })} placeholder="bez limitu" /></Field>
-          <Field id="pr-until" label="Platí do"><Input id="pr-until" type="date" value={f.valid_until} onChange={e => setF({ ...f, valid_until: e.target.value })} /></Field>
-        </div>
-        <Button type="submit" variant="primary" icon="plus" loading={busy} disabled={!f.code}>Vytvořit kód</Button>
-      </Card>
-      <Card pad="none" aria-labelledby="pr-kody">
-        <h2 id="pr-kody" className="t-card px-5 pt-4">Promo kódy</h2>
-        {d.promos.length === 0 ? (
-          <div className="px-5 pb-5"><EmptyState icon="tag" title="Zatím žádný promo kód" hint="Vytvoř první. Krátký a snadno opsatelný funguje nejlíp." compact /></div>
-        ) : (
-          <ul className="list px-5">
-            {d.promos.map((p: any) => (
-              <li key={p.id} className="list-row">
-                <div className={`min-w-0 flex-1 ${p.active ? '' : 'opacity-55'}`}>
-                  <p className="text-[15px] font-medium leading-snug text-[#16181A] truncate"><span className="font-mono tracking-widest">{p.code}</span> <span className="text-black/50">· {p.title}</span></p>
-                  <p className="text-[13px] text-black/55 leading-snug mt-0.5 truncate">
-                    {[Number(p.points) > 0 ? `${p.points} b.` : null, p.coupon_title ? `kupon ${p.coupon_title}` : null].filter(Boolean).join(' + ')} · použito {p.uses}×{p.max_uses ? ` z ${p.max_uses}` : ''}{p.valid_until ? ` · do ${czDay(p.valid_until)}` : ''}
-                  </p>
-                </div>
-                <Switch className="shrink-0" label={`Aktivní: ${p.code}`} checked={!!p.active} onChange={() => { void prepni(p); }} />
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-    </div>
-  );
-}

@@ -151,5 +151,8 @@
   "Zpráva už neexistuje.": "Diese Nachricht gibt es nicht mehr.",
   "Záznam nenalezen": "Eintrag nicht gefunden",
   "Účet neexistuje.": "Dieses Konto existiert nicht.",
-  "Účet se nepodařilo smazat. Zkuste to znovu, nebo napište podpoře.": "Das Konto konnte nicht gelöscht werden. Versuchen Sie es erneut oder schreiben Sie dem Support."
+  "Účet se nepodařilo smazat. Zkuste to znovu, nebo napište podpoře.": "Das Konto konnte nicht gelöscht werden. Versuchen Sie es erneut oder schreiben Sie dem Support.",
+  "Kupony došly.": "Die Gutscheine sind vergriffen.",
+  "Odměna tohoto kódu už není k dispozici.": "Die Belohnung dieses Codes ist nicht mehr verfügbar.",
+  "Kupony z tohoto kódu už došly.": "Die Gutscheine zu diesem Code sind aufgebraucht."
 }
