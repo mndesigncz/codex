@@ -12,6 +12,9 @@ import { pragueToday, pragueHM } from '@/lib/pragueTime';
 import { buildBoard, publicShape, menaListku } from '@/lib/menu';
 import { menaZRadku } from '@/lib/mena';
 import { aktivniBannery } from '@/lib/clientBanners';
+import { aktivniBonus } from '@/lib/bonusAkceDb';
+import { dokdyDnes } from '@/lib/bonusAkce';
+import { planClena } from '@/lib/propadaniBoduDb';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -122,6 +125,12 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
       })),
       reservations, claims,
     };
+    // Body, kterým brzy vyprší platnost (jen když podnik propadání používá).
+    if (p.loyalty_on && Number(p.points_expire_days) > 0) {
+      const pl = await planClena(teamId, me.id, p);
+      const body = pl.propadne + pl.varovat;
+      mine.expiring = body > 0 ? { points: body, till: pl.varovatDo ?? today } : null;
+    }
   }
   // Novinky: poslední rozeslané zprávy členům rovnou na stránce podniku,
   // ať mají co číst i hosté bez zapnutých oznámení.
@@ -221,5 +230,14 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
   });
   // Promo bannery podniku (max 5, aktivní a v platnosti). Obsah je data podniku.
   const banners = await aktivniBannery(teamId, today);
-  return NextResponse.json({ business: publicProfile(p), menu, tables, plan, coupons: shapedCoupons, news, events, stampCampaigns, banners, me: mine, signedIn: !!me, today });
+  // Bonusová akce, která právě běží („Dnes dvojnásobné body do 18:00"); text skládá stránka přes t().
+  let bonus: any = null;
+  if (p.loyalty_on) {
+    const bn = await aktivniBonus(teamId);
+    if (bn.pravidla.length) {
+      const konec = dokdyDnes(bn);
+      bonus = { name: bn.nazev, multiplier: bn.nasobic, stampBonus: bn.razitka, until: konec == null ? null : `${String(konec).padStart(2, '0')}:00` };
+    }
+  }
+  return NextResponse.json({ business: publicProfile(p), bonus, menu, tables, plan, coupons: shapedCoupons, news, events, stampCampaigns, banners, me: mine, signedIn: !!me, today });
 }

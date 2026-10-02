@@ -8,6 +8,8 @@
 // jedno denně, ať tři čaje nejsou tři návštěvy).
 
 import { pripisUtratu } from './urovneDb';
+import { aktivniBonus } from './bonusAkceDb';
+import { bodySBonusem, poznamkaRazitek } from './bonusAkce';
 import { sql, award, stampVisit, ensureProfile } from './client';
 import { clenoveSOpravnenim } from './opravneniDb';
 import { normName } from './menuPos';
@@ -247,14 +249,17 @@ export async function setOrderStatus(teamId: number, id: number, next: string): 
   if (next === 'done') {
     const profile = await ensureProfile(teamId);
     if (profile.loyalty_on) {
-      const pts = Math.floor(Number(o.total) / 100) * (Number(profile.points_per_100) || 0);
-      const points = pts > 0 ? await award(teamId, Number(o.customer_id), pts, 'order', `ord:${o.id}`, `Útrata ${(await menaPodniku(teamId)).price(Number(o.total))}`) : null;
+      // Bonusová akce (Happy hour) se uplatní uvnitř téhož připsání, ne jako druhé.
+      const bonus = await aktivniBonus(teamId);
+      const zaklad = Math.floor(Number(o.total) / 100) * (Number(profile.points_per_100) || 0);
+      const { body: pts, poznamka } = bodySBonusem(zaklad, bonus);
+      const points = pts > 0 ? await award(teamId, Number(o.customer_id), pts, 'order', `ord:${o.id}`, `Útrata ${(await menaPodniku(teamId)).price(Number(o.total))}${poznamka}`) : null;
       const [m] = await sql`SELECT last_visit_at FROM client_memberships WHERE customer_id = ${o.customer_id} AND team_id = ${teamId}`;
       // Ovladač vrací TIMESTAMP jako Date, ne text — porovnává se pražský den,
       // ne prvních deset znaků řetězce.
       const last = parseDbTime(m?.last_visit_at);
       const visitedToday = !!last && pragueDayOf(last) === pragueToday();
-      const stamp = visitedToday ? null : await stampVisit(teamId, Number(o.customer_id), profile, `ord:${o.id}`);
+      const stamp = visitedToday ? null : await stampVisit(teamId, Number(o.customer_id), profile, `ord:${o.id}`, bonus.razitka, poznamkaRazitek(bonus));
       // Útrata pro úrovně podle útraty: hotová objednávka se započte jednou
       // (do „done" se z ORDER_FLOW dá přejít jen jednou).
       await pripisUtratu(teamId, Number(o.customer_id), Number(o.total));

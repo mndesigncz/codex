@@ -3,6 +3,7 @@ import { neon } from '@neondatabase/serverless';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { awardBirthdays } from '@/lib/client';
+import { propadniBody } from '@/lib/propadaniBoduDb';
 import { checkCron } from '@/lib/cronAuth';
 import { hit } from '@/lib/rateLimit';
 import { zDashboardConfig } from '@/lib/widgety/migrace';
@@ -2172,6 +2173,32 @@ export async function GET(request: Request) {
     let birthdays = 0;
     try { birthdays = await awardBirthdays(); } catch { /* nesmí shodit migrace */ }
 
+    // ---- Kolo 73: propadání bodů a bonusové akce věrnosti ----
+    // Propadání: po kolika dnech body propadnou (0 = nikdy) a od kdy se stáří počítá.
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS points_expire_days INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS points_expire_since TEXT`);
+    // Bonusové akce (Happy hour): násobič bodů a razítka navíc podle dne, hodin a data.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS client_bonus_rules (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        multiplier NUMERIC(5,2) NOT NULL DEFAULT 1,
+        stamp_bonus INTEGER NOT NULL DEFAULT 0,
+        days_of_week JSONB NOT NULL DEFAULT '[]',
+        hour_from INTEGER NOT NULL DEFAULT 0,
+        hour_till INTEGER NOT NULL DEFAULT 24,
+        valid_since TEXT,
+        valid_till TEXT,
+        active BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_bonus_rules_team ON client_bonus_rules (team_id)`);
+    // Propadlé body se odepíšou do deníku (kind 'expire', ref exp:<den>) a hosté dostanou upozornění;
+    // úloha je idempotentní, opakované volání téhož dne nic nezdvojí.
+    let propadleBody = { expired: 0, warned: 0 };
+    try { propadleBody = await propadniBody(); } catch { /* nesmí shodit migrace */ }
+
     // ---- Kolo 77: nativní obal a obchody (App Store, Google Play) ----
     // Vše idempotentní; kód, který tyhle tabulky čte, je před migrací fail-open.
     // Smazání účtu: anonymizovaný řádek users nese čas smazání, přihlášení ho odmítne.
@@ -2255,7 +2282,7 @@ export async function GET(request: Request) {
       // (hlášky Postgresu, názvy indexů a omezení, jméno databáze) jen cron —
       // vedení kteréhokoli podniku je dřív dostávalo do prohlížeče.
       migFails: migFails.length,
-      ...(zCronu ? { closingIndex, closingIndexes, closingConstraints, birthdays, migFailDetail: migFails.slice(0, 10) } : {}),
+      ...(zCronu ? { closingIndex, closingIndexes, closingConstraints, birthdays, propadleBody, migFailDetail: migFails.slice(0, 10) } : {}),
     });
   } catch (error) {
     console.error('Init error:', error);

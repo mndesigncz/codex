@@ -8,6 +8,8 @@ import { getConnection, seatReservation, StoryousError } from '@/lib/storyous';
 import { notifyUser } from '@/lib/push';
 import { pragueToday, dayPlus } from '@/lib/pragueTime';
 import { audit } from '@/lib/audit';
+import { aktivniBonus } from '@/lib/bonusAkceDb';
+import { poznamkaRazitek } from '@/lib/bonusAkce';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -109,7 +111,10 @@ export async function PATCH(req: NextRequest) {
   let loyalty: any = null;
   if (next === 'done') {
     const profile = await ensureProfile(u.team_id);
-    if (profile.loyalty_on) loyalty = await stampVisit(u.team_id, Number(r.customer_id), profile, `res:${r.id}`);
+    if (profile.loyalty_on) {
+      const bonus = await aktivniBonus(u.team_id);
+      loyalty = await stampVisit(u.team_id, Number(r.customer_id), profile, `res:${r.id}`, bonus.razitka, poznamkaRazitek(bonus));
+    }
   }
   if (next === 'confirmed' || next === 'declined') {
     const when = `${String(r.date).split('-').reverse().join('. ')} ${r.time}`;

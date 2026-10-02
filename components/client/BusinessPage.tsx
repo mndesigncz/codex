@@ -144,6 +144,7 @@ export default function BusinessPage({ slug }: { slug: string }) {
                 style={b.coverUrl ? undefined : { background: `${accent}22`, border: `1px solid ${accent}66` }}>
                 <p className="text-[11px] uppercase tracking-wider opacity-70">{t(me.levelLabel ?? 'Člen')}{me.discount > 0 ? ` · ${me.discountSource === 'skupina' && me.discountName ? t('sleva {n} % ({skupina})', { n: me.discount, skupina: me.discountName }) : t('sleva {n} %', { n: me.discount })}` : ''}</p>
                 <p className="text-lg font-bold tabular-nums leading-tight">{me.points} {t('b.')} {b.stampTarget > 0 && <span className="opacity-60 font-medium text-sm">· {t('{stamps}/{target} razítek', { stamps: me.stamps, target: b.stampTarget })}</span>}</p>
+                {me.expiring && <p className="text-[11px] font-semibold leading-snug">{t('{n, plural, one {# bod propadne} few {# body propadnou} other {# bodů propadne}} do {kdy}', { n: me.expiring.points, kdy: denKratce(me.expiring.till) })}</p>}
                 {me.credit > 0 && <p className="text-sm font-semibold tabular-nums leading-tight">{t('{castka} kreditu', { castka: formatMoney(me.credit, b.currency) })}</p>}
                 {me.nextTierAt && <p className="text-[11px] opacity-60 leading-snug">{me.nextTierUnit === 'spend' ? t('do „{level}“ ještě {castka}', { level: t(me.nextTierLabel), castka: formatMoney(Math.max(0, me.nextTierAt - (me.spend ?? 0)), b.currency) }) : t('do „{level}“ ještě {n, plural, one {# návštěva} few {# návštěvy} other {# návštěv}}', { level: t(me.nextTierLabel), n: Math.max(0, me.nextTierAt - me.visits) })}</p>}
               </div>
@@ -157,6 +158,9 @@ export default function BusinessPage({ slug }: { slug: string }) {
 
       {/* Promo bannery podniku: akce a oznámení (data podniku, nepřekládají se). */}
       {(d.banners?.length ?? 0) > 0 && <PromoBanners banners={d.banners} accent={accent} loyaltyOn={!!b.loyaltyOn} onGoTab={setTab} />}
+
+      {/* Běžící bonusová akce („Dnes dvojnásobné body do 18:00"): název akce je data podniku, věta jde přes t(). */}
+      {d.bonus && b.loyaltyOn && <BonusPruh bonus={d.bonus} accent={accent} />}
 
       {flash && <p role="status" className="toast-in rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 text-[#3E5406] text-sm px-4 py-3">{flash}</p>}
 
@@ -411,6 +415,40 @@ function ReserveTab({ slug, b, me, today, signedIn, onDone }: { slug: string; b:
   );
 }
 
+/** 2026-11-12 na „12. 11." (pořadí den, měsíc platí pro všechny jazyky stránky). */
+function denKratce(den: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(den);
+  return m ? `${Number(m[3])}. ${Number(m[2])}.` : den;
+}
+
+/** Pruh s právě běžící bonusovou akcí podniku. */
+function BonusPruh({ bonus, accent }: { bonus: { name: string; multiplier: number; stampBonus: number; until: string | null }; accent: string }) {
+  const t = useT('klient-host');
+  const kdy = bonus.until ?? '';
+  const nasobek = String(bonus.multiplier).replace('.', ',');
+  const radky: string[] = [];
+  if (bonus.multiplier > 1) {
+    radky.push(bonus.multiplier === 2
+      ? (kdy ? t('Dnes dvojnásobné body do {kdy}', { kdy }) : t('Dnes dvojnásobné body'))
+      : (kdy ? t('Dnes {n}× body do {kdy}', { n: nasobek, kdy }) : t('Dnes {n}× body', { n: nasobek })));
+  }
+  if (bonus.stampBonus > 0) {
+    radky.push(kdy
+      ? t('Dnes navíc {n, plural, one {# razítko} few {# razítka} other {# razítek}} do {kdy}', { n: bonus.stampBonus, kdy })
+      : t('Dnes navíc {n, plural, one {# razítko} few {# razítka} other {# razítek}}', { n: bonus.stampBonus }));
+  }
+  if (!radky.length) return null;
+  return (
+    <section aria-label={bonus.name} className="rounded-2xl px-4 py-3 flex items-start gap-3 min-w-0" style={{ background: `${accent}22`, border: `1px solid ${accent}66` }}>
+      <Icon name="gift" size={18} className="shrink-0 mt-0.5" />
+      <div className="min-w-0">
+        <p className="text-[11px] uppercase tracking-wider opacity-70 break-words">{bonus.name}</p>
+        {radky.map(r => <p key={r} className="text-sm font-semibold leading-snug text-pretty">{r}</p>)}
+      </div>
+    </section>
+  );
+}
+
 function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slug: string; b: any; me: any; campaigns: any[]; coupons: any[]; signedIn: boolean; onDone: (m: string) => void }) {
   const t = useT('klient-host');
   const { jazyk } = useJazyk();
@@ -456,6 +494,7 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
     <div className="grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-6 md:gap-10 items-start">
       <section className="glass-card p-5 sm:p-6">
         <h2 className="t-section">{t('Razítka a body')}</h2>
+        {b.pointsExpireDays > 0 && <p className="text-xs text-black/55 mt-1 text-pretty">{t('Body, které nepoužiješ, propadají po {n, plural, one {# dni} few {# dnech} other {# dnech}}.', { n: b.pointsExpireDays })}</p>}
         {me?.member ? (
           <>
             {(me.campaigns ?? []).length > 0 ? (
