@@ -141,9 +141,11 @@ export function publicProfile(p: any) {
       platinumDiscount: Number(p.platinum_discount) || 0,
       tierBy: p.tier_by === 'spend' ? 'spend' : 'visits',
       silverSpend: Number(p.silver_spend) || 0, goldSpend: Number(p.gold_spend) || 0, platinumSpend: Number(p.platinum_spend) || 0,
+      inactiveDays: Math.max(0, Math.trunc(Number(p.tier_inactive_days)) || 0),
     },
     cashbackPct: Number(p.cashback_pct) || 0,
     pointsExpireDays: Math.max(0, Math.trunc(Number(p.points_expire_days)) || 0),
+    creditExpireDays: Math.max(0, Math.trunc(Number(p.credit_expire_days)) || 0),
     stampTarget: Number(p.stamp_target) || 0,
     stampReward: p.stamp_reward ?? '',
     maxParty: Number(p.max_party) || 8,
@@ -219,23 +221,54 @@ function obnovPenezenku(teamId: number, customerId: number): void {
   import('./walletDb').then(m => m.obnovKartuVPenezence(teamId, customerId)).catch(() => {});
 }
 
-export type LedgerKind = 'visit' | 'order' | 'manual' | 'coupon' | 'welcome' | 'birthday' | 'referral' | 'cashback' | 'credit' | 'expire' | 'reactivation';
+export type LedgerKind = 'visit' | 'order' | 'manual' | 'coupon' | 'welcome' | 'birthday' | 'referral' | 'cashback' | 'credit' | 'expire' | 'reactivation' | 'storno';
+
+let denikUtrataPripraven: Promise<void> | null = null;
+/** Sloupec `amount` (základ útraty) v deníku. Jednou za studený start; stejný příkaz je v app/api/init/route.ts. */
+export function zajistiDenikUtrata(): Promise<void> {
+  if (!denikUtrataPripraven) {
+    denikUtrataPripraven = (async () => {
+      await sql`ALTER TABLE client_loyalty_ledger ADD COLUMN IF NOT EXISTS amount INTEGER`;
+    })().catch(e => { denikUtrataPripraven = null; throw e; });
+  }
+  return denikUtrataPripraven;
+}
+
+/** Poznámka s dovětkem, když zůstatek nedovolil celou změnu (deník píše, co se opravdu stalo). */
+function poznamkaOmezeni(note: string | null | undefined, pozadovano: number, skutecne: number, jednotka: string): string | null {
+  if (pozadovano === skutecne) return note ?? null;
+  return `${note ? `${note} ` : ''}(požadováno ${pozadovano > 0 ? '+' : ''}${pozadovano} ${jednotka}, víc než zůstatek)`.slice(0, 250);
+}
 
 /**
  * Připíše (nebo odečte) body a zapíše to do deníku. Body nikdy nejdou pod
- * nulu — kupon za víc, než host má, se prostě nedá vzít.
+ * nulu — kupon za víc, než host má, se prostě nedá vzít. Do deníku jde to,
+ * co se opravdu stalo: odečet 50 bodů hostovi s 30 body je v deníku −30
+ * (a poznámka řekne proč), takže součet deníku vždy sedí se zůstatkem.
+ * `utrata` je základ útraty, ze kterého odměna vznikla (pro přehledy a CSV).
  */
-export async function award(teamId: number, customerId: number, delta: number, kind: LedgerKind, ref?: string | null, note?: string | null): Promise<number> {
+export async function award(teamId: number, customerId: number, delta: number, kind: LedgerKind, ref?: string | null, note?: string | null, utrata?: number | null): Promise<number> {
   await join(customerId, teamId);
+  const d = Math.trunc(Number(delta) || 0);
   const [m] = await sql`
-    UPDATE client_memberships SET points = GREATEST(0, points + ${delta})
-    WHERE customer_id = ${customerId} AND team_id = ${teamId}
-    RETURNING points`;
-  await sql`
-    INSERT INTO client_loyalty_ledger (team_id, customer_id, delta, kind, ref, note)
-    VALUES (${teamId}, ${customerId}, ${delta}, ${kind}, ${ref ?? null}, ${note ?? null})`;
+    WITH stare AS (SELECT points FROM client_memberships WHERE customer_id = ${customerId} AND team_id = ${teamId} FOR UPDATE)
+    UPDATE client_memberships c SET points = GREATEST(0, c.points + ${d})
+    FROM stare WHERE c.customer_id = ${customerId} AND c.team_id = ${teamId}
+    RETURNING c.points AS nove, stare.points AS stare` as any[];
+  const skutecne = m ? Number(m.nove) - Number(m.stare) : d;
+  const poznamka = poznamkaOmezeni(note, d, skutecne, Math.abs(d) === 1 ? 'bod' : 'bodů');
+  if (utrata != null) {
+    await zajistiDenikUtrata();
+    await sql`
+      INSERT INTO client_loyalty_ledger (team_id, customer_id, delta, kind, ref, note, amount)
+      VALUES (${teamId}, ${customerId}, ${skutecne}, ${kind}, ${ref ?? null}, ${poznamka}, ${Math.max(0, Math.round(Number(utrata) || 0))})`;
+  } else {
+    await sql`
+      INSERT INTO client_loyalty_ledger (team_id, customer_id, delta, kind, ref, note)
+      VALUES (${teamId}, ${customerId}, ${skutecne}, ${kind}, ${ref ?? null}, ${poznamka})`;
+  }
   obnovPenezenku(teamId, customerId);
-  return Number(m?.points ?? 0);
+  return Number(m?.nove ?? 0);
 }
 
 /**
@@ -414,15 +447,27 @@ export async function awardBirthdays(): Promise<number> {
  * Kredit z útraty (cashback). Na rozdíl od bodů se utrácí přímo v korunách
  * u kasy, takže se drží v členství zvlášť a v deníku má vlastní sloupec.
  */
-export async function awardCredit(teamId: number, customerId: number, deltaCzk: number, kind: LedgerKind, ref?: string | null, note?: string | null): Promise<number> {
+export async function awardCredit(teamId: number, customerId: number, deltaCzk: number, kind: LedgerKind, ref?: string | null, note?: string | null, utrata?: number | null): Promise<number> {
   await join(customerId, teamId);
+  const d = Math.round(Number(deltaCzk) || 0);
   const [m] = await sql`
-    UPDATE client_memberships SET credit = GREATEST(0, credit + ${Math.round(deltaCzk)})
-    WHERE customer_id = ${customerId} AND team_id = ${teamId} RETURNING credit`;
-  await sql`
-    INSERT INTO client_loyalty_ledger (team_id, customer_id, delta, credit_delta, kind, ref, note)
-    VALUES (${teamId}, ${customerId}, 0, ${Math.round(deltaCzk)}, ${kind}, ${ref ?? null}, ${note ?? null})`;
-  return Number(m?.credit ?? 0);
+    WITH stare AS (SELECT credit FROM client_memberships WHERE customer_id = ${customerId} AND team_id = ${teamId} FOR UPDATE)
+    UPDATE client_memberships c SET credit = GREATEST(0, c.credit + ${d})
+    FROM stare WHERE c.customer_id = ${customerId} AND c.team_id = ${teamId}
+    RETURNING c.credit AS nove, stare.credit AS stare` as any[];
+  const skutecne = m ? Number(m.nove) - Number(m.stare) : d;
+  const poznamka = poznamkaOmezeni(note, d, skutecne, 'kreditu');
+  if (utrata != null) {
+    await zajistiDenikUtrata();
+    await sql`
+      INSERT INTO client_loyalty_ledger (team_id, customer_id, delta, credit_delta, kind, ref, note, amount)
+      VALUES (${teamId}, ${customerId}, 0, ${skutecne}, ${kind}, ${ref ?? null}, ${poznamka}, ${Math.max(0, Math.round(Number(utrata) || 0))})`;
+  } else {
+    await sql`
+      INSERT INTO client_loyalty_ledger (team_id, customer_id, delta, credit_delta, kind, ref, note)
+      VALUES (${teamId}, ${customerId}, 0, ${skutecne}, ${kind}, ${ref ?? null}, ${poznamka})`;
+  }
+  return Number(m?.nove ?? 0);
 }
 
 /** Souhrnná čísla věrnosti pro přehled: co je v oběhu a co čeká na vyzvednutí. */
@@ -438,7 +483,7 @@ export async function loyaltySummary(teamId: number) {
     FROM client_coupon_claims WHERE team_id = ${teamId}` as any[];
   const [l] = await sql`
     SELECT COALESCE(SUM(delta) FILTER (WHERE delta > 0 AND created_at >= NOW() - INTERVAL '30 days'), 0)::int AS given30,
-           COALESCE(SUM(-delta) FILTER (WHERE delta < 0 AND kind <> 'expire' AND created_at >= NOW() - INTERVAL '30 days'), 0)::int AS spent30
+           COALESCE(SUM(-delta) FILTER (WHERE delta < 0 AND kind NOT IN ('expire', 'storno') AND created_at >= NOW() - INTERVAL '30 days'), 0)::int AS spent30
     FROM client_loyalty_ledger WHERE team_id = ${teamId}` as any[];
   return {
     members: Number(m?.members) || 0, newMembers30: Number(m?.new30) || 0,

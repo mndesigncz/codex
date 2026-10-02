@@ -306,5 +306,9 @@
   "— mrkni do záložky Menu": "— mrkni do záložky Menu",
   "✋ Jdu — zrušit účast": "✋ Idem — zrušiť účasť",
   "✋ Přijdu": "✋ Prídem",
-  "✋ {n, plural, one {# člověk jde} few {# lidi jdou} other {# lidí jde}}": "✋ {n, plural, one {# človek ide} few {# ľudia idú} other {# ľudí ide}}"
+  "✋ {n, plural, one {# člověk jde} few {# lidi jdou} other {# lidí jde}}": "✋ {n, plural, one {# človek ide} few {# ľudia idú} other {# ľudí ide}}",
+  "Kredit, který nevyužiješ, propadá po {n, plural, one {# dni} few {# dnech} other {# dnech}}.": "Kredit, ktorý nevyužiješ, prepadne po {n, plural, one {# dni} few {# dňoch} other {# dňoch}}.",
+  "Kredit {castka} propadne do {kdy}": "Kredit {castka} prepadne do {kdy}",
+  "Úroveň klesá o stupeň po {n, plural, one {# dni} few {# dnech} other {# dnech}} bez návštěvy.": "Úroveň klesne o stupeň po {n, plural, one {# dni} few {# dňoch} other {# dňoch}} bez návštevy.",
+  "Úroveň je dočasně snížená, dlouho jsme tě neviděli. Stačí přijít.": "Úroveň je dočasne znížená, dlho sme ťa nevideli. Stačí prísť."
 }

@@ -38,6 +38,9 @@ import { useOpravneni } from '../role/useOpravneni';
 import Poukazy from './Poukazy';
 import OdkazCtecka from './OdkazCtecka';
 import PrechodZKarticky, { useImportKarticky } from './PrechodZKarticky';
+import PokrocilaPravidla, { MaxPoznamka } from './loyalty/PokrocilaPravidla';
+import BodyPrehledy from './loyalty/BodyPrehledy';
+import { zkontrolujPrahy, MAX_PRAH_NAVSTEV } from '@/lib/bodyPravidla';
 
 // Věrnost měla šest podzáložek pod deseti hlavními — šestnáct sourozenců
 // nad sebou. „Body" a „Slevy a úrovně" jsou jedna věc (co host nasbírá a co
@@ -209,6 +212,9 @@ function BodyAUrovne({ toast, setUkladam }: { toast: (m: string) => void; setUkl
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!meni) return;
+    // Prahy se kontrolují stejně jako na serveru: zlato nad stříbrem, platina nad zlatem.
+    const chybaPrahu = zkontrolujPrahy(p);
+    if (chybaPrahu) { toast(chybaPrahu); return; }
     setUkladam(true);
     try {
       const r = await j('/api/client/admin/profile', { method: 'PUT', body: JSON.stringify({
@@ -230,6 +236,7 @@ function BodyAUrovne({ toast, setUkladam }: { toast: (m: string) => void; setUkl
   // Režim úrovní: z návštěv (výchozí), nebo z kumulované útraty. Prahy obou režimů
   // zůstávají uložené vedle sebe — přepnutí nic nemaže, jen mění, který platí.
   const podleUtraty = p.tier_by === 'spend';
+  const chybaPrahuUI = zkontrolujPrahy(p);
   const urovne: { id: string; name: string; atKey?: string; discKey: string; tone: 'muted' | 'ink'; hint: string }[] = [
     { id: 'bronze', name: 'Člen', discKey: 'member_discount', tone: 'muted', hint: podleUtraty ? 'Od první útraty.' : 'Od první návštěvy.' },
     { id: 'silver', name: 'Stříbrný host', atKey: podleUtraty ? 'silver_spend' : 'silver_at', discKey: 'silver_discount', tone: 'muted', hint: podleUtraty ? `Od jaké celkové útraty (v ${symbol}).` : 'Od kolika návštěv.' },
@@ -248,6 +255,7 @@ function BodyAUrovne({ toast, setUkladam }: { toast: (m: string) => void; setUkl
     <div className="space-y-4 max-w-3xl">
       <form id={FORM_BODY} onSubmit={save} className="space-y-4">
         {!meni && <p className="note note-wait">Pravidla věrnosti tu jen vidíš — měnit je může, kdo má na starosti věrnostní program.</p>}
+        {meni && <MaxPoznamka />}
         <Card className="space-y-4">
           <div>
             <h2 className="t-card">Za co host dostane body</h2>
@@ -322,7 +330,7 @@ function BodyAUrovne({ toast, setUkladam }: { toast: (m: string) => void; setUkl
                 </div>
                 {t.atKey ? (
                   <Field id={`t-${t.id}`} label={podleUtraty ? `Útrata (${symbol})` : 'Návštěv'}>
-                    <Input id={`t-${t.id}`} type="number" min={t.id === 'platinum' ? 0 : 1} max={podleUtraty ? 100000000 : 2000} disabled={!meni} className={podleUtraty ? '!w-32' : '!w-24'} value={p[t.atKey] ?? 0} onChange={e => setP({ ...p, [t.atKey!]: e.target.value })} />
+                    <Input id={`t-${t.id}`} type="number" min={t.id === 'platinum' ? 0 : 1} max={podleUtraty ? 100000000 : (MAX_PRAH_NAVSTEV as Record<string, number>)[t.id] ?? 2000} disabled={!meni} className={podleUtraty ? '!w-32' : '!w-24'} value={p[t.atKey] ?? 0} onChange={e => setP({ ...p, [t.atKey!]: e.target.value })} />
                   </Field>
                 ) : <span className="hidden sm:block" />}
                 <Field id={`d-${t.id}`} label="Sleva %">
@@ -331,7 +339,8 @@ function BodyAUrovne({ toast, setUkladam }: { toast: (m: string) => void; setUkl
               </Well>
             ))}
           </ul>
-          <p className="t-meta">Sleva se nepočítá automaticky do pokladny — obsluha ji zadá sama. Nulová sleva znamená, že úroveň je jen odznak. Uvítacích 10 bodů dostane každý nový člen automaticky; ruční úpravu bodů najdeš u hosta v Zákaznících.</p>
+          {chybaPrahuUI && <p role="alert" className="note note-bad">{chybaPrahuUI}</p>}
+          <p className="t-meta">Sleva se nepočítá automaticky do pokladny — obsluha ji zadá sama. Nulová sleva znamená, že úroveň je jen odznak. Uvítací body novému členovi nastavíš níž v pravidlech připisování; ruční úpravu bodů najdeš u hosta v Zákaznících.</p>
         </Card>
       </form>
       {ma('zakaznici.zobrazit') && <Groups toast={toast} />}
@@ -1038,8 +1047,8 @@ export default function LoyaltyTabs({ toast, promos, oznam, otevriCast }: {
   useEffect(() => { if (otevriCast) setVolba(otevriCast.id); }, [otevriCast]);
   const sub: LoyaltySub | null = casti.some(c => c.id === volba) ? volba : casti[0]?.id ?? null;
   const [ukladam, setUkladam] = useState(false);
-  const nastroj0 = sub === 'overview' ? <Overview toast={toast} oznam={oznam} />
-    : sub === 'points' ? <BodyAUrovne toast={toast} setUkladam={setUkladam} />
+  const nastroj0 = sub === 'overview' ? <div className="space-y-4"><Overview toast={toast} oznam={oznam} /><BodyPrehledy toast={toast} /></div>
+    : sub === 'points' ? <div className="space-y-4"><BodyAUrovne toast={toast} setUkladam={setUkladam} /><PokrocilaPravidla toast={toast} /></div>
     : sub === 'bonus' ? <BonusAkce toast={toast} />
     : sub === 'stamps' ? <Stamps toast={toast} />
     : sub === 'coupons' ? <div className="space-y-4"><Coupons toast={toast} />{promos}</div>

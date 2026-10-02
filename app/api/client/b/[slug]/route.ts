@@ -15,6 +15,7 @@ import { aktivniBannery } from '@/lib/clientBanners';
 import { aktivniBonus } from '@/lib/bonusAkceDb';
 import { dokdyDnes } from '@/lib/bonusAkce';
 import { planClena } from '@/lib/propadaniBoduDb';
+import { planKreditu } from '@/lib/bodyPravidlaDb';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -107,7 +108,7 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
     const claims = await sql`
       SELECT cl.id, cl.code, cl.claimed_at, cl.redeemed_at, c.title FROM client_coupon_claims cl JOIN client_coupons c ON c.id = cl.coupon_id
       WHERE cl.team_id = ${teamId} AND cl.customer_id = ${me.id} AND cl.redeemed_at IS NULL ORDER BY cl.claimed_at DESC`;
-    const tier = tierForMember({ visits: Number(m?.visits ?? 0), spend: Number(m?.spend ?? 0) }, tierRulesFromProfile(p));
+    const tier = tierForMember({ visits: Number(m?.visits ?? 0), spend: Number(m?.spend ?? 0), lastVisitAt: m?.last_visit_at }, tierRulesFromProfile(p));
     // Sleva = nejvyšší z úrovně a slev skupin; host vidí i odkud je.
     const sleva = await slevaClena(teamId, me.id, tier);
     const myCamps = await activeCampaigns(teamId, today);
@@ -131,6 +132,14 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
       const body = pl.propadne + pl.varovat;
       mine.expiring = body > 0 ? { points: body, till: pl.varovatDo ?? today } : null;
     }
+    // Kredit, kterému brzy vyprší platnost (jen když podnik propadání kreditu používá).
+    if (p.loyalty_on && Number(p.credit_expire_days) > 0) {
+      const pk = await planKreditu(teamId, me.id, p);
+      const castka = pk.propadne + pk.varovat;
+      mine.creditExpiring = castka > 0 ? { amount: castka, till: pk.varovatDo ?? today } : null;
+    }
+    // Úroveň snížená kvůli neaktivitě: host má vědět proč a co s tím.
+    mine.levelDegraded = !!tier.degraded;
   }
   // Novinky: poslední rozeslané zprávy členům rovnou na stránce podniku,
   // ať mají co číst i hosté bez zapnutých oznámení.

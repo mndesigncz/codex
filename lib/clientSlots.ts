@@ -1,6 +1,8 @@
 // Sdílené mezi serverem a prohlížečem: kdy se dá rezervovat a jak se čte
 // otevírací doba. Bez importů ze serveru, ať to jde i do klientské komponenty.
 
+import { pragueDayOf, pragueToday, parseDbTime } from './pragueTime.ts';
+
 export interface OpeningDay { open?: string | null; close?: string | null; closed?: boolean }
 export type OpeningHours = Record<string, OpeningDay>;
 
@@ -68,12 +70,18 @@ export interface TierRules {
   tierBy?: TierBy | string | null;
   /** Prahy v útratě (celé jednotky měny podniku); platí jen v režimu 'spend'. */
   silverSpend?: number; goldSpend?: number; platinumSpend?: number;
+  /** Po kolika dnech bez návštěvy úroveň klesne o stupeň (0 = platí natrvalo). */
+  inactiveDays?: number;
 }
 
 export type TierId = 'bronze' | 'silver' | 'gold' | 'platinum';
 
 /** `unit` říká, v čem je `nextAt`: návštěvy, nebo měna podniku. */
-export interface Tier { id: TierId; label: string; discount: number; nextAt: number | null; nextLabel: string | null; unit: TierBy }
+export interface Tier {
+  id: TierId; label: string; discount: number; nextAt: number | null; nextLabel: string | null; unit: TierBy;
+  /** Úroveň byla snížena kvůli neaktivitě: z čeho, po kolika dnech bez návštěvy. */
+  degraded?: { from: TierId; dni: number };
+}
 
 /** Režim úrovní podniku; cokoli jiného než 'spend' je 'visits'. */
 export function tierBy(r?: TierRules | null): TierBy {
@@ -115,9 +123,40 @@ export function tierFor(hodnota: number, r?: TierRules | null): Tier {
   return { id: 'bronze', label: 'Člen', discount: base, nextAt: silverAt, nextLabel: 'Stříbrný host', unit: by };
 }
 
-/** Úroveň člena s režimem podniku: z návštěv, nebo z útraty. Tohle volej všude, kde máš člena. */
-export function tierForMember(m: { visits?: number | string | null; spend?: number | string | null }, r?: TierRules | null): Tier {
-  return tierFor(tierBy(r) === 'spend' ? Number(m?.spend) || 0 : Number(m?.visits) || 0, r);
+/** Úroveň podle id (po snížení kvůli neaktivitě): stejná čísla jako tierFor, jen bez hledání podle hodnoty. */
+function tierProId(id: TierId, r?: TierRules | null): Tier {
+  const { by, silver, gold, platinum } = tierThresholds(r);
+  const base = Math.max(0, Math.min(90, Number(r?.memberDiscount) || 0));
+  const sd = Math.max(base, Math.min(90, Number(r?.silverDiscount) || 0));
+  const gd = Math.max(sd, Math.min(90, Number(r?.goldDiscount) || 0));
+  const pd = Math.max(gd, Math.min(90, Number(r?.platinumDiscount) || 0));
+  if (id === 'platinum' && platinum > 0) return { id, label: 'Platinový host', discount: pd, nextAt: null, nextLabel: null, unit: by };
+  if (id === 'gold' || id === 'platinum') return { id: 'gold', label: 'Zlatý host', discount: gd, nextAt: platinum > 0 ? platinum : null, nextLabel: platinum > 0 ? 'Platinový host' : null, unit: by };
+  if (id === 'silver') return { id, label: 'Stříbrný host', discount: sd, nextAt: gold, nextLabel: 'Zlatý host', unit: by };
+  return { id: 'bronze', label: 'Člen', discount: base, nextAt: silver, nextLabel: 'Stříbrný host', unit: by };
+}
+
+const PORADI: TierId[] = ['bronze', 'silver', 'gold', 'platinum'];
+
+/**
+ * Úroveň člena s režimem podniku: z návštěv, nebo z útraty. Tohle volej všude, kde máš člena.
+ * Má-li podnik zapnuté snížení po neaktivitě (r.inactiveDays) a znáš poslední návštěvu
+ * (`lastVisitAt` nebo `last_visit_at` z řádku členství), úroveň klesne o stupeň
+ * za každých `inactiveDays` dní bez návštěvy. Nasbíraná útrata ani návštěvy se nemění.
+ */
+export function tierForMember(m: { visits?: number | string | null; spend?: number | string | null; lastVisitAt?: unknown; last_visit_at?: unknown }, r?: TierRules | null): Tier {
+  const t = tierFor(tierBy(r) === 'spend' ? Number(m?.spend) || 0 : Number(m?.visits) || 0, r);
+  const platnost = Math.trunc(Number(r?.inactiveDays) || 0);
+  const posledni = m?.lastVisitAt ?? m?.last_visit_at;
+  if (platnost <= 0 || !posledni || t.id === 'bronze') return t;
+  const d = parseDbTime(posledni as any);
+  if (!d) return t;
+  const dni = Math.max(0, Math.round((Date.parse(`${pragueToday()}T12:00:00Z`) - Date.parse(`${pragueDayOf(d)}T12:00:00Z`)) / 86400000));
+  const stupnu = dni < platnost ? 0 : Math.floor(dni / platnost);
+  if (stupnu <= 0) return t;
+  const na = PORADI[Math.max(0, PORADI.indexOf(t.id) - stupnu)];
+  if (na === t.id) return t;
+  return { ...tierProId(na, r), degraded: { from: t.id, dni } };
 }
 
 /** Řádek client_profiles (snake_case z databáze) → pravidla úrovní. */
@@ -128,6 +167,7 @@ export function tierRulesFromProfile(p: any): TierRules {
     platinumDiscount: Number(p?.platinum_discount) || 0,
     tierBy: p?.tier_by === 'spend' ? 'spend' : 'visits',
     silverSpend: Number(p?.silver_spend) || 0, goldSpend: Number(p?.gold_spend) || 0, platinumSpend: Number(p?.platinum_spend) || 0,
+    inactiveDays: Math.max(0, Math.trunc(Number(p?.tier_inactive_days)) || 0),
   };
 }
 

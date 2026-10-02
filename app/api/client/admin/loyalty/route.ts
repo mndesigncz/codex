@@ -5,6 +5,7 @@ import { tierForMember, tierRulesFromProfile } from '@/lib/clientSlots';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { upravUtratu, dopocitejUtratu } from '@/lib/urovneDb';
 import { audit } from '@/lib/audit';
+import { pragueToday } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -22,22 +23,27 @@ export async function GET(req: NextRequest) {
       FROM client_loyalty_ledger l JOIN users us ON us.id = l.customer_id
       WHERE l.team_id = ${u.team_id} ORDER BY l.created_at DESC LIMIT 20`;
     // Statistiky za 31 dní (po vzoru Kartičky): po dnech, ať jde vidět rytmus
-    // týdne. Vše z dat, která už vedeme — deník, členství, kupony.
+    // týdne. Vše z dat, která už vedeme — deník, členství, kupony. Dny jsou
+    // pražské (databáze drží UTC; kolem půlnoci by se body přiřadily špatnému dni)
+    // a „Členové u kasy" jsou jen ti, kdo opravdu byli u kasy (návštěva, účtenka,
+    // útrata, objednávka), ne každý, komu cron připsal narozeninový dárek.
     let series: any[] = [];
     try {
       series = await sql`
-        WITH days AS (SELECT generate_series(CURRENT_DATE - 30, CURRENT_DATE, '1 day')::date AS d)
+        WITH l AS (
+          SELECT customer_id, delta, kind, ref, (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Prague')::date AS den
+          FROM client_loyalty_ledger
+          WHERE team_id = ${u.team_id} AND created_at >= NOW() - INTERVAL '33 days'
+        ), days AS (SELECT generate_series(${pragueToday(-30)}::date, ${pragueToday()}::date, '1 day')::date AS d)
         SELECT days.d::text AS day,
-          COALESCE((SELECT COUNT(DISTINCT l.customer_id) FROM client_loyalty_ledger l
-            WHERE l.team_id = ${u.team_id} AND l.created_at::date = days.d), 0)::int AS active,
-          COALESCE((SELECT SUM(l.delta) FROM client_loyalty_ledger l
-            WHERE l.team_id = ${u.team_id} AND l.created_at::date = days.d AND l.delta > 0), 0)::int AS points_given,
-          COALESCE((SELECT -SUM(l.delta) FROM client_loyalty_ledger l
-            WHERE l.team_id = ${u.team_id} AND l.created_at::date = days.d AND l.delta < 0), 0)::int AS points_spent,
+          COALESCE((SELECT COUNT(DISTINCT l.customer_id) FROM l
+            WHERE l.den = days.d AND (l.kind IN ('visit', 'order', 'cashback') OR (l.kind = 'manual' AND l.ref IS NOT NULL AND l.ref <> 'spend'))), 0)::int AS active,
+          COALESCE((SELECT SUM(l.delta) FROM l WHERE l.den = days.d AND l.delta > 0), 0)::int AS points_given,
+          COALESCE((SELECT -SUM(l.delta) FROM l WHERE l.den = days.d AND l.delta < 0 AND l.kind NOT IN ('expire', 'storno')), 0)::int AS points_spent,
           COALESCE((SELECT COUNT(*) FROM client_memberships m
-            WHERE m.team_id = ${u.team_id} AND m.joined_at::date = days.d), 0)::int AS new_members,
+            WHERE m.team_id = ${u.team_id} AND (m.joined_at AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Prague')::date = days.d), 0)::int AS new_members,
           COALESCE((SELECT COUNT(*) FROM client_coupon_claims cl
-            WHERE cl.team_id = ${u.team_id} AND cl.redeemed_at::date = days.d), 0)::int AS redeemed
+            WHERE cl.team_id = ${u.team_id} AND (cl.redeemed_at AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Prague')::date = days.d), 0)::int AS redeemed
         FROM days ORDER BY days.d` as any[];
     } catch { series = []; }
     return NextResponse.json({ summary: await loyaltySummary(u.team_id), recent, series });
@@ -48,7 +54,7 @@ export async function GET(req: NextRequest) {
   const [m] = await sql`SELECT * FROM client_memberships WHERE team_id = ${u.team_id} AND customer_id = ${cid}` as any[];
   if (!m) return NextResponse.json({ error: 'Tenhle host není členem podniku.' }, { status: 404 });
   const profil = await ensureProfile(u.team_id);
-  const uroven = tierForMember({ visits: m.visits, spend: m.spend }, tierRulesFromProfile(profil));
+  const uroven = tierForMember({ visits: m.visits, spend: m.spend, lastVisitAt: m.last_visit_at }, tierRulesFromProfile(profil));
   const kampane = await sql`
     SELECT c.name, c.required_stamps, c.reward_title, p.stamps
     FROM client_stamp_progress p JOIN client_stamp_campaigns c ON c.id = p.campaign_id
@@ -113,8 +119,10 @@ export async function POST(req: NextRequest) {
   // Stejným koncovým bodem se dá upravit i kredit — obsluha ho u kasy odečítá.
   if (b.what === 'credit') {
     const credit = await awardCredit(u.team_id, cid, delta, 'credit', null, note);
+    audit(u.team_id, u.id, 'client.kredit', 'client', cid, `kredit ${delta > 0 ? '+' : ''}${delta} → ${credit}${note ? ` (${note})` : ''}`);
     return NextResponse.json({ ok: true, credit });
   }
   const points = await award(u.team_id, cid, delta, 'manual', null, note);
+  audit(u.team_id, u.id, 'client.body', 'client', cid, `body ${delta > 0 ? '+' : ''}${delta} → ${points}${note ? ` (${note})` : ''}`);
   return NextResponse.json({ ok: true, points });
 }

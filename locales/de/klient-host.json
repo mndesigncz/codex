@@ -306,5 +306,9 @@
   "— mrkni do záložky Menu": "— schau in den Reiter Menü",
   "✋ Jdu — zrušit účast": "✋ Ich komme – Zusage zurückziehen",
   "✋ Přijdu": "✋ Ich komme",
-  "✋ {n, plural, one {# člověk jde} few {# lidi jdou} other {# lidí jde}}": "✋ {n, plural, one {# Person kommt} other {# Personen kommen}}"
+  "✋ {n, plural, one {# člověk jde} few {# lidi jdou} other {# lidí jde}}": "✋ {n, plural, one {# Person kommt} other {# Personen kommen}}",
+  "Kredit, který nevyužiješ, propadá po {n, plural, one {# dni} few {# dnech} other {# dnech}}.": "Guthaben, das du nicht einlöst, verfällt nach {n, plural, one {# Tag} other {# Tagen}}.",
+  "Kredit {castka} propadne do {kdy}": "Guthaben {castka} verfällt am {kdy}",
+  "Úroveň klesá o stupeň po {n, plural, one {# dni} few {# dnech} other {# dnech}} bez návštěvy.": "Dein Status sinkt nach {n, plural, one {# Tag} other {# Tagen}} ohne Besuch um eine Stufe.",
+  "Úroveň je dočasně snížená, dlouho jsme tě neviděli. Stačí přijít.": "Dein Status ist vorübergehend gesenkt, weil wir dich länger nicht gesehen haben. Komm einfach vorbei."
 }

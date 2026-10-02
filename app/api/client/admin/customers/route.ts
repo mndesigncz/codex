@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
   const rows = await sql`
     SELECT m.customer_id AS id, us.name, us.email, m.points, m.stamps, m.visits, m.joined_at, m.last_visit_at,
            COALESCE((to_jsonb(m)->>'spend')::int, 0) AS spend,
+           COALESCE((to_jsonb(m)->>'credit')::int, 0) AS credit,
            (SELECT COUNT(*)::int FROM client_reservations r WHERE r.customer_id = m.customer_id AND r.team_id = m.team_id) AS reservations,
            (SELECT COUNT(*)::int FROM client_coupon_claims c WHERE c.customer_id = m.customer_id AND c.team_id = m.team_id AND c.redeemed_at IS NULL) AS open_coupons
     FROM client_memberships m JOIN users us ON us.id = m.customer_id
@@ -65,7 +66,7 @@ export async function GET(req: NextRequest) {
     } catch { /* před migrací */ }
   }
   const obohacene = rows.map(r => {
-    const t = tierForMember({ visits: r.visits, spend: r.spend }, pravidla);
+    const t = tierForMember({ visits: r.visits, spend: r.spend, lastVisitAt: r.last_visit_at }, pravidla);
     const s = efektivniSleva({ uroven: t, skupiny: skupinyBy.get(Number(r.id)) });
     return { ...r, level: t.id, level_label: t.label, discount: s.pct, discount_source: s.zdroj, discount_name: s.nazev };
   });

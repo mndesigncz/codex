@@ -9,6 +9,8 @@ import { zajistiUrovne } from '@/lib/urovneDb';
 import { ulozPropadani, zajistiPropadani } from '@/lib/propadaniBoduDb';
 import { zajistiReaktivaci } from '@/lib/reaktivace';
 import { teamIsMax, MAX_ONLY_MSG } from '@/lib/planServer';
+import { zkontrolujPrahy } from '@/lib/bodyPravidla';
+import { zaznamenejZmenuProfilu, zajistiBodyPravidla } from '@/lib/bodyPravidlaDb';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -50,6 +52,7 @@ export async function GET(req: NextRequest) {
   try { await zajistiUrovne(); } catch { /* bez nich platí návštěvy */ }
   try { await zajistiPropadani(); } catch { /* bez nich body nepropadají */ }
   try { await zajistiReaktivaci(); } catch { /* bez nich je „Chybíš nám“ vypnuté */ }
+  try { await zajistiBodyPravidla(); } catch { /* bez nich platí základní pravidla bodů */ }
   const p = await ensureProfile(u.team_id);
   const boards = await sql`
     SELECT b.slug, b.name,
@@ -86,6 +89,15 @@ export async function PUT(req: NextRequest) {
   if (slug !== cur.slug) {
     const [clash] = await sql`SELECT team_id FROM client_profiles WHERE slug = ${slug} AND team_id <> ${u.team_id}`;
     if (clash) return NextResponse.json({ error: 'Tuhle adresu už používá jiný podnik.' }, { status: 409 });
+  }
+  // Prahy úrovní: server je dřív potichu „opravoval" (zlato nad stříbrem), takže uložená hodnota
+  // nesedela s tím, co vedení zadalo. Teď je to srozumitelná chyba, stejná jako v obrazovce.
+  if (['tier_by', 'silver_at', 'gold_at', 'platinum_at', 'silver_spend', 'gold_spend', 'platinum_spend'].some(k => b?.[k] !== undefined)) {
+    const sloucene: Record<string, any> = {};
+    for (const k of ['tier_by', 'silver_at', 'gold_at', 'platinum_at', 'silver_spend', 'gold_spend', 'platinum_spend']) sloucene[k] = b?.[k] !== undefined ? b[k] : cur[k];
+    if (sloucene.tier_by !== 'spend') sloucene.tier_by = 'visits';
+    const chyba = zkontrolujPrahy(sloucene);
+    if (chyba) return NextResponse.json({ error: chyba }, { status: 400 });
   }
   // „|| d" bralo nulu jako nevyplněno — narozeninové body (0 = nedávat),
   // body za útratu i cíl razítek pak nešly vypnout.
@@ -175,6 +187,8 @@ export async function PUT(req: NextRequest) {
     audit(u.team_id, u.id, 'client.reaktivace', 'client', null, Number(pFinal.reactivation_days) > 0
       ? `Chybíš nám po ${pFinal.reactivation_days} dnech · ${pFinal.reactivation_points} bodů` : 'Chybíš nám vypnuto');
   }
+  // Pravidla věrnosti: co se změnilo, před a po (verze s popiskem i v historii změn).
+  await zaznamenejZmenuProfilu(u.team_id, u.id, cur, pFinal).catch(() => {});
   audit(u.team_id, u.id, 'client.profile', 'client', null, pFinal.enabled ? `zapnuto · /client/${pFinal.slug}` : 'vypnuto');
   return NextResponse.json({ ok: true, profile: pFinal, public: publicProfile({ ...pFinal, team_name: '', opening_hours: {} }), url: `${origin(req)}/client/${pFinal.slug}` });
 }

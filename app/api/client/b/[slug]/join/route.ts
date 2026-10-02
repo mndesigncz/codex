@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { customer, profileBySlug, join, membership, award } from '@/lib/client';
+import { uvitaciBody } from '@/lib/bodyPravidla';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -14,6 +15,8 @@ export async function POST(_req: Request, props: { params: Promise<{ slug: strin
   const already = await membership(me.id, teamId);
   const m = await join(me.id, teamId);
   // Uvítací body: hned je co ztratit, hned je proč se vrátit.
-  if (!already && p.loyalty_on && Number(p.points_per_100) > 0) await award(teamId, me.id, 10, 'welcome', null, 'Vítej v podniku');
-  return NextResponse.json({ ok: true, points: Number(m?.points ?? 0) + (!already && p.loyalty_on ? 10 : 0) });
+  // Kolik bodů, určuje podnik (Věrnost → Body a úrovně → Uvítací body); bez nastavení platí dřívějších 10.
+  const uvitaci = !already && p.loyalty_on ? uvitaciBody(p) : 0;
+  if (uvitaci > 0) await award(teamId, me.id, uvitaci, 'welcome', null, 'Vítej v podniku');
+  return NextResponse.json({ ok: true, points: Number(m?.points ?? 0) + uvitaci });
 }

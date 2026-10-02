@@ -306,5 +306,9 @@
   "— mrkni do záložky Menu": "— check the Menu tab",
   "✋ Jdu — zrušit účast": "✋ I'm coming — cancel",
   "✋ Přijdu": "✋ I'll come",
-  "✋ {n, plural, one {# člověk jde} few {# lidi jdou} other {# lidí jde}}": "✋ {n, plural, one {# person is going} other {# people are going}}"
+  "✋ {n, plural, one {# člověk jde} few {# lidi jdou} other {# lidí jde}}": "✋ {n, plural, one {# person is going} other {# people are going}}",
+  "Kredit, který nevyužiješ, propadá po {n, plural, one {# dni} few {# dnech} other {# dnech}}.": "Credit you don't use expires after {n, plural, one {# day} other {# days}}.",
+  "Kredit {castka} propadne do {kdy}": "Credit {castka} expires on {kdy}",
+  "Úroveň klesá o stupeň po {n, plural, one {# dni} few {# dnech} other {# dnech}} bez návštěvy.": "Your level drops one step after {n, plural, one {# day} other {# days}} without a visit.",
+  "Úroveň je dočasně snížená, dlouho jsme tě neviděli. Stačí přijít.": "Your level is temporarily lowered because we haven't seen you for a while. Just drop by."
 }
