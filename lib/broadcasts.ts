@@ -11,11 +11,13 @@
 import { tierThresholds, tierRulesFromProfile } from './clientSlots';
 import { sql } from './client';
 import { notifyUsers } from './push';
+import { pragueToday } from './pragueTime';
+import { SEGMENTY, jeSegment, stitekPublika, vyberClenu, spoctiSegmenty, type ClenSegmentu, type KontextSegmentu } from './segmenty';
 
 export const AUDIENCES = ['all', 'quiet', 'tier:silver', 'tier:gold', 'tier:platinum'] as const;
 
 export function audienceLabel(a: string, groupName?: string | null): string {
-  if (a === 'quiet') return 'kdo dlouho nebyl';
+  if (jeSegment(a)) return stitekPublika(a) ?? 'všem členům';
   if (a === 'tier:silver') return 'Stříbrní a výš';
   if (a === 'tier:gold') return 'Zlatí a výš';
   if (a === 'tier:platinum') return 'Platinoví hosté';
@@ -33,6 +35,49 @@ export function linkFor(kind: string | null | undefined, slug: string | null): s
   return base;
 }
 
+/** Členové s údaji, podle kterých se řadí do segmentů (jeden průchod, bez N+1). */
+async function nactiClenySegmentu(teamId: number): Promise<{ clenove: ClenSegmentu[]; kontext: KontextSegmentu }> {
+  const rows = await sql`
+    SELECT m.customer_id, m.points, m.last_visit_at, m.joined_at, us.birthday
+    FROM client_memberships m JOIN users us ON us.id = m.customer_id
+    WHERE m.team_id = ${teamId}` as any[];
+  // Razítka: kolik chybí do nejbližší odměny v aktivních kampaních, kde host už něco nasbíral.
+  const chybi = new Map<number, number>();
+  try {
+    const st = await sql`
+      SELECT p.customer_id, MIN(c.required_stamps - p.stamps)::int AS chybi
+      FROM client_stamp_progress p JOIN client_stamp_campaigns c ON c.id = p.campaign_id
+      WHERE p.team_id = ${teamId} AND c.active = TRUE AND p.stamps > 0 AND p.stamps < c.required_stamps
+      GROUP BY p.customer_id` as any[];
+    for (const r of st) chybi.set(Number(r.customer_id), Number(r.chybi));
+  } catch { /* bez kampaní nikdo blízko není */ }
+  let cenyKuponu: number[] = [];
+  try {
+    const kp = await sql`SELECT cost_points FROM client_coupons WHERE team_id = ${teamId} AND active = TRUE AND cost_points > 0` as any[];
+    cenyKuponu = kp.map(r => Number(r.cost_points));
+  } catch { cenyKuponu = []; }
+  const dnes = pragueToday();
+  return {
+    clenove: rows.map(r => ({
+      id: Number(r.customer_id), points: Number(r.points) || 0,
+      lastVisitAt: r.last_visit_at ?? null, joinedAt: r.joined_at ?? null,
+      birthday: r.birthday ? String(r.birthday) : null,
+      chybiRazitek: chybi.get(Number(r.customer_id)) ?? null,
+    })),
+    kontext: { now: new Date(), mesic: parseInt(dnes.slice(5, 7), 10), cenyKuponu },
+  };
+}
+
+/** Počty členů ve všech segmentech, pro výběr komu zprávu poslat. */
+export async function segmentyPocty(teamId: number): Promise<Record<string, number>> {
+  try {
+    const { clenove, kontext } = await nactiClenySegmentu(teamId);
+    return spoctiSegmenty(clenove, kontext);
+  } catch {
+    return Object.fromEntries(SEGMENTY.map(s => [s.id, 0]));
+  }
+}
+
 /**
  * Kdo do publika patří. Úrovně se počítají z prahů podniku (visits),
  * „tier:silver" znamená Stříbrný A VÝŠ — zpráva pro věrné, ne jen pro
@@ -40,10 +85,9 @@ export function linkFor(kind: string | null | undefined, slug: string | null): s
  */
 export async function audienceIds(teamId: number, audience: string): Promise<number[]> {
   let rows: any[] = [];
-  if (audience === 'quiet') {
-    rows = await sql`
-      SELECT customer_id FROM client_memberships
-      WHERE team_id = ${teamId} AND (last_visit_at IS NULL OR last_visit_at < NOW() - INTERVAL '30 days')` as any[];
+  if (jeSegment(audience)) {
+    const { clenove, kontext } = await nactiClenySegmentu(teamId);
+    return vyberClenu(audience, clenove, kontext);
   } else if (audience.startsWith('tier:')) {
     // Prahy i režim (návštěvy / útrata) z jedné funkce s pravidly podniku.
     const [p] = await sql`SELECT * FROM client_profiles WHERE team_id = ${teamId}`;

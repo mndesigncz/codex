@@ -3,6 +3,7 @@ import { neon } from '@neondatabase/serverless';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { awardBirthdays } from '@/lib/client';
+import { odesliChybisNam } from '@/lib/reaktivace';
 import { checkCron } from '@/lib/cronAuth';
 import { hit } from '@/lib/rateLimit';
 import { zDashboardConfig } from '@/lib/widgety/migrace';
@@ -1940,6 +1941,9 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_x DOUBLE PRECISION`);
     await ddl(sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_y DOUBLE PRECISION`);
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS birthday_points INTEGER NOT NULL DEFAULT 0`);
+    // Automatické „Chybíš nám“: po kolika dnech bez návštěvy (0 = vypnuto) a kolik bodů k tomu.
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS reactivation_days INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS reactivation_points INTEGER NOT NULL DEFAULT 0`);
     await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS audience TEXT NOT NULL DEFAULT 'all'`);
     // Pozvi kamaráda: kdo hosta přivedl, a kolik bodů za to podnik dává.
     await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by INTEGER`);
@@ -2171,6 +2175,10 @@ export async function GET(request: Request) {
     // člena a podnik (hlídá deník), takže opakované volání nic nerozdá dvakrát.
     let birthdays = 0;
     try { birthdays = await awardBirthdays(); } catch { /* nesmí shodit migrace */ }
+    // „Chybíš nám“: hostům, kteří přestali chodit, jednou za odmlku pošle oznámení
+    // (a volitelně body). Pravidlo je volitelné (reactivation_days, 0 = vypnuto).
+    let reactivations = 0;
+    try { reactivations = await odesliChybisNam(); } catch { /* nesmí shodit migrace */ }
 
     // ---- Kolo 77: nativní obal a obchody (App Store, Google Play) ----
     // Vše idempotentní; kód, který tyhle tabulky čte, je před migrací fail-open.
@@ -2255,7 +2263,7 @@ export async function GET(request: Request) {
       // (hlášky Postgresu, názvy indexů a omezení, jméno databáze) jen cron —
       // vedení kteréhokoli podniku je dřív dostávalo do prohlížeče.
       migFails: migFails.length,
-      ...(zCronu ? { closingIndex, closingIndexes, closingConstraints, birthdays, migFailDetail: migFails.slice(0, 10) } : {}),
+      ...(zCronu ? { closingIndex, closingIndexes, closingConstraints, birthdays, reactivations, migFailDetail: migFails.slice(0, 10) } : {}),
     });
   } catch (error) {
     console.error('Init error:', error);

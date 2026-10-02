@@ -1,6 +1,7 @@
 // Ruční úprava bodů (omluva, bonus, oprava) a deník člena.
 import { NextRequest, NextResponse } from 'next/server';
-import { sql, award, awardCredit, loyaltySummary } from '@/lib/client';
+import { sql, award, awardCredit, loyaltySummary, ensureProfile } from '@/lib/client';
+import { tierForMember, tierRulesFromProfile } from '@/lib/clientSlots';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { upravUtratu, dopocitejUtratu } from '@/lib/urovneDb';
 import { audit } from '@/lib/audit';
@@ -42,7 +43,38 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ summary: await loyaltySummary(u.team_id), recent, series });
   }
   const ledger = await sql`SELECT * FROM client_loyalty_ledger WHERE team_id = ${u.team_id} AND customer_id = ${cid} ORDER BY created_at DESC LIMIT 100`;
-  return NextResponse.json({ ledger });
+  if (!q.get('detail')) return NextResponse.json({ ledger });
+  // Přehled hosta pro okno člena: všechno, co už o něm evidujeme, bez nových tabulek.
+  const [m] = await sql`SELECT * FROM client_memberships WHERE team_id = ${u.team_id} AND customer_id = ${cid}` as any[];
+  if (!m) return NextResponse.json({ error: 'Tenhle host není členem podniku.' }, { status: 404 });
+  const profil = await ensureProfile(u.team_id);
+  const uroven = tierForMember({ visits: m.visits, spend: m.spend }, tierRulesFromProfile(profil));
+  const kampane = await sql`
+    SELECT c.name, c.required_stamps, c.reward_title, p.stamps
+    FROM client_stamp_progress p JOIN client_stamp_campaigns c ON c.id = p.campaign_id
+    WHERE p.team_id = ${u.team_id} AND p.customer_id = ${cid} AND c.active = TRUE
+    ORDER BY c.position, c.id` as any[];
+  const claims = await sql`
+    SELECT cl.claimed_at, cl.redeemed_at, cp.title
+    FROM client_coupon_claims cl JOIN client_coupons cp ON cp.id = cl.coupon_id
+    WHERE cl.team_id = ${u.team_id} AND cl.customer_id = ${cid}
+    ORDER BY cl.claimed_at DESC LIMIT 30` as any[];
+  let vouchers: any[] = [];
+  try {
+    vouchers = await sql`
+      SELECT code, value_amount, balance, created_at FROM client_vouchers
+      WHERE team_id = ${u.team_id} AND customer_id = ${cid} ORDER BY created_at DESC LIMIT 20` as any[];
+  } catch { vouchers = []; }
+  const orders = await sql`
+    SELECT id, total, status, created_at FROM client_orders
+    WHERE team_id = ${u.team_id} AND customer_id = ${cid} ORDER BY created_at DESC LIMIT 20` as any[];
+  return NextResponse.json({
+    ledger, claims, vouchers, orders, kampane, uroven,
+    clen: {
+      points: Number(m.points) || 0, stamps: Number(m.stamps) || 0, visits: Number(m.visits) || 0,
+      spend: Number(m.spend) || 0, credit: Number(m.credit) || 0, joined_at: m.joined_at, last_visit_at: m.last_visit_at,
+    },
+  });
 }
 
 export async function POST(req: NextRequest) {

@@ -156,7 +156,7 @@ export default function ({ eq, ok }: Testy) {
   ok('ClientAdmin: souhrn (odznaky) se obnoví při změně záložky a periodicky', /minulaZalozka\.current = tab;\s*obnovSouhrn\(\)/.test(admin) && /setInterval\(\(\) => \{ if \(document\.visibilityState === 'visible'\) obnovSouhrn\(\)/.test(admin));
   ok('StaffInbox a widget Objednávky od stolu obnoví souhrn po změně objednávky', /onZmena\?\.\(\)/.test(precti('components/client/StaffInbox.tsx')) && /<StaffInbox onToast=\{t => oznam\(t\)\} onZmena=\{onZmena\} \/>/.test(admin)
     && /obnovDataWidgetu\('\/api\/client\/admin\/summary'\);\s*\}\s*\};\s*const vse = data\.data\?\.objednavky/.test(precti('components/widgety/oblasti/klient.tsx')));
-  ok('ClientAdmin: skupiny člena i bez vernost.zobrazit (deník bodů jen s ním)', /const rozbali = vidiDenik \|\| meniSkupiny/.test(admin) && /useLoad<any\[\]>\(vidiDenik \? /.test(admin));
+  ok('ClientAdmin: skupiny člena i bez vernost.zobrazit (deník bodů jen s ním)', /const rozbali = vidiDenik \|\| meniSkupiny/.test(admin) && /useLoad<any>\(vidiDenik \? /.test(admin));
 
   for (const l of ['components/employer/EmployerLayout.tsx', 'components/employee/EmployeeLayout.tsx']) {
     ok(`${l}: spodní dok je sdílený Dock`, /<Dock /.test(precti(l)) && !/dock-strong|glass-strong mx-auto max-w-md/.test(precti(l)));

@@ -6,6 +6,7 @@ import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { normalizeQrDesign } from '@/lib/qrDesign';
 import { audit } from '@/lib/audit';
 import { zajistiUrovne } from '@/lib/urovneDb';
+import { zajistiReaktivaci } from '@/lib/reaktivace';
 import { teamIsMax, MAX_ONLY_MSG } from '@/lib/planServer';
 
 export const dynamic = 'force-dynamic';
@@ -29,6 +30,7 @@ const POLE_OPRAVNENI: Record<string, string> = {
   birthday_points: 'vernost.pravidla', referral_points: 'vernost.pravidla', silver_at: 'vernost.pravidla', gold_at: 'vernost.pravidla',
   platinum_at: 'vernost.pravidla', member_discount: 'vernost.pravidla', silver_discount: 'vernost.pravidla',
   tier_by: 'vernost.pravidla', silver_spend: 'vernost.pravidla', gold_spend: 'vernost.pravidla', platinum_spend: 'vernost.pravidla',
+  reactivation_days: 'vernost.pravidla', reactivation_points: 'vernost.pravidla',
   gold_discount: 'vernost.pravidla', platinum_discount: 'vernost.pravidla', cashback_pct: 'vernost.pravidla', cashback_mode: 'vernost.pravidla',
 };
 const NAZEV_SKUPINY: Record<string, string> = {
@@ -44,6 +46,7 @@ export async function GET(req: NextRequest) {
   const u = { id: ctx.meId, team_id: ctx.teamId };
   // Sloupce úrovní podle útraty se zajistí dřív, ať je profil (SELECT *) vrátí.
   try { await zajistiUrovne(); } catch { /* bez nich platí návštěvy */ }
+  try { await zajistiReaktivaci(); } catch { /* bez nich je „Chybíš nám“ vypnuté */ }
   const p = await ensureProfile(u.team_id);
   const boards = await sql`
     SELECT b.slug, b.name,
@@ -152,6 +155,17 @@ export async function PUT(req: NextRequest) {
         gold_spend = ${num(b.gold_spend, Number(p.gold_spend) || 15000, 2, 100000000)},
         platinum_spend = ${num(b.platinum_spend, Number(p.platinum_spend) || 0, 0, 100000000)}
       WHERE team_id = ${u.team_id} RETURNING *`;
+  }
+  // „Chybíš nám“: po kolika dnech bez návštěvy (0 = vypnuto) a kolik bodů k tomu. Zvlášť, jako úrovně.
+  if (['reactivation_days', 'reactivation_points'].some(k => b?.[k] !== undefined)) {
+    await zajistiReaktivaci();
+    [pFinal] = await sql`
+      UPDATE client_profiles SET
+        reactivation_days = ${num(b.reactivation_days, Number(pFinal.reactivation_days) || 0, 0, 365)},
+        reactivation_points = ${num(b.reactivation_points, Number(pFinal.reactivation_points) || 0, 0, 1000)}
+      WHERE team_id = ${u.team_id} RETURNING *`;
+    audit(u.team_id, u.id, 'client.reaktivace', 'client', null, Number(pFinal.reactivation_days) > 0
+      ? `Chybíš nám po ${pFinal.reactivation_days} dnech · ${pFinal.reactivation_points} bodů` : 'Chybíš nám vypnuto');
   }
   audit(u.team_id, u.id, 'client.profile', 'client', null, pFinal.enabled ? `zapnuto · /client/${pFinal.slug}` : 'vypnuto');
   return NextResponse.json({ ok: true, profile: pFinal, public: publicProfile({ ...pFinal, team_name: '', opening_hours: {} }), url: `${origin(req)}/client/${pFinal.slug}` });

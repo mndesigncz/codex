@@ -208,7 +208,7 @@ async function maybeReferralReward(customerId: number, teamId: number): Promise<
   }).catch(() => {});
 }
 
-export type LedgerKind = 'visit' | 'order' | 'manual' | 'coupon' | 'welcome' | 'birthday' | 'referral' | 'cashback' | 'credit';
+export type LedgerKind = 'visit' | 'order' | 'manual' | 'coupon' | 'welcome' | 'birthday' | 'referral' | 'cashback' | 'credit' | 'reactivation';
 
 /**
  * Připíše (nebo odečte) body a zapíše to do deníku. Body nikdy nejdou pod

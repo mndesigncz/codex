@@ -1,5 +1,5 @@
 {
-  "members": 248, "quiet": 31, "silver": 96, "gold": 42, "platinum": 11,
+  "members": 248, "quiet": 31, "segments": { "quiet": 31, "quiet:60": 14, "quiet:90": 6, "birthday:month": 9, "near:stamps": 12, "near:points": 7, "new:14": 18 }, "silver": 96, "gold": 42, "platinum": 11,
   "groups": [{ "id": 1, "name": "Ranní štamgasti", "members": 34 }],
   "history": [
     { "id": 1, "title": "Nová jarní nabídka", "body": "Od pondělí máme novou kávu z Etiopie.", "audience": "all", "sentAt": "2026-09-10T09:00:00Z", "recipients": 240 },
