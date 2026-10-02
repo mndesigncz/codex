@@ -7,6 +7,7 @@
 // Hotová objednávka připíše body za útratu a razítko za návštěvu (nejvýš
 // jedno denně, ať tři čaje nejsou tři návštěvy).
 
+import { pripisUtratu } from './urovneDb';
 import { sql, award, stampVisit, ensureProfile } from './client';
 import { clenoveSOpravnenim } from './opravneniDb';
 import { normName } from './menuPos';
@@ -238,7 +239,9 @@ export async function setOrderStatus(teamId: number, id: number, next: string): 
     const r = await sendToPos(teamId, id);
     posOk = r.posOk; posNote = r.posNote;
   }
-  await sql`UPDATE client_orders SET status = ${next}, updated_at = NOW() WHERE id = ${id}`;
+  // Přechod je atomický: dva současné kliky „hotovo" nepřipíšou věrnost ani útratu dvakrát.
+  const prechod = await sql`UPDATE client_orders SET status = ${next}, updated_at = NOW() WHERE id = ${id} AND team_id = ${teamId} AND status = ${cur} RETURNING id`;
+  if (!prechod.length) throw new Error('Objednávku mezitím změnil někdo jiný. Obnov seznam.');
 
   let loyalty: any = null;
   if (next === 'done') {
@@ -252,6 +255,9 @@ export async function setOrderStatus(teamId: number, id: number, next: string): 
       const last = parseDbTime(m?.last_visit_at);
       const visitedToday = !!last && pragueDayOf(last) === pragueToday();
       const stamp = visitedToday ? null : await stampVisit(teamId, Number(o.customer_id), profile, `ord:${o.id}`);
+      // Útrata pro úrovně podle útraty: hotová objednávka se započte jednou
+      // (do „done" se z ORDER_FLOW dá přejít jen jednou).
+      await pripisUtratu(teamId, Number(o.customer_id), Number(o.total));
       loyalty = { points, pts, stamp };
     }
   }

@@ -2,6 +2,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql, award, awardCredit, loyaltySummary } from '@/lib/client';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { upravUtratu, dopocitejUtratu } from '@/lib/urovneDb';
+import { audit } from '@/lib/audit';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -54,12 +56,28 @@ export async function POST(req: NextRequest) {
   if (!ctx.role.opravneni.has(klic)) {
     return NextResponse.json({ error: b.what === 'credit' ? 'Upravovat kredit hostů nemáš povoleno.' : 'Upravovat body hostů nemáš povoleno.' }, { status: 403 });
   }
+  // Jednorázové dopočtení útraty všem členům z objednávek a účtenek (jen tam, kde je útrata nulová).
+  if (b.what === 'spend_backfill') {
+    const upraveno = await dopocitejUtratu(u.team_id);
+    audit(u.team_id, u.id, 'client.spend', 'client', null, `dopočtena útrata ${upraveno} členům`);
+    return NextResponse.json({ ok: true, updated: upraveno });
+  }
   const cid = parseInt(String(b.customerId), 10);
   const delta = Math.max(-100000, Math.min(100000, parseInt(String(b.delta), 10) || 0));
   if (!cid || !delta) return NextResponse.json({ error: 'Kolik bodů a komu?' }, { status: 400 });
   const [m] = await sql`SELECT id FROM client_memberships WHERE customer_id = ${cid} AND team_id = ${u.team_id}`;
   if (!m) return NextResponse.json({ error: 'Tenhle host není členem podniku.' }, { status: 404 });
   const note = String(b.note ?? '').slice(0, 120) || null;
+  // Ruční úprava kumulované útraty (oprava, převod z jiné aplikace). Do deníku jde řádek bez bodů.
+  if (b.what === 'spend') {
+    const spend = await upravUtratu(u.team_id, cid, delta);
+    if (spend == null) return NextResponse.json({ error: 'Tenhle host není členem podniku.' }, { status: 404 });
+    await sql`
+      INSERT INTO client_loyalty_ledger (team_id, customer_id, delta, kind, ref, note)
+      VALUES (${u.team_id}, ${cid}, 0, 'manual', 'spend', ${`Útrata ${delta > 0 ? '+' : ''}${delta}${note ? ` — ${note}` : ''}`.slice(0, 200)})`;
+    audit(u.team_id, u.id, 'client.spend', 'client', cid, `útrata ${delta > 0 ? '+' : ''}${delta} → ${spend}`);
+    return NextResponse.json({ ok: true, spend });
+  }
   // Stejným koncovým bodem se dá upravit i kredit — obsluha ho u kasy odečítá.
   if (b.what === 'credit') {
     const credit = await awardCredit(u.team_id, cid, delta, 'credit', null, note);

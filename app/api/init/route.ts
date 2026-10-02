@@ -1812,6 +1812,44 @@ export async function GET(request: Request) {
         PRIMARY KEY (import_id, customer_id)
       )`);
     await ddl(sql`CREATE INDEX IF NOT EXISTS client_importy_team ON client_importy (team_id, created_at)`);
+    // ---- Kolo 74: poukazy (dárkové poukazy s unikátními kódy) ----
+    // Peněžní poukaz: hodnota a zůstatek v celých jednotkách měny podniku, kód DP-XXXX-XXXX unikátní v podniku.
+    // Stav `expired` se neukládá (vyplývá z valid_until). Stejné příkazy jsou v lib/poukazyDb.ts
+    // (zajistiTabulkyPoukazu), takže poukazy fungují i dřív, než někdo po nasazení otevře /api/init.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS client_vouchers (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        code TEXT NOT NULL,
+        value_amount INTEGER NOT NULL,
+        balance INTEGER NOT NULL,
+        currency TEXT NOT NULL DEFAULT 'CZK',
+        recipient_name TEXT,
+        buyer_name TEXT,
+        note TEXT,
+        customer_id INTEGER,
+        valid_until DATE,
+        status TEXT NOT NULL DEFAULT 'active',
+        created_by INTEGER,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE (team_id, code)
+      )`);
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS client_voucher_uses (
+        id SERIAL PRIMARY KEY,
+        voucher_id INTEGER NOT NULL,
+        team_id INTEGER NOT NULL,
+        amount INTEGER NOT NULL,
+        kind TEXT NOT NULL DEFAULT 'use',
+        balance_after INTEGER,
+        by_user INTEGER,
+        note TEXT,
+        ref TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_vouchers_team ON client_vouchers (team_id, created_at DESC)`);
+    await ddl(sql`CREATE UNIQUE INDEX IF NOT EXISTS client_voucher_uses_ref ON client_voucher_uses (voucher_id, ref) WHERE ref IS NOT NULL`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_voucher_uses_voucher ON client_voucher_uses (voucher_id, created_at)`);
     // Platina: čtvrtá úroveň nad Zlatým hostem. 0 = vypnuto.
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS platinum_at INTEGER NOT NULL DEFAULT 0`);
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS platinum_discount INTEGER NOT NULL DEFAULT 0`);
@@ -1930,6 +1968,32 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_h DOUBLE PRECISION`);
     await ddl(sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_shape TEXT`);
     await ddl(sql`ALTER TABLE client_tables ADD COLUMN IF NOT EXISTS map_rot INTEGER`);
+
+    // Kolo 74: úrovně podle útraty a slevové skupiny s vlastní slevou.
+    // Stejné příkazy jsou v lib/urovneDb.ts (zajistiUrovne) — věrnost funguje i před spuštěním /api/init.
+    await ddl(sql`ALTER TABLE client_memberships ADD COLUMN IF NOT EXISTS spend INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS tier_by TEXT NOT NULL DEFAULT 'visits'`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS silver_spend INTEGER NOT NULL DEFAULT 5000`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS gold_spend INTEGER NOT NULL DEFAULT 15000`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS platinum_spend INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_groups ADD COLUMN IF NOT EXISTS discount_pct INTEGER NOT NULL DEFAULT 0`);
+    // Kolo 74: promo bannery podniku (akce a oznámení nahoře na stránce hosta).
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS client_banners (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        text TEXT NOT NULL DEFAULT '',
+        image_url TEXT,
+        link_kind TEXT NOT NULL DEFAULT 'none',
+        link_ref TEXT,
+        active BOOLEAN NOT NULL DEFAULT TRUE,
+        valid_since TEXT,
+        valid_until TEXT,
+        position INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_banners_team_idx ON client_banners (team_id, position)`);
 
     // ---- Sdílené číselníky (kolo 60) ----
     // Řádek číselníku patří dál svému podniku; sdílení je jen ve čtení

@@ -8,6 +8,7 @@
 // atomicky přivlastní (status scheduled → sent), takže dva souběžné
 // dispatchery zprávu nepošlou dvakrát.
 
+import { tierThresholds, tierRulesFromProfile } from './clientSlots';
 import { sql } from './client';
 import { notifyUsers } from './push';
 
@@ -44,13 +45,14 @@ export async function audienceIds(teamId: number, audience: string): Promise<num
       SELECT customer_id FROM client_memberships
       WHERE team_id = ${teamId} AND (last_visit_at IS NULL OR last_visit_at < NOW() - INTERVAL '30 days')` as any[];
   } else if (audience.startsWith('tier:')) {
-    const [p] = await sql`SELECT silver_at, gold_at, platinum_at FROM client_profiles WHERE team_id = ${teamId}`;
-    const silverAt = Math.max(1, Number(p?.silver_at) || 10);
-    const goldAt = Math.max(silverAt + 1, Number(p?.gold_at) || 25);
-    const platinumAt = Number(p?.platinum_at) > 0 ? Math.max(goldAt + 1, Number(p?.platinum_at)) : 0;
+    // Prahy i režim (návštěvy / útrata) z jedné funkce s pravidly podniku.
+    const [p] = await sql`SELECT * FROM client_profiles WHERE team_id = ${teamId}`;
+    const th = tierThresholds(tierRulesFromProfile(p));
     const tier = audience.slice(5);
-    const from = tier === 'platinum' ? (platinumAt || goldAt) : tier === 'gold' ? goldAt : silverAt;
-    rows = await sql`SELECT customer_id FROM client_memberships WHERE team_id = ${teamId} AND visits >= ${from}` as any[];
+    const from = tier === 'platinum' ? (th.platinum || th.gold) : tier === 'gold' ? th.gold : th.silver;
+    rows = th.by === 'spend'
+      ? await sql`SELECT customer_id FROM client_memberships WHERE team_id = ${teamId} AND spend >= ${from}` as any[]
+      : await sql`SELECT customer_id FROM client_memberships WHERE team_id = ${teamId} AND visits >= ${from}` as any[];
   } else if (audience.startsWith('group:')) {
     const gid = parseInt(audience.slice(6), 10);
     if (Number.isFinite(gid)) {

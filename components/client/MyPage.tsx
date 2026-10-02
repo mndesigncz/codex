@@ -9,11 +9,13 @@ import { Initials } from './ClientShell';
 import Link from 'next/link';
 import { Icon } from '../Icons';
 import { Skeleton, EmptyState } from '../ui';
-import { RES_STATUS, tierFor } from '@/lib/clientSlots';
+import { RES_STATUS, tierForMember } from '@/lib/clientSlots';
+import { efektivniSleva } from '@/lib/slevy';
 import { formatMoney } from '@/lib/money';
 import { okJson } from '@/lib/api';
 import { pragueDaySafe } from '@/lib/pragueTime';
 import UcetHosta from './UcetHosta';
+import MamPoukaz from './MamPoukaz';
 import { useJazyk, useT } from '@/lib/i18n/client';
 import { fmtDatum } from '@/lib/i18n/format';
 import type { Jazyk } from '@/lib/i18n/config';
@@ -77,10 +79,10 @@ export default function MyPage() {
                     <Initials name={m.name} size={40} />
                     <div className="min-w-0 flex-1">
                       <p className="text-lg font-bold tracking-tight leading-tight truncate">{m.name}</p>
-                      {(() => { const lv = tierFor(Number(m.visits), m.tiers); return (
+                      {(() => { const lv = tierForMember({ visits: Number(m.visits), spend: Number(m.spend) }, m.tiers); const sl = efektivniSleva({ uroven: lv, skupiny: m.groupDiscounts }); return (
                         <p className="text-sm text-black/55 mt-0.5 flex items-center gap-1.5 flex-wrap">
                           {lv.id !== 'bronze' && <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${lv.id === 'gold' ? 'bg-[#C8F542]/30 text-[#3E5406]' : 'bg-black/[0.07] text-black/60'}`}>{t(lv.label)}</span>}
-                          {lv.discount > 0 && <span className="rounded-full bg-[#16181A] text-[#C8F542] px-2 py-0.5 text-[11px] font-bold">{t('sleva {n} %', { n: lv.discount })}</span>}
+                          {sl.pct > 0 && <span className="rounded-full bg-[#16181A] text-[#C8F542] px-2 py-0.5 text-[11px] font-bold">{sl.zdroj === 'skupina' && sl.nazev ? t('sleva {n} % ({skupina})', { n: sl.pct, skupina: sl.nazev }) : t('sleva {n} %', { n: sl.pct })}</span>}
                           <span>{t('{n, plural, one {# návštěva} few {# návštěvy} other {# návštěv}}', { n: m.visits })}{m.lastVisitAt ? ` · ${t('naposledy {datum}', { datum: denCesky(m.lastVisitAt, jazyk) })}` : ''}</span>
                         </p>
                       ); })()}
@@ -119,6 +121,12 @@ export default function MyPage() {
         )}
       </section>
 
+      {d.memberships?.length > 0 && (
+        <section className="max-w-md">
+          <MamPoukaz podniky={d.memberships.map((m: any) => ({ slug: m.slug, name: m.name }))} />
+        </section>
+      )}
+
       {(upcoming.length > 0 || open.length > 0) && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10 items-start">
           {upcoming.length > 0 && (
@@ -136,12 +144,24 @@ export default function MyPage() {
               <p className="text-sm text-black/55 mt-1 mb-3">{t('Kód ukaž obsluze u kasy.')}</p>
               <ul className="space-y-2">
                 {open.map((c: any) => (
-                  <li key={c.id} className="rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 px-4 py-3 flex items-center gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold leading-tight truncate">{c.title}</p>
-                      <p className="text-xs text-black/55 truncate">{c.business}</p>
+                  <li key={c.id} className="rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold leading-tight truncate">{c.title}</p>
+                        <p className="text-xs text-black/55 truncate">{c.business}</p>
+                      </div>
+                      <p className="font-mono font-bold tracking-widest text-lg shrink-0">{c.code}</p>
                     </div>
-                    <p className="font-mono font-bold tracking-widest text-lg shrink-0">{c.code}</p>
+                    {/* QR „managero:coupon:<kód>“: obsluha ho načte skenerem místo opisování. Obrázek se stáhne až po rozbalení. */}
+                    <details className="mt-2 group/qr">
+                      <summary className="tap-target-sm inline-flex items-center gap-1.5 text-sm font-semibold text-black/60 cursor-pointer hover:text-black list-none">
+                        <Icon name="chevron" size={15} className="transition-transform group-open/qr:rotate-180" />{t('Ukázat QR kód')}
+                      </summary>
+                      <div className="mt-2 rounded-2xl bg-white p-3 w-40 h-40 mx-auto">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={`/api/client/coupons/${c.id}/qr`} alt={t('QR kód kuponu {kod}', { kod: c.code })} loading="lazy" className="w-full h-full" />
+                      </div>
+                    </details>
                   </li>
                 ))}
               </ul>

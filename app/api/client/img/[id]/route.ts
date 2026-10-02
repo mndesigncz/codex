@@ -35,6 +35,16 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
     } catch { /* photos bez migrace */ }
   }
   if (!ref) {
+    // Obrázek aktivního promo banneru zapnutého podniku.
+    try {
+      [ref] = await sql`
+        SELECT b.team_id FROM client_banners b
+        JOIN client_profiles p ON p.team_id = b.team_id AND p.enabled = TRUE
+        WHERE b.active = TRUE AND b.image_url = ${url}
+        LIMIT 1`;
+    } catch { /* bannery bez migrace */ }
+  }
+  if (!ref) {
     // Vedení si potřebuje prohlédnout fotky i u akce, která ještě veřejná
     // není — vlastnímu týmu se soubor vydá po přihlášení. Aktivní podnik
     // z users.team_id nestačí: host s vyplněným team_id členem není, proto

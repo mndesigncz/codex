@@ -19,7 +19,7 @@
 //    která vypadala jako skutečný průběh.
 // Oprávnění: pravidla a úrovně mění jen vernost.pravidla, kartičky
 // vernost.kampane, kupony kupony.spravovat, uplatnit kód kupony.uplatnit,
-// skupiny hostů zakaznici.skupiny.
+// skupiny hostů zakaznici.skupiny, dárkové poukazy poukazy.* (komponenta Poukazy).
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -35,22 +35,25 @@ import { apiMessage, okJson } from '@/lib/api';
 import { obsahuje } from '@/lib/hledani';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { useOpravneni } from '../role/useOpravneni';
+import Poukazy from './Poukazy';
 
 // Věrnost měla šest podzáložek pod deseti hlavními — šestnáct sourozenců
 // nad sebou. „Body" a „Slevy a úrovně" jsou jedna věc (co host nasbírá a co
 // za to má) a „Kupony" s „Promo kódy" taky (co host uplatní).
-export type LoyaltySub = 'overview' | 'points' | 'stamps' | 'coupons';
+export type LoyaltySub = 'overview' | 'points' | 'stamps' | 'coupons' | 'vouchers';
 export const LOYALTY_SUBS: { id: LoyaltySub; label: string }[] = [
   { id: 'overview', label: 'Přehled' },
   { id: 'points', label: 'Body a úrovně' },
   { id: 'stamps', label: 'Razítka' },
   { id: 'coupons', label: 'Kupony a kódy' },
+  { id: 'vouchers', label: 'Poukazy' },
 ];
 const KLIC_CASTI: Record<LoyaltySub, readonly string[]> = {
   overview: ['vernost.zobrazit'],
   points: ['vernost.zobrazit'],
   stamps: ['vernost.zobrazit'],
   coupons: ['kupony.spravovat', 'kupony.uplatnit'],
+  vouchers: ['poukazy.zobrazit', 'poukazy.uplatnit'],
 };
 const FORM_BODY = 'vernost-body';
 
@@ -188,6 +191,7 @@ function BodyAUrovne({ toast, setUkladam }: { toast: (m: string) => void; setUkl
   const { ma } = useOpravneni();
   const meni = ma('vernost.pravidla');
   const symbol = useSymbol();
+  const [dopocitavam, setDopocitavam] = useState(false);
   const { p, setP, reload: reloadProfile, error: profileError } = useProfile();
   if (profileError) return <ErrorState title="Věrnost se nenačetla" onRetry={reloadProfile} detail={profileError} />;
   if (!p) return <Kostra />;
@@ -199,6 +203,7 @@ function BodyAUrovne({ toast, setUkladam }: { toast: (m: string) => void; setUkl
       const r = await j('/api/client/admin/profile', { method: 'PUT', body: JSON.stringify({
         points_per_100: p.points_per_100, cashback_pct: p.cashback_pct, cashback_mode: p.cashback_mode, birthday_points: p.birthday_points, referral_points: p.referral_points,
         silver_at: p.silver_at, gold_at: p.gold_at, platinum_at: p.platinum_at,
+        tier_by: p.tier_by === 'spend' ? 'spend' : 'visits', silver_spend: p.silver_spend, gold_spend: p.gold_spend, platinum_spend: p.platinum_spend,
         member_discount: p.member_discount, silver_discount: p.silver_discount, gold_discount: p.gold_discount, platinum_discount: p.platinum_discount,
       }) });
       setP(r.profile); toast('Pravidla bodů, úrovně a slevy uloženy.');
@@ -210,12 +215,23 @@ function BodyAUrovne({ toast, setUkladam }: { toast: (m: string) => void; setUkl
       <Input id={id} type="number" min={min} max={max} disabled={!meni} className="!w-28" value={p[key] ?? 0} onChange={e => setP({ ...p, [key]: e.target.value })} />
     </Field>
   );
+  // Režim úrovní: z návštěv (výchozí), nebo z kumulované útraty. Prahy obou režimů
+  // zůstávají uložené vedle sebe — přepnutí nic nemaže, jen mění, který platí.
+  const podleUtraty = p.tier_by === 'spend';
   const urovne: { id: string; name: string; atKey?: string; discKey: string; tone: 'muted' | 'ink'; hint: string }[] = [
-    { id: 'bronze', name: 'Člen', discKey: 'member_discount', tone: 'muted', hint: 'Od první návštěvy.' },
-    { id: 'silver', name: 'Stříbrný host', atKey: 'silver_at', discKey: 'silver_discount', tone: 'muted', hint: 'Od kolika návštěv.' },
-    { id: 'gold', name: 'Zlatý host', atKey: 'gold_at', discKey: 'gold_discount', tone: 'ink', hint: 'Od kolika návštěv.' },
-    { id: 'platinum', name: 'Platinový host', atKey: 'platinum_at', discKey: 'platinum_discount', tone: 'ink', hint: '0 návštěv = Platina vypnutá.' },
+    { id: 'bronze', name: 'Člen', discKey: 'member_discount', tone: 'muted', hint: podleUtraty ? 'Od první útraty.' : 'Od první návštěvy.' },
+    { id: 'silver', name: 'Stříbrný host', atKey: podleUtraty ? 'silver_spend' : 'silver_at', discKey: 'silver_discount', tone: 'muted', hint: podleUtraty ? `Od jaké celkové útraty (v ${symbol}).` : 'Od kolika návštěv.' },
+    { id: 'gold', name: 'Zlatý host', atKey: podleUtraty ? 'gold_spend' : 'gold_at', discKey: 'gold_discount', tone: 'ink', hint: podleUtraty ? `Od jaké celkové útraty (v ${symbol}).` : 'Od kolika návštěv.' },
+    { id: 'platinum', name: 'Platinový host', atKey: podleUtraty ? 'platinum_spend' : 'platinum_at', discKey: 'platinum_discount', tone: 'ink', hint: podleUtraty ? '0 = Platina vypnutá.' : '0 návštěv = Platina vypnutá.' },
   ];
+  const dopocitat = async () => {
+    setDopocitavam(true);
+    try {
+      const r = await j('/api/client/admin/loyalty', { method: 'POST', body: JSON.stringify({ what: 'spend_backfill' }) });
+      toast(r.updated > 0 ? `Útrata dopočtena. Upraveno: ${czCount(r.updated, HOST)}.` : 'Není co dopočítat — členové s útratou už ji mají, nebo chybí objednávky a účtenky.');
+    } catch (err) { toast(apiMessage(err, 'Útrata se nedopočetla.')); }
+    setDopocitavam(false);
+  };
   return (
     <div className="space-y-4 max-w-3xl">
       <form id={FORM_BODY} onSubmit={save} className="space-y-4">
@@ -248,8 +264,19 @@ function BodyAUrovne({ toast, setUkladam }: { toast: (m: string) => void; setUkl
         <Card className="space-y-4">
           <div>
             <h2 className="t-card">Úrovně hostů a jejich sleva</h2>
-            <p className="t-meta mt-0.5 max-w-[70ch]">Čím víc návštěv, tím lepší úroveň. Sleva je informace pro obsluhu: při načtení kartičky u kasy uvidí, kolik hostovi odečíst. Úroveň vidí i host na své stránce.</p>
+            <p className="t-meta mt-0.5 max-w-[70ch]">{podleUtraty ? 'Čím víc host celkem utratí, tím lepší úroveň.' : 'Čím víc návštěv, tím lepší úroveň.'} Sleva je informace pro obsluhu: při načtení kartičky u kasy uvidí, kolik hostovi odečíst. Úroveň vidí i host na své stránce.</p>
           </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="field-label !mb-0">Úrovně podle</p>
+            <Segmented options={[{ id: 'visits', label: 'Návštěv' }, { id: 'spend', label: 'Útraty' }]}
+              value={podleUtraty ? 'spend' : 'visits'} onChange={v => { if (meni) setP({ ...p, tier_by: v }); }} size="sm" ariaLabel="Úrovně podle" />
+          </div>
+          {podleUtraty && (
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="t-meta max-w-[70ch]">Útrata se sčítá z účtenek, objednávek od stolu a částek zadaných u kasy. Přepnutí nic nemaže — prahy obou režimů zůstávají uložené.</p>
+              {ma('vernost.upravit_body') && <Button size="sm" variant="secondary" loading={dopocitavam} onClick={dopocitat}>Dopočítat útratu z historie</Button>}
+            </div>
+          )}
           <ul className="space-y-2">
             {urovne.map(t => (
               <Well as="li" key={t.id} className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-3 items-end">
@@ -258,8 +285,8 @@ function BodyAUrovne({ toast, setUkladam }: { toast: (m: string) => void; setUkl
                   <p className="t-meta mt-1.5">{t.hint}</p>
                 </div>
                 {t.atKey ? (
-                  <Field id={`t-${t.id}`} label="Návštěv">
-                    <Input id={`t-${t.id}`} type="number" min={t.id === 'platinum' ? 0 : 1} max={2000} disabled={!meni} className="!w-24" value={p[t.atKey] ?? 0} onChange={e => setP({ ...p, [t.atKey!]: e.target.value })} />
+                  <Field id={`t-${t.id}`} label={podleUtraty ? `Útrata (${symbol})` : 'Návštěv'}>
+                    <Input id={`t-${t.id}`} type="number" min={t.id === 'platinum' ? 0 : 1} max={podleUtraty ? 100000000 : 2000} disabled={!meni} className={podleUtraty ? '!w-32' : '!w-24'} value={p[t.atKey] ?? 0} onChange={e => setP({ ...p, [t.atKey!]: e.target.value })} />
                   </Field>
                 ) : <span className="hidden sm:block" />}
                 <Field id={`d-${t.id}`} label="Sleva %">
@@ -282,14 +309,24 @@ function Groups({ toast }: { toast: (m: string) => void }) {
   const meni = useOpravneni().ma('zakaznici.skupiny');
   const [list, setList] = useState<any[] | null>(null);
   const [name, setName] = useState('');
+  const [novaSleva, setNovaSleva] = useState('');
   const [busy, setBusy] = useState('');
   const [mazu, setMazu] = useState<any | null>(null);
   const load = useCallback(() => fetch('/api/client/admin/groups').then(okJson).then(d => setList(d.groups ?? [])).catch(() => setList([])), []);
   useEffect(() => { load(); }, [load]);
   const add = async (e: React.FormEvent) => {
     e.preventDefault(); if (!name.trim()) return; setBusy('add');
-    try { await j('/api/client/admin/groups', { method: 'POST', body: JSON.stringify({ name }) }); setName(''); load(); }
+    try { await j('/api/client/admin/groups', { method: 'POST', body: JSON.stringify({ name, discount_pct: novaSleva === '' ? undefined : novaSleva }) }); setName(''); setNovaSleva(''); load(); }
     catch (err) { toast(apiMessage(err, 'Skupinu se nepodařilo založit.')); }
+    setBusy('');
+  };
+  // Sleva skupiny se ukládá po opuštění pole; 0 = skupina je jen štítek.
+  const ulozSlevu = async (g: any, hodnota: string) => {
+    const n = Math.max(0, Math.min(100, Math.round(Number(hodnota) || 0)));
+    if (n === (Number(g.discount_pct) || 0)) return;
+    setBusy('sleva:' + g.id);
+    try { await j('/api/client/admin/groups', { method: 'PATCH', body: JSON.stringify({ id: g.id, discount_pct: n }) }); load(); toast(`Sleva skupiny ${g.name}: ${n} %.`); }
+    catch (err) { toast(apiMessage(err, 'Slevu se nepodařilo uložit.')); }
     setBusy('');
   };
   const del = async (g: any) => {
@@ -300,19 +337,27 @@ function Groups({ toast }: { toast: (m: string) => void }) {
     <Card className="space-y-3" aria-labelledby="v-skupiny">
       <div>
         <h2 id="v-skupiny" className="t-card">Skupiny hostů</h2>
-        <p className="t-meta mt-0.5 max-w-[70ch]">Vlastní štítky mimo úrovně — „štamgasti", „firemní večery". Hosty do nich přidáš v Zákaznících; kupony na ně cílíš v jejich editoru.</p>
+        <p className="t-meta mt-0.5 max-w-[70ch]">Vlastní štítky mimo úrovně — „štamgasti", „firemní večery". Hosty do nich přidáš v Zákaznících; kupony na ně cílíš v jejich editoru. Skupina může mít i vlastní slevu: člen ve víc skupinách (a s úrovní) bere vždy nejvyšší z nich, nikdy součet.</p>
       </div>
       {list === null ? <Skeleton className="h-16" /> : list.length > 0 && (
         <ul className="list">
           {list.map((g: any) => (
-            <ListRow key={g.id} title={g.name} meta={czCount(Number(g.members) || 0, HOST)}
-              actions={meni ? <Button size="sm" variant="ghost" icon="trash" aria-label={`Smazat skupinu ${g.name}`} loading={busy === 'del:' + g.id} onClick={() => setMazu(g)}>Smazat</Button> : undefined} />
+            <ListRow key={g.id} title={g.name} meta={`${czCount(Number(g.members) || 0, HOST)}${Number(g.discount_pct) > 0 ? ` · sleva ${g.discount_pct} %` : ''}`}
+              actions={meni ? <>
+                <label htmlFor={`sk-${g.id}`} className="inline-flex items-center gap-1.5 text-xs text-black/60">Sleva v %
+                  <Input id={`sk-${g.id}`} key={`${g.id}:${g.discount_pct}`} type="number" min={0} max={100} className="!w-20" aria-label={`Sleva v % pro skupinu ${g.name}`}
+                    defaultValue={Number(g.discount_pct) || 0} disabled={busy === 'sleva:' + g.id}
+                    onBlur={e => { void ulozSlevu(g, e.target.value); }} />
+                </label>
+                <Button size="sm" variant="ghost" icon="trash" aria-label={`Smazat skupinu ${g.name}`} loading={busy === 'del:' + g.id} onClick={() => setMazu(g)}>Smazat</Button>
+              </> : undefined} />
           ))}
         </ul>
       )}
       {meni && (
         <form onSubmit={add} className="flex gap-2 flex-wrap">
           <Input aria-label="Název nové skupiny" value={name} onChange={e => setName(e.target.value)} placeholder="Nová skupina…" className="flex-1 basis-48 !w-auto" maxLength={60} />
+          <Input type="number" min={0} max={100} aria-label="Sleva nové skupiny v %" placeholder="Sleva v %" value={novaSleva} onChange={e => setNovaSleva(e.target.value)} className="!w-28" />
           <Button type="submit" variant="secondary" icon="plus" loading={busy === 'add'} disabled={!name.trim()}>Přidat</Button>
         </form>
       )}
@@ -794,6 +839,7 @@ const POPIS_CASTI: Record<LoyaltySub, string> = {
   points: 'Za co host dostane body, kolik se mu vrátí jako kredit, a jaké úrovně a slevy si tím odemyká.',
   stamps: 'Razítkové kartičky — za návštěvy, za vybrané položky, nebo za útratu. Klidně víc najednou.',
   coupons: 'Co host uplatní: kupony se slevou v % i v měně podniku, X+Y, cílením a limity — a promo kódy na leták nebo účtenku.',
+  vouchers: 'Dárkové poukazy s jedinečným kódem a QR: peněžní hodnota, platnost, uplatnění po částech u kasy a tisk.',
 };
 
 export default function LoyaltyTabs({ toast, promos }: { toast: (m: string) => void; promos: React.ReactNode }) {
@@ -807,6 +853,7 @@ export default function LoyaltyTabs({ toast, promos }: { toast: (m: string) => v
     : sub === 'points' ? <BodyAUrovne toast={toast} setUkladam={setUkladam} />
     : sub === 'stamps' ? <Stamps toast={toast} />
     : sub === 'coupons' ? <div className="space-y-4"><Coupons toast={toast} />{promos}</div>
+    : sub === 'vouchers' ? <Poukazy toast={toast} />
     : null;
   return (
     <PlochaWidgetu

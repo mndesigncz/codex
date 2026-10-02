@@ -51,6 +51,24 @@ export async function GET() {
       ]);
     }
   } catch { /* před migrací */ }
+  // Útrata a slevy skupin po podnicích: samostatné dotazy, ať chybějící sloupec (před migrací) nic neshodí.
+  const spendBy = new Map<number, number>();
+  const skupinyBy = new Map<number, { name: string; discount: number }[]>();
+  try {
+    const rows = await sql`SELECT team_id, spend FROM client_memberships WHERE customer_id = ${me.id}` as any[];
+    for (const r of rows) spendBy.set(Number(r.team_id), Number(r.spend) || 0);
+  } catch { /* před migrací */ }
+  try {
+    const rows = await sql`
+      SELECT gm.team_id, g.name, g.discount_pct FROM client_group_members gm
+      JOIN client_groups g ON g.id = gm.group_id AND g.team_id = gm.team_id
+      WHERE gm.customer_id = ${me.id} AND g.discount_pct > 0 ORDER BY g.discount_pct DESC` as any[];
+    for (const r of rows) {
+      const t = Number(r.team_id);
+      if (!skupinyBy.has(t)) skupinyBy.set(t, []);
+      skupinyBy.get(t)!.push({ name: String(r.name), discount: Number(r.discount_pct) || 0 });
+    }
+  } catch { /* před migrací */ }
   const progBy = new Map(progRows.map((r: any) => [Number(r.campaign_id), r]));
   const campsByTeam = new Map<number, any[]>();
   for (const r of campaignRows) {
@@ -63,7 +81,7 @@ export async function GET() {
   }
   return NextResponse.json({
     me: { ...(profile ?? me), novinky },
-    memberships: memberships.map(m => ({ ...publicProfile(m), points: Number(m.points), stamps: Number(m.stamps), visits: Number(m.visits), credit: Number(m.credit ?? 0), lastVisitAt: m.last_visit_at, campaigns: campsByTeam.get(Number(m.team_id)) ?? [] })),
+    memberships: memberships.map(m => ({ ...publicProfile(m), points: Number(m.points), stamps: Number(m.stamps), visits: Number(m.visits), spend: spendBy.get(Number(m.team_id)) ?? 0, groupDiscounts: skupinyBy.get(Number(m.team_id)) ?? [], credit: Number(m.credit ?? 0), lastVisitAt: m.last_visit_at, campaigns: campsByTeam.get(Number(m.team_id)) ?? [] })),
     reservations, orders, claims, today,
   });
 }

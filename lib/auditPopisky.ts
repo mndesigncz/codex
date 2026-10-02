@@ -26,6 +26,11 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'onboarding.apply': 'Průvodce nastavením podniku založil předvolby',
   'klient.import': 'Import členů z jiné aplikace',
   'klient.import.vraceni': 'Import členů vrácen',
+  'klient.poukaz.vytvoren': 'Dárkové poukazy založeny',
+  'klient.poukaz.uplatnen': 'Dárkový poukaz uplatněn',
+  'klient.poukaz.vracen': 'Částka vrácena na dárkový poukaz',
+  'klient.poukaz.zrusen': 'Dárkový poukaz zrušen',
+  'klient.poukaz.upraven': 'Dárkový poukaz upraven',
   // role
   'role.create': 'Vytvořena role',
   'role.update': 'Upravena role',
@@ -80,7 +85,9 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'client.reservation': 'Změněna rezervace hosta',
   'client.profile': 'Změna veřejné stránky podniku',
   'client.broadcast': 'Odeslána zpráva členům věrnostního programu',
+  'client.banner': 'Změna promo banneru na stránce podniku',
   'client.card': 'Změna na věrnostní kartě',
+  'client.spend': 'Úprava útraty člena (úrovně podle útraty)',
   'client.order': 'Změněn stav objednávky hosta',
   'client.order.pos': 'Objednávka hosta předána do kasy',
   // předplatné

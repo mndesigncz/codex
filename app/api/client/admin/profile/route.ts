@@ -5,6 +5,7 @@ import { sql, ensureProfile, slugify, publicProfile } from '@/lib/client';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { normalizeQrDesign } from '@/lib/qrDesign';
 import { audit } from '@/lib/audit';
+import { zajistiUrovne } from '@/lib/urovneDb';
 import { teamIsMax, MAX_ONLY_MSG } from '@/lib/planServer';
 
 export const dynamic = 'force-dynamic';
@@ -27,6 +28,7 @@ const POLE_OPRAVNENI: Record<string, string> = {
   loyalty_on: 'vernost.pravidla', points_per_100: 'vernost.pravidla', stamp_target: 'vernost.pravidla', stamp_reward: 'vernost.pravidla',
   birthday_points: 'vernost.pravidla', referral_points: 'vernost.pravidla', silver_at: 'vernost.pravidla', gold_at: 'vernost.pravidla',
   platinum_at: 'vernost.pravidla', member_discount: 'vernost.pravidla', silver_discount: 'vernost.pravidla',
+  tier_by: 'vernost.pravidla', silver_spend: 'vernost.pravidla', gold_spend: 'vernost.pravidla', platinum_spend: 'vernost.pravidla',
   gold_discount: 'vernost.pravidla', platinum_discount: 'vernost.pravidla', cashback_pct: 'vernost.pravidla', cashback_mode: 'vernost.pravidla',
 };
 const NAZEV_SKUPINY: Record<string, string> = {
@@ -40,6 +42,8 @@ export async function GET(req: NextRequest) {
   const ctx = await pozaduj(['klient.nastaveni', 'klient.vzhled', 'vernost.zobrazit']);
   if (jeOdpoved(ctx)) return ctx;
   const u = { id: ctx.meId, team_id: ctx.teamId };
+  // Sloupce úrovní podle útraty se zajistí dřív, ať je profil (SELECT *) vrátí.
+  try { await zajistiUrovne(); } catch { /* bez nich platí návštěvy */ }
   const p = await ensureProfile(u.team_id);
   const boards = await sql`
     SELECT b.slug, b.name,
@@ -135,6 +139,20 @@ export async function PUT(req: NextRequest) {
       qr_design = ${b.qr_design !== undefined ? JSON.stringify(normalizeQrDesign(b.qr_design)) : JSON.stringify(normalizeQrDesign(cur.qr_design))}::jsonb,
       updated_at = NOW()
     WHERE team_id = ${u.team_id} RETURNING *`;
-  audit(u.team_id, u.id, 'client.profile', 'client', null, p.enabled ? `zapnuto · /client/${p.slug}` : 'vypnuto');
-  return NextResponse.json({ ok: true, profile: p, public: publicProfile({ ...p, team_name: '', opening_hours: {} }), url: `${origin(req)}/client/${p.slug}` });
+  // Režim úrovní a prahy v útratě: zvlášť a až po zajištění sloupců, ať uložení
+  // ostatních pravidel nezávisí na migraci. Přepnutí režimu nic nemaže —
+  // prahy obou režimů zůstávají uložené vedle sebe.
+  let pFinal = p;
+  if (['tier_by', 'silver_spend', 'gold_spend', 'platinum_spend'].some(k => b?.[k] !== undefined)) {
+    await zajistiUrovne();
+    [pFinal] = await sql`
+      UPDATE client_profiles SET
+        tier_by = ${b.tier_by !== undefined ? (b.tier_by === 'spend' ? 'spend' : 'visits') : (p.tier_by === 'spend' ? 'spend' : 'visits')},
+        silver_spend = ${num(b.silver_spend, Number(p.silver_spend) || 5000, 1, 100000000)},
+        gold_spend = ${num(b.gold_spend, Number(p.gold_spend) || 15000, 2, 100000000)},
+        platinum_spend = ${num(b.platinum_spend, Number(p.platinum_spend) || 0, 0, 100000000)}
+      WHERE team_id = ${u.team_id} RETURNING *`;
+  }
+  audit(u.team_id, u.id, 'client.profile', 'client', null, pFinal.enabled ? `zapnuto · /client/${pFinal.slug}` : 'vypnuto');
+  return NextResponse.json({ ok: true, profile: pFinal, public: publicProfile({ ...pFinal, team_name: '', opening_hours: {} }), url: `${origin(req)}/client/${pFinal.slug}` });
 }

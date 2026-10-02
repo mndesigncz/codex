@@ -15,6 +15,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { onAccent, staciKontrast } from '@/lib/floorplan';
 import { Icon } from '../Icons';
 import { Button, Card, Field, Input, PageHeader, Skeleton, ErrorState, Textarea } from '../ui';
+import BannersEditor from './BannersEditor';
 
 /** Předvolené barvy značky — podnik si může vybrat i vlastní. */
 const ACCENTS = ['#C8F542', '#E8A33D', '#D9644A', '#7C9A6B', '#4A7DBF', '#9B6BAE', '#16181A'];
@@ -111,7 +112,8 @@ export default function BrandTab({ toast, onChange }: { toast: (m: string) => vo
   const gallery: string[] = p.gallery ?? [];
 
   return (
-    <form onSubmit={save} className="space-y-6 max-w-3xl">
+    <div className="space-y-6 max-w-3xl">
+    <form onSubmit={save} className="space-y-6">
       <PageHeader hintId="brandtab" title="Vzhled" subtitle="Čím se podnik hostům představí: logo, fotky a pár vět o sobě."
         primary={<Button type="submit" variant="accent" loading={busy === 'save'}>Uložit</Button>}
         secondary={<Button type="button" variant="secondary" icon="external" onClick={() => url && window.open(url, '_blank')} disabled={!url}>Zobrazit</Button>} />
@@ -192,5 +194,8 @@ export default function BrandTab({ toast, onChange }: { toast: (m: string) => vo
         <Field id="b-addr" label="Adresa"><Input id="b-addr" value={p.address ?? ''} onChange={e => setP({ ...p, address: e.target.value })} placeholder="Vodní 14, Brno" /></Field>
       </Card>
     </form>
+    {/* Bannery se ukládají samy (vlastní tlačítka), proto stojí mimo formulář Vzhledu. */}
+    <BannersEditor toast={toast} upload={uploadImage} accent={p.accent || ''} />
+    </div>
   );
 }

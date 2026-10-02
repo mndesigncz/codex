@@ -59,34 +59,89 @@ export const RES_STATUS: Record<string, { label: string; tone: 'wait' | 'ok' | '
 // každý podnik vlastní; výchozí hodnoty odpovídají malému podniku, kde je
 // pětadvacet návštěv opravdový štamgast.
 
+export type TierBy = 'visits' | 'spend';
+
 export interface TierRules {
   silverAt?: number; goldAt?: number; platinumAt?: number;
   memberDiscount?: number; silverDiscount?: number; goldDiscount?: number; platinumDiscount?: number;
+  /** Podle čeho se úroveň počítá: 'visits' (výchozí, jako dřív) nebo 'spend' (kumulovaná útrata). */
+  tierBy?: TierBy | string | null;
+  /** Prahy v útratě (celé jednotky měny podniku); platí jen v režimu 'spend'. */
+  silverSpend?: number; goldSpend?: number; platinumSpend?: number;
 }
 
 export type TierId = 'bronze' | 'silver' | 'gold' | 'platinum';
 
-export interface Tier { id: TierId; label: string; discount: number; nextAt: number | null; nextLabel: string | null }
+/** `unit` říká, v čem je `nextAt`: návštěvy, nebo měna podniku. */
+export interface Tier { id: TierId; label: string; discount: number; nextAt: number | null; nextLabel: string | null; unit: TierBy }
 
-/** Úroveň hosta i s tím, co z ní plyne — sleva a kolik chybí do další.
- *  Platina běží jen tam, kde ji podnik zapnul (platinumAt > 0). */
-export function tierFor(visits: number, r?: TierRules | null): Tier {
-  const v = Math.max(0, Number(visits) || 0);
-  const silverAt = Math.max(1, Number(r?.silverAt) || 10);
-  const goldAt = Math.max(silverAt + 1, Number(r?.goldAt) || 25);
-  const platinumAt = Number(r?.platinumAt) > 0 ? Math.max(goldAt + 1, Number(r?.platinumAt)) : 0;
+/** Režim úrovní podniku; cokoli jiného než 'spend' je 'visits'. */
+export function tierBy(r?: TierRules | null): TierBy {
+  return r?.tierBy === 'spend' ? 'spend' : 'visits';
+}
+
+/** Výchozí prahy útraty, když je podnik nemá nastavené (0 u stříbra a zlata = výchozí; u platiny = vypnuto). */
+export const VYCHOZI_PRAHY_UTRATY = { silver: 5000, gold: 15000 };
+
+/**
+ * Prahy podle režimu, už srovnané: stříbro aspoň 1, zlato nad stříbrem, platina
+ * nad zlatem (0 = platina vypnutá). Jedno místo pro tierFor i pro SQL publika zpráv.
+ */
+export function tierThresholds(r?: TierRules | null): { by: TierBy; silver: number; gold: number; platinum: number } {
+  const by = tierBy(r);
+  const spend = by === 'spend';
+  const silver = Math.max(1, Number(spend ? r?.silverSpend : r?.silverAt) || (spend ? VYCHOZI_PRAHY_UTRATY.silver : 10));
+  const gold = Math.max(silver + 1, Number(spend ? r?.goldSpend : r?.goldAt) || (spend ? VYCHOZI_PRAHY_UTRATY.gold : 25));
+  const rawPlat = Number(spend ? r?.platinumSpend : r?.platinumAt);
+  const platinum = rawPlat > 0 ? Math.max(gold + 1, rawPlat) : 0;
+  return { by, silver, gold, platinum };
+}
+
+/**
+ * Úroveň hosta i s tím, co z ní plyne — sleva a kolik chybí do další.
+ * `hodnota` je počet návštěv, nebo kumulovaná útrata — podle r.tierBy (bez r a
+ * s 'visits' je to dnešní chování). Platina běží jen tam, kde ji podnik zapnul.
+ */
+export function tierFor(hodnota: number, r?: TierRules | null): Tier {
+  const v = Math.max(0, Number(hodnota) || 0);
+  const { by, silver: silverAt, gold: goldAt, platinum: platinumAt } = tierThresholds(r);
   const base = Math.max(0, Math.min(90, Number(r?.memberDiscount) || 0));
   const sd = Math.max(base, Math.min(90, Number(r?.silverDiscount) || 0));
   const gd = Math.max(sd, Math.min(90, Number(r?.goldDiscount) || 0));
   const pd = Math.max(gd, Math.min(90, Number(r?.platinumDiscount) || 0));
-  if (platinumAt > 0 && v >= platinumAt) return { id: 'platinum', label: 'Platinový host', discount: pd, nextAt: null, nextLabel: null };
-  if (v >= goldAt) return { id: 'gold', label: 'Zlatý host', discount: gd, nextAt: platinumAt > 0 ? platinumAt : null, nextLabel: platinumAt > 0 ? 'Platinový host' : null };
-  if (v >= silverAt) return { id: 'silver', label: 'Stříbrný host', discount: sd, nextAt: goldAt, nextLabel: 'Zlatý host' };
-  return { id: 'bronze', label: 'Člen', discount: base, nextAt: silverAt, nextLabel: 'Stříbrný host' };
+  if (platinumAt > 0 && v >= platinumAt) return { id: 'platinum', label: 'Platinový host', discount: pd, nextAt: null, nextLabel: null, unit: by };
+  if (v >= goldAt) return { id: 'gold', label: 'Zlatý host', discount: gd, nextAt: platinumAt > 0 ? platinumAt : null, nextLabel: platinumAt > 0 ? 'Platinový host' : null, unit: by };
+  if (v >= silverAt) return { id: 'silver', label: 'Stříbrný host', discount: sd, nextAt: goldAt, nextLabel: 'Zlatý host', unit: by };
+  return { id: 'bronze', label: 'Člen', discount: base, nextAt: silverAt, nextLabel: 'Stříbrný host', unit: by };
+}
+
+/** Úroveň člena s režimem podniku: z návštěv, nebo z útraty. Tohle volej všude, kde máš člena. */
+export function tierForMember(m: { visits?: number | string | null; spend?: number | string | null }, r?: TierRules | null): Tier {
+  return tierFor(tierBy(r) === 'spend' ? Number(m?.spend) || 0 : Number(m?.visits) || 0, r);
+}
+
+/** Řádek client_profiles (snake_case z databáze) → pravidla úrovní. */
+export function tierRulesFromProfile(p: any): TierRules {
+  return {
+    silverAt: Number(p?.silver_at), goldAt: Number(p?.gold_at), platinumAt: Number(p?.platinum_at) || 0,
+    memberDiscount: Number(p?.member_discount), silverDiscount: Number(p?.silver_discount), goldDiscount: Number(p?.gold_discount),
+    platinumDiscount: Number(p?.platinum_discount) || 0,
+    tierBy: p?.tier_by === 'spend' ? 'spend' : 'visits',
+    silverSpend: Number(p?.silver_spend) || 0, goldSpend: Number(p?.gold_spend) || 0, platinumSpend: Number(p?.platinum_spend) || 0,
+  };
 }
 
 /** Zpětně kompatibilní zkratka pro místa, kde stačí jméno úrovně. */
 export function levelFor(visits: number): { id: TierId; label: string } {
   const t = tierFor(visits);
   return { id: t.id, label: t.label };
+}
+
+/** Horní mez jedné útraty — překlep o tři nuly nesmí přetéct INTEGER ani rozhodit úrovně. */
+export const MAX_UTRATA = 10_000_000;
+
+/** Částka na celé nezáporné jednotky v rozumném rozsahu. */
+export function celaUtrata(v: unknown): number {
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) ? Math.max(0, Math.min(MAX_UTRATA, n)) : 0;
 }
