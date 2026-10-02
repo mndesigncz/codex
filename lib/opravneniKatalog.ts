@@ -1204,6 +1204,26 @@ export const KATALOG: Opravneni[] = [
   ]
  },
  {
+  "id": "zakaznici.export",
+  "oblast": "Zákazníci a menu",
+  "nazev": "Export členů do CSV",
+  "popis": "Stáhnout seznam členů nebo členů skupiny jako soubor CSV. E-maily jsou v souboru jen se zakaznici.kontakty.",
+  "citlivost": "vysoká",
+  "vyzaduje": [
+   "zakaznici.zobrazit"
+  ]
+ },
+ {
+  "id": "zakaznici.poznamky",
+  "oblast": "Zákazníci a menu",
+  "nazev": "Interní poznámky k hostům",
+  "popis": "Číst a psát interní poznámky u člena klubu (alergie, oblíbený čaj, domluva). Host je nevidí.",
+  "citlivost": "střední",
+  "vyzaduje": [
+   "zakaznici.zobrazit"
+  ]
+ },
+ {
   "id": "zakaznici.skupiny",
   "oblast": "Zákazníci a menu",
   "nazev": "Skupiny členů",
@@ -1782,8 +1802,10 @@ export const SYSTEMOVE_ROLE: SystemovaRole[] = [
    "volno.zobrazit",
    "vyroba.receptura",
    "vyroba.vyrabet",
+   "zakaznici.export",
    "zakaznici.import",
    "zakaznici.kontakty",
+   "zakaznici.poznamky",
    "zakaznici.recenze",
    "zakaznici.skupiny",
    "zakaznici.zobrazit",

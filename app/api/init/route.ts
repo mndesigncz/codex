@@ -1786,6 +1786,22 @@ export async function GET(request: Request) {
         PRIMARY KEY (group_id, customer_id)
       )`);
     await ddl(sql`CREATE INDEX IF NOT EXISTS client_group_members_customer ON client_group_members (team_id, customer_id)`);
+    // Kolo 81 (členové a zprávy): popis a barva skupiny, pravidla dynamické skupiny, poznámky k hostovi.
+    // Stejné příkazy jsou v lib/clenoveDb.ts (zajistiClenove) — funguje i před spuštěním /api/init.
+    await ddl(sql`ALTER TABLE client_groups ADD COLUMN IF NOT EXISTS description TEXT`);
+    await ddl(sql`ALTER TABLE client_groups ADD COLUMN IF NOT EXISTS color TEXT`);
+    await ddl(sql`ALTER TABLE client_groups ADD COLUMN IF NOT EXISTS rules JSONB`);
+    await ddl(sql`ALTER TABLE client_groups ADD COLUMN IF NOT EXISTS rules_refreshed_at TIMESTAMP`);
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS client_member_notes (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        customer_id INTEGER NOT NULL,
+        body TEXT NOT NULL,
+        created_by INTEGER,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_member_notes_customer ON client_member_notes (team_id, customer_id)`);
     // Profil podniku v Nastavení: IČO a DIČ (volitelné).
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS ico TEXT`);
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS dic TEXT`);
@@ -1946,6 +1962,10 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS reactivation_days INTEGER NOT NULL DEFAULT 0`);
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS reactivation_points INTEGER NOT NULL DEFAULT 0`);
     await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS audience TEXT NOT NULL DEFAULT 'all'`);
+    // Kolo 81: ke zprávě lze připojit existující kupon nebo promo kód; `muted` = kolik členů si novinky vypnulo.
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS coupon_id INTEGER`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS promo_id INTEGER`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS muted INTEGER NOT NULL DEFAULT 0`);
     // Pozvi kamaráda: kdo hosta přivedl, a kolik bodů za to podnik dává.
     await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by INTEGER`);
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS referral_points INTEGER NOT NULL DEFAULT 0`);

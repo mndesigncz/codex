@@ -1,6 +1,6 @@
 // Ruční úprava bodů (omluva, bonus, oprava) a deník člena.
 import { NextRequest, NextResponse } from 'next/server';
-import { sql, award, awardCredit, loyaltySummary, ensureProfile } from '@/lib/client';
+import { sql, award, awardCredit, spendCredit, spendPoints, loyaltySummary, ensureProfile } from '@/lib/client';
 import { tierForMember, tierRulesFromProfile } from '@/lib/clientSlots';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { upravUtratu, dopocitejUtratu } from '@/lib/urovneDb';
@@ -111,10 +111,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, spend });
   }
   // Stejným koncovým bodem se dá upravit i kredit — obsluha ho u kasy odečítá.
+  // Odečet jde přes atomické spendCredit / spendPoints: víc, než host má, odečíst nejde
+  // (dřív se zůstatek ořízl na nulu, ale do deníku se zapsal celý odečet, takže se rozešly).
   if (b.what === 'credit') {
-    const credit = await awardCredit(u.team_id, cid, delta, 'credit', null, note);
+    const credit = delta > 0 ? await awardCredit(u.team_id, cid, delta, 'credit', null, note) : await spendCredit(u.team_id, cid, -delta, 'credit', null, note);
+    if (credit == null) return NextResponse.json({ error: 'Host nemá tolik kreditu. Odečíst jde nejvýš to, co má.' }, { status: 400 });
+    await audit(u.team_id, u.id, 'client.credit', 'client', cid, `kredit ${delta > 0 ? '+' : ''}${delta} → ${credit}${note ? ` (${note})` : ''}`);
     return NextResponse.json({ ok: true, credit });
   }
-  const points = await award(u.team_id, cid, delta, 'manual', null, note);
+  const points = delta > 0 ? await award(u.team_id, cid, delta, 'manual', null, note) : await spendPoints(u.team_id, cid, -delta, 'manual', null, note);
+  if (points == null) return NextResponse.json({ error: 'Host nemá tolik bodů. Odečíst jde nejvýš to, co má.' }, { status: 400 });
+  await audit(u.team_id, u.id, 'client.points', 'client', cid, `body ${delta > 0 ? '+' : ''}${delta} → ${points}${note ? ` (${note})` : ''}`);
   return NextResponse.json({ ok: true, points });
 }

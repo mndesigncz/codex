@@ -1,74 +1,80 @@
 // Členové podniku: kdo chodí, kolik má bodů a razítek, kdy byl naposledy.
+// Filtry (úroveň, skupina, neaktivní N dní, narozeniny tento měsíc, otevřený kupon,
+// útrata), řazení, stránkování („načíst další") a export do CSV. Rozhodování o tom,
+// kdo filtr splňuje, je v lib/clenoveFiltr.ts a sdílí ho seznam, export, hromadné
+// akce i dynamické skupiny.
 import { NextRequest, NextResponse } from 'next/server';
-import { sql, ensureProfile } from '@/lib/client';
-import { tierForMember, tierRulesFromProfile } from '@/lib/clientSlots';
-import { efektivniSleva } from '@/lib/slevy';
+import { sql } from '@/lib/client';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { audit } from '@/lib/audit';
+import { pragueDaySafe, pragueToday } from '@/lib/pragueTime';
+import { nactiClenyTymu, obnovDynamickeSkupiny, kontextFiltru } from '@/lib/clenoveDb';
+import {
+  normalizujFiltr, normalizujRazeni, splnujeFiltr, seradCleny, strankuj, sestavCsvClenu, type FiltrClenu,
+} from '@/lib/clenoveFiltr';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
+
+/** Strop řádků jednoho exportu (soubor, který Excel ještě otevře). */
+const EXPORT_MAX = 50_000;
 
 export async function GET(req: NextRequest) {
   const ctx = await pozaduj('zakaznici.zobrazit');
   if (jeOdpoved(ctx)) return ctx;
   const u = { id: ctx.meId, team_id: ctx.teamId };
-  const q = String(new URL(req.url).searchParams.get('q') ?? '').trim().toLowerCase();
-  // Hledání patří do SQL: filtr v JS až po LIMIT 500 znamenal, že člena za
-  // pětistou hranicí nešlo najít a „total" byl zavádějícím způsobem uříznutý.
-  // Speciální znaky LIKE (% _ \) escapujeme, ať se text bere doslovně.
-  const like = '%' + q.replace(/[\\%_]/g, ch => '\\' + ch) + '%';
+  const params = new URL(req.url).searchParams;
   // E-mail hosta je kontakt — vidí ho a hledá podle něj jen ten, kdo smí
   // hostům psát. Jinak by šlo e-mail uhodnout hledáním po písmenech.
   const kontakty = ctx.role.opravneni.has('zakaznici.kontakty');
-  // Widget „Členové klubu" (kolo 69, B8) chce jen pět nejvěrnějších podle
-  // zvoleného řazení — ne 500 řádků, ze kterých by si pět vybral sám.
-  // Bez parametrů zůstává pořadí i strop seznamu Zákazníci beze změny.
-  const razeni = String(new URL(req.url).searchParams.get('sort') ?? '');
-  const strop = Math.min(500, Math.max(1, parseInt(String(new URL(req.url).searchParams.get('limit') ?? '500'), 10) || 500));
-  const podleNavstev = razeni === 'navstevy';
-  const podleBodu = razeni === 'body';
-  const nejnovejsi = razeni === 'nejnovejsi';
-  const rows = await sql`
-    SELECT m.customer_id AS id, us.name, us.email, m.points, m.stamps, m.visits, m.joined_at, m.last_visit_at,
-           COALESCE((to_jsonb(m)->>'spend')::int, 0) AS spend,
-           (SELECT COUNT(*)::int FROM client_reservations r WHERE r.customer_id = m.customer_id AND r.team_id = m.team_id) AS reservations,
-           (SELECT COUNT(*)::int FROM client_coupon_claims c WHERE c.customer_id = m.customer_id AND c.team_id = m.team_id AND c.redeemed_at IS NULL) AS open_coupons
-    FROM client_memberships m JOIN users us ON us.id = m.customer_id
-    WHERE m.team_id = ${u.team_id}
-      AND (${q} = '' OR LOWER(us.name) LIKE ${like} ESCAPE '\\' OR (${kontakty} AND LOWER(us.email) LIKE ${like} ESCAPE '\\'))
-    ORDER BY
-      CASE WHEN ${podleNavstev} THEN m.visits END DESC NULLS LAST,
-      CASE WHEN ${podleBodu} THEN m.points END DESC NULLS LAST,
-      CASE WHEN ${nejnovejsi} THEN m.joined_at END DESC NULLS LAST,
-      m.last_visit_at DESC NULLS LAST, m.joined_at DESC
-    LIMIT ${strop}` as any[];
-  const [cnt] = await sql`
-    SELECT COUNT(*)::int AS total
-    FROM client_memberships m JOIN users us ON us.id = m.customer_id
-    WHERE m.team_id = ${u.team_id}
-      AND (${q} = '' OR LOWER(us.name) LIKE ${like} ESCAPE '\\' OR (${kontakty} AND LOWER(us.email) LIKE ${like} ESCAPE '\\'))` as any[];
-  // Úroveň podle režimu podniku a efektivní sleva (nejvyšší z úrovně a slev skupin).
-  const pravidla = tierRulesFromProfile(await ensureProfile(u.team_id));
-  const ids = rows.map(r => Number(r.id));
-  const skupinyBy = new Map<number, { name: string; discount: number }[]>();
-  if (ids.length) {
-    try {
-      const sk = await sql`
-        SELECT gm.customer_id, g.name, g.discount_pct FROM client_group_members gm
-        JOIN client_groups g ON g.id = gm.group_id AND g.team_id = gm.team_id
-        WHERE gm.team_id = ${u.team_id} AND g.discount_pct > 0 AND gm.customer_id = ANY(${ids})` as any[];
-      for (const r of sk) {
-        const c = Number(r.customer_id);
-        if (!skupinyBy.has(c)) skupinyBy.set(c, []);
-        skupinyBy.get(c)!.push({ name: String(r.name), discount: Number(r.discount_pct) || 0 });
-      }
-    } catch { /* před migrací */ }
+  const filtr: FiltrClenu = normalizujFiltr(params);
+  const razeni = normalizujRazeni(params.get('sort'));
+  const csv = params.get('format') === 'csv';
+  if (csv && !ctx.role.opravneni.has('zakaznici.export')) {
+    return NextResponse.json({ error: 'Export členů nemáš povolený.' }, { status: 403 });
   }
-  const obohacene = rows.map(r => {
-    const t = tierForMember({ visits: r.visits, spend: r.spend }, pravidla);
-    const s = efektivniSleva({ uroven: t, skupiny: skupinyBy.get(Number(r.id)) });
-    return { ...r, level: t.id, level_label: t.label, discount: s.pct, discount_source: s.zdroj, discount_name: s.nazev };
+
+  // Dynamická skupina musí být před výběrem aktuální (jinak by člen, který pravidla už splňuje, chyběl).
+  if (filtr.group) { try { await obnovDynamickeSkupiny(u.team_id); } catch (e) { console.error('[clenove] přepočet skupin', e); } }
+
+  const vsichni = await nactiClenyTymu(u.team_id);
+  const poHostu = new Map<number, Set<number>>(vsichni.map(c => [c.id, new Set(c.skupiny.map(g => g.id))]));
+  const k = { ...kontextFiltru(), hledatEmail: kontakty, skupinyHosta: (id: number) => poHostu.get(id) };
+  const vybrani = seradCleny(vsichni.filter(c => splnujeFiltr(c, filtr, k)), razeni);
+
+  if (csv) {
+    const rows = vybrani.slice(0, EXPORT_MAX);
+    const telo = sestavCsvClenu(rows.map(c => ({
+      name: c.name, email: c.email, level_label: c.level_label, points: c.points, credit: c.credit, stamps: c.stamps, visits: c.visits, spend: c.spend,
+      joined: pragueDaySafe(c.joined_at), lastVisit: pragueDaySafe(c.last_visit_at), groups: c.skupiny.map(g => g.name).join(', '),
+    })), kontakty);
+    await audit(u.team_id, u.id, 'client.export', 'client', null, `export členů: ${rows.length}${filtr.group ? ' (skupina)' : ''}${kontakty ? ' s e-maily' : ''}`);
+    return new NextResponse(telo, {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="clenove-${pragueToday()}.csv"`,
+        'Cache-Control': 'no-store',
+      },
+    });
+  }
+
+  const strana = strankuj(vybrani, params.get('offset'), params.get('limit'));
+  // Rezervace jen stránce, ne všem členům.
+  const ids = strana.rows.map(c => c.id);
+  const rez = new Map<number, number>();
+  if (ids.length) {
+    const r = await sql`
+      SELECT customer_id, COUNT(*)::int AS n FROM client_reservations
+      WHERE team_id = ${u.team_id} AND customer_id = ANY(${ids}) GROUP BY customer_id` as any[];
+    for (const x of r) rez.set(Number(x.customer_id), Number(x.n));
+  }
+  const customers = strana.rows.map(c => {
+    const { email, birthday, ...zbytek } = c;
+    return { ...zbytek, ...(kontakty ? { email } : {}), reservations: rez.get(c.id) ?? 0, has_birthday_month: !!birthday && Number(birthday.slice(5, 7)) === k.mesic };
   });
-  const customers = kontakty ? obohacene : obohacene.map(({ email: _e, ...r }) => r);
-  return NextResponse.json({ customers, total: cnt?.total ?? rows.length });
+  return NextResponse.json({
+    customers, total: strana.total, hasMore: strana.hasMore, nextOffset: strana.nextOffset,
+    // Celkem členů bez filtru: rozlišuje „nikdo takový" od „zatím žádní členové".
+    all: vsichni.length,
+  });
 }
