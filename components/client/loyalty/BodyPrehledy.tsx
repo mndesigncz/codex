@@ -30,6 +30,8 @@ const RAZENI = [
 const POHYB: CzNoun = { one: 'pohyb', few: 'pohyby', many: 'pohybů' };
 const HOST: CzNoun = { one: 'host', few: 'hosté', many: 'hostů' };
 const NAVSTEVA: CzNoun = { one: 'návštěva', few: 'návštěvy', many: 'návštěv' };
+const UCET: CzNoun = { one: 'účtenka', few: 'účtenky', many: 'účtenek' };
+const POUKAZ: CzNoun = { one: 'poukaz', few: 'poukazy', many: 'poukazů' };
 
 const cs = cisloCs;
 
@@ -75,8 +77,29 @@ export function BodyPrehledy({ toast }: { toast: (m: string) => void }) {
           <Stat label="Odhad hodnoty bodů" value={z.pointsValue == null ? '—' : money(z.pointsValue)}
             note={z.pointValue == null ? 'Chybí kupon za body s pevnou slevou' : `1 bod ≈ ${money(Math.round(z.pointValue * 100) / 100)}`} />
         </StatRow>
+        {(z.poukazuAktivnich ?? 0) > 0 && (
+          <StatRow>
+            <Stat label="Nevyčerpané poukazy" value={money(z.poukazy)} note={`${czCount(z.poukazuAktivnich, POUKAZ)} platných`} />
+          </StatRow>
+        )}
         {z.pointValue == null && <p className="t-meta max-w-[70ch]">Hodnotu bodu odhadujeme z kuponů za body s pevnou slevou v penězích. Kupon se slevou v procentech nebo „X+Y“ se do odhadu nepočítá.</p>}
       </Card>
+
+      {d.vynosnost && (
+      <Card className="space-y-4" aria-labelledby="pv-vynos">
+        <div>
+          <h2 id="pv-vynos" className="t-card">Výnosnost za období</h2>
+          <p className="t-meta mt-0.5 max-w-[70ch]">Kolik útraty prošlo účtenkami z pokladny, které věrnost připsala (bez stornovaných), a kolik podnik hostům vrátil. Období přepíná volba níž.</p>
+        </div>
+        <StatRow>
+          <Stat label="Útrata členů z účtenek" value={money(d.vynosnost.utrata)} note={d.vynosnost.ucty > 0 ? czCount(d.vynosnost.ucty, UCET) : 'zatím žádná účtenka'} />
+          <Stat label="Cashback v kreditu" value={money(d.vynosnost.cashbackKredit)} note={d.vynosnost.cashbackBody > 0 ? `a ${cs(d.vynosnost.cashbackBody)} b. cashbacku v bodech` : undefined} />
+          <Stat label="Náklad odměn" value={d.vynosnost.nakladPct == null ? '—' : `${String(d.vynosnost.nakladPct).replace('.', ',')} %`}
+            note={d.vynosnost.nakladPct == null ? 'Chybí útrata nebo hodnota bodu' : 'z útraty, odhad (kredit + body × hodnota bodu)'} />
+        </StatRow>
+        {d.vynosnost.storno > 0 && <p className="t-meta max-w-[70ch]">Za zrušené nebo vrácené účtenky se v období odečetlo {cs(d.vynosnost.storno)} b.</p>}
+      </Card>
+      )}
 
       <Card pad="none" aria-labelledby="pv-zdroje">
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-4">

@@ -12,6 +12,7 @@ import { czCount, type CzNoun } from '@/lib/czech';
 import { apiMessage } from '@/lib/api';
 import { chybaBonusu, BONUS_CELKEM_MAX, type FiltrClenu } from '@/lib/clenoveFiltr';
 import { TITLE_MAX, BODY_MAX } from '@/lib/zpravyPravidla';
+import { KANALY_ZPRAVY, type KanalyZpravy } from '@/lib/zpravyKanaly';
 import { j, type Hlaska } from '../import/typy';
 import ZpravyNahled from './ZpravyNahled';
 
@@ -153,7 +154,7 @@ export function HromadnyBonus({ vyber, oznam, onZavrit, onHotovo }: { vyber: Vyb
 export function HromadnaZprava({ vyber, nazevPodniku, oznam, onZavrit, onHotovo }: {
   vyber: VyberHostu; nazevPodniku: string | null; oznam: Hlaska; onZavrit: () => void; onHotovo: () => void;
 }) {
-  const [f, setF] = useState({ title: '', body: '', linkKind: 'page' });
+  const [f, setF] = useState({ title: '', body: '', linkKind: 'page', channels: 'push' as KanalyZpravy });
   const { busy, chyba, spust } = useAkce(vyber, oznam, onHotovo);
   const potvrd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -177,6 +178,10 @@ export function HromadnaZprava({ vyber, nazevPodniku, oznam, onZavrit, onHotovo 
         <Field id="hz-body" label="Text" hint={`${f.body.length} z ${BODY_MAX} znaků`}>
           <Textarea id="hz-body" rows={3} maxLength={BODY_MAX} value={f.body} onChange={e => setF({ ...f, body: e.target.value })} />
         </Field>
+        <Field label="Kudy" hint={KANALY_ZPRAVY.find(k => k.id === f.channels)?.popis}>
+          <Segmented size="sm" ariaLabel="Kanál zprávy" value={f.channels} onChange={v => setF({ ...f, channels: v })}
+            options={KANALY_ZPRAVY.map(k => ({ id: k.id, label: k.label }))} />
+        </Field>
         <Field id="hz-link" label="Kam zpráva vezme">
           <Select id="hz-link" value={f.linkKind} onChange={e => setF({ ...f, linkKind: e.target.value })}>
             <option value="page">Na stránku podniku</option>
@@ -185,8 +190,8 @@ export function HromadnaZprava({ vyber, nazevPodniku, oznam, onZavrit, onHotovo 
             <option value="me">Na jeho kartičku (Moje)</option>
           </Select>
         </Field>
-        <ZpravyNahled nazev={nazevPodniku} title={f.title} body={f.body} linkKind={f.linkKind} />
-        <p className="t-meta">Zpráva dojde jen těm, kdo mají zapnuté novinky. Počítá se do dnešního limitu pěti zpráv a odeslanou už nejde vzít zpátky.</p>
+        <ZpravyNahled nazev={nazevPodniku} title={f.title} body={f.body} linkKind={f.linkKind} oznameni={f.channels !== 'email'} email={f.channels !== 'push'} />
+        <p className="t-meta">Zpráva dojde jen těm, kdo mají zapnuté novinky (e-mail i adresu), a blokovaným členům nikdy. Počítá se do dnešního limitu pěti zpráv a odeslanou už nejde vzít zpátky.</p>
         {chyba && <p role="alert" className="note note-wait">{chyba}</p>}
       </form>
     </Modal>

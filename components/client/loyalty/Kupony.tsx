@@ -10,15 +10,17 @@ import { useOpravneni } from '../../role/useOpravneni';
 import { czDay } from '@/lib/clientSlots';
 import { czCount, type CzNoun } from '@/lib/czech';
 import { STAV_POPISKY, type StavKuponu } from '@/lib/kuponyPravidla';
-import { apiMessage, duplikujKupon, j, kuponNaForm, prazdnyKupon, type FormKupon } from './kuponyForm';
+import { apiMessage, duplikujKupon, j, kuponNaForm, prazdnyKupon, stahni, type FormKupon } from './kuponyForm';
 import KuponyEditor from './KuponyEditor';
 import KuponyNahled from './KuponyNahled';
 import KuponyOdeslat from './KuponyOdeslat';
 import KuponyPrehled from './KuponyPrehled';
 import KuponyUplatnit from './KuponyUplatnit';
+import KuponyHistorie from './KuponyHistorie';
 
 const KOD: CzNoun = { one: 'kód', few: 'kódy', many: 'kódů' };
 const KUS: CzNoun = { one: 'kus', few: 'kusy', many: 'kusů' };
+const KUPON: CzNoun = { one: 'kupon', few: 'kupony', many: 'kuponů' };
 const TON: Record<StavKuponu, ChipTone> = {
   aktivni: 'ok', naplanovano: 'info', koncept: 'muted', vypnuto: 'muted', vyprselo: 'bad', vyprodano: 'wait', archiv: 'muted',
 };
@@ -37,6 +39,10 @@ export default function Kupony({ toast }: { toast: (m: string) => void }) {
   const [posilam, setPosilam] = useState<any | null>(null);
   const [nahled, setNahled] = useState<any | null>(null);
   const [obnov, setObnov] = useState(0);
+  const [historie, setHistorie] = useState<any | null>(null);
+  // Hromadný výběr: zaškrtnuté kupony se dají najednou zapnout, pozastavit, archivovat, vrátit nebo smazat.
+  const [vybiram, setVybiram] = useState(false);
+  const [vybrane, setVybrane] = useState<number[]>([]);
 
   // Katalog čte jen správce (API chce kupony.spravovat); uplatnění kódu jde i bez něj.
   const load = useCallback(() => {
@@ -75,6 +81,17 @@ export default function Kupony({ toast }: { toast: (m: string) => void }) {
     setBusy('');
   };
 
+  const hromadne = async (action: 'zapnout' | 'pozastavit' | 'archivovat' | 'obnovit' | 'smazat') => {
+    if (!vybrane.length) return;
+    setBusy('hromadne');
+    try {
+      const r = await j('/api/client/admin/coupons', { method: 'PATCH', body: JSON.stringify({ ids: vybrane, action }) });
+      toast(`Hotovo: ${czCount(r.hotovo, KUPON)}${r.preskoceno ? `, ${r.preskoceno} přeskočeno${action === 'smazat' ? ' (hosté je drží nebo uplatnili, archivuj je)' : ''}` : ''}.`);
+      setVybrane([]); setVybiram(false); obnovVse();
+    } catch (e) { toast(apiMessage(e, 'Hromadná změna se nepovedla.')); }
+    setBusy('');
+  };
+
   if (chyba) return <ErrorState title="Kupony se nenačetly" onRetry={load} detail={chyba} />;
   if (list === null) return <div className="space-y-4"><Skeleton className="h-28" /><Skeleton className="h-48" /></div>;
 
@@ -91,6 +108,7 @@ export default function Kupony({ toast }: { toast: (m: string) => void }) {
       ...(stav === 'koncept' ? [{ label: 'Zveřejnit', icon: 'check', hint: 'Hosté ho uvidí a mohou si ho vzít.', onClick: () => { void zmen(c, { draft: false }, 'Kupon zveřejněn.'); } }] : []),
       ...(!c.draft && !c.archived && stav !== 'vyprselo' && c.active ? [{ label: 'Poslat hostům…', icon: 'send', hint: 'Hostovi, skupině, nebo všem členům.', onClick: () => setPosilam(c) }] : []),
       { label: 'Duplikovat', icon: 'copy', hint: 'Vznikne koncept, který si upravíš.', onClick: () => setForm(duplikujKupon(c)) },
+      { label: 'Historie změn…', icon: 'clock', hint: 'Kdo a kdy kupon založil, upravil nebo rozeslal.', onClick: () => setHistorie(c) },
       c.archived
         ? { label: 'Vrátit z archivu', icon: 'undo', onClick: () => { void zmen(c, { archived: false }, 'Kupon je zpět mezi aktuálními.'); } }
         : { label: 'Archivovat', icon: 'archive', hint: 'Hosté ho už neuvidí, vydané kódy zůstanou platné.', onClick: () => { void zmen(c, { archived: true }, 'Kupon archivován.'); } },
@@ -109,8 +127,28 @@ export default function Kupony({ toast }: { toast: (m: string) => void }) {
           <Card pad="none" aria-labelledby="v-kupony" className={uplatni ? '' : 'lg:col-span-2'}>
             <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-4">
               <h2 id="v-kupony" className="t-card">Katalog kuponů</h2>
-              <Button size="sm" variant="secondary" icon="plus" onClick={() => setForm(prazdnyKupon())}>Nový kupon</Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Menu size="sm" label="Exportovat kupony do CSV" items={[
+                  { label: 'Katalog kuponů (CSV)', icon: 'download', onClick: () => stahni('/api/client/admin/coupons?export=kupony') },
+                  { label: 'Vydané kódy (CSV)', icon: 'download', hint: 'Kdo kód dostal, kdy ho uplatnil, za kolik, kdo ho uplatnil.', onClick: () => stahni('/api/client/admin/coupons?export=claimy') },
+                ]} />
+                {videt.length > 0 && <Button size="sm" variant="ghost" onClick={() => { setVybiram(v => !v); setVybrane([]); }}>{vybiram ? 'Hotovo' : 'Vybrat'}</Button>}
+                <Button size="sm" variant="secondary" icon="plus" onClick={() => setForm(prazdnyKupon())}>Nový kupon</Button>
+              </div>
             </div>
+            {vybiram && (
+              <div className="px-5 pt-3 flex flex-wrap items-center gap-2" role="toolbar" aria-label="Hromadné akce s kupony">
+                <span className="t-meta mr-1">{vybrane.length ? `Vybráno: ${czCount(vybrane.length, KUPON)}` : 'Zaškrtni kupony'}</span>
+                {filtr === 'archiv'
+                  ? <Button size="sm" variant="secondary" disabled={!vybrane.length} loading={busy === 'hromadne'} onClick={() => { void hromadne('obnovit'); }}>Vrátit z archivu</Button>
+                  : <>
+                    <Button size="sm" variant="secondary" disabled={!vybrane.length} loading={busy === 'hromadne'} onClick={() => { void hromadne('zapnout'); }}>Zapnout</Button>
+                    <Button size="sm" variant="secondary" disabled={!vybrane.length} loading={busy === 'hromadne'} onClick={() => { void hromadne('pozastavit'); }}>Pozastavit</Button>
+                    <Button size="sm" variant="secondary" disabled={!vybrane.length} loading={busy === 'hromadne'} onClick={() => { void hromadne('archivovat'); }}>Archivovat</Button>
+                  </>}
+                <Button size="sm" variant="danger" disabled={!vybrane.length} loading={busy === 'hromadne'} onClick={() => { void hromadne('smazat'); }}>Smazat nepoužité</Button>
+              </div>
+            )}
             <div className="px-5 pt-3">
               <Segmented size="sm" ariaLabel="Které kupony ukázat" value={filtr} onChange={setFiltr} options={[
                 { id: 'aktualni', label: `Aktuální (${pocet('aktualni')})` },
@@ -130,6 +168,8 @@ export default function Kupony({ toast }: { toast: (m: string) => void }) {
                   const stav: StavKuponu = c.stav;
                   return (
                     <ListRow key={c.id} className={c.active && !c.archived ? '' : 'opacity-70'}
+                      lead={vybiram ? <input type="checkbox" className="h-5 w-5 accent-[#16181A]" aria-label={`Vybrat kupon ${c.title}`} checked={vybrane.includes(c.id)}
+                        onChange={() => setVybrane(v => (v.includes(c.id) ? v.filter(x => x !== c.id) : [...v, c.id]))} /> : undefined}
                       title={<span className="flex items-center gap-1.5 min-w-0"><span className="truncate">{c.title}</span>{c.benefit && <Chip tone="muted" size="sm">{c.benefit}</Chip>}</span>}
                       meta={[
                         c.costPoints > 0 ? `${c.costPoints} b.` : 'zdarma', ...(c.badges ?? []),
@@ -161,6 +201,7 @@ export default function Kupony({ toast }: { toast: (m: string) => void }) {
           <KuponyNahled f={nahled} />
         </Modal>
       )}
+      {historie && <KuponyHistorie kupon={historie} onZavrit={() => setHistorie(null)} />}
       {posilam && <KuponyOdeslat kupon={posilam} groups={groups} onZavrit={() => setPosilam(null)} oznam={toast} onHotovo={obnovVse} />}
       {mazu && (
         <Modal open onClose={() => setMazu(null)} size="sm" title={`Smazat kupon „${mazu.title}"?`}

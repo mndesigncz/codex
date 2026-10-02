@@ -9,7 +9,10 @@ import { sql } from '@/lib/client';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import {
   dispatchDueBroadcasts, segmentyPocty, audienceIds, dosahPublika, odeslanoDnes, odesliZpravu, nactiPrilohu, zkusebniZprava,
+  skupinyKVyberu,
 } from '@/lib/broadcasts';
+import { jeKanal } from '@/lib/zpravyKanaly';
+import { zajistiSchemaClenu } from '@/lib/clenoveSchema';
 import { zkontrolujZpravu, oknoUcinku, jePlatnePublikum, ZPRAV_DENNE, type VstupZpravy } from '@/lib/zpravyPravidla';
 import { hit } from '@/lib/rateLimit';
 import { audit } from '@/lib/audit';
@@ -17,6 +20,7 @@ import { pragueToday } from '@/lib/pragueTime';
 import { zajistiClenove } from '@/lib/clenoveDb';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
+export const maxDuration = 60;
 
 /** Skupina v publiku musí patřit podniku; kupon a promo kód smí připojit jen ten, kdo je spravuje. */
 async function zkontrolujCile(teamId: number, data: VstupZpravy, smiPrilohy: boolean): Promise<NextResponse | null> {
@@ -42,17 +46,22 @@ export async function GET(req: NextRequest) {
   const dosah = params.get('dosah');
   if (dosah) {
     if (!jePlatnePublikum(dosah)) return NextResponse.json({ error: 'Tohle publikum neznám.' }, { status: 400 });
+    const kanalParam = params.get('kanal');
+    const kanal = jeKanal(kanalParam) ? kanalParam : 'push';
     const ids = await audienceIds(u.team_id, dosah);
-    return NextResponse.json({ pocet: ids.length, souhlas: await dosahPublika(ids) });
+    // `souhlas` = kolik členů dostane oznámení; `dosah` rozepisuje zvolený kanál a důvody, proč někdo nic nedostane.
+    const d = await dosahPublika(u.team_id, ids, kanal);
+    return NextResponse.json({ pocet: ids.length, souhlas: d.push, dosah: d });
   }
   await zajistiClenove();
+  await zajistiSchemaClenu();
   await dispatchDueBroadcasts();
   const history = await sql`
     SELECT b.*
     FROM client_broadcasts b
     WHERE b.team_id = ${u.team_id} AND (b.status IS NULL OR b.status <> 'cancelled')
     ORDER BY COALESCE(b.scheduled_at, b.sent_at) DESC LIMIT 50` as any[];
-  // Ke každé odeslané zprávě i to, co po ní přišlo: kolik různých členů se v sedmi
+  // Ke každé odeslané zprávě i to, co po ní přišlo: kolik různých PŘÍJEMCŮ té zprávy se v sedmi
   // kalendářních dnech po dni odeslání objevilo u kasy (skutečná návštěva nebo objednávka,
   // ne bonus ani narozeniny), a kolik jich přišlo sedm dní předtím. Není to důkaz, že za
   // to může zpráva — je to jediné poctivé srovnání, které z našich dat jde udělat.
@@ -64,10 +73,12 @@ export async function GET(req: NextRequest) {
       SELECT w.id,
         (SELECT COUNT(DISTINCT l.customer_id)::int FROM client_loyalty_ledger l
           WHERE l.team_id = ${u.team_id} AND l.kind IN ('visit', 'order')
-            AND ((l.created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague')::date BETWEEN w.po_od::date AND w.po_do::date) AS visits_after,
+            AND ((l.created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague')::date BETWEEN w.po_od::date AND w.po_do::date
+            AND COALESCE((SELECT CASE WHEN jsonb_array_length(b.prijemci) < 5000 THEN b.prijemci @> to_jsonb(l.customer_id) END FROM client_broadcasts b WHERE b.id = w.id), TRUE)) AS visits_after,
         (SELECT COUNT(DISTINCT l.customer_id)::int FROM client_loyalty_ledger l
           WHERE l.team_id = ${u.team_id} AND l.kind IN ('visit', 'order')
-            AND ((l.created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague')::date BETWEEN w.pred_od::date AND w.pred_do::date) AS visits_before
+            AND ((l.created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague')::date BETWEEN w.pred_od::date AND w.pred_do::date
+            AND COALESCE((SELECT CASE WHEN jsonb_array_length(b.prijemci) < 5000 THEN b.prijemci @> to_jsonb(l.customer_id) END FROM client_broadcasts b WHERE b.id = w.id), TRUE)) AS visits_before
       FROM unnest(${okna.map(x => x.id)}::int[], ${okna.map(x => x.okno!.poOd)}::text[], ${okna.map(x => x.okno!.poDo)}::text[],
                   ${okna.map(x => x.okno!.predOd)}::text[], ${okna.map(x => x.okno!.predDo)}::text[]) AS w(id, po_od, po_do, pred_od, pred_do)` as any[];
     for (const r of rows) ucinek.set(Number(r.id), { after: Number(r.visits_after) || 0, before: Number(r.visits_before) || 0 });
@@ -86,18 +97,13 @@ export async function GET(req: NextRequest) {
            COUNT(*) FILTER (WHERE spend >= ${th.silver})::int AS silver,
            COUNT(*) FILTER (WHERE spend >= ${th.gold})::int AS gold,
            COUNT(*) FILTER (WHERE spend >= ${platinumAt > 0 ? platinumAt : th.gold})::int AS platinum
-    FROM client_memberships WHERE team_id = ${u.team_id}` as any[] : await sql`
+    FROM client_memberships WHERE team_id = ${u.team_id} AND blocked = FALSE` as any[] : await sql`
     SELECT COUNT(*)::int AS members,
            COUNT(*) FILTER (WHERE visits >= ${th.silver})::int AS silver,
            COUNT(*) FILTER (WHERE visits >= ${th.gold})::int AS gold,
            COUNT(*) FILTER (WHERE visits >= ${platinumAt > 0 ? platinumAt : th.gold})::int AS platinum
-    FROM client_memberships WHERE team_id = ${u.team_id}` as any[];
-  let groups: any[] = [];
-  try {
-    groups = await sql`
-      SELECT g.id, g.name, (SELECT COUNT(*)::int FROM client_group_members gm WHERE gm.group_id = g.id) AS members
-      FROM client_groups g WHERE g.team_id = ${u.team_id} ORDER BY g.name` as any[];
-  } catch { groups = []; }
+    FROM client_memberships WHERE team_id = ${u.team_id} AND blocked = FALSE` as any[];
+  const groups = (await skupinyKVyberu(u.team_id)).filter(g => !g.archived);
   const segments = await segmentyPocty(u.team_id);
   // Kupony a promo kódy k připojení: jen vybrat existující; jen pro toho, kdo je spravuje.
   const smiPrilohy = ctx.role.opravneni.has('kupony.spravovat');
@@ -142,6 +148,7 @@ export async function POST(req: NextRequest) {
   const chyba = await zkontrolujCile(u.team_id, data, smiPrilohy);
   if (chyba) return chyba;
   await zajistiClenove();
+  await zajistiSchemaClenu();
 
   // Zkouška jen sobě: nic se nezapisuje do historie a nespotřebuje se denní slot.
   if (b.action === 'test') {
@@ -150,15 +157,15 @@ export async function POST(req: NextRequest) {
     const r = await zkusebniZprava(u.id, u.team_id, data);
     if (!r.ok) return NextResponse.json({ error: r.chyba }, { status: 400 });
     await audit(u.team_id, u.id, 'client.broadcast.test', 'client', null, `zkouška: ${data.title}`);
-    return NextResponse.json({ ok: true, test: true });
+    return NextResponse.json({ ok: true, test: true, ...r.v });
   }
 
   // Naplánování: čas v budoucnu → zpráva jde do fronty a počká si. Denní limit se bere až při odeslání.
   if (data.scheduledAt) {
     const at = data.scheduledAt.toISOString();
     const [row] = await sql`
-      INSERT INTO client_broadcasts (team_id, title, body, recipients, sent_by, audience, status, scheduled_at, sent_at, link_kind, coupon_id, promo_id)
-      VALUES (${u.team_id}, ${data.title}, ${data.body || null}, 0, ${u.id}, ${data.audience}, 'scheduled', ${at}, ${at}, ${data.linkKind}, ${data.couponId}, ${data.promoId})
+      INSERT INTO client_broadcasts (team_id, title, body, recipients, sent_by, audience, status, scheduled_at, sent_at, link_kind, coupon_id, promo_id, channels)
+      VALUES (${u.team_id}, ${data.title}, ${data.body || null}, 0, ${u.id}, ${data.audience}, 'scheduled', ${at}, ${at}, ${data.linkKind}, ${data.couponId}, ${data.promoId}, ${data.channels})
       RETURNING *`;
     await audit(u.team_id, u.id, 'client.broadcast', 'client', null, `naplánováno: ${data.title} (${data.audience})`);
     return NextResponse.json({ ok: true, broadcast: row, scheduled: true });
@@ -183,6 +190,7 @@ export async function PATCH(req: NextRequest) {
   if (!data.scheduledAt) {
     return NextResponse.json({ error: 'Čas odeslání musí být v budoucnu. Chceš poslat hned? Zprávu zruš a pošli novou.' }, { status: 400 });
   }
+  await zajistiSchemaClenu();
   const chyba = await zkontrolujCile(u.team_id, data, ctx.role.opravneni.has('kupony.spravovat'));
   if (chyba) return chyba;
   const at = data.scheduledAt.toISOString();
@@ -190,7 +198,7 @@ export async function PATCH(req: NextRequest) {
   const [row] = await sql`
     UPDATE client_broadcasts
     SET title = ${data.title}, body = ${data.body || null}, audience = ${data.audience}, link_kind = ${data.linkKind},
-        coupon_id = ${data.couponId}, promo_id = ${data.promoId}, scheduled_at = ${at}, sent_at = ${at}
+        coupon_id = ${data.couponId}, promo_id = ${data.promoId}, channels = ${data.channels}, scheduled_at = ${at}, sent_at = ${at}
     WHERE id = ${id} AND team_id = ${u.team_id} AND status = 'scheduled'
     RETURNING *`;
   if (!row) return NextResponse.json({ error: 'Zpráva už odešla, byla zrušena, nebo neexistuje. Změnit ji nejde.' }, { status: 409 });

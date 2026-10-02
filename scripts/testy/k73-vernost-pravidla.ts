@@ -8,9 +8,10 @@ import { readFileSync } from 'node:fs';
 import type { Testy } from './_testy.ts';
 import { planPropadani, normalizujDny, VAROVANI_DNI, rozlisDenik, smiVarovat, denKratce } from '../../lib/propadaniBodu.ts';
 import {
-  normalizujPravidlo, tvarPravidla, platiTed, vyberBonus, bodySBonusem, poznamkaRazitek, popisNasobice, dokdyDnes, prazskeTed, ZADNY_BONUS,
+  normalizujPravidlo, tvarPravidla, platiTed, vyberBonus, poznamkaRazitek, popisNasobice, dokdyDnes, prazskeTed, ZADNY_BONUS,
   type BonusPravidlo,
 } from '../../lib/bonusAkce.ts';
+import { spoctiOdmenu, pravidlaBoduZProfilu } from '../../lib/bodyPravidla.ts';
 
 const zdroj = (p: string) => readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8');
 
@@ -94,11 +95,16 @@ export default function ({ eq, ok }: Testy) {
   eq('bonus: víc akcí se nesčítá, bere se nejvyšší násobič a razítka', [vyber.nasobic, vyber.razitka, vyber.nazev], [3, 2, 'B']);
   eq('bonus: dokdy dnes', [dokdyDnes(vyber), dokdyDnes(vyberBonus([pravidlo({ hourFrom: 0, hourTill: 24 })], t0)), dokdyDnes(ZADNY_BONUS)], [18, null, null]);
 
-  eq('body s bonusem: dvojnásobek s poznámkou do deníku', bodySBonusem(25, vyberBonus([pravidlo()], t0)), { body: 50, poznamka: ' — dvojnásobné body (Happy hour)' });
-  eq('body s bonusem: 1,5× se zaokrouhlí', bodySBonusem(5, vyberBonus([pravidlo({ multiplier: 1.5 })], t0)).body, 8);
-  eq('body s bonusem: bez bonusu beze změny a bez poznámky', bodySBonusem(25, ZADNY_BONUS), { body: 25, poznamka: '' });
-  eq('body s bonusem: nula zůstane nula, záporné a NaN neprojde', [bodySBonusem(0, vyberBonus([pravidlo()], t0)).body, bodySBonusem(-5, vyberBonus([pravidlo()], t0)).body, bodySBonusem(NaN, vyberBonus([pravidlo()], t0)).body], [0, 0, 0]);
-  eq('body s bonusem: nikdy míň než základ', bodySBonusem(3, { ...ZADNY_BONUS, nasobic: 1.01, nazev: 'x' }).body >= 3, true);
+  // Body s bonusem počítá spoctiOdmenu (jediné místo): vyšší z násobiče akce a úrovně, před stropy.
+  const P5 = pravidlaBoduZProfilu({ points_per_100: 5 });
+  const sBonusem = (castka: number, b: { nasobic: number; nazev: string }, p = P5) => spoctiOdmenu(castka, p, { bonusNasobic: b.nasobic, bonusNazev: b.nazev });
+  const hh = vyberBonus([pravidlo()], t0);
+  eq('body s bonusem: dvojnásobek s poznámkou do deníku', [sBonusem(500, hh).points, sBonusem(500, hh).nasobicPopis], [50, 'dvojnásobné body, Happy hour']);
+  eq('body s bonusem: 1,5× se zaokrouhlí', sBonusem(100, vyberBonus([pravidlo({ multiplier: 1.5 })], t0)).points, 8);
+  eq('body s bonusem: bez bonusu beze změny a bez poznámky', [sBonusem(500, ZADNY_BONUS).points, sBonusem(500, ZADNY_BONUS).nasobicPopis], [25, '']);
+  eq('body s bonusem: nula zůstane nula, záporné a NaN neprojde', [sBonusem(0, hh).points, sBonusem(-500, hh).points, sBonusem(NaN, hh).points], [0, 0, 0]);
+  eq('body s bonusem: nikdy míň než základ', sBonusem(100, { nasobic: 1.01, nazev: 'x' }, pravidlaBoduZProfilu({ points_per_100: 3 })).points >= 3, true);
+  eq('body s bonusem: strop na účtenku platí i po násobiči', sBonusem(1000, hh, pravidlaBoduZProfilu({ points_per_100: 5, points_cap_per_bill: 60 })).points, 60);
   eq('razítka navíc: poznámka se správným tvarem', [poznamkaRazitek(vyberBonus([pravidlo({ multiplier: 1, stampBonus: 1 })], t0)), poznamkaRazitek(vyberBonus([pravidlo({ multiplier: 1, stampBonus: 3 })], t0)), poznamkaRazitek(vyberBonus([pravidlo({ multiplier: 1, stampBonus: 5 })], t0)), poznamkaRazitek(ZADNY_BONUS)],
     [' — 1 razítko navíc (Happy hour)', ' — 3 razítka navíc (Happy hour)', ' — 5 razítek navíc (Happy hour)', '']);
   eq('násobič slovy', [popisNasobice(2), popisNasobice(3), popisNasobice(1.5), popisNasobice(4)], ['dvojnásobné body', 'trojnásobné body', '1,5× body', '4× body']);
@@ -130,8 +136,8 @@ export default function ({ eq, ok }: Testy) {
 
   const scan = zdroj('app/api/client/staff/scan/route.ts');
   const client = zdroj('lib/client.ts');
-  ok('bonus: kartička u kasy (razítko, účtenka, částka) bonus uplatňuje', (scan.match(/bodySBonusem\(/g) ?? []).length === 2 && client.includes('1 + navic') && scan.includes('stampVisit(u.team_id, c.id, p, \'card\', bonus.razitka') && /applyBillToCampaigns\([^\n]*razitka: bonus\.razitka/.test(scan));
-  ok('bonus: hotová objednávka od stolu bonus uplatňuje', zdroj('lib/clientOrders.ts').includes('bodySBonusem(zaklad, bonus)') && zdroj('lib/clientOrders.ts').includes('bonus.razitka'));
+  ok('bonus: kartička u kasy (razítko, účtenka, částka) bonus uplatňuje', (scan.match(/customerId: c\.id, bonus/g) ?? []).length === 2 && client.includes('1 + navic') && scan.includes('stampVisit(u.team_id, c.id, p, \'card\', bonus.razitka') && /applyBillToCampaigns\([^\n]*razitka: bonus\.razitka/.test(scan));
+  ok('bonus: hotová objednávka od stolu bonus uplatňuje', zdroj('lib/clientOrders.ts').includes('customerId: Number(o.customer_id), bonus') && zdroj('lib/clientOrders.ts').includes('bonus.razitka'));
   ok('bonus: návštěva z rezervace dává razítka navíc', zdroj('app/api/client/admin/reservations/route.ts').includes('bonus.razitka'));
   ok('bonus: stránka podniku hostovi ukazuje běžící akci', zdroj('app/api/client/b/[slug]/route.ts').includes('aktivniBonus(teamId)') && zdroj('components/client/BusinessPage.tsx').includes('<BonusPruh'));
 

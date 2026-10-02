@@ -7,6 +7,7 @@ import { escHtml } from './email.ts';
 import { datumCesky } from './poukazyTisk.ts';
 import { formatMoney } from './money.ts';
 import { czCount, DEN } from './czech.ts';
+import { sablona } from './poukazySablony.ts';
 import { normalizujEmail, vypadaJakoEmail } from './emailAdresa.ts';
 
 export const MAX_VZKAZ = 300;
@@ -30,14 +31,18 @@ export interface ObsahPoukazu {
   komu?: string | null; vzkaz?: string | null;
   /** Odkaz na stránku podniku (host si tam zůstatek ověří), nebo null. */
   odkaz?: string | null;
+  /** Šablona vzhledu (lib/poukazySablony); prázdné = klasik. */
+  design?: string | null;
 }
 
 const OBAL = 'font-family:-apple-system,sans-serif;max-width:520px;margin:0 auto;padding:28px;background:#F1F4EC;color:#16181A;border-radius:20px;';
 
 function karta(o: ObsahPoukazu, nadpis: string): string {
+  const v = sablona(o.design);
   return `
-    <div style="background:#ffffff;border:2px solid #16181A;border-radius:18px;padding:24px;text-align:center;margin:16px 0;">
+    <div style="background:${v.podklad};border:2px solid ${v.barva};color:${v.barva};border-radius:18px;padding:24px;text-align:center;margin:16px 0;">
       <p style="margin:0;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#5c6353;">${escHtml(o.podnik)}</p>
+      <div style="height:6px;width:120px;border-radius:3px;background:${v.akcent};margin:10px auto 8px;"></div>
       <p style="margin:4px 0 12px;font-size:20px;font-weight:800;">${escHtml(nadpis)}</p>
       <p style="margin:0 0 8px;font-size:38px;font-weight:800;line-height:1.1;">${escHtml(formatMoney(o.castka, o.mena))}</p>
       <p style="margin:12px 0 4px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:24px;font-weight:700;letter-spacing:.14em;word-break:break-all;">${escHtml(o.kod)}</p>
@@ -55,7 +60,7 @@ export function emailPoukazu(o: ObsahPoukazu): { subject: string; html: string }
         <p style="margin:0 0 4px;">${osloveni}</p>
         <p style="margin:0;color:#5c6353;">dostáváš dárkový poukaz. Ukaž kód u kasy a obsluha ho odečte.</p>
         ${o.vzkaz ? `<p style="margin:14px 0 0;padding:12px 14px;background:#ffffff;border-radius:12px;white-space:pre-wrap;">${escHtml(o.vzkaz)}</p>` : ''}
-        ${karta(o, 'Dárkový poukaz')}
+        ${karta(o, sablona(o.design).nadpis)}
         ${o.odkaz ? `<p style="margin:0;font-size:13px;color:#5c6353;">Zůstatek a platnost si ověříš na <a href="${escHtml(o.odkaz)}" style="color:#16181A;">stránce podniku</a> (Věrnost → Mám poukaz).</p>` : ''}
         <p style="margin:16px 0 0;font-size:12px;color:#8a917f;">Kód je jako hotovost: nikomu ho nepřeposílej.</p>
       </div>`,

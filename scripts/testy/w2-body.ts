@@ -23,7 +23,7 @@ const precti = (cesta: string) => readFileSync(new URL(`../../${cesta}`, import.
 /** Zdroják bez řádkových komentářů — komentáře o opraveném chování mluví o starém záměrně. */
 const bezKomentaru = (s: string) => s.split('\n').filter(l => !/^\s*(\/\/|\/?\*|\{\/\*)/.test(l)).join('\n');
 
-const PRAVIDLA: PravidlaBodu = { pointsPer100: 5, round: 'sta', minSpend: 0, capPerBill: 0, excludePrepaid: true, cashbackPct: 0 };
+const PRAVIDLA: PravidlaBodu = { pointsPer100: 5, round: 'sta', minSpend: 0, capPerBill: 0, excludePrepaid: true, cashbackPct: 0, capPerDay: 0, multSilver: 1, multGold: 1, multPlatinum: 1 };
 const money = (n: number) => `${n} Kč`;
 
 export default async function ({ eq, ok }: Testy) {
@@ -78,7 +78,7 @@ export default async function ({ eq, ok }: Testy) {
     ['200 Kč zaplaceno kreditem nebo poukazem se nepočítá', 'strop 5 b. na účtenku']);
   eq('věty: minimum se řekne lidsky', vetyOOmezeni(spoctiOdmenu(140, { ...PRAVIDLA, minSpend: 150 }), { ...PRAVIDLA, minSpend: 150 }, money), ['body se dávají od 150 Kč (z tohohle účtu se počítá 140 Kč)']);
   eq('pravidla z profilu: chybějící sloupce = dosavadní chování', pravidlaBoduZProfilu({ points_per_100: 5, cashback_pct: 2 }),
-    { pointsPer100: 5, round: 'sta', minSpend: 0, capPerBill: 0, excludePrepaid: true, cashbackPct: 2 });
+    { pointsPer100: 5, round: 'sta', minSpend: 0, capPerBill: 0, excludePrepaid: true, cashbackPct: 2, capPerDay: 0, multSilver: 1, multGold: 1, multPlatinum: 1 });
   eq('pravidla z profilu: nesmysl se ořízne, neznámé zaokrouhlení je výchozí', (() => { const r = pravidlaBoduZProfilu({ points_per_100: 9999, points_round: 'hack', cashback_pct: -3, points_cap_per_bill: 'x' }); return [r.pointsPer100, r.round, r.cashbackPct, r.capPerBill]; })(), [100, 'sta', 0, 0]);
   eq('vyloučené položky z profilu: duplicity, nesmysly a strop počtu', (() => {
     const v = vylouceneZProfilu([{ itemId: 1, name: 'A' }, { itemId: 1, name: 'B' }, { itemId: 'x' }, { itemId: -4 }, ...Array.from({ length: 80 }, (_, i) => ({ itemId: i + 10, name: 'p' }))]);
@@ -148,7 +148,7 @@ export default async function ({ eq, ok }: Testy) {
   ok('validace: každá zpráva je česká věta a jmenuje pole', validujPravidla({ gold_at: 1, silver_at: 5, tier_by: 'visits' }).every(c => /[a-zá-ž]/i.test(c.text) && c.text.length > 10));
   ok('validace: POLE_PRAVIDEL obsahuje každé pole, které validace zná', ['points_round', 'points_min_spend', 'points_cap_per_bill', 'tier_inactive_months', 'silver_at', 'platinum_spend'].every(k => (POLE_PRAVIDEL as readonly string[]).includes(k)));
   eq('formulář: nová pole do PUT (přidaná pole se nesmí ztratit)', Object.keys(novaPolePravidel({})).sort(),
-    ['points_cap_per_bill', 'points_exclude_items', 'points_exclude_prepaid', 'points_min_spend', 'points_round', 'tier_inactive_months']);
+    ['credit_expire_days', 'mult_gold', 'mult_platinum', 'mult_silver', 'points_cap_per_bill', 'points_cap_per_day', 'points_exclude_items', 'points_exclude_prepaid', 'points_exclude_sections', 'points_min_spend', 'points_round', 'tier_inactive_months', 'welcome_points']);
   {
     // Nesoulad UI × server: dřív UI 2000, server 500/1000.
     const server = bezKomentaru(precti('app/api/client/admin/profile/route.ts'));

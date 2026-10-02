@@ -9,25 +9,32 @@
 // spotřebuje až při odeslání, ke zprávě jde připojit jen existující kupon nebo promo
 // kód (uplatnění řeší stávající logika). Host dostane zprávu, jen když má zapnuté
 // novinky — proto se u publika ukazuje, kolika členům zpráva opravdu dojde.
+// Kanály: oznámení v aplikaci, e-mail (s odhlášením, jen se souhlasem a s adresou), nebo
+// obojí; publikum jde složit z víc podmínek (A / NEBO, „kromě“).
 
-import { useEffect, useState } from 'react';
-import { Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Modal, Select, Skeleton, Textarea, useLoad } from '../../ui';
+import { useEffect, useMemo, useState } from 'react';
+import { Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Modal, Segmented, Select, Skeleton, Textarea, useLoad } from '../../ui';
 import { DraftNote } from '../../ui/DraftNote';
 import { czCount, type CzNoun } from '@/lib/czech';
 import { dbTimeDayHM, dbTimeHM, parseDbTime, pragueDayOf } from '@/lib/pragueTime';
 import { SEGMENTY, jeSegment, stitekPublika } from '@/lib/segmenty';
 import { vetaUcinku, ZPRAV_DENNE, TITLE_MAX, BODY_MAX, type PrilohaZpravy } from '@/lib/zpravyPravidla';
+import { KANALY_ZPRAVY, vetaDosahu, type DosahZpravy, type KanalyZpravy } from '@/lib/zpravyKanaly';
+import { ctiKombinaci, stitekKombinace } from '@/lib/skupinyPravidla';
 import { apiMessage, okJson } from '@/lib/api';
 import { useDraft } from '@/lib/useDraft';
 import { j, type Hlaska } from '../import/typy';
 import ZpravyNahled from './ZpravyNahled';
+import KombinaceVyber from './KombinaceVyber';
 
 const CLEN: CzNoun = { one: 'člen', few: 'členové', many: 'členů' };
 const CLENOVI: CzNoun = { one: 'členovi', few: 'členům', many: 'členům' };
 const CLENA: CzNoun = { one: 'člena', few: 'členy', many: 'členů' };
 const HOST: CzNoun = { one: 'host', few: 'hosté', many: 'hostů' };
 
-const PRAZDNA_ZPRAVA = { title: '', body: '', audience: 'all', linkKind: 'page', scheduledAt: '', priloha: '' };
+const MIX = '__mix__';
+const EMAILU: CzNoun = { one: 'e-mail', few: 'e-maily', many: 'e-mailů' };
+const PRAZDNA_ZPRAVA = { title: '', body: '', audience: 'all', kombinace: '', linkKind: 'page', scheduledAt: '', priloha: '', channels: 'push' as KanalyZpravy };
 type Zprava = typeof PRAZDNA_ZPRAVA;
 
 /** „2026-10-05T14:00" → „5. 10. 2026 14:00" (čas je pražský, bez převodu přes zónu prohlížeče). */
@@ -61,25 +68,37 @@ export default function ZpravyRozeslani({ oznam }: { oznam: Hlaska }) {
   const [testuji, setTestuji] = useState(false);
   const [potvrdit, setPotvrdit] = useState(false);
   const [rusim, setRusim] = useState<any | null>(null);
-  const [dosah, setDosah] = useState<{ pocet: number; souhlas: number } | null>(null);
+  const [dosah, setDosah] = useState<{ pocet: number; souhlas: number; dosah: DosahZpravy | null } | null>(null);
   // Rozeslání jde stovkám zákazníků, takže se text píše rozmyšleně —
   // a o to víc mrzí, když ho spolkne přechod na jinou záložku.
   const koncept = useDraft('rozeslani', f, setF, { vychozi: PRAZDNA_ZPRAVA, aktivni: editId === null, upravujeSe: editId !== null });
   const { data: d, error, reload } = useLoad<any>('/api/client/admin/broadcast', raw => ({ ...raw, history: Array.isArray(raw?.history) ? raw.history : [] }));
 
-  // Kolik z vybraného publika zprávu opravdu dostane (jen ti, kdo mají zapnuté novinky).
+  const publikum = f.audience === MIX ? f.kombinace : f.audience;
+  const kanal = f.channels;
+
+  // Kolik z vybraného publika zprávu opravdu dostane přes zvolený kanál (jen ti, kdo mají zapnuté novinky).
   useEffect(() => {
+    if (!publikum) { setDosah(null); return; }
     let zije = true;
     setDosah(null);
     const t = setTimeout(() => {
-      fetch(`/api/client/admin/broadcast?dosah=${encodeURIComponent(f.audience)}`).then(okJson)
-        .then(r => { if (zije) setDosah({ pocet: Number(r.pocet) || 0, souhlas: Number(r.souhlas) || 0 }); })
+      fetch(`/api/client/admin/broadcast?dosah=${encodeURIComponent(publikum)}&kanal=${kanal}`).then(okJson)
+        .then(r => { if (zije) setDosah({ pocet: Number(r.pocet) || 0, souhlas: Number(r.souhlas) || 0, dosah: r.dosah ?? null }); })
         .catch(() => { if (zije) setDosah(null); });
     }, 200);
     return () => { zije = false; clearTimeout(t); };
-  }, [f.audience]);
+  }, [publikum, kanal]);
 
-  const target = !d ? 0 : jeSegment(f.audience) ? (d.segments?.[f.audience] ?? 0)
+  const moznostiKombinace = useMemo(() => !d ? [] : [
+    ...SEGMENTY.map(x => ({ id: x.id, label: x.label, pocet: d.segments?.[x.id] ?? 0, skupina: 'Podle chování' })),
+    { id: 'tier:silver', label: 'Stříbrní a výš', pocet: d.silver ?? 0, skupina: 'Podle úrovně' },
+    { id: 'tier:gold', label: 'Zlatí a výš', pocet: d.gold ?? 0, skupina: 'Podle úrovně' },
+    ...(d.platinum != null ? [{ id: 'tier:platinum', label: 'Platinoví hosté', pocet: d.platinum, skupina: 'Podle úrovně' }] : []),
+    ...(d.groups ?? []).map((g: any) => ({ id: `group:${g.id}`, label: `Skupina ${g.name}`, pocet: g.members, skupina: 'Podle skupiny' })),
+  ], [d]);
+
+  const target = !d ? 0 : f.audience === MIX ? (dosah?.pocet ?? 0) : jeSegment(f.audience) ? (d.segments?.[f.audience] ?? 0)
     : f.audience === 'tier:silver' ? (d.silver ?? 0)
     : f.audience === 'tier:gold' || f.audience === 'gold' ? (d.gold ?? 0)
     : f.audience === 'tier:platinum' ? (d.platinum ?? 0)
@@ -90,7 +109,8 @@ export default function ZpravyRozeslani({ oznam }: { oznam: Hlaska }) {
   const odeslano = Number(d?.limit?.odeslano) || 0;
   const limitVycerpan = odeslano >= (Number(d?.limit?.max) || ZPRAV_DENNE);
   const priloZvolena = d ? priloha(d, f.priloha) : null;
-  const nikomu = dosah != null && dosah.pocet > 0 && dosah.souhlas === 0;
+  const dosazeni = dosah?.dosah ? (kanal !== 'email' ? dosah.dosah.push : 0) + (kanal !== 'push' ? dosah.dosah.email : 0) : (dosah?.souhlas ?? null);
+  const nikomu = dosah != null && dosah.pocet > 0 && dosazeni === 0;
 
   const nahraj = (h: any) => {
     let volba = h.coupon_id ? `coupon:${h.coupon_id}` : h.promo_id ? `promo:${h.promo_id}` : '';
@@ -98,13 +118,19 @@ export default function ZpravyRozeslani({ oznam }: { oznam: Hlaska }) {
       oznam('Připojený kupon nebo promo kód už neplatí, ze zprávy se odebral.', 'bad');
       volba = '';
     }
-    setF({ title: String(h.title ?? ''), body: String(h.body ?? ''), audience: String(h.audience ?? 'all'), linkKind: String(h.link_kind ?? 'page'), scheduledAt: doPoleCasu(h.scheduled_at), priloha: volba });
+    const aud = String(h.audience ?? 'all');
+    const jeMix = !!ctiKombinaci(aud, { skupiny: true });
+    setF({
+      title: String(h.title ?? ''), body: String(h.body ?? ''), audience: jeMix ? MIX : aud, kombinace: jeMix ? aud : '',
+      linkKind: String(h.link_kind ?? 'page'), scheduledAt: doPoleCasu(h.scheduled_at), priloha: volba,
+      channels: (KANALY_ZPRAVY.some(k => k.id === h.channels) ? h.channels : 'push') as KanalyZpravy,
+    });
     setEditId(Number(h.id));
   };
   const zrusUpravu = () => { setEditId(null); setF(PRAZDNA_ZPRAVA); };
 
   const telo = (extra: Record<string, unknown> = {}) => ({
-    title: f.title, body: f.body, audience: f.audience, linkKind: f.linkKind, scheduledAt: f.scheduledAt || null,
+    title: f.title, body: f.body, audience: publikum || 'all', linkKind: f.linkKind, scheduledAt: f.scheduledAt || null, channels: f.channels,
     couponId: f.priloha.startsWith('coupon:') ? Number(f.priloha.slice(7)) : null,
     promoId: f.priloha.startsWith('promo:') ? Number(f.priloha.slice(6)) : null,
     ...extra,
@@ -122,7 +148,8 @@ export default function ZpravyRozeslani({ oznam }: { oznam: Hlaska }) {
         if (r.scheduled) oznam('Zpráva je naplánovaná. Odejde ve svůj čas a do té doby jde upravit nebo zrušit.');
         else {
           const zt = Number(r.ztlumeno) || 0;
-          oznam(`Odesláno ${czCount(Number(r.doruceno) || 0, CLENOVI)}.${zt ? ` ${czCount(zt, HOST)} má novinky vypnuté, těm zpráva nedošla.` : ''}`);
+          const e = Number(r.broadcast?.email_total) || 0;
+          oznam(`Odesláno ${czCount(Number(r.doruceno) || 0, CLENOVI)}.${zt ? ` ${czCount(zt, HOST)} má novinky vypnuté, těm zpráva nedošla.` : ''}${e ? ` E-maily (${e}) se odesílají po dávkách.` : ''}`);
         }
       }
       koncept.hotovo(); setF(PRAZDNA_ZPRAVA); reload();
@@ -132,8 +159,12 @@ export default function ZpravyRozeslani({ oznam }: { oznam: Hlaska }) {
   const zkouska = async () => {
     setTestuji(true);
     try {
-      await j('/api/client/admin/broadcast', { method: 'POST', body: JSON.stringify(telo({ action: 'test', scheduledAt: null })) });
-      oznam('Zkouška odeslaná jen tobě. Mrkni do oznámení nebo do telefonu.');
+      const r = await j('/api/client/admin/broadcast', { method: 'POST', body: JSON.stringify(telo({ action: 'test', scheduledAt: null })) });
+      const casti: string[] = [];
+      if (r.push) casti.push('do aplikace');
+      if (r.email) casti.push(r.email.sent ? `e-mailem na ${r.adresa}` : `e-mail se neodeslal: ${r.email.error ?? 'neznámá chyba'}`);
+      const emailSelhal = !!r.email && !r.email.sent;
+      oznam(emailSelhal && !r.push ? `Zkouška nedorazila: ${r.email.error ?? 'e-mail se neodeslal'}.` : `Zkouška ti odešla jen tobě ${casti.join(' a ')}.`, emailSelhal ? 'bad' : 'ok');
     } catch (err) { oznam(apiMessage(err, 'Zkoušku se nepodařilo odeslat.'), 'bad'); }
     setTestuji(false);
   };
@@ -144,9 +175,13 @@ export default function ZpravyRozeslani({ oznam }: { oznam: Hlaska }) {
 
   if (error) return <ErrorState title="Zprávy se nenačetly" onRetry={reload} detail={error} />;
   if (!d) return <div className="space-y-4"><Skeleton className="h-28" /><Skeleton className="h-48" /></div>;
-  const komu = (a: string) => stitekPublika(a);
+  const komu = (a: string) => {
+    const k = ctiKombinaci(a, { skupiny: true });
+    return k ? stitekKombinace(k, Object.fromEntries((d.groups ?? []).map((x: any) => [x.id, x.name]))) : stitekPublika(a);
+  };
   const smiPrilohy = !!d.prilohy;
-  const mozneOdeslat = !!target && !!f.title.trim() && (naplanovano || editId !== null || !limitVycerpan);
+  const kanalInfo = KANALY_ZPRAVY.find(k => k.id === kanal);
+  const mozneOdeslat = !!target && !!publikum && !!f.title.trim() && (naplanovano || editId !== null || !limitVycerpan);
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-4 items-start">
       <div className="space-y-4 min-w-0">
@@ -161,6 +196,10 @@ export default function ZpravyRozeslani({ oznam }: { oznam: Hlaska }) {
           </Field>
           <Field id="bc-body" label="Text" hint={`${f.body.length} z ${BODY_MAX} znaků`}>
             <Textarea id="bc-body" value={f.body} onChange={e => setF({ ...f, body: e.target.value })} placeholder="Tento týden ochutnávka zdarma ke každé konvici." maxLength={BODY_MAX} rows={3} />
+          </Field>
+          <Field label="Kudy" hint={kanalInfo?.popis}>
+            <Segmented size="sm" ariaLabel="Kanál zprávy" value={kanal} onChange={v => setF({ ...f, channels: v })}
+              options={KANALY_ZPRAVY.map(k => ({ id: k.id, label: k.label }))} />
           </Field>
           <Field id="bc-aud" label="Komu">
             <Select id="bc-aud" value={f.audience} onChange={e => setF({ ...f, audience: e.target.value })}>
@@ -178,14 +217,18 @@ export default function ZpravyRozeslani({ oznam }: { oznam: Hlaska }) {
                   {(d.groups ?? []).map((g: any) => <option key={g.id} value={`group:${g.id}`}>Skupina {g.name} ({g.members})</option>)}
                 </optgroup>
               )}
+              <optgroup label="Složitější výběr">
+                <option value={MIX}>Kombinace podmínek…</option>
+              </optgroup>
             </Select>
           </Field>
+          {f.audience === MIX && <KombinaceVyber idPrefix="bc-mix" moznosti={moznostiKombinace} value={f.kombinace} onChange={k => setF(cur => (cur.kombinace === k ? cur : { ...cur, kombinace: k }))} />}
           <p className={target && !nikomu ? 'text-sm text-black/70' : 'note note-wait'} aria-live="polite">
             {!target
               ? `Teď to nedostane nikdo, ve výběru jsou 0 členů.${segmentInfo ? ` ${segmentInfo.popis}` : ''} Zkus jiný výběr, nebo pošli zprávu všem členům.`
               : nikomu
-                ? `Ve výběru je ${czCount(target, CLEN)}, ale nikdo z nich nemá zapnuté novinky. Zpráva by nikam nedorazila.`
-                : `Ve výběru je ${czCount(target, CLEN)}.${dosah ? ` Zprávu dostane ${czCount(dosah.souhlas, CLEN)}, ostatní si novinky nezapnuli.` : ''}${segmentInfo ? ` ${segmentInfo.popis}` : ''}`}
+                ? `Ve výběru je ${czCount(target, CLEN)}, ale nikdo z nich teď zprávu tímhle kanálem nedostane (bez souhlasu s novinkami nebo bez e-mailu). Zkus jiný kanál nebo výběr.`
+                : `${dosah?.dosah ? vetaDosahu(dosah.dosah, kanal, n => czCount(n, CLEN)) : `Ve výběru je ${czCount(target, CLEN)}.`}${segmentInfo ? ` ${segmentInfo.popis}` : ''}${dosah?.dosah && dosah.dosah.blokovanych > 0 ? ` ${czCount(dosah.dosah.blokovanych, CLEN)} je zablokovaných, těm zprávy nechodí.` : ''}`}
           </p>
           {smiPrilohy && (
             <Field id="bc-priloha" label="Připojit kupon nebo promo kód" hint="Vybereš jen existující. Uplatnění řeší kupony a promo kódy, zpráva host odkáže do Věrnosti.">
@@ -228,7 +271,7 @@ export default function ZpravyRozeslani({ oznam }: { oznam: Hlaska }) {
             <Button type="button" variant="secondary" icon="bell" loading={testuji} disabled={!f.title.trim()} onClick={() => { void zkouska(); }}>Poslat zkušebně sobě</Button>
           </div>
         </Card>
-        <ZpravyNahled nazev={d.nazevPodniku} title={f.title} body={f.body} priloha={priloZvolena} linkKind={f.linkKind} />
+        <ZpravyNahled nazev={d.nazevPodniku} title={f.title} body={f.body} priloha={priloZvolena} linkKind={f.linkKind} oznameni={kanal !== 'email'} email={kanal !== 'push'} />
       </div>
       <Card pad="none" aria-labelledby="bc-odeslane">
         <h2 id="bc-odeslane" className="t-card px-5 pt-4">Odeslané a naplánované</h2>
@@ -244,11 +287,17 @@ export default function ZpravyRozeslani({ oznam }: { oznam: Hlaska }) {
                 const ceka = h.status === 'scheduled';
                 const poCase = ceka && parseDbTime(h.scheduled_at) != null && parseDbTime(h.scheduled_at)!.getTime() <= Date.now();
                 const muted = Number(h.muted) || 0;
+                const kn = String(h.channels ?? 'push');
+                const emailCelkem = Number(h.email_total) || 0, emailPos = Number(h.email_pos) || 0;
+                const emailInfo = kn === 'push' || ceka ? null
+                  : emailCelkem === 0 ? 'e-mail nikomu (nikdo nesplnil podmínky)'
+                  : emailPos < emailCelkem ? `e-maily se ještě odesílají (${emailPos} z ${emailCelkem})`
+                  : `${czCount(Number(h.email_sent) || 0, EMAILU)} odesláno${Number(h.email_failed) > 0 ? `, ${czCount(Number(h.email_failed), EMAILU)} se nepodařilo` : ''}`;
                 return (
                   <ListRow key={h.id} title={h.title}
                     meta={[
                       ceka ? `odejde ${dbTimeDayHM(h.scheduled_at)}` : `${dbTimeDayHM(h.sent_at)} · doručeno ${czCount(Number(h.recipients) || 0, CLENOVI)}${muted ? `, ${czCount(muted, HOST)} bez souhlasu` : ''}`,
-                      komu(String(h.audience ?? '')), ucinek,
+                      komu(String(h.audience ?? '')), emailInfo, ucinek,
                     ].filter(Boolean).join(' · ')}
                     right={ceka ? <Chip tone="wait" size="sm">{poCase ? 'Čeká na limit' : 'Naplánováno'}</Chip> : undefined}
                     actions={ceka ? (
@@ -260,7 +309,7 @@ export default function ZpravyRozeslani({ oznam }: { oznam: Hlaska }) {
                 );
               })}
             </ul>
-            <p className="t-meta px-5 pb-4 pt-1">Srovnání je po kalendářních dnech: sedm dní po dni odeslání proti sedmi dnům před ním, jen skutečné návštěvy a objednávky. Neříká, že za návštěvu může zpráva — říká, jestli se po ní něco pohnulo.</p>
+            <p className="t-meta px-5 pb-4 pt-1">Srovnání je po kalendářních dnech: sedm dní po dni odeslání proti sedmi dnům před ním, jen skutečné návštěvy a objednávky a jen mezi příjemci té zprávy. Neříká, že za návštěvu může zpráva — říká, jestli se po ní něco pohnulo.</p>
           </>
         )}
       </Card>
@@ -271,7 +320,7 @@ export default function ZpravyRozeslani({ oznam }: { oznam: Hlaska }) {
             <Button variant="primary" icon="send" onClick={() => { setPotvrdit(false); void odeslat(); }}>{editId !== null ? 'Uložit' : naplanovano ? 'Naplánovat' : 'Poslat'}</Button>
           </>}>
           <p className="text-sm text-black/70 text-pretty">
-            „{f.title}" dostane až {czCount(dosah?.souhlas ?? target, CLEN)}{naplanovano ? ` ${casCesky(f.scheduledAt)}` : ' hned'}. {naplanovano ? 'Do odeslání jde zpráva upravit nebo zrušit.' : 'Odeslanou zprávu už vzít zpátky nejde.'}
+            „{f.title}" dostane až {czCount(dosazeni ?? target, CLEN)}{naplanovano ? ` ${casCesky(f.scheduledAt)}` : ' hned'}. {naplanovano ? 'Do odeslání jde zpráva upravit nebo zrušit.' : 'Odeslanou zprávu už vzít zpátky nejde.'}
           </p>
         </Modal>
       )}

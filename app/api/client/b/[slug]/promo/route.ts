@@ -8,7 +8,7 @@
 //  3) odměna (kupon, body); když se cokoli po kroku 2 nepovede, použití i odměna se vrátí
 //     a kód se hostovi nespotřebuje.
 import { NextResponse } from 'next/server';
-import { sql, customer, profileBySlug, join, membership, award, couponCode } from '@/lib/client';
+import { sql, customer, profileBySlug, join, membership, award, couponCode, jeClenBlokovan } from '@/lib/client';
 import { pragueToday } from '@/lib/pragueTime';
 import { hit } from '@/lib/rateLimit';
 import { tierForMember, tierRulesFromProfile } from '@/lib/clientSlots';
@@ -36,6 +36,7 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
   const [promo] = await sql`SELECT * FROM client_promos WHERE code = ${code} AND team_id = ${teamId} AND active = TRUE`;
   if (!promo || (promo.valid_until && String(promo.valid_until) < pragueToday())) return NextResponse.json({ error: 'Tenhle kód neplatí.' }, { status: 404 });
   await join(me.id, teamId);
+  if (await jeClenBlokovan(teamId, me.id)) return NextResponse.json({ error: 'Tvůj účet je v tomhle podniku zablokovaný. Obrať se na obsluhu.' }, { status: 403 });
   // Kupon z kódu: nesmí obejít podmínky, které by host měl při vyzvednutí za body.
   let kupon: any = null;
   if (promo.coupon_id) {

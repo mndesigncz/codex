@@ -264,6 +264,8 @@ export async function syncBills(teamId: number, opts: { force?: boolean; backfil
     stats.itemsFetched = it.fetched; stats.itemsPending = it.pending;
 
     await sql`UPDATE pos_connections SET last_sync_at = NOW(), last_error = NULL, last_error_at = NULL WHERE team_id = ${teamId}`;
+    // Zrušené nebo vrácené účtenky vezmou zpět body a kredit, které za ně host dostal (best-effort, nikdy neshodí synchronizaci).
+    try { const { stornujUctenky } = await import('./bodyPravidlaDb'); await stornujUctenky(teamId); } catch { /* příště */ }
     return stats;
   } catch (e) {
     const msg = e instanceof StoryousError ? e.message : 'Synchronizace selhala.';

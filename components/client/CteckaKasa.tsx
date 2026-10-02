@@ -18,12 +18,14 @@ import { Button, Chip, Input, ListRow, Segmented, Well } from '../ui';
 import { useOpravneni } from '../role/useOpravneni';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 import { czCount, type CzNoun } from '@/lib/czech';
-import { ApiError, okJson, apiMessage, isOffline } from '@/lib/api';
+import { ApiError, okJson, apiMessage, isOffline, statusMessage } from '@/lib/api';
 import {
   rozpoznejKod, ocistiVstupCtecky, jeDvojitySken, psalaCtecka, pridejDoHistorie, navratSekundy, navratPopisek,
   poslediNavsteva, NAVRAT_MOZNOSTI, type ZaznamHistorie,
 } from '@/lib/ctecka';
 import { formatujPriPsani } from '@/lib/poukazy';
+import KuponUplatnitOkno from './loyalty/KuponUplatnitOkno';
+import { useKlicAkce, hlavickyAkce, UpozorneniRazitek, RazitkoKarty, RucniPolozky, StornoRazitek } from './loyalty/RazitkaKasa';
 
 const NAVSTEVA: CzNoun = { one: 'návštěva', few: 'návštěvy', many: 'návštěv' };
 const RAZITKO: CzNoun = { one: 'razítko', few: 'razítka', many: 'razítek' };
@@ -67,6 +69,8 @@ export default function CteckaKasa() {
   const [potvrzeni, setPotvrzeni] = useState<{ text: string; ok: boolean } | null>(null);
   const [historie, setHistorie] = useState<ZaznamHistorie[]>([]);
   const [busy, setBusy] = useState('');
+  // Kupon s varováním (min. útrata, 18+) se dokončí v okně KuponUplatnitOkno.
+  const [uplatnuji, setUplatnuji] = useState<{ kod: string; jen: boolean } | null>(null);
   const [castka, setCastka] = useState('');
   const [poukazCastka, setPoukazCastka] = useState('');
   const [rucne, setRucne] = useState('');
@@ -86,6 +90,8 @@ export default function CteckaKasa() {
   const idHistorie = useRef(0);
   const audio = useRef<AudioContext | null>(null);
   const poukazRef = useRef<string | null>(null);
+  const klicAkce = useKlicAkce();
+  const [upoz, setUpoz] = useState<{ expiredCount?: number; lost?: number } | null>(null);
   const zvukRef = useRef(true);
   zvukRef.current = zvuk;
 
@@ -125,7 +131,7 @@ export default function CteckaKasa() {
 
   /** Zpět na „Čekám na další kartu". */
   const dalsi = useCallback(() => {
-    setFaze({ druh: 'ceka' }); setPotvrzeni(null); setCastka(''); setPoukazCastka(''); setZustat(false); setZbyva(null); poukazRef.current = null;
+    setFaze({ druh: 'ceka' }); setPotvrzeni(null); setUpoz(null); setCastka(''); setPoukazCastka(''); setZustat(false); setZbyva(null); poukazRef.current = null;
     posledniSken.current = null;
     setTimeout(() => pole.current?.focus({ preventScroll: true }), 0);
   }, []);
@@ -294,22 +300,35 @@ export default function CteckaKasa() {
   };
 
   // ---- Akce u hosta ----
-  const akce = async (action: 'stamp' | 'points' | 'credit' | 'bill' | 'join', extra: { amount?: number; billId?: string } = {}) => {
+  const akce = async (action: 'stamp' | 'points' | 'credit' | 'bill' | 'join' | 'undo' | 'items', extra: { amount?: number; billId?: string; items?: { itemId: number; qty: number }[] } = {}) => {
     if (faze.druh !== 'host') return;
     const kod = faze.kod;
     setBusy(action + (extra.billId ?? ''));
+    // Idempotency-Key: stejná akce při opakování po výpadku sítě = stejný klíč, server ji připíše jednou.
+    const telo = { code: kod, action, amount: extra.amount ?? 0, billId: extra.billId, items: extra.items };
+    const klic = klicAkce.klic(JSON.stringify(telo));
     try {
-      const x = await fetch('/api/client/staff/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: kod, action, amount: extra.amount ?? 0, billId: extra.billId }) }).then(okJson);
+      const x = await fetch('/api/client/staff/scan', { method: 'POST', headers: hlavickyAkce(klic), body: JSON.stringify(telo) }).then(okJson);
+      klicAkce.hotovo();
       setFaze(f => f.druh === 'host' && f.kod === kod ? { ...f, data: { ...f.data, ...x, bills: extra.billId ? (f.data.bills ?? []).filter((b: any) => b.bill_id !== extra.billId) : f.data.bills } } : f);
       setCastka('');
+      // Vypršelá karta a razítka, která se nevešla, zůstávají vidět i po návratu na „Čekám“ (do dalšího hosta).
+      setUpoz({ expiredCount: x.expiredCount, lost: x.lost });
       ohlas(x.message, true); zapis(x.message, true, kod);
-    } catch (e) { ohlas(chyba(e, 'karta'), false); }
+    } catch (e) {
+      klicAkce.pochybe(e instanceof ApiError ? e.status : null);
+      ohlas(chyba(e, 'karta'), false);
+    }
     setBusy('');
   };
   const uplatniKupon = async (kod: string, jenPoukazanyKupon = false) => {
     setBusy('kupon:' + kod);
     try {
-      const x = await fetch('/api/client/admin/redeem', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: kod }) }).then(okJson);
+      const r = await fetch('/api/client/admin/redeem', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: kod }) });
+      const x = await r.json().catch(() => ({}));
+      // Kupon s varováním (útrata pod minimem, 18+) se dokončí v okně, kde obsluha varování uvidí a potvrdí.
+      if (r.status === 409 && x.needsConfirm === true) { setUplatnuji({ kod, jen: jenPoukazanyKupon }); setBusy(''); return; }
+      if (!r.ok) throw new ApiError(r.status, typeof x.error === 'string' && x.error ? x.error : statusMessage(r.status));
       const text = `Uplatněno: ${x.title}${x.benefit ? ` (${x.benefit})` : ''}.${x.badges?.length ? ` Zkontroluj: ${x.badges.join(', ')}.` : ''}`;
       if (jenPoukazanyKupon) setFaze({ druh: 'ceka' });
       else setFaze(f => f.druh === 'host' ? { ...f, data: { ...f.data, openCoupons: (f.data.openCoupons ?? []).filter((c: any) => c.code !== kod) } } : f);
@@ -380,6 +399,7 @@ export default function CteckaKasa() {
             )}
           </div>
         )}
+        {potvrzeni?.ok && <UpozorneniRazitek expiredCount={upoz?.expiredCount} lost={upoz?.lost} />}
       </div>
 
       <Well pad="md" as="div" className="space-y-4" aria-label="Načtený kód" role="group">
@@ -431,20 +451,20 @@ export default function CteckaKasa() {
             {/* Nejčastější akce nahoře: razítko, účtenky, body z částky. */}
             <div className="space-y-2">
               <Button size="lg" variant="primary" icon="check" block loading={busy === 'stamp'}
-                disabled={h.stampedToday || (!h.rules?.stampTarget && !h.campaigns?.some((c: any) => c.ruleType === 'visit'))}
+                disabled={h.stampedToday || (!h.rules?.stampTarget && !h.campaigns?.some((c: any) => c.ruleType === 'visit')) || (h.campaigns?.some((c: any) => c.ruleType === 'visit') && !h.campaigns.some((c: any) => c.ruleType === 'visit' && c.platiTed !== false))}
                 onClick={() => akce('stamp')}>
                 {h.stampedToday ? 'Dnes razítko už má' : 'Razítko za návštěvu'}
               </Button>
               {h.bills?.length > 0 && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {h.bills.map((bl: any) => (
-                    <Button key={bl.bill_id} size="lg" variant="secondary" icon="receipt" loading={busy === 'bill' + bl.bill_id} onClick={() => akce('bill', { billId: bl.bill_id })}>
-                      Připsat z účtenky {money(Math.round(Number(bl.final_price)))}
+                    <Button key={bl.bill_id} size="lg" variant="secondary" icon="receipt" loading={busy === 'bill' + bl.bill_id} disabled={bl.awarded} onClick={() => akce('bill', { billId: bl.bill_id })}>
+                      {bl.awarded ? `Účtenka ${money(Math.round(Number(bl.final_price)))} už je připsaná` : `Připsat z účtenky ${money(Math.round(Number(bl.final_price)))}`}
                     </Button>
                   ))}
                 </div>
               )}
-              {smiBody && h.rules?.pointsPer100 > 0 && (
+              {smiBody && (h.rules?.pointsPer100 > 0 || h.campaigns?.some((c: any) => c.ruleType === 'min_value')) && (
                 <form onSubmit={e => { e.preventDefault(); if (cislo > 0) void akce('points', { amount: cislo }); }} className="flex gap-2">
                   <Input aria-label={`Útrata v ${symbol}`} type="number" inputMode="numeric" min={0} step={1} value={castka} onChange={e => setCastka(e.target.value)} placeholder={`Útrata ${symbol}`} className="!w-36 text-center !h-12" />
                   <Button type="submit" size="lg" variant="secondary" loading={busy === 'points'} disabled={!(cislo > 0)}>Body z částky</Button>
@@ -471,26 +491,12 @@ export default function CteckaKasa() {
               </div>
             )}
 
-            {h.campaigns?.length > 0 && (
-              <div>
-                <p className="t-label mb-1">Razítkové karty</p>
-                <ul className="list">
-                  {h.campaigns.map((c: any) => (
-                    <li key={c.id} className="list-row flex-col items-stretch gap-1.5">
-                      <div className="flex items-baseline justify-between gap-3">
-                        <p className="text-sm font-semibold min-w-0 truncate">{c.name}</p>
-                        <p className="text-[13px] font-semibold tabular-nums text-black/60 shrink-0">{c.stamps}/{c.required}</p>
-                      </div>
-                      <div className="flex gap-1" aria-hidden>
-                        {Array.from({ length: Math.min(c.required, 12) }).map((_, i) => (
-                          <span key={i} className={`h-1.5 flex-1 rounded-full ${i < c.stamps ? 'bg-[#C8F542]' : 'bg-black/[0.08]'}`} />
-                        ))}
-                      </div>
-                      <p className="t-meta">Do odměny{c.reward ? ` „${c.reward}"` : ''} ještě {czCount(Math.max(0, c.required - c.stamps), RAZITKO)}.</p>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+            <RazitkoKarty campaigns={h.campaigns ?? []} />
+            {h.member && (
+              <>
+                <RucniPolozky polozky={h.polozky ?? []} busy={busy === 'items'} onPripsat={items => akce('items', { items })} />
+                <StornoRazitek posledni={h.posledniAkce ?? null} busy={busy === 'undo'} onStorno={() => akce('undo')} />
+              </>
             )}
             {!h.campaigns?.length && h.member && h.rules?.stampTarget > 0 && (
               <p className="t-meta tabular-nums">Razítka {h.stamps}/{h.rules.stampTarget}{h.rules.stampReward ? ` do odměny „${h.rules.stampReward}"` : ''}.</p>
@@ -581,6 +587,14 @@ export default function CteckaKasa() {
             ))}
           </ul>
         </div>
+      )}
+      {uplatnuji && (
+        <KuponUplatnitOkno kod={uplatnuji.kod} onZavrit={() => { setUplatnuji(null); pole.current?.focus(); }}
+          onHotovo={text => {
+            if (uplatnuji.jen) setFaze({ druh: 'ceka' });
+            else setFaze(f => f.druh === 'host' ? { ...f, data: { ...f.data, openCoupons: (f.data.openCoupons ?? []).filter((c: any) => c.code !== uplatnuji.kod) } } : f);
+            ohlas(text, true); zapis(text, true);
+          }} />
       )}
     </div>
   );

@@ -4,7 +4,9 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { awardBirthdays } from '@/lib/client';
 import { propadniBody } from '@/lib/propadaniBoduDb';
+import { propadniKredit, oznamPoklesyUrovni } from '@/lib/bodyPravidlaDb';
 import { odesliChybisNam } from '@/lib/reaktivace';
+import { spustAutomatizaceCron } from '@/lib/automatizaceDb';
 import { pripomenPoukazy } from '@/lib/poukazyPrehledDb';
 import { checkCron } from '@/lib/cronAuth';
 import { hit } from '@/lib/rateLimit';
@@ -1743,6 +1745,13 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE client_stamp_campaigns ADD COLUMN IF NOT EXISTS hour_from TEXT`);
     await ddl(sql`ALTER TABLE client_stamp_campaigns ADD COLUMN IF NOT EXISTS hour_till TEXT`);
     await ddl(sql`ALTER TABLE client_stamp_campaigns ADD COLUMN IF NOT EXISTS excluded_items JSONB NOT NULL DEFAULT '[]'`);
+    // Kategorie nabídky (razítko za celou kategorii, vyloučená kategorie), kombinovatelnost a vzhled karty.
+    await ddl(sql`ALTER TABLE client_stamp_campaigns ADD COLUMN IF NOT EXISTS stamp_sections JSONB NOT NULL DEFAULT '[]'`);
+    await ddl(sql`ALTER TABLE client_stamp_campaigns ADD COLUMN IF NOT EXISTS excluded_sections JSONB NOT NULL DEFAULT '[]'`);
+    await ddl(sql`ALTER TABLE client_stamp_campaigns ADD COLUMN IF NOT EXISTS combinable BOOLEAN NOT NULL DEFAULT TRUE`);
+    await ddl(sql`ALTER TABLE client_stamp_campaigns ADD COLUMN IF NOT EXISTS card_color TEXT`);
+    await ddl(sql`ALTER TABLE client_stamp_campaigns ADD COLUMN IF NOT EXISTS card_icon TEXT`);
+    await ddl(sql`ALTER TABLE client_stamp_campaigns ADD COLUMN IF NOT EXISTS card_image TEXT`);
     // Dřív vypnutá kampaň = active FALSE; teď je to stav „pozastaveno". Idempotentní.
     await ddl(sql`UPDATE client_stamp_campaigns SET status = 'paused' WHERE active = FALSE AND status = 'active'`);
     // Průběh hosta: rev hlídá souběžné zápisy, expired_* je zpráva o propadlé kartě.
@@ -1779,6 +1788,8 @@ export async function GET(request: Request) {
     // Kupon za plnou kartu ví, ze které kampaně a z které události vzešel.
     await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS campaign_id INTEGER`);
     await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS stamp_event_id INTEGER`);
+    // Odměna za kartu je jeden řádek kuponu na kampaň; nárok si pamatuje, z které události vznikl (storno).
+    await ddl(sql`ALTER TABLE client_coupon_claims ADD COLUMN IF NOT EXISTS stamp_event_id INTEGER`);
     // Deník věrnosti: kdo to u kasy připsal.
     await ddl(sql`ALTER TABLE client_loyalty_ledger ADD COLUMN IF NOT EXISTS staff_id INTEGER`);
     // Guard účtenky: done_at prázdné = připisování se rozběhlo a nedoběhlo; kroky už hotové se při opakování přeskočí.
@@ -1801,6 +1812,18 @@ export async function GET(request: Request) {
       )`);
     await ddl(sql`CREATE UNIQUE INDEX IF NOT EXISTS client_scan_actions_key ON client_scan_actions (team_id, idem_key) WHERE idem_key IS NOT NULL`);
     await ddl(sql`CREATE UNIQUE INDEX IF NOT EXISTS client_scan_actions_fp ON client_scan_actions (team_id, customer_id, fingerprint, bucket)`);
+    // Stejný klíč akce (Idempotency-Key) dvakrát = jedna akce; druhé volání dostane tutéž odpověď (lib/idempotence.ts).
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS client_kasa_idem (
+        team_id INTEGER NOT NULL,
+        idem_key TEXT NOT NULL,
+        response JSONB,
+        status INTEGER,
+        created_at TIMESTAMP DEFAULT NOW(),
+        PRIMARY KEY (team_id, idem_key)
+      )`);
+    // Storno poslední akce u kasy: vrácená akce se označí, ať ji nejde vrátit podruhé.
+    await ddl(sql`ALTER TABLE client_scan_actions ADD COLUMN IF NOT EXISTS undone_at TIMESTAMP`);
 
     // Migrace jednoduchého razítka: podnik se zapnutým stamp_target dostane
     // výchozí kampaň „za návštěvu" a rozsbíraná razítka členů se přenesou.
@@ -1872,6 +1895,60 @@ export async function GET(request: Request) {
         created_at TIMESTAMP DEFAULT NOW()
       )`);
     await ddl(sql`CREATE INDEX IF NOT EXISTS client_member_notes_customer ON client_member_notes (team_id, customer_id)`);
+    // Kolo 81: archiv skupin, blokace člena, e-mailový kanál zpráv (fronta a počty doručení) a automatizace
+    // zpráv s deníkem odeslání. Stejné příkazy jsou v lib/clenoveSchema.ts.
+    await ddl(sql`ALTER TABLE client_groups ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT FALSE`);
+    await ddl(sql`ALTER TABLE client_memberships ADD COLUMN IF NOT EXISTS blocked BOOLEAN NOT NULL DEFAULT FALSE`);
+    await ddl(sql`ALTER TABLE client_memberships ADD COLUMN IF NOT EXISTS blocked_at TIMESTAMP`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS channels TEXT NOT NULL DEFAULT 'push'`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS audience_ids JSONB`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS prijemci JSONB`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS push_count INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS email_sent INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS email_failed INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS no_consent INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS email_total INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_broadcasts ADD COLUMN IF NOT EXISTS email_pos INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS client_automatizace (
+        team_id INTEGER NOT NULL,
+        kind TEXT NOT NULL,
+        enabled BOOLEAN NOT NULL DEFAULT FALSE,
+        config JSONB NOT NULL DEFAULT '{}'::jsonb,
+        enabled_at TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT NOW(),
+        PRIMARY KEY (team_id, kind)
+      )`);
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS client_automatizace_log (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        kind TEXT NOT NULL,
+        customer_id INTEGER NOT NULL,
+        ref TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'odeslano',
+        channels TEXT,
+        note TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE (team_id, kind, customer_id, ref)
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_automatizace_log_team ON client_automatizace_log (team_id, created_at)`);
+    // Koncept a verze pravidel věrnosti. Stejné příkazy jsou v lib/pravidlaVerze.ts.
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS loyalty_draft JSONB`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS loyalty_draft_at TIMESTAMP`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS rules_version INTEGER NOT NULL DEFAULT 1`);
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS client_pravidla_verze (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        version INTEGER NOT NULL,
+        changed_by INTEGER,
+        source TEXT NOT NULL DEFAULT 'form',
+        note TEXT,
+        changes JSONB NOT NULL DEFAULT '[]'::jsonb,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE (team_id, version)
+      )`);
     // Profil podniku v Nastavení: IČO a DIČ (volitelné).
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS ico TEXT`);
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS dic TEXT`);
@@ -1945,6 +2022,18 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE client_vouchers ADD COLUMN IF NOT EXISTS expiry_mailed_at DATE`);
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS voucher_min_use INTEGER NOT NULL DEFAULT 0`);
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS voucher_max_use INTEGER NOT NULL DEFAULT 0`);
+    // Úplnost poukazů: šablona vzhledu, vazba na hosta (majitel v aplikaci, kupující s body), nejnižší účet k uplatnění, body za nákup.
+    await ddl(sql`ALTER TABLE client_vouchers ADD COLUMN IF NOT EXISTS design TEXT NOT NULL DEFAULT 'klasik'`);
+    await ddl(sql`ALTER TABLE client_vouchers ADD COLUMN IF NOT EXISTS buyer_customer_id INTEGER`);
+    await ddl(sql`ALTER TABLE client_vouchers ADD COLUMN IF NOT EXISTS points_awarded INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_vouchers ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMP`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_vouchers_customer ON client_vouchers (customer_id) WHERE customer_id IS NOT NULL`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS voucher_min_bill INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS voucher_points_per_100 INTEGER NOT NULL DEFAULT 0`);
+    // Body mimo kasu: objednávky od stolu (zapnout/vypnout) a pevný počet bodů za rezervaci, která proběhla.
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS points_orders BOOLEAN NOT NULL DEFAULT TRUE`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS points_per_reservation INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_reservations ADD COLUMN IF NOT EXISTS points_awarded INTEGER NOT NULL DEFAULT 0`);
     // Platina: čtvrtá úroveň nad Zlatým hostem. 0 = vypnuto.
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS platinum_at INTEGER NOT NULL DEFAULT 0`);
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS platinum_discount INTEGER NOT NULL DEFAULT 0`);
@@ -2020,6 +2109,10 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS daily_day TEXT`);
     await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS draft BOOLEAN NOT NULL DEFAULT FALSE`);
     await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS archived_at TIMESTAMP`);
+    // Kupon vázaný na položku nabídky a vyloučené položky a kategorie (připomínka pro hosta i obsluhu).
+    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS menu_item_id INTEGER`);
+    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS excluded_items JSONB NOT NULL DEFAULT '[]'`);
+    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS excluded_sections JSONB NOT NULL DEFAULT '[]'`);
     await ddl(sql`ALTER TABLE client_coupon_claims ADD COLUMN IF NOT EXISTS redeemed_by INTEGER`);
     await ddl(sql`ALTER TABLE client_coupon_claims ADD COLUMN IF NOT EXISTS order_value NUMERIC(12,2)`);
     await ddl(sql`ALTER TABLE client_coupon_claims ADD COLUMN IF NOT EXISTS source TEXT`);
@@ -2106,6 +2199,26 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS points_exclude_prepaid BOOLEAN NOT NULL DEFAULT TRUE`);
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS points_exclude_items JSONB NOT NULL DEFAULT '[]'`);
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS tier_inactive_months INTEGER NOT NULL DEFAULT 0`);
+    // Rozšíření pravidel: strop za den, vyloučené kategorie nabídky, násobič podle úrovně, uvítací body, propadání kreditu,
+    // přenesený zbytek útraty, oznámené snížení úrovně a to, co se za účtenku připsalo (storno zrušené nebo vrácené účtenky).
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS points_cap_per_day INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS points_exclude_sections JSONB NOT NULL DEFAULT '[]'`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS mult_silver NUMERIC(4,2) NOT NULL DEFAULT 1`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS mult_gold NUMERIC(4,2) NOT NULL DEFAULT 1`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS mult_platinum NUMERIC(4,2) NOT NULL DEFAULT 1`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS welcome_points INTEGER`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS credit_expire_days INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS credit_expire_since TEXT`);
+    await ddl(sql`ALTER TABLE client_memberships ADD COLUMN IF NOT EXISTS spend_rest INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_memberships ADD COLUMN IF NOT EXISTS tier_seen TEXT`);
+    await ddl(sql`ALTER TABLE client_bill_awards ADD COLUMN IF NOT EXISTS points INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_bill_awards ADD COLUMN IF NOT EXISTS credit INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_bill_awards ADD COLUMN IF NOT EXISTS spend INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_bill_awards ADD COLUMN IF NOT EXISTS rev_points INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_bill_awards ADD COLUMN IF NOT EXISTS rev_credit INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_bill_awards ADD COLUMN IF NOT EXISTS rev_spend INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_bill_awards ADD COLUMN IF NOT EXISTS reversed_at TIMESTAMP`);
+    await ddl(sql`ALTER TABLE client_bill_awards ADD COLUMN IF NOT EXISTS reversed_reason TEXT`);
     // Kolo 74: promo bannery podniku (akce a oznámení nahoře na stránce hosta).
     await ddl(sql`
       CREATE TABLE IF NOT EXISTS client_banners (
@@ -2128,6 +2241,11 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE client_banners ADD COLUMN IF NOT EXISTS target_kind TEXT NOT NULL DEFAULT 'all'`);
     await ddl(sql`ALTER TABLE client_banners ADD COLUMN IF NOT EXISTS target_ref TEXT`);
     await ddl(sql`ALTER TABLE client_banners ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT FALSE`);
+    // Plán (dny a hodiny, pražský čas) a jazykové mutace nadpisu a textu.
+    await ddl(sql`ALTER TABLE client_banners ADD COLUMN IF NOT EXISTS days_of_week JSONB NOT NULL DEFAULT '[]'`);
+    await ddl(sql`ALTER TABLE client_banners ADD COLUMN IF NOT EXISTS hour_from TEXT`);
+    await ddl(sql`ALTER TABLE client_banners ADD COLUMN IF NOT EXISTS hour_till TEXT`);
+    await ddl(sql`ALTER TABLE client_banners ADD COLUMN IF NOT EXISTS i18n JSONB NOT NULL DEFAULT '{}'`);
     await ddl(sql`
       CREATE TABLE IF NOT EXISTS client_banner_stats (
         banner_id INTEGER NOT NULL,
@@ -2319,6 +2437,9 @@ export async function GET(request: Request) {
     // (a volitelně body). Pravidlo je volitelné (reactivation_days, 0 = vypnuto).
     let reactivations = 0;
     try { reactivations = await odesliChybisNam(); } catch { /* nesmí shodit migrace */ }
+    // Automatizace zpráv (uvítací série, narozeninový kupon): denní průchod; ostatní jdou hned při události.
+    let automatizace = 0;
+    try { automatizace = await spustAutomatizaceCron(); } catch { /* nesmí shodit migrace */ }
 
     // ---- Kolo 73: propadání bodů a bonusové akce věrnosti ----
     // Propadání: po kolika dnech body propadnou (0 = nikdy) a od kdy se stáří počítá.
@@ -2345,6 +2466,11 @@ export async function GET(request: Request) {
     // úloha je idempotentní, opakované volání téhož dne nic nezdvojí.
     let propadleBody = { expired: 0, warned: 0 };
     try { propadleBody = await propadniBody(); } catch { /* nesmí shodit migrace */ }
+    // Denně: propadnutí kreditu (s upozorněním týden předem) a oznámení o snížení úrovně po neaktivitě.
+    let propadlyKredit = { expired: 0, warned: 0 };
+    try { propadlyKredit = await propadniKredit(); } catch { /* nesmí shodit migrace */ }
+    let poklesyUrovni = 0;
+    try { poklesyUrovni = await oznamPoklesyUrovni(); } catch { /* nesmí shodit migrace */ }
     // Poukazy: připomenutí konce platnosti podniku i obdarovaným (jednou za platnost, idempotentní).
     try { await pripomenPoukazy(); } catch { /* nesmí shodit migrace */ }
 
@@ -2431,7 +2557,7 @@ export async function GET(request: Request) {
       // (hlášky Postgresu, názvy indexů a omezení, jméno databáze) jen cron —
       // vedení kteréhokoli podniku je dřív dostávalo do prohlížeče.
       migFails: migFails.length,
-      ...(zCronu ? { closingIndex, closingIndexes, closingConstraints, birthdays, propadleBody, reactivations, migFailDetail: migFails.slice(0, 10) } : {}),
+      ...(zCronu ? { closingIndex, closingIndexes, closingConstraints, birthdays, propadleBody, propadlyKredit, poklesyUrovni, reactivations, automatizace, migFailDetail: migFails.slice(0, 10) } : {}),
     });
   } catch (error) {
     console.error('Init error:', error);

@@ -7,6 +7,7 @@ import { cistyJazyk, VYCHOZI, type Jazyk } from './i18n/config';
 import { bezpecnaBarva, VYCHOZI_BARVA, type DataKarty } from './walletKarta';
 import { googleKonfig } from './walletKonfig';
 import { aktualizujGoogleObjekt } from './walletGoogle';
+import { pragueToday } from './pragueTime';
 
 /** Jazyk hosta: osobní volba (users.lang), jinak ten, co dodá volající (jazyk požadavku). Před migrací sloupce výchozí. */
 async function jazykHosta(customerId: number, nahradni: Jazyk): Promise<Jazyk> {
@@ -30,14 +31,30 @@ export async function dataKartyHosta(me: { id: number; name: string }, slug: str
   const pub = publicProfile(p);
   const tier = tierForMember({ visits: Number(m.visits ?? 0), spend: Number(m.spend ?? 0) }, tierRulesFromProfile(p));
   const logo = pub.logoUrl && /^https:\/\//.test(pub.logoUrl) ? pub.logoUrl : '';
+  // Razítka: jakmile podnik má kampaně, počítadlo na členství neplatí (jediný zdroj pravdy jsou kampaně).
+  // Na kartě je rozdělaná kampaň, případně první běžící.
+  let razitka = Number(m.stamps ?? 0);
+  let razitkaCil = Number(p.stamp_target) || 0;
+  try {
+    const { maKampane, activeCampaigns, progressFor } = await import('./stamps');
+    if (await maKampane(Number(p.team_id))) {
+      razitka = 0; razitkaCil = 0;
+      const camps = await activeCampaigns(Number(p.team_id), pragueToday());
+      if (camps.length) {
+        const prog = await progressFor(Number(p.team_id), me.id);
+        const c = camps.find(x => Number(prog.get(x.id)?.stamps ?? 0) > 0) ?? camps[0];
+        razitka = Number(prog.get(c.id)?.stamps ?? 0); razitkaCil = c.required_stamps;
+      }
+    }
+  } catch { /* zůstane počítadlo z členství */ }
   return {
     podnik: pub.name,
     host: me.name,
     kod: await ensureCard(me.id),
     teamId: Number(p.team_id),
     body: Number(m.points ?? 0),
-    razitka: Number(m.stamps ?? 0),
-    razitkaCil: Number(p.stamp_target) || 0,
+    razitka,
+    razitkaCil,
     uroven: tier.id === 'bronze' ? '' : tier.label,
     barva: bezpecnaBarva(pub.accent, VYCHOZI_BARVA),
     logoUrl: logo || (origin ? `${origin}/icon-512.png` : ''),

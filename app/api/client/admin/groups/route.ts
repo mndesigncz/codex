@@ -9,6 +9,7 @@ import { sql } from '@/lib/client';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { audit } from '@/lib/audit';
 import { zajistiClenove, obnovDynamickeSkupiny, prepocitejClenyDynamicke } from '@/lib/clenoveDb';
+import { zajistiSchemaClenu } from '@/lib/clenoveSchema';
 import { chybaPravidel, normalizujPravidla, normalizujBarvu } from '@/lib/clenoveFiltr';
 
 export const dynamic = 'force-dynamic';
@@ -30,10 +31,11 @@ export async function GET(req: NextRequest) {
   const u = { id: ctx.meId, team_id: ctx.teamId };
   try {
     await zajistiClenove();
+    await zajistiSchemaClenu();
     // Dynamické skupiny se přepočítají, jakmile jsou zastaralé (krátká prodleva, atomicky).
     try { await obnovDynamickeSkupiny(u.team_id); } catch (e) { console.error('[skupiny] přepočet', e); }
     const groups = await sql`
-      SELECT g.id, g.name, g.description, g.color, g.rules, COALESCE(g.discount_pct, 0) AS discount_pct,
+      SELECT g.id, g.name, g.description, g.color, g.rules, g.archived, COALESCE(g.discount_pct, 0) AS discount_pct,
              (SELECT COUNT(*)::int FROM client_group_members gm WHERE gm.group_id = g.id AND gm.team_id = g.team_id) AS members
       FROM client_groups g WHERE g.team_id = ${u.team_id} ORDER BY g.name, g.id` as any[];
     // Detail jedné skupiny: kdo v ní je (pro správu členů v Zákaznících).
@@ -95,7 +97,8 @@ export async function PATCH(req: NextRequest) {
   const b = await req.json().catch(() => ({}));
   const id = parseInt(String(b.id), 10);
   await zajistiClenove();
-  const [g] = await sql`SELECT id, name, rules FROM client_groups WHERE id = ${Number.isFinite(id) ? id : 0} AND team_id = ${u.team_id}` as any[];
+  await zajistiSchemaClenu();
+  const [g] = await sql`SELECT id, name, rules, archived FROM client_groups WHERE id = ${Number.isFinite(id) ? id : 0} AND team_id = ${u.team_id}` as any[];
   if (!g) return NextResponse.json({ error: 'Skupina nenalezena' }, { status: 404 });
   const zmeny: string[] = [];
 
@@ -132,6 +135,11 @@ export async function PATCH(req: NextRequest) {
   if (b.color !== undefined) {
     await sql`UPDATE client_groups SET color = ${normalizujBarvu(b.color)} WHERE id = ${id} AND team_id = ${u.team_id}`;
     zmeny.push('změněna barva');
+  }
+  // Archiv: skupina zmizí z nabídek (zprávy, kupony), členové i historie zůstanou.
+  if (typeof b.archived === 'boolean' && b.archived !== (g.archived === true)) {
+    await sql`UPDATE client_groups SET archived = ${b.archived} WHERE id = ${id} AND team_id = ${u.team_id}`;
+    zmeny.push(b.archived ? 'přesunuta do archivu' : 'vrácena z archivu');
   }
   // Vlastní procentní sleva skupiny (0–100); člen ve víc skupinách bere nejvyšší, ne součet.
   const sleva = slevaZTela(b.discount_pct);

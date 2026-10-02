@@ -16,7 +16,8 @@ import { notifyUser } from './push';
 import { googleKonfig } from './walletKonfig';
 import { pragueToday } from './pragueTime';
 import { slotsFor as _slotsFor } from './clientSlots';
-import { MAX_ZUSTATEK } from './bodyPravidla';
+import { MAX_ZUSTATEK, uvitaciBody } from './bodyPravidla';
+import { automatizaceUdalost } from './automatizaceHaky';
 
 // Veřejné routy hosta (podnik podle adresy, seznam podniků) sahají do
 // databáze dřív, než se dotknou session. Next.js na Vercelu takové volání
@@ -145,7 +146,13 @@ export function publicProfile(p: any) {
       inactiveMonths: Number(p.tier_inactive_months) || 0,
     },
     cashbackPct: Number(p.cashback_pct) || 0,
+    // Za co jsou body mimo kasu (stránka hosta z toho skládá „Jak získat body“).
+    pointsOrders: p.points_orders !== false,
+    pointsPerReservation: Math.max(0, Math.trunc(Number(p.points_per_reservation)) || 0),
+    voucherPointsPer100: Math.max(0, Math.trunc(Number(p.voucher_points_per_100)) || 0),
     pointsExpireDays: Math.max(0, Math.trunc(Number(p.points_expire_days)) || 0),
+    creditExpireDays: Math.max(0, Math.trunc(Number(p.credit_expire_days)) || 0),
+    welcomePoints: p.loyalty_on ? uvitaciBody(p) : 0,
     birthdayPoints: Math.max(0, Math.trunc(Number(p.birthday_points)) || 0),
     referralPoints: Math.max(0, Math.trunc(Number(p.referral_points)) || 0),
     stampTarget: Number(p.stamp_target) || 0,
@@ -184,6 +191,8 @@ export async function join(customerId: number, teamId: number): Promise<any> {
       const { grantWelcomeCoupons } = await import('./coupons');
       await grantWelcomeCoupons(teamId, customerId, couponCode);
     } catch { /* uvítací kupony nesmí shodit vstup do podniku */ }
+    // Uvítací série (Automatizace): první zpráva hned, další přijdou z denního průchodu.
+    automatizaceUdalost('uvitani', teamId, customerId, 'krok:0');
   }
   return m;
 }
@@ -223,7 +232,15 @@ function obnovPenezenku(teamId: number, customerId: number): void {
   import('./walletDb').then(m => m.obnovKartuVPenezence(teamId, customerId)).catch(() => {});
 }
 
-export type LedgerKind = 'visit' | 'order' | 'manual' | 'coupon' | 'welcome' | 'birthday' | 'referral' | 'cashback' | 'credit' | 'expire' | 'reactivation';
+/** Je člen v podniku blokovaný? Před migrací sloupce (nebo při chybě) ne. */
+export async function jeClenBlokovan(teamId: number, customerId: number): Promise<boolean> {
+  try {
+    const [r] = await sql`SELECT blocked FROM client_memberships WHERE team_id = ${teamId} AND customer_id = ${customerId}`;
+    return r?.blocked === true;
+  } catch { return false; }
+}
+
+export type LedgerKind = 'visit' | 'order' | 'manual' | 'coupon' | 'welcome' | 'birthday' | 'referral' | 'cashback' | 'credit' | 'expire' | 'reactivation' | 'storno';
 
 /**
  * Připíše (nebo odečte) body a zapíše to do deníku. Body nikdy nejdou pod nulu
@@ -235,6 +252,11 @@ export type LedgerKind = 'visit' | 'order' | 'manual' | 'coupon' | 'welcome' | '
  */
 export async function awardDetail(teamId: number, customerId: number, delta: number, kind: LedgerKind, ref?: string | null, note?: string | null, staffId?: number | null): Promise<{ points: number; change: number }> {
   await join(customerId, teamId);
+  // Blokovaný člen body nesbírá (odečet projde, ať jde přečerpaný účet vyrovnat).
+  if (delta > 0 && await jeClenBlokovan(teamId, customerId)) {
+    const [cur] = await sql`SELECT points FROM client_memberships WHERE customer_id = ${customerId} AND team_id = ${teamId}`;
+    return { points: Number(cur?.points ?? 0), change: 0 };
+  }
   const d = Math.max(-MAX_ZUSTATEK, Math.min(MAX_ZUSTATEK, Math.round(Number(delta) || 0)));
   const [m] = await sql`
     WITH stary AS (
@@ -322,14 +344,21 @@ export async function spendCredit(teamId: number, customerId: number, amountCzk:
  * `already` = dnes už návštěvu měl (nic se nezměnilo). `lines` jsou věty pro obsluhu.
  * `extra` jsou razítka navíc z bonusové akce (stejné připsání, žádný druhý řádek), `note` jejich popis do deníku.
  */
-export async function stampVisit(teamId: number, customerId: number, profile: any, ref?: string, extra = 0, note = '', staffId?: number | null): Promise<{ stamps: number; rewarded: boolean; already?: boolean; lines?: string[] }> {
+export async function stampVisit(teamId: number, customerId: number, profile: any, ref?: string, extra = 0, note = '', staffId?: number | null): Promise<{ stamps: number; rewarded: boolean; already?: boolean; lines?: string[]; expired?: number; lost?: number }> {
   await join(customerId, teamId);
+  if (await jeClenBlokovan(teamId, customerId)) {
+    const [cur] = await sql`SELECT stamps FROM client_memberships WHERE customer_id = ${customerId} AND team_id = ${teamId}`;
+    return { stamps: Number(cur?.stamps ?? 0), rewarded: false, already: true };
+  }
   const target = Number(profile?.stamp_target) || 0;
   const navic = Math.max(0, Math.trunc(Number(extra)) || 0);
   // Dynamický import: lib/stamps importuje tenhle soubor.
-  const { activeCampaigns, addStamps, vetaVysledku } = await import('./stamps');
+  const { activeCampaigns, addStamps, vetaVysledku, maKampane } = await import('./stamps');
   const camps = await activeCampaigns(teamId, pragueToday());
-  const legacy = camps.length === 0;
+  // Jakmile podnik má kartičku „za návštěvu“ (i pozastavenou), staré počítadlo na členství neběží a nevydává
+  // vlastní odměnu — dřív běžela dvě počítadla vedle sebe a host viděl „37/10“. Kartičky za položky nebo
+  // za útratu staré razítko za návštěvu neřídí.
+  const legacy = !(await maKampane(teamId));
   // Razítko nejvýš jedno za pražský den. Podmínka je přímo v UPDATE, takže dva
   // rychlé pokusy neprojdou oba — dřív se „už dnes byl" kontrolovalo zvlášť a
   // dalo se to dvojklikem obejít (dvě razítka, dvě návštěvy, dvakrát odměna).
@@ -339,26 +368,29 @@ export async function stampVisit(teamId: number, customerId: number, profile: an
       AND (last_visit_at IS NULL OR
            (last_visit_at AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Prague')::date
              < (NOW() AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Prague')::date)
-    RETURNING stamps`;
+    RETURNING stamps, visits`;
   if (!m) {
     // Dnes už razítko má — vrátí se aktuální stav beze změny.
     const [cur] = await sql`SELECT stamps FROM client_memberships WHERE customer_id = ${customerId} AND team_id = ${teamId}`;
     return { stamps: Number(cur?.stamps ?? 0), rewarded: false, already: true };
   }
+  // Po první návštěvě (Automatizace): jen když je to opravdu první návštěva člena v podniku.
+  if (Number(m?.visits) === 1) automatizaceUdalost('prvni_navsteva', teamId, customerId, 'prvni');
   // Přešel host touhle návštěvou na vyšší úroveň (podle návštěv)? Pak mu přijde oznámení.
   await import('./urovnePostup').then(x => x.oznamPostupUrovne(teamId, customerId, { navstev: 1 })).catch(() => {});
   if (!legacy) {
     const den = pragueToday();
-    const lines: string[] = []; let rewarded = false; let first = 0;
+    const lines: string[] = []; let rewarded = false; let first = 0; let expired = 0; let lost = 0;
     for (const vc of camps.filter(x => x.rule_type === 'visit')) {
       // ref s dnem: i kdyby zámek výš selhal, jedinečný index razítka na kampaň a den nepustí podruhé.
       const r = await addStamps(vc, customerId, 1 + navic, `${ref ?? 'visit'}:${den}`, { staffId, poznamka: navic > 0 ? note : '' });
       if (r.completions > 0) rewarded = true;
       if (!first) first = r.stamps;
+      expired += r.expired ?? 0; lost += r.dropped ?? 0;
       lines.push(vetaVysledku(vc, r));
     }
     obnovPenezenku(teamId, customerId);
-    return { stamps: first, rewarded, lines };
+    return { stamps: first, rewarded, lines, expired, lost };
   }
   let stamps = Number(m?.stamps ?? 0);
   let rewarded = false;
@@ -367,6 +399,7 @@ export async function stampVisit(teamId: number, customerId: number, profile: an
     stamps = stamps - target;
     await sql`UPDATE client_memberships SET stamps = ${stamps} WHERE customer_id = ${customerId} AND team_id = ${teamId}`;
     rewarded = true;
+    automatizaceUdalost('dokoncena_karta', teamId, customerId, `karta:0:${Date.now()}`);
     // Odměna za razítka je kupon, který host ukáže u kasy.
     const [coupon] = await sql`
       INSERT INTO client_coupons (team_id, title, description, cost_points, active, kind)
@@ -453,11 +486,17 @@ export async function awardBirthdays(): Promise<number> {
       AND NOT EXISTS (
         SELECT 1 FROM client_loyalty_ledger l
         WHERE l.team_id = m.team_id AND l.customer_id = m.customer_id AND l.kind = 'birthday' AND l.ref = ${'bday:' + year})` as any[];
+  // Podniky s zapnutým narozeninovým kuponem v Automatizacích posílají vlastní zprávu; tahle by byla druhá.
+  let vlastniZprava = new Set<number>();
+  try {
+    const a = await sql`SELECT team_id FROM client_automatizace WHERE enabled = TRUE AND kind = 'narozeniny_kupon'` as any[];
+    vlastniZprava = new Set(a.map(x => Number(x.team_id)));
+  } catch { /* před migrací */ }
   let n = 0;
   for (const r of rows) {
     try {
       await award(Number(r.team_id), Number(r.customer_id), Number(r.birthday_points), 'birthday', `bday:${year}`, 'Dárek k narozeninám');
-      notifyUser(Number(r.customer_id), {
+      if (!vlastniZprava.has(Number(r.team_id))) notifyUser(Number(r.customer_id), {
         title: `Všechno nejlepší! ${r.birthday_points} bodů od ${r.team_name}`,
         body: 'Dárek k narozeninám máš na kartičce.',
         link: r.slug ? `/client/${r.slug}?tab=loyalty` : '/client/me', type: 'success',
@@ -518,7 +557,7 @@ export async function loyaltySummary(teamId: number) {
     FROM client_coupon_claims WHERE team_id = ${teamId}` as any[];
   const [l] = await sql`
     SELECT COALESCE(SUM(delta) FILTER (WHERE delta > 0 AND created_at >= NOW() - INTERVAL '30 days'), 0)::int AS given30,
-           COALESCE(SUM(-delta) FILTER (WHERE delta < 0 AND kind <> 'expire' AND created_at >= NOW() - INTERVAL '30 days'), 0)::int AS spent30
+           COALESCE(SUM(-delta) FILTER (WHERE delta < 0 AND kind NOT IN ('expire', 'storno') AND created_at >= NOW() - INTERVAL '30 days'), 0)::int AS spent30
     FROM client_loyalty_ledger WHERE team_id = ${teamId}` as any[];
   return {
     members: Number(m?.members) || 0, newMembers30: Number(m?.new30) || 0,

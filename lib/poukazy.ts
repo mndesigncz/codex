@@ -114,7 +114,7 @@ export const STAV_POPISEK: Record<StavPoukazu, string> = {
 };
 
 export type DuvodOdmitnuti =
-  | 'nenalezen' | 'zaporna' | 'nulova' | 'necela' | 'mena' | 'zruseny' | 'vycerpany' | 'propadly' | 'vic_nez_zustatek' | 'vic_nez_hodnota' | 'pod_minimem' | 'nad_maximem';
+  | 'nenalezen' | 'zaporna' | 'nulova' | 'necela' | 'mena' | 'zruseny' | 'vycerpany' | 'propadly' | 'vic_nez_zustatek' | 'vic_nez_hodnota' | 'pod_minimem' | 'nad_maximem' | 'utrata_chybi' | 'malo_utraty';
 
 export const DUVOD_TEXT: Record<DuvodOdmitnuti, string> = {
   nenalezen: 'Poukaz nenalezen.',
@@ -129,6 +129,8 @@ export const DUVOD_TEXT: Record<DuvodOdmitnuti, string> = {
   vic_nez_hodnota: 'Vrátit se dá nejvýš to, co už bylo uplatněno.',
   pod_minimem: 'Částka je nižší než nejmenší povolené uplatnění.',
   nad_maximem: 'Částka je vyšší než nejvyšší povolené uplatnění najednou.',
+  utrata_chybi: 'Zadej výši účtu: poukaz jde uplatnit jen při určité útratě.',
+  malo_utraty: 'Účet je nižší než útrata, od které jde poukaz uplatnit.',
 };
 
 export type Posudek = { ok: true; novyZustatek: number; castka: number } | { ok: false; duvod: DuvodOdmitnuti };
@@ -146,7 +148,7 @@ function castkaChyba(castka: unknown): DuvodOdmitnuti | null {
  * Čistá obdoba podmínky v SQL (`balance >= amount AND status = 'active' AND valid_until >= dnes`): databáze
  * rozhoduje atomicky, tohle dává srozumitelný důvod pro obsluhu a testuje se bez databáze.
  */
-export function posudUplatneni(p: PoukazVstup | null, castka: unknown, dnes: string, mena?: string | null, limity?: LimityUplatneni | null): Posudek {
+export function posudUplatneni(p: PoukazVstup | null, castka: unknown, dnes: string, mena?: string | null, limity?: LimityUplatneni | null, utrata?: number | null): Posudek {
   if (!p) return { ok: false, duvod: 'nenalezen' };
   const chyba = castkaChyba(castka);
   if (chyba) return { ok: false, duvod: chyba };
@@ -161,6 +163,13 @@ export function posudUplatneni(p: PoukazVstup | null, castka: unknown, dnes: str
   if (limity) {
     if (limity.max > 0 && c > limity.max) return { ok: false, duvod: 'nad_maximem' };
     if (limity.min > 0 && c < limity.min && c !== p.balance) return { ok: false, duvod: 'pod_minimem' };
+    // Uplatnění jen s určitou útratou: účet (celková útrata, ze které se poukaz odečítá) musí dosáhnout na minimum.
+    // Výjimka pro zbytek poukazu tu není: útrata je podmínka podniku, ne tvar částky.
+    const minUtrata = limity.minUtrata ?? 0;
+    if (minUtrata > 0) {
+      if (utrata == null || !Number.isFinite(utrata)) return { ok: false, duvod: 'utrata_chybi' };
+      if (utrata < minUtrata) return { ok: false, duvod: 'malo_utraty' };
+    }
   }
   return { ok: true, novyZustatek: p.balance - c, castka: c };
 }
@@ -235,7 +244,11 @@ export function hodnotyDavky(v: unknown, pocet: number): number[] | null {
 // ---- Limity uplatnění (nastavení podniku) --------------------------------------------------
 
 /** Nejmenší a největší částka jednoho uplatnění; 0 = bez omezení. */
-export interface LimityUplatneni { min: number; max: number }
+export interface LimityUplatneni {
+  min: number; max: number;
+  /** Nejnižší účet, od kterého jde poukaz uplatnit (0 = bez podmínky). Nepovinné: starší volající ho neznají. */
+  minUtrata?: number;
+}
 export const BEZ_LIMITU: LimityUplatneni = { min: 0, max: 0 };
 
 /** Limity z formuláře: celá čísla 0..MAX_HODNOTA, nejmenší nesmí přesáhnout největší (když je zadaný). */
@@ -252,6 +265,7 @@ export function normalizujLimity(minRaw: unknown, maxRaw: unknown): { ok: true; 
 export function textOdmitnuti(duvod: DuvodOdmitnuti, limity: LimityUplatneni | null | undefined, mena: string): string {
   if (duvod === 'pod_minimem' && limity?.min) return `Nejmenší povolené uplatnění je ${formatMoney(limity.min, mena)}. Celý zbytek poukazu ale uplatnit jde.`;
   if (duvod === 'nad_maximem' && limity?.max) return `Najednou jde uplatnit nejvýš ${formatMoney(limity.max, mena)}.`;
+  if ((duvod === 'utrata_chybi' || duvod === 'malo_utraty') && limity?.minUtrata) return `Poukaz jde uplatnit u účtu od ${formatMoney(limity.minUtrata, mena)}.${duvod === 'utrata_chybi' ? ' Zadej výši účtu.' : ''}`;
   return DUVOD_TEXT[duvod];
 }
 
@@ -354,4 +368,30 @@ export const PRIPOMENUTI_DNI = 14;
 export function kPripomenuti(p: { status?: string | null; balance: number; valid_until: string | null; pripomenuto?: boolean | null }, dnes: string, dni = PRIPOMENUTI_DNI): boolean {
   if (p.status === 'void' || p.balance <= 0 || !p.valid_until || p.pripomenuto) return false;
   return p.valid_until >= dnes && p.valid_until <= dayPlus(dnes, dni);
+}
+
+// ---- Nastavení poukazů: útrata a body za nákup --------------------------------------------------
+
+/** Kolik bodů dá nákup poukazu za každých 100 jednotek hodnoty, a nejmenší účet k uplatnění. */
+export const MAX_BODU_ZA_NAKUP = 100;
+export const MAX_MIN_UTRATA_POUKAZU = 100_000;
+
+export interface NastaveniPoukazu { minUtrata: number; bodyZaNakup: number }
+export const VYCHOZI_NASTAVENI_POUKAZU: NastaveniPoukazu = { minUtrata: 0, bodyZaNakup: 0 };
+
+/** Nastavení z formuláře: celá čísla v mezích, prázdné = 0 (vypnuto). Neplatné je chyba, ne tiché zaokrouhlení. */
+export function normalizujNastaveniPoukazu(minUtrataRaw: unknown, bodyRaw: unknown): { ok: true; nastaveni: NastaveniPoukazu } | { ok: false; chyba: string } {
+  const prazdne = (v: unknown) => v == null || (typeof v === 'string' && v.trim() === '');
+  const minUtrata = prazdne(minUtrataRaw) ? 0 : celaCastka(minUtrataRaw, MAX_MIN_UTRATA_POUKAZU);
+  const body = prazdne(bodyRaw) ? 0 : celaCastka(bodyRaw, MAX_BODU_ZA_NAKUP);
+  if (minUtrata == null) return { ok: false, chyba: `Nejnižší účet je celé číslo od 0 do 100 000 (0 = bez podmínky).` };
+  if (body == null) return { ok: false, chyba: `Bodů za nákup poukazu je celé číslo od 0 do ${MAX_BODU_ZA_NAKUP} (0 = bez bodů).` };
+  return { ok: true, nastaveni: { minUtrata, bodyZaNakup: body } };
+}
+
+/** Body za nákup poukazu: za každých celých 100 hodnoty `bodyZaNakup` bodů (stejně jako body za útratu po stovkách). */
+export function bodyZaNakupPoukazu(hodnota: number, bodyZaNakup: number): number {
+  const h = Math.max(0, Math.trunc(Number(hodnota)) || 0);
+  const b = Math.max(0, Math.min(MAX_BODU_ZA_NAKUP, Math.trunc(Number(bodyZaNakup)) || 0));
+  return Math.floor(h / 100) * b;
 }

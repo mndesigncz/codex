@@ -6,7 +6,8 @@ import { normalizePlan } from '@/lib/floorplan';
 import { tierForMember, tierRulesFromProfile } from '@/lib/clientSlots';
 import { slevaClena } from '@/lib/urovneDb';
 import { sql, customer, profileBySlug, publicProfile, membership } from '@/lib/client';
-import { activeCampaigns, progressFor, hostKarta } from '@/lib/stamps';
+import { activeCampaigns, progressFor, skonceneKampane, jmenaPolozek, prubehHosta } from '@/lib/stamps';
+import { kartaProHosta } from '@/lib/razitkaPravidla';
 import { shapeCoupon, windowOk, ageFrom, TIER_LABELS } from '@/lib/coupons';
 import { pragueToday, pragueHM } from '@/lib/pragueTime';
 import { buildBoard, publicShape, menaListku } from '@/lib/menu';
@@ -15,6 +16,7 @@ import { aktivniBannery, kontextHosta } from '@/lib/clientBanners';
 import { aktivniBonus } from '@/lib/bonusAkceDb';
 import { dokdyDnes } from '@/lib/bonusAkce';
 import { planClena } from '@/lib/propadaniBoduDb';
+import { planKreditu } from '@/lib/bodyPravidlaDb';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -90,7 +92,7 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
   const [menu, tables, coupons] = await Promise.all([
     menuFor(teamId, p.menu_slug ?? null, new URL(req.url).searchParams.get('lang'), p.currency),
     p.ordering_on ? sql`SELECT id, name, seats, map_x, map_y, map_w, map_h, map_shape, map_rot FROM client_tables WHERE team_id = ${teamId} AND active = TRUE ORDER BY position, id` : Promise.resolve([]),
-    p.loyalty_on ? sql`SELECT * FROM client_coupons
+    p.loyalty_on ? sql`SELECT c.*, (SELECT mi.name FROM menu_items mi WHERE mi.id = c.menu_item_id) AS menu_item_name FROM client_coupons c
                        WHERE team_id = ${teamId} AND active = TRUE AND kind = 'offer' AND draft = FALSE AND archived_at IS NULL AND (valid_until IS NULL OR valid_until >= ${today})
                        ORDER BY cost_points, id` : Promise.resolve([]),
   ]);
@@ -112,23 +114,17 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
     const sleva = await slevaClena(teamId, me.id, tier);
     const myCamps = await activeCampaigns(teamId, today);
     const myProg = myCamps.length ? await progressFor(teamId, me.id) : new Map();
+    const odmenaJmena = await jmenaPolozek(Array.from(new Set(myCamps.flatMap(c => c.reward_items.map(x => x.itemId)))));
+    // Skončené kartičky, na kterých host něco měl: ať ví, proč karta zmizela.
+    const endedCampaigns = await skonceneKampane(teamId, me.id, today);
     mine = {
       member: !!m, points: Number(m?.points ?? 0), stamps: Number(m?.stamps ?? 0), visits: Number(m?.visits ?? 0),
       credit: Number(m?.credit ?? 0),
       spend: Number(m?.spend ?? 0), tierBy: tier.unit,
       level: tier.id, levelLabel: tier.label, discount: sleva.pct, discountSource: sleva.zdroj, discountName: sleva.nazev,
       nextTierAt: tier.nextAt, nextTierLabel: tier.nextLabel, nextTierUnit: tier.unit,
-      campaigns: myCamps.map(c => {
-        const k = hostKarta(c, myProg.get(c.id));
-        return {
-          id: c.id, name: c.name, description: c.description, required: c.required_stamps,
-          reward: c.reward_title, stamps: k.stamps, completed: k.completed,
-          // Kdy karta vyprší a zpráva o propadlé kartě (host se to dozví při otevření stránky).
-          expiresAt: k.expiresAt, expiredCount: k.expiredCount, expiredAt: k.expiredAt,
-          maxCompletions: c.max_completions, daysOfWeek: c.days_of_week, hourFrom: c.hour_from, hourTill: c.hour_till,
-          oneTime: c.repeat_mode === 'one_time',
-        };
-      }),
+      campaigns: myCamps.map(c => kartaProHosta(c, myProg.has(c.id) ? prubehHosta(myProg.get(c.id)) : null, c.reward_items.map(x => odmenaJmena.get(x.itemId)).filter((x): x is string => !!x))),
+      endedCampaigns,
       reservations, claims,
     };
     // Body, kterým brzy vyprší platnost (jen když podnik propadání používá).
@@ -137,6 +133,14 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
       const body = pl.propadne + pl.varovat;
       mine.expiring = body > 0 ? { points: body, till: pl.varovatDo ?? today } : null;
     }
+    // Kredit, kterému brzy vyprší platnost (jen když podnik propadání kreditu používá).
+    if (p.loyalty_on && Number(p.credit_expire_days) > 0) {
+      const pk = await planKreditu(teamId, me.id, p);
+      const castka = pk.propadne + pk.varovat;
+      mine.creditExpiring = castka > 0 ? { amount: castka, till: pk.varovatDo ?? today } : null;
+    }
+    // Úroveň dočasně snížená po neaktivitě: host se dozví proč.
+    mine.levelDegraded = !!tier.reduced;
   }
   // Novinky: poslední rozeslané zprávy členům rovnou na stránce podniku,
   // ať mají co číst i hosté bez zapnutých oznámení.
@@ -205,10 +209,9 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
   // Kartičky podniku vidí i nepřihlášený host — je to lákadlo k registraci.
   let stampCampaigns: any[] = [];
   try {
-    stampCampaigns = (await activeCampaigns(teamId, today)).map(c => ({
-      id: c.id, name: c.name, description: c.description, required: c.required_stamps, reward: c.reward_title,
-      daysOfWeek: c.days_of_week, hourFrom: c.hour_from, hourTill: c.hour_till, maxCompletions: c.max_completions,
-    }));
+    const aktivni = await activeCampaigns(teamId, today);
+    const jm = await jmenaPolozek(Array.from(new Set(aktivni.flatMap(c => c.reward_items.map(x => x.itemId)))));
+    stampCampaigns = aktivni.map(c => kartaProHosta(c, null, c.reward_items.map(x => jm.get(x.itemId)).filter((x): x is string => !!x)));
   } catch { stampCampaigns = []; }
 
   let news: any[] = [];
@@ -238,7 +241,7 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
   });
   // Promo bannery podniku (max 5, aktivní a v platnosti). Obsah je data podniku.
   // Cílení: člen vidí jiné bannery než nečlen; úroveň a skupiny se berou z hostova členství.
-  const banners = await aktivniBannery(teamId, today, await kontextHosta(teamId, me?.id ?? null, mine));
+  const banners = await aktivniBannery(teamId, today, await kontextHosta(teamId, me?.id ?? null, mine), new URL(req.url).searchParams.get('lang'));
   // Bonusová akce, která právě běží („Dnes dvojnásobné body do 18:00"); text skládá stránka přes t().
   let bonus: any = null;
   if (p.loyalty_on) {

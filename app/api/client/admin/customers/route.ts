@@ -8,7 +8,9 @@ import { sql } from '@/lib/client';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { audit } from '@/lib/audit';
 import { pragueDaySafe, pragueToday } from '@/lib/pragueTime';
-import { nactiClenyTymu, obnovDynamickeSkupiny, kontextFiltru } from '@/lib/clenoveDb';
+import { nactiClenyTymu, obnovDynamickeSkupiny, kontextFiltru, smazClenaZPodniku } from '@/lib/clenoveDb';
+import { zajistiSchemaClenu } from '@/lib/clenoveSchema';
+import { najdiDuplicity } from '@/lib/clenoveSeznam';
 import {
   normalizujFiltr, normalizujRazeni, splnujeFiltr, seradCleny, strankuj, sestavCsvClenu, type FiltrClenu,
 } from '@/lib/clenoveFiltr';
@@ -29,6 +31,27 @@ export async function GET(req: NextRequest) {
   const kontakty = ctx.role.opravneni.has('zakaznici.kontakty');
   // Kredit je peněžní zůstatek hosta — vidí ho jen ten, kdo smí do věrnosti (stejně jako deník).
   const vidiKredit = ctx.role.opravneni.has('vernost.zobrazit');
+  // Duplicity: dvojice a trojice členů, kteří vypadají jako jeden člověk (jen pro správce členů).
+  if (params.get('duplicity') === '1') {
+    if (!ctx.role.opravneni.has('zakaznici.sprava_clenu')) return NextResponse.json({ error: 'Na slučování členů nemáš oprávnění.' }, { status: 403 });
+    const rows = await sql`
+      SELECT m.customer_id AS id, us.name, us.email, us.phone, m.points, m.visits, m.joined_at, m.last_visit_at
+      FROM client_memberships m JOIN users us ON us.id = m.customer_id
+      WHERE m.team_id = ${u.team_id}
+      LIMIT 20000` as any[];
+    const skupiny = najdiDuplicity(rows.map(r => ({ id: Number(r.id), name: String(r.name), email: r.email, phone: r.phone })));
+    const by = new Map(rows.map(r => [Number(r.id), r]));
+    return NextResponse.json({
+      skupiny: skupiny.slice(0, 100).map(sk => ({
+        duvod: sk.duvod,
+        clenove: sk.ids.map(id => {
+          const r = by.get(id)!;
+          return { id, name: r.name, email: kontakty ? r.email : null, phone: kontakty ? r.phone : null, points: Number(r.points) || 0, visits: Number(r.visits) || 0, joined_at: r.joined_at, last_visit_at: r.last_visit_at };
+        }),
+      })),
+      celkem: skupiny.length,
+    });
+  }
   const filtr: FiltrClenu = normalizujFiltr(params);
   const razeni = normalizujRazeni(params.get('sort'));
   const csv = params.get('format') === 'csv';
@@ -79,4 +102,32 @@ export async function GET(req: NextRequest) {
     // Celkem členů bez filtru: rozlišuje „nikdo takový" od „zatím žádní členové".
     all: vsichni.length,
   });
+}
+
+/** Blokace člena (nesbírá body ani razítka, nedostává zprávy). Jen s oprávněním správy členů; zapisuje se do historie změn. */
+export async function PATCH(req: NextRequest) {
+  const ctx = await pozaduj('zakaznici.sprava_clenu');
+  if (jeOdpoved(ctx)) return ctx;
+  await zajistiSchemaClenu();
+  const b = await req.json().catch(() => ({}));
+  const id = Math.round(Number(b.id));
+  if (!Number.isInteger(id) || id <= 0) return NextResponse.json({ error: 'Neplatný člen.' }, { status: 400 });
+  const [m] = await sql`SELECT m.blocked, us.name FROM client_memberships m JOIN users us ON us.id = m.customer_id WHERE m.team_id = ${ctx.teamId} AND m.customer_id = ${id}`;
+  if (!m) return NextResponse.json({ error: 'Člen v podniku není.' }, { status: 404 });
+  if (typeof b.blocked === 'boolean' && b.blocked !== (m.blocked === true)) {
+    await sql`UPDATE client_memberships SET blocked = ${b.blocked}, blocked_at = ${b.blocked ? new Date().toISOString() : null} WHERE team_id = ${ctx.teamId} AND customer_id = ${id}`;
+    await audit(ctx.teamId, ctx.meId, 'client.clen.blokace', 'client', id, `${m.name}: ${b.blocked ? 'zablokován' : 'odblokován'}`);
+  }
+  const [novy] = await sql`SELECT blocked FROM client_memberships WHERE team_id = ${ctx.teamId} AND customer_id = ${id}`;
+  return NextResponse.json({ ok: true, blocked: novy?.blocked === true });
+}
+
+/** Odebrání člena z podniku (body, razítka, kupony a deník zmizí; účet hosta zůstává). Jen s oprávněním správy členů. */
+export async function DELETE(req: NextRequest) {
+  const ctx = await pozaduj('zakaznici.sprava_clenu');
+  if (jeOdpoved(ctx)) return ctx;
+  const id = parseInt(new URL(req.url).searchParams.get('id') ?? '', 10);
+  const r = await smazClenaZPodniku(ctx.teamId, id, ctx.meId);
+  if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
+  return NextResponse.json({ ok: true, name: r.name, body: r.body });
 }

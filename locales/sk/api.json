@@ -94,10 +94,13 @@
   "Položka nenalezena": "Položka sa nenašla",
   "Položku se nepodařilo vytvořit.": "Položku sa nepodarilo vytvoriť.",
   "Portál se nepodařilo otevřít.": "Portál sa nepodarilo otvoriť.",
+  "Poukaz nenalezen": "Poukaz sa nenašiel",
   "Poukaz nenalezen nebo neplatí": "Poukaz sa nenašiel alebo neplatí",
+  "Poukaz se teď nepodařilo odebrat. Zkus to za chvíli.": "Poukaz sa teraz nepodarilo odobrať. Skús to o chvíľu.",
   "Poukaz se teď nepodařilo ověřit. Zkus to za chvíli.": "Poukaz sa teraz nepodarilo overiť. Skús to o chvíľu.",
   "Povinné věci se nepodařilo načíst.": "Povinné veci sa nepodarilo načítať.",
   "Požadavek z cizí stránky byl zamítnut.": "Požiadavka z cudzej stránky bola zamietnutá.",
+  "Pro přidání poukazu do aplikace se přihlas.": "Na pridanie poukazu do aplikácie sa prihlás.",
   "Publikování se nepodařilo": "Zverejnenie sa nepodarilo",
   "Předchozí objednávka ještě čeká na obsluhu.": "Predchádzajúca objednávka ešte čaká na obsluhu.",
   "Přihlas se jako host.": "Prihlás sa ako hosť.",
@@ -158,5 +161,10 @@
   "Účet se nepodařilo smazat. Zkuste to znovu, nebo napište podpoře.": "Účet sa nepodarilo zmazať. Skúste to znova alebo napíšte podpore.",
   "Kupony došly.": "Kupóny sa minuli.",
   "Odměna tohoto kódu už není k dispozici.": "Odmena tohto kódu už nie je k dispozícii.",
-  "Kupony z tohoto kódu už došly.": "Kupóny z tohto kódu sa už minuli."
+  "Kupony z tohoto kódu už došly.": "Kupóny z tohto kódu sa už minuli.",
+  "Odkaz na odhlášení není platný.": "Odkaz na odhlásenie nie je platný.",
+  "Odhlášení se nepodařilo načíst. Zkus to znovu.": "Odhlásenie sa nepodarilo načítať. Skús to znova.",
+  "Moc pokusů za sebou. Zkus to za chvíli.": "Príliš veľa pokusov za sebou. Skús to o chvíľu.",
+  "Odhlášení se nepodařilo uložit. Zkus to znovu.": "Odhlásenie sa nepodarilo uložiť. Skús to znova.",
+  "Tvůj účet je v tomhle podniku zablokovaný. Obrať se na obsluhu.": "Tvoj účet je v tomto podniku zablokovaný. Obráť sa na obsluhu."
 }

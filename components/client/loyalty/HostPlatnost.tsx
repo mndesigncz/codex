@@ -1,6 +1,6 @@
 'use client';
 
-// Hostovská strana: platnost kuponu („vyprší za 3 dny“). Kdy vyprší razítková karta, říká RazitkaHost.
+// Hostovská strana: platnost kuponu („vyprší za 3 dny“). Kdy vyprší razítková karta, říká KartaRazitek.
 // Čísla počítá lib/hostPrehled.ts (platí pro server i klienta); tady jsou jen věty v jazyce hosta.
 
 import { useJazyk, useT } from '@/lib/i18n/client';

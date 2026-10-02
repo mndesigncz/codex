@@ -87,6 +87,8 @@ for (const sirka of [1280, 390]) {
   await p.getByRole('button', { name: 'Zkontrolovat kupon' }).click();
   const okno = p.getByRole('dialog');
   await okno.waitFor({ timeout: 5000 });
+  // Okno si náhled kuponu načítá samo (stejné okno má i čtečka u kasy), takže se na obsah počká.
+  await okno.getByLabel(/Částka účtenky/).waitFor({ timeout: 5000 });
   tvrdi(`${L}: okno uplatnění ukazuje varování o minimu`, (await okno.innerText()).includes('Kupon platí od 200'));
   tvrdi(`${L}: tlačítko je „Uplatnit i přesto“`, await okno.getByRole('button', { name: 'Uplatnit i přesto' }).count() === 1);
   await okno.getByLabel(/Částka účtenky/).fill('150');

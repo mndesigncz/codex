@@ -7,7 +7,7 @@ import type { Testy } from './_testy.ts';
 import {
   normalizujFiltr, filtrNaParametry, pocetFiltru, splnujeFiltr, jeNeaktivni, maNarozeninyVMesici, seradCleny, normalizujRazeni, strankuj,
   normalizujPravidla, chybaPravidel, patriDoPravidel, vyberPodlePravidel, popisPravidel, normalizujBarvu, tonBarvy, bunkaCsv, sestavCsvClenu,
-  chybaBonusu, normalizujKlicAkce, HROMADNE_AKCE, AKCE_PRIPRAVUJE, PRAZDNY_FILTR, STRANKA_MAX, HROMADNA_MAX, BONUS_CELKEM_MAX,
+  chybaBonusu, normalizujKlicAkce, HROMADNE_AKCE, PRAZDNY_FILTR, STRANKA_MAX, HROMADNA_MAX, BONUS_CELKEM_MAX,
   type ClenFiltrovany, type FiltrClenu,
 } from '../../lib/clenoveFiltr.ts';
 import { chybaPoznamky, NOTE_MAX } from '../../lib/poznamkyHosta.ts';
@@ -134,8 +134,7 @@ export default async function ({ eq, ok }: Testy) {
   eq('bonus: 0, záporné, desetinné a nad 10 000 se odmítnou', [0, -5, 1.5, 10001, 'abc'].map(v => chybaBonusu(v) != null), [true, true, true, true, true]);
   eq('bonus: 1 a 10 000 projdou', [chybaBonusu(1), chybaBonusu(10000)], [null, null]);
   eq('klíč akce: jen bezpečné znaky a rozumná délka', ['abcdef12', 'a'.repeat(64), 'krátký', 'a b c d e f g h', '', 'x'.repeat(65)].map(normalizujKlicAkce), ['abcdef12', 'a'.repeat(64), null, null, null, null]);
-  eq('akce: skupina, body, zpráva a kupon', [...HROMADNE_AKCE], ['group', 'points', 'message', 'coupon']);
-  eq('akce: kupon je připravené místo pro jiný okruh', [...AKCE_PRIPRAVUJE], ['coupon']);
+  eq('akce: skupina, body a zpráva (kupon jde přes okno posílání kuponů)', [...HROMADNE_AKCE], ['group', 'points', 'message']);
   ok('limity: výběr 2000 hostů a milion bodů celkem', HROMADNA_MAX === 2000 && BONUS_CELKEM_MAX === 1_000_000);
 
   const bulk = precti('app/api/client/admin/customers/bulk/route.ts');
@@ -144,7 +143,7 @@ export default async function ({ eq, ok }: Testy) {
   ok('bulk: cizí id se zahodí (jen členové podniku) a výběr podle filtru hlídá očekávaný počet', /FROM client_memberships WHERE team_id = \$\{u\.team_id\} AND customer_id = ANY/.test(bulk) && /ocekavano !== ids\.length/.test(bulk) && /status: 409/.test(bulk));
   ok('bulk: každá akce má svůj klíč oprávnění a výběr vyžaduje zakaznici.zobrazit', /group: 'zakaznici\.skupiny', points: 'vernost\.upravit_body', message: 'zakaznici\.zpravy'/.test(bulk) && /ctx\.role\.opravneni\.has\('zakaznici\.zobrazit'\)/.test(bulk));
   ok('bulk: do dynamické skupiny se ručně nepřidává', /g\.rules\) return NextResponse\.json/.test(bulk));
-  ok('bulk: kupon vybraným odpoví 501 srozumitelnou větou', /status: 501/.test(bulk) && /se připravuje/.test(bulk));
+  ok('bulk: blokovanému členovi se body nepřipíšou', /customer_id = ANY\(\$\{ids\}\) AND blocked = FALSE/.test(bulk));
   ok('bulk: každá akce zapíše do historie změn', (bulk.match(/await audit\(/g) ?? []).length >= 3);
 
   // Souběh: dvojklik na stejnou hromadnou akci nezdvojí body (přivlastnění klíče je atomický upsert).
@@ -168,6 +167,10 @@ export default async function ({ eq, ok }: Testy) {
   const ui = precti('components/client/loyalty/ClenoveSprava.tsx');
   ok('UI členů: úprava kreditu jen s vernost.kredit_upravit (okno BodyUpravaClena)', /upravujeKredit = smi\('vernost\.kredit_upravit'\)/.test(ui) && /<UpravaClenaOkno/.test(ui) && /what: 'credit'/.test(precti('components/client/loyalty/BodyUpravaClena.tsx')));
   ok('UI členů: slot pro akce jiného okruhu (kupon vybraným)', /dalsiAkce\?: \(vyber: VyberHostu\) => BulkAction\[\]/.test(ui));
+  const admin = precti('components/client/ClientAdmin.tsx');
+  ok('kupon vybraným: lišta výběru otevře okno posílání kuponů, jen s oprávněním ke kuponům', /dalsiAkce = ma\('kupony\.spravovat'\)/.test(admin) && /<KuponVybranym /.test(admin) && /dalsiAkce=\{dalsiAkce\}/.test(admin));
+  const kv = precti('components/client/loyalty/KuponVybranym.tsx');
+  ok('kupon vybraným: posílá se přes KuponyOdeslat s předem vybranými hosty (jedna cesta rozesílky kuponů)', /<KuponyOdeslat [^>]*hostIds=\{ids\}/.test(kv));
   ok('UI členů: strop 500 je pryč, je „Načíst další"', /Načíst další/.test(ui) && !/limit=500/.test(ui));
 
   // ---- poznámky ----

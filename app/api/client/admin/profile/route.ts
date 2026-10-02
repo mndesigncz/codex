@@ -11,10 +11,13 @@ import { zajistiReaktivaci } from '@/lib/reaktivace';
 import { zajistiBodyPravidla } from '@/lib/bodyPravidlaDb';
 import {
   validujPravidla, POLE_PRAVIDEL, popisZmenyPravidel, vetaZmenPravidel, jeZaokrouhleni, vylouceneZProfilu,
-  MAX_PRAH_NAVSTEV, MAX_PRAH_UTRATY, MAX_MIN_UTRATA, MAX_STROP_BODU, MAX_MESICU_NEAKTIVITY,
+  MAX_PRAH_NAVSTEV, MAX_PRAH_UTRATY, MAX_MIN_UTRATA, MAX_STROP_BODU, MAX_MESICU_NEAKTIVITY, MAX_UVITACI_BODY, MAX_DNI_KREDITU,
+  vylouceneSekceZProfilu, nasobicZProfilu, uvitaciBody,
 } from '@/lib/bodyPravidla';
+import { pragueToday } from '@/lib/pragueTime';
 import { menaPodniku } from '@/lib/menaPodniku';
 import { teamIsMax, MAX_ONLY_MSG } from '@/lib/planServer';
+import { zapisVerzi } from '@/lib/pravidlaVerze';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -42,9 +45,14 @@ const POLE_OPRAVNENI: Record<string, string> = {
   points_expire_days: 'vernost.pravidla',
   points_round: 'vernost.pravidla', points_min_spend: 'vernost.pravidla', points_cap_per_bill: 'vernost.pravidla',
   points_exclude_prepaid: 'vernost.pravidla', points_exclude_items: 'vernost.pravidla', tier_inactive_months: 'vernost.pravidla',
+  points_cap_per_day: 'vernost.pravidla', points_exclude_sections: 'vernost.pravidla', mult_silver: 'vernost.pravidla', mult_gold: 'vernost.pravidla',
+  mult_platinum: 'vernost.pravidla', welcome_points: 'vernost.pravidla', credit_expire_days: 'vernost.pravidla',
 };
 /** Pole pravidel bodů, která žijí ve vlastním UPDATE (sloupce se zajišťují za běhu). */
-const POLE_BODU = ['points_round', 'points_min_spend', 'points_cap_per_bill', 'points_exclude_prepaid', 'points_exclude_items', 'tier_inactive_months'];
+const POLE_BODU = [
+  'points_round', 'points_min_spend', 'points_cap_per_bill', 'points_exclude_prepaid', 'points_exclude_items', 'tier_inactive_months',
+  'points_cap_per_day', 'points_exclude_sections', 'mult_silver', 'mult_gold', 'mult_platinum', 'welcome_points', 'credit_expire_days',
+];
 const NAZEV_SKUPINY: Record<string, string> = {
   'klient.nastaveni': 'nastavení stránky pro hosty', 'klient.vzhled': 'vzhled stránky pro hosty', 'vernost.pravidla': 'pravidla věrnosti',
 };
@@ -198,6 +206,9 @@ export async function PUT(req: NextRequest) {
   // Body bez stropu, minimum, zaokrouhlení, kredit a poukazy, vyloučené položky a snížení úrovně po neaktivitě.
   if (POLE_BODU.some(k => b?.[k] !== undefined)) {
     await zajistiBodyPravidla();
+    // Zapnutí propadání kreditu si pamatuje den zapnutí (stáří se počítá od něj, nic se nesmaže zpětně).
+    const kreditDny = num(b.credit_expire_days, Number(pFinal.credit_expire_days) || 0, 0, MAX_DNI_KREDITU);
+    const kreditOd = kreditDny <= 0 ? null : (!(Number(pFinal.credit_expire_days) > 0) || !pFinal.credit_expire_since ? pragueToday() : String(pFinal.credit_expire_since));
     [pFinal] = await sql`
       UPDATE client_profiles SET
         points_round = ${jeZaokrouhleni(b.points_round) ? b.points_round : (jeZaokrouhleni(pFinal.points_round) ? pFinal.points_round : 'sta')},
@@ -205,12 +216,24 @@ export async function PUT(req: NextRequest) {
         points_cap_per_bill = ${num(b.points_cap_per_bill, Number(pFinal.points_cap_per_bill) || 0, 0, MAX_STROP_BODU)},
         points_exclude_prepaid = ${b.points_exclude_prepaid != null ? !!b.points_exclude_prepaid : pFinal.points_exclude_prepaid !== false},
         points_exclude_items = ${JSON.stringify(b.points_exclude_items !== undefined ? vylouceneZProfilu(b.points_exclude_items) : vylouceneZProfilu(pFinal.points_exclude_items))}::jsonb,
-        tier_inactive_months = ${num(b.tier_inactive_months, Number(pFinal.tier_inactive_months) || 0, 0, MAX_MESICU_NEAKTIVITY)}
+        tier_inactive_months = ${num(b.tier_inactive_months, Number(pFinal.tier_inactive_months) || 0, 0, MAX_MESICU_NEAKTIVITY)},
+        points_cap_per_day = ${num(b.points_cap_per_day, Number(pFinal.points_cap_per_day) || 0, 0, MAX_STROP_BODU)},
+        points_exclude_sections = ${JSON.stringify(b.points_exclude_sections !== undefined ? vylouceneSekceZProfilu(b.points_exclude_sections) : vylouceneSekceZProfilu(pFinal.points_exclude_sections))}::jsonb,
+        mult_silver = ${nasobicZProfilu(b.mult_silver !== undefined ? b.mult_silver : pFinal.mult_silver)},
+        mult_gold = ${nasobicZProfilu(b.mult_gold !== undefined ? b.mult_gold : pFinal.mult_gold)},
+        mult_platinum = ${nasobicZProfilu(b.mult_platinum !== undefined ? b.mult_platinum : pFinal.mult_platinum)},
+        welcome_points = ${b.welcome_points !== undefined ? num(b.welcome_points, uvitaciBody(pFinal), 0, MAX_UVITACI_BODY) : (pFinal.welcome_points ?? null)},
+        credit_expire_days = ${kreditDny},
+        credit_expire_since = ${kreditOd}
       WHERE team_id = ${u.team_id} RETURNING *`;
   }
   // Verze pravidel: co se změnilo, před → po, v historii změn.
   const zmeny = popisZmenyPravidel(cur, pFinal, (await menaPodniku(u.team_id)).money);
-  if (zmeny.length) audit(u.team_id, u.id, 'client.pravidla', 'client', null, vetaZmenPravidel(zmeny));
+  if (zmeny.length) {
+    audit(u.team_id, u.id, 'client.pravidla', 'client', null, vetaZmenPravidel(zmeny));
+    // Verze pravidel: přímé uložení i použití konceptu (ten posílá `_verze` s poznámkou).
+    await zapisVerzi(u.team_id, u.id, zmeny, b?._verze?.zdroj === 'koncept' ? 'koncept' : 'form', b?._verze?.poznamka);
+  }
   audit(u.team_id, u.id, 'client.profile', 'client', null, pFinal.enabled ? `zapnuto · /client/${pFinal.slug}` : 'vypnuto');
   return NextResponse.json({ ok: true, profile: pFinal, public: publicProfile({ ...pFinal, team_name: '', opening_hours: {} }), url: `${origin(req)}/client/${pFinal.slug}` });
 }

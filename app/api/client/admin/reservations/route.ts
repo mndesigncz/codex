@@ -9,6 +9,7 @@ import { notifyUser } from '@/lib/push';
 import { pragueToday, dayPlus } from '@/lib/pragueTime';
 import { audit } from '@/lib/audit';
 import { aktivniBonus } from '@/lib/bonusAkceDb';
+import { pripisBodyZaRezervaci } from '@/lib/bodyZdrojeDb';
 import { poznamkaRazitek } from '@/lib/bonusAkce';
 
 export const dynamic = 'force-dynamic';
@@ -109,11 +110,14 @@ export async function PATCH(req: NextRequest) {
   await sql`UPDATE client_reservations SET status = ${status}, table_id = ${tableId}, storyous_reservation_id = ${storyousId}, updated_at = NOW() WHERE id = ${id}`;
 
   let loyalty: any = null;
+  let bodyRezervace = 0;
   if (next === 'done') {
     const profile = await ensureProfile(u.team_id);
     if (profile.loyalty_on) {
       const bonus = await aktivniBonus(u.team_id);
       loyalty = await stampVisit(u.team_id, Number(r.customer_id), profile, `res:${r.id}`, bonus.razitka, poznamkaRazitek(bonus));
+      // Body za rezervaci, která proběhla (nastavení podniku; jednou za rezervaci). Selhání bodů uzavření rezervace nezastaví.
+      try { bodyRezervace = await pripisBodyZaRezervaci(u.team_id, Number(r.id), Number(r.customer_id)); } catch (e) { console.error('[rezervace] body', e); }
     }
   }
   if (next === 'confirmed' || next === 'declined') {
@@ -125,5 +129,5 @@ export async function PATCH(req: NextRequest) {
     }).catch(() => {});
   }
   audit(u.team_id, u.id, 'client.reservation', 'client', id, `${r.customer_name} · ${r.date} ${r.time} → ${status}`);
-  return NextResponse.json({ ok: true, status, tableId, posNote, loyalty });
+  return NextResponse.json({ ok: true, status, tableId, posNote, loyalty, bodyRezervace });
 }

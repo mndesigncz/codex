@@ -94,10 +94,13 @@
   "Položka nenalezena": "Artikel nicht gefunden",
   "Položku se nepodařilo vytvořit.": "Der Artikel konnte nicht angelegt werden.",
   "Portál se nepodařilo otevřít.": "Das Portal konnte nicht geöffnet werden.",
+  "Poukaz nenalezen": "Gutschein nicht gefunden",
   "Poukaz nenalezen nebo neplatí": "Gutschein nicht gefunden oder ungültig",
+  "Poukaz se teď nepodařilo odebrat. Zkus to za chvíli.": "Der Gutschein konnte gerade nicht entfernt werden. Versuche es gleich noch einmal.",
   "Poukaz se teď nepodařilo ověřit. Zkus to za chvíli.": "Der Gutschein konnte gerade nicht geprüft werden. Versuche es gleich noch einmal.",
   "Povinné věci se nepodařilo načíst.": "Die Pflichtpunkte konnten nicht geladen werden.",
   "Požadavek z cizí stránky byl zamítnut.": "Eine Anfrage von einer fremden Seite wurde abgelehnt.",
+  "Pro přidání poukazu do aplikace se přihlas.": "Melde dich an, um den Gutschein zu deiner App hinzuzufügen.",
   "Publikování se nepodařilo": "Veröffentlichen hat nicht geklappt",
   "Předchozí objednávka ještě čeká na obsluhu.": "Deine vorherige Bestellung wartet noch auf das Personal.",
   "Přihlas se jako host.": "Melde dich als Gast an.",
@@ -158,5 +161,10 @@
   "Účet se nepodařilo smazat. Zkuste to znovu, nebo napište podpoře.": "Das Konto konnte nicht gelöscht werden. Versuchen Sie es erneut oder schreiben Sie dem Support.",
   "Kupony došly.": "Die Gutscheine sind vergriffen.",
   "Odměna tohoto kódu už není k dispozici.": "Die Belohnung dieses Codes ist nicht mehr verfügbar.",
-  "Kupony z tohoto kódu už došly.": "Die Gutscheine zu diesem Code sind aufgebraucht."
+  "Kupony z tohoto kódu už došly.": "Die Gutscheine zu diesem Code sind aufgebraucht.",
+  "Odkaz na odhlášení není platný.": "Der Abmeldelink ist nicht gültig.",
+  "Odhlášení se nepodařilo načíst. Zkus to znovu.": "Die Abmeldung konnte nicht geladen werden. Versuch es noch einmal.",
+  "Moc pokusů za sebou. Zkus to za chvíli.": "Zu viele Versuche hintereinander. Versuch es gleich noch einmal.",
+  "Odhlášení se nepodařilo uložit. Zkus to znovu.": "Die Abmeldung konnte nicht gespeichert werden. Versuch es noch einmal.",
+  "Tvůj účet je v tomhle podniku zablokovaný. Obrať se na obsluhu.": "Dein Konto ist in diesem Betrieb gesperrt. Wende dich an das Personal."
 }

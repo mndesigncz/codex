@@ -94,10 +94,13 @@
   "Položka nenalezena": "Nie znaleziono pozycji",
   "Položku se nepodařilo vytvořit.": "Nie udało się utworzyć pozycji.",
   "Portál se nepodařilo otevřít.": "Nie udało się otworzyć portalu.",
+  "Poukaz nenalezen": "Nie znaleziono vouchera",
   "Poukaz nenalezen nebo neplatí": "Nie znaleziono bonu lub jest nieważny",
+  "Poukaz se teď nepodařilo odebrat. Zkus to za chvíli.": "Nie udało się teraz usunąć vouchera. Spróbuj za chwilę.",
   "Poukaz se teď nepodařilo ověřit. Zkus to za chvíli.": "Nie udało się teraz sprawdzić bonu. Spróbuj za chwilę.",
   "Povinné věci se nepodařilo načíst.": "Nie udało się wczytać obowiązkowych rzeczy.",
   "Požadavek z cizí stránky byl zamítnut.": "Żądanie z obcej strony zostało odrzucone.",
+  "Pro přidání poukazu do aplikace se přihlas.": "Zaloguj się, aby dodać voucher do aplikacji.",
   "Publikování se nepodařilo": "Publikacja się nie udała",
   "Předchozí objednávka ještě čeká na obsluhu.": "Poprzednie zamówienie wciąż czeka na obsługę.",
   "Přihlas se jako host.": "Zaloguj się jako gość.",
@@ -158,5 +161,10 @@
   "Účet se nepodařilo smazat. Zkuste to znovu, nebo napište podpoře.": "Nie udało się usunąć konta. Spróbuj ponownie lub napisz do pomocy technicznej.",
   "Kupony došly.": "Kupony się skończyły.",
   "Odměna tohoto kódu už není k dispozici.": "Nagroda za ten kod nie jest już dostępna.",
-  "Kupony z tohoto kódu už došly.": "Kupony z tego kodu już się skończyły."
+  "Kupony z tohoto kódu už došly.": "Kupony z tego kodu już się skończyły.",
+  "Odkaz na odhlášení není platný.": "Link do wypisania nie jest prawidłowy.",
+  "Odhlášení se nepodařilo načíst. Zkus to znovu.": "Nie udało się wczytać wypisania. Spróbuj ponownie.",
+  "Moc pokusů za sebou. Zkus to za chvíli.": "Zbyt wiele prób z rzędu. Spróbuj za chwilę.",
+  "Odhlášení se nepodařilo uložit. Zkus to znovu.": "Nie udało się zapisać wypisania. Spróbuj ponownie.",
+  "Tvůj účet je v tomhle podniku zablokovaný. Obrať se na obsluhu.": "Twoje konto jest w tym lokalu zablokowane. Zwróć się do obsługi."
 }

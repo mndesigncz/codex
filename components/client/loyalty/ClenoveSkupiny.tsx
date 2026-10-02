@@ -17,12 +17,13 @@ import { apiMessage, okJson, okText } from '@/lib/api';
 import { ulozSoubor } from '@/lib/stahni';
 import { BARVY_SKUPIN, chybaPravidel, popisPravidel, tonBarvy, MAX_NEAKTIVNI_DNI, type PravidlaSkupiny } from '@/lib/clenoveFiltr';
 import { j } from '../import/typy';
+import SkupinyImport from './SkupinyImport';
 
 const HOST: CzNoun = { one: 'host', few: 'hosté', many: 'hostů' };
 
 interface Skupina {
   id: number; name: string; description: string | null; color: string | null; discount_pct: number; members: number;
-  rules: PravidlaSkupiny | null; dynamic: boolean;
+  rules: PravidlaSkupiny | null; dynamic: boolean; archived?: boolean;
 }
 
 interface Formular {
@@ -48,11 +49,14 @@ const pravidlaZFormulare = (f: Formular): PravidlaSkupiny | null => {
 
 export default function ClenoveSkupiny({ toast }: { toast: (m: string, ton?: 'ok' | 'bad') => void }) {
   const meni = useOpravneni().ma('zakaznici.skupiny');
+  const smiImport = useOpravneni().ma('zakaznici.kontakty');
   const money = useMoney();
   const { data: d, error, reload } = useLoad<{ groups: Skupina[] }>('/api/client/admin/groups', raw => ({ groups: Array.isArray(raw?.groups) ? raw.groups : [] }));
   const [form, setForm] = useState<Formular | null>(null);
   const [mazu, setMazu] = useState<Skupina | null>(null);
   const [clenove, setClenove] = useState<Skupina | null>(null);
+  const [import_, setImport] = useState<Skupina | null>(null);
+  const [archiv, setArchiv] = useState(false);
   const [busy, setBusy] = useState('');
 
   // Sleva skupiny se ukládá po opuštění pole; 0 = skupina je jen štítek.
@@ -62,6 +66,13 @@ export default function ClenoveSkupiny({ toast }: { toast: (m: string, ton?: 'ok
     setBusy('sleva:' + g.id);
     try { await j('/api/client/admin/groups', { method: 'PATCH', body: JSON.stringify({ id: g.id, discount_pct: n }) }); reload(); toast(`Sleva skupiny ${g.name}: ${n} %.`); }
     catch (err) { toast(apiMessage(err, 'Slevu se nepodařilo uložit.'), 'bad'); reload(); }
+    setBusy('');
+  };
+  // Archiv: skupina zmizí z nabídek (zprávy, kupony), členové i historie zůstanou.
+  const archivuj = async (g: Skupina, archived: boolean) => {
+    setBusy('arch:' + g.id);
+    try { await j('/api/client/admin/groups', { method: 'PATCH', body: JSON.stringify({ id: g.id, archived }) }); reload(); toast(archived ? `Skupina ${g.name} je v archivu.` : `Skupina ${g.name} je zpátky.`); }
+    catch (err) { toast(apiMessage(err, 'Skupinu se nepodařilo přesunout.'), 'bad'); }
     setBusy('');
   };
   const smaz = async (g: Skupina) => {
@@ -78,6 +89,7 @@ export default function ClenoveSkupiny({ toast }: { toast: (m: string, ton?: 'ok
           <h2 id="v-skupiny" className="t-card">Skupiny hostů</h2>
           <p className="t-meta mt-0.5 max-w-[70ch]">Vlastní štítky mimo úrovně — „štamgasti", „firemní večery". Ruční skupinu plníš v Zákaznících, i hromadně podle filtru. Dynamická skupina se plní sama podle pravidel. Kupony na skupiny cílíš v jejich editoru. Skupina může mít i vlastní slevu: člen ve víc skupinách (a s úrovní) bere vždy nejvyšší z nich, nikdy součet.</p>
         </div>
+        {d?.groups.some(g => g.archived) && <Button size="sm" variant="ghost" aria-pressed={archiv} onClick={() => setArchiv(v => !v)}>{archiv ? 'Skrýt archiv' : 'Ukázat archiv'}</Button>}
         {meni && <Button size="sm" variant="secondary" icon="plus" onClick={() => setForm({ ...PRAZDNY })}>Nová skupina</Button>}
       </div>
       {error ? <ErrorState title="Skupiny se nenačetly" detail={error} onRetry={reload} />
@@ -85,9 +97,9 @@ export default function ClenoveSkupiny({ toast }: { toast: (m: string, ton?: 'ok
         : d.groups.length === 0 ? <EmptyState icon="users" compact title="Zatím žádná skupina" hint={meni ? 'Založ první: třeba Štamgasti, nebo dynamickou „Nepřišli 60 dní".' : 'Skupiny zakládá vedení.'} />
         : (
           <ul className="list">
-            {d.groups.map(g => (
+            {d.groups.filter(g => archiv || !g.archived).map(g => (
               <ListRow key={g.id}
-                title={<span className="flex items-center gap-2 min-w-0"><span className="truncate">{g.name}</span><Chip tone={tonBarvy(g.color)} size="sm">{g.dynamic ? 'Dynamická' : 'Ruční'}</Chip></span>}
+                title={<span className="flex items-center gap-2 min-w-0"><span className="truncate">{g.name}</span><Chip tone={tonBarvy(g.color)} size="sm">{g.dynamic ? 'Dynamická' : 'Ruční'}</Chip>{g.archived && <Chip tone="muted" size="sm">Archiv</Chip>}</span>}
                 meta={[czCount(Number(g.members) || 0, HOST), Number(g.discount_pct) > 0 ? `sleva ${g.discount_pct} %` : null, g.dynamic ? popisPravidel(g.rules, money) : null, g.description].filter(Boolean).join(' · ')}
                 actions={<>
                   <Button size="sm" variant="secondary" onClick={() => setClenove(g)}>Členové</Button>
@@ -98,6 +110,8 @@ export default function ClenoveSkupiny({ toast }: { toast: (m: string, ton?: 'ok
                           defaultValue={Number(g.discount_pct) || 0} disabled={busy === 'sleva:' + g.id}
                           onBlur={e => { void ulozSlevu(g, e.target.value); }} />
                       </label>
+                      {!g.dynamic && !g.archived && smiImport && <Button size="sm" variant="ghost" icon="upload" aria-label={`Přidat členy z CSV do skupiny ${g.name}`} onClick={() => setImport(g)}>Z CSV</Button>}
+                      <Button size="sm" variant="ghost" loading={busy === 'arch:' + g.id} aria-label={`${g.archived ? 'Vrátit z archivu' : 'Archivovat'} skupinu ${g.name}`} onClick={() => { void archivuj(g, !g.archived); }}>{g.archived ? 'Vrátit' : 'Archiv'}</Button>
                       <Button size="sm" variant="ghost" aria-label={`Upravit skupinu ${g.name}`} onClick={() => setForm(naFormular(g))}>Upravit</Button>
                       <Button size="sm" variant="ghost" icon="trash" aria-label={`Smazat skupinu ${g.name}`} loading={busy === 'del:' + g.id} onClick={() => setMazu(g)}>Smazat</Button>
                     </>
@@ -106,6 +120,7 @@ export default function ClenoveSkupiny({ toast }: { toast: (m: string, ton?: 'ok
             ))}
           </ul>
         )}
+      {import_ && <SkupinyImport skupina={import_} oznam={toast} onZavrit={() => { setImport(null); reload(); }} />}
       {form && <SkupinaOkno vychozi={form} toast={toast} onZavrit={() => setForm(null)} onHotovo={() => { setForm(null); reload(); }} />}
       {clenove && <ClenoveSkupinyOkno skupina={clenove} meni={meni} toast={toast} onZavrit={() => { setClenove(null); reload(); }} />}
       {mazu && (

@@ -10,25 +10,26 @@ import { useOpravneni } from '../../role/useOpravneni';
 import { useMoney } from '../../CurrencyProvider';
 import { casovaOsa, zbyvaDoUrovne, zbyvaDoOdmeny, type UdalostOsy } from '@/lib/clenPrehled';
 import { czCount, type CzNoun } from '@/lib/czech';
-import { dbTimeDayHM, pragueDaySafe } from '@/lib/pragueTime';
+import { dbTimeDayHM } from '@/lib/pragueTime';
 import { apiMessage, okJson } from '@/lib/api';
 import { NOTE_MAX } from '@/lib/poznamkyHosta';
 import { j, type Hlaska } from '../import/typy';
 import RazitkaClen from './RazitkaClen';
+import { HistorieClena, SpravaClena } from './ClenSprava';
+import { denCesky } from './datum';
 
 const NAVSTEVA: CzNoun = { one: 'návštěva', few: 'návštěvy', many: 'návštěv' };
 const POPISEK_DRUHU: Record<string, string> = { body: 'Body', kupon: 'Kupon', poukaz: 'Poukaz', objednavka: 'Objednávka' };
 
-/** Datum z databáze česky i s rokem („11. 2. 2026") — přes pražský den, ne místní zónu prohlížeče. */
-export function denCesky(v: unknown): string {
-  const d = pragueDaySafe(v);
-  return d ? `${Number(d.slice(8, 10))}. ${Number(d.slice(5, 7))}. ${d.slice(0, 4)}` : '–';
-}
+export { denCesky };
 
 /** Deník bodů, skupiny a poznámky člena — jamka pod řádkem. */
-export default function DetailClena({ customerId, oznam, vidiDenik }: { customerId: number; oznam: Hlaska; vidiDenik: boolean }) {
+export default function DetailClena({ customerId, jmeno, zablokovany = false, oznam, vidiDenik, onZmena }: {
+  customerId: number; jmeno: string; zablokovany?: boolean; oznam: Hlaska; vidiDenik: boolean; onZmena: () => void;
+}) {
   const money = useMoney();
   const { ma: smi } = useOpravneni();
+  const [celaHistorie, setCelaHistorie] = useState(false);
   // Přehled hosta jen s vernost.zobrazit — bez něj by GET skončil 403 (widget bez oprávnění nevolá).
   const { data: pr } = useLoad<any>(vidiDenik ? `/api/client/admin/loyalty?customerId=${customerId}&detail=1` : null,
     raw => ({ ...raw, osa: casovaOsa({ ledger: raw?.ledger, claims: raw?.claims, vouchers: raw?.vouchers, orders: raw?.orders }, money), kampane: Array.isArray(raw?.kampane) ? raw.kampane : [] }));
@@ -39,6 +40,7 @@ export default function DetailClena({ customerId, oznam, vidiDenik }: { customer
       <SkupinyClena customerId={customerId} oznam={oznam} prazdne={!vidiDenik && !smi('zakaznici.poznamky')} />
       {vidiDenik && <RazitkaClen customerId={customerId} oznam={oznam} />}
       {smi('zakaznici.poznamky') && <PoznamkyClena customerId={customerId} oznam={oznam} />}
+      {smi('zakaznici.sprava_clenu') && <SpravaClena clen={{ id: customerId, name: jmeno, blocked: zablokovany }} oznam={oznam} onZmena={onZmena} />}
       {!vidiDenik ? null
         : pr === null ? <Skeleton className="h-10" />
         : (
@@ -53,6 +55,8 @@ export default function DetailClena({ customerId, oznam, vidiDenik }: { customer
               {zbyva && <p className="t-meta">{zbyva}</p>}
               {razitka.map(r => <p key={r} className="t-meta">{r}</p>)}
             </div>
+            <Button size="sm" variant="ghost" aria-expanded={celaHistorie} onClick={() => setCelaHistorie(v => !v)}>{celaHistorie ? 'Skrýt celou historii' : 'Celá historie'}</Button>
+            {celaHistorie && <HistorieClena customerId={customerId} />}
             {pr.osa.length === 0 ? <p className="t-meta">Zatím žádná historie.</p> : (
               <ul className="list" aria-label="Časová osa hosta">
                 {pr.osa.map((u: UdalostOsy, i: number) => (

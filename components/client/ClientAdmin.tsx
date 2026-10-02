@@ -41,6 +41,9 @@ import LoyaltyTabs, { LOYALTY_SUBS, type LoyaltySub } from './LoyaltyTabs';
 import PrechodZKarticky, { PRECHOD_TLACITKO, PRECHOD_OTAZKA, PRECHOD_POPIS, useImportKarticky } from './PrechodZKarticky';
 import ClenoveSprava from './loyalty/ClenoveSprava';
 import ZpravyRozeslani from './loyalty/ZpravyRozeslani';
+import Automatizace from './loyalty/Automatizace';
+import KuponVybranym from './loyalty/KuponVybranym';
+import type { VyberHostu } from './loyalty/ClenoveHromadne';
 import MenuEditor from '../employer/MenuEditor';
 import EventsView from '../employer/EventsView';
 import { czDay, RES_STATUS } from '@/lib/clientSlots';
@@ -651,11 +654,12 @@ function StolyStranka({ oznam }: { oznam: Hlaska }) {
 
 // ---- Zákazníci ------------------------------------------------------------------
 
-type CastZakazniku = 'members' | 'reviews' | 'messages';
+type CastZakazniku = 'members' | 'reviews' | 'messages' | 'automations';
 const CASTI_ZAKAZNIKU: { id: CastZakazniku; label: string; klic: string; popis: string }[] = [
   { id: 'members', label: 'Členové', klic: 'zakaznici.zobrazit', popis: 'Kdo se k podniku přidal, kolik má bodů a razítek, deník změn.' },
   { id: 'reviews', label: 'Hodnocení', klic: 'zakaznici.recenze', popis: 'Host dostane po hotové rezervaci nebo objednávce výzvu k hodnocení. Slabé hodnocení (1 až 2 hvězdy) ti přijde jako oznámení.' },
-  { id: 'messages', label: 'Zprávy členům', klic: 'zakaznici.zpravy', popis: 'Novinka, akce nebo sezónní nabídka pro všechny členy. Přijde jako oznámení v aplikaci a push na telefon. Nejvýš pět za den.' },
+  { id: 'messages', label: 'Zprávy členům', klic: 'zakaznici.zpravy', popis: 'Novinka, akce nebo nabídka pro členy: oznámení v aplikaci a push, nebo e-mail. Nejvýš pět za den.' },
+  { id: 'automations', label: 'Automatizace', klic: 'zakaznici.zpravy', popis: 'Zprávy, které odejdou samy: uvítání, po první návštěvě, po dokončení karty, k narozeninám a „Chybíš nám“.' },
 ];
 
 function ZakazniciStranka({ oznam, hledat }: { oznam: Hlaska; hledat: string }) {
@@ -664,11 +668,17 @@ function ZakazniciStranka({ oznam, hledat }: { oznam: Hlaska; hledat: string }) 
   const casti = CASTI_ZAKAZNIKU.filter(c => ma(c.klic));
   const [volba, setVolba] = useState<CastZakazniku>('members');
   const cast = casti.find(c => c.id === volba) ?? casti[0] ?? null;
+  // Kupon vybraným členům: akce v liště výběru, okno posílání kuponů je z části Kupony.
+  const [kuponVyber, setKuponVyber] = useState<VyberHostu | null>(null);
+  const dalsiAkce = ma('kupony.spravovat') ? (vyber: VyberHostu) => [{ label: 'Kupon', icon: 'tag', onClick: () => setKuponVyber(vyber) }] : undefined;
   const nastroj = !cast ? null
-    : cast.id === 'members' ? <ClenoveSprava oznam={oznam} hledat={hledat} />
+    : cast.id === 'members' ? <ClenoveSprava oznam={oznam} hledat={hledat} dalsiAkce={dalsiAkce} />
     : cast.id === 'reviews' ? <Recenze />
+    : cast.id === 'automations' ? <Automatizace oznam={oznam} />
     : <ZpravyRozeslani oznam={oznam} />;
   return (
+    <>
+    {kuponVyber && <KuponVybranym vyber={kuponVyber} oznam={oznam} onZavrit={() => setKuponVyber(null)} onHotovo={() => setKuponVyber(null)} />}
     <PlochaWidgetu
       stranka="vedeni.klient_zakaznici"
       hlavicka={{
@@ -681,6 +691,7 @@ function ZakazniciStranka({ oznam, hledat }: { oznam: Hlaska; hledat: string }) 
       }}
       nastroj={nastroj}
     />
+    </>
   );
 }
 

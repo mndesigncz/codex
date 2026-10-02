@@ -3,7 +3,7 @@
 // Členové klubu: hledání, filtry (úroveň, skupina, neaktivní N dní, narozeniny tento
 // měsíc, otevřený kupon, útrata), řazení, stránkování („Načíst další"), export do CSV,
 // výběr hostů a hromadné akce (skupina, bonus bodů, zpráva), úprava bodů, kreditu a útraty
-// jednoho hosta a detail s poznámkami. Dřív funkce Clenove v ClientAdmin.tsx se stropem
+// jednoho hosta, detail s poznámkami, blokací, odebráním z klubu a celou historií a sloučení duplicit. Dřív funkce Clenove v ClientAdmin.tsx se stropem
 // 500 řádků a bez filtrů.
 //
 // Oprávnění: seznam zakaznici.zobrazit, e-mail zakaznici.kontakty, export zakaznici.export,
@@ -27,6 +27,7 @@ import { PRECHOD_TLACITKO, useImportKarticky } from '../PrechodZKarticky';
 import type { Hlaska } from '../import/typy';
 import DetailClena, { denCesky } from './ClenoveDetail';
 import { UpravaClenaOkno } from './BodyUpravaClena';
+import Duplicity from './Duplicity';
 import { HromadnaSkupina, HromadnyBonus, HromadnaZprava, type VyberHostu } from './ClenoveHromadne';
 
 const CLEN: CzNoun = { one: 'člen', few: 'členové', many: 'členů' };
@@ -38,7 +39,7 @@ interface ClenRadek {
   joined_at: string; last_visit_at: string | null; reservations: number; open_coupons: number;
   // Úroveň podle režimu podniku a efektivní sleva (nejvyšší z úrovně a slev skupin) — počítá server.
   spend?: number; credit?: number; level_reduced?: boolean; level?: string; level_label?: string; discount?: number; discount_source?: 'uroven' | 'skupina' | null; discount_name?: string | null;
-  skupiny?: { id: number; name: string; color: string | null }[]; has_birthday_month?: boolean;
+  skupiny?: { id: number; name: string; color: string | null }[]; has_birthday_month?: boolean; blocked?: boolean;
 }
 
 interface Stranka { rows: ClenRadek[]; total: number; all: number; hasMore: boolean; nextOffset: number | null }
@@ -65,7 +66,8 @@ export default function ClenoveSprava({ oznam, hledat = '', dalsiAkce }: {
   const piseZpravy = smi('zakaznici.zpravy');
   const smiExport = smi('zakaznici.export');
   const maPoznamky = smi('zakaznici.poznamky');
-  const rozbali = vidiDenik || meniSkupiny || maPoznamky;
+  const smiSpravu = smi('zakaznici.sprava_clenu');
+  const rozbali = vidiDenik || meniSkupiny || maPoznamky || smiSpravu;
 
   // Hledání a čísla ve filtrech se ptají serveru s krátkou prodlevou, ať se neptá na každé písmeno.
   const [q, setQ] = useState(hledat);
@@ -113,7 +115,7 @@ export default function ClenoveSprava({ oznam, hledat = '', dalsiAkce }: {
   };
 
   // Skupiny pro filtr a hromadné přidání.
-  const { data: sk, reload: reloadSkupin } = useLoad<{ groups: { id: number; name: string; color: string | null; dynamic: boolean; members: number }[] }>(
+  const { data: sk, reload: reloadSkupin } = useLoad<{ groups: { id: number; name: string; color: string | null; dynamic: boolean; archived?: boolean; members: number }[] }>(
     '/api/client/admin/groups', raw => ({ groups: Array.isArray(raw?.groups) ? raw.groups : [] }));
 
   const imp = useImportKarticky(oznam, reload);
@@ -123,6 +125,7 @@ export default function ClenoveSprava({ oznam, hledat = '', dalsiAkce }: {
   const [verzeDeniku, setVerzeDeniku] = useState(0);
   const [exportuji, setExportuji] = useState(false);
   const [okno, setOkno] = useState<Okno>(null);
+  const [duplicity, setDuplicity] = useState(false);
 
   // ---- výběr ----
   const sel = useSelection<number>();
@@ -164,7 +167,7 @@ export default function ClenoveSprava({ oznam, hledat = '', dalsiAkce }: {
   const pocetPodminek = pocetFiltru(navrh);
   const jeFiltrovano = pocetPodminek > 0 || !!filtr.q;
   const skupiny = sk?.groups ?? [];
-  const rucniSkupiny = skupiny.filter(g => !g.dynamic);
+  const rucniSkupiny = skupiny.filter(g => !g.dynamic && !g.archived);
   const prazdnaCelkem = d && d.all === 0;
 
   return (
@@ -178,6 +181,7 @@ export default function ClenoveSprava({ oznam, hledat = '', dalsiAkce }: {
           </Button>
           {smiExport && <Button size="sm" variant="secondary" icon="download" loading={exportuji} disabled={!d || d.total === 0} onClick={() => { void exportuj(); }}>Export CSV</Button>}
           {smiImport && <Button size="sm" variant="secondary" icon="upload" onClick={imp.otevri}>{PRECHOD_TLACITKO}</Button>}
+          {smiSpravu && <Button size="sm" variant="secondary" icon="users" onClick={() => setDuplicity(true)}>Duplicity</Button>}
         </div>
       </div>
 
@@ -248,6 +252,7 @@ export default function ClenoveSprava({ oznam, hledat = '', dalsiAkce }: {
                         <span className="truncate">{c.name}</span>
                         {uroven.id !== 'bronze' && <Chip tone={uroven.id === 'silver' ? 'muted' : 'ink'} size="sm">{uroven.label}</Chip>}
                         {c.level_reduced && <Chip tone="wait" size="sm">snížená po pauze</Chip>}
+                        {c.blocked && <Chip tone="bad" size="sm">Zablokovaný</Chip>}
                         {Number(c.discount) > 0 && <Chip tone="ok" size="sm">{`Sleva ${c.discount} %${c.discount_source === 'skupina' && c.discount_name ? ` (${c.discount_name})` : ''}`}</Chip>}
                         {c.has_birthday_month && <Chip tone="info" size="sm" icon="gift">Narozeniny</Chip>}
                         {sg.slice(0, 2).map(g => <Chip key={g.id} tone={tonBarvy(g.color)} size="sm">{g.name}</Chip>)}
@@ -263,7 +268,7 @@ export default function ClenoveSprava({ oznam, hledat = '', dalsiAkce }: {
                           {rozbali && <Button size="sm" variant="ghost" aria-expanded={otevreny === c.id} onClick={() => setOtevreny(otevreny === c.id ? null : c.id)}>{otevreny === c.id ? 'Skrýt' : vidiDenik ? 'Deník' : maPoznamky ? 'Poznámky' : 'Skupiny'}</Button>}
                         </>
                       ) : undefined} />
-                    {otevreny === c.id && <DetailClena key={verzeDeniku} customerId={c.id} oznam={oznam} vidiDenik={vidiDenik} />}
+                    {otevreny === c.id && <DetailClena key={verzeDeniku} customerId={c.id} jmeno={c.name} zablokovany={c.blocked === true} oznam={oznam} vidiDenik={vidiDenik} onZmena={() => { setOtevreny(null); reload(); }} />}
                   </li>
                 );
               })}
@@ -275,6 +280,7 @@ export default function ClenoveSprava({ oznam, hledat = '', dalsiAkce }: {
           </Card>
         )}
       {imp.okno}
+      {duplicity && <Duplicity oznam={oznam} onZavrit={() => setDuplicity(false)} onSlouceno={() => { setOtevreny(null); reload(); }} />}
 
       <BulkBar count={pocetVyberu}
         totalLabel={d && pocetVyberu < d.total ? `Vybrat vše (${d.total})` : undefined}

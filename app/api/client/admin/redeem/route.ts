@@ -47,7 +47,8 @@ export async function POST(req: NextRequest) {
     SELECT cl.*, c.title, c.description, us.name AS customer_name, c.benefit_kind, c.percent_off, c.amount_off,
            c.xy_buy, c.xy_free, c.min_order_value, c.days_of_week, c.hour_from, c.hour_till,
            c.adult_only, c.valid_since, c.valid_until, c.target_tiers,
-           c.daily_limit, c.daily_count, c.daily_day
+           c.daily_limit, c.daily_count, c.daily_day, c.excluded_items, c.excluded_sections,
+           (SELECT mi.name FROM menu_items mi WHERE mi.id = c.menu_item_id) AS menu_item_name
     FROM client_coupon_claims cl
     JOIN client_coupons c ON c.id = cl.coupon_id JOIN users us ON us.id = cl.customer_id
     WHERE cl.code = ${norm} AND cl.team_id = ${u.team_id}`;

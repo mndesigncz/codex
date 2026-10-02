@@ -5,7 +5,7 @@
 // pohledem hosta. Kontrola je tatáž jako na serveru (lib/kuponyPole), takže chybu
 // správce uvidí dřív, než formulář odešle.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, Card, Field, Input, Segmented, SwitchRow } from '../../ui';
 import { useSymbol } from '../../CurrencyProvider';
 import { normalizujKupon, zkontrolujKupon } from '@/lib/kuponyPole';
@@ -13,6 +13,8 @@ import { jeNocniOkno } from '@/lib/kuponyPravidla';
 import { czCount, type CzNoun } from '@/lib/czech';
 import KuponyNahled from './KuponyNahled';
 import { DNY_TYDNE, TIER_VOLBY, type FormKupon } from './kuponyForm';
+import { VyberPolozek, VyberKategorii } from './KampanEditor';
+import { okJson } from '@/lib/api';
 
 const KUS: CzNoun = { one: 'kus', few: 'kusy', many: 'kusů' };
 
@@ -31,6 +33,19 @@ export default function KuponyEditor({ form, setForm, groups, busy, onSave, onZp
 }) {
   const symbol = useSymbol();
   const [pokus, setPokus] = useState(false);
+  // Položky a kategorie nabídky: pro kupon vázaný na položku a pro vyloučení (načtou se jednou při otevření editoru).
+  const [polozky, setPolozky] = useState<{ id: number; name: string; board: string; paired: boolean }[]>([]);
+  const [sekce, setSekce] = useState<{ id: number; name: string; board: string }[]>([]);
+  useEffect(() => {
+    fetch('/api/menu').then(okJson).then(d => {
+      const flat: any[] = []; const sec: any[] = [];
+      for (const b of d.boards ?? []) for (const s of b.sections ?? []) {
+        sec.push({ id: s.id, name: s.title ?? s.name, board: b.name });
+        for (const i of s.items ?? []) flat.push({ id: i.id, name: i.name, board: b.name, paired: !!i.posProductId });
+      }
+      setPolozky(flat); setSekce(sec);
+    }).catch(() => {});
+  }, []);
   const f = form;
   const set = (patch: Partial<FormKupon>) => setForm({ ...f, ...patch });
   const flip = <T,>(arr: T[], v: T) => (arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]);
@@ -79,6 +94,25 @@ export default function KuponyEditor({ form, setForm, groups, busy, onSave, onZp
               <Field id="cp-min" label={`Min. útrata (${symbol})`}><Input id="cp-min" type="number" inputMode="numeric" min={0} max={100000} className="!w-28 text-center" value={f.minOrderValue} onChange={e => set({ minOrderValue: e.target.value })} placeholder="—" /></Field>
             </div>
             <p className="t-meta mt-1.5">Minimální útrata: obsluha při uplatnění dostane varování, když je účtenka pod ní.</p>
+            {f.benefitKind !== 'text' && (polozky.length > 0 || f.menuItemId) && (
+              <Field id="cp-item" label="Platí jen na položku" hint="Volitelné. Host i obsluha uvidí „Zdarma: Dezert dne“ nebo „Sleva 20 % na Dezert dne“.">
+                <select id="cp-item" className="field" value={f.menuItemId} onChange={e => set({ menuItemId: e.target.value })}>
+                  <option value="">Bez vazby na položku</option>
+                  {polozky.map(i => <option key={i.id} value={i.id}>{i.name} ({i.board})</option>)}
+                  {f.menuItemId && !polozky.some(i => String(i.id) === f.menuItemId) && <option value={f.menuItemId}>Položka č. {f.menuItemId}</option>}
+                </select>
+              </Field>
+            )}
+            {f.benefitKind !== 'text' && (polozky.length > 0 || f.excludedItems.length + f.excludedSections.length > 0) && (
+              <details className="well px-4 py-3 mt-3" open={f.excludedItems.length + f.excludedSections.length > 0}>
+                <summary className="cursor-pointer text-sm font-semibold">Vyloučené položky a kategorie{f.excludedItems.length + f.excludedSections.length > 0 ? ` (${f.excludedItems.length + f.excludedSections.length})` : ''}</summary>
+                <div className="mt-3 space-y-4">
+                  <VyberPolozek id="cp-excl-items" items={polozky} value={f.excludedItems} onChange={v => set({ excludedItems: v })} label="Na tyhle položky kupon neplatí"
+                    hint="Připomínka pro hosta i obsluhu (štítek „mimo …“). Slevu z účtenky kasa automaticky nepočítá, obsluha ji uplatní ručně." />
+                  <VyberKategorii sections={sekce} value={f.excludedSections} onChange={v => set({ excludedSections: v })} label="Na tyhle kategorie kupon neplatí" />
+                </div>
+              </details>
+            )}
           </div>
           <div className="border-t border-black/[0.06] pt-4">
             <p className="field-label">Pro koho platí</p>

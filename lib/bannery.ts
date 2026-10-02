@@ -6,6 +6,8 @@
 // Odkaz jde jen na https (nikdy javascript:, data:, http:) nebo na vnitřní
 // cíl (nabídka, kupon, akce podniku).
 
+import { validujPlan, validujPreklady, planZRadku, planSedi, popisPlanu, maPlan, type Kdy, type PrekladyBanneru } from './banneryPlan.ts';
+
 export const LINK_KINDS = ['none', 'menu', 'coupon', 'campaign', 'event', 'url'] as const;
 export type LinkKind = typeof LINK_KINDS[number];
 export const MAX_AKTIVNICH = 5;
@@ -55,6 +57,10 @@ export interface BannerHodnoty {
   link_kind: LinkKind; link_ref: string | null;
   active: boolean; valid_since: string | null; valid_until: string | null;
   target_kind: CilKind; target_ref: string | null; archived: boolean;
+  /** Plán: dny v týdnu (prázdné = každý den) a hodiny od–do (pražský čas). */
+  days_of_week: number[]; hour_from: string | null; hour_till: string | null;
+  /** Překlady nadpisu a textu do jazyků hosta. */
+  i18n: PrekladyBanneru;
 }
 
 export type VysledekValidace = { ok: true; hodnoty: BannerHodnoty } | { ok: false; chyba: string };
@@ -98,11 +104,16 @@ export function validujBanner(b: any): VysledekValidace {
   const valid_until = platneDatum(b?.valid_until);
   if (valid_since === undefined || valid_until === undefined) return { ok: false, chyba: 'Datum musí být ve tvaru RRRR-MM-DD.' };
   if (valid_since && valid_until && valid_until < valid_since) return { ok: false, chyba: 'Konec platnosti je před začátkem.' };
+  const plan = validujPlan(b ?? {});
+  if (!plan.ok) return { ok: false, chyba: plan.chyba };
+  const preklady = validujPreklady(b?.i18n);
+  if (!preklady.ok) return { ok: false, chyba: preklady.chyba };
   // Archivovaný banner se hostům neukazuje nikdy; archiv a „aktivní“ si nemohou odporovat.
   const archived = b?.archived === true;
   return { ok: true, hodnoty: {
     title, text, image_url, link_kind: kind, link_ref, active: archived ? false : b?.active !== false, valid_since, valid_until,
     target_kind: cil.kind, target_ref: cil.ref, archived,
+    days_of_week: plan.plan.days_of_week, hour_from: plan.plan.hour_from, hour_till: plan.plan.hour_till, i18n: preklady.preklady,
   } };
 }
 
@@ -149,19 +160,22 @@ export interface BannerRadek {
   id: number; active?: boolean | null; position?: number | null;
   valid_since?: string | null; valid_until?: string | null;
   archived?: boolean | null; target_kind?: string | null; target_ref?: string | null;
+  days_of_week?: unknown; hour_from?: string | null; hour_till?: string | null;
 }
 
 /**
  * Bannery, které se k datu (YYYY-MM-DD) ukážou hostovi: aktivní, nearchivované, v platnosti, podle pozice, nejvýš `max`.
  * Cílení se uplatní PŘED limitem pěti: banner, který tenhle host nevidí, mu nesmí zabrat místo.
+ * Plán (dny a hodiny) se uplatní, když je známé `kdy`; dřív než limit pěti, ze stejného důvodu jako cílení.
  * Bez `host` se cílení neuplatňuje (editor: „co je v provozu“).
  */
-export function vyberAktivni<T extends BannerRadek>(radky: T[], dnes: string, max = MAX_AKTIVNICH, host?: HostKontext): T[] {
+export function vyberAktivni<T extends BannerRadek>(radky: T[], dnes: string, max = MAX_AKTIVNICH, host?: HostKontext, kdy?: Kdy): T[] {
   return radky
     .filter(r => r.active !== false && r.archived !== true
       && (!r.valid_since || String(r.valid_since).slice(0, 10) <= dnes)
       && (!r.valid_until || String(r.valid_until).slice(0, 10) >= dnes)
-      && (!host || cilSedi(r, host)))
+      && (!host || cilSedi(r, host))
+      && (!kdy || planSedi(planZRadku(r), kdy)))
     .sort((a, b) => (Number(a.position) || 0) - (Number(b.position) || 0) || a.id - b.id)
     .slice(0, max);
 }
@@ -177,11 +191,14 @@ export function presunBanner(ids: number[], id: number, smer: -1 | 1): number[] 
 }
 
 /** Stav banneru pro editor: proč se právě teď hostům neukazuje (null = ukazuje se). */
-export function procNeukazuje(r: BannerRadek, dnes: string): string | null {
+export function procNeukazuje(r: BannerRadek, dnes: string, kdy?: Kdy): string | null {
   if (r.archived === true) return 'archivovaný';
   if (r.active === false) return 'vypnutý';
   if (r.valid_since && String(r.valid_since).slice(0, 10) > dnes) return `začne ${String(r.valid_since).slice(0, 10)}`;
   if (r.valid_until && String(r.valid_until).slice(0, 10) < dnes) return 'platnost skončila';
+  // Plán dnů a hodin: banner „čeká“, mimo okno se hostům neukazuje (a jinak by štítek tvrdil, že se vidí).
+  const plan = planZRadku(r);
+  if (kdy && maPlan(plan) && !planSedi(plan, kdy)) return `mimo plán (${popisPlanu(plan)})`;
   return null;
 }
 

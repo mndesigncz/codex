@@ -91,6 +91,15 @@ export interface PravidlaPodniku {
   campaigns: { name: string; required: number; reward: string }[];
   /** Rozšířené věrnostní úrovně: odměna za návštěvy nebo útratu (jen když podnik nějakou slevu dává). */
   maUrovneSeSlevou: boolean;
+  /** Uvítací body nového člena, propadání kreditu a snížení úrovně po neaktivitě (nepovinné; nula = nezmiňuje se). */
+  welcomePoints?: number;
+  creditExpireDays?: number;
+  inactiveMonths?: number;
+  /** Body za objednávky od stolu (výchozí ano) a za rezervaci, která proběhla (0 = žádné). */
+  pointsOrders?: boolean;
+  pointsPerReservation?: number;
+  /** Bodů za každých 100 hodnoty koupeného dárkového poukazu (0 = žádné). */
+  voucherPointsPer100?: number;
 }
 
 export type PravidloZisku =
@@ -100,13 +109,23 @@ export type PravidloZisku =
   | { druh: 'narozeniny'; body: number }
   | { druh: 'pozvanka'; body: number }
   | { druh: 'urovne' }
-  | { druh: 'propadani'; dny: number };
+  | { druh: 'propadani'; dny: number }
+  | { druh: 'uvitani'; body: number }
+  | { druh: 'propadani_kreditu'; dny: number }
+  | { druh: 'pokles_urovne'; mesice: number }
+  | { druh: 'bez_objednavek' }
+  | { druh: 'rezervace'; body: number }
+  | { druh: 'poukaz'; body: number };
 
 /** Co host dělá, aby dostal body a odměny: jen to, co podnik opravdu zapnul (nulové hodnoty se nezmiňují). */
 export function pravidlaZisku(p: PravidlaPodniku): PravidloZisku[] {
   const out: PravidloZisku[] = [];
   const cele = (v: unknown) => Math.max(0, Math.trunc(Number(v)) || 0);
   if (cele(p.pointsPer100) > 0) out.push({ druh: 'body_za_utratu', body: cele(p.pointsPer100) });
+  // Host, který objednává od stolu, má vědět, že za to body nejsou (jinak by je čekal).
+  if (cele(p.pointsPer100) > 0 && p.pointsOrders === false) out.push({ druh: 'bez_objednavek' });
+  if (cele(p.pointsPerReservation) > 0) out.push({ druh: 'rezervace', body: cele(p.pointsPerReservation) });
+  if (cele(p.voucherPointsPer100) > 0) out.push({ druh: 'poukaz', body: cele(p.voucherPointsPer100) });
   for (const c of p.campaigns ?? []) {
     if (cele(c.required) > 0) out.push({ druh: 'razitka', nazev: String(c.name ?? ''), pocet: cele(c.required), odmena: String(c.reward ?? '') });
   }
@@ -115,6 +134,9 @@ export function pravidlaZisku(p: PravidlaPodniku): PravidloZisku[] {
   if (cele(p.referralPoints) > 0) out.push({ druh: 'pozvanka', body: cele(p.referralPoints) });
   if (p.maUrovneSeSlevou) out.push({ druh: 'urovne' });
   if (cele(p.pointsExpireDays) > 0) out.push({ druh: 'propadani', dny: cele(p.pointsExpireDays) });
+  if (cele(p.welcomePoints) > 0) out.push({ druh: 'uvitani', body: cele(p.welcomePoints) });
+  if (cele(p.creditExpireDays) > 0) out.push({ druh: 'propadani_kreditu', dny: cele(p.creditExpireDays) });
+  if (cele(p.inactiveMonths) > 0) out.push({ druh: 'pokles_urovne', mesice: cele(p.inactiveMonths) });
   return out;
 }
 

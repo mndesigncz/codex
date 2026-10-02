@@ -19,7 +19,7 @@ export const VEREJNE_TRASY = ['/', '/register', '/client', '/soukromi', '/podmin
 export const SOUKROME_PREDPONY = [
   '/api/', '/employer', '/employee', '/kiosk', '/admin', '/demo', '/s/', '/join', '/login',
   '/pozastaveno', '/client/me', '/client/login', '/client/register',
-  '/zapomenute-heslo', '/nove-heslo', '/client/zapomenute-heslo', '/client/nove-heslo',
+  '/zapomenute-heslo', '/nove-heslo', '/client/zapomenute-heslo', '/client/nove-heslo', '/client/odhlasit',
 ] as const;
 
 /**

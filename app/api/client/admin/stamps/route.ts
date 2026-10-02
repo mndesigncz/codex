@@ -1,14 +1,19 @@
 // Správa razítkových kampaní. Vedení jich může mít víc vedle sebe — každá
 // říká, za co se razítko připisuje, kolik jich je potřeba a co je odměna.
 // POST i PATCH procházejí stejnou validací (overKampan v lib/stampsPlan.ts).
+//
+// GET ?export=ID           CSV hostů na kampani (&udalosti=1 = CSV deníku razítek)
 
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/client';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { normalizeItemRefs, shapeCampaign } from '@/lib/stamps';
+import { normalizujSekce } from '@/lib/razitkaPravidla';
 import { zajistiRazitka } from '@/lib/stampsSchema';
 import { overKampan } from '@/lib/stampsPlan';
 import { audit } from '@/lib/audit';
+import { pragueToday, dbTimeDayHM } from '@/lib/pragueTime';
+import { razitkaCsv, udalostiCsv, DRUH_UDALOSTI } from '@/lib/razitkaPravidla';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -24,12 +29,55 @@ async function itemNames(teamId: number, ids: number[]) {
   return new Map((rows as any[]).map(r => [Number(r.id), String(r.name)]));
 }
 
-export async function GET() {
+/** Jména kategorií nabídky pro editor (id → název). */
+async function sectionNames(teamId: number, ids: number[]) {
+  if (!ids.length) return new Map<number, string>();
+  const rows = await sql`
+    SELECT ms.id, ms.title FROM menu_sections ms
+    JOIN menu_boards mb ON mb.id = ms.board_id AND mb.team_id = ${teamId}
+    WHERE ms.id = ANY(${ids})`;
+  return new Map((rows as any[]).map(r => [Number(r.id), String(r.title)]));
+}
+
+const csvOdpoved = (text: string, soubor: string) => new NextResponse(text, {
+  headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${soubor}"`, 'Cache-Control': 'private, no-store' },
+});
+
+export async function GET(req: NextRequest) {
   const ctx = await pozaduj('vernost.zobrazit');
   if (jeOdpoved(ctx)) return ctx;
   const u = { id: ctx.meId, team_id: ctx.teamId };
+  const q = req.nextUrl.searchParams;
   try {
     await zajistiRazitka();
+    const expId = Math.round(Number(q.get('export')));
+    if (Number.isFinite(expId) && expId > 0) {
+      // Export nese e-maily členů: smí jen ten, kdo kampaně spravuje.
+      if (!ctx.role.opravneni.has('vernost.kampane')) return NextResponse.json({ error: 'Na tohle nemáš v tomto podniku oprávnění.' }, { status: 403 });
+      const [c] = await sql`SELECT id, name FROM client_stamp_campaigns WHERE id = ${expId} AND team_id = ${u.team_id}`;
+      if (!c) return NextResponse.json({ error: 'Kampaň nenalezena.' }, { status: 404 });
+      const dnes = pragueToday();
+      if (q.get('udalosti') === '1') {
+        const rows = await sql`
+          SELECT e.created_at, us.name AS host, e.delta, e.kind, e.reason, s.name AS obsluha
+          FROM client_stamp_events e LEFT JOIN users us ON us.id = e.customer_id LEFT JOIN users s ON s.id = e.staff_id
+          WHERE e.team_id = ${u.team_id} AND e.campaign_id = ${expId} AND e.undone_at IS NULL AND (e.delta <> 0 OR e.completions > 0)
+          ORDER BY e.id DESC LIMIT 20000` as any[];
+        return csvOdpoved(udalostiCsv(rows.map(r => ({
+          datum: dbTimeDayHM(r.created_at), host: String(r.host ?? ''), zmena: Number(r.delta) || 0, druh: DRUH_UDALOSTI[String(r.kind)] ?? String(r.kind),
+          poznamka: String(r.reason ?? ''), obsluha: String(r.obsluha ?? ''), castka: null,
+        }))), `razitka-udalosti-${expId}-${dnes}.csv`);
+      }
+      const rows = await sql`
+        SELECT us.name, us.email, p.stamps, p.completed, p.started_at, p.last_stamp_at, p.last_completed_at, p.expired_count
+        FROM client_stamp_progress p JOIN users us ON us.id = p.customer_id
+        WHERE p.team_id = ${u.team_id} AND p.campaign_id = ${expId} ORDER BY p.completed DESC, p.stamps DESC, us.name LIMIT 20000` as any[];
+      return csvOdpoved(razitkaCsv(rows.map(r => ({
+        host: String(r.name ?? ''), email: String(r.email ?? ''), razitka: Number(r.stamps) || 0, dokonceno: Number(r.completed) || 0,
+        zacatek: r.started_at ? dbTimeDayHM(r.started_at) : '', posledniRazitko: r.last_stamp_at ? dbTimeDayHM(r.last_stamp_at) : '',
+        posledniDokonceni: r.last_completed_at ? dbTimeDayHM(r.last_completed_at) : '', vypraselo: Number(r.expired_count) || 0,
+      }))), `razitka-${expId}-${dnes}.csv`);
+    }
     const [rows, stats, odmeny] = await Promise.all([
       sql`SELECT * FROM client_stamp_campaigns WHERE team_id = ${u.team_id} ORDER BY position, id`,
       sql`
@@ -46,7 +94,9 @@ export async function GET() {
     const odmenyBy = new Map((odmeny as any[]).map(r => [Number(r.campaign_id), r]));
     const ids = Array.from(new Set((rows as any[]).flatMap(r =>
       [...normalizeItemRefs(r.stamp_items), ...normalizeItemRefs(r.reward_items), ...normalizeItemRefs(r.excluded_items)].map(x => x.itemId))));
-    const names = await itemNames(u.team_id, ids);
+    const secIds = Array.from(new Set((rows as any[]).flatMap(r => [...normalizujSekce(r.stamp_sections), ...normalizujSekce(r.excluded_sections)].map(x => x.sectionId))));
+    const [names, secNames] = await Promise.all([itemNames(u.team_id, ids), sectionNames(u.team_id, secIds)]);
+    const sec = (x: { sectionId: number }) => ({ sectionId: x.sectionId, name: secNames.get(x.sectionId) ?? `#${x.sectionId}` });
     const campaigns = (rows as any[]).map(r => {
       const c = shapeCampaign(r);
       const st = byId.get(c.id); const od = odmenyBy.get(c.id);
@@ -55,6 +105,7 @@ export async function GET() {
         stampItems: c.stamp_items.map(x => ({ itemId: x.itemId, name: names.get(x.itemId) ?? `#${x.itemId}` })),
         rewardItems: c.reward_items.map(x => ({ itemId: x.itemId, name: names.get(x.itemId) ?? `#${x.itemId}` })),
         excludedItems: c.excluded_items.map(x => ({ itemId: x.itemId, name: names.get(x.itemId) ?? `#${x.itemId}` })),
+        stampSections: c.stamp_sections.map(sec), excludedSections: c.excluded_sections.map(sec),
         collectors: Number(st?.collectors) || 0,
         openStamps: Number(st?.open_stamps) || 0,
         completions: Number(st?.completions) || 0,
@@ -82,12 +133,14 @@ export async function POST(req: NextRequest) {
       team_id, name, description, conditions, active, status, valid_since, valid_till,
       required_stamps, rule_type, stamp_items, excluded_items, min_value, min_value_multiple, one_per_order,
       reward_title, reward_items, days_to_finish, days_to_redeem, repeat_mode, stack_cards,
-      max_completions, daily_cap, days_of_week, hour_from, hour_till, position)
+      max_completions, daily_cap, days_of_week, hour_from, hour_till,
+      stamp_sections, excluded_sections, combinable, card_color, card_icon, card_image, position)
     VALUES (
       ${u.team_id}, ${f.name}, ${f.description}, ${f.conditions}, ${f.active}, ${f.status}, ${f.valid_since}, ${f.valid_till},
       ${f.required_stamps}, ${f.rule_type}, ${JSON.stringify(f.stamp_items)}::jsonb, ${JSON.stringify(f.excluded_items)}::jsonb, ${f.min_value}, ${f.min_value_multiple}, ${f.one_per_order},
       ${f.reward_title}, ${JSON.stringify(f.reward_items)}::jsonb, ${f.days_to_finish}, ${f.days_to_redeem}, ${f.repeat_mode}, ${f.stack_cards},
       ${f.max_completions}, ${f.daily_cap}, ${JSON.stringify(f.days_of_week)}::jsonb, ${f.hour_from}, ${f.hour_till},
+      ${JSON.stringify(f.stamp_sections)}::jsonb, ${JSON.stringify(f.excluded_sections)}::jsonb, ${f.combinable}, ${f.card_color}, ${f.card_icon}, ${f.card_image},
       (SELECT COALESCE(MAX(position), 0) + 1 FROM client_stamp_campaigns WHERE team_id = ${u.team_id}))
     RETURNING id`;
   audit(u.team_id, u.id, 'client.stamps.create', 'client', Number(row.id), f.name);
@@ -119,7 +172,9 @@ export async function PATCH(req: NextRequest) {
       days_to_finish = ${f.days_to_finish}, days_to_redeem = ${f.days_to_redeem},
       repeat_mode = ${f.repeat_mode}, stack_cards = ${f.stack_cards},
       max_completions = ${f.max_completions}, daily_cap = ${f.daily_cap}, days_of_week = ${JSON.stringify(f.days_of_week)}::jsonb,
-      hour_from = ${f.hour_from}, hour_till = ${f.hour_till}
+      hour_from = ${f.hour_from}, hour_till = ${f.hour_till},
+      stamp_sections = ${JSON.stringify(f.stamp_sections)}::jsonb, excluded_sections = ${JSON.stringify(f.excluded_sections)}::jsonb,
+      combinable = ${f.combinable}, card_color = ${f.card_color}, card_icon = ${f.card_icon}, card_image = ${f.card_image}
     WHERE id = ${id} AND team_id = ${u.team_id}`;
   audit(u.team_id, u.id, 'client.stamps.update', 'client', id, f.name);
   return NextResponse.json({ ok: true });

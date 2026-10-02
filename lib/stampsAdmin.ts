@@ -169,7 +169,7 @@ export async function stornoPosledni(o: { teamId: number; campaignId: number; cu
   if (Number(posl.completions) > 0) {
     const [uplatneno] = await sql`
       SELECT 1 AS ano FROM client_coupon_claims cl JOIN client_coupons cp ON cp.id = cl.coupon_id
-      WHERE cp.team_id = ${o.teamId} AND cp.stamp_event_id = ${Number(posl.id)} AND cl.redeemed_at IS NOT NULL LIMIT 1`;
+      WHERE cp.team_id = ${o.teamId} AND (cl.stamp_event_id = ${Number(posl.id)} OR cp.stamp_event_id = ${Number(posl.id)}) AND cl.redeemed_at IS NOT NULL LIMIT 1`;
     if (uplatneno) return je('Odměnu z té karty host už uplatnil, storno nejde.', 409);
   }
   const vysl = await sCasem({
@@ -190,7 +190,9 @@ export async function stornoPosledni(o: { teamId: number; campaignId: number; cu
   // ref dostane příponu, ať jde za stejnou účtenku/návštěvu razítko připsat znovu.
   await sql`UPDATE client_stamp_events SET undone_at = NOW(), ref = CASE WHEN ref IS NULL THEN NULL ELSE ref || ':storno' END WHERE id = ${Number(posl.id)}`;
   if (Number(posl.completions) > 0) {
-    await sql`DELETE FROM client_coupon_claims WHERE team_id = ${o.teamId} AND coupon_id IN (SELECT id FROM client_coupons WHERE team_id = ${o.teamId} AND stamp_event_id = ${Number(posl.id)})`;
+    // Nárok vzniklý touhle akcí zmizí; řádek kuponu kampaně zůstává (sdílí ho další nároky). Starší kupony
+    // s vazbou na událost (jeden řádek na dokončení) se mažou celé.
+    await sql`DELETE FROM client_coupon_claims WHERE team_id = ${o.teamId} AND (stamp_event_id = ${Number(posl.id)} OR coupon_id IN (SELECT id FROM client_coupons WHERE team_id = ${o.teamId} AND stamp_event_id = ${Number(posl.id)}))`;
     await sql`DELETE FROM client_coupons WHERE team_id = ${o.teamId} AND stamp_event_id = ${Number(posl.id)}`;
   }
   const veta = `${c.name}: stornována poslední akce (${Number(posl.delta) > 0 ? '+' : ''}${posl.delta}), zpět ${Number(posl.before_stamps)}/${c.required_stamps}`;
@@ -198,6 +200,43 @@ export async function stornoPosledni(o: { teamId: number; campaignId: number; cu
     INSERT INTO client_loyalty_ledger (team_id, customer_id, delta, kind, ref, note, staff_id)
     VALUES (${o.teamId}, ${o.customerId}, 0, 'manual', 'razitka', ${veta}, ${o.staffId})`;
   return { ok: true, razitek: Number(posl.before_stamps), veta };
+}
+
+/**
+ * Storno razítek z jedné akce u kasy: všechny neuplatněné zápisy s odkazem `ref` (nebo `ref:…`; jde zadat víc odkazů), každý jen
+ * když je v kampani poslední (jinak by se přepsala pozdější razítka). Vrací věty o tom, co se vrátilo,
+ * a chybu, když část nešla. Zápis do deníku a odměny řeší stornoPosledni.
+ */
+export async function stornoPodleRef(o: { teamId: number; customerId: number; staffId: number; ref: string | string[] }): Promise<{ vety: string[]; chyba: string | null }> {
+  const refy = Array.isArray(o.ref) ? o.ref : [o.ref];
+  await zajistiRazitka();
+  const udalosti = (await sql`
+    SELECT id, campaign_id FROM client_stamp_events
+    WHERE team_id = ${o.teamId} AND customer_id = ${o.customerId} AND undone_at IS NULL AND delta <> 0 AND kind IN ('earn', 'manual')
+      AND (ref = ANY(${refy}) OR ref LIKE ANY(${refy.map(r => r + ':%')}))
+    ORDER BY id DESC`) as any[];
+  const vety: string[] = [];
+  for (const e of udalosti) {
+    const r = await stornoPosledni({ teamId: o.teamId, campaignId: Number(e.campaign_id), customerId: o.customerId, ocekavanaUdalost: Number(e.id), staffId: o.staffId });
+    if ('chyba' in r) return { vety, chyba: r.chyba };
+    vety.push(r.veta);
+  }
+  return { vety, chyba: null };
+}
+
+/** Odkaz poslední návštěvy z kasy (razítko za návštěvu: `card:<den>`), nebo null. */
+export async function refPosledniNavstevy(teamId: number, customerId: number): Promise<string | null> {
+  await zajistiRazitka();
+  const [e] = await sql`
+    SELECT ref FROM client_stamp_events
+    WHERE team_id = ${teamId} AND customer_id = ${customerId} AND undone_at IS NULL AND delta <> 0 AND kind = 'earn' AND ref LIKE 'card:%'
+    ORDER BY id DESC LIMIT 1` as any[];
+  return e?.ref ? String(e.ref) : null;
+}
+
+/** Návštěva z téhle akce se nepočítá a host může razítko dostat znovu ještě dnes (uvolní denní zámek). */
+export async function vratNavstevu(teamId: number, customerId: number): Promise<void> {
+  await sql`UPDATE client_memberships SET visits = GREATEST(0, visits - 1), last_visit_at = NULL WHERE customer_id = ${customerId} AND team_id = ${teamId}`;
 }
 
 // ---- seznam kampaní: duplikace, řazení, stav ----------------------------------------
@@ -211,11 +250,13 @@ export async function duplikujKampan(teamId: number, id: number): Promise<number
     INSERT INTO client_stamp_campaigns (
       team_id, name, description, conditions, active, status, valid_since, valid_till, required_stamps, rule_type,
       stamp_items, excluded_items, min_value, min_value_multiple, one_per_order, reward_title, reward_items,
-      days_to_finish, days_to_redeem, repeat_mode, stack_cards, max_completions, daily_cap, days_of_week, hour_from, hour_till, position)
+      days_to_finish, days_to_redeem, repeat_mode, stack_cards, max_completions, daily_cap, days_of_week, hour_from, hour_till,
+      stamp_sections, excluded_sections, combinable, card_color, card_icon, card_image, position)
     VALUES (
       ${teamId}, ${jmeno}, ${c.description}, ${c.conditions}, FALSE, 'draft', ${c.valid_since}, ${c.valid_till}, ${c.required_stamps}, ${c.rule_type},
       ${JSON.stringify(c.stamp_items)}::jsonb, ${JSON.stringify(c.excluded_items)}::jsonb, ${c.min_value}, ${c.min_value_multiple}, ${c.one_per_order}, ${c.reward_title}, ${JSON.stringify(c.reward_items)}::jsonb,
       ${c.days_to_finish}, ${c.days_to_redeem}, ${c.repeat_mode}, ${c.stack_cards}, ${c.max_completions}, ${c.daily_cap}, ${JSON.stringify(c.days_of_week)}::jsonb, ${c.hour_from}, ${c.hour_till},
+      ${JSON.stringify(c.stamp_sections)}::jsonb, ${JSON.stringify(c.excluded_sections)}::jsonb, ${c.combinable}, ${c.card_color}, ${c.card_icon}, ${c.card_image},
       (SELECT COALESCE(MAX(position), 0) + 1 FROM client_stamp_campaigns WHERE team_id = ${teamId}))
     RETURNING id`;
   return Number(r.id);

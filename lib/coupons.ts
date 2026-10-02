@@ -14,7 +14,7 @@ import { pragueToday } from './pragueTime';
 import { pragueDow, ageFrom, windowOk, stavKuponu, kusyZbyva, jeVidetelnyHostum } from './kuponyPravidla';
 export { pragueDow, ageFrom, windowOk };
 import type { TierId } from './clientSlots';
-import { TIER_LABELS, TIER_RANK, intList, tierList, benefitLabel, conditionBadges, type FormatCastky } from './kuponyPopisky';
+import { TIER_LABELS, TIER_RANK, intList, tierList, odkazyList, benefitLabel, conditionBadges, type FormatCastky } from './kuponyPopisky';
 export { TIER_LABELS, benefitLabel, conditionBadges };
 export type { FormatCastky };
 
@@ -37,6 +37,9 @@ export function shapeCoupon(r: any, castka?: FormatCastky) {
     perCustomer: Number(r.per_customer) || 0, cooldownDays: Number(r.cooldown_days) || 0,
     daysOfWeek: intList(r.days_of_week), hourFrom: r.hour_from ?? null, hourTill: r.hour_till ?? null,
     adultOnly: r.adult_only === true, welcome: r.welcome === true,
+    menuItemId: r.menu_item_id == null ? null : Number(r.menu_item_id), menuItemName: r.menu_item_name ? String(r.menu_item_name) : null,
+    excludedItems: odkazyList(r.excluded_items, 'itemId').map(x => ({ itemId: x.id, name: x.name })),
+    excludedSections: odkazyList(r.excluded_sections, 'sectionId').map(x => ({ sectionId: x.id, name: x.name })),
     maxTotal: Number(r.max_total) > 0 ? Number(r.max_total) : null, issued: Number(r.issued) || 0, remaining: kusyZbyva(r),
     dailyLimit: Number(r.daily_limit) > 0 ? Number(r.daily_limit) : null,
     draft: r.draft === true, archived: !!r.archived_at, stav: stavKuponu(r, pragueToday()),

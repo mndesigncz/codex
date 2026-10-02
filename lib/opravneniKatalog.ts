@@ -1234,6 +1234,16 @@ export const KATALOG: Opravneni[] = [
   ]
  },
  {
+  "id": "zakaznici.sprava_clenu",
+  "oblast": "Zákazníci a menu",
+  "nazev": "Správa členů",
+  "popis": "Blokace člena, sloučení duplicit a odebrání člena z klubu (členovi zmizí body, razítka a kupony).",
+  "citlivost": "vysoká",
+  "vyzaduje": [
+   "zakaznici.zobrazit"
+  ]
+ },
+ {
   "id": "zakaznici.import",
   "oblast": "Zákazníci a menu",
   "nazev": "Import členů z jiné aplikace",
@@ -1288,7 +1298,7 @@ export const KATALOG: Opravneni[] = [
   "id": "vernost.kampane",
   "oblast": "Zákazníci a menu",
   "nazev": "Razítkové kampaně",
-  "popis": "Založit, upravit, aktivovat a smazat kampaně. Smazáním zmizí i nasbíraná razítka.",
+  "popis": "Založit, upravit, duplikovat, pozastavit, archivovat a smazat razítkové kampaně. Archiv nechá postup hostů, smazáním zmizí i nasbíraná razítka.",
   "citlivost": "střední",
   "vyzaduje": [
    "vernost.zobrazit"
@@ -1819,6 +1829,7 @@ export const SYSTEMOVE_ROLE: SystemovaRole[] = [
    "zakaznici.poznamky",
    "zakaznici.recenze",
    "zakaznici.skupiny",
+   "zakaznici.sprava_clenu",
    "zakaznici.zobrazit",
    "zakaznici.zpravy"
   ]
