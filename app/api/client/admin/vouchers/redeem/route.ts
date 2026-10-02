@@ -8,8 +8,8 @@ import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { menaPodniku } from '@/lib/menaPodniku';
 import { pragueToday } from '@/lib/pragueTime';
 import { hit } from '@/lib/rateLimit';
-import { overKod, celaCastka, DUVOD_TEXT } from '@/lib/poukazy';
-import { poukazPodleKodu, historiePoukazu, uplatniPoukaz } from '@/lib/poukazyDb';
+import { overKod, celaCastka, textOdmitnuti, DUVOD_TEXT } from '@/lib/poukazy';
+import { poukazPodleKodu, historiePoukazu, uplatniPoukaz, nactiLimity } from '@/lib/poukazyDb';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
     const p = await poukazPodleKodu(ctx.teamId, kod, pragueToday());
     if (!p) return NextResponse.json({ error: 'Poukaz nenalezen.' }, { status: 404 });
     // Obsluha vidí i zrušený a vyčerpaný poukaz se stavem, ať ví, proč nejde uplatnit.
-    return NextResponse.json({ poukaz: p, historie: (await historiePoukazu(ctx.teamId, p.id)).slice(0, 5) });
+    return NextResponse.json({ poukaz: p, historie: (await historiePoukazu(ctx.teamId, p.id)).slice(0, 5), limity: await nactiLimity(ctx.teamId) });
   } catch (e) {
     console.error('[poukazy] náhled', e);
     return NextResponse.json({ error: 'Poukaz se teď nepodařilo načíst. Zkus to za chvíli.' }, { status: 500 });
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
     const mena = (await menaPodniku(ctx.teamId)).currency;
     const r = await uplatniPoukaz(ctx.teamId, ctx.meId, kod, castka, { ref: b.ref, note: b.note, mena, dnes: pragueToday() });
     if (!r.ok) {
-      const text = r.duvod === 'souboh' ? 'Poukaz se právě změnil. Načti ho znovu.' : DUVOD_TEXT[r.duvod];
+      const text = r.duvod === 'souboh' ? 'Poukaz se právě změnil. Načti ho znovu.' : textOdmitnuti(r.duvod, r.limity, mena);
       return NextResponse.json({ error: text, poukaz: r.poukaz }, { status: r.duvod === 'nenalezen' ? 404 : 409 });
     }
     return NextResponse.json({ ok: true, poukaz: r.poukaz, castka: r.castka, opakovani: r.opakovani });

@@ -1,17 +1,28 @@
 // Promo bannery podniku: akce a oznámení nahoře na stránce pro hosty.
 // Správa patří k Vzhledu (oprávnění klient.vzhled). Odkazy se ověřují na serveru
 // (jen https nebo vnitřní cíl), obrázek je nahraný soubor podniku nebo https adresa.
+//
+// Co umí navíc oproti prvnímu kolu:
+//  · cílení (všem / členům / nečlenům / úroveň / skupina), validované na serveru,
+//  · koncept (vypnutý) a archiv (hostům se neukazuje nikdy, nepočítá se do limitu),
+//  · duplikace (kopie je koncept, limit se hlídá ve stejném příkazu),
+//  · odkaz na konkrétní kupon nebo razítkovou kartu (musí patřit podniku),
+//  · přeřazení JEDNÍM příkazem (UPDATE ... FROM unnest) a jen s úplným seznamem id podniku,
+//  · statistiku zobrazení a prokliků za 30 dní (součty z denních počítadel bez osobních údajů).
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/client';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { audit } from '@/lib/audit';
-import { zajistiTabulkuBanneru } from '@/lib/clientBanners';
-import { validujBanner, MAX_BANNERU, type BannerHodnoty } from '@/lib/bannery';
+import { pragueToday } from '@/lib/pragueTime';
+import { zajistiTabulkuBanneru, statistikyBanneru } from '@/lib/clientBanners';
+import { validujBanner, overPoradi, nadpisKopie, souhrnStatistik, MAX_BANNERU, type BannerHodnoty } from '@/lib/bannery';
+import { TIER_LABELS } from '@/lib/kuponyPopisky';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 const OPR = 'klient.vzhled';
+const DNI_STATISTIKY = 30;
 
 /** Akce, na kterou banner odkazuje, musí patřit tomuto podniku. */
 async function akceJeMoje(teamId: number, id: string | null): Promise<boolean> {
@@ -30,10 +41,27 @@ async function obrazekJeMuj(teamId: number, url: string | null): Promise<boolean
   return !!u;
 }
 
+/** Cíl odkazu a cílení musí existovat a patřit podniku (cizí kupon, karta ani skupina se nepustí). */
 async function over(teamId: number, h: BannerHodnoty): Promise<string | null> {
   if (h.link_kind === 'event' && !(await akceJeMoje(teamId, h.link_ref))) return 'Akce nenalezena.';
+  if (h.link_kind === 'coupon' && h.link_ref) {
+    const [c] = await sql`SELECT id FROM client_coupons WHERE id = ${Number(h.link_ref)} AND team_id = ${teamId} AND kind = 'offer'`;
+    if (!c) return 'Kupon nenalezen.';
+  }
+  if (h.link_kind === 'campaign') {
+    const [c] = await sql`SELECT id FROM client_stamp_campaigns WHERE id = ${Number(h.link_ref)} AND team_id = ${teamId}`;
+    if (!c) return 'Razítková karta nenalezena.';
+  }
+  if (h.target_kind === 'group') {
+    const [g] = await sql`SELECT id FROM client_groups WHERE id = ${Number(h.target_ref)} AND team_id = ${teamId}`;
+    if (!g) return 'Skupina nenalezena.';
+  }
   if (!(await obrazekJeMuj(teamId, h.image_url))) return 'Obrázek nenalezen.';
   return null;
+}
+
+async function volitelne<T>(dotaz: Promise<unknown>): Promise<T[]> {
+  try { return (await dotaz) as T[]; } catch { return []; }
 }
 
 export async function GET() {
@@ -41,10 +69,17 @@ export async function GET() {
   if (jeOdpoved(ctx)) return ctx;
   await zajistiTabulkuBanneru();
   const banners = await sql`SELECT * FROM client_banners WHERE team_id = ${ctx.teamId} ORDER BY position, id`;
-  // Akce pro výběr cíle odkazu: nadcházející veřejné.
-  let events: any[] = [];
-  try { events = await sql`SELECT id, title, date FROM events WHERE team_id = ${ctx.teamId} AND public = TRUE AND status <> 'cancelled' ORDER BY date DESC LIMIT 40` as any[]; } catch { events = []; }
-  return NextResponse.json({ banners, events });
+  // Cíle odkazů a cílení: nadcházející veřejné akce, kupony za body, razítkové karty a skupiny hostů.
+  const [events, coupons, campaigns, groups, stat] = await Promise.all([
+    volitelne<any>(sql`SELECT id, title, date FROM events WHERE team_id = ${ctx.teamId} AND public = TRUE AND status <> 'cancelled' ORDER BY date DESC LIMIT 40`),
+    volitelne<any>(sql`SELECT id, title FROM client_coupons WHERE team_id = ${ctx.teamId} AND kind = 'offer' AND active = TRUE ORDER BY title LIMIT 100`),
+    volitelne<any>(sql`SELECT id, name FROM client_stamp_campaigns WHERE team_id = ${ctx.teamId} AND active = TRUE ORDER BY position, id LIMIT 50`),
+    volitelne<any>(sql`SELECT id, name FROM client_groups WHERE team_id = ${ctx.teamId} ORDER BY name LIMIT 100`),
+    statistikyBanneru(ctx.teamId, DNI_STATISTIKY).catch(() => []),
+  ]);
+  const souhrn = souhrnStatistik(stat);
+  const statistiky = Object.fromEntries([...souhrn.entries()].map(([id, v]) => [id, v]));
+  return NextResponse.json({ banners, events, coupons, campaigns, groups, urovne: TIER_LABELS, statistiky, dniStatistiky: DNI_STATISTIKY, dnes: pragueToday() });
 }
 
 export async function POST(req: NextRequest) {
@@ -57,12 +92,15 @@ export async function POST(req: NextRequest) {
   const chyba = await over(ctx.teamId, h);
   if (chyba) return NextResponse.json({ error: chyba }, { status: 400 });
   await zajistiTabulkuBanneru();
-  const [st] = await sql`SELECT COUNT(*)::int AS n, COALESCE(MAX(position), -1) AS maxpos FROM client_banners WHERE team_id = ${ctx.teamId}`;
-  if (Number(st.n) >= MAX_BANNERU) return NextResponse.json({ error: `Bannerů může být nejvýš ${MAX_BANNERU}. Smaž nepotřebné.` }, { status: 409 });
+  // Limit se hlídá ve stejném příkazu jako vložení: dva souběžné požadavky nepřekročí MAX_BANNERU.
+  // Archivované se do limitu nepočítají (archiv je přesně na staré bannery).
   const [row] = await sql`
-    INSERT INTO client_banners (team_id, title, text, image_url, link_kind, link_ref, active, valid_since, valid_until, position)
-    VALUES (${ctx.teamId}, ${h.title}, ${h.text}, ${h.image_url}, ${h.link_kind}, ${h.link_ref}, ${h.active}, ${h.valid_since}, ${h.valid_until}, ${Number(st.maxpos) + 1})
+    INSERT INTO client_banners (team_id, title, text, image_url, link_kind, link_ref, active, valid_since, valid_until, position, target_kind, target_ref, archived)
+    SELECT ${ctx.teamId}, ${h.title}, ${h.text}, ${h.image_url}, ${h.link_kind}, ${h.link_ref}, ${h.active}, ${h.valid_since}, ${h.valid_until},
+      (SELECT COALESCE(MAX(position), -1) + 1 FROM client_banners WHERE team_id = ${ctx.teamId}), ${h.target_kind}, ${h.target_ref}, ${h.archived}
+    WHERE ${h.archived}::boolean OR (SELECT COUNT(*) FROM client_banners WHERE team_id = ${ctx.teamId} AND archived = FALSE) < ${MAX_BANNERU}
     RETURNING *`;
+  if (!row) return NextResponse.json({ error: `Bannerů může být nejvýš ${MAX_BANNERU}. Smaž nebo archivuj nepotřebné.` }, { status: 409 });
   audit(ctx.teamId, ctx.meId, 'client.banner', 'client_banner', row.id, `přidán: ${h.title}`);
   return NextResponse.json({ ok: true, banner: row });
 }
@@ -73,12 +111,17 @@ export async function PATCH(req: NextRequest) {
   const b = await req.json().catch(() => ({}));
   await zajistiTabulkuBanneru();
 
-  // Nové pořadí: pole id, každé musí patřit podniku.
+  // Nové pořadí: úplný seznam id podniku. Částečný, zdvojený nebo cizí seznam se odmítne (nic se nezmění).
   if (Array.isArray(b.order)) {
-    const ids = b.order.map((x: any) => parseInt(String(x), 10)).filter((n: number) => Number.isFinite(n)).slice(0, MAX_BANNERU);
-    for (let i = 0; i < ids.length; i++) {
-      await sql`UPDATE client_banners SET position = ${i} WHERE id = ${ids[i]} AND team_id = ${ctx.teamId}`;
-    }
+    const moje = (await sql`SELECT id FROM client_banners WHERE team_id = ${ctx.teamId}`) as any[];
+    const o = overPoradi(b.order, moje.map(r => Number(r.id)));
+    if (!o.ok) return NextResponse.json({ error: o.chyba }, { status: 400 });
+    // Jeden příkaz místo smyčky UPDATE: pád uprostřed nikdy nenechá poloviční pořadí.
+    await sql`
+      UPDATE client_banners b SET position = o.ord - 1
+      FROM unnest(${o.ids}::int[]) WITH ORDINALITY AS o(id, ord)
+      WHERE b.id = o.id AND b.team_id = ${ctx.teamId}`;
+    audit(ctx.teamId, ctx.meId, 'client.banner', 'client_banner', null, `přeřazeno: ${o.ids.length} bannerů`);
     return NextResponse.json({ ok: true });
   }
 
@@ -86,22 +129,55 @@ export async function PATCH(req: NextRequest) {
   const [cur] = Number.isFinite(id) ? await sql`SELECT * FROM client_banners WHERE id = ${id} AND team_id = ${ctx.teamId}` : [];
   if (!cur) return NextResponse.json({ error: 'Banner nenalezen' }, { status: 404 });
 
-  // Jen přepnutí „aktivní“ (přepínač v seznamu).
+  // Kopie: vypnutý banner (koncept) na konci seznamu; limit se hlídá ve stejném příkazu.
+  if (b.action === 'duplicate') {
+    const [row] = await sql`
+      INSERT INTO client_banners (team_id, title, text, image_url, link_kind, link_ref, active, valid_since, valid_until, position, target_kind, target_ref, archived)
+      SELECT s.team_id, ${nadpisKopie(cur.title)}, s.text, s.image_url, s.link_kind, s.link_ref, FALSE, s.valid_since, s.valid_until,
+        (SELECT COALESCE(MAX(position), -1) + 1 FROM client_banners WHERE team_id = ${ctx.teamId}), s.target_kind, s.target_ref, FALSE
+      FROM client_banners s WHERE s.id = ${id} AND s.team_id = ${ctx.teamId}
+        AND (SELECT COUNT(*) FROM client_banners WHERE team_id = ${ctx.teamId} AND archived = FALSE) < ${MAX_BANNERU}
+      RETURNING *`;
+    if (!row) return NextResponse.json({ error: `Bannerů může být nejvýš ${MAX_BANNERU}. Smaž nebo archivuj nepotřebné.` }, { status: 409 });
+    audit(ctx.teamId, ctx.meId, 'client.banner', 'client_banner', row.id, `duplikován: ${cur.title}`);
+    return NextResponse.json({ ok: true, banner: row });
+  }
+
+  // Archiv a návrat z archivu: archivovaný banner je vypnutý a hostům se neukáže; po návratu je koncept.
+  if (b.action === 'archive' || b.action === 'restore') {
+    const arch = b.action === 'archive';
+    // Návrat z archivu se počítá do limitu stejně jako nový banner.
+    const [row] = arch
+      ? await sql`UPDATE client_banners SET archived = TRUE, active = FALSE WHERE id = ${id} AND team_id = ${ctx.teamId} RETURNING *`
+      : await sql`
+          UPDATE client_banners SET archived = FALSE, active = FALSE
+          WHERE id = ${id} AND team_id = ${ctx.teamId}
+            AND (SELECT COUNT(*) FROM client_banners WHERE team_id = ${ctx.teamId} AND archived = FALSE) < ${MAX_BANNERU}
+          RETURNING *`;
+    if (!row) return NextResponse.json({ error: `Bannerů může být nejvýš ${MAX_BANNERU}. Smaž nebo archivuj nepotřebné.` }, { status: 409 });
+    audit(ctx.teamId, ctx.meId, 'client.banner', 'client_banner', id, `${arch ? 'archivován' : 'vrácen z archivu'}: ${row.title}`);
+    return NextResponse.json({ ok: true, banner: row });
+  }
+
+  // Jen přepnutí „aktivní“ (přepínač v seznamu). Archivovaný banner se nezapne; nejdřív ho vrať z archivu.
   if (Object.keys(b).every(k => k === 'id' || k === 'active')) {
-    const [row] = await sql`UPDATE client_banners SET active = ${b.active === true} WHERE id = ${id} AND team_id = ${ctx.teamId} RETURNING *`;
+    if (cur.archived === true) return NextResponse.json({ error: 'Archivovaný banner nejdřív vrať z archivu.' }, { status: 409 });
+    const [row] = await sql`UPDATE client_banners SET active = ${b.active === true} WHERE id = ${id} AND team_id = ${ctx.teamId} AND archived = FALSE RETURNING *`;
+    if (!row) return NextResponse.json({ error: 'Archivovaný banner nejdřív vrať z archivu.' }, { status: 409 });
     audit(ctx.teamId, ctx.meId, 'client.banner', 'client_banner', id, `${row.active ? 'zapnut' : 'vypnut'}: ${row.title}`);
     return NextResponse.json({ ok: true, banner: row });
   }
 
-  // Úprava: chybějící pole zůstanou, jak byla.
-  const v = validujBanner({ ...cur, ...b });
+  // Úprava: chybějící pole zůstanou, jak byla. Archiv se tudy nemění (má vlastní akci).
+  const v = validujBanner({ ...cur, ...b, archived: cur.archived === true });
   if (!v.ok) return NextResponse.json({ error: v.chyba }, { status: 400 });
   const h = v.hodnoty;
   const chyba = await over(ctx.teamId, h);
   if (chyba) return NextResponse.json({ error: chyba }, { status: 400 });
   const [row] = await sql`
     UPDATE client_banners SET title = ${h.title}, text = ${h.text}, image_url = ${h.image_url}, link_kind = ${h.link_kind},
-      link_ref = ${h.link_ref}, active = ${h.active}, valid_since = ${h.valid_since}, valid_until = ${h.valid_until}
+      link_ref = ${h.link_ref}, active = ${h.active}, valid_since = ${h.valid_since}, valid_until = ${h.valid_until},
+      target_kind = ${h.target_kind}, target_ref = ${h.target_ref}
     WHERE id = ${id} AND team_id = ${ctx.teamId} RETURNING *`;
   audit(ctx.teamId, ctx.meId, 'client.banner', 'client_banner', id, `upraven: ${h.title}`);
   return NextResponse.json({ ok: true, banner: row });
@@ -115,6 +191,7 @@ export async function DELETE(req: NextRequest) {
   await zajistiTabulkuBanneru();
   const [row] = await sql`DELETE FROM client_banners WHERE id = ${id} AND team_id = ${ctx.teamId} RETURNING title`;
   if (!row) return NextResponse.json({ error: 'Banner nenalezen' }, { status: 404 });
+  await sql`DELETE FROM client_banner_stats WHERE banner_id = ${id} AND team_id = ${ctx.teamId}`;
   audit(ctx.teamId, ctx.meId, 'client.banner', 'client_banner', id, `smazán: ${row.title}`);
   return NextResponse.json({ ok: true });
 }

@@ -17,6 +17,8 @@ import { pragueDaySafe } from '@/lib/pragueTime';
 import UcetHosta from './UcetHosta';
 import KartaNastroje from './KartaNastroje';
 import MamPoukaz from './MamPoukaz';
+import HostHistorie from './loyalty/HostHistorie';
+import { PlatnostKuponu } from './loyalty/HostPlatnost';
 import { useJazyk, useT } from '@/lib/i18n/client';
 import { fmtDatum } from '@/lib/i18n/format';
 import type { Jazyk } from '@/lib/i18n/config';
@@ -151,6 +153,7 @@ export default function MyPage() {
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold leading-tight truncate">{c.title}</p>
                         <p className="text-xs text-black/55 truncate">{c.business}</p>
+                        <PlatnostKuponu validUntil={c.valid_until} today={d.today} className="block text-xs" />
                       </div>
                       <p className="font-mono font-bold tracking-widest text-lg shrink-0">{c.code}</p>
                     </div>
@@ -173,6 +176,8 @@ export default function MyPage() {
       )}
 
       {card?.code && <InviteCard code={card.code} onFlash={setFlash} />}
+
+      {d.memberships?.length > 0 && <HostHistorie showBusiness />}
 
       {(past.length > 0 || orders.length > 0) && (
         <details className="group">

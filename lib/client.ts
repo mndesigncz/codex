@@ -146,6 +146,8 @@ export function publicProfile(p: any) {
     },
     cashbackPct: Number(p.cashback_pct) || 0,
     pointsExpireDays: Math.max(0, Math.trunc(Number(p.points_expire_days)) || 0),
+    birthdayPoints: Math.max(0, Math.trunc(Number(p.birthday_points)) || 0),
+    referralPoints: Math.max(0, Math.trunc(Number(p.referral_points)) || 0),
     stampTarget: Number(p.stamp_target) || 0,
     stampReward: p.stamp_reward ?? '',
     maxParty: Number(p.max_party) || 8,

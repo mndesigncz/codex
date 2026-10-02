@@ -24,6 +24,9 @@ import { DiscardGuard } from '../ui/DiscardGuard';
 import MamPoukaz from './MamPoukaz';
 import PromoBanners from './PromoBanners';
 import RazitkaPoznamky from './loyalty/RazitkaHost';
+import HostHistorie from './loyalty/HostHistorie';
+import HostPravidla from './loyalty/HostPravidla';
+import { PlatnostKuponu } from './loyalty/HostPlatnost';
 
 type Tab = 'menu' | 'reserve' | 'order' | 'loyalty';
 
@@ -158,7 +161,7 @@ export default function BusinessPage({ slug }: { slug: string }) {
       </section>
 
       {/* Promo bannery podniku: akce a oznámení (data podniku, nepřekládají se). */}
-      {(d.banners?.length ?? 0) > 0 && <PromoBanners banners={d.banners} accent={accent} loyaltyOn={!!b.loyaltyOn} onGoTab={setTab} />}
+      {(d.banners?.length ?? 0) > 0 && <PromoBanners banners={d.banners} accent={accent} loyaltyOn={!!b.loyaltyOn} onGoTab={setTab} slug={slug} />}
 
       {/* Běžící bonusová akce („Dnes dvojnásobné body do 18:00"): název akce je data podniku, věta jde přes t(). */}
       {d.bonus && b.loyaltyOn && <BonusPruh bonus={d.bonus} accent={accent} />}
@@ -170,7 +173,7 @@ export default function BusinessPage({ slug }: { slug: string }) {
       {tab === 'menu' && <MenuTab menu={d.menu} news={d.news} events={d.events} gallery={b.gallery} accent={accent} tagline={b.tagline} address={b.address} description={b.description} hours={b.hours} currency={b.currency} slug={slug} signedIn={d.signedIn} businessName={b.name} />}
       {tab === 'reserve' && b.reservationsOn && <ReserveTab slug={slug} b={b} me={me} today={today} signedIn={d.signedIn} onDone={(m: string) => { setFlash(m); load(); }} />}
       {tab === 'order' && b.orderingOn && <OrderTab slug={slug} b={b} menu={d.menu} tables={d.tables ?? []} plan={d.plan} signedIn={d.signedIn} onDone={(m: string) => { setFlash(m); }} />}
-      {tab === 'loyalty' && b.loyaltyOn && <LoyaltyTab slug={slug} b={b} me={me} campaigns={d.stampCampaigns ?? []} coupons={d.coupons} signedIn={d.signedIn} onDone={(m: string) => { setFlash(m); load(); }} />}
+      {tab === 'loyalty' && b.loyaltyOn && <LoyaltyTab slug={slug} b={b} me={me} today={today} campaigns={d.stampCampaigns ?? []} coupons={d.coupons} signedIn={d.signedIn} onDone={(m: string) => { setFlash(m); load(); }} />}
     </div>
   );
 }
@@ -450,7 +453,7 @@ function BonusPruh({ bonus, accent }: { bonus: { name: string; multiplier: numbe
   );
 }
 
-function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slug: string; b: any; me: any; campaigns: any[]; coupons: any[]; signedIn: boolean; onDone: (m: string) => void }) {
+function LoyaltyTab({ slug, b, me, today, campaigns, coupons, signedIn, onDone }: { slug: string; b: any; me: any; today: string; campaigns: any[]; coupons: any[]; signedIn: boolean; onDone: (m: string) => void }) {
   const t = useT('klient-host');
   const { jazyk } = useJazyk();
   const [busy, setBusy] = useState<number | null>(null);
@@ -495,13 +498,12 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
     <div className="grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-6 md:gap-10 items-start">
       <section className="glass-card p-5 sm:p-6">
         <h2 className="t-section">{t('Razítka a body')}</h2>
-        {b.pointsExpireDays > 0 && <p className="text-xs text-black/55 mt-1 text-pretty">{t('Body, které nepoužiješ, propadají po {n, plural, one {# dni} few {# dnech} other {# dnech}}.', { n: b.pointsExpireDays })}</p>}
         {me?.member ? (
           <>
             {(me.campaigns ?? []).length > 0 ? (
               <ul className="mt-4 space-y-4">
                 {me.campaigns.map((cp: any) => (
-                  <li key={cp.id}>
+                  <li key={cp.id} id={`karta-${cp.id}`}>
                     <div className="flex items-baseline justify-between gap-3">
                       <p className="text-sm font-semibold min-w-0 truncate">{cp.name}</p>
                       <p className="text-sm font-semibold tabular-nums shrink-0">{cp.stamps} / {cp.required}</p>
@@ -560,15 +562,19 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-black/45 mb-2">{t('Kupony k uplatnění')}</p>
                 <ul className="space-y-2">
                   {me.claims.map((c: any) => (
-                    <li key={c.id} className="flex items-center justify-between gap-3 rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 px-3.5 py-2.5">
-                      <span className="text-sm font-medium min-w-0 truncate">{c.title}</span>
-                      <span className="font-mono font-bold tracking-widest text-sm shrink-0">{c.code}</span>
+                    <li key={c.id} className="rounded-2xl bg-[#C8F542]/15 border border-[#C8F542]/40 px-3.5 py-2.5">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm font-medium min-w-0 truncate">{c.title}</span>
+                        <span className="font-mono font-bold tracking-widest text-sm shrink-0">{c.code}</span>
+                      </div>
+                      <PlatnostKuponu validUntil={c.valid_until} today={today} className="block text-xs mt-0.5" />
                     </li>
                   ))}
                 </ul>
                 <p className="text-xs text-black/50 mt-2">{t('Kód ukaž obsluze u kasy.')}</p>
               </div>
             )}
+            {signedIn && <HostHistorie slug={slug} className="mt-5 border-t border-black/[0.06] pt-4" />}
           </>
         ) : (
           <>
@@ -589,6 +595,7 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
             )}
           </>
         )}
+        <HostPravidla b={b} campaigns={campaigns} />
         <form onSubmit={usePromo} className="mt-5 border-t border-black/[0.06] pt-4">
           <label htmlFor="promo-code" className={label}>{t('Máš promo kód?')}</label>
           <div className="flex gap-2">
@@ -607,7 +614,7 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
             {coupons.map((c: any) => {
               const can = me?.member && me.points >= Number(c.cost_points) && !c.blocked;
               return (
-                <li key={c.id} className={`py-3.5 flex items-center gap-4 ${c.blocked ? 'opacity-60' : ''}`}>
+                <li key={c.id} id={`kupon-${c.id}`} className={`py-3.5 flex items-center gap-4 ${c.blocked ? 'opacity-60' : ''}`}>
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold">
                       {c.title}
@@ -616,7 +623,8 @@ function LoyaltyTab({ slug, b, me, campaigns, coupons, signedIn, onDone }: { slu
                     {c.description && <p className="text-sm text-black/55 text-pretty">{c.description}</p>}
                     {(c.badges?.length > 0 || c.valid_until) && (
                       <p className="text-xs text-black/45 mt-0.5">
-                        {[...(c.badges ?? []), c.valid_until ? t('do {datum}', { datum: fmtDatum(c.valid_until, { jazyk, styl: 'denKratce' }) }) : null].filter(Boolean).join(' · ')}
+                        {(c.badges ?? []).join(' · ')}{c.badges?.length > 0 && c.valid_until ? ' · ' : ''}
+                        <PlatnostKuponu validUntil={c.valid_until} today={today} />
                       </p>
                     )}
                     {c.blocked && <p className="text-xs text-wait-ink mt-0.5">{c.blocked}</p>}
