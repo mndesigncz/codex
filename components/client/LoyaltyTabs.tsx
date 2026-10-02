@@ -36,6 +36,7 @@ import { obsahuje } from '@/lib/hledani';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { useOpravneni } from '../role/useOpravneni';
 import Poukazy from './Poukazy';
+import PrechodZKarticky, { useImportKarticky } from './PrechodZKarticky';
 
 // Věrnost měla šest podzáložek pod deseti hlavními — šestnáct sourozenců
 // nad sebou. „Body" a „Slevy a úrovně" jsou jedna věc (co host nasbírá a co
@@ -102,14 +103,17 @@ function Smazat({ title, text, onPotvrdit, onZavrit }: { title: string; text: st
 
 // ---- Přehled --------------------------------------------------------------------
 
-function Overview({ toast }: { toast: (m: string) => void }) {
+function Overview({ toast, oznam }: { toast: (m: string) => void; oznam: (text: string, ton?: 'ok' | 'bad') => void }) {
   const { ma: smi } = useOpravneni();
   const money = useMoney();
   const symbol = useSymbol();
   const [d, setD] = useState<any | null>(null);
   const { p, setP, reload: reloadProfile, error: profileError } = useProfile();
   const [busy, setBusy] = useState(false);
-  useEffect(() => { fetch('/api/client/admin/loyalty').then(okJson).then(setD).catch(() => setD({ summary: null, recent: [], series: [] })); }, []);
+  const nacti = useCallback(() => { fetch('/api/client/admin/loyalty').then(okJson).then(setD).catch(() => setD({ summary: null, recent: [], series: [] })); }, []);
+  useEffect(() => { nacti(); }, [nacti]);
+  // Přechod z Kartičky: výrazná karta pro podnik bez členů nebo s hrstkou, jinak decentní řádek.
+  const imp = useImportKarticky(oznam, nacti);
   const zapnout = async () => {
     setBusy(true);
     try { const r = await j('/api/client/admin/profile', { method: 'PUT', body: JSON.stringify({ loyalty_on: true }) }); setP(r.profile); toast('Věrnost je zapnutá. Hosté začnou sbírat body.'); }
@@ -138,6 +142,8 @@ function Overview({ toast }: { toast: (m: string) => void }) {
           {smi('vernost.pravidla') && <Button size="sm" variant="secondary" loading={busy} onClick={zapnout}>Zapnout</Button>}
         </div>
       )}
+      {imp.smi && d && p && <PrechodZKarticky clenu={Number(d.summary?.members) || 0} onOtevri={imp.otevri} />}
+      {imp.okno}
       <Card>
         <StatRow>
           <Stat label="Členů" value={(Number(s.members) || 0).toLocaleString('cs-CZ')} />
@@ -842,14 +848,19 @@ const POPIS_CASTI: Record<LoyaltySub, string> = {
   vouchers: 'Dárkové poukazy s jedinečným kódem a QR: peněžní hodnota, platnost, uplatnění po částech u kasy a tisk.',
 };
 
-export default function LoyaltyTabs({ toast, promos }: { toast: (m: string) => void; promos: React.ReactNode }) {
+export default function LoyaltyTabs({ toast, promos, oznam, otevriCast }: {
+  toast: (m: string) => void; promos: React.ReactNode; oznam: (text: string, ton?: 'ok' | 'bad') => void;
+  /** Zvenku (z průvodce přechodem z Kartičky) otevře zadanou část; `n` se zvyšuje při každém požadavku. */
+  otevriCast?: { id: LoyaltySub; n: number } | null;
+}) {
   // Části jako záložky aplikace: podle `ma` (do načtení oprávnění všechny, pak jen povolené).
   const { ma } = useOpravneni();
   const casti = LOYALTY_SUBS.filter(c => ma(KLIC_CASTI[c.id]));
-  const [volba, setVolba] = useState<LoyaltySub>('overview');
+  const [volba, setVolba] = useState<LoyaltySub>(otevriCast?.id ?? 'overview');
+  useEffect(() => { if (otevriCast) setVolba(otevriCast.id); }, [otevriCast]);
   const sub: LoyaltySub | null = casti.some(c => c.id === volba) ? volba : casti[0]?.id ?? null;
   const [ukladam, setUkladam] = useState(false);
-  const nastroj = sub === 'overview' ? <Overview toast={toast} />
+  const nastroj = sub === 'overview' ? <Overview toast={toast} oznam={oznam} />
     : sub === 'points' ? <BodyAUrovne toast={toast} setUkladam={setUkladam} />
     : sub === 'stamps' ? <Stamps toast={toast} />
     : sub === 'coupons' ? <div className="space-y-4"><Coupons toast={toast} />{promos}</div>

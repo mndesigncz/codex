@@ -37,7 +37,8 @@ import MobileMoreSheet from '../MobileMoreSheet';
 import FloorPlanEditor from './FloorPlanEditor';
 import QrDesigner from './QrDesigner';
 import BrandTab from './BrandTab';
-import LoyaltyTabs from './LoyaltyTabs';
+import LoyaltyTabs, { LOYALTY_SUBS, type LoyaltySub } from './LoyaltyTabs';
+import PrechodZKarticky, { PRECHOD_TLACITKO, PRECHOD_OTAZKA, PRECHOD_POPIS, useImportKarticky } from './PrechodZKarticky';
 import MenuEditor from '../employer/MenuEditor';
 import EventsView from '../employer/EventsView';
 import { czDay, RES_STATUS } from '@/lib/clientSlots';
@@ -60,7 +61,6 @@ import { otevriNaTisk } from '@/lib/stahni';
 
 // Nastavení účtu v okně: stejná obrazovka jako v administraci (profil, vzhled a jazyk, oznámení, zabezpečení),
 // jen se stahuje až při otevření, ať ho Client nenese s každým načtením.
-const ImportKartickaOkno = dynamic(() => import('./ImportKartickaOkno'), { ssr: false });
 const NastaveniUctu = dynamic(() => import('../Settings'), { loading: () => <div className="flex items-center justify-center h-48"><div className="spinner" /></div> });
 
 type Tab = 'overview' | 'reservations' | 'orders' | 'tables' | 'menu' | 'events' | 'customers' | 'loyalty' | 'brand' | 'settings';
@@ -120,13 +120,15 @@ async function j(url: string, init?: RequestInit) {
 type Hlaska = (text: string, ton?: 'ok' | 'bad') => void;
 
 /** Souhrn Clientu pro skořápku: slug, zapnuto, odznaky. Sdílí mezipaměť s widgety Přehledu. */
-interface SouhrnSkorapky { zapnuto: boolean | null; slug: string | null; rezervaceCekaji: number; objednavkyNove: number }
+interface SouhrnSkorapky { zapnuto: boolean | null; slug: string | null; rezervaceCekaji: number; objednavkyNove: number; clenu: number | null }
 const vyberSouhrnSkorapky = (raw: any): SouhrnSkorapky => ({
   zapnuto: typeof raw?.enabled === 'boolean' ? raw.enabled : null,
   slug: typeof raw?.slug === 'string' && raw.slug ? raw.slug : null,
   // N13: bez klíče přijde null — odznak se pak nekreslí.
   rezervaceCekaji: Number(raw?.reservations?.requested) || 0,
   objednavkyNove: Number(raw?.orders?.new) || 0,
+  // Bez oprávnění (nebo před načtením) přijde null: výzva k přechodu z Kartičky se pak neukáže.
+  clenu: typeof raw?.members === 'number' ? raw.members : null,
 });
 
 export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () => void; initialTab?: string; user?: { id?: string | number; name?: string; role?: string; avatar?: string } }) {
@@ -167,6 +169,8 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
   const [moreOpen, setMoreOpen] = useState(false);
   const [ucetOtevren, setUcetOtevren] = useState(false);
   const prejdi = useCallback((t: Tab) => { setVolba(t); setMoreOpen(false); }, []);
+  // Odkaz z průvodce přechodem z Kartičky umí otevřít rovnou část Věrnosti (Kupony, Poukazy…).
+  const [castVernosti, setCastVernosti] = useState<{ id: LoyaltySub; n: number } | null>(null);
   const otevriHosta = useCallback((q: string) => { setHledatHosta(q); prejdi('customers'); }, [prejdi]);
   const strankaProHosty = () => { if (souhrn?.slug) window.open(`/client/${souhrn.slug}`, '_blank'); };
 
@@ -179,7 +183,12 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
       return JE_TAB(id) && klicMoje.split(',').includes(id) ? id : null;
     };
     return {
-      onNavigate: (pohled, arg) => { const t = mistni(pohled); if (t) prejdi(t); else nadrazena.onNavigate(pohled, arg); },
+      onNavigate: (pohled, arg) => {
+        const t = mistni(pohled);
+        if (!t) { nadrazena.onNavigate(pohled, arg); return; }
+        if (t === 'loyalty' && arg && LOYALTY_SUBS.some(c => c.id === arg)) setCastVernosti(c => ({ id: arg as LoyaltySub, n: (c?.n ?? 0) + 1 }));
+        prejdi(t);
+      },
       // Odkaz „Věrnost ›" na stránce Věrnost by vedl tam, kde člověk už je —
       // záložka, která je právě otevřená, se widgetům hlásí jako nedostupná.
       smiPohled: pohled => {
@@ -270,14 +279,14 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
           <main className="relative flex-1 overflow-y-auto scrollbar-thin pb-36 md:pb-4">
             <div className="mx-auto w-full max-w-7xl">
               <ErrorBoundary resetKey={tab} zalozka={aktivni.label}>
-                {tab === 'overview' && <PrehledClientu zapnuto={souhrn?.zapnuto ?? null} slug={souhrn?.slug ?? null} prejdi={prejdi} />}
+                {tab === 'overview' && <PrehledClientu zapnuto={souhrn?.zapnuto ?? null} slug={souhrn?.slug ?? null} clenu={souhrn?.clenu ?? null} prejdi={prejdi} oznam={oznam} onZmena={obnovSouhrn} />}
                 {tab === 'reservations' && <RezervaceStranka oznam={oznam} onZmena={obnovSouhrn} otevriHosta={moje.some(t => t.id === 'customers') ? otevriHosta : undefined} />}
                 {tab === 'orders' && <ObjednavkyStranka oznam={oznam} onZmena={obnovSouhrn} />}
                 {tab === 'tables' && <StolyStranka oznam={oznam} />}
                 {tab === 'menu' && <MenuEditor />}
                 {tab === 'events' && <EventsView user={(user ?? {}) as { id?: string }} oznam={oznam} />}
                 {tab === 'customers' && <ZakazniciStranka oznam={oznam} hledat={hledatHosta} />}
-                {tab === 'loyalty' && <LoyaltyTabs toast={t => oznam(t)} promos={<Promos oznam={oznam} />} />}
+                {tab === 'loyalty' && <LoyaltyTabs toast={t => oznam(t)} promos={<Promos oznam={oznam} />} oznam={oznam} otevriCast={castVernosti} />}
                 {tab === 'brand' && <div className="p-4 sm:p-6"><BrandTab toast={t => oznam(t)} onChange={obnovSouhrn} /></div>}
                 {tab === 'settings' && <div className="p-4 sm:p-6"><SettingsTab oznam={oznam} onChange={obnovSouhrn} /></div>}
               </ErrorBoundary>
@@ -327,10 +336,15 @@ export default function ClientAdmin({ onExit, initialTab, user }: { onExit: () =
 // věrnost, propojení). Vypnutý Client řekne hlavička a jediná limetka ho
 // nabídne nastavit — jen tomu, kdo smí do Nastavení.
 
-function PrehledClientu({ zapnuto, slug, prejdi }: { zapnuto: boolean | null; slug: string | null; prejdi: (t: Tab) => void }) {
+function PrehledClientu({ zapnuto, slug, clenu, prejdi, oznam, onZmena }: {
+  zapnuto: boolean | null; slug: string | null; clenu: number | null; prejdi: (t: Tab) => void; oznam: Hlaska; onZmena: () => void;
+}) {
   const { ma } = useOpravneni();
   const vypnuto = zapnuto === false;
+  // Krok „Začni": podnik bez členů a s právem importu dostane nahoře přechod z Kartičky.
+  const imp = useImportKarticky(oznam, onZmena);
   return (
+    <>
     <PlochaWidgetu
       stranka="vedeni.klient"
       hlavicka={{
@@ -343,8 +357,11 @@ function PrehledClientu({ zapnuto, slug, prejdi }: { zapnuto: boolean | null; sl
         primary: vypnuto && ma('klient.nastaveni')
           ? <Button variant="accent" icon="settings" onClick={() => prejdi('settings')}>Nastavit a zapnout</Button>
           : undefined,
+        aside: imp.smi && clenu === 0 ? <PrechodZKarticky clenu={0} krok onOtevri={imp.otevri} className="mt-3" /> : undefined,
       }}
     />
+    {imp.okno}
+    </>
   );
 }
 
@@ -691,8 +708,6 @@ function Clenove({ oznam, hledat = '' }: { oznam: Hlaska; hledat?: string }) {
   const meniSkupiny = smi('zakaznici.skupiny');
   const rozbali = vidiDenik || meniSkupiny;
   // Přechod z jiné věrnostní aplikace (Kartička): jen s oprávněním Import členů.
-  const smiImport = smi('zakaznici.import');
-  const [importOtevren, setImportOtevren] = useState(false);
   const [q, setQ] = useState(hledat);
   useEffect(() => { setQ(hledat); }, [hledat]);
   // Hledání se ptá serveru (výsledky přes 500 členů) — s krátkou prodlevou, ať se neptá na každé písmeno.
@@ -702,6 +717,8 @@ function Clenove({ oznam, hledat = '' }: { oznam: Hlaska; hledat?: string }) {
     `/api/client/admin/customers?q=${encodeURIComponent(dotaz)}`,
     raw => ({ customers: Array.isArray(raw?.customers) ? raw.customers : [], total: Number(raw?.total) || 0 }),
   );
+  const imp = useImportKarticky(oznam, reload);
+  const smiImport = imp.smi;
   const [otevreny, setOtevreny] = useState<number | null>(null);
   const [upravuji, setUpravuji] = useState<{ c: ClenRadek; delta: string; poznamka: string; co: 'body' | 'utrata' } | null>(null);
   const [ukladam, setUkladam] = useState(false);
@@ -727,13 +744,13 @@ function Clenove({ oznam, hledat = '' }: { oznam: Hlaska; hledat?: string }) {
       <div className="flex items-center gap-3 flex-wrap">
         <SearchField className="w-full max-w-sm" value={q} onChange={setQ} storageKey="hoste" placeholder="Jméno nebo e-mail" ariaLabel="Hledat zákazníka" />
         {d && <p className="t-meta tabular-nums">{czCount(d.total, CLEN)}</p>}
-        {smiImport && <Button size="sm" variant="secondary" icon="upload" className="sm:ml-auto" onClick={() => setImportOtevren(true)}>Přecházíte z Kartičky?</Button>}
+        {smiImport && <Button size="sm" variant="secondary" icon="upload" className="sm:ml-auto" onClick={imp.otevri}>{PRECHOD_TLACITKO}</Button>}
       </div>
       {error ? <ErrorState title="Členové se nenačetli" onRetry={reload} detail={error} />
         : d === null ? <PageSkel />
         : d.customers.length === 0 ? (
-          <Card><EmptyState icon="users" compact title={q ? 'Nikdo takový' : 'Zatím žádní členové'} hint={q ? undefined : smiImport ? 'Přidají se sami na tvé stránce pro hosty. Máte členy v Kartičce? Můžete je přenést i s body a razítky.' : 'Přidají se sami na tvé stránce pro hosty.'}
-            action={!q && smiImport ? <Button size="sm" variant="secondary" icon="upload" onClick={() => setImportOtevren(true)}>Přenést z Kartičky</Button> : undefined} /></Card>
+          <Card><EmptyState icon="users" compact title={q ? 'Nikdo takový' : 'Zatím žádní členové'} hint={q ? undefined : smiImport ? 'Přidají se sami na tvé stránce pro hosty. Máš členy v Kartičce? Přeneseš je i s body a razítky.' : 'Přidají se sami na tvé stránce pro hosty.'}
+            action={!q && smiImport ? <Button size="sm" variant="secondary" icon="upload" onClick={imp.otevri}>{PRECHOD_TLACITKO}</Button> : undefined} /></Card>
         ) : (
           <Card pad="none">
             <ul className="list px-5">
@@ -760,7 +777,7 @@ function Clenove({ oznam, hledat = '' }: { oznam: Hlaska; hledat?: string }) {
             </ul>
           </Card>
         )}
-      {importOtevren && <ImportKartickaOkno open onClose={() => setImportOtevren(false)} oznam={oznam} onHotovo={reload} />}
+      {imp.okno}
       {upravuji && (
         <Modal open onClose={() => setUpravuji(null)} size="sm" title={`Body pro ${upravuji.c.name}`}
           subtitle={upravuji.co === 'utrata' ? `Útrata teď ${money(Number(upravuji.c.spend) || 0)}` : `Teď má ${upravuji.c.points.toLocaleString('cs-CZ')} b.`}
@@ -1054,7 +1071,8 @@ function SettingsTab({ oznam, onChange }: { oznam: Hlaska; onChange: () => void 
   const vybrane = p.menu_slug ? boards.find((b: any) => b.slug === p.menu_slug) : boards[0];
   const chybi = vybrane ? Number(vybrane.items) - Number(vybrane.linked) : 0;
   return (
-    <form onSubmit={save} className="space-y-6 max-w-3xl">
+    <div className="space-y-6 max-w-3xl">
+    <form onSubmit={save} className="space-y-6">
       <PageHeader hintId="clientadmin-8" title="Nastavení" subtitle="Jak podnik vidí hosté a co u něj můžou dělat." primary={<Button type="submit" variant="accent" loading={busy}>Uložit</Button>} />
       <Card className="space-y-4">
         <ul className="list">
@@ -1130,6 +1148,26 @@ function SettingsTab({ oznam, onChange }: { oznam: Hlaska; onChange: () => void 
         </ul>
       </Card>
     </form>
+    <DataZKarticky oznam={oznam} onZmena={onChange} />
+    </div>
+  );
+}
+
+/** Nastavení → Data: přenos členů a pravidel z Kartičky (jen s oprávněním Import členů). */
+function DataZKarticky({ oznam, onZmena }: { oznam: Hlaska; onZmena: () => void }) {
+  const imp = useImportKarticky(oznam, onZmena);
+  if (!imp.smi) return null;
+  return (
+    <Card className="grid gap-3" aria-labelledby="s-karticka">
+      <div>
+        <h2 id="s-karticka" className="t-card">{PRECHOD_OTAZKA}</h2>
+        <p className="t-meta mt-0.5 text-pretty">{PRECHOD_POPIS}</p>
+      </div>
+      <div>
+        <Button type="button" variant="secondary" icon="upload" className="max-sm:w-full" onClick={imp.otevri}>{PRECHOD_TLACITKO}</Button>
+      </div>
+      {imp.okno}
+    </Card>
   );
 }
 

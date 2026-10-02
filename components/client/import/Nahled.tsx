@@ -39,7 +39,7 @@ export default function Nahled({
       {souhrn.clenu === 0 ? (
         <div role="alert" className="flex items-start gap-2 rounded-2xl bg-[var(--bad-bg)] text-[var(--bad-ink)] p-3 text-sm">
           <Icon name="warning" size={16} className="shrink-0 mt-0.5" />
-          <span className="min-w-0 text-pretty">Z tabulky nevyšel žádný člen. Vraťte se o krok zpět a zkontrolujte sloupec s e-mailem.</span>
+          <span className="min-w-0 text-pretty">Z tabulky nevyšel žádný člen. Vrať se o krok zpět a zkontroluj sloupec s e-mailem.</span>
         </div>
       ) : (
         <section aria-label="Souhrn importu">
@@ -67,7 +67,7 @@ export default function Nahled({
           <div className="mt-2 space-y-2" aria-busy><Skeleton className="h-4 w-3/4" /><Skeleton className="h-4 w-2/3" /></div>
         ) : server.stav === 'chyba' ? (
           <ErrorState compact title={server.status === 403 ? 'K importu chybí oprávnění Import členů' : 'Kontrola se nepovedla'}
-            hint={server.status === 403 ? 'Požádejte vedení, ať vám oprávnění „Import členů“ přidá v nastavení rolí.' : server.zprava}
+            hint={server.status === 403 ? 'Požádej vedení, ať ti oprávnění „Import členů“ přidá v nastavení rolí.' : server.zprava}
             onRetry={server.status === 403 ? undefined : onServerZnovu} />
         ) : (
           <>

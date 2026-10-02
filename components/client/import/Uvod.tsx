@@ -18,6 +18,14 @@ const PRENASI = [
   'skupiny nebo úrovně (založí se jako skupiny členů)',
 ];
 
+/** Co import nepřenáší: nic z toho neumí zapsat, takže to člověk nemá hledat v souboru. */
+const NEPRENASI = [
+  'pravidla věrnosti (razítka na kartě, body za útratu, cashback, úrovně)',
+  'kupony, promo kódy a dárkové poukazy',
+  'bannery a vzhled stránky',
+  'jednotlivé transakce (přenesou se jen zůstatky)',
+];
+
 const MAX_BAJTU = 10 * 1024 * 1024;
 
 /** Přečte soubor v daném kódování; vrací text a to, jestli v něm zůstaly nečitelné znaky (U+FFFD). */
@@ -66,6 +74,18 @@ export default function Uvod({
             </li>
           ))}
         </ul>
+        <h4 className="mt-4 text-sm font-semibold text-[#16181A]">Co se nepřenese</h4>
+        <ul className="mt-2 space-y-1.5">
+          {NEPRENASI.map(t => (
+            <li key={t} className="flex items-start gap-2 text-sm text-black/70">
+              <Icon name="close" size={15} className="shrink-0 mt-0.5 text-black/40" />
+              <span className="min-w-0 text-pretty">{t}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-2 text-xs text-black/55 text-pretty">
+          Pravidla věrnosti si opíšeš v kroku Pravidla, ostatní ti ten krok připomene s odkazy.
+        </p>
         <p className="mt-2 text-xs text-black/50 text-pretty">
           Funguje i s jiným souborem: stačí tabulka (CSV, TSV nebo text z Excelu) s e-maily členů.
         </p>
@@ -74,12 +94,12 @@ export default function Uvod({
       <Well className="space-y-2">
         <h4 className="text-sm font-semibold text-[#16181A]">Jak soubor získat</h4>
         <ol className="list-decimal pl-5 space-y-1 text-sm text-black/70">
-          <li className="text-pretty">V administraci Kartičky (mojekarticka.cz) exportujte zákazníky jako CSV nebo Excel.</li>
-          <li className="text-pretty">Excel: <em>Uložit jako</em> a typ <em>CSV UTF-8</em>. Nebo celou tabulku označte, zkopírujte a vložte do pole níže.</li>
+          <li className="text-pretty">V administraci Kartičky (mojekarticka.cz) exportuj zákazníky jako CSV nebo Excel.</li>
+          <li className="text-pretty">Excel: <em>Uložit jako</em> a typ <em>CSV UTF-8</em>. Nebo celou tabulku označ, zkopíruj a vlož do pole níže.</li>
         </ol>
         <p className="text-xs text-black/55 text-pretty">
-          Upřímně: přesný formát exportu Kartička nezveřejňuje. Proto si v dalším kroku sloupce před importem zkontrolujete
-          a přiřadíte sami. Když export nejde nebo je potíž, pomůže podpora Kartičky (info@karticka.cz).
+          Upřímně: přesný formát exportu Kartička nezveřejňuje. Proto si v dalším kroku sloupce před importem zkontroluješ
+          a přiřadíš sám. Když export nejde nebo je potíž, pomůže podpora Kartičky (info@karticka.cz).
         </p>
       </Well>
 
@@ -105,7 +125,7 @@ export default function Uvod({
                 onChange={e => { const f = e.target.files?.[0]; if (f) onSoubor(f); e.target.value = ''; }} />
               <Button variant="secondary" icon="upload" onClick={() => vstup.current?.click()}>Vybrat soubor</Button>
               <p className="text-sm text-black/60 min-w-0 truncate" aria-live="polite">
-                {nazevSouboru ? <>Načteno: <span className="font-medium text-[#16181A]">{nazevSouboru}</span></> : 'Podporujeme .csv, .tsv a .txt. Soubor se čte jen ve vašem prohlížeči.'}
+                {nazevSouboru ? <>Načteno: <span className="font-medium text-[#16181A]">{nazevSouboru}</span></> : 'Podporujeme .csv, .tsv a .txt. Soubor se čte jen ve tvém prohlížeči.'}
               </p>
             </div>
             {nazevSouboru && (
