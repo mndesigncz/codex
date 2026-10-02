@@ -36,6 +36,7 @@ import { obsahuje } from '@/lib/hledani';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { useOpravneni } from '../role/useOpravneni';
 import Poukazy from './Poukazy';
+import OdkazCtecka from './OdkazCtecka';
 
 // Věrnost měla šest podzáložek pod deseti hlavními — šestnáct sourozenců
 // nad sebou. „Body" a „Slevy a úrovně" jsou jedna věc (co host nasbírá a co
@@ -849,12 +850,14 @@ export default function LoyaltyTabs({ toast, promos }: { toast: (m: string) => v
   const [volba, setVolba] = useState<LoyaltySub>('overview');
   const sub: LoyaltySub | null = casti.some(c => c.id === volba) ? volba : casti[0]?.id ?? null;
   const [ukladam, setUkladam] = useState(false);
-  const nastroj = sub === 'overview' ? <Overview toast={toast} />
+  const nastroj0 = sub === 'overview' ? <Overview toast={toast} />
     : sub === 'points' ? <BodyAUrovne toast={toast} setUkladam={setUkladam} />
     : sub === 'stamps' ? <Stamps toast={toast} />
     : sub === 'coupons' ? <div className="space-y-4"><Coupons toast={toast} />{promos}</div>
     : sub === 'vouchers' ? <Poukazy toast={toast} />
     : null;
+  // Čtečka u kasy: celoobrazovkový režim pro terminál s čtečkou kódů (vstup z Věrnosti).
+  const nastroj = nastroj0 && ma('vernost.karta') ? <div className="space-y-3"><OdkazCtecka />{nastroj0}</div> : nastroj0;
   return (
     <PlochaWidgetu
       stranka="vedeni.klient_vernost"
