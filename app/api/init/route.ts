@@ -1732,6 +1732,63 @@ export async function GET(request: Request) {
         awarded_at TIMESTAMP DEFAULT NOW(),
         PRIMARY KEY (team_id, bill_id)
       )`);
+    // Úplnost razítek (kolo 81): limity, okna platnosti, kategorie, koncept/archiv,
+    // vzhled karty, deník razítek (storno, statistiky, export) a idempotence u kasy.
+    // Stejné příkazy jsou i v lib/stampsSchema.ts (lazy při prvním použití).
+    await ddl(sql`ALTER TABLE client_stamp_campaigns ADD COLUMN IF NOT EXISTS max_completions INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_stamp_campaigns ADD COLUMN IF NOT EXISTS daily_cap INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_stamp_campaigns ADD COLUMN IF NOT EXISTS valid_days JSONB NOT NULL DEFAULT '[]'`);
+    await ddl(sql`ALTER TABLE client_stamp_campaigns ADD COLUMN IF NOT EXISTS hour_from TEXT`);
+    await ddl(sql`ALTER TABLE client_stamp_campaigns ADD COLUMN IF NOT EXISTS hour_till TEXT`);
+    await ddl(sql`ALTER TABLE client_stamp_campaigns ADD COLUMN IF NOT EXISTS excluded_items JSONB NOT NULL DEFAULT '[]'`);
+    await ddl(sql`ALTER TABLE client_stamp_campaigns ADD COLUMN IF NOT EXISTS stamp_sections JSONB NOT NULL DEFAULT '[]'`);
+    await ddl(sql`ALTER TABLE client_stamp_campaigns ADD COLUMN IF NOT EXISTS excluded_sections JSONB NOT NULL DEFAULT '[]'`);
+    await ddl(sql`ALTER TABLE client_stamp_campaigns ADD COLUMN IF NOT EXISTS combinable BOOLEAN NOT NULL DEFAULT TRUE`);
+    await ddl(sql`ALTER TABLE client_stamp_campaigns ADD COLUMN IF NOT EXISTS draft BOOLEAN NOT NULL DEFAULT FALSE`);
+    await ddl(sql`ALTER TABLE client_stamp_campaigns ADD COLUMN IF NOT EXISTS archived_at TIMESTAMP`);
+    await ddl(sql`ALTER TABLE client_stamp_campaigns ADD COLUMN IF NOT EXISTS card_color TEXT`);
+    await ddl(sql`ALTER TABLE client_stamp_campaigns ADD COLUMN IF NOT EXISTS card_icon TEXT`);
+    await ddl(sql`ALTER TABLE client_stamp_campaigns ADD COLUMN IF NOT EXISTS card_image TEXT`);
+    await ddl(sql`ALTER TABLE client_stamp_progress ADD COLUMN IF NOT EXISTS ver INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_stamp_progress ADD COLUMN IF NOT EXISTS expired_stamps INTEGER NOT NULL DEFAULT 0`);
+    await ddl(sql`ALTER TABLE client_stamp_progress ADD COLUMN IF NOT EXISTS expired_at TIMESTAMP`);
+    await ddl(sql`ALTER TABLE client_coupons ADD COLUMN IF NOT EXISTS campaign_id INTEGER`);
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS client_stamp_events (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        campaign_id INTEGER NOT NULL,
+        customer_id INTEGER NOT NULL,
+        delta INTEGER NOT NULL DEFAULT 0,
+        kind TEXT NOT NULL DEFAULT 'visit',
+        ref TEXT,
+        note TEXT,
+        staff_id INTEGER,
+        amount NUMERIC(12,2),
+        completions INTEGER NOT NULL DEFAULT 0,
+        took_days NUMERIC(8,2),
+        expired INTEGER NOT NULL DEFAULT 0,
+        stamps_before INTEGER,
+        completed_before INTEGER,
+        started_before TIMESTAMP,
+        last_stamp_before TIMESTAMP,
+        last_completed_before TIMESTAMP,
+        claim_ids JSONB NOT NULL DEFAULT '[]',
+        undone_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_stamp_events_campaign ON client_stamp_events (team_id, campaign_id, created_at)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_stamp_events_customer ON client_stamp_events (team_id, customer_id, created_at)`);
+    // Idempotence akcí u kasy: stejný klíč dvakrát = jedna akce, druhé volání dostane tutéž odpověď.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS client_kasa_idem (
+        team_id INTEGER NOT NULL,
+        idem_key TEXT NOT NULL,
+        response JSONB,
+        status INTEGER,
+        created_at TIMESTAMP DEFAULT NOW(),
+        PRIMARY KEY (team_id, idem_key)
+      )`);
     // Migrace jednoduchého razítka: podnik se zapnutým stamp_target dostane
     // výchozí kampaň „za návštěvu" a rozsbíraná razítka členů se přenesou.
     await ddl(sql`

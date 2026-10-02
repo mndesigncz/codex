@@ -22,13 +22,29 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
   await join(me.id, teamId);
   try { await sql`INSERT INTO client_promo_uses (promo_id, customer_id) VALUES (${promo.id}, ${me.id})`; }
   catch { return NextResponse.json({ error: 'Tenhle kód už jsi použil.' }, { status: 409 }); }
-  await sql`UPDATE client_promos SET uses = uses + 1 WHERE id = ${promo.id}`;
+  // Počítadlo uplatnění je atomické: limit se kontroluje přímo v UPDATE, takže poslední kus nevezmou dva hosté najednou.
+  const obsazeno = await sql`
+    UPDATE client_promos SET uses = uses + 1
+    WHERE id = ${promo.id} AND (max_uses IS NULL OR max_uses = 0 OR uses < max_uses) RETURNING uses`;
+  if (!obsazeno.length) {
+    await sql`DELETE FROM client_promo_uses WHERE promo_id = ${promo.id} AND customer_id = ${me.id}`.catch(() => {});
+    return NextResponse.json({ error: 'Kód už je vyčerpaný.' }, { status: 409 });
+  }
   let points: number | null = null;let coupon: string | null = null;
-  if (Number(promo.points) > 0) points = await award(teamId, me.id, Number(promo.points), 'manual', `promo:${promo.code}`, `Promo kód ${promo.title}`);
-  if (promo.coupon_id) {
-    const c = couponCode();
-    await sql`INSERT INTO client_coupon_claims (coupon_id, customer_id, team_id, code) VALUES (${promo.coupon_id}, ${me.id}, ${teamId}, ${c})`;
-    coupon = c;
+  let pripsano = 0;
+  try {
+    if (Number(promo.points) > 0) { points = await award(teamId, me.id, Number(promo.points), 'manual', `promo:${promo.code}`, `Promo kód ${promo.title}`); pripsano = Number(promo.points); }
+    if (promo.coupon_id) {
+      const c = couponCode();
+      await sql`INSERT INTO client_coupon_claims (coupon_id, customer_id, team_id, code) VALUES (${promo.coupon_id}, ${me.id}, ${teamId}, ${c})`;
+      coupon = c;
+    }
+  } catch {
+    // Pád po zabrání kódu: vrátit body, použití i počítadlo, ať host může zkusit znovu a kód nezůstane „spálený“.
+    if (pripsano > 0) await award(teamId, me.id, -pripsano, 'manual', `promo-storno:${promo.code}`, `Vráceno: ${promo.title}`).catch(() => {});
+    await sql`DELETE FROM client_promo_uses WHERE promo_id = ${promo.id} AND customer_id = ${me.id}`.catch(() => {});
+    await sql`UPDATE client_promos SET uses = GREATEST(0, uses - 1) WHERE id = ${promo.id}`.catch(() => {});
+    return NextResponse.json({ error: 'Kód se nepodařilo uplatnit. Zkus to znovu.' }, { status: 500 });
   }
   return NextResponse.json({ ok: true, title: promo.title, points, coupon });
 }

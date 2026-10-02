@@ -101,7 +101,7 @@ export default function MyPage() {
                           <div className="flex gap-1" aria-label={t('{name}: {stamps} z {required} razítek', { name: cp.name, stamps: cp.stamps, required: cp.required })}>
                             {Array.from({ length: Math.min(cp.required, 12) }).map((_, i) => <span key={i} className={`h-2 flex-1 rounded-full ${i < cp.stamps ? 'bg-[#C8F542]' : 'bg-black/[0.08]'}`} />)}
                           </div>
-                          <p className="text-xs text-black/55 mt-1.5 tabular-nums">{cp.name} · {cp.stamps}/{cp.required}{cp.reward ? ` · ${cp.reward}` : ''}</p>
+                          <p className="text-xs text-black/55 mt-1.5 tabular-nums">{cp.name} · {cp.stamps}/{cp.required}{cp.reward ? ` · ${cp.reward}` : ''}{cp.expired ? ` · ${t('karta vypršela')}` : ''}</p>
                         </div>
                       ))}
                     </div>

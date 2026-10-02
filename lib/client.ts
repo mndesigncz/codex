@@ -281,16 +281,28 @@ export async function spendCredit(teamId: number, customerId: number, amountCzk:
 /**
  * Návštěva: +1 razítko, +1 návštěva; po dosažení cíle se razítka vynulují a vznikne kupon na odměnu.
  * `extra` jsou razítka navíc z bonusové akce (stejné připsání, žádný druhý řádek), `note` jejich popis do deníku.
+ *
+ * Razítka řídí kampaně (lib/stamps.ts). Jakmile podnik nějakou kampaň má, staré
+ * počítadlo na členství se nezvyšuje a nevydává vlastní odměnu (dřív běžely dva
+ * počítadla vedle sebe) a návštěva dá razítko všem kampaním „za návštěvu“, které
+ * teď platí. Bez kampaní funguje jednoduché razítko podle stamp_target jako dřív.
  */
-export async function stampVisit(teamId: number, customerId: number, profile: any, ref?: string, extra = 0, note = ''): Promise<{ stamps: number; rewarded: boolean; already?: boolean }> {
+export async function stampVisit(teamId: number, customerId: number, profile: any, ref?: string, extra = 0, note = '', staffId: number | null = null): Promise<{
+  stamps: number; rewarded: boolean; already?: boolean;
+  /** Řádky pro obsluhu po kampaních (jen když podnik kampaně má). */
+  kampane?: string[]; expiredCount?: number; lost?: number;
+}> {
   await join(customerId, teamId);
-  const target = Number(profile?.stamp_target) || 0;
+  const { maKampane, razitkaZaNavstevu } = await import('./stamps');
+  const kampane = await maKampane(teamId);
+  const target = kampane ? 0 : (Number(profile?.stamp_target) || 0);
   const navic = Math.max(0, Math.trunc(Number(extra)) || 0);
+  const prirustek = kampane ? 0 : 1 + navic;
   // Razítko nejvýš jedno za pražský den. Podmínka je přímo v UPDATE, takže dva
   // rychlé pokusy neprojdou oba — dřív se „už dnes byl" kontrolovalo zvlášť a
   // dalo se to dvojklikem obejít (dvě razítka, dvě návštěvy, dvakrát odměna).
   const [m] = await sql`
-    UPDATE client_memberships SET stamps = stamps + ${1 + navic}, visits = visits + 1, last_visit_at = NOW()
+    UPDATE client_memberships SET stamps = stamps + ${prirustek}, visits = visits + 1, last_visit_at = NOW()
     WHERE customer_id = ${customerId} AND team_id = ${teamId}
       AND (last_visit_at IS NULL OR
            (last_visit_at AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Prague')::date
@@ -300,6 +312,11 @@ export async function stampVisit(teamId: number, customerId: number, profile: an
     // Dnes už razítko má — vrátí se aktuální stav beze změny.
     const [cur] = await sql`SELECT stamps FROM client_memberships WHERE customer_id = ${customerId} AND team_id = ${teamId}`;
     return { stamps: Number(cur?.stamps ?? 0), rewarded: false, already: true };
+  }
+  if (kampane) {
+    const r = await razitkaZaNavstevu(teamId, customerId, ref ?? 'card', navic, note, staffId);
+    obnovPenezenku(teamId, customerId);
+    return { stamps: r.stamps, rewarded: r.rewarded, kampane: r.parts, expiredCount: r.expiredCount, lost: r.lost };
   }
   let stamps = Number(m?.stamps ?? 0);
   let rewarded = false;

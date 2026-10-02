@@ -41,11 +41,18 @@ export async function POST(_req: Request, props: { params: Promise<{ slug: strin
     points = after;
   }
   // Vložení hlídá, že host nemá otevřený stejný kupon (dvojklik nevydá druhý kód).
-  const vlozeno = await sql`
-    INSERT INTO client_coupon_claims (coupon_id, customer_id, team_id, code)
-    SELECT ${c.id}, ${me.id}, ${teamId}, ${code}
-    WHERE NOT EXISTS (SELECT 1 FROM client_coupon_claims WHERE coupon_id = ${c.id} AND customer_id = ${me.id} AND redeemed_at IS NULL)
-    RETURNING id`;
+  // Když vložení spadne (výjimka), body se vrátí — host je nesmí ztratit bez kuponu.
+  let vlozeno: any[];
+  try {
+    vlozeno = await sql`
+      INSERT INTO client_coupon_claims (coupon_id, customer_id, team_id, code)
+      SELECT ${c.id}, ${me.id}, ${teamId}, ${code}
+      WHERE NOT EXISTS (SELECT 1 FROM client_coupon_claims WHERE coupon_id = ${c.id} AND customer_id = ${me.id} AND redeemed_at IS NULL)
+      RETURNING id` as any[];
+  } catch {
+    if (cost > 0) await award(teamId, me.id, cost, 'coupon', `vraceni:${code}`, `Vráceno: ${c.title}`).catch(() => {});
+    return NextResponse.json({ error: 'Kupon se nepodařilo vydat, body ti zůstaly. Zkus to znovu.' }, { status: 500 });
+  }
   if (!vlozeno.length) {
     if (cost > 0) await award(teamId, me.id, cost, 'coupon', `vraceni:${code}`, `Vráceno: ${c.title}`);
     return NextResponse.json({ error: 'Tenhle kupon už máš vyzvednutý — ukaž ho u kasy.' }, { status: 409 });

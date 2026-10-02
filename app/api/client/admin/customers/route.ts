@@ -4,6 +4,7 @@ import { sql, ensureProfile } from '@/lib/client';
 import { tierForMember, tierRulesFromProfile } from '@/lib/clientSlots';
 import { efektivniSleva } from '@/lib/slevy';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { maKampane } from '@/lib/stamps';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -64,7 +65,22 @@ export async function GET(req: NextRequest) {
       }
     } catch { /* před migrací */ }
   }
+  // Razítka: s kampaněmi je zdrojem pravdy průběh kampaní, ne staré počítadlo na členství (dvojí počítadlo).
+  const razitkaBy = new Map<number, number>();
+  if (ids.length) {
+    try {
+      if (await maKampane(u.team_id)) {
+        const sp = await sql`
+          SELECT p.customer_id, COALESCE(SUM(p.stamps), 0)::int AS s FROM client_stamp_progress p
+          JOIN client_stamp_campaigns c ON c.id = p.campaign_id AND c.active = TRUE
+          WHERE p.team_id = ${u.team_id} AND p.customer_id = ANY(${ids}) GROUP BY p.customer_id` as any[];
+        for (const r of ids) razitkaBy.set(r, 0);
+        for (const r of sp) razitkaBy.set(Number(r.customer_id), Number(r.s) || 0);
+      }
+    } catch { /* před migrací zůstane počítadlo z členství */ }
+  }
   const obohacene = rows.map(r => {
+    if (razitkaBy.size) r = { ...r, stamps: razitkaBy.get(Number(r.id)) ?? 0 };
     const t = tierForMember({ visits: r.visits, spend: r.spend }, pravidla);
     const s = efektivniSleva({ uroven: t, skupiny: skupinyBy.get(Number(r.id)) });
     return { ...r, level: t.id, level_label: t.label, discount: s.pct, discount_source: s.zdroj, discount_name: s.nazev };

@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     ledger, claims, vouchers, orders, kampane, uroven,
     clen: {
-      points: Number(m.points) || 0, stamps: Number(m.stamps) || 0, visits: Number(m.visits) || 0,
+      points: Number(m.points) || 0, stamps: kampane.length ? kampane.reduce((a, k) => a + (Number(k.stamps) || 0), 0) : Number(m.stamps) || 0, visits: Number(m.visits) || 0,
       spend: Number(m.spend) || 0, credit: Number(m.credit) || 0, joined_at: m.joined_at, last_visit_at: m.last_visit_at,
     },
   });

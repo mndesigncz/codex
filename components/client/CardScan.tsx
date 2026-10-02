@@ -26,6 +26,7 @@ import { useMoney, useSymbol } from '../CurrencyProvider';
 import { czCount, type CzNoun } from '@/lib/czech';
 import { rozpoznejQr } from '@/lib/kuponQr';
 import OdkazCtecka from './OdkazCtecka';
+import { useKlicAkce, hlavickyAkce, UpozorneniRazitek, RazitkoKarty, RucniPolozky, StornoRazitek } from './loyalty/RazitkaKasa';
 
 const NAVSTEVA: CzNoun = { one: 'návštěva', few: 'návštěvy', many: 'návštěv' };
 const fmt = (raw: string) => { const c = raw.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8); return c.length > 4 ? `${c.slice(0, 4)}-${c.slice(4)}` : c; };
@@ -42,6 +43,9 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
   const [cam, setCam] = useState(false);
+  // Klíč akce (opakování po výpadku sítě se připíše jednou) a upozornění po akci (vypršelá karta, nevešlá razítka).
+  const klicAkce = useKlicAkce();
+  const [upoz, setUpoz] = useState<{ expiredCount?: number; lost?: number } | null>(null);
   // Náhled kuponu z QR nebo kódu, který obsluha ještě neuplatnila.
   const [cp, setCp] = useState<any | null>(null);
   // Nativní skener z obalu (window.manageroNative, components/NativeBridge): na iPhonu
@@ -99,18 +103,27 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
       const r = await fetch(`/api/client/staff/scan?code=${encodeURIComponent(norm)}`);
       const x = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(x.error || 'Nepovedlo se.');
-      setHit(x); setCode(fmt(norm));
+      setHit(x); setCode(fmt(norm)); setUpoz(null);
     } catch (e: any) { setErr(e.message); setHit(null); }
     setBusy('');
   };
-  const act = async (action: 'stamp' | 'points' | 'credit' | 'bill') => {
+  const act = async (action: 'stamp' | 'points' | 'credit' | 'bill' | 'storno' | 'items', extra: { items?: { itemId: number; qty: number }[] } = {}) => {
     setBusy(action); setErr('');
+    const telo = { code, action, amount: Number(amount) || 0, billId: action === 'bill' ? bill : undefined, items: extra.items };
+    // Stejná akce při opakování = stejný klíč. Server ji podruhé nepřipíše, jen vrátí původní odpověď.
+    const klic = klicAkce.klic(JSON.stringify(telo));
+    let status: number | null = null;
     try {
-      const r = await fetch('/api/client/staff/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, action, amount: Number(amount) || 0, billId: action === 'bill' ? bill : undefined }) });
+      const r = await fetch('/api/client/staff/scan', { method: 'POST', headers: hlavickyAkce(klic), body: JSON.stringify(telo) });
+      status = r.status;
       const x = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(x.error || 'Nepovedlo se.');
-      onToast(x.message); setHit((h: any) => ({ ...h, ...x })); setAmount(''); setBill(null); onChange?.();
-    } catch (e: any) { setErr(e.message); }
+      klicAkce.hotovo();
+      onToast(x.message); setHit((h: any) => ({ ...h, ...x })); setAmount(''); setBill(null); setUpoz({ expiredCount: x.expiredCount, lost: x.lost }); onChange?.();
+    } catch (e: any) {
+      klicAkce.pochybe(status);
+      setErr(status == null ? 'Nepodařilo se spojit se serverem. Zkontroluj, jestli akce neprošla, a zkus to znovu — nezdvojí se.' : e.message);
+    }
     setBusy('');
   };
   const redeem = async (couponCode: string) => {
@@ -124,7 +137,7 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
     } catch (e: any) { setErr(e.message); }
     setBusy('');
   };
-  const reset = () => { setHit(null); setCp(null); setCode(''); setErr(''); setAmount(''); setBill(null); };
+  const reset = () => { setHit(null); setCp(null); setCode(''); setErr(''); setAmount(''); setBill(null); setUpoz(null); };
 
   return (
     // Jamka, ne karta: kartička se kreslí uvnitř karty (widget Objednávky od
@@ -181,33 +194,18 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
               {hit.nextTierAt && <span className="t-meta">do „{hit.nextTierLabel}" ještě {hit.nextTierUnit === 'spend' ? money(Math.max(0, hit.nextTierAt - (hit.spend ?? 0))) : czCount(Math.max(0, hit.nextTierAt - hit.visits), NAVSTEVA)}</span>}
             </div>
           )}
-          {hit.campaigns?.length > 0 && (
-            <ul className="list">
-              {hit.campaigns.map((cp: any) => (
-                <li key={cp.id} className="list-row flex-col items-stretch gap-1.5">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <p className="text-sm font-semibold min-w-0 truncate">{cp.name}</p>
-                    <p className="text-[13px] font-semibold tabular-nums text-black/60 shrink-0">{cp.stamps}/{cp.required}</p>
-                  </div>
-                  <div className="flex gap-1" aria-hidden>
-                    {Array.from({ length: Math.min(cp.required, 12) }).map((_, i) => (
-                      <span key={i} className={`h-1.5 flex-1 rounded-full ${i < cp.stamps ? 'bg-[#C8F542]' : 'bg-black/[0.08]'}`} />
-                    ))}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
+          <RazitkoKarty campaigns={hit.campaigns ?? []} />
+          <UpozorneniRazitek expiredCount={upoz?.expiredCount} lost={upoz?.lost} />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {/* Tmavé, ne limetka: kartička žije uvnitř widgetu a na ploše je limetka jen „Hotovo" v úpravách. */}
             <Button variant="primary" icon="check" loading={busy === 'stamp'}
-              disabled={hit.stampedToday || (!hit.rules?.stampTarget && !hit.campaigns?.some((cp: any) => cp.ruleType === 'visit'))}
+              disabled={hit.stampedToday || (!hit.rules?.stampTarget && !hit.campaigns?.some((cp: any) => cp.ruleType === 'visit')) || (hit.campaigns?.some((cp: any) => cp.ruleType === 'visit') && !hit.campaigns.some((cp: any) => cp.ruleType === 'visit' && cp.platiTed !== false))}
               onClick={() => act('stamp')}>
               {hit.stampedToday ? 'Dnes razítko už má' : 'Razítko za návštěvu'}
             </Button>
             <form onSubmit={e => { e.preventDefault(); act('points'); }} className="flex gap-2">
               <Input aria-label={`Útrata v ${symbol}`} type="number" inputMode="numeric" min={0} step={1} value={amount} onChange={e => setAmount(e.target.value)} placeholder={`Útrata ${symbol}`} className="!w-32 text-center" />
-              <Button type="submit" variant="secondary" loading={busy === 'points'} disabled={!hit.rules?.pointsPer100 || !amount}>Body</Button>
+              <Button type="submit" variant="secondary" loading={busy === 'points'} disabled={!(hit.rules?.pointsPer100 || hit.campaigns?.some((cp: any) => cp.ruleType === 'min_value')) || !amount}>Body</Button>
             </form>
           </div>
           {hit.bills?.length > 0 && (
@@ -215,10 +213,11 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
               <p className="t-label mb-1.5">Dnešní účty z pokladny</p>
               <div className="flex flex-wrap gap-1.5">
                 {hit.bills.map((bl: any) => (
-                  <button key={bl.bill_id} type="button" aria-pressed={bill === bl.bill_id}
+                  <button key={bl.bill_id} type="button" aria-pressed={bill === bl.bill_id} disabled={bl.awarded}
+                    title={bl.awarded ? 'Z téhle účtenky už věrnost připsala.' : undefined}
                     onClick={() => { const on = bill === bl.bill_id; setBill(on ? null : bl.bill_id); setAmount(on ? '' : String(Math.round(Number(bl.final_price)))); }}
-                    className={`filter-pill tap-target-sm tabular-nums ${bill === bl.bill_id ? 'seg-on' : 'seg-off glass'}`}>
-                    {money(Math.round(Number(bl.final_price)))}
+                    className={`filter-pill tap-target-sm tabular-nums ${bill === bl.bill_id ? 'seg-on' : 'seg-off glass'} ${bl.awarded ? 'opacity-50 line-through' : ''}`}>
+                    {money(Math.round(Number(bl.final_price)))}{bl.awarded ? ' · připsáno' : ''}
                   </button>
                 ))}
               </div>
@@ -230,6 +229,8 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
               )}
             </div>
           )}
+          <RucniPolozky polozky={hit.polozky ?? []} busy={busy === 'items'} onPripsat={items => act('items', { items })} />
+          <StornoRazitek posledni={hit.posledniAkce ?? null} busy={busy === 'storno'} onStorno={() => act('storno')} />
           {hit.credit > 0 && (
             <form onSubmit={e => { e.preventDefault(); act('credit'); }} className="flex gap-2 items-center">
               <Input aria-label="Kolik kreditu uplatnit" type="number" inputMode="numeric" min={1} max={hit.credit} value={amount} onChange={e => setAmount(e.target.value)} placeholder={`Max ${hit.credit}`} className="!w-32 text-center" />
