@@ -39,6 +39,7 @@ export function jeSegment(a: string): boolean {
 
 /** Člověku srozumitelný název publika (pro historii zpráv). */
 export function stitekPublika(a: string, nazevSkupiny?: string | null): string | null {
+  if (a === 'selection') return 'vybraní hosté';
   const s = SEGMENTY.find(x => x.id === a);
   if (s) return s.label.charAt(0).toLowerCase() + s.label.slice(1);
   if (a === 'tier:silver') return 'stříbrní a výš';

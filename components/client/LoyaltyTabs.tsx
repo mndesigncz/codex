@@ -38,6 +38,7 @@ import { useOpravneni } from '../role/useOpravneni';
 import Poukazy from './Poukazy';
 import OdkazCtecka from './OdkazCtecka';
 import Kupony from './loyalty/Kupony';
+import ClenoveSkupiny from './loyalty/ClenoveSkupiny';
 import PrechodZKarticky, { useImportKarticky } from './PrechodZKarticky';
 import { RAZITKA_DEFAULTY, razitkaZRadku, RazitkaDalsiNastaveni, RazitkaNahled } from './loyalty/RazitkaNastaveni';
 import { podleFiltru, RazitkaFiltr, StavChip, useRazitkaAkce, type FiltrStavu } from './loyalty/RazitkaAkce';
@@ -359,71 +360,8 @@ function BodyAUrovne({ toast, setUkladam }: { toast: (m: string) => void; setUkl
         </Card>
         <BodyNeaktivita p={p} setP={upravP} meni={meni} chyby={chyby} />
       </form>
-      {ma('zakaznici.zobrazit') && <Groups toast={toast} />}
+      {ma('zakaznici.zobrazit') && <ClenoveSkupiny toast={toast} />}
     </div>
-  );
-}
-
-// Ruční skupiny hostů („štamgasti", „firemní večery"). Členy do nich přidává
-// vedení v Zákaznících; kupony na ně jdou cílit v editoru kuponu.
-function Groups({ toast }: { toast: (m: string) => void }) {
-  const meni = useOpravneni().ma('zakaznici.skupiny');
-  const [list, setList] = useState<any[] | null>(null);
-  const [name, setName] = useState('');
-  const [novaSleva, setNovaSleva] = useState('');
-  const [busy, setBusy] = useState('');
-  const [mazu, setMazu] = useState<any | null>(null);
-  const load = useCallback(() => fetch('/api/client/admin/groups').then(okJson).then(d => setList(d.groups ?? [])).catch(() => setList([])), []);
-  useEffect(() => { load(); }, [load]);
-  const add = async (e: React.FormEvent) => {
-    e.preventDefault(); if (!name.trim()) return; setBusy('add');
-    try { await j('/api/client/admin/groups', { method: 'POST', body: JSON.stringify({ name, discount_pct: novaSleva === '' ? undefined : novaSleva }) }); setName(''); setNovaSleva(''); load(); }
-    catch (err) { toast(apiMessage(err, 'Skupinu se nepodařilo založit.')); }
-    setBusy('');
-  };
-  // Sleva skupiny se ukládá po opuštění pole; 0 = skupina je jen štítek.
-  const ulozSlevu = async (g: any, hodnota: string) => {
-    const n = Math.max(0, Math.min(100, Math.round(Number(hodnota) || 0)));
-    if (n === (Number(g.discount_pct) || 0)) return;
-    setBusy('sleva:' + g.id);
-    try { await j('/api/client/admin/groups', { method: 'PATCH', body: JSON.stringify({ id: g.id, discount_pct: n }) }); load(); toast(`Sleva skupiny ${g.name}: ${n} %.`); }
-    catch (err) { toast(apiMessage(err, 'Slevu se nepodařilo uložit.')); }
-    setBusy('');
-  };
-  const del = async (g: any) => {
-    try { await j(`/api/client/admin/groups?id=${g.id}`, { method: 'DELETE' }); load(); }
-    catch (err) { toast(apiMessage(err, 'Skupinu se nepodařilo smazat.')); }
-  };
-  return (
-    <Card className="space-y-3" aria-labelledby="v-skupiny">
-      <div>
-        <h2 id="v-skupiny" className="t-card">Skupiny hostů</h2>
-        <p className="t-meta mt-0.5 max-w-[70ch]">Vlastní štítky mimo úrovně — „štamgasti", „firemní večery". Hosty do nich přidáš v Zákaznících; kupony na ně cílíš v jejich editoru. Skupina může mít i vlastní slevu: člen ve víc skupinách (a s úrovní) bere vždy nejvyšší z nich, nikdy součet.</p>
-      </div>
-      {list === null ? <Skeleton className="h-16" /> : list.length > 0 && (
-        <ul className="list">
-          {list.map((g: any) => (
-            <ListRow key={g.id} title={g.name} meta={`${czCount(Number(g.members) || 0, HOST)}${Number(g.discount_pct) > 0 ? ` · sleva ${g.discount_pct} %` : ''}`}
-              actions={meni ? <>
-                <label htmlFor={`sk-${g.id}`} className="inline-flex items-center gap-1.5 text-xs text-black/60">Sleva v %
-                  <Input id={`sk-${g.id}`} key={`${g.id}:${g.discount_pct}`} type="number" min={0} max={100} className="!w-20" aria-label={`Sleva v % pro skupinu ${g.name}`}
-                    defaultValue={Number(g.discount_pct) || 0} disabled={busy === 'sleva:' + g.id}
-                    onBlur={e => { void ulozSlevu(g, e.target.value); }} />
-                </label>
-                <Button size="sm" variant="ghost" icon="trash" aria-label={`Smazat skupinu ${g.name}`} loading={busy === 'del:' + g.id} onClick={() => setMazu(g)}>Smazat</Button>
-              </> : undefined} />
-          ))}
-        </ul>
-      )}
-      {meni && (
-        <form onSubmit={add} className="flex gap-2 flex-wrap">
-          <Input aria-label="Název nové skupiny" value={name} onChange={e => setName(e.target.value)} placeholder="Nová skupina…" className="flex-1 basis-48 !w-auto" maxLength={60} />
-          <Input type="number" min={0} max={100} aria-label="Sleva nové skupiny v %" placeholder="Sleva v %" value={novaSleva} onChange={e => setNovaSleva(e.target.value)} className="!w-28" />
-          <Button type="submit" variant="secondary" icon="plus" loading={busy === 'add'} disabled={!name.trim()}>Přidat</Button>
-        </form>
-      )}
-      {mazu && <Smazat title={`Smazat skupinu „${mazu.name}"?`} text="Hosté v ní zůstanou, jen přijdou o štítek." onZavrit={() => setMazu(null)} onPotvrdit={() => { void del(mazu); }} />}
-    </Card>
   );
 }
 

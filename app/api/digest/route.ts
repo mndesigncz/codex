@@ -33,6 +33,7 @@ export async function GET(request: Request) {
 
   // Záchranná síť pro naplánované zprávy členům: co nestihl provoz, pošle cron.
   try { const { dispatchDueBroadcasts } = await import('@/lib/broadcasts'); await dispatchDueBroadcasts(); } catch { /* nesmí shodit digest */ }
+  try { const { obnovVsechnyDynamickeSkupiny } = await import('@/lib/clenoveDb'); await obnovVsechnyDynamickeSkupiny(); } catch { /* nesmí shodit digest */ }
 
   try {
     const teams = await sql`SELECT id, name FROM teams ORDER BY id`;

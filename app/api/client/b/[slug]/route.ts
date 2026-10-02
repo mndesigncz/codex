@@ -212,8 +212,8 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
   } catch { stampCampaigns = []; }
 
   let news: any[] = [];
-  // Jen opravdu odeslané — naplánované zprávy nesmí do Novinek předčasně.
-  try { news = await sql`SELECT id, title, body, sent_at FROM client_broadcasts WHERE team_id = ${teamId} AND COALESCE(status, 'sent') = 'sent' ORDER BY sent_at DESC LIMIT 3` as any[]; } catch { news = []; }
+  // Jen opravdu odeslané — naplánované zprávy nesmí do Novinek předčasně. Zprávy skupině, úrovni nebo vybraným hostům jsou soukromé a na veřejnou stránku nepatří.
+  try { news = await sql`SELECT id, title, body, sent_at FROM client_broadcasts WHERE team_id = ${teamId} AND COALESCE(status, 'sent') = 'sent' AND COALESCE(audience, 'all') = 'all' ORDER BY sent_at DESC LIMIT 3` as any[]; } catch { news = []; }
   const plan = p.floorplan && p.ordering_on ? normalizePlan(p.floorplan) : null;
 
   // Kupony v plné síle: výhoda + štítky podmínek, a přihlášenému členovi

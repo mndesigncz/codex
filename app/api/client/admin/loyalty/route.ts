@@ -1,6 +1,6 @@
 // Ruční úprava bodů (omluva, bonus, oprava) a deník člena.
 import { NextRequest, NextResponse } from 'next/server';
-import { sql, awardDetail, awardCreditDetail, loyaltySummary, ensureProfile } from '@/lib/client';
+import { sql, awardDetail, awardCreditDetail, spendCredit, spendPoints, loyaltySummary, ensureProfile } from '@/lib/client';
 import { tierForMember, tierRulesFromProfile } from '@/lib/clientSlots';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { upravUtratu, dopocitejUtratu } from '@/lib/urovneDb';
@@ -102,18 +102,33 @@ export async function POST(req: NextRequest) {
   const jmeno = String(host?.name ?? `host ${cid}`);
   const duvod = note ? ` — ${note}` : '';
   // Stejným koncovým bodem se dá upravit i kredit — obsluha ho u kasy odečítá.
+  // Odečet jde přes atomické spendCredit / spendPoints: víc, než host má, odečíst nejde
+  // (dřív se zůstatek ořízl na nulu, ale do deníku se zapsal celý odečet, takže se rozešly).
   if (b.what === 'credit') {
     const mena = await menaPodniku(u.team_id);
     const mel = Number(m.credit) || 0;
     // Odepsat víc, než host má, nejde: dřív se zůstatek potichu ořízl na nulu a deník lhal.
-    if (delta < 0 && -delta > mel) return NextResponse.json({ error: `${jmeno} má kredit jen ${mena.money(mel)}, víc odepsat nejde.` }, { status: 409 });
-    const r = await awardCreditDetail(u.team_id, cid, delta, 'credit', null, note);
+    // Odečet jde přes atomické spendCredit, takže ani souběh dvou úprav nepřečerpá zůstatek.
+    const neniDost = () => NextResponse.json({ error: `${jmeno} má kredit jen ${mena.money(mel)}, víc odepsat nejde.` }, { status: 409 });
+    if (delta < 0 && -delta > mel) return neniDost();
+    let r: { credit: number; change: number };
+    if (delta < 0) {
+      const po = await spendCredit(u.team_id, cid, -delta, 'credit', null, note);
+      if (po == null) return neniDost();
+      r = { credit: po, change: delta };
+    } else r = await awardCreditDetail(u.team_id, cid, delta, 'credit', null, note);
     audit(u.team_id, u.id, 'client.credit', 'client', cid, `${jmeno}: ${r.change > 0 ? '+' : ''}${mena.money(r.change)} (${mena.money(mel)} → ${mena.money(r.credit)})${duvod}`);
     return NextResponse.json({ ok: true, credit: r.credit, change: r.change });
   }
   const mel = Number(m.points) || 0;
-  if (delta < 0 && -delta > mel) return NextResponse.json({ error: `${jmeno} má jen ${cisloCs(mel)} b., víc odepsat nejde.` }, { status: 409 });
-  const r = await awardDetail(u.team_id, cid, delta, 'manual', null, note);
+  const neniDost = () => NextResponse.json({ error: `${jmeno} má jen ${cisloCs(mel)} b., víc odepsat nejde.` }, { status: 409 });
+  if (delta < 0 && -delta > mel) return neniDost();
+  let r: { points: number; change: number };
+  if (delta < 0) {
+    const po = await spendPoints(u.team_id, cid, -delta, 'manual', null, note);
+    if (po == null) return neniDost();
+    r = { points: po, change: delta };
+  } else r = await awardDetail(u.team_id, cid, delta, 'manual', null, note);
   audit(u.team_id, u.id, 'client.points', 'client', cid, `${jmeno}: ${r.change > 0 ? '+' : ''}${r.change} b. (${mel} → ${r.points})${duvod}`);
   return NextResponse.json({ ok: true, points: r.points, change: r.change });
 }

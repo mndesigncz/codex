@@ -125,7 +125,9 @@ export default function ({ eq, ok }: Testy) {
 
   // ---- zdrojáky stránek: audit ----
   const soubory = ['components/client/ClientAdmin.tsx', 'components/client/StaffInbox.tsx', 'components/client/LoyaltyTabs.tsx', 'components/client/FloorPlanEditor.tsx',
-    'components/client/QrDesigner.tsx', 'components/client/CardScan.tsx', 'components/client/BrandTab.tsx', 'components/employer/EventsView.tsx', 'components/employer/ShareSettings.tsx'];
+    'components/client/QrDesigner.tsx', 'components/client/CardScan.tsx', 'components/client/BrandTab.tsx',
+    'components/client/loyalty/ClenoveSprava.tsx', 'components/client/loyalty/ClenoveDetail.tsx', 'components/client/loyalty/ClenoveHromadne.tsx', 'components/client/loyalty/ClenoveSkupiny.tsx',
+    'components/client/loyalty/ZpravyRozeslani.tsx', 'components/client/loyalty/ZpravyNahled.tsx', 'components/employer/EventsView.tsx', 'components/employer/ShareSettings.tsx'];
   for (const soubor of soubory) {
     const kod = bezKomentaru(precti(soubor));
     ok(`${soubor}: bez confirm() a prompt()`, !/\b(confirm|prompt)\(/.test(kod));
@@ -156,7 +158,8 @@ export default function ({ eq, ok }: Testy) {
   ok('ClientAdmin: souhrn (odznaky) se obnoví při změně záložky a periodicky', /minulaZalozka\.current = tab;\s*obnovSouhrn\(\)/.test(admin) && /setInterval\(\(\) => \{ if \(document\.visibilityState === 'visible'\) obnovSouhrn\(\)/.test(admin));
   ok('StaffInbox a widget Objednávky od stolu obnoví souhrn po změně objednávky', /onZmena\?\.\(\)/.test(precti('components/client/StaffInbox.tsx')) && /<StaffInbox onToast=\{t => oznam\(t\)\} onZmena=\{onZmena\} \/>/.test(admin)
     && /obnovDataWidgetu\('\/api\/client\/admin\/summary'\);\s*\}\s*\};\s*const vse = data\.data\?\.objednavky/.test(precti('components/widgety/oblasti/klient.tsx')));
-  ok('ClientAdmin: skupiny člena i bez vernost.zobrazit (deník bodů jen s ním)', /const rozbali = vidiDenik \|\| meniSkupiny/.test(admin) && /useLoad<any>\(vidiDenik \? /.test(admin));
+  const clenoveUi = precti('components/client/loyalty/ClenoveSprava.tsx');
+  ok('Členové: skupiny člena i bez vernost.zobrazit (deník bodů jen s ním)', /const rozbali = vidiDenik \|\| meniSkupiny/.test(clenoveUi) && /useLoad<any>\(vidiDenik \? /.test(precti('components/client/loyalty/ClenoveDetail.tsx')));
 
   for (const l of ['components/employer/EmployerLayout.tsx', 'components/employee/EmployeeLayout.tsx']) {
     ok(`${l}: spodní dok je sdílený Dock`, /<Dock /.test(precti(l)) && !/dock-strong|glass-strong mx-auto max-w-md/.test(precti(l)));
@@ -165,5 +168,5 @@ export default function ({ eq, ok }: Testy) {
   // ---- API ----
   ok('N13: /api/client/admin/summary filtruje podle oprávnění', /souhrnPodleOpravneni\(/.test(precti('app/api/client/admin/summary/route.ts')));
   const zakaznici = precti('app/api/client/admin/customers/route.ts');
-  ok('API členů: řazení a strop pro widget (?sort=&limit=), bez nich beze změny', /CASE WHEN \$\{podleNavstev\} THEN m\.visits END DESC/.test(zakaznici) && /Math\.min\(500/.test(zakaznici));
+  ok('API členů: řazení a limit pro widget (?sort=&limit=), strop stránky a stránkování', /normalizujRazeni\(params\.get\('sort'\)\)/.test(zakaznici) && /strankuj\(vybrani, params\.get\('offset'\), params\.get\('limit'\)\)/.test(zakaznici) && /STRANKA_MAX/.test(precti('lib/clenoveFiltr.ts')));
 }
