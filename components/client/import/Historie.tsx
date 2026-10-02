@@ -80,15 +80,15 @@ export default function Historie({ h, oznam, onVraceno }: { h: StavHistorie; ozn
     return (
       <ErrorState
         title={s.status === 403 ? 'K importu chybí oprávnění' : 'Historii se nepodařilo načíst'}
-        hint={s.status === 403 ? 'K importu chybí oprávnění „Import členů“. Požádejte vedení, ať vám ho přidá v nastavení rolí.' : s.zprava}
+        hint={s.status === 403 ? 'K importu chybí oprávnění „Import členů“. Požádej vedení, ať ti ho přidá v nastavení rolí.' : s.zprava}
         onRetry={s.status === 403 ? undefined : h.nacti} />
     );
   }
   if (h.nemigrovano) {
-    return <EmptyState icon="warning" title="Import zatím není připravený" hint="Databáze se ještě neaktualizovala pro import členů. Zkuste to za chvíli, případně dejte vědět podpoře." />;
+    return <EmptyState icon="warning" title="Import zatím není připravený" hint="Databáze se ještě neaktualizovala pro import členů. Zkus to za chvíli, případně dej vědět podpoře." />;
   }
   if (s.data.length === 0) {
-    return <EmptyState icon="inbox" title="Zatím žádný import" hint="Až nějaký členy do podniku přenesete, uvidíte ho tady a půjde vrátit." />;
+    return <EmptyState icon="inbox" title="Zatím žádný import" hint="Až nějaké členy do podniku přeneseš, uvidíš to tady a půjde to vrátit." />;
   }
 
   return (

@@ -65,7 +65,7 @@ export default function Prubeh({
           <div className={`h-full rounded-full transition-[width] duration-300 ${faze === 'chyba' ? 'bg-[#DC2626]' : 'bg-[#16181A]'}`} style={{ width: `${procent}%` }} />
         </div>
         {bezi && (
-          <p className="mt-2 text-xs text-black/50">Dávka {cislo(Math.min(cisloDavky, pocetDavek))} z {cislo(pocetDavek)}. Okno nezavírejte, dokud import neskončí.</p>
+          <p className="mt-2 text-xs text-black/50">Dávka {cislo(Math.min(cisloDavky, pocetDavek))} z {cislo(pocetDavek)}. Okno nezavírej, dokud import neskončí.</p>
         )}
       </div>
 
@@ -98,7 +98,7 @@ function Vysledek({ soucet, importId, onVratit, vraceno, zastaveno }: {
       )}
       {zastaveno && !vraceno && (
         <p role="status" className="rounded-2xl bg-[var(--wait-bg)] text-[var(--wait-ink)] p-3 text-sm text-pretty">
-          Import jste zastavili. Co se stihlo zapsat, zůstává. Můžete ho nechat, nebo vrátit odkazem níže.
+          Import jsi zastavil. Co se stihlo zapsat, zůstává. Můžeš to nechat, nebo vrátit odkazem níže.
         </p>
       )}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-5">
@@ -118,7 +118,7 @@ function Vysledek({ soucet, importId, onVratit, vraceno, zastaveno }: {
           <p className="font-medium text-[#16181A]">Plné karty</p>
           <p className="mt-1">
             {cislo(soucet.plneKarty)} {soucet.plneKarty === 1 ? 'člen měl' : 'členů mělo'} v souboru plnou kartu. Plná karta se ve výchozím zápisu uložila
-            jako rozdělaná zbytková část, odměna se automaticky nevydala. Tyto členy zkontrolujte ručně a odměnu případně dejte sami.
+            jako rozdělaná zbytková část, odměna se automaticky nevydala. Tyto členy zkontroluj ručně a odměnu případně dej sám.
           </p>
         </Well>
       )}
