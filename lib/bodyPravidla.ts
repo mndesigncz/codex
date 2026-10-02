@@ -379,6 +379,14 @@ export const POLE_PRAVIDEL = [
   'tier_by', 'silver_at', 'gold_at', 'platinum_at', 'silver_spend', 'gold_spend', 'platinum_spend',
 ] as const;
 
+/** Pole, která se dají uložit do konceptu: všechna pravidla z obrazovky Body a úrovně. */
+export const KLICE_KONCEPTU: readonly string[] = [
+  'points_per_100', 'cashback_pct', 'cashback_mode', 'birthday_points', 'referral_points', 'points_expire_days',
+  'silver_at', 'gold_at', 'platinum_at', 'tier_by', 'silver_spend', 'gold_spend', 'platinum_spend',
+  'member_discount', 'silver_discount', 'gold_discount', 'platinum_discount', 'reactivation_days', 'reactivation_points',
+  ...Object.keys(novaPolePravidel({})),
+];
+
 // ---- Rozdíl pravidel pro historii změn --------------------------------------
 
 type Popis = { pole: string; nazev: string; hodnota: (v: any, money: (n: number) => string) => string };
@@ -408,11 +416,14 @@ const POPISY_PRAVIDEL: Popis[] = [
   { pole: 'platinum_discount', nazev: 'Sleva platiny', hodnota: pct },
   { pole: 'tier_inactive_months', nazev: 'Snížení úrovně po neaktivitě', hodnota: v => (Number(v) > 0 ? `po ${Number(v)} měs.` : 'vypnuto') },
   { pole: 'points_cap_per_day', nazev: 'Strop bodů za den', hodnota: v => (Number(v) > 0 ? `${Number(v)} b.` : 'bez stropu') },
-  { pole: 'mult_silver', nazev: 'Násobič stříbro', hodnota: v => `${nasobicZProfilu(v)}×` },
-  { pole: 'mult_gold', nazev: 'Násobič zlato', hodnota: v => `${nasobicZProfilu(v)}×` },
-  { pole: 'mult_platinum', nazev: 'Násobič platina', hodnota: v => `${nasobicZProfilu(v)}×` },
+  { pole: 'mult_silver', nazev: 'Násobič stříbro', hodnota: v => `${String(nasobicZProfilu(v)).replace('.', ',')}×` },
+  { pole: 'mult_gold', nazev: 'Násobič zlato', hodnota: v => `${String(nasobicZProfilu(v)).replace('.', ',')}×` },
+  { pole: 'mult_platinum', nazev: 'Násobič platina', hodnota: v => `${String(nasobicZProfilu(v)).replace('.', ',')}×` },
   { pole: 'welcome_points', nazev: 'Uvítací body', hodnota: v => (Number(v) > 0 ? cisloTxt(v) : 'vypnuto') },
   { pole: 'credit_expire_days', nazev: 'Propadnutí kreditu', hodnota: v => (Number(v) > 0 ? `po ${Number(v)} dnech` : 'vypnuto') },
+  { pole: 'points_expire_days', nazev: 'Propadnutí bodů', hodnota: v => (Number(v) > 0 ? `po ${Number(v)} dnech` : 'nikdy') },
+  { pole: 'reactivation_days', nazev: 'Chybíš nám po', hodnota: v => (Number(v) > 0 ? `${Number(v)} dnech` : 'vypnuto') },
+  { pole: 'reactivation_points', nazev: 'Chybíš nám, body navíc', hodnota: v => vypnuto(v) },
 ];
 
 /** Hodnota pole pro porovnání: chybějící sloupec = výchozí hodnota, ať se u prvního uložení nehlásí falešná změna. */

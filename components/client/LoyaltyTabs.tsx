@@ -44,6 +44,7 @@ import { BodyDalsiPravidla, BodyNeaktivita, BodyNasobiceKredit } from './loyalty
 import { BodyNahled } from './loyalty/BodyNahled';
 import { BodyPrehledy } from './loyalty/BodyPrehledy';
 import BodyZdroje from './loyalty/BodyZdroje';
+import { KonceptPanel, VerzePravidel, useKoncept } from './loyalty/BodyKoncept';
 import { usePlan } from '../Pro';
 import { MAX_ONLY_MSG } from '@/lib/plan';
 import { validujPravidla, novaPolePravidel, MAX_PRAH_NAVSTEV, MAX_PRAH_UTRATY, MAX_BODU_ZA_100, MAX_CASHBACK_PCT } from '@/lib/bodyPravidla';
@@ -217,28 +218,38 @@ function BodyAUrovne({ toast, setUkladam }: { toast: (m: string) => void; setUkl
   // Chyby kontroly pravidel podle polí (stejná funkce jako na serveru); mažou se, jakmile se pole změní.
   const [chyby, setChyby] = useState<Record<string, string>>({});
   const { p, setP, reload: reloadProfile, error: profileError } = useProfile();
+  // Koncept pravidel a verze: rozpracovaný koncept se při otevření vrátí do formuláře.
+  const { stav: koncept, reload: reloadKoncept } = useKoncept();
+  const [konceptVeFormulari, setKonceptVeFormulari] = useState(false);
+  useEffect(() => {
+    if (koncept?.koncept && p && !konceptVeFormulari) { setKonceptVeFormulari(true); setP({ ...p, ...koncept.koncept }); }
+  }, [koncept, p, konceptVeFormulari, setP]);
   if (profileError) return <ErrorState title="Věrnost se nenačetla" onRetry={reloadProfile} detail={profileError} />;
   if (!p) return <Kostra />;
   const upravP = (n: any) => { setP(n); if (Object.keys(chyby).length) setChyby({}); };
+  const sestavTelo = (x: any) => ({
+    points_per_100: x.points_per_100, cashback_pct: x.cashback_pct, cashback_mode: x.cashback_mode, birthday_points: x.birthday_points, referral_points: x.referral_points, points_expire_days: x.points_expire_days,
+    silver_at: x.silver_at, gold_at: x.gold_at, platinum_at: x.platinum_at,
+    tier_by: x.tier_by === 'spend' ? 'spend' : 'visits', silver_spend: x.silver_spend, gold_spend: x.gold_spend, platinum_spend: x.platinum_spend,
+    member_discount: x.member_discount, silver_discount: x.silver_discount, gold_discount: x.gold_discount, platinum_discount: x.platinum_discount,
+    reactivation_days: x.reactivation_days ?? 0, reactivation_points: x.reactivation_points ?? 0,
+    ...novaPolePravidel(x),
+  });
+  // Po uložení konceptu, jeho použití nebo zahození se znovu načte profil i koncept; formulář se vrátí k tomu, co platí.
+  const poZmeneKonceptu = async () => { setKonceptVeFormulari(false); await reloadProfile(); await reloadKoncept(); };
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!meni) return;
     // Tarif se vysvětluje před uložením (poznámka nahoře, tlačítko je zhasnuté); tohle je jen pojistka.
     if (!maMax) { toast(MAX_ONLY_MSG); return; }
-    const telo = {
-      points_per_100: p.points_per_100, cashback_pct: p.cashback_pct, cashback_mode: p.cashback_mode, birthday_points: p.birthday_points, referral_points: p.referral_points, points_expire_days: p.points_expire_days,
-      silver_at: p.silver_at, gold_at: p.gold_at, platinum_at: p.platinum_at,
-      tier_by: p.tier_by === 'spend' ? 'spend' : 'visits', silver_spend: p.silver_spend, gold_spend: p.gold_spend, platinum_spend: p.platinum_spend,
-      member_discount: p.member_discount, silver_discount: p.silver_discount, gold_discount: p.gold_discount, platinum_discount: p.platinum_discount,
-      reactivation_days: p.reactivation_days ?? 0, reactivation_points: p.reactivation_points ?? 0,
-      ...novaPolePravidel(p),
-    };
+    const telo = sestavTelo(p);
     const ch = validujPravidla(telo);
     if (ch.length) { setChyby(Object.fromEntries(ch.map(c => [c.pole, c.text]))); toast(ch[0].text); return; }
     setUkladam(true);
     try {
       const r = await j('/api/client/admin/profile', { method: 'PUT', body: JSON.stringify(telo) });
       setP(r.profile); toast('Pravidla bodů, úrovně a slevy uloženy.');
+      void reloadKoncept();
     } catch (err) { toast(apiMessage(err, 'Uložení se nepovedlo.')); }
     setUkladam(false);
   };
@@ -269,6 +280,7 @@ function BodyAUrovne({ toast, setUkladam }: { toast: (m: string) => void; setUkl
       <form id={FORM_BODY} onSubmit={save} noValidate className="space-y-4">
         {!meni && <p className="note note-wait">Pravidla věrnosti tu jen vidíš — měnit je může, kdo má na starosti věrnostní program.</p>}
         {meni && !maMax && <p className="note note-wait" role="status">Pravidla věrnosti jde ukládat jen v plánu Max, takže tlačítko Uložit je zhasnuté. Plán změníš v Nastavení → Předplatné.</p>}
+        {koncept && <KonceptPanel stav={koncept} telo={sestavTelo(p)} meni={meni} maMax={maMax} toast={toast} onZmena={poZmeneKonceptu} />}
         <Card className="space-y-4">
           <div>
             <h2 className="t-card">Za co host dostane body</h2>
@@ -359,6 +371,7 @@ function BodyAUrovne({ toast, setUkladam }: { toast: (m: string) => void; setUkl
         <BodyNeaktivita p={p} setP={upravP} meni={meni} chyby={chyby} />
         <BodyNasobiceKredit p={p} setP={upravP} meni={meni} chyby={chyby} />
       </form>
+      {koncept && <VerzePravidel stav={koncept} />}
       <BodyZdroje toast={toast} />
       {ma('zakaznici.zobrazit') && <ClenoveSkupiny toast={toast} />}
     </div>

@@ -58,7 +58,7 @@ const podvrh = (req, json, stav) => {
       if (url.searchParams.get('prehled') === '1') return json({
         prehled: { zavazek: 3150, pocetPlatnych: 2, propadlo: 800, pocetPropadlych: 1, brzyPropadne: { pocet: 1, castka: 150 }, vJineMene: 0, brzyDni: 30 },
         mesice: Array.from({ length: 12 }, (_, i) => { const d = new Date(Date.UTC(Number(DNES.slice(0, 4)), Number(DNES.slice(5, 7)) - 1 - (11 - i), 1)); return { mesic: d.toISOString().slice(0, 7), prodano: i === 11 ? 1800 : i === 9 ? 500 : 0, pocetProdanych: i === 11 ? 3 : i === 9 ? 1 : 0, uplatneno: i === 11 ? 350 : 0, vraceno: 0, cistoUplatneno: i === 11 ? 350 : 0 }; }),
-        limity: { min: 0, max: 0 }, currency: 'CZK', dnes: DNES });
+        limity: { min: 0, max: 0 }, nastaveni: { minUtrata: 0, bodyZaNakup: 0 }, poukazBezBodu: false, currency: 'CZK', dnes: DNES });
       if (url.searchParams.get('nahled') === 'prodlouzeni') return json({ pocet: 2, castka: 950 });
       if (id) { const p = POUKAZY.find(x => x.id === Number(id)); return p ? json({ poukaz: p.id === 2 ? { ...p, balance: s.zustatek, stav: s.zustatek > 0 ? 'active' : 'used' } : p, historie: p.id === 2 ? HISTORIE : [] }) : json({ error: 'Poukaz nenalezen.' }, 404); }
       const q = (url.searchParams.get('q') ?? '').toLowerCase();
@@ -118,7 +118,8 @@ async function sprava(viewport, mobil) {
   tvrdi(`${jm} prodloužení: PATCH extend s doDne a novou platností`, s_pk(p, stav).patche.some(x => x.action === 'extend' && x.validUntil && x.doDne));
   await p.getByLabel(/Nejmenší uplatnění/).fill('50');
   await p.getByLabel(/Největší uplatnění/).fill('500');
-  await p.getByRole('button', { name: 'Uložit nastavení' }).click();
+  // Od W6 jsou na stránce dva formuláře s tlačítkem „Uložit nastavení“ (Uplatnění u kasy, Útrata a body).
+  await p.getByRole('form', { name: 'Uplatnění u kasy' }).getByRole('button', { name: 'Uložit nastavení' }).click();
   await p.waitForTimeout(300);
   tvrdi(`${jm} nastavení uplatnění: PATCH limits`, s_pk(p, stav).patche.some(x => x.action === 'limits' && x.min === 50 && x.max === 500));
 

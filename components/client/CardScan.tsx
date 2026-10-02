@@ -26,6 +26,7 @@ import { useMoney, useSymbol } from '../CurrencyProvider';
 import { czCount, type CzNoun } from '@/lib/czech';
 import { rozpoznejQr } from '@/lib/kuponQr';
 import OdkazCtecka from './OdkazCtecka';
+import KuponUplatnitOkno from './loyalty/KuponUplatnitOkno';
 import { useKlicAkce, hlavickyAkce, UpozorneniRazitek, RazitkoKarty, RucniPolozky, StornoRazitek } from './loyalty/RazitkaKasa';
 
 const NAVSTEVA: CzNoun = { one: 'návštěva', few: 'návštěvy', many: 'návštěv' };
@@ -53,6 +54,8 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
   const [upoz, setUpoz] = useState<{ expiredCount?: number; lost?: number } | null>(null);
   // Náhled kuponu z QR nebo kódu, který obsluha ještě neuplatnila.
   const [cp, setCp] = useState<any | null>(null);
+  // Uplatnění jde přes okno s náhledem (útrata, varování, ověření věku): KuponUplatnitOkno.
+  const [uplatnuji, setUplatnuji] = useState<{ kod: string; zNahledu: boolean } | null>(null);
   // Nativní skener z obalu (window.manageroNative, components/NativeBridge): na iPhonu
   // BarcodeDetector není, nativní ML Kit skener ano. Most se nahlásí až po hydrataci.
   const [nativni, setNativni] = useState(false);
@@ -87,18 +90,7 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
     } catch (e: any) { setErr(e.message); }
     setBusy('');
   };
-  const redeemPreview = async () => {
-    if (!cp) return;
-    setBusy('redeem:preview'); setErr('');
-    try {
-      const r = await fetch('/api/client/admin/redeem', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: cp.code }) });
-      const x = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(x.error || 'Nepovedlo se.');
-      onToast(`Uplatněno: ${x.title}${x.benefit ? ` (${x.benefit})` : ''}.${x.badges?.length ? ` Zkontroluj: ${x.badges.join(', ')}.` : ''}`);
-      setCp(null); setCode(''); onChange?.();
-    } catch (e: any) { setErr(e.message); }
-    setBusy('');
-  };
+  const redeemPreview = () => { if (cp) setUplatnuji({ kod: cp.code, zNahledu: true }); };
 
   const lookup = async (c: string) => {
     const norm = c.replace(/[^A-Z0-9]/g, '');
@@ -134,17 +126,7 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
     }
     setBusy('');
   };
-  const redeem = async (couponCode: string) => {
-    setBusy('redeem:' + couponCode); setErr('');
-    try {
-      const r = await fetch('/api/client/admin/redeem', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: couponCode }) });
-      const x = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(x.error || 'Nepovedlo se.');
-      onToast(`Uplatněno: ${x.title}${x.benefit ? ` (${x.benefit})` : ''}.${x.badges?.length ? ` Zkontroluj: ${x.badges.join(', ')}.` : ''}`);
-      setHit((h: any) => ({ ...h, openCoupons: (h.openCoupons ?? []).filter((c: any) => c.code !== couponCode) }));
-    } catch (e: any) { setErr(e.message); }
-    setBusy('');
-  };
+  const redeem = (couponCode: string) => setUplatnuji({ kod: couponCode, zNahledu: false });
   const reset = () => { setHit(null); setCp(null); setCode(''); setErr(''); setAmount(''); setBill(null); setPredplaceno(''); setUctenka(''); setUpoz(null); };
 
   return (
@@ -175,7 +157,7 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
           )}
           {cp.problem && <p role="alert" className="note note-danger">{cp.problem}</p>}
           <div className="flex gap-2 flex-wrap">
-            <Button variant="primary" icon="check" loading={busy === 'redeem:preview'} disabled={!cp.usable} onClick={redeemPreview}>Uplatnit</Button>
+            <Button variant="primary" icon="check" disabled={!cp.usable} onClick={redeemPreview}>Uplatnit</Button>
             <Button variant="secondary" onClick={reset}>Zrušit</Button>
           </div>
         </div>
@@ -274,7 +256,7 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
               <ul className="list">
                 {hit.openCoupons.map((c: any) => (
                   <ListRow key={c.code} title={c.title} meta={<span className="font-mono">{c.code}</span>}
-                    actions={<Button size="sm" variant="secondary" loading={busy === 'redeem:' + c.code} onClick={() => redeem(c.code)}>Uplatnit</Button>} />
+                    actions={<Button size="sm" variant="secondary" onClick={() => redeem(c.code)}>Uplatnit</Button>} />
                 ))}
               </ul>
             </div>
@@ -283,6 +265,14 @@ export default function CardScan({ onToast, onChange }: { onToast: (m: string) =
       )}
       {cam && !hit && !cp && rezim === 'karta' && <Camera onCode={c => { setCam(false); void resolve(c); }} onForeign={() => setErr('Tohle není QR z Managera (kartička ani kupon). Zkus jiný.')} onError={m => { setCam(false); setErr(m); }} />}
       {err && rezim === 'karta' && <p role="alert" className="note note-danger">{err}</p>}
+      {uplatnuji && (
+        <KuponUplatnitOkno kod={uplatnuji.kod} onZavrit={() => setUplatnuji(null)}
+          onHotovo={m => {
+            onToast(m);
+            if (uplatnuji.zNahledu) { setCp(null); setCode(''); onChange?.(); }
+            else setHit((h: any) => ({ ...h, openCoupons: (h.openCoupons ?? []).filter((c: any) => c.code !== uplatnuji.kod) }));
+          }} />
+      )}
     </Well>
   );
 }

@@ -17,6 +17,7 @@ import {
 import { pragueToday } from '@/lib/pragueTime';
 import { menaPodniku } from '@/lib/menaPodniku';
 import { teamIsMax, MAX_ONLY_MSG } from '@/lib/planServer';
+import { zapisVerzi } from '@/lib/pravidlaVerze';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -228,7 +229,11 @@ export async function PUT(req: NextRequest) {
   }
   // Verze pravidel: co se změnilo, před → po, v historii změn.
   const zmeny = popisZmenyPravidel(cur, pFinal, (await menaPodniku(u.team_id)).money);
-  if (zmeny.length) audit(u.team_id, u.id, 'client.pravidla', 'client', null, vetaZmenPravidel(zmeny));
+  if (zmeny.length) {
+    audit(u.team_id, u.id, 'client.pravidla', 'client', null, vetaZmenPravidel(zmeny));
+    // Verze pravidel: přímé uložení i použití konceptu (ten posílá `_verze` s poznámkou).
+    await zapisVerzi(u.team_id, u.id, zmeny, b?._verze?.zdroj === 'koncept' ? 'koncept' : 'form', b?._verze?.poznamka);
+  }
   audit(u.team_id, u.id, 'client.profile', 'client', null, pFinal.enabled ? `zapnuto · /client/${pFinal.slug}` : 'vypnuto');
   return NextResponse.json({ ok: true, profile: pFinal, public: publicProfile({ ...pFinal, team_name: '', opening_hours: {} }), url: `${origin(req)}/client/${pFinal.slug}` });
 }

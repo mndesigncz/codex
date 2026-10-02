@@ -5,7 +5,7 @@
 //     další (nová) akce po úspěchu klíč jiný.
 //  R2 Odpověď s expiredCount a lost ukáže upozornění „Rozdělaná karta hosta vypršela“.
 //  R3 Ruční položky: klepnutí na položky → „Připsat razítka“ → POST action items s položkami a množstvím.
-//  R4 Storno poslední akce: tlačítko, potvrzení v okně, POST action storno.
+//  R4 Storno poslední akce: tlačítko, potvrzení v okně, POST action undo (jediné storno u kasy: razítka, body i kredit z té akce).
 //  R5 Karta mimo okno platnosti ukáže důvod; účtenka, která už věrnost připsala, je zablokovaná.
 //  R6 390 px bez vodorovného scrollu.
 //   SONDY_ZAKLAD=http://localhost:3414 node scripts/sondy/razitka-kasa.mjs
@@ -89,11 +89,11 @@ tvrdi('R1: nová akce má jiný klíč než předchozí', !!items?.klic && items
 await p.getByRole('button', { name: 'Storno poslední akce' }).click();
 tvrdi('R4: storno se ptá na potvrzení', await p.getByRole('button', { name: 'Stornovat' }).isVisible());
 await p.getByRole('button', { name: 'Ne, nechat' }).click();
-tvrdi('R4: „Ne, nechat“ nic neposlala', !zaznam.some(z => z.action === 'storno'));
+tvrdi('R4: „Ne, nechat“ nic neposlala', !zaznam.some(z => z.action === 'undo'));
 await p.getByRole('button', { name: 'Storno poslední akce' }).click();
 await p.getByRole('button', { name: 'Stornovat' }).click();
 await p.locator('[data-testid="ctecka-potvrzeni"]').waitFor({ timeout: 3000 });
-tvrdi('R4: POST storno', zaznam.some(z => z.action === 'storno'));
+tvrdi('R4: POST undo', zaznam.some(z => z.action === 'undo'));
 tvrdi('bez chyb v konzoli', chyby.length === 0, chyby.slice(0, 2).join(' | '));
 await ctx.close();
 await konec();

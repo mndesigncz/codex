@@ -107,7 +107,9 @@ export default function MyPage() {
                           <div className="flex gap-1" aria-label={t('{name}: {stamps} z {required} razítek', { name: cp.name, stamps: cp.stamps, required: cp.required })}>
                             {Array.from({ length: Math.min(cp.required, 12) }).map((_, i) => <span key={i} className={`h-2 flex-1 rounded-full ${i < cp.stamps ? 'bg-[#C8F542]' : 'bg-black/[0.08]'}`} />)}
                           </div>
-                          <p className="text-xs text-black/55 mt-1.5 tabular-nums">{cp.name} · {cp.stamps}/{cp.required}{cp.reward ? ` · ${cp.reward}` : ''}{cp.expired ? ` · ${t('karta vypršela')}` : ''}</p>
+                          <p className="text-xs text-black/55 mt-1.5 tabular-nums">{cp.name} · {cp.stamps}/{cp.required}{cp.reward ? ` · ${cp.reward}` : ''}</p>
+                          {cp.expired && <p role="status" className="mt-1 text-xs font-semibold text-wait-ink">{t('Rozdělaná karta vypršela, {n, plural, one {# razítko propadlo} few {# razítka propadla} other {# razítek propadlo}}. Další razítko začne novou kartu.', { n: cp.expiredStamps })}</p>}
+                          {!cp.expired && cp.finishBy && cp.stamps > 0 && <p className="mt-1 text-xs text-wait-ink">{cp.daysLeft === 0 ? t('Dosbírej kartu dnes, jinak razítka propadnou.') : t('Dosbírej kartu do {datum}, jinak razítka propadnou.', { datum: denCesky(cp.finishBy, jazyk) })}</p>}
                         </div>
                       ))}
                     </div>

@@ -101,23 +101,23 @@ for (const [sirka, mobil] of [[1280, false], [390, true]]) {
   await p.waitForTimeout(300);
   tvrdi(`${jmeno} duplikace: POST akce duplicate`, stav.w1.akce.some(a => a.action === 'duplicate' && a.id === 1), JSON.stringify(stav.w1.akce));
 
-  // Editor: nová pole, validace, náhled
+  // Editor (jeden sjednocený KampanEditor): nová pole, validace, náhled
   await p.getByRole('button', { name: 'Nová kartička' }).click();
-  await p.getByText('Kdy se razítko dává').waitFor();
+  await p.getByText('Kdy platí', { exact: true }).waitFor();
   const ed = await p.locator('[data-plocha]').innerText();
-  tvrdi(`${jmeno} editor: dny, hodiny, limity, stav a náhled pro hosta`, ['Kdy se razítko dává', 'Nejvýš karet na hosta', 'Razítek denně na hosta', 'Stav kartičky', 'Náhled pro hosta'].every(t => ed.includes(t)));
-  const uloz = p.getByRole('button', { name: 'Založit kartičku' });
+  tvrdi(`${jmeno} editor: dny, hodiny, limity a náhled pro hosta`, ['Kdy platí', 'Karet na hosta', 'Razítek za den', 'Uložit jako koncept', 'Náhled pohledem hosta'].every(t => ed.includes(t)));
+  const uloz = p.getByRole('button', { name: 'Založit a spustit' });
   tvrdi(`${jmeno} editor: bez názvu je vidět důvod a tlačítko je zakázané`, await uloz.isDisabled() && ed.includes('Zadej název kampaně.'));
-  await p.getByLabel('Název').fill('Test kartička');
-  await p.getByLabel('Od hodiny').fill('08:00');
+  await p.getByLabel('Název', { exact: true }).fill('Test kartička');
+  await p.getByLabel('Hodiny od').fill('08:00');
   tvrdi(`${jmeno} editor: jen jedna hodina → varování a zakázané ukládání`, await uloz.isDisabled() && (await p.locator('[data-plocha]').innerText()).includes('obě'));
-  await p.getByLabel('Do hodiny').fill('11:00');
+  await p.getByLabel('Hodiny do').fill('11:00');
   await p.getByRole('button', { name: 'Pá', exact: true }).click();
   tvrdi(`${jmeno} editor: po opravě jde uložit`, await uloz.isEnabled());
   tvrdi(`${jmeno} editor: náhled ukazuje okno „pá, 08:00–11:00“`, (await p.locator('[data-plocha]').innerText()).includes('pá, 08:00–11:00'));
   tvrdi(`${jmeno} editor: bez vodorovného přetečení`, await bezPreteceni(p));
   await p.screenshot({ path: `${OUT}w1-editor-${jmeno}.png`, fullPage: true });
-  await p.getByLabel('Razítek denně na hosta').fill('2');
+  await p.getByLabel('Razítek za den').fill('2');
   await uloz.click();
   await p.waitForTimeout(400);
   const post = stav.w1.stamps.at(-1);

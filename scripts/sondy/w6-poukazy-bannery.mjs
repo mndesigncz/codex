@@ -91,7 +91,7 @@ for (const sirka of [390, 1280]) {
     ],
     memberships: (me.memberships ?? []).map((m, i) => i === 0 ? {
       ...m, expiring: { points: 40, till: '2026-10-20' },
-      campaigns: [{ id: 1, name: 'Osmá káva zdarma', required: 8, reward: 'Káva zdarma', stamps: 0, completed: 0, expiresAt: null, expiredCount: 5, expiredAt: '2026-10-01' }],
+      campaigns: [{ id: 1, name: 'Osmá káva zdarma', required: 8, reward: 'Káva zdarma', stamps: 0, completed: 0, expired: true, expiredStamps: 5, finishBy: null, daysLeft: null }],
     } : m),
   };
   await ctx.addCookies([{ name: 'next-auth.session-token', value: tokenPro('customer'), domain: 'localhost', path: '/', httpOnly: true, sameSite: 'Lax' }]);
@@ -112,7 +112,7 @@ for (const sirka of [390, 1280]) {
   const t = await p.locator('body').innerText();
   tvrdi(`${L}: poukaz s kódem, zůstatkem a platností`, /DP-ABCD-2345/.test(t) && /Zůstatek\s*300/.test(t) && /platí do/.test(t), t.slice(0, 400));
   tvrdi(`${L}: vyčerpaný poukaz zůstává vidět se stavem`, /Vyčerpaný/.test(t));
-  tvrdi(`${L}: propadlá razítková karta`, /Karta vypršela a razítka propadla \(5\)/.test(t), t.slice(0, 600));
+  tvrdi(`${L}: propadlá razítková karta`, /Rozdělaná karta vypršela, 5 razítek propadlo/.test(t), t.slice(0, 600));
   tvrdi(`${L}: body, které brzy propadnou`, /40 bodů propadne do/.test(t));
   tvrdi(`${L}: bez vodorovného scrollu`, await bezPreteceni(p));
   // Odebrání z aplikace: nejdřív potvrzení, teprve pak zápis.

@@ -1933,6 +1933,22 @@ export async function GET(request: Request) {
         UNIQUE (team_id, kind, customer_id, ref)
       )`);
     await ddl(sql`CREATE INDEX IF NOT EXISTS client_automatizace_log_team ON client_automatizace_log (team_id, created_at)`);
+    // Koncept a verze pravidel věrnosti. Stejné příkazy jsou v lib/pravidlaVerze.ts.
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS loyalty_draft JSONB`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS loyalty_draft_at TIMESTAMP`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS rules_version INTEGER NOT NULL DEFAULT 1`);
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS client_pravidla_verze (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        version INTEGER NOT NULL,
+        changed_by INTEGER,
+        source TEXT NOT NULL DEFAULT 'form',
+        note TEXT,
+        changes JSONB NOT NULL DEFAULT '[]'::jsonb,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE (team_id, version)
+      )`);
     // Profil podniku v Nastavení: IČO a DIČ (volitelné).
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS ico TEXT`);
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS dic TEXT`);

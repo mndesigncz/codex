@@ -30,7 +30,7 @@ const HOST = {
   ],
   me: {
     member: true, points: 320, stamps: 6, visits: 18, credit: 0, level: 'silver', levelLabel: 'Stříbrný', discount: 5,
-    campaigns: [{ id: 1, name: 'Osmá káva zdarma', description: '', required: 8, reward: 'Káva zdarma', stamps: 6, completed: 0, expiresAt: plus(DNES, 25) }],
+    campaigns: [{ id: 1, name: 'Osmá káva zdarma', description: '', required: 8, reward: 'Káva zdarma', stamps: 6, completed: 0, expired: false, expiredStamps: 0, finishBy: plus(DNES, 25), daysLeft: 25 }],
     claims: [{ id: 5, code: 'ABC-123', claimed_at: `${DNES}T09:00:00Z`, redeemed_at: null, title: 'Káva zdarma', valid_until: plus(DNES, 3) }],
     reservations: [],
   },
@@ -72,7 +72,7 @@ for (const sirka of [390, 1280]) {
   tvrdi(`${L}: kupon, který brzy končí, má „Vyprší za 3 dny“`, /Vyprší za 3 dny/.test(text), text.slice(0, 200));
   tvrdi(`${L}: vyzvednutý kupon má platnost`, (text.match(/Vyprší za 3 dny/g) ?? []).length >= 2);
   tvrdi(`${L}: dálku platnosti ukáže jako „Platí do“`, /Platí do/.test(text));
-  tvrdi(`${L}: kdy karta vyprší`, /Dosbírej do/.test(text));
+  tvrdi(`${L}: kdy karta vyprší`, /Dosbírej kartu do/.test(text));
   tvrdi(`${L}: „Jak získat body a odměny“`, /jak získat body a odměny/i.test(text) && /Za každých 100\s*Kč útraty dostaneš 10 bodů/.test(text) && /Na narozeniny dostaneš 50 bodů/.test(text), text.slice(-900));
   tvrdi(`${L}: bez vodorovného scrollu`, await bezPreteceni(p));
   tvrdi(`${L}: historie se bez rozbalení nestahuje`, historie.length === 0, JSON.stringify(historie));

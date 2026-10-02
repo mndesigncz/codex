@@ -18,12 +18,13 @@ import { Button, Chip, Input, ListRow, Segmented, Well } from '../ui';
 import { useOpravneni } from '../role/useOpravneni';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 import { czCount, type CzNoun } from '@/lib/czech';
-import { ApiError, okJson, apiMessage, isOffline } from '@/lib/api';
+import { ApiError, okJson, apiMessage, isOffline, statusMessage } from '@/lib/api';
 import {
   rozpoznejKod, ocistiVstupCtecky, jeDvojitySken, psalaCtecka, pridejDoHistorie, navratSekundy, navratPopisek,
   poslediNavsteva, NAVRAT_MOZNOSTI, type ZaznamHistorie,
 } from '@/lib/ctecka';
 import { formatujPriPsani } from '@/lib/poukazy';
+import KuponUplatnitOkno from './loyalty/KuponUplatnitOkno';
 import { useKlicAkce, hlavickyAkce, UpozorneniRazitek, RazitkoKarty, RucniPolozky, StornoRazitek } from './loyalty/RazitkaKasa';
 
 const NAVSTEVA: CzNoun = { one: 'návštěva', few: 'návštěvy', many: 'návštěv' };
@@ -68,6 +69,8 @@ export default function CteckaKasa() {
   const [potvrzeni, setPotvrzeni] = useState<{ text: string; ok: boolean } | null>(null);
   const [historie, setHistorie] = useState<ZaznamHistorie[]>([]);
   const [busy, setBusy] = useState('');
+  // Kupon s varováním (min. útrata, 18+) se dokončí v okně KuponUplatnitOkno.
+  const [uplatnuji, setUplatnuji] = useState<{ kod: string; jen: boolean } | null>(null);
   const [castka, setCastka] = useState('');
   const [poukazCastka, setPoukazCastka] = useState('');
   const [rucne, setRucne] = useState('');
@@ -321,7 +324,11 @@ export default function CteckaKasa() {
   const uplatniKupon = async (kod: string, jenPoukazanyKupon = false) => {
     setBusy('kupon:' + kod);
     try {
-      const x = await fetch('/api/client/admin/redeem', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: kod }) }).then(okJson);
+      const r = await fetch('/api/client/admin/redeem', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: kod }) });
+      const x = await r.json().catch(() => ({}));
+      // Kupon s varováním (útrata pod minimem, 18+) se dokončí v okně, kde obsluha varování uvidí a potvrdí.
+      if (r.status === 409 && x.needsConfirm === true) { setUplatnuji({ kod, jen: jenPoukazanyKupon }); setBusy(''); return; }
+      if (!r.ok) throw new ApiError(r.status, typeof x.error === 'string' && x.error ? x.error : statusMessage(r.status));
       const text = `Uplatněno: ${x.title}${x.benefit ? ` (${x.benefit})` : ''}.${x.badges?.length ? ` Zkontroluj: ${x.badges.join(', ')}.` : ''}`;
       if (jenPoukazanyKupon) setFaze({ druh: 'ceka' });
       else setFaze(f => f.druh === 'host' ? { ...f, data: { ...f.data, openCoupons: (f.data.openCoupons ?? []).filter((c: any) => c.code !== kod) } } : f);
@@ -580,6 +587,14 @@ export default function CteckaKasa() {
             ))}
           </ul>
         </div>
+      )}
+      {uplatnuji && (
+        <KuponUplatnitOkno kod={uplatnuji.kod} onZavrit={() => { setUplatnuji(null); pole.current?.focus(); }}
+          onHotovo={text => {
+            if (uplatnuji.jen) setFaze({ druh: 'ceka' });
+            else setFaze(f => f.druh === 'host' ? { ...f, data: { ...f.data, openCoupons: (f.data.openCoupons ?? []).filter((c: any) => c.code !== uplatnuji.kod) } } : f);
+            ohlas(text, true); zapis(text, true);
+          }} />
       )}
     </div>
   );

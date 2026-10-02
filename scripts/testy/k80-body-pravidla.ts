@@ -74,7 +74,7 @@ export default function ({ eq, ok }: Testy) {
   eq('validace: uvítací body mají meze', chyby({ welcome_points: 1001 }), ['welcome_points']);
   eq('validace: propadnutí kreditu pod 7 dní je chyba, 0 je vypnuto', [chyby({ credit_expire_days: 6 }), chyby({ credit_expire_days: 0 }), chyby({ credit_expire_days: 90 })], [['credit_expire_days'], [], []]);
   ok('formulář: nová pole jdou do PUT', ['points_cap_per_day', 'mult_gold', 'welcome_points', 'credit_expire_days', 'points_exclude_sections'].every(k => k in novaPolePravidel({})));
-  ok('historie změn: nová pole mají popisek před → po', popisZmenyPravidel({ mult_gold: 1, credit_expire_days: 0 }, { mult_gold: 1.5, credit_expire_days: 90 }, money).join(';') === 'Násobič zlato: 1× → 1.5×;Propadnutí kreditu: vypnuto → po 90 dnech');
+  ok('historie změn: nová pole mají popisek před → po', popisZmenyPravidel({ mult_gold: 1, credit_expire_days: 0 }, { mult_gold: 1.5, credit_expire_days: 90 }, money).join(';') === 'Násobič zlato: 1× → 1,5×;Propadnutí kreditu: vypnuto → po 90 dnech');
 
   // ---- propadání kreditu ----
   const D = '2026-10-01';
