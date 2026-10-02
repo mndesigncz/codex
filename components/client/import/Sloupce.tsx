@@ -32,7 +32,7 @@ export default function Sloupce({ hlavicka, radky, sloupcePole, onPole }: {
   return (
     <div className="space-y-5 min-w-0">
       <p className="text-sm text-black/65 text-pretty">
-        Zkontrolujte, co je který sloupec. Navrhli jsme to podle názvů; co nepoznáme, nastavíte jedním výběrem.
+        Zkontroluj, co je který sloupec. Navrhli jsme to podle názvů; co nepoznáme, nastavíš jedním výběrem.
         Povinný je jen e-mail.
       </p>
 

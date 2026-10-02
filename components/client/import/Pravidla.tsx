@@ -1,133 +1,75 @@
 'use client';
 
-// Krok 4 (nepovinný): opsat staré pravidlo věrnosti. Kartička pravidla exportovat neumí, takže je podnik
-// opíše sám. Ukládá se jedním PUT na /api/client/admin/profile, jen s políčky, která člověk zapnul
-// (route sama doplní zbytek profilu z uložených hodnot, takže nic dalšího se nepřepíše).
+// Krok 4 (nepovinný): převzít pravidla věrnosti. Kartička pravidla exportovat neumí, takže si je správce
+// přepíše sám. Formulář je předvyplněný ze současného profilu podniku; uloží se jedním PUT na
+// /api/client/admin/profile a jen se změněnými poli (route zbytek profilu nechá). Pod formulářem je
+// seznam toho, co se musí přenést ručně, s odkazy na příslušné části administrace.
 
-import { useCallback, useState, type ReactNode } from 'react';
-import { Button, ErrorState, Input, Label, Select, Skeleton } from '../../ui';
+import { useCallback, useRef, useState } from 'react';
+import { Button, ErrorState, Field, Input, Skeleton } from '../../ui';
 import { Icon } from '../../Icons';
 import { useSymbol } from '../../CurrencyProvider';
+import { useOpravneni } from '../../role/useOpravneni';
+import {
+  chybaPravidla, formularZProfilu, maChybuPravidel, MAX_ODMENA, POLE_PRAVIDEL, RUCNI_PRENOS, telaZmen,
+  type FormularPravidel, type KlicPravidla,
+} from '@/lib/importKartickaPravidla';
 import { ChybaApi, j, zprava, type StavNacteni } from './typy';
-
-type KlicPravidla =
-  | 'cashback_pct' | 'cashback_mode' | 'points_per_100' | 'birthday_points'
-  | 'silver_at' | 'gold_at' | 'platinum_at'
-  | 'member_discount' | 'silver_discount' | 'gold_discount' | 'platinum_discount';
-
-interface DefPole {
-  klic: KlicPravidla; popis: string; min: number; max: number; vychozi: string; napoveda?: string; jednotka?: string;
-}
-
-const SKUPINY: { nazev: string; popis?: string; pole: (DefPole | 'rezim')[] }[] = [
-  {
-    nazev: 'Cashback a body',
-    pole: [
-      { klic: 'cashback_pct', popis: 'Cashback v %', min: 0, max: 50, vychozi: '5', jednotka: '%', napoveda: 'Kolik procent z útraty se vrací.' },
-      'rezim',
-      { klic: 'points_per_100', popis: 'Body za 100 {m}', min: 0, max: 100, vychozi: '10', napoveda: '0 = body za útratu nedávat.' },
-      { klic: 'birthday_points', popis: 'Body k narozeninám', min: 0, max: 1000, vychozi: '50', napoveda: '0 = nedávat.' },
-    ],
-  },
-  {
-    nazev: 'Úrovně podle počtu návštěv',
-    popis: 'U nás se úroveň počítá z počtu návštěv člena, ne z utracené částky.',
-    pole: [
-      { klic: 'silver_at', popis: 'Stříbrná od návštěv', min: 1, max: 500, vychozi: '10' },
-      { klic: 'gold_at', popis: 'Zlatá od návštěv', min: 2, max: 1000, vychozi: '25' },
-      { klic: 'platinum_at', popis: 'Platinová od návštěv', min: 0, max: 2000, vychozi: '50', napoveda: '0 = platinovou úroveň nepoužívat.' },
-    ],
-  },
-  {
-    nazev: 'Sleva podle úrovně',
-    pole: [
-      { klic: 'member_discount', popis: 'Sleva člena', min: 0, max: 90, vychozi: '0', jednotka: '%' },
-      { klic: 'silver_discount', popis: 'Sleva stříbrné', min: 0, max: 90, vychozi: '3', jednotka: '%' },
-      { klic: 'gold_discount', popis: 'Sleva zlaté', min: 0, max: 90, vychozi: '5', jednotka: '%' },
-      { klic: 'platinum_discount', popis: 'Sleva platinové', min: 0, max: 90, vychozi: '10', jednotka: '%' },
-    ],
-  },
-];
-
-const VSECHNA_POLE: DefPole[] = SKUPINY.flatMap(s => s.pole.filter((p): p is DefPole => p !== 'rezim'));
-
-interface Zapis { zapnuto: boolean; hodnota: string }
-type Formular = Record<KlicPravidla, Zapis>;
-
-const vychoziFormular = (): Formular => {
-  const f = {} as Formular;
-  for (const p of VSECHNA_POLE) f[p.klic] = { zapnuto: false, hodnota: p.vychozi };
-  f.cashback_mode = { zapnuto: false, hodnota: 'credit' };
-  return f;
-};
-
-/** Chyba pole, nebo null. Vyplněné, ale nezapnuté pole se nekontroluje. */
-function chybaPole(f: Formular, p: DefPole): string | null {
-  const z = f[p.klic];
-  if (!z.zapnuto) return null;
-  const t = z.hodnota.trim();
-  if (!/^\d+$/.test(t)) return 'Zadejte celé číslo.';
-  const n = Number(t);
-  if (n < p.min || n > p.max) return `Povoleno ${p.min} až ${p.max}.`;
-  if (p.klic === 'gold_at' && f.silver_at.zapnuto && /^\d+$/.test(f.silver_at.hodnota) && n <= Number(f.silver_at.hodnota)) return 'Zlatá musí být výš než stříbrná.';
-  if (p.klic === 'platinum_at' && n > 0 && f.gold_at.zapnuto && /^\d+$/.test(f.gold_at.hodnota) && n <= Number(f.gold_at.hodnota)) return 'Platinová musí být výš než zlatá.';
-  return null;
-}
 
 export interface StavPravidel {
   profil: StavNacteni<Record<string, unknown>>;
-  formular: Formular;
-  nastav: (klic: KlicPravidla, cast: Partial<Zapis>) => void;
+  /** null, dokud se profil nenačetl a formulář nemá co předvyplnit. */
+  formular: FormularPravidel | null;
+  nastav: (klic: KlicPravidla, hodnota: string) => void;
   nacti: () => void;
   uloz: () => Promise<boolean>;
   uklada: boolean;
   chyba: string | null;
   ulozeno: boolean;
-  vyplnitDoporucene: () => void;
 }
+
+const NAPOVEDA: Partial<Record<KlicPravidla, string>> = {
+  stamp_target: '0 = jednoduchou razítkovou kartu nepoužívat.',
+  points_per_100: '0 = body za útratu nedávat.',
+  cashback_pct: 'Kolik procent z útraty se hostovi vrací.',
+  birthday_points: 'Dárek v den narozenin. 0 = nedávat.',
+  referral_points: 'Dostanou je oba, když kamarád poprvé přijde. 0 = vypnuto.',
+};
 
 /** Stav formuláře drží rodič, ať se po kroku Zpět a znovu dopředu nic neztratí. */
 export function usePravidla(): StavPravidel {
   const [profil, setProfil] = useState<StavNacteni<Record<string, unknown>>>({ stav: 'nic' });
-  const [formular, setFormular] = useState<Formular>(vychoziFormular);
+  const [formular, setFormular] = useState<FormularPravidel | null>(null);
   const [uklada, setUklada] = useState(false);
   const [chyba, setChyba] = useState<string | null>(null);
   const [ulozeno, setUlozeno] = useState(false);
+  // Předvyplnění jen poprvé: nové načtení po uložení nesmí přepsat, co člověk zrovna píše.
+  const predvyplneno = useRef(false);
 
   const nacti = useCallback(() => {
     setProfil({ stav: 'nacita' });
     j<{ profile?: Record<string, unknown> }>('/api/client/admin/profile')
-      .then(d => setProfil({ stav: 'ok', data: d.profile ?? {} }))
+      .then(d => {
+        const p = d.profile ?? {};
+        setProfil({ stav: 'ok', data: p });
+        if (!predvyplneno.current) { predvyplneno.current = true; setFormular(formularZProfilu(p)); }
+      })
       .catch(e => setProfil({ stav: 'chyba', zprava: zprava(e, 'Pravidla se nepodařilo načíst.'), status: e instanceof ChybaApi ? e.status : undefined }));
   }, []);
 
-  const nastav = useCallback((klic: KlicPravidla, cast: Partial<Zapis>) => {
-    setFormular(f => ({ ...f, [klic]: { ...f[klic], ...cast } }));
+  const nastav = useCallback((klic: KlicPravidla, hodnota: string) => {
+    setFormular(f => (f ? { ...f, [klic]: hodnota } : f));
     setUlozeno(false);
     setChyba(null);
   }, []);
 
-  const vyplnitDoporucene = useCallback(() => {
-    setFormular(f => {
-      const n = { ...f };
-      for (const p of VSECHNA_POLE) n[p.klic] = { zapnuto: true, hodnota: p.vychozi };
-      n.cashback_mode = { zapnuto: true, hodnota: 'credit' };
-      return n;
-    });
-    setUlozeno(false);
-  }, []);
-
   const uloz = useCallback(async (): Promise<boolean> => {
-    const telo: Record<string, string | number> = {};
-    for (const p of VSECHNA_POLE) {
-      if (formular[p.klic].zapnuto) telo[p.klic] = Number(formular[p.klic].hodnota.trim());
-    }
-    if (formular.cashback_mode.zapnuto) telo.cashback_mode = formular.cashback_mode.hodnota === 'points' ? 'points' : 'credit';
+    if (!formular || profil.stav !== 'ok') return false;
+    const telo = telaZmen(formular, profil.data);
     if (!Object.keys(telo).length) return false;
     setUklada(true);
     setChyba(null);
     try {
-      // GET profilu už proběhl při otevření kroku; PUT pošle jen vyplněná pole a server zbytek profilu nechá.
       await j('/api/client/admin/profile', { method: 'PUT', body: JSON.stringify(telo) });
       setUlozeno(true);
       nacti();
@@ -138,112 +80,124 @@ export function usePravidla(): StavPravidel {
     } finally {
       setUklada(false);
     }
-  }, [formular, nacti]);
+  }, [formular, profil, nacti]);
 
-  return { profil, formular, nastav, nacti, uloz, uklada, chyba, ulozeno, vyplnitDoporucene };
+  return { profil, formular, nastav, nacti, uloz, uklada, chyba, ulozeno };
 }
 
-export default function Pravidla({ s }: { s: StavPravidel }) {
+export default function Pravidla({ s, onPrejdi }: {
+  s: StavPravidel;
+  /** Zavře průvodce a otevře danou část administrace (pohled např. `klient:loyalty`, cast = záložka Věrnosti). */
+  onPrejdi: (pohled: string, cast?: string) => void;
+}) {
   const symbol = useSymbol();
-  const { profil, formular, nastav } = s;
-  const zapnutych = Object.values(formular).filter(z => z.zapnuto).length;
-  const maChybu = VSECHNA_POLE.some(p => chybaPole(formular, p));
-  const aktualni = profil.stav === 'ok' ? profil.data : null;
+  const { ma } = useOpravneni();
+  const { profil, formular } = s;
 
   if (profil.stav === 'chyba') {
     return (
       <ErrorState
         title={profil.status === 403 ? 'K pravidlům věrnosti chybí oprávnění' : 'Pravidla se nepodařilo načíst'}
-        hint={profil.status === 403 ? 'Tento krok můžete přeskočit a pravidla nastavit později v části Věrnost.' : profil.zprava}
+        hint={profil.status === 403 ? 'Tento krok můžeš přeskočit a pravidla nastavit později v části Věrnost.' : profil.zprava}
         onRetry={profil.status === 403 ? undefined : s.nacti} />
     );
   }
-  if (profil.stav === 'nacita' || profil.stav === 'nic') {
+  if (profil.stav !== 'ok' || !formular) {
     return <div className="space-y-3" aria-busy><Skeleton className="h-16" /><Skeleton className="h-40" /></div>;
   }
 
-  const nyni = (k: KlicPravidla): string | null => {
-    const v = aktualni?.[k];
-    if (v === undefined || v === null || v === '') return null;
-    if (k === 'cashback_mode') return v === 'points' ? 'body' : 'kredit';
-    return String(v);
-  };
+  const telo = telaZmen(formular, profil.data);
+  const zmen = Object.keys(telo).length;
+  const maChybu = maChybuPravidel(formular);
+  const razitkaZapnuta = /^\d+$/.test(formular.stamp_target.trim()) && Number(formular.stamp_target.trim()) > 0;
 
   return (
     <div className="space-y-6 min-w-0">
       <p className="text-sm text-black/65 text-pretty">
-        Kartička pravidla věrnosti exportovat neumí, proto je tu opište ze svého starého nastavení. Zapněte jen to, co chcete změnit,
-        ostatní zůstane, jak je. Celý krok je nepovinný a nezávisí na importu členů.
+        Kartička pravidla věrnosti exportovat neumí. Otevři její nastavení a přepiš sem čísla. Předvyplnili jsme to, co teď platí
+        u tebe v Manageru. Krok je nepovinný a nezávisí na importu členů.
       </p>
-      <div>
-        <Button size="sm" variant="secondary" onClick={s.vyplnitDoporucene}>Zapnout vše s doporučenými hodnotami</Button>
-      </div>
 
-      {SKUPINY.map(sk => (
-        <fieldset key={sk.nazev} className="min-w-0 space-y-3">
-          <legend className="text-sm font-semibold text-[#16181A]">{sk.nazev}</legend>
-          {sk.popis && <p className="text-xs text-black/55 -mt-1 text-pretty">{sk.popis}</p>}
-          <div className="grid gap-4 sm:grid-cols-2">
-            {sk.pole.map(p => {
-              if (p === 'rezim') {
-                const z = formular.cashback_mode;
-                return (
-                  <PoleRamec key="rezim" id="pravidlo-cashback_mode" popis="Cashback jako" zapnuto={z.zapnuto} onZapnuto={v => nastav('cashback_mode', { zapnuto: v })}
-                    nyni={nyni('cashback_mode')} chyba={null}>
-                    <Select className="min-h-11" id="pravidlo-cashback_mode" disabled={!z.zapnuto} value={z.hodnota} onChange={e => nastav('cashback_mode', { hodnota: e.target.value })}>
-                      <option value="credit">Kredit (korun na účtě)</option>
-                      <option value="points">Body</option>
-                    </Select>
-                  </PoleRamec>
-                );
-              }
-              const z = formular[p.klic];
-              const ch = chybaPole(formular, p);
-              return (
-                <PoleRamec key={p.klic} id={`pravidlo-${p.klic}`} popis={p.popis.replace('{m}', symbol)} zapnuto={z.zapnuto} onZapnuto={v => nastav(p.klic, { zapnuto: v })}
-                  nyni={nyni(p.klic)} napoveda={p.napoveda} chyba={ch}>
-                  <div className="flex items-center gap-2">
-                    <Input className="min-h-11" id={`pravidlo-${p.klic}`} type="number" inputMode="numeric" min={p.min} max={p.max} disabled={!z.zapnuto}
-                      value={z.hodnota} aria-invalid={ch ? true : undefined} onChange={e => nastav(p.klic, { hodnota: e.target.value })} />
-                    {p.jednotka && <span className="text-sm text-black/50 shrink-0">{p.jednotka}</span>}
-                  </div>
-                </PoleRamec>
-              );
-            })}
-          </div>
-        </fieldset>
-      ))}
+      <fieldset className="min-w-0 space-y-3">
+        <legend className="text-sm font-semibold text-[#16181A]">Razítková karta</legend>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {POLE_PRAVIDEL.filter(p => p.klic === 'stamp_target' || p.klic === 'stamp_reward').map(p => {
+            const ch = chybaPravidla(formular, p);
+            const text = p.klic === 'stamp_reward';
+            return (
+              <Field key={p.klic} id={`pravidlo-${p.klic}`} label={p.popis} hint={NAPOVEDA[p.klic]} error={ch}>
+                <Input className="min-h-11" id={`pravidlo-${p.klic}`}
+                  {...(text ? { type: 'text', maxLength: MAX_ODMENA, disabled: !razitkaZapnuta } : { type: 'number', inputMode: 'numeric' as const, min: p.min, max: p.max })}
+                  value={formular[p.klic]} aria-invalid={ch ? true : undefined}
+                  onChange={e => s.nastav(p.klic, e.target.value)} />
+              </Field>
+            );
+          })}
+        </div>
+        <p className="text-xs text-black/55 text-pretty">
+          Je to jednoduchá karta za návštěvu. Když máš v části Razítka vlastní kampaň za návštěvu, odměnu řídí ta kampaň.
+        </p>
+      </fieldset>
+
+      <fieldset className="min-w-0 space-y-3">
+        <legend className="text-sm font-semibold text-[#16181A]">Body a cashback</legend>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {POLE_PRAVIDEL.filter(p => p.klic !== 'stamp_target' && p.klic !== 'stamp_reward').map(p => {
+            const ch = chybaPravidla(formular, p);
+            return (
+              <Field key={p.klic} id={`pravidlo-${p.klic}`} label={p.popis.replace('{m}', symbol)} hint={NAPOVEDA[p.klic]} error={ch}>
+                <div className="flex items-center gap-2">
+                  <Input className="min-h-11" id={`pravidlo-${p.klic}`} type="number" inputMode="numeric" min={p.min} max={p.max}
+                    value={formular[p.klic]} aria-invalid={ch ? true : undefined} onChange={e => s.nastav(p.klic, e.target.value)} />
+                  {p.klic === 'cashback_pct' && <span className="text-sm text-black/50 shrink-0">%</span>}
+                </div>
+              </Field>
+            );
+          })}
+        </div>
+      </fieldset>
 
       {s.chyba && <p role="alert" className="text-sm text-[var(--bad-ink)] text-pretty">{s.chyba}</p>}
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="primary" icon="check" loading={s.uklada} disabled={zapnutych === 0 || maChybu} onClick={() => { void s.uloz(); }}>
-          Použít pravidla
+        <Button variant="primary" icon="check" loading={s.uklada} disabled={zmen === 0 || maChybu} onClick={() => { void s.uloz(); }}>
+          Uložit pravidla
         </Button>
         <p className="text-sm text-black/60" role="status" aria-live="polite">
           {s.ulozeno ? <span className="inline-flex items-center gap-1.5 text-[var(--ok-ink)]"><Icon name="check" size={14} /> Uloženo.</span>
-            : zapnutych === 0 ? 'Zatím není zapnuté žádné políčko.' : `Zapnuto polí: ${zapnutych}`}
+            : zmen === 0 ? 'Zatím jsi nic nezměnil.' : `Změněných polí: ${zmen}`}
         </p>
       </div>
-    </div>
-  );
-}
 
-function PoleRamec({ id, popis, zapnuto, onZapnuto, nyni, napoveda, chyba, children }: {
-  id: string; popis: string; zapnuto: boolean; onZapnuto: (v: boolean) => void; nyni: string | null; napoveda?: string; chyba: string | null; children: ReactNode;
-}) {
-  return (
-    <div className="min-w-0">
-      <div className="flex items-center justify-between gap-2">
-        <Label htmlFor={id} className="!mb-0 truncate">{popis}</Label>
-        <label className="inline-flex items-center gap-2 min-h-11 px-1 text-xs text-black/65 cursor-pointer shrink-0">
-          <input type="checkbox" className="h-5 w-5 accent-[#16181A]" checked={zapnuto} onChange={e => onZapnuto(e.target.checked)}
-            aria-label={`Nastavit: ${popis}`} />
-          Nastavit
-        </label>
-      </div>
-      {children}
-      {chyba ? <p role="alert" className="mt-1.5 text-xs text-[var(--bad-ink)]">{chyba}</p>
-        : (napoveda || nyni !== null) ? <p className="mt-1.5 text-xs text-black/50">{napoveda}{napoveda && nyni !== null ? ' ' : ''}{nyni !== null ? `Nyní: ${nyni}.` : ''}</p> : null}
+      <section className="well p-4 space-y-3" aria-labelledby="ruce-nadpis">
+        <div>
+          <h4 id="ruce-nadpis" className="text-sm font-semibold text-[#16181A]">Co přenést ručně</h4>
+          <p className="mt-1 text-xs text-black/55 text-pretty">
+            Import přenáší členy s body, kreditem, razítky a návštěvami. Tohle si z Kartičky přepiš v administraci sám.
+            Okno se zavře a otevře se příslušná část.
+          </p>
+        </div>
+        <ul className="space-y-1">
+          {RUCNI_PRENOS.map(r => {
+            const smi = ma(r.klice);
+            return (
+              <li key={r.id} className="text-sm min-w-0">
+                {smi ? (
+                  <button type="button" onClick={() => onPrejdi(r.pohled, r.cast)}
+                    className="tap-target-sm w-full text-left flex items-start gap-2 rounded-xl py-1.5 hover:bg-black/[0.04] focus-visible:outline-2">
+                    <Icon name="chevronRight" size={15} className="shrink-0 mt-1 text-black/40" />
+                    <span className="min-w-0 text-pretty"><span className="font-medium text-[#16181A] underline underline-offset-2">{r.nazev}</span> <span className="text-black/55">{r.popis}</span></span>
+                  </button>
+                ) : (
+                  <p className="flex items-start gap-2 py-1.5 text-black/55">
+                    <Icon name="chevronRight" size={15} className="shrink-0 mt-1 text-black/25" />
+                    <span className="min-w-0 text-pretty"><span className="font-medium">{r.nazev}</span> {r.popis} Na tohle nemáš oprávnění.</span>
+                  </p>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </section>
     </div>
   );
 }

@@ -118,7 +118,7 @@ async function sprava(viewport, mobil) {
   await okno(p).getByLabel(/Obdarovaný/).fill('Eva');
   await p.screenshot({ path: `${OUT}poukazy-${jm}-2-novy.png` });
   await okno(p).getByRole('button', { name: 'Založit 3 poukazů' }).or(okno(p).getByRole('button', { name: /Založit 3/ })).click();
-  await okno(p).getByText(/Hotovo: 3 poukazů/).waitFor({ timeout: 5000 });
+  await okno(p).getByText(/Hotovo: 3 poukazy/).waitFor({ timeout: 5000 });
   const post = stav.pk.posty.at(-1);
   tvrdi(`${jm} nový: POST má hodnotu 500, 3 kusy, platnost a obdarovaného`, post?.value === 500 && post.count === 3 && /^\d{4}-\d{2}-\d{2}$/.test(post.validUntil) && post.recipient === 'Eva', JSON.stringify(post));
   await zmer(p, `${jm} po založení dávky`);

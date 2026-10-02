@@ -1,6 +1,6 @@
 'use client';
 
-// Průvodce „Přecházíte z aplikace Kartička?“: import členů a nastavení věrnostního programu z Moje kartička
+// Průvodce „Přecházíš z Kartičky?“: import členů a nastavení věrnostního programu z Moje kartička
 // (mojekarticka.cz) nebo z jakéhokoli jiného souboru s členy.
 //
 // Čtení tabulky, rozpoznání sloupců a převod řádků jsou čisté funkce v lib/importKarticka.ts (stejné pravidlo
@@ -12,6 +12,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Button, Modal, Segmented } from '../ui';
+import { useNavigace } from '../widgety/NavigaceKontext';
 import { HLASKA_NEJDE_ULOZIT, ulozSoubor } from '@/lib/stahni';
 import {
   chybyJakoCsv, navrhniMapovani, prevedRadky, rozeberTabulku, souhrnImportu,
@@ -30,10 +31,10 @@ import {
 
 type Krok = 'uvod' | 'sloupce' | 'nahled' | 'pravidla' | 'import';
 const KROKY: { id: Krok; label: string; nadpis: string }[] = [
-  { id: 'uvod', label: '1 · Soubor', nadpis: 'Přecházíte z aplikace Kartička?' },
-  { id: 'sloupce', label: '2 · Sloupce', nadpis: 'Zkontrolujte sloupce' },
+  { id: 'uvod', label: '1 · Soubor', nadpis: 'Přecházíš z Kartičky?' },
+  { id: 'sloupce', label: '2 · Sloupce', nadpis: 'Zkontroluj sloupce' },
   { id: 'nahled', label: '3 · Náhled', nadpis: 'Náhled importu' },
-  { id: 'pravidla', label: '4 · Pravidla', nadpis: 'Přenést pravidla věrnosti' },
+  { id: 'pravidla', label: '4 · Pravidla', nadpis: 'Převzít pravidla věrnosti' },
   { id: 'import', label: '5 · Import', nadpis: 'Import členů' },
 ];
 
@@ -127,7 +128,7 @@ export default function ImportKartickaOkno({ open, onClose, oznam, onHotovo }: {
   }, []);
 
   const nactiSoubor = useCallback(async (f: File, kod?: Kodovani) => {
-    if (jeSouborMoc(f)) { setChybaSouboru('Soubor je větší než 10 MB. Rozdělte ho na více souborů.'); return; }
+    if (jeSouborMoc(f)) { setChybaSouboru('Soubor je větší než 10 MB. Rozděl ho na více souborů.'); return; }
     try {
       let k: Kodovani = kod ?? 'utf-8';
       let r = await precistSoubor(f, k);
@@ -136,10 +137,10 @@ export default function ImportKartickaOkno({ open, onClose, oznam, onHotovo }: {
         const r2 = await precistSoubor(f, 'windows-1250');
         if (!r2.vadnyZnak) {
           r = r2; k = 'windows-1250';
-          upoz = 'Soubor nebyl v UTF-8, přečetli jsme ho jako Windows-1250 (starší Excel). Zkontrolujte háčky a čárky; kódování můžete přepnout níže.';
+          upoz = 'Soubor nebyl v UTF-8, přečetli jsme ho jako Windows-1250 (starší Excel). Zkontroluj háčky a čárky; kódování můžeš přepnout níže.';
         }
       }
-      if (r.vadnyZnak && !upoz) upoz = 'V souboru jsou nečitelné znaky. Zkuste přepnout kódování, nebo ho v Excelu uložte jako CSV UTF-8.';
+      if (r.vadnyZnak && !upoz) upoz = 'V souboru jsou nečitelné znaky. Zkus přepnout kódování, nebo ho v Excelu ulož jako CSV UTF-8.';
       souborRef.current = f;
       setNazevSouboru(f.name); setKodovani(k); setChybaSouboru(null); setUpozorneniKodovani(upoz);
       nastavText(r.text);
@@ -193,6 +194,9 @@ export default function ImportKartickaOkno({ open, onClose, oznam, onHotovo }: {
     onClose();
   }, [onClose, onHotovo]);
   const pozadavekZavreni = () => { if (bezi) setZavreniZaBehu(true); else zavri(); };
+  // Odkazy v kroku Pravidla („Co přenést ručně“): okno se zavře a otevře se část administrace.
+  const nav = useNavigace();
+  const prejdiJinam = (pohled: string, cast?: string) => { zavri(); nav.onNavigate(pohled, cast); };
 
   const stahniChyby = async () => {
     const r = await ulozSoubor('chyby-importu.csv', '﻿' + chybyJakoCsv(rozbor.chyby), 'text/csv;charset=utf-8');
@@ -340,7 +344,7 @@ export default function ImportKartickaOkno({ open, onClose, oznam, onHotovo }: {
                 <>
                   {bezOpravneni && (
                     <div role="alert" className="rounded-2xl bg-[var(--bad-bg)] text-[var(--bad-ink)] p-3 text-sm text-pretty">
-                      K importu chybí oprávnění „Import členů“. Požádejte vedení, ať vám ho přidá v nastavení rolí.
+                      K importu chybí oprávnění „Import členů“. Požádej vedení, ať ti ho přidá v nastavení rolí.
                     </div>
                   )}
                   <Uvod
@@ -366,7 +370,7 @@ export default function ImportKartickaOkno({ open, onClose, oznam, onHotovo }: {
                   server={server} onServerZnovu={nactiNahled} kampane={kampane} onKampaneZnovu={nactiKampane}
                   volby={volby} setVolby={setVolby} onStahnoutChyby={() => { void stahniChyby(); }} />
               )}
-              {krok === 'pravidla' && <Pravidla s={pravidla} />}
+              {krok === 'pravidla' && <Pravidla s={pravidla} onPrejdi={prejdiJinam} />}
               {krok === 'import' && (
                 <Prubeh
                   faze={faze} zpracovano={zpracovano} celkem={souhrn.clenu} soucet={soucet} chybaDavky={chybaDavky}
