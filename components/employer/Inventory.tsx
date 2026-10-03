@@ -43,6 +43,7 @@ import {
 import CategoryNav from '../inventory/CategoryNav';
 import { type ItemDefaults, DEFAULT_FIELDS, mergeDefaults, hasDefaults } from '@/lib/itemDefaults';
 import StocktakeModal from '../inventory/Stocktake';
+import NakupniSeznamOkno, { type RadekSeznamu } from './NakupniSeznamOkno';
 import ItemRecipeLinks from '../inventory/ItemRecipeLinks';
 import ProductionRecipe from '../inventory/ProductionRecipe';
 import { useMoney, usePrice, useSymbol } from '../CurrencyProvider';
@@ -447,6 +448,17 @@ export default function Inventory({ initialCategory, onNavigate }: {
         return d !== 0 ? d : a.name.localeCompare(b.name, 'cs');
       }),
   [active, pk]);
+
+  // Řádky nákupního seznamu pro okno (lib/nakupSeznam.ts): položky z hlášení týmu
+  // (shoppingExtra) se přidají k tomu, co je pod limitem, bez duplicit.
+  const radkyNakupu = useMemo<RadekSeznamu[]>(() =>
+    [...toBuy, ...shoppingExtra.filter(e => !toBuy.some(x => x.id === e.id))].map(i => ({
+      id: i.id, name: i.name, category: i.category, categoryId: i.categoryId ?? null,
+      supplier: i.supplier ?? null, unit: i.unit, unitCost: i.unitCost ?? null,
+      stav: statusOf(i, pk), naVyrobu: (i.buyFor?.length ?? 0) > 0, navrh: suggestedAmount(i),
+      zbyva: i.quantity, naVyrobuJmena: (i.buyFor ?? []).map(f => f.name), supplierUrl: i.supplierUrl ?? null,
+    })),
+  [toBuy, shoppingExtra, pk]);
 
   // N8: hodnota zásob jedním výpočtem se stejným vzorcem jako Finance
   // (bez archivovaných, s podílem načatého balení). Dřív tu bylo Σ množství ×
@@ -1331,11 +1343,11 @@ export default function Inventory({ initialCategory, onNavigate }: {
       </Modal>
 
       {showShopping && (
-        <ShoppingListModal
+        <NakupniSeznamOkno
           suppliers={suppliers}
-          items={[...toBuy, ...shoppingExtra.filter(e => !toBuy.some(t => t.id === e.id))]
-            .filter(i => !shoppingSupplier || (i.supplier ?? '').trim() === shoppingSupplier)}
-          pk={pk}
+          polozky={radkyNakupu}
+          kategorie={categories}
+          dodavatel={shoppingSupplier}
           smiObjednat={smiObjednat}
           smiOdeslat={ma('nakup.odeslat')}
           onClose={() => { setShowShopping(false); setShoppingExtra([]); setShoppingSupplier(null); }}
@@ -1643,201 +1655,6 @@ function GridView({ items, step, openEdit, remove, money, pk, setArchived, selec
         );
       })}
     </div>
-  );
-}
-
-/* ---------- Shopping list modal ---------- */
-function ShoppingListModal({ items, onClose, onOrdered, pk, suppliers = [], smiObjednat, smiOdeslat }: {
-  items: Item[];
-  onClose: () => void;
-  onOrdered: (createdCount: number, requested: number) => void;
-  pk: PackagingLookup;
-  suppliers?: any[];
-  /** nakup.vytvorit — bez něj jde seznam jen zkopírovat, vytisknout nebo poslat. */
-  smiObjednat: boolean;
-  /** nakup.odeslat — objednávka e-mailem přímo dodavateli. */
-  smiOdeslat: boolean;
-}) {
-  const loc = useLocale();
-  const t = useT('sprava');
-  const supplierByName = (name: string) => suppliers.find(sp => sp.name === name) ?? null;
-  const [emailing, setEmailing] = useState<string | null>(null);
-  const [emailMsg, setEmailMsg] = useState<{ text: string; ok: boolean } | null>(null);
-  const emailGroup = async (supplier: string, list: Item[]) => {
-    const sp = supplierByName(supplier);
-    if (!sp?.email) return;
-    setEmailing(supplier); setEmailMsg(null);
-    try {
-      const res = await fetch('/api/orders', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          supplier, supplierId: sp.id, sendEmail: true,
-          items: list.map(i => ({ name: i.name, qty: suggestedAmount(i), unit: i.unit, itemId: i.id })),
-        }),
-      });
-      const d = await res.json().catch(() => ({}));
-      if (res.ok && d.emailed) setEmailMsg({ text: t('Objednávka odeslána na {email}.', { email: sp.email }), ok: true });
-      // Server teď říká i proč. Dřív se tu psalo obecné „nepodařilo se"
-      // — a hlavně se sem často ani nedostalo, protože odmítnutý e-mail
-      // se tvářil jako odeslaný.
-      else if (res.ok) setEmailMsg({ text: d.emailError ? t('Objednávka je vytvořená, ale e-mail neodešel ({chyba}) — pošli ji ručně.', { chyba: d.emailError }) : t('Objednávka je vytvořená, ale e-mail neodešel — pošli ji ručně.'), ok: false });
-      else setEmailMsg({ text: d.error || t('Odeslání se nepodařilo.'), ok: false });
-      if (res.ok) obnovDataWidgetu('/api/orders');
-    } catch { setEmailMsg({ text: t('Odeslání se nepodařilo.'), ok: false }); }
-    setEmailing(null);
-  };
-  const [copied, setCopied] = useState(false);
-  const [ordering, setOrdering] = useState(false);
-  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current); }, []);
-
-  const hasSuppliers = items.some(i => (i.supplier ?? '').trim() !== '');
-
-  // Group by supplier (keeps the critical-first ordering inside each group).
-  const groups = useMemo(() => {
-    const map = new Map<string, Item[]>();
-    items.forEach(i => {
-      const key = (i.supplier ?? '').trim(); // '' = bez dodavatele (klíč se nepřekládá, popisek až při výpisu)
-      const arr = map.get(key);
-      if (arr) arr.push(i); else map.set(key, [i]);
-    });
-    return Array.from(map.entries());
-  }, [items]);
-  const popisDodavatele = (s: string) => s || t('Bez dodavatele');
-
-  const buildText = () => {
-    const date = new Date().toLocaleDateString(loc);
-    const lines: string[] = [t('Nákupní seznam – Managero ({datum})', { datum: date })];
-    groups.forEach(([supplier, list]) => {
-      lines.push('');
-      lines.push(`${popisDodavatele(supplier)}:`);
-      list.forEach(i => {
-        const why = (i.buyFor?.length ?? 0) > 0 ? ` — ${t('na výrobu: {seznam}', { seznam: i.buyFor!.map(f => f.name).join(', ') })}` : '';
-        lines.push(`• ${i.name} — ${t('objednat {mnozstvi} {jednotka} (zbývá {zbyva})', { mnozstvi: suggestedAmount(i), jednotka: i.unit, zbyva: i.quantity })}${why}`);
-      });
-    });
-    return lines.join('\n');
-  };
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(buildText());
-      setCopied(true);
-      if (copyTimer.current) clearTimeout(copyTimer.current);
-      copyTimer.current = setTimeout(() => setCopied(false), 2000);
-    } catch { /* schránka nedostupná — tlačítko zůstane „Zkopírovat" */ }
-  };
-
-  // Do velkoobchodu se nejde s telefonem v ruce a prstem po seznamu —
-  // jde se s papírem a tužkou. Čtvereček u každé položky je na odškrtání.
-  const [printFailed, setPrintFailed] = useState(false);
-  const printList = () => {
-    const rows = groups.map(([supplier, list]) => `
-      <h2>${esc(popisDodavatele(supplier))}</h2>
-      <table>
-        <thead><tr><th style="width:8mm"></th><th>${esc(t('Položka'))}</th><th class="num">${esc(t('Objednat'))}</th><th class="num">${esc(t('Zbývá'))}</th></tr></thead>
-        <tbody>${list.map(i => `<tr>
-          <td><span class="tick"></span></td>
-          <td>${esc(i.name)}${(i.buyFor?.length ?? 0) > 0
-            ? `<div class="note">${esc(t('na výrobu: {seznam}', { seznam: i.buyFor!.map(x => x.name).join(', ') }))}</div>` : ''}</td>
-          <td class="num">${esc(suggestedAmount(i))} ${esc(i.unit)}</td>
-          <td class="num">${esc(i.quantity)} ${esc(i.unit)}</td>
-        </tr>`).join('')}</tbody>
-      </table>`).join('');
-    const n = items.length;
-    const ok = openPrint({
-      title: t('Nákupní seznam'),
-      subtitle: `${t('{n, plural, one {# položka} few {# položky} other {# položek}}', { n: n })} · ${new Date().toLocaleDateString(loc, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}`,
-      body: rows,
-    });
-    setPrintFailed(!ok);
-  };
-
-  const canShare = typeof navigator !== 'undefined' && 'share' in navigator;
-  const share = async () => {
-    try { await navigator.share({ title: t('Nákupní seznam'), text: buildText() }); } catch { /* zrušeno */ }
-  };
-
-  // One order per supplier group.
-  const createOrders = async () => {
-    if (ordering) return;
-    setOrdering(true);
-    let created = 0;
-    for (const [supplier, list] of groups) {
-      try {
-        const res = await fetch('/api/orders', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            supplier: supplier === '' ? null : supplier,
-            items: list.map(i => ({ name: i.name, qty: suggestedAmount(i), unit: i.unit, itemId: i.id })),
-          }),
-        });
-        if (res.ok) created++;
-      } catch { /* spočítá se jako nevytvořená */ }
-    }
-    setOrdering(false);
-    onOrdered(created, groups.length);
-  };
-
-  const mailto = `mailto:?subject=${encodeURIComponent(t('Objednávka – {datum}', { datum: new Date().toLocaleDateString(loc) }))}&body=${encodeURIComponent(buildText())}`;
-
-  return (
-    <Modal open onClose={onClose} size="lg" title={t('Nákupní seznam')} subtitle={t('{n, plural, one {# položka} few {# položky} other {# položek}}', { n: items.length })}
-      footer={<>
-        <Menu label={t('Další možnosti seznamu')} items={[
-          { label: t('Vytisknout'), icon: 'print', hint: t('S čtverečky k odškrtání v obchodě.'), onClick: printList },
-          { label: t('Poslat e-mailem'), icon: 'mail', hint: t('Otevře e-mail s předvyplněným seznamem.'), onClick: () => { window.location.href = mailto; } },
-          ...(canShare ? [{ label: t('Sdílet'), icon: 'send', onClick: share }] : []),
-        ]} />
-        <Button variant="secondary" icon="copy" onClick={copy}>{copied ? t('Zkopírováno') : t('Zkopírovat')}</Button>
-        {smiObjednat && (
-          <Button variant="primary" loading={ordering} disabled={items.length === 0} onClick={createOrders}>{t('Vytvořit objednávku')}</Button>
-        )}
-      </>}>
-      <div className="space-y-4">
-        {emailMsg && <p className={`note ${emailMsg.ok ? 'note-ok' : 'note-wait'}`} role="status">{emailMsg.text}</p>}
-        {printFailed && (
-          <p className="note note-wait">
-            
-            {t('Tiskové okno prohlížeč zablokoval. Povol vyskakovací okna pro tuhle stránku, nebo si seznam zkopíruj a vytiskni odjinud.')}
-          </p>
-        )}
-        {items.length === 0 && <p className="t-meta">{t('Od tohoto dodavatele teď nic nechybí.')}</p>}
-        {groups.map(([supplier, list]) => (
-          <section key={supplier || '_bez'} aria-label={popisDodavatele(supplier)}>
-            {hasSuppliers && (
-              <div className="flex items-center justify-between gap-2">
-                <p className="t-label">{popisDodavatele(supplier)}</p>
-                {smiOdeslat && supplierByName(supplier)?.email && (
-                  <Button variant="secondary" size="sm" icon="send" loading={emailing === supplier} onClick={() => emailGroup(supplier, list)}>
-                    
-                    {t('Objednat e-mailem')}
-                  </Button>
-                )}
-              </div>
-            )}
-            <ul className="list mt-1">
-              {list.map(i => {
-                const st = statusOf(i, pk);
-                return (
-                  <ListRow key={i.id}
-                    title={i.name}
-                    meta={[t('zbývá {n} {jednotka}', { n: i.quantity, jednotka: i.unit }), (i.buyFor?.length ?? 0) > 0 ? t('na výrobu: {seznam}', { seznam: i.buyFor!.map(f => f.name).join(', ') }) : null].filter(Boolean).join(' · ')}
-                    value={<span className="tabular-nums">+{suggestedAmount(i)} {i.unit}</span>}
-                    right={<Chip tone={st === 'critical' ? 'bad' : st === 'low' ? 'wait' : 'info'} size="sm">{st === 'critical' ? t('kriticky') : st === 'low' ? t('dochází') : t('na výrobu')}</Chip>}
-                    actions={i.supplierUrl ? (
-                      <a href={i.supplierUrl} target="_blank" rel="noopener" className="btn-icon" aria-label={t('Objednat {nazev} u dodavatele', { nazev: i.name })}>
-                        <Icon name="external" size={15} />
-                      </a>
-                    ) : undefined} />
-                );
-              })}
-            </ul>
-          </section>
-        ))}
-      </div>
-    </Modal>
   );
 }
 
