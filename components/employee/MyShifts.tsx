@@ -29,13 +29,15 @@ import { Button, Card, Chip, EmptyState, ErrorState, Field, ListRow, Menu, Modal
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useSmi } from '../widgety/NavigaceKontext';
+import { useTymSmeny } from '../widgety/useTymSmeny';
+import { KolegoveSmeny } from '../widgety/KolegoveSmeny';
 import { apiMessage, okJson } from '@/lib/api';
 import { buildIcs, downloadIcs } from '@/lib/ics';
 import { dayPlus, pragueToday } from '@/lib/pragueTime';
 import { useJazyk, useT } from '@/lib/i18n/client';
 import { fmtDatum, fmtHM } from '@/lib/i18n/format';
 import {
-  UDALOST_ZMENA, den, hm, kategorieBarvy, nadchazejiciSmeny, popisekTypu,
+  UDALOST_ZMENA, den, hm, kategorieBarvy, kolegoveKeSmene, nadchazejiciSmeny, popisekTypu,
   type MojeSmena, type NabidkaSmeny,
 } from '@/lib/rozvrhPrehled';
 
@@ -124,6 +126,8 @@ export default function MyShifts({ user }: Props) {
   };
 
   const ukaz = vse ? nadchazejici : nadchazejici.slice(0, NA_ZACATEK);
+  // S kým mám směnu: tým se bere za zobrazené směny (nejvýš dva měsíce); bez rozvrh.nahled se neptá.
+  const tym = useTymSmeny(smi('rozvrh.nahled'), [den(ukaz[0]?.date).slice(0, 7), den(ukaz[ukaz.length - 1]?.date).slice(0, 7)]);
   const nastroj = (
     <Card as="section" aria-labelledby="nadchazejici-smeny">
       <h2 id="nadchazejici-smeny" className="t-card">{t('Nadcházející směny')}</h2>
@@ -157,6 +161,7 @@ export default function MyShifts({ user }: Props) {
                       <span aria-hidden className={`inline-block h-2 w-2 rounded-full align-middle mr-1.5 ${kat ? `cat-dot-${kat}` : 'bg-black/15'}`} />
                       {popisekTypu(s)}
                     </>}
+                    detail={tym.zapnuto ? <KolegoveSmeny kolegove={kolegoveKeSmene(s, tym.smeny)} hotovo={tym.hotovo} /> : undefined}
                     value={`${fmtHM(s.startTime ?? s.start_time)}–${fmtHM(s.endTime ?? s.end_time)}`}
                     right={nabidnuto ? <Chip tone="info" size="sm">{t('V burze')}</Chip> : d === dnes ? <Chip tone="ok" size="sm">{t('Dnes')}</Chip> : undefined}
                     actions={smiBurza && !nabidnuto ? (

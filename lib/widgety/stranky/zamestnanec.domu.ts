@@ -43,6 +43,7 @@ export const STRANKA: DefiniceStranky = {
     'typ:zamestnanec': [
       { w: 'dochazka.moje_pichacky', s: 'M' },
       { w: 'moje.nejblizsi_smena', s: 'M' },
+      { w: 'rozvrh.tym_nahled', s: 'M' },
       { w: 'ukoly.dnes', s: 'M' },
       { w: 'postupy.povinne_dnes', s: 'M' },
       { w: 'oznameni.nastenka', s: 'M' },
