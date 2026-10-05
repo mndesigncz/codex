@@ -34,12 +34,14 @@
 //
 // Data jen přes useDataWidgetu (sdílená mezipaměť), v náhledu nic nenaviguje ani nezapisuje.
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
 import { widget } from '@/lib/widgety/katalog';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { dbTimeHM, pragueToday } from '@/lib/pragueTime';
 import { apiMessage, okJson } from '@/lib/api';
+import { fmtMesic } from '@/lib/i18n/format';
+import { aktualniJazyk } from '@/lib/i18n/stav';
 import { dnyObdobi, kasaProtiUzaverkam, mesiceObdobi, vyberKalendarTrzeb as vyberKalendar } from '@/lib/financeWidgety';
 import { useMoney } from '../../CurrencyProvider';
 import { BarSpark, Button, Chip, ListRow, Stat, StatRow } from '../../ui';
@@ -47,7 +49,7 @@ import { useOpravneni } from '../../role/useOpravneni';
 import { Widget, useWidget, type StavNacteni } from '../Widget';
 import { useDataWidgetu, obnovDataWidgetu } from '../useDataWidgetu';
 import { useNavigace, useSmi } from '../NavigaceKontext';
-import { useNaFinancich } from './finance';
+import { MesicStrankyFinanci, useNaFinancich } from './finance';
 import {
   DnyPokladny, HodinyPokladny, ObsluhaPokladny, OsaGrafu, ProdanoPokladny, RadyJakoSeznam,
   kratkeDatum, obdobiPokladny, pismenoDne, popisUctenek, vyberDenniPokladnu, type DenniPokladna,
@@ -290,7 +292,14 @@ function PoDnech({ velikost, nastaveni }: WidgetProps<{ obdobi: string; zdroj: s
   const { ok, ceka } = useBrana(klice('trzby.po_dnech', ['finance.trzby']));
   const smiUzaverky = ok && smi('uzaverky.zobrazit_vse');
   const chceUzaverky = nastaveni.zdroj === 'uzaverky' && smiUzaverky;
-  const { data: pos, obdobi } = useDenniPokladna(ok && !chceUzaverky, nastaveni.obdobi);
+  // „Měsíc stránky": na Financích měsíc z přepínače v hlavičce, jinde dnešní měsíc.
+  const mesicStranky = useContext(MesicStrankyFinanci);
+  const obdobiId = nastaveni.obdobi === 'mesic_stranky' ? (mesicStranky ? `mesic:${mesicStranky}` : 'tento_mesic') : nastaveni.obdobi;
+  const { data: pos, obdobi: obdobiZakladni } = useDenniPokladna(ok && !chceUzaverky, obdobiId);
+  const obdobi = /^\d{4}-\d{2}$/.test(obdobiZakladni.popis)
+    ? { ...obdobiZakladni, popis: fmtMesic(obdobiZakladni.popis, { jazyk: aktualniJazyk() }) }
+    : obdobiZakladni;
+  const [vsechnyDny, setVsechnyDny] = useState(false);
   // Bez pokladny (nepropojená, nebo tarif bez ní) spadne na uzávěrky, když na ně divák smí.
   const zUzaverek = chceUzaverky || (smiUzaverky && pos.data?.propojeno === false);
   const mesice = useMemo(() => mesiceObdobi(obdobi.from, obdobi.to), [obdobi.from, obdobi.to]);
@@ -339,6 +348,33 @@ function PoDnech({ velikost, nastaveni }: WidgetProps<{ obdobi: string; zdroj: s
           {/* Víc než dva týdny: písmeno dne by se do sloupku nevešlo — osa jen se začátkem a koncem. */}
           {dny.length > 14 && <OsaGrafu popisky={[kratkeDatum(dny[0].den), kratkeDatum(dny[dny.length - 1].den)]} />}
           </div>
+          {L && sTrzbou.length > 0 && (() => {
+            // Přehled dnů: nejnovější nahoře, jen dny s tržbou (zavřeno / bez dat se do seznamu nepletou,
+            // jejich počet je pod ním). Sloupek je podíl na nejsilnějším dni — pozná se rozdíl i bez čtení čísel.
+            const nejvic = rekord?.trzba ?? 1;
+            const zobrazene = [...sTrzbou].filter(x => x.den <= dnes).reverse();
+            const videt = vsechnyDny ? zobrazene : zobrazene.slice(0, 7);
+            const bezTrzby = dny.filter(x => x.den <= dnes && x.trzba <= 0).length;
+            return (
+              <div>
+                <ul className="list" aria-label={t('Tržba po jednotlivých dnech')}>
+                  {videt.map(x => (
+                    <li key={x.den} className="flex items-center gap-3 py-2 text-[14px]">
+                      <span className="w-[5.5rem] shrink-0 text-black/70 tabular-nums">{pismenoDne(x.den)} {kratkeDatum(x.den)}</span>
+                      <span aria-hidden className="h-1.5 flex-1 rounded-full bg-black/[0.06] overflow-hidden"><span className="block h-full rounded-full bg-[#16181A]/70" style={{ width: `${Math.max(3, Math.round((x.trzba / nejvic) * 100))}%` }} /></span>
+                      <span className="w-[6.5rem] shrink-0 text-right font-semibold tabular-nums text-[#16181A]">{money(x.trzba)}</span>
+                    </li>
+                  ))}
+                </ul>
+                {zobrazene.length > 7 && (
+                  <Button variant="ghost" size="sm" className="mt-1" aria-expanded={vsechnyDny} onClick={() => setVsechnyDny(v => !v)}>
+                    {vsechnyDny ? t('Ukázat méně') : t('Zobrazit všechny dny ({n})', { n: zobrazene.length })}
+                  </Button>
+                )}
+                {bezTrzby > 0 && <p className="t-meta mt-1">{t('{n, plural, one {# den bez tržby} few {# dny bez tržby} other {# dní bez tržby}}', { n: bezTrzby })}</p>}
+              </div>
+            );
+          })()}
           {L && rekord && (
             <p className="t-meta">{t('Nejsilnější den {den} {datum} · {castka}', { den: pismenoDne(rekord.den), datum: kratkeDatum(rekord.den), castka: money(rekord.trzba) })}</p>
           )}
