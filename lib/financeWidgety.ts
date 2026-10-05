@@ -35,6 +35,16 @@ function rady(list: unknown): RadaSIkonou[] {
 
 /** Období widgetu tržeb → dny od–do (pražské „RRRR-MM-DD"). `mesic` = od prvního dne měsíce do dneška. */
 export function obdobiPokladny(id: unknown, dnes: string = pragueToday()): { from: string; to: string; popis: string } {
+  // „mesic:RRRR-MM" = celý vybraný měsíc (u dnešního jen do dneška, budoucí dny nemají tržbu).
+  // `popis` nese přímo „RRRR-MM"; název měsíce v jazyce uživatele skládá widget.
+  const mm = /^mesic:(\d{4})-(\d{2})$/.exec(String(id));
+  if (mm) {
+    const mesic = `${mm[1]}-${mm[2]}`;
+    const od = `${mesic}-01`;
+    const posledni = `${mesic}-${String(new Date(Date.UTC(Number(mm[1]), Number(mm[2]), 0)).getUTCDate()).padStart(2, '0')}`;
+    const konec = posledni < dnes ? posledni : dnes < od ? od : dnes;
+    return { from: od, to: konec, popis: mesic };
+  }
   switch (id) {
     case 'vcera': return { from: dayPlus(dnes, -1), to: dayPlus(dnes, -1), popis: 'Včera' };
     case '7_dni': return { from: dayPlus(dnes, -6), to: dnes, popis: 'Posledních 7 dní' };

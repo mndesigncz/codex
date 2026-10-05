@@ -40,20 +40,19 @@ export const STRANKA: DefiniceStranky = {
     'dochazka.mzdy_za_obdobi',
   ],
   vychozi: {
+    // Jen to podstatné: co přišlo (souhrn), jaký den kolik (tržba po dnech za měsíc z hlavičky),
+    // jak to vychází proti mzdám a kam peníze šly; pod tím kniha výdajů. Doporučení, živá pokladna,
+    // marže, ztráty, hosté a hodnota zásob jsou v galerii widgetů, ne v základu.
     'typ:vedeni': [
       { w: 'finance.souhrn_mesice', s: 'L' },
+      { w: 'trzby.po_dnech', s: 'L', o: { obdobi: 'mesic_stranky' } },
       { w: 'finance.trzby_vs_mzdy', s: 'S' },
       { w: 'finance.kam_sly_penize', s: 'M' },
-      { w: 'sklad.hodnota_zasob', s: 'S' },
-      { w: 'finance.doporuceni', s: 'L' },
-      { w: 'pokladna.zive', s: 'L' },
-      { w: 'finance.marze', s: 'L' },
-      { w: 'finance.ztraty', s: 'M' },
-      { w: 'finance.hoste_vernost', s: 'M' },
       { w: 'nastroj' },
     ],
     'role:ucetni': [
       { w: 'finance.souhrn_mesice', s: 'L' },
+      { w: 'trzby.po_dnech', s: 'L', o: { obdobi: 'mesic_stranky' } },
       { w: 'finance.trzby_vs_mzdy', s: 'S' },
       { w: 'uzaverky.rozdil_kasy', s: 'S' },
       { w: 'finance.uctenky', s: 'M' },

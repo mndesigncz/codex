@@ -11,6 +11,7 @@
 // den do zítřka).
 
 import { dayPlus } from './pragueTime.ts';
+import { usek } from './rozvrhDen.ts';
 
 // ---------------------------------------------------------------------------
 // Předávání mezi widgetem a nástrojem
@@ -249,6 +250,47 @@ export function tymPoDnech<T extends SmenaNahledu>(smeny: readonly T[], dnes: st
   }
   return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]))
     .map(([d, l]) => ({ den: d, smeny: l.sort((a, b) => hm(a.startTime).localeCompare(hm(b.startTime)) || String(a.employeeName ?? '').localeCompare(String(b.employeeName ?? ''), 'cs')) }));
+}
+
+export interface Kolega {
+  id: number;
+  jmeno: string | null;
+  avatar: string | null;
+  od: string;
+  do: string;
+  /** Kolik minut spolu stojíte (překryv obou směn). */
+  spolu: number;
+  /** Kolega má směnu ve stejný čas jako ty, na minutu. */
+  stejne: boolean;
+}
+
+/**
+ * Kdo je s tebou na směně: ostatní z náhledu týmu, kdo ten den stojí aspoň minutu
+ * ve stejnou dobu. Noční směna přes půlnoc se počítá (22:00–06:00 se potká s 18:00–23:00),
+ * dotyk (jeden končí, druhý začíná) ne. Řazeno podle začátku, pak podle jména.
+ */
+export function kolegoveKeSmene(
+  moje: { date: string; startTime?: string; endTime?: string; start_time?: string; end_time?: string },
+  tym: readonly SmenaNahledu[],
+): Kolega[] {
+  const d = den(moje.date);
+  const od = hm(moje.startTime ?? moje.start_time);
+  const doC = hm(moje.endTime ?? moje.end_time);
+  const mine = usek(od, doC);
+  if (!d || !mine) return [];
+  const out: Kolega[] = [];
+  for (const s of tym) {
+    if (s.isMine || den(s.date) !== d) continue;
+    const j = usek(hm(s.startTime), hm(s.endTime));
+    if (!j) continue;
+    const spolu = Math.min(mine.end, j.end) - Math.max(mine.start, j.start);
+    if (spolu <= 0) continue;
+    out.push({
+      id: s.employeeId ?? s.id, jmeno: s.employeeName ?? null, avatar: s.employeeAvatar ?? null,
+      od: hm(s.startTime), do: hm(s.endTime), spolu, stejne: hm(s.startTime) === od && hm(s.endTime) === doC,
+    });
+  }
+  return out.sort((a, b) => a.od.localeCompare(b.od) || String(a.jmeno ?? '').localeCompare(String(b.jmeno ?? ''), 'cs'));
 }
 
 export interface MojeSmena {

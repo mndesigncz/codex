@@ -14,12 +14,14 @@ import { Icon } from '../Icons';
 // jediné, co drží sloupec svisle, je pevná šířka a `tabular-nums`.
 
 export function ListRow({
-  lead, title, meta, value, valueMeta, aside, actions, right,
+  lead, title, meta, detail, value, valueMeta, aside, actions, right,
   onClick, href, chevron, className = '', as,
 }: {
   lead?: React.ReactNode;
   title: React.ReactNode;
   meta?: React.ReactNode;
+  /** Třetí řádek pod meta, který se zalamuje (ne zkracuje) — třeba kdo je s tebou na směně. */
+  detail?: React.ReactNode;
   /** Hlavní číslo řádku — sloupec pevné šířky, zarovnaný doprava, tabulkové číslice. */
   value?: React.ReactNode;
   /** Druhý řádek pod číslem (menší, tišší). */
@@ -48,6 +50,7 @@ export function ListRow({
       <span className="min-w-0 flex-1">
         <span className="block font-medium text-[15px] leading-snug text-[#16181A] truncate">{title}</span>
         {meta && <span className="block text-[13px] text-black/55 leading-snug mt-0.5 truncate">{meta}</span>}
+        {detail && <span className="block text-[13px] text-black/55 leading-snug mt-0.5 text-pretty">{detail}</span>}
       </span>
       {/* Ocas řádku. Na počítači je `display: contents`, takže číslo, doplněk
           a akce sedí ve svých svislých sloupcích. Na mobilu se z něj stane

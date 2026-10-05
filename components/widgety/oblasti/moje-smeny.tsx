@@ -35,13 +35,15 @@ import { Chip, ListRow, Stat, StatRow } from '../../ui';
 import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
 import { Widget, type StavNacteni } from '../Widget';
 import { useDataWidgetu } from '../useDataWidgetu';
-import { useNavigace } from '../NavigaceKontext';
+import { useNavigace, useSmi } from '../NavigaceKontext';
+import { useTymSmeny } from '../useTymSmeny';
+import { KolegoveSmeny } from '../KolegoveSmeny';
 import { pragueHM, pragueToday } from '@/lib/pragueTime';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { tg, aktualniJazyk } from '@/lib/i18n/stav';
 import { fmtDatum, fmtHM } from '@/lib/i18n/format';
 import {
-  den as denZ, denKratce as denKratceCs, dnuVolna, hodinyText, kategorieBarvy, minuleSmeny, mojeCisla, popisekTypu,
+  den as denZ, denKratce as denKratceCs, dnuVolna, hodinyText, kategorieBarvy, kolegoveKeSmene, minuleSmeny, mojeCisla, popisekTypu,
   TYP_VOLNA, zadostiVolna, type ZadostVolna,
 } from '@/lib/rozvrhPrehled';
 
@@ -135,6 +137,13 @@ function NejblizsiSmena({ velikost, nahled }: WidgetProps) {
 
   const S = velikost === 'S';
   const muze = !nahled && nav.smiPohled('my-shifts');
+  // S kým mám tu směnu: malá karta na to nemá místo a náhled v galerii se na tým neptá.
+  const smi = useSmi();
+  const tym = useTymSmeny(!S && !nahled && smi('rozvrh.nahled'), [prvni?.den.slice(0, 7) ?? '']);
+  const kolegove = useMemo(
+    () => (prvni ? kolegoveKeSmene({ date: prvni.den, startTime: prvni.od, endTime: prvni.do }, tym.smeny) : []),
+    [prvni, tym.smeny],
+  );
   const typ = prvni ? (POPISEK_TYPU[String(prvni.s.typeLabel ?? '')] ? t(POPISEK_TYPU[String(prvni.s.typeLabel ?? '')]) : prvni.s.typeLabel ?? null) : null;
   const kat = prvni ? KATEGORIE_BARVY[String(prvni.s.typeColor ?? '').toLowerCase()] ?? null : null;
   const cas = prvni ? (prvni.do ? `${prvni.od}–${prvni.do}` : prvni.od) : '';
@@ -159,6 +168,7 @@ function NejblizsiSmena({ velikost, nahled }: WidgetProps) {
               {typ && <><span aria-hidden className={`inline-block h-2 w-2 rounded-full align-middle mr-1.5 ${kat ? `cat-dot-${kat}` : 'bg-black/15'}`} />{typ} · </>}
               {denVetou(prvni.den)}
             </span>} />
+          {tym.zapnuto && <p className="t-meta text-pretty"><KolegoveSmeny kolegove={kolegove} hotovo={tym.hotovo} /></p>}
           {dalsi && (
             <p className="t-meta">
               {t('Potom')} <span className="tabular-nums">{denVetou(dalsi.den)}{dalsi.od ? `, ${dalsi.od}${dalsi.do ? `–${dalsi.do}` : ''}` : ''}</span>

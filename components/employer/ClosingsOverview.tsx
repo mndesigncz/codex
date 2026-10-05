@@ -23,7 +23,7 @@
 // Uzávěrkám nepředává, proto z jiné stránky žádost počká v sessionStorage.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Avatar, Button, Card, Chip, EmptyState, ErrorState, ListRow, Skeleton } from '../ui';
+import { Avatar, Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Menu, SearchField, Segmented, Select, Skeleton } from '../ui';
 import { usePlan, UpgradeModal } from '../Pro';
 import { ulozSoubor } from '@/lib/stahni';
 import { diffReasonLabel, expectedCash, cashDifference, cashLeft, type ShiftPerson } from '@/lib/closing';
@@ -39,6 +39,7 @@ import {
   KLIC_DEN, KLIC_VYPLNIT, UDALOST_DEN, UDALOST_VYPLNIT,
   denUzaverky, jeHlavni, rozdilUzaverky, type RadekUzaverky,
 } from '@/lib/uzaverkyPrehled';
+import { filtrujUzaverky, jmenaZUzaverek, pocetFiltru, PRAZDNY_FILTR, stitkySmen, type FiltrUzaverek, type Razeni } from '@/lib/uzaverkyFiltr';
 import { useT } from '@/lib/i18n/client';
 import { useLocale } from './jazyk';
 
@@ -89,6 +90,9 @@ export default function ClosingsOverview() {
   const [detailId, setDetailId] = useState<number | null>(null);
   const [month, setMonth] = useState<string>('all'); // 'all' | 'YYYY-MM'
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [filtr, setFiltr] = useState<FiltrUzaverek>(PRAZDNY_FILTR);
+  const [dalsiFiltry, setDalsiFiltry] = useState(false);
+  const nastav = (zmena: Partial<FiltrUzaverek>) => setFiltr(f => ({ ...f, ...zmena }));
   const listRef = useRef<HTMLDivElement>(null);
 
   const data = useDataWidgetu<Seznam>(URL_SEZNAM, raw => {
@@ -155,7 +159,13 @@ export default function ClosingsOverview() {
   // Exporty jdou za filtrem měsíce; seznam se navíc zúží na den z kalendáře.
   const closings = month === 'all' ? allClosings : allClosings.filter(c => denUzaverky(c).slice(0, 7) === month);
   const listed = selectedDate ? allClosings.filter(c => denUzaverky(c) === selectedDate) : closings;
-  const topLevel = listed.filter(jeHlavni);
+  // Filtry (hledání, stav, kasa, směna, rozmezí dnů) a řazení platí na seznam; exporty zůstávají za měsícem.
+  const zakladSeznamu = listed.filter(jeHlavni);
+  const topLevel = filtrujUzaverky(zakladSeznamu, filtr);
+  const nFiltru = pocetFiltru(filtr);
+  const stitky = useMemo(() => stitkySmen(allClosings), [allClosings]);
+  const jmena = useMemo(() => jmenaZUzaverek(allClosings), [allClosings]);
+  const kCekani = zakladSeznamu.filter(c => c.approved === false).length;
   const coveredBy = (parentId: number) => allClosings.filter(c => c.covered_by === parentId);
 
   // ---- Exporty ----
@@ -256,6 +266,72 @@ export default function ClosingsOverview() {
             ))}
           </div>
         )}
+        {allClosings.length > 0 && (
+          <div className="space-y-2" role="search" aria-label={t('Filtry uzávěrek')}>
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+              <SearchField className="flex-1 min-w-0" value={filtr.hledej} onChange={v => nastav({ hledej: v })}
+                placeholder={t('Hledat podle dne, směny, jména nebo poznámky…')} ariaLabel={t('Hledat v uzávěrkách')} storageKey="uzaverky"
+                suggestions={[
+                  ...jmena.map(j => ({ label: j, hint: t('na směně') })),
+                  ...stitky.map(x => ({ label: x, hint: t('směna') })),
+                ]} />
+              <div className="flex items-center gap-2 min-w-0">
+                <Segmented size="sm" ariaLabel={t('Stav uzávěrky')} value={filtr.stav} onChange={v => nastav({ stav: v })}
+                  options={[
+                    { id: 'vse', label: t('Vše') },
+                    { id: 'ceka', label: t('Ke schválení'), count: kCekani || undefined },
+                    { id: 'schvaleno', label: t('Schválené') },
+                  ]} />
+                <Button variant="secondary" size="sm" aria-expanded={dalsiFiltry} onClick={() => setDalsiFiltry(v => !v)}
+                  className="shrink-0">
+                  {t('Filtry')}{nFiltru > 0 ? ` · ${nFiltru}` : ''}
+                </Button>
+              </div>
+            </div>
+            {dalsiFiltry && (
+              <div className="well px-4 py-3 space-y-3">
+                <div className="space-y-1.5">
+                  <p className="t-label">{t('Kasa')}</p>
+                  <Segmented size="sm" ariaLabel={t('Rozdíl v kase')} value={filtr.kasa} onChange={v => nastav({ kasa: v })}
+                    options={[
+                      { id: 'vse', label: t('Vše') },
+                      { id: 'sedi', label: t('Sedí') },
+                      { id: 'manko', label: t('Manko') },
+                      { id: 'prebytek', label: t('Přebytek') },
+                    ]} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field id="uz-od" label={t('Od dne')}><Input id="uz-od" type="date" value={filtr.od} max={filtr.do || undefined} onChange={e => nastav({ od: e.target.value })} /></Field>
+                  <Field id="uz-do" label={t('Do dne')}><Input id="uz-do" type="date" value={filtr.do} min={filtr.od || undefined} onChange={e => nastav({ do: e.target.value })} /></Field>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {stitky.length > 1 && (
+                    <Field id="uz-smena" label={t('Směna')}>
+                      <Select id="uz-smena" value={filtr.smena} onChange={e => nastav({ smena: e.target.value })}>
+                        <option value="">{t('Všechny směny')}</option>
+                        {stitky.map(x => <option key={x} value={x}>{x}</option>)}
+                      </Select>
+                    </Field>
+                  )}
+                  <Field id="uz-razeni" label={t('Řadit')}>
+                    <Select id="uz-razeni" value={filtr.razeni} onChange={e => nastav({ razeni: e.target.value as Razeni })}>
+                      <option value="nejnovejsi">{t('Od nejnovější')}</option>
+                      <option value="nejstarsi">{t('Od nejstarší')}</option>
+                      <option value="trzba">{t('Podle tržby')}</option>
+                      <option value="rozdil">{t('Podle rozdílu v kase')}</option>
+                    </Select>
+                  </Field>
+                </div>
+              </div>
+            )}
+            {nFiltru > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-2" role="status">
+                <p className="t-meta">{t('Zobrazeno {n} z {celkem}', { n: topLevel.length, celkem: zakladSeznamu.length })}</p>
+                <Button variant="ghost" size="sm" onClick={() => setFiltr(f => ({ ...PRAZDNY_FILTR, razeni: f.razeni }))}>{t('Zrušit filtry')}</Button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="px-5 pb-2">
@@ -265,6 +341,9 @@ export default function ClosingsOverview() {
           </div>
         ) : data.error ? (
           <ErrorState compact title={t('Uzávěrky se nenačetly')} onRetry={data.reload} detail={data.error} className="!py-6" />
+        ) : topLevel.length === 0 && nFiltru > 0 ? (
+          <EmptyState compact icon="search" title={t('Žádná uzávěrka neodpovídá filtrům')} hint={t('Zkus jiné slovo, jiný stav nebo rozmezí dnů.')}
+            action={<Button variant="secondary" size="sm" onClick={() => setFiltr(f => ({ ...PRAZDNY_FILTR, razeni: f.razeni }))}>{t('Zrušit filtry')}</Button>} />
         ) : topLevel.length === 0 ? (
           selectedDate
             ? <EmptyState compact icon="receipt" title={t('Za tento den není uzávěrka')} hint={t('Buď se ten den nepracovalo, nebo na ni někdo zapomněl.')} />
