@@ -349,13 +349,15 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, ton, nac
           <span aria-hidden className={`shrink-0 grid h-6 w-6 place-items-center rounded-xl ${S ? '-mt-0.5' : ''} ${inkoust ? 'bg-white/10 text-white/70' : 'bg-ok/15 text-ok-ink'}`}>
             <Icon name={ikona ?? k.definice?.ikona ?? 'overview'} size={14} />
           </span>
-          <span className={S ? 'line-clamp-2 break-words' : 'truncate'}>{nazev}</span>
+          <span className="line-clamp-2 break-words">{nazev}</span>
           {doplnek}
         </h2>
         {mozeSbalit && (
-          <Button variant="ghost" size="sm" icon="chevron" aria-expanded={!k.sbaleno}
-            aria-label={k.sbaleno ? t('Rozbalit {nazev}', { nazev }) : t('Sbalit {nazev}', { nazev })}
-            className={`shrink-0 -my-1.5 ${k.sbaleno ? '' : '[&_svg]:rotate-180'} ${inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : ''}`}
+          // Jen ikona (názvu se nebere ani px) a popisek bez jména widgetu — jméno nese nadpis karty přes
+          // aria-describedby; „Sbalit {název}" by se pletlo s tlačítky, která se hledají podle názvu widgetu.
+          <Button variant="ghost" size="sm" iconOnly icon="chevron" aria-expanded={!k.sbaleno} aria-describedby={idTitulku}
+            aria-label={k.sbaleno ? t('Rozbalit widget') : t('Sbalit widget')}
+            className={`shrink-0 -my-1.5 -mr-1 ${k.sbaleno ? '' : '[&_svg]:rotate-180'} ${inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : ''}`}
             onClick={k.prepniSbaleni} />
         )}
         {vidiOdkaz && (
