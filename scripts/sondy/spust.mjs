@@ -138,6 +138,7 @@ export const ZELENE = [
   'sirka-zam',
   's-kym',
   'finance-uzaverky',
+  'widgety-sbalit',
 ];
 
 const MIMO = new Set(['spust', 'pruchod', 'cookie-role', 'fixtury-k53', 'fixtury-navody', 'k68-spolecne', 'k69-mereni-jadro', 'import-karticka', 'w1-razitka', 'w5-host-bannery', 'poukazy', 'urovne', 'bannery', 'bannery-sprava', 'pruchod-hloubka', 'razitka-kasa', 'vernost-pravidla', 'w6-poukazy-bannery', 'k81-clenove-zpravy']);

@@ -52,15 +52,15 @@ const text = async (p, w) => (await p.locator(`[data-plocha] li[data-widget="${w
     tvrdi(`A2 ${w}: tento měsíc se ptá od 1. dne měsíce`, poz1.some(u => u.includes(`from=${mesic}-01`)), poz1.join(' '));
 
     await p.getByRole('button', { name: 'Předchozí měsíc' }).click();
-    await dokud(async () => (await p.locator('[data-plocha] li[data-widget="trzby.po_dnech"] ul[aria-label="Tržba po jednotlivých dnech"] > li').count()) === 7, 8000);
     const posl = dayPlus(`${mesic}-01`, -1);
+    await dokud(async () => (await p.locator('[data-plocha] li[data-widget="trzby.po_dnech"] ul[aria-label="Tržba po jednotlivých dnech"] > li').count()) === Number(posl.slice(8)), 8000);
     const poz2 = dotazyNa(stav, ['/api/pos/daily']).map(d => d.u);
     tvrdi(`A3 ${w}: po přepnutí na minulý měsíc se widget ptá na celý minulý měsíc`, poz2.some(u => u.includes(`from=${minuly}-01`) && u.includes(`to=${posl}`)), poz2.join(' '));
-    const tlacitko = p.locator('[data-plocha] li[data-widget="trzby.po_dnech"]').getByRole('button', { name: /^Zobrazit všechny dny/ });
-    tvrdi(`A4 ${w}: celý minulý měsíc se nevejde do 7 řádků — je tlačítko „Zobrazit všechny dny"`, await tlacitko.count() === 1);
-    await tlacitko.click();
-    const n3 = await p.locator('[data-plocha] li[data-widget="trzby.po_dnech"] ul[aria-label="Tržba po jednotlivých dnech"] > li').count();
-    tvrdi(`A5 ${w}: po rozbalení jsou vidět všechny dny měsíce (${posl.slice(8)})`, n3 === Number(posl.slice(8)), String(n3));
+    const karta = p.locator('[data-plocha] li[data-widget="trzby.po_dnech"]');
+    tvrdi(`A4 ${w}: celý minulý měsíc je dlouhý — obsah je zkrácený a nabízí „Zobrazit vše"`, await karta.locator('[data-zkraceno]').count() === 1 && await karta.getByRole('button', { name: 'Zobrazit vše', exact: true }).count() === 1);
+    await karta.getByRole('button', { name: 'Zobrazit vše', exact: true }).click();
+    const n3 = await karta.locator('ul[aria-label="Tržba po jednotlivých dnech"] > li').count();
+    tvrdi(`A5 ${w}: po rozbalení jsou všechny dny měsíce (${posl.slice(8)})`, n3 === Number(posl.slice(8)), String(n3));
     const pres = await p.evaluate(() => document.documentElement.scrollWidth - innerWidth);
     tvrdi(`A6 ${w}: Finance bez vodorovného přetečení`, pres <= 0, String(pres));
     if (w === 390) await p.screenshot({ path: OUT + 'finance-po-dnech.png', fullPage: false });

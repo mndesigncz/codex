@@ -299,7 +299,6 @@ function PoDnech({ velikost, nastaveni }: WidgetProps<{ obdobi: string; zdroj: s
   const obdobi = /^\d{4}-\d{2}$/.test(obdobiZakladni.popis)
     ? { ...obdobiZakladni, popis: fmtMesic(obdobiZakladni.popis, { jazyk: aktualniJazyk() }) }
     : obdobiZakladni;
-  const [vsechnyDny, setVsechnyDny] = useState(false);
   // Bez pokladny (nepropojená, nebo tarif bez ní) spadne na uzávěrky, když na ně divák smí.
   const zUzaverek = chceUzaverky || (smiUzaverky && pos.data?.propojeno === false);
   const mesice = useMemo(() => mesiceObdobi(obdobi.from, obdobi.to), [obdobi.from, obdobi.to]);
@@ -353,12 +352,11 @@ function PoDnech({ velikost, nastaveni }: WidgetProps<{ obdobi: string; zdroj: s
             // jejich počet je pod ním). Sloupek je podíl na nejsilnějším dni — pozná se rozdíl i bez čtení čísel.
             const nejvic = rekord?.trzba ?? 1;
             const zobrazene = [...sTrzbou].filter(x => x.den <= dnes).reverse();
-            const videt = vsechnyDny ? zobrazene : zobrazene.slice(0, 7);
             const bezTrzby = dny.filter(x => x.den <= dnes && x.trzba <= 0).length;
             return (
               <div>
                 <ul className="list" aria-label={t('Tržba po jednotlivých dnech')}>
-                  {videt.map(x => (
+                  {zobrazene.map(x => (
                     <li key={x.den} className="flex items-center gap-3 py-2 text-[14px]">
                       <span className="w-[5.5rem] shrink-0 text-black/70 tabular-nums">{pismenoDne(x.den)} {kratkeDatum(x.den)}</span>
                       <span aria-hidden className="h-1.5 flex-1 rounded-full bg-black/[0.06] overflow-hidden"><span className="block h-full rounded-full bg-[#16181A]/70" style={{ width: `${Math.max(3, Math.round((x.trzba / nejvic) * 100))}%` }} /></span>
@@ -366,11 +364,6 @@ function PoDnech({ velikost, nastaveni }: WidgetProps<{ obdobi: string; zdroj: s
                     </li>
                   ))}
                 </ul>
-                {zobrazene.length > 7 && (
-                  <Button variant="ghost" size="sm" className="mt-1" aria-expanded={vsechnyDny} onClick={() => setVsechnyDny(v => !v)}>
-                    {vsechnyDny ? t('Ukázat méně') : t('Zobrazit všechny dny ({n})', { n: zobrazene.length })}
-                  </Button>
-                )}
                 {bezTrzby > 0 && <p className="t-meta mt-1">{t('{n, plural, one {# den bez tržby} few {# dny bez tržby} other {# dní bez tržby}}', { n: bezTrzby })}</p>}
               </div>
             );
