@@ -21,7 +21,7 @@ const text = async (p, w) => (await p.locator(`[data-plocha] li[data-widget="${w
   const blok = src.slice(src.indexOf("'typ:vedeni': ["), src.indexOf('],', src.indexOf("'typ:vedeni': [")));
   const polozky = [...blok.matchAll(/\{ w: '([^']+)'(?:, s: '([SML])')?(?:, o: (\{[^}]*\}))?/g)]
     .map(m => ({ id: m[1].replace(/[._]/g, '-'), widget: m[1], ...(m[2] ? { velikost: m[2] } : {}), ...(m[3] ? { nastaveni: JSON.parse(m[3].replace(/(\w+):/g, '"$1":').replace(/'/g, '"')) } : {}) }));
-  tvrdi('A0: výchozí Finance má jen podstatné widgety (5, ne deset)', polozky.length === 5, polozky.map(x => x.widget).join(', '));
+  tvrdi('A0: výchozí Finance je přehledný dashboard (7 widgetů, ne dvacet)', polozky.length === 7, polozky.map(x => x.widget).join(', '));
   const fix = { ...fixtura('k69-b5b-rozlozeni-finance'), polozky };
 
   const dalsi = (req, json) => {

@@ -196,6 +196,8 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['zamestnanec.domu', 'vedeni.moje_smeny', 'zamestnanec.moje_smeny'],
     opravneni: { vse: [], nektere: ['finance.moje_mzda', 'finance.mzdy'] },
     tarif: 'zdarma',
+    // Klepnutí na Přehledu vede na Moje směny, kde je výdělek spolu s odpracovanými hodinami.
+    cil: { pohled: 'my-shifts' },
     stav: 'hotovo',
   },
 ];

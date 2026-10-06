@@ -297,3 +297,93 @@ export const urlPrehledu = (mesic: string) => `/api/organization/overview?month=
  */
 export const potrebujePozornost = (r: RadekPodnikuApi) => r.missingClosings > 0 || r.pendingApproval > 0 || r.stockAlerts > 0
   || dnesJesteChybi(r);
+
+// ---------------------------------------------------------------------------
+// Přehledy tržby v čase: týdny, dny v týdnu, kalendář (widget Tržba po dnech)
+// ---------------------------------------------------------------------------
+
+/** Den a jeho tržba; budoucí dny a dny bez dat mají 0 (rozliší se podle `dnes`). */
+export interface DenTrzbyData { den: string; trzba: number }
+
+/** 0 = pondělí … 6 = neděle. Poledne UTC, ať se den nepřehoupne podle pásma zařízení. */
+export const poradiDneVTydnu = (d: string): number => (new Date(`${d}T12:00:00Z`).getUTCDay() + 6) % 7;
+/** Pondělí týdne, do kterého den patří. */
+export const pondeliTydne = (d: string): string => dayPlus(d, -poradiDneVTydnu(d));
+
+export interface TydenTrzeb {
+  od: string; do: string;
+  soucet: number;
+  /** Dny s nenulovou tržbou (zavřeno / bez dat se nepočítá). */
+  dnu: number;
+  /** Průměr na den s tržbou; neúplný týden se tak nesrovnává s plným podle součtu. */
+  prumer: number;
+  /** Změna průměru proti předchozímu týdnu v datech (%); null = není s čím srovnat. */
+  zmena: number | null;
+}
+
+/** Týdny od pondělí do neděle, nejnovější první; dny po `dnes` se nepočítají. */
+export function tydnyTrzeb(dny: readonly DenTrzbyData[], dnes: string): TydenTrzeb[] {
+  const m = new Map<string, DenTrzbyData[]>();
+  for (const x of dny) {
+    if (!x.den || x.den > dnes) continue;
+    const k = pondeliTydne(x.den);
+    const l = m.get(k) ?? []; l.push(x); m.set(k, l);
+  }
+  const chronologicky = [...m.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([, l]) => {
+    const dnyL = [...l].sort((a, b) => a.den.localeCompare(b.den));
+    const soucet = dnyL.reduce((s, x) => s + x.trzba, 0);
+    const dnu = dnyL.filter(x => x.trzba > 0).length;
+    return { od: dnyL[0].den, do: dnyL[dnyL.length - 1].den, soucet, dnu, prumer: dnu ? Math.round(soucet / dnu) : 0, zmena: null as number | null };
+  });
+  chronologicky.forEach((t, i) => { if (i > 0 && chronologicky[i - 1].prumer > 0 && t.prumer > 0) t.zmena = zmenaProti(t.prumer, chronologicky[i - 1].prumer); });
+  return chronologicky.reverse();
+}
+
+export interface DenVTydnu {
+  /** 0 = pondělí … 6 = neděle. */
+  poradi: number;
+  dnu: number;
+  prumer: number;
+  nejsilnejsi: boolean;
+}
+
+/** Průměrná tržba podle dne v týdnu (jen dny s tržbou do `dnes`); vždy sedm řádků, pondělí první. */
+export function dnyVTydnu(dny: readonly DenTrzbyData[], dnes: string): DenVTydnu[] {
+  const soucty = Array.from({ length: 7 }, () => ({ soucet: 0, dnu: 0 }));
+  for (const x of dny) {
+    if (!x.den || x.den > dnes || !(x.trzba > 0)) continue;
+    const s = soucty[poradiDneVTydnu(x.den)]; s.soucet += x.trzba; s.dnu += 1;
+  }
+  const prumery = soucty.map(s => (s.dnu ? Math.round(s.soucet / s.dnu) : 0));
+  const max = Math.max(...prumery);
+  return soucty.map((s, poradi) => ({ poradi, dnu: s.dnu, prumer: prumery[poradi], nejsilnejsi: max > 0 && prumery[poradi] === max }));
+}
+
+export interface BunkaKalendare {
+  /** null = buňka mimo zobrazené období (zarovnání na týdny). */
+  den: string | null;
+  trzba: number | null;
+  /** 0–1 podíl na nejsilnějším dni (podbarvení). */
+  intenzita: number;
+  dnes: boolean;
+  budouci: boolean;
+}
+
+/** Kalendář po týdnech (pondělí první) přes celé období; řádky jsou týdny shora dolů. */
+export function kalendarTrzeb(dny: readonly DenTrzbyData[], dnes: string): BunkaKalendare[][] {
+  if (dny.length === 0) return [];
+  const trzba = new Map(dny.map(x => [x.den, x.trzba]));
+  const od = dny.reduce((m, x) => (x.den < m ? x.den : m), dny[0].den);
+  const doD = dny.reduce((m, x) => (x.den > m ? x.den : m), dny[0].den);
+  const max = dny.reduce((m, x) => (x.den <= dnes ? Math.max(m, x.trzba) : m), 0);
+  const radky: BunkaKalendare[][] = [];
+  for (let zacatek = pondeliTydne(od); zacatek <= doD; zacatek = dayPlus(zacatek, 7)) {
+    radky.push(Array.from({ length: 7 }, (_, i) => {
+      const d = dayPlus(zacatek, i);
+      if (d < od || d > doD) return { den: null, trzba: null, intenzita: 0, dnes: false, budouci: false };
+      const t = trzba.get(d) ?? 0;
+      return { den: d, trzba: t, intenzita: max > 0 && d <= dnes ? Math.min(1, t / max) : 0, dnes: d === dnes, budouci: d > dnes };
+    }));
+  }
+  return radky;
+}
