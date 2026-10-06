@@ -77,7 +77,7 @@ export default function FinanceDen({ den, onDen, onClose }: { den: string; onDen
   return (
     <Modal open onClose={onClose} size="lg" title={t('Finance dne')} subtitle={<span className="cz-sentence">{datumVetou}</span>}
       footer={<>
-        <Button variant="secondary" icon="chevron" className="[&_svg]:rotate-90" onClick={() => onDen(dayPlus(den, -1))}>{t('Předchozí den')}</Button>
+        <Button variant="secondary" icon="chevronLeft" onClick={() => onDen(dayPlus(den, -1))}>{t('Předchozí den')}</Button>
         <Button variant="secondary" iconAfter="chevronRight" disabled={den >= dnes} onClick={() => onDen(dayPlus(den, 1))}>{t('Další den')}</Button>
       </>}>
       <div className="space-y-5">

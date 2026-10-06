@@ -147,8 +147,8 @@ function Zkratitelne({ id, velikost, children }: { id: string; velikost: 'M' | '
         <div ref={vnitrek}>{children}</div>
       </div>
       {dlouhy && (
-        <Button variant="ghost" size="sm" icon="chevron" aria-expanded={!zkraceno} onClick={prepni}
-          className={`mt-1 ${zkraceno ? '' : '[&_svg]:rotate-180'}`}>
+        <Button variant="ghost" size="sm" icon={zkraceno ? 'chevron' : 'chevronUp'} aria-expanded={!zkraceno} onClick={prepni}
+          className="mt-1">
           {zkraceno ? t('Zobrazit vše') : t('Ukázat méně')}
         </Button>
       )}
@@ -355,9 +355,9 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, ton, nac
         {mozeSbalit && (
           // Jen ikona (názvu se nebere ani px) a popisek bez jména widgetu — jméno nese nadpis karty přes
           // aria-describedby; „Sbalit {název}" by se pletlo s tlačítky, která se hledají podle názvu widgetu.
-          <Button variant="ghost" size="sm" iconOnly icon="chevron" aria-expanded={!k.sbaleno} aria-describedby={idTitulku}
+          <Button variant="ghost" size="sm" icon={k.sbaleno ? 'chevron' : 'chevronUp'} aria-expanded={!k.sbaleno} aria-describedby={idTitulku}
             aria-label={k.sbaleno ? t('Rozbalit widget') : t('Sbalit widget')}
-            className={`shrink-0 -my-1.5 -mr-1 ${k.sbaleno ? '' : '[&_svg]:rotate-180'} ${inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : ''}`}
+            className={`shrink-0 -my-1.5 -mr-1 ${inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : ''}`}
             onClick={k.prepniSbaleni} />
         )}
         {vidiOdkaz && (

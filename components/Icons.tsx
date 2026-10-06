@@ -152,6 +152,10 @@ const paths: Record<string, React.ReactNode> = {
     </>
   ),
   chevron: <path d="m6 9 6 6 6-6" />,
+  // Nahoru (sbalit) a doleva (předchozí): vlastní tvary, ne otočený `chevron` — otočená ikona v tlačítku
+  // nafoukne `scrollWidth` a sonda ořezaného textu pak hlásí přetečení 40 > 36.
+  chevronUp: <path d="m6 15 6-6 6 6" />,
+  chevronLeft: <path d="m15 6-6 6 6 6" />,
   // „Odkaz dál" a krok vpřed. Dřív se kreslil `chevron` otočený o −90°, jenže
   // otočení nese každé místo zvlášť a `iconAfter` u tlačítka otočit nejde —
   // proto zelené „Sklad →" s šipkou v textu.
