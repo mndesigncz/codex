@@ -34,7 +34,7 @@
 //
 // Data jen přes useDataWidgetu (sdílená mezipaměť), v náhledu nic nenaviguje ani nezapisuje.
 
-import { useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Suspense, lazy, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
 import { widget } from '@/lib/widgety/katalog';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
@@ -42,9 +42,10 @@ import { dbTimeHM, pragueToday } from '@/lib/pragueTime';
 import { apiMessage, okJson } from '@/lib/api';
 import { fmtMesic } from '@/lib/i18n/format';
 import { aktualniJazyk } from '@/lib/i18n/stav';
-import { dnyObdobi, kasaProtiUzaverkam, mesiceObdobi, vyberKalendarTrzeb as vyberKalendar } from '@/lib/financeWidgety';
+import { dnyObdobi, dnyVTydnu, kalendarTrzeb, kasaProtiUzaverkam, mesiceObdobi, tydnyTrzeb, vyberKalendarTrzeb as vyberKalendar } from '@/lib/financeWidgety';
 import { useMoney } from '../../CurrencyProvider';
-import { BarSpark, Button, Chip, ListRow, Stat, StatRow } from '../../ui';
+import { Icon } from '../../Icons';
+import { BarSpark, Button, Chip, ListRow, Segmented, Stat, StatRow } from '../../ui';
 import { useOpravneni } from '../../role/useOpravneni';
 import { Widget, useWidget, type StavNacteni } from '../Widget';
 import { useDataWidgetu, obnovDataWidgetu } from '../useDataWidgetu';
@@ -285,6 +286,108 @@ function ZivePokladna({ velikost, nastaveni }: WidgetProps<{ obdobi: string }>) 
 
 interface DenTrzby { den: string; trzba: number }
 
+const FinanceDen = lazy(() => import('../../employer/FinanceDen'));
+
+type PohledDnu = 'dny' | 'kalendar' | 'tydny' | 'dnyvt';
+const KLIC_POHLEDU_DNU = 'managero-trzby-pohled';
+
+/** Krátce pro buňku kalendáře: „18,9k" (měna je jasná z nadpisu widgetu, do buňky se nevejde). */
+const kratce = (v: number) => (v >= 10000 ? `${Math.round(v / 1000)}k` : v >= 1000 ? `${(v / 1000).toFixed(1).replace('.', ',')}k` : String(Math.round(v)));
+
+/**
+ * Přehledy tržby v čase pod grafem: dny (seznam), kalendář, týdny a dny v týdnu. Řádky dnů a buňky kalendáře
+ * otevírají detail dne (FinanceDen). Zvolený pohled se pamatuje v tomhle prohlížeči.
+ */
+function PrehledDnu({ dny, dnes, rekord, onDen }: { dny: DenTrzby[]; dnes: string; rekord: DenTrzby | null; onDen: (d: string) => void }) {
+  const t = useT('widgety');
+  const money = useMoney();
+  const loc = aktualniJazyk();
+  const [pohled, setPohled] = useState<PohledDnu>('dny');
+  useEffect(() => {
+    try { const v = localStorage.getItem(KLIC_POHLEDU_DNU); if (v === 'dny' || v === 'kalendar' || v === 'tydny' || v === 'dnyvt') setPohled(v); } catch { /* soukromé okno */ }
+  }, []);
+  const zvol = (v: PohledDnu) => { setPohled(v); try { localStorage.setItem(KLIC_POHLEDU_DNU, v); } catch { /* soukromé okno */ } };
+
+  const sTrzbou = dny.filter(x => x.trzba > 0 && x.den <= dnes);
+  const nejvic = rekord?.trzba ?? 1;
+  const bezTrzby = dny.filter(x => x.den <= dnes && x.trzba <= 0).length;
+  const kal = useMemo(() => kalendarTrzeb(dny, dnes), [dny, dnes]);
+  const tydny = useMemo(() => tydnyTrzeb(dny, dnes), [dny, dnes]);
+  const dnyVt = useMemo(() => dnyVTydnu(dny, dnes), [dny, dnes]);
+  const jmenoDne = (poradi: number, styl: 'long' | 'narrow' | 'short') => new Date(`2024-01-0${poradi + 1}T12:00:00`).toLocaleDateString(loc, { weekday: styl });
+  const nejvicVt = Math.max(1, ...dnyVt.map(x => x.prumer));
+
+  const radekDne = (x: DenTrzby) => (
+    <li key={x.den}>
+      <button type="button" onClick={() => onDen(x.den)} aria-label={t('Detail dne {den}', { den: `${pismenoDne(x.den)} ${kratkeDatum(x.den)}` })}
+        className="w-full flex items-center gap-3 py-2 text-[14px] text-left rounded-xl hover:bg-black/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542]">
+        <span className="w-[5.5rem] shrink-0 text-black/70 tabular-nums">{pismenoDne(x.den)} {kratkeDatum(x.den)}</span>
+        <span aria-hidden className="h-1.5 flex-1 rounded-full bg-black/[0.06] overflow-hidden"><span className="block h-full rounded-full bg-[#16181A]/70" style={{ width: `${Math.max(3, Math.round((x.trzba / nejvic) * 100))}%` }} /></span>
+        <span className="w-[6.5rem] shrink-0 text-right font-semibold tabular-nums text-[#16181A]">{money(x.trzba)}</span>
+        <Icon name="chevronRight" size={14} className="shrink-0 text-black/30" />
+      </button>
+    </li>
+  );
+
+  return (
+    <div className="space-y-3">
+      <Segmented size="sm" ariaLabel={t('Přehled tržby')} value={pohled} onChange={zvol}
+        options={[
+          { id: 'dny', label: t('Dny') }, { id: 'kalendar', label: t('Kalendář') },
+          { id: 'tydny', label: t('Týdny') }, { id: 'dnyvt', label: t('Dny v týdnu') },
+        ]} />
+      {pohled === 'dny' && (
+        <div>
+          <ul className="list" aria-label={t('Tržba po jednotlivých dnech')}>{[...sTrzbou].reverse().map(radekDne)}</ul>
+          {bezTrzby > 0 && <p className="t-meta mt-1">{t('{n, plural, one {# den bez tržby} few {# dny bez tržby} other {# dní bez tržby}}', { n: bezTrzby })}</p>}
+        </div>
+      )}
+      {pohled === 'kalendar' && (
+        <div role="group" aria-label={t('Kalendář tržby')}>
+          <div aria-hidden className="grid grid-cols-7 gap-1 mb-1 text-center text-[11px] text-black/45">
+            {Array.from({ length: 7 }, (_, i) => <span key={i}>{jmenoDne(i, 'short')}</span>)}
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {kal.flat().map((b, i) => b.den == null ? <span key={i} aria-hidden /> : (
+              <button key={b.den} type="button" disabled={b.budouci} onClick={() => onDen(b.den!)}
+                aria-label={t('Detail dne {den}', { den: `${pismenoDne(b.den)} ${kratkeDatum(b.den)}` }) + (b.trzba ? `: ${money(b.trzba)}` : '')}
+                style={{ background: b.intenzita > 0 ? `color-mix(in srgb, var(--ink) ${Math.round(b.intenzita * 14)}%, transparent)` : undefined }}
+                className={`flex flex-col items-center justify-center rounded-xl py-1.5 min-h-[3.1rem] border text-[11px] leading-tight disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542] ${b.dnes ? 'border-[#16181A]' : 'border-transparent'} ${b.intenzita > 0 ? '' : 'bg-black/[0.03]'}`}>
+                <span className="text-black/55 tabular-nums">{Number(b.den.slice(8))}</span>
+                <span className="font-semibold tabular-nums text-[#16181A]">{b.trzba && !b.budouci ? kratce(b.trzba) : '·'}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {pohled === 'tydny' && (
+        <ul className="list" aria-label={t('Tržba po týdnech')}>
+          {tydny.map(w => (
+            <ListRow key={w.od} as="li" title={<span className="tabular-nums">{kratkeDatum(w.od)} – {kratkeDatum(w.do)}</span>}
+              meta={`${t('{n, plural, one {# den s tržbou} few {# dny s tržbou} other {# dní s tržbou}}', { n: w.dnu })} · ${t('průměr {castka} za den', { castka: money(w.prumer) })}`}
+              value={<span className="tabular-nums">{money(w.soucet)}</span>}
+              right={w.zmena != null ? <Chip tone={w.zmena >= 0 ? 'ok' : 'wait'} size="sm">{w.zmena > 0 ? '+' : ''}{w.zmena} %</Chip> : undefined} />
+          ))}
+        </ul>
+      )}
+      {pohled === 'dnyvt' && (
+        <div>
+          <ul className="list" aria-label={t('Průměrná tržba podle dne v týdnu')}>
+            {dnyVt.map(d => (
+              <li key={d.poradi} className="flex items-center gap-3 py-2 text-[14px]">
+                <span className="w-[5.5rem] shrink-0 cz-sentence text-black/70">{jmenoDne(d.poradi, 'long')}</span>
+                <span aria-hidden className="h-1.5 flex-1 rounded-full bg-black/[0.06] overflow-hidden"><span className="block h-full rounded-full bg-[#16181A]/70" style={{ width: `${d.prumer > 0 ? Math.max(3, Math.round((d.prumer / nejvicVt) * 100)) : 0}%` }} /></span>
+                <span className="w-[6.5rem] shrink-0 text-right font-semibold tabular-nums text-[#16181A]">{d.dnu ? money(d.prumer) : '—'}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="t-meta mt-1">{t('Průměr ze dnů, kdy byla tržba.')}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PoDnech({ velikost, nastaveni }: WidgetProps<{ obdobi: string; zdroj: string }>) {
   const t = useT('widgety');
   const money = useMoney();
@@ -299,7 +402,6 @@ function PoDnech({ velikost, nastaveni }: WidgetProps<{ obdobi: string; zdroj: s
   const obdobi = /^\d{4}-\d{2}$/.test(obdobiZakladni.popis)
     ? { ...obdobiZakladni, popis: fmtMesic(obdobiZakladni.popis, { jazyk: aktualniJazyk() }) }
     : obdobiZakladni;
-  const [vsechnyDny, setVsechnyDny] = useState(false);
   // Bez pokladny (nepropojená, nebo tarif bez ní) spadne na uzávěrky, když na ně divák smí.
   const zUzaverek = chceUzaverky || (smiUzaverky && pos.data?.propojeno === false);
   const mesice = useMemo(() => mesiceObdobi(obdobi.from, obdobi.to), [obdobi.from, obdobi.to]);
@@ -319,6 +421,8 @@ function PoDnech({ velikost, nastaveni }: WidgetProps<{ obdobi: string; zdroj: s
     return vsechny.map(den => ({ den, trzba: m.get(den) ?? 0 }));
   }, [zUzaverek, kal1.data, kal2.data, mesice, pos.data, obdobi.from, obdobi.to]);
 
+  const { nahled } = useWidget();
+  const [denDetail, setDenDetail] = useState<string | null>(null);
   const dnes = pragueToday();
   const celkem = (dny ?? []).reduce((s, x) => s + x.trzba, 0);
   const sTrzbou = (dny ?? []).filter(x => x.trzba > 0);
@@ -348,37 +452,16 @@ function PoDnech({ velikost, nastaveni }: WidgetProps<{ obdobi: string; zdroj: s
           {/* Víc než dva týdny: písmeno dne by se do sloupku nevešlo — osa jen se začátkem a koncem. */}
           {dny.length > 14 && <OsaGrafu popisky={[kratkeDatum(dny[0].den), kratkeDatum(dny[dny.length - 1].den)]} />}
           </div>
-          {L && sTrzbou.length > 0 && (() => {
-            // Přehled dnů: nejnovější nahoře, jen dny s tržbou (zavřeno / bez dat se do seznamu nepletou,
-            // jejich počet je pod ním). Sloupek je podíl na nejsilnějším dni — pozná se rozdíl i bez čtení čísel.
-            const nejvic = rekord?.trzba ?? 1;
-            const zobrazene = [...sTrzbou].filter(x => x.den <= dnes).reverse();
-            const videt = vsechnyDny ? zobrazene : zobrazene.slice(0, 7);
-            const bezTrzby = dny.filter(x => x.den <= dnes && x.trzba <= 0).length;
-            return (
-              <div>
-                <ul className="list" aria-label={t('Tržba po jednotlivých dnech')}>
-                  {videt.map(x => (
-                    <li key={x.den} className="flex items-center gap-3 py-2 text-[14px]">
-                      <span className="w-[5.5rem] shrink-0 text-black/70 tabular-nums">{pismenoDne(x.den)} {kratkeDatum(x.den)}</span>
-                      <span aria-hidden className="h-1.5 flex-1 rounded-full bg-black/[0.06] overflow-hidden"><span className="block h-full rounded-full bg-[#16181A]/70" style={{ width: `${Math.max(3, Math.round((x.trzba / nejvic) * 100))}%` }} /></span>
-                      <span className="w-[6.5rem] shrink-0 text-right font-semibold tabular-nums text-[#16181A]">{money(x.trzba)}</span>
-                    </li>
-                  ))}
-                </ul>
-                {zobrazene.length > 7 && (
-                  <Button variant="ghost" size="sm" className="mt-1" aria-expanded={vsechnyDny} onClick={() => setVsechnyDny(v => !v)}>
-                    {vsechnyDny ? t('Ukázat méně') : t('Zobrazit všechny dny ({n})', { n: zobrazene.length })}
-                  </Button>
-                )}
-                {bezTrzby > 0 && <p className="t-meta mt-1">{t('{n, plural, one {# den bez tržby} few {# dny bez tržby} other {# dní bez tržby}}', { n: bezTrzby })}</p>}
-              </div>
-            );
-          })()}
+          {L && sTrzbou.length > 0 && !nahled && <PrehledDnu dny={dny} dnes={dnes} rekord={rekord} onDen={setDenDetail} />}
           {L && rekord && (
             <p className="t-meta">{t('Nejsilnější den {den} {datum} · {castka}', { den: pismenoDne(rekord.den), datum: kratkeDatum(rekord.den), castka: money(rekord.trzba) })}</p>
           )}
         </div>
+      )}
+      {denDetail && (
+        <Suspense fallback={null}>
+          <FinanceDen den={denDetail} onDen={setDenDetail} onClose={() => setDenDetail(null)} />
+        </Suspense>
       )}
     </Widget>
   );

@@ -125,6 +125,8 @@ interface Obsluha {
   nahlasSkryti: (instance: string, skryto: boolean) => void;
   nahlasVyrizeno: (instance: string, souhrn: string | null) => void;
   rozbal: (instance: string) => void;
+  /** Sbalí / rozbalí kartu na hlavičku (pamatuje se po stránce v tomhle prohlížeči). */
+  prepniSbaleni: (instance: string) => void;
   /** Klepnutí na kartu v klidu: naviguje na `cil` widgetu z katalogu. */
   klikKlid: (e: React.MouseEvent<HTMLElement>, instance: string) => void;
 }
@@ -147,6 +149,8 @@ interface PolozkaProps {
   nova: boolean;
   /** Souhrn vyřízeného widgetu — kreslí se minimalizovaně (null = plný). */
   mini: string | null;
+  /** Uživatel kartu sbalil na hlavičku. */
+  sbaleno: boolean;
   navodId: string;
   stranka: DefiniceStranky;
   nastroj: React.ReactNode;
@@ -190,16 +194,17 @@ function velikostPoZmene(t: PrekladFn, velikost: Velikost, nazev: string): strin
 }
 
 const PolozkaPlochy = memo(function PolozkaPlochy(props: PolozkaProps) {
-  const { p, index, pocet, def, nazev, rozpeti, skryta, upravy, odznakyMizi, pripojit, bezOpravneni, schematicky, inkoust, pokus, nova, mini, navodId, stranka, nastroj, h } = props;
+  const { p, index, pocet, def, nazev, rozpeti, skryta, upravy, odznakyMizi, pripojit, bezOpravneni, schematicky, inkoust, pokus, nova, mini, sbaleno, navodId, stranka, nastroj, h } = props;
   const t = useT('widgety');
   const jeNastroj = p.widget === NASTROJ;
   const nahlasSkryti = useCallback((ano: boolean) => h.nahlasSkryti(p.id, ano), [h, p.id]);
   const nahlasVyrizeno = useCallback((souhrn: string | null) => h.nahlasVyrizeno(p.id, souhrn), [h, p.id]);
   const rozbal = useCallback(() => h.rozbal(p.id), [h, p.id]);
+  const prepniSbaleni = useCallback(() => h.prepniSbaleni(p.id), [h, p.id]);
   const kontext = useMemo<KontextWidgetu>(() => ({
     instance: p.id, velikost: p.velikost, definice: def, nahled: false, upravy, inkoust, nahlasSkryti,
-    nahlasVyrizeno, mini, rozbal,
-  }), [p.id, p.velikost, def, upravy, inkoust, nahlasSkryti, nahlasVyrizeno, mini, rozbal]);
+    nahlasVyrizeno, mini, rozbal, pohledStranky: stranka.pohled, sbaleno, prepniSbaleni,
+  }), [p.id, p.velikost, def, upravy, inkoust, nahlasSkryti, nahlasVyrizeno, mini, rozbal, stranka.pohled, sbaleno, prepniSbaleni]);
   const Komponenta = useMemo(() => (def && !jeNastroj ? lineWidget(p.widget, pokus) : null), [def, jeNastroj, p.widget, pokus]);
   const nastaveni = useMemo(() => sNastavenimVychozimi(def?.nastaveni, p.nastaveni), [def, p.nastaveni]);
   // Fáze a délka kmitu z hashe id: vypadá náhodně, ale je stálá — sousedé se
@@ -372,6 +377,12 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
   // Vyřízené widgety (instance → souhrn) — hlásí je komponenty přes useVyrizeno.
   const [vyrizene, setVyrizene] = useState<ReadonlyMap<string, string>>(() => new Map());
   // „Ukázat i tak": rozbalení vyřízeného widgetu platí do konce sezení.
+  // Sbalené karty (uživatel je sbalil na hlavičku): po stránce, v localStorage, ať přežijí zavření karty.
+  const klicSbaleni = `managero-plocha-sbaleno-${idStranky}`;
+  const [sbalene, setSbalene] = useState<ReadonlySet<string>>(() => new Set<string>());
+  useEffect(() => {
+    try { setSbalene(new Set<string>(JSON.parse(localStorage.getItem(klicSbaleni) ?? '[]'))); } catch { /* soukromé okno */ }
+  }, [klicSbaleni]);
   const klicRozbaleni = `managero-plocha-rozbal-${idStranky}`;
   const [rozbalene, setRozbalene] = useState<ReadonlySet<string>>(() => {
     // sessionStorage může chybět nebo házet (soukromé okno, server) — pak prázdno.
@@ -1062,11 +1073,27 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
     const cil = najdiWidget(pol.widget)?.cil;
     const nav = navigaceRef.current;
     if (!cil || !nav.smiPohled(cil.pohled)) return;
+    // Cíl je stránka, na které karta už leží: klepnutí nemá kam vést (dřív „nic neudělalo");
+    // karta se sbaluje klepnutím do hlavičky a tlačítkem v ní, ne klepnutím kamkoli.
+    if (cil.pohled === stranka?.pohled) return;
     nav.onNavigate(cil.pohled, cil.arg);
-  }, [tahne, bezOpravneni]);
+  }, [tahne, bezOpravneni, stranka?.pohled]);
 
-  const obsluhaRef = useRef({ klavesaPolozky, odeber, klikKlid });
-  obsluhaRef.current = { klavesaPolozky, odeber, klikKlid };
+  const sbaleneRef = useRef(sbalene);
+  sbaleneRef.current = sbalene;
+  const prepniSbaleni = useCallback((id: string) => {
+    const n = new Set(sbaleneRef.current);
+    const sbalit = !n.has(id);
+    if (sbalit) n.add(id); else n.delete(id);
+    // Výška karty se změní — FLIP změří stav před tím, ať sousedé neskočí.
+    pripravFlip();
+    if (fokusVKarte(id)) oznam(sbalit ? t('{nazev}: widget sbalen.', { nazev: nazevIdRef.current(id) }) : t('{nazev}: widget rozbalen.', { nazev: nazevIdRef.current(id) }));
+    try { localStorage.setItem(klicSbaleni, JSON.stringify([...n])); } catch { /* soukromé okno */ }
+    setSbalene(n);
+  }, [pripravFlip, fokusVKarte, oznam, klicSbaleni, t]);
+
+  const obsluhaRef = useRef({ klavesaPolozky, odeber, klikKlid, prepniSbaleni });
+  obsluhaRef.current = { klavesaPolozky, odeber, klikKlid, prepniSbaleni };
   const obsluha = useMemo<Obsluha>(() => ({
     pointerDown: tahPointerDown,
     klavesa: (e, id) => obsluhaRef.current.klavesaPolozky(e, id),
@@ -1075,6 +1102,7 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
     nahlasSkryti,
     nahlasVyrizeno,
     rozbal,
+    prepniSbaleni: id => obsluhaRef.current.prepniSbaleni(id),
     klikKlid: (e, id) => obsluhaRef.current.klikKlid(e, id),
   }), [tahPointerDown, nahlasSkryti, nahlasVyrizeno, rozbal]);
 
@@ -1242,6 +1270,7 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
                 pokus={pokusy[p.id] ?? 0}
                 nova={nova === p.id}
                 mini={!upravy && !vychoziRezim && !rozbalene.has(p.id) ? vyrizene.get(p.id) ?? null : null}
+                sbaleno={!upravy && !vychoziRezim && sbalene.has(p.id)}
                 navodId={navodId}
                 stranka={stranka}
                 nastroj={p.widget === NASTROJ ? nastroj : null}

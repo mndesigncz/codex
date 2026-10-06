@@ -13,7 +13,7 @@
 // náhled nebo režim úprav, jestli smí nést inkoust), mu dává plocha přes
 // kontext — autor widgetu to nemusí protahovat props.
 
-import React, { createContext, useContext, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Icon } from '../Icons';
 import { Button, Card, ErrorState, Menu, Skeleton, type MenuItem } from '../ui';
 import type { LoadState } from '../ui/useLoad';
@@ -49,6 +49,12 @@ export interface KontextWidgetu {
   nahlasVyrizeno: (souhrn: string | null) => void;
   /** Plocha rozhodla: místo plné karty se kreslí nízká vyřízená karta s tímhle souhrnem. */
   mini: string | null;
+  /** Pohled (`DefiniceStranky.pohled`) stránky, na které karta leží; null mimo plochu. */
+  pohledStranky: string | null;
+  /** Karta je sbalená na samotnou hlavičku (uživatel ji sbalil; pamatuje se). */
+  sbaleno: boolean;
+  /** Sbalí / rozbalí kartu. */
+  prepniSbaleni: () => void;
   /** „Ukázat i tak" — rozbalí vyřízený widget do konce sezení. */
   rozbal: () => void;
 }
@@ -56,6 +62,7 @@ export interface KontextWidgetu {
 const MIMO_PLOCHU: KontextWidgetu = {
   instance: 'widget', velikost: 'M', definice: undefined, nahled: false, upravy: false, inkoust: false,
   nahlasSkryti: () => {}, nahlasVyrizeno: () => {}, mini: null, rozbal: () => {},
+  pohledStranky: null, sbaleno: false, prepniSbaleni: () => {},
 };
 
 export const KontextWidgetuCtx = createContext<KontextWidgetu>(MIMO_PLOCHU);
@@ -82,6 +89,71 @@ export function useVyrizeno(hotovo: boolean, souhrn: string): void {
   useEffect(() => { nahlasVyrizeno(hotovo ? souhrn : null); }, [hotovo, souhrn, nahlasVyrizeno]);
   // Odpojení (odebrání z plochy) po sobě uklidí, ať plocha nedrží mrtvý stav.
   useEffect(() => () => nahlasVyrizeno(null), [nahlasVyrizeno]);
+}
+
+// ---------------------------------------------------------------------------
+// Dlouhý obsah: zkrácení s „Zobrazit vše"
+// ---------------------------------------------------------------------------
+
+/** Nad tuhle výšku (px) se obsah widgetu zkrátí a nabídne „Zobrazit vše"; M a L mají jiný práh. */
+const PRAH_ZKRACENI: Record<'M' | 'L', number> = { M: 300, L: 440 };
+/** O kolik musí obsah práh přesáhnout, aby se zkracovalo (kvůli pár pixelům se nezkracuje). */
+const REZERVA_ZKRACENI = 60;
+const KLIC_ROZBALENO = 'managero-widgety-rozbaleno';
+
+function nactiRozbalene(): Record<string, true> {
+  try { const v = JSON.parse(localStorage.getItem(KLIC_ROZBALENO) ?? '{}'); return v && typeof v === 'object' ? v : {}; } catch { return {}; }
+}
+
+/**
+ * Tělo widgetu, které je nad prahem výšky zkrácené (přehled nahoře zůstane, dlouhý výčet pod ním se
+ * zasune pod odlesk) a jde rozbalit i zase zabalit. Volba se pamatuje v tomhle prohlížeči po instanci.
+ * V náhledu galerie a v úpravách se nezkracuje — tam má být vidět všechno.
+ */
+function Zkratitelne({ id, velikost, children }: { id: string; velikost: 'M' | 'L'; children: React.ReactNode }) {
+  const t = useT('widgety');
+  const vnitrek = useRef<HTMLDivElement>(null);
+  const [vyska, setVyska] = useState(0);
+  const [rozbaleno, setRozbaleno] = useState(false);
+  // Uložená volba se čte až v prohlížeči (SSR a první vykreslení se musí shodovat).
+  useEffect(() => { setRozbaleno(!!nactiRozbalene()[id]); }, [id]);
+  useLayoutEffect(() => {
+    const el = vnitrek.current;
+    if (!el) return;
+    const zmer = () => setVyska(el.getBoundingClientRect().height);
+    zmer();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(zmer);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const prah = PRAH_ZKRACENI[velikost];
+  const dlouhy = vyska > prah + REZERVA_ZKRACENI;
+  const zkraceno = dlouhy && !rozbaleno;
+  const prepni = () => {
+    const dalsi = !rozbaleno;
+    setRozbaleno(dalsi);
+    try {
+      const m = nactiRozbalene();
+      if (dalsi) m[id] = true; else delete m[id];
+      localStorage.setItem(KLIC_ROZBALENO, JSON.stringify(m));
+    } catch { /* soukromé okno */ }
+  };
+  const maska = 'linear-gradient(to bottom, #000 calc(100% - 64px), transparent)';
+  return (
+    <div>
+      <div data-zkraceno={zkraceno ? '' : undefined}
+        style={zkraceno ? { maxHeight: prah, overflow: 'hidden', maskImage: maska, WebkitMaskImage: maska } : undefined}>
+        <div ref={vnitrek}>{children}</div>
+      </div>
+      {dlouhy && (
+        <Button variant="ghost" size="sm" icon={zkraceno ? 'chevron' : 'chevronUp'} aria-expanded={!zkraceno} onClick={prepni}
+          className="mt-1">
+          {zkraceno ? t('Zobrazit vše') : t('Ukázat méně')}
+        </Button>
+      )}
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -197,7 +269,11 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, ton, nac
   // zvednutí na hover) a klávesovou cestu: <li> v klidu tabIndex mít nesmí
   // (sonda k68-klavesnice 5), takže Enter nese tlačítko „Otevřít …".
   const cilKarty = k.definice?.cil;
-  const smiCil = !!cilKarty && !k.nahled && !k.upravy && nav.smiPohled(cilKarty.pohled);
+  // Karta, jejíž cíl je stránka, na které už leží, nemá kam vést: žádná šipka „Otevřít" (nic by neudělala)
+  // a klepnutí do hlavičky ji místo toho sbalí / rozbalí.
+  const naCili = !!cilKarty && !!k.pohledStranky && cilKarty.pohled === k.pohledStranky;
+  const smiCil = !!cilKarty && !k.nahled && !k.upravy && !naCili && nav.smiPohled(cilKarty.pohled);
+  const mozeSbalit = k.velikost !== 'S' && !k.nahled && !k.upravy && k.pohledStranky != null;
   const klepnutelna = smiCil && !otevrit;
   const otevriCil = () => { if (cilKarty) nav.onNavigate(cilKarty.pohled, cilKarty.arg); };
 
@@ -261,7 +337,8 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, ton, nac
       {/* Limetkový dotek karet čísel: gradient (background-image), žádná plná
           plocha — sonda k68-design měří backgroundColor, gradientu se netýká. */}
       {S && !inkoust && <span aria-hidden className="w-dotek" />}
-      <div className="relative flex items-start justify-between gap-3">
+      <div className={`relative flex items-start justify-between gap-3 ${naCili && mozeSbalit ? 'cursor-pointer' : ''}`}
+        onClick={naCili && mozeSbalit ? (e => { if (!(e.target as Element).closest('button, a, [role="menu"], [role="menuitem"]')) k.prepniSbaleni(); }) : undefined}>
         {/* Malá karta je na telefonu široká ~171 px a na název zbývá ~125 px:
             „Docházející zásoby" by skončil jako „Docházející zá…" a číslo pod
             ním by nemělo jméno. U S proto dva řádky, ikona u prvního. */}
@@ -272,9 +349,17 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, ton, nac
           <span aria-hidden className={`shrink-0 grid h-6 w-6 place-items-center rounded-xl ${S ? '-mt-0.5' : ''} ${inkoust ? 'bg-white/10 text-white/70' : 'bg-ok/15 text-ok-ink'}`}>
             <Icon name={ikona ?? k.definice?.ikona ?? 'overview'} size={14} />
           </span>
-          <span className={S ? 'line-clamp-2 break-words' : 'truncate'}>{nazev}</span>
+          <span className="line-clamp-2 break-words">{nazev}</span>
           {doplnek}
         </h2>
+        {mozeSbalit && (
+          // Jen ikona (názvu se nebere ani px) a popisek bez jména widgetu — jméno nese nadpis karty přes
+          // aria-describedby; „Sbalit {název}" by se pletlo s tlačítky, která se hledají podle názvu widgetu.
+          <Button variant="ghost" size="sm" icon={k.sbaleno ? 'chevron' : 'chevronUp'} aria-expanded={!k.sbaleno} aria-describedby={idTitulku}
+            aria-label={k.sbaleno ? t('Rozbalit widget') : t('Sbalit widget')}
+            className={`shrink-0 -my-1.5 -mr-1 ${inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : ''}`}
+            onClick={k.prepniSbaleni} />
+        )}
         {vidiOdkaz && (
           <Button variant="ghost" size="sm" iconAfter="chevronRight"
             className={`shrink-0 -my-1.5 -mr-2 ${inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : ''}`}
@@ -294,7 +379,13 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, ton, nac
             onClick={otevriCil} />
         )}
       </div>
-      <div className={`relative mt-3 flex-1 min-h-0 ${S ? 'flex flex-col justify-end' : ''}`}>{obsah}</div>
+      {!(mozeSbalit && k.sbaleno) && (
+        <div className={`relative mt-3 flex-1 min-h-0 ${S ? 'flex flex-col justify-end' : ''}`}>
+          {!S && !k.nahled && !k.upravy && !nacitam && !chyba && prazdno === undefined
+            ? <Zkratitelne id={k.instance} velikost={k.velikost as 'M' | 'L'}>{obsah}</Zkratitelne>
+            : obsah}
+        </div>
+      )}
       {otevrit && (
         <button type="button" onClick={otevrit} aria-label={t('Otevřít {nazev}', { nazev })}
           className="absolute inset-0 rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)]" />

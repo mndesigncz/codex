@@ -1,6 +1,7 @@
 'use client';
 
-import React from 'react';
+import React, { useSyncExternalStore } from 'react';
+import { createPortal } from 'react-dom';
 import { Icon } from '../Icons';
 import { useModal } from '@/lib/useModal';
 import { DiscardGuard } from './DiscardGuard';
@@ -35,9 +36,13 @@ export function Modal({ open, onClose, title, subtitle, size = 'md', children, f
 }) {
   const t = useT();
   const modal = useModal(open, onClose, typeof title === 'string' ? title : undefined);
-  if (!open) return null;
+  // Okno se kreslí do <body>, ne tam, kde je v komponentách napsané. Uvnitř karty widgetu (zkrácené tělo
+  // s overflow a maskou, kývající se <li> s transformací) by `position: fixed` okno ořízlo nebo posunulo.
+  // Na serveru a při hydrataci false (žádný document), hned potom true.
+  const vBody = useSyncExternalStore(() => () => {}, () => true, () => false);
+  if (!open || !vBody) return null;
   const width = size === 'sm' ? 'max-w-sm' : size === 'lg' ? 'max-w-2xl' : 'max-w-md';
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[70] flex items-center justify-center p-4 modal-overlay"
       onClick={onClose}>
@@ -59,7 +64,8 @@ export function Modal({ open, onClose, title, subtitle, size = 'md', children, f
         <div className="px-6 pb-6 overflow-y-auto scrollbar-thin">{children}</div>
         {footer && <div className="px-6 pb-6 pt-0 flex items-center justify-end gap-2">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
