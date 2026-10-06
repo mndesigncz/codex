@@ -352,31 +352,36 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, ton, nac
           <span className="line-clamp-2 break-words">{nazev}</span>
           {doplnek}
         </h2>
-        {mozeSbalit && (
-          // Jen ikona (názvu se nebere ani px) a popisek bez jména widgetu — jméno nese nadpis karty přes
-          // aria-describedby; „Sbalit {název}" by se pletlo s tlačítky, která se hledají podle názvu widgetu.
-          <Button variant="ghost" size="sm" icon={k.sbaleno ? 'chevron' : 'chevronUp'} aria-expanded={!k.sbaleno} aria-describedby={idTitulku}
-            aria-label={k.sbaleno ? t('Rozbalit widget') : t('Sbalit widget')}
-            className={`shrink-0 -my-1.5 -mr-1 ${inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : ''}`}
-            onClick={k.prepniSbaleni} />
-        )}
-        {vidiOdkaz && (
-          <Button variant="ghost" size="sm" iconAfter="chevronRight"
-            className={`shrink-0 -my-1.5 -mr-2 ${inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : ''}`}
-            onClick={() => nav.onNavigate(odkaz!.pohled, odkaz!.arg)}>
-            {odkaz!.popisek}
-          </Button>
-        )}
-        {!odkaz && akce && akce.length > 0 && (
-          <Menu size="sm" label={t('Další akce: {nazev}', { nazev })} items={akce} className="-my-1.5 -mr-2" />
-        )}
-        {/* Jemná nápověda navigovatelné karty: chevron jen tam, kde v hlavičce
-            není odkaz ani „···" — a zároveň klávesová cesta (Enter naviguje),
-            protože <li> v klidu tabIndex nemá (sonda k68-klavesnice 5). */}
-        {klepnutelna && !vidiOdkaz && !(akce && akce.length > 0) && (
-          <Button variant="ghost" size="sm" icon="chevronRight" aria-label={t('Otevřít {nazev}', { nazev })}
-            className={`shrink-0 -my-1.5 -mr-2 ${inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : ''}`}
-            onClick={otevriCil} />
+        {/* Ovládací prvky vpravo v jedné skupině a Sbalit VŽDY úplně vpravo: dřív stál mezi názvem a odkazem
+            („Finance ›"), takže se podle toho, jaké další prvky karta měla, posouval a „plaval". */}
+        {(mozeSbalit || vidiOdkaz || (!odkaz && akce && akce.length > 0) || (klepnutelna && !vidiOdkaz && !(akce && akce.length > 0))) && (
+          <div className="flex items-center shrink-0 -my-1.5 -mr-2">
+            {vidiOdkaz && (
+              <Button variant="ghost" size="sm" iconAfter="chevronRight"
+                className={inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : ''}
+                onClick={() => nav.onNavigate(odkaz!.pohled, odkaz!.arg)}>
+                {odkaz!.popisek}
+              </Button>
+            )}
+            {!odkaz && akce && akce.length > 0 && (
+              <Menu size="sm" label={t('Další akce: {nazev}', { nazev })} items={akce} />
+            )}
+            {/* Jemná nápověda navigovatelné karty: chevron jen tam, kde v hlavičce
+                není odkaz ani „···" — a zároveň klávesová cesta (Enter naviguje),
+                protože <li> v klidu tabIndex nemá (sonda k68-klavesnice 5). */}
+            {klepnutelna && !vidiOdkaz && !(akce && akce.length > 0) && (
+              <Button variant="ghost" size="sm" icon="chevronRight" aria-label={t('Otevřít {nazev}', { nazev })}
+                className={inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : ''}
+                onClick={otevriCil} />
+            )}
+            {mozeSbalit && (
+              // Jméno widgetu v popisku by se pletlo s tlačítky hledanými podle názvu widgetu — nese ho nadpis (aria-describedby).
+              <Button variant="ghost" size="sm" icon={k.sbaleno ? 'chevron' : 'chevronUp'} aria-expanded={!k.sbaleno} aria-describedby={idTitulku}
+                aria-label={k.sbaleno ? t('Rozbalit widget') : t('Sbalit widget')}
+                className={inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : ''}
+                onClick={k.prepniSbaleni} />
+            )}
+          </div>
         )}
       </div>
       {!(mozeSbalit && k.sbaleno) && (

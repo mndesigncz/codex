@@ -1530,5 +1530,7 @@
   "Podle rozdílu v kase": "Nach Kassendifferenz",
   "Zobrazeno {n} z {celkem}": "{n} von {celkem} angezeigt",
   "Žádná uzávěrka neodpovídá filtrům": "Kein Kassenabschluss passt zu den Filtern",
-  "Zkus jiné slovo, jiný stav nebo rozmezí dnů.": "Versuche ein anderes Wort, einen anderen Status oder Zeitraum."
+  "Zkus jiné slovo, jiný stav nebo rozmezí dnů.": "Versuche ein anderes Wort, einen anderen Status oder Zeitraum.",
+  "Celý den": "Ganztags",
+  "Celý den {den}": "Ganzer Tag {den}"
 }

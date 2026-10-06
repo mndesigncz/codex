@@ -20,6 +20,7 @@ import { billsOfDays, productsFromMirror, mirrorCovers, soldLines, soldDays, typ
 import { pragueToday, businessDayOf, dayPlus, pragueHourOf, NIGHT_CUTOFF_HOUR } from '@/lib/pragueTime';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { menaPodniku } from '@/lib/menaPodniku';
+import { jeOtevrenyUcet } from '@/lib/financeWidgety';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -75,6 +76,7 @@ export async function GET(req: NextRequest) {
   });
 
   let byPerson = new Map<string, { total: number; bills: number }>();
+  const openList: { id: string; desk: string | null; since: string; total: number; persons: number | null; who: string | null; day: string }[] = [];
   const hours = new Array(24).fill(0);
 
   // Účtenky ze zrcadla — pokladna se tu už nevolá. Když zrcadlo období
@@ -88,6 +90,15 @@ export async function GET(req: NextRequest) {
       const day = b.day;
       const row = days.get(day) ?? blank(day);
       const price = b.finalPrice;
+      // Otevřený účet = ještě nezaplacený (bez `paid_at`) a nevyúčtovaný (bez fiskalizace) a s částkou. Je to
+      // rozpracovaná tržba, ne tržba: do součtů nepatří (dřív se počítal, jako by už byl zaplacený), ukazuje se zvlášť.
+      // Účet bez `paid_at`, který už je fiskalizovaný, je uzavřený a počítá se jako dřív.
+      if (jeOtevrenyUcet(b)) {
+        openList.push({
+          id: b.billId, desk: b.deskId, since: b.createdAt, total: price, persons: b.personCount, who: b.createdByName ?? null, day,
+        });
+        continue;
+      }
       if (b.refunded) {
         row.refundCount++; row.refundTotal += price;
         days.set(day, row);
@@ -292,6 +303,19 @@ export async function GET(req: NextRequest) {
       };
     }),
     hours,
+    // Otevřené účty v období: kolik jich je, na kolik se vyšplhaly a které to jsou (nejstarší první).
+    open: (() => {
+      const items = [...openList].sort((a, b) => a.since.localeCompare(b.since));
+      const byDay: Record<string, { count: number; total: number }> = {};
+      for (const o of items) { const d = byDay[o.day] ?? { count: 0, total: 0 }; d.count += 1; d.total += o.total; byDay[o.day] = d; }
+      return {
+        count: items.length,
+        total: Math.round(items.reduce((s2, o) => s2 + o.total, 0)),
+        oldestSince: items[0]?.since ?? null,
+        byDay,
+        items: items.slice(0, 40).map(o => ({ id: o.id, desk: o.desk, since: o.since, total: o.total, persons: o.persons, who: o.who, day: o.day })),
+      };
+    })(),
     byPerson: poLidech
       ? Array.from(byPerson.entries())
         .map(([name, v]) => ({ name, ...v }))

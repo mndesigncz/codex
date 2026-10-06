@@ -34,7 +34,7 @@
 //
 // Data jen přes useDataWidgetu (sdílená mezipaměť), v náhledu nic nenaviguje ani nezapisuje.
 
-import { Suspense, lazy, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
 import { widget } from '@/lib/widgety/katalog';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
@@ -42,9 +42,10 @@ import { dbTimeHM, pragueToday } from '@/lib/pragueTime';
 import { apiMessage, okJson } from '@/lib/api';
 import { fmtMesic } from '@/lib/i18n/format';
 import { aktualniJazyk } from '@/lib/i18n/stav';
-import { dnyObdobi, dnyVTydnu, kalendarTrzeb, kasaProtiUzaverkam, mesiceObdobi, tydnyTrzeb, vyberKalendarTrzeb as vyberKalendar } from '@/lib/financeWidgety';
+import { DLOUHO_OTEVRENY_MIN, dnyObdobi, dnyVTydnu, kalendarTrzeb, kasaProtiUzaverkam, mesiceObdobi, minutOtevrenosti, tydnyTrzeb, vyberKalendarTrzeb as vyberKalendar } from '@/lib/financeWidgety';
 import { useMoney } from '../../CurrencyProvider';
 import { Icon } from '../../Icons';
+import { otevriDen } from '@/lib/denUdalost';
 import { BarSpark, Button, Chip, ListRow, Segmented, Stat, StatRow } from '../../ui';
 import { useOpravneni } from '../../role/useOpravneni';
 import { Widget, useWidget, type StavNacteni } from '../Widget';
@@ -286,7 +287,6 @@ function ZivePokladna({ velikost, nastaveni }: WidgetProps<{ obdobi: string }>) 
 
 interface DenTrzby { den: string; trzba: number }
 
-const FinanceDen = lazy(() => import('../../employer/FinanceDen'));
 
 type PohledDnu = 'dny' | 'kalendar' | 'tydny' | 'dnyvt';
 const KLIC_POHLEDU_DNU = 'managero-trzby-pohled';
@@ -296,7 +296,7 @@ const kratce = (v: number) => (v >= 10000 ? `${Math.round(v / 1000)}k` : v >= 10
 
 /**
  * Přehledy tržby v čase pod grafem: dny (seznam), kalendář, týdny a dny v týdnu. Řádky dnů a buňky kalendáře
- * otevírají detail dne (FinanceDen). Zvolený pohled se pamatuje v tomhle prohlížeči.
+ * otevírají detail dne (detail dne). Zvolený pohled se pamatuje v tomhle prohlížeči.
  */
 function PrehledDnu({ dny, dnes, rekord, onDen }: { dny: DenTrzby[]; dnes: string; rekord: DenTrzby | null; onDen: (d: string) => void }) {
   const t = useT('widgety');
@@ -422,7 +422,6 @@ function PoDnech({ velikost, nastaveni }: WidgetProps<{ obdobi: string; zdroj: s
   }, [zUzaverek, kal1.data, kal2.data, mesice, pos.data, obdobi.from, obdobi.to]);
 
   const { nahled } = useWidget();
-  const [denDetail, setDenDetail] = useState<string | null>(null);
   const dnes = pragueToday();
   const celkem = (dny ?? []).reduce((s, x) => s + x.trzba, 0);
   const sTrzbou = (dny ?? []).filter(x => x.trzba > 0);
@@ -452,17 +451,67 @@ function PoDnech({ velikost, nastaveni }: WidgetProps<{ obdobi: string; zdroj: s
           {/* Víc než dva týdny: písmeno dne by se do sloupku nevešlo — osa jen se začátkem a koncem. */}
           {dny.length > 14 && <OsaGrafu popisky={[kratkeDatum(dny[0].den), kratkeDatum(dny[dny.length - 1].den)]} />}
           </div>
-          {L && sTrzbou.length > 0 && !nahled && <PrehledDnu dny={dny} dnes={dnes} rekord={rekord} onDen={setDenDetail} />}
+          {L && sTrzbou.length > 0 && !nahled && <PrehledDnu dny={dny} dnes={dnes} rekord={rekord} onDen={d => otevriDen(d, 'finance')} />}
           {L && rekord && (
             <p className="t-meta">{t('Nejsilnější den {den} {datum} · {castka}', { den: pismenoDne(rekord.den), datum: kratkeDatum(rekord.den), castka: money(rekord.trzba) })}</p>
           )}
         </div>
       )}
-      {denDetail && (
-        <Suspense fallback={null}>
-          <FinanceDen den={denDetail} onDen={setDenDetail} onClose={() => setDenDetail(null)} />
-        </Suspense>
-      )}
+    </Widget>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Otevřené účty (rozpracovaná tržba)
+// ---------------------------------------------------------------------------
+
+/** „45 min" / „2 h 10 min" — jak dlouho je účet otevřený. */
+function jakDlouho(min: number, t: PrekladFn): string {
+  return min < 60 ? t('{n} min', { n: min }) : t('{h} h {m} min', { h: Math.floor(min / 60), m: min % 60 });
+}
+
+function Otevrene({ velikost }: WidgetProps) {
+  const t = useT('widgety');
+  const money = useMoney();
+  const { ok, ceka } = useBrana(klice('trzby.otevrene', ['finance.trzby']));
+  const { data } = useDenniPokladna(ok, 'dnes');
+  const d = data.data;
+  const o = d?.otevrene;
+  const nyni = Date.now();
+  const S = velikost === 'S';
+  const nejstarsiMin = o?.nejstarsi ? minutOtevrenosti(o.nejstarsi, nyni) : 0;
+  const hodiny = (iso: string) => new Date(iso).toLocaleTimeString(aktualniJazyk(), { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Prague' });
+  const limit = velikost === 'L' ? 10 : 5;
+  const stav = d?.posledniSynchronizace ? t('Stav z pokladny v {cas}.', { cas: dbTimeHM(d.posledniSynchronizace) }) : null;
+
+  return (
+    <Widget nacteni={ceka ? CEKA : data} kostra={S ? 'cislo' : 'seznam'}
+      prazdno={d && !d.propojeno ? <NepropojenaPokladna kratce={S} /> : undefined}>
+      {d?.propojeno && o && (o.pocet === 0 ? (
+        S ? <Stat label={t('Otevřené účty')} value="0" note={t('nic nevisí')} />
+          : <p className="t-meta text-pretty">{t('Žádný otevřený účet — všechno, co hosté dnes objednali, je zaplacené.')}{stav ? ` ${stav}` : ''}</p>
+      ) : S ? (
+        <Stat label={t('Otevřené účty')} value={money(o.soucet)} note={t('{n, plural, one {# účet} few {# účty} other {# účtů}}', { n: o.pocet })} />
+      ) : (
+        <div className="space-y-3">
+          <Stat label={t('Zatím nezaplaceno')} value={money(o.soucet)}
+            note={[t('{n, plural, one {# otevřený účet} few {# otevřené účty} other {# otevřených účtů}}', { n: o.pocet }),
+              nejstarsiMin > 0 ? t('nejstarší {kdy}', { kdy: jakDlouho(nejstarsiMin, t) }) : ''].filter(Boolean).join(' · ')} />
+          <ul className="list" aria-label={t('Otevřené účty')}>
+            {o.ucty.slice(0, limit).map(u => {
+              const min = minutOtevrenosti(u.od, nyni);
+              return (
+                <ListRow key={u.id} title={u.stul ? t('Stůl {n}', { n: u.stul }) : t('Bez stolu')}
+                  meta={[u.kdo, u.od ? t('od {cas} ({kdy})', { cas: hodiny(u.od), kdy: jakDlouho(min, t) }) : '', u.hoste ? t('{n, plural, one {# host} few {# hosté} other {# hostů}}', { n: u.hoste }) : ''].filter(Boolean).join(' · ')}
+                  value={<span className="tabular-nums">{money(u.castka)}</span>}
+                  right={min >= DLOUHO_OTEVRENY_MIN ? <Chip tone="wait" size="sm">{t('dlouho otevřený')}</Chip> : undefined} />
+              );
+            })}
+          </ul>
+          {o.pocet > limit && <p className="t-meta">{t('…a dalších {n}', { n: o.pocet - limit })}</p>}
+          {stav && <p className="t-meta">{stav}</p>}
+        </div>
+      ))}
     </Widget>
   );
 }
@@ -790,6 +839,7 @@ function StavPokladny({ velikost, nahled }: WidgetProps) {
 export const KOMPONENTY: Record<string, KomponentaWidgetu> = {
   'pokladna.dnes': PokladnaDnes,
   'pokladna.zive': ZivePokladna,
+  'trzby.otevrene': Otevrene,
   'trzby.po_dnech': PoDnech,
   'trzby.hodiny': Hodiny,
   'trzby.top_produkty': TopProdukty,

@@ -20,6 +20,7 @@ export const STRANKA: DefiniceStranky = {
     'prehled.prvni_kroky',
     'pokladna.dnes',
     'pokladna.zive',
+    'trzby.otevrene',
     'trzby.po_dnech',
     'trzby.top_produkty',
     'trzby.platby',

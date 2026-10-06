@@ -40,6 +40,7 @@ import {
   denUzaverky, jeHlavni, rozdilUzaverky, type RadekUzaverky,
 } from '@/lib/uzaverkyPrehled';
 import { filtrujUzaverky, jmenaZUzaverek, pocetFiltru, PRAZDNY_FILTR, stitkySmen, type FiltrUzaverek, type Razeni } from '@/lib/uzaverkyFiltr';
+import { otevriDen } from '@/lib/denUdalost';
 import { useT } from '@/lib/i18n/client';
 import { useLocale } from './jazyk';
 
@@ -250,6 +251,7 @@ export default function ClosingsOverview() {
               <span className="font-normal text-black/55"> · {topLevel.length === 0 ? t('bez uzávěrky') : t('{n, plural, one {# uzávěrka} few {# uzávěrky} other {# uzávěrek}}', { n: topLevel.length })}</span>
             </p>
             <div className="flex items-center gap-2 flex-wrap">
+              <Button variant="secondary" size="sm" icon="calendar" onClick={() => otevriDen(selectedDate, 'uzaverky')}>{t('Celý den')}</Button>
               {topLevel.length === 0 && smiVytvorit && (
                 <Button variant="secondary" size="sm" icon="plus" onClick={() => openCreate(selectedDate)}>{t('Vyplnit')}</Button>
               )}
@@ -358,7 +360,8 @@ export default function ClosingsOverview() {
               const trzba = c.trzbaSkryta ? null : (Number(c.cash_revenue) || 0) + (Number(c.card_revenue) || 0);
               const duvod = d != null && d !== 0 ? diffReasonLabel(c.diff_reason) : null;
               return (
-                <li key={c.id}>
+                <li key={c.id} className="flex items-center gap-1">
+                  <div className="min-w-0 flex-1">
                   <ListRow as="div"
                     lead={<Avatar emoji={c.author_avatar} size="sm" />}
                     title={<span className="cz-sentence">{denKratce(denUzaverky(c), loc)}{c.shift_label ? ` · ${c.shift_label}` : ''}</span>}
@@ -375,6 +378,11 @@ export default function ClosingsOverview() {
                       )}
                     </>}
                     onClick={() => setDetailId(c.id)} />
+                  </div>
+                  {/* Celý den: tržba, otevřené účty, výdaje, směny — vedle řádku, ne v něm (v klikacím řádku už je tlačítko). */}
+                  <Button variant="ghost" size="sm" iconOnly icon="calendar" className="shrink-0"
+                    aria-label={t('Celý den {den}', { den: denKratce(denUzaverky(c), loc) })}
+                    onClick={() => otevriDen(denUzaverky(c), 'uzaverky')} />
                 </li>
               );
             })}

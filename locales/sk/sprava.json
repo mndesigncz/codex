@@ -1530,5 +1530,7 @@
   "Podle rozdílu v kase": "Podľa rozdielu v pokladni",
   "Zobrazeno {n} z {celkem}": "Zobrazené {n} z {celkem}",
   "Žádná uzávěrka neodpovídá filtrům": "Žiadna uzávierka nezodpovedá filtrom",
-  "Zkus jiné slovo, jiný stav nebo rozmezí dnů.": "Skús iné slovo, iný stav alebo rozmedzie dní."
+  "Zkus jiné slovo, jiný stav nebo rozmezí dnů.": "Skús iné slovo, iný stav alebo rozmedzie dní.",
+  "Celý den": "Celý deň",
+  "Celý den {den}": "Celý deň {den}"
 }

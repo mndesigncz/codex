@@ -49,6 +49,8 @@ import {
 import type { KomponentaWidgetu, Navigace, WidgetProps } from '@/lib/widgety/typy';
 import { Widget, useVyrizeno, type StavNacteni } from '../Widget';
 import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
+import { otevriDen } from '@/lib/denUdalost';
+import { Icon } from '../../Icons';
 import { useNavigace, useSmi } from '../NavigaceKontext';
 import { obnovOpravneni, useOpravneni } from '../../role/useOpravneni';
 import { apiMessage, okJson } from '@/lib/api';
@@ -1123,7 +1125,11 @@ function TymNahled({ velikost, nastaveni }: WidgetProps<{ rozsah?: string }>) {
       <ul className="list">
         {(velikost === 'L' ? dnyTymu : dnyTymu.slice(0, DNU_M)).map(({ den: d, smeny }) => (
           <li key={d} className="py-3 first:pt-0 last:pb-0">
-            <p className="t-label mb-2 cz-sentence">{denKratce(d, dnes, t)}</p>
+            {/* Štítek dne otevře detail dne (kdo měl směnu; s právy i tržba a uzávěrky). */}
+            <button type="button" onClick={() => otevriDen(d, 'obecne')} aria-label={t('Detail dne {den}', { den: denKratce(d, dnes, t) })}
+              className="t-label mb-2 cz-sentence inline-flex items-center gap-1 rounded-lg hover:text-[#16181A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542]">
+              {denKratce(d, dnes, t)}<Icon name="chevronRight" size={12} className="opacity-50" />
+            </button>
             <ul className="flex flex-wrap gap-1.5" aria-label={t('Směny {kdy}', { kdy: denKratce(d, dnes, t).toLowerCase() })}>
               {smeny.map(s => (
                 <li key={s.id} className="min-w-0 max-w-full">

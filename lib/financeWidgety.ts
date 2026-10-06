@@ -77,6 +77,15 @@ export interface DenPokladny {
 }
 export interface PolozkaPokladny { productId: string; name: string; category: string | null; qty: number; revenue: number | null }
 export interface OsobaPokladny { name: string; total: number; bills: number }
+/** Otevřený (ještě nezaplacený) účet v pokladně. */
+export interface OtevrenyUcet { id: string; stul: string | null; od: string; castka: number; hoste: number | null; kdo: string | null; den: string }
+export interface OtevreneUcty {
+  pocet: number; soucet: number;
+  /** Kdy byl otevřen nejstarší z nich (ISO), null = žádný. */
+  nejstarsi: string | null;
+  poDnech: Record<string, { pocet: number; soucet: number }>;
+  ucty: OtevrenyUcet[];
+}
 export interface SouctyPokladny {
   bills: number; total: number; cash: number; card: number; other: number; tips: number;
   tipsCash: number; tipsCard: number; refundCount: number; refundTotal: number;
@@ -95,8 +104,29 @@ export interface DenniPokladna {
   hodiny: number[];
   obsluha: OsobaPokladny[];
   polozky: PolozkaPokladny[];
+  /** Rozpracovaná tržba: účty, které ještě nikdo nezaplatil. Nejsou v `soucty` ani v `dny`. */
+  otevrene: OtevreneUcty;
   poznamky: { tone: TonRady; title: string; text: string }[];
   poznamka: string;
+}
+
+/** `open` z /api/pos/daily; starší odpověď bez něj = žádné otevřené účty. */
+export function vyberOtevrene(raw: any): OtevreneUcty {
+  const prazdne: OtevreneUcty = { pocet: 0, soucet: 0, nejstarsi: null, poDnech: {}, ucty: [] };
+  if (!raw || typeof raw !== 'object') return prazdne;
+  const poDnech: OtevreneUcty['poDnech'] = {};
+  if (raw.byDay && typeof raw.byDay === 'object') {
+    for (const [d, v] of Object.entries(raw.byDay as Record<string, any>)) poDnech[d] = { pocet: cis(v?.count), soucet: cis(v?.total) };
+  }
+  return {
+    pocet: cis(raw.count), soucet: cis(raw.total),
+    nejstarsi: typeof raw.oldestSince === 'string' ? raw.oldestSince : null,
+    poDnech,
+    ucty: Array.isArray(raw.items) ? raw.items.map((o: any) => ({
+      id: text(o?.id), stul: o?.desk != null && String(o.desk) !== '' ? String(o.desk) : null, od: text(o?.since),
+      castka: cis(o?.total), hoste: nebo(o?.persons), kdo: text(o?.who).trim() || null, den: text(o?.day),
+    })) : [],
+  };
 }
 
 export function vyberDenniPokladnu(raw: any): DenniPokladna {
@@ -124,6 +154,7 @@ export function vyberDenniPokladnu(raw: any): DenniPokladna {
       productId: text(i?.productId) || text(i?.name), name: text(i?.name) || 'Bez názvu', category: text(i?.category) || null,
       qty: cis(i?.qty), revenue: nebo(i?.revenue),
     })) : [],
+    otevrene: vyberOtevrene(raw.open),
     poznamky: rady(raw.notes).map(({ tone, title, text: t2 }) => ({ tone, title, text: t2 })),
     poznamka: text(raw.note),
   };
@@ -386,4 +417,23 @@ export function kalendarTrzeb(dny: readonly DenTrzbyData[], dnes: string): Bunka
     }));
   }
   return radky;
+}
+
+/** Kolik minut je účet otevřený (od `od` do `nyni`); neplatný čas nebo budoucnost = 0. */
+export function minutOtevrenosti(od: string, nyni: number = Date.now()): number {
+  const t = Date.parse(od);
+  if (!Number.isFinite(t) || t > nyni) return 0;
+  return Math.floor((nyni - t) / 60000);
+}
+
+/** Jak dlouho se má účet brát jako „dlouho otevřený" (zapomenutý na stole). */
+export const DLOUHO_OTEVRENY_MIN = 120;
+
+/**
+ * Je účet z pokladny otevřený (rozpracovaná tržba), ne zaplacený? Ano, když není vrácený, nemá `paid_at`,
+ * není fiskalizovaný (uzavřený účet bez `paid_at` je zaplacený, jen to pokladna nenapsala) a má částku.
+ * Do tržby se otevřený účet nepočítá; ukazuje se zvlášť (Otevřené účty, detail dne).
+ */
+export function jeOtevrenyUcet(b: { refunded?: boolean; deleted?: boolean; paidAt?: string | null; fiscalized?: boolean; finalPrice?: number }): boolean {
+  return !b.deleted && !b.refunded && b.paidAt == null && !b.fiscalized && Number(b.finalPrice) > 0;
 }

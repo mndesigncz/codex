@@ -62,6 +62,24 @@ export const WIDGETY: DefiniceWidgetu[] = [
     cil: { pohled: 'finance' },
     stav: 'hotovo',
   },
+  // Data: GET /api/pos/daily?from=dnes&to=dnes → open{count,total,oldestSince,items[{id,desk,since,total,persons,who}]}
+  // Otevřený účet = ještě nezaplacený a nevyúčtovaný; je to rozpracovaná tržba, v Tržbě dne zatím není.
+  {
+    id: 'trzby.otevrene',
+    oblast: 'trzby',
+    nazev: 'Otevřené účty',
+    popis: 'Rozpracovaná tržba: účty, které hosté ještě nezaplatili — kolik jich je, na kolik se vyšplhaly, u kterého stolu a jak dlouho jsou otevřené. Čtou se z posledního stažení z pokladny.',
+    ikona: 'cup',
+    velikosti: ['S', 'M', 'L'],
+    vychoziVelikost: 'M',
+    rozhrani: ['vedeni'],
+    stranky: ['vedeni.prehled', 'vedeni.finance', 'vedeni.uzaverky', 'vedeni.togo'],
+    opravneni: { vse: ['finance.trzby'], nektere: [] },
+    tarif: 'max',
+    kostra: { S: 'cislo', M: 'seznam', L: 'seznam' },
+    cil: { pohled: 'finance' },
+    stav: 'hotovo',
+  },
   // Data: pokladna: GET /api/pos/daily?from&to → days[{day,total,bills}]; uzávěrky:
   // GET /api/closings/calendar?month → days{datum:{revenue}} (jen s finance.trzby + uzaverky.zobrazit_vse)
   {

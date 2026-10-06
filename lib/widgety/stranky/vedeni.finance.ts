@@ -25,6 +25,7 @@ export const STRANKA: DefiniceStranky = {
     'finance.doporuceni',
     'finance.postrehy',
     'pokladna.zive',
+    'trzby.otevrene',
     'trzby.po_dnech',
     'trzby.top_produkty',
     'trzby.platby',
@@ -47,6 +48,7 @@ export const STRANKA: DefiniceStranky = {
     'typ:vedeni': [
       { w: 'finance.souhrn_mesice', s: 'L' },
       { w: 'trzby.po_dnech', s: 'L', o: { obdobi: 'mesic_stranky' } },
+      { w: 'trzby.otevrene', s: 'M' },
       { w: 'trzby.platby', s: 'M', o: { obdobi: 'tento_mesic' } },
       { w: 'trzby.top_produkty', s: 'M', o: { obdobi: 'tento_mesic' } },
       { w: 'finance.trzby_vs_mzdy', s: 'S' },

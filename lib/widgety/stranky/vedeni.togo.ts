@@ -24,6 +24,7 @@ export const STRANKA: DefiniceStranky = {
   inkoust: true,
   doporucene: [
     'pokladna.dnes',
+    'trzby.otevrene',
     'trzby.po_dnech',
     'dochazka.prave_na_smene',
     'dochazka.dnes_v_podniku',
