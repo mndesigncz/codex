@@ -1530,5 +1530,7 @@
   "Podle rozdílu v kase": "By register difference",
   "Zobrazeno {n} z {celkem}": "Showing {n} of {celkem}",
   "Žádná uzávěrka neodpovídá filtrům": "No closing matches the filters",
-  "Zkus jiné slovo, jiný stav nebo rozmezí dnů.": "Try another word, another status or date range."
+  "Zkus jiné slovo, jiný stav nebo rozmezí dnů.": "Try another word, another status or date range.",
+  "Celý den": "All day",
+  "Celý den {den}": "Whole day {den}"
 }

@@ -34,6 +34,7 @@ import { delkaKyvu, fazeKyvu, idZWidgetu, uhelKyvu } from '@/lib/widgety/hash';
 import { HYSTEREZE_PX, NASTROJ, TOAST_S_AKCI_MS } from '@/lib/widgety/konstanty';
 import { jeCilVPrekryvu, jeInteraktivniCil, jePrekryvOtevreny, smiKlepnutiNavigovat, type StiskKlid } from '@/lib/widgety/klik';
 import { PLAN_ENFORCED } from '@/lib/plan';
+import { DenHost } from './DenHost';
 import { KontextWidgetuCtx, KostraWidgetu, PojistkaWidgetu, SchematickyWidget, type KontextWidgetu } from './Widget';
 import { lineWidget, maCoNastavit, predstahni } from './registr';
 import { useRozlozeni, type Rozlozeni, type UdalostRozlozeni } from './useRozlozeni';
@@ -1193,6 +1194,7 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
   const nastavovanaDef = nastavovana ? najdiWidget(nastavovana.widget) : undefined;
 
   return (
+    <>
     <div
       ref={koren}
       data-plocha={stranka.id}
@@ -1352,6 +1354,9 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
           ms={toast?.akce ? TOAST_S_AKCI_MS : undefined} onClose={() => setToast(null)} />
       </div>
     </div>
+    {/* Mimo kořen plochy: událost z oken (React je bublá stromem komponent) by jinak došla do obsluhy plochy. */}
+    {!vychoziRezim && <DenHost />}
+    </>
   );
 }
 

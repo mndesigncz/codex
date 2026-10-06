@@ -24,6 +24,7 @@ import { rozdilUzaverky, maSkrytouTrzbu } from '@/lib/uzaverkyPrehled';
 import { okJson, apiMessage } from '@/lib/api';
 import { dbTimeHM, dbTimeDayHM } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
+import { otevriDen } from '@/lib/denUdalost';
 import { openPrint, esc } from '@/lib/printDoc';
 import { DiscardGuard } from '../ui/DiscardGuard';
 import { Avatar, Button, Chip } from '../ui';
@@ -251,6 +252,11 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
               <Chip tone={diff === 0 ? 'ok' : diff > 0 ? 'info' : 'bad'} className="tabular-nums">
                 {diff === 0 ? t('Sedí') : `${diff > 0 ? '+' : ''}${money(diff)}`}
               </Chip>
+            )}
+            {c && (
+              // Celý den té uzávěrky: tržba z pokladny, otevřené účty, výdaje, směny. Okno uzávěrky se nejdřív zavře.
+              <Button variant="ghost" size="sm" icon="calendar"
+                onClick={() => { onClose(); otevriDen(String(c.shift_date ?? c.date).slice(0, 10), 'uzaverky'); }}>{t('Celý den')}</Button>
             )}
             <button onClick={modal.guard.attemptClose} aria-label={t('Zavřít')}
               className="tap-target h-9 w-9 flex items-center justify-center rounded-full text-black/40 hover:text-[#16181A] hover:bg-black/[0.06] transition-colors">

@@ -34,6 +34,7 @@ export const STRANKA: DefiniceStranky = {
     'trzby.po_obsluze',
     'trzby.prumerna_uctenka',
     'pokladna.dnes',
+    'trzby.otevrene',
     'postupy.povinne_dnes',
   ],
   vychozi: {
