@@ -37,6 +37,8 @@ const shape = (r: any) => ({
   // Kolo 69 (widget Splněno dnes): sloupec se plnil od kola s body, jen ho API
   // nevracelo — „co se dnes splnilo" nešlo odlišit od včerejška.
   completedAt: r.completed_at ?? null,
+  // Kdy úkol vznikl (graf „Založeno vs. splněno" na stránce Úkolů).
+  createdAt: r.created_at ?? null,
   source: r.source ?? null,
   sourceRef: r.source_ref ?? null,
   sourceMeta: r.source_meta ?? null,

@@ -20,7 +20,7 @@ import { TaskChecklist, recurrenceLabel, type ChecklistItem } from '../TaskCheck
 import { useCurrency } from '../CurrencyProvider';
 import TaskWeekBoard from '../TaskWeekBoard';
 import { pragueToday } from '@/lib/pragueTime';
-import { Button, Card, Chip, EmptyState, ErrorState, Menu, Modal, Segmented, Skeleton, Toast } from '../ui';
+import { Button, Card, Chip, EmptyState, ErrorState, Menu, Modal, Segmented, Skeleton, Stat, StatRow, Toast } from '../ui';
 import { Icon } from '../Icons';
 import { apiMessage, okJson } from '@/lib/api';
 import { useJazyk, useT } from '@/lib/i18n/client';
@@ -29,7 +29,12 @@ import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useSmi } from '../widgety/NavigaceKontext';
 import { URL_UKOLY, Zaskrtnuti } from '../widgety/oblasti/ukoly';
-import { vyberUkoly, vRozsahu, rozdelPoDnech, jeCiziUkol, type Ukol } from '@/lib/ukolyPrehled';
+import { vyberUkoly, vRozsahu, rozdelPoDnech, jeCiziUkol, splnenoDnes, type Ukol } from '@/lib/ukolyPrehled';
+import { VYCHOZI_FILTR, filtrujBezStavu, filtrujUkoly, poctyStavu, seradUkoly, statistikaUkolu, type FiltrUkolu } from '@/lib/ukolyFiltr';
+import { UkolDetail } from '../ukoly/UkolDetail';
+import { UkolyFiltry } from '../ukoly/UkolyFiltry';
+import { UkolyMesic } from '../ukoly/UkolyMesic';
+import { UkolyPrehled } from '../ukoly/UkolyPrehled';
 import { oznamZmenuPovinnych, ChipPredUzaverkou } from '../PredUzaverkou';
 
 interface Props {
@@ -54,7 +59,9 @@ export default function Tasks({ user }: Props) {
   // Server vrací moje a pro kohokoli; kdo má ukoly.zobrazit_tym, dostane celý tým —
   // tahle stránka je ale „moje úkoly", tak cizí nechává seznamu vedení.
   const tasks = useMemo(() => vRozsahu(data.data ?? [], 'moje_a_volne', ja), [data.data, ja]);
-  const [view, setView] = useState<'list' | 'week'>('list');
+  const [view, setView] = useState<'list' | 'week' | 'month' | 'prehled'>('list');
+  const [filtr, setFiltr] = useState<FiltrUkolu>(VYCHOZI_FILTR);
+  const [detailId, setDetailId] = useState<number | null>(null);
   const [showLater, setShowLater] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [bodyToast, setBodyToast] = useState<string | null>(null);
@@ -107,7 +114,18 @@ export default function Tasks({ user }: Props) {
   /** Odškrtnout nebo odškrtnutí zrušit u celého seznamu jedním požadavkem. */
   const toggleChecklistAll = (task: Ukol, done: boolean) => saveChecklist(task, task.checklist.map(it => ({ ...it, done })));
 
-  const skupiny = rozdelPoDnech(tasks, today, weekAhead, 20);
+  // Filtry kromě stavu platí pro všechny pohledy; záložka stavu jen pro seznam.
+  const bezStavu = useMemo(() => seradUkoly(filtrujBezStavu(tasks, filtr), filtr.razeni), [tasks, filtr]);
+  const pocty = useMemo(() => poctyStavu(tasks, filtr, today, weekAhead), [tasks, filtr, today, weekAhead]);
+  const plochySeznam = filtr.stav !== 'vse' || filtr.razeni !== 'termin';
+  const vSeznamu = useMemo(() => filtrujUkoly(tasks, filtr, today, weekAhead), [tasks, filtr, today, weekAhead]);
+  const detail = detailId != null ? tasks.find(x => x.id === detailId) ?? null : null;
+  const karty = useMemo(() => {
+    const tyden = statistikaUkolu(tasks, pragueToday(-6), today, today);
+    return { otevrene: tasks.filter(x => x.status !== 'done').length, poTerminu: poctyStavu(tasks, VYCHOZI_FILTR, today, weekAhead).po_terminu,
+      dnesHotovo: splnenoDnes(tasks, today).length, tyden: tyden.splneno };
+  }, [tasks, today, weekAhead]);
+  const skupiny = rozdelPoDnech(bezStavu, today, weekAhead, 20);
 
   const row = (task: Ukol) => {
     const hotovo = task.status === 'done';
@@ -123,7 +141,10 @@ export default function Tasks({ user }: Props) {
             onClick={() => updateStatus(task, hotovo ? 'pending' : 'done')} />
         </span>
         <div className={`min-w-0 flex-1 ${inactive ? 'opacity-60' : ''}`}>
-          <p className={`font-medium text-[15px] leading-snug ${hotovo ? 'text-black/45' : 'text-[#16181A]'}`}>{task.title}</p>
+          <p className="flex">
+            <button type="button" onClick={() => setDetailId(task.id)} aria-haspopup="dialog" title={t('Otevřít detail úkolu')}
+              className={`min-w-0 text-left font-medium text-[15px] leading-snug hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542] rounded ${hotovo ? 'text-black/45' : 'text-[#16181A]'}`}>{task.title}</button>
+          </p>
           {task.description && <p className="text-sm text-black/55 mt-1 whitespace-pre-wrap text-pretty">{task.description}</p>}
           <div className="flex items-center gap-1.5 mt-1.5 flex-wrap text-[13px] text-black/55">
             {task.dueDate && <span className={pozde ? 'text-bad-ink font-medium' : undefined}><span className="cz-sentence">{denKratce(task.dueDate)}</span>{pozde && ` · ${t('po termínu')}`}</span>}
@@ -169,6 +190,17 @@ export default function Tasks({ user }: Props) {
   const zbyva = skupiny.poTerminu.length + skupiny.dnes.length;
   const nastroj = (
     <div className="space-y-6">
+      {tasks.length > 0 && (
+        <Card>
+          <StatRow>
+            <Stat label={t('Otevřené')} value={karty.otevrene} icon="clipboard" tone="info" />
+            <Stat label={t('Po termínu')} value={karty.poTerminu} icon="clock" tone={karty.poTerminu > 0 ? 'bad' : 'muted'} />
+            <Stat label={t('Dnes hotovo')} value={karty.dnesHotovo} icon="check" tone="ok" />
+            <Stat label={t('Splněno za 7 dní')} value={karty.tyden} icon="trend" tone="muted" />
+          </StatRow>
+        </Card>
+      )}
+      {tasks.length > 0 && view !== 'prehled' && <UkolyFiltry filtr={filtr} onChange={setFiltr} pocty={pocty} skrytStav={view !== 'list'} />}
       {saveErr && <p className="note note-danger text-sm" role="alert">{saveErr}</p>}
       {data.error && !data.data ? (
         <Card><ErrorState title={t('Úkoly se nenačetly')} onRetry={data.reload} detail={data.error} /></Card>
@@ -176,13 +208,22 @@ export default function Tasks({ user }: Props) {
         <Card aria-busy className="space-y-2">
           <Skeleton className="h-10" /><Skeleton className="h-10" /><Skeleton className="h-10 w-2/3" />
         </Card>
+      ) : view === 'prehled' ? (
+        <UkolyPrehled ukoly={bezStavu} dnes={today} onOtevri={u => setDetailId(u.id)} />
+      ) : view === 'month' ? (
+        <UkolyMesic ukoly={bezStavu} dnes={today} zacatekTydne={weekStart === 0 ? 0 : 1} radek={row} />
       ) : view === 'week' ? (
-        <TaskWeekBoard tasks={tasks} weekStart={weekStart}
+        <TaskWeekBoard tasks={bezStavu} weekStart={weekStart}
           onComplete={(t, done) => { const u = tasks.find(x => x.id === t.id); if (u) updateStatus(u, done ? 'done' : 'pending'); }}
           canComplete={t => { const u = tasks.find(x => x.id === t.id); return !!u && smiSplnit(u); }}
           labelFor={x => (x.teamTask ? t('Pro kohokoli') : '')} />
       ) : tasks.length === 0 ? (
         <Card><EmptyState illustration="ukoly" title={t('Žádné úkoly')} hint={t('Až ti vedení něco zadá, objeví se to tady i v přehledu.')} compact /></Card>
+      ) : plochySeznam ? (
+        vSeznamu.length === 0
+          ? <Card><EmptyState compact icon="search" title={t('Nic nevyhovuje filtrům')} hint={t('Zkus jiný stav, hledání nebo zruš filtry.')}
+              action={<Button variant="secondary" size="sm" onClick={() => setFiltr(VYCHOZI_FILTR)}>{t('Zrušit filtry')}</Button>} /></Card>
+          : <Card pad="none" className="px-5"><ul className="list" aria-label={t('Úkoly')}>{vSeznamu.map(row)}</ul></Card>
       ) : (
         <>
           {section(t('Po termínu'), skupiny.poTerminu, 'text-bad-ink')}
@@ -213,10 +254,18 @@ export default function Tasks({ user }: Props) {
           subtitle: data.data && zbyva > 0 ? t('Na dnešek a po termínu: {n, plural, one {# úkol} few {# úkoly} other {# úkolů}}.', { n: zbyva }) : t('Co je dnes na tobě — a co je pro kohokoli.'),
           hintId: 'tasks',
           aside: <Segmented size="sm" ariaLabel={t('Zobrazení')} value={view} onChange={setView}
-            options={[{ id: 'list', label: t('Seznam') }, { id: 'week', label: t('Týden') }]} />,
+            options={[{ id: 'list', label: t('Seznam') }, { id: 'week', label: t('Týden') }, { id: 'month', label: t('Měsíc') }, { id: 'prehled', label: t('Přehled') }]} />,
         }}
         nastroj={nastroj}
       />
+      {detail && (
+        <UkolDetail ukol={detail} dnes={today} onClose={() => setDetailId(null)}
+          kdo={detail.assigneeName ?? t('Já')} zamceno={!smiSplnit(detail)}
+          navodHref={detail.sourceMeta?.guideId ? `/employee/shifts?view=guides&guide=${detail.sourceMeta.guideId}` : undefined}
+          onSplnit={done => { if (done && detail.dueDate && detail.dueDate !== today) setDetailId(null); updateStatus(detail, done ? 'done' : 'pending'); }}
+          onChecklist={smiSplnit(detail) ? i => toggleChecklistItem(detail, i) : undefined}
+          onChecklistVse={smiSplnit(detail) ? d => toggleChecklistAll(detail, d) : undefined} />
+      )}
       {mimoDen && (
         <Modal open onClose={() => setMimoDen(null)} size="sm" title={t('Tohle není dnešní úkol')}
           footer={<>

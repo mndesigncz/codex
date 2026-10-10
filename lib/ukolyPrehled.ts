@@ -33,6 +33,8 @@ export interface Ukol {
   completedByName: string | null;
   /** ISO čas splnění; null u nesplněných a u starých řádků z doby před sloupcem. */
   completedAt: string | null;
+  /** ISO čas založení úkolu (starší odpovědi ho nemají). */
+  createdAt: string | null;
   recurrence: string | null;
   seriesId: string | null;
   checklist: PolozkaChecklistu[];
@@ -66,6 +68,7 @@ export function vyberUkoly(raw: unknown): Ukol[] {
     completedBy: cisloNeboNull(t?.completedBy),
     completedByName: t?.completedByName ?? null,
     completedAt: t?.completedAt ? String(t.completedAt) : null,
+    createdAt: t?.createdAt ? String(t.createdAt) : null,
     recurrence: t?.recurrence ?? null,
     seriesId: t?.seriesId ?? null,
     checklist: Array.isArray(t?.checklist)

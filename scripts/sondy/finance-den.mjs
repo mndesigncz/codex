@@ -44,8 +44,9 @@ for (const w of [1280, 390]) {
   const { ctx, p, stav } = await kontext({ viewport: { width: w, height: 900 }, mobil: w < 600, fix, dalsi });
   await otevri(p, '/employer/overview?view=finance', 'vedeni.finance');
   const karta = p.locator('[data-instance="po-dnech"]');
-  await karta.getByRole('tab', { name: 'Dny', exact: true }).waitFor({ timeout: 10000 });
-  tvrdi(`${w}: karta nabízí čtyři přehledy`, await karta.getByRole('tab').count() === 4, String(await karta.getByRole('tab').count()));
+  const prehledy = karta.locator('[aria-label="Přehled tržby"]').getByRole('tab');
+  await prehledy.first().waitFor({ timeout: 10000 });
+  tvrdi(`${w}: karta nabízí čtyři přehledy`, await prehledy.count() === 4, String(await prehledy.count()));
 
   // Detail dne z řádku
   await radky(p).first().waitFor();

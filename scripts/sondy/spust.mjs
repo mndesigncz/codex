@@ -140,6 +140,8 @@ export const ZELENE = [
   'finance-uzaverky',
   'widgety-sbalit',
   'finance-den',
+  'obdobi-graf',
+  'ukoly-pohledy',
   'den-detail',
 ];
 

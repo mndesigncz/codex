@@ -11,6 +11,8 @@
 // nesmí vidět) zůstává null, ne nula, která by tvrdila, že podnik nic neutržil.
 
 import { dayPlus, pragueToday } from './pragueTime.ts';
+import { okJson } from './api.ts';
+import { vyresPreset } from './obdobi.ts';
 import { dnesJesteChybi } from './uzaverkyOrganizace.ts';
 
 const cis = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
@@ -35,6 +37,9 @@ function rady(list: unknown): RadaSIkonou[] {
 
 /** Období widgetu tržeb → dny od–do (pražské „RRRR-MM-DD"). `mesic` = od prvního dne měsíce do dneška. */
 export function obdobiPokladny(id: unknown, dnes: string = pragueToday()): { from: string; to: string; popis: string } {
+  // „rozmezi:RRRR-MM-DD:RRRR-MM-DD" = vlastní rozmezí (jednotný model období, lib/obdobi).
+  const rm = /^rozmezi:(\d{4}-\d{2}-\d{2}):(\d{4}-\d{2}-\d{2})$/.exec(String(id));
+  if (rm) return rm[2] < rm[1] ? { from: rm[2], to: rm[1], popis: 'Rozmezí' } : { from: rm[1], to: rm[2], popis: 'Rozmezí' };
   // „mesic:RRRR-MM" = celý vybraný měsíc (u dnešního jen do dneška, budoucí dny nemají tržbu).
   // `popis` nese přímo „RRRR-MM"; název měsíce v jazyce uživatele skládá widget.
   const mm = /^mesic:(\d{4})-(\d{2})$/.exec(String(id));
@@ -47,6 +52,11 @@ export function obdobiPokladny(id: unknown, dnes: string = pragueToday()): { fro
   }
   switch (id) {
     case 'vcera': return { from: dayPlus(dnes, -1), to: dayPlus(dnes, -1), popis: 'Včera' };
+    case 'tyden': { const x = vyresPreset('tyden', dnes); return { from: x.od, to: x.do, popis: 'Tento týden' }; }
+    case 'minuly_mesic': { const x = vyresPreset('minuly_mesic', dnes); return { from: x.od, to: x.do, popis: 'Minulý měsíc' }; }
+    case '90_dni': return { from: dayPlus(dnes, -89), to: dnes, popis: 'Poslední 3 měsíce' };
+    case '180_dni': return { from: dayPlus(dnes, -179), to: dnes, popis: 'Posledních 6 měsíců' };
+    case '365_dni': return { from: dayPlus(dnes, -364), to: dnes, popis: 'Poslední rok' };
     case '7_dni': return { from: dayPlus(dnes, -6), to: dnes, popis: 'Posledních 7 dní' };
     case '14_dni': return { from: dayPlus(dnes, -13), to: dnes, popis: 'Posledních 14 dní' };
     case '30_dni': return { from: dayPlus(dnes, -29), to: dnes, popis: 'Posledních 30 dní' };
@@ -436,4 +446,10 @@ export const DLOUHO_OTEVRENY_MIN = 120;
  */
 export function jeOtevrenyUcet(b: { refunded?: boolean; deleted?: boolean; paidAt?: string | null; fiscalized?: boolean; finalPrice?: number }): boolean {
   return !b.deleted && !b.refunded && b.paidAt == null && !b.fiscalized && Number(b.finalPrice) > 0;
+}
+
+/** Kalendáře uzávěrek za víc měsíců najednou (tržba dne z uzávěrek, když pokladna chybí). */
+export async function nactiKalendareUzaverek(mesice: readonly string[]): Promise<Record<string, number>> {
+  const casti = await Promise.all(mesice.map(m => fetch(`/api/closings/calendar?month=${m}`).then(okJson).then(vyberKalendarTrzeb)));
+  return Object.assign({}, ...casti);
 }
