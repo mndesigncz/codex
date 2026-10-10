@@ -1532,5 +1532,13 @@
   "Žádná uzávěrka neodpovídá filtrům": "No closing matches the filters",
   "Zkus jiné slovo, jiný stav nebo rozmezí dnů.": "Try another word, another status or date range.",
   "Celý den": "All day",
-  "Celý den {den}": "Whole day {den}"
+  "Celý den {den}": "Whole day {den}",
+  "Otevřít detail úkolu": "Open task details",
+  "Otevřené": "Open",
+  "Dnes hotovo": "Done today",
+  "Splněno za 7 dní": "Completed in 7 days",
+  "Nic nevyhovuje filtrům": "Nothing matches the filters",
+  "Zkus jiný stav, hledání nebo zruš filtry.": "Try another status or search, or clear the filters.",
+  "z {n} s dnešním termínem": "of {n} due today",
+  "úspěšnost {n} %": "{n} % success rate"
 }

@@ -1532,5 +1532,13 @@
   "Žádná uzávěrka neodpovídá filtrům": "Żadne zamknięcie kasy nie pasuje do filtrów",
   "Zkus jiné slovo, jiný stav nebo rozmezí dnů.": "Spróbuj innego słowa, innego statusu lub zakresu dni.",
   "Celý den": "Cały dzień",
-  "Celý den {den}": "Cały dzień {den}"
+  "Celý den {den}": "Cały dzień {den}",
+  "Otevřít detail úkolu": "Otwórz szczegóły zadania",
+  "Otevřené": "Otwarte",
+  "Dnes hotovo": "Dziś zrobione",
+  "Splněno za 7 dní": "Wykonane w 7 dni",
+  "Nic nevyhovuje filtrům": "Nic nie pasuje do filtrów",
+  "Zkus jiný stav, hledání nebo zruš filtry.": "Spróbuj innego statusu lub wyszukiwania albo wyczyść filtry.",
+  "z {n} s dnešním termínem": "z {n} z dzisiejszym terminem",
+  "úspěšnost {n} %": "skuteczność {n} %"
 }

@@ -42,19 +42,22 @@ import { dbTimeHM, pragueToday } from '@/lib/pragueTime';
 import { apiMessage, okJson } from '@/lib/api';
 import { fmtMesic } from '@/lib/i18n/format';
 import { aktualniJazyk } from '@/lib/i18n/stav';
-import { DLOUHO_OTEVRENY_MIN, dnyObdobi, dnyVTydnu, kalendarTrzeb, kasaProtiUzaverkam, mesiceObdobi, minutOtevrenosti, tydnyTrzeb, vyberKalendarTrzeb as vyberKalendar } from '@/lib/financeWidgety';
+import { DLOUHO_OTEVRENY_MIN, nactiKalendareUzaverek, dnyObdobi, dnyVTydnu, obdobiPokladny, pondeliTydne, kalendarTrzeb, kasaProtiUzaverkam, mesiceObdobi, minutOtevrenosti, tydnyTrzeb, vyberKalendarTrzeb as vyberKalendar } from '@/lib/financeWidgety';
 import { useMoney } from '../../CurrencyProvider';
 import { Icon } from '../../Icons';
 import { otevriDen } from '@/lib/denUdalost';
-import { BarSpark, Button, Chip, ListRow, Segmented, Stat, StatRow } from '../../ui';
+import { BarSpark, Button, CasovyGraf, Chip, ListRow, ObdobiLista, Segmented, Stat, StatRow } from '../../ui';
+import { agreguj, hrubostProRozmezi, jeVybranyDen, obdobiZPresetu, pocetDni, platneRozmezi, predchoziRozmezi, souhrn as souhrnObdobi, zmenaPct, type Obdobi, type Slot } from '@/lib/obdobi';
+import { useObdobi } from '@/lib/useObdobi';
+import { useUlozeno } from '@/lib/useUlozeno';
 import { useOpravneni } from '../../role/useOpravneni';
-import { Widget, useWidget, type StavNacteni } from '../Widget';
+import { Widget, Zkratitelne, useWidget, type StavNacteni } from '../Widget';
 import { useDataWidgetu, obnovDataWidgetu } from '../useDataWidgetu';
 import { useNavigace, useSmi } from '../NavigaceKontext';
 import { MesicStrankyFinanci, useNaFinancich } from './finance';
 import {
   DnyPokladny, HodinyPokladny, ObsluhaPokladny, OsaGrafu, ProdanoPokladny, RadyJakoSeznam,
-  kratkeDatum, obdobiPokladny, pismenoDne, popisUctenek, vyberDenniPokladnu, type DenniPokladna,
+  kratkeDatum, pismenoDne, popisUctenek, vyberDenniPokladnu, type DenniPokladna,
 } from '../../employer/LiveRevenue';
 
 // ---------------------------------------------------------------------------
@@ -388,6 +391,43 @@ function PrehledDnu({ dny, dnes, rekord, onDen }: { dny: DenTrzby[]; dnes: strin
   );
 }
 
+/** Výchozí období widgetu z jeho nastavení (dřív jediná volba); člověk si pak zvolí vlastní a ta se pamatuje. */
+function obdobiZNastaveni(volba: string, mesicStranky: string | null): Obdobi {
+  const dnes = pragueToday();
+  if (volba === 'mesic_stranky' && mesicStranky) {
+    const x = obdobiPokladny(`mesic:${mesicStranky}`, dnes);
+    return { preset: 'vlastni', od: x.from, do: x.to, dnyTydne: [], hrubost: 'auto' };
+  }
+  if (volba === '7_dni') return obdobiZPresetu('7_dni', dnes);
+  if (volba === 'tento_mesic' || volba === 'mesic_stranky') return obdobiZPresetu('mesic', dnes);
+  return obdobiZPresetu('30_dni', dnes);
+}
+
+/** Kalendář uzávěrek po měsících (tržba dne z uzávěrek, když pokladna chybí): všechny měsíce rozmezí najednou. */
+function useKalendareUzaverek(mesice: readonly string[], povoleno: boolean) {
+  const klic = mesice.join(',');
+  const [stav, setStav] = useState<{ data: Record<string, number> | null; loading: boolean; error: string | null }>({ data: null, loading: false, error: null });
+  const [verze, setVerze] = useState(0);
+  useEffect(() => {
+    if (!povoleno || mesice.length === 0) { setStav({ data: null, loading: false, error: null }); return; }
+    let zrusit = false;
+    setStav(s => ({ ...s, loading: true, error: null }));
+    nactiKalendareUzaverek(mesice)
+      .then(data => { if (!zrusit) setStav({ data, loading: false, error: null }); })
+      .catch(e => { if (!zrusit) setStav({ data: null, loading: false, error: apiMessage(e, 'Uzávěrky se nenačetly.') }); }); // i18n-ok: překládá apiMessage
+    return () => { zrusit = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [klic, povoleno, verze]);
+  return { ...stav, reload: () => setVerze(v => v + 1) };
+}
+
+const urlTrzeb = (od: string, doD: string) => `/api/pos/daily?from=${od}&to=${doD}&lite=1`;
+const mesiceRozmezi = (od: string, doD: string): string[] => {
+  const out: string[] = [];
+  for (let m = od.slice(0, 7); m <= doD.slice(0, 7) && out.length < 30; ) { out.push(m); const [r, mm] = m.split('-').map(Number); m = mm === 12 ? `${r + 1}-01` : `${r}-${String(mm + 1).padStart(2, '0')}`; }
+  return out;
+};
+
 function PoDnech({ velikost, nastaveni }: WidgetProps<{ obdobi: string; zdroj: string }>) {
   const t = useT('widgety');
   const money = useMoney();
@@ -395,65 +435,122 @@ function PoDnech({ velikost, nastaveni }: WidgetProps<{ obdobi: string; zdroj: s
   const { ok, ceka } = useBrana(klice('trzby.po_dnech', ['finance.trzby']));
   const smiUzaverky = ok && smi('uzaverky.zobrazit_vse');
   const chceUzaverky = nastaveni.zdroj === 'uzaverky' && smiUzaverky;
-  // „Měsíc stránky": na Financích měsíc z přepínače v hlavičce, jinde dnešní měsíc.
+  const loc = aktualniJazyk();
+  const { nahled, instance } = useWidget();
+  const L = velikost === 'L';
+  const dnes = pragueToday();
+
+  // Období: výchozí z nastavení widgetu („Měsíc stránky" = měsíc z přepínače v hlavičce Financí), ale člověk si ho v kartě
+  // změní na cokoli (rychlé volby, od–do, dny v týdnu, hrubost) a volba se pamatuje.
   const mesicStranky = useContext(MesicStrankyFinanci);
-  const obdobiId = nastaveni.obdobi === 'mesic_stranky' ? (mesicStranky ? `mesic:${mesicStranky}` : 'tento_mesic') : nastaveni.obdobi;
-  const { data: pos, obdobi: obdobiZakladni } = useDenniPokladna(ok && !chceUzaverky, obdobiId);
-  const obdobi = /^\d{4}-\d{2}$/.test(obdobiZakladni.popis)
-    ? { ...obdobiZakladni, popis: fmtMesic(obdobiZakladni.popis, { jazyk: aktualniJazyk() }) }
-    : obdobiZakladni;
+  const vychozi = useMemo(() => obdobiZNastaveni(nastaveni.obdobi, mesicStranky), [nastaveni.obdobi, mesicStranky]);
+  const { obdobi, nastav } = useObdobi(`po_dnech-${instance}`, vychozi);
+  const r = platneRozmezi(obdobi, dnes);
+  const nDni = pocetDni(r.od, r.do);
+  const pred = predchoziRozmezi(r.od, r.do);
+  const [druh, setDruh] = useUlozeno<'sloupce' | 'cara'>('trzby-druh', 'sloupce', ['sloupce', 'cara']);
+  const [porovnat, setPorovnat] = useUlozeno<boolean>('trzby-porovnat', false);
+  const chcePorovnani = L && porovnat;
+
+  const pos = useDataWidgetu(ok && !chceUzaverky ? urlTrzeb(r.od, r.do) : null, vyberDenniPokladnu);
+  const posPred = useDataWidgetu(ok && !chceUzaverky && chcePorovnani ? urlTrzeb(pred.od, pred.do) : null, vyberDenniPokladnu);
   // Bez pokladny (nepropojená, nebo tarif bez ní) spadne na uzávěrky, když na ně divák smí.
   const zUzaverek = chceUzaverky || (smiUzaverky && pos.data?.propojeno === false);
-  const mesice = useMemo(() => mesiceObdobi(obdobi.from, obdobi.to), [obdobi.from, obdobi.to]);
-  const kal1 = useDataWidgetu(zUzaverek ? `/api/closings/calendar?month=${mesice[0]}` : null, vyberKalendar);
-  const kal2 = useDataWidgetu(zUzaverek && mesice[1] ? `/api/closings/calendar?month=${mesice[1]}` : null, vyberKalendar);
+  const kal = useKalendareUzaverek(mesiceRozmezi(r.od, r.do), zUzaverek);
+  const kalPred = useKalendareUzaverek(mesiceRozmezi(pred.od, pred.do), zUzaverek && chcePorovnani);
 
-  const dny: DenTrzby[] | null = useMemo(() => {
-    const vsechny = dnyObdobi(obdobi.from, obdobi.to);
-    if (zUzaverek) {
-      if (!kal1.data || (mesice[1] && !kal2.data)) return null;
-      const m = { ...kal1.data, ...(kal2.data ?? {}) };
-      return vsechny.map(den => ({ den, trzba: m[den] ?? 0 }));
-    }
+  const hodnoty = useMemo(() => {
+    if (zUzaverek) return kal.data ? dnyObdobi(r.od, r.do).map(den => ({ den, hodnota: kal.data![den] ?? 0 })) : null;
     const p = pos.data;
     if (!p || !p.propojeno) return null;
     const m = new Map(p.dny.map(x => [x.day, x.total]));
-    return vsechny.map(den => ({ den, trzba: m.get(den) ?? 0 }));
-  }, [zUzaverek, kal1.data, kal2.data, mesice, pos.data, obdobi.from, obdobi.to]);
+    return dnyObdobi(r.od, r.do).map(den => ({ den, hodnota: m.get(den) ?? 0 }));
+  }, [zUzaverek, kal.data, pos.data, r.od, r.do]);
+  const hodnotyPred = useMemo(() => {
+    if (!chcePorovnani) return null;
+    if (zUzaverek) return kalPred.data ? dnyObdobi(pred.od, pred.do).map(den => ({ den, hodnota: kalPred.data![den] ?? 0 })) : null;
+    const p = posPred.data;
+    if (!p || !p.propojeno) return null;
+    const m = new Map(p.dny.map(x => [x.day, x.total]));
+    return dnyObdobi(pred.od, pred.do).map(den => ({ den, hodnota: m.get(den) ?? 0 }));
+  }, [chcePorovnani, zUzaverek, kalPred.data, posPred.data, pred.od, pred.do]);
 
-  const { nahled } = useWidget();
-  const dnes = pragueToday();
-  const celkem = (dny ?? []).reduce((s, x) => s + x.trzba, 0);
-  const sTrzbou = (dny ?? []).filter(x => x.trzba > 0);
-  const prumer = sTrzbou.length ? Math.round(celkem / sTrzbou.length) : 0;
-  const rekord = sTrzbou.reduce<DenTrzby | null>((m, x) => (!m || x.trzba > m.trzba ? x : m), null);
-  const L = velikost === 'L';
-  const nacteni = ceka ? CEKA : zUzaverek ? [kal1, kal2] : pos;
+  const hr = hrubostProRozmezi(obdobi, nDni);
+  const sloty: Slot[] = useMemo(() => (hodnoty ? agreguj(hodnoty, r.od, r.do, hr, obdobi.dnyTydne) : []), [hodnoty, r.od, r.do, hr, obdobi.dnyTydne]);
+  const slotyPred: Slot[] | null = useMemo(() => (hodnotyPred ? agreguj(hodnotyPred, pred.od, pred.do, hr, obdobi.dnyTydne) : null), [hodnotyPred, pred.od, pred.do, hr, obdobi.dnyTydne]);
+  const sum = useMemo(() => (hodnoty ? souhrnObdobi(hodnoty, r.od, r.do, obdobi.dnyTydne, dnes) : null), [hodnoty, r.od, r.do, obdobi.dnyTydne, dnes]);
+  const sumPred = useMemo(() => (hodnotyPred ? souhrnObdobi(hodnotyPred, pred.od, pred.do, obdobi.dnyTydne, dnes) : null), [hodnotyPred, pred.od, pred.do, obdobi.dnyTydne, dnes]);
+  const zmena = sum && sumPred ? zmenaPct(sum.soucet, sumPred.soucet) : null;
+  // Dny pro přehledy pod grafem (jen vybrané dny v týdnu, jen do dneška).
+  const dnyPrehled: DenTrzby[] = useMemo(() => (hodnoty ?? []).filter(x => jeVybranyDen(x.den, obdobi.dnyTydne)).map(x => ({ den: x.den, trzba: x.hodnota })), [hodnoty, obdobi.dnyTydne]);
+
+  const nacteni = ceka ? CEKA : zUzaverek ? [kal] : [pos, posPred];
   const naFinancich = useNaFinancich();
   const prazdno = !zUzaverek && pos.data?.propojeno === false ? <NepropojenaPokladna /> : undefined;
 
+  const dnesKlic = hr === 'den' ? dnes : hr === 'tyden' ? pondeliTydne(dnes) : dnes.slice(0, 7);
+  const kratceDatum = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString(loc, { day: 'numeric', month: 'numeric' });
+  const jmenoSlotu = (sl: Slot) => hr === 'den' ? `${pismenoDne(sl.klic)} ${kratceDatum(sl.klic)}`
+    : hr === 'tyden' ? `${kratceDatum(sl.od)} – ${kratceDatum(sl.do)}`
+    : new Date(`${sl.klic}-01T12:00:00`).toLocaleDateString(loc, { month: 'long', year: 'numeric' });
+  const popisekOsy = (sl: Slot) => hr === 'den' ? (sloty.length <= 10 ? pismenoDne(sl.klic) : String(Number(sl.klic.slice(8))))
+    : hr === 'tyden' ? kratceDatum(sl.od) : new Date(`${sl.klic}-01T12:00:00`).toLocaleDateString(loc, { month: 'short' });
+  const kratce = (v: number) => (v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1).replace('.', ',')} M` : v >= 10_000 ? `${Math.round(v / 1000)}k` : v >= 1000 ? `${(v / 1000).toFixed(1).replace('.', ',')}k` : String(Math.round(v)));
+  const popisObdobi = r.od === r.do ? kratceDatum(r.od) : `${kratceDatum(r.od)} – ${kratceDatum(r.do)}`;
+
+  const vyber = (sl: Slot) => {
+    if (hr === 'den') { otevriDen(sl.klic, 'finance'); return; }
+    // Týden nebo měsíc: přiblížit na něj (drill-down); zpátky přes rychlé volby.
+    nastav({ ...obdobi, preset: 'vlastni', od: sl.od, do: sl.do, hrubost: 'auto' });
+  };
+
   return (
-    <Widget nacteni={nacteni} kostra="graf" prazdno={prazdno}
+    <Widget bezZkraceni={L} nacteni={nacteni} kostra="graf" prazdno={prazdno}
       odkaz={nastaveni.zdroj === 'uzaverky' || zUzaverek ? { popisek: t('Uzávěrky'), pohled: 'reports' } : naFinancich ? undefined : { popisek: t('Finance'), pohled: 'finance' }}>
-      {dny && (
-        <div className="space-y-3">
-          <Stat label={obdobi.popis} value={money(celkem)}
-            note={[zUzaverek ? t('z uzávěrek') : t('z pokladny'), prumer > 0 ? t('průměr {castka} za den', { castka: money(prumer) }) : ''].filter(Boolean).join(' · ')} />
+      {hodnoty && sum && (
+        <div className="space-y-4">
+          {L && !nahled && <ObdobiLista value={obdobi} onChange={nastav} />}
           <div>
-          <BarSpark height={L ? 96 : 56} showLabels={dny.length <= 14}
-            highlight={dny.findIndex(x => x.den === dnes) >= 0 ? dny.findIndex(x => x.den === dnes) : undefined}
-            label={t('Tržba po dnech: {obdobi}', { obdobi: obdobi.popis.toLowerCase() })}
-            data={dny.map(x => ({
-              value: x.den > dnes ? null : x.trzba,
-              label: pismenoDne(x.den),
-              tip: `${pismenoDne(x.den)} ${kratkeDatum(x.den)}: ${money(x.trzba)}`,
-            }))} />
-          {/* Víc než dva týdny: písmeno dne by se do sloupku nevešlo — osa jen se začátkem a koncem. */}
-          {dny.length > 14 && <OsaGrafu popisky={[kratkeDatum(dny[0].den), kratkeDatum(dny[dny.length - 1].den)]} />}
+            <Stat label={L ? t('Tržba za období') : popisObdobi} value={money(sum.soucet)}
+              note={[zUzaverek ? t('z uzávěrek') : t('z pokladny'), sum.prumer > 0 ? t('průměr {castka} za den', { castka: money(sum.prumer) }) : ''].filter(Boolean).join(' · ')} />
+            {L && zmena != null && (
+              <p className="t-meta mt-2 text-pretty">
+                <Chip tone={zmena >= 0 ? 'ok' : 'wait'} size="sm">{zmena > 0 ? '+' : ''}{zmena} %</Chip>{' '}
+                {t('proti předchozím {n, plural, one {# dni} other {# dnům}}', { n: nDni })} ({money(sumPred!.soucet)})
+              </p>
+            )}
           </div>
-          {L && sTrzbou.length > 0 && !nahled && <PrehledDnu dny={dny} dnes={dnes} rekord={rekord} onDen={d => otevriDen(d, 'finance')} />}
-          {L && rekord && (
-            <p className="t-meta">{t('Nejsilnější den {den} {datum} · {castka}', { den: pismenoDne(rekord.den), datum: kratkeDatum(rekord.den), castka: money(rekord.trzba) })}</p>
+          {L ? (
+            <div className="space-y-2">
+              {!nahled && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Segmented size="sm" ariaLabel={t('Druh grafu')} value={druh} onChange={setDruh}
+                    options={[{ id: 'sloupce', label: t('Sloupce') }, { id: 'cara', label: t('Čára') }]} />
+                  <button type="button" aria-pressed={porovnat} onClick={() => setPorovnat(!porovnat)}
+                    className={`filter-pill tap-target-sm ${porovnat ? 'seg-on' : 'seg-off glass'}`}>{t('Porovnat s předchozím obdobím')}</button>
+                </div>
+              )}
+              <CasovyGraf sloty={sloty} porovnani={porovnat ? slotyPred : null} druh={druh} vyska={190}
+                format={money} kratce={kratce} jmenoSlotu={jmenoSlotu} popisekOsy={popisekOsy} zvyraznit={dnesKlic}
+                popisekPorovnani={t('předchozí období')} onVyber={nahled ? undefined : vyber}
+                label={t('Tržba po dnech: {obdobi}', { obdobi: popisObdobi })} />
+              <p className="t-meta">{hr === 'den' ? t('Klepnutím na den otevřeš jeho detail.') : t('Klepnutím na sloupec se přiblížíš na jeho období.')}</p>
+            </div>
+          ) : (
+            <BarSpark height={56} showLabels={sloty.length <= 14}
+              highlight={sloty.findIndex(x => x.klic === dnesKlic) >= 0 ? sloty.findIndex(x => x.klic === dnesKlic) : undefined}
+              label={t('Tržba po dnech: {obdobi}', { obdobi: popisObdobi })}
+              data={sloty.map(x => ({ value: x.od > dnes ? null : x.hodnota, label: hr === 'den' ? pismenoDne(x.klic) : popisekOsy(x), tip: `${jmenoSlotu(x)}: ${money(x.hodnota)}` }))} />
+          )}
+          {L && sum.nejlepsi && (
+            <p className="t-meta">{t('Nejsilnější den {den} {datum} · {castka}', { den: pismenoDne(sum.nejlepsi.den), datum: kratkeDatum(sum.nejlepsi.den), castka: money(sum.nejlepsi.hodnota) })}
+              {sum.dnuSHodnotou > 0 && <> · {t('{n, plural, one {# den s tržbou} few {# dny s tržbou} other {# dní s tržbou}}', { n: sum.dnuSHodnotou })}</>}</p>
+          )}
+          {/* Graf s lištou zůstává celý; zkracuje se jen dlouhý přehled dnů pod ním („Zobrazit vše"). */}
+          {L && dnyPrehled.some(x => x.trzba > 0) && !nahled && (
+            <Zkratitelne id={`${instance}-dny`} velikost="L">
+              <PrehledDnu dny={dnyPrehled} dnes={dnes} rekord={sum.nejlepsi ? { den: sum.nejlepsi.den, trzba: sum.nejlepsi.hodnota } : null} onDen={d => otevriDen(d, 'finance')} />
+            </Zkratitelne>
           )}
         </div>
       )}

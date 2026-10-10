@@ -60,9 +60,12 @@ export async function GET(req: NextRequest) {
   if (to < from) return NextResponse.json({ error: 'Období je obráceně' }, { status: 400 });
   // Strop drží jeden požadavek v rozumné době — delší období patří do měsíčních
   // přehledů, ne do živého pohledu na dnešek.
+  // `lite=1`: jen dny, součty, hodiny a otevřené účty (bez rozpisu po produktech a poznámek) — snese až 400 dní
+  // (roční graf); plný pohled zůstává na tři měsíce.
+  const lite = sp.get('lite') === '1';
   const span = Math.round((Date.parse(to) - Date.parse(from)) / 86400000);
-  if (!Number.isFinite(span) || span > 92) {
-    return NextResponse.json({ error: 'Nejvýš tři měsíce najednou.' }, { status: 400 });
+  if (!Number.isFinite(span) || span > (lite ? 400 : 92)) {
+    return NextResponse.json({ error: lite ? 'Nejvýš 400 dní najednou.' : 'Nejvýš tři měsíce najednou.' }, { status: 400 });
   }
 
   const conn = await getConnection(teamId);
@@ -77,6 +80,19 @@ export async function GET(req: NextRequest) {
 
   let byPerson = new Map<string, { total: number; bills: number }>();
   const openList: { id: string; desk: string | null; since: string; total: number; persons: number | null; who: string | null; day: string }[] = [];
+  // Otevřené účty v období: kolik jich je, na kolik se vyšplhaly a které to jsou (nejstarší první).
+  const sestavOtevrene = () => {
+    const items = [...openList].sort((a, b) => a.since.localeCompare(b.since));
+    const byDay: Record<string, { count: number; total: number }> = {};
+    for (const o of items) { const d = byDay[o.day] ?? { count: 0, total: 0 }; d.count += 1; d.total += o.total; byDay[o.day] = d; }
+    return {
+      count: items.length,
+      total: Math.round(items.reduce((s2, o) => s2 + o.total, 0)),
+      oldestSince: items[0]?.since ?? null,
+      byDay,
+      items: items.slice(0, 40).map(o => ({ id: o.id, desk: o.desk, since: o.since, total: o.total, persons: o.persons, who: o.who, day: o.day })),
+    };
+  };
   const hours = new Array(24).fill(0);
 
   // Účtenky ze zrcadla — pokladna se tu už nevolá. Když zrcadlo období
@@ -128,6 +144,19 @@ export async function GET(req: NextRequest) {
     }
   } catch {
     return NextResponse.json({ connected: true, error: 'Zrcadlo pokladny není připravené — spusť migraci a synchronizaci v Nastavení → Pokladna.' }, { status: 502 });
+  }
+
+  // Odlehčený pohled (grafy v čase): dny a součty, bez rozpisu po produktech, bez poznámek a bez uzávěrek.
+  if (lite) {
+    const dl = Array.from(days.values()).sort((a, b) => a.day.localeCompare(b.day));
+    const sm = <K extends keyof DayRow>(k: K) => dl.reduce((t, d) => t + (d[k] as number), 0);
+    return NextResponse.json({
+      connected: true, from, to, today, placeName: conn.placeName ?? null, lastSyncAt: null,
+      totals: { bills: sm('bills'), total: sm('total'), cash: sm('cash'), card: sm('card'), other: sm('other'), tips: sm('tips'), tipsCash: sm('tipsCash'), tipsCard: sm('tipsCard'),
+        discounts: sm('discounts'), refundCount: sm('refundCount'), refundTotal: sm('refundTotal'), methods: [], avgBill: sm('bills') > 0 ? Math.round(sm('total') / sm('bills')) : 0, soldQty: 0, productRevenue: 0 },
+      days: dl.map(d => ({ ...d, closings: 0, declared: null, diff: null })),
+      hours, byPerson: [], items: [], notes: [], note: '', open: sestavOtevrene(),
+    });
   }
 
   // ---- co se prodalo, po produktech (z položek účtenek v zrcadle) ----
@@ -303,19 +332,7 @@ export async function GET(req: NextRequest) {
       };
     }),
     hours,
-    // Otevřené účty v období: kolik jich je, na kolik se vyšplhaly a které to jsou (nejstarší první).
-    open: (() => {
-      const items = [...openList].sort((a, b) => a.since.localeCompare(b.since));
-      const byDay: Record<string, { count: number; total: number }> = {};
-      for (const o of items) { const d = byDay[o.day] ?? { count: 0, total: 0 }; d.count += 1; d.total += o.total; byDay[o.day] = d; }
-      return {
-        count: items.length,
-        total: Math.round(items.reduce((s2, o) => s2 + o.total, 0)),
-        oldestSince: items[0]?.since ?? null,
-        byDay,
-        items: items.slice(0, 40).map(o => ({ id: o.id, desk: o.desk, since: o.since, total: o.total, persons: o.persons, who: o.who, day: o.day })),
-      };
-    })(),
+    open: sestavOtevrene(),
     byPerson: poLidech
       ? Array.from(byPerson.entries())
         .map(([name, v]) => ({ name, ...v }))

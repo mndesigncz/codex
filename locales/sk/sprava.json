@@ -1532,5 +1532,13 @@
   "Žádná uzávěrka neodpovídá filtrům": "Žiadna uzávierka nezodpovedá filtrom",
   "Zkus jiné slovo, jiný stav nebo rozmezí dnů.": "Skús iné slovo, iný stav alebo rozmedzie dní.",
   "Celý den": "Celý deň",
-  "Celý den {den}": "Celý deň {den}"
+  "Celý den {den}": "Celý deň {den}",
+  "Otevřít detail úkolu": "Otvoriť detail úlohy",
+  "Otevřené": "Otvorené",
+  "Dnes hotovo": "Dnes hotové",
+  "Splněno za 7 dní": "Splnené za 7 dní",
+  "Nic nevyhovuje filtrům": "Nič nevyhovuje filtrom",
+  "Zkus jiný stav, hledání nebo zruš filtry.": "Skús iný stav, hľadanie alebo zruš filtre.",
+  "z {n} s dnešním termínem": "z {n} s dnešným termínom",
+  "úspěšnost {n} %": "úspešnosť {n} %"
 }

@@ -110,7 +110,7 @@ function nactiRozbalene(): Record<string, true> {
  * zasune pod odlesk) a jde rozbalit i zase zabalit. Volba se pamatuje v tomhle prohlížeči po instanci.
  * V náhledu galerie a v úpravách se nezkracuje — tam má být vidět všechno.
  */
-function Zkratitelne({ id, velikost, children }: { id: string; velikost: 'M' | 'L'; children: React.ReactNode }) {
+export function Zkratitelne({ id, velikost, children }: { id: string; velikost: 'M' | 'L'; children: React.ReactNode }) {
   const t = useT('widgety');
   const vnitrek = useRef<HTMLDivElement>(null);
   const [vyska, setVyska] = useState(0);
@@ -179,6 +179,8 @@ export interface ObalWidgetuProps {
   akce?: MenuItem[];
   /** Jen S bez jiných ovládacích prvků: celá karta je proklik. */
   otevrit?: () => void;
+  /** Dlouhý obsah se nezkracuje pod „Zobrazit vše" (velký dashboard, který je celý obsah karty). */
+  bezZkraceni?: boolean;
   /** Jediný tónovaný widget na ploše: „Čeká na tebe". */
   ton?: 'wait';
   /** Stav dat (jeden nebo víc dotazů); vypnuté dotazy (url null) se nepočítají. */
@@ -237,7 +239,7 @@ function KostraTela({ tvar, velikost }: { tvar: Kostra; velikost: Velikost }) {
  * poctivými stavy (DP §5.3). Autor widgetu dodá data (`nacteni`), obsah
  * (children) a případně prázdno — o kostru, chybu a skrytí se postará obal.
  */
-export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, ton, nacteni, kostra, prazdno, children }: ObalWidgetuProps) {
+export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkraceni, ton, nacteni, kostra, prazdno, children }: ObalWidgetuProps) {
   const k = useWidget();
   const nav = useNavigace();
   const t = useT('widgety');
@@ -386,7 +388,7 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, ton, nac
       </div>
       {!(mozeSbalit && k.sbaleno) && (
         <div className={`relative mt-3 flex-1 min-h-0 ${S ? 'flex flex-col justify-end' : ''}`}>
-          {!S && !k.nahled && !k.upravy && !nacitam && !chyba && prazdno === undefined
+          {!S && !bezZkraceni && !k.nahled && !k.upravy && !nacitam && !chyba && prazdno === undefined
             ? <Zkratitelne id={k.instance} velikost={k.velikost as 'M' | 'L'}>{obsah}</Zkratitelne>
             : obsah}
         </div>
