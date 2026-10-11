@@ -247,12 +247,14 @@ export function postupChecklistu(u: Pick<Ukol, 'checklist'>): number | null {
 // ---------------------------------------------------------------------------
 
 export type PohledUkolu = 'list' | 'week' | 'month' | 'prehled';
-export interface PredaniUkolu { stav?: StavUkolu; pohled?: PohledUkolu }
+export interface PredaniUkolu { stav?: StavUkolu; pohled?: PohledUkolu; /** Otevřít rovnou detail úkolu (z globálního hledání). */ ukolId?: number }
 export const KLIC_PREDANI_UKOLU = 'managero-ukoly-predani';
 export const UDALOST_PREDANI_UKOLU = 'managero:predani-ukolu';
 
-/** „stav:po_terminu" / „pohled:week" (to, co widget nese v `cil.arg`); neznámé hodnoty se zahodí. */
+/** „stav:po_terminu" / „pohled:week" / „ukol:42" (to, co widget nebo hledání nese v `arg`); neznámé hodnoty se zahodí. */
 export function rozborPredani(arg: string | null | undefined): PredaniUkolu {
+  const id = /^ukol:(\d+)$/.exec(String(arg ?? ''));
+  if (id) return { ukolId: Number(id[1]) };
   const m = /^(stav|pohled):([a-z_]+)$/.exec(String(arg ?? ''));
   if (!m) return {};
   if (m[1] === 'stav') return (STAVY_UKOLU as readonly string[]).includes(m[2]) ? { stav: m[2] as StavUkolu } : {};

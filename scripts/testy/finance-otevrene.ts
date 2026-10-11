@@ -1,6 +1,6 @@
 // Otevřené účty (rozpracovaná tržba): výběr z /api/pos/daily (`open`) a doba otevřenosti.
 import type { Testy } from './_testy.ts';
-import { jeOtevrenyUcet, vyberOtevrene, vyberDenniPokladnu, minutOtevrenosti, DLOUHO_OTEVRENY_MIN } from '../../lib/financeWidgety.ts';
+import { jeOtevrenyUcet, vyberOtevrene, vyberDenniPokladnu, minutOtevrenosti, DLOUHO_OTEVRENY_MIN, trzbaDoHodiny, zmenaOprotiMinulemuTydnu } from '../../lib/financeWidgety.ts';
 
 export default function ({ eq, ok }: Testy) {
   eq('otevřené: starší odpověď bez `open` = žádné účty', vyberOtevrene(undefined), { pocet: 0, soucet: 0, nejstarsi: null, poDnech: {}, ucty: [] });
@@ -31,4 +31,14 @@ export default function ({ eq, ok }: Testy) {
   eq('otevřený účet: bez paid_at, ale fiskalizovaný = uzavřený, ne', jeOtevrenyUcet({ paidAt: null, fiscalized: true, finalPrice: 250 }), false);
   eq('otevřený účet: nulová částka = ne', jeOtevrenyUcet({ paidAt: null, fiscalized: false, finalPrice: 0 }), false);
   eq('otevřený účet: vrácený a smazaný = ne', [jeOtevrenyUcet({ paidAt: null, refunded: true, finalPrice: 90 }), jeOtevrenyUcet({ paidAt: null, deleted: true, finalPrice: 90 })], [false, false]);
+
+  // Srovnání s minulým týdnem ke stejné hodině
+  const dnesH = [0, 0, 0, 0, 0, 0, 0, 0, 100, 200, 300, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  const minH = [0, 0, 0, 0, 0, 0, 0, 0, 100, 100, 100, 100, 500, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  eq('tržba do hodiny: součet hodin 0 až h včetně', trzbaDoHodiny(dnesH, 9), 300);
+  eq('tržba do hodiny: za konec pole nic nepřičte', trzbaDoHodiny([5, 5], 30), 10);
+  eq('minulý týden: do poslední dokončené hodiny (ve 12:xx se bere do 11:59)', zmenaOprotiMinulemuTydnu(dnesH, minH, 12), { pct: 50, doHodiny: 12 });
+  eq('minulý týden: půlnoc = nejde', zmenaOprotiMinulemuTydnu(dnesH, minH, 0), null);
+  eq('minulý týden: když minule nic neprodal = nejde', zmenaOprotiMinulemuTydnu(dnesH, [0, 0, 0], 12), null);
+  eq('minulý týden: slabší den je záporný', zmenaOprotiMinulemuTydnu([0, 50], [0, 100], 2)?.pct, -50);
 }

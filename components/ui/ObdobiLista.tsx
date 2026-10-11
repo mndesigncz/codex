@@ -23,7 +23,7 @@ import { pragueToday } from '@/lib/pragueTime';
 const SHODNE = (a: number[], b: number[]) => a.length === b.length && a.every((v, i) => v === b[i]);
 
 /** Volby v okně v pořadí, v jakém je čte člověk (krátká období → měsíce → rok). */
-const VOLBY: PresetObdobi[] = ['dnes', '7_dni', '30_dni', 'mesic', 'minuly_mesic', '90_dni', '180_dni', '365_dni'];
+const VOLBY: PresetObdobi[] = ['dnes', 'vcera', 'tyden', '7_dni', '30_dni', 'mesic', 'minuly_mesic', '90_dni', '180_dni', '365_dni'];
 
 export function ObdobiLista({ value, onChange, volby, dnyTydne = true, hrubost = true, porovnat, onPorovnat, className = '' }: {
   value: Obdobi;
@@ -50,7 +50,7 @@ export function ObdobiLista({ value, onChange, volby, dnyTydne = true, hrubost =
   const rozmezi = r.od === r.do ? datum(r.od, true) : `${datum(r.od)} – ${datum(r.do, true)}`;
 
   const popisky: Partial<Record<PresetObdobi, string>> = {
-    dnes: t('Dnes'), '7_dni': t('Posledních 7 dní'), '30_dni': t('Posledních 30 dní'), mesic: t('Tento měsíc'),
+    dnes: t('Dnes'), vcera: t('Včera'), tyden: t('Tento týden'), '7_dni': t('Posledních 7 dní'), '30_dni': t('Posledních 30 dní'), mesic: t('Tento měsíc'),
     minuly_mesic: t('Minulý měsíc'), '90_dni': t('3 měsíce'), '180_dni': t('6 měsíců'), '365_dni': t('Rok'),
   };
   const nabidka = VOLBY.filter(v => !volby || volby.includes(v));

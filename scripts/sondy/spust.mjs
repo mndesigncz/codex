@@ -143,6 +143,7 @@ export const ZELENE = [
   'obdobi-graf',
   'ukoly-pohledy',
   'widgety-zvetsit',
+  'globalni-hledani',
   'den-detail',
 ];
 

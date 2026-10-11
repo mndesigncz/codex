@@ -2,6 +2,7 @@
 //  1) widget Otevřené účty (Finance): kolik je nezaplaceno, stoly, „dlouho otevřený"; bez finance.trzby se nekreslí,
 //  2) Uzávěrky: „Celý den" u řádku i v detailu uzávěrky otevře detail dne s uzávěrkami nahoře,
 //  3) zaměstnanec s náhledem rozvrhu: štítek dne v „Kdo má směnu" otevře „Den v podniku" jen se směnami (bez financí),
+//  3b) klepnutí na kartu Pokladna dnes otevře rozbor dnešního dne (ne jen stránku Financí),
 //  4) tlačítko Sbalit stojí vždy úplně vpravo v hlavičce karty, ať má karta odkaz („Finance ›"), nebo ne.
 import { readFileSync } from 'node:fs';
 import { kontext, konec, tvrdi, otevri, dokud, dotazyNa, fixtura, roleMine, DIR, OUT } from './k68-spolecne.mjs';
@@ -20,7 +21,7 @@ const posDaily = (od, doD) => {
     count: 2, total: 1350, oldestSince: pred3h, byDay: { [dnes]: { count: 2, total: 1350 } },
     items: [{ id: 'o1', desk: '7', since: pred3h, total: 900, persons: 3, who: 'Eva Testová', day: dnes }, { id: 'o2', desk: null, since: pred20m, total: 450, persons: null, who: 'Martin Nemeškal', day: dnes }],
   } : { count: 0, total: 0, oldestSince: null, byDay: {}, items: [] };
-  return { ...b, from: od, to: doD, days, open, totals: { ...b.totals, total: days.reduce((s, x) => s + x.total, 0), avgBill: 200, methods: [] } };
+  return { ...b, from: od, to: doD, days, open, hours: Array.from({ length: 24 }, () => 1000), totals: { ...b.totals, total: days.reduce((s, x) => s + x.total, 0), avgBill: 200, methods: [] } };
 };
 const DNY = Object.fromEntries(['DNES', 'VCERA', 'PREDEVCIREM', 'PRED3', 'PRED4', 'PRED5', 'PRED6'].map((k, i) => [k, dayPlus(dnes, -i)]));
 const nacti = (j) => { let t = readFileSync(DIR + j + '.json', 'utf8'); for (const [k, v] of Object.entries(DNY)) t = t.replaceAll(`"${k}"`, `"${v}"`); return JSON.parse(t.replaceAll('"MESIC"', `"${mesic}"`)); };
@@ -29,6 +30,7 @@ const dalsi = (req, json) => {
   const u = new URL(req.url()); if (req.method() !== 'GET') return undefined;
   const q = u.searchParams;
   if (u.pathname === '/api/pos/daily') return json(posDaily(q.get('from'), q.get('to')));
+  if (u.pathname === '/api/pos/summary') return json(JSON.parse(readFileSync(DIR + 'k68-pos-summary.json', 'utf8').replaceAll('DNES', dnes)));
   if (u.pathname === '/api/finance') return json({ ...JSON.parse(readFileSync(DIR + 'k69-b5b-finance.json', 'utf8').replaceAll('DNES', dnes)), month: q.get('month') });
   if (u.pathname === '/api/closings') return json(nacti('k69-b5a-closings'));
   if (u.pathname === '/api/closings/calendar') return json({ ...nacti('k69-b5a-calendar'), month: q.get('month') ?? mesic });
@@ -118,6 +120,20 @@ for (const w of [1280, 390]) {
   const t = (await okno.innerText()).replace(/\s+/g, ' ');
   tvrdi('3: zaměstnanec vidí, kdo měl ten den směnu', /Anna Kolegová/.test(t) && /Ty/.test(t), t.slice(0, 300));
   tvrdi('3: bez práv na finance nejsou v detailu tržba, platby ani výdaje', !/tržba|platby|výdaje/i.test(t.replace(/Den v podniku/i, '')), t.slice(0, 300));
+  await ctx.close();
+}
+// 3b) Pokladna dnes → rozbor dnešního dne
+{
+  const fix = { ...fixtura('k68-rozlozeni-vedeni'), polozky: [{ id: 'pokl', widget: 'pokladna.dnes', velikost: 'M' }] };
+  const { ctx, p } = await kontext({ viewport: { width: 1280, height: 900 }, fix, dalsi });
+  await otevri(p, '/employer/overview', 'vedeni.prehled');
+  const karta = p.locator('[data-instance="pokl"]');
+  await karta.getByRole('button', { name: /^Otevřít/ }).waitFor({ timeout: 10000 });
+  if (Number(new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hourCycle: 'h23', timeZone: 'Europe/Prague' }).format(new Date())) >= 1) {
+    tvrdi('Pokladna dnes: ukazuje změnu proti stejnému dni minulý týden ke stejné hodině', await dokud(async () => /proti stejnému dni minulý týden · do \d+:00/.test(await karta.innerText()), 6000), (await karta.innerText()).slice(0, 200));
+  }
+  await karta.getByRole('button', { name: /^Otevřít/ }).click();
+  tvrdi('Pokladna dnes: klepnutí otevře „Finance dne" dnešního dne a zůstane se na Přehledu', await p.getByRole('dialog', { name: 'Finance dne' }).waitFor({ timeout: 8000 }).then(() => true, () => false) && await p.locator('[data-plocha="vedeni.prehled"]').count() === 1);
   await ctx.close();
 }
 await konec();

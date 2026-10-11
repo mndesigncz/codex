@@ -301,6 +301,10 @@ const FIX_PLAN = nacti('k69-b6a-rozlozeni-planovani');
   tvrdi('P1: Karty ke schválení — Letní terasa před Novým ceníkem', await dokud(async () => { const t = await fronta.innerText(); return t.indexOf('Letní terasa') >= 0 && t.indexOf('Letní terasa') < t.indexOf('Nový ceník'); }, 1500));
   await p.screenshot({ path: OUT + 'k69-b6a-planovani-desk.png', fullPage: true });
 
+  // Klepnutí na kartu na tabuli ji otevře k úpravě (jako v Trellu), ne jen přes „···".
+  await nastroj.locator('button[aria-haspopup="dialog"]', { hasText: 'Nová sezónní káva' }).first().click();
+  tvrdi('P-K: klepnutí na kartu otevře okno Upravit kartu', await dokud(() => p.getByRole('dialog', { name: 'Upravit kartu' }).isVisible(), 2000));
+  await p.keyboard.press('Escape');
   await fronta.getByRole('button', { name: 'Schválit kartu Letní terasa' }).click();
   tvrdi('P-W: Schválit pošle PATCH /api/planning/3 do Hotovo', await dokud(() => (stav.kartyPatche ?? []).some(x => x.id === 3 && x.telo.column === 'done'), 2000), JSON.stringify(stav.kartyPatche));
   tvrdi('P-W: v řádku fronty žádné inkoustové (primary) tlačítko — jediná silná akce je limetka v hlavičce', await fronta.locator('button[class*="bg-[#16181A]"]').count() === 0);

@@ -432,7 +432,6 @@
   "OK": "OK",
   "Obarvit barvou nadpisů (jednobarevné logo)": "Tint with the heading color (single-color logo)",
   "Obchodní den {datum}": "Business day {datum}",
-  "Období": "Period",
   "Objednat": "Order",
   "Objednat e-mailem": "Order by email",
   "Objednat u dodavatele": "Order from supplier",
@@ -1088,7 +1087,6 @@
   "Za tento den není uzávěrka": "There is no closing for this day",
   "Za uzávěrku": "For the closing",
   "Za vyplněnou uzávěrku": "For a filled-in closing",
-  "Za {dni} dní nejsou žádné záznamy docházky.": "There are no attendance records for the last {dni} days.",
   "Za úkol": "For a task",
   "Za úkol, který měl ten den termín a zůstal nesplněný": "For a task that was due that day and stayed unfinished",
   "Zadej název role.": "Enter a role name.",
@@ -1369,7 +1367,6 @@
   "{nazev}: smazáno": "{nazev}: deleted",
   "{n} auto": "{n} auto",
   "{n} b": "{n} pts",
-  "{n} dní": "{n} days",
   "{n} k hodnocení": "{n} to review",
   "{n} ke schválení": "{n} awaiting approval",
   "{n} menu": "{n} menu",
@@ -1533,5 +1530,10 @@
   "Celý den {den}": "Whole day {den}",
   "Otevřít detail úkolu": "Open task details",
   "Nic nevyhovuje filtrům": "Nothing matches the filters",
-  "Zkus jiný stav, hledání nebo zruš filtry.": "Try another status or search, or clear the filters."
+  "Zkus jiný stav, hledání nebo zruš filtry.": "Try another status or search, or clear the filters.",
+  "V tomto období nejsou žádné záznamy docházky.": "There are no attendance records in this period.",
+  "Úkol je odložený na {den}.": "Task postponed to {den}.",
+  "Hledat v aplikaci (Ctrl K)": "Search the app (Ctrl K)",
+  "Hledat v aplikaci": "Search the app",
+  "Hledat": "Search"
 }

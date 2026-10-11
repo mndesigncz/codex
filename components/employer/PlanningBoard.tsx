@@ -211,10 +211,20 @@ export default function PlanningBoard() {
                     className={`card p-4 transition-shadow hover:shadow-[shadow:var(--shadow-float)] ${upravuje ? 'cursor-grab active:cursor-grabbing' : ''} ${dragId === card.id ? 'opacity-40' : ''}`}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-[15px] leading-snug text-[#16181A] break-words">{card.title}</p>
-                        {card.description && <p className="text-[13px] text-black/55 mt-1 break-words text-pretty">{card.description}</p>}
-                      </div>
+                      {upravuje ? (
+                        // Klepnutí na kartu ji otevře k úpravě (jako v Trellu); „···" zůstává pro přesun a smazání.
+                        <button type="button" aria-haspopup="dialog" title={t('Upravit kartu')}
+                          onClick={() => setEditCard({ id: card.id, title: card.title, description: card.description ?? '' })}
+                          className="min-w-0 flex-1 text-left rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542]">
+                          <span className="block font-medium text-[15px] leading-snug text-[#16181A] break-words">{card.title}</span>
+                          {card.description && <span className="block text-[13px] text-black/55 mt-1 break-words text-pretty">{card.description}</span>}
+                        </button>
+                      ) : (
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-[15px] leading-snug text-[#16181A] break-words">{card.title}</p>
+                          {card.description && <p className="text-[13px] text-black/55 mt-1 break-words text-pretty">{card.description}</p>}
+                        </div>
+                      )}
                       {upravuje && <Menu size="sm" label={t('Možnosti karty {nazev}', { nazev: card.title })} items={polozkyMenu(card)} className="-mr-1.5 -mt-1" />}
                     </div>
                   </li>

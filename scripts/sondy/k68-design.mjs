@@ -135,7 +135,8 @@ for (const [nazev, cesta, stranka, fix, role, mineData, jmeno] of [
       return { n: hs.length, nad: hs[0] && li ? hs[0].getBoundingClientRect().bottom <= li.getBoundingClientRect().top : false };
     });
     tvrdi(`2: ${nazev} ${druh} — právě jeden h1 a leží nad widgety`, h1.n === 1 && h1.nad, JSON.stringify(h1));
-    const karty = await p.$$eval('[data-plocha] li[data-widget] section:has(> button[aria-label^="Otevřít"])', els => els.map(e => getComputedStyle(e).backgroundColor));
+    // Inkoustová karta (jediná tmavá plocha obsahu, DP §2.10) je výjimka: Pokladna dnes se klepnutím otevírá taky.
+    const karty = await p.$$eval('[data-plocha] li[data-widget] section:has(> button[aria-label^="Otevřít"])', els => els.filter(e => !e.className.includes('bg-[#16181A]')).map(e => getComputedStyle(e).backgroundColor));
     tvrdi(`2: ${nazev} ${druh} — klikací karty jsou bílé (T5)`, karty.every(c => c === 'rgb(255, 255, 255)'), JSON.stringify(karty));
     tvrdi(`2: ${nazev} ${druh} — nic nepulzuje (animate-pulse/ping)`, await p.locator('[data-plocha] .animate-pulse, [data-plocha] .animate-ping').count() === 0);
     const f = await pismo(p);

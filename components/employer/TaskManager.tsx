@@ -139,6 +139,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
     const pouzij = (arg: string | null) => {
       const r = rozborPredani(arg);
       if (r.stav) { setFiltr(f => ({ ...f, stav: r.stav! })); setView('list'); }
+      if (r.ukolId != null) { setView('list'); setFiltr(VYCHOZI_FILTR); setDetailId(r.ukolId); }
       if (r.pohled) setView(r.pohled);
     };
     const a = cerstvePredani();
@@ -542,6 +543,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
           onSplnit={done => { if (done && detail.dueDate && detail.dueDate !== today) setDetailId(null); completeTask(detail, done); }}
           onUpravit={smiUpravit(detail) ? () => { setDetailId(null); openEdit(detail); } : undefined}
           onSmazat={smiSmazat(detail) ? () => { setDetailId(null); setMazani(detail); } : undefined}
+          onOdlozit={smiUpravit(detail) ? den => { setDetailId(null); void moveTask(detail, den); setZprava(t('Úkol je odložený na {den}.', { den: denKratce(den, loc) })); } : undefined}
           onChecklist={smiSplnit(detail) ? i => toggleChecklistItem(detail, i) : undefined}
           onChecklistVse={smiSplnit(detail) ? d => toggleChecklistAll(detail, d) : undefined} />
       )}

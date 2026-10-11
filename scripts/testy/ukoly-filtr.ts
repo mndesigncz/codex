@@ -93,6 +93,7 @@ export default function ({ eq, ok }: Testy) {
 
   eq('předání z widgetu: stav', rozborPredani('stav:po_terminu'), { stav: 'po_terminu' });
   eq('předání z widgetu: pohled', rozborPredani('pohled:week'), { pohled: 'week' });
+  eq('předání: konkrétní úkol (z hledání)', rozborPredani('ukol:42'), { ukolId: 42 });
   eq('předání z widgetu: neznámé a prázdné se zahodí', [rozborPredani('stav:nesmysl'), rozborPredani('pohled:x'), rozborPredani(undefined), rozborPredani('42')], [{}, {}, {}, {}]);
 
   // Rychlé přidání: 2026-10-07 je středa

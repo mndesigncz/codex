@@ -1323,7 +1323,8 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
   const nastroj = (
     <Card as="section" aria-labelledby="planovac-nadpis" className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="planovac-nadpis" className="t-card cz-sentence">{monthLabel(month, jazyk)}</h2>
+        {/* Na telefonu měsíc ukazuje už MonthNav pod ním; nadpis tam jen opakuje totéž (zůstává pro odečítač). */}
+        <h2 id="planovac-nadpis" className="t-card cz-sentence max-sm:sr-only">{monthLabel(month, jazyk)}</h2>
         {/* Šipky pro libovolný měsíc, pilulky pro dva obvyklé (tento slouží i jako „zpět na dnešek"). */}
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <MonthNav value={month} onChange={(m) => { zmenMesic(m); }} />

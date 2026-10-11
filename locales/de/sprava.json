@@ -432,7 +432,6 @@
   "OK": "OK",
   "Obarvit barvou nadpisů (jednobarevné logo)": "Mit der Überschriftenfarbe einfärben (einfarbiges Logo)",
   "Obchodní den {datum}": "Geschäftstag {datum}",
-  "Období": "Zeitraum",
   "Objednat": "Bestellen",
   "Objednat e-mailem": "Per E-Mail bestellen",
   "Objednat u dodavatele": "Beim Lieferanten bestellen",
@@ -1088,7 +1087,6 @@
   "Za tento den není uzávěrka": "Für diesen Tag gibt es keinen Kassenabschluss",
   "Za uzávěrku": "Für den Kassenabschluss",
   "Za vyplněnou uzávěrku": "Für einen ausgefüllten Kassenabschluss",
-  "Za {dni} dní nejsou žádné záznamy docházky.": "Für die letzten {dni} Tage gibt es keine Zeiterfassungseinträge.",
   "Za úkol": "Für eine Aufgabe",
   "Za úkol, který měl ten den termín a zůstal nesplněný": "Für eine Aufgabe, die an dem Tag fällig war und unerledigt blieb",
   "Zadej název role.": "Gib einen Namen für die Rolle ein.",
@@ -1369,7 +1367,6 @@
   "{nazev}: smazáno": "{nazev}: gelöscht",
   "{n} auto": "{n} auto",
   "{n} b": "{n} Pkt.",
-  "{n} dní": "{n} Tage",
   "{n} k hodnocení": "{n} zu bewerten",
   "{n} ke schválení": "{n} warten auf Genehmigung",
   "{n} menu": "{n} Karte",
@@ -1533,5 +1530,10 @@
   "Celý den {den}": "Ganzer Tag {den}",
   "Otevřít detail úkolu": "Aufgabendetails öffnen",
   "Nic nevyhovuje filtrům": "Nichts passt zu den Filtern",
-  "Zkus jiný stav, hledání nebo zruš filtry.": "Probiere einen anderen Status oder eine andere Suche oder setze die Filter zurück."
+  "Zkus jiný stav, hledání nebo zruš filtry.": "Probiere einen anderen Status oder eine andere Suche oder setze die Filter zurück.",
+  "V tomto období nejsou žádné záznamy docházky.": "In diesem Zeitraum gibt es keine Anwesenheitseinträge.",
+  "Úkol je odložený na {den}.": "Aufgabe auf {den} verschoben.",
+  "Hledat v aplikaci (Ctrl K)": "In der App suchen (Strg K)",
+  "Hledat v aplikaci": "In der App suchen",
+  "Hledat": "Suchen"
 }

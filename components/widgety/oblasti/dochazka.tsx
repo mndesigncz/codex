@@ -424,8 +424,13 @@ const urlDni = (dni: number) => `/api/attendance?days=${dni}`;
  */
 export function obnovDochazku(): void {
   const dnuMesice = Number(pragueToday().slice(8, 10)) + 1;
-  for (const d of new Set([1, 7, 30, 90, dnuMesice])) obnovDataWidgetu(urlDni(d));
+  // Stránka Docházky si volí libovolné rozmezí, takže se obnoví i délky, které si v téhle relaci někdo vyžádal.
+  for (const d of new Set([1, 7, 30, 90, dnuMesice, ...POUZITE_DNI])) obnovDataWidgetu(urlDni(d));
 }
+
+/** Délky období (ve dnech), které si stránka Docházky vyžádala — `obnovDochazku` je po zápisu obnoví taky. */
+const POUZITE_DNI = new Set<number>();
+export function zapamatujDniDochazky(dni: number): void { POUZITE_DNI.add(dni); }
 
 const aDalsich = (t: PrekladFn, n: number) => t('…a {n, plural, one {# další} few {# další} other {# dalších}}', { n });
 
@@ -704,7 +709,7 @@ function SouhrnHodin({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: str
       prazdno={!L && radky.length === 0 ? <p className="t-meta">{t('Za {n, plural, one {# den} few {# dny} other {# dní}} nikdo nic neodpíchl.', { n: dni })}</p> : undefined}>
       {L && (
         <div className="mb-4 space-y-4">
-          <ObdobiLista value={obdobi} onChange={nastav} volby={['dnes', '7_dni', '30_dni', 'mesic', 'minuly_mesic', '90_dni', '180_dni']} porovnat={porovnat} onPorovnat={setPorovnat} />
+          <ObdobiLista value={obdobi} onChange={nastav} volby={['dnes', 'vcera', 'tyden', '7_dni', '30_dni', 'mesic', 'minuly_mesic', '90_dni', '180_dni']} porovnat={porovnat} onPorovnat={setPorovnat} />
           <div>
             <Stat label={t('Odpracováno')} value={hodinyText(sumHodin)} note={t('{n, plural, one {# směna} few {# směny} other {# směn}}', { n: radky.reduce((a, x) => a + x.pocet, 0) })} />
             {zmena != null && (

@@ -73,6 +73,7 @@ for (const w of [1280, 390]) {
   const tOkno = (await okno.innerText()).replace(/\s+/g, ' ');
   tvrdi(`${w}: detail ukáže popis, komu, termín, kroky a návod`, /Vanilka a karamel/.test(tOkno) && /Eva Testová/.test(tOkno) && /Termín/i.test(tOkno) && /Kroky/i.test(tOkno) && /Lískový oříšek/.test(tOkno) && /Sirupy na baru/.test(tOkno), tOkno.slice(0, 400));
   tvrdi(`${w}: detail nabízí Upravit, Smazat a Označit jako hotový`, await okno.getByRole('button', { name: 'Upravit' }).count() === 1 && await okno.getByRole('button', { name: 'Smazat' }).count() === 1 && await okno.getByRole('button', { name: 'Označit jako hotový' }).count() === 1);
+  tvrdi(`${w}: nehotový úkol jde z detailu odložit`, await okno.getByRole('button', { name: /^Odložit/ }).count() === 1);
   await okno.getByRole('button', { name: 'Označit jako hotový' }).click();
   tvrdi(`${w}: Označit jako hotový pošle PATCH status done`, await dokud(() => (stav.ukolyPatche ?? []).some(t => t.id === 2 && t.status === 'done'), 3000), JSON.stringify(stav.ukolyPatche));
   await p.keyboard.press('Escape');
