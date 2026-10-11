@@ -22,6 +22,7 @@
 // Tablet (KioskApp) plochu nemá — kreslí nástroj s vlastní hlavičkou jako dřív.
 
 import { useCallback, useEffect, useId, useState } from 'react';
+import { cerstvePredaniPohledu, stavZPredani, udalostPredani } from '@/lib/predaniPohledu';
 import { usePathname } from 'next/navigation';
 import { Icon } from '../Icons';
 import {
@@ -148,6 +149,16 @@ export default function Procedures({ user }: Props) {
   const behy = useDataWidgetu(URL_PRUBEHY, vyberPrubehy);
   const procedures = (data.data?.postupy ?? []) as Procedure[];
 
+  // Filtr „Čeká na schválení" — z widgetu Návrhy postupů (stav:navrhy) i ručně; viz lib/predaniPohledu.ts.
+  const [jenNavrhy, setJenNavrhy] = useState(() => stavZPredani(cerstvePredaniPohledu('procedures'), ['navrhy']) === 'navrhy');
+  useEffect(() => {
+    const naPredani = (e: Event) => { if (stavZPredani((e as CustomEvent).detail, ['navrhy'])) setJenNavrhy(true); };
+    window.addEventListener(udalostPredani('procedures'), naPredani);
+    return () => window.removeEventListener(udalostPredani('procedures'), naPredani);
+  }, []);
+  const nNavrhu = procedures.filter(p => p.approved === false).length;
+  const zobrazene = jenNavrhy ? procedures.filter(p => p.approved === false) : procedures;
+
   const [seeding, setSeeding] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<Procedure | null>(null);
@@ -272,9 +283,20 @@ export default function Procedures({ user }: Props) {
     );
   } else {
     nastroj = (
+      <>
+        {/* Co čeká na schválení: pilulka jen když takový postup je (nebo je filtr zapnutý). */}
+        {(nNavrhu > 0 || jenNavrhy) && (
+          <div className="flex gap-2 mb-3">
+            <button type="button" aria-pressed={jenNavrhy} onClick={() => setJenNavrhy(v => !v)}
+              className={`filter-pill tap-target whitespace-nowrap shrink-0 ${jenNavrhy ? 'seg-on' : 'seg-off glass'}`}>
+              {t('Čeká na schválení')} <span className="tabular-nums opacity-60">{nNavrhu}</span>
+            </button>
+          </div>
+        )}
       <Card pad="none">
         <ul className="list px-5">
-          {procedures.map(p => {
+          {zobrazene.length === 0 && <li className="py-6 text-center t-meta">{t('Žádný postup nečeká na schválení.')}</li>}
+          {zobrazene.map(p => {
             const running = active?.procedureId === p.id;
             const steps = parseSteps(p.items);
             const mins = totalMinutes(steps);
@@ -314,6 +336,7 @@ export default function Procedures({ user }: Props) {
           })}
         </ul>
       </Card>
+      </>
     );
   }
 

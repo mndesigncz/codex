@@ -229,7 +229,7 @@ export default function EmployerLayout({ user }: Props) {
     setRecipeProduct(view === 'recipes' ? arg : undefined);
     setChatConvId(view === 'chat' && arg ? Number(arg) : null);
     setGuideId(view === 'guides' && arg && /^\d+$/.test(arg) ? Number(arg) : null);
-    if (view === 'suggestions') predejPohledu('suggestions', arg);
+    if (view === 'suggestions' || view === 'procedures') predejPohledu(view, arg);
     if (view === 'guides') setGuideFiltr(f => ({ stav: arg === 'stav:kprecteni' ? 'kprecteni' : arg === 'stav:navrhy' ? 'navrhy' : undefined, n: f.n + 1 }));
     // Konkrétní postup (zamčená uzávěrka, widget) — detail se otevře, až se Postupy připojí.
     if (view === 'procedures' && arg && /^\d+$/.test(arg)) otevriPostupPoPrechodu(Number(arg));

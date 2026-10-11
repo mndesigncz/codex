@@ -112,7 +112,7 @@ export default function EmployeeLayout({ user }: Props) {
     if (view === 'settings') setSettingsNonce(n => n + 1);
     setInventoryCat(view === 'inventory' ? arg : undefined);
     setGuideId(view === 'guides' && arg && /^\d+$/.test(arg) ? Number(arg) : null);
-    if (view === 'suggestions') predejPohledu('suggestions', arg);
+    if (view === 'suggestions' || view === 'procedures') predejPohledu(view, arg);
     if (view === 'guides') setGuideFiltr(f => ({ stav: arg === 'stav:kprecteni' ? 'kprecteni' : arg === 'stav:navrhy' ? 'navrhy' : undefined, n: f.n + 1 }));
     setChatConvId(view === 'chat' && arg && /^\d+$/.test(arg) ? Number(arg) : null);
     // Proklik na KONKRÉTNÍ postup (zamčená uzávěrka, widget) — bez toho
