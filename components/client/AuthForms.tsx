@@ -11,7 +11,7 @@ import { mistniCesta } from '@/lib/bezpecnaUrl';
 import { useObal } from '../ObalProvider';
 import { HLASKA_ROLE_V_CLIENTU } from '@/lib/obal';
 import PravniOdkazy from '../pravni/PravniOdkazy';
-import { useT } from '@/lib/i18n/client';
+import { useT, useJazyk } from '@/lib/i18n/client';
 
 const input = 'field text-sm';
 const label = 'field-label';
@@ -72,6 +72,8 @@ export function RegisterForm() {
 
 export function LoginForm() {
   const t = useT('klient-host');
+  // Právní stránky existují česky a anglicky; ostatní jazyky dostanou anglické.
+  const jazykPravni = useJazyk().jazyk === 'cs' ? 'cs' : 'en';
   const router = useRouter();
   const { jeObal } = useObal();
   const params = useSearchParams();
@@ -106,7 +108,7 @@ export function LoginForm() {
         <button type="submit" disabled={busy} className="tap-target btn btn-accent hover:brightness-105 active:scale-[0.98] disabled:opacity-50 transition">
           {busy ? t('Přihlašuji…') : t('Přihlásit se')}
         </button>
-        <PravniOdkazy jen={['soukromi', 'podminky', 'podpora']} className="justify-center text-xs text-black/50" />
+        <PravniOdkazy jazyk={jazykPravni} jen={['soukromi', 'podminky', 'podpora']} className="justify-center text-xs text-black/50" />
         <p className="text-sm text-black/55 text-center">{t('Ještě účet nemáš?')} <Link href={`/client/register?next=${encodeURIComponent(next)}`} className="tap-target-sm inline-flex items-center font-semibold text-[#16181A] underline-offset-2 hover:underline">{t('Založ si ho')}</Link></p>
       </form>
     </AuthCard>
