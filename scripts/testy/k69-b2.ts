@@ -11,7 +11,7 @@ import type { Testy } from './_testy.ts';
 import {
   ZAPOMENUTY_MS, bezSazby, cekajiciPozvanky, dnesVPodniku, hodinyMinuty, konecSmeny, mujMesic, mzdyZaObdobi, obdobiDni,
   otevrenePrichody, podilMezd, roleSPocty, rozeberZaznam, sazbyZRosteru, seradSouhrn, souhrnHodin, trzbyZaObdobi,
-  type ZaznamDochazky,
+  hodinyPoDnech, zaznamyVRozmezi, denZaznamu, type ZaznamDochazky,
 } from '../../lib/dochazkaPrehled.ts';
 import { pragueMomentOf } from '../../lib/pragueTime.ts';
 import { WIDGETY as DOCHAZKA } from '../../lib/widgety/katalog/dochazka.ts';
@@ -177,4 +177,21 @@ export default function ({ eq, ok }: Testy) {
   ok('Docházka: export s dochazka.exportovat, mazání s dochazka.mazat', /smi\('dochazka\.exportovat'\)/.test(zdroj('components/employer/Attendance.tsx')) && /smi\('dochazka\.mazat'\)/.test(zdroj('components/employer/Attendance.tsx')));
   ok('Tým: jediná limetka „Pozvat člena"', (kod('components/TeamManagement.tsx').match(/variant="accent"/g) ?? []).length === 1);
   ok('RoleEditor: přepínač je Switch z components/ui', /<Switch checked=\{on\}/.test(zdroj('components/role/RoleEditor.tsx')) && !/function Prepinac/.test(zdroj('components/role/RoleEditor.tsx')));
+
+  // ---- hodiny po dnech (lišta období, graf) ----
+  {
+    const z = (clockIn: string, clockOut: string | null, employeeId = 1): ZaznamDochazky => ({ employeeId, employeeName: 'Eva', clockIn, clockOut });
+    const zz = [
+      z('2026-09-21 08:00:00', '2026-09-21 16:00:00'),            // pondělí, 8 h
+      z('2026-09-21 10:00:00', '2026-09-21 14:30:00', 2),         // pondělí, 4,5 h (další člověk)
+      z('2026-09-22 08:00:00', '2026-09-23 20:00:00'),            // 36 h = zapomenutý odchod, nepočítá se
+      z('2026-09-27 09:00:00', '2026-09-27 12:00:00'),            // neděle, 3 h
+    ];
+    const ted = pragueMomentOf('2026-09-28', '12:00')!.getTime();
+    eq('hodiny po dnech: součet všech lidí v den, zapomenutý odchod 0', hodinyPoDnech(zz, ted, '2026-09-21', '2026-09-23').map(x => x.hodnota), [12.5, 0, 0]);
+    eq('hodiny po dnech: prázdný den uvnitř rozmezí je 0', hodinyPoDnech(zz, ted, '2026-09-26', '2026-09-27').map(x => x.hodnota), [0, 3]);
+    eq('záznamy v rozmezí: jen dny příchodu v rozmezí', zaznamyVRozmezi(zz, '2026-09-21', '2026-09-22').length, 3);
+    eq('záznamy v rozmezí: filtr na dny v týdnu (neděle = 6)', zaznamyVRozmezi(zz, '2026-09-20', '2026-09-30', [6]).length, 1);
+    eq('den záznamu: nečitelný příchod = null', denZaznamu({ clockIn: 'nesmysl' }), null);
+  }
 }

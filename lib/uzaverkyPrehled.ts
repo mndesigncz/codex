@@ -15,6 +15,7 @@
 
 import { cashDifference, type Closing } from './closing.ts';
 import { dayPlus } from './pragueTime.ts';
+import { dnTydne, type HodnotaDne } from './obdobi.ts';
 
 /** Řádek z GET /api/closings (sdílený typ + pole, která vrací jen seznam). */
 export type RadekUzaverky = Closing & {
@@ -109,6 +110,52 @@ export function souhrnUzaverek(radky: readonly RadekUzaverky[], obdobi: ObdobiSo
   }
   s.trzba = s.hotove + s.kartou;
   return s;
+}
+
+// ---------------------------------------------------------------------------
+// Souhrn a graf za libovolné rozmezí (lišta období: od–do, dny v týdnu)
+// ---------------------------------------------------------------------------
+
+const vRozmezi = (den: string, od: string, doD: string, dnyTydne: readonly number[]) =>
+  !!den && den >= od && den <= doD && (dnyTydne.length === 0 || dnyTydne.includes(dnTydne(den)));
+
+/** Totéž co `souhrnUzaverek`, jen za rozmezí dnů a (volitelně) jen vybrané dny v týdnu. */
+export function souhrnUzaverekRozmezi(radky: readonly RadekUzaverky[], od: string, doD: string, dnyTydne: readonly number[] = []): Souhrn {
+  const s: Souhrn = { pocet: 0, hotove: 0, kartou: 0, trzba: 0, spropitne: 0, vyplaceno: 0, odvedeno: 0, rozdil: 0, skryto: false };
+  for (const c of radky) {
+    if (!vRozmezi(denUzaverky(c), od, doD, dnyTydne)) continue;
+    if (skryty(c)) { s.skryto = true; continue; }
+    s.vyplaceno += num(c.self_payout);
+    s.odvedeno += num(c.cash_removed) + num(c.final_removal);
+    if (!jeHlavni(c)) continue;
+    s.pocet++;
+    s.hotove += num(c.cash_revenue);
+    s.kartou += num(c.card_revenue);
+    s.spropitne += num(c.tips);
+    s.rozdil += cashDifference(c);
+  }
+  s.trzba = s.hotove + s.kartou;
+  return s;
+}
+
+export type MetrikaGrafu = 'trzba' | 'spropitne' | 'odvedeno' | 'vyplaceno' | 'rozdil';
+
+/** Hodnota metriky pro každý den rozmezí (dny bez uzávěrky = 0); skryté řádky se nepočítají. */
+export function hodnotyUzaverekPoDnech(radky: readonly RadekUzaverky[], metrika: MetrikaGrafu, od: string, doD: string): HodnotaDne[] {
+  const m = new Map<string, number>();
+  for (const c of radky) {
+    const den = denUzaverky(c);
+    if (!den || den < od || den > doD || skryty(c)) continue;
+    let v = 0;
+    if (metrika === 'vyplaceno') v = num(c.self_payout);
+    else if (metrika === 'odvedeno') v = num(c.cash_removed) + num(c.final_removal);
+    else if (!jeHlavni(c)) continue;
+    else v = metrika === 'trzba' ? num(c.cash_revenue) + num(c.card_revenue) : metrika === 'spropitne' ? num(c.tips) : cashDifference(c);
+    m.set(den, (m.get(den) ?? 0) + v);
+  }
+  const out: HodnotaDne[] = [];
+  for (let d = od, n = 0; d <= doD && n < 800; d = dayPlus(d, 1), n++) out.push({ den: d, hodnota: m.get(d) ?? 0 });
+  return out;
 }
 
 // ---------------------------------------------------------------------------

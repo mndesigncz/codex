@@ -30,10 +30,10 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
-import { Button, Chip, ListRow, Menu, Modal, MonthNav, Stat, StatRow, posunMesic } from '../../ui';
+import { Button, CasovyGraf, Chip, ListRow, Menu, Modal, MonthNav, ObdobiLista, Segmented, Stat, StatRow, posunMesic } from '../../ui';
 import { Icon } from '../../Icons';
 import type { KomponentaWidgetu, Navigace, WidgetProps } from '@/lib/widgety/typy';
-import { Widget, useVyrizeno, type StavNacteni } from '../Widget';
+import { Widget, useVyrizeno, useWidget, type StavNacteni } from '../Widget';
 import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
 import { useNavigace, useSmi } from '../NavigaceKontext';
 import { useOpravneni } from '../../role/useOpravneni';
@@ -45,11 +45,14 @@ import { zkratkyDnuJazyk } from '@/lib/weekJazyk';
 import { pragueDaySafe, pragueToday } from '@/lib/pragueTime';
 import { zacatekTydne } from '@/lib/week';
 import { apiMessage, okJson } from '@/lib/api';
+import { agreguj, hrubostProRozmezi, obdobiZPresetu, platneRozmezi, pocetDni, predchoziRozmezi, zmenaPct, type Slot } from '@/lib/obdobi';
+import { useObdobi } from '@/lib/useObdobi';
+import { useUlozeno } from '@/lib/useUlozeno';
 import {
   KLIC_DEN, KLIC_VYPLNIT, UDALOST_DEN, UDALOST_VYPLNIT, DNY_V_TYDNU,
   bunkyMesice, chybejiciDny, denUzaverky, keSchvaleni, mesicPred, mojeUzaverky, rozdilKasy, rozdilUzaverky,
-  souhrnUzaverek, stavDne, trendyTrzeb,
-  type ChybejiciDen, type DenKalendare, type ObdobiSouhrnu, type RadekUzaverky, type StavDne,
+  souhrnUzaverek, souhrnUzaverekRozmezi, hodnotyUzaverekPoDnech, stavDne, trendyTrzeb,
+  type MetrikaGrafu, type ChybejiciDen, type DenKalendare, type ObdobiSouhrnu, type RadekUzaverky, type StavDne,
 } from '@/lib/uzaverkyPrehled';
 
 // ---------------------------------------------------------------------------
@@ -450,8 +453,74 @@ function KeSchvaleni({ velikost, nahled }: WidgetProps) {
 type Metrika = 'trzba' | 'odvedeno' | 'vyplaceno' | 'spropitne' | 'rozdil_kasy';
 const nazevObdobi = (t: PrekladFn, o: ObdobiSouhrnu): string => (o === 'tento_mesic' ? t('tento měsíc') : o === 'minuly_mesic' ? t('minulý měsíc') : t('celkem'));
 
+/** Velký Souhrn uzávěrek: tlačítko období, jedno hlavní číslo se změnou proti předchozímu období a graf po dnech. */
+function SouhrnL({ radky, vyplata, vychozi, instance, nav }: { radky: RadekUzaverky[]; vyplata: boolean; vychozi: ObdobiSouhrnu; instance: string; nav: Navigace }) {
+  const t = useT('widgety');
+  const money = useMoney();
+  const loc = useJazyk().jazyk;
+  const dnes = pragueToday();
+  const pocatek = useMemo(() => obdobiZPresetu(vychozi === 'minuly_mesic' ? 'minuly_mesic' : vychozi === 'vse' ? '365_dni' : 'mesic', dnes), [vychozi, dnes]);
+  const { obdobi, nastav } = useObdobi(`uzaverky_souhrn-${instance}`, pocatek);
+  const [porovnat, setPorovnat] = useUlozeno<boolean>('uzaverky-porovnat-2', true);
+  const treti: MetrikaGrafu = vyplata ? 'vyplaceno' : 'spropitne';
+  const [metrika, setMetrika] = useUlozeno<MetrikaGrafu>('uzaverky-metrika', 'trzba', ['trzba', 'spropitne', 'vyplaceno', 'odvedeno']);
+  const m: MetrikaGrafu = metrika === 'spropitne' || metrika === 'vyplaceno' ? treti : metrika;
+
+  const r = platneRozmezi(obdobi, dnes);
+  const pred = predchoziRozmezi(r.od, r.do);
+  const hr = hrubostProRozmezi(obdobi, pocetDni(r.od, r.do));
+  const hodnoty = useMemo(() => hodnotyUzaverekPoDnech(radky, m, r.od, r.do), [radky, m, r.od, r.do]);
+  const hodnotyPred = useMemo(() => (porovnat ? hodnotyUzaverekPoDnech(radky, m, pred.od, pred.do) : null), [porovnat, radky, m, pred.od, pred.do]);
+  const sloty: Slot[] = useMemo(() => agreguj(hodnoty, r.od, r.do, hr, obdobi.dnyTydne), [hodnoty, r.od, r.do, hr, obdobi.dnyTydne]);
+  const slotyPred: Slot[] | null = useMemo(() => (hodnotyPred ? agreguj(hodnotyPred, pred.od, pred.do, hr, obdobi.dnyTydne) : null), [hodnotyPred, pred.od, pred.do, hr, obdobi.dnyTydne]);
+  const s = useMemo(() => souhrnUzaverekRozmezi(radky, r.od, r.do, obdobi.dnyTydne), [radky, r.od, r.do, obdobi.dnyTydne]);
+  const sp = useMemo(() => (porovnat ? souhrnUzaverekRozmezi(radky, pred.od, pred.do, obdobi.dnyTydne) : null), [porovnat, radky, pred.od, pred.do, obdobi.dnyTydne]);
+
+  const hodnotaMetriky = (x: typeof s) => (m === 'trzba' ? x.trzba : m === 'odvedeno' ? x.odvedeno : m === 'vyplaceno' ? x.vyplaceno : x.spropitne);
+  const zmena = sp ? zmenaPct(hodnotaMetriky(s), hodnotaMetriky(sp)) : null;
+  const nazev = m === 'trzba' ? t('Tržba') : m === 'odvedeno' ? t('Odvedeno') : m === 'vyplaceno' ? t('Vyplaceno') : t('Spropitné');
+  const rozdil = <span className={s.rozdil === 0 ? '' : s.rozdil > 0 ? 'text-info-ink' : 'text-bad-ink'}>{s.rozdil > 0 ? '+' : ''}{money(s.rozdil)}</span>;
+
+  const kratceDatum = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString(loc, { day: 'numeric', month: 'numeric' });
+  const pismeno = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString(loc, { weekday: 'short' });
+  const jmenoSlotu = (sl: Slot) => hr === 'den' ? `${pismeno(sl.klic)} ${kratceDatum(sl.klic)}` : hr === 'tyden' ? `${kratceDatum(sl.od)} – ${kratceDatum(sl.do)}`
+    : new Date(`${sl.klic}-01T12:00:00`).toLocaleDateString(loc, { month: 'long', year: 'numeric' });
+  const popisekOsy = (sl: Slot) => hr === 'den' ? (sloty.length <= 10 ? pismeno(sl.klic) : String(Number(sl.klic.slice(8)))) : hr === 'tyden' ? kratceDatum(sl.od)
+    : new Date(`${sl.klic}-01T12:00:00`).toLocaleDateString(loc, { month: 'short' });
+  const kratce = (v: number) => (v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1).replace('.', ',')} M` : v >= 10_000 ? `${Math.round(v / 1000)}k` : v >= 1000 ? `${(v / 1000).toFixed(1).replace('.', ',')}k` : String(Math.round(v)));
+  const dnesKlic = hr === 'den' ? dnes : hr === 'tyden' ? obdobiZPresetu('tyden', dnes).od : dnes.slice(0, 7);
+  const vyber = (sl: Slot) => {
+    // Den: seznam uzávěrek se zúží na něj. Týden a měsíc: období se přiblíží (zpátky přes tlačítko období).
+    if (hr === 'den') predejNastroji(nav, UDALOST_DEN, KLIC_DEN, sl.klic, 'reports');
+    else nastav({ ...obdobi, preset: 'vlastni', od: sl.od, do: sl.do, hrubost: 'auto' });
+  };
+
+  return (
+    <div className="space-y-4">
+      <ObdobiLista value={obdobi} onChange={nastav} porovnat={porovnat} onPorovnat={setPorovnat} />
+      <div>
+        <Stat label={nazev} value={money(hodnotaMetriky(s))} note={uzaverekPocet(t, s.pocet)} />
+        {zmena != null && (
+          <p className="t-meta mt-2 text-pretty">
+            <Chip tone={zmena >= 0 ? 'ok' : 'wait'} size="sm">{zmena > 0 ? '+' : ''}{zmena} %</Chip> {t('proti předchozímu období')} ({money(hodnotaMetriky(sp!))})
+          </p>
+        )}
+        <p className="t-meta mt-2">{t('Rozdíl kasy')}: {rozdil} · {m === 'trzba' ? `${t('Odvedeno')}: ${money(s.odvedeno)}` : `${t('Tržba')}: ${money(s.trzba)}`}</p>
+      </div>
+      <Segmented size="sm" ariaLabel={t('Co ukázat v grafu')} value={m} onChange={(v: MetrikaGrafu) => setMetrika(v)}
+        options={[{ id: 'trzba', label: t('Tržba') }, { id: treti, label: vyplata ? t('Vyplaceno') : t('Spropitné') }, { id: 'odvedeno', label: t('Odvedeno') }]} />
+      <CasovyGraf sloty={sloty} porovnani={porovnat ? slotyPred : null} druh="sloupce" vyska={190} format={money} kratce={kratce}
+        jmenoSlotu={jmenoSlotu} popisekOsy={popisekOsy} zvyraznit={dnesKlic} onVyber={vyber} popisekPorovnani={t('předchozí období')}
+        label={t('{co}: {obdobi}', { co: nazev, obdobi: `${kratceDatum(r.od)} – ${kratceDatum(r.do)}` })} />
+      <p className="t-meta">{hr === 'den' ? t('Klepnutím na den otevřeš jeho uzávěrky.') : t('Klepnutím na sloupec se přiblížíš na jeho období.')}</p>
+    </div>
+  );
+}
+
 function Souhrn({ velikost, nastaveni }: WidgetProps<{ obdobi?: ObdobiSouhrnu; metrika?: Metrika }>) {
   const t = useT('widgety');
+  const nav = useNavigace();
+  const { instance } = useWidget();
   const { ok, ceka } = useBrana(['uzaverky.zobrazit_vse', 'finance.trzby']);
   const money = useMoney();
   const data = useDataWidgetu(ok ? URL_SEZNAM : null, vyberSeznam);
@@ -478,7 +547,7 @@ function Souhrn({ velikost, nastaveni }: WidgetProps<{ obdobi?: ObdobiSouhrnu; m
 
   return (
     <Widget nacteni={ceka ? CEKA : data} kostra="cislo"
-      prazdno={s && s.pocet === 0 ? <p className="t-meta">{obdobi === 'vse' ? t('Za celé období zatím žádná uzávěrka.') : obdobi === 'minuly_mesic' ? t('Za minulý měsíc zatím žádná uzávěrka.') : t('Za tento měsíc zatím žádná uzávěrka.')}</p> : undefined}>
+      prazdno={velikost !== 'L' && s && s.pocet === 0 ? <p className="t-meta">{obdobi === 'vse' ? t('Za celé období zatím žádná uzávěrka.') : obdobi === 'minuly_mesic' ? t('Za minulý měsíc zatím žádná uzávěrka.') : t('Za tento měsíc zatím žádná uzávěrka.')}</p> : undefined}>
       {s && (velikost === 'S' ? (
         <Stat label={cisla[metrika].label} value={cisla[metrika].value} note={nazevObdobi(t, obdobi)} />
       ) : velikost === 'M' ? (
@@ -487,15 +556,7 @@ function Souhrn({ velikost, nastaveni }: WidgetProps<{ obdobi?: ObdobiSouhrnu; m
           <Stat label={t('Rozdíl kasy')} value={rozdil} note={t('manko a přebytek')} />
         </StatRow>
       ) : (
-        <div className="space-y-2">
-          <StatRow>
-            <Stat label={t('Tržba')} value={money(s.trzba)} note={cisla.trzba.note} />
-            <Stat label={t('Odvedeno')} value={money(s.odvedeno)} note={t('odloženo ven a odvody')} />
-            <Stat label={cisla[treti].label} value={cisla[treti].value} note={cisla[treti].note} />
-            <Stat label={t('Rozdíl kasy')} value={rozdil} note={t('manko a přebytek')} />
-          </StatRow>
-          <p className="t-meta cz-sentence">{obdobiNote}</p>
-        </div>
+        <SouhrnL radky={data.data!.radky} vyplata={vyplata} vychozi={obdobi} instance={instance} nav={nav} />
       ))}
     </Widget>
   );
