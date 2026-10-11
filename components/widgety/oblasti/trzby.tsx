@@ -154,7 +154,7 @@ function vyberSouhrn(raw: any): SouhrnPokladny {
   };
 }
 
-function PokladnaDnes({ velikost }: WidgetProps) {
+function PokladnaDnes({ velikost, nahled }: WidgetProps) {
   const t = useT('widgety');
   const money = useMoney();
   const { inkoust } = useWidget();
@@ -171,6 +171,8 @@ function PokladnaDnes({ velikost }: WidgetProps) {
       nacteni={ceka ? CEKA : data}
       kostra="cislo"
       odkaz={velikost === 'S' ? undefined : { popisek: t('Finance'), pohled: 'finance' }}
+      // Klepnutí na dnešní tržbu otevře rozbor dne (platby, hodiny, prodej, obsluha), ne jen měsíční stránku Financí.
+      otevrit={s?.propojeno && !nahled ? () => otevriDen(pragueToday(), 'finance') : undefined}
       prazdno={s && !s.propojeno ? <p className="t-meta">{t('Pokladna není propojená. Propojí ji majitel v Nastavení.')}</p> : undefined}
     >
       {s && (velikost === 'S' ? (
