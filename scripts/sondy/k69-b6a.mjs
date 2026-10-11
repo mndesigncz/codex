@@ -387,6 +387,12 @@ const FIX_NAPADY = nacti('k69-b6a-rozlozeni-napady');
   const nej = widgetLi(p, 'napady.nejzadanejsi');
   const tNej = await nej.innerText();
   tvrdi('N1: Nejžádanější (nové) — Druhý mlýnek (4) před zástěrami (1), naplánované ne', tNej.indexOf('Druhý mlýnek') < tNej.indexOf('Nové zástěry') && !tNej.includes('Ovesné'), zkrat(tNej));
+  // Předání z widgetu („Nové nápady" → stav:new): filtr „Nové" se zapne i na už otevřené stránce.
+  const filtrNapadu = nastroj.getByRole('group', { name: 'Filtr podle stavu' });
+  tvrdi('N1: filtr stavu je ze začátku na „Vše"', await filtrNapadu.getByRole('button', { name: /^Vše/ }).getAttribute('aria-pressed') === 'true');
+  await p.evaluate(() => window.dispatchEvent(new CustomEvent('managero:predani:suggestions', { detail: 'stav:new' })));
+  tvrdi('N1: předání stav:new zapne filtr „Nové"', await dokud(async () => await filtrNapadu.getByRole('button', { name: /^Nové/ }).getAttribute('aria-pressed') === 'true', 2000));
+  await filtrNapadu.getByRole('button', { name: /^Vše/ }).click();
   await p.screenshot({ path: OUT + 'k69-b6a-napady-desk.png', fullPage: true });
 
   await nej.getByRole('button', { name: /^Podpořit: Druhý mlýnek/ }).click();

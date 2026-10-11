@@ -49,7 +49,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['vedeni.planovani', 'vedeni.napady'],
     opravneni: { vse: ['napady.spravovat'], nektere: [] },
     tarif: 'zdarma',
-    cil: { pohled: 'suggestions' },
+    cil: { pohled: 'suggestions', arg: 'stav:new' },
     stav: 'hotovo',
   },
 ];

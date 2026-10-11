@@ -16,7 +16,8 @@
 // náhradní emoji 👤 → Avatar; na telefonu se pás filtrů ořízl vedle řazení → řazení
 // je samostatné Menu vedle pásu, pás se posouvá sám.
 
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
+import { cerstvePredaniPohledu, stavZPredani, udalostPredani } from '@/lib/predaniPohledu';
 import { usePathname } from 'next/navigation';
 import {
   Avatar, Button, Card, Chip, EmptyState, ErrorState, Field, Input, Menu, Modal, Segmented, Skeleton, Textarea, Toast, type ChipTone, type MenuItem,
@@ -50,6 +51,8 @@ const statusFlow = (t: PrekladFn): { id: IdStavu; label: string }[] => [
   { id: 'declined', label: t('Zamítnout') },
 ];
 
+const STAVY_FILTRU = ['new', 'planned', 'done', 'declined'] as const;
+
 const filtry = (t: PrekladFn): { id: string; label: string }[] => [
   { id: 'all', label: t('Vše') },
   { id: 'new', label: t('Nové') },
@@ -82,7 +85,13 @@ export default function SuggestionsBoard() {
   const meId = data.data?.meId ?? null;
   const pridava = smi('napady.pridat');
   const doPlanovani = spravuje && smi('planovani.upravit');
-  const [filter, setFilter] = useState('all');
+  // Filtr z widgetu („Nové nápady" → stav:new): čte se při připojení i za běhu, viz lib/predaniPohledu.ts.
+  const [filter, setFilter] = useState(() => stavZPredani(cerstvePredaniPohledu('suggestions'), STAVY_FILTRU) ?? 'all');
+  useEffect(() => {
+    const naPredani = (e: Event) => { const f = stavZPredani((e as CustomEvent).detail, STAVY_FILTRU); if (f) setFilter(f); };
+    window.addEventListener(udalostPredani('suggestions'), naPredani);
+    return () => window.removeEventListener(udalostPredani('suggestions'), naPredani);
+  }, []);
   const [sort, setSort] = useState<'new' | 'votes'>('new');
   const [composing, setComposing] = useState(false);
   const [title, setTitle] = useState('');
