@@ -542,6 +542,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
           onSplnit={done => { if (done && detail.dueDate && detail.dueDate !== today) setDetailId(null); completeTask(detail, done); }}
           onUpravit={smiUpravit(detail) ? () => { setDetailId(null); openEdit(detail); } : undefined}
           onSmazat={smiSmazat(detail) ? () => { setDetailId(null); setMazani(detail); } : undefined}
+          onOdlozit={smiUpravit(detail) ? den => { setDetailId(null); void moveTask(detail, den); setZprava(t('Úkol je odložený na {den}.', { den: denKratce(den, loc) })); } : undefined}
           onChecklist={smiSplnit(detail) ? i => toggleChecklistItem(detail, i) : undefined}
           onChecklistVse={smiSplnit(detail) ? d => toggleChecklistAll(detail, d) : undefined} />
       )}

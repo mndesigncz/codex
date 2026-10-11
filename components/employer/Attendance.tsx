@@ -20,7 +20,7 @@
 // a končila 403.
 
 import { useEffect, useMemo, useState } from 'react';
-import { Avatar, Button, Card, Chip, ErrorState, Field, Input, ListRow, Modal, SearchField, Segmented, Select, Skeleton } from '../ui';
+import { Avatar, Button, Card, Chip, ErrorState, Field, Input, ListRow, Modal, ObdobiLista, SearchField, Select, Skeleton } from '../ui';
 import { usePersonProfile } from './ProfileLinkProvider';
 import { useSymbol } from '../CurrencyProvider';
 import { usePlan, UpgradeModal } from '../Pro';
@@ -28,12 +28,15 @@ import { ulozSoubor } from '@/lib/stahni';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useOpravneni } from '../role/useOpravneni';
-import { ObdobiStrankyDochazky, obnovDochazku } from '../widgety/oblasti/dochazka';
+import { ObdobiStrankyDochazky, obnovDochazku, zapamatujDniDochazky } from '../widgety/oblasti/dochazka';
 import { dbTimeHM, parseDbTime, pragueDayOf, pragueToday } from '@/lib/pragueTime';
 import { earnedFor } from '@/lib/wages';
 import { apiMessage, okJson } from '@/lib/api';
 import { obsahuje } from '@/lib/hledani';
-import { hodinyMinuty, konecSmeny, navrhOdchodu, rozeberZaznam, sazbyZRosteru, type ClenRosteru, type ZaznamDochazky } from '@/lib/dochazkaPrehled';
+import { hodinyMinuty, konecSmeny, navrhOdchodu, rozeberZaznam, sazbyZRosteru, zaznamyVRozmezi, type ClenRosteru, type ZaznamDochazky } from '@/lib/dochazkaPrehled';
+import { obdobiZPresetu, platneRozmezi, pocetDni } from '@/lib/obdobi';
+import { useObdobi } from '@/lib/useObdobi';
+import { dayPlus } from '@/lib/pragueTime';
 import { useT } from '@/lib/i18n/client';
 import { useLocale } from './jazyk';
 
@@ -45,8 +48,8 @@ function vyberData(raw: any): Data {
   return { roster: raw.roster, entries: Array.isArray(raw.entries) ? raw.entries : [] };
 }
 
-const OBDOBI = [7, 30, 90] as const;
-type Obdobi = (typeof OBDOBI)[number];
+/** Server vrací docházku nejvýš 180 dní zpět. */
+const NEJDALE_DNI = 180;
 const JSON_HLAVICKA = { 'Content-Type': 'application/json' };
 
 /** Datum na vstup datetime-local v místním čase prohlížeče. */
@@ -85,9 +88,17 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
   const { pro } = usePlan();
   const [upgradeFor, setUpgradeFor] = useState<string | null>(null);
 
-  const [dni, setDni] = useState<Obdobi>(30);
+  // Období je libovolné rozmezí (rychlé volby i od–do), ne jen 7 / 30 / 90 dní. Server ale umí nejvýš 180 dní zpět,
+  // takže se načte od nejstaršího zvoleného dne a záznamy se pak zúží na rozmezí.
+  const dnesDen = pragueToday();
+  const { obdobi, nastav: nastavObdobi } = useObdobi('dochazka-stranka', obdobiZPresetu('30_dni', dnesDen));
+  const rHrube = platneRozmezi(obdobi, dnesDen);
+  const nejdrive = dayPlus(dnesDen, -(NEJDALE_DNI - 1));
+  const r = { od: rHrube.od < nejdrive ? nejdrive : rHrube.od, do: rHrube.do };
+  const dni = pocetDni(r.od, dnesDen);
+  zapamatujDniDochazky(dni);
   const data = useDataWidgetu<Data>(`/api/attendance?days=${dni}`, vyberData);
-  const entries = data.data?.entries ?? [];
+  const entries = useMemo(() => zaznamyVRozmezi(data.data?.entries ?? [], r.od, r.do), [data.data, r.od, r.do]);
   const roster = data.data?.roster ?? [];
   // Hledání zúží patnáct lidí krát devadesát dní (přes tisíc řádků) na jednoho člověka.
   const [q, setQ] = useState('');
@@ -226,7 +237,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
       ];
     });
     const csv = [hlava, ...radky].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n');
-    void ulozSoubor(`dochazka-${dni}dni.csv`, '﻿' + csv, 'text/csv;charset=utf-8');
+    void ulozSoubor(`dochazka-${r.od}_${r.do}.csv`, '﻿' + csv, 'text/csv;charset=utf-8');
   };
 
   const pocet = zobrazene.length;
@@ -252,7 +263,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
         ) : data.error ? (
           <ErrorState compact title={t('Záznamy se nenačetly')} detail={data.error} onRetry={data.reload} />
         ) : entries.length === 0 ? (
-          <p className="t-meta py-4">{t('Za {dni} dní nejsou žádné záznamy docházky.', { dni })}</p>
+          <p className="t-meta py-4">{t('V tomto období nejsou žádné záznamy docházky.')}</p>
         ) : pocet === 0 ? (
           <p className="t-meta py-4">{t('Nikdo takový za tohle období nic neodpíchl.')}</p>
         ) : dny.map(d => (
@@ -318,8 +329,8 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
           // Vedlejší akce se na telefonu schovají (DP §3.4) — Export proto i v „···".
           menu: smiExport && entries.length > 0 ? [{ label: t('Export CSV'), icon: 'download', onClick: exportCsv }] : undefined,
           aside: (
-            <Segmented size="sm" ariaLabel={t('Období')} value={String(dni)} onChange={v => setDni(Number(v) as Obdobi)}
-              options={OBDOBI.map(p => ({ id: String(p), label: t('{n} dní', { n: p }) }))} />
+            <ObdobiLista value={obdobi} onChange={nastavObdobi} dnyTydne={false} hrubost={false}
+              volby={['dnes', '7_dni', '30_dni', 'mesic', 'minuly_mesic', '90_dni', '180_dni']} />
           ),
         }}
         nastroj={nastroj}

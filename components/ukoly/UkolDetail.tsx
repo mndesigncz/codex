@@ -16,7 +16,7 @@ import { dayPlus } from '@/lib/pragueTime';
 
 const prioTon = (p: string): 'bad' | 'wait' | 'muted' => (p === 'high' ? 'bad' : p === 'medium' ? 'wait' : 'muted');
 
-export function UkolDetail({ ukol, dnes, kdo, navodHref, onClose, onSplnit, onUpravit, onSmazat, onChecklist, onChecklistVse, zamceno }: {
+export function UkolDetail({ ukol, dnes, kdo, navodHref, onClose, onSplnit, onUpravit, onSmazat, onOdlozit, onChecklist, onChecklistVse, zamceno }: {
   ukol: Ukol;
   dnes: string;
   /** Komu úkol patří (jméno nebo odkaz na člověka). */
@@ -27,6 +27,8 @@ export function UkolDetail({ ukol, dnes, kdo, navodHref, onClose, onSplnit, onUp
   onSplnit?: (hotovo: boolean) => void;
   onUpravit?: () => void;
   onSmazat?: () => void;
+  /** Přesune termín na jiný den (jen kdo smí úkol upravit); nabízí se u nehotového úkolu. */
+  onOdlozit?: (den: string) => void;
   onChecklist?: (index: number) => void;
   onChecklistVse?: (hotovo: boolean) => void;
   zamceno?: boolean;
@@ -62,6 +64,7 @@ export function UkolDetail({ ukol, dnes, kdo, navodHref, onClose, onSplnit, onUp
       footer={<>
         {onSmazat && <Button variant="ghost" icon="trash" className="mr-auto hover:!text-[var(--bad-ink)]" onClick={onSmazat}>{t('Smazat')}</Button>}
         {onUpravit && <Button variant="secondary" icon="pencil" onClick={onUpravit}>{t('Upravit')}</Button>}
+        {onOdlozit && !hotovo && <Button variant="secondary" icon="clock" onClick={() => onOdlozit(dayPlus(ukol.dueDate && ukol.dueDate > dnes ? ukol.dueDate : dnes, 1))}>{ukol.dueDate && ukol.dueDate > dnes ? t('Odložit o den') : t('Odložit na zítra')}</Button>}
         {onSplnit && !zamceno && (hotovo
           ? <Button variant="secondary" icon="undo" onClick={() => onSplnit(false)}>{t('Vrátit mezi nehotové')}</Button>
           : <Button variant="primary" icon="check" onClick={() => onSplnit(true)}>{t('Označit jako hotový')}</Button>)}

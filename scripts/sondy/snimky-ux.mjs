@@ -38,25 +38,29 @@ const posPodvrh = (req, json) => {
   return undefined;
 };
 
-for (const w of [1280, 390]) {
+// SIRKY=768,390 a TMAVY=1 zúží šířky / zapne tmavý motiv (pojmenování souborů dostane příponu).
+const SIRKY = (process.env.SIRKY ?? '1280,390').split(',').map(Number);
+const TMAVY = process.env.TMAVY === '1';
+const PRIPONA = TMAVY ? '-tmavy' : '';
+for (const w of SIRKY) {
   if (sada('ukoly')) {
-    const { ctx, p } = await kontext({ viewport: { width: w, height: 900 }, mobil: w < 600, fix: nacti('k69-b6a-rozlozeni-ukoly'), dalsi: ukolyPodvrh });
+    const { ctx, p } = await kontext({ viewport: { width: w, height: 900 }, mobil: w < 600, tmavy: TMAVY, fix: nacti('k69-b6a-rozlozeni-ukoly'), dalsi: ukolyPodvrh });
     await otevri(p, '/employer/overview?view=tasks', 'vedeni.ukoly');
     const nastroj = p.locator('[data-plocha] li[data-widget="nastroj"]');
     await nastroj.getByRole('group', { name: 'Stav úkolů' }).waitFor({ timeout: 10000 });
-    await p.waitForTimeout(500); await foto(p, `ukoly-seznam-${w}`);
+    await p.waitForTimeout(500); await foto(p, `ukoly-seznam-${w}${PRIPONA}`);
     const pohledy = p.locator('[aria-label="Zobrazení"]').first();
-    await pohledy.getByRole('tab', { name: 'Měsíc', exact: true }).click(); await p.waitForTimeout(500); await foto(p, `ukoly-mesic-${w}`);
-    await pohledy.getByRole('tab', { name: 'Přehled', exact: true }).click(); await p.waitForTimeout(700); await foto(p, `ukoly-prehled-${w}`);
+    await pohledy.getByRole('tab', { name: 'Měsíc', exact: true }).click(); await p.waitForTimeout(500); await foto(p, `ukoly-mesic-${w}${PRIPONA}`);
+    await pohledy.getByRole('tab', { name: 'Přehled', exact: true }).click(); await p.waitForTimeout(700); await foto(p, `ukoly-prehled-${w}${PRIPONA}`);
     await ctx.close();
   }
   if (sada('finance')) {
     const fix = { ...fixtura('k69-b5b-rozlozeni-finance'), polozky: [{ id: 'po-dnech', widget: 'trzby.po_dnech', velikost: 'L', nastaveni: { obdobi: 'mesic_stranky' } }] };
-    const { ctx, p } = await kontext({ viewport: { width: w, height: 900 }, mobil: w < 600, fix, dalsi: posPodvrh });
+    const { ctx, p } = await kontext({ viewport: { width: w, height: 900 }, mobil: w < 600, tmavy: TMAVY, fix, dalsi: posPodvrh });
     await otevri(p, '/employer/overview?view=finance', 'vedeni.finance');
     await p.locator('[data-instance="po-dnech"]').getByRole('group', { name: 'Období', exact: true }).waitFor({ timeout: 12000 });
-    await p.waitForTimeout(600); await foto(p, `finance-po-dnech-${w}`, p.locator('[data-instance="po-dnech"]'));
-    await p.locator('[data-instance="po-dnech"]').getByRole('group', { name: 'Období', exact: true }).getByRole('button').click(); await p.waitForTimeout(400); await p.screenshot({ path: OUT + `ux-finance-po-dnech-okno-${w}.png` });
+    await p.waitForTimeout(600); await foto(p, `finance-po-dnech-${w}${PRIPONA}`, p.locator('[data-instance="po-dnech"]'));
+    await p.locator('[data-instance="po-dnech"]').getByRole('group', { name: 'Období', exact: true }).getByRole('button').click(); await p.waitForTimeout(400); await p.screenshot({ path: OUT + `ux-finance-po-dnech-okno-${w}${PRIPONA}.png` });
     await ctx.close();
   }
 }

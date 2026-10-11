@@ -432,7 +432,6 @@
   "OK": "OK",
   "Obarvit barvou nadpisů (jednobarevné logo)": "Zafarbiť farbou nadpisov (jednofarebné logo)",
   "Obchodní den {datum}": "Obchodný deň {datum}",
-  "Období": "Obdobie",
   "Objednat": "Objednať",
   "Objednat e-mailem": "Objednať e-mailom",
   "Objednat u dodavatele": "Objednať u dodávateľa",
@@ -1088,7 +1087,6 @@
   "Za tento den není uzávěrka": "Za tento deň nie je uzávierka",
   "Za uzávěrku": "Za uzávierku",
   "Za vyplněnou uzávěrku": "Za vyplnenú uzávierku",
-  "Za {dni} dní nejsou žádné záznamy docházky.": "Za {dni} dní nie sú žiadne záznamy dochádzky.",
   "Za úkol": "Za úlohu",
   "Za úkol, který měl ten den termín a zůstal nesplněný": "Za úlohu, ktorá mala ten deň termín a zostala nesplnená",
   "Zadej název role.": "Zadaj názov roly.",
@@ -1369,7 +1367,6 @@
   "{nazev}: smazáno": "{nazev}: zmazané",
   "{n} auto": "{n} auto",
   "{n} b": "{n} b",
-  "{n} dní": "{n} dní",
   "{n} k hodnocení": "{n} na hodnotenie",
   "{n} ke schválení": "{n} na schválenie",
   "{n} menu": "{n} menu",
@@ -1533,5 +1530,7 @@
   "Celý den {den}": "Celý deň {den}",
   "Otevřít detail úkolu": "Otvoriť detail úlohy",
   "Nic nevyhovuje filtrům": "Nič nevyhovuje filtrom",
-  "Zkus jiný stav, hledání nebo zruš filtry.": "Skús iný stav, hľadanie alebo zruš filtre."
+  "Zkus jiný stav, hledání nebo zruš filtry.": "Skús iný stav, hľadanie alebo zruš filtre.",
+  "V tomto období nejsou žádné záznamy docházky.": "V tomto období nie sú žiadne záznamy dochádzky.",
+  "Úkol je odložený na {den}.": "Úloha je odložená na {den}."
 }

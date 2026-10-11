@@ -116,7 +116,8 @@ const doporucene = async (p) => {
   await p.screenshot({ path: OUT + 'k69-b2-dochazka-desk.png', fullPage: true });
 
   // Období stránky řídí widgety „Podle stránky" (Souhrn hodin) i nástroj.
-  await p.getByRole('tab', { name: '7 dní' }).click();
+  await p.locator('[data-plocha] [role=group][aria-label="Období"]').first().getByRole('button').click();
+  await p.getByRole('dialog', { name: 'Období' }).getByRole('button', { name: 'Posledních 7 dní', exact: true }).click();
   tvrdi('D1: přepínač 7 dní pošle dotaz days=7', await dokud(() => dotazyNa(stav, ['/api/attendance']).some(d => d.u.includes('days=7')), 3000));
   tvrdi('D1: …a Souhrn hodin přepne na „7 dní"', await dokud(async () => (await widgetLi(p, 'dochazka.souhrn_hodin').innerText()).includes('7 dní'), 3000));
 
