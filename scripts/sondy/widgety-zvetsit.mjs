@@ -40,7 +40,8 @@ for (const w of [1280, 390]) {
   await okno.waitFor({ timeout: 6000 });
   tvrdi(`${w}: okno ukáže velkou podobu (tlačítko období a graf)`, await dokud(async () => await okno.getByRole('group', { name: 'Období', exact: true }).count() === 1 && await okno.locator('[role=group][aria-label^="Tržba po dnech"]').count() >= 1, 8000));
   tvrdi(`${w}: v okně není druhá hlavička karty (název nese jen okno)`, await okno.getByRole('heading', { name: 'Tržba po dnech' }).count() === 1);
-  await okno.getByText('Tržba za období', { exact: false }).first().click({ force: true });
+  // dispatchEvent místo click: okno ještě dojíždí (animace), a Playwright pak hlásil „outside of the viewport"; bublání události stejně testuje totéž.
+  await okno.getByText('Tržba za období', { exact: false }).first().dispatchEvent('click');
   tvrdi(`${w}: klepnutí do okna nenaviguje (stále Přehled)`, await p.locator('[data-plocha="vedeni.prehled"]').count() === 1 && await okno.isVisible());
   await p.keyboard.press('Escape');
   tvrdi(`${w}: Escape okno zavře`, await dokud(async () => await p.getByRole('dialog', { name: 'Tržba po dnech' }).count() === 0, 3000));
