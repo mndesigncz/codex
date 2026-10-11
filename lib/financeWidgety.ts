@@ -453,3 +453,23 @@ export async function nactiKalendareUzaverek(mesice: readonly string[]): Promise
   const casti = await Promise.all(mesice.map(m => fetch(`/api/closings/calendar?month=${m}`).then(okJson).then(vyberKalendarTrzeb)));
   return Object.assign({}, ...casti);
 }
+
+/** Tržba za hodiny 0 až `hodina` včetně (pole hodin z /api/pos/daily, index = hodina dne). */
+export function trzbaDoHodiny(hodiny: readonly number[], hodina: number): number {
+  let soucet = 0;
+  for (let h = 0; h <= hodina && h < hodiny.length; h++) soucet += Number(hodiny[h]) || 0;
+  return soucet;
+}
+
+/**
+ * Změna dnešní tržby proti stejnému dni minulý týden ke stejné hodině (v %). Porovnává se jen do poslední dokončené hodiny:
+ * celodenní součet minulého týdne by dopoledne ukazoval dramatický propad a dnešní rozpracovaná hodina by srovnání křivila.
+ * null = nejde (půlnoc, minulý týden nic neprodal).
+ */
+export function zmenaOprotiMinulemuTydnu(dnes: readonly number[], minuly: readonly number[], hodinaTed: number): { pct: number; doHodiny: number } | null {
+  const posledni = hodinaTed - 1;
+  if (posledni < 0) return null;
+  const min = trzbaDoHodiny(minuly, posledni);
+  if (!(min > 0)) return null;
+  return { pct: Math.round(((trzbaDoHodiny(dnes, posledni) - min) / min) * 100), doHodiny: hodinaTed };
+}

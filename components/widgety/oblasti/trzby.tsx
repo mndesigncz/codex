@@ -38,11 +38,11 @@ import { useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
 import { widget } from '@/lib/widgety/katalog';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
-import { dbTimeHM, pragueToday } from '@/lib/pragueTime';
+import { dbTimeHM, dayPlus, pragueToday } from '@/lib/pragueTime';
 import { apiMessage, okJson } from '@/lib/api';
 import { fmtMesic } from '@/lib/i18n/format';
 import { aktualniJazyk } from '@/lib/i18n/stav';
-import { DLOUHO_OTEVRENY_MIN, nactiKalendareUzaverek, dnyObdobi, dnyVTydnu, obdobiPokladny, pondeliTydne, kalendarTrzeb, kasaProtiUzaverkam, mesiceObdobi, minutOtevrenosti, tydnyTrzeb, vyberKalendarTrzeb as vyberKalendar } from '@/lib/financeWidgety';
+import { DLOUHO_OTEVRENY_MIN, zmenaOprotiMinulemuTydnu, nactiKalendareUzaverek, dnyObdobi, dnyVTydnu, obdobiPokladny, pondeliTydne, kalendarTrzeb, kasaProtiUzaverkam, mesiceObdobi, minutOtevrenosti, tydnyTrzeb, vyberKalendarTrzeb as vyberKalendar } from '@/lib/financeWidgety';
 import { useMoney } from '../../CurrencyProvider';
 import { Icon } from '../../Icons';
 import { otevriDen } from '@/lib/denUdalost';
@@ -163,6 +163,13 @@ function PokladnaDnes({ velikost, nahled }: WidgetProps) {
   // po půlnoci UTC ukazoval zítřek.
   const data = useDataWidgetu<SouhrnPokladny>(ok ? `/api/pos/summary?date=${pragueToday()}` : null, vyberSouhrn);
   const s = data.data;
+  // Změna proti stejnému dni minulý týden ke stejné hodině — velká karta (ne S) s tím ukáže, jestli je den dobrý nebo slabý.
+  const dnesDen = pragueToday();
+  const hodinaTed = Number(new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hourCycle: 'h23', timeZone: 'Europe/Prague' }).format(new Date()));
+  const dnesHodiny = useDataWidgetu(ok && velikost !== 'S' ? `/api/pos/daily?from=${dnesDen}&to=${dnesDen}&lite=1` : null, vyberDenniPokladnu);
+  const minulyHodiny = useDataWidgetu(ok && velikost !== 'S' ? `/api/pos/daily?from=${dayPlus(dnesDen, -7)}&to=${dayPlus(dnesDen, -7)}&lite=1` : null, vyberDenniPokladnu);
+  const zmenaTydne = dnesHodiny.data?.propojeno && minulyHodiny.data?.propojeno ? zmenaOprotiMinulemuTydnu(dnesHodiny.data.hodiny, minulyHodiny.data.hodiny, hodinaTed) : null;
+  const zmenaText = zmenaTydne ? `${zmenaTydne.pct > 0 ? '+' : ''}${zmenaTydne.pct} % ${t('proti stejnému dni minulý týden')} · ${t('do {h}:00', { h: zmenaTydne.doHodiny })}` : '';
   const uctenky = s ? t('{n, plural, one {# účtenka} few {# účtenky} other {# účtenek}}', { n: s.uctenek }) : '';
   const poznamka = s ? [uctenky, s.misto].filter(Boolean).join(' · ') : '';
 
@@ -185,6 +192,7 @@ function PokladnaDnes({ velikost, nahled }: WidgetProps) {
           <p className="t-label !text-white/55">{t('Tržba')}</p>
           <p className="mt-1.5 text-[2.5rem] leading-none font-bold tracking-tight tabular-nums text-white">{money(s.celkem)}</p>
           {poznamka && <p className="mt-1.5 text-[13px] text-white/60 truncate">{poznamka}</p>}
+          {zmenaTydne && <p className={`mt-1 text-[13px] font-medium truncate ${zmenaTydne.pct >= 0 ? 'text-[#C8F542]' : 'text-[#FFB4A8]'}`}>{zmenaText}</p>}
           <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-white/10 pt-3">
             {([[t('Hotově'), s.hotove], [t('Kartou'), s.kartou], [t('Spropitné'), s.spropitne]] as const).map(([stitek, castka]) => (
               <div key={stitek} className="min-w-0">
@@ -196,7 +204,10 @@ function PokladnaDnes({ velikost, nahled }: WidgetProps) {
         </div>
       ) : (
         <div className="space-y-4">
-          <Stat label={t('Tržba')} value={money(s.celkem)} note={poznamka} />
+          <div>
+            <Stat label={t('Tržba')} value={money(s.celkem)} note={poznamka} />
+            {zmenaTydne && <p className={`mt-1 text-[13px] font-medium ${zmenaTydne.pct >= 0 ? 'text-ok-ink' : 'text-wait-ink'}`}>{zmenaText}</p>}
+          </div>
           <StatRow className="border-t border-[var(--surface-line)] pt-4">
             <Stat label={t('Hotově')} value={money(s.hotove)} />
             <Stat label={t('Kartou')} value={money(s.kartou)} />

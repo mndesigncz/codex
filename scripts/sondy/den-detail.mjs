@@ -21,7 +21,7 @@ const posDaily = (od, doD) => {
     count: 2, total: 1350, oldestSince: pred3h, byDay: { [dnes]: { count: 2, total: 1350 } },
     items: [{ id: 'o1', desk: '7', since: pred3h, total: 900, persons: 3, who: 'Eva Testová', day: dnes }, { id: 'o2', desk: null, since: pred20m, total: 450, persons: null, who: 'Martin Nemeškal', day: dnes }],
   } : { count: 0, total: 0, oldestSince: null, byDay: {}, items: [] };
-  return { ...b, from: od, to: doD, days, open, totals: { ...b.totals, total: days.reduce((s, x) => s + x.total, 0), avgBill: 200, methods: [] } };
+  return { ...b, from: od, to: doD, days, open, hours: Array.from({ length: 24 }, () => 1000), totals: { ...b.totals, total: days.reduce((s, x) => s + x.total, 0), avgBill: 200, methods: [] } };
 };
 const DNY = Object.fromEntries(['DNES', 'VCERA', 'PREDEVCIREM', 'PRED3', 'PRED4', 'PRED5', 'PRED6'].map((k, i) => [k, dayPlus(dnes, -i)]));
 const nacti = (j) => { let t = readFileSync(DIR + j + '.json', 'utf8'); for (const [k, v] of Object.entries(DNY)) t = t.replaceAll(`"${k}"`, `"${v}"`); return JSON.parse(t.replaceAll('"MESIC"', `"${mesic}"`)); };
@@ -129,6 +129,9 @@ for (const w of [1280, 390]) {
   await otevri(p, '/employer/overview', 'vedeni.prehled');
   const karta = p.locator('[data-instance="pokl"]');
   await karta.getByRole('button', { name: /^Otevřít/ }).waitFor({ timeout: 10000 });
+  if (Number(new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hourCycle: 'h23', timeZone: 'Europe/Prague' }).format(new Date())) >= 1) {
+    tvrdi('Pokladna dnes: ukazuje změnu proti stejnému dni minulý týden ke stejné hodině', await dokud(async () => /proti stejnému dni minulý týden · do \d+:00/.test(await karta.innerText()), 6000), (await karta.innerText()).slice(0, 200));
+  }
   await karta.getByRole('button', { name: /^Otevřít/ }).click();
   tvrdi('Pokladna dnes: klepnutí otevře „Finance dne" dnešního dne a zůstane se na Přehledu', await p.getByRole('dialog', { name: 'Finance dne' }).waitFor({ timeout: 8000 }).then(() => true, () => false) && await p.locator('[data-plocha="vedeni.prehled"]').count() === 1);
   await ctx.close();
