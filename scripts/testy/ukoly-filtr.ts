@@ -2,7 +2,7 @@
 import type { Testy } from './_testy.ts';
 import {
   VYCHOZI_FILTR, filtrujUkoly, poctyStavu, stavUkolu, odpovidaHledani, ukolyPoDnech, statistikaUkolu, splneniPodleLidi,
-  kalendarUkolu, ukolyDne, postupChecklistu, pocetFiltru, seradUkoly,
+  kalendarUkolu, ukolyDne, postupChecklistu, pocetFiltru, seradUkoly, rozborPredani,
 } from '../../lib/ukolyFiltr.ts';
 import type { Ukol } from '../../lib/ukolyPrehled.ts';
 
@@ -90,4 +90,8 @@ export default function ({ eq, ok }: Testy) {
   eq('úkoly dne: nehotové první', ukolyDne(ukoly, DNES).map(x => x.id), [2, 8, 6]);
   eq('checklist: postup 50 %', postupChecklistu(ukoly[7]), 50);
   eq('checklist: bez bodů = null', postupChecklistu(ukoly[0]), null);
+
+  eq('předání z widgetu: stav', rozborPredani('stav:po_terminu'), { stav: 'po_terminu' });
+  eq('předání z widgetu: pohled', rozborPredani('pohled:week'), { pohled: 'week' });
+  eq('předání z widgetu: neznámé a prázdné se zahodí', [rozborPredani('stav:nesmysl'), rozborPredani('pohled:x'), rozborPredani(undefined), rozborPredani('42')], [{}, {}, {}, {}]);
 }

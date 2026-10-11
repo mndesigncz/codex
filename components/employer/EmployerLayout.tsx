@@ -1,5 +1,6 @@
 'use client';
 
+import { predejUkolum } from '@/lib/ukolyFiltr';
 import { useSession } from 'next-auth/react';
 
 import { useState, useEffect } from 'react';
@@ -205,6 +206,7 @@ export default function EmployerLayout({ user }: Props) {
     naviguj(view, arg);
   };
   const naviguj = (view: string, arg?: string) => {
+    if (view === 'tasks') predejUkolum(arg);
     setInventoryCat(view === 'inventory' ? arg : undefined);
     setRecipeProduct(view === 'recipes' ? arg : undefined);
     setChatConvId(view === 'chat' && arg ? Number(arg) : null);

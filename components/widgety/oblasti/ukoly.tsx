@@ -175,6 +175,8 @@ function UkolyDnes({ velikost, nastaveni, nahled }: WidgetProps<{ rozsah?: strin
   const ja = useJa();
   const smi = useSmi();
   const nav = useNavigace();
+  // Malá karta se otevírá přímo (`otevrit`) a nese i předání filtru z katalogu (Po termínu → záložka Po termínu).
+  const cilArg = widget('ukoly.dnes')?.cil?.arg;
   const data = useDataWidgetu<Ukol[]>(ja.id != null ? URL_UKOLY : null, vyberUkoly);
   const o = useOdskrtavani(data, ja.id, nahled);
   // Odškrtnuté v téhle chvíli zůstanou v seznamu (jako hotové), dokud se plocha
@@ -214,7 +216,7 @@ function UkolyDnes({ velikost, nastaveni, nahled }: WidgetProps<{ rozsah?: strin
       nacteni={ja.stav ?? data}
       doplnek={!S && zbyva > 0 ? <Chip tone={poTerminuN > 0 ? 'bad' : 'muted'} size="sm">{cislo(zbyva)}</Chip> : undefined}
       odkaz={S ? undefined : { popisek: t('Úkoly'), pohled: 'tasks' }}
-      otevrit={S && !nahled && nav.smiPohled('tasks') ? () => nav.onNavigate('tasks') : undefined}
+      otevrit={S && !nahled && nav.smiPohled('tasks') ? () => nav.onNavigate('tasks', cilArg) : undefined}
       prazdno={(S ? zbyva === 0 : radky.length === 0) ? <p className="t-meta">{t('Na dnešek nic nezbývá.')}</p> : undefined}
     >
       {S ? (
@@ -262,6 +264,8 @@ function PoTerminu({ velikost, nahled }: WidgetProps) {
   const ja = useJa();
   const smi = useSmi();
   const nav = useNavigace();
+  // Malá karta se otevírá přímo (`otevrit`) a nese i předání filtru z katalogu (Po termínu → záložka Po termínu).
+  const cilArg = widget('ukoly.po_terminu')?.cil?.arg;
   const def = widget('ukoly.po_terminu');
   const data = useDataWidgetu<Ukol[]>(ja.id != null ? URL_UKOLY : null, vyberUkoly);
   // Celý tým jen s ukoly.zobrazit_tym (pole `cely_tym`); bez něj by stejně přišly
@@ -281,7 +285,7 @@ function PoTerminu({ velikost, nahled }: WidgetProps) {
       nacteni={ja.stav ?? data}
       doplnek={!S && vse.length > 0 ? <Chip tone="bad" size="sm">{cislo(vse.length)}</Chip> : undefined}
       odkaz={S ? undefined : { popisek: t('Úkoly'), pohled: 'tasks' }}
-      otevrit={S && !nahled && nav.smiPohled('tasks') ? () => nav.onNavigate('tasks') : undefined}
+      otevrit={S && !nahled && nav.smiPohled('tasks') ? () => nav.onNavigate('tasks', cilArg) : undefined}
       prazdno={vse.length === 0 ? <p className="t-meta">{t('Nic není po termínu.')}</p> : undefined}
     >
       {S ? (

@@ -2,7 +2,7 @@
 // detail úkolu v okně (popis, kroky, kdo a kdy, Označit jako hotový), pohledy Seznam / Týden / Měsíc / Přehled
 // (měsíční kalendář s úkoly dne, graf splněno/založeno/termíny s lištou období a srovnáním), telefon 390 bez přetečení.
 import { readFileSync } from 'node:fs';
-import { kontext, konec, tvrdi, otevri, dokud, roleMine, DIR, OUT } from './k68-spolecne.mjs';
+import { kontext, konec, tvrdi, otevri, dokud, roleMine, fixtura, DIR, OUT } from './k68-spolecne.mjs';
 
 const praha = (o = 0) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now() + o * 86400000));
 const DNY = { DNES: praha(0), VCERA: praha(-1), PREDVCEREM: praha(-2), ZITRA: praha(1), POZDEJI: praha(20) };
@@ -135,6 +135,19 @@ for (const w of [1280, 390]) {
   tvrdi(`Z ${w}: zaměstnanec nemá Přehled (statistiky týmu patří vedení)`, await pohledy.getByRole('tab', { name: 'Přehled', exact: true }).count() === 0);
   tvrdi(`Z ${w}: bez vodorovného přetečení`, await bezPreteceni(p));
   tvrdi(`Z ${w}: bez chyb v konzoli`, chyby.length === 0, chyby.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+// Widget → Úkoly: klepnutí na „Po termínu" na Přehledu otevře Úkoly rovnou na záložce Po termínu.
+{
+  const fix = { ...fixtura('k68-rozlozeni-vedeni'), polozky: [{ id: 'po-terminu', widget: 'ukoly.po_terminu', velikost: 'S' }] };
+  const { ctx, p } = await kontext({ viewport: { width: 1280, height: 900 }, fix, dalsi: podvrh });
+  await otevri(p, '/employer/overview', 'vedeni.prehled');
+  const karta = p.locator('[data-instance="po-terminu"]');
+  await karta.waitFor({ timeout: 10000 });
+  await karta.click({ position: { x: 40, y: 60 }, force: true });
+  const stavy = p.locator('[data-plocha] li[data-widget="nastroj"]').getByRole('group', { name: 'Stav úkolů' });
+  await stavy.waitFor({ timeout: 10000 });
+  tvrdi('widget → Úkoly: záložka „Po termínu" je rovnou zapnutá', await dokud(async () => (await stavy.getByRole('button', { name: /^Po termínu/ }).getAttribute('aria-pressed')) === 'true', 4000));
   await ctx.close();
 }
 await konec();

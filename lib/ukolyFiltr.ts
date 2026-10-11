@@ -241,3 +241,40 @@ export function postupChecklistu(u: Pick<Ukol, 'checklist'>): number | null {
   const n = u.checklist.length;
   return n === 0 ? null : Math.round((u.checklist.filter(i => i.done).length / n) * 100);
 }
+
+// ---------------------------------------------------------------------------
+// Předání z widgetu: klepnutí na „Po termínu" otevře Úkoly rovnou na záložce Po termínu
+// ---------------------------------------------------------------------------
+
+export type PohledUkolu = 'list' | 'week' | 'month' | 'prehled';
+export interface PredaniUkolu { stav?: StavUkolu; pohled?: PohledUkolu }
+export const KLIC_PREDANI_UKOLU = 'managero-ukoly-predani';
+export const UDALOST_PREDANI_UKOLU = 'managero:predani-ukolu';
+
+/** „stav:po_terminu" / „pohled:week" (to, co widget nese v `cil.arg`); neznámé hodnoty se zahodí. */
+export function rozborPredani(arg: string | null | undefined): PredaniUkolu {
+  const m = /^(stav|pohled):([a-z_]+)$/.exec(String(arg ?? ''));
+  if (!m) return {};
+  if (m[1] === 'stav') return (STAVY_UKOLU as readonly string[]).includes(m[2]) ? { stav: m[2] as StavUkolu } : {};
+  return ['list', 'week', 'month', 'prehled'].includes(m[2]) ? { pohled: m[2] as PohledUkolu } : {};
+}
+
+const PLATNOST_PREDANI_MS = 6000;
+
+/**
+ * Zapamatuje předání pro Úkoly (otevřou se po přechodu) a oznámí ho už otevřeným Úkolům. Platí pár vteřin a nemaže se
+ * při přečtení: plocha si nástroj po načtení rozložení odmontuje a připojí znovu, a ten druhý by o předání nevěděl.
+ */
+export function predejUkolum(arg: string | undefined): void {
+  if (!arg || typeof window === 'undefined') return;
+  try { sessionStorage.setItem(KLIC_PREDANI_UKOLU, JSON.stringify({ arg, cas: Date.now() })); } catch { /* soukromé okno: otevře se bez předání */ }
+  window.dispatchEvent(new CustomEvent(UDALOST_PREDANI_UKOLU, { detail: arg }));
+}
+
+/** Čerstvé předání uložené `predejUkolum`, nebo null. */
+export function cerstvePredani(): string | null {
+  try {
+    const v = JSON.parse(sessionStorage.getItem(KLIC_PREDANI_UKOLU) ?? 'null');
+    return v && typeof v.arg === 'string' && Date.now() - Number(v.cas) < PLATNOST_PREDANI_MS ? v.arg : null;
+  } catch { return null; }
+}

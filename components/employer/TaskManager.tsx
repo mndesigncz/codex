@@ -33,7 +33,7 @@ import { apiMessage, okJson } from '@/lib/api';
 import { useDraft } from '@/lib/useDraft';
 import { DraftNote } from '../ui/DraftNote';
 import { vyberUkoly, rozdelPoDnech, jeCiziUkol, splnenoDnes, type Ukol } from '@/lib/ukolyPrehled';
-import { VYCHOZI_FILTR, filtrujBezStavu, filtrujUkoly, poctyStavu, seradUkoly, statistikaUkolu, type FiltrUkolu } from '@/lib/ukolyFiltr';
+import { VYCHOZI_FILTR, filtrujBezStavu, filtrujUkoly, poctyStavu, seradUkoly, statistikaUkolu, rozborPredani, cerstvePredani, UDALOST_PREDANI_UKOLU, type FiltrUkolu } from '@/lib/ukolyFiltr';
 import { UkolDetail } from '../ukoly/UkolDetail';
 import { UkolyFiltry, type ClovekFiltru } from '../ukoly/UkolyFiltry';
 import { UkolySouhrn } from '../ukoly/UkolySouhrn';
@@ -131,6 +131,20 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
     };
     window.addEventListener(UDALOST_FILTR_UKOLU, naUdalost);
     return () => window.removeEventListener(UDALOST_FILTR_UKOLU, naUdalost);
+  }, []);
+
+  // Předání z widgetu (Po termínu → rovnou záložka Po termínu): po přechodu z uloženého, na otevřené stránce z události.
+  useEffect(() => {
+    const pouzij = (arg: string | null) => {
+      const r = rozborPredani(arg);
+      if (r.stav) { setFiltr(f => ({ ...f, stav: r.stav! })); setView('list'); }
+      if (r.pohled) setView(r.pohled);
+    };
+    const a = cerstvePredani();
+    if (a) pouzij(a);
+    const naUdalost = (e: Event) => pouzij((e as CustomEvent<string>).detail);
+    window.addEventListener(UDALOST_PREDANI_UKOLU, naUdalost);
+    return () => window.removeEventListener(UDALOST_PREDANI_UKOLU, naUdalost);
   }, []);
 
   const [showLater, setShowLater] = useState(false);
