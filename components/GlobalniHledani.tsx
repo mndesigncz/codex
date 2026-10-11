@@ -13,6 +13,8 @@ import { useT } from '@/lib/i18n/client';
 import { obsahujeNekde, proHledani } from '@/lib/hledani';
 import { vyberUkoly, jeHotovy, type Ukol } from '@/lib/ukolyPrehled';
 import { jeAktivni, type PolozkaSkladu } from '@/lib/skladPrehled';
+import { URL_NAVODY, vyberNavody } from '@/lib/navodyPrehled';
+import { URL_POSTUPY, vyberPostupy } from '@/lib/postupyPrehled';
 
 const URL_UKOLY = '/api/tasks';
 const URL_SKLAD = '/api/inventory';
@@ -26,7 +28,7 @@ type Vysledek =
   | { druh: 'stranka'; klic: string; ikona: string; titulek: string; podtitulek?: string; stranka: string; arg?: string }
   | { druh: 'clovek'; klic: string; ikona: string; titulek: string; podtitulek?: string; id: number };
 
-export function GlobalniHledani({ open, onClose, stranky, onStranka, hledatUkoly = false, hledatSklad = false, hledatLidi = false, onOsoba, jeUkolyStranka = 'tasks', jeSkladStranka = 'inventory' }: {
+export function GlobalniHledani({ open, onClose, stranky, onStranka, hledatUkoly = false, hledatSklad = false, hledatLidi = false, hledatNavody = false, hledatPostupy = false, onOsoba, jeUkolyStranka = 'tasks', jeSkladStranka = 'inventory' }: {
   open: boolean;
   onClose: () => void;
   /** Stránky, které divák smí otevřít (z navigace layoutu). */
@@ -35,6 +37,8 @@ export function GlobalniHledani({ open, onClose, stranky, onStranka, hledatUkoly
   hledatUkoly?: boolean;
   hledatSklad?: boolean;
   hledatLidi?: boolean;
+  hledatNavody?: boolean;
+  hledatPostupy?: boolean;
   /** Otevře profil člověka (jen když ho divák smí vidět). */
   onOsoba?: (id: number) => void;
   jeUkolyStranka?: string;
@@ -48,6 +52,8 @@ export function GlobalniHledani({ open, onClose, stranky, onStranka, hledatUkoly
 
   const ukoly = useDataWidgetu<Ukol[]>(open && hledatUkoly ? URL_UKOLY : null, vyberUkoly);
   const sklad = useDataWidgetu<PolozkaSkladu[]>(open && hledatSklad ? URL_SKLAD : null, raw => (Array.isArray(raw) ? raw : []).filter(p => p && jeAktivni(p)));
+  const navody = useDataWidgetu(open && hledatNavody ? URL_NAVODY : null, vyberNavody);
+  const postupy = useDataWidgetu(open && hledatPostupy ? URL_POSTUPY : null, vyberPostupy);
   const lide = useDataWidgetu<Clovek[]>(open && hledatLidi ? URL_TYM : null, raw => (Array.isArray(raw?.members) ? raw.members : []).filter((m: Clovek) => m.role === 'employee' || m.role === 'employer'));
 
   useEffect(() => { if (open) { setQ(''); setAktivni(0); } }, [open]);
@@ -68,15 +74,21 @@ export function GlobalniHledani({ open, onClose, stranky, onStranka, hledatUkoly
         .map<Vysledek>(x => ({ druh: 'stranka', klic: `p-${x.id}`, ikona: 'box', titulek: x.name, podtitulek: [x.category, `${x.quantity}${x.unit ? ` ${x.unit}` : ''}`].filter(Boolean).join(' · '),
           stranka: jeSkladStranka, arg: x.category ?? undefined }));
       if (s.length) out.push({ id: 'sklad', nadpis: t('Sklad'), polozky: s });
+      const n = (navody.data ?? []).filter(x => (x as { approved?: boolean }).approved !== false && obsahujeNekde(dotaz, x.title, (x as { content?: string }).content)).slice(0, NEJVIC_NA_SKUPINU)
+        .map<Vysledek>(x => ({ druh: 'stranka', klic: `n-${x.id}`, ikona: 'book', titulek: x.title, stranka: 'guides', arg: String(x.id) }));
+      if (n.length) out.push({ id: 'navody', nadpis: t('Návody'), polozky: n });
+      const po = (postupy.data?.postupy ?? []).filter(x => x.approved !== false && obsahujeNekde(dotaz, x.name, x.description)).slice(0, NEJVIC_NA_SKUPINU)
+        .map<Vysledek>(x => ({ druh: 'stranka', klic: `po-${x.id}`, ikona: 'clipboard', titulek: x.name, podtitulek: Array.isArray(x.items) ? t('{n, plural, one {# krok} few {# kroky} other {# kroků}}', { n: x.items.length }) : undefined, stranka: 'procedures', arg: String(x.id) }));
+      if (po.length) out.push({ id: 'postupy', nadpis: t('Postupy'), polozky: po });
       const l = (lide.data ?? []).filter(x => obsahujeNekde(dotaz, x.name)).slice(0, NEJVIC_NA_SKUPINU)
         .map<Vysledek>(x => ({ druh: 'clovek', klic: `l-${x.id}`, ikona: 'user', titulek: x.name, podtitulek: x.role === 'employer' ? t('Vedení') : t('Tým'), id: x.id }));
       if (l.length) out.push({ id: 'lide', nadpis: t('Lidé'), polozky: l });
     }
     return out;
-  }, [dotaz, stranky, ukoly.data, sklad.data, lide.data, jeUkolyStranka, jeSkladStranka, t]);
+  }, [dotaz, stranky, ukoly.data, sklad.data, navody.data, postupy.data, lide.data, jeUkolyStranka, jeSkladStranka, t]);
 
   const plocha = skupiny.flatMap(g => g.polozky);
-  const nacitam = dotaz !== '' && (ukoly.loading || sklad.loading || lide.loading);
+  const nacitam = dotaz !== '' && (ukoly.loading || sklad.loading || navody.loading || postupy.loading || lide.loading);
   useEffect(() => { setAktivni(0); }, [dotaz]);
   useEffect(() => { seznamRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }); }, [aktivni]);
 

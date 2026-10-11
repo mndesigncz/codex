@@ -118,12 +118,12 @@ interface Props {
 }
 
 /** Hledání uvnitř ProfileLinkProvideru (kvůli otevření profilu člověka). */
-function HledaniVedeni({ otevreno, zavrit, stranky, onStranka, ukoly, sklad, lide }: {
+function HledaniVedeni({ otevreno, zavrit, stranky, onStranka, ukoly, sklad, lide, navody, postupy }: {
   otevreno: boolean; zavrit: () => void; stranky: { id: string; label: string; icon: string }[]; onStranka: (id: string, arg?: string) => void;
-  ukoly: boolean; sklad: boolean; lide: boolean;
+  ukoly: boolean; sklad: boolean; lide: boolean; navody: boolean; postupy: boolean;
 }) {
   const otevriProfil = usePersonProfile();
-  return <GlobalniHledani open={otevreno} onClose={zavrit} stranky={stranky} onStranka={onStranka} hledatUkoly={ukoly} hledatSklad={sklad}
+  return <GlobalniHledani open={otevreno} onClose={zavrit} stranky={stranky} onStranka={onStranka} hledatUkoly={ukoly} hledatSklad={sklad} hledatNavody={navody} hledatPostupy={postupy}
     hledatLidi={lide && !!otevriProfil} onOsoba={otevriProfil ?? undefined} />;
 }
 
@@ -619,7 +619,7 @@ export default function EmployerLayout({ user }: Props) {
         ]}
       />
       <HledaniVedeni otevreno={hledaniOtevreno} zavrit={() => setHledani(false)} stranky={nav.vse} onStranka={navigate}
-        ukoly={smiPohled('tasks')} sklad={smiPohled('inventory')} lide={ma('tym.profil')} />
+        ukoly={smiPohled('tasks')} sklad={smiPohled('inventory')} lide={ma('tym.profil')} navody={smiPohled('guides')} postupy={smiPohled('procedures')} />
       <JazykOkno open={jazykOpen} onClose={() => setJazykOpen(false)} />
     </div>
     </ProfileLinkProvider>

@@ -40,6 +40,19 @@ const podvrh = (req, json) => {
 
   await p.keyboard.press('Control+k');
   await okno.waitFor({ timeout: 5000 });
+  await okno.getByRole('combobox').fill('flat white');
+  tvrdi('„flat white" najde návod a výběr otevře Návody', await dokud(async () => await okno.getByRole('option', { name: /Jak se dělá flat white/ }).count() >= 1, 5000));
+  await okno.getByRole('option', { name: /Jak se dělá flat white/ }).first().click();
+  tvrdi('…na stránce Návody', await dokud(async () => await p.locator('[data-plocha="vedeni.navody"]').count() === 1, 6000));
+
+  await p.keyboard.press('Control+k');
+  await okno.waitFor({ timeout: 5000 });
+  await okno.getByRole('combobox').fill('zavírací');
+  tvrdi('„zavírací" najde postup', await dokud(async () => await okno.getByRole('option', { name: /Zavírací rutina/ }).count() >= 1, 5000));
+  await p.keyboard.press('Escape');
+
+  await p.keyboard.press('Control+k');
+  await okno.waitFor({ timeout: 5000 });
   await okno.getByRole('combobox').fill('zzzzzz');
   tvrdi('bez shody ukáže „Nic nenalezeno"', await dokud(async () => /Nic nenalezeno/.test(await okno.innerText()), 3000));
   await p.keyboard.press('Escape');
