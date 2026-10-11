@@ -25,10 +25,11 @@ export function Modal({ open, onClose, title, subtitle, size = 'md', children, f
    *   sm — potvrzení a krátký formulář (dvě tři pole)
    *   md — běžné okno (výchozí)
    *   lg — tabulka, náhled nebo editor
+   *   xl — widget zvětšený na celou plochu (graf, dlouhý seznam)
    * V aplikaci se dřív vyskytovalo šest různých šířek, protože každé okno
    * si tu svoji odhadlo samo.
    */
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
   children: React.ReactNode;
   /** Patička s tlačítky. Hlavní akce vpravo, stejně jako všude jinde. */
   footer?: React.ReactNode;
@@ -41,7 +42,7 @@ export function Modal({ open, onClose, title, subtitle, size = 'md', children, f
   // Na serveru a při hydrataci false (žádný document), hned potom true.
   const vBody = useSyncExternalStore(() => () => {}, () => true, () => false);
   if (!open || !vBody) return null;
-  const width = size === 'sm' ? 'max-w-sm' : size === 'lg' ? 'max-w-2xl' : 'max-w-md';
+  const width = size === 'sm' ? 'max-w-sm' : size === 'xl' ? 'max-w-5xl' : size === 'lg' ? 'max-w-2xl' : 'max-w-md';
   return createPortal(
     <div
       className="fixed inset-0 z-[70] flex items-center justify-center p-4 modal-overlay"

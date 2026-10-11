@@ -47,9 +47,9 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useSession } from 'next-auth/react';
-import { Avatar, Button, Chip, Field, Input, ListRow, Modal, PersonChip, Segmented, Stat, StatRow } from '../../ui';
+import { Avatar, Button, CasovyGraf, Chip, Field, Input, ListRow, Modal, ObdobiLista, PersonChip, Segmented, Stat, StatRow } from '../../ui';
 import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
-import { Widget, type StavNacteni } from '../Widget';
+import { Widget, useWidget, type StavNacteni } from '../Widget';
 import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
 import { useNavigace, useSmi } from '../NavigaceKontext';
 import { useOpravneni } from '../../role/useOpravneni';
@@ -58,10 +58,13 @@ import { usePersonProfile } from '../../employer/ProfileLinkProvider';
 import { apiMessage, okJson } from '@/lib/api';
 import { useJazyk, useT, type PrekladFn } from '@/lib/i18n/client';
 import { fmtHM, fmtMesic } from '@/lib/i18n/format';
-import { dbTimeDayHM, dbTimeHM, parseDbTime, pragueDayOf, pragueToday } from '@/lib/pragueTime';
+import { dbTimeDayHM, dbTimeHM, dayPlus, parseDbTime, pragueDayOf, pragueToday } from '@/lib/pragueTime';
+import { agreguj, hrubostProRozmezi, obdobiZPresetu, platneRozmezi, pocetDni, predchoziRozmezi, zmenaPct, type Slot } from '@/lib/obdobi';
+import { useObdobi } from '@/lib/useObdobi';
+import { useUlozeno } from '@/lib/useUlozeno';
 import {
   ZAPOMENUTY_MS, dnesVPodniku, konecSmeny, navrhOdchodu as navrhOdchoduPlan, hodinyMinuty, mujMesic, mzdyZaObdobi, obdobiDni, otevrenePrichody, podilMezd,
-  sazbyZRosteru, seradSouhrn, souhrnHodin, trzbyZaObdobi,
+  sazbyZRosteru, seradSouhrn, souhrnHodin, trzbyZaObdobi, hodinyPoDnech, zaznamyVRozmezi,
   type OtevrenyPrichod, type RadekDne, type RazeniSouhrnu, type UzaverkaTrzby,
 } from '@/lib/dochazkaPrehled';
 
@@ -638,21 +641,54 @@ function SouhrnHodin({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: str
   const smi = useSmi();
   const money = useMoney();
   const otevriProfil = usePersonProfile();
+  const { instance } = useWidget();
   const { dni } = useDniWidgetu(nastaveni.obdobi);
   const L = velikost === 'L';
   const vidiMzdy = smi('finance.mzdy');
   const vychoziRazeni: RazeniSouhrnu = nastaveni.razeni === 'mzda' && !vidiMzdy ? 'hodiny' : nastaveni.razeni ?? 'hodiny';
   const [razeni, setRazeni] = useState<RazeniSouhrnu>(vychoziRazeni);
   useEffect(() => { setRazeni(vychoziRazeni); }, [vychoziRazeni]);
-  const data = useDataWidgetu<Dochazka>(brana ? urlDni(dni) : null, raw => vyberDochazku(raw, t));
+
+  // Velká varianta: období si člověk volí tlačítkem (rychlé volby, od–do, dny v týdnu) a nad lidmi je graf hodin po dnech.
+  // Server vrací nejvýš 180 dní zpět, takže volby i srovnání se jím omezují.
+  const dnes = pragueToday();
+  const pocatek = useMemo(() => obdobiZPresetu(dni === 7 ? '7_dni' : dni === 30 ? '30_dni' : dni === 90 ? '90_dni' : 'mesic', dnes), [dni, dnes]);
+  const { obdobi, nastav } = useObdobi(`dochazka_souhrn-${instance}`, pocatek);
+  const [porovnat, setPorovnat] = useUlozeno<boolean>('dochazka-porovnat-2', true);
+  const nejdrive = dayPlus(dnes, -179);
+  const rHrube = platneRozmezi(obdobi, dnes);
+  const r = { od: rHrube.od < nejdrive ? nejdrive : rHrube.od, do: rHrube.do };
+  const pred = predchoziRozmezi(r.od, r.do);
+  const chcePorovnani = L && porovnat && pred.od >= nejdrive;
+  const dniNacist = L ? pocetDni(chcePorovnani ? pred.od : r.od, dnes) : dni;
+  const data = useDataWidgetu<Dochazka>(brana ? urlDni(dniNacist) : null, raw => vyberDochazku(raw, t));
   const ted = useTed(!!data.data?.entries.some(e => !e.clockOut), 60_000);
+  const entriesObdobi = useMemo(() => (data.data ? (L ? zaznamyVRozmezi(data.data.entries, r.od, r.do, obdobi.dnyTydne) : data.data.entries) : []), [data.data, L, r.od, r.do, obdobi.dnyTydne]);
   const radky = useMemo(() => {
     if (!data.data) return [];
     // Sazby jen s finance.mzdy — server je bez něj posílá jako null, ale
     // widget se na to nespoléhá (pole katalogu: Kč u člověka).
     const sazby = vidiMzdy ? sazbyZRosteru(data.data.roster as ClenRosteruB2[]) : new Map<string, number>();
-    return seradSouhrn(souhrnHodin(data.data.entries, ted, sazby), razeni);
-  }, [data.data, ted, razeni, vidiMzdy]);
+    return seradSouhrn(souhrnHodin(entriesObdobi, ted, sazby), razeni);
+  }, [data.data, entriesObdobi, ted, razeni, vidiMzdy]);
+
+  const hr = hrubostProRozmezi(obdobi, pocetDni(r.od, r.do));
+  const hodnoty = useMemo(() => (L && data.data ? hodinyPoDnech(data.data.entries, ted, r.od, r.do) : []), [L, data.data, ted, r.od, r.do]);
+  const hodnotyPred = useMemo(() => (chcePorovnani && data.data ? hodinyPoDnech(data.data.entries, ted, pred.od, pred.do) : null), [chcePorovnani, data.data, ted, pred.od, pred.do]);
+  const sloty: Slot[] = useMemo(() => agreguj(hodnoty, r.od, r.do, hr, obdobi.dnyTydne), [hodnoty, r.od, r.do, hr, obdobi.dnyTydne]);
+  const slotyPred: Slot[] | null = useMemo(() => (hodnotyPred ? agreguj(hodnotyPred, pred.od, pred.do, hr, obdobi.dnyTydne) : null), [hodnotyPred, pred.od, pred.do, hr, obdobi.dnyTydne]);
+  const sumHodin = useMemo(() => sloty.reduce((s2, x) => s2 + x.hodnota, 0), [sloty]);
+  const sumPred = useMemo(() => (slotyPred ? slotyPred.reduce((s2, x) => s2 + x.hodnota, 0) : null), [slotyPred]);
+  const zmena = sumPred != null ? zmenaPct(sumHodin, sumPred) : null;
+  const loc = useJazyk().jazyk;
+  const kratceDatum = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString(loc, { day: 'numeric', month: 'numeric' });
+  const pismeno = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString(loc, { weekday: 'short' });
+  const jmenoSlotu = (sl: Slot) => hr === 'den' ? `${pismeno(sl.klic)} ${kratceDatum(sl.klic)}` : hr === 'tyden' ? `${kratceDatum(sl.od)} – ${kratceDatum(sl.do)}`
+    : new Date(`${sl.klic}-01T12:00:00`).toLocaleDateString(loc, { month: 'long', year: 'numeric' });
+  const popisekOsy = (sl: Slot) => hr === 'den' ? (sloty.length <= 10 ? pismeno(sl.klic) : String(Number(sl.klic.slice(8)))) : hr === 'tyden' ? kratceDatum(sl.od)
+    : new Date(`${sl.klic}-01T12:00:00`).toLocaleDateString(loc, { month: 'short' });
+  const dnesKlic = hr === 'den' ? dnes : hr === 'tyden' ? obdobiZPresetu('tyden', dnes).od : dnes.slice(0, 7);
+  const hodinyText = (h: number) => `${(Math.round(h * 10) / 10).toLocaleString(loc)} h`;
   if (!brana) return <Widget prazdno={null} />;
 
   const profil = !nahled && !!otevriProfil && smi('tym.profil');
@@ -664,8 +700,24 @@ function SouhrnHodin({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: str
   ];
   return (
     <Widget nacteni={data}
-      doplnek={radky.length > 0 ? <Chip tone="muted" size="sm">{nazevDni(t, dni)}</Chip> : undefined}
-      prazdno={radky.length === 0 ? <p className="t-meta">{t('Za {n, plural, one {# den} few {# dny} other {# dní}} nikdo nic neodpíchl.', { n: dni })}</p> : undefined}>
+      doplnek={!L && radky.length > 0 ? <Chip tone="muted" size="sm">{nazevDni(t, dni)}</Chip> : undefined}
+      prazdno={!L && radky.length === 0 ? <p className="t-meta">{t('Za {n, plural, one {# den} few {# dny} other {# dní}} nikdo nic neodpíchl.', { n: dni })}</p> : undefined}>
+      {L && (
+        <div className="mb-4 space-y-4">
+          <ObdobiLista value={obdobi} onChange={nastav} volby={['dnes', '7_dni', '30_dni', 'mesic', 'minuly_mesic', '90_dni', '180_dni']} porovnat={porovnat} onPorovnat={setPorovnat} />
+          <div>
+            <Stat label={t('Odpracováno')} value={hodinyText(sumHodin)} note={t('{n, plural, one {# směna} few {# směny} other {# směn}}', { n: radky.reduce((a, x) => a + x.pocet, 0) })} />
+            {zmena != null && (
+              <p className="t-meta mt-2 text-pretty">
+                <Chip tone={zmena >= 0 ? 'ok' : 'wait'} size="sm">{zmena > 0 ? '+' : ''}{zmena} %</Chip> {t('proti předchozímu období')} ({hodinyText(sumPred!)})
+              </p>
+            )}
+          </div>
+          <CasovyGraf sloty={sloty} porovnani={slotyPred} druh="sloupce" vyska={170} format={hodinyText} kratce={v => String(Math.round(v))}
+            jmenoSlotu={jmenoSlotu} popisekOsy={popisekOsy} zvyraznit={dnesKlic} popisekPorovnani={t('předchozí období')}
+            label={t('Odpracované hodiny: {obdobi}', { obdobi: `${kratceDatum(r.od)} – ${kratceDatum(r.do)}` })} />
+        </div>
+      )}
       {L && radky.length > 2 && (
         <Segmented size="sm" ariaLabel={t('Řadit souhrn')} value={razeni} onChange={v => setRazeni(v)} options={moznosti} className="mb-2" />
       )}

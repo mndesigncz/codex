@@ -57,11 +57,15 @@ export interface KontextWidgetu {
   prepniSbaleni: () => void;
   /** „Ukázat i tak" — rozbalí vyřízený widget do konce sezení. */
   rozbal: () => void;
+  /** Otevře widget zvětšený v okně (jen střední karty, které mají velkou podobu); jinak chybí. */
+  zvetsit?: (() => void) | null;
+  /** Widget je zvětšený v okně: kreslí se jen obsah, bez karty a hlavičky (název nese okno). */
+  vOkne?: boolean;
 }
 
 const MIMO_PLOCHU: KontextWidgetu = {
   instance: 'widget', velikost: 'M', definice: undefined, nahled: false, upravy: false, inkoust: false,
-  nahlasSkryti: () => {}, nahlasVyrizeno: () => {}, mini: null, rozbal: () => {},
+  nahlasSkryti: () => {}, nahlasVyrizeno: () => {}, mini: null, rozbal: () => {}, zvetsit: null, vOkne: false,
   pohledStranky: null, sbaleno: false, prepniSbaleni: () => {},
 };
 
@@ -313,6 +317,8 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
   else obsah = children;
 
   const vidiOdkaz = !!odkaz && nav.smiPohled(odkaz.pohled);
+  if (k.vOkne) return <div className="min-w-0" aria-busy={nacitam || undefined}>{obsah}</div>;
+  const mozeZvetsit = !!k.zvetsit && !k.nahled && !k.upravy;
   return (
     <Card
       as="section"
@@ -356,13 +362,14 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
         </h2>
         {/* Ovládací prvky vpravo v jedné skupině a Sbalit VŽDY úplně vpravo: dřív stál mezi názvem a odkazem
             („Finance ›"), takže se podle toho, jaké další prvky karta měla, posouval a „plaval". */}
-        {(mozeSbalit || vidiOdkaz || (!odkaz && akce && akce.length > 0) || (klepnutelna && !vidiOdkaz && !(akce && akce.length > 0))) && (
+        {(mozeSbalit || mozeZvetsit || vidiOdkaz || (!odkaz && akce && akce.length > 0) || (klepnutelna && !vidiOdkaz && !(akce && akce.length > 0))) && (
           <div className="flex items-center shrink-0 -my-1.5 -mr-2">
             {vidiOdkaz && (
               <Button variant="ghost" size="sm" iconAfter="chevronRight"
                 className={inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : ''}
                 onClick={() => nav.onNavigate(odkaz!.pohled, odkaz!.arg)}>
-                {odkaz!.popisek}
+                {/* Vedle Zvětšit a Sbalit zbývá na telefonu málo místa na název: odkaz je tam jen šipka (text čte odečítač). */}
+                <span className={mozeZvetsit ? 'max-sm:sr-only' : ''}>{odkaz!.popisek}</span>
               </Button>
             )}
             {!odkaz && akce && akce.length > 0 && (
@@ -375,6 +382,11 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
               <Button variant="ghost" size="sm" icon="chevronRight" aria-label={t('Otevřít {nazev}', { nazev })}
                 className={inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : ''}
                 onClick={otevriCil} />
+            )}
+            {mozeZvetsit && (
+              <Button variant="ghost" size="sm" icon="expand" aria-haspopup="dialog" aria-describedby={idTitulku} aria-label={t('Zvětšit widget')}
+                className={inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : ''}
+                onClick={k.zvetsit!} />
             )}
             {mozeSbalit && (
               // Jméno widgetu v popisku by se pletlo s tlačítky hledanými podle názvu widgetu — nese ho nadpis (aria-describedby).

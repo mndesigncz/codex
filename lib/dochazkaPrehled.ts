@@ -16,6 +16,7 @@
 
 import { MAX_SHIFT_HOURS, earnedFor } from './wages.ts';
 import { dayPlus, parseDbTime, pragueDayOf, pragueMomentOf } from './pragueTime.ts';
+import type { HodnotaDne } from './obdobi.ts';
 
 /**
  * Otevřený příchod delší než tohle je zapomenutý odchod, ne běžící směna —
@@ -107,6 +108,34 @@ export interface RadekSouhrnu {
   vynechano: number;
   /** Hrubá mzda; null = bez sazby (nebo sazby nejsou vidět). */
   mzda: number | null;
+}
+
+/** Den (pražský), do kterého záznam patří: den příchodu; null u záznamu bez čitelného příchodu. */
+export function denZaznamu(e: Pick<ZaznamDochazky, 'clockIn'>): string | null {
+  const od = parseDbTime(e.clockIn);
+  return od ? pragueDayOf(od) : null;
+}
+
+/** Záznamy, jejichž den příchodu leží v rozmezí (a případně v jednom z vybraných dnů v týdnu: 0 = po … 6 = ne). */
+export function zaznamyVRozmezi<T extends Pick<ZaznamDochazky, 'clockIn'>>(entries: readonly T[], od: string, doD: string, dnyTydne: readonly number[] = []): T[] {
+  return entries.filter(e => {
+    const d = denZaznamu(e);
+    if (!d || d < od || d > doD) return false;
+    return dnyTydne.length === 0 || dnyTydne.includes((new Date(`${d}T12:00:00Z`).getUTCDay() + 6) % 7);
+  });
+}
+
+/** Odpracované hodiny po dnech rozmezí (dny bez záznamu = 0); stejná pravidla jako souhrn (zapomenuté odchody se nepočítají). */
+export function hodinyPoDnech(entries: readonly ZaznamDochazky[], ted: number, od: string, doD: string): HodnotaDne[] {
+  const m = new Map<string, number>();
+  for (const e of entries) {
+    const d = denZaznamu(e);
+    if (!d || d < od || d > doD) continue;
+    m.set(d, (m.get(d) ?? 0) + rozeberZaznam(e, ted).ms);
+  }
+  const out: HodnotaDne[] = [];
+  for (let d = od, n = 0; d <= doD && n < 800; d = dayPlus(d, 1), n++) out.push({ den: d, hodnota: Math.round(((m.get(d) ?? 0) / 3600000) * 10) / 10 });
+  return out;
 }
 
 export type RazeniSouhrnu = 'hodiny' | 'mzda' | 'jmeno';

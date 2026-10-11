@@ -142,6 +142,7 @@ export const ZELENE = [
   'finance-den',
   'obdobi-graf',
   'ukoly-pohledy',
+  'widgety-zvetsit',
   'den-detail',
 ];
 

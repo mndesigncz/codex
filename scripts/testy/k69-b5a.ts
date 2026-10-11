@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs';
 import type { Testy } from './_testy.ts';
 import {
   souhrnUzaverek, rozdilKasy, trendyTrzeb, chybejiciDny, keSchvaleni, rozdilUzaverky, stavDne, bunkyMesice,
-  mojeUzaverky, denUzaverky, vObdobi, mesicPred, denVTydnu, type RadekUzaverky,
+  mojeUzaverky, denUzaverky, vObdobi, mesicPred, denVTydnu, souhrnUzaverekRozmezi, hodnotyUzaverekPoDnech, type RadekUzaverky,
 } from '../../lib/uzaverkyPrehled.ts';
 import { WIDGETY } from '../../lib/widgety/katalog/uzaverky.ts';
 import { STRANKA as VEDENI } from '../../lib/widgety/stranky/vedeni.uzaverky.ts';
@@ -129,4 +129,23 @@ export default function ({ eq, ok }: Testy) {
     .split('\n').filter(l => !/^\s*(\/\/|\*|\{\/\*)/.test(l)).join('\n');
   ok('formulář uzávěrky: bez confirm(), bez „Krok N/4" a bez vytištěného názvu ikony', !/\bconfirm\(/.test(formular) && !/Krok \{num\}/.test(formular) && !/\{p\.icon \?\? '/.test(formular));
   ok('formulář uzávěrky: jediná limetka je Odeslat uzávěrku', (formular.match(/variant="accent"/g) ?? []).length === 1);
+
+  // ---- rozmezí a graf (lišta období) ----
+  {
+    const ra = [
+      r({ date: '2026-09-20', cash_revenue: 5000, card_revenue: 3000, tips: 200 }),                  // neděle
+      r({ date: '2026-09-21', cash_revenue: 4000, card_revenue: 1000, tips: 100 }),                  // pondělí
+      r({ date: '2026-09-21', covered_by: 9, cash_revenue: 0, card_revenue: 0, self_payout: 400, closing_cash: 0 }), // pomocný řádek: jen výplata
+      r({ date: '2026-08-30', cash_revenue: 9999, card_revenue: 0 }),                                // mimo rozmezí
+    ];
+    eq('rozmezí: tržba jen z dnů v rozmezí', souhrnUzaverekRozmezi(ra, '2026-09-20', '2026-09-26').trzba, 13000);
+    eq('rozmezí: filtr na dny v týdnu (jen pondělí)', souhrnUzaverekRozmezi(ra, '2026-09-20', '2026-09-26', [0]).trzba, 5000);
+    eq('rozmezí: výplata z pomocného řádku se počítá', souhrnUzaverekRozmezi(ra, '2026-09-20', '2026-09-26').vyplaceno, 400);
+    eq('rozmezí: souhlasí s měsíčním souhrnem', souhrnUzaverekRozmezi(ra, '2026-09-01', '2026-09-30').trzba, souhrnUzaverek(ra, 'tento_mesic', dnes).trzba);
+    const g = hodnotyUzaverekPoDnech(ra, 'trzba', '2026-09-20', '2026-09-22');
+    eq('graf: tržba po dnech včetně prázdného dne', g.map(x => x.hodnota), [8000, 5000, 0]);
+    eq('graf: spropitné po dnech', hodnotyUzaverekPoDnech(ra, 'spropitne', '2026-09-20', '2026-09-21').map(x => x.hodnota), [200, 100]);
+    eq('graf: výplata po dnech (i z pomocného řádku)', hodnotyUzaverekPoDnech(ra, 'vyplaceno', '2026-09-21', '2026-09-21').map(x => x.hodnota), [400]);
+    eq('graf: skrytá tržba (role bez finance.trzby) se nepočítá', hodnotyUzaverekPoDnech([r({ date: '2026-09-20', trzbaSkryta: true })], 'trzba', '2026-09-20', '2026-09-20').map(x => x.hodnota), [0]);
+  }
 }

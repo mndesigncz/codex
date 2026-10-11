@@ -2,7 +2,7 @@
 import type { Testy } from './_testy.ts';
 import {
   VYCHOZI_FILTR, filtrujUkoly, poctyStavu, stavUkolu, odpovidaHledani, ukolyPoDnech, statistikaUkolu, splneniPodleLidi,
-  kalendarUkolu, ukolyDne, postupChecklistu, pocetFiltru, seradUkoly,
+  kalendarUkolu, ukolyDne, postupChecklistu, pocetFiltru, seradUkoly, rozborPredani, rozborRychlehoUkolu,
 } from '../../lib/ukolyFiltr.ts';
 import type { Ukol } from '../../lib/ukolyPrehled.ts';
 
@@ -90,4 +90,18 @@ export default function ({ eq, ok }: Testy) {
   eq('úkoly dne: nehotové první', ukolyDne(ukoly, DNES).map(x => x.id), [2, 8, 6]);
   eq('checklist: postup 50 %', postupChecklistu(ukoly[7]), 50);
   eq('checklist: bez bodů = null', postupChecklistu(ukoly[0]), null);
+
+  eq('předání z widgetu: stav', rozborPredani('stav:po_terminu'), { stav: 'po_terminu' });
+  eq('předání z widgetu: pohled', rozborPredani('pohled:week'), { pohled: 'week' });
+  eq('předání z widgetu: neznámé a prázdné se zahodí', [rozborPredani('stav:nesmysl'), rozborPredani('pohled:x'), rozborPredani(undefined), rozborPredani('42')], [{}, {}, {}, {}]);
+
+  // Rychlé přidání: 2026-10-07 je středa
+  eq('rychlé přidání: bez data = dnes', rozborRychlehoUkolu('Objednat mléko', DNES), { title: 'Objednat mléko', dueDate: DNES });
+  eq('rychlé přidání: zítra', rozborRychlehoUkolu('Objednat mléko zítra', DNES), { title: 'Objednat mléko', dueDate: '2026-10-08' });
+  eq('rychlé přidání: pozítří (s diakritikou i bez)', [rozborRychlehoUkolu('Úklid pozítří', DNES).dueDate, rozborRychlehoUkolu('Úklid pozitri', DNES).dueDate], ['2026-10-09', '2026-10-09']);
+  eq('rychlé přidání: v pátek (nejbližší pátek)', rozborRychlehoUkolu('Umýt okna v pátek', DNES), { title: 'Umýt okna', dueDate: '2026-10-09' });
+  eq('rychlé přidání: středa na středu je až za týden', rozborRychlehoUkolu('Inventura středa', DNES), { title: 'Inventura', dueDate: '2026-10-14' });
+  eq('rychlé přidání: za 3 dny', rozborRychlehoUkolu('Objednat kávu za 3 dny', DNES), { title: 'Objednat kávu', dueDate: '2026-10-10' });
+  eq('rychlé přidání: samotné datum zůstane názvem', rozborRychlehoUkolu('zítra', DNES), { title: 'zítra', dueDate: DNES });
+  eq('rychlé přidání: zkratky dnů (po, út, … ne) se nečtou („ne" bývá záporka), celá slova a pády ano', [rozborRychlehoUkolu('Vyrobit sirup ne', DNES).dueDate, rozborRychlehoUkolu('Vyrobit sirup v neděli', DNES).dueDate, rozborRychlehoUkolu('Vyrobit sirup nedele', DNES).dueDate], [DNES, '2026-10-11', '2026-10-11']);
 }

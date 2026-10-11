@@ -2,7 +2,7 @@
 // detail úkolu v okně (popis, kroky, kdo a kdy, Označit jako hotový), pohledy Seznam / Týden / Měsíc / Přehled
 // (měsíční kalendář s úkoly dne, graf splněno/založeno/termíny s lištou období a srovnáním), telefon 390 bez přetečení.
 import { readFileSync } from 'node:fs';
-import { kontext, konec, tvrdi, otevri, dokud, roleMine, DIR, OUT } from './k68-spolecne.mjs';
+import { kontext, konec, tvrdi, otevri, dokud, roleMine, fixtura, DIR, OUT } from './k68-spolecne.mjs';
 
 const praha = (o = 0) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now() + o * 86400000));
 const DNY = { DNES: praha(0), VCERA: praha(-1), PREDVCEREM: praha(-2), ZITRA: praha(1), POZDEJI: praha(20) };
@@ -16,6 +16,7 @@ const podvrh = (req, json, stav) => {
   const { pathname: path } = new URL(req.url()); const m = req.method();
   if (path === '/api/tasks') {
     if (m === 'PATCH') { const t = req.postDataJSON(); (stav.ukolyPatche ??= []).push(t); return json({ id: t.id, ...t }); }
+    if (m === 'POST') { stav.novyUkol = req.postDataJSON(); return json({ id: 99, ...stav.novyUkol }); }
     if (m === 'GET') {
       // Vrátí i čas založení, ať má graf „Založeno" z čeho kreslit.
       return json(nacti('k69-b6a-tasks').map((u, i) => ({ ...u, createdAt: new Date(Date.now() - (i % 4) * 86400000).toISOString() })));
@@ -77,6 +78,13 @@ for (const w of [1280, 390]) {
   await p.keyboard.press('Escape');
   tvrdi(`${w}: Escape detail zavře`, await dokud(async () => await p.getByRole('dialog').count() === 0, 3000));
 
+  // Rychlé přidání jedním řádkem: „zítra" na konci se přečte jako termín
+  const rychle = nastroj.getByRole('textbox', { name: 'Přidat úkol' });
+  await rychle.fill('Koupit citrony zítra');
+  tvrdi(`${w}: rychlé přidání ukáže přečtený termín`, await dokud(async () => /Termín:/.test(await nastroj.innerText()), 2000));
+  await rychle.press('Enter');
+  tvrdi(`${w}: Enter pošle POST s názvem bez data a s termínem zítra`, await dokud(() => stav.novyUkol?.title === 'Koupit citrony' && stav.novyUkol?.dueDate === DNY.ZITRA, 3000), JSON.stringify(stav.novyUkol));
+
   // Měsíc
   const pohledy = p.locator('[data-plocha]').getByRole('tablist', { name: 'Zobrazení' }).or(p.locator('[aria-label="Zobrazení"]')).first();
   await pohledy.getByRole('tab', { name: 'Měsíc', exact: true }).click();
@@ -135,6 +143,19 @@ for (const w of [1280, 390]) {
   tvrdi(`Z ${w}: zaměstnanec nemá Přehled (statistiky týmu patří vedení)`, await pohledy.getByRole('tab', { name: 'Přehled', exact: true }).count() === 0);
   tvrdi(`Z ${w}: bez vodorovného přetečení`, await bezPreteceni(p));
   tvrdi(`Z ${w}: bez chyb v konzoli`, chyby.length === 0, chyby.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+// Widget → Úkoly: klepnutí na „Po termínu" na Přehledu otevře Úkoly rovnou na záložce Po termínu.
+{
+  const fix = { ...fixtura('k68-rozlozeni-vedeni'), polozky: [{ id: 'po-terminu', widget: 'ukoly.po_terminu', velikost: 'S' }] };
+  const { ctx, p } = await kontext({ viewport: { width: 1280, height: 900 }, fix, dalsi: podvrh });
+  await otevri(p, '/employer/overview', 'vedeni.prehled');
+  const karta = p.locator('[data-instance="po-terminu"]');
+  await karta.waitFor({ timeout: 10000 });
+  await karta.click({ position: { x: 40, y: 60 }, force: true });
+  const stavy = p.locator('[data-plocha] li[data-widget="nastroj"]').getByRole('group', { name: 'Stav úkolů' });
+  await stavy.waitFor({ timeout: 10000 });
+  tvrdi('widget → Úkoly: záložka „Po termínu" je rovnou zapnutá', await dokud(async () => (await stavy.getByRole('button', { name: /^Po termínu/ }).getAttribute('aria-pressed')) === 'true', 4000));
   await ctx.close();
 }
 await konec();

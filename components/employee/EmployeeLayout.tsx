@@ -1,5 +1,6 @@
 'use client';
 
+import { predejUkolum } from '@/lib/ukolyFiltr';
 import { useState, useEffect } from 'react';
 import { odhlasit } from '@/lib/odhlaseni';
 import PodnikSwitcher from '../PodnikSwitcher';
@@ -102,6 +103,7 @@ export default function EmployeeLayout({ user }: Props) {
   const [settingsTab, setSettingsTab] = useState<ReturnType<typeof zalozkaNastaveni>>();
   const [settingsNonce, setSettingsNonce] = useState(0);
   const navigate = (view: string, arg?: string) => {
+    if (view === 'tasks') predejUkolum(arg);
     setSettingsTab(view === 'settings' ? zalozkaNastaveni(arg) : undefined);
     if (view === 'settings') setSettingsNonce(n => n + 1);
     setInventoryCat(view === 'inventory' ? arg : undefined);

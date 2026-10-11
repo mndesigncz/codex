@@ -307,6 +307,7 @@ const paths: Record<string, React.ReactNode> = {
     </>
   ),
   refresh: <path d="M20 12a8 8 0 0 1-14.4 4.8M4 12a8 8 0 0 1 14.4-4.8M18 4v4h-4M6 20v-4h4" />,
+  expand: <path d="M14 4h6v6m0-6-7 7M10 20H4v-6m0 6 7-7" />,
   external: <path d="M14 4h6v6m0-6-9 9M19 14v5a1.5 1.5 0 0 1-1.5 1.5h-12A1.5 1.5 0 0 1 4 19V7a1.5 1.5 0 0 1 1.5-1.5H10" />,
   inbox: <path d="M4 13V6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5V13m-16 0v4.5A2.5 2.5 0 0 0 6.5 20h11a2.5 2.5 0 0 0 2.5-2.5V13m-16 0h4.5l1.5 2.5h4L16 13H20" />,
   handover: <path d="M4 8h12l-3-3m7 11H8l3 3" />,
