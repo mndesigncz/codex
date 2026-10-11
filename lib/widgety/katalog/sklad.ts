@@ -45,7 +45,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
       { klic: 'vyroba', typ: 'prepinac', nazev: 'Včetně vlastní výroby', vychozi: false },
     ],
     kostra: { S: 'cislo', M: 'seznam', L: 'seznam' },
-    cil: { pohled: 'inventory' },
+    cil: { pohled: 'inventory', arg: 'stav:dochazi' },
     stav: 'hotovo',
   },
   // Data: GET /api/inventory →

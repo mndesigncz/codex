@@ -46,6 +46,7 @@ import StocktakeModal from '../../inventory/Stocktake';
 import { Widget, useVyrizeno, useWidget, type StavNacteni } from '../Widget';
 import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
 import { useNavigace, useSmi } from '../NavigaceKontext';
+import { skladArg } from '@/lib/skladPredani';
 
 // ---------------------------------------------------------------------------
 // Společné drobnosti
@@ -246,7 +247,8 @@ function Dochazi({ velikost, nastaveni, nahled }: WidgetProps<NastaveniDochazi>)
 
   // Odkaz vede do vybrané kategorie (Sklad ji hledá podle jména), jinak na celý sklad.
   const smiSklad = nav.smiPohled('inventory');
-  const doSkladu = (kat?: string | null) => { if (!nahled && smiSklad) nav.onNavigate('inventory', kat ?? undefined); };
+  // Widget ukazuje to, co dochází, takže se Sklad otevře rovnou s filtrem „Jen co dochází" (lib/skladPredani.ts).
+  const doSkladu = (kat?: string | null) => { if (!nahled && smiSklad) nav.onNavigate('inventory', skladArg({ kategorie: kat, jenDochazi: true })); };
 
   const prazdno = ztracena
     ? <p className="t-meta">{t('Vybraná kategorie už ve skladu není. Vyber jinou v nastavení widgetu.')}</p>

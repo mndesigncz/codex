@@ -186,6 +186,7 @@ export default function EmployerLayout({ user }: Props) {
   };
   // A quick-access tile can ask for a specific stock category.
   const [inventoryCat, setInventoryCat] = useState<string | undefined>();
+  const [inventoryN, setInventoryN] = useState(0);
   // Proklik ze skladu do konkrétní receptury: „tahle surovina se používá v
   // Blue Lagoon" → jedno kliknutí a jsi v jeho receptuře.
   const [recipeProduct, setRecipeProduct] = useState<string | undefined>();
@@ -221,6 +222,7 @@ export default function EmployerLayout({ user }: Props) {
   const naviguj = (view: string, arg?: string) => {
     if (view === 'tasks') predejUkolum(arg);
     setInventoryCat(view === 'inventory' ? arg : undefined);
+    if (view === 'inventory') setInventoryN(n => n + 1);
     setRecipeProduct(view === 'recipes' ? arg : undefined);
     setChatConvId(view === 'chat' && arg ? Number(arg) : null);
     setGuideId(view === 'guides' && arg ? Number(arg) : null);
@@ -273,7 +275,7 @@ export default function EmployerLayout({ user }: Props) {
       case 'overview':  return <EmployerDashboard user={user} />;
       // Výměny a žádosti o volno jsou od kola 69 widgety plochy Rozvrhu.
       case 'shifts':    return <ScheduleBuilder user={user as any} onNavigate={navigate} />;
-      case 'inventory': return <Inventory user={user as any} initialCategory={inventoryCat} onNavigate={navigate} />;
+      case 'inventory': return <Inventory user={user as any} initialCategory={inventoryCat} predaniN={inventoryN} onNavigate={navigate} />;
       // Menu je plocha s vlastní hlavičkou a odsazením (kolo 69).
       case 'menu':      return <MenuEditor />;
       case 'recipes':   return <RecipesView openProductId={recipeProduct} onNavigate={navigate} />;
