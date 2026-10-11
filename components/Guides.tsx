@@ -425,7 +425,7 @@ export default function Guides({ user, ticksFor, openGuideId, zaKoho, vyberKoho 
               );
             }
             return (
-              <ListRow key={g.id} className="relative"
+              <ListRow key={g.id} className="relative" akceVRadku
                 // Řádek má „···", takže celý klikací být nemůže (tlačítko v tlačítku) — čtečku otevře název.
                 // Cíl je celý řádek: ::after tlačítka se roztáhne přes <li className="relative">
                 // (samotný text měřil na telefonu ~20 px; tap-target i -my ořízne `truncate` obalu).

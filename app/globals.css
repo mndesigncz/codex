@@ -346,6 +346,8 @@ button:where(.list-row-tap) { margin: 0 -0.5rem; padding-left: 0.5rem; padding-r
      „···" zůstane vedle ní. */
   .list-actions:only-child { flex: 1 1 auto; }
   .list-actions:only-child > :first-child { flex: 1 1 auto; }
+  /* Akce mimo ocas (ListRow akceVRadku) zůstávají v prvním řádku vedle názvu. */
+  .list-actions-radek { order: 0; }
 }
 
 /* ---------- Typografická škála ----------

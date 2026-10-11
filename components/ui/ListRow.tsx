@@ -15,7 +15,7 @@ import { Icon } from '../Icons';
 
 export function ListRow({
   lead, title, meta, detail, value, valueMeta, aside, actions, right,
-  onClick, href, chevron, className = '', as,
+  onClick, href, chevron, className = '', as, akceVRadku = false,
 }: {
   lead?: React.ReactNode;
   title: React.ReactNode;
@@ -38,12 +38,16 @@ export function ListRow({
   chevron?: boolean;
   className?: string;
   as?: 'li' | 'div';
+  /** Na telefonu zůstanou akce v prvním řádku vedle názvu (jen ikonové „···"); chip ze `right` jde pod ně.
+   *  Bez toho je u řádku s chipem a menu druhý řádek jen kvůli jedné ikoně. Číslo (`value`) ocas řeší samo. */
+  akceVRadku?: boolean;
 }) {
   const interactive = !!(onClick || href);
   const Tag = (as ?? 'li') as any;
   const maCislo = value != null || valueMeta != null;
   const maOcas = maCislo || aside != null || !!right || !!actions;
   const jenDoplnek = aside != null && !maCislo && !right && !actions;
+  const akceMimoOcas = akceVRadku && !maCislo && !!actions && !!right;
   const inner = (
     <>
       {lead && <span className="shrink-0 flex items-center">{lead}</span>}
@@ -77,8 +81,9 @@ export function ListRow({
             Naměřeno: 768 px → jméno 0 px, 1024 px → 250 px. */}
         {aside != null && <span className="list-aside shrink-0 hidden lg:block text-[13px] text-black/55">{aside}</span>}
         {right && <span className="shrink-0 flex items-center gap-2 text-right">{right}</span>}
-        {actions && <span className="list-actions shrink-0">{actions}</span>}
+        {actions && !akceMimoOcas && <span className="list-actions shrink-0">{actions}</span>}
       </span>}
+      {akceMimoOcas && <span className="list-actions list-actions-radek shrink-0">{actions}</span>}
       {/* Šipka stojí v DOM za ocasem (na počítači je tak poslední sloupec),
           ale na telefonu ji globals.css posune `order` před ocas — sedí
           vedle názvu a ocas se odlomí až pod ni. */}
