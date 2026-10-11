@@ -21,7 +21,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['zamestnanec.domu', 'zamestnanec.ukoly', 'vedeni.navody', 'zamestnanec.navody'],
     opravneni: { vse: ['navody.zobrazit'], nektere: [] },
     tarif: 'zdarma',
-    cil: { pohled: 'guides' },
+    cil: { pohled: 'guides', arg: 'stav:kprecteni' },
     stav: 'hotovo',
   },
   // Data: GET /api/guides/ctenari → guides[{id,title,precetlo,celkem,neprecetli[]}] (kolo 69: jeden
@@ -79,7 +79,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['vedeni.navody'],
     opravneni: { vse: ['navody.schvalovat'], nektere: [] },
     tarif: 'zdarma',
-    cil: { pohled: 'guides' },
+    cil: { pohled: 'guides', arg: 'stav:navrhy' },
     stav: 'hotovo',
   },
   // Data: GET /api/guides → guides[forClosing=true && approved]
@@ -95,7 +95,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['zamestnanec.uzaverka', 'vedeni.navody', 'zamestnanec.navody'],
     opravneni: { vse: ['navody.zobrazit'], nektere: [] },
     tarif: 'zdarma',
-    cil: { pohled: 'guides' },
+    cil: { pohled: 'guides', arg: 'stav:kprecteni' },
     stav: 'hotovo',
   },
 ];

@@ -199,6 +199,8 @@ export default function EmployerLayout({ user }: Props) {
   // návodů a hledal ten svůj znovu ručně. Teď na něj míří i úkol „Vyrobit X“,
   // takže mrtvý odkaz by byl vidět mnohem víc.
   const [guideId, setGuideId] = useState<number | null>(null);
+  // Filtr Návodů z widgetu (`stav:kprecteni`, `stav:navrhy`); `n` se zvedne při každém příchodu.
+  const [guideFiltr, setGuideFiltr] = useState<{ stav?: 'kprecteni' | 'navrhy'; n: number }>({ n: 0 });
   // Z přehledu organizace do konkrétního podniku: přepnout členství na
   // serveru a načíst znovu — stejná cesta jako přepínač v hlavičce.
   // Stejná cesta jako v přepínači: koncepty starého podniku pryč, token
@@ -225,7 +227,8 @@ export default function EmployerLayout({ user }: Props) {
     if (view === 'inventory') setInventoryN(n => n + 1);
     setRecipeProduct(view === 'recipes' ? arg : undefined);
     setChatConvId(view === 'chat' && arg ? Number(arg) : null);
-    setGuideId(view === 'guides' && arg ? Number(arg) : null);
+    setGuideId(view === 'guides' && arg && /^\d+$/.test(arg) ? Number(arg) : null);
+    if (view === 'guides') setGuideFiltr(f => ({ stav: arg === 'stav:kprecteni' ? 'kprecteni' : arg === 'stav:navrhy' ? 'navrhy' : undefined, n: f.n + 1 }));
     // Konkrétní postup (zamčená uzávěrka, widget) — detail se otevře, až se Postupy připojí.
     if (view === 'procedures' && arg && /^\d+$/.test(arg)) otevriPostupPoPrechodu(Number(arg));
     // Rada, která říká „nastav to v Nastavení → Pokladna", musí umět
@@ -281,7 +284,7 @@ export default function EmployerLayout({ user }: Props) {
       case 'recipes':   return <RecipesView openProductId={recipeProduct} onNavigate={navigate} />;
       case 'chat':      return <ChatView user={user as any} openConversationId={chatConvId} />;
       case 'procedures': return <Procedures user={user as any} />;
-      case 'guides':    return <Guides user={user as any} openGuideId={guideId} />;
+      case 'guides':    return <Guides user={user as any} openGuideId={guideId} predani={guideFiltr} />;
       case 'planning':  return <PlanningBoard />;
       case 'events':    return <EventsView user={user as any} />;
       case 'tasks':     return <TaskManager user={user as any} />;
