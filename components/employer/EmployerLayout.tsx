@@ -1,6 +1,7 @@
 'use client';
 
 import { predejUkolum } from '@/lib/ukolyFiltr';
+import { GlobalniHledani, useZkratkaHledani } from '../GlobalniHledani';
 import { useSession } from 'next-auth/react';
 
 import { useState, useEffect } from 'react';
@@ -19,7 +20,7 @@ import EmployerDashboard from './EmployerDashboard';
 
 import ReceiptsPanel from './ReceiptsPanel';
 import MobileMoreSheet from '../MobileMoreSheet';
-import { ProfileLinkProvider } from './ProfileLinkProvider';
+import { ProfileLinkProvider, usePersonProfile } from './ProfileLinkProvider';
 import { usePlan, MaxGate } from '../Pro';
 import { useObal } from '../ObalProvider';
 import { TRIAL_DAYS } from '@/lib/plan';
@@ -116,6 +117,16 @@ interface Props {
   user: { name?: string | null; email?: string | null; id?: string; role?: string; avatar?: string; superadmin?: boolean };
 }
 
+/** Hledání uvnitř ProfileLinkProvideru (kvůli otevření profilu člověka). */
+function HledaniVedeni({ otevreno, zavrit, stranky, onStranka, ukoly, sklad, lide }: {
+  otevreno: boolean; zavrit: () => void; stranky: { id: string; label: string; icon: string }[]; onStranka: (id: string, arg?: string) => void;
+  ukoly: boolean; sklad: boolean; lide: boolean;
+}) {
+  const otevriProfil = usePersonProfile();
+  return <GlobalniHledani open={otevreno} onClose={zavrit} stranky={stranky} onStranka={onStranka} hledatUkoly={ukoly} hledatSklad={sklad}
+    hledatLidi={lide && !!otevriProfil} onOsoba={otevriProfil ?? undefined} />;
+}
+
 export default function EmployerLayout({ user }: Props) {
   const { plan: planPodniku } = usePlan();
   // V obalu žádné bannery o tarifu, zkoušce a platbě (Apple 3.1.1): plán se tváří jako neznámý.
@@ -129,6 +140,8 @@ export default function EmployerLayout({ user }: Props) {
   const nav = useNavigaceAplikace('vedeni', smiPohled, [opravneni, nacteno]);
   const [jazykOpen, setJazykOpen] = useState(false);
   const [currentView, setCurrentViewRaw] = useState('overview');
+  // Globální hledání: Ctrl/⌘ K, ikona v hlavičce (od tabletu výš) a řádek „Hledat" v nabídce Více na telefonu.
+  const { otevreno: hledaniOtevreno, setOtevreno: setHledani } = useZkratkaHledani();
   // Rozepsaná role v Nastavení (editor sedí na stránce, ne v okně): přechod
   // na jiný pohled nebo do jiného režimu ji odmontuje, takže se nejdřív
   // zeptá. Přechod na tentýž pohled nic neodmontuje, ten projde rovnou.
@@ -493,6 +506,10 @@ export default function EmployerLayout({ user }: Props) {
           {/* Sekce skrytá v nastavení podniku, otevřená odkazem nebo widgetem: jedna
               informace, žádné okno. Skrytí je preference, ne zákaz. */}
           {jeSkryty && <Chip tone="muted" size="sm" className="shrink-0">{t('Skrytá sekce')}</Chip>}
+          <button type="button" onClick={() => setHledani(true)} title={t('Hledat v aplikaci (Ctrl K)')} aria-label={t('Hledat v aplikaci')} aria-haspopup="dialog"
+            className="tap-target-sm hidden md:inline-flex shrink-0 rounded-full p-2 text-black/45 hover:text-black hover:bg-black/[0.05] transition-colors">
+            <Icon name="search" size={20} />
+          </button>
           {ma(UCTENKY) && (
           <button onClick={() => setReceiptsOpen(true)} title={t('Účtenky')} aria-label={t('Účtenky')}
             className="tap-target-sm shrink-0 rounded-full p-2 text-black/45 hover:text-black hover:bg-black/[0.05] transition-colors">
@@ -591,6 +608,7 @@ export default function EmployerLayout({ user }: Props) {
         activeId={currentView}
         onSelect={setCurrentView}
         actions={[
+          { label: t('Hledat'), icon: 'search', onClick: () => { setMoreOpen(false); setHledani(true); } },
           { label: t('Nastavení'), icon: 'settings', onClick: openSettings },
           ...(smiTym ? [{ label: t('Nastavení týmu'), icon: 'users', onClick: openTeam }] : []),
           { label: `${t('Jazyk')}: ${JAZYK_NAZEV[jazyk]}`, icon: 'globe', onClick: () => { setMoreOpen(false); setJazykOpen(true); } },
@@ -600,6 +618,8 @@ export default function EmployerLayout({ user }: Props) {
           { label: t('Odhlásit se'), icon: 'logout', onClick: () => odhlasit({ callbackUrl: '/login' }), danger: true },
         ]}
       />
+      <HledaniVedeni otevreno={hledaniOtevreno} zavrit={() => setHledani(false)} stranky={nav.vse} onStranka={navigate}
+        ukoly={smiPohled('tasks')} sklad={smiPohled('inventory')} lide={ma('tym.profil')} />
       <JazykOkno open={jazykOpen} onClose={() => setJazykOpen(false)} />
     </div>
     </ProfileLinkProvider>

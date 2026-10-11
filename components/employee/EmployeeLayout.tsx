@@ -1,6 +1,7 @@
 'use client';
 
 import { predejUkolum } from '@/lib/ukolyFiltr';
+import { GlobalniHledani, useZkratkaHledani } from '../GlobalniHledani';
 import { useState, useEffect } from 'react';
 import { odhlasit } from '@/lib/odhlaseni';
 import PodnikSwitcher from '../PodnikSwitcher';
@@ -116,6 +117,7 @@ export default function EmployeeLayout({ user }: Props) {
     setCurrentView(view);
   };
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const { otevreno: hledaniOtevreno, setOtevreno: setHledani } = useZkratkaHledani();
   // Chat byl na telefonu jediná ikona v docku, která nikdy nedala vědět,
   // že něco přišlo. Sklad hlásil „3", Docházka „2", chat mlčel — takže
   // nebyl důvod na něj ťuknout.
@@ -264,6 +266,10 @@ export default function EmployeeLayout({ user }: Props) {
           </div>
           {/* Sekce skrytá v nastavení podniku, otevřená odkazem nebo widgetem: preference, ne zákaz. */}
           {jeSkryty && <Chip tone="muted" size="sm" className="shrink-0">{t('Skrytá sekce')}</Chip>}
+          <button type="button" onClick={() => setHledani(true)} title={t('Hledat v aplikaci (Ctrl K)')} aria-label={t('Hledat v aplikaci')} aria-haspopup="dialog"
+            className="tap-target-sm hidden md:inline-flex shrink-0 rounded-full p-2 text-black/45 hover:text-black hover:bg-black/[0.05] transition-colors">
+            <Icon name="search" size={20} />
+          </button>
           <NotificationBell />
         </header>
 
@@ -311,11 +317,14 @@ export default function EmployeeLayout({ user }: Props) {
         activeId={currentView}
         onSelect={setCurrentView}
         actions={[
+          { label: t('Hledat'), icon: 'search', onClick: () => { setMoreOpen(false); setHledani(true); } },
           { label: t('Nastavení'), icon: 'settings', onClick: openSettings },
           { label: `${t('Jazyk')}: ${JAZYK_NAZEV[jazyk]}`, icon: 'globe', onClick: () => { setMoreOpen(false); setJazykOpen(true); } },
           { label: t('Odhlásit se'), icon: 'logout', onClick: () => odhlasit({ callbackUrl: '/login' }), danger: true },
         ]}
       />
+      <GlobalniHledani open={hledaniOtevreno} onClose={() => setHledani(false)} stranky={nav.vse} onStranka={navigate}
+        hledatUkoly={smiPohled('tasks')} hledatSklad={smiPohled('inventory')} />
       <JazykOkno open={jazykOpen} onClose={() => setJazykOpen(false)} />
     </div>
     </NavigaceKontext.Provider>

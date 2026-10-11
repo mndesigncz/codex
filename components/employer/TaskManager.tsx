@@ -139,6 +139,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
     const pouzij = (arg: string | null) => {
       const r = rozborPredani(arg);
       if (r.stav) { setFiltr(f => ({ ...f, stav: r.stav! })); setView('list'); }
+      if (r.ukolId != null) { setView('list'); setFiltr(VYCHOZI_FILTR); setDetailId(r.ukolId); }
       if (r.pohled) setView(r.pohled);
     };
     const a = cerstvePredani();

@@ -1532,5 +1532,8 @@
   "Nic nevyhovuje filtrům": "Nichts passt zu den Filtern",
   "Zkus jiný stav, hledání nebo zruš filtry.": "Probiere einen anderen Status oder eine andere Suche oder setze die Filter zurück.",
   "V tomto období nejsou žádné záznamy docházky.": "In diesem Zeitraum gibt es keine Anwesenheitseinträge.",
-  "Úkol je odložený na {den}.": "Aufgabe auf {den} verschoben."
+  "Úkol je odložený na {den}.": "Aufgabe auf {den} verschoben.",
+  "Hledat v aplikaci (Ctrl K)": "In der App suchen (Strg K)",
+  "Hledat v aplikaci": "In der App suchen",
+  "Hledat": "Suchen"
 }

@@ -1532,5 +1532,8 @@
   "Nic nevyhovuje filtrům": "Nothing matches the filters",
   "Zkus jiný stav, hledání nebo zruš filtry.": "Try another status or search, or clear the filters.",
   "V tomto období nejsou žádné záznamy docházky.": "There are no attendance records in this period.",
-  "Úkol je odložený na {den}.": "Task postponed to {den}."
+  "Úkol je odložený na {den}.": "Task postponed to {den}.",
+  "Hledat v aplikaci (Ctrl K)": "Search the app (Ctrl K)",
+  "Hledat v aplikaci": "Search the app",
+  "Hledat": "Search"
 }

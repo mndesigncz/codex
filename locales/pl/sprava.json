@@ -1532,5 +1532,8 @@
   "Nic nevyhovuje filtrům": "Nic nie pasuje do filtrów",
   "Zkus jiný stav, hledání nebo zruš filtry.": "Spróbuj innego statusu lub wyszukiwania albo wyczyść filtry.",
   "V tomto období nejsou žádné záznamy docházky.": "W tym okresie nie ma zapisów obecności.",
-  "Úkol je odložený na {den}.": "Zadanie przełożone na {den}."
+  "Úkol je odložený na {den}.": "Zadanie przełożone na {den}.",
+  "Hledat v aplikaci (Ctrl K)": "Szukaj w aplikacji (Ctrl K)",
+  "Hledat v aplikaci": "Szukaj w aplikacji",
+  "Hledat": "Szukaj"
 }
