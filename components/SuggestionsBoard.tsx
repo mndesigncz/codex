@@ -239,7 +239,7 @@ export default function SuggestionsBoard() {
               const mine = meId != null && s.authorId === meId;
               const polozky = akce(s);
               return (
-                <li key={s.id} className="list-row items-start">
+                <li key={s.id} className="list-row items-start flex-wrap">
                   <Hlas podnet={s} onClick={() => void toggleVote(s)} zamceno={!pridava} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
@@ -252,15 +252,17 @@ export default function SuggestionsBoard() {
                       <span className="truncate min-w-0">{s.authorName ?? t('Neznámý')}{mine ? ' (ty)' : ''}</span>
                       {relDate(s.createdAt, t, loc) && <><span aria-hidden className="text-black/40">·</span><span className="whitespace-nowrap">{relDate(s.createdAt, t, loc)}</span></>}
                     </p>
-                    {/* Posun podnětu — jen kdo podněty spravuje (server to tak pustí). */}
-                    {spravuje && (
-                      <div className="mt-3">
-                        <Segmented size="sm" ariaLabel={t('Stav podnětu {nazev}', { nazev: s.title })} value={(statusFlow(t).some(x => x.id === s.status) ? s.status : 'new') as IdStavu}
-                          onChange={v => void setStatus(s, v)} options={statusFlow(t).map(x => ({ id: x.id, label: x.label }))} />
-                      </div>
-                    )}
                   </div>
                   {polozky.length > 0 && <Menu size="sm" label={t('Další akce: {nazev}', { nazev: s.title })} items={polozky} className="shrink-0 -my-1" />}
+                  {/* Posun podnětu — jen kdo podněty spravuje (server to tak pustí). Přes celou šířku
+                      řádku, ne v úzkém sloupci vedle hlasu: čtyři stavy se tam nevešly a „Hotovo" a
+                      „Zamítnout" byly za okrajem. */}
+                  {spravuje && (
+                    <div className="basis-full min-w-0">
+                      <Segmented size="sm" ariaLabel={t('Stav podnětu {nazev}', { nazev: s.title })} value={(statusFlow(t).some(x => x.id === s.status) ? s.status : 'new') as IdStavu}
+                        onChange={v => void setStatus(s, v)} options={statusFlow(t).map(x => ({ id: x.id, label: x.label }))} />
+                    </div>
+                  )}
                 </li>
               );
             })}
