@@ -47,7 +47,7 @@ import { useMoney } from '../../CurrencyProvider';
 import { Icon } from '../../Icons';
 import { otevriDen } from '@/lib/denUdalost';
 import { BarSpark, Button, CasovyGraf, Chip, ListRow, ObdobiLista, Segmented, Stat, StatRow } from '../../ui';
-import { agreguj, hrubostProRozmezi, jeVybranyDen, obdobiZPresetu, pocetDni, platneRozmezi, predchoziRozmezi, souhrn as souhrnObdobi, zmenaPct, type Obdobi, type Slot } from '@/lib/obdobi';
+import { agreguj, hrubostProRozmezi, type HodnotaDne, jeVybranyDen, obdobiZPresetu, pocetDni, platneRozmezi, predchoziRozmezi, souhrn as souhrnObdobi, zmenaPct, type Obdobi, type Slot } from '@/lib/obdobi';
 import { useObdobi } from '@/lib/useObdobi';
 import { useUlozeno } from '@/lib/useUlozeno';
 import { useOpravneni } from '../../role/useOpravneni';
@@ -446,10 +446,9 @@ function PoDnech({ velikost, nastaveni }: WidgetProps<{ obdobi: string; zdroj: s
   const vychozi = useMemo(() => obdobiZNastaveni(nastaveni.obdobi, mesicStranky), [nastaveni.obdobi, mesicStranky]);
   const { obdobi, nastav } = useObdobi(`po_dnech-${instance}`, vychozi);
   const r = platneRozmezi(obdobi, dnes);
-  const nDni = pocetDni(r.od, r.do);
   const pred = predchoziRozmezi(r.od, r.do);
-  const [druh, setDruh] = useUlozeno<'sloupce' | 'cara'>('trzby-druh', 'sloupce', ['sloupce', 'cara']);
-  const [porovnat, setPorovnat] = useUlozeno<boolean>('trzby-porovnat', false);
+  // Srovnání s předchozím obdobím je ve výchozím stavu zapnuté (jako v Toast a Shopify): číslo bez srovnání nic neříká.
+  const [porovnat, setPorovnat] = useUlozeno<boolean>('trzby-porovnat-2', true);
   const chcePorovnani = L && porovnat;
 
   const pos = useDataWidgetu(ok && !chceUzaverky ? urlTrzeb(r.od, r.do) : null, vyberDenniPokladnu);
@@ -459,13 +458,14 @@ function PoDnech({ velikost, nastaveni }: WidgetProps<{ obdobi: string; zdroj: s
   const kal = useKalendareUzaverek(mesiceRozmezi(r.od, r.do), zUzaverek);
   const kalPred = useKalendareUzaverek(mesiceRozmezi(pred.od, pred.do), zUzaverek && chcePorovnani);
 
-  const hodnoty = useMemo(() => {
-    if (zUzaverek) return kal.data ? dnyObdobi(r.od, r.do).map(den => ({ den, hodnota: kal.data![den] ?? 0 })) : null;
+  // Hotová jsou jen data pro právě zvolené rozmezí: při změně období hook chvíli drží stará data s příznakem loading.
+  const hodnotyNow = useMemo(() => {
+    if (zUzaverek) return kal.data && !kal.loading ? dnyObdobi(r.od, r.do).map(den => ({ den, hodnota: kal.data![den] ?? 0 })) : null;
     const p = pos.data;
-    if (!p || !p.propojeno) return null;
+    if (!p || pos.loading || !p.propojeno) return null;
     const m = new Map(p.dny.map(x => [x.day, x.total]));
     return dnyObdobi(r.od, r.do).map(den => ({ den, hodnota: m.get(den) ?? 0 }));
-  }, [zUzaverek, kal.data, pos.data, r.od, r.do]);
+  }, [zUzaverek, kal.data, kal.loading, pos.data, pos.loading, r.od, r.do]);
   const hodnotyPred = useMemo(() => {
     if (!chcePorovnani) return null;
     if (zUzaverek) return kalPred.data ? dnyObdobi(pred.od, pred.do).map(den => ({ den, hodnota: kalPred.data![den] ?? 0 })) : null;
@@ -475,16 +475,29 @@ function PoDnech({ velikost, nastaveni }: WidgetProps<{ obdobi: string; zdroj: s
     return dnyObdobi(pred.od, pred.do).map(den => ({ den, hodnota: m.get(den) ?? 0 }));
   }, [chcePorovnani, zUzaverek, kalPred.data, posPred.data, pred.od, pred.do]);
 
-  const hr = hrubostProRozmezi(obdobi, nDni);
-  const sloty: Slot[] = useMemo(() => (hodnoty ? agreguj(hodnoty, r.od, r.do, hr, obdobi.dnyTydne) : []), [hodnoty, r.od, r.do, hr, obdobi.dnyTydne]);
-  const slotyPred: Slot[] | null = useMemo(() => (hodnotyPred ? agreguj(hodnotyPred, pred.od, pred.do, hr, obdobi.dnyTydne) : null), [hodnotyPred, pred.od, pred.do, hr, obdobi.dnyTydne]);
-  const sum = useMemo(() => (hodnoty ? souhrnObdobi(hodnoty, r.od, r.do, obdobi.dnyTydne, dnes) : null), [hodnoty, r.od, r.do, obdobi.dnyTydne, dnes]);
-  const sumPred = useMemo(() => (hodnotyPred ? souhrnObdobi(hodnotyPred, pred.od, pred.do, obdobi.dnyTydne, dnes) : null), [hodnotyPred, pred.od, pred.do, obdobi.dnyTydne, dnes]);
+  // Když se období změní, nová data se načítají: do jejich příchodu zůstane vidět předchozí graf (ztlumený). Kdyby se
+  // místo něj ukázala kostra, lišta období i s oknem otevřeným uprostřed volby by zmizela a okno se zavřelo.
+  const [drzene, setDrzene] = useState<{ od: string; do: string; hodnoty: HodnotaDne[] } | null>(null);
+  useEffect(() => { if (hodnotyNow) setDrzene({ od: r.od, do: r.do, hodnoty: hodnotyNow }); }, [hodnotyNow, r.od, r.do]);
+  const cekaNaNova = !hodnotyNow && !!drzene;
+  const hodnoty = hodnotyNow ?? drzene?.hodnoty ?? null;
+  const rv = hodnotyNow || !drzene ? r : { od: drzene.od, do: drzene.do };
+  const nDniV = pocetDni(rv.od, rv.do);
+  const predV = predchoziRozmezi(rv.od, rv.do);
+  const hodnotyPredV = hodnotyNow ? hodnotyPred : null;
+
+  const hr = hrubostProRozmezi(obdobi, nDniV);
+  const sloty: Slot[] = useMemo(() => (hodnoty ? agreguj(hodnoty, rv.od, rv.do, hr, obdobi.dnyTydne) : []), [hodnoty, rv.od, rv.do, hr, obdobi.dnyTydne]);
+  const slotyPred: Slot[] | null = useMemo(() => (hodnotyPredV ? agreguj(hodnotyPredV, predV.od, predV.do, hr, obdobi.dnyTydne) : null), [hodnotyPredV, predV.od, predV.do, hr, obdobi.dnyTydne]);
+  const sum = useMemo(() => (hodnoty ? souhrnObdobi(hodnoty, rv.od, rv.do, obdobi.dnyTydne, dnes) : null), [hodnoty, rv.od, rv.do, obdobi.dnyTydne, dnes]);
+  const sumPred = useMemo(() => (hodnotyPredV ? souhrnObdobi(hodnotyPredV, predV.od, predV.do, obdobi.dnyTydne, dnes) : null), [hodnotyPredV, predV.od, predV.do, obdobi.dnyTydne, dnes]);
   const zmena = sum && sumPred ? zmenaPct(sum.soucet, sumPred.soucet) : null;
   // Dny pro přehledy pod grafem (jen vybrané dny v týdnu, jen do dneška).
   const dnyPrehled: DenTrzby[] = useMemo(() => (hodnoty ?? []).filter(x => jeVybranyDen(x.den, obdobi.dnyTydne)).map(x => ({ den: x.den, trzba: x.hodnota })), [hodnoty, obdobi.dnyTydne]);
 
-  const nacteni = ceka ? CEKA : zUzaverek ? [kal] : [pos, posPred];
+  // Srovnání s předchozím obdobím widget nikdy nezdržuje (když dorazí později, jen se doplní), a po prvním načtení se
+  // místo kostry drží poslední graf — jinak by se lišta období s otevřeným oknem při každé změně rozmezí odmontovala.
+  const nacteni = ceka ? CEKA : drzene && !(zUzaverek ? kal.error : pos.error) ? [] : zUzaverek ? [kal] : [pos];
   const naFinancich = useNaFinancich();
   const prazdno = !zUzaverek && pos.data?.propojeno === false ? <NepropojenaPokladna /> : undefined;
 
@@ -496,7 +509,7 @@ function PoDnech({ velikost, nastaveni }: WidgetProps<{ obdobi: string; zdroj: s
   const popisekOsy = (sl: Slot) => hr === 'den' ? (sloty.length <= 10 ? pismenoDne(sl.klic) : String(Number(sl.klic.slice(8))))
     : hr === 'tyden' ? kratceDatum(sl.od) : new Date(`${sl.klic}-01T12:00:00`).toLocaleDateString(loc, { month: 'short' });
   const kratce = (v: number) => (v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1).replace('.', ',')} M` : v >= 10_000 ? `${Math.round(v / 1000)}k` : v >= 1000 ? `${(v / 1000).toFixed(1).replace('.', ',')}k` : String(Math.round(v)));
-  const popisObdobi = r.od === r.do ? kratceDatum(r.od) : `${kratceDatum(r.od)} – ${kratceDatum(r.do)}`;
+  const popisObdobi = rv.od === rv.do ? kratceDatum(rv.od) : `${kratceDatum(rv.od)} – ${kratceDatum(rv.do)}`;
 
   const vyber = (sl: Slot) => {
     if (hr === 'den') { otevriDen(sl.klic, 'finance'); return; }
@@ -508,29 +521,21 @@ function PoDnech({ velikost, nastaveni }: WidgetProps<{ obdobi: string; zdroj: s
     <Widget bezZkraceni={L} nacteni={nacteni} kostra="graf" prazdno={prazdno}
       odkaz={nastaveni.zdroj === 'uzaverky' || zUzaverek ? { popisek: t('Uzávěrky'), pohled: 'reports' } : naFinancich ? undefined : { popisek: t('Finance'), pohled: 'finance' }}>
       {hodnoty && sum && (
-        <div className="space-y-4">
-          {L && !nahled && <ObdobiLista value={obdobi} onChange={nastav} />}
+        <div className={`space-y-4 transition-opacity ${cekaNaNova ? 'opacity-60' : ''}`} aria-busy={cekaNaNova || undefined}>
+          {L && !nahled && <ObdobiLista value={obdobi} onChange={nastav} porovnat={porovnat} onPorovnat={setPorovnat} />}
           <div>
             <Stat label={L ? t('Tržba za období') : popisObdobi} value={money(sum.soucet)}
               note={[zUzaverek ? t('z uzávěrek') : t('z pokladny'), sum.prumer > 0 ? t('průměr {castka} za den', { castka: money(sum.prumer) }) : ''].filter(Boolean).join(' · ')} />
             {L && zmena != null && (
               <p className="t-meta mt-2 text-pretty">
                 <Chip tone={zmena >= 0 ? 'ok' : 'wait'} size="sm">{zmena > 0 ? '+' : ''}{zmena} %</Chip>{' '}
-                {t('proti předchozím {n, plural, one {# dni} other {# dnům}}', { n: nDni })} ({money(sumPred!.soucet)})
+                {t('proti předchozím {n, plural, one {# dni} other {# dnům}}', { n: nDniV })} ({money(sumPred!.soucet)})
               </p>
             )}
           </div>
           {L ? (
             <div className="space-y-2">
-              {!nahled && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <Segmented size="sm" ariaLabel={t('Druh grafu')} value={druh} onChange={setDruh}
-                    options={[{ id: 'sloupce', label: t('Sloupce') }, { id: 'cara', label: t('Čára') }]} />
-                  <button type="button" aria-pressed={porovnat} onClick={() => setPorovnat(!porovnat)}
-                    className={`filter-pill tap-target-sm ${porovnat ? 'seg-on' : 'seg-off glass'}`}>{t('Porovnat s předchozím obdobím')}</button>
-                </div>
-              )}
-              <CasovyGraf sloty={sloty} porovnani={porovnat ? slotyPred : null} druh={druh} vyska={190}
+              <CasovyGraf sloty={sloty} porovnani={porovnat ? slotyPred : null} druh="sloupce" vyska={190}
                 format={money} kratce={kratce} jmenoSlotu={jmenoSlotu} popisekOsy={popisekOsy} zvyraznit={dnesKlic}
                 popisekPorovnani={t('předchozí období')} onVyber={nahled ? undefined : vyber}
                 label={t('Tržba po dnech: {obdobi}', { obdobi: popisObdobi })} />

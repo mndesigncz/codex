@@ -30,8 +30,7 @@ export function UkolyPrehled({ ukoly, dnes, lidi = false, onOtevri }: {
   const loc = aktualniJazyk();
   const { obdobi, nastav } = useObdobi('ukoly-prehled', obdobiZPresetu('30_dni', dnes));
   const [metrika, setMetrika] = useUlozeno<MetrikaUkolu>('ukoly-metrika', 'splneno', METRIKY);
-  const [druh, setDruh] = useUlozeno<'sloupce' | 'cara'>('ukoly-druh', 'sloupce', ['sloupce', 'cara']);
-  const [porovnat, setPorovnat] = useUlozeno<boolean>('ukoly-porovnat', false);
+  const [porovnat, setPorovnat] = useUlozeno<boolean>('ukoly-porovnat-2', true);
   const [vybrany, setVybrany] = useState<Slot | null>(null);
 
   const r = platneRozmezi(obdobi, dnes);
@@ -69,36 +68,30 @@ export function UkolyPrehled({ ukoly, dnes, lidi = false, onOtevri }: {
       .sort((a, b) => den(a).localeCompare(den(b)) || a.id - b.id);
   }, [vybrany, ukoly, metrika, obdobi.dnyTydne]);
 
+  const zmenaSplneno = porovnat ? zmenaPct(stat.splneno, statPred.splneno) : null;
   const pct = (v: number | null) => (v == null ? '–' : `${v} %`);
 
   return (
     <div className="space-y-4">
-      <ObdobiLista value={obdobi} onChange={o => { setVybrany(null); nastav(o); }} />
+      <ObdobiLista value={obdobi} onChange={o => { setVybrany(null); nastav(o); }} porovnat={porovnat} onPorovnat={setPorovnat} />
 
       <Card>
         <StatRow>
-          <Stat label={t('Splněno')} value={stat.splneno} note={statPred.splneno > 0 || stat.splneno > 0 ? t('v předchozím období {n}', { n: statPred.splneno }) : undefined} />
-          <Stat label={t('Založeno')} value={stat.zalozeno} />
-          <Stat label={t('Splněno v termínu')} value={pct(stat.vTerminuPct)} note={t('ze splněných s termínem')} />
-          <Stat label={t('Úspěšnost')} value={pct(stat.uspesnostPct)} note={t('hotové z úkolů po termínu')} />
+          <Stat label={t('Splněno')} value={stat.splneno}
+            note={porovnat && zmenaSplneno != null ? `${zmenaSplneno > 0 ? '+' : ''}${zmenaSplneno} % ${t('proti předchozímu období')}` : undefined} />
+          <Stat label={t('Splněno v termínu')} value={pct(stat.vTerminuPct)} note={t('z těch s termínem')} />
           <Stat label={t('Po termínu teď')} value={stat.poTerminu} tone={stat.poTerminu > 0 ? 'bad' : 'muted'} />
         </StatRow>
       </Card>
 
       <Card className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <Segmented size="sm" ariaLabel={t('Co ukázat v grafu')} value={metrika} onChange={(m: MetrikaUkolu) => { setVybrany(null); setMetrika(m); }}
-            options={[{ id: 'splneno', label: t('Splněno') }, { id: 'zalozeno', label: t('Založeno') }, { id: 'terminy', label: t('Termíny') }]} />
-          <Segmented size="sm" ariaLabel={t('Druh grafu')} value={druh} onChange={setDruh}
-            options={[{ id: 'sloupce', label: t('Sloupce') }, { id: 'cara', label: t('Čára') }]} />
-          <button type="button" aria-pressed={porovnat} onClick={() => setPorovnat(!porovnat)}
-            className={`filter-pill tap-target-sm ${porovnat ? 'seg-on' : 'seg-off glass'}`}>{t('Porovnat s předchozím obdobím')}</button>
-        </div>
+        <Segmented size="sm" ariaLabel={t('Co ukázat v grafu')} value={metrika} onChange={(m: MetrikaUkolu) => { setVybrany(null); setMetrika(m); }}
+          options={[{ id: 'splneno', label: t('Splněno') }, { id: 'zalozeno', label: t('Založeno') }, { id: 'terminy', label: t('Termíny') }]} />
         <p className="t-meta">
           <span className="font-semibold text-[#16181A] tabular-nums">{sum.soucet}</span> {metrikaNazev.toLowerCase()}
           {zmena != null && <> <Chip tone={zmena >= 0 ? 'ok' : 'wait'} size="sm">{zmena > 0 ? '+' : ''}{zmena} %</Chip> {t('proti předchozím {n, plural, one {# dni} other {# dnům}}', { n: nDni })}</>}
         </p>
-        <CasovyGraf sloty={sloty} porovnani={porovnat ? slotyPred : null} druh={druh} vyska={190} celaCisla
+        <CasovyGraf sloty={sloty} porovnani={porovnat ? slotyPred : null} druh="sloupce" vyska={190} celaCisla
           format={v => String(Math.round(v))} jmenoSlotu={jmenoSlotu} popisekOsy={popisekOsy} zvyraznit={dnesKlic}
           vybrany={vybrany?.klic ?? null} popisekPorovnani={t('předchozí období')}
           onVyber={sl => setVybrany(v => (v?.klic === sl.klic ? null : sl))}

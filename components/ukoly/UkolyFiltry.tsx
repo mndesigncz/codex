@@ -6,24 +6,31 @@
 
 import { useState } from 'react';
 import { Button, Segmented, SearchField } from '../ui';
+import { Icon } from '../Icons';
 import { useT } from '@/lib/i18n/client';
 import { aktualniJazyk } from '@/lib/i18n/stav';
 import {
   VYCHOZI_FILTR, pocetFiltru, type FiltrUkolu, type PoctyStavu, type PrioritaUkolu, type RazeniUkolu, type StavUkolu, type ZdrojUkolu,
 } from '@/lib/ukolyFiltr';
 
-export function UkolyFiltry({ filtr, onChange, pocty, skrytStav = false, className = '' }: {
+export interface ClovekFiltru { id: number | 'volne'; label: string; n: number }
+
+export function UkolyFiltry({ filtr, onChange, pocty, skrytStav = false, lide = [], className = '' }: {
   filtr: FiltrUkolu;
   onChange: (f: FiltrUkolu) => void;
   pocty: PoctyStavu;
   /** Týden a měsíc ukazují úkoly podle dnů, takže záložky stavu tam nedávají smysl. */
   skrytStav?: boolean;
+  /** Lidé, podle kterých jde filtrovat (jen vedení, které vidí úkoly celého týmu). */
+  lide?: ClovekFiltru[];
   className?: string;
 }) {
   const t = useT('widgety');
   const loc = aktualniJazyk();
   const [otevreno, setOtevreno] = useState(false);
-  const n = pocetFiltru(filtr);
+  const kdoZapnuto = lide.length > 0 && filtr.kdo !== 'all';
+  const n = pocetFiltru(filtr) + (kdoZapnuto ? 1 : 0);
+  const kdoJmeno = lide.find(l => l.id === filtr.kdo)?.label ?? '';
   const nastav = (cast: Partial<FiltrUkolu>) => onChange({ ...filtr, ...cast });
   const jmenoDne = (i: number) => new Date(`2024-01-0${i + 1}T12:00:00`).toLocaleDateString(loc, { weekday: 'short' });
 
@@ -62,8 +69,28 @@ export function UkolyFiltry({ filtr, onChange, pocty, skrytStav = false, classNa
         ))}
       </div>}
 
+      {kdoZapnuto && (
+        <button type="button" onClick={() => nastav({ kdo: 'all' })} aria-label={t('Zrušit filtr: {kdo}', { kdo: kdoJmeno })}
+          className="filter-pill tap-target-sm seg-on inline-flex items-center gap-1.5 self-start">
+          {kdoJmeno}<Icon name="close" size={12} />
+        </button>
+      )}
+
       {otevreno && (
         <div className="well px-4 py-3 space-y-3">
+          {lide.length > 1 && (
+            <div className="space-y-1.5">
+              <p className="t-label">{t('Komu úkol patří')}</p>
+              <div className="flex flex-wrap gap-1.5" role="group" aria-label={t('Komu úkol patří')}>
+                <button type="button" aria-pressed={filtr.kdo === 'all'} onClick={() => nastav({ kdo: 'all' })}
+                  className={`filter-pill tap-target-sm ${filtr.kdo === 'all' ? 'seg-on' : 'seg-off glass'}`}>{t('Všichni')}</button>
+                {lide.map(l => (
+                  <button key={String(l.id)} type="button" aria-pressed={filtr.kdo === l.id} onClick={() => nastav({ kdo: filtr.kdo === l.id ? 'all' : l.id })}
+                    className={`filter-pill tap-target-sm ${filtr.kdo === l.id ? 'seg-on' : 'seg-off glass'}`}>{l.label} · {l.n}</button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="space-y-1.5">
             <p className="t-label">{t('Priorita')}</p>
             <div className="flex flex-wrap gap-1.5" role="group" aria-label={t('Priorita')}>
@@ -96,7 +123,7 @@ export function UkolyFiltry({ filtr, onChange, pocty, skrytStav = false, classNa
               options={[{ id: 'termin', label: t('Termínu') }, { id: 'priorita', label: t('Priority') }, { id: 'nazev', label: t('Názvu') }, { id: 'nejnovejsi', label: t('Nejnovější') }]} />
           </div>
           {(n > 0 || filtr.hledat || filtr.stav !== 'vse') && (
-            <Button variant="ghost" size="sm" icon="close" onClick={() => onChange({ ...VYCHOZI_FILTR, kdo: filtr.kdo })}>{t('Zrušit filtry')}</Button>
+            <Button variant="ghost" size="sm" icon="close" onClick={() => onChange({ ...VYCHOZI_FILTR })}>{t('Zrušit filtry')}</Button>
           )}
         </div>
       )}

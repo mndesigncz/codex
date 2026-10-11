@@ -35,7 +35,8 @@ for (const w of [1280, 390]) {
   // Karty a záložky stavu
   const txt = async () => (await nastroj.innerText()).replace(/\s+/g, ' ');
   const t0 = await txt();
-  tvrdi(`${w}: statistické karty (Otevřené, Po termínu, Dnes hotovo, Splněno za 7 dní)`, ['Otevřené', 'Po termínu', 'Dnes hotovo', 'Splněno za 7 dní'].every(x => new RegExp(x, 'i').test(t0)), t0.slice(0, 200));
+  tvrdi(`${w}: nahoře jedna věta o dni („1 z 4 hotovo") místo karet se statistikou`, /1\s*z 4 hotovo/.test(t0) && !/Splněno za 7 dní/i.test(t0), t0.slice(0, 200));
+  tvrdi(`${w}: štítek „2 po termínu" zapne filtr`, await nastroj.getByRole('button', { name: '2 po termínu', exact: true }).count() === 1);
   const stavy = nastroj.getByRole('group', { name: 'Stav úkolů' });
   tvrdi(`${w}: záložka Vše počítá všech 9 úkolů`, await stavy.getByRole('button', { name: /^Vše · 9$/ }).count() === 1, await stavy.innerText());
   tvrdi(`${w}: Po termínu = 2 (Umýt okna, Vynést sklo; dnešní ne)`, await stavy.getByRole('button', { name: /^Po termínu · 2$/ }).count() === 1, await stavy.innerText());
@@ -54,6 +55,9 @@ for (const w of [1280, 390]) {
 
   // Filtry: priorita Vysoká
   await nastroj.getByRole('button', { name: /^Filtry/ }).click();
+  await nastroj.getByRole('group', { name: 'Komu úkol patří' }).getByRole('button', { name: /^Petr/ }).click();
+  tvrdi(`${w}: filtr „Komu úkol patří" ukáže jen Petrovy úkoly a jde zrušit štítkem`, await dokud(async () => { const t = await txt(); return t.includes('Objednat mléko') && !t.includes('Umýt okna'); }, 3000) && await nastroj.getByRole('button', { name: /^Zrušit filtr: Petr/ }).count() === 1);
+  await nastroj.getByRole('button', { name: /^Zrušit filtr: Petr/ }).click();
   await nastroj.getByRole('group', { name: 'Priorita' }).getByRole('button', { name: 'Vysoká', exact: true }).click();
   tvrdi(`${w}: filtr Vysoká priorita nechá Umýt okna a schová ostatní`, await dokud(async () => { const t = await txt(); return t.includes('Umýt okna') && !t.includes('Doplnit sirupy') && !t.includes('Vynést sklo'); }, 3000));
   tvrdi(`${w}: počet zapnutých filtrů je vidět na tlačítku`, await nastroj.getByRole('button', { name: /^Filtry · 1$/ }).count() === 1);
@@ -90,13 +94,14 @@ for (const w of [1280, 390]) {
   await pohledy.getByRole('tab', { name: 'Přehled', exact: true }).click();
   const lista = nastroj.getByRole('group', { name: 'Období', exact: true });
   await lista.waitFor({ timeout: 5000 });
-  tvrdi(`${w}: Přehled má lištu období a graf`, await lista.getByRole('tab', { name: '30 dní', exact: true }).count() === 1 && await nastroj.locator('[role=group][aria-label^="Úkoly: "]').count() >= 1);
-  await lista.getByRole('tab', { name: '7 dní', exact: true }).click();
+  tvrdi(`${w}: Přehled má tlačítko období a graf`, await lista.getByRole('button').count() === 1 && await nastroj.locator('[role=group][aria-label^="Úkoly: "]').count() >= 1);
+  await lista.getByRole('button').first().click();
+  const okno2 = p.getByRole('dialog', { name: 'Období' });
+  await okno2.getByRole('button', { name: 'Posledních 7 dní', exact: true }).click();
   const graf = nastroj.locator('[role=group][aria-label^="Úkoly: "]');
   tvrdi(`${w}: „7 dní" dá sedm sloupců`, await dokud(async () => await graf.locator('button').count() === 7, 3000), String(await graf.locator('button').count()));
   await nastroj.getByRole('tab', { name: 'Založeno', exact: true }).click();
-  await nastroj.getByRole('button', { name: 'Porovnat s předchozím obdobím' }).click();
-  tvrdi(`${w}: graf přepne metriku a porovnání bez chyby`, await graf.locator('button').count() === 7);
+  tvrdi(`${w}: graf přepne metriku (porovnání je zapnuté samo)`, await graf.locator('button').count() === 7);
   await graf.locator('button').last().click();
   tvrdi(`${w}: klepnutí na sloupec ukáže úkoly toho dne`, await dokud(async () => await nastroj.locator('section[aria-label^="Úkoly: "]').count() === 1, 3000));
   tvrdi(`${w}: Přehled ukazuje výkon podle lidí (vedení)`, /Výkon podle lidí/i.test(await txt()));
@@ -127,8 +132,7 @@ for (const w of [1280, 390]) {
   const pohledy = p.locator('[aria-label="Zobrazení"]').first();
   await pohledy.getByRole('tab', { name: 'Měsíc', exact: true }).click();
   tvrdi(`Z ${w}: měsíční kalendář`, await dokud(async () => await nastroj.getByRole('group', { name: 'Kalendář úkolů' }).locator('button').count() >= 28, 4000));
-  await pohledy.getByRole('tab', { name: 'Přehled', exact: true }).click();
-  tvrdi(`Z ${w}: Přehled s lištou období a bez výkonu podle lidí`, await dokud(async () => await nastroj.getByRole('group', { name: 'Období', exact: true }).count() === 1, 4000) && !/Výkon podle lidí/i.test(await nastroj.innerText()));
+  tvrdi(`Z ${w}: zaměstnanec nemá Přehled (statistiky týmu patří vedení)`, await pohledy.getByRole('tab', { name: 'Přehled', exact: true }).count() === 0);
   tvrdi(`Z ${w}: bez vodorovného přetečení`, await bezPreteceni(p));
   tvrdi(`Z ${w}: bez chyb v konzoli`, chyby.length === 0, chyby.slice(0, 3).join(' | '));
   await ctx.close();

@@ -41,53 +41,68 @@ for (const w of [1280, 390]) {
   const karta = p.locator('[data-instance="po-dnech"]');
   const lista = karta.getByRole('group', { name: 'Období', exact: true });
   await lista.waitFor({ timeout: 12000 });
+  const okno = p.getByRole('dialog', { name: 'Období' });
+  const otevriOkno = async () => { if (!(await okno.isVisible())) { await lista.getByRole('button').first().click(); await okno.waitFor({ timeout: 4000 }); } };
+  const zavriOkno = async () => { if (await okno.isVisible()) { await okno.getByRole('button', { name: 'Hotovo' }).click(); await okno.waitFor({ state: 'hidden', timeout: 4000 }); } };
+  /** Zvolí hotovou volbu: okno se po ní samo zavře. */
+  const volba = async (nazev) => { await otevriOkno(); await okno.getByRole('button', { name: nazev, exact: true }).click(); await okno.waitFor({ state: 'hidden', timeout: 4000 }); };
   const graf = karta.locator('[role=group][aria-label^="Tržba po dnech"]');
   const sloupce = graf.locator('button');
   const pocet = async () => sloupce.count();
   await sloupce.first().waitFor({ timeout: 8000 });
 
   const dnuMesice = Number(dnes.slice(8)); // měsíc ze stránky = od prvního do dneška (budoucí dny tržbu nemají)
-  tvrdi(`${w}: lišta období nabízí rychlé volby a Vlastní`, (await Promise.all(['Dnes', '7 dní', '30 dní', 'Měsíc', '3 měsíce', '6 měsíců', 'Rok', 'Vlastní'].map(x => lista.getByRole('tab', { name: x, exact: true }).count()))).every(n => n === 1));
+  tvrdi(`${w}: na ploše je jediné tlačítko období (žádná řada přepínačů)`, await lista.getByRole('button').count() === 1 && await lista.getByRole('tab').count() === 0);
+  await otevriOkno();
+  tvrdi(`${w}: okno období nabízí hotové volby a vlastní od–do`, (await Promise.all(['Dnes', 'Posledních 7 dní', 'Posledních 30 dní', 'Tento měsíc', 'Minulý měsíc', '3 měsíce', '6 měsíců', 'Rok'].map(x => okno.getByRole('button', { name: x, exact: true }).count()))).every(n => n === 1) && await okno.getByLabel('Od dne').count() === 1);
+  tvrdi(`${w}: dny v týdnu a hrubost grafu jsou schované pod „Upřesnit"`, await okno.getByRole('button', { name: 'Pracovní dny' }).count() === 0 && await okno.getByRole('button', { name: /^Upřesnit/ }).count() === 1);
+  await zavriOkno();
   tvrdi(`${w}: výchozí je měsíc ze stránky: sloupec za každý den do dneška`, await pocet() === dnuMesice, `${await pocet()} vs ${dnuMesice}`);
   tvrdi(`${w}: dotaz jde odlehčeně (lite=1)`, dotazyNa(stav, ['/api/pos/daily']).some(x => x.u.includes('lite=1')));
   tvrdi(`${w}: ukáže tržbu za období a průměr`, /Tržba za období/i.test(await karta.innerText()) && /průměr/i.test(await karta.innerText()));
 
   // 7 dní
-  await lista.getByRole('tab', { name: '7 dní', exact: true }).click();
+  await volba('Posledních 7 dní');
   tvrdi(`${w}: „7 dní" dá sedm sloupců`, await dokud(async () => await pocet() === 7, 4000), String(await pocet()));
   tvrdi(`${w}: „7 dní" se dotáže přesně na týden`, await dokud(async () => dotazyNa(stav, ['/api/pos/daily']).some(x => x.u.includes(`from=${dayPlus(dnes, -6)}&to=${dnes}`)), 4000));
 
   // Dny v týdnu
-  await lista.getByRole('button', { name: /^Filtry/ }).click();
-  await lista.getByRole('button', { name: 'Pracovní dny' }).click();
+  await otevriOkno();
+  await okno.getByRole('button', { name: /^Upřesnit/ }).click();
+  await okno.getByRole('button', { name: 'Pracovní dny' }).click();
+  await zavriOkno();
   tvrdi(`${w}: filtr Pracovní dny vyhodí víkendy z grafu (≤5 sloupců)`, await dokud(async () => { const n = await pocet(); return n >= 3 && n <= 5; }, 4000), String(await pocet()));
   tvrdi(`${w}: popisek období zapíše vybrané dny`, /po, út, st, čt, pá/i.test(await lista.innerText()), (await lista.innerText()).slice(0, 200));
-  await lista.getByRole('button', { name: 'Všechny dny' }).click();
+  await otevriOkno();
+  await okno.getByRole('button', { name: 'Všechny dny' }).click();
+  await zavriOkno();
   tvrdi(`${w}: „Všechny dny" vrátí sedm sloupců`, await dokud(async () => await pocet() === 7, 4000));
 
   // Rok → měsíce
-  await lista.getByRole('tab', { name: 'Rok', exact: true }).click();
+  await volba('Rok');
   tvrdi(`${w}: „Rok" přepne graf na měsíce (≤13 sloupců)`, await dokud(async () => { const n = await pocet(); return n >= 12 && n <= 13; }, 5000), String(await pocet()));
   tvrdi(`${w}: „Rok" se dotáže na 365 dní`, dotazyNa(stav, ['/api/pos/daily']).some(x => x.u.includes(`from=${dayPlus(dnes, -364)}&to=${dnes}`)));
   // Měsíc → přiblížení na jeho rozmezí
   await sloupce.nth((await pocet()) - 2).click();
   tvrdi(`${w}: klepnutí na měsíc přiblíží na jeho dny (graf po dnech)`, await dokud(async () => { const n = await pocet(); return n >= 28 && n <= 31; }, 5000), String(await pocet()));
-  tvrdi(`${w}: po přiblížení je zvolené „Vlastní" s poli Od dne / Do dne`, await karta.getByLabel('Od dne').count() === 1 && await karta.getByLabel('Do dne').count() === 1);
+  tvrdi(`${w}: po přiblížení tlačítko ukazuje jen rozmezí (vlastní období)`, await dokud(async () => !/Rok|Posledních/.test(await lista.innerText()), 3000), await lista.innerText());
 
   // Vlastní rozmezí
   const od = dayPlus(dnes, -20), doD = dayPlus(dnes, -10);
-  await karta.getByLabel('Od dne').fill(od);
-  await karta.getByLabel('Do dne').fill(doD);
+  await otevriOkno();
+  await okno.getByLabel('Od dne').fill(od);
+  await okno.getByLabel('Do dne').fill(doD);
+  await zavriOkno();
   tvrdi(`${w}: vlastní rozmezí se dotáže přesně na zadané dny`, await dokud(async () => dotazyNa(stav, ['/api/pos/daily']).some(x => x.u.includes(`from=${od}&to=${doD}`)), 4000));
   tvrdi(`${w}: vlastní rozmezí má sloupec za každý den (11)`, await dokud(async () => await pocet() === 11, 4000), String(await pocet()));
 
-  // Porovnání
-  await karta.getByRole('button', { name: 'Porovnat s předchozím obdobím' }).click();
-  tvrdi(`${w}: porovnání se dotáže na předchozí stejně dlouhé období`, await dokud(async () => dotazyNa(stav, ['/api/pos/daily']).some(x => x.u.includes(`from=${dayPlus(od, -11)}&to=${dayPlus(od, -1)}`)), 5000));
-  tvrdi(`${w}: porovnání ukáže změnu proti předchozím dnům`, await dokud(async () => /proti předchozím 11 dnům/.test(await karta.innerText()), 5000));
-  // Druh grafu: čára
-  await karta.getByRole('tab', { name: 'Čára', exact: true }).click();
-  tvrdi(`${w}: čára stále nabízí klepnutí na den`, await dokud(async () => await pocet() === 11, 3000));
+  // Porovnání je zapnuté samo (číslo bez srovnání nic neříká); vypíná se v okně období.
+  tvrdi(`${w}: porovnání s předchozím obdobím je ve výchozím stavu zapnuté`, await dokud(async () => dotazyNa(stav, ['/api/pos/daily']).some(x => x.u.includes(`from=${dayPlus(od, -11)}&to=${dayPlus(od, -1)}`)), 5000));
+  tvrdi(`${w}: ukáže změnu proti předchozím dnům`, await dokud(async () => /proti předchozím 11 dnům/.test(await karta.innerText()), 5000));
+  await otevriOkno();
+  await okno.getByRole('switch', { name: 'Porovnat s předchozím obdobím' }).click();
+  await zavriOkno();
+  tvrdi(`${w}: vypnuté porovnání schová změnu`, await dokud(async () => !/proti předchozím 11 dnům/.test(await karta.innerText()), 4000));
 
   // Rozklik dne
   await sloupce.nth(3).click();
@@ -101,7 +116,8 @@ for (const w of [1280, 390]) {
   // Volba přežije obnovení
   await p.reload({ waitUntil: 'networkidle' });
   await p.locator('[data-plocha] li[data-instance]').first().waitFor({ timeout: 15000 });
-  tvrdi(`${w}: zvolené rozmezí přežije obnovení`, await dokud(async () => await p.locator('[data-instance="po-dnech"]').getByLabel('Od dne').inputValue().catch(() => '') === od, 6000));
+  const kratceOd = `${Number(od.slice(8))}. ${Number(od.slice(5, 7))}.`;
+  tvrdi(`${w}: zvolené rozmezí přežije obnovení`, await dokud(async () => (await p.locator('[data-instance="po-dnech"] [role=group][aria-label="Období"]').innerText().catch(() => '')).includes(kratceOd), 6000));
   await ctx.close();
 }
 await konec();

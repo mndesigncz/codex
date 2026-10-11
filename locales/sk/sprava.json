@@ -119,7 +119,6 @@
   "Export pro účetní": "Export pre účtovníka",
   "Fakturace": "Fakturácia",
   "Filtr podle stavu": "Filter podľa stavu",
-  "Filtr podle člověka": "Filter podľa človeka",
   "Finance": "Financie",
   "Fotka akce {n}": "Fotka podujatia {n}",
   "Fotka účtenky {dodavatel}": "Fotka účtenky {dodavatel}",
@@ -1057,7 +1056,6 @@
   "Všechny najednou": "Všetky naraz",
   "Všechny podniky": "Všetky podniky",
   "Všem členům podniku přijde push a akce se objeví v novinkách na stránce podniku.": "Všetkým členom podniku príde push a podujatie sa objaví v novinkách na stránke podniku.",
-  "Všichni": "Všetci",
   "Wi-Fi — heslo": "Wi-Fi — heslo",
   "Wi-Fi — síť": "Wi-Fi — sieť",
   "Workshop": "Workshop",
@@ -1534,11 +1532,6 @@
   "Celý den": "Celý deň",
   "Celý den {den}": "Celý deň {den}",
   "Otevřít detail úkolu": "Otvoriť detail úlohy",
-  "Otevřené": "Otvorené",
-  "Dnes hotovo": "Dnes hotové",
-  "Splněno za 7 dní": "Splnené za 7 dní",
   "Nic nevyhovuje filtrům": "Nič nevyhovuje filtrom",
-  "Zkus jiný stav, hledání nebo zruš filtry.": "Skús iný stav, hľadanie alebo zruš filtre.",
-  "z {n} s dnešním termínem": "z {n} s dnešným termínom",
-  "úspěšnost {n} %": "úspešnosť {n} %"
+  "Zkus jiný stav, hledání nebo zruš filtry.": "Skús iný stav, hľadanie alebo zruš filtre."
 }
