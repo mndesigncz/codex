@@ -278,3 +278,39 @@ export function cerstvePredani(): string | null {
     return v && typeof v.arg === 'string' && Date.now() - Number(v.cas) < PLATNOST_PREDANI_MS ? v.arg : null;
   } catch { return null; }
 }
+
+// ---------------------------------------------------------------------------
+// Rychlé přidání úkolu jedním řádkem („Objednat mléko zítra", „Umýt okna v pátek")
+// ---------------------------------------------------------------------------
+
+// Jen celá slova (včetně pádu „v neděli", „ve středu", „v sobotu"): zkratky po, út, st, ne bývají jiná slova.
+const DNY_SLOVA: Record<string, number> = {
+  pondeli: 0, utery: 1, streda: 2, stredu: 2, ctvrtek: 3, patek: 4, sobota: 5, sobotu: 5, nedele: 6, nedeli: 6,
+};
+const bezDiakritiky = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+/**
+ * Z řádku „Objednat mléko zítra" udělá název a termín. Datum se čte jen z konce řádku: „dnes", „zítra", „pozítří",
+ * „v pátek" / „pátek" (nejbližší takový den po dnešku), „za 3 dny". Bez data je to dnes. Řádek, který je jen datum
+ * („zítra"), zůstane názvem — nic se neztratí.
+ */
+export function rozborRychlehoUkolu(radek: string, dnes: string): { title: string; dueDate: string } {
+  const slova = radek.trim().split(/\s+/).filter(Boolean);
+  const vrat = (pocet: number, den: string) => ({ title: slova.slice(0, slova.length - pocet).join(' ').trim(), dueDate: den });
+  const hotovo = (r: { title: string; dueDate: string }) => (r.title ? r : { title: radek.trim(), dueDate: dnes });
+  const posl = bezDiakritiky(slova.at(-1) ?? '');
+  const pred = bezDiakritiky(slova.at(-2) ?? '');
+  if (slova.length > 1) {
+    if (posl === 'dnes') return hotovo(vrat(1, dnes));
+    if (posl === 'zitra') return hotovo(vrat(1, dayPlus(dnes, 1)));
+    if (posl === 'pozitri') return hotovo(vrat(1, dayPlus(dnes, 2)));
+    if (posl in DNY_SLOVA) {
+      const cil = DNY_SLOVA[posl];
+      const rozdil = ((cil - dnTydne(dnes) + 7) % 7) || 7;
+      return hotovo(vrat(pred === 'v' || pred === 've' ? 2 : 1, dayPlus(dnes, rozdil)));
+    }
+    const za = /^\d{1,3}$/.test(pred) && slova.length > 3 && bezDiakritiky(slova.at(-3) ?? '') === 'za' && /^(den|dny|dni|dnu)$/.test(posl);
+    if (za) return hotovo(vrat(3, dayPlus(dnes, Number(pred))));
+  }
+  return { title: radek.trim(), dueDate: dnes };
+}

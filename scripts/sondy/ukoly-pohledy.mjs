@@ -16,6 +16,7 @@ const podvrh = (req, json, stav) => {
   const { pathname: path } = new URL(req.url()); const m = req.method();
   if (path === '/api/tasks') {
     if (m === 'PATCH') { const t = req.postDataJSON(); (stav.ukolyPatche ??= []).push(t); return json({ id: t.id, ...t }); }
+    if (m === 'POST') { stav.novyUkol = req.postDataJSON(); return json({ id: 99, ...stav.novyUkol }); }
     if (m === 'GET') {
       // Vrátí i čas založení, ať má graf „Založeno" z čeho kreslit.
       return json(nacti('k69-b6a-tasks').map((u, i) => ({ ...u, createdAt: new Date(Date.now() - (i % 4) * 86400000).toISOString() })));
@@ -76,6 +77,13 @@ for (const w of [1280, 390]) {
   tvrdi(`${w}: Označit jako hotový pošle PATCH status done`, await dokud(() => (stav.ukolyPatche ?? []).some(t => t.id === 2 && t.status === 'done'), 3000), JSON.stringify(stav.ukolyPatche));
   await p.keyboard.press('Escape');
   tvrdi(`${w}: Escape detail zavře`, await dokud(async () => await p.getByRole('dialog').count() === 0, 3000));
+
+  // Rychlé přidání jedním řádkem: „zítra" na konci se přečte jako termín
+  const rychle = nastroj.getByRole('textbox', { name: 'Přidat úkol' });
+  await rychle.fill('Koupit citrony zítra');
+  tvrdi(`${w}: rychlé přidání ukáže přečtený termín`, await dokud(async () => /Termín:/.test(await nastroj.innerText()), 2000));
+  await rychle.press('Enter');
+  tvrdi(`${w}: Enter pošle POST s názvem bez data a s termínem zítra`, await dokud(() => stav.novyUkol?.title === 'Koupit citrony' && stav.novyUkol?.dueDate === DNY.ZITRA, 3000), JSON.stringify(stav.novyUkol));
 
   // Měsíc
   const pohledy = p.locator('[data-plocha]').getByRole('tablist', { name: 'Zobrazení' }).or(p.locator('[aria-label="Zobrazení"]')).first();

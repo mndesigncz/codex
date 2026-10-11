@@ -37,6 +37,7 @@ import { VYCHOZI_FILTR, filtrujBezStavu, filtrujUkoly, poctyStavu, seradUkoly, s
 import { UkolDetail } from '../ukoly/UkolDetail';
 import { UkolyFiltry, type ClovekFiltru } from '../ukoly/UkolyFiltry';
 import { UkolySouhrn } from '../ukoly/UkolySouhrn';
+import { RychlePridani } from '../ukoly/RychlePridani';
 import { UkolyMesic } from '../ukoly/UkolyMesic';
 import { UkolyPrehled } from '../ukoly/UkolyPrehled';
 import { oznamZmenuPovinnych, ChipPredUzaverkou } from '../PredUzaverkou';
@@ -153,6 +154,17 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
   const weekAhead = pragueToday(7);
 
   const memberById = useMemo(() => new Map(members.map(m => [m.id, m])), [members]);
+
+  /** Rychlé přidání jedním řádkem: úkol pro kohokoli (kdo smí zadávat) nebo pro mě, s termínem z řádku. */
+  const rychle = async (title: string, dueDate: string) => {
+    await fetch(URL_UKOLY, {
+      method: 'POST', headers: JSON_HLAVICKA,
+      body: JSON.stringify({ title, description: null, priority: 'medium', assignedTo: zadava ? null : ja, dueDate, recurrence: null, checklist: [] }),
+    }).then(okJson).catch(e => { throw new Error(apiMessage(e, t('Úkol se nepodařilo vytvořit.'))); });
+    data.reload();
+    oznamZmenuPovinnych();
+    setZprava(t('Úkol je zadaný.'));
+  };
 
   const closeForm = () => { setShowForm(false); setEditingId(null); setEditingSeries(false); setForm(emptyForm()); setError(''); };
   const openNew = (dueDate = '') => {
@@ -370,6 +382,8 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
 
   const nastroj = (
     <div className="space-y-6">
+      {view === 'list' && !showForm && <RychlePridani dnes={today} onPridat={rychle} />}
+
       {tasks.length > 0 && view !== 'prehled' && (
         <UkolySouhrn hotovo={hodnotyKarty.dnesHotovo} celkem={hodnotyKarty.dnesCelkem} poTerminu={hodnotyKarty.poTerminu}
           onPoTerminu={() => { setView('list'); setFiltr(f => ({ ...f, stav: 'po_terminu' })); }} />
