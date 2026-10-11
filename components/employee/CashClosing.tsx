@@ -1105,7 +1105,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
               )}
               {gapDays.length > 0 && gapDays.every(d => d < form.date) && (
                 <p role="alert" className="note note-danger text-[13px]">
-                  {t('Mezi poslední uzávěrkou a dneškem chybí uzávěrka za {dny}. Hotovost z té směny je v kase, ale do dnešní tržby nepatří — nejdřív dopiš tu chybějící, jinak dnešek vyjde s přebytkem, který není jeho.', { dny: gapDays.map(d => `${fmtDatum(d, { jazyk, styl: 'denvtydnu' })} ${fmtDatum(d, { jazyk, styl: 'kratce' })}`).join(', ') })}
+                  {t('Mezi poslední uzávěrkou a dneškem chybí uzávěrka za {dny}. Hotovost z té směny je v kase, ale do dnešní tržby nepatří — nejdřív dopiš tu chybějící, jinak dnešek vyjde s přebytkem, který není jeho.', { dny: gapDays.map(d => `${fmtDatum(d, { jazyk, styl: 'denvtydnu' })} ${fmtDatum(d, { jazyk, styl: 'kratce' })}`).join(', ').replace(/\.$/, '') })}
                 </p>
               )}
               {carry && (
