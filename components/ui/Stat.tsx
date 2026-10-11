@@ -35,7 +35,10 @@ export function Stat({ label, value, unit, note, icon, tone = 'muted', className
  * údaj se na telefonu roztáhne přes oba sloupce, ať linka nad ním nekončí
  * v půlce karty.
  */
-export function StatRow({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+export function StatRow({ children, className = '', podleKarty = false }: { children: React.ReactNode; className?: string; podleKarty?: boolean }) {
+  // Widget bývá na tabletu a počítači jen v půlce řádku: okno je široké, ale karta ne, a tři čísla vedle sebe
+  // („12 400 Kč  850 Kč") se pak dotýkala. `podleKarty` skládá sloupce podle šířky karty, ne okna (container query).
+  if (podleKarty) return <div className={`statrow-karta ${className}`}><div className="statrow-karta-v">{children}</div></div>;
   return (
     <div className={[
       'grid -mx-2 [&>*]:px-4',
