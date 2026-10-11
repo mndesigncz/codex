@@ -709,7 +709,7 @@ function SouhrnHodin({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: str
       prazdno={!L && radky.length === 0 ? <p className="t-meta">{t('Za {n, plural, one {# den} few {# dny} other {# dní}} nikdo nic neodpíchl.', { n: dni })}</p> : undefined}>
       {L && (
         <div className="mb-4 space-y-4">
-          <ObdobiLista value={obdobi} onChange={nastav} volby={['dnes', '7_dni', '30_dni', 'mesic', 'minuly_mesic', '90_dni', '180_dni']} porovnat={porovnat} onPorovnat={setPorovnat} />
+          <ObdobiLista value={obdobi} onChange={nastav} volby={['dnes', 'vcera', 'tyden', '7_dni', '30_dni', 'mesic', 'minuly_mesic', '90_dni', '180_dni']} porovnat={porovnat} onPorovnat={setPorovnat} />
           <div>
             <Stat label={t('Odpracováno')} value={hodinyText(sumHodin)} note={t('{n, plural, one {# směna} few {# směny} other {# směn}}', { n: radky.reduce((a, x) => a + x.pocet, 0) })} />
             {zmena != null && (

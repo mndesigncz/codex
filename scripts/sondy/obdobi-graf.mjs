@@ -54,7 +54,7 @@ for (const w of [1280, 390]) {
   const dnuMesice = Number(dnes.slice(8)); // měsíc ze stránky = od prvního do dneška (budoucí dny tržbu nemají)
   tvrdi(`${w}: na ploše je jediné tlačítko období (žádná řada přepínačů)`, await lista.getByRole('button').count() === 1 && await lista.getByRole('tab').count() === 0);
   await otevriOkno();
-  tvrdi(`${w}: okno období nabízí hotové volby a vlastní od–do`, (await Promise.all(['Dnes', 'Posledních 7 dní', 'Posledních 30 dní', 'Tento měsíc', 'Minulý měsíc', '3 měsíce', '6 měsíců', 'Rok'].map(x => okno.getByRole('button', { name: x, exact: true }).count()))).every(n => n === 1) && await okno.getByLabel('Od dne').count() === 1);
+  tvrdi(`${w}: okno období nabízí hotové volby a vlastní od–do`, (await Promise.all(['Dnes', 'Včera', 'Tento týden', 'Posledních 7 dní', 'Posledních 30 dní', 'Tento měsíc', 'Minulý měsíc', '3 měsíce', '6 měsíců', 'Rok'].map(x => okno.getByRole('button', { name: x, exact: true }).count()))).every(n => n === 1) && await okno.getByLabel('Od dne').count() === 1);
   tvrdi(`${w}: dny v týdnu a hrubost grafu jsou schované pod „Upřesnit"`, await okno.getByRole('button', { name: 'Pracovní dny' }).count() === 0 && await okno.getByRole('button', { name: /^Upřesnit/ }).count() === 1);
   await zavriOkno();
   tvrdi(`${w}: výchozí je měsíc ze stránky: sloupec za každý den do dneška`, await pocet() === dnuMesice, `${await pocet()} vs ${dnuMesice}`);

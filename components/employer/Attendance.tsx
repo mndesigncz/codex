@@ -330,7 +330,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
           menu: smiExport && entries.length > 0 ? [{ label: t('Export CSV'), icon: 'download', onClick: exportCsv }] : undefined,
           aside: (
             <ObdobiLista value={obdobi} onChange={nastavObdobi} dnyTydne={false} hrubost={false}
-              volby={['dnes', '7_dni', '30_dni', 'mesic', 'minuly_mesic', '90_dni', '180_dni']} />
+              volby={['dnes', 'vcera', 'tyden', '7_dni', '30_dni', 'mesic', 'minuly_mesic', '90_dni', '180_dni']} />
           ),
         }}
         nastroj={nastroj}
