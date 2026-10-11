@@ -11,7 +11,7 @@ import type { Testy } from './_testy.ts';
 import {
   ZAPOMENUTY_MS, bezSazby, cekajiciPozvanky, dnesVPodniku, hodinyMinuty, konecSmeny, mujMesic, mzdyZaObdobi, obdobiDni,
   otevrenePrichody, podilMezd, roleSPocty, rozeberZaznam, sazbyZRosteru, seradSouhrn, souhrnHodin, trzbyZaObdobi,
-  hodinyPoDnech, zaznamyVRozmezi, denZaznamu, type ZaznamDochazky,
+  hodinyPoDnech, zaznamyVRozmezi, denZaznamu, spropitneZaObdobi, type ZaznamDochazky,
 } from '../../lib/dochazkaPrehled.ts';
 import { pragueMomentOf } from '../../lib/pragueTime.ts';
 import { WIDGETY as DOCHAZKA } from '../../lib/widgety/katalog/dochazka.ts';
@@ -59,6 +59,28 @@ export default function ({ eq, ok }: Testy) {
   ], [['1', '3', '2'], '1', ['Běží', 'Člověk 1', 'Zapomněl']]);
   eq('mzdy za období: součet, lidé s hodinami bez sazby, vynechané záznamy', mzdyZaObdobi(entries, ted, sazby), { celkem: 2500, bezSazby: 2, vynechano: 1 });
   eq('hodiny slovy', [hodinyMinuty(12.5 * H), hodinyMinuty(45 * 60000), hodinyMinuty(-5)], ['12 h 30 min', '45 min', '0 min']);
+
+  // ---- spropitné po lidech (podle hodin na směně) ----
+  const uzSp = [
+    // 25. 9.: Člověk 1 (8 h) a Člověk 3 (zapomenutý odchod = 0 h) → podle hodin dostane všechno Člověk 1.
+    { date: '2026-09-25', tips: 300, shiftEmployees: [{ id: 1 }, { id: 3 }], created_by: 1 },
+    // 24. 9.: směna 1 + 2, ale 2 ten den nic neodpíchl a 1 má 4,5 h → vše 1; druhá uzávěrka bez směny jde autorovi 2.
+    { date: '2026-09-24', tips: 100, shiftEmployees: [{ id: 1 }, { id: 2 }] },
+    { date: '2026-09-24', tips: 50, shiftEmployees: [], created_by: 2 },
+    // 23. 9.: dva lidé bez záznamů docházky → rovným dílem.
+    { date: '2026-09-23', tips: 80, shiftEmployees: [{ id: 4 }, { id: 5 }] },
+    // Bez směny i autora → nerozděleno; pomocný řádek kolegy se přeskočí; mimo rozmezí se přeskočí.
+    { date: '2026-09-22', tips: 40, shiftEmployees: [] },
+    { date: '2026-09-25', tips: 999, shiftEmployees: [{ id: 1 }], covered_by: 7 },
+    { date: '2026-09-10', tips: 999, shiftEmployees: [{ id: 1 }] },
+  ];
+  const sp = spropitneZaObdobi(uzSp, entries, ted, '2026-09-20', '2026-09-26');
+  eq('spropitné: podle hodin dne, autorovi bez směny, rovným dílem bez docházky', [...sp.poLidech.entries()].sort(), [['1', 400], ['2', 50], ['3', 0], ['4', 40], ['5', 40]]);
+  eq('spropitné: celkem, nerozděleno, nic skryto', [sp.celkem, sp.nerozdeleno, sp.skryto], [570, 40, false]);
+  eq('spropitné: po dnech a lidech pro export', [sp.poDnech.get('2026-09-25|1'), sp.poDnech.get('2026-09-24|1'), sp.poDnech.get('2026-09-24|2')], [300, 100, 50]);
+  eq('spropitné: jen pondělí (24. 9. je čtvrtek) → nic', spropitneZaObdobi(uzSp, entries, ted, '2026-09-20', '2026-09-26', [0]).celkem, 0);
+  eq('spropitné: uzávěrka bez tržby (role bez finance.trzby) → skryto', spropitneZaObdobi([{ date: '2026-09-25', tips: 10, trzbaSkryta: true }], entries, ted, '2026-09-20', '2026-09-26').skryto, true);
+  eq('souhrn: podíl na spropitném do řádku (bez mapy null)', [souhrnHodin(entries, ted, sazby, sp.poLidech).find(r => r.id === '1')!.spropitne, souhrnHodin(entries, ted, sazby).find(r => r.id === '1')!.spropitne], [400, null]);
 
   // ---- tržby a podíl ----
   const uz = [

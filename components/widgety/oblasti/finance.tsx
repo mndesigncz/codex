@@ -123,7 +123,7 @@ function InkoustoveCislo({ stitek, hodnota, poznamka, velke = false }: { stitek:
 // Souhrn měsíce
 // ---------------------------------------------------------------------------
 
-type Metrika = 'trzby' | 'nakupy' | 'mzdy' | 'vysledek';
+type Metrika = 'trzby' | 'nakupy' | 'mzdy' | 'spropitne' | 'vysledek';
 
 function SouhrnMesice({ velikost, nastaveni }: WidgetProps<{ mesic: string; metrika: Metrika }>) {
   const t = useT('widgety');
@@ -148,9 +148,11 @@ function SouhrnMesice({ velikost, nastaveni }: WidgetProps<{ mesic: string; metr
       trzby: { stitek: t('Tržby'), hodnota: money(s.revenue), poznamka: pozTrzby },
       nakupy: { stitek: t('Nákupy a výdaje'), hodnota: money(s.purchases), poznamka: t('účtenky, objednávky, kasa') },
       mzdy: { stitek: t('Mzdy'), hodnota: mzdy, poznamka: pozMzdy },
+      // Spropitné není tržba podniku, ale majitel ho chce vidět vedle ní (Toast, Square): kolik tým za měsíc dostal.
+      spropitne: { stitek: t('Spropitné'), hodnota: money(s.tips), poznamka: t('z uzávěrek, mimo tržbu') },
       vysledek: { stitek: t('Hrubý výsledek'), hodnota: money(s.gross), poznamka: pozVysledek },
     };
-    const ostatni: Metrika[] = velikost === 'L' ? ['nakupy', 'mzdy', 'vysledek'] : ['vysledek'];
+    const ostatni: Metrika[] = velikost === 'L' ? ['nakupy', 'mzdy', ...(s.tips > 0 ? ['spropitne' as const] : []), 'vysledek'] : ['vysledek'];
     if (velikost === 'S') {
       const m = polozky[nastaveni.metrika] ?? polozky.trzby;
       obsah = <Stat label={m.stitek} value={m.hodnota} note={m.poznamka} />;
@@ -159,7 +161,7 @@ function SouhrnMesice({ velikost, nastaveni }: WidgetProps<{ mesic: string; metr
         <div className="min-w-0">
           <InkoustoveCislo velke stitek={t('Tržby')} hodnota={money(s.revenue)} poznamka={pozTrzby} />
           {/* Tři údaje se na telefonu nevejdou vedle sebe bez uříznutých štítků — dvě a dvě. */}
-          <dl className={`mt-4 grid gap-3 border-t border-white/10 pt-3 ${ostatni.length === 3 ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-1'}`}>
+          <dl className={`mt-4 grid gap-3 border-t border-white/10 pt-3 ${ostatni.length >= 4 ? 'grid-cols-2 sm:grid-cols-4' : ostatni.length === 3 ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-1'}`}>
             {ostatni.map(k => (
               <div key={k} className="min-w-0">
                 <dt className="t-label !text-white/55 truncate">{polozky[k].stitek}</dt>

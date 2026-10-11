@@ -33,7 +33,7 @@ import { dbTimeHM, parseDbTime, pragueDayOf, pragueToday } from '@/lib/pragueTim
 import { earnedFor } from '@/lib/wages';
 import { apiMessage, okJson } from '@/lib/api';
 import { obsahuje } from '@/lib/hledani';
-import { hodinyMinuty, konecSmeny, navrhOdchodu, rozeberZaznam, sazbyZRosteru, zaznamyVRozmezi, type ClenRosteru, type ZaznamDochazky } from '@/lib/dochazkaPrehled';
+import { hodinyMinuty, konecSmeny, navrhOdchodu, rozeberZaznam, sazbyZRosteru, spropitneZaObdobi, zaznamyVRozmezi, type ClenRosteru, type UzaverkaSpropitne, type ZaznamDochazky } from '@/lib/dochazkaPrehled';
 import { obdobiZPresetu, platneRozmezi, pocetDni } from '@/lib/obdobi';
 import { useObdobi } from '@/lib/useObdobi';
 import { dayPlus } from '@/lib/pragueTime';
@@ -46,6 +46,10 @@ interface Data { roster: ClenRosteru[]; entries: Zaznam[] }
 function vyberData(raw: any): Data {
   if (!raw || typeof raw !== 'object' || !Array.isArray(raw.roster)) throw new Error('Docházka přišla v nečekaném tvaru.'); // i18n-ok
   return { roster: raw.roster, entries: Array.isArray(raw.entries) ? raw.entries : [] };
+}
+function vyberUzaverky(raw: any): UzaverkaSpropitne[] {
+  if (!raw || !Array.isArray(raw.closings)) throw new Error('Uzávěrky přišly v nečekaném tvaru.'); // i18n-ok
+  return raw.closings;
 }
 
 /** Server vrací docházku nejvýš 180 dní zpět. */
@@ -114,6 +118,10 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
   }, [nekdoBezi]);
 
   const sazby = useMemo(() => sazbyZRosteru(roster), [roster]);
+  // Spropitné do exportu: z uzávěrek, rozpočítané podle hodin na směně (lib/dochazkaPrehled.spropitneZaObdobi) — jen
+  // s celými tržbami, jinak by podíl lhal. Stejná adresa jako widgety, takže dotaz se sdílí.
+  const vidiDyska = vidiMzdy && smi('finance.trzby') && smi('uzaverky.zobrazit_vse');
+  const uzaverky = useDataWidgetu<UzaverkaSpropitne[]>(vidiDyska ? '/api/closings' : null, vyberUzaverky);
   const zobrazene = useMemo(() => {
     const n = q.trim().toLowerCase();
     return n ? entries.filter(e => obsahuje(e.employeeName, n)) : entries;
@@ -220,11 +228,18 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
 
   const exportCsv = () => {
     if (!pro) { setUpgradeFor('Export CSV'); return; } // i18n-ok (název funkce)
-    const hlava = ['Datum', 'Zaměstnanec', 'Příchod', 'Odchod', 'Odpracováno', 'Zdroj', ...(vidiMzdy ? [`Mzda (${symbol})`] : [])]; // i18n-ok (CSV pro účetní zůstává česky)
+    const dyska = vidiDyska && uzaverky.data ? spropitneZaObdobi(uzaverky.data, entries, Date.now(), r.od, r.do) : null;
+    const sDyskem = !!dyska && !dyska.skryto;
+    const hlava = ['Datum', 'Zaměstnanec', 'Příchod', 'Odchod', 'Odpracováno', 'Zdroj', ...(vidiMzdy ? [`Mzda (${symbol})`] : []), ...(sDyskem ? [`Spropitné podíl (${symbol})`] : [])]; // i18n-ok (CSV pro účetní zůstává česky)
+    // Podíl na spropitném je za den a člověka — v CSV ho nese první záznam toho dne, ať se nesčítá dvakrát.
+    const dyskoVyplneno = new Set<string>();
     const radky = entries.map(e => {
       const od = parseDbTime(e.clockIn);
       const z = rozeberZaznam(e, Date.now());
       const sazba = sazby.get(String(e.employeeId));
+      const klicDne = `${od ? pragueDayOf(od) : ''}|${e.employeeId}`;
+      const dysko = sDyskem && !dyskoVyplneno.has(klicDne) ? dyska!.poDnech.get(klicDne) ?? 0 : 0;
+      if (sDyskem) dyskoVyplneno.add(klicDne);
       return [
         od ? od.toLocaleDateString('cs-CZ', { timeZone: 'Europe/Prague' }) : '',
         e.employeeName ?? 'Neznámý', // i18n-ok
@@ -234,6 +249,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
         ZDROJ[e.source ?? ''] ?? 'ručně', // i18n-ok
         // Stejné pravidlo jako součty (lib/wages): mzda po záznamu, záznam nad 24 h 0.
         ...(vidiMzdy ? [sazba ? String(earnedFor(z.ms, sazba)) : ''] : []),
+        ...(sDyskem ? [dysko > 0 ? String(Math.round(dysko)) : ''] : []),
       ];
     });
     const csv = [hlava, ...radky].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n');

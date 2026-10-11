@@ -108,6 +108,8 @@ export interface RadekSouhrnu {
   vynechano: number;
   /** Hrubá mzda; null = bez sazby (nebo sazby nejsou vidět). */
   mzda: number | null;
+  /** Podíl na spropitném z uzávěrek (spropitneZaObdobi); null = dýška nejsou k dispozici. */
+  spropitne: number | null;
 }
 
 /** Den (pražský), do kterého záznam patří: den příchodu; null u záznamu bez čitelného příchodu. */
@@ -140,12 +142,12 @@ export function hodinyPoDnech(entries: readonly ZaznamDochazky[], ted: number, o
 
 export type RazeniSouhrnu = 'hodiny' | 'mzda' | 'jmeno';
 
-export function souhrnHodin(entries: readonly ZaznamDochazky[], ted: number, sazby: ReadonlyMap<string, number>): RadekSouhrnu[] {
+export function souhrnHodin(entries: readonly ZaznamDochazky[], ted: number, sazby: ReadonlyMap<string, number>, spropitne?: ReadonlyMap<string, number> | null): RadekSouhrnu[] {
   const m = new Map<string, RadekSouhrnu>();
   for (const e of entries) {
     const id = String(e.employeeId ?? '');
     if (!id) continue;
-    const r = m.get(id) ?? { id, jmeno: e.employeeName ?? 'Neznámý', avatar: e.employeeAvatar ?? null, ms: 0, pocet: 0, bezi: false, vynechano: 0, mzda: null };
+    const r = m.get(id) ?? { id, jmeno: e.employeeName ?? 'Neznámý', avatar: e.employeeAvatar ?? null, ms: 0, pocet: 0, bezi: false, vynechano: 0, mzda: null, spropitne: spropitne ? spropitne.get(id) ?? 0 : null };
     const z = rozeberZaznam(e, ted);
     r.pocet += 1;
     if (z.druh === 'zapomenuty' || z.druh === 'dlouhy') r.vynechano += 1;
@@ -223,6 +225,72 @@ export function trzbyZaObdobi(closings: readonly UzaverkaTrzby[], od: string, do
     pocet += 1;
   }
   return { trzby, pocet, skryto };
+}
+
+// ---------------------------------------------------------------------------
+// Spropitné po lidech (z uzávěrek, podle hodin na směně)
+// ---------------------------------------------------------------------------
+
+/** Uzávěrka, jak ji vrací GET /api/closings — jen pole, která dělení spropitného potřebuje. */
+export interface UzaverkaSpropitne extends UzaverkaTrzby {
+  tips?: number | string | null;
+  shiftEmployees?: readonly { id: number | string }[] | null;
+  created_by?: number | string | null;
+}
+
+export interface SpropitneObdobi {
+  /** Podíl po lidech za celé období (id → částka). */
+  poLidech: Map<string, number>;
+  /** Podíl po dnech a lidech („RRRR-MM-DD|id" → částka) — pro export po záznamech. */
+  poDnech: Map<string, number>;
+  celkem: number;
+  /** Spropitné uzávěrek bez známé směny ani autora — není komu připsat. */
+  nerozdeleno: number;
+  /** Aspoň jedna uzávěrka přišla bez tržby (role bez finance.trzby) — součet by lhal. */
+  skryto: boolean;
+}
+
+/**
+ * Spropitné z hlavních uzávěrek v rozmezí rozpočítané mezi lidi na směně — „tip pool podle hodin" (7shifts, Toast):
+ * dýško uzávěrky se dělí mezi její `shiftEmployees` podle času, který ten den odpracovali (záznamy docházky);
+ * bez záznamů rovným dílem. Uzávěrka bez směny jde autorovi; bez autora zůstane v `nerozdeleno`.
+ */
+export function spropitneZaObdobi(
+  closings: readonly UzaverkaSpropitne[], entries: readonly ZaznamDochazky[], ted: number, od: string, doD: string, dnyTydne: readonly number[] = [],
+): SpropitneObdobi {
+  // Odpracovaný čas po dnech a lidech — stejná pravidla jako souhrn (zapomenuté odchody 0).
+  const hodiny = new Map<string, Map<string, number>>();
+  for (const e of entries) {
+    const d = denZaznamu(e);
+    const id = String(e.employeeId ?? '');
+    if (!d || !id) continue;
+    const den = hodiny.get(d) ?? new Map<string, number>();
+    den.set(id, (den.get(id) ?? 0) + rozeberZaznam(e, ted).ms);
+    hodiny.set(d, den);
+  }
+  const out: SpropitneObdobi = { poLidech: new Map(), poDnech: new Map(), celkem: 0, nerozdeleno: 0, skryto: false };
+  const pripis = (den: string, id: string, castka: number) => {
+    out.poLidech.set(id, (out.poLidech.get(id) ?? 0) + castka);
+    out.poDnech.set(`${den}|${id}`, (out.poDnech.get(`${den}|${id}`) ?? 0) + castka);
+  };
+  for (const c of closings) {
+    const den = String(c.shift_date ?? c.date ?? '').slice(0, 10);
+    if (!den || den < od || den > doD) continue;
+    if (dnyTydne.length > 0 && !dnyTydne.includes((new Date(`${den}T12:00:00Z`).getUTCDay() + 6) % 7)) continue;
+    if (c.covered_by != null) continue;
+    if (c.trzbaSkryta) { out.skryto = true; continue; }
+    const tips = Number(c.tips) || 0;
+    if (tips <= 0) continue;
+    out.celkem += tips;
+    let smena = [...new Set((c.shiftEmployees ?? []).map(p => String(p.id)).filter(Boolean))];
+    if (smena.length === 0 && c.created_by != null) smena = [String(c.created_by)];
+    if (smena.length === 0) { out.nerozdeleno += tips; continue; }
+    const ms = hodiny.get(den);
+    const vahy = smena.map(id => ms?.get(id) ?? 0);
+    const soucet = vahy.reduce((a, b) => a + b, 0);
+    smena.forEach((id, i) => pripis(den, id, soucet > 0 ? (tips * vahy[i]) / soucet : tips / smena.length));
+  }
+  return out;
 }
 
 /** Období „posledních N dní" jako pražské dny <od, do> včetně dneška. */

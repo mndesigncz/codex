@@ -59,6 +59,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
           { id: 'trzby', nazev: 'Tržby' },
           { id: 'nakupy', nazev: 'Nákupy' },
           { id: 'mzdy', nazev: 'Mzdy' },
+          { id: 'spropitne', nazev: 'Spropitné' },
           { id: 'vysledek', nazev: 'Výsledek' },
         ],
         vychozi: 'trzby',

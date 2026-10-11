@@ -64,8 +64,8 @@ import { useObdobi } from '@/lib/useObdobi';
 import { useUlozeno } from '@/lib/useUlozeno';
 import {
   ZAPOMENUTY_MS, dnesVPodniku, konecSmeny, navrhOdchodu as navrhOdchoduPlan, hodinyMinuty, mujMesic, mzdyZaObdobi, obdobiDni, otevrenePrichody, podilMezd,
-  sazbyZRosteru, seradSouhrn, souhrnHodin, trzbyZaObdobi, hodinyPoDnech, zaznamyVRozmezi,
-  type OtevrenyPrichod, type RadekDne, type RazeniSouhrnu, type UzaverkaTrzby,
+  sazbyZRosteru, seradSouhrn, souhrnHodin, spropitneZaObdobi, trzbyZaObdobi, hodinyPoDnech, zaznamyVRozmezi,
+  type OtevrenyPrichod, type RadekDne, type RazeniSouhrnu, type UzaverkaSpropitne, type UzaverkaTrzby,
 } from '@/lib/dochazkaPrehled';
 
 // ---------------------------------------------------------------------------
@@ -669,13 +669,22 @@ function SouhrnHodin({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: str
   const data = useDataWidgetu<Dochazka>(brana ? urlDni(dniNacist) : null, raw => vyberDochazku(raw, t));
   const ted = useTed(!!data.data?.entries.some(e => !e.clockOut), 60_000);
   const entriesObdobi = useMemo(() => (data.data ? (L ? zaznamyVRozmezi(data.data.entries, r.od, r.do, obdobi.dnyTydne) : data.data.entries) : []), [data.data, L, r.od, r.do, obdobi.dnyTydne]);
+  // Spropitné z uzávěrek rozpočítané podle hodin na směně (jako tip pool v 7shifts / Toast) — velká podoba a jen s celými
+  // tržbami (bez uzaverky.zobrazit_vse přijdou jen vlastní uzávěrky a podíl by lhal). Chyba uzávěrek widget neshodí: dýška
+  // jsou doplněk k hodinám.
+  const vidiDyska = L && smi('finance.trzby') && smi('uzaverky.zobrazit_vse');
+  const uzaverky = useDataWidgetu<UzaverkaSpropitne[]>(brana && vidiDyska ? '/api/closings' : null, raw => vyberUzaverky(raw, t) as UzaverkaSpropitne[]);
+  const dyska = useMemo(() => (vidiDyska && uzaverky.data ? spropitneZaObdobi(uzaverky.data, entriesObdobi, ted, r.od, r.do, obdobi.dnyTydne) : null),
+    [vidiDyska, uzaverky.data, entriesObdobi, ted, r.od, r.do, obdobi.dnyTydne]);
   const radky = useMemo(() => {
     if (!data.data) return [];
     // Sazby jen s finance.mzdy — server je bez něj posílá jako null, ale
     // widget se na to nespoléhá (pole katalogu: Kč u člověka).
     const sazby = vidiMzdy ? sazbyZRosteru(data.data.roster as ClenRosteruB2[]) : new Map<string, number>();
-    return seradSouhrn(souhrnHodin(entriesObdobi, ted, sazby), razeni);
-  }, [data.data, entriesObdobi, ted, razeni, vidiMzdy]);
+    return seradSouhrn(souhrnHodin(entriesObdobi, ted, sazby, dyska && !dyska.skryto ? dyska.poLidech : null), razeni);
+  }, [data.data, entriesObdobi, ted, razeni, vidiMzdy, dyska]);
+  const mzdyCelkem = useMemo(() => radky.reduce((a, x) => a + (x.mzda ?? 0), 0), [radky]);
+  const bezSazby = useMemo(() => radky.filter(x => x.mzda == null && x.ms > 0).length, [radky]);
 
   const hr = hrubostProRozmezi(obdobi, pocetDni(r.od, r.do));
   const hodnoty = useMemo(() => (L && data.data ? hodinyPoDnech(data.data.entries, ted, r.od, r.do) : []), [L, data.data, ted, r.od, r.do]);
@@ -711,7 +720,19 @@ function SouhrnHodin({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: str
         <div className="mb-4 space-y-4">
           <ObdobiLista value={obdobi} onChange={nastav} volby={['dnes', 'vcera', 'tyden', '7_dni', '30_dni', 'mesic', 'minuly_mesic', '90_dni', '180_dni']} porovnat={porovnat} onPorovnat={setPorovnat} />
           <div>
-            <Stat label={t('Odpracováno')} value={hodinyText(sumHodin)} note={t('{n, plural, one {# směna} few {# směny} other {# směn}}', { n: radky.reduce((a, x) => a + x.pocet, 0) })} />
+            {/* Hodiny, mzdy a spropitné za období vedle sebe — co člověk hledá v „kdo kolik odpracoval a kolik to stálo".
+                Mzdy jen s finance.mzdy, spropitné jen s celými tržbami. */}
+            <StatRow podleKarty>
+              <Stat label={t('Odpracováno')} value={hodinyText(sumHodin)} note={t('{n, plural, one {# směna} few {# směny} other {# směn}}', { n: radky.reduce((a, x) => a + x.pocet, 0) })} />
+              {vidiMzdy && (
+                <Stat label={t('Mzdy')} value={money(mzdyCelkem)}
+                  note={bezSazby > 0 ? t('bez sazby: {n, plural, one {# člověk} few {# lidé} other {# lidí}}', { n: bezSazby }) : t('hodiny × sazba')} />
+              )}
+              {dyska && !dyska.skryto && (
+                <Stat label={t('Spropitné')} value={money(dyska.celkem)}
+                  note={dyska.nerozdeleno > 0 ? t('{castka} bez směny', { castka: money(dyska.nerozdeleno) }) : t('z uzávěrek, podle hodin na směně')} />
+              )}
+            </StatRow>
             {zmena != null && (
               <p className="t-meta mt-2 text-pretty">
                 <Chip tone={zmena >= 0 ? 'ok' : 'wait'} size="sm">{zmena > 0 ? '+' : ''}{zmena} %</Chip> {t('proti předchozímu období')} ({hodinyText(sumPred!)})
@@ -728,7 +749,11 @@ function SouhrnHodin({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: str
       )}
       <ul className="list">
         {zobrazene.map(r => {
-          const meta = [t('{n, plural, one {# směna} few {# směny} other {# směn}}', { n: r.pocet }), r.bezi ? t('právě běží') : null, r.vynechano > 0 ? t('{n}× bez odchodu', { n: r.vynechano.toLocaleString('cs-CZ') }) : null].filter(Boolean).join(' · ');
+          const meta = [
+            t('{n, plural, one {# směna} few {# směny} other {# směn}}', { n: r.pocet }), r.bezi ? t('právě běží') : null,
+            r.vynechano > 0 ? t('{n}× bez odchodu', { n: r.vynechano.toLocaleString('cs-CZ') }) : null,
+            r.spropitne != null && r.spropitne > 0 ? t('spropitné {castka}', { castka: money(Math.round(r.spropitne)) }) : null,
+          ].filter(Boolean).join(' · ');
           const radek = {
             lead: <Avatar emoji={r.avatar} size="sm" />,
             title: r.jmeno,

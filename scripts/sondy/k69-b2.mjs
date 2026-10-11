@@ -113,6 +113,9 @@ const doporucene = async (p) => {
   tvrdi('D1: Chybí sazba počítá Jakuba (vlastník se nepočítá)', (await widgetLi(p, 'tym.bez_sazby').innerText()).includes('1'));
   const souhrn = await widgetLi(p, 'dochazka.souhrn_hodin').innerText();
   tvrdi('D1: Souhrn hodin v jedné kartě s řádky lidí a „30 dní"', souhrn.includes('Petra Malá') && souhrn.includes('30 dní'), souhrn.slice(0, 200));
+  // Kolo 5: hodiny, mzdy a spropitné za období vedle sebe; dýško z uzávěrek (420 Kč) rozpočítané lidem na směně do řádku.
+  tvrdi('D1: Souhrn hodin má vedle hodin i Mzdy a Spropitné 420 Kč', /Mzdy/i.test(souhrn) && /Spropitné\s*420/i.test(souhrn.replace(/\u00a0/g, ' ')), souhrn.slice(0, 300));
+  tvrdi('D1: …a Petra má v řádku svůj podíl „spropitné … Kč"', /Petra Malá[\s\S]{0,120}spropitné \d/.test(souhrn.replace(/\u00a0/g, ' ')), souhrn.slice(0, 400));
   await p.screenshot({ path: OUT + 'k69-b2-dochazka-desk.png', fullPage: true });
 
   // Období stránky řídí widgety „Podle stránky" (Souhrn hodin) i nástroj.
