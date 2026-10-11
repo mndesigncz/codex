@@ -22,7 +22,7 @@
 import React, { Suspense, lazy, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Icon } from '../Icons';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
-import { Button, Card, EmptyState, ErrorState, Hint, PageHeader, Skeleton, Toast, Well, type MenuItem } from '../ui';
+import { Button, Card, EmptyState, ErrorState, Hint, Modal, PageHeader, Skeleton, Toast, Well, type MenuItem } from '../ui';
 import { usePlan } from '../Pro';
 import { obnovOpravneni, useOpravneni } from '../role/useOpravneni';
 import type { DefiniceStranky, DefiniceWidgetu, IdStranky, PolozkaRozlozeni, Rozsah, Tarif, Velikost } from '@/lib/widgety/typy';
@@ -130,6 +130,8 @@ interface Obsluha {
   prepniSbaleni: (instance: string) => void;
   /** Klepnutí na kartu v klidu: naviguje na `cil` widgetu z katalogu. */
   klikKlid: (e: React.MouseEvent<HTMLElement>, instance: string) => void;
+  /** Otevře střední kartu zvětšenou v okně (velká podoba widgetu). */
+  zvetsit: (instance: string) => void;
 }
 
 interface PolozkaProps {
@@ -194,6 +196,33 @@ function velikostPoZmene(t: PrekladFn, velikost: Velikost, nazev: string): strin
   return t('{nazev}: velký.', { nazev });
 }
 
+const BEZ_AKCE = () => {};
+
+/**
+ * Widget zvětšený do okna: tatáž komponenta ve velké podobě (L), jen bez karty a hlavičky (název nese okno).
+ * Je mimo `<li>` i mimo kořen plochy: událost z okna by se jinak (React ji bublá stromem komponent) dostala do obsluhy karty
+ * a klepnutí mimo okno by otevřelo cíl widgetu.
+ */
+function ZvetsenyWidget({ p, def, nazev, stranka, onClose }: { p: PolozkaRozlozeni; def: DefiniceWidgetu; nazev: string; stranka: DefiniceStranky; onClose: () => void }) {
+  const Komponenta = useMemo(() => lineWidget(p.widget, 0), [p.widget]);
+  const nastaveni = useMemo(() => sNastavenimVychozimi(def.nastaveni, p.nastaveni), [def, p.nastaveni]);
+  const kontext = useMemo<KontextWidgetu>(() => ({
+    instance: p.id, velikost: 'L', definice: def, nahled: false, upravy: false, inkoust: false, nahlasSkryti: BEZ_AKCE,
+    nahlasVyrizeno: BEZ_AKCE, mini: null, rozbal: BEZ_AKCE, pohledStranky: stranka.pohled, sbaleno: false, prepniSbaleni: BEZ_AKCE, zvetsit: null, vOkne: true,
+  }), [p.id, def, stranka.pohled]);
+  return (
+    <Modal open onClose={onClose} size="xl" title={nazev}>
+      <KontextWidgetuCtx.Provider value={kontext}>
+        <PojistkaWidgetu resetKey={`${p.id}-velky`} onZnovu={onClose}>
+          <Suspense fallback={<Skeleton className="h-48" />}>
+            <Komponenta instance={p.id} velikost="L" nastaveni={nastaveni} nahled={false} />
+          </Suspense>
+        </PojistkaWidgetu>
+      </KontextWidgetuCtx.Provider>
+    </Modal>
+  );
+}
+
 const PolozkaPlochy = memo(function PolozkaPlochy(props: PolozkaProps) {
   const { p, index, pocet, def, nazev, rozpeti, skryta, upravy, odznakyMizi, pripojit, bezOpravneni, schematicky, inkoust, pokus, nova, mini, sbaleno, navodId, stranka, nastroj, h } = props;
   const t = useT('widgety');
@@ -202,10 +231,13 @@ const PolozkaPlochy = memo(function PolozkaPlochy(props: PolozkaProps) {
   const nahlasVyrizeno = useCallback((souhrn: string | null) => h.nahlasVyrizeno(p.id, souhrn), [h, p.id]);
   const rozbal = useCallback(() => h.rozbal(p.id), [h, p.id]);
   const prepniSbaleni = useCallback(() => h.prepniSbaleni(p.id), [h, p.id]);
+  // Střední karta, která má velkou podobu (graf, delší seznam), se dá zvětšit do okna — jako „Otevřít" u widgetů v jiných aplikacích.
+  const smiZvetsit = !jeNastroj && !upravy && !schematicky && p.velikost === 'M' && !!def?.velikosti.includes('L');
+  const zvetsit = useCallback(() => h.zvetsit(p.id), [h, p.id]);
   const kontext = useMemo<KontextWidgetu>(() => ({
     instance: p.id, velikost: p.velikost, definice: def, nahled: false, upravy, inkoust, nahlasSkryti,
-    nahlasVyrizeno, mini, rozbal, pohledStranky: stranka.pohled, sbaleno, prepniSbaleni,
-  }), [p.id, p.velikost, def, upravy, inkoust, nahlasSkryti, nahlasVyrizeno, mini, rozbal, stranka.pohled, sbaleno, prepniSbaleni]);
+    nahlasVyrizeno, mini, rozbal, pohledStranky: stranka.pohled, sbaleno, prepniSbaleni, zvetsit: smiZvetsit ? zvetsit : null,
+  }), [p.id, p.velikost, def, upravy, inkoust, nahlasSkryti, nahlasVyrizeno, mini, rozbal, stranka.pohled, sbaleno, prepniSbaleni, smiZvetsit, zvetsit]);
   const Komponenta = useMemo(() => (def && !jeNastroj ? lineWidget(p.widget, pokus) : null), [def, jeNastroj, p.widget, pokus]);
   const nastaveni = useMemo(() => sNastavenimVychozimi(def?.nastaveni, p.nastaveni), [def, p.nastaveni]);
   // Fáze a délka kmitu z hashe id: vypadá náhodně, ale je stálá — sousedé se
@@ -366,6 +398,8 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
   const [upravyNekdy, setUpravyNekdy] = useState(vychoziRezim);
   const [odznakyMizi, setOdznakyMizi] = useState(false);
   const [menu, setMenu] = useState<OtevreneMenu | null>(null);
+  /** Instance widgetu zvětšeného do okna. */
+  const [velky, setVelky] = useState<string | null>(null);
   const [galerie, setGalerie] = useState<null | { odkud: 'lista' | 'bunka' | 'prazdna' }>(null);
   const [nastaveni, setNastaveni] = useState<string | null>(null);
   const [ulozVychozi, setUlozVychozi] = useState(false);
@@ -395,7 +429,7 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
   upravyRef.current = upravy;
   const menuRef = useRef<OtevreneMenu | null>(menu);
   menuRef.current = menu;
-  const oknoOtevreno = !!(galerie || nastaveni || ulozVychozi);
+  const oknoOtevreno = !!(galerie || nastaveni || ulozVychozi || velky);
   const oknoRef = useRef(oknoOtevreno);
   oknoRef.current = oknoOtevreno;
   const toastId = useRef(0);
@@ -1105,6 +1139,7 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
     rozbal,
     prepniSbaleni: id => obsluhaRef.current.prepniSbaleni(id),
     klikKlid: (e, id) => obsluhaRef.current.klikKlid(e, id),
+    zvetsit: id => setVelky(id),
   }), [tahPointerDown, nahlasSkryti, nahlasVyrizeno, rozbal]);
 
   // ---- Menu ----
@@ -1356,6 +1391,11 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
     </div>
     {/* Mimo kořen plochy: událost z oken (React je bublá stromem komponent) by jinak došla do obsluhy plochy. */}
     {!vychoziRezim && <DenHost />}
+    {velky && !vychoziRezim && (() => {
+      const pol = polozky.find(x => x.id === velky);
+      const def = pol ? najdiWidget(pol.widget) : undefined;
+      return pol && def ? <ZvetsenyWidget p={pol} def={def} nazev={nazevPolozky(pol)} stranka={stranka} onClose={() => setVelky(null)} /> : null;
+    })()}
     </>
   );
 }
