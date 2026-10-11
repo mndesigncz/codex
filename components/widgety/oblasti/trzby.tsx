@@ -192,7 +192,7 @@ function PokladnaDnes({ velikost, nahled }: WidgetProps) {
           <p className="t-label !text-white/55">{t('Tržba')}</p>
           <p className="mt-1.5 text-[2.5rem] leading-none font-bold tracking-tight tabular-nums text-white">{money(s.celkem)}</p>
           {poznamka && <p className="mt-1.5 text-[13px] text-white/60 truncate">{poznamka}</p>}
-          {zmenaTydne && <p className={`mt-1 text-[13px] font-medium truncate ${zmenaTydne.pct >= 0 ? 'text-[#C8F542]' : 'text-[#FFB4A8]'}`}>{zmenaText}</p>}
+          {zmenaTydne && <p className={`mt-1 text-[13px] font-medium truncate ${zmenaTydne.pct >= 0 ? 'text-[#C8F542]' : 'text-bad-lift'}`}>{zmenaText}</p>}
           <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-white/10 pt-3">
             {([[t('Hotově'), s.hotove], [t('Kartou'), s.kartou], [t('Spropitné'), s.spropitne]] as const).map(([stitek, castka]) => (
               <div key={stitek} className="min-w-0">
