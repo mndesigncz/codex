@@ -18,7 +18,7 @@
 import { useState, useEffect, useMemo, useCallback, useId } from 'react';
 import { Icon } from '../Icons';
 import {
-  Button, Card, Chip, EmptyState, ErrorState, Field, Input, Modal, Segmented, Select, Skeleton, Stat, StatRow, SwitchRow, Textarea, Toast,
+  Button, Card, Chip, EmptyState, ErrorState, Field, Input, Modal, Segmented, Select, Skeleton, SwitchRow, Textarea, Toast,
 } from '../ui';
 import { useCurrency } from '../CurrencyProvider';
 import { TaskChecklist, ChecklistItem } from '../TaskChecklist';
@@ -35,7 +35,8 @@ import { DraftNote } from '../ui/DraftNote';
 import { vyberUkoly, rozdelPoDnech, jeCiziUkol, splnenoDnes, type Ukol } from '@/lib/ukolyPrehled';
 import { VYCHOZI_FILTR, filtrujBezStavu, filtrujUkoly, poctyStavu, seradUkoly, statistikaUkolu, type FiltrUkolu } from '@/lib/ukolyFiltr';
 import { UkolDetail } from '../ukoly/UkolDetail';
-import { UkolyFiltry } from '../ukoly/UkolyFiltry';
+import { UkolyFiltry, type ClovekFiltru } from '../ukoly/UkolyFiltry';
+import { UkolySouhrn } from '../ukoly/UkolySouhrn';
 import { UkolyMesic } from '../ukoly/UkolyMesic';
 import { UkolyPrehled } from '../ukoly/UkolyPrehled';
 import { oznamZmenuPovinnych, ChipPredUzaverkou } from '../PredUzaverkou';
@@ -276,11 +277,18 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
   const plochySeznam = filtr.stav !== 'vse' || filtr.razeni !== 'termin';
   const vSeznamu = useMemo(() => filtrujUkoly(tasks, filtr, today, weekAhead), [tasks, filtr, today, weekAhead]);
   const skupiny = rozdelPoDnech(forWho, today, weekAhead);
+  const lideFiltru = useMemo(() => {
+    const out: ClovekFiltru[] = [];
+    const volne = tasks.filter(uk => uk.assignedTo == null).length;
+    if (volne > 0) out.push({ id: 'volne', label: t('Kdokoli'), n: volne });
+    for (const m of members) { const n = tasks.filter(uk => uk.assignedTo === m.id).length; if (n > 0) out.push({ id: m.id, label: m.name.split(' ')[0], n }); }
+    return out;
+  }, [tasks, members, t]);
   const detail = detailId != null ? tasks.find(x => x.id === detailId) ?? null : null;
   const hodnotyKarty = useMemo(() => {
     const tyden = statistikaUkolu(tasks, pragueToday(-6), today, today);
     return { otevrene: tasks.filter(x => x.status !== 'done').length, poTerminu: poctyStavu(tasks, VYCHOZI_FILTR, today, weekAhead).po_terminu,
-      dnesHotovo: splnenoDnes(tasks, today).length, dnesCelkem: tasks.filter(x => x.dueDate === today).length, tyden: tyden.splneno, uspesnost: tyden.uspesnostPct };
+      dnesHotovo: tasks.filter(x => x.dueDate === today && x.status === 'done').length, dnesCelkem: tasks.filter(x => x.dueDate === today).length, tyden: tyden.splneno, uspesnost: tyden.uspesnostPct };
   }, [tasks, today, weekAhead]);
   const labelFor = (uk: Ukol) => uk.teamTask ? t('Kdokoli') : (uk.assignedTo != null ? (memberById.get(uk.assignedTo)?.name ?? uk.assigneeName ?? '') : '');
 
@@ -348,43 +356,13 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
 
   const nastroj = (
     <div className="space-y-6">
-      {tasks.length > 0 && (
-        <Card>
-          <StatRow>
-            <Stat label={t('Otevřené')} value={hodnotyKarty.otevrene} icon="clipboard" tone="info" />
-            <Stat label={t('Po termínu')} value={hodnotyKarty.poTerminu} icon="clock" tone={hodnotyKarty.poTerminu > 0 ? 'bad' : 'muted'} />
-            <Stat label={t('Dnes hotovo')} value={`${hodnotyKarty.dnesHotovo}`} note={hodnotyKarty.dnesCelkem > 0 ? t('z {n} s dnešním termínem', { n: hodnotyKarty.dnesCelkem }) : undefined} icon="check" tone="ok" />
-            <Stat label={t('Splněno za 7 dní')} value={hodnotyKarty.tyden} note={hodnotyKarty.uspesnost != null ? t('úspěšnost {n} %', { n: hodnotyKarty.uspesnost }) : undefined} icon="trend" tone="muted" />
-          </StatRow>
-        </Card>
+      {tasks.length > 0 && view !== 'prehled' && (
+        <UkolySouhrn hotovo={hodnotyKarty.dnesHotovo} celkem={hodnotyKarty.dnesCelkem} poTerminu={hodnotyKarty.poTerminu}
+          onPoTerminu={() => { setView('list'); setFiltr(f => ({ ...f, stav: 'po_terminu' })); }} />
       )}
 
-      {tasks.length > 0 && view !== 'prehled' && <UkolyFiltry filtr={filtr} onChange={setFiltr} pocty={pocty} skrytStav={view !== 'list'} />}
-
-      {/* Filtr podle člověka. Ukáže se, až když je koho filtrovat. */}
-      {members.length > 1 && tasks.length > 0 && (
-        <div className="flex gap-1.5 overflow-x-auto scrollbar-thin scroll-fade-x -mx-1 px-1 py-0.5" role="group" aria-label={t('Filtr podle člověka')}>
-          <button type="button" aria-pressed={who === 'all'} onClick={() => setWho('all')}
-            className={`filter-pill tap-target-sm ${who === 'all' ? 'seg-on' : 'seg-off glass'}`}>
-            {t('Všichni')} · {tasks.length}
-          </button>
-          {tasks.some(uk => uk.assignedTo == null) && (
-            <button type="button" aria-pressed={who === 'volne'} onClick={() => setWho(w => (w === 'volne' ? 'all' : 'volne'))}
-              className={`filter-pill tap-target-sm ${who === 'volne' ? 'seg-on' : 'seg-off glass'}`}>
-              {t('Kdokoli')} · {tasks.filter(uk => uk.assignedTo == null).length}
-            </button>
-          )}
-          {members.map(m => {
-            const n = tasks.filter(uk => uk.assignedTo === m.id).length;
-            if (n === 0) return null;
-            return (
-              <button key={m.id} type="button" aria-pressed={who === m.id} onClick={() => setWho(w => (w === m.id ? 'all' : m.id))}
-                className={`filter-pill tap-target-sm ${who === m.id ? 'seg-on' : 'seg-off glass'}`}>
-                {m.name.split(' ')[0]} · {n}
-              </button>
-            );
-          })}
-        </div>
+      {tasks.length > 0 && view !== 'prehled' && (
+        <UkolyFiltry filtr={filtr} onChange={setFiltr} pocty={pocty} skrytStav={view !== 'list'} lide={lideFiltru} />
       )}
 
       {showForm && (

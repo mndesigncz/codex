@@ -39,13 +39,16 @@ export interface CasovyGrafProps {
   className?: string;
 }
 
-/** „Hezký" strop osy: 1, 2, 2,5, 5 × 10ⁿ. */
+/**
+ * „Hezký" strop osy: čtyři stejné dílky po „kulatém" kroku (1; 1,2; 1,5; 2; 2,5; 3; 4; 5; 6; 8 × 10ⁿ), takže popisky osy
+ * jsou čísla, která člověk čte rovnou (0, 6k, 12k, 18k, 24k), ne 6,3k a 18,8k.
+ */
 export function hezkyStrop(max: number): number {
   if (!(max > 0)) return 1;
-  const exp = Math.pow(10, Math.floor(Math.log10(max)));
-  const f = max / exp;
-  const nasobek = f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10;
-  return nasobek * exp;
+  const exp = Math.pow(10, Math.floor(Math.log10(max / 4)));
+  const f = max / 4 / exp;
+  const krok = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find(k => k >= f - 1e-9) ?? 10;
+  return krok * exp * 4;
 }
 
 export function CasovyGraf({
@@ -115,13 +118,13 @@ export function CasovyGraf({
                 </>
               );
               const spolecne = {
-                key: s.klic, className: `relative flex-1 min-w-0 h-full ${najeto === i ? 'bg-black/[0.04]' : ''}`,
+                className: `relative flex-1 min-w-0 h-full ${najeto === i ? 'bg-black/[0.04]' : ''}`,
                 onMouseEnter: () => setNajeto(i), onFocus: () => setNajeto(i), onBlur: () => setNajeto(v => (v === i ? null : v)),
               };
               return onVyber
-                ? <button type="button" {...spolecne} aria-label={vetaSlotu} aria-pressed={vb} onClick={() => onVyber(s)}
+                ? <button key={s.klic} type="button" {...spolecne} aria-label={vetaSlotu} aria-pressed={vb} onClick={() => onVyber(s)}
                     className={`${spolecne.className} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542] rounded-sm`}>{obsah}</button>
-                : <div {...spolecne} role="img" aria-label={vetaSlotu}>{obsah}</div>;
+                : <div key={s.klic} {...spolecne} role="img" aria-label={vetaSlotu}>{obsah}</div>;
             })}
           </div>
           {aktivni && (

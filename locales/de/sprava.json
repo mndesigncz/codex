@@ -119,7 +119,6 @@
   "Export pro účetní": "Export für die Buchhaltung",
   "Fakturace": "Abrechnung",
   "Filtr podle stavu": "Nach Status filtern",
-  "Filtr podle člověka": "Nach Person filtern",
   "Finance": "Finanzen",
   "Fotka akce {n}": "Veranstaltungsfoto {n}",
   "Fotka účtenky {dodavatel}": "Belegfoto {dodavatel}",
@@ -1057,7 +1056,6 @@
   "Všechny najednou": "Alle auf einmal",
   "Všechny podniky": "Alle Betriebe",
   "Všem členům podniku přijde push a akce se objeví v novinkách na stránce podniku.": "Alle Mitglieder des Betriebs bekommen eine Push-Nachricht und die Veranstaltung erscheint in den Neuigkeiten auf der Seite des Betriebs.",
-  "Všichni": "Alle",
   "Wi-Fi — heslo": "WLAN — Passwort",
   "Wi-Fi — síť": "WLAN — Netzwerk",
   "Workshop": "Workshop",
@@ -1534,11 +1532,6 @@
   "Celý den": "Ganztags",
   "Celý den {den}": "Ganzer Tag {den}",
   "Otevřít detail úkolu": "Aufgabendetails öffnen",
-  "Otevřené": "Offen",
-  "Dnes hotovo": "Heute erledigt",
-  "Splněno za 7 dní": "In 7 Tagen erledigt",
   "Nic nevyhovuje filtrům": "Nichts passt zu den Filtern",
-  "Zkus jiný stav, hledání nebo zruš filtry.": "Probiere einen anderen Status oder eine andere Suche oder setze die Filter zurück.",
-  "z {n} s dnešním termínem": "von {n} mit heutigem Termin",
-  "úspěšnost {n} %": "{n} % Erfolgsquote"
+  "Zkus jiný stav, hledání nebo zruš filtry.": "Probiere einen anderen Status oder eine andere Suche oder setze die Filter zurück."
 }

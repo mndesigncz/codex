@@ -146,9 +146,9 @@ const FIX_UKOLY = nacti('k69-b6a-rozlozeni-ukoly');
 
   // Widget → nástroj: klepnutí na Petra vyfiltruje seznam.
   await lide.getByRole('button', { name: /Petr Novák/ }).click();
-  tvrdi('U-W: řádek „Petr Novák" v Podle lidí zapne filtr Petr v nástroji', await dokud(() => nastroj.getByRole('button', { name: /^Petr · / }).getAttribute('aria-pressed').then(v => v === 'true'), 1500));
+  tvrdi('U-W: řádek „Petr Novák" v Podle lidí zapne filtr Petr v nástroji (štítek „Zrušit filtr: Petr")', await dokud(async () => await nastroj.getByRole('button', { name: /^Zrušit filtr: Petr/ }).count() === 1, 1500));
   tvrdi('U-W: …a seznam ukáže jen Petrovy úkoly', await dokud(async () => { const t = await nastroj.innerText(); return t.includes('Objednat mléko') && !t.includes('Umýt okna'); }, 1500));
-  await nastroj.getByRole('button', { name: /^Všichni · / }).click();
+  await nastroj.getByRole('button', { name: /^Zrušit filtr: Petr/ }).click();
 
   // Splnit úkol s termínem jindy než dnes → okno (dřív confirm()).
   await nastroj.getByRole('checkbox', { name: 'Umýt okna' }).click();

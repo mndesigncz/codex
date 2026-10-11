@@ -20,7 +20,7 @@ import { TaskChecklist, recurrenceLabel, type ChecklistItem } from '../TaskCheck
 import { useCurrency } from '../CurrencyProvider';
 import TaskWeekBoard from '../TaskWeekBoard';
 import { pragueToday } from '@/lib/pragueTime';
-import { Button, Card, Chip, EmptyState, ErrorState, Menu, Modal, Segmented, Skeleton, Stat, StatRow, Toast } from '../ui';
+import { Button, Card, Chip, EmptyState, ErrorState, Menu, Modal, Segmented, Skeleton, Toast } from '../ui';
 import { Icon } from '../Icons';
 import { apiMessage, okJson } from '@/lib/api';
 import { useJazyk, useT } from '@/lib/i18n/client';
@@ -33,8 +33,8 @@ import { vyberUkoly, vRozsahu, rozdelPoDnech, jeCiziUkol, splnenoDnes, type Ukol
 import { VYCHOZI_FILTR, filtrujBezStavu, filtrujUkoly, poctyStavu, seradUkoly, statistikaUkolu, type FiltrUkolu } from '@/lib/ukolyFiltr';
 import { UkolDetail } from '../ukoly/UkolDetail';
 import { UkolyFiltry } from '../ukoly/UkolyFiltry';
+import { UkolySouhrn } from '../ukoly/UkolySouhrn';
 import { UkolyMesic } from '../ukoly/UkolyMesic';
-import { UkolyPrehled } from '../ukoly/UkolyPrehled';
 import { oznamZmenuPovinnych, ChipPredUzaverkou } from '../PredUzaverkou';
 
 interface Props {
@@ -121,9 +121,8 @@ export default function Tasks({ user }: Props) {
   const vSeznamu = useMemo(() => filtrujUkoly(tasks, filtr, today, weekAhead), [tasks, filtr, today, weekAhead]);
   const detail = detailId != null ? tasks.find(x => x.id === detailId) ?? null : null;
   const karty = useMemo(() => {
-    const tyden = statistikaUkolu(tasks, pragueToday(-6), today, today);
     return { otevrene: tasks.filter(x => x.status !== 'done').length, poTerminu: poctyStavu(tasks, VYCHOZI_FILTR, today, weekAhead).po_terminu,
-      dnesHotovo: splnenoDnes(tasks, today).length, tyden: tyden.splneno };
+      dnesHotovo: tasks.filter(x => x.dueDate === today && x.status === 'done').length, dnesCelkem: tasks.filter(x => x.dueDate === today).length };
   }, [tasks, today, weekAhead]);
   const skupiny = rozdelPoDnech(bezStavu, today, weekAhead, 20);
 
@@ -191,14 +190,8 @@ export default function Tasks({ user }: Props) {
   const nastroj = (
     <div className="space-y-6">
       {tasks.length > 0 && (
-        <Card>
-          <StatRow>
-            <Stat label={t('Otevřené')} value={karty.otevrene} icon="clipboard" tone="info" />
-            <Stat label={t('Po termínu')} value={karty.poTerminu} icon="clock" tone={karty.poTerminu > 0 ? 'bad' : 'muted'} />
-            <Stat label={t('Dnes hotovo')} value={karty.dnesHotovo} icon="check" tone="ok" />
-            <Stat label={t('Splněno za 7 dní')} value={karty.tyden} icon="trend" tone="muted" />
-          </StatRow>
-        </Card>
+        <UkolySouhrn hotovo={karty.dnesHotovo} celkem={karty.dnesCelkem} poTerminu={karty.poTerminu}
+          onPoTerminu={() => { setView('list'); setFiltr(f => ({ ...f, stav: 'po_terminu' })); }} />
       )}
       {tasks.length > 0 && view !== 'prehled' && <UkolyFiltry filtr={filtr} onChange={setFiltr} pocty={pocty} skrytStav={view !== 'list'} />}
       {saveErr && <p className="note note-danger text-sm" role="alert">{saveErr}</p>}
@@ -208,8 +201,6 @@ export default function Tasks({ user }: Props) {
         <Card aria-busy className="space-y-2">
           <Skeleton className="h-10" /><Skeleton className="h-10" /><Skeleton className="h-10 w-2/3" />
         </Card>
-      ) : view === 'prehled' ? (
-        <UkolyPrehled ukoly={bezStavu} dnes={today} onOtevri={u => setDetailId(u.id)} />
       ) : view === 'month' ? (
         <UkolyMesic ukoly={bezStavu} dnes={today} zacatekTydne={weekStart === 0 ? 0 : 1} radek={row} />
       ) : view === 'week' ? (
@@ -254,7 +245,7 @@ export default function Tasks({ user }: Props) {
           subtitle: data.data && zbyva > 0 ? t('Na dnešek a po termínu: {n, plural, one {# úkol} few {# úkoly} other {# úkolů}}.', { n: zbyva }) : t('Co je dnes na tobě — a co je pro kohokoli.'),
           hintId: 'tasks',
           aside: <Segmented size="sm" ariaLabel={t('Zobrazení')} value={view} onChange={setView}
-            options={[{ id: 'list', label: t('Seznam') }, { id: 'week', label: t('Týden') }, { id: 'month', label: t('Měsíc') }, { id: 'prehled', label: t('Přehled') }]} />,
+            options={[{ id: 'list', label: t('Seznam') }, { id: 'week', label: t('Týden') }, { id: 'month', label: t('Měsíc') }]} />,
         }}
         nastroj={nastroj}
       />
