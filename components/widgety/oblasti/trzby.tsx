@@ -208,7 +208,7 @@ function PokladnaDnes({ velikost, nahled }: WidgetProps) {
             <Stat label={t('Tržba')} value={money(s.celkem)} note={poznamka} />
             {zmenaTydne && <p className={`mt-1 text-[13px] font-medium ${zmenaTydne.pct >= 0 ? 'text-ok-ink' : 'text-wait-ink'}`}>{zmenaText}</p>}
           </div>
-          <StatRow className="border-t border-[var(--surface-line)] pt-4">
+          <StatRow podleKarty className="border-t border-[var(--surface-line)] pt-4">
             <Stat label={t('Hotově')} value={money(s.hotove)} />
             <Stat label={t('Kartou')} value={money(s.kartou)} />
             <Stat label={t('Spropitné')} value={money(s.spropitne)} />
@@ -253,7 +253,7 @@ function ZivePokladna({ velikost, nastaveni }: WidgetProps<{ obdobi: string }>) 
           ) : (
             <>
               <Stat label={t('Tržba')} value={money(sc.total)} note={popisUctenek(sc.bills, sc.avgBill, money)} />
-              <StatRow className="border-t border-[var(--surface-line)] pt-4">
+              <StatRow podleKarty className="border-t border-[var(--surface-line)] pt-4">
                 <Stat label={t('Hotově')} value={money(sc.cash)} />
                 <Stat label={t('Kartou')} value={money(sc.card)} />
                 <Stat label={t('Spropitné')} value={money(sc.tips)} />

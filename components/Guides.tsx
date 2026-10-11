@@ -174,11 +174,13 @@ function renderInline(text: string) {
   });
 }
 
-export default function Guides({ user, ticksFor, openGuideId, zaKoho, vyberKoho }: {
+export default function Guides({ user, ticksFor, openGuideId, predani, zaKoho, vyberKoho }: {
   user: User;
   ticksFor?: number | null;
   /** Otevřít rovnou tenhle návod — proklik z receptury, ze skladu, z úkolu nebo z widgetu. */
   openGuideId?: number | null;
+  /** Filtr z widgetu („K přečtení", „Návrhy"); `n` se mění při každém příchodu, i když je stav stejný. */
+  predani?: { stav?: StavNavodu; n: number } | null;
   /** Tablet: člověk vybraný u tabletu — za něj se potvrzuje přečtení. */
   zaKoho?: Osoba | null;
   /** Tablet: zeptá se, kdo u tabletu stojí (null = výběr zavřel). */
@@ -214,6 +216,9 @@ export default function Guides({ user, ticksFor, openGuideId, zaKoho, vyberKoho 
   const categories = kategorie.data ?? [];
 
   const [activeCat, setActiveCat] = useState<number | 'all'>('all');
+  // Stavový filtr vedle kategorií: co ještě čeká na přečtení a co čeká na schválení.
+  const [stav, setStav] = useState<StavNavodu>(predani?.stav ?? 'vse');
+  useEffect(() => { if (predani) setStav(predani.stav ?? 'vse'); }, [predani?.stav, predani?.n]); // eslint-disable-line react-hooks/exhaustive-deps
   const [search, setSearch] = useState('');
   const [chyba, setChyba] = useState('');
 
@@ -247,12 +252,16 @@ export default function Guides({ user, ticksFor, openGuideId, zaKoho, vyberKoho 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return guides.filter((g) => {
+      if (stav === 'kprecteni' && !jeKPrecteni(g)) return false;
+      if (stav === 'navrhy' && g.approved !== false) return false;
       if (activeCat === -1) { if (g.categoryId != null) return false; }
       else if (activeCat !== 'all' && g.categoryId !== activeCat) return false;
       if (!q) return true;
       return obsahujeNekde(q, g.title, g.excerpt);
     });
-  }, [guides, activeCat, search]);
+  }, [guides, activeCat, search, stav]);
+  const nKPrecteni = useMemo(() => guides.filter(jeKPrecteni).length, [guides]);
+  const nNavrhu = useMemo(() => guides.filter(g => g.approved === false).length, [guides]);
 
   const hasUncategorized = useMemo(() => guides.some((g) => g.categoryId == null), [guides]);
 
@@ -425,7 +434,7 @@ export default function Guides({ user, ticksFor, openGuideId, zaKoho, vyberKoho 
               );
             }
             return (
-              <ListRow key={g.id} className="relative"
+              <ListRow key={g.id} className="relative" akceVRadku
                 // Řádek má „···", takže celý klikací být nemůže (tlačítko v tlačítku) — čtečku otevře název.
                 // Cíl je celý řádek: ::after tlačítka se roztáhne přes <li className="relative">
                 // (samotný text měřil na telefonu ~20 px; tap-target i -my ořízne `truncate` obalu).
@@ -455,6 +464,19 @@ export default function Guides({ user, ticksFor, openGuideId, zaKoho, vyberKoho 
           {smiKategorie && categories.length === 0 && !kategorie.loading && !kategorie.error && (
             <Button variant="secondary" size="sm" icon="plus" onClick={createDefaults} loading={creatingCat} className="shrink-0">{t('Vytvořit výchozí kategorie')}</Button>
           )}
+        </div>
+      )}
+      {/* Co čeká na člověka: přečíst nebo schválit. Jen když takový návod je (nebo je filtr zapnutý). */}
+      {(nKPrecteni > 0 || nNavrhu > 0 || stav !== 'vse') && (
+        <div className="flex gap-2 overflow-x-auto scrollbar-thin -mx-1 px-1 items-center" role="group" aria-label={t('Stav návodů')}>
+          {([['kprecteni', t('K přečtení'), nKPrecteni], ['navrhy', t('Čeká na schválení'), nNavrhu]] as const)
+            .filter(([id, , n]) => n > 0 || stav === id)
+            .map(([id, label, n]) => (
+              <button key={id} type="button" aria-pressed={stav === id} onClick={() => setStav(stav === id ? 'vse' : id)}
+                className={`filter-pill tap-target whitespace-nowrap shrink-0 ${stav === id ? 'seg-on' : 'seg-off glass'}`}>
+                {label} <span className="tabular-nums opacity-60">{n}</span>
+              </button>
+            ))}
         </div>
       )}
       {seznam}
@@ -1007,6 +1029,15 @@ function GuideEditor({
  * Stav čtení u návodu — v seznamu i ve čtečce stejně. Povinný před uzávěrkou
  * počítá jen přečtení aktuální verze (myReadCurrent), jinak stačí kdykoli.
  */
+type StavNavodu = 'vse' | 'kprecteni' | 'navrhy';
+
+/** Povinný návod (čtení, nebo před uzávěrkou), který ten, kdo se dívá, ještě nepřečetl. Stejné pravidlo jako štítek v řádku. */
+function jeKPrecteni(g: NavodApi): boolean {
+  const predUzaverkou = g.requireBeforeClosing === true;
+  if (!predUzaverkou && !g.requireRead) return false;
+  return !(predUzaverkou ? g.myReadCurrent === true : g.myRead === true);
+}
+
 function StavCteni({ g }: { g: NavodApi }) {
   const t = useT('navody');
   const predUzaverkou = g.requireBeforeClosing === true;

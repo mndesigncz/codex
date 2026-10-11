@@ -121,7 +121,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stranky: ['vedeni.postupy'],
     opravneni: { vse: ['postupy.schvalovat'], nektere: [] },
     tarif: 'zdarma',
-    cil: { pohled: 'procedures' },
+    cil: { pohled: 'procedures', arg: 'stav:navrhy' },
     stav: 'hotovo',
   },
   // Data: GET /api/procedures → procedures[{remindAt,remindDays,remindAnchor}], openingToday, hasShiftToday

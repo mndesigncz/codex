@@ -173,6 +173,23 @@ const doporucene = (galerie) => galerie.evaluate(el => {
   await ctx.close();
 }
 
+// Widget Docházející zásoby → Sklad s filtrem „Jen co dochází" (klepnutí na řádek vede tam, kde je vidět to, co widget ukázal).
+{
+  const { ctx, p } = await kontext({ fix: FIX_VEDENI, dalsi: podvrh() });
+  await otevri(p, VEDENI, 'vedeni.sklad');
+  const nastroj = widgetLi(p, 'nastroj');
+  const pilulka = nastroj.getByRole('button', { name: /^Jen co dochází/ });
+  tvrdi('D1: nástroj nabízí „Jen co dochází" s počtem a ze začátku vypnuté', await pilulka.count() === 1 && /· \d/.test(await pilulka.innerText()) && await pilulka.getAttribute('aria-pressed') === 'false');
+  const vseTxt = await nastroj.innerText();
+  await widgetLi(p, 'sklad.dochazi').locator('button.list-row').first().click();
+  tvrdi('D2: klepnutí na řádek Docházejících zásob zapne filtr', await dokud(async () => (await pilulka.getAttribute('aria-pressed')) === 'true', 3000));
+  const filtrTxt = await nastroj.innerText();
+  tvrdi('D2: …v kategorii té položky (Obaly) a Kelímky (pod limitem) v seznamu jsou', filtrTxt.includes('Kelímky') && filtrTxt.includes('v „Obaly"') && filtrTxt.length <= vseTxt.length, `${filtrTxt.length} vs ${vseTxt.length} | ${filtrTxt.slice(0, 300)}`);
+  await pilulka.click();
+  tvrdi('D3: pilulkou jde filtr zase vypnout', await dokud(async () => (await pilulka.getAttribute('aria-pressed')) === 'false', 2000));
+  await ctx.close();
+}
+
 // Review B3: Objednávky ve výchozí velikosti M — Přijmout v řádku, okno s cenou,
 // cena jde jako totalCost; velký widget má historii přijatých a zrušených.
 {

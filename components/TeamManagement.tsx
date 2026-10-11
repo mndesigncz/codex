@@ -473,7 +473,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                 </>
               );
               return (
-                <ListRow key={m.id}
+                <ListRow key={m.id} akceVRadku
                   lead={<Avatar emoji={m.avatar} size="sm" />}
                   title={m.name}
                   meta={[m.job_title, m.email].filter(Boolean).join(' · ')}

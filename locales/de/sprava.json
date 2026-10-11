@@ -1535,5 +1535,8 @@
   "Úkol je odložený na {den}.": "Aufgabe auf {den} verschoben.",
   "Hledat v aplikaci (Ctrl K)": "In der App suchen (Strg K)",
   "Hledat v aplikaci": "In der App suchen",
-  "Hledat": "Suchen"
+  "Hledat": "Suchen",
+  "Úkol je hotový.": "Aufgabe erledigt.",
+  "Vrátit": "Zurücklegen",
+  "Jen co dochází": "Nur was zur Neige geht"
 }

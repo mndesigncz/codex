@@ -148,6 +148,17 @@ async function nastrojVUpravach(p, stav, znacka, vidget) {
   tvrdi('P1: klepnutí na meta řádku trefí tlačítko detailu (cíl = řádek ≥ 44 px)', trefa.meta && trefa.vyska >= 44, JSON.stringify(trefa));
   tvrdi('P1: …a „Spustit" v řádku zůstává klikací nad ním', trefa.spustit, JSON.stringify(trefa));
   tvrdi('P1: nad seznamem už není ApproveAllBar ani mřížka karet s inkoustovým „Spustit"', await nastroj.locator('.bg-\\[\\#16181A\\]').count() === 0);
+  // Pilulka „Čeká na schválení": jen návrhy, zapne ji i předání z widgetu (stav:navrhy), druhé klepnutí vypne.
+  const pilNavrhy = nastroj.getByRole('button', { name: /^Čeká na schválení \d/ });
+  tvrdi('P1: vedle seznamu je pilulka „Čeká na schválení" s počtem a ze začátku vypnutá', await pilNavrhy.count() === 1 && await pilNavrhy.getAttribute('aria-pressed') === 'false');
+  await pilNavrhy.click();
+  const jenNavrhyTxt = await nastroj.innerText();
+  tvrdi('P1: filtr nechá jen návrhy (Otevírací rutina pryč, Příjem zboží (návrh) zůstává)', !jenNavrhyTxt.includes('Otevírací rutina') && jenNavrhyTxt.includes('Příjem zboží'), jenNavrhyTxt.slice(0, 200));
+  await pilNavrhy.click();
+  await p.evaluate(() => window.dispatchEvent(new CustomEvent('managero:predani:procedures', { detail: 'stav:navrhy' })));
+  tvrdi('P1: předání stav:navrhy z widgetu zapne filtr', await dokud(async () => await pilNavrhy.getAttribute('aria-pressed') === 'true', 2000));
+  await pilNavrhy.click();
+  tvrdi('P1: …a jde zase vypnout', await dokud(async () => (await nastroj.innerText()).includes('Otevírací rutina'), 2000));
   await p.screenshot({ path: OUT + 'k69-b6b-postupy-desk.png', fullPage: true });
 
   // Widget → nástroj: návrh ve widgetu otevře detail postupu (bez přechodu jinam).
@@ -286,6 +297,16 @@ async function nastrojVUpravach(p, stav, znacka, vidget) {
   tvrdi('N1: klikací řádky „Kdo nečetl" mají mezi sebou linku', lKdo.pocet >= 1 && lKdo.bez.length === 0, JSON.stringify(lKdo));
   tvrdi('N1: Návrhy návodů — matcha tonic a „Schválit"', (await widgetLi(p, 'navody.navrhy').innerText()).includes('matcha') && await widgetLi(p, 'navody.navrhy').getByRole('button', { name: 'Schválit' }).isVisible());
   tvrdi('N1: vybraná kategorie je inkoustová pilulka (seg-on), ne limetka', await nastroj.locator('.filter-pill.seg-on').count() === 1);
+  // Stavový filtr vedle kategorií: co čeká na přečtení a na schválení.
+  const stavy = nastroj.getByRole('group', { name: 'Stav návodů' });
+  const celyTxt = await nastroj.innerText();
+  tvrdi('N1: vedle kategorií jsou pilulky „K přečtení" a „Čeká na schválení" s počty', await stavy.isVisible()
+    && await stavy.getByRole('button', { name: /^K přečtení \d/ }).count() === 1 && await stavy.getByRole('button', { name: /^Čeká na schválení \d/ }).count() === 1, await stavy.innerText().catch(() => ''));
+  await stavy.getByRole('button', { name: /^Čeká na schválení/ }).click();
+  const jenNavrhy = await nastroj.innerText();
+  tvrdi('N1: „Čeká na schválení" nechá v seznamu jen návrhy (matcha tonic ano, flat white ne)', jenNavrhy.includes('matcha') && !jenNavrhy.includes('Jak se dělá flat white') && jenNavrhy.length < celyTxt.length, jenNavrhy.slice(0, 200));
+  await stavy.getByRole('button', { name: /^Čeká na schválení/ }).click();
+  tvrdi('N1: druhé klepnutí filtr vypne', await dokud(async () => (await nastroj.innerText()).includes('Jak se dělá flat white'), 1500));
   await p.screenshot({ path: OUT + 'k69-b6b-navody-desk.png', fullPage: true });
 
   // Widget → nástroj: řádek „Kdo nečetl" otevře čtečku (bez přechodu jinam).

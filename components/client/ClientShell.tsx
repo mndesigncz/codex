@@ -14,7 +14,7 @@ import { usePopover } from '@/lib/usePopover';
 import { useObal } from '../ObalProvider';
 import PravniOdkazy from '../pravni/PravniOdkazy';
 import JazykMenu from '../ui/JazykMenu';
-import { useT } from '@/lib/i18n/client';
+import { useT, useJazyk } from '@/lib/i18n/client';
 
 export interface ClientUser { id: number; name: string; email: string }
 
@@ -30,6 +30,8 @@ export function Initials({ name, size = 36 }: { name: string; size?: number }) {
 
 export default function ClientShell({ me, children }: { me: ClientUser | null; children: React.ReactNode }) {
   const t = useT('klient-host');
+  // Právní stránky existují česky a anglicky; ostatní jazyky dostanou anglické.
+  const jazykPravni = useJazyk().jazyk === 'cs' ? 'cs' : 'en';
   // Hostovská část je světlá i při tmavém motivu účtu (viz ThemeProvider).
   const { setForcedLight } = useTheme();
   useEffect(() => { setForcedLight(true); return () => setForcedLight(false); }, [setForcedLight]);
@@ -107,7 +109,7 @@ export default function ClientShell({ me, children }: { me: ClientUser | null; c
         {jeObal
           ? <span className="sm:ml-auto">{t('Provozujete podnik? Používejte aplikaci Managero pro podniky.')}</span>
           : <Link href="/" className="tap-target-sm sm:ml-auto inline-flex items-center hover:text-black">{t('Jsem podnik')}</Link>}
-        <PravniOdkazy jen={['soukromi', 'podminky', 'podpora']} className="basis-full" />
+        <PravniOdkazy jazyk={jazykPravni} jen={['soukromi', 'podminky', 'podpora']} className="basis-full" />
       </footer>
 
       {/* Mobilní spodní dock — stejný jazyk jako administrace. */}

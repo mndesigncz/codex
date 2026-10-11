@@ -10,11 +10,13 @@ import { HLASKA_ROLE_V_PROVOZU } from '@/lib/obal';
 
 import { Button } from './ui';
 import JazykMenu from './ui/JazykMenu';
-import { useT } from '@/lib/i18n/client';
+import { useT, useJazyk } from '@/lib/i18n/client';
 export default function LoginForm() {
   // Texty přihlášení: vykání jako v českém originálu (německy „Sie“), protože jde
   // o veřejný vstup do aplikace, stejně jako registrace.
   const t = useT('auth');
+  // Právní stránky existují česky a anglicky; ostatní jazyky dostanou anglické.
+  const jazykPravni = useJazyk().jazyk === 'cs' ? 'cs' : 'en';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPwd, setShowPwd] = useState(false);
@@ -109,7 +111,7 @@ export default function LoginForm() {
 
           <div className="mt-8 pt-6 border-t border-black/[0.07] space-y-2 text-center text-sm">
             <p className="text-black/50">{t('Provozujete podnik?')} <Link href="/register" className="tap-target-sm inline-flex items-center text-[#5B7A08] hover:underline font-semibold">{t('Vytvořit účet')}</Link></p>
-            <PravniOdkazy className="justify-center text-xs text-black/45" />
+            <PravniOdkazy jazyk={jazykPravni} className="justify-center text-xs text-black/45" />
             <p className="text-black/50">{t('Máte kód týmu nebo pozvánku?')} <Link href="/join" className="tap-target-sm inline-flex items-center text-[#5B7A08] hover:underline font-semibold">{t('Připojit se')}</Link></p>
           </div>
         </div>

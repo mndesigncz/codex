@@ -17,6 +17,7 @@
 // množství (`draft`) drží tahle komponenta — nástroj zůstává v úpravách
 // plochy připojený, takže je vstup do úprav nezahodí.
 
+import { rozborSkladArg } from '@/lib/skladPredani';
 import { useState, useEffect, useMemo } from 'react';
 import { Button, Card, Chip, EmptyState, ErrorState, ListRow, Menu, SearchField, Skeleton, Toast, type MenuItem } from '../ui';
 import CategoryStockView from '../inventory/CategoryStockView';
@@ -117,8 +118,10 @@ export default function InventoryReport({ initialCategory }: Props) {
   // A quick-access tile still points at a category by name; resolve it to an id
   // once the categories have loaded.
   useEffect(() => {
-    if (!initialCategory || allCats.length === 0) return;
-    const hit = allCats.find((c: any) => c.name === initialCategory);
+    // Argument z widgetu může nést i filtr (`stav:dochazi`) — tady se bere jen kategorie.
+    const kategorie = rozborSkladArg(initialCategory).kategorie;
+    if (!kategorie || allCats.length === 0) return;
+    const hit = allCats.find((c: any) => c.name === kategorie);
     if (hit) setOpenCat(hit.id);
   }, [initialCategory, allCats]);
 

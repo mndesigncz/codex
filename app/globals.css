@@ -346,11 +346,26 @@ button:where(.list-row-tap) { margin: 0 -0.5rem; padding-left: 0.5rem; padding-r
      „···" zůstane vedle ní. */
   .list-actions:only-child { flex: 1 1 auto; }
   .list-actions:only-child > :first-child { flex: 1 1 auto; }
+  /* Akce mimo ocas (ListRow akceVRadku) zůstávají v prvním řádku vedle názvu. */
+  .list-actions-radek { order: 0; }
 }
 
 /* ---------- Typografická škála ----------
    Nadpis obrazovky 28, sekce 18, karta 15, meta 13, štítek 11. Jediné
    povolené velikosti nadpisů — 10 velikostí h1 a 9 h2 bylo moc. */
+/* StatRow podleKarty: sloupce podle šířky karty. Do 34 rem dva sloupce, lichý poslední přes oba; od 34 rem jedna řada. */
+.statrow-karta { container-type: inline-size; }
+.statrow-karta-v { display: grid; margin-inline: -0.5rem; grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 1rem; }
+.statrow-karta-v > * { padding-inline: 1rem; min-width: 0; }
+.statrow-karta-v > :nth-child(n+3) { border-top: 1px solid var(--surface-line); padding-top: 1rem; }
+.statrow-karta-v > :last-child:nth-child(odd) { grid-column: span 2; }
+@container (min-width: 34rem) {
+  .statrow-karta-v { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); row-gap: 0; }
+  .statrow-karta-v > :nth-child(n+3) { border-top: 0; padding-top: 0; }
+  .statrow-karta-v > :last-child:nth-child(odd) { grid-column: auto; }
+  .statrow-karta-v > * + * { border-left: 1px solid var(--surface-line); }
+}
+
 @layer components {
 .t-page { font-size: 1.75rem; line-height: 1.1; font-weight: 700; letter-spacing: -0.022em; color: var(--ink); }
 .t-section { font-size: 1.125rem; line-height: 1.25; font-weight: 600; letter-spacing: -0.012em; color: var(--ink); }

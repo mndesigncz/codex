@@ -3,6 +3,7 @@
 import { predejUkolum } from '@/lib/ukolyFiltr';
 import { GlobalniHledani, useZkratkaHledani } from '../GlobalniHledani';
 import { useState, useEffect } from 'react';
+import { predejPohledu } from '@/lib/predaniPohledu';
 import { odhlasit } from '@/lib/odhlaseni';
 import PodnikSwitcher from '../PodnikSwitcher';
 import { Icon, LogoMark } from '../Icons';
@@ -96,6 +97,8 @@ export default function EmployeeLayout({ user }: Props) {
   // Proklik na KONKRÉTNÍ návod — z úkolu „Vyrobit X“ nebo z výrobní tabule.
   // Bez toho vede každý odkaz jen na seznam návodů.
   const [guideId, setGuideId] = useState<number | null>(null);
+  // Filtr Návodů z widgetu (`stav:kprecteni`, `stav:navrhy`); `n` se zvedne při každém příchodu.
+  const [guideFiltr, setGuideFiltr] = useState<{ stav?: 'kprecteni' | 'navrhy'; n: number }>({ n: 0 });
   // Proklik z widgetu „Nepřečtené zprávy“ do konkrétního vlákna. Layout
   // zaměstnance arg pro chat zahazoval (jen vedení ho předávalo), takže
   // klepnutí na řádek skončilo na seznamu konverzací.
@@ -108,7 +111,9 @@ export default function EmployeeLayout({ user }: Props) {
     setSettingsTab(view === 'settings' ? zalozkaNastaveni(arg) : undefined);
     if (view === 'settings') setSettingsNonce(n => n + 1);
     setInventoryCat(view === 'inventory' ? arg : undefined);
-    setGuideId(view === 'guides' && arg ? Number(arg) : null);
+    setGuideId(view === 'guides' && arg && /^\d+$/.test(arg) ? Number(arg) : null);
+    if (view === 'suggestions' || view === 'procedures') predejPohledu(view, arg);
+    if (view === 'guides') setGuideFiltr(f => ({ stav: arg === 'stav:kprecteni' ? 'kprecteni' : arg === 'stav:navrhy' ? 'navrhy' : undefined, n: f.n + 1 }));
     setChatConvId(view === 'chat' && arg && /^\d+$/.test(arg) ? Number(arg) : null);
     // Proklik na KONKRÉTNÍ postup (zamčená uzávěrka, widget) — bez toho
     // skončil člověk na seznamu a hledal. Detail otevře událost, až se
@@ -146,7 +151,7 @@ export default function EmployeeLayout({ user }: Props) {
       case 'tasks':        return <Tasks user={user as any} />;
       case 'rewards':      return <MyRewards />;
       case 'chat':         return <ChatView user={user as any} openConversationId={chatConvId} />;
-      case 'guides':       return <Guides user={user as any} openGuideId={guideId} />;
+      case 'guides':       return <Guides user={user as any} openGuideId={guideId} predani={guideFiltr} />;
       case 'suggestions':  return <SuggestionsBoard />;
       case 'settings':     return <Settings user={user as any} initialTab={settingsTab ?? 'account'} tabNonce={settingsNonce} />;
       default:             return <EmployeeDashboard user={user} />;

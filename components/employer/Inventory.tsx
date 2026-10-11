@@ -61,6 +61,7 @@ import {
 } from '@/lib/skladPrehled';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { useLocale } from './jazyk';
+import { rozborSkladArg } from '@/lib/skladPredani';
 
 const URL_SKLAD = '/api/inventory';
 const URL_FORMAT = '/api/inventory/format';
@@ -190,8 +191,8 @@ function OknoPotvrzeni({ p, onZavrit }: { p: Potvrzeni; onZavrit: () => void }) 
   );
 }
 
-export default function Inventory({ initialCategory, onNavigate }: {
-  user?: any; initialCategory?: string; onNavigate?: (view: string, arg?: string) => void;
+export default function Inventory({ initialCategory, predaniN = 0, onNavigate }: {
+  user?: any; initialCategory?: string; predaniN?: number; onNavigate?: (view: string, arg?: string) => void;
 }) {
   const loc = useLocale();
   const t = useT('sprava');
@@ -210,12 +211,17 @@ export default function Inventory({ initialCategory, onNavigate }: {
   const [orphanCat, setOrphanCat] = useState<string | null>(null);
   // A quick-access tile still points at a category by name; resolve it once the
   // categories are loaded. An ambiguous name resolves to the first match.
+  // `initialCategory` je argument z widgetu: jméno kategorie a/nebo `stav:dochazi` (lib/skladPredani.ts).
+  const predani = useMemo(() => rozborSkladArg(initialCategory), [initialCategory]);
   useEffect(() => {
-    if (!initialCategory || categories.length === 0) return;
-    const hit = categories.find(c => c.name === initialCategory);
+    if (!predani.kategorie || categories.length === 0) return;
+    const hit = categories.find(c => c.name === predani.kategorie);
     if (hit) { setCatId(hit.id); setOrphanCat(null); }
-    else { setOrphanCat(initialCategory); setCatId(null); }
-  }, [initialCategory, categories]);
+    else { setOrphanCat(predani.kategorie); setCatId(null); }
+  }, [predani.kategorie, categories]);
+  // Filtr „Dochází" se z widgetu zapne při každém příchodu (`predaniN`), i když je argument stejný jako minule.
+  const [jenDochazi, setJenDochazi] = useState(predani.jenDochazi);
+  useEffect(() => { if (initialCategory != null) setJenDochazi(predani.jenDochazi); }, [predani.jenDochazi, initialCategory, predaniN]);
 
   const current = findById(categories, catId) ?? null;
   const catLabel = orphanCat ?? (current ? current.name : '');
@@ -378,6 +384,7 @@ export default function Inventory({ initialCategory, onNavigate }: {
   // Parked items are out of the active stock entirely — they must not show up
   // in counts, alerts or the shopping list.
   const active = useMemo(() => items.filter(i => i.archived !== true && i.approved !== false), [items]);
+  const pocetDochazi = useMemo(() => active.filter(i => statusOf(i, pk) !== 'ok').length, [active, pk]);
   const archivedCount = items.filter(i => i.archived === true && i.approved !== false).length;
 
   // Counts on the navigation buttons include everything nested below.
@@ -416,6 +423,7 @@ export default function Inventory({ initialCategory, onNavigate }: {
       (showArchived ? i.archived === true : i.archived !== true) &&
       inCat(i) &&
       !hiddenOnOverview(i) &&
+      (!jenDochazi || statusOf(i, pk) !== 'ok') &&
       obsahujeNekde(q, i.name, i.brand, i.supplier));
     const sorted = [...list];
     sorted.sort((a, b) => {
@@ -435,7 +443,7 @@ export default function Inventory({ initialCategory, onNavigate }: {
       }
     });
     return sorted;
-  }, [items, categories, catId, orphanCat, search, sort, pk, showArchived]);
+  }, [items, categories, catId, orphanCat, search, sort, pk, showArchived, jenDochazi]);
 
   // Items to (re)order: critical first, then low, alphabetically within each group.
   // Vlastní výroba do nákupu nepatří — ta dostává úkol „vyrobit". Naopak
@@ -885,6 +893,13 @@ export default function Inventory({ initialCategory, onNavigate }: {
         </p>
         {showArchived && (
           <Button variant="secondary" size="sm" onClick={() => setShowArchived(false)}>{t('Zpět na aktivní sklad')}</Button>
+        )}
+        {/* Jen co dochází: totéž, co ukazuje widget Dochází, jedním klepnutím. Bez položek pod limitem se nenabízí. */}
+        {!showArchived && (pocetDochazi > 0 || jenDochazi) && (
+          <button type="button" aria-pressed={jenDochazi} onClick={() => setJenDochazi(v => !v)}
+            className={`filter-pill tap-target-sm ${jenDochazi ? 'seg-on' : 'seg-off glass'}`}>
+            {t('Jen co dochází')}<span className={jenDochazi ? 'text-white/60' : 'text-black/45'}> · {pocetDochazi}</span>
+          </button>
         )}
       </div>
 

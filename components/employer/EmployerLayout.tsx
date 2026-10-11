@@ -5,6 +5,7 @@ import { GlobalniHledani, useZkratkaHledani } from '../GlobalniHledani';
 import { useSession } from 'next-auth/react';
 
 import { useState, useEffect } from 'react';
+import { predejPohledu } from '@/lib/predaniPohledu';
 import { odhlasit } from '@/lib/odhlaseni';
 import PodnikSwitcher, { uklidKonceptu } from '../PodnikSwitcher';
 import { Icon, LogoMark } from '../Icons';
@@ -186,6 +187,7 @@ export default function EmployerLayout({ user }: Props) {
   };
   // A quick-access tile can ask for a specific stock category.
   const [inventoryCat, setInventoryCat] = useState<string | undefined>();
+  const [inventoryN, setInventoryN] = useState(0);
   // Proklik ze skladu do konkrétní receptury: „tahle surovina se používá v
   // Blue Lagoon" → jedno kliknutí a jsi v jeho receptuře.
   const [recipeProduct, setRecipeProduct] = useState<string | undefined>();
@@ -198,6 +200,8 @@ export default function EmployerLayout({ user }: Props) {
   // návodů a hledal ten svůj znovu ručně. Teď na něj míří i úkol „Vyrobit X“,
   // takže mrtvý odkaz by byl vidět mnohem víc.
   const [guideId, setGuideId] = useState<number | null>(null);
+  // Filtr Návodů z widgetu (`stav:kprecteni`, `stav:navrhy`); `n` se zvedne při každém příchodu.
+  const [guideFiltr, setGuideFiltr] = useState<{ stav?: 'kprecteni' | 'navrhy'; n: number }>({ n: 0 });
   // Z přehledu organizace do konkrétního podniku: přepnout členství na
   // serveru a načíst znovu — stejná cesta jako přepínač v hlavičce.
   // Stejná cesta jako v přepínači: koncepty starého podniku pryč, token
@@ -221,9 +225,12 @@ export default function EmployerLayout({ user }: Props) {
   const naviguj = (view: string, arg?: string) => {
     if (view === 'tasks') predejUkolum(arg);
     setInventoryCat(view === 'inventory' ? arg : undefined);
+    if (view === 'inventory') setInventoryN(n => n + 1);
     setRecipeProduct(view === 'recipes' ? arg : undefined);
     setChatConvId(view === 'chat' && arg ? Number(arg) : null);
-    setGuideId(view === 'guides' && arg ? Number(arg) : null);
+    setGuideId(view === 'guides' && arg && /^\d+$/.test(arg) ? Number(arg) : null);
+    if (view === 'suggestions' || view === 'procedures') predejPohledu(view, arg);
+    if (view === 'guides') setGuideFiltr(f => ({ stav: arg === 'stav:kprecteni' ? 'kprecteni' : arg === 'stav:navrhy' ? 'navrhy' : undefined, n: f.n + 1 }));
     // Konkrétní postup (zamčená uzávěrka, widget) — detail se otevře, až se Postupy připojí.
     if (view === 'procedures' && arg && /^\d+$/.test(arg)) otevriPostupPoPrechodu(Number(arg));
     // Rada, která říká „nastav to v Nastavení → Pokladna", musí umět
@@ -273,13 +280,13 @@ export default function EmployerLayout({ user }: Props) {
       case 'overview':  return <EmployerDashboard user={user} />;
       // Výměny a žádosti o volno jsou od kola 69 widgety plochy Rozvrhu.
       case 'shifts':    return <ScheduleBuilder user={user as any} onNavigate={navigate} />;
-      case 'inventory': return <Inventory user={user as any} initialCategory={inventoryCat} onNavigate={navigate} />;
+      case 'inventory': return <Inventory user={user as any} initialCategory={inventoryCat} predaniN={inventoryN} onNavigate={navigate} />;
       // Menu je plocha s vlastní hlavičkou a odsazením (kolo 69).
       case 'menu':      return <MenuEditor />;
       case 'recipes':   return <RecipesView openProductId={recipeProduct} onNavigate={navigate} />;
       case 'chat':      return <ChatView user={user as any} openConversationId={chatConvId} />;
       case 'procedures': return <Procedures user={user as any} />;
-      case 'guides':    return <Guides user={user as any} openGuideId={guideId} />;
+      case 'guides':    return <Guides user={user as any} openGuideId={guideId} predani={guideFiltr} />;
       case 'planning':  return <PlanningBoard />;
       case 'events':    return <EventsView user={user as any} />;
       case 'tasks':     return <TaskManager user={user as any} />;
