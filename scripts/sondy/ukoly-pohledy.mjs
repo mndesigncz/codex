@@ -78,6 +78,11 @@ for (const w of [1280, 390]) {
   tvrdi(`${w}: Označit jako hotový pošle PATCH status done`, await dokud(() => (stav.ukolyPatche ?? []).some(t => t.id === 2 && t.status === 'done'), 3000), JSON.stringify(stav.ukolyPatche));
   await p.keyboard.press('Escape');
   tvrdi(`${w}: Escape detail zavře`, await dokud(async () => await p.getByRole('dialog').count() === 0, 3000));
+  // Omylem odškrtnuté jde vrátit z toastu
+  const vratit = p.getByRole('button', { name: 'Vrátit', exact: true });
+  tvrdi(`${w}: po splnění toast „Úkol je hotový." s tlačítkem Vrátit`, await dokud(async () => await vratit.count() === 1, 3000) && /Úkol je hotový\./.test(await p.locator('body').innerText()));
+  await vratit.click();
+  tvrdi(`${w}: Vrátit pošle PATCH status pending`, await dokud(() => (stav.ukolyPatche ?? []).some(t => t.id === 2 && t.status === 'pending'), 3000), JSON.stringify(stav.ukolyPatche));
 
   // Rychlé přidání jedním řádkem: „zítra" na konci se přečte jako termín
   const rychle = nastroj.getByRole('textbox', { name: 'Přidat úkol' });

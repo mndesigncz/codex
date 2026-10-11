@@ -80,6 +80,9 @@ export default function Tasks({ user }: Props) {
   const [showLater, setShowLater] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [bodyToast, setBodyToast] = useState<string | null>(null);
+  // Splněný úkol jde jedním klepnutím vrátit (omylem odškrtnuté je na telefonu časté); `idToastu` dá každému toastu novou dobu.
+  const [zpetUkol, setZpetUkol] = useState<Ukol | null>(null);
+  const [idToastu, setIdToastu] = useState(0);
   const [mimoDen, setMimoDen] = useState<Ukol | null>(null);
   const { weekStart } = useCurrency();
 
@@ -96,7 +99,12 @@ export default function Tasks({ user }: Props) {
       // Body se přičítaly potichu. Když je člověk uvidí hned, ví, že
       // odškrtnutí něco znamená — a „vyrob limonádu" přestane být otrava.
       const pts = Number(d?.pointsEarned);
-      if (newStatus === 'done' && Number.isFinite(pts) && pts > 0) setBodyToast(t('+{n, plural, one {# bod} few {# body} other {# bodů}} za splněný úkol', { n: pts }));
+      if (newStatus === 'done') {
+        setBodyToast(Number.isFinite(pts) && pts > 0 ? t('+{n, plural, one {# bod} few {# body} other {# bodů}} za splněný úkol', { n: pts }) : t('Úkol je hotový.'));
+        // Výrobní úkol už dávku naskladnil — „Vrátit" by jen lhalo, že se to vrátilo.
+        setZpetUkol(task.source === 'production' ? null : task);
+        setIdToastu(n => n + 1);
+      }
       data.reload();
       // Hotový povinný úkol odemyká uzávěrku — otevřený formulář uzávěrky se přepočítá sám.
       oznamZmenuPovinnych();
@@ -281,7 +289,8 @@ export default function Tasks({ user }: Props) {
           <p className="text-sm text-black/70 text-pretty"><span className="cz-sentence">{t('„{nazev}" má termín {den}.', { nazev: mimoDen.title, den: denDlouze(mimoDen.dueDate!) })}</span> {t('Opravdu ho chceš splnit už teď?')}</p>
         </Modal>
       )}
-      <Toast message={bodyToast} onClose={() => setBodyToast(null)} />
+      <Toast message={bodyToast} id={idToastu} onClose={() => { setBodyToast(null); setZpetUkol(null); }}
+        action={zpetUkol ? { label: t('Vrátit'), onClick: () => { const u = zpetUkol; setBodyToast(null); setZpetUkol(null); void zmenStav(u, 'pending'); } } : undefined} />
     </>
   );
 }

@@ -1535,5 +1535,7 @@
   "Úkol je odložený na {den}.": "Task postponed to {den}.",
   "Hledat v aplikaci (Ctrl K)": "Search the app (Ctrl K)",
   "Hledat v aplikaci": "Search the app",
-  "Hledat": "Search"
+  "Hledat": "Search",
+  "Úkol je hotový.": "Task done.",
+  "Vrátit": "Put back"
 }

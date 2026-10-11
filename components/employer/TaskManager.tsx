@@ -104,6 +104,8 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
   const [editingSeries, setEditingSeries] = useState(false);
   const [akceChyba, setAkceChyba] = useState<string | null>(null);
   const [zprava, setZprava] = useState<string | null>(null);
+  // Omylem odškrtnutý úkol jde vrátit z toastu; vlastní toast, ať se nepletou ostatní zprávy.
+  const [hotovyUkol, setHotovyUkol] = useState<{ uk: Ukol; id: number } | null>(null);
   // Okna místo confirm(): mazání a splnění úkolu, který není na dnešek.
   const [mazani, setMazani] = useState<Ukol | null>(null);
   const [mazu, setMazu] = useState(false);
@@ -244,9 +246,11 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
       data.reload();
       // Splnění i přesun na jiný den mění zámek uzávěrky — otevřený formulář se přepočítá.
       oznamZmenuPovinnych();
+      return true;
     } catch (e) {
       data.set(() => puvodni ?? []);
       setAkceChyba(apiMessage(e, chyba));
+      return false;
     }
   }, [data]);
 
@@ -263,7 +267,10 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
   const completeTask = (uk: Ukol, done: boolean) => {
     if (!smiSplnit(uk)) return;
     if (done && uk.dueDate && uk.dueDate !== today) { setMimoDen(uk); return; }
-    void setStatus(uk, done);
+    void setStatus(uk, done).then(ok => {
+      // Výrobní úkol už dávku naskladnil — „Vrátit" by jen lhalo, že se to vrátilo.
+      if (ok && done && uk.source !== 'production') setHotovyUkol(h => ({ uk, id: (h?.id ?? 0) + 1 }));
+    });
   };
 
   const remove = async () => {
@@ -568,6 +575,8 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
         </Modal>
       )}
       <Toast message={zprava} onClose={() => setZprava(null)} />
+      <Toast message={hotovyUkol ? t('Úkol je hotový.') : null} id={hotovyUkol?.id} onClose={() => setHotovyUkol(null)}
+        action={hotovyUkol ? { label: t('Vrátit'), onClick: () => { const u = hotovyUkol.uk; setHotovyUkol(null); void setStatus(u, false); } } : undefined} />
     </>
   );
 }
