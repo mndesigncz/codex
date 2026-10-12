@@ -480,10 +480,10 @@ const FIX_MOJE_V = nacti('k69-b1-rozlozeni-moje-vedeni');
   tvrdi('MV1: na stránce jediná limetka (Odeslat dostupnost pod plochou; Odeslat žádost je primary)', await limetky(p) <= 1, `${await limetky(p)}×`);
 
   // Burza u směny: nabídka → okno s poznámkou → POST.
-  await nastroj.getByRole('button', { name: /Další akce se směnou/ }).first().click();
-  await p.getByRole('menuitem', { name: 'Nabídnout do burzy…' }).click();
+  // Kolo 6 (Z10): „Nabídnout" je přímo u směny jako tlačítko (u zaměstnance i vedení), ne v „···".
+  await nastroj.getByRole('button', { name: /^Nabídnout do burzy směnu/ }).first().click();
   const okno = p.getByRole('dialog', { name: 'Nabídnout směnu do burzy' });
-  tvrdi('MV2: „Nabídnout do burzy…" otevře okno s poznámkou', await dokud(() => okno.isVisible(), 2000) && await okno.getByLabel('Proč směnu nabízíš?').isVisible());
+  tvrdi('MV2: „Nabídnout" u směny otevře okno s poznámkou', await dokud(() => okno.isVisible(), 2000) && await okno.getByLabel('Proč směnu nabízíš?').isVisible());
   await okno.getByLabel('Proč směnu nabízíš?').fill('Svatba sestry');
   await okno.getByRole('button', { name: 'Nabídnout' }).click();
   tvrdi('MV2: …a pošle POST /api/shifts/offers s poznámkou', await dokud(() => (stav.zapisy ?? []).some(z => z.path === '/api/shifts/offers' && z.m === 'POST' && z.body.includes('Svatba sestry')), 2000));
@@ -503,7 +503,7 @@ const FIX_MOJE_V = nacti('k69-b1-rozlozeni-moje-vedeni');
   await otevri(p, MOJE_V, 'vedeni.moje_smeny');
   await p.waitForTimeout(600);
   tvrdi('MO1: bez rozvrh.burza není widget Výměny směn', await naPlose(p, 'rozvrh.vymeny') === 0);
-  tvrdi('MO1: …ani nabídka u směny', await widgetLi(p, 'nastroj').getByRole('button', { name: /Další akce se směnou/ }).count() === 0);
+  tvrdi('MO1: …ani nabídka u směny', await widgetLi(p, 'nastroj').getByRole('button', { name: /^Nabídnout do burzy směnu/ }).count() === 0);
   tvrdi('MO1: …a na /api/shifts/offers neodešel dotaz', dotazyNa(stav, ['/api/shifts/offers']).length === 0);
   await ctx.close();
 }
@@ -518,8 +518,8 @@ const FIX_MOJE_V = nacti('k69-b1-rozlozeni-moje-vedeni');
   tvrdi('ME1: jen ono — nástroj a čísla žijí', await p.locator('[data-plocha]').getByText('Widget se nenačetl').count() === 1
     && await widgetLi(p, 'nastroj').getByRole('heading', { name: 'Nadcházející směny' }).isVisible());
   tvrdi('MT1: telefon 390 — žádné vodorovné přetečení', await bezPreteceni(p));
-  const menu = widgetLi(p, 'nastroj').getByRole('button', { name: /Další akce se směnou/ }).first();
-  tvrdi('MT1: nabídka u směny je na telefonu vidět a klikatelná', await menu.isVisible() && await menu.isEnabled());
+  const menu = widgetLi(p, 'nastroj').getByRole('button', { name: /^Nabídnout do burzy směnu/ }).first();
+  tvrdi('MT1: „Nabídnout" u směny je na telefonu vidět a klikatelné', await menu.isVisible() && await menu.isEnabled());
   await p.screenshot({ path: OUT + 'k69-b1-moje-vedeni-tel.png', fullPage: true });
   await ctx.close();
 }
