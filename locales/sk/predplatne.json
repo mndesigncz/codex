@@ -122,5 +122,13 @@
   "Ušetříš {castka} oproti měsíčnímu placení, vychází na {mesicne} měsíčně.": "Ušetríš {castka} oproti mesačnému plateniu, vychádza na {mesicne} mesačne.",
   "Čím se tarify liší": "Čím sa tarify líšia",
   "Celé srovnání, {n, plural, one {# řádek} few {# řádky} other {# řádků}}": "Celé porovnanie, {n, plural, one {# riadok} few {# riadky} other {# riadkov}}",
-  "Ceny jsou bez DPH. Doporuč Managero dalšímu podniku a dostaneš měsíc zdarma, nejvýš tři za měsíc.": "Ceny sú bez DPH. Odporuč Managero ďalšiemu podniku a dostaneš mesiac zadarmo, najviac tri za mesiac."
+  "Ceny jsou bez DPH. Doporuč Managero dalšímu podniku a dostaneš měsíc zdarma, nejvýš tři za měsíc.": "Ceny sú bez DPH. Odporuč Managero ďalšiemu podniku a dostaneš mesiac zadarmo, najviac tri za mesiac.",
+  "Lidé v týmu": "Ľudia v tíme",
+  "Sdílené odkazy": "Zdieľané odkazy",
+  "Podniky v organizaci": "Podniky v organizácii",
+  "Přejít na Pro": "Prejsť na Pro",
+  "Plno": "Plno",
+  "bez limitu": "bez limitu",
+  "Zbývá {n, plural, one {# místo} few {# místa} other {# míst}}": "Zostáva {n, plural, one {# miesto} few {# miesta} other {# miest}}",
+  "Zbývá {n, plural, one {# odkaz} few {# odkazy} other {# odkazů}}": "Zostáva {n, plural, one {# odkaz} few {# odkazy} other {# odkazov}}"
 }

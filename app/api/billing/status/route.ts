@@ -15,8 +15,9 @@ export async function GET(request: Request) {
   try {
     const st = await billingStatus(c.teamId);
     // Obal (Apple 3.1.1): jen stav tarifu, bez ceníku a bez odkazu, který vede k platbě
-    // nebo k odměně za nákup. Serverová pojistka vedle skrytého UI.
-    if (obalZHlavicek(request.headers) !== null) return NextResponse.json({ configured: false, plan: st.plan });
+    // nebo k odměně za nákup. Serverová pojistka vedle skrytého UI. Čerpání limitů
+    // („Lidé 2 / 3") ceník není — patří ke stavu tarifu, posílá se i tady.
+    if (obalZHlavicek(request.headers) !== null) return NextResponse.json({ configured: false, plan: st.plan, usage: st.usage });
     return NextResponse.json(st);
   } catch {
     return NextResponse.json({ error: 'Stav předplatného se nepodařilo načíst.' }, { status: 500 });

@@ -25,6 +25,8 @@ import { clenoveSOpravnenim } from './opravneniDb';
 import { neon } from '@neondatabase/serverless';
 import { PRICES, REFERRALS_PER_MONTH, MAX_OFFER_DAYS, TRIAL_DAYS, type Interval, type PlanId, planInfoOf } from './plan';
 import { generateJoinCode } from './team';
+import { pocetClenu, organizaceTymu, podnikyOrganizace } from './tenant';
+import type { CerpaniTarifu } from './plan';
 import { notifyUsers } from './push';
 import { audit } from './audit';
 import { pragueToday } from './pragueTime';
@@ -591,9 +593,35 @@ export async function teamByReferralCode(code: string): Promise<number | null> {
   } catch { return null; }
 }
 
+/**
+ * Aktivní sdílené odkazy podniku — týž dotaz, kterým POST /api/share odmítá další
+ * odkaz na plánu Zdarma (app/api/share/route.ts), ať se číslo v kartě a v chybě neliší.
+ */
+export async function pocetSdilenychOdkazu(teamId: number): Promise<number> {
+  try {
+    const [r] = await sql`SELECT COUNT(*)::int AS n FROM share_links WHERE team_id = ${teamId} AND enabled = TRUE` as any[];
+    return Number(r?.n ?? 0);
+  } catch { return 0; /* tabulka před migrací — není co počítat, stejně jako u limitu */ }
+}
+
+/**
+ * Čerpání limitů tarifu pro kartu Váš plán. Lidé stejnou funkcí jako vymáhání limitu
+ * (pocetClenu — canAddMember ve všech cestách, kudy člen přibývá), odkazy stejným dotazem
+ * jako POST /api/share; podniky jen v organizaci.
+ */
+export async function cerpaniTarifu(teamId: number): Promise<CerpaniTarifu> {
+  const [members, shareLinks, teams] = await Promise.all([
+    pocetClenu(teamId).catch(() => 0),
+    pocetSdilenychOdkazu(teamId),
+    organizaceTymu(teamId).then(o => (o ? podnikyOrganizace(o.id).then(p => p.length) : null)).catch(() => null),
+  ]);
+  return { members, shareLinks, teams };
+}
+
 export async function billingStatus(teamId: number) {
   const t = await teamRow(teamId);
   const info = planInfoOf(t);
+  const usage = await cerpaniTarifu(teamId);
   const code = await referralCodeFor(teamId).catch(() => null);
   const month = pragueToday().slice(0, 7);
   let thisMonth = 0, total = 0, referredCount = 0;
@@ -607,6 +635,7 @@ export async function billingStatus(teamId: number) {
     configured: !!stripe(),
     plan: info,
     prices: PRICES,
+    usage,
     subscription: t?.stripe_subscription_id ? {
       status: t.subscription_status, interval: t.subscription_interval, price: t.subscription_price,
       currentPeriodEnd: t.current_period_end, cancelAtPeriodEnd: !!t.cancel_at_period_end, trialEnd: t.trial_end,
