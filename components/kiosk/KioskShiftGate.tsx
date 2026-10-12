@@ -2,10 +2,13 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../Icons';
-import { Avatar, Button, Card, Chip, EmptyState, ErrorState, ListRow, MenuPanel, Modal, Toast } from '../ui';
+import { Avatar, Button, Card, Chip, EmptyState, ErrorState, ListRow, MenuPanel, Modal, SearchField, Toast } from '../ui';
 import { usePopover } from '@/lib/usePopover';
 import { useT } from '@/lib/i18n/client';
-import { parseDbTime, dbTimeHM } from '@/lib/pragueTime';
+import { fmtHM } from '@/lib/i18n/format';
+import { parseDbTime, dbTimeHM, pragueToday } from '@/lib/pragueTime';
+import { hodinyMinuty } from '@/lib/dochazkaPrehled';
+import { PRAH_HLEDANI_ROSTERU, rozdelRoster, hledejVRosteru, zpozdeniPrichodu, minutPoPlanu } from '@/lib/kioskPrehled';
 import { nextActiveId, IDLE_MS, ACTING_MAX_AGE_S, ACTING_OBNOVA_MS, obnovitCookie } from '@/lib/kioskIdentity';
 
 export interface RosterMember {
@@ -389,19 +392,34 @@ function LockScreen() {
   );
 }
 
-/** Big tap-target grid of people — used on the lock screen and for late arrivals. */
+/**
+ * Big tap-target grid of people — used on the lock screen, for late arrivals
+ * and for „Kdo teď u tabletu stojí?".
+ *
+ * Od kola 6 (B4): nejdřív „Dnes na rozpisu" (podle začátku směny), pak
+ * „Ostatní" abecedně — vedení bez směny je až dole, brigádník, který dnes
+ * nastupuje, nahoře. Od devíti lidí hledací pole; bez autofocusu, tablet je
+ * sdílený a klávesnice by vyjela každému, kdo jde kolem. Řadí se tady na
+ * klientu: roster z /api/attendance čtou i widgety vedení, ORDER BY se nemění.
+ */
 export function PersonPicker({ members, onPick, emptyText }: {
   members: RosterMember[];
   onPick: (m: RosterMember) => void;
   emptyText: string;
 }) {
   const t = useT('kiosk');
+  const [dotaz, setDotaz] = useState('');
+  const hledani = members.length >= PRAH_HLEDANI_ROSTERU;
+  const nalezeni = useMemo(() => (hledani ? hledejVRosteru(members, dotaz) : members), [members, dotaz, hledani]);
+  const { naRozpisu, ostatni } = useMemo(() => rozdelRoster(nalezeni), [nalezeni]);
   if (members.length === 0) {
     return <p className="t-meta py-6">{emptyText}</p>;
   }
-  return (
+  // Bez rozpisu na dnešek by nadpis „Ostatní" nad všemi jen mátl.
+  const skupiny = naRozpisu.length > 0;
+  const mrizka = (lide: RosterMember[]) => (
     <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3.5">
-      {members.map(m => (
+      {lide.map(m => (
         // Jamka, ne karta: výběr leží v kartě zamykací obrazovky nebo „Kdo teď
         // pracuje" a karta v kartě se nedělá (DP §3.9). Velká plocha zůstává —
         // u baru se ťuká na délku paže.
@@ -412,16 +430,40 @@ export function PersonPicker({ members, onPick, emptyText }: {
           className="well p-5 text-left min-h-[112px] hover:bg-black/[0.05] active:scale-[0.98] transition"
         >
           <Avatar emoji={m.avatar} size="xl" ring={false} />
-          <span className="block t-card mt-3 truncate">{m.name}</span>
+          {/* Dvě řádky místo „Karolína Šť…": na telefonu jsou dlaždice dvě vedle sebe. */}
+          <span className="block t-card mt-3 line-clamp-2 break-words">{m.name}</span>
           {m.openSince ? (
             <span className="block text-sm font-semibold text-ok-ink mt-0.5">{t('Na směně')}</span>
           ) : m.shiftStart ? (
-            <span className="block t-meta tabular-nums mt-0.5">{t('Dnes {od}–{do}', { od: m.shiftStart, do: m.shiftEnd })}</span>
+            <span className="block t-meta tabular-nums mt-0.5">{t('Dnes {od}–{do}', { od: fmtHM(m.shiftStart), do: fmtHM(m.shiftEnd) })}</span>
           ) : (
             <span className="block t-meta mt-0.5">{t('Mimo směnu')}</span>
           )}
         </button>
       ))}
+    </div>
+  );
+  return (
+    <div className="space-y-4 text-left">
+      {hledani && (
+        <SearchField value={dotaz} onChange={setDotaz} placeholder={t('Hledat jméno…')} ariaLabel={t('Hledat jméno…')} />
+      )}
+      {nalezeni.length === 0 ? (
+        <EmptyState icon="search" compact title={t('Nikdo takový')} hint={t('Zkus jméno napsat jinak.')} />
+      ) : skupiny ? (
+        <>
+          <section aria-labelledby="kiosk-skupina-rozpis">
+            <h3 id="kiosk-skupina-rozpis" className="t-label mb-2.5">{t('Dnes na rozpisu')}</h3>
+            {mrizka(naRozpisu)}
+          </section>
+          {ostatni.length > 0 && (
+            <section aria-labelledby="kiosk-skupina-ostatni">
+              <h3 id="kiosk-skupina-ostatni" className="t-label mb-2.5">{t('Ostatní')}</h3>
+              {mrizka(ostatni)}
+            </section>
+          )}
+        </>
+      ) : mrizka(ostatni)}
     </div>
   );
 }
@@ -439,7 +481,10 @@ export function WhoIsWorking() {
   const t = useT('kiosk');
   const { onShift, offShift, activeId, selectPerson, punch } = useKioskShift();
   const [adding, setAdding] = useState(false);
-  const now = useNow();
+  // Řádek ukazuje délku v minutách, ne vteřinách — stačí tik za minutu
+  // (PunchDialog dál tiká po sekundě, tam se odečítá čas odchodu).
+  const now = useNow(60000);
+  const dnes = pragueToday();
 
   return (
     <Card as="section" aria-labelledby="kiosk-kdo-pracuje">
@@ -457,15 +502,30 @@ export function WhoIsWorking() {
       <ul className="list mt-3">
         {onShift.map(m => {
           const isActive = m.id === activeId;
+          // Plán proti skutečnosti: od kolika · jak dlouho · plán do. Po plánu
+          // chip „wait", bez rozpisu chip „info" — vedle stavu „Zapisuje se".
+          const od = parseDbTime(m.openSince)?.getTime();
+          const doba = now && od != null ? hodinyMinuty(now - od) : '—';
+          const poPlanu = minutPoPlanu(dnes, m.shiftStart, m.shiftEnd, now);
           return (
+            // akceVRadku: na telefonu zůstane ikona odchodu v prvním řádku u jména
+            // a chipy s „Přepnout" jdou pod něj — jinak by odchod skončil sám na třetím řádku.
             <ListRow
               key={m.id}
+              akceVRadku
               lead={<Avatar emoji={m.avatar} size="md" ring={false} />}
               title={m.name}
-              meta={<span className="tabular-nums">{t('Na směně {doba}', { doba: elapsed(m.openSince!, now) })}</span>}
-              right={isActive
-                ? <Chip tone="ok" icon="check">{t('Zapisuje se')}</Chip>
-                : <Button variant="secondary" onClick={() => selectPerson(m.id)} aria-label={t('Zapisovat jako {jmeno}', { jmeno: m.name })}>{t('Přepnout')}</Button>}
+              meta={<span className="tabular-nums">
+                {t('od {cas}', { cas: dbTimeHM(m.openSince) })} · {doba}
+                {m.shiftEnd && <span className="hidden md:inline"> · {t('plán do {cas}', { cas: fmtHM(m.shiftEnd) })}</span>}
+              </span>}
+              right={<span className="flex flex-wrap items-center justify-end gap-2">
+                {poPlanu != null && <Chip tone="wait" icon="clock" className="tabular-nums">{t('po plánu +{n} min', { n: poPlanu })}</Chip>}
+                {!m.shiftStart && <Chip tone="info">{t('bez rozpisu')}</Chip>}
+                {isActive
+                  ? <Chip tone="ok" icon="check">{t('Zapisuje se')}</Chip>
+                  : <Button variant="secondary" onClick={() => selectPerson(m.id)} aria-label={t('Zapisovat jako {jmeno}', { jmeno: m.name })}>{t('Přepnout')}</Button>}
+              </span>}
               actions={
                 <Button variant="ghost" iconOnly icon="logout" title={t('Odchod – {jmeno}', { jmeno: m.name })}
                   aria-label={t('Odchod – {jmeno}', { jmeno: m.name })} onClick={() => punch(m)} />
@@ -586,8 +646,15 @@ export function PunchDialog({ member, now, onClose, onDone }: {
 }) {
   const t = useT('kiosk');
   const on = !!member.openSince;
-  const needPin = member.hasPin && !on; // PIN only required to clock in
+  // PIN i při odchodu: server ho u action=out vyžaduje (app/api/attendance/route.ts,
+  // `isKiosk && (empPinHash || emp.pin)`), takže bez číselníku odchod člověka
+  // s PINem končil „Nesprávný PIN". A podepsat odchod za kolegu je stejná lež
+  // jako podepsat mu příchod.
+  const needPin = member.hasPin;
   const [pin, setPin] = useState('');
+  // Jak příchod sedí na rozpis — jen chip, nic se neblokuje (server posílá
+  // vedení upozornění od stejných 10 minut).
+  const rozpis = !on ? zpozdeniPrichodu(pragueToday(), member.shiftStart, now) : null;
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
@@ -632,13 +699,16 @@ export function PunchDialog({ member, now, onClose, onDone }: {
       <div className="text-center">
         <Avatar emoji={member.avatar} size="xl" ring={false} />
         {!on && member.shiftStart && (
-          <p className="mt-2">
-            <Chip tone="info" icon="calendar" className="tabular-nums">{t('Dnes máš směnu {od}–{do}', { od: member.shiftStart, do: member.shiftEnd })}</Chip>
+          <p className="mt-2 flex flex-wrap justify-center gap-1.5">
+            <Chip tone="info" icon="calendar" className="tabular-nums">{t('Dnes máš směnu {od}–{do}', { od: fmtHM(member.shiftStart), do: fmtHM(member.shiftEnd) })}</Chip>
+            {rozpis?.druh === 'pozde' && <Chip tone="wait" icon="clock" className="tabular-nums">{t('Přicházíš o {n} min později', { n: rozpis.min })}</Chip>}
+            {rozpis?.druh === 'brzy' && <Chip tone="info" icon="clock" className="tabular-nums">{t('Směna začíná za {n} min', { n: rozpis.min })}</Chip>}
           </p>
         )}
 
         {needPin && (
           <div className="mt-5">
+            <p className="t-meta mb-3">{on ? t('Zadej PIN pro odchod') : t('Zadej PIN pro příchod')}</p>
             {/* Tečky nesou délku PINu i pro odečítač (role=img s popisem). */}
             <div className="flex justify-center gap-2 mb-3" role="img" aria-label={t('Zadáno číslic: {n}', { n: pin.length })}>
               {[0, 1, 2, 3].map(i => (
