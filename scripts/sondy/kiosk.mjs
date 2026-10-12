@@ -9,6 +9,8 @@
 //   - po odchodu okno „{jméno}, díky za směnu" s Příchod / Odchod / Odpracováno; bez uzávěrky
 //     Chip „Uzávěrka chybí" a „Vyplnit uzávěrku" přepne záložku; samo se zavře po 20 s,
 //     dotyk odpočet zastaví;
+//   - Sklad: Segmented „Vše · Dochází (n) · Kriticky (n)" filtruje, řazení kriticky › dochází,
+//     meta „min 2 kg · chybí 1"; proklik z widgetu Docházející zásoby otevře Sklad s Dochází;
 // Rozpis se skládá z časů kolem „teď", ať sonda neplatí na to, kdy běží.
 //   SONDY_ZAKLAD=http://localhost:3400 node scripts/sondy/kiosk.mjs
 import { readFileSync } from 'node:fs';
@@ -222,8 +224,9 @@ const zalozka = (p, nazev) => p.locator('nav').getByRole('button', { name: new R
   tvrdi('souhrn: čísla čitelná z metru (Stat 28 px)', cislo >= 28, String(cislo));
   const vyplnit = s1.getByRole('button', { name: 'Vyplnit uzávěrku' });
   tvrdi('bez uzávěrky: hlavní akce „Vyplnit uzávěrku" (tmavá, ne limetka) a cíl ≥ 48 px',
-    await vyplnit.count() === 1 && !/C8F542|accent/i.test(await vyplnit.getAttribute('class') ?? '') && ((await vyplnit.boundingBox())?.height ?? 0) >= 47.5,
-    `${await vyplnit.getAttribute('class')} ${(await vyplnit.boundingBox())?.height}`);
+    // offsetHeight, ne boundingBox: okno ještě dojíždí animací (scale) a rámeček by byl menší.
+    await vyplnit.count() === 1 && !/bg-\[#C8F542\]/i.test(await vyplnit.getAttribute('class') ?? '') && (await vyplnit.evaluate(e => e.offsetHeight)) >= 48,
+    `${await vyplnit.getAttribute('class')} ${await vyplnit.evaluate(e => e.offsetHeight)}`);
   await vyplnit.click();
   tvrdi('„Vyplnit uzávěrku": okno se zavře a tablet přepne na záložku Uzávěrka',
     await dokud(async () => (await s1.count()) === 0 && (await zalozka(p, 'Uzávěrka').getAttribute('aria-current')) === 'page', 3000));
@@ -247,6 +250,53 @@ const zalozka = (p, nazev) => p.locator('nav').getByRole('button', { name: new R
   tvrdi('dotyk: okno po dotyku zůstává otevřené', await s3.isVisible().catch(() => false));
   await s3.getByRole('button', { name: 'Hotovo' }).click();
   tvrdi('dotyk: „Hotovo" zavře', await dokud(async () => (await s3.count()) === 0, 2000));
+  await ctx.close();
+}
+
+// ---------------------------------------------------------------------------
+// 5) Sklad na tabletu: Dochází / Kriticky s počty, minimum v meta, proklik z widgetu
+// ---------------------------------------------------------------------------
+{
+  // Jen Martin na směně → tablet ví, kdo u něj stojí (WhoFirst se neptá).
+  const jeden = (req, json, stav) => {
+    const u = new URL(req.url());
+    if (u.pathname === '/api/attendance' && req.method() === 'GET') return json({ ...roster(), roster: roster().roster.map(r => (r.id === 1 ? r : { ...r, openSince: null, openEntryId: null })) });
+    return podvrh(req, json, stav);
+  };
+  const { ctx, p, chyby } = await kontext({ role: 'kiosk', viewport: { width: 768, height: 1024 }, mobil: true, fix: FIX, mineData: KIOSK, dalsi: jeden });
+  await otevriTablet(p);
+  await zalozka(p, 'Sklad').click();
+  const pas = p.getByRole('tablist', { name: 'Stav zásob' });
+  tvrdi('sklad: nad kategoriemi Segmented „Stav zásob"', await dokud(() => pas.isVisible().catch(() => false), 8000));
+  const dochazi = pas.getByRole('tab', { name: /^Dochází/ });
+  const kriticky = pas.getByRole('tab', { name: /^Kriticky/ });
+  tvrdi('sklad: počty Dochází 4 a Kriticky 3 (bez neschválených a odložených navíc)', (await dochazi.innerText()).replace(/\s+/g, '') === 'Dochází4' && (await kriticky.innerText()).replace(/\s+/g, '') === 'Kriticky3',
+    `${await dochazi.innerText()} / ${await kriticky.innerText()}`);
+  tvrdi('sklad: Segmented v jednom řádku bez posuvu, cíle ≥ 48 px', await pas.evaluate(e => e.scrollWidth <= e.clientWidth + 1) && ((await dochazi.boundingBox())?.height ?? 0) >= 47.5,
+    `${await pas.evaluate(e => `${e.scrollWidth}/${e.clientWidth}`)} výška ${(await dochazi.boundingBox())?.height}`);
+  // Název řádku = první textový uzel titulku ListRow (za ním je značka výrobce).
+  const nazvy = () => p.locator('main ul.list > li span.block.font-medium.truncate').evaluateAll(els => els.map(e => e.childNodes[0]?.textContent?.trim()).filter(Boolean));
+  tvrdi('sklad: řazení kriticky › dochází › ok, pak název', (await nazvy()).slice(0, 4).join('|') === 'Citrony|Domácí limonáda zázvorová|Sirup Monin Levandule|Matcha Ceremonial', (await nazvy()).join('|'));
+  await dochazi.click();
+  tvrdi('sklad: Dochází nechá jen 4 položky pod minimem', await dokud(async () => (await nazvy()).length === 4, 2000), (await nazvy()).join('|'));
+  const matcha = p.locator('main ul.list > li', { hasText: 'Matcha Ceremonial' });
+  const textMatcha = (await matcha.innerText()).replace(/\s+/g, ' ');
+  tvrdi('sklad: meta „min 2 kg · chybí 1"', /min 2 kg · chybí 1/.test(textMatcha), textMatcha);
+  tvrdi('sklad: u kritického sirupu „min 2 ks · chybí 2"', /min 2 ks · chybí 2/.test((await p.locator('main ul.list > li', { hasText: 'Sirup Monin' }).innerText()).replace(/\s+/g, ' ')));
+  await kriticky.click();
+  tvrdi('sklad: Kriticky nechá 3 položky', await dokud(async () => (await nazvy()).length === 3, 2000), (await nazvy()).join('|'));
+  tvrdi('sklad: stránka bez přetečení', await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+
+  // Proklik z widgetu Docházející zásoby na Směně: řádek Matchy → Sklad s Dochází a kategorií.
+  await zalozka(p, 'Směna').click();
+  const widget = p.locator(`[data-plocha="${STRANKA}"] li[data-widget="sklad.dochazi"]`);
+  await widget.waitFor({ timeout: 8000 });
+  await widget.getByText('Matcha Ceremonial').click();
+  tvrdi('proklik: tablet přepne na Sklad', await dokud(async () => (await zalozka(p, 'Sklad').getAttribute('aria-current')) === 'page', 3000));
+  tvrdi('proklik: vybrané Dochází a kategorie Čaje sypané', await dokud(async () => (await pas.getByRole('tab', { name: /^Dochází/ }).getAttribute('aria-selected')) === 'true'
+    && (await p.getByRole('button', { name: 'Čaje sypané', exact: true }).getAttribute('aria-pressed')) === 'true', 4000));
+  tvrdi('proklik: seznam ukazuje jen Matchu', await dokud(async () => (await nazvy()).join('|') === 'Matcha Ceremonial', 2000), (await nazvy()).join('|'));
+  tvrdi('sklad: bez chyb v konzoli', chyby.length === 0, chyby.slice(0, 3).join(' | '));
   await ctx.close();
 }
 

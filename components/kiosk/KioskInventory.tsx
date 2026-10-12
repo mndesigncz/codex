@@ -2,14 +2,17 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Icon } from '../Icons';
-import { Button, Card, EmptyState, ErrorState, ListRow, SearchField } from '../ui';
+import { Button, Card, EmptyState, ErrorState, ListRow, SearchField, Segmented } from '../ui';
 import KioskPackagedStock from './KioskPackagedStock';
 import NewStockEntry from '../inventory/NewStockEntry';
 import StocktakeModal from '../inventory/Stocktake';
 import { useKioskShift } from './KioskShiftGate';
 import { okJson } from '@/lib/api';
-import { obsahuje, obsahujeNekde } from '@/lib/hledani';
-import { useT } from '@/lib/i18n/client';
+import { useJazyk, useT } from '@/lib/i18n/client';
+import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
+import {
+  filtrujSkladTabletu, filtrZeSkladArg, minimumPolozky, pocetStavuSkladu, stavPolozkyTabletu, type FiltrStavuSkladu,
+} from '@/lib/kioskPrehled';
 
 interface Item {
   id: number;
@@ -28,14 +31,17 @@ interface Item {
 /** Interní hodnota filtru „všechny kategorie“ — nápis se překládá až při vykreslení. */
 const KAT_VSE = '*vse*';
 
-const statusOf = (i: Item) =>
-  (i as any).status ?? (i.quantity <= (i.criticalQuantity ?? 0) ? 'critical' : i.quantity <= i.minQuantity ? 'low' : 'ok');
+/** Předání z widgetu (Docházející zásoby): argument `stav:dochazi|Kategorie` a počítadlo, ať jde stejný proklik zopakovat. */
+export interface PredaniSkladuTabletu { arg?: string; n: number }
 
-export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }: {
+export default function KioskInventory({ autoOpenEntry = false, onEntryOpened, predani }: {
   autoOpenEntry?: boolean;
   onEntryOpened?: () => void;
+  predani?: PredaniSkladuTabletu;
 } = {}) {
   const t = useT('kiosk');
+  const { jazyk } = useJazyk();
+  const cislo = (n: number) => n.toLocaleString(LOCALE_PRO_JAZYK[jazyk]);
   const [items, setItems] = useState<Item[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +51,17 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
   const [saveErr, setSaveErr] = useState('');
   const [cat, setCat] = useState(KAT_VSE);
   const [search, setSearch] = useState('');
+  // Filtr stavu nad kategoriemi (MarketMan „Below par", Square „Low stock"): obsluha před
+  // objednávkou chce vidět jen to, co dochází. Proklik z widgetu ho nastaví sám.
+  const [filtrStavu, setFiltrStavu] = useState<FiltrStavuSkladu>(() => filtrZeSkladArg(predani?.arg).stav);
+  useEffect(() => {
+    if (!predani?.n) return;
+    const f = filtrZeSkladArg(predani.arg);
+    setFiltrStavu(f.stav);
+    setCat(f.kategorie ?? KAT_VSE);
+    setShowParked(false);
+    setStockFocused(false);
+  }, [predani?.n]); // eslint-disable-line react-hooks/exhaustive-deps
   // Debounced quantity saves so rapid taps don't spam the server.
   const timers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
   // While a packaged category is open it owns the screen — the search and the
@@ -88,11 +105,12 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
   }, [autoOpenEntry]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cats = useMemo(() => [KAT_VSE, ...Array.from(new Set(items.map(i => i.category).filter(Boolean)))], [items]);
+  // Kategorie z prokliku, kterou sklad nemá (přejmenovaná, nebo jen v jiném podniku): zpět na Vše,
+  // ať seznam neukazuje prázdno bez vybrané pilulky.
+  useEffect(() => { if (!loading && cat !== KAT_VSE && !cats.includes(cat)) setCat(KAT_VSE); }, [loading, cat, cats]);
   const parkedCount = items.filter(i => i.archived === true).length;
-  const filtered = items.filter(i =>
-    (showParked ? i.archived === true : i.archived !== true) &&
-    (cat === KAT_VSE || i.category === cat) &&
-    obsahuje(i.name, search));
+  const pocty = useMemo(() => pocetStavuSkladu(items), [items]);
+  const filtered = filtrujSkladTabletu(items, { nevedeme: showParked, stav: filtrStavu, kategorie: cat === KAT_VSE ? null : cat, hledani: search });
 
   const setParked = (item: Item, archived: boolean) => {
     setItems(list => list.map(x => x.id === item.id ? { ...x, archived } : x));
@@ -187,6 +205,16 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
               {showParked ? t('Zpět na to, co máme') : t('Co nevedeme ({n})', { n: parkedCount })}
             </Button>
           )}
+          {/* Stav nad kategoriemi; počty jen z toho, co podnik vede. V „Co nevedeme" nedává smysl. */}
+          {!showParked && (
+            // U baru palcem: položky pásu 48 px jako záložky tabletu (tap-target-sm by dal jen 44).
+            <Segmented ariaLabel={t('Stav zásob')} value={filtrStavu} onChange={setFiltrStavu} className="[&_[role=tab]]:min-h-12"
+              options={[
+                { id: 'vse', label: t('Vše') },
+                { id: 'dochazi', label: t('Dochází'), count: pocty.dochazi },
+                { id: 'kriticky', label: t('Kriticky'), count: pocty.kriticky },
+              ]} />
+          )}
           <div className="flex gap-1.5 overflow-x-auto scrollbar-thin -mx-1 px-1">
             {cats.map(c => (
               <button key={c} type="button" aria-pressed={cat === c} onClick={() => setCat(c)}
@@ -210,8 +238,14 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
                 onRetry={() => { setLoading(true); reload(); }} />
             </Card>
           ) : filtered.length === 0 ? (
-            <Card pad="sm"><EmptyState icon="box" compact title={t('Žádné položky')}
-              hint={t('V téhle kategorii zatím nic není. Zkus jinou, nebo hledej podle názvu.')} /></Card>
+            filtrStavu !== 'vse' && !showParked ? (
+              <Card pad="sm"><EmptyState icon="box" compact title={filtrStavu === 'kriticky' ? t('Nic není kriticky') : t('Nic nedochází')}
+                hint={t('Všechno je nad minimem. Ostatní položky najdeš pod Vše.')}
+                action={<Button variant="secondary" onClick={() => setFiltrStavu('vse')}>{t('Ukázat vše')}</Button>} /></Card>
+            ) : (
+              <Card pad="sm"><EmptyState icon="box" compact title={t('Žádné položky')}
+                hint={t('V téhle kategorii zatím nic není. Zkus jinou, nebo hledej podle názvu.')} /></Card>
+            )
           ) : (
             // Jedna karta s linkami (DP §3.6), ne karta na položku. Na telefonu
             // ListRow zalomí ovládání pod název, takže „Sirup Monin Levandule"
@@ -219,8 +253,9 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
             <Card pad="none" className="px-5">
               <ul className="list">
                 {filtered.map(i => {
-                  const st = statusOf(i);
+                  const st = stavPolozkyTabletu(i);
                   const ceka = (i as any).approved === false;
+                  const { min, chybi } = minimumPolozky(i);
                   return (
                     <li key={i.id}>
                       <ListRow as="div"
@@ -229,6 +264,10 @@ export default function KioskInventory({ autoOpenEntry = false, onEntryOpened }:
                         meta={<>
                           {st !== 'ok' && <span className={`font-medium ${st === 'critical' ? 'text-bad-ink' : 'text-wait-ink'}`}>{st === 'critical' ? `${t('kriticky')} · ` : `${t('dochází')} · `}</span>}
                           {ceka && <span className="font-medium text-wait-ink">{t('čeká na potvrzení')} · </span>}
+                          {/* Minimum jako „par level" — u „1 bal · dochází" je vidět, jestli má být 2, nebo 10.
+                              Před kategorií: meta se na telefonu zkracuje a kategorie je z toho nejméně důležitá. */}
+                          {min != null && <span className="tabular-nums">{t('min {n} {jednotka}', { n: cislo(min), jednotka: i.unit })} · </span>}
+                          {chybi != null && <span className={`tabular-nums font-medium ${st === 'critical' ? 'text-bad-ink' : 'text-wait-ink'}`}>{t('chybí {n}', { n: cislo(chybi) })} · </span>}
                           {i.category}
                         </>}
                         actions={i.archived ? (

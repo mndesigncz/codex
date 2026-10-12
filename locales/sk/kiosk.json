@@ -201,5 +201,14 @@
   "Za tuhle směnu ještě není vyplněná.": "Za túto zmenu ešte nie je vyplnená.",
   "další den": "nasledujúci deň",
   "Zavře se samo za {n} s": "Zavrie sa samo o {n} s",
-  "Okno zůstane otevřené, dokud ho nezavřeš.": "Okno zostane otvorené, kým ho nezavrieš."
+  "Okno zůstane otevřené, dokud ho nezavřeš.": "Okno zostane otvorené, kým ho nezavrieš.",
+  "Dochází": "Dochádza",
+  "Kriticky": "Kriticky",
+  "Stav zásob": "Stav zásob",
+  "Nic nedochází": "Nič nedochádza",
+  "Nic není kriticky": "Nič nie je kriticky",
+  "Všechno je nad minimem. Ostatní položky najdeš pod Vše.": "Všetko je nad minimom. Ostatné položky nájdeš pod Všetko.",
+  "Ukázat vše": "Ukázať všetko",
+  "min {n} {jednotka}": "min. {n} {jednotka}",
+  "chybí {n}": "chýba {n}"
 }

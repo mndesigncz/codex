@@ -4,7 +4,9 @@
 
 import type { Testy } from './_testy.ts';
 import { vyuziti, limityTarifu, LIMITS } from '../../lib/plan.ts';
-import { souhrnOdchodu, SOUHRN_ZAVRIT_S } from '../../lib/kioskPrehled.ts';
+import {
+  souhrnOdchodu, SOUHRN_ZAVRIT_S, pocetStavuSkladu, seradSkladTabletu, filtrujSkladTabletu, minimumPolozky, filtrZeSkladArg,
+} from '../../lib/kioskPrehled.ts';
 
 export default function ({ eq, ok }: Testy) {
   // ---- 1) čerpání limitu tarifu (karta Váš plán) ----
@@ -34,4 +36,31 @@ export default function ({ eq, ok }: Testy) {
     souhrnOdchodu({ clockIn: '2026-10-12T08:00:00Z', clockOut: '2026-10-12T07:00:00Z' }),
   ], [null, null, null, null]);
   eq('souhrn: okno se zavře samo po 20 s', SOUHRN_ZAVRIT_S, 20);
+
+  // ---- 3) sklad na tabletu: Dochází / Kriticky, řazení, minimum, proklik z widgetu ----
+  const sklad = [
+    { name: 'Mléko', category: 'Nápoje', quantity: 8, minQuantity: 4, criticalQuantity: 1 },
+    { name: 'Matcha', category: 'Čaj', quantity: 1, minQuantity: 2, criticalQuantity: 0 },
+    { name: 'Citrony', category: 'Ovoce', quantity: 0, minQuantity: 5, criticalQuantity: 1 },
+    { name: 'Avokádo', category: 'Ovoce', quantity: 0, minQuantity: 3, criticalQuantity: 1, archived: true },
+    { name: 'Brčka', category: 'Obaly', quantity: 2, minQuantity: 0, criticalQuantity: 0, status: 'low' },
+    { name: 'Čokoláda', category: 'Nápoje', quantity: 3, minQuantity: 2, criticalQuantity: 1, status: 'critical' },
+  ];
+  eq('sklad tabletu: počty bez odložených („nevedeme"); Dochází zahrnuje i kriticky', pocetStavuSkladu(sklad), { dochazi: 4, kriticky: 2 });
+  eq('sklad tabletu: stav posílaný serverem má přednost (balení) — jako stavZasoby', pocetStavuSkladu([{ name: 'X', quantity: 9, minQuantity: 2, criticalQuantity: 1, status: 'critical' }]), { dochazi: 1, kriticky: 1 });
+  eq('sklad tabletu: řazení kriticky › dochází › ok, pak název česky',
+    seradSkladTabletu(sklad.filter(x => !x.archived)).map(x => x.name), ['Citrony', 'Čokoláda', 'Brčka', 'Matcha', 'Mléko']);
+  const f = (o: Partial<Parameters<typeof filtrujSkladTabletu>[1]>) => filtrujSkladTabletu(sklad, { nevedeme: false, stav: 'vse', kategorie: null, hledani: '', ...o }).map(x => x.name);
+  eq('sklad tabletu: Dochází filtruje low + critical bez odložených', f({ stav: 'dochazi' }), ['Citrony', 'Čokoláda', 'Brčka', 'Matcha']);
+  eq('sklad tabletu: Kriticky jen critical', f({ stav: 'kriticky' }), ['Citrony', 'Čokoláda']);
+  eq('sklad tabletu: Dochází + kategorie + hledání bez diakritiky', [f({ stav: 'dochazi', kategorie: 'Ovoce' }), f({ hledani: 'cokol' })], [['Citrony'], ['Čokoláda']]);
+  eq('sklad tabletu: „Co nevedeme" ukazuje jen odložené a filtr stavu neplatí', f({ nevedeme: true, stav: 'kriticky' }), ['Avokádo']);
+  eq('minimum: „min 2 · chybí 1" u dochází', minimumPolozky(sklad[1]), { min: 2, chybi: 1 });
+  eq('minimum: v pořádku jen min, žádné chybí', minimumPolozky(sklad[0]), { min: 4, chybi: null });
+  eq('minimum: položka bez minima (0) nic — ani „chybí", i když je dochází podle balení', minimumPolozky(sklad[4]), { min: null, chybi: null });
+  eq('minimum: stav podle balení nad holým minimem → bez „chybí"', minimumPolozky(sklad[5]), { min: 2, chybi: null });
+  eq('minimum: desetiny bez šumu (0,5 bal.)', minimumPolozky({ name: 'Káva', quantity: 0.7, minQuantity: 1.2, criticalQuantity: 0.2 }), { min: 1.2, chybi: 0.5 });
+  eq('proklik z widgetu: stav:dochazi|Nápoje → Dochází v kategorii Nápoje', filtrZeSkladArg('stav:dochazi|Nápoje'), { stav: 'dochazi', kategorie: 'Nápoje' });
+  eq('proklik z widgetu: jen stav, jen kategorie, nic, položka', [filtrZeSkladArg('stav:dochazi'), filtrZeSkladArg('Čaj'), filtrZeSkladArg(undefined), filtrZeSkladArg('stav:dochazi|polozka:12')],
+    [{ stav: 'dochazi', kategorie: null }, { stav: 'vse', kategorie: 'Čaj' }, { stav: 'vse', kategorie: null }, { stav: 'dochazi', kategorie: null }]);
 }

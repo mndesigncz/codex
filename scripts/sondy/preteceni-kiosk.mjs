@@ -79,6 +79,21 @@ for (const vp of [{ width: 810, height: 1080 }, { width: 768, height: 1024 }]) {
   tvrdi(`tablet ${vp.width}: okno souhrnu po odchodu s „Uzávěrka chybí"`, await dokud(() => souhrn.getByText('Uzávěrka chybí').isVisible().catch(() => false), 3000));
   await p.waitForTimeout(500);
   await prover(p, `tablet ${vp.width} Směna – souhrn po odchodu`);
+  await souhrn.getByRole('button', { name: 'Hotovo' }).click().catch(() => {});
+  // Sklad s filtrem stavu (kolo 7): Segmented „Vše · Dochází (n) · Kriticky (n)" a meta s minimem.
+  await p.locator('nav').getByRole('button', { name: /^Sklad/ }).click();
+  await p.waitForTimeout(700);
+  if (await p.getByRole('button', { name: 'Vybrat sebe' }).isVisible().catch(() => false)) {
+    await p.getByRole('button', { name: 'Vybrat sebe' }).click();
+    await p.getByRole('dialog').getByRole('button', { name: /Martin Nemeškal/ }).first().click();
+    await p.waitForTimeout(700);
+  }
+  const pasStavu = p.getByRole('tablist', { name: 'Stav zásob' });
+  tvrdi(`tablet ${vp.width}: Sklad má Segmented stavu v jednom řádku`, await dokud(() => pasStavu.isVisible().catch(() => false), 6000)
+    && await pasStavu.evaluate(e => e.scrollWidth <= e.clientWidth + 1));
+  await pasStavu.getByRole('tab', { name: /^Dochází/ }).click().catch(() => {});
+  await p.waitForTimeout(500);
+  await prover(p, `tablet ${vp.width} Sklad – Dochází`);
   await ctx.close();
 }
 

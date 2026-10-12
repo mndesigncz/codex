@@ -201,5 +201,14 @@
   "Za tuhle směnu ještě není vyplněná.": "Für diese Schicht ist er noch nicht ausgefüllt.",
   "další den": "am Folgetag",
   "Zavře se samo za {n} s": "Schließt sich in {n} s von selbst",
-  "Okno zůstane otevřené, dokud ho nezavřeš.": "Das Fenster bleibt offen, bis du es schließt."
+  "Okno zůstane otevřené, dokud ho nezavřeš.": "Das Fenster bleibt offen, bis du es schließt.",
+  "Dochází": "Wird knapp",
+  "Kriticky": "Kritisch",
+  "Stav zásob": "Lagerstand",
+  "Nic nedochází": "Nichts wird knapp",
+  "Nic není kriticky": "Nichts ist kritisch",
+  "Všechno je nad minimem. Ostatní položky najdeš pod Vše.": "Alles liegt über dem Minimum. Die übrigen Artikel findest du unter Alle.",
+  "Ukázat vše": "Alle anzeigen",
+  "min {n} {jednotka}": "min. {n} {jednotka}",
+  "chybí {n}": "{n} fehlen"
 }
