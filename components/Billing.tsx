@@ -34,10 +34,15 @@ function VetaSTucnym({ veta, tucne, className }: { veta: (tucne: string) => stri
   return <>{pred}<strong className={className}>{tucne}</strong>{po}</>;
 }
 
-function Cell({ v }: { v: string | boolean }) {
+/**
+ * Hodnota tarifu u funkce: fajfka, pomlčka, nebo text („Až 3"). `chip`: v řádku seznamu na
+ * telefonu se text ukáže jako tlumený Chip, který se zalamuje — sloupec má jen třetinu šířky.
+ */
+function Cell({ v, chip = false }: { v: string | boolean; chip?: boolean }) {
   const t = useT('predplatne');
-  if (v === true) return <Icon name="check" size={16} className="text-[#5B7A08]" />;
-  if (v === false) return <span className="text-black/25">—</span>;
+  if (v === true) return <Icon name="check" size={16} className="text-[#5B7A08]" title={t('ano')} />;
+  if (v === false) return <span role="img" className="text-black/25" aria-label={t('ne')}>—</span>;
+  if (chip) return <Chip size="sm" className="whitespace-normal text-pretty max-w-full">{t(v)}</Chip>;
   return <>{t(v)}</>;
 }
 
@@ -261,28 +266,45 @@ export default function Billing() {
       {/* Srovnání */}
       <div className="card p-6">
         <h3 className="t-card mb-4">{t('Co je v jakém plánu')}</h3>
-        <div className="overflow-x-auto -mx-2 px-2">
-          <table className="w-full text-sm min-w-[520px]">
-            <thead>
-              <tr className="text-left t-label">
-                <th className="py-2 pr-3">{t('Funkce')}</th>
-                <th className="py-2 px-3 w-24">{t('Zdarma')}</th>
-                <th className="py-2 px-3 w-36">Pro</th>
-                <th className="py-2 pl-3 w-36">Max</th>
+        {/* Telefon: funkce pod sebou a pod každou tři úzké sloupce Zdarma / Pro / Max (vzor
+            Stripe pricing table). Dřív tabulka s min-w 520 px v posuvném obalu — Pro a Max
+            byly na 390 px mimo kartu a tabulkou se muselo tahat do strany. */}
+        <ul className="list sm:hidden" aria-label={t('Co je v jakém plánu')}>
+          {PLAN_FEATURES.map(f => (
+            <li key={f.label} className="py-3">
+              <p className="text-sm font-medium text-[#16181A] text-pretty">{t(f.label)}</p>
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                {(['free', 'pro', 'max'] as const).map(p => (
+                  <div key={p} className="min-w-0">
+                    <p className="t-label">{nazevTarifu(p)}</p>
+                    <div className="mt-1 min-h-[1.25rem] flex items-center text-sm text-black/70"><Cell v={f[p]} chip /></div>
+                  </div>
+                ))}
+              </div>
+            </li>
+          ))}
+        </ul>
+        {/* Od sm tabulka s pevnými sloupci: první půlka pro název funkce (zalamuje se), zbytek tarifům. */}
+        <table className="hidden sm:table w-full text-sm table-fixed">
+          <thead>
+            <tr className="text-left t-label">
+              <th className="py-2 pr-3 w-1/2">{t('Funkce')}</th>
+              <th className="py-2 px-3">{t('Zdarma')}</th>
+              <th className="py-2 px-3">Pro</th>
+              <th className="py-2 pl-3">Max</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-black/[0.06]">
+            {PLAN_FEATURES.map(f => (
+              <tr key={f.label} className="align-top">
+                <td className="py-2.5 pr-3 text-[#16181A] text-pretty">{t(f.label)}</td>
+                <td className="py-2.5 px-3 text-black/55 text-pretty"><Cell v={f.free} /></td>
+                <td className="py-2.5 px-3 text-black/70 text-pretty"><Cell v={f.pro} /></td>
+                <td className="py-2.5 pl-3 text-black/70 text-pretty"><Cell v={f.max} /></td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-black/[0.06]">
-              {PLAN_FEATURES.map(f => (
-                <tr key={f.label}>
-                  <td className="py-2.5 pr-3 text-[#16181A]">{t(f.label)}</td>
-                  <td className="py-2.5 px-3 text-black/55"><Cell v={f.free} /></td>
-                  <td className="py-2.5 px-3 text-black/70"><Cell v={f.pro} /></td>
-                  <td className="py-2.5 pl-3 text-black/70"><Cell v={f.max} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
         <p className="mt-3 t-meta">{t('Ceny bez DPH. Fakturu se všemi náležitostmi vystaví Stripe a najdete ji v portálu.')}</p>
       </div>
     </div>
