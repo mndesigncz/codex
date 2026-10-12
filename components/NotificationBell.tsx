@@ -4,11 +4,13 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { Icon } from './Icons';
 import { Badge } from './ui/Badge';
-import { czCount, type CzNoun } from '@/lib/czech';
-import { dbTimeDayHM } from '@/lib/pragueTime';
+import { dbTimeHM, parseDbTime } from '@/lib/pragueTime';
 import { usePopover } from '@/lib/usePopover';
 import { useVejdiSe } from '@/lib/useVejdiSe';
 import { okJson } from '@/lib/api';
+import { useT, useJazyk } from '@/lib/i18n/client';
+import { fmtDatum } from '@/lib/i18n/format';
+import { ikonaOznameni, otevriOznameni } from '@/lib/oznameniOdkaz';
 
 interface Notif {
   id: number;
@@ -20,15 +22,9 @@ interface Notif {
   created_at: string;
 }
 
-const typeIcon: Record<string, string> = {
-  chat: 'chat', inventory: 'box', shift: 'calendar', invite: 'users', info: 'bell',
-  warning: 'warning', success: 'check',
-};
-
-/** Věta pro odečítač u odznaku zvonku: „3 nové notifikace". */
-const NOVA_NOTIFIKACE: CzNoun = { one: 'nová notifikace', few: 'nové notifikace', many: 'nových notifikací' };
-
 export default function NotificationBell() {
+  const t = useT();
+  const { jazyk } = useJazyk();
   const { data: session } = useSession();
   const role = (session?.user as any)?.role as string | undefined;
   const [open, setOpen] = useState(false);
@@ -103,18 +99,14 @@ export default function NotificationBell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  const openNotif = async (n: Notif) => {
-    try {
-      const res = await fetch('/api/notifications', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: n.id }) });
-      if (res.ok) {
-        setNotifs(prev => prev.map(x => x.id === n.id ? { ...x, is_read: true } : x));
-        setUnread(u => Math.max(0, u - (n.is_read ? 0 : 1)));
-      }
-    } catch { /* příště to srovná pravidelné načtení */ }
-    // Na odkaz se jde tak jako tak — kvůli neoznačenému přečtení nemá smysl
-    // člověka zdržovat.
-    if (n.link && n.link !== '/') window.location.href = n.link;
-  };
+  // Otevření oznámení sdílí s Centrem oznámení v Nastavení (lib/oznameniOdkaz): přečteno
+  // až podle odpovědi serveru, na odkaz se jde tak jako tak.
+  const openNotif = (n: Notif) => otevriOznameni(n, x => {
+    setNotifs(prev => prev.map(y => (y.id === x.id ? { ...y, is_read: true } : y)));
+    setUnread(u => Math.max(0, u - 1));
+  });
+  /** „12. 9. 14:30" v jazyce a formátu člověka (čas z databáze přes parseDbTime). */
+  const kdy = (iso: string) => { const d = parseDbTime(iso); return d ? `${fmtDatum(d, { jazyk, styl: 'kratce' })} ${dbTimeHM(d)}` : ''; };
 
   // The flagged feedback stays on the badge until it is acknowledged in Odměny,
   // so "přečíst vše" here can't hide it.
@@ -131,7 +123,7 @@ export default function NotificationBell() {
           setOpen(o => !o);
         }}
         className="relative rounded-full bg-black/[0.04] border border-black/[0.08] w-10 h-10 flex items-center justify-center text-black/60 hover:text-black transition-colors"
-        title="Notifikace"
+        title={t('Notifikace')} aria-label={t('Notifikace')}
       >
         {/* The bell only moves when there is actually something new. */}
         <Icon name="bell" size={19} className="i-lead" motion={badge > 0 ? 'ring' : undefined} />
@@ -139,16 +131,16 @@ export default function NotificationBell() {
             s hlavní akcí obrazovky o jedinou limetku; červený zůstává pro
             vlajku (nízké hodnocení čeká na potvrzení). */}
         <Badge count={badge} tone={flaggedFeedback > 0 ? 'bad' : 'ink'}
-          label={czCount(badge, NOVA_NOTIFIKACE)} className="absolute -top-0.5 -right-0.5" />
+          label={t('{n, plural, one {# nová notifikace} few {# nové notifikace} other {# nových notifikací}}', { n: badge })} className="absolute -top-0.5 -right-0.5" />
       </button>
 
       {open && (
-        <div ref={pop.panelRef} onKeyDown={pop.onPanelKeyDown} role="dialog" aria-label="Notifikace" style={vejdiSe}
+        <div ref={pop.panelRef} onKeyDown={pop.onPanelKeyDown} role="dialog" aria-label={t('Notifikace')} style={vejdiSe}
           className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] glass-strong rounded-3xl overflow-hidden z-50 shadow-[0_16px_44px_rgba(25,35,15,0.18)]">
           <div className="px-4 py-3 border-b border-black/[0.07] flex items-center justify-between">
-            <span className="font-bold text-[#16181A] text-sm">Notifikace</span>
+            <span className="font-bold text-[#16181A] text-sm">{t('Notifikace')}</span>
             {notifs.some(n => !n.is_read) && (
-              <button onClick={markAllRead} className="text-xs text-[#5B7A08] hover:underline">Přečíst vše</button>
+              <button onClick={markAllRead} className="text-xs text-[#5B7A08] hover:underline">{t('Přečíst vše')}</button>
             )}
           </div>
           <div className="max-h-96 overflow-y-auto scrollbar-thin divide-y divide-black/[0.05]">
@@ -158,28 +150,25 @@ export default function NotificationBell() {
                   <Icon name="warning" size={15} />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-[#16181A]">Něco je potřeba napravit</p>
+                  <p className="text-sm font-semibold text-[#16181A]">{t('Něco je potřeba napravit')}</p>
                   <p className="text-xs text-black/55 mt-0.5">
-        {/* czech-ok: po předložce „u“ je 2. pád stejný pro 2–4 i 5+ („u tří směn“, „u pěti směn“). */}
-                    {flaggedFeedback === 1 ? 'U jedné z tvých směn' : `U ${flaggedFeedback} tvých směn`} máš zpětnou vazbu od vedení. Otevři sekci Odměny.
+                    {t('{n, plural, one {U jedné z tvých směn} few {U # tvých směn} other {U # tvých směn}} máš zpětnou vazbu od vedení. Otevři sekci Odměny.', { n: flaggedFeedback })}
                   </p>
                 </div>
               </div>
             )}
             {notifs.length === 0 && flaggedFeedback === 0 ? (
-              <div className="p-8 text-center text-black/40 text-sm">Žádné notifikace</div>
+              <div className="p-8 text-center text-black/40 text-sm">{t('Žádné notifikace')}</div>
             ) : notifs.map(n => (
               <button key={n.id} onClick={() => openNotif(n)}
                 className={`w-full text-left px-4 py-3 flex gap-3 hover:bg-black/[0.03] transition-colors ${!n.is_read ? 'bg-[#C8F542]/[0.04]' : ''}`}>
                 <span className="mt-0.5 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#C8F542]/15 text-[#5B7A08]">
-                  <Icon name={typeIcon[n.type] || 'bell'} size={15} />
+                  <Icon name={ikonaOznameni(n.type)} size={15} />
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-[#16181A] truncate">{n.title}</p>
                   {n.body && <p className="text-xs text-black/50 mt-0.5 line-clamp-2">{n.body}</p>}
-                  <p className="text-[11px] text-black/35 mt-1">
-                    {dbTimeDayHM(n.created_at)}
-                  </p>
+                  <p className="text-[11px] text-black/35 mt-1 tabular-nums">{kdy(n.created_at)}</p>
                 </div>
                 {!n.is_read && <span className="mt-1.5 h-2 w-2 rounded-full bg-[#C8F542] flex-shrink-0" />}
               </button>

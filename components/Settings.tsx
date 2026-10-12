@@ -5,12 +5,13 @@ import { useSession } from 'next-auth/react';
 import { planInfoOf, type PlanInfo } from '@/lib/plan';
 import Billing from './Billing';
 import { Icon } from './Icons';
-import { EmptyState, Button, Skeleton, PageHeader, Segmented, Badge, Chip, Modal, Stat, StatRow, Label } from './ui';
+import { EmptyState, Button, Skeleton, PageHeader, Segmented, Badge, Chip, ListRow, Modal, Stat, StatRow, Label } from './ui';
 import { useObal } from './ObalProvider';
 import PravniOdkazy from './pravni/PravniOdkazy';
 import NahlasenyObsah from './moderace/NahlasenyObsah';
 import Zablokovani from './moderace/Zablokovani';
-import { useT } from '@/lib/i18n/client';
+import { useT, useJazyk, type PrekladFn } from '@/lib/i18n/client';
+import type { Jazyk } from '@/lib/i18n/config';
 import SekceVzhled from './settings/SekceVzhled';
 import SekceJazyk from './settings/SekceJazyk';
 import SekceOznameni from './settings/SekceOznameni';
@@ -19,7 +20,10 @@ import SekceZkratky from './settings/SekceZkratky';
 import SekcePodnik from './settings/SekcePodnik';
 import { zalozkaNastaveni, SKUPINA_ZALOZKY, SKUPINY_NASTAVENI, type SectionId, type SkupinaNastaveni } from '@/lib/nastaveniZalozky';
 import TeamManagement from './TeamManagement';
-import { dbTimeDayHM } from '@/lib/pragueTime';
+import { dbTimeDayHM, parseDbTime } from '@/lib/pragueTime';
+import { relativniCas } from '@/lib/poznamky';
+import { fmtDatum } from '@/lib/i18n/format';
+import { cilOznameni, ikonaOznameni, otevriOznameni, LIMIT_OZNAMENI } from '@/lib/oznameniOdkaz';
 import { czCount } from '@/lib/czech';
 import { okJson } from '@/lib/api';
 import { useOpravneni } from './role/useOpravneni';
@@ -76,33 +80,29 @@ const labelClass = 'field-label';
 // tracking-tight` a hlavní akce formulářů ručně psanou limetkou.
 const cardTitle = 't-card';
 
-const typeIcon: Record<string, string> = {
-  chat: 'chat', inventory: 'box', shift: 'calendar', invite: 'users', info: 'bell',
-};
-
 const UCTENKA = { one: 'účtenka', few: 'účtenky', many: 'účtenek' };
 const POLOZKA = { one: 'položka', few: 'položky', many: 'položek' };
 
-function relativeCzech(iso: string): string {
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return '';
-  const diff = Date.now() - then;
-  const s = Math.floor(diff / 1000);
-  if (s < 45) return 'právě teď';
-  const m = Math.floor(s / 60);
-  if (m < 60) return `před ${m} min`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `před ${h} h`;
-  const d = Math.floor(h / 24);
-  if (d === 1) return 'včera';
-  if (d < 7) return `před ${d} dny`;
-  return new Date(iso).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', year: 'numeric' });
+/** „před 5 min", „před 2 h", „před 3 dny", po týdnu datum — v jazyce člověka (čas z databáze přes parseDbTime). */
+function kdyPrislo(iso: string, t: PrekladFn, jazyk: Jazyk): string {
+  const d = parseDbTime(iso);
+  if (!d) return '';
+  const r = relativniCas(d);
+  if (r.druh === 'ted') return t('právě teď');
+  if (r.druh === 'min') return t('před {n} min', { n: r.n });
+  if (r.druh === 'h') return t('před {n} h', { n: r.n });
+  if (r.druh === 'den') return t('před {n, plural, one {# dnem} few {# dny} other {# dny}}', { n: r.n });
+  return fmtDatum(d, { jazyk, styl: 'cislo' });
 }
+
+/** Filtr Centra oznámení. */
+type FiltrOznameni = 'vse' | 'neprectene';
 
 export default function Settings({ user, initialTab, tabNonce, vOkne = false }: Props) {
   const { update } = useSession();
   const { smiPlatby } = useObal();
   const t = useT();
+  const { jazyk } = useJazyk();
   const [zvolena, setZvolena] = useState<SectionId>(zalozkaNastaveni(initialTab) ?? 'account');
   // Přepnutí záložky odmontuje editor rolí — u rozepsané role se nejdřív zeptá.
   const straz = useStrazRole();
@@ -252,10 +252,19 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
   const [pwdMsg, setPwdMsg] = useState('');
   const [pwdErr, setPwdErr] = useState('');
 
-  // Notification center
+  // Centrum oznámení (kolo 6, B3): řádek s odkazem vede na cíl, filtr Vše / Nepřečtené,
+  // pilulky druhu s počtem (od dvou druhů), „Načíst starší" po dávkách z /api/notifications.
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [notifsLoading, setNotifsLoading] = useState(false);
   const [notifsLoaded, setNotifsLoaded] = useState(false);
+  const [notifsErr, setNotifsErr] = useState(false);
+  const [notifMsg, setNotifMsg] = useState('');
+  const [filtrOzn, setFiltrOzn] = useState<FiltrOznameni>('vse');
+  const [druhOzn, setDruhOzn] = useState<string | null>(null);
+  const [druhyOzn, setDruhyOzn] = useState<Record<string, number>>({});
+  const [unreadTotal, setUnreadTotal] = useState(0);
+  const [maStarsi, setMaStarsi] = useState(false);
+  const [nacitamStarsi, setNacitamStarsi] = useState(false);
 
   // Plan & trial for the billing section (employer only).
   const [plan, setPlan] = useState<PlanInfo | null>(null);
@@ -283,14 +292,49 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
       .finally(() => setLoading(false));
   }, []);
 
-  const loadNotifs = () => {
-    setNotifsLoading(true);
-    fetch('/api/notifications')
+  const adresaOznameni = (f: FiltrOznameni, druh: string | null, pred?: number) => {
+    const q = new URLSearchParams({ limit: String(LIMIT_OZNAMENI.vychozi) });
+    if (f === 'neprectene') q.set('unread', '1');
+    if (druh) q.set('type', druh);
+    if (pred) q.set('before', String(pred)); else q.set('souhrn', '1');
+    return `/api/notifications?${q}`;
+  };
+  const loadNotifs = (f: FiltrOznameni = filtrOzn, druh: string | null = druhOzn) => {
+    setNotifsLoading(true); setNotifsErr(false);
+    fetch(adresaOznameni(f, druh))
       .then(okJson)
-      .then(data => setNotifs(data.notifications || []))
-      .catch(() => {})
+      .then(data => {
+        const seznam: Notif[] = Array.isArray(data.notifications) ? data.notifications : [];
+        setNotifs(seznam);
+        setUnreadTotal(Number(data.unread) || 0);
+        setDruhyOzn(data.druhy && typeof data.druhy === 'object' ? data.druhy : {});
+        setMaStarsi(seznam.length >= (Number(data.limit) || LIMIT_OZNAMENI.vychozi));
+      })
+      .catch(() => setNotifsErr(true))
       .finally(() => { setNotifsLoading(false); setNotifsLoaded(true); });
   };
+  const nactiStarsi = () => {
+    const posledni = notifs[notifs.length - 1];
+    if (!posledni) return;
+    setNacitamStarsi(true); setNotifMsg('');
+    fetch(adresaOznameni(filtrOzn, druhOzn, posledni.id))
+      .then(okJson)
+      .then(data => {
+        const dalsi: Notif[] = Array.isArray(data.notifications) ? data.notifications : [];
+        setNotifs(prev => [...prev, ...dalsi.filter(n => !prev.some(p => p.id === n.id))]);
+        setMaStarsi(dalsi.length >= (Number(data.limit) || LIMIT_OZNAMENI.vychozi));
+      })
+      .catch(() => setNotifMsg(t('Starší oznámení se nepodařilo načíst.')))
+      .finally(() => setNacitamStarsi(false));
+  };
+  const zmenFiltr = (f: FiltrOznameni) => { setFiltrOzn(f); loadNotifs(f, druhOzn); };
+  // Druhý klik na tutéž pilulku filtr zruší (DESIGN „Filtrovací pás").
+  const zmenDruh = (d: string) => { const novy = druhOzn === d ? null : d; setDruhOzn(novy); loadNotifs(filtrOzn, novy); };
+  // Klepnutí na řádek s odkazem: přečteno (až podle serveru) a přechod na cíl — stejně jako zvonek.
+  const otevriNotif = (n: Notif) => otevriOznameni(n, x => {
+    setNotifs(prev => prev.map(y => (y.id === x.id ? { ...y, is_read: true } : y)));
+    setUnreadTotal(u => Math.max(0, u - 1));
+  });
 
   useEffect(() => {
     if (section === 'notifications' && !notifsLoaded) loadNotifs();
@@ -362,18 +406,34 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
     }
   };
 
+  // Přečteno je až to, co server potvrdí — dřív se odznak vynuloval i po chybě.
   const markAllRead = async () => {
+    setNotifMsg('');
+    const res = await fetch('/api/notifications', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(() => null);
+    if (!res?.ok) { setNotifMsg(t('Oznámení se nepodařilo označit jako přečtená. Zkus to znovu.')); return; }
     setNotifs(prev => prev.map(n => ({ ...n, is_read: true })));
-    try {
-      await fetch('/api/notifications', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: '{}',
-      });
-    } catch { /* ignore */ }
+    setUnreadTotal(0);
+    if (filtrOzn === 'neprectene') loadNotifs();
   };
 
-  const unreadCount = notifs.filter(n => !n.is_read).length;
+  // Počet všech nepřečtených ze serveru (ne jen v načtené dávce); před prvním načtením z dávky.
+  const unreadCount = notifsLoaded ? unreadTotal : notifs.filter(n => !n.is_read).length;
+  // Druhy oznámení pro pilulky: od dvou druhů, vybraný zůstává vidět i s nulou.
+  const druhyPilulek = Object.entries({ ...(druhOzn ? { [druhOzn]: 0 } : {}), ...druhyOzn });
+  const nazevDruhu = (typ: string): string => {
+    switch (typ) {
+      case 'shift': return t('Směny');
+      case 'chat': return t('Zprávy');
+      case 'inventory': return t('Sklad');
+      case 'task': return t('Úkoly');
+      case 'invite': return t('Tým');
+      case 'warning': return t('Upozornění', undefined, 'druh');
+      case 'success': return t('Odměny');
+      case 'billing': return t('Předplatné');
+      case 'info': return t('Informace');
+      default: return t('Ostatní', undefined, 'druh');
+    }
+  };
 
   return (
     <div className={vOkne ? 'space-y-4' : 'p-4 sm:p-6 max-w-5xl mx-auto space-y-6'}>
@@ -501,44 +561,70 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
             <div className="space-y-6">
             <SekceOznameni />
 
-            <section className="card p-6 space-y-4">
+            <section className="card p-6 space-y-4" aria-labelledby="nast-centrum-t">
               <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
                 <div className="min-w-0">
-                  <h2 className={cardTitle}>Centrum oznámení</h2>
+                  <h2 id="nast-centrum-t" className={cardTitle}>{t('Centrum oznámení')}</h2>
                   <p className="t-meta mt-1">
-                    {unreadCount > 0 ? `Nepřečtená oznámení: ${unreadCount}` : 'Vše přečteno'}
+                    {unreadCount > 0 ? t('Nepřečtená oznámení: {n}', { n: unreadCount }) : t('Vše přečteno')}
                   </p>
                 </div>
                 {unreadCount > 0 && (
-                  <Button variant="secondary" size="sm" icon="check" onClick={markAllRead}>Označit vše jako přečtené</Button>
+                  <Button variant="secondary" size="sm" icon="check" onClick={markAllRead}>{t('Označit vše jako přečtené')}</Button>
                 )}
               </div>
 
+              <Segmented size="sm" ariaLabel={t('Která oznámení ukázat')} value={filtrOzn} onChange={zmenFiltr}
+                options={[{ id: 'vse', label: t('Vše') }, { id: 'neprectene', label: t('Nepřečtené'), count: unreadCount }]} />
+              {druhyPilulek.length >= 2 && (
+                <div className="flex flex-wrap gap-1.5" role="group" aria-label={t('Druh oznámení')}>
+                  {druhyPilulek.map(([typ, n]) => (
+                    <button key={typ} type="button" aria-pressed={druhOzn === typ} onClick={() => zmenDruh(typ)}
+                      className={`filter-pill tap-target-sm inline-flex items-center gap-1.5 ${druhOzn === typ ? 'seg-on' : 'seg-off glass'}`}>
+                      <Icon name={ikonaOznameni(typ)} size={13} className="shrink-0" />
+                      <span>{nazevDruhu(typ)} · <span className="tabular-nums">{n}</span></span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {notifMsg && <p role="alert" className="note note-danger text-sm">{notifMsg}</p>}
+
               {notifsLoading ? (
-                <div className="space-y-2" aria-busy="true" aria-label="Načítám oznámení">
+                <div className="space-y-2" aria-busy="true" aria-label={t('Načítám oznámení')}>
                   {[0, 1, 2].map(i => <Skeleton key={i} className="h-14 w-full" />)}
                 </div>
+              ) : notifsErr ? (
+                <ErrorState compact title={t('Oznámení se nepodařilo načíst')} onRetry={() => loadNotifs()} />
               ) : notifs.length === 0 ? (
-                <EmptyState compact icon="bell" title="Žádná oznámení" hint="Až se něco stane, zobrazí se to tady." />
+                filtrOzn === 'neprectene' || druhOzn
+                  ? <EmptyState compact icon="bell" title={t('Nic tu není')} hint={t('Pod tímhle filtrem žádné oznámení nečeká.')} />
+                  : <EmptyState compact icon="bell" title={t('Žádná oznámení')} hint={t('Až se něco stane, zobrazí se to tady.')} />
               ) : (
                 <ul className="list">
-                  {/* Řádek ručně v .list, ne ListRow: text oznámení se nesmí useknout
-                      na jeden řádek (ListRow meta ořezává). Nepřečtené nese chip,
-                      ne limetkový podklad. */}
-                  {notifs.map(n => (
-                    <li key={n.id} className="list-row !items-start">
+                  {/* ListRow: titulek, čas v meta a text oznámení v `detail` (zalamuje se,
+                      neořezává). Řádek s odkazem je tlačítko a vede na cíl; bez odkazu jen
+                      informuje. Nepřečtené nese chip, ne limetkový podklad. */}
+                  {notifs.map(n => {
+                    const ikona = (
                       <span className="well h-9 w-9 grid place-items-center text-black/55 shrink-0">
-                        <Icon name={typeIcon[n.type] || 'bell'} size={16} />
+                        <Icon name={ikonaOznameni(n.type)} size={16} />
                       </span>
-                      <span className="min-w-0 flex-1">
-                        <span className={`block text-[15px] leading-snug text-[#16181A] ${!n.is_read ? 'font-bold' : 'font-medium'}`}>{n.title}</span>
-                        {n.body && <span className="block text-[13px] text-black/55 mt-0.5 break-words">{n.body}</span>}
-                        <span className="block t-meta mt-1">{relativeCzech(n.created_at)}</span>
-                      </span>
-                      {!n.is_read && <Chip tone="info" size="sm" className="shrink-0">Nové</Chip>}
-                    </li>
-                  ))}
+                    );
+                    const maOdkaz = cilOznameni(n) !== null;
+                    return (
+                      <ListRow key={n.id}
+                        lead={ikona}
+                        title={<span className={!n.is_read ? 'font-bold' : undefined}>{n.title}</span>}
+                        meta={kdyPrislo(n.created_at, t, jazyk)}
+                        detail={n.body ? <span className="break-words">{n.body}</span> : undefined}
+                        right={!n.is_read ? <Chip tone="info" size="sm">{t('Nové')}</Chip> : undefined}
+                        onClick={maOdkaz ? () => { void otevriNotif(n); } : undefined} />
+                    );
+                  })}
                 </ul>
+              )}
+              {!notifsLoading && !notifsErr && maStarsi && (
+                <Button variant="secondary" block icon="refresh" loading={nacitamStarsi} onClick={nactiStarsi}>{t('Načíst starší')}</Button>
               )}
             </section>
             </div>
