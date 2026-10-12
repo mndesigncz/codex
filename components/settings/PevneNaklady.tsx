@@ -47,25 +47,33 @@ export default function PevneNaklady({ onUlozeno }: { onUlozeno?: () => void }) 
 
   const seznam = radky ?? data.data ?? [];
   const ulozene = data.data ?? [];
-  const zmeneno = JSON.stringify(seznam) !== JSON.stringify(ulozene);
+  // Vyplněný, ale nepřidaný řádek se při Uložit přidá sám — na telefonu se „Přidat" snadno přeskočí
+  // a řádek by se potichu ztratil.
+  const rozepsano = nazev.trim() !== '' || castka.trim() !== '';
+  const zmeneno = rozepsano || JSON.stringify(seznam) !== JSON.stringify(ulozene);
   const soucet = soucetPevnychNakladu(seznam);
   const plno = seznam.length >= MAX_PEVNYCH_NAKLADU;
 
-  const pridat = () => {
+  /** Přidá rozepsaný řádek; vrátí nový seznam, nebo null, když pole nesedí (chyba je pod nimi). */
+  const pridat = (): PevnyNaklad[] | null => {
     const jmeno = nazev.trim();
     const n = castkaNakladuZPole(castka);
-    if (!jmeno) { setChybaPole(t('Napiš, za co se platí — třeba Nájem.')); return; }
-    if (n == null) { setChybaPole(t('Částka musí být číslo od nuly.')); return; }
-    if (plno) { setChybaPole(t('Nejvýš {n} řádků.', { n: MAX_PEVNYCH_NAKLADU })); return; }
+    if (!jmeno) { setChybaPole(t('Napiš, za co se platí — třeba Nájem.')); return null; }
+    if (n == null) { setChybaPole(t('Částka musí být číslo od nuly.')); return null; }
+    if (plno) { setChybaPole(t('Nejvýš {n} řádků.', { n: MAX_PEVNYCH_NAKLADU })); return null; }
     setChybaPole('');
-    setRadky([...seznam, { name: jmeno.slice(0, MAX_NAZEV_NAKLADU), amount: n }]);
+    const novy = [...seznam, { name: jmeno.slice(0, MAX_NAZEV_NAKLADU), amount: n }];
+    setRadky(novy);
     setNazev(''); setCastka('');
+    return novy;
   };
 
   const odebrat = (i: number) => setRadky(seznam.filter((_, j) => j !== i));
 
   const ulozit = async () => {
-    const ciste = cistePevneNaklady(seznam);
+    const kUlozeni = rozepsano ? pridat() : seznam;
+    if (!kUlozeni) return;
+    const ciste = cistePevneNaklady(kUlozeni);
     if (!ciste) { setToast({ text: t('Pravidelné náklady nejsou v pořádku — zkontroluj názvy a částky.'), ton: 'bad', id: Date.now() }); return; }
     setUkladam(true);
     try {

@@ -30,7 +30,7 @@ import { useDataWidgetu, obnovDataWidgetu } from '../widgety/useDataWidgetu';
 import { useSmi } from '../widgety/NavigaceKontext';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { useLocale } from './jazyk';
-import { KATEGORIE_UCTENEK, VYCHOZI_KATEGORIE_UCTENKY, jeKategorieUctenky, type KategorieUctenky } from '@/lib/financeWidgety';
+import { KATEGORIE_UCTENEK, VYCHOZI_KATEGORIE_UCTENKY, jeKategorieUctenky, urlFinanci, type KategorieUctenky } from '@/lib/financeWidgety';
 
 export const URL_UCTENEK = '/api/receipts';
 
@@ -165,6 +165,8 @@ export function NovaUctenka({ onUlozeno }: { onUlozeno?: () => void }) {
       setPhotoUrl(null); setObchod(''); setCastka(''); setPoznamka(''); setNaskladneno({}); setDatum(dnes); setKategorie(VYCHOZI_KATEGORIE_UCTENKY);
       setHotovo(t('Účtenka uložena.'));
       obnovDataWidgetu(URL_UCTENEK);
+      // Kniha výdajů a souhrn měsíce nákupu (podle data nákupu, ne nafocení) se načtou znovu.
+      obnovDataWidgetu(urlFinanci((datum || dnes).slice(0, 7)));
       onUlozeno?.();
     } catch (e) { setChyba(apiMessage(e, t('Uložení se nepodařilo.'))); }
     setUkladam(false);
