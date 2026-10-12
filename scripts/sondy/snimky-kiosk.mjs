@@ -9,7 +9,8 @@ await p.waitForTimeout(900);
 const nazvy = await p.locator('nav button, [role="tablist"] button, header ~ div button').evaluateAll(bs => bs.map(b => b.textContent?.trim()).filter(Boolean));
 for (const n of ['Směna', 'Úkoly', 'Postupy', 'Sklad', 'Objednávky', 'Uzávěrka', 'Návody']) {
   try {
-    await p.getByRole('button', { name: n, exact: true }).first().click({ timeout: 4000 });
+    // Odznak (Úkoly, Postupy, Objednávky) přidává do jména tlačítka skrytý popisek počtu — hledá se podle začátku.
+    await p.locator('nav').getByRole('button', { name: new RegExp(`^${n}`) }).first().click({ timeout: 4000 });
     await p.waitForTimeout(900);
     const vyska = await p.evaluate(() => document.documentElement.scrollHeight);
     await p.screenshot({ path: OUT + `kiosk-zalozka-${n}-${sirka}.png`, fullPage: true, clip: { x: 0, y: 0, width: sirka, height: Math.min(vyska, 1700) } });
