@@ -3,7 +3,9 @@
 //    prodejem, obsluhou, uzávěrkami dne a výdaji dne z knihy výdajů,
 //  - šipky listují dny, Escape zavře, zvolený pohled se pamatuje,
 //  - role bez finance.trzby widget ani detail nevidí a dotazy na pokladnu neodcházejí,
-//  - telefon 390: bez vodorovného přetečení.
+//  - telefon 390: bez vodorovného přetečení;
+//  - kolo 81 (B2), telefon: výsledek po pevných nákladech, export v „···", okno Pravidelné náklady zdola,
+//    pás kategorií v knize výdajů, detail objednávky, kategorie a datum nákupu v nové účtence.
 import { readFileSync } from 'node:fs';
 import { kontext, konec, tvrdi, otevri, dokud, dotazyNa, fixtura, roleMine, DIR, OUT } from './k68-spolecne.mjs';
 import { dayPlus, pragueToday } from '../../lib/pragueTime.ts';
@@ -90,6 +92,78 @@ for (const w of [1280, 390]) {
   await p.reload({ waitUntil: 'networkidle' });
   await p.locator('[data-plocha] li[data-instance]').first().waitFor({ timeout: 15000 });
   tvrdi(`${w}: zvolený přehled přežije obnovení`, await dokud(async () => await p.locator('[data-instance="po-dnech"]').getByRole('tab', { name: 'Dny v týdnu' }).getAttribute('aria-selected') === 'true', 6000));
+  await ctx.close();
+}
+
+// Kolo 81 (B2), telefon 390: výsledek po pevných nákladech, export v „···" místo limetky, okno
+// Pravidelné náklady zdola, pás kategorií v knize výdajů a Segmented kategorií v nové účtence
+// (jeden pás, nezalomený) — nic nepřetéká.
+{
+  const pretece = (loc) => loc.evaluate(el => el.scrollWidth > el.clientWidth + 1);
+  const teams = { ...fixtura('teams') }; teams.team = { ...teams.team, fixed_costs: [{ name: 'Nájem', amount: 40000 }, { name: 'Energie', amount: 8500 }] };
+  const dalsiB2 = (req, json, stav) => {
+    const u = new URL(req.url());
+    if (req.method() === 'GET' && u.pathname === '/api/finance') {
+      const f = JSON.parse(readFileSync(DIR + 'k69-b5b-finance.json', 'utf8').replaceAll('DNES', dnes));
+      return json({ ...f, month: u.searchParams.get('month'), summary: { ...f.summary, fixedCosts: 48500, net: f.summary.gross - 48500, fixedCostsSet: true }, ledger: [
+        { date: vcera, kind: 'receipt', label: 'Velkoobchod Bílkovi', amount: 8420, receiptId: 31, photoUrl: null, note: 'Mléko, káva', category: 'suroviny', supplier: 'Velkoobchod Bílkovi' },
+        { date: vcera, kind: 'receipt', label: 'Večerka u Nováků', amount: 640, receiptId: 32, photoUrl: null, note: null, category: 'napoje', supplier: 'Večerka u Nováků' },
+        { date: dayPlus(dnes, -2), kind: 'order', label: 'Objednávka — Monin', amount: 4200, orderId: 7, supplier: 'Monin', orderedBy: 'Eva Testová', items: [{ name: 'Sirup Mango', qty: 6, unit: 'ks' }] },
+        { date: vcera, kind: 'expense', label: 'Výdaje z kasy', amount: 640 },
+      ] });
+    }
+    if (req.method() === 'GET' && u.pathname === '/api/teams') return json(teams);
+    if (req.method() === 'GET' && u.pathname === '/api/receipts') return json({ receipts: [] });
+    return dalsi(req, json, stav);
+  };
+  const { ctx, p } = await kontext({ viewport: { width: 390, height: 844 }, mobil: true, fix: fixtura('k69-b5b-rozlozeni-finance'), dalsi: dalsiB2 });
+  await otevri(p, '/employer/overview?view=finance', 'vedeni.finance');
+  const souhrn = p.locator('[data-instance="souhrn"]');
+  await souhrn.getByText('Výsledek').first().waitFor({ timeout: 10000 });
+  const s = (await souhrn.innerText()).replace(/\s+/g, ' ');
+  tvrdi('390 B2: Souhrn měsíce ukáže Výsledek po nájmu a energiích a tržby „z uzávěrek"', /Výsledek/.test(s) && /po nájmu a energiích/.test(s) && /25\s780/.test(s) && /z uzávěrek/.test(s), s.slice(0, 260));
+  tvrdi('390 B2: na telefonu žádná limetka Export pro účetní', await p.getByRole('button', { name: 'Export pro účetní' }).count() === 0);
+  await p.locator('[data-plocha] button[aria-haspopup="menu"]:visible').first().click();
+  tvrdi('390 B2: „···" nese Export pro účetní', await dokud(async () => await p.getByRole('menuitem', { name: 'Export pro účetní' }).count() === 1, 4000));
+  await p.getByRole('menuitem', { name: /Pravidelné náklady/ }).click();
+  const okno = p.getByRole('dialog', { name: 'Pravidelné náklady' });
+  await okno.getByText('Nájem', { exact: true }).waitFor({ timeout: 8000 });
+  // Okno vyjíždí zdola — měří se, až dojede.
+  let box = null;
+  const dosedlo = await dokud(async () => { box = await okno.boundingBox(); return !!box && Math.abs(box.y + box.height - 844) < 2; }, 4000);
+  tvrdi('390 B2: okno Pravidelné náklady dosedá na spodní hranu (zdola)', dosedlo, JSON.stringify(box));
+  tvrdi('390 B2: částka nákladu má inputMode=decimal', await okno.locator('#pevne-castka').getAttribute('inputmode') === 'decimal');
+  await p.keyboard.press('Escape');
+  await dokud(async () => await p.getByRole('dialog').count() === 0, 3000);
+
+  const kniha = p.locator('section[aria-labelledby="finance-vydaje"]');
+  await kniha.getByRole('tab', { name: /Účtenky/ }).click();
+  const pas = kniha.getByRole('group', { name: 'Kategorie účtenky' });
+  await pas.waitFor({ timeout: 4000 });
+  tvrdi('390 B2: druh Účtenka ukáže pás kategorií s počty', await pas.getByRole('button').count() === 2);
+  const mereni = await p.evaluate(() => { const li = document.querySelector('[data-plocha] li[data-widget="nastroj"]'); return { li: [li.scrollWidth, li.clientWidth], doc: [document.documentElement.scrollWidth, innerWidth] }; });
+  tvrdi('390 B2: kniha výdajů s pásem kategorií nepřetéká', mereni.li[0] <= mereni.li[1] + 1 && mereni.doc[0] <= mereni.doc[1] + 1, JSON.stringify(mereni));
+  await kniha.getByRole('tab', { name: /Objednávky/ }).click();
+  await kniha.locator('ul.list > li').first().click();
+  tvrdi('390 B2: objednávka se rozklikne na položky', await dokud(async () => /Sirup Mango/.test(await p.getByRole('dialog').innerText().catch(() => '')), 5000));
+  await p.keyboard.press('Escape');
+  await dokud(async () => await p.getByRole('dialog').count() === 0, 3000);
+  await kniha.getByRole('tab', { name: /Z kasy/ }).click();
+  await kniha.locator('ul.list > li').first().click();
+  tvrdi('390 B2: výdaj z kasy otevře celý den (Finance dne)', await dokud(async () => await p.getByRole('dialog', { name: 'Finance dne' }).count() === 1, 6000));
+  await p.keyboard.press('Escape');
+  await dokud(async () => await p.getByRole('dialog').count() === 0, 3000);
+
+  const uct = p.locator('[data-instance="uctenky"]');
+  await uct.scrollIntoViewIfNeeded();
+  await uct.getByRole('button', { name: 'Nafotit' }).click();
+  const nova = p.getByRole('dialog', { name: 'Nová účtenka' });
+  const segm = nova.getByRole('tablist', { name: 'Kategorie účtenky' });
+  await segm.waitFor({ timeout: 6000 });
+  const radkuSegm = await segm.evaluate(el => new Set([...el.querySelectorAll('[role=tab]')].map(t => Math.round(t.getBoundingClientRect().top))).size);
+  tvrdi('390 B2: Segmented kategorií v nové účtence je jeden pás bez zalomení', radkuSegm === 1, String(radkuSegm));
+  tvrdi('390 B2: datum nákupu je výchozí dnešek a nejvýš dnešek', await nova.locator('#uctenka-datum').inputValue() === dnes && await nova.locator('#uctenka-datum').getAttribute('max') === dnes);
+  tvrdi('390 B2: okno nové účtenky nepřetéká', !(await pretece(nova)));
   await ctx.close();
 }
 
