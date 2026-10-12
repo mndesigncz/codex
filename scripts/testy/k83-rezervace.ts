@@ -4,7 +4,7 @@
 // (slotsFor nefiltroval podle času a server kontroloval jen den).
 
 import type { Testy } from './_testy.ts';
-import { slotsFor, nejdriveDnes, PREDSTIH_REZERVACE_MIN } from '../../lib/clientSlots.ts';
+import { slotsFor, nejdriveDnes, PREDSTIH_REZERVACE_MIN, autoPotvrdit, zpravaHostoviORezervaci } from '../../lib/clientSlots.ts';
 
 export default function ({ eq, ok }: Testy) {
   // ---- sloty v minulosti (rezervace-slot-v-minulosti) ----
@@ -25,4 +25,13 @@ export default function ({ eq, ok }: Testy) {
   eq('sloty: ráno před otevřením celý den', slotsFor(hodiny, den, 30, nejdriveDnes('06:10')), vse);
   eq('sloty: zavřený den nic', slotsFor(hodiny, '2026-10-18', 30, nejdriveDnes('06:00')), []);
   eq('sloty: nečitelné „teď" nic neschová', nejdriveDnes('x'), '00:00');
+
+  // ---- automatické potvrzení (rezervace-automaticke-potvrzeni) ----
+  eq('auto: vypnuto (i bez sloupců před migrací) → čeká na vedení', [autoPotvrdit({ auto_confirm: false, auto_confirm_max_party: 0 }, 2), autoPotvrdit({}, 2), autoPotvrdit(null, 2)], [false, false, false]);
+  eq('auto: zapnuto bez hranice → všechny velikosti', [autoPotvrdit({ auto_confirm: true, auto_confirm_max_party: 0 }, 1), autoPotvrdit({ auto_confirm: true }, 40)], [true, true]);
+  eq('auto: hranice 6 → do 6 osob samo, 7 čeká', [autoPotvrdit({ auto_confirm: true, auto_confirm_max_party: 6 }, 6), autoPotvrdit({ auto_confirm: true, auto_confirm_max_party: '6' }, 7)], [true, false]);
+  ok('auto: jen opravdové true (řetězec „false" z formuláře nezapne)', !autoPotvrdit({ auto_confirm: 'false' }, 2));
+  const potvrzeni = zpravaHostoviORezervaci('confirmed', '2026-10-12', '18:30:00');
+  eq('auto: host dostane stejné „Rezervace potvrzena" jako po ručním potvrzení', [potvrzeni.title, potvrzeni.body, potvrzeni.type], ['Rezervace potvrzena', 'Těšíme se 12. 10. 2026 18:30.', 'success']);
+  eq('auto: odmítnutí stejnou funkcí', zpravaHostoviORezervaci('declined', '2026-10-12', '18:30').title, 'Rezervaci se nepodařilo přijmout');
 }

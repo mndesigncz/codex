@@ -813,7 +813,9 @@ function SettingsTab({ oznam, onChange }: { oznam: Hlaska; onChange: () => void 
     e.preventDefault(); setBusy(true);
     try {
       const r = await j('/api/client/admin/profile', { method: 'PUT', body: JSON.stringify({ enabled: p.enabled, slug: p.slug, reservations_on: p.reservations_on, ordering_on: p.ordering_on, max_party: p.max_party, lead_days: p.lead_days, slot_minutes: p.slot_minutes, menu_slug: p.menu_slug || null,
-        order_qr_required: p.order_qr_required, order_geo: p.order_geo, lat: p.lat ?? '', lng: p.lng ?? '', geo_radius_m: p.geo_radius_m, order_auto_pos: p.order_auto_pos }) });
+        order_qr_required: p.order_qr_required, order_geo: p.order_geo, lat: p.lat ?? '', lng: p.lng ?? '', geo_radius_m: p.geo_radius_m, order_auto_pos: p.order_auto_pos,
+        // Před migrací sloupců (profil je nemá) se nic neposílá, ať uložení zbytku nespadne.
+        ...(p.auto_confirm !== undefined ? { auto_confirm: p.auto_confirm === true, auto_confirm_max_party: Number(p.auto_confirm_max_party) || 0 } : {}) }) });
       setP(r.profile); setD({ ...d, url: r.url }); oznam(r.profile.enabled ? 'Uloženo. Podnik je pro hosty zapnutý.' : 'Uloženo. Podnik je zatím vypnutý.'); onChange();
     } catch (err) { oznam(apiMessage(err, 'Uložení se nepovedlo.'), 'bad'); }
     setBusy(false);
@@ -869,6 +871,21 @@ function SettingsTab({ oznam, onChange }: { oznam: Hlaska; onChange: () => void 
         <h2 className="t-card">Rezervace a objednávky</h2>
         <ul className="list">
           <SwitchRow title="Hosté můžou rezervovat" checked={!!p.reservations_on} onChange={v => setP({ ...p, reservations_on: v })} />
+          {/* Malá kavárna nemá nikoho, kdo by požadavky hlídal: rezervace se potvrdí sama
+              a ručně se schvalují jen velké skupiny (jako instant booking v OpenTable a Resy). */}
+          <SwitchRow title="Potvrzovat rezervace automaticky"
+            hint={Number(p.auto_confirm_max_party) > 0
+              ? `Větší skupiny (od ${Number(p.auto_confirm_max_party) + 1} osob) dál čekají na tvé potvrzení.`
+              : 'Host má potvrzeno hned po odeslání. Hranici pro velké skupiny nastavíš pod přepínačem.'}
+            checked={p.auto_confirm === true} onChange={v => setP({ ...p, auto_confirm: v })} />
+        </ul>
+        {p.auto_confirm === true && (
+          <Field id="s-auto-max" label="Samy se potvrdí skupiny do (osob)" hint="0 = všechny velikosti. Větší skupiny počkají, až je potvrdíš v Rezervacích.">
+            <Input id="s-auto-max" type="number" inputMode="numeric" min={0} max={40} className="!w-full sm:!w-28" value={p.auto_confirm_max_party ?? 0}
+              onChange={e => setP({ ...p, auto_confirm_max_party: e.target.value })} />
+          </Field>
+        )}
+        <ul className="list">
           <SwitchRow title="Hosté můžou objednávat od stolu" hint="Objednávky potřebují stoly (záložka Stoly) a nabídku z Menu. S napojenou pokladnou jdou přijaté objednávky rovnou na stůl v kase."
             checked={!!p.ordering_on} onChange={v => setP({ ...p, ordering_on: v })} />
         </ul>

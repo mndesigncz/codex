@@ -60,6 +60,28 @@ export function slotsFor(hours: OpeningHours | null | undefined, dateStr: string
   return nejdrive && /^\d{2}:\d{2}$/.test(nejdrive) ? out.filter(s => s >= nejdrive) : out;
 }
 
+/**
+ * Potvrdí se rezervace hosta sama? Podnik zapne `auto_confirm` a volitelně hranici
+ * `auto_confirm_max_party`: skupiny do té velikosti se potvrdí hned, větší dál čekají
+ * na vedení. 0 (nebo nic) = bez hranice, potvrdí se všechny.
+ */
+export function autoPotvrdit(profil: { auto_confirm?: unknown; auto_confirm_max_party?: unknown } | null | undefined, osob: number): boolean {
+  if (profil?.auto_confirm !== true) return false;
+  const max = Math.max(0, Math.round(Number(profil.auto_confirm_max_party) || 0));
+  return max === 0 || Math.max(1, Number(osob) || 1) <= max;
+}
+
+/**
+ * Oznámení hostovi o rozhodnutí o rezervaci. Jedno místo pro ruční potvrzení (PATCH),
+ * automatické potvrzení (POST hosta) i ruční zápis s napojeným členem — ať se texty nerozjedou.
+ */
+export function zpravaHostoviORezervaci(stav: 'confirmed' | 'declined', datum: string, cas: string): { title: string; body: string; link: string; type: 'success' | 'info' } {
+  const kdy = `${String(datum).split('-').reverse().join('. ')} ${String(cas).slice(0, 5)}`;
+  return stav === 'confirmed'
+    ? { title: 'Rezervace potvrzena', body: `Těšíme se ${kdy}.`, link: '/client/me', type: 'success' }
+    : { title: 'Rezervaci se nepodařilo přijmout', body: `Na ${kdy} bohužel nemáme místo.`, link: '/client/me', type: 'info' };
+}
+
 /** „pá 12. 9." pro seznamy, „pátek 12. září" pro nadpisy. */
 export function czDay(dateStr: string, long = false): string {
   return new Date(dateStr + 'T12:00:00').toLocaleDateString('cs-CZ', long

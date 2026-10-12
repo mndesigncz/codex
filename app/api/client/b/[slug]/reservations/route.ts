@@ -4,8 +4,8 @@
 import { NextResponse } from 'next/server';
 import { sql, customer, profileBySlug, join, slotsFor } from '@/lib/client';
 import { clenoveSOpravnenim } from '@/lib/opravneniDb';
-import { notifyUsers } from '@/lib/push';
-import { nejdriveDnes } from '@/lib/clientSlots';
+import { notifyUser, notifyUsers } from '@/lib/push';
+import { autoPotvrdit, nejdriveDnes, zpravaHostoviORezervaci } from '@/lib/clientSlots';
 import { pragueToday, pragueHM, dayPlus } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
@@ -51,13 +51,16 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
   const [dup] = await sql`
     SELECT id FROM client_reservations WHERE team_id = ${teamId} AND customer_id = ${me.id} AND date = ${date} AND time = ${time} AND status NOT IN ('cancelled','declined')`;
   if (dup) return NextResponse.json({ error: 'Na tenhle termín už rezervaci máš.' }, { status: 409 });
+  // Malý podnik si zapne automatické potvrzování (Nastavení › Rezervace a objednávky):
+  // rezervace vznikne rovnou potvrzená, větší skupiny než nastavená hranice dál čekají.
+  const status = autoPotvrdit(p, party) ? 'confirmed' : 'requested';
   // Dedup výš je rychlá cesta; skutečnou pojistku proti dvojkliku dělá
   // unikátní index (viz /api/init). Kolizi překládáme na klidné 409.
   let r: any;
   try {
     [r] = await sql`
-      INSERT INTO client_reservations (team_id, customer_id, date, time, party, note)
-      VALUES (${teamId}, ${me.id}, ${date}, ${time}, ${party}, ${note})
+      INSERT INTO client_reservations (team_id, customer_id, date, time, party, note, status)
+      VALUES (${teamId}, ${me.id}, ${date}, ${time}, ${party}, ${note}, ${status})
       RETURNING id, date, time, party, note, status`;
   } catch (e: any) {
     if (String(e?.message ?? '').toLowerCase().includes('unique') || e?.code === '23505') {
@@ -65,8 +68,11 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
     }
     throw e;
   }
+  // Host dostane stejné „Rezervace potvrzena“ jako po ručním potvrzení.
+  if (status === 'confirmed') notifyUser(me.id, zpravaHostoviORezervaci('confirmed', date, time)).catch(() => {});
   await upozorni(teamId, {
-    title: 'Nová rezervace',
+    // Vedoucí musí poznat, že nemusí nic dělat.
+    title: status === 'confirmed' ? 'Nová rezervace (potvrzena automaticky)' : 'Nová rezervace',
     body: `${me.name} · ${date.split('-').reverse().join('. ')} ${time} · ${party} ${party === 1 ? 'osoba' : party < 5 ? 'osoby' : 'osob'}`,
     link: '/employer/overview?mode=client&tab=reservations', type: 'info',
   });

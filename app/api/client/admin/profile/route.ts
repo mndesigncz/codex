@@ -33,6 +33,7 @@ const POLE_OPRAVNENI: Record<string, string> = {
   max_party: 'klient.nastaveni', lead_days: 'klient.nastaveni', slot_minutes: 'klient.nastaveni', menu_slug: 'klient.nastaveni',
   order_qr_required: 'klient.nastaveni', order_geo: 'klient.nastaveni', lat: 'klient.nastaveni', lng: 'klient.nastaveni',
   geo_radius_m: 'klient.nastaveni', order_auto_pos: 'klient.nastaveni',
+  auto_confirm: 'klient.nastaveni', auto_confirm_max_party: 'klient.nastaveni',
   // Texty a adresa se upravují na obrazovce Vzhled spolu s logem a galerií.
   tagline: 'klient.vzhled', description: 'klient.vzhled', address: 'klient.vzhled', cover_url: 'klient.vzhled',
   logo_url: 'klient.vzhled', gallery: 'klient.vzhled', accent: 'klient.vzhled', qr_design: 'klient.vzhled',
@@ -226,6 +227,20 @@ export async function PUT(req: NextRequest) {
         credit_expire_days = ${kreditDny},
         credit_expire_since = ${kreditOd}
       WHERE team_id = ${u.team_id} RETURNING *`;
+  }
+  // Automatické potvrzování rezervací: zvlášť, ať uložení ostatního nastavení nezávisí na migraci
+  // sloupců. Hranice 0–40 osob (víc než „Nejvíc osob" nedává smysl), 0 = všechny velikosti.
+  if (b?.auto_confirm !== undefined || b?.auto_confirm_max_party !== undefined) {
+    const zapnuto = b.auto_confirm !== undefined ? b.auto_confirm === true : pFinal.auto_confirm === true;
+    const hranice = num(b.auto_confirm_max_party, Number(pFinal.auto_confirm_max_party) || 0, 0, 40);
+    [pFinal] = await sql`
+      UPDATE client_profiles SET auto_confirm = ${zapnuto}, auto_confirm_max_party = ${hranice}
+      WHERE team_id = ${u.team_id} RETURNING *`;
+    if (zapnuto !== (cur.auto_confirm === true) || hranice !== (Number(cur.auto_confirm_max_party) || 0)) {
+      audit(u.team_id, u.id, 'client.profile', 'client', null, zapnuto
+        ? `rezervace se potvrzují automaticky${hranice > 0 ? ` (skupiny do ${hranice} osob)` : ''}`
+        : 'rezervace potvrzuje vedení ručně');
+    }
   }
   // Verze pravidel: co se změnilo, před → po, v historii změn.
   const zmeny = popisZmenyPravidel(cur, pFinal, (await menaPodniku(u.team_id)).money);

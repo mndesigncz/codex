@@ -340,7 +340,8 @@ function ReserveTab({ slug, b, me, today, signedIn, onDone }: { slug: string; b:
       const r = await fetch(`/api/client/b/${encodeURIComponent(slug)}/reservations`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date, time, party, note }) });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { setErr(d.error ? t(d.error) : t('Rezervace se nepovedla.')); return; }
-      setNote(''); onDone(t('Rezervace odeslána. Podnik ji potvrdí.'));
+      // Podnik s automatickým potvrzováním vrátí rovnou „confirmed" — host to má vědět hned.
+      setNote(''); onDone(d.reservation?.status === 'confirmed' ? t('Rezervace je potvrzená. Těšíme se na tebe.') : t('Rezervace odeslána. Podnik ji potvrdí.'));
     } catch {
       setErr(t('Rezervace neodešla — vypadlo připojení. Zkus to prosím znovu.'));
     } finally {

@@ -11,7 +11,7 @@ import { audit } from '@/lib/audit';
 import { aktivniBonus } from '@/lib/bonusAkceDb';
 import { pripisBodyZaRezervaci } from '@/lib/bodyZdrojeDb';
 import { poznamkaRazitek } from '@/lib/bonusAkce';
-import { tierForMember, tierRulesFromProfile } from '@/lib/clientSlots';
+import { tierForMember, tierRulesFromProfile, zpravaHostoviORezervaci } from '@/lib/clientSlots';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -162,12 +162,7 @@ export async function PATCH(req: NextRequest) {
     }
   }
   if (next === 'confirmed' || next === 'declined') {
-    const when = `${String(r.date).split('-').reverse().join('. ')} ${r.time}`;
-    notifyUser(Number(r.customer_id), {
-      title: next === 'confirmed' ? 'Rezervace potvrzena' : 'Rezervaci se nepodařilo přijmout',
-      body: next === 'confirmed' ? `Těšíme se ${when}.` : `Na ${when} bohužel nemáme místo.`,
-      link: '/client/me', type: next === 'confirmed' ? 'success' : 'info',
-    }).catch(() => {});
+    notifyUser(Number(r.customer_id), zpravaHostoviORezervaci(next, String(r.date), String(r.time))).catch(() => {});
   }
   audit(u.team_id, u.id, 'client.reservation', 'client', id, `${r.customer_name} · ${r.date} ${r.time} → ${status}`);
   return NextResponse.json({ ok: true, status, tableId, posNote, loyalty, bodyRezervace });
