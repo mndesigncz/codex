@@ -35,6 +35,8 @@ for (const dlouhe of [false, true]) for (const w of [360, 390]) for (const cesta
       return undefined;
     } });
   await p.goto(BASE + cesta, { waitUntil: 'networkidle' }).catch(() => {});
+  // Nadpis počkat (pod zátěží dev serveru se plocha kreslí i přes 1,2 s — „bezi:false" bylo jen pomalé načtení).
+  await p.locator('h1').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
   await p.waitForTimeout(1200);
   const bezi = await p.locator('h1').first().isVisible().catch(() => false);
   const m = await mereni(p);
