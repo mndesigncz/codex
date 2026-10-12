@@ -39,7 +39,9 @@
 // Widgety s obdobím „Podle stránky" čtou přepínač Docházky přes ObdobiStrankyDochazky.
 //
 // Kolo 7 (R7-2): Píchačky ukážou dnešní směnu z rozvrhu a zpoždění, Souhrn hodin plán
-// a počet pozdních příchodů a „Ukončit" má nepovinný důvod.
+// a počet pozdních příchodů, „Ukončit" má nepovinný důvod a nový widget
+// dochazka.moje_zaznamy („Moje docházka") ukáže zaměstnanci jeho dny před výplatou —
+// ze stejné adresy jako Odpracováno a Můj výdělek.
 //
 // Všechny berou /api/attendance a tam, kde stačí jeden den, stejnou adresu —
 // sdílená mezipaměť useDataWidgetu pak pošle jediný dotaz za celou plochu a odpíchnutí
@@ -60,7 +62,7 @@ import { useCurrency, useMoney, useSymbol } from '../../CurrencyProvider';
 import { usePersonProfile } from '../../employer/ProfileLinkProvider';
 import { apiMessage, okJson } from '@/lib/api';
 import { useJazyk, useT, type PrekladFn } from '@/lib/i18n/client';
-import { fmtHM, fmtMesic } from '@/lib/i18n/format';
+import { fmtDatum, fmtHM, fmtMesic } from '@/lib/i18n/format';
 import { dbTimeDayHM, dbTimeHM, dayPlus, parseDbTime, pragueDayOf, pragueToday } from '@/lib/pragueTime';
 import { agreguj, hrubostProRozmezi, obdobiZPresetu, platneRozmezi, pocetDni, predchoziRozmezi, zmenaPct, type Slot } from '@/lib/obdobi';
 import { useObdobi } from '@/lib/useObdobi';
@@ -68,6 +70,7 @@ import { useUlozeno } from '@/lib/useUlozeno';
 import {
   ZAPOMENUTY_MS, dnesVPodniku, konecSmeny, navrhOdchodu as navrhOdchoduPlan, hodinyMinuty, mujMesic, mzdyZaObdobi, obdobiDni, obdobiMesice, mojeUpravyMesice, otevrenePrichody, podilMezd,
   sazbyZRosteru, seradSouhrn, souhrnHodin, spropitneZaObdobi, trzbyZaObdobi, hodinyPoDnech, zaznamyVRozmezi, upravyVRozmezi, upravyPoLidech, zpozdeniPichacek,
+  radkyMojeDochazky, orizniSeznam,
   type OtevrenyPrichod, type RadekDne, type RazeniSouhrnu, type UpravaMzdy, type UzaverkaSpropitne, type UzaverkaTrzby, type VolbaMesice,
 } from '@/lib/dochazkaPrehled';
 
@@ -93,6 +96,10 @@ interface ZaznamDochazky {
   employeeId?: number;
   clockIn: string;
   clockOut: string | null;
+  /** Moje docházka (kolo 7): „ručně" u source 'manual' nebo u záznamu, který vedení upravilo; note jako detail. */
+  source?: string;
+  note?: string | null;
+  updatedBy?: number | null;
 }
 
 interface Dochazka { roster: ClenRosteru[]; entries: ZaznamDochazky[]; /** Prémie a srážky (jen s finance.mzdy, jinak prázdné). */ adjustments: UpravaMzdy[] }
@@ -550,7 +557,7 @@ function useMujMesic(zapnuto: boolean, volba: VolbaMesice = 'tento') {
   const m = Number(mesic.slice(5, 7));
   const nazevMesice = fmtMesic(m, { jazyk });
   const upravy = useMemo(() => mojeUpravyMesice(data.data?.adjustments ?? [], ja.id ?? -1, mesic), [data.data?.adjustments, ja.id, mesic]);
-  return { ja, data, s, sazba, sazbaZnama: sazbaRaw !== undefined && sazbaRaw !== null, bezZaznamu, nazevMesice, mesic, upravy };
+  return { ja, data, s, sazba, sazbaZnama: sazbaRaw !== undefined && sazbaRaw !== null, bezZaznamu, nazevMesice, mesic, upravy, vlastni, ted };
 }
 
 type ClenRosteruB2 = ClenRosteru & { hourlyRate?: number | null };
@@ -1076,6 +1083,55 @@ function DnesVPodniku(_: WidgetProps) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Moje docházka (kolo 7)
+// ---------------------------------------------------------------------------
+
+/** Ve střední velikosti nejnovějších pět dní (DESIGN „Ořezané seznamy"), velká ukáže celý měsíc. */
+const DNU_M = 5;
+
+/**
+ * Vlastní příchody a odchody po dnech za tento nebo minulý měsíc — barista si před výplatou
+ * zkontroluje, který den přišel a odešel, kde má zapomenutý odchod a co mu vedení opravilo
+ * („ručně"). Stejná adresa i výpočet jako Odpracováno a Můj výdělek (useMujMesic,
+ * lib/dochazkaPrehled.radkyMojeDochazky), takže součet v hlavičce sedí s Odpracováno.
+ * Plán u minulých dnů záměrně není: API ho zaměstnanci posílá jen pro dnešek (Píchačky).
+ */
+function MojeDochazka({ velikost, nastaveni }: WidgetProps<{ mesic?: VolbaMesice }>) {
+  const t = useT('widgety');
+  const { jazyk } = useJazyk();
+  const volba: VolbaMesice = nastaveni.mesic === 'minuly' ? 'minuly' : 'tento';
+  const { ja, data, bezZaznamu, nazevMesice, mesic, vlastni, ted } = useMujMesic(true, volba);
+  const md = useMemo(() => radkyMojeDochazky(vlastni, ja.id ?? -1, mesic, ted), [vlastni, ja.id, mesic, ted]);
+  const { zobrazene, dalsich } = orizniSeznam(md.dny, velikost === 'L' ? Infinity : DNU_M);
+  const chipDne = (d: (typeof md.dny)[number]) => d.zapomenuty ? <Chip tone="wait" size="sm">{t('Zapomenutý odchod?')}</Chip>
+    : d.dlouhy ? <Chip tone="wait" size="sm">{t('Nad 24 h')}</Chip>
+    : d.rucne ? <Chip tone="muted" size="sm">{t('ručně')}</Chip> : null;
+  // Chipy na počítači ve sloupci pevné šířky (aside) u všech řádků, ať hodiny drží svislici; pod lg vpravo v ocase.
+  const sChipy = zobrazene.some(d => chipDne(d) != null);
+  const prazdno = bezZaznamu ? <p className="t-meta text-pretty">{t('S touhle rolí se hodiny z píchaček nedají spočítat.')}</p>
+    : md.dny.length === 0 ? <p className="t-meta text-pretty">{volba === 'minuly' ? t('Minulý měsíc nic neodpíchnuto.') : t('Tento měsíc zatím nic neodpíchnuto.')}</p>
+    : undefined;
+  return (
+    <Widget nacteni={ja.stav ?? data} prazdno={prazdno}
+      // Součet měsíce vedle titulku; název měsíce jen u minulého (tento je zřejmý) — na 390 px by jinak titulek zalomil.
+      doplnek={md.dny.length > 0 ? <Chip tone="muted" size="sm">{volba === 'minuly' ? `${nazevMesice} · ${hodinyMinuty(md.ms)}` : hodinyMinuty(md.ms)}</Chip> : undefined}>
+      <ul className="list">
+        {zobrazene.map(d => (
+          <ListRow key={d.den}
+            title={fmtDatum(d.den, { jazyk, styl: 'denKratce' })}
+            meta={d.useky.map(u => `${dbTimeHM(u.od)} – ${u.do ? dbTimeHM(u.do) : '…'}`).join(', ')}
+            detail={d.poznamky.length ? d.poznamky.join(' · ') : undefined}
+            value={d.zapomenuty && d.ms === 0 ? undefined : d.bezi ? t('běží {cas}', { cas: hodinyMinuty(d.ms) }) : hodinyMinuty(d.ms)}
+            aside={sChipy ? chipDne(d) ?? '' : undefined}
+            right={sChipy ? <span className="lg:hidden">{chipDne(d)}</span> : undefined} />
+        ))}
+      </ul>
+      {dalsich > 0 && <p className="t-meta mt-2">{t('…a {n, plural, one {# další den} few {# další dny} other {# dalších dní}}', { n: dalsich })}</p>}
+    </Widget>
+  );
+}
+
 export const KOMPONENTY: Record<string, KomponentaWidgetu> = {
   'dochazka.moje_pichacky': Pichacky,
   'dochazka.prave_na_smene': PraveNaSmene,
@@ -1085,4 +1141,5 @@ export const KOMPONENTY: Record<string, KomponentaWidgetu> = {
   'dochazka.dlouhe_prichody': DlouhePrichody,
   'dochazka.dnes_v_podniku': DnesVPodniku,
   'moje.vydelek': MujVydelek,
+  'dochazka.moje_zaznamy': MojeDochazka,
 };

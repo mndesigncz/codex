@@ -1,0 +1,55 @@
+{
+ "stranka": "zamestnanec.moje_smeny",
+ "polozky": [
+  {
+   "id": "moje-smeny-prehled",
+   "widget": "moje.smeny_prehled",
+   "velikost": "M"
+  },
+  {
+   "id": "moje-vydelek",
+   "widget": "moje.vydelek",
+   "velikost": "S"
+  },
+  {
+   "id": "moje-odpracovano",
+   "widget": "dochazka.moje_odpracovano",
+   "velikost": "S"
+  },
+  {
+   "id": "moje-zaznamy",
+   "widget": "dochazka.moje_zaznamy",
+   "velikost": "M"
+  },
+  {
+   "id": "nastroj",
+   "widget": "nastroj",
+   "velikost": "L"
+  },
+  {
+   "id": "tym-nahled",
+   "widget": "rozvrh.tym_nahled",
+   "velikost": "L"
+  }
+ ],
+ "dostupne": [
+  "dochazka.moje_odpracovano",
+  "dochazka.moje_zaznamy",
+  "moje.minule_smeny",
+  "moje.nejblizsi_smena",
+  "moje.schvalene_volno",
+  "moje.smeny_prehled",
+  "moje.vydelek",
+  "rozvrh.pripominka_dostupnosti",
+  "rozvrh.tym_nahled",
+  "rozvrh.vymeny",
+  "uzaverky.kalendar"
+ ],
+ "tarifem": [],
+ "zdroj": "podnik",
+ "rozsah": "typ:zamestnanec",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": false,
+ "verze": 0
+}

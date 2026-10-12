@@ -1904,5 +1904,13 @@
   "Např. zapomněl se odpíchnout": "Napr. zabudol sa odpichnúť",
   "Pozdě": "Neskoro",
   "plán {h} h": "plán {h} h",
-  "{n}× pozdě": "{n}× neskoro"
+  "{n}× pozdě": "{n}× neskoro",
+  "Minulý měsíc nic neodpíchnuto.": "Minulý mesiac nič neodpichnuté.",
+  "Tento měsíc zatím nic neodpíchnuto.": "Tento mesiac zatiaľ nič neodpichnuté.",
+  "běží {cas}": "beží {cas}",
+  "Nad 24 h": "Nad 24 h",
+  "ručně": "ručne",
+  "…a {n, plural, one {# další den} few {# další dny} other {# dalších dní}}": "…a {n, plural, one {# ďalší deň} few {# ďalšie dni} other {# ďalších dní}}",
+  "Moje docházka": "Moja dochádzka",
+  "Tvoje příchody a odchody po dnech za měsíc.": "Tvoje príchody a odchody po dňoch za mesiac."
 }

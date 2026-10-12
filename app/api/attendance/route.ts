@@ -275,12 +275,24 @@ export async function GET(req: NextRequest) {
   // hodiny ze všech podniků, kde člověk pracuje — barista ve dvou kavárnách
   // viděl součet obou. NULL připouští řádky z doby před sloupcem team_id
   // (stejně jako otevřený příchod v POST).
-  const entries = await sql`
-    SELECT id, employee_id AS "employeeId", clock_in AS "clockIn", clock_out AS "clockOut", source, note
-    FROM time_entries
-    WHERE employee_id = ${c.meId} AND clock_in >= NOW() - INTERVAL '70 days'
-      AND (team_id = ${c.teamId} OR team_id IS NULL)
-    ORDER BY clock_in DESC`;
+  // Kolo 7: i kdo záznam ručně upravil (updatedBy) — „Moje docházka" u něj ukáže „ručně".
+  let entries: any[];
+  try {
+    entries = await sql`
+      SELECT id, employee_id AS "employeeId", clock_in AS "clockIn", clock_out AS "clockOut", source, note, updated_by AS "updatedBy"
+      FROM time_entries
+      WHERE employee_id = ${c.meId} AND clock_in >= NOW() - INTERVAL '70 days'
+        AND (team_id = ${c.teamId} OR team_id IS NULL)
+      ORDER BY clock_in DESC`;
+  } catch {
+    // updated_by ještě není (migrace) — bez stopy úprav, jako dřív.
+    entries = await sql`
+      SELECT id, employee_id AS "employeeId", clock_in AS "clockIn", clock_out AS "clockOut", source, note
+      FROM time_entries
+      WHERE employee_id = ${c.meId} AND clock_in >= NOW() - INTERVAL '70 days'
+        AND (team_id = ${c.teamId} OR team_id IS NULL)
+      ORDER BY clock_in DESC`;
+  }
   // Their own open entry rides along so the clock widget works for them too.
   // Jen otevřený příchod v tomhle podniku: Píchačky by jinak ukazovaly
   // „na směně" podle příchodu v jiném podniku a odchod (POST) by ho nenašel.

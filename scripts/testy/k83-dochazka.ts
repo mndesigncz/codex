@@ -1,19 +1,22 @@
-// Kolo 7, balík R7-2 (Docházka) — plán proti skutečnosti, důvod ruční opravy a Píchačky
-// s dnešní směnou.
+// Kolo 7, balík R7-2 (Docházka) — plán proti skutečnosti, důvod ruční opravy, Píchačky
+// s dnešní směnou a „Moje docházka" po dnech.
 //
 // Čistá logika je v lib/dochazkaPrehled.ts. Hlídá se hlavně to, na co se snadno zapomene:
 // práh deseti minut (stejný jako tablet), noční směna přes půlnoc, otevřený záznam,
-// přestávka (dva záznamy na jednu směnu nesmí hlásit „+270 min pozdě" ani plán dvakrát)
-// a stopa ruční opravy (kdo, kdy, proč) až do CSV pro účetní.
+// přestávka (dva záznamy na jednu směnu nesmí hlásit „+270 min pozdě" ani plán dvakrát),
+// „ručně" i u záznamu z tabletu, který vedení opravilo, a součet měsíce, který musí
+// sedět s widgetem Odpracováno.
 
 import { readFileSync } from 'node:fs';
 import type { Testy } from './_testy.ts';
 import {
-  PRAH_POZDE_MIN, csvPlanAUprava, odchylkaOdPlanu, odchylkyZaznamu, seradSouhrn, souhrnHodin,
+  PRAH_POZDE_MIN, csvPlanAUprava, mujMesic, odchylkaOdPlanu, odchylkyZaznamu, orizniSeznam, radkyMojeDochazky, seradSouhrn, souhrnHodin,
   vyberSmenuPichacek, zpozdeniPichacek, type ZaznamDochazky,
 } from '../../lib/dochazkaPrehled.ts';
 import { PRAH_POZDE_MIN as PRAH_TABLETU } from '../../lib/kioskPrehled.ts';
 import { dayPlus, pragueMomentOf } from '../../lib/pragueTime.ts';
+import { widget } from '../../lib/widgety/katalog/index.ts';
+import { STRANKA as MOJE_SMENY } from '../../lib/widgety/stranky/zamestnanec.moje_smeny.ts';
 import { AUDIT_POPISKY } from '../../lib/auditPopisky.ts';
 
 const zdroj = (cesta: string) => readFileSync(new URL(`../../${cesta}`, import.meta.url), 'utf8');
@@ -103,6 +106,43 @@ export default function ({ eq, ok }: Testy) {
   eq('Píchačky: ve 3:00 s otevřeným příchodem z noční pořád noční', vyberSmenuPichacek(smeny, dnes, pragueMomentOf(dnes, '03:00')!.getTime(), p('2026-09-25', '22:05')), { shiftStart: '22:00', shiftEnd: '02:00', shiftDate: '2026-09-25' });
   eq('Píchačky: včerejší denní směna se nebere', vyberSmenuPichacek([{ date: '2026-09-25', start_time: '08:00', end_time: '16:00' }], dnes, ted), null);
   eq('Píchačky: bez směn null', vyberSmenuPichacek([], dnes, ted), null);
+
+  // ---- Moje docházka po dnech ----
+  const me = 16;
+  const moje = [
+    z(20, me, p('2026-09-26', '13:00'), null),                                     // dnes běží 1 h
+    z(21, me, p('2026-09-25', '08:02'), p('2026-09-25', '12:00')),                 // přestávka
+    z(22, me, p('2026-09-25', '12:30'), p('2026-09-25', '16:10'), { note: 'Dodávka' }),
+    z(23, me, p('2026-09-24', '08:00'), p('2026-09-24', '16:00'), { source: 'manual' }),     // ručně přidaný
+    z(24, me, p('2026-09-23', '08:00'), p('2026-09-23', '15:00'), { updatedBy: 15 }),        // z tabletu, opravený vedením
+    z(25, me, p('2026-09-22', '08:00'), p('2026-09-22', '16:00')),
+    z(26, me, p('2026-09-21', '08:00'), p('2026-09-21', '16:00')),
+    z(27, me, p('2026-09-20', '08:00'), p('2026-09-20', '16:00')),
+    z(28, me, p('2026-08-31', '08:00'), p('2026-08-31', '16:00')),                 // minulý měsíc
+    z(29, 99, p('2026-09-24', '08:00'), p('2026-09-24', '16:00')),                 // cizí
+  ];
+  const md = radkyMojeDochazky(moje, me, '2026-09', ted);
+  eq('moje docházka: den na řádek, nejnovější první, jen můj měsíc', md.dny.map(d => d.den), ['2026-09-26', '2026-09-25', '2026-09-24', '2026-09-23', '2026-09-22', '2026-09-21', '2026-09-20']);
+  eq('moje docházka: přestávka = jeden den se dvěma úseky a poznámkou', [md.dny[1].useky.length, md.dny[1].ms / MIN, md.dny[1].poznamky], [2, 238 + 220, ['Dodávka']]);
+  eq('moje docházka: ručně = source manual nebo upraveno vedením', md.dny.map(d => d.rucne), [false, false, true, true, false, false, false]);
+  ok('moje docházka: dnešní běží', md.dny[0].bezi && !md.dny[0].zapomenuty);
+  eq('moje docházka: součet měsíce = Odpracováno (mujMesic)', md.ms, mujMesic(moje, me, '2026-09', ted, null).ms);
+  const zapomenuty = radkyMojeDochazky([z(30, me, p('2026-09-25', '08:00'), null)], me, '2026-09', ted);
+  eq('moje docházka: otevřený příchod přes 16 h = zapomenutý odchod, do součtu 0', [zapomenuty.dny[0].zapomenuty, zapomenuty.ms], [true, 0]);
+  eq('moje docházka: prázdný měsíc', radkyMojeDochazky(moje, me, '2026-07', ted), { dny: [], ms: 0, pocet: 0 });
+  const m5 = orizniSeznam(md.dny, 5);
+  eq('M: 5 nejnovějších dní a „…a dalších 2"', [m5.zobrazene.length, m5.dalsich, m5.zobrazene[4].den], [5, 2, '2026-09-22']);
+  eq('L: celý měsíc bez oříznutí', orizniSeznam(md.dny, Infinity).dalsich, 0);
+
+  // ---- katalog a stránka ----
+  const w = widget('dochazka.moje_zaznamy');
+  ok('katalog: Moje docházka je hotová, M/L, jen zaměstnanec, bez klíče jako Odpracováno', !!w && w.stav === 'hotovo' && JSON.stringify(w.velikosti) === '["M","L"]'
+    && w.vychoziVelikost === 'M' && JSON.stringify(w.rozhrani) === '["zamestnanec"]' && JSON.stringify(w.opravneni) === JSON.stringify(widget('dochazka.moje_odpracovano')?.opravneni));
+  eq('katalog: nastavení měsíce tento/minulý jako Můj výdělek', w?.nastaveni, widget('moje.vydelek')?.nastaveni);
+  const vychozi = MOJE_SMENY.vychozi['typ:zamestnanec'] ?? [];
+  const i = vychozi.findIndex(x => x.w === 'dochazka.moje_zaznamy');
+  ok('Moje směny: Moje docházka (M) ve výchozím rozložení pod Můj výdělek, před nástrojem, a v doporučených',
+    i > vychozi.findIndex(x => x.w === 'moje.vydelek') && i < vychozi.findIndex(x => x.w === 'nastroj') && vychozi[i].s === 'M' && MOJE_SMENY.doporucene.includes('dochazka.moje_zaznamy'));
 
   // ---- API a audit ----
   const api = zdroj('app/api/attendance/route.ts');

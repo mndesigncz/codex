@@ -781,3 +781,63 @@ export function zpozdeniPichacek(dnes: string, shiftStart: string | null | undef
   return za > 0 && za <= PRED_ZACATKEM_MS ? { druh: 'zacina', min: Math.ceil(za / 60000) } : null;
 }
 
+// ---------------------------------------------------------------------------
+// Moje docházka po dnech (kolo 7, widget dochazka.moje_zaznamy)
+// ---------------------------------------------------------------------------
+
+export interface DenMojeDochazky {
+  /** Pražský den příchodu „RRRR-MM-DD". */
+  den: string;
+  /** Příchody a odchody dne, od nejstaršího. */
+  useky: { od: Date; do: Date | null }[];
+  /** Započitatelný čas dne — stejná pravidla jako Odpracováno (mujMesic). */
+  ms: number;
+  bezi: boolean;
+  /** Otevřený příchod déle než 16 h. */
+  zapomenuty: boolean;
+  /** Uzavřený záznam nad 24 h (nepočítá se). */
+  dlouhy: boolean;
+  /** Ručně přidaný (source 'manual') nebo upravený vedením (updatedBy). */
+  rucne: boolean;
+  poznamky: string[];
+}
+
+/**
+ * Vlastní docházka měsíce „RRRR-MM" po dnech, nejnovější den první. Jeden řádek na den
+ * (přestávka nedělá z dne dva), součet `ms` je přesně číslo z Odpracováno — stejný
+ * filtr (den příchodu v Praze) i stejná pravidla (zapomenutý ani nad 24 h se nepočítá).
+ */
+export function radkyMojeDochazky(entries: readonly ZaznamDochazky[], meId: number, mesic: string, ted: number): { dny: DenMojeDochazky[]; ms: number; pocet: number } {
+  const dny = new Map<string, DenMojeDochazky>();
+  let ms = 0, pocet = 0;
+  for (const e of entries) {
+    if (Number(e.employeeId) !== meId) continue;
+    const od = parseDbTime(e.clockIn);
+    if (!od) continue;
+    const den = pragueDayOf(od);
+    if (den.slice(0, 7) !== mesic) continue;
+    const z = rozeberZaznam(e, ted);
+    if (z.druh === 'vadny') continue;
+    pocet += 1;
+    ms += z.ms;
+    const r = dny.get(den) ?? { den, useky: [], ms: 0, bezi: false, zapomenuty: false, dlouhy: false, rucne: false, poznamky: [] };
+    r.useky.push({ od, do: parseDbTime(e.clockOut) });
+    r.ms += z.ms;
+    if (z.druh === 'bezi') r.bezi = true;
+    if (z.druh === 'zapomenuty') r.zapomenuty = true;
+    if (z.druh === 'dlouhy') r.dlouhy = true;
+    if (e.source === 'manual' || (e.updatedBy != null && e.updatedBy !== '')) r.rucne = true;
+    const pozn = String(e.note ?? '').trim();
+    if (pozn && !r.poznamky.includes(pozn)) r.poznamky.push(pozn);
+    dny.set(den, r);
+  }
+  const out = [...dny.values()].sort((a, b) => b.den.localeCompare(a.den));
+  for (const d of out) d.useky.sort((a, b) => a.od.getTime() - b.od.getTime());
+  return { dny: out, ms, pocet };
+}
+
+/** Oříznutý seznam, který to řekne (DESIGN „Ořezané seznamy"): prvních `strop` a kolik zbylo. */
+export function orizniSeznam<T>(polozky: readonly T[], strop: number): { zobrazene: T[]; dalsich: number } {
+  const n = Math.max(0, Math.floor(strop));
+  return { zobrazene: polozky.slice(0, n), dalsich: Math.max(0, polozky.length - n) };
+}

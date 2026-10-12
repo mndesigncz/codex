@@ -1,0 +1,141 @@
+{
+ "roster": [
+  {
+   "id": 16,
+   "openSince": "@D-1T08:03",
+   "shiftStart": "14:00",
+   "shiftEnd": "22:00",
+   "shiftDate": "D-0",
+   "hourlyRate": 150
+  }
+ ],
+ "entries": [
+  {
+   "id": 701,
+   "employeeId": 16,
+   "clockIn": "@D-1T08:03",
+   "clockOut": null,
+   "source": "kiosk",
+   "note": null,
+   "updatedBy": null
+  },
+  {
+   "id": 702,
+   "employeeId": 16,
+   "clockIn": "@D-2T07:58",
+   "clockOut": "@D-2T16:10",
+   "source": "kiosk",
+   "note": null,
+   "updatedBy": null
+  },
+  {
+   "id": 704,
+   "employeeId": 16,
+   "clockIn": "@D-3T12:30",
+   "clockOut": "@D-3T16:05",
+   "source": "kiosk",
+   "note": "Dovoz zboží, zůstala déle na skladě.",
+   "updatedBy": null
+  },
+  {
+   "id": 703,
+   "employeeId": 16,
+   "clockIn": "@D-3T08:00",
+   "clockOut": "@D-3T12:00",
+   "source": "kiosk",
+   "note": null,
+   "updatedBy": null
+  },
+  {
+   "id": 705,
+   "employeeId": 16,
+   "clockIn": "@D-4T08:00",
+   "clockOut": "@D-4T16:00",
+   "source": "manual",
+   "note": "Tablet nešel, zapsala vedoucí.",
+   "updatedBy": 15
+  },
+  {
+   "id": 706,
+   "employeeId": 16,
+   "clockIn": "@D-5T09:00",
+   "clockOut": "@D-5T17:00",
+   "source": "kiosk",
+   "note": "Opraven odchod podle uzávěrky.",
+   "updatedBy": 15
+  },
+  {
+   "id": 707,
+   "employeeId": 16,
+   "clockIn": "@D-6T08:00",
+   "clockOut": "@D-6T16:00",
+   "source": "self",
+   "note": null,
+   "updatedBy": null
+  },
+  {
+   "id": 708,
+   "employeeId": 16,
+   "clockIn": "@D-7T08:05",
+   "clockOut": "@D-7T16:00",
+   "source": "kiosk",
+   "note": null,
+   "updatedBy": null
+  },
+  {
+   "id": 709,
+   "employeeId": 16,
+   "clockIn": "@D-8T08:00",
+   "clockOut": "@D-8T16:00",
+   "source": "kiosk",
+   "note": null,
+   "updatedBy": null
+  },
+  {
+   "id": 710,
+   "employeeId": 16,
+   "clockIn": "@D-9T14:00",
+   "clockOut": "@D-9T22:00",
+   "source": "kiosk",
+   "note": null,
+   "updatedBy": null
+  },
+  {
+   "id": 711,
+   "employeeId": 16,
+   "clockIn": "@D-10T14:00",
+   "clockOut": "@D-10T22:10",
+   "source": "kiosk",
+   "note": null,
+   "updatedBy": null
+  },
+  {
+   "id": 712,
+   "employeeId": 16,
+   "clockIn": "@D-12T08:00",
+   "clockOut": "@D-12T16:00",
+   "source": "kiosk",
+   "note": null,
+   "updatedBy": null
+  },
+  {
+   "id": 713,
+   "employeeId": 16,
+   "clockIn": "@D-13T08:00",
+   "clockOut": "@D-13T16:00",
+   "source": "kiosk",
+   "note": null,
+   "updatedBy": null
+  },
+  {
+   "id": 714,
+   "employeeId": 16,
+   "clockIn": "@D-25T08:00",
+   "clockOut": "@D-25T16:00",
+   "source": "kiosk",
+   "note": null,
+   "updatedBy": null
+  }
+ ],
+ "adjustments": []
+}

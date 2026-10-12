@@ -1901,5 +1901,13 @@
   "Např. zapomněl se odpíchnout": "E.g. forgot to clock out",
   "Pozdě": "Late",
   "plán {h} h": "plan {h} h",
-  "{n}× pozdě": "{n}× late"
+  "{n}× pozdě": "{n}× late",
+  "Minulý měsíc nic neodpíchnuto.": "Nothing clocked last month.",
+  "Tento měsíc zatím nic neodpíchnuto.": "Nothing clocked this month yet.",
+  "běží {cas}": "running {cas}",
+  "Nad 24 h": "Over 24 h",
+  "ručně": "manual",
+  "…a {n, plural, one {# další den} few {# další dny} other {# dalších dní}}": "…and {n, plural, one {# more day} other {# more days}}",
+  "Moje docházka": "My attendance",
+  "Tvoje příchody a odchody po dnech za měsíc.": "Your clock-ins and clock-outs by day for the month."
 }

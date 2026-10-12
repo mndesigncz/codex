@@ -1902,5 +1902,13 @@
   "Např. zapomněl se odpíchnout": "Z. B. Ausstempeln vergessen",
   "Pozdě": "Verspätet",
   "plán {h} h": "Plan {h} Std.",
-  "{n}× pozdě": "{n}× zu spät"
+  "{n}× pozdě": "{n}× zu spät",
+  "Minulý měsíc nic neodpíchnuto.": "Letzten Monat nichts gestempelt.",
+  "Tento měsíc zatím nic neodpíchnuto.": "Diesen Monat noch nichts gestempelt.",
+  "běží {cas}": "läuft seit {cas}",
+  "Nad 24 h": "Über 24 Std.",
+  "ručně": "manuell",
+  "…a {n, plural, one {# další den} few {# další dny} other {# dalších dní}}": "…und {n, plural, one {# weiterer Tag} other {# weitere Tage}}",
+  "Moje docházka": "Meine Zeiterfassung",
+  "Tvoje příchody a odchody po dnech za měsíc.": "Deine Kommen- und Gehen-Zeiten Tag für Tag im Monat."
 }
