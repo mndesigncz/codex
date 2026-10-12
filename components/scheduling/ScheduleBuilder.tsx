@@ -2205,9 +2205,15 @@ function TydenniPohled({ tydny, tyden, onTyden, mesic, zacatek, jazyk, radky, dn
             <tr className="border-t border-black/[0.08] bg-black/[0.02]">
               <th scope="row" className="text-left font-medium px-2 py-1.5 truncate">{t('Celkem')}</th>
               {celkem.map((c, k) => (
-                <td key={poDnech[k].den} className="text-center py-1.5 tabular-nums text-black/55 truncate"
+                <td key={poDnech[k].den} className="text-center py-1.5 tabular-nums text-black/55 overflow-hidden"
                   title={poDnech[k].vMesici && c.lidi ? t('{lidi, plural, one {# člověk} few {# lidé} other {# lidí}} · {h} h', { lidi: c.lidi, h: hodinyTextJ(c.hodin, jazyk) }) : undefined}>
-                  {poDnech[k].vMesici && c.lidi ? `${c.lidi} · ${hodinyTextJ(c.hodin, jazyk)}` : '—'}
+                  {/* Dva řádky místo „3 · 24": hodiny s jednotkou a lidé ikonou (bez slova — „3 Personen" by se do 46 px nevešlo). */}
+                  {poDnech[k].vMesici && c.lidi ? (
+                    <span className="flex flex-col items-center leading-snug">
+                      <span className="font-semibold text-[#16181A]">{hodinyTextJ(c.hodin, jazyk)} {t('h')}</span>
+                      <span className="inline-flex items-center gap-0.5"><Icon name="users" size={11} className="shrink-0" />{c.lidi}</span>
+                    </span>
+                  ) : '—'}
                 </td>
               ))}
               <td className="text-right px-2 py-1.5 tabular-nums font-semibold text-[13px] text-[#16181A]">{hodinyTextJ(hodinCelkem, jazyk)}</td>
