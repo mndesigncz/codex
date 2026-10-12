@@ -48,8 +48,8 @@ import { createPortal } from 'react-dom';
 import { useSession } from 'next-auth/react';
 import type { KomponentaWidgetu, Navigace, WidgetProps } from '@/lib/widgety/typy';
 import { widget } from '@/lib/widgety/katalog';
-import { useJazyk, useT, type PrekladFn } from '@/lib/i18n/client';
-import { parseDbTime, pragueDayOf, pragueToday } from '@/lib/pragueTime';
+import { useT, type PrekladFn } from '@/lib/i18n/client';
+import { dbTimeDayHM, parseDbTime, pragueDayOf, pragueToday } from '@/lib/pragueTime';
 import { apiMessage, okJson } from '@/lib/api';
 import {
   KLIC_KALENDAR, UDALOST_KALENDAR,
@@ -1069,11 +1069,8 @@ function Zebricek({ velikost, nastaveni }: WidgetProps<{ pocet?: string; obdobi?
 const URL_POCHVALY = '/api/rewards/awards';
 const RYCHLE_BODY = [5, 10, 20, 50] as const;
 
-/** Den a čas pochvaly krátce: „12. 10. 14:05" (v jazyce diváka). */
-function kdyKratce(iso: string, jazyk: string): string {
-  const d = parseDbTime(iso);
-  return d ? d.toLocaleString(jazyk, { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
-}
+/** Den a čas pochvaly krátce: „12. 10. 14:05" — čas z databáze přes dbTimeDayHM (zóna Praha, check-time). */
+const kdyKratce = (iso: string): string => (parseDbTime(iso) ? dbTimeDayHM(iso) : '');
 
 /**
  * Okno „Pochválit": body + za co. Bez `clovek` se vybírá ze žebříčku (vedení s
@@ -1149,7 +1146,6 @@ export function PochvalaOkno({ clovek, onClose, onHotovo }: {
 /** Widget Pochvaly: kolik jich tento měsíc padlo, poslední v seznamu a tlačítko Pochválit. */
 function Pochvaly({ velikost, nahled }: WidgetProps) {
   const t = useT('widgety');
-  const { jazyk } = useJazyk();
   const smi = useSmi();
   const { ok, ceka } = useBranaWidgetu('odmeny.pochvaly', ['hodnoceni.zobrazit']);
   const data = useDataWidgetu(ok ? `${URL_POCHVALY}?limit=30` : null, vyberPochvaly);
@@ -1172,13 +1168,13 @@ function Pochvaly({ velikost, nahled }: WidgetProps) {
       ) : undefined}>
       <StatRow podleKarty>
         <Stat label={t('Tento měsíc')} value={cislo(mesic.pocet)} note={bodu(t, mesic.body)} />
-        <Stat label={t('Poslední')} value={pochvaly[0] ? pochvaly[0].jmeno : '—'} note={pochvaly[0] ? kdyKratce(pochvaly[0].kdy, jazyk) : undefined} />
+        <Stat label={t('Poslední')} value={pochvaly[0] ? pochvaly[0].jmeno : '—'} note={pochvaly[0] ? kdyKratce(pochvaly[0].kdy) : undefined} />
       </StatRow>
       {strop > 0 && (
         <ul className="list mt-3">
           {pochvaly.slice(0, strop).map(p => (
             <ListRow key={p.id} lead={<Avatar emoji={p.avatar} size="sm" />} title={p.jmeno}
-              meta={[p.duvod, kdyKratce(p.kdy, jazyk), p.dal ? t('od {kdo}', { kdo: p.dal }) : null].filter(Boolean).join(' · ')}
+              meta={[p.duvod, kdyKratce(p.kdy), p.dal ? t('od {kdo}', { kdo: p.dal }) : null].filter(Boolean).join(' · ')}
               value={sZnamenkem(p.body)} valueMeta={bodTvar(t, p.body)} />
           ))}
         </ul>
