@@ -3,11 +3,12 @@ import bcrypt from 'bcryptjs';
 import { timingSafeEqual } from 'crypto';
 import { hit, clear } from '@/lib/rateLimit';
 import { neon } from '@neondatabase/serverless';
-import { pragueToday, pragueDaySafe, parseDbTime } from '@/lib/pragueTime';
+import { pragueToday, pragueDaySafe, parseDbTime, dayPlus } from '@/lib/pragueTime';
 import { autoCloseEntry, isForgottenClockOut, pragueMoment, denSmeny } from '@/lib/staleShifts';
 import { notifyUser } from '@/lib/push';
 import { jeClenem } from '@/lib/tenant';
 import { pozaduj, jeOdpoved, clenoveSOpravnenim } from '@/lib/opravneniDb';
+import { vyberSmenuPichacek, type SmenaPichacek } from '@/lib/dochazkaPrehled';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,6 +58,11 @@ export async function GET(req: NextRequest) {
   if (opr.has('dochazka.tablet') || opr.has('dochazka.zobrazit')) {
     // Roster: every employee + their currently-open entry (if clocked in)
     // + today's planned shift so the kiosk can show plan vs reality.
+    // Kolo 7: plán je jen PLÁNOVANÁ směna. Automatická (type 'auto', vzniká při
+    // příchodu bez rozvrhu se začátkem i koncem v čase příchodu) by se tvářila
+    // jako „plán 14:12–14:12": Píchačky by ji ukázaly jako rozvrh, Otevřené
+    // příchody by z ní udělaly noční směnu do zítřka a hlídač níž by po půl
+    // hodině poslal „Směna ti už skončila" každému, kdo přišel bez rozvrhu.
     const today = pragueToday();
     // Kolo 62: v rosteru je každý, kdo má v podniku ČLENSTVÍ nebo zrcadlo —
     // člen přepnutý do jiného podniku z tabletu nezmizí. Sazba je z členství
@@ -83,6 +89,7 @@ export async function GET(req: NextRequest) {
       LEFT JOIN LATERAL (
         SELECT start_time, end_time FROM shifts
         WHERE employee_id = u.id AND date = ${today} AND team_id = ${c.teamId}
+          AND auto_created IS NOT TRUE AND type <> 'auto'
         ORDER BY start_time ASC LIMIT 1
       ) sh ON TRUE
       WHERE (m.user_id IS NOT NULL OR u.team_id = ${c.teamId})
@@ -108,7 +115,7 @@ export async function GET(req: NextRequest) {
         ) te ON TRUE
         LEFT JOIN LATERAL (
           SELECT start_time, end_time FROM shifts
-          WHERE employee_id = u.id AND date = ${today} AND team_id = ${c.teamId}
+          WHERE employee_id = u.id AND date = ${today} AND team_id = ${c.teamId} AND type <> 'auto'
           ORDER BY start_time ASC LIMIT 1
         ) sh ON TRUE
         WHERE (m.user_id IS NOT NULL OR u.team_id = ${c.teamId})
@@ -220,7 +227,24 @@ export async function GET(req: NextRequest) {
   } catch { /* ignore */ }
   // Vlastní sazba jen s oprávněním na vlastní (nebo všechny) mzdy — pro „Můj výdělek".
   const smiSazbu = opr.has('finance.moje_mzda') || opr.has('finance.mzdy');
-  const ja: Record<string, unknown> = { id: c.meId, openSince };
+  // Dnešní směna z rozvrhu pro Píchačky (kolo 7) — jedním dotazem tady, ne přes
+  // /api/shifts: Píchačky jsou i na Domů a widget má jednu adresu. Dnešek a noční
+  // směna ze včerejška, která ještě běží (příchod po půlnoci patří včerejšku);
+  // vybírá lib/dochazkaPrehled.vyberSmenuPichacek. Automatické směny nejsou rozvrh.
+  let smena: SmenaPichacek | null = null;
+  try {
+    const dnes = pragueToday();
+    const smeny = await sql`
+      SELECT date, start_time, end_time FROM shifts
+      WHERE employee_id = ${c.meId} AND team_id = ${c.teamId} AND date IN (${dnes}, ${dayPlus(dnes, -1)})
+        AND auto_created IS NOT TRUE AND type <> 'auto'
+      ORDER BY date DESC, start_time ASC`;
+    smena = vyberSmenuPichacek(smeny as { date: string; start_time: string; end_time: string }[], dnes, Date.now(), openSince);
+  } catch { /* bez rozvrhu Píchačky jen neukážou plán */ }
+  const ja: Record<string, unknown> = {
+    id: c.meId, openSince,
+    shiftStart: smena?.shiftStart ?? null, shiftEnd: smena?.shiftEnd ?? null, shiftDate: smena?.shiftDate ?? null,
+  };
   if (smiSazbu) ja.hourlyRate = await vlastniSazba(c.meId, c.teamId);
   // Vlastní prémie a srážky (Můj výdělek) — kdo smí znát svou mzdu, vidí i co k ní vedení přidalo.
   let adjustments: any[] = [];

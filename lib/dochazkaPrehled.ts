@@ -593,3 +593,70 @@ export function bezSazby(members: readonly ClenTymu[], ownerId: number | null): 
     .filter(m => m.role !== 'kiosk' && m.id !== ownerId && m.hourly_rate != null && !(Number(m.hourly_rate) > 0))
     .sort((a, b) => String(a.name ?? '').localeCompare(String(b.name ?? ''), 'cs'));
 }
+
+// ---------------------------------------------------------------------------
+// Plán proti skutečnosti (kolo 7, balík R7-2): Píchačky
+// ---------------------------------------------------------------------------
+
+/**
+ * Pozdní příchod a dřívější odchod se tvrdí až nad tolik minut. Stejný práh jako tablet
+ * (PRAH_POZDE_MIN v lib/kioskPrehled.ts) a push „Pozdní příchod" v POST /api/attendance.
+ * Zopakovaný, ne importovaný: kioskPrehled importuje odsud a import opačným směrem by
+ * udělal kruh. Kdo mění jedno, změní obojí.
+ */
+export const PRAH_POZDE_MIN = 10;
+/** „Směna začíná za…" v Píchačkách nejvýš tolik před začátkem (jako tablet: BRZY_MAX_MS). */
+export const PRED_ZACATKEM_MS = 3 * 3600_000;
+/** Dál od plánu se odchylka netvrdí — to už není ta směna (jako tablet: MAX_ODCHYLKA_MS). */
+export const MAX_ODCHYLKA_MS = 12 * 3600_000;
+
+const hm5 = (v: string | null | undefined) => String(v ?? '').slice(0, 5);
+const jeDen = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+
+/** Směna z rozvrhu pro Píchačky (GET /api/attendance, větev zaměstnance). */
+export interface SmenaPichacek { shiftStart: string; shiftEnd: string; shiftDate: string }
+
+/**
+ * Kterou směnu ukázat v Píchačkách: dnešní první, ale noční směna ze včerejška
+ * (konec ≤ začátek), která ještě neskončila — nebo ke které patří otevřený příchod —
+ * má přednost. Ve 0:30 je barman pořád na sobotní noční, ne „dnes bez směny"
+ * (DESIGN „Příchod po půlnoci patří včerejšku").
+ */
+export function vyberSmenuPichacek(
+  smeny: readonly { date: string; start_time: string; end_time: string }[], dnes: string, ted: number, openSince?: string | Date | null,
+): SmenaPichacek | null {
+  const vcera = dayPlus(dnes, -1);
+  const od = parseDbTime(openSince ?? null);
+  for (const s of smeny) {
+    if (String(s.date).slice(0, 10) !== vcera || !s.start_time || !s.end_time || hm5(s.end_time) > hm5(s.start_time)) continue;
+    const zacatek = pragueMomentOf(vcera, hm5(s.start_time));
+    const konec = konecSmeny(vcera, s.start_time, s.end_time);
+    if (!zacatek || !konec) continue;
+    const prichodPatri = !!od && od.getTime() >= zacatek.getTime() - PRED_ZACATKEM_MS && od.getTime() < konec.getTime();
+    if (ted < konec.getTime() || prichodPatri) return { shiftStart: hm5(s.start_time), shiftEnd: hm5(s.end_time), shiftDate: vcera };
+  }
+  const dnesni = smeny.filter(s => String(s.date).slice(0, 10) === dnes && s.start_time).sort((a, b) => hm5(a.start_time).localeCompare(hm5(b.start_time)))[0];
+  return dnesni ? { shiftStart: hm5(dnesni.start_time), shiftEnd: hm5(dnesni.end_time), shiftDate: dnes } : null;
+}
+
+export type StavPichacek = { druh: 'zacina'; min: number } | { druh: 'pozde'; min: number };
+
+/**
+ * Píchačky proti rozvrhu. Před příchodem: „Směna začíná za…" nejvýš tři hodiny předem.
+ * Po příchodu: zpoždění proti začátku směny, jen nad deset minut (stejný práh jako tablet
+ * a Docházka). `dnes` je den směny (shiftDate z API, i včerejšek u noční), takže příchod
+ * ve 0:30 na směnu od 22:00 je +150 min, ne „o 21 h dřív".
+ */
+export function zpozdeniPichacek(dnes: string, shiftStart: string | null | undefined, openSince: string | Date | null | undefined, ted: number): StavPichacek | null {
+  if (!shiftStart || !jeDen(dnes)) return null;
+  const zacatek = pragueMomentOf(dnes, hm5(shiftStart));
+  if (!zacatek) return null;
+  const od = parseDbTime(openSince ?? null);
+  if (od) {
+    const r = od.getTime() - zacatek.getTime();
+    const min = Math.round(r / 60000);
+    return r > 0 && r <= MAX_ODCHYLKA_MS && min > PRAH_POZDE_MIN ? { druh: 'pozde', min } : null;
+  }
+  const za = zacatek.getTime() - ted;
+  return za > 0 && za <= PRED_ZACATKEM_MS ? { druh: 'zacina', min: Math.ceil(za / 60000) } : null;
+}

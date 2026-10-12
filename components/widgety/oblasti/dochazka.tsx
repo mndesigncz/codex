@@ -38,6 +38,8 @@
 //  - moje.vydelek — hodiny × vlastní sazba (sazbu API pošle jen s oprávněním).
 // Widgety s obdobím „Podle stránky" čtou přepínač Docházky přes ObdobiStrankyDochazky.
 //
+// Kolo 7 (R7-2): Píchačky ukážou dnešní směnu z rozvrhu a zpoždění po příchodu.
+//
 // Všechny berou /api/attendance a tam, kde stačí jeden den, stejnou adresu —
 // sdílená mezipaměť useDataWidgetu pak pošle jediný dotaz za celou plochu a odpíchnutí
 // v Píchačkách se hned ukáže i v „Právě na směně". Nástroj Docházky čte tutéž
@@ -64,7 +66,7 @@ import { useObdobi } from '@/lib/useObdobi';
 import { useUlozeno } from '@/lib/useUlozeno';
 import {
   ZAPOMENUTY_MS, dnesVPodniku, konecSmeny, navrhOdchodu as navrhOdchoduPlan, hodinyMinuty, mujMesic, mzdyZaObdobi, obdobiDni, obdobiMesice, mojeUpravyMesice, otevrenePrichody, podilMezd,
-  sazbyZRosteru, seradSouhrn, souhrnHodin, spropitneZaObdobi, trzbyZaObdobi, hodinyPoDnech, zaznamyVRozmezi, upravyVRozmezi, upravyPoLidech,
+  sazbyZRosteru, seradSouhrn, souhrnHodin, spropitneZaObdobi, trzbyZaObdobi, hodinyPoDnech, zaznamyVRozmezi, upravyVRozmezi, upravyPoLidech, zpozdeniPichacek,
   type OtevrenyPrichod, type RadekDne, type RazeniSouhrnu, type UpravaMzdy, type UzaverkaSpropitne, type UzaverkaTrzby, type VolbaMesice,
 } from '@/lib/dochazkaPrehled';
 
@@ -81,6 +83,8 @@ interface ClenRosteru {
   openEntryId?: number | null;
   shiftStart?: string | null;
   shiftEnd?: string | null;
+  /** Den směny (jen vlastní řádek zaměstnance, kolo 7): včerejšek u noční, která ještě běží. Vedení má dnešek. */
+  shiftDate?: string | null;
 }
 
 interface ZaznamDochazky {
@@ -192,14 +196,21 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
   const [chyba, setChyba] = useState<string | null>(null);
   const [pripomenUzaverku, setPripomenUzaverku] = useState(false);
 
-  const openSince = ja.id != null ? data.data?.roster.find(r => Number(r.id) === ja.id)?.openSince ?? null : null;
+  const muj = ja.id != null ? data.data?.roster.find(r => Number(r.id) === ja.id) : undefined;
+  const openSince = muj?.openSince ?? null;
   const zacatek = parseDbTime(openSince);
   const naSmene = !!zacatek;
   const S = velikost === 'S';
+  // Dnešní směna z rozvrhu (kolo 7): API ji pošle na vlastním řádku rosteru — zaměstnanci
+  // i s dnem (noční ze včerejška), vedení dnešní. „Začíná za…" se musí posouvat i bez
+  // příchodu, proto stopky tikají po minutě i tehdy, když je v rozvrhu směna.
+  const planOd = muj?.shiftStart ? hm(muj.shiftStart) : null;
+  const planDo = muj?.shiftEnd ? hm(muj.shiftEnd) : null;
   // Sekundy ukazuje jen střední velikost; malá má hodiny a minuty, stačí jí obnova po čtvrt minutě.
-  const ted = useTed(naSmene, S ? 15_000 : 1000);
+  const ted = useTed(naSmene || (!S && !!planOd), S ? 15_000 : naSmene ? 1000 : 60_000);
   const bezi = zacatek ? Math.max(0, ted - zacatek.getTime()) : 0;
   const zapomenuty = naSmene && bezi > ZAPOMENUTY_MS;
+  const vuciPlanu = planOd ? zpozdeniPichacek(muj?.shiftDate || pragueToday(), planOd, openSince, ted) : null;
 
   const pichni = async () => {
     if (nahled || ja.id == null || pise) return;
@@ -237,6 +248,16 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
       {pripomenUzaverku && <p className="t-meta" role="status">{t('Směna skončila. Nezapomeň vyplnit uzávěrku.')}</p>}
     </>
   );
+  // Řádek rozvrhu pod číslem (jen M): kdy směna podle rozvrhu je, a buď „začíná za…"
+  // (před příchodem, nejvýš 3 h předem), nebo zpoždění po příchodu nad 10 min. Zalamuje
+  // se jako celek (flex-wrap), ne oddělovačem uprostřed — na 390 px chip sjede pod text.
+  const rozvrh = data.data ? (
+    <p className="t-meta flex flex-wrap items-center gap-x-2 gap-y-1">
+      <span>{planOd ? t('Dnes podle rozvrhu {od}–{do}', { od: fmtHM(planOd), do: fmtHM(planDo) }) : t('Dnes nemáš směnu v rozvrhu')}</span>
+      {vuciPlanu?.druh === 'pozde' && <Chip tone="wait" size="sm">{t('+{n} min po začátku', { n: vuciPlanu.min })}</Chip>}
+      {vuciPlanu?.druh === 'zacina' && <Chip tone="muted" size="sm">{t('Směna začíná za {delka}', { delka: delkaSlovy(t, vuciPlanu.min * 60_000) })}</Chip>}
+    </p>
+  ) : null;
 
   return (
     <Widget
@@ -266,9 +287,10 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
           ) : naSmene ? (
             // „Na směně" už říká chip u titulku — štítek čísla nese čas příchodu.
             <Stat label={t('Příchod {cas}', { cas: dbTimeHM(openSince) })} value={stopky(bezi, true)} />
-          ) : (
+          ) : planOd ? null : (
             <p className="t-meta text-pretty">{t('Odpíchni si příchod, až začneš pracovat — čas se začne počítat hned.')}</p>
           )}
+          {!zapomenuty && rozvrh}
           {hlaseni}
           {tlacitko}
         </div>
