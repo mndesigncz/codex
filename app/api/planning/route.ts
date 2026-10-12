@@ -10,14 +10,17 @@ const sql = neon(process.env.DATABASE_URL!);
 // komukoli přihlášenému (i tabletu, hostovi s team_id, a bez podniku vznikla
 // osiřelá karta). Kolo 67 to zavírá oprávněním v aktivním podniku.
 
-// GET — cards created by members of my team (cards have no team_id; scope via creator).
+// GET — karty podniku. Kolo 7: s autorem (jméno a avatar) pro patku karty
+// „kdo ji založil a jak dlouho leží"; LEFT JOIN, ať karta smazaného autora nezmizí.
 export async function GET() {
   const c = await pozaduj('planovani.zobrazit');
   if (jeOdpoved(c)) return c;
 
   try {
     const cards = await sql`
-      SELECT p.* FROM planning_cards p
+      SELECT p.*, u.name AS author_name, u.avatar AS author_avatar
+      FROM planning_cards p
+      LEFT JOIN users u ON u.id = p.created_by
       WHERE p.team_id = ${c.teamId}
       ORDER BY p.position ASC, p.created_at ASC`;
     return NextResponse.json(cards);

@@ -7,7 +7,7 @@
 // ve widgetu by nesedělo se sekcí seznamu. Soubor je bez Reactu, ať ho
 // `npm test` pustí přímo v Node (scripts/testy/k69-b6a.ts).
 
-import { pragueDaySafe, dayPlus } from './pragueTime.ts';
+import { pragueDaySafe, dayPlus, parseDbTime } from './pragueTime.ts';
 
 // ---------------------------------------------------------------------------
 // Úkoly (GET /api/tasks → pole ve tvaru shape() z app/api/tasks/route.ts)
@@ -290,7 +290,14 @@ export function jeCiziUkol(t: Pick<Ukol, 'assignedTo' | 'createdBy'>, ja: number
 // Plánování (GET /api/planning → pole karet)
 // ---------------------------------------------------------------------------
 
-export interface KartaPlanu { id: number; title: string; description: string | null; column: string; position: number }
+export interface KartaPlanu {
+  id: number; title: string; description: string | null; column: string; position: number;
+  /** Kolo 7: kdo kartu založil (GET /api/planning LEFT JOIN users) — null u smazaného autora a staré odpovědi. */
+  autor: string | null;
+  autorAvatar: string | null;
+  /** Kdy karta vznikla (created_at), nebo null. */
+  vytvoreno: string | null;
+}
 
 export const SLOUPCE_PLANU = [
   { id: 'ideas', nazev: 'Nápady' },
@@ -308,8 +315,42 @@ export function vyberKarty(raw: unknown): KartaPlanu[] {
     description: c?.description ? String(c.description) : null,
     column: String(c?.column ?? 'ideas'),
     position: Number(c?.position) || 0,
+    autor: c?.author_name ? String(c.author_name) : null,
+    autorAvatar: c?.author_avatar ? String(c.author_avatar) : null,
+    vytvoreno: c?.created_at ? String(c.created_at) : null,
   })).filter(c => Number.isFinite(c.id));
 }
+
+export type StariKarty =
+  | { druh: 'ted' }
+  | { druh: 'min' | 'h' | 'den' | 'tyden' | 'mesic' | 'rok'; n: number }
+  /** Čas chybí nebo je nečitelný — patka stáří nepíše. */
+  | { druh: 'nevim' };
+
+/**
+ * Jak dlouho karta leží („před 3 dny", „před 2 týdny") — patka karty v Plánování.
+ * Čas z databáze přes parseDbTime (TIMESTAMP bez zóny je UTC). Na rozdíl od
+ * relativniCas v lib/poznamky.ts nepřejde po týdnu na datum: u karty je právě
+ * stáří ta informace („v Rozpracováno leží dva měsíce"). Budoucí čas (hodiny
+ * serveru napřed) je „právě teď".
+ */
+export function stariKarty(vytvoreno: string | null | undefined, ted: number = Date.now()): StariKarty {
+  const d = parseDbTime(vytvoreno ?? null);
+  if (!d) return { druh: 'nevim' };
+  const min = Math.floor((ted - d.getTime()) / 60000);
+  if (min < 1) return { druh: 'ted' };
+  if (min < 60) return { druh: 'min', n: min };
+  const h = Math.floor(min / 60);
+  if (h < 24) return { druh: 'h', n: h };
+  const dny = Math.floor(h / 24);
+  if (dny < 14) return { druh: 'den', n: dny };
+  if (dny < 60) return { druh: 'tyden', n: Math.floor(dny / 7) };
+  if (dny < 365) return { druh: 'mesic', n: Math.floor(dny / 30) };
+  return { druh: 'rok', n: Math.floor(dny / 365) };
+}
+
+/** Křestní jméno do úzké patky karty („Eva" z „Eva Testová"). */
+export const krestniJmeno = (jmeno: string | null | undefined): string => String(jmeno ?? '').trim().split(/\s+/)[0] ?? '';
 
 /** Karty jednoho sloupce v pořadí na tabuli. */
 export function kartySloupce(karty: readonly KartaPlanu[], sloupec: string): KartaPlanu[] {

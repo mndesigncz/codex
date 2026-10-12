@@ -6,12 +6,13 @@
 //    validace vstupu API a přenos do dalších výskytů série, text push oznámení,
 //  - jeden úkol víc lidem (runBulk, každé res.ok, toast s plurálem, částečné selhání jménem),
 //  - fotka jako důkaz: serverová brána validujDukaz, jen /api/upload/<id>, výskyty dědí require_photo, ne fotku,
+//  - karta v Plánování: autor z GET /api/planning a stáří karty („před 3 dny", „před 2 týdny"),
 
 import { readFileSync } from 'node:fs';
 import type { Testy } from './_testy.ts';
 import {
   jeStavZapisu, stavPoOdskrtnuti, STAVY_ZAPISU, vyberUkoly, rozdelPoDnech, validujCasTerminu, doplnkyVyskytu, textOznameniUkolu, casNeboNull,
-  platnaFotka, chceFotku, validujDukaz,
+  platnaFotka, chceFotku, validujDukaz, vyberKarty, stariKarty, krestniJmeno,
 } from '../../lib/ukolyPrehled.ts';
 import { poCase, seradUkoly, stavUkolu } from '../../lib/ukolyFiltr.ts';
 import { pragueDayOf, pragueHM } from '../../lib/pragueTime.ts';
@@ -147,4 +148,28 @@ export default function ({ eq, ok }: Testy) {
   ok('tablet: fotka i splnění jdou za vybraného člověka (actingAs), okno řekne za koho',
     /actingAs: who\.id, \.\.\.\(fotka \? \{ completionPhotoUrl: fotka \} : \{\}\)/.test(zdroj('components/kiosk/KioskTasks.tsx'))
     && /zaKoho=\{foto\.who\.name\}/.test(zdroj('components/kiosk/KioskTasks.tsx')));
+
+  // ---- 5) Karta v Plánování: autor a stáří ----
+  const karty = vyberKarty([
+    { id: 1, title: 'Letní terasa', column: 'in_progress', position: 0, created_by: 15, author_name: 'Martin Nemeškal', author_avatar: '🧑', created_at: '2026-10-09T08:00:00.000Z' },
+    { id: 2, title: 'Smazaný autor', column: 'ideas', position: 1, created_by: 99, author_name: null, created_at: '2026-10-12 06:30:00' },
+    { id: 3, title: 'Stará odpověď', column: 'ideas', position: 2 },
+  ]);
+  eq('karta: výběr nese autora, avatar a čas založení (bez autora / starý tvar = null)', karty.map(k => [k.autor, k.autorAvatar, k.vytvoreno]), [
+    ['Martin Nemeškal', '🧑', '2026-10-09T08:00:00.000Z'], [null, null, '2026-10-12 06:30:00'], [null, null, null],
+  ]);
+  const TED = Date.parse('2026-10-12T08:00:00.000Z');
+  eq('karta: stáří — před 3 dny; TIMESTAMP bez zóny je UTC (06:30 → před 1 h); bez času nevím', [
+    stariKarty(karty[0].vytvoreno, TED), stariKarty(karty[1].vytvoreno, TED), stariKarty(karty[2].vytvoreno, TED),
+  ], [{ druh: 'den', n: 3 }, { druh: 'h', n: 1 }, { druh: 'nevim' }]);
+  eq('karta: stáří po stupních — právě teď, minuty, týdny, měsíce, roky; budoucí čas = právě teď', [
+    stariKarty('2026-10-12T07:59:40.000Z', TED), stariKarty('2026-10-12T07:15:00.000Z', TED), stariKarty('2026-09-21T08:00:00.000Z', TED),
+    stariKarty('2026-07-01T08:00:00.000Z', TED), stariKarty('2024-09-01T08:00:00.000Z', TED), stariKarty('2026-10-12T09:00:00.000Z', TED),
+  ], [{ druh: 'ted' }, { druh: 'min', n: 45 }, { druh: 'tyden', n: 3 }, { druh: 'mesic', n: 3 }, { druh: 'rok', n: 2 }, { druh: 'ted' }]);
+  eq('karta: křestní jméno do patky', [krestniJmeno('Eva Testová'), krestniJmeno('  Petr  '), krestniJmeno(null)], ['Eva', 'Petr', '']);
+  ok('API plánování: GET s LEFT JOIN users (author_name, author_avatar), karta smazaného autora nezmizí',
+    /LEFT JOIN users u ON u\.id = p\.created_by/.test(zdroj('app/api/planning/route.ts')) && /u\.name AS author_name, u\.avatar AS author_avatar/.test(zdroj('app/api/planning/route.ts')));
+  ok('tabule: patka karty t-meta s Avatarem xs, truncate a celým jménem s datem v title',
+    /<p className="t-meta mt-2\.5 flex items-center gap-1\.5 min-w-0" title=\{presne \|\| undefined\}>/.test(zdroj('components/employer/PlanningBoard.tsx'))
+    && /<Avatar emoji=\{card\.autorAvatar\} name=\{card\.autor\} size="xs"/.test(zdroj('components/employer/PlanningBoard.tsx')));
 }

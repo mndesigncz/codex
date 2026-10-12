@@ -1654,5 +1654,9 @@
   "Každý dostane vlastní úkol ({n, plural, one {# člověk} few {# lidé} other {# lidí}}).": "Everyone gets their own task ({n, plural, one {# person} other {# people}}).",
   "chce fotku": "needs photo",
   "Vyžadovat fotku při splnění": "Require a photo on completion",
-  "Úkol půjde odškrtnout až s fotkou z telefonu nebo tabletu — uvidíš ji v detailu úkolu.": "The task can only be ticked off with a photo from a phone or tablet — you'll see it in the task detail."
+  "Úkol půjde odškrtnout až s fotkou z telefonu nebo tabletu — uvidíš ji v detailu úkolu.": "The task can only be ticked off with a photo from a phone or tablet — you'll see it in the task detail.",
+  "před {n, plural, one {# dnem} few {# dny} other {# dny}}": "{n, plural, one {# day ago} other {# days ago}}",
+  "před {n, plural, one {# týdnem} few {# týdny} other {# týdny}}": "{n, plural, one {# week ago} other {# weeks ago}}",
+  "před {n, plural, one {# měsícem} few {# měsíci} other {# měsíci}}": "{n, plural, one {# month ago} other {# months ago}}",
+  "před {n, plural, one {# rokem} few {# lety} other {# lety}}": "{n, plural, one {# year ago} other {# years ago}}"
 }
