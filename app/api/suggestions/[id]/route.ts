@@ -131,6 +131,10 @@ export async function DELETE(req: NextRequest, props: { params: Promise<{ id: st
     return NextResponse.json({ error: 'Můžeš smazat jen svůj podnět.' }, { status: 403 });
   }
   await sql`DELETE FROM suggestion_votes WHERE suggestion_id = ${id}`;
+  // Vlákno pod podnětem (kolo 7) bez podnětu nikdo neotevře — smaže se s ním.
+  try {
+    await sql`DELETE FROM entity_notes WHERE team_id = ${c.teamId} AND entity_type = 'suggestion' AND entity_id = ${String(id)}`;
+  } catch { /* před migrací tabulka není */ }
   await sql`DELETE FROM suggestions WHERE id = ${id} AND team_id = ${c.teamId}`;
   return NextResponse.json({ ok: true });
 }
