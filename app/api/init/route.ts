@@ -559,6 +559,9 @@ export async function GET(request: Request) {
     // ({ podleTrzeb, prah }), výchozí vypnuto. JSON, ať každé další volitelné
     // pravidlo generátoru nepotřebuje vlastní sloupec (lib/rozvrhGenerator.ts).
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS staffing_rules JSONB`);
+    // Připomenutí dostupnosti (kolo 7): kdy a na jaký měsíc vedení naposledy připomnělo — jednou za 20 h.
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS availability_reminded_at TIMESTAMP`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS availability_reminded_month TEXT`);
     // watchdog for forgotten clock-outs: when the person was already reminded
     await ddl(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS nudged_at TIMESTAMP`);
     // Kolo 7: kdo záznam ručně upravil nebo přidal a kdy (důvod je v note) — hodiny jsou mzda.

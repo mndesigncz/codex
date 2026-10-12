@@ -61,6 +61,7 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'schedule.rules': 'Změna pravidel rozvrhu',
   'volno.rozhodnout': 'Rozhodnuto o žádosti o volno',
   'rozvrh.poznamka': 'Poznámka ke směně',
+  'rozvrh.pripomenout_dostupnost': 'Lidem bez dostupnosti připomenuto, ať ji zadají',
   // sklad, dodavatelé, účtenky
   'inventory.create': 'Přidána položka skladu',
   'inventory.write-in': 'Zapsána nová věc do skladu',

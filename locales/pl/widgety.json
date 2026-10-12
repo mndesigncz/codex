@@ -1926,5 +1926,16 @@
   "Nepovinné — třeba „Ten týden už má volno Petr, zkus jiný termín“.": "Opcjonalne — np. „W tym tygodniu wolne ma już Piotr, spróbuj innego terminu”.",
   "Žádost zamítnuta, žadatel dostal upozornění.": "Wniosek odrzucony, wnioskujący dostał powiadomienie.",
   "Vedení: {duvod}": "Kierownictwo: {duvod}",
-  "Požádat o volno": "Poproś o wolne"
+  "Požádat o volno": "Poproś o wolne",
+  "Všichni už dostupnost zadali.": "Wszyscy już podali dostępność.",
+  "{n, plural, one {Připomenuto # člověku} few {Připomenuto # lidem} other {Připomenuto # lidem}}": "{n, plural, one {Przypomniano # osobie} few {Przypomniano # osobom} many {Przypomniano # osobom} other {Przypomniano # osoby}}",
+  "Nikomu nešlo připomenout — upozornění na směny mají vypnutá.": "Nie udało się nikomu przypomnieć — mają wyłączone powiadomienia o zmianach.",
+  "Dnes už se připomínalo — další připomínka půjde poslat za 20 hodin od té poslední.": "Dziś już przypominano — kolejne przypomnienie można wysłać 20 godzin po ostatnim.",
+  "Připomínku se nepodařilo poslat — zkus to znovu.": "Nie udało się wysłać przypomnienia — spróbuj ponownie.",
+  "Připomenuto": "Przypomniano",
+  "Další připomínka půjde poslat za 20 hodin od té poslední.": "Kolejne przypomnienie można wysłać 20 godzin po ostatnim.",
+  "Připomenout dostupnost ({n})": "Przypomnij o dostępności ({n})",
+  "Pošle upozornění všem, kdo na {mesic} dostupnost nezadali.": "Wyśle powiadomienie wszystkim, którzy nie podali dostępności na {mesic}.",
+  "Připomenout ({n})": "Przypomnij ({n})",
+  "Připomenout dostupnost": "Przypomnij o dostępności"
 }

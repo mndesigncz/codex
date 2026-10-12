@@ -491,6 +491,42 @@ const KATEGORIE_BARVY: Record<string, number> = {
 export const kategorieBarvy = (barva: unknown): number | null => KATEGORIE_BARVY[String(barva ?? '').toLowerCase()] ?? null;
 
 // ---------------------------------------------------------------------------
+// Připomenutí dostupnosti (kolo 7, R7-1)
+// ---------------------------------------------------------------------------
+
+/**
+ * Jak často jde lidem připomenout dostupnost — na podnik a měsíc. Dvacet hodin,
+ * ne „jednou za den": kdo připomene v 9:12, nemá druhý den v 8:50 narazit na zákaz.
+ * POST /api/availability/remind hlídá totéž v SQL (`INTERVAL '20 hours'`).
+ */
+export const PRIPOMINKA_DOSTUPNOSTI_H = 20;
+
+/** Měsíc, na který jde připomínat: „RRRR-MM" tohoto nebo příštího měsíce (podle `dnes`), jinak null. */
+export function mesicProPripominku(v: unknown, dnes: string): string | null {
+  const m = String(v ?? '');
+  if (!/^\d{4}-\d{2}$/.test(m)) return null;
+  const tento = dnes.slice(0, 7);
+  return m === tento || m === posunMesice(tento, 1) ? m : null;
+}
+
+/** Brání poslední připomínka další? Jen pro tentýž měsíc a do PRIPOMINKA_DOSTUPNOSTI_H hodin. */
+export function pripominkaBlokuje(posledni: { at: Date | null; mesic: string | null | undefined }, mesic: string, ted: Date): boolean {
+  if (!posledni.at || posledni.mesic !== mesic) return false;
+  const uplynulo = ted.getTime() - posledni.at.getTime();
+  return uplynulo >= 0 && uplynulo < PRIPOMINKA_DOSTUPNOSTI_H * 3600_000;
+}
+
+/**
+ * Komu připomenout: členové podniku, ze kterých widget Dostupnost týmu počítá
+ * „Chybí" (vedení i zaměstnanci, ne tablet), bez odevzdané dostupnosti na měsíc
+ * a bez toho, kdo připomíná. Pořadí podle vstupu, bez duplicit.
+ */
+export function komuPripomenout(clenove: readonly number[], odevzdali: readonly number[], meId: number): number[] {
+  const hotovo = new Set(odevzdali.map(Number));
+  return [...new Set(clenove.map(Number))].filter(id => Number.isFinite(id) && id !== meId && !hotovo.has(id));
+}
+
+// ---------------------------------------------------------------------------
 // Poznámka ke směně (kolo 7, R7-1)
 // ---------------------------------------------------------------------------
 

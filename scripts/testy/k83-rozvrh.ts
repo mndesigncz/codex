@@ -9,7 +9,9 @@ import type { Testy } from './_testy.ts';
 import {
   duvodVolna, textRozhodnutiVolna, MAX_DUVOD_VOLNA, otevritMojeZadosti,
   stavyDostupnosti, denTydne, nastavDenVTydnu, prevezmiVzor, poznamkaSmeny, MAX_POZNAMKA_SMENY,
+  mesicProPripominku, pripominkaBlokuje, komuPripomenout, PRIPOMINKA_DOSTUPNOSTI_H,
 } from '../../lib/rozvrhPrehled.ts';
+import { AKCE_HLEDANI } from '../../components/widgety/akceHledani.ts';
 import { VYCHOZI_NAV, NAV_TEXTY } from '../../lib/navigace.ts';
 
 const cti = (cesta: string) => readFileSync(new URL(`../../${cesta}`, import.meta.url), 'utf8');
@@ -123,4 +125,28 @@ export default function ({ eq, ok }: Testy) {
   ok('poznámka směny: okno dne má pole Poznámka (maxLength 200) a pilulka ikonu s poznámkou v title',
     /label=\{t\('Poznámka ke směně \(nepovinné\)'\)\}/.test(planovac) && /maxLength=\{MAX_POZNAMKA_SMENY\}/.test(planovac) && /\$\{s\.note \? ` · \$\{s\.note\}` : ''\}/.test(planovac));
   ok('poznámka směny: Moje směny ji ukazují v detailu řádku', /data-poznamka-smeny/.test(cti('components/employee/MyShifts.tsx')) && /prvni\.s\.note/.test(cti('components/widgety/oblasti/moje-smeny.tsx')));
+
+  // ---- dostupnost-pripomenout ----
+  eq('připomenout: jen tento nebo příští měsíc (podle Prahy), přes rok taky',
+    [mesicProPripominku('2026-10', '2026-10-12'), mesicProPripominku('2026-11', '2026-10-12'), mesicProPripominku('2026-12', '2026-10-12'), mesicProPripominku('2026-09', '2026-10-12'), mesicProPripominku('2027-01', '2026-12-31'), mesicProPripominku('x', '2026-10-12')],
+    ['2026-10', '2026-11', null, null, '2027-01', null]);
+  const ted = new Date('2026-10-12T10:00:00Z');
+  eq('připomenout: ochrana 20 h na podnik a měsíc (jiný měsíc neblokuje, 21 h staré už ne)', [
+    pripominkaBlokuje({ at: new Date('2026-10-12T07:12:00Z'), mesic: '2026-11' }, '2026-11', ted),
+    pripominkaBlokuje({ at: new Date('2026-10-11T13:00:00Z'), mesic: '2026-11' }, '2026-11', ted),
+    pripominkaBlokuje({ at: new Date('2026-10-12T07:12:00Z'), mesic: '2026-10' }, '2026-11', ted),
+    pripominkaBlokuje({ at: null, mesic: null }, '2026-11', ted),
+  ], [true, false, false, false]);
+  eq('připomenout: příjemci = členové bez odevzdané dostupnosti, bez připomínajícího a bez duplicit',
+    komuPripomenout([15, 16, 17, 17, 18, 19], [16, 19], 15), [17, 18]);
+  const remind = cti('app/api/availability/remind/route.ts');
+  ok('připomenout: routa chce rozvrh.generovat, hlídá 20 h v SQL, píše do historie a posílá kategorii shift',
+    /pozaduj\('rozvrh\.generovat'\)/.test(remind) && remind.includes(`INTERVAL '${PRIPOMINKA_DOSTUPNOSTI_H} hours'`)
+    && /audit\(c\.teamId, c\.meId, 'rozvrh\.pripomenout_dostupnost'/.test(remind) && /category: 'shift'/.test(remind) && /status: 429/.test(remind)
+    && /link: '\/employee\/shifts\?view=availability'/.test(remind));
+  ok('připomenout: DDL teams.availability_reminded_at/_month', /availability_reminded_at TIMESTAMP/.test(cti('app/api/init/route.ts')) && /availability_reminded_month TEXT/.test(cti('app/api/init/route.ts')));
+  ok('připomenout: widget hlídá rozvrh.generovat a náhled, v S jen ikona s aria-label',
+    /const smiPripomenout = !nahled && smi\('rozvrh\.generovat'\) && komu > 0;/.test(widget) && /tlacitkoPripomenout\(true\)/.test(widget) && /'\/api\/availability\/remind'/.test(widget));
+  const akcePrip = AKCE_HLEDANI.find(a => a.id === 'dostupnost-pripomenout');
+  eq('připomenout: v paletě jen navigace na Rozvrh (vedení)', [akcePrip?.stranka, akcePrip?.arg, akcePrip?.rozhrani], ['shifts', undefined, ['vedeni']]);
 }

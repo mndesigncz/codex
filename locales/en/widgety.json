@@ -1926,5 +1926,16 @@
   "Nepovinné — třeba „Ten týden už má volno Petr, zkus jiný termín“.": "Optional — e.g. “Peter is already off that week, try another date”.",
   "Žádost zamítnuta, žadatel dostal upozornění.": "Request rejected, the requester has been notified.",
   "Vedení: {duvod}": "Management: {duvod}",
-  "Požádat o volno": "Request time off"
+  "Požádat o volno": "Request time off",
+  "Všichni už dostupnost zadali.": "Everyone has already entered their availability.",
+  "{n, plural, one {Připomenuto # člověku} few {Připomenuto # lidem} other {Připomenuto # lidem}}": "{n, plural, one {Reminded # person} other {Reminded # people}}",
+  "Nikomu nešlo připomenout — upozornění na směny mají vypnutá.": "Couldn't remind anyone — they've turned off shift notifications.",
+  "Dnes už se připomínalo — další připomínka půjde poslat za 20 hodin od té poslední.": "A reminder already went out today — the next one can be sent 20 hours after the last.",
+  "Připomínku se nepodařilo poslat — zkus to znovu.": "Couldn't send the reminder — try again.",
+  "Připomenuto": "Reminded",
+  "Další připomínka půjde poslat za 20 hodin od té poslední.": "The next reminder can be sent 20 hours after the last.",
+  "Připomenout dostupnost ({n})": "Remind about availability ({n})",
+  "Pošle upozornění všem, kdo na {mesic} dostupnost nezadali.": "Sends a notification to everyone who hasn't entered availability for {mesic}.",
+  "Připomenout ({n})": "Remind ({n})",
+  "Připomenout dostupnost": "Remind about availability"
 }

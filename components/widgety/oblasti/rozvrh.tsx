@@ -43,6 +43,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { useSession } from 'next-auth/react';
 import {
   Avatar, BulkBar, Button, Chip, EmptyState, Field, Input, ListRow, Menu, Modal, PersonChip, SelectBox, Stat, Textarea, Toast,
   runBulk, useSelection, type MenuItem,
@@ -55,7 +56,7 @@ import { otevriDen } from '@/lib/denUdalost';
 import { Icon } from '../../Icons';
 import { useNavigace, useSmi } from '../NavigaceKontext';
 import { obnovOpravneni, useOpravneni } from '../../role/useOpravneni';
-import { apiMessage, okJson } from '@/lib/api';
+import { ApiError, apiMessage, okJson } from '@/lib/api';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { tg, aktualniJazyk } from '@/lib/i18n/stav';
 import { fmtDatum, fmtHM, fmtMesic } from '@/lib/i18n/format';
@@ -371,7 +372,7 @@ function DnesniSmeny({ velikost, nastaveni, nahled }: WidgetProps<{ den?: string
 interface Odevzdani { employeeId: number; unavailableDates?: unknown[] }
 interface Clen { id: number; name: string; avatar?: string | null; role?: string }
 
-interface DataDostupnosti { odevzdane: Odevzdani[]; naplanovanoSmen: number }
+interface DataDostupnosti { odevzdane: Odevzdani[]; naplanovanoSmen: number; pripomenuto: string | null }
 
 function vyberOdevzdani(raw: any): DataDostupnosti {
   // Bez dostupnost.zobrazit by API vrátilo jen vlastní záznam (nebo null) —
@@ -379,7 +380,8 @@ function vyberOdevzdani(raw: any): DataDostupnosti {
   if (!raw || typeof raw !== 'object' || !Array.isArray(raw.submissions)) throw new Error(tg('Dostupnost týmu přišla v nečekaném tvaru.'));
   // Počet naplánovaných směn měsíce je novější pole odpovědi — bez něj 0,
   // widget se pak jen neminimalizuje (konzervativně).
-  return { odevzdane: raw.submissions, naplanovanoSmen: Number(raw.naplanovanoSmen) || 0 };
+  // `pripomenuto` (kolo 7): kdy vedení naposledy připomnělo, dokud platí ochrana 20 h; jinak null.
+  return { odevzdane: raw.submissions, naplanovanoSmen: Number(raw.naplanovanoSmen) || 0, pripomenuto: typeof raw.pripomenuto === 'string' ? raw.pripomenuto : null };
 }
 function vyberCleny(raw: any): Clen[] {
   if (!raw || typeof raw !== 'object' || !Array.isArray(raw.members)) throw new Error(tg('Seznam lidí přišel v nečekaném tvaru.'));
@@ -402,6 +404,12 @@ function DostupnostTymu({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: s
   const odevzdani = useDataWidgetu(brana ? `/api/availability?month=${mesic}` : null, vyberOdevzdani);
   const clenove = useDataWidgetu(brana ? '/api/teams' : null, vyberCleny);
   const [vseLidi, setVseLidi] = useState(false);
+  // Připomenout dostupnost (kolo 7): kdo nezadal, dostane jedním klepnutím upozornění.
+  const { data: relace } = useSession();
+  const meId = Number((relace?.user as { id?: unknown } | undefined)?.id);
+  const [pripominam, setPripominam] = useState(false);
+  const [pripomenutoTed, setPripomenutoTed] = useState<string | null>(null);
+  const [hlaskaPripominky, setHlaskaPripominky] = useState<{ text: string; tone: 'ok' | 'bad'; id: number } | null>(null);
 
   const { zadali, chybi, blokovano } = useMemo(() => {
     const podle = new Map<number, Odevzdani>();
@@ -436,8 +444,63 @@ function DostupnostTymu({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: s
   const smiVyplnit = !nahled && smi('dostupnost.upravit') && nav.smiPohled('shifts');
   // Náhled zadané dostupnosti stačí dostupnost.zobrazit (hlavní brána widgetu).
   const smiNahlednout = !nahled && nav.smiPohled('shifts');
-  const sestavit = smiSestavit ? (
-    <Button variant="secondary" size="sm" icon="calendar" onClick={() => nav.onNavigate('shifts')}>{t('Sestavit rozvrh')}</Button>
+  // Připomenout jde jen těm, kdo chybí — bez sebe (server připomínajícímu nepíše).
+  const komu = chybi.filter(c => Number(c.id) !== meId).length;
+  const smiPripomenout = !nahled && smi('rozvrh.generovat') && komu > 0;
+  const pripomenuto = pripomenutoTed ?? odevzdani.data?.pripomenuto ?? null;
+  const pripomenout = async () => {
+    setPripominam(true);
+    try {
+      const d = await fetch('/api/availability/remind', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ month: mesic }),
+      }).then(okJson);
+      const n = Number(d?.notified) || 0;
+      const ztlumeno = Number(d?.ztlumeno) || 0;
+      if (n === 0 && ztlumeno === 0) {
+        // Mezitím všichni zadali (server nikomu nepsal a ochranu nespotřeboval) — načíst znovu.
+        obnovDataWidgetu(`/api/availability?month=${mesic}`);
+        setHlaskaPripominky({ text: t('Všichni už dostupnost zadali.'), tone: 'ok', id: Date.now() });
+      } else {
+        setPripomenutoTed(new Date().toISOString());
+        setHlaskaPripominky({
+          text: n > 0
+            ? t('{n, plural, one {Připomenuto # člověku} few {Připomenuto # lidem} other {Připomenuto # lidem}}', { n })
+            : t('Nikomu nešlo připomenout — upozornění na směny mají vypnutá.'),
+          tone: n > 0 ? 'ok' : 'bad', id: Date.now(),
+        });
+      }
+    } catch (e) {
+      // 429 = dnes už připomenuto (ochrana 20 h na podnik a měsíc) — tlačítko se přepne na „Připomenuto".
+      if (e instanceof ApiError && e.status === 429) {
+        setPripomenutoTed(new Date().toISOString());
+        setHlaskaPripominky({ text: t('Dnes už se připomínalo — další připomínka půjde poslat za 20 hodin od té poslední.'), tone: 'bad', id: Date.now() });
+      } else {
+        setHlaskaPripominky({ text: apiMessage(e, t('Připomínku se nepodařilo poslat — zkus to znovu.')), tone: 'bad', id: Date.now() });
+      }
+    }
+    setPripominam(false);
+  };
+  const tlacitkoPripomenout = (jenIkona: boolean) => (smiPripomenout ? (
+    pripomenuto ? (
+      <Button variant="secondary" size="sm" icon="check" disabled iconOnly={jenIkona}
+        aria-label={jenIkona ? t('Připomenuto') : undefined}
+        title={t('Další připomínka půjde poslat za 20 hodin od té poslední.')}>
+        {jenIkona ? null : t('Připomenuto')}
+      </Button>
+    ) : (
+      <Button variant="secondary" size="sm" icon="bell" loading={pripominam} onClick={() => { void pripomenout(); }} iconOnly={jenIkona}
+        aria-label={jenIkona ? t('Připomenout dostupnost ({n})', { n: komu }) : undefined}
+        title={t('Pošle upozornění všem, kdo na {mesic} dostupnost nezadali.', { mesic: naMesic })}>
+        {jenIkona ? null : t('Připomenout ({n})', { n: komu })}
+      </Button>
+    )
+  ) : null);
+  const sestavit = smiSestavit || smiPripomenout ? (
+    // Tichá akce se srovná s levým okrajem (DESIGN: Na telefonu nesmí prvek skončit v půlce).
+    <div className="flex flex-wrap items-center gap-2">
+      {smiSestavit && <Button variant="secondary" size="sm" icon="calendar" onClick={() => nav.onNavigate('shifts')}>{t('Sestavit rozvrh')}</Button>}
+      {tlacitkoPripomenout(false)}
+    </div>
   ) : null;
   const shrnuti = <p className="t-meta">{t('Na {mesic} zadalo {zadali} z {celkem}.', { mesic: naMesic, zadali: zadali.length.toLocaleString('cs-CZ'), celkem: celkem.toLocaleString('cs-CZ') })}</p>;
   const vsichni = chybi.length === 0 && celkem > 0 ? (
@@ -446,16 +509,23 @@ function DostupnostTymu({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: s
 
   let telo: ReactNode;
   if (velikost === 'S') {
+    // V malé velikosti je připomenutí jen ikonou vedle čísla (celá karta pak není proklik).
     telo = (
-      <Stat label={naMesic} value={zadali.length.toLocaleString('cs-CZ')} unit={t('z {celkem}', { celkem: celkem.toLocaleString('cs-CZ') })}
-        note={chybi.length === 0 ? t('všichni zadali') : t('{n, plural, one {zbývá # člověk} few {zbývají # lidé} other {zbývá # lidí}}', { n: chybi.length })} />
+      <div className="flex items-end justify-between gap-2 min-w-0">
+        <Stat className="min-w-0 flex-1" label={naMesic} value={zadali.length.toLocaleString('cs-CZ')} unit={t('z {celkem}', { celkem: celkem.toLocaleString('cs-CZ') })}
+          note={chybi.length === 0 ? t('všichni zadali') : t('{n, plural, one {zbývá # člověk} few {zbývají # lidé} other {zbývá # lidí}}', { n: chybi.length })} />
+        {tlacitkoPripomenout(true)}
+      </div>
     );
   } else if (velikost === 'M') {
     telo = (
       <div className="space-y-3">
-        {vsichni ?? (
+        {/* Akce (Sestavit, Připomenout) hned pod souhrnem, ne pod seznamem lidí: dlouhý seznam se ve widgetu
+            zkracuje pod „Zobrazit vše" a tlačítka by skončila pod přechodem do ztracena. */}
+        {vsichni ?? shrnuti}
+        {sestavit}
+        {!vsichni && (
           <>
-            {shrnuti}
             <ul className="flex flex-wrap gap-2" aria-label={t('Kdo ještě nezadal')}>
               {chybi.slice(0, PILULEK_M).map(c => (
                 <li key={c.id} className="min-w-0 max-w-full"><PersonChip name={c.name} avatar={c.avatar} /></li>
@@ -464,7 +534,6 @@ function DostupnostTymu({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: s
             {chybi.length > PILULEK_M && <p className="t-meta">{t('…a dalších {n}', { n: (chybi.length - PILULEK_M).toLocaleString('cs-CZ') })}</p>}
           </>
         )}
-        {sestavit}
       </div>
     );
   } else {
@@ -475,6 +544,7 @@ function DostupnostTymu({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: s
     telo = (
       <div className="space-y-3">
         {vsichni ?? shrnuti}
+        {sestavit}
         <ul className="list">
           {radky.map(c => {
             const zadal = !chybi.includes(c);
@@ -509,7 +579,6 @@ function DostupnostTymu({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: s
             {vseLidi ? t('Ukázat méně') : t('…a dalších {n}', { n: cislo(poradi.length - RADKU_L) })}
           </Button>
         )}
-        {sestavit}
       </div>
     );
   }
@@ -518,7 +587,7 @@ function DostupnostTymu({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: s
     <Widget
       nacteni={[odevzdani, clenove]}
       doplnek={velikost !== 'S' && chybi.length > 0 ? <Chip tone="wait" size="sm">{chybi.length.toLocaleString('cs-CZ')}</Chip> : undefined}
-      otevrit={velikost === 'S' && !nahled && nav.smiPohled('shifts') ? () => nav.onNavigate('shifts') : undefined}
+      otevrit={velikost === 'S' && !nahled && !smiPripomenout && nav.smiPohled('shifts') ? () => nav.onNavigate('shifts') : undefined}
       prazdno={celkem === 0 ? (velikost === 'S' ? <p className="t-meta">{t('V týmu zatím nikdo není.')}</p> : (
         <EmptyState compact icon="users" title={t('V týmu zatím nikdo není')}
           hint={t('Až pozveš lidi, uvidíš tu, kdo zadal dostupnost.')}
@@ -528,6 +597,11 @@ function DostupnostTymu({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: s
       )) : undefined}
     >
       {telo}
+      {hlaskaPripominky && (
+        <NadPlochou>
+          <Toast id={hlaskaPripominky.id} tone={hlaskaPripominky.tone} message={hlaskaPripominky.text} onClose={() => setHlaskaPripominky(null)} />
+        </NadPlochou>
+      )}
     </Widget>
   );
 }

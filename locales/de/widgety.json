@@ -1927,5 +1927,16 @@
   "Nepovinné — třeba „Ten týden už má volno Petr, zkus jiný termín“.": "Optional — z. B. „Peter hat in der Woche schon frei, versuch einen anderen Termin“.",
   "Žádost zamítnuta, žadatel dostal upozornění.": "Antrag abgelehnt, die Person wurde benachrichtigt.",
   "Vedení: {duvod}": "Leitung: {duvod}",
-  "Požádat o volno": "Urlaub beantragen"
+  "Požádat o volno": "Urlaub beantragen",
+  "Všichni už dostupnost zadali.": "Alle haben ihre Verfügbarkeit schon eingetragen.",
+  "{n, plural, one {Připomenuto # člověku} few {Připomenuto # lidem} other {Připomenuto # lidem}}": "{n, plural, one {# Person erinnert} other {# Personen erinnert}}",
+  "Nikomu nešlo připomenout — upozornění na směny mají vypnutá.": "Niemand konnte erinnert werden — Schicht-Benachrichtigungen sind ausgeschaltet.",
+  "Dnes už se připomínalo — další připomínka půjde poslat za 20 hodin od té poslední.": "Heute wurde schon erinnert — die nächste Erinnerung geht 20 Stunden nach der letzten.",
+  "Připomínku se nepodařilo poslat — zkus to znovu.": "Die Erinnerung konnte nicht gesendet werden — versuch es noch einmal.",
+  "Připomenuto": "Erinnert",
+  "Další připomínka půjde poslat za 20 hodin od té poslední.": "Die nächste Erinnerung geht 20 Stunden nach der letzten.",
+  "Připomenout dostupnost ({n})": "An Verfügbarkeit erinnern ({n})",
+  "Pošle upozornění všem, kdo na {mesic} dostupnost nezadali.": "Benachrichtigt alle, die für {mesic} keine Verfügbarkeit eingetragen haben.",
+  "Připomenout ({n})": "Erinnern ({n})",
+  "Připomenout dostupnost": "An Verfügbarkeit erinnern"
 }
