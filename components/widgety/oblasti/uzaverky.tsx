@@ -652,7 +652,7 @@ function Trendy({ velikost }: WidgetProps) {
 // Měsíc v číslech
 // ---------------------------------------------------------------------------
 
-interface MesicFinanci { trzby: number; nakupy: number; mzdy: number; vysledek: number; mzdySkryte: boolean }
+interface MesicFinanci { trzby: number; nakupy: number; mzdy: number; vysledek: number; poPevnych: boolean; mzdySkryte: boolean }
 
 function MesicVCislech({ velikost, nastaveni }: WidgetProps<{ mesic?: 'tento' | 'minuly' }>) {
   const t = useT('widgety');
@@ -669,7 +669,10 @@ function MesicVCislech({ velikost, nastaveni }: WidgetProps<{ mesic?: 'tento' | 
     const n = (v: unknown) => Number(v) || 0;
     // Mzdy jako Finance: vyšší z odpracovaného a vyplaceného (jinak by se denní výplata počítala dvakrát nebo vůbec).
     const mzdy = Math.max(n(s.wagesWorked), n(s.wagesCash));
-    return { trzby: n(s.revenue), nakupy: n(s.purchases), mzdy, vysledek: n(s.gross), mzdySkryte: s.mzdySkryte === true };
+    // Výsledek jako Souhrn měsíce ve Financích: po pravidelných nákladech (nájem, energie), když je podnik
+    // vyplnil; jinak hrubý. Dřív tu byl vždy hrubý a dva widgety téhož měsíce ukazovaly dvě různá čísla.
+    const poPevnych = s.fixedCostsSet === true;
+    return { trzby: n(s.revenue), nakupy: n(s.purchases), mzdy, vysledek: poPevnych ? n(s.net) : n(s.gross), poPevnych, mzdySkryte: s.mzdySkryte === true };
   });
   const f = data.data;
 
@@ -687,7 +690,7 @@ function MesicVCislech({ velikost, nastaveni }: WidgetProps<{ mesic?: 'tento' | 
       {f && (
         <div className="space-y-2">
           <StatRow>
-            <Stat label={t('Výsledek')} value={vysledek} note={t('orientačně, bez DPH')} />
+            <Stat label={t('Výsledek')} value={vysledek} note={f.poPevnych ? t('po nájmu a energiích') : t('orientačně, bez DPH')} />
             <Stat label={t('Podíl mezd')} value={<span className={nadCilem ? 'text-bad-ink' : ''}>{podilText}</span>} note={cil} />
             {velikost === 'L' && <Stat label={t('Tržby')} value={money(f.trzby)} />}
             {velikost === 'L' && <Stat label={t('Mzdy a nákupy')} value={`−${money(f.mzdy + f.nakupy)}`} note={`${t('mzdy {castka}', { castka: money(f.mzdy) })} · ${t('nákupy {castka}', { castka: money(f.nakupy) })}`} />}
