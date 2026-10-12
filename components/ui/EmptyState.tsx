@@ -41,7 +41,9 @@ export function EmptyState({ illustration, icon, title, hint, action, compact = 
       ) : null}
       <p className={`font-bold tracking-tight text-[#16181A] text-balance ${compact ? 'text-base' : 'text-lg'}`}>{title}</p>
       {hint && <p className={`text-black/55 mt-1.5 max-w-sm text-pretty ${compact ? 'text-sm' : 'text-sm'}`}>{hint}</p>}
-      {action && <div className="mt-5">{action}</div>}
+      {/* Akce se zalamují a dlouhý text tlačítka (německé „Karte aus dem heutigen Angebot anlegen" na 288 px)
+          se zalomí dovnitř, místo aby vyčuhoval z karty (sondy preteceni-*). */}
+      {action && <div className="mt-5 flex flex-wrap justify-center gap-2 max-w-full [&_button]:max-w-full [&_button]:whitespace-normal [&_button]:h-auto [&_button]:min-h-11 [&_button]:py-2 [&_button]:text-center [&_a]:max-w-full [&_a]:whitespace-normal">{action}</div>}
     </div>
   );
 }

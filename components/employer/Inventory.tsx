@@ -1591,8 +1591,8 @@ function CatChip({ name, active, small, onPick }: {
 }) {
   return (
     <button type="button" onClick={onPick} aria-pressed={active}
-      className={`filter-pill tap-target-sm inline-flex items-center gap-1.5 ${small ? '!text-[12px]' : ''} ${active ? 'seg-on' : 'seg-off glass'}`}>
-      {active && <Icon name="check" size={small ? 12 : 13} />}{name}
+      className={`filter-pill tap-target-sm inline-flex items-center gap-1.5 max-w-full !shrink !whitespace-normal text-left ${small ? '!text-[12px]' : ''} ${active ? 'seg-on' : 'seg-off glass'}`}>
+      {active && <Icon name="check" size={small ? 12 : 13} className="shrink-0" />}{name}
     </button>
   );
 }
