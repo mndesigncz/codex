@@ -46,6 +46,7 @@ import StocktakeModal from '../inventory/Stocktake';
 import NakupniSeznamOkno, { type RadekSeznamu } from './NakupniSeznamOkno';
 import ItemRecipeLinks from '../inventory/ItemRecipeLinks';
 import ProductionRecipe from '../inventory/ProductionRecipe';
+import { Poznamky } from '../Poznamky';
 import { useMoney, usePrice, useSymbol } from '../CurrencyProvider';
 import { okJson } from '@/lib/api';
 import { openPrint, esc } from '@/lib/printDoc';
@@ -1244,6 +1245,8 @@ export default function Inventory({ initialCategory, predaniN = 0, onNavigate }:
           )}
           {formErr && <p className="note note-danger" role="alert">{formErr}</p>}
         </form>
+        {/* Poznámky k položce mimo formulář (vlastní pole, vlastní tlačítko) — jen u existující položky. */}
+        {editing && <Poznamky typ="inventory_item" id={editing.id} className="mt-6" />}
       </Modal>
 
       {/* Lišta, ze které tenhle vzor vzešel — teď už sdílená komponenta,

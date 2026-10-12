@@ -38,6 +38,7 @@ import {
 } from '../ui';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
+import { Poznamky } from '../Poznamky';
 import { useSmi } from '../widgety/NavigaceKontext';
 import { useOpravneni } from '../role/useOpravneni';
 import { URL_RECEPTURY, UDALOST_OTEVRIT_RECEPTURU } from '../widgety/oblasti/receptury';
@@ -645,6 +646,12 @@ function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, 
           <p className="t-meta">{t('Uloženou recepturu odepisuje synchronizace s pokladnou po každém prodeji.')}</p>
         </Card>
       </div>
+
+      {/* Poznámky k receptuře („sirup od nového dodavatele je sladší, stačí 15 ml") — klíčem je product_id kasy,
+          receptura nemá vlastní číslo. Píše každý, kdo receptury vidí, i bez práva je měnit. */}
+      <Card className="min-w-0">
+        <Poznamky typ="recipe" id={draft.productId} />
+      </Card>
 
       <Modal open={mazani} onClose={() => setMazani(false)} size="sm" title={t('Smazat recepturu?')}
         footer={<>

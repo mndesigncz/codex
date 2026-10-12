@@ -1,0 +1,20 @@
+[
+ {
+  "id": 11,
+  "text": "Sirupy jsou v druhé polici vzadu, ne u kávy.",
+  "createdAt": "CAS_PRED_2H",
+  "updatedAt": null,
+  "autor": { "id": 15, "name": "Martin Nemeškal", "avatar": null },
+  "moje": true,
+  "muzuSmazat": true
+ },
+ {
+  "id": 12,
+  "text": "Karamel došel úplně — objednáno,\npřijde ve čtvrtek.",
+  "createdAt": "CAS_PRED_3D",
+  "updatedAt": "CAS_PRED_2H",
+  "autor": { "id": 16, "name": "Eva Testová", "avatar": "🙂" },
+  "moje": false,
+  "muzuSmazat": true
+ }
+]
