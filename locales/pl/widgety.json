@@ -315,7 +315,6 @@
   "Kolega": "Kolega",
   "Kolik % položek menu má recepturu, kolik se prodává bez receptury, kolik položek je ve skladu.": "Jaki % pozycji menu ma recepturę, ile sprzedaje się bez receptury, ile pozycji jest w magazynie.",
   "Kolik akcí": "Ile wydarzeń",
-  "Kolik hodin má kdo v měsíci naplánováno — a kdo se blíží limitu z pravidel generátoru.": "Ile godzin ma kto zaplanowanych w miesiącu — i kto zbliża się do limitu z reguł generatora.",
   "Kolik hodin máš tento měsíc odpracováno podle píchaček.": "Ile godzin masz przepracowanych w tym miesiącu według rejestracji czasu.",
   "Kolik je v týmu lidí a kdo má jakou roli.": "Ilu ludzi jest w zespole i kto ma jaką rolę.",
   "Kolik jsem si vydělal: hodiny × vlastní sazba, prémie a srážky; tento nebo minulý měsíc.": "Ile zarobiłem: godziny × moja stawka, premie i potrącenia; ten lub poprzedni miesiąc.",
@@ -1886,5 +1885,9 @@
   "…a {n, plural, one {# další} few {# další} other {# dalších}} vyprodané": "…i {n, plural, one {# kolejna} few {# kolejne} many {# kolejnych} other {# kolejnej}} wyprzedane",
   "↑ ↓ vybírají, Enter otevře, Esc zavře.": "↑ ↓ wybierają, Enter otwiera, Esc zamyka.",
   "{n, plural, one {# cena jinak} few {# ceny jinak} other {# cen jinak}}": "{n, plural, one {# cena inna} few {# ceny inne} many {# cen innych} other {# cen innych}}",
-  "zatím nevyplněné — doplň ve Financích › ··· › Pravidelné náklady": "jeszcze nieuzupełnione — uzupełnij w Finansach › ··· › Koszty stałe"
+  "zatím nevyplněné — doplň ve Financích › ··· › Pravidelné náklady": "jeszcze nieuzupełnione — uzupełnij w Finansach › ··· › Koszty stałe",
+  "Kolik hodin má kdo v měsíci naplánováno, kdo se blíží limitu z pravidel generátoru a s oprávněním ke mzdám i kolik to stojí.": "Ile godzin ma kto zaplanowanych w miesiącu, kto zbliża się do limitu z reguł generatora i – z dostępem do wynagrodzeń – ile to kosztuje.",
+  "{n, plural, one {# směna v rozvrhu} few {# směny v rozvrhu} other {# směn v rozvrhu}}": "{n, plural, one {# zmiana w grafiku} few {# zmiany w grafiku} many {# zmian w grafiku} other {# zmiany w grafiku}}",
+  "{n, plural, one {Volno schváleno, ale # směna zůstala v rozvrhu} few {Volno schváleno, ale # směny zůstaly v rozvrhu} other {Volno schváleno, ale # směn zůstalo v rozvrhu}}": "{n, plural, one {Urlop zatwierdzony, ale # zmiana została w grafiku} few {Urlop zatwierdzony, ale # zmiany zostały w grafiku} many {Urlop zatwierdzony, ale # zmian zostało w grafiku} other {Urlop zatwierdzony, ale # zmiany zostały w grafiku}}",
+  "Upravit rozvrh": "Edytuj grafik"
 }

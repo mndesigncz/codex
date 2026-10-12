@@ -83,6 +83,16 @@ async function vygeneruj(p) {
   await p.getByRole('button', { name: 'Vygenerovat rozvrh' }).click();
   return dokud(() => p.getByText('Navržený rozvrh').isVisible(), 4000);
 }
+// Kolo 6 UX (V02): plánovač se otevírá na aktuálním měsíci, dokud v něm jsou směny po dnešku
+// (fixtura je má v prvních dnech měsíce) — sonda pracuje s příštím měsícem, vybere si ho sama.
+// Bez toho by sonda padala vždy 1.–4. dne v měsíci.
+async function otevriRozvrh(p) {
+  await otevri(p, ROZVRH, 'vedeni.rozvrh');
+  const pristi = p.getByRole('button', { name: 'Příští měsíc' });
+  await dokud(() => pristi.isVisible(), 6000);
+  if ((await pristi.getAttribute('aria-pressed')) !== 'true') await pristi.click();
+  await dokud(async () => (await pristi.getAttribute('aria-pressed')) === 'true', 3000);
+}
 async function otevriDen(p, d) {
   await bunka(p, d).click();
   return dokud(() => okno(p).getByText('Přiřazené směny').isVisible(), 3000);
@@ -91,7 +101,7 @@ async function otevriDen(p, d) {
 // 1) BUG: úpravy návrhu + Publikovat → uloží se upravený návrh, pak teprve publikace.
 {
   const { ctx, p, stav, chyby } = await kontext({ fix: FIX, dalsi: podvrh() });
-  await otevri(p, ROZVRH, 'vedeni.rozvrh');
+  await otevriRozvrh(p);
   tvrdi('N1: Vygenerovat ukáže návrh', await vygeneruj(p));
   tvrdi('N1: s návrhem říká tlačítko „Uložit a publikovat"', await p.getByRole('button', { name: 'Uložit a publikovat' }).isVisible());
   tvrdi('N1: okno dne s návrhem se otevře', await otevriDen(p, DEN));
@@ -133,7 +143,7 @@ async function otevriDen(p, d) {
 // 2) Přepnutí měsíce s neuloženým návrhem se zeptá — žádná tichá ztráta.
 {
   const { ctx, p, stav } = await kontext({ fix: FIX, dalsi: podvrh() });
-  await otevri(p, ROZVRH, 'vedeni.rozvrh');
+  await otevriRozvrh(p);
   await vygeneruj(p);
   await p.getByRole('button', { name: 'Tento měsíc' }).click();
   tvrdi('N2: přepnutí měsíce s návrhem otevře „Návrh není uložený"', await dokud(() => okno(p).getByText('Návrh není uložený').isVisible(), 2000));
@@ -147,7 +157,7 @@ async function otevriDen(p, d) {
 // 3) Okno dne: tým se stavy, poznámkou a pořadím; přidání a překryv.
 {
   const { ctx, p, stav } = await kontext({ fix: FIX, dalsi: podvrh() });
-  await otevri(p, ROZVRH, 'vedeni.rozvrh');
+  await otevriRozvrh(p);
   const dotazyDostupnosti = dotazyNa(stav, ['/api/availability']).length;
   await vygeneruj(p);
   await otevriDen(p, DEN);
@@ -203,7 +213,7 @@ async function otevriDen(p, d) {
 // 7) Ruční úpravy se bez ptaní nezahodí; zápisy do DB s otevřeným návrhem nejdou; SPA navigace se zeptá.
 {
   const { ctx, p, stav } = await kontext({ fix: FIX, dalsi: podvrh() });
-  await otevri(p, ROZVRH, 'vedeni.rozvrh');
+  await otevriRozvrh(p);
   await vygeneruj(p);
   const generovani = () => (stav.zapisy ?? []).filter(z => z.path === '/api/schedule/generate' && !JSON.parse(z.body || '{}').commit);
   tvrdi('Z0: generování posílá, jestli se měsíc přepíše (nahradit)', JSON.parse(generovani()[0]?.body || '{}').nahradit === true, generovani()[0]?.body);
@@ -243,7 +253,7 @@ async function otevriDen(p, d) {
 // 8) Souběh: „Potvrdit a uložit" a hned „Uložit a publikovat" → jediný commit.
 {
   const { ctx, p, stav } = await kontext({ fix: FIX, dalsi: podvrh({ pomalyCommit: true }) });
-  await otevri(p, ROZVRH, 'vedeni.rozvrh');
+  await otevriRozvrh(p);
   await vygeneruj(p);
   await p.getByRole('button', { name: 'Potvrdit a uložit' }).click();
   await p.getByRole('button', { name: 'Uložit a publikovat' }).click({ force: true, timeout: 1000 }).catch(() => {});
@@ -255,7 +265,7 @@ async function otevriDen(p, d) {
 // 9) 409 od serveru (jiná záložka změnila měsíc): chyba, návrh zůstane, plánovač se znovu načte.
 {
   const { ctx, p, stav } = await kontext({ fix: FIX, dalsi: podvrh({ konflikt: true }) });
-  await otevri(p, ROZVRH, 'vedeni.rozvrh');
+  await otevriRozvrh(p);
   await vygeneruj(p);
   const nacteniMesice = () => stav.dotazy.filter(d => d.path === '/api/schedule' && d.m === 'GET').length;
   const pred = nacteniMesice();
@@ -269,7 +279,7 @@ async function otevriDen(p, d) {
 // 4) Bez návrhu: „Přidat" v okně dne vytvoří rovnou směnu.
 {
   const { ctx, p, stav } = await kontext({ fix: FIX, dalsi: podvrh() });
-  await otevri(p, ROZVRH, 'vedeni.rozvrh');
+  await otevriRozvrh(p);
   await otevriDen(p, DEN);
   await radek(p, 'Lukáš Beneš').getByRole('button', { name: 'Přidat — Lukáš Beneš' }).click();
   await okno(p).getByRole('button', { name: 'Přidat směnu' }).first().click();
@@ -282,7 +292,7 @@ async function otevriDen(p, d) {
 {
   const opravneni = ROLE.ja.opravneni.filter(k => k !== 'dostupnost.zobrazit' && k !== 'dostupnost.upravit');
   const { ctx, p, stav } = await kontext({ fix: FIX, dalsi: podvrh(), mineData: mine(opravneni, { klic: 'vedeni', roleId: null, nazev: 'Vedoucí', typ: 'vedeni', jeVlastnik: false }) });
-  await otevri(p, ROZVRH, 'vedeni.rozvrh');
+  await otevriRozvrh(p);
   await otevriDen(p, DEN);
   tvrdi('P1: bez dostupnost.zobrazit okno dne bez sekce týmu', await okno(p).getByText('Tým na tento den').count() === 0);
   tvrdi('P1: …a žádný dotaz na /api/availability', dotazyNa(stav, ['/api/availability']).length === 0, dotazyNa(stav, ['/api/availability']).map(d => d.u).join(', '));
@@ -292,7 +302,7 @@ async function otevriDen(p, d) {
 // 6) Telefon 390: okno dne s rozbaleným přidáním nepřetéká.
 {
   const { ctx, p } = await kontext({ fix: FIX, viewport: { width: 390, height: 844 }, mobil: true, dalsi: podvrh() });
-  await otevri(p, ROZVRH, 'vedeni.rozvrh');
+  await otevriRozvrh(p);
   await vygeneruj(p);
   await otevriDen(p, DEN);
   await radek(p, 'Jakub Horák').getByRole('button', { name: 'Přidat — Jakub Horák' }).click();

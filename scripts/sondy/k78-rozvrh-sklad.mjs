@@ -77,9 +77,17 @@ const ceskeSlova = (txt) => CESKA_SLOVA.filter(s => txt.includes(s));
 /** Nejhorší kontrast textu proti ploše pod ním mezi (viditelnými) prvky nástroje. */
 const kontrastTextu = (p, selektor) => p.evaluate((sel) => {
   const parse = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c || ''); if (!m) return null; const x = m[1].split(',').map(parseFloat); return { r: x[0], g: x[1], b: x[2], a: x.length > 3 ? x[3] : 1 }; };
-  const over = (f, b) => ({ r: f.r * f.a + b.r * (1 - f.a), g: f.g * f.a + b.g * (1 - f.a), b: f.b * f.a + b.b * (1 - f.a), a: 1 });
+  // Skládání průsvitných vrstev (source-over) i s alfou spodní vrstvy. Dřív vracelo vždy a: 1, takže
+  // dvě průsvitné vrstvy nad sebou (pilulka v buňce rozvrhu) daly „neprůhlednou" barvu a pod ni se už
+  // nedívalo — v tmavém režimu vyšla bílá místo tmavé plochy a kontrast 1,1:1 u čitelného textu.
+  const over = (f, b) => {
+    const a = f.a + b.a * (1 - f.a);
+    if (a <= 0) return { r: 0, g: 0, b: 0, a: 0 };
+    const k = (x, y) => (x * f.a + y * b.a * (1 - f.a)) / a;
+    return { r: k(f.r, b.r), g: k(f.g, b.g), b: k(f.b, b.b), a };
+  };
   const lum = (c) => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b); };
-  const bgOf = (el) => { let acc = null; for (let n = el; n; n = n.parentElement) { const c = parse(getComputedStyle(n).backgroundColor); if (!c || c.a === 0) continue; acc = acc ? over(acc, c) : c; if (acc.a >= 0.999) return acc; } return acc ?? { r: 255, g: 255, b: 255, a: 1 }; };
+  const bgOf = (el) => { let acc = null; for (let n = el; n; n = n.parentElement) { const c = parse(getComputedStyle(n).backgroundColor); if (!c || c.a === 0) continue; acc = acc ? over(acc, c) : c; if (acc.a >= 0.999) return acc; } const bila = { r: 255, g: 255, b: 255, a: 1 }; return acc ? (acc.a < 0.999 ? over(acc, bila) : acc) : bila; };
   const koren = document.querySelector(sel);
   if (!koren) return { pocet: 0, nejhorsi: null, kde: 'selektor nenalezen' };
   let nejhorsi = 99; let kde = ''; let pocet = 0;

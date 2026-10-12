@@ -63,6 +63,24 @@ export function delkaSmeny(od: unknown, doCasu: unknown): number {
   return (m <= 0 ? m + 24 * 60 : m) / 60;
 }
 
+/**
+ * Čas do pilulky v mřížce: „08–16", „08:30–16", „22–06". Minuty jen tam, kde
+ * nejsou nula — na 126 px široké buňce je „08:00–16:00" o třetinu delší a
+ * neřekne nic navíc. Neplatný čas = prázdný řetězec.
+ */
+export function casKratce(od: unknown, doCasu: unknown): string {
+  const a = hodinaKratce(od); const b = hodinaKratce(doCasu);
+  return a && b ? `${a}–${b}` : a || b;
+}
+
+/** „08:00" → „08", „08:30" → „08:30", „8:05" → „08:05"; neplatný čas → „". */
+export function hodinaKratce(t: unknown): string {
+  const m = minutyZ(t);
+  if (m == null) return '';
+  const h = String(Math.floor(m / 60)).padStart(2, '0'); const mi = m % 60;
+  return mi === 0 ? h : `${h}:${String(mi).padStart(2, '0')}`;
+}
+
 /** Hodiny do textu: „8", „7,5". */
 export function hodinyText(h: number): string {
   const r = Math.round(h * 10) / 10;
@@ -74,6 +92,24 @@ export function posunMesice(mesic: string, o: number): string {
   const [y, m] = mesic.split('-').map(Number);
   const d = new Date(Date.UTC(y, m - 1 + o, 1));
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+/** Od kolikátého dne se plánovač otevírá rovnou na příštím měsíci. */
+export const PRAH_PRISTIHO_MESICE = 25;
+
+/**
+ * Výchozí měsíc plánovače (kolo 6 UX, nález V02). Dřív vždy příští — majitel
+ * 12. října otevřel prázdný listopad, přestože z telefonu nejčastěji kontroluje
+ * a zveřejňuje rozvrh, který běží. Teď aktuální, dokud v něm jsou směny po
+ * dnešku; po 25. dni (zbytek měsíce už je naplánovaný) a v měsíci, kde po
+ * dnešku nic není, příští. `smenyTohoMesice` = null: směny ještě nejsou
+ * načtené — začne se aktuálním a rozhodne se po načtení.
+ */
+export function mesicPlanovace(dnes: string, smenyTohoMesice: readonly { date: unknown }[] | null = null): string {
+  const tento = dnes.slice(0, 7);
+  if (Number(dnes.slice(8, 10)) > PRAH_PRISTIHO_MESICE) return posunMesice(tento, 1);
+  if (smenyTohoMesice == null) return tento;
+  return smenyTohoMesice.some(s => den(s.date) > dnes) ? tento : posunMesice(tento, 1);
 }
 
 /** „2026-09-28" → „pondělí 28. září" (poledne UTC, ať den neuteče přes pásmo ani letní čas). */
@@ -119,6 +155,8 @@ export interface SmenaRozvrhu {
   startTime: string;
   endTime: string;
   type?: string | null;
+  /** Hodinová sazba (GET /api/schedule jen s finance.mzdy, jinak null; 0 = nenastavená). */
+  hourlyRate?: number | null;
 }
 
 export interface HodinyClovek {
@@ -131,6 +169,8 @@ export interface HodinyClovek {
   limit: number | null;
   /** hodiny / limit (1 = na stropu); null bez limitu. */
   podil: number | null;
+  /** Mzdový náklad (hodiny × sazba, zaokrouhlený až v součtu); null bez sazby nebo bez finance.mzdy. */
+  naklad: number | null;
 }
 
 export interface PravidlaHodin {
@@ -148,9 +188,12 @@ export function hodinyLidi(smeny: readonly SmenaRozvrhu[], mesic: string, pravid
   for (const s of smeny) {
     if (den(s.date).slice(0, 7) !== mesic) continue;
     const id = Number(s.employeeId);
-    const c = podle.get(id) ?? { employeeId: id, jmeno: s.employeeName ?? 'Bez jména', avatar: s.employeeAvatar ?? null, hodiny: 0, smen: 0, limit: null, podil: null };
-    c.hodiny += delkaSmeny(s.startTime, s.endTime);
+    const c = podle.get(id) ?? { employeeId: id, jmeno: s.employeeName ?? 'Bez jména', avatar: s.employeeAvatar ?? null, hodiny: 0, smen: 0, limit: null, podil: null, naklad: null };
+    const h = delkaSmeny(s.startTime, s.endTime);
+    c.hodiny += h;
     c.smen += 1;
+    // Chybějící sazba není nula: bez ní náklad nevzniká (null), ne „0 Kč".
+    if (Number(s.hourlyRate) > 0) c.naklad = (c.naklad ?? 0) + h * Number(s.hourlyRate);
     podle.set(id, c);
   }
   const tym = pravidla?.teamMaxHours != null && pravidla.teamMaxHours > 0 ? Number(pravidla.teamMaxHours) : null;
@@ -158,10 +201,103 @@ export function hodinyLidi(smeny: readonly SmenaRozvrhu[], mesic: string, pravid
   const out = [...podle.values()].map(c => {
     const o = osobni.get(c.employeeId);
     const limit = o === 0 ? null : o != null && o > 0 ? Number(o) : tym;
-    return { ...c, hodiny: Math.round(c.hodiny * 100) / 100, limit, podil: limit ? c.hodiny / limit : null };
+    return { ...c, hodiny: Math.round(c.hodiny * 100) / 100, limit, podil: limit ? c.hodiny / limit : null, naklad: c.naklad == null ? null : Math.round(c.naklad) };
   });
   return out.sort((a, b) => (b.podil ?? -1) - (a.podil ?? -1) || b.hodiny - a.hodiny || a.jmeno.localeCompare(b.jmeno, 'cs'));
 }
+
+/** Součet za den do patičky buňky: počet směn a hodiny (uložené i návrh, co mřížka právě kreslí). */
+export function souhrnDne(smeny: readonly { startTime: unknown; endTime: unknown }[]): { smen: number; hodin: number } {
+  return { smen: smeny.length, hodin: Math.round(smeny.reduce((n, s) => n + delkaSmeny(s.startTime, s.endTime), 0) * 100) / 100 };
+}
+
+// ---------------------------------------------------------------------------
+// Týdenní pohled (lidé × dny) — jen čtení, kolo 6 UX
+// ---------------------------------------------------------------------------
+
+/** První den týdne, do kterého `den` patří; `zacatek` 1 = pondělí, 0 = neděle (lib/week). */
+export function prvniDenTydne(den: string, zacatek: 0 | 1): string {
+  const d = new Date(`${den}T12:00:00Z`);
+  const poradi = (d.getUTCDay() - zacatek + 7) % 7;
+  return dayPlus(den, -poradi);
+}
+
+/** Sedm dní od prvního dne týdne. */
+export const dnyTydne = (prvni: string): string[] => Array.from({ length: 7 }, (_, i) => dayPlus(prvni, i));
+
+/** První dny týdnů, které zasahují do měsíce „RRRR-MM" (první může být v minulém měsíci). */
+export function tydnyMesice(mesic: string, zacatek: 0 | 1): string[] {
+  const [y, m] = mesic.split('-').map(Number);
+  const posledni = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const out: string[] = [];
+  for (let t = prvniDenTydne(`${mesic}-01`, zacatek); t <= `${mesic}-${String(posledni).padStart(2, '0')}`; t = dayPlus(t, 7)) out.push(t);
+  return out;
+}
+
+/**
+ * Který týden měsíce ukázat napřed: ten s dneškem, když do měsíce patří,
+ * jinak první týden měsíce — první, který v měsíci leží aspoň čtyřmi dny
+ * (listopad 2026 začíná nedělí: „26. 10. – 1. 11." by ukázal šest dnů
+ * jiného měsíce bez dat a plánovač by hned klepal na šipku).
+ */
+export function vychoziTyden(mesic: string, dnes: string, zacatek: 0 | 1): string {
+  const tydny = tydnyMesice(mesic, zacatek);
+  if (dnes.slice(0, 7) === mesic) {
+    const sDneskem = tydny.find(t => t <= dnes && dnes <= dayPlus(t, 6));
+    if (sDneskem) return sDneskem;
+  }
+  return tydny.find(t => dnyTydne(t).filter(d => d.slice(0, 7) === mesic).length >= 4) ?? tydny[0];
+}
+
+/** Hodiny každého člověka ve vybraných dnech (z délky směn, ne z měsíčního vytížení). */
+export function hodinyVeDnech(
+  smeny: readonly { employeeId: number; date: string; startTime: unknown; endTime: unknown }[],
+  dny: readonly string[],
+): Map<number, number> {
+  const v = new Set(dny);
+  const out = new Map<number, number>();
+  for (const s of smeny) {
+    if (!v.has(den(s.date))) continue;
+    const id = Number(s.employeeId);
+    out.set(id, Math.round(((out.get(id) ?? 0) + delkaSmeny(s.startTime, s.endTime)) * 100) / 100);
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Mzdový náklad plánu (kolo 6 UX) — jen hodiny × sazba, bez poměru k tržbám
+// ---------------------------------------------------------------------------
+
+export interface SmenaSeSazbou { employeeId: number; startTime: unknown; endTime: unknown; hourlyRate?: number | null }
+
+/**
+ * Naplánované hodiny a mzdový náklad. Sazba chodí z API jen s finance.mzdy
+ * (jinak null u všech) — pak `castka` = null a ukáže se jen počet hodin.
+ * Směna bez sazby (0/null) se do částky nepočítá: chybějící sazba není nula,
+ * ale díra, na kterou upozorňuje `lideBezSazby`.
+ */
+export function nakladPlanu(smeny: readonly SmenaSeSazbou[]): { hodin: number; castka: number | null } {
+  let hodin = 0; let castka = 0; let seSazbou = false;
+  for (const s of smeny) {
+    const h = delkaSmeny(s.startTime, s.endTime);
+    hodin += h;
+    if (s.hourlyRate != null) seSazbou = true;
+    if (Number(s.hourlyRate) > 0) castka += h * Number(s.hourlyRate);
+  }
+  return { hodin: Math.round(hodin * 100) / 100, castka: seSazbou ? Math.round(castka) : null };
+}
+
+/** Kolik lidí se směnou nemá sazbu (0 nebo null) — má smysl jen s finance.mzdy. */
+export function lideBezSazby(smeny: readonly SmenaSeSazbou[]): number {
+  const bez = new Set<number>(); const se = new Set<number>();
+  for (const s of smeny) (Number(s.hourlyRate) > 0 ? se : bez).add(Number(s.employeeId));
+  for (const id of se) bez.delete(id);
+  return bez.size;
+}
+
+/** Náklad jednoho člověka: hodiny × sazba; null bez sazby. */
+export const nakladCloveka = (hodiny: number, sazba: number | null | undefined): number | null =>
+  Number(sazba) > 0 ? Math.round(hodiny * Number(sazba)) : null;
 
 export interface DenSDirou {
   den: string;
@@ -366,6 +502,36 @@ export interface ZadostVolna {
   type: string;
   note?: string | null;
   status: 'pending' | 'approved' | 'rejected' | string;
+  /** Kolik směn má člověk v rozvrhu ve dnech volna (API u čekajících žádostí, kolo 6 UX). */
+  conflicts?: number | null;
+}
+
+/** Směna, která schválenému volnu zůstala v rozvrhu (PATCH /api/timeoff → conflicts[]). */
+export interface SmenaVKolizi { date: string; startTime?: string; endTime?: string }
+
+/**
+ * Kolik směn v rozvrhu koliduje s žádostí o volno — 0, když API nic
+ * neposlalo (starší server). Schválení nic neblokuje; číslo jen varuje,
+ * že po schválení zůstane člověk v rozvrhu a plánovač ho musí vyndat.
+ */
+export function kolizeVolna(z: { conflicts?: number | null }): number {
+  const n = Number(z.conflicts);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+}
+
+/**
+ * Souhrn kolizí po schválení (i hromadném): kolik směn zůstalo v rozvrhu
+ * a nejbližší den, který má plánovač otevřít. Neplatné dny se přeskočí.
+ */
+export function souhrnKolizi(seznamy: readonly (readonly SmenaVKolizi[] | null | undefined)[]): { n: number; prvniDen: string | null } {
+  let n = 0; let prvniDen: string | null = null;
+  for (const s of seznamy) for (const k of s ?? []) {
+    const d = den(k.date);
+    if (!d) continue;
+    n += 1;
+    if (!prvniDen || d < prvniDen) prvniDen = d;
+  }
+  return { n, prvniDen };
 }
 
 /**

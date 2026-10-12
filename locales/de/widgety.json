@@ -315,7 +315,6 @@
   "Kolega": "Kollege",
   "Kolik % položek menu má recepturu, kolik se prodává bez receptury, kolik položek je ve skladu.": "Wie viel % der Artikel der Karte eine Rezeptur haben, wie viele ohne Rezeptur verkauft werden, wie viele Artikel im Lager sind.",
   "Kolik akcí": "Wie viele Veranstaltungen",
-  "Kolik hodin má kdo v měsíci naplánováno — a kdo se blíží limitu z pravidel generátoru.": "Wie viele Stunden jede Person im Monat geplant hat – und wer sich dem Limit aus den Generator-Regeln nähert.",
   "Kolik hodin máš tento měsíc odpracováno podle píchaček.": "Wie viele Stunden du diesen Monat laut Stempelzeiten gearbeitet hast.",
   "Kolik je v týmu lidí a kdo má jakou roli.": "Wie viele Leute im Team sind und wer welche Rolle hat.",
   "Kolik jsem si vydělal: hodiny × vlastní sazba, prémie a srážky; tento nebo minulý měsíc.": "Was ich verdient habe: Stunden × mein Satz, Prämien und Abzüge; dieser oder letzter Monat.",
@@ -1887,5 +1886,9 @@
   "…a {n, plural, one {# další} few {# další} other {# dalších}} vyprodané": "…und {n, plural, one {# weiterer} other {# weitere}} ausverkauft",
   "↑ ↓ vybírají, Enter otevře, Esc zavře.": "↑ ↓ wählen, Enter öffnet, Esc schließt.",
   "{n, plural, one {# cena jinak} few {# ceny jinak} other {# cen jinak}}": "{n, plural, one {# Preis anders} other {# Preise anders}}",
-  "zatím nevyplněné — doplň ve Financích › ··· › Pravidelné náklady": "noch nicht ausgefüllt — ergänze sie unter Finanzen › ··· › Regelmäßige Kosten"
+  "zatím nevyplněné — doplň ve Financích › ··· › Pravidelné náklady": "noch nicht ausgefüllt — ergänze sie unter Finanzen › ··· › Regelmäßige Kosten",
+  "Kolik hodin má kdo v měsíci naplánováno, kdo se blíží limitu z pravidel generátoru a s oprávněním ke mzdám i kolik to stojí.": "Wie viele Stunden jede Person im Monat geplant hat, wer sich dem Limit aus den Generator-Regeln nähert und – mit Zugriff auf Löhne – was es kostet.",
+  "{n, plural, one {# směna v rozvrhu} few {# směny v rozvrhu} other {# směn v rozvrhu}}": "{n, plural, one {# Schicht im Dienstplan} other {# Schichten im Dienstplan}}",
+  "{n, plural, one {Volno schváleno, ale # směna zůstala v rozvrhu} few {Volno schváleno, ale # směny zůstaly v rozvrhu} other {Volno schváleno, ale # směn zůstalo v rozvrhu}}": "{n, plural, one {Urlaub genehmigt, aber # Schicht steht noch im Dienstplan} other {Urlaub genehmigt, aber # Schichten stehen noch im Dienstplan}}",
+  "Upravit rozvrh": "Dienstplan bearbeiten"
 }

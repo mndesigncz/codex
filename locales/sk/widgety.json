@@ -316,7 +316,6 @@
   "Kolega": "Kolega",
   "Kolik % položek menu má recepturu, kolik se prodává bez receptury, kolik položek je ve skladu.": "Koľko % položiek menu má receptúru, koľko sa predáva bez receptúry, koľko položiek je na sklade.",
   "Kolik akcí": "Koľko podujatí",
-  "Kolik hodin má kdo v měsíci naplánováno — a kdo se blíží limitu z pravidel generátoru.": "Koľko hodín má kto v mesiaci naplánovaných — a kto sa blíži limitu z pravidiel generátora.",
   "Kolik hodin máš tento měsíc odpracováno podle píchaček.": "Koľko hodín máš tento mesiac odpracovaných podľa píchačiek.",
   "Kolik je v týmu lidí a kdo má jakou roli.": "Koľko ľudí je v tíme a kto má akú rolu.",
   "Kolik jsem si vydělal: hodiny × vlastní sazba, prémie a srážky; tento nebo minulý měsíc.": "Koľko som si zarobil: hodiny × vlastná sadzba, prémie a zrážky; tento alebo minulý mesiac.",
@@ -1889,5 +1888,9 @@
   "…a {n, plural, one {# další} few {# další} other {# dalších}} vyprodané": "…a {n, plural, one {# ďalšia} few {# ďalšie} many {# ďalšej} other {# ďalších}} vypredané",
   "↑ ↓ vybírají, Enter otevře, Esc zavře.": "↑ ↓ vyberajú, Enter otvorí, Esc zavrie.",
   "{n, plural, one {# cena jinak} few {# ceny jinak} other {# cen jinak}}": "{n, plural, one {# cena inak} few {# ceny inak} other {# cien inak}}",
-  "zatím nevyplněné — doplň ve Financích › ··· › Pravidelné náklady": "zatiaľ nevyplnené — doplň vo Financiách › ··· › Pravidelné náklady"
+  "zatím nevyplněné — doplň ve Financích › ··· › Pravidelné náklady": "zatiaľ nevyplnené — doplň vo Financiách › ··· › Pravidelné náklady",
+  "Kolik hodin má kdo v měsíci naplánováno, kdo se blíží limitu z pravidel generátoru a s oprávněním ke mzdám i kolik to stojí.": "Koľko hodín má kto v mesiaci naplánovaných, kto sa blíži limitu z pravidiel generátora a s oprávnením k mzdám aj koľko to stojí.",
+  "{n, plural, one {# směna v rozvrhu} few {# směny v rozvrhu} other {# směn v rozvrhu}}": "{n, plural, one {# zmena v rozvrhu} few {# zmeny v rozvrhu} other {# zmien v rozvrhu}}",
+  "{n, plural, one {Volno schváleno, ale # směna zůstala v rozvrhu} few {Volno schváleno, ale # směny zůstaly v rozvrhu} other {Volno schváleno, ale # směn zůstalo v rozvrhu}}": "{n, plural, one {Voľno schválené, ale # zmena zostala v rozvrhu} few {Voľno schválené, ale # zmeny zostali v rozvrhu} other {Voľno schválené, ale # zmien zostalo v rozvrhu}}",
+  "Upravit rozvrh": "Upraviť rozvrh"
 }

@@ -16,7 +16,19 @@ const shape = (r: any) => ({
   id: r.id, employeeId: r.employee_id, fromDate: r.from_date, toDate: r.to_date,
   type: r.type, note: r.note, status: r.status, createdAt: r.created_at,
   employeeName: r.employee_name ?? null, employeeAvatar: r.employee_avatar ?? null,
+  // Kolize s rozvrhem (kolo 6 UX): kolik směn má člověk v dnech čekající žádosti.
+  // Jen v seznamu pro vedení a jen u čekajících — o ostatních už se rozhodlo.
+  ...(r.conflicts != null ? { conflicts: Number(r.conflicts) || 0 } : {}),
 });
+
+/** Směny člověka v podniku ve dnech volna — kolize, která po schválení zůstane v rozvrhu. */
+async function smenyVeVolnu(teamId: number, employeeId: number, from: string, to: string) {
+  const rows = await sql`
+    SELECT date, start_time, end_time FROM shifts
+    WHERE team_id = ${teamId} AND employee_id = ${employeeId} AND date >= ${from} AND date <= ${to}
+    ORDER BY date ASC, start_time ASC`;
+  return rows.map((s: any) => ({ date: String(s.date), startTime: String(s.start_time ?? ''), endTime: String(s.end_time ?? '') }));
+}
 
 // GET — bez volno.zobrazit vlastní žádosti, s ním celý tým.
 export async function GET(req: NextRequest) {
@@ -39,15 +51,31 @@ export async function GET(req: NextRequest) {
   // Pole se dál jmenuje isEmployer kvůli klientům; znamená „odpověď nese
   // žádosti týmu".
   const isEmployer = c.role.opravneni.has('volno.zobrazit');
+  // Čekající žádost nese počet směn, které má člověk v rozvrhu ve dnech volna —
+  // jedním dotazem (LATERAL), ne dotazem na žádost. Schválení nic neblokuje;
+  // widget jen řekne „2 směny v rozvrhu", ať se na ně po schválení nezapomene.
+  const tymSKolizemi = () => sql`
+    SELECT t.*, u.name AS employee_name, u.avatar AS employee_avatar,
+           CASE WHEN t.status = 'pending' THEN k.n END AS conflicts
+    FROM time_off_requests t
+    LEFT JOIN users u ON u.id = t.employee_id
+    LEFT JOIN LATERAL (
+      SELECT COUNT(*)::int AS n FROM shifts s
+      WHERE s.team_id = ${c.teamId} AND s.employee_id = t.employee_id
+        AND s.date >= t.from_date AND s.date <= t.to_date
+    ) k ON TRUE
+    WHERE t.team_id = ${c.teamId}
+    ORDER BY (t.status = 'pending') DESC, t.from_date DESC
+    LIMIT 100`;
   try {
     const rows = isEmployer
-      ? await sql`
+      ? await tymSKolizemi().catch(() => sql`
           SELECT t.*, u.name AS employee_name, u.avatar AS employee_avatar
           FROM time_off_requests t
           LEFT JOIN users u ON u.id = t.employee_id
           WHERE t.team_id = ${c.teamId}
           ORDER BY (t.status = 'pending') DESC, t.from_date DESC
-          LIMIT 100`
+          LIMIT 100`)
       : await sql`
           SELECT t.* FROM time_off_requests t
           WHERE t.employee_id = ${c.meId}
@@ -127,6 +155,13 @@ export async function PATCH(req: NextRequest) {
     RETURNING *`;
   if (!row) return NextResponse.json({ error: 'Žádost nenalezena' }, { status: 404 });
 
+  // Směny, které po schválení zůstaly v rozvrhu ve dnech volna. Schválení projde jako
+  // dřív; widget podle nich ukáže „Upravit rozvrh" (okno dne už umí „Přesto přidat").
+  let conflicts: { date: string; startTime: string; endTime: string }[] = [];
+  if (nextStatus === 'approved') {
+    try { conflicts = await smenyVeVolnu(c.teamId, Number(row.employee_id), fromDate, toDate); } catch { /* bez výčtu — schválení platí */ }
+  }
+
   const datesChanged = fromDate !== String(existing.from_date) || toDate !== String(existing.to_date);
   try {
     await notifyUser(row.employee_id, {
@@ -140,7 +175,7 @@ export async function PATCH(req: NextRequest) {
     });
   } catch { /* best-effort */ }
 
-  return NextResponse.json({ ok: true, request: shape(row) });
+  return NextResponse.json({ ok: true, request: shape(row), conflicts });
 }
 
 // DELETE ?id= — the author cancels their own pending request; kdo volno

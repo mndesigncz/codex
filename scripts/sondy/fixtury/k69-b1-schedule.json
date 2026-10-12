@@ -8,7 +8,8 @@
    "date": "@-02",
    "startTime": "08:00",
    "endTime": "16:00",
-   "type": "Ranní"
+   "type": "Ranní",
+   "hourlyRate": 180
   },
   {
    "id": 502,
@@ -18,27 +19,30 @@
    "date": "@-03",
    "startTime": "22:00",
    "endTime": "06:00",
-   "type": "Noční"
+   "type": "Noční",
+   "hourlyRate": 180
   },
   {
    "id": 503,
    "employeeId": 17,
    "employeeName": "Jakub Horák",
-   "employeeAvatar": "🧔",
+   "employeeAvatar": "👤",
    "date": "@-04",
    "startTime": "08:00",
    "endTime": "20:00",
-   "type": "Ranní"
+   "type": "Ranní",
+   "hourlyRate": 200
   },
   {
    "id": 504,
    "employeeId": 18,
    "employeeName": "Tereza Malá",
-   "employeeAvatar": "👱‍♀️",
+   "employeeAvatar": null,
    "date": "@-05",
    "startTime": "10:00",
    "endTime": "14:00",
-   "type": "Odpolední"
+   "type": "Odpolední",
+   "hourlyRate": 0
   }
  ],
  "gaps": [

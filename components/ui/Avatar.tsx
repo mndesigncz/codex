@@ -6,8 +6,24 @@ import { Icon } from '../Icons';
 // Avatar člověka. Lidé si v nastavení vybírají emoji — to je jejich obsah
 // a zůstává. Náhrada za chybějící avatar ale nebude další emoji (👤 vypadá
 // na každém telefonu jinak), nýbrž kreslená silueta v barvě systému.
+//
+// Výchozí „👤" z databáze (users.avatar DEFAULT; /api/schedule ho doplňuje
+// i místo NULL) není nic, co by si člověk vybral — bere se jako prázdné
+// emoji, a tak se místo něj kreslí iniciály (nebo silueta bez jména).
+
+/** Výchozí hodnota users.avatar — nikdo si ji nevybral, proto se nekreslí. */
+export const VYCHOZI_AVATAR = '👤';
+
+/** Emoji, které stojí za zobrazení: ne prázdné a ne výchozí „👤" z databáze. */
+export function maEmoji(emoji: string | null | undefined): boolean {
+  const e = (emoji ?? '').trim();
+  return e !== '' && e !== VYCHOZI_AVATAR;
+}
 
 const SIZES = {
+  // 2xs: do pilulky v buňce mřížky rozvrhu na telefonu (buňka má na 390 px uvnitř 32 px:
+  // tečka typu 8 + mezera 2 + kruh 18 + okraje 4). Písmo nejmíň 11 px jako všude (check-contrast).
+  '2xs': { box: 'h-[18px] w-[18px]', text: 'text-[11px]', icon: 11, pismo: 'text-[11px]' },
   xs: { box: 'h-6 w-6', text: 'text-xs', icon: 12, pismo: 'text-[11px]' },
   sm: { box: 'h-8 w-8', text: 'text-base', icon: 15, pismo: 'text-[12px]' },
   md: { box: 'h-10 w-10', text: 'text-xl', icon: 18, pismo: 'text-[13px]' },
@@ -46,7 +62,7 @@ export function Avatar({ emoji, name, size = 'md', ring = true, className = '', 
   title?: string;
 }) {
   const s = SIZES[size];
-  const has = !!(emoji && emoji.trim());
+  const has = maEmoji(emoji);
   // Emoji má přednost: je to obsah, který si člověk vybral sám.
   const zkratka = has ? '' : inicialy(name);
   return (

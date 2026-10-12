@@ -11,7 +11,8 @@
    "type": "vacation",
    "note": "Svatba",
    "status": "pending",
-   "createdAt": "DNES"
+   "createdAt": "DNES",
+   "conflicts": 2
   },
   {
    "id": 72,
@@ -23,7 +24,8 @@
    "type": "other",
    "note": null,
    "status": "pending",
-   "createdAt": "DNES"
+   "createdAt": "DNES",
+   "conflicts": 0
   },
   {
    "id": 73,
