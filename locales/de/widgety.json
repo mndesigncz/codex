@@ -1893,5 +1893,8 @@
   "Kolik hodin má kdo v měsíci naplánováno, kdo se blíží limitu z pravidel generátoru a s oprávněním ke mzdám i kolik to stojí.": "Wie viele Stunden jede Person im Monat geplant hat, wer sich dem Limit aus den Generator-Regeln nähert und – mit Zugriff auf Löhne – was es kostet.",
   "{n, plural, one {# směna v rozvrhu} few {# směny v rozvrhu} other {# směn v rozvrhu}}": "{n, plural, one {# Schicht im Dienstplan} other {# Schichten im Dienstplan}}",
   "{n, plural, one {Volno schváleno, ale # směna zůstala v rozvrhu} few {Volno schváleno, ale # směny zůstaly v rozvrhu} other {Volno schváleno, ale # směn zůstalo v rozvrhu}}": "{n, plural, one {Urlaub genehmigt, aber # Schicht steht noch im Dienstplan} other {Urlaub genehmigt, aber # Schichten stehen noch im Dienstplan}}",
-  "Upravit rozvrh": "Dienstplan bearbeiten"
+  "Upravit rozvrh": "Dienstplan bearbeiten",
+  "Zavolat hostovi": "Gast anrufen",
+  "Napsat e-mail": "E-Mail schreiben",
+  "Zavolat hostovi {host}: {telefon}": "Gast {host} anrufen: {telefon}"
 }

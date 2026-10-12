@@ -34,17 +34,17 @@ export async function GET(req: NextRequest) {
   const range = tablet ? 'today' : String(new URL(req.url).searchParams.get('range') ?? 'upcoming');
   const today = pragueToday();
   const rows = range === 'today'
-    ? await sql`SELECT r.*, us.name AS customer_name, us.email AS customer_email, t.name AS table_name FROM client_reservations r JOIN users us ON us.id = r.customer_id LEFT JOIN client_tables t ON t.id = r.table_id WHERE r.team_id = ${u.team_id} AND r.date = ${today} ORDER BY r.time`
+    ? await sql`SELECT r.*, us.name AS customer_name, us.email AS customer_email, us.phone AS customer_phone, t.name AS table_name FROM client_reservations r JOIN users us ON us.id = r.customer_id LEFT JOIN client_tables t ON t.id = r.table_id WHERE r.team_id = ${u.team_id} AND r.date = ${today} ORDER BY r.time`
     : range === 'past'
-    ? await sql`SELECT r.*, us.name AS customer_name, us.email AS customer_email, t.name AS table_name FROM client_reservations r JOIN users us ON us.id = r.customer_id LEFT JOIN client_tables t ON t.id = r.table_id WHERE r.team_id = ${u.team_id} AND r.date < ${today} ORDER BY r.date DESC, r.time DESC LIMIT 100`
-    : await sql`SELECT r.*, us.name AS customer_name, us.email AS customer_email, t.name AS table_name FROM client_reservations r JOIN users us ON us.id = r.customer_id LEFT JOIN client_tables t ON t.id = r.table_id WHERE r.team_id = ${u.team_id} AND r.date >= ${today} AND r.date <= ${dayPlus(today, 60)} ORDER BY r.date, r.time`;
+    ? await sql`SELECT r.*, us.name AS customer_name, us.email AS customer_email, us.phone AS customer_phone, t.name AS table_name FROM client_reservations r JOIN users us ON us.id = r.customer_id LEFT JOIN client_tables t ON t.id = r.table_id WHERE r.team_id = ${u.team_id} AND r.date < ${today} ORDER BY r.date DESC, r.time DESC LIMIT 100`
+    : await sql`SELECT r.*, us.name AS customer_name, us.email AS customer_email, us.phone AS customer_phone, t.name AS table_name FROM client_reservations r JOIN users us ON us.id = r.customer_id LEFT JOIN client_tables t ON t.id = r.table_id WHERE r.team_id = ${u.team_id} AND r.date >= ${today} AND r.date <= ${dayPlus(today, 60)} ORDER BY r.date, r.time`;
   const tables = await sql`SELECT id, name, seats, storyous_desk_id FROM client_tables WHERE team_id = ${u.team_id} AND active = TRUE ORDER BY position, id`;
-  // Kdo vidí rezervace, nemusí vidět kontakt na hosta — e-mail je osobní
-  // údaj a patří jen tomu, kdo smí hostům psát (zakaznici.kontakty).
+  // Kdo vidí rezervace, nemusí vidět kontakt na hosta — e-mail a telefon jsou
+  // osobní údaje a patří jen tomu, kdo smí hostům psát (zakaznici.kontakty).
   const kontakty = ctx.role.opravneni.has('zakaznici.kontakty');
   const reservations = (rows as any[]).map(r => {
     const out: Record<string, any> = { ...r };
-    if (!kontakty) delete out.customer_email;
+    if (!kontakty) { delete out.customer_email; delete out.customer_phone; }
     if (tablet) delete out.note;
     return out;
   });

@@ -1892,5 +1892,8 @@
   "Kolik hodin má kdo v měsíci naplánováno, kdo se blíží limitu z pravidel generátoru a s oprávněním ke mzdám i kolik to stojí.": "How many hours each person has scheduled this month, who is nearing the limit from the generator rules and, with access to wages, what it costs.",
   "{n, plural, one {# směna v rozvrhu} few {# směny v rozvrhu} other {# směn v rozvrhu}}": "{n, plural, one {# shift in the schedule} other {# shifts in the schedule}}",
   "{n, plural, one {Volno schváleno, ale # směna zůstala v rozvrhu} few {Volno schváleno, ale # směny zůstaly v rozvrhu} other {Volno schváleno, ale # směn zůstalo v rozvrhu}}": "{n, plural, one {Time off approved, but # shift is still in the schedule} other {Time off approved, but # shifts are still in the schedule}}",
-  "Upravit rozvrh": "Edit schedule"
+  "Upravit rozvrh": "Edit schedule",
+  "Zavolat hostovi": "Call the guest",
+  "Napsat e-mail": "Send an email",
+  "Zavolat hostovi {host}: {telefon}": "Call guest {host}: {telefon}"
 }

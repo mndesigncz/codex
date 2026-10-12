@@ -52,7 +52,7 @@ import { czCount, type CzNoun } from '@/lib/czech';
 import { apiMessage } from '@/lib/api';
 import type { Navigace } from '@/lib/widgety/typy';
 import {
-  TON_REZERVACE, hlavniKrok, klicPrechodu, muzeDo, poDnech, prumerCesky, vyberHodnoceni, vyberRezervace,
+  TON_REZERVACE, hlavniKrok, klicPrechodu, muzeDo, odkazTel, poDnech, prumerCesky, vyberHodnoceni, vyberRezervace,
   type Rezervace, type StavRezervace,
 } from '@/lib/klientPrehled';
 import { useOpravneni } from '../role/useOpravneni';
@@ -436,20 +436,23 @@ function RezervaceStranka({ oznam, onZmena, otevriHosta }: { oznam: Hlaska; onZm
               {radky.map(r => {
                 const krok = hlavniKrok(r.stav, smi);
                 const konec = ['done', 'declined', 'cancelled'].includes(r.stav);
+                const tel = odkazTel(r.telefon);
                 const dalsi: MenuItem[] = [
                   ...(krok?.na === 'seated' && muzeDo(r.stav, 'done') && smi(klicPrechodu('done'))
                     ? [{ label: 'Rovnou hotovo', icon: 'check', onClick: () => { void zmenit(r, { status: 'done' }); } }] : []),
                   ...(usazuje && !konec ? [{ label: r.stul ? 'Změnit stůl…' : 'Přidělit stůl…', icon: 'location', onClick: () => setStulPro({ r, stul: r.stulId ? String(r.stulId) : '' }) }] : []),
+                  ...(tel ? [{ label: 'Zavolat hostovi', icon: 'chat', onClick: () => { window.location.href = tel; } }] : []),
+                  ...(r.email ? [{ label: 'Napsat e-mail', icon: 'mail', onClick: () => { window.location.href = `mailto:${r.email}`; } }] : []),
                   ...(otevriHosta ? [{ label: 'Otevřít v Zákaznících', icon: 'users', onClick: () => otevriHosta(r.host) }] : []),
                   ...(muzeDo(r.stav, 'declined') && smi(klicPrechodu('declined'))
                     ? [{ label: 'Odmítnout rezervaci…', icon: 'close', danger: true, hint: 'Host dostane zprávu, že se to nepovedlo.', onClick: () => setOdmitam(r) }] : []),
                 ];
                 return (
                   <ListRow key={r.id} value={r.cas} title={r.host}
-                    meta={[czCount(r.osob, OSOBA), r.stul ?? 'bez stolu', r.email].filter(Boolean).join(' · ')}
-                    // Poznámka hosta je to, co obsluha u dveří potřebuje přečíst celé — `detail`
-                    // se zalamuje, `meta` by ji na telefonu uřízl na „Oslav…".
-                    detail={r.poznamka ? <span className="text-black/70">„{r.poznamka}“</span> : undefined}
+                    meta={[czCount(r.osob, OSOBA), r.stul ?? 'bez stolu'].join(' · ')}
+                    // Kontakt a poznámka hosta jsou to, co obsluha u dveří potřebuje celé — `detail`
+                    // se zalamuje, `meta` by poznámku na telefonu uřízl na „Oslav…".
+                    detail={detailRezervace(r)}
                     right={<Chip tone={TON_REZERVACE[r.stav]} size="sm">{RES_STATUS[r.stav]?.label ?? r.stav}</Chip>}
                     actions={krok || dalsi.length ? (
                       <>
@@ -500,6 +503,24 @@ function RezervaceStranka({ oznam, onZmena, otevriHosta }: { oznam: Hlaska; onZm
           </Field>
         </Modal>
       )}
+    </>
+  );
+}
+
+/**
+ * Třetí řádek rezervace: telefon na klepnutí (jinak e-mail) a celá poznámka hosta.
+ * Kontakt přijde jen se zakaznici.kontakty — bez něj API telefon ani e-mail nepošle.
+ */
+function detailRezervace(r: Rezervace): React.ReactNode {
+  const tel = odkazTel(r.telefon);
+  if (!tel && !r.email && !r.poznamka) return undefined;
+  return (
+    <>
+      {tel ? (
+        <a href={tel} className="tap-target inline-flex items-center font-medium text-[#16181A] tabular-nums underline decoration-black/25 underline-offset-2"
+          aria-label={`Zavolat hostovi ${r.host}: ${r.telefon}`}>{r.telefon}</a>
+      ) : r.email ? <span className="block truncate">{r.email}</span> : null}
+      {r.poznamka && <span className="block text-black/70">„{r.poznamka}“</span>}
     </>
   );
 }

@@ -27,6 +27,8 @@ export interface Rezervace {
   host: string;
   /** Jen s zakaznici.kontakty — jinak ho API vůbec nepošle (osobní údaj). */
   email: string | null;
+  /** Telefon hosta (z profilu hosta); stejně jako e-mail jen se zakaznici.kontakty. */
+  telefon: string | null;
   osob: number;
   stulId: number | null;
   stul: string | null;
@@ -54,6 +56,7 @@ export function vyberRezervace(raw: any): SeznamRezervaci {
       cas: String(r.time ?? '').slice(0, 5),
       host: text(r.customer_name) ?? 'Host',
       email: text(r.customer_email),
+      telefon: text(r.customer_phone),
       osob: Math.max(1, cislo(r.party)),
       stulId: r.table_id == null ? null : Number(r.table_id),
       stul: text(r.table_name),
@@ -62,6 +65,12 @@ export function vyberRezervace(raw: any): SeznamRezervaci {
     })),
     stoly: seznam(raw.tables).map((t: any) => ({ id: Number(t.id), nazev: String(t.name ?? ''), mist: cislo(t.seats) })),
   };
+}
+
+/** Odkaz `tel:` z telefonu, jak ho host napsal („+420 776 221 004" → „tel:+420776221004"); bez číslic null. */
+export function odkazTel(telefon: string | null | undefined): string | null {
+  const cisla = String(telefon ?? '').replace(/[^\d+]/g, '').replace(/(?!^)\+/g, '');
+  return /\d{3,}/.test(cisla) ? `tel:${cisla}` : null;
 }
 
 /** Kam smí rezervace ze svého stavu (stejná mapa jako FLOW v API). */

@@ -46,7 +46,7 @@ import { useOpravneni } from '../../role/useOpravneni';
 import { Widget, useWidget, type StavNacteni } from '../Widget';
 import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
 import {
-  RAZENI_CLENU, TON_REZERVACE, hlavniKrok, klicPrechodu, krokyPropojeni, muzeDo, nejvernejsi, prumerCesky, seradDnes, souhrnDne,
+  RAZENI_CLENU, TON_REZERVACE, hlavniKrok, klicPrechodu, krokyPropojeni, muzeDo, nejvernejsi, odkazTel, prumerCesky, seradDnes, souhrnDne,
   vyberCleny, vyberHodnoceni, vyberRezervace, vyberVernost, type RazeniClenu, type Rezervace, type StavRezervace, type KrokPropojeni,
 } from '@/lib/klientPrehled';
 import { RES_STATUS, czDay } from '@/lib/clientSlots';
@@ -478,9 +478,27 @@ function ObjednavkyOdStolu({ velikost }: WidgetProps) {
 const ID_REZERVACE = 'klient.dnesni_rezervace';
 const URL_REZERVACE_DNES = '/api/client/admin/reservations?range=today';
 
-/** Meta řádek rezervace: počet osob, stůl, e-mail (jen když ho API poslalo — zakaznici.kontakty). */
-function metaRezervace(r: Rezervace, t: PrekladFn): string {
-  return [osoby(r.osob, t), r.stul ?? t('bez stolu'), r.email].filter(Boolean).join(' · ');
+/**
+ * Meta řádek rezervace: počet osob, stůl a v menších velikostech e-mail (jen když ho
+ * API poslalo — zakaznici.kontakty). Ve velikosti L je kontakt v `detail` (telefon na klepnutí).
+ */
+function metaRezervace(r: Rezervace, t: PrekladFn, L = false): string {
+  return [osoby(r.osob, t), r.stul ?? t('bez stolu'), L ? null : r.email].filter(Boolean).join(' · ');
+}
+
+/** Třetí řádek ve velikosti L: telefon na klepnutí (jinak e-mail) a celá poznámka hosta (tabletu ji API nepošle). */
+function detailRezervace(r: Rezervace, t: PrekladFn): React.ReactNode {
+  const tel = odkazTel(r.telefon);
+  if (!tel && !r.email && !r.poznamka) return undefined;
+  return (
+    <>
+      {tel ? (
+        <a href={tel} className="tap-target inline-flex items-center font-medium text-[#16181A] tabular-nums underline decoration-black/25 underline-offset-2"
+          aria-label={t('Zavolat hostovi {host}: {telefon}', { host: r.host, telefon: r.telefon ?? '' })}>{r.telefon}</a>
+      ) : r.email ? <span className="block truncate">{r.email}</span> : null}
+      {r.poznamka && <span className="block text-black/70">„{r.poznamka}“</span>}
+    </>
+  );
 }
 
 /** Stav rezervace slovy (RES_STATUS nese české popisky, tady se překládají při vykreslení). */
@@ -577,17 +595,20 @@ function DnesniRezervace({ velikost }: WidgetProps) {
           <ul className="list">
             {videt.map(r => {
               const krok = L && !nahled ? hlavniKrok(r.stav, smiKrok) : null;
+              const tel = odkazTel(r.telefon);
               const dalsi: MenuItem[] = L && !nahled ? [
                 ...(krok?.na === 'seated' && muzeDo(r.stav, 'done') && smiKrok(klicPrechodu('done'))
                   ? [{ label: t('Rovnou hotovo'), icon: 'check', onClick: () => { void zmenit(r, 'done'); } }] : []),
+                ...(tel ? [{ label: t('Zavolat hostovi'), icon: 'chat', onClick: () => { window.location.href = tel; } }] : []),
+                ...(r.email ? [{ label: t('Napsat e-mail'), icon: 'mail', onClick: () => { window.location.href = `mailto:${r.email}`; } }] : []),
                 ...(muzeDo(r.stav, 'declined') && smiKrok(klicPrechodu('declined'))
                   ? [{ label: t('Odmítnout rezervaci…'), icon: 'close', danger: true, onClick: () => setOdmitam(r) }] : []),
               ] : [];
               const stav = <Chip tone={TON_REZERVACE[r.stav]} size="sm">{stavText(r.stav, t)}</Chip>;
               return (
-                <ListRow key={r.id} title={r.host} meta={metaRezervace(r, t)} value={r.cas}
-                  // Poznámka hosta celá (zalamuje se) jen ve velké velikosti; tabletu ji API nepošle.
-                  detail={L && r.poznamka ? <span className="text-black/70">„{r.poznamka}“</span> : undefined}
+                <ListRow key={r.id} title={r.host} meta={metaRezervace(r, t, L)} value={r.cas}
+                  // Kontakt a poznámka hosta celé (zalamují se) jen ve velké velikosti.
+                  detail={L ? detailRezervace(r, t) : undefined}
                   // Stav zůstává vidět i na telefonu (aside by se pod `lg` schoval).
                   right={stav}
                   actions={krok || dalsi.length ? (

@@ -1895,5 +1895,8 @@
   "Kolik hodin má kdo v měsíci naplánováno, kdo se blíží limitu z pravidel generátoru a s oprávněním ke mzdám i kolik to stojí.": "Koľko hodín má kto v mesiaci naplánovaných, kto sa blíži limitu z pravidiel generátora a s oprávnením k mzdám aj koľko to stojí.",
   "{n, plural, one {# směna v rozvrhu} few {# směny v rozvrhu} other {# směn v rozvrhu}}": "{n, plural, one {# zmena v rozvrhu} few {# zmeny v rozvrhu} other {# zmien v rozvrhu}}",
   "{n, plural, one {Volno schváleno, ale # směna zůstala v rozvrhu} few {Volno schváleno, ale # směny zůstaly v rozvrhu} other {Volno schváleno, ale # směn zůstalo v rozvrhu}}": "{n, plural, one {Voľno schválené, ale # zmena zostala v rozvrhu} few {Voľno schválené, ale # zmeny zostali v rozvrhu} other {Voľno schválené, ale # zmien zostalo v rozvrhu}}",
-  "Upravit rozvrh": "Upraviť rozvrh"
+  "Upravit rozvrh": "Upraviť rozvrh",
+  "Zavolat hostovi": "Zavolať hosťovi",
+  "Napsat e-mail": "Napísať e-mail",
+  "Zavolat hostovi {host}: {telefon}": "Zavolať hosťovi {host}: {telefon}"
 }

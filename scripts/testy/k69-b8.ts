@@ -9,7 +9,7 @@
 import { readFileSync } from 'node:fs';
 import type { Testy } from './_testy.ts';
 import {
-  vyberRezervace, hlavniKrok, muzeDo, klicPrechodu, souhrnDne, seradDnes, poDnech, vyberHodnoceni, prumerCesky,
+  vyberRezervace, hlavniKrok, muzeDo, klicPrechodu, souhrnDne, seradDnes, poDnech, vyberHodnoceni, prumerCesky, odkazTel,
   vyberCleny, nejvernejsi, vyberVernost, krokyPropojeni, souhrnPodleOpravneni, vyberAkceSouhrn, akceKPriprave,
   posledniProbehla, vysledekAkce, prepniBod,
 } from '../../lib/klientPrehled.ts';
@@ -36,6 +36,13 @@ export default function ({ eq, ok }: Testy) {
   });
   eq('rezervace: čas bez sekund, e-mail jen když ho API poslalo (zakaznici.kontakty)', [rez.rezervace[0].cas, rez.rezervace[0].email, rez.rezervace[1].email], ['19:15', null, 'jana@x.cz']);
   eq('rezervace: poznámka ořezaná, neznámý stav → čeká, host bez jména → „Host", aspoň 1 osoba', [rez.rezervace[1].poznamka, rez.rezervace[4].stav, rez.rezervace[4].host, rez.rezervace[4].osob], ['Oslava', 'requested', 'Host', 1]);
+  // Kolo 7 (R7-3): telefon hosta jako e-mail — jen když ho API poslalo (zakaznici.kontakty).
+  const sTel = vyberRezervace({ reservations: [
+    { id: 1, date: '2026-09-26', time: '17:30', party: 4, status: 'requested', customer_name: 'Jana', customer_phone: ' +420 776 221 004 ' },
+    { id: 2, date: '2026-09-26', time: '18:00', party: 2, status: 'confirmed', customer_name: 'Petr', customer_email: 'p@x.cz', customer_phone: '' },
+  ] });
+  eq('rezervace: telefon ořezaný, prázdný → null', sTel.rezervace.map(r => r.telefon), ['+420 776 221 004', null]);
+  eq('rezervace: odkaz tel: bez mezer, bez číslic null', [odkazTel('+420 776 221 004'), odkazTel('776-221-004'), odkazTel(''), odkazTel(null), odkazTel('volat')], ['tel:+420776221004', 'tel:776221004', null, null, null]);
   let spadlo = false;
   try { vyberRezervace({ error: 'x' }); } catch { spadlo = true; }
   ok('rezervace: nečekaný tvar je chyba widgetu (ErrorState), ne „nikdo nerezervoval"', spadlo);
