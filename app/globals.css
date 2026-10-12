@@ -1255,6 +1255,9 @@ input[type='search']::-webkit-search-decoration {
 .kiosk-surface .text-\[13px\],
 .kiosk-surface .text-sm { font-size: 15.5px; }
 /* Odznak nese stav („Čeká na schválení", „Výroba"), ne ozdobu. */
+/* Každý chip, ne jen malý: „po plánu +12 min" a „bez rozpisu" v nástroji Kdo teď pracuje
+   (kolo 6) měly základních 12 px — na délku paže u baru nečitelné. */
+.kiosk-surface .chip { font-size: 14px; }
 .kiosk-surface .chip-sm { font-size: 14px; padding: 0.25rem 0.625rem; }
 /* Popisky polí v uzávěrce — podle nich se píšou peníze do kasy. */
 .kiosk-surface .t-meta { font-size: 14.5px; }
