@@ -45,6 +45,71 @@
    "started_at": "DNES 07:31:00",
    "completed_at": "DNES 07:40:00",
    "duration_seconds": 540
+  },
+  {
+   "id": 33,
+   "procedure_id": 3,
+   "procedure_name": "Kontrola lednic",
+   "procedure_icon": "box",
+   "user_id": 8,
+   "user_name": "Petr Malý",
+   "user_avatar": "😎",
+   "status": "completed",
+   "total_items": 1,
+   "checked_items": [
+    0
+   ],
+   "skipped_items": [],
+   "skip_reasons": {},
+   "values": {
+    "0": 4.2
+   },
+   "started_at": "2026-10-05 12:02:00",
+   "completed_at": "2026-10-05 12:04:00",
+   "duration_seconds": 120
+  },
+  {
+   "id": 34,
+   "procedure_id": 3,
+   "procedure_name": "Kontrola lednic",
+   "procedure_icon": "box",
+   "user_id": 7,
+   "user_name": "Jana Nováková",
+   "user_avatar": "🙂",
+   "status": "completed",
+   "total_items": 1,
+   "checked_items": [
+    0
+   ],
+   "skipped_items": [],
+   "skip_reasons": {},
+   "values": {
+    "0": 7.5
+   },
+   "started_at": "2026-10-04 12:01:00",
+   "completed_at": "2026-10-04 12:03:30",
+   "duration_seconds": 150
+  },
+  {
+   "id": 35,
+   "procedure_id": 2,
+   "procedure_name": "Zavírání",
+   "procedure_icon": "check",
+   "user_id": 8,
+   "user_name": "Petr Malý",
+   "user_avatar": "😎",
+   "status": "completed",
+   "total_items": 3,
+   "checked_items": [
+    0,
+    1,
+    2
+   ],
+   "skipped_items": [],
+   "skip_reasons": {},
+   "started_at": "2026-10-03 20:05:00",
+   "completed_at": "2026-10-03 20:31:00",
+   "duration_seconds": 1560
   }
  ]
 }

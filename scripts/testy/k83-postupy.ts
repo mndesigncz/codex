@@ -1,11 +1,12 @@
 // Kolo 7, balík R7-5 (Postupy, návody, nápady a odměny) — jednotkové testy.
 //
-// Hlídá čistou logiku balíku: validaci úpravy odměny (lib/odmenyKatalog.ts).
-// Další části balíku (měřená hodnota v kroku, poslední průběhy postupu, fotky
-// v návodu) přidávají své testy níž.
+// Hlídá čistou logiku balíku: validaci úpravy odměny (lib/odmenyKatalog.ts),
+// poslední průběhy jednoho postupu (lib/postupyPrehled.ts). Další části balíku
+// (měřená hodnota v kroku, fotky v návodu) přidávají své testy níž.
 
 import type { Testy } from './_testy.ts';
 import { validujOdmenu, jeIkonaOdmeny, grafemy, MAX_NAZEV_ODMENY, MAX_CENA_ODMENY } from '../../lib/odmenyKatalog.ts';
+import { prubehyPostupu, PRUBEHU_V_DETAILU, type PrubehApi } from '../../lib/postupyPrehled.ts';
 
 export default function ({ eq, ok }: Testy) {
   // ---- odměny: validace přidání a úpravy ----
@@ -34,4 +35,30 @@ export default function ({ eq, ok }: Testy) {
   ok('ikona: vlajka (dva regionální indikátory) je jedno emoji', jeIkonaOdmeny('🇨🇿'));
   ok('ikona: číslice ani písmeno ne', !jeIkonaOdmeny('1') && !jeIkonaOdmeny('a'));
   ok('ikona: prázdná = bez ikony', jeIkonaOdmeny('  '));
+
+  // ---- detail postupu: poslední průběhy jednoho postupu ----
+  const beh = (id: number, postup: number | null, kdy: string, o: Partial<PrubehApi> = {}): PrubehApi => ({
+    id, procedure_id: postup, procedure_name: 'Zavírání', user_name: `Člověk ${id}`, status: 'completed', total_items: 3,
+    checked_items: [0, 1, 2], started_at: kdy, completed_at: kdy, duration_seconds: 600, ...o,
+  });
+  const behy: PrubehApi[] = [
+    beh(1, 2, '2026-10-01 20:00:00'),
+    beh(2, 1, '2026-10-09 07:40:00'),
+    beh(3, 2, '2026-10-08 20:10:00', { checked_items: [0], skipped_items: [1] }),
+    beh(4, 2, '2026-10-02 20:00:00'),
+    beh(5, 2, '2026-10-03 20:00:00'),
+    beh(6, 2, '2026-10-04 20:00:00'),
+    beh(7, 2, '2026-10-05 20:00:00'),
+    beh(8, null, '2026-10-10 20:00:00'),
+    beh(9, 2, '2026-10-11 20:00:00', { status: 'running', completed_at: null, checked_items: [0] }),
+  ];
+  const r2 = prubehyPostupu(behy, 2);
+  eq(`průběhy postupu: jen tohoto postupu (podle ID), nejnovější nahoře, nejvýš ${PRUBEHU_V_DETAILU}`, r2.map(r => r.id), [9, 3, 7, 6, 5]);
+  eq('průběhy postupu: běžící je „nehotový" s počtem odškrtnutých', [r2[0].hotovo, r2[0].odskrtano, r2[0].celkem], [false, 1, 3]);
+  eq('průběhy postupu: nedokončený (1 ze 3) má nedokonceno 2', r2[1].nedokonceno, 2);
+  eq('průběhy postupu: celý hotový má nedokonceno 0', r2[2].nedokonceno, 0);
+  eq('průběhy postupu: jiný postup a průběh bez postupu se nemíchají', prubehyPostupu(behy, 1).map(r => r.id), [2]);
+  eq('průběhy postupu: postup bez průběhů = prázdno', prubehyPostupu(behy, 3), []);
+  eq('průběhy postupu: id jako text z API páruje taky', prubehyPostupu([beh(1, '4' as unknown as number, '2026-10-01 10:00:00')], 4).length, 1);
+  eq('průběhy postupu: vlastní počet', prubehyPostupu(behy, 2, 2).map(r => r.id), [9, 3]);
 }

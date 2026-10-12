@@ -26,9 +26,10 @@ import { cerstvePredaniPohledu, stavZPredani, udalostPredani } from '@/lib/preda
 import { usePathname } from 'next/navigation';
 import { Icon } from '../Icons';
 import {
-  Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Menu, Modal, PageHeader, Segmented, Skeleton, SwitchRow,
+  Avatar, Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Menu, Modal, PageHeader, Segmented, Skeleton, SwitchRow,
   type MenuItem,
 } from '../ui';
+import DetailPrubehu from './DetailPrubehu';
 import { useProcedures } from './ProcedureProvider';
 import StepTimeline from './StepTimeline';
 import { parseSteps, totalMinutes, fmtMinutes, STEP_WEIGHTS, weightSpec, type Step } from '@/lib/steps';
@@ -41,8 +42,8 @@ import { PlochaWidgetu, type HlavickaPlochy } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useOpravneni } from '../role/useOpravneni';
 import {
-  URL_POSTUPY, URL_PRUBEHY, UDALOST_OTEVRIT_POSTUP, vyberPostupy, vyberPrubehy, posledniDokonceni,
-  type PostupApi,
+  URL_POSTUPY, URL_PRUBEHY, UDALOST_OTEVRIT_POSTUP, vyberPostupy, vyberPrubehy, posledniDokonceni, prubehyPostupu, delka,
+  type PostupApi, type PrubehApi,
 } from '@/lib/postupyPrehled';
 import { useObnovaPoPrubehu } from '../widgety/oblasti/postupy';
 import { useT, useJazyk, type PrekladFn } from '@/lib/i18n/client';
@@ -365,6 +366,9 @@ export default function Procedures({ user }: Props) {
           running={active?.procedureId === detail.id}
           starting={starting}
           tablet={tablet}
+          prubehy={behy.data ?? null}
+          prubehyChyba={!!behy.error && !behy.data}
+          tym={smi('postupy.prubehy_tymu')}
           // Tablet kreslí nástroj pod vybraným člověkem (actingUser v KioskApp): za něj se píšou poznámky.
           zaKoho={tablet && user.role !== 'kiosk' && Number(user.id) > 0 ? { id: Number(user.id), name: user.name ?? '' } : null}
           onRun={() => { spust(detail); setDetailId(null); }}
@@ -427,7 +431,7 @@ export default function Procedures({ user }: Props) {
 }
 
 function ProcedureDetail({
-  procedure, smiUpravit, smiSpustit, smiSchvalit, running, starting, tablet, zaKoho, onRun, onApprove, onEdit, onClose,
+  procedure, smiUpravit, smiSpustit, smiSchvalit, running, starting, tablet, prubehy, prubehyChyba, tym, zaKoho, onRun, onApprove, onEdit, onClose,
 }: {
   procedure: Procedure;
   smiUpravit: boolean;
@@ -436,6 +440,11 @@ function ProcedureDetail({
   running: boolean;
   starting: boolean;
   tablet: boolean;
+  /** Průběhy z hooku stránky (GET /api/procedures/runs, LIMIT 50) — žádný další dotaz; null = ještě nejsou. */
+  prubehy: PrubehApi[] | null;
+  prubehyChyba: boolean;
+  /** postupy.prubehy_tymu: API vrací průběhy celého týmu, jinak jen moje. */
+  tym: boolean;
   /** Tablet: člověk, za kterého se píšou poznámky (vybraný u tabletu). */
   zaKoho: AutorNaTabletu | null;
   onRun: () => void;
@@ -444,12 +453,18 @@ function ProcedureDetail({
   onClose: () => void;
 }) {
   const t = useT('postupy');
+  const { jazyk } = useJazyk();
   const steps = parseSteps(procedure.items);
   const mins = totalMinutes(steps);
   const navodOdkaz = useOtevreniNavodu();
   const navrh = procedure.approved === false;
+  // Historie tohoto postupu (kolo 7): kdo ho naposledy prošel, kdy, jak dlouho, co zůstalo.
+  const radky = prubehy ? prubehyPostupu(prubehy, procedure.id) : [];
+  const [prubeh, setPrubeh] = useState<PrubehApi | null>(null);
+  const surovy = (id: number) => prubehy?.find(r => Number(r.id) === id) ?? null;
 
   return (
+    <>
     <Modal open onClose={onClose} size="md" title={procedure.name}
       subtitle={[t('{n, plural, one {# krok} few {# kroky} other {# kroků}}', { n: steps.length }), mins > 0 ? fmtMinutes(mins) : null, popisPripominky(procedure, t)].filter(Boolean).join(' · ')}
       footer={<>
@@ -464,9 +479,43 @@ function ProcedureDetail({
       {navrh && <p className="note note-wait text-sm mb-3">{t('Návrh čeká na schválení — spustit půjde až potom.')}</p>}
       {procedure.description && <p className="text-sm leading-relaxed text-black/60 mb-3 text-pretty">{procedure.description}</p>}
       <StepTimeline steps={steps} {...navodOdkaz} />
+      {!navrh && (
+        <section className="mt-6 min-w-0" aria-labelledby={`prubehy-${procedure.id}`}>
+          <div className="flex flex-wrap items-baseline gap-x-2">
+            <h3 id={`prubehy-${procedure.id}`} className="t-label">{t('Poslední průběhy')}</h3>
+            {/* API vrací posledních 50 průběhů za tým — u málo používaného postupu to nemusí být celá historie. */}
+            <span className="t-meta">{tym ? t('z posledních průběhů týmu') : t('jen tvoje')}</span>
+          </div>
+          {prubehyChyba ? (
+            <p className="t-meta mt-1 text-pretty">{t('Průběhy se nenačetly.')}</p>
+          ) : !prubehy ? (
+            <div className="mt-2 space-y-2" aria-busy><Skeleton className="h-11" /><Skeleton className="h-11 w-3/4" /></div>
+          ) : radky.length === 0 ? (
+            <p className="t-meta mt-1 text-pretty">{tym ? t('Tenhle postup zatím nikdo neprošel.') : t('Tenhle postup jsi zatím neprošel.')}</p>
+          ) : (
+            <ul className="list mt-1">
+              {radky.map(r => (
+                <ListRow key={r.id}
+                  lead={<Avatar emoji={r.avatar} name={r.kdo} size="sm" />}
+                  title={r.kdo || t('Neznámý')}
+                  meta={[r.hotovo ? kdyPrubehu(r.kdy, t, jazyk) : t('probíhá'), r.hotovo ? delka(r.sekund) : null].filter(Boolean).join(' · ')}
+                  right={!r.hotovo
+                    ? <Chip tone="info" size="sm">{r.odskrtano}/{r.celkem}</Chip>
+                    : r.nedokonceno > 0 ? <Chip tone="wait" size="sm" icon="warning">{t('{n} nedokončeno', { n: r.nedokonceno })}</Chip> : undefined}
+                  onClick={r.hotovo ? () => setPrubeh(surovy(r.id)) : undefined} />
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
       {/* Postřehy k postupu („krok 3 trvá déle, když je mráz") pod kroky — píše každý, kdo postup vidí. */}
       <Poznamky typ="procedure" id={procedure.id} tablet={tablet} zaKoho={zaKoho} className="mt-6" />
     </Modal>
+    {prubeh && (
+      <DetailPrubehu prubeh={prubeh} kroky={procedure.items}
+        kdy={kdyPrubehu(prubeh.completed_at || prubeh.started_at, t, jazyk)} onClose={() => setPrubeh(null)} />
+    )}
+    </>
   );
 }
 

@@ -178,6 +178,32 @@ async function nastrojVUpravach(p, stav, znacka, vidget) {
   tvrdi('P-W: …bez emoji ✅ ⏭️ ❌', !/[✅⏭❌]/u.test(await dPrub.innerText()));
   await p.keyboard.press('Escape');
 
+  // Kolo 7 (postup-detail-bez-historie): detail postupu ukáže jeho poslední průběhy a klik otevře detail průběhu.
+  await dokud(async () => (await dPrub.count()) === 0, 1500);
+  await nastroj.getByRole('button', { name: 'Zavírání', exact: true }).click();
+  const dZav = p.getByRole('dialog', { name: 'Zavírání' });
+  await dokud(() => dZav.isVisible(), 2000);
+  const sekce = dZav.locator('section').filter({ has: p.getByRole('heading', { name: 'Poslední průběhy' }) });
+  tvrdi('P-H: detail postupu má pod kroky „Poslední průběhy" s popiskem „z posledních průběhů týmu"', await dokud(() => sekce.isVisible(), 2000)
+    && (await sekce.innerText()).includes('z posledních průběhů týmu'));
+  const radkyH = await sekce.locator('ul.list > li').allInnerTexts();
+  tvrdi('P-H: jen průběhy Zavírání (Jana dnes, Petr 3. 10.), nejnovější nahoře', radkyH.length === 2 && radkyH[0].includes('Jana Nováková') && radkyH[1].includes('Petr Malý'), JSON.stringify(radkyH));
+  tvrdi('P-H: Jana s „1 nedokončeno" a trváním 20:00, Petr bez chipu', radkyH[0].includes('1 nedokončeno') && radkyH[0].includes('20:00') && !radkyH[1].includes('nedokončeno'), JSON.stringify(radkyH));
+  await sekce.locator('button.list-row').filter({ hasText: 'Petr Malý' }).click();
+  const dPrubH = p.getByRole('dialog', { name: 'Zavírání' }).last();
+  tvrdi('P-H: klik na průběh otevře detail průběhu nad detailem postupu (Petr · 26:00)', await dokud(async () => (await p.getByRole('dialog', { name: 'Zavírání' }).count()) === 2, 2000)
+    && (await dPrubH.innerText()).includes('Petr Malý') && (await dPrubH.innerText()).includes('26:00'));
+  await p.keyboard.press('Escape');
+  tvrdi('P-H: Escape zavře jen detail průběhu, detail postupu zůstane', await dokud(async () => (await p.getByRole('dialog', { name: 'Zavírání' }).count()) === 1, 1500));
+  await p.screenshot({ path: OUT + 'k83-postup-detail-desk.png' });
+  await p.keyboard.press('Escape');
+  await dokud(async () => (await dZav.count()) === 0, 1500);
+  await nastroj.getByRole('button', { name: 'Příjem zboží (návrh)', exact: true }).click();
+  const dNavrh = p.getByRole('dialog', { name: 'Příjem zboží (návrh)' });
+  tvrdi('P-H: návrh (nikdo ho nespustí) sekci Poslední průběhy nemá', await dokud(() => dNavrh.isVisible(), 1500) && await dNavrh.getByRole('heading', { name: 'Poslední průběhy' }).count() === 0);
+  await p.keyboard.press('Escape');
+  await dokud(async () => (await dNavrh.count()) === 0, 1500);
+
   // Smazání přes „···" → okno (ne confirm()).
   let dialogConfirm = false;
   p.on('dialog', d => { dialogConfirm = true; d.dismiss().catch(() => {}); });
