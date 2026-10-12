@@ -29,7 +29,7 @@ import { Avatar, Button, Chip, Field, Input, ListRow, Modal, Stat, StatRow, Well
 import { useOpravneni } from '../../role/useOpravneni';
 import { usePersonProfile } from '../../employer/ProfileLinkProvider';
 import { useMoney, useSymbol } from '../../CurrencyProvider';
-import { Widget, type StavNacteni } from '../Widget';
+import { Widget, type StavNacteni, useVyrizeno } from '../Widget';
 import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
 import { useNavigace, useSmi } from '../NavigaceKontext';
 
@@ -341,6 +341,9 @@ function BezSazby({ velikost, nahled }: WidgetProps) {
   const { ok, ceka } = useBrana(widget('tym.bez_sazby')?.opravneni.vse ?? ['finance.mzdy']);
   const data = useDataWidgetu(ok ? URL_TYM : null, raw => vyberBezSazby(raw, t));
   const [nastavit, setNastavit] = useState<ClenTymu | null>(null);
+  // Když má sazbu každý, je widget vyřízený: v klidu se minimalizuje na řádek se souhrnem
+  // (jako Otevřené příchody), místo prázdné karty, která jen zabírá místo na ploše.
+  useVyrizeno(ok && data.data != null && !data.error && data.data.length === 0, t('Sazbu má nastavenou každý.'));
   if (!ok && !ceka) return <Widget prazdno={null} />;
   const lide = data.data ?? [];
   // Nastavit je akce z katalogu (akce:nastavit_sazbu → finance.sazby_upravit).
