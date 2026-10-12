@@ -476,5 +476,10 @@
   "Poznámka ke směně — {jmeno}": "Schichtnotiz — {jmeno}",
   "Otevíráš sám, klíče u Petry": "Du schließt allein auf, Schlüssel bei Petra",
   "Poznámka ke směně (nepovinné)": "Schichtnotiz (optional)",
-  "Uvidí ji jen ten, kdo směnu dostane, a vedení.": "Nur die Person auf der Schicht und die Leitung sehen sie."
+  "Uvidí ji jen ten, kdo směnu dostane, a vedení.": "Nur die Person auf der Schicht und die Leitung sehen sie.",
+  "Publikovat změny": "Änderungen veröffentlichen",
+  "Od publikování se rozvrh změnil — lidé dostanou upozornění znovu.": "Der Dienstplan hat sich seit der Veröffentlichung geändert — alle werden erneut benachrichtigt.",
+  "Publikováno {datum}": "Veröffentlicht {datum}",
+  "Změněno od publikování": "Seit Veröffentlichung geändert",
+  "Nepublikováno": "Nicht veröffentlicht"
 }

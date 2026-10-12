@@ -50,7 +50,8 @@ import { tg } from '@/lib/i18n/stav';
 import { fmtDatum, fmtHM } from '@/lib/i18n/format';
 import type { Jazyk } from '@/lib/i18n/config';
 import { dnuTxt, hodinTxt, hodinuTxt, hodinyTextJ, prelozPopisStavu, rozsahVolnaJ, smenTxt, upozorneniTxt } from './texty';
-import { pragueToday } from '@/lib/pragueTime';
+import { pragueDaySafe, pragueToday } from '@/lib/pragueTime';
+import { publikaceZOdpovedi, stavChipu, type Publikace } from '@/lib/rozvrhPublikace';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu } from '../widgety/useDataWidgetu';
 import { nactiTeamsMine, useOpravneni } from '../role/useOpravneni';
@@ -459,6 +460,8 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
   // Commit ji pošle zpátky; když ji mezitím změnila jiná záložka nebo jiné
   // zařízení, server vrátí 409 místo tichého přepsání.
   const [verzeMesice, setVerzeMesice] = useState<string | null>(null);
+  // Stav publikování měsíce (kolo 7): z GET /api/schedule `publication`, po publikování hned lokálně.
+  const [publikace, setPublikace] = useState<Publikace | null>(null);
 
   // Filtr mřížky (lidé, typ, jen díry) a přehled „Směny podle lidí".
   // Pamatuje se v localStorage jednoho zařízení, ne v URL: adresu stránky
@@ -592,6 +595,7 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
         setSubmissions(Array.isArray(aData?.submissions) ? aData.submissions : []);
         setShifts(sData.shifts ?? []);
         setVerzeMesice(typeof sData.verze === 'string' ? sData.verze : null);
+        setPublikace(publikaceZOdpovedi(sData.publication));
         setGaps(Array.isArray(sData.gaps) ? sData.gaps : []);
         setUnderstaffed(Array.isArray(sData.understaffed) ? sData.understaffed : []);
         setDemand(sData.demand && typeof sData.demand === 'object' ? sData.demand : {});
@@ -899,6 +903,8 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
       const d = await res.json().catch(() => ({}));
       if (res.ok) {
         const n = Number(d.notified) || 0;
+        // Chip „Publikováno" hned (server vrátí čas zápisu; prázdný měsíc se nezapisuje).
+        if (typeof d.publishedAt === 'string') setPublikace({ publishedAt: d.publishedAt, zmeneno: false });
         setPublishNote(n === 0
           ? { text: t('V tomhle měsíci zatím nikdo nemá směnu — není komu dát vědět.'), ok: false }
           : { text: t('Hotovo — rozvrh {n, plural, one {dostal # člověk} few {dostalo # lidé} other {dostalo # lidí}} jako upozornění. Každá další změna se jim ukáže v Mých směnách.', { n }), ok: true });
@@ -1396,6 +1402,8 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
     ? <Segmented ariaLabel={t('Část rozvrhu')} value={aktivniTab} onChange={(v) => setTab(v as Tab)} options={zalozky} />
     : undefined;
 
+  // Stav publikování pro Chip a texty Publikovat (jen plánovač — náhled publikaci nezná).
+  const stavPub = planovac ? stavChipu(publikace, shifts.length) : null;
   const menu: MenuItem[] = [];
   // Import, kopírování týdne a úprava podle požadavků zapisují rovnou do
   // uložených směn. S otevřeným návrhem by je jeho uložení (výchozí
@@ -1407,7 +1415,8 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
       ? { label: t('Uložit návrh a publikovat'), icon: 'send', onClick: () => { void publish(); }, disabled: committing || publishing, hint: `${t('Návrh se uloží i s tvými úpravami a lidé dostanou upozornění.')}${hintCelyMesic}` }
       // S počtem směn měsíce: na telefonu je to první položka „···" a bez čísla
       // nejde poznat, jestli je vůbec co publikovat (kolo 6 UX, V02).
-      : { label: shifts.length > 0 ? t('Publikovat rozvrh ({n})', { n: shifts.length }) : t('Publikovat rozvrh'), icon: 'send', onClick: () => { void publish(); }, disabled: publishing, hint: `${t('Lidé dostanou upozornění, že je rozvrh hotový.')}${hintCelyMesic}` });
+      : { label: stavPub === 'zmeneno' ? t('Publikovat změny') : shifts.length > 0 ? t('Publikovat rozvrh ({n})', { n: shifts.length }) : t('Publikovat rozvrh'), icon: 'send', onClick: () => { void publish(); }, disabled: publishing,
+        hint: `${stavPub === 'zmeneno' ? t('Od publikování se rozvrh změnil — lidé dostanou upozornění znovu.') : t('Lidé dostanou upozornění, že je rozvrh hotový.')}${hintCelyMesic}` });
     if (smiUpravit) {
       menu.push({ label: t('Upravit podle nových požadavků'), icon: 'swap', onClick: runAdjust, disabled: !!preview || adjusting || shifts.length === 0,
         hint: preview ? hintNavrh : t('Zkontroluje uložený rozvrh proti nejnovější dostupnosti.') });
@@ -1449,7 +1458,7 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
           ? <Button variant="secondary" icon="bulb" onClick={() => zadejGenerovani(clearBeforeCommit)} loading={generating} disabled={committing || publishing}>{t('Vygenerovat znovu')}</Button>
           : undefined)
         : smiPublikovat
-          ? <Button variant="secondary" icon="send" onClick={() => { void publish(); }} loading={publishing}>{t('Publikovat')}</Button>
+          ? <Button variant="secondary" icon="send" onClick={() => { void publish(); }} loading={publishing}>{stavPub === 'zmeneno' ? t('Publikovat změny') : t('Publikovat')}</Button>
           : undefined,
     menu: menu.length ? menu : undefined,
   };
@@ -1524,6 +1533,16 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
                 className={`filter-pill tap-target-sm ${month === m.id ? 'seg-on' : 'seg-off glass'}`}>{m.label}</button>
             ))}
           </div>
+          {/* Stav publikování měsíce (kolo 7) — vejde se vedle měsíce, nebo se zalomí pod něj. */}
+          {stavPub && !loading && !loadError && (
+            <span data-publikace={stavPub} className="min-w-0 max-w-full">
+              {stavPub === 'publikovano' && publikace
+                ? <Chip tone="ok" size="sm" icon="check">{t('Publikováno {datum}', { datum: fmtDatum(pragueDaySafe(publikace.publishedAt), { jazyk, styl: 'kratce' }) })}</Chip>
+                : stavPub === 'zmeneno'
+                  ? <Chip tone="wait" size="sm">{t('Změněno od publikování')}</Chip>
+                  : <Chip tone="muted" size="sm">{t('Nepublikováno')}</Chip>}
+            </span>
+          )}
           {/* Telefon: „Filtry" ve stejném řádku jako měsíce — vlastní řádek nad mřížkou
               by ji spolu s dostupností odsunul pod ohyb (kolo 6 UX). */}
           {maPasy && !loading && !loadError && (

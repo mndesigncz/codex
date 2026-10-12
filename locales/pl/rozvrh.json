@@ -476,5 +476,10 @@
   "Poznámka ke směně — {jmeno}": "Notatka do zmiany — {jmeno}",
   "Otevíráš sám, klíče u Petry": "Otwierasz sam, klucze ma Petra",
   "Poznámka ke směně (nepovinné)": "Notatka do zmiany (opcjonalnie)",
-  "Uvidí ji jen ten, kdo směnu dostane, a vedení.": "Zobaczy ją tylko osoba na zmianie i kierownictwo."
+  "Uvidí ji jen ten, kdo směnu dostane, a vedení.": "Zobaczy ją tylko osoba na zmianie i kierownictwo.",
+  "Publikovat změny": "Opublikuj zmiany",
+  "Od publikování se rozvrh změnil — lidé dostanou upozornění znovu.": "Od publikacji grafik się zmienił — wszyscy dostaną powiadomienie ponownie.",
+  "Publikováno {datum}": "Opublikowano {datum}",
+  "Změněno od publikování": "Zmieniono od publikacji",
+  "Nepublikováno": "Nieopublikowany"
 }

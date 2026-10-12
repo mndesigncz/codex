@@ -72,5 +72,10 @@
    "reservations": 2,
    "guests": 7
   }
+ },
+ "verze": "otisk-1",
+ "publication": {
+  "publishedAt": "2026-10-03T08:12:00.000Z",
+  "zmeneno": false
  }
 }

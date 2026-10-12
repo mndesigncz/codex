@@ -6,6 +6,8 @@ import { tymyCiselniku, idClenu } from '@/lib/tenant';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { platnyCas, platneDatum } from '@/lib/rozvrhCsv';
 import { poznamkaSmeny } from '@/lib/rozvrhPrehled';
+import { stavPublikace } from '@/lib/rozvrhPublikace';
+import { parseDbTime } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
 
@@ -126,7 +128,21 @@ export async function GET(req: Request) {
     verze = v?.verze ?? null;
   } catch { /* bez verze se uložení návrhu jen nehlídá proti souběhu */ }
 
-  return NextResponse.json({ shifts, gaps, understaffed, demand, verze });
+  // Stav publikování měsíce (kolo 7): kdy se naposledy publikovalo a jestli se od té doby
+  // změnil otisk směn (stejný výraz jako `verze` výš — zapisuje ho POST /api/schedule/publish).
+  let publication: { publishedAt: string; zmeneno: boolean } | null = null;
+  try {
+    const [p] = await sql`
+      SELECT published_at, shift_count, shifts_hash FROM schedule_publications
+      WHERE team_id = ${ctx.teamId} AND month = ${month}` as any[];
+    const at = parseDbTime(p?.published_at ?? null);
+    if (at) {
+      const stav = stavPublikace({ publishedAt: at, ulozenyOtisk: p.shifts_hash ?? null, aktualniOtisk: verze, ulozenyPocet: p.shift_count == null ? null : Number(p.shift_count), pocetSmen: shifts.length });
+      publication = { publishedAt: at.toISOString(), zmeneno: stav === 'zmeneno' };
+    }
+  } catch { /* tabulka před migrací — plánovač Chip neukáže */ }
+
+  return NextResponse.json({ shifts, gaps, understaffed, demand, verze, publication });
 }
 
 // POST (employer) — { shifts: [{employeeId, date, startTime, endTime, type, note?}] } bulk append

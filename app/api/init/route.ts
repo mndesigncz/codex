@@ -2619,6 +2619,21 @@ export async function GET(request: Request) {
       )`);
     await ddl(sql`CREATE INDEX IF NOT EXISTS entity_notes_entity ON entity_notes (team_id, entity_type, entity_id)`);
 
+    // Stav publikování rozvrhu (kolo 7, R7-1): jeden řádek na podnik a měsíc, publikování ho
+    // přepíše. shifts_hash = otisk směn měsíce stejným výrazem jako `verze` v GET /api/schedule,
+    // podle něj plánovač ukáže „Změněno od publikování".
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS schedule_publications (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        month TEXT NOT NULL,
+        published_at TIMESTAMP DEFAULT NOW(),
+        created_by INTEGER,
+        shift_count INTEGER NOT NULL DEFAULT 0,
+        shifts_hash TEXT
+      )`);
+    await ddl(sql`CREATE UNIQUE INDEX IF NOT EXISTS schedule_publications_team_month ON schedule_publications(team_id, month)`);
+
     // Kroky migrace, které selhaly (a byly zachyceny), ať se to pozná zvenku
     // místo tichého „ok". Prázdné pole = celé schéma prošlo.
     if (migFails.length) console.error('init: kroků selhalo', migFails.length, migFails);

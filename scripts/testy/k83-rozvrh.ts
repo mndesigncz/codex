@@ -12,6 +12,8 @@ import {
   mesicProPripominku, pripominkaBlokuje, komuPripomenout, PRIPOMINKA_DOSTUPNOSTI_H,
 } from '../../lib/rozvrhPrehled.ts';
 import { AKCE_HLEDANI } from '../../components/widgety/akceHledani.ts';
+import { stavPublikace, stavChipu, publikaceZOdpovedi } from '../../lib/rozvrhPublikace.ts';
+import { ZACHAZENI_TABULEK, TYMOVE_TABULKY } from '../../lib/smazaniUctu.ts';
 import { VYCHOZI_NAV, NAV_TEXTY } from '../../lib/navigace.ts';
 
 const cti = (cesta: string) => readFileSync(new URL(`../../${cesta}`, import.meta.url), 'utf8');
@@ -149,4 +151,32 @@ export default function ({ eq, ok }: Testy) {
     /const smiPripomenout = !nahled && smi\('rozvrh\.generovat'\) && komu > 0;/.test(widget) && /tlacitkoPripomenout\(true\)/.test(widget) && /'\/api\/availability\/remind'/.test(widget));
   const akcePrip = AKCE_HLEDANI.find(a => a.id === 'dostupnost-pripomenout');
   eq('připomenout: v paletě jen navigace na Rozvrh (vedení)', [akcePrip?.stranka, akcePrip?.arg, akcePrip?.rozhrani], ['shifts', undefined, ['vedeni']]);
+
+  // ---- rozvrh-publikovani-bez-stavu (krok 1) ----
+  eq('publikace: bez záznamu nepublikováno, stejný otisk publikováno, jiný změněno', [
+    stavPublikace({ publishedAt: null, ulozenyOtisk: 'a', aktualniOtisk: 'a', pocetSmen: 4 }),
+    stavPublikace({ publishedAt: '2026-10-03T08:00:00Z', ulozenyOtisk: 'abc', aktualniOtisk: 'abc', pocetSmen: 4 }),
+    stavPublikace({ publishedAt: '2026-10-03T08:00:00Z', ulozenyOtisk: 'abc', aktualniOtisk: 'xyz', pocetSmen: 4 }),
+  ], ['nepublikovano', 'publikovano', 'zmeneno']);
+  eq('publikace: neznámý otisk se nehádá — rozhodne počet směn, jinak publikováno', [
+    stavPublikace({ publishedAt: new Date(), ulozenyOtisk: null, aktualniOtisk: 'x', ulozenyPocet: 4, pocetSmen: 5 }),
+    stavPublikace({ publishedAt: new Date(), ulozenyOtisk: 'a', aktualniOtisk: null, ulozenyPocet: 4, pocetSmen: 4 }),
+    stavPublikace({ publishedAt: new Date(), pocetSmen: 0 }),
+  ], ['zmeneno', 'publikovano', 'publikovano']);
+  eq('publikace: Chip „Nepublikováno" jen s nějakou směnou; z odpovědi zmeneno → změněno', [
+    stavChipu(null, 0), stavChipu(null, 3),
+    stavChipu(publikaceZOdpovedi({ publishedAt: '2026-10-03T08:00:00.000Z', zmeneno: true }), 3),
+    stavChipu(publikaceZOdpovedi({ publishedAt: '2026-10-03T08:00:00.000Z', zmeneno: false }), 3),
+    publikaceZOdpovedi({ zmeneno: true }),
+  ], [null, 'nepublikovano', 'zmeneno', 'publikovano', null]);
+  const publish = cti('app/api/schedule/publish/route.ts');
+  const OTISK = "md5(COALESCE(string_agg(id::text || '|' || employee_id::text || '|' || date || '|' || start_time || '|' || end_time, ',' ORDER BY id), ''))";
+  ok('publikace: publish ukládá otisk stejným výrazem jako verze v GET /api/schedule', publish.includes(OTISK) && rozvrhApi.includes(OTISK));
+  ok('publikace: upsert podle (team_id, month), audit rozvrh.publikovat, GET vrací publication',
+    /ON CONFLICT \(team_id, month\) DO UPDATE/.test(publish) && /audit\(teamId, meId, 'rozvrh\.publikovat'/.test(publish) && /publication \}\);/.test(rozvrhApi));
+  const init = cti('app/api/init/route.ts');
+  ok('publikace: DDL tabulky a unikátního indexu', /CREATE TABLE IF NOT EXISTS schedule_publications/.test(init) && /CREATE UNIQUE INDEX IF NOT EXISTS schedule_publications_team_month ON schedule_publications\(team_id, month\)/.test(init));
+  eq('publikace: smazání účtu — ponechat a mazat s podnikem', [ZACHAZENI_TABULEK.schedule_publications, TYMOVE_TABULKY.includes('schedule_publications')], ['ponechat', true]);
+  ok('publikace: plánovač — Chip u měsíce a „Publikovat změny" při změně',
+    /data-publikace=\{stavPub\}/.test(planovac) && /t\('Změněno od publikování'\)/.test(planovac) && /stavPub === 'zmeneno' \? t\('Publikovat změny'\)/.test(planovac));
 }
