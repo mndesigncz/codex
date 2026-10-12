@@ -586,6 +586,8 @@ function DnesniRezervace({ velikost }: WidgetProps) {
               const stav = <Chip tone={TON_REZERVACE[r.stav]} size="sm">{stavText(r.stav, t)}</Chip>;
               return (
                 <ListRow key={r.id} title={r.host} meta={metaRezervace(r, t)} value={r.cas}
+                  // Poznámka hosta celá (zalamuje se) jen ve velké velikosti; tabletu ji API nepošle.
+                  detail={L && r.poznamka ? <span className="text-black/70">„{r.poznamka}“</span> : undefined}
                   // Stav zůstává vidět i na telefonu (aside by se pod `lg` schoval).
                   right={stav}
                   actions={krok || dalsi.length ? (

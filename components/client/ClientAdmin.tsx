@@ -446,7 +446,10 @@ function RezervaceStranka({ oznam, onZmena, otevriHosta }: { oznam: Hlaska; onZm
                 ];
                 return (
                   <ListRow key={r.id} value={r.cas} title={r.host}
-                    meta={[czCount(r.osob, OSOBA), r.stul ?? 'bez stolu', r.email, r.poznamka ? `„${r.poznamka}"` : null].filter(Boolean).join(' · ')}
+                    meta={[czCount(r.osob, OSOBA), r.stul ?? 'bez stolu', r.email].filter(Boolean).join(' · ')}
+                    // Poznámka hosta je to, co obsluha u dveří potřebuje přečíst celé — `detail`
+                    // se zalamuje, `meta` by ji na telefonu uřízl na „Oslav…".
+                    detail={r.poznamka ? <span className="text-black/70">„{r.poznamka}“</span> : undefined}
                     right={<Chip tone={TON_REZERVACE[r.stav]} size="sm">{RES_STATUS[r.stav]?.label ?? r.stav}</Chip>}
                     actions={krok || dalsi.length ? (
                       <>
