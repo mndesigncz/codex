@@ -1649,7 +1649,7 @@
   "{krok}: {host}, {cas}": "{krok}: {host}, {cas}",
   "{min} min": "{min} min",
   "{n, plural, one {# bod} few {# body} other {# bodů}}": "{n, plural, one {# bod} few {# body} other {# bodov}}",
-  "{n, plural, one {# cena jinak než v kase} few {# ceny jinak než v kase} other {# cen jinak než v kase}}": "{n, plural, one {# cena inak než v kase} few {# ceny inak než v kase} other {# cien inak než v kase}}",
+  "{n, plural, one {# cena jinak než v kase} few {# ceny jinak než v kase} other {# cen jinak než v kase}}": "{n, plural, one {# cena inak ako v pokladni} few {# ceny inak ako v pokladni} other {# cien inak ako v pokladni}}",
   "{n, plural, one {# den bez tržby} few {# dny bez tržby} other {# dní bez tržby}}": "{n, plural, one {# deň bez tržby} few {# dni bez tržby} many {# dňa bez tržby} other {# dní bez tržby}}",
   "{n, plural, one {# den nad práh} few {# dny nad práh} other {# dní nad práh}}": "{n, plural, one {# deň nad prahom} few {# dni nad prahom} many {# dňa nad prahom} other {# dní nad prahom}}",
   "{n, plural, one {# den s tržbou} few {# dny s tržbou} other {# dní s tržbou}}": "{n, plural, one {# deň s tržbou} few {# dni s tržbou} many {# dňa s tržbou} other {# dní s tržbou}}",
@@ -1760,7 +1760,6 @@
   "{n} bez ceny": "{n} bez ceny",
   "{n} bez příchodu": "{n} bez príchodu",
   "{n} bez vazby na kasu": "{n} bez väzby na pokladňu",
-  "{n} cen jinak": "{n} cien inak",
   "{n} chybí": "{n} chýba",
   "{n} ke schválení": "{n} na schválenie",
   "{n} min": "{n} min",
@@ -1888,5 +1887,6 @@
   "…a {n, plural, one {# další podnět} few {# další podněty} other {# dalších podnětů}}": "…a {n, plural, one {# ďalší podnet} few {# ďalšie podnety} many {# ďalšieho podnetu} other {# ďalších podnetov}}",
   "…a {n, plural, one {# další} few {# další} other {# dalších}}": "…a {n, plural, one {# ďalšia} few {# ďalšie} many {# ďalšej} other {# ďalších}}",
   "…a {n, plural, one {# další} few {# další} other {# dalších}} vyprodané": "…a {n, plural, one {# ďalšia} few {# ďalšie} many {# ďalšej} other {# ďalších}} vypredané",
-  "↑ ↓ vybírají, Enter otevře, Esc zavře.": "↑ ↓ vyberajú, Enter otvorí, Esc zavrie."
+  "↑ ↓ vybírají, Enter otevře, Esc zavře.": "↑ ↓ vyberajú, Enter otvorí, Esc zavrie.",
+  "{n, plural, one {# cena jinak} few {# ceny jinak} other {# cen jinak}}": "{n, plural, one {# cena inak} few {# ceny inak} other {# cien inak}}"
 }

@@ -1757,7 +1757,6 @@
   "{n} bez ceny": "{n} bez ceny",
   "{n} bez příchodu": "{n} bez wejścia",
   "{n} bez vazby na kasu": "{n} bez powiązania z kasą",
-  "{n} cen jinak": "{n} cen inaczej",
   "{n} chybí": "brakuje: {n}",
   "{n} ke schválení": "{n} do zatwierdzenia",
   "{n} min": "{n} min",
@@ -1885,5 +1884,6 @@
   "…a {n, plural, one {# další podnět} few {# další podněty} other {# dalších podnětů}}": "…i {n, plural, one {# kolejne zgłoszenie} few {# kolejne zgłoszenia} many {# kolejnych zgłoszeń} other {# kolejnego zgłoszenia}}",
   "…a {n, plural, one {# další} few {# další} other {# dalších}}": "…i {n, plural, one {# kolejna} few {# kolejne} many {# kolejnych} other {# kolejnej}}",
   "…a {n, plural, one {# další} few {# další} other {# dalších}} vyprodané": "…i {n, plural, one {# kolejna} few {# kolejne} many {# kolejnych} other {# kolejnej}} wyprzedane",
-  "↑ ↓ vybírají, Enter otevře, Esc zavře.": "↑ ↓ wybierają, Enter otwiera, Esc zamyka."
+  "↑ ↓ vybírají, Enter otevře, Esc zavře.": "↑ ↓ wybierają, Enter otwiera, Esc zamyka.",
+  "{n, plural, one {# cena jinak} few {# ceny jinak} other {# cen jinak}}": "{n, plural, one {# cena inna} few {# ceny inne} many {# cen innych} other {# cen innych}}"
 }

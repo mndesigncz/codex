@@ -201,14 +201,14 @@ function PasKategorii({ pocty, vybrana, onZmena }: { pocty: Record<KategorieUcte
   const sPocty = KATEGORIE_UCTENEK.filter(k => pocty[k] > 0);
   if (sPocty.length === 0) return null;
   return (
-    <div role="group" aria-label={t('Kategorie účtenky')} className="flex gap-2 overflow-x-auto -mx-1 px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div role="group" aria-label={t('Kategorie účtenky')} className="flex gap-2 overflow-x-auto scrollbar-thin scroll-fade-x py-1 items-center">
       {sPocty.map(k => {
         const on = vybrana === k;
+        // Jako filtrovací pás v Návodech: počet ztlumeně za popiskem, žádný vlastní odznak.
         return (
           <button key={k} type="button" aria-pressed={on} onClick={() => onZmena(on ? null : k)}
-            className={`filter-pill tap-target-sm ${on ? 'seg-on' : 'seg-off glass'}`}>
-            <span>{popisky[k]}</span>
-            <span aria-hidden className={`rounded-full px-1.5 min-w-[1.25rem] text-center text-[11px] font-semibold tabular-nums ${on ? 'bg-white/20 text-white' : 'bg-black/[0.08] text-[#16181A]'}`}>{pocty[k]}</span>
+            className={`filter-pill tap-target whitespace-nowrap shrink-0 ${on ? 'seg-on' : 'seg-off glass'}`}>
+            {popisky[k]} <span className="tabular-nums opacity-60">{pocty[k]}</span>
           </button>
         );
       })}
@@ -401,7 +401,7 @@ function KnihaVydaju({ mesic, podleDodavatelu, onZrusitDodavatele }: { mesic: st
               // Vlastní <li>: klikací ListRow se jinak kreslí jako <li class="contents">
               // a `.list > * + *` na něm linku nad řádkem nenakreslí. Šipka žádná —
               // měla by ji jen účtenka a odsunula by jí částku ze sloupce čísel;
-              // detail se otevírá klepnutím na celý řádek (účtenka i objednávka).
+              // detail se otevírá klepnutím na celý řádek (účtenka i objednávka; výdaj z kasy otevře den).
               const maDetail = r.kind === 'receipt' || r.kind === 'order';
               return (
                 <li key={`${r.date}-${i}`}>
@@ -410,11 +410,9 @@ function KnihaVydaju({ mesic, podleDodavatelu, onZrusitDodavatele }: { mesic: st
                     title={r.label}
                     meta={[kratce(r.date), druh.label, r.kind === 'receipt' && r.category ? popiskyKat[r.category] : null, r.note, r.photoUrl ? t('s fotkou') : null].filter(Boolean).join(' · ')}
                     value={<span className="tabular-nums">−{money(r.amount)}</span>}
-                    // Výdaj z kasy patří k uzávěrce dne — „Celý den" otevře detail dne (Finance dne) jako z widgetů.
-                    actions={r.kind === 'expense' ? (
-                      <Button variant="ghost" size="sm" onClick={() => otevriDen(r.date, 'finance')} aria-label={t('Celý den {datum}', { datum: kratce(r.date) })}>{t('Celý den')}</Button>
-                    ) : undefined}
-                    onClick={maDetail ? () => setDetail(r) : undefined} />
+                    // Výdaj z kasy patří k uzávěrce dne: klepnutí otevře celý den (Finance dne) jako řádek
+                    // v widgetech. Tlačítko v řádku by odsunulo částku ze sloupce čísel (sonda k69-b5b).
+                    onClick={r.kind === 'expense' ? () => otevriDen(r.date, 'finance') : maDetail ? () => setDetail(r) : undefined} />
                 </li>
               );
             })}
@@ -504,8 +502,8 @@ export default function FinanceView() {
         nastroj={<KnihaVydaju mesic={mesic} podleDodavatelu={podleDodavatelu} onZrusitDodavatele={() => setPodleDodavatelu(false)} />}
       />
       {exportuji && <ExportDialog mesic={mesic} onClose={() => setExportuji(false)} />}
-      <Modal open={pevne} onClose={() => setPevne(false)} size="md" title={t('Pravidelné náklady')}
-        subtitle={t('Nájem, energie a další platby každý měsíc. Odečítají se z výsledku měsíce.')}>
+      {/* Bez podtitulu: vysvětlení nese PevneNaklady sama (kreslí se i v Nastavení › Podnik). */}
+      <Modal open={pevne} onClose={() => setPevne(false)} size="md" title={t('Pravidelné náklady')}>
         {pevne && <PevneNaklady onUlozeno={poUlozeniPevnych} />}
       </Modal>
       {upgrade && <UpgradeModal feature={upgrade} onClose={() => setUpgrade(null)} />}

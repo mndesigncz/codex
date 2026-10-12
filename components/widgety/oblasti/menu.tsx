@@ -148,7 +148,7 @@ function StavMenu({ velikost, nahled }: WidgetProps) {
     <Widget nacteni={ceka ? CEKA : data} kostra="seznam" prazdno={prazdno}
       doplnek={desky.length > 1 || jinychCen > 0 ? (
         <span className="inline-flex items-center gap-1.5">
-          {jinychCen > 0 && <Chip tone="wait" size="sm">{t('{n} cen jinak', { n: cislo(jinychCen) })}</Chip>}
+          {jinychCen > 0 && <Chip tone="wait" size="sm">{t('{n, plural, one {# cena jinak} few {# ceny jinak} other {# cen jinak}}', { n: jinychCen })}</Chip>}
           {desky.length > 1 && <Chip tone="muted" size="sm">{cislo(desky.length)}</Chip>}
         </span>
       ) : undefined}>

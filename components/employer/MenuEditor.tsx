@@ -293,8 +293,9 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
    * `prevzitAdresu` řekne serveru, že se smí zabraná adresa odebrat jinému
    * menu stejného podniku. Bez toho by se z kolize nedalo dostat.
    */
-  const ulozit = async (navic?: Record<string, any>) => {
-    if (!board) return;
+  // Vrací, jestli se uložilo — volající s vlastní hláškou (převzetí cen z kasy) ji bez úspěchu neukáže.
+  const ulozit = async (navic?: Record<string, any>): Promise<boolean> => {
+    if (!board) return false;
     setUkladam(true); setChyba(null);
     try {
       const telo: any = { ...board, ...navic, theme: normalizeMenuTheme(board.theme) };
@@ -313,18 +314,20 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
             akce: t('Převzít adresu'),
             onAno: () => { void ulozit({ ...navic, prevzitAdresu: true }); },
           });
-          return;
+          return false;
         }
         setChyba(d?.error ?? t('Uložení se nepodařilo (odpověď serveru {status}).', { status: r.status }));
-        return;
+        return false;
       }
       setPin('');
       await load();
       obnovWidgety();
       setNeulozeno(false);
       hlas(t('Uloženo. Na iPadu se to projeví do minuty, ručně obnovovat nemusíš.'));
+      return true;
     } catch {
       setChyba(t('Uložení se nepodařilo — spojení se serverem selhalo. Změny máš pořád na obrazovce, zkus to znovu.'));
+      return false;
     } finally { setUkladam(false); }
   };
 
@@ -554,7 +557,8 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
     }));
     if (n === 0) return;
     upravit((b) => { b.sections = kopie.sections; });
-    await ulozit({ sections: kopie.sections });
+    // Neuložené převzetí ukáže chybu z `ulozit` (setChyba) a cena zůstane rozpracovaná na obrazovce — žádná hláška o úspěchu.
+    if (!(await ulozit({ sections: kopie.sections }))) return;
     hlas(t('{n, plural, one {# cena převzata z kasy} few {# ceny převzaty z kasy} other {# cen převzato z kasy}}.', { n }));
   };
 
@@ -1003,8 +1007,8 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
                               <>
                                 <Chip tone="wait" size="sm">{t('v kase {cena}', { cena: `${cenaDoPole(it.posPrice as number)} ${board.currency}` })}</Chip>
                                 {!zamceno && smiCeny && (
-                                  <Button variant="ghost" size="sm" disabled={ukladam} onClick={() => void prevzitCenyZKasy({ si, ii })}
-                                    aria-label={t('Převzít cenu z kasy — {nazev}', { nazev: it.name || t('nová položka') })}>{t('Převzít')}</Button>
+                                  <Button variant="ghost" size="sm" className="tap-target" disabled={ukladam} onClick={() => void prevzitCenyZKasy({ si, ii })}
+                                    aria-label={t('Převzít cenu z kasy — {nazev}', { nazev: it.name || t('nová položka') })}>{t('Převzít', undefined, 'cena')}</Button>
                                 )}
                               </>
                             )}

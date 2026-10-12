@@ -102,7 +102,7 @@ export default function PevneNaklady({ onUlozeno }: { onUlozeno?: () => void }) 
           {seznam.map((r, i) => (
             <ListRow key={`${r.name}-${i}`} title={r.name}
               value={<span className="tabular-nums">{money(r.amount)}</span>}
-              actions={<Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={t('Odebrat {nazev}', { nazev: r.name })} onClick={() => odebrat(i)} />} />
+              actions={<Button variant="ghost" size="sm" iconOnly icon="trash" className="tap-target" aria-label={t('Odebrat {nazev}', { nazev: r.name })} onClick={() => odebrat(i)} />} />
           ))}
           <ListRow title={<span className="font-semibold">{t('Celkem za měsíc')}</span>}
             value={<span className="tabular-nums font-semibold">{money(soucet)}</span>} />

@@ -1757,7 +1757,6 @@
   "{n} bez ceny": "{n} without a price",
   "{n} bez příchodu": "{n} not clocked in",
   "{n} bez vazby na kasu": "{n} not linked to the POS",
-  "{n} cen jinak": "{n} prices differ",
   "{n} chybí": "{n} missing",
   "{n} ke schválení": "{n} awaiting approval",
   "{n} min": "{n} min",
@@ -1885,5 +1884,6 @@
   "…a {n, plural, one {# další podnět} few {# další podněty} other {# dalších podnětů}}": "…and {n, plural, one {# more suggestion} other {# more suggestions}}",
   "…a {n, plural, one {# další} few {# další} other {# dalších}}": "…and {n, plural, one {# more} other {# more}}",
   "…a {n, plural, one {# další} few {# další} other {# dalších}} vyprodané": "…and {n, plural, one {# more} other {# more}} sold out",
-  "↑ ↓ vybírají, Enter otevře, Esc zavře.": "↑ ↓ to choose, Enter to open, Esc to close."
+  "↑ ↓ vybírají, Enter otevře, Esc zavře.": "↑ ↓ to choose, Enter to open, Esc to close.",
+  "{n, plural, one {# cena jinak} few {# ceny jinak} other {# cen jinak}}": "{n, plural, one {# price differs} other {# prices differ}}"
 }

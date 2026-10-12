@@ -1758,7 +1758,6 @@
   "{n} bez ceny": "{n} ohne Preis",
   "{n} bez příchodu": "{n} nicht gekommen",
   "{n} bez vazby na kasu": "{n} ohne Verknüpfung zur Kasse",
-  "{n} cen jinak": "{n} Preise anders",
   "{n} chybí": "{n} fehlen",
   "{n} ke schválení": "{n} warten auf Genehmigung",
   "{n} min": "{n} Min.",
@@ -1886,5 +1885,6 @@
   "…a {n, plural, one {# další podnět} few {# další podněty} other {# dalších podnětů}}": "…und {n, plural, one {# weiterer Vorschlag} other {# weitere Vorschläge}}",
   "…a {n, plural, one {# další} few {# další} other {# dalších}}": "…und {n, plural, one {# weiterer} other {# weitere}}",
   "…a {n, plural, one {# další} few {# další} other {# dalších}} vyprodané": "…und {n, plural, one {# weiterer} other {# weitere}} ausverkauft",
-  "↑ ↓ vybírají, Enter otevře, Esc zavře.": "↑ ↓ wählen, Enter öffnet, Esc schließt."
+  "↑ ↓ vybírají, Enter otevře, Esc zavře.": "↑ ↓ wählen, Enter öffnet, Esc schließt.",
+  "{n, plural, one {# cena jinak} few {# ceny jinak} other {# cen jinak}}": "{n, plural, one {# Preis anders} other {# Preise anders}}"
 }
