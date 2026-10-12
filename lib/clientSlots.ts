@@ -22,18 +22,42 @@ export function hoursLabel(hours: OpeningHours | null | undefined, dateStr: stri
   return `${d.open}–${d.close}`;
 }
 
-/** Časy, kdy se dá v daný den rezervovat: od otevření po zavření minus hodina, po krocích. */
-export function slotsFor(hours: OpeningHours | null | undefined, dateStr: string, slotMinutes: number): string[] {
+const naMinuty = (t: string) => { const [h, m] = String(t).split(':').map(Number); return h * 60 + (m || 0); };
+const naHM = (min: number) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+const JE_HM = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/**
+ * Kolik minut dopředu musí host rezervovat na dnešek. Pevně — podnik si to
+ * zatím nenastavuje (OpenTable i Resy nabízejí pro dnešek jen časy s předstihem).
+ */
+export const PREDSTIH_REZERVACE_MIN = 30;
+
+/**
+ * Nejdřívější čas, na který jde dnes rezervovat: teď + předstih ve tvaru „HH:MM".
+ * „Teď" dodává volající (server pragueHM(), prohlížeč své hodiny) — tenhle soubor
+ * jde i do klientské komponenty, takže na server nesahá. Přes půlnoc „24:00":
+ * dnes už nic.
+ */
+export function nejdriveDnes(tedHM: string, predstih: number = PREDSTIH_REZERVACE_MIN): string {
+  if (!JE_HM.test(String(tedHM).slice(0, 5))) return '00:00';
+  const m = naMinuty(String(tedHM).slice(0, 5)) + Math.max(0, Math.round(Number(predstih) || 0));
+  return m >= 24 * 60 ? '24:00' : naHM(m);
+}
+
+/**
+ * Časy, kdy se dá v daný den rezervovat: od otevření po zavření minus hodina, po krocích.
+ * S `nejdrive` („HH:MM") jen časy od něj včetně — pro dnešek, ať host nerezervuje
+ * na čas, který už minul (volající dá nejdriveDnes(teď)).
+ */
+export function slotsFor(hours: OpeningHours | null | undefined, dateStr: string, slotMinutes: number, nejdrive?: string): string[] {
   const day = hours?.[dayKey(dateStr)];
   if (!day || day.closed || !day.open || !day.close) return [];
-  const toMin = (t: string) => { const [h, m] = String(t).split(':').map(Number); return h * 60 + (m || 0); };
-  const start = toMin(day.open), end = toMin(day.close) - 60;
+  const start = naMinuty(day.open), end = naMinuty(day.close) - 60;
   const out: string[] = [];
   const step = Math.max(15, slotMinutes || 30);
-  for (let t = Math.ceil(start / step) * step; t <= end; t += step) {
-    out.push(`${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`);
-  }
-  return out;
+  for (let t = Math.ceil(start / step) * step; t <= end; t += step) out.push(naHM(t));
+  // „HH:MM" s nulami vpředu se dá porovnat jako text; „24:00" vyřadí všechno.
+  return nejdrive && /^\d{2}:\d{2}$/.test(nejdrive) ? out.filter(s => s >= nejdrive) : out;
 }
 
 /** „pá 12. 9." pro seznamy, „pátek 12. září" pro nadpisy. */

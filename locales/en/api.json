@@ -166,5 +166,6 @@
   "Odhlášení se nepodařilo načíst. Zkus to znovu.": "Couldn't load the unsubscribe page. Try again.",
   "Moc pokusů za sebou. Zkus to za chvíli.": "Too many attempts in a row. Try again in a moment.",
   "Odhlášení se nepodařilo uložit. Zkus to znovu.": "Couldn't save the unsubscribe. Try again.",
-  "Tvůj účet je v tomhle podniku zablokovaný. Obrať se na obsluhu.": "Your account is blocked at this business. Please ask the staff."
+  "Tvůj účet je v tomhle podniku zablokovaný. Obrať se na obsluhu.": "Your account is blocked at this business. Please ask the staff.",
+  "Na tenhle čas už je pozdě, vyber pozdější.": "It's too late for this time, pick a later one."
 }

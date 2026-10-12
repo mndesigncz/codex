@@ -5,8 +5,8 @@ import { NextResponse } from 'next/server';
 import { sql, customer, profileBySlug, join, slotsFor } from '@/lib/client';
 import { clenoveSOpravnenim } from '@/lib/opravneniDb';
 import { notifyUsers } from '@/lib/push';
-
-import { pragueToday, dayPlus } from '@/lib/pragueTime';
+import { nejdriveDnes } from '@/lib/clientSlots';
+import { pragueToday, pragueHM, dayPlus } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -41,6 +41,11 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
   }
   const slots = slotsFor(p.opening_hours, date, Number(p.slot_minutes) || 30);
   if (!slots.includes(time)) return NextResponse.json({ error: 'V tenhle čas podnik nerezervuje.' }, { status: 400 });
+  // Dnes jen s předstihem: v 15:00 se nedá rezervovat na 8:00 ani na 15:10 (stránka
+  // takové časy nenabídne, tohle chytí starou záložku nebo ruční požadavek).
+  if (date === today && time < nejdriveDnes(pragueHM())) {
+    return NextResponse.json({ error: 'Na tenhle čas už je pozdě, vyber pozdější.' }, { status: 400 });
+  }
   const teamId = Number(p.team_id);
   await join(me.id, teamId);
   const [dup] = await sql`

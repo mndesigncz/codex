@@ -6,14 +6,14 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Icon } from '../Icons';
-import { Segmented, Skeleton, EmptyState, ErrorState } from '../ui';
+import { Segmented, Skeleton, EmptyState, ErrorState, Well } from '../ui';
 import { Initials } from './ClientShell';
 import TableMap, { placedTables } from './TableMap';
 import { onAccent } from '@/lib/floorplan';
-import { hoursLabel, slotsFor, RES_STATUS } from '@/lib/clientSlots';
+import { hoursLabel, slotsFor, nejdriveDnes, RES_STATUS } from '@/lib/clientSlots';
 import { useJazyk, useT } from '@/lib/i18n/client';
 import { fmtDatum, fmtDenVTydnu, fmtMesic } from '@/lib/i18n/format';
-import { pragueToday, dayPlus } from '@/lib/pragueTime';
+import { pragueToday, pragueHM, dayPlus } from '@/lib/pragueTime';
 import { useModal } from '@/lib/useModal';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
@@ -314,9 +314,18 @@ function ReserveTab({ slug, b, me, today, signedIn, onDone }: { slug: string; b:
   const [note, setNote] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
-  const slots = useMemo(() => slotsFor(b.hours, date, b.slotMinutes), [b.hours, date, b.slotMinutes]);
+  // Dnešek jen s předstihem (PREDSTIH_REZERVACE_MIN): v 15:00 se nenabídne 8:00. „Teď" se
+  // posouvá jednou za minutu, ať stránka otevřená přes poledne nenabízí dopolední časy.
+  const [ted, setTed] = useState(() => pragueHM());
+  useEffect(() => { const i = setInterval(() => setTed(pragueHM()), 60_000); return () => clearInterval(i); }, []);
+  const jeDnes = date === today;
+  const vsechnySloty = useMemo(() => slotsFor(b.hours, date, b.slotMinutes), [b.hours, date, b.slotMinutes]);
+  const slots = useMemo(() => (jeDnes ? slotsFor(b.hours, date, b.slotMinutes, nejdriveDnes(ted)) : vsechnySloty), [jeDnes, b.hours, date, b.slotMinutes, ted, vsechnySloty]);
+  /** Dnes je otevřeno, ale všechny časy už minuly (nebo jsou moc brzo). */
+  const dnesPozde = jeDnes && vsechnySloty.length > 0 && slots.length === 0;
   useEffect(() => { if (!slots.includes(time)) setTime(slots[0] ?? ''); }, [slots, time]);
   const maxDate = dayPlus(today, b.leadDays);
+  const zitra = dayPlus(today, 1);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setErr('');
@@ -357,18 +366,26 @@ function ReserveTab({ slug, b, me, today, signedIn, onDone }: { slug: string; b:
       <form onSubmit={submit} className="glass-card p-5 sm:p-6 grid gap-4" noValidate>
         <h2 className="t-section">{t('Rezervovat stůl')}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="grid gap-2">
+          <div className={`grid gap-2 ${dnesPozde ? 'sm:col-span-2' : ''}`}>
             <label htmlFor="r-date" className={label}>{t('Den')}</label>
             <input id="r-date" type="date" min={today} max={maxDate} value={date} onChange={e => setDate(e.target.value)} className={input} required />
           </div>
-          <div className="grid gap-2">
-            <label htmlFor="r-time" className={label}>{t('Čas')}</label>
-            {slots.length ? (
-              <select id="r-time" value={time} onChange={e => setTime(e.target.value)} className={input}>
-                {slots.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            ) : <p className="text-sm text-black/55 py-3">{t('V tento den je zavřeno.')}</p>}
-          </div>
+          {dnesPozde ? (
+            // Celý řádek: věta i tlačítko, které přepne den — host nemusí hledat v kalendáři.
+            <Well pad="none" className="sm:col-span-2">
+              <EmptyState icon="clock" compact title={t('Dnes už se nedá rezervovat, vyber zítřek.')}
+                action={zitra <= maxDate ? <Button type="button" variant="secondary" icon="calendar" onClick={() => setDate(zitra)}>{t('Zítra')}</Button> : undefined} />
+            </Well>
+          ) : (
+            <div className="grid gap-2">
+              <label htmlFor="r-time" className={label}>{t('Čas')}</label>
+              {slots.length ? (
+                <select id="r-time" value={time} onChange={e => setTime(e.target.value)} className={input}>
+                  {slots.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              ) : <p className="text-sm text-black/55 py-3">{t('V tento den je zavřeno.')}</p>}
+            </div>
+          )}
           <div className="grid gap-2">
             <label htmlFor="r-party" className={label}>{t('Kolik vás bude')}</label>
             <div className="flex items-center gap-2">
