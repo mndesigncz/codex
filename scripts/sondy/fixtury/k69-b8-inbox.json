@@ -40,12 +40,22 @@
  ],
  "reservations": [
   {
+   "id": 16,
+   "time": "12:30",
+   "party": 3,
+   "status": "confirmed",
+   "customer_name": "Pavel Horák",
+   "table_name": "Bar",
+   "manual": true
+  },
+  {
    "id": 11,
    "time": "17:30",
    "party": 4,
    "status": "requested",
    "customer_name": "Jana Dvořáková",
-   "table_name": "U okna"
+   "table_name": "U okna",
+   "manual": false
   }
  ],
  "newCount": 1,

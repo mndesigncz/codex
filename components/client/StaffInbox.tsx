@@ -46,7 +46,8 @@ export function useStaffInbox(enabled = true) {
   return { d, err, reload: load };
 }
 
-const ORDER_STATUS: Record<string, { label: string; tone: ChipTone }> = {
+/** Stav objednávky slovem a tónem — stejný ve frontě i v historii (Client › Objednávky). */
+export const ORDER_STATUS: Record<string, { label: string; tone: ChipTone }> = {
   new: { label: 'Nová', tone: 'wait' }, confirmed: { label: 'Připravuje se', tone: 'ok' }, done: { label: 'Hotovo', tone: 'muted' }, declined: { label: 'Nepřijato', tone: 'muted' },
 };
 const POS_STATE: Record<string, string> = { NEW: 'v kase čeká na přijetí', CONFIRMED: 'v kase, připravuje se', DISPATCHED: 'v kase vydáno', DECLINED: 'kasa odmítla', SCHEDULING_DELIVERY: 'v kase' };
@@ -245,8 +246,9 @@ export default function StaffInbox({ compact = false, onToast, onZmena }: { comp
           <h2 id="h-rez" className="t-card px-5 pt-4">Dnešní rezervace</h2>
           <ul className="list px-5">
             {reservations.map(r => (
-              <ListRow key={r.id} value={String(r.time ?? '').slice(0, 5)} title={r.customer_name}
-                meta={[czCount(Number(r.party) || 1, OSOBA), r.table_name].filter(Boolean).join(' · ')}
+              <ListRow key={r.id} value={String(r.time ?? '').slice(0, 5)} title={r.customer_name || 'Host'}
+                // Ručně zapsaný host (telefon, u dveří) nemá účet — jméno nese rezervace (API: COALESCE s guest_name).
+                meta={[czCount(Number(r.party) || 1, OSOBA), r.table_name, r.manual ? 'zapsáno ručně' : null].filter(Boolean).join(' · ')}
                 right={<Chip tone={TON_REZERVACE[r.status as StavRezervace] ?? 'wait'} size="sm">{RES_STATUS[r.status]?.label ?? r.status}</Chip>} />
             ))}
           </ul>

@@ -1910,5 +1910,13 @@
   "ručně": "manuell",
   "…a {n, plural, one {# další den} few {# další dny} other {# dalších dní}}": "…und {n, plural, one {# weiterer Tag} other {# weitere Tage}}",
   "Moje docházka": "Meine Zeiterfassung",
-  "Tvoje příchody a odchody po dnech za měsíc.": "Deine Kommen- und Gehen-Zeiten Tag für Tag im Monat."
+  "Tvoje příchody a odchody po dnech za měsíc.": "Deine Kommen- und Gehen-Zeiten Tag für Tag im Monat.",
+  "Zavolat hostovi": "Gast anrufen",
+  "Napsat e-mail": "E-Mail schreiben",
+  "Zavolat hostovi {host}: {telefon}": "Gast {host} anrufen: {telefon}",
+  "Stříbrný host": "Silbergast",
+  "Zlatý host": "Goldgast",
+  "Platinový host": "Platingast",
+  "1. návštěva": "Erster Besuch",
+  "Poznámka personálu:": "Notiz des Personals:"
 }

@@ -27,17 +27,36 @@ export interface Rezervace {
   host: string;
   /** Jen s zakaznici.kontakty — jinak ho API vůbec nepošle (osobní údaj). */
   email: string | null;
+  /** Telefon hosta (z profilu hosta); stejně jako e-mail jen se zakaznici.kontakty. */
+  telefon: string | null;
   osob: number;
   stulId: number | null;
   stul: string | null;
   stav: StavRezervace;
   /** Tablet ji nedostane (API ji maže); poznámka hosta patří jen vedení. */
   poznamka: string | null;
+  /**
+   * Úroveň člena pro štítek u jména (Stříbrný / Zlatý / Platinový host); obyčejný
+   * člen štítek nemá (null). Jen se zakaznici.zobrazit — jinak ji API nepošle.
+   */
+  uroven: { id: string; label: string; ton: ChipTone } | null;
+  /** Kolikrát host v podniku byl (0 = jde poprvé); null = není člen nebo divák nesmí vidět. */
+  navstev: number | null;
+  /** Poslední interní poznámka personálu k hostovi (zakaznici.poznamky, nikdy na tabletu). */
+  poznamkaPersonalu: string | null;
+  /**
+   * Zapsala ji obsluha (telefon, u dveří): host bez účtu (customer_id NULL), nebo ručně
+   * zapsaná a napojená na člena (created_by).
+   */
+  rucne: boolean;
 }
 
 export interface Stul { id: number; nazev: string; mist: number }
 
-export interface SeznamRezervaci { rezervace: Rezervace[]; stoly: Stul[] }
+/** Co potřebuje okno „Nová rezervace" (API to pošle jen s rezervace.schvalovat). */
+export interface NastaveniZapisu { hodiny: Record<string, { open?: string | null; close?: string | null; closed?: boolean }>; maxOsob: number; dniDopredu: number; krok: number }
+
+export interface SeznamRezervaci { rezervace: Rezervace[]; stoly: Stul[]; zapis: NastaveniZapisu | null }
 
 const STAVY: StavRezervace[] = ['requested', 'confirmed', 'seated', 'done', 'declined', 'cancelled'];
 
@@ -54,14 +73,37 @@ export function vyberRezervace(raw: any): SeznamRezervaci {
       cas: String(r.time ?? '').slice(0, 5),
       host: text(r.customer_name) ?? 'Host',
       email: text(r.customer_email),
+      telefon: text(r.customer_phone),
       osob: Math.max(1, cislo(r.party)),
       stulId: r.table_id == null ? null : Number(r.table_id),
       stul: text(r.table_name),
       stav: (STAVY.includes(r.status) ? r.status : 'requested') as StavRezervace,
       poznamka: text(r.note),
+      uroven: urovenHosta(r.customer_level, r.customer_level_label),
+      navstev: r.customer_visits == null ? null : Math.max(0, Math.round(cislo(r.customer_visits))),
+      poznamkaPersonalu: text(r.staff_note),
+      rucne: r.customer_id === null || (r.created_by != null && r.created_by !== ''),
     })),
     stoly: seznam(raw.tables).map((t: any) => ({ id: Number(t.id), nazev: String(t.name ?? ''), mist: cislo(t.seats) })),
+    zapis: raw.zapis && typeof raw.zapis === 'object' ? {
+      hodiny: raw.zapis.opening_hours && typeof raw.zapis.opening_hours === 'object' ? raw.zapis.opening_hours : {},
+      maxOsob: Math.max(1, cislo(raw.zapis.max_party) || 8),
+      dniDopredu: Math.max(1, cislo(raw.zapis.lead_days) || 30),
+      krok: Math.max(15, cislo(raw.zapis.slot_minutes) || 30),
+    } : null,
   };
+}
+
+/** Štítek úrovně jako v Zákaznících › Členové: stříbro tlumeně, zlato a platina inkoustem, obyčejný člen bez štítku. */
+function urovenHosta(id: unknown, label: unknown): Rezervace['uroven'] {
+  if (id !== 'silver' && id !== 'gold' && id !== 'platinum') return null;
+  return { id, label: text(label) ?? (id === 'silver' ? 'Stříbrný host' : id === 'gold' ? 'Zlatý host' : 'Platinový host'), ton: id === 'silver' ? 'muted' : 'ink' };
+}
+
+/** Odkaz `tel:` z telefonu, jak ho host napsal („+420 776 221 004" → „tel:+420776221004"); bez číslic null. */
+export function odkazTel(telefon: string | null | undefined): string | null {
+  const cisla = String(telefon ?? '').replace(/[^\d+]/g, '').replace(/(?!^)\+/g, '');
+  return /\d{3,}/.test(cisla) ? `tel:${cisla}` : null;
 }
 
 /** Kam smí rezervace ze svého stavu (stejná mapa jako FLOW v API). */
@@ -116,6 +158,101 @@ export function poDnech(rez: Rezervace[]): [string, Rezervace[]][] {
   for (const r of rez) { const d = m.get(r.datum); if (d) d.push(r); else m.set(r.datum, [r]); }
   return [...m.entries()];
 }
+
+// ---------------------------------------------------------------------------
+// Objednávky od stolu — historie (Client › Objednávky › Historie)
+// ---------------------------------------------------------------------------
+//
+// Fronta ukazuje jen poslední tři hodiny; majitel večer chce vědět, kolik objednávek
+// od stolu přišlo, za kolik a kolik jich obsluha nepřijala. Součet je jen z hotových
+// a jmenuje se „Od stolu celkem" — skutečná tržba podniku je z pokladny (Finance).
+
+export type StavObjednavky = 'new' | 'confirmed' | 'done' | 'declined';
+export const STAVY_OBJEDNAVEK: StavObjednavky[] = ['new', 'confirmed', 'done', 'declined'];
+
+/** Nejdelší období historie v jednom dotazu (čtvrt roku). */
+export const MAX_DNI_HISTORIE = 92;
+
+export interface ObjednavkaHistorie {
+  id: number;
+  /** Čas z databáze (UTC bez zóny) — zobrazit jen přes dbTimeHM/dbTimeDayHM. */
+  vytvoreno: string;
+  upraveno: string | null;
+  /** Ve stejných jednotkách jako příjem u obsluhy (cena z menu, smí mít haléře → usePrice). */
+  castka: number;
+  stav: StavObjednavky;
+  stul: string | null;
+  host: string;
+  polozky: { nazev: string; pocet: number }[];
+}
+
+export interface SouhrnObjednavek { pocet: number; soucet: number; prumer: number | null; neprijato: number; hotovych: number }
+
+/** Počet, součet a průměr jen z hotových (nepřijaté a rozpracované by součet nafoukly), počet nepřijatých. */
+export function souhrnObjednavek(objednavky: readonly { castka: number; stav: string }[]): SouhrnObjednavek {
+  const hotove = objednavky.filter(o => o.stav === 'done');
+  const soucet = Math.round(hotove.reduce((s, o) => s + cislo(o.castka), 0) * 100) / 100;
+  return {
+    pocet: objednavky.length,
+    soucet,
+    prumer: hotove.length ? Math.round((soucet / hotove.length) * 100) / 100 : null,
+    neprijato: objednavky.filter(o => o.stav === 'declined').length,
+    hotovych: hotove.length,
+  };
+}
+
+/**
+ * Období historie z dotazu (?from=&to=, RRRR-MM-DD). Bez parametrů dnešek; obrácené
+ * pořadí se prohodí; delší než MAX_DNI_HISTORIE je chyba (ne tiché uříznutí).
+ */
+export function obdobiHistorie(from: unknown, to: unknown, dnes: string): { od: string; do: string } | { chyba: string } {
+  const den = (v: unknown) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T12:00:00Z`)) ? v : null);
+  const f = from == null || from === '' ? null : den(from);
+  const t = to == null || to === '' ? null : den(to);
+  if ((from != null && from !== '' && !f) || (to != null && to !== '' && !t)) return { chyba: 'Období má tvar RRRR-MM-DD.' };
+  let od = f ?? t ?? dnes;
+  let doo = t ?? f ?? dnes;
+  if (od > doo) [od, doo] = [doo, od];
+  const dni = Math.round((Date.parse(`${doo}T12:00:00Z`) - Date.parse(`${od}T12:00:00Z`)) / 86_400_000) + 1;
+  if (dni > MAX_DNI_HISTORIE) return { chyba: `Období může mít nejvýš ${MAX_DNI_HISTORIE} dní.` };
+  return { od, do: doo };
+}
+
+/** Odpověď GET /api/client/admin/orders. Nečekaný tvar je chyba (ErrorState), ne „žádné objednávky". */
+export function vyberHistoriiObjednavek(raw: any): { objednavky: ObjednavkaHistorie[]; souhrn: SouhrnObjednavek; celkem: number } {
+  if (!raw || !Array.isArray(raw.orders)) throw new Error('Objednávky přišly v nečekaném tvaru.');
+  const objednavky: ObjednavkaHistorie[] = raw.orders.map((o: any) => ({
+    id: Number(o.id),
+    vytvoreno: String(o.createdAt ?? ''),
+    upraveno: o.updatedAt ? String(o.updatedAt) : null,
+    castka: cislo(o.total),
+    stav: (STAVY_OBJEDNAVEK.includes(o.status) ? o.status : 'new') as StavObjednavky,
+    stul: text(o.tableName),
+    host: text(o.customerName) ?? 'Host',
+    polozky: seznam(o.polozky).map((l: any) => ({ nazev: String(l?.nazev ?? l?.name ?? '').trim(), pocet: Math.max(1, Math.round(cislo(l?.pocet ?? l?.count) || 1)) })).filter((l: { nazev: string }) => l.nazev),
+  }));
+  const s = raw.souhrn && typeof raw.souhrn === 'object' ? raw.souhrn : null;
+  return {
+    objednavky,
+    souhrn: s ? { pocet: cislo(s.pocet), soucet: cislo(s.soucet), prumer: s.prumer == null ? null : cislo(s.prumer), neprijato: cislo(s.neprijato), hotovych: cislo(s.hotovych) } : souhrnObjednavek(objednavky),
+    celkem: raw.celkem == null ? objednavky.length : cislo(raw.celkem),
+  };
+}
+
+/**
+ * Za kolik minut se s objednávkou pohnulo. Sloupec „přijato v" nemáme — updated_at je čas
+ * poslední změny stavu: u „Připravuje se" přijetí, u „Hotovo" vyřízení. Nová a nečitelné → null.
+ */
+export function dobaObjednavky(o: Pick<ObjednavkaHistorie, 'vytvoreno' | 'upraveno' | 'stav'>, naDatum: (v: string) => Date | null): { co: 'prijato' | 'hotovo' | 'odmitnuto'; minut: number } | null {
+  if (o.stav === 'new' || !o.upraveno) return null;
+  const a = naDatum(o.vytvoreno), b = naDatum(o.upraveno);
+  if (!a || !b) return null;
+  const minut = Math.max(0, Math.round((b.getTime() - a.getTime()) / 60_000));
+  return { co: o.stav === 'confirmed' ? 'prijato' : o.stav === 'done' ? 'hotovo' : 'odmitnuto', minut };
+}
+
+/** „2× Matcha latte, 1× Sencha" — položky zkráceně pro meta řádek. */
+export const polozkyKratce = (polozky: readonly { nazev: string; pocet: number }[]) => polozky.map(l => `${l.pocet}× ${l.nazev}`).join(', ');
 
 // ---------------------------------------------------------------------------
 // Hodnocení

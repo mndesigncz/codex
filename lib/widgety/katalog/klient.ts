@@ -39,7 +39,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     stav: 'hotovo',
   },
   // Data: GET /api/client/admin/reservations?range=today →
-  // reservations[{time,customer_name,party,table_name,status}]
+  // reservations[{time,customer_name,party,table_name,status,customer_email?,customer_phone?,note?}]
   {
     id: 'klient.dnesni_rezervace',
     oblast: 'klient',
@@ -55,6 +55,9 @@ export const WIDGETY: DefiniceWidgetu[] = [
       nektere: [],
       pole: {
         e_mail_hosta: 'zakaznici.kontakty',
+        telefon_hosta: 'zakaznici.kontakty',
+        uroven: 'zakaznici.zobrazit',
+        poznamka_personalu: 'zakaznici.poznamky',
         'akce:potvrdit_odmitnout': 'rezervace.schvalovat',
         'akce:usadit': 'rezervace.usadit',
       },

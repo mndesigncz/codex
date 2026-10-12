@@ -102,6 +102,7 @@ export const AUDIT_POPISKY: Record<string, string> = {
   // Managero client (hosté)
   'client.floorplan': 'Uložen plánek stolů',
   'client.reservation': 'Změněna rezervace hosta',
+  'rezervace.zapsat': 'Obsluha ručně zapsala rezervaci (telefon, u dveří)',
   'client.profile': 'Změna veřejné stránky podniku',
   'client.broadcast': 'Odeslána zpráva členům věrnostního programu',
   'client.reaktivace': 'Změna automatického oslovení „Chybíš nám“',
