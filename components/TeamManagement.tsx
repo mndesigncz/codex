@@ -34,7 +34,7 @@ import { useDataWidgetu } from './widgety/useDataWidgetu';
 import { obnovTym } from './widgety/oblasti/tym';
 import NavigaceNastaveni from './NavigaceNastaveni';
 import { useNavigace } from './widgety/NavigaceKontext';
-import { useSymbol } from './CurrencyProvider';
+import { useMoney, useSymbol } from './CurrencyProvider';
 import { apiMessage, okJson } from '@/lib/api';
 import { obsahujeNekde } from '@/lib/hledani';
 import { useOpravneni } from './role/useOpravneni';
@@ -160,6 +160,10 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
   const smiOdebrat = ma('tym.odebrat');
   const smiPozvat = ma('tym.pozvat');
   const smiProfil = ma('tym.profil');
+  // Seznam lidí (kolo 6): telefon jen s tym.kontakty, sazba jen s finance.mzdy (server je bez nich ani nepošle).
+  const smiKontakty = ma('tym.kontakty');
+  const smiVidetSazby = ma('finance.mzdy');
+  const money = useMoney();
 
   const data = useDataWidgetu<DataTymu>('/api/teams', vyberTym);
   const pozvankyData = useDataWidgetu<Invitation[]>(smiPozvat ? '/api/invitations' : null, vyberPozvanky);
@@ -213,7 +217,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
   const [hledat, setHledat] = useState('');
   const zobrazeni = useMemo(() => {
     const q = hledat.trim().toLowerCase();
-    return q ? members.filter(m => obsahujeNekde(q, m.name, m.email, m.job_title)) : members;
+    return q ? members.filter(m => obsahujeNekde(q, m.name, m.email, m.job_title, m.phone)) : members;
   }, [members, hledat]);
 
   const [uprava, setUprava] = useState<{ m: Member; role: string; pozice: string; sazba: string } | null>(null);
@@ -468,8 +472,8 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
           {t('Lidé v podniku')}
           {data.data && <Chip tone="muted" size="sm">{members.length.toLocaleString(loc)}</Chip>}
         </h2>
-        {/* Nad osm lidí se v seznamu hledalo Ctrl+F v prohlížeči. */}
-        {members.length > 8 && (
+        {/* Od šesti lidí se v seznamu hledalo Ctrl+F v prohlížeči (dřív až nad osm). */}
+        {members.length >= 6 && (
           <SearchField value={hledat} onChange={setHledat} storageKey="tym" placeholder={t('Hledat člena — jméno, pozice…')} ariaLabel={t('Hledat člena týmu')} />
         )}
       </div>
@@ -480,9 +484,13 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
           <ul className="list">
             {zobrazeni.map(m => {
               const owner = m.id === team?.owner_id;
-              const menu: MenuItem[] = [
+              // Telefon jako odkaz tel: v řádku je na telefonu drobný cíl — „Zavolat" je proto
+              // i v „···" (44 px položka), s číslem v názvu.
+              const tel = smiKontakty && m.phone ? m.phone.replace(/[^\d+]/g, '') : '';
+              const menu: (MenuItem & { kratce?: string })[] = [
                 ...(smiProfil ? [{ label: t('Profil'), icon: 'user', onClick: () => otevriProfil(m.id) }] : []),
-                ...(smiOdebrat && !owner && !nadeMnou(m) && m.id !== user.id ? [{ label: t('Odebrat z týmu'), icon: 'minus', danger: true, onClick: () => setOdebrat(m) }] : []),
+                ...(tel && m.id !== Number(user.id) ? [{ label: t('Zavolat {telefon}', { telefon: m.phone ?? '' }), kratce: t('Zavolat'), icon: 'external', onClick: () => { window.location.href = `tel:${tel}`; } }] : []),
+                ...(smiOdebrat && !owner && !nadeMnou(m) && m.id !== user.id ? [{ label: t('Odebrat z týmu'), kratce: t('Odebrat'), icon: 'minus', danger: true, onClick: () => setOdebrat(m) }] : []),
               ];
               const upravit = smiUpravitClena && !owner && !nadeMnou(m);
               const akce = (
@@ -490,19 +498,39 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                   {upravit && <Button variant="secondary" size="sm" onClick={() => otevriUpravu(m)} aria-label={`Upravit: ${m.name}`}>{t('Upravit')}</Button>}
                   {menu.length > 1 || (menu.length === 1 && upravit)
                     ? <Menu size="sm" label={t('Další akce: {jmeno}', { jmeno: m.name })} items={menu} />
-                    : menu.length === 1 ? <Button variant="secondary" size="sm" onClick={menu[0].onClick}>{menu[0].label === t('Profil') ? t('Profil') : t('Odebrat')}</Button> : null}
+                    : menu.length === 1 ? <Button variant="secondary" size="sm" onClick={menu[0].onClick}>{menu[0].kratce ?? menu[0].label}</Button> : null}
                 </>
               );
+              // Meta: pozice · telefon (odkaz tel:) · „bez sazby" · e-mail. E-mail je poslední —
+              // když se řádek na telefonu nevejde, utne se tečkami on, ne telefon. „Bez sazby"
+              // je text, ne chip: widget Chybí sazba je hned nad nástrojem (vlastník se nepočítá).
+              const sazba = smiVidetSazby && m.hourly_rate != null && m.hourly_rate > 0 ? m.hourly_rate : null;
+              const casti: React.ReactNode[] = [
+                m.job_title ? <span key="pozice">{m.job_title}</span> : null,
+                tel ? (
+                  <a key="tel" href={`tel:${tel}`} className="hover:underline underline-offset-2"
+                    aria-label={t('Zavolat: {jmeno}, {telefon}', { jmeno: m.name, telefon: m.phone })}>{m.phone}</a>
+                ) : null,
+                smiVidetSazby && sazba == null && !owner ? <span key="sazba">{t('bez sazby')}</span> : null,
+                m.email ? <span key="email">{m.email}</span> : null,
+              ].filter(Boolean);
+              const meta = casti.length ? casti.flatMap((c, i) => (i ? [' · ', c] : [c])) : undefined;
+              const jinde = t('Je členem i jiného podniku a je tam právě přepnutý. Tady zůstává v seznamu, rozvrhu i ve mzdách.');
               return (
                 <ListRow key={m.id} akceVRadku
                   lead={<Avatar emoji={m.avatar} size="sm" />}
                   title={m.name}
-                  meta={[m.job_title, m.email].filter(Boolean).join(' · ')}
+                  meta={meta}
+                  // Sazba v jednom sloupci s tabulkovými číslicemi; bez ní pomlčka, ať sloupec drží.
+                  value={smiVidetSazby ? (sazba != null ? t('{sazba}/h', { sazba: money(sazba) }) : <span aria-hidden className="hidden sm:inline text-black/35">—</span>) : undefined}
                   right={<>
                     {owner ? <Chip tone="ink" size="sm">{t('Vlastník')}</Chip> : <Chip tone="muted" size="sm">{nazevRole(t, m, role)}</Chip>}
+                    {/* Na telefonu jen ikona (s popisem v title a pro odečítač), od sm celý chip. */}
                     {m.aktivni_jinde && (
-                      <span className="hidden sm:inline-flex" title={t('Je členem i jiného podniku a je tam právě přepnutý. Tady zůstává v seznamu, rozvrhu i ve mzdách.')}>
-                        <Chip tone="muted" size="sm">{t('Právě v jiném podniku')}</Chip>
+                      <span className="inline-flex" title={jinde}>
+                        <Chip tone="muted" size="sm" icon="swap">
+                          <span className="sr-only sm:not-sr-only">{t('Právě v jiném podniku')}</span>
+                        </Chip>
                       </span>
                     )}
                   </>}
