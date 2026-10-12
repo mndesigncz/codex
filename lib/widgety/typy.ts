@@ -50,7 +50,7 @@ export type IdStranky =
   | 'vedeni.rozvrh' | 'vedeni.moje_smeny' | 'zamestnanec.moje_smeny' | 'zamestnanec.dostupnost'
   | 'vedeni.dochazka' | 'vedeni.tym'
   | 'vedeni.sklad' | 'zamestnanec.sklad'
-  | 'vedeni.receptury' | 'vedeni.menu'
+  | 'vedeni.receptury' | 'zamestnanec.receptury' | 'vedeni.menu'
   | 'vedeni.uzaverky' | 'zamestnanec.uzaverka'
   | 'vedeni.finance' | 'vedeni.togo' | 'vedeni.vsechny_podniky'
   | 'vedeni.ukoly' | 'zamestnanec.ukoly' | 'vedeni.planovani' | 'vedeni.napady' | 'zamestnanec.napady'

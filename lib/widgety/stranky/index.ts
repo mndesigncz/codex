@@ -17,6 +17,7 @@ import { STRANKA as vedeniTym } from './vedeni.tym.ts';
 import { STRANKA as vedeniSklad } from './vedeni.sklad.ts';
 import { STRANKA as zamestnanecSklad } from './zamestnanec.sklad.ts';
 import { STRANKA as vedeniReceptury } from './vedeni.receptury.ts';
+import { STRANKA as zamestnanecReceptury } from './zamestnanec.receptury.ts';
 import { STRANKA as vedeniMenu } from './vedeni.menu.ts';
 import { STRANKA as vedeniUzaverky } from './vedeni.uzaverky.ts';
 import { STRANKA as zamestnanecUzaverka } from './zamestnanec.uzaverka.ts';
@@ -49,7 +50,7 @@ export const STRANKY: readonly DefiniceStranky[] = [
   vedeniRozvrh, vedeniMojeSmeny, zamestnanecMojeSmeny, zamestnanecDostupnost,
   vedeniDochazka, vedeniTym,
   vedeniSklad, zamestnanecSklad,
-  vedeniReceptury, vedeniMenu,
+  vedeniReceptury, zamestnanecReceptury, vedeniMenu,
   vedeniUzaverky, zamestnanecUzaverka,
   vedeniFinance, vedeniTogo, vedeniVsechnyPodniky,
   vedeniUkoly, zamestnanecUkoly, vedeniPlanovani, vedeniNapady, zamestnanecNapady,

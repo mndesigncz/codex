@@ -37,7 +37,7 @@ export const AKCE_HLEDANI: AkceHledani[] = [
   { id: 'sklad-dochazi', nazev: 'Co dochází ve skladu', kde: 'Sklad', ikona: 'box', slova: ['zásoby', 'málo', 'kriticky', 'objednat', 'nákup'], stranka: 'inventory', arg: 'stav:dochazi', rozhrani: V },
   { id: 'sklad-nakup', nazev: 'Nákupní seznam', kde: 'Sklad', ikona: 'cart', slova: ['objednávka', 'nakoupit', 'dodavatel'], stranka: 'inventory', arg: 'stav:dochazi', rozhrani: V },
   { id: 'sklad-zapsat', nazev: 'Zapsat stav skladu', kde: 'Sklad', ikona: 'box', slova: ['inventura', 'zbytky', 'spočítat', 'hlášení'], stranka: 'inventory', rozhrani: Z },
-  { id: 'receptury', nazev: 'Receptury a odpis z kasy', kde: 'Receptury', ikona: 'clipboard', slova: ['recept', 'suroviny', 'odepsat', 'kasa', 'produkt'], stranka: 'recipes', rozhrani: V },
+  { id: 'receptury', nazev: 'Receptury a odpis z kasy', kde: 'Receptury', ikona: 'clipboard', slova: ['recept', 'suroviny', 'odepsat', 'kasa', 'produkt'], stranka: 'recipes', rozhrani: VZ },
   // Docházka a lidé
   { id: 'dochazka-export', nazev: 'Export docházky pro účetní', kde: 'Docházka', ikona: 'download', slova: ['csv', 'mzdy', 'účetní', 'hodiny', 'výplata'], stranka: 'attendance', rozhrani: V },
   { id: 'dochazka-premie', nazev: 'Prémie a srážky k mzdě', kde: 'Docházka › Souhrn hodin', ikona: 'coins', slova: ['bonus', 'odměna v penězích', 'srážka', 'výplata'], stranka: 'attendance', rozhrani: V },

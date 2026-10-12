@@ -161,7 +161,9 @@ export default function ({ eq, ok }: Testy) {
   ok('Receptury (N1): odpis přes POST /api/pos/sync, ne neexistující PATCH /api/pos/products',
     recipes.includes("'/api/pos/sync'") && !/method: 'PATCH'/.test(recipes));
   ok('Receptury (N1): „Odepsat prodeje" jen s pokladna.synchronizovat', /ma\('pokladna\.synchronizovat'\)/.test(recipes));
-  ok('Receptury: plocha vedeni.receptury s hlavičkou (žádný vlastní h1)', recipes.includes('stranka="vedeni.receptury"') && !/<h1/.test(recipes));
+  ok('Receptury: plocha podle rozhraní (vedeni.receptury výchozí, zamestnanec.receptury z layoutu zaměstnance) s hlavičkou, žádný vlastní h1',
+    recipes.includes("stranka = 'vedeni.receptury'") && recipes.includes('stranka={stranka}') && !/<h1/.test(recipes)
+    && zdroj('components/employee/EmployeeLayout.tsx').includes('stranka="zamestnanec.receptury"'));
   ok('Receptury: smazání receptury bez setTimeout(save) (dřív odešla stará receptura)', !/setTimeout\(save/.test(recipes));
   const editor = kod('components/employer/MenuEditor.tsx');
   ok('Menu: plocha vedeni.menu, žádné prompt()/confirm(), ruční okno ani znaky ↑ ↓ × ↗ ＋', editor.includes('stranka="vedeni.menu"')

@@ -96,6 +96,8 @@ const tonMarze = (m: number) => (m >= 65 ? 'text-ok-ink' : m >= 45 ? 'text-[#161
 export interface RecipesViewProps {
   openProductId?: string;
   onNavigate?: (view: string, arg?: string) => void;
+  /** Plocha, na které se stránka kreslí: vedení (výchozí) nebo zaměstnanec (kolo 5 — receptury i pro tým). */
+  stranka?: 'vedeni.receptury' | 'zamestnanec.receptury';
 }
 
 // Archivované suroviny zůstávají: receptura je může pořád obsahovat a bez nich by editor
@@ -106,7 +108,7 @@ const vyberKategorie = (raw: unknown) => (Array.isArray(raw) ? raw.map((c: any) 
 const vyberNavody = (raw: any): { id: number; title: string; productId: string | null }[] =>
   (Array.isArray(raw?.guides) ? raw.guides.filter((x: any) => x.productId) : []);
 
-export default function RecipesView({ openProductId, onNavigate }: RecipesViewProps = {}) {
+export default function RecipesView({ openProductId, onNavigate, stranka = 'vedeni.receptury' }: RecipesViewProps = {}) {
   // Data (návody) přísně přes useSmi — bez jistoty se neptat; tlačítka přes
   // `ma` jako Sklad: do načtení oprávnění ANO, rozhodne server.
   const t = useT('sklad');
@@ -285,7 +287,9 @@ export default function RecipesView({ openProductId, onNavigate }: RecipesViewPr
     menu: smiOdepsat ? [{ label: t('Odepsat prodeje'), icon: 'swap', onClick: sync }] : undefined,
     // Sklad › Položky / Receptury z kasy / Inventura — stejné záložky jako na Skladu (kolo 82),
     // takže se z receptur chodí na položky a zpět jedním klepnutím.
-    aside: <SkladZalozky aktivni="receptury" onNavigate={onNavigate} smiReceptury smiInventura={smi('inventura.pocitat') && smi('sklad.zobrazit')} />,
+    // Inventura je okno nad Skladem vedení; zaměstnanec má zápis stavu rovnou ve svém Skladu.
+    aside: <SkladZalozky aktivni="receptury" onNavigate={onNavigate} smiReceptury
+      smiInventura={stranka === 'vedeni.receptury' && smi('inventura.pocitat') && smi('sklad.zobrazit')} />,
   };
 
   let nastroj: React.ReactNode;
@@ -397,7 +401,7 @@ export default function RecipesView({ openProductId, onNavigate }: RecipesViewPr
 
   return (
     <>
-      <PlochaWidgetu stranka="vedeni.receptury" hlavicka={hlavicka} nastroj={<div ref={nastrojRef} className="scroll-mt-4">{nastroj}</div>} />
+      <PlochaWidgetu stranka={stranka} hlavicka={hlavicka} nastroj={<div ref={nastrojRef} className="scroll-mt-4">{nastroj}</div>} />
       {zprava && <Toast message={zprava.text} tone={zprava.ton} onClose={() => setZprava(null)} />}
     </>
   );
