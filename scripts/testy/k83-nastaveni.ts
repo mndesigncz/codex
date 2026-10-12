@@ -3,6 +3,8 @@
 // Čistá logika bez databáze a bez prohlížeče.
 
 import type { Testy } from './_testy.ts';
+import { widget } from '../../lib/widgety/katalog/index.ts';
+import { stranka } from '../../lib/widgety/stranky/index.ts';
 import { vyuziti, limityTarifu, LIMITS } from '../../lib/plan.ts';
 import {
   souhrnOdchodu, SOUHRN_ZAVRIT_S, pocetStavuSkladu, seradSkladTabletu, filtrujSkladTabletu, minimumPolozky, filtrZeSkladArg,
@@ -63,4 +65,12 @@ export default function ({ eq, ok }: Testy) {
   eq('proklik z widgetu: stav:dochazi|Nápoje → Dochází v kategorii Nápoje', filtrZeSkladArg('stav:dochazi|Nápoje'), { stav: 'dochazi', kategorie: 'Nápoje' });
   eq('proklik z widgetu: jen stav, jen kategorie, nic, položka', [filtrZeSkladArg('stav:dochazi'), filtrZeSkladArg('Čaj'), filtrZeSkladArg(undefined), filtrZeSkladArg('stav:dochazi|polozka:12')],
     [{ stav: 'dochazi', kategorie: null }, { stav: 'vse', kategorie: 'Čaj' }, { stav: 'vse', kategorie: null }, { stav: 'dochazi', kategorie: null }]);
+
+  // ---- 4) týdenní rozpis na tabletu (widget Kdo má směnu) ----
+  const tym = widget('rozvrh.tym_nahled');
+  ok('rozpis: Kdo má směnu má rozhraní kiosk a nabízí se pro Směnu tabletu', !!tym && tym.rozhrani.includes('kiosk') && tym.stranky.includes('kiosk.smena'));
+  ok('rozpis: v doporučených stránky kiosk.smena', !!stranka('kiosk.smena')?.doporucene.includes('rozvrh.tym_nahled'));
+  ok('rozpis: NE ve výchozím rozložení tabletu (podnik s vypnutým náhledem ho nesmí dostat sám)',
+    !Object.values(stranka('kiosk.smena')?.vychozi ?? {}).some(seznam => (seznam ?? []).some(q => q.w === 'rozvrh.tym_nahled')));
+  ok('rozpis: widget chce rozvrh.nahled — bez klíče ho tablet nevidí', JSON.stringify(tym?.opravneni.vse) === JSON.stringify(['rozvrh.nahled']));
 }

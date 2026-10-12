@@ -2094,7 +2094,7 @@ export const SYSTEMOVE_ROLE: SystemovaRole[] = [
  {
   "klic": "kiosk",
   "nazev": "Kiosk (tablet)",
-  "popis": "Systémová role pouze pro účty typu kiosk. Nejde přiřadit osobě a vlastní role nesmí kombinovat dochazka.tablet s finance.*. Vlastni.* má jen v rozsahu profil a notifikace. Odpovídá dnešnímu chování tabletu: píchání s PINem, uzávěrka za kohokoli, všechny úkoly týmu, postupy za osobu, sklad, inventura, výroba, příjem objednávek a rezervací, kartička hosta, vyprodáno, akce, žebříček, týmový chat včetně zakládání konverzací.",
+  "popis": "Systémová role pouze pro účty typu kiosk. Nejde přiřadit osobě a vlastní role nesmí kombinovat dochazka.tablet s finance.*. Vlastni.* má jen v rozsahu profil a notifikace. Odpovídá dnešnímu chování tabletu: píchání s PINem, uzávěrka za kohokoli, všechny úkoly týmu, postupy za osobu, sklad, inventura, výroba, příjem objednávek a rezervací, kartička hosta, vyprodáno, akce, žebříček, týmový chat včetně zakládání konverzací a náhled rozvrhu týmu (jména a časy, bez sazeb).",
   "typ": "kiosk",
   "opravneni": [
    "akce.checklist",
@@ -2112,6 +2112,7 @@ export const SYSTEMOVE_ROLE: SystemovaRole[] = [
    "postupy.spoustet",
    "postupy.zobrazit",
    "rezervace.zobrazit",
+   "rozvrh.nahled",
    "sklad.hlasit",
    "sklad.navrhnout",
    "sklad.zapsat_stav",

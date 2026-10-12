@@ -11,12 +11,19 @@
 //     dotyk odpočet zastaví;
 //   - Sklad: Segmented „Vše · Dochází (n) · Kriticky (n)" filtruje, řazení kriticky › dochází,
 //     meta „min 2 kg · chybí 1"; proklik z widgetu Docházející zásoby otevře Sklad s Dochází;
+//   - widget Kdo má směnu (rozvrh.tym_nahled) přidaný do rozložení tabletu kreslí týden týmu
+//     z /api/shifts?team=1 a nekreslí odkaz Moje směny (tablet ho nemá kam vést).
 // Rozpis se skládá z časů kolem „teď", ať sonda neplatí na to, kdy běží.
 //   SONDY_ZAKLAD=http://localhost:3400 node scripts/sondy/kiosk.mjs
 import { readFileSync } from 'node:fs';
 import { kontext, konec, tvrdi, dokud, roleMine, DIR, BASE } from './k68-spolecne.mjs';
 
 const nacti = (jmeno) => JSON.parse(readFileSync(DIR + jmeno + '.json', 'utf8'));
+/** Náhled rozvrhu týmu (/api/shifts?team=1) s dnešním a zítřejším pražským dnem místo DNES/ZITRA ve fixtuře. */
+const tymoveSmeny = () => {
+  const den = (n) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now() + n * 86400000));
+  return JSON.parse(readFileSync(DIR + 'k69-b1-shifts-team.json', 'utf8').replaceAll('"DNES"', `"${den(0)}"`).replaceAll('"ZITRA"', `"${den(1)}"`));
+};
 const FIX = nacti('k69-b9-rozlozeni-smena');
 const KIOSK = roleMine('kiosk');
 const STRANKA = 'kiosk.smena';
@@ -62,6 +69,8 @@ const podvrh = (req, json, stav) => {
     return json({ ok: true, action: telo.action, entry: { id: 900, clockIn: new Date().toISOString(), clockOut: null } });
   }
   if (path === '/api/closings/handover' && m === 'GET') return json(nacti('k69-b9-handover'));
+  // Tablet má od kola 7 rozvrh.nahled: Dnešní směny berou náhled rozvrhu týmu (tvar skutečné routy).
+  if (path === '/api/shifts' && m === 'GET' && new URL(req.url()).searchParams.get('team') === '1') return json(tymoveSmeny());
   // Dnešní průběhy: jen otevírání hotové, Zavírací rutina (povinná) ještě neběžela → odznak Postupů.
   if (path === '/api/procedures/runs' && m === 'GET') return json({ runs: nacti('k69-b6b-runs').runs.filter(r => r.procedure_id !== 2) });
   return undefined;
@@ -270,7 +279,7 @@ const zalozka = (p, nazev) => p.locator('nav').getByRole('button', { name: new R
   tvrdi('sklad: nad kategoriemi Segmented „Stav zásob"', await dokud(() => pas.isVisible().catch(() => false), 8000));
   const dochazi = pas.getByRole('tab', { name: /^Dochází/ });
   const kriticky = pas.getByRole('tab', { name: /^Kriticky/ });
-  tvrdi('sklad: počty Dochází 4 a Kriticky 3 (bez neschválených a odložených navíc)', (await dochazi.innerText()).replace(/\s+/g, '') === 'Dochází4' && (await kriticky.innerText()).replace(/\s+/g, '') === 'Kriticky3',
+  tvrdi('sklad: počty Dochází 4 a Kriticky 3 (bez neschválených a odložených navíc)', await dokud(async () => (await dochazi.innerText()).replace(/\s+/g, '') === 'Dochází4' && (await kriticky.innerText()).replace(/\s+/g, '') === 'Kriticky3', 5000),
     `${await dochazi.innerText()} / ${await kriticky.innerText()}`);
   tvrdi('sklad: Segmented v jednom řádku bez posuvu, cíle ≥ 48 px', await pas.evaluate(e => e.scrollWidth <= e.clientWidth + 1) && ((await dochazi.boundingBox())?.height ?? 0) >= 47.5,
     `${await pas.evaluate(e => `${e.scrollWidth}/${e.clientWidth}`)} výška ${(await dochazi.boundingBox())?.height}`);
@@ -297,6 +306,41 @@ const zalozka = (p, nazev) => p.locator('nav').getByRole('button', { name: new R
     && (await p.getByRole('button', { name: 'Čaje sypané', exact: true }).getAttribute('aria-pressed')) === 'true', 4000));
   tvrdi('proklik: seznam ukazuje jen Matchu', await dokud(async () => (await nazvy()).join('|') === 'Matcha Ceremonial', 2000), (await nazvy()).join('|'));
   tvrdi('sklad: bez chyb v konzoli', chyby.length === 0, chyby.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
+// ---------------------------------------------------------------------------
+// 6) Týdenní rozpis: vedení přidá tabletu widget Kdo má směnu (doporučený, ne výchozí)
+// ---------------------------------------------------------------------------
+{
+  const dnesP = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date());
+  const zaDni = (n) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now() + n * 86400000));
+  const fix = { ...FIX, polozky: [...FIX.polozky, { id: 'tym-nahled', widget: 'rozvrh.tym_nahled', velikost: 'L', nastaveni: { rozsah: 'tyden' } }] };
+  const smeny = (req, json, stav) => {
+    const u = new URL(req.url());
+    if (u.pathname === '/api/shifts' && u.searchParams.get('team') === '1') {
+      (stav.tymDotazy ??= []).push(u.search);
+      // Tvar skutečné routy (app/api/shifts, team=1): enabled + shifts se jménem, časy a isMine.
+      return json({ enabled: true, shifts: [
+        { id: 71, date: dnesP, startTime: '08:00', endTime: '16:00', type: 'morning', employeeId: 2, employeeName: 'Eva Testová', employeeAvatar: '👩', isMine: false },
+        { id: 72, date: dnesP, startTime: '14:00', endTime: '22:00', type: 'afternoon', employeeId: 3, employeeName: 'Jakub Horák', employeeAvatar: '🧔', isMine: false },
+        { id: 73, date: zaDni(1), startTime: '07:00', endTime: '15:00', type: 'morning', employeeId: 8, employeeName: 'Lucie Černá', employeeAvatar: '👩‍🦰', isMine: false },
+        { id: 74, date: zaDni(5), startTime: '10:00', endTime: '18:00', type: 'day', employeeId: 7, employeeName: 'Petr Novák', employeeAvatar: '🧑‍🍳', isMine: false },
+      ] });
+    }
+    return podvrh(req, json, stav);
+  };
+  const { ctx, p, stav, chyby } = await kontext({ role: 'kiosk', viewport: { width: 810, height: 1080 }, mobil: true, fix, mineData: KIOSK, dalsi: smeny });
+  await otevriTablet(p);
+  const w = p.locator(`[data-plocha="${STRANKA}"] li[data-widget="rozvrh.tym_nahled"]`);
+  tvrdi('rozpis: widget Kdo má směnu se na tabletu vykreslí', await dokud(() => w.isVisible().catch(() => false), 8000));
+  tvrdi('rozpis: kreslí data z /api/shifts?team=1 (dnes i další dny týdne)', await dokud(async () => {
+    const tx = await w.innerText().catch(() => '');
+    return /Eva Testová/.test(tx) && /Lucie Černá/.test(tx) && /Petr Novák/.test(tx);
+  }, 6000) && (stav.tymDotazy ?? []).some(q => q.includes('team=1')), (await w.innerText().catch(() => '')).replace(/\n/g, ' | ').slice(0, 200));
+  tvrdi('rozpis: bez odkazu Moje směny (tablet nemá kam vést)', await w.getByRole('link', { name: /Moje směny/ }).count() === 0 && await w.getByRole('button', { name: /Moje směny/ }).count() === 0);
+  tvrdi('rozpis: widget bez přetečení', await w.evaluate(li => li.scrollWidth <= li.clientWidth + 1));
+  tvrdi('rozpis: bez chyb v konzoli', chyby.length === 0, chyby.slice(0, 3).join(' | '));
   await ctx.close();
 }
 

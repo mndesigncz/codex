@@ -18,6 +18,11 @@ import {
 } from './k68-spolecne.mjs';
 
 const nacti = (jmeno) => JSON.parse(readFileSync(DIR + jmeno + '.json', 'utf8'));
+/** Náhled rozvrhu týmu (/api/shifts?team=1) s dnešním a zítřejším pražským dnem místo DNES/ZITRA ve fixtuře. */
+const tymoveSmeny = () => {
+  const den = (n) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now() + n * 86400000));
+  return JSON.parse(readFileSync(DIR + 'k69-b1-shifts-team.json', 'utf8').replaceAll('"DNES"', `"${den(0)}"`).replaceAll('"ZITRA"', `"${den(1)}"`));
+};
 const FIX = nacti('k69-b9-rozlozeni-smena');
 const KIOSK = roleMine('kiosk');
 const KIOSK_URL = '/kiosk';
@@ -38,6 +43,9 @@ const podvrh = (req, json, stav) => {
   // Předávka a dnešní průběhy postupů ve tvaru skutečných rout (obecné fixtury je nemají).
   if (path === '/api/closings/handover' && m === 'GET') return json(nacti('k69-b9-handover'));
   if (path === '/api/procedures/runs' && m === 'GET') return json(nacti('k69-b6b-runs'));
+  // Náhled rozvrhu týmu (tablet má od kola 7 rozvrh.nahled — Dnešní směny i Kdo má směnu berou
+  // /api/shifts?team=1). Obecná fixtura shifts.json je holé pole ze starší verze API.
+  if (path === '/api/shifts' && m === 'GET' && url.searchParams.get('team') === '1') return json(tymoveSmeny());
   if (path === '/api/rozlozeni/vychozi' && url.searchParams.get('stranka') === STRANKA) {
     if (m === 'PUT') { stav.vychoziPuty.push({ stranka: STRANKA, ...JSON.parse(req.postData() || '{}') }); return json({ ok: true, polozky: [], zamceno: false, verze: 1 }); }
     return json(nacti('k69-b9-vychozi-smena'));
@@ -326,7 +334,8 @@ const zalozka = (p, nazev) => p.locator('nav').getByRole('button', { name: new R
   let dialog = false;
   p.on('dialog', d => { dialog = true; void d.dismiss(); });
   await p.goto(BASE + '/employer/overview?view=settings', { waitUntil: 'networkidle' });
-  tvrdi('S1: Nastavení má PageHeader s jediným h1', await p.getByRole('heading', { level: 1, name: 'Nastavení' }).isVisible() && await p.locator('h1:visible').count() === 1);
+  // Na dev serveru se Nastavení po networkidle ještě dokompilovává (deep link přepne pohled až po něm).
+  tvrdi('S1: Nastavení má PageHeader s jediným h1', await dokud(async () => await p.getByRole('heading', { level: 1, name: 'Nastavení' }).isVisible() && await p.locator('h1:visible').count() === 1, 10000));
   await p.getByRole('button', { name: /Vzhled/ }).filter({ visible: true }).first().click();
   tvrdi('S2: motiv je Segmented (tablist), ne dvě limetkové volby', await dokud(() => p.getByRole('tab', { name: 'Tmavý' }).isVisible(), 1500) && await p.locator(LIMETKA).count() === 0);
   tvrdi('S2: nápovědy jako přepínač', await p.getByRole('switch', { name: /Zobrazovat nápovědy/ }).isVisible());
@@ -383,6 +392,8 @@ const zalozka = (p, nazev) => p.locator('nav').getByRole('button', { name: new R
   await p.waitForTimeout(500);
   // Kolo 6 (B3): na telefonu jsou sekce svislý seznam ve skupinách Osobní / Podnik (navigace „Sekce nastavení"),
   // ne posuvný pás 13 pilulek — klepnutí otevře sekci s hlavičkou a „Zpět".
+  // Deep link přepne pohled až po dokompilování Nastavení (dev server) — čeká se na seznam sekcí.
+  await dokud(() => p.getByRole('navigation', { name: 'Sekce nastavení' }).first().isVisible().catch(() => false), 10000);
   tvrdi('S5: Nastavení na telefonu 390 bez přetečení, sekce jako svislý seznam', await bezPreteceni(p) && await p.getByRole('navigation', { name: 'Sekce nastavení' }).first().isVisible());
   await p.screenshot({ path: OUT + 'k69-b9-nastaveni-tel.png', fullPage: true });
   await ctx.close();
