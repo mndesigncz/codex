@@ -3,7 +3,8 @@
 // (components/employee/MyShifts.tsx). Bloky, které dřív stály natvrdo nad seznamem a pod ním
 // (tři dlaždice, Kdo má směnu, Schválené volno, Minulé směny, kalendář a burza), jsou widgety.
 //
-// Výchozí z katalogu: čísla nahoře, seznam, pak tým a vlastní historie. Kalendář uzávěrek
+// Výchozí z katalogu: čísla nahoře, seznam, pak tým a vlastní historie. Kolo 7 přidalo pod čísla
+// Moje docházka (vlastní píchačky po dnech) — před výplatou se kontroluje právě tady. Kalendář uzávěrek
 // na konci ukáže zaměstnanci jeho vlastní dny (bez uzaverky.zobrazit_vse rozsah Tým nemá).
 import type { DefiniceStranky } from '../typy.ts';
 
@@ -26,6 +27,7 @@ export const STRANKA: DefiniceStranky = {
     'uzaverky.kalendar',
     'rozvrh.vymeny',
     'moje.vydelek',
+    'dochazka.moje_zaznamy',
     'dochazka.moje_odpracovano',
     'rozvrh.pripominka_dostupnosti',
   ],
@@ -34,6 +36,9 @@ export const STRANKA: DefiniceStranky = {
       { w: 'moje.smeny_prehled', s: 'M' },
       { w: 'moje.vydelek', s: 'S' },
       { w: 'dochazka.moje_odpracovano', s: 'S' },
+      // Kolo 7: Moje docházka (M) pod Můj výdělek — za oběma S dlaždicemi, ať ty sdílejí řadu
+      // (na telefonu vedle sebe) a seznam dnů nerozdělí výdělek a Odpracováno na dvě osamělé řady.
+      { w: 'dochazka.moje_zaznamy', s: 'M' },
       { w: 'nastroj' },
       { w: 'rozvrh.tym_nahled', s: 'L' },
       { w: 'moje.schvalene_volno', s: 'M' },

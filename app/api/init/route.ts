@@ -559,6 +559,9 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS staffing_rules JSONB`);
     // watchdog for forgotten clock-outs: when the person was already reminded
     await ddl(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS nudged_at TIMESTAMP`);
+    // Kolo 7: kdo záznam ručně upravil nebo přidal a kdy (důvod je v note) — hodiny jsou mzda.
+    await ddl(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS updated_by INTEGER`);
+    await ddl(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP`);
 
     // ---- Announcements (pinned team board) ----
     await ddl(sql`

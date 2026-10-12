@@ -1633,5 +1633,16 @@
   "„{nazev}\" zmizí z tabule. Vrátit to nepůjde.": "„{nazev}” zniknie z tablicy. Nie będzie można tego cofnąć.",
   "„{nazev}\" zmizí ze seznamu i z přehledu týmu.": "„{nazev}” zniknie z listy i z przeglądu zespołu.",
   "„{nazev}“ přidáno, ale kasa u něj nedala cenu — doplň ji ručně.": "„{nazev}” dodano, ale kasa nie podała do niej ceny — uzupełnij ją ręcznie.",
-  "…a dalších {n}": "…i {n} więcej"
+  "…a dalších {n}": "…i {n} więcej",
+  "plán {od}–{do}": "plan {od}–{do}",
+  "upraveno ({kdo})": "edytowano ({kdo})",
+  "upraveno": "edytowano",
+  "+{n} min pozdě": "+{n} min spóźnienia",
+  "odešel o {n} min dřív": "wyszedł {n} min wcześniej",
+  "Upravil(a) {kdo}": "Edytował(a) {kdo}",
+  "Důvod (nepovinné)": "Powód (opcjonalnie)",
+  "Uvidí ho účetní v exportu.": "Księgowa zobaczy go w eksporcie.",
+  "Uvidí ho i člověk v oznámení o změně a účetní v exportu.": "Zobaczy go osoba w powiadomieniu o zmianie i księgowa w eksporcie.",
+  "Např. zapomněl se odpíchnout": "Np. zapomniał zarejestrować wyjście",
+  "Upraveno|zaznam": "Edytowany"
 }

@@ -1895,5 +1895,22 @@
   "Kolik hodin má kdo v měsíci naplánováno, kdo se blíží limitu z pravidel generátoru a s oprávněním ke mzdám i kolik to stojí.": "Koľko hodín má kto v mesiaci naplánovaných, kto sa blíži limitu z pravidiel generátora a s oprávnením k mzdám aj koľko to stojí.",
   "{n, plural, one {# směna v rozvrhu} few {# směny v rozvrhu} other {# směn v rozvrhu}}": "{n, plural, one {# zmena v rozvrhu} few {# zmeny v rozvrhu} other {# zmien v rozvrhu}}",
   "{n, plural, one {Volno schváleno, ale # směna zůstala v rozvrhu} few {Volno schváleno, ale # směny zůstaly v rozvrhu} other {Volno schváleno, ale # směn zůstalo v rozvrhu}}": "{n, plural, one {Voľno schválené, ale # zmena zostala v rozvrhu} few {Voľno schválené, ale # zmeny zostali v rozvrhu} other {Voľno schválené, ale # zmien zostalo v rozvrhu}}",
-  "Upravit rozvrh": "Upraviť rozvrh"
+  "Upravit rozvrh": "Upraviť rozvrh",
+  "Dnes podle rozvrhu {od}–{do}": "Dnes podľa rozvrhu {od}–{do}",
+  "Dnes nemáš směnu v rozvrhu": "Dnes nemáš zmenu v rozvrhu",
+  "+{n} min po začátku": "+{n} min po začiatku",
+  "Směna začíná za {delka}": "Zmena začína o {delka}",
+  "Důvod (nepovinné)": "Dôvod (nepovinné)",
+  "Např. zapomněl se odpíchnout": "Napr. zabudol sa odpichnúť",
+  "Pozdě": "Neskoro",
+  "plán {h} h": "plán {h} h",
+  "{n}× pozdě": "{n}× neskoro",
+  "Minulý měsíc nic neodpíchnuto.": "Minulý mesiac nič neodpichnuté.",
+  "Tento měsíc zatím nic neodpíchnuto.": "Tento mesiac zatiaľ nič neodpichnuté.",
+  "běží {cas}": "beží {cas}",
+  "Nad 24 h": "Nad 24 h",
+  "ručně": "ručne",
+  "…a {n, plural, one {# další den} few {# další dny} other {# dalších dní}}": "…a {n, plural, one {# ďalší deň} few {# ďalšie dni} other {# ďalších dní}}",
+  "Moje docházka": "Moja dochádzka",
+  "Tvoje příchody a odchody po dnech za měsíc.": "Tvoje príchody a odchody po dňoch za mesiac."
 }

@@ -46,7 +46,13 @@
    "clockIn": "2026-09-17T06:58:00Z",
    "clockOut": null,
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   },
   {
    "id": 499,
@@ -56,7 +62,13 @@
    "clockIn": "2026-09-16T10:02:00Z",
    "clockOut": "2026-09-16T18:11:00Z",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": "12:00",
+   "planEnd": "20:00",
+   "planDate": "2026-09-16"
   },
   {
    "id": 498,
@@ -66,7 +78,13 @@
    "clockIn": "2026-09-16T08:55:00Z",
    "clockOut": "2026-09-16T17:03:00Z",
    "source": "app",
-   "note": "Přijel dřív kvůli dodávce."
+   "note": "Přijel dřív kvůli dodávce.",
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   },
   {
    "id": 497,
@@ -76,7 +94,13 @@
    "clockIn": "2026-09-15T07:01:00Z",
    "clockOut": "2026-09-15T16:28:00Z",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": "09:00",
+   "planEnd": "19:00",
+   "planDate": "2026-09-15"
   },
   {
    "id": 496,
@@ -86,7 +110,13 @@
    "clockIn": "2026-09-15T11:58:00Z",
    "clockOut": "2026-09-15T20:04:00Z",
    "source": "kiosk",
-   "note": null
+   "note": "Zapomněla odpíchnout odchod, doplněno podle uzávěrky.",
+   "updatedBy": 6,
+   "updatedByName": "Zuzana Vedoucí",
+   "updatedAt": "2026-09-16T07:30:00Z",
+   "planStart": "14:00",
+   "planEnd": "22:00",
+   "planDate": "2026-09-15"
   },
   {
    "id": 502,
@@ -96,7 +126,13 @@
    "clockIn": "2026-09-11T06:00:00Z",
    "clockOut": "2026-09-11T14:00:00Z",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   },
   {
    "id": 503,
@@ -106,7 +142,13 @@
    "clockIn": "2026-09-11T06:00:00Z",
    "clockOut": "2026-09-11T14:00:00Z",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   },
   {
    "id": 504,
@@ -116,7 +158,13 @@
    "clockIn": "2026-09-11T06:00:00Z",
    "clockOut": "2026-09-11T14:00:00Z",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   },
   {
    "id": 505,
@@ -126,7 +174,13 @@
    "clockIn": "2026-09-11T06:00:00Z",
    "clockOut": "2026-09-11T14:00:00Z",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   },
   {
    "id": 506,
@@ -136,7 +190,13 @@
    "clockIn": "2026-09-12T06:00:00Z",
    "clockOut": "2026-09-12T14:00:00Z",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   },
   {
    "id": 507,
@@ -146,7 +206,13 @@
    "clockIn": "2026-09-12T06:00:00Z",
    "clockOut": "2026-09-12T14:00:00Z",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   },
   {
    "id": 508,
@@ -156,7 +222,13 @@
    "clockIn": "2026-09-12T06:00:00Z",
    "clockOut": "2026-09-12T14:00:00Z",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   },
   {
    "id": 509,
@@ -166,7 +238,13 @@
    "clockIn": "2026-09-12T06:00:00Z",
    "clockOut": "2026-09-12T14:00:00Z",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   },
   {
    "id": 510,
@@ -176,7 +254,13 @@
    "clockIn": "2026-09-13T06:00:00Z",
    "clockOut": "2026-09-13T14:00:00Z",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   },
   {
    "id": 511,
@@ -186,7 +270,13 @@
    "clockIn": "2026-09-13T06:00:00Z",
    "clockOut": "2026-09-13T14:00:00Z",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   },
   {
    "id": 512,
@@ -196,7 +286,13 @@
    "clockIn": "2026-09-13T06:00:00Z",
    "clockOut": "2026-09-13T14:00:00Z",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   },
   {
    "id": 513,
@@ -206,7 +302,13 @@
    "clockIn": "2026-09-13T06:00:00Z",
    "clockOut": "2026-09-13T14:00:00Z",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   },
   {
    "id": 514,
@@ -216,7 +318,13 @@
    "clockIn": "2026-09-14T06:00:00Z",
    "clockOut": "2026-09-14T14:00:00Z",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   },
   {
    "id": 515,
@@ -226,7 +334,13 @@
    "clockIn": "2026-09-14T06:00:00Z",
    "clockOut": "2026-09-14T14:00:00Z",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   },
   {
    "id": 516,
@@ -236,7 +350,13 @@
    "clockIn": "2026-09-14T06:00:00Z",
    "clockOut": "2026-09-14T14:00:00Z",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   },
   {
    "id": 517,
@@ -246,7 +366,13 @@
    "clockIn": "2026-09-14T06:00:00Z",
    "clockOut": "2026-09-14T14:00:00Z",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   },
   {
    "id": 518,
@@ -256,7 +382,13 @@
    "clockIn": "2026-09-15T06:00:00Z",
    "clockOut": "2026-09-15T14:00:00Z",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   },
   {
    "id": 519,
@@ -266,7 +398,13 @@
    "clockIn": "2026-09-15T06:00:00Z",
    "clockOut": "2026-09-15T14:00:00Z",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   },
   {
    "id": 520,
@@ -276,7 +414,13 @@
    "clockIn": "2026-09-15T06:00:00Z",
    "clockOut": "2026-09-15T14:00:00Z",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   },
   {
    "id": 521,
@@ -286,7 +430,13 @@
    "clockIn": "2026-09-15T06:00:00Z",
    "clockOut": "2026-09-15T14:00:00Z",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   },
   {
    "id": 522,
@@ -296,7 +446,13 @@
    "clockIn": "2026-09-16T06:00:00Z",
    "clockOut": "2026-09-16T14:00:00Z",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": "07:45",
+   "planEnd": "16:00",
+   "planDate": "2026-09-16"
   },
   {
    "id": 523,
@@ -306,7 +462,13 @@
    "clockIn": "2026-09-16T06:00:00Z",
    "clockOut": "2026-09-16T14:00:00Z",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   },
   {
    "id": 524,
@@ -316,7 +478,13 @@
    "clockIn": "2026-09-16T06:00:00Z",
    "clockOut": "2026-09-16T14:00:00Z",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   },
   {
    "id": 525,
@@ -326,7 +494,13 @@
    "clockIn": "2026-09-16T06:00:00Z",
    "clockOut": "2026-09-16T14:00:00Z",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   }
  ]
 }

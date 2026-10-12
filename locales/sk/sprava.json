@@ -1633,5 +1633,16 @@
   "„{nazev}\" zmizí z tabule. Vrátit to nepůjde.": "„{nazev}“ zmizne z tabule. Vrátiť to nepôjde.",
   "„{nazev}\" zmizí ze seznamu i z přehledu týmu.": "„{nazev}“ zmizne zo zoznamu aj z prehľadu tímu.",
   "„{nazev}“ přidáno, ale kasa u něj nedala cenu — doplň ji ručně.": "„{nazev}“ pridané, ale pokladňa k nemu nedala cenu — doplň ju ručne.",
-  "…a dalších {n}": "…a ďalších {n}"
+  "…a dalších {n}": "…a ďalších {n}",
+  "plán {od}–{do}": "plán {od}–{do}",
+  "upraveno ({kdo})": "upravené ({kdo})",
+  "upraveno": "upravené",
+  "+{n} min pozdě": "+{n} min neskoro",
+  "odešel o {n} min dřív": "odišiel o {n} min skôr",
+  "Upravil(a) {kdo}": "Upravil(a) {kdo}",
+  "Důvod (nepovinné)": "Dôvod (nepovinné)",
+  "Uvidí ho účetní v exportu.": "Uvidí ho účtovník v exporte.",
+  "Uvidí ho i člověk v oznámení o změně a účetní v exportu.": "Uvidí ho aj človek v oznámení o zmene a účtovník v exporte.",
+  "Např. zapomněl se odpíchnout": "Napr. zabudol sa odpichnúť",
+  "Upraveno|zaznam": "Upravený"
 }

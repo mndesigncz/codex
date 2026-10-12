@@ -38,6 +38,11 @@
 //  - moje.vydelek — hodiny × vlastní sazba (sazbu API pošle jen s oprávněním).
 // Widgety s obdobím „Podle stránky" čtou přepínač Docházky přes ObdobiStrankyDochazky.
 //
+// Kolo 7 (R7-2): Píchačky ukážou dnešní směnu z rozvrhu a zpoždění, Souhrn hodin plán
+// a počet pozdních příchodů, „Ukončit" má nepovinný důvod a nový widget
+// dochazka.moje_zaznamy („Moje docházka") ukáže zaměstnanci jeho dny před výplatou —
+// ze stejné adresy jako Odpracováno a Můj výdělek.
+//
 // Všechny berou /api/attendance a tam, kde stačí jeden den, stejnou adresu —
 // sdílená mezipaměť useDataWidgetu pak pošle jediný dotaz za celou plochu a odpíchnutí
 // v Píchačkách se hned ukáže i v „Právě na směně". Nástroj Docházky čte tutéž
@@ -47,7 +52,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useSession } from 'next-auth/react';
-import { Avatar, Button, CasovyGraf, Chip, Field, Input, ListRow, Menu, Modal, ObdobiLista, PersonChip, Segmented, Stat, StatRow } from '../../ui';
+import { Avatar, Button, CasovyGraf, Chip, Field, Input, ListRow, Menu, Modal, ObdobiLista, PersonChip, Segmented, Stat, StatRow, Textarea } from '../../ui';
 import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
 import { Widget, useVyrizeno, useWidget, type StavNacteni } from '../Widget';
 import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
@@ -57,14 +62,15 @@ import { useCurrency, useMoney, useSymbol } from '../../CurrencyProvider';
 import { usePersonProfile } from '../../employer/ProfileLinkProvider';
 import { apiMessage, okJson } from '@/lib/api';
 import { useJazyk, useT, type PrekladFn } from '@/lib/i18n/client';
-import { fmtHM, fmtMesic } from '@/lib/i18n/format';
+import { fmtDatum, fmtHM, fmtMesic } from '@/lib/i18n/format';
 import { dbTimeDayHM, dbTimeHM, dayPlus, parseDbTime, pragueDayOf, pragueToday } from '@/lib/pragueTime';
 import { agreguj, hrubostProRozmezi, obdobiZPresetu, platneRozmezi, pocetDni, predchoziRozmezi, zmenaPct, type Slot } from '@/lib/obdobi';
 import { useObdobi } from '@/lib/useObdobi';
 import { useUlozeno } from '@/lib/useUlozeno';
 import {
   ZAPOMENUTY_MS, dnesVPodniku, konecSmeny, navrhOdchodu as navrhOdchoduPlan, hodinyMinuty, mujMesic, mzdyZaObdobi, obdobiDni, obdobiMesice, mojeUpravyMesice, otevrenePrichody, podilMezd,
-  sazbyZRosteru, seradSouhrn, souhrnHodin, spropitneZaObdobi, trzbyZaObdobi, hodinyPoDnech, zaznamyVRozmezi, upravyVRozmezi, upravyPoLidech,
+  sazbyZRosteru, seradSouhrn, souhrnHodin, spropitneZaObdobi, trzbyZaObdobi, hodinyPoDnech, zaznamyVRozmezi, upravyVRozmezi, upravyPoLidech, zpozdeniPichacek,
+  radkyMojeDochazky, orizniSeznam,
   type OtevrenyPrichod, type RadekDne, type RazeniSouhrnu, type UpravaMzdy, type UzaverkaSpropitne, type UzaverkaTrzby, type VolbaMesice,
 } from '@/lib/dochazkaPrehled';
 
@@ -81,6 +87,8 @@ interface ClenRosteru {
   openEntryId?: number | null;
   shiftStart?: string | null;
   shiftEnd?: string | null;
+  /** Den směny (jen vlastní řádek zaměstnance, kolo 7): včerejšek u noční, která ještě běží. Vedení má dnešek. */
+  shiftDate?: string | null;
 }
 
 interface ZaznamDochazky {
@@ -88,6 +96,10 @@ interface ZaznamDochazky {
   employeeId?: number;
   clockIn: string;
   clockOut: string | null;
+  /** Moje docházka (kolo 7): „ručně" u source 'manual' nebo u záznamu, který vedení upravilo; note jako detail. */
+  source?: string;
+  note?: string | null;
+  updatedBy?: number | null;
 }
 
 interface Dochazka { roster: ClenRosteru[]; entries: ZaznamDochazky[]; /** Prémie a srážky (jen s finance.mzdy, jinak prázdné). */ adjustments: UpravaMzdy[] }
@@ -192,14 +204,21 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
   const [chyba, setChyba] = useState<string | null>(null);
   const [pripomenUzaverku, setPripomenUzaverku] = useState(false);
 
-  const openSince = ja.id != null ? data.data?.roster.find(r => Number(r.id) === ja.id)?.openSince ?? null : null;
+  const muj = ja.id != null ? data.data?.roster.find(r => Number(r.id) === ja.id) : undefined;
+  const openSince = muj?.openSince ?? null;
   const zacatek = parseDbTime(openSince);
   const naSmene = !!zacatek;
   const S = velikost === 'S';
+  // Dnešní směna z rozvrhu (kolo 7): API ji pošle na vlastním řádku rosteru — zaměstnanci
+  // i s dnem (noční ze včerejška), vedení dnešní. „Začíná za…" se musí posouvat i bez
+  // příchodu, proto stopky tikají po minutě i tehdy, když je v rozvrhu směna.
+  const planOd = muj?.shiftStart ? hm(muj.shiftStart) : null;
+  const planDo = muj?.shiftEnd ? hm(muj.shiftEnd) : null;
   // Sekundy ukazuje jen střední velikost; malá má hodiny a minuty, stačí jí obnova po čtvrt minutě.
-  const ted = useTed(naSmene, S ? 15_000 : 1000);
+  const ted = useTed(naSmene || (!S && !!planOd), S ? 15_000 : naSmene ? 1000 : 60_000);
   const bezi = zacatek ? Math.max(0, ted - zacatek.getTime()) : 0;
   const zapomenuty = naSmene && bezi > ZAPOMENUTY_MS;
+  const vuciPlanu = planOd ? zpozdeniPichacek(muj?.shiftDate || pragueToday(), planOd, openSince, ted) : null;
 
   const pichni = async () => {
     if (nahled || ja.id == null || pise) return;
@@ -237,6 +256,16 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
       {pripomenUzaverku && <p className="t-meta" role="status">{t('Směna skončila. Nezapomeň vyplnit uzávěrku.')}</p>}
     </>
   );
+  // Řádek rozvrhu pod číslem (jen M): kdy směna podle rozvrhu je, a buď „začíná za…"
+  // (před příchodem, nejvýš 3 h předem), nebo zpoždění po příchodu nad 10 min. Zalamuje
+  // se jako celek (flex-wrap), ne oddělovačem uprostřed — na 390 px chip sjede pod text.
+  const rozvrh = data.data ? (
+    <p className="t-meta flex flex-wrap items-center gap-x-2 gap-y-1">
+      <span>{planOd ? t('Dnes podle rozvrhu {od}–{do}', { od: fmtHM(planOd), do: fmtHM(planDo) }) : t('Dnes nemáš směnu v rozvrhu')}</span>
+      {vuciPlanu?.druh === 'pozde' && <Chip tone="wait" size="sm">{t('+{n} min po začátku', { n: vuciPlanu.min })}</Chip>}
+      {vuciPlanu?.druh === 'zacina' && <Chip tone="muted" size="sm">{t('Směna začíná za {delka}', { delka: delkaSlovy(t, vuciPlanu.min * 60_000) })}</Chip>}
+    </p>
+  ) : null;
 
   return (
     <Widget
@@ -266,9 +295,10 @@ function Pichacky({ velikost, nahled }: WidgetProps) {
           ) : naSmene ? (
             // „Na směně" už říká chip u titulku — štítek čísla nese čas příchodu.
             <Stat label={t('Příchod {cas}', { cas: dbTimeHM(openSince) })} value={stopky(bezi, true)} />
-          ) : (
+          ) : planOd ? null : (
             <p className="t-meta text-pretty">{t('Odpíchni si příchod, až začneš pracovat — čas se začne počítat hned.')}</p>
           )}
+          {!zapomenuty && rozvrh}
           {hlaseni}
           {tlacitko}
         </div>
@@ -455,6 +485,7 @@ function OknoUkonceni({ jmeno, entryId, navrh, zPlanu, onHotovo, onZavrit }: {
 }) {
   const t = useT('widgety');
   const [cas, setCas] = useState(() => doVstupu(navrh));
+  const [duvod, setDuvod] = useState('');
   const [pise, setPise] = useState(false);
   const [chyba, setChyba] = useState<string | null>(null);
   const idPole = `ukoncit-${entryId}`;
@@ -463,7 +494,8 @@ function OknoUkonceni({ jmeno, entryId, navrh, zPlanu, onHotovo, onZavrit }: {
     if (!cas || Number.isNaN(d.getTime())) { setChyba(t('Vyplň čas odchodu.')); return; }
     setPise(true); setChyba(null);
     try {
-      await fetch('/api/attendance', { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify({ id: entryId, clockOut: d.toISOString() }) }).then(okJson);
+      // Prázdný důvod = beze změny (případná poznámka záznamu zůstane), vyplněný se uloží s tím, kdo ukončil.
+      await fetch('/api/attendance', { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify({ id: entryId, clockOut: d.toISOString(), note: duvod.trim() || undefined }) }).then(okJson);
       onHotovo();
     } catch (e) {
       setChyba(apiMessage(e, t('Příchod se nepodařilo ukončit.')));
@@ -479,9 +511,15 @@ function OknoUkonceni({ jmeno, entryId, navrh, zPlanu, onHotovo, onZavrit }: {
         <Button variant="secondary" onClick={onZavrit}>{t('Zrušit')}</Button>
         <Button variant="primary" loading={pise} onClick={uloz}>{t('Uložit odchod')}</Button>
       </>}>
-      <Field id={idPole} label={t('Odchod')} hint={zPlanu ? t('Předvyplněný je plánovaný konec směny. Uprav ho, jestli odešel jindy.') : t('Plánovanou směnu nemá, předvyplněný je aktuální čas. Uprav ho, jestli odešel dřív.')} error={chyba}>
-        <Input id={idPole} type="datetime-local" value={cas} onChange={e => setCas(e.target.value)} />
-      </Field>
+      <div className="space-y-3">
+        <Field id={idPole} label={t('Odchod')} hint={zPlanu ? t('Předvyplněný je plánovaný konec směny. Uprav ho, jestli odešel jindy.') : t('Plánovanou směnu nemá, předvyplněný je aktuální čas. Uprav ho, jestli odešel dřív.')}>
+          <Input id={idPole} type="datetime-local" value={cas} onChange={e => setCas(e.target.value)} />
+        </Field>
+        <Field id={`${idPole}-duvod`} label={t('Důvod (nepovinné)')}>
+          <Textarea id={`${idPole}-duvod`} rows={2} maxLength={300} value={duvod} placeholder={t('Např. zapomněl se odpíchnout')} onChange={e => setDuvod(e.target.value)} />
+        </Field>
+        {chyba && <p className="note note-danger text-sm" role="alert">{chyba}</p>}
+      </div>
     </Modal>,
     document.body,
   );
@@ -519,7 +557,7 @@ function useMujMesic(zapnuto: boolean, volba: VolbaMesice = 'tento') {
   const m = Number(mesic.slice(5, 7));
   const nazevMesice = fmtMesic(m, { jazyk });
   const upravy = useMemo(() => mojeUpravyMesice(data.data?.adjustments ?? [], ja.id ?? -1, mesic), [data.data?.adjustments, ja.id, mesic]);
-  return { ja, data, s, sazba, sazbaZnama: sazbaRaw !== undefined && sazbaRaw !== null, bezZaznamu, nazevMesice, mesic, upravy };
+  return { ja, data, s, sazba, sazbaZnama: sazbaRaw !== undefined && sazbaRaw !== null, bezZaznamu, nazevMesice, mesic, upravy, vlastni, ted };
 }
 
 type ClenRosteruB2 = ClenRosteru & { hourlyRate?: number | null };
@@ -716,7 +754,8 @@ function SouhrnHodin({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: str
     // widget se na to nespoléhá (pole katalogu: Kč u člověka).
     const sazby = vidiMzdy ? sazbyZRosteru(data.data.roster as ClenRosteruB2[]) : new Map<string, number>();
     const lide = new Map(data.data.roster.map(m => [String(m.id), { jmeno: m.name ?? '', avatar: m.avatar ?? null }]));
-    return seradSouhrn(souhrnHodin(entriesObdobi, ted, sazby, { spropitne: dyska && !dyska.skryto ? dyska.poLidech : null, upravy: upravyPoLidech(upravyObdobi), lide }), razeni);
+    // Kolo 7: i plán (součet délek plánovaných směn) a pozdní příchody — API je posílá u záznamů (planStart/planEnd).
+    return seradSouhrn(souhrnHodin(entriesObdobi, ted, sazby, { spropitne: dyska && !dyska.skryto ? dyska.poLidech : null, upravy: upravyPoLidech(upravyObdobi), lide, plan: true }), razeni);
   }, [data.data, entriesObdobi, ted, razeni, vidiMzdy, dyska, upravyObdobi]);
   const mzdyCelkem = useMemo(() => radky.reduce((a, x) => a + (x.vyplata ?? 0), 0), [radky]);
   const upravyCelkem = useMemo(() => radky.reduce((a, x) => a + x.upravy, 0), [radky]);
@@ -746,11 +785,15 @@ function SouhrnHodin({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: str
 
   const profil = !nahled && !!otevriProfil && smi('tym.profil');
   const zobrazene = L ? radky : radky.slice(0, RADKU_M);
+  // „Kdo chodí pozdě" (kolo 7) jako řazení, jen když v období někdo pozdě přišel.
+  const nekdoPozde = radky.some(r => r.pozde > 0);
   const moznosti = [
     { id: 'hodiny' as const, label: t('Hodiny', undefined, 'widgety') },
     ...(vidiMzdy ? [{ id: 'mzda' as const, label: t('Mzda') }] : []),
+    ...(nekdoPozde || razeni === 'pozde' ? [{ id: 'pozde' as const, label: t('Pozdě') }] : []),
     { id: 'jmeno' as const, label: t('Jméno') },
   ];
+  const planText = (ms: number) => t('plán {h} h', { h: (Math.round(ms / 360_000) / 10).toLocaleString(loc) });
   return (
     <Widget nacteni={data}
       doplnek={!L && radky.length > 0 ? <Chip tone="muted" size="sm">{nazevDni(t, dni)}</Chip> : undefined}
@@ -798,12 +841,22 @@ function SouhrnHodin({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: str
             r.upravy > 0 ? t('prémie {castka}', { castka: sZnamenkem(r.upravy, money) }) : r.upravy < 0 ? t('srážka {castka}', { castka: sZnamenkem(r.upravy, money) }) : null,
           ].filter(Boolean).join(' · ');
           const pocetUprav = upravyObdobi.filter(u => String(u.userId) === r.id).length;
+          // Pod hodinami plán (Homebase/7shifts „Scheduled") a výplata; počet pozdních příchodů chipem vpravo.
+          const sMzdou = vidiMzdy && r.vyplata != null;
           const radek = {
             lead: <Avatar emoji={r.avatar} size="sm" />,
             title: r.jmeno,
             meta,
             value: hodinyMinuty(r.ms),
-            valueMeta: vidiMzdy && r.vyplata != null ? money(r.vyplata) : undefined,
+            valueMeta: r.planMs > 0 || sMzdou ? (
+              <>
+                {r.planMs > 0 && <span className="block">{planText(r.planMs)}</span>}
+                {sMzdou && <span className="block">{money(r.vyplata!)}</span>}
+              </>
+            ) : undefined,
+            // Na počítači ve sloupci pevné šířky (aside, i prázdný), ať hodiny drží svislici; pod lg vpravo v ocase.
+            aside: nekdoPozde ? (r.pozde > 0 ? <Chip tone="wait" size="sm">{t('{n}× pozdě', { n: r.pozde.toLocaleString(loc) })}</Chip> : '') : undefined,
+            right: nekdoPozde ? <span className="lg:hidden">{r.pozde > 0 && <Chip tone="wait" size="sm">{t('{n}× pozdě', { n: r.pozde.toLocaleString(loc) })}</Chip>}</span> : undefined,
           };
           if (smiPremie) {
             // Řádek nese „···" (prémie / srážka), takže celý klikací být nemůže — profil otevře jméno.
@@ -1030,6 +1083,55 @@ function DnesVPodniku(_: WidgetProps) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Moje docházka (kolo 7)
+// ---------------------------------------------------------------------------
+
+/** Ve střední velikosti nejnovějších pět dní (DESIGN „Ořezané seznamy"), velká ukáže celý měsíc. */
+const DNU_M = 5;
+
+/**
+ * Vlastní příchody a odchody po dnech za tento nebo minulý měsíc — barista si před výplatou
+ * zkontroluje, který den přišel a odešel, kde má zapomenutý odchod a co mu vedení opravilo
+ * („ručně"). Stejná adresa i výpočet jako Odpracováno a Můj výdělek (useMujMesic,
+ * lib/dochazkaPrehled.radkyMojeDochazky), takže součet v hlavičce sedí s Odpracováno.
+ * Plán u minulých dnů záměrně není: API ho zaměstnanci posílá jen pro dnešek (Píchačky).
+ */
+function MojeDochazka({ velikost, nastaveni }: WidgetProps<{ mesic?: VolbaMesice }>) {
+  const t = useT('widgety');
+  const { jazyk } = useJazyk();
+  const volba: VolbaMesice = nastaveni.mesic === 'minuly' ? 'minuly' : 'tento';
+  const { ja, data, bezZaznamu, nazevMesice, mesic, vlastni, ted } = useMujMesic(true, volba);
+  const md = useMemo(() => radkyMojeDochazky(vlastni, ja.id ?? -1, mesic, ted), [vlastni, ja.id, mesic, ted]);
+  const { zobrazene, dalsich } = orizniSeznam(md.dny, velikost === 'L' ? Infinity : DNU_M);
+  const chipDne = (d: (typeof md.dny)[number]) => d.zapomenuty ? <Chip tone="wait" size="sm">{t('Zapomenutý odchod?')}</Chip>
+    : d.dlouhy ? <Chip tone="wait" size="sm">{t('Nad 24 h')}</Chip>
+    : d.rucne ? <Chip tone="muted" size="sm">{t('ručně')}</Chip> : null;
+  // Chipy na počítači ve sloupci pevné šířky (aside) u všech řádků, ať hodiny drží svislici; pod lg vpravo v ocase.
+  const sChipy = zobrazene.some(d => chipDne(d) != null);
+  const prazdno = bezZaznamu ? <p className="t-meta text-pretty">{t('S touhle rolí se hodiny z píchaček nedají spočítat.')}</p>
+    : md.dny.length === 0 ? <p className="t-meta text-pretty">{volba === 'minuly' ? t('Minulý měsíc nic neodpíchnuto.') : t('Tento měsíc zatím nic neodpíchnuto.')}</p>
+    : undefined;
+  return (
+    <Widget nacteni={ja.stav ?? data} prazdno={prazdno}
+      // Součet měsíce vedle titulku; název měsíce jen u minulého (tento je zřejmý) — na 390 px by jinak titulek zalomil.
+      doplnek={md.dny.length > 0 ? <Chip tone="muted" size="sm">{volba === 'minuly' ? `${nazevMesice} · ${hodinyMinuty(md.ms)}` : hodinyMinuty(md.ms)}</Chip> : undefined}>
+      <ul className="list">
+        {zobrazene.map(d => (
+          <ListRow key={d.den}
+            title={fmtDatum(d.den, { jazyk, styl: 'denKratce' })}
+            meta={d.useky.map(u => `${dbTimeHM(u.od)} – ${u.do ? dbTimeHM(u.do) : '…'}`).join(', ')}
+            detail={d.poznamky.length ? d.poznamky.join(' · ') : undefined}
+            value={d.zapomenuty && d.ms === 0 ? undefined : d.bezi ? t('běží {cas}', { cas: hodinyMinuty(d.ms) }) : hodinyMinuty(d.ms)}
+            aside={sChipy ? chipDne(d) ?? '' : undefined}
+            right={sChipy ? <span className="lg:hidden">{chipDne(d)}</span> : undefined} />
+        ))}
+      </ul>
+      {dalsich > 0 && <p className="t-meta mt-2">{t('…a {n, plural, one {# další den} few {# další dny} other {# dalších dní}}', { n: dalsich })}</p>}
+    </Widget>
+  );
+}
+
 export const KOMPONENTY: Record<string, KomponentaWidgetu> = {
   'dochazka.moje_pichacky': Pichacky,
   'dochazka.prave_na_smene': PraveNaSmene,
@@ -1039,4 +1141,5 @@ export const KOMPONENTY: Record<string, KomponentaWidgetu> = {
   'dochazka.dlouhe_prichody': DlouhePrichody,
   'dochazka.dnes_v_podniku': DnesVPodniku,
   'moje.vydelek': MujVydelek,
+  'dochazka.moje_zaznamy': MojeDochazka,
 };

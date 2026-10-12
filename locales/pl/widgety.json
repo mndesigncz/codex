@@ -1892,5 +1892,22 @@
   "Kolik hodin má kdo v měsíci naplánováno, kdo se blíží limitu z pravidel generátoru a s oprávněním ke mzdám i kolik to stojí.": "Ile godzin ma kto zaplanowanych w miesiącu, kto zbliża się do limitu z reguł generatora i – z dostępem do wynagrodzeń – ile to kosztuje.",
   "{n, plural, one {# směna v rozvrhu} few {# směny v rozvrhu} other {# směn v rozvrhu}}": "{n, plural, one {# zmiana w grafiku} few {# zmiany w grafiku} many {# zmian w grafiku} other {# zmiany w grafiku}}",
   "{n, plural, one {Volno schváleno, ale # směna zůstala v rozvrhu} few {Volno schváleno, ale # směny zůstaly v rozvrhu} other {Volno schváleno, ale # směn zůstalo v rozvrhu}}": "{n, plural, one {Urlop zatwierdzony, ale # zmiana została w grafiku} few {Urlop zatwierdzony, ale # zmiany zostały w grafiku} many {Urlop zatwierdzony, ale # zmian zostało w grafiku} other {Urlop zatwierdzony, ale # zmiany zostały w grafiku}}",
-  "Upravit rozvrh": "Edytuj grafik"
+  "Upravit rozvrh": "Edytuj grafik",
+  "Dnes podle rozvrhu {od}–{do}": "Dziś według grafiku {od}–{do}",
+  "Dnes nemáš směnu v rozvrhu": "Dziś nie masz zmiany w grafiku",
+  "+{n} min po začátku": "+{n} min po rozpoczęciu",
+  "Směna začíná za {delka}": "Zmiana zaczyna się za {delka}",
+  "Důvod (nepovinné)": "Powód (opcjonalnie)",
+  "Např. zapomněl se odpíchnout": "Np. zapomniał zarejestrować wyjście",
+  "Pozdě": "Spóźnienia",
+  "plán {h} h": "plan {h} godz.",
+  "{n}× pozdě": "{n}× spóźnienie",
+  "Minulý měsíc nic neodpíchnuto.": "W zeszłym miesiącu nic nie zarejestrowano.",
+  "Tento měsíc zatím nic neodpíchnuto.": "W tym miesiącu jeszcze nic nie zarejestrowano.",
+  "běží {cas}": "trwa {cas}",
+  "Nad 24 h": "Ponad 24 godz.",
+  "ručně": "ręcznie",
+  "…a {n, plural, one {# další den} few {# další dny} other {# dalších dní}}": "…i {n, plural, one {# kolejny dzień} few {# kolejne dni} many {# kolejnych dni} other {# kolejnego dnia}}",
+  "Moje docházka": "Moja ewidencja czasu",
+  "Tvoje příchody a odchody po dnech za měsíc.": "Twoje wejścia i wyjścia dzień po dniu w miesiącu."
 }

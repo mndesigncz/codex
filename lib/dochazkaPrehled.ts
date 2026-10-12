@@ -42,6 +42,14 @@ export interface ZaznamDochazky {
   clockOut: string | null;
   source?: string;
   note?: string | null;
+  /** Plánovaná směna, ke které záznam patří (GET vedení, kolo 7): „HH:MM[:SS]" a její den „RRRR-MM-DD". */
+  planStart?: string | null;
+  planEnd?: string | null;
+  planDate?: string | null;
+  /** Kdo záznam naposledy ručně upravil nebo přidal (time_entries.updated_by) a kdy. */
+  updatedBy?: number | string | null;
+  updatedByName?: string | null;
+  updatedAt?: string | null;
 }
 
 export interface ClenRosteru {
@@ -114,6 +122,10 @@ export interface RadekSouhrnu {
   upravy: number;
   /** K výplatě: mzda + prémie − srážky; null, když není sazba a žádná úprava. */
   vyplata: number | null;
+  /** Součet délek plánovaných směn záznamů (ms); 0 bez plánu nebo bez `doplnky.plan`. */
+  planMs: number;
+  /** Kolikrát přišel o víc než PRAH_POZDE_MIN po začátku plánované směny (jen s `doplnky.plan`). */
+  pozde: number;
 }
 
 /** Prémie nebo srážka k mzdě (GET /api/attendance → adjustments). Částka: + prémie, − srážka. */
@@ -155,6 +167,8 @@ export interface DoplnkySouhrnu {
   upravy?: ReadonlyMap<string, number> | null;
   /** Jména lidí, kteří mají úpravu, ale v období nic neodpíchli — řádek vznikne i bez záznamu. */
   lide?: ReadonlyMap<string, { jmeno: string; avatar: string | null }>;
+  /** Plán proti skutečnosti (kolo 7): sečíst délky plánovaných směn a pozdní příchody ze záznamů (planStart/planEnd z API). */
+  plan?: boolean;
 }
 
 /** Den (pražský), do kterého záznam patří: den příchodu; null u záznamu bez čitelného příchodu. */
@@ -185,13 +199,14 @@ export function hodinyPoDnech(entries: readonly ZaznamDochazky[], ted: number, o
   return out;
 }
 
-export type RazeniSouhrnu = 'hodiny' | 'mzda' | 'jmeno';
+export type RazeniSouhrnu = 'hodiny' | 'mzda' | 'jmeno' | 'pozde';
 
 export function souhrnHodin(entries: readonly ZaznamDochazky[], ted: number, sazby: ReadonlyMap<string, number>, doplnky: DoplnkySouhrnu = {}): RadekSouhrnu[] {
-  const { spropitne, upravy, lide } = doplnky;
+  const { spropitne, upravy, lide, plan } = doplnky;
   const m = new Map<string, RadekSouhrnu>();
   const novy = (id: string, jmeno: string, avatar: string | null): RadekSouhrnu =>
-    ({ id, jmeno, avatar, ms: 0, pocet: 0, bezi: false, vynechano: 0, mzda: null, spropitne: spropitne ? spropitne.get(id) ?? 0 : null, upravy: upravy?.get(id) ?? 0, vyplata: null });
+    ({ id, jmeno, avatar, ms: 0, pocet: 0, bezi: false, vynechano: 0, mzda: null, spropitne: spropitne ? spropitne.get(id) ?? 0 : null, upravy: upravy?.get(id) ?? 0, vyplata: null, planMs: 0, pozde: 0 });
+  const plany = plan ? odchylkyZaznamu(entries, ted) : null;
   for (const e of entries) {
     const id = String(e.employeeId ?? '');
     if (!id) continue;
@@ -204,6 +219,11 @@ export function souhrnHodin(entries: readonly ZaznamDochazky[], ted: number, saz
     const sazba = sazby.get(id);
     if (sazba) r.mzda = (r.mzda ?? 0) + earnedFor(z.ms, sazba);
     if (!r.avatar && e.employeeAvatar) r.avatar = e.employeeAvatar;
+    const p = plany?.get(String(e.id ?? ''));
+    if (p) {
+      r.planMs += p.planMs;
+      if (p.pozdeMin != null) r.pozde += 1;
+    }
     m.set(id, r);
   }
   // Prémie bez odpíchnuté směny (bonus za akci, srážka za manko) patří do výplaty, i když člověk v období nepracoval.
@@ -221,6 +241,8 @@ export function seradSouhrn(radky: readonly RadekSouhrnu[], razeni: RazeniSouhrn
   const r = [...radky];
   if (razeni === 'jmeno') return r.sort((a, b) => a.jmeno.localeCompare(b.jmeno, 'cs'));
   if (razeni === 'mzda') return r.sort((a, b) => (b.mzda ?? -1) - (a.mzda ?? -1) || b.ms - a.ms);
+  // Kdo chodí pozdě (kolo 7): nejvíc pozdních příchodů nahoře, při shodě víc hodin.
+  if (razeni === 'pozde') return r.sort((a, b) => b.pozde - a.pozde || b.ms - a.ms || a.jmeno.localeCompare(b.jmeno, 'cs'));
   return r.sort((a, b) => b.ms - a.ms || a.jmeno.localeCompare(b.jmeno, 'cs'));
 }
 
@@ -592,4 +614,230 @@ export function bezSazby(members: readonly ClenTymu[], ownerId: number | null): 
   return members
     .filter(m => m.role !== 'kiosk' && m.id !== ownerId && m.hourly_rate != null && !(Number(m.hourly_rate) > 0))
     .sort((a, b) => String(a.name ?? '').localeCompare(String(b.name ?? ''), 'cs'));
+}
+
+// ---------------------------------------------------------------------------
+// Plán proti skutečnosti (kolo 7, balík R7-2)
+// ---------------------------------------------------------------------------
+
+/**
+ * Pozdní příchod a dřívější odchod se tvrdí až nad tolik minut. Stejný práh jako tablet
+ * (PRAH_POZDE_MIN v lib/kioskPrehled.ts) a push „Pozdní příchod" v POST /api/attendance.
+ * Zopakovaný, ne importovaný: kioskPrehled importuje odsud a import opačným směrem by
+ * udělal kruh. Kdo mění jedno, změní obojí.
+ */
+export const PRAH_POZDE_MIN = 10;
+/** „Směna začíná za…" v Píchačkách nejvýš tolik před začátkem (jako tablet: BRZY_MAX_MS). */
+export const PRED_ZACATKEM_MS = 3 * 3600_000;
+/** Dál od plánu se odchylka netvrdí — to už není ta směna (jako tablet: MAX_ODCHYLKA_MS). */
+export const MAX_ODCHYLKA_MS = 12 * 3600_000;
+
+const hm5 = (v: string | null | undefined) => String(v ?? '').slice(0, 5);
+const jeDen = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+
+export interface OdchylkaOdPlanu {
+  /** O kolik minut přišel po začátku směny (nad práh), jinak null. */
+  pozdeMin: number | null;
+  /** O kolik minut odešel před koncem směny (nad práh), jinak null — u otevřeného záznamu vždy null. */
+  drivMin: number | null;
+}
+
+/**
+ * O kolik záznam ujel od plánované směny. `den` je den směny (planDate z API), bez něj
+ * den příchodu. Konec přes půlnoc (konec ≤ začátek) je druhý den — konecSmeny. Do deseti
+ * minut včetně se nic netvrdí (PRAH_POZDE_MIN), nad dvanáct hodin taky ne: to už je
+ * jiná směna, ne zpoždění. Otevřený záznam odchod nemá, takže ani „dřív".
+ */
+export function odchylkaOdPlanu({ clockIn, clockOut, planStart, planEnd, den }: {
+  clockIn: string | Date | null | undefined; clockOut?: string | Date | null; planStart?: string | null; planEnd?: string | null; den?: string | null;
+}): OdchylkaOdPlanu {
+  const out: OdchylkaOdPlanu = { pozdeMin: null, drivMin: null };
+  const od = parseDbTime(clockIn ?? null);
+  if (!od || !planStart) return out;
+  const d = jeDen(den) ? den : pragueDayOf(od);
+  const zacatek = pragueMomentOf(d, hm5(planStart));
+  if (zacatek) {
+    const r = od.getTime() - zacatek.getTime();
+    const min = Math.round(r / 60000);
+    if (r > 0 && r <= MAX_ODCHYLKA_MS && min > PRAH_POZDE_MIN) out.pozdeMin = min;
+  }
+  const odchod = parseDbTime(clockOut ?? null);
+  const konec = konecSmeny(d, planStart, planEnd);
+  if (odchod && konec) {
+    const r = konec.getTime() - odchod.getTime();
+    const min = Math.round(r / 60000);
+    if (r > 0 && r <= MAX_ODCHYLKA_MS && min > PRAH_POZDE_MIN) out.drivMin = min;
+  }
+  return out;
+}
+
+export interface PlanZaznamu extends OdchylkaOdPlanu {
+  /** Délka plánované směny (ms) — jen u prvního záznamu směny, ať se přestávka nepočítá jako druhá směna. */
+  planMs: number;
+  /** Odpracováno − plán v minutách za celou směnu (u prvního záznamu); null bez plánu nebo dokud směna běží. */
+  rozdilMin: number | null;
+}
+
+/**
+ * Odchylky od plánu pro všechny záznamy naráz (klíč = id záznamu). Záznamy jedné směny
+ * (přestávka = odchod a nový příchod) se posuzují spolu: pozdě se počítá jen u prvního
+ * příchodu, dřív jen u posledního odchodu a délka plánu jen jednou. Bez toho by návrat
+ * z oběda ve 12:30 na směnu od osmi hlásil „+270 min pozdě" a plán se sečetl dvakrát.
+ */
+export function odchylkyZaznamu(entries: readonly ZaznamDochazky[], ted: number = Date.now()): Map<string, PlanZaznamu> {
+  const skupiny = new Map<string, { e: ZaznamDochazky; od: Date; den: string }[]>();
+  for (const e of entries) {
+    if (e.id == null || !e.planStart) continue;
+    const od = parseDbTime(e.clockIn);
+    if (!od) continue;
+    const den = jeDen(e.planDate) ? e.planDate : pragueDayOf(od);
+    const k = `${e.employeeId ?? ''}|${den}|${hm5(e.planStart)}|${hm5(e.planEnd)}`;
+    skupiny.set(k, [...(skupiny.get(k) ?? []), { e, od, den }]);
+  }
+  const out = new Map<string, PlanZaznamu>();
+  for (const sk of skupiny.values()) {
+    sk.sort((a, b) => a.od.getTime() - b.od.getTime());
+    const { e: prvni, den } = sk[0];
+    const posledni = sk[sk.length - 1].e;
+    const zacatek = pragueMomentOf(den, hm5(prvni.planStart));
+    const konec = konecSmeny(den, prvni.planStart, prvni.planEnd);
+    const planMs = zacatek && konec ? Math.max(0, konec.getTime() - zacatek.getTime()) : 0;
+    const rozbory = sk.map(x => rozeberZaznam(x.e, ted));
+    const uzavrene = rozbory.every(z => z.druh === 'hotovy');
+    const odpracovano = rozbory.reduce((a, z) => a + z.ms, 0);
+    sk.forEach(({ e }, i) => {
+      const o = odchylkaOdPlanu({ clockIn: e.clockIn, clockOut: e.clockOut, planStart: e.planStart, planEnd: e.planEnd, den });
+      out.set(String(e.id), {
+        pozdeMin: i === 0 ? o.pozdeMin : null,
+        drivMin: e === posledni ? o.drivMin : null,
+        planMs: i === 0 ? planMs : 0,
+        rozdilMin: i === 0 && uzavrene && planMs > 0 ? Math.round((odpracovano - planMs) / 60000) : null,
+      });
+    });
+  }
+  return out;
+}
+
+/**
+ * Sloupce CSV k plánu a ruční úpravě (pro účetní): Plán od, Plán do, Odchylka (min),
+ * Poznámka, Upravil. Odchylka = odpracováno − plán za směnu (7shifts „Variance"),
+ * se znaménkem; u druhého záznamu téže směny prázdná, ať se nesčítá dvakrát.
+ */
+export function csvPlanAUprava(e: ZaznamDochazky, p: PlanZaznamu | undefined): string[] {
+  return [
+    e.planStart ? hm5(e.planStart) : '',
+    e.planEnd ? hm5(e.planEnd) : '',
+    p?.rozdilMin != null ? String(p.rozdilMin) : '',
+    String(e.note ?? '').trim(),
+    e.updatedBy != null && e.updatedBy !== '' ? String(e.updatedByName ?? '').trim() : '',
+  ];
+}
+
+/** Směna z rozvrhu pro Píchačky (GET /api/attendance, větev zaměstnance). */
+export interface SmenaPichacek { shiftStart: string; shiftEnd: string; shiftDate: string }
+
+/**
+ * Kterou směnu ukázat v Píchačkách: dnešní první, ale noční směna ze včerejška
+ * (konec ≤ začátek), která ještě neskončila — nebo ke které patří otevřený příchod —
+ * má přednost. Ve 0:30 je barman pořád na sobotní noční, ne „dnes bez směny"
+ * (DESIGN „Příchod po půlnoci patří včerejšku").
+ */
+export function vyberSmenuPichacek(
+  smeny: readonly { date: string; start_time: string; end_time: string }[], dnes: string, ted: number, openSince?: string | Date | null,
+): SmenaPichacek | null {
+  const vcera = dayPlus(dnes, -1);
+  const od = parseDbTime(openSince ?? null);
+  for (const s of smeny) {
+    if (String(s.date).slice(0, 10) !== vcera || !s.start_time || !s.end_time || hm5(s.end_time) > hm5(s.start_time)) continue;
+    const zacatek = pragueMomentOf(vcera, hm5(s.start_time));
+    const konec = konecSmeny(vcera, s.start_time, s.end_time);
+    if (!zacatek || !konec) continue;
+    const prichodPatri = !!od && od.getTime() >= zacatek.getTime() - PRED_ZACATKEM_MS && od.getTime() < konec.getTime();
+    if (ted < konec.getTime() || prichodPatri) return { shiftStart: hm5(s.start_time), shiftEnd: hm5(s.end_time), shiftDate: vcera };
+  }
+  const dnesni = smeny.filter(s => String(s.date).slice(0, 10) === dnes && s.start_time).sort((a, b) => hm5(a.start_time).localeCompare(hm5(b.start_time)))[0];
+  return dnesni ? { shiftStart: hm5(dnesni.start_time), shiftEnd: hm5(dnesni.end_time), shiftDate: dnes } : null;
+}
+
+export type StavPichacek = { druh: 'zacina'; min: number } | { druh: 'pozde'; min: number };
+
+/**
+ * Píchačky proti rozvrhu. Před příchodem: „Směna začíná za…" nejvýš tři hodiny předem.
+ * Po příchodu: zpoždění proti začátku směny, jen nad deset minut (stejný práh jako tablet
+ * a Docházka). `dnes` je den směny (shiftDate z API, i včerejšek u noční), takže příchod
+ * ve 0:30 na směnu od 22:00 je +150 min, ne „o 21 h dřív".
+ */
+export function zpozdeniPichacek(dnes: string, shiftStart: string | null | undefined, openSince: string | Date | null | undefined, ted: number): StavPichacek | null {
+  if (!shiftStart || !jeDen(dnes)) return null;
+  const zacatek = pragueMomentOf(dnes, hm5(shiftStart));
+  if (!zacatek) return null;
+  const od = parseDbTime(openSince ?? null);
+  if (od) {
+    const r = od.getTime() - zacatek.getTime();
+    const min = Math.round(r / 60000);
+    return r > 0 && r <= MAX_ODCHYLKA_MS && min > PRAH_POZDE_MIN ? { druh: 'pozde', min } : null;
+  }
+  const za = zacatek.getTime() - ted;
+  return za > 0 && za <= PRED_ZACATKEM_MS ? { druh: 'zacina', min: Math.ceil(za / 60000) } : null;
+}
+
+// ---------------------------------------------------------------------------
+// Moje docházka po dnech (kolo 7, widget dochazka.moje_zaznamy)
+// ---------------------------------------------------------------------------
+
+export interface DenMojeDochazky {
+  /** Pražský den příchodu „RRRR-MM-DD". */
+  den: string;
+  /** Příchody a odchody dne, od nejstaršího. */
+  useky: { od: Date; do: Date | null }[];
+  /** Započitatelný čas dne — stejná pravidla jako Odpracováno (mujMesic). */
+  ms: number;
+  bezi: boolean;
+  /** Otevřený příchod déle než 16 h. */
+  zapomenuty: boolean;
+  /** Uzavřený záznam nad 24 h (nepočítá se). */
+  dlouhy: boolean;
+  /** Ručně přidaný (source 'manual') nebo upravený vedením (updatedBy). */
+  rucne: boolean;
+  poznamky: string[];
+}
+
+/**
+ * Vlastní docházka měsíce „RRRR-MM" po dnech, nejnovější den první. Jeden řádek na den
+ * (přestávka nedělá z dne dva), součet `ms` je přesně číslo z Odpracováno — stejný
+ * filtr (den příchodu v Praze) i stejná pravidla (zapomenutý ani nad 24 h se nepočítá).
+ */
+export function radkyMojeDochazky(entries: readonly ZaznamDochazky[], meId: number, mesic: string, ted: number): { dny: DenMojeDochazky[]; ms: number; pocet: number } {
+  const dny = new Map<string, DenMojeDochazky>();
+  let ms = 0, pocet = 0;
+  for (const e of entries) {
+    if (Number(e.employeeId) !== meId) continue;
+    const od = parseDbTime(e.clockIn);
+    if (!od) continue;
+    const den = pragueDayOf(od);
+    if (den.slice(0, 7) !== mesic) continue;
+    const z = rozeberZaznam(e, ted);
+    if (z.druh === 'vadny') continue;
+    pocet += 1;
+    ms += z.ms;
+    const r = dny.get(den) ?? { den, useky: [], ms: 0, bezi: false, zapomenuty: false, dlouhy: false, rucne: false, poznamky: [] };
+    r.useky.push({ od, do: parseDbTime(e.clockOut) });
+    r.ms += z.ms;
+    if (z.druh === 'bezi') r.bezi = true;
+    if (z.druh === 'zapomenuty') r.zapomenuty = true;
+    if (z.druh === 'dlouhy') r.dlouhy = true;
+    if (e.source === 'manual' || (e.updatedBy != null && e.updatedBy !== '')) r.rucne = true;
+    const pozn = String(e.note ?? '').trim();
+    if (pozn && !r.poznamky.includes(pozn)) r.poznamky.push(pozn);
+    dny.set(den, r);
+  }
+  const out = [...dny.values()].sort((a, b) => b.den.localeCompare(a.den));
+  for (const d of out) d.useky.sort((a, b) => a.od.getTime() - b.od.getTime());
+  return { dny: out, ms, pocet };
+}
+
+/** Oříznutý seznam, který to řekne (DESIGN „Ořezané seznamy"): prvních `strop` a kolik zbylo. */
+export function orizniSeznam<T>(polozky: readonly T[], strop: number): { zobrazene: T[]; dalsich: number } {
+  const n = Math.max(0, Math.floor(strop));
+  return { zobrazene: polozky.slice(0, n), dalsich: Math.max(0, polozky.length - n) };
 }

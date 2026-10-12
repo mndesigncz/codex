@@ -1633,5 +1633,16 @@
   "„{nazev}\" zmizí z tabule. Vrátit to nepůjde.": "„{nazev}“ verschwindet vom Board. Das lässt sich nicht rückgängig machen.",
   "„{nazev}\" zmizí ze seznamu i z přehledu týmu.": "„{nazev}“ verschwindet aus der Liste und aus der Teamübersicht.",
   "„{nazev}“ přidáno, ale kasa u něj nedala cenu — doplň ji ručně.": "„{nazev}“ wurde hinzugefügt, aber die Kasse hat dafür keinen Preis geliefert — trag ihn manuell nach.",
-  "…a dalších {n}": "…und {n} weitere"
+  "…a dalších {n}": "…und {n} weitere",
+  "plán {od}–{do}": "Plan {od}–{do}",
+  "upraveno ({kdo})": "bearbeitet ({kdo})",
+  "upraveno": "bearbeitet",
+  "+{n} min pozdě": "+{n} Min. zu spät",
+  "odešel o {n} min dřív": "{n} Min. früher gegangen",
+  "Upravil(a) {kdo}": "Bearbeitet von {kdo}",
+  "Důvod (nepovinné)": "Grund (optional)",
+  "Uvidí ho účetní v exportu.": "Die Buchhaltung sieht ihn im Export.",
+  "Uvidí ho i člověk v oznámení o změně a účetní v exportu.": "Die Person sieht ihn in der Benachrichtigung, die Buchhaltung im Export.",
+  "Např. zapomněl se odpíchnout": "Z. B. Ausstempeln vergessen",
+  "Upraveno|zaznam": "Bearbeitet"
 }
