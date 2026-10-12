@@ -1651,5 +1651,8 @@
   "Nejdřív vyber den.": "Najpierw wybierz dzień.",
   "{n, plural, one {Úkol je zadaný # člověku} few {Úkol je zadaný # lidem} other {Úkol je zadaný # lidem}}": "{n, plural, one {Zadanie przydzielone # osobie} few {Zadanie przydzielone # osobom} many {Zadanie przydzielone # osobom} other {Zadanie przydzielone # osoby}}",
   "Nezadalo se {n} z {celkem}: {komu}": "Nie przydzielono {n} z {celkem}: {komu}",
-  "Každý dostane vlastní úkol ({n, plural, one {# člověk} few {# lidé} other {# lidí}}).": "Każdy dostanie własne zadanie ({n, plural, one {# osoba} few {# osoby} many {# osób} other {# osoby}})."
+  "Každý dostane vlastní úkol ({n, plural, one {# člověk} few {# lidé} other {# lidí}}).": "Każdy dostanie własne zadanie ({n, plural, one {# osoba} few {# osoby} many {# osób} other {# osoby}}).",
+  "chce fotku": "wymaga zdjęcia",
+  "Vyžadovat fotku při splnění": "Wymagaj zdjęcia przy wykonaniu",
+  "Úkol půjde odškrtnout až s fotkou z telefonu nebo tabletu — uvidíš ji v detailu úkolu.": "Zadanie da się odhaczyć dopiero ze zdjęciem z telefonu lub tabletu — zobaczysz je w szczegółach zadania."
 }

@@ -1942,5 +1942,16 @@
   "Začít": "Loslegen",
   "po čase": "zu spät",
   "dnes do {cas}": "heute bis {cas}",
-  "zítra do {cas}": "morgen bis {cas}"
+  "zítra do {cas}": "morgen bis {cas}",
+  "Přilož fotku": "Foto anhängen",
+  "U tohoto úkolu chce vedení fotku jako důkaz, že je hotovo.": "Für diese Aufgabe möchte die Leitung ein Foto als Nachweis, dass sie erledigt ist.",
+  "Splní se za: {jmeno}": "Erledigt für: {jmeno}",
+  "Náhled fotky": "Fotovorschau",
+  "Vyfotit znovu": "Neu fotografieren",
+  "Vyfotit / nahrát": "Fotografieren / hochladen",
+  "Fotku se nepodařilo nahrát.": "Das Foto konnte nicht hochgeladen werden.",
+  "Fotku se nepodařilo nahrát — zkontroluj připojení.": "Das Foto konnte nicht hochgeladen werden — prüf die Verbindung.",
+  "Fotka ze splnění": "Foto der Erledigung",
+  "Otevřít fotku v plné velikosti": "Foto in voller Größe öffnen",
+  "Fotka ze splnění úkolu {nazev}": "Foto der Erledigung der Aufgabe {nazev}"
 }

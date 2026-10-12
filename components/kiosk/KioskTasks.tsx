@@ -15,7 +15,7 @@
 // čte tutéž adresu, takže odškrtnutí tady srovná i jeho.
 
 import { useMemo, useState } from 'react';
-import { useKioskShift } from './KioskShiftGate';
+import { useKioskShift, type ActivePerson } from './KioskShiftGate';
 import { pragueToday } from '@/lib/pragueTime';
 import { okJson, apiMessage } from '@/lib/api';
 import { useJazyk, useT } from '@/lib/i18n/client';
@@ -24,7 +24,8 @@ import { Avatar, Button, Card, Chip, EmptyState, ErrorState, Skeleton, Toast } f
 import { Icon } from '../Icons';
 import { TaskChecklist } from '../TaskChecklist';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
-import { vyberUkoly, rozdelPoDnech, type Ukol } from '@/lib/ukolyPrehled';
+import { vyberUkoly, rozdelPoDnech, chceFotku, type Ukol } from '@/lib/ukolyPrehled';
+import { PrilozFoto } from '../ukoly/PrilozFoto';
 import { poCase } from '@/lib/ukolyFiltr';
 import { useTedHM } from '../widgety/oblasti/ukoly';
 import { oznamZmenuPovinnych, ChipPredUzaverkou } from '../PredUzaverkou';
@@ -46,6 +47,8 @@ export default function KioskTasks({ onOpenGuide }: { onOpenGuide?: (id: number)
   const [filter, setFilter] = useState<Filter>('open');
   const [bodyToast, setBodyToast] = useState<string | null>(null);
   const [chyba, setChyba] = useState<string | null>(null);
+  // Kolo 7: úkol „jen s fotkou" — okno Přilož fotku; fotka i splnění jdou za vybraného člověka.
+  const [foto, setFoto] = useState<{ u: Ukol; who: ActivePerson } | null>(null);
 
   // Kdo splnil úkol, je záznam o práci. Když tablet neví, koho zapsat,
   // musí se zeptat dřív, než se cokoli pošle — `actingAs: undefined` dřív
@@ -53,10 +56,17 @@ export default function KioskTasks({ onOpenGuide }: { onOpenGuide?: (id: number)
   const setStatus = async (u: Ukol, status: string) => {
     const who = await requireActive();
     if (!who) return;
+    // Bez fotky by server odmítl (400) — tablet napřed otevře okno a nafotí ji za `who`.
+    if (status === 'done' && chceFotku(u)) { setFoto({ u, who }); return; }
+    await zapisStav(u, status, who);
+  };
+
+  /** PATCH stavu za vybraného člověka; s fotkou vrátí hlášku chyby oknu (null = hotovo). */
+  const zapisStav = async (u: Ukol, status: string, who: ActivePerson, fotka?: string): Promise<string | null> => {
     setChyba(null);
-    data.set(prev => (prev ?? []).map(x => (x.id === u.id ? { ...x, status } : x)));
+    data.set(prev => (prev ?? []).map(x => (x.id === u.id ? { ...x, status, ...(fotka ? { completionPhoto: fotka } : {}) } : x)));
     try {
-      const d = await fetch('/api/tasks', { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify({ id: u.id, status, actingAs: who.id }) }).then(okJson);
+      const d = await fetch('/api/tasks', { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify({ id: u.id, status, actingAs: who.id, ...(fotka ? { completionPhotoUrl: fotka } : {}) }) }).then(okJson);
       // Body patří tomu, kdo u tabletu stojí — a má je vidět hned, jinak
       // odškrtnutí „vyrob limonádu" nic neznamená.
       const pts = Number(d?.pointsEarned);
@@ -64,9 +74,13 @@ export default function KioskTasks({ onOpenGuide }: { onOpenGuide?: (id: number)
       data.reload();
       // Na tabletu je uzávěrka o záložku vedle — po splnění povinného úkolu se odemkne sama.
       oznamZmenuPovinnych();
+      if (fotka) setFoto(null);
+      return null;
     } catch (e) {
-      data.set(prev => (prev ?? []).map(x => (x.id === u.id ? { ...x, status: u.status } : x)));
-      setChyba(apiMessage(e, t('Úkol se nepodařilo uložit.')));
+      data.set(prev => (prev ?? []).map(x => (x.id === u.id ? { ...x, status: u.status, completionPhoto: u.completionPhoto } : x)));
+      const hlaska = apiMessage(e, t('Úkol se nepodařilo uložit.'));
+      if (!fotka) setChyba(hlaska);
+      return hlaska;
     }
   };
 
@@ -123,6 +137,7 @@ export default function KioskTasks({ onOpenGuide }: { onOpenGuide?: (id: number)
             <span className={`font-medium leading-snug ${isDone ? 'text-black/45' : 'text-[#16181A]'}`}>{u.title}</span>
           </p>
           {u.requireBeforeClosing && !isDone && <ChipPredUzaverkou className="mt-1 mr-1" />}
+          {u.requirePhoto && !isDone && !u.completionPhoto && <Chip tone="muted" size="sm" icon="camera" className="mt-1 mr-1">{t('chce fotku')}</Chip>}
           {u.source === 'production' && !isDone && <Chip tone="info" size="sm" icon="leaf" className="mt-1">{t('Výroba · odškrtnutí naskladní dávku')}</Chip>}
           {u.description && !isDone && <p className="text-sm text-black/55 mt-1 whitespace-pre-wrap text-pretty">{u.description}</p>}
           <p className="text-sm text-black/55 mt-1.5 flex items-center gap-1.5 min-w-0">
@@ -164,6 +179,7 @@ export default function KioskTasks({ onOpenGuide }: { onOpenGuide?: (id: number)
   return (
     <div className="space-y-6">
       <Toast message={bodyToast} onClose={() => setBodyToast(null)} />
+      {foto && <PrilozFoto nazev={foto.u.title} zaKoho={foto.who.name} onClose={() => setFoto(null)} onHotovo={url => zapisStav(foto.u, 'done', foto.who, url)} />}
       <div className="flex gap-1.5 overflow-x-auto overscroll-x-contain scrollbar-none scroll-fade-x -mx-1 px-1" role="group" aria-label={t('Filtr úkolů')}>
         {FILTERS.map(f => (
           <button key={f.id} type="button" aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}

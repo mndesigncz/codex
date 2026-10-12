@@ -152,6 +152,8 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'billing.customer_reset': 'Zákazník platební brány zapomenut',
   'billing.referral': 'Měsíc zdarma za doporučení',
   'billing.upgrade': 'Změna tarifu na vyšší',
+  // úkoly (kolo 7)
+  'ukoly.fotka': 'Úkol splněn s fotkou jako důkazem',
 };
 
 /** Popisek akce; neznámý klíč nikdy neukážeme syrový. */

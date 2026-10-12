@@ -101,6 +101,19 @@ export function UkolDetail({ ukol, dnes, kdo, navodHref, onClose, onSplnit, onSt
           {navodHref && radek(t('Návod'), <a href={navodHref} className="btn btn-ghost btn-sm -my-1"><span className="truncate max-w-[16rem]">{ukol.sourceMeta?.guideTitle ?? t('Otevřít návod')}</span></a>)}
         </dl>
 
+        {/* Kolo 7: fotka jako důkaz splnění — pod řádkem Splněno, klepnutí otevře plnou velikost. */}
+        {ukol.completionPhoto && (
+          <div>
+            <p className="t-label">{t('Fotka ze splnění')}</p>
+            <a href={ukol.completionPhoto} target="_blank" rel="noopener noreferrer" title={t('Otevřít fotku v plné velikosti')}
+              className="mt-1.5 inline-block max-w-full rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={ukol.completionPhoto} alt={t('Fotka ze splnění úkolu {nazev}', { nazev: ukol.title })} loading="lazy"
+                className="block rounded-2xl max-h-64 w-auto max-w-full" />
+            </a>
+          </div>
+        )}
+
         {postup != null && (
           <div>
             <p className="t-label">{t('Kroky')} · {postup} %</p>

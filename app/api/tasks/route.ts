@@ -9,7 +9,8 @@ import { sazebnikBodu } from '@/lib/mzdaSmeny';
 import { jeClenem } from '@/lib/tenant';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { typNaUcet } from '@/lib/opravneni';
-import { jeStavZapisu, casNeboNull, validujCasTerminu, doplnkyVyskytu, textOznameniUkolu, type DoplnkyVyskytu } from '@/lib/ukolyPrehled';
+import { jeStavZapisu, casNeboNull, validujCasTerminu, doplnkyVyskytu, textOznameniUkolu, platnaFotka, validujDukaz, type DoplnkyVyskytu } from '@/lib/ukolyPrehled';
+import { audit } from '@/lib/audit';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,6 +48,9 @@ const shape = (r: any) => ({
   sourceMeta: r.source_meta ?? null,
   // Kolo 70: výskyt úkolu zamyká uzávěrku svého dne, dokud není hotový.
   requireBeforeClosing: r.require_before_closing === true,
+  // Kolo 7: splní se jen s fotkou; fotka ze splnění (jen /api/upload/<id>).
+  requirePhoto: r.require_photo === true,
+  completionPhoto: platnaFotka(r.completion_photo) ? r.completion_photo : null,
 });
 
 // Povinný před uzávěrkou smí úkol označit jen ten, kdo úkoly zadává nebo
@@ -72,7 +76,7 @@ async function zapisPovinny(flag: boolean, cil: { id?: number | null; seriesId?:
   } catch { /* sloupec ještě není — úkol platí, jen bez zámku */ }
 }
 
-// Kolo 7: doplňky výskytu (čas termínu) se zapisují ZVLÁŠŤ a best-effort,
+// Kolo 7: doplňky výskytu (čas termínu, „jen s fotkou") se zapisují ZVLÁŠŤ a best-effort,
 // stejně jako příznak povinného úkolu výš: před migrací by INSERT s novým
 // sloupcem shodil i založení úkolu. Cíl: jeden řádek, budoucí nesplněné
 // výskyty série, nebo konkrétní dny série (nově vygenerované výskyty).
@@ -80,14 +84,14 @@ type CilDoplnku = { id?: number | null; seriesId?: string | null; odDne?: string
 async function zapisDoplnky(d: DoplnkyVyskytu, cil: CilDoplnku) {
   try {
     if (cil.seriesId && cil.dny) {
-      if (cil.dny.length) await sql`UPDATE tasks SET due_time = ${d.due_time} WHERE series_id = ${cil.seriesId} AND due_date = ANY(${cil.dny}::text[])`;
+      if (cil.dny.length) await sql`UPDATE tasks SET due_time = ${d.due_time}, require_photo = ${d.require_photo} WHERE series_id = ${cil.seriesId} AND due_date = ANY(${cil.dny}::text[])`;
     } else if (cil.seriesId && cil.odDne) {
-      await sql`UPDATE tasks SET due_time = ${d.due_time} WHERE series_id = ${cil.seriesId} AND due_date >= ${cil.odDne} AND status <> 'done'`;
+      await sql`UPDATE tasks SET due_time = ${d.due_time}, require_photo = ${d.require_photo} WHERE series_id = ${cil.seriesId} AND due_date >= ${cil.odDne} AND status <> 'done'`;
     } else if (cil.seriesId) {
-      await sql`UPDATE tasks SET due_time = ${d.due_time} WHERE series_id = ${cil.seriesId}`;
+      await sql`UPDATE tasks SET due_time = ${d.due_time}, require_photo = ${d.require_photo} WHERE series_id = ${cil.seriesId}`;
     }
-    if (cil.id != null) await sql`UPDATE tasks SET due_time = ${d.due_time} WHERE id = ${cil.id}`;
-  } catch { /* sloupec ještě není — úkol platí, jen bez času */ }
+    if (cil.id != null) await sql`UPDATE tasks SET due_time = ${d.due_time}, require_photo = ${d.require_photo} WHERE id = ${cil.id}`;
+  } catch { /* sloupce ještě nejsou — úkol platí, jen bez času a bez fotky */ }
 }
 
 const RECURRENCES = ['daily', 'weekdays', 'weekly'];
@@ -170,10 +174,10 @@ async function topUpSeries(teamId: number) {
           UPDATE tasks SET require_before_closing = (SELECT COALESCE(require_before_closing, FALSE) FROM tasks WHERE id = ${tmpl.id})
           WHERE series_id = ${seriesId} AND due_date = ANY(${inserts}::text[])`;
       } catch { /* před migrací */ }
-      // Kolo 7: čas termínu ze vzoru (doplnkyVyskytu) — zvlášť, ať případný
+      // Kolo 7: čas termínu a „jen s fotkou" ze vzoru (doplnkyVyskytu; fotka ze splnění ne) — zvlášť, ať případný
       // výpadek nového sloupce nevezme s sebou zámek uzávěrky výš.
       try {
-        const [vzor] = await sql`SELECT due_time FROM tasks WHERE id = ${tmpl.id}`;
+        const [vzor] = await sql`SELECT due_time, require_photo FROM tasks WHERE id = ${tmpl.id}`;
         await zapisDoplnky(doplnkyVyskytu(vzor), { seriesId, dny: inserts });
       } catch { /* před migrací */ }
     }
@@ -267,6 +271,8 @@ export async function POST(req: NextRequest) {
   const casV = validujCasTerminu(b.dueTime, !!(dueDate || recurrence));
   if (!casV.ok) return NextResponse.json({ error: casV.chyba }, { status: 400 });
   const povinny = b.requireBeforeClosing === true && smiPovinny(c.opr);
+  // Kolo 7: „splní se jen s fotkou" nastaví, kdo zadává úkoly (jako zámek uzávěrky); bez práva se ignoruje.
+  const chceFoto = b.requirePhoto === true && smiPovinny(c.opr);
   // Zámek patří dni — úkol bez termínu a bez opakování by nezamkl nikdy nic
   // a manažer by si myslel, že hlídá.
   if (povinny && !dueDate && !recurrence) return NextResponse.json({ error: BEZ_DNE }, { status: 400 });
@@ -304,9 +310,9 @@ export async function POST(req: NextRequest) {
     await zapisPovinny(true, seriesId ? { seriesId } : { id: Number(first.id) });
     first = { ...first, require_before_closing: true };
   }
-  if (casV.cas && first) {
-    await zapisDoplnky({ due_time: casV.cas }, seriesId ? { seriesId } : { id: Number(first.id) });
-    first = { ...first, due_time: casV.cas };
+  if ((casV.cas || chceFoto) && first) {
+    await zapisDoplnky({ due_time: casV.cas, require_photo: chceFoto }, seriesId ? { seriesId } : { id: Number(first.id) });
+    first = { ...first, due_time: casV.cas, require_photo: chceFoto };
   }
 
   // Notify the assignee (specific person) when it isn't self-assigned.
@@ -427,6 +433,8 @@ export async function PATCH(req: NextRequest) {
       if (!v.ok) return NextResponse.json({ error: v.chyba }, { status: 400 });
       cas = v.cas;
     } else cas = maDen ? casNeboNull(task.due_time) : null;
+    // Kolo 7: „jen s fotkou" — z formuláře jen s právem (jako zámek uzávěrky), jinak zůstává.
+    const chceFoto = b.requirePhoto !== undefined && smiPovinny(c.opr) ? b.requirePhoto === true : task.require_photo === true;
 
     // Příznak: z formuláře jen s právem, jinak zůstává, jak byl. Zapisuje se
     // vždycky (i beze změny), protože přestavba série níž maže budoucí výskyty
@@ -510,7 +518,7 @@ export async function PATCH(req: NextRequest) {
 
     if (povinny || bylPovinny) await zapisPovinny(povinny, cilPovinny);
     // Doplňky (čas) vždycky: přestavba série výš zakládá výskyty bez nich.
-    await zapisDoplnky({ due_time: cas }, cilPovinny);
+    await zapisDoplnky({ due_time: cas, require_photo: chceFoto }, cilPovinny);
 
     // Return a representative row (the edited one if it survived, else the series' next occurrence).
     let [row] = await sql`
@@ -571,6 +579,22 @@ export async function PATCH(req: NextRequest) {
   }
   let row: any;
   const done = b.status === 'done';
+  // Kolo 7: fotka jako důkaz. Úkol s require_photo se bez fotky nesplní (ani z widgetu
+  // a tabletu); fotka musí být soubor nahraný v tomhle podniku. Na tabletu ji přiloží
+  // vybraný člověk (effectiveId) — audit i „splnil" jdou na něj.
+  const dukaz = validujDukaz({ pozadovana: task.require_photo === true, ulozena: task.completion_photo, vstup: b.completionPhotoUrl, hotovo: done });
+  if (!dukaz.ok) return NextResponse.json({ error: dukaz.chyba }, { status: 400 });
+  if (dukaz.foto) {
+    const idSouboru = Number(dukaz.foto.split('/').pop());
+    const [soubor] = Number.isInteger(idSouboru) && c.teamId
+      ? await sql`SELECT id FROM uploads WHERE id = ${idSouboru} AND team_id = ${c.teamId}`
+      : [];
+    if (!soubor) return NextResponse.json({ error: 'Fotka není platná — nahraj ji prosím znovu.' }, { status: 400 });
+    try {
+      await sql`UPDATE tasks SET completion_photo = ${dukaz.foto} WHERE id = ${id}`;
+      await audit(c.teamId, effectiveId, 'ukoly.fotka', 'task', id, String(task.title ?? '').slice(0, 120));
+    } catch { /* před migrací — úkol se splní i bez uložené fotky */ }
+  }
   // Výrobní úkol: odškrtnutí = vyrobeno. Dávka se naskladní a suroviny odepíšou
   // tady na serveru, aby to platilo z appky, tabletu i z telefonu stejně.
   if (done && task.source === 'production' && task.source_ref && taskTeam && !task.source_meta?.produced) {

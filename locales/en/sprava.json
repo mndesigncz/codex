@@ -1651,5 +1651,8 @@
   "Nejdřív vyber den.": "Pick a day first.",
   "{n, plural, one {Úkol je zadaný # člověku} few {Úkol je zadaný # lidem} other {Úkol je zadaný # lidem}}": "{n, plural, one {Task assigned to # person} other {Task assigned to # people}}",
   "Nezadalo se {n} z {celkem}: {komu}": "{n} of {celkem} not assigned: {komu}",
-  "Každý dostane vlastní úkol ({n, plural, one {# člověk} few {# lidé} other {# lidí}}).": "Everyone gets their own task ({n, plural, one {# person} other {# people}})."
+  "Každý dostane vlastní úkol ({n, plural, one {# člověk} few {# lidé} other {# lidí}}).": "Everyone gets their own task ({n, plural, one {# person} other {# people}}).",
+  "chce fotku": "needs photo",
+  "Vyžadovat fotku při splnění": "Require a photo on completion",
+  "Úkol půjde odškrtnout až s fotkou z telefonu nebo tabletu — uvidíš ji v detailu úkolu.": "The task can only be ticked off with a photo from a phone or tablet — you'll see it in the task detail."
 }

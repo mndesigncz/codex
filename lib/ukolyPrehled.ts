@@ -44,6 +44,10 @@ export interface Ukol {
   sourceMeta: { guideId?: number | null; guideTitle?: string | null } | null;
   /** Dokud není hotový, zamyká uzávěrku dne (jen výskyt s termínem ten den). */
   requireBeforeClosing?: boolean;
+  /** Kolo 7: splní se jen s fotkou (server vymáhá — widget ani tablet to neobejdou). */
+  requirePhoto?: boolean;
+  /** Kolo 7: fotka ze splnění (`/api/upload/<id>`), nebo null. Po vrácení mezi nehotové zůstává. */
+  completionPhoto?: string | null;
 }
 
 const den = (v: unknown): string | null => (/^\d{4}-\d{2}-\d{2}/.test(String(v ?? '')) ? String(v).slice(0, 10) : null);
@@ -89,6 +93,9 @@ export function vyberUkoly(raw: unknown): Ukol[] {
     sourceMeta: t?.sourceMeta && typeof t.sourceMeta === 'object' ? t.sourceMeta : null,
     // Bez tohohle by klient příznak zahodil a štítek „Před uzávěrkou" by nikde nesvítil.
     requireBeforeClosing: t?.requireBeforeClosing === true,
+    requirePhoto: t?.requirePhoto === true,
+    // Jen vlastní adresa nahraného souboru — cizí URL by obrázek načetla odjinud.
+    completionPhoto: platnaFotka(t?.completionPhoto) ? t.completionPhoto : null,
   })).filter(t => Number.isFinite(t.id));
 }
 
@@ -134,15 +141,42 @@ export function validujCasTerminu(vstup: unknown, maDen: boolean): VysledekCasu 
 }
 
 /** Řádek úkolu z databáze — jen sloupce, které se přenáší do dalších výskytů série. */
-export interface VzorVyskytu { due_time?: unknown }
-export interface DoplnkyVyskytu { due_time: string | null }
+export interface VzorVyskytu { due_time?: unknown; require_photo?: unknown; completion_photo?: unknown }
+export interface DoplnkyVyskytu { due_time: string | null; require_photo: boolean }
 
 /**
  * Co nový výskyt opakovaného úkolu převezme ze vzoru (posledního výskytu).
- * Kolo 7: čas termínu — jinak by „každý den do 10:00" měl čas jen první den.
+ * Kolo 7: čas termínu — jinak by „každý den do 10:00" měl čas jen první den —
+ * a „splní se jen s fotkou". Fotka ze splnění (completion_photo) se NEpřenáší:
+ * patří jednomu dni, zítřejší úklid potřebuje vlastní.
  */
 export function doplnkyVyskytu(vzor: VzorVyskytu | null | undefined): DoplnkyVyskytu {
-  return { due_time: casNeboNull(vzor?.due_time) };
+  return { due_time: casNeboNull(vzor?.due_time), require_photo: vzor?.require_photo === true };
+}
+
+// ---------------------------------------------------------------------------
+// Fotka jako důkaz splnění (kolo 7, R7-4)
+// ---------------------------------------------------------------------------
+
+/** Adresa nahraného souboru z POST /api/upload — nic jiného se jako fotka neuloží. */
+export const ADRESA_FOTKY = /^\/api\/upload\/[A-Za-z0-9_-]+$/;
+export const platnaFotka = (v: unknown): v is string => typeof v === 'string' && ADRESA_FOTKY.test(v);
+
+/** Klepnutí na „hotovo" musí napřed otevřít okno Přilož fotku (úkol ji chce a ještě žádnou nemá). */
+export const chceFotku = (u: Pick<Ukol, 'requirePhoto' | 'completionPhoto'>) => u.requirePhoto === true && !u.completionPhoto;
+
+export type VysledekDukazu = { ok: true; foto: string | null } | { ok: false; chyba: string };
+
+/**
+ * Serverová brána PATCH status: úkol s require_photo se bez fotky nesplní —
+ * ani z widgetu, ani z tabletu (UI jen otevře okno, vymáhá to tahle funkce).
+ * Uložená fotka z dřívějška stačí (vrácení mezi nehotové ji nemaže).
+ */
+export function validujDukaz({ pozadovana, ulozena, vstup, hotovo }: { pozadovana: boolean; ulozena: unknown; vstup: unknown; hotovo: boolean }): VysledekDukazu {
+  const poslana = vstup == null || vstup === '' ? null : vstup;
+  if (poslana != null && !platnaFotka(poslana)) return { ok: false, chyba: 'Fotka není platná — nahraj ji prosím znovu.' };
+  if (hotovo && pozadovana && poslana == null && !platnaFotka(ulozena)) return { ok: false, chyba: 'U tohoto úkolu je potřeba fotka.' };
+  return { ok: true, foto: hotovo ? poslana : null };
 }
 
 /** Tělo push oznámení o novém úkolu: „Objednat pečivo · dnes do 10:00". Bez času jen název. */

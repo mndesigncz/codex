@@ -5,11 +5,13 @@
 //  - čas termínu „do 14:00": řazení uvnitř dne, „po čase" podle pražských hodin (i kolem půlnoci),
 //    validace vstupu API a přenos do dalších výskytů série, text push oznámení,
 //  - jeden úkol víc lidem (runBulk, každé res.ok, toast s plurálem, částečné selhání jménem),
+//  - fotka jako důkaz: serverová brána validujDukaz, jen /api/upload/<id>, výskyty dědí require_photo, ne fotku,
 
 import { readFileSync } from 'node:fs';
 import type { Testy } from './_testy.ts';
 import {
   jeStavZapisu, stavPoOdskrtnuti, STAVY_ZAPISU, vyberUkoly, rozdelPoDnech, validujCasTerminu, doplnkyVyskytu, textOznameniUkolu, casNeboNull,
+  platnaFotka, chceFotku, validujDukaz,
 } from '../../lib/ukolyPrehled.ts';
 import { poCase, seradUkoly, stavUkolu } from '../../lib/ukolyFiltr.ts';
 import { pragueDayOf, pragueHM } from '../../lib/pragueTime.ts';
@@ -75,8 +77,8 @@ export default function ({ eq, ok }: Testy) {
   const bezDne = validujCasTerminu('14:00', false);
   ok('validace času: čas bez dne je chyba („jen s dnem")', !bezDne.ok && /jen s dnem/.test(bezDne.chyba));
   eq('série: další výskyt převezme čas vzoru, nesmysl a chybějící sloupec (před migrací) = bez času',
-    [doplnkyVyskytu({ due_time: '10:00' }), doplnkyVyskytu({ due_time: 'x' }), doplnkyVyskytu({}), doplnkyVyskytu(null)],
-    [{ due_time: '10:00' }, { due_time: null }, { due_time: null }, { due_time: null }]);
+    [doplnkyVyskytu({ due_time: '10:00' }).due_time, doplnkyVyskytu({ due_time: 'x' }).due_time, doplnkyVyskytu({}).due_time, doplnkyVyskytu(null).due_time],
+    ['10:00', null, null, null]);
   eq('push: „do 14:00" podle dne — dnes, zítra, jindy datum; bez času jen název', [
     textOznameniUkolu('Objednat pečivo', DNES, '10:00', DNES), textOznameniUkolu('Objednat pečivo', ZITRA, '10:00', DNES),
     textOznameniUkolu('Objednat pečivo', '2026-11-03', '10:00', DNES), textOznameniUkolu('Objednat pečivo', DNES, null, DNES),
@@ -85,7 +87,7 @@ export default function ({ eq, ok }: Testy) {
   const api = zdroj('app/api/tasks/route.ts');
   ok('API: POST i PATCH validují čas (validujCasTerminu), shape vrací dueTime, top-up i přestavba série čas přenesou',
     (api.match(/validujCasTerminu\(/g) ?? []).length >= 2 && /dueTime: r\.due_date \? casNeboNull\(r\.due_time\)/.test(api)
-    && /zapisDoplnky\(doplnkyVyskytu\(vzor\), \{ seriesId, dny: inserts \}\)/.test(api) && /await zapisDoplnky\(\{ due_time: cas \}, cilPovinny\)/.test(api));
+    && /zapisDoplnky\(doplnkyVyskytu\(vzor\), \{ seriesId, dny: inserts \}\)/.test(api) && /await zapisDoplnky\(\{ due_time: cas, require_photo: chceFoto \}, cilPovinny\)/.test(api));
   ok('formulář: Termín a „Do kdy" sdílí řádek i na telefonu (grid-cols-2), čas bez data zamčený',
     /<div className="grid grid-cols-2 gap-3 sm:gap-4">\s*<Field id=\{fid\('termin'\)\}/.test(zdroj('components/employer/TaskManager.tsx'))
     && /type="time" value=\{form\.dueTime\} disabled=\{!form\.dueDate\}/.test(zdroj('components/employer/TaskManager.tsx')));
@@ -103,4 +105,46 @@ export default function ({ eq, ok }: Testy) {
     && /max-h-\[16\.5rem\] overflow-y-auto/.test(tm) && /<SelectBox checked=\{on\}/.test(tm));
   ok('víc lidí: úprava zůstává na jednom člověku (Select), výběr víc lidí jen při zakládání s ukoly.zadavat',
     /const vyberVic = zadava && editingId == null;/.test(tm));
+
+  // ---- 4) Fotka jako důkaz ----
+  ok('fotka: platná je jen adresa nahraného souboru /api/upload/<id>',
+    platnaFotka('/api/upload/123') && platnaFotka('/api/upload/abc_D-9') && !platnaFotka('https://evil.example/x.jpg') && !platnaFotka('/api/upload/1/../2')
+    && !platnaFotka('/api/upload/') && !platnaFotka('javascript:alert(1)') && !platnaFotka(null));
+  const foto = vyberUkoly([
+    { ...zaklad, id: 21, title: 'Vyčistit lednici', dueDate: DNES, requirePhoto: true },
+    { ...zaklad, id: 22, title: 'Umyto', dueDate: DNES, status: 'done', requirePhoto: true, completionPhoto: '/api/upload/77' },
+    { ...zaklad, id: 23, title: 'Cizí URL', dueDate: DNES, requirePhoto: 'ano', completionPhoto: 'https://x.cz/a.jpg' },
+  ]);
+  eq('fotka: výběr — requirePhoto jen true, completionPhoto jen /api/upload/', foto.map(u => [u.requirePhoto, u.completionPhoto]),
+    [[true, null], [true, '/api/upload/77'], [false, null]]);
+  ok('fotka: okno se otevře u úkolu, který fotku chce a ještě žádnou nemá; s uloženou (vrácený mezi nehotové) ne',
+    chceFotku(foto[0]) && !chceFotku(foto[1]) && !chceFotku(foto[2]));
+  eq('server: hotovo bez fotky u require_photo = 400 „U tohoto úkolu je potřeba fotka."',
+    validujDukaz({ pozadovana: true, ulozena: null, vstup: undefined, hotovo: true }), { ok: false, chyba: 'U tohoto úkolu je potřeba fotka.' });
+  eq('server: s fotkou projde a vrátí ji k uložení; uložená z dřívějška stačí; bez require_photo fotka není potřeba', [
+    validujDukaz({ pozadovana: true, ulozena: null, vstup: '/api/upload/5', hotovo: true }),
+    validujDukaz({ pozadovana: true, ulozena: '/api/upload/4', vstup: null, hotovo: true }),
+    validujDukaz({ pozadovana: false, ulozena: null, vstup: '', hotovo: true }),
+  ], [{ ok: true, foto: '/api/upload/5' }, { ok: true, foto: null }, { ok: true, foto: null }]);
+  ok('server: cizí adresa fotky je 400 i u úkolu bez require_photo; vrácení mezi nehotové fotku nechce ani neukládá',
+    !validujDukaz({ pozadovana: false, ulozena: null, vstup: 'https://x.cz/a.jpg', hotovo: true }).ok
+    && JSON.stringify(validujDukaz({ pozadovana: true, ulozena: null, vstup: undefined, hotovo: false })) === JSON.stringify({ ok: true, foto: null }));
+  eq('série: další výskyt zdědí require_photo, fotku ze splnění ne', doplnkyVyskytu({ due_time: '10:00', require_photo: true, completion_photo: '/api/upload/9' }),
+    { due_time: '10:00', require_photo: true });
+  const apiF = zdroj('app/api/tasks/route.ts');
+  ok('API: PATCH status projde validujDukaz před výrobou i zápisem, fotka musí být nahraná v podniku, zápis do historie ukoly.fotka',
+    apiF.indexOf('validujDukaz(') > 0 && apiF.indexOf('validujDukaz(') < apiF.indexOf("task.source === 'production'")
+    && /SELECT id FROM uploads WHERE id = \$\{idSouboru\} AND team_id = \$\{c\.teamId\}/.test(apiF) && /'ukoly\.fotka'/.test(apiF)
+    && /completionPhoto: platnaFotka\(r\.completion_photo\)/.test(apiF) && /requirePhoto: r\.require_photo === true/.test(apiF));
+  const okno = zdroj('components/ukoly/PrilozFoto.tsx');
+  ok('okno Přilož fotku: Modal sm, input image/* s capture (zadní fotoaparát), POST /api/upload, náhled max-h-48 max-w-full, „Označit" až po nahrání',
+    /<Modal open onClose=\{onClose\} size="sm"/.test(okno) && /type="file" accept="image\/\*" capture="environment"/.test(okno)
+    && /fetch\('\/api\/upload', \{ method: 'POST', body: fd \}\)\.then\(okJson\)/.test(okno) && /max-h-48 w-auto max-w-full/.test(okno)
+    && /disabled=\{!url \|\| nahravam\}/.test(okno) && /size="lg" block icon="camera"/.test(okno));
+  eq('okno Přilož fotku volají všechna místa odškrtnutí (vedení, zaměstnanec, widget, tablet)',
+    ['components/employer/TaskManager.tsx', 'components/employee/Tasks.tsx', 'components/widgety/oblasti/ukoly.tsx', 'components/kiosk/KioskTasks.tsx']
+      .filter(f => !/<PrilozFoto\b/.test(zdroj(f)) || !/chceFotku\(/.test(zdroj(f))), []);
+  ok('tablet: fotka i splnění jdou za vybraného člověka (actingAs), okno řekne za koho',
+    /actingAs: who\.id, \.\.\.\(fotka \? \{ completionPhotoUrl: fotka \} : \{\}\)/.test(zdroj('components/kiosk/KioskTasks.tsx'))
+    && /zaKoho=\{foto\.who\.name\}/.test(zdroj('components/kiosk/KioskTasks.tsx')));
 }

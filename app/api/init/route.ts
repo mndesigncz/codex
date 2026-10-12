@@ -2637,6 +2637,11 @@ export async function GET(request: Request) {
     // Kolo 7 (R7-4, Úkoly): čas termínu „do 14:00" (HH:MM uvnitř dne due_date,
     // nepovinný; výskyty série ho dědí).
     await ddl(sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS due_time TEXT`);
+    // Fotka jako důkaz splnění: úkol s require_photo se bez fotky nesplní (vymáhá
+    // PATCH /api/tasks), completion_photo = /api/upload/<id>; výskyty série dědí
+    // jen require_photo, fotku ne.
+    await ddl(sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS require_photo BOOLEAN DEFAULT FALSE`);
+    await ddl(sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS completion_photo TEXT`);
 
     // Kroky migrace, které selhaly (a byly zachyceny), ať se to pozná zvenku
     // místo tichého „ok". Prázdné pole = celé schéma prošlo.

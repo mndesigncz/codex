@@ -1941,5 +1941,16 @@
   "Začít": "Zacznij",
   "po čase": "po czasie",
   "dnes do {cas}": "dziś do {cas}",
-  "zítra do {cas}": "jutro do {cas}"
+  "zítra do {cas}": "jutro do {cas}",
+  "Přilož fotku": "Dołącz zdjęcie",
+  "U tohoto úkolu chce vedení fotku jako důkaz, že je hotovo.": "Przy tym zadaniu kierownictwo chce zdjęcie jako dowód, że jest zrobione.",
+  "Splní se za: {jmeno}": "Wykonane za: {jmeno}",
+  "Náhled fotky": "Podgląd zdjęcia",
+  "Vyfotit znovu": "Zrób zdjęcie ponownie",
+  "Vyfotit / nahrát": "Zrób zdjęcie / wgraj",
+  "Fotku se nepodařilo nahrát.": "Nie udało się wgrać zdjęcia.",
+  "Fotku se nepodařilo nahrát — zkontroluj připojení.": "Nie udało się wgrać zdjęcia — sprawdź połączenie.",
+  "Fotka ze splnění": "Zdjęcie z wykonania",
+  "Otevřít fotku v plné velikosti": "Otwórz zdjęcie w pełnym rozmiarze",
+  "Fotka ze splnění úkolu {nazev}": "Zdjęcie z wykonania zadania {nazev}"
 }

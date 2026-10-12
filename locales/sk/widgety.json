@@ -1944,5 +1944,16 @@
   "Začít": "Začať",
   "po čase": "po čase",
   "dnes do {cas}": "dnes do {cas}",
-  "zítra do {cas}": "zajtra do {cas}"
+  "zítra do {cas}": "zajtra do {cas}",
+  "Přilož fotku": "Prilož fotku",
+  "U tohoto úkolu chce vedení fotku jako důkaz, že je hotovo.": "Pri tejto úlohe chce vedenie fotku ako dôkaz, že je hotovo.",
+  "Splní se za: {jmeno}": "Splní sa za: {jmeno}",
+  "Náhled fotky": "Náhľad fotky",
+  "Vyfotit znovu": "Odfotiť znova",
+  "Vyfotit / nahrát": "Odfotiť / nahrať",
+  "Fotku se nepodařilo nahrát.": "Fotku sa nepodarilo nahrať.",
+  "Fotku se nepodařilo nahrát — zkontroluj připojení.": "Fotku sa nepodarilo nahrať — skontroluj pripojenie.",
+  "Fotka ze splnění": "Fotka zo splnenia",
+  "Otevřít fotku v plné velikosti": "Otvoriť fotku v plnej veľkosti",
+  "Fotka ze splnění úkolu {nazev}": "Fotka zo splnenia úlohy {nazev}"
 }

@@ -29,9 +29,10 @@ import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useSmi } from '../widgety/NavigaceKontext';
 import { URL_UKOLY, Zaskrtnuti, useTedHM } from '../widgety/oblasti/ukoly';
-import { vyberUkoly, vRozsahu, rozdelPoDnech, jeCiziUkol, splnenoDnes, type Ukol } from '@/lib/ukolyPrehled';
+import { vyberUkoly, vRozsahu, rozdelPoDnech, jeCiziUkol, splnenoDnes, chceFotku, type Ukol } from '@/lib/ukolyPrehled';
 import { VYCHOZI_FILTR, filtrujBezStavu, filtrujUkoly, poctyStavu, seradUkoly, statistikaUkolu, rozborPredani, cerstvePredani, poCase, UDALOST_PREDANI_UKOLU, type FiltrUkolu } from '@/lib/ukolyFiltr';
 import { UkolDetail } from '../ukoly/UkolDetail';
+import { PrilozFoto } from '../ukoly/PrilozFoto';
 import { UkolyFiltry } from '../ukoly/UkolyFiltry';
 import { UkolySouhrn } from '../ukoly/UkolySouhrn';
 import { UkolyMesic } from '../ukoly/UkolyMesic';
@@ -84,6 +85,8 @@ export default function Tasks({ user }: Props) {
   const [zpetUkol, setZpetUkol] = useState<Ukol | null>(null);
   const [idToastu, setIdToastu] = useState(0);
   const [mimoDen, setMimoDen] = useState<Ukol | null>(null);
+  // Kolo 7: úkol „jen s fotkou" — okno Přilož fotku (fotí se telefonem) před splněním.
+  const [fotoUkol, setFotoUkol] = useState<Ukol | null>(null);
   const { weekStart } = useCurrency();
 
   const today = pragueToday();
@@ -91,12 +94,13 @@ export default function Tasks({ user }: Props) {
   const ted = useTedHM();
   const smiSplnit = (t: Ukol) => !jeCiziUkol(t, ja) || smi('ukoly.plnit');
 
-  const zmenStav = async (task: Ukol, newStatus: string) => {
+  /** Zápis stavu; s fotkou (okno Přilož fotku) vrátí hlášku chyby místo pruhu nad seznamem. */
+  const zmenStav = async (task: Ukol, newStatus: string, foto?: string): Promise<string | null> => {
     setSaveErr(null);
     const puvodni = task.status;
-    data.set(prev => (prev ?? []).map(t => (t.id === task.id ? { ...t, status: newStatus } : t)));
+    data.set(prev => (prev ?? []).map(t => (t.id === task.id ? { ...t, status: newStatus, ...(foto ? { completionPhoto: foto } : {}) } : t)));
     try {
-      const d = await fetch(URL_UKOLY, { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify({ id: task.id, status: newStatus }) }).then(okJson);
+      const d = await fetch(URL_UKOLY, { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify({ id: task.id, status: newStatus, ...(foto ? { completionPhotoUrl: foto } : {}) }) }).then(okJson);
       // Body se přičítaly potichu. Když je člověk uvidí hned, ví, že
       // odškrtnutí něco znamená — a „vyrob limonádu" přestane být otrava.
       const pts = Number(d?.pointsEarned);
@@ -109,9 +113,13 @@ export default function Tasks({ user }: Props) {
       data.reload();
       // Hotový povinný úkol odemyká uzávěrku — otevřený formulář uzávěrky se přepočítá sám.
       oznamZmenuPovinnych();
+      if (foto) setFotoUkol(null);
+      return null;
     } catch (e) {
-      data.set(prev => (prev ?? []).map(t => (t.id === task.id ? { ...t, status: puvodni } : t)));
-      setSaveErr(apiMessage(e, t('Změnu stavu se nepodařilo uložit.')));
+      data.set(prev => (prev ?? []).map(t => (t.id === task.id ? { ...t, status: puvodni, completionPhoto: task.completionPhoto } : t)));
+      const hlaska = apiMessage(e, t('Změnu stavu se nepodařilo uložit.'));
+      if (!foto) setSaveErr(hlaska);
+      return hlaska;
     }
   };
 
@@ -119,6 +127,8 @@ export default function Tasks({ user }: Props) {
   const updateStatus = (task: Ukol, newStatus: string) => {
     if (!smiSplnit(task)) return;
     if (newStatus === 'done' && task.dueDate && task.dueDate !== today) { setMimoDen(task); return; }
+    // Kolo 7: „jen s fotkou" — bez fotky by server odmítl; okno ji nafotí a pak teprve splní.
+    if (newStatus === 'done' && chceFotku(task)) { setFotoUkol(task); return; }
     void zmenStav(task, newStatus);
   };
 
@@ -184,6 +194,8 @@ export default function Tasks({ user }: Props) {
             {task.teamTask && <Chip tone="info" size="sm" icon="users">{t('Pro kohokoli')}</Chip>}
             {opakovani && <Chip tone="muted" size="sm" icon="refresh">{opakovani}</Chip>}
             {task.requireBeforeClosing && !hotovo && <ChipPredUzaverkou />}
+            {task.requirePhoto && !hotovo && !task.completionPhoto && <Chip tone="muted" size="sm" icon="camera">{t('chce fotku')}</Chip>}
+            {hotovo && task.completionPhoto && <Chip tone="muted" size="sm" icon="camera">{t('s fotkou')}</Chip>}
             {hotovo && task.completedByName && <span>{t('splnil {jmeno}', { jmeno: task.completedByName })}</span>}
             {/* Postup bydlí v návodu — odsud se na něj dá dostat jedním ťuknutím místo hledání v seznamu návodů. */}
             {task.sourceMeta?.guideId && (
@@ -299,7 +311,7 @@ export default function Tasks({ user }: Props) {
         <UkolDetail ukol={detail} dnes={today} onClose={() => setDetailId(null)}
           kdo={detail.assigneeName ?? t('Já')} zamceno={!smiSplnit(detail)}
           navodHref={detail.sourceMeta?.guideId ? `/employee/shifts?view=guides&guide=${detail.sourceMeta.guideId}` : undefined}
-          onSplnit={done => { if (done && detail.dueDate && detail.dueDate !== today) setDetailId(null); updateStatus(detail, done ? 'done' : 'pending'); }}
+          onSplnit={done => { if (done && ((detail.dueDate && detail.dueDate !== today) || chceFotku(detail))) setDetailId(null); updateStatus(detail, done ? 'done' : 'pending'); }}
           onStav={smiSplnit(detail) ? s => updateStatus(detail, s) : undefined}
           onChecklist={smiSplnit(detail) ? i => toggleChecklistItem(detail, i) : undefined}
           onChecklistVse={smiSplnit(detail) ? d => toggleChecklistAll(detail, d) : undefined} />
@@ -308,11 +320,12 @@ export default function Tasks({ user }: Props) {
         <Modal open onClose={() => setMimoDen(null)} size="sm" title={t('Tohle není dnešní úkol')}
           footer={<>
             <Button variant="secondary" onClick={() => setMimoDen(null)}>{t('Zrušit')}</Button>
-            <Button variant="primary" icon="check" onClick={() => { const u = mimoDen; setMimoDen(null); void zmenStav(u, 'done'); }}>{t('Splnit teď')}</Button>
+            <Button variant="primary" icon="check" onClick={() => { const u = mimoDen; setMimoDen(null); if (chceFotku(u)) setFotoUkol(u); else void zmenStav(u, 'done'); }}>{t('Splnit teď')}</Button>
           </>}>
           <p className="text-sm text-black/70 text-pretty"><span className="cz-sentence">{t('„{nazev}" má termín {den}.', { nazev: mimoDen.title, den: denDlouze(mimoDen.dueDate!) })}</span> {t('Opravdu ho chceš splnit už teď?')}</p>
         </Modal>
       )}
+      {fotoUkol && <PrilozFoto nazev={fotoUkol.title} onClose={() => setFotoUkol(null)} onHotovo={url => zmenStav(fotoUkol, 'done', url)} />}
       <Toast message={bodyToast} id={idToastu} onClose={() => { setBodyToast(null); setZpetUkol(null); }}
         action={zpetUkol ? { label: t('Vrátit'), onClick: () => { const u = zpetUkol; setBodyToast(null); setZpetUkol(null); void zmenStav(u, 'pending'); } } : undefined} />
     </>

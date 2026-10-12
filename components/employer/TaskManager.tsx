@@ -32,9 +32,10 @@ import { pragueToday } from '@/lib/pragueTime';
 import { apiMessage, okJson } from '@/lib/api';
 import { useDraft } from '@/lib/useDraft';
 import { DraftNote } from '../ui/DraftNote';
-import { vyberUkoly, rozdelPoDnech, jeCiziUkol, splnenoDnes, stavPoOdskrtnuti, type StavZapisu, type Ukol } from '@/lib/ukolyPrehled';
+import { vyberUkoly, rozdelPoDnech, jeCiziUkol, splnenoDnes, stavPoOdskrtnuti, chceFotku, type StavZapisu, type Ukol } from '@/lib/ukolyPrehled';
 import { VYCHOZI_FILTR, filtrujBezStavu, filtrujUkoly, poctyStavu, seradUkoly, statistikaUkolu, rozborPredani, cerstvePredani, poCase, UDALOST_PREDANI_UKOLU, type FiltrUkolu } from '@/lib/ukolyFiltr';
 import { UkolDetail } from '../ukoly/UkolDetail';
+import { PrilozFoto } from '../ukoly/PrilozFoto';
 import { UkolyFiltry, type ClovekFiltru } from '../ukoly/UkolyFiltry';
 import { UkolySouhrn } from '../ukoly/UkolySouhrn';
 import { RychlePridani } from '../ukoly/RychlePridani';
@@ -68,6 +69,8 @@ const emptyForm = () => ({
   komu: [] as string[],
   // Úkol zamyká uzávěrku dne, dokud není hotový (tasks.require_before_closing).
   requireBeforeClosing: false,
+  // Kolo 7: splní se jen s fotkou (tasks.require_photo) — okno Přilož fotku u odškrtnutí.
+  requirePhoto: false,
 });
 type Form = ReturnType<typeof emptyForm>;
 
@@ -118,6 +121,8 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
   const [mazani, setMazani] = useState<Ukol | null>(null);
   const [mazu, setMazu] = useState(false);
   const [mimoDen, setMimoDen] = useState<Ukol | null>(null);
+  // Kolo 7: úkol, který chce fotku jako důkaz — okno Přilož fotku před splněním.
+  const [fotoUkol, setFotoUkol] = useState<Ukol | null>(null);
   // Záložky v aplikaci jsou `?view=`, takže odchod na Rozvrh formulář
   // odmontuje. Do kola 37 to znamenalo psát úkol znovu.
   const koncept = useDraft('ukoly', form, setForm, {
@@ -214,6 +219,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
       priority: uk.priority, dueDate: uk.dueDate ?? '', dueTime: uk.dueTime ?? '',
       recurrence: uk.recurrence ?? '', checklist: uk.checklist ?? [],
       requireBeforeClosing: uk.requireBeforeClosing === true,
+      requirePhoto: uk.requirePhoto === true,
     });
     setShowForm(true); setError(''); setCastecne(null);
   };
@@ -238,7 +244,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
       dueTime: form.dueDate && form.dueTime ? form.dueTime : null,
       recurrence: form.recurrence || null,
       // Bez práva se příznak neposílá vůbec: úprava od autora bez práva ho pak na serveru nechá, jak byl.
-      ...(smiPovinny ? { requireBeforeClosing: form.requireBeforeClosing } : {}),
+      ...(smiPovinny ? { requireBeforeClosing: form.requireBeforeClosing, requirePhoto: form.requirePhoto } : {}),
     };
     // Kolo 7: víc lidí najednou = úkol každému zvlášť (Connecteam „Assign to"). Požadavky
     // jdou naráz (runBulk), každý s kontrolou res.ok; co se nepovede, se řekne jménem.
@@ -282,7 +288,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
   };
 
   /** Zápis s optimistickou změnou a vrácením při chybě (seznam, tabule i widgety nad /api/tasks). */
-  const zapis = useCallback(async (zmena: (ts: Ukol[]) => Ukol[], telo: Record<string, unknown>, chyba: string) => {
+  const zapis = useCallback(async (zmena: (ts: Ukol[]) => Ukol[], telo: Record<string, unknown>, chyba: string, naChybu?: (zprava: string) => void) => {
     setAkceChyba(null);
     const puvodni = data.data;
     data.set(prev => zmena(prev ?? []));
@@ -294,7 +300,8 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
       return true;
     } catch (e) {
       data.set(() => puvodni ?? []);
-      setAkceChyba(apiMessage(e, chyba));
+      // Okno (Přilož fotku) ukáže chybu u sebe; jinak hláška nad seznamem.
+      if (naChybu) naChybu(apiMessage(e, chyba)); else setAkceChyba(apiMessage(e, chyba));
       return false;
     }
   }, [data]);
@@ -311,10 +318,21 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
   const completeTask = (uk: Ukol, done: boolean) => {
     if (!smiSplnit(uk)) return;
     if (done && uk.dueDate && uk.dueDate !== today) { setMimoDen(uk); return; }
+    // Kolo 7: úkol „jen s fotkou" se odškrtne až v okně Přilož fotku (server bez fotky vrátí 400).
+    if (done && chceFotku(uk)) { setFotoUkol(uk); return; }
     void setStatus(uk, stavPoOdskrtnuti(done, uk.status)).then(ok => {
       // Výrobní úkol už dávku naskladnil — „Vrátit" by jen lhalo, že se to vrátilo.
       if (ok && done && uk.source !== 'production') setHotovyUkol(h => ({ uk, id: (h?.id ?? 0) + 1 }));
     });
+  };
+
+  /** Splnění s fotkou z okna Přilož fotku: vrátí hlášku chyby (zůstane v okně), nebo null. */
+  const splnitSFotkou = async (uk: Ukol, url: string): Promise<string | null> => {
+    let chyba: string | null = null;
+    const ok = await zapis(ts => ts.map(x => (x.id === uk.id ? { ...x, status: 'done', completionPhoto: url } : x)),
+      { id: uk.id, status: 'done', completionPhotoUrl: url }, t('Změnu stavu se nepodařilo uložit.'), z => { chyba = z; });
+    if (ok) { setFotoUkol(null); setHotovyUkol(h => ({ uk, id: (h?.id ?? 0) + 1 })); }
+    return chyba;
   };
 
   const remove = async () => {
@@ -402,6 +420,9 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
             {uk.source === 'production' && <Chip tone="info" size="sm" icon="leaf">{t('Výroba')}</Chip>}
             {opakovani && <Chip tone="muted" size="sm" icon="refresh">{opakovani}</Chip>}
             {uk.requireBeforeClosing && <ChipPredUzaverkou />}
+            {/* Kolo 7: fotka jako důkaz — nehotový „chce fotku", hotový „s fotkou". */}
+            {uk.requirePhoto && !done && !uk.completionPhoto && <Chip tone="muted" size="sm" icon="camera">{t('chce fotku')}</Chip>}
+            {done && uk.completionPhoto && <Chip tone="muted" size="sm" icon="camera">{t('s fotkou')}</Chip>}
             {/* Vedení odsud vidí, podle čeho obsluha vyrábí — a jedním ťuknutím je v tom návodu. */}
             {uk.sourceMeta?.guideId && (
               <a href={`/employer/overview?view=guides&guide=${uk.sourceMeta.guideId}`} className="btn btn-ghost btn-sm -my-1">
@@ -548,6 +569,9 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
               <SwitchRow title={<span className="inline-flex items-center gap-1.5"><Icon name="lock" size={15} className="shrink-0 text-black/55" />{t('Vyžadovat před uzávěrkou')}</span>}
                 hint={t('Dokud nebude hotový, uzávěrka dne zůstane zamčená. Počítá se jen výskyt na daný den a jen pro lidi na směně.')}
                 checked={form.requireBeforeClosing} onChange={v => setForm(f => ({ ...f, requireBeforeClosing: v }))} />
+              <SwitchRow title={<span className="inline-flex items-center gap-1.5"><Icon name="camera" size={15} className="shrink-0 text-black/55" />{t('Vyžadovat fotku při splnění')}</span>}
+                hint={t('Úkol půjde odškrtnout až s fotkou z telefonu nebo tabletu — uvidíš ji v detailu úkolu.')}
+                checked={form.requirePhoto} onChange={v => setForm(f => ({ ...f, requirePhoto: v }))} />
             </ul>
           )}
 
@@ -661,7 +685,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
           kdo={detail.assignedTo != null ? <PersonLink id={detail.assignedTo}>{detail.assigneeName ?? memberById.get(detail.assignedTo)?.name ?? t('Neznámý')}</PersonLink> : t('Kdokoli')}
           navodHref={detail.sourceMeta?.guideId ? `/employer/overview?view=guides&guide=${detail.sourceMeta.guideId}` : undefined}
           zamceno={!smiSplnit(detail)}
-          onSplnit={done => { if (done && detail.dueDate && detail.dueDate !== today) setDetailId(null); completeTask(detail, done); }}
+          onSplnit={done => { if (done && ((detail.dueDate && detail.dueDate !== today) || chceFotku(detail))) setDetailId(null); completeTask(detail, done); }}
           onStav={smiSplnit(detail) ? s => void setStatus(detail, s) : undefined}
           onUpravit={smiUpravit(detail) ? () => { setDetailId(null); openEdit(detail); } : undefined}
           onSmazat={smiSmazat(detail) ? () => { setDetailId(null); setMazani(detail); } : undefined}
@@ -684,11 +708,12 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
         <Modal open onClose={() => setMimoDen(null)} size="sm" title={t('Tohle není dnešní úkol')}
           footer={<>
             <Button variant="secondary" onClick={() => setMimoDen(null)}>{t('Zrušit')}</Button>
-            <Button variant="primary" icon="check" onClick={() => { const uk = mimoDen; setMimoDen(null); void setStatus(uk, 'done'); }}>{t('Označit jako hotové')}</Button>
+            <Button variant="primary" icon="check" onClick={() => { const uk = mimoDen; setMimoDen(null); if (chceFotku(uk)) setFotoUkol(uk); else void setStatus(uk, 'done'); }}>{t('Označit jako hotové')}</Button>
           </>}>
           <p className="text-sm text-black/70 text-pretty"><span className="cz-sentence">{t('„{nazev}" má termín {den}.', { nazev: mimoDen.title, den: denDlouze(mimoDen.dueDate!, loc) })}</span> {t('Opravdu ho označit jako hotový už teď?')}</p>
         </Modal>
       )}
+      {fotoUkol && <PrilozFoto nazev={fotoUkol.title} onClose={() => setFotoUkol(null)} onHotovo={url => splnitSFotkou(fotoUkol, url)} />}
       <Toast message={zprava} onClose={() => setZprava(null)} />
       <Toast message={hotovyUkol ? t('Úkol je hotový.') : null} id={hotovyUkol?.id} onClose={() => setHotovyUkol(null)}
         action={hotovyUkol ? { label: t('Vrátit'), onClick: () => { const u = hotovyUkol.uk; setHotovyUkol(null); void setStatus(u, stavPoOdskrtnuti(false, u.status)); } } : undefined} />

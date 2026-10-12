@@ -195,6 +195,9 @@ export const tasks = pgTable('tasks', {
   dueDate: text('due_date'),
   // Kolo 7 (R7-4): „do 14:00" — HH:MM uvnitř dne due_date, nepovinné (DDL v app/api/init).
   dueTime: text('due_time'),
+  // Kolo 7: splní se jen s fotkou; fotka ze splnění (/api/upload/<id>).
+  requirePhoto: boolean('require_photo').default(false),
+  completionPhoto: text('completion_photo'),
   createdAt: timestamp('created_at').defaultNow(),
 });
 

@@ -413,5 +413,7 @@
   "Není co převzít — dny už mají vlastní stav, nebo se minulý měsíc žádný den neopakoval.": "Nie je čo prevziať — dni už majú vlastný stav, alebo sa minulý mesiac žiadny deň neopakoval.",
   "{n, plural, one {Převzato z minulého měsíce: # den} few {Převzato z minulého měsíce: # dny} other {Převzato z minulého měsíce: # dní}}": "{n, plural, one {Prevzaté z minulého mesiaca: # deň} few {Prevzaté z minulého mesiaca: # dni} other {Prevzaté z minulého mesiaca: # dní}}",
   "Vrátit|zpet": "Vrátiť",
-  "po čase": "po čase"
+  "po čase": "po čase",
+  "chce fotku": "chce fotku",
+  "s fotkou": "s fotkou"
 }
