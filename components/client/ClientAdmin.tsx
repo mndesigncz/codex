@@ -415,9 +415,16 @@ function RezervaceStranka({ oznam, onZmena, otevriHosta }: { oznam: Hlaska; onZm
   const [novaOtevrena, setNovaOtevrena] = useState(false);
   const [form, setForm] = useState<FormRezervace>(() => prazdnaRezervace(dnes));
   // Rozepsaná rezervace přežije přechod na jinou záložku; po návratu se okno otevře samo (DESIGN „Rozepsané přežije…").
-  const koncept = useDraft('rezervace-nova', form, setForm, { vychozi: prazdnaRezervace(dnes), aktivni: novaOtevrena });
+  // Rozepsané je jen psaný text (jméno, telefon, poznámka): bez něj se nic neukládá — okno samo předvybere
+  // čas a samotný den nebo počet osob nejsou práce, kvůli které by se mělo příště otevírat samo.
+  const maText = !!(form.jmeno.trim() || form.telefon.trim() || form.poznamka.trim());
+  const konceptHodnota = useMemo<KonceptRezervace>(() => (maText
+    ? { jmeno: form.jmeno, telefon: form.telefon, poznamka: form.poznamka, datum: form.datum, osob: form.osob, stul: form.stul, hostId: form.hostId, hostJmeno: form.hostJmeno }
+    : konceptZFormulare(prazdnaRezervace(dnes))), [maText, form.jmeno, form.telefon, form.poznamka, form.datum, form.osob, form.stul, form.hostId, form.hostJmeno, dnes]);
+  const koncept = useDraft('rezervace-nova', konceptHodnota, v => setForm(f => ({ ...f, ...v })),
+    { vychozi: konceptZFormulare(prazdnaRezervace(dnes)), aktivni: novaOtevrena });
   useEffect(() => { if (koncept.cekaKoncept && zapisuje) setNovaOtevrena(true); }, [koncept.cekaKoncept, zapisuje]);
-  const zavriNovou = () => { koncept.zahodit(); setNovaOtevrena(false); };
+  const zavriNovou = () => { koncept.zahodit(); setForm(prazdnaRezervace(pragueToday())); setNovaOtevrena(false); };
   const zapsano = () => {
     koncept.hotovo();
     setForm(prazdnaRezervace(pragueToday()));
@@ -592,12 +599,15 @@ type FormRezervace = {
 const prazdnaRezervace = (dnes: string): FormRezervace => ({
   jmeno: '', telefon: '', datum: dnes, cas: '', jinyCas: false, osob: '2', stul: '', poznamka: '', hostId: 0, hostJmeno: '',
 });
+/** Co se drží v konceptu: formulář bez času (ten okno předvybere samo podle dne). */
+type KonceptRezervace = Omit<FormRezervace, 'cas' | 'jinyCas'>;
+const konceptZFormulare = ({ cas: _cas, jinyCas: _jiny, ...zbytek }: FormRezervace): KonceptRezervace => zbytek;
 const JINY_CAS = 'jiny';
 /** „Jana Dvořáková" → „Jana D." pro štítek napojeného člena. */
 const kratkeJmeno = (j: string) => { const c = j.trim().split(/\s+/); return c.length > 1 ? `${c[0]} ${c[c.length - 1][0]}.` : j.trim(); };
 
 function NovaRezervaceOkno({ form, setForm, koncept, zapis, stoly, onZavrit, onZapsano }: {
-  form: FormRezervace; setForm: (f: FormRezervace) => void; koncept: Koncept;
+  form: FormRezervace; setForm: React.Dispatch<React.SetStateAction<FormRezervace>>; koncept: Koncept;
   zapis: NastaveniZapisu | null; stoly: Stul[]; onZavrit: () => void; onZapsano: () => void;
 }) {
   // Hledání členů posílá dotaz na Zákazníky — přísně podle klíče (spec §1.5), ne „ano, dokud nevíme".
@@ -623,13 +633,15 @@ function NovaRezervaceOkno({ form, setForm, koncept, zapis, stoly, onZavrit, onZ
   const nabidnoutTed = jeDnes && !!zapis && vOteviraciDobe(zapis.hodiny, form.datum, ted) && !sloty.includes(ted);
   const volby = [...(nabidnoutTed ? [ted] : []), ...sloty];
   const jiny = form.jinyCas || !zapis || volby.length === 0;
-  const zmen = (cast: Partial<FormRezervace>) => { setForm({ ...form, ...cast }); if (chyba) setChyba(null); };
-  // Po změně dne zvolit první nabízený čas (nebo nechat ruční čas, když je zadaný ručně).
+  const zmen = (cast: Partial<FormRezervace>) => { setForm(f => ({ ...f, ...cast })); if (chyba) setChyba(null); };
+  // Po změně dne zvolit první nabízený čas (nebo nechat ruční čas, když je zadaný ručně). Funkční
+  // aktualizace: efekt běží i ve chvíli, kdy koncept právě dosazuje rozepsané — starý `form` by ho přepsal.
+  const klicVoleb = volby.join(',');
   useEffect(() => {
-    if (form.jinyCas || !zapis) return;
-    if (volby.length && !volby.includes(form.cas)) setForm({ ...form, cas: volby[0] });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.datum, zapis, volby.join(',')]);
+    if (!zapis || !klicVoleb) return;
+    const nabidka = klicVoleb.split(',');
+    setForm(f => (f.jinyCas || nabidka.includes(f.cas) ? f : { ...f, cas: nabidka[0] }));
+  }, [form.datum, zapis, klicVoleb, setForm]);
 
   const telo = () => ({
     name: form.jmeno, phone: form.telefon, date: form.datum, time: form.cas, party: Number(form.osob),
@@ -656,7 +668,7 @@ function NovaRezervaceOkno({ form, setForm, koncept, zapis, stoly, onZavrit, onZ
   };
   const chybaPole = (pole: PoleRucni) => (chyba?.pole === pole ? chyba.text : undefined);
   const vyberClena = (c: { id: number; jmeno: string }) => {
-    setForm({ ...form, hostId: c.id, hostJmeno: c.jmeno, jmeno: form.jmeno.trim() && form.jmeno !== form.hostJmeno ? form.jmeno : c.jmeno });
+    setForm(f => ({ ...f, hostId: c.id, hostJmeno: c.jmeno, jmeno: f.jmeno.trim() && f.jmeno !== f.hostJmeno ? f.jmeno : c.jmeno }));
     setQ(''); setHledano(''); setChyba(null);
   };
 

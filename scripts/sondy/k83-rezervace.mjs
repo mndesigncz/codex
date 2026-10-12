@@ -143,6 +143,50 @@ for (const [vp, mobil, jmeno] of [[{ width: 1280, height: 900 }, false, 'desk'],
 }
 
 // ---------------------------------------------------------------------------
+// Vedení: rozepsaná Nová rezervace přežije přechod na jinou záložku (useDraft)
+// ---------------------------------------------------------------------------
+{
+  const { ctx, p, chyby } = await kontext({ viewport: TEL, mobil: true, fix: nacti('k69-b8-rozlozeni-rezervace') });
+  await otevri(p, '/employer/overview?mode=client&tab=reservations', 'vedeni.klient_rezervace');
+  const zalozka = (jmeno) => p.getByRole('navigation', { name: 'Spodní navigace klienta' }).getByRole('button', { name: new RegExp(jmeno) });
+  const okno = p.getByRole('dialog', { name: 'Nová rezervace' });
+  const novaTl = p.locator('[data-plocha]').getByRole('button', { name: 'Nová rezervace' });
+  // Odchod z Rezervací s otevřeným oknem (dok pod oknem; záložka se odmontuje i s oknem).
+  const odejdi = () => p.evaluate(() => { const b = [...document.querySelectorAll('nav[aria-label="Spodní navigace klienta"] button')].find(x => /Objednávky/.test(x.textContent ?? '')); b?.click(); });
+  // Bez psaného textu se nic neukládá: okno samo předvybere čas, to není rozepsaná práce.
+  await novaTl.click();
+  await dokud(() => okno.isVisible(), 2000);
+  await p.waitForTimeout(400);
+  await odejdi();
+  await p.waitForTimeout(1000);
+  await zalozka('Rezervace').click();
+  await p.waitForTimeout(1200);
+  tvrdi('D1: okno bez psaného textu se po návratu samo neotevře', !(await okno.isVisible()));
+  // S rozepsaným jménem: přechod na Objednávky a zpět okno otevře a přizná obnovení.
+  await novaTl.click();
+  await dokud(() => okno.isVisible(), 2000);
+  await okno.getByLabel('Jméno').fill('Rozepsaný Host');
+  await okno.getByLabel('Poznámka').fill('Volal v poledne');
+  await p.waitForTimeout(300);
+  await odejdi();
+  await p.waitForTimeout(1000);
+  await zalozka('Rezervace').click().catch(() => {});
+  tvrdi('D2: po návratu se okno s rozepsanou rezervací otevře samo', await dokud(() => okno.isVisible(), 4000));
+  await p.waitForTimeout(400);
+  const obnoveno = { jmeno: await okno.getByLabel('Jméno').inputValue(), pozn: await okno.getByLabel('Poznámka').inputValue(), veta: await okno.getByText('Vrátili jsme ti rozepsané z minula.').isVisible() };
+  tvrdi('D2: …se jménem a poznámkou a přizná, že je obnovené', obnoveno.jmeno === 'Rozepsaný Host' && obnoveno.pozn === 'Volal v poledne' && obnoveno.veta, JSON.stringify(obnoveno));
+  await okno.getByRole('button', { name: 'Zrušit', exact: true }).click();
+  await p.waitForTimeout(400);
+  await zalozka('Objednávky').click();
+  await p.waitForTimeout(800);
+  await zalozka('Rezervace').click();
+  await p.waitForTimeout(1200);
+  tvrdi('D3: „Zrušit" rozepsané zahodí — okno se už samo neotevře', !(await okno.isVisible()));
+  tvrdi('D: bez chyb v konzoli', chyby.length === 0, chyby.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
+// ---------------------------------------------------------------------------
 // Příjem u obsluhy: ručně zapsaná rezervace se jménem
 // ---------------------------------------------------------------------------
 {
