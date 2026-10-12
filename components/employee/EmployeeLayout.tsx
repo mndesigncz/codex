@@ -97,6 +97,8 @@ export default function EmployeeLayout({ user }: Props) {
   }, []);
   // A quick-access tile can ask for a specific stock category.
   const [inventoryCat, setInventoryCat] = useState<string | undefined>();
+  // Zvedne se při každém příchodu do Skladu z widgetu: stejný argument podruhé (filtr mezitím zrušený) se použije znovu.
+  const [inventoryPredani, setInventoryPredani] = useState(0);
   // Proklik na KONKRÉTNÍ návod — z úkolu „Vyrobit X“ nebo z výrobní tabule.
   // Bez toho vede každý odkaz jen na seznam návodů.
   const [guideId, setGuideId] = useState<number | null>(null);
@@ -116,6 +118,7 @@ export default function EmployeeLayout({ user }: Props) {
     setSettingsTab(view === 'settings' ? zalozkaNastaveni(arg) : undefined);
     if (view === 'settings') setSettingsNonce(n => n + 1);
     setInventoryCat(view === 'inventory' ? arg : undefined);
+    if (view === 'inventory' && arg) setInventoryPredani(n => n + 1);
     setRecipeProduct(view === 'recipes' && arg && !arg.includes(':') ? arg : undefined);
     setGuideId(view === 'guides' && arg && /^\d+$/.test(arg) ? Number(arg) : null);
     if (view === 'suggestions' || view === 'procedures') predejPohledu(view, arg);
@@ -151,7 +154,7 @@ export default function EmployeeLayout({ user }: Props) {
           <div className="px-4 sm:px-6 pb-6 max-w-3xl mx-auto w-full"><TimeOffRequest /></div>
         </div>
       );
-      case 'inventory':    return <InventoryReport user={user as any} initialCategory={inventoryCat} />;
+      case 'inventory':    return <InventoryReport user={user as any} initialCategory={inventoryCat} predani={inventoryPredani} />;
       case 'recipes':      return <RecipesView stranka="zamestnanec.receptury" openProductId={recipeProduct} onNavigate={navigate} />;
       case 'closing':      return <CashClosing user={user as any} />;
       case 'procedures':   return <Procedures user={user as any} />;
