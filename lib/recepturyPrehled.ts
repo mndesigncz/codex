@@ -131,7 +131,11 @@ export function vetaOdpisu(raw: any, t: PrekladVety = cesky): { text: string; ch
 // Menu (GET /api/menu, GET /api/menu?jen=vyprodano)
 // ---------------------------------------------------------------------------
 
-export interface PolozkaDesky { id: number; nazev: string; sekce: string; vyprodano: boolean }
+export interface PolozkaDesky {
+  id: number; nazev: string; sekce: string; vyprodano: boolean;
+  /** Cena v menu a cena téhož produktu v kase (kolo 81); null = slabá odpověď, bez vazby nebo kasa cenu nedala. */
+  cena: number | null; cenaKasy: number | null;
+}
 export interface DeskaMenu {
   id: number;
   slug: string;
@@ -143,6 +147,8 @@ export interface DeskaMenu {
   polozek: number;
   bezCeny: number;
   sparovano: number;
+  /** Spárované položky, které mají v menu jinou cenu než v kase (kolo 81). */
+  jinaCena: number;
   polozky: PolozkaDesky[];
 }
 export interface DataMenu { nezmigrovano: boolean; desky: DeskaMenu[] }
@@ -160,7 +166,11 @@ export function vyberMenu(raw: any): DataMenu {
     for (const s of pole(b.sections)) {
       for (const it of pole(s?.items)) {
         if (!it || it.id == null) continue;
-        polozky.push({ id: cislo(it.id), nazev: String(it.name ?? ''), sekce: String(s?.title ?? ''), vyprodano: it.soldOut === true });
+        polozky.push({
+          id: cislo(it.id), nazev: String(it.name ?? ''), sekce: String(s?.title ?? ''), vyprodano: it.soldOut === true,
+          cena: 'price' in it && it.price != null ? cislo(it.price) : null,
+          cenaKasy: it.posProductId && it.posPrice != null && Number.isFinite(Number(it.posPrice)) ? Number(it.posPrice) : null,
+        });
         // Slabá odpověď (jen=vyprodano) cenu ani vazbu nenese — nic se nepočítá.
         if ('price' in it && !(cislo(it.price) > 0)) bezCeny++;
         if (it.posProductId) sparovano++;
@@ -169,7 +179,7 @@ export function vyberMenu(raw: any): DataMenu {
     return {
       id: cislo(b.id), slug: String(b.slug ?? ''), nazev: String(b.name ?? ''), zapnuto: b.enabled !== false, pin: b.hasPin === true,
       wifiSsid: b.wifiSsid ? String(b.wifiSsid) : null, wifiHeslo: b.wifiPassword ? String(b.wifiPassword) : null,
-      polozek: polozky.length, bezCeny, sparovano, polozky,
+      polozek: polozky.length, bezCeny, sparovano, jinaCena: jinaCena(polozky), polozky,
     };
   });
   return { nezmigrovano: false, desky };
@@ -186,6 +196,16 @@ export function wifiMenu(desky: DeskaMenu[]): DeskaMenu | null {
   if (h?.wifiSsid) return h;
   return desky.find(d => d.wifiSsid) ?? null;
 }
+
+/**
+ * Kolik spárovaných položek má v menu jinou cenu než kasa (kolo 81). Host pak
+ * vidí na lístku jiné číslo, než mu kasa naúčtuje. Položka bez vazby nebo bez
+ * ceny z kasy se nepočítá — není s čím srovnat.
+ */
+export const jinaCena = (polozky: readonly PolozkaDesky[]): number =>
+  polozky.filter(p => p.cenaKasy != null && p.cena != null && p.cena !== p.cenaKasy).length;
+
+export const jinaCenaDesek = (desky: readonly DeskaMenu[]): number => desky.reduce((n, d) => n + d.jinaCena, 0);
 
 /** Nespárovaných s kasou — jen u menu, které párování používá (aspoň jedna vazba). */
 export const nesparovano = (d: DeskaMenu) => (d.sparovano > 0 ? d.polozek - d.sparovano : 0);

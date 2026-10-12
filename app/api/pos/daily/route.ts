@@ -98,11 +98,14 @@ export async function GET(req: NextRequest) {
   // Účtenky ze zrcadla — pokladna se tu už nevolá. Když zrcadlo období
   // nepokrývá (starší než první synchronizace), řekne se to místo nul.
   const methodsTotal: Record<string, number> = {};
+  // Storna (kolo 81): smazané účty v období — počet a částka zvlášť, smazaný účet bez položek má 0.
+  // Do ostatních součtů (tržba, hodiny, lidé) dál nejdou — `continue` zůstává.
+  let voidCount = 0, voidTotal = 0;
   let covered = true;
   try {
     covered = await mirrorCovers(teamId, from);
     for (const b of await billsOfDays(teamId, from, to)) {
-      if (b.deleted) continue;
+      if (b.deleted) { voidCount++; voidTotal += b.finalPrice; continue; }
       const day = b.day;
       const row = days.get(day) ?? blank(day);
       const price = b.finalPrice;
@@ -153,7 +156,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       connected: true, from, to, today, placeName: conn.placeName ?? null, lastSyncAt: null,
       totals: { bills: sm('bills'), total: sm('total'), cash: sm('cash'), card: sm('card'), other: sm('other'), tips: sm('tips'), tipsCash: sm('tipsCash'), tipsCard: sm('tipsCard'),
-        discounts: sm('discounts'), refundCount: sm('refundCount'), refundTotal: sm('refundTotal'), methods: [], avgBill: sm('bills') > 0 ? Math.round(sm('total') / sm('bills')) : 0, soldQty: 0, productRevenue: 0 },
+        discounts: sm('discounts'), refundCount: sm('refundCount'), refundTotal: sm('refundTotal'), voidCount, voidTotal: Math.round(voidTotal), methods: [], avgBill: sm('bills') > 0 ? Math.round(sm('total') / sm('bills')) : 0, soldQty: 0, productRevenue: 0 },
       days: dl.map(d => ({ ...d, closings: 0, declared: null, diff: null })),
       hours, byPerson: [], items: [], notes: [], note: '', open: sestavOtevrene(),
     });
@@ -315,6 +318,8 @@ export async function GET(req: NextRequest) {
       discounts: sum('discounts'),
       refundCount: sum('refundCount'),
       refundTotal: refunds,
+      voidCount,
+      voidTotal: Math.round(voidTotal),
       methods: Object.entries(methodsTotal).map(([id, amount]) => ({ id, label: paymentLabel(id), amount: Math.round(amount) }))
         .sort((a, b) => b.amount - a.amount),
       avgBill: sum('bills') > 0 ? Math.round(posTotal / sum('bills')) : 0,

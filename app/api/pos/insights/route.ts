@@ -20,6 +20,7 @@ import { pragueHourOf, pragueDayOf, dayPlus, businessDayOf, NIGHT_CUTOFF_HOUR } 
 import { czCount } from '@/lib/czech';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { menaPodniku } from '@/lib/menaPodniku';
+import { podilSlev, slevyNadPrah } from '@/lib/financeWidgety';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -176,6 +177,16 @@ export async function GET(req: NextRequest) {
           text: `Jeden člověk tu udělá ${mena.money(bestHour.perHour ?? 0)} za hodinu. Rozvrh na špičky sedí.`,
         });
       }
+    }
+
+    // Slevy (kolo 81): nad 5 % tržby je to rada, ne poznámka pod čarou — sleva je
+    // tržba, která se markovala a nepřišla. Práh a výpočet v lib/financeWidgety (test).
+    if (slevyNadPrah(discounts, total)) {
+      staffingAdvice.push({
+        tone: 'warn',
+        title: `Slevy dělají ${podilSlev(discounts, total)} % tržby`,
+        text: `Za měsíc ${mena.money(Math.round(discounts))} na slevách. Projdi, kdo a proč slevy dává — zaměstnanecké kávy a „známí" se mají markovat zvlášť, ať je vidět, kolik stojí.`,
+      });
     }
 
     // ---- uzávěrky proti kase, den po dni ----

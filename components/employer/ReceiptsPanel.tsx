@@ -23,13 +23,14 @@
 import { useMemo, useRef, useState } from 'react';
 import { Icon } from '../Icons';
 import { apiMessage, okJson } from '@/lib/api';
-import { pragueDaySafe } from '@/lib/pragueTime';
+import { pragueDaySafe, pragueToday } from '@/lib/pragueTime';
 import { useMoney, useSymbol } from '../CurrencyProvider';
-import { Button, Field, Input, ListRow, Modal, Skeleton, ErrorState } from '../ui';
+import { Button, Field, Input, ListRow, Modal, Segmented, Skeleton, ErrorState } from '../ui';
 import { useDataWidgetu, obnovDataWidgetu } from '../widgety/useDataWidgetu';
 import { useSmi } from '../widgety/NavigaceKontext';
-import { useT } from '@/lib/i18n/client';
+import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { useLocale } from './jazyk';
+import { KATEGORIE_UCTENEK, VYCHOZI_KATEGORIE_UCTENKY, jeKategorieUctenky, urlFinanci, type KategorieUctenky } from '@/lib/financeWidgety';
 
 export const URL_UCTENEK = '/api/receipts';
 
@@ -41,7 +42,21 @@ export interface Uctenka {
   note: string | null;
   createdAt: string;
   authorName: string | null;
+  /** Datum nákupu „RRRR-MM-DD" (kolo 81); null = starší účtenka, platí den nafocení. */
+  purchaseDate: string | null;
+  category: KategorieUctenky | null;
 }
+
+/** Popisky kategorií účtenek v jazyce uživatele (hodnoty do databáze jsou v KATEGORIE_UCTENEK). */
+export const popiskyKategorii = (t: PrekladFn): Record<KategorieUctenky, string> => ({
+  suroviny: t('Suroviny'), napoje: t('Nápoje'), provoz: t('Provoz', undefined, 'kategorie'), vybaveni: t('Vybavení'), jine: t('Jiné'),
+});
+
+/** Volby Segmented kategorií: pět krátkých slov, na telefonu jeden posuvný pás. */
+export const volbyKategorii = (t: PrekladFn) => {
+  const p = popiskyKategorii(t);
+  return KATEGORIE_UCTENEK.map(k => ({ id: k, label: p[k] }));
+};
 
 /** Odpověď /api/receipts: `{ receipts, error? }`. Chybějící tabulka (error) je chyba, ne prázdný seznam. */
 export function vyberUctenky(raw: any): Uctenka[] {
@@ -55,15 +70,20 @@ export function vyberUctenky(raw: any): Uctenka[] {
     note: typeof r.note === 'string' && r.note.trim() ? r.note.trim() : null,
     createdAt: String(r.createdAt ?? ''),
     authorName: typeof r.authorName === 'string' && r.authorName.trim() ? r.authorName.trim() : null,
+    purchaseDate: typeof r.purchaseDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.purchaseDate) ? r.purchaseDate : null,
+    category: jeKategorieUctenky(r.category) ? r.category : null,
   }));
 }
 
-/** „26. 9." z časové značky — pražský den, ne den prohlížeče. */
-export function denUctenky(createdAt: string): string {
-  const d = pragueDaySafe(createdAt);
+/** „26. 9." z časové značky — pražský den, ne den prohlížeče. Datum nákupu („RRRR-MM-DD") je už den. */
+export function denUctenky(kdy: string): string {
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(kdy) ? kdy : pragueDaySafe(kdy);
   const [, m, dd] = d.split('-').map(Number);
   return m && dd ? `${dd}. ${m}.` : '';
 }
+
+/** Den účtenky pro seznam: datum nákupu, když ho má, jinak den nafocení. */
+export const denNakupu = (r: Pick<Uctenka, 'purchaseDate' | 'createdAt'>) => denUctenky(r.purchaseDate ?? r.createdAt);
 
 /** Hledání položek skladu ve volném textu bez ohledu na diakritiku. */
 const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -96,6 +116,11 @@ export function NovaUctenka({ onUlozeno }: { onUlozeno?: () => void }) {
   const [obchod, setObchod] = useState('');
   const [castka, setCastka] = useState('');
   const [poznamka, setPoznamka] = useState('');
+  // Datum nákupu a kategorie (kolo 81): výchozí dnešek (pražský) a suroviny — účtenka za
+  // zářijový nákup nafocená v říjnu se bez data řadila do října.
+  const dnes = pragueToday();
+  const [datum, setDatum] = useState(dnes);
+  const [kategorie, setKategorie] = useState<KategorieUctenky>(VYCHOZI_KATEGORIE_UCTENKY);
   const [ukladam, setUkladam] = useState(false);
   const [chyba, setChyba] = useState('');
   const [hotovo, setHotovo] = useState('');
@@ -133,11 +158,15 @@ export function NovaUctenka({ onUlozeno }: { onUlozeno?: () => void }) {
           supplier: obchod.trim() || null,
           amount: castka === '' ? null : Math.round(Number(castka)),
           note: poznamka.trim() || null,
+          purchaseDate: datum || dnes,
+          category: kategorie,
         }),
       }).then(okJson);
-      setPhotoUrl(null); setObchod(''); setCastka(''); setPoznamka(''); setNaskladneno({});
+      setPhotoUrl(null); setObchod(''); setCastka(''); setPoznamka(''); setNaskladneno({}); setDatum(dnes); setKategorie(VYCHOZI_KATEGORIE_UCTENKY);
       setHotovo(t('Účtenka uložena.'));
       obnovDataWidgetu(URL_UCTENEK);
+      // Kniha výdajů a souhrn měsíce nákupu (podle data nákupu, ne nafocení) se načtou znovu.
+      obnovDataWidgetu(urlFinanci((datum || dnes).slice(0, 7)));
       onUlozeno?.();
     } catch (e) { setChyba(apiMessage(e, t('Uložení se nepodařilo.'))); }
     setUkladam(false);
@@ -183,6 +212,13 @@ export function NovaUctenka({ onUlozeno }: { onUlozeno?: () => void }) {
       <Field id="uctenka-poznamka" label={t('Co se kupovalo')}>
         <Input id="uctenka-poznamka" value={poznamka} onChange={e => setPoznamka(e.target.value)} placeholder={t('Mléko, sirup Mango…')} autoComplete="off" />
       </Field>
+      <Field id="uctenka-datum" label={t('Datum nákupu')}>
+        <Input id="uctenka-datum" type="date" value={datum} max={dnes} onChange={e => setDatum(e.target.value)} />
+      </Field>
+      <div>
+        <p id="uctenka-kategorie" className="t-label mb-1.5">{t('Kategorie')}</p>
+        <Segmented size="sm" ariaLabel={t('Kategorie účtenky')} value={kategorie} onChange={setKategorie} options={volbyKategorii(t)} />
+      </div>
 
       {smiNaskladnit && shody.length > 0 && (
         <div>
@@ -248,7 +284,7 @@ export function SeznamUctenek({ uctenky, limit = Infinity, sFotkou = false, smiM
               </span>
             )}
             title={r.supplier ?? t('Účtenka')}
-            meta={[denUctenky(r.createdAt), r.note, r.authorName].filter(Boolean).join(' · ')}
+            meta={[denNakupu(r), r.category ? popiskyKategorii(t)[r.category] : null, r.note, r.authorName].filter(Boolean).join(' · ')}
             value={r.amount != null ? <span className="tabular-nums">{money(r.amount)}</span> : undefined}
             actions={smiMazat ? (
               <Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={t('Smazat účtenku {dodavatel}', { dodavatel: r.supplier ?? '' }).trim()}
@@ -258,7 +294,7 @@ export function SeznamUctenek({ uctenky, limit = Infinity, sFotkou = false, smiM
       </ul>
       {uctenky.length > vidim.length && <p className="t-meta mt-2">{t('…a dalších {n}', { n: (uctenky.length - vidim.length).toLocaleString(loc) })}</p>}
       <Modal open={!!mazana} onClose={() => setMazana(null)} size="sm" title={t('Smazat účtenku?')}
-        subtitle={mazana ? [mazana.supplier ?? t('Účtenka'), mazana.amount != null ? money(mazana.amount) : null, denUctenky(mazana.createdAt)].filter(Boolean).join(' · ') : undefined}
+        subtitle={mazana ? [mazana.supplier ?? t('Účtenka'), mazana.amount != null ? money(mazana.amount) : null, denNakupu(mazana)].filter(Boolean).join(' · ') : undefined}
         footer={<>
           <Button variant="secondary" onClick={() => setMazana(null)}>{t('Zrušit')}</Button>
           <Button variant="danger" icon="trash" loading={mazu} onClick={smaz}>{t('Smazat')}</Button>
