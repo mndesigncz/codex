@@ -157,7 +157,10 @@ function SouhrnMesice({ velikost, nastaveni }: WidgetProps<{ mesic: string; metr
       mzdy: { stitek: t('Mzdy'), hodnota: mzdy, poznamka: pozMzdy },
       // Spropitné není tržba podniku, ale majitel ho chce vidět vedle ní (Toast, Square): kolik tým za měsíc dostal.
       spropitne: { stitek: t('Spropitné'), hodnota: money(s.tips), poznamka: t('z uzávěrek, mimo tržbu') },
-      pevne: { stitek: t('Pevné náklady'), hodnota: money(s.fixedCosts), poznamka: t('nájem, energie — každý měsíc') },
+      // Nevyplněné pevné náklady nejsou „0 Kč" (malá S karta s touhle metrikou by tvrdila, že nájem nic nestojí).
+      pevne: s.fixedCostsSet
+        ? { stitek: t('Pevné náklady'), hodnota: money(s.fixedCosts), poznamka: t('nájem, energie — každý měsíc') }
+        : { stitek: t('Pevné náklady'), hodnota: '—', poznamka: t('zatím nevyplněné — doplň ve Financích › ··· › Pravidelné náklady') },
       vysledek: { stitek: t('Výsledek'), hodnota: money(s.net), poznamka: pozVysledek },
     };
     const ostatni: Metrika[] = velikost === 'L' ? [...zaklad, ...(sPevnymi ? ['pevne' as const] : []), 'vysledek'] : ['vysledek'];

@@ -1885,5 +1885,6 @@
   "…a {n, plural, one {# další} few {# další} other {# dalších}}": "…i {n, plural, one {# kolejna} few {# kolejne} many {# kolejnych} other {# kolejnej}}",
   "…a {n, plural, one {# další} few {# další} other {# dalších}} vyprodané": "…i {n, plural, one {# kolejna} few {# kolejne} many {# kolejnych} other {# kolejnej}} wyprzedane",
   "↑ ↓ vybírají, Enter otevře, Esc zavře.": "↑ ↓ wybierają, Enter otwiera, Esc zamyka.",
-  "{n, plural, one {# cena jinak} few {# ceny jinak} other {# cen jinak}}": "{n, plural, one {# cena inna} few {# ceny inne} many {# cen innych} other {# cen innych}}"
+  "{n, plural, one {# cena jinak} few {# ceny jinak} other {# cen jinak}}": "{n, plural, one {# cena inna} few {# ceny inne} many {# cen innych} other {# cen innych}}",
+  "zatím nevyplněné — doplň ve Financích › ··· › Pravidelné náklady": "jeszcze nieuzupełnione — uzupełnij w Finansach › ··· › Koszty stałe"
 }

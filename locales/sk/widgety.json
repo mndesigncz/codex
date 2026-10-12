@@ -1888,5 +1888,6 @@
   "…a {n, plural, one {# další} few {# další} other {# dalších}}": "…a {n, plural, one {# ďalšia} few {# ďalšie} many {# ďalšej} other {# ďalších}}",
   "…a {n, plural, one {# další} few {# další} other {# dalších}} vyprodané": "…a {n, plural, one {# ďalšia} few {# ďalšie} many {# ďalšej} other {# ďalších}} vypredané",
   "↑ ↓ vybírají, Enter otevře, Esc zavře.": "↑ ↓ vyberajú, Enter otvorí, Esc zavrie.",
-  "{n, plural, one {# cena jinak} few {# ceny jinak} other {# cen jinak}}": "{n, plural, one {# cena inak} few {# ceny inak} other {# cien inak}}"
+  "{n, plural, one {# cena jinak} few {# ceny jinak} other {# cen jinak}}": "{n, plural, one {# cena inak} few {# ceny inak} other {# cien inak}}",
+  "zatím nevyplněné — doplň ve Financích › ··· › Pravidelné náklady": "zatiaľ nevyplnené — doplň vo Financiách › ··· › Pravidelné náklady"
 }
