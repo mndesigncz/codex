@@ -112,6 +112,7 @@
   "Na dnešek a po termínu: {n, plural, one {# úkol} few {# úkoly} other {# úkolů}}.": "Due today or overdue: {n, plural, one {# task} other {# tasks}}.",
   "Na dnešek máš hotovo": "You're done for today",
   "Nabídnout": "Offer",
+  "Nabídnout do burzy směnu {den}": "Offer the shift ({den}) to the swap board",
   "Nabídnout do burzy…": "Offer to swap board…",
   "Nabídnout směnu do burzy": "Offer shift to swap board",
   "Nadcházející směny": "Upcoming shifts",

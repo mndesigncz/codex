@@ -112,6 +112,7 @@
   "Na dnešek a po termínu: {n, plural, one {# úkol} few {# úkoly} other {# úkolů}}.": "Für heute und überfällig: {n, plural, one {# Aufgabe} other {# Aufgaben}}.",
   "Na dnešek máš hotovo": "Für heute bist du fertig",
   "Nabídnout": "Anbieten",
+  "Nabídnout do burzy směnu {den}": "Anbieten: Schicht ({den}) in die Tauschbörse stellen",
   "Nabídnout do burzy…": "In die Tauschbörse stellen…",
   "Nabídnout směnu do burzy": "Schicht in die Tauschbörse stellen",
   "Nadcházející směny": "Kommende Schichten",

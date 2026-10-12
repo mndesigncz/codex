@@ -112,6 +112,7 @@
   "Na dnešek a po termínu: {n, plural, one {# úkol} few {# úkoly} other {# úkolů}}.": "Na dnes a po termíne: {n, plural, one {# úloha} few {# úlohy} other {# úloh}}.",
   "Na dnešek máš hotovo": "Na dnes máš hotovo",
   "Nabídnout": "Ponúknuť",
+  "Nabídnout do burzy směnu {den}": "Ponúknuť do burzy zmenu ({den})",
   "Nabídnout do burzy…": "Ponúknuť do burzy…",
   "Nabídnout směnu do burzy": "Ponúknuť zmenu do burzy",
   "Nadcházející směny": "Nadchádzajúce zmeny",
