@@ -24,6 +24,8 @@ import { Icon } from '../Icons';
 import { useMoney, useCost } from '../CurrencyProvider';
 import ItemInlineEdit from './ItemInlineEdit';
 import NewIngredientInline from './NewIngredientInline';
+import SkladZalozky from './SkladZalozky';
+import { polozkaArg } from '@/lib/skladPredani';
 import { apiMessage, okJson } from '@/lib/api';
 import { recipeCost, ingredientCost, marginPct } from '@/lib/recipeCost';
 import { obsahujeNekde } from '@/lib/hledani';
@@ -281,6 +283,9 @@ export default function RecipesView({ openProductId, onNavigate }: RecipesViewPr
     secondary: smiOdepsat ? <Button variant="secondary" icon="swap" loading={syncing} onClick={sync}>{t('Odepsat prodeje')}</Button> : undefined,
     // Vedlejší akce se na telefonu schovají — v „···" musí být i tam.
     menu: smiOdepsat ? [{ label: t('Odepsat prodeje'), icon: 'swap', onClick: sync }] : undefined,
+    // Sklad › Položky / Receptury z kasy / Inventura — stejné záložky jako na Skladu (kolo 82),
+    // takže se z receptur chodí na položky a zpět jedním klepnutím.
+    aside: <SkladZalozky aktivni="receptury" onNavigate={onNavigate} smiReceptury smiInventura={smi('inventura.pocitat') && smi('sklad.zobrazit')} />,
   };
 
   let nastroj: React.ReactNode;
@@ -317,6 +322,8 @@ export default function RecipesView({ openProductId, onNavigate }: RecipesViewPr
         guide={(navody.data ?? []).find(g => g.productId === draft.productId) ?? null}
         onItemSaved={patched => { setMistniSklad(m => ({ ...m, [String(patched.id)]: patched })); obnovDataWidgetu(URL_SKLAD); }}
         onItemCreated={created => { setMistniSklad(m => ({ ...m, [String(created.id)]: created })); obnovDataWidgetu(URL_SKLAD); }}
+        // Proklik na celou položku ve Skladu (prahy, dodavatel, výroba) — druhý směr k „Používá se v kase" u položky.
+        onOpenItem={onNavigate && smi('sklad.zobrazit') ? (id => onNavigate('inventory', polozkaArg(id))) : undefined}
       />
     );
   } else {
@@ -334,7 +341,8 @@ export default function RecipesView({ openProductId, onNavigate }: RecipesViewPr
           </button>
         </div>
         {categories.length > 2 && (
-          <div className="flex gap-2 overflow-x-auto scrollbar-thin scroll-fade-x -mx-1 px-1" role="group" aria-label={t('Kategorie menu')}>
+          // Zalamuje se; posuvný pás se záporným okrajem (-mx-1) dřív přečníval 4 px za widget.
+          <div className="flex flex-wrap gap-2" role="group" aria-label={t('Kategorie menu')}>
             {categories.map(c => (
               <button key={c} type="button" aria-pressed={cat === c} onClick={() => setCat(c)}
                 className={`filter-pill tap-target whitespace-nowrap shrink-0 ${cat === c ? 'seg-on' : 'seg-off glass'}`}>
@@ -400,7 +408,7 @@ export default function RecipesView({ openProductId, onNavigate }: RecipesViewPr
 // ruce, a hned pod ním je vidět, kolik porcí z balení vyjde a co stojí — na
 // tom se chyba o řád (0,02 l vs 0,2 l) pozná dřív, než se odepíše sklad.
 // ---------------------------------------------------------------------------
-function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, err, yieldOf, recipes, products, categories, smiUpravit, guide, onItemSaved, onItemCreated }: {
+function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, err, yieldOf, recipes, products, categories, smiUpravit, guide, onItemSaved, onItemCreated, onOpenItem }: {
   draft: Draft; items: any[]; itemById: Map<string, any>;
   setIng: (idx: number, patch: Partial<Ingredient>) => void;
   setDraft: React.Dispatch<React.SetStateAction<Draft | null>>;
@@ -411,6 +419,8 @@ function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, 
   guide: { id: number; title: string } | null;
   onItemSaved: (item: any) => void;
   onItemCreated: (item: any) => void;
+  /** Otevřít položku ve Skladu (celý formulář); bez práva na sklad se nenabízí. */
+  onOpenItem?: (itemId: number) => void;
 }) {
   const t = useT('sklad');
   const { jazyk } = useJazyk();
@@ -547,6 +557,11 @@ function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, 
                         <Button variant="ghost" size="sm" icon={editingItem === ing.itemId ? 'close' : 'pencil'} aria-expanded={editingItem === ing.itemId}
                           onClick={() => setEditingItem(editingItem === ing.itemId ? null : ing.itemId)}>
                           {editingItem === ing.itemId ? t('Zavřít úpravu') : t('Upravit položku a díly')}
+                        </Button>
+                      )}
+                      {onOpenItem && (
+                        <Button variant="ghost" size="sm" icon="box" onClick={() => onOpenItem(Number(item.id))}>
+                          {t('Otevřít ve skladu')}
                         </Button>
                       )}
                     </div>
