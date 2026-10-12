@@ -86,6 +86,7 @@ export const OSOBNI_UDAJE: Record<string, { zpusob: ZpusobOsobni; co: string }> 
   organizations: { zpusob: 'smazat', co: 'Organizace (název firmy, sdílená nastavení) se smaže se smazáním posledního podniku v ní; prázdná organizace vlastníka se smaže vždy.' },
   team_members: { zpusob: 'smazat', co: 'Členství v podniku včetně pozice a hodinové sazby se smaže.' },
   menu_boards: { zpusob: 'podnik', co: 'PIN tabule s menu patří podniku (ne osobě) a maže se s ním.' },
+  client_reservations: { zpusob: 'anonymizovat', co: 'Rezervace hosta zůstanou podniku: budoucí se zruší a poznámky hosta se vymažou, vazba jde na anonymní účet. Jméno a telefon ručně zapsaného hosta (guest_name, guest_phone — host bez účtu, kterého zapsala obsluha) jsou údaje podniku a zmizí se smazáním podniku; created_by u nich ukazuje na anonymizovaný účet obsluhy.' },
   suppliers: { zpusob: 'podnik', co: 'Kontakty na dodavatele patří podniku a mažou se s ním.' },
   billing_events: { zpusob: 'ponechat', co: 'Id událostí Stripe bez osobních údajů; evidence fakturace podniku (zákon o účetnictví). Faktury samotné zůstávají ve Stripe.' },
   referral_rewards: { zpusob: 'ponechat', co: 'Provize za doporučení, jen čísla podniků a částka; účetní záznam platformy.' },

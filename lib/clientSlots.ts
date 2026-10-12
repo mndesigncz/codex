@@ -82,6 +82,82 @@ export function zpravaHostoviORezervaci(stav: 'confirmed' | 'declined', datum: s
     : { title: 'Rezervaci se nepodařilo přijmout', body: `Na ${kdy} bohužel nemáme místo.`, link: '/client/me', type: 'info' };
 }
 
+// ---- Ruční zápis rezervace (telefon, u dveří) -------------------------------
+//
+// Obsluha zapíše rezervaci za hosta, který zavolal nebo stojí u dveří. Server
+// i okno „Nová rezervace" kontrolují stejnou funkcí, ať okno neodmítne, co server
+// vezme (a naopak). Čas smí být mimo nabízené sloty — obsluha ví víc — ale musí
+// padnout do otevírací doby dne.
+
+export const RUCNI_MAX_JMENO = 80;
+export const RUCNI_MAX_TELEFON = 30;
+export const RUCNI_MAX_POZNAMKA = 300;
+
+export type PoleRucni = 'name' | 'phone' | 'date' | 'time' | 'party' | 'tableId' | 'note' | 'customerId';
+
+export interface RucniRezervace {
+  jmeno: string;
+  /** Jak ho obsluha napsala (mezery srovnané), nebo null. */
+  telefon: string | null;
+  datum: string;
+  cas: string;
+  osob: number;
+  stulId: number | null;
+  poznamka: string | null;
+  /** Napojení na člena podniku (příslušnost ověří server dotazem). */
+  hostId: number | null;
+}
+
+/** Je „HH:MM" v otevírací době dne? Zavírání po půlnoci (18:00–02:00) se počítá přes půlnoc. */
+export function vOteviraciDobe(hours: OpeningHours | null | undefined, dateStr: string, cas: string): boolean {
+  const day = hours?.[dayKey(dateStr)];
+  if (!day || day.closed || !day.open || !day.close || !JE_HM.test(cas)) return false;
+  const t = naMinuty(cas), od = naMinuty(day.open), doo = naMinuty(day.close);
+  return doo > od ? t >= od && t < doo : t >= od || t < doo;
+}
+
+const kladneCele = (v: unknown): number | null | 'chyba' => {
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  return Number.isInteger(n) && n > 0 ? n : 'chyba';
+};
+
+/**
+ * Kontrola ručně zapisované rezervace. `nejpozdeji` = dnes + dní dopředu podniku
+ * (počítá volající přes pragueTime), `maxOsob` = Nejvíc osob z nastavení.
+ */
+export function validujRucniRezervaci(
+  v: Record<string, unknown> | null | undefined,
+  k: { dnes: string; nejpozdeji: string; maxOsob: number; hodiny: OpeningHours | null | undefined },
+): { ok: true; data: RucniRezervace } | { ok: false; pole: PoleRucni; chyba: string } {
+  const b = v ?? {};
+  const spatne = (pole: PoleRucni, chyba: string) => ({ ok: false as const, pole, chyba });
+  const jmeno = String(b.name ?? '').replace(/\s+/g, ' ').trim();
+  if (!jmeno) return spatne('name', 'Napiš jméno hosta.');
+  if (jmeno.length > RUCNI_MAX_JMENO) return spatne('name', `Jméno je moc dlouhé (nejvýš ${RUCNI_MAX_JMENO} znaků).`);
+  const tel = String(b.phone ?? '').replace(/\s+/g, ' ').trim();
+  if (tel && (tel.length > RUCNI_MAX_TELEFON || !/^\+?[\d ]+$/.test(tel) || (tel.match(/\d/g) ?? []).length < 3)) {
+    return spatne('phone', 'Telefon může mít jen číslice, mezery a + na začátku.');
+  }
+  const datum = String(b.date ?? '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(datum) || datum < k.dnes || datum > k.nejpozdeji) return spatne('date', 'Vyber den od dneška do posledního dne, na který podnik rezervuje.');
+  const cas = String(b.time ?? '').slice(0, 5);
+  if (!JE_HM.test(cas)) return spatne('time', 'Vyber čas.');
+  const den = k.hodiny?.[dayKey(datum)];
+  if (!den || den.closed || !den.open || !den.close) return spatne('time', 'V tento den má podnik zavřeno.');
+  if (!vOteviraciDobe(k.hodiny, datum, cas)) return spatne('time', `Čas je mimo otevírací dobu (${den.open}–${den.close}).`);
+  const maxOsob = Math.max(1, Math.round(Number(k.maxOsob) || 8));
+  const osob = Number(b.party);
+  if (!Number.isInteger(osob) || osob < 1 || osob > maxOsob) return spatne('party', `Počet osob od 1 do ${maxOsob}.`);
+  const stulId = kladneCele(b.tableId);
+  if (stulId === 'chyba') return spatne('tableId', 'Vyber stůl ze seznamu.');
+  const poznamka = String(b.note ?? '').trim();
+  if (poznamka.length > RUCNI_MAX_POZNAMKA) return spatne('note', `Poznámka je moc dlouhá (nejvýš ${RUCNI_MAX_POZNAMKA} znaků).`);
+  const hostId = kladneCele(b.customerId);
+  if (hostId === 'chyba') return spatne('customerId', 'Člen se nenašel.');
+  return { ok: true, data: { jmeno, telefon: tel || null, datum, cas, osob, stulId, poznamka: poznamka || null, hostId } };
+}
+
 /** „pá 12. 9." pro seznamy, „pátek 12. září" pro nadpisy. */
 export function czDay(dateStr: string, long = false): string {
   return new Date(dateStr + 'T12:00:00').toLocaleDateString('cs-CZ', long

@@ -1,6 +1,21 @@
 {
  "reservations": [
   {
+   "id": 16,
+   "date": "2026-09-17",
+   "time": "12:30",
+   "party": 3,
+   "status": "confirmed",
+   "note": null,
+   "customer_id": null,
+   "customer_name": "Pavel Horák",
+   "guest_name": "Pavel Horák",
+   "customer_phone": "+420 603 555 120",
+   "table_id": 4,
+   "table_name": "Bar",
+   "created_by": 1
+  },
+  {
    "id": 11,
    "date": "2026-09-17",
    "time": "17:30",
@@ -16,7 +31,8 @@
    "customer_visits": 41,
    "customer_level": "gold",
    "customer_level_label": "Zlatý host",
-   "staff_note": "Nesnáší mléko, dort si přinesou sami."
+   "staff_note": "Nesnáší mléko, dort si přinesou sami.",
+   "created_by": null
   },
   {
    "id": 12,
@@ -33,7 +49,8 @@
    "customer_id": 102,
    "customer_visits": 7,
    "customer_level": "bronze",
-   "customer_level_label": "Člen"
+   "customer_level_label": "Člen",
+   "created_by": null
   },
   {
    "id": 13,
@@ -50,7 +67,8 @@
    "customer_id": 103,
    "customer_visits": 12,
    "customer_level": "silver",
-   "customer_level_label": "Stříbrný host"
+   "customer_level_label": "Stříbrný host",
+   "created_by": null
   },
   {
    "id": 14,
@@ -67,7 +85,8 @@
    "customer_id": 104,
    "customer_visits": 0,
    "customer_level": "bronze",
-   "customer_level_label": "Člen"
+   "customer_level_label": "Člen",
+   "created_by": null
   },
   {
    "id": 15,
@@ -84,7 +103,8 @@
    "customer_id": 105,
    "customer_visits": 3,
    "customer_level": "bronze",
-   "customer_level_label": "Člen"
+   "customer_level_label": "Člen",
+   "created_by": null
   }
  ],
  "tables": [
@@ -117,5 +137,40 @@
    "active": true
   }
  ],
- "today": "2026-09-17"
+ "today": "2026-09-17",
+ "zapis": {
+  "opening_hours": {
+   "0": {
+    "open": "08:00",
+    "close": "18:00"
+   },
+   "1": {
+    "open": "08:00",
+    "close": "18:00"
+   },
+   "2": {
+    "open": "08:00",
+    "close": "18:00"
+   },
+   "3": {
+    "open": "08:00",
+    "close": "18:00"
+   },
+   "4": {
+    "open": "08:00",
+    "close": "20:00"
+   },
+   "5": {
+    "open": "09:00",
+    "close": "20:00"
+   },
+   "6": {
+    "open": "09:00",
+    "close": "16:00"
+   }
+  },
+  "max_party": 8,
+  "lead_days": 30,
+  "slot_minutes": 30
+ }
 }

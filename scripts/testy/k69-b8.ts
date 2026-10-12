@@ -54,6 +54,20 @@ export default function ({ eq, ok }: Testy) {
     sKontext.rezervace.map(r => r.uroven), [{ id: 'gold', label: 'Zlatý host', ton: 'ink' }, null, { id: 'silver', label: 'Stříbrný host', ton: 'muted' }, null]);
   eq('rezervace: návštěvy — 0 = jde poprvé, bez práva null', sKontext.rezervace.map(r => r.navstev), [41, 0, 12, null]);
   eq('rezervace: poznámka personálu ořezaná, jinak null', sKontext.rezervace.map(r => r.poznamkaPersonalu), ['Nesnáší mléko.', null, null, null]);
+  // Ruční zápis (kolo 7): host bez účtu (customer_id NULL, jméno z guest_name přes COALESCE v API) i napojený člen.
+  const sRucne = vyberRezervace({
+    reservations: [
+      { id: 1, date: '2026-09-26', time: '17:30', party: 4, status: 'confirmed', customer_id: null, customer_name: 'Pan Novák', guest_name: 'Pan Novák', customer_phone: '777 123 456', created_by: 7 },
+      { id: 2, date: '2026-09-26', time: '18:00', party: 2, status: 'confirmed', customer_id: 5, customer_name: 'Jana', created_by: 7 },
+      { id: 3, date: '2026-09-26', time: '18:30', party: 2, status: 'requested', customer_id: 6, customer_name: 'Eva', created_by: null },
+      { id: 4, date: '2026-09-26', time: '19:00', party: 2, status: 'confirmed', customer_id: null, customer_name: null, created_by: 7 },
+    ],
+    zapis: { opening_hours: { '0': { open: '08:00', close: '18:00' } }, max_party: 12, lead_days: 60, slot_minutes: 15 },
+  });
+  eq('rezervace: ručně zapsaná — bez účtu nebo s created_by; host z účtu (bez created_by) ne', sRucne.rezervace.map(r => r.rucne), [true, true, false, true]);
+  eq('rezervace: jméno ručně zapsaného hosta, bez jména „Host", telefon ručního hosta', [sRucne.rezervace[0].host, sRucne.rezervace[3].host, sRucne.rezervace[0].telefon], ['Pan Novák', 'Host', '777 123 456']);
+  eq('rezervace: nastavení pro okno Nová rezervace (jen s rezervace.schvalovat)', [sRucne.zapis?.maxOsob, sRucne.zapis?.dniDopredu, sRucne.zapis?.krok, Object.keys(sRucne.zapis?.hodiny ?? {})], [12, 60, 15, ['0']]);
+  eq('rezervace: bez práva zapisovat nastavení nepřijde', vyberRezervace({ reservations: [] }).zapis, null);
   let spadlo = false;
   try { vyberRezervace({ error: 'x' }); } catch { spadlo = true; }
   ok('rezervace: nečekaný tvar je chyba widgetu (ErrorState), ne „nikdo nerezervoval"', spadlo);

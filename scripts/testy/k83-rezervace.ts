@@ -4,7 +4,7 @@
 // (slotsFor nefiltroval podle času a server kontroloval jen den).
 
 import type { Testy } from './_testy.ts';
-import { slotsFor, nejdriveDnes, PREDSTIH_REZERVACE_MIN, autoPotvrdit, zpravaHostoviORezervaci } from '../../lib/clientSlots.ts';
+import { slotsFor, nejdriveDnes, PREDSTIH_REZERVACE_MIN, autoPotvrdit, zpravaHostoviORezervaci, validujRucniRezervaci, vOteviraciDobe } from '../../lib/clientSlots.ts';
 
 export default function ({ eq, ok }: Testy) {
   // ---- sloty v minulosti (rezervace-slot-v-minulosti) ----
@@ -34,4 +34,19 @@ export default function ({ eq, ok }: Testy) {
   const potvrzeni = zpravaHostoviORezervaci('confirmed', '2026-10-12', '18:30:00');
   eq('auto: host dostane stejné „Rezervace potvrzena" jako po ručním potvrzení', [potvrzeni.title, potvrzeni.body, potvrzeni.type], ['Rezervace potvrzena', 'Těšíme se 12. 10. 2026 18:30.', 'success']);
   eq('auto: odmítnutí stejnou funkcí', zpravaHostoviORezervaci('declined', '2026-10-12', '18:30').title, 'Rezervaci se nepodařilo přijmout');
+
+  // ---- ruční zápis (rezervace-rucni-zapis) ----
+  const k = { dnes: den, nejpozdeji: '2026-11-09', maxOsob: 8, hodiny };
+  const zaklad = { name: '  Pan   Novák ', phone: '+420 777 123 456', date: den, time: '18:30', party: 4 };
+  const dobre = validujRucniRezervaci({ ...zaklad, time: '17:45', tableId: '3', note: ' U okna ', customerId: '' }, k);
+  eq('ruční: platný zápis — jméno srovnané, stůl číslem, poznámka ořezaná, bez člena', dobre.ok ? dobre.data : dobre,
+    { jmeno: 'Pan Novák', telefon: '+420 777 123 456', datum: den, cas: '17:45', osob: 4, stulId: 3, poznamka: 'U okna', hostId: null });
+  const chyba = (v: Record<string, unknown>) => { const r = validujRucniRezervaci({ ...zaklad, time: '12:00', ...v }, k); return r.ok ? 'ok' : r.pole; };
+  eq('ruční: jméno povinné a nejvýš 80 znaků', [chyba({ name: '   ' }), chyba({ name: 'x'.repeat(81) }), chyba({ name: 'x'.repeat(80) })], ['name', 'name', 'ok']);
+  eq('ruční: telefon jen číslice, mezery a + na začátku (nepovinný)', [chyba({ phone: '' }), chyba({ phone: '777 12a 456' }), chyba({ phone: '777+123' }), chyba({ phone: '12' }), chyba({ phone: '1'.repeat(31) })], ['ok', 'phone', 'phone', 'phone', 'phone']);
+  eq('ruční: den od dneška do posledního dne rezervací', [chyba({ date: '2026-10-11' }), chyba({ date: '2026-11-09', time: '10:00' }), chyba({ date: '2026-11-10' }), chyba({ date: '12. 10.' })], ['date', 'ok', 'date', 'date']);
+  eq('ruční: čas v otevírací době (mimo sloty smí), zavřeno nebo mimo dobu ne', [chyba({ time: '08:00' }), chyba({ time: '17:59' }), chyba({ time: '18:00' }), chyba({ time: '07:59' }), chyba({ date: '2026-10-18' }), chyba({ time: '25:00' })], ['ok', 'ok', 'time', 'time', 'time', 'time']);
+  eq('ruční: osoby od 1 do „Nejvíc osob"', [chyba({ party: 0 }), chyba({ party: 1 }), chyba({ party: 8 }), chyba({ party: 9 }), chyba({ party: 2.5 }), chyba({ party: 'x' })], ['party', 'ok', 'ok', 'party', 'party', 'party']);
+  eq('ruční: stůl a člen kladné číslo, poznámka nejvýš 300 znaků', [chyba({ tableId: -1 }), chyba({ customerId: 'x' }), chyba({ note: 'x'.repeat(301) }), chyba({ customerId: 42 })], ['tableId', 'customerId', 'note', 'ok']);
+  ok('ruční: otevírací doba přes půlnoc (18:00–02:00)', vOteviraciDobe({ '0': { open: '18:00', close: '02:00' } }, den, '01:30') && !vOteviraciDobe({ '0': { open: '18:00', close: '02:00' } }, den, '03:00'));
 }

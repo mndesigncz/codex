@@ -44,11 +44,19 @@ export interface Rezervace {
   navstev: number | null;
   /** Poslední interní poznámka personálu k hostovi (zakaznici.poznamky, nikdy na tabletu). */
   poznamkaPersonalu: string | null;
+  /**
+   * Zapsala ji obsluha (telefon, u dveří): host bez účtu (customer_id NULL), nebo ručně
+   * zapsaná a napojená na člena (created_by).
+   */
+  rucne: boolean;
 }
 
 export interface Stul { id: number; nazev: string; mist: number }
 
-export interface SeznamRezervaci { rezervace: Rezervace[]; stoly: Stul[] }
+/** Co potřebuje okno „Nová rezervace" (API to pošle jen s rezervace.schvalovat). */
+export interface NastaveniZapisu { hodiny: Record<string, { open?: string | null; close?: string | null; closed?: boolean }>; maxOsob: number; dniDopredu: number; krok: number }
+
+export interface SeznamRezervaci { rezervace: Rezervace[]; stoly: Stul[]; zapis: NastaveniZapisu | null }
 
 const STAVY: StavRezervace[] = ['requested', 'confirmed', 'seated', 'done', 'declined', 'cancelled'];
 
@@ -74,8 +82,15 @@ export function vyberRezervace(raw: any): SeznamRezervaci {
       uroven: urovenHosta(r.customer_level, r.customer_level_label),
       navstev: r.customer_visits == null ? null : Math.max(0, Math.round(cislo(r.customer_visits))),
       poznamkaPersonalu: text(r.staff_note),
+      rucne: r.customer_id === null || (r.created_by != null && r.created_by !== ''),
     })),
     stoly: seznam(raw.tables).map((t: any) => ({ id: Number(t.id), nazev: String(t.name ?? ''), mist: cislo(t.seats) })),
+    zapis: raw.zapis && typeof raw.zapis === 'object' ? {
+      hodiny: raw.zapis.opening_hours && typeof raw.zapis.opening_hours === 'object' ? raw.zapis.opening_hours : {},
+      maxOsob: Math.max(1, cislo(raw.zapis.max_party) || 8),
+      dniDopredu: Math.max(1, cislo(raw.zapis.lead_days) || 30),
+      krok: Math.max(15, cislo(raw.zapis.slot_minutes) || 30),
+    } : null,
   };
 }
 
