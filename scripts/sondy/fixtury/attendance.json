@@ -9,8 +9,8 @@
    "openSince": "2026-09-17T06:58:00Z",
    "openEntryId": 501,
    "nudgedAt": null,
-   "shiftStart": "08:00",
-   "shiftEnd": "16:00"
+   "shiftStart": "06:00:00",
+   "shiftEnd": "08:30:00"
   },
   {
    "id": 2,
@@ -35,6 +35,90 @@
    "nudgedAt": null,
    "shiftStart": "09:00",
    "shiftEnd": "17:00"
+  },
+  {
+   "id": 4,
+   "name": "Tereza Malá",
+   "avatar": "👱‍♀️",
+   "hourlyRate": 170,
+   "hasPin": false,
+   "openSince": null,
+   "openEntryId": null,
+   "nudgedAt": null,
+   "shiftStart": "14:00:00",
+   "shiftEnd": "22:00:00"
+  },
+  {
+   "id": 5,
+   "name": "Ondřej Kučera",
+   "avatar": null,
+   "hourlyRate": 165,
+   "hasPin": true,
+   "openSince": null,
+   "openEntryId": null,
+   "nudgedAt": null,
+   "shiftStart": null,
+   "shiftEnd": null
+  },
+  {
+   "id": 6,
+   "name": "Zuzana Vedoucí",
+   "avatar": "👩‍💼",
+   "hourlyRate": 0,
+   "hasPin": false,
+   "openSince": null,
+   "openEntryId": null,
+   "nudgedAt": null,
+   "shiftStart": null,
+   "shiftEnd": null
+  },
+  {
+   "id": 7,
+   "name": "Petr Novák",
+   "avatar": "🧑‍🍳",
+   "hourlyRate": 190,
+   "hasPin": false,
+   "openSince": null,
+   "openEntryId": null,
+   "nudgedAt": null,
+   "shiftStart": "16:00:00",
+   "shiftEnd": "23:30:00"
+  },
+  {
+   "id": 8,
+   "name": "Lucie Černá",
+   "avatar": "👩‍🦰",
+   "hourlyRate": 185,
+   "hasPin": true,
+   "openSince": null,
+   "openEntryId": null,
+   "nudgedAt": null,
+   "shiftStart": "07:00:00",
+   "shiftEnd": "15:00:00"
+  },
+  {
+   "id": 9,
+   "name": "Filip Dvořák",
+   "avatar": "🧑‍🦱",
+   "hourlyRate": 160,
+   "hasPin": false,
+   "openSince": null,
+   "openEntryId": null,
+   "nudgedAt": null,
+   "shiftStart": null,
+   "shiftEnd": null
+  },
+  {
+   "id": 10,
+   "name": "Karolína Šťastná",
+   "avatar": "👩‍🦱",
+   "hourlyRate": 175,
+   "hasPin": false,
+   "openSince": null,
+   "openEntryId": null,
+   "nudgedAt": null,
+   "shiftStart": "12:00:00",
+   "shiftEnd": "20:00:00"
   }
  ],
  "entries": [
