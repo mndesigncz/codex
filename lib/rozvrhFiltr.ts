@@ -51,6 +51,15 @@ export const klicFiltru = (uzivatel: string | number | null | undefined, podnik:
 /** Rozbalení přehledu „Směny podle lidí" a zvolené řazení. */
 export const KLIC_PREHLEDU = 'managero-rozvrh-prehled-lidi';
 
+/** Pohled plánovače: měsíční mřížka, nebo týdenní tabulka lidé × dny (kolo 6 UX). */
+export type PohledRozvrhu = 'mesic' | 'tyden';
+export const KLIC_POHLEDU = 'managero-rozvrh-pohled';
+/** Klíč pohledu zvlášť pro uživatele a podnik — stejný důvod jako u filtru. */
+export const klicPohledu = (uzivatel: string | number | null | undefined, podnik: number | null | undefined): string =>
+  `${KLIC_POHLEDU}:${uzivatel ?? 'nekdo'}:${podnik ?? 'bez-podniku'}`;
+/** Pohled z localStorage — neznámá hodnota = měsíc. */
+export const nactiPohled = (v: unknown): PohledRozvrhu => (v === 'tyden' ? 'tyden' : 'mesic');
+
 export const jeAktivni = (f: FiltrRozvrhu): boolean => f.lide.length > 0 || f.typy.length > 0 || f.jenDiry;
 
 /**

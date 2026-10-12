@@ -452,5 +452,21 @@
   "Žádný úkol": "Žiadna úloha",
   "— např.": "— napr.",
   "„{text}“": "„{text}“",
-  "…a dalších {n}": "…a ďalších {n}"
+  "…a dalších {n}": "…a ďalších {n}",
+  "Publikovat rozvrh ({n})": "Publikovať rozvrh ({n})",
+  "Naplánováno podle filtru": "Naplánované podľa filtra",
+  "Naplánováno v návrhu": "Naplánované v návrhu",
+  "Naplánováno": "Naplánované",
+  "h": "h",
+  "Mzdový náklad": "Mzdový náklad",
+  "{n, plural, one {# člověk bez sazby} few {# lidé bez sazby} other {# lidí bez sazby}}": "{n, plural, one {# človek bez sadzby} few {# ľudia bez sadzby} other {# ľudí bez sadzby}}",
+  "hodiny × sazba": "hodiny × sadzba",
+  "Pohled plánovače": "Zobrazenie plánovača",
+  "Měsíc": "Mesiac",
+  "Týden": "Týždeň",
+  "Člověk": "Človek",
+  "Jiný měsíc": "Iný mesiac",
+  "V měsíci zatím nikdo nemá směnu.": "V mesiaci zatiaľ nikto nemá zmenu.",
+  "Celkem": "Spolu",
+  "{lidi, plural, one {# člověk} few {# lidé} other {# lidí}} · {h} h": "{lidi, plural, one {# človek} few {# ľudia} other {# ľudí}} · {h} h"
 }

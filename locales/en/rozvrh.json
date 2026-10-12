@@ -452,5 +452,21 @@
   "Žádný úkol": "No tasks",
   "— např.": "— e.g.",
   "„{text}“": "“{text}”",
-  "…a dalších {n}": "…and {n} more"
+  "…a dalších {n}": "…and {n} more",
+  "Publikovat rozvrh ({n})": "Publish schedule ({n})",
+  "Naplánováno podle filtru": "Planned (filtered)",
+  "Naplánováno v návrhu": "Planned in the draft",
+  "Naplánováno": "Planned",
+  "h": "h",
+  "Mzdový náklad": "Labor cost",
+  "{n, plural, one {# člověk bez sazby} few {# lidé bez sazby} other {# lidí bez sazby}}": "{n, plural, one {# person without a rate} other {# people without a rate}}",
+  "hodiny × sazba": "hours × rate",
+  "Pohled plánovače": "Planner view",
+  "Měsíc": "Month",
+  "Týden": "Week",
+  "Člověk": "Person",
+  "Jiný měsíc": "Another month",
+  "V měsíci zatím nikdo nemá směnu.": "Nobody has a shift this month yet.",
+  "Celkem": "Total",
+  "{lidi, plural, one {# člověk} few {# lidé} other {# lidí}} · {h} h": "{lidi, plural, one {# person} other {# people}} · {h} h"
 }
