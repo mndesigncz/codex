@@ -12,6 +12,7 @@
 //
 // Fixtury: scripts/sondy/fixtury/k69-b6b-*.json.
 import { readFileSync } from 'node:fs';
+import { deflateSync } from 'node:zlib';
 import {
   kontext, konec, tvrdi, otevri, lista, upravit, hotovo, vUpravach, dokud, poradi, poradiPutu, dotazyNa, roleMine, DIR, OUT, BASE,
 } from './k68-spolecne.mjs';
@@ -57,8 +58,20 @@ const podvrh = () => (req, json, stav) => {
   }
   if (/^\/api\/guides\/\d+\/reads$/.test(path)) return json(nacti('guides_1_reads'));
   if (path === '/api/organization/podniky' || path === '/api/organization') return json({ podniky: [] });
+  // Kolo 7: fotka do návodu — nahrání vrátí adresu v úložišti podniku (tvar skutečné routy).
+  if (path === '/api/upload' && m === 'POST') { stav.nahrano = (stav.nahrano ?? 0) + 1; return json({ url: '/api/upload/77', type: 'image', name: 'latte-art.png' }); }
   return undefined;
 };
+
+/** Jednobarevné PNG šířka × výška (fotka v návodu musí být širší než telefon, ať je vidět max-w-full). */
+function png(w, h) {
+  const crc = (buf) => { let c, r = -1; for (let n = 0; n < buf.length; n++) { c = (r ^ buf[n]) & 0xff; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; r = (r >>> 8) ^ c; } return (r ^ -1) >>> 0; };
+  const kus = (typ, data) => { const d = Buffer.concat([Buffer.from(typ), data]); const len = Buffer.alloc(4); len.writeUInt32BE(data.length); const c = Buffer.alloc(4); c.writeUInt32BE(crc(d)); return Buffer.concat([len, d, c]); };
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 2;
+  const radek = Buffer.concat([Buffer.from([0]), Buffer.alloc(w * 3, 0xc8)]);
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), kus('IHDR', ihdr), kus('IDAT', deflateSync(Buffer.concat(Array(h).fill(radek)))), kus('IEND', Buffer.alloc(0))]);
+}
+const FOTKA = png(1600, 900);
 
 const POSTUPY = '/employer/overview?view=procedures';
 const NAVODY = '/employer/overview?view=guides';
@@ -433,6 +446,48 @@ async function nastrojVUpravach(p, stav, znacka, vidget) {
   tvrdi('NZ1: „Potvrzuji přečtení" pošle POST { markRead: true }', await dokud(() => (stav.zapisyNavodu ?? []).some(z => z.m === 'POST' && z.telo?.includes('markRead')), 2000));
   await p.screenshot({ path: OUT + 'k69-b6b-navody-zam-desk.png', fullPage: true });
   tvrdi('NZ: bez chyb v konzoli', chyby.length === 0, chyby.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
+// Kolo 7 (navod-bez-fotky): fotka v návodu na telefonu nepřeteče, cizí adresa zůstane textem, editor fotku nahraje a vloží.
+{
+  const { ctx, p, stav, chyby } = await kontext({ fix: FIX_NAVODY, viewport: { width: 390, height: 844 }, mobil: true, dalsi: podvrh() });
+  await p.route('**/api/upload/*', route => route.fulfill({ status: 200, contentType: 'image/png', body: FOTKA }));
+  await otevri(p, NAVODY, 'vedeni.navody');
+  await widgetLi(p, 'nastroj').getByRole('button', { name: 'Jak se dělá flat white', exact: true }).click();
+  const ctecka = p.getByRole('dialog', { name: 'Jak se dělá flat white' });
+  await dokud(() => ctecka.isVisible(), 2500);
+  const img = ctecka.locator('img[src="/api/upload/41"]');
+  tvrdi('NF1: řádek ![…](/api/upload/41) se ve čtečce vykreslí jako fotka s popisem a loading=lazy', await dokud(async () => (await img.count()) === 1, 2000)
+    && await img.getAttribute('alt') === 'Pěna na flat white' && await img.getAttribute('loading') === 'lazy');
+  await img.scrollIntoViewIfNeeded();
+  await dokud(() => img.evaluate(el => el.complete && el.naturalWidth > 0), 3000);
+  const m = await img.evaluate(el => { const r = el.getBoundingClientRect(); const rodic = el.parentElement.getBoundingClientRect(); return { w: Math.round(r.width), rodic: Math.round(rodic.width), prirozena: el.naturalWidth, right: Math.round(r.right) }; });
+  tvrdi('NF1: fotka 1600 px je zmenšená na šířku obsahu okna (max-w-full), nic nepřetéká', m.prirozena === 1600 && m.w <= m.rodic && m.right <= 390 && await bezPreteceni(p)
+    && await ctecka.evaluate(el => el.scrollWidth <= el.clientWidth + 1), JSON.stringify(m));
+  tvrdi('NF2: cizí adresa (sledovací pixel) se nevykreslí jako obrázek, zůstane textem', await ctecka.locator('img[src*="sledovani"]').count() === 0
+    && (await ctecka.innerText()).includes('![pixel](https://sledovani.example.com/p.gif)'));
+  await p.screenshot({ path: OUT + 'k83-navod-fotka-tel.png' });
+  await p.keyboard.press('Escape');
+  await dokud(async () => (await ctecka.count()) === 0, 1500);
+  // Editor: Přidat fotku → POST /api/upload → do obsahu řádek ![latte-art](/api/upload/77).
+  await p.locator('[data-plocha]').getByRole('button', { name: 'Nový návod' }).click();
+  const editor = p.getByRole('dialog', { name: 'Nový návod' });
+  await dokud(() => editor.isVisible(), 2000);
+  const obsah = editor.getByLabel('Obsah');
+  tvrdi('NF3: editor má u obsahu „Přidat fotku" (≥ 44 px) a nápovědu s fotkami', await editor.getByRole('button', { name: 'Přidat fotku' }).isVisible()
+    && (await editor.getByRole('button', { name: 'Přidat fotku' }).evaluate(el => el.getBoundingClientRect().height)) >= 44
+    && await editor.getByText('Podporováno: **tučně**, odrážky a fotky.').isVisible());
+  await obsah.fill('Nejdřív napěň mléko.\nPak nalij.');
+  await obsah.evaluate(el => { el.focus(); el.setSelectionRange(20, 20); });
+  // Jako člověk: klepnutí na „Přidat fotku" otevře výběr souboru (pole s obsahem se tím rozostří).
+  const [vyber] = await Promise.all([p.waitForEvent('filechooser'), editor.getByRole('button', { name: 'Přidat fotku' }).click()]);
+  tvrdi('NF3: výběr nabízí jen obrázky (accept="image/*"), jeden soubor', !vyber.isMultiple() && await vyber.element().getAttribute('accept') === 'image/*');
+  await vyber.setFiles({ name: 'latte-art.png', mimeType: 'image/png', buffer: png(40, 30) });
+  tvrdi('NF3: fotka se nahraje (POST /api/upload) a vloží jako samostatný řádek na místo kurzoru', await dokud(() => stav.nahrano === 1, 3000)
+    && await dokud(async () => (await obsah.inputValue()) === 'Nejdřív napěň mléko.\n![latte-art](/api/upload/77)\nPak nalij.', 2000), JSON.stringify(await obsah.inputValue()));
+  await p.screenshot({ path: OUT + 'k83-navod-editor-tel.png' });
+  tvrdi('NF: bez chyb v konzoli', chyby.length === 0, chyby.slice(0, 3).join(' | '));
   await ctx.close();
 }
 

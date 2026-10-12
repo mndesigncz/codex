@@ -2,7 +2,7 @@
  "guide": {
   "id": 1,
   "title": "Jak se dělá flat white",
-  "content": "Dvojité espresso.\n- mléko do 60 °C\n- nalít jedním tahem",
+  "content": "Dvojité espresso.\n![Pěna na flat white](/api/upload/41)\n- mléko do 60 °C\n- nalít jedním tahem\n![pixel](https://sledovani.example.com/p.gif)",
   "checklist": [
    "Namlít kávu",
    "Napěnit mléko"

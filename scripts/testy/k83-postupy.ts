@@ -1,12 +1,13 @@
 // Kolo 7, balík R7-5 (Postupy, návody, nápady a odměny) — jednotkové testy.
 //
 // Hlídá čistou logiku balíku: validaci úpravy odměny (lib/odmenyKatalog.ts),
-// poslední průběhy jednoho postupu (lib/postupyPrehled.ts). Další části balíku
-// (měřená hodnota v kroku, fotky v návodu) přidávají své testy níž.
+// poslední průběhy jednoho postupu (lib/postupyPrehled.ts), fotky v návodu
+// (lib/navodObsah.ts). Měřená hodnota v kroku přidává své testy níž.
 
 import type { Testy } from './_testy.ts';
 import { validujOdmenu, jeIkonaOdmeny, grafemy, MAX_NAZEV_ODMENY, MAX_CENA_ODMENY } from '../../lib/odmenyKatalog.ts';
 import { prubehyPostupu, PRUBEHU_V_DETAILU, type PrubehApi } from '../../lib/postupyPrehled.ts';
+import { radekFotky, popisZNazvuSouboru, zapisFotky, vlozFotku, cistyPopis, MAX_POPIS_FOTKY } from '../../lib/navodObsah.ts';
 
 export default function ({ eq, ok }: Testy) {
   // ---- odměny: validace přidání a úpravy ----
@@ -61,4 +62,29 @@ export default function ({ eq, ok }: Testy) {
   eq('průběhy postupu: postup bez průběhů = prázdno', prubehyPostupu(behy, 3), []);
   eq('průběhy postupu: id jako text z API páruje taky', prubehyPostupu([beh(1, '4' as unknown as number, '2026-10-01 10:00:00')], 4).length, 1);
   eq('průběhy postupu: vlastní počet', prubehyPostupu(behy, 2, 2).map(r => r.id), [9, 3]);
+
+  // ---- návod: fotky v obsahu ----
+  eq('fotka: řádek ![popis](/api/upload/id) = fotka', radekFotky('![Pěna na flat white](/api/upload/41)'), { popis: 'Pěna na flat white', url: '/api/upload/41' });
+  eq('fotka: okrajové mezery řádku nevadí', radekFotky('  ![x](/api/upload/a_B-9)  '), { popis: 'x', url: '/api/upload/a_B-9' });
+  eq('fotka: prázdný popis projde', radekFotky('![](/api/upload/5)'), { popis: '', url: '/api/upload/5' });
+  eq('fotka: cizí doména = text', radekFotky('![pixel](https://sledovani.example.com/p.gif)'), null);
+  eq('fotka: protokol-relativní cizí adresa = text', radekFotky('![x](//evil.example/a.png)'), null);
+  eq('fotka: jiná naše cesta = text', radekFotky('![x](/api/menu/public/u-lipy/qr)'), null);
+  eq('fotka: výstup z cesty (../) = text', radekFotky('![x](/api/upload/../teams)'), null);
+  eq('fotka: parametry za id = text', radekFotky('![x](/api/upload/5?x=1)'), null);
+  eq('fotka: uprostřed věty = text', radekFotky('Viz ![x](/api/upload/5) níž'), null);
+  eq('fotka: javascript: = text', radekFotky('![x](javascript:alert(1))'), null);
+  eq('fotka: odrážka ani obyčejný text fotkou nejsou', [radekFotky('- mléko'), radekFotky('Dvojité espresso.')], [null, null]);
+  eq('popis z názvu souboru: bez přípony', popisZNazvuSouboru('IMG_2041.HEIC'), 'IMG_2041');
+  eq('popis z názvu souboru: bez závorek a zalomení', popisZNazvuSouboru('latte [nový] (2).jpg'), 'latte nový 2');
+  eq(`popis: nejvýš ${MAX_POPIS_FOTKY} znaků`, cistyPopis('x'.repeat(200)).length, MAX_POPIS_FOTKY);
+  eq('zápis fotky: náš upload', zapisFotky('Pěna', '/api/upload/77'), '![Pěna](/api/upload/77)');
+  eq('zápis fotky: cizí adresa se nezapíše', zapisFotky('x', 'https://evil.example/a.png'), null);
+  eq('vložení: do prázdného obsahu bez prázdných řádků', vlozFotku('', 0, '![a](/api/upload/1)'), { text: '![a](/api/upload/1)', kurzor: 19 });
+  eq('vložení: na konec řádku = nový řádek pod ním', vlozFotku('Napěň mléko.\nPak nalij.', 12, '![a](/api/upload/1)'),
+    { text: 'Napěň mléko.\n![a](/api/upload/1)\nPak nalij.', kurzor: 32 });
+  eq('vložení: uprostřed řádku = zalomení před i za fotkou', vlozFotku('AB', 1, '![a](/api/upload/1)'), { text: 'A\n![a](/api/upload/1)\nB', kurzor: 21 });
+  eq('vložení: na začátek řádku = fotka nad ním', vlozFotku('A\nB', 2, '![a](/api/upload/1)'), { text: 'A\n![a](/api/upload/1)\nB', kurzor: 21 });
+  eq('vložení: pozice mimo text = na konec', vlozFotku('A', 99, '![a](/api/upload/1)'), { text: 'A\n![a](/api/upload/1)', kurzor: 21 });
+  ok('vložená fotka je po vložení zase řádek fotky', vlozFotku('A', 1, zapisFotky('p', '/api/upload/9')!).text.split('\n').some(r => radekFotky(r) != null));
 }

@@ -34,6 +34,7 @@ import {
 import StepTimeline from './procedures/StepTimeline';
 import { parseSteps } from '@/lib/steps';
 import { normalizeSteps, popisMnozstviKroku, type GuideStep } from '@/lib/guideSteps';
+import { radekFotky, popisZNazvuSouboru, vlozFotku, zapisFotky } from '@/lib/navodObsah';
 import GuideStepIngredient from './guides/GuideStepIngredient';
 import GuideProductLink from './guides/GuideProductLink';
 import GuideItemLink from './guides/GuideItemLink';
@@ -122,7 +123,9 @@ function vyberKategorie(raw: any): Category[] {
   return raw.categories;
 }
 
-// Lightweight markdown-ish renderer: **bold**, "- " bullets, preserved line breaks.
+// Lightweight markdown-ish renderer: **bold**, "- " bullets, preserved line breaks,
+// a fotky — samostatný řádek ![popis](/api/upload/<id>) (kolo 7). Jinou adresu
+// (cizí doména, sledovací pixel) radekFotky nepustí a řádek zůstane textem.
 function renderContent(content: string) {
   const lines = String(content || '').split('\n');
   const blocks: JSX.Element[] = [];
@@ -142,7 +145,15 @@ function renderContent(content: string) {
 
   lines.forEach((line, i) => {
     const trimmed = line.trim();
-    if (trimmed.startsWith('- ')) {
+    const fotka = radekFotky(trimmed);
+    if (fotka) {
+      flushBullets(`ul-${i}`);
+      blocks.push(
+        // Fotka z úložiště podniku (/api/upload je jen pro členy) — next/image by ji neuměl bez veřejné adresy.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img key={`img-${i}`} src={fotka.url} alt={fotka.popis} loading="lazy" decoding="async" className="block rounded-2xl max-w-full h-auto my-3" />
+      );
+    } else if (trimmed.startsWith('- ')) {
       bullets.push(trimmed.slice(2));
     } else {
       flushBullets(`ul-${i}`);
@@ -893,6 +904,39 @@ function GuideEditor({
   }, []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  // Fotky do obsahu (kolo 7): z telefonu přes /api/upload, do textu řádek ![popis](/api/upload/id).
+  const obsahRef = useRef<HTMLTextAreaElement>(null);
+  const kurzorRef = useRef<number | null>(null);
+  const fotkaRef = useRef<HTMLInputElement>(null);
+  const [nahravam, setNahravam] = useState(false);
+  const [chybaFotky, setChybaFotky] = useState('');
+  const pridatFotku = async (f: File | null) => {
+    if (!f || nahravam) return;
+    // Kde stál kurzor, když člověk z pole odešel (na telefonu ho výběr fotky rozostří);
+    // kdo do pole neklepl, tomu jde fotka na konec.
+    const pozice = kurzorRef.current ?? content.length;
+    setNahravam(true);
+    setChybaFotky('');
+    try {
+      if (!f.type.startsWith('image/')) throw new Error(t('Vyber fotku (obrázek).'));
+      const { compressImage } = await import('@/lib/clientImage');
+      const fd = new FormData();
+      fd.append('file', await compressImage(f));
+      const d = await fetch('/api/upload', { method: 'POST', body: fd }).then(okJson) as { url?: unknown; type?: unknown };
+      const radek = typeof d?.url === 'string' && d.type === 'image' ? zapisFotky(popisZNazvuSouboru(f.name) || t('Fotka'), d.url) : null;
+      if (!radek) throw new Error(t('Fotku se nepodařilo nahrát.'));
+      const v = vlozFotku(content, pozice, radek);
+      setContent(v.text);
+      kurzorRef.current = v.kurzor;
+      // Kurzor za vloženou fotku, ať další psaní pokračuje pod ní.
+      requestAnimationFrame(() => { const el = obsahRef.current; if (el) { el.focus({ preventScroll: true }); el.setSelectionRange(v.kurzor, v.kurzor); } });
+    } catch (e) {
+      setChybaFotky(apiMessage(e, t('Fotku se nepodařilo nahrát — zkontroluj připojení.')));
+    } finally {
+      setNahravam(false);
+      if (fotkaRef.current) fotkaRef.current.value = '';
+    }
+  };
 
   const addStep = () => setSteps((prev) => [...prev, { text: '' }]);
   const patchStep = (i: number, patch: Partial<GuideStep>) =>
@@ -967,10 +1011,20 @@ function GuideEditor({
           </Select>
         </Field>
 
-        <Field id={`${uid}-obsah`} label={t('Obsah')} hint={t('Zalomení řádků se zachovají. Podporováno: **tučně** a odrážky „- “.')}>
-          <Textarea id={`${uid}-obsah`} value={content} onChange={(e) => setContent(e.target.value)} rows={12}
+        <Field id={`${uid}-obsah`} label={t('Obsah')} hint={t('Podporováno: **tučně**, odrážky a fotky.')}>
+          <Textarea ref={obsahRef} id={`${uid}-obsah`} value={content} onChange={(e) => setContent(e.target.value)} rows={12}
+            onSelect={(e) => { kurzorRef.current = e.currentTarget.selectionStart; }}
+            onBlur={(e) => { kurzorRef.current = e.currentTarget.selectionStart; }}
             placeholder={`${t('Sem napiš návod…')}\n\n${t('Tip: řádky **tučně** a odrážky pomocí „- “.')}`} className="leading-relaxed !resize-y" />
         </Field>
+        <div className="-mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+          {/* accept="image/*" bez capture: telefon nabídne foťák i galerii. */}
+          <input ref={fotkaRef} id={`${uid}-fotka`} type="file" accept="image/*" className="sr-only" tabIndex={-1} aria-hidden
+            onChange={(e) => { void pridatFotku(e.target.files?.[0] ?? null); }} />
+          <Button variant="secondary" icon="camera" loading={nahravam} onClick={() => fotkaRef.current?.click()}>{t('Přidat fotku')}</Button>
+          <span className="t-meta min-w-0 text-pretty">{t('Vloží se na místo kurzoru jako řádek ![popis](…) — popis můžeš přepsat.')}</span>
+          {chybaFotky && <p className="note note-danger w-full text-sm" role="alert">{chybaFotky}</p>}
+        </div>
 
         {/* Vazba na položku v kase — z ní plyne, že se suroviny z návodu dají uložit rovnou jako receptura. */}
         <GuideProductLink productId={productId} productName={productName}
