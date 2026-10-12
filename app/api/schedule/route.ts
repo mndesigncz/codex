@@ -24,13 +24,35 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Neplatný měsíc' }, { status: 400 });
   }
 
-  const rows = await sql`
+  // Hodinová sazba u každé směny (kolo 6 UX: mzdový náklad plánu) stejnou logikou jako
+  // roster docházky (app/api/attendance/route.ts): z členství v TOMHLE podniku, u starých
+  // účtů ze zrcadla users; nula = nenastaveno. NULL, když volající nemá finance.mzdy —
+  // Provozní plánuje, sazby nevidí.
+  const sSazbou = ctx.role.opravneni.has('finance.mzdy');
+  const smenyMesice = (withRate: boolean) => sql`
     SELECT s.id, s.employee_id, s.date, s.start_time, s.end_time, s.type,
-           u.name AS employee_name, u.avatar AS employee_avatar
+           u.name AS employee_name, u.avatar AS employee_avatar,
+           CASE WHEN ${withRate}
+                THEN (CASE WHEN m.user_id IS NOT NULL THEN COALESCE(m.hourly_rate, 0) ELSE COALESCE(u.hourly_rate, 0) END)
+                ELSE NULL END AS hourly_rate
     FROM shifts s
     JOIN users u ON u.id = s.employee_id
+    LEFT JOIN team_members m ON m.user_id = u.id AND m.team_id = ${ctx.teamId}
     WHERE s.team_id = ${ctx.teamId} AND to_char(s.date::date, 'YYYY-MM') = ${month}
     ORDER BY s.date ASC, s.start_time ASC`;
+  let rows: any[];
+  try {
+    rows = await smenyMesice(sSazbou);
+  } catch {
+    // hourly_rate ještě nemigrované — rozvrh se načte bez sazeb (jako docházka).
+    rows = await sql`
+      SELECT s.id, s.employee_id, s.date, s.start_time, s.end_time, s.type,
+             u.name AS employee_name, u.avatar AS employee_avatar, NULL AS hourly_rate
+      FROM shifts s
+      JOIN users u ON u.id = s.employee_id
+      WHERE s.team_id = ${ctx.teamId} AND to_char(s.date::date, 'YYYY-MM') = ${month}
+      ORDER BY s.date ASC, s.start_time ASC`;
+  }
 
   const shifts = rows.map((r: any) => ({
     id: r.id,
@@ -41,6 +63,7 @@ export async function GET(req: Request) {
     startTime: r.start_time,
     endTime: r.end_time,
     type: r.type,
+    hourlyRate: r.hourly_rate == null ? null : Number(r.hourly_rate) || 0,
   }));
   // Díry v pokrytí se počítají i pro uložený rozvrh — vzniknou i ruční
   // úpravou, ne jen generováním, a vedení je musí vidět hned.
