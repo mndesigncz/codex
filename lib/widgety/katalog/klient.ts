@@ -56,6 +56,8 @@ export const WIDGETY: DefiniceWidgetu[] = [
       pole: {
         e_mail_hosta: 'zakaznici.kontakty',
         telefon_hosta: 'zakaznici.kontakty',
+        uroven: 'zakaznici.zobrazit',
+        poznamka_personalu: 'zakaznici.poznamky',
         'akce:potvrdit_odmitnout': 'rezervace.schvalovat',
         'akce:usadit': 'rezervace.usadit',
       },

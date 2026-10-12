@@ -1895,5 +1895,10 @@
   "Upravit rozvrh": "Edit schedule",
   "Zavolat hostovi": "Call the guest",
   "Napsat e-mail": "Send an email",
-  "Zavolat hostovi {host}: {telefon}": "Call guest {host}: {telefon}"
+  "Zavolat hostovi {host}: {telefon}": "Call guest {host}: {telefon}",
+  "Stříbrný host": "Silver guest",
+  "Zlatý host": "Gold guest",
+  "Platinový host": "Platinum guest",
+  "1. návštěva": "First visit",
+  "Poznámka personálu:": "Staff note:"
 }

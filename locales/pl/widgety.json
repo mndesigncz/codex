@@ -1895,5 +1895,10 @@
   "Upravit rozvrh": "Edytuj grafik",
   "Zavolat hostovi": "Zadzwoń do gościa",
   "Napsat e-mail": "Napisz e-mail",
-  "Zavolat hostovi {host}: {telefon}": "Zadzwoń do gościa {host}: {telefon}"
+  "Zavolat hostovi {host}: {telefon}": "Zadzwoń do gościa {host}: {telefon}",
+  "Stříbrný host": "Gość srebrny",
+  "Zlatý host": "Gość złoty",
+  "Platinový host": "Gość platynowy",
+  "1. návštěva": "Pierwsza wizyta",
+  "Poznámka personálu:": "Notatka personelu:"
 }

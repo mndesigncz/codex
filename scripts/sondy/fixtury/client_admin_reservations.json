@@ -6,12 +6,17 @@
    "time": "17:30",
    "party": 4,
    "status": "requested",
-   "note": "Oslava narozenin, prosíme o klidnější stůl.",
+   "note": "Oslava narozenin, prosíme o klidnější stůl kousek od okna a místo na kočárek — přijdeme o pár minut dřív.",
    "customer_name": "Jana Dvořáková",
    "customer_email": "jana.dvorakova@email.cz",
    "table_id": 1,
    "table_name": "U okna",
-   "customer_phone": "+420 776 221 004"
+   "customer_phone": "+420 776 221 004",
+   "customer_id": 101,
+   "customer_visits": 41,
+   "customer_level": "gold",
+   "customer_level_label": "Zlatý host",
+   "staff_note": "Nesnáší mléko, dort si přinesou sami."
   },
   {
    "id": 12,
@@ -24,7 +29,11 @@
    "customer_email": "p.novak@email.cz",
    "table_id": 3,
    "table_name": "Zahrádka 1",
-   "customer_phone": "+420 605 118 992"
+   "customer_phone": "+420 605 118 992",
+   "customer_id": 102,
+   "customer_visits": 7,
+   "customer_level": "bronze",
+   "customer_level_label": "Člen"
   },
   {
    "id": 13,
@@ -37,7 +46,11 @@
    "customer_email": "t.malkova@firma.cz",
    "table_id": 2,
    "table_name": "Velký stůl",
-   "customer_phone": "+420 777 431 220"
+   "customer_phone": "+420 777 431 220",
+   "customer_id": 103,
+   "customer_visits": 12,
+   "customer_level": "silver",
+   "customer_level_label": "Stříbrný host"
   },
   {
    "id": 14,
@@ -50,7 +63,11 @@
    "customer_email": "benes.o@email.cz",
    "table_id": null,
    "table_name": null,
-   "customer_phone": "+420 733 904 511"
+   "customer_phone": "+420 733 904 511",
+   "customer_id": 104,
+   "customer_visits": 0,
+   "customer_level": "bronze",
+   "customer_level_label": "Člen"
   },
   {
    "id": 15,
@@ -63,7 +80,11 @@
    "customer_email": "klara.s@email.cz",
    "table_id": 1,
    "table_name": "U okna",
-   "customer_phone": "+420 720 664 130"
+   "customer_phone": "+420 720 664 130",
+   "customer_id": 105,
+   "customer_visits": 3,
+   "customer_level": "bronze",
+   "customer_level_label": "Člen"
   }
  ],
  "tables": [

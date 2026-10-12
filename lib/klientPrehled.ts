@@ -35,6 +35,15 @@ export interface Rezervace {
   stav: StavRezervace;
   /** Tablet ji nedostane (API ji maže); poznámka hosta patří jen vedení. */
   poznamka: string | null;
+  /**
+   * Úroveň člena pro štítek u jména (Stříbrný / Zlatý / Platinový host); obyčejný
+   * člen štítek nemá (null). Jen se zakaznici.zobrazit — jinak ji API nepošle.
+   */
+  uroven: { id: string; label: string; ton: ChipTone } | null;
+  /** Kolikrát host v podniku byl (0 = jde poprvé); null = není člen nebo divák nesmí vidět. */
+  navstev: number | null;
+  /** Poslední interní poznámka personálu k hostovi (zakaznici.poznamky, nikdy na tabletu). */
+  poznamkaPersonalu: string | null;
 }
 
 export interface Stul { id: number; nazev: string; mist: number }
@@ -62,9 +71,18 @@ export function vyberRezervace(raw: any): SeznamRezervaci {
       stul: text(r.table_name),
       stav: (STAVY.includes(r.status) ? r.status : 'requested') as StavRezervace,
       poznamka: text(r.note),
+      uroven: urovenHosta(r.customer_level, r.customer_level_label),
+      navstev: r.customer_visits == null ? null : Math.max(0, Math.round(cislo(r.customer_visits))),
+      poznamkaPersonalu: text(r.staff_note),
     })),
     stoly: seznam(raw.tables).map((t: any) => ({ id: Number(t.id), nazev: String(t.name ?? ''), mist: cislo(t.seats) })),
   };
+}
+
+/** Štítek úrovně jako v Zákaznících › Členové: stříbro tlumeně, zlato a platina inkoustem, obyčejný člen bez štítku. */
+function urovenHosta(id: unknown, label: unknown): Rezervace['uroven'] {
+  if (id !== 'silver' && id !== 'gold' && id !== 'platinum') return null;
+  return { id, label: text(label) ?? (id === 'silver' ? 'Stříbrný host' : id === 'gold' ? 'Zlatý host' : 'Platinový host'), ton: id === 'silver' ? 'muted' : 'ink' };
 }
 
 /** Odkaz `tel:` z telefonu, jak ho host napsal („+420 776 221 004" → „tel:+420776221004"); bez číslic null. */

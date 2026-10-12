@@ -448,7 +448,7 @@ function RezervaceStranka({ oznam, onZmena, otevriHosta }: { oznam: Hlaska; onZm
                     ? [{ label: 'Odmítnout rezervaci…', icon: 'close', danger: true, hint: 'Host dostane zprávu, že se to nepovedlo.', onClick: () => setOdmitam(r) }] : []),
                 ];
                 return (
-                  <ListRow key={r.id} value={r.cas} title={r.host}
+                  <ListRow key={r.id} value={r.cas} title={<JmenoHosta r={r} />}
                     meta={[czCount(r.osob, OSOBA), r.stul ?? 'bez stolu'].join(' · ')}
                     // Kontakt a poznámka hosta jsou to, co obsluha u dveří potřebuje celé — `detail`
                     // se zalamuje, `meta` by poznámku na telefonu uřízl na „Oslav…".
@@ -513,7 +513,7 @@ function RezervaceStranka({ oznam, onZmena, otevriHosta }: { oznam: Hlaska; onZm
  */
 function detailRezervace(r: Rezervace): React.ReactNode {
   const tel = odkazTel(r.telefon);
-  if (!tel && !r.email && !r.poznamka) return undefined;
+  if (!tel && !r.email && !r.poznamka && !r.poznamkaPersonalu) return undefined;
   return (
     <>
       {tel ? (
@@ -521,7 +521,26 @@ function detailRezervace(r: Rezervace): React.ReactNode {
           aria-label={`Zavolat hostovi ${r.host}: ${r.telefon}`}>{r.telefon}</a>
       ) : r.email ? <span className="block truncate">{r.email}</span> : null}
       {r.poznamka && <span className="block text-black/70">„{r.poznamka}“</span>}
+      {/* Poslední interní poznámka personálu (Zákazníci › Deník) — jiný hlas než host, proto kurzívou s ikonou. */}
+      {r.poznamkaPersonalu && (
+        <span className="flex items-start gap-1.5 italic text-black/60">
+          <Icon name="pencil" size={13} className="shrink-0 mt-0.5" />
+          <span className="min-w-0"><span className="sr-only">Poznámka personálu: </span>{r.poznamkaPersonalu}</span>
+        </span>
+      )}
     </>
+  );
+}
+
+/** Jméno hosta a kdo to je: štítek úrovně jako v Zákaznících › Členové, „1. návštěva" u člena, který jde poprvé. */
+function JmenoHosta({ r }: { r: Rezervace }) {
+  if (!r.uroven && r.navstev !== 0) return <>{r.host}</>;
+  return (
+    <span className="flex items-center gap-2 min-w-0">
+      <span className="truncate">{r.host}</span>
+      {r.uroven && <Chip tone={r.uroven.ton} size="sm">{r.uroven.label}</Chip>}
+      {!r.uroven && r.navstev === 0 && <Chip tone="muted" size="sm">1. návštěva</Chip>}
+    </span>
   );
 }
 

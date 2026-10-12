@@ -486,10 +486,13 @@ function metaRezervace(r: Rezervace, t: PrekladFn, L = false): string {
   return [osoby(r.osob, t), r.stul ?? t('bez stolu'), L ? null : r.email].filter(Boolean).join(' · ');
 }
 
-/** Třetí řádek ve velikosti L: telefon na klepnutí (jinak e-mail) a celá poznámka hosta (tabletu ji API nepošle). */
+/**
+ * Třetí řádek ve velikosti L: telefon na klepnutí (jinak e-mail), celá poznámka hosta
+ * (tabletu ji API nepošle) a poslední poznámka personálu (zakaznici.poznamky).
+ */
 function detailRezervace(r: Rezervace, t: PrekladFn): React.ReactNode {
   const tel = odkazTel(r.telefon);
-  if (!tel && !r.email && !r.poznamka) return undefined;
+  if (!tel && !r.email && !r.poznamka && !r.poznamkaPersonalu) return undefined;
   return (
     <>
       {tel ? (
@@ -497,7 +500,29 @@ function detailRezervace(r: Rezervace, t: PrekladFn): React.ReactNode {
           aria-label={t('Zavolat hostovi {host}: {telefon}', { host: r.host, telefon: r.telefon ?? '' })}>{r.telefon}</a>
       ) : r.email ? <span className="block truncate">{r.email}</span> : null}
       {r.poznamka && <span className="block text-black/70">„{r.poznamka}“</span>}
+      {r.poznamkaPersonalu && (
+        <span className="flex items-start gap-1.5 italic text-black/60">
+          <Icon name="pencil" size={13} className="shrink-0 mt-0.5" />
+          <span className="min-w-0"><span className="sr-only">{t('Poznámka personálu:')} </span>{r.poznamkaPersonalu}</span>
+        </span>
+      )}
     </>
+  );
+}
+
+/** Úroveň hosta slovy (API posílá české popisky z tierFor). */
+function urovenText(id: string, t: PrekladFn): string {
+  return id === 'platinum' ? t('Platinový host') : id === 'gold' ? t('Zlatý host') : t('Stříbrný host');
+}
+
+/** Jméno a ve velikosti L štítek úrovně nebo „1. návštěva" (jen se zakaznici.zobrazit — jinak je API nepošle). */
+function jmenoHosta(r: Rezervace, t: PrekladFn, L: boolean): React.ReactNode {
+  if (!L || (!r.uroven && r.navstev !== 0)) return r.host;
+  return (
+    <span className="flex items-center gap-2 min-w-0">
+      <span className="truncate">{r.host}</span>
+      {r.uroven ? <Chip tone={r.uroven.ton} size="sm">{urovenText(r.uroven.id, t)}</Chip> : <Chip tone="muted" size="sm">{t('1. návštěva')}</Chip>}
+    </span>
   );
 }
 
@@ -606,7 +631,7 @@ function DnesniRezervace({ velikost }: WidgetProps) {
               ] : [];
               const stav = <Chip tone={TON_REZERVACE[r.stav]} size="sm">{stavText(r.stav, t)}</Chip>;
               return (
-                <ListRow key={r.id} title={r.host} meta={metaRezervace(r, t, L)} value={r.cas}
+                <ListRow key={r.id} title={jmenoHosta(r, t, L)} meta={metaRezervace(r, t, L)} value={r.cas}
                   // Kontakt a poznámka hosta celé (zalamují se) jen ve velké velikosti.
                   detail={L ? detailRezervace(r, t) : undefined}
                   // Stav zůstává vidět i na telefonu (aside by se pod `lg` schoval).

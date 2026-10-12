@@ -11,6 +11,7 @@ import { audit } from '@/lib/audit';
 import { aktivniBonus } from '@/lib/bonusAkceDb';
 import { pripisBodyZaRezervaci } from '@/lib/bodyZdrojeDb';
 import { poznamkaRazitek } from '@/lib/bonusAkce';
+import { tierForMember, tierRulesFromProfile } from '@/lib/clientSlots';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -42,13 +43,53 @@ export async function GET(req: NextRequest) {
   // Kdo vidí rezervace, nemusí vidět kontakt na hosta — e-mail a telefon jsou
   // osobní údaje a patří jen tomu, kdo smí hostům psát (zakaznici.kontakty).
   const kontakty = ctx.role.opravneni.has('zakaznici.kontakty');
+  const kontext = await kontextHostu(u.team_id, rows as any[], {
+    // Úroveň a počet návštěv jsou údaje z Zákazníků; tablet za barem je nemá (zakaznici.zobrazit).
+    hoste: ctx.role.opravneni.has('zakaznici.zobrazit'),
+    // Interní poznámka personálu k hostovi: jen se zakaznici.poznamky a nikdy na sdíleném tabletu.
+    poznamky: !tablet && ctx.role.opravneni.has('zakaznici.poznamky'),
+  });
   const reservations = (rows as any[]).map(r => {
-    const out: Record<string, any> = { ...r };
+    const out: Record<string, any> = { ...r, ...(kontext.get(Number(r.customer_id)) ?? {}) };
     if (!kontakty) { delete out.customer_email; delete out.customer_phone; }
     if (tablet) delete out.note;
     return out;
   });
   return NextResponse.json({ reservations, tables, today });
+}
+
+/**
+ * Kdo host je: počet návštěv a úroveň (pravidla podniku, stejně jako Zákazníci › Členové)
+ * a poslední poznámka personálu. Jen pro hosty s účtem; ručně zapsaný host bez členství
+ * nic nedostane. Nezmigrované sloupce (útrata, poznámky) seznam rezervací neshodí.
+ */
+async function kontextHostu(teamId: number, rows: any[], smi: { hoste: boolean; poznamky: boolean }) {
+  const out = new Map<number, Record<string, unknown>>();
+  const ids = [...new Set(rows.map(r => Number(r.customer_id)).filter(n => Number.isInteger(n) && n > 0))];
+  if (!ids.length) return out;
+  const pridej = (id: number, x: Record<string, unknown>) => out.set(id, { ...(out.get(id) ?? {}), ...x });
+  if (smi.hoste) {
+    try {
+      const pravidla = tierRulesFromProfile(await ensureProfile(teamId));
+      const clenove = await sql`
+        SELECT customer_id, visits, spend, last_visit_at FROM client_memberships
+        WHERE team_id = ${teamId} AND customer_id = ANY(${ids})` as any[];
+      for (const m of clenove) {
+        const t = tierForMember({ visits: m.visits, spend: m.spend, lastVisitAt: m.last_visit_at }, pravidla);
+        pridej(Number(m.customer_id), { customer_visits: Number(m.visits) || 0, customer_level: t.id, customer_level_label: t.label });
+      }
+    } catch (e) { console.error('[rezervace] kontext hostů', e); }
+  }
+  if (smi.poznamky) {
+    try {
+      const poznamky = await sql`
+        SELECT DISTINCT ON (customer_id) customer_id, body FROM client_member_notes
+        WHERE team_id = ${teamId} AND customer_id = ANY(${ids})
+        ORDER BY customer_id, created_at DESC, id DESC` as any[];
+      for (const n of poznamky) pridej(Number(n.customer_id), { staff_note: String(n.body ?? '') });
+    } catch (e) { console.error('[rezervace] poznámky personálu', e); }
+  }
+  return out;
 }
 
 export async function PATCH(req: NextRequest) {

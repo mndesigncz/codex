@@ -43,6 +43,17 @@ export default function ({ eq, ok }: Testy) {
   ] });
   eq('rezervace: telefon ořezaný, prázdný → null', sTel.rezervace.map(r => r.telefon), ['+420 776 221 004', null]);
   eq('rezervace: odkaz tel: bez mezer, bez číslic null', [odkazTel('+420 776 221 004'), odkazTel('776-221-004'), odkazTel(''), odkazTel(null), odkazTel('volat')], ['tel:+420776221004', 'tel:776221004', null, null, null]);
+  // Kdo host je: úroveň a návštěvy (zakaznici.zobrazit), poslední poznámka personálu (zakaznici.poznamky).
+  const sKontext = vyberRezervace({ reservations: [
+    { id: 1, date: '2026-09-26', time: '17:30', party: 4, status: 'requested', customer_name: 'Jana', customer_visits: 41, customer_level: 'gold', customer_level_label: 'Zlatý host', staff_note: ' Nesnáší mléko. ' },
+    { id: 2, date: '2026-09-26', time: '18:00', party: 2, status: 'confirmed', customer_name: 'Petr', customer_visits: 0, customer_level: 'bronze', customer_level_label: 'Člen' },
+    { id: 3, date: '2026-09-26', time: '18:30', party: 2, status: 'confirmed', customer_name: 'Eva', customer_visits: 12, customer_level: 'silver' },
+    { id: 4, date: '2026-09-26', time: '19:00', party: 2, status: 'confirmed', customer_name: 'Bez práva' },
+  ] });
+  eq('rezervace: úroveň jako v Členech — zlato inkoustem, stříbro tlumeně, obyčejný člen a bez práva bez štítku',
+    sKontext.rezervace.map(r => r.uroven), [{ id: 'gold', label: 'Zlatý host', ton: 'ink' }, null, { id: 'silver', label: 'Stříbrný host', ton: 'muted' }, null]);
+  eq('rezervace: návštěvy — 0 = jde poprvé, bez práva null', sKontext.rezervace.map(r => r.navstev), [41, 0, 12, null]);
+  eq('rezervace: poznámka personálu ořezaná, jinak null', sKontext.rezervace.map(r => r.poznamkaPersonalu), ['Nesnáší mléko.', null, null, null]);
   let spadlo = false;
   try { vyberRezervace({ error: 'x' }); } catch { spadlo = true; }
   ok('rezervace: nečekaný tvar je chyba widgetu (ErrorState), ne „nikdo nerezervoval"', spadlo);

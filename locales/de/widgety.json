@@ -1896,5 +1896,10 @@
   "Upravit rozvrh": "Dienstplan bearbeiten",
   "Zavolat hostovi": "Gast anrufen",
   "Napsat e-mail": "E-Mail schreiben",
-  "Zavolat hostovi {host}: {telefon}": "Gast {host} anrufen: {telefon}"
+  "Zavolat hostovi {host}: {telefon}": "Gast {host} anrufen: {telefon}",
+  "Stříbrný host": "Silbergast",
+  "Zlatý host": "Goldgast",
+  "Platinový host": "Platingast",
+  "1. návštěva": "Erster Besuch",
+  "Poznámka personálu:": "Notiz des Personals:"
 }
