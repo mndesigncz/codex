@@ -339,7 +339,7 @@ export default function EmployerLayout({ user }: Props) {
       : (byId[pohled] != null || pohled in KLICE_POHLEDU) && smiPohled(pohled);
   const navigaceWidgetu = useHodnotaNavigace(navigujZWidgetu, smiPohledZWidgetu, mojeNav, [opravneni, nacteno, appMode]);
   const title = currentView === 'settings' ? t('Nastavení')
-    : currentView === 'team-settings' ? t('Nastavení týmu')
+    : currentView === 'team-settings' ? t('Tým')
     : currentView === 'org' ? t('Všechny podniky')
     : active?.label;
   const vDoku = (id: string) => nav.dok.some(d => d.id === id);
@@ -354,7 +354,7 @@ export default function EmployerLayout({ user }: Props) {
   // klepnutím vedle a bez šipek. Otevírá se nahoru, protože sedí na dně pásu.
   const polozkyUctu: MenuItem[] = [
     { label: t('Nastavení'), icon: 'settings', onClick: openSettings },
-    ...(smiTym ? [{ label: t('Nastavení týmu'), icon: 'users', onClick: openTeam }] : []),
+    ...(smiTym ? [{ label: t('Tým'), icon: 'users', onClick: openTeam }] : []),
     ...(smiKlient ? [{ label: 'Managero client', icon: 'gift', onClick: () => { setAccountOpen(false); switchMode('client'); } }] : []),
     // Endonym v popisku: kdo se ocitne v cizím jazyce, pozná cestu zpět.
     { label: `${t('Jazyk')}: ${JAZYK_NAZEV[jazyk]}`, icon: 'globe', onClick: () => { setAccountOpen(false); setJazykOpen(true); } },
@@ -618,7 +618,7 @@ export default function EmployerLayout({ user }: Props) {
         actions={[
           { label: t('Hledat'), icon: 'search', onClick: () => { setMoreOpen(false); setHledani(true); } },
           { label: t('Nastavení'), icon: 'settings', onClick: openSettings },
-          ...(smiTym ? [{ label: t('Nastavení týmu'), icon: 'users', onClick: openTeam }] : []),
+          ...(smiTym ? [{ label: t('Tým'), icon: 'users', onClick: openTeam }] : []),
           { label: `${t('Jazyk')}: ${JAZYK_NAZEV[jazyk]}`, icon: 'globe', onClick: () => { setMoreOpen(false); setJazykOpen(true); } },
           // Správce platformy podle prostředí (SUPERADMIN_USER_IDS), ne podle role.
           ...(user.superadmin ? [{ label: t('Správa platformy'), icon: 'lock', onClick: () => { window.location.assign('/admin'); } }] : []),

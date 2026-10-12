@@ -32,10 +32,8 @@ import { Icon } from './Icons';
 import { PlochaWidgetu } from './widgety/PlochaWidgetu';
 import { useDataWidgetu } from './widgety/useDataWidgetu';
 import { obnovTym } from './widgety/oblasti/tym';
-import { CURRENCIES, LOCALES } from '@/lib/money';
 import NavigaceNastaveni from './NavigaceNastaveni';
-import { JAZYKY, JAZYK_NAZEV, cistyJazyk } from '@/lib/i18n/config';
-import { ZEME, PREDVOLBY_ZEMI, predvolbaProZemi, navrhNastaveni } from '@/lib/i18n/zeme';
+import { useNavigace } from './widgety/NavigaceKontext';
 import { useSymbol } from './CurrencyProvider';
 import { apiMessage, okJson } from '@/lib/api';
 import { obsahujeNekde } from '@/lib/hledani';
@@ -149,6 +147,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
   // Co smí přihlášený v tomhle podniku (kolo 67). Akce, na které nemá,
   // se neukazují: tlačítko, které vždycky skončí 403, je jen past.
   const { ma, role: mojeRole } = useOpravneni();
+  const nav = useNavigace();
   const smiPrirazovat = ma('tym.role_prirazovat');
   const smiPozici = ma('tym.upravit');
   const smiSazbu = ma('finance.sazby_upravit');
@@ -417,17 +416,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
     }
   };
 
-  // ---- Podnik: název a provoz ----
-  const [nazev, setNazev] = useState<string | null>(null);
-  const [ukladamNazev, setUkladamNazev] = useState(false);
-  const ulozNazev = async () => {
-    const n = (nazev ?? '').trim();
-    if (!n) return;
-    setUkladamNazev(true);
-    if (await patchTym({ name: n }, { name: n }, t('Název podniku je uložený.'))) setNazev(null);
-    setUkladamNazev(false);
-  };
-  const [cilMezd, setCilMezd] = useState<string | null>(null);
+  // ---- Uzávěrka: kasa a přepínače ----
   const [kasa, setKasa] = useState<string | null>(null);
   const [ukladam, setUkladam] = useState<string | null>(null);
   const prepni = async (klic: string, telo: Record<string, unknown>, lokalne: Partial<Team>, hotovo: string) => {
@@ -542,126 +531,28 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
     </Card>
   );
 
+  // Název a Provoz podniku (měna, formáty, jazyk, cíl mezd) se přestěhovaly do Nastavení →
+  // Profil podniku (kolo 6, B3) — jeden domov pro nastavení podniku. Tady zůstává navigace
+  // aplikace a organizace; řádek níž vede do Profilu podniku, ať ho nikdo nehledá.
+  const odkazProfil = ma(['podnik.nastaveni', 'finance.nastaveni']) && nav.smiPohled('settings');
   const podnik = team && (
     <>
-      {ma('podnik.nastaveni') && (
-        <Card aria-labelledby="tym-nazev-t">
-          <h2 id="tym-nazev-t" className="t-card flex items-center gap-2">
-            <Icon name="tag" size={17} className="shrink-0 text-black/40" />  {t('Název podniku')}
-          </h2>
-          {nazev !== null ? (
-            <div className="mt-3 flex flex-col sm:flex-row gap-2">
-              <Field id="tym-nazev" className="flex-1">
-                <Input id="tym-nazev" aria-label={t('Název podniku')} value={nazev} onChange={e => setNazev(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') void ulozNazev(); }} />
-              </Field>
-              <div className="flex gap-2">
-                <Button variant="primary" loading={ukladamNazev} onClick={ulozNazev}>{t('Uložit')}</Button>
-                <Button variant="secondary" onClick={() => setNazev(null)}>{t('Zrušit')}</Button>
-              </div>
-            </div>
-          ) : (
-            <div className="mt-2 flex items-center justify-between gap-3 flex-wrap">
-              <p className="t-section min-w-0 line-clamp-2">{team.name}</p>
-              <Button variant="secondary" icon="pencil" onClick={() => setNazev(team.name)}>{t('Přejmenovat')}</Button>
-            </div>
-          )}
+      {(odkazProfil || isOwner) && (
+        <Card pad="none">
+          <ul className="list px-5 py-1">
+            {odkazProfil && (
+              <ListRow lead={<span className="well h-9 w-9 grid place-items-center text-black/55"><Icon name="receipt" size={16} /></span>}
+                title={t('Profil podniku')} meta={t('Název, adresa, měna, formát čísel, jazyk a cíl mezd.')}
+                onClick={() => nav.onNavigate('settings', 'podnik')} />
+            )}
+            {/* Průvodce prvotním nastavením jde spustit znovu; nic nepřepíše, jen přidá. Smí jen vlastník. */}
+            {isOwner && (
+              <ListRow title={t('Průvodce nastavením')} meta={t('Znovu projdi typ podniku, otevírací dobu a cíle. Nic nepřepíše, jen přidá.')}
+                actions={<a href="/employer/start?znovu=1" className="btn btn-secondary btn-sm">{t('Spustit znovu')}</a>} />
+            )}
+          </ul>
         </Card>
       )}
-      {/* Provoz podniku podle oprávnění (kolo 67) — bez nich by každá změna skončila „nepodařilo se uložit". */}
-      {ma(['podnik.nastaveni', 'finance.nastaveni']) && <Card aria-labelledby="tym-provoz-t">
-        <h2 id="tym-provoz-t" className="t-card flex items-center gap-2">
-          <Icon name="settings" size={17} className="shrink-0 text-black/40" />  {t('Provoz podniku')}
-        </h2>
-        <p className="t-meta mt-1">{t('Měna, formát čísel a cíle — přizpůsob aplikaci svému podniku.')}</p>
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field id="tym-mena" label={t('Měna')}>
-            <Select id="tym-mena" value={team.currency ?? 'CZK'} disabled={ukladam === 'biz'}
-              onChange={e => prepni('biz', { currency: e.target.value }, { currency: e.target.value }, t('Nastavení provozu je uložené.'))}>
-              {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.label}</option>)}
-            </Select>
-          </Field>
-          <Field id="tym-jazyk" label={t('Formát čísel a měny')}>
-            <Select id="tym-jazyk" value={team.locale ?? 'cs-CZ'} disabled={ukladam === 'biz'}
-              onChange={e => prepni('biz', { locale: e.target.value }, { locale: e.target.value }, t('Nastavení provozu je uložené.'))}>
-              {LOCALES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
-            </Select>
-          </Field>
-          <Field id="tym-tyden" label={t('Začátek týdne')}>
-            <Select id="tym-tyden" value={String(team.week_start ?? 1)} disabled={ukladam === 'biz'}
-              onChange={e => prepni('biz', { weekStart: Number(e.target.value) }, { week_start: Number(e.target.value) }, t('Nastavení provozu je uložené.'))}>
-              <option value="1">{t('Pondělí')}</option>
-              <option value="0">{t('Neděle')}</option>
-            </Select>
-          </Field>
-          {/* Lokalizace podniku (kolo 76): země jen předvyplňuje návrhy, nic nezamyká a nic netvrdí o právu. */}
-          <Field id="tym-zeme" label={t('Země')} hint={t('Návrh podle země. Zkontroluj si to s účetním.')}>
-            <Select id="tym-zeme" value={team.country ?? ''} disabled={ukladam === 'biz'}
-              onChange={e => prepni('biz', { country: e.target.value || null }, { country: e.target.value || null }, t('Nastavení provozu je uložené.'))}>
-              <option value="">{t('Nevybráno')}</option>
-              {ZEME.map(z => <option key={z} value={z}>{PREDVOLBY_ZEMI[z].nazev}</option>)}
-            </Select>
-          </Field>
-          <Field id="tym-jazyk-podniku" label={t('Jazyk podniku')} hint={t('Výchozí jazyk nových členů, e-mailů dodavatelům a lístku pro hosty.')}>
-            <Select id="tym-jazyk-podniku" value={cistyJazyk(team.default_lang) ?? 'cs'} disabled={ukladam === 'biz'}
-              onChange={e => prepni('biz', { defaultLang: e.target.value }, { default_lang: e.target.value }, t('Nastavení provozu je uložené.'))}>
-              {JAZYKY.map(j => <option key={j} value={j} lang={j}>{JAZYK_NAZEV[j]}</option>)}
-            </Select>
-          </Field>
-          <Field id="tym-cas" label={t('Formát času')}>
-            <Select id="tym-cas" value={team.time_format === '12' ? '12' : '24'} disabled={ukladam === 'biz'}
-              onChange={e => prepni('biz', { timeFormat: e.target.value }, { time_format: e.target.value }, t('Nastavení provozu je uložené.'))}>
-              <option value="24">{t('24 hodin (14:30)')}</option>
-              <option value="12">{t('12 hodin (2:30 PM)')}</option>
-            </Select>
-          </Field>
-          <Field id="tym-pasmo" label={t('Časové pásmo')} hint={t('Pro Česko, Slovensko, Německo, Rakousko a Polsko je stejné jako v Praze. Jiná pásma aplikace zatím nepodporuje.')}>
-            <Input id="tym-pasmo" readOnly value={t('Střední Evropa (Praha, Berlín, Varšava)')} />
-          </Field>
-          <Field id="tym-cil" label={t('Cíl mzdových nákladů (%)')} hint={t('Podíl mezd na tržbách — Mzdy za období ukážou, jestli jste v cíli.')}>
-            <Input id="tym-cil" type="number" inputMode="numeric" min={0} max={100} placeholder="30" disabled={ukladam === 'biz'}
-              value={cilMezd ?? (team.labor_target_pct != null ? String(team.labor_target_pct) : '')}
-              onChange={e => setCilMezd(e.target.value)}
-              onBlur={() => {
-                if (cilMezd === null) return;
-                const v = cilMezd.trim() === '' ? null : Math.max(0, Math.min(100, Math.round(Number(cilMezd))));
-                setCilMezd(null);
-                if ((team.labor_target_pct ?? null) !== v) void prepni('biz', { laborTargetPct: v }, { labor_target_pct: v }, t('Nastavení provozu je uložené.'));
-              }} />
-          </Field>
-        </div>
-        {/* Průvodce prvotním nastavením jde spustit znovu; nic nepřepíše, jen přidá. Smí jen vlastník. */}
-        {isOwner && (
-          <ul className="list mt-3" aria-label={t('Průvodce nastavením')}>
-            <ListRow title={t('Průvodce nastavením')} meta={t('Znovu projdi typ podniku, otevírací dobu a cíle. Nic nepřepíše, jen přidá.')}
-              actions={<a href="/employer/start?znovu=1" className="btn btn-secondary btn-sm">{t('Spustit znovu')}</a>} />
-          </ul>
-        )}
-        {/* Předvyplnění podle země: ukáže, co navrhne, a změní to až po kliknutí. DPH jen jako informace k ověření; appka z něj nic nepočítá. */}
-        {(() => {
-          const p = predvolbaProZemi(team.country);
-          const n = navrhNastaveni(team.country);
-          if (!p || !n) return null;
-          const shoda = (team.currency ?? 'CZK') === n.currency && (team.locale ?? 'cs-CZ') === n.locale && (team.week_start ?? 1) === n.weekStart
-            && (cistyJazyk(team.default_lang) ?? 'cs') === n.defaultLang && (team.time_format === '12' ? '12' : '24') === n.timeFormat;
-          return (
-            <div className="well mt-4 p-4 space-y-2" role="group" aria-label={t('Návrh podle země')}>
-              <p className="text-sm font-semibold text-[#16181A]">{t('Návrh pro zemi {zeme}', { zeme: p.nazev })}</p>
-              <p className="t-meta text-pretty">
-                {t('Jazyk {jazyk}, měna {mena}, formát čísel {locale}, týden od {den}, {hodiny} hodin.', { jazyk: JAZYK_NAZEV[p.jazyk], mena: p.mena, locale: p.locale, den: p.zacatekTydne === 1 ? t('pondělí') : t('neděle'), hodiny: p.hodiny })}{' '}
-                {t('Sazby DPH {sazby} (návrh k ověření, aplikace z nich nic nepočítá).', { sazby: p.dph.map(d => `${d.sazba} %`).join(' / ') })}
-              </p>
-              {shoda
-                ? <p className="t-meta">{t('Nastavení už návrhu odpovídá.')}</p>
-                : <Button variant="secondary" size="sm" loading={ukladam === 'biz'}
-                    onClick={() => prepni('biz', n, { default_lang: n.defaultLang, currency: n.currency, locale: n.locale, week_start: n.weekStart, time_format: n.timeFormat, timezone: n.timezone }, t('Návrh podle země je použitý.'))}>
-                    
-                    {t('Předvyplnit podle země')}
-                  </Button>}
-            </div>
-          );
-        })()}
-      </Card>}
       {ma('podnik.nastaveni') && <NavigaceNastaveni />}
       <OrganizationSettings />
     </>

@@ -31,8 +31,10 @@
   "O aplikaci": "Über die App",
   "Odhlásit se": "Abmelden",
   "Odměny|nav": "Belohnungen",
+  "Osobní": "Persönlich",
   "Plán a fakturace": "Tarif und Abrechnung",
   "Plánování|nav": "Planung",
+  "Podnik": "Betrieb",
   "Pokladna": "Kasse",
   "Portál zaměstnance": "Mitarbeiterportal",
   "Postupy|nav": "Abläufe",
@@ -71,7 +73,7 @@
   "neuvedeno": "nicht angegeben",
   "zavřeno": "geschlossen",
   "{n, plural, one {# nepřečtená zpráva} few {# nepřečtené zprávy} other {# nepřečtených zpráv}}": "{n, plural, one {# ungelesene Nachricht} other {# ungelesene Nachrichten}}",
-  "Údaje a prahy skladu": "Angaben und Lagerschwellen",
+  "Údaje, provoz a prahy skladu": "Angaben, Betrieb und Lagerschwellen",
   "Úkoly|nav": "Aufgaben",
   "Účet": "Konto"
 }

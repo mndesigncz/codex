@@ -17,7 +17,7 @@ import SekceOznameni from './settings/SekceOznameni';
 import SekceData from './settings/SekceData';
 import SekceZkratky from './settings/SekceZkratky';
 import SekcePodnik from './settings/SekcePodnik';
-import { zalozkaNastaveni, type SectionId } from '@/lib/nastaveniZalozky';
+import { zalozkaNastaveni, SKUPINA_ZALOZKY, SKUPINY_NASTAVENI, type SectionId, type SkupinaNastaveni } from '@/lib/nastaveniZalozky';
 import TeamManagement from './TeamManagement';
 import { dbTimeDayHM } from '@/lib/pragueTime';
 import { czCount } from '@/lib/czech';
@@ -64,6 +64,8 @@ interface Notif {
   is_read: boolean;
   created_at: string;
 }
+
+interface Sekce { id: SectionId; label: string; icon: string; desc: string; skupina: SkupinaNastaveni }
 
 const AVATARS = ['👤', '👩‍💼', '👨‍🍳', '🧑‍🍳', '👩‍🍳', '🧑‍💼', '🙂', '😎', '🌿', '🍵', '🧋', '☕'];
 
@@ -116,26 +118,37 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
   // Záložky podniku podle oprávnění (kolo 67). Vedení má všechno, takže
   // vidí totéž co dřív; Provozní nebo Účetní jen to, co mu server dovolí.
   const { ma } = useOpravneni();
-  const sections: { id: SectionId; label: string; icon: string; desc: string }[] = [
-    { id: 'account', label: t('Účet'), icon: 'settings', desc: t('Profil a osobní údaje') },
+  // Sekce ve dvou skupinách (kolo 6, B3): „Osobní" — můj účet, platí v každém podniku —
+  // a „Podnik" — nastavení podniku. Skupinu nese lib/nastaveniZalozky (SKUPINA_ZALOZKY),
+  // nadpisy kreslí boční pás na počítači i svislý seznam na telefonu.
+  const sekce = (id: SectionId, label: string, icon: string, desc: string): Sekce => ({ id, label, icon, desc, skupina: SKUPINA_ZALOZKY[id] });
+  const sections: Sekce[] = [
+    sekce('account', t('Účet'), 'settings', t('Profil a osobní údaje')),
     // Jazyk má vlastní viditelnou záložku (dřív byl schovaný ve Vzhledu): jazyk aplikace a osobní formáty.
-    { id: 'jazyk', label: t('Jazyk a region'), icon: 'globe', desc: t('Jazyk, čas a formáty') },
-    { id: 'app', label: t('Vzhled'), icon: 'sun', desc: t('Motiv, písmo a pohyb') },
-    { id: 'notifications', label: t('Notifikace'), icon: 'bell', desc: t('Upozornění a centrum oznámení') },
-    { id: 'security', label: t('Zabezpečení'), icon: 'check', desc: t('Heslo') },
-    { id: 'privacy', label: t('Data a soukromí'), icon: 'archive', desc: t('Stažení dat a smazání účtu') },
-    { id: 'zkratky', label: t('Klávesové zkratky'), icon: 'menu', desc: t('Co umí klávesnice') },
-    ...(isEmployer && smiPlatby && ma('predplatne.zobrazit') ? [{ id: 'billing' as SectionId, label: t('Předplatné'), icon: 'award', desc: t('Plán a fakturace') }] : []),
-    // Profil podniku (kolo 73): název, typ, adresa, IČO a DIČ, výchozí prahy skladu.
-    ...(isEmployer && ma('podnik.nastaveni') ? [{ id: 'podnik' as SectionId, label: t('Profil podniku'), icon: 'receipt', desc: t('Údaje a prahy skladu') }] : []),
-    ...(isEmployer && ma('pokladna.stav') ? [{ id: 'pos' as SectionId, label: t('Pokladna'), icon: 'trend', desc: t('Napojení Storyous') }] : []),
-    ...(isEmployer && ma(['tym.role_spravovat', 'tym.role_prirazovat']) ? [{ id: 'roles' as SectionId, label: t('Role a oprávnění'), icon: 'lock', desc: t('Kdo co v podniku smí') }] : []),
+    sekce('jazyk', t('Jazyk a region'), 'globe', t('Jazyk, čas a formáty')),
+    sekce('app', t('Vzhled'), 'sun', t('Motiv, písmo a pohyb')),
+    sekce('notifications', t('Notifikace'), 'bell', t('Upozornění a centrum oznámení')),
+    sekce('security', t('Zabezpečení'), 'check', t('Heslo')),
+    sekce('privacy', t('Data a soukromí'), 'archive', t('Stažení dat a smazání účtu')),
+    sekce('zkratky', t('Klávesové zkratky'), 'menu', t('Co umí klávesnice')),
+    // Profil podniku (kolo 73) a od kola 6 i Provoz podniku: název, adresa, IČO, prahy skladu, měna,
+    // formáty, jazyk a cíl mezd. Cíl mezd smí i role s finance.nastaveni, proto i ona tu sekci vidí.
+    ...(isEmployer && ma(['podnik.nastaveni', 'finance.nastaveni']) ? [sekce('podnik', t('Profil podniku'), 'receipt', t('Údaje, provoz a prahy skladu'))] : []),
+    ...(isEmployer && ma(['tym.role_spravovat', 'tym.role_prirazovat']) ? [sekce('roles', t('Role a oprávnění'), 'lock', t('Kdo co v podniku smí'))] : []),
     // Výchozí plocha pro typ role nebo roli a zámky (spec §3.8); tablet stačí spravovat.
-    ...(isEmployer && ma(['podnik.nastaveni', 'kiosk.spravovat']) ? [{ id: 'stranky' as SectionId, label: t('Stránky'), icon: 'overview', desc: t('Výchozí plocha a zámky') }] : []),
+    ...(isEmployer && ma(['podnik.nastaveni', 'kiosk.spravovat']) ? [sekce('stranky', t('Stránky'), 'overview', t('Výchozí plocha a zámky'))] : []),
+    ...(isEmployer && ma('pokladna.stav') ? [sekce('pos', t('Pokladna'), 'trend', t('Napojení Storyous'))] : []),
+    ...(isEmployer && smiPlatby && ma('predplatne.zobrazit') ? [sekce('billing', t('Předplatné'), 'award', t('Plán a fakturace'))] : []),
+    ...(isEmployer && ma('audit.zobrazit') ? [sekce('audit', t('Historie změn'), 'clock', t('Kdo co kdy změnil'))] : []),
     // Moderace uživatelského obsahu (Apple 1.2): nahlášené zprávy a nápady vidí, kdo smí odebírat členy.
-    ...(ma('tym.odebrat') ? [{ id: 'nahlaseni' as SectionId, label: t('Nahlášený obsah'), icon: 'warning', desc: t('Zprávy a nápady nahlášené týmem') }] : []),
-    ...(isEmployer && ma('audit.zobrazit') ? [{ id: 'audit' as SectionId, label: t('Historie změn'), icon: 'clock', desc: t('Kdo co kdy změnil') }] : []),
+    ...(ma('tym.odebrat') ? [sekce('nahlaseni', t('Nahlášený obsah'), 'warning', t('Zprávy a nápady nahlášené týmem'))] : []),
   ];
+  // Nadpisy skupin jen tam, kde jsou obě (zaměstnanec má jen osobní sekce — nadpis by nic neodlišil).
+  const nazevSkupiny: Record<SkupinaNastaveni, string> = { osobni: t('Osobní'), podnik: t('Podnik') };
+  const skupiny = SKUPINY_NASTAVENI
+    .map(id => ({ id, nazev: nazevSkupiny[id], polozky: sections.filter(s => s.skupina === id) }))
+    .filter(g => g.polozky.length > 0);
+  const sNadpisy = skupiny.length > 1;
   // Záložka, na kterou role nemá, se nevykreslí, ani když na ni vede odkaz
   // (Receptury → „Nastavit pokladnu", banner předplatného) nebo když se
   // oprávnění načetla až po otevření. Obsah by jinak ukázal formulář
@@ -377,21 +390,26 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
 
       <div className="flex gap-6">
         {/* Desktop: left vertical section list */}
-        <nav className="hidden md:flex flex-col gap-1 w-60 flex-shrink-0">
-          {sections.map(s => (
-            <button key={s.id} onClick={() => setSection(s.id)} aria-pressed={section === s.id}
-              className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-2xl transition duration-200 ${
-                section === s.id ? 'seg-on' : 'seg-off'
-              }`}>
-              <Icon name={s.icon} size={20} className="flex-shrink-0" />
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold truncate">{s.label}</span>
-                <span className={`block text-xs truncate ${section === s.id ? 'text-white/60' : 'text-black/55'}`}>{s.desc}</span>
-              </span>
-              {s.id === 'notifications' && (
-                <Badge count={unreadCount} label={t('Nepřečtená oznámení: {n}', { n: unreadCount })} />
-              )}
-            </button>
+        <nav className="hidden md:flex flex-col gap-1 w-60 flex-shrink-0" aria-label={t('Sekce nastavení')}>
+          {skupiny.map((g, gi) => (
+            <div key={g.id} className={`flex flex-col gap-1 ${gi > 0 ? 'pt-3' : ''}`}>
+              {sNadpisy && <h2 className="t-label px-4 pb-0.5">{g.nazev}</h2>}
+              {g.polozky.map(s => (
+                <button key={s.id} onClick={() => setSection(s.id)} aria-pressed={section === s.id}
+                  className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-2xl transition duration-200 ${
+                    section === s.id ? 'seg-on' : 'seg-off'
+                  }`}>
+                  <Icon name={s.icon} size={20} className="flex-shrink-0" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold truncate">{s.label}</span>
+                    <span className={`block text-xs truncate ${section === s.id ? 'text-white/60' : 'text-black/55'}`}>{s.desc}</span>
+                  </span>
+                  {s.id === 'notifications' && (
+                    <Badge count={unreadCount} label={t('Nepřečtená oznámení: {n}', { n: unreadCount })} />
+                  )}
+                </button>
+              ))}
+            </div>
           ))}
         </nav>
 

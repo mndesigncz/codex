@@ -31,8 +31,10 @@
   "O aplikaci": "About the app",
   "Odhlásit se": "Sign out",
   "Odměny|nav": "Rewards",
+  "Osobní": "Personal",
   "Plán a fakturace": "Plan and billing",
   "Plánování|nav": "Planning",
+  "Podnik": "Business",
   "Pokladna": "POS",
   "Portál zaměstnance": "Employee portal",
   "Postupy|nav": "Procedures",
@@ -71,7 +73,7 @@
   "neuvedeno": "not specified",
   "zavřeno": "closed",
   "{n, plural, one {# nepřečtená zpráva} few {# nepřečtené zprávy} other {# nepřečtených zpráv}}": "{n, plural, one {# unread message} other {# unread messages}}",
-  "Údaje a prahy skladu": "Details and stock thresholds",
+  "Údaje, provoz a prahy skladu": "Details, operations and stock thresholds",
   "Úkoly|nav": "Tasks",
   "Účet": "Account"
 }

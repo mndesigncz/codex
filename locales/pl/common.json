@@ -31,8 +31,10 @@
   "O aplikaci": "O aplikacji",
   "Odhlásit se": "Wyloguj się",
   "Odměny|nav": "Nagrody",
+  "Osobní": "Osobiste",
   "Plán a fakturace": "Plan i rozliczenia",
   "Plánování|nav": "Planowanie",
+  "Podnik": "Lokal",
   "Pokladna": "Kasa fiskalna",
   "Portál zaměstnance": "Portal pracownika",
   "Postupy|nav": "Procedury",
@@ -71,7 +73,7 @@
   "neuvedeno": "nie podano",
   "zavřeno": "zamknięte",
   "{n, plural, one {# nepřečtená zpráva} few {# nepřečtené zprávy} other {# nepřečtených zpráv}}": "{n, plural, one {# nieprzeczytana wiadomość} few {# nieprzeczytane wiadomości} many {# nieprzeczytanych wiadomości} other {# nieprzeczytanej wiadomości}}",
-  "Údaje a prahy skladu": "Dane i progi magazynu",
+  "Údaje, provoz a prahy skladu": "Dane, działanie i progi magazynu",
   "Úkoly|nav": "Zadania",
   "Účet": "Konto"
 }

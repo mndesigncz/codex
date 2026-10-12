@@ -31,8 +31,10 @@
   "O aplikaci": "O aplikácii",
   "Odhlásit se": "Odhlásiť sa",
   "Odměny|nav": "Odmeny",
+  "Osobní": "Osobné",
   "Plán a fakturace": "Plán a fakturácia",
   "Plánování|nav": "Plánovanie",
+  "Podnik": "Podnik",
   "Pokladna": "Pokladňa",
   "Portál zaměstnance": "Portál zamestnanca",
   "Postupy|nav": "Postupy",
@@ -71,7 +73,7 @@
   "neuvedeno": "neuvedené",
   "zavřeno": "zatvorené",
   "{n, plural, one {# nepřečtená zpráva} few {# nepřečtené zprávy} other {# nepřečtených zpráv}}": "{n, plural, one {# neprečítaná správa} few {# neprečítané správy} other {# neprečítaných správ}}",
-  "Údaje a prahy skladu": "Údaje a prahy skladu",
+  "Údaje, provoz a prahy skladu": "Údaje, prevádzka a prahy skladu",
   "Úkoly|nav": "Úlohy",
   "Účet": "Účet"
 }
