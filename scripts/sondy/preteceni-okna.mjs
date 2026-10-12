@@ -14,8 +14,8 @@ import { dayPlus, pragueToday } from '../../lib/pragueTime.ts';
 
 // Názvy tlačítek v jazyce (sonda klepe podle jména, jako člověk).
 const T = {
-  cs: { pridatZaznam: 'Přidat záznam', novyUkol: 'Nový úkol', pridatPolozku: 'Přidat položku', obdobi: 'Období', upravitStranku: 'Upravit stránku' },
-  de: { pridatZaznam: 'Eintrag hinzufügen', novyUkol: 'Neue Aufgabe', pridatPolozku: 'Artikel hinzufügen', obdobi: 'Zeitraum', upravitStranku: 'Seite bearbeiten' },
+  cs: { pridatZaznam: 'Přidat záznam', novyUkol: 'Nový úkol', pridatPolozku: 'Přidat položku', obdobi: 'Období', upravitStranku: 'Upravit stránku', dalsiAkce: 'Další akce' },
+  de: { pridatZaznam: 'Eintrag hinzufügen', novyUkol: 'Neue Aufgabe', pridatPolozku: 'Artikel hinzufügen', obdobi: 'Zeitraum', upravitStranku: 'Seite bearbeiten', dalsiAkce: 'Weitere Aktionen' },
 };
 
 // Finance: lišta Období patří widgetu „Tržba po dnech" — stejná fixtura a podvrh
@@ -42,9 +42,22 @@ const podvrhFinanci = (req, json) => {
 };
 const fixFinanci = { ...fixtura('k69-b5b-rozlozeni-finance'), polozky: [{ id: 'po-dnech', widget: 'trzby.po_dnech', velikost: 'L', nastaveni: { obdobi: 'mesic_stranky' } }] };
 
-async function klikni(p, jmeno, popis) {
+// Akce stránky: tlačítko v hlavičce, nebo (kolo 6, B6) na telefonu v „···" hlavičky — vedení na telefonu
+// má limetku pro to, co z telefonu dělá (Sklad: Nakoupit), a zakládání ustoupilo do nabídky.
+async function klikni(p, jmeno, popis, dalsiAkce) {
   const tl = p.getByRole('button', { name: jmeno, exact: true }).first();
-  const je = await dokud(() => tl.isVisible().catch(() => false), 5000);
+  let je = await dokud(() => tl.isVisible().catch(() => false), dalsiAkce ? 3000 : 5000);
+  if (!je && dalsiAkce) {
+    const vice = p.locator('main').getByRole('button', { name: dalsiAkce, exact: true }).first();
+    if (await vice.isVisible().catch(() => false)) {
+      await vice.click();
+      const polozka = p.getByRole('menuitem', { name: jmeno, exact: true }).first();
+      je = await dokud(() => polozka.isVisible().catch(() => false), 3000);
+      if (je) { await polozka.click(); await p.waitForTimeout(700); }
+      tvrdi(`${popis}: akce „${jmeno}" je v hlavičce nebo v „···"`, je);
+      return je;
+    }
+  }
   tvrdi(`${popis}: tlačítko „${jmeno}" je na obrazovce`, je);
   if (!je) return false;
   await tl.click();
@@ -79,11 +92,11 @@ for (const [w, jazyk] of [[320, 'cs'], [320, 'de'], [390, 'cs']]) {
 
     // Úkoly: Nový úkol (formulář v listu)
     await otevriStranku(p, url('employer', 'tasks'));
-    if (await klikni(p, t.novyUkol, popis)) await prover(p, `${popis} Nový úkol`);
+    if (await klikni(p, t.novyUkol, popis, t.dalsiAkce)) await prover(p, `${popis} Nový úkol`);
 
     // Sklad: Přidat položku
     await otevriStranku(p, url('employer', 'inventory'));
-    if (await klikni(p, t.pridatPolozku, popis)) {
+    if (await klikni(p, t.pridatPolozku, popis, t.dalsiAkce)) {
       tvrdi(`${popis}: okno „${t.pridatPolozku}" se otevřelo`, await dokud(() => dialog(p).isVisible().catch(() => false), 4000));
       await prover(p, `${popis} Přidat položku`);
     }
