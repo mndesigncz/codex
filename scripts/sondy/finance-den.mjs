@@ -113,10 +113,11 @@ for (const w of [1280, 390]) {
       ] });
     }
     if (req.method() === 'GET' && u.pathname === '/api/teams') return json(teams);
+    if (req.method() === 'PATCH' && u.pathname === '/api/teams') { stav.patchTeams = req.postDataJSON(); return json({ ok: true }); }
     if (req.method() === 'GET' && u.pathname === '/api/receipts') return json({ receipts: [] });
     return dalsi(req, json, stav);
   };
-  const { ctx, p } = await kontext({ viewport: { width: 390, height: 844 }, mobil: true, fix: fixtura('k69-b5b-rozlozeni-finance'), dalsi: dalsiB2 });
+  const { ctx, p, stav } = await kontext({ viewport: { width: 390, height: 844 }, mobil: true, fix: fixtura('k69-b5b-rozlozeni-finance'), dalsi: dalsiB2 });
   await otevri(p, '/employer/overview?view=finance', 'vedeni.finance');
   const souhrn = p.locator('[data-instance="souhrn"]');
   await souhrn.getByText('Výsledek').first().waitFor({ timeout: 10000 });
@@ -133,6 +134,11 @@ for (const w of [1280, 390]) {
   const dosedlo = await dokud(async () => { box = await okno.boundingBox(); return !!box && Math.abs(box.y + box.height - 844) < 2; }, 4000);
   tvrdi('390 B2: okno Pravidelné náklady dosedá na spodní hranu (zdola)', dosedlo, JSON.stringify(box));
   tvrdi('390 B2: částka nákladu má inputMode=decimal', await okno.locator('#pevne-castka').getAttribute('inputmode') === 'decimal');
+  // Rozepsaný řádek bez „Přidat" se při Uložit neztratí.
+  await okno.locator('#pevne-nazev').fill('Pojištění');
+  await okno.locator('#pevne-castka').fill('1 250');
+  await okno.getByRole('button', { name: 'Uložit', exact: true }).click();
+  tvrdi('390 B2: Uložit vezme i rozepsaný řádek (PATCH se třemi řádky)', await dokud(() => stav.patchTeams?.fixedCosts?.length === 3 && stav.patchTeams.fixedCosts[2].amount === 1250, 4000), JSON.stringify(stav.patchTeams));
   await p.keyboard.press('Escape');
   await dokud(async () => await p.getByRole('dialog').count() === 0, 3000);
 
