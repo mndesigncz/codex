@@ -9,6 +9,8 @@
 import type { Testy } from './_testy.ts';
 import { nazevExportuUzaverek, popisObdobiExportu } from '../../lib/uzaverkyFiltr.ts';
 import { souhrnUzaverek, souhrnUzaverekRozmezi, hodnotyUzaverekPoDnech, maHosty, nejviceHostu, hosteUzaverky, type RadekUzaverky } from '../../lib/uzaverkyPrehled.ts';
+import { overPrijem, souhrnPrijmu, rozdilPrijmu, radkyKPrijmu, nedodano, posledniCenyBaleni, type PolozkaObjednavky } from '../../lib/skladPrehled.ts';
+import { cenaProSloupec } from '../../lib/cena.ts';
 
 export default function ({ eq, ok }: Testy) {
   // ---- 1) Export uzávěrek: jméno souboru podle toho, co je vidět ----
@@ -49,4 +51,57 @@ export default function ({ eq, ok }: Testy) {
   eq('hosté: graf po dnech (metrika hoste)', hodnotyUzaverekPoDnech(sHosty, 'hoste', '2026-10-03', '2026-10-06').map(x => x.hodnota), [80, 0, 40, 0]);
   eq('hosté: nejvíc hostů v průměru — sobota (5)', nejviceHostu(sHosty), { den: 5, prumer: 80 });
   eq('hosté: bez vyplněných žádný den', nejviceHostu(bez), null);
+
+  // ---- 3) Příjem objednávky po položkách ----
+  const obj: PolozkaObjednavky[] = [
+    { name: 'Mléko', qty: 12, unit: 'l', itemId: 7 },
+    { name: 'Kafe Brazílie', qty: 2, unit: 'kg', itemId: 9 },
+    { name: 'Ubrousky', qty: 5, unit: 'bal', itemId: null },
+  ];
+  const p1 = overPrijem(obj, [{ i: 0, itemId: 7, qty: '10' }, { itemId: 9, qty: 2, unitCost: '459,90' }], true);
+  ok('příjem: platný příjem projde', p1.ok);
+  if (p1.ok) {
+    eq('příjem: přišlo, co se zapsalo; řádek bez zmínky přišel celý', p1.radky.map(r => r.qty), [10, 2, 5]);
+    eq('příjem: cena za balení s haléři z textu s čárkou', p1.radky[1].unitCost, 459.9);
+    eq('příjem: bez ceny = null (nic se nepřepíše)', [p1.radky[0].unitCost, p1.radky[2].unitCost], [null, null]);
+    ok('příjem: chybějící 2 l = částečný', p1.castecny);
+  }
+  const vse = overPrijem(obj, [{ i: 0, itemId: 7, qty: 12 }, { i: 1, itemId: 9, qty: 2 }, { i: 2, qty: 5 }], false);
+  ok('příjem: všechno přesně = není částečný', vse.ok && !vse.castecny);
+  const nula = overPrijem(obj, [{ i: 2, qty: 0 }], false);
+  ok('příjem: 0 = nepřišlo (smí se), řádek bez itemId podle pořadí', nula.ok && nula.radky[2].qty === 0 && nula.castecny);
+  eq('příjem: cizí položka (itemId mimo objednávku) = 400', overPrijem(obj, [{ itemId: 99, qty: 1 }], true), { ok: false, status: 400, chyba: 'Položka v objednávce není.' });
+  eq('příjem: pořadí s jiným itemId = cizí položka', (overPrijem(obj, [{ i: 0, itemId: 9, qty: 1 }, { i: 1, itemId: 9, qty: 1 }], true) as any).chyba, 'Položka je v příjmu dvakrát.');
+  eq('příjem: víc než 10× objednaného = 400', (overPrijem(obj, [{ i: 1, itemId: 9, qty: 21 }], true) as any).status, 400);
+  ok('příjem: přesně 10× objednaného ještě projde', overPrijem(obj, [{ i: 1, itemId: 9, qty: 20 }], true).ok);
+  eq('příjem: záporné množství = 400', (overPrijem(obj, [{ i: 0, itemId: 7, qty: -1 }], true) as any).status, 400);
+  eq('příjem: nesmysl v množství = 400', (overPrijem(obj, [{ i: 0, itemId: 7, qty: 'hodně' }], true) as any).status, 400);
+  eq('příjem: cena bez sklad.ceny_upravit = 403', (overPrijem(obj, [{ i: 0, itemId: 7, qty: 12, unitCost: 25 }], false) as any).status, 403);
+  ok('příjem: prázdná cena bez oprávnění nevadí', overPrijem(obj, [{ i: 0, itemId: 7, qty: 12, unitCost: '' }], false).ok);
+  eq('příjem: cena, která není číslo = 400', (overPrijem(obj, [{ i: 0, itemId: 7, qty: 12, unitCost: '12a' }], true) as any).status, 400);
+  eq('příjem: prázdný seznam = 400', (overPrijem(obj, [], true) as any).status, 400);
+  // Haléře: do NUMERIC sloupce s haléři, do INTEGER (před migrací) zaokrouhleně jako dřív.
+  eq('příjem: cena za balení do NUMERIC sloupce s haléři', cenaProSloupec(459.9, true), 459.9);
+  eq('příjem: cena za balení do INTEGER sloupce zaokrouhleně', cenaProSloupec(459.9, false), 460);
+
+  // Souhrn v okně příjmu: součet řádků (přišlo × cena), nedodáno, navíc.
+  const s1 = souhrnPrijmu([{ mnozstvi: 12, prislo: 10, cena: 24.9 }, { mnozstvi: 2, prislo: 2, cena: 459.9 }, { mnozstvi: 5, prislo: 0, cena: null }]);
+  eq('příjem: součet řádků 10 × 24,90 + 2 × 459,90 (nepřišlý řádek bez ceny nevadí)', s1.soucet, 1168.8);
+  eq('příjem: nedodáno 2 řádky (méně i nula), navíc 0', [s1.nedodano, s1.navic, s1.castecny], [2, 0, true]);
+  eq('příjem: přišlý řádek bez ceny → součet se neukáže (chybějící cena není nula)', souhrnPrijmu([{ mnozstvi: 1, prislo: 1, cena: 10 }, { mnozstvi: 1, prislo: 1, cena: null }]).soucet, null);
+  eq('příjem: bez jediné ceny součet není', souhrnPrijmu([{ mnozstvi: 1, prislo: 1, cena: null }]).soucet, null);
+  eq('příjem: navíc se pozná', souhrnPrijmu([{ mnozstvi: 1, prislo: 3, cena: 2 }]).navic, 1);
+  eq('příjem: rozdíl řádku (chybí 2, desetiny)', [rozdilPrijmu({ mnozstvi: 12, prislo: 10 }), rozdilPrijmu({ mnozstvi: 1, prislo: 1.25 })], [-2, 0.25]);
+
+  // Historie: co nedorazilo a poslední zaplacená cena za balení.
+  const api = { orders: [
+    { id: 5, status: 'received', receivedAt: '2026-10-10T08:00:00Z', items: [{ name: 'Mléko', qty: 12, unit: 'l', itemId: 7, received: 10, unitCost: 24.9 }, { name: 'Kafe', qty: 2, unit: 'kg', itemId: 9, received: 2 }] },
+    { id: 4, status: 'received', receivedAt: '2026-10-01T08:00:00Z', items: [{ name: 'Mléko', qty: 12, unit: 'l', itemId: 7, received: 12, unitCost: 22 }, { name: 'Kafe', qty: 2, unit: 'kg', itemId: 9, unitCost: 450 }] },
+    { id: 6, status: 'ordered', items: [{ name: 'Mléko', qty: 6, unit: 'l', itemId: 7 }] },
+  ] };
+  const rk = radkyKPrijmu(api);
+  eq('historie: nedodáno 2 l mléka', nedodano(rk[5]), [{ nazev: 'Mléko', chybi: 2, jednotka: 'l' }]);
+  eq('historie: objednávka přijatá celá (bez received) nic nedodaného nemá', nedodano(rk[4]).length, 0);
+  eq('historie: řádky čekající objednávky s itemId a pořadím', rk[6].map(r => [r.i, r.itemId, r.mnozstvi, r.prislo]), [[0, 7, 6, null]]);
+  eq('příjem: poslední zaplacená cena za balení podle položky (nejnovější příjem)', posledniCenyBaleni(api), { 7: 24.9, 9: 450 });
 }

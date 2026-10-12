@@ -32,7 +32,9 @@
      "name": "Sirup Mango",
      "qty": 6,
      "unit": "ks",
-     "itemId": 3
+     "itemId": 3,
+     "received": 4,
+     "unitCost": 89
     }
    ],
    "totalCost": null,
