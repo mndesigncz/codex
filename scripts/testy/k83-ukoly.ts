@@ -4,6 +4,7 @@
 //  - stav úkolu při zápisu (Čeká / Probíhá / Hotovo jedním slovníkem pro vedení, zaměstnance, widget i tablet),
 //  - čas termínu „do 14:00": řazení uvnitř dne, „po čase" podle pražských hodin (i kolem půlnoci),
 //    validace vstupu API a přenos do dalších výskytů série, text push oznámení,
+//  - jeden úkol víc lidem (runBulk, každé res.ok, toast s plurálem, částečné selhání jménem),
 
 import { readFileSync } from 'node:fs';
 import type { Testy } from './_testy.ts';
@@ -88,4 +89,18 @@ export default function ({ eq, ok }: Testy) {
   ok('formulář: Termín a „Do kdy" sdílí řádek i na telefonu (grid-cols-2), čas bez data zamčený',
     /<div className="grid grid-cols-2 gap-3 sm:gap-4">\s*<Field id=\{fid\('termin'\)\}/.test(zdroj('components/employer/TaskManager.tsx'))
     && /type="time" value=\{form\.dueTime\} disabled=\{!form\.dueDate\}/.test(zdroj('components/employer/TaskManager.tsx')));
+
+  // ---- 3) Jeden úkol víc lidem ----
+  const tm = zdroj('components/employer/TaskManager.tsx');
+  ok('víc lidí: N× POST přes runBulk, každý s okJson (res.ok), koncept se uklidí jen po úplném úspěchu',
+    /runBulk\(lide, id =>\s*fetch\(URL_UKOLY, \{ method: 'POST'[^\n]*\)\.then\(okJson\)\)/.test(tm)
+    && /if \(failed\.length === 0\) \{\s*koncept\.hotovo\(\); closeForm\(\);/.test(tm));
+  ok('víc lidí: toast s plurálem „Úkol je zadaný # lidem", částečné selhání note-wait se jmény',
+    tm.includes("t('{n, plural, one {Úkol je zadaný # člověku} few {Úkol je zadaný # lidem} other {Úkol je zadaný # lidem}}'")
+    && /<p className="note note-wait text-sm" role="alert">\{castecne\}<\/p>/.test(tm));
+  ok('víc lidí: pás pilulek (filter-pill, aria-pressed, výlučné Kdokoli) do 10 lidí, nad 10 seznam se SelectBox a vlastním posuvem',
+    /members\.length <= 10 \?/.test(tm) && /aria-pressed=\{form\.komu\.length === 0\}/.test(tm) && /overflow-x-auto overscroll-x-contain/.test(tm)
+    && /max-h-\[16\.5rem\] overflow-y-auto/.test(tm) && /<SelectBox checked=\{on\}/.test(tm));
+  ok('víc lidí: úprava zůstává na jednom člověku (Select), výběr víc lidí jen při zakládání s ukoly.zadavat',
+    /const vyberVic = zadava && editingId == null;/.test(tm));
 }

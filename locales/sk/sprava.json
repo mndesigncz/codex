@@ -1648,5 +1648,8 @@
   "Probíhá": "Prebieha",
   "po čase": "po čase",
   "Do kdy (nepovinné)": "Do kedy (nepovinné)",
-  "Nejdřív vyber den.": "Najprv vyber deň."
+  "Nejdřív vyber den.": "Najprv vyber deň.",
+  "{n, plural, one {Úkol je zadaný # člověku} few {Úkol je zadaný # lidem} other {Úkol je zadaný # lidem}}": "{n, plural, one {Úloha je zadaná # človeku} few {Úloha je zadaná # ľuďom} other {Úloha je zadaná # ľuďom}}",
+  "Nezadalo se {n} z {celkem}: {komu}": "Nezadalo sa {n} z {celkem}: {komu}",
+  "Každý dostane vlastní úkol ({n, plural, one {# člověk} few {# lidé} other {# lidí}}).": "Každý dostane vlastnú úlohu ({n, plural, one {# človek} few {# ľudia} other {# ľudí}})."
 }

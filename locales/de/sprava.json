@@ -1648,5 +1648,8 @@
   "Probíhá": "In Arbeit",
   "po čase": "zu spät",
   "Do kdy (nepovinné)": "Bis wann (optional)",
-  "Nejdřív vyber den.": "Wähle zuerst einen Tag."
+  "Nejdřív vyber den.": "Wähle zuerst einen Tag.",
+  "{n, plural, one {Úkol je zadaný # člověku} few {Úkol je zadaný # lidem} other {Úkol je zadaný # lidem}}": "{n, plural, one {Aufgabe an # Person vergeben} other {Aufgabe an # Personen vergeben}}",
+  "Nezadalo se {n} z {celkem}: {komu}": "{n} von {celkem} nicht vergeben: {komu}",
+  "Každý dostane vlastní úkol ({n, plural, one {# člověk} few {# lidé} other {# lidí}}).": "Jede Person bekommt eine eigene Aufgabe ({n, plural, one {# Person} other {# Personen}})."
 }

@@ -1648,5 +1648,8 @@
   "Probíhá": "In progress",
   "po čase": "late",
   "Do kdy (nepovinné)": "By what time (optional)",
-  "Nejdřív vyber den.": "Pick a day first."
+  "Nejdřív vyber den.": "Pick a day first.",
+  "{n, plural, one {Úkol je zadaný # člověku} few {Úkol je zadaný # lidem} other {Úkol je zadaný # lidem}}": "{n, plural, one {Task assigned to # person} other {Task assigned to # people}}",
+  "Nezadalo se {n} z {celkem}: {komu}": "{n} of {celkem} not assigned: {komu}",
+  "Každý dostane vlastní úkol ({n, plural, one {# člověk} few {# lidé} other {# lidí}}).": "Everyone gets their own task ({n, plural, one {# person} other {# people}})."
 }
