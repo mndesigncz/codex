@@ -21,7 +21,10 @@ import { rozborSkladArg } from '@/lib/skladPredani';
 import { useState, useEffect, useMemo } from 'react';
 import { Button, Card, Chip, EmptyState, ErrorState, ListRow, Menu, SearchField, Skeleton, Toast, type MenuItem } from '../ui';
 import CategoryStockView from '../inventory/CategoryStockView';
+import PoleMnozstvi from '../inventory/PoleMnozstvi';
 import { normalizeCategoryPackaging } from '@/lib/packaging';
+import { pocetDoPole, pocetZPole } from '@/lib/inventura';
+import { jednotkaSnesDesetiny } from '@/lib/jednotky';
 import { packagingSourceOf, branchTracksOpen, findById, matcher } from '@/lib/categoryTree';
 import CategoryNav from '../inventory/CategoryNav';
 import { useT } from '@/lib/i18n/client';
@@ -57,6 +60,7 @@ interface Props {
 
 const URL_SKLAD = '/api/inventory';
 const URL_KATEGORIE = '/api/inventory/categories';
+const URL_FORMAT = '/api/inventory/format';
 const pole = (raw: unknown): any[] => (Array.isArray(raw) ? raw : []);
 
 // The API already applied the category's threshold unit; the comparison below
@@ -84,8 +88,11 @@ export default function InventoryReport({ initialCategory }: Props) {
   // Parked items step aside from the working list but stay one tap away.
   const [showParked, setShowParked] = useState(false);
 
-  // Per-item edited (unsaved) quantity draft.
-  const [draft, setDraft] = useState<Record<number, number>>({});
+  // Rozepsané (neuložené) množství po položkách — jako text, ať „2," při psaní
+  // nepřijde o čárku (kolo 82: pole s jednotkou a ± místo type="number").
+  const [draft, setDraft] = useState<Record<number, string>>({});
+  // Desetiny (2,5 kg) jen tam, kde je sloupec NUMERIC a jednotka je snese.
+  const sloupce = useDataWidgetu<{ mnozstvi: boolean }>(URL_FORMAT, raw => ({ mnozstvi: (raw as any)?.mnozstvi === true }));
   const [savingId, setSavingId] = useState<number | null>(null);
   const [zprava, setZprava] = useState<{ text: string; ton?: 'bad' } | null>(null);
   // Zápis stavu a „nevedeme" chce sklad.zapsat_stav (kolo 67) — bez něj seznam jen čte.
@@ -125,9 +132,10 @@ export default function InventoryReport({ initialCategory }: Props) {
     if (hit) setOpenCat(hit.id);
   }, [initialCategory, allCats]);
 
-  const qtyOf = (i: InventoryItem) => (draft[i.id] !== undefined ? draft[i.id] : i.quantity);
-  const isDirty = (i: InventoryItem) => draft[i.id] !== undefined && draft[i.id] !== i.quantity;
-  const setQty = (id: number, val: number) => setDraft(prev => ({ ...prev, [id]: Math.max(0, val) }));
+  const textOf = (i: InventoryItem) => draft[i.id] ?? pocetDoPole(i.quantity);
+  const qtyOf = (i: InventoryItem) => { const p = pocetZPole(textOf(i), true); return p.ok && p.hodnota != null ? p.hodnota : i.quantity; };
+  const isDirty = (i: InventoryItem) => draft[i.id] !== undefined && qtyOf(i) !== i.quantity;
+  const setQty = (id: number, text: string) => setDraft(prev => ({ ...prev, [id]: text }));
 
   const save = async (item: InventoryItem) => {
     const newQty = qtyOf(item);
@@ -200,19 +208,15 @@ export default function InventoryReport({ initialCategory }: Props) {
             {(item.description || item.category) && <>{st !== 'ok' || item.approved === false ? ' · ' : ''}{item.description || item.category}</>}
           </> : undefined}
           actions={smiZapsat ? <>
-            <span className="flex items-center gap-1">
-              <Button variant="secondary" size="sm" iconOnly icon="minus" aria-label={t('Ubrat — {nazev}', { nazev: item.name })} onClick={() => setQty(item.id, qtyOf(item) - 1)} />
-              <input
-                type="number" inputMode="numeric"
-                // Bez popisku odečítač přečte jen „číslo" a člověk neví, čeho.
-                aria-label={item.unit ? t('Množství — {nazev} ({jednotka})', { nazev: item.name, jednotka: item.unit }) : t('Množství — {nazev}', { nazev: item.name })}
-                value={qtyOf(item)}
-                onChange={e => setQty(item.id, parseInt(e.target.value) || 0)}
-                className="field !w-16 !px-2 text-center tabular-nums"
-              />
-              <Button variant="secondary" size="sm" iconOnly icon="plus" aria-label={t('Přidat — {nazev}', { nazev: item.name })} onClick={() => setQty(item.id, qtyOf(item) + 1)} />
-              <span className="text-xs text-black/55 w-6">{item.unit}</span>
-            </span>
+            {/* Jednotka je přímo v poli (dřív šedý text vedle, u „balení" useknutý) a ± kolem něj. */}
+            <PoleMnozstvi
+              value={textOf(item)} onChange={v => setQty(item.id, v)}
+              jednotka={item.unit} krok={1} nazev={item.name}
+              desetinne={sloupce.data?.mnozstvi === true && jednotkaSnesDesetiny(item.unit)}
+              // Bez popisku odečítač přečte jen „číslo" a člověk neví, čeho.
+              ariaLabel={item.unit ? t('Množství — {nazev} ({jednotka})', { nazev: item.name, jednotka: item.unit }) : t('Množství — {nazev}', { nazev: item.name })}
+              className="!w-44 max-w-full"
+            />
             {/* Uložit je `primary` jen s rozepsanou změnou — limetka na obrazovce
                 je jedna a v řádku nikdy (DP §3.1). */}
             <Button variant={dirty ? 'primary' : 'secondary'} size="sm" disabled={!dirty} loading={savingId === item.id}
