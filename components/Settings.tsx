@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { planInfoOf, type PlanInfo } from '@/lib/plan';
 import Billing from './Billing';
@@ -18,7 +18,7 @@ import SekceOznameni from './settings/SekceOznameni';
 import SekceData from './settings/SekceData';
 import SekceZkratky from './settings/SekceZkratky';
 import SekcePodnik from './settings/SekcePodnik';
-import { zalozkaNastaveni, SKUPINA_ZALOZKY, SKUPINY_NASTAVENI, type SectionId, type SkupinaNastaveni } from '@/lib/nastaveniZalozky';
+import { zalozkaNastaveni, otevritSekciRovnou, SKUPINA_ZALOZKY, SKUPINY_NASTAVENI, type SectionId, type SkupinaNastaveni } from '@/lib/nastaveniZalozky';
 import TeamManagement from './TeamManagement';
 import { dbTimeDayHM, parseDbTime } from '@/lib/pragueTime';
 import { relativniCas } from '@/lib/poznamky';
@@ -104,14 +104,32 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
   const t = useT();
   const { jazyk } = useJazyk();
   const [zvolena, setZvolena] = useState<SectionId>(zalozkaNastaveni(initialTab) ?? 'account');
+  // Telefon (kolo 6, B3): Nastavení je svislý seznam sekcí; klepnutí otevře sekci přes celou
+  // obrazovku s „Zpět". Dřív posuvný pás 13 pilulek (1 817 px) — Notifikace, Zabezpečení, Pokladna
+  // i Role byly mimo obrazovku. Rovnou sekci otevře jen výslovný odkaz (?tab=, banner, hledání);
+  // na počítači se nic nemění (boční pás + obsah).
+  const [zobrazeni, setZobrazeni] = useState<'seznam' | 'sekce'>(otevritSekciRovnou(initialTab) ? 'sekce' : 'seznam');
   // Přepnutí záložky odmontuje editor rolí — u rozepsané role se nejdřív zeptá.
   const straz = useStrazRole();
-  const setSection = (id: SectionId) => { if (id !== zvolena) straz.pokus(() => setZvolena(id)); };
+  const setSection = (id: SectionId, sekci = true) => {
+    if (id !== zvolena) straz.pokus(() => { setZvolena(id); if (sekci) setZobrazeni('sekce'); });
+    else if (sekci) setZobrazeni('sekce');
+  };
   // Odkaz na záložku, když je Nastavení už otevřené: useState výše si initialTab
   // přečte jen při prvním vykreslení.
-  useEffect(() => { const z = zalozkaNastaveni(initialTab); if (tabNonce && z) setSection(z); },
+  useEffect(() => { const z = zalozkaNastaveni(initialTab); if (tabNonce && z) setSection(z, otevritSekciRovnou(z)); },
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [tabNonce]);
+  // Nová obrazovka na telefonu začíná nahoře — ne v půlce dlouhého seznamu, odkud se klepalo.
+  const korenRef = useRef<HTMLDivElement>(null);
+  const prvniZobrazeni = useRef(true);
+  useEffect(() => {
+    if (prvniZobrazeni.current) { prvniZobrazeni.current = false; return; }
+    try { if (window.matchMedia('(max-width: 767px)').matches) korenRef.current?.scrollIntoView({ block: 'start' }); } catch { /* starý prohlížeč */ }
+  }, [zobrazeni, zvolena]);
+  // Klávesové zkratky na dotykovém telefonu nedávají smysl — v seznamu na telefonu se nekreslí (na počítači zůstávají).
+  const [dotyk, setDotyk] = useState(false);
+  useEffect(() => { try { setDotyk(window.matchMedia('(hover: none) and (pointer: coarse)').matches); } catch { /* bez matchMedia */ } }, []);
   const [account, setAccount] = useState<Account | null>(null);
   const [loading, setLoading] = useState(true);
   const isEmployer = (account?.role ?? user.role) === 'employer';
@@ -149,6 +167,9 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
     .map(id => ({ id, nazev: nazevSkupiny[id], polozky: sections.filter(s => s.skupina === id) }))
     .filter(g => g.polozky.length > 0);
   const sNadpisy = skupiny.length > 1;
+  const skupinyTelefon = skupiny
+    .map(g => ({ ...g, polozky: g.polozky.filter(s => !(dotyk && s.id === 'zkratky')) }))
+    .filter(g => g.polozky.length > 0);
   // Záložka, na kterou role nemá, se nevykreslí, ani když na ni vede odkaz
   // (Receptury → „Nastavit pokladnu", banner předplatného) nebo když se
   // oprávnění načetla až po otevření. Obsah by jinak ukázal formulář
@@ -435,18 +456,49 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
     }
   };
 
+  const aktivni = sections.find(s => s.id === section);
+  const odznakOznameni = unreadCount > 0
+    ? <Badge count={unreadCount} label={t('Nepřečtená oznámení: {n}', { n: unreadCount })} ring={false} />
+    : null;
+
   return (
-    <div className={vOkne ? 'space-y-4' : 'p-4 sm:p-6 max-w-5xl mx-auto space-y-6'}>
-      {!vOkne && <PageHeader title={t('Nastavení')} subtitle={t('Spravujte svůj profil, jazyk, vzhled, oznámení a zabezpečení.')} />}
+    <div ref={korenRef} className={vOkne ? 'space-y-4' : 'p-4 sm:p-6 max-w-5xl mx-auto space-y-6'}>
+      {!vOkne && <PageHeader title={t('Nastavení')} subtitle={t('Spravujte svůj profil, jazyk, vzhled, oznámení a zabezpečení.')}
+        className={zobrazeni === 'sekce' ? 'hidden md:block' : ''} />}
       <DiscardGuard guard={straz.guard} what={CO_SE_ZAHODI_ROLE} />
 
-      {/* Telefon: sekce jako posuvný pás filtrových pilulek. Dřív ruční
-          pilulky bez náznaku, že pás pokračuje — poslední byla useknutá.
-          Segmented umí přetečení s měkkým okrajem sám. */}
-      <div className="md:hidden">
-        <Segmented ariaLabel={t('Sekce nastavení')} value={section} onChange={id => setSection(id)}
-          options={sections.map(s => ({ id: s.id, label: s.label, icon: s.icon, count: s.id === 'notifications' && unreadCount > 0 ? unreadCount : undefined }))} />
-      </div>
+      {/* Telefon: svislý seznam sekcí ve skupinách Osobní / Podnik (ikona, název, popis,
+          šipka; odznak nepřečtených u Notifikací). Segmented zůstává jen pro pár položek. */}
+      {zobrazeni === 'seznam' && (
+        <nav className="md:hidden space-y-4" aria-label={t('Sekce nastavení')}>
+          {skupinyTelefon.map(g => (
+            <section key={g.id} className="space-y-1.5" aria-labelledby={sNadpisy ? `nast-skupina-${g.id}` : undefined}>
+              {sNadpisy && <h2 id={`nast-skupina-${g.id}`} className="t-label px-1">{g.nazev}</h2>}
+              <div className="card px-4 py-1">
+                <ul className="list">
+                  {g.polozky.map(s => (
+                    <ListRow key={s.id}
+                      lead={<span className="well h-10 w-10 grid place-items-center text-black/60"><Icon name={s.icon} size={18} /></span>}
+                      title={s.id === 'notifications' && odznakOznameni
+                        ? <span className="flex items-center gap-2 min-w-0"><span className="truncate">{s.label}</span>{odznakOznameni}</span>
+                        : s.label}
+                      meta={s.desc}
+                      onClick={() => setSection(s.id)} />
+                  ))}
+                </ul>
+              </div>
+            </section>
+          ))}
+        </nav>
+      )}
+
+      {/* Telefon v sekci: hlavička s názvem sekce a cesta zpět na seznam (jako „Zpět na uzávěrky"). */}
+      {zobrazeni === 'sekce' && (
+        <div className="md:hidden space-y-1">
+          <Button variant="ghost" icon="chevron" className="-ml-3 [&>svg]:rotate-90" onClick={() => setZobrazeni('seznam')}>{t('Zpět')}</Button>
+          <PageHeader as={vOkne ? 'h2' : 'h1'} title={aktivni?.label ?? (section === 'team' ? t('Tým') : t('Nastavení'))} subtitle={aktivni?.desc} />
+        </div>
+      )}
 
       <div className="flex gap-6">
         {/* Desktop: left vertical section list */}
@@ -473,8 +525,8 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
           ))}
         </nav>
 
-        {/* Content */}
-        <div className="flex-1 min-w-0">
+        {/* Obsah sekce; na telefonu jen v režimu sekce (seznam ho zakryje, editor rolí zůstane připojený). */}
+        <div className={`flex-1 min-w-0 ${zobrazeni === 'seznam' ? 'hidden md:block' : ''}`}>
           {loading ? (
             <Skeleton className="h-72 rounded-3xl" />
           ) : section === 'account' ? (
@@ -614,10 +666,12 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
                     return (
                       <ListRow key={n.id}
                         lead={ikona}
-                        title={<span className={!n.is_read ? 'font-bold' : undefined}>{n.title}</span>}
+                        // Chip „Nové" v řádku titulku: v ocase by na telefonu dostal vlastní řádek.
+                        title={!n.is_read
+                          ? <span className="flex items-center gap-2 min-w-0"><span className="truncate font-bold">{n.title}</span><Chip tone="info" size="sm" className="shrink-0">{t('Nové')}</Chip></span>
+                          : n.title}
                         meta={kdyPrislo(n.created_at, t, jazyk)}
                         detail={n.body ? <span className="break-words">{n.body}</span> : undefined}
-                        right={!n.is_read ? <Chip tone="info" size="sm">{t('Nové')}</Chip> : undefined}
                         onClick={maOdkaz ? () => { void otevriNotif(n); } : undefined} />
                     );
                   })}
