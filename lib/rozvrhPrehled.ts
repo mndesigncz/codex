@@ -10,7 +10,7 @@
 // a „HH:MM" (žádné `toISOString()`, které po 22:00 pražského času posune
 // den do zítřka).
 
-import { dayPlus } from './pragueTime.ts';
+import { dayPlus, parseDbTime, pragueDayOf } from './pragueTime.ts';
 import { usek } from './rozvrhDen.ts';
 
 // ---------------------------------------------------------------------------
@@ -576,6 +576,22 @@ export function textRozhodnutiVolna(o: { od: string; doDne: string; status: 'app
   const upraveno = o.terminUpraven && o.status ? ' (termín upraven vedením)' : '';
   const duvod = o.status === 'rejected' && o.duvod ? ` · ${o.duvod}` : '';
   return `${termin}${upraveno}${duvod}`;
+}
+
+/**
+ * Má být sbalené „Moje žádosti (n)" na Dostupnosti rovnou otevřené? Ano, když
+ * nějaká žádost čeká, nebo je zamítnutá a čerstvá (podaná v posledních 14 dnech,
+ * nebo termín ještě neproběhl) — důvod zamítnutí má člověk vidět bez hledání.
+ * Schválené a staré zamítnuté jsou historie, ty zůstanou sbalené.
+ */
+export function otevritMojeZadosti(zadosti: readonly { status: string; toDate: string; fromDate?: string; createdAt?: string | null }[], dnes: string): boolean {
+  const pred14 = dayPlus(dnes, -14);
+  return zadosti.some(z => {
+    if (z.status === 'pending') return true;
+    if (z.status !== 'rejected') return false;
+    const podano = parseDbTime(z.createdAt ?? null);
+    return (podano != null && pragueDayOf(podano) >= pred14) || den(z.toDate || z.fromDate) >= dnes;
+  });
 }
 
 export interface NabidkaSmeny {

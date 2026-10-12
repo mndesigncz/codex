@@ -12,7 +12,8 @@
    "note": "Svatba",
    "status": "pending",
    "createdAt": "DNES",
-   "conflicts": 2
+   "conflicts": 2,
+   "decisionNote": null
   },
   {
    "id": 72,
@@ -25,7 +26,8 @@
    "note": null,
    "status": "pending",
    "createdAt": "DNES",
-   "conflicts": 0
+   "conflicts": 0,
+   "decisionNote": null
   },
   {
    "id": 73,
@@ -37,7 +39,21 @@
    "type": "vacation",
    "note": null,
    "status": "approved",
-   "createdAt": "DNES"
+   "createdAt": "DNES",
+   "decisionNote": null
+  },
+  {
+   "id": 74,
+   "employeeId": 19,
+   "employeeName": "Ondřej Kučera",
+   "employeeAvatar": null,
+   "fromDate": "PRED3",
+   "toDate": "PRED3",
+   "type": "vacation",
+   "note": null,
+   "status": "rejected",
+   "createdAt": "PRED3",
+   "decisionNote": "Ten den je akce pro 80 lidí, potřebujeme všechny."
   }
  ]
 }

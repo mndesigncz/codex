@@ -43,7 +43,6 @@ const Guides = naLine(() => import('../Guides'));
 const Settings = naLine(() => import('../Settings'));
 const MyShifts = naLine(() => import('./MyShifts'));
 const AvailabilitySubmit = naLine(() => import('../scheduling/AvailabilitySubmit'));
-const TimeOffRequest = naLine(() => import('../scheduling/TimeOffRequest'));
 const InventoryReport = naLine(() => import('./InventoryReport'));
 const RecipesView = naLine<import('../inventory/RecipesView').RecipesViewProps>(() => import('../inventory/RecipesView'));
 const Tasks = naLine(() => import('./Tasks'));
@@ -121,7 +120,8 @@ export default function EmployeeLayout({ user }: Props) {
     if (view === 'inventory' && arg) setInventoryPredani(n => n + 1);
     setRecipeProduct(view === 'recipes' && arg && !arg.includes(':') ? arg : undefined);
     setGuideId(view === 'guides' && arg && /^\d+$/.test(arg) ? Number(arg) : null);
-    if (view === 'suggestions' || view === 'procedures') predejPohledu(view, arg);
+    // Dostupnost: `volno` (akce „Požádat o volno" v paletě) otevře okno žádosti hned po příchodu.
+    if (view === 'suggestions' || view === 'procedures' || view === 'availability') predejPohledu(view, arg);
     if (view === 'guides') setGuideFiltr(f => ({ stav: arg === 'stav:kprecteni' ? 'kprecteni' : arg === 'stav:navrhy' ? 'navrhy' : undefined, n: f.n + 1 }));
     setChatConvId(view === 'chat' && arg && /^\d+$/.test(arg) ? Number(arg) : null);
     // Proklik na KONKRÉTNÍ postup (zamčená uzávěrka, widget) — bez toho
@@ -148,12 +148,9 @@ export default function EmployeeLayout({ user }: Props) {
       case 'home':         return <EmployeeDashboard user={user} />;
       // Výměny a kalendář vlastních směn jsou od kola 69 widgety plochy Mých směn.
       case 'my-shifts':    return <MyShifts user={user as any} />;
-      case 'availability': return (
-        <div className="space-y-2">
-          <AvailabilitySubmit user={user as any} />
-          <div className="px-4 sm:px-6 pb-6 max-w-3xl mx-auto w-full"><TimeOffRequest /></div>
-        </div>
-      );
+      // Žádost o volno je od kola 7 tlačítko v hlavičce Dostupnosti (okno) a „Moje žádosti" pod kalendářem —
+      // karta pod plochou (na telefonu mimo výřez) je pryč.
+      case 'availability': return <AvailabilitySubmit user={user as any} />;
       case 'inventory':    return <InventoryReport user={user as any} initialCategory={inventoryCat} predani={inventoryPredani} />;
       case 'recipes':      return <RecipesView stranka="zamestnanec.receptury" openProductId={recipeProduct} onNavigate={navigate} />;
       case 'closing':      return <CashClosing user={user as any} />;

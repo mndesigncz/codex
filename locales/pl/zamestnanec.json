@@ -397,5 +397,10 @@
   "Žádost se nepodařilo zrušit — zkus to znovu.": "Nie udało się anulować wniosku — spróbuj jeszcze raz.",
   "Žádosti se nenačetly.": "Nie udało się wczytać wniosków.",
   "„{nazev}\" má termín {den}.": "„{nazev}” ma termin {den}.",
-  "Vedení: {duvod}": "Kierownictwo: {duvod}"
+  "Vedení: {duvod}": "Kierownictwo: {duvod}",
+  "Žádost o volno": "Wniosek o wolne",
+  "Zrušit|dialog": "Anuluj",
+  "Moje žádosti o volno": "Moje wnioski o wolne",
+  "Moje žádosti ({n})": "Moje wnioski ({n})",
+  "Žádost odeslána": "Wniosek wysłany"
 }

@@ -65,7 +65,9 @@ export const VYCHOZI_NAV: Record<Rozhrani, VychoziNav> = {
       { id: 'home', label: 'Přehled', icon: 'overview', short: 'Domů' },
       { id: 'my-shifts', label: 'Moje směny', icon: 'calendar', short: 'Směny' },
       { id: 'procedures', label: 'Postupy', icon: 'clipboard' },
-      { id: 'availability', label: 'Dostupnost', icon: 'swap' },
+      // Kolo 7: „a volno" — žádost o volno je na téže stránce (tlačítko v hlavičce) a název o ní dřív mlčel.
+      // V doku (když si ho tam podnik dá) by se celý název na 320 px nevešel — tam „Dostupnost".
+      { id: 'availability', label: 'Dostupnost a volno', icon: 'swap', short: 'Dostupnost' },
       { id: 'inventory', label: 'Sklad', icon: 'box' },
       // Kolo 5: receptury i pro zaměstnance (jen s receptury.zobrazit — smiPohled je jinak schová).
       { id: 'recipes', label: 'Receptury', icon: 'clipboard' },

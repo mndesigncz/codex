@@ -22,6 +22,14 @@
 // klepnutý den jedním klepnutím (druhé ho vrátí na Dostupný) — a s rozepsanou
 // změnou je odeslání v plovoucí liště nad dokem (jen samostatná stránka;
 // v Mých směnách vedení má limetku „Hotovo" úprav).
+//
+// Kolo 7 (R7-1): žádost o volno ležela jako karta pod celým kalendářem (na telefonu
+// mimo výřez). Teď je v hlavičce stránky „Žádost o volno" (vedlejší akce; na telefonu
+// přes celý řádek pod nadpisem) → okno zdola s formulářem, a vlastní žádosti se stavem
+// jsou právě jednou — sbalené „Moje žádosti (n)" pod kalendářem, otevřené, když něco
+// čeká nebo bylo nedávno zamítnuto. Paleta (akce „Požádat o volno") předá `volno`
+// a okno se otevře rovnou. Pod Mými směnami vedení (h2) nic z toho není — tam je
+// karta TimeOffRequest z EmployerLayout.
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { odsazeniMesice, zacatekTydne } from '@/lib/week';
@@ -29,13 +37,16 @@ import { useJazyk, useT } from '@/lib/i18n/client';
 import { fmtDenVTydnu } from '@/lib/i18n/format';
 import { useCurrency } from '@/components/CurrencyProvider';
 
-import { Button, Card, Chip, ErrorState, Field, Input, MonthNav, PageHeader, PlovouciLista, Segmented, Skeleton, Textarea } from '../ui';
+import { Button, Card, Chip, ErrorState, Field, Input, MonthNav, PageHeader, PlovouciLista, Segmented, Skeleton, Textarea, Toast } from '../ui';
 import { useSkrytyNastroj } from '@/lib/useSkrytyNastroj';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu } from '../widgety/useDataWidgetu';
 import { okJson } from '@/lib/api';
 import { Icon } from '../Icons';
 import { pragueToday } from '@/lib/pragueTime';
+import { cerstvePredaniPohledu, udalostPredani } from '@/lib/predaniPohledu';
+import { otevritMojeZadosti } from '@/lib/rozvrhPrehled';
+import { OknoZadostiVolna, SeznamZadosti, useFormularVolna, useMojeZadosti } from './TimeOffRequest';
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string; role?: string };
   /**
@@ -125,6 +136,28 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
   const [stetec, setStetec] = useState<DayState | null>(null);
   const korenRef = useRef<HTMLSpanElement>(null);
   const schovany = useSkrytyNastroj(korenRef);
+
+  // ---- Žádost o volno (jen samostatná stránka) ----
+  const samostatna = headingLevel === 'h1';
+  const [oknoVolna, setOknoVolna] = useState(false);
+  const [odeslanoVolno, setOdeslanoVolno] = useState<number | null>(null);
+  const zadosti = useMojeZadosti(samostatna);
+  const volno = useFormularVolna({
+    aktivni: samostatna && oknoVolna,
+    onOdeslano: () => { setOknoVolna(false); setOdeslanoVolno(Date.now()); zadosti.reload(); },
+  });
+  // Rozepsaná žádost z minula: okno se otevře samo (koncept, který není vidět, je ztracený).
+  useEffect(() => { if (samostatna && volno.koncept.cekaKoncept) setOknoVolna(true); }, [samostatna, volno.koncept.cekaKoncept]);
+  // „Požádat o volno" z palety (Ctrl K): layout předá `volno`, okno se otevře hned — i když už stránka je otevřená.
+  useEffect(() => {
+    if (!samostatna) return;
+    if (cerstvePredaniPohledu('availability') === 'volno') setOknoVolna(true);
+    const naPredani = (e: Event) => { if ((e as CustomEvent).detail === 'volno') setOknoVolna(true); };
+    window.addEventListener(udalostPredani('availability'), naPredani);
+    return () => window.removeEventListener(udalostPredani('availability'), naPredani);
+  }, [samostatna]);
+  const [zadostiOtevrene, setZadostiOtevrene] = useState<boolean | null>(null);
+  const zadostiAuto = useMemo(() => otevritMojeZadosti(zadosti.requests, dnes), [zadosti.requests, dnes]);
 
   const [types, setTypes] = useState<{ id: number; name: string }[]>([]);
   const [typesErr, setTypesErr] = useState(false);
@@ -275,7 +308,7 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
   const popisCyklu = stateList.map((st) => metaOf(st).label.toLowerCase()).join(', ');
   // Odeslání nad dokem: jen samostatná stránka, s rozepsanou změnou a když je co odeslat.
   const listaOdeslani = headingLevel === 'h1' && zmeneno && !loading && !loadFailed && !schovany;
-  const nastroj = (
+  const kalendar = (
     <Card as="section" aria-labelledby="dostupnost-kalendar" className="space-y-5">
       <span ref={korenRef} aria-hidden className="hidden" />
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -423,13 +456,45 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
   );
 
   // Samostatná stránka zaměstnance = plocha s widgety; v Mých směnách vedení jen sekce.
-  if (headingLevel === 'h1') {
+  if (samostatna) {
+    // Vlastní žádosti právě jednou na stránce: sbalené pod kalendářem (stav, důvod zamítnutí, zrušení čekající).
+    const otevreno = zadostiOtevrene ?? zadostiAuto;
+    const nastroj = (
+      <div className="space-y-4">
+        {kalendar}
+        <Card as="section" aria-label={t('Moje žádosti o volno')} className="!py-1">
+          <details open={otevreno} onToggle={(e) => { const o = e.currentTarget.open; if (o !== otevreno) setZadostiOtevrene(o); }} className="group">
+            <summary className="tap-target flex items-center justify-between gap-3 py-3 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
+              <span className="t-card">
+                {zadosti.loading ? t('Moje žádosti') : t('Moje žádosti ({n})', { n: zadosti.requests.length })}
+              </span>
+              <Icon name="chevron" size={16} className="shrink-0 text-black/45 transition-transform duration-200 group-open:rotate-180" />
+            </summary>
+            <div className="pb-3"><SeznamZadosti z={zadosti} /></div>
+          </details>
+        </Card>
+      </div>
+    );
+    const zadostTlacitko = (
+      <Button variant="secondary" icon="plus" onClick={() => setOknoVolna(true)} aria-haspopup="dialog">{t('Žádost o volno')}</Button>
+    );
     return (
-      <PlochaWidgetu
-        stranka="zamestnanec.dostupnost"
-        hlavicka={{ title: t('Dostupnost'), subtitle: t('Dej vedení vědět, kdy můžeš pracovat — podle toho sestaví rozvrh.'), hintId: 'availabilitysubmit' }}
-        nastroj={nastroj}
-      />
+      <>
+        <PlochaWidgetu
+          stranka="zamestnanec.dostupnost"
+          hlavicka={{
+            title: t('Dostupnost'), subtitle: t('Dej vedení vědět, kdy můžeš pracovat — podle toho sestaví rozvrh.'), hintId: 'availabilitysubmit',
+            // Vedlejší akce (limetka zůstává „Odeslat dostupnost" v plovoucí liště). PageHeader vedlejší akce
+            // na telefonu schovává do „···" — tam by žádost zase nikdo nenašel, proto na telefonu stojí
+            // v místě hlavní akce: přes celý řádek pod nadpisem, pořád tónovaná, ne limetková.
+            secondary: zadostTlacitko,
+            primaryTelefon: zadostTlacitko,
+          }}
+          nastroj={nastroj}
+        />
+        {oknoVolna && <OknoZadostiVolna f={volno} onClose={() => setOknoVolna(false)} />}
+        <Toast id={odeslanoVolno ?? undefined} message={odeslanoVolno != null ? t('Žádost odeslána') : null} onClose={() => setOdeslanoVolno(null)} />
+      </>
     );
   }
   return (
@@ -437,7 +502,7 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
     // šířku — užší sloupec by na desktopu nesedl na okraje karet nad ním.
     <section className="p-4 sm:p-6 space-y-6 w-full">
       <PageHeader as="h2" title={t('Dostupnost')} subtitle={t('Kdy můžeš pracovat — podle toho se skládá rozvrh.')} />
-      {nastroj}
+      {kalendar}
     </section>
   );
 }

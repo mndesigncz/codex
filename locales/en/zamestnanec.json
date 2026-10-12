@@ -397,5 +397,10 @@
   "Žádost se nepodařilo zrušit — zkus to znovu.": "Couldn't cancel the request — try again.",
   "Žádosti se nenačetly.": "Requests didn't load.",
   "„{nazev}\" má termín {den}.": "“{nazev}” is due {den}.",
-  "Vedení: {duvod}": "Management: {duvod}"
+  "Vedení: {duvod}": "Management: {duvod}",
+  "Žádost o volno": "Time-off request",
+  "Zrušit|dialog": "Cancel",
+  "Moje žádosti o volno": "My time-off requests",
+  "Moje žádosti ({n})": "My requests ({n})",
+  "Žádost odeslána": "Request sent"
 }

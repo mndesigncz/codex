@@ -47,6 +47,8 @@ export const AKCE_HLEDANI: AkceHledani[] = [
   // Rozvrh
   { id: 'rozvrh-generovat', nazev: 'Vygenerovat rozvrh', kde: 'Rozvrh', ikona: 'calendar', slova: ['směny', 'naplánovat', 'plán směn'], stranka: 'shifts', rozhrani: V },
   { id: 'dostupnost', nazev: 'Zadat dostupnost', kde: 'Dostupnost', ikona: 'calendar', slova: ['kdy můžu', 'volno', 'směny'], stranka: 'availability', rozhrani: Z },
+  // Kolo 7: žádost o volno má vlastní akci — `arg: 'volno'` otevře na Dostupnosti rovnou okno žádosti.
+  { id: 'volno-zadost', nazev: 'Požádat o volno', kde: 'Dostupnost', ikona: 'calendar', slova: ['dovolená', 'nemoc', 'volno', 'nepřítomnost'], stranka: 'availability', arg: 'volno', rozhrani: Z },
   { id: 'moje-smeny', nazev: 'Moje směny', kde: 'Směny', ikona: 'calendar', slova: ['kdy pracuju', 'rozvrh', 'výměna směny'], stranka: 'my-shifts', rozhrani: VZ },
   // Kasa a finance
   { id: 'uzaverka-nova', nazev: 'Nová uzávěrka', kde: 'Uzávěrky', ikona: 'coins', slova: ['kasa', 'zavřít kasu', 'spočítat kasu', 'tržba', 'konec směny'], stranka: 'reports', rozhrani: V },

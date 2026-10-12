@@ -397,5 +397,10 @@
   "Žádost se nepodařilo zrušit — zkus to znovu.": "Die Anfrage konnte nicht zurückgezogen werden — versuch es noch einmal.",
   "Žádosti se nenačetly.": "Anträge konnten nicht geladen werden.",
   "„{nazev}\" má termín {den}.": "„{nazev}“ ist fällig am {den}.",
-  "Vedení: {duvod}": "Leitung: {duvod}"
+  "Vedení: {duvod}": "Leitung: {duvod}",
+  "Žádost o volno": "Urlaubsantrag",
+  "Zrušit|dialog": "Abbrechen",
+  "Moje žádosti o volno": "Meine Urlaubsanträge",
+  "Moje žádosti ({n})": "Meine Anträge ({n})",
+  "Žádost odeslána": "Antrag gesendet"
 }

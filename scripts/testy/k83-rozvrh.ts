@@ -6,7 +6,8 @@
 
 import { readFileSync } from 'node:fs';
 import type { Testy } from './_testy.ts';
-import { duvodVolna, textRozhodnutiVolna, MAX_DUVOD_VOLNA } from '../../lib/rozvrhPrehled.ts';
+import { duvodVolna, textRozhodnutiVolna, MAX_DUVOD_VOLNA, otevritMojeZadosti } from '../../lib/rozvrhPrehled.ts';
+import { VYCHOZI_NAV, NAV_TEXTY } from '../../lib/navigace.ts';
 
 const cti = (cesta: string) => readFileSync(new URL(`../../${cesta}`, import.meta.url), 'utf8');
 
@@ -38,4 +39,26 @@ export default function ({ eq, ok }: Testy) {
   ok('volno widget: okno s důvodem má Textarea s maxLength a zamítá přes note', /maxLength=\{MAX_DUVOD_VOLNA\}/.test(widget) && /status: 'rejected', note: duvod\.trim\(\) \|\| null/.test(widget));
   ok('volno zaměstnanec: zamítnutá žádost ukazuje „Vedení: …" v detailu řádku',
     /detail=\{r\.status === 'rejected' && r\.decisionNote \? t\('Vedení: \{duvod\}'/.test(cti('components/scheduling/TimeOffRequest.tsx')));
+
+  // ---- volno-utopene-pod-dostupnosti ----
+  const dnes = '2026-10-12';
+  eq('moje žádosti: čekající otevře sbalený seznam', otevritMojeZadosti([{ status: 'pending', toDate: '2026-11-01' }], dnes), true);
+  eq('moje žádosti: zamítnutá podaná před týdnem otevře, starší s proběhlým termínem ne', [
+    otevritMojeZadosti([{ status: 'rejected', toDate: '2026-09-01', createdAt: '2026-10-05 10:00:00' }], dnes),
+    otevritMojeZadosti([{ status: 'rejected', toDate: '2026-09-01', createdAt: '2026-09-01 10:00:00' }], dnes),
+  ], [true, false]);
+  eq('moje žádosti: zamítnutá s budoucím termínem otevře i bez data podání', otevritMojeZadosti([{ status: 'rejected', toDate: '2026-12-24' }], dnes), true);
+  eq('moje žádosti: schválené a prázdné nechají sbalené', [otevritMojeZadosti([{ status: 'approved', toDate: '2026-12-24' }], dnes), otevritMojeZadosti([], dnes)], [false, false]);
+
+  const layout = cti('components/employee/EmployeeLayout.tsx');
+  ok('Dostupnost: karta TimeOffRequest pod plochou je pryč, layout předá arg Dostupnosti',
+    !/TimeOffRequest/.test(layout) && /view === 'availability'\) predejPohledu\(view, arg\)/.test(layout));
+  const dostupnost = cti('components/scheduling/AvailabilitySubmit.tsx');
+  ok('Dostupnost: „Žádost o volno" v hlavičce (secondary i na telefonu) otevírá okno',
+    /secondary: zadostTlacitko/.test(dostupnost) && /primaryTelefon: zadostTlacitko/.test(dostupnost) && /<OknoZadostiVolna /.test(dostupnost));
+  ok('Dostupnost: Moje žádosti právě jednou (SeznamZadosti v <details>), okno je jen formulář',
+    (dostupnost.match(/<SeznamZadosti /g) ?? []).length === 1 && /<details open=\{otevreno\}/.test(dostupnost) && !/SeznamZadosti/.test(cti('components/scheduling/TimeOffRequest.tsx').split('export function OknoZadostiVolna')[1].split('// Moje žádosti')[0]));
+  ok('Dostupnost: předání „volno" z palety okno otevře', /cerstvePredaniPohledu\('availability'\) === 'volno'/.test(dostupnost));
+  const zam = VYCHOZI_NAV.zamestnanec.polozky.find(p => p.id === 'availability');
+  eq('navigace: „Dostupnost a volno" (překlad s kontextem |nav)', [zam?.label, NAV_TEXTY.includes('Dostupnost a volno')], ['Dostupnost a volno', true]);
 }

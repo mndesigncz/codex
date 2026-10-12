@@ -397,5 +397,10 @@
   "Žádost se nepodařilo zrušit — zkus to znovu.": "Žiadosť sa nepodarilo zrušiť — skús to znova.",
   "Žádosti se nenačetly.": "Žiadosti sa nenačítali.",
   "„{nazev}\" má termín {den}.": "„{nazev}“ má termín {den}.",
-  "Vedení: {duvod}": "Vedenie: {duvod}"
+  "Vedení: {duvod}": "Vedenie: {duvod}",
+  "Žádost o volno": "Žiadosť o voľno",
+  "Zrušit|dialog": "Zrušiť",
+  "Moje žádosti o volno": "Moje žiadosti o voľno",
+  "Moje žádosti ({n})": "Moje žiadosti ({n})",
+  "Žádost odeslána": "Žiadosť odoslaná"
 }

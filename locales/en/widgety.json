@@ -1925,5 +1925,6 @@
   "Důvod (uvidí žadatel)": "Reason (visible to the requester)",
   "Nepovinné — třeba „Ten týden už má volno Petr, zkus jiný termín“.": "Optional — e.g. “Peter is already off that week, try another date”.",
   "Žádost zamítnuta, žadatel dostal upozornění.": "Request rejected, the requester has been notified.",
-  "Vedení: {duvod}": "Management: {duvod}"
+  "Vedení: {duvod}": "Management: {duvod}",
+  "Požádat o volno": "Request time off"
 }
