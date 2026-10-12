@@ -699,15 +699,21 @@ function ProcedureEditor({
                   </div>
                   {s.valueKind === 'number' && (
                     // Telefon: tři pole vedle sebe přes celou šířku; od sm úzká pole v řádku.
-                    <div className="grid grid-cols-3 gap-2 sm:flex sm:items-center" role="group" aria-label={t('Měřená hodnota kroku {n}', { n: i + 1 })}>
-                      <Input value={s.valueUnit ?? ''} onChange={e => patchStep(i, { valueUnit: e.target.value.slice(0, MAX_JEDNOTKA) || null })}
-                        maxLength={MAX_JEDNOTKA} placeholder="°C" autoComplete="off"
-                        aria-label={t('Jednotka kroku {n}', { n: i + 1 })} className="sm:!w-24 min-w-0" />
-                      <MezHodnoty value={s.valueMin ?? null} onChange={v => patchStep(i, { valueMin: v })} placeholder={t('Od')}
-                        label={t('Nejnižší povolená hodnota kroku {n}', { n: i + 1 })} />
-                      <MezHodnoty value={s.valueMax ?? null} onChange={v => patchStep(i, { valueMax: v })} placeholder={t('Do')}
-                        label={t('Nejvyšší povolená hodnota kroku {n}', { n: i + 1 })} />
-                      <span className="t-meta col-span-3 sm:col-span-1 text-pretty">{t('Hodnota mimo rozsah se v průběhu jen označí, nic neblokuje.')}</span>
+                    <div className="grid grid-cols-3 gap-2 sm:flex sm:items-end" role="group" aria-label={t('Měřená hodnota kroku {n}', { n: i + 1 })}>
+                      <Field id={`${uid}-k${i}-jednotka`} label={t('Jednotka')} className="sm:w-24">
+                        <Input id={`${uid}-k${i}-jednotka`} value={s.valueUnit ?? ''} onChange={e => patchStep(i, { valueUnit: e.target.value.slice(0, MAX_JEDNOTKA) || null })}
+                          maxLength={MAX_JEDNOTKA} placeholder="°C" autoComplete="off"
+                          aria-label={t('Jednotka kroku {n}', { n: i + 1 })} />
+                      </Field>
+                      <Field id={`${uid}-k${i}-od`} label={t('Od')} className="sm:w-24">
+                        <MezHodnoty id={`${uid}-k${i}-od`} value={s.valueMin ?? null} onChange={v => patchStep(i, { valueMin: v })}
+                          label={t('Nejnižší povolená hodnota kroku {n}', { n: i + 1 })} />
+                      </Field>
+                      <Field id={`${uid}-k${i}-do`} label={t('Do')} className="sm:w-24">
+                        <MezHodnoty id={`${uid}-k${i}-do`} value={s.valueMax ?? null} onChange={v => patchStep(i, { valueMax: v })}
+                          label={t('Nejvyšší povolená hodnota kroku {n}', { n: i + 1 })} />
+                      </Field>
+                      <p className="t-meta col-span-3 sm:col-span-1 sm:self-center text-pretty">{t('Hodnota mimo rozsah se v průběhu jen označí, nic neblokuje.')}</p>
                     </div>
                   )}
                 </div>
@@ -777,10 +783,10 @@ function ProcedureEditor({
  * Mez měřené hodnoty (Od/Do): textové pole s inputMode decimal — čárka i tečka, „−1,5".
  * Rozepsaný text drží lokálně, ať „4," při psaní nezmizí; ven jde číslo, nebo null.
  */
-function MezHodnoty({ value, onChange, placeholder, label }: {
+function MezHodnoty({ id, value, onChange, label }: {
+  id: string;
   value: number | null;
   onChange: (v: number | null) => void;
-  placeholder: string;
   label: string;
 }) {
   const { jazyk } = useJazyk();
@@ -791,8 +797,8 @@ function MezHodnoty({ value, onChange, placeholder, label }: {
     if (cisloZTextu(text) !== value) setText(zobraz(value));
   }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <Input inputMode="decimal" autoComplete="off" value={text} placeholder={placeholder} aria-label={label}
+    <Input id={id} inputMode="decimal" autoComplete="off" value={text} aria-label={label}
       onChange={e => { setText(e.target.value); onChange(cisloZTextu(e.target.value)); }}
-      className="sm:!w-24 min-w-0 tabular-nums" />
+      className="min-w-0 tabular-nums" />
   );
 }
