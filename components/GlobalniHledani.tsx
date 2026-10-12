@@ -114,7 +114,7 @@ export function GlobalniHledani({ open, onClose, stranky, akce = [], onStranka, 
   if (!open) return null;
   let poradi = -1;
   return (
-    <Modal open onClose={onClose} size="md" title={t('Hledat v aplikaci')}>
+    <Modal open onClose={onClose} size="md" title={t('Hledat v aplikaci')} nadOkny>
       <div className="space-y-3" onKeyDown={klavesa}>
         <div className="flex items-center gap-2 rounded-full glass pl-4 pr-3 focus-within:ring-2 focus-within:ring-[#C8F542]">
           <Icon name="search" size={16} className="shrink-0 text-black/45" />

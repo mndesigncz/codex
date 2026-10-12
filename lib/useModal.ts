@@ -43,6 +43,13 @@ import { jePsanePole, jeRozepsano, reakceNaZavreni, type ZpusobZavreni } from '.
 let lockCount = 0;
 let lockedFrom = '';
 
+// Zásobník otevřených oken. Když je otevřených víc (hledání Ctrl K nad detailem
+// úkolu, otázka „zahodit?" nad formulářem), Escape patří jen tomu vrchnímu —
+// každé okno má vlastní posluchač na dokumentu a `stopPropagation` ostatním
+// posluchačům na stejném prvku nezabrání. Dřív jeden Escape zavřel všechno.
+const otevrenaOkna: symbol[] = [];
+const jeVrchni = (id: symbol) => otevrenaOkna[otevrenaOkna.length - 1] === id;
+
 function lockScroll() {
   if (lockCount === 0) lockedFrom = document.body.style.overflow;
   lockCount++;
@@ -213,6 +220,8 @@ export function useModal<T extends HTMLElement = HTMLDivElement>(open: boolean, 
   useEffect(() => {
     if (!open) return;
     const panel = ref.current;
+    const id = Symbol('okno');
+    otevrenaOkna.push(id);
     lockScroll();
 
     const visible = () => Array.from(panel?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [])
@@ -227,6 +236,7 @@ export function useModal<T extends HTMLElement = HTMLDivElement>(open: boolean, 
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        if (!jeVrchni(id)) return;
         e.preventDefault();
         e.stopPropagation();
         // Escape nad otevřenou otázkou znamená „zpět k úpravám" — druhý
@@ -251,6 +261,8 @@ export function useModal<T extends HTMLElement = HTMLDivElement>(open: boolean, 
     return () => {
       clearTimeout(t);
       document.removeEventListener('keydown', onKey, true);
+      const i = otevrenaOkna.indexOf(id);
+      if (i >= 0) otevrenaOkna.splice(i, 1);
       unlockScroll();
       const back = restoreRef.current;
       restoreRef.current = null;
