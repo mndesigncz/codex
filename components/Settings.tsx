@@ -18,6 +18,7 @@ import SekceOznameni from './settings/SekceOznameni';
 import SekceData from './settings/SekceData';
 import SekceZkratky from './settings/SekceZkratky';
 import SekcePodnik from './settings/SekcePodnik';
+import PevneNaklady from './settings/PevneNaklady';
 import { zalozkaNastaveni, otevritSekciRovnou, SKUPINA_ZALOZKY, SKUPINY_NASTAVENI, type SectionId, type SkupinaNastaveni } from '@/lib/nastaveniZalozky';
 import TeamManagement from './TeamManagement';
 import { dbTimeDayHM, parseDbTime } from '@/lib/pragueTime';
@@ -739,7 +740,8 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
           ) : section === 'zkratky' ? (
             <SekceZkratky />
           ) : section === 'podnik' ? (
-            <SekcePodnik />
+            // Pravidelné náklady (nájem, energie) patří k profilu podniku; edituje je i okno ve Financích.
+            <SekcePodnik pravidelneNaklady={ma('finance.nastaveni') ? <PevneNaklady /> : undefined} />
           ) : section === 'nahlaseni' ? (
             <NahlasenyObsah />
           ) : section === 'billing' && smiPlatby ? (
