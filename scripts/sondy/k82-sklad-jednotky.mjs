@@ -158,10 +158,11 @@ const otevriMenuPolozky = async (p, nazev) => {
   await p.locator('[data-sklad-zalozky]').first().getByRole('button', { name: 'Inventura' }).click();
   const okno = p.getByRole('dialog', { name: 'Inventura skladu' });
   tvrdi('I1: tlačítko Inventura v záložkách otevře okno', await dokud(() => okno.isVisible(), 3000));
-  tvrdi('I1: pruh postupu a 1/5 spočítáno', await okno.getByRole('progressbar').isVisible() && (await okno.innerText()).includes('1/5 spočítáno'));
+  // Okno se otevře dřív, než dorazí položky (v CI i o pár set ms) — na data počkat, ne je číst hned.
+  tvrdi('I1: pruh postupu a 1/5 spočítáno', await dokud(async () => await okno.getByRole('progressbar').isVisible() && (await okno.innerText()).includes('1/5 spočítáno'), 4000));
   const filtr = okno.getByRole('group', { name: 'Filtr inventury' });
-  tvrdi('I1: filtr kategorií (Vše, Mléčné, Obaly, Alkohol, Suroviny) a Jen nespočítané', await filtr.getByRole('button', { name: /^Mléčné/ }).isVisible()
-    && await filtr.getByRole('button', { name: /^Alkohol/ }).isVisible() && await filtr.getByRole('button', { name: /^Jen nespočítané/ }).isVisible());
+  tvrdi('I1: filtr kategorií (Vše, Mléčné, Obaly, Alkohol, Suroviny) a Jen nespočítané', await dokud(async () => await filtr.getByRole('button', { name: /^Mléčné/ }).isVisible()
+    && await filtr.getByRole('button', { name: /^Alkohol/ }).isVisible() && await filtr.getByRole('button', { name: /^Jen nespočítané/ }).isVisible(), 3000));
   const pole = okno.getByLabel('Spočítáno — Ovesné mléko (l)');
   tvrdi('I1: pole má jednotku „l" přímo v poli a je velké pro palec (≥ 44 px)', await sufix(pole) === 'l' && (await pole.boundingBox()).height >= 44);
   await okno.getByRole('button', { name: 'Přidat — Ovesné mléko' }).click();
