@@ -1541,5 +1541,18 @@
   "Jen co dochází": "Nur was zur Neige geht",
   "Bonus k výplatě": "Bonus zur Auszahlung",
   "Volitelné; schválení ho zapíše jako prémii.": "Optional; die Freigabe erfasst ihn als Prämie.",
-  "+{castka} k výplatě": "+{castka} zur Auszahlung"
+  "+{castka} k výplatě": "+{castka} zur Auszahlung",
+  "Výplata · tento měsíc": "Auszahlung · dieser Monat",
+  "Mzda": "Lohn",
+  "bez sazby": "ohne Satz",
+  "Prémie a srážky": "Prämien und Abzüge",
+  "{n, plural, one {# zápis} few {# zápisy} other {# zápisů}}": "{n, plural, one {# Eintrag} other {# Einträge}}",
+  "zatím nic": "noch nichts",
+  "podíl podle hodin": "Anteil nach Stunden",
+  "K výplatě": "Zur Auszahlung",
+  "od 1. do dneška": "vom 1. bis heute",
+  "Výplatu se nepodařilo spočítat.": "Auszahlung konnte nicht berechnet werden.",
+  "Docházka přišla v nečekaném tvaru.": "Die Zeiterfassungsdaten haben ein unerwartetes Format.",
+  "Prémie": "Prämie",
+  "Srážka": "Abzug"
 }

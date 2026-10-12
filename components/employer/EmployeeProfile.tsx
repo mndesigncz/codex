@@ -22,7 +22,9 @@ import { apiMessage, okJson } from '@/lib/api';
 import { fmtHM } from '@/lib/i18n/format';
 import { useMoney } from '../CurrencyProvider';
 import { useOpravneni } from '../role/useOpravneni';
-import { hodinyMinuty } from '@/lib/dochazkaPrehled';
+import { hodinyMinuty, sazbyZRosteru, souhrnHodin, spropitneZaObdobi, upravyPoLidech, upravyVRozmezi, zaznamyVRozmezi, type ClenRosteru, type UpravaMzdy, type UzaverkaSpropitne, type ZaznamDochazky } from '@/lib/dochazkaPrehled';
+import { pragueToday } from '@/lib/pragueTime';
+import { useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { useLocale } from './jazyk';
 
@@ -151,6 +153,8 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                   )}
                 </section>
 
+                {smi('finance.mzdy') && <VyplataMesice employeeId={employeeId} />}
+
                 <section aria-labelledby="profil-body">
                   <h3 id="profil-body" className="t-label mb-2">{t('Odkud má body')}</h3>
                   <div className="flex flex-wrap gap-1.5">
@@ -278,5 +282,65 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
         />
       )}
     </>
+  );
+}
+
+
+/** „+500 Kč" / „−200 Kč" — částka se znaménkem. */
+const sZnamenkem = (castka: number, money: (n: number) => string) => (castka >= 0 ? `+${money(castka)}` : `−${money(Math.abs(castka))}`);
+
+/**
+ * Výplata za tento měsíc: hodiny × sazba, prémie a srážky (se seznamem), podíl na spropitném a součet k výplatě.
+ * Stejné výpočty jako Souhrn hodin v Docházce (lib/dochazkaPrehled), stejné adresy (/api/attendance, /api/closings),
+ * takže dotaz se sdílí s widgety. Jen s finance.mzdy; spropitné navíc jen s celými tržbami.
+ */
+function VyplataMesice({ employeeId }: { employeeId: number }) {
+  const t = useT('sprava');
+  const loc = useLocale();
+  const money = useMoney();
+  const { ma: smi } = useOpravneni();
+  const dnes = pragueToday();
+  const od = `${dnes.slice(0, 7)}-01`;
+  const dni = Number(dnes.slice(8, 10)) + 1;
+  const data = useDataWidgetu<{ roster: ClenRosteru[]; entries: ZaznamDochazky[]; adjustments: UpravaMzdy[] }>(`/api/attendance?days=${dni}`, raw => {
+    if (!raw || !Array.isArray(raw.roster)) throw new Error(t('Docházka přišla v nečekaném tvaru.'));
+    return { roster: raw.roster, entries: Array.isArray(raw.entries) ? raw.entries : [], adjustments: Array.isArray(raw.adjustments) ? raw.adjustments : [] };
+  });
+  const vidiDyska = smi('finance.trzby') && smi('uzaverky.zobrazit_vse');
+  const uzaverky = useDataWidgetu<UzaverkaSpropitne[]>(vidiDyska ? '/api/closings' : null, raw => (Array.isArray(raw?.closings) ? raw.closings : []));
+  const ted = Date.now();
+  const vse = zaznamyVRozmezi(data.data?.entries ?? [], od, dnes);
+  const upravy = upravyVRozmezi(data.data?.adjustments ?? [], od, dnes).filter(u => Number(u.userId) === employeeId);
+  const dyska = vidiDyska && uzaverky.data ? spropitneZaObdobi(uzaverky.data, vse, ted, od, dnes) : null;
+  const sazby = sazbyZRosteru(data.data?.roster ?? []);
+  const radek = souhrnHodin(vse.filter(e => Number(e.employeeId) === employeeId), ted, sazby,
+    { spropitne: dyska && !dyska.skryto ? dyska.poLidech : null, upravy: upravyPoLidech(upravy), lide: new Map([[String(employeeId), { jmeno: '', avatar: null }]]) })[0];
+  const sazba = sazby.get(String(employeeId));
+  const upravySoucet = radek?.upravy ?? 0;
+  const vyplata = (radek?.mzda ?? 0) + upravySoucet + (radek?.spropitne ?? 0);
+  if (data.error) return <p className="note note-wait text-sm">{t('Výplatu se nepodařilo spočítat.')} {data.error}</p>;
+  return (
+    <section aria-labelledby="profil-vyplata">
+      <h3 id="profil-vyplata" className="t-label mb-2">{t('Výplata · tento měsíc')}</h3>
+      {data.loading ? <Skeleton className="h-16" /> : (
+        <>
+          <StatRow podleKarty>
+            <Stat label={t('Mzda')} value={money(radek?.mzda ?? 0)} note={sazba ? `${hodinyMinuty(radek?.ms ?? 0)} × ${money(sazba)}/h` : t('bez sazby')} />
+            <Stat label={t('Prémie a srážky')} value={sZnamenkem(upravySoucet, money)} note={upravy.length ? t('{n, plural, one {# zápis} few {# zápisy} other {# zápisů}}', { n: upravy.length }) : t('zatím nic')} />
+            {dyska && !dyska.skryto && <Stat label={t('Spropitné')} value={money(Math.round(radek?.spropitne ?? 0))} note={t('podíl podle hodin')} />}
+            <Stat label={t('K výplatě')} value={money(Math.round(vyplata))} note={t('od 1. do dneška')} />
+          </StatRow>
+          {upravy.length > 0 && (
+            <ul className="list mt-2">
+              {upravy.slice(0, 5).map(u => (
+                <ListRow key={u.id} title={u.note || (u.amount > 0 ? t('Prémie') : t('Srážka'))}
+                  meta={new Date(`${String(u.day).slice(0, 10)}T12:00:00`).toLocaleDateString(loc, { day: 'numeric', month: 'numeric' })}
+                  value={<span className={u.amount > 0 ? 'text-ok-ink' : 'text-bad-ink'}>{sZnamenkem(Number(u.amount), money)}</span>} />
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </section>
   );
 }

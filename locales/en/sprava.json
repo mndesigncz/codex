@@ -1541,5 +1541,18 @@
   "Jen co dochází": "Running low only",
   "Bonus k výplatě": "Payout bonus",
   "Volitelné; schválení ho zapíše jako prémii.": "Optional; approval records it as a bonus.",
-  "+{castka} k výplatě": "+{castka} to payout"
+  "+{castka} k výplatě": "+{castka} to payout",
+  "Výplata · tento měsíc": "Payout · this month",
+  "Mzda": "Wage",
+  "bez sazby": "no rate",
+  "Prémie a srážky": "Bonuses and deductions",
+  "{n, plural, one {# zápis} few {# zápisy} other {# zápisů}}": "{n, plural, one {# entry} other {# entries}}",
+  "zatím nic": "nothing yet",
+  "podíl podle hodin": "share by hours",
+  "K výplatě": "To pay out",
+  "od 1. do dneška": "from the 1st to today",
+  "Výplatu se nepodařilo spočítat.": "Could not calculate the payout.",
+  "Docházka přišla v nečekaném tvaru.": "The attendance data came in an unexpected format.",
+  "Prémie": "Bonus",
+  "Srážka": "Deduction"
 }

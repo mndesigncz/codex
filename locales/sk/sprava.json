@@ -1541,5 +1541,18 @@
   "Jen co dochází": "Len čo dochádza",
   "Bonus k výplatě": "Bonus k výplate",
   "Volitelné; schválení ho zapíše jako prémii.": "Voliteľné; schválenie ho zapíše ako prémiu.",
-  "+{castka} k výplatě": "+{castka} k výplate"
+  "+{castka} k výplatě": "+{castka} k výplate",
+  "Výplata · tento měsíc": "Výplata · tento mesiac",
+  "Mzda": "Mzda",
+  "bez sazby": "bez sadzby",
+  "Prémie a srážky": "Prémie a zrážky",
+  "{n, plural, one {# zápis} few {# zápisy} other {# zápisů}}": "{n, plural, one {# zápis} few {# zápisy} many {# zápisov} other {# zápisov}}",
+  "zatím nic": "zatiaľ nič",
+  "podíl podle hodin": "podiel podľa hodín",
+  "K výplatě": "K výplate",
+  "od 1. do dneška": "od 1. do dnes",
+  "Výplatu se nepodařilo spočítat.": "Výplatu sa nepodarilo spočítať.",
+  "Docházka přišla v nečekaném tvaru.": "Dochádzka prišla v neočakávanom tvare.",
+  "Prémie": "Prémia",
+  "Srážka": "Zrážka"
 }

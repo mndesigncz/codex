@@ -327,6 +327,8 @@ const doporucene = async (p) => {
   await p.getByRole('menuitem', { name: 'Profil' }).click();
   const profil = p.getByRole('dialog').filter({ hasText: 'Zkušená' });
   tvrdi('M1: Profil otevře okno s odpracovanými hodinami (42 h)', await dokud(() => profil.isVisible(), 3000) && (await profil.innerText()).includes('42 h'));
+  // Kolo 5: profil nese i výplatu měsíce (mzda, prémie a srážky, k výplatě) ze stejných dat jako Souhrn hodin.
+  tvrdi('M1: …a sekci „Výplata · tento měsíc" s „K výplatě"', await dokud(async () => /Výplata · tento měsíc/i.test(await profil.innerText()) && /K výplatě/i.test(await profil.innerText()), 4000), (await profil.innerText()).slice(0, 300));
   await profil.getByRole('button', { name: 'Zavřít' }).click();
 
   // 7) Rozepsané hledání přežije úpravy.
