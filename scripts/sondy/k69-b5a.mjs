@@ -194,13 +194,32 @@ const bezPreteceni = (p) => p.evaluate(() => document.documentElement.scrollWidt
   await ctx.close();
 }
 
-// 6) Telefon 390: bez přetečení, „Nová uzávěrka" vidět a klikatelná.
+// 6) Telefon 390: bez přetečení, seznam hned pod frontami, „Nová uzávěrka" v „···" a klikatelná.
 {
-  const { ctx, p } = await kontext({ fix: FIX_UZAVERKY, viewport: { width: 390, height: 844 }, mobil: true, dalsi: podvrh() });
+  // Pořadí jako výchozí rozložení z kódu od kola 6 (V04): fronty, souhrn S, seznam, pod ním kalendář.
+  const poradiK6 = ['uzaverky-chybejici', 'uzaverky-ke-schvaleni', 'uzaverky-souhrn', 'nastroj', 'uzaverky-kalendar'];
+  const fixK6 = { ...FIX_UZAVERKY, polozky: poradiK6.map(id => ({ ...FIX_UZAVERKY.polozky.find(x => x.id === id), ...(id === 'uzaverky-souhrn' ? { velikost: 'S' } : {}) })) };
+  const { ctx, p } = await kontext({ fix: fixK6, viewport: { width: 390, height: 844 }, mobil: true, dalsi: podvrh() });
   await otevri(p, VEDENI, 'vedeni.uzaverky');
   tvrdi('T1: telefon 390 — žádné vodorovné přetečení', await bezPreteceni(p));
-  const nova = p.getByRole('button', { name: 'Nová uzávěrka' });
-  tvrdi('T1: „Nová uzávěrka" je vidět a povolená', await nova.isVisible() && await nova.isEnabled());
+  // Kolo 6 (V04): majitel na telefonu uzávěrky kontroluje, vyplňuje je tým — bez limetky v hlavičce,
+  // „Nová uzávěrka" v „···", a seznam uzávěrek začíná na první obrazovce i se dvěma plnými frontami.
+  tvrdi('T1 (V04): na telefonu v hlavičce žádná limetka', await p.locator('[data-plocha] button.on-accent:visible').count() === 0);
+  const seznamTop = await widgetLi(p, 'nastroj').evaluate(el => el.getBoundingClientRect().top);
+  tvrdi('T1 (V04): seznam uzávěrek začíná nad ohybem (i se dvěma plnými frontami)', seznamTop < 844, String(Math.round(seznamTop)));
+  // Řádek uzávěrky: posádka na vlastním řádku bez useknutí, tržba a rozdíl kasy na jednom řádku pod ní.
+  const radek = await widgetLi(p, 'nastroj').locator('ul.list button.list-row').first().evaluate(b => {
+    const posadka = [...b.querySelectorAll('span')].find(x => x.textContent?.startsWith('Směna:') && x.className.includes('line-clamp'));
+    const cislo = b.querySelector('.list-value')?.getBoundingClientRect();
+    const chip = b.querySelector('.list-tail .chip')?.getBoundingClientRect();
+    return { posadka: !!posadka && posadka.scrollWidth <= posadka.clientWidth + 1 && posadka.scrollHeight <= posadka.clientHeight + 1,
+      cislo: !!cislo, vedleSebe: !!cislo && !!chip && Math.abs((cislo.top + cislo.height / 2) - (chip.top + chip.height / 2)) < 12 && chip.left > cislo.right };
+  });
+  tvrdi('T1 (V04): řádek uzávěrky — posádka celá, tržba jako číslo a rozdíl kasy vedle ní', radek.posadka && radek.cislo && radek.vedleSebe, JSON.stringify(radek));
+  await p.locator('[data-plocha]').getByRole('button', { name: 'Další akce' }).first().click();
+  const nova = p.getByRole('menuitem', { name: 'Nová uzávěrka' });
+  tvrdi('T1: „Nová uzávěrka" je v „···" vidět a povolená', await dokud(() => nova.isVisible(), 3000) && await nova.isEnabled());
+  await p.keyboard.press('Escape');
   // Šipka klikacího řádku Chybějících dřív osiřela na telefonu na vlastním
   // řádku, a proto ji widget pod `sm` skrýval. Kolo 69 (rámec) to opravilo
   // v ListRow: šipka se na telefonu řadí před ocas, takže sedí v prvním řádku
@@ -222,6 +241,7 @@ const bezPreteceni = (p) => p.evaluate(() => document.documentElement.scrollWidt
   }));
   tvrdi('T1: dny kalendáře mají dotykový cíl aspoň 44 × 44 px', cile.length > 0 && cile.every(c => c.w >= 44 && c.hc >= 44), JSON.stringify(cile.slice(0, 2)));
   await p.screenshot({ path: OUT + 'k69-b5a-uzaverky-tel.png', fullPage: true });
+  await p.locator('[data-plocha]').getByRole('button', { name: 'Další akce' }).first().click();
   await nova.click();
   tvrdi('T1: …a otevře formulář', await dokud(() => p.getByRole('button', { name: 'Zpět na uzávěrky' }).isVisible(), 3000));
   tvrdi('T1: formulář na telefonu nepřetéká', await bezPreteceni(p));

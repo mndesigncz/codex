@@ -255,7 +255,7 @@ const doporucene = (galerie) => galerie.evaluate(el => {
   await ctx.close();
 }
 
-// 6) Telefon 390: bez přetečení, „Přidat položku" vidět a otevře formulář.
+// 6) Telefon 390: bez přetečení, limetkou „Nakoupit (4)", „Přidat položku" v „···" otevře formulář.
 {
   const { ctx, p } = await kontext({ fix: FIX_VEDENI, viewport: { width: 390, height: 844 }, mobil: true, dalsi: podvrh() });
   await otevri(p, VEDENI, 'vedeni.sklad');
@@ -267,8 +267,26 @@ const doporucene = (galerie) => galerie.evaluate(el => {
     return { h: Math.round(r.height), sipkaVRadku: !!s && s.top < r.top + r.height / 2 + 4 && s.right <= r.right + 1 };
   }));
   tvrdi('T1: Docházející zásoby — řádek do 72 px a šipka v řádku', radky.length > 0 && radky.every(r => r.h <= 72 && r.sipkaVRadku), JSON.stringify(radky));
-  const pridat = p.getByRole('button', { name: 'Přidat položku' });
-  tvrdi('T1: „Přidat položku" je vidět a povolené', await pridat.isVisible() && await pridat.isEnabled());
+  // Kolo 6 (V05): na telefonu majitel ze Skladu objednává, co dochází — limetkou je „Nakoupit (N)"
+  // (4 položky pod limitem nebo chybějící na výrobu), „Přidat položku" je v „···". Na monitoru naopak (V1).
+  const limetka = p.locator('[data-plocha] button.on-accent:visible');
+  tvrdi('T1 (V05): jediná limetka na telefonu je „Nakoupit (4)"', await limetek(p) === 1 && (await limetka.first().innerText()).trim() === 'Nakoupit (4)',
+    `${await limetek(p)}× ${await limetka.first().innerText().catch(() => '')}`);
+  tvrdi('T1 (V05): „Přidat položku" na telefonu není tlačítkem v hlavičce', await p.locator('[data-plocha]').getByRole('button', { name: 'Přidat položku' }).count() === 0);
+  const hlav = await limetka.first().boundingBox();
+  tvrdi('T1 (V05): „Nakoupit" je nad ohybem a aspoň 44 px vysoké', !!hlav && hlav.y + hlav.height <= 844 && hlav.height >= 44, JSON.stringify(hlav));
+  await limetka.first().click();
+  tvrdi('T1 (V05): „Nakoupit (4)" otevře okno Nákupní seznam', await dokud(() => p.getByRole('dialog', { name: 'Nákupní seznam' }).isVisible(), 3000));
+  await p.keyboard.press('Escape');
+  await dokud(async () => !(await p.getByRole('dialog', { name: 'Nákupní seznam' }).isVisible()), 2000);
+  // Hlášení od týmu: klepnutí na malý widget Hlášení ze skladu otevře okno hlášení (dřív vedl na tutéž stránku a nic).
+  await widgetLi(p, 'sklad.hlaseni').getByRole('button', { name: /^Otevřít/ }).click();
+  tvrdi('T1 (V05): klepnutí na widget Hlášení ze skladu otevře okno Hlášení ze skladu', await dokud(() => p.getByRole('dialog', { name: 'Hlášení ze skladu' }).isVisible(), 3000));
+  await p.keyboard.press('Escape');
+  await dokud(async () => !(await p.getByRole('dialog', { name: 'Hlášení ze skladu' }).isVisible()), 2000);
+  // Docházející zásoby mají v patičce „Nakoupit (4)" (ve widgetu nikdy limetka).
+  const nakupWidget = widgetLi(p, 'sklad.dochazi').getByRole('button', { name: 'Nakoupit (4)' });
+  tvrdi('T1 (V05): Docházející zásoby mají v patičce „Nakoupit (4)" (secondary, ne limetka)', await nakupWidget.count() === 1 && await widgetLi(p, 'sklad.dochazi').locator('button.on-accent').count() === 0);
   await p.screenshot({ path: OUT + 'k69-b3-sklad-tel.png', fullPage: true });
   // Lišta nástroje (hledání, Seznam/Karty, kategorie): plná leží v toku
   // stránky, kompaktní plave nad obsahem, až plná odjede nahoru. Dřív se
@@ -308,8 +326,10 @@ const doporucene = (galerie) => galerie.evaluate(el => {
   await p.waitForTimeout(250);
   const r = await panel.evaluate(el => { const b = el.getBoundingClientRect(); return { l: Math.round(b.left), r: Math.round(b.right), t: Math.round(b.top), b: Math.round(b.bottom), vw: document.documentElement.clientWidth, vh: window.innerHeight }; });
   tvrdi('T1: menu „···" na telefonu celé na obrazovce s okrajem (16 px)', r.l >= 15 && r.r <= r.vw - 15 && r.t >= 0 && r.b <= r.vh, JSON.stringify(r));
-  await p.keyboard.press('Escape');
-  await pridat.click();
+  const polozkyMenu = (await panel.getByRole('menuitem').allInnerTexts()).map(x => x.trim().split('\n')[0]);
+  tvrdi('T1 (V05): v „···" jsou nahoře nová hlášení od týmu, je tam „Přidat položku" a Nakoupit se neopakuje',
+    /^Hlášení od týmu \(1 nových\)/.test(polozkyMenu[0] ?? '') && polozkyMenu.includes('Přidat položku') && !polozkyMenu.some(x => x.startsWith('Nakoupit')), JSON.stringify(polozkyMenu));
+  await panel.getByRole('menuitem', { name: 'Přidat položku' }).click();
   tvrdi('T1: …a otevře formulář Nová položka', await dokud(() => p.getByRole('dialog', { name: 'Nová položka' }).isVisible(), 3000));
   tvrdi('T1: formulář na telefonu nepřetéká', await bezPreteceni(p));
   await ctx.close();
