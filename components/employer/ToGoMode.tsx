@@ -55,7 +55,7 @@ export default function ToGoMode({ user, onExit, onOpenView, dok }: {
    * Spodní dok na telefonu (V01): položky doku administrace a obsah listu „Více"
    * (skupiny pohledů a akce). Klepnutí na pohled jde přes `onOpenView`.
    */
-  dok?: { polozky: DockItem[]; skupiny: MoreGroup[]; akce: MoreAction[] };
+  dok?: { polozky: DockItem[]; skupiny: MoreGroup[]; akce: MoreAction[]; odznakVice?: { pocet: number; veta: string } };
 }) {
   const t = useT('sprava');
   const { title, subtitle } = useHlavickaPrehledu(user?.name);
@@ -80,7 +80,7 @@ export default function ToGoMode({ user, onExit, onOpenView, dok }: {
         <>
           <Dock label={t('Spodní navigace')} items={dok.polozky} activeId={null}
             onSelect={id => { setViceOtevreno(false); onOpenView(id); }}
-            more={{ onClick: () => setViceOtevreno(v => !v), active: viceOtevreno }} />
+            more={{ onClick: () => setViceOtevreno(v => !v), active: viceOtevreno, badge: viceOtevreno ? 0 : dok.odznakVice?.pocet, badgeLabel: dok.odznakVice?.veta }} />
           <MobileMoreSheet open={viceOtevreno} onClose={() => setViceOtevreno(false)} groups={dok.skupiny} activeId="togo"
             onSelect={id => onOpenView(id)} actions={dok.akce} />
         </>

@@ -343,6 +343,10 @@ export default function EmployerLayout({ user }: Props) {
     : currentView === 'org' ? t('Všechny podniky')
     : active?.label;
   const vDoku = (id: string) => nav.dok.some(d => d.id === id);
+  // Odznak na „Více": nepřečtené zprávy, když Chat v doku není (podnik si dok přeskládal) —
+  // jinak by čekající zprávy schované v listu nebyly z doku vidět vůbec.
+  const odznakVice = ma(KLICE_POHLEDU.chat!) && !vDoku('chat') && nav.vse.some(n => n.id === 'chat') ? unreadChat : 0;
+  const odznakViceVeta = t('{n, plural, one {# nepřečtená zpráva} few {# nepřečtené zprávy} other {# nepřečtených zpráv}}', { n: odznakVice });
   const mobileSecondary = nav.vse.filter(n => !vDoku(n.id));
   // Same categories as the sidebar, minus whatever is already in the bottom dock.
   const mobileGroups = nav.sekce
@@ -403,6 +407,7 @@ export default function EmployerLayout({ user }: Props) {
         ...(n.id === 'chat' ? { badge: unreadChat, badgeLabel: t('{n, plural, one {# nepřečtená zpráva} few {# nepřečtené zprávy} other {# nepřečtených zpráv}}', { n: unreadChat }) } : {}),
       })),
       skupiny: mobileGroups,
+      odznakVice: { pocet: odznakVice, veta: odznakViceVeta },
       akce: [
         { label: t('Hledat'), icon: 'search', onClick: () => doAdministrace(() => setHledani(true)) },
         { label: t('Nastavení'), icon: 'settings', onClick: () => doAdministrace(openSettings) },
@@ -532,8 +537,10 @@ export default function EmployerLayout({ user }: Props) {
           {/* Sekce skrytá v nastavení podniku, otevřená odkazem nebo widgetem: jedna
               informace, žádné okno. Skrytí je preference, ne zákaz. */}
           {jeSkryty && <Chip tone="muted" size="sm" className="shrink-0">{t('Skrytá sekce')}</Chip>}
+          {/* Hledání (paleta Ctrl K) i na telefonu (kolo 6): vedení kontroluje podnik hlavně z mobilu
+              a v listu Více bylo o dvě klepnutí dál. Dotyková plocha 44 px (tap-target). */}
           <button type="button" onClick={() => setHledani(true)} title={t('Hledat v aplikaci (Ctrl K)')} aria-label={t('Hledat v aplikaci')} aria-haspopup="dialog"
-            className="tap-target-sm hidden md:inline-flex shrink-0 rounded-full p-2 text-black/45 hover:text-black hover:bg-black/[0.05] transition-colors">
+            className="tap-target inline-flex shrink-0 rounded-full p-2 text-black/45 hover:text-black hover:bg-black/[0.05] transition-colors">
             <Icon name="search" size={20} />
           </button>
           {ma(UCTENKY) && (
@@ -542,9 +549,10 @@ export default function EmployerLayout({ user }: Props) {
             <Icon name="receipt" size={20} />
           </button>
           )}
+          {/* Pod 380 px je přepínač do Managero client jen v listu Více — místo dostala lupa hledání, název stránky má přednost. */}
           {smiKlient && (
           <button onClick={() => switchMode('client')} title={t('Managero client: hosté, rezervace, věrnost')} aria-label={t('Přepnout do Managero client')}
-            className="tap-target shrink-0 inline-flex items-center gap-1.5 rounded-full bg-[#16181A]/[0.06] border border-black/10 text-[#16181A] px-2.5 sm:px-3 py-1.5 text-xs font-bold hover:bg-[#16181A]/[0.1] transition whitespace-nowrap">
+            className="tap-target shrink-0 hidden min-[380px]:inline-flex items-center gap-1.5 rounded-full bg-[#16181A]/[0.06] border border-black/10 text-[#16181A] px-2.5 sm:px-3 py-1.5 text-xs font-bold hover:bg-[#16181A]/[0.1] transition whitespace-nowrap">
             <Icon name="gift" size={15} className="shrink-0" /><span className="hidden sm:inline">{t('Client')}</span>
           </button>
           )}
@@ -610,7 +618,8 @@ export default function EmployerLayout({ user }: Props) {
         }))}
         activeId={currentView}
         onSelect={id => { setCurrentView(id); setMoreOpen(false); }}
-        more={{ onClick: () => setMoreOpen(v => !v), active: moreOpen || currentView === 'settings' || currentView === 'team-settings' || mobileSecondary.some(n => n.id === currentView) }} />
+        more={{ onClick: () => setMoreOpen(v => !v), active: moreOpen || currentView === 'settings' || currentView === 'team-settings' || mobileSecondary.some(n => n.id === currentView),
+          badge: moreOpen || currentView === 'chat' ? 0 : odznakVice, badgeLabel: odznakViceVeta }} />
 
       {receiptsOpen && (
         <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4" onClick={() => setReceiptsOpen(false)}>
