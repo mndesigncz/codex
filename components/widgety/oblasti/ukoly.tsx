@@ -24,7 +24,7 @@
 //    s ukoly.upravit, odškrtává se jen dnešek a dřív.
 //  - ukoly.splneno_dnes — co dnes kdo dokončil (completedAt z API, kolo 69).
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { Chip, ListRow, Stat } from '../../ui';
 import { Icon } from '../../Icons';
@@ -40,8 +40,9 @@ import { apiMessage, okJson } from '@/lib/api';
 import { oznamZmenuPovinnych, ChipPredUzaverkou } from '../../PredUzaverkou';
 import { pragueToday, pragueHM } from '@/lib/pragueTime';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
+import { fmtHM } from '@/lib/i18n/format';
 import {
-  vyberUkoly, vRozsahu, poTerminu, podleLidi, splnenoDnes, jeCiziUkol, povinnePrvni, type Ukol, type RozsahUkolu,
+  vyberUkoly, vRozsahu, poTerminu, podleLidi, splnenoDnes, jeCiziUkol, povinnePrvni, podleCasuTerminu, type Ukol, type RozsahUkolu,
 } from '@/lib/ukolyPrehled';
 
 // ---------------------------------------------------------------------------
@@ -103,6 +104,21 @@ function filtrujUkoly(nav: Navigace, kdo: number | null) {
   if (detail.prijato) return;
   try { sessionStorage.setItem(KLIC_FILTRU_UKOLU, kdo == null ? 'volne' : String(kdo)); } catch { /* soukromé okno: otevře se bez filtru */ }
   nav.onNavigate('tasks');
+}
+
+/**
+ * Pražské „HH:MM" teď, obnovené každou minutu — pro štítek „po čase" (lib/ukolyFiltr poCase).
+ * Do připojení null: server a prohlížeč by se o minutu rozešly a štítek by
+ * při hydrataci problikl. Sdílí ho Úkoly vedení, zaměstnance i tablet.
+ */
+export function useTedHM(): string | null {
+  const [ted, setTed] = useState<string | null>(null);
+  useEffect(() => {
+    setTed(pragueHM());
+    const i = setInterval(() => setTed(pragueHM()), 30000);
+    return () => clearInterval(i);
+  }, []);
+  return ted;
 }
 
 /**
@@ -192,7 +208,8 @@ function UkolyDnes({ velikost, nastaveni, nahled }: WidgetProps<{ rozsah?: strin
     const vidim = vRozsahu(data.data ?? [], rozsah, ja.id).filter(t => t.status !== 'done' || odskrtnute.has(t.id));
     const po = vidim.filter(t => t.dueDate && t.dueDate < dnes);
     // Povinné před uzávěrkou nahoru — bez nich nepůjde dnešní uzávěrka odeslat.
-    const dnesni = vidim.filter(t => !t.dueDate || t.dueDate === dnes).sort(povinnePrvni<Ukol>(dnes));
+    // …a uvnitř dne podle času termínu („do 10:00" před „do 14:00", bez času na konci).
+    const dnesni = vidim.filter(t => !t.dueDate || t.dueDate === dnes).sort((a, b) => povinnePrvni<Ukol>(dnes)(a, b) || podleCasuTerminu(a, b));
     const vse = [...po, ...dnesni];
     return {
       radky: vse,
@@ -237,6 +254,8 @@ function UkolyDnes({ velikost, nastaveni, nahled }: WidgetProps<{ rozsah?: strin
                 t.assignedTo == null ? proKohokoli
                   : rozsah === 'tym' && t.assignedTo !== ja.id ? t.assigneeName : null,
                 pozde ? termin(t.dueDate!) : null,
+                // Kolo 7: čas termínu jen v meta („· 10:00"), štítek „po čase" mají seznamy Úkolů.
+                t.dueDate && t.dueTime ? fmtHM(t.dueTime) : null,
                 // Odškrtnutí výrobního úkolu naskladní dávku a odepíše suroviny (API).
                 t.source === 'production' ? vyroba : null,
               ].filter(Boolean).join(' · ');

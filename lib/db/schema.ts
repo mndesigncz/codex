@@ -193,6 +193,8 @@ export const tasks = pgTable('tasks', {
   priority: priorityEnum('priority').notNull().default('medium'),
   status: text('status').default('pending'),
   dueDate: text('due_date'),
+  // Kolo 7 (R7-4): „do 14:00" — HH:MM uvnitř dne due_date, nepovinné (DDL v app/api/init).
+  dueTime: text('due_time'),
   createdAt: timestamp('created_at').defaultNow(),
 });
 

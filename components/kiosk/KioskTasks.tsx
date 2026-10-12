@@ -19,12 +19,14 @@ import { useKioskShift } from './KioskShiftGate';
 import { pragueToday } from '@/lib/pragueTime';
 import { okJson, apiMessage } from '@/lib/api';
 import { useJazyk, useT } from '@/lib/i18n/client';
-import { fmtDatum } from '@/lib/i18n/format';
+import { fmtDatum, fmtHM } from '@/lib/i18n/format';
 import { Avatar, Button, Card, Chip, EmptyState, ErrorState, Skeleton, Toast } from '../ui';
 import { Icon } from '../Icons';
 import { TaskChecklist } from '../TaskChecklist';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
 import { vyberUkoly, rozdelPoDnech, type Ukol } from '@/lib/ukolyPrehled';
+import { poCase } from '@/lib/ukolyFiltr';
+import { useTedHM } from '../widgety/oblasti/ukoly';
 import { oznamZmenuPovinnych, ChipPredUzaverkou } from '../PredUzaverkou';
 
 type Filter = 'all' | 'mine' | 'open' | 'done';
@@ -84,6 +86,7 @@ export default function KioskTasks({ onOpenGuide }: { onOpenGuide?: (id: number)
 
   const today = pragueToday();
   const weekAhead = pragueToday(7);
+  const ted = useTedHM();
 
   const filtered = useMemo(() => tasks.filter(t => {
     if (filter === 'mine') return active != null && (t.assignedTo === active.id || t.assignedTo == null);
@@ -103,6 +106,8 @@ export default function KioskTasks({ onOpenGuide }: { onOpenGuide?: (id: number)
   const row = (u: Ukol) => {
     const isDone = u.status === 'done';
     const overdueTask = !isDone && !!u.dueDate && u.dueDate < today;
+    // Kolo 7: dnešní úkol „do 10:00" po desáté — stejně červeně jako po termínu.
+    const poCasu = poCase(u, today, ted);
     return (
       <li key={u.id} className="list-row items-start">
         <button type="button" role="checkbox" aria-checked={isDone} aria-label={u.title}
@@ -125,8 +130,8 @@ export default function KioskTasks({ onOpenGuide }: { onOpenGuide?: (id: number)
               <><Avatar emoji={u.assigneeAvatar} size="xs" ring={false} /><span className="truncate">{u.assigneeName ?? ''}</span></>
             )}
             {u.dueDate && (
-              <span className={`whitespace-nowrap ${overdueTask ? 'text-bad-ink font-medium' : ''}`}>
-                {' · '}{denKratce(u.dueDate)}{overdueTask && ` · ${t('po termínu')}`}
+              <span className={`whitespace-nowrap ${overdueTask || poCasu ? 'text-bad-ink font-medium' : ''}`}>
+                {' · '}{denKratce(u.dueDate)}{u.dueTime && ` · ${fmtHM(u.dueTime)}`}{overdueTask && ` · ${t('po termínu')}`}{poCasu && ` · ${t('po čase')}`}
               </span>
             )}
             {isDone && u.completedByName && <span className="truncate"> · {t('splnil {jmeno}', { jmeno: u.completedByName })}</span>}

@@ -27,13 +27,13 @@ import { PersonLink } from './ProfileLinkProvider';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useSmi } from '../widgety/NavigaceKontext';
-import { URL_UKOLY, UDALOST_FILTR_UKOLU, KLIC_FILTRU_UKOLU, Zaskrtnuti } from '../widgety/oblasti/ukoly';
+import { URL_UKOLY, UDALOST_FILTR_UKOLU, KLIC_FILTRU_UKOLU, Zaskrtnuti, useTedHM } from '../widgety/oblasti/ukoly';
 import { pragueToday } from '@/lib/pragueTime';
 import { apiMessage, okJson } from '@/lib/api';
 import { useDraft } from '@/lib/useDraft';
 import { DraftNote } from '../ui/DraftNote';
 import { vyberUkoly, rozdelPoDnech, jeCiziUkol, splnenoDnes, stavPoOdskrtnuti, type StavZapisu, type Ukol } from '@/lib/ukolyPrehled';
-import { VYCHOZI_FILTR, filtrujBezStavu, filtrujUkoly, poctyStavu, seradUkoly, statistikaUkolu, rozborPredani, cerstvePredani, UDALOST_PREDANI_UKOLU, type FiltrUkolu } from '@/lib/ukolyFiltr';
+import { VYCHOZI_FILTR, filtrujBezStavu, filtrujUkoly, poctyStavu, seradUkoly, statistikaUkolu, rozborPredani, cerstvePredani, poCase, UDALOST_PREDANI_UKOLU, type FiltrUkolu } from '@/lib/ukolyFiltr';
 import { UkolDetail } from '../ukoly/UkolDetail';
 import { UkolyFiltry, type ClovekFiltru } from '../ukoly/UkolyFiltry';
 import { UkolySouhrn } from '../ukoly/UkolySouhrn';
@@ -42,6 +42,7 @@ import { UkolyMesic } from '../ukoly/UkolyMesic';
 import { UkolyPrehled } from '../ukoly/UkolyPrehled';
 import { oznamZmenuPovinnych, ChipPredUzaverkou } from '../PredUzaverkou';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
+import { fmtHM } from '@/lib/i18n/format';
 import { sUzlem, VLOZ } from './jazyk';
 import { useLocale } from './jazyk';
 
@@ -60,6 +61,8 @@ const prioritaText = (t: PrekladFn): Record<string, string> => ({ high: t('vysok
 
 const emptyForm = () => ({
   title: '', description: '', assignedTo: '', priority: 'medium', dueDate: '', recurrence: '', checklist: [] as ChecklistItem[],
+  // Kolo 7: „do 14:00" — HH:MM, jen s termínem (pole je bez data zamčené).
+  dueTime: '',
   // Úkol zamyká uzávěrku dne, dokud není hotový (tasks.require_before_closing).
   requireBeforeClosing: false,
 });
@@ -155,6 +158,8 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
   const { weekStart } = useCurrency();
   const today = pragueToday();
   const weekAhead = pragueToday(7);
+  // Pražské „teď" pro štítek „po čase" (dnešní úkol, jehož čas termínu minul).
+  const ted = useTedHM();
 
   const memberById = useMemo(() => new Map(members.map(m => [m.id, m])), [members]);
 
@@ -189,7 +194,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
     setForm({
       title: uk.title, description: uk.description ?? '',
       assignedTo: uk.assignedTo == null ? '' : String(uk.assignedTo),
-      priority: uk.priority, dueDate: uk.dueDate ?? '',
+      priority: uk.priority, dueDate: uk.dueDate ?? '', dueTime: uk.dueTime ?? '',
       recurrence: uk.recurrence ?? '', checklist: uk.checklist ?? [],
       requireBeforeClosing: uk.requireBeforeClosing === true,
     });
@@ -210,6 +215,8 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
       title: form.title.trim(), description: form.description.trim() || null, priority: form.priority,
       assignedTo: form.assignedTo === '' ? null : parseInt(form.assignedTo),
       dueDate: form.dueDate || null,
+      // Čas bez dne server odmítne — pole je bez data zamčené, tady jen pojistka.
+      dueTime: form.dueDate && form.dueTime ? form.dueTime : null,
       recurrence: form.recurrence || null,
       // Bez práva se příznak neposílá vůbec: úprava od autora bez práva ho pak na serveru nechá, jak byl.
       ...(smiPovinny ? { requireBeforeClosing: form.requireBeforeClosing } : {}),
@@ -348,10 +355,12 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
             <span className="min-w-0">
               {uk.assignedTo != null ? <PersonLink id={uk.assignedTo}>{kdo}</PersonLink> : kdo}
               {uk.dueDate ? ` · ${denKratce(uk.dueDate, loc)}` : ''}
+              {uk.dueDate && uk.dueTime ? ` · ${fmtHM(uk.dueTime)}` : ''}
               {done && uk.completedByName ? <>  · {t('splnil')} <PersonLink id={uk.completedBy}>{uk.completedByName}</PersonLink></> : ''}
             </span>
             {/* Kolo 7: „Probíhá" i ve správcovském seznamu — dřív ho viděl jen zaměstnanec a detail. */}
             {uk.status === 'in_progress' && !done && <Chip tone="info" size="sm">{t('Probíhá')}</Chip>}
+            {poCase(uk, today, ted) && <Chip tone="bad" size="sm">{t('po čase')}</Chip>}
             {uk.source === 'production' && <Chip tone="info" size="sm" icon="leaf">{t('Výroba')}</Chip>}
             {opakovani && <Chip tone="muted" size="sm" icon="refresh">{opakovani}</Chip>}
             {uk.requireBeforeClosing && <ChipPredUzaverkou />}
@@ -415,19 +424,25 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
           <Field id={fid('popis')} label={t('Popis')} hint={t('Nepovinné.')}>
             <Textarea id={fid('popis')} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} />
           </Field>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field id={fid('kdo')} label={t('Kdo úkol udělá')}
-              hint={form.assignedTo === '' ? t('Úkol na daný den — splní ho kdokoli z týmu.') : t('Úkol pro konkrétního člověka.')}>
-              <Select id={fid('kdo')} value={form.assignedTo} onChange={e => setForm(f => ({ ...f, assignedTo: e.target.value }))}>
-                {/* Úkol pro kohokoli nebo pro kolegu zadá jen ten, kdo smí úkoly zadávat (jako POST /api/tasks). */}
-                {zadava && <option value="">{t('Kdokoli (podle dne)')}</option>}
-                {zadava ? members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)
-                  : <option value={String(ja ?? '')}>{t('Já')}</option>}
-              </Select>
-            </Field>
+          <Field id={fid('kdo')} label={t('Kdo úkol udělá')}
+            hint={form.assignedTo === '' ? t('Úkol na daný den — splní ho kdokoli z týmu.') : t('Úkol pro konkrétního člověka.')}>
+            <Select id={fid('kdo')} value={form.assignedTo} onChange={e => setForm(f => ({ ...f, assignedTo: e.target.value }))}>
+              {/* Úkol pro kohokoli nebo pro kolegu zadá jen ten, kdo smí úkoly zadávat (jako POST /api/tasks). */}
+              {zadava && <option value="">{t('Kdokoli (podle dne)')}</option>}
+              {zadava ? members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)
+                : <option value={String(ja ?? '')}>{t('Já')}</option>}
+            </Select>
+          </Field>
+          {/* Termín a čas jsou dvojice — sdílí řádek i na telefonu (DESIGN: Dvojice polí sdílí řádek). */}
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
             <Field id={fid('termin')} label={editingSeries ? t('Termín (od kdy)') : t('Termín')}
               hint={editingSeries ? undefined : form.assignedTo === '' ? t('Povinné u úkolu pro kohokoli.') : t('Nepovinné.')}>
-              <Input id={fid('termin')} type="date" value={form.dueDate} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} />
+              <Input id={fid('termin')} type="date" value={form.dueDate}
+                onChange={e => { const v = e.target.value; setForm(f => ({ ...f, dueDate: v, dueTime: v ? f.dueTime : '' })); }} />
+            </Field>
+            <Field id={fid('cas')} label={t('Do kdy (nepovinné)')} hint={form.dueDate ? undefined : t('Nejdřív vyber den.')}>
+              <Input id={fid('cas')} type="time" value={form.dueTime} disabled={!form.dueDate}
+                onChange={e => setForm(f => ({ ...f, dueTime: e.target.value }))} />
             </Field>
           </div>
           {editingSeries && (

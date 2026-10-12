@@ -1645,5 +1645,8 @@
   "Uvidí ho i člověk v oznámení o změně a účetní v exportu.": "The person sees it in the change notification and the accountant in the export.",
   "Např. zapomněl se odpíchnout": "E.g. forgot to clock out",
   "Upraveno|zaznam": "Edited",
-  "Probíhá": "In progress"
+  "Probíhá": "In progress",
+  "po čase": "late",
+  "Do kdy (nepovinné)": "By what time (optional)",
+  "Nejdřív vyber den.": "Pick a day first."
 }

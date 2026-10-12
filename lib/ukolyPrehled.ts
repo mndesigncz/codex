@@ -7,7 +7,7 @@
 // ve widgetu by nesedělo se sekcí seznamu. Soubor je bez Reactu, ať ho
 // `npm test` pustí přímo v Node (scripts/testy/k69-b6a.ts).
 
-import { pragueDaySafe } from './pragueTime.ts';
+import { pragueDaySafe, dayPlus } from './pragueTime.ts';
 
 // ---------------------------------------------------------------------------
 // Úkoly (GET /api/tasks → pole ve tvaru shape() z app/api/tasks/route.ts)
@@ -23,6 +23,8 @@ export interface Ukol {
   priority: string;
   /** YYYY-MM-DD, nebo null (úkol bez termínu). */
   dueDate: string | null;
+  /** Kolo 7: „do 14:00" — HH:MM uvnitř dne termínu, nebo null (stačí den). Bez dne nikdy. */
+  dueTime?: string | null;
   assignedTo: number | null;
   createdBy: number | null;
   /** Úkol pro kohokoli (bez přiřazení). */
@@ -45,6 +47,13 @@ export interface Ukol {
 }
 
 const den = (v: unknown): string | null => (/^\d{4}-\d{2}-\d{2}/.test(String(v ?? '')) ? String(v).slice(0, 10) : null);
+/** Čas termínu „HH:MM" (00:00–23:59). Jiný tvar je chyba vstupu, ne čas. */
+export const CAS_TERMINU = /^([01]\d|2[0-3]):[0-5]\d$/;
+/** HH:MM, nebo null — cokoli jiného (i „14:00:00" ze starého zápisu oříznuté na minuty projde). */
+export const casNeboNull = (v: unknown): string | null => {
+  const s = typeof v === 'string' ? v.trim().slice(0, 5) : '';
+  return CAS_TERMINU.test(s) ? s : null;
+};
 const cisloNeboNull = (v: unknown): number | null => (v == null || v === '' ? null : Number.isFinite(Number(v)) ? Number(v) : null);
 
 /**
@@ -60,6 +69,8 @@ export function vyberUkoly(raw: unknown): Ukol[] {
     status: String(t?.status ?? 'pending'),
     priority: String(t?.priority ?? 'medium'),
     dueDate: den(t?.dueDate),
+    // Čas bez dne nemá smysl (do 14:00 kterého dne?) — zahodí se.
+    dueTime: den(t?.dueDate) ? casNeboNull(t?.dueTime) : null,
     assignedTo: cisloNeboNull(t?.assignedTo),
     createdBy: cisloNeboNull(t?.createdBy),
     teamTask: t?.assignedTo == null,
@@ -104,6 +115,44 @@ export function stavPoOdskrtnuti(hotovo: boolean, predtim?: string | null): Stav
   return predtim === 'in_progress' ? 'in_progress' : 'pending';
 }
 
+// ---------------------------------------------------------------------------
+// Čas termínu a výskyty série (kolo 7, R7-4) — sdílí API, formulář a testy
+// ---------------------------------------------------------------------------
+
+export type VysledekCasu = { ok: true; cas: string | null } | { ok: false; chyba: string };
+
+/**
+ * Čas termínu ze vstupu (POST/PATCH /api/tasks). Prázdno = bez času. Čas jde
+ * jen s dnem: „do 14:00" bez data by nikdo nevěděl kterého dne.
+ */
+export function validujCasTerminu(vstup: unknown, maDen: boolean): VysledekCasu {
+  if (vstup == null || vstup === '') return { ok: true, cas: null };
+  const cas = typeof vstup === 'string' && CAS_TERMINU.test(vstup.trim()) ? vstup.trim() : null;
+  if (!cas) return { ok: false, chyba: 'Čas termínu zadej jako HH:MM (např. 14:00).' };
+  if (!maDen) return { ok: false, chyba: 'Čas termínu jde zadat jen s dnem.' };
+  return { ok: true, cas };
+}
+
+/** Řádek úkolu z databáze — jen sloupce, které se přenáší do dalších výskytů série. */
+export interface VzorVyskytu { due_time?: unknown }
+export interface DoplnkyVyskytu { due_time: string | null }
+
+/**
+ * Co nový výskyt opakovaného úkolu převezme ze vzoru (posledního výskytu).
+ * Kolo 7: čas termínu — jinak by „každý den do 10:00" měl čas jen první den.
+ */
+export function doplnkyVyskytu(vzor: VzorVyskytu | null | undefined): DoplnkyVyskytu {
+  return { due_time: casNeboNull(vzor?.due_time) };
+}
+
+/** Tělo push oznámení o novém úkolu: „Objednat pečivo · dnes do 10:00". Bez času jen název. */
+export function textOznameniUkolu(nazev: string, termin: string | null, cas: string | null, dnes: string): string {
+  if (!cas || !termin) return nazev;
+  if (termin === dnes) return `${nazev} · dnes do ${cas}`;
+  if (termin === dayPlus(dnes, 1)) return `${nazev} · zítra do ${cas}`;
+  return `${nazev} · ${Number(termin.slice(8, 10))}. ${Number(termin.slice(5, 7))}. do ${cas}`;
+}
+
 /** Po termínu = nedokončený a termín byl včera nebo dřív (dnešní termín ještě platí). */
 export const jePoTerminu = (t: Pick<Ukol, 'status' | 'dueDate'>, dnes: string) => !jeHotovy(t) && !!t.dueDate && t.dueDate < dnes;
 
@@ -116,7 +165,10 @@ export function vRozsahu(ukoly: readonly Ukol[], rozsah: RozsahUkolu, ja: number
   return ukoly.filter(t => (rozsah === 'moje' ? moje(t) : moje(t) || t.assignedTo == null));
 }
 
-const podleTerminu = (a: Ukol, b: Ukol) => String(a.dueDate ?? '').localeCompare(String(b.dueDate ?? '')) || a.id - b.id;
+/** Uvnitř jednoho dne podle času termínu; úkol bez času patří na konec dne. */
+export const podleCasuTerminu = (a: Pick<Ukol, 'dueTime'>, b: Pick<Ukol, 'dueTime'>) =>
+  String(a.dueTime ?? '99:99').localeCompare(String(b.dueTime ?? '99:99'));
+const podleTerminu = (a: Ukol, b: Ukol) => String(a.dueDate ?? '').localeCompare(String(b.dueDate ?? '')) || podleCasuTerminu(a, b) || a.id - b.id;
 
 /** Povinný úkol na dnešek (zamyká dnešní uzávěrku). */
 export const jePovinnyDnes = (t: Pick<Ukol, 'requireBeforeClosing' | 'dueDate' | 'status'>, dnes: string) =>

@@ -7,7 +7,7 @@
 
 import { dayPlus } from './pragueTime.ts';
 import { pragueDaySafe } from './pragueTime.ts';
-import { jeHotovy, jePoTerminu, type Ukol } from './ukolyPrehled.ts';
+import { jeHotovy, jePoTerminu, podleCasuTerminu, type Ukol } from './ukolyPrehled.ts';
 import { dnTydne, type HodnotaDne } from './obdobi.ts';
 
 export type StavUkolu = 'vse' | 'po_terminu' | 'dnes' | 'tyden' | 'pozdeji' | 'bez_terminu' | 'hotove';
@@ -47,6 +47,15 @@ export function odpovidaHledani(u: Ukol, hledat: string): boolean {
   return q.split(/\s+/).every(slovo => seno.includes(slovo));
 }
 
+/**
+ * Kolo 7: dnešní nehotový úkol, jehož čas termínu už minul („do 10:00" a je 10:05).
+ * `tedHM` je pražské „HH:MM" z pragueHM() — porovnává se čas na zdi podniku, ne čas
+ * prohlížeče. Úkol z minulého dne je „po termínu" (stavUkolu), ne „po čase".
+ */
+export function poCase(u: Pick<Ukol, 'status' | 'dueDate' | 'dueTime'>, dnes: string, tedHM: string | null | undefined): boolean {
+  return !jeHotovy(u) && !!u.dueDate && u.dueDate === dnes && !!u.dueTime && !!tedHM && u.dueTime < tedHM;
+}
+
 /** Do které záložky úkol patří. Hotové mají vlastní; nehotové podle termínu (dnešní termín není po termínu). */
 export function stavUkolu(u: Pick<Ukol, 'status' | 'dueDate'>, dnes: string, zaTyden: string): Exclude<StavUkolu, 'vse'> {
   if (jeHotovy(u)) return 'hotove';
@@ -78,7 +87,8 @@ export function filtrujBezStavu(ukoly: readonly Ukol[], f: FiltrUkolu): Ukol[] {
 }
 
 const poradiPriority: Record<string, number> = { high: 0, medium: 1, low: 2 };
-const podleTerminu = (a: Ukol, b: Ukol) => String(a.dueDate ?? '9999').localeCompare(String(b.dueDate ?? '9999')) || a.id - b.id;
+// Uvnitř dne podle času termínu (kolo 7), úkol bez času na konec dne.
+const podleTerminu = (a: Ukol, b: Ukol) => String(a.dueDate ?? '9999').localeCompare(String(b.dueDate ?? '9999')) || podleCasuTerminu(a, b) || a.id - b.id;
 
 export function seradUkoly(ukoly: readonly Ukol[], razeni: RazeniUkolu): Ukol[] {
   const kopie = [...ukoly];

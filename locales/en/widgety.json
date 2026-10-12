@@ -1938,5 +1938,8 @@
   "Pošle upozornění všem, kdo na {mesic} dostupnost nezadali.": "Sends a notification to everyone who hasn't entered availability for {mesic}.",
   "Připomenout ({n})": "Remind ({n})",
   "Připomenout dostupnost": "Remind about availability",
-  "Začít": "Start"
+  "Začít": "Start",
+  "po čase": "late",
+  "dnes do {cas}": "today until {cas}",
+  "zítra do {cas}": "tomorrow until {cas}"
 }

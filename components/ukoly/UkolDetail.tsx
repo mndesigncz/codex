@@ -12,8 +12,9 @@ import { Poznamky } from '../Poznamky';
 import { useT } from '@/lib/i18n/client';
 import { aktualniJazyk } from '@/lib/i18n/stav';
 import { jeHotovy, jePoTerminu, type Ukol } from '@/lib/ukolyPrehled';
-import { postupChecklistu } from '@/lib/ukolyFiltr';
-import { dayPlus } from '@/lib/pragueTime';
+import { postupChecklistu, poCase } from '@/lib/ukolyFiltr';
+import { dayPlus, pragueHM } from '@/lib/pragueTime';
+import { fmtHM } from '@/lib/i18n/format';
 
 const prioTon = (p: string): 'bad' | 'wait' | 'muted' => (p === 'high' ? 'bad' : p === 'medium' ? 'wait' : 'muted');
 
@@ -40,6 +41,9 @@ export function UkolDetail({ ukol, dnes, kdo, navodHref, onClose, onSplnit, onSt
   const loc = aktualniJazyk();
   const hotovo = jeHotovy(ukol);
   const poTerminu = jePoTerminu(ukol, dnes);
+  // Kolo 7: dnešní úkol, jehož čas termínu minul (okno je otevřené krátce — stačí čas při vykreslení).
+  const poCasu = poCase(ukol, dnes, pragueHM());
+  const casTerminu = ukol.dueDate && ukol.dueTime ? fmtHM(ukol.dueTime) : null;
   const den = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString(loc, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const cas = (iso: string) => new Date(iso).toLocaleString(loc, { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Prague' });
   const opakovani = recurrenceLabel(ukol.recurrence);
@@ -48,10 +52,11 @@ export function UkolDetail({ ukol, dnes, kdo, navodHref, onClose, onSplnit, onSt
 
   const terminPopis = (() => {
     if (!ukol.dueDate) return t('Bez termínu');
-    if (hotovo) return den(ukol.dueDate);
-    if (ukol.dueDate === dnes) return `${den(ukol.dueDate)} · ${t('dnes')}`;
-    if (ukol.dueDate === dayPlus(dnes, 1)) return `${den(ukol.dueDate)} · ${t('zítra')}`;
-    return `${den(ukol.dueDate)}${poTerminu ? ` · ${t('po termínu')}` : ''}`;
+    const doCasu = casTerminu ? ` · ${t('do {cas}', { cas: casTerminu })}` : '';
+    if (hotovo) return `${den(ukol.dueDate)}${doCasu}`;
+    if (ukol.dueDate === dnes) return `${den(ukol.dueDate)} · ${casTerminu ? t('dnes do {cas}', { cas: casTerminu }) : t('dnes')}${poCasu ? ` · ${t('po čase')}` : ''}`;
+    if (ukol.dueDate === dayPlus(dnes, 1)) return `${den(ukol.dueDate)} · ${casTerminu ? t('zítra do {cas}', { cas: casTerminu }) : t('zítra')}`;
+    return `${den(ukol.dueDate)}${doCasu}${poTerminu ? ` · ${t('po termínu')}` : ''}`;
   })();
 
   const radek = (nazev: string, hodnota: ReactNode) => (
@@ -89,7 +94,7 @@ export function UkolDetail({ ukol, dnes, kdo, navodHref, onClose, onSplnit, onSt
 
         <dl className="divide-y divide-black/[0.06] border-y border-black/[0.06]">
           {radek(t('Komu'), ukol.teamTask ? t('Kdokoli z týmu') : kdo)}
-          {radek(t('Termín'), <span className={poTerminu ? 'text-bad-ink font-medium' : undefined}>{terminPopis}</span>)}
+          {radek(t('Termín'), <span className={poTerminu || poCasu ? 'text-bad-ink font-medium' : undefined}>{terminPopis}</span>)}
           {ukol.createdAt && radek(t('Založeno'), cas(ukol.createdAt))}
           {hotovo && ukol.completedAt && radek(t('Splněno'), <>{cas(ukol.completedAt)}{ukol.completedByName ? ` · ${ukol.completedByName}` : ''}</>)}
           {hotovo && !ukol.completedAt && ukol.completedByName && radek(t('Splnil'), ukol.completedByName)}

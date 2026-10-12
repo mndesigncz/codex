@@ -24,13 +24,13 @@ import { Button, Card, Chip, EmptyState, ErrorState, Menu, Modal, Segmented, Ske
 import { Icon } from '../Icons';
 import { apiMessage, okJson } from '@/lib/api';
 import { useJazyk, useT } from '@/lib/i18n/client';
-import { fmtDatum } from '@/lib/i18n/format';
+import { fmtDatum, fmtHM } from '@/lib/i18n/format';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useSmi } from '../widgety/NavigaceKontext';
-import { URL_UKOLY, Zaskrtnuti } from '../widgety/oblasti/ukoly';
+import { URL_UKOLY, Zaskrtnuti, useTedHM } from '../widgety/oblasti/ukoly';
 import { vyberUkoly, vRozsahu, rozdelPoDnech, jeCiziUkol, splnenoDnes, type Ukol } from '@/lib/ukolyPrehled';
-import { VYCHOZI_FILTR, filtrujBezStavu, filtrujUkoly, poctyStavu, seradUkoly, statistikaUkolu, rozborPredani, cerstvePredani, UDALOST_PREDANI_UKOLU, type FiltrUkolu } from '@/lib/ukolyFiltr';
+import { VYCHOZI_FILTR, filtrujBezStavu, filtrujUkoly, poctyStavu, seradUkoly, statistikaUkolu, rozborPredani, cerstvePredani, poCase, UDALOST_PREDANI_UKOLU, type FiltrUkolu } from '@/lib/ukolyFiltr';
 import { UkolDetail } from '../ukoly/UkolDetail';
 import { UkolyFiltry } from '../ukoly/UkolyFiltry';
 import { UkolySouhrn } from '../ukoly/UkolySouhrn';
@@ -88,6 +88,7 @@ export default function Tasks({ user }: Props) {
 
   const today = pragueToday();
   const weekAhead = pragueToday(7);
+  const ted = useTedHM();
   const smiSplnit = (t: Ukol) => !jeCiziUkol(t, ja) || smi('ukoly.plnit');
 
   const zmenStav = async (task: Ukol, newStatus: string) => {
@@ -175,8 +176,10 @@ export default function Tasks({ user }: Props) {
           </p>
           {task.description && <p className="text-sm text-black/55 mt-1 whitespace-pre-wrap text-pretty">{task.description}</p>}
           <div className="flex items-center gap-1.5 mt-1.5 flex-wrap text-[13px] text-black/55">
-            {task.dueDate && <span className={pozde ? 'text-bad-ink font-medium' : undefined}><span className="cz-sentence">{denKratce(task.dueDate)}</span>{pozde && ` · ${t('po termínu')}`}</span>}
+            {task.dueDate && <span className={pozde ? 'text-bad-ink font-medium' : undefined}><span className="cz-sentence">{denKratce(task.dueDate)}</span>{task.dueTime && ` · ${fmtHM(task.dueTime)}`}{pozde && ` · ${t('po termínu')}`}</span>}
             {task.status === 'in_progress' && <Chip tone={stav.tone} size="sm">{t('Probíhá')}</Chip>}
+            {/* Kolo 7: dnešní úkol „do 10:00" po desáté zčervená. */}
+            {poCase(task, today, ted) && <Chip tone="bad" size="sm">{t('po čase')}</Chip>}
             {task.source === 'production' && <Chip tone="info" size="sm" icon="leaf">{t('Výroba')}</Chip>}
             {task.teamTask && <Chip tone="info" size="sm" icon="users">{t('Pro kohokoli')}</Chip>}
             {opakovani && <Chip tone="muted" size="sm" icon="refresh">{opakovani}</Chip>}

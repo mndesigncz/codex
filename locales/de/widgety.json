@@ -1939,5 +1939,8 @@
   "Pošle upozornění všem, kdo na {mesic} dostupnost nezadali.": "Benachrichtigt alle, die für {mesic} keine Verfügbarkeit eingetragen haben.",
   "Připomenout ({n})": "Erinnern ({n})",
   "Připomenout dostupnost": "An Verfügbarkeit erinnern",
-  "Začít": "Loslegen"
+  "Začít": "Loslegen",
+  "po čase": "zu spät",
+  "dnes do {cas}": "heute bis {cas}",
+  "zítra do {cas}": "morgen bis {cas}"
 }

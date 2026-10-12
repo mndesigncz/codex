@@ -9,7 +9,7 @@ import { sazebnikBodu } from '@/lib/mzdaSmeny';
 import { jeClenem } from '@/lib/tenant';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { typNaUcet } from '@/lib/opravneni';
-import { jeStavZapisu } from '@/lib/ukolyPrehled';
+import { jeStavZapisu, casNeboNull, validujCasTerminu, doplnkyVyskytu, textOznameniUkolu, type DoplnkyVyskytu } from '@/lib/ukolyPrehled';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,6 +29,8 @@ const shape = (r: any) => ({
   assignedTo: r.assigned_to ?? null, createdBy: r.created_by,
   teamTask: r.assigned_to == null,
   priority: r.priority, status: r.status, dueDate: r.due_date,
+  // Kolo 7: „do 14:00" (HH:MM, nepovinné; jen s dnem termínu).
+  dueTime: r.due_date ? casNeboNull(r.due_time) : null,
   recurrence: r.recurrence ?? null,
   seriesId: r.series_id ?? null,
   checklist: Array.isArray(r.checklist) ? r.checklist : [],
@@ -70,7 +72,26 @@ async function zapisPovinny(flag: boolean, cil: { id?: number | null; seriesId?:
   } catch { /* sloupec ještě není — úkol platí, jen bez zámku */ }
 }
 
+// Kolo 7: doplňky výskytu (čas termínu) se zapisují ZVLÁŠŤ a best-effort,
+// stejně jako příznak povinného úkolu výš: před migrací by INSERT s novým
+// sloupcem shodil i založení úkolu. Cíl: jeden řádek, budoucí nesplněné
+// výskyty série, nebo konkrétní dny série (nově vygenerované výskyty).
+type CilDoplnku = { id?: number | null; seriesId?: string | null; odDne?: string; dny?: string[] };
+async function zapisDoplnky(d: DoplnkyVyskytu, cil: CilDoplnku) {
+  try {
+    if (cil.seriesId && cil.dny) {
+      if (cil.dny.length) await sql`UPDATE tasks SET due_time = ${d.due_time} WHERE series_id = ${cil.seriesId} AND due_date = ANY(${cil.dny}::text[])`;
+    } else if (cil.seriesId && cil.odDne) {
+      await sql`UPDATE tasks SET due_time = ${d.due_time} WHERE series_id = ${cil.seriesId} AND due_date >= ${cil.odDne} AND status <> 'done'`;
+    } else if (cil.seriesId) {
+      await sql`UPDATE tasks SET due_time = ${d.due_time} WHERE series_id = ${cil.seriesId}`;
+    }
+    if (cil.id != null) await sql`UPDATE tasks SET due_time = ${d.due_time} WHERE id = ${cil.id}`;
+  } catch { /* sloupec ještě není — úkol platí, jen bez času */ }
+}
+
 const RECURRENCES = ['daily', 'weekdays', 'weekly'];
+const DEN = /^\d{4}-\d{2}-\d{2}$/;
 const TARGET_UPCOMING = 5;   // keep this many future, undone occurrences per series
 const HORIZON_DAYS = 120;    // never generate further than this ahead
 
@@ -148,6 +169,12 @@ async function topUpSeries(teamId: number) {
         await sql`
           UPDATE tasks SET require_before_closing = (SELECT COALESCE(require_before_closing, FALSE) FROM tasks WHERE id = ${tmpl.id})
           WHERE series_id = ${seriesId} AND due_date = ANY(${inserts}::text[])`;
+      } catch { /* před migrací */ }
+      // Kolo 7: čas termínu ze vzoru (doplnkyVyskytu) — zvlášť, ať případný
+      // výpadek nového sloupce nevezme s sebou zámek uzávěrky výš.
+      try {
+        const [vzor] = await sql`SELECT due_time FROM tasks WHERE id = ${tmpl.id}`;
+        await zapisDoplnky(doplnkyVyskytu(vzor), { seriesId, dny: inserts });
       } catch { /* před migrací */ }
     }
   }
@@ -235,6 +262,10 @@ export async function POST(req: NextRequest) {
     : [];
   const priority = b.priority ?? 'medium';
   const dueDate = b.dueDate || null;
+  if (dueDate != null && !(typeof dueDate === 'string' && DEN.test(dueDate))) return NextResponse.json({ error: 'Termín zadej jako datum (RRRR-MM-DD).' }, { status: 400 });
+  // Kolo 7: „do 14:00" jen s dnem — opakovaný úkol bez data začíná dnes, takže den má.
+  const casV = validujCasTerminu(b.dueTime, !!(dueDate || recurrence));
+  if (!casV.ok) return NextResponse.json({ error: casV.chyba }, { status: 400 });
   const povinny = b.requireBeforeClosing === true && smiPovinny(c.opr);
   // Zámek patří dni — úkol bez termínu a bez opakování by nezamkl nikdy nic
   // a manažer by si myslel, že hlídá.
@@ -273,11 +304,15 @@ export async function POST(req: NextRequest) {
     await zapisPovinny(true, seriesId ? { seriesId } : { id: Number(first.id) });
     first = { ...first, require_before_closing: true };
   }
+  if (casV.cas && first) {
+    await zapisDoplnky({ due_time: casV.cas }, seriesId ? { seriesId } : { id: Number(first.id) });
+    first = { ...first, due_time: casV.cas };
+  }
 
   // Notify the assignee (specific person) when it isn't self-assigned.
   if (assignedTo && assignedTo !== c.meId) {
     try {
-      await notifyUser(assignedTo, { title: 'Nový úkol', body: title, type: priority === 'high' ? 'warning' : 'info', category: 'task', link: '/employee/shifts?view=tasks' });
+      await notifyUser(assignedTo, { title: 'Nový úkol', body: textOznameniUkolu(title, dates[0], casV.cas, todayStr()), type: priority === 'high' ? 'warning' : 'info', category: 'task', link: '/employee/shifts?view=tasks' });
     } catch { /* best-effort */ }
   }
 
@@ -382,6 +417,16 @@ export async function PATCH(req: NextRequest) {
       ? (RECURRENCES.includes(b.recurrence) ? b.recurrence : null)
       : (task.recurrence ?? null);
     const dueDate = b.dueDate !== undefined ? (b.dueDate || null) : task.due_date;
+    if (b.dueDate && !(typeof b.dueDate === 'string' && DEN.test(b.dueDate))) return NextResponse.json({ error: 'Termín zadej jako datum (RRRR-MM-DD).' }, { status: 400 });
+    // Kolo 7: čas termínu. Bez dne (a bez opakování, které den dá) čas zmizí —
+    // poslaný čas bez dne je chyba vstupu, uložený se tiše zahodí s dnem.
+    const maDen = !!(dueDate || newRecurrence);
+    let cas: string | null;
+    if (b.dueTime !== undefined) {
+      const v = validujCasTerminu(b.dueTime, maDen);
+      if (!v.ok) return NextResponse.json({ error: v.chyba }, { status: 400 });
+      cas = v.cas;
+    } else cas = maDen ? casNeboNull(task.due_time) : null;
 
     // Příznak: z formuláře jen s právem, jinak zůstává, jak byl. Zapisuje se
     // vždycky (i beze změny), protože přestavba série níž maže budoucí výskyty
@@ -464,6 +509,8 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (povinny || bylPovinny) await zapisPovinny(povinny, cilPovinny);
+    // Doplňky (čas) vždycky: přestavba série výš zakládá výskyty bez nich.
+    await zapisDoplnky({ due_time: cas }, cilPovinny);
 
     // Return a representative row (the edited one if it survived, else the series' next occurrence).
     let [row] = await sql`

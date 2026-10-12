@@ -2634,6 +2634,10 @@ export async function GET(request: Request) {
       )`);
     await ddl(sql`CREATE UNIQUE INDEX IF NOT EXISTS schedule_publications_team_month ON schedule_publications(team_id, month)`);
 
+    // Kolo 7 (R7-4, Úkoly): čas termínu „do 14:00" (HH:MM uvnitř dne due_date,
+    // nepovinný; výskyty série ho dědí).
+    await ddl(sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS due_time TEXT`);
+
     // Kroky migrace, které selhaly (a byly zachyceny), ať se to pozná zvenku
     // místo tichého „ok". Prázdné pole = celé schéma prošlo.
     if (migFails.length) console.error('init: kroků selhalo', migFails.length, migFails);
