@@ -6,7 +6,10 @@
 
 import { readFileSync } from 'node:fs';
 import type { Testy } from './_testy.ts';
-import { duvodVolna, textRozhodnutiVolna, MAX_DUVOD_VOLNA, otevritMojeZadosti } from '../../lib/rozvrhPrehled.ts';
+import {
+  duvodVolna, textRozhodnutiVolna, MAX_DUVOD_VOLNA, otevritMojeZadosti,
+  stavyDostupnosti, denTydne, nastavDenVTydnu, prevezmiVzor,
+} from '../../lib/rozvrhPrehled.ts';
 import { VYCHOZI_NAV, NAV_TEXTY } from '../../lib/navigace.ts';
 
 const cti = (cesta: string) => readFileSync(new URL(`../../${cesta}`, import.meta.url), 'utf8');
@@ -61,4 +64,43 @@ export default function ({ eq, ok }: Testy) {
   ok('Dostupnost: předání „volno" z palety okno otevře', /cerstvePredaniPohledu\('availability'\) === 'volno'/.test(dostupnost));
   const zam = VYCHOZI_NAV.zamestnanec.polozky.find(p => p.id === 'availability');
   eq('navigace: „Dostupnost a volno" (překlad s kontextem |nav)', [zam?.label, NAV_TEXTY.includes('Dostupnost a volno')], ['Dostupnost a volno', true]);
+
+  // ---- dostupnost-tydenni-vzor ----
+  // Listopad 2026: 1. je neděle; pondělky 2, 9, 16, 23, 30.
+  const CYKLUS = ['available', 'off', 'type:1', 'type:2'];
+  eq('vzor: den v týdnu jako getDay (1. 11. 2026 je neděle, 2. 11. pondělí)', [denTydne('2026-11-01'), denTydne('2026-11-02'), denTydne('2026-11-30')], [0, 1, 1]);
+  eq('vzor: uložená dostupnost → stavy (preference přednost, nedostupné = off, neznámé pryč)',
+    stavyDostupnosti({ dayPreferences: { '2026-11-02': 'type:3', '2026-11-03': 'available', '2026-11-04': 'nesmysl' }, unavailableDates: ['2026-11-02', '2026-11-05'] }),
+    { '2026-11-02': 'type:3', '2026-11-05': 'off' });
+  eq('vzor: štětcem „Nemůžu" na Po nastaví všechna pondělí měsíce',
+    Object.keys(nastavDenVTydnu({}, '2026-11', 1, 'off', CYKLUS, '2026-10-12')), ['2026-11-02', '2026-11-09', '2026-11-16', '2026-11-23', '2026-11-30']);
+  const vsechnaPo = nastavDenVTydnu({}, '2026-11', 1, 'off', CYKLUS, '2026-10-12');
+  eq('vzor: druhé klepnutí se štětcem (všechna už „Nemůžu") je vrátí na Dostupný, ostatní dny nechá',
+    nastavDenVTydnu({ ...vsechnaPo, '2026-11-03': 'type:1' }, '2026-11', 1, 'off', CYKLUS, '2026-10-12'), { '2026-11-03': 'type:1' });
+  eq('vzor: bez štětce další stav cyklu podle prvního takového dne (pondělí 2. je „Nemůžu" → všechna „Jen 1")',
+    Object.values(nastavDenVTydnu({ '2026-11-02': 'off' }, '2026-11', 1, null, CYKLUS, '2026-10-12')), ['type:1', 'type:1', 'type:1', 'type:1', 'type:1']);
+  eq('vzor: v aktuálním měsíci přeskočí dny před dneškem (dnes je pondělí 13. 10. → jen 19. a 26.; 5. 10. zůstane, jak byl)',
+    nastavDenVTydnu({ '2026-10-05': 'type:2' }, '2026-10', 1, 'off', CYKLUS, '2026-10-13'), { '2026-10-05': 'type:2', '2026-10-19': 'off', '2026-10-26': 'off' });
+
+  // Říjen 2026: pondělky 5, 12, 19, 26; středy 7, 14, 21, 28.
+  const rijen = { dayPreferences: { '2026-10-07': 'type:1', '2026-10-14': 'type:1', '2026-10-21': 'type:2' }, unavailableDates: ['2026-10-05', '2026-10-12', '2026-10-19', '2026-10-26', '2026-10-09'] };
+  const listopad = prevezmiVzor(rijen, '2026-11', 1);
+  eq('vzor: Jako minulý měsíc — pondělí „Nemůžu" (4×), středa „Jen 1" (2× proti 1×), pátek jen 1× nic',
+    [listopad.stavy['2026-11-02'], listopad.stavy['2026-11-30'], listopad.stavy['2026-11-04'], listopad.stavy['2026-11-06'], listopad.zmeneno], ['off', 'off', 'type:1', undefined, 9]);
+  eq('vzor: po sloupcích podle začátku týdne (pondělí první vs. neděle první)',
+    [prevezmiVzor(rijen, '2026-11', 1).vzor, prevezmiVzor(rijen, '2026-11', 0).vzor],
+    [['off', null, 'type:1', null, null, null, null], [null, 'off', null, 'type:1', null, null, null]]);
+  eq('vzor: dny s vlastním stavem a minulé dny nepřepíše, smazaný typ nepřenese, remíza nic',
+    [
+      prevezmiVzor(rijen, '2026-11', 1, { stavajici: { '2026-11-02': 'type:2' } }).stavy['2026-11-02'],
+      prevezmiVzor(rijen, '2026-10', 1, { dnes: '2026-10-20' }).stavy['2026-10-12'],
+      prevezmiVzor(rijen, '2026-11', 1, { povolene: ['off'] }).stavy['2026-11-04'],
+      prevezmiVzor({ unavailableDates: ['2026-10-07', '2026-10-14'], dayPreferences: { '2026-10-21': 'type:1', '2026-10-28': 'type:1' } }, '2026-11', 1).vzor[2],
+      prevezmiVzor(null, '2026-11', 1).zmeneno,
+    ],
+    ['type:2', undefined, undefined, null, 0]);
+  ok('vzor: hlavičky dnů jsou tlačítka s aria-label a „Jako minulý měsíc" je ghost s ikonou copy',
+    /aria-label=\{t\('Nastavit všechny dny \{den\} v měsíci'/.test(dostupnost) && /onClick=\{\(\) => nastavSloupec\(\(i \+ 1\) % 7\)\}/.test(dostupnost)
+    && /<Button variant="ghost" size="sm" icon="copy"[\s\S]{0,400}?\{t\('Jako minulý měsíc'\)\}/.test(dostupnost));
+  ok('vzor: minulý měsíc se stahuje přes mezipaměť (každý měsíc nejvýš jednou)', /ulozeneMesice\.current\.has\(m\)/.test(dostupnost) && /\/api\/availability\?mine=1&month=\$\{m\}/.test(dostupnost));
 }

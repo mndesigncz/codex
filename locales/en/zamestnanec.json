@@ -402,5 +402,15 @@
   "Zrušit|dialog": "Cancel",
   "Moje žádosti o volno": "My time-off requests",
   "Moje žádosti ({n})": "My requests ({n})",
-  "Žádost odeslána": "Request sent"
+  "Žádost odeslána": "Request sent",
+  "Nastavit všechny dny {den} v měsíci": "Set every {den} this month",
+  "Nastavit celý sloupec: {stav}": "Set the whole column: {stav}",
+  "Přepnout celý sloupec": "Switch the whole column",
+  "Klepnutím na zkratku dne nad kalendářem nastavíš celý sloupec najednou.": "Tap a weekday above the calendar to set the whole column at once.",
+  "Jako minulý měsíc": "Same as last month",
+  "Převezme z minulého měsíce, co se opakovalo podle dne v týdnu — jen do dnů, které ještě nemají vlastní stav.": "Copies what repeated by weekday last month — only into days that don't have their own setting yet.",
+  "Minulý měsíc se nenačetl — zkus to znovu.": "Last month didn't load — try again.",
+  "Není co převzít — dny už mají vlastní stav, nebo se minulý měsíc žádný den neopakoval.": "Nothing to copy — the days already have their own setting, or nothing repeated last month.",
+  "{n, plural, one {Převzato z minulého měsíce: # den} few {Převzato z minulého měsíce: # dny} other {Převzato z minulého měsíce: # dní}}": "{n, plural, one {Copied from last month: # day} other {Copied from last month: # days}}",
+  "Vrátit|zpet": "Undo"
 }

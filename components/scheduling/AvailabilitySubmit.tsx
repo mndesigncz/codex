@@ -30,6 +30,12 @@
 // čeká nebo bylo nedávno zamítnuto. Paleta (akce „Požádat o volno") předá `volno`
 // a okno se otevře rovnou. Pod Mými směnami vedení (h2) nic z toho není — tam je
 // karta TimeOffRequest z EmployerLayout.
+//
+// Týdenní vzor (kolo 7, R7-1): student, který nikdy nemůže v pondělí, ťukal každé pondělí
+// zvlášť. Hlavičky sloupců (Po–Ne) jsou tlačítka — nastaví celý sloupec měsíce stavem štětce
+// (bez štětce dalším stavem cyklu), minulé dny přeskočí. „Jako minulý měsíc" vedle přepínače
+// měsíce převezme z minulé dostupnosti stav podle dne v týdnu (nejčastější, aspoň 2×) do dnů
+// bez vlastního stavu. Logika je v lib/rozvrhPrehled.ts (nastavDenVTydnu, prevezmiVzor).
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { odsazeniMesice, zacatekTydne } from '@/lib/week';
@@ -45,7 +51,7 @@ import { okJson } from '@/lib/api';
 import { Icon } from '../Icons';
 import { pragueToday } from '@/lib/pragueTime';
 import { cerstvePredaniPohledu, udalostPredani } from '@/lib/predaniPohledu';
-import { otevritMojeZadosti } from '@/lib/rozvrhPrehled';
+import { nastavDenVTydnu, otevritMojeZadosti, posunMesice, prevezmiVzor, stavyDostupnosti } from '@/lib/rozvrhPrehled';
 import { OknoZadostiVolna, SeznamZadosti, useFormularVolna, useMojeZadosti } from './TimeOffRequest';
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string; role?: string };
@@ -140,11 +146,11 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
   // ---- Žádost o volno (jen samostatná stránka) ----
   const samostatna = headingLevel === 'h1';
   const [oknoVolna, setOknoVolna] = useState(false);
-  const [odeslanoVolno, setOdeslanoVolno] = useState<number | null>(null);
+  const [toast, setToast] = useState<{ text: string; tone?: 'ok' | 'bad'; id: number; vratit?: () => void } | null>(null);
   const zadosti = useMojeZadosti(samostatna);
   const volno = useFormularVolna({
     aktivni: samostatna && oknoVolna,
-    onOdeslano: () => { setOknoVolna(false); setOdeslanoVolno(Date.now()); zadosti.reload(); },
+    onOdeslano: () => { setOknoVolna(false); setToast({ text: t('Žádost odeslána'), id: Date.now() }); zadosti.reload(); },
   });
   // Rozepsaná žádost z minula: okno se otevře samo (koncept, který není vidět, je ztracený).
   useEffect(() => { if (samostatna && volno.koncept.cekaKoncept) setOknoVolna(true); }, [samostatna, volno.koncept.cekaKoncept]);
@@ -195,6 +201,8 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
   const zacatek = zacatekTydne(useCurrency().weekStart);
   const grid = useMemo(() => buildGrid(month, zacatek), [month, zacatek]);
   const todayStr = currentMonth === month ? dnes : null;
+  /** Uložená dostupnost po měsících (null = nic neposláno) — „Jako minulý měsíc" nestahuje, co už kalendář má. */
+  const ulozeneMesice = useRef(new Map<string, any>());
 
   useEffect(() => {
     let active = true;
@@ -211,17 +219,10 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
       })
       .then((data) => {
         if (!active) return;
+        ulozeneMesice.current.set(month, data && data.id ? data : null);
         if (data && data.id) {
           setExisting(true);
-          const map: Record<string, DayState> = {};
-          const dp = (data.dayPreferences ?? {}) as Record<string, string>;
-          Object.entries(dp).forEach(([date, v]) => {
-            if (v === 'morning' || v === 'afternoon' || v === 'off' || /^type:\d+$/.test(v)) map[date] = v;
-          });
-          (data.unavailableDates ?? []).forEach((date: string) => {
-            if (!map[date]) map[date] = 'off';
-          });
-          setDayStates(map);
+          setDayStates(stavyDostupnosti(data));
           setPreferredShift(data.preferredShift ?? 'flexible');
           setMaxShifts(data.maxShifts != null ? String(data.maxShifts) : '');
           setNote(data.note ?? '');
@@ -256,6 +257,56 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
     });
   };
 
+  // Hlavička sloupce: celý den v týdnu najednou (Po = všechna pondělí měsíce), minulé dny přeskočí.
+  const nastavSloupec = (den0az6: number) => {
+    zmena();
+    setDayStates((prev) => nastavDenVTydnu(prev, month, den0az6, stetec, stateList, dnes));
+  };
+
+  // „Jako minulý měsíc": minulá dostupnost se stáhne líně po načtení měsíce (jen kvůli tomu, jestli
+  // tlačítko vůbec ukázat) a každý měsíc nejvýš jednou — přepínání měsíců tam a zpátky nic nestahuje znovu.
+  const minulyMesic = posunMesice(month, -1);
+  const [minuly, setMinuly] = useState<{ mesic: string; data: any } | { mesic: string; chyba: true } | null>(null);
+  const nactiMinuly = async (m: string): Promise<any> => {
+    if (ulozeneMesice.current.has(m)) return ulozeneMesice.current.get(m);
+    const data = await fetch(`/api/availability?mine=1&month=${m}`).then(okJson);
+    const v = data && data.id ? data : null;
+    ulozeneMesice.current.set(m, v);
+    return v;
+  };
+  useEffect(() => {
+    if (loading || loadFailed) return;
+    let active = true;
+    nactiMinuly(minulyMesic).then(
+      (data) => { if (active) setMinuly({ mesic: minulyMesic, data }); },
+      () => { if (active) setMinuly({ mesic: minulyMesic, chyba: true }); },
+    );
+    return () => { active = false; };
+  }, [loading, loadFailed, minulyMesic]);
+  const minulyTed = minuly && minuly.mesic === minulyMesic ? minuly : null;
+  // Tlačítko jen tehdy, když je co převzít (nebo se to nepodařilo zjistit — pak klepnutí zkusí znovu).
+  const ukazJakoMinule = !!minulyTed && ('chyba' in minulyTed
+    || prevezmiVzor(minulyTed.data, month, zacatek, { povolene: stateList }).vzor.some(Boolean));
+  const jakoMinule = async () => {
+    let data: any;
+    try { data = await nactiMinuly(minulyMesic); }
+    catch { setToast({ text: t('Minulý měsíc se nenačetl — zkus to znovu.'), tone: 'bad', id: Date.now() }); return; }
+    setMinuly({ mesic: minulyMesic, data });
+    const predtim = dayStates;
+    const v = prevezmiVzor(data, month, zacatek, { stavajici: dayStates, dnes, povolene: stateList });
+    if (!v.zmeneno) {
+      setToast({ text: t('Není co převzít — dny už mají vlastní stav, nebo se minulý měsíc žádný den neopakoval.'), id: Date.now() });
+      return;
+    }
+    zmena();
+    setDayStates(v.stavy);
+    setToast({
+      text: t('{n, plural, one {Převzato z minulého měsíce: # den} few {Převzato z minulého měsíce: # dny} other {Převzato z minulého měsíce: # dní}}', { n: v.zmeneno }),
+      id: Date.now(),
+      vratit: () => setDayStates(predtim),
+    });
+  };
+
   const submit = async () => {
     setSaving(true); setErr('');
     try {
@@ -279,6 +330,7 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
         }),
       });
       if (res.ok) {
+        ulozeneMesice.current.set(month, { id: -1, dayPreferences, unavailableDates });
         setExisting(true);
         setConfirmed(true);
         setZmeneno(false);
@@ -313,8 +365,17 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
       <span ref={korenRef} aria-hidden className="hidden" />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="dostupnost-kalendar" className="t-card">{t('Kalendář dostupnosti')}</h2>
-        {/* Do minulosti nejde — dostupnost na uplynulý měsíc nemá smysl. */}
-        <MonthNav value={month} onChange={setMonth} min={currentMonth} />
+        {/* Do minulosti nejde — dostupnost na uplynulý měsíc nemá smysl. Tichá akce „Jako minulý měsíc"
+            se na telefonu zalomí pod přepínač a drží se levého okraje. */}
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <MonthNav value={month} onChange={setMonth} min={currentMonth} />
+          {ukazJakoMinule && !loading && !loadFailed && (
+            <Button variant="ghost" size="sm" icon="copy" onClick={() => { void jakoMinule(); }} className="tap-target"
+              title={t('Převezme z minulého měsíce, co se opakovalo podle dne v týdnu — jen do dnů, které ještě nemají vlastní stav.')}>
+              {t('Jako minulý měsíc')}
+            </Button>
+          )}
+        </div>
       </div>
 
       {typesErr && (
@@ -356,13 +417,23 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
               {stetec === null
                 ? t('Klepnutím na den přepínáš: {popis}. Denní volby jsou závazné — „Jen …" a „Nemůžu" generátor vždy dodrží.', { popis: popisCyklu })
                 : t('Klepnutím na den nastavíš „{stav}", druhým klepnutím ho vrátíš na Dostupný. Denní volby jsou závazné — „Jen …" a „Nemůžu" generátor vždy dodrží.', { stav: metaOf(stetec).label })}
+              {' '}{t('Klepnutím na zkratku dne nad kalendářem nastavíš celý sloupec najednou.')}
             </p>
+            {/* Hlavička sloupce je tlačítko: nastaví celý den v týdnu v měsíci (týdenní vzor). Index pro
+                fmtDenVTydnu je 0 = pondělí; den pro výpočet jako getDay() (0 = neděle). */}
             <div className="grid grid-cols-7 gap-1 sm:gap-1.5 mb-1.5">
-              {(zacatek === 0 ? [6, 0, 1, 2, 3, 4, 5] : [0, 1, 2, 3, 4, 5, 6]).map((i) => { const z = fmtDenVTydnu(i, { jazyk }); return z.charAt(0).toLocaleUpperCase() + z.slice(1); }).map((d) => (
-                <div key={d} className="text-center text-[11px] font-medium text-black/35 py-1">
-                  {d}
-                </div>
-              ))}
+              {(zacatek === 0 ? [6, 0, 1, 2, 3, 4, 5] : [0, 1, 2, 3, 4, 5, 6]).map((i) => {
+                const z = fmtDenVTydnu(i, { jazyk });
+                const kratce = z.charAt(0).toLocaleUpperCase() + z.slice(1);
+                return (
+                  <button key={i} type="button" onClick={() => nastavSloupec((i + 1) % 7)}
+                    aria-label={t('Nastavit všechny dny {den} v měsíci', { den: fmtDenVTydnu(i, { jazyk, styl: 'dlouhy' }) })}
+                    title={stetec ? t('Nastavit celý sloupec: {stav}', { stav: metaOf(stetec).label }) : t('Přepnout celý sloupec')}
+                    className="tap-target-sm min-w-0 whitespace-nowrap rounded-lg py-2 text-center text-[11px] font-semibold text-black/55 hover:bg-black/[0.05] hover:text-[#16181A] transition-colors">
+                    {kratce}
+                  </button>
+                );
+              })}
             </div>
             <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
               {grid.map((cell, i) => {
@@ -455,6 +526,11 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
     </Card>
   );
 
+  const toastEl = (
+    <Toast id={toast?.id} message={toast?.text ?? null} tone={toast?.tone} onClose={() => setToast(null)}
+      action={toast?.vratit ? { label: t('Vrátit', undefined, 'zpet'), onClick: () => { toast.vratit?.(); setToast(null); } } : undefined} />
+  );
+
   // Samostatná stránka zaměstnance = plocha s widgety; v Mých směnách vedení jen sekce.
   if (samostatna) {
     // Vlastní žádosti právě jednou na stránce: sbalené pod kalendářem (stav, důvod zamítnutí, zrušení čekající).
@@ -493,7 +569,7 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
           nastroj={nastroj}
         />
         {oknoVolna && <OknoZadostiVolna f={volno} onClose={() => setOknoVolna(false)} />}
-        <Toast id={odeslanoVolno ?? undefined} message={odeslanoVolno != null ? t('Žádost odeslána') : null} onClose={() => setOdeslanoVolno(null)} />
+        {toastEl}
       </>
     );
   }
@@ -503,6 +579,7 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
     <section className="p-4 sm:p-6 space-y-6 w-full">
       <PageHeader as="h2" title={t('Dostupnost')} subtitle={t('Kdy můžeš pracovat — podle toho se skládá rozvrh.')} />
       {kalendar}
+      {toastEl}
     </section>
   );
 }

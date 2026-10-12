@@ -489,6 +489,103 @@ const KATEGORIE_BARVY: Record<string, number> = {
 export const kategorieBarvy = (barva: unknown): number | null => KATEGORIE_BARVY[String(barva ?? '').toLowerCase()] ?? null;
 
 // ---------------------------------------------------------------------------
+// Dostupnost: týdenní vzor (kolo 7, R7-1)
+// ---------------------------------------------------------------------------
+
+/**
+ * Stav dne v kalendáři dostupnosti: 'available' (výchozí, neukládá se), 'off',
+ * starší 'morning' / 'afternoon', nebo 'type:<id>' podle typů směn podniku.
+ */
+export type StavDneDostupnosti = string;
+
+const PLATNY_STAV_DNE = (v: unknown): v is string =>
+  v === 'morning' || v === 'afternoon' || v === 'off' || (typeof v === 'string' && /^type:\d+$/.test(v));
+
+/**
+ * Uložená dostupnost (GET /api/availability?mine=1) → mapa „den → stav" bez
+ * výchozích dnů. Denní preference mají přednost, nedostupné dny bez preference
+ * jsou 'off'. Neznámé hodnoty se zahodí (stejně jako dřív při načtení v kalendáři).
+ */
+export function stavyDostupnosti(data: { dayPreferences?: Record<string, unknown> | null; unavailableDates?: readonly unknown[] | null } | null | undefined): Record<string, StavDneDostupnosti> {
+  const mapa: Record<string, StavDneDostupnosti> = {};
+  for (const [d, v] of Object.entries(data?.dayPreferences ?? {})) if (PLATNY_STAV_DNE(v) && den(d)) mapa[d] = v;
+  for (const d of data?.unavailableDates ?? []) { const x = den(d); if (x && !mapa[x]) mapa[x] = 'off'; }
+  return mapa;
+}
+
+/** Dny měsíce „RRRR-MM" jako „RRRR-MM-DD". */
+function dnyMesice(mesic: string): string[] {
+  const [y, m] = mesic.split('-').map(Number);
+  const pocet = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return Array.from({ length: pocet }, (_, i) => `${mesic}-${String(i + 1).padStart(2, '0')}`);
+}
+
+/** Den v týdnu jako Date.getDay(): 0 = neděle … 6 = sobota (počítá se v UTC, bez hodin zařízení). */
+export function denTydne(d: string): number {
+  const [y, m, dd] = d.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, dd)).getUTCDay();
+}
+
+/**
+ * Klepnutí na hlavičku sloupce (Po–Ne): všem dnům toho dne v týdnu v měsíci nastaví stav.
+ * Se štětcem (`stav`) vybraný stav — a když už ho všechny mají, vrátí je na Dostupný
+ * (jako druhé klepnutí na den). Bez štětce (`null`) další stav cyklu podle prvního
+ * takového dne — stejná logika jako klepnutí na jeden den. Dny před `dnes` se
+ * přeskočí (dostupnost na včerejšek nemá smysl a přepsala by odeslané).
+ */
+export function nastavDenVTydnu(
+  stavy: Readonly<Record<string, StavDneDostupnosti>>, mesic: string, den0az6: number,
+  stav: StavDneDostupnosti | null, cyklus: readonly StavDneDostupnosti[], dnes: string,
+): Record<string, StavDneDostupnosti> {
+  const dny = dnyMesice(mesic).filter(d => denTydne(d) === den0az6 && d >= dnes);
+  if (!dny.length) return { ...stavy };
+  const stavDne = (d: string) => stavy[d] ?? 'available';
+  let novy: StavDneDostupnosti;
+  if (stav) novy = dny.every(d => stavDne(d) === stav) ? 'available' : stav;
+  else { const i = cyklus.indexOf(stavDne(dny[0])); novy = cyklus[(i < 0 ? 0 : i + 1) % Math.max(1, cyklus.length)] ?? 'available'; }
+  const out = { ...stavy };
+  for (const d of dny) { if (novy === 'available') delete out[d]; else out[d] = novy; }
+  return out;
+}
+
+/**
+ * „Jako minulý měsíc": z minulé dostupnosti vezme pro každý den v týdnu nejčastější
+ * ne-výchozí stav (jen když se vyskytl aspoň 2× a jednoznačně — remíza nic nepřenese)
+ * a dá ho stejným dnům v týdnu v měsíci `mesic`. Konkrétní data se nepřenášejí
+ * (3. listopad není 3. prosinec). Přepíše jen dny bez vlastního stavu, přeskočí dny
+ * před `dnes` a stavy, které podnik už nemá (`povolene`, smazaný typ směny).
+ *
+ * `vzor` je po sloupcích mřížky podle začátku týdne podniku (0 = neděle, 1 = pondělí):
+ * vzor[0] je první sloupec — UI z něj skládá větu „Převzato: Po Nemůžu".
+ */
+export function prevezmiVzor(
+  minuly: Parameters<typeof stavyDostupnosti>[0], mesic: string, zacatekTydne: 0 | 1,
+  o: { stavajici?: Readonly<Record<string, StavDneDostupnosti>>; dnes?: string; povolene?: readonly StavDneDostupnosti[] } = {},
+): { stavy: Record<string, StavDneDostupnosti>; vzor: (StavDneDostupnosti | null)[]; zmeneno: number } {
+  const pocty: Map<string, number>[] = Array.from({ length: 7 }, () => new Map());
+  for (const [d, st] of Object.entries(stavyDostupnosti(minuly))) {
+    if (o.povolene && !o.povolene.includes(st)) continue;
+    const m = pocty[denTydne(d)];
+    m.set(st, (m.get(st) ?? 0) + 1);
+  }
+  const poDnech: (StavDneDostupnosti | null)[] = pocty.map(m => {
+    const serazene = [...m.entries()].sort((a, b) => b[1] - a[1]);
+    if (!serazene.length || serazene[0][1] < 2) return null;
+    return serazene[1] && serazene[1][1] === serazene[0][1] ? null : serazene[0][0];
+  });
+  const stavy: Record<string, StavDneDostupnosti> = { ...(o.stavajici ?? {}) };
+  let zmeneno = 0;
+  for (const d of dnyMesice(mesic)) {
+    const st = poDnech[denTydne(d)];
+    if (!st || stavy[d] || (o.dnes && d < o.dnes)) continue;
+    stavy[d] = st;
+    zmeneno += 1;
+  }
+  const vzor = Array.from({ length: 7 }, (_, sloupec) => poDnech[(sloupec + zacatekTydne) % 7]);
+  return { stavy, vzor, zmeneno };
+}
+
+// ---------------------------------------------------------------------------
 // Volno a výměny
 // ---------------------------------------------------------------------------
 
