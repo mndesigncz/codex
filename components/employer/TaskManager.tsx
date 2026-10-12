@@ -32,7 +32,7 @@ import { pragueToday } from '@/lib/pragueTime';
 import { apiMessage, okJson } from '@/lib/api';
 import { useDraft } from '@/lib/useDraft';
 import { DraftNote } from '../ui/DraftNote';
-import { vyberUkoly, rozdelPoDnech, jeCiziUkol, splnenoDnes, stavPoOdskrtnuti, chceFotku, type StavZapisu, type Ukol } from '@/lib/ukolyPrehled';
+import { vyberUkoly, rozdelPoDnech, jeCiziUkol, splnenoDnes, stavPoOdskrtnuti, chceFotku, prazdnyFormularUkolu, type FormularUkolu, type StavZapisu, type Ukol } from '@/lib/ukolyPrehled';
 import { VYCHOZI_FILTR, filtrujBezStavu, filtrujUkoly, poctyStavu, seradUkoly, statistikaUkolu, rozborPredani, cerstvePredani, poCase, UDALOST_PREDANI_UKOLU, type FiltrUkolu } from '@/lib/ukolyFiltr';
 import { UkolDetail } from '../ukoly/UkolDetail';
 import { PrilozFoto } from '../ukoly/PrilozFoto';
@@ -60,19 +60,10 @@ const priority = (t: PrekladFn): { id: 'low' | 'medium' | 'high'; label: string 
 ];
 const prioritaText = (t: PrekladFn): Record<string, string> => ({ high: t('vysoká'), medium: t('střední'), low: t('nízká') });
 
-const emptyForm = () => ({
-  title: '', description: '', assignedTo: '', priority: 'medium', dueDate: '', recurrence: '', checklist: [] as ChecklistItem[],
-  // Kolo 7: „do 14:00" — HH:MM, jen s termínem (pole je bez data zamčené).
-  dueTime: '',
-  // Kolo 7: komu při zakládání (víc lidí = úkol každému zvlášť); prázdné = kdokoli.
-  // Úprava zůstává na jednom člověku (`assignedTo`).
-  komu: [] as string[],
-  // Úkol zamyká uzávěrku dne, dokud není hotový (tasks.require_before_closing).
-  requireBeforeClosing: false,
-  // Kolo 7: splní se jen s fotkou (tasks.require_photo) — okno Přilož fotku u odškrtnutí.
-  requirePhoto: false,
-});
-type Form = ReturnType<typeof emptyForm>;
+// Prázdný formulář je v lib/ukolyPrehled.ts: stejný tvar zapisuje Plánování
+// („Založit úkol z karty") jako koncept — jinak by ho slouceni v lib/draft nepřijalo.
+const emptyForm = prazdnyFormularUkolu;
+type Form = FormularUkolu;
 
 const vyberCleny = (raw: any): Member[] =>
   (Array.isArray(raw?.members) ? raw.members : []).filter((m: Member) => m.role === 'employee' || m.role === 'employer');

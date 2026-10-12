@@ -287,6 +287,33 @@ export function jeCiziUkol(t: Pick<Ukol, 'assignedTo' | 'createdBy'>, ja: number
 }
 
 // ---------------------------------------------------------------------------
+// Formulář úkolu (TaskManager) — kolo 7: sdílený tvar, protože ho jako koncept
+// zapisuje i Plánování („Založit úkol z karty"). lib/draft (slouceni) z konceptu
+// vezme jen klíče a typy, které tenhle tvar zná — jinak by se nic neobnovilo.
+// ---------------------------------------------------------------------------
+
+export function prazdnyFormularUkolu() {
+  return {
+    title: '', description: '', assignedTo: '', priority: 'medium', dueDate: '', recurrence: '', checklist: [] as PolozkaChecklistu[],
+    // „do 14:00" — HH:MM, jen s termínem (pole je bez data zamčené).
+    dueTime: '',
+    // Komu při zakládání (víc lidí = úkol každému zvlášť); prázdné = kdokoli.
+    // Úprava zůstává na jednom člověku (`assignedTo`).
+    komu: [] as string[],
+    // Úkol zamyká uzávěrku dne, dokud není hotový (tasks.require_before_closing).
+    requireBeforeClosing: false,
+    // Splní se jen s fotkou (tasks.require_photo) — okno Přilož fotku u odškrtnutí.
+    requirePhoto: false,
+  };
+}
+export type FormularUkolu = ReturnType<typeof prazdnyFormularUkolu>;
+
+/** Koncept úkolu z karty Plánování: název a popis karty, zbytek prázdný formulář. */
+export function konceptUkoluZKarty(karta: Pick<KartaPlanu, 'title' | 'description'>): FormularUkolu {
+  return { ...prazdnyFormularUkolu(), title: karta.title.slice(0, 200), description: karta.description ?? '' };
+}
+
+// ---------------------------------------------------------------------------
 // Plánování (GET /api/planning → pole karet)
 // ---------------------------------------------------------------------------
 

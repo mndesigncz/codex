@@ -27,10 +27,11 @@ import { Icon } from '../Icons';
 import { Avatar, Button, Card, Chip, EmptyState, ErrorState, Field, Input, Menu, Modal, Segmented, Skeleton, Textarea, Toast, type MenuItem } from '../ui';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
-import { useSmi } from '../widgety/NavigaceKontext';
+import { useNavigace, useSmi } from '../widgety/NavigaceKontext';
 import { URL_PLANOVANI } from '../widgety/oblasti/planovani';
 import { apiMessage, okJson } from '@/lib/api';
-import { vyberKarty, kartySloupce, sloupecKarty, stariKarty, krestniJmeno, type KartaPlanu } from '@/lib/ukolyPrehled';
+import { vyberKarty, kartySloupce, sloupecKarty, stariKarty, krestniJmeno, konceptUkoluZKarty, type KartaPlanu } from '@/lib/ukolyPrehled';
+import { zapisKoncept } from '@/lib/useDraft';
 import { parseDbTime } from '@/lib/pragueTime';
 import { fmtDatum } from '@/lib/i18n/format';
 import { useJazyk, useT } from '@/lib/i18n/client';
@@ -57,7 +58,10 @@ export default function PlanningBoard() {
   const { jazyk } = useJazyk();
   const nazvySloupcu: Record<IdSloupce, string> = { ideas: t('Nápady'), in_progress: t('Rozpracováno'), review: t('Ke schválení'), done: t('Hotovo') };
   const smi = useSmi();
+  const nav = useNavigace();
   const upravuje = smi('planovani.upravit');
+  // Kolo 7: z karty jde založit úkol — jen kdo smí úkoly zadávat (a vidí stránku Úkolů).
+  const zakladaUkoly = smi('ukoly.zadavat') && nav.smiPohled('tasks');
   const data = useDataWidgetu<KartaPlanu[]>(URL_PLANOVANI, vyberKarty);
   const cards = data.data ?? [];
   const [newCard, setNewCard] = useState<{ column: string; title: string; description: string } | null>(null);
@@ -165,11 +169,27 @@ export default function PlanningBoard() {
     if (card) void moveCard(card, colId);
   };
 
+  /**
+   * Kolo 7: karta → rozepsaný úkol. Název a popis karty se zapíšou jako koncept formuláře
+   * Úkolů (tvar konceptUkoluZKarty = prázdný formulář TaskManageru) a Úkoly ho po přechodu
+   * otevřou samy s „Vrátili jsme ti rozepsaný úkol" — termín a komu doplní člověk.
+   */
+  const zalozUkol = (card: KartaPlanu) => {
+    if (!zapisKoncept('ukoly', konceptUkoluZKarty(card))) {
+      setZprava({ text: t('Úkol z karty se nepodařilo připravit — prohlížeč nedovolil uložit rozepsaný úkol.'), ton: 'bad' });
+      return;
+    }
+    nav.onNavigate('tasks', 'pohled:list');
+  };
+
   const polozkyMenu = (card: KartaPlanu): MenuItem[] => [
-    ...COLUMNS.filter(c => c.id !== sloupecKarty(card)).map(c => ({ label: t('Přesunout do: {sloupec}', { sloupec: nazvySloupcu[c.id] }), icon: 'swap', onClick: () => void moveCard(card, c.id) })),
-    ...(noisium ? [{ label: publishing === card.id ? t('Publikuji…') : t('Publikovat do Noisium'), icon: 'upload', onClick: () => void publishToNoisium(card) }] : []),
-    { label: t('Upravit kartu'), icon: 'pencil', onClick: () => setEditCard({ id: card.id, title: card.title, description: card.description ?? '' }) },
-    { label: t('Smazat kartu…'), icon: 'trash', danger: true, onClick: () => setMazani(card) },
+    ...(zakladaUkoly ? [{ label: t('Založit úkol z karty'), icon: 'check', onClick: () => zalozUkol(card) }] : []),
+    ...(upravuje ? [
+      ...COLUMNS.filter(c => c.id !== sloupecKarty(card)).map(c => ({ label: t('Přesunout do: {sloupec}', { sloupec: nazvySloupcu[c.id] }), icon: 'swap', onClick: () => void moveCard(card, c.id) })),
+      ...(noisium ? [{ label: publishing === card.id ? t('Publikuji…') : t('Publikovat do Noisium'), icon: 'upload', onClick: () => void publishToNoisium(card) }] : []),
+      { label: t('Upravit kartu'), icon: 'pencil', onClick: () => setEditCard({ id: card.id, title: card.title, description: card.description ?? '' }) },
+      { label: t('Smazat kartu…'), icon: 'trash', danger: true, onClick: () => setMazani(card) },
+    ] : []),
   ];
 
   /** Kolo 7: „před 3 dny" — jak dlouho karta leží (stariKarty v lib/ukolyPrehled). */
@@ -276,7 +296,7 @@ export default function PlanningBoard() {
                           {card.description && <p className="text-[13px] text-black/55 mt-1 break-words text-pretty">{card.description}</p>}
                         </div>
                       )}
-                      {upravuje && <Menu size="sm" label={t('Možnosti karty {nazev}', { nazev: card.title })} items={polozkyMenu(card)} className="-mr-1.5 -mt-1" />}
+                      {(upravuje || zakladaUkoly) && <Menu size="sm" label={t('Možnosti karty {nazev}', { nazev: card.title })} items={polozkyMenu(card)} className="-mr-1.5 -mt-1" />}
                     </div>
                     {patka(card)}
                   </li>

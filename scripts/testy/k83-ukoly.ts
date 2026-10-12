@@ -7,13 +7,15 @@
 //  - jeden úkol víc lidem (runBulk, každé res.ok, toast s plurálem, částečné selhání jménem),
 //  - fotka jako důkaz: serverová brána validujDukaz, jen /api/upload/<id>, výskyty dědí require_photo, ne fotku,
 //  - karta v Plánování: autor z GET /api/planning a stáří karty („před 3 dny", „před 2 týdny"),
+//  - úkol z karty: koncept ve tvaru formuláře TaskManageru, který lib/draft opravdu obnoví.
 
 import { readFileSync } from 'node:fs';
 import type { Testy } from './_testy.ts';
 import {
   jeStavZapisu, stavPoOdskrtnuti, STAVY_ZAPISU, vyberUkoly, rozdelPoDnech, validujCasTerminu, doplnkyVyskytu, textOznameniUkolu, casNeboNull,
-  platnaFotka, chceFotku, validujDukaz, vyberKarty, stariKarty, krestniJmeno,
+  platnaFotka, chceFotku, validujDukaz, vyberKarty, stariKarty, krestniJmeno, prazdnyFormularUkolu, konceptUkoluZKarty,
 } from '../../lib/ukolyPrehled.ts';
+import { slouceni, maSeObnovit } from '../../lib/draft.ts';
 import { poCase, seradUkoly, stavUkolu } from '../../lib/ukolyFiltr.ts';
 import { pragueDayOf, pragueHM } from '../../lib/pragueTime.ts';
 
@@ -172,4 +174,21 @@ export default function ({ eq, ok }: Testy) {
   ok('tabule: patka karty t-meta s Avatarem xs, truncate a celým jménem s datem v title',
     /<p className="t-meta mt-2\.5 flex items-center gap-1\.5 min-w-0" title=\{presne \|\| undefined\}>/.test(zdroj('components/employer/PlanningBoard.tsx'))
     && /<Avatar emoji=\{card\.autorAvatar\} name=\{card\.autor\} size="xs"/.test(zdroj('components/employer/PlanningBoard.tsx')));
+
+  // ---- 6) Úkol z karty ----
+  const prazdny = prazdnyFormularUkolu();
+  const koncept = konceptUkoluZKarty({ title: 'Nový ceník', description: 'Ceny od listopadu, tisk A4.' });
+  eq('z karty: koncept má přesně klíče formuláře TaskManageru (jinak by ho slouceni zahodilo)', Object.keys(koncept).sort(), Object.keys(prazdny).sort());
+  ok('z karty: koncept se obnoví (maSeObnovit) a slouceni vrátí název i popis karty, zbytek prázdný (komu = kdokoli)',
+    maSeObnovit({ upravujeSe: false, ulozeny: JSON.parse(JSON.stringify(koncept)), vychozi: prazdny })
+    && JSON.stringify(slouceni(prazdny, JSON.parse(JSON.stringify(koncept)))) === JSON.stringify({ ...prazdny, title: 'Nový ceník', description: 'Ceny od listopadu, tisk A4.' }));
+  eq('z karty: karta bez popisu → prázdný popis, dlouhý název se uřízne na 200 znaků (jako pole formuláře)',
+    [konceptUkoluZKarty({ title: 'x'.repeat(250), description: null }).title.length, konceptUkoluZKarty({ title: 'A', description: null }).description], [200, '']);
+  ok('formulář: TaskManager bere prázdný formulář z lib (stejný tvar jako koncept z karty)', /const emptyForm = prazdnyFormularUkolu;/.test(zdroj('components/employer/TaskManager.tsx')));
+  const pb = zdroj('components/employer/PlanningBoard.tsx');
+  ok('tabule: „Založit úkol z karty" (ikona check) jen s ukoly.zadavat, zapíše koncept a otevře Úkoly na seznamu',
+    /const zakladaUkoly = smi\('ukoly\.zadavat'\) && nav\.smiPohled\('tasks'\);/.test(pb) && /label: t\('Založit úkol z karty'\), icon: 'check'/.test(pb)
+    && /zapisKoncept\('ukoly', konceptUkoluZKarty\(card\)\)/.test(pb) && /nav\.onNavigate\('tasks', 'pohled:list'\)/.test(pb));
+  ok('useDraft: zapisKoncept píše do sessionStorage pod stejným klíčem jako hook a v try/catch',
+    /export function zapisKoncept\(jmeno: string, hodnota: Record<string, unknown>\): boolean \{\s*try \{\s*sessionStorage\.setItem\(KLIC\(jmeno\)/.test(zdroj('lib/useDraft.ts')));
 }

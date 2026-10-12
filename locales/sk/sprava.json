@@ -1658,5 +1658,7 @@
   "před {n, plural, one {# dnem} few {# dny} other {# dny}}": "pred {n, plural, one {# dňom} few {# dňami} many {# dňami} other {# dňami}}",
   "před {n, plural, one {# týdnem} few {# týdny} other {# týdny}}": "pred {n, plural, one {# týždňom} few {# týždňami} many {# týždňami} other {# týždňami}}",
   "před {n, plural, one {# měsícem} few {# měsíci} other {# měsíci}}": "pred {n, plural, one {# mesiacom} few {# mesiacmi} many {# mesiacmi} other {# mesiacmi}}",
-  "před {n, plural, one {# rokem} few {# lety} other {# lety}}": "pred {n, plural, one {# rokom} few {# rokmi} many {# rokmi} other {# rokmi}}"
+  "před {n, plural, one {# rokem} few {# lety} other {# lety}}": "pred {n, plural, one {# rokom} few {# rokmi} many {# rokmi} other {# rokmi}}",
+  "Založit úkol z karty": "Založiť úlohu z karty",
+  "Úkol z karty se nepodařilo připravit — prohlížeč nedovolil uložit rozepsaný úkol.": "Úlohu z karty sa nepodarilo pripraviť — prehliadač nedovolil uložiť rozpísanú úlohu."
 }

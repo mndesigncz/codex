@@ -1658,5 +1658,7 @@
   "před {n, plural, one {# dnem} few {# dny} other {# dny}}": "vor {n, plural, one {# Tag} other {# Tagen}}",
   "před {n, plural, one {# týdnem} few {# týdny} other {# týdny}}": "vor {n, plural, one {# Woche} other {# Wochen}}",
   "před {n, plural, one {# měsícem} few {# měsíci} other {# měsíci}}": "vor {n, plural, one {# Monat} other {# Monaten}}",
-  "před {n, plural, one {# rokem} few {# lety} other {# lety}}": "vor {n, plural, one {# Jahr} other {# Jahren}}"
+  "před {n, plural, one {# rokem} few {# lety} other {# lety}}": "vor {n, plural, one {# Jahr} other {# Jahren}}",
+  "Založit úkol z karty": "Aufgabe aus Karte erstellen",
+  "Úkol z karty se nepodařilo připravit — prohlížeč nedovolil uložit rozepsaný úkol.": "Aufgabe aus der Karte konnte nicht vorbereitet werden — der Browser hat das Speichern des Entwurfs nicht erlaubt."
 }

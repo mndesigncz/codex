@@ -1658,5 +1658,7 @@
   "před {n, plural, one {# dnem} few {# dny} other {# dny}}": "{n, plural, one {# day ago} other {# days ago}}",
   "před {n, plural, one {# týdnem} few {# týdny} other {# týdny}}": "{n, plural, one {# week ago} other {# weeks ago}}",
   "před {n, plural, one {# měsícem} few {# měsíci} other {# měsíci}}": "{n, plural, one {# month ago} other {# months ago}}",
-  "před {n, plural, one {# rokem} few {# lety} other {# lety}}": "{n, plural, one {# year ago} other {# years ago}}"
+  "před {n, plural, one {# rokem} few {# lety} other {# lety}}": "{n, plural, one {# year ago} other {# years ago}}",
+  "Založit úkol z karty": "Create task from card",
+  "Úkol z karty se nepodařilo připravit — prohlížeč nedovolil uložit rozepsaný úkol.": "Couldn't prepare a task from the card — the browser didn't allow saving the draft."
 }

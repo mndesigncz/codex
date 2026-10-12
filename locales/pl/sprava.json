@@ -1658,5 +1658,7 @@
   "před {n, plural, one {# dnem} few {# dny} other {# dny}}": "{n, plural, one {# dzień temu} few {# dni temu} many {# dni temu} other {# dnia temu}}",
   "před {n, plural, one {# týdnem} few {# týdny} other {# týdny}}": "{n, plural, one {# tydzień temu} few {# tygodnie temu} many {# tygodni temu} other {# tygodnia temu}}",
   "před {n, plural, one {# měsícem} few {# měsíci} other {# měsíci}}": "{n, plural, one {# miesiąc temu} few {# miesiące temu} many {# miesięcy temu} other {# miesiąca temu}}",
-  "před {n, plural, one {# rokem} few {# lety} other {# lety}}": "{n, plural, one {# rok temu} few {# lata temu} many {# lat temu} other {# roku temu}}"
+  "před {n, plural, one {# rokem} few {# lety} other {# lety}}": "{n, plural, one {# rok temu} few {# lata temu} many {# lat temu} other {# roku temu}}",
+  "Založit úkol z karty": "Utwórz zadanie z karty",
+  "Úkol z karty se nepodařilo připravit — prohlížeč nedovolil uložit rozepsaný úkol.": "Nie udało się przygotować zadania z karty — przeglądarka nie pozwoliła zapisać szkicu."
 }
