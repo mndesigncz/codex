@@ -1672,7 +1672,6 @@
   "Zavolat {nazev}: {telefon}": "{nazev} anrufen: {telefon}",
   "Objednat od {nazev}": "Bei {nazev} bestellen",
   "Upravit…": "Bearbeiten…",
-  "Další akce s odměnou {nazev}": "Weitere Aktionen für Belohnung {nazev}",
   "Smazat…": "Löschen…",
   "Odměna upravena.": "Die Belohnung wurde geändert.",
   "Upravit odměnu": "Belohnung bearbeiten",
@@ -1681,5 +1680,6 @@
   "Cena musí být celé číslo od 1 do 100 000 bodů.": "Der Preis muss eine ganze Zahl von 1 bis 100.000 Punkten sein.",
   "Ikona musí být jedno nebo dvě emoji.": "Das Symbol muss ein oder zwei Emojis sein.",
   "Zadej částku, nebo pole nech prázdné.": "Gib einen Betrag ein oder lass das Feld leer.",
-  "Filtry · {n}": "Filter · {n}"
+  "Filtry · {n}": "Filter · {n}",
+  "Upravit nebo smazat odměnu {nazev}": "Belohnung {nazev} bearbeiten oder löschen"
 }

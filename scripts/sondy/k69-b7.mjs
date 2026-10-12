@@ -166,14 +166,14 @@ const cast = (p, nazev) => p.locator('[data-plocha]').getByRole('tab', { name: n
   const nabizet = nastroj.getByRole('switch', { name: 'Nabízet: Káva zdarma na směně' });
   tvrdi('V-N: Nastavení ukáže katalog se Switch „Nabízet"', await dokud(() => nabizet.isVisible(), 2000));
   tvrdi('V-N: cizí odměna z organizace bez přepínače i menu, se správcem', await nastroj.getByRole('switch', { name: /Volný den z organizace/ }).count() === 0
-    && await nastroj.getByRole('button', { name: 'Další akce s odměnou Volný den z organizace' }).count() === 0
+    && await nastroj.getByRole('button', { name: 'Upravit nebo smazat odměnu Volný den z organizace' }).count() === 0
     && (await nastroj.innerText()).includes('spravuje Kavárna Vinohrady'));
   await nabizet.click();
   tvrdi('V-N: vypnutí pošle PATCH { manage, id: 1, active: false }', await dokud(() => (stav.patche ?? []).some(b => b.manage === true && b.id === 1 && b.active === false), 2000));
   let dialog = false;
   p.on('dialog', d => { dialog = true; void d.dismiss(); });
   // Kolo 7: koš je v menu „···" (Upravit… / Smazat…).
-  await nastroj.getByRole('button', { name: 'Další akce s odměnou Volný pátek' }).click();
+  await nastroj.getByRole('button', { name: 'Upravit nebo smazat odměnu Volný pátek' }).click();
   await p.getByRole('menuitem', { name: 'Smazat…' }).click();
   const okno = p.getByRole('dialog', { name: /Smazat odměnu „Volný pátek"/ });
   tvrdi('V-N: mazání se ptá oknem, ne confirm()', await dokud(() => okno.isVisible(), 1500) && !dialog);
@@ -181,7 +181,7 @@ const cast = (p, nazev) => p.locator('[data-plocha]').getByRole('tab', { name: n
   tvrdi('V-N: …a po potvrzení pošle DELETE ?id=2', await dokud(() => (stav.mazani ?? []).includes('2'), 2000));
 
   // Kolo 7 (odmena-katalog-neupravit): Upravit… otevře okno s poli a Uložit pošle PATCH s title/cost/icon.
-  await nastroj.getByRole('button', { name: 'Další akce s odměnou Oběd na účet podniku' }).click();
+  await nastroj.getByRole('button', { name: 'Upravit nebo smazat odměnu Oběd na účet podniku' }).click();
   await p.getByRole('menuitem', { name: 'Upravit…' }).click();
   const uprava = p.getByRole('dialog', { name: 'Upravit odměnu' });
   tvrdi('V-U: „Upravit…" otevře okno s vyplněným názvem, cenou a emoji', await dokud(() => uprava.isVisible(), 1500)
@@ -337,7 +337,7 @@ const cast = (p, nazev) => p.locator('[data-plocha]').getByRole('tab', { name: n
   await p.screenshot({ path: OUT + 'k83-odmeny-formular-320.png' });
   await p.setViewportSize({ width: 390, height: 844 });
   // Okno Upravit odměnu na telefonu vyjíždí zdola.
-  await widgetLi(p, 'nastroj').getByRole('button', { name: 'Další akce s odměnou Káva zdarma na směně' }).click();
+  await widgetLi(p, 'nastroj').getByRole('button', { name: 'Upravit nebo smazat odměnu Káva zdarma na směně' }).click();
   await p.getByRole('menuitem', { name: 'Upravit…' }).click();
   const uprava = p.getByRole('dialog', { name: 'Upravit odměnu' });
   await dokud(() => uprava.isVisible(), 1500);

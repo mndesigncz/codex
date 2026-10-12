@@ -485,7 +485,7 @@ function SpravaKatalogu() {
                   {/* !flex-none: na telefonu `.list-actions:only-child > :first-child` natáhne první
                       prvek ocasu přes řádek — přepínač by byl limetkový pruh s knoflíkem vlevo. */}
                   <Switch checked={o.aktivni} disabled={pracuji === o.id} label={t('Nabízet: {nazev}', { nazev: o.nazev })} onChange={v => { void prepnout(o, v); }} className="!flex-none" />
-                  <Menu size="sm" label={t('Další akce s odměnou {nazev}', { nazev: o.nazev })} items={[
+                  <Menu size="sm" label={t('Upravit nebo smazat odměnu {nazev}', { nazev: o.nazev })} items={[
                     { label: t('Upravit…'), icon: 'pencil', onClick: () => setUprava(o), disabled: pracuji != null },
                     { label: t('Smazat…'), icon: 'trash', danger: true, onClick: () => setMazani(o), disabled: pracuji != null },
                   ]} />
