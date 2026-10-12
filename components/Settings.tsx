@@ -200,6 +200,7 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
     loadPosHealth();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section]);
+  // i18n-ok: hlášky Pokladny (napojení Storyous) zůstávají česky — viz sekce Pokladna níž.
   const posDo = async (action: string, extra: Record<string, any> = {}) => {
     setPosAction(action); setPosMsg('');
     const res = await fetch('/api/pos/status', {
@@ -374,7 +375,7 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
     e.preventDefault();
     setProfileErr('');
     setProfileMsg('');
-    if (!name.trim()) { setProfileErr('Jméno nesmí být prázdné.'); return; }
+    if (!name.trim()) { setProfileErr(t('Jméno nesmí být prázdné.')); return; }
     setSavingProfile(true);
     try {
       const res = await fetch('/api/account', {
@@ -392,13 +393,14 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
       if (res.ok) {
         setAccount(data.user);
         await update({ user: { name: name.trim(), avatar } });
-        setProfileMsg('Profil byl uložen.');
+        setProfileMsg(t('Profil byl uložen.'));
         setTimeout(() => setProfileMsg(''), 4000);
       } else {
-        setProfileErr(data.error || 'Profil se nepodařilo uložit.');
+        // Hláška serveru se hledá ve slovníku (věta ze serveru je klíč, jako u apiMessage).
+        setProfileErr(data.error ? t(data.error) : t('Profil se nepodařilo uložit.'));
       }
     } catch {
-      setProfileErr('Nastala chyba při ukládání.');
+      setProfileErr(t('Nastala chyba při ukládání.'));
     } finally {
       setSavingProfile(false);
     }
@@ -408,9 +410,9 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
     e.preventDefault();
     setPwdErr('');
     setPwdMsg('');
-    if (!currentPassword || !newPassword) { setPwdErr('Vyplňte všechna pole.'); return; }
-    if (newPassword.length < 8) { setPwdErr('Nové heslo musí mít alespoň 8 znaků.'); return; }
-    if (newPassword !== confirmPassword) { setPwdErr('Nová hesla se neshodují.'); return; }
+    if (!currentPassword || !newPassword) { setPwdErr(t('Vyplňte všechna pole.')); return; }
+    if (newPassword.length < 8) { setPwdErr(t('Nové heslo musí mít alespoň 8 znaků.')); return; }
+    if (newPassword !== confirmPassword) { setPwdErr(t('Nová hesla se neshodují.')); return; }
     setSavingPwd(true);
     try {
       const res = await fetch('/api/account', {
@@ -420,16 +422,16 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
       });
       const data = await res.json();
       if (res.ok) {
-        setPwdMsg(data.message || 'Heslo bylo změněno.');
+        setPwdMsg(data.message ? t(data.message) : t('Heslo bylo změněno.'));
         setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
         setTimeout(() => setPwdMsg(''), 4000);
       } else {
-        setPwdErr(data.error || 'Heslo se nepodařilo změnit.');
+        setPwdErr(data.error ? t(data.error) : t('Heslo se nepodařilo změnit.'));
       }
     } catch {
-      setPwdErr('Nastala chyba při změně hesla.');
+      setPwdErr(t('Nastala chyba při změně hesla.'));
     } finally {
       setSavingPwd(false);
     }
@@ -545,22 +547,22 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
                 </div>
               )}
               {profileErr && (
-                <div className="note note-danger p-4 text-sm flex items-center gap-2">
-                  <Icon name="warning" size={16} /> {profileErr}
+                <div role="alert" className="note note-danger p-4 text-sm flex items-center gap-2">
+                  <Icon name="warning" size={16} className="shrink-0" /> {profileErr}
                 </div>
               )}
 
               <div>
-                <label className={labelClass}>Avatar</label>
+                <label className={labelClass} id="nast-avatar">{t('Avatar')}</label>
                 <div className="flex items-center gap-4 flex-wrap">
                   <div className="w-16 h-16 rounded-full bg-[var(--well)] border border-[var(--well-line)] flex items-center justify-center text-3xl flex-shrink-0" aria-hidden>
                     {avatar}
                   </div>
-                  <div className="flex flex-wrap gap-2 min-w-0 max-w-full">
+                  <div className="flex flex-wrap gap-2 min-w-0 max-w-full" role="group" aria-labelledby="nast-avatar">
                     {AVATARS.map(a => (
                       // Vybraný avatar nese inkoustový prstenec, ne limetkový tón —
                       // limetka na obrazovce patří tlačítku Uložit.
-                      <button key={a} type="button" onClick={() => setAvatar(a)} aria-pressed={avatar === a} aria-label={`Avatar ${a}`}
+                      <button key={a} type="button" onClick={() => setAvatar(a)} aria-pressed={avatar === a} aria-label={t('Avatar {a}', { a })}
                         className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl transition ${
                           avatar === a ? 'bg-black/[0.04] ring-2 ring-[#16181A]' : 'bg-black/[0.04] border border-black/[0.08] hover:bg-black/[0.06]'
                         }`}>
@@ -573,37 +575,38 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="nast-jmeno" className={labelClass}>Jméno</label>
-                  <input id="nast-jmeno" value={name} aria-label="Jméno" onChange={e => setName(e.target.value)} className={inputClass} />
+                  <label htmlFor="nast-jmeno" className={labelClass}>{t('Jméno')}</label>
+                  <input id="nast-jmeno" value={name} autoComplete="name" onChange={e => setName(e.target.value)} className={inputClass} />
                 </div>
                 <div>
-                  <label htmlFor="nast-email" className={labelClass}>E-mail</label>
-                  <input id="nast-email" value={account?.email ?? ''} aria-label="E-mail" disabled
+                  <label htmlFor="nast-email" className={labelClass}>{t('E-mail')}</label>
+                  <input id="nast-email" value={account?.email ?? ''} disabled
                     className={inputClass + ' opacity-60 cursor-not-allowed'} />
                 </div>
                 <div>
-                  <label htmlFor="nast-telefon" className={labelClass}>Telefon</label>
-                  <input id="nast-telefon" value={phone} aria-label="Telefon" onChange={e => setPhone(e.target.value)} placeholder="+420…" className={inputClass} />
+                  <label htmlFor="nast-telefon" className={labelClass}>{t('Telefon')}</label>
+                  {/* Telefonní klávesnice na mobilu (inputMode/type tel) a doplnění z kontaktů. */}
+                  <input id="nast-telefon" type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+420…" className={inputClass} />
                 </div>
                 <div>
-                  <label htmlFor="nast-pozice" className={labelClass}>Pozice</label>
-                  <input id="nast-pozice" value={jobTitle} aria-label="Pozice" onChange={e => setJobTitle(e.target.value)} placeholder="Barista" className={inputClass} />
+                  <label htmlFor="nast-pozice" className={labelClass}>{t('Pozice')}</label>
+                  <input id="nast-pozice" value={jobTitle} autoComplete="organization-title" onChange={e => setJobTitle(e.target.value)} placeholder={t('Barista')} className={inputClass} />
                 </div>
                 {!isEmployer && (
                   <div className="sm:col-span-2">
-                    <label htmlFor="nast-preference" className={labelClass}>Preference směn</label>
+                    <label htmlFor="nast-preference" className={labelClass}>{t('Preference směn')}</label>
                     <select id="nast-preference" value={shiftPreference} onChange={e => setShiftPreference(e.target.value)}
                       className={inputClass + ' appearance-none'}>
-                      <option value="morning">Ranní</option>
-                      <option value="afternoon">Odpolední</option>
-                      <option value="flexible">Flexibilní</option>
+                      <option value="morning">{t('Ranní')}</option>
+                      <option value="afternoon">{t('Odpolední')}</option>
+                      <option value="flexible">{t('Flexibilní')}</option>
                     </select>
                   </div>
                 )}
               </div>
 
               <div className="flex flex-col sm:flex-row sm:justify-end">
-                <Button type="submit" variant="accent" block loading={savingProfile}>Uložit změny</Button>
+                <Button type="submit" variant="accent" block loading={savingProfile}>{t('Uložit změny')}</Button>
               </div>
             </form>
           ) : section === 'jazyk' ? (
@@ -695,8 +698,8 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
             <div>
             <form onSubmit={savePassword} className="card p-6 space-y-6">
               <div>
-                <h2 className={cardTitle}>Změna hesla</h2>
-                <p className="t-meta mt-1">Nové heslo musí mít alespoň 8 znaků.</p>
+                <h2 className={cardTitle}>{t('Změna hesla')}</h2>
+                <p className="t-meta mt-1">{t('Nové heslo musí mít alespoň 8 znaků.')}</p>
               </div>
 
               {pwdMsg && (
@@ -705,28 +708,28 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
                 </div>
               )}
               {pwdErr && (
-                <div className="note note-danger p-4 text-sm flex items-center gap-2">
-                  <Icon name="warning" size={16} /> {pwdErr}
+                <div role="alert" className="note note-danger p-4 text-sm flex items-center gap-2">
+                  <Icon name="warning" size={16} className="shrink-0" /> {pwdErr}
                 </div>
               )}
 
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="nast-heslo" className={labelClass}>Současné heslo</label>
-                  <input id="nast-heslo" type="password" value={currentPassword} aria-label="Stávající heslo" onChange={e => setCurrentPassword(e.target.value)} className={inputClass} />
+                  <label htmlFor="nast-heslo" className={labelClass}>{t('Současné heslo')}</label>
+                  <input id="nast-heslo" type="password" autoComplete="current-password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} className={inputClass} />
                 </div>
                 <div>
-                  <label htmlFor="nast-heslo-nove" className={labelClass}>Nové heslo</label>
-                  <input id="nast-heslo-nove" type="password" value={newPassword} aria-label="Nové heslo" onChange={e => setNewPassword(e.target.value)} className={inputClass} />
+                  <label htmlFor="nast-heslo-nove" className={labelClass}>{t('Nové heslo')}</label>
+                  <input id="nast-heslo-nove" type="password" autoComplete="new-password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className={inputClass} />
                 </div>
                 <div>
-                  <label htmlFor="nast-heslo-znovu" className={labelClass}>Potvrdit nové heslo</label>
-                  <input id="nast-heslo-znovu" type="password" value={confirmPassword} aria-label="Nové heslo znovu" onChange={e => setConfirmPassword(e.target.value)} className={inputClass} />
+                  <label htmlFor="nast-heslo-znovu" className={labelClass}>{t('Potvrdit nové heslo')}</label>
+                  <input id="nast-heslo-znovu" type="password" autoComplete="new-password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className={inputClass} />
                 </div>
               </div>
 
               <div className="flex justify-end">
-                <Button type="submit" variant="accent" block loading={savingPwd}>Změnit heslo</Button>
+                <Button type="submit" variant="accent" block loading={savingPwd}>{t('Změnit heslo')}</Button>
               </div>
             </form>
             <Zablokovani />
@@ -742,6 +745,7 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
           ) : section === 'billing' && smiPlatby ? (
             <Billing />
           ) : section === 'pos' ? (
+            // i18n-ok: Pokladna (napojení Storyous) zůstává česky — česká služba, klíče a hlášky z jejího back-office.
             <section className="card p-6">
               <h2 className={cardTitle}>Napojení pokladny Storyous</h2>
               <p className="t-meta mt-1 mb-4">
@@ -880,16 +884,16 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
             <VychoziRozlozeni />
           ) : section === 'audit' ? (
             <section className="card p-6">
-              <h2 className={cardTitle}>Historie změn</h2>
-              <p className="t-meta mt-1 mb-4">Důležité zásahy v týmu — mazání, nastavení, odměny. Posledních 100 záznamů.</p>
+              <h2 className={cardTitle}>{t('Historie změn')}</h2>
+              <p className="t-meta mt-1 mb-4">{t('Důležité zásahy v týmu — mazání, nastavení, odměny. Posledních 100 záznamů.')}</p>
               {auditErr ? (
-                <ErrorState title="Historii změn se nepodařilo načíst" onRetry={nactiAudit} compact />
+                <ErrorState title={t('Historii změn se nepodařilo načíst')} onRetry={nactiAudit} compact />
               ) : auditEntries === null ? (
-                <div className="space-y-2" aria-busy="true" aria-label="Načítám historii">
+                <div className="space-y-2" aria-busy="true" aria-label={t('Načítám historii')}>
                   {[0, 1, 2].map(i => <Skeleton key={i} className="h-10 w-full" />)}
                 </div>
               ) : auditEntries.length === 0 ? (
-                <EmptyState icon="clock" title="Zatím žádný záznam" hint="Kdo co změnil, se sem zapisuje samo — smazání, schválení, úpravy cen." compact />
+                <EmptyState icon="clock" title={t('Zatím žádný záznam')} hint={t('Kdo co změnil, se sem zapisuje samo — smazání, schválení, úpravy cen.')} compact />
               ) : (
                 <div className="divide-y divide-black/[0.05]">
                   {auditEntries.map(e => (
@@ -917,7 +921,7 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
 
       <Modal open={!!potvrzeni} onClose={() => setPotvrzeni(null)} size="sm" title={potvrzeni?.title ?? ''}
         footer={<>
-          <Button variant="secondary" onClick={() => setPotvrzeni(null)}>Zrušit</Button>
+          <Button variant="secondary" onClick={() => setPotvrzeni(null)}>{t('Zrušit')}</Button>
           <Button variant={potvrzeni?.danger ? 'danger-solid' : 'primary'} onClick={() => {
             const p = potvrzeni; setPotvrzeni(null); void p?.akce();
           }}>{potvrzeni?.label}</Button>
