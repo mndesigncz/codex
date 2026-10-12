@@ -42,7 +42,8 @@ export const AKCE_HLEDANI: AkceHledani[] = [
   { id: 'dochazka-export', nazev: 'Export docházky pro účetní', kde: 'Docházka', ikona: 'download', slova: ['csv', 'mzdy', 'účetní', 'hodiny', 'výplata'], stranka: 'attendance', rozhrani: V },
   { id: 'dochazka-premie', nazev: 'Prémie a srážky k mzdě', kde: 'Docházka › Souhrn hodin', ikona: 'coins', slova: ['bonus', 'odměna v penězích', 'srážka', 'výplata'], stranka: 'attendance', rozhrani: V },
   { id: 'tym-pozvat', nazev: 'Pozvat člena týmu', kde: 'Tým', ikona: 'users', slova: ['pozvánka', 'kód', 'nový zaměstnanec', 'přidat člověka'], stranka: 'team-settings', rozhrani: V },
-  { id: 'tym-role', nazev: 'Role a oprávnění', kde: 'Tým', ikona: 'lock', slova: ['práva', 'přístup', 'kdo smí'], stranka: 'team-settings', rozhrani: V },
+  // Role a oprávnění bydlí v Nastavení (záložka roles), ne v Týmu — dřív akce vedla na Tým a člověk hledal dál.
+  { id: 'tym-role', nazev: 'Role a oprávnění', kde: 'Nastavení', ikona: 'lock', slova: ['práva', 'přístup', 'kdo smí'], stranka: 'settings', arg: 'roles', rozhrani: V },
   // Rozvrh
   { id: 'rozvrh-generovat', nazev: 'Vygenerovat rozvrh', kde: 'Rozvrh', ikona: 'calendar', slova: ['směny', 'naplánovat', 'plán směn'], stranka: 'shifts', rozhrani: V },
   { id: 'dostupnost', nazev: 'Zadat dostupnost', kde: 'Dostupnost', ikona: 'calendar', slova: ['kdy můžu', 'volno', 'směny'], stranka: 'availability', rozhrani: Z },

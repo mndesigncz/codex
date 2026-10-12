@@ -17,4 +17,7 @@ export default function ({ eq, ok }: Testy) {
   ok('akce: „kasa" najde Nastavení › Pokladna i Novou uzávěrku', najdi('kasa').includes('nastaveni-pokladna') && najdi('kasa').includes('uzaverka-nova'));
   eq('akce: „dysko" bez diakritiky najde spropitné', najdi('dysko'), ['finance-dysko']);
   ok('akce: „csv" najde exporty', najdi('csv').includes('dochazka-export') && najdi('csv').includes('finance-export'));
+  // Kolo 6 (B3): Role a oprávnění jsou záložka Nastavení, ne Tým.
+  const role = AKCE_HLEDANI.find(a => a.id === 'tym-role');
+  eq('akce: Role a oprávnění vedou do Nastavení › Role', [role?.stranka, role?.arg], ['settings', 'roles']);
 }

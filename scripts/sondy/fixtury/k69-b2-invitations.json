@@ -7,7 +7,11 @@
    "status": "pending",
    "token": "tok-71",
    "created_at": "VCERA",
-   "role": "employee"
+   "role": "employee",
+   "role_id": null,
+   "role_klic": null,
+   "role_nazev": "Barista",
+   "sent_at": "@1500"
   },
   {
    "id": 72,
@@ -16,7 +20,11 @@
    "status": "pending",
    "token": "tok-72",
    "created_at": "PRED5",
-   "role": "employee"
+   "role": "employee",
+   "role_id": null,
+   "role_klic": "kuchar",
+   "role_nazev": "Kuchař",
+   "sent_at": "@4"
   },
   {
    "id": 70,
@@ -25,7 +33,11 @@
    "status": "accepted",
    "token": null,
    "created_at": "PRED5",
-   "role": "employee"
+   "role": "employee",
+   "role_id": null,
+   "role_klic": null,
+   "role_nazev": "Barista",
+   "sent_at": "@7200"
   }
  ]
 }

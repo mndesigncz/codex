@@ -33,8 +33,13 @@ export function Dock({ items, activeId, onSelect, more, label }: {
   items: DockItem[];
   activeId: string | null;
   onSelect: (id: string) => void;
-  /** Tlačítko „Více" na konci; `active` = je otevřené nebo je vybraná položka z listu. */
-  more?: { onClick: () => void; active: boolean };
+  /**
+   * Tlačítko „Více" na konci; `active` = je otevřené nebo je vybraná položka z listu.
+   * `badge` = počet k vyřízení u položek schovaných v listu (typicky Chat mimo dok) —
+   * stejný odznak jako u položek doku; `badgeLabel` je věta pro odečítač. Volající pošle 0,
+   * když je list otevřený nebo je otevřená sama položka s odznakem.
+   */
+  more?: { onClick: () => void; active: boolean; badge?: number; badgeLabel?: string };
   /** Název navigace pro odečítač. */
   label: string;
 }) {
@@ -77,8 +82,15 @@ export function Dock({ items, activeId, onSelect, more, label }: {
         })}
         {more && (
           <button type="button" onClick={more.onClick} title={t('Více')}
-            className={`flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition duration-[var(--dur-2)] ease-[var(--ease-out-soft)] ${more.active ? 'text-[#16181A]' : 'text-black/40'}`}>
+            className={`relative flex flex-col items-center gap-1 rounded-2xl px-3 py-1.5 transition duration-[var(--dur-2)] ease-[var(--ease-out-soft)] ${more.active ? 'text-[#16181A]' : 'text-black/40'}`}>
             <Icon name="menu" size={22} />
+            {/* Co čeká v listu Více, musí být vidět už na doku (DESIGN „Odznak patří na navigaci"). */}
+            {/* Na rozdíl od položky doku se neschovává s `active`: aktivní „Více" znamená jen, že
+                otevřená stránka bydlí v listu — zprávy čekají dál. Kdy odznak nedává smysl
+                (otevřený list, otevřený Chat), řekne volající nulou. */}
+            {!!more.badge && (
+              <Badge count={more.badge} label={more.badgeLabel} className="absolute top-0 right-1" />
+            )}
             <span className="text-[11px] leading-none font-medium">{t('Více')}</span>
           </button>
         )}

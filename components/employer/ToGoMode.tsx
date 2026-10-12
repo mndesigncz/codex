@@ -21,15 +21,27 @@
 //    chrom aplikace (na telefonu se vedlejší akce PageHeader schovávají do „···");
 //  - pozadí a tmavý režim dává body — vynucený světlý motiv byl jen záplata na
 //    natvrdo světlé barvy, které tu už nejsou.
+//
+// Kolo 6 (B3, mobilní audit V01): na telefonu měl TO GO jen „Administrace" — žádný
+// spodní dok, žádné „Více", žádný zvonek; k Rozvrhu dvě klepnutí, k Docházce tři a po
+// návratu znovu. TO GO zůstává samostatné prostředí (DESIGN „tři prostředí"), ale kreslí
+// sdílený Dock (stejné položky jako administrace + „Více" s listem MobileMoreSheet)
+// a zvonek vedle přepínače podniku. Klepnutí na položku doku přepne do administrace
+// rovnou na ten pohled. „Administrace" zůstává v liště (na počítači je dok skrytý
+// a jiná cesta zpět by nebyla; na telefonu je to zkratka do plné správy).
 
+import { useState } from 'react';
 import { LogoMark } from '../Icons';
 import PodnikSwitcher from '../PodnikSwitcher';
+import NotificationBell from '../NotificationBell';
+import MobileMoreSheet, { type MoreAction, type MoreGroup } from '../MobileMoreSheet';
 import { Button } from '../ui';
+import { Dock, type DockItem } from '../ui/Dock';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { useHlavickaPrehledu } from '../useHlavickaPrehledu';
 import { useT } from '@/lib/i18n/client';
 
-export default function ToGoMode({ user, onExit, onOpenView }: {
+export default function ToGoMode({ user, onExit, onOpenView, dok }: {
   user: { name?: string };
   onExit: () => void;
   /** Skok do pohledu plné administrace; `arg` upřesní cíl (id konverzace…). */
@@ -39,22 +51,40 @@ export default function ToGoMode({ user, onExit, onOpenView }: {
    * widgety samy přes NavigaceKontext (smiPohled z layoutu).
    */
   smiPohled?: (view: string) => boolean;
+  /**
+   * Spodní dok na telefonu (V01): položky doku administrace a obsah listu „Více"
+   * (skupiny pohledů a akce). Klepnutí na pohled jde přes `onOpenView`.
+   */
+  dok?: { polozky: DockItem[]; skupiny: MoreGroup[]; akce: MoreAction[]; odznakVice?: { pocet: number; veta: string } };
 }) {
   const t = useT('sprava');
   const { title, subtitle } = useHlavickaPrehledu(user?.name);
+  const [viceOtevreno, setViceOtevreno] = useState(false);
 
   return (
-    <div className="min-h-[100dvh] pb-[env(safe-area-inset-bottom)]">
-      {/* Chrom aplikace: značka, přepínač podniku (jen s víc podniky) a cesta do administrace. */}
+    // Pod dokem zůstává místo (pb-36 jako v administraci), ať dok nepřekryje poslední widget.
+    <div className={`min-h-[100dvh] ${dok ? 'pb-36 md:pb-[env(safe-area-inset-bottom)]' : 'pb-[env(safe-area-inset-bottom)]'}`}>
+      {/* Chrom aplikace: značka, přepínač podniku (jen s víc podniky), zvonek a cesta do administrace. */}
       <div className="max-w-lg mx-auto w-full px-4 pt-[max(env(safe-area-inset-top),12px)] flex items-center gap-3">
         <LogoMark size={34} />
-        <span className="t-card flex-1 min-w-0 truncate">{t('Managero')}</span>
+        {/* Pod 380 px by se název s přepínačem, zvonkem a „Administrace" smrštil na jedno písmeno — zůstane jen značka. */}
+        <span className="t-card flex-1 min-w-0 truncate"><span className="hidden min-[380px]:inline">{t('Managero')}</span></span>
         <PodnikSwitcher compact jenPrepinani onOverview={() => onOpenView('org')} />
-        <Button variant="secondary" size="sm" icon="swap" onClick={onExit}>{t('Administrace')}</Button>
+        <NotificationBell />
+        <Button variant="secondary" size="sm" icon="swap" onClick={onExit} className="shrink-0">{t('Administrace')}</Button>
       </div>
       <div className="max-w-lg mx-auto w-full">
         <PlochaWidgetu stranka="vedeni.togo" hlavicka={{ title, subtitle: `TO GO · ${subtitle}` }} />
       </div>
+      {dok && (
+        <>
+          <Dock label={t('Spodní navigace')} items={dok.polozky} activeId={null}
+            onSelect={id => { setViceOtevreno(false); onOpenView(id); }}
+            more={{ onClick: () => setViceOtevreno(v => !v), active: viceOtevreno, badge: viceOtevreno ? 0 : dok.odznakVice?.pocet, badgeLabel: dok.odznakVice?.veta }} />
+          <MobileMoreSheet open={viceOtevreno} onClose={() => setViceOtevreno(false)} groups={dok.skupiny} activeId="togo"
+            onSelect={id => onOpenView(id)} actions={dok.akce} />
+        </>
+      )}
     </div>
   );
 }

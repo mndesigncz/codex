@@ -1,25 +1,29 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { planInfoOf, type PlanInfo } from '@/lib/plan';
 import Billing from './Billing';
 import { Icon } from './Icons';
-import { EmptyState, Button, Skeleton, PageHeader, Segmented, Badge, Chip, Modal, Stat, StatRow, Label } from './ui';
+import { EmptyState, Button, Skeleton, PageHeader, Segmented, Badge, Chip, ListRow, Modal, Stat, StatRow, Label } from './ui';
 import { useObal } from './ObalProvider';
 import PravniOdkazy from './pravni/PravniOdkazy';
 import NahlasenyObsah from './moderace/NahlasenyObsah';
 import Zablokovani from './moderace/Zablokovani';
-import { useT } from '@/lib/i18n/client';
+import { useT, useJazyk, type PrekladFn } from '@/lib/i18n/client';
+import type { Jazyk } from '@/lib/i18n/config';
 import SekceVzhled from './settings/SekceVzhled';
 import SekceJazyk from './settings/SekceJazyk';
 import SekceOznameni from './settings/SekceOznameni';
 import SekceData from './settings/SekceData';
 import SekceZkratky from './settings/SekceZkratky';
 import SekcePodnik from './settings/SekcePodnik';
-import { zalozkaNastaveni, type SectionId } from '@/lib/nastaveniZalozky';
+import { zalozkaNastaveni, otevritSekciRovnou, SKUPINA_ZALOZKY, SKUPINY_NASTAVENI, type SectionId, type SkupinaNastaveni } from '@/lib/nastaveniZalozky';
 import TeamManagement from './TeamManagement';
-import { dbTimeDayHM } from '@/lib/pragueTime';
+import { dbTimeDayHM, parseDbTime } from '@/lib/pragueTime';
+import { relativniCas } from '@/lib/poznamky';
+import { fmtDatum } from '@/lib/i18n/format';
+import { cilOznameni, ikonaOznameni, otevriOznameni, LIMIT_OZNAMENI } from '@/lib/oznameniOdkaz';
 import { czCount } from '@/lib/czech';
 import { okJson } from '@/lib/api';
 import { useOpravneni } from './role/useOpravneni';
@@ -65,6 +69,8 @@ interface Notif {
   created_at: string;
 }
 
+interface Sekce { id: SectionId; label: string; icon: string; desc: string; skupina: SkupinaNastaveni }
+
 const AVATARS = ['👤', '👩‍💼', '👨‍🍳', '🧑‍🍳', '👩‍🍳', '🧑‍💼', '🙂', '😎', '🌿', '🍵', '🧋', '☕'];
 
 const inputClass =
@@ -74,68 +80,96 @@ const labelClass = 'field-label';
 // tracking-tight` a hlavní akce formulářů ručně psanou limetkou.
 const cardTitle = 't-card';
 
-const typeIcon: Record<string, string> = {
-  chat: 'chat', inventory: 'box', shift: 'calendar', invite: 'users', info: 'bell',
-};
-
 const UCTENKA = { one: 'účtenka', few: 'účtenky', many: 'účtenek' };
 const POLOZKA = { one: 'položka', few: 'položky', many: 'položek' };
 
-function relativeCzech(iso: string): string {
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return '';
-  const diff = Date.now() - then;
-  const s = Math.floor(diff / 1000);
-  if (s < 45) return 'právě teď';
-  const m = Math.floor(s / 60);
-  if (m < 60) return `před ${m} min`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `před ${h} h`;
-  const d = Math.floor(h / 24);
-  if (d === 1) return 'včera';
-  if (d < 7) return `před ${d} dny`;
-  return new Date(iso).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', year: 'numeric' });
+/** „před 5 min", „před 2 h", „před 3 dny", po týdnu datum — v jazyce člověka (čas z databáze přes parseDbTime). */
+function kdyPrislo(iso: string, t: PrekladFn, jazyk: Jazyk): string {
+  const d = parseDbTime(iso);
+  if (!d) return '';
+  const r = relativniCas(d);
+  if (r.druh === 'ted') return t('právě teď');
+  if (r.druh === 'min') return t('před {n} min', { n: r.n });
+  if (r.druh === 'h') return t('před {n} h', { n: r.n });
+  if (r.druh === 'den') return t('před {n, plural, one {# dnem} few {# dny} other {# dny}}', { n: r.n });
+  return fmtDatum(d, { jazyk, styl: 'cislo' });
 }
+
+/** Filtr Centra oznámení. */
+type FiltrOznameni = 'vse' | 'neprectene';
 
 export default function Settings({ user, initialTab, tabNonce, vOkne = false }: Props) {
   const { update } = useSession();
   const { smiPlatby } = useObal();
   const t = useT();
+  const { jazyk } = useJazyk();
   const [zvolena, setZvolena] = useState<SectionId>(zalozkaNastaveni(initialTab) ?? 'account');
+  // Telefon (kolo 6, B3): Nastavení je svislý seznam sekcí; klepnutí otevře sekci přes celou
+  // obrazovku s „Zpět". Dřív posuvný pás 13 pilulek (1 817 px) — Notifikace, Zabezpečení, Pokladna
+  // i Role byly mimo obrazovku. Rovnou sekci otevře jen výslovný odkaz (?tab=, banner, hledání);
+  // na počítači se nic nemění (boční pás + obsah).
+  const [zobrazeni, setZobrazeni] = useState<'seznam' | 'sekce'>(otevritSekciRovnou(initialTab) ? 'sekce' : 'seznam');
   // Přepnutí záložky odmontuje editor rolí — u rozepsané role se nejdřív zeptá.
   const straz = useStrazRole();
-  const setSection = (id: SectionId) => { if (id !== zvolena) straz.pokus(() => setZvolena(id)); };
+  const setSection = (id: SectionId, sekci = true) => {
+    if (id !== zvolena) straz.pokus(() => { setZvolena(id); if (sekci) setZobrazeni('sekce'); });
+    else if (sekci) setZobrazeni('sekce');
+  };
   // Odkaz na záložku, když je Nastavení už otevřené: useState výše si initialTab
   // přečte jen při prvním vykreslení.
-  useEffect(() => { const z = zalozkaNastaveni(initialTab); if (tabNonce && z) setSection(z); },
+  useEffect(() => { const z = zalozkaNastaveni(initialTab); if (tabNonce && z) setSection(z, otevritSekciRovnou(z)); },
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [tabNonce]);
+  // Nová obrazovka na telefonu začíná nahoře — ne v půlce dlouhého seznamu, odkud se klepalo.
+  const korenRef = useRef<HTMLDivElement>(null);
+  const prvniZobrazeni = useRef(true);
+  useEffect(() => {
+    if (prvniZobrazeni.current) { prvniZobrazeni.current = false; return; }
+    try { if (window.matchMedia('(max-width: 767px)').matches) korenRef.current?.scrollIntoView({ block: 'start' }); } catch { /* starý prohlížeč */ }
+  }, [zobrazeni, zvolena]);
+  // Klávesové zkratky na dotykovém telefonu nedávají smysl — v seznamu na telefonu se nekreslí (na počítači zůstávají).
+  const [dotyk, setDotyk] = useState(false);
+  useEffect(() => { try { setDotyk(window.matchMedia('(hover: none) and (pointer: coarse)').matches); } catch { /* bez matchMedia */ } }, []);
   const [account, setAccount] = useState<Account | null>(null);
   const [loading, setLoading] = useState(true);
   const isEmployer = (account?.role ?? user.role) === 'employer';
   // Záložky podniku podle oprávnění (kolo 67). Vedení má všechno, takže
   // vidí totéž co dřív; Provozní nebo Účetní jen to, co mu server dovolí.
   const { ma } = useOpravneni();
-  const sections: { id: SectionId; label: string; icon: string; desc: string }[] = [
-    { id: 'account', label: t('Účet'), icon: 'settings', desc: t('Profil a osobní údaje') },
+  // Sekce ve dvou skupinách (kolo 6, B3): „Osobní" — můj účet, platí v každém podniku —
+  // a „Podnik" — nastavení podniku. Skupinu nese lib/nastaveniZalozky (SKUPINA_ZALOZKY),
+  // nadpisy kreslí boční pás na počítači i svislý seznam na telefonu.
+  const sekce = (id: SectionId, label: string, icon: string, desc: string): Sekce => ({ id, label, icon, desc, skupina: SKUPINA_ZALOZKY[id] });
+  const sections: Sekce[] = [
+    sekce('account', t('Účet'), 'settings', t('Profil a osobní údaje')),
     // Jazyk má vlastní viditelnou záložku (dřív byl schovaný ve Vzhledu): jazyk aplikace a osobní formáty.
-    { id: 'jazyk', label: t('Jazyk a region'), icon: 'globe', desc: t('Jazyk, čas a formáty') },
-    { id: 'app', label: t('Vzhled'), icon: 'sun', desc: t('Motiv, písmo a pohyb') },
-    { id: 'notifications', label: t('Notifikace'), icon: 'bell', desc: t('Upozornění a centrum oznámení') },
-    { id: 'security', label: t('Zabezpečení'), icon: 'check', desc: t('Heslo') },
-    { id: 'privacy', label: t('Data a soukromí'), icon: 'archive', desc: t('Stažení dat a smazání účtu') },
-    { id: 'zkratky', label: t('Klávesové zkratky'), icon: 'menu', desc: t('Co umí klávesnice') },
-    ...(isEmployer && smiPlatby && ma('predplatne.zobrazit') ? [{ id: 'billing' as SectionId, label: t('Předplatné'), icon: 'award', desc: t('Plán a fakturace') }] : []),
-    // Profil podniku (kolo 73): název, typ, adresa, IČO a DIČ, výchozí prahy skladu.
-    ...(isEmployer && ma('podnik.nastaveni') ? [{ id: 'podnik' as SectionId, label: t('Profil podniku'), icon: 'receipt', desc: t('Údaje a prahy skladu') }] : []),
-    ...(isEmployer && ma('pokladna.stav') ? [{ id: 'pos' as SectionId, label: t('Pokladna'), icon: 'trend', desc: t('Napojení Storyous') }] : []),
-    ...(isEmployer && ma(['tym.role_spravovat', 'tym.role_prirazovat']) ? [{ id: 'roles' as SectionId, label: t('Role a oprávnění'), icon: 'lock', desc: t('Kdo co v podniku smí') }] : []),
+    sekce('jazyk', t('Jazyk a region'), 'globe', t('Jazyk, čas a formáty')),
+    sekce('app', t('Vzhled'), 'sun', t('Motiv, písmo a pohyb')),
+    sekce('notifications', t('Notifikace'), 'bell', t('Upozornění a centrum oznámení')),
+    sekce('security', t('Zabezpečení'), 'check', t('Heslo')),
+    sekce('privacy', t('Data a soukromí'), 'archive', t('Stažení dat a smazání účtu')),
+    sekce('zkratky', t('Klávesové zkratky'), 'menu', t('Co umí klávesnice')),
+    // Profil podniku (kolo 73) a od kola 6 i Provoz podniku: název, adresa, IČO, prahy skladu, měna,
+    // formáty, jazyk a cíl mezd. Cíl mezd smí i role s finance.nastaveni, proto i ona tu sekci vidí.
+    ...(isEmployer && ma(['podnik.nastaveni', 'finance.nastaveni']) ? [sekce('podnik', t('Profil podniku'), 'receipt', t('Údaje, provoz a prahy skladu'))] : []),
+    ...(isEmployer && ma(['tym.role_spravovat', 'tym.role_prirazovat']) ? [sekce('roles', t('Role a oprávnění'), 'lock', t('Kdo co v podniku smí'))] : []),
     // Výchozí plocha pro typ role nebo roli a zámky (spec §3.8); tablet stačí spravovat.
-    ...(isEmployer && ma(['podnik.nastaveni', 'kiosk.spravovat']) ? [{ id: 'stranky' as SectionId, label: t('Stránky'), icon: 'overview', desc: t('Výchozí plocha a zámky') }] : []),
+    ...(isEmployer && ma(['podnik.nastaveni', 'kiosk.spravovat']) ? [sekce('stranky', t('Stránky'), 'overview', t('Výchozí plocha a zámky'))] : []),
+    ...(isEmployer && ma('pokladna.stav') ? [sekce('pos', t('Pokladna'), 'trend', t('Napojení Storyous'))] : []),
+    ...(isEmployer && smiPlatby && ma('predplatne.zobrazit') ? [sekce('billing', t('Předplatné'), 'award', t('Plán a fakturace'))] : []),
+    ...(isEmployer && ma('audit.zobrazit') ? [sekce('audit', t('Historie změn'), 'clock', t('Kdo co kdy změnil'))] : []),
     // Moderace uživatelského obsahu (Apple 1.2): nahlášené zprávy a nápady vidí, kdo smí odebírat členy.
-    ...(ma('tym.odebrat') ? [{ id: 'nahlaseni' as SectionId, label: t('Nahlášený obsah'), icon: 'warning', desc: t('Zprávy a nápady nahlášené týmem') }] : []),
-    ...(isEmployer && ma('audit.zobrazit') ? [{ id: 'audit' as SectionId, label: t('Historie změn'), icon: 'clock', desc: t('Kdo co kdy změnil') }] : []),
+    ...(ma('tym.odebrat') ? [sekce('nahlaseni', t('Nahlášený obsah'), 'warning', t('Zprávy a nápady nahlášené týmem'))] : []),
   ];
+  // Nadpisy skupin jen tam, kde jsou obě (zaměstnanec má jen osobní sekce — nadpis by nic neodlišil).
+  const nazevSkupiny: Record<SkupinaNastaveni, string> = { osobni: t('Osobní'), podnik: t('Podnik') };
+  const skupiny = SKUPINY_NASTAVENI
+    .map(id => ({ id, nazev: nazevSkupiny[id], polozky: sections.filter(s => s.skupina === id) }))
+    .filter(g => g.polozky.length > 0);
+  const sNadpisy = skupiny.length > 1;
+  const skupinyTelefon = skupiny
+    .map(g => ({ ...g, polozky: g.polozky.filter(s => !(dotyk && s.id === 'zkratky')) }))
+    .filter(g => g.polozky.length > 0);
   // Záložka, na kterou role nemá, se nevykreslí, ani když na ni vede odkaz
   // (Receptury → „Nastavit pokladnu", banner předplatného) nebo když se
   // oprávnění načetla až po otevření. Obsah by jinak ukázal formulář
@@ -166,6 +200,7 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
     loadPosHealth();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section]);
+  // i18n-ok: hlášky Pokladny (napojení Storyous) zůstávají česky — viz sekce Pokladna níž.
   const posDo = async (action: string, extra: Record<string, any> = {}) => {
     setPosAction(action); setPosMsg('');
     const res = await fetch('/api/pos/status', {
@@ -239,10 +274,20 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
   const [pwdMsg, setPwdMsg] = useState('');
   const [pwdErr, setPwdErr] = useState('');
 
-  // Notification center
+  // Centrum oznámení (kolo 6, B3): řádek s odkazem vede na cíl, filtr Vše / Nepřečtené,
+  // pilulky druhu s počtem (od dvou druhů), „Načíst starší" po dávkách z /api/notifications.
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [notifsLoading, setNotifsLoading] = useState(false);
   const [notifsLoaded, setNotifsLoaded] = useState(false);
+  const [notifsErr, setNotifsErr] = useState(false);
+  const [notifMsg, setNotifMsg] = useState('');
+  const [filtrOzn, setFiltrOzn] = useState<FiltrOznameni>('vse');
+  const [druhOzn, setDruhOzn] = useState<string | null>(null);
+  const [druhyOzn, setDruhyOzn] = useState<Record<string, number>>({});
+  // Počet všech nepřečtených ze serveru; null = ještě nevím (odznak u Notifikací v seznamu sekcí).
+  const [unreadTotal, setUnreadTotal] = useState<number | null>(null);
+  const [maStarsi, setMaStarsi] = useState(false);
+  const [nacitamStarsi, setNacitamStarsi] = useState(false);
 
   // Plan & trial for the billing section (employer only).
   const [plan, setPlan] = useState<PlanInfo | null>(null);
@@ -270,25 +315,67 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
       .finally(() => setLoading(false));
   }, []);
 
-  const loadNotifs = () => {
-    setNotifsLoading(true);
-    fetch('/api/notifications')
+  const adresaOznameni = (f: FiltrOznameni, druh: string | null, pred?: number) => {
+    const q = new URLSearchParams({ limit: String(LIMIT_OZNAMENI.vychozi) });
+    if (f === 'neprectene') q.set('unread', '1');
+    if (druh) q.set('type', druh);
+    if (pred) q.set('before', String(pred)); else q.set('souhrn', '1');
+    return `/api/notifications?${q}`;
+  };
+  const loadNotifs = (f: FiltrOznameni = filtrOzn, druh: string | null = druhOzn) => {
+    setNotifsLoading(true); setNotifsErr(false);
+    fetch(adresaOznameni(f, druh))
       .then(okJson)
-      .then(data => setNotifs(data.notifications || []))
-      .catch(() => {})
+      .then(data => {
+        const seznam: Notif[] = Array.isArray(data.notifications) ? data.notifications : [];
+        setNotifs(seznam);
+        setUnreadTotal(Number(data.unread) || 0);
+        setDruhyOzn(data.druhy && typeof data.druhy === 'object' ? data.druhy : {});
+        setMaStarsi(seznam.length >= (Number(data.limit) || LIMIT_OZNAMENI.vychozi));
+      })
+      .catch(() => setNotifsErr(true))
       .finally(() => { setNotifsLoading(false); setNotifsLoaded(true); });
   };
+  const nactiStarsi = () => {
+    const posledni = notifs[notifs.length - 1];
+    if (!posledni) return;
+    setNacitamStarsi(true); setNotifMsg('');
+    fetch(adresaOznameni(filtrOzn, druhOzn, posledni.id))
+      .then(okJson)
+      .then(data => {
+        const dalsi: Notif[] = Array.isArray(data.notifications) ? data.notifications : [];
+        setNotifs(prev => [...prev, ...dalsi.filter(n => !prev.some(p => p.id === n.id))]);
+        setMaStarsi(dalsi.length >= (Number(data.limit) || LIMIT_OZNAMENI.vychozi));
+      })
+      .catch(() => setNotifMsg(t('Starší oznámení se nepodařilo načíst.')))
+      .finally(() => setNacitamStarsi(false));
+  };
+  const zmenFiltr = (f: FiltrOznameni) => { setFiltrOzn(f); loadNotifs(f, druhOzn); };
+  // Druhý klik na tutéž pilulku filtr zruší (DESIGN „Filtrovací pás").
+  const zmenDruh = (d: string) => { const novy = druhOzn === d ? null : d; setDruhOzn(novy); loadNotifs(filtrOzn, novy); };
+  // Klepnutí na řádek s odkazem: přečteno (až podle serveru) a přechod na cíl — stejně jako zvonek.
+  const otevriNotif = (n: Notif) => otevriOznameni(n, x => {
+    setNotifs(prev => prev.map(y => (y.id === x.id ? { ...y, is_read: true } : y)));
+    setUnreadTotal(u => Math.max(0, (u ?? 1) - 1));
+  });
 
   useEffect(() => {
     if (section === 'notifications' && !notifsLoaded) loadNotifs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section]);
+  // Odznak nepřečtených u Notifikací (seznam sekcí, boční pás) i před otevřením sekce:
+  // stačí počet, seznam se stáhne až v sekci. Bez sítě odznak prostě nebude.
+  useEffect(() => {
+    fetch('/api/notifications?limit=1').then(okJson)
+      .then(d => setUnreadTotal(u => u ?? (Number(d?.unread) || 0)))
+      .catch(() => { /* odznak je doplněk */ });
+  }, []);
 
   const saveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setProfileErr('');
     setProfileMsg('');
-    if (!name.trim()) { setProfileErr('Jméno nesmí být prázdné.'); return; }
+    if (!name.trim()) { setProfileErr(t('Jméno nesmí být prázdné.')); return; }
     setSavingProfile(true);
     try {
       const res = await fetch('/api/account', {
@@ -306,13 +393,14 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
       if (res.ok) {
         setAccount(data.user);
         await update({ user: { name: name.trim(), avatar } });
-        setProfileMsg('Profil byl uložen.');
+        setProfileMsg(t('Profil byl uložen.'));
         setTimeout(() => setProfileMsg(''), 4000);
       } else {
-        setProfileErr(data.error || 'Profil se nepodařilo uložit.');
+        // Hláška serveru se hledá ve slovníku (věta ze serveru je klíč, jako u apiMessage).
+        setProfileErr(data.error ? t(data.error) : t('Profil se nepodařilo uložit.'));
       }
     } catch {
-      setProfileErr('Nastala chyba při ukládání.');
+      setProfileErr(t('Nastala chyba při ukládání.'));
     } finally {
       setSavingProfile(false);
     }
@@ -322,9 +410,9 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
     e.preventDefault();
     setPwdErr('');
     setPwdMsg('');
-    if (!currentPassword || !newPassword) { setPwdErr('Vyplňte všechna pole.'); return; }
-    if (newPassword.length < 8) { setPwdErr('Nové heslo musí mít alespoň 8 znaků.'); return; }
-    if (newPassword !== confirmPassword) { setPwdErr('Nová hesla se neshodují.'); return; }
+    if (!currentPassword || !newPassword) { setPwdErr(t('Vyplňte všechna pole.')); return; }
+    if (newPassword.length < 8) { setPwdErr(t('Nové heslo musí mít alespoň 8 znaků.')); return; }
+    if (newPassword !== confirmPassword) { setPwdErr(t('Nová hesla se neshodují.')); return; }
     setSavingPwd(true);
     try {
       const res = await fetch('/api/account', {
@@ -334,69 +422,121 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
       });
       const data = await res.json();
       if (res.ok) {
-        setPwdMsg(data.message || 'Heslo bylo změněno.');
+        setPwdMsg(data.message ? t(data.message) : t('Heslo bylo změněno.'));
         setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
         setTimeout(() => setPwdMsg(''), 4000);
       } else {
-        setPwdErr(data.error || 'Heslo se nepodařilo změnit.');
+        setPwdErr(data.error ? t(data.error) : t('Heslo se nepodařilo změnit.'));
       }
     } catch {
-      setPwdErr('Nastala chyba při změně hesla.');
+      setPwdErr(t('Nastala chyba při změně hesla.'));
     } finally {
       setSavingPwd(false);
     }
   };
 
+  // Přečteno je až to, co server potvrdí — dřív se odznak vynuloval i po chybě.
   const markAllRead = async () => {
+    setNotifMsg('');
+    const res = await fetch('/api/notifications', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(() => null);
+    if (!res?.ok) { setNotifMsg(t('Oznámení se nepodařilo označit jako přečtená. Zkus to znovu.')); return; }
     setNotifs(prev => prev.map(n => ({ ...n, is_read: true })));
-    try {
-      await fetch('/api/notifications', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: '{}',
-      });
-    } catch { /* ignore */ }
+    setUnreadTotal(0);
+    if (filtrOzn === 'neprectene') loadNotifs();
   };
 
-  const unreadCount = notifs.filter(n => !n.is_read).length;
+  // Počet všech nepřečtených ze serveru (ne jen v načtené dávce).
+  const unreadCount = unreadTotal ?? notifs.filter(n => !n.is_read).length;
+  // Druhy oznámení pro pilulky: od dvou druhů, vybraný zůstává vidět i s nulou.
+  const druhyPilulek = Object.entries({ ...(druhOzn ? { [druhOzn]: 0 } : {}), ...druhyOzn });
+  const nazevDruhu = (typ: string): string => {
+    switch (typ) {
+      case 'shift': return t('Směny');
+      case 'chat': return t('Zprávy');
+      case 'inventory': return t('Sklad');
+      case 'task': return t('Úkoly');
+      case 'invite': return t('Tým');
+      case 'warning': return t('Upozornění', undefined, 'druh');
+      case 'success': return t('Odměny');
+      case 'billing': return t('Předplatné');
+      case 'info': return t('Informace');
+      default: return t('Ostatní', undefined, 'druh');
+    }
+  };
+
+  const aktivni = sections.find(s => s.id === section);
+  const odznakOznameni = unreadCount > 0
+    ? <Badge count={unreadCount} label={t('Nepřečtená oznámení: {n}', { n: unreadCount })} ring={false} />
+    : null;
 
   return (
-    <div className={vOkne ? 'space-y-4' : 'p-4 sm:p-6 max-w-5xl mx-auto space-y-6'}>
-      {!vOkne && <PageHeader title={t('Nastavení')} subtitle={t('Spravujte svůj profil, jazyk, vzhled, oznámení a zabezpečení.')} />}
+    <div ref={korenRef} className={vOkne ? 'space-y-4' : 'p-4 sm:p-6 max-w-5xl mx-auto space-y-6'}>
+      {!vOkne && <PageHeader title={t('Nastavení')} subtitle={t('Spravujte svůj profil, jazyk, vzhled, oznámení a zabezpečení.')}
+        className={zobrazeni === 'sekce' ? 'hidden md:block' : ''} />}
       <DiscardGuard guard={straz.guard} what={CO_SE_ZAHODI_ROLE} />
 
-      {/* Telefon: sekce jako posuvný pás filtrových pilulek. Dřív ruční
-          pilulky bez náznaku, že pás pokračuje — poslední byla useknutá.
-          Segmented umí přetečení s měkkým okrajem sám. */}
-      <div className="md:hidden">
-        <Segmented ariaLabel={t('Sekce nastavení')} value={section} onChange={id => setSection(id)}
-          options={sections.map(s => ({ id: s.id, label: s.label, icon: s.icon, count: s.id === 'notifications' && unreadCount > 0 ? unreadCount : undefined }))} />
-      </div>
+      {/* Telefon: svislý seznam sekcí ve skupinách Osobní / Podnik (ikona, název, popis,
+          šipka; odznak nepřečtených u Notifikací). Segmented zůstává jen pro pár položek. */}
+      {zobrazeni === 'seznam' && (
+        <nav className="md:hidden space-y-4" aria-label={t('Sekce nastavení')}>
+          {skupinyTelefon.map(g => (
+            <section key={g.id} className="space-y-1.5" aria-labelledby={sNadpisy ? `nast-skupina-${g.id}` : undefined}>
+              {sNadpisy && <h2 id={`nast-skupina-${g.id}`} className="t-label px-1">{g.nazev}</h2>}
+              <div className="card px-4 py-1">
+                <ul className="list">
+                  {g.polozky.map(s => (
+                    <ListRow key={s.id}
+                      lead={<span className="well h-10 w-10 grid place-items-center text-black/60"><Icon name={s.icon} size={18} /></span>}
+                      title={s.id === 'notifications' && odznakOznameni
+                        ? <span className="flex items-center gap-2 min-w-0"><span className="truncate">{s.label}</span>{odznakOznameni}</span>
+                        : s.label}
+                      meta={s.desc}
+                      onClick={() => setSection(s.id)} />
+                  ))}
+                </ul>
+              </div>
+            </section>
+          ))}
+        </nav>
+      )}
+
+      {/* Telefon v sekci: hlavička s názvem sekce a cesta zpět na seznam (jako „Zpět na uzávěrky"). */}
+      {zobrazeni === 'sekce' && (
+        <div className="md:hidden space-y-1">
+          <Button variant="ghost" icon="chevron" className="-ml-3 [&>svg]:rotate-90" onClick={() => setZobrazeni('seznam')}>{t('Zpět')}</Button>
+          <PageHeader as={vOkne ? 'h2' : 'h1'} title={aktivni?.label ?? (section === 'team' ? t('Tým') : t('Nastavení'))} subtitle={aktivni?.desc} />
+        </div>
+      )}
 
       <div className="flex gap-6">
         {/* Desktop: left vertical section list */}
-        <nav className="hidden md:flex flex-col gap-1 w-60 flex-shrink-0">
-          {sections.map(s => (
-            <button key={s.id} onClick={() => setSection(s.id)} aria-pressed={section === s.id}
-              className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-2xl transition duration-200 ${
-                section === s.id ? 'seg-on' : 'seg-off'
-              }`}>
-              <Icon name={s.icon} size={20} className="flex-shrink-0" />
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold truncate">{s.label}</span>
-                <span className={`block text-xs truncate ${section === s.id ? 'text-white/60' : 'text-black/55'}`}>{s.desc}</span>
-              </span>
-              {s.id === 'notifications' && (
-                <Badge count={unreadCount} label={t('Nepřečtená oznámení: {n}', { n: unreadCount })} />
-              )}
-            </button>
+        <nav className="hidden md:flex flex-col gap-1 w-60 flex-shrink-0" aria-label={t('Sekce nastavení')}>
+          {skupiny.map((g, gi) => (
+            <div key={g.id} className={`flex flex-col gap-1 ${gi > 0 ? 'pt-3' : ''}`}>
+              {sNadpisy && <h2 className="t-label px-4 pb-0.5">{g.nazev}</h2>}
+              {g.polozky.map(s => (
+                <button key={s.id} onClick={() => setSection(s.id)} aria-pressed={section === s.id}
+                  className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-2xl transition duration-200 ${
+                    section === s.id ? 'seg-on' : 'seg-off'
+                  }`}>
+                  <Icon name={s.icon} size={20} className="flex-shrink-0" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold truncate">{s.label}</span>
+                    <span className={`block text-xs truncate ${section === s.id ? 'text-white/60' : 'text-black/55'}`}>{s.desc}</span>
+                  </span>
+                  {s.id === 'notifications' && (
+                    <Badge count={unreadCount} label={t('Nepřečtená oznámení: {n}', { n: unreadCount })} />
+                  )}
+                </button>
+              ))}
+            </div>
           ))}
         </nav>
 
-        {/* Content */}
-        <div className="flex-1 min-w-0">
+        {/* Obsah sekce; na telefonu jen v režimu sekce (seznam ho zakryje, editor rolí zůstane připojený). */}
+        <div className={`flex-1 min-w-0 ${zobrazeni === 'seznam' ? 'hidden md:block' : ''}`}>
           {loading ? (
             <Skeleton className="h-72 rounded-3xl" />
           ) : section === 'account' ? (
@@ -407,22 +547,22 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
                 </div>
               )}
               {profileErr && (
-                <div className="note note-danger p-4 text-sm flex items-center gap-2">
-                  <Icon name="warning" size={16} /> {profileErr}
+                <div role="alert" className="note note-danger p-4 text-sm flex items-center gap-2">
+                  <Icon name="warning" size={16} className="shrink-0" /> {profileErr}
                 </div>
               )}
 
               <div>
-                <label className={labelClass}>Avatar</label>
+                <label className={labelClass} id="nast-avatar">{t('Avatar')}</label>
                 <div className="flex items-center gap-4 flex-wrap">
                   <div className="w-16 h-16 rounded-full bg-[var(--well)] border border-[var(--well-line)] flex items-center justify-center text-3xl flex-shrink-0" aria-hidden>
                     {avatar}
                   </div>
-                  <div className="flex flex-wrap gap-2 min-w-0 max-w-full">
+                  <div className="flex flex-wrap gap-2 min-w-0 max-w-full" role="group" aria-labelledby="nast-avatar">
                     {AVATARS.map(a => (
                       // Vybraný avatar nese inkoustový prstenec, ne limetkový tón —
                       // limetka na obrazovce patří tlačítku Uložit.
-                      <button key={a} type="button" onClick={() => setAvatar(a)} aria-pressed={avatar === a} aria-label={`Avatar ${a}`}
+                      <button key={a} type="button" onClick={() => setAvatar(a)} aria-pressed={avatar === a} aria-label={t('Avatar {a}', { a })}
                         className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl transition ${
                           avatar === a ? 'bg-black/[0.04] ring-2 ring-[#16181A]' : 'bg-black/[0.04] border border-black/[0.08] hover:bg-black/[0.06]'
                         }`}>
@@ -435,37 +575,38 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="nast-jmeno" className={labelClass}>Jméno</label>
-                  <input id="nast-jmeno" value={name} aria-label="Jméno" onChange={e => setName(e.target.value)} className={inputClass} />
+                  <label htmlFor="nast-jmeno" className={labelClass}>{t('Jméno')}</label>
+                  <input id="nast-jmeno" value={name} autoComplete="name" onChange={e => setName(e.target.value)} className={inputClass} />
                 </div>
                 <div>
-                  <label htmlFor="nast-email" className={labelClass}>E-mail</label>
-                  <input id="nast-email" value={account?.email ?? ''} aria-label="E-mail" disabled
+                  <label htmlFor="nast-email" className={labelClass}>{t('E-mail')}</label>
+                  <input id="nast-email" value={account?.email ?? ''} disabled
                     className={inputClass + ' opacity-60 cursor-not-allowed'} />
                 </div>
                 <div>
-                  <label htmlFor="nast-telefon" className={labelClass}>Telefon</label>
-                  <input id="nast-telefon" value={phone} aria-label="Telefon" onChange={e => setPhone(e.target.value)} placeholder="+420…" className={inputClass} />
+                  <label htmlFor="nast-telefon" className={labelClass}>{t('Telefon')}</label>
+                  {/* Telefonní klávesnice na mobilu (inputMode/type tel) a doplnění z kontaktů. */}
+                  <input id="nast-telefon" type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+420…" className={inputClass} />
                 </div>
                 <div>
-                  <label htmlFor="nast-pozice" className={labelClass}>Pozice</label>
-                  <input id="nast-pozice" value={jobTitle} aria-label="Pozice" onChange={e => setJobTitle(e.target.value)} placeholder="Barista" className={inputClass} />
+                  <label htmlFor="nast-pozice" className={labelClass}>{t('Pozice')}</label>
+                  <input id="nast-pozice" value={jobTitle} autoComplete="organization-title" onChange={e => setJobTitle(e.target.value)} placeholder={t('Barista')} className={inputClass} />
                 </div>
                 {!isEmployer && (
                   <div className="sm:col-span-2">
-                    <label htmlFor="nast-preference" className={labelClass}>Preference směn</label>
+                    <label htmlFor="nast-preference" className={labelClass}>{t('Preference směn')}</label>
                     <select id="nast-preference" value={shiftPreference} onChange={e => setShiftPreference(e.target.value)}
                       className={inputClass + ' appearance-none'}>
-                      <option value="morning">Ranní</option>
-                      <option value="afternoon">Odpolední</option>
-                      <option value="flexible">Flexibilní</option>
+                      <option value="morning">{t('Ranní')}</option>
+                      <option value="afternoon">{t('Odpolední')}</option>
+                      <option value="flexible">{t('Flexibilní')}</option>
                     </select>
                   </div>
                 )}
               </div>
 
               <div className="flex flex-col sm:flex-row sm:justify-end">
-                <Button type="submit" variant="accent" block loading={savingProfile}>Uložit změny</Button>
+                <Button type="submit" variant="accent" block loading={savingProfile}>{t('Uložit změny')}</Button>
               </div>
             </form>
           ) : section === 'jazyk' ? (
@@ -483,44 +624,73 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
             <div className="space-y-6">
             <SekceOznameni />
 
-            <section className="card p-6 space-y-4">
+            <section className="card p-6 space-y-4" aria-labelledby="nast-centrum-t">
               <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
                 <div className="min-w-0">
-                  <h2 className={cardTitle}>Centrum oznámení</h2>
+                  <h2 id="nast-centrum-t" className={cardTitle}>{t('Centrum oznámení')}</h2>
                   <p className="t-meta mt-1">
-                    {unreadCount > 0 ? `Nepřečtená oznámení: ${unreadCount}` : 'Vše přečteno'}
+                    {unreadCount > 0 ? t('Nepřečtená oznámení: {n}', { n: unreadCount }) : t('Vše přečteno')}
                   </p>
                 </div>
                 {unreadCount > 0 && (
-                  <Button variant="secondary" size="sm" icon="check" onClick={markAllRead}>Označit vše jako přečtené</Button>
+                  <Button variant="secondary" size="sm" icon="check" onClick={markAllRead}>{t('Označit vše jako přečtené')}</Button>
                 )}
               </div>
 
+              <Segmented size="sm" ariaLabel={t('Která oznámení ukázat')} value={filtrOzn} onChange={zmenFiltr}
+                options={[{ id: 'vse', label: t('Vše') }, { id: 'neprectene', label: t('Nepřečtené'), count: unreadCount }]} />
+              {druhyPilulek.length >= 2 && (
+                // Filtrovací pás (DESIGN): na úzké obrazovce jede do strany uvnitř sebe, nezalamuje se do tří řádků.
+                <div className="flex gap-1.5 overflow-x-auto overscroll-x-contain scrollbar-none scroll-fade-x -mx-1 px-1 py-0.5" role="group" aria-label={t('Druh oznámení')}>
+                  {druhyPilulek.map(([typ, n]) => (
+                    <button key={typ} type="button" aria-pressed={druhOzn === typ} onClick={() => zmenDruh(typ)}
+                      className={`filter-pill tap-target-sm shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 ${druhOzn === typ ? 'seg-on' : 'seg-off glass'}`}>
+                      <Icon name={ikonaOznameni(typ)} size={13} className="shrink-0" />
+                      <span>{nazevDruhu(typ)} · <span className="tabular-nums">{n}</span></span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {notifMsg && <p role="alert" className="note note-danger text-sm">{notifMsg}</p>}
+
               {notifsLoading ? (
-                <div className="space-y-2" aria-busy="true" aria-label="Načítám oznámení">
+                <div className="space-y-2" aria-busy="true" aria-label={t('Načítám oznámení')}>
                   {[0, 1, 2].map(i => <Skeleton key={i} className="h-14 w-full" />)}
                 </div>
+              ) : notifsErr ? (
+                <ErrorState compact title={t('Oznámení se nepodařilo načíst')} onRetry={() => loadNotifs()} />
               ) : notifs.length === 0 ? (
-                <EmptyState compact icon="bell" title="Žádná oznámení" hint="Až se něco stane, zobrazí se to tady." />
+                filtrOzn === 'neprectene' || druhOzn
+                  ? <EmptyState compact icon="bell" title={t('Nic tu není')} hint={t('Pod tímhle filtrem žádné oznámení nečeká.')} />
+                  : <EmptyState compact icon="bell" title={t('Žádná oznámení')} hint={t('Až se něco stane, zobrazí se to tady.')} />
               ) : (
                 <ul className="list">
-                  {/* Řádek ručně v .list, ne ListRow: text oznámení se nesmí useknout
-                      na jeden řádek (ListRow meta ořezává). Nepřečtené nese chip,
-                      ne limetkový podklad. */}
-                  {notifs.map(n => (
-                    <li key={n.id} className="list-row !items-start">
+                  {/* ListRow: titulek, čas v meta a text oznámení v `detail` (zalamuje se,
+                      neořezává). Řádek s odkazem je tlačítko a vede na cíl; bez odkazu jen
+                      informuje. Nepřečtené nese chip, ne limetkový podklad. */}
+                  {notifs.map(n => {
+                    const ikona = (
                       <span className="well h-9 w-9 grid place-items-center text-black/55 shrink-0">
-                        <Icon name={typeIcon[n.type] || 'bell'} size={16} />
+                        <Icon name={ikonaOznameni(n.type)} size={16} />
                       </span>
-                      <span className="min-w-0 flex-1">
-                        <span className={`block text-[15px] leading-snug text-[#16181A] ${!n.is_read ? 'font-bold' : 'font-medium'}`}>{n.title}</span>
-                        {n.body && <span className="block text-[13px] text-black/55 mt-0.5 break-words">{n.body}</span>}
-                        <span className="block t-meta mt-1">{relativeCzech(n.created_at)}</span>
-                      </span>
-                      {!n.is_read && <Chip tone="info" size="sm" className="shrink-0">Nové</Chip>}
-                    </li>
-                  ))}
+                    );
+                    const maOdkaz = cilOznameni(n) !== null;
+                    return (
+                      <ListRow key={n.id}
+                        lead={ikona}
+                        // Chip „Nové" v řádku titulku: v ocase by na telefonu dostal vlastní řádek.
+                        title={!n.is_read
+                          ? <span className="flex items-center gap-2 min-w-0"><span className="truncate font-bold">{n.title}</span><Chip tone="info" size="sm" className="shrink-0">{t('Nové')}</Chip></span>
+                          : n.title}
+                        meta={kdyPrislo(n.created_at, t, jazyk)}
+                        detail={n.body ? <span className="break-words">{n.body}</span> : undefined}
+                        onClick={maOdkaz ? () => { void otevriNotif(n); } : undefined} />
+                    );
+                  })}
                 </ul>
+              )}
+              {!notifsLoading && !notifsErr && maStarsi && (
+                <Button variant="secondary" block icon="refresh" loading={nacitamStarsi} onClick={nactiStarsi}>{t('Načíst starší')}</Button>
               )}
             </section>
             </div>
@@ -528,8 +698,8 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
             <div>
             <form onSubmit={savePassword} className="card p-6 space-y-6">
               <div>
-                <h2 className={cardTitle}>Změna hesla</h2>
-                <p className="t-meta mt-1">Nové heslo musí mít alespoň 8 znaků.</p>
+                <h2 className={cardTitle}>{t('Změna hesla')}</h2>
+                <p className="t-meta mt-1">{t('Nové heslo musí mít alespoň 8 znaků.')}</p>
               </div>
 
               {pwdMsg && (
@@ -538,28 +708,28 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
                 </div>
               )}
               {pwdErr && (
-                <div className="note note-danger p-4 text-sm flex items-center gap-2">
-                  <Icon name="warning" size={16} /> {pwdErr}
+                <div role="alert" className="note note-danger p-4 text-sm flex items-center gap-2">
+                  <Icon name="warning" size={16} className="shrink-0" /> {pwdErr}
                 </div>
               )}
 
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="nast-heslo" className={labelClass}>Současné heslo</label>
-                  <input id="nast-heslo" type="password" value={currentPassword} aria-label="Stávající heslo" onChange={e => setCurrentPassword(e.target.value)} className={inputClass} />
+                  <label htmlFor="nast-heslo" className={labelClass}>{t('Současné heslo')}</label>
+                  <input id="nast-heslo" type="password" autoComplete="current-password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} className={inputClass} />
                 </div>
                 <div>
-                  <label htmlFor="nast-heslo-nove" className={labelClass}>Nové heslo</label>
-                  <input id="nast-heslo-nove" type="password" value={newPassword} aria-label="Nové heslo" onChange={e => setNewPassword(e.target.value)} className={inputClass} />
+                  <label htmlFor="nast-heslo-nove" className={labelClass}>{t('Nové heslo')}</label>
+                  <input id="nast-heslo-nove" type="password" autoComplete="new-password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className={inputClass} />
                 </div>
                 <div>
-                  <label htmlFor="nast-heslo-znovu" className={labelClass}>Potvrdit nové heslo</label>
-                  <input id="nast-heslo-znovu" type="password" value={confirmPassword} aria-label="Nové heslo znovu" onChange={e => setConfirmPassword(e.target.value)} className={inputClass} />
+                  <label htmlFor="nast-heslo-znovu" className={labelClass}>{t('Potvrdit nové heslo')}</label>
+                  <input id="nast-heslo-znovu" type="password" autoComplete="new-password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className={inputClass} />
                 </div>
               </div>
 
               <div className="flex justify-end">
-                <Button type="submit" variant="accent" block loading={savingPwd}>Změnit heslo</Button>
+                <Button type="submit" variant="accent" block loading={savingPwd}>{t('Změnit heslo')}</Button>
               </div>
             </form>
             <Zablokovani />
@@ -575,6 +745,7 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
           ) : section === 'billing' && smiPlatby ? (
             <Billing />
           ) : section === 'pos' ? (
+            // i18n-ok: Pokladna (napojení Storyous) zůstává česky — česká služba, klíče a hlášky z jejího back-office.
             <section className="card p-6">
               <h2 className={cardTitle}>Napojení pokladny Storyous</h2>
               <p className="t-meta mt-1 mb-4">
@@ -713,16 +884,16 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
             <VychoziRozlozeni />
           ) : section === 'audit' ? (
             <section className="card p-6">
-              <h2 className={cardTitle}>Historie změn</h2>
-              <p className="t-meta mt-1 mb-4">Důležité zásahy v týmu — mazání, nastavení, odměny. Posledních 100 záznamů.</p>
+              <h2 className={cardTitle}>{t('Historie změn')}</h2>
+              <p className="t-meta mt-1 mb-4">{t('Důležité zásahy v týmu — mazání, nastavení, odměny. Posledních 100 záznamů.')}</p>
               {auditErr ? (
-                <ErrorState title="Historii změn se nepodařilo načíst" onRetry={nactiAudit} compact />
+                <ErrorState title={t('Historii změn se nepodařilo načíst')} onRetry={nactiAudit} compact />
               ) : auditEntries === null ? (
-                <div className="space-y-2" aria-busy="true" aria-label="Načítám historii">
+                <div className="space-y-2" aria-busy="true" aria-label={t('Načítám historii')}>
                   {[0, 1, 2].map(i => <Skeleton key={i} className="h-10 w-full" />)}
                 </div>
               ) : auditEntries.length === 0 ? (
-                <EmptyState icon="clock" title="Zatím žádný záznam" hint="Kdo co změnil, se sem zapisuje samo — smazání, schválení, úpravy cen." compact />
+                <EmptyState icon="clock" title={t('Zatím žádný záznam')} hint={t('Kdo co změnil, se sem zapisuje samo — smazání, schválení, úpravy cen.')} compact />
               ) : (
                 <div className="divide-y divide-black/[0.05]">
                   {auditEntries.map(e => (
@@ -750,7 +921,7 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
 
       <Modal open={!!potvrzeni} onClose={() => setPotvrzeni(null)} size="sm" title={potvrzeni?.title ?? ''}
         footer={<>
-          <Button variant="secondary" onClick={() => setPotvrzeni(null)}>Zrušit</Button>
+          <Button variant="secondary" onClick={() => setPotvrzeni(null)}>{t('Zrušit')}</Button>
           <Button variant={potvrzeni?.danger ? 'danger-solid' : 'primary'} onClick={() => {
             const p = potvrzeni; setPotvrzeni(null); void p?.akce();
           }}>{potvrzeni?.label}</Button>
