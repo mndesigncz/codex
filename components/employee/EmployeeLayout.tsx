@@ -97,6 +97,8 @@ export default function EmployeeLayout({ user }: Props) {
   }, []);
   // A quick-access tile can ask for a specific stock category.
   const [inventoryCat, setInventoryCat] = useState<string | undefined>();
+  // Zvedne se při každém příchodu do Skladu z widgetu: stejný argument podruhé (filtr mezitím zrušený) se použije znovu.
+  const [inventoryPredani, setInventoryPredani] = useState(0);
   // Proklik na KONKRÉTNÍ návod — z úkolu „Vyrobit X“ nebo z výrobní tabule.
   // Bez toho vede každý odkaz jen na seznam návodů.
   const [guideId, setGuideId] = useState<number | null>(null);
@@ -116,6 +118,7 @@ export default function EmployeeLayout({ user }: Props) {
     setSettingsTab(view === 'settings' ? zalozkaNastaveni(arg) : undefined);
     if (view === 'settings') setSettingsNonce(n => n + 1);
     setInventoryCat(view === 'inventory' ? arg : undefined);
+    if (view === 'inventory' && arg) setInventoryPredani(n => n + 1);
     setRecipeProduct(view === 'recipes' && arg && !arg.includes(':') ? arg : undefined);
     setGuideId(view === 'guides' && arg && /^\d+$/.test(arg) ? Number(arg) : null);
     if (view === 'suggestions' || view === 'procedures') predejPohledu(view, arg);
@@ -151,7 +154,7 @@ export default function EmployeeLayout({ user }: Props) {
           <div className="px-4 sm:px-6 pb-6 max-w-3xl mx-auto w-full"><TimeOffRequest /></div>
         </div>
       );
-      case 'inventory':    return <InventoryReport user={user as any} initialCategory={inventoryCat} />;
+      case 'inventory':    return <InventoryReport user={user as any} initialCategory={inventoryCat} predani={inventoryPredani} />;
       case 'recipes':      return <RecipesView stranka="zamestnanec.receptury" openProductId={recipeProduct} onNavigate={navigate} />;
       case 'closing':      return <CashClosing user={user as any} />;
       case 'procedures':   return <Procedures user={user as any} />;
@@ -174,8 +177,12 @@ export default function EmployeeLayout({ user }: Props) {
   const mojeNav = navItems.filter(n => smiPohled(n.id));
   const vDoku = (id: string) => nav.dok.some(d => d.id === id);
   const mobileSecondary = nav.vse.filter(n => !vDoku(n.id));
+  // Chat mimo dok nese odznak nepřečtených na dlaždici (stejné číslo jako v doku).
+  const odznakChatu = (id: string) => (id === 'chat' && currentView !== 'chat' && unreadChat > 0
+    ? { badge: unreadChat, badgeLabel: t('{n, plural, one {# nepřečtená zpráva} few {# nepřečtené zprávy} other {# nepřečtených zpráv}}', { n: unreadChat }) }
+    : {});
   const mobileGroups = nav.sekce
-    .map(sec => ({ title: sec.title, items: sec.items.filter(n => !vDoku(n.id)) }))
+    .map(sec => ({ title: sec.title, items: sec.items.filter(n => !vDoku(n.id)).map(n => ({ ...n, ...odznakChatu(n.id) })) }))
     .filter(g => g.items.length);
 
   // Navigace pro widgety na ploše (kolo 68, spec §2.6): proklik z widgetu vede
@@ -278,8 +285,10 @@ export default function EmployeeLayout({ user }: Props) {
           </div>
           {/* Sekce skrytá v nastavení podniku, otevřená odkazem nebo widgetem: preference, ne zákaz. */}
           {jeSkryty && <Chip tone="muted" size="sm" className="shrink-0">{t('Skrytá sekce')}</Chip>}
+          {/* Lupa i na telefonu (kolo 6, Z9): hledání najde úkoly, položky skladu, návody i akce,
+              a jako řádek v listu Více o něm nikdo nevěděl. Titulek je truncate, místo tu je. */}
           <button type="button" onClick={() => setHledani(true)} title={t('Hledat v aplikaci (Ctrl K)')} aria-label={t('Hledat v aplikaci')} aria-haspopup="dialog"
-            className="tap-target-sm hidden md:inline-flex shrink-0 rounded-full p-2 text-black/45 hover:text-black hover:bg-black/[0.05] transition-colors">
+            className="tap-target-sm inline-flex shrink-0 rounded-full p-2 text-black/45 hover:text-black hover:bg-black/[0.05] transition-colors">
             <Icon name="search" size={20} />
           </button>
           <NotificationBell />

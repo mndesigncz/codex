@@ -14,8 +14,9 @@
 // „@" = požadovaný měsíc) se doplní při podvrhu podle pražského dne, ať sonda nezestárne.
 import { readFileSync } from 'node:fs';
 import {
-  kontext, konec, tvrdi, otevri, lista, upravit, hotovo, vUpravach, dokud, poradi, poradiPutu, dotazyNa, roleMine, DIR, OUT,
+  kontext, konec, tvrdi, otevri, lista, upravit, hotovo, vUpravach, dokud, poradi, poradiPutu, dotazyNa, roleMine, DIR, OUT, VLASTNIK,
 } from './k68-spolecne.mjs';
+import { STRANKA as STRANKA_ROZVRH } from '../../lib/widgety/stranky/vedeni.rozvrh.ts';
 
 const praha = (o = 0) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now() + o * 86400000));
 const DNY = { DNES: praha(0), VCERA: praha(-1), PRED3: praha(-3), ZITRA: praha(1), POZITRI: praha(2), ZA3: praha(3), ZA5: praha(5), ZA7: praha(7), ZA10: praha(10) };
@@ -38,6 +39,12 @@ const podvrh = ({ mineId = 15 } = {}) => (req, json, stav) => {
     if (path === '/api/schedule/generate' && !JSON.parse(req.postData() || '{}').commit) return json(nacti('k69-b1-generate'));
     if (['/api/timeoff', '/api/shifts/offers', '/api/schedule', '/api/availability', '/api/schedule/publish'].includes(path)) {
       (stav.zapisy ??= []).push({ m: req.method(), path, full, body: req.postData() });
+      // Schválení Terezina volna (71): ve dnech volna má dvě směny — server je vrátí v `conflicts` (kolo 6 UX).
+      if (path === '/api/timeoff' && req.method() === 'PATCH') {
+        const b = JSON.parse(req.postData() || '{}');
+        const conflicts = b.id === 71 && b.status === 'approved' ? [{ date: DNY.ZA7, startTime: '10:00', endTime: '14:00' }, { date: DNY.ZA5, startTime: '08:00', endTime: '16:00' }] : [];
+        return json({ ok: true, request: { id: b.id, status: b.status }, conflicts });
+      }
       return json({ ok: true, notified: 3 });
     }
     return undefined;
@@ -147,7 +154,11 @@ const FIX_ROZVRH = nacti('k69-b1-rozlozeni-rozvrh');
   tvrdi('R1: právě jeden viditelný h1 „Rozvrh" a je první nadpis plochy', h.pocet === 1 && h.prvniJeH1 && h.text === 'Rozvrh', JSON.stringify(h));
   const nastroj = widgetLi(p, 'nastroj');
   tvrdi('R1: plocha má nástroj a v klidu je vidět (přepínač měsíce a mřížka)', await nastroj.count() === 1 && await nastroj.getByRole('group', { name: 'Měsíc', exact: true }).isVisible());
-  tvrdi('R1: nástroj otevírá příští měsíc (plánuje se dopředu)', (await nastroj.getByRole('button', { name: 'Příští měsíc' }).getAttribute('aria-pressed')) === 'true');
+  // Kolo 6 UX (V02): aktuální měsíc, dokud v něm jsou směny po dnešku; po 25. dni příští.
+  // Fixtura má směny 2.–5. dne, takže od 5. dne v měsíci se otevře příští.
+  const denDnes = Number(DNY.DNES.slice(8, 10));
+  const cekanyMesic = denDnes > 25 || denDnes >= 5 ? 'Příští měsíc' : 'Tento měsíc';
+  tvrdi(`R1: nástroj otevírá „${cekanyMesic}" (aktuální, dokud má směny po dnešku)`, await dokud(async () => (await nastroj.getByRole('button', { name: cekanyMesic }).getAttribute('aria-pressed')) === 'true', 3000));
   tvrdi('R1: jediná limetka je „Vygenerovat rozvrh" (dřív devět)', await limetky(p) === 1 && await p.getByRole('button', { name: 'Vygenerovat rozvrh' }).isVisible(), `${await limetky(p)}×`);
   tvrdi('R1: bez vlastní hlavičky a ručních pilulek — záložky jsou Segmented', await p.getByRole('radiogroup', { name: 'Část rozvrhu' }).or(p.locator('[aria-label="Část rozvrhu"]')).count() >= 1);
   const zad = widgetLi(p, 'rozvrh.zadosti_volno');
@@ -316,6 +327,137 @@ const FIX_ROZVRH = nacti('k69-b1-rozlozeni-rozvrh');
   tvrdi('T11: tečky typů v legendě a pásu typů jsou třídy kategorií, ne inline hex', tecky > 0 && await p.locator(kde.map(m => `${m} [style*="background"]`).join(', ')).count() === 0, `${tecky}`);
   await p.screenshot({ path: OUT + 'k69-b1-rozvrh-tmavy.png', fullPage: true });
   tvrdi('T11: bez chyb v konzoli', chyby.length === 0, chyby.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
+// ---------------------------------------------------------------------------
+// Kolo 6 UX (B1): víc údajů v mřížce, týdenní pohled, Kč, kolize volna, výchozí rozložení
+// ---------------------------------------------------------------------------
+// Výchozí rozložení přímo z kódu (dostupnost M a hned za ní plánovač) — fixtura
+// k69-b1-rozlozeni-rozvrh je uložené rozložení podniku a nový default se jí netýká.
+const FIX_VYCHOZI = {
+  ...FIX_ROZVRH, zdroj: 'aplikace',
+  polozky: STRANKA_ROZVRH.vychozi['typ:vedeni'].map(x => ({ id: x.w === 'nastroj' ? 'nastroj' : x.w.replace(/[._]/g, '-'), widget: x.w, velikost: x.s ?? 'L' })),
+};
+const mrizka = (p) => widgetLi(p, 'nastroj').locator('[aria-label="Mřížka rozvrhu"]');
+const bunkaDne = (p, d) => widgetLi(p, 'nastroj').locator('[aria-label="Mřížka rozvrhu"] + div > button').filter({ has: p.locator(`span:text-is("${Number(d.slice(8, 10))}")`) }).first();
+async function naTentoMesic(p) {
+  const b = widgetLi(p, 'nastroj').getByRole('button', { name: 'Tento měsíc' });
+  if ((await b.getAttribute('aria-pressed')) !== 'true') await b.click();
+  await dokud(async () => (await b.getAttribute('aria-pressed')) === 'true' && await mrizka(p).isVisible(), 3000);
+  await p.waitForTimeout(300);
+}
+/** Prvky uvnitř kořene, které vyčuhují z rodiče nebo mají obsah širší než sebe (bez posuvných pásů a ořezu). */
+const vycuhuje = (p, sel) => p.locator(sel).first().evaluate(koren => [...koren.querySelectorAll('*')].filter(el => {
+  const r = el.getBoundingClientRect(); const rod = el.parentElement.getBoundingClientRect();
+  if (r.width === 0) return false;
+  const ven = r.right > rod.right + 1 || r.left < rod.left - 1;
+  const cs = getComputedStyle(el);
+  const sire = el.scrollWidth > el.clientWidth + 1 && !['auto', 'scroll', 'hidden'].includes(cs.overflowX) && cs.textOverflow !== 'ellipsis';
+  return ven || sire;
+}).slice(0, 5).map(el => `${el.tagName.toLowerCase()}.${String(el.className).split(' ').slice(0, 3).join('.')}`));
+
+// K1) Telefon 390 s novým výchozím rozložením: mřížka bez scrollu, pilulky s avatarem v buňce, bez patičky.
+{
+  const { ctx, p, chyby } = await kontext({ fix: FIX_VYCHOZI, viewport: { width: 390, height: 844 }, mobil: true, dalsi: podvrh() });
+  await otevri(p, ROZVRH, 'vedeni.rozvrh');
+  await dokud(() => mrizka(p).isVisible(), 4000);
+  tvrdi('K1: výchozí rozložení — Dostupnost týmu střední a hned za ní plánovač', JSON.stringify((await poradi(p)).slice(0, 2)) === JSON.stringify(['rozvrh-dostupnost-tymu', 'nastroj']), JSON.stringify(await poradi(p)));
+  const top = await mrizka(p).evaluate(el => Math.round(el.getBoundingClientRect().top));
+  tvrdi('K1: po načtení je mřížka vidět bez scrollu (začíná nad dokem)', top > 0 && top < 844 - 90, `top ${top}`);
+  tvrdi('K1: přepínač Měsíc | Týden na telefonu není (pohled je vždy měsíc)', await widgetLi(p, 'nastroj').getByRole('tab', { name: 'Týden' }).isHidden());
+  await naTentoMesic(p);
+  const mira = await p.evaluate(() => {
+    const bunky = [...document.querySelectorAll('[aria-label="Mřížka rozvrhu"] + div > button')];
+    const pilulky = bunky.flatMap(b => [...b.querySelectorAll('span[title]')].map(s => ({ s, b })));
+    return {
+      pilulek: pilulky.length,
+      venku: pilulky.filter(({ s, b }) => { const r = s.getBoundingClientRect(); const o = b.getBoundingClientRect(); return r.right > o.right + 0.5 || r.left < o.left - 0.5; }).length,
+      orez: pilulky.filter(({ s }) => s.scrollWidth > s.clientWidth + 1).length,
+      paticky: [...document.querySelectorAll('[data-paticka-dne]')].filter(e => e.getClientRects().length > 0).length,
+      sirka: Math.round(bunky[0]?.getBoundingClientRect().width ?? 0),
+    };
+  });
+  tvrdi('K1: pilulky v buňce nepřetékají ani se neořezávají (tečka + avatar)', mira.pilulek >= 4 && mira.venku === 0 && mira.orez === 0, JSON.stringify(mira));
+  tvrdi('K1: patička dne „3 · 24 h" se na telefonu nekreslí', mira.paticky === 0, JSON.stringify(mira));
+  const jakub = bunkaDne(p, `${MESIC}-04`).locator('span[title^="Jakub Horák"]');
+  tvrdi('K1: Jakub s výchozím „👤" má v pilulce iniciály JH, ne emoji', (await jakub.innerText()).includes('JH') && !(await jakub.innerText()).includes('👤'), await jakub.innerText().catch(() => ''));
+  tvrdi('K1: telefon bez vodorovného přetečení', await bezPreteceni(p));
+  await widgetLi(p, 'nastroj').scrollIntoViewIfNeeded().catch(() => {});
+  await p.getByRole('button', { name: 'Další akce' }).first().click();
+  tvrdi('K1: v „···" je Publikovat s počtem směn měsíce', await dokud(() => p.getByRole('menuitem', { name: /Publikovat rozvrh \(4\)/ }).isVisible(), 1500));
+  await p.keyboard.press('Escape');
+  await p.screenshot({ path: OUT + 'k69-b1-k6-tel.png' });
+  tvrdi('K1: bez chyb v konzoli', chyby.length === 0, chyby.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
+// K2) Monitor: jméno a od–do v pilulce, patička dne, souhrn hodin a Kč, týdenní pohled.
+for (const [nazev, viewport] of [['1280', { width: 1280, height: 950 }], ['768', { width: 768, height: 1024 }]]) {
+  const { ctx, p, chyby } = await kontext({ fix: FIX_ROZVRH, viewport, dalsi: podvrh() });
+  await otevri(p, ROZVRH, 'vedeni.rozvrh');
+  await naTentoMesic(p);
+  const nastroj = widgetLi(p, 'nastroj');
+  if (nazev === '1280') {
+    const eva = bunkaDne(p, `${MESIC}-02`);
+    tvrdi('K2: pilulka nese krátké jméno a „08–16"', /Eva\s*08–16/.test(await eva.locator('span[title]').first().innerText()), await eva.innerText());
+    tvrdi('K2: patička dne „1 · 8 h"', (await eva.locator('[data-paticka-dne]').innerText()).replace(/\s+/g, ' ') === '1 · 8 h', await eva.locator('[data-paticka-dne]').innerText().catch(() => ''));
+    const souhrn = (await nastroj.locator('[data-naklad-planu]').innerText()).replace(/\s+/g, ' ');
+    tvrdi('K2: nad mřížkou „Naplánováno 32 h" a mzdový náklad 5 280 Kč (Eva 16 h × 180, Jakub 12 h × 200)', /Naplánováno 32 ?h/i.test(souhrn) && /5\s280\sKč/.test(souhrn), souhrn);
+    tvrdi('K2: …a chip „1 člověk bez sazby" (Tereza má sazbu 0)', souhrn.includes('1 člověk bez sazby'), souhrn);
+    const hod = (await widgetLi(p, 'rozvrh.hodiny_lidi').innerText()).replace(/\s+/g, ' ');
+    tvrdi('K2: widget Naplánované hodiny má pod hodinami Kč (Eva 2 880 Kč)', /2\s880\sKč/.test(hod), hod.slice(0, 200));
+  }
+  await nastroj.getByRole('tab', { name: 'Týden' }).click();
+  const tyden = nastroj.locator('[data-tydenni-pohled]');
+  tvrdi(`K3 ${nazev}: Segmented Týden ukáže tabulku lidé × dny`, await dokud(() => tyden.isVisible(), 2000) && await tyden.locator('[data-radek-tydne]').count() >= 3);
+  tvrdi(`K3 ${nazev}: souhrn hodin zůstává i nad týdenním pohledem`, await nastroj.locator('[data-naklad-planu]').isVisible());
+  tvrdi(`K3 ${nazev}: nic v tabulce nevyčuhuje ani nepřetéká`, (await vycuhuje(p, '[data-tydenni-pohled]')).length === 0, JSON.stringify(await vycuhuje(p, '[data-tydenni-pohled]')));
+  tvrdi(`K3 ${nazev}: tabulka se vejde do šířky karty (bez posuvu do strany)`, await tyden.evaluate(el => el.scrollWidth <= el.clientWidth + 1) && await bezPreteceni(p));
+  tvrdi(`K3 ${nazev}: řádek „Celkem" a sloupec hodin za týden`, (await tyden.locator('tfoot').innerText()).includes('Celkem'));
+  if (nazev === '1280') {
+    await p.reload({ waitUntil: 'networkidle' });
+    await dokud(() => widgetLi(p, 'nastroj').locator('[data-tydenni-pohled]').isVisible(), 5000);
+    tvrdi('K3: pohled Týden si plánovač pamatuje po znovunačtení', await widgetLi(p, 'nastroj').locator('[data-tydenni-pohled]').isVisible());
+    await widgetLi(p, 'nastroj').locator('[data-tydenni-pohled] tbody button').first().click();
+    tvrdi('K3: klepnutí na buňku otevře okno dne', await dokud(() => p.getByRole('dialog').getByText('Přiřazené směny').isVisible(), 3000));
+    await p.keyboard.press('Escape');
+  }
+  await p.screenshot({ path: OUT + `k69-b1-k6-tyden-${nazev}.png`, fullPage: true });
+  tvrdi(`K3 ${nazev}: bez chyb v konzoli`, chyby.length === 0, chyby.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
+// K4) Kolize volna se směnami: chip u čekající žádosti, po schválení toast s „Upravit rozvrh".
+{
+  const { ctx, p, stav } = await kontext({ fix: FIX_ROZVRH, dalsi: podvrh() });
+  await otevri(p, ROZVRH, 'vedeni.rozvrh');
+  const zad = widgetLi(p, 'rozvrh.zadosti_volno');
+  const tereza = zad.locator('.list-row').filter({ hasText: 'Tereza Malá' }).first();
+  const ondrej = zad.locator('.list-row').filter({ hasText: 'Ondřej Kučera' }).first();
+  tvrdi('K4: čekající žádost s kolizí má chip „2 směny v rozvrhu"', (await tereza.innerText()).includes('2 směny v rozvrhu'), await tereza.innerText());
+  tvrdi('K4: žádost bez kolize chip nemá', !(await ondrej.innerText()).includes('v rozvrhu'), await ondrej.innerText());
+  await tereza.getByRole('button', { name: 'Schválit' }).click();
+  const toast = p.getByText('Volno schváleno, ale 2 směny zůstaly v rozvrhu');
+  tvrdi('K4: schválení projde a toast řekne, že směny zůstaly v rozvrhu', await dokud(() => toast.isVisible(), 3000)
+    && (stav.zapisy ?? []).some(z => z.path === '/api/timeoff' && z.m === 'PATCH' && z.body.includes('approved')));
+  await p.getByRole('button', { name: 'Upravit rozvrh' }).click();
+  const okno = p.getByRole('dialog');
+  tvrdi('K4: „Upravit rozvrh" otevře v plánovači první den volna se směnou', await dokud(() => okno.getByText('Přiřazené směny').isVisible(), 3000)
+    && (await widgetLi(p, 'nastroj').getByRole('button', { name: 'Tento měsíc' }).getAttribute('aria-pressed')) === (DNY.ZA5.slice(0, 7) === MESIC ? 'true' : 'false'));
+  await p.screenshot({ path: OUT + 'k69-b1-k6-kolize.png' });
+  await ctx.close();
+}
+
+// K5) Bez finance.mzdy: hodiny ano, Kč ani „bez sazby" ne — ani v plánovači, ani ve widgetu.
+{
+  const bezMezd = { ...VLASTNIK, opravneni: VLASTNIK.opravneni.filter(k => k !== 'finance.mzdy') };
+  const { ctx, p } = await kontext({ fix: FIX_ROZVRH, mineData: bezMezd, dalsi: podvrh() });
+  await otevri(p, ROZVRH, 'vedeni.rozvrh');
+  await naTentoMesic(p);
+  const souhrn = (await widgetLi(p, 'nastroj').locator('[data-naklad-planu]').innerText()).replace(/\s+/g, ' ');
+  tvrdi('K5: bez finance.mzdy souhrn jen s hodinami', /Naplánováno/i.test(souhrn) && !souhrn.includes('Kč') && !souhrn.includes('bez sazby'), souhrn);
+  tvrdi('K5: …a widget Naplánované hodiny bez Kč', !(await widgetLi(p, 'rozvrh.hodiny_lidi').innerText()).includes('Kč'));
   await ctx.close();
 }
 

@@ -15,6 +15,12 @@
 // klávesnice by přesun, který tabule nabízí, neměly jak udělat (review kola 69,
 // DP §5.5). Volba je okno, ne rozbalovací menu — tabule je vodorovně posuvná
 // a absolutně umístěný panel by v ní uřízl okraj sloupce.
+//
+// Na telefonu (pod md) jsou dny pod sebou, ne sedm sloupců po 240 px vedle sebe
+// (audit kola 6, Z2): na 390 px bylo vidět pondělí a kus úterý a zbytek týdne
+// se tahal do strany — vodorovný posuv obsahu, který DESIGN toleruje jen
+// u ovládacích pásů, a na dotyku se pral s tahem po ploše. Prázdný den je na
+// telefonu jen řádek „Žádný úkol". Sloupce a přetahování zůstávají od md.
 
 import { useMemo, useState } from 'react';
 import { Icon } from './Icons';
@@ -141,8 +147,8 @@ export default function TaskWeekBoard({ tasks, weekStart, onComplete, labelFor, 
         <Button variant="secondary" size="sm" iconOnly icon="chevronRight" aria-label={t('Další týden')} onClick={() => setOffset(o => o + 1)} />
       </div>
 
-      {/* Sloupce dnů — vodorovně posuvná tabule (na telefonu po jednom dni se scroll-snap). */}
-      <div className="flex gap-3 overflow-x-auto scrollbar-thin pb-2 -mx-1 px-1 snap-x">
+      {/* Dny: na telefonu pod sebou, od md vodorovně posuvná tabule sloupců. */}
+      <div className="flex flex-col gap-3 md:flex-row md:overflow-x-auto scrollbar-thin md:pb-2 md:-mx-1 md:px-1 md:snap-x">
         {days.map(d => {
           const key = ymd(d);
           // Hotové dolů; z nehotových nahoru ty, bez kterých nepůjde uzávěrka dne.
@@ -157,7 +163,8 @@ export default function TaskWeekBoard({ tasks, weekStart, onComplete, labelFor, 
               onDragOver={onMove ? (e => { e.preventDefault(); setDragOver(key); }) : undefined}
               onDragLeave={onMove ? (() => setDragOver(c => (c === key ? null : c))) : undefined}
               onDrop={onMove ? (() => drop(key)) : undefined}
-              className={`well shrink-0 w-[15rem] snap-start p-3 flex flex-col gap-3 transition-shadow ${dragOver === key ? 'ring-2 ring-black/15' : ''}`}
+              aria-current={isToday ? 'date' : undefined}
+              className={`well md:shrink-0 md:w-[15rem] md:snap-start p-3 flex flex-col transition-shadow ${list.length === 0 && !onAddForDay ? 'gap-1 md:gap-3' : 'gap-3'} ${dragOver === key ? 'ring-2 ring-black/15' : ''}`}
             >
               <div className="flex items-center justify-between gap-2 px-1">
                 <h3 className="t-card truncate">
@@ -169,9 +176,9 @@ export default function TaskWeekBoard({ tasks, weekStart, onComplete, labelFor, 
                 </span>
               </div>
 
-              <div className="space-y-2 min-h-[3rem]">
+              <div className="space-y-2 md:min-h-[3rem]">
                 {list.map(card)}
-                {list.length === 0 && <p className="t-meta text-center py-4">{t('Žádný úkol')}</p>}
+                {list.length === 0 && <p className="t-meta px-1 md:px-0 md:text-center md:py-4">{t('Žádný úkol')}</p>}
               </div>
 
               {onAddForDay && (

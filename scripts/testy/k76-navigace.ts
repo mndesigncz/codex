@@ -25,7 +25,9 @@ export default function ({ eq, ok }: Testy) {
   eq('výchozí vedení: nic skrytého', v.skryte, []);
   eq('výchozí vedení: všech 15 pohledů', v.vse.length, 15);
   const z = slozNavigaci({ rozhrani: 'zamestnanec', smiPohled: vse, nastaveni: null, jazyk: 'cs' });
-  eq('výchozí zaměstnanec: dok', ids(z.dok), ['home', 'my-shifts', 'inventory', 'chat']);
+  // Kolo 6 (Z16): denní věci baristy v doku; Sklad a Chat zůstávají v listu Více (chat tam s odznakem).
+  eq('výchozí zaměstnanec: dok', ids(z.dok), ['home', 'my-shifts', 'tasks', 'closing']);
+  ok('zaměstnanec: Sklad a Chat mimo dok zůstávají v nabídce', ['inventory', 'chat'].every(id => ids(z.vse).includes(id)));
   eq('zaměstnanec: zkrácený štítek Směny pro dok', z.dok.find(p => p.id === 'my-shifts')?.short, 'Směny');
 
   // ---- oprávnění jako první ----

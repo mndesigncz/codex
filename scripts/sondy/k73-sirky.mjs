@@ -29,7 +29,13 @@ for (const w of [768, 834, 1024, 1280]) {
 for (const w of [320, 360]) {
   const { ctx, p } = await kontext({ viewport: { width: w, height: 800 }, role: 'employee', mobil: true });
   await p.goto(BASE + '/employee/shifts?view=closing', { waitUntil: 'networkidle' });
-  await p.getByRole('tab', { name: 'Spočítat bankovky' }).click();
+  // Kolo 6 (B5): uzávěrka je na telefonu průvodce po krocích — neaktivní krok je sbalený do
+  // tlačítka s názvem a souhrnem. Bankovky jsou v kroku Kontrola kasy, ten se nejdřív otevře.
+  const kontrola = p.getByRole('button', { name: /^Kontrola kasy/ }).first();
+  const bankovky = p.getByRole('tab', { name: 'Spočítat bankovky' });
+  await dokud(async () => await kontrola.isVisible() || await bankovky.isVisible(), 15000);
+  if (await kontrola.isVisible()) await kontrola.click();
+  await bankovky.click();
   await p.waitForTimeout(500);
   const m = await p.evaluate(() => {
     const well = document.querySelector('.well.overflow-hidden');

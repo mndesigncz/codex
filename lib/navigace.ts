@@ -60,14 +60,17 @@ export const VYCHOZI_NAV: Record<Rozhrani, VychoziNav> = {
   },
   zamestnanec: {
     polozky: [
-      { id: 'home', label: 'Přehled', icon: 'overview' },
+      // Krátké štítky (`short`) jsou pro dok: pět položek + Více se musí vejít na 320 px
+      // i v němčině a polštině, kde je „Uzávěrka" „Kassenabschluss" a „Zamknięcie kasy".
+      { id: 'home', label: 'Přehled', icon: 'overview', short: 'Domů' },
       { id: 'my-shifts', label: 'Moje směny', icon: 'calendar', short: 'Směny' },
       { id: 'procedures', label: 'Postupy', icon: 'clipboard' },
       { id: 'availability', label: 'Dostupnost', icon: 'swap' },
       { id: 'inventory', label: 'Sklad', icon: 'box' },
       // Kolo 5: receptury i pro zaměstnance (jen s receptury.zobrazit — smiPohled je jinak schová).
       { id: 'recipes', label: 'Receptury', icon: 'clipboard' },
-      { id: 'closing', label: 'Uzávěrka', icon: 'trend' },
+      // „Udělat kasu“ = uzávěrka; v doku kratší slovo, název stránky zůstává Uzávěrka.
+      { id: 'closing', label: 'Uzávěrka', icon: 'trend', short: 'Kasa' },
       { id: 'tasks', label: 'Úkoly', icon: 'check' },
       { id: 'rewards', label: 'Odměny', icon: 'award' },
       { id: 'chat', label: 'Chat', icon: 'chat' },
@@ -80,7 +83,10 @@ export const VYCHOZI_NAV: Record<Rozhrani, VychoziNav> = {
       { id: 'prace', title: 'Práce', ids: ['closing', 'inventory', 'recipes', 'tasks', 'procedures'] },
       { id: 'tym', title: 'Tým', ids: ['rewards', 'chat', 'guides', 'suggestions'] },
     ],
-    dok: ['home', 'my-shifts', 'inventory', 'chat'],
+    // Audit kola 6 (Z16): denní věci baristy — úkoly a uzávěrka — byly za „Více" (odškrtnout
+    // úkol = Více → Úkoly → checkbox). Sklad a chat jsou v listu Více (chat tam nese odznak
+    // nepřečtených, stejně jako dřív v doku); podnik si dok v Nastavení přeskládá.
+    dok: ['home', 'my-shifts', 'tasks', 'closing'],
   },
 };
 

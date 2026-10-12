@@ -157,15 +157,21 @@ export default function Tasks({ user }: Props) {
     const opakovani = recurrenceLabel(task.recurrence);
     const stav = STAVY[task.status] ?? STAVY.pending;
     return (
-      <li key={task.id} className="list-row items-start">
-        <span className="shrink-0 pt-0.5">
+      // Celý řádek otevírá detail (audit kola 6, Z4): dřív jen 21 px vysoký text titulku a klepnutí
+      // na popis, datum nebo chipy nedělalo nic. Tlačítko titulku se roztáhne přes řádek (::after).
+      // Nad ním leží zaškrtávátko (je v DOM před tlačítkem, proto z-[1]) a „···", návod a kontrolní
+      // seznam (jsou za ním, stačí `relative`; bez z-indexu, ať panel „···" překryje další řádek).
+      // `!transform-none`: globální `button:active { scale }` by z tlačítka udělal obal pro ::after,
+      // překryv by se při stisku smrštil na titulek a puštění prstu by skončilo mimo tlačítko.
+      <li key={task.id} className="list-row items-start relative">
+        <span className="relative z-[1] shrink-0 pt-0.5">
           <Zaskrtnuti hotovo={hotovo} nazev={task.title} zamceno={!smiSplnit(task)} ceka={false}
             onClick={() => updateStatus(task, hotovo ? 'pending' : 'done')} />
         </span>
         <div className={`min-w-0 flex-1 ${inactive ? 'opacity-60' : ''}`}>
           <p className="flex">
             <button type="button" onClick={() => setDetailId(task.id)} aria-haspopup="dialog" title={t('Otevřít detail úkolu')}
-              className={`min-w-0 text-left font-medium text-[15px] leading-snug hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542] rounded ${hotovo ? 'text-black/45' : 'text-[#16181A]'}`}>{task.title}</button>
+              className={`min-w-0 text-left font-medium text-[15px] leading-snug hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542] rounded !transform-none after:absolute after:inset-0 after:content-[''] after:rounded-[var(--r-md)] active:after:bg-black/[0.03] ${hotovo ? 'text-black/45' : 'text-[#16181A]'}`}>{task.title}</button>
           </p>
           {task.description && <p className="text-sm text-black/55 mt-1 whitespace-pre-wrap text-pretty">{task.description}</p>}
           <div className="flex items-center gap-1.5 mt-1.5 flex-wrap text-[13px] text-black/55">
@@ -178,7 +184,7 @@ export default function Tasks({ user }: Props) {
             {hotovo && task.completedByName && <span>{t('splnil {jmeno}', { jmeno: task.completedByName })}</span>}
             {/* Postup bydlí v návodu — odsud se na něj dá dostat jedním ťuknutím místo hledání v seznamu návodů. */}
             {task.sourceMeta?.guideId && (
-              <a href={`/employee/shifts?view=guides&guide=${task.sourceMeta.guideId}`} className="btn btn-ghost btn-sm -my-1"
+              <a href={`/employee/shifts?view=guides&guide=${task.sourceMeta.guideId}`} className="btn btn-ghost btn-sm -my-1 relative"
                 title={task.sourceMeta.guideTitle ?? t('Otevřít návod')}>
                 <Icon name="book" size={15} className="shrink-0" />
                 <span className="truncate max-w-[12rem]">{task.sourceMeta.guideTitle ?? t('Návod')}</span>
@@ -186,8 +192,10 @@ export default function Tasks({ user }: Props) {
             )}
           </div>
           {task.checklist.length > 0 && (
-            <TaskChecklist items={task.checklist} onToggle={smiSplnit(task) ? i => toggleChecklistItem(task, i) : undefined}
-              onToggleAll={smiSplnit(task) ? d => toggleChecklistAll(task, d) : undefined} />
+            <div className="relative">
+              <TaskChecklist items={task.checklist} onToggle={smiSplnit(task) ? i => toggleChecklistItem(task, i) : undefined}
+                onToggleAll={smiSplnit(task) ? d => toggleChecklistAll(task, d) : undefined} />
+            </div>
           )}
         </div>
         {!hotovo && smiSplnit(task) && (
@@ -210,13 +218,25 @@ export default function Tasks({ user }: Props) {
     );
 
   const zbyva = skupiny.poTerminu.length + skupiny.dnes.length;
+  const prepinac = <Segmented size="sm" ariaLabel={t('Zobrazení')} value={view} onChange={setView}
+    options={[{ id: 'list', label: t('Seznam') }, { id: 'week', label: t('Týden') }, { id: 'month', label: t('Měsíc') }]} />;
+  const sFiltry = tasks.length > 0 && view !== 'prehled';
   const nastroj = (
     <div className="space-y-6">
+      {/* Telefon začíná úkolem, ne ovládáním (audit kola 6, Z3): dřív Segmented, souhrn dne,
+          hledání s Filtry a pás záložek — první úkol na y=427 z 844. Teď jeden řádek
+          Seznam/Týden/Měsíc · lupa · Filtry · n; souhrn dne je až od md (po termínu je hned
+          první sekce seznamu, červeně), záložky stavu od devíti úkolů nebo se zapnutým stavem. */}
       {tasks.length > 0 && (
-        <UkolySouhrn hotovo={karty.dnesHotovo} celkem={karty.dnesCelkem} poTerminu={karty.poTerminu}
-          onPoTerminu={() => { setView('list'); setFiltr(f => ({ ...f, stav: 'po_terminu' })); }} />
+        <div className="hidden md:block">
+          <UkolySouhrn hotovo={karty.dnesHotovo} celkem={karty.dnesCelkem} poTerminu={karty.poTerminu}
+            onPoTerminu={() => { setView('list'); setFiltr(f => ({ ...f, stav: 'po_terminu' })); }} />
+        </div>
       )}
-      {tasks.length > 0 && view !== 'prehled' && <UkolyFiltry filtr={filtr} onChange={setFiltr} pocty={pocty} skrytStav={view !== 'list'} />}
+      {sFiltry
+        ? <UkolyFiltry filtr={filtr} onChange={setFiltr} pocty={pocty} skrytStav={view !== 'list'}
+            kompaktniNaTelefonu pilulkyNaTelefonu={tasks.length > 8} vlevoNaTelefonu={prepinac} />
+        : <div className="md:hidden">{prepinac}</div>}
       {saveErr && <p className="note note-danger text-sm" role="alert">{saveErr}</p>}
       {data.error && !data.data ? (
         <Card><ErrorState title={t('Úkoly se nenačetly')} onRetry={data.reload} detail={data.error} /></Card>
@@ -267,8 +287,8 @@ export default function Tasks({ user }: Props) {
           title: t('Úkoly'),
           subtitle: data.data && zbyva > 0 ? t('Na dnešek a po termínu: {n, plural, one {# úkol} few {# úkoly} other {# úkolů}}.', { n: zbyva }) : t('Co je dnes na tobě — a co je pro kohokoli.'),
           hintId: 'tasks',
-          aside: <Segmented size="sm" ariaLabel={t('Zobrazení')} value={view} onChange={setView}
-            options={[{ id: 'list', label: t('Seznam') }, { id: 'week', label: t('Týden') }, { id: 'month', label: t('Měsíc') }]} />,
+          // Na telefonu je přepínač v řádku s Filtry (nástroj), tady až od md.
+          aside: <div className="hidden md:block">{prepinac}</div>,
         }}
         nastroj={nastroj}
       />

@@ -168,19 +168,20 @@ export const WIDGETY: DefiniceWidgetu[] = [
     cil: { pohled: 'my-shifts' },
     stav: 'hotovo',
   },
-  // Data: GET /api/schedule?month → shifts[{employeeId,employeeName,startTime,endTime}]; limit:
-  // GET /api/schedule/rules → teamMaxHours, members[] (rozvrh.nastaveni)
+  // Data: GET /api/schedule?month → shifts[{employeeId,employeeName,startTime,endTime,hourlyRate}]; limit:
+  // GET /api/schedule/rules → teamMaxHours, members[] (rozvrh.nastaveni). Náklad (Kč pod hodinami
+  // v M a L) z hourlyRate, kterou server pošle jen s finance.mzdy (kolo 6 UX).
   {
     id: 'rozvrh.hodiny_lidi',
     oblast: 'rozvrh',
     nazev: 'Naplánované hodiny',
-    popis: 'Kolik hodin má kdo v měsíci naplánováno — a kdo se blíží limitu z pravidel generátoru.',
+    popis: 'Kolik hodin má kdo v měsíci naplánováno, kdo se blíží limitu z pravidel generátoru a s oprávněním ke mzdám i kolik to stojí.',
     ikona: 'clock',
     velikosti: ['S', 'M', 'L'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni'],
     stranky: ['vedeni.rozvrh'],
-    opravneni: { vse: ['rozvrh.zobrazit'], nektere: [], pole: { limit_hodin: 'rozvrh.nastaveni' } },
+    opravneni: { vse: ['rozvrh.zobrazit'], nektere: [], pole: { limit_hodin: 'rozvrh.nastaveni', naklad: 'finance.mzdy' } },
     tarif: 'zdarma',
     nastaveni: [
       {

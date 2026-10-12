@@ -366,11 +366,26 @@ export function ZamekUzaverky({ stav, actingAs, naTabletu = false, proKoho, onZm
 
       {prvni && (
         // Jediná limetka obrazovky, dokud je zamčeno — odeslání je mezitím šedé.
-        <Button ref={hlavniRef} variant="accent" size="lg" block iconAfter="chevronRight"
-          loading={starting && !!spustitelny(prvni)} disabled={bezi(prvni)}
-          onClick={() => otevri(prvni)} className="!w-full min-w-0">
-          <span className="min-w-0 truncate">{t('Dokončit: {nazev}', { nazev: prvni.nazev })}</span>
-        </Button>
+        //
+        // Audit kola 6 (Z13): úkol bez checklistu se odškrtne rovnou tady, ne
+        // odchodem na seznam Úkolů a zpátky — řádkové „Hotovo" to umělo, ale
+        // výraznější limetka vedla horší cestou. Návod a postup se na místě
+        // udělat nedají, ty dál otevírají svou obrazovku. Text se zalamuje na
+        // dva řádky, dřív byl na 390 px useknutý „…". Nápis zůstává „Dokončit:",
+        // ať řádkové „Hotovo: …" má jediné jméno (sondy k70, k74).
+        odskrtnutelny(prvni) ? (
+          <Button ref={hlavniRef} variant="accent" size="lg" block icon="check"
+            loading={odskrtavam === prvni.id}
+            onClick={() => hotovo(prvni)} className="!w-full min-w-0 !whitespace-normal text-left">
+            <span className="min-w-0 text-pretty">{t('Dokončit: {nazev}', { nazev: prvni.nazev })}</span>
+          </Button>
+        ) : (
+          <Button ref={hlavniRef} variant="accent" size="lg" block iconAfter="chevronRight"
+            loading={starting && !!spustitelny(prvni)} disabled={bezi(prvni)}
+            onClick={() => otevri(prvni)} className="!w-full min-w-0 !whitespace-normal text-left">
+            <span className="min-w-0 text-pretty">{t('Dokončit: {nazev}', { nazev: prvni.nazev })}</span>
+          </Button>
+        )
       )}
       {stav.smiObejit && (
         <p className="t-meta text-pretty">
