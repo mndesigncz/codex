@@ -134,8 +134,15 @@ for (const w of [1280, 390]) {
   await otevri(p, '/employee/shifts?view=tasks', 'zamestnanec.ukoly');
   const nastroj = p.locator('[data-plocha] li[data-widget="nastroj"]');
   const stavy = nastroj.getByRole('group', { name: 'Stav úkolů' });
-  await stavy.waitFor({ timeout: 10000 });
-  tvrdi(`Z ${w}: záložky stavu s počty (moje a pro kohokoli)`, await stavy.getByRole('button', { name: /^Vše · \d+$/ }).count() === 1 && await stavy.getByRole('button', { name: /^Po termínu · \d+$/ }).count() === 1, await stavy.innerText());
+  if (w >= 600) {
+    await stavy.waitFor({ timeout: 10000 });
+    tvrdi(`Z ${w}: záložky stavu s počty (moje a pro kohokoli)`, await stavy.getByRole('button', { name: /^Vše · \d+$/ }).count() === 1 && await stavy.getByRole('button', { name: /^Po termínu · \d+$/ }).count() === 1, await stavy.innerText());
+  } else {
+    // Kolo 6 (B5, Z3): na telefonu je ovládání v jednom řádku (Seznam/Týden/Měsíc · lupa · Filtry)
+    // a záložky stavu přibudou až od devíti úkolů — fixtura jich má méně, po termínu je první sekce seznamu.
+    await nastroj.getByRole('button', { name: /^Filtry/ }).waitFor({ timeout: 10000 });
+    tvrdi(`Z ${w}: na telefonu ovládání v jednom řádku, záložky stavu až od devíti úkolů`, !(await stavy.isVisible()));
+  }
   await nastroj.getByRole('button', { name: 'Doplnit sirupy', exact: true }).click();
   const okno = p.getByRole('dialog', { name: 'Doplnit sirupy' });
   await okno.waitFor({ timeout: 5000 });
@@ -143,7 +150,9 @@ for (const w of [1280, 390]) {
   await okno.getByRole('button', { name: 'Označit jako hotový' }).click();
   tvrdi(`Z ${w}: Označit jako hotový pošle PATCH status done`, await dokud(() => (stav.ukolyPatche ?? []).some(t => t.id === 2 && t.status === 'done'), 3000));
   await p.keyboard.press('Escape');
-  const pohledy = p.locator('[aria-label="Zobrazení"]').first();
+  // Kolo 6 (B5): přepínač Seznam/Týden/Měsíc je ve stránce dvakrát — na telefonu v řádku filtrů,
+  // od md v hlavičce nástroje; ten druhý je vždy skrytý. Bere se viditelný.
+  const pohledy = p.locator('[aria-label="Zobrazení"]:visible').first();
   await pohledy.getByRole('tab', { name: 'Měsíc', exact: true }).click();
   tvrdi(`Z ${w}: měsíční kalendář`, await dokud(async () => await nastroj.getByRole('group', { name: 'Kalendář úkolů' }).locator('button').count() >= 28, 4000));
   tvrdi(`Z ${w}: zaměstnanec nemá Přehled (statistiky týmu patří vedení)`, await pohledy.getByRole('tab', { name: 'Přehled', exact: true }).count() === 0);
