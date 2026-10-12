@@ -71,7 +71,32 @@ export const WIDGETY: DefiniceWidgetu[] = [
         moznosti: [{ id: '3', nazev: '3' }, { id: '5', nazev: '5' }, { id: '10', nazev: '10' }],
         vychozi: '5',
       },
+      // Kolo 5: „tento měsíc" = body získané od 1. dne (server ?od=, bez odečtů za odměny).
+      {
+        klic: 'obdobi',
+        nazev: 'Období',
+        typ: 'vyber',
+        moznosti: [{ id: 'celkem', nazev: 'Celkem' }, { id: 'mesic', nazev: 'Tento měsíc' }],
+        vychozi: 'celkem',
+      },
     ],
+    cil: { pohled: 'rewards' },
+    stav: 'hotovo',
+  },
+  // Data: GET /api/rewards/awards?limit=30 → awards[{id,userId,name,avatar,points,reason,givenBy,createdAt}]
+  // Kolo 5 („lepší odměny", vzor Bonusly / Connecteam): pochvala s body kdykoli, s důvodem.
+  {
+    id: 'odmeny.pochvaly',
+    oblast: 'odmeny',
+    nazev: 'Pochvaly',
+    popis: 'Body navíc za dobře odvedenou práci — kdo je dostal, za co a tlačítko Pochválit.',
+    ikona: 'award',
+    velikosti: ['S', 'M', 'L'],
+    vychoziVelikost: 'M',
+    rozhrani: ['vedeni'],
+    stranky: ['vedeni.odmeny', 'vedeni.prehled'],
+    opravneni: { vse: ['hodnoceni.zobrazit'], nektere: [], pole: { 'akce:pochvalit': 'hodnoceni.hodnotit' } },
+    tarif: 'pro',
     cil: { pohled: 'rewards' },
     stav: 'hotovo',
   },

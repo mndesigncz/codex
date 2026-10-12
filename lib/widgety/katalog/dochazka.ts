@@ -188,14 +188,24 @@ export const WIDGETY: DefiniceWidgetu[] = [
     id: 'moje.vydelek',
     oblast: 'dochazka',
     nazev: 'Můj výdělek',
-    popis: 'Kolik jsem si tento měsíc vydělal: hodiny × vlastní sazba.',
+    popis: 'Kolik jsem si vydělal: hodiny × vlastní sazba, prémie a srážky; tento nebo minulý měsíc.',
     ikona: 'coins',
-    velikosti: ['S'],
+    // Kolo 5 (vzor Homebase „Earnings"): M s rozpadem, L i se seznamem prémií; měsíc podle nastavení.
+    velikosti: ['S', 'M', 'L'],
     vychoziVelikost: 'S',
     rozhrani: ['vedeni', 'zamestnanec'],
     stranky: ['zamestnanec.domu', 'vedeni.moje_smeny', 'zamestnanec.moje_smeny'],
     opravneni: { vse: [], nektere: ['finance.moje_mzda', 'finance.mzdy'] },
     tarif: 'zdarma',
+    nastaveni: [
+      {
+        klic: 'mesic',
+        nazev: 'Měsíc',
+        typ: 'vyber',
+        moznosti: [{ id: 'tento', nazev: 'Tento' }, { id: 'minuly', nazev: 'Minulý' }],
+        vychozi: 'tento',
+      },
+    ],
     // Klepnutí na Přehledu vede na Moje směny, kde je výdělek spolu s odpracovanými hodinami.
     cil: { pohled: 'my-shifts' },
     stav: 'hotovo',

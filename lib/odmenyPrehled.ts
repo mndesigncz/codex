@@ -35,6 +35,8 @@ export interface Uroven { nazev: string; odBodu: number; vyhody: string }
 export interface Rozpad {
   ukoly: number; postupy: number; uzaverky: number;
   zHodnoceni: number; hodnocenychSmen: number; automaticke: number; uPolozek: number; vytek: number;
+  /** Body z pochval mimo hodnocení směny (kolo 5) a kolik pochval to bylo. */
+  pochvaly: number; pochval: number;
 }
 
 export interface Sazebnik { ukol: number; postup: number; uzaverka: number }
@@ -56,6 +58,7 @@ function vyberRozpad(b: any): Rozpad {
     ukoly: cele(b?.tasks), postupy: cele(b?.procedures), uzaverky: cele(b?.closings),
     zHodnoceni: cele(b?.reviewPoints), hodnocenychSmen: cele(b?.ratedShifts),
     automaticke: cele(b?.autoPoints), uPolozek: cele(b?.itemPoints), vytek: cele(b?.flagged),
+    pochvaly: cele(b?.awards), pochval: cele(b?.awardCount),
   };
 }
 
@@ -108,9 +111,46 @@ export function odkudBody(r: Rozpad, s: Sazebnik): RadekBodu[] {
     { klic: 'postupy', nazev: 'Postupy', body: r.postupy * s.postup, pocet: r.postupy, ikona: 'clipboard' },
     { klic: 'uzaverky', nazev: 'Uzávěrky', body: r.uzaverky * s.uzaverka, pocet: r.uzaverky, ikona: 'receipt' },
     { klic: 'hodnoceni', nazev: 'Z hodnocení směn', body: r.zHodnoceni + r.automaticke, pocet: r.hodnocenychSmen, ikona: 'star' },
+    { klic: 'pochvaly', nazev: 'Pochvaly', body: r.pochvaly, pocet: r.pochval, ikona: 'award' },
     // Body u položek jsou i odečtené odměny (záporné řádky ledgeru) — patří do součtu, jinak nesedí s celkem.
     { klic: 'polozky', nazev: 'U položek a za odměny', body: r.uPolozek, pocet: null, ikona: 'gift' },
   ];
+}
+
+// ---------------------------------------------------------------------------
+// Pochvaly s body (/api/rewards/awards) a žebříček za období
+// ---------------------------------------------------------------------------
+
+export interface Pochvala {
+  id: number; clovek: number; jmeno: string; avatar: string | null;
+  body: number; duvod: string | null; dal: string | null; kdy: string;
+}
+
+/** Seznam pochval z GET /api/rewards/awards (nejnovější první, jak je server posílá). */
+export function vyberPochvaly(raw: any): Pochvala[] {
+  if (!raw || typeof raw !== 'object') throw new Error('Pochvaly mají nečekaný tvar.');
+  return seznam(raw.awards).map((a: any) => ({
+    id: cele(a.id), clovek: cele(a.userId), jmeno: String(a.name ?? ''),
+    avatar: typeof a.avatar === 'string' && a.avatar ? a.avatar : null,
+    body: cele(a.points), duvod: text(a.reason), dal: text(a.givenBy), kdy: String(a.createdAt ?? ''),
+  }));
+}
+
+/** Pochvaly od začátku měsíce dne `dnes` (YYYY-MM-DD): počet a body. */
+export function pochvalyMesice(p: Pochvala[], dnes: string): { pocet: number; body: number } {
+  const od = `${dnes.slice(0, 7)}-01`;
+  const v = p.filter(x => x.kdy.slice(0, 10) >= od && x.kdy.slice(0, 10) <= dnes);
+  return { pocet: v.length, body: v.reduce((s, x) => s + x.body, 0) };
+}
+
+export type ObdobiZebricku = 'celkem' | 'mesic';
+
+/**
+ * Adresa žebříčku: celkem = zůstatek jako dřív, tento měsíc = body získané od 1. dne
+ * měsíce (server počítá jen záznamy od `od`, odečty za odměny vynechá).
+ */
+export function urlZebricku(obdobi: ObdobiZebricku, dnes: string): string {
+  return obdobi === 'mesic' ? `/api/rewards?od=${dnes.slice(0, 7)}-01` : '/api/rewards';
 }
 
 // ---------------------------------------------------------------------------
@@ -262,7 +302,7 @@ export function minulyMesic(mesic: string): string {
 // Katalog odměn a žádosti (/api/rewards/catalog)
 // ---------------------------------------------------------------------------
 
-export interface Odmena { id: number; nazev: string; ikona: string | null; cena: number; aktivni: boolean; zOrganizace: boolean; sdileno: boolean; spravuje: string | null }
+export interface Odmena { id: number; nazev: string; ikona: string | null; cena: number; aktivni: boolean; zOrganizace: boolean; sdileno: boolean; spravuje: string | null; /** Bonus k výplatě v měně podniku (null = jen odměna). */ bonusKc: number | null }
 export interface Zadost {
   id: number; odmena: number | null; nazev: string; cena: number; stav: 'pending' | 'approved' | 'declined';
   clovek: number; jmeno: string | null; avatar: string | null; kdy: string | null;
@@ -275,6 +315,7 @@ export function vyberKatalog(raw: any): Katalog {
     odmeny: seznam(raw.catalog).map((r: any) => ({
       id: cele(r.id), nazev: String(r.title ?? ''), ikona: text(r.icon), cena: Math.max(0, cele(r.cost)),
       aktivni: r.active !== false, zOrganizace: r.zOrganizace === true, sdileno: r.sdileno === true, spravuje: text(r.spravuje),
+      bonusKc: Number(r.bonus_amount) > 0 ? cele(r.bonus_amount) : null,
     })),
     zadosti: seznam(raw.redemptions).map((r: any) => ({
       id: cele(r.id), odmena: r.reward_id == null ? null : cele(r.reward_id), nazev: String(r.title ?? ''), cena: cele(r.cost),

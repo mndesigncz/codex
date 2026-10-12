@@ -29,7 +29,7 @@ import {
   Avatar, Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Modal, Segmented, Skeleton, Switch, Textarea, Toast,
 } from '../ui';
 import { DEFAULT_POINTS, normalizeLevels, normalizePoints, type RewardLevel, type PointsConfig } from '@/lib/rewardLevels';
-import { KLIC_KALENDAR, UDALOST_KALENDAR, vyberKatalog, vyberPoradi, type Odmena, type Poradi } from '@/lib/odmenyPrehled';
+import { KLIC_KALENDAR, UDALOST_KALENDAR, urlZebricku, vyberKatalog, vyberPoradi, type ObdobiZebricku, type Odmena, type Poradi } from '@/lib/odmenyPrehled';
 import { apiMessage, okJson } from '@/lib/api';
 import ShiftReviewModal from './ShiftReviewModal';
 import ShiftReviewCalendar from './ShiftReviewCalendar';
@@ -38,9 +38,11 @@ import { ProGate } from '../Pro';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useSmi } from '../widgety/NavigaceKontext';
-import { NaStranceOdmen } from '../widgety/oblasti/odmeny';
+import { NaStranceOdmen, PochvalaOkno } from '../widgety/oblasti/odmeny';
+import { pragueToday } from '@/lib/pragueTime';
 import { useT } from '@/lib/i18n/client';
 import { useLocale } from './jazyk';
+import { useMoney, useSymbol } from '../CurrencyProvider';
 
 const URL_ODMENY = '/api/rewards';
 const URL_KATALOG = '/api/rewards/catalog';
@@ -76,6 +78,7 @@ function RewardsViewInner() {
   const cast: Cast | null = casti.some(c => c.id === volba) ? volba : casti[0]?.id ?? null;
   const [denKalendare, setDenKalendare] = useState<string | null>(null);
   const [hodnotim, setHodnotim] = useState<Poradi | null>(null);
+  const [chvalim, setChvalim] = useState<Poradi | null>(null);
   const [profil, setProfil] = useState<number | null>(null);
 
   // Widget Nehodnocené směny otevírá kalendář na dni: na téhle stránce událostí,
@@ -102,7 +105,7 @@ function RewardsViewInner() {
     <ShiftReviewCalendar den={denKalendare} smiHodnotit={hodnoti} onSaved={obnov} />
   ) : cast === 'board' ? (
     <Zebricek smiHodnotit={hodnoti} smiProfil={smi('tym.profil')} vidiHodnoceni={vidiKalendar}
-      onHodnotit={setHodnotim} onProfil={setProfil} />
+      onHodnotit={setHodnotim} onPochvalit={setChvalim} onProfil={setProfil} />
   ) : cast === 'settings' ? (
     <div className="space-y-4">
       {nastavuje && <NastaveniBodu onUlozeno={obnov} />}
@@ -135,6 +138,7 @@ function RewardsViewInner() {
           onSaved={() => { setHodnotim(null); obnov(); }}
         />
       )}
+      {chvalim && <PochvalaOkno clovek={{ id: chvalim.id, jmeno: chvalim.jmeno }} onClose={() => setChvalim(null)} />}
       {profil != null && <EmployeeProfile employeeId={profil} onClose={() => { setProfil(null); obnov(); }} />}
     </>
   );
@@ -144,21 +148,27 @@ function RewardsViewInner() {
 // Žebříček
 // ---------------------------------------------------------------------------
 
-function Zebricek({ smiHodnotit, smiProfil, vidiHodnoceni, onHodnotit, onProfil }: {
+function Zebricek({ smiHodnotit, smiProfil, vidiHodnoceni, onHodnotit, onPochvalit, onProfil }: {
   smiHodnotit: boolean; smiProfil: boolean; vidiHodnoceni: boolean;
-  onHodnotit: (s: Poradi) => void; onProfil: (id: number) => void;
+  onHodnotit: (s: Poradi) => void; onPochvalit: (s: Poradi) => void; onProfil: (id: number) => void;
 }) {
   const t = useT('sprava');
   const loc = useLocale();
-  const data = useDataWidgetu(URL_ODMENY, vyberPoradi);
+  // Období (kolo 5): celkový zůstatek, nebo body získané tento měsíc (bez odečtů za odměny).
+  const [obdobi, setObdobi] = useState<ObdobiZebricku>('celkem');
+  const data = useDataWidgetu(urlZebricku(obdobi, pragueToday()), vyberPoradi);
   const poradi = data.data ?? [];
   return (
     <Card aria-labelledby="zebricek-titulek">
-      <h2 id="zebricek-titulek" className="t-card flex items-center gap-2">
-        <Icon name="award" size={17} className="shrink-0 text-black/40" />
-        
-        {t('Žebříček')}
-      </h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 id="zebricek-titulek" className="t-card flex items-center gap-2">
+          <Icon name="award" size={17} className="shrink-0 text-black/40" />
+          {t('Žebříček')}
+        </h2>
+        <Segmented size="sm" ariaLabel={t('Období žebříčku')} value={obdobi} onChange={setObdobi}
+          options={[{ id: 'celkem', label: t('Celkem') }, { id: 'mesic', label: t('Tento měsíc') }]} />
+      </div>
+      {obdobi === 'mesic' && <p className="t-meta mt-1">{t('Body získané od 1. dne měsíce, bez odečtů za vyměněné odměny.')}</p>}
       {data.error ? (
         <ErrorState compact title={t('Žebříček se nenačetl')} onRetry={data.reload} detail={data.error} className="mt-3" />
       ) : data.loading ? (
@@ -202,6 +212,7 @@ function Zebricek({ smiHodnotit, smiProfil, vidiHodnoceni, onHodnotit, onProfil 
                   <>
                     {/* Akce řádku není limetka ani inkoust: tři lidé = tři „hlavní" akce (DP §3.1). */}
                     <Button variant="secondary" size="sm" onClick={() => onHodnotit(s)} aria-label={`Ohodnotit: ${s.jmeno}`}>{t('Ohodnotit')}</Button>
+                    <Button variant="ghost" size="sm" iconOnly icon="award" aria-label={t('Pochválit: {jmeno}', { jmeno: s.jmeno })} title={t('Pochválit')} onClick={() => onPochvalit(s)} />
                     {smiProfil && (
                       <Button variant="ghost" size="sm" iconOnly icon="user" aria-label={`Profil: ${s.jmeno}`} onClick={() => onProfil(s.id)} />
                     )}
@@ -351,9 +362,13 @@ function SpravaKatalogu() {
   const t = useT('sprava');
   const data = useDataWidgetu(URL_KATALOG, vyberKatalog);
   const odmeny = data.data?.odmeny ?? [];
+  const money = useMoney();
+  const symbol = useSymbol();
   const [nazev, setNazev] = useState('');
   const [cena, setCena] = useState('');
   const [ikona, setIkona] = useState('');
+  // Bonus v měně podniku (volitelný): schválená výměna ho zapíše jako prémii k výplatě — „lepší odměny" než jen volno.
+  const [bonus, setBonus] = useState('');
   const [pridavam, setPridavam] = useState(false);
   const [pracuji, setPracuji] = useState<number | null>(null);
   const [mazani, setMazani] = useState<Odmena | null>(null);
@@ -368,8 +383,8 @@ function SpravaKatalogu() {
     setPridavam(true);
     setChyba(null);
     try {
-      await fetch(URL_KATALOG, { method: 'POST', headers: JSON_HLAVICKA, body: JSON.stringify({ manage: true, title: nazev.trim(), cost: cenaCislo, icon: ikona.trim() || null }) }).then(okJson);
-      setNazev(''); setCena(''); setIkona('');
+      await fetch(URL_KATALOG, { method: 'POST', headers: JSON_HLAVICKA, body: JSON.stringify({ manage: true, title: nazev.trim(), cost: cenaCislo, icon: ikona.trim() || null, bonusAmount: Math.round(Number(bonus)) > 0 ? Math.round(Number(bonus)) : null }) }).then(okJson);
+      setNazev(''); setCena(''); setIkona(''); setBonus('');
       setToast(t('Odměna přidána do katalogu.'));
       obnov();
     } catch (e) {
@@ -419,7 +434,7 @@ function SpravaKatalogu() {
         {t('Katalog odměn')}
       </h2>
       <p className="t-meta mt-1 text-pretty">{t('Za co si tým může vyměnit body. Schválená výměna body odečte automaticky.')}</p>
-      <form className="mt-4 grid grid-cols-[4.5rem_minmax(0,1fr)] sm:grid-cols-[4.5rem_minmax(0,1fr)_8rem_auto] items-end gap-3"
+      <form className="mt-4 grid grid-cols-[4.5rem_minmax(0,1fr)] sm:grid-cols-[4.5rem_minmax(0,1fr)_7rem_8rem_auto] items-end gap-3"
         onSubmit={e => { e.preventDefault(); void pridat(); }}>
         <Field id="nova-odmena-ikona" label={t('Emoji')}>
           <Input id="nova-odmena-ikona" value={ikona} onChange={e => setIkona(e.target.value)} maxLength={4} className="text-center" />
@@ -427,8 +442,14 @@ function SpravaKatalogu() {
         <Field id="nova-odmena-nazev" label={t('Název odměny')}>
           <Input id="nova-odmena-nazev" value={nazev} onChange={e => setNazev(e.target.value)} maxLength={120} placeholder={t('Např. Směna končí o hodinu dřív')} />
         </Field>
-        <Field id="nova-odmena-cena" label={t('Cena v bodech')} className="col-span-2 sm:col-span-1">
+        <Field id="nova-odmena-cena" label={t('Cena v bodech')}>
           <Input id="nova-odmena-cena" type="number" inputMode="numeric" min={1} value={cena} onChange={e => setCena(e.target.value)} className="tabular-nums" />
+        </Field>
+        <Field id="nova-odmena-bonus" label={t('Bonus k výplatě')} hint={t('Volitelné; schválení ho zapíše jako prémii.')}>
+          <div className="relative">
+            <Input id="nova-odmena-bonus" type="number" inputMode="numeric" min={0} value={bonus} onChange={e => setBonus(e.target.value)} className="tabular-nums pr-9" />
+            <span aria-hidden className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-black/45">{symbol}</span>
+          </div>
         </Field>
         <Button type="submit" variant="primary" icon="plus" loading={pridavam} disabled={!jde} className="col-span-2 sm:col-span-1">{t('Přidat')}</Button>
       </form>
@@ -445,7 +466,11 @@ function SpravaKatalogu() {
             <ListRow key={o.id}
               lead={<span aria-hidden className="well grid h-9 w-9 shrink-0 place-items-center text-lg leading-none text-black/55">{o.ikona ?? <Icon name="gift" size={16} />}</span>}
               title={o.nazev}
-              meta={o.zOrganizace && o.spravuje ? `${t('{n, plural, one {# bod} few {# body} other {# bodů}}', { n: o.cena })} · ${t('spravuje {kdo}', { kdo: o.spravuje })}` : `${t('{n, plural, one {# bod} few {# body} other {# bodů}}', { n: o.cena })}${o.aktivni ? '' : ` · ${t('nenabízí se')}`}`}
+              meta={[
+                t('{n, plural, one {# bod} few {# body} other {# bodů}}', { n: o.cena }),
+                o.bonusKc ? t('+{castka} k výplatě', { castka: money(o.bonusKc) }) : null,
+                o.zOrganizace && o.spravuje ? t('spravuje {kdo}', { kdo: o.spravuje }) : !o.aktivni ? t('nenabízí se') : null,
+              ].filter(Boolean).join(' · ')}
               right={o.zOrganizace ? <Chip tone="muted" size="sm">{t('Z organizace')}</Chip> : o.sdileno ? <Chip tone="info" size="sm">{t('Sdíleno')}</Chip> : undefined}
               // Odměnu ze zdrojového podniku organizace (kolo 60) upraví jen jeho vedení —
               // přepínač i koš by tu vracely 404, tak se neukazují.

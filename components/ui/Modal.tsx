@@ -15,7 +15,7 @@ import { useT } from '@/lib/i18n/client';
 // okno zavře. Tohle je ta jedna podoba; `useModal` pod ním řeší fokus,
 // Escape a zámek posouvání.
 
-export function Modal({ open, onClose, title, subtitle, size = 'md', children, footer, className = '' }: {
+export function Modal({ open, onClose, title, subtitle, size = 'md', children, footer, className = '', nadOkny = false }: {
   open: boolean;
   onClose: () => void;
   title: React.ReactNode;
@@ -34,6 +34,12 @@ export function Modal({ open, onClose, title, subtitle, size = 'md', children, f
   /** Patička s tlačítky. Hlavní akce vpravo, stejně jako všude jinde. */
   footer?: React.ReactNode;
   className?: string;
+  /**
+   * Okno nad ostatními okny. Běžná okna sdílejí jednu vrstvu a vrch určuje pořadí v DOM —
+   * hledání (Ctrl K) se kreslí z layoutu, tedy dřív než okna stránky, a otevřené nad detailem
+   * úkolu nebo čtečkou návodu by skončilo pod nimi: klávesnice v něm, oči ne.
+   */
+  nadOkny?: boolean;
 }) {
   const t = useT();
   const modal = useModal(open, onClose, typeof title === 'string' ? title : undefined);
@@ -45,7 +51,7 @@ export function Modal({ open, onClose, title, subtitle, size = 'md', children, f
   const width = size === 'sm' ? 'max-w-sm' : size === 'xl' ? 'max-w-5xl' : size === 'lg' ? 'max-w-2xl' : 'max-w-md';
   return createPortal(
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center p-4 modal-overlay"
+      className={`fixed inset-0 ${nadOkny ? 'z-[90]' : 'z-[70]'} flex items-center justify-center p-4 modal-overlay`}
       onClick={onClose}>
       {/* Vyjetí zdola a dosednutí na spodní hranu na telefonu řeší
           `.modal-overlay` / `.modal-sheet` v globals.css — pro všechna okna
@@ -63,7 +69,9 @@ export function Modal({ open, onClose, title, subtitle, size = 'md', children, f
             className="btn-icon shrink-0 -mt-1 -mr-1"><Icon name="close" size={16} /></button>
         </div>
         <div className="px-6 pb-6 overflow-y-auto scrollbar-thin">{children}</div>
-        {footer && <div className="px-6 pb-6 pt-0 flex items-center justify-end gap-2">{footer}</div>}
+        {/* Tlačítka se zalamují: na 320 px má tělo okna 240 px a „Stornieren" +
+            „Eintrag speichern" mají 270 — bez zalomení vyjelo Zrušit za levý okraj. */}
+        {footer && <div className="px-6 pb-6 pt-0 flex flex-wrap items-center justify-end gap-2">{footer}</div>}
       </div>
     </div>,
     document.body,

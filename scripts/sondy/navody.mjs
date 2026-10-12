@@ -50,6 +50,9 @@ await p.waitForTimeout(700);
 await p.getByRole('button', { name: 'Další akce: Domácí limonáda' }).first().click();
 await p.getByRole('menuitem', { name: 'Upravit položku' }).first().click();
 await p.waitForTimeout(900);
+// Kolo 82: výroba a návod jsou za sbaleným „Další nastavení" (nejdřív co to je a v čem se počítá).
+await p.getByRole('button', { name: 'Další nastavení' }).first().click();
+await p.waitForTimeout(600);
 const editor = await p.locator('body').innerText();
 tvrdi('editor výroby ukáže připnutý návod',
   editor.includes('Návod k výrobě') && editor.includes('Domácí limonáda — postup'),

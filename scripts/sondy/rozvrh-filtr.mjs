@@ -236,6 +236,11 @@ async function nactiRozvrh(p) {
 {
   const { ctx, p } = await kontext({ fix: FIX, viewport: { width: 390, height: 844 }, mobil: true, dalsi: podvrh() });
   await nactiRozvrh(p);
+  // Kolo 5: na telefonu jsou pásy lidí a typů za tlačítkem „Filtry" (kalendář byl až pod ohybem).
+  const filtryTl = p.locator('[data-plocha]').getByRole('button', { name: /^Filtry/ });
+  tvrdi('T1: na telefonu je pás lidí schovaný za tlačítkem „Filtry"', await filtryTl.isVisible() && await pas(p).isHidden());
+  await filtryTl.click();
+  tvrdi('T1: po klepnutí se pás ukáže', await dokud(() => pas(p).isVisible(), 2000));
   const pasMira = await pas(p).evaluate(el => {
     const tops = [...el.querySelectorAll('button')].map(b => b.offsetTop);
     const r = el.getBoundingClientRect();

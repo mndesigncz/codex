@@ -519,7 +519,7 @@ export default function (t: Testy) {
   eq('katalog: dostupnost týmu chce dostupnost.zobrazit (N11)', widget('rozvrh.dostupnost_tymu')?.opravneni.vse, ['dostupnost.zobrazit']);
 
   const sids = STRANKY.map(s => s.id);
-  ok('stránky: 36 stránek s unikátním id', sids.length === 36 && new Set(sids).size === 36);
+  ok('stránky: 37 stránek s unikátním id (kolo 5: zamestnanec.receptury)', sids.length === 37 && new Set(sids).size === 37);
   ok('stránky: Přehled vedení a Domů zaměstnance jsou aktivní', !!stranka('vedeni.prehled')?.aktivni && !!stranka('zamestnanec.domu')?.aktivni);
   const spatneStr: string[] = [];
   const ROLE = new Map(SYSTEMOVE_ROLE.map(r => [r.klic, r]));

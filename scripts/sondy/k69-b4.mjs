@@ -168,9 +168,9 @@ const presahy = (loc) => loc.evaluate(li => {
   await ctx.close();
 }
 
-// 4) Oprávnění: Provozní (receptury.zobrazit bez upravit, marží, cen a synchronizace).
+// 4) Oprávnění: role s receptury.zobrazit bez upravit (Provozní od kola 5 upravit má, tady se mu odebere), bez marží, cen a synchronizace.
 {
-  const { ctx, p, stav } = await kontext({ fix: FIX_RECEPTURY, mineData: roleMine('provozni'), dalsi: podvrh() });
+  const { ctx, p, stav } = await kontext({ fix: FIX_RECEPTURY, mineData: roleMine('provozni', ['receptury.upravit']), dalsi: podvrh() });
   await otevri(p, RECEPTURY, 'vedeni.receptury');
   await p.waitForTimeout(600);
   tvrdi('R4: Provozní nevidí Marže a na /api/pos/margins neodešel dotaz', await naPlose(p, 'finance.marze') === 0 && dotazyNa(stav, ['/api/pos/margins']).length === 0);

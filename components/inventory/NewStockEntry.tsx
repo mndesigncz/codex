@@ -10,6 +10,8 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { Icon } from '../Icons';
 import { Button } from '../ui';
+import PoleMnozstvi from './PoleMnozstvi';
+import { CONTENT_UNITS } from '@/lib/jednotky';
 import { useSymbol } from '../CurrencyProvider';
 import { cenaDoPole } from '@/lib/cena';
 import { ancestryOfId, flattenTree } from '@/lib/categoryTree';
@@ -57,6 +59,8 @@ export default function NewStockEntry({
   const [note, setNote] = useState('');
   const [brand, setBrand] = useState('');
   const [packageSize, setPackageSize] = useState('');
+  // V čem se měří obsah balení (0,7 l, 1 kg) — bez něj by receptury nevěděly, co „0,7" znamená.
+  const [contentUnit, setContentUnit] = useState('');
   const [unitCost, setUnitCost] = useState('');
   const symbol = useSymbol();
   const cenaZaBaleni = vyznamCeny(packageSize) === 'baleni';
@@ -138,6 +142,7 @@ export default function NewStockEntry({
           description: note.trim() || undefined,
           brand: brand.trim() || undefined,
           packageSize: packageSize === '' ? undefined : dec(packageSize),
+          contentUnit: packageSize === '' || !contentUnit ? undefined : contentUnit,
           unitCost: unitCost === '' || !smiCenu ? undefined : unitCost,
           supplier: supplier.trim() || undefined,
           minQuantity: defaults.minQuantity ?? undefined,
@@ -253,9 +258,16 @@ export default function NewStockEntry({
             <input id="nova-vec-znacka" value={brand} onChange={e => setBrand(e.target.value)} className={field} placeholder={t('Např. Monin')} />
           </div>
           <div>
-            <label htmlFor="nova-vec-baleni" className={label}>{t('Velikost balení')}</label>
-            <input id="nova-vec-baleni" inputMode="decimal" value={packageSize}
-              onChange={e => setPackageSize(e.target.value)} className={field} placeholder="0,7" />
+            {/* „1 lahev obsahuje 0,7 l" — velikost i jednotka obsahu pohromadě, ať je jasné, co se píše (kolo 82). */}
+            <label htmlFor="nova-vec-baleni" className={label}>{t('1 {j} obsahuje', { j: unit === 'balení' ? t('balení') : unit || 'ks' })}</label>
+            <div className="flex items-center gap-2">
+              <PoleMnozstvi id="nova-vec-baleni" value={packageSize} onChange={setPackageSize} desetinne placeholder="0,7" className="flex-1 min-w-0" />
+              <select aria-label={t('Jednotka obsahu')} value={contentUnit} onChange={e => setContentUnit(e.target.value)}
+                className={`${field} !w-24 shrink-0 px-2`}>
+                <option value="">—</option>
+                {CONTENT_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
+            </div>
           </div>
           {smiCenu && (
             <div>

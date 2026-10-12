@@ -65,6 +65,8 @@ export const VYCHOZI_NAV: Record<Rozhrani, VychoziNav> = {
       { id: 'procedures', label: 'Postupy', icon: 'clipboard' },
       { id: 'availability', label: 'Dostupnost', icon: 'swap' },
       { id: 'inventory', label: 'Sklad', icon: 'box' },
+      // Kolo 5: receptury i pro zaměstnance (jen s receptury.zobrazit — smiPohled je jinak schová).
+      { id: 'recipes', label: 'Receptury', icon: 'clipboard' },
       { id: 'closing', label: 'Uzávěrka', icon: 'trend' },
       { id: 'tasks', label: 'Úkoly', icon: 'check' },
       { id: 'rewards', label: 'Odměny', icon: 'award' },
@@ -75,7 +77,7 @@ export const VYCHOZI_NAV: Record<Rozhrani, VychoziNav> = {
     sekce: [
       { id: 'prehled', title: null, ids: ['home'] },
       { id: 'smeny', title: 'Směny', ids: ['my-shifts', 'availability'] },
-      { id: 'prace', title: 'Práce', ids: ['closing', 'inventory', 'tasks', 'procedures'] },
+      { id: 'prace', title: 'Práce', ids: ['closing', 'inventory', 'recipes', 'tasks', 'procedures'] },
       { id: 'tym', title: 'Tým', ids: ['rewards', 'chat', 'guides', 'suggestions'] },
     ],
     dok: ['home', 'my-shifts', 'inventory', 'chat'],

@@ -2,6 +2,7 @@
 
 import { predejUkolum } from '@/lib/ukolyFiltr';
 import { GlobalniHledani, useZkratkaHledani } from '../GlobalniHledani';
+import { akceProHledani, type AkceHledani } from '@/components/widgety/akceHledani';
 import { useSession } from 'next-auth/react';
 
 import { useState, useEffect } from 'react';
@@ -119,12 +120,12 @@ interface Props {
 }
 
 /** Hledání uvnitř ProfileLinkProvideru (kvůli otevření profilu člověka). */
-function HledaniVedeni({ otevreno, zavrit, stranky, onStranka, ukoly, sklad, lide, navody, postupy }: {
-  otevreno: boolean; zavrit: () => void; stranky: { id: string; label: string; icon: string }[]; onStranka: (id: string, arg?: string) => void;
+function HledaniVedeni({ otevreno, zavrit, stranky, akce, onStranka, ukoly, sklad, lide, navody, postupy }: {
+  otevreno: boolean; zavrit: () => void; stranky: { id: string; label: string; icon: string }[]; akce: AkceHledani[]; onStranka: (id: string, arg?: string) => void;
   ukoly: boolean; sklad: boolean; lide: boolean; navody: boolean; postupy: boolean;
 }) {
   const otevriProfil = usePersonProfile();
-  return <GlobalniHledani open={otevreno} onClose={zavrit} stranky={stranky} onStranka={onStranka} hledatUkoly={ukoly} hledatSklad={sklad} hledatNavody={navody} hledatPostupy={postupy}
+  return <GlobalniHledani open={otevreno} onClose={zavrit} stranky={stranky} akce={akce} onStranka={onStranka} hledatUkoly={ukoly} hledatSklad={sklad} hledatNavody={navody} hledatPostupy={postupy}
     hledatLidi={lide && !!otevriProfil} onOsoba={otevriProfil ?? undefined} />;
 }
 
@@ -625,7 +626,7 @@ export default function EmployerLayout({ user }: Props) {
           { label: t('Odhlásit se'), icon: 'logout', onClick: () => odhlasit({ callbackUrl: '/login' }), danger: true },
         ]}
       />
-      <HledaniVedeni otevreno={hledaniOtevreno} zavrit={() => setHledani(false)} stranky={nav.vse} onStranka={navigate}
+      <HledaniVedeni otevreno={hledaniOtevreno} zavrit={() => setHledani(false)} stranky={nav.vse} akce={akceProHledani('vedeni', smiPohled)} onStranka={navigate}
         ukoly={smiPohled('tasks')} sklad={smiPohled('inventory')} lide={ma('tym.profil')} navody={smiPohled('guides')} postupy={smiPohled('procedures')} />
       <JazykOkno open={jazykOpen} onClose={() => setJazykOpen(false)} />
     </div>

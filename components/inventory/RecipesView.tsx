@@ -24,6 +24,8 @@ import { Icon } from '../Icons';
 import { useMoney, useCost } from '../CurrencyProvider';
 import ItemInlineEdit from './ItemInlineEdit';
 import NewIngredientInline from './NewIngredientInline';
+import SkladZalozky from './SkladZalozky';
+import { polozkaArg } from '@/lib/skladPredani';
 import { apiMessage, okJson } from '@/lib/api';
 import { recipeCost, ingredientCost, marginPct } from '@/lib/recipeCost';
 import { obsahujeNekde } from '@/lib/hledani';
@@ -38,6 +40,7 @@ import {
 } from '../ui';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
+import { Poznamky } from '../Poznamky';
 import { useSmi } from '../widgety/NavigaceKontext';
 import { useOpravneni } from '../role/useOpravneni';
 import { URL_RECEPTURY, UDALOST_OTEVRIT_RECEPTURU } from '../widgety/oblasti/receptury';
@@ -93,6 +96,8 @@ const tonMarze = (m: number) => (m >= 65 ? 'text-ok-ink' : m >= 45 ? 'text-[#161
 export interface RecipesViewProps {
   openProductId?: string;
   onNavigate?: (view: string, arg?: string) => void;
+  /** Plocha, na které se stránka kreslí: vedení (výchozí) nebo zaměstnanec (kolo 5 — receptury i pro tým). */
+  stranka?: 'vedeni.receptury' | 'zamestnanec.receptury';
 }
 
 // Archivované suroviny zůstávají: receptura je může pořád obsahovat a bez nich by editor
@@ -103,7 +108,7 @@ const vyberKategorie = (raw: unknown) => (Array.isArray(raw) ? raw.map((c: any) 
 const vyberNavody = (raw: any): { id: number; title: string; productId: string | null }[] =>
   (Array.isArray(raw?.guides) ? raw.guides.filter((x: any) => x.productId) : []);
 
-export default function RecipesView({ openProductId, onNavigate }: RecipesViewProps = {}) {
+export default function RecipesView({ openProductId, onNavigate, stranka = 'vedeni.receptury' }: RecipesViewProps = {}) {
   // Data (návody) přísně přes useSmi — bez jistoty se neptat; tlačítka přes
   // `ma` jako Sklad: do načtení oprávnění ANO, rozhodne server.
   const t = useT('sklad');
@@ -280,6 +285,11 @@ export default function RecipesView({ openProductId, onNavigate }: RecipesViewPr
     secondary: smiOdepsat ? <Button variant="secondary" icon="swap" loading={syncing} onClick={sync}>{t('Odepsat prodeje')}</Button> : undefined,
     // Vedlejší akce se na telefonu schovají — v „···" musí být i tam.
     menu: smiOdepsat ? [{ label: t('Odepsat prodeje'), icon: 'swap', onClick: sync }] : undefined,
+    // Sklad › Položky / Receptury z kasy / Inventura — stejné záložky jako na Skladu (kolo 82),
+    // takže se z receptur chodí na položky a zpět jedním klepnutím.
+    // Inventura je okno nad Skladem vedení; zaměstnanec má zápis stavu rovnou ve svém Skladu.
+    aside: <SkladZalozky aktivni="receptury" onNavigate={onNavigate} smiReceptury
+      smiInventura={stranka === 'vedeni.receptury' && smi('inventura.pocitat') && smi('sklad.zobrazit')} />,
   };
 
   let nastroj: React.ReactNode;
@@ -316,6 +326,8 @@ export default function RecipesView({ openProductId, onNavigate }: RecipesViewPr
         guide={(navody.data ?? []).find(g => g.productId === draft.productId) ?? null}
         onItemSaved={patched => { setMistniSklad(m => ({ ...m, [String(patched.id)]: patched })); obnovDataWidgetu(URL_SKLAD); }}
         onItemCreated={created => { setMistniSklad(m => ({ ...m, [String(created.id)]: created })); obnovDataWidgetu(URL_SKLAD); }}
+        // Proklik na celou položku ve Skladu (prahy, dodavatel, výroba) — druhý směr k „Používá se v kase" u položky.
+        onOpenItem={onNavigate && smi('sklad.zobrazit') ? (id => onNavigate('inventory', polozkaArg(id))) : undefined}
       />
     );
   } else {
@@ -333,7 +345,8 @@ export default function RecipesView({ openProductId, onNavigate }: RecipesViewPr
           </button>
         </div>
         {categories.length > 2 && (
-          <div className="flex gap-2 overflow-x-auto scrollbar-thin scroll-fade-x -mx-1 px-1" role="group" aria-label={t('Kategorie menu')}>
+          // Zalamuje se; posuvný pás se záporným okrajem (-mx-1) dřív přečníval 4 px za widget.
+          <div className="flex flex-wrap gap-2" role="group" aria-label={t('Kategorie menu')}>
             {categories.map(c => (
               <button key={c} type="button" aria-pressed={cat === c} onClick={() => setCat(c)}
                 className={`filter-pill tap-target whitespace-nowrap shrink-0 ${cat === c ? 'seg-on' : 'seg-off glass'}`}>
@@ -388,7 +401,7 @@ export default function RecipesView({ openProductId, onNavigate }: RecipesViewPr
 
   return (
     <>
-      <PlochaWidgetu stranka="vedeni.receptury" hlavicka={hlavicka} nastroj={<div ref={nastrojRef} className="scroll-mt-4">{nastroj}</div>} />
+      <PlochaWidgetu stranka={stranka} hlavicka={hlavicka} nastroj={<div ref={nastrojRef} className="scroll-mt-4">{nastroj}</div>} />
       {zprava && <Toast message={zprava.text} tone={zprava.ton} onClose={() => setZprava(null)} />}
     </>
   );
@@ -399,7 +412,7 @@ export default function RecipesView({ openProductId, onNavigate }: RecipesViewPr
 // ruce, a hned pod ním je vidět, kolik porcí z balení vyjde a co stojí — na
 // tom se chyba o řád (0,02 l vs 0,2 l) pozná dřív, než se odepíše sklad.
 // ---------------------------------------------------------------------------
-function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, err, yieldOf, recipes, products, categories, smiUpravit, guide, onItemSaved, onItemCreated }: {
+function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, err, yieldOf, recipes, products, categories, smiUpravit, guide, onItemSaved, onItemCreated, onOpenItem }: {
   draft: Draft; items: any[]; itemById: Map<string, any>;
   setIng: (idx: number, patch: Partial<Ingredient>) => void;
   setDraft: React.Dispatch<React.SetStateAction<Draft | null>>;
@@ -410,6 +423,8 @@ function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, 
   guide: { id: number; title: string } | null;
   onItemSaved: (item: any) => void;
   onItemCreated: (item: any) => void;
+  /** Otevřít položku ve Skladu (celý formulář); bez práva na sklad se nenabízí. */
+  onOpenItem?: (itemId: number) => void;
 }) {
   const t = useT('sklad');
   const { jazyk } = useJazyk();
@@ -548,6 +563,11 @@ function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, 
                           {editingItem === ing.itemId ? t('Zavřít úpravu') : t('Upravit položku a díly')}
                         </Button>
                       )}
+                      {onOpenItem && (
+                        <Button variant="ghost" size="sm" icon="box" onClick={() => onOpenItem(Number(item.id))}>
+                          {t('Otevřít ve skladu')}
+                        </Button>
+                      )}
                     </div>
                   )}
 
@@ -645,6 +665,12 @@ function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, 
           <p className="t-meta">{t('Uloženou recepturu odepisuje synchronizace s pokladnou po každém prodeji.')}</p>
         </Card>
       </div>
+
+      {/* Poznámky k receptuře („sirup od nového dodavatele je sladší, stačí 15 ml") — klíčem je product_id kasy,
+          receptura nemá vlastní číslo. Píše každý, kdo receptury vidí, i bez práva je měnit. */}
+      <Card className="min-w-0">
+        <Poznamky typ="recipe" id={draft.productId} />
+      </Card>
 
       <Modal open={mazani} onClose={() => setMazani(false)} size="sm" title={t('Smazat recepturu?')}
         footer={<>

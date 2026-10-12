@@ -34,6 +34,7 @@ import StepTimeline from './StepTimeline';
 import { parseSteps, totalMinutes, fmtMinutes, STEP_WEIGHTS, weightSpec, type Step } from '@/lib/steps';
 import { okJson, apiMessage } from '@/lib/api';
 import StepGuidePicker, { type PickableGuide } from '../guides/StepGuidePicker';
+import { Poznamky, type AutorNaTabletu } from '../Poznamky';
 import { useOtevreniNavodu } from '@/lib/otevriNavod';
 import KopieZPodniku, { useJinePodniky } from '../organizace/KopieZPodniku';
 import { PlochaWidgetu, type HlavickaPlochy } from '../widgety/PlochaWidgetu';
@@ -363,6 +364,9 @@ export default function Procedures({ user }: Props) {
           smiSchvalit={smiSchvalovat}
           running={active?.procedureId === detail.id}
           starting={starting}
+          tablet={tablet}
+          // Tablet kreslí nástroj pod vybraným člověkem (actingUser v KioskApp): za něj se píšou poznámky.
+          zaKoho={tablet && user.role !== 'kiosk' && Number(user.id) > 0 ? { id: Number(user.id), name: user.name ?? '' } : null}
           onRun={() => { spust(detail); setDetailId(null); }}
           onApprove={() => { void approveProcedure(detail.id); }}
           onEdit={() => { const p = detail; setDetailId(null); openEdit(p); }}
@@ -423,7 +427,7 @@ export default function Procedures({ user }: Props) {
 }
 
 function ProcedureDetail({
-  procedure, smiUpravit, smiSpustit, smiSchvalit, running, starting, onRun, onApprove, onEdit, onClose,
+  procedure, smiUpravit, smiSpustit, smiSchvalit, running, starting, tablet, zaKoho, onRun, onApprove, onEdit, onClose,
 }: {
   procedure: Procedure;
   smiUpravit: boolean;
@@ -431,6 +435,9 @@ function ProcedureDetail({
   smiSchvalit: boolean;
   running: boolean;
   starting: boolean;
+  tablet: boolean;
+  /** Tablet: člověk, za kterého se píšou poznámky (vybraný u tabletu). */
+  zaKoho: AutorNaTabletu | null;
   onRun: () => void;
   onApprove: () => void;
   onEdit: () => void;
@@ -457,6 +464,8 @@ function ProcedureDetail({
       {navrh && <p className="note note-wait text-sm mb-3">{t('Návrh čeká na schválení — spustit půjde až potom.')}</p>}
       {procedure.description && <p className="text-sm leading-relaxed text-black/60 mb-3 text-pretty">{procedure.description}</p>}
       <StepTimeline steps={steps} {...navodOdkaz} />
+      {/* Postřehy k postupu („krok 3 trvá déle, když je mráz") pod kroky — píše každý, kdo postup vidí. */}
+      <Poznamky typ="procedure" id={procedure.id} tablet={tablet} zaKoho={zaKoho} className="mt-6" />
     </Modal>
   );
 }

@@ -43,6 +43,13 @@ import { jePsanePole, jeRozepsano, reakceNaZavreni, type ZpusobZavreni } from '.
 let lockCount = 0;
 let lockedFrom = '';
 
+// Zásobník otevřených oken. Když je otevřených víc (hledání Ctrl K nad detailem
+// úkolu, otázka „zahodit?" nad formulářem), Escape patří jen tomu vrchnímu —
+// každé okno má vlastní posluchač na dokumentu a `stopPropagation` ostatním
+// posluchačům na stejném prvku nezabrání. Dřív jeden Escape zavřel všechno.
+const otevrenaOkna: symbol[] = [];
+const jeVrchni = (id: symbol) => otevrenaOkna[otevrenaOkna.length - 1] === id;
+
 function lockScroll() {
   if (lockCount === 0) lockedFrom = document.body.style.overflow;
   lockCount++;
@@ -110,14 +117,29 @@ export function useModal<T extends HTMLElement = HTMLDivElement>(open: boolean, 
   const askingRef = useRef(false);
   askingRef.current = asking;
 
+  // Pole, do kterých se v okně psalo (plní posluchač níž). Rozepsáno se počítá
+  // z jejich ŽIVÝCH hodnot a jen z těch, která v okně pořád jsou.
+  const psanoRef = useRef<(HTMLInputElement | HTMLTextAreaElement)[]>([]);
+  const prepocitat = useCallback(() => {
+    const neco = jeRozepsano(psanoRef.current.filter(el => el.isConnected).map(el => el.value));
+    if (neco === dirtyRef.current) return;
+    dirtyRef.current = neco;
+    setDirty(neco);
+  }, []);
+
   const keep = useCallback(() => setAsking(false), []);
   const zavrit = useCallback(() => { setAsking(false); dirtyRef.current = false; setDirty(false); closeRef.current(); }, []);
   const rozhodnout = useCallback((zpusob: ZpusobZavreni) => {
+    // Před rozhodnutím se rozepsáno přepočítá z toho, co v okně opravdu je.
+    // Hodnotu, kterou pole vyprázdní React po odeslání (poznámka, zpráva), ani
+    // inline editor, který po uložení z okna zmizel, prohlížeč jako `input`
+    // nehlásí — bez přepočtu by se okno ptalo na text, který už nikde není.
+    prepocitat();
     const r = reakceNaZavreni({ rozepsano: dirtyRef.current, ptameSe: askingRef.current, zpusob });
     if (r === 'zavrit') zavrit();
     else if (r === 'zeptat se') setAsking(true);
     else setAsking(false);
-  }, [zavrit]);
+  }, [zavrit, prepocitat]);
   const rozhodnoutRef = useRef(rozhodnout);
   rozhodnoutRef.current = rozhodnout;
   const discard = useCallback(() => rozhodnout('zahodit'), [rozhodnout]);
@@ -127,6 +149,7 @@ export function useModal<T extends HTMLElement = HTMLDivElement>(open: boolean, 
   useEffect(() => {
     if (open) return;
     dirtyRef.current = false;
+    psanoRef.current = [];
     setDirty(false);
     setAsking(false);
   }, [open]);
@@ -149,19 +172,13 @@ export function useModal<T extends HTMLElement = HTMLDivElement>(open: boolean, 
     if (!open) return;
     const panel = ref.current;
     if (!panel) return;
-    const psano: (HTMLInputElement | HTMLTextAreaElement)[] = [];
+    const psano = psanoRef.current;
     let cekani: ReturnType<typeof setTimeout> | null = null;
     // Přepočítat se musí až po Reactu, ne během události. Posluchač běží
     // v zachytávací fázi, tedy dřív, než se ke změně dostane komponenta —
     // a `value` v tu chvíli drží, co do pole napsal prohlížeč, ne to, co
     // React přijme. U pole, které si vstup upraví nebo odmítne, by se tak
     // dalo „rozepsáno" zhasnout nad textem, který na obrazovce pořád je.
-    const prepocitat = () => {
-      const neco = jeRozepsano(psano.filter(el => el.isConnected).map(el => el.value));
-      if (neco === dirtyRef.current) return;
-      dirtyRef.current = neco;
-      setDirty(neco);
-    };
     const zmena = (e: Event) => {
       if (!e.isTrusted) return;
       const t = e.target as HTMLElement | null;
@@ -178,7 +195,7 @@ export function useModal<T extends HTMLElement = HTMLDivElement>(open: boolean, 
       if (cekani) clearTimeout(cekani);
       panel.removeEventListener('input', zmena, true);
     };
-  }, [open]);
+  }, [open, prepocitat]);
 
   // Klik vedle okna. Volající má na překryvu `onClick={onClose}`; kdyby se
   // tady jen nastavil stav, okno by se stejně zavřelo. Proto se událost
@@ -203,6 +220,8 @@ export function useModal<T extends HTMLElement = HTMLDivElement>(open: boolean, 
   useEffect(() => {
     if (!open) return;
     const panel = ref.current;
+    const id = Symbol('okno');
+    otevrenaOkna.push(id);
     lockScroll();
 
     const visible = () => Array.from(panel?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [])
@@ -217,6 +236,7 @@ export function useModal<T extends HTMLElement = HTMLDivElement>(open: boolean, 
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        if (!jeVrchni(id)) return;
         e.preventDefault();
         e.stopPropagation();
         // Escape nad otevřenou otázkou znamená „zpět k úpravám" — druhý
@@ -241,6 +261,8 @@ export function useModal<T extends HTMLElement = HTMLDivElement>(open: boolean, 
     return () => {
       clearTimeout(t);
       document.removeEventListener('keydown', onKey, true);
+      const i = otevrenaOkna.indexOf(id);
+      if (i >= 0) otevrenaOkna.splice(i, 1);
       unlockScroll();
       const back = restoreRef.current;
       restoreRef.current = null;

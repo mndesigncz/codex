@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { normalizeLevels, normalizePoints, standingForPoints } from '@/lib/rewardLevels';
-import { breakdownFor, breakdownForTeam, totalPoints, PointsBreakdown } from '@/lib/pointsBalance';
-import { pragueToday } from '@/lib/pragueTime';
+import { breakdownFor, breakdownForTeam, totalPoints, PointsBreakdown, PRAZDNY_ROZPAD } from '@/lib/pointsBalance';
+import { pragueToday, pragueDaySafe } from '@/lib/pragueTime';
 import { clenovePodniku } from '@/lib/tenant';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 
@@ -94,11 +94,22 @@ async function itemsFor(teamId: number, userId: number) {
       ORDER BY i.work_date DESC LIMIT 50`;
     push(rows, 'closing', 'Uzávěrka', l => `Uzávěrka — ${l}`);
   } catch { /* ignore */ }
+  // Pochvaly (point_awards) jdou do stejného seznamu jako položky — zaměstnanec
+  // je vidí ve zpětné vazbě u dne, kdy přišly. Den podle pražského času.
+  try {
+    const rows = await sql`
+      SELECT id, points, reason, created_at FROM point_awards
+      WHERE user_id = ${userId} AND team_id = ${teamId} ORDER BY created_at DESC LIMIT 50`;
+    rows.forEach((r: any) => out.push({
+      work_date: pragueDaySafe(r.created_at), kind: 'award', refId: r.id,
+      label: r.reason ? String(r.reason) : 'Pochvala', points: r.points ?? 0, note: null, flagged: false,
+    }));
+  } catch { /* table missing */ }
   out.sort((a, b) => String(b.work_date).localeCompare(String(a.work_date)));
   return out.slice(0, 60);
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const c = await ctx();
   if (jeOdpoved(c)) return c;
 
@@ -123,11 +134,14 @@ export async function GET() {
     const members = await clenovePodniku(c.teamId, { role: 'employee' });
     // Dřív 6 dotazů na každého člena (N+1). Teď dvě dávkové sady GROUP BY.
     const memberIds = members.map(m => m.id);
-    const breakdowns = await breakdownForTeam(c.teamId, memberIds);
+    // ?od=YYYY-MM-DD → pořadí za období (widget Žebříček „tento měsíc"); bez něj celkem.
+    const odParam = req.nextUrl.searchParams.get('od');
+    const od = odParam && /^\d{4}-\d{2}-\d{2}$/.test(odParam) ? odParam : null;
+    const breakdowns = await breakdownForTeam(c.teamId, memberIds, od);
     const pendings = vidiHodnoceni ? await pendingForTeam(c.teamId, memberIds) : new Map<number, { n: number; oldest: string | null }>();
     const nevidene = vidiHodnoceni ? await neviseneVytky(c.teamId, memberIds) : new Map<number, number>();
     const standings = members.map(m => {
-      const b0 = breakdowns.get(m.id) ?? { tasks: 0, procedures: 0, closings: 0, reviewPoints: 0, ratedShifts: 0, autoPoints: 0, itemPoints: 0, flagged: 0 };
+      const b0 = breakdowns.get(m.id) ?? PRAZDNY_ROZPAD;
       const total = totalPoints(b0, points);
       const st = standingForPoints(levels, total);
       const b = vidiHodnoceni ? b0 : { ...b0, flagged: 0 };

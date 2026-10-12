@@ -34,7 +34,10 @@ import {
   CONTENT_UNITS, type ScaleStep, type CategoryPackaging,
 } from '@/lib/packaging';
 import ConsumeControl from '../inventory/ConsumeControl';
+import PoleMnozstvi from '../inventory/PoleMnozstvi';
+import SkladZalozky from '../inventory/SkladZalozky';
 import { vyznamCeny, jednotkaSnesDesetiny } from '@/lib/jednotky';
+import { NABIDKA_JEDNOTEK, jeZNabidky, vedeniPolozky, celkemObsahu } from '@/lib/mnozstvi';
 import { pocetDoPole } from '@/lib/inventura';
 import {
   buildTree, flattenTree, scopeIds, pathOfId, childrenOfId, possibleParents,
@@ -46,6 +49,7 @@ import StocktakeModal from '../inventory/Stocktake';
 import NakupniSeznamOkno, { type RadekSeznamu } from './NakupniSeznamOkno';
 import ItemRecipeLinks from '../inventory/ItemRecipeLinks';
 import ProductionRecipe from '../inventory/ProductionRecipe';
+import { Poznamky } from '../Poznamky';
 import { useMoney, usePrice, useSymbol } from '../CurrencyProvider';
 import { okJson } from '@/lib/api';
 import { openPrint, esc } from '@/lib/printDoc';
@@ -233,6 +237,12 @@ export default function Inventory({ initialCategory, predaniN = 0, onNavigate }:
   const [showCats, setShowCats] = useState(false);
   const [editing, setEditing] = useState<Item | null>(null);
   const [form, setForm] = useState(emptyForm);
+  // „Jiná…" jednotka (lahev, krabička) má textové pole; pilulky nabízejí ks, balení, l, kg, g, ml.
+  const [jinaJednotka, setJinaJednotka] = useState(false);
+  // „Další nastavení" (hlídání zásob, cena, díly, zobrazení, výroba, kasa) je sbalené —
+  // nejdřív co to je a v čem se počítá (zadání kola 82). Rozbalí se samo, když sem
+  // člověk přijde kvůli chybějící ceně nebo z receptury.
+  const [dalsi, setDalsi] = useState(false);
   // Množství a prahy jsou v databázi INTEGER, dokud se sloupce nepřevedou na NUMERIC;
   // desetiny (2,5 kg) se nabídnou jen tam, kde je sloupec unese, a jen u kg / l
   // (g, ml a kusy zůstávají celé).
@@ -497,7 +507,7 @@ export default function Inventory({ initialCategory, predaniN = 0, onNavigate }:
       supplier: d.supplier ?? '',
       supplierUrl: d.supplierUrl ?? '',
       unitCost: cenaDoPole(d.unitCost),
-      packageSize: d.packageSize != null ? String(d.packageSize) : '',
+      packageSize: d.packageSize != null ? pocetDoPole(d.packageSize) : '',
       minQuantity: d.minQuantity != null ? String(d.minQuantity) : emptyForm.minQuantity,
       criticalQuantity: d.criticalQuantity != null ? String(d.criticalQuantity) : emptyForm.criticalQuantity,
       maxQuantity: d.maxQuantity != null ? String(d.maxQuantity) : emptyForm.maxQuantity,
@@ -510,6 +520,7 @@ export default function Inventory({ initialCategory, predaniN = 0, onNavigate }:
     setForm(seedForm(catId ?? categories[0]?.id ?? null));
     setNewCatInline('');
     setItemLog([]); setLogOpen(false);
+    setJinaJednotka(false); setDalsi(false);
     setShowForm(true);
   };
   // Kde se položka používá v kase — čte jen tabulku párování, takže se to dá
@@ -523,10 +534,12 @@ export default function Inventory({ initialCategory, predaniN = 0, onNavigate }:
       .catch(() => {});
   }, [smiReceptury]);
 
-  const openEdit = (i: Item) => {
+  const openEdit = (i: Item, volby?: { dalsi?: boolean }) => {
     setFormErr('');
     setEditing(i);
-    setForm({ name: i.name, categoryId: i.categoryId ?? categories.find(c => c.name === i.category)?.id ?? null, quantity: pocetDoPole(i.quantity), minQuantity: pocetDoPole(i.minQuantity), criticalQuantity: pocetDoPole(i.criticalQuantity), maxQuantity: pocetDoPole(i.maxQuantity), unit: i.unit, supplier: i.supplier ?? '', supplierUrl: i.supplierUrl ?? '', unitCost: cenaDoPole(i.unitCost), brand: i.brand ?? '', description: i.description ?? '', packageSize: i.packageSize != null ? String(i.packageSize) : '', contentUnit: i.contentUnit ?? '', openAmount: i.openAmount != null ? String(i.openAmount) : '', portions: Array.isArray((i as any).portions) ? (i as any).portions.map((p: any) => ({ name: String(p.name ?? ''), amount: String(p.amount ?? '') })) : [], archived: i.archived === true, hideFromOverview: i.hideFromOverview === true, highlight: i.highlight ?? '' });
+    setJinaJednotka(!jeZNabidky(i.unit));
+    setDalsi(volby?.dalsi === true);
+    setForm({ name: i.name, categoryId: i.categoryId ?? categories.find(c => c.name === i.category)?.id ?? null, quantity: pocetDoPole(i.quantity), minQuantity: pocetDoPole(i.minQuantity), criticalQuantity: pocetDoPole(i.criticalQuantity), maxQuantity: pocetDoPole(i.maxQuantity), unit: i.unit, supplier: i.supplier ?? '', supplierUrl: i.supplierUrl ?? '', unitCost: cenaDoPole(i.unitCost), brand: i.brand ?? '', description: i.description ?? '', packageSize: i.packageSize != null ? pocetDoPole(i.packageSize) : '', contentUnit: i.contentUnit ?? '', openAmount: i.openAmount != null ? pocetDoPole(i.openAmount) : '', portions: Array.isArray((i as any).portions) ? (i as any).portions.map((p: any) => ({ name: String(p.name ?? ''), amount: pocetDoPole(Number(p.amount)) })) : [], archived: i.archived === true, hideFromOverview: i.hideFromOverview === true, highlight: i.highlight ?? '' });
     setNewCatInline('');
     setItemLog([]); setLogOpen(false);
     if (smi('sklad.historie')) {
@@ -544,7 +557,7 @@ export default function Inventory({ initialCategory, predaniN = 0, onNavigate }:
   openEditRef.current = openEdit;
   const itemsRef = useRef(items);
   itemsRef.current = items;
-  const [cekaUprava, setCekaUprava] = useState<number | null>(null);
+  const [cekaUprava, setCekaUprava] = useState<{ id: number; dalsi: boolean } | null>(null);
   useEffect(() => {
     const nakup = (e: Event) => {
       const d = (e as CustomEvent).detail ?? {};
@@ -555,7 +568,8 @@ export default function Inventory({ initialCategory, predaniN = 0, onNavigate }:
     const uprav = (e: Event) => {
       const d = (e as CustomEvent).detail ?? {};
       d.prijato = true;
-      if (Number.isFinite(Number(d.id))) setCekaUprava(Number(d.id));
+      // Z widgetu (Suroviny bez ceny) jde člověk doplnit cenu nebo balení — to je v Dalším nastavení.
+      if (Number.isFinite(Number(d.id))) setCekaUprava({ id: Number(d.id), dalsi: true });
     };
     window.addEventListener(UDALOST_NAKUP, nakup);
     window.addEventListener(UDALOST_UPRAVIT, uprav);
@@ -571,7 +585,7 @@ export default function Inventory({ initialCategory, predaniN = 0, onNavigate }:
       if (u != null) {
         sessionStorage.removeItem(KLIC_UPRAVIT);
         const d = JSON.parse(u || '{}');
-        if (Number.isFinite(Number(d?.id))) setCekaUprava(Number(d.id));
+        if (Number.isFinite(Number(d?.id))) setCekaUprava({ id: Number(d.id), dalsi: true });
       }
     } catch { /* soukromé okno */ }
     return () => {
@@ -582,10 +596,17 @@ export default function Inventory({ initialCategory, predaniN = 0, onNavigate }:
   // Úprava položky čeká, až dorazí seznam (ze Skladu je hned, z Přehledu ne).
   useEffect(() => {
     if (cekaUprava == null || items.length === 0) return;
-    const i = itemsRef.current.find(x => x.id === cekaUprava);
+    const i = itemsRef.current.find(x => x.id === cekaUprava.id);
     setCekaUprava(null);
-    if (i) openEditRef.current(i);
+    if (i) openEditRef.current(i, { dalsi: cekaUprava.dalsi });
   }, [cekaUprava, items]);
+  // Argument z jiné stránky (záložky Sklad › Inventura, proklik z receptury na položku):
+  // `akce:inventura` otevře inventuru, `polozka:<id>` úpravu položky (lib/skladPredani).
+  useEffect(() => {
+    if (initialCategory == null) return;
+    if (predani.akce === 'inventura') setShowStocktake(true);
+    if (predani.polozkaId) setCekaUprava({ id: predani.polozkaId, dalsi: true });
+  }, [predani.akce, predani.polozkaId, initialCategory, predaniN]);
 
   const createCategory = async (name: string, parentId?: number | null): Promise<boolean> => {
     const clean = name.trim();
@@ -627,7 +648,8 @@ export default function Inventory({ initialCategory, predaniN = 0, onNavigate }:
     // Cena smí mít haléře (4,99 €); co cenou není, se nesmí tiše uložit jako
     // nula — dřív parseInt z „4,99" udělal 4 a z „abc" nulu.
     const cena = cenaZFormulare(form.unitCost);
-    if (!cena.ok) { setFormErr(t('Cena musí být číslo, třeba 4,99.')); return; }
+    if (!cena.ok) { setFormErr(t('Cena musí být číslo, třeba 4,99.')); setDalsi(true); return; }
+    if (!form.unit.trim()) { setFormErr(t('Vyber, v čem položku počítáš (ks, balení, l…).')); return; }
     // Množství a prahy: české číslo s čárkou i tečkou; kde se počítá na celé, desetina je chyba, ne tiché zaokrouhlení.
     const cisla = { quantity: 0, minQuantity: 0, criticalQuantity: 0, maxQuantity: 0 };
     for (const [klic, text, desetinne] of [
@@ -875,7 +897,8 @@ export default function Inventory({ initialCategory, predaniN = 0, onNavigate }:
           plave nad obsahem a v toku nezabírá místo. */}
       <div className="sticky top-0 z-20 h-0">
         {plovouci && (
-          <div className="absolute inset-x-0 top-0 -mx-4 px-4 sm:-mx-6 sm:px-6 py-2 space-y-2 glass-strong rounded-b-3xl shadow-[shadow:var(--shadow-float)] pop-in">
+          // Drží se uvnitř widgetu: záporné okraje (-mx-4) ji dřív vysunuly 16 px za jeho pravou hranu (kolo 82).
+          <div className="absolute inset-x-0 top-0 px-3 py-2 space-y-2 glass-strong rounded-2xl shadow-[shadow:var(--shadow-float)] pop-in">
             {lista(true)}
           </div>
         )}
@@ -944,13 +967,38 @@ export default function Inventory({ initialCategory, predaniN = 0, onNavigate }:
   );
 
   const idFormulare = 'sklad-polozka-formular';
-  const jednotkaPrahu = thresholdUnitLabel(pk(form), form.unit || 'ks');
-  const cenaZaBaleni = vyznamCeny(form.packageSize || pk(form)?.defaultPackageSize) === 'baleni';
-  const desMnozstvi = sloupce.data?.mnozstvi === true && jednotkaSnesDesetiny(form.unit);
+  const balKat = pk(form);
+  // Co o vedení položky plyne z jednotky, balení a kategorie (lib/mnozstvi): v čem se
+  // zadává stav, v čem prahy, v čem receptury — a jedna věta, která to člověku řekne.
+  const vedeni = vedeniPolozky({ unit: form.unit, packageSize: form.packageSize, contentUnit: form.contentUnit }, balKat);
+  const jednotka = vedeni.jednotka;
+  const jednotkaPrahu = vedeni.prahyV;
+  const cenaZaBaleni = vyznamCeny(form.packageSize || balKat?.defaultPackageSize) === 'baleni';
+  const desMnozstvi = sloupce.data?.mnozstvi === true && jednotkaSnesDesetiny(jednotka);
   // Prahy se počítají v jednotce položky, nebo obsahu (gramy jsou celé) — to říká `jednotkaPrahu`.
   const desPrahy = sloupce.data?.prahy === true && jednotkaSnesDesetiny(jednotkaPrahu);
-  // Krok ± u množství: o jedničku, v desetinném poli bez plovoucí chyby, s českou čárkou.
-  const krokMnozstvi = (delta: number) => setForm(f => ({ ...f, quantity: pocetDoPole(Math.max(0, (dec(f.quantity)) + delta)) }));
+  const vlastniJednotka = jinaJednotka || !jeZNabidky(form.unit);
+  const obsahJ = vedeni.baleni?.jednotka ?? (form.contentUnit || balKat?.contentUnit || '');
+  const celkem = vedeni.baleni ? celkemObsahu(form.quantity, vedeni.baleni.velikost, form.openAmount) : null;
+  // Jedna věta „jak se to počítá" pod výběrem jednotky — nahrazuje čtyři vysvětlivky rozházené po formuláři.
+  const vetaVedeni = vedeni.baleni
+    ? t('1 {j} = {v} {o}. Stav a limity píšeš v {j}; receptury a odpis z kasy jdou v {o} — nejdřív z načatého balení.', { j: jednotka, v: fmtAmount(vedeni.baleni.velikost), o: vedeni.baleni.jednotka })
+    : vedeni.druh === 'kusy' ? t('Stav, limity i receptury píšeš v kusech.')
+    : vedeni.druh === 'objem' || vedeni.druh === 'hmotnost'
+      ? t('Stav a limity píšeš v {j}; v receptuře můžeš psát i {mensi} — přepočte se.', { j: jednotka, mensi: vedeni.mensiJednotky.join(', ') })
+      : t('Doplň, kolik jedno {j} obsahuje — bez toho se z kasy odepisují jen celá {j} a receptura na 0,04 {j} neodepíše nic.', { j: jednotka });
+  // Souhrn sbaleného „Dalšího nastavení": co je vyplněné, bez rozbalování.
+  const pocetDilu = (form.portions ?? []).filter(p => p.name.trim()).length;
+  const vKase = editing ? (posUsage[String(editing.id)]?.length ?? 0) : 0;
+  const souhrnDalsich = [
+    t('hlídání od {n} {j}', { n: form.minQuantity || '0', j: jednotkaPrahu }),
+    ma('sklad.ceny_upravit') && form.unitCost ? t('cena {castka}', { castka: `${form.unitCost} ${symbol}` }) : null,
+    form.supplier.trim() || null,
+    pocetDilu > 0 ? t('{n, plural, one {# díl} few {# díly} other {# dílů}}', { n: pocetDilu }) : null,
+    vKase > 0 ? t('v kase {n}×', { n: vKase }) : null,
+    editing?.madeInHouse ? t('vyrábíme sami') : null,
+    form.archived ? t('momentálně nevedeme') : null,
+  ].filter(Boolean).join(' · ');
 
   return (
     <>
@@ -965,14 +1013,19 @@ export default function Inventory({ initialCategory, predaniN = 0, onNavigate }:
             : undefined,
           menu,
           primary: smiPridat ? <Button variant="accent" icon="plus" onClick={openNew}>{t('Přidat položku')}</Button> : undefined,
+          // Sklad › Položky / Receptury z kasy / Inventura — totéž je na stránce Receptury,
+          // takže se mezi nimi chodí jedním klepnutím oběma směry (kolo 82).
+          aside: <SkladZalozky aktivni="polozky" onNavigate={onNavigate} smiReceptury={smiReceptury} smiInventura={smiInventura}
+            onInventura={() => setShowStocktake(true)} />,
         }}
         nastroj={nastroj}
       />
 
       {notice && <Toast message={notice.text} tone={notice.ton} onClose={() => setNotice(null)} />}
 
-      {/* Formulář položky — jedno okno z ui (dřív ruční překryv s blur hlavičkou,
-          limetkovým čtvercem v titulku a limetkou v patičce). */}
+      {/* Formulář položky — jedno okno z ui. Kolo 82: pořadí podle toho, co člověk
+          potřebuje vědět první — co to je, v čem to počítá, kolik je teď. Hlídání
+          zásob, cena, díly, zobrazení, výroba a kasa jsou za „Další nastavení". */}
       <Modal open={showForm} onClose={() => setShowForm(false)} size="lg"
         title={editing ? t('Upravit položku') : t('Nová položka')}
         subtitle={editing ? editing.name : t('Přidej novou zásobu do skladu.')}
@@ -981,32 +1034,10 @@ export default function Inventory({ initialCategory, predaniN = 0, onNavigate }:
           <Button type="submit" form={idFormulare} variant="primary" icon="check" loading={saving}>{t('Uložit položku')}</Button>
         </>}>
         <form id={idFormulare} onSubmit={save} className="space-y-6">
-          {/* Druhá strana provázání: co se z týhle položky na kase prodává.
-              Bez toho člověk mění gramáž nebo cenu naslepo. */}
-          {editing && smiReceptury && (
-            <ItemRecipeLinks
-              item={{ id: editing.id, name: editing.name }}
-              links={posUsage[String(editing.id)] ?? []}
-              unitLabel={editing.contentUnit ?? editing.unit}
-              onChanged={next => setPosUsage(u => ({ ...u, [String(editing.id)]: next }))}
-              onOpenRecipe={pid => { setShowForm(false); onNavigate?.('recipes', pid); }}
-            />
-          )}
-          {/* Z čeho se položka dělá — když ji vyrábíme sami. */}
-          {editing && (
-            <ProductionRecipe
-              item={{ id: editing.id, name: editing.name, unit: editing.unit }}
-              items={items.filter(i => !i.archived)}
-              onSaved={r => setItems(prev => prev.map(x => x.id === r.itemId
-                ? { ...x, madeInHouse: r.madeInHouse, batchYield: r.batchYield, productionLabel: r.productionLabel || null } : x))}
-            />
-          )}
-
-          {/* Skupiny oddělené rozestupem a štítkem (DP §4.D) — dřív šedý box
-              na každou skupinu a v něm další box (karta v kartě). */}
+          {/* 1. Co to je */}
           <section className="space-y-3" aria-labelledby="sklad-f-zaklad">
-            <p id="sklad-f-zaklad" className="t-label">{t('Základní informace')}</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <p id="sklad-f-zaklad" className="t-label">{t('Co to je')}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-3">
               <Field id="sklad-f-nazev" label={t('Název')}>
                 <input id="sklad-f-nazev" required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder={t('Např. Mléko plnotučné')} className={inputClass} />
               </Field>
@@ -1014,11 +1045,6 @@ export default function Inventory({ initialCategory, predaniN = 0, onNavigate }:
                 <input id="sklad-f-znacka" value={form.brand} onChange={e => setForm(f => ({ ...f, brand: e.target.value }))} placeholder={t('Např. Stanislaw')} className={inputClass} />
               </Field>
             </div>
-            <Field id="sklad-f-popis" label={t('Krátký popis')} hint={t('Uvidí ho obsluha rovnou na kartě.')}>
-              <textarea id="sklad-f-popis" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2}
-                placeholder={t('Např. medová, jemná, pro začátečníky')}
-                className={`${inputClass} resize-none`} />
-            </Field>
             <div>
               <p className="field-label" id="sklad-f-kat">{t('Kategorie')}</p>
               {(flatCats.length > 0 || orphanNames.length > 0) && (
@@ -1055,7 +1081,7 @@ export default function Inventory({ initialCategory, predaniN = 0, onNavigate }:
                     className={`${inputClass} !w-full sm:!w-40 shrink-0`}>
                     <option value="">{t('Hlavní')}</option>
                     {flatOwnCats.map(({ cat: c, depth }) => (
-                      <option key={c.id} value={String(c.id)}>{' '.repeat(depth * 2)}{t('pod {nazev}', { nazev: c.name })}</option>
+                      <option key={c.id} value={String(c.id)}>{' '.repeat(depth * 2)}{t('pod {nazev}', { nazev: c.name })}</option>
                     ))}
                   </select>
                   <Button type="button" variant="secondary" icon="plus" onClick={addInlineCategory} loading={addingCat} disabled={!newCatInline.trim()}>{t('Přidat')}</Button>
@@ -1064,186 +1090,236 @@ export default function Inventory({ initialCategory, predaniN = 0, onNavigate }:
             </div>
           </section>
 
-          <section className="space-y-3" aria-labelledby="sklad-f-mnozstvi">
-            <p id="sklad-f-mnozstvi" className="t-label">{t('Množství')}</p>
-            <div className="grid grid-cols-2 gap-3 items-end">
-              <div className="col-span-2 sm:col-span-1">
-                <label htmlFor="sklad-f-q" className="field-label">{t('Aktuální množství')}</label>
-                <div className="flex items-center gap-2">
-                  <Button type="button" variant="secondary" size="sm" iconOnly icon="minus" aria-label={t('Ubrat')}
-                    onClick={() => krokMnozstvi(-1)} />
-                  <input id="sklad-f-q" inputMode={desMnozstvi ? 'decimal' : 'numeric'} value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
-                    className={`${inputClass} flex-1 min-w-0 text-center tabular-nums`} />
-                  <Button type="button" variant="secondary" size="sm" iconOnly icon="plus" aria-label={t('Přidat')}
-                    onClick={() => krokMnozstvi(1)} />
-                </div>
-              </div>
-              <Field id="sklad-f-jednotka" label={t('Jednotka')}>
-                <input id="sklad-f-jednotka" value={form.unit} onChange={e => setForm(f => ({ ...f, unit: e.target.value }))} placeholder="ks" className={inputClass} />
-              </Field>
-              <Field id="sklad-f-max" label={t('Max. množství')}>
-                <input id="sklad-f-max" inputMode={desPrahy ? 'decimal' : 'numeric'} value={form.maxQuantity} onChange={e => setForm(f => ({ ...f, maxQuantity: e.target.value }))} className={inputClass} />
-              </Field>
+          {/* 2. V čem to počítáš — jednotka stavu, a když se bere po částech, co jedno balení obsahuje. */}
+          <section className="space-y-3" aria-labelledby="sklad-f-jednotka-l">
+            <p id="sklad-f-jednotka-l" className="t-label">{t('V čem to počítáš')}</p>
+            <div role="group" aria-labelledby="sklad-f-jednotka-l" className="flex flex-wrap gap-1.5">
+              {NABIDKA_JEDNOTEK.map(u => (
+                <CatChip key={u} name={u === 'balení' ? t('balení') : u} active={!vlastniJednotka && form.unit === u} // i18n-ok: „balení" je hodnota jednotky v datech; text kreslí t()
+                  onPick={() => { setJinaJednotka(false); setForm(f => ({ ...f, unit: u })); }} />
+              ))}
+              <CatChip name={t('Jiná…')} active={vlastniJednotka}
+                onPick={() => { setJinaJednotka(true); setForm(f => ({ ...f, unit: jeZNabidky(f.unit) ? '' : f.unit })); }} />
             </div>
-
-            {/* Partial consumption: any item can say how big one package is
-                and what's left in the open one — a bottle of wine doesn't
-                leave whole when one glass is poured. */}
-            <div className="well p-4 space-y-3">
-              <p className="t-card">{t('Načaté balení')}</p>
-              <p className="t-meta -mt-2">{t('Pro zboží, ze kterého se spotřebovává jen část (lahev vína, plechovka tabáku…).')}</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="sklad-f-baleni" className="field-label">{t('Velikost balení')}</label>
-                  <div className="flex gap-2">
-                    <input id="sklad-f-baleni" inputMode="decimal" value={form.packageSize} onChange={e => setForm(f => ({ ...f, packageSize: e.target.value }))}
-                      placeholder={String(pk(form)?.defaultPackageSize ?? '750')} className={`${inputClass} min-w-0`} />
-                    <select aria-label={t('Jednotka obsahu')} value={form.contentUnit} onChange={e => setForm(f => ({ ...f, contentUnit: e.target.value }))}
-                      className={`${inputClass} !w-20 shrink-0 px-2`}>
-                      <option value="">{pk(form)?.contentUnit ?? '—'}</option>
-                      {CONTENT_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label htmlFor="sklad-f-nacate" className="field-label">{t('V načatém zbývá')}</label>
-                  <div className="relative">
-                    <input id="sklad-f-nacate" inputMode="decimal" value={form.openAmount} onChange={e => setForm(f => ({ ...f, openAmount: e.target.value }))}
-                      placeholder="0" className={`${inputClass} pr-12`} />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/55">{form.contentUnit || pk(form)?.contentUnit || ''}</span>
-                  </div>
-                </div>
-              </div>
-              <p className="t-meta">
-                
-                {t('Aktuální množství pak počítá jen zavřená balení; odpisy (ruční i z pokladny) berou nejdřív z načatého.')}
-                {pk(form) ? ` ${t('Prázdná velikost = výchozí z kategorie.')}` : ''}
-              </p>
-
-              {/* Dílčí díly: pojmenované porce, které pak receptury jen
-                  vybírají — místo aby se 0,02 přepisovalo u každého drinku. */}
-              <div className="pt-1 space-y-2">
-                <p className="field-label">{t('Dílčí díly')} <span className="font-normal text-black/55">{t('— porce k výběru v recepturách')}</span></p>
-                {(form.portions ?? []).map((p, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <input value={p.name} placeholder={t('panák')} aria-label={t('Název dílu {n}', { n: idx + 1 })}
-                      onChange={e => setForm(f => ({ ...f, portions: f.portions.map((x, i) => i === idx ? { ...x, name: e.target.value } : x) }))}
-                      className={`${inputClass} flex-1 min-w-0`} />
-                    <input value={p.amount} placeholder="0,04" inputMode="decimal" aria-label={t('Množství dílu {n}', { n: idx + 1 })}
-                      onChange={e => setForm(f => ({ ...f, portions: f.portions.map((x, i) => i === idx ? { ...x, amount: e.target.value } : x) }))}
-                      className={`${inputClass} !w-24 text-center`} />
-                    <span className="text-xs text-black/55 w-8">{form.contentUnit || pk(form)?.contentUnit || form.unit}</span>
-                    <Button type="button" variant="ghost" size="sm" iconOnly icon="trash" aria-label={t('Odebrat díl {nazev}', { nazev: p.name || idx + 1 })}
-                      onClick={() => setForm(f => ({ ...f, portions: f.portions.filter((_, i) => i !== idx) }))} />
-                  </div>
-                ))}
-                <Button type="button" variant="ghost" size="sm" icon="plus"
-                  onClick={() => setForm(f => ({ ...f, portions: [...(f.portions ?? []), { name: '', amount: '' }] }))}>
-                  
-                  {t('Přidat díl')}
-                </Button>
-              </div>
-            </div>
-          </section>
-
-          <section className="space-y-3" aria-labelledby="sklad-f-hlidani">
-            <p id="sklad-f-hlidani" className="t-label">{t('Hlídání zásob · v {jednotka}', { jednotka: jednotkaPrahu })}</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="sklad-f-min" className="field-label flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-wait" aria-hidden /> {t('Upozornit při')}</label>
-                <div className="relative">
-                  <input id="sklad-f-min" inputMode={desPrahy ? 'decimal' : 'numeric'} value={form.minQuantity} onChange={e => setForm(f => ({ ...f, minQuantity: e.target.value }))} className={`${inputClass} pr-14`} />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/55">{jednotkaPrahu}</span>
-                </div>
-              </div>
-              <div>
-                <label htmlFor="sklad-f-krit" className="field-label flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-bad" aria-hidden /> {t('Kriticky málo při')}</label>
-                <div className="relative">
-                  <input id="sklad-f-krit" inputMode={desPrahy ? 'decimal' : 'numeric'} value={form.criticalQuantity} onChange={e => setForm(f => ({ ...f, criticalQuantity: e.target.value }))} className={`${inputClass} pr-14`} />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/55">{jednotkaPrahu}</span>
-                </div>
-              </div>
-            </div>
-            {pk(form)?.thresholdUnit === 'content' && (
-              <p className="note note-info text-[13px]">
-                {t('Kategorie „{nazev}" hlídá zásoby podle obsahu, ne podle počtu balení — započítá se i zbytek v načatém balení.', { nazev: findById(categories, form.categoryId)?.name })}
-              </p>
-            )}
-          </section>
-
-          <section className="space-y-3" aria-labelledby="sklad-f-dodavatel">
-            <p id="sklad-f-dodavatel" className="t-label">{t('Dodavatel · volitelné')}</p>
-            {/* Pole znamená cenu BALENÍ, když má položka velikost balení (vlastní nebo
-                z kategorie), jinak cenu jednotky — popisek i přípona se řídí tím, co
-                právě znamená, a při změně velikosti balení se přepnou (lib/recipeCost). */}
-            {ma('sklad.ceny_upravit') && (
-              <Field id="sklad-f-cena" label={cenaZaBaleni ? t('Cena za balení') : t('Cena za jednotku')} hint={t('Slouží k výpočtu hodnoty zásob a marže.')}>
-                <div className="relative">
-                  <input id="sklad-f-cena" inputMode="decimal" value={form.unitCost} onChange={e => setForm(f => ({ ...f, unitCost: e.target.value }))} placeholder="0" className={`${inputClass} ${cenaZaBaleni ? 'pr-16' : 'pr-24'}`} />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-black/55 max-w-[5.5rem] truncate pointer-events-none">{cenaZaBaleni ? symbol : `${symbol}/${form.unit || 'ks'}`}</span>
-                </div>
+            {vlastniJednotka && (
+              <Field id="sklad-f-jednotka" label={t('Vlastní jednotka')} hint={t('Např. lahev, krabička, pytel — tak se bude psát u každého čísla.')}>
+                <input id="sklad-f-jednotka" autoFocus={jinaJednotka && !form.unit} value={form.unit} onChange={e => setForm(f => ({ ...f, unit: e.target.value }))}
+                  placeholder={t('lahev')} maxLength={20} className={`${inputClass} sm:!w-60`} />
               </Field>
             )}
-            <Field id="sklad-f-dod" label={t('Název dodavatele')}>
-              <input id="sklad-f-dod" value={form.supplier} onChange={e => setForm(f => ({ ...f, supplier: e.target.value }))} placeholder={t('Např. Velkoobchod s.r.o.')} className={inputClass} list="managero-suppliers" />
-            </Field>
-            <Field id="sklad-f-url" label={t('Odkaz na objednání')}>
-              <input id="sklad-f-url" type="url" inputMode="url" value={form.supplierUrl} onChange={e => setForm(f => ({ ...f, supplierUrl: e.target.value }))} placeholder="https://..." className={inputClass} />
-            </Field>
+            <div className="well p-4 space-y-2">
+              <label htmlFor="sklad-f-baleni" className="field-label !text-[#16181A]">{t('1 {j} obsahuje', { j: jednotka })}</label>
+              <div className="flex items-center gap-2">
+                <PoleMnozstvi id="sklad-f-baleni" value={form.packageSize} onChange={v => setForm(f => ({ ...f, packageSize: v }))} desetinne
+                  placeholder={balKat?.defaultPackageSize ? pocetDoPole(balKat.defaultPackageSize) : '0,7'} className="!w-32" />
+                <select aria-label={t('Jednotka obsahu')} value={form.contentUnit} onChange={e => setForm(f => ({ ...f, contentUnit: e.target.value }))}
+                  className={`${inputClass} !w-24 shrink-0 px-2`}>
+                  <option value="">{balKat?.contentUnit ?? '—'}</option>
+                  {CONTENT_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
+              </div>
+              <p className="t-meta text-pretty">
+                {vedeni.baleni?.zKategorie
+                  ? t('Z kategorie „{k}“: {v} {o}. Vlastní hodnota ji přebije.', { k: findById(categories, form.categoryId)?.name ?? '', v: fmtAmount(vedeni.baleni.velikost), o: vedeni.baleni.jednotka })
+                  : t('Vyplň u věcí, ze kterých se bere po částech (láhev 0,7 l, pytel kávy 1 kg). U kusového zboží nech prázdné.')}
+              </p>
+            </div>
+            <p className="t-meta text-pretty" aria-live="polite">{vetaVedeni}</p>
           </section>
 
-          <section className="space-y-3" aria-labelledby="sklad-f-zobrazeni">
-            <p id="sklad-f-zobrazeni" className="t-label">{t('Zobrazení')}</p>
-            <ul className="list">
-              <SwitchRow title={t('Momentálně nevedeme')}
-                hint={t('Zůstane v katalogu, ale zmizí z aktivního skladu i z hlídání zásob. Až přijde, jedním klepnutím ji vrátíš.')}
-                checked={form.archived} onChange={v => setForm(f => ({ ...f, archived: v }))} />
-              <SwitchRow title={t('Jen ve své kategorii')}
-                hint={t('V přehledu „Vše“ se nezobrazí — uvidíš ji až po otevření kategorie. Hlídání zásob funguje dál.')}
-                checked={form.hideFromOverview} onChange={v => setForm(f => ({ ...f, hideFromOverview: v }))} />
-              <li className="py-3">
-                <p className="text-sm font-medium text-[#16181A]" id="sklad-f-zvyraznit">{t('Zvýraznit zákazníkům')}</p>
-                <p className="t-meta mt-0.5 mb-2">{t('Na sdílené stránce dostane odznak a řadí se nahoru.')}</p>
-                <Segmented ariaLabel={t('Zvýraznit zákazníkům')} size="sm" value={(form.highlight || 'nic') as 'nic' | 'new' | 'tip'}
-                  onChange={v => setForm(f => ({ ...f, highlight: v === 'nic' ? '' : v }))}
-                  options={[{ id: 'nic', label: t('Nic') }, { id: 'new', label: t('Novinka') }, { id: 'tip', label: t('Tip') }]} />
-              </li>
-            </ul>
-          </section>
-
-          {editing && itemLog.length > 0 && (
-            <section className="space-y-2">
-              <Button type="button" variant="ghost" size="sm" iconAfter="chevron" aria-expanded={logOpen}
-                className={logOpen ? '[&_svg]:rotate-180' : ''} onClick={() => setLogOpen(o => !o)}>
-                {t('Historie změn ({n})', { n: itemLog.length })}
-              </Button>
-              {logOpen && (
-                <ul className="list max-h-56 overflow-y-auto scrollbar-thin">
-                  {itemLog.map((l: any) => {
-                    const delta = Number(l.newQuantity) - Number(l.oldQuantity);
-                    // Odpis podle receptury často ubere jen z načatého balení —
-                    // kusy se nezmění a bez tohohle by řádek hlásil „0".
-                    const openDelta = l.oldOpen != null && l.newOpen != null
-                      ? Math.round((Number(l.newOpen) - Number(l.oldOpen)) * 1000) / 1000 : 0;
-                    const label = delta !== 0
-                      ? (delta > 0 ? `+${delta}` : `−${Math.abs(delta)}`)
-                      : openDelta !== 0
-                        ? `${openDelta > 0 ? '+' : '−'}${Math.abs(openDelta).toLocaleString(loc, { maximumFractionDigits: 3 })}${l.contentUnit ? ' ' + l.contentUnit : ''}`
-                        : '0';
-                    const tone = delta || openDelta;
-                    return (
-                      <ListRow key={l.id}
-                        title={`${l.userName ?? t('Někdo')}${l.note ? ` · ${l.note}` : ''}`}
-                        meta={new Date(l.createdAt).toLocaleDateString(loc, { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                        value={<span className={tone > 0 ? 'text-ok-ink' : tone < 0 ? 'text-bad-ink' : 'text-black/55'}>{label}</span>} />
-                    );
-                  })}
-                </ul>
+          {/* 3. Kolik je teď */}
+          <section className="space-y-3" aria-labelledby="sklad-f-stav">
+            <p id="sklad-f-stav" className="t-label">{t('Kolik je teď')}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="sklad-f-q" className="field-label">{vedeni.baleni ? t('Zavřených balení') : t('Aktuální množství')}</label>
+                <PoleMnozstvi id="sklad-f-q" value={form.quantity} onChange={v => setForm(f => ({ ...f, quantity: v }))}
+                  jednotka={jednotka} krok={1} desetinne={desMnozstvi} velikost="lg" nazev={form.name.trim() || undefined} />
+              </div>
+              {vedeni.baleni && (
+                <div>
+                  <label htmlFor="sklad-f-nacate" className="field-label">{t('V načatém balení zbývá')}</label>
+                  <PoleMnozstvi id="sklad-f-nacate" value={form.openAmount} onChange={v => setForm(f => ({ ...f, openAmount: v }))}
+                    jednotka={obsahJ} desetinne velikost="lg" zarovnat="center" placeholder="0" />
+                </div>
               )}
-            </section>
-          )}
+            </div>
+            {vedeni.baleni && celkem != null && (
+              <p className="t-meta tabular-nums text-pretty" aria-live="polite">
+                <span className="font-medium text-[#16181A]">
+                  {t('{n} × {v} {o} + {z} {o} = {c} {o} celkem', { n: pocetDoPole(dec(form.quantity)), v: fmtAmount(vedeni.baleni.velikost), o: obsahJ, z: pocetDoPole(dec(form.openAmount)), c: fmtAmount(celkem) })}
+                </span>
+                {' · '}{t('Odpisy (ruční i z kasy) berou nejdřív z načatého, pak načnou další balení.')}
+              </p>
+            )}
+          </section>
+
+          {/* Další nastavení — sbalené; souhrn říká, co je vyplněné. */}
+          <section className="space-y-4" aria-labelledby="sklad-f-dalsi-l">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <Button type="button" variant="ghost" size="sm" iconAfter="chevron" aria-expanded={dalsi} aria-controls="sklad-f-dalsi"
+                className={`-ml-2 ${dalsi ? '[&_svg]:rotate-180' : ''}`} onClick={() => setDalsi(d => !d)}>
+                <span id="sklad-f-dalsi-l">{t('Další nastavení')}</span>
+              </Button>
+              {!dalsi && <p className="t-meta min-w-0 flex-1 truncate">{souhrnDalsich}</p>}
+            </div>
+            {!dalsi && (
+              <p className="t-meta -mt-2 text-pretty">
+                {editing ? t('Hlídání zásob, cena a dodavatel, dílčí díly, zobrazení, výroba a použití v kase.') : t('Hlídání zásob, cena a dodavatel, dílčí díly, zobrazení.')}
+              </p>
+            )}
+            {dalsi && (
+              <div id="sklad-f-dalsi" className="space-y-6">
+                <section className="space-y-3" aria-labelledby="sklad-f-hlidani">
+                  <p id="sklad-f-hlidani" className="t-label">{t('Hlídání zásob · v {jednotka}', { jednotka: jednotkaPrahu })}</p>
+                  <p className="t-meta -mt-1 text-pretty">{t('Pod „Upozornit při“ se položka objeví v Dochází a v nákupním seznamu, pod „Kriticky“ jde nahoru. Maximum je cíl, na který nákup doplňuje.')}</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label htmlFor="sklad-f-min" className="field-label flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-wait" aria-hidden /> {t('Upozornit při')}</label>
+                      <PoleMnozstvi id="sklad-f-min" value={form.minQuantity} onChange={v => setForm(f => ({ ...f, minQuantity: v }))} jednotka={jednotkaPrahu} desetinne={desPrahy} />
+                    </div>
+                    <div>
+                      <label htmlFor="sklad-f-krit" className="field-label flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-bad" aria-hidden /> {t('Kriticky málo při')}</label>
+                      <PoleMnozstvi id="sklad-f-krit" value={form.criticalQuantity} onChange={v => setForm(f => ({ ...f, criticalQuantity: v }))} jednotka={jednotkaPrahu} desetinne={desPrahy} />
+                    </div>
+                    <div className="col-span-2 sm:col-span-1">
+                      <label htmlFor="sklad-f-max" className="field-label">{t('Max. množství')}</label>
+                      <PoleMnozstvi id="sklad-f-max" value={form.maxQuantity} onChange={v => setForm(f => ({ ...f, maxQuantity: v }))} jednotka={jednotkaPrahu} desetinne={desPrahy} />
+                    </div>
+                  </div>
+                  {balKat?.thresholdUnit === 'content' && (
+                    <p className="note note-info text-[13px]">
+                      {t('Kategorie „{nazev}" hlídá zásoby podle obsahu, ne podle počtu balení — započítá se i zbytek v načatém balení.', { nazev: findById(categories, form.categoryId)?.name })}
+                    </p>
+                  )}
+                </section>
+
+                {/* Dílčí díly: pojmenované porce, které pak receptury jen vybírají — místo aby se 0,02 přepisovalo u každého drinku. */}
+                <section className="space-y-2" aria-labelledby="sklad-f-dily">
+                  <p id="sklad-f-dily" className="t-label">{t('Dílčí díly')}</p>
+                  <p className="t-meta -mt-1 text-pretty">{t('Pojmenované porce (panák 0,04 l), které pak v receptuře jen vybereš místo psaní čísla.')}</p>
+                  {(form.portions ?? []).map((p, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <input value={p.name} placeholder={t('panák')} aria-label={t('Název dílu {n}', { n: idx + 1 })}
+                        onChange={e => setForm(f => ({ ...f, portions: f.portions.map((x, i) => i === idx ? { ...x, name: e.target.value } : x) }))}
+                        className={`${inputClass} flex-1 min-w-0`} />
+                      <PoleMnozstvi value={p.amount} placeholder="0,04" desetinne jednotka={vedeni.odepisujeV} ariaLabel={t('Množství dílu {n}', { n: idx + 1 })}
+                        onChange={v => setForm(f => ({ ...f, portions: f.portions.map((x, i) => i === idx ? { ...x, amount: v } : x) }))}
+                        className="!w-32 shrink-0" />
+                      <Button type="button" variant="ghost" size="sm" iconOnly icon="trash" aria-label={t('Odebrat díl {nazev}', { nazev: p.name || idx + 1 })}
+                        onClick={() => setForm(f => ({ ...f, portions: f.portions.filter((_, i) => i !== idx) }))} />
+                    </div>
+                  ))}
+                  <Button type="button" variant="ghost" size="sm" icon="plus"
+                    onClick={() => setForm(f => ({ ...f, portions: [...(f.portions ?? []), { name: '', amount: '' }] }))}>
+                    {t('Přidat díl')}
+                  </Button>
+                </section>
+
+                <section className="space-y-3" aria-labelledby="sklad-f-dodavatel">
+                  <p id="sklad-f-dodavatel" className="t-label">{t('Cena a dodavatel · volitelné')}</p>
+                  {/* Pole znamená cenu BALENÍ, když má položka velikost balení (vlastní nebo
+                      z kategorie), jinak cenu jednotky — popisek i přípona se řídí tím, co
+                      právě znamená, a při změně velikosti balení se přepnou (lib/recipeCost). */}
+                  {ma('sklad.ceny_upravit') && (
+                    <Field id="sklad-f-cena" label={cenaZaBaleni ? t('Cena za balení') : t('Cena za jednotku')}
+                      hint={cenaZaBaleni ? t('Co stojí jedno balení ({v} {o}). Z toho se počítá hodnota zásob a marže.', { v: fmtAmount(vedeni.baleni?.velikost ?? dec(form.packageSize)), o: obsahJ || jednotka }) : t('Co stojí 1 {j}. Z toho se počítá hodnota zásob a marže.', { j: jednotka })}>
+                      <PoleMnozstvi id="sklad-f-cena" value={form.unitCost} onChange={v => setForm(f => ({ ...f, unitCost: v }))} desetinne placeholder="0"
+                        jednotka={cenaZaBaleni ? symbol : `${symbol}/${jednotka}`} className="sm:!w-60" />
+                    </Field>
+                  )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Field id="sklad-f-dod" label={t('Název dodavatele')} hint={t('Podle dodavatele se skládá nákupní seznam.')}>
+                      <input id="sklad-f-dod" value={form.supplier} onChange={e => setForm(f => ({ ...f, supplier: e.target.value }))} placeholder={t('Např. Velkoobchod s.r.o.')} className={inputClass} list="managero-suppliers" />
+                    </Field>
+                    <Field id="sklad-f-url" label={t('Odkaz na objednání')} hint={t('S odkazem jde objednat jedním klepnutím ze seznamu.')}>
+                      <input id="sklad-f-url" type="url" inputMode="url" value={form.supplierUrl} onChange={e => setForm(f => ({ ...f, supplierUrl: e.target.value }))} placeholder="https://..." className={inputClass} />
+                    </Field>
+                  </div>
+                </section>
+
+                <section className="space-y-3" aria-labelledby="sklad-f-zobrazeni">
+                  <p id="sklad-f-zobrazeni" className="t-label">{t('Zobrazení')}</p>
+                  <Field id="sklad-f-popis" label={t('Krátký popis')} hint={t('Uvidí ho obsluha rovnou na kartě.')}>
+                    <textarea id="sklad-f-popis" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2}
+                      placeholder={t('Např. medová, jemná, pro začátečníky')}
+                      className={`${inputClass} resize-none`} />
+                  </Field>
+                  <ul className="list">
+                    <SwitchRow title={t('Momentálně nevedeme')}
+                      hint={t('Zůstane v katalogu, ale zmizí z aktivního skladu i z hlídání zásob. Až přijde, jedním klepnutím ji vrátíš.')}
+                      checked={form.archived} onChange={v => setForm(f => ({ ...f, archived: v }))} />
+                    <SwitchRow title={t('Jen ve své kategorii')}
+                      hint={t('V přehledu „Vše“ se nezobrazí — uvidíš ji až po otevření kategorie. Hlídání zásob funguje dál.')}
+                      checked={form.hideFromOverview} onChange={v => setForm(f => ({ ...f, hideFromOverview: v }))} />
+                    <li className="py-3">
+                      <p className="text-sm font-medium text-[#16181A]" id="sklad-f-zvyraznit">{t('Zvýraznit zákazníkům')}</p>
+                      <p className="t-meta mt-0.5 mb-2">{t('Na sdílené stránce dostane odznak a řadí se nahoru.')}</p>
+                      <Segmented ariaLabel={t('Zvýraznit zákazníkům')} size="sm" value={(form.highlight || 'nic') as 'nic' | 'new' | 'tip'}
+                        onChange={v => setForm(f => ({ ...f, highlight: v === 'nic' ? '' : v }))}
+                        options={[{ id: 'nic', label: t('Nic') }, { id: 'new', label: t('Novinka') }, { id: 'tip', label: t('Tip') }]} />
+                    </li>
+                  </ul>
+                </section>
+
+                {/* Druhá strana provázání: co se z téhle položky na kase prodává. Bez toho člověk mění gramáž nebo cenu naslepo. */}
+                {editing && smiReceptury && (
+                  <ItemRecipeLinks
+                    item={{ id: editing.id, name: editing.name }}
+                    links={posUsage[String(editing.id)] ?? []}
+                    unitLabel={vedeni.odepisujeV}
+                    onChanged={next => setPosUsage(u => ({ ...u, [String(editing.id)]: next }))}
+                    onOpenRecipe={pid => { setShowForm(false); onNavigate?.('recipes', pid); }}
+                  />
+                )}
+                {/* Z čeho se položka dělá — když ji vyrábíme sami. */}
+                {editing && (
+                  <ProductionRecipe
+                    item={{ id: editing.id, name: editing.name, unit: editing.unit }}
+                    items={items.filter(i => !i.archived)}
+                    onSaved={r => setItems(prev => prev.map(x => x.id === r.itemId
+                      ? { ...x, madeInHouse: r.madeInHouse, batchYield: r.batchYield, productionLabel: r.productionLabel || null } : x))}
+                  />
+                )}
+
+                {editing && itemLog.length > 0 && (
+                  <section className="space-y-2">
+                    <Button type="button" variant="ghost" size="sm" iconAfter="chevron" aria-expanded={logOpen}
+                      className={logOpen ? '[&_svg]:rotate-180' : ''} onClick={() => setLogOpen(o => !o)}>
+                      {t('Historie změn ({n})', { n: itemLog.length })}
+                    </Button>
+                    {logOpen && (
+                      <ul className="list max-h-56 overflow-y-auto scrollbar-thin">
+                        {itemLog.map((l: any) => {
+                          const delta = Number(l.newQuantity) - Number(l.oldQuantity);
+                          // Odpis podle receptury často ubere jen z načatého balení —
+                          // kusy se nezmění a bez tohohle by řádek hlásil „0".
+                          const openDelta = l.oldOpen != null && l.newOpen != null
+                            ? Math.round((Number(l.newOpen) - Number(l.oldOpen)) * 1000) / 1000 : 0;
+                          const label = delta !== 0
+                            ? (delta > 0 ? `+${delta}` : `−${Math.abs(delta)}`)
+                            : openDelta !== 0
+                              ? `${openDelta > 0 ? '+' : '−'}${Math.abs(openDelta).toLocaleString(loc, { maximumFractionDigits: 3 })}${l.contentUnit ? ' ' + l.contentUnit : ''}`
+                              : '0';
+                          const tone = delta || openDelta;
+                          return (
+                            <ListRow key={l.id}
+                              title={`${l.userName ?? t('Někdo')}${l.note ? ` · ${l.note}` : ''}`}
+                              meta={new Date(l.createdAt).toLocaleDateString(loc, { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              value={<span className={tone > 0 ? 'text-ok-ink' : tone < 0 ? 'text-bad-ink' : 'text-black/55'}>{label}</span>} />
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </section>
+                )}
+              </div>
+            )}
+          </section>
           {formErr && <p className="note note-danger" role="alert">{formErr}</p>}
         </form>
+        {/* Poznámky k položce mimo formulář (vlastní pole, vlastní tlačítko) — jen u existující položky. */}
+        {editing && <Poznamky typ="inventory_item" id={editing.id} className="mt-6" />}
       </Modal>
 
       {/* Lišta, ze které tenhle vzor vzešel — teď už sdílená komponenta,
@@ -1515,8 +1591,8 @@ function CatChip({ name, active, small, onPick }: {
 }) {
   return (
     <button type="button" onClick={onPick} aria-pressed={active}
-      className={`filter-pill tap-target-sm inline-flex items-center gap-1.5 ${small ? '!text-[12px]' : ''} ${active ? 'seg-on' : 'seg-off glass'}`}>
-      {active && <Icon name="check" size={small ? 12 : 13} />}{name}
+      className={`filter-pill tap-target-sm inline-flex items-center gap-1.5 max-w-full !shrink !whitespace-normal text-left ${small ? '!text-[12px]' : ''} ${active ? 'seg-on' : 'seg-off glass'}`}>
+      {active && <Icon name="check" size={small ? 12 : 13} className="shrink-0" />}{name}
     </button>
   );
 }
@@ -1581,8 +1657,10 @@ function ListView({ items, step, openEdit, remove, pk, setArchived, selecting, s
                 right={st !== 'ok' ? <Chip tone={STAV_CHIP[st]} size="sm">{stavPopisek(t, st, i.madeInHouse)}</Chip> : undefined}
                 onClick={selecting ? () => onToggle(i.id) : undefined}
                 actions={selecting ? undefined : <>
+                  {/* Na telefonu se ocas „Odpis · − + · ···" (209 px) do řádku na 320 px nevešel a widget
+                      přetékal; odpis části je tam v Zápisu zbytků kategorie, na kartách a v položce. */}
                   {Number(i.packageSize) > 0 && step && (
-                    <ConsumeControl itemId={i.id} unit={cu} onDone={onConsumed} onFail={onConsumeFail} />
+                    <span className="hidden sm:block"><ConsumeControl itemId={i.id} unit={cu} onDone={onConsumed} onFail={onConsumeFail} /></span>
                   )}
                   {i.archived && setArchived
                     ? <Button variant="primary" size="sm" onClick={() => setArchived(i, false)}>{t('Naskladnit')}</Button>
@@ -2010,6 +2088,7 @@ function DefaultsEditor({ category, inherited, onSaved }: {
   onSaved: () => Promise<void> | void;
 }) {
   const t = useT('sprava');
+  const symbol = useSymbol();
   const [values, setValues] = useState<Record<string, string>>(() => {
     const own = category.defaults ?? {};
     const out: Record<string, string> = {};
@@ -2058,9 +2137,13 @@ function DefaultsEditor({ category, inherited, onSaved }: {
                 <textarea id={id} rows={2} value={values[f.key]} onChange={e => setValues(v => ({ ...v, [f.key]: e.target.value }))}
                   placeholder={fromParent != null ? String(fromParent) : f.hint}
                   className={`${inputClass} resize-none`} />
+              ) : f.kind === 'number' ? (
+                // Jednotka přímo v poli: prahy a balení v jednotce, kterou kategorie předvyplňuje (nebo dědí), cena v měně.
+                <PoleMnozstvi id={id} value={values[f.key]} onChange={v => setValues(x => ({ ...x, [f.key]: v }))} desetinne
+                  placeholder={fromParent != null ? String(fromParent) : f.hint}
+                  jednotka={f.key === 'unitCost' ? symbol : f.key === 'packageSize' ? '' : (values.unit || (inherited as any).unit || '')} />
               ) : (
                 <input id={id} type={f.kind === 'url' ? 'url' : 'text'}
-                  inputMode={f.kind === 'number' ? 'decimal' : undefined}
                   value={values[f.key]} onChange={e => setValues(v => ({ ...v, [f.key]: e.target.value }))}
                   placeholder={fromParent != null ? String(fromParent) : f.hint}
                   className={inputClass} />
@@ -2088,7 +2171,8 @@ function PackagingEditor({ category, onSaved }: {
   const t = useT('sprava');
   const [on, setOn] = useState(category.tracksOpen === true);
   const [unit, setUnit] = useState(category.contentUnit ?? 'g');
-  const [size, setSize] = useState(category.defaultPackageSize != null ? String(category.defaultPackageSize) : '');
+  // Textové pole s českou čárkou (0,7) — type="number" by ji zahodil a velikost tiše zmizela.
+  const [size, setSize] = useState(category.defaultPackageSize != null ? pocetDoPole(category.defaultPackageSize) : '');
   const [steps, setSteps] = useState<ScaleStep[]>(() => normalizeScale(category.scale).steps);
   const [thresholdUnit, setThresholdUnit] = useState<'package' | 'content'>(
     category.thresholdUnit === 'content' ? 'content' : 'package',
@@ -2105,7 +2189,7 @@ function PackagingEditor({ category, onSaved }: {
         body: JSON.stringify({
           tracksOpen: on,
           contentUnit: unit || null,
-          defaultPackageSize: size === '' ? null : Number(size),
+          defaultPackageSize: size.trim() === '' ? null : dec(size),
           thresholdUnit,
           scale: { kind: 'fraction', steps },
         }),
@@ -2135,14 +2219,13 @@ function PackagingEditor({ category, onSaved }: {
       {on && (
         <>
           <div className="grid grid-cols-2 gap-2.5">
-            <Field id={`${idK}-jednotka`} label={t('Jednotka obsahu')}>
+            <Field id={`${idK}-jednotka`} label={t('Jednotka obsahu')} hint={t('V ní se píšou zbytky i receptury.')}>
               <select id={`${idK}-jednotka`} value={unit} onChange={e => setUnit(e.target.value)} className={inputClass}>
                 {CONTENT_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
               </select>
             </Field>
-            <Field id={`${idK}-velikost`} label={t('Výchozí balení')}>
-              <input id={`${idK}-velikost`} type="number" inputMode="numeric" min={0} value={size} onChange={e => setSize(e.target.value)} placeholder="100"
-                className={`${inputClass} tabular-nums`} />
+            <Field id={`${idK}-velikost`} label={t('Výchozí balení')} hint={t('Pro položky bez vlastní velikosti balení.')}>
+              <PoleMnozstvi id={`${idK}-velikost`} value={size} onChange={setSize} desetinne jednotka={unit} placeholder="100" />
             </Field>
           </div>
 

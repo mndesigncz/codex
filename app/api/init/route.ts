@@ -472,6 +472,37 @@ export async function GET(request: Request) {
       )`);
     // wages: hourly rate per member (Kc/h)
     await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS hourly_rate INTEGER DEFAULT 0`);
+    // Prémie a srážky k mzdě (kolo 5 UX): + prémie / − srážka v měně podniku, ke dni; `source` 'manual' (vedení)
+    // nebo 'reward' (schválená odměna z katalogu s částkou v Kč, source_ref = id žádosti).
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS wage_adjustments (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        day TEXT NOT NULL,
+        amount INTEGER NOT NULL,
+        note TEXT,
+        source TEXT DEFAULT 'manual',
+        source_ref INTEGER,
+        created_by INTEGER,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS wage_adjustments_team_day ON wage_adjustments (team_id, day)`);
+    // Odměna z katalogu může nést i částku k výplatě (bonus v Kč) — schválení ji zapíše jako prémii.
+    await ddl(sql`ALTER TABLE rewards_catalog ADD COLUMN IF NOT EXISTS bonus_amount INTEGER`);
+    // Pochvaly s body (kolo 5, „lepší odměny"): vedení dá body kdykoli, s důvodem —
+    // mimo hodnocení směny (to je jedno na den a nese hvězdy). Počítají se do bodů.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS point_awards (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        points INTEGER NOT NULL,
+        reason TEXT,
+        given_by INTEGER,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS point_awards_team_user ON point_awards (team_id, user_id)`);
     // Scheduling rule: how many days in a row a person may be rostered.
     // Team-wide default on teams, optional per-person override on users;
     // NULL on both means no limit.
@@ -2539,6 +2570,22 @@ export async function GET(request: Request) {
         created_at TIMESTAMP DEFAULT NOW(),
         PRIMARY KEY (blocker_id, blocked_id)
       )`);
+    // Poznámky k věcem (úkol, návod, postup, receptura z kasy, položka skladu,
+    // směna) — jedna tabulka pro všechny, typ drží lib/poznamky.ts
+    // (TYPY_POZNAMEK). entity_id je TEXT: receptura z kasy nemá číselný řádek,
+    // jen product_id pokladny; ostatní typy ukládají číslo jako text.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS entity_notes (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        entity_type TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        user_id INTEGER NOT NULL,
+        text TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS entity_notes_entity ON entity_notes (team_id, entity_type, entity_id)`);
 
     // Kroky migrace, které selhaly (a byly zachyceny), ať se to pozná zvenku
     // místo tichého „ok". Prázdné pole = celé schéma prošlo.

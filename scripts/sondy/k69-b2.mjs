@@ -48,6 +48,7 @@ const podvrh = () => (req, json, stav) => {
   const url = new URL(req.url());
   const path = url.pathname;
   if (stav.chyby[path]) return json({ error: 'Server spadl' }, stav.chyby[path]);
+  if (req.method() === 'POST' && path === '/api/wage-adjustments') { stav.premie = req.postDataJSON(); return json({ adjustment: { id: 9, ...stav.premie } }); }
   if (req.method() !== 'GET' && /^\/api\/(attendance|teams|invitations)/.test(path)) {
     (stav.zapisy ??= []).push({ m: req.method(), path, telo: req.postData() });
     return json({ ok: true, entry: {} });
@@ -113,6 +114,24 @@ const doporucene = async (p) => {
   tvrdi('D1: Chybí sazba počítá Jakuba (vlastník se nepočítá)', (await widgetLi(p, 'tym.bez_sazby').innerText()).includes('1'));
   const souhrn = await widgetLi(p, 'dochazka.souhrn_hodin').innerText();
   tvrdi('D1: Souhrn hodin v jedné kartě s řádky lidí a „30 dní"', souhrn.includes('Petra Malá') && souhrn.includes('30 dní'), souhrn.slice(0, 200));
+  // Kolo 5: hodiny, mzdy a spropitné za období vedle sebe; dýško z uzávěrek (420 Kč) rozpočítané lidem na směně do řádku.
+  tvrdi('D1: Souhrn hodin má vedle hodin i Mzdy a Spropitné 420 Kč', /Mzdy/i.test(souhrn) && /Spropitné\s*420/i.test(souhrn.replace(/\u00a0/g, ' ')), souhrn.slice(0, 300));
+  tvrdi('D1: …a Petra má v řádku svůj podíl „spropitné … Kč"', /Petra Malá[\s\S]{0,120}spropitné \d/.test(souhrn.replace(/\u00a0/g, ' ')), souhrn.slice(0, 400));
+  // Kolo 5: prémie a srážky — v řádku, v součtu mezd a přes „···" nové zapsání (POST /api/wage-adjustments).
+  const souhrnB = souhrn.replace(/\u00a0/g, ' ');
+  tvrdi('D1: Eva má v řádku „prémie +500 Kč", Petra „srážka −200 Kč"', /Eva Testová[\s\S]{0,160}prémie \+500/.test(souhrnB) && /Petra Malá[\s\S]{0,160}srážka −200/.test(souhrnB), souhrnB.slice(0, 500));
+  tvrdi('D1: součet mezd přiznává „vč. prémií a srážek +300 Kč"', /vč\. prémií a srážek \+300/.test(souhrnB), souhrnB.slice(0, 300));
+  const souhrnW = widgetLi(p, 'dochazka.souhrn_hodin');
+  await souhrnW.getByRole('button', { name: 'Prémie a srážky: Eva Testová' }).click();
+  await p.getByRole('menuitem', { name: 'Přidat prémii' }).click();
+  const oknoPremie = p.getByRole('dialog', { name: 'Prémie a srážky' });
+  tvrdi('D1: okno Prémie a srážky s druhem, částkou, dnem a zapsanou prémií Evy', await dokud(() => oknoPremie.isVisible(), 2000) && (await oknoPremie.innerText()).includes('Víkendová akce'));
+  await oknoPremie.screenshot({ path: OUT + 'k69-b2-premie-okno.png' });
+  await oknoPremie.getByLabel('Částka').fill('250');
+  await oknoPremie.getByLabel('Poznámka').fill('Školení');
+  await oknoPremie.getByRole('button', { name: 'Přidat prémii' }).click();
+  tvrdi('D1: Přidat prémii pošle POST s userId 16, +250 a poznámkou', await dokud(() => stav.premie?.userId === 16 && stav.premie?.amount === 250 && stav.premie?.note === 'Školení', 3000), JSON.stringify(stav.premie));
+  tvrdi('D1: …a okno se zavře', await dokud(async () => !(await oknoPremie.isVisible()), 2000));
   await p.screenshot({ path: OUT + 'k69-b2-dochazka-desk.png', fullPage: true });
 
   // Období stránky řídí widgety „Podle stránky" (Souhrn hodin) i nástroj.
@@ -308,6 +327,8 @@ const doporucene = async (p) => {
   await p.getByRole('menuitem', { name: 'Profil' }).click();
   const profil = p.getByRole('dialog').filter({ hasText: 'Zkušená' });
   tvrdi('M1: Profil otevře okno s odpracovanými hodinami (42 h)', await dokud(() => profil.isVisible(), 3000) && (await profil.innerText()).includes('42 h'));
+  // Kolo 5: profil nese i výplatu měsíce (mzda, prémie a srážky, k výplatě) ze stejných dat jako Souhrn hodin.
+  tvrdi('M1: …a sekci „Výplata · tento měsíc" s „K výplatě"', await dokud(async () => /Výplata · tento měsíc/i.test(await profil.innerText()) && /K výplatě/i.test(await profil.innerText()), 4000), (await profil.innerText()).slice(0, 300));
   await profil.getByRole('button', { name: 'Zavřít' }).click();
 
   // 7) Rozepsané hledání přežije úpravy.

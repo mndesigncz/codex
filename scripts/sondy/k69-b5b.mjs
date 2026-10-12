@@ -59,6 +59,8 @@ const pretece = (p) => p.evaluate(() => document.documentElement.scrollWidth > w
   tvrdi('finance 1: nástroj (kniha výdajů) je v klidu vidět', await p.locator('[data-plocha] li[data-widget="nastroj"] >> text=Výdaje').first().isVisible());
   const souhrn = await text(p, 'finance.souhrn_mesice');
   tvrdi('finance 1: Souhrn měsíce ukazuje tržby 184 320', /184 320/.test(souhrn), souhrn.slice(0, 120));
+  // Kolo 5: spropitné vedle tržeb (Toast, Square) — fixtura 4 260.
+  tvrdi('finance 1: Souhrn měsíce (L) ukazuje i Spropitné 4 260', /Spropitné[\s\S]{0,40}4\s260/i.test(souhrn.replace(/\u00a0/g, ' ')), souhrn.slice(0, 300));
   const inkoust = await p.$$eval('[data-plocha] li[data-widget] section', els => els.filter(e => getComputedStyle(e).backgroundColor === 'rgb(22, 24, 26)').length);
   tvrdi('finance 1: právě jedna inkoustová plocha (Souhrn měsíce)', inkoust === 1, String(inkoust));
   tvrdi('finance 1: podíl mezd proti cíli 28 %', /26 %/.test(await text(p, 'finance.trzby_vs_mzdy')) && /cíl 28 %/.test(await text(p, 'finance.trzby_vs_mzdy')), await text(p, 'finance.trzby_vs_mzdy'));

@@ -97,6 +97,8 @@ export interface DemoStav {
   pozvanky: PozvankaDemo[];
   /** Hodnocení směn vedením (Odměny, widget Ohodnotit směny). */
   hodnoceni: HodnoceniSmeny[];
+  /** Pochvaly s body (kolo 5) — v ukázce jen v paměti relace. */
+  pochvaly: { id: number; userId: number; points: number; reason: string | null; givenBy: number; createdAt: string }[];
   /** Receptury: id produktu z kasy → suroviny skladu (množství na jeden prodej). */
   receptury: Record<string, { itemId: number; amount: number }[]>;
   /** Běhy postupů, které v ukázce někdo spustil (checklist v Runneru). */
@@ -370,6 +372,7 @@ export function vytvorStav(role: RoleDema): DemoStav {
     ],
     pozvanky: [],
     hodnoceni: [],
+    pochvaly: [],
     receptury: Object.fromEntries(Object.entries(RECEPTURY_DEMA).map(([k, v]) => [k, v.map(x => ({ ...x }))])),
     dalsiId: id,
     notifikace: [

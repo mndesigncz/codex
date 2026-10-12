@@ -1,5 +1,6 @@
 'use client';
 
+import { akceProHledani } from '@/components/widgety/akceHledani';
 import { predejUkolum } from '@/lib/ukolyFiltr';
 import { GlobalniHledani, useZkratkaHledani } from '../GlobalniHledani';
 import { useState, useEffect } from 'react';
@@ -44,6 +45,7 @@ const MyShifts = naLine(() => import('./MyShifts'));
 const AvailabilitySubmit = naLine(() => import('../scheduling/AvailabilitySubmit'));
 const TimeOffRequest = naLine(() => import('../scheduling/TimeOffRequest'));
 const InventoryReport = naLine(() => import('./InventoryReport'));
+const RecipesView = naLine<import('../inventory/RecipesView').RecipesViewProps>(() => import('../inventory/RecipesView'));
 const Tasks = naLine(() => import('./Tasks'));
 const MyRewards = naLine(() => import('./MyRewards'));
 const CashClosing = naLine(() => import('./CashClosing'));
@@ -62,6 +64,7 @@ const byId = Object.fromEntries(navItems.map(n => [n.id, n]));
 // úkoly a odměny patří každému — jde o jeho vlastní data.
 const KLICE_POHLEDU: Record<string, readonly string[] | null> = {
   inventory: ['sklad.zobrazit'],
+  recipes: ['receptury.zobrazit'],
   closing: ['uzaverky.vytvorit', 'uzaverky.predavka'],
   procedures: ['postupy.zobrazit'],
   guides: ['navody.zobrazit'],
@@ -103,6 +106,8 @@ export default function EmployeeLayout({ user }: Props) {
   // zaměstnance arg pro chat zahazoval (jen vedení ho předávalo), takže
   // klepnutí na řádek skončilo na seznamu konverzací.
   const [chatConvId, setChatConvId] = useState<number | null>(null);
+  // Receptura z kasy k otevření (proklik z widgetu nebo z položky skladu).
+  const [recipeProduct, setRecipeProduct] = useState<string | undefined>();
   // Záložka Nastavení z odkazu nebo z widgetu; nonce říká otevřenému Nastavení, že si ji někdo vyžádal znovu.
   const [settingsTab, setSettingsTab] = useState<ReturnType<typeof zalozkaNastaveni>>();
   const [settingsNonce, setSettingsNonce] = useState(0);
@@ -111,6 +116,7 @@ export default function EmployeeLayout({ user }: Props) {
     setSettingsTab(view === 'settings' ? zalozkaNastaveni(arg) : undefined);
     if (view === 'settings') setSettingsNonce(n => n + 1);
     setInventoryCat(view === 'inventory' ? arg : undefined);
+    setRecipeProduct(view === 'recipes' && arg && !arg.includes(':') ? arg : undefined);
     setGuideId(view === 'guides' && arg && /^\d+$/.test(arg) ? Number(arg) : null);
     if (view === 'suggestions' || view === 'procedures') predejPohledu(view, arg);
     if (view === 'guides') setGuideFiltr(f => ({ stav: arg === 'stav:kprecteni' ? 'kprecteni' : arg === 'stav:navrhy' ? 'navrhy' : undefined, n: f.n + 1 }));
@@ -146,6 +152,7 @@ export default function EmployeeLayout({ user }: Props) {
         </div>
       );
       case 'inventory':    return <InventoryReport user={user as any} initialCategory={inventoryCat} />;
+      case 'recipes':      return <RecipesView stranka="zamestnanec.receptury" openProductId={recipeProduct} onNavigate={navigate} />;
       case 'closing':      return <CashClosing user={user as any} />;
       case 'procedures':   return <Procedures user={user as any} />;
       case 'tasks':        return <Tasks user={user as any} />;
@@ -328,7 +335,7 @@ export default function EmployeeLayout({ user }: Props) {
           { label: t('Odhlásit se'), icon: 'logout', onClick: () => odhlasit({ callbackUrl: '/login' }), danger: true },
         ]}
       />
-      <GlobalniHledani open={hledaniOtevreno} onClose={() => setHledani(false)} stranky={nav.vse} onStranka={navigate}
+      <GlobalniHledani open={hledaniOtevreno} onClose={() => setHledani(false)} stranky={nav.vse} akce={akceProHledani('zamestnanec', smiPohled)} onStranka={navigate}
         hledatUkoly={smiPohled('tasks')} hledatSklad={smiPohled('inventory')} hledatNavody={smiPohled('guides')} hledatPostupy={smiPohled('procedures')} />
       <JazykOkno open={jazykOpen} onClose={() => setJazykOpen(false)} />
     </div>

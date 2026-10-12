@@ -17,6 +17,11 @@
    "velikost": "S"
   },
   {
+   "id": "odmeny-pochvaly",
+   "widget": "odmeny.pochvaly",
+   "velikost": "M"
+  },
+  {
    "id": "nastroj",
    "widget": "nastroj",
    "velikost": "L"
@@ -27,6 +32,7 @@
   "hodnoceni.nehodnocene",
   "hodnoceni.ohodnotit_smeny",
   "odmeny.vytky_tymu",
+  "odmeny.pochvaly",
   "odmeny.zebricek",
   "odmeny.katalog",
   "odmeny.urovne",

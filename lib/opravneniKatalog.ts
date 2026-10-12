@@ -1889,6 +1889,7 @@ export const SYSTEMOVE_ROLE: SystemovaRole[] = [
    "postupy.upravit",
    "postupy.vytvorit",
    "postupy.zobrazit",
+   "receptury.upravit",
    "receptury.zobrazit",
    "rezervace.schvalovat",
    "rezervace.usadit",
@@ -1938,7 +1939,7 @@ export const SYSTEMOVE_ROLE: SystemovaRole[] = [
  {
   "klic": "barista",
   "nazev": "Barista / Obsluha",
-  "popis": "Výchozí role pro nové členy (join kód, pozvánka bez role). Odpovídá tomu, co dnes smí employee v UI: vlastní uzávěrka, stav skladu a návrhy, inventura, výroba, postupy, návody, chat, podněty, příjem objednávek a kartičky hostů, vyprodáno, akce s checklistem, náhled rozvrhu. Podniky s vypnutým show_team_schedule dostanou při migraci kopii této role bez rozvrh.nahled. Záměrně se zavírají jen úniky na úrovni API, které UI zaměstnanci nikdy neukazovalo (viz pravidla).",
+  "popis": "Výchozí role pro nové členy (join kód, pozvánka bez role). Odpovídá tomu, co dnes smí employee v UI: vlastní uzávěrka, stav skladu a návrhy, inventura, výroba, receptury z kasy (vidět i upravit), postupy, návody, chat, podněty, příjem objednávek a kartičky hostů, vyprodáno, akce s checklistem, náhled rozvrhu. Podniky s vypnutým show_team_schedule dostanou při migraci kopii této role bez rozvrh.nahled. Záměrně se zavírají jen úniky na úrovni API, které UI zaměstnanci nikdy neukazovalo (viz pravidla).",
   "typ": "zamestnanec",
   "opravneni": [
    "akce.checklist",
@@ -1954,6 +1955,8 @@ export const SYSTEMOVE_ROLE: SystemovaRole[] = [
    "navody.zobrazit",
    "objednavky.vyridit",
    "objednavky.zobrazit",
+   "receptury.upravit",
+   "receptury.zobrazit",
    "postupy.navrhnout",
    "postupy.spoustet",
    "postupy.zobrazit",
@@ -1975,7 +1978,7 @@ export const SYSTEMOVE_ROLE: SystemovaRole[] = [
  {
   "klic": "kuchar",
   "nazev": "Kuchař",
-  "popis": "Kuchyně: sklad a odpisy, výroba, inventura, postupy a návody (i návrhy), objednávky od stolu ke čtení, menu a vyprodáno. Bez uzávěrek kasy a bez věrnosti hostů.",
+  "popis": "Kuchyně: sklad a odpisy, výroba, inventura, receptury z kasy (vidět i upravit), postupy a návody (i návrhy), objednávky od stolu ke čtení, menu a vyprodáno. Bez uzávěrek kasy a bez věrnosti hostů.",
   "typ": "zamestnanec",
   "opravneni": [
    "akce.checklist",
@@ -1990,6 +1993,8 @@ export const SYSTEMOVE_ROLE: SystemovaRole[] = [
    "navody.navrhnout",
    "navody.zobrazit",
    "objednavky.zobrazit",
+   "receptury.upravit",
+   "receptury.zobrazit",
    "postupy.navrhnout",
    "postupy.spoustet",
    "postupy.zobrazit",

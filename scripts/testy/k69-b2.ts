@@ -9,9 +9,9 @@
 import { readFileSync } from 'node:fs';
 import type { Testy } from './_testy.ts';
 import {
-  ZAPOMENUTY_MS, bezSazby, cekajiciPozvanky, dnesVPodniku, hodinyMinuty, konecSmeny, mujMesic, mzdyZaObdobi, obdobiDni,
+  ZAPOMENUTY_MS, bezSazby, cekajiciPozvanky, dnesVPodniku, hodinyMinuty, konecSmeny, mujMesic, mzdyZaObdobi, obdobiDni, obdobiMesice, mojeUpravyMesice,
   otevrenePrichody, podilMezd, roleSPocty, rozeberZaznam, sazbyZRosteru, seradSouhrn, souhrnHodin, trzbyZaObdobi,
-  hodinyPoDnech, zaznamyVRozmezi, denZaznamu, type ZaznamDochazky,
+  hodinyPoDnech, zaznamyVRozmezi, denZaznamu, spropitneZaObdobi, upravyVRozmezi, upravyPoLidech, type ZaznamDochazky,
 } from '../../lib/dochazkaPrehled.ts';
 import { pragueMomentOf } from '../../lib/pragueTime.ts';
 import { WIDGETY as DOCHAZKA } from '../../lib/widgety/katalog/dochazka.ts';
@@ -57,8 +57,45 @@ export default function ({ eq, ok }: Testy) {
   eq('souhrn: řazení podle hodin / mzdy / jména', [
     seradSouhrn(souhrn, 'hodiny').map(r => r.id), seradSouhrn(souhrn, 'mzda')[0].id, seradSouhrn(souhrn, 'jmeno').map(r => r.jmeno),
   ], [['1', '3', '2'], '1', ['Běží', 'Člověk 1', 'Zapomněl']]);
-  eq('mzdy za období: součet, lidé s hodinami bez sazby, vynechané záznamy', mzdyZaObdobi(entries, ted, sazby), { celkem: 2500, bezSazby: 2, vynechano: 1 });
+  eq('mzdy za období: součet, lidé s hodinami bez sazby, vynechané záznamy', mzdyZaObdobi(entries, ted, sazby), { celkem: 2500, bezSazby: 2, vynechano: 1, upravy: 0 });
+  // ---- prémie a srážky (wage_adjustments) ----
+  const upravy = [
+    { id: 1, userId: 1, day: '2026-09-25', amount: 500, note: 'Akce' },
+    { id: 2, userId: 1, day: '2026-09-26', amount: -200, note: 'Manko' },
+    { id: 3, userId: 9, day: '2026-09-24', amount: 300 },           // nic neodpíchl → řádek jen se jménem z rosteru
+    { id: 4, userId: 2, day: '2026-09-10', amount: 999 },           // mimo rozmezí
+  ];
+  const uRoz = upravyVRozmezi(upravy, '2026-09-20', '2026-09-26');
+  eq('úpravy: v rozmezí a jen pondělí–pátek', [uRoz.map(u => u.id), upravyVRozmezi(upravy, '2026-09-20', '2026-09-26', [5, 6]).map(u => u.id)], [[1, 2, 3], [2]]);
+  const sUpr = souhrnHodin(entries, ted, sazby, { upravy: upravyPoLidech(uRoz), lide: new Map([['9', { jmeno: 'Bonusák', avatar: null }]]) });
+  eq('souhrn: prémie − srážka do řádku a k výplatě (2 500 + 300), člověk bez směny dostane řádek, bez sazby jen úprava',
+    [sUpr.find(r => r.id === '1')!.upravy, sUpr.find(r => r.id === '1')!.vyplata, sUpr.find(r => r.id === '9')!.jmeno, sUpr.find(r => r.id === '9')!.vyplata, sUpr.find(r => r.id === '2')!.vyplata],
+    [300, 2800, 'Bonusák', 300, null]);
+  eq('mzdy za období s úpravami: celkem zahrnuje prémie i srážky', mzdyZaObdobi(entries, ted, sazby, uRoz), { celkem: 3100, bezSazby: 2, vynechano: 1, upravy: 600 });
+  eq('můj měsíc: prémie jen moje a jen v měsíci', mujMesic(entries, 1, '2026-09', ted, 200, upravy).upravy, 300);
   eq('hodiny slovy', [hodinyMinuty(12.5 * H), hodinyMinuty(45 * 60000), hodinyMinuty(-5)], ['12 h 30 min', '45 min', '0 min']);
+
+  // ---- spropitné po lidech (podle hodin na směně) ----
+  const uzSp = [
+    // 25. 9.: Člověk 1 (8 h) a Člověk 3 (zapomenutý odchod = 0 h) → podle hodin dostane všechno Člověk 1.
+    { date: '2026-09-25', tips: 300, shiftEmployees: [{ id: 1 }, { id: 3 }], created_by: 1 },
+    // 24. 9.: směna 1 + 2, ale 2 ten den nic neodpíchl a 1 má 4,5 h → vše 1; druhá uzávěrka bez směny jde autorovi 2.
+    { date: '2026-09-24', tips: 100, shiftEmployees: [{ id: 1 }, { id: 2 }] },
+    { date: '2026-09-24', tips: 50, shiftEmployees: [], created_by: 2 },
+    // 23. 9.: dva lidé bez záznamů docházky → rovným dílem.
+    { date: '2026-09-23', tips: 80, shiftEmployees: [{ id: 4 }, { id: 5 }] },
+    // Bez směny i autora → nerozděleno; pomocný řádek kolegy se přeskočí; mimo rozmezí se přeskočí.
+    { date: '2026-09-22', tips: 40, shiftEmployees: [] },
+    { date: '2026-09-25', tips: 999, shiftEmployees: [{ id: 1 }], covered_by: 7 },
+    { date: '2026-09-10', tips: 999, shiftEmployees: [{ id: 1 }] },
+  ];
+  const sp = spropitneZaObdobi(uzSp, entries, ted, '2026-09-20', '2026-09-26');
+  eq('spropitné: podle hodin dne, autorovi bez směny, rovným dílem bez docházky', [...sp.poLidech.entries()].sort(), [['1', 400], ['2', 50], ['3', 0], ['4', 40], ['5', 40]]);
+  eq('spropitné: celkem, nerozděleno, nic skryto', [sp.celkem, sp.nerozdeleno, sp.skryto], [570, 40, false]);
+  eq('spropitné: po dnech a lidech pro export', [sp.poDnech.get('2026-09-25|1'), sp.poDnech.get('2026-09-24|1'), sp.poDnech.get('2026-09-24|2')], [300, 100, 50]);
+  eq('spropitné: jen pondělí (24. 9. je čtvrtek) → nic', spropitneZaObdobi(uzSp, entries, ted, '2026-09-20', '2026-09-26', [0]).celkem, 0);
+  eq('spropitné: uzávěrka bez tržby (role bez finance.trzby) → skryto', spropitneZaObdobi([{ date: '2026-09-25', tips: 10, trzbaSkryta: true }], entries, ted, '2026-09-20', '2026-09-26').skryto, true);
+  eq('souhrn: podíl na spropitném do řádku (bez mapy null)', [souhrnHodin(entries, ted, sazby, { spropitne: sp.poLidech }).find(r => r.id === '1')!.spropitne, souhrnHodin(entries, ted, sazby).find(r => r.id === '1')!.spropitne], [400, null]);
 
   // ---- tržby a podíl ----
   const uz = [
@@ -117,6 +154,16 @@ export default function ({ eq, ok }: Testy) {
   eq('můj měsíc: jen moje záznamy v září, běžící do teď, nad 24 h vynechané', [m.ms / H, m.bezi, m.vynechano, m.pocet], [10, true, 1, 3]);
   eq('můj výdělek: po záznamu 8 × 150 + 2 × 150', m.mzda, 1500);
   eq('můj výdělek: bez sazby null (ne nula)', mujMesic(moje, 5, '2026-09', ted, null).mzda, null);
+  // Kolo 5: Můj výdělek umí i minulý měsíc — měsíc a kolik dní zpět si vyžádat (od 1. dne do dneška včetně, +1 jako dřív).
+  eq('můj výdělek: tento měsíc = dnešní měsíc, dní = den + 1', obdobiMesice('2026-10-12', 'tento'), { mesic: '2026-10', dni: 13 });
+  eq('můj výdělek: minulý měsíc od 1. 9. do 12. 10. = 43 dní', obdobiMesice('2026-10-12', 'minuly'), { mesic: '2026-09', dni: 43 });
+  eq('můj výdělek: minulý měsíc v lednu je prosinec loňského roku', obdobiMesice('2027-01-03', 'minuly'), { mesic: '2026-12', dni: 35 });
+  eq('můj výdělek: minulý měsíc na 31. se vejde do 70 dní API', obdobiMesice('2026-10-31', 'minuly').dni <= 70, true);
+  eq('můj výdělek: seznam prémií jen moje a jen v měsíci, nejnovější první',
+    mojeUpravyMesice([
+      { id: 1, userId: 5, day: '2026-09-03', amount: 500 }, { id: 2, userId: 5, day: '2026-10-01', amount: 100 },
+      { id: 3, userId: 6, day: '2026-09-10', amount: 900 }, { id: 4, userId: 5, day: '2026-09-20', amount: -200 },
+    ], 5, '2026-09').map(u => u.id), [4, 1]);
 
   // ---- tým ----
   eq('pozvánky: jen čekající, nejstarší první', cekajiciPozvanky([

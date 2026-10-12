@@ -1,5 +1,5 @@
 // Globální hledání (Ctrl K): jedno okno najde stránku, úkol, položku skladu nebo člověka a rovnou tam vede.
-//  - Ctrl K otevře okno, šipky a Enter vybírají, Escape zavře,
+//  - Ctrl K otevře okno, šipky a Enter vybírají, Escape zavře (jen hledání — okno pod ním zůstane),
 //  - „sklad" najde stránku Sklad a Enter ji otevře,
 //  - název úkolu najde úkol a výběr otevře Úkoly rovnou s detailem toho úkolu,
 //  - zaměstnanec hledá ve stránkách a úkolech, ale lidi ne,
@@ -36,7 +36,22 @@ const podvrh = (req, json) => {
   tvrdi('název úkolu najde úkol ve skupině Úkoly', await dokud(async () => await okno.getByRole('option', { name: /Doplnit sirupy/ }).count() >= 1, 5000));
   await okno.getByRole('option', { name: /Doplnit sirupy/ }).first().click();
   tvrdi('výběr úkolu otevře Úkoly rovnou s jeho detailem', await dokud(async () => await p.locator('[data-plocha="vedeni.ukoly"]').count() === 1 && await p.getByRole('dialog', { name: 'Doplnit sirupy' }).count() === 1, 8000));
+  // Hledání nad otevřeným oknem: paleta musí být vrchní vrstva (jinak klepnutí na výsledek chytí detail
+  // pod ní) a Escape zavře jen ji — detail úkolu zůstane.
+  await p.keyboard.press('Control+k');
+  await okno.waitFor({ timeout: 5000 });
+  const prvni = okno.getByRole('option').first();
+  await prvni.waitFor({ timeout: 5000 });
+  const nadDetailem = await prvni.evaluate(el => {
+    const r = el.getBoundingClientRect();
+    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return !!hit && el.contains(hit);
+  });
+  tvrdi('hledání otevřené nad detailem úkolu je navrchu (výsledek jde klepnout)', nadDetailem);
   await p.keyboard.press('Escape');
+  tvrdi('Escape zavře jen hledání, detail úkolu zůstane', await dokud(async () => await okno.count() === 0, 3000) && await p.getByRole('dialog', { name: 'Doplnit sirupy' }).count() === 1);
+  await p.keyboard.press('Escape');
+  tvrdi('druhý Escape zavře detail úkolu', await dokud(async () => await p.getByRole('dialog', { name: 'Doplnit sirupy' }).count() === 0, 3000));
 
   await p.keyboard.press('Control+k');
   await okno.waitFor({ timeout: 5000 });
@@ -49,6 +64,21 @@ const podvrh = (req, json) => {
   await okno.waitFor({ timeout: 5000 });
   await okno.getByRole('combobox').fill('zavírací');
   tvrdi('„zavírací" najde postup', await dokud(async () => await okno.getByRole('option', { name: /Zavírací rutina/ }).count() >= 1, 5000));
+  await p.keyboard.press('Escape');
+
+  // Kolo 5: paleta akcí — „kasa" najde Nastavení › Pokladna (synonymum) a výběr otevře Nastavení na záložce Pokladna;
+  // „po termínu" najde akci Úkoly po termínu (deep link stav:po_terminu).
+  await p.keyboard.press('Control+k');
+  await okno.waitFor({ timeout: 5000 });
+  await okno.getByRole('combobox').fill('kasa');
+  tvrdi('„kasa" najde ve skupině Akce a nastavení Nastavení › Pokladna i Novou uzávěrku', await dokud(async () => await okno.getByRole('option', { name: /Nastavení › Pokladna/ }).count() === 1 && await okno.getByRole('option', { name: /Nová uzávěrka/ }).count() === 1, 4000), await okno.innerText());
+  tvrdi('…skupina se jmenuje „Akce a nastavení"', /Akce a nastavení/i.test(await okno.innerText()));
+  await okno.getByRole('option', { name: /Nastavení › Pokladna/ }).click();
+  tvrdi('výběr otevře Nastavení rovnou na záložce Pokladna', await dokud(async () => await p.getByRole('heading', { name: 'Pokladna', exact: true }).count() >= 1 || await p.locator('[aria-pressed="true"], [aria-selected="true"]').filter({ hasText: 'Pokladna' }).count() >= 1, 8000), (await p.locator('main').innerText()).slice(0, 200));
+  await p.keyboard.press('Control+k');
+  await okno.waitFor({ timeout: 5000 });
+  await okno.getByRole('combobox').fill('po termínu');
+  tvrdi('„po termínu" najde akci Úkoly po termínu', await dokud(async () => await okno.getByRole('option', { name: /Úkoly po termínu/ }).count() === 1, 4000));
   await p.keyboard.press('Escape');
 
   await p.keyboard.press('Control+k');

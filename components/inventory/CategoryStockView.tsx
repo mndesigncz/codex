@@ -376,7 +376,7 @@ export default function CategoryStockView({
                           >
                             {krokStupnice(t, s.label)}
                             <span className="ml-1.5 text-xs tabular-nums opacity-70">
-                              {fmtAmount(s.amount)}{unit}
+                              {fmtAmount(s.amount)} {unit}
                             </span>
                           </button>
                         );

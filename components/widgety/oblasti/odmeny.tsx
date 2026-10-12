@@ -49,20 +49,21 @@ import { useSession } from 'next-auth/react';
 import type { KomponentaWidgetu, Navigace, WidgetProps } from '@/lib/widgety/typy';
 import { widget } from '@/lib/widgety/katalog';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
-import { parseDbTime, pragueDayOf, pragueToday } from '@/lib/pragueTime';
+import { dbTimeDayHM, parseDbTime, pragueDayOf, pragueToday } from '@/lib/pragueTime';
 import { apiMessage, okJson } from '@/lib/api';
 import {
   KLIC_KALENDAR, UDALOST_KALENDAR,
-  bodyDne, cekajiciZadosti, dnyHodnoceni, minulyMesic, nabidka, nehodnocene, odkudBody, vyberKatalog, vyberOdmeny,
-  vyberPoradi, vytkyTymu, zbyvaDoDalsi,
-  type DenHodnoceni, type MojeUroven, type NabidkaOdmeny, type Zadost,
+  bodyDne, cekajiciZadosti, dnyHodnoceni, minulyMesic, nabidka, nehodnocene, odkudBody, pochvalyMesice, urlZebricku, vyberKatalog, vyberOdmeny,
+  vyberPochvaly, vyberPoradi, vytkyTymu, zbyvaDoDalsi,
+  type DenHodnoceni, type MojeUroven, type NabidkaOdmeny, type ObdobiZebricku, type Zadost,
 } from '@/lib/odmenyPrehled';
 import { Icon } from '../../Icons';
 import {
-  Avatar, BulkBar, Button, Chip, EmptyState, Field, Input, ListRow, Modal, Segmented, SelectBox, Stat, StatRow, Toast, Well,
+  Avatar, BulkBar, Button, Chip, EmptyState, Field, Input, ListRow, Modal, Segmented, Select, SelectBox, Stat, StatRow, Toast, Well,
   runBulk, useSelection,
 } from '../../ui';
 import { useOpravneni } from '../../role/useOpravneni';
+import { useMoney } from '../../CurrencyProvider';
 import { Widget, useWidget, type StavNacteni } from '../Widget';
 import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
 import { NavigaceKontext, useNavigace, useSmi } from '../NavigaceKontext';
@@ -570,6 +571,7 @@ function pocetZaBody(t: PrekladFn, klic: string, n: number): string | null {
     case 'postupy': return t('{n, plural, one {# dokončený postup} few {# dokončené postupy} other {# dokončených postupů}}', { n });
     case 'uzaverky': return t('{n, plural, one {# uzávěrka} few {# uzávěrky} other {# uzávěrek}}', { n });
     case 'hodnoceni': return t('{n, plural, one {# hodnocená směna} few {# hodnocené směny} other {# hodnocených směn}}', { n });
+    case 'pochvaly': return t('{n, plural, one {# pochvala} few {# pochvaly} other {# pochval}}', { n });
     default: return null;
   }
 }
@@ -581,6 +583,7 @@ function nazevRadkuBodu(t: PrekladFn, klic: string, nazev: string): string {
     case 'postupy': return t('Postupy');
     case 'uzaverky': return t('Uzávěrky');
     case 'hodnoceni': return t('Z hodnocení směn');
+    case 'pochvaly': return t('Pochvaly');
     case 'polozky': return t('U položek a za odměny');
     default: return nazev;
   }
@@ -644,6 +647,7 @@ function druhPolozky(t: PrekladFn, druh: string): string {
     case 'task': return t('Úkol');
     case 'procedure': return t('Postup');
     case 'closing': return t('Uzávěrka');
+    case 'award': return t('Pochvala');
     default: return t('Hodnocení', undefined, 'widgety');
   }
 }
@@ -803,6 +807,7 @@ const stavZadosti = (t: PrekladFn): Record<Zadost['stav'], { text: string; ton: 
 
 function KatalogOdmen({ velikost, nahled }: WidgetProps) {
   const t = useT('widgety');
+  const money = useMoney();
   const stavy = stavZadosti(t);
   const smi = useSmi();
   const { ok, ceka } = useBrana([]);
@@ -854,9 +859,13 @@ function KatalogOdmen({ velikost, nahled }: WidgetProps) {
         <ul className={`list ${moje ? 'mt-1' : ''}`}>
           {videt.map(o => (
             <ListRow key={o.id} lead={<IkonaOdmeny ikona={o.ikona} />} title={o.nazev}
-              meta={o.ceka ? t('{cena} · čeká na schválení', { cena: `${cislo(o.cena)} ${bodTvar(t, o.cena)}` })
-                : moje && !o.dosahnu ? t('{cena} · chybí {chybi}', { cena: `${cislo(o.cena)} ${bodTvar(t, o.cena)}`, chybi: cislo(o.chybi) })
-                : `${cislo(o.cena)} ${bodTvar(t, o.cena)}`}
+              meta={[
+                o.ceka ? t('{cena} · čeká na schválení', { cena: `${cislo(o.cena)} ${bodTvar(t, o.cena)}` })
+                  : moje && !o.dosahnu ? t('{cena} · chybí {chybi}', { cena: `${cislo(o.cena)} ${bodTvar(t, o.cena)}`, chybi: cislo(o.chybi) })
+                  : `${cislo(o.cena)} ${bodTvar(t, o.cena)}`,
+                // Odměna s bonusem v penězích: člověk vidí, že výměna přidá částku k výplatě.
+                o.bonusKc ? t('+{castka} k výplatě', { castka: money(o.bonusKc) }) : null,
+              ].filter(Boolean).join(' · ')}
               right={o.ceka ? <Chip tone="wait" size="sm">{t('Čeká')}</Chip> : undefined}
               actions={!o.ceka && moje ? (
                 <Button variant="primary" size="sm" disabled={!o.dosahnu || nahled} aria-label={t('Vyměnit body za {nazev}', { nazev: o.nazev })}
@@ -1015,10 +1024,12 @@ function ZadostiOOdmeny({ velikost, nahled }: WidgetProps) {
 // Žebříček
 // ---------------------------------------------------------------------------
 
-function Zebricek({ velikost, nastaveni }: WidgetProps<{ pocet?: string }>) {
+function Zebricek({ velikost, nastaveni }: WidgetProps<{ pocet?: string; obdobi?: ObdobiZebricku }>) {
   const t = useT('widgety');
   const { ok, ceka } = useBranaWidgetu('odmeny.zebricek', ['odmeny.zebricek']);
-  const data = useDataWidgetu(ok ? URL_ODMENY : null, vyberPoradi);
+  // Období (kolo 5, vzor Bonusly): „tento měsíc" = body získané od 1. dne, bez odečtů za odměny.
+  const obdobi: ObdobiZebricku = nastaveni.obdobi === 'mesic' ? 'mesic' : 'celkem';
+  const data = useDataWidgetu(ok ? urlZebricku(obdobi, pragueToday()) : null, vyberPoradi);
   const poradi = data.data ?? [];
   const odkaz = useOdkazOdmeny();
   const strop = velikost === 'S' ? 3 : velikost === 'M' ? Math.max(1, Number(nastaveni.pocet) || 5) : poradi.length;
@@ -1026,6 +1037,7 @@ function Zebricek({ velikost, nastaveni }: WidgetProps<{ pocet?: string }>) {
   return (
     <Widget nacteni={ceka ? CEKA : data} odkaz={velikost === 'S' ? undefined : odkaz}
       prazdno={data.data && poradi.length === 0 ? <p className="t-meta">{t('V týmu zatím nikdo není.')}</p> : undefined}>
+      {obdobi === 'mesic' && velikost !== 'S' && <p className="t-meta mb-1">{t('Body získané tento měsíc (bez odečtů za odměny).')}</p>}
       <ul className="list">
         {videt.map((s, i) => (
           <ListRow key={s.id}
@@ -1046,6 +1058,130 @@ function Zebricek({ velikost, nastaveni }: WidgetProps<{ pocet?: string }>) {
         ))}
       </ul>
       {poradi.length > videt.length && velikost !== 'S' && <p className="t-meta mt-2">{aDalsich(t, poradi.length - videt.length)}</p>}
+    </Widget>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Pochvaly s body (kolo 5 — vzor Bonusly / Connecteam „recognition")
+// ---------------------------------------------------------------------------
+
+const URL_POCHVALY = '/api/rewards/awards';
+const RYCHLE_BODY = [5, 10, 20, 50] as const;
+
+/** Den a čas pochvaly krátce: „12. 10. 14:05" — čas z databáze přes dbTimeDayHM (zóna Praha, check-time). */
+const kdyKratce = (iso: string): string => (parseDbTime(iso) ? dbTimeDayHM(iso) : '');
+
+/**
+ * Okno „Pochválit": body + za co. Bez `clovek` se vybírá ze žebříčku (vedení s
+ * hodnoceni.hodnotit žebříček zpravidla má; bez něj nabídka zůstane prázdná a
+ * tlačítko zakázané — chválit pak jde z profilu člena).
+ */
+export function PochvalaOkno({ clovek, onClose, onHotovo }: {
+  clovek?: { id: number; jmeno: string } | null;
+  onClose: () => void;
+  onHotovo?: () => void;
+}) {
+  const t = useT('widgety');
+  const lide = useDataWidgetu(clovek ? null : URL_ODMENY, vyberPoradi);
+  const [kdo, setKdo] = useState<string>(clovek ? String(clovek.id) : '');
+  const [body, setBody] = useState('10');
+  const [duvod, setDuvod] = useState('');
+  const [ukladam, setUkladam] = useState(false);
+  const [chyba, setChyba] = useState<string | null>(null);
+  const n = Math.round(Number(body));
+  const jde = kdo !== '' && Number.isFinite(n) && n >= 1 && n <= 500;
+  const uloz = async () => {
+    if (!jde || ukladam) return;
+    setUkladam(true); setChyba(null);
+    try {
+      await fetch(URL_POCHVALY, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: Number(kdo), points: n, reason: duvod.trim() || undefined }),
+      }).then(okJson);
+      obnovDataWidgetu(URL_ODMENY);
+      obnovDataWidgetu(`${URL_POCHVALY}?limit=30`);
+      onHotovo?.();
+      onClose();
+    } catch (e) {
+      setChyba(apiMessage(e, t('Pochvalu se nepodařilo uložit.')));
+    } finally {
+      setUkladam(false);
+    }
+  };
+  return (
+    <NadPlochou>
+      <Modal open onClose={onClose} size="sm" title={t('Pochválit')} subtitle={clovek?.jmeno ?? t('Body navíc za dobře odvedenou práci')}
+        footer={<>
+          <Button variant="secondary" onClick={onClose}>{t('Zavřít')}</Button>
+          <Button variant="primary" icon="award" onClick={uloz} loading={ukladam} disabled={!jde}>{t('Dát body')}</Button>
+        </>}>
+        <div className="space-y-4">
+          {!clovek && (
+            <Field id="pochvala-kdo" label={t('Komu')}>
+              <Select id="pochvala-kdo" value={kdo} onChange={e => setKdo(e.target.value)} autoFocus>
+                <option value="">{lide.loading ? t('Načítám členy…') : t('Vyber člena…')}</option>
+                {(lide.data ?? []).map(p => <option key={p.id} value={p.id}>{p.jmeno}</option>)}
+              </Select>
+            </Field>
+          )}
+          <Field id="pochvala-body" label={t('Body')} hint={t('Rychlá volba, nebo vlastní číslo (1–500).')}>
+            <div className="flex flex-wrap items-center gap-2">
+              <Segmented size="sm" ariaLabel={t('Body')} value={RYCHLE_BODY.some(v => v === n) ? String(n) : ''}
+                onChange={v => setBody(v)} options={RYCHLE_BODY.map(v => ({ id: String(v), label: `+${v}` }))} />
+              <Input id="pochvala-body" type="number" inputMode="numeric" min={1} max={500} value={body} onChange={e => setBody(e.target.value)} className="w-24 tabular-nums" />
+            </div>
+          </Field>
+          <Field id="pochvala-duvod" label={t('Za co')} hint={t('Uvidí to v oznámení i ve zpětné vazbě.')}>
+            <Input id="pochvala-duvod" value={duvod} onChange={e => setDuvod(e.target.value)} maxLength={200}
+              placeholder={t('Např. zaskočil za nemocného kolegu')} autoFocus={!!clovek} />
+          </Field>
+          {chyba && <p className="note note-danger text-sm" role="alert">{chyba}</p>}
+        </div>
+      </Modal>
+    </NadPlochou>
+  );
+}
+
+/** Widget Pochvaly: kolik jich tento měsíc padlo, poslední v seznamu a tlačítko Pochválit. */
+function Pochvaly({ velikost, nahled }: WidgetProps) {
+  const t = useT('widgety');
+  const smi = useSmi();
+  const { ok, ceka } = useBranaWidgetu('odmeny.pochvaly', ['hodnoceni.zobrazit']);
+  const data = useDataWidgetu(ok ? `${URL_POCHVALY}?limit=30` : null, vyberPochvaly);
+  const pochvaly = data.data ?? [];
+  const mesic = pochvalyMesice(pochvaly, pragueToday());
+  const [okno, setOkno] = useState(false);
+  const smiChvalit = !nahled && smi(klicCasti('odmeny.pochvaly', 'akce:pochvalit') ?? 'hodnoceni.hodnotit');
+  const odkaz = useOdkazOdmeny();
+  const strop = velikost === 'S' ? 0 : velikost === 'M' ? 4 : 10;
+  // Druhotné, ne limetka: na ploše Odměn je hlavní akce jedna (DP §3.1) a tohle je jedna z více.
+  const tlacitko = smiChvalit && <Button variant="secondary" size="sm" icon="award" onClick={() => setOkno(true)}>{t('Pochválit')}</Button>;
+  return (
+    <Widget nacteni={ceka ? CEKA : data} odkaz={velikost === 'S' ? undefined : odkaz}
+      prazdno={data.data && pochvaly.length === 0 ? (
+        <div className="space-y-3">
+          <p className="t-meta text-pretty">{t('Zatím žádná pochvala. Body za dobře odvedenou práci potěší víc než hvězdy u směny.')}</p>
+          {tlacitko}
+          {okno && <PochvalaOkno onClose={() => setOkno(false)} />}
+        </div>
+      ) : undefined}>
+      <StatRow podleKarty>
+        <Stat label={t('Tento měsíc')} value={cislo(mesic.pocet)} note={bodu(t, mesic.body)} />
+        <Stat label={t('Poslední')} value={pochvaly[0] ? pochvaly[0].jmeno : '—'} note={pochvaly[0] ? kdyKratce(pochvaly[0].kdy) : undefined} />
+      </StatRow>
+      {strop > 0 && (
+        <ul className="list mt-3">
+          {pochvaly.slice(0, strop).map(p => (
+            <ListRow key={p.id} lead={<Avatar emoji={p.avatar} size="sm" />} title={p.jmeno}
+              meta={[p.duvod, kdyKratce(p.kdy), p.dal ? t('od {kdo}', { kdo: p.dal }) : null].filter(Boolean).join(' · ')}
+              value={sZnamenkem(p.body)} valueMeta={bodTvar(t, p.body)} />
+          ))}
+        </ul>
+      )}
+      {pochvaly.length > strop && strop > 0 && <p className="t-meta mt-2">{aDalsich(t, pochvaly.length - strop)}</p>}
+      {tlacitko && <div className="mt-3">{tlacitko}</div>}
+      {okno && <PochvalaOkno onClose={() => setOkno(false)} />}
     </Widget>
   );
 }
@@ -1148,6 +1284,7 @@ export const KOMPONENTY: Record<string, KomponentaWidgetu> = {
   'odmeny.zebricek': Zebricek,
   'odmeny.zadosti': ZadostiOOdmeny,
   'odmeny.vytky_tymu': VytkyVTymu,
+  'odmeny.pochvaly': Pochvaly,
   'odmeny.katalog': KatalogOdmen,
   'odmeny.urovne': Urovne,
   'moje.uroven': MojeUrovenWidget,

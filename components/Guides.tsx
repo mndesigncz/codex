@@ -37,6 +37,7 @@ import { normalizeSteps, popisMnozstviKroku, type GuideStep } from '@/lib/guideS
 import GuideStepIngredient from './guides/GuideStepIngredient';
 import GuideProductLink from './guides/GuideProductLink';
 import GuideItemLink from './guides/GuideItemLink';
+import { Poznamky } from './Poznamky';
 import { okJson, apiMessage } from '@/lib/api';
 import { obsahujeNekde } from '@/lib/hledani';
 import KopieZPodniku, { useJinePodniky } from './organizace/KopieZPodniku';
@@ -746,6 +747,8 @@ function GuideReader({
           {smiPovinne && povinne && ctenari && <CtenariNavodu guideId={reader.id} />}
           <div className="text-[15px] whitespace-pre-wrap break-words">{renderContent(reader.content)}</div>
           {reader.checklist.length > 0 && <ReaderChecklist steps={reader.checklist} guideId={reader.id} ticksFor={ticksFor} />}
+          {/* Zkušenosti k návodu („v neděli stačí půl dávky") pod obsahem; tablet píše za vybraného člověka jako u přečtení. */}
+          <Poznamky typ="guide" id={reader.id} tablet={tablet} zaKoho={zaKoho} vyberKoho={vyberKoho} className="mt-6" />
         </>
       )}
     </Modal>

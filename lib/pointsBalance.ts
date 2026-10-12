@@ -13,7 +13,14 @@ export interface PointsBreakdown {
   autoPoints: number;    // points the system derived from the shift itself
   itemPoints: number;    // points attached to individual tasks/runs/closings
   flagged: number;       // reviews or items marked "něco je špatně"
+  awards: number;        // body z pochval mimo hodnocení směny (point_awards)
+  awardCount: number;    // kolik pochval
 }
+
+/** Prázdný rozpad — jeden tvar pro „člen bez bodů" všude (route i dávka). */
+export const PRAZDNY_ROZPAD: PointsBreakdown = {
+  tasks: 0, procedures: 0, closings: 0, reviewPoints: 0, ratedShifts: 0, autoPoints: 0, itemPoints: 0, flagged: 0, awards: 0, awardCount: 0,
+};
 
 // Count the point-earning signals for one user (each guarded so a missing
 // column degrades to zero instead of failing the whole request).
@@ -55,19 +62,31 @@ export async function breakdownFor(teamId: number, userId: number): Promise<Poin
       FROM shift_review_items WHERE employee_id = ${userId} AND team_id = ${teamId}`;
     itemPoints = r?.pts ?? 0; flagged += r?.flg ?? 0;
   } catch { /* table missing */ }
-  return { tasks, procedures, closings, reviewPoints, ratedShifts, autoPoints, itemPoints, flagged };
+  let awards = 0, awardCount = 0;
+  try {
+    const [r] = await sql`
+      SELECT COALESCE(SUM(points),0)::int AS pts, COUNT(*)::int AS n
+      FROM point_awards WHERE user_id = ${userId} AND team_id = ${teamId}`;
+    awards = r?.pts ?? 0; awardCount = r?.n ?? 0;
+  } catch { /* table missing */ }
+  return { tasks, procedures, closings, reviewPoints, ratedShifts, autoPoints, itemPoints, flagged, awards, awardCount };
 }
 
 // Batched varianta breakdownFor pro celý tým naráz: místo 5 dotazů na každého
 // člena (N+1, u týmu 20 lidí 100+ round-tripů a riziko timeoutu na žebříčku)
 // pět agregací GROUP BY. Aritmetika je stejná jako v breakdownFor — jen se
 // spočítá hromadně. Chybějící člen v mapě = samé nuly.
-export async function breakdownForTeam(teamId: number, userIds: number[]): Promise<Map<number, PointsBreakdown>> {
+//
+// `od` (YYYY-MM-DD) omezí počítání na období: žebříček „tento měsíc" (kolo 5).
+// Odečty za odměny (kind = redemption) se v období nepočítají — pořadí za měsíc
+// říká, kdo si body vydělal, ne kdo si za ně koupil kávu. Bez `od` je to
+// celkový zůstatek jako dřív, včetně odečtů.
+export async function breakdownForTeam(teamId: number, userIds: number[], od: string | null = null): Promise<Map<number, PointsBreakdown>> {
   const map = new Map<number, PointsBreakdown>();
-  for (const id of userIds) {
-    map.set(id, { tasks: 0, procedures: 0, closings: 0, reviewPoints: 0, ratedShifts: 0, autoPoints: 0, itemPoints: 0, flagged: 0 });
-  }
+  for (const id of userIds) map.set(id, { ...PRAZDNY_ROZPAD });
   if (userIds.length === 0) return map;
+  // Časové sloupce jsou TIMESTAMP bez zóny (NOW() serveru), dny jsou TEXT YYYY-MM-DD.
+  const odCas = od ? `${od}T00:00:00` : null;
 
   // Jen řádky TOHOHLE podniku (kolo 62): člen dvou podniků má v žebříčku A
   // jen úkoly, postupy a uzávěrky z A. NULL jsou řádky z doby před sloupcem.
@@ -75,6 +94,7 @@ export async function breakdownForTeam(teamId: number, userIds: number[]): Promi
     const rows = await sql`
       SELECT completed_by AS uid, COUNT(*)::int AS n FROM tasks
       WHERE completed_by = ANY(${userIds}) AND status = 'done' AND (team_id = ${teamId} OR team_id IS NULL)
+        AND (${odCas}::text IS NULL OR completed_at >= ${odCas}::timestamp)
       GROUP BY completed_by`;
     for (const r of rows as any[]) { const b = map.get(r.uid); if (b) b.tasks = r.n; }
   } catch { /* column missing */ }
@@ -83,6 +103,7 @@ export async function breakdownForTeam(teamId: number, userIds: number[]): Promi
     const rows = await sql`
       SELECT user_id AS uid, COUNT(*)::int AS n FROM procedure_runs
       WHERE user_id = ANY(${userIds}) AND status = 'completed' AND (team_id = ${teamId} OR team_id IS NULL)
+        AND (${odCas}::text IS NULL OR completed_at >= ${odCas}::timestamp)
       GROUP BY user_id`;
     for (const r of rows as any[]) { const b = map.get(r.uid); if (b) b.procedures = r.n; }
   } catch { /* ignore */ }
@@ -91,6 +112,7 @@ export async function breakdownForTeam(teamId: number, userIds: number[]): Promi
     const rows = await sql`
       SELECT created_by AS uid, COUNT(*)::int AS n FROM cash_closings
       WHERE created_by = ANY(${userIds}) AND covered_by IS NULL AND (team_id = ${teamId} OR team_id IS NULL)
+        AND (${od}::text IS NULL OR date >= ${od})
       GROUP BY created_by`;
     for (const r of rows as any[]) { const b = map.get(r.uid); if (b) b.closings = r.n; }
   } catch {
@@ -98,6 +120,7 @@ export async function breakdownForTeam(teamId: number, userIds: number[]): Promi
       const rows = await sql`
         SELECT created_by AS uid, COUNT(*)::int AS n FROM cash_closings
         WHERE created_by = ANY(${userIds}) AND (team_id = ${teamId} OR team_id IS NULL)
+          AND (${od}::text IS NULL OR date >= ${od})
         GROUP BY created_by`;
       for (const r of rows as any[]) { const b = map.get(r.uid); if (b) b.closings = r.n; }
     } catch { /* ignore */ }
@@ -107,11 +130,12 @@ export async function breakdownForTeam(teamId: number, userIds: number[]): Promi
     const rows = await sql`
       SELECT employee_id AS uid, COALESCE(SUM(points),0)::int AS pts, COALESCE(SUM(auto_points),0)::int AS auto,
              COUNT(*)::int AS n, COUNT(*) FILTER (WHERE flagged)::int AS flg
-      FROM shift_reviews WHERE employee_id = ANY(${userIds}) AND team_id = ${teamId} GROUP BY employee_id`;
+      FROM shift_reviews WHERE employee_id = ANY(${userIds}) AND team_id = ${teamId}
+        AND (${od}::text IS NULL OR work_date >= ${od}) GROUP BY employee_id`;
     for (const r of rows as any[]) { const b = map.get(r.uid); if (b) { b.reviewPoints = r.pts; b.autoPoints = r.auto; b.ratedShifts = r.n; b.flagged += r.flg; } }
   } catch {
     try {
-      const rows = await sql`SELECT employee_id AS uid, COALESCE(SUM(points),0)::int AS pts, COUNT(*)::int AS n FROM shift_reviews WHERE employee_id = ANY(${userIds}) AND team_id = ${teamId} GROUP BY employee_id`;
+      const rows = await sql`SELECT employee_id AS uid, COALESCE(SUM(points),0)::int AS pts, COUNT(*)::int AS n FROM shift_reviews WHERE employee_id = ANY(${userIds}) AND team_id = ${teamId} AND (${od}::text IS NULL OR work_date >= ${od}) GROUP BY employee_id`;
       for (const r of rows as any[]) { const b = map.get(r.uid); if (b) { b.reviewPoints = r.pts; b.ratedShifts = r.n; } }
     } catch { /* table missing */ }
   }
@@ -119,8 +143,17 @@ export async function breakdownForTeam(teamId: number, userIds: number[]): Promi
   try {
     const rows = await sql`
       SELECT employee_id AS uid, COALESCE(SUM(points),0)::int AS pts, COUNT(*) FILTER (WHERE flagged)::int AS flg
-      FROM shift_review_items WHERE employee_id = ANY(${userIds}) AND team_id = ${teamId} GROUP BY employee_id`;
+      FROM shift_review_items WHERE employee_id = ANY(${userIds}) AND team_id = ${teamId}
+        AND (${od}::text IS NULL OR (work_date >= ${od} AND kind <> 'redemption')) GROUP BY employee_id`;
     for (const r of rows as any[]) { const b = map.get(r.uid); if (b) { b.itemPoints = r.pts; b.flagged += r.flg; } }
+  } catch { /* table missing */ }
+
+  try {
+    const rows = await sql`
+      SELECT user_id AS uid, COALESCE(SUM(points),0)::int AS pts, COUNT(*)::int AS n
+      FROM point_awards WHERE user_id = ANY(${userIds}) AND team_id = ${teamId}
+        AND (${odCas}::text IS NULL OR created_at >= ${odCas}::timestamp) GROUP BY user_id`;
+    for (const r of rows as any[]) { const b = map.get(r.uid); if (b) { b.awards = r.pts; b.awardCount = r.n; } }
   } catch { /* table missing */ }
 
   return map;
@@ -128,7 +161,7 @@ export async function breakdownForTeam(teamId: number, userIds: number[]): Promi
 
 export function totalPoints(b: PointsBreakdown, pt: PointsConfig): number {
   return b.tasks * pt.task + b.procedures * pt.procedure + b.closings * pt.closing
-    + b.reviewPoints + b.autoPoints + b.itemPoints;
+    + b.reviewPoints + b.autoPoints + b.itemPoints + (b.awards ?? 0);
 }
 
 /** Current spendable balance: earned total minus reward requests still waiting

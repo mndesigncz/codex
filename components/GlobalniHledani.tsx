@@ -15,6 +15,7 @@ import { vyberUkoly, jeHotovy, type Ukol } from '@/lib/ukolyPrehled';
 import { jeAktivni, type PolozkaSkladu } from '@/lib/skladPrehled';
 import { URL_NAVODY, vyberNavody } from '@/lib/navodyPrehled';
 import { URL_POSTUPY, vyberPostupy } from '@/lib/postupyPrehled';
+import type { AkceHledani } from '@/components/widgety/akceHledani';
 
 const URL_UKOLY = '/api/tasks';
 const URL_SKLAD = '/api/inventory';
@@ -28,9 +29,11 @@ type Vysledek =
   | { druh: 'stranka'; klic: string; ikona: string; titulek: string; podtitulek?: string; stranka: string; arg?: string }
   | { druh: 'clovek'; klic: string; ikona: string; titulek: string; podtitulek?: string; id: number };
 
-export function GlobalniHledani({ open, onClose, stranky, onStranka, hledatUkoly = false, hledatSklad = false, hledatLidi = false, hledatNavody = false, hledatPostupy = false, onOsoba, jeUkolyStranka = 'tasks', jeSkladStranka = 'inventory' }: {
+export function GlobalniHledani({ open, onClose, stranky, akce = [], onStranka, hledatUkoly = false, hledatSklad = false, hledatLidi = false, hledatNavody = false, hledatPostupy = false, onOsoba, jeUkolyStranka = 'tasks', jeSkladStranka = 'inventory' }: {
   open: boolean;
   onClose: () => void;
+  /** Akce a nastavení (lib/akceHledani), které divák smí: Export docházky, Nastavení › Pokladna… */
+  akce?: AkceHledani[];
   /** Stránky, které divák smí otevřít (z navigace layoutu). */
   stranky: readonly StrankaHledani[];
   onStranka: (stranka: string, arg?: string) => void;
@@ -65,6 +68,10 @@ export function GlobalniHledani({ open, onClose, stranky, onStranka, hledatUkoly
       .map<Vysledek>(s => ({ druh: 'stranka', klic: `s-${s.id}`, ikona: s.icon, titulek: s.label, stranka: s.id }));
     if (strankyNalezene.length) out.push({ id: 'stranky', nadpis: t('Stránky'), polozky: strankyNalezene });
     if (dotaz) {
+      // Paleta akcí: hledá se v názvu, umístění i synonymech („kasa" najde Nastavení › Pokladna i Novou uzávěrku).
+      const a = akce.filter(x => obsahujeNekde(dotaz, t(x.nazev), t(x.kde), x.nazev, x.kde, ...x.slova)).slice(0, NEJVIC_NA_SKUPINU)
+        .map<Vysledek>(x => ({ druh: 'stranka', klic: `a-${x.id}`, ikona: x.ikona, titulek: t(x.nazev), podtitulek: t(x.kde), stranka: x.stranka, arg: x.arg }));
+      if (a.length) out.push({ id: 'akce', nadpis: t('Akce a nastavení'), polozky: a });
       const u = (ukoly.data ?? []).filter(x => obsahujeNekde(dotaz, x.title, x.description, x.assigneeName)).sort((a, b) => Number(jeHotovy(a)) - Number(jeHotovy(b)))
         .slice(0, NEJVIC_NA_SKUPINU).map<Vysledek>(x => ({ druh: 'stranka', klic: `u-${x.id}`, ikona: 'check', titulek: x.title,
           podtitulek: [jeHotovy(x) ? t('Hotovo') : x.dueDate ? new Date(`${x.dueDate}T12:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'numeric' }) : '', x.assigneeName ?? ''].filter(Boolean).join(' · '),
@@ -85,7 +92,7 @@ export function GlobalniHledani({ open, onClose, stranky, onStranka, hledatUkoly
       if (l.length) out.push({ id: 'lide', nadpis: t('Lidé'), polozky: l });
     }
     return out;
-  }, [dotaz, stranky, ukoly.data, sklad.data, navody.data, postupy.data, lide.data, jeUkolyStranka, jeSkladStranka, t]);
+  }, [dotaz, stranky, akce, ukoly.data, sklad.data, navody.data, postupy.data, lide.data, jeUkolyStranka, jeSkladStranka, t]);
 
   const plocha = skupiny.flatMap(g => g.polozky);
   const nacitam = dotaz !== '' && (ukoly.loading || sklad.loading || navody.loading || postupy.loading || lide.loading);
@@ -107,14 +114,14 @@ export function GlobalniHledani({ open, onClose, stranky, onStranka, hledatUkoly
   if (!open) return null;
   let poradi = -1;
   return (
-    <Modal open onClose={onClose} size="md" title={t('Hledat v aplikaci')}>
+    <Modal open onClose={onClose} size="md" title={t('Hledat v aplikaci')} nadOkny>
       <div className="space-y-3" onKeyDown={klavesa}>
         <div className="flex items-center gap-2 rounded-full glass pl-4 pr-3 focus-within:ring-2 focus-within:ring-[#C8F542]">
           <Icon name="search" size={16} className="shrink-0 text-black/45" />
           {/* data-transient: dotaz není rozepsaný text, který by se měl chránit před zavřením okna */}
           <input ref={vstup} data-transient autoFocus value={q} onChange={e => setQ(e.target.value)} role="combobox" aria-expanded aria-controls="globalni-hledani-vysledky" aria-autocomplete="list"
             aria-activedescendant={plocha[aktivni] ? `gh-${plocha[aktivni].klic}` : undefined} aria-label={t('Hledat v aplikaci')}
-            placeholder={t('Stránka, úkol, položka skladu, člověk…')} maxLength={80} enterKeyHint="go"
+            placeholder={t('Stránka, akce, úkol, položka skladu, člověk…')} maxLength={80} enterKeyHint="go"
             className="min-w-0 flex-1 bg-transparent py-3 text-[15px] text-[#16181A] placeholder:text-black/40 focus:outline-none" />
         </div>
         <div id="globalni-hledani-vysledky" role="listbox" aria-label={t('Výsledky hledání')} className="max-h-[50vh] overflow-y-auto scrollbar-thin -mx-1 px-1">

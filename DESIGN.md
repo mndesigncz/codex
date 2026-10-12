@@ -74,6 +74,16 @@ Písmo **Geist** (balíček `geist`, `--font-geist-sans`), kódy kartiček a kup
 - Přepínač pohledu: `Segmented` (tmavá pilulka klouže, `aria-selected`,
   vždy jeden řádek, co se nevejde, posouvá se do strany).
 - Statistiky: `Stat` / `StatRow` (štítek `.t-label`, číslo 28 px tabular).
+  Číslo se nezalamuje ani nezkracuje; když se do sloupce nevejde (dva
+  sloupce na 320 px), Stat ho zmenší o stupeň škály (28 → 18 → 14) a v řadě
+  všechna stejně (`data-tesne` na obalu, měří Stat.tsx).
+- Nic nepřetéká: žádný vodorovný posuv stránky, nic nevyčuhuje z karty,
+  widgetu ani okna — hlídají sondy `preteceni-*` (vedení, zaměstnanec,
+  tablet + veřejné stránky, okna) na 320/390/768/1024 px, česky, německy
+  a polsky. Vodorovný pás (`overflow-x-auto`, `scroll-fade-x`) je zároveň
+  `position: relative` (globals.css): absolutně umístěný potomek (sr-only
+  text chipu) by jinak z odjeté položky natáhl `<main>` do posuvu.
+  Řádek akcí (hlavička, patička okna, ocas ListRow) se zalamuje, ne smršťuje.
 
 ## Komponenty (components/ui)
 
