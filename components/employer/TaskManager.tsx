@@ -481,7 +481,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
             <fieldset className="min-w-0">
               <legend className="field-label">{t('Kdo úkol udělá')}</legend>
               {members.length <= 10 ? (
-                <div ref={pasLidi} role="group" aria-label={t('Kdo úkol udělá')} onScroll={e => konecPasu(e.currentTarget)}
+                <div ref={pasLidi} onScroll={e => konecPasu(e.currentTarget)}
                   className="flex gap-1.5 overflow-x-auto overscroll-x-contain scrollbar-none scroll-fade-x -mx-1 px-1 py-2.5 -my-1.5 sm:flex-wrap sm:overflow-visible sm:[mask-image:none] sm:[-webkit-mask-image:none]">
                   <button type="button" aria-pressed={form.komu.length === 0} onClick={() => setForm(f => ({ ...f, komu: [] }))}
                     className={`filter-pill tap-target ${form.komu.length === 0 ? 'seg-on' : 'seg-off glass'}`}>{t('Kdokoli')}</button>

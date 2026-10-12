@@ -9,6 +9,7 @@
   "priority": "high",
   "status": "pending",
   "dueDate": "PREDVCEREM",
+  "dueTime": null,
   "recurrence": null,
   "seriesId": null,
   "checklist": [],
@@ -19,7 +20,9 @@
   "completedAt": null,
   "source": null,
   "sourceMeta": null,
-  "requireBeforeClosing": false
+  "requireBeforeClosing": false,
+  "requirePhoto": false,
+  "completionPhoto": null
  },
  {
   "id": 2,
@@ -31,6 +34,7 @@
   "priority": "medium",
   "status": "pending",
   "dueDate": "DNES",
+  "dueTime": "CAS_PRED",
   "recurrence": null,
   "seriesId": null,
   "checklist": [
@@ -57,7 +61,9 @@
    "guideId": 4,
    "guideTitle": "Sirupy na baru"
   },
-  "requireBeforeClosing": false
+  "requireBeforeClosing": false,
+  "requirePhoto": false,
+  "completionPhoto": null
  },
  {
   "id": 3,
@@ -67,8 +73,9 @@
   "createdBy": 15,
   "teamTask": true,
   "priority": "low",
-  "status": "pending",
+  "status": "in_progress",
   "dueDate": "VCERA",
+  "dueTime": null,
   "recurrence": null,
   "seriesId": null,
   "checklist": [],
@@ -79,7 +86,9 @@
   "completedAt": null,
   "source": null,
   "sourceMeta": null,
-  "requireBeforeClosing": false
+  "requireBeforeClosing": false,
+  "requirePhoto": false,
+  "completionPhoto": null
  },
  {
   "id": 4,
@@ -91,6 +100,7 @@
   "priority": "medium",
   "status": "pending",
   "dueDate": "DNES",
+  "dueTime": "18:00",
   "recurrence": "daily",
   "seriesId": "s-1",
   "checklist": [],
@@ -101,7 +111,9 @@
   "completedAt": null,
   "source": null,
   "sourceMeta": null,
-  "requireBeforeClosing": false
+  "requireBeforeClosing": false,
+  "requirePhoto": false,
+  "completionPhoto": null
  },
  {
   "id": 5,
@@ -113,6 +125,7 @@
   "priority": "medium",
   "status": "pending",
   "dueDate": "ZITRA",
+  "dueTime": "18:00",
   "recurrence": "daily",
   "seriesId": "s-1",
   "checklist": [],
@@ -123,7 +136,9 @@
   "completedAt": null,
   "source": null,
   "sourceMeta": null,
-  "requireBeforeClosing": false
+  "requireBeforeClosing": false,
+  "requirePhoto": false,
+  "completionPhoto": null
  },
  {
   "id": 6,
@@ -135,6 +150,7 @@
   "priority": "high",
   "status": "pending",
   "dueDate": "POZDEJI",
+  "dueTime": null,
   "recurrence": null,
   "seriesId": null,
   "checklist": [],
@@ -145,7 +161,9 @@
   "completedAt": null,
   "source": null,
   "sourceMeta": null,
-  "requireBeforeClosing": false
+  "requireBeforeClosing": false,
+  "requirePhoto": false,
+  "completionPhoto": null
  },
  {
   "id": 7,
@@ -157,6 +175,7 @@
   "priority": "low",
   "status": "done",
   "dueDate": "DNES",
+  "dueTime": null,
   "recurrence": null,
   "seriesId": null,
   "checklist": [],
@@ -167,7 +186,9 @@
   "completedAt": "CAS_DNES",
   "source": null,
   "sourceMeta": null,
-  "requireBeforeClosing": false
+  "requireBeforeClosing": false,
+  "requirePhoto": true,
+  "completionPhoto": "/api/upload/77"
  },
  {
   "id": 8,
@@ -179,6 +200,7 @@
   "priority": "low",
   "status": "done",
   "dueDate": "PREDVCEREM",
+  "dueTime": null,
   "recurrence": null,
   "seriesId": null,
   "checklist": [],
@@ -189,7 +211,9 @@
   "completedAt": "CAS_PREDVCEREM",
   "source": null,
   "sourceMeta": null,
-  "requireBeforeClosing": false
+  "requireBeforeClosing": false,
+  "requirePhoto": false,
+  "completionPhoto": null
  },
  {
   "id": 9,
@@ -201,6 +225,7 @@
   "priority": "medium",
   "status": "pending",
   "dueDate": "DNES",
+  "dueTime": null,
   "recurrence": null,
   "seriesId": null,
   "checklist": [
@@ -224,6 +249,8 @@
   "completedAt": null,
   "source": null,
   "sourceMeta": null,
-  "requireBeforeClosing": true
+  "requireBeforeClosing": true,
+  "requirePhoto": true,
+  "completionPhoto": null
  }
 ]
