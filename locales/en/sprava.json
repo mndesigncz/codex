@@ -1633,5 +1633,16 @@
   "„{nazev}\" zmizí z tabule. Vrátit to nepůjde.": "“{nazev}” will disappear from the board. This cannot be undone.",
   "„{nazev}\" zmizí ze seznamu i z přehledu týmu.": "“{nazev}” will disappear from the list and from the team overview.",
   "„{nazev}“ přidáno, ale kasa u něj nedala cenu — doplň ji ručně.": "“{nazev}” was added, but the register gave no price for it — fill it in manually.",
-  "…a dalších {n}": "…and {n} more"
+  "…a dalších {n}": "…and {n} more",
+  "plán {od}–{do}": "plan {od}–{do}",
+  "upraveno ({kdo})": "edited ({kdo})",
+  "upraveno": "edited",
+  "+{n} min pozdě": "+{n} min late",
+  "odešel o {n} min dřív": "left {n} min early",
+  "Upravil(a) {kdo}": "Edited by {kdo}",
+  "Důvod (nepovinné)": "Reason (optional)",
+  "Uvidí ho účetní v exportu.": "The accountant will see it in the export.",
+  "Uvidí ho i člověk v oznámení o změně a účetní v exportu.": "The person sees it in the change notification and the accountant in the export.",
+  "Např. zapomněl se odpíchnout": "E.g. forgot to clock out",
+  "Upraveno|zaznam": "Edited"
 }

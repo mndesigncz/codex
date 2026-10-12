@@ -1899,5 +1899,10 @@
   "Dnes podle rozvrhu {od}–{do}": "Dnes podľa rozvrhu {od}–{do}",
   "Dnes nemáš směnu v rozvrhu": "Dnes nemáš zmenu v rozvrhu",
   "+{n} min po začátku": "+{n} min po začiatku",
-  "Směna začíná za {delka}": "Zmena začína o {delka}"
+  "Směna začíná za {delka}": "Zmena začína o {delka}",
+  "Důvod (nepovinné)": "Dôvod (nepovinné)",
+  "Např. zapomněl se odpíchnout": "Napr. zabudol sa odpichnúť",
+  "Pozdě": "Neskoro",
+  "plán {h} h": "plán {h} h",
+  "{n}× pozdě": "{n}× neskoro"
 }

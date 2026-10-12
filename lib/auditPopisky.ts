@@ -80,6 +80,10 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'wage.adjustment_delete': 'Smazána prémie nebo srážka',
   'points.award': 'Pochvala s body',
   'points.award_delete': 'Smazána pochvala',
+  // docházka (kolo 7: ruční oprava s důvodem)
+  'dochazka.upravit': 'Ručně upraven záznam docházky',
+  'dochazka.pridat': 'Ručně přidán záznam docházky',
+  'dochazka.smazat': 'Smazán záznam docházky',
   // akce
   'event.create': 'Založena akce',
   'event.checkout': 'Akce: zboží vydáno ze skladu',

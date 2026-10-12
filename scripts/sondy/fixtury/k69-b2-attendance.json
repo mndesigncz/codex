@@ -54,7 +54,13 @@
    "clockIn": "@120",
    "clockOut": null,
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   },
   {
    "id": 902,
@@ -64,7 +70,13 @@
    "clockIn": "@600",
    "clockOut": null,
    "source": "self",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   },
   {
    "id": 881,
@@ -74,27 +86,45 @@
    "clockIn": "@1920",
    "clockOut": "@1440",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   },
   {
    "id": 882,
    "employeeId": 18,
    "employeeName": "Petra Malá",
    "employeeAvatar": "👱",
-   "clockIn": "@1920",
-   "clockOut": "@1440",
+   "clockIn": "@D-1T08:12",
+   "clockOut": "@D-1T16:05",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": "08:00",
+   "planEnd": "16:00",
+   "planDate": "D-1"
   },
   {
    "id": 883,
    "employeeId": 17,
    "employeeName": "Jakub Horák",
    "employeeAvatar": "🧔",
-   "clockIn": "@1920",
-   "clockOut": "@1440",
-   "source": "manual",
-   "note": null
+   "clockIn": "@D-2T07:58",
+   "clockOut": "@D-2T15:35",
+   "source": "kiosk",
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": "08:00",
+   "planEnd": "16:00",
+   "planDate": "D-2"
   },
   {
    "id": 884,
@@ -104,17 +134,29 @@
    "clockIn": "@3360",
    "clockOut": "@2880",
    "source": "kiosk",
-   "note": null
+   "note": "Zapomněla se odpíchnout, doplněno podle kamery.",
+   "updatedBy": 15,
+   "updatedByName": "Martin Nemeškal",
+   "updatedAt": "@2700",
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   },
   {
    "id": 885,
    "employeeId": 18,
    "employeeName": "Petra Malá",
    "employeeAvatar": "👱",
-   "clockIn": "@3360",
-   "clockOut": "@2880",
+   "clockIn": "@D-2T08:25",
+   "clockOut": "@D-2T16:00",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": "08:00",
+   "planEnd": "16:00",
+   "planDate": "D-2"
   },
   {
    "id": 886,
@@ -124,7 +166,13 @@
    "clockIn": "@3360",
    "clockOut": "@2880",
    "source": "manual",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   },
   {
    "id": 887,
@@ -134,17 +182,29 @@
    "clockIn": "@4800",
    "clockOut": "@4320",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   },
   {
    "id": 888,
    "employeeId": 18,
    "employeeName": "Petra Malá",
    "employeeAvatar": "👱",
-   "clockIn": "@4800",
-   "clockOut": "@4320",
+   "clockIn": "@D-3T08:02",
+   "clockOut": "@D-3T16:00",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": "08:00",
+   "planEnd": "16:00",
+   "planDate": "D-3"
   },
   {
    "id": 889,
@@ -154,7 +214,13 @@
    "clockIn": "@4800",
    "clockOut": "@4320",
    "source": "manual",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   },
   {
    "id": 890,
@@ -164,17 +230,29 @@
    "clockIn": "@6240",
    "clockOut": "@5760",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
   },
   {
    "id": 891,
    "employeeId": 18,
    "employeeName": "Petra Malá",
    "employeeAvatar": "👱",
-   "clockIn": "@6240",
-   "clockOut": "@5760",
+   "clockIn": "@D-4T08:15",
+   "clockOut": "@D-4T16:00",
    "source": "kiosk",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": "08:00",
+   "planEnd": "16:00",
+   "planDate": "D-4"
   },
   {
    "id": 892,
@@ -184,7 +262,29 @@
    "clockIn": "@6240",
    "clockOut": "@5760",
    "source": "manual",
-   "note": null
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": null,
+   "planEnd": null,
+   "planDate": null
+  },
+  {
+   "id": 893,
+   "employeeId": 18,
+   "employeeName": "Petra Malá",
+   "employeeAvatar": "👱",
+   "clockIn": "@D-5T07:58",
+   "clockOut": "@D-5T16:01",
+   "source": "kiosk",
+   "note": null,
+   "updatedBy": null,
+   "updatedByName": null,
+   "updatedAt": null,
+   "planStart": "08:00",
+   "planEnd": "16:00",
+   "planDate": "D-5"
   }
  ],
  "adjustments": [

@@ -1896,5 +1896,10 @@
   "Dnes podle rozvrhu {od}–{do}": "Dziś według grafiku {od}–{do}",
   "Dnes nemáš směnu v rozvrhu": "Dziś nie masz zmiany w grafiku",
   "+{n} min po začátku": "+{n} min po rozpoczęciu",
-  "Směna začíná za {delka}": "Zmiana zaczyna się za {delka}"
+  "Směna začíná za {delka}": "Zmiana zaczyna się za {delka}",
+  "Důvod (nepovinné)": "Powód (opcjonalnie)",
+  "Např. zapomněl se odpíchnout": "Np. zapomniał zarejestrować wyjście",
+  "Pozdě": "Spóźnienia",
+  "plán {h} h": "plan {h} godz.",
+  "{n}× pozdě": "{n}× spóźnienie"
 }

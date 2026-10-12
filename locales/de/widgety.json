@@ -1897,5 +1897,10 @@
   "Dnes podle rozvrhu {od}–{do}": "Heute laut Dienstplan {od}–{do}",
   "Dnes nemáš směnu v rozvrhu": "Heute keine Schicht im Dienstplan",
   "+{n} min po začátku": "+{n} Min. nach Beginn",
-  "Směna začíná za {delka}": "Schicht beginnt in {delka}"
+  "Směna začíná za {delka}": "Schicht beginnt in {delka}",
+  "Důvod (nepovinné)": "Grund (optional)",
+  "Např. zapomněl se odpíchnout": "Z. B. Ausstempeln vergessen",
+  "Pozdě": "Verspätet",
+  "plán {h} h": "Plan {h} Std.",
+  "{n}× pozdě": "{n}× zu spät"
 }

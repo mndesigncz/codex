@@ -14,13 +14,18 @@
 // adrese jako tyto widgety, takže plocha pošle jediný dotaz a po úpravě
 // záznamu (obnovDochazku) se překreslí obojí najednou.
 //
+// Kolo 7 (R7-2): u záznamu plán směny a odchylka („+12 min pozdě", „odešel o 25 min
+// dřív"; lib/dochazkaPrehled.odchylkyZaznamu — přestávka nehlásí pozdní příchod), ruční
+// oprava a přidání nesou důvod (Textarea do 300 znaků) a v řádku „upraveno (Martin)"
+// s chipem Upraveno; CSV pro účetní má Plán od/do, Odchylku, Poznámku a kdo upravil.
+//
 // Oprávnění (kolo 67, katalog): přidat a opravit čas jen s dochazka.upravit,
 // smazat s dochazka.mazat, export s dochazka.exportovat (sloupec Mzda jen
 // s finance.mzdy). Dřív se tlačítka ukazovala všem, kdo docházku vidí,
 // a končila 403.
 
 import { useEffect, useMemo, useState } from 'react';
-import { Avatar, Button, Card, Chip, ErrorState, Field, Input, ListRow, Modal, ObdobiLista, SearchField, Select, Skeleton } from '../ui';
+import { Avatar, Button, Card, Chip, ErrorState, Field, Input, ListRow, Modal, ObdobiLista, SearchField, Select, Skeleton, Textarea } from '../ui';
 import { usePersonProfile } from './ProfileLinkProvider';
 import { useSymbol } from '../CurrencyProvider';
 import { usePlan, UpgradeModal } from '../Pro';
@@ -33,7 +38,8 @@ import { dbTimeHM, parseDbTime, pragueDayOf, pragueToday } from '@/lib/pragueTim
 import { earnedFor } from '@/lib/wages';
 import { apiMessage, okJson } from '@/lib/api';
 import { obsahuje } from '@/lib/hledani';
-import { hodinyMinuty, konecSmeny, navrhOdchodu, rozeberZaznam, sazbyZRosteru, spropitneZaObdobi, upravyVRozmezi, zaznamyVRozmezi, type ClenRosteru, type UpravaMzdy, type UzaverkaSpropitne, type ZaznamDochazky } from '@/lib/dochazkaPrehled';
+import { csvPlanAUprava, hodinyMinuty, konecSmeny, navrhOdchodu, odchylkyZaznamu, rozeberZaznam, sazbyZRosteru, spropitneZaObdobi, upravyVRozmezi, zaznamyVRozmezi, type ClenRosteru, type UpravaMzdy, type UzaverkaSpropitne, type ZaznamDochazky } from '@/lib/dochazkaPrehled';
+import { fmtHM } from '@/lib/i18n/format';
 import { obdobiZPresetu, platneRozmezi, pocetDni } from '@/lib/obdobi';
 import { useObdobi } from '@/lib/useObdobi';
 import { dayPlus } from '@/lib/pragueTime';
@@ -54,6 +60,10 @@ function vyberUzaverky(raw: any): UzaverkaSpropitne[] {
 
 /** Server vrací docházku nejvýš 180 dní zpět. */
 const NEJDALE_DNI = 180;
+/** Nejdelší důvod ruční opravy — stejný strop jako server (app/api/attendance). */
+const MAX_DUVOD = 300;
+/** Křestní jméno do řádku („upraveno (Martin)"); celé jméno nese CSV a title. */
+const krestni = (jmeno: string | null | undefined) => String(jmeno ?? '').trim().split(/\s+/)[0] ?? '';
 const JSON_HLAVICKA = { 'Content-Type': 'application/json' };
 
 /** Datum na vstup datetime-local v místním čase prohlížeče. */
@@ -118,6 +128,9 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
   }, [nekdoBezi]);
 
   const sazby = useMemo(() => sazbyZRosteru(roster), [roster]);
+  // Plán proti skutečnosti po záznamech (kolo 7) — počítá se ze všech záznamů období, ne jen
+  // z vyhledaných: přestávka (dva záznamy na směnu) se posuzuje jako jedna směna.
+  const plany = useMemo(() => odchylkyZaznamu(entries, ted), [entries, ted]);
   // Spropitné do exportu: z uzávěrek, rozpočítané podle hodin na směně (lib/dochazkaPrehled.spropitneZaObdobi) — jen
   // s celými tržbami, jinak by podíl lhal. Stejná adresa jako widgety, takže dotaz se sdílí.
   const vidiDyska = vidiMzdy && smi('finance.trzby') && smi('uzaverky.zobrazit_vse');
@@ -142,7 +155,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
   }, [zobrazene, loc, t]);
 
   // ---- Úprava a ukončení ----
-  const [uprava, setUprava] = useState<{ e: Zaznam; od: string; do: string; zPlanu?: boolean } | null>(null);
+  const [uprava, setUprava] = useState<{ e: Zaznam; od: string; do: string; duvod: string; zPlanu?: boolean } | null>(null);
   const [ukladam, setUkladam] = useState(false);
   const [chybaUpravy, setChybaUpravy] = useState<string | null>(null);
   // „Ukončit" zapomenutého odchodu nesmí předvyplnit teď: kdo odešel v 16:00 a vedoucí
@@ -161,7 +174,8 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
       odchod = doVstupu(n?.cas ?? new Date());
       zPlanu = !!n?.zPlanu;
     }
-    setUprava({ e, od: doVstupu(e.clockIn), do: odchod, zPlanu });
+    // Důvod předvyplní dosavadní poznámku — kdo ji nechá, nic nezmění; kdo ji smaže, smaže ji.
+    setUprava({ e, od: doVstupu(e.clockIn), do: odchod, duvod: e.note ?? '', zPlanu });
   };
   const ulozUpravu = async () => {
     if (!uprava) return;
@@ -173,6 +187,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
           id: uprava.e.id,
           clockIn: uprava.od ? new Date(uprava.od).toISOString() : undefined,
           clockOut: uprava.do ? new Date(uprava.do).toISOString() : null,
+          note: uprava.duvod.trim(),
         }),
       }).then(okJson);
       setUprava(null);
@@ -186,7 +201,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
 
   // ---- Přidání záznamu (někdo se zapomněl odpíchnout úplně) ----
   const [pridat, setPridat] = useState(false);
-  const [novy, setNovy] = useState<{ kdo: string; od: string; do: string }>({ kdo: '', od: '', do: '' });
+  const [novy, setNovy] = useState<{ kdo: string; od: string; do: string; duvod: string }>({ kdo: '', od: '', do: '', duvod: '' });
   const [pridavam, setPridavam] = useState(false);
   const [chybaPridani, setChybaPridani] = useState<string | null>(null);
   const ulozNovy = async () => {
@@ -195,10 +210,10 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
     try {
       await fetch('/api/attendance', {
         method: 'POST', headers: JSON_HLAVICKA,
-        body: JSON.stringify({ employeeId: Number(novy.kdo), clockIn: new Date(novy.od).toISOString(), clockOut: new Date(novy.do).toISOString() }),
+        body: JSON.stringify({ employeeId: Number(novy.kdo), clockIn: new Date(novy.od).toISOString(), clockOut: new Date(novy.do).toISOString(), note: novy.duvod.trim() || undefined }),
       }).then(okJson);
       setPridat(false);
-      setNovy({ kdo: '', od: '', do: '' });
+      setNovy({ kdo: '', od: '', do: '', duvod: '' });
       obnovDochazku();
     } catch (err) {
       setChybaPridani(apiMessage(err, t('Záznam se nepodařilo přidat.')));
@@ -230,7 +245,8 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
     if (!pro) { setUpgradeFor('Export CSV'); return; } // i18n-ok (název funkce)
     const dyska = vidiDyska && uzaverky.data ? spropitneZaObdobi(uzaverky.data, entries, Date.now(), r.od, r.do) : null;
     const sDyskem = !!dyska && !dyska.skryto;
-    const hlava = ['Datum', 'Zaměstnanec', 'Příchod', 'Odchod', 'Odpracováno', 'Zdroj', ...(vidiMzdy ? [`Mzda (${symbol})`] : []), ...(sDyskem ? [`Spropitné podíl (${symbol})`] : [])]; // i18n-ok (CSV pro účetní zůstává česky)
+    // Plán, odchylka a stopa ruční opravy (kolo 7) stojí hned za Zdrojem: účetní chce vidět, co je z tabletu, co opravené a proč.
+    const hlava = ['Datum', 'Zaměstnanec', 'Příchod', 'Odchod', 'Odpracováno', 'Zdroj', 'Plán od', 'Plán do', 'Odchylka (min)', 'Poznámka', 'Upravil', ...(vidiMzdy ? [`Mzda (${symbol})`] : []), ...(sDyskem ? [`Spropitné podíl (${symbol})`] : [])]; // i18n-ok (CSV pro účetní zůstává česky)
     // Podíl na spropitném je za den a člověka — v CSV ho nese první záznam toho dne, ať se nesčítá dvakrát.
     const dyskoVyplneno = new Set<string>();
     const radky = entries.map(e => {
@@ -247,6 +263,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
         e.clockOut ? dbTimeHM(e.clockOut) : '',
         hMM(z.delka),
         ZDROJ[e.source ?? ''] ?? 'ručně', // i18n-ok
+        ...csvPlanAUprava(e, plany.get(String(e.id))),
         // Stejné pravidlo jako součty (lib/wages): mzda po záznamu, záznam nad 24 h 0.
         ...(vidiMzdy ? [sazba ? String(earnedFor(z.ms, sazba)) : ''] : []),
         ...(sDyskem ? [dysko > 0 ? String(Math.round(dysko)) : ''] : []),
@@ -259,6 +276,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
         String(u.day).slice(0, 10).split('-').reverse().map(Number).join('. '), // „12. 10. 2026" bez locale — CSV je pro účetní
         kdo?.name ?? 'Neznámý', '', '', '', // i18n-ok
         `${u.amount > 0 ? 'prémie' : 'srážka'}${u.note ? `: ${u.note}` : ''}`, // i18n-ok
+        '', '', '', '', '',
         String(u.amount),
         ...(sDyskem ? [''] : []),
       ];
@@ -302,14 +320,40 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                 const bezi = z.druh === 'bezi';
                 const zapomenuty = z.druh === 'zapomenuty';
                 const cas = `${dbTimeHM(e.clockIn)} – ${e.clockOut ? dbTimeHM(e.clockOut) : '…'}`;
-                const meta = [cas, zdrojText(e.source), e.note].filter(Boolean).join(' · ');
+                const upraveno = e.updatedBy != null && e.updatedBy !== '';
+                const kdoUpravil = krestni(e.updatedByName);
+                // Meta se na úzkém displeji zkracuje — nejdřív čas a plán, pak zdroj a kdo upravil.
+                // Důvod (poznámka) jde do `detail`, který se zalamuje: věta na 300 znaků by v meta zmizela.
+                const meta = [
+                  cas,
+                  e.planStart ? t('plán {od}–{do}', { od: fmtHM(e.planStart), do: fmtHM(e.planEnd) }) : null,
+                  zdrojText(e.source),
+                  upraveno ? (kdoUpravil ? t('upraveno ({kdo})', { kdo: kdoUpravil }) : t('upraveno')) : null,
+                ].filter(Boolean).join(' · ');
+                const o = plany.get(String(e.id));
+                const pozde = o?.pozdeMin != null ? t('+{n} min pozdě', { n: o.pozdeMin }) : null;
+                const driv = o?.drivMin != null ? t('odešel o {n} min dřív', { n: o.drivMin }) : null;
+                // Pravý slot: zapomenutý odchod má přednost, pak odchylka od plánu (při obojím chip
+                // pozdě a v title obojí), pak poznámka ze samoobsluhy k ověření. „Upraveno" vedle.
+                const stav = zapomenuty ? <Chip tone="wait" size="sm" icon="warning">{t('Zapomenutý odchod?')}</Chip>
+                  : pozde ? <span title={driv ? `${pozde} · ${driv}` : undefined} className="inline-flex"><Chip tone="wait" size="sm">{pozde}</Chip>{driv && <span className="sr-only">{` · ${driv}`}</span>}</span>
+                  : driv ? <Chip tone="wait" size="sm">{driv}</Chip>
+                  : e.note && !upraveno ? <Chip tone="wait" size="sm">{t('Zkontrolovat')}</Chip>
+                  : z.druh === 'dlouhy' ? <Chip tone="wait" size="sm">{t('Nad 24 h')}</Chip> : null;
+                const chipy = stav || upraveno ? (
+                  <span className="inline-flex flex-wrap items-center justify-end gap-1.5">
+                    {stav}
+                    {upraveno && <span title={e.updatedByName ? t('Upravil(a) {kdo}', { kdo: e.updatedByName }) : undefined} className="inline-flex"><Chip tone="muted" size="sm">{t('Upraveno', undefined, 'zaznam')}</Chip></span>}
+                  </span>
+                ) : null;
+                // Tužka a koš mají na telefonu 44 px (palec), na počítači zůstávají drobné v hustém seznamu.
                 const akce = (
                   <>
                     {smiUpravit && (zapomenuty
-                      ? <Button variant="secondary" size="sm" onClick={() => otevriUpravu(e, true)} aria-label={t('Ukončit příchod: {jmeno}', { jmeno: e.employeeName ?? '' })}>{t('Ukončit')}</Button>
-                      : <Button variant="ghost" size="sm" iconOnly icon="pencil" onClick={() => otevriUpravu(e)} aria-label={t('Upravit čas: {jmeno}', { jmeno: e.employeeName ?? '' })} />)}
+                      ? <Button variant="secondary" size="sm" className="max-sm:!h-11" onClick={() => otevriUpravu(e, true)} aria-label={t('Ukončit příchod: {jmeno}', { jmeno: e.employeeName ?? '' })}>{t('Ukončit')}</Button>
+                      : <Button variant="ghost" size="sm" iconOnly icon="pencil" className="max-sm:!h-11 max-sm:!w-11" onClick={() => otevriUpravu(e)} aria-label={t('Upravit čas: {jmeno}', { jmeno: e.employeeName ?? '' })} />)}
                     {smiMazat && (
-                      <Button variant="ghost" size="sm" iconOnly icon="trash" onClick={() => { setChybaSmazani(null); setSmazat(e); }} aria-label={t('Smazat záznam: {jmeno}', { jmeno: e.employeeName ?? '' })} />
+                      <Button variant="ghost" size="sm" iconOnly icon="trash" className="max-sm:!h-11 max-sm:!w-11" onClick={() => { setChybaSmazani(null); setSmazat(e); }} aria-label={t('Smazat záznam: {jmeno}', { jmeno: e.employeeName ?? '' })} />
                     )}
                   </>
                 );
@@ -326,10 +370,14 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
                       </button>
                     ) : (e.employeeName ?? t('Neznámý'))}
                     meta={meta}
+                    detail={e.note || undefined}
                     value={zapomenuty ? undefined : bezi ? t('běží {cas}', { cas: hodinyMinuty(z.delka) }) : hodinyMinuty(z.delka)}
-                    right={zapomenuty ? <Chip tone="wait" size="sm" icon="warning">{t('Zapomenutý odchod?')}</Chip>
-                      : e.note ? <Chip tone="wait" size="sm">{t('Zkontrolovat')}</Chip>
-                      : z.druh === 'dlouhy' ? <Chip tone="wait" size="sm">{t('Nad 24 h')}</Chip> : undefined}
+                    // Chipy na počítači (lg+) ve sloupci pevné šířky `aside` — u každého řádku, i prázdný —
+                    // ať hodiny stojí v jedné svislici, i když má jen každý třetí řádek „+12 min pozdě".
+                    // Pod lg je doplněk skrytý a chipy jdou do `right`, který ocas zalomí pod jméno. `right`
+                    // dostane každý řádek (na lg+ prázdný), jinak by mezera navíc posunula čísla o 12 px.
+                    aside={chipy ?? ''}
+                    right={<span className="lg:hidden">{chipy}</span>}
                     actions={smiUpravit || smiMazat ? akce : undefined}
                   />
                 );
@@ -379,9 +427,14 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
             <Field id="dochazka-novy-od" label={t('Příchod')}>
               <Input id="dochazka-novy-od" type="datetime-local" value={novy.od} onChange={e => setNovy(n => ({ ...n, od: e.target.value }))} />
             </Field>
-            <Field id="dochazka-novy-do" label={t('Odchod')} error={chybaPridani}>
+            <Field id="dochazka-novy-do" label={t('Odchod')}>
               <Input id="dochazka-novy-do" type="datetime-local" value={novy.do} onChange={e => setNovy(n => ({ ...n, do: e.target.value }))} />
             </Field>
+            <Field id="dochazka-novy-duvod" label={t('Důvod (nepovinné)')} hint={t('Uvidí ho účetní v exportu.')}>
+              <Textarea id="dochazka-novy-duvod" rows={2} maxLength={MAX_DUVOD} value={novy.duvod} placeholder={t('Např. zapomněl se odpíchnout')}
+                onChange={e => setNovy(n => ({ ...n, duvod: e.target.value }))} />
+            </Field>
+            {chybaPridani && <p className="note note-danger text-sm" role="alert">{chybaPridani}</p>}
           </div>
         </Modal>
       )}
@@ -396,9 +449,14 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
             <Field id="dochazka-uprava-od" label={t('Příchod')}>
               <Input id="dochazka-uprava-od" type="datetime-local" value={uprava.od} onChange={e => setUprava(u => (u ? { ...u, od: e.target.value } : u))} />
             </Field>
-            <Field id="dochazka-uprava-do" label={t('Odchod')} hint={uprava.zPlanu ? t('Předvyplněný je plánovaný konec směny. Uprav ho, jestli odešel jindy.') : t('Prázdné pole = pořád na směně.')} error={chybaUpravy}>
+            <Field id="dochazka-uprava-do" label={t('Odchod')} hint={uprava.zPlanu ? t('Předvyplněný je plánovaný konec směny. Uprav ho, jestli odešel jindy.') : t('Prázdné pole = pořád na směně.')}>
               <Input id="dochazka-uprava-do" type="datetime-local" value={uprava.do} onChange={e => setUprava(u => (u ? { ...u, do: e.target.value } : u))} />
             </Field>
+            <Field id="dochazka-uprava-duvod" label={t('Důvod (nepovinné)')} hint={t('Uvidí ho i člověk v oznámení o změně a účetní v exportu.')}>
+              <Textarea id="dochazka-uprava-duvod" rows={2} maxLength={MAX_DUVOD} value={uprava.duvod} placeholder={t('Např. zapomněl se odpíchnout')}
+                onChange={e => setUprava(u => (u ? { ...u, duvod: e.target.value } : u))} />
+            </Field>
+            {chybaUpravy && <p className="note note-danger text-sm" role="alert">{chybaUpravy}</p>}
           </div>
         </Modal>
       )}

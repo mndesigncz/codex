@@ -38,7 +38,8 @@
 //  - moje.vydelek — hodiny × vlastní sazba (sazbu API pošle jen s oprávněním).
 // Widgety s obdobím „Podle stránky" čtou přepínač Docházky přes ObdobiStrankyDochazky.
 //
-// Kolo 7 (R7-2): Píchačky ukážou dnešní směnu z rozvrhu a zpoždění po příchodu.
+// Kolo 7 (R7-2): Píchačky ukážou dnešní směnu z rozvrhu a zpoždění, Souhrn hodin plán
+// a počet pozdních příchodů a „Ukončit" má nepovinný důvod.
 //
 // Všechny berou /api/attendance a tam, kde stačí jeden den, stejnou adresu —
 // sdílená mezipaměť useDataWidgetu pak pošle jediný dotaz za celou plochu a odpíchnutí
@@ -49,7 +50,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useSession } from 'next-auth/react';
-import { Avatar, Button, CasovyGraf, Chip, Field, Input, ListRow, Menu, Modal, ObdobiLista, PersonChip, Segmented, Stat, StatRow } from '../../ui';
+import { Avatar, Button, CasovyGraf, Chip, Field, Input, ListRow, Menu, Modal, ObdobiLista, PersonChip, Segmented, Stat, StatRow, Textarea } from '../../ui';
 import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
 import { Widget, useVyrizeno, useWidget, type StavNacteni } from '../Widget';
 import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
@@ -477,6 +478,7 @@ function OknoUkonceni({ jmeno, entryId, navrh, zPlanu, onHotovo, onZavrit }: {
 }) {
   const t = useT('widgety');
   const [cas, setCas] = useState(() => doVstupu(navrh));
+  const [duvod, setDuvod] = useState('');
   const [pise, setPise] = useState(false);
   const [chyba, setChyba] = useState<string | null>(null);
   const idPole = `ukoncit-${entryId}`;
@@ -485,7 +487,8 @@ function OknoUkonceni({ jmeno, entryId, navrh, zPlanu, onHotovo, onZavrit }: {
     if (!cas || Number.isNaN(d.getTime())) { setChyba(t('Vyplň čas odchodu.')); return; }
     setPise(true); setChyba(null);
     try {
-      await fetch('/api/attendance', { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify({ id: entryId, clockOut: d.toISOString() }) }).then(okJson);
+      // Prázdný důvod = beze změny (případná poznámka záznamu zůstane), vyplněný se uloží s tím, kdo ukončil.
+      await fetch('/api/attendance', { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify({ id: entryId, clockOut: d.toISOString(), note: duvod.trim() || undefined }) }).then(okJson);
       onHotovo();
     } catch (e) {
       setChyba(apiMessage(e, t('Příchod se nepodařilo ukončit.')));
@@ -501,9 +504,15 @@ function OknoUkonceni({ jmeno, entryId, navrh, zPlanu, onHotovo, onZavrit }: {
         <Button variant="secondary" onClick={onZavrit}>{t('Zrušit')}</Button>
         <Button variant="primary" loading={pise} onClick={uloz}>{t('Uložit odchod')}</Button>
       </>}>
-      <Field id={idPole} label={t('Odchod')} hint={zPlanu ? t('Předvyplněný je plánovaný konec směny. Uprav ho, jestli odešel jindy.') : t('Plánovanou směnu nemá, předvyplněný je aktuální čas. Uprav ho, jestli odešel dřív.')} error={chyba}>
-        <Input id={idPole} type="datetime-local" value={cas} onChange={e => setCas(e.target.value)} />
-      </Field>
+      <div className="space-y-3">
+        <Field id={idPole} label={t('Odchod')} hint={zPlanu ? t('Předvyplněný je plánovaný konec směny. Uprav ho, jestli odešel jindy.') : t('Plánovanou směnu nemá, předvyplněný je aktuální čas. Uprav ho, jestli odešel dřív.')}>
+          <Input id={idPole} type="datetime-local" value={cas} onChange={e => setCas(e.target.value)} />
+        </Field>
+        <Field id={`${idPole}-duvod`} label={t('Důvod (nepovinné)')}>
+          <Textarea id={`${idPole}-duvod`} rows={2} maxLength={300} value={duvod} placeholder={t('Např. zapomněl se odpíchnout')} onChange={e => setDuvod(e.target.value)} />
+        </Field>
+        {chyba && <p className="note note-danger text-sm" role="alert">{chyba}</p>}
+      </div>
     </Modal>,
     document.body,
   );
@@ -738,7 +747,8 @@ function SouhrnHodin({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: str
     // widget se na to nespoléhá (pole katalogu: Kč u člověka).
     const sazby = vidiMzdy ? sazbyZRosteru(data.data.roster as ClenRosteruB2[]) : new Map<string, number>();
     const lide = new Map(data.data.roster.map(m => [String(m.id), { jmeno: m.name ?? '', avatar: m.avatar ?? null }]));
-    return seradSouhrn(souhrnHodin(entriesObdobi, ted, sazby, { spropitne: dyska && !dyska.skryto ? dyska.poLidech : null, upravy: upravyPoLidech(upravyObdobi), lide }), razeni);
+    // Kolo 7: i plán (součet délek plánovaných směn) a pozdní příchody — API je posílá u záznamů (planStart/planEnd).
+    return seradSouhrn(souhrnHodin(entriesObdobi, ted, sazby, { spropitne: dyska && !dyska.skryto ? dyska.poLidech : null, upravy: upravyPoLidech(upravyObdobi), lide, plan: true }), razeni);
   }, [data.data, entriesObdobi, ted, razeni, vidiMzdy, dyska, upravyObdobi]);
   const mzdyCelkem = useMemo(() => radky.reduce((a, x) => a + (x.vyplata ?? 0), 0), [radky]);
   const upravyCelkem = useMemo(() => radky.reduce((a, x) => a + x.upravy, 0), [radky]);
@@ -768,11 +778,15 @@ function SouhrnHodin({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: str
 
   const profil = !nahled && !!otevriProfil && smi('tym.profil');
   const zobrazene = L ? radky : radky.slice(0, RADKU_M);
+  // „Kdo chodí pozdě" (kolo 7) jako řazení, jen když v období někdo pozdě přišel.
+  const nekdoPozde = radky.some(r => r.pozde > 0);
   const moznosti = [
     { id: 'hodiny' as const, label: t('Hodiny', undefined, 'widgety') },
     ...(vidiMzdy ? [{ id: 'mzda' as const, label: t('Mzda') }] : []),
+    ...(nekdoPozde || razeni === 'pozde' ? [{ id: 'pozde' as const, label: t('Pozdě') }] : []),
     { id: 'jmeno' as const, label: t('Jméno') },
   ];
+  const planText = (ms: number) => t('plán {h} h', { h: (Math.round(ms / 360_000) / 10).toLocaleString(loc) });
   return (
     <Widget nacteni={data}
       doplnek={!L && radky.length > 0 ? <Chip tone="muted" size="sm">{nazevDni(t, dni)}</Chip> : undefined}
@@ -820,12 +834,22 @@ function SouhrnHodin({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: str
             r.upravy > 0 ? t('prémie {castka}', { castka: sZnamenkem(r.upravy, money) }) : r.upravy < 0 ? t('srážka {castka}', { castka: sZnamenkem(r.upravy, money) }) : null,
           ].filter(Boolean).join(' · ');
           const pocetUprav = upravyObdobi.filter(u => String(u.userId) === r.id).length;
+          // Pod hodinami plán (Homebase/7shifts „Scheduled") a výplata; počet pozdních příchodů chipem vpravo.
+          const sMzdou = vidiMzdy && r.vyplata != null;
           const radek = {
             lead: <Avatar emoji={r.avatar} size="sm" />,
             title: r.jmeno,
             meta,
             value: hodinyMinuty(r.ms),
-            valueMeta: vidiMzdy && r.vyplata != null ? money(r.vyplata) : undefined,
+            valueMeta: r.planMs > 0 || sMzdou ? (
+              <>
+                {r.planMs > 0 && <span className="block">{planText(r.planMs)}</span>}
+                {sMzdou && <span className="block">{money(r.vyplata!)}</span>}
+              </>
+            ) : undefined,
+            // Na počítači ve sloupci pevné šířky (aside, i prázdný), ať hodiny drží svislici; pod lg vpravo v ocase.
+            aside: nekdoPozde ? (r.pozde > 0 ? <Chip tone="wait" size="sm">{t('{n}× pozdě', { n: r.pozde.toLocaleString(loc) })}</Chip> : '') : undefined,
+            right: nekdoPozde ? <span className="lg:hidden">{r.pozde > 0 && <Chip tone="wait" size="sm">{t('{n}× pozdě', { n: r.pozde.toLocaleString(loc) })}</Chip>}</span> : undefined,
           };
           if (smiPremie) {
             // Řádek nese „···" (prémie / srážka), takže celý klikací být nemůže — profil otevře jméno.

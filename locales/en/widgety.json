@@ -1896,5 +1896,10 @@
   "Dnes podle rozvrhu {od}–{do}": "Scheduled today {od}–{do}",
   "Dnes nemáš směnu v rozvrhu": "No shift scheduled for you today",
   "+{n} min po začátku": "+{n} min after start",
-  "Směna začíná za {delka}": "Shift starts in {delka}"
+  "Směna začíná za {delka}": "Shift starts in {delka}",
+  "Důvod (nepovinné)": "Reason (optional)",
+  "Např. zapomněl se odpíchnout": "E.g. forgot to clock out",
+  "Pozdě": "Late",
+  "plán {h} h": "plan {h} h",
+  "{n}× pozdě": "{n}× late"
 }
