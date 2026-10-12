@@ -31,7 +31,8 @@ const OBRAZOVKY = [
   { id: 'uzaverka', url: '/employee/shifts?view=closing', fix: 'k69-b5a-rozlozeni-uzaverka', plocha: 'zamestnanec.uzaverka',
     de: ['Schichtabschluss', 'Kassenprüfung'], en: ['Shift closing', 'Till check'], cs: ['Uzávěrka směny', 'Kontrola kasy', 'Tržby'] },
   { id: 'dostupnost', url: '/employee/shifts?view=availability', fix: 'k69-b1-rozlozeni-dostupnost', plocha: 'zamestnanec.dostupnost',
-    de: ['Verfügbarkeitskalender', 'Urlaub und Freizeit'], en: ['Availability calendar', 'Vacation and time off'], cs: ['Kalendář dostupnosti', 'Dovolená a volno'] },
+    // Kolo 7 (R7-1): karta „Dovolená a volno" pod plochou je pryč — žádost o volno je tlačítko v hlavičce.
+    de: ['Verfügbarkeitskalender', 'Urlaubsantrag'], en: ['Availability calendar', 'Time-off request'], cs: ['Kalendář dostupnosti', 'Žádost o volno'] },
   { id: 'odmeny', url: '/employee/shifts?view=rewards', fix: 'k69-b7-rozlozeni-odmeny-zam', plocha: 'zamestnanec.odmeny',
     de: ['Belohnungen'], en: ['Rewards'], cs: ['Body za směny'] },
   { id: 'chat', url: '/employee/shifts?view=chat', fix: null, plocha: null,

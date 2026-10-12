@@ -1,0 +1,12 @@
+{
+ "id": 41,
+ "employeeId": 16,
+ "month": "MINULY",
+ "unavailableDates": ["PO1", "PO2", "PO3", "PO4", "PO5"],
+ "dayPreferences": {},
+ "preferredShift": "flexible",
+ "maxShifts": null,
+ "note": "Pondělky škola",
+ "status": "submitted",
+ "createdAt": "2026-10-01T09:00:00.000Z"
+}

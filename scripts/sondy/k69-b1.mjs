@@ -37,8 +37,12 @@ const podvrh = ({ mineId = 15 } = {}) => (req, json, stav) => {
   if (stav.chyby[path] || stav.chyby[full]) return json({ error: 'Server spadl' }, stav.chyby[path] || stav.chyby[full]);
   if (req.method() !== 'GET') {
     if (path === '/api/schedule/generate' && !JSON.parse(req.postData() || '{}').commit) return json(nacti('k69-b1-generate'));
-    if (['/api/timeoff', '/api/shifts/offers', '/api/schedule', '/api/availability', '/api/schedule/publish'].includes(path)) {
+    if (['/api/timeoff', '/api/shifts/offers', '/api/schedule', '/api/availability', '/api/schedule/publish', '/api/availability/remind', '/api/shifts'].includes(path)) {
       (stav.zapisy ??= []).push({ m: req.method(), path, full, body: req.postData() });
+      // Kolo 7 (R7-1): připomenutí dostupnosti, poznámka ke směně a stav publikování.
+      if (path === '/api/availability/remind') return json({ notified: 3, ztlumeno: 0 });
+      if (path === '/api/shifts' && req.method() === 'PATCH') { const b = JSON.parse(req.postData() || '{}'); return json({ ok: true, shift: { id: b.id, note: b.note ?? null } }); }
+      if (path === '/api/schedule/publish') return json({ ok: true, notified: 3, publishedAt: new Date().toISOString() });
       // Schválení Terezina volna (71): ve dnech volna má dvě směny — server je vrátí v `conflicts` (kolo 6 UX).
       if (path === '/api/timeoff' && req.method() === 'PATCH') {
         const b = JSON.parse(req.postData() || '{}');
@@ -215,6 +219,77 @@ const FIX_ROZVRH = nacti('k69-b1-rozlozeni-rozvrh');
   await p.locator('[aria-label="Část rozvrhu"]').getByText('Typy směn').click();
   tvrdi('W3: záložka Typy směn je bez plochy widgetů, hlavička zůstává (jeden h1)', await dokud(async () => (await p.locator('[data-plocha]').count()) === 0, 2000) && (await h1(p)).pocet === 1);
   tvrdi('W3: …a ukáže typy směn s „Přidat typ" (jediná limetka záložky)', await p.getByRole('button', { name: 'Přidat typ' }).isVisible() && await limetky(p) === 1);
+  await ctx.close();
+}
+
+// Kolo 7 (R7-1): stav publikování u měsíce, poznámka ke směně (okno dne, pilulka, úprava),
+// připomenutí dostupnosti a zamítnutí volna s důvodem.
+{
+  const { ctx, p, stav, chyby } = await kontext({ fix: FIX_ROZVRH, dalsi: podvrh() });
+  await otevri(p, ROZVRH, 'vedeni.rozvrh');
+  const nastroj = widgetLi(p, 'nastroj');
+  const chip = nastroj.locator('[data-publikace]');
+  tvrdi('R7-1: Chip „Publikováno 3. 10." vedle přepínače měsíce', await dokud(async () => (await chip.getAttribute('data-publikace').catch(() => null)) === 'publikovano', 3000)
+    && /Publikováno 3\. 10\./.test(await chip.innerText()), await chip.innerText().catch(() => '—'));
+  // Pilulka s poznámkou: ikona, poznámka v title a nic nepřetéká buňku.
+  const pil = nastroj.locator('[data-poznamka]');
+  const pm = await pil.first().evaluate(el => ({ title: el.getAttribute('title'), ikona: !!el.querySelector('svg'), pres: el.scrollWidth - el.clientWidth, bunka: el.closest('button')?.scrollWidth - el.closest('button')?.clientWidth }));
+  tvrdi('R7-2: pilulka směny s poznámkou má ikonu a poznámku v title, nepřetéká', await pil.count() >= 1 && pm.ikona && /klíče u Petry/.test(pm.title ?? '') && pm.bunka <= 1, JSON.stringify(pm));
+  // Okno dne s poznámkou u směny, pole Poznámka a úprava tužkou.
+  await pil.first().click();
+  const den = p.getByRole('dialog');
+  tvrdi('R7-3: okno dne ukazuje poznámku u uložené směny', await dokud(() => den.locator('[data-poznamka-smeny]').first().isVisible(), 3000) && /klíče u Petry/.test(await den.locator('[data-poznamka-smeny]').first().innerText()));
+  await den.getByRole('button', { name: /Upravit poznámku ke směně/ }).first().click();
+  const pole = den.getByLabel(/Poznámka ke směně — /);
+  await pole.fill('Klíče jsou v trezoru');
+  await den.getByRole('button', { name: 'Uložit' }).click();
+  tvrdi('R7-3: tužka → Uložit pošle PATCH /api/shifts s poznámkou', await dokud(() => (stav.zapisy ?? []).some(z => z.path === '/api/shifts' && z.m === 'PATCH' && z.body.includes('Klíče jsou v trezoru')), 2000));
+  await den.getByRole('button', { name: 'Přidat s vlastním časem…' }).click().catch(() => {});
+  await den.getByLabel('Kdo').selectOption({ label: 'Jakub Horák' }).catch(() => {});
+  await den.getByLabel('Poznámka ke směně (nepovinné)').fill('Rozvoz v 9:00');
+  tvrdi('R7-4: pole Poznámka má maxLength 200', await den.getByLabel('Poznámka ke směně (nepovinné)').getAttribute('maxlength') === '200');
+  await den.getByRole('button', { name: /^(Přidat směnu|Přesto přidat)$/ }).last().click();
+  tvrdi('R7-4: přidání směny pošle POST /api/schedule s poznámkou', await dokud(() => (stav.zapisy ?? []).some(z => z.path === '/api/schedule' && z.m === 'POST' && z.body.includes('"note":"Rozvoz v 9:00"')), 2000),
+    JSON.stringify((stav.zapisy ?? []).filter(z => z.path === '/api/schedule').map(z => z.body).slice(-1)));
+  await den.getByRole('button', { name: 'Zavřít', exact: true }).last().click().catch(() => {});
+  await dokud(async () => !(await den.isVisible()), 2000);
+  // Připomenout dostupnost.
+  const dost = widgetLi(p, 'rozvrh.dostupnost_tymu');
+  const pripomenout = dost.getByRole('button', { name: /^Připomenout \(\d+\)$/ });
+  tvrdi('R7-5: Dostupnost týmu má „Připomenout (n)"', await pripomenout.count() === 1, await dost.innerText().catch(() => '').then(x => x.slice(0, 120)));
+  await pripomenout.click();
+  tvrdi('R7-5: …pošle POST /api/availability/remind s měsícem widgetu', await dokud(() => (stav.zapisy ?? []).some(z => z.path === '/api/availability/remind' && /"month":"\d{4}-\d{2}"/.test(z.body)), 2000));
+  tvrdi('R7-5: …Toast „Připomenuto 3 lidem" a tlačítko „Připomenuto" zakázané', await dokud(() => p.getByText('Připomenuto 3 lidem').isVisible(), 2000)
+    && await dost.getByRole('button', { name: 'Připomenuto' }).isDisabled());
+  // Zamítnout s důvodem.
+  const volno = widgetLi(p, 'rozvrh.zadosti_volno');
+  await volno.getByRole('button', { name: /Další akce se žádostí/ }).first().click();
+  await p.getByRole('menuitem', { name: /Zamítnout s důvodem/ }).click();
+  const okno = p.getByRole('dialog', { name: 'Zamítnout žádost o volno' });
+  tvrdi('R7-6: „···" › Zamítnout s důvodem… otevře okno s polem „Důvod (uvidí žadatel)"', await dokud(() => okno.isVisible(), 2000) && await okno.getByLabel('Důvod (uvidí žadatel)').isVisible());
+  await okno.getByLabel('Důvod (uvidí žadatel)').fill('Ten týden už má volno Petr');
+  await okno.getByRole('button', { name: 'Zamítnout' }).click();
+  tvrdi('R7-6: …PATCH /api/timeoff rejected s note', await dokud(() => (stav.zapisy ?? []).some(z => z.path === '/api/timeoff' && z.m === 'PATCH' && z.body.includes('rejected') && z.body.includes('Ten týden už má volno Petr')), 2000));
+  tvrdi('R7-6: Zamítnout v řádku zůstává jedním klikem (bez okna)', await volno.getByRole('button', { name: 'Zamítnout', exact: true }).count() >= 1);
+  tvrdi('R7: bez chyb v konzoli', chyby.filter(c => !/hydrat|same key/i.test(c)).length === 0, chyby.slice(0, 3).join(' | '));
+  await p.screenshot({ path: OUT + 'k83-rozvrh-desk.png', fullPage: true });
+  await ctx.close();
+}
+// …a „Změněno od publikování" s „Publikovat změny".
+{
+  const zmeneno = (req, json, stav) => {
+    const u = new URL(req.url());
+    if (u.pathname === '/api/schedule' && req.method() === 'GET') {
+      const d = nacti('k69-b1-schedule', u.searchParams.get('month') ?? MESIC);
+      return json({ ...d, publication: { ...d.publication, zmeneno: true } });
+    }
+    return podvrh()(req, json, stav);
+  };
+  const { ctx, p } = await kontext({ fix: FIX_ROZVRH, dalsi: zmeneno });
+  await otevri(p, ROZVRH, 'vedeni.rozvrh');
+  const chip = widgetLi(p, 'nastroj').locator('[data-publikace]');
+  tvrdi('R7-7: změněný měsíc — Chip „Změněno od publikování" a tlačítko „Publikovat změny"',
+    await dokud(async () => (await chip.getAttribute('data-publikace').catch(() => null)) === 'zmeneno', 3000) && await p.getByRole('button', { name: 'Publikovat změny' }).first().isVisible());
   await ctx.close();
 }
 
