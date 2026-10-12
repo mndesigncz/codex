@@ -205,7 +205,8 @@ function SmenyPrehled({ velikost, nahled }: WidgetProps) {
       ) : (
         <StatRow>
           <Stat label={t('Nadcházející')} value={c.nadchazejici.toLocaleString('cs-CZ')} note={t('{n, plural, one {směna} few {směny} other {směn}}', { n: c.nadchazejici })} />
-          <Stat label={t('Odpracováno')} value={hodinyText(c.odpracovanoH)} unit={t('h')} note={t('{n, plural, one {# směna} few {# směny} other {# směn}} do včerejška', { n: c.minulych })} />
+          {/* Součet délek směn z rozvrhu, ne z píchaček — „Odpracováno" podle docházky ukazuje dochazka.moje_odpracovano. */}
+          <Stat label={t('Naplánováno')} value={hodinyText(c.odpracovanoH)} unit={t('h')} note={t('{n, plural, one {# směna} few {# směny} other {# směn}} z rozvrhu do včerejška', { n: c.minulych })} />
           <Stat label={t('Celkem')} value={c.celkem.toLocaleString('cs-CZ')} note={t('{n, plural, one {směna} few {směny} other {směn}}', { n: c.celkem })} />
         </StatRow>
       )}
