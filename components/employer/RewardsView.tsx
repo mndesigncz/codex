@@ -434,24 +434,27 @@ function SpravaKatalogu() {
         {t('Katalog odměn')}
       </h2>
       <p className="t-meta mt-1 text-pretty">{t('Za co si tým může vyměnit body. Schválená výměna body odečte automaticky.')}</p>
-      <form className="mt-4 grid grid-cols-[4.5rem_minmax(0,1fr)] sm:grid-cols-[4.5rem_minmax(0,1fr)_7rem_8rem_auto] items-end gap-3"
+      {/* Na telefonu dva sloupce: Název přes celou šířku, pod ním Emoji | Cena, pak Bonus
+          a Přidat přes celou šířku (pořadí přes max-sm:order-*). Dřív pět polí ve dvou
+          sloupcích [4.5rem, 1fr] posadilo Cenu do 72px sloupce. Od sm beze změny. */}
+      <form className="mt-4 grid grid-cols-2 sm:grid-cols-[4.5rem_minmax(0,1fr)_7rem_8rem_auto] items-end gap-3"
         onSubmit={e => { e.preventDefault(); void pridat(); }}>
-        <Field id="nova-odmena-ikona" label={t('Emoji')}>
+        <Field id="nova-odmena-ikona" label={t('Emoji')} className="max-sm:order-2">
           <Input id="nova-odmena-ikona" value={ikona} onChange={e => setIkona(e.target.value)} maxLength={4} className="text-center" />
         </Field>
-        <Field id="nova-odmena-nazev" label={t('Název odměny')}>
+        <Field id="nova-odmena-nazev" label={t('Název odměny')} className="col-span-2 sm:col-span-1 max-sm:order-1">
           <Input id="nova-odmena-nazev" value={nazev} onChange={e => setNazev(e.target.value)} maxLength={120} placeholder={t('Např. Směna končí o hodinu dřív')} />
         </Field>
-        <Field id="nova-odmena-cena" label={t('Cena v bodech')}>
+        <Field id="nova-odmena-cena" label={t('Cena v bodech')} className="max-sm:order-3">
           <Input id="nova-odmena-cena" type="number" inputMode="numeric" min={1} value={cena} onChange={e => setCena(e.target.value)} className="tabular-nums" />
         </Field>
-        <Field id="nova-odmena-bonus" label={t('Bonus k výplatě')} hint={t('Volitelné; schválení ho zapíše jako prémii.')}>
+        <Field id="nova-odmena-bonus" label={t('Bonus k výplatě')} hint={t('Volitelné; schválení ho zapíše jako prémii.')} className="col-span-2 sm:col-span-1 max-sm:order-4">
           <div className="relative">
             <Input id="nova-odmena-bonus" type="number" inputMode="numeric" min={0} value={bonus} onChange={e => setBonus(e.target.value)} className="tabular-nums pr-9" />
             <span aria-hidden className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-black/45">{symbol}</span>
           </div>
         </Field>
-        <Button type="submit" variant="primary" icon="plus" loading={pridavam} disabled={!jde} className="col-span-2 sm:col-span-1">{t('Přidat')}</Button>
+        <Button type="submit" variant="primary" icon="plus" loading={pridavam} disabled={!jde} className="col-span-2 w-full sm:col-span-1 sm:w-auto max-sm:order-5">{t('Přidat')}</Button>
       </form>
       {chyba && <p className="note note-danger mt-3" role="alert">{chyba}</p>}
       {data.error ? (
