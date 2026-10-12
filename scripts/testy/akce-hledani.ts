@@ -20,4 +20,9 @@ export default function ({ eq, ok }: Testy) {
   // Kolo 6 (B3): Role a oprávnění jsou záložka Nastavení, ne Tým.
   const role = AKCE_HLEDANI.find(a => a.id === 'tym-role');
   eq('akce: Role a oprávnění vedou do Nastavení › Role', [role?.stranka, role?.arg], ['settings', 'roles']);
+  // Kolo 7 (R7-1): žádost o volno jako vlastní akce zaměstnance — otevře okno na Dostupnosti (arg `volno`).
+  const volno = AKCE_HLEDANI.find(a => a.id === 'volno-zadost');
+  eq('akce: Požádat o volno vede na Dostupnost s předáním „volno"', [volno?.nazev, volno?.stranka, volno?.arg], ['Požádat o volno', 'availability', 'volno']);
+  const najdiZam = (q: string) => zam.filter(a => obsahujeNekde(proHledani(q), a.nazev, a.kde, ...a.slova)).map(a => a.id);
+  ok('akce: „dovolena" i „nemoc" najdou Požádat o volno (jen zaměstnanec)', najdiZam('dovolena').includes('volno-zadost') && najdiZam('nemoc').includes('volno-zadost') && !vedeni.some(a => a.id === 'volno-zadost'));
 }

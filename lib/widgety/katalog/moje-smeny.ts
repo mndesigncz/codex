@@ -30,7 +30,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     id: 'moje.smeny_prehled',
     oblast: 'moje-smeny',
     nazev: 'Moje směny v číslech',
-    popis: 'Nadcházející, odpracované a celkem směn.',
+    popis: 'Nadcházející, naplánované hodiny a celkem.',
     ikona: 'overview',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'M',

@@ -61,6 +61,8 @@ export const ZACHAZENI_TABULEK: Record<string, Zachazeni> = {
   daily_reports: 'ponechat', recipes: 'ponechat', guides: 'ponechat', procedures: 'ponechat', polls: 'ponechat',
   stocktakes: 'ponechat', share_links: 'ponechat', menu_boards: 'ponechat', roles: 'ponechat', role_upravy: 'ponechat',
   pos_bills: 'ponechat', client_broadcasts: 'ponechat', client_pravidla_verze: 'ponechat',
+  // stav publikování rozvrhu (kolo 7): kdo publikoval, zůstane anonymně jako u směn
+  schedule_publications: 'ponechat',
   // vlastnictví: řeší se u podniku
   teams: 'tym', organizations: 'tym',
 };
@@ -105,7 +107,7 @@ export const TYMOVE_TABULKY = [
   'client_memberships', 'client_reservations', 'client_orders', 'client_coupons', 'client_coupon_claims', 'client_loyalty_ledger',
   'client_stamp_progress', 'client_stamp_events', 'client_scan_actions', 'client_kasa_idem', 'client_stamp_campaigns', 'client_bill_awards', 'client_groups', 'client_group_members', 'client_reviews',
   'client_broadcasts', 'client_pravidla_verze', 'client_member_notes', 'client_automatizace', 'client_automatizace_log', 'client_promos', 'client_banners', 'client_banner_stats', 'rozlozeni_stranek', 'content_reports', 'client_importy', 'client_vouchers', 'client_voucher_uses', 'client_bonus_rules',
-  'entity_notes',
+  'entity_notes', 'schedule_publications',
 ];
 /** Tabulky s `team_id`, které se při smazání podniku ZÁMĚRNĚ nemažou: účetní záznamy platformy (fakturace, provize). */
 export const TYMOVE_PONECHAT = ['billing_events', 'referral_rewards', 'admin_audit'];

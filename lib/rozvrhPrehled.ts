@@ -10,7 +10,7 @@
 // a „HH:MM" (žádné `toISOString()`, které po 22:00 pražského času posune
 // den do zítřka).
 
-import { dayPlus } from './pragueTime.ts';
+import { dayPlus, parseDbTime, pragueDayOf } from './pragueTime.ts';
 import { usek } from './rozvrhDen.ts';
 
 // ---------------------------------------------------------------------------
@@ -441,6 +441,8 @@ export interface MojeSmena {
   typeColor?: string | null;
   /** Hodnocení směny (1–5) — API ho vrací jen u vlastních směn. */
   rating?: number | null;
+  /** Instrukce vedení ke směně (kolo 7) — API ji vrací jen u vlastních směn nebo plánovači. */
+  note?: string | null;
 }
 
 const odS = (s: MojeSmena) => hm(s.startTime ?? s.start_time);
@@ -489,6 +491,158 @@ const KATEGORIE_BARVY: Record<string, number> = {
 export const kategorieBarvy = (barva: unknown): number | null => KATEGORIE_BARVY[String(barva ?? '').toLowerCase()] ?? null;
 
 // ---------------------------------------------------------------------------
+// Připomenutí dostupnosti (kolo 7, R7-1)
+// ---------------------------------------------------------------------------
+
+/**
+ * Jak často jde lidem připomenout dostupnost — na podnik a měsíc. Dvacet hodin,
+ * ne „jednou za den": kdo připomene v 9:12, nemá druhý den v 8:50 narazit na zákaz.
+ * POST /api/availability/remind hlídá totéž v SQL (`INTERVAL '20 hours'`).
+ */
+export const PRIPOMINKA_DOSTUPNOSTI_H = 20;
+
+/** Měsíc, na který jde připomínat: „RRRR-MM" tohoto nebo příštího měsíce (podle `dnes`), jinak null. */
+export function mesicProPripominku(v: unknown, dnes: string): string | null {
+  const m = String(v ?? '');
+  if (!/^\d{4}-\d{2}$/.test(m)) return null;
+  const tento = dnes.slice(0, 7);
+  return m === tento || m === posunMesice(tento, 1) ? m : null;
+}
+
+/** Brání poslední připomínka další? Jen pro tentýž měsíc a do PRIPOMINKA_DOSTUPNOSTI_H hodin. */
+export function pripominkaBlokuje(posledni: { at: Date | null; mesic: string | null | undefined }, mesic: string, ted: Date): boolean {
+  if (!posledni.at || posledni.mesic !== mesic) return false;
+  const uplynulo = ted.getTime() - posledni.at.getTime();
+  return uplynulo >= 0 && uplynulo < PRIPOMINKA_DOSTUPNOSTI_H * 3600_000;
+}
+
+/**
+ * Komu připomenout: členové podniku, ze kterých widget Dostupnost týmu počítá
+ * „Chybí" (vedení i zaměstnanci, ne tablet), bez odevzdané dostupnosti na měsíc
+ * a bez toho, kdo připomíná. Pořadí podle vstupu, bez duplicit.
+ */
+export function komuPripomenout(clenove: readonly number[], odevzdali: readonly number[], meId: number): number[] {
+  const hotovo = new Set(odevzdali.map(Number));
+  return [...new Set(clenove.map(Number))].filter(id => Number.isFinite(id) && id !== meId && !hotovo.has(id));
+}
+
+// ---------------------------------------------------------------------------
+// Poznámka ke směně (kolo 7, R7-1)
+// ---------------------------------------------------------------------------
+
+/** Nejvýš tolik znaků smí mít poznámka ke směně — jednořádková instrukce („Otevíráš sám, klíče u Petry"). */
+export const MAX_POZNAMKA_SMENY = 200;
+
+/**
+ * Poznámka ke směně ze vstupu API nebo CSV: ořízne mezery a zalomení na jeden
+ * řádek, prázdná → null. Delší než MAX_POZNAMKA_SMENY → false (server odpoví
+ * 400; uříznutá instrukce by mohla říkat něco jiného, než vedení napsalo).
+ */
+export function poznamkaSmeny(v: unknown): string | null | false {
+  if (v == null) return null;
+  const s = String(v).replace(/\s+/g, ' ').trim();
+  if (!s) return null;
+  return s.length > MAX_POZNAMKA_SMENY ? false : s;
+}
+
+// ---------------------------------------------------------------------------
+// Dostupnost: týdenní vzor (kolo 7, R7-1)
+// ---------------------------------------------------------------------------
+
+/**
+ * Stav dne v kalendáři dostupnosti: 'available' (výchozí, neukládá se), 'off',
+ * starší 'morning' / 'afternoon', nebo 'type:<id>' podle typů směn podniku.
+ */
+export type StavDneDostupnosti = string;
+
+const PLATNY_STAV_DNE = (v: unknown): v is string =>
+  v === 'morning' || v === 'afternoon' || v === 'off' || (typeof v === 'string' && /^type:\d+$/.test(v));
+
+/**
+ * Uložená dostupnost (GET /api/availability?mine=1) → mapa „den → stav" bez
+ * výchozích dnů. Denní preference mají přednost, nedostupné dny bez preference
+ * jsou 'off'. Neznámé hodnoty se zahodí (stejně jako dřív při načtení v kalendáři).
+ */
+export function stavyDostupnosti(data: { dayPreferences?: Record<string, unknown> | null; unavailableDates?: readonly unknown[] | null } | null | undefined): Record<string, StavDneDostupnosti> {
+  const mapa: Record<string, StavDneDostupnosti> = {};
+  for (const [d, v] of Object.entries(data?.dayPreferences ?? {})) if (PLATNY_STAV_DNE(v) && den(d)) mapa[d] = v;
+  for (const d of data?.unavailableDates ?? []) { const x = den(d); if (x && !mapa[x]) mapa[x] = 'off'; }
+  return mapa;
+}
+
+/** Dny měsíce „RRRR-MM" jako „RRRR-MM-DD". */
+function dnyMesice(mesic: string): string[] {
+  const [y, m] = mesic.split('-').map(Number);
+  const pocet = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return Array.from({ length: pocet }, (_, i) => `${mesic}-${String(i + 1).padStart(2, '0')}`);
+}
+
+/** Den v týdnu jako Date.getDay(): 0 = neděle … 6 = sobota (počítá se v UTC, bez hodin zařízení). */
+export function denTydne(d: string): number {
+  const [y, m, dd] = d.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, dd)).getUTCDay();
+}
+
+/**
+ * Klepnutí na hlavičku sloupce (Po–Ne): všem dnům toho dne v týdnu v měsíci nastaví stav.
+ * Se štětcem (`stav`) vybraný stav — a když už ho všechny mají, vrátí je na Dostupný
+ * (jako druhé klepnutí na den). Bez štětce (`null`) další stav cyklu podle prvního
+ * takového dne — stejná logika jako klepnutí na jeden den. Dny před `dnes` se
+ * přeskočí (dostupnost na včerejšek nemá smysl a přepsala by odeslané).
+ */
+export function nastavDenVTydnu(
+  stavy: Readonly<Record<string, StavDneDostupnosti>>, mesic: string, den0az6: number,
+  stav: StavDneDostupnosti | null, cyklus: readonly StavDneDostupnosti[], dnes: string,
+): Record<string, StavDneDostupnosti> {
+  const dny = dnyMesice(mesic).filter(d => denTydne(d) === den0az6 && d >= dnes);
+  if (!dny.length) return { ...stavy };
+  const stavDne = (d: string) => stavy[d] ?? 'available';
+  let novy: StavDneDostupnosti;
+  if (stav) novy = dny.every(d => stavDne(d) === stav) ? 'available' : stav;
+  else { const i = cyklus.indexOf(stavDne(dny[0])); novy = cyklus[(i < 0 ? 0 : i + 1) % Math.max(1, cyklus.length)] ?? 'available'; }
+  const out = { ...stavy };
+  for (const d of dny) { if (novy === 'available') delete out[d]; else out[d] = novy; }
+  return out;
+}
+
+/**
+ * „Jako minulý měsíc": z minulé dostupnosti vezme pro každý den v týdnu nejčastější
+ * ne-výchozí stav (jen když se vyskytl aspoň 2× a jednoznačně — remíza nic nepřenese)
+ * a dá ho stejným dnům v týdnu v měsíci `mesic`. Konkrétní data se nepřenášejí
+ * (3. listopad není 3. prosinec). Přepíše jen dny bez vlastního stavu, přeskočí dny
+ * před `dnes` a stavy, které podnik už nemá (`povolene`, smazaný typ směny).
+ *
+ * `vzor` je po sloupcích mřížky podle začátku týdne podniku (0 = neděle, 1 = pondělí):
+ * vzor[0] je první sloupec — UI z něj skládá větu „Převzato: Po Nemůžu".
+ */
+export function prevezmiVzor(
+  minuly: Parameters<typeof stavyDostupnosti>[0], mesic: string, zacatekTydne: 0 | 1,
+  o: { stavajici?: Readonly<Record<string, StavDneDostupnosti>>; dnes?: string; povolene?: readonly StavDneDostupnosti[] } = {},
+): { stavy: Record<string, StavDneDostupnosti>; vzor: (StavDneDostupnosti | null)[]; zmeneno: number } {
+  const pocty: Map<string, number>[] = Array.from({ length: 7 }, () => new Map());
+  for (const [d, st] of Object.entries(stavyDostupnosti(minuly))) {
+    if (o.povolene && !o.povolene.includes(st)) continue;
+    const m = pocty[denTydne(d)];
+    m.set(st, (m.get(st) ?? 0) + 1);
+  }
+  const poDnech: (StavDneDostupnosti | null)[] = pocty.map(m => {
+    const serazene = [...m.entries()].sort((a, b) => b[1] - a[1]);
+    if (!serazene.length || serazene[0][1] < 2) return null;
+    return serazene[1] && serazene[1][1] === serazene[0][1] ? null : serazene[0][0];
+  });
+  const stavy: Record<string, StavDneDostupnosti> = { ...(o.stavajici ?? {}) };
+  let zmeneno = 0;
+  for (const d of dnyMesice(mesic)) {
+    const st = poDnech[denTydne(d)];
+    if (!st || stavy[d] || (o.dnes && d < o.dnes)) continue;
+    stavy[d] = st;
+    zmeneno += 1;
+  }
+  const vzor = Array.from({ length: 7 }, (_, sloupec) => poDnech[(sloupec + zacatekTydne) % 7]);
+  return { stavy, vzor, zmeneno };
+}
+
+// ---------------------------------------------------------------------------
 // Volno a výměny
 // ---------------------------------------------------------------------------
 
@@ -504,6 +658,8 @@ export interface ZadostVolna {
   status: 'pending' | 'approved' | 'rejected' | string;
   /** Kolik směn má člověk v rozvrhu ve dnech volna (API u čekajících žádostí, kolo 6 UX). */
   conflicts?: number | null;
+  /** Důvod rozhodnutí, který vedení napsalo (u zamítnutí ho vidí žadatel; kolo 7). */
+  decisionNote?: string | null;
 }
 
 /** Směna, která schválenému volnu zůstala v rozvrhu (PATCH /api/timeoff → conflicts[]). */
@@ -546,6 +702,50 @@ export function zadostiVolna<T extends ZadostVolna>(zadosti: readonly T[], dnes:
     vyrizene: zadosti.filter(z => z.status !== 'pending' && !(z.status === 'approved' && den(z.toDate || z.fromDate) >= dnes))
       .sort((a, b) => den(b.fromDate).localeCompare(den(a.fromDate))),
   };
+}
+
+/** Nejvýš tolik znaků smí mít důvod rozhodnutí o volnu (PATCH /api/timeoff `note`, kolo 7). */
+export const MAX_DUVOD_VOLNA = 300;
+
+/**
+ * Důvod rozhodnutí o volnu ze vstupu API: ořízne mezery, prázdný → null.
+ * Delší než MAX_DUVOD_VOLNA → false: server odpoví 400 a nic potichu neuřízne
+ * (žadatel by dostal useknutou větu).
+ */
+export function duvodVolna(v: unknown): string | null | false {
+  if (v == null) return null;
+  const s = String(v).trim();
+  if (!s) return null;
+  return s.length > MAX_DUVOD_VOLNA ? false : s;
+}
+
+/**
+ * Text oznámení žadateli po rozhodnutí o volnu: termín („2026-10-03" nebo
+ * „2026-10-03 až 2026-10-07"), poznámka, že vedení termín upravilo, a důvod
+ * zamítnutí za tečkou („ · Málo lidí, zkus jiný týden"). Důvod jde jen k
+ * zamítnutí — u schválení ho UI nenabízí a „schváleno · …" by mátlo.
+ */
+export function textRozhodnutiVolna(o: { od: string; doDne: string; status: 'approved' | 'rejected' | null; terminUpraven: boolean; duvod?: string | null }): string {
+  const termin = o.od === o.doDne ? o.od : `${o.od} až ${o.doDne}`;
+  const upraveno = o.terminUpraven && o.status ? ' (termín upraven vedením)' : '';
+  const duvod = o.status === 'rejected' && o.duvod ? ` · ${o.duvod}` : '';
+  return `${termin}${upraveno}${duvod}`;
+}
+
+/**
+ * Má být sbalené „Moje žádosti (n)" na Dostupnosti rovnou otevřené? Ano, když
+ * nějaká žádost čeká, nebo je zamítnutá a čerstvá (podaná v posledních 14 dnech,
+ * nebo termín ještě neproběhl) — důvod zamítnutí má člověk vidět bez hledání.
+ * Schválené a staré zamítnuté jsou historie, ty zůstanou sbalené.
+ */
+export function otevritMojeZadosti(zadosti: readonly { status: string; toDate: string; fromDate?: string; createdAt?: string | null }[], dnes: string): boolean {
+  const pred14 = dayPlus(dnes, -14);
+  return zadosti.some(z => {
+    if (z.status === 'pending') return true;
+    if (z.status !== 'rejected') return false;
+    const podano = parseDbTime(z.createdAt ?? null);
+    return (podano != null && pragueDayOf(podano) >= pred14) || den(z.toDate || z.fromDate) >= dnes;
+  });
 }
 
 export interface NabidkaSmeny {

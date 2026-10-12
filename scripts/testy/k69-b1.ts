@@ -156,7 +156,7 @@ export default function ({ eq, ok }: Testy) {
   ok('review: Moje směny vedení mají ve výchozím Minulé směny i Kdo má směnu (MyShifts je kreslil i vedení)',
     vychoziW(MOJE_V).includes('moje.minule_smeny') && vychoziW(MOJE_V).includes('rozvrh.tym_nahled'));
   ok('review: Moje směny vedení bez „Zadej dostupnost" ve výchozím (formulář je na téže stránce)', !vychoziW(MOJE_V).includes('rozvrh.pripominka_dostupnosti'));
-  ok('review: Dostupnost zaměstnance bez Mého volna ve výchozím (Moje žádosti jsou pod plochou)', !vychoziW(DOSTUPNOST).includes('moje.schvalene_volno'));
+  ok('review: Dostupnost zaměstnance bez Mého volna ve výchozím (Moje žádosti jsou v nástroji pod kalendářem)', !vychoziW(DOSTUPNOST).includes('moje.schvalene_volno'));
   const rozsah = widget('rozvrh.tym_nahled')?.nastaveni?.find(n => n.klic === 'rozsah') as { moznosti?: { id: string }[] } | undefined;
   eq('review: Kdo má směnu nabízí Dnes, Týden i 14 dní (dřív TeamSchedule 14 dní)', rozsah?.moznosti?.map(m => m.id), ['dnes', 'tyden', 'dva_tydny']);
   eq('review: Kdo má směnu — 14 dní rozsahu projde tymPoDnech celé', tymPoDnech([{ id: 1, date: '2026-10-09' }, { id: 2, date: '2026-10-10' }] as any, '2026-09-26', 14).map(d => d.den), ['2026-10-09']);

@@ -9,11 +9,19 @@
 // s `.list` a stav chipem místo ručně obarvených pilulek; zrušení čekající
 // žádosti se po chybě vrátí a řekne to (dřív se tiše objevila zpátky).
 // Po odeslání se obnoví widget „Moje volno" (stejná data přes /api/timeoff?mine=1).
+//
+// Kolo 7 (R7-1): na telefonu ležela karta pod celým kalendářem dostupnosti, mimo
+// výřez. Zaměstnanec teď žádá tlačítkem „Žádost o volno" v hlavičce Dostupnosti
+// (AvailabilitySubmit → `OknoZadostiVolna`, okno zdola) a své žádosti vidí ve
+// sbaleném „Moje žádosti (n)" pod kalendářem (`SeznamZadosti`). Kusy jsou proto
+// rozebrané: stav formuláře s konceptem (`useFormularVolna` — drží ho volající,
+// ať zavřené okno rozepsané neztratí), pole (`PoleVolna`), seznam (`useMojeZadosti`
+// + `SeznamZadosti`). Výchozí export je dál karta pro Moje směny vedení.
 
 import { useCallback, useEffect, useState } from 'react';
 
-import { Button, Card, Chip, EmptyState, Field, Input, ListRow, Segmented } from '../ui';
-import { useDraft } from '@/lib/useDraft';
+import { Button, Card, Chip, EmptyState, Field, Input, ListRow, Modal, Segmented } from '../ui';
+import { useDraft, type Koncept } from '@/lib/useDraft';
 import { DraftNote } from '../ui/DraftNote';
 import { obnovDataWidgetu } from '../widgety/useDataWidgetu';
 import { useJazyk, useT } from '@/lib/i18n/client';
@@ -22,7 +30,7 @@ import type { Jazyk } from '@/lib/i18n/config';
 type TimeOffType = 'vacation' | 'sick' | 'other';
 type TimeOffStatus = 'pending' | 'approved' | 'rejected';
 
-interface TimeOffRequestItem {
+export interface TimeOffRequestItem {
   id: number;
   employeeId: string;
   fromDate: string;
@@ -33,6 +41,8 @@ interface TimeOffRequestItem {
   createdAt: string;
   employeeName?: string | null;
   employeeAvatar?: string | null;
+  /** Důvod rozhodnutí od vedení (kolo 7) — u zamítnuté žádosti „Vedení: …". */
+  decisionNote?: string | null;
 }
 
 const TYPE_IDS: TimeOffType[] = ['vacation', 'sick', 'other'];
@@ -50,14 +60,34 @@ function formatRange(fromDate: string, toDate: string, jazyk: Jazyk): string {
   return `${full(fromDate)} – ${full(toDate)}`;
 }
 
+const obnovWidget = () => obnovDataWidgetu('/api/timeoff?mine=1');
 
-export default function TimeOffRequest() {
+// ---------------------------------------------------------------------------
+// Formulář
+// ---------------------------------------------------------------------------
+
+export interface FormularVolna {
+  fromDate: string; setFromDate: (v: string) => void;
+  toDate: string; setToDate: (v: string) => void;
+  type: TimeOffType; setType: (v: TimeOffType) => void;
+  note: string; setNote: (v: string) => void;
+  koncept: Koncept;
+  error: string | null;
+  submitting: boolean;
+  /** Odešle žádost; true = prošla (formulář je prázdný a koncept smazaný). */
+  submit: () => Promise<boolean>;
+  /** Zahodí rozepsané (tlačítko Zrušit v okně). */
+  zahodit: () => void;
+}
+
+/**
+ * Stav formuláře žádosti s konceptem. Drží ho ten, kdo formulář ukazuje — okno
+ * se zavírá a otevírá, stav i koncept přežijí. `aktivni` = formulář je vidět
+ * (koncept se dosadí a zapisuje jen tehdy); `koncept.cekaKoncept` říká volajícímu,
+ * že má okno otevřít, protože tam leží rozepsaná žádost z minula.
+ */
+export function useFormularVolna({ aktivni = true, onOdeslano }: { aktivni?: boolean; onOdeslano?: () => void } = {}): FormularVolna {
   const t = useT('zamestnanec');
-  const { jazyk } = useJazyk();
-  const typLabel = (id: TimeOffType) => (id === 'vacation' ? t('Dovolená') : id === 'sick' ? t('Nemoc') : t('Jiné'));
-  const stavLabel = (s: TimeOffStatus) => (s === 'pending' ? t('Čeká') : s === 'approved' ? t('Schváleno') : t('Zamítnuto'));
-  const [requests, setRequests] = useState<TimeOffRequestItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [type, setType] = useState<TimeOffType>('vacation');
@@ -66,12 +96,122 @@ export default function TimeOffRequest() {
   // směnu, a vrátit se. Do kola 37 to znamenalo vyplňovat znovu.
   const koncept = useDraft('volno', { fromDate, toDate, type, note },
     (v) => { setFromDate(v.fromDate); setToDate(v.toDate); setType(v.type); setNote(v.note); },
-    { vychozi: { fromDate: '', toDate: '', type: 'vacation' as TimeOffType, note: '' } });
+    { vychozi: { fromDate: '', toDate: '', type: 'vacation' as TimeOffType, note: '' }, aktivni });
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [loadErr, setLoadErr] = useState(false);
 
-  // `?mine=1`: vlastní žádosti i pro vedení, kterému by /api/timeoff vrátilo celý tým.
+  const vycisti = () => { setFromDate(''); setToDate(''); setType('vacation'); setNote(''); setError(null); };
+
+  const submit = async (): Promise<boolean> => {
+    setError(null);
+    if (!fromDate || !toDate) {
+      setError(t('Vyplň datum od i do.'));
+      return false;
+    }
+    if (fromDate > toDate) {
+      setError(t('Datum „Od" nesmí být později než datum „Do".'));
+      return false;
+    }
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/timeoff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fromDate, toDate, type, note: note.trim() || null }),
+      });
+      if (!res.ok) {
+        setError(t('Žádost se nepodařilo odeslat. Zkus to prosím znovu.'));
+        return false;
+      }
+      koncept.hotovo();
+      vycisti();
+      obnovWidget();
+      onOdeslano?.();
+      return true;
+    } catch {
+      setError(t('Žádost se nepodařilo odeslat. Zkus to prosím znovu.'));
+      return false;
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return {
+    fromDate, setFromDate, toDate, setToDate, type, setType, note, setNote,
+    koncept, error, submitting, submit,
+    zahodit: () => { koncept.zahodit(); vycisti(); },
+  };
+}
+
+/** Pole žádosti (od–do, typ, poznámka) s větou o obnoveném konceptu a chybou. Bez tlačítka odeslání. */
+export function PoleVolna({ f }: { f: FormularVolna }) {
+  const t = useT('zamestnanec');
+  const typLabel = (id: TimeOffType) => (id === 'vacation' ? t('Dovolená') : id === 'sick' ? t('Nemoc') : t('Jiné'));
+  return (
+    <div className="space-y-3">
+      <DraftNote koncept={f.koncept} co="rozepsanou žádost" />{/* i18n-ok: druh konceptu je identifikátor, větu překládá DraftNote */}
+      {/* Dvojice dat sdílí řádek i na telefonu (DESIGN: dvojice polí grid-cols-2). */}
+      <div className="grid grid-cols-2 gap-3">
+        <Field id="volno-od" label={t('Od')}>
+          <Input id="volno-od" type="date" value={f.fromDate} onChange={(e) => f.setFromDate(e.target.value)} className="appearance-none min-w-0" />
+        </Field>
+        <Field id="volno-do" label={t('Do')}>
+          <Input id="volno-do" type="date" value={f.toDate} min={f.fromDate || undefined} onChange={(e) => f.setToDate(e.target.value)} className="appearance-none min-w-0" />
+        </Field>
+      </div>
+
+      <Segmented ariaLabel={t('Typ volna')} value={f.type} onChange={(v) => f.setType(v as TimeOffType)}
+        options={TYPE_IDS.map(id => ({ id, label: typLabel(id) }))} />
+
+      <Field id="volno-poznamka" label={t('Poznámka')} hint={t('Nepovinné — třeba zkouška nebo svatba.')}>
+        <Input id="volno-poznamka" type="text" inputMode="text" enterKeyHint="done" value={f.note} onChange={(e) => f.setNote(e.target.value)} maxLength={300} />
+      </Field>
+
+      {f.error && <p className="note note-danger text-sm" role="alert">{f.error}</p>}
+    </div>
+  );
+}
+
+/**
+ * Okno „Žádost o volno" (Dostupnost zaměstnance). Na telefonu vyjede zdola (to umí sám Modal),
+ * Odeslat žádost je v patičce, ať ho klávesnice nad polem Poznámka neodsune z dosahu.
+ * Zrušit rozepsané zahodí (na tlačítku je napsané, co dělá); křížek a Escape se zeptají.
+ */
+export function OknoZadostiVolna({ f, onClose }: { f: FormularVolna; onClose: () => void }) {
+  const t = useT('zamestnanec');
+  return (
+    <Modal open onClose={onClose} size="md" title={t('Žádost o volno')}
+      subtitle={t('Požádej o volno — vedoucí dostane upozornění a žádost schválí.')}
+      footer={<>
+        <Button variant="secondary" onClick={() => { f.zahodit(); onClose(); }}>{t('Zrušit', undefined, 'dialog')}</Button>
+        <Button variant="primary" icon="send" loading={f.submitting} onClick={() => { void f.submit(); }}>{t('Odeslat žádost')}</Button>
+      </>}>
+      <PoleVolna f={f} />
+    </Modal>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Moje žádosti
+// ---------------------------------------------------------------------------
+
+export interface MojeZadosti {
+  requests: TimeOffRequestItem[];
+  loading: boolean;
+  loadErr: boolean;
+  error: string | null;
+  reload: () => void;
+  cancel: (id: number) => Promise<void>;
+}
+
+/** Vlastní žádosti (`?mine=1`: i pro vedení, kterému by /api/timeoff vrátilo celý tým). `zapnuto` false = nic nenačítá. */
+export function useMojeZadosti(zapnuto = true): MojeZadosti {
+  const t = useT('zamestnanec');
+  const [requests, setRequests] = useState<TimeOffRequestItem[]>([]);
+  const [loading, setLoading] = useState(zapnuto);
+  const [loadErr, setLoadErr] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     try {
       const res = await fetch('/api/timeoff?mine=1');
@@ -86,48 +226,10 @@ export default function TimeOffRequest() {
       setLoading(false);
     }
   }, []);
-  const obnovWidget = () => obnovDataWidgetu('/api/timeoff?mine=1');
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { if (zapnuto) load(); }, [load, zapnuto]);
 
-  const submit = async () => {
-    setError(null);
-    if (!fromDate || !toDate) {
-      setError(t('Vyplň datum od i do.'));
-      return;
-    }
-    if (fromDate > toDate) {
-      setError(t('Datum „Od" nesmí být později než datum „Do".'));
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const res = await fetch('/api/timeoff', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fromDate, toDate, type, note: note.trim() || null }),
-      });
-      if (!res.ok) {
-        setError(t('Žádost se nepodařilo odeslat. Zkus to prosím znovu.'));
-        return;
-      }
-      koncept.hotovo();
-      setFromDate('');
-      setToDate('');
-      setType('vacation');
-      setNote('');
-      await load();
-      obnovWidget();
-    } catch {
-      setError(t('Žádost se nepodařilo odeslat. Zkus to prosím znovu.'));
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const cancelRequest = async (id: number) => {
+  const cancel = async (id: number) => {
     const prev = requests;
     setRequests((rs) => rs.filter((r) => r.id !== id));
     setError(null);
@@ -141,6 +243,56 @@ export default function TimeOffRequest() {
     }
   };
 
+  return { requests, loading, loadErr, error, reload: () => { setLoading(true); load(); }, cancel };
+}
+
+/** Seznam vlastních žádostí se stavem; u zamítnuté důvod od vedení. */
+export function SeznamZadosti({ z }: { z: MojeZadosti }) {
+  const t = useT('zamestnanec');
+  const { jazyk } = useJazyk();
+  const typLabel = (id: TimeOffType) => (id === 'vacation' ? t('Dovolená') : id === 'sick' ? t('Nemoc') : t('Jiné'));
+  const stavLabel = (s: TimeOffStatus) => (s === 'pending' ? t('Čeká') : s === 'approved' ? t('Schváleno') : t('Zamítnuto'));
+  if (z.loading) return <p className="t-meta mt-2">{t('Načítám…')}</p>;
+  if (z.loadErr) return (
+    <p className="note note-danger text-sm mt-2 flex flex-wrap items-center justify-between gap-2" role="alert">
+      <span>{t('Žádosti se nenačetly.')}</span>
+      <Button variant="secondary" size="sm" onClick={z.reload}>{t('Zkusit znovu')}</Button>
+    </p>
+  );
+  return (
+    <>
+      {z.error && <p className="note note-danger text-sm mt-2" role="alert">{z.error}</p>}
+      {z.requests.length === 0 ? (
+        <EmptyState illustration="volno" title={t('Zatím žádná žádost o volno')} hint={t('Dovolená, doktor, zkoušky — napiš termín a vedení to uvidí v rozvrhu.')} compact />
+      ) : (
+        <ul className="list">
+          {z.requests.map((r) => (
+            <ListRow key={r.id}
+              title={<span className="tabular-nums">{formatRange(r.fromDate, r.toDate, jazyk)}</span>}
+              meta={typLabel(r.type)}
+              // Proč vedení zamítlo — dřív jen červený chip a vysvětlení až osobně. `detail` se zalamuje.
+              detail={r.status === 'rejected' && r.decisionNote ? t('Vedení: {duvod}', { duvod: r.decisionNote }) : undefined}
+              right={<Chip tone={STATUS_TONE[r.status]} size="sm">{stavLabel(r.status)}</Chip>}
+              actions={r.status === 'pending'
+                ? <Button variant="ghost" size="sm" onClick={() => z.cancel(r.id)}>{t('Zrušit')}</Button>
+                : undefined}
+            />
+          ))}
+        </ul>
+      )}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Karta (Moje směny vedení)
+// ---------------------------------------------------------------------------
+
+export default function TimeOffRequest() {
+  const t = useT('zamestnanec');
+  const zadosti = useMojeZadosti();
+  const f = useFormularVolna({ onOdeslano: zadosti.reload });
+
   return (
     <Card as="section" aria-labelledby="volno-nadpis" className="space-y-4">
       <div>
@@ -149,53 +301,13 @@ export default function TimeOffRequest() {
       </div>
 
       <div className="space-y-3">
-        <DraftNote koncept={koncept} co="rozepsanou žádost" />{/* i18n-ok: druh konceptu je identifikátor, větu překládá DraftNote */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Field id="volno-od" label={t('Od')}>
-            <Input id="volno-od" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="appearance-none min-w-0" />
-          </Field>
-          <Field id="volno-do" label={t('Do')}>
-            <Input id="volno-do" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="appearance-none min-w-0" />
-          </Field>
-        </div>
-
-        <Segmented ariaLabel={t('Typ volna')} value={type} onChange={(v) => setType(v as TimeOffType)}
-          options={TYPE_IDS.map(id => ({ id, label: typLabel(id) }))} />
-
-        <Field id="volno-poznamka" label={t('Poznámka')} hint={t('Nepovinné — třeba zkouška nebo svatba.')}>
-          <Input id="volno-poznamka" type="text" value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} />
-        </Field>
-
-        {error && <p className="note note-danger text-sm" role="alert">{error}</p>}
-
-        <Button variant="primary" icon="send" block loading={submitting} onClick={submit}>{t('Odeslat žádost')}</Button>
+        <PoleVolna f={f} />
+        <Button variant="primary" icon="send" block loading={f.submitting} onClick={() => { void f.submit(); }}>{t('Odeslat žádost')}</Button>
       </div>
 
       <div className="pt-3 border-t border-black/[0.06]">
         <h3 className="t-card">{t('Moje žádosti')}</h3>
-        {loading ? (
-          <p className="t-meta mt-2">{t('Načítám…')}</p>
-        ) : loadErr ? (
-          <p className="note note-danger text-sm mt-2 flex flex-wrap items-center justify-between gap-2" role="alert">
-            <span>{t('Žádosti se nenačetly.')}</span>
-            <Button variant="secondary" size="sm" onClick={() => { setLoading(true); load(); }}>{t('Zkusit znovu')}</Button>
-          </p>
-        ) : requests.length === 0 ? (
-          <EmptyState illustration="volno" title={t('Zatím žádná žádost o volno')} hint={t('Dovolená, doktor, zkoušky — napiš termín a vedení to uvidí v rozvrhu.')} compact />
-        ) : (
-          <ul className="list">
-            {requests.map((r) => (
-              <ListRow key={r.id}
-                title={<span className="tabular-nums">{formatRange(r.fromDate, r.toDate, jazyk)}</span>}
-                meta={typLabel(r.type)}
-                right={<Chip tone={STATUS_TONE[r.status]} size="sm">{stavLabel(r.status)}</Chip>}
-                actions={r.status === 'pending'
-                  ? <Button variant="ghost" size="sm" onClick={() => cancelRequest(r.id)}>{t('Zrušit')}</Button>
-                  : undefined}
-              />
-            ))}
-          </ul>
-        )}
+        <SeznamZadosti z={zadosti} />
       </div>
     </Card>
   );

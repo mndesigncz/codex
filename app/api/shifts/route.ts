@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { tymyCiselniku, jeClenem } from '@/lib/tenant';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { audit } from '@/lib/audit';
+import { poznamkaSmeny } from '@/lib/rozvrhPrehled';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,13 +36,17 @@ async function typeResolver(teamId: number | null) {
   };
 }
 
-const shape = (r: any, resolve?: (r: any) => { label: string; color: string }) => {
+// Poznámka ke směně (kolo 7) je instrukce pro přiřazeného člověka a vedení
+// („zaskakuje za Petru"), ne pro celý tým: `sPoznamkou` jen u vlastních směn
+// a plánovači (rozvrh.zobrazit) — týmový náhled (team=1, tablet) ji nedostane.
+const shape = (r: any, resolve?: (r: any) => { label: string; color: string }, sPoznamkou = false) => {
   const rt = resolve ? resolve(r) : null;
   return {
     id: r.id, teamId: r.team_id, employeeId: r.employee_id, date: r.date,
     startTime: r.start_time, endTime: r.end_time, type: r.type,
     start_time: r.start_time, end_time: r.end_time,
     typeLabel: rt?.label ?? r.type, typeColor: rt?.color ?? '#64748B',
+    ...(sPoznamkou ? { note: r.note ?? null } : {}),
   };
 };
 
@@ -83,7 +89,8 @@ export async function GET(req: NextRequest) {
       } catch { /* tabulka hodnocení chybí — směny bez hodnocení */ }
     }
     return NextResponse.json(rows.map((r: any) => {
-      const s = shape(r, resolve);
+      // Cizí směny s poznámkou jen plánovači; kdo má jen hodnocení směn, poznámku nedostane.
+      const s = shape(r, resolve, !cizi || opr.has('rozvrh.zobrazit'));
       if (cizi) return s;
       const d = typeof r.date === 'string' ? r.date.slice(0, 10) : new Date(r.date).toISOString().slice(0, 10);
       return { ...s, rating: hodnoceni.get(d) ?? null };
@@ -132,7 +139,7 @@ export async function GET(req: NextRequest) {
       WHERE s.team_id = ${c.teamId}
       ORDER BY s.date ASC`;
     return NextResponse.json({
-      shifts: rows.map((r: any) => ({ ...shape(r, resolve), employeeName: r.employee_name ?? null, employeeAvatar: r.employee_avatar ?? null })),
+      shifts: rows.map((r: any) => ({ ...shape(r, resolve, true), employeeName: r.employee_name ?? null, employeeAvatar: r.employee_avatar ?? null })),
       requests: [],
     });
   }
@@ -140,7 +147,7 @@ export async function GET(req: NextRequest) {
   // Filtr podniku jako ve větvi `employeeId`: kdo pracuje ve dvou podnicích,
   // nemá v podniku A vidět (a počítat) směny z B.
   const rows = await sql`SELECT * FROM shifts WHERE employee_id = ${c.meId} AND team_id = ${c.teamId} ORDER BY date ASC`;
-  return NextResponse.json({ shifts: rows.map((r: any) => shape(r, resolve)), requests: [] });
+  return NextResponse.json({ shifts: rows.map((r: any) => shape(r, resolve, true)), requests: [] });
 }
 
 // POST — create a shift for a team member.
@@ -156,10 +163,31 @@ export async function POST(req: NextRequest) {
   if (!(await jeClenem(employeeId, c.teamId))) {
     return NextResponse.json({ error: 'Zaměstnanec není ve vašem týmu' }, { status: 400 });
   }
+  const note = poznamkaSmeny(b.note);
+  if (note === false) return NextResponse.json({ error: 'Poznámka ke směně může mít nejvýš 200 znaků.' }, { status: 400 });
 
   const [row] = await sql`
-    INSERT INTO shifts (team_id, employee_id, date, start_time, end_time, type)
-    VALUES (${c.teamId}, ${employeeId}, ${b.date}, ${b.startTime}, ${b.endTime}, ${b.type ?? 'custom'})
+    INSERT INTO shifts (team_id, employee_id, date, start_time, end_time, type, note)
+    VALUES (${c.teamId}, ${employeeId}, ${b.date}, ${b.startTime}, ${b.endTime}, ${b.type ?? 'custom'}, ${note})
     RETURNING *`;
-  return NextResponse.json(shape(row));
+  return NextResponse.json(shape(row, undefined, true));
+}
+
+// PATCH (rozvrh.upravit) — { id, note }: poznámka k uložené směně (kolo 7). Prázdná = smazat.
+// Jen směna tohohle podniku; čas ani člověka tudy měnit nejde (to je smazat a přidat v plánovači).
+export async function PATCH(req: NextRequest) {
+  const c = await pozaduj('rozvrh.upravit');
+  if (jeOdpoved(c)) return c;
+  const b = await req.json().catch(() => ({}));
+  const id = parseInt(b.id);
+  if (!Number.isFinite(id) || !('note' in b)) return NextResponse.json({ error: 'Neplatný požadavek' }, { status: 400 });
+  const note = poznamkaSmeny(b.note);
+  if (note === false) return NextResponse.json({ error: 'Poznámka ke směně může mít nejvýš 200 znaků.' }, { status: 400 });
+  const [row] = await sql`
+    UPDATE shifts SET note = ${note}
+    WHERE id = ${id} AND team_id = ${c.teamId}
+    RETURNING *`;
+  if (!row) return NextResponse.json({ error: 'Směna nenalezena' }, { status: 404 });
+  await audit(c.teamId, c.meId, 'rozvrh.poznamka', 'shift', id, `${String(row.date).slice(0, 10)}: ${note ?? '(smazána)'}`);
+  return NextResponse.json({ ok: true, shift: shape(row, undefined, true) });
 }

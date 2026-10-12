@@ -145,6 +145,8 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE shifts ADD COLUMN IF NOT EXISTS team_id INTEGER`);
     // shift created automatically from a clock-in / added via a closing (not planned)
     await ddl(sql`ALTER TABLE shifts ADD COLUMN IF NOT EXISTS auto_created BOOLEAN DEFAULT FALSE`);
+    // Instrukce ke směně od vedení (kolo 7): „Otevíráš sám, klíče u Petry" — vidí ji přiřazený a plánovač.
+    await ddl(sql`ALTER TABLE shifts ADD COLUMN IF NOT EXISTS note TEXT`);
 
     await ddl(sql`
       CREATE TABLE IF NOT EXISTS shift_requests (
@@ -557,6 +559,9 @@ export async function GET(request: Request) {
     // ({ podleTrzeb, prah }), výchozí vypnuto. JSON, ať každé další volitelné
     // pravidlo generátoru nepotřebuje vlastní sloupec (lib/rozvrhGenerator.ts).
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS staffing_rules JSONB`);
+    // Připomenutí dostupnosti (kolo 7): kdy a na jaký měsíc vedení naposledy připomnělo — jednou za 20 h.
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS availability_reminded_at TIMESTAMP`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS availability_reminded_month TEXT`);
     // watchdog for forgotten clock-outs: when the person was already reminded
     await ddl(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS nudged_at TIMESTAMP`);
     // Kolo 7: kdo záznam ručně upravil nebo přidal a kdy (důvod je v note) — hodiny jsou mzda.
@@ -588,6 +593,8 @@ export async function GET(request: Request) {
         decided_by INTEGER,
         created_at TIMESTAMP DEFAULT NOW()
       )`);
+    // Důvod rozhodnutí pro žadatele (kolo 7): „Málo lidí, zkus jiný týden" — vidí ho u žádosti i v oznámení.
+    await ddl(sql`ALTER TABLE time_off_requests ADD COLUMN IF NOT EXISTS decision_note TEXT`);
 
     // ---- Supplier orders (from the shopping list) ----
     await ddl(sql`
@@ -2611,6 +2618,21 @@ export async function GET(request: Request) {
         updated_at TIMESTAMP
       )`);
     await ddl(sql`CREATE INDEX IF NOT EXISTS entity_notes_entity ON entity_notes (team_id, entity_type, entity_id)`);
+
+    // Stav publikování rozvrhu (kolo 7, R7-1): jeden řádek na podnik a měsíc, publikování ho
+    // přepíše. shifts_hash = otisk směn měsíce stejným výrazem jako `verze` v GET /api/schedule,
+    // podle něj plánovač ukáže „Změněno od publikování".
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS schedule_publications (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        month TEXT NOT NULL,
+        published_at TIMESTAMP DEFAULT NOW(),
+        created_by INTEGER,
+        shift_count INTEGER NOT NULL DEFAULT 0,
+        shifts_hash TEXT
+      )`);
+    await ddl(sql`CREATE UNIQUE INDEX IF NOT EXISTS schedule_publications_team_month ON schedule_publications(team_id, month)`);
 
     // Kroky migrace, které selhaly (a byly zachyceny), ať se to pozná zvenku
     // místo tichého „ok". Prázdné pole = celé schéma prošlo.

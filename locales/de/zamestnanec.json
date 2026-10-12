@@ -396,5 +396,21 @@
   "Žádost se nepodařilo odeslat. Zkus to prosím znovu.": "Die Anfrage konnte nicht gesendet werden. Bitte versuch es noch einmal.",
   "Žádost se nepodařilo zrušit — zkus to znovu.": "Die Anfrage konnte nicht zurückgezogen werden — versuch es noch einmal.",
   "Žádosti se nenačetly.": "Anträge konnten nicht geladen werden.",
-  "„{nazev}\" má termín {den}.": "„{nazev}“ ist fällig am {den}."
+  "„{nazev}\" má termín {den}.": "„{nazev}“ ist fällig am {den}.",
+  "Vedení: {duvod}": "Leitung: {duvod}",
+  "Žádost o volno": "Urlaubsantrag",
+  "Zrušit|dialog": "Abbrechen",
+  "Moje žádosti o volno": "Meine Urlaubsanträge",
+  "Moje žádosti ({n})": "Meine Anträge ({n})",
+  "Žádost odeslána": "Antrag gesendet",
+  "Nastavit všechny dny {den} v měsíci": "Alle {den}e im Monat festlegen",
+  "Nastavit celý sloupec: {stav}": "Ganze Spalte festlegen: {stav}",
+  "Přepnout celý sloupec": "Ganze Spalte umschalten",
+  "Klepnutím na zkratku dne nad kalendářem nastavíš celý sloupec najednou.": "Tippe auf einen Wochentag über dem Kalender, um die ganze Spalte auf einmal festzulegen.",
+  "Jako minulý měsíc": "Wie letzten Monat",
+  "Převezme z minulého měsíce, co se opakovalo podle dne v týdnu — jen do dnů, které ještě nemají vlastní stav.": "Übernimmt aus dem letzten Monat, was sich je Wochentag wiederholt hat — nur in Tage ohne eigene Auswahl.",
+  "Minulý měsíc se nenačetl — zkus to znovu.": "Der letzte Monat wurde nicht geladen — versuch es noch einmal.",
+  "Není co převzít — dny už mají vlastní stav, nebo se minulý měsíc žádný den neopakoval.": "Nichts zu übernehmen — die Tage haben schon eine eigene Auswahl, oder letzten Monat hat sich nichts wiederholt.",
+  "{n, plural, one {Převzato z minulého měsíce: # den} few {Převzato z minulého měsíce: # dny} other {Převzato z minulého měsíce: # dní}}": "{n, plural, one {Aus dem letzten Monat übernommen: # Tag} other {Aus dem letzten Monat übernommen: # Tage}}",
+  "Vrátit|zpet": "Rückgängig"
 }

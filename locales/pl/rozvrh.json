@@ -468,5 +468,18 @@
   "Jiný měsíc": "Inny miesiąc",
   "V měsíci zatím nikdo nemá směnu.": "W tym miesiącu nikt nie ma jeszcze zmiany.",
   "Celkem": "Razem",
-  "{lidi, plural, one {# člověk} few {# lidé} other {# lidí}} · {h} h": "{lidi, plural, one {# osoba} few {# osoby} many {# osób} other {# osoby}} · {h} h"
+  "{lidi, plural, one {# člověk} few {# lidé} other {# lidí}} · {h} h": "{lidi, plural, one {# osoba} few {# osoby} many {# osób} other {# osoby}} · {h} h",
+  "Poznámku se nepodařilo uložit — zkus to znovu.": "Nie udało się zapisać notatki — spróbuj ponownie.",
+  "Zmizí i jejich poznámky ke směnám.": "Znikną też ich notatki do zmian.",
+  "Upravit poznámku ke směně — {jmeno}": "Edytuj notatkę do zmiany — {jmeno}",
+  "Přidat poznámku ke směně — {jmeno}": "Dodaj notatkę do zmiany — {jmeno}",
+  "Poznámka ke směně — {jmeno}": "Notatka do zmiany — {jmeno}",
+  "Otevíráš sám, klíče u Petry": "Otwierasz sam, klucze ma Petra",
+  "Poznámka ke směně (nepovinné)": "Notatka do zmiany (opcjonalnie)",
+  "Uvidí ji jen ten, kdo směnu dostane, a vedení.": "Zobaczy ją tylko osoba na zmianie i kierownictwo.",
+  "Publikovat změny": "Opublikuj zmiany",
+  "Od publikování se rozvrh změnil — lidé dostanou upozornění znovu.": "Od publikacji grafik się zmienił — wszyscy dostaną powiadomienie ponownie.",
+  "Publikováno {datum}": "Opublikowano {datum}",
+  "Změněno od publikování": "Zmieniono od publikacji",
+  "Nepublikováno": "Nieopublikowany"
 }

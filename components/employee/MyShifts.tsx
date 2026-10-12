@@ -31,6 +31,7 @@ import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useSmi } from '../widgety/NavigaceKontext';
 import { useTymSmeny } from '../widgety/useTymSmeny';
 import { KolegoveSmeny } from '../widgety/KolegoveSmeny';
+import { Icon } from '../Icons';
 import { apiMessage, okJson } from '@/lib/api';
 import { buildIcs, downloadIcs } from '@/lib/ics';
 import { dayPlus, pragueToday } from '@/lib/pragueTime';
@@ -102,7 +103,8 @@ export default function MyShifts({ user }: Props) {
       startTime: hm(s.startTime ?? s.start_time) || '08:00',
       endTime: hm(s.endTime ?? s.end_time) || '16:00',
       summary: `${popisekTypu(s)} — Managero`,
-      description: s.startTime && s.endTime ? `${hm(s.startTime)}–${hm(s.endTime)}` : null,
+      // Poznámka vedení ke směně (kolo 7) jde i do kalendáře — tam se na směnu člověk dívá ráno.
+      description: [s.startTime && s.endTime ? `${hm(s.startTime)}–${hm(s.endTime)}` : '', s.note ?? ''].filter(Boolean).join(' · ') || null,
     })), '-//Managero//Smeny//CS');
     downloadIcs('moje-smeny.ics', ics);
   };
@@ -161,7 +163,16 @@ export default function MyShifts({ user }: Props) {
                       <span aria-hidden className={`inline-block h-2 w-2 rounded-full align-middle mr-1.5 ${kat ? `cat-dot-${kat}` : 'bg-black/15'}`} />
                       {popisekTypu(s)}
                     </>}
-                    detail={tym.zapnuto ? <KolegoveSmeny kolegove={kolegoveKeSmene(s, tym.smeny)} hotovo={tym.hotovo} /> : undefined}
+                    // Instrukce vedení ke směně (kolo 7: „Otevíráš sám, klíče u Petry") nad tím, s kým směnu máš.
+                    detail={s.note || tym.zapnuto ? <>
+                      {s.note && (
+                        <span className="flex items-start gap-1.5 text-[#16181A]" data-poznamka-smeny>
+                          <Icon name="chat" size={13} className="shrink-0 mt-0.5 text-black/45" />
+                          <span className="min-w-0 text-pretty">{s.note}</span>
+                        </span>
+                      )}
+                      {tym.zapnuto && <span className="block"><KolegoveSmeny kolegove={kolegoveKeSmene(s, tym.smeny)} hotovo={tym.hotovo} /></span>}
+                    </> : undefined}
                     value={`${fmtHM(s.startTime ?? s.start_time)}–${fmtHM(s.endTime ?? s.end_time)}`}
                     right={nabidnuto ? <Chip tone="info" size="sm">{t('V burze')}</Chip> : d === dnes ? <Chip tone="ok" size="sm">{t('Dnes')}</Chip> : undefined}
                     // Jediná akce směny rovnou jako tlačítko (audit kola 6, Z10) — u zaměstnance i vedení:

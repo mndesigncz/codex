@@ -3,6 +3,8 @@ import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { tymyCiselniku, jeClenem } from '@/lib/tenant';
 import { pozaduj, jeOdpoved, clenoveSOpravnenim } from '@/lib/opravneniDb';
+import { parseDbTime } from '@/lib/pragueTime';
+import { pripominkaBlokuje } from '@/lib/rozvrhPrehled';
 
 export const dynamic = 'force-dynamic';
 
@@ -91,7 +93,15 @@ export async function GET(req: Request) {
       const [n] = await sql`SELECT COUNT(*)::int AS n FROM shifts WHERE team_id = ${ctx.teamId} AND date LIKE ${month + '-%'} AND auto_created IS NOT TRUE`;
       naplanovanoSmen = Number(n?.n) || 0;
     } catch { /* bez počtu zůstane 0 — widget se jen neminimalizuje */ }
-    return NextResponse.json({ submissions, naplanovanoSmen });
+    // Připomenutí dostupnosti (kolo 7): kdy vedení naposledy připomnělo na TENHLE měsíc, dokud
+    // ještě platí ochrana 20 h — widget pak ukáže „Připomenuto" místo tlačítka. Jinak null.
+    let pripomenuto: string | null = null;
+    try {
+      const [tm] = await sql`SELECT availability_reminded_at, availability_reminded_month FROM teams WHERE id = ${ctx.teamId}`;
+      const at = parseDbTime(tm?.availability_reminded_at ?? null);
+      if (at && pripominkaBlokuje({ at, mesic: tm?.availability_reminded_month }, month, new Date())) pripomenuto = at.toISOString();
+    } catch { /* sloupce před migrací — tlačítko se ukáže, server ochranu pohlídá sám */ }
+    return NextResponse.json({ submissions, naplanovanoSmen, pripomenuto });
   }
 
   // employee — own submission

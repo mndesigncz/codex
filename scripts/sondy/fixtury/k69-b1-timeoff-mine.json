@@ -9,7 +9,8 @@
    "type": "vacation",
    "note": null,
    "status": "approved",
-   "createdAt": "DNES"
+   "createdAt": "DNES",
+   "decisionNote": null
   },
   {
    "id": 82,
@@ -19,7 +20,19 @@
    "type": "other",
    "note": "Zkouška",
    "status": "pending",
-   "createdAt": "DNES"
+   "createdAt": "DNES",
+   "decisionNote": null
+  },
+  {
+   "id": 83,
+   "employeeId": 15,
+   "fromDate": "ZA3",
+   "toDate": "ZA3",
+   "type": "vacation",
+   "note": null,
+   "status": "rejected",
+   "createdAt": "VCERA",
+   "decisionNote": "Ten den už má volno Petra, zkus prosím jiný termín."
   }
  ]
 }
