@@ -12,6 +12,12 @@
 //
 // Fixtury: scripts/sondy/fixtury/k69-b8-*.json (rozložení stránek, hodnocení, příjem);
 // akce se skládají tady (dny podle dnešního data, ať sonda nezastará s kalendářem).
+//
+// Kolo 7 (R7-3): Rezervace — limetka „Nová rezervace" jen s rezervace.schvalovat, okno
+// (na telefonu zdola) pošle POST se jménem, telefonem, dnem, časem a osobami a seznam se
+// obnoví; řádek nese celou poznámku hosta v detail, telefon jako odkaz tel:, štítek úrovně,
+// „1. návštěva", poznámku personálu a „zapsáno ručně". Objednávky — Fronta / Historie se
+// čtyřmi čísly (2 × 2 na telefonu, bez osiřelé buňky).
 import { readFileSync } from 'node:fs';
 import {
   kontext, konec, tvrdi, otevri, lista, upravit, hotovo, vUpravach, dokud, poradi, poradiPutu, dotazyNa, mine, ROLE, DIR, OUT,
@@ -65,6 +71,10 @@ const podvrh = (req, json, stav) => {
   if (path === '/api/client/staff/inbox') {
     if (m === 'PATCH') { (stav.prijem ??= []).push(req.postDataJSON()); return json({ ok: true }); }
     return json(nacti('k69-b8-inbox'));
+  }
+  if (path === '/api/client/admin/reservations' && m === 'POST') {
+    (stav.zapisy ??= []).push(req.postDataJSON());
+    return json({ ok: true, reservation: { id: 99, status: 'confirmed' } });
   }
   if (path === '/api/client/admin/reservations' && m === 'PATCH') {
     const b = req.postDataJSON();
@@ -179,6 +189,7 @@ const OBSLUHA_CLIENTU = mine(['klient.prehled', 'rezervace.zobrazit', 'rezervace
   const nastroj = widgetLi(p, 'nastroj');
   tvrdi('P4: bez rezervace.schvalovat žádné „Potvrdit", potvrzenou rezervaci jde usadit', await nastroj.getByRole('button', { name: /^Potvrdit:/ }).count() === 0
     && await nastroj.getByRole('button', { name: /^Usadit:/ }).count() > 0);
+  tvrdi('P4: bez rezervace.schvalovat ani limetka „Nová rezervace" (ruční zápis = potvrzení)', await p.locator('[data-plocha]').getByRole('button', { name: 'Nová rezervace' }).count() === 0);
   await ctx.close();
 }
 
@@ -205,7 +216,31 @@ const OBSLUHA_CLIENTU = mine(['klient.prehled', 'rezervace.zobrazit', 'rezervace
   const nastroj = widgetLi(p, 'nastroj');
   tvrdi('R1: nástroj v klidu vidět (rezervace po dnech, přepínač období)', await nastroj.getByText('Jana Dvořáková').first().isVisible()
     && await p.locator('[data-plocha]').getByRole('tab', { name: 'Nadcházející' }).isVisible());
-  tvrdi('R1: žádná limetka — „Potvrdit" je tmavé', await limetek(p) === 0 && await nastroj.getByRole('button', { name: /^Potvrdit:/ }).first().isVisible());
+  tvrdi('R1: jediná limetka „Nová rezervace" — „Potvrdit" je tmavé', await limetek(p) === 1
+    && await p.locator('[data-plocha]').getByRole('button', { name: 'Nová rezervace' }).isVisible() && await nastroj.getByRole('button', { name: /^Potvrdit:/ }).first().isVisible(), `${await limetek(p)}×`);
+  // Kolo 7: kdo host je a jak se mu dovolat — přímo v řádku.
+  const poznamka = 'Oslava narozenin, prosíme o klidnější stůl kousek od okna a místo na kočárek — přijdeme o pár minut dřív.';
+  tvrdi('R-P: poznámka hosta celá (detail se zalamuje, žádné „Oslav…")', await nastroj.getByText(`„${poznamka}“`).isVisible());
+  tvrdi('R-T: telefon hosta jako odkaz tel: bez mezer', await nastroj.locator('a[href="tel:+420776221004"]').isVisible());
+  tvrdi('R-K: štítek úrovně „Zlatý host" u Jany a „1. návštěva" u Ondřeje', await nastroj.locator('li', { hasText: 'Jana Dvořáková' }).getByText('Zlatý host', { exact: true }).isVisible()
+    && await nastroj.locator('li', { hasText: 'Ondřej Beneš' }).getByText('1. návštěva', { exact: true }).isVisible());
+  tvrdi('R-K: poslední poznámka personálu pod poznámkou hosta', await nastroj.getByText('Nesnáší mléko, dort si přinesou sami.').isVisible());
+  tvrdi('R-R: ručně zapsaná rezervace (bez účtu) se jménem a štítkem „zapsáno ručně"', await nastroj.locator('li', { hasText: 'Pavel Horák' }).getByText('zapsáno ručně').isVisible());
+  // Ruční zápis z počítače: okno → POST → seznam se obnoví.
+  const predZapisem = Date.now();
+  await p.locator('[data-plocha]').getByRole('button', { name: 'Nová rezervace' }).click();
+  const nova = p.getByRole('dialog', { name: 'Nová rezervace' });
+  tvrdi('R-N: „Nová rezervace" otevře okno', await dokud(() => nova.isVisible(), 2000));
+  await nova.getByLabel('Jméno').fill('Marek Svoboda');
+  await nova.getByLabel('Telefon').fill('+420 602 111 222');
+  await nova.getByLabel('Osob').fill('5');
+  await nova.getByRole('button', { name: 'Zapsat rezervaci' }).click();
+  const zapis = await dokud(() => (stav.zapisy ?? []).at(-1), 3000);
+  tvrdi('R-N: „Zapsat rezervaci" pošle POST se jménem, telefonem, dnem, časem a osobami', !!zapis && zapis.name === 'Marek Svoboda' && zapis.phone === '+420 602 111 222'
+    && zapis.date === dnes && /^\d{2}:\d{2}$/.test(zapis.time) && zapis.party === 5 && zapis.customerId === null, JSON.stringify(zapis));
+  tvrdi('R-N: okno se zavře a seznam rezervací se načte znovu', await dokud(async () => !(await nova.isVisible()), 2000)
+    && await dokud(() => dotazyNa(stav, ['/api/client/admin/reservations'], predZapisem).some(d => d.m === 'GET'), 2000));
+  tvrdi('R-N: potvrzení „Rezervace zapsána."', await dokud(() => p.getByText('Rezervace zapsána.').isVisible(), 2000));
   await p.screenshot({ path: OUT + 'k69-b8-rezervace-desk.png', fullPage: true });
   await nastroj.getByRole('button', { name: /^Potvrdit: Jana Dvořáková/ }).click();
   tvrdi('R-W: „Potvrdit" pošle PATCH { id: 11, status: confirmed }', await dokud(() => (stav.rezervace ?? []).some(b => b.id === 11 && b.status === 'confirmed'), 2000), JSON.stringify(stav.rezervace));
@@ -249,10 +284,42 @@ const OBSLUHA_CLIENTU = mine(['klient.prehled', 'rezervace.zobrazit', 'rezervace
   const { ctx, p } = await kontext({ fix: nacti('k69-b8-rozlozeni-rezervace'), viewport: { width: 390, height: 844 }, mobil: true, dalsi: podvrh });
   await otevri(p, CLIENT('reservations'), 'vedeni.klient_rezervace');
   tvrdi('R6: telefon 390 — žádné vodorovné přetečení', await bezPreteceni(p));
+  const novaTl = p.locator('[data-plocha]').getByRole('button', { name: 'Nová rezervace' });
+  const boxTl = await novaTl.boundingBox();
+  tvrdi('R6: limetka „Nová rezervace" na telefonu přes celou šířku a nad ohybem', !!boxTl && boxTl.width >= 300 && boxTl.y + boxTl.height <= 844 && boxTl.height >= 44, JSON.stringify(boxTl));
+  const tel = widgetLi(p, 'nastroj').locator('a[href^="tel:"]').first();
+  const plocha = await tel.evaluate(a => { const r = getComputedStyle(a, '::before'); return { w: parseFloat(r.width), h: parseFloat(r.height), cls: a.className }; });
+  tvrdi('R6: odkaz tel: má dotykovou plochu aspoň 44 px (tap-target)', plocha.h >= 44 && plocha.w >= 44, JSON.stringify(plocha));
   const potvrdit = widgetLi(p, 'nastroj').getByRole('button', { name: /^Potvrdit:/ }).first();
   await potvrdit.scrollIntoViewIfNeeded();
   tvrdi('R6: „Potvrdit" vidět a povolené', await potvrdit.isVisible() && await potvrdit.isEnabled());
+  const srazka = await p.evaluate(() => {
+    // Štítek úrovně (u jména) a hlavní krok (v ocasu řádku) se nesmí překrývat.
+    const li = [...document.querySelectorAll('[data-plocha] li[data-widget="nastroj"] .list-row')].find(x => x.textContent?.includes('Zlatý host'));
+    const chip = [...(li?.querySelectorAll('.chip') ?? [])].find(c => c.textContent === 'Zlatý host')?.getBoundingClientRect();
+    const krok = li?.querySelector('.list-actions button')?.getBoundingClientRect();
+    if (!chip || !krok) return 'nenalezeno';
+    return chip.right <= krok.left || chip.bottom <= krok.top || krok.bottom <= chip.top ? 'ok' : 'překryv';
+  });
+  tvrdi('R6: štítek úrovně a „Potvrdit" se na 390 nesrazí', srazka === 'ok', srazka);
   await p.screenshot({ path: OUT + 'k69-b8-rezervace-tel.png', fullPage: true });
+  await novaTl.scrollIntoViewIfNeeded();
+  await novaTl.click();
+  const okno = p.getByRole('dialog', { name: 'Nová rezervace' });
+  await dokud(() => okno.isVisible(), 2000);
+  await p.waitForTimeout(500);
+  const box = await okno.boundingBox();
+  tvrdi('R6: okno Nová rezervace vyjede zdola přes celou šířku', !!box && Math.abs(box.y + box.height - 844) <= 2 && box.width >= 380, JSON.stringify(box));
+  const pole = await okno.evaluate(o => [...o.querySelectorAll('input:not([type="search"]), select, textarea')].map(e => ({ id: e.id, f: parseFloat(getComputedStyle(e).fontSize), im: e.getAttribute('inputmode'), t: e.getAttribute('type') })));
+  tvrdi('R6: pole okna mají písmo aspoň 16 px (bez zoomu při fokusu)', pole.length >= 6 && pole.every(x => x.f >= 16), JSON.stringify(pole));
+  tvrdi('R6: telefon s klávesnicí na čísla (type tel, inputMode tel), osoby inputMode numeric', pole.some(x => x.id === 'rez-tel' && x.t === 'tel' && x.im === 'tel') && pole.some(x => x.id === 'rez-osob' && x.im === 'numeric'), JSON.stringify(pole));
+  const dvojice = await okno.evaluate(o => { const a = o.querySelector('#rez-den')?.getBoundingClientRect(); const b = o.querySelector('#rez-cas-volba, #rez-cas')?.getBoundingClientRect(); return a && b ? Math.abs(a.top - b.top) < 4 && a.right <= b.left : false; });
+  tvrdi('R6: den a čas sdílí řádek i na telefonu', dvojice);
+  const zapsat = okno.getByRole('button', { name: 'Zapsat rezervaci' });
+  const bz = await zapsat.boundingBox();
+  tvrdi('R6: „Zapsat rezervaci" vidět v patičce okna nad spodní hranou', !!bz && bz.y + bz.height <= 844 && bz.height >= 44, JSON.stringify(bz));
+  tvrdi('R6: okno bez vodorovného přetečení', await bezPreteceni(p) && await okno.evaluate(o => o.scrollWidth <= o.clientWidth + 1));
+  await p.screenshot({ path: OUT + 'k69-b8-rezervace-okno-tel.png' });
   await ctx.close();
 }
 
@@ -276,6 +343,27 @@ const OBSLUHA_CLIENTU = mine(['klient.prehled', 'rezervace.zobrazit', 'rezervace
   tvrdi('O-S: přepnutí záložky souhrn obnoví (jako dřív useEffect na tab)', await dokud(() => souhrnPo(predZalozkou) > 0, 2000), `${souhrnPo(predZalozkou)}×`);
   await p.screenshot({ path: OUT + 'k69-b8-objednavky-desk.png', fullPage: true });
   tvrdi('O: bez chyb v konzoli', chyby.length === 0, chyby.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
+// Kolo 7: Objednávky › Historie — období, čtyři čísla, seznam; na telefonu 2 × 2 bez osiřelé buňky.
+for (const [vp, mobil, jmeno] of [[{ width: 1280, height: 900 }, false, 'desk'], [{ width: 390, height: 844 }, true, 'tel']]) {
+  const { ctx, p, stav, chyby } = await kontext({ fix: nacti('k69-b8-rozlozeni-objednavky'), viewport: vp, mobil, dalsi: podvrh });
+  await otevri(p, CLIENT('orders'), 'vedeni.klient_objednavky');
+  const nastroj = widgetLi(p, 'nastroj');
+  tvrdi(`O-H ${jmeno}: v klidu Fronta (nová objednávka)`, await nastroj.getByText('Nová objednávka od stolu').isVisible());
+  await p.locator('[data-plocha]').getByRole('tab', { name: 'Historie' }).click();
+  tvrdi(`O-H ${jmeno}: Historie se ptá /api/client/admin/orders s obdobím (dnes)`, await dokud(() => stav.dotazy.some(d => d.path === '/api/client/admin/orders' && d.u.includes(`from=${dnes}`) && d.u.includes(`to=${dnes}`)), 3000));
+  const statRow = nastroj.locator('[data-statrow]');
+  await dokud(() => statRow.isVisible(), 3000);
+  const text = await statRow.innerText();
+  tvrdi(`O-H ${jmeno}: čtyři čísla — Objednávek 6, Od stolu celkem, Průměr, Nepřijato 1`, /Objednávek/i.test(text) && /Od stolu celkem/i.test(text) && /Průměr/i.test(text) && /Nepřijato/i.test(text) && /882,50/.test(text), text.replace(/\n/g, ' | '));
+  const mrizka = await statRow.evaluate(el => ({ deti: el.children.length, sloupcu: getComputedStyle(el).gridTemplateColumns.split(' ').filter(Boolean).length, flow: getComputedStyle(el).gridAutoFlow }));
+  tvrdi(`O-H ${jmeno}: ${mobil ? '2 × 2 bez osiřelé buňky' : 'čtyři vedle sebe'}`, mobil ? mrizka.deti === 4 && mrizka.sloupcu === 2 : mrizka.deti === 4 && /column/.test(mrizka.flow), JSON.stringify(mrizka));
+  tvrdi(`O-H ${jmeno}: seznam s dobou přijetí a stavem`, await nastroj.getByText(/přijato za 3 min/).isVisible() && await nastroj.getByText('Nepřijato', { exact: true }).last().isVisible());
+  tvrdi(`O-H ${jmeno}: bez přetečení`, await bezPreteceni(p));
+  await p.screenshot({ path: OUT + `k69-b8-objednavky-historie-${jmeno}.png`, fullPage: true });
+  tvrdi(`O-H ${jmeno}: bez chyb v konzoli`, chyby.length === 0, chyby.slice(0, 3).join(' | '));
   await ctx.close();
 }
 
