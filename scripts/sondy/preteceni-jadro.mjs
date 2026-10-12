@@ -186,6 +186,30 @@ export const zmer = (p) => p.evaluate(() => {
   return nalezy;
 });
 
+/**
+ * Projde obrazovky (dvojice [adresa, popis]) v jednom kontextu. Když
+ * Chromium stránku shodí („Page crashed" — nedostatek paměti ve sdíleném
+ * běhu, ne chyba aplikace), otevře novou a obrazovku zkusí ještě jednou;
+ * teprve druhý pád je nález. Sonda tak nespadne celá kvůli jednomu
+ * rendereru a ostatní obrazovky se změří.
+ */
+export async function projdi(ctx, p, obrazovky, jmeno) {
+  for (const [cesta, popis] of obrazovky) {
+    for (let pokus = 0; ; pokus++) {
+      try {
+        await otevriStranku(p, cesta);
+        await prover(p, `${jmeno} ${popis}`);
+        break;
+      } catch (e) {
+        const pad = /crashed|has been closed/i.test(String(e));
+        if (pad && pokus === 0) { p = await ctx.newPage(); continue; }
+        tvrdi(`${jmeno} ${popis}: obrazovka se otevřela`, false, String(e).split('\n')[0].slice(0, 140));
+        break;
+      }
+    }
+  }
+}
+
 export const popisNalezu = (n) => `${n.druh}: ${n.prvek} «${n.text}» ${n.detail}${n.vinici.length ? '\n      ↳ ' + n.vinici.join('\n      ↳ ') : ''}`;
 
 /**
