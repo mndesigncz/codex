@@ -19,7 +19,7 @@
 // (přechod), .w-kyv = vlnění (animace). Každá vrstva má svůj transform,
 // takže se nepřepisují.
 
-import React, { Suspense, lazy, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import React, { Suspense, lazy, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import { Icon } from '../Icons';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { Button, Card, EmptyState, ErrorState, Hint, Modal, PageHeader, Skeleton, Toast, Well, type MenuItem } from '../ui';
@@ -80,6 +80,15 @@ export interface HlavickaPlochy {
   secondary?: React.ReactNode;
   /** Položky „···"; plocha přidá „Upravit stránku". */
   menu?: MenuItem[];
+  /**
+   * Hlavní akce na telefonu (pod `md`), když má být jiná než na monitoru — majitel
+   * z telefonu kontroluje, na monitoru zakládá (Sklad: „Nakoupit (7)" místo „Přidat
+   * položku"). undefined = jako `primary`; null = na telefonu bez limetky (hlavička se
+   * pak složí do jednoho řádku s „···" a ušetří první obrazovce 68 px).
+   */
+  primaryTelefon?: React.ReactNode | null;
+  /** Položky „···" jen pod `md` — typicky akce, která na telefonu ustoupila z limetky. */
+  menuTelefon?: MenuItem[];
   /** Přepínač pohledu nebo filtr pod hlavičkou; v úpravách `inert`. */
   aside?: React.ReactNode;
   hintId?: string;
@@ -102,6 +111,23 @@ export interface PlochaWidgetuProps {
   rizeni?: Rozlozeni;
   /** Jen `rezim="vychozi"`: „Hotovo" v liště (zpět na seznam stránek). */
   onHotovo?: () => void;
+}
+
+/** Telefon = pod `md` (768 px), stejná hranice, pod kterou PageHeader schovává vedlejší akce do „···". */
+const DOTAZ_TELEFON = '(max-width: 767.98px)';
+const odebirejTelefon = (zmena: () => void) => {
+  const mq = typeof window !== 'undefined' ? window.matchMedia?.(DOTAZ_TELEFON) : undefined;
+  mq?.addEventListener?.('change', zmena);
+  return () => mq?.removeEventListener?.('change', zmena);
+};
+const jeTelefon = () => (typeof window !== 'undefined' && window.matchMedia?.(DOTAZ_TELEFON).matches) || false;
+
+/**
+ * Je plocha na telefonu? Server a hydratace počítají s monitorem (false) a hned po ní se
+ * přepne — useSyncExternalStore tak nehlásí nesoulad hydratace a otočení iPadu se projeví živě.
+ */
+function useTelefon(): boolean {
+  return useSyncExternalStore(odebirejTelefon, jeTelefon, () => false);
 }
 
 /** Počet prvků (i uvnitř fragmentu) — kolik vedlejších akcí stránka do hlavičky dala. */
@@ -208,8 +234,8 @@ function ZvetsenyWidget({ p, def, nazev, stranka, onClose }: { p: PolozkaRozloze
   const nastaveni = useMemo(() => sNastavenimVychozimi(def.nastaveni, p.nastaveni), [def, p.nastaveni]);
   const kontext = useMemo<KontextWidgetu>(() => ({
     instance: p.id, velikost: 'L', definice: def, nahled: false, upravy: false, inkoust: false, nahlasSkryti: BEZ_AKCE,
-    nahlasVyrizeno: BEZ_AKCE, mini: null, rozbal: BEZ_AKCE, pohledStranky: stranka.pohled, sbaleno: false, prepniSbaleni: BEZ_AKCE, zvetsit: null, vOkne: true,
-  }), [p.id, def, stranka.pohled]);
+    nahlasVyrizeno: BEZ_AKCE, mini: null, rozbal: BEZ_AKCE, pohledStranky: stranka.pohled, rozhraniStranky: stranka.rozhrani, sbaleno: false, prepniSbaleni: BEZ_AKCE, zvetsit: null, vOkne: true,
+  }), [p.id, def, stranka.pohled, stranka.rozhrani]);
   return (
     <Modal open onClose={onClose} size="xl" title={nazev}>
       <KontextWidgetuCtx.Provider value={kontext}>
@@ -236,8 +262,8 @@ const PolozkaPlochy = memo(function PolozkaPlochy(props: PolozkaProps) {
   const zvetsit = useCallback(() => h.zvetsit(p.id), [h, p.id]);
   const kontext = useMemo<KontextWidgetu>(() => ({
     instance: p.id, velikost: p.velikost, definice: def, nahled: false, upravy, inkoust, nahlasSkryti,
-    nahlasVyrizeno, mini, rozbal, pohledStranky: stranka.pohled, sbaleno, prepniSbaleni, zvetsit: smiZvetsit ? zvetsit : null,
-  }), [p.id, p.velikost, def, upravy, inkoust, nahlasSkryti, nahlasVyrizeno, mini, rozbal, stranka.pohled, sbaleno, prepniSbaleni, smiZvetsit, zvetsit]);
+    nahlasVyrizeno, mini, rozbal, pohledStranky: stranka.pohled, rozhraniStranky: stranka.rozhrani, sbaleno, prepniSbaleni, zvetsit: smiZvetsit ? zvetsit : null,
+  }), [p.id, p.velikost, def, upravy, inkoust, nahlasSkryti, nahlasVyrizeno, mini, rozbal, stranka.pohled, stranka.rozhrani, sbaleno, prepniSbaleni, smiZvetsit, zvetsit]);
   const Komponenta = useMemo(() => (def && !jeNastroj ? lineWidget(p.widget, pokus) : null), [def, jeNastroj, p.widget, pokus]);
   const nastaveni = useMemo(() => sNastavenimVychozimi(def?.nastaveni, p.nastaveni), [def, p.nastaveni]);
   // Fáze a délka kmitu z hashe id: vypadá náhodně, ale je stálá — sousedé se
@@ -372,6 +398,7 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
   const navigaceRef = useRef(navigace);
   navigaceRef.current = navigace;
   const { plan, loaded: planNacten } = usePlan();
+  const telefon = useTelefon();
   // Tarif jen pro nabídku polí a záložní rozložení; widgety filtruje server.
   const tarif: Tarif = !PLAN_ENFORCED || !planNacten || !plan ? 'max' : plan.effective === 'max' ? 'max' : plan.effective === 'pro' ? 'pro' : 'zdarma';
 
@@ -493,7 +520,13 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
   }, [vychoziRezim, nacteno, opravneni]);
 
   const skrytaVKlidu = (p: PolozkaRozlozeni) => !upravy && (skryte.has(p.id) || bezOpravneni(p));
-  const rozpeti = sloupcu ? rozvrhni(polozky.map(p => (skrytaVKlidu(p) || (!najdiWidget(p.widget) && p.widget !== NASTROJ) ? null : p.widget === NASTROJ ? 'L' : p.velikost)), sloupcu, !upravy) : null;
+  /** Souhrn vyřízeného widgetu, když se v klidu kreslí minimalizovaně (null = plná karta). */
+  const miniVKlidu = (p: PolozkaRozlozeni): string | null => (!upravy && !vychoziRezim && !rozbalene.has(p.id) ? vyrizene.get(p.id) ?? null : null);
+  // Minimalizovaná malá karta zabírá místo střední: na telefonu (2 sloupce) celý řádek, na monitoru
+  // půl řádku. V polovině telefonu (171 px) zbývalo na název a souhrn ~70 px — „Uzávě… / Nic neč…",
+  // nebylo poznat, co karta je, ani že je v pořádku. Dvě nízké karty pod sebou jsou pořád nižší než jedna plná S.
+  const velikostVKlidu = (p: PolozkaRozlozeni): Velikost => (p.widget === NASTROJ ? 'L' : p.velikost === 'S' && miniVKlidu(p) != null ? 'M' : p.velikost);
+  const rozpeti = sloupcu ? rozvrhni(polozky.map(p => (skrytaVKlidu(p) || (!najdiWidget(p.widget) && p.widget !== NASTROJ) ? null : velikostVKlidu(p))), sloupcu, !upravy) : null;
   const inkoust = vychoziRezim || !stranka ? null : inkoustovaInstance(stranka, polozky.filter(p => !skrytaVKlidu(p)));
   const viditelnych = polozky.filter(p => !skrytaVKlidu(p) && (p.widget === NASTROJ || !!najdiWidget(p.widget))).length;
 
@@ -1215,7 +1248,8 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
   // opakuje sousední tlačítko, je ovládací prvek bez nové funkce (DP §0).
   const upravitStranku: MenuItem[] = smiUpravit && !vychoziRezim ? [{ label: t('Upravit stránku'), icon: 'pencil', onClick: () => vstupDoUprav('tlacitko') }] : [];
   const menuHlavicky: MenuItem[] = [...(hlavicka.menu ?? []), ...(upravit ? [] : upravitStranku)];
-  const menuHlavickyMobil: MenuItem[] = upravit ? upravitStranku : [];
+  const menuHlavickyMobil: MenuItem[] = [...(hlavicka.menuTelefon ?? []), ...(upravit ? upravitStranku : [])];
+  const primaryHlavicky = telefon && hlavicka.primaryTelefon !== undefined ? hlavicka.primaryTelefon ?? undefined : hlavicka.primary;
 
   const celaChyba = zaloha && chybaOpravneni;
   const nacitam = r.nacteni === 'nacitam' && !r.predbezne && !polozky.length;
@@ -1247,7 +1281,7 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
           title={hlavicka.title}
           subtitle={upravy && !vychoziRezim ? t('Přetáhni widget na jiné místo. Mínusem ho odebereš.') : hlavicka.subtitle}
           hintId={upravy ? undefined : hlavicka.hintId}
-          primary={upravy ? undefined : hlavicka.primary}
+          primary={upravy ? undefined : primaryHlavicky}
           secondary={upravy ? undefined : (hlavicka.secondary || upravit ? <>{hlavicka.secondary}{upravit}</> : undefined)}
           menu={upravy ? undefined : menuHlavicky}
           menuMobile={upravy ? undefined : menuHlavickyMobil}
@@ -1306,7 +1340,7 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
                 inkoust={inkoust === p.id}
                 pokus={pokusy[p.id] ?? 0}
                 nova={nova === p.id}
-                mini={!upravy && !vychoziRezim && !rozbalene.has(p.id) ? vyrizene.get(p.id) ?? null : null}
+                mini={miniVKlidu(p)}
                 sbaleno={!upravy && !vychoziRezim && sbalene.has(p.id)}
                 navodId={navodId}
                 stranka={stranka}

@@ -49,7 +49,7 @@ import { createPortal } from 'react-dom';
 import { useSession } from 'next-auth/react';
 import { Avatar, Button, CasovyGraf, Chip, Field, Input, ListRow, Menu, Modal, ObdobiLista, PersonChip, Segmented, Stat, StatRow } from '../../ui';
 import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
-import { Widget, useWidget, type StavNacteni } from '../Widget';
+import { Widget, useVyrizeno, useWidget, type StavNacteni } from '../Widget';
 import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
 import { useNavigace, useSmi } from '../NavigaceKontext';
 import { useOpravneni } from '../../role/useOpravneni';
@@ -944,6 +944,10 @@ function DlouhePrichody({ velikost, nahled }: WidgetProps) {
   const ted = useTed(brana, 60_000);
   const [ukoncit, setUkoncit] = useState<OtevrenyPrichod | null>(null);
   const seznam = useMemo(() => (data.data ? otevrenePrichody(data.data.roster, ted, pragueToday()) : []), [data.data, ted]);
+  // Nikdo napíchnutý déle = vyřízeno: plocha kartu v klidu složí na nízký řádek s fajfkou (V10).
+  // Dřív stála prázdná malá karta sama v řádku 136 px vysoká s jednou větou u dna. Jen nad
+  // načtenými daty — během načítání nebo po chybě se neví, jestli je co ukončit.
+  useVyrizeno(brana && data.data != null && !data.error && seznam.length === 0, t('Nikdo není napíchnutý déle, než měl'));
   if (!brana) return <Widget prazdno={null} />;
 
   const smiUkoncit = !nahled && smi('dochazka.upravit');
