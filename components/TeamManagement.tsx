@@ -585,7 +585,10 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                       {zkopirovano === inv.token ? t('Zkopírováno') : t('Odkaz')}
                     </Button>
                   )}
-                  <Button variant="ghost" size="sm" icon="send" loading={posilamZnovu === inv.id} disabled={posilamZnovu != null}
+                  {/* Tři akce se na 320 px (a v němčině) do řádku nevejdou — na telefonu je „Poslat znovu" jen ikona. */}
+                  <Button variant="ghost" size="sm" icon="send" iconOnly className="sm:hidden" loading={posilamZnovu === inv.id} disabled={posilamZnovu != null}
+                    onClick={() => posliZnovu(inv)} aria-label={t('Poslat znovu: {email}', { email: inv.email })} title={t('Poslat znovu')} />
+                  <Button variant="ghost" size="sm" icon="send" className="hidden sm:inline-flex" loading={posilamZnovu === inv.id} disabled={posilamZnovu != null}
                     onClick={() => posliZnovu(inv)} aria-label={t('Poslat znovu: {email}', { email: inv.email })}>{t('Poslat znovu')}</Button>
                   <Button variant="ghost" size="sm" onClick={() => setZrusit(inv)} aria-label={t('Zrušit pozvánku: {email}', { email: inv.email })}>{t('Zrušit')}</Button>
                 </> : undefined}
