@@ -45,7 +45,7 @@ export const ZALOZKY_TABLETU = [
 
 export type IdZalozkyTabletu = (typeof ZALOZKY_TABLETU)[number]['id'];
 
-/** Záložky, na které role tabletu má. `smi` je useSmi() — před načtením oprávnění vrací ano. */
+/** Záložky, na které role tabletu má. `smi` je useSmi() — před načtením oprávnění vrací ne (při chybě načtení ano). */
 export function viditelneZalozky<T extends ZalozkaTabletu>(zalozky: readonly T[], smi: (klic: string) => boolean): T[] {
   return zalozky.filter(z => !z.klic || smi(z.klic));
 }
