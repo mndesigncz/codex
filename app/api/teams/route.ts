@@ -47,7 +47,8 @@ export async function GET() {
     // Kolo 67: nastavení podniku (měna, uzávěrky, přehledy, tarif…) čte každý
     // člen — stojí na nich jeho vlastní obrazovky i tablet. Citlivá pole jen
     // s oprávněním: kód pro připojení (tym.pozvat), e-maily a telefony
-    // (tym.kontakty), sazby (finance.mzdy), podrobnosti předplatného
+    // (tym.kontakty), sazby (finance.mzdy), pravidelné náklady (finance.zobrazit /
+    // finance.nastaveni), podrobnosti předplatného
     // (predplatne.zobrazit). Kdo v podniku není členem (host se zrcadlem
     // team_id), neprojde vůbec — dřív tu dostal i join kód.
     const r = await roleClena(me.id, Number(teamId));
@@ -127,11 +128,15 @@ export async function GET() {
       biz.country = b?.country ?? null;
     } catch { /* columns not migrated yet */ }
     // Pevné náklady (kolo 81): zvlášť, ať chybějící sloupec nevezme ostatní nastavení.
+    // Nájem a energie jsou finanční údaje podniku: dostane je jen role, která vidí Finance
+    // nebo je nastavuje (stejně jako sazby jen s finance.mzdy), ne každý člen.
     let fixedCosts: PevnyNaklad[] = [];
-    try {
-      const [b] = await sql`SELECT fixed_costs FROM teams WHERE id = ${teamId}`;
-      fixedCosts = pevneNakladyZDb(b?.fixed_costs);
-    } catch { /* column not migrated yet */ }
+    if (ma('finance.zobrazit') || ma('finance.nastaveni')) {
+      try {
+        const [b] = await sql`SELECT fixed_costs FROM teams WHERE id = ${teamId}`;
+        fixedCosts = pevneNakladyZDb(b?.fixed_costs);
+      } catch { /* column not migrated yet */ }
+    }
     // IČO a DIČ (kolo 73): taky zvlášť, sloupce přibydou až s DDL.
     try {
       // sql.query (ne šablona): sloupce teams.ico a teams.dic přibudou až s DDL z poznámky ke kolu 73; do té doby je kontrola schématu (check-sql) nezná.
