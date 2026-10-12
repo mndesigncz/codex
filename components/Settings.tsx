@@ -283,7 +283,8 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
   const [filtrOzn, setFiltrOzn] = useState<FiltrOznameni>('vse');
   const [druhOzn, setDruhOzn] = useState<string | null>(null);
   const [druhyOzn, setDruhyOzn] = useState<Record<string, number>>({});
-  const [unreadTotal, setUnreadTotal] = useState(0);
+  // Počet všech nepřečtených ze serveru; null = ještě nevím (odznak u Notifikací v seznamu sekcí).
+  const [unreadTotal, setUnreadTotal] = useState<number | null>(null);
   const [maStarsi, setMaStarsi] = useState(false);
   const [nacitamStarsi, setNacitamStarsi] = useState(false);
 
@@ -354,13 +355,20 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
   // Klepnutí na řádek s odkazem: přečteno (až podle serveru) a přechod na cíl — stejně jako zvonek.
   const otevriNotif = (n: Notif) => otevriOznameni(n, x => {
     setNotifs(prev => prev.map(y => (y.id === x.id ? { ...y, is_read: true } : y)));
-    setUnreadTotal(u => Math.max(0, u - 1));
+    setUnreadTotal(u => Math.max(0, (u ?? 1) - 1));
   });
 
   useEffect(() => {
     if (section === 'notifications' && !notifsLoaded) loadNotifs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section]);
+  // Odznak nepřečtených u Notifikací (seznam sekcí, boční pás) i před otevřením sekce:
+  // stačí počet, seznam se stáhne až v sekci. Bez sítě odznak prostě nebude.
+  useEffect(() => {
+    fetch('/api/notifications?limit=1').then(okJson)
+      .then(d => setUnreadTotal(u => u ?? (Number(d?.unread) || 0)))
+      .catch(() => { /* odznak je doplněk */ });
+  }, []);
 
   const saveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -437,8 +445,8 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
     if (filtrOzn === 'neprectene') loadNotifs();
   };
 
-  // Počet všech nepřečtených ze serveru (ne jen v načtené dávce); před prvním načtením z dávky.
-  const unreadCount = notifsLoaded ? unreadTotal : notifs.filter(n => !n.is_read).length;
+  // Počet všech nepřečtených ze serveru (ne jen v načtené dávce).
+  const unreadCount = unreadTotal ?? notifs.filter(n => !n.is_read).length;
   // Druhy oznámení pro pilulky: od dvou druhů, vybraný zůstává vidět i s nulou.
   const druhyPilulek = Object.entries({ ...(druhOzn ? { [druhOzn]: 0 } : {}), ...druhyOzn });
   const nazevDruhu = (typ: string): string => {
@@ -629,10 +637,11 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
               <Segmented size="sm" ariaLabel={t('Která oznámení ukázat')} value={filtrOzn} onChange={zmenFiltr}
                 options={[{ id: 'vse', label: t('Vše') }, { id: 'neprectene', label: t('Nepřečtené'), count: unreadCount }]} />
               {druhyPilulek.length >= 2 && (
-                <div className="flex flex-wrap gap-1.5" role="group" aria-label={t('Druh oznámení')}>
+                // Filtrovací pás (DESIGN): na úzké obrazovce jede do strany uvnitř sebe, nezalamuje se do tří řádků.
+                <div className="flex gap-1.5 overflow-x-auto overscroll-x-contain scrollbar-none scroll-fade-x -mx-1 px-1 py-0.5" role="group" aria-label={t('Druh oznámení')}>
                   {druhyPilulek.map(([typ, n]) => (
                     <button key={typ} type="button" aria-pressed={druhOzn === typ} onClick={() => zmenDruh(typ)}
-                      className={`filter-pill tap-target-sm inline-flex items-center gap-1.5 ${druhOzn === typ ? 'seg-on' : 'seg-off glass'}`}>
+                      className={`filter-pill tap-target-sm shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 ${druhOzn === typ ? 'seg-on' : 'seg-off glass'}`}>
                       <Icon name={ikonaOznameni(typ)} size={13} className="shrink-0" />
                       <span>{nazevDruhu(typ)} · <span className="tabular-nums">{n}</span></span>
                     </button>

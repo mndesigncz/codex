@@ -164,7 +164,8 @@ export default function SekcePodnik({ pravidelneNaklady }: {
         {!smiPrahy && <p className="t-meta">{t('Prahy skladu mění jen ten, kdo smí spravovat kategorie skladu.')}</p>}
         {hlaska('prahy')}
         <div className="flex flex-col sm:flex-row sm:justify-end">
-          <Button type="submit" variant="accent" block loading={uklada === 'prahy'} disabled={!smiPrahy}>{t('Uložit prahy')}</Button>
+          {/* Jediná limetka plochy je Uložit profil (DESIGN); prahy jsou vedlejší formulář. */}
+          <Button type="submit" variant="primary" block loading={uklada === 'prahy'} disabled={!smiPrahy}>{t('Uložit prahy')}</Button>
         </div>
       </form>
 

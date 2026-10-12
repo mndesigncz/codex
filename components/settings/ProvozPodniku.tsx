@@ -14,9 +14,8 @@
 // takže po uložení se překreslí všude. Texty zůstávají ve slovníku `tym`, odkud přišly.
 
 import { useState } from 'react';
-import { Button, Card, Field, Input, Select, Skeleton, Toast } from '../ui';
+import { Button, Field, Input, Select, Skeleton, Toast } from '../ui';
 import { ErrorState } from '../ui/ErrorState';
-import { Icon } from '../Icons';
 import { useDataWidgetu, obnovDataWidgetu } from '../widgety/useDataWidgetu';
 import { useOpravneni } from '../role/useOpravneni';
 import { useT } from '@/lib/i18n/client';
@@ -77,7 +76,7 @@ export default function ProvozPodniku() {
   };
   const ulozeno = t('Nastavení provozu je uložené.');
 
-  if (data.error) return <Card><ErrorState compact title={t('Nastavení se nepodařilo načíst')} detail={data.error} onRetry={data.reload} /></Card>;
+  if (data.error) return <section className="card p-6"><ErrorState compact title={t('Nastavení se nepodařilo načíst')} detail={data.error} onRetry={data.reload} /></section>;
   if (!team) return <Skeleton className="h-72 rounded-3xl" />;
 
   const navrh = (() => {
@@ -105,10 +104,9 @@ export default function ProvozPodniku() {
 
   return (
     <>
-      <Card aria-labelledby="nast-provoz-t">
-        <h2 id="nast-provoz-t" className="t-card flex items-center gap-2">
-          <Icon name="settings" size={17} className="shrink-0 text-black/40" />  {t('Provoz podniku')}
-        </h2>
+      {/* Stejná karta jako profil a prahy nad ní (card p-6, nadpis t-card bez ikony). */}
+      <section className="card p-6" aria-labelledby="nast-provoz-t">
+        <h2 id="nast-provoz-t" className="t-card">{t('Provoz podniku')}</h2>
         <p className="t-meta mt-1">{t('Měna, formát čísel a cíle — přizpůsob aplikaci svému podniku.')}</p>
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field id="tym-mena" label={t('Měna')}>
@@ -168,7 +166,7 @@ export default function ProvozPodniku() {
         </div>
         {/* Předvyplnění podle země: ukáže, co navrhne, a změní to až po kliknutí. DPH jen jako informace k ověření; appka z něj nic nepočítá. */}
         {navrh}
-      </Card>
+      </section>
       <Toast message={toast?.text ?? null} tone={toast?.tone ?? 'ok'} onClose={() => setToast(null)} />
     </>
   );
