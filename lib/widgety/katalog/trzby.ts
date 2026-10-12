@@ -238,7 +238,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     id: 'trzby.platby',
     oblast: 'trzby',
     nazev: 'Platby a spropitné',
-    popis: 'Hotově / kartou / ostatní (stravenky, kredit…) a spropitné rozdělené na hotovost a kartu.',
+    popis: 'Hotově / kartou / ostatní (stravenky, kredit…), spropitné rozdělené na hotovost a kartu; slevy (% z tržby) a storna, když nějaké jsou.',
     ikona: 'card',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'S',

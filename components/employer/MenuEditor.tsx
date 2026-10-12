@@ -55,6 +55,8 @@ interface Item {
   description?: string | null;
   soldOut: boolean;
   posProductId?: string | null;
+  /** Cena téhož produktu v kase (kolo 81); null = bez vazby nebo kasa cenu nedala. Jen ke čtení, PUT ji ignoruje. */
+  posPrice?: number | null;
   /** Kódy alergenů 1–14; prázdné = nevyplněno (ne „bez alergenů"). */
   allergens?: number[];
   tags?: string[];
@@ -536,6 +538,26 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
     return { celkem, spojene, chybi: celkem - spojene };
   })();
 
+  /* Cena v menu jiná než v kase (kolo 81): host vidí na lístku jiné číslo, než mu kasa naúčtuje. */
+  const jinaCenaNezVKase = (it: Item) => it.posProductId != null && it.posPrice != null && it.price !== it.posPrice;
+  const jinychCen = (board?.sections ?? []).reduce((n, s) => n + s.items.filter(jinaCenaNezVKase).length, 0);
+
+  /* Převzít cenu z kasy — jedna položka nebo všechny; uloží se stávající cestou (PUT), stav se
+     předá `ulozit` zvlášť, protože React ho v tomhle tiku ještě nepřekreslil (jako `zverejnit`). */
+  const prevzitCenyZKasy = async (jen?: { si: number; ii: number }) => {
+    if (!board) return;
+    const kopie = JSON.parse(JSON.stringify(board)) as Board;
+    let n = 0;
+    kopie.sections.forEach((s, si) => s.items.forEach((it, ii) => {
+      if (jen && (jen.si !== si || jen.ii !== ii)) return;
+      if (jinaCenaNezVKase(it)) { it.price = it.posPrice as number; n++; }
+    }));
+    if (n === 0) return;
+    upravit((b) => { b.sections = kopie.sections; });
+    await ulozit({ sections: kopie.sections });
+    hlas(t('{n, plural, one {# cena převzata z kasy} few {# ceny převzaty z kasy} other {# cen převzato z kasy}}.', { n }));
+  };
+
   // -------------------------------------------------------------------------
 
   /* Okno kopie je ve všech větvích na TÉŽE pozici (za nástrojem). Po
@@ -618,6 +640,10 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
             <h2 className="t-card flex items-center gap-2"><Icon name="clipboard" size={17} className="shrink-0 text-black/40" />{boards.length > 1 ? t('Tvoje menu') : board.name}</h2>
             {smiUpravit && (
               <div className="flex flex-wrap gap-2">
+                {/* Hromadné převzetí cen z kasy (kolo 81) — secondary, ne druhá limetka; jen s menu.ceny. */}
+                {posPripojena && smiCeny && jinychCen > 0 && (
+                  <Button variant="secondary" size="sm" icon="refresh" disabled={ukladam} onClick={() => void prevzitCenyZKasy()}>{t('Převzít ceny z kasy ({n})', { n: jinychCen })}</Button>
+                )}
                 <Button variant="secondary" size="sm" icon="plus" disabled={ukladam} onClick={() => setNoveMenu('')}>{t('Nové menu')}</Button>
                 {/* Při neuložených změnách ne: obnova seznamu po kopii by rozpracovanou
                     desku přepsala tím, co je v databázi. */}
@@ -972,6 +998,16 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
                         {posPripojena && (it.posProductId ? (
                           <>
                             <Chip tone="ok" size="sm" icon="check">{t('Tiskne se na kase')}</Chip>
+                            {/* Cena jiná než v kase (kolo 81): štítek wait a převzetí na jedno klepnutí (s menu.ceny). */}
+                            {jinaCenaNezVKase(it) && (
+                              <>
+                                <Chip tone="wait" size="sm">{t('v kase {cena}', { cena: `${cenaDoPole(it.posPrice as number)} ${board.currency}` })}</Chip>
+                                {!zamceno && smiCeny && (
+                                  <Button variant="ghost" size="sm" disabled={ukladam} onClick={() => void prevzitCenyZKasy({ si, ii })}
+                                    aria-label={t('Převzít cenu z kasy — {nazev}', { nazev: it.name || t('nová položka') })}>{t('Převzít')}</Button>
+                                )}
+                              </>
+                            )}
                             {!zamceno && <Button variant="ghost" size="sm" onClick={() => upravit((b) => { b.sections[si].items[ii].posProductId = null; })}>{t('Zrušit vazbu')}</Button>}
                           </>
                         ) : (

@@ -27,7 +27,7 @@ import { apiMessage, okJson } from '@/lib/api';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import {
   hlavniDeska, nesparovano, pocetVyprodanych, radkyVyprodano, vyberMenu, wifiMenu,
-  UDALOST_VYPRODANO, URL_MENU, URL_VYPRODANO, type DataMenu, type DeskaMenu, type RadekVyprodano,
+  UDALOST_VYPRODANO, URL_MENU, URL_VYPRODANO, type DataMenu, type DeskaMenu, type RadekVyprodano, jinaCenaDesek,
 } from '@/lib/recepturyPrehled';
 import { Icon } from '../../Icons';
 import { Button, Chip, EmptyState, ListRow, SearchField, Stat, Switch, Toast } from '../../ui';
@@ -84,6 +84,8 @@ function metaDesky(d: DeskaMenu, t: PrekladFn): string {
   if (d.bezCeny > 0) casti.push(t('{n} bez ceny', { n: cislo(d.bezCeny) }));
   const n = nesparovano(d);
   if (n > 0) casti.push(t('{n} bez vazby na kasu', { n: cislo(n) }));
+  // Kolo 81: cena v menu jiná než v kase — host vidí na lístku jiné číslo, než zaplatí.
+  if (d.jinaCena > 0) casti.push(t('{n, plural, one {# cena jinak než v kase} few {# ceny jinak než v kase} other {# cen jinak než v kase}}', { n: d.jinaCena }));
   return casti.join(' · ');
 }
 
@@ -141,9 +143,15 @@ function StavMenu({ velikost, nahled }: WidgetProps) {
 
   const zobrazeno = desky.slice(0, 5);
   const qr = hlavni?.zapnuto ? hlavni : null;
+  const jinychCen = jinaCenaDesek(desky);
   return (
     <Widget nacteni={ceka ? CEKA : data} kostra="seznam" prazdno={prazdno}
-      doplnek={desky.length > 1 ? <Chip tone="muted" size="sm">{cislo(desky.length)}</Chip> : undefined}>
+      doplnek={desky.length > 1 || jinychCen > 0 ? (
+        <span className="inline-flex items-center gap-1.5">
+          {jinychCen > 0 && <Chip tone="wait" size="sm">{t('{n} cen jinak', { n: cislo(jinychCen) })}</Chip>}
+          {desky.length > 1 && <Chip tone="muted" size="sm">{cislo(desky.length)}</Chip>}
+        </span>
+      ) : undefined}>
       <div className="flex flex-col sm:flex-row gap-4">
         <ul className="list min-w-0 flex-1">
           {zobrazeno.map(d => (

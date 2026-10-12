@@ -42,7 +42,7 @@ import { dbTimeHM, dayPlus, pragueToday } from '@/lib/pragueTime';
 import { apiMessage, okJson } from '@/lib/api';
 import { fmtMesic } from '@/lib/i18n/format';
 import { aktualniJazyk } from '@/lib/i18n/stav';
-import { DLOUHO_OTEVRENY_MIN, zmenaOprotiMinulemuTydnu, nactiKalendareUzaverek, dnyObdobi, dnyVTydnu, obdobiPokladny, pondeliTydne, kalendarTrzeb, kasaProtiUzaverkam, mesiceObdobi, minutOtevrenosti, tydnyTrzeb, vyberKalendarTrzeb as vyberKalendar } from '@/lib/financeWidgety';
+import { DLOUHO_OTEVRENY_MIN, zmenaOprotiMinulemuTydnu, nactiKalendareUzaverek, dnyObdobi, dnyVTydnu, obdobiPokladny, pondeliTydne, kalendarTrzeb, kasaProtiUzaverkam, mesiceObdobi, minutOtevrenosti, tydnyTrzeb, vyberKalendarTrzeb as vyberKalendar, podilSlev, slevyNadPrah, PRAH_SLEV_PCT } from '@/lib/financeWidgety';
 import { useMoney } from '../../CurrencyProvider';
 import { Icon } from '../../Icons';
 import { otevriDen } from '@/lib/denUdalost';
@@ -797,6 +797,16 @@ function Platby({ velikost, nastaveni }: WidgetProps<{ obdobi: string }>) {
               : sc.other > 0 && <ListRow title={t('Jinak')} value={<span className="tabular-nums">{money(sc.other)}</span>} valueMeta={`${pct(sc.other)} %`} />}
             <ListRow title={t('Spropitné')} meta={t('hotově {hotove} · kartou {kartou}', { hotove: money(sc.tipsCash), kartou: money(sc.tipsCard) })}
               value={<span className="tabular-nums">{money(sc.tips)}</span>} />
+            {/* Slevy a storna (kolo 81): jen když nějaké jsou — nulový řádek by byl šum. Slevy nad 5 % tržby nesou Chip wait. */}
+            {sc.discounts > 0 && (
+              <ListRow title={<span className="inline-flex items-center gap-2">{t('Slevy')}{slevyNadPrah(sc.discounts, sc.total) && <Chip tone="wait" size="sm">{t('nad {pct} %', { pct: PRAH_SLEV_PCT })}</Chip>}</span>}
+                meta={t('{pct} % z tržby', { pct: podilSlev(sc.discounts, sc.total) })}
+                value={<span className="tabular-nums">−{money(sc.discounts)}</span>} />
+            )}
+            {sc.voidCount > 0 && (
+              <ListRow title={t('Storna')} meta={t('{n}× smazaný účet', { n: sc.voidCount })}
+                value={<span className="tabular-nums">{money(sc.voidTotal)}</span>} />
+            )}
           </ul>
         </>
       ))}

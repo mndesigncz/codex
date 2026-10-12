@@ -1,10 +1,13 @@
 {
- "connected": true,
- "placeName": "Kavárna Vinohrady",
- "bills": 42,
- "total": 18450,
- "cash": 5200,
- "card": 12100,
- "other": 300,
- "tips": 850
+  "connected": true,
+  "placeName": "Kavárna Vinohrady",
+  "bills": 42,
+  "total": 18450,
+  "cash": 5200,
+  "card": 12100,
+  "other": 300,
+  "tips": 850,
+  "discounts": 1180,
+  "voidCount": 2,
+  "voidTotal": 640
 }

@@ -12,6 +12,7 @@
 // půlka změny by vypadala jako úspěch.
 
 import { NextResponse } from 'next/server';
+import { cenaZDb } from '@/lib/cena';
 import { neon } from '@neondatabase/serverless';
 import bcrypt from 'bcryptjs';
 import {
@@ -104,8 +105,26 @@ export async function GET(request: Request) {
     return NextResponse.json({ boards: [], notMigrated: true });
   }
 
+  // Cena v kase (kolo 81): k položce s vazbou `posPrice` ze zrcadla pokladny, ať editor
+  // i widget Stav menu řeknou, kde host vidí na lístku jiné číslo, než mu kasa naúčtuje.
+  // Hostovské menu (menu/public) tuhle cestu nepoužívá — beze změny.
+  const cenyKasy = new Map<string, number>();
+  try {
+    const produkty = await sql`SELECT product_id, price FROM pos_products WHERE team_id = ${me.teamId} AND price IS NOT NULL` as any[];
+    for (const p of produkty) { const c = cenaZDb(p.price); if (c != null) cenyKasy.set(String(p.product_id), c); }
+  } catch { /* zrcadlo pokladny ještě není */ }
+
   const boards = [];
-  for (const r of rows) boards.push(await loadBoard(r));
+  for (const r of rows) {
+    const b = await loadBoard(r);
+    boards.push({
+      ...b,
+      sections: b.sections.map(s => ({
+        ...s,
+        items: s.items.map(it => ({ ...it, posPrice: it.posProductId != null ? cenyKasy.get(it.posProductId) ?? null : null })),
+      })),
+    });
+  }
   return NextResponse.json({ boards });
 }
 
