@@ -2,7 +2,7 @@
 // na 744 × 1133 (iPad mini na výšku) a 1024 × 768, česky a německy; /login, /register
 // a /client/login na 320/390/768/1024 px. Co se měří a proč: preteceni-jadro.mjs.
 //   SONDY_ZAKLAD=http://localhost:3400 node scripts/sondy/preteceni-kiosk.mjs
-import { kontext, konec, tvrdi, BASE, SIRKY, KIOSK_ZALOZKY, VEREJNE, viewport, nastavJazyk, otevriStranku, prover } from './preteceni-jadro.mjs';
+import { kontext, konec, tvrdi, BASE, SIRKY, KIOSK_ZALOZKY, VEREJNE, viewport, nastavJazyk, otevriStranku, prover, projdi } from './preteceni-jadro.mjs';
 
 // Záložky tabletu v jazyce (sonda klepe podle názvu; tablet nemá URL záložek).
 const ZALOZKY = { cs: KIOSK_ZALOZKY, de: ['Schicht', 'Aufgaben', 'Abläufe', 'Lager', 'Bestellungen', 'Kassenabschluss', 'Anleitungen'] };
@@ -30,10 +30,7 @@ for (const [w, jazyk] of [...SIRKY.map(w => [w, 'cs']), [320, 'de'], [320, 'pl']
   const { ctx, p } = await kontext({ viewport: viewport(w), role: 'employer', mobil: w < 600 });
   await ctx.clearCookies();
   await nastavJazyk(ctx, jazyk);
-  for (const cesta of VEREJNE) {
-    await otevriStranku(p, BASE + cesta);
-    await prover(p, `veřejné ${jazyk} ${w} ${cesta}`);
-  }
+  await projdi(ctx, p, VEREJNE.map(c => [BASE + c, c]), `veřejné ${jazyk} ${w}`);
   await ctx.close();
 }
 await konec();
