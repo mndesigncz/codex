@@ -18,7 +18,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Icon } from '../Icons';
-import { Avatar, Button, Chip, Modal, PageHeader, Segmented, SwitchRow } from '../ui';
+import { Avatar, Button, Chip, Modal, PageHeader, PlovouciLista, Segmented, SwitchRow } from '../ui';
 import {
   Closing, expectedCash, cashDifference, expectedCashLines,
   type Movement, type MovementKind, MOVEMENT_KINDS, movementLabel, sumMovements,
@@ -35,6 +35,7 @@ import { obnovDataWidgetu } from '../widgety/useDataWidgetu';
 import { useSmi } from '../widgety/NavigaceKontext';
 import { KLIC_VYPLNIT, UDALOST_VYPLNIT } from '@/lib/uzaverkyPrehled';
 import { useJazyk, useT, type PrekladFn } from '@/lib/i18n/client';
+import { useJeTelefon } from '@/lib/useJeTelefon';
 import { fmtDatum } from '@/lib/i18n/format';
 import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
 import type { PovinnaPolozka } from '@/lib/povinnePredUzaverkou';
@@ -42,7 +43,7 @@ import { UDALOST_ZMENA_POVINNYCH } from '../PredUzaverkou';
 import { ZamekUzaverky, URL_POVINNE, vyberStavZamku, stavZOdmitnuti, type StavZamku } from './ZamekUzaverky';
 
 const inputClass =
-  'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition text-sm';
+  'w-full field border border-black/[0.08] px-4 py-3 text-[#16181A] placeholder-black/30 focus:border-[#C8F542]/50 focus:ring-2 focus:ring-[#C8F542]/20 focus:outline-none transition';
 
 const today = () => pragueToday();
 
@@ -312,39 +313,75 @@ function hodinyMinuty(ms: number): string {
 }
 
 function Step({
-  icon, title, subtitle, children, refCb, guide,
+  icon, title, subtitle, children, refCb, guide, krok,
 }: {
   icon: string; title: string; subtitle: string;
   children: React.ReactNode;
   refCb?: (el: HTMLElement | null) => void;
   /** Návod připnutý k tomuhle kroku — viz „Připnout k uzávěrce" v Návodech. */
   guide?: { id: number; title: string; href: string | null; onOpen?: () => void } | null;
+  /**
+   * Průvodce na telefonu (audit kola 6, Z1): neaktivní krok je pod `md` sbalený
+   * na hlavičku s chipem stavu a klepnutím se otevře; aktivní je rozbalený.
+   * Na počítači jsou všechny kroky vidět (jen CSS, server i telefon kreslí totéž).
+   */
+  krok?: { sbaleny: boolean; stav: 'hotovo' | 'doplnit' | 'zamceno'; onOtevrit: () => void; souhrn?: string };
 }) {
+  const t = useT('zamestnanec');
   // Krok je oddíl jedné karty formuláře oddělený linkou, ne karta v kartě
   // (DP §4 D). Štítek „KROK 1/4" nad nadpisem zmizel — pořadí ukazuje
   // stepper nahoře jednou, ne nadpis každého kroku.
+  const sbaleny = krok?.sbaleny === true;
+  const chip = krok && (
+    krok.stav === 'zamceno' ? <Chip tone="wait" size="sm" icon="lock">{t('Zamčeno')}</Chip>
+      : krok.stav === 'hotovo' ? <Chip tone="ok" size="sm" icon="check">{t('Hotovo')}</Chip>
+        : <Chip tone="muted" size="sm">{t('Doplnit')}</Chip>
+  );
+  const ikona = (
+    <span aria-hidden className="well grid h-11 w-11 shrink-0 place-items-center !p-0">
+      <Icon name={icon} size={20} className="text-black/55" />
+    </span>
+  );
+  const navod = guide && (guide.href || guide.onOpen) && (
+    guide.onOpen ? (
+      <Button variant="secondary" size="sm" icon="book" onClick={guide.onOpen} className="mt-2">{guide.title}</Button>
+    ) : (
+      <a href={guide.href as string} className="btn btn-secondary btn-sm mt-2 inline-flex items-center gap-1.5">
+        <Icon name="book" size={15} /> {guide.title}
+      </a>
+    )
+  );
   return (
-    <section ref={refCb} className="scroll-mt-20 border-t border-[var(--surface-line)] pt-5 sm:pt-6 space-y-4 sm:space-y-5">
-      <div className="flex items-start gap-3.5">
-        <span aria-hidden className="well grid h-11 w-11 shrink-0 place-items-center !p-0">
-          <Icon name={icon} size={20} className="text-black/55" />
-        </span>
+    <section ref={refCb} className={`scroll-mt-20 border-t border-[var(--surface-line)] space-y-4 sm:space-y-5 ${sbaleny ? 'pt-3 md:pt-6' : 'pt-5 sm:pt-6'}`}>
+      {/* Sbalený krok na telefonu: celá hlavička je tlačítko, které krok otevře.
+          Nadpis h3 nese jen rozbalená podoba — v tlačítku nadpis být nesmí. */}
+      {krok && sbaleny && (
+        <button type="button" onClick={krok.onOtevrit} aria-expanded={false}
+          className="md:hidden tap-target flex w-full items-center gap-3.5 rounded-[var(--r-md)] text-left transition-colors active:bg-black/[0.04]">
+          {ikona}
+          {/* Sbalené kroky jsou zároveň souhrn: co v kroku je, bez otevírání. */}
+          <span className="min-w-0 flex-1">
+            <span className="block t-card truncate">{title}</span>
+            {krok.souhrn && <span className="block t-meta truncate tabular-nums">{krok.souhrn}</span>}
+          </span>
+          <span className="shrink-0 flex items-center gap-2">{chip}<Icon name="chevronRight" size={16} className="text-black/30" /></span>
+        </button>
+      )}
+      <div className={`items-start gap-3.5 ${krok && sbaleny ? 'hidden md:flex' : 'flex'}`}>
+        {ikona}
         <div className="min-w-0 flex-1">
-          <h3 className="t-card">{title}</h3>
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="t-card min-w-0">{title}</h3>
+            {krok && <span className="md:hidden shrink-0 -my-0.5">{chip}</span>}
+          </div>
           <p className="t-meta mt-0.5">{subtitle}</p>
           {/* Když kasa nesedí, odpověď na „co teď" nesmí být v jiné záložce. */}
-          {guide && (guide.href || guide.onOpen) && (
-            guide.onOpen ? (
-              <Button variant="secondary" size="sm" icon="book" onClick={guide.onOpen} className="mt-2">{guide.title}</Button>
-            ) : (
-              <a href={guide.href as string} className="btn btn-secondary btn-sm mt-2 inline-flex items-center gap-1.5">
-                <Icon name="book" size={15} /> {guide.title}
-              </a>
-            )
-          )}
+          {navod}
         </div>
       </div>
-      {children}
+      <div className={`space-y-4 sm:space-y-5 ${sbaleny ? 'hidden md:block' : ''}`}>
+        {children}
+      </div>
     </section>
   );
 }
@@ -971,6 +1008,55 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
     );
   };
 
+  // Telefon (audit kola 6, Z1): formulář je průvodce — vidět je jen aktivní
+  // krok, ostatní jsou sbalené na hlavičku se stavem a nad dokem je pevný pruh
+  // Zpět / Další krok / Dokončit. Kroky sbaluje CSS (pod `md`), takže server
+  // i telefon vykreslí totéž a rozepsané hodnoty zůstávají ve `form`; jen pruh
+  // se kreslí podle hooku — PlovouciLista měří výšku pro toast a jen schovaná
+  // by na počítači lhala.
+  const [aktivniKrok, setAktivniKrok] = useState(0);
+  const jeTelefon = useJeTelefon();
+  const otevriKrok = (i: number) => {
+    const k = Math.max(0, Math.min(totalSteps - 1, i));
+    setAktivniKrok(k);
+    // Sbalený krok se napřed rozbalí, až pak se na něj dá najet.
+    requestAnimationFrame(() => scrollToStep(k));
+  };
+  // Nativní validace (jediné `required` je skutečný stav kasy) narazí na pole
+  // ve sbaleném kroku: prohlížeč ho nemůže zaostřit a odeslání potichu zastaví.
+  // Krok s neplatným polem se proto otevře a pole dostane fokus i bublinu.
+  const naNeplatne = (e: React.FormEvent<HTMLFormElement>) => {
+    const el = e.target as HTMLInputElement;
+    const i = stepRefs.current.findIndex(st => st?.contains(el));
+    if (i < 0 || i === aktivniKrok) return;
+    setAktivniKrok(i);
+    setTimeout(() => { el.focus?.(); el.reportValidity?.(); }, 60);
+  };
+  const stavKroku = (i: number): 'hotovo' | 'doplnit' | 'zamceno' =>
+    i === totalSteps - 1 && zamceno ? 'zamceno' : stepDone[i] ? 'hotovo' : 'doplnit';
+  const odeslo = effExpenses + effRemoved + (payoutFromRegister ? effPayout : 0);
+  const souhrnKroku = [
+    form.openingCash !== '' ? money(n(form.openingCash)) : '',
+    form.cashRevenue !== '' || form.cardRevenue !== ''
+      ? `${t('hotově')} ${money(n(form.cashRevenue))} · ${t('kartou')} ${money(n(form.cardRevenue))}` : '',
+    odeslo > 0 ? t('Z kasy odešlo {castka}', { castka: money(odeslo) }) : stepDone[2] ? t('Z kasy nic neodešlo') : '',
+    form.closingCash === '' || diff === null ? ''
+      : `${money(n(form.closingCash))} · ${diff === 0 ? t('Sedí') : diff > 0 ? t('Přebytek +{castka}', { castka: money(diff) }) : t('Manko {castka}', { castka: money(diff) })}`,
+  ];
+  const krokPro = (i: number) => ({ sbaleny: aktivniKrok !== i, stav: stavKroku(i), onOtevrit: () => otevriKrok(i), souhrn: souhrnKroku[i] });
+  // Oddíly mimo <Step> (akce dne, kolegové, předávka a poznámka) patří na telefonu ke kroku, se kterým souvisí.
+  const jenVKroku = (i: number) => (aktivniKrok === i ? '' : 'hidden md:block');
+  // „Dokončit" v pruhu = totéž, co „Odeslat uzávěrku" na konci kroku Kontrola;
+  // zamčeno bez práva obejít vede k zámku nahoře (stejně jako šedé odeslání).
+  const dokoncit = () => {
+    if (zamceno && !povinne!.smiObejit) {
+      setErr(''); setPulzZamku(x => x + 1);
+      document.getElementById('zamek-uzaverky-titulek')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    formRef.current?.requestSubmit();
+  };
+
   return (
     <div className={vPlose ? 'space-y-4' : 'p-4 sm:p-6 space-y-5 sm:space-y-6'}>
       {/* Na ploše hlavičku kreslí plocha (jediný h1); tablet a vedení ji mají tady. */}
@@ -992,7 +1078,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
       {/* Výzva „Chybí ti uzávěrka" nad formulářem je od kola 69 widget
           uzaverky.moje_uzaverka; směny k vyplnění nabízí i první krok. */}
 
-      <form ref={formRef} onSubmit={submit} className="card scroll-mt-4 p-4 min-[400px]:p-5 sm:p-7 space-y-5 sm:space-y-6">
+      <form ref={formRef} onSubmit={submit} onInvalid={naNeplatne} className="card scroll-mt-4 p-4 min-[400px]:p-5 sm:p-7 space-y-5 sm:space-y-6">
         {/* Header + visual step progress */}
         <div>
           <div className="flex items-start justify-between gap-4">
@@ -1006,9 +1092,9 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
           <div className="mt-5 flex items-center gap-2">
             {[t('Kasa'), t('Tržby'), t('Výdaje'), t('Kontrola')].map((lbl, i) => (
               <div key={lbl} className="flex items-center gap-2 flex-1 last:flex-initial min-w-0">
-                <button type="button" onClick={() => scrollToStep(i)} title={t('Přejít na krok {krok}', { krok: lbl })}
+                <button type="button" onClick={() => otevriKrok(i)} title={t('Přejít na krok {krok}', { krok: lbl })} aria-current={aktivniKrok === i ? 'step' : undefined}
                   aria-label={i === totalSteps - 1 && zamceno ? t('Přejít na krok {krok} (uzávěrka je zamčená)', { krok: lbl }) : t('Přejít na krok {krok}', { krok: lbl })}
-                  className="tap-target-sm flex items-center gap-2 shrink-0 group">
+                  className="tap-target flex items-center gap-2 shrink-0 group">
                   {/* Poslední krok (odeslání) nese zámek, dokud chybí povinné věci. */}
                   {i === totalSteps - 1 && zamceno ? (
                     <span className="grid place-items-center h-6 w-6 shrink-0 rounded-full bg-wait/20 text-wait-ink">
@@ -1025,7 +1111,8 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
                     {stepDone[i] ? <Icon name="check" size={12} strokeWidth={3} /> : i + 1}
                   </span>
                   )}
-                  <span className={`text-[11px] font-semibold hidden sm:inline transition ${stepDone[i] ? 'text-ok-ink' : 'text-black/45'}`}>{lbl}</span>
+                  {/* Na telefonu nese popisek jen aktivní krok (čtyři popisky by se na 320 px nevešly), od sm všechny. */}
+                  <span className={`text-[11px] font-semibold transition ${aktivniKrok === i ? 'inline' : 'hidden sm:inline'} ${stepDone[i] ? 'text-ok-ink' : aktivniKrok === i ? 'text-[#16181A]' : 'text-black/45'}`}>{lbl}</span>
                 </button>
                 {i < totalSteps - 1 && <span className={`h-px flex-1 transition ${stepDone[i] ? 'bg-[#C8F542]/60' : 'bg-black/[0.09]'}`} />}
               </div>
@@ -1036,7 +1123,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
         {/* Running total that follows the person through the form, so every
             field they fill visibly moves the number they'll be checking against. */}
         {(form.openingCash !== '' || form.cashRevenue !== '') && (
-          <button type="button" onClick={() => scrollToStep(3)}
+          <button type="button" onClick={() => otevriKrok(3)}
             // Jediná inkoustová plocha formuláře (souhrn peněz, DP §4 D) — bez
             // rozmazání: blur v obsahu je zákaz a plná barva čte stejně.
             className="sticky top-2 z-20 w-full flex items-center justify-between gap-3 rounded-2xl bg-[#16181A] px-4 py-2.5 text-white shadow-[shadow:var(--shadow-float)] active:scale-[0.99] transition-transform">
@@ -1069,7 +1156,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
         {/* Nabízí se jen akce dne, za který se uzávěrka dělá — dřív tu visel
             seznam všech akcí historie a „ten den je akce" nešlo poznat. */}
         {evsToday.length > 0 && (
-            <div className="well p-4 space-y-2.5" role="radiogroup" aria-label={t('Za co je tahle uzávěrka')}>
+            <div className={`well p-4 space-y-2.5 ${jenVKroku(0)}`} role="radiogroup" aria-label={t('Za co je tahle uzávěrka')}>
               <p className="text-sm font-semibold text-[#16181A] flex items-center gap-1.5"><Icon name="calendarCheck" size={15} className="shrink-0 text-black/40" /> {evsToday.length === 1 ? t('Ten den se koná akce: {nazev}', { nazev: evsToday[0].title }) : t('Ten den se konají akce')}</p>
               <p className="t-meta">
                 {t('Výjezd s vlastní kasou má uzávěrku zvlášť („Za akci") a s kasou podniku se nemíchá. U akce u nás stačí běžná uzávěrka podniku — kolik z tržby spadlo do okna akce se po uložení rozepíše samo (z účtenek pokladny).')}
@@ -1089,7 +1176,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
             </div>
         )}
 
-        <Step refCb={el => { stepRefs.current[0] = el; }} icon="clock" title={t('Kasa na začátku')}
+        <Step refCb={el => { stepRefs.current[0] = el; }} krok={krokPro(0)} icon="clock" title={t('Kasa na začátku')}
           subtitle={t('Kolik bylo v kase, když směna začala.')}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="min-w-0 space-y-2">
@@ -1202,7 +1289,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
         </Step>
 
         {/* Step 2 — revenue */}
-        <Step refCb={el => { stepRefs.current[1] = el; }} icon="trend" title={t('Tržby')}
+        <Step refCb={el => { stepRefs.current[1] = el; }} krok={krokPro(1)} icon="trend" title={t('Tržby')}
           subtitle={t('Co za směnu přišlo — hotově, kartou a spropitné.')}>
           {pos && (
             <div className="well p-4 mb-1">
@@ -1250,7 +1337,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
         </Step>
 
         {/* Step 3 — expenses & payouts */}
-        <Step refCb={el => { stepRefs.current[2] = el; }} icon="box" title={t('Výdaje a odvody')}
+        <Step refCb={el => { stepRefs.current[2] = el; }} krok={krokPro(2)} icon="box" title={t('Výdaje a odvody')}
           subtitle={t('Co z kasy odešlo během směny.')}>
           <MovementEditor
             movements={movements} setMovements={setMovements}
@@ -1282,7 +1369,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
         {/* Kolegové na směně — one person closes for the whole crew */}
         {coworkers.length > 0 && (
           // Oddíl jako kroky (linka, jamka s ikonou), ne limetková karta v kartě.
-          <section className="border-t border-[var(--surface-line)] pt-5 sm:pt-6 space-y-3">
+          <section className={`border-t border-[var(--surface-line)] pt-5 sm:pt-6 space-y-3 ${jenVKroku(2)}`}>
             <div className="flex items-start gap-3.5">
               <span aria-hidden className="well grid h-11 w-11 shrink-0 place-items-center !p-0">
                 <Icon name="users" size={20} className="text-black/55" />
@@ -1337,7 +1424,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
         )}
 
         {/* Step 4 — the climax: expected vs counted */}
-        <Step refCb={el => { stepRefs.current[3] = el; }} icon="check" title={t('Kontrola kasy')}
+        <Step refCb={el => { stepRefs.current[3] = el; }} krok={krokPro(3)} icon="check" title={t('Kontrola kasy')}
           subtitle={t('Spočítej hotovost v kase a porovnej s očekáváním.')}
           guide={navodUzaverky}>
           {/* The arithmetic spelled out — no mystery number to argue with. */}
@@ -1484,7 +1571,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
           )}
         </Step>
 
-        <div>
+        <div className={jenVKroku(3)}>
           {/* Proč se tu nic nevyžaduje, i když povinné věci existují — prázdné
               místo by příště vypadalo jako chyba. Důvod určuje server. */}
           {povinne?.duvodVolna && povinne.vsechny.length > 0 && (
@@ -1602,6 +1689,36 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
           </Button>
         )}
       </form>
+      {/* Místo pro pevný pruh průvodce nad dokem, ať nezakryje konec formuláře. */}
+      <div aria-hidden className="h-14 md:hidden" />
+
+      {/* Pevný pruh průvodce (telefon): Zpět · krok z celku · Další krok / Dokončit.
+          Bez limetky: jediná limetka obrazovky je „Odeslat uzávěrku" na konci
+          formuláře (se zámkem „Dokončit: …" v zámku) a lišta nad dokem by
+          s ní byla v jednom výřezu. „Další krok" je proto zvýrazněná tlumená
+          pilulka a „Dokončit" na posledním kroku odešle totéž co ono tlačítko. */}
+      {jeTelefon && (
+        <PlovouciLista label={t('Kroky uzávěrky')}>
+          <button type="button" onClick={() => otevriKrok(aktivniKrok - 1)} disabled={aktivniKrok === 0}
+            className="tap-target rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium hover:bg-white/20 transition whitespace-nowrap disabled:opacity-40">
+            <Icon name="chevronLeft" size={14} className="inline -mt-0.5 mr-1" />{t('Zpět')}
+          </button>
+          <span className="text-sm font-semibold whitespace-nowrap px-1 tabular-nums" aria-live="polite">
+            {t('Krok {krok} z {celkem}', { krok: aktivniKrok + 1, celkem: totalSteps })}
+          </span>
+          {aktivniKrok < totalSteps - 1 ? (
+            <button type="button" onClick={() => otevriKrok(aktivniKrok + 1)}
+              className="tap-target rounded-full bg-white/20 px-3.5 py-1.5 text-xs font-semibold hover:bg-white/30 transition whitespace-nowrap">
+              {t('Další krok')}<Icon name="chevronRight" size={14} className="inline -mt-0.5 ml-1" />
+            </button>
+          ) : (
+            <button type="button" onClick={dokoncit} disabled={submitting}
+              className="tap-target rounded-full bg-white/20 px-3.5 py-1.5 text-xs font-semibold hover:bg-white/30 transition whitespace-nowrap disabled:opacity-40">
+              <Icon name={zamceno && !povinne!.smiObejit ? 'lock' : 'check'} size={14} className="inline -mt-0.5 mr-1" />{t('Dokončit')}
+            </button>
+          )}
+        </PlovouciLista>
+      )}
 
       {/* Historie „Moje uzávěrky" je od kola 69 widget uzaverky.moje_historie
           (na tabletu a ve vloženém formuláři vedení nebyla nikdy). */}
