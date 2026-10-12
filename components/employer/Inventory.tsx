@@ -66,6 +66,7 @@ import {
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { useLocale } from './jazyk';
 import { rozborSkladArg } from '@/lib/skladPredani';
+import { KLIC_HLASENI, UDALOST_HLASENI } from '../widgety/oblasti/sklad';
 
 const URL_SKLAD = '/api/inventory';
 const URL_FORMAT = '/api/inventory/format';
@@ -571,9 +572,20 @@ export default function Inventory({ initialCategory, predaniN = 0, onNavigate }:
       // Z widgetu (Suroviny bez ceny) jde člověk doplnit cenu nebo balení — to je v Dalším nastavení.
       if (Number.isFinite(Number(d.id))) setCekaUprava({ id: Number(d.id), dalsi: true });
     };
+    // Malý widget Hlášení ze skladu otevře okno hlášení (na telefonu jinak schované v „···").
+    const hlaseni = (e: Event) => {
+      const d = (e as CustomEvent).detail ?? {};
+      d.prijato = true;
+      setShowReports(true);
+    };
     window.addEventListener(UDALOST_NAKUP, nakup);
     window.addEventListener(UDALOST_UPRAVIT, uprav);
+    window.addEventListener(UDALOST_HLASENI, hlaseni);
     try {
+      if (sessionStorage.getItem(KLIC_HLASENI) != null) {
+        sessionStorage.removeItem(KLIC_HLASENI);
+        setShowReports(true);
+      }
       const n = sessionStorage.getItem(KLIC_NAKUP);
       if (n != null) {
         sessionStorage.removeItem(KLIC_NAKUP);
@@ -591,6 +603,7 @@ export default function Inventory({ initialCategory, predaniN = 0, onNavigate }:
     return () => {
       window.removeEventListener(UDALOST_NAKUP, nakup);
       window.removeEventListener(UDALOST_UPRAVIT, uprav);
+      window.removeEventListener(UDALOST_HLASENI, hlaseni);
     };
   }, []);
   // Úprava položky čeká, až dorazí seznam (ze Skladu je hned, z Přehledu ne).
@@ -815,9 +828,15 @@ export default function Inventory({ initialCategory, predaniN = 0, onNavigate }:
 
   // ---- Hlavička ----
   const noveHlaseni = reports.filter(r => r.status !== 'done').length;
+  const otevriNakup = () => { setShoppingSupplier(null); setShowShopping(true); };
+  // Hlášení od týmu: s novými nahoře v „···" (na telefonu je to jediná cesta vedle widgetu), jinak na konci.
+  const polozkaHlaseni: MenuItem[] = smiHlaseni && reports.length > 0 ? [{
+    label: noveHlaseni > 0 ? t('Hlášení od týmu ({n} nových)', { n: noveHlaseni }) : t('Hlášení od týmu'),
+    icon: 'inbox', onClick: () => setShowReports(true),
+  }] : [];
+  // „Nakoupit (7)" v „···" není: na monitoru je vedlejší akcí vedle limetky, na telefonu limetkou (V05).
   const menu: MenuItem[] = [
-    ...(toBuy.length > 0 ? [{ label: t('Nakoupit ({n})', { n: toBuy.length }), icon: 'cart', onClick: () => { setShoppingSupplier(null); setShowShopping(true); },
-      hint: t('Nákupní seznam z položek pod limitem.') }] : []),
+    ...(noveHlaseni > 0 ? polozkaHlaseni : []),
     ...(smiUpravit || smiMazat ? [{ label: t('Vybrat víc položek'), icon: 'check', onClick: () => setSelecting(true) }] : []),
     ...(smiKategorie ? [{ label: t('Kategorie a balení'), icon: 'settings', onClick: () => setShowCats(true) }] : []),
     ...(smiDodavatele ? [{ label: t('Dodavatelé'), icon: 'users', onClick: () => setShowSuppliers(true) }] : []),
@@ -830,11 +849,13 @@ export default function Inventory({ initialCategory, predaniN = 0, onNavigate }:
     // Párování s kasou má vlastní obrazovku — dvě místa na jednu věc
     // byla hlavní důvod, proč to působilo krkolomně.
     ...(smiReceptury && onNavigate ? [{ label: t('Receptury a prodeje z kasy'), icon: 'card', onClick: () => onNavigate('recipes') }] : []),
-    ...(smiHlaseni && reports.length > 0 ? [{
-      label: noveHlaseni > 0 ? t('Hlášení od týmu ({n} nových)', { n: noveHlaseni }) : t('Hlášení od týmu'),
-      icon: 'inbox', onClick: () => setShowReports(true),
-    }] : []),
+    ...(noveHlaseni > 0 ? [] : polozkaHlaseni),
   ];
+  // Na telefonu majitel ze Skladu hlavně objednává, co dochází — zakládá položky u počítače.
+  // S položkami pod limitem je proto limetkou „Nakoupit (7)" a „Přidat položku" jde do „···";
+  // bez nich zůstává limetkou Přidat položku (V05, vzor Toast Now / MarketMan).
+  const nakupJeHlavni = toBuy.length > 0;
+  const tlacitkoPridat = smiPridat ? <Button variant="accent" icon="plus" onClick={openNew}>{t('Přidat položku')}</Button> : undefined;
 
   const subtitle = <>
     {t('{n, plural, one {# položka} few {# položky} other {# položek}}', { n: active.length })}
@@ -1008,11 +1029,15 @@ export default function Inventory({ initialCategory, predaniN = 0, onNavigate }:
           title: t('Sklad'),
           subtitle,
           hintId: 'inventory',
-          secondary: toBuy.length > 0
-            ? <Button variant="secondary" icon="cart" onClick={() => { setShoppingSupplier(null); setShowShopping(true); }}>{t('Nakoupit ({n})', { n: toBuy.length })}</Button>
+          secondary: nakupJeHlavni
+            ? <Button variant="secondary" icon="cart" title={t('Nákupní seznam z položek pod limitem.')} onClick={otevriNakup}>{t('Nakoupit ({n})', { n: toBuy.length })}</Button>
             : undefined,
           menu,
-          primary: smiPridat ? <Button variant="accent" icon="plus" onClick={openNew}>{t('Přidat položku')}</Button> : undefined,
+          primary: tlacitkoPridat,
+          ...(nakupJeHlavni ? {
+            primaryTelefon: <Button variant="accent" icon="cart" onClick={otevriNakup}>{t('Nakoupit ({n})', { n: toBuy.length })}</Button>,
+            menuTelefon: smiPridat ? [{ label: t('Přidat položku'), icon: 'plus', onClick: openNew }] : [],
+          } : {}),
           // Sklad › Položky / Receptury z kasy / Inventura — totéž je na stránce Receptury,
           // takže se mezi nimi chodí jedním klepnutím oběma směry (kolo 82).
           aside: <SkladZalozky aktivni="polozky" onNavigate={onNavigate} smiReceptury={smiReceptury} smiInventura={smiInventura}

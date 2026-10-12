@@ -210,11 +210,18 @@ type NastaveniDochazi = { kategorie: number | string | null; jen_kriticke: boole
 const idKategorie = (v: unknown): number | null =>
   v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v);
 
+/** Kolik řádků má nákupní seznam (totéž číslo jako „Nakoupit (7)" v hlavičce Skladu). */
+const vyberPocetNakupu = (raw: unknown): number => nakupniSeznam(vyberSklad(raw)).length;
+
 function Dochazi({ velikost, nastaveni, nahled }: WidgetProps<NastaveniDochazi>) {
   const t = useT('widgety');
   const nav = useNavigace();
+  const { rozhraniStranky } = useWidget();
   const { ok, ceka } = useBrana('sklad.dochazi');
   const katId = idKategorie(nastaveni.kategorie);
+  // Pohled `inventory` je u vedení Sklad (nákupní seznam, úprava položky), u zaměstnance a na tabletu
+  // hlášení chybějícího. Podle toho se liší, co řádek a patička widgetu předají.
+  const naVedeni = rozhraniStranky === 'vedeni';
 
   const sklad = useDataWidgetu<Polozka[]>(ok ? URL_SKLAD : null, vyberPolozky);
   // Kategorie jen s vybranou kategorií: kvůli podkategoriím a jménu do odkazu.
@@ -248,7 +255,18 @@ function Dochazi({ velikost, nastaveni, nahled }: WidgetProps<NastaveniDochazi>)
   // Odkaz vede do vybrané kategorie (Sklad ji hledá podle jména), jinak na celý sklad.
   const smiSklad = nav.smiPohled('inventory');
   // Widget ukazuje to, co dochází, takže se Sklad otevře rovnou s filtrem „Jen co dochází" (lib/skladPredani.ts).
-  const doSkladu = (kat?: string | null) => { if (!nahled && smiSklad) nav.onNavigate('inventory', skladArg({ kategorie: kat, jenDochazi: true })); };
+  // Zaměstnanci (a tabletu) řádek předá i položku (`polozka:<id>`): jeho Sklad na ni posune seznam
+  // a zaostří pole množství — položku nehledá znovu. Vedení ne: tam `polozka:` otevírá okno Upravit
+  // položku (proklik z receptury), a to klepnutí na docházející zboží nečeká.
+  const doSkladu = (kat?: string | null, polozkaId?: number) => {
+    if (!nahled && smiSklad) nav.onNavigate('inventory', skladArg({ polozkaId: naVedeni ? undefined : polozkaId, kategorie: kat, jenDochazi: true }));
+  };
+  // „Nakoupit (7)" v patičce (jen vedení, střední a velká karta): totéž okno nákupního seznamu jako
+  // v hlavičce Skladu — na telefonu je tak objednání docházejícího zboží jedno klepnutí z Přehledu.
+  // Sdílí dotaz se seznamem výš (stejná URL), jen z odpovědi počítá řádky nákupu.
+  const nakup = useDataWidgetu<number>(ok && naVedeni && velikost !== 'S' ? URL_SKLAD : null, vyberPocetNakupu);
+  const kNakupu = nakup.data ?? 0;
+  const smiNakoupit = naVedeni && smiSklad && !nahled && kNakupu > 0;
 
   const prazdno = ztracena
     ? <p className="t-meta">{t('Vybraná kategorie už ve skladu není. Vyber jinou v nastavení widgetu.')}</p>
@@ -290,7 +308,7 @@ function Dochazi({ velikost, nastaveni, nahled }: WidgetProps<NastaveniDochazi>)
           <span className={`font-medium tabular-nums ${p.kriticke ? 'text-bad-ink' : 'text-wait-ink'}`}>{mnozstvi(p.mnozstvi)} {p.jednotka}</span>
           {metaKategorie && p.kategorie ? ` · ${p.kategorie}` : ''}
         </>}
-        onClick={smiSklad && !nahled ? () => doSkladu(p.kategorie) : undefined}
+        onClick={smiSklad && !nahled ? () => doSkladu(p.kategorie, p.id) : undefined}
       />
     </li>
   );
@@ -327,7 +345,16 @@ function Dochazi({ velikost, nastaveni, nahled }: WidgetProps<NastaveniDochazi>)
       ) : (
         <ul className="list">{ukazat.map(p => radek(p, !vybrana))}</ul>
       )}
-      {polozky.length > strop && <p className="t-meta mt-2">{aDalsich(polozky.length - strop, t)}</p>}
+      {smiNakoupit ? (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          {polozky.length > strop ? <p className="t-meta">{aDalsich(polozky.length - strop, t)}</p> : <span />}
+          {/* Ve widgetu nikdy limetka (DESIGN.md) — ta patří hlavní akci stránky. */}
+          <Button variant="secondary" size="sm" icon="cart"
+            onClick={() => pozadejSklad(nav, UDALOST_NAKUP, KLIC_NAKUP, { dodavatel: null })}>
+            {t('Nakoupit ({n})', { n: cislo(kNakupu) })}
+          </Button>
+        </div>
+      ) : polozky.length > strop && <p className="t-meta mt-2">{aDalsich(polozky.length - strop, t)}</p>}
     </Widget>
   );
 }
@@ -605,9 +632,19 @@ function Navrhy({ velikost, nahled }: WidgetProps) {
 
 const URL_HLASENI = '/api/inventory/reports';
 
+/**
+ * Žádost „otevři hlášení od týmu" (malý widget Hlášení ze skladu → okno Hlášení v nástroji Skladu).
+ * Stejný vzor jako nákup a úprava (pozadejSklad): na Skladu ji nástroj přijme hned, z Přehledu
+ * počká v sessionStorage. Dřív klepnutí na widget přímo na Skladu nedělalo nic (vedlo na tutéž
+ * stránku) a hlášení byla na telefonu jen v „···".
+ */
+export const UDALOST_HLASENI = 'managero:sklad-hlaseni';
+export const KLIC_HLASENI = 'managero-sklad-hlaseni';
+
 function HlaseniW({ velikost, nahled }: WidgetProps) {
   const t = useT('widgety');
   const nav = useNavigace();
+  const { rozhraniStranky } = useWidget();
   const { ok, ceka } = useBrana('sklad.hlaseni');
   const data = useDataWidgetu<Hlaseni[]>(ok ? URL_HLASENI : null, vyberHlaseni);
   const [pracuji, setPracuji] = useState<number | null>(null);
@@ -632,7 +669,9 @@ function HlaseniW({ velikost, nahled }: WidgetProps) {
   if (velikost === 'S') {
     return (
       <Widget nacteni={ceka ? CEKA : data} kostra="cislo"
-        otevrit={nav.smiPohled('inventory') && !nahled ? () => nav.onNavigate('inventory') : undefined}>
+        otevrit={nav.smiPohled('inventory') && !nahled
+          ? () => (rozhraniStranky === 'vedeni' ? pozadejSklad(nav, UDALOST_HLASENI, KLIC_HLASENI) : nav.onNavigate('inventory'))
+          : undefined}>
         <Stat label={t('Nevyřízeno')} value={cislo(nova.length)} note={nova.length === 0 ? t('vše vyřízeno') : t('{n, plural, one {hlášení} few {hlášení} other {hlášení}} od týmu', { n: nova.length })} />
       </Widget>
     );
