@@ -28,7 +28,7 @@
 // pohledu Rozvrhu nepředává, proto z jiné stránky žádost počká
 // v sessionStorage.
 
-import { Fragment, useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { Fragment, useCallback, useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { odsazeniMesice, zacatekTydne, type ZacatekTydne } from '@/lib/week';
 import { nazvyDnuDlouze, zkratkyDnuJazyk } from '@/lib/weekJazyk';
 import { useCurrency } from '@/components/CurrencyProvider';
@@ -60,7 +60,7 @@ import { sestavCsv, rozeberCsv } from '@/lib/rozvrhCsv';
 import {
   KLIC_DEN, KLIC_DOSTUPNOST, UDALOST_DEN, UDALOST_DOSTUPNOST, UDALOST_ZMENA, den as denZ, hm as hmZ, posunMesice,
   kategorieBarvy, rozsahVolna, casKratce, hodinaKratce, souhrnDne, tydnyMesice, vychoziTyden, dnyTydne, hodinyVeDnech,
-  nakladPlanu, lideBezSazby, mesicPlanovace,
+  nakladPlanu, lideBezSazby, mesicPlanovace, nakladCloveka,
 } from '@/lib/rozvrhPrehled';
 import {
   KLIC_FILTRU, KLIC_PREHLEDU, PRAZDNY_FILTR, klicFiltru, procistiFiltr, jeAktivni, nactiFiltr, nactiRazeni, prepni, projdeSmena, denProjde,
@@ -1205,6 +1205,20 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
     return smiMzdy ? n : { ...n, castka: null };
   }, [smenyPlanu, smiMzdy]);
   const bezSazby = useMemo(() => (smiMzdy ? lideBezSazby(smenyPlanu) : 0), [smiMzdy, smenyPlanu]);
+  // Náklad člověka v přehledu „Směny podle lidí": jeho hodiny za měsíc (všech typů, jako přehled)
+  // × sazba. Jen s finance.mzdy; bez sazby se částka nekreslí (chip „bez sazby" je nad mřížkou).
+  const sazbyLidi = useMemo(() => {
+    const m = new Map<number, number>();
+    for (const c of members) if (Number(c.hourly_rate) > 0) m.set(Number(c.id), Number(c.hourly_rate));
+    for (const sm of shifts) if (Number(sm.hourlyRate) > 0) m.set(Number(sm.employeeId), Number(sm.hourlyRate));
+    return m;
+  }, [members, shifts]);
+  const nakladCloveText = useCallback((r: { id: number; hodiny: number }) => {
+    // Bez hodin žádná částka — „0 h · 0 Kč" u člověka bez směn jen zaplevelí řádek.
+    if (!(r.hodiny > 0)) return null;
+    const c = nakladCloveka(r.hodiny, sazbyLidi.get(r.id));
+    return c == null ? null : money(c);
+  }, [sazbyLidi, money]);
 
   // ---- Týdenní pohled (lidé × dny) ----
   const tydenni = planovac && pohled === 'tyden' && siroka;
@@ -1426,7 +1440,8 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
     <PrehledLidi v={vytizeniLidi} radky={radkyPrehledu} razeni={razeni} onRazeni={setRazeni}
       otevreno={prehledOtevren} onOtevreno={setPrehledOtevren} vybrani={filtr.lide}
       onVyber={vyberClovekaZPrehledu} navrh={!!preview} dostupnostViditelna={smiDostupnost}
-      bezFiltru={filtr.typy.length > 0 && filtr.jenDiry ? t('všechny typy a dny') : filtr.typy.length > 0 ? t('všechny typy směn') : filtr.jenDiry ? t('všechny dny') : null} />
+      bezFiltru={filtr.typy.length > 0 && filtr.jenDiry ? t('všechny typy a dny') : filtr.typy.length > 0 ? t('všechny typy směn') : filtr.jenDiry ? t('všechny dny') : null}
+      nakladText={smiMzdy ? nakladCloveText : undefined} />
   ) : null;
   const legenda = (
     <ul className={`flex items-center gap-x-3 gap-y-1 t-meta flex-wrap ${siroka ? 'mb-3 mt-3' : ''}`} aria-label={t('Legenda')}>

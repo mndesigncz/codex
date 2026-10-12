@@ -234,7 +234,7 @@ function Pruh({ r, prumer, stupnice }: { r: RadekVytizeni; prumer: number; stupn
  * lepší než okno: po klepnutí na člověka se mřížka vyfiltruje přímo pod
  * rukou a přehled zůstane, kde byl, bez zavírání a znovuotevírání.
  */
-export function PrehledLidi({ v, radky, razeni, onRazeni, otevreno, onOtevreno, vybrani, onVyber, navrh, dostupnostViditelna, bezFiltru }: {
+export function PrehledLidi({ v, radky, razeni, onRazeni, otevreno, onOtevreno, vybrani, onVyber, navrh, dostupnostViditelna, bezFiltru, nakladText }: {
   v: Vytizeni;
   radky: RadekVytizeni[];
   razeni: RazeniVytizeni;
@@ -253,6 +253,11 @@ export function PrehledLidi({ v, radky, razeni, onRazeni, otevreno, onOtevreno, 
    * a nebylo by jasné, kterému číslu věřit.
    */
   bezFiltru?: string | null;
+  /**
+   * Mzdový náklad člověka za měsíc (hodiny × sazba) jako hotový text v měně podniku; null,
+   * když člověk sazbu nemá. Předává se jen roli s finance.mzdy — ostatní částky nevidí.
+   */
+  nakladText?: (r: RadekVytizeni) => string | null;
 }) {
   const t = useT('rozvrh');
   const { jazyk } = useJazyk();
@@ -299,8 +304,10 @@ export function PrehledLidi({ v, radky, razeni, onRazeni, otevreno, onOtevreno, 
               const skryt = !vse && i >= RADKU_NA_TELEFONU && !vybran;
               // Strop platí na měsíc (formulář dostupnosti je za měsíc).
               const strop = r.max != null ? t('chce nejvýš {smen} za měsíc', { smen: smenTxt(t, r.max) }) : null;
+              const naklad = nakladText?.(r) ?? null;
               const meta = [
                 `${hodinyTextJ(r.hodiny, jazyk)} h`,
+                naklad,
                 r.vikend > 0 ? t('{n}× víkend', { n: r.vikend }) : null,
                 v.zavreniZname && r.zaviraci > 0 ? t('{n}× zavírá', { n: r.zaviraci }) : null,
                 strop,
@@ -311,7 +318,7 @@ export function PrehledLidi({ v, radky, razeni, onRazeni, otevreno, onOtevreno, 
                   <button type="button" onClick={() => onVyber(r.id)} aria-pressed={vybran}
                     aria-label={t('{jmeno}: {smen}, {h} h{strop}{upoz}. {akce}', {
                       jmeno: r.jmeno, smen: smenTxt(t, r.smen), h: hodinyTextJ(r.hodiny, jazyk),
-                      strop: strop ? `, ${strop}` : '',
+                      strop: `${naklad ? `, ${naklad}` : ''}${strop ? `, ${strop}` : ''}`,
                       upoz: r.upozorneni.length ? `, ${r.upozorneni.map(u => textUpozorneni(t, u, r)).join(', ')}` : '',
                       akce: jediny ? t('Zrušit filtr na {jmeno}.', { jmeno: r.jmeno }) : t('Ukázat v rozvrhu jen tyhle směny, všech typů.'),
                     })}
