@@ -95,6 +95,8 @@ interface Invitation {
   /** Null, když pozvánku vytvořil někdo jiný a její roli bych dát nesměl (server token schová). */
   token?: string | null;
   created_at: string;
+  /** Role, se kterou člověk přijde (kolo 6): název pro chip; u výchozí role ta dnešní. Starší server ho neposílá. */
+  role_nazev?: string | null;
 }
 
 interface DataTymu { team: Team | null; members: Member[] }
@@ -106,6 +108,10 @@ function vyberTym(raw: any): DataTymu {
 function vyberPozvanky(raw: any): Invitation[] {
   if (!raw || !Array.isArray(raw.invitations)) throw new Error('Pozvánky přišly v nečekaném tvaru.'); // i18n-ok
   return raw.invitations;
+}
+/** Výchozí role podniku z /api/roles ve tvaru hodnoty <select> ('' = neznámá). */
+function vyberVychoziRoli(raw: any): string {
+  return raw?.vychozi && typeof raw.vychozi === 'object' ? hodnotaRole({ klic: raw.vychozi.klic ?? null, id: raw.vychozi.id ?? null }) : '';
 }
 function vyberRole(raw: any): VolbaRole[] {
   const sys = Array.isArray(raw?.system) ? raw.system : [];
@@ -160,6 +166,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
   // Role pro výběr u člena. Selhání není důvod schovat tým — výběr role
   // se pak jen nenabídne a zbytek obrazovky funguje dál.
   const roleData = useDataWidgetu<VolbaRole[]>('/api/roles', vyberRole);
+  const vychoziRole = useDataWidgetu<string>('/api/roles', vyberVychoziRoli).data ?? '';
   const team = data.data?.team ?? null;
   const members = useMemo(() => data.data?.members ?? [], [data.data]);
   const invitations = pozvankyData.data ?? [];
@@ -304,7 +311,9 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
   const [pozvat, setPozvat] = useState(false);
   const [emaily, setEmaily] = useState('');
   const [pozicePozvanky, setPozicePozvanky] = useState('Barista');
-  const [rolePozvanky, setRolePozvanky] = useState<'employee' | 'employer'>('employee');
+  // Role pozvánky jako u člena (kolo 6): hodnota <select> ('id:5', 'k:kuchar'); prázdná = výchozí role podniku.
+  const [rolePozvanky, setRolePozvanky] = useState('');
+  const [posilamZnovu, setPosilamZnovu] = useState<number | null>(null);
   const [zvu, setZvu] = useState(false);
   const [chybaPozvani, setChybaPozvani] = useState<string | null>(null);
   const [posledni, setPosledni] = useState<{ email: string; token?: string; emailSent: boolean; emailError?: string | null } | null>(null);
@@ -326,14 +335,17 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
     try { await navigator.clipboard.writeText(text); setZkopirovano(klic); return true; } catch { return false; /* schránka zakázaná — text je vidět */ }
   };
 
-  // „Pozvat jako vedoucí" = přidělit Vedení: jen když se Vedení vejde do mé role.
-  const sadaVedeni = role.find(r => r.klic === 'vedeni')?.opravneni;
-  const smiPozvatVedeni = smiPrirazovat && (vlastnik || !sadaVedeni || vejdeSe(sadaVedeni));
+  // Pozvat do jiné než výchozí role = přidělit roli: výběr jen s tym.role_prirazovat,
+  // role nad moji jsou v nabídce zamčené (zamekRole) — server to ověří znovu.
+  const vybranaPozvanky = role.find(r => hodnotaRole(r) === (rolePozvanky || vychoziRole)) ?? null;
+  const nazevVychoziRole = role.find(r => hodnotaRole(r) === vychoziRole)?.nazev ?? null;
+  const otevriPozvani = () => { setPosledni(null); setChybaPozvani(null); setRolePozvanky(vychoziRole); setPozvat(true); };
 
   const pozviJednoho = async (email: string) => {
+    const r = smiPrirazovat && rolePozvanky && rolePozvanky !== vychoziRole ? role.find(x => hodnotaRole(x) === rolePozvanky) : null;
     const d = await fetch('/api/invitations', {
       method: 'POST', headers: JSON_HLAVICKA,
-      body: JSON.stringify({ email, jobTitle: pozicePozvanky.trim() || 'Barista', role: rolePozvanky }),
+      body: JSON.stringify({ email, jobTitle: pozicePozvanky.trim() || 'Barista', ...(r ? (r.id != null ? { roleId: r.id } : { roleKlic: r.klic }) : {}) }),
     }).then(okJson);
     return d as { token?: string; emailSent?: boolean; emailError?: string | null };
   };
@@ -398,6 +410,26 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
     } finally {
       setRusim(false);
       setZrusit(null);
+    }
+  };
+
+  // Poslat pozvánku znovu (kolo 6): tentýž odkaz, nejvýš jednou za 10 minut (hlídá server).
+  // Hotovo říká až odpověď serveru — e-mail, který neodešel, se neslaví.
+  const posliZnovu = async (inv: Invitation) => {
+    setPosilamZnovu(inv.id);
+    try {
+      const res = await fetch(`/api/invitations/${inv.id}/resend`, { method: 'POST' }).catch(() => null);
+      if (!res) { chyba(t('Nepodařilo se spojit se serverem.')); return; }
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const zbyva = Number(d?.zbyvaMin);
+        chyba(res.status === 409 && zbyva > 0 ? t('Pozvánka šla před chvílí, zkus to za {n} min.', { n: zbyva })
+          : typeof d?.error === 'string' && d.error ? d.error : t('Pozvánku se nepodařilo poslat znovu.'));
+        return;
+      }
+      flash(t('Pozvánka odešla znovu.'));
+    } finally {
+      setPosilamZnovu(null);
     }
   };
 
@@ -514,13 +546,19 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
               <ListRow key={inv.id}
                 title={<span className="break-all sm:break-normal">{inv.email}</span>}
                 meta={inv.job_title || 'Barista'}
-                right={<Chip tone={stav.tone} size="sm">{stav.label}</Chip>}
+                right={<>
+                  {/* S jakou rolí člověk přijde — u čekající pozvánky (u přijaté ji už nese člen). */}
+                  {ceka && inv.role_nazev && <Chip tone="muted" size="sm">{inv.role_nazev}</Chip>}
+                  <Chip tone={stav.tone} size="sm">{stav.label}</Chip>
+                </>}
                 actions={ceka ? <>
                   {inv.token && (
                     <Button variant="secondary" size="sm" icon={zkopirovano === inv.token ? 'check' : 'copy'} onClick={() => kopiruj(odkazPozvanky(inv.token), inv.token!)}>
                       {zkopirovano === inv.token ? t('Zkopírováno') : t('Odkaz')}
                     </Button>
                   )}
+                  <Button variant="ghost" size="sm" icon="send" loading={posilamZnovu === inv.id} disabled={posilamZnovu != null}
+                    onClick={() => posliZnovu(inv)} aria-label={t('Poslat znovu: {email}', { email: inv.email })}>{t('Poslat znovu')}</Button>
                   <Button variant="ghost" size="sm" onClick={() => setZrusit(inv)} aria-label={t('Zrušit pozvánku: {email}', { email: inv.email })}>{t('Zrušit')}</Button>
                 </> : undefined}
               />
@@ -625,6 +663,14 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
     </div>
   );
 
+  const volbaRolePozvanky = (r: VolbaRole) => {
+    const v = hodnotaRole(r);
+    const z = zamekRole(r);
+    // Výchozí roli podniku smí do pozvánky dát každý, kdo zve — ta se nezamyká.
+    const zamek = v === vychoziRole ? null : z;
+    return <option key={v} value={v} disabled={!!zamek}>{r.nazev}{v === vychoziRole ? ` (${t('výchozí')})` : ''}{zamek ? ` — ${zamek}` : ''}</option>;
+  };
+
   const volbaRole = (r: VolbaRole, m: Member) => {
     const z = zamekRole(r);
     return <option key={hodnotaRole(r)} value={hodnotaRole(r)} disabled={!!z && hodnotaRole(r) !== roleClena(m)}>{r.nazev}{z ? ` — ${z}` : ''}</option>;
@@ -638,7 +684,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
           title: t('Tým'),
           subtitle: t('Lidé, role, pozvánky a pravidla podniku.'),
           hintId: 'teammanagement',
-          primary: smiPozvat && team ? <Button variant="accent" icon="plus" onClick={() => { setPosledni(null); setChybaPozvani(null); setPozvat(true); }}>{t('Pozvat člena')}</Button> : undefined,
+          primary: smiPozvat && team ? <Button variant="accent" icon="plus" onClick={otevriPozvani}>{t('Pozvat člena')}</Button> : undefined,
           menu: smiPozvat && team?.join_code ? [{ label: t('Kopírovat kód {kod}', { kod: team.join_code }), icon: 'copy', onClick: () => { void kopiruj(team.join_code ?? '', 'kod').then(ok => (ok ? flash(t('Kód pro připojení je ve schránce.')) : chyba(t('Schránka je zakázaná. Kód pro připojení: {kod}', { kod: team.join_code })))); } }] : undefined,
         }}
         nastroj={nastroj}
@@ -677,16 +723,24 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
               <Field id="tym-pozvat-pozice" label={t('Pozice (nepovinné)')}>
                 <Input id="tym-pozvat-pozice" value={pozicePozvanky} onChange={e => setPozicePozvanky(e.target.value)} />
               </Field>
-              {/* Pozvat jako vedení = přidělit roli; bez tym.role_prirazovat jde pozvat jen do výchozí role podniku. */}
-              {smiPozvatVedeni && (
-                <div>
-                  <p className="field-label" id="tym-pozvat-role">{t('Jako')}</p>
-                  <Segmented size="sm" ariaLabel={t('Role nového člena')} value={rolePozvanky} onChange={setRolePozvanky}
-                    options={[{ id: 'employee', label: t('Zaměstnanec') }, { id: 'employer', label: t('Vedoucí') }]} />
-                  {rolePozvanky === 'employer' && (
-                    <p className="note note-wait mt-2 text-[13px]">{t('Vedoucí má plný přístup: správa týmu, rozvrhy, sklad, uzávěrky i docházka.')}</p>
-                  )}
-                </div>
+              {/* Role nového člena (kolo 6): stejný výběr jako v „Upravit člena" — přednastavené a vlastní
+                  role, co přidělit nesmím, je zamčené. Bez tym.role_prirazovat přijde s výchozí rolí podniku. */}
+              {smiPrirazovat && volbyRole.length > 0 ? (
+                <Field id="tym-pozvat-role" label={t('Role nového člena')}
+                  hint={t('Co role smí, nastavíš v Nastavení → Role a oprávnění.')}>
+                  <Select id="tym-pozvat-role" value={rolePozvanky || vychoziRole} onChange={e => setRolePozvanky(e.target.value)}>
+                    {!vychoziRole && !rolePozvanky && <option value="">{t('Výchozí role podniku')}</option>}
+                    <optgroup label={t('Přednastavené')}>{volbyRole.filter(r => r.id == null).map(volbaRolePozvanky)}</optgroup>
+                    {volbyRole.some(r => r.id != null) && (
+                      <optgroup label={t('Vlastní role')}>{volbyRole.filter(r => r.id != null).map(volbaRolePozvanky)}</optgroup>
+                    )}
+                  </Select>
+                </Field>
+              ) : nazevVychoziRole ? (
+                <p className="t-meta">{t('Přijde s výchozí rolí podniku: {role}.', { role: nazevVychoziRole })}</p>
+              ) : null}
+              {vybranaPozvanky?.klic === 'vedeni' && (
+                <p className="note note-wait text-[13px]">{t('Vedoucí má plný přístup: správa týmu, rozvrhy, sklad, uzávěrky i docházka.')}</p>
               )}
             </div>
           )}

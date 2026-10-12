@@ -20,6 +20,7 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'team.create': 'Založen nový podnik',
   'team.create_account': 'Založen účet člena',
   'team.remove': 'Člen odebrán z podniku',
+  'tym.pozvanka_znovu': 'Pozvánka poslána znovu',
   'kiosk.login': 'Změna přihlášení tabletu',
   'kiosk.pin': 'Změna PINu člena',
   'rozlozeni.vychozi': 'Změna výchozího rozložení stránky',

@@ -8,6 +8,9 @@ import {
 import {
   otevriOznameni, cilOznameni, cistyDruhOznameni, cistyLimitOznameni, ikonaOznameni, LIMIT_OZNAMENI,
 } from '../../lib/oznameniOdkaz.ts';
+import {
+  cilPozvanky, cilZVyberu, sloupcePozvanky, smiZvouciDatRoli, roleZPozvanky, minutDoZnovu, ZNOVU_PO_MIN, type RolePozvanky,
+} from '../../lib/pozvanky.ts';
 
 /** Podvržený fetch: zapisuje volání a vrací odpověď s daným `ok`. */
 function falesnyFetch(ok: boolean) {
@@ -62,4 +65,38 @@ export default async function ({ eq, ok }: Testy) {
   eq('API: limit výchozí 30, strop 100, nesmysl = výchozí', [cistyLimitOznameni(null), cistyLimitOznameni('500'), cistyLimitOznameni('-3'), cistyLimitOznameni('50')], [LIMIT_OZNAMENI.vychozi, 100, 30, 50]);
   eq('API: druh jen ve tvaru notifications.type', [cistyDruhOznameni('shift'), cistyDruhOznameni("x' OR 1=1"), cistyDruhOznameni('')], ['shift', null, null]);
   eq('ikona: známý druh má svou, neznámý zvonek', [ikonaOznameni('shift'), ikonaOznameni('warning'), ikonaOznameni('nevim')], ['calendar', 'warning', 'bell']);
+
+  // ---- 3) pozvánka s rolí a Poslat znovu ----
+  eq('pozvánka: řádek → slib role', [
+    cilPozvanky({ role: 'employee', role_id: null }), cilPozvanky({ role: 'employer' }), cilPozvanky({ role: 'kuchar' }),
+    cilPozvanky({ role: 'employee', role_id: 12 }), cilPozvanky({ role: 'kiosk' }), cilPozvanky({ role: 'nesmysl' }), cilPozvanky({}),
+  ], [
+    { druh: 'vychozi' }, { druh: 'system', klic: 'vedeni' }, { druh: 'system', klic: 'kuchar' },
+    { druh: 'vlastni', id: 12 }, { druh: 'vychozi' }, { druh: 'vychozi' }, { druh: 'vychozi' },
+  ]);
+  eq('pozvánka: vlastní role se zapíše do role_id, role zůstane employee (starší kód pustí jen do výchozí)',
+    sloupcePozvanky({ druh: 'vlastni', id: 12 }), { role: 'employee', role_id: 12 });
+  eq('pozvánka: přednastavená role jako klíč v role', sloupcePozvanky({ druh: 'system', klic: 'kuchar' }), { role: 'kuchar', role_id: null });
+  ok('pozvánka: zápis a čtení jsou opak', [{ druh: 'vychozi' }, { druh: 'system', klic: 'provozni' }, { druh: 'vlastni', id: 3 }]
+    .every(c => JSON.stringify(cilPozvanky(sloupcePozvanky(c as any))) === JSON.stringify(c)));
+  eq('pozvánka: výběr z formuláře (roleId má přednost, starý tvar employer = Vedení)', [
+    cilZVyberu({ roleId: 7, roleKlic: 'kuchar' }), cilZVyberu({ roleKlic: 'kuchar' }), cilZVyberu({ role: 'employer' }), cilZVyberu({}),
+  ], [{ druh: 'vlastni', id: 7 }, { druh: 'system', klic: 'kuchar' }, { druh: 'system', klic: 'vedeni' }, { druh: 'vychozi' }]);
+
+  const vychozi: RolePozvanky = { klic: 'barista', roleId: null, typ: 'zamestnanec', nazev: 'Barista', opravneni: ['ukoly.zobrazit'] };
+  const sefKuchar: RolePozvanky = { klic: null, roleId: 12, typ: 'vedeni', nazev: 'Šéfkuchař', opravneni: ['tym.pozvat', 'tym.role_prirazovat', 'finance.mzdy'] };
+  const zvouci = { jeVlastnik: false, opravneni: new Set(['tym.pozvat', 'tym.role_prirazovat', 'ukoly.zobrazit']) };
+  eq('přijetí: vlastní role s oprávněním nad zvoucím → výchozí role podniku', roleZPozvanky(sefKuchar, zvouci, vychozi).nazev, 'Barista');
+  eq('přijetí: vlastní role, kterou zvoucí smí dát, projde', roleZPozvanky({ ...sefKuchar, opravneni: ['tym.pozvat', 'ukoly.zobrazit'] }, zvouci, vychozi).roleId, 12);
+  eq('přijetí: zvoucí už bez tym.role_prirazovat → výchozí role', roleZPozvanky({ ...sefKuchar, opravneni: ['ukoly.zobrazit'] }, { jeVlastnik: false, opravneni: ['tym.pozvat', 'ukoly.zobrazit'] }, vychozi).nazev, 'Barista');
+  eq('přijetí: zvoucí už v podniku není → výchozí role', roleZPozvanky(sefKuchar, null, vychozi).nazev, 'Barista');
+  eq('přijetí: smazaná role → výchozí role', roleZPozvanky(null, zvouci, vychozi).nazev, 'Barista');
+  ok('přijetí: vlastník smí dát cokoli, jen tablet ne', smiZvouciDatRoli({ jeVlastnik: true, opravneni: [] }, sefKuchar, [])
+    && !smiZvouciDatRoli({ jeVlastnik: true, opravneni: ['tym.pozvat', 'tym.role_prirazovat'] }, { ...sefKuchar, typ: 'kiosk' }));
+
+  const ted = Date.parse('2026-10-12T10:00:00Z');
+  eq('znovu: limit je 10 minut', ZNOVU_PO_MIN, 10);
+  eq('znovu: před 3 min → za 7 min', minutDoZnovu(new Date(ted - 3 * 60_000), ted), 7);
+  eq('znovu: před 9,5 min → za 1 min (zaokrouhlí nahoru)', minutDoZnovu(new Date(ted - 9.5 * 60_000), ted), 1);
+  eq('znovu: po 10 min a bez času odeslání jde hned', [minutDoZnovu(new Date(ted - 10 * 60_000), ted), minutDoZnovu(null, ted)], [0, 0]);
 }

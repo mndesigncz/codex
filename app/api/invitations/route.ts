@@ -1,8 +1,10 @@
 // Pozvánky do podniku. Kolo 67: místo „jen vedení" je hlídá oprávnění
-// tym.pozvat. Pozvánka jde do výchozí role podniku; pozvat „jako vedení"
-// (starý tvar role=employer) je přidělení role — potřebuje navíc
-// tym.role_prirazovat a stejná pravidla jako změna role u člena (Vedení
-// dává jen vlastník). Při přijetí se to ověřuje znovu (invitations/accept).
+// tym.pozvat. Pozvánka jde do výchozí role podniku; jiná role (kolo 6, B3:
+// `roleId` vlastní, `roleKlic` přednastavená, starý tvar role=employer =
+// Vedení) je přidělení role — potřebuje navíc tym.role_prirazovat a stejná
+// pravidla jako změna role u člena (Vedení dává jen vlastník). Při přijetí
+// se to ověřuje znovu (invitations/accept, lib/pozvanky.ts). Znovu poslat:
+// invitations/[id]/resend.
 import { NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { planInfoOf, PLAN_ENFORCED, canAddMember } from '@/lib/plan';
@@ -12,8 +14,9 @@ import { jazykPodniku } from '@/lib/i18n/jazykPozadavku';
 import { normalizujEmail } from '@/lib/emailAdresa';
 import { smiPridatClena, pocetClenu } from '@/lib/tenant';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
-import { smiPriraditRoli } from '@/lib/opravneni';
-import { roleVedeni, vychoziRolePodniku, typUctu } from '../teams/_role';
+import { cilPozvanky, cilZVyberu, sloupcePozvanky, smiZvouciDatRoli, type CilPozvanky, type RolePozvanky } from '@/lib/pozvanky';
+import { vychoziRolePodniku, typUctu } from '../teams/_role';
+import { nactiRoliPozvanky } from './_role';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,27 +35,49 @@ export async function GET() {
   let rows: any[];
   try {
     rows = await sql`
-      SELECT id, email, job_title, status, token, created_at, role, invited_by FROM invitations
+      SELECT id, email, job_title, status, token, created_at, role, role_id, sent_at, invited_by FROM invitations
       WHERE team_id = ${c.teamId} ORDER BY created_at DESC` as any[];
   } catch {
-    // Před sloupcem role: všechny pozvánky jsou do výchozí role.
-    rows = await sql`
-      SELECT id, email, job_title, status, token, created_at, invited_by FROM invitations
-      WHERE team_id = ${c.teamId} ORDER BY created_at DESC` as any[];
+    try {
+      // Před sloupci role_id a sent_at (kolo 6): role jen jako klíč.
+      rows = await sql`
+        SELECT id, email, job_title, status, token, created_at, role, invited_by FROM invitations
+        WHERE team_id = ${c.teamId} ORDER BY created_at DESC` as any[];
+    } catch {
+      // Před sloupcem role: všechny pozvánky jsou do výchozí role.
+      rows = await sql`
+        SELECT id, email, job_title, status, token, created_at, invited_by FROM invitations
+        WHERE team_id = ${c.teamId} ORDER BY created_at DESC` as any[];
+    }
   }
   const V = { jeVlastnik: c.role.jeVlastnik, opravneni: c.role.opravneni };
-  const bezCile = { jeVlastnik: false, jeTo: false, soucasna: [], soucasnaKlic: null };
-  // Pozvánka „jako vedení" = přidělení role Vedení: stejná kontrola jako při
-  // jejím vytvoření v POST (tym.role_prirazovat + smiPriraditRoli). Pozvánku
-  // do výchozí role smí vytvořit každý s tym.pozvat (POST ji nijak dál
-  // neomezuje), takže její token mu nic navíc nedá.
-  const smiVedeni = c.role.opravneni.has('tym.role_prirazovat')
-    && smiPriraditRoli(V, bezCile, { opravneni: roleVedeni().opravneni, klic: 'vedeni' }).ok;
+  // Slíbené role čekajících pozvánek, jak dnes platí — jednou za klíč / id.
+  const role = new Map<string, RolePozvanky | null>();
+  const klicRole = (cil: CilPozvanky) => (cil.druh === 'vlastni' ? `id:${cil.id}` : cil.druh === 'system' ? `k:${cil.klic}` : 'vychozi');
+  let vychozi: RolePozvanky | null = null;
+  try { vychozi = await vychoziRolePodniku(c.teamId); } catch { /* název výchozí role se jen nezobrazí */ }
+  for (const r of rows) {
+    const cil = cilPozvanky(r);
+    if (cil.druh === 'vychozi' || role.has(klicRole(cil))) continue;
+    role.set(klicRole(cil), await nactiRoliPozvanky(c.teamId, cil).catch(() => null));
+  }
   const invitations = rows.map(r => {
+    const cil = cilPozvanky(r);
+    const slibena = cil.druh === 'vychozi' ? null : role.get(klicRole(cil)) ?? null;
     const jeho = r.invited_by != null && Number(r.invited_by) === c.meId;
-    const smi = jeho || (r.role === 'employer' ? smiVedeni : true);
-    const { invited_by: _zvouci, ...zbytek } = r;
-    return { ...zbytek, token: smi ? r.token : null };
+    // Pozvánku do výchozí role smí vytvořit každý s tym.pozvat (POST ji nijak
+    // dál neomezuje), takže její token mu nic navíc nedá. Jinou roli jen ten,
+    // kdo by ji směl dát sám — stejná kontrola jako při vytvoření v POST.
+    // Role, která už neexistuje, při přijetí spadne na výchozí — token nic nedá.
+    const smi = jeho || cil.druh === 'vychozi' || !slibena || smiZvouciDatRoli(V, slibena, ['tym.role_prirazovat']);
+    const { invited_by: _zvouci, role_id: _roleId, ...zbytek } = r;
+    return {
+      ...zbytek, token: smi ? r.token : null,
+      role_id: cil.druh === 'vlastni' ? cil.id : null,
+      role_klic: cil.druh === 'system' ? cil.klic : null,
+      // Název role pro chip u pozvánky; u výchozí role ten dnešní (rozhodne se při přijetí).
+      role_nazev: slibena?.nazev ?? (cil.druh === 'vychozi' ? vychozi?.nazev ?? null : null),
+    };
   });
   return NextResponse.json({ invitations });
 }
@@ -72,22 +97,33 @@ export async function POST(request: Request) {
   const [meRow] = await sql`SELECT name FROM users WHERE id = ${c.meId}`;
   const me = { id: c.meId, name: String(meRow?.name ?? '') };
 
-  const invRole = role === 'employer' ? 'employer' : 'employee';
-  // Jiná než výchozí role = přidělení role: stejná pravidla jako u člena.
-  // Bez nich by pozvánka byla boční dveře, kudy dát Vedení i tomu, komu ho
-  // změnou role dát nejde.
-  if (invRole === 'employer') {
-    if (!c.role.opravneni.has('tym.role_prirazovat')) {
-      return NextResponse.json({ error: 'Pozvat jde jen do výchozí role — na přidělování rolí nemáš oprávnění.' }, { status: 403 });
+  // Role pozvánky: vlastní (roleId), přednastavená (roleKlic), starý tvar role=employer
+  // (Vedení), nebo nic = výchozí role podniku. Jiná než výchozí role = přidělení role:
+  // stejná pravidla jako u člena. Bez nich by pozvánka byla boční dveře, kudy dát
+  // Vedení i tomu, komu ho změnou role dát nejde.
+  let cil = cilZVyberu({ roleId: telo.roleId, roleKlic: telo.roleKlic, role });
+  const vychozi = await vychoziRolePodniku(Number(team.id));
+  let slibena: RolePozvanky | null = null;
+  if (cil.druh !== 'vychozi') {
+    try { slibena = await nactiRoliPozvanky(Number(team.id), cil); }
+    catch { return NextResponse.json({ error: 'Roli se teď nepodařilo načíst. Zkus to za chvíli znovu.' }, { status: 503 }); }
+    if (!slibena) return NextResponse.json({ error: 'Tuhle roli novému členovi dát nejde — vyber jinou.' }, { status: 400 });
+    // Výchozí role podniku vybraná ze seznamu není přidělení — smí ji každý s tym.pozvat.
+    const jeVychozi = (slibena.roleId != null && slibena.roleId === vychozi.roleId) || (slibena.klic != null && slibena.klic === vychozi.klic);
+    if (jeVychozi) { cil = { druh: 'vychozi' }; slibena = null; }
+    else {
+      if (!c.role.opravneni.has('tym.role_prirazovat')) {
+        return NextResponse.json({ error: 'Pozvat jde jen do výchozí role — na přidělování rolí nemáš oprávnění.' }, { status: 403 });
+      }
+      if (!smiZvouciDatRoli({ jeVlastnik: c.role.jeVlastnik, opravneni: c.role.opravneni }, slibena, ['tym.role_prirazovat'])) {
+        return NextResponse.json({ error: 'Nemůžeš pozvat do role s oprávněními, která sám nemáš.' }, { status: 403 });
+      }
     }
-    const vedeni = roleVedeni();
-    const v = smiPriraditRoli({ jeVlastnik: c.role.jeVlastnik, opravneni: c.role.opravneni },
-      { jeVlastnik: false, jeTo: false, soucasna: [], soucasnaKlic: null }, { opravneni: vedeni.opravneni, klic: vedeni.klic });
-    if (!v.ok) return NextResponse.json({ error: v.chyba }, { status: 403 });
   }
+  const sloupce = sloupcePozvanky(cil);
   // Pro kontrolu sdílení lidí mezi podniky rozhoduje typ účtu, se kterým
   // člověk přijde — u výchozí role ten její.
-  const typPrijeti = invRole === 'employer' ? 'employer' : typUctu(await vychoziRolePodniku(Number(team.id)));
+  const typPrijeti = typUctu(slibena ?? vychozi);
   // Existující účet jde pozvat do DALŠÍHO podniku (přijetí mu přidá členství).
   // Nejde pozvat tablet ani hosta, a nejde pozvat někoho, kdo už tu je.
   const [existingUser] = await sql`SELECT id, role, team_id FROM users WHERE lower(email) = ${email} ORDER BY id LIMIT 1`;
@@ -113,9 +149,17 @@ export async function POST(request: Request) {
   if (await memberLimitHit(sql, team.id)) {
     return NextResponse.json({ error: 'Tým je na plánu Zdarma plný (3 členové). Vedení může přejít na Pro v Nastavení → Předplatné.' }, { status: 403 });
   }
-    await sql`
-      INSERT INTO invitations (team_id, email, token, job_title, role, invited_by, status)
-      VALUES (${team.id}, ${email}, ${token}, ${jobTitle || 'Barista'}, ${invRole}, ${me.id}, 'pending')`;
+    try {
+      await sql`
+        INSERT INTO invitations (team_id, email, token, job_title, role, role_id, invited_by, status, sent_at)
+        VALUES (${team.id}, ${email}, ${token}, ${jobTitle || 'Barista'}, ${sloupce.role}, ${sloupce.role_id}, ${me.id}, 'pending', NOW())`;
+    } catch {
+      // Před sloupci role_id a sent_at (kolo 6): vlastní role se nezapíše a člověk
+      // přijde s výchozí rolí — radši méně, než víc.
+      await sql`
+        INSERT INTO invitations (team_id, email, token, job_title, role, invited_by, status)
+        VALUES (${team.id}, ${email}, ${token}, ${jobTitle || 'Barista'}, ${sloupce.role_id != null ? 'employee' : sloupce.role}, ${me.id}, 'pending')`;
+    }
   } catch {
     // role column not migrated yet — invite as a regular employee
     await sql`

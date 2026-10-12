@@ -621,6 +621,10 @@ export async function GET(request: Request) {
 
     // invited members may come in with an elevated role
     await ddl(sql`ALTER TABLE invitations ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'employee'`);
+    // Pozvánka s rolí (kolo 6, B3): vlastní role podle id (přednastavená dál jako klíč v role)
+    // a čas posledního odeslání — „Poslat znovu" nejvýš jednou za 10 minut.
+    await ddl(sql`ALTER TABLE invitations ADD COLUMN IF NOT EXISTS role_id INTEGER`);
+    await ddl(sql`ALTER TABLE invitations ADD COLUMN IF NOT EXISTS sent_at TIMESTAMPTZ`);
     // optional per-employee PIN for the shared kiosk device
     await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS pin TEXT`);
     // per-user notification category preferences (server-side, synced across devices)
