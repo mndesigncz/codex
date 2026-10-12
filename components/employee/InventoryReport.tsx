@@ -42,6 +42,7 @@ import { obsahuje } from '@/lib/hledani';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useOpravneni } from '../role/useOpravneni';
+import { useSkrytyNastroj } from '@/lib/useSkrytyNastroj';
 
 interface InventoryItem {
   id: number;
@@ -115,6 +116,9 @@ export default function InventoryReport({ initialCategory, predani = 0 }: Props)
   const [filtrKategorie, setFiltrKategorie] = useState<string | null>(null);
   const [vybranaId, setVybranaId] = useState<number | null>(null);
   const seznamRef = useRef<HTMLDivElement>(null);
+  // V úpravách plochy je nástroj schovaný (zůstává připojený) — lišta hromadného uložení se pak nekreslí.
+  const korenRef = useRef<HTMLDivElement>(null);
+  const schovany = useSkrytyNastroj(korenRef);
   const [zprava, setZprava] = useState<{ text: string; ton?: 'bad' } | null>(null);
   // Položka, ke které jsou otevřené poznámky („···" → Poznámky): zaměstnanec nemá okno Upravit položku,
   // tak je čte a píše tady — ve stejném okně, jaké vidí vedení u položky.
@@ -246,7 +250,7 @@ export default function InventoryReport({ initialCategory, predani = 0 }: Props)
     if (done.length > 0) obnovDataWidgetu(URL_SKLAD);
     setUkladamVse(false);
   };
-  const hromadnaLista = smiZapsat && rozepsane.length >= HROMADNE_OD;
+  const hromadnaLista = smiZapsat && rozepsane.length >= HROMADNE_OD && !schovany;
 
   // The person at the counter is the one who knows something ran out.
   const setParked = async (item: InventoryItem, archived: boolean) => {
@@ -312,7 +316,7 @@ export default function InventoryReport({ initialCategory, predani = 0 }: Props)
   };
 
   const nastroj = (
-    <div className="space-y-4">
+    <div ref={korenRef} className="space-y-4">
       {!loading && packagedCats.length > 0 && (
         <div className="space-y-3">
           <CategoryNav

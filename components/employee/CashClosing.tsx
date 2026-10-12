@@ -36,6 +36,7 @@ import { useSmi } from '../widgety/NavigaceKontext';
 import { KLIC_VYPLNIT, UDALOST_VYPLNIT } from '@/lib/uzaverkyPrehled';
 import { useJazyk, useT, type PrekladFn } from '@/lib/i18n/client';
 import { useJeTelefon } from '@/lib/useJeTelefon';
+import { useSkrytyNastroj } from '@/lib/useSkrytyNastroj';
 import { fmtDatum } from '@/lib/i18n/format';
 import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
 import type { PovinnaPolozka } from '@/lib/povinnePredUzaverkou';
@@ -1016,6 +1017,9 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
   // by na počítači lhala.
   const [aktivniKrok, setAktivniKrok] = useState(0);
   const jeTelefon = useJeTelefon();
+  // V úpravách plochy je formulář schovaný (zůstává připojený) — lišta se pak nekreslí.
+  const korenRef = useRef<HTMLDivElement>(null);
+  const schovany = useSkrytyNastroj(korenRef);
   const otevriKrok = (i: number) => {
     const k = Math.max(0, Math.min(totalSteps - 1, i));
     setAktivniKrok(k);
@@ -1058,7 +1062,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
   };
 
   return (
-    <div className={vPlose ? 'space-y-4' : 'p-4 sm:p-6 space-y-5 sm:space-y-6'}>
+    <div ref={korenRef} className={vPlose ? 'space-y-4' : 'p-4 sm:p-6 space-y-5 sm:space-y-6'}>
       {/* Na ploše hlavičku kreslí plocha (jediný h1); tablet a vedení ji mají tady. */}
       {!vPlose && <PageHeader hintId="cashclosing" title={t('Uzávěrka')} subtitle={t('Spočítej kasu na konci směny — tržby se předvyplní z pokladny.')} />}
       {msg && (
@@ -1697,7 +1701,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
           formuláře (se zámkem „Dokončit: …" v zámku) a lišta nad dokem by
           s ní byla v jednom výřezu. „Další krok" je proto zvýrazněná tlumená
           pilulka a „Dokončit" na posledním kroku odešle totéž co ono tlačítko. */}
-      {jeTelefon && (
+      {jeTelefon && !schovany && (
         <PlovouciLista label={t('Kroky uzávěrky')}>
           <button type="button" onClick={() => otevriKrok(aktivniKrok - 1)} disabled={aktivniKrok === 0}
             className="tap-target rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium hover:bg-white/20 transition whitespace-nowrap disabled:opacity-40">
