@@ -195,7 +195,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ roster, entries, adjustments });
   }
 
-  // Zaměstnanec — vlastní záznamy (posledních 60 dní) v TOMHLE podniku.
+  // Zaměstnanec — vlastní záznamy (posledních 70 dní — i „minulý měsíc" na 31.) v TOMHLE podniku.
   // Kolo 69 (nález N14): bez filtru podniku sčítalo „Odpracováno" na Domů
   // hodiny ze všech podniků, kde člověk pracuje — barista ve dvou kavárnách
   // viděl součet obou. NULL připouští řádky z doby před sloupcem team_id
@@ -203,7 +203,7 @@ export async function GET(req: NextRequest) {
   const entries = await sql`
     SELECT id, employee_id AS "employeeId", clock_in AS "clockIn", clock_out AS "clockOut", source, note
     FROM time_entries
-    WHERE employee_id = ${c.meId} AND clock_in >= NOW() - INTERVAL '60 days'
+    WHERE employee_id = ${c.meId} AND clock_in >= NOW() - INTERVAL '70 days'
       AND (team_id = ${c.teamId} OR team_id IS NULL)
     ORDER BY clock_in DESC`;
   // Their own open entry rides along so the clock widget works for them too.
@@ -228,7 +228,7 @@ export async function GET(req: NextRequest) {
     try {
       adjustments = await sql`
         SELECT id, user_id AS "userId", day, amount, note, source FROM wage_adjustments
-        WHERE team_id = ${c.teamId} AND user_id = ${c.meId} AND day >= ${pragueDaySafe(new Date(Date.now() - 59 * 86400000))}
+        WHERE team_id = ${c.teamId} AND user_id = ${c.meId} AND day >= ${pragueDaySafe(new Date(Date.now() - 69 * 86400000))}
         ORDER BY day DESC, id DESC`;
     } catch { /* bez migrace */ }
   }

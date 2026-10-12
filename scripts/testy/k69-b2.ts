@@ -9,7 +9,7 @@
 import { readFileSync } from 'node:fs';
 import type { Testy } from './_testy.ts';
 import {
-  ZAPOMENUTY_MS, bezSazby, cekajiciPozvanky, dnesVPodniku, hodinyMinuty, konecSmeny, mujMesic, mzdyZaObdobi, obdobiDni,
+  ZAPOMENUTY_MS, bezSazby, cekajiciPozvanky, dnesVPodniku, hodinyMinuty, konecSmeny, mujMesic, mzdyZaObdobi, obdobiDni, obdobiMesice, mojeUpravyMesice,
   otevrenePrichody, podilMezd, roleSPocty, rozeberZaznam, sazbyZRosteru, seradSouhrn, souhrnHodin, trzbyZaObdobi,
   hodinyPoDnech, zaznamyVRozmezi, denZaznamu, spropitneZaObdobi, upravyVRozmezi, upravyPoLidech, type ZaznamDochazky,
 } from '../../lib/dochazkaPrehled.ts';
@@ -154,6 +154,16 @@ export default function ({ eq, ok }: Testy) {
   eq('můj měsíc: jen moje záznamy v září, běžící do teď, nad 24 h vynechané', [m.ms / H, m.bezi, m.vynechano, m.pocet], [10, true, 1, 3]);
   eq('můj výdělek: po záznamu 8 × 150 + 2 × 150', m.mzda, 1500);
   eq('můj výdělek: bez sazby null (ne nula)', mujMesic(moje, 5, '2026-09', ted, null).mzda, null);
+  // Kolo 5: Můj výdělek umí i minulý měsíc — měsíc a kolik dní zpět si vyžádat (od 1. dne do dneška včetně, +1 jako dřív).
+  eq('můj výdělek: tento měsíc = dnešní měsíc, dní = den + 1', obdobiMesice('2026-10-12', 'tento'), { mesic: '2026-10', dni: 13 });
+  eq('můj výdělek: minulý měsíc od 1. 9. do 12. 10. = 43 dní', obdobiMesice('2026-10-12', 'minuly'), { mesic: '2026-09', dni: 43 });
+  eq('můj výdělek: minulý měsíc v lednu je prosinec loňského roku', obdobiMesice('2027-01-03', 'minuly'), { mesic: '2026-12', dni: 35 });
+  eq('můj výdělek: minulý měsíc na 31. se vejde do 70 dní API', obdobiMesice('2026-10-31', 'minuly').dni <= 70, true);
+  eq('můj výdělek: seznam prémií jen moje a jen v měsíci, nejnovější první',
+    mojeUpravyMesice([
+      { id: 1, userId: 5, day: '2026-09-03', amount: 500 }, { id: 2, userId: 5, day: '2026-10-01', amount: 100 },
+      { id: 3, userId: 6, day: '2026-09-10', amount: 900 }, { id: 4, userId: 5, day: '2026-09-20', amount: -200 },
+    ], 5, '2026-09').map(u => u.id), [4, 1]);
 
   // ---- tým ----
   eq('pozvánky: jen čekající, nejstarší první', cekajiciPozvanky([

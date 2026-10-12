@@ -191,7 +191,7 @@ export default function ({ eq, ok }: Testy) {
   let padlo = false; try { vyberPochvaly(null); } catch { padlo = true; }
   ok('pochvaly: nečekaný tvar je chyba widgetu, ne prázdno', padlo);
   eq('žebříček za období: adresa s ?od=1. dne měsíce, celkem bez parametru', [urlZebricku('mesic', '2026-10-12'), urlZebricku('celkem', '2026-10-12')], ['/api/rewards?od=2026-10-01', '/api/rewards']);
-  ok('žebříček: widget má nastavení Období (celkem / měsíc)', !!widget('odmeny.zebricek')?.nastaveni?.some(n => n.klic === 'obdobi' && n.moznosti?.some(m => m.id === 'mesic')));
+  ok('žebříček: widget má nastavení Období (celkem / měsíc)', !!widget('odmeny.zebricek')?.nastaveni?.some(n => n.klic === 'obdobi' && n.typ === 'vyber' && n.moznosti.some(m => m.id === 'mesic')));
   ok('pochvaly: widget odmeny.pochvaly v katalogu, akce chválit = hodnoceni.hodnotit', widget('odmeny.pochvaly')?.opravneni.pole?.['akce:pochvalit'] === 'hodnoceni.hodnotit');
   // Server: období vynechá odečty za odměny — pořadí za měsíc říká, kdo si body vydělal.
   ok('žebříček za období: shift_review_items bez redemption, když je `od`', /kind <> 'redemption'/.test(balance) && /point_awards/.test(balance));

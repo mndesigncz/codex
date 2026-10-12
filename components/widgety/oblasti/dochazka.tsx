@@ -63,9 +63,9 @@ import { agreguj, hrubostProRozmezi, obdobiZPresetu, platneRozmezi, pocetDni, pr
 import { useObdobi } from '@/lib/useObdobi';
 import { useUlozeno } from '@/lib/useUlozeno';
 import {
-  ZAPOMENUTY_MS, dnesVPodniku, konecSmeny, navrhOdchodu as navrhOdchoduPlan, hodinyMinuty, mujMesic, mzdyZaObdobi, obdobiDni, otevrenePrichody, podilMezd,
+  ZAPOMENUTY_MS, dnesVPodniku, konecSmeny, navrhOdchodu as navrhOdchoduPlan, hodinyMinuty, mujMesic, mzdyZaObdobi, obdobiDni, obdobiMesice, mojeUpravyMesice, otevrenePrichody, podilMezd,
   sazbyZRosteru, seradSouhrn, souhrnHodin, spropitneZaObdobi, trzbyZaObdobi, hodinyPoDnech, zaznamyVRozmezi, upravyVRozmezi, upravyPoLidech,
-  type OtevrenyPrichod, type RadekDne, type RazeniSouhrnu, type UpravaMzdy, type UzaverkaSpropitne, type UzaverkaTrzby,
+  type OtevrenyPrichod, type RadekDne, type RazeniSouhrnu, type UpravaMzdy, type UzaverkaSpropitne, type UzaverkaTrzby, type VolbaMesice,
 } from '@/lib/dochazkaPrehled';
 
 // ---------------------------------------------------------------------------
@@ -499,16 +499,16 @@ function OknoUkonceni({ jmeno, entryId, navrh, zPlanu, onHotovo, onZavrit }: {
  * správné pro obě větve. Jen tabletové oprávnění dostane roster bez
  * záznamů — hodiny z toho nespočítáme (`bezZaznamu`).
  */
-function useMujMesic(zapnuto: boolean) {
+function useMujMesic(zapnuto: boolean, volba: VolbaMesice = 'tento') {
   const t = useT('widgety');
   const { jazyk } = useJazyk();
   const ja = useJa();
   const { nacteno, ma } = useOpravneni();
   const dnes = pragueToday();
-  const mesic = dnes.slice(0, 7);
+  // Kolo 5: i minulý měsíc — na začátku měsíce se člověk dívá, kolik mu přijde (vzor Homebase „last pay period").
+  const { mesic, dni: dnuMesice } = obdobiMesice(dnes, volba);
   const tymova = nacteno ? ma('dochazka.zobrazit') : true;
   const bezZaznamu = nacteno && !ma('dochazka.zobrazit') && ma('dochazka.tablet');
-  const dnuMesice = Number(dnes.slice(8, 10)) + 1;
   const url = !zapnuto || ja.id == null || bezZaznamu ? null : tymova ? urlDni(dnuMesice) : URL_DNES;
   const data = useDataWidgetu<Dochazka>(url, raw => vyberDochazku(raw, t));
   const vlastni = useMemo(() => (data.data?.entries ?? []).filter(e => ja.id != null && Number(e.employeeId) === ja.id), [data.data, ja.id]);
@@ -518,7 +518,8 @@ function useMujMesic(zapnuto: boolean) {
   const s = useMemo(() => mujMesic(vlastni, ja.id ?? -1, mesic, ted, sazba, data.data?.adjustments ?? []), [vlastni, ja.id, mesic, ted, sazba, data.data?.adjustments]);
   const m = Number(mesic.slice(5, 7));
   const nazevMesice = fmtMesic(m, { jazyk });
-  return { ja, data, s, sazba, sazbaZnama: sazbaRaw !== undefined && sazbaRaw !== null, bezZaznamu, nazevMesice };
+  const upravy = useMemo(() => mojeUpravyMesice(data.data?.adjustments ?? [], ja.id ?? -1, mesic), [data.data?.adjustments, ja.id, mesic]);
+  return { ja, data, s, sazba, sazbaZnama: sazbaRaw !== undefined && sazbaRaw !== null, bezZaznamu, nazevMesice, mesic, upravy };
 }
 
 type ClenRosteruB2 = ClenRosteru & { hourlyRate?: number | null };
@@ -549,22 +550,50 @@ function Odpracovano(_: WidgetProps) {
  * vlastním řádku rosteru jen s finance.moje_mzda (nebo finance.mzdy);
  * bez oprávnění ho plocha nepřipojí a dotaz neodejde.
  */
-function MujVydelek(_: WidgetProps) {
+function MujVydelek({ velikost, nastaveni }: WidgetProps<{ mesic?: VolbaMesice }>) {
   const t = useT('widgety');
+  const { jazyk } = useJazyk();
   const brana = useBrana(['finance.moje_mzda', 'finance.mzdy']);
   const money = useMoney();
-  const { ja, data, s, sazba, sazbaZnama, bezZaznamu, nazevMesice } = useMujMesic(brana);
+  const volba: VolbaMesice = nastaveni.mesic === 'minuly' ? 'minuly' : 'tento';
+  const { ja, data, s, sazba, sazbaZnama, bezZaznamu, nazevMesice, upravy } = useMujMesic(brana, volba);
   if (!brana) return <Widget prazdno={null} />;
   const minut = Math.floor(s.ms / 60000);
   const hodiny = minut % 60 > 0 ? t('{h} h {min} min', { h: Math.floor(minut / 60), min: minut % 60 }) : t('{h} h', { h: Math.floor(minut / 60) });
   const prazdno = bezZaznamu ? <p className="t-meta text-pretty">{t('S touhle rolí se hodiny z píchaček nedají spočítat.')}</p>
     : sazbaZnama && sazba == null ? <p className="t-meta text-pretty">{t('Hodinovou sazbu ti zatím nikdo nenastavil.')}</p>
     : undefined;
+  const celkem = (s.mzda ?? 0) + s.upravy;
+  if (velikost === 'S') {
+    return (
+      <Widget nacteni={ja.stav ?? data} prazdno={prazdno}>
+        <Stat label={nazevMesice} value={money(celkem)}
+          note={s.zapomenuty ? <Chip tone="wait" size="sm">{t('Zapomenutý odchod')}</Chip>
+            : `${hodiny}${s.bezi ? ` · ${t('běží')}` : ''}${s.upravy > 0 ? ` · ${t('prémie {castka}', { castka: sZnamenkem(s.upravy, money) })}` : s.upravy < 0 ? ` · ${t('srážka {castka}', { castka: sZnamenkem(s.upravy, money) })}` : ''}`} />
+      </Widget>
+    );
+  }
+  // M/L (kolo 5, vzor Homebase / 7shifts „Earnings"): rozpad výdělku — hodiny × sazba, prémie a srážky,
+  // ve velkém i jejich seznam. Měsíc podle nastavení (tento / minulý).
+  const denText = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString(jazyk, { day: 'numeric', month: 'numeric' });
   return (
     <Widget nacteni={ja.stav ?? data} prazdno={prazdno}>
-      <Stat label={nazevMesice} value={money((s.mzda ?? 0) + s.upravy)}
-        note={s.zapomenuty ? <Chip tone="wait" size="sm">{t('Zapomenutý odchod')}</Chip>
-          : `${hodiny}${s.bezi ? ` · ${t('běží')}` : ''}${s.upravy > 0 ? ` · ${t('prémie {castka}', { castka: sZnamenkem(s.upravy, money) })}` : s.upravy < 0 ? ` · ${t('srážka {castka}', { castka: sZnamenkem(s.upravy, money) })}` : ''}`} />
+      <StatRow podleKarty>
+        <Stat label={nazevMesice} value={money(celkem)} note={s.zapomenuty ? <Chip tone="wait" size="sm">{t('Zapomenutý odchod')}</Chip> : s.bezi ? t('včetně běžící směny') : t('hrubého, k výplatě')} />
+        <Stat label={t('Odpracováno')} value={hodiny} note={sazba ? t('× {sazba}/h', { sazba: money(sazba) }) : t('bez sazby')} />
+        <Stat label={t('Prémie a srážky')} value={upravy.length ? sZnamenkem(s.upravy, money) : '—'} tone={s.upravy > 0 ? 'ok' : s.upravy < 0 ? 'bad' : 'muted'}
+          note={upravy.length ? t('{n, plural, one {# zápis} few {# zápisy} other {# zápisů}}', { n: upravy.length }) : t('zatím nic')} />
+      </StatRow>
+      {velikost === 'L' && upravy.length > 0 && (
+        <ul className="list mt-3">
+          {upravy.slice(0, 6).map(u => (
+            <ListRow key={u.id} title={u.note || (Number(u.amount) > 0 ? t('Prémie') : t('Srážka'))}
+              meta={`${denText(String(u.day).slice(0, 10))}${u.source === 'reward' ? ` · ${t('z odměny')}` : ''}`}
+              value={<span className={Number(u.amount) > 0 ? 'text-ok-ink' : 'text-bad-ink'}>{sZnamenkem(Number(u.amount), money)}</span>} />
+          ))}
+        </ul>
+      )}
+      {velikost === 'L' && upravy.length > 6 && <p className="t-meta mt-2">{t('…a {n, plural, one {# další} few {# další} other {# dalších}}', { n: upravy.length - 6 })}</p>}
     </Widget>
   );
 }

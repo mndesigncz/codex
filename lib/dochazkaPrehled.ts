@@ -511,6 +511,27 @@ export interface MujMesic {
  * Hodiny a výdělek přihlášeného v měsíci „RRRR-MM" podle dne příchodu (Praha).
  * Vedení dostává záznamy celého týmu — vlastní se vyberou podle id.
  */
+export type VolbaMesice = 'tento' | 'minuly';
+
+/**
+ * Měsíc pro Můj výdělek / Odpracováno podle volby widgetu a kolik dní zpět si
+ * od API vyžádat (od 1. dne měsíce do dneška včetně, +1 jako dřív). Minulý
+ * měsíc na 31. = až 62 dní; API zaměstnance posílá 70.
+ */
+export function obdobiMesice(dnes: string, volba: VolbaMesice): { mesic: string; dni: number } {
+  const [r, m] = [Number(dnes.slice(0, 4)), Number(dnes.slice(5, 7))];
+  const mesic = volba === 'minuly' ? `${m === 1 ? r - 1 : r}-${String(m === 1 ? 12 : m - 1).padStart(2, '0')}` : dnes.slice(0, 7);
+  const od = Date.UTC(Number(mesic.slice(0, 4)), Number(mesic.slice(5, 7)) - 1, 1);
+  const do_ = Date.UTC(r, m - 1, Number(dnes.slice(8, 10)));
+  return { mesic, dni: Math.round((do_ - od) / 86400000) + 2 };
+}
+
+/** Vlastní prémie a srážky v měsíci, nejnovější první (seznam v Mém výdělku). */
+export function mojeUpravyMesice(upravy: readonly UpravaMzdy[], meId: number, mesic: string): UpravaMzdy[] {
+  return upravy.filter(u => Number(u.userId) === meId && String(u.day ?? '').slice(0, 7) === mesic)
+    .sort((a, b) => String(b.day).localeCompare(String(a.day)) || b.id - a.id);
+}
+
 export function mujMesic(entries: readonly ZaznamDochazky[], meId: number, mesic: string, ted: number, sazba: number | null, upravy: readonly UpravaMzdy[] = []): MujMesic {
   const s: MujMesic = { ms: 0, mzda: sazba && sazba > 0 ? 0 : null, bezi: false, zapomenuty: false, vynechano: 0, pocet: 0, upravy: 0 };
   for (const u of upravy) {
