@@ -255,10 +255,11 @@ function Dochazi({ velikost, nastaveni, nahled }: WidgetProps<NastaveniDochazi>)
   // Odkaz vede do vybrané kategorie (Sklad ji hledá podle jména), jinak na celý sklad.
   const smiSklad = nav.smiPohled('inventory');
   // Widget ukazuje to, co dochází, takže se Sklad otevře rovnou s filtrem „Jen co dochází" (lib/skladPredani.ts).
-  // Řádek předá i položku (`polozka:<id>`): Sklad na ni posune seznam a zaostří množství, hlášení
-  // chybějícího u zaměstnance ji rovnou vybere — člověk ji nehledá znovu.
+  // Zaměstnanci (a tabletu) řádek předá i položku (`polozka:<id>`): jeho Sklad na ni posune seznam
+  // a zaostří pole množství — položku nehledá znovu. Vedení ne: tam `polozka:` otevírá okno Upravit
+  // položku (proklik z receptury), a to klepnutí na docházející zboží nečeká.
   const doSkladu = (kat?: string | null, polozkaId?: number) => {
-    if (!nahled && smiSklad) nav.onNavigate('inventory', skladArg({ polozkaId, kategorie: kat, jenDochazi: true }));
+    if (!nahled && smiSklad) nav.onNavigate('inventory', skladArg({ polozkaId: naVedeni ? undefined : polozkaId, kategorie: kat, jenDochazi: true }));
   };
   // „Nakoupit (7)" v patičce (jen vedení, střední a velká karta): totéž okno nákupního seznamu jako
   // v hlavičce Skladu — na telefonu je tak objednání docházejícího zboží jedno klepnutí z Přehledu.

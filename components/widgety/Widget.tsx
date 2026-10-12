@@ -372,8 +372,11 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
         {/* Malá karta je na telefonu široká ~171 px a na název zbývá ~107 px:
             „Docházející zásoby" by skončil jako „Docházející zá…" a číslo pod
             ním by nemělo jméno. U S proto dva řádky, ikona u prvního. Dlouhé
-            slovo se dělí podle jazyka stránky (hyphens, <html lang>); rozlomení
-            bez spojovníku (break-words) je až poslední záchrana proti přetečení. */}
+            slovo se dělí podle jazyka stránky (hyphens, <html lang>), ale jen
+            slovo od 10 znaků a nejméně po 5 znacích na každé straně — „schvá-lení"
+            by vypadalo hůř než celé slovo na dalším řádku (Safari zná jen
+            limit před/za). Rozlomení bez spojovníku (break-words) je až poslední
+            záchrana proti přetečení (německá složená slova). */}
         <h2 id={idTitulku} data-w-titulek="" tabIndex={-1} className={`t-card flex ${S ? 'items-start' : 'items-center'} gap-2 min-w-0 ${FOKUS_TITULKU} ${inkoust ? '!text-white' : ''}`}>
           {/* Ikona v limetkové dlaždičce: jemný akcent hlavičky (kolo 71). Tónovaná
               průhledností (bg-ok/15) — plná limetka je vyhrazená akci (DP T3)
@@ -381,7 +384,7 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
           <span aria-hidden className={`shrink-0 grid h-6 w-6 place-items-center rounded-xl ${S ? '-mt-0.5' : ''} ${inkoust ? 'bg-white/10 text-white/70' : 'bg-ok/15 text-ok-ink'}`}>
             <Icon name={ikona ?? k.definice?.ikona ?? 'overview'} size={14} />
           </span>
-          <span className="line-clamp-2 break-words hyphens-auto" title={nazev}>{nazev}</span>
+          <span className="line-clamp-2 break-words hyphens-auto [hyphenate-limit-chars:10_5_5] [-webkit-hyphenate-limit-before:5] [-webkit-hyphenate-limit-after:5]" title={nazev}>{nazev}</span>
           {doplnek}
         </h2>
         {/* Ovládací prvky vpravo v jedné skupině a Sbalit VŽDY úplně vpravo: dřív stál mezi názvem a odkazem
