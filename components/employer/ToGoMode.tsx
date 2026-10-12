@@ -27,8 +27,8 @@
 // návratu znovu. TO GO zůstává samostatné prostředí (DESIGN „tři prostředí"), ale kreslí
 // sdílený Dock (stejné položky jako administrace + „Více" s listem MobileMoreSheet)
 // a zvonek vedle přepínače podniku. Klepnutí na položku doku přepne do administrace
-// rovnou na ten pohled. „Administrace" je na telefonu v listu Více (první akce), na
-// počítači zůstává v liště — dok je tam skrytý a jiná cesta zpět by nebyla.
+// rovnou na ten pohled. „Administrace" zůstává v liště (na počítači je dok skrytý
+// a jiná cesta zpět by nebyla; na telefonu je to zkratka do plné správy).
 
 import { useState } from 'react';
 import { LogoMark } from '../Icons';
@@ -67,10 +67,11 @@ export default function ToGoMode({ user, onExit, onOpenView, dok }: {
       {/* Chrom aplikace: značka, přepínač podniku (jen s víc podniky), zvonek a cesta do administrace. */}
       <div className="max-w-lg mx-auto w-full px-4 pt-[max(env(safe-area-inset-top),12px)] flex items-center gap-3">
         <LogoMark size={34} />
-        <span className="t-card flex-1 min-w-0 truncate">{t('Managero')}</span>
+        {/* Pod 380 px by se název s přepínačem, zvonkem a „Administrace" smrštil na jedno písmeno — zůstane jen značka. */}
+        <span className="t-card flex-1 min-w-0 truncate"><span className="hidden min-[380px]:inline">{t('Managero')}</span></span>
         <PodnikSwitcher compact jenPrepinani onOverview={() => onOpenView('org')} />
         <NotificationBell />
-        <Button variant="secondary" size="sm" icon="swap" onClick={onExit} className={dok ? 'hidden md:inline-flex' : ''}>{t('Administrace')}</Button>
+        <Button variant="secondary" size="sm" icon="swap" onClick={onExit} className="shrink-0">{t('Administrace')}</Button>
       </div>
       <div className="max-w-lg mx-auto w-full">
         <PlochaWidgetu stranka="vedeni.togo" hlavicka={{ title, subtitle: `TO GO · ${subtitle}` }} />

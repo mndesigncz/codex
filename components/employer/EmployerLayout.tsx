@@ -404,7 +404,6 @@ export default function EmployerLayout({ user }: Props) {
       })),
       skupiny: mobileGroups,
       akce: [
-        { label: t('Administrace'), icon: 'swap', onClick: () => doAdministrace() },
         { label: t('Hledat'), icon: 'search', onClick: () => doAdministrace(() => setHledani(true)) },
         { label: t('Nastavení'), icon: 'settings', onClick: () => doAdministrace(openSettings) },
         ...(smiTym ? [{ label: t('Tým'), icon: 'users', onClick: () => doAdministrace(openTeam) }] : []),
