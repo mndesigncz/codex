@@ -174,8 +174,12 @@ export default function EmployeeLayout({ user }: Props) {
   const mojeNav = navItems.filter(n => smiPohled(n.id));
   const vDoku = (id: string) => nav.dok.some(d => d.id === id);
   const mobileSecondary = nav.vse.filter(n => !vDoku(n.id));
+  // Chat mimo dok nese odznak nepřečtených na dlaždici (stejné číslo jako v doku).
+  const odznakChatu = (id: string) => (id === 'chat' && currentView !== 'chat' && unreadChat > 0
+    ? { badge: unreadChat, badgeLabel: t('{n, plural, one {# nepřečtená zpráva} few {# nepřečtené zprávy} other {# nepřečtených zpráv}}', { n: unreadChat }) }
+    : {});
   const mobileGroups = nav.sekce
-    .map(sec => ({ title: sec.title, items: sec.items.filter(n => !vDoku(n.id)) }))
+    .map(sec => ({ title: sec.title, items: sec.items.filter(n => !vDoku(n.id)).map(n => ({ ...n, ...odznakChatu(n.id) })) }))
     .filter(g => g.items.length);
 
   // Navigace pro widgety na ploše (kolo 68, spec §2.6): proklik z widgetu vede
@@ -278,8 +282,10 @@ export default function EmployeeLayout({ user }: Props) {
           </div>
           {/* Sekce skrytá v nastavení podniku, otevřená odkazem nebo widgetem: preference, ne zákaz. */}
           {jeSkryty && <Chip tone="muted" size="sm" className="shrink-0">{t('Skrytá sekce')}</Chip>}
+          {/* Lupa i na telefonu (kolo 6, Z9): hledání najde úkoly, položky skladu, návody i akce,
+              a jako řádek v listu Více o něm nikdo nevěděl. Titulek je truncate, místo tu je. */}
           <button type="button" onClick={() => setHledani(true)} title={t('Hledat v aplikaci (Ctrl K)')} aria-label={t('Hledat v aplikaci')} aria-haspopup="dialog"
-            className="tap-target-sm hidden md:inline-flex shrink-0 rounded-full p-2 text-black/45 hover:text-black hover:bg-black/[0.05] transition-colors">
+            className="tap-target-sm inline-flex shrink-0 rounded-full p-2 text-black/45 hover:text-black hover:bg-black/[0.05] transition-colors">
             <Icon name="search" size={20} />
           </button>
           <NotificationBell />

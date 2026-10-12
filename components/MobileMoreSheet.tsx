@@ -3,8 +3,10 @@
 import { useEffect } from 'react';
 import { Icon } from './Icons';
 import { useModal } from '@/lib/useModal';
+import { Badge } from './ui/Badge';
 
-export interface MoreItem { id: string; label: string; icon: string }
+/** Dlaždice listu; `badge` = počet k vyřízení (chat mimo dok nese nepřečtené), `badgeLabel` ho přečte odečítači. */
+export interface MoreItem { id: string; label: string; icon: string; badge?: number; badgeLabel?: string }
 export interface MoreGroup { title?: string | null; items: MoreItem[] }
 export interface MoreAction { label: string; icon: string; onClick: () => void; danger?: boolean }
 
@@ -45,8 +47,10 @@ export default function MobileMoreSheet({ open, onClose, title = 'Menu', items, 
         className={`flex flex-col items-center justify-center gap-1.5 rounded-2xl py-2.5 px-1 transition active:scale-[0.96] ${
           active ? 'seg-on' : 'seg-off'
         }`}>
-        <span className={`flex h-10 w-10 items-center justify-center rounded-full ${active ? 'bg-white/15' : 'bg-black/[0.05]'}`}>
+        <span className={`relative flex h-10 w-10 items-center justify-center rounded-full ${active ? 'bg-white/15' : 'bg-black/[0.05]'}`}>
           <Icon name={item.icon} size={20} className={active ? 'text-[#C8F542]' : 'text-[#16181A]'} />
+          {/* Odznak jako v doku: chat vyřazený z doku (kolo 6, Z16) by jinak o nepřečtených mlčel. */}
+          {!!item.badge && !active && <Badge count={item.badge} label={item.badgeLabel} className="absolute -top-1 -right-1" />}
         </span>
         <span className="text-[11px] font-medium text-center leading-tight truncate w-full">{item.label}</span>
       </button>
