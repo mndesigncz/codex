@@ -16,7 +16,10 @@
   "closingsCount": 21,
   "diffSum": -180,
   "diffAbs": 940,
-  "eventsRevenue": 12400
+  "eventsRevenue": 12400,
+  "fixedCosts": 48500,
+  "net": 25780,
+  "fixedCostsSet": true
  },
  "guest": {
   "orders": 142,
@@ -35,7 +38,9 @@
    "amount": 8420,
    "receiptId": 31,
    "photoUrl": null,
-   "note": "Mléko, káva, kelímky"
+   "note": "Mléko, káva, kelímky",
+   "category": "suroviny",
+   "supplier": "Velkoobchod Bílkovi"
   },
   {
    "date": "2026-09-15",
@@ -62,7 +67,41 @@
    "amount": 3150,
    "receiptId": 30,
    "photoUrl": null,
-   "note": null
+   "note": null,
+   "category": "suroviny",
+   "supplier": "Pekárna Na rohu"
+  },
+  {
+   "date": "2026-09-10",
+   "kind": "order",
+   "label": "Objednávka — Monin",
+   "amount": 4200,
+   "orderId": 7,
+   "supplier": "Monin",
+   "orderedBy": "Eva Testová",
+   "items": [
+    {
+     "name": "Sirup Mango",
+     "qty": 6,
+     "unit": "ks"
+    },
+    {
+     "name": "Sirup Kokos",
+     "qty": 3,
+     "unit": "ks"
+    }
+   ]
+  },
+  {
+   "date": "2026-09-08",
+   "kind": "receipt",
+   "label": "Večerka u Nováků",
+   "amount": 640,
+   "receiptId": 32,
+   "photoUrl": null,
+   "note": "Limonády, led",
+   "category": "napoje",
+   "supplier": "Večerka u Nováků"
   }
  ],
  "insights": [

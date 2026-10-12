@@ -190,8 +190,11 @@ const pretece = (p) => p.evaluate(() => document.documentElement.scrollWidth > w
   await otevri(p, '/employer/overview?view=finance', 'vedeni.finance');
   await p.waitForTimeout(1200);
   tvrdi('finance 6: telefon bez vodorovného přetečení', !(await pretece(p)));
-  const exp = p.getByRole('button', { name: 'Export pro účetní' });
-  tvrdi('finance 6: hlavní akce Export pro účetní vidět a klikatelná', await exp.isVisible() && await exp.isEnabled());
+  // Kolo 81 (V12): stáhnout CSV do telefonu není hlavní akce — na telefonu žádná limetka, export je v „···".
+  tvrdi('finance 6: na telefonu Export pro účetní není limetka v hlavičce', await p.getByRole('button', { name: 'Export pro účetní' }).count() === 0);
+  await p.locator('[data-plocha] button[aria-haspopup="menu"]:visible').first().click();
+  const exp = p.getByRole('menuitem', { name: 'Export pro účetní' });
+  tvrdi('finance 6: Export pro účetní je v „···" a klikatelný', await dokud(() => exp.isVisible(), 3000) && await exp.isEnabled());
   await exp.click();
   await p.waitForTimeout(500);
   tvrdi('finance 6: Export otevře okno (ne ruční překryv)', await p.getByRole('dialog', { name: 'Export pro účetní' }).isVisible());

@@ -155,6 +155,7 @@ const POLE_NASTAVENI: Record<string, string> = {
   dashboardConfig: 'domovská plocha', showTeamSchedule: 'sdílení rozvrhu', regenerateCode: 'kód pro pozvání',
   payDailyCash: 'denní výplata v hotovosti', drawerFloat: 'kasa na začátku', closingRequiresShift: 'uzávěrka jen ve směně',
   payoutFromRegister: 'výplaty z kasy', tipsInDrawer: 'spropitné v kase', laborTargetPct: 'cíl mzdových nákladů',
+  fixedCosts: 'pravidelné náklady',
   levelsConfig: 'úrovně odměn', pointsConfig: 'body odměn', lowStockDefault: 'výchozí nízký stav',
   criticalStockDefault: 'výchozí kritický stav', address: 'adresa', ico: 'IČO', dic: 'DIČ',
   country: 'země', defaultLang: 'jazyk podniku', timeFormat: 'formát času', timezone: 'časové pásmo', navConfig: 'navigace aplikace',

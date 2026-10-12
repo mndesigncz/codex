@@ -99,6 +99,8 @@ export interface OtevreneUcty {
 export interface SouctyPokladny {
   bills: number; total: number; cash: number; card: number; other: number; tips: number;
   tipsCash: number; tipsCard: number; refundCount: number; refundTotal: number;
+  /** Slevy na účtenkách a smazané (stornované) účty v období (kolo 81); starší server = nuly. */
+  discounts: number; voidCount: number; voidTotal: number;
   avgBill: number; soldQty: number; productRevenue: number;
   methods: { id: string; label: string; amount: number }[];
 }
@@ -150,6 +152,7 @@ export function vyberDenniPokladnu(raw: any): DenniPokladna {
     soucty: {
       bills: cis(t.bills), total: cis(t.total), cash: cis(t.cash), card: cis(t.card), other: cis(t.other), tips: cis(t.tips),
       tipsCash: cis(t.tipsCash), tipsCard: cis(t.tipsCard), refundCount: cis(t.refundCount), refundTotal: cis(t.refundTotal),
+      discounts: cis(t.discounts), voidCount: cis(t.voidCount), voidTotal: cis(t.voidTotal),
       avgBill: cis(t.avgBill), soldQty: cis(t.soldQty), productRevenue: cis(t.productRevenue),
       methods: Array.isArray(t.methods) ? t.methods.map((m: any) => ({ id: text(m?.id), label: text(m?.label) || text(m?.id), amount: cis(m?.amount) })) : [],
     },
@@ -196,9 +199,20 @@ export function vyberKalendarTrzeb(raw: any): Record<string, number> {
 // Finance: /api/finance
 // ---------------------------------------------------------------------------
 
+/** Položka objednávky dodavateli, jak ji nese kniha výdajů (kolo 81). */
+export interface PolozkaObjednavky { name: string; qty: number; unit: string }
+
 export interface RadekKnihy {
   date: string; kind: string; label: string; amount: number;
   receiptId?: number; photoUrl?: string | null; note?: string | null;
+  /** Kategorie účtenky (KATEGORIE_UCTENEK); null = starší účtenka bez kategorie. */
+  category?: KategorieUctenky | null;
+  /** Objednávka dodavateli: id, položky a kdo ji zadal — pro detail v knize výdajů. */
+  orderId?: number;
+  items?: PolozkaObjednavky[];
+  orderedBy?: string | null;
+  /** Dodavatel (účtenka i objednávka) pro seskupení „Podle dodavatele"; null = bez jména. */
+  supplier?: string | null;
 }
 
 export interface FinanceMesice {
@@ -206,6 +220,10 @@ export interface FinanceMesice {
   souhrn: {
     revenue: number; prevRevenue: number; cash: number; card: number; tips: number;
     purchases: number; wagesCash: number; wagesWorked: number; gross: number; diffSum: number;
+    /** Pevné náklady měsíce (nájem, energie…) a výsledek po nich (kolo 81). */
+    fixedCosts: number; net: number;
+    /** Podnik má pevné náklady vyplněné; bez nich je `net` = `gross` a widget to řekne. */
+    fixedCostsSet: boolean;
     stockValue: number; stockTop: { name: string; value: number }[];
     laborTargetPct: number | null; closingsCount: number; mzdySkryte: boolean;
   };
@@ -222,6 +240,10 @@ export function vyberFinance(raw: any): FinanceMesice {
     souhrn: {
       revenue: cis(s.revenue), prevRevenue: cis(s.prevRevenue), cash: cis(s.cash), card: cis(s.card), tips: cis(s.tips),
       purchases: cis(s.purchases), wagesCash: cis(s.wagesCash), wagesWorked: cis(s.wagesWorked), gross: cis(s.gross), diffSum: cis(s.diffSum),
+      // Starší server pevné náklady neposílá: výsledek je pak hrubý a `fixedCostsSet` false — nic se nevymýšlí.
+      fixedCosts: cis(s.fixedCosts),
+      net: s.net == null ? cis(s.gross) : cis(s.net),
+      fixedCostsSet: s.fixedCostsSet === true,
       stockValue: cis(s.stockValue),
       stockTop: Array.isArray(s.stockTop) ? s.stockTop.map((i: any) => ({ name: text(i?.name), value: cis(i?.value) })) : [],
       laborTargetPct: nebo(s.laborTargetPct),
@@ -235,6 +257,12 @@ export function vyberFinance(raw: any): FinanceMesice {
     kniha: Array.isArray(raw.ledger) ? raw.ledger.map((r: any) => ({
       date: text(r?.date), kind: text(r?.kind), label: text(r?.label), amount: cis(r?.amount),
       receiptId: r?.receiptId != null ? Number(r.receiptId) : undefined, photoUrl: r?.photoUrl ?? null, note: r?.note ?? null,
+      category: jeKategorieUctenky(r?.category) ? r.category : null,
+      orderId: r?.orderId != null ? Number(r.orderId) : undefined,
+      items: Array.isArray(r?.items) ? r.items.filter((i: any) => i && typeof i.name === 'string')
+        .map((i: any) => ({ name: i.name, qty: cis(i.qty), unit: text(i.unit) })) : undefined,
+      orderedBy: text(r?.orderedBy).trim() || null,
+      supplier: text(r?.supplier).trim() || null,
     })) : [],
     postrehy: rady(raw.insights),
   };
@@ -271,6 +299,134 @@ export function kamSlyPenize(f: FinanceMesice): { klic: 'nakupy' | 'kasa' | 'mzd
 
 /** Změna proti minulému měsíci v %, nebo null, když minulý měsíc nic neměl. */
 export const zmenaProti = (ted: number, predtim: number) => (predtim > 0 ? Math.round(((ted - predtim) / predtim) * 100) : null);
+
+// ---------------------------------------------------------------------------
+// Pevné náklady podniku (teams.fixed_costs) — kolo 81
+// ---------------------------------------------------------------------------
+
+/** Jeden řádek pevných nákladů: nájem, energie, pojištění… Částka za měsíc, celé jednotky měny. */
+export interface PevnyNaklad { name: string; amount: number }
+
+export const MAX_PEVNYCH_NAKLADU = 20;
+export const MAX_NAZEV_NAKLADU = 40;
+
+/**
+ * Očistí pole pevných nákladů z API nebo formuláře. Vrátí null, když tvar
+ * nesedí (není pole, přes 20 řádků, prázdný nebo dlouhý název, záporná nebo
+ * necelá částka) — server pak odmítne celou změnu, ne půlku.
+ */
+export function cistePevneNaklady(raw: unknown): PevnyNaklad[] | null {
+  if (!Array.isArray(raw) || raw.length > MAX_PEVNYCH_NAKLADU) return null;
+  const out: PevnyNaklad[] = [];
+  for (const r of raw) {
+    if (!r || typeof r !== 'object') return null;
+    const name = typeof (r as any).name === 'string' ? (r as any).name.trim() : '';
+    const amount = Number((r as any).amount);
+    if (!name || name.length > MAX_NAZEV_NAKLADU) return null;
+    if (!Number.isFinite(amount) || amount < 0 || !Number.isInteger(amount)) return null;
+    out.push({ name, amount });
+  }
+  return out;
+}
+
+/** Uložené pevné náklady z databáze (JSONB nebo nic) — vadný záznam je prázdný seznam, ne pád. */
+export const pevneNakladyZDb = (raw: unknown): PevnyNaklad[] => cistePevneNaklady(raw) ?? [];
+
+/** Součet pevných nákladů za měsíc. */
+export const soucetPevnychNakladu = (rows: readonly PevnyNaklad[]): number => rows.reduce((s, r) => s + r.amount, 0);
+
+/** Výsledek po pevných nákladech: hrubý výsledek (tržby − nákupy − mzdy) minus nájem a energie. */
+export const cistyVysledek = (gross: number, fixedCosts: number): number => gross - fixedCosts;
+
+/** Částka z pole formuláře („12 000", „1200,00") na celé jednotky; null = nečitelné nebo záporné. */
+export function castkaNakladuZPole(text: string): number | null {
+  const cisty = String(text).replace(/\s/g, '').replace(',', '.');
+  if (!cisty) return null;
+  const n = Number(cisty);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.round(n);
+}
+
+// ---------------------------------------------------------------------------
+// Kategorie účtenek (receipts.category) — kolo 81
+// ---------------------------------------------------------------------------
+
+/** Pevné hodnoty do databáze; popisky překládá rozhraní (viz popiskyKategorii v komponentách). */
+export const KATEGORIE_UCTENEK = ['suroviny', 'napoje', 'provoz', 'vybaveni', 'jine'] as const;
+export type KategorieUctenky = typeof KATEGORIE_UCTENEK[number];
+export const VYCHOZI_KATEGORIE_UCTENKY: KategorieUctenky = 'suroviny';
+/** České popisky (klíče pro `t`): „Suroviny", „Nápoje", „Provoz", „Vybavení", „Jiné". */
+export const POPISKY_KATEGORII_CS: Record<KategorieUctenky, string> = {
+  suroviny: 'Suroviny', napoje: 'Nápoje', provoz: 'Provoz', vybaveni: 'Vybavení', jine: 'Jiné',
+};
+
+export const jeKategorieUctenky = (v: unknown): v is KategorieUctenky => typeof v === 'string' && (KATEGORIE_UCTENEK as readonly string[]).includes(v);
+
+/** Platné datum nákupu („RRRR-MM-DD", ne po dnešku); jinak null. */
+export function datumNakupu(v: unknown, dnes: string): string | null {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
+  const d = new Date(`${v}T12:00:00Z`);
+  if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== v) return null;
+  return v <= dnes ? v : null;
+}
+
+/** Počty účtenek knihy podle kategorie (jen druh receipt); účtenka bez kategorie se počítá jako „jine". */
+export function poctyKategorii(kniha: readonly RadekKnihy[]): Record<KategorieUctenky, number> {
+  const out = Object.fromEntries(KATEGORIE_UCTENEK.map(k => [k, 0])) as Record<KategorieUctenky, number>;
+  for (const r of kniha) if (r.kind === 'receipt') out[r.category ?? 'jine'] += 1;
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Slevy z pokladny — kolo 81
+// ---------------------------------------------------------------------------
+
+/** Nad kolik procent tržby jsou slevy varování (Chip wait, rada). */
+export const PRAH_SLEV_PCT = 5;
+
+/** Podíl slev na tržbě v celých procentech; bez tržby 0 (ne dělení nulou, ne „nekonečno"). */
+export function podilSlev(slevy: number, trzba: number): number {
+  if (!(trzba > 0) || !(slevy > 0)) return 0;
+  return Math.round((slevy / trzba) * 100);
+}
+
+export const slevyNadPrah = (slevy: number, trzba: number): boolean => podilSlev(slevy, trzba) > PRAH_SLEV_PCT;
+
+// ---------------------------------------------------------------------------
+// Kniha výdajů podle dodavatele — kolo 81
+// ---------------------------------------------------------------------------
+
+export interface RadekDodavatele {
+  /** Jméno, jak ho napsal první doklad (normalizovaný klíč spojí „Makro" a „MAKRO"). */
+  nazev: string;
+  klic: string;
+  castka: number;
+  dokladu: number;
+  /** Podíl na všech výdajích knihy v celých procentech. */
+  pct: number;
+}
+
+const klicDodavatele = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+/**
+ * Účtenky a objednávky seskupené podle dodavatele, největší první. Doklad bez
+ * dodavatele jde pod „" (rozhraní ho pojmenuje „Bez dodavatele"). Procento je
+ * z celé knihy (i mzdy a výdaje z kasy), aby odpovídalo na „kolik z výdajů jde přes Makro".
+ */
+export function podleDodavatele(kniha: readonly RadekKnihy[]): RadekDodavatele[] {
+  const celkem = kniha.reduce((s, r) => s + r.amount, 0);
+  const m = new Map<string, RadekDodavatele>();
+  for (const r of kniha) {
+    if (r.kind !== 'receipt' && r.kind !== 'order') continue;
+    const jmeno = (r.supplier ?? '').trim();
+    const klic = klicDodavatele(jmeno);
+    const z = m.get(klic) ?? { nazev: jmeno, klic, castka: 0, dokladu: 0, pct: 0 };
+    z.castka += r.amount; z.dokladu += 1;
+    m.set(klic, z);
+  }
+  return [...m.values()].map(z => ({ ...z, pct: celkem > 0 ? Math.round((z.castka / celkem) * 100) : 0 }))
+    .sort((a, b) => b.castka - a.castka || a.nazev.localeCompare(b.nazev, 'cs'));
+}
 
 // ---------------------------------------------------------------------------
 // Organizace: /api/organization/overview

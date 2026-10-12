@@ -13,6 +13,8 @@ import { audit } from '@/lib/audit';
 import { souborUrl } from '@/lib/bezpecnaUrl';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { menaPodniku } from '@/lib/menaPodniku';
+import { pragueToday } from '@/lib/pragueTime';
+import { datumNakupu, jeKategorieUctenky } from '@/lib/financeWidgety';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,15 +30,18 @@ export async function GET() {
   const u = await clen(['finance.uctenky_zobrazit', 'finance.uctenky_pridat']);
   if (jeOdpoved(u)) return u;
   try {
+    // Kolo 81: datum nákupu a kategorie (sloupce přibyly s DDL; před migrací GET spadne do catch jako dřív).
     const rows = u.vse
       ? await sql`
         SELECT r.id, r.photo_url AS "photoUrl", r.supplier, r.amount, r.note, r.created_at AS "createdAt",
+               r.purchase_date AS "purchaseDate", r.category,
                us.name AS "authorName"
         FROM receipts r LEFT JOIN users us ON us.id = r.user_id
         WHERE r.team_id = ${u.team_id}
         ORDER BY r.created_at DESC LIMIT 100`
       : await sql`
         SELECT r.id, r.photo_url AS "photoUrl", r.supplier, r.amount, r.note, r.created_at AS "createdAt",
+               r.purchase_date AS "purchaseDate", r.category,
                us.name AS "authorName"
         FROM receipts r LEFT JOIN users us ON us.id = r.user_id
         WHERE r.team_id = ${u.team_id} AND r.user_id = ${u.id}
@@ -59,11 +64,17 @@ export async function POST(req: NextRequest) {
   if (!photoUrl && !supplier && !amount && !note) {
     return NextResponse.json({ error: 'Účtenka je prázdná.' }, { status: 400 });
   }
+  // Datum nákupu: dnešek, když chybí; budoucí nebo nečitelné datum se odmítne. Kategorie jen z whitelistu.
+  const dnes = pragueToday();
+  const purchaseDate = b.purchaseDate == null || b.purchaseDate === '' ? dnes : datumNakupu(b.purchaseDate, dnes);
+  if (!purchaseDate) return NextResponse.json({ error: 'Datum nákupu musí být ve tvaru RRRR-MM-DD a nejpozději dnes.' }, { status: 400 });
+  const category = b.category == null || b.category === '' ? 'suroviny' : (jeKategorieUctenky(b.category) ? b.category : null);
+  if (!category) return NextResponse.json({ error: 'Neznámá kategorie účtenky.' }, { status: 400 });
   try {
     const [row] = await sql`
-      INSERT INTO receipts (team_id, user_id, photo_url, supplier, amount, note)
-      VALUES (${u.team_id}, ${u.id}, ${photoUrl}, ${supplier}, ${amount}, ${note})
-      RETURNING id, photo_url AS "photoUrl", supplier, amount, note, created_at AS "createdAt"`;
+      INSERT INTO receipts (team_id, user_id, photo_url, supplier, amount, note, purchase_date, category)
+      VALUES (${u.team_id}, ${u.id}, ${photoUrl}, ${supplier}, ${amount}, ${note}, ${purchaseDate}, ${category})
+      RETURNING id, photo_url AS "photoUrl", supplier, amount, note, created_at AS "createdAt", purchase_date AS "purchaseDate", category`;
     audit(u.team_id, u.id, 'receipt.add', 'receipt', row.id,
       `${supplier ?? 'Účtenka'}${amount ? ` · ${(await menaPodniku(u.team_id)).money(amount)}` : ''}`);
     return NextResponse.json({ ok: true, receipt: row });
@@ -78,14 +89,20 @@ export async function PATCH(req: NextRequest) {
   const b = await req.json().catch(() => ({}));
   const id = parseInt(b.id);
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Neplatné ID' }, { status: 400 });
-  const [row] = await sql`SELECT id, supplier, amount, note FROM receipts WHERE id = ${id} AND team_id = ${u.team_id}`;
+  const [row] = await sql`SELECT id, supplier, amount, note, purchase_date, category FROM receipts WHERE id = ${id} AND team_id = ${u.team_id}`;
   if (!row) return NextResponse.json({ error: 'Účtenka nenalezena' }, { status: 404 });
   const supplier = b.supplier !== undefined ? (b.supplier ? String(b.supplier).trim().slice(0, 160) : null) : row.supplier;
   const amount = b.amount !== undefined
     ? (b.amount === null || b.amount === '' ? null : Math.max(0, Math.round(Number(b.amount)) || 0))
     : row.amount;
   const note = b.note !== undefined ? (b.note ? String(b.note).trim().slice(0, 1000) : null) : row.note;
-  await sql`UPDATE receipts SET supplier = ${supplier}, amount = ${amount}, note = ${note} WHERE id = ${id}`;
+  // Kolo 81: datum nákupu a kategorie se dají opravit z detailu v knize výdajů.
+  const dnes = pragueToday();
+  const purchaseDate = b.purchaseDate !== undefined ? datumNakupu(b.purchaseDate, dnes) : (row.purchase_date ?? null);
+  if (b.purchaseDate !== undefined && !purchaseDate) return NextResponse.json({ error: 'Datum nákupu musí být ve tvaru RRRR-MM-DD a nejpozději dnes.' }, { status: 400 });
+  const category = b.category !== undefined ? (jeKategorieUctenky(b.category) ? b.category : null) : (row.category ?? null);
+  if (b.category !== undefined && !category) return NextResponse.json({ error: 'Neznámá kategorie účtenky.' }, { status: 400 });
+  await sql`UPDATE receipts SET supplier = ${supplier}, amount = ${amount}, note = ${note}, purchase_date = ${purchaseDate}, category = ${category} WHERE id = ${id}`;
   return NextResponse.json({ ok: true });
 }
 
