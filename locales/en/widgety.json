@@ -316,7 +316,7 @@
   "Kolega": "Colleague",
   "Kolik % položek menu má recepturu, kolik se prodává bez receptury, kolik položek je ve skladu.": "What % of menu items have a recipe, how many sell without one, how many items are in stock.",
   "Kolik akcí": "How many events",
-  "Kolik hodin má kdo v měsíci naplánováno — a kdo se blíží limitu z pravidel generátoru.": "How many hours each person has scheduled this month — and who is nearing the limit from the generator rules.",
+  "Kolik hodin má kdo v měsíci naplánováno, kdo se blíží limitu z pravidel generátoru a s oprávněním ke mzdám i kolik to stojí.": "How many hours each person has scheduled this month, who is nearing the limit from the generator rules and, with access to wages, what it costs.",
   "Kolik hodin máš tento měsíc odpracováno podle píchaček.": "How many hours you've worked this month according to clock-ins.",
   "Kolik je v týmu lidí a kdo má jakou roli.": "How many people are on the team and who has which role.",
   "Kolik jsem si vydělal: hodiny × vlastní sazba, prémie a srážky; tento nebo minulý měsíc.": "What I have earned: hours × my rate, bonuses and deductions; this or last month.",
@@ -1876,5 +1876,8 @@
   "…a {n, plural, one {# další podnět} few {# další podněty} other {# dalších podnětů}}": "…and {n, plural, one {# more suggestion} other {# more suggestions}}",
   "…a {n, plural, one {# další} few {# další} other {# dalších}}": "…and {n, plural, one {# more} other {# more}}",
   "…a {n, plural, one {# další} few {# další} other {# dalších}} vyprodané": "…and {n, plural, one {# more} other {# more}} sold out",
-  "↑ ↓ vybírají, Enter otevře, Esc zavře.": "↑ ↓ to choose, Enter to open, Esc to close."
+  "↑ ↓ vybírají, Enter otevře, Esc zavře.": "↑ ↓ to choose, Enter to open, Esc to close.",
+  "{n, plural, one {# směna v rozvrhu} few {# směny v rozvrhu} other {# směn v rozvrhu}}": "{n, plural, one {# shift in the schedule} other {# shifts in the schedule}}",
+  "{n, plural, one {Volno schváleno, ale # směna zůstala v rozvrhu} few {Volno schváleno, ale # směny zůstaly v rozvrhu} other {Volno schváleno, ale # směn zůstalo v rozvrhu}}": "{n, plural, one {Time off approved, but # shift is still in the schedule} other {Time off approved, but # shifts are still in the schedule}}",
+  "Upravit rozvrh": "Edit schedule"
 }
