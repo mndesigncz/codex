@@ -262,7 +262,7 @@ export function minulyMesic(mesic: string): string {
 // Katalog odměn a žádosti (/api/rewards/catalog)
 // ---------------------------------------------------------------------------
 
-export interface Odmena { id: number; nazev: string; ikona: string | null; cena: number; aktivni: boolean; zOrganizace: boolean; sdileno: boolean; spravuje: string | null }
+export interface Odmena { id: number; nazev: string; ikona: string | null; cena: number; aktivni: boolean; zOrganizace: boolean; sdileno: boolean; spravuje: string | null; /** Bonus k výplatě v měně podniku (null = jen odměna). */ bonusKc: number | null }
 export interface Zadost {
   id: number; odmena: number | null; nazev: string; cena: number; stav: 'pending' | 'approved' | 'declined';
   clovek: number; jmeno: string | null; avatar: string | null; kdy: string | null;
@@ -275,6 +275,7 @@ export function vyberKatalog(raw: any): Katalog {
     odmeny: seznam(raw.catalog).map((r: any) => ({
       id: cele(r.id), nazev: String(r.title ?? ''), ikona: text(r.icon), cena: Math.max(0, cele(r.cost)),
       aktivni: r.active !== false, zOrganizace: r.zOrganizace === true, sdileno: r.sdileno === true, spravuje: text(r.spravuje),
+      bonusKc: Number(r.bonus_amount) > 0 ? cele(r.bonus_amount) : null,
     })),
     zadosti: seznam(raw.redemptions).map((r: any) => ({
       id: cele(r.id), odmena: r.reward_id == null ? null : cele(r.reward_id), nazev: String(r.title ?? ''), cena: cele(r.cost),

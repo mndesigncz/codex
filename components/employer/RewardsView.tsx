@@ -41,6 +41,7 @@ import { useSmi } from '../widgety/NavigaceKontext';
 import { NaStranceOdmen } from '../widgety/oblasti/odmeny';
 import { useT } from '@/lib/i18n/client';
 import { useLocale } from './jazyk';
+import { useMoney, useSymbol } from '../CurrencyProvider';
 
 const URL_ODMENY = '/api/rewards';
 const URL_KATALOG = '/api/rewards/catalog';
@@ -351,9 +352,13 @@ function SpravaKatalogu() {
   const t = useT('sprava');
   const data = useDataWidgetu(URL_KATALOG, vyberKatalog);
   const odmeny = data.data?.odmeny ?? [];
+  const money = useMoney();
+  const symbol = useSymbol();
   const [nazev, setNazev] = useState('');
   const [cena, setCena] = useState('');
   const [ikona, setIkona] = useState('');
+  // Bonus v měně podniku (volitelný): schválená výměna ho zapíše jako prémii k výplatě — „lepší odměny" než jen volno.
+  const [bonus, setBonus] = useState('');
   const [pridavam, setPridavam] = useState(false);
   const [pracuji, setPracuji] = useState<number | null>(null);
   const [mazani, setMazani] = useState<Odmena | null>(null);
@@ -368,8 +373,8 @@ function SpravaKatalogu() {
     setPridavam(true);
     setChyba(null);
     try {
-      await fetch(URL_KATALOG, { method: 'POST', headers: JSON_HLAVICKA, body: JSON.stringify({ manage: true, title: nazev.trim(), cost: cenaCislo, icon: ikona.trim() || null }) }).then(okJson);
-      setNazev(''); setCena(''); setIkona('');
+      await fetch(URL_KATALOG, { method: 'POST', headers: JSON_HLAVICKA, body: JSON.stringify({ manage: true, title: nazev.trim(), cost: cenaCislo, icon: ikona.trim() || null, bonusAmount: Math.round(Number(bonus)) > 0 ? Math.round(Number(bonus)) : null }) }).then(okJson);
+      setNazev(''); setCena(''); setIkona(''); setBonus('');
       setToast(t('Odměna přidána do katalogu.'));
       obnov();
     } catch (e) {
@@ -419,7 +424,7 @@ function SpravaKatalogu() {
         {t('Katalog odměn')}
       </h2>
       <p className="t-meta mt-1 text-pretty">{t('Za co si tým může vyměnit body. Schválená výměna body odečte automaticky.')}</p>
-      <form className="mt-4 grid grid-cols-[4.5rem_minmax(0,1fr)] sm:grid-cols-[4.5rem_minmax(0,1fr)_8rem_auto] items-end gap-3"
+      <form className="mt-4 grid grid-cols-[4.5rem_minmax(0,1fr)] sm:grid-cols-[4.5rem_minmax(0,1fr)_7rem_8rem_auto] items-end gap-3"
         onSubmit={e => { e.preventDefault(); void pridat(); }}>
         <Field id="nova-odmena-ikona" label={t('Emoji')}>
           <Input id="nova-odmena-ikona" value={ikona} onChange={e => setIkona(e.target.value)} maxLength={4} className="text-center" />
@@ -427,8 +432,14 @@ function SpravaKatalogu() {
         <Field id="nova-odmena-nazev" label={t('Název odměny')}>
           <Input id="nova-odmena-nazev" value={nazev} onChange={e => setNazev(e.target.value)} maxLength={120} placeholder={t('Např. Směna končí o hodinu dřív')} />
         </Field>
-        <Field id="nova-odmena-cena" label={t('Cena v bodech')} className="col-span-2 sm:col-span-1">
+        <Field id="nova-odmena-cena" label={t('Cena v bodech')}>
           <Input id="nova-odmena-cena" type="number" inputMode="numeric" min={1} value={cena} onChange={e => setCena(e.target.value)} className="tabular-nums" />
+        </Field>
+        <Field id="nova-odmena-bonus" label={t('Bonus k výplatě')} hint={t('Volitelné; schválení ho zapíše jako prémii.')}>
+          <div className="relative">
+            <Input id="nova-odmena-bonus" type="number" inputMode="numeric" min={0} value={bonus} onChange={e => setBonus(e.target.value)} className="tabular-nums pr-9" />
+            <span aria-hidden className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-black/45">{symbol}</span>
+          </div>
         </Field>
         <Button type="submit" variant="primary" icon="plus" loading={pridavam} disabled={!jde} className="col-span-2 sm:col-span-1">{t('Přidat')}</Button>
       </form>
@@ -445,7 +456,11 @@ function SpravaKatalogu() {
             <ListRow key={o.id}
               lead={<span aria-hidden className="well grid h-9 w-9 shrink-0 place-items-center text-lg leading-none text-black/55">{o.ikona ?? <Icon name="gift" size={16} />}</span>}
               title={o.nazev}
-              meta={o.zOrganizace && o.spravuje ? `${t('{n, plural, one {# bod} few {# body} other {# bodů}}', { n: o.cena })} · ${t('spravuje {kdo}', { kdo: o.spravuje })}` : `${t('{n, plural, one {# bod} few {# body} other {# bodů}}', { n: o.cena })}${o.aktivni ? '' : ` · ${t('nenabízí se')}`}`}
+              meta={[
+                t('{n, plural, one {# bod} few {# body} other {# bodů}}', { n: o.cena }),
+                o.bonusKc ? t('+{castka} k výplatě', { castka: money(o.bonusKc) }) : null,
+                o.zOrganizace && o.spravuje ? t('spravuje {kdo}', { kdo: o.spravuje }) : !o.aktivni ? t('nenabízí se') : null,
+              ].filter(Boolean).join(' · ')}
               right={o.zOrganizace ? <Chip tone="muted" size="sm">{t('Z organizace')}</Chip> : o.sdileno ? <Chip tone="info" size="sm">{t('Sdíleno')}</Chip> : undefined}
               // Odměnu ze zdrojového podniku organizace (kolo 60) upraví jen jeho vedení —
               // přepínač i koš by tu vracely 404, tak se neukazují.

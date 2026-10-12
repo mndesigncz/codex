@@ -1538,5 +1538,8 @@
   "Hledat": "Search",
   "Úkol je hotový.": "Task done.",
   "Vrátit": "Put back",
-  "Jen co dochází": "Running low only"
+  "Jen co dochází": "Running low only",
+  "Bonus k výplatě": "Payout bonus",
+  "Volitelné; schválení ho zapíše jako prémii.": "Optional; approval records it as a bonus.",
+  "+{castka} k výplatě": "+{castka} to payout"
 }

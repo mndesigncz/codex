@@ -33,7 +33,7 @@ import { dbTimeHM, parseDbTime, pragueDayOf, pragueToday } from '@/lib/pragueTim
 import { earnedFor } from '@/lib/wages';
 import { apiMessage, okJson } from '@/lib/api';
 import { obsahuje } from '@/lib/hledani';
-import { hodinyMinuty, konecSmeny, navrhOdchodu, rozeberZaznam, sazbyZRosteru, spropitneZaObdobi, zaznamyVRozmezi, type ClenRosteru, type UzaverkaSpropitne, type ZaznamDochazky } from '@/lib/dochazkaPrehled';
+import { hodinyMinuty, konecSmeny, navrhOdchodu, rozeberZaznam, sazbyZRosteru, spropitneZaObdobi, upravyVRozmezi, zaznamyVRozmezi, type ClenRosteru, type UpravaMzdy, type UzaverkaSpropitne, type ZaznamDochazky } from '@/lib/dochazkaPrehled';
 import { obdobiZPresetu, platneRozmezi, pocetDni } from '@/lib/obdobi';
 import { useObdobi } from '@/lib/useObdobi';
 import { dayPlus } from '@/lib/pragueTime';
@@ -41,11 +41,11 @@ import { useT } from '@/lib/i18n/client';
 import { useLocale } from './jazyk';
 
 type Zaznam = ZaznamDochazky & { id: number | string; employeeId: number | string };
-interface Data { roster: ClenRosteru[]; entries: Zaznam[] }
+interface Data { roster: ClenRosteru[]; entries: Zaznam[]; adjustments: UpravaMzdy[] }
 
 function vyberData(raw: any): Data {
   if (!raw || typeof raw !== 'object' || !Array.isArray(raw.roster)) throw new Error('Docházka přišla v nečekaném tvaru.'); // i18n-ok
-  return { roster: raw.roster, entries: Array.isArray(raw.entries) ? raw.entries : [] };
+  return { roster: raw.roster, entries: Array.isArray(raw.entries) ? raw.entries : [], adjustments: Array.isArray(raw.adjustments) ? raw.adjustments : [] };
 }
 function vyberUzaverky(raw: any): UzaverkaSpropitne[] {
   if (!raw || !Array.isArray(raw.closings)) throw new Error('Uzávěrky přišly v nečekaném tvaru.'); // i18n-ok
@@ -216,7 +216,7 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
     setMazu(true); setChybaSmazani(null);
     try {
       await fetch(`/api/attendance?id=${smazat.id}`, { method: 'DELETE' }).then(okJson);
-      data.set(d => ({ roster: d?.roster ?? [], entries: (d?.entries ?? []).filter(x => x.id !== smazat.id) }));
+      data.set(d => ({ roster: d?.roster ?? [], entries: (d?.entries ?? []).filter(x => x.id !== smazat.id), adjustments: d?.adjustments ?? [] }));
       setSmazat(null);
       obnovDochazku();
     } catch (err) {
@@ -252,7 +252,18 @@ export default function Attendance({ user: _user }: { user: { id?: string | numb
         ...(sDyskem ? [dysko > 0 ? String(Math.round(dysko)) : ''] : []),
       ];
     });
-    const csv = [hlava, ...radky].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n');
+    // Prémie a srážky jako vlastní řádky (den, člověk, částka ve sloupci Mzda) — účetní je sečte se mzdou.
+    const upravy = vidiMzdy ? upravyVRozmezi(data.data?.adjustments ?? [], r.od, r.do).map(u => {
+      const kdo = roster.find(m => String(m.id) === String(u.userId));
+      return [
+        String(u.day).slice(0, 10).split('-').reverse().map(Number).join('. '), // „12. 10. 2026" bez locale — CSV je pro účetní
+        kdo?.name ?? 'Neznámý', '', '', '', // i18n-ok
+        `${u.amount > 0 ? 'prémie' : 'srážka'}${u.note ? `: ${u.note}` : ''}`, // i18n-ok
+        String(u.amount),
+        ...(sDyskem ? [''] : []),
+      ];
+    }) : [];
+    const csv = [hlava, ...radky, ...upravy].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n');
     void ulozSoubor(`dochazka-${r.od}_${r.do}.csv`, '﻿' + csv, 'text/csv;charset=utf-8');
   };
 

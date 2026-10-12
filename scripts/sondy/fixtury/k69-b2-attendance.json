@@ -186,5 +186,23 @@
    "source": "manual",
    "note": null
   }
+ ],
+ "adjustments": [
+  {
+   "id": 1,
+   "userId": 16,
+   "day": "VCERA",
+   "amount": 500,
+   "note": "Víkendová akce",
+   "source": "manual"
+  },
+  {
+   "id": 2,
+   "userId": 18,
+   "day": "PREDEVCIREM",
+   "amount": -200,
+   "note": "Manko v kase",
+   "source": "manual"
+  }
  ]
 }

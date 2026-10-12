@@ -1538,5 +1538,8 @@
   "Hledat": "Suchen",
   "Úkol je hotový.": "Aufgabe erledigt.",
   "Vrátit": "Zurücklegen",
-  "Jen co dochází": "Nur was zur Neige geht"
+  "Jen co dochází": "Nur was zur Neige geht",
+  "Bonus k výplatě": "Bonus zur Auszahlung",
+  "Volitelné; schválení ho zapíše jako prémii.": "Optional; die Freigabe erfasst ihn als Prämie.",
+  "+{castka} k výplatě": "+{castka} zur Auszahlung"
 }

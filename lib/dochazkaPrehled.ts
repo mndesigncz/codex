@@ -110,6 +110,51 @@ export interface RadekSouhrnu {
   mzda: number | null;
   /** Podíl na spropitném z uzávěrek (spropitneZaObdobi); null = dýška nejsou k dispozici. */
   spropitne: number | null;
+  /** Prémie (+) a srážky (−) za období (wage_adjustments), sečtené. */
+  upravy: number;
+  /** K výplatě: mzda + prémie − srážky; null, když není sazba a žádná úprava. */
+  vyplata: number | null;
+}
+
+/** Prémie nebo srážka k mzdě (GET /api/attendance → adjustments). Částka: + prémie, − srážka. */
+export interface UpravaMzdy {
+  id: number;
+  userId: number | string;
+  /** Den „RRRR-MM-DD", ke kterému patří (období, výplata). */
+  day: string;
+  amount: number;
+  note?: string | null;
+  /** 'manual' (vedení) nebo 'reward' (schválená odměna z katalogu). */
+  source?: string | null;
+}
+
+/** Úpravy v rozmezí dnů (a volitelně jen vybrané dny v týdnu: 0 = po … 6 = ne). */
+export function upravyVRozmezi(upravy: readonly UpravaMzdy[], od: string, doD: string, dnyTydne: readonly number[] = []): UpravaMzdy[] {
+  return upravy.filter(u => {
+    const d = String(u.day ?? '').slice(0, 10);
+    if (!d || d < od || d > doD) return false;
+    return dnyTydne.length === 0 || dnyTydne.includes((new Date(`${d}T12:00:00Z`).getUTCDay() + 6) % 7);
+  });
+}
+
+/** Součet úprav po lidech (id → částka). */
+export function upravyPoLidech(upravy: readonly UpravaMzdy[]): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const u of upravy) {
+    const id = String(u.userId ?? '');
+    if (!id) continue;
+    m.set(id, (m.get(id) ?? 0) + (Number(u.amount) || 0));
+  }
+  return m;
+}
+
+export interface DoplnkySouhrnu {
+  /** Podíl na spropitném po lidech (spropitneZaObdobi). */
+  spropitne?: ReadonlyMap<string, number> | null;
+  /** Prémie a srážky po lidech (upravyPoLidech). */
+  upravy?: ReadonlyMap<string, number> | null;
+  /** Jména lidí, kteří mají úpravu, ale v období nic neodpíchli — řádek vznikne i bez záznamu. */
+  lide?: ReadonlyMap<string, { jmeno: string; avatar: string | null }>;
 }
 
 /** Den (pražský), do kterého záznam patří: den příchodu; null u záznamu bez čitelného příchodu. */
@@ -142,12 +187,15 @@ export function hodinyPoDnech(entries: readonly ZaznamDochazky[], ted: number, o
 
 export type RazeniSouhrnu = 'hodiny' | 'mzda' | 'jmeno';
 
-export function souhrnHodin(entries: readonly ZaznamDochazky[], ted: number, sazby: ReadonlyMap<string, number>, spropitne?: ReadonlyMap<string, number> | null): RadekSouhrnu[] {
+export function souhrnHodin(entries: readonly ZaznamDochazky[], ted: number, sazby: ReadonlyMap<string, number>, doplnky: DoplnkySouhrnu = {}): RadekSouhrnu[] {
+  const { spropitne, upravy, lide } = doplnky;
   const m = new Map<string, RadekSouhrnu>();
+  const novy = (id: string, jmeno: string, avatar: string | null): RadekSouhrnu =>
+    ({ id, jmeno, avatar, ms: 0, pocet: 0, bezi: false, vynechano: 0, mzda: null, spropitne: spropitne ? spropitne.get(id) ?? 0 : null, upravy: upravy?.get(id) ?? 0, vyplata: null });
   for (const e of entries) {
     const id = String(e.employeeId ?? '');
     if (!id) continue;
-    const r = m.get(id) ?? { id, jmeno: e.employeeName ?? 'Neznámý', avatar: e.employeeAvatar ?? null, ms: 0, pocet: 0, bezi: false, vynechano: 0, mzda: null, spropitne: spropitne ? spropitne.get(id) ?? 0 : null };
+    const r = m.get(id) ?? novy(id, e.employeeName ?? 'Neznámý', e.employeeAvatar ?? null);
     const z = rozeberZaznam(e, ted);
     r.pocet += 1;
     if (z.druh === 'zapomenuty' || z.druh === 'dlouhy') r.vynechano += 1;
@@ -158,6 +206,14 @@ export function souhrnHodin(entries: readonly ZaznamDochazky[], ted: number, saz
     if (!r.avatar && e.employeeAvatar) r.avatar = e.employeeAvatar;
     m.set(id, r);
   }
+  // Prémie bez odpíchnuté směny (bonus za akci, srážka za manko) patří do výplaty, i když člověk v období nepracoval.
+  for (const [id, castka] of upravy ?? []) {
+    if (m.has(id) || !castka) continue;
+    const kdo = lide?.get(id);
+    if (!kdo) continue;
+    m.set(id, novy(id, kdo.jmeno, kdo.avatar));
+  }
+  for (const r of m.values()) r.vyplata = r.mzda == null ? (r.upravy ? r.upravy : null) : r.mzda + r.upravy;
   return [...m.values()];
 }
 
@@ -180,14 +236,17 @@ export function hodinyMinuty(ms: number): string {
 // ---------------------------------------------------------------------------
 
 export interface MzdyObdobi {
+  /** Mzdy (hodiny × sazba) + prémie − srážky. */
   celkem: number;
   /** Lidé s odpracovaným časem, ale bez sazby — jejich mzda v součtu chybí. */
   bezSazby: number;
   /** Záznamy vynechané jako zapomenuté odpíchnutí. */
   vynechano: number;
+  /** Prémie a srážky v součtu (součást `celkem`). */
+  upravy: number;
 }
 
-export function mzdyZaObdobi(entries: readonly ZaznamDochazky[], ted: number, sazby: ReadonlyMap<string, number>): MzdyObdobi {
+export function mzdyZaObdobi(entries: readonly ZaznamDochazky[], ted: number, sazby: ReadonlyMap<string, number>, upravy: readonly UpravaMzdy[] = []): MzdyObdobi {
   const radky = souhrnHodin(entries, ted, sazby);
   let celkem = 0, bezSazby = 0, vynechano = 0;
   for (const r of radky) {
@@ -195,7 +254,8 @@ export function mzdyZaObdobi(entries: readonly ZaznamDochazky[], ted: number, sa
     if (r.mzda == null) { if (r.ms > 0) bezSazby += 1; continue; }
     celkem += r.mzda;
   }
-  return { celkem, bezSazby, vynechano };
+  const u = upravy.reduce((a, x) => a + (Number(x.amount) || 0), 0);
+  return { celkem: celkem + u, bezSazby, vynechano, upravy: u };
 }
 
 /** Uzávěrka, jak ji vrací GET /api/closings (jen pole, která tržby potřebují). */
@@ -443,14 +503,20 @@ export interface MujMesic {
   /** Uzavřené záznamy nad 24 h (nepočítají se). */
   vynechano: number;
   pocet: number;
+  /** Prémie a srážky měsíce (wage_adjustments) — k výdělku navíc. */
+  upravy: number;
 }
 
 /**
  * Hodiny a výdělek přihlášeného v měsíci „RRRR-MM" podle dne příchodu (Praha).
  * Vedení dostává záznamy celého týmu — vlastní se vyberou podle id.
  */
-export function mujMesic(entries: readonly ZaznamDochazky[], meId: number, mesic: string, ted: number, sazba: number | null): MujMesic {
-  const s: MujMesic = { ms: 0, mzda: sazba && sazba > 0 ? 0 : null, bezi: false, zapomenuty: false, vynechano: 0, pocet: 0 };
+export function mujMesic(entries: readonly ZaznamDochazky[], meId: number, mesic: string, ted: number, sazba: number | null, upravy: readonly UpravaMzdy[] = []): MujMesic {
+  const s: MujMesic = { ms: 0, mzda: sazba && sazba > 0 ? 0 : null, bezi: false, zapomenuty: false, vynechano: 0, pocet: 0, upravy: 0 };
+  for (const u of upravy) {
+    if (Number(u.userId) !== meId || String(u.day ?? '').slice(0, 7) !== mesic) continue;
+    s.upravy += Number(u.amount) || 0;
+  }
   for (const e of entries) {
     if (Number(e.employeeId) !== meId) continue;
     const od = parseDbTime(e.clockIn);

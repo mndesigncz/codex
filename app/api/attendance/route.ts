@@ -179,7 +179,20 @@ export async function GET(req: NextRequest) {
           AND te.clock_in >= NOW() - (${days} || ' days')::interval
         ORDER BY te.clock_in DESC`;
     }
-    return NextResponse.json({ roster, entries });
+    // Prémie a srážky za stejné období — jen kdo vidí mzdy (jako sazby). Jedna adresa pro hodiny, sazby i úpravy,
+    // ať Souhrn hodin, Mzdy a nástroj nemusí na další endpoint. Bez migrace prázdné.
+    let adjustments: any[] = [];
+    if (opr.has('dochazka.zobrazit') && opr.has('finance.mzdy')) {
+      const { searchParams } = new URL(req.url);
+      const days = Math.min(180, Math.max(1, parseInt(searchParams.get('days') ?? '30')));
+      try {
+        adjustments = await sql`
+          SELECT id, user_id AS "userId", day, amount, note, source FROM wage_adjustments
+          WHERE team_id = ${c.teamId} AND day >= ${pragueDaySafe(new Date(Date.now() - (days - 1) * 86400000))}
+          ORDER BY day DESC, id DESC`;
+      } catch { /* wage_adjustments ještě nejsou (migrace) */ }
+    }
+    return NextResponse.json({ roster, entries, adjustments });
   }
 
   // Zaměstnanec — vlastní záznamy (posledních 60 dní) v TOMHLE podniku.
@@ -209,7 +222,17 @@ export async function GET(req: NextRequest) {
   const smiSazbu = opr.has('finance.moje_mzda') || opr.has('finance.mzdy');
   const ja: Record<string, unknown> = { id: c.meId, openSince };
   if (smiSazbu) ja.hourlyRate = await vlastniSazba(c.meId, c.teamId);
-  return NextResponse.json({ roster: [ja], entries });
+  // Vlastní prémie a srážky (Můj výdělek) — kdo smí znát svou mzdu, vidí i co k ní vedení přidalo.
+  let adjustments: any[] = [];
+  if (smiSazbu) {
+    try {
+      adjustments = await sql`
+        SELECT id, user_id AS "userId", day, amount, note, source FROM wage_adjustments
+        WHERE team_id = ${c.teamId} AND user_id = ${c.meId} AND day >= ${pragueDaySafe(new Date(Date.now() - 59 * 86400000))}
+        ORDER BY day DESC, id DESC`;
+    } catch { /* bez migrace */ }
+  }
+  return NextResponse.json({ roster: [ja], entries, adjustments });
 }
 
 // POST — clock in / out. Sám za sebe kdokoli z podniku; za jiného jen

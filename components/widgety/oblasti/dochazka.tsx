@@ -47,13 +47,13 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useSession } from 'next-auth/react';
-import { Avatar, Button, CasovyGraf, Chip, Field, Input, ListRow, Modal, ObdobiLista, PersonChip, Segmented, Stat, StatRow } from '../../ui';
+import { Avatar, Button, CasovyGraf, Chip, Field, Input, ListRow, Menu, Modal, ObdobiLista, PersonChip, Segmented, Stat, StatRow } from '../../ui';
 import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
 import { Widget, useWidget, type StavNacteni } from '../Widget';
 import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
 import { useNavigace, useSmi } from '../NavigaceKontext';
 import { useOpravneni } from '../../role/useOpravneni';
-import { useCurrency, useMoney } from '../../CurrencyProvider';
+import { useCurrency, useMoney, useSymbol } from '../../CurrencyProvider';
 import { usePersonProfile } from '../../employer/ProfileLinkProvider';
 import { apiMessage, okJson } from '@/lib/api';
 import { useJazyk, useT, type PrekladFn } from '@/lib/i18n/client';
@@ -64,8 +64,8 @@ import { useObdobi } from '@/lib/useObdobi';
 import { useUlozeno } from '@/lib/useUlozeno';
 import {
   ZAPOMENUTY_MS, dnesVPodniku, konecSmeny, navrhOdchodu as navrhOdchoduPlan, hodinyMinuty, mujMesic, mzdyZaObdobi, obdobiDni, otevrenePrichody, podilMezd,
-  sazbyZRosteru, seradSouhrn, souhrnHodin, spropitneZaObdobi, trzbyZaObdobi, hodinyPoDnech, zaznamyVRozmezi,
-  type OtevrenyPrichod, type RadekDne, type RazeniSouhrnu, type UzaverkaSpropitne, type UzaverkaTrzby,
+  sazbyZRosteru, seradSouhrn, souhrnHodin, spropitneZaObdobi, trzbyZaObdobi, hodinyPoDnech, zaznamyVRozmezi, upravyVRozmezi, upravyPoLidech,
+  type OtevrenyPrichod, type RadekDne, type RazeniSouhrnu, type UpravaMzdy, type UzaverkaSpropitne, type UzaverkaTrzby,
 } from '@/lib/dochazkaPrehled';
 
 // ---------------------------------------------------------------------------
@@ -90,7 +90,7 @@ interface ZaznamDochazky {
   clockOut: string | null;
 }
 
-interface Dochazka { roster: ClenRosteru[]; entries: ZaznamDochazky[] }
+interface Dochazka { roster: ClenRosteru[]; entries: ZaznamDochazky[]; /** Prémie a srážky (jen s finance.mzdy, jinak prázdné). */ adjustments: UpravaMzdy[] }
 
 /**
  * Jeden den docházky. S dochazka.zobrazit / dochazka.tablet vrací API celý
@@ -102,7 +102,7 @@ const URL_DNES = '/api/attendance?days=1';
 /** Odpověď bez rosteru je nečekaný tvar (chyba widgetu), ne „nikdo není na směně". */
 function vyberDochazku(raw: any, t: PrekladFn): Dochazka {
   if (!raw || typeof raw !== 'object' || !Array.isArray(raw.roster)) throw new Error(t('Docházka přišla v nečekaném tvaru.'));
-  return { roster: raw.roster, entries: Array.isArray(raw.entries) ? raw.entries : [] };
+  return { roster: raw.roster, entries: Array.isArray(raw.entries) ? raw.entries : [], adjustments: Array.isArray(raw.adjustments) ? raw.adjustments : [] };
 }
 
 // Hranice zapomenutého odchodu (16 h) je v lib/dochazkaPrehled — jedna pro widgety i nástroj.
@@ -515,7 +515,7 @@ function useMujMesic(zapnuto: boolean) {
   const ted = useTed(vlastni.some(e => !e.clockOut), 60_000);
   const sazbaRaw = ja.id != null ? (data.data?.roster.find(r => Number(r.id) === ja.id) as ClenRosteruB2 | undefined)?.hourlyRate : undefined;
   const sazba = Number(sazbaRaw) > 0 ? Number(sazbaRaw) : null;
-  const s = useMemo(() => mujMesic(vlastni, ja.id ?? -1, mesic, ted, sazba), [vlastni, ja.id, mesic, ted, sazba]);
+  const s = useMemo(() => mujMesic(vlastni, ja.id ?? -1, mesic, ted, sazba, data.data?.adjustments ?? []), [vlastni, ja.id, mesic, ted, sazba, data.data?.adjustments]);
   const m = Number(mesic.slice(5, 7));
   const nazevMesice = fmtMesic(m, { jazyk });
   return { ja, data, s, sazba, sazbaZnama: sazbaRaw !== undefined && sazbaRaw !== null, bezZaznamu, nazevMesice };
@@ -562,8 +562,9 @@ function MujVydelek(_: WidgetProps) {
     : undefined;
   return (
     <Widget nacteni={ja.stav ?? data} prazdno={prazdno}>
-      <Stat label={nazevMesice} value={money(s.mzda ?? 0)}
-        note={s.zapomenuty ? <Chip tone="wait" size="sm">{t('Zapomenutý odchod')}</Chip> : `${hodiny}${s.bezi ? ` · ${t('běží')}` : ''}`} />
+      <Stat label={nazevMesice} value={money((s.mzda ?? 0) + s.upravy)}
+        note={s.zapomenuty ? <Chip tone="wait" size="sm">{t('Zapomenutý odchod')}</Chip>
+          : `${hodiny}${s.bezi ? ` · ${t('běží')}` : ''}${s.upravy > 0 ? ` · ${t('prémie {castka}', { castka: sZnamenkem(s.upravy, money) })}` : s.upravy < 0 ? ` · ${t('srážka {castka}', { castka: sZnamenkem(s.upravy, money) })}` : ''}`} />
     </Widget>
   );
 }
@@ -594,7 +595,7 @@ function MzdyZaObdobi({ velikost, nastaveni }: WidgetProps<{ obdobi?: string }>)
   const data = useDataWidgetu<Dochazka>(brana ? urlDni(dni) : null, raw => vyberDochazku(raw, t));
   const trzbyData = useDataWidgetu<UzaverkaTrzby[]>(brana && podil ? '/api/closings' : null, raw => vyberUzaverky(raw, t));
   const ted = useTed(!!data.data?.entries.some(e => !e.clockOut), 60_000);
-  const mzdy = useMemo(() => data.data ? mzdyZaObdobi(data.data.entries, ted, sazbyZRosteru(data.data.roster as ClenRosteruB2[])) : null, [data.data, ted]);
+  const mzdy = useMemo(() => data.data ? mzdyZaObdobi(data.data.entries, ted, sazbyZRosteru(data.data.roster as ClenRosteruB2[]), data.data.adjustments) : null, [data.data, ted]);
   const trzby = useMemo(() => {
     if (!trzbyData.data) return null;
     const o = obdobiDni(dni, pragueToday());
@@ -604,9 +605,10 @@ function MzdyZaObdobi({ velikost, nastaveni }: WidgetProps<{ obdobi?: string }>)
 
   const pct = mzdy && trzby && !trzby.skryto ? podilMezd(mzdy.celkem, trzby.trzby) : null;
   const nad = pct != null && laborTargetPct != null && pct > laborTargetPct;
-  const poznamkaMezd = mzdy && mzdy.bezSazby > 0
-    ? t('bez sazby: {n, plural, one {# člověk} few {# lidé} other {# lidí}}', { n: mzdy.bezSazby })
-    : t('za {n, plural, one {# den} few {# dny} other {# dní}}', { n: dni });
+  const poznamkaMezd = [
+    mzdy && mzdy.bezSazby > 0 ? t('bez sazby: {n, plural, one {# člověk} few {# lidé} other {# lidí}}', { n: mzdy.bezSazby }) : null,
+    mzdy && mzdy.upravy !== 0 ? t('vč. prémií a srážek {castka}', { castka: sZnamenkem(mzdy.upravy, money) }) : null,
+  ].filter(Boolean).join(' · ') || t('za {n, plural, one {# den} few {# dny} other {# dní}}', { n: dni });
   return (
     <Widget nacteni={[data, trzbyData]}
       odkaz={naStrance ? undefined : { popisek: t('Docházka'), pohled: 'attendance' }}>
@@ -676,15 +678,23 @@ function SouhrnHodin({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: str
   const uzaverky = useDataWidgetu<UzaverkaSpropitne[]>(brana && vidiDyska ? '/api/closings' : null, raw => vyberUzaverky(raw, t) as UzaverkaSpropitne[]);
   const dyska = useMemo(() => (vidiDyska && uzaverky.data ? spropitneZaObdobi(uzaverky.data, entriesObdobi, ted, r.od, r.do, obdobi.dnyTydne) : null),
     [vidiDyska, uzaverky.data, entriesObdobi, ted, r.od, r.do, obdobi.dnyTydne]);
+  // Prémie a srážky období (API je posílá jen s finance.mzdy) — do řádků, do součtu a do okna „Prémie a srážky".
+  const upravyObdobi = useMemo(() => (data.data && vidiMzdy ? (L ? upravyVRozmezi(data.data.adjustments, r.od, r.do, obdobi.dnyTydne) : data.data.adjustments) : []),
+    [data.data, vidiMzdy, L, r.od, r.do, obdobi.dnyTydne]);
   const radky = useMemo(() => {
     if (!data.data) return [];
     // Sazby jen s finance.mzdy — server je bez něj posílá jako null, ale
     // widget se na to nespoléhá (pole katalogu: Kč u člověka).
     const sazby = vidiMzdy ? sazbyZRosteru(data.data.roster as ClenRosteruB2[]) : new Map<string, number>();
-    return seradSouhrn(souhrnHodin(entriesObdobi, ted, sazby, dyska && !dyska.skryto ? dyska.poLidech : null), razeni);
-  }, [data.data, entriesObdobi, ted, razeni, vidiMzdy, dyska]);
-  const mzdyCelkem = useMemo(() => radky.reduce((a, x) => a + (x.mzda ?? 0), 0), [radky]);
+    const lide = new Map(data.data.roster.map(m => [String(m.id), { jmeno: m.name ?? '', avatar: m.avatar ?? null }]));
+    return seradSouhrn(souhrnHodin(entriesObdobi, ted, sazby, { spropitne: dyska && !dyska.skryto ? dyska.poLidech : null, upravy: upravyPoLidech(upravyObdobi), lide }), razeni);
+  }, [data.data, entriesObdobi, ted, razeni, vidiMzdy, dyska, upravyObdobi]);
+  const mzdyCelkem = useMemo(() => radky.reduce((a, x) => a + (x.vyplata ?? 0), 0), [radky]);
+  const upravyCelkem = useMemo(() => radky.reduce((a, x) => a + x.upravy, 0), [radky]);
   const bezSazby = useMemo(() => radky.filter(x => x.mzda == null && x.ms > 0).length, [radky]);
+  // Prémii / srážku přidá, kdo smí měnit sazby (zápis mzdy); okno nese i seznam už zapsaných s košem.
+  const smiPremie = L && !nahled && smi('finance.sazby_upravit');
+  const [okno, setOkno] = useState<{ id: string; jmeno: string; druh: 'premie' | 'srazka' } | null>(null);
 
   const hr = hrubostProRozmezi(obdobi, pocetDni(r.od, r.do));
   const hodnoty = useMemo(() => (L && data.data ? hodinyPoDnech(data.data.entries, ted, r.od, r.do) : []), [L, data.data, ted, r.od, r.do]);
@@ -726,7 +736,10 @@ function SouhrnHodin({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: str
               <Stat label={t('Odpracováno')} value={hodinyText(sumHodin)} note={t('{n, plural, one {# směna} few {# směny} other {# směn}}', { n: radky.reduce((a, x) => a + x.pocet, 0) })} />
               {vidiMzdy && (
                 <Stat label={t('Mzdy')} value={money(mzdyCelkem)}
-                  note={bezSazby > 0 ? t('bez sazby: {n, plural, one {# člověk} few {# lidé} other {# lidí}}', { n: bezSazby }) : t('hodiny × sazba')} />
+                  note={[
+                    bezSazby > 0 ? t('bez sazby: {n, plural, one {# člověk} few {# lidé} other {# lidí}}', { n: bezSazby }) : null,
+                    upravyCelkem !== 0 ? t('vč. prémií a srážek {castka}', { castka: sZnamenkem(upravyCelkem, money) }) : null,
+                  ].filter(Boolean).join(' · ') || t('hodiny × sazba')} />
               )}
               {dyska && !dyska.skryto && (
                 <Stat label={t('Spropitné')} value={money(dyska.celkem)}
@@ -750,24 +763,143 @@ function SouhrnHodin({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: str
       <ul className="list">
         {zobrazene.map(r => {
           const meta = [
-            t('{n, plural, one {# směna} few {# směny} other {# směn}}', { n: r.pocet }), r.bezi ? t('právě běží') : null,
+            r.pocet > 0 ? t('{n, plural, one {# směna} few {# směny} other {# směn}}', { n: r.pocet }) : t('bez směny'), r.bezi ? t('právě běží') : null,
             r.vynechano > 0 ? t('{n}× bez odchodu', { n: r.vynechano.toLocaleString('cs-CZ') }) : null,
             r.spropitne != null && r.spropitne > 0 ? t('spropitné {castka}', { castka: money(Math.round(r.spropitne)) }) : null,
+            r.upravy > 0 ? t('prémie {castka}', { castka: sZnamenkem(r.upravy, money) }) : r.upravy < 0 ? t('srážka {castka}', { castka: sZnamenkem(r.upravy, money) }) : null,
           ].filter(Boolean).join(' · ');
+          const pocetUprav = upravyObdobi.filter(u => String(u.userId) === r.id).length;
           const radek = {
             lead: <Avatar emoji={r.avatar} size="sm" />,
             title: r.jmeno,
             meta,
             value: hodinyMinuty(r.ms),
-            valueMeta: vidiMzdy && r.mzda != null ? money(r.mzda) : undefined,
+            valueMeta: vidiMzdy && r.vyplata != null ? money(r.vyplata) : undefined,
           };
+          if (smiPremie) {
+            // Řádek nese „···" (prémie / srážka), takže celý klikací být nemůže — profil otevře jméno.
+            const polozky = [
+              { label: t('Přidat prémii'), icon: 'plus', onClick: () => setOkno({ id: r.id, jmeno: r.jmeno, druh: 'premie' }) },
+              { label: t('Přidat srážku'), icon: 'minus', onClick: () => setOkno({ id: r.id, jmeno: r.jmeno, druh: 'srazka' }) },
+              ...(pocetUprav > 0 ? [{ label: t('Prémie a srážky ({n})', { n: pocetUprav }), icon: 'coins', onClick: () => setOkno({ id: r.id, jmeno: r.jmeno, druh: 'premie' }) }] : []),
+            ];
+            return (
+              <ListRow key={r.id} {...radek}
+                title={profil && otevriProfil
+                  ? <button type="button" onClick={() => otevriProfil(Number(r.id))} aria-label={`Profil: ${r.jmeno}`} className="max-w-full truncate text-left rounded-sm hover:underline decoration-black/25 underline-offset-2">{r.jmeno}</button>
+                  : r.jmeno}
+                actions={<Menu size="sm" label={t('Prémie a srážky: {jmeno}', { jmeno: r.jmeno })} items={polozky} />} />
+            );
+          }
           return profil && otevriProfil ? (
             <li key={r.id}><ListRow as="div" {...radek} onClick={() => otevriProfil(Number(r.id))} /></li>
           ) : <ListRow key={r.id} {...radek} />;
         })}
       </ul>
+      {okno && (
+        <UpravaMzdyOkno clovek={okno} rozmezi={r} upravy={upravyObdobi.filter(u => String(u.userId) === okno.id)} onClose={() => setOkno(null)} />
+      )}
       {!L && radky.length > RADKU_M && <p className="t-meta mt-2">{aDalsich(t, radky.length - RADKU_M)}</p>}
     </Widget>
+  );
+}
+
+/** „+500 Kč" / „−200 Kč" — částka se znaménkem (mínus typograficky). */
+function sZnamenkem(castka: number, money: (n: number) => string): string {
+  return castka >= 0 ? `+${money(castka)}` : `−${money(Math.abs(castka))}`;
+}
+
+/**
+ * Okno Prémie / srážka: částka ke dni a člověku s poznámkou, pod tím už zapsané úpravy období s košem.
+ * Vzor Homebase / 7shifts („Add bonus / deduction" u výplaty). Zápis jde na /api/wage-adjustments,
+ * po uložení se obnoví docházka (stejná adresa pro hodiny i úpravy), takže souhrn i Mzdy se přepočítají.
+ */
+function UpravaMzdyOkno({ clovek, rozmezi, upravy, onClose }: {
+  clovek: { id: string; jmeno: string; druh: 'premie' | 'srazka' };
+  rozmezi: { od: string; do: string };
+  upravy: UpravaMzdy[];
+  onClose: () => void;
+}) {
+  const t = useT('widgety');
+  const money = useMoney();
+  const symbol = useSymbol();
+  const { jazyk } = useJazyk();
+  const dnes = pragueToday();
+  const [druh, setDruh] = useState<'premie' | 'srazka'>(clovek.druh);
+  const [castka, setCastka] = useState('');
+  const [den, setDen] = useState(dnes >= rozmezi.od && dnes <= rozmezi.do ? dnes : rozmezi.do);
+  const [poznamka, setPoznamka] = useState('');
+  const [ukladam, setUkladam] = useState(false);
+  const [mazu, setMazu] = useState<number | null>(null);
+  const [chyba, setChyba] = useState<string | null>(null);
+  const cislo = Math.round(Number(castka.replace(',', '.')));
+  const jde = Number.isFinite(cislo) && cislo > 0 && /^\d{4}-\d{2}-\d{2}$/.test(den);
+  const uloz = async () => {
+    if (!jde || ukladam) return;
+    setUkladam(true); setChyba(null);
+    try {
+      await fetch('/api/wage-adjustments', {
+        method: 'POST', headers: JSON_HLAVICKA,
+        body: JSON.stringify({ userId: Number(clovek.id), day: den, amount: druh === 'premie' ? cislo : -cislo, note: poznamka.trim() || undefined }),
+      }).then(okJson);
+      obnovDochazku();
+      onClose();
+    } catch (e) {
+      setChyba(apiMessage(e, t('Zápis se nepodařilo uložit.')));
+    } finally {
+      setUkladam(false);
+    }
+  };
+  const smaz = async (id: number) => {
+    setMazu(id); setChyba(null);
+    try {
+      await fetch(`/api/wage-adjustments?id=${id}`, { method: 'DELETE' }).then(okJson);
+      obnovDochazku();
+    } catch (e) {
+      setChyba(apiMessage(e, t('Smazání se nepodařilo.')));
+    } finally {
+      setMazu(null);
+    }
+  };
+  const denText = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString(jazyk, { day: 'numeric', month: 'numeric' });
+  return (
+    <Modal open onClose={onClose} size="sm" title={t('Prémie a srážky')} subtitle={clovek.jmeno}
+      footer={<>
+        <Button variant="secondary" onClick={onClose}>{t('Zavřít')}</Button>
+        <Button variant="primary" icon="check" onClick={uloz} loading={ukladam} disabled={!jde}>{druh === 'premie' ? t('Přidat prémii') : t('Přidat srážku')}</Button>
+      </>}>
+      <div className="space-y-4">
+        <Segmented ariaLabel={t('Druh')} value={druh} onChange={setDruh} options={[{ id: 'premie', label: t('Prémie') }, { id: 'srazka', label: t('Srážka') }]} />
+        <div className="grid grid-cols-2 gap-3">
+          <Field id="uprava-castka" label={t('Částka')}>
+            <div className="relative">
+              <Input id="uprava-castka" type="number" inputMode="numeric" min={1} value={castka} onChange={e => setCastka(e.target.value)} className="tabular-nums pr-10" autoFocus />
+              <span aria-hidden className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-black/45">{symbol}</span>
+            </div>
+          </Field>
+          <Field id="uprava-den" label={t('Den')}>
+            <Input id="uprava-den" type="date" value={den} min={rozmezi.od} max={dnes} onChange={e => setDen(e.target.value)} />
+          </Field>
+        </div>
+        <Field id="uprava-poznamka" label={t('Poznámka')} hint={t('Za co — uvidí ji i člověk v oznámení.')}>
+          <Input id="uprava-poznamka" value={poznamka} onChange={e => setPoznamka(e.target.value)} maxLength={200} placeholder={druh === 'premie' ? t('Např. víkendová akce') : t('Např. manko v kase')} />
+        </Field>
+        {chyba && <p className="note note-danger text-sm" role="alert">{chyba}</p>}
+        {upravy.length > 0 && (
+          <div>
+            <p className="t-label mb-1">{t('Zapsané v období')}</p>
+            <ul className="list">
+              {upravy.map(u => (
+                <ListRow key={u.id} title={u.note || (u.amount > 0 ? t('Prémie') : t('Srážka'))}
+                  meta={`${denText(String(u.day).slice(0, 10))}${u.source === 'reward' ? ` · ${t('z odměny')}` : ''}`}
+                  value={<span className={u.amount > 0 ? 'text-ok-ink' : 'text-bad-ink'}>{sZnamenkem(Number(u.amount), money)}</span>}
+                  actions={<Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={t('Smazat zápis')} loading={mazu === u.id} onClick={() => { void smaz(u.id); }} />} />
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </Modal>
   );
 }
 

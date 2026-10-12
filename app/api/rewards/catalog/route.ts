@@ -45,11 +45,11 @@ export async function GET() {
     const { tymy, jsemZdroj, spravuje } = await ciselnikPodniku(teamId, 'odmeny');
     const rows = spravujeKatalog
       ? await sql`
-          SELECT id, team_id, title, icon, cost, active, created_at FROM rewards_catalog
+          SELECT id, team_id, title, icon, cost, active, created_at, bonus_amount FROM rewards_catalog
           WHERE team_id = ANY(${tymy})
           ORDER BY (team_id = ${teamId}) DESC, cost ASC, id ASC`
       : await sql`
-          SELECT id, team_id, title, icon, cost, active, created_at FROM rewards_catalog
+          SELECT id, team_id, title, icon, cost, active, created_at, bonus_amount FROM rewards_catalog
           WHERE team_id = ANY(${tymy}) AND active = TRUE
           ORDER BY (team_id = ${teamId}) DESC, cost ASC, id ASC`;
     const catalog = (rows as any[]).map(r => {
@@ -88,9 +88,11 @@ export async function POST(req: NextRequest) {
     const title = String(b.title ?? '').trim().slice(0, 120);
     const cost = Math.max(1, Math.round(Number(b.cost) || 0));
     if (!title) return NextResponse.json({ error: 'Název je povinný' }, { status: 400 });
+    // Odměna s částkou k výplatě (bonus v měně podniku): schválení žádosti ji zapíše jako prémii (wage_adjustments).
+    const bonus = Number(b.bonusAmount) > 0 ? Math.min(1_000_000, Math.round(Number(b.bonusAmount))) : null;
     const [row] = await sql`
-      INSERT INTO rewards_catalog (team_id, title, icon, cost)
-      VALUES (${u.team_id}, ${title}, ${b.icon ? String(b.icon).slice(0, 8) : null}, ${cost})
+      INSERT INTO rewards_catalog (team_id, title, icon, cost, bonus_amount)
+      VALUES (${u.team_id}, ${title}, ${b.icon ? String(b.icon).slice(0, 8) : null}, ${cost}, ${bonus})
       RETURNING *`;
     audit(u.team_id, u.id, 'reward.create', 'reward', row.id, `${title} (${cost} b.)`);
     return NextResponse.json({ reward: row });
@@ -150,6 +152,10 @@ export async function PATCH(req: NextRequest) {
     if (typeof b.active === 'boolean') {
       await sql`UPDATE rewards_catalog SET active = ${b.active} WHERE id = ${id} AND team_id = ${u.team_id}`;
     }
+    if (b.bonusAmount !== undefined) {
+      const bonus = Number(b.bonusAmount) > 0 ? Math.min(1_000_000, Math.round(Number(b.bonusAmount))) : null;
+      await sql`UPDATE rewards_catalog SET bonus_amount = ${bonus} WHERE id = ${id} AND team_id = ${u.team_id}`;
+    }
     return NextResponse.json({ ok: true });
   }
 
@@ -193,6 +199,19 @@ export async function PATCH(req: NextRequest) {
                 ${-Math.abs(Number(row.cost) || 0)}, ${'Odměna: ' + row.title}, FALSE, ${u.id})
         ON CONFLICT (employee_id, work_date, kind, ref_id) DO NOTHING`;
     } catch { /* ledger missing — approval still stands */ }
+    // Odměna s bonusem v Kč → prémie k výplatě (idempotentně podle žádosti: dvojí schválení nezapíše dvakrát).
+    try {
+      const [odmena] = row.reward_id != null ? await sql`SELECT bonus_amount FROM rewards_catalog WHERE id = ${row.reward_id}` : [];
+      const bonus = Number(odmena?.bonus_amount) || 0;
+      if (bonus > 0) {
+        const [uz] = await sql`SELECT id FROM wage_adjustments WHERE team_id = ${u.team_id} AND source = 'reward' AND source_ref = ${id}`;
+        if (!uz) {
+          await sql`
+            INSERT INTO wage_adjustments (team_id, user_id, day, amount, note, source, source_ref, created_by)
+            VALUES (${u.team_id}, ${row.employee_id}, ${today}, ${bonus}, ${'Odměna: ' + row.title}, 'reward', ${id}, ${u.id})`;
+        }
+      }
+    } catch { /* bez migrace wage_adjustments zůstává jen odměna */ }
   }
   audit(u.team_id, u.id, `reward.${status}`, 'redemption', id, `${row.title} · ${row.cost} b.`);
   try {

@@ -472,6 +472,24 @@ export async function GET(request: Request) {
       )`);
     // wages: hourly rate per member (Kc/h)
     await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS hourly_rate INTEGER DEFAULT 0`);
+    // Prémie a srážky k mzdě (kolo 5 UX): + prémie / − srážka v měně podniku, ke dni; `source` 'manual' (vedení)
+    // nebo 'reward' (schválená odměna z katalogu s částkou v Kč, source_ref = id žádosti).
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS wage_adjustments (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        day TEXT NOT NULL,
+        amount INTEGER NOT NULL,
+        note TEXT,
+        source TEXT DEFAULT 'manual',
+        source_ref INTEGER,
+        created_by INTEGER,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS wage_adjustments_team_day ON wage_adjustments (team_id, day)`);
+    // Odměna z katalogu může nést i částku k výplatě (bonus v Kč) — schválení ji zapíše jako prémii.
+    await ddl(sql`ALTER TABLE rewards_catalog ADD COLUMN IF NOT EXISTS bonus_amount INTEGER`);
     // Scheduling rule: how many days in a row a person may be rostered.
     // Team-wide default on teams, optional per-person override on users;
     // NULL on both means no limit.

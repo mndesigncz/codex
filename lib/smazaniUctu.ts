@@ -51,7 +51,7 @@ export const ZACHAZENI_TABULEK: Record<string, Zachazeni> = {
   uploads: 'upravit', audit_log: 'upravit', content_reports: 'upravit',
   // záznamy podniku: anonymní autor, obsah patří podniku
   shifts: 'ponechat', shift_requests: 'ponechat', availability_requests: 'ponechat', shift_offers: 'ponechat',
-  time_entries: 'ponechat', fixed_assignments: 'ponechat', time_off_requests: 'ponechat', shift_reviews: 'ponechat',
+  time_entries: 'ponechat', fixed_assignments: 'ponechat', time_off_requests: 'ponechat', shift_reviews: 'ponechat', wage_adjustments: 'ponechat',
   shift_review_items: 'ponechat', reward_redemptions: 'ponechat', inventory_log: 'ponechat', inventory_reports: 'ponechat',
   inventory_items: 'ponechat', chat_messages: 'ponechat', messages: 'ponechat', procedure_runs: 'ponechat',
   suggestions: 'ponechat', announcements: 'ponechat', receipts: 'ponechat',
@@ -96,7 +96,7 @@ export const TYMOVE_TABULKY = [
   'conversations', 'messages', 'guide_categories', 'guides', 'procedures', 'procedure_runs', 'inventory_categories', 'tasks',
   'planning_cards', 'daily_reports', 'recipes', 'shift_types', 'fixed_assignments', 'cash_closings', 'time_entries', 'uploads',
   'receipts', 'announcements', 'time_off_requests', 'orders', 'suggestions', 'shift_reviews', 'billing_interest', 'share_links',
-  'menu_boards', 'shift_review_items', 'stocktakes', 'suppliers', 'rewards_catalog', 'reward_redemptions', 'team_members', 'roles',
+  'menu_boards', 'shift_review_items', 'stocktakes', 'suppliers', 'rewards_catalog', 'reward_redemptions', 'wage_adjustments', 'team_members', 'roles',
   'role_upravy', 'polls', 'audit_log', 'events', 'pos_connections', 'pos_product_map', 'pos_sales', 'pos_processed_bills',
   'pos_unmapped', 'pos_bills', 'pos_bill_items', 'pos_products', 'item_recipes', 'purchase_flags', 'client_profiles', 'client_tables',
   'client_memberships', 'client_reservations', 'client_orders', 'client_coupons', 'client_coupon_claims', 'client_loyalty_ledger',

@@ -63,6 +63,7 @@ import {
   runBulk, useSelection,
 } from '../../ui';
 import { useOpravneni } from '../../role/useOpravneni';
+import { useMoney } from '../../CurrencyProvider';
 import { Widget, useWidget, type StavNacteni } from '../Widget';
 import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
 import { NavigaceKontext, useNavigace, useSmi } from '../NavigaceKontext';
@@ -803,6 +804,7 @@ const stavZadosti = (t: PrekladFn): Record<Zadost['stav'], { text: string; ton: 
 
 function KatalogOdmen({ velikost, nahled }: WidgetProps) {
   const t = useT('widgety');
+  const money = useMoney();
   const stavy = stavZadosti(t);
   const smi = useSmi();
   const { ok, ceka } = useBrana([]);
@@ -854,9 +856,13 @@ function KatalogOdmen({ velikost, nahled }: WidgetProps) {
         <ul className={`list ${moje ? 'mt-1' : ''}`}>
           {videt.map(o => (
             <ListRow key={o.id} lead={<IkonaOdmeny ikona={o.ikona} />} title={o.nazev}
-              meta={o.ceka ? t('{cena} · čeká na schválení', { cena: `${cislo(o.cena)} ${bodTvar(t, o.cena)}` })
-                : moje && !o.dosahnu ? t('{cena} · chybí {chybi}', { cena: `${cislo(o.cena)} ${bodTvar(t, o.cena)}`, chybi: cislo(o.chybi) })
-                : `${cislo(o.cena)} ${bodTvar(t, o.cena)}`}
+              meta={[
+                o.ceka ? t('{cena} · čeká na schválení', { cena: `${cislo(o.cena)} ${bodTvar(t, o.cena)}` })
+                  : moje && !o.dosahnu ? t('{cena} · chybí {chybi}', { cena: `${cislo(o.cena)} ${bodTvar(t, o.cena)}`, chybi: cislo(o.chybi) })
+                  : `${cislo(o.cena)} ${bodTvar(t, o.cena)}`,
+                // Odměna s bonusem v penězích: člověk vidí, že výměna přidá částku k výplatě.
+                o.bonusKc ? t('+{castka} k výplatě', { castka: money(o.bonusKc) }) : null,
+              ].filter(Boolean).join(' · ')}
               right={o.ceka ? <Chip tone="wait" size="sm">{t('Čeká')}</Chip> : undefined}
               actions={!o.ceka && moje ? (
                 <Button variant="primary" size="sm" disabled={!o.dosahnu || nahled} aria-label={t('Vyměnit body za {nazev}', { nazev: o.nazev })}
