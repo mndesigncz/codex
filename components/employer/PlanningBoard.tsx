@@ -16,10 +16,15 @@
 // Input/Textarea a Button; na telefonu čtyři sloupce pod sebou, i prázdné → vodorovný
 // pás sloupců se scroll-snap. Přidat, přesunout, upravit a smazat jde jen
 // s planovani.upravit — role jen se zobrazením dřív viděla ovládání, které skončilo 403.
+//
+// Kolo 6 (V13): vodorovný pás byl jediný vodorovný posun obsahu v administraci — vidět byl jen
+// první sloupec a kousek druhého, zjistit, co je „Ke schválení", chtělo tři tahy do strany. Na
+// telefonu jsou teď sloupce záložky (Segmented s počty) nad svislým seznamem karet zvoleného
+// sloupce; přesun mezi sloupci je v „···" karty (Přesunout do: …). Od `sm` mřížka jako dřív.
 
 import { useEffect, useId, useState } from 'react';
 import { Icon } from '../Icons';
-import { Button, Card, Chip, EmptyState, ErrorState, Field, Input, Menu, Modal, Skeleton, Textarea, Toast, type MenuItem } from '../ui';
+import { Button, Card, Chip, EmptyState, ErrorState, Field, Input, Menu, Modal, Segmented, Skeleton, Textarea, Toast, type MenuItem } from '../ui';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useSmi } from '../widgety/NavigaceKontext';
@@ -42,11 +47,12 @@ const COLUMNS = [
 ] as const;
 
 const JSON_HLAVICKA = { 'Content-Type': 'application/json' };
+type IdSloupce = (typeof COLUMNS)[number]['id'];
 
 export default function PlanningBoard() {
   const loc = useLocale();
   const t = useT('sprava');
-  const nazvySloupcu: Record<(typeof COLUMNS)[number]['id'], string> = { ideas: t('Nápady'), in_progress: t('Rozpracováno'), review: t('Ke schválení'), done: t('Hotovo') };
+  const nazvySloupcu: Record<IdSloupce, string> = { ideas: t('Nápady'), in_progress: t('Rozpracováno'), review: t('Ke schválení'), done: t('Hotovo') };
   const smi = useSmi();
   const upravuje = smi('planovani.upravit');
   const data = useDataWidgetu<KartaPlanu[]>(URL_PLANOVANI, vyberKarty);
@@ -64,6 +70,8 @@ export default function PlanningBoard() {
   const [mazu, setMazu] = useState(false);
   const [zprava, setZprava] = useState<{ text: string; ton?: 'bad' } | null>(null);
   const [chybaFormulare, setChybaFormulare] = useState<string | null>(null);
+  /** Sloupec zobrazený na telefonu (pod `sm` je vidět jen jeden, přepíná se záložkami). */
+  const [sloupecTelefon, setSloupecTelefon] = useState<IdSloupce>(COLUMNS[0].id);
   const idForm = useId();
 
   useEffect(() => {
@@ -161,7 +169,12 @@ export default function PlanningBoard() {
     { label: t('Smazat kartu…'), icon: 'trash', danger: true, onClick: () => setMazani(card) },
   ];
 
-  const otevriNovou = (column: string = COLUMNS[0].id) => { setChybaFormulare(null); setNewCard({ column, title: '', description: '' }); };
+  const otevriNovou = (column: IdSloupce = COLUMNS[0].id) => {
+    setChybaFormulare(null);
+    setNewCard({ column, title: '', description: '' });
+    // Na telefonu je vidět jen jeden sloupec — formulář nové karty musí být v tom zobrazeném.
+    setSloupecTelefon(column);
+  };
 
   const nastroj = data.error && !data.data ? (
     <Card><ErrorState title={t('Plánování se nenačetlo')} onRetry={data.reload} detail={data.error} /></Card>
@@ -180,8 +193,14 @@ export default function PlanningBoard() {
             action={upravuje ? <Button variant="secondary" icon="plus" onClick={() => otevriNovou()}>{t('Přidat první kartu')}</Button> : undefined} />
         </Card>
       )}
-      {/* Na telefonu vodorovný pás sloupců (jeden a kousek dalšího na šířku), od sm mřížka. */}
-      <div className={`flex gap-3 overflow-x-auto snap-x snap-mandatory scrollbar-thin -mx-1 px-1 pb-1 sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:gap-4 sm:overflow-visible sm:mx-0 sm:px-0 ${cards.length === 0 && !newCard ? 'hidden' : ''}`}>
+      {/* Na telefonu záložky sloupců s počty a pod nimi jeden sloupec svisle; od sm mřížka všech čtyř. */}
+      {(cards.length > 0 || newCard) && (
+        <div className="sm:hidden">
+          <Segmented size="sm" ariaLabel={t('Sloupec tabule')} value={sloupecTelefon} onChange={setSloupecTelefon}
+            options={COLUMNS.map(c => ({ id: c.id, label: nazvySloupcu[c.id], count: getColumnCards(c.id).length }))} />
+        </div>
+      )}
+      <div className={`grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 sm:gap-4 ${cards.length === 0 && !newCard ? 'hidden' : ''}`}>
         {COLUMNS.map(col => {
           const karty = getColumnCards(col.id);
           return (
@@ -191,9 +210,10 @@ export default function PlanningBoard() {
               onDragOver={upravuje ? (e => { e.preventDefault(); setDragOverCol(col.id); }) : undefined}
               onDragLeave={upravuje ? (() => setDragOverCol(c => (c === col.id ? null : c))) : undefined}
               onDrop={upravuje ? (() => handleDrop(col.id)) : undefined}
-              className={`well shrink-0 w-[84%] snap-start sm:w-auto p-3 flex flex-col gap-3 transition-shadow ${dragOverCol === col.id ? 'ring-2 ring-black/15' : ''}`}
+              className={`well min-w-0 p-3 flex flex-col gap-3 transition-shadow ${col.id === sloupecTelefon ? '' : 'max-sm:hidden'} ${dragOverCol === col.id ? 'ring-2 ring-black/15' : ''}`}
             >
-              <div className="flex items-center justify-between gap-2 px-1">
+              {/* Na telefonu název i počet nesou záložky nad sloupcem — nadpis zůstává jen pro odečítač. */}
+              <div className="flex items-center justify-between gap-2 px-1 max-sm:sr-only">
                 <h3 id={`${idForm}-${col.id}`} className="t-card flex items-center gap-2 min-w-0">
                   <span className={`w-2 h-2 rounded-full shrink-0 ${col.dot}`} aria-hidden />
                   <span className="truncate">{nazvySloupcu[col.id]}</span>

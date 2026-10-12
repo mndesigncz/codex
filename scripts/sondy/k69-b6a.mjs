@@ -229,13 +229,22 @@ const FIX_UKOLY = nacti('k69-b6a-rozlozeni-ukoly');
   await ctx.close();
 }
 
-// 6) Telefon 390: bez přetečení, „Nový úkol" vidět a otevře formulář.
+// 6) Telefon 390: bez přetečení, bez limetky (kolo 6, V11): „Nový úkol" v „···" otevře formulář,
+// souhrn dne v podtitulku, nad seznamem jako jediné přidání rychlé pole.
 {
   const { ctx, p } = await kontext({ fix: FIX_UKOLY, viewport: { width: 390, height: 844 }, mobil: true, dalsi: podvrh() });
   await otevri(p, UKOLY, 'vedeni.ukoly');
   tvrdi('U6: telefon 390 — žádné vodorovné přetečení', await bezPreteceni(p));
-  const novy = p.locator('[data-plocha]').getByRole('button', { name: 'Nový úkol' });
-  tvrdi('U6: „Nový úkol" je vidět', await novy.isVisible());
+  tvrdi('U6 (V11): na telefonu v hlavičce žádná limetka ani tlačítko „Nový úkol"', await limetek(p) === 0
+    && await p.locator('[data-plocha]').getByRole('button', { name: 'Nový úkol' }).count() === 0, `${await limetek(p)}×`);
+  const podtitul = (await p.locator('[data-plocha] h1 + p').first().innerText()).trim();
+  tvrdi('U6 (V11): souhrn dne je v podtitulku („Dnes 1 z 4 hotovo · 2 po termínu")', /^Dnes \d+ z \d+ hotovo · \d+ po termínu/.test(podtitul), podtitul);
+  const nastrojU = widgetLi(p, 'nastroj');
+  tvrdi('U6 (V11): řádek souhrnu s pruhem v nástroji na telefonu není', !(await nastrojU.getByRole('progressbar', { name: 'Dnes hotovo' }).isVisible()));
+  tvrdi('U6 (V11): nad seznamem je rychlé pole „Přidat úkol" (jediná cesta k přidání)', await nastrojU.getByRole('textbox', { name: 'Přidat úkol' }).isVisible());
+  await p.locator('[data-plocha] button[aria-haspopup="menu"][aria-label="Další akce"]:visible').first().click();
+  const novy = p.getByRole('menuitem', { name: 'Nový úkol' });
+  tvrdi('U6: „Nový úkol" je v „···"', await dokud(() => novy.isVisible(), 3000));
   await novy.click();
   tvrdi('U6: …a otevře formulář bez přetečení', await dokud(() => widgetLi(p, 'nastroj').getByLabel('Název úkolu').isVisible(), 1500) && await bezPreteceni(p));
   await p.screenshot({ path: OUT + 'k69-b6a-ukoly-tel.png', fullPage: true });
@@ -360,11 +369,32 @@ const FIX_PLAN = nacti('k69-b6a-rozlozeni-planovani');
   // 6) Telefon 390.
   const { ctx, p } = await kontext({ fix: FIX_PLAN, viewport: { width: 390, height: 844 }, mobil: true, dalsi: podvrh() });
   await otevri(p, PLANOVANI, 'vedeni.planovani');
-  tvrdi('P6: telefon 390 — žádné vodorovné přetečení stránky (sloupce se posouvají uvnitř pásu)', await bezPreteceni(p));
+  tvrdi('P6: telefon 390 — žádné vodorovné přetečení stránky', await bezPreteceni(p));
+  // Kolo 6 (V13): sloupce jsou na telefonu záložky s počty, karty zvoleného sloupce svisle — žádný vodorovný pás.
+  const nastrojP = widgetLi(p, 'nastroj');
+  const zalozky = nastrojP.getByRole('tablist', { name: 'Sloupec tabule' });
+  tvrdi('P6 (V13): záložky sloupců se čtyřmi sloupci', await zalozky.isVisible() && await zalozky.getByRole('tab').count() === 4);
+  const tabule = await nastrojP.evaluate(el => {
+    const sekce = [...el.querySelectorAll('section')];
+    const vid = sekce.filter(x => x.getBoundingClientRect().width > 0);
+    const obal = vid[0]?.parentElement;
+    return { vidSloupcu: vid.length, siroky: vid.length === 1 && Math.round(vid[0].getBoundingClientRect().width) >= Math.round(el.getBoundingClientRect().width) - 2,
+      pas: obal ? obal.scrollWidth - obal.clientWidth : -1 };
+  });
+  tvrdi('P6 (V13): vidět je jeden sloupec přes celou šířku a tabule se neposouvá do strany', tabule.vidSloupcu === 1 && tabule.siroky && tabule.pas <= 1, JSON.stringify(tabule));
+  tvrdi('P6 (V13): ze začátku Nápady (Nová sezónní káva)', await nastrojP.getByText('Nová sezónní káva').isVisible() && !(await nastrojP.getByText('Letní terasa').isVisible()));
+  await zalozky.getByRole('tab', { name: /^Ke schválení/ }).click();
+  tvrdi('P6 (V13): záložka Ke schválení ukáže svoje karty pod sebou', await dokud(async () => await nastrojP.getByText('Letní terasa').isVisible() && await nastrojP.getByText('Nový ceník').isVisible() && !(await nastrojP.getByText('Nová sezónní káva').isVisible()), 2000));
+  const karty = await nastrojP.locator('section:visible ul > li.card').evaluateAll(els => els.map(e => Math.round(e.getBoundingClientRect().top)));
+  tvrdi('P6 (V13): karty sloupce jsou svisle pod sebou', karty.length === 2 && karty[1] > karty[0], JSON.stringify(karty));
+  await nastrojP.getByRole('button', { name: 'Možnosti karty Letní terasa' }).click();
+  tvrdi('P6 (V13): menu karty nabízí přesun do jiného sloupce', await dokud(() => p.getByRole('menuitem', { name: 'Přesunout do: Hotovo' }).isVisible(), 2000));
+  await p.keyboard.press('Escape');
   const nova = p.locator('[data-plocha]').getByRole('button', { name: 'Nová karta' });
   tvrdi('P6: „Nová karta" je vidět', await nova.isVisible());
   await nova.click();
-  tvrdi('P6: …a otevře pole názvu karty', await dokud(() => widgetLi(p, 'nastroj').getByLabel('Název karty').isVisible(), 1500));
+  tvrdi('P6: …a otevře pole názvu karty (přepne na záložku Nápady)', await dokud(() => widgetLi(p, 'nastroj').getByLabel('Název karty').isVisible(), 1500)
+    && await zalozky.getByRole('tab', { name: /^Nápady/ }).getAttribute('aria-selected') === 'true');
   await p.screenshot({ path: OUT + 'k69-b6a-planovani-tel.png', fullPage: true });
   await ctx.close();
 }

@@ -392,9 +392,12 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
     <div className="space-y-6">
       {view === 'list' && !showForm && <RychlePridani dnes={today} onPridat={rychle} />}
 
+      {/* Na telefonu je souhrn dne v podtitulku hlavičky (V11) — tady by byl další řádek nad prvním úkolem. */}
       {tasks.length > 0 && view !== 'prehled' && (
-        <UkolySouhrn hotovo={hodnotyKarty.dnesHotovo} celkem={hodnotyKarty.dnesCelkem} poTerminu={hodnotyKarty.poTerminu}
-          onPoTerminu={() => { setView('list'); setFiltr(f => ({ ...f, stav: 'po_terminu' })); }} />
+        <div className="max-md:hidden">
+          <UkolySouhrn hotovo={hodnotyKarty.dnesHotovo} celkem={hodnotyKarty.dnesCelkem} poTerminu={hodnotyKarty.poTerminu}
+            onPoTerminu={() => { setView('list'); setFiltr(f => ({ ...f, stav: 'po_terminu' })); }} />
+        </div>
       )}
 
       {tasks.length > 0 && view !== 'prehled' && (
@@ -528,15 +531,29 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
   );
 
   const nehotovych = tasks.filter(uk => uk.status !== 'done' && (!uk.dueDate || uk.dueDate <= today)).length;
+  const podtitul = data.data && nehotovych > 0 ? t('Na dnešek a po termínu: {n, plural, one {# úkol} few {# úkoly} other {# úkolů}}.', { n: nehotovych }) : t('Úkoly na den nebo pro konkrétní lidi — a jejich plnění.');
+  // Telefon (V11): souhrn dne „Dnes 2 z 5 hotovo · 1 po termínu" je podtitulek — nad prvním úkolem tak
+  // zůstane jen rychlé přidání, filtry a pás stavů. Na monitoru zůstává řádek s pruhem v nástroji.
+  const souhrnDne = [
+    hodnotyKarty.dnesCelkem > 0 ? t('Dnes {hotovo} z {celkem} hotovo', { hotovo: hodnotyKarty.dnesHotovo, celkem: hodnotyKarty.dnesCelkem }) : null,
+    hodnotyKarty.poTerminu > 0 ? t('{n} po termínu', { n: hodnotyKarty.poTerminu }) : null,
+  ].filter(Boolean).join(' · ');
+  const novyUkol = () => (showForm && !editingId ? closeForm() : openNew());
   return (
     <>
       <PlochaWidgetu
         stranka="vedeni.ukoly"
         hlavicka={{
           title: t('Úkoly'),
-          subtitle: data.data && nehotovych > 0 ? t('Na dnešek a po termínu: {n, plural, one {# úkol} few {# úkoly} other {# úkolů}}.', { n: nehotovych }) : t('Úkoly na den nebo pro konkrétní lidi — a jejich plnění.'),
+          subtitle: data.data && tasks.length > 0 && view !== 'prehled' && souhrnDne
+            ? <><span className="md:hidden">{souhrnDne}</span><span className="max-md:hidden">{podtitul}</span></>
+            : podtitul,
           hintId: 'taskmanager',
-          primary: <Button variant="accent" icon="plus" onClick={() => (showForm && !editingId ? closeForm() : openNew())}>{t('Nový úkol')}</Button>,
+          primary: <Button variant="accent" icon="plus" onClick={novyUkol}>{t('Nový úkol')}</Button>,
+          // Na telefonu jedna cesta k přidání: rychlé pole „Přidat úkol…" nad seznamem. Plný formulář je
+          // v „···" — hlavička bez limetky se složí do jednoho řádku a první úkol vyjede o 68 px výš.
+          primaryTelefon: null,
+          menuTelefon: [{ label: t('Nový úkol'), icon: 'plus', onClick: novyUkol }],
           aside: <Segmented size="sm" ariaLabel={t('Zobrazení')} value={view} onChange={setView}
             options={[{ id: 'list', label: t('Seznam') }, { id: 'week', label: t('Týden') }, { id: 'month', label: t('Měsíc') }, { id: 'prehled', label: t('Přehled') }]} />,
         }}

@@ -6,8 +6,10 @@ import { planInfoOf, PLAN_ENFORCED, canAddMember } from '@/lib/plan';
 import { linkNewMember } from '@/lib/chat';
 import { notifyUser, notifyUsers } from '@/lib/push';
 import { pridejClenstvi, smiPridatClena, pocetClenu } from '@/lib/tenant';
-import { clenoveSOpravnenim } from '@/lib/opravneniDb';
-import { roleVedeni, vychoziRolePodniku, smiDatRoli, typUctu, zapisRoliClenstvi, type RoleNoveho } from '../../teams/_role';
+import { clenoveSOpravnenim, roleClena } from '@/lib/opravneniDb';
+import { cilPozvanky, roleZPozvanky as vyberRoliPozvanky } from '@/lib/pozvanky';
+import { vychoziRolePodniku, typUctu, zapisRoliClenstvi, type RoleNoveho } from '../../teams/_role';
+import { nactiRoliPozvanky } from '../_role';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,19 +25,21 @@ export async function GET(request: Request) {
 }
 
 /**
- * Jakou roli pozvaný dostane (kolo 67). Pozvánka nese jen typ z doby před
- * rolemi: „vedení", nebo nic (= výchozí role podniku). Mezi odesláním a
- * přijetím mohl zvoucí přijít o právo zvát nebo přidělovat role, odejít
- * z podniku, nebo mohla změnit výchozí role — proto se tu všechno ověřuje
- * ZNOVU podle dnešního stavu. Když zvoucí Vedení dát už nesmí, pozvánka
- * nepropadne: člověk přijde s výchozí rolí a vedení mu roli upraví.
+ * Jakou roli pozvaný dostane (kolo 67, od kola 6 i vlastní nebo přednastavená
+ * role z pozvánky — role_id / klíč v role, lib/pozvanky.ts). Mezi odesláním
+ * a přijetím mohl zvoucí přijít o právo zvát nebo přidělovat role, odejít
+ * z podniku, role mohla zmizet nebo se změnit — proto se tu všechno ověřuje
+ * ZNOVU podle dnešního stavu (čerstvá role zvoucího). Když zvoucí slíbenou
+ * roli dát už nesmí, pozvánka nepropadne: člověk přijde s výchozí rolí
+ * a vedení mu roli upraví.
  */
 async function roleZPozvanky(inv: any, teamId: number): Promise<RoleNoveho> {
-  if (inv.role === 'employer') {
-    const vedeni = roleVedeni();
-    if (await smiDatRoli(Number(inv.invited_by), teamId, vedeni, ['tym.pozvat', 'tym.role_prirazovat'])) return vedeni;
-  }
-  return vychoziRolePodniku(teamId);
+  const vychozi = await vychoziRolePodniku(teamId);
+  const cil = cilPozvanky(inv);
+  if (cil.druh === 'vychozi') return vychozi;
+  const slibena = await nactiRoliPozvanky(teamId, cil).catch(() => null);
+  const zvouci = Number.isFinite(Number(inv.invited_by)) ? await roleClena(Number(inv.invited_by), teamId, { cerstve: true }).catch(() => null) : null;
+  return vyberRoliPozvanky(slibena, zvouci, vychozi);
 }
 
 /** O přijaté pozvánce ví, kdo tým zve (tym.pozvat) — dřív jen vlastník. */

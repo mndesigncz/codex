@@ -365,8 +365,14 @@ export default function ClosingsOverview() {
                   <ListRow as="div"
                     lead={<Avatar emoji={c.author_avatar} size="sm" />}
                     title={<span className="cz-sentence">{denKratce(denUzaverky(c), loc)}{c.shift_label ? ` · ${c.shift_label}` : ''}</span>}
-                    meta={`${t('Směna: {crew}', { crew })}${trzba != null ? ` · ${t('tržba {castka}', { castka: money(trzba) })}` : ''}`}
-                    right={<>
+                    // Posádka na vlastním řádku, nejvýš na dva (V04): v jednom řádku s tržbou se utínala
+                    // na „Směna: Jakub Kolář + Petra Mar…". Tržba je číslo řádku — pevný sloupec
+                    // s tabulkovými číslicemi na monitoru, na telefonu vlevo pod jménem a rozdíl kasy vedle ní.
+                    detail={<span className="line-clamp-2 break-words">{t('Směna: {crew}', { crew })}</span>}
+                    value={trzba != null ? <><span className="sr-only">{t('tržba {castka}', { castka: money(trzba) })}</span><span aria-hidden>{money(trzba)}</span></> : undefined}
+                    // Štítky mají na monitoru jednotnou minimální šířku, ať tržby vlevo od nich stojí v jednom
+                    // svislém sloupci (jinak „Sedí" a „Čeká na schválení −200 Kč" posouvaly číslo o 150 px).
+                    right={<span className="flex flex-wrap items-center justify-end gap-2 lg:min-w-[16rem]">
                       {c.event_title && <Chip tone="info" size="sm" icon="calendarCheck" className="hidden sm:inline-flex">{c.event_title}</Chip>}
                       {covered.length > 0 && <Chip tone="muted" size="sm" icon="users" className="hidden sm:inline-flex">+{covered.length}</Chip>}
                       {c.approved === false && <Chip tone="wait" size="sm">{t('Čeká na schválení')}</Chip>}
@@ -376,7 +382,7 @@ export default function ClosingsOverview() {
                           {duvod && <span className="hidden sm:inline font-normal"> · {duvod}</span>}
                         </Chip>
                       )}
-                    </>}
+                    </span>}
                     onClick={() => setDetailId(c.id)} />
                   </div>
                   {/* Celý den: tržba, otevřené účty, výdaje, směny — vedle řádku, ne v něm (v klikacím řádku už je tlačítko). */}
@@ -401,6 +407,10 @@ export default function ClosingsOverview() {
           subtitle: t('Denní tržby, rozdíly proti kase a co čeká na schválení.'),
           hintId: 'closingsoverview',
           primary: smiVytvorit ? <Button variant="accent" icon="plus" onClick={() => openCreate()}>{t('Nová uzávěrka')}</Button> : undefined,
+          // Na telefonu majitel uzávěrky kontroluje a schvaluje, vyplňuje je tým po směně. „Nová uzávěrka"
+          // tam jde do „···": hlavička se složí do jednoho řádku a seznam uzávěrek vyjede o 68 px výš (V04).
+          primaryTelefon: null,
+          menuTelefon: smiVytvorit ? [{ label: t('Nová uzávěrka'), icon: 'plus', onClick: () => openCreate() }] : undefined,
           menu,
         }}
         nastroj={nastroj}

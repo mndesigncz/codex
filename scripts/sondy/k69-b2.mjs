@@ -284,6 +284,49 @@ const doporucene = async (p) => {
   await ctx.close();
 }
 
+// 6b) Telefon 390, nic k řešení (kolo 6, V10): nikdo napíchnutý déle než podle plánu a sazbu mají
+// všichni. Otevřené příchody i Chybí sazba se složí na nízký řádek s fajfkou přes celou šířku
+// (useVyrizeno) — věta stojí nahoře, ne u dna 136px karty.
+{
+  const bezDlouhych = (req, json, stav) => {
+    const url = new URL(req.url());
+    if (req.method() === 'GET' && url.pathname === '/api/attendance') {
+      const d = nacti('k69-b2-attendance');
+      // Jakub (napíchnutý 10 h, směna skončila před hodinou) odpíchnutý — Eva je na směně podle plánu.
+      return json({ ...d, roster: d.roster.map(r => (r.id === 17 ? { ...r, openSince: null, openEntryId: null } : r)) });
+    }
+    if (req.method() === 'GET' && url.pathname === '/api/teams') {
+      const d = nacti('k69-b2-teams');
+      return json({ ...d, members: d.members.map(m => ({ ...m, hourly_rate: Number(m.hourly_rate) > 0 ? m.hourly_rate : 170 })) });
+    }
+    return podvrh()(req, json, stav);
+  };
+  const { ctx, p } = await kontext({ posunCasu: POSUN, fix: FIX_DOCHAZKA, viewport: { width: 390, height: 844 }, mobil: true, dalsi: bezDlouhych });
+  await otevri(p, DOCHAZKA, 'vedeni.dochazka');
+  const otevrene = widgetLi(p, 'dochazka.dlouhe_prichody');
+  tvrdi('T2 (V10): Otevřené příchody bez dlouhých příchodů jsou minimalizované s fajfkou a souhrnem',
+    await dokud(async () => (await otevrene.getByRole('region', { name: /vyřízeno/ }).count()) === 1, 4000)
+    && (await otevrene.innerText()).includes('Nikdo není napíchnutý déle, než měl'), (await otevrene.innerText()).slice(0, 120));
+  const mrizka = await p.evaluate(() => {
+    const plocha = document.querySelector('[data-plocha] ul')?.getBoundingClientRect();
+    const r = (w) => document.querySelector(`[data-plocha] li[data-widget="${w}"]`)?.getBoundingClientRect();
+    const o = r('dochazka.dlouhe_prichody'); const s = r('tym.bez_sazby');
+    const veta = [...document.querySelectorAll('[data-plocha] li[data-widget="tym.bez_sazby"] p')].find(x => x.textContent?.includes('Sazbu má nastavenou každý'))?.getBoundingClientRect();
+    return { plocha: plocha && Math.round(plocha.width), otevreneW: o && Math.round(o.width), otevreneH: o && Math.round(o.height),
+      sazbaH: s && Math.round(s.height), vetaOdShora: veta && s ? Math.round(veta.top - s.top) : null };
+  });
+  tvrdi('T2 (V10/V14): minimalizovaná karta je přes celou šířku plochy a nízká', !!mrizka.otevreneW && mrizka.otevreneW >= mrizka.plocha - 1 && mrizka.otevreneH <= 90, JSON.stringify(mrizka));
+  // Chybí sazba bez lidí bez sazby je vyřízená (useVyrizeno): minimalizovaná jako Otevřené příchody —
+  // nízká, souhrn „Sazbu má nastavenou každý." nahoře, ne prázdná karta s větou u dna.
+  const sazba = widgetLi(p, 'tym.bez_sazby');
+  tvrdi('T2 (V10): Chybí sazba, když ji má každý, je minimalizovaná se souhrnem', await dokud(async () => (await sazba.getByRole('region', { name: /vyřízeno/ }).count()) === 1, 4000)
+    && (await sazba.innerText()).includes('Sazbu má nastavenou každý'), (await sazba.innerText()).slice(0, 120));
+  tvrdi('T2 (V10): Chybí sazba je nízká a věta stojí nahoře (ne u dna)', !!mrizka.sazbaH && mrizka.sazbaH <= 110 && mrizka.vetaOdShora != null && mrizka.vetaOdShora <= 70, JSON.stringify(mrizka));
+  tvrdi('T2: telefon 390 — žádné vodorovné přetečení', await bezPreteceni(p));
+  await p.screenshot({ path: OUT + 'k69-b2-dochazka-tel-vyrizeno.png', fullPage: true });
+  await ctx.close();
+}
+
 // ---------------------------------------------------------------------------
 // Tým
 // ---------------------------------------------------------------------------

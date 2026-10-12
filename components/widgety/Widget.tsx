@@ -17,7 +17,7 @@ import React, { createContext, useContext, useEffect, useLayoutEffect, useRef, u
 import { Icon } from '../Icons';
 import { Button, Card, ErrorState, Menu, Skeleton, type MenuItem } from '../ui';
 import type { LoadState } from '../ui/useLoad';
-import type { DefiniceWidgetu, Kostra, Velikost } from '@/lib/widgety/typy';
+import type { DefiniceWidgetu, Kostra, Rozhrani, Velikost } from '@/lib/widgety/typy';
 import { kostraWidgetu } from '@/lib/widgety/rozlozeni';
 import { useT } from '@/lib/i18n/client';
 import { useNavigace } from './NavigaceKontext';
@@ -51,6 +51,12 @@ export interface KontextWidgetu {
   mini: string | null;
   /** Pohled (`DefiniceStranky.pohled`) stránky, na které karta leží; null mimo plochu. */
   pohledStranky: string | null;
+  /**
+   * Rozhraní stránky (vedení, zaměstnanec, tablet); null/chybí mimo plochu. Tentýž pohled
+   * znamená v každém rozhraní jinou obrazovku — `inventory` je u vedení Sklad, u zaměstnance
+   * hlášení chybějícího — a widget podle toho předává jiný argument.
+   */
+  rozhraniStranky?: Rozhrani | null;
   /** Karta je sbalená na samotnou hlavičku (uživatel ji sbalil; pamatuje se). */
   sbaleno: boolean;
   /** Sbalí / rozbalí kartu. */
@@ -300,8 +306,10 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
         <div className="relative min-w-0 flex-1">
           {/* tabIndex -1 + data-w-titulek: cíl fokusu po výměně karet (plocha sem vrátí
               fokus, když klávesnicí ovládané tlačítko, které ho neslo, zmizelo z DOM). */}
-          <h2 id={idTitulku} data-w-titulek="" tabIndex={-1} className={`t-card truncate ${FOKUS_TITULKU}`}>{nazev}</h2>
-          <p className="t-meta truncate">{k.mini}</p>
+          {/* Název na jeden řádek (celý v `title`), souhrn pod ním smí na dva — plocha minimalizované
+              kartě dává aspoň půl řádku na monitoru a celý řádek na telefonu, takže se neutínají. */}
+          <h2 id={idTitulku} data-w-titulek="" tabIndex={-1} title={nazev} className={`t-card truncate ${FOKUS_TITULKU}`}>{nazev}</h2>
+          <p className="t-meta line-clamp-2 break-words" title={k.mini}>{k.mini}</p>
         </div>
         <Button variant="ghost" size="sm" icon="chevron" aria-label={t('Ukázat celý widget {nazev}', { nazev })}
           className="relative shrink-0 -my-1 -mr-2" onClick={k.rozbal} />
@@ -319,6 +327,20 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
   const vidiOdkaz = !!odkaz && nav.smiPohled(odkaz.pohled);
   if (k.vOkne) return <div className="min-w-0" aria-busy={nacitam || undefined}>{obsah}</div>;
   const mozeZvetsit = !!k.zvetsit && !k.nahled && !k.upravy;
+  // Prázdný stav (věta místo dat): malá karta se pak neroztahuje na výšku čísla a věta stojí nahoře.
+  // Dřív `justify-end` a min. výška 8,5 rem nechaly samotnou větu u dna prázdné karty — vypadalo to
+  // jako chyba vykreslení („Nikdo není napíchnutý déle, než měl." u spodní hrany 136px karty).
+  const prazdnyStav = !nacitam && !chyba && prazdno !== undefined;
+  // Šipka „Otevřít" navigovatelné karty. U malé karty nestojí v hlavičce, ale vpravo dole vedle čísla:
+  // v polovině telefonu (171 px) by v hlavičce vzala názvu 40 px a „Docházející zásoby" se lámal
+  // uvnitř slova („Docház / ející…"). Odkaz s textem nebo „···" zůstávají v hlavičce jako dřív.
+  const sipkaCile = klepnutelna && !vidiOdkaz && !(akce && akce.length > 0);
+  const sipkaDole = S && sipkaCile;
+  const tlacitkoCile = sipkaCile ? (
+    <Button variant="ghost" size="sm" icon="chevronRight" aria-label={t('Otevřít {nazev}', { nazev })}
+      className={`${sipkaDole ? 'shrink-0 -mb-1.5 -mr-2 self-end' : ''} ${inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : ''}`}
+      onClick={otevriCil} />
+  ) : null;
   return (
     <Card
       as="section"
@@ -332,7 +354,7 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
       inert={k.upravy || undefined}
       className={[
         'min-w-0 h-full flex flex-col',
-        S ? 'sm:p-5 min-h-[8.5rem] relative' : '',
+        S ? `sm:p-5 relative ${prazdnyStav ? '' : 'min-h-[8.5rem]'}` : '',
         // Klepnutelná karta (natažený odkaz, nebo cíl z katalogu) se na hover jemně zvedne.
         otevrit || klepnutelna ? 'relative transition-shadow hover:shadow-[shadow:var(--shadow-float)]' : '',
         // Jediná tmavá plocha v obsahu: hlavní číslo peněz se září v rohu (DP §2.10).
@@ -347,9 +369,14 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
       {S && !inkoust && <span aria-hidden className="w-dotek" />}
       <div className={`relative flex items-start justify-between gap-3 ${naCili && mozeSbalit ? 'cursor-pointer' : ''}`}
         onClick={naCili && mozeSbalit ? (e => { if (!(e.target as Element).closest('button, a, [role="menu"], [role="menuitem"]')) k.prepniSbaleni(); }) : undefined}>
-        {/* Malá karta je na telefonu široká ~171 px a na název zbývá ~125 px:
+        {/* Malá karta je na telefonu široká ~171 px a na název zbývá ~107 px:
             „Docházející zásoby" by skončil jako „Docházející zá…" a číslo pod
-            ním by nemělo jméno. U S proto dva řádky, ikona u prvního. */}
+            ním by nemělo jméno. U S proto dva řádky, ikona u prvního. Dlouhé
+            slovo se dělí podle jazyka stránky (hyphens, <html lang>), ale jen
+            slovo od 10 znaků a nejméně po 5 znacích na každé straně — „schvá-lení"
+            by vypadalo hůř než celé slovo na dalším řádku (Safari zná jen
+            limit před/za). Rozlomení bez spojovníku (break-words) je až poslední
+            záchrana proti přetečení (německá složená slova). */}
         <h2 id={idTitulku} data-w-titulek="" tabIndex={-1} className={`t-card flex ${S ? 'items-start' : 'items-center'} gap-2 min-w-0 ${FOKUS_TITULKU} ${inkoust ? '!text-white' : ''}`}>
           {/* Ikona v limetkové dlaždičce: jemný akcent hlavičky (kolo 71). Tónovaná
               průhledností (bg-ok/15) — plná limetka je vyhrazená akci (DP T3)
@@ -357,12 +384,12 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
           <span aria-hidden className={`shrink-0 grid h-6 w-6 place-items-center rounded-xl ${S ? '-mt-0.5' : ''} ${inkoust ? 'bg-white/10 text-white/70' : 'bg-ok/15 text-ok-ink'}`}>
             <Icon name={ikona ?? k.definice?.ikona ?? 'overview'} size={14} />
           </span>
-          <span className="line-clamp-2 break-words">{nazev}</span>
+          <span className="line-clamp-2 break-words hyphens-auto [hyphenate-limit-chars:10_5_5] [-webkit-hyphenate-limit-before:5] [-webkit-hyphenate-limit-after:5]" title={nazev}>{nazev}</span>
           {doplnek}
         </h2>
         {/* Ovládací prvky vpravo v jedné skupině a Sbalit VŽDY úplně vpravo: dřív stál mezi názvem a odkazem
             („Finance ›"), takže se podle toho, jaké další prvky karta měla, posouval a „plaval". */}
-        {(mozeSbalit || mozeZvetsit || vidiOdkaz || (!odkaz && akce && akce.length > 0) || (klepnutelna && !vidiOdkaz && !(akce && akce.length > 0))) && (
+        {(mozeSbalit || mozeZvetsit || vidiOdkaz || (!odkaz && akce && akce.length > 0) || (sipkaCile && !sipkaDole)) && (
           <div className="flex items-center shrink-0 -my-1.5 -mr-2">
             {vidiOdkaz && (
               <Button variant="ghost" size="sm" iconAfter="chevronRight"
@@ -378,11 +405,7 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
             {/* Jemná nápověda navigovatelné karty: chevron jen tam, kde v hlavičce
                 není odkaz ani „···" — a zároveň klávesová cesta (Enter naviguje),
                 protože <li> v klidu tabIndex nemá (sonda k68-klavesnice 5). */}
-            {klepnutelna && !vidiOdkaz && !(akce && akce.length > 0) && (
-              <Button variant="ghost" size="sm" icon="chevronRight" aria-label={t('Otevřít {nazev}', { nazev })}
-                className={inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : ''}
-                onClick={otevriCil} />
-            )}
+            {!sipkaDole && tlacitkoCile}
             {mozeZvetsit && (
               <Button variant="ghost" size="sm" icon="expand" aria-haspopup="dialog" aria-describedby={idTitulku} aria-label={t('Zvětšit widget')}
                 className={inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : ''}
@@ -399,8 +422,14 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
         )}
       </div>
       {!(mozeSbalit && k.sbaleno) && (
-        <div className={`relative mt-3 flex-1 min-h-0 ${S ? 'flex flex-col justify-end' : ''}`}>
-          {!S && !bezZkraceni && !k.nahled && !k.upravy && !nacitam && !chyba && prazdno === undefined
+        <div className={`relative mt-3 flex-1 min-h-0 ${sipkaDole ? (chyba ? 'flex flex-col justify-end gap-1' : 'flex items-end gap-1') : S && !prazdnyStav ? 'flex flex-col justify-end' : ''}`}>
+          {sipkaDole ? (
+            // Chyba se „Zkusit znovu" potřebuje celou šířku karty — šipka jde pod ni, ne vedle.
+            <>
+              <div className={`min-w-0 ${chyba ? '' : 'flex-1'} ${prazdnyStav ? 'self-start' : ''}`}>{obsah}</div>
+              {tlacitkoCile}
+            </>
+          ) : !S && !bezZkraceni && !k.nahled && !k.upravy && !nacitam && !chyba && prazdno === undefined
             ? <Zkratitelne id={k.instance} velikost={k.velikost as 'M' | 'L'}>{obsah}</Zkratitelne>
             : obsah}
         </div>

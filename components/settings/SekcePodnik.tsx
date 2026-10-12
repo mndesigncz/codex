@@ -4,28 +4,35 @@ import { useEffect, useState } from 'react';
 import { Button, Field, Input, Select, Skeleton } from '../ui';
 import { ErrorState } from '../ui/ErrorState';
 import { useLoad } from '../ui/useLoad';
-import { useNavigace } from '../widgety/NavigaceKontext';
 import { useOpravneni } from '../role/useOpravneni';
+import ProvozPodniku from './ProvozPodniku';
 import { useT } from '@/lib/i18n/client';
 import { okJson } from '@/lib/api';
 import { TYPY } from '@/lib/pruvodce/typy';
 import { cistyDic, cistyIco, cistyPrah, pragySedi } from '@/lib/podnikProfil';
 
-// Nastavení → Profil podniku (oprávnění podnik.nastaveni): název, typ, adresa, IČO a DIČ
-// a výchozí prahy skladu (nízký a kritický stav). Měna, formát čísel, jazyk a čas podniku
-// už jsou v Nastavení týmu → Podnik, tady je jen odkaz. IČO a DIČ jsou údaje k zobrazení
-// (doklady); aplikace z nich nic nepočítá. Server (PATCH /api/teams) tvar ověřuje znovu.
+// Nastavení → Profil podniku: jeden domov pro nastavení podniku (kolo 6, balík B3).
+//  - profil (podnik.nastaveni): název, typ, adresa, IČO a DIČ — údaje k zobrazení (doklady),
+//    aplikace z nich nic nepočítá; server (PATCH /api/teams) tvar ověřuje znovu;
+//  - výchozí prahy skladu (nízký a kritický stav, mění sklad.kategorie);
+//  - Provoz podniku (měna, formát čísel, týden, země, jazyk, čas, cíl mezd) — dřív karta
+//    v Nastavení týmu → Podnik, kam odsud vedl jen odkaz (ProvozPodniku.tsx);
+//  - Pravidelné náklady (nájem, energie…) — místo pro kartu balíku Finance (`pravidelneNaklady`).
 
 interface Podnik {
   name: string; business_type: string | null; address: string | null; ico: string | null; dic: string | null;
   low_stock_default: number | null; critical_stock_default: number | null; ico_dic_ok: boolean;
 }
 
-export default function SekcePodnik() {
+export default function SekcePodnik({ pravidelneNaklady }: {
+  /** Pravidelné náklady podniku (components/settings/PevneNaklady.tsx z balíku Finance); bez nich se sekce nekreslí. */
+  pravidelneNaklady?: React.ReactNode;
+} = {}) {
   const t = useT('spolecne');
-  const nav = useNavigace();
   const { ma } = useOpravneni();
-  const podnik = useLoad<Podnik>('/api/teams', raw => {
+  // Profil a prahy patří podnik.nastaveni; Provoz ukáže i roli, která smí jen cíl mezd (finance.nastaveni).
+  const smiProfil = ma('podnik.nastaveni');
+  const podnik = useLoad<Podnik>(smiProfil ? '/api/teams' : null, raw => {
     const x = raw?.team;
     if (!x || typeof x !== 'object') throw new Error('tvar');
     return {
@@ -89,6 +96,13 @@ export default function SekcePodnik() {
     void patch('prahy', { lowStockDefault: n, criticalStockDefault: k }, t('Prahy skladu jsou uložené.'));
   };
 
+  const naklady = pravidelneNaklady != null && pravidelneNaklady !== false && (
+    <section className="card p-6 space-y-3" aria-labelledby="nast-p-naklady-t">
+      <h2 id="nast-p-naklady-t" className="t-card">{t('Pravidelné náklady')}</h2>
+      {pravidelneNaklady}
+    </section>
+  );
+  if (!smiProfil) return <div className="space-y-6"><ProvozPodniku />{naklady}</div>;
   if (podnik.error) return <section className="card p-6"><ErrorState compact title={t('Profil podniku se nepodařilo načíst')} detail={podnik.error} onRetry={podnik.reload} /></section>;
   if (podnik.loading) return <Skeleton className="h-72 rounded-3xl" />;
 
@@ -150,17 +164,17 @@ export default function SekcePodnik() {
         {!smiPrahy && <p className="t-meta">{t('Prahy skladu mění jen ten, kdo smí spravovat kategorie skladu.')}</p>}
         {hlaska('prahy')}
         <div className="flex flex-col sm:flex-row sm:justify-end">
-          <Button type="submit" variant="accent" block loading={uklada === 'prahy'} disabled={!smiPrahy}>{t('Uložit prahy')}</Button>
+          {/* Jediná limetka plochy je Uložit profil (DESIGN); prahy jsou vedlejší formulář. */}
+          <Button type="submit" variant="primary" block loading={uklada === 'prahy'} disabled={!smiPrahy}>{t('Uložit prahy')}</Button>
         </div>
       </form>
 
-      <section className="card p-6 space-y-3" aria-labelledby="nast-p-mena-t">
-        <h2 id="nast-p-mena-t" className="t-card">{t('Měna, formát a jazyk podniku')}</h2>
-        <p className="t-meta">{t('Měna, formát čísel, země, jazyk podniku a formát času se nastavují v Nastavení týmu v části Podnik.')}</p>
-        {nav.smiPohled('team-settings') && (
-          <div><Button variant="secondary" icon="settings" onClick={() => nav.onNavigate('team-settings')}>{t('Otevřít Nastavení týmu')}</Button></div>
-        )}
-      </section>
+      {/* Měna, formát čísel, země, jazyk, čas a cíl mezd — dřív v Nastavení týmu, sem vedl jen odkaz. */}
+      <ProvozPodniku />
+
+      {/* Pravidelné náklady (nájem, energie…): kartu dodá balík Finance — components/settings/PevneNaklady.tsx,
+          klíč finance.nastaveni — přes `pravidelneNaklady`. */}
+      {naklady}
     </div>
   );
 }
