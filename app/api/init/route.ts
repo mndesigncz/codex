@@ -659,6 +659,13 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS nav_config JSONB`);
     await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT`);                          // null = podle podniku
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS labor_target_pct INTEGER`);      // target labor cost as % of revenue
+    // Pevné náklady podniku (kolo 81, Finance): [{ name, amount }], částky za měsíc v celých
+    // jednotkách měny. Výsledek měsíce je tržby − nákupy − mzdy − tyhle řádky.
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS fixed_costs JSONB`);
+    // Účtenka má datum nákupu (RRRR-MM-DD; NULL = den nafocení) a kategorii
+    // ('suroviny' | 'napoje' | 'provoz' | 'vybaveni' | 'jine'; NULL = starší účtenka).
+    await ddl(sql`ALTER TABLE receipts ADD COLUMN IF NOT EXISTS purchase_date TEXT`);
+    await ddl(sql`ALTER TABLE receipts ADD COLUMN IF NOT EXISTS category TEXT`);
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS low_stock_default INTEGER DEFAULT 5`);
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS critical_stock_default INTEGER DEFAULT 2`);
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS business_type TEXT`);

@@ -11,6 +11,10 @@ import { pragueToday, pragueDaySafe } from '@/lib/pragueTime';
 import { wagesTotal } from '@/lib/wages';
 import { menaPodniku } from '@/lib/menaPodniku';
 import { hodnotaZasobTymu } from '@/lib/hodnotaZasobDb';
+import { normName } from '@/lib/menuPos';
+import {
+  cistyVysledek, jeKategorieUctenky, pevneNakladyZDb, soucetPevnychNakladu, type KategorieUctenky, type PolozkaObjednavky,
+} from '@/lib/financeWidgety';
 
 export const dynamic = 'force-dynamic';
 
@@ -83,23 +87,42 @@ export async function GET(req: NextRequest) {
   type Row = {
     date: string; kind: string; label: string; amount: number;
     receiptId?: number; photoUrl?: string | null; note?: string | null;
+    // Kolo 81: kategorie účtenky, detail objednávky a dodavatel pro seskupení v knize výdajů.
+    category?: KategorieUctenky | null;
+    orderId?: number; items?: PolozkaObjednavky[]; orderedBy?: string | null;
+    supplier?: string | null;
   };
   const ledger: Row[] = [];
+  // Jméno dodavatele očištěné pro seskupení („MAKRO" = „Makro"); prázdné = bez dodavatele.
+  const dodavatel = (v: unknown): string | null => (normName(v) ? String(v).trim() : null);
 
-  // Receipts (purchases on the go).
+  // Receipts (purchases on the go). Měsíc podle data nákupu, když ho účtenka má
+  // (kolo 81): účtenka za zářijový nákup nafocená 1. října patří do září.
+  const dalsiMesic = `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, '0')}-01`;
   let receiptRows: any[] = [];
   try {
     receiptRows = await sql`
-      SELECT id, photo_url, supplier, amount, note, created_at FROM receipts
+      SELECT id, photo_url, supplier, amount, note, created_at, purchase_date, category FROM receipts
       WHERE team_id = ${u.team_id}
-        AND ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') >= ${month + '-01'}::timestamp
-        AND ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') < (${month + '-01'}::timestamp + INTERVAL '1 month')`;
-  } catch { /* not migrated */ }
+        AND COALESCE(purchase_date, to_char((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD')) >= ${month + '-01'}
+        AND COALESCE(purchase_date, to_char((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD')) < ${dalsiMesic}`;
+  } catch {
+    // Před migrací sloupců (purchase_date, category) jako dřív: podle dne nafocení.
+    try {
+      receiptRows = await sql`
+        SELECT id, photo_url, supplier, amount, note, created_at FROM receipts
+        WHERE team_id = ${u.team_id}
+          AND ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') >= ${month + '-01'}::timestamp
+          AND ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') < (${month + '-01'}::timestamp + INTERVAL '1 month')`;
+    } catch { /* not migrated */ }
+  }
   for (const r of receiptRows) {
     ledger.push({
-      date: pragueDaySafe(r.created_at), kind: 'receipt',
+      date: typeof r.purchase_date === 'string' && r.purchase_date ? r.purchase_date : pragueDaySafe(r.created_at), kind: 'receipt',
       label: r.supplier || 'Účtenka', amount: num(r.amount),
       receiptId: r.id, photoUrl: r.photo_url ?? null, note: r.note ?? null,
+      category: jeKategorieUctenky(r.category) ? r.category : null,
+      supplier: dodavatel(r.supplier),
     });
   }
 
@@ -130,17 +153,23 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Supplier orders with a price.
+  // Supplier orders with a price. Kolo 81: i položky a kdo objednal — kniha výdajů
+  // objednávku rozklikne, nejen ukáže částku.
   try {
     const orders = await sql`
-      SELECT id, supplier, total_cost, received_at, created_at FROM orders
-      WHERE team_id = ${u.team_id} AND total_cost IS NOT NULL AND total_cost > 0
-        AND ((COALESCE(received_at, created_at) AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') >= ${month + '-01'}::timestamp
-        AND ((COALESCE(received_at, created_at) AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') < (${month + '-01'}::timestamp + INTERVAL '1 month')`;
+      SELECT o.id, o.supplier, o.total_cost, o.received_at, o.created_at, o.items, us.name AS ordered_by
+      FROM orders o LEFT JOIN users us ON us.id = o.created_by
+      WHERE o.team_id = ${u.team_id} AND o.total_cost IS NOT NULL AND o.total_cost > 0
+        AND ((COALESCE(o.received_at, o.created_at) AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') >= ${month + '-01'}::timestamp
+        AND ((COALESCE(o.received_at, o.created_at) AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') < (${month + '-01'}::timestamp + INTERVAL '1 month')`;
     for (const o of orders as any[]) {
+      const items: PolozkaObjednavky[] = (Array.isArray(o.items) ? o.items : [])
+        .filter((i: any) => i && typeof i.name === 'string')
+        .map((i: any) => ({ name: String(i.name), qty: num(i.qty), unit: typeof i.unit === 'string' ? i.unit : '' }));
       ledger.push({
         date: pragueDaySafe(o.received_at ?? o.created_at), kind: 'order',
         label: `Objednávka — ${o.supplier ?? 'dodavatel'}`, amount: num(o.total_cost),
+        orderId: Number(o.id), items, orderedBy: o.ordered_by ?? null, supplier: dodavatel(o.supplier),
       });
     }
   } catch { /* ignore */ }
@@ -261,6 +290,24 @@ export async function GET(req: NextRequest) {
     const [t] = await sql`SELECT labor_target_pct FROM teams WHERE id = ${u.team_id}`;
     target = t?.labor_target_pct != null && Number.isFinite(Number(t.labor_target_pct)) ? Number(t.labor_target_pct) : null;
   } catch { /* ignore */ }
+  // Pevné náklady podniku (kolo 81): nájem, energie… Výsledek měsíce bez nich lhal —
+  // kavárna s nájmem 40 000 byla „v plusu" i v měsíci, který ho nevydělal.
+  let fixedCostsRows: ReturnType<typeof pevneNakladyZDb> = [];
+  try {
+    const [t] = await sql`SELECT fixed_costs FROM teams WHERE id = ${u.team_id}`;
+    fixedCostsRows = pevneNakladyZDb(t?.fixed_costs);
+  } catch { /* sloupec ještě není */ }
+  const fixedCosts = soucetPevnychNakladu(fixedCostsRows);
+  const fixedCostsSet = fixedCostsRows.length > 0;
+  const gross = revenue + eventsRevenueNoClosing - purchases - Math.max(wagesCash, wagesWorked);
+  const net = cistyVysledek(gross, fixedCosts);
+  if (fixedCostsSet && net < 0) {
+    insights.push({
+      icon: 'warning', tone: 'warn',
+      title: `Po nájmu a energiích je měsíc ${mena.money(Math.abs(net))} v minusu`,
+      text: `Pevné náklady dělají ${mena.money(fixedCosts)} měsíčně. Hrubý výsledek je ${mena.money(gross)} — buď víc tržby, nebo levnější nákupy a kratší směny.`,
+    });
+  }
   if (revenue > 0 && laborBase > 0) {
     const share = Math.round((laborBase / revenue) * 100);
     const goal = target ?? 30;
@@ -355,7 +402,8 @@ export async function GET(req: NextRequest) {
     summary: {
       revenue, cash, card, tips,
       purchases, wagesCash, wagesWorked, totalOut,
-      gross: revenue + eventsRevenueNoClosing - purchases - Math.max(wagesCash, wagesWorked),
+      gross,
+      fixedCosts, net, fixedCostsSet,
       stockValue,
       stockTop,
       laborTargetPct: target,

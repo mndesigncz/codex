@@ -123,7 +123,7 @@ function InkoustoveCislo({ stitek, hodnota, poznamka, velke = false }: { stitek:
 // Souhrn měsíce
 // ---------------------------------------------------------------------------
 
-type Metrika = 'trzby' | 'nakupy' | 'mzdy' | 'spropitne' | 'vysledek';
+type Metrika = 'trzby' | 'nakupy' | 'mzdy' | 'spropitne' | 'pevne' | 'vysledek';
 
 function SouhrnMesice({ velikost, nastaveni }: WidgetProps<{ mesic: string; metrika: Metrika }>) {
   const t = useT('widgety');
@@ -139,20 +139,28 @@ function SouhrnMesice({ velikost, nastaveni }: WidgetProps<{ mesic: string; metr
   if (f) {
     const s = f.souhrn;
     const trend = zmena(s.revenue, s.prevRevenue);
-    const pozTrzby = trend != null ? t('{zmena} proti minulému měsíci', { zmena: sZnamenkem(trend) }) : t('{n, plural, one {# uzávěrka} few {# uzávěrky} other {# uzávěrek}}', { n: s.closingsCount });
+    // „z uzávěrek": Tržba po dnech vedle ukazuje číslo z pokladny za jiné období — bez zdroje to vypadalo jako chyba (V12).
+    const pozTrzby = `${t('z uzávěrek')} · ${trend != null ? t('{zmena} proti minulému měsíci', { zmena: sZnamenkem(trend) }) : t('{n, plural, one {# uzávěrka} few {# uzávěrky} other {# uzávěrek}}', { n: s.closingsCount })}`;
     // Bez finance.mzdy API mzdy nepošle a hrubý výsledek je bez nich — nula by lhala.
     const mzdy = s.mzdySkryte ? t('skryto') : money(mzdyMesice(f));
     const pozMzdy = s.mzdySkryte ? t('mzdy vidí jen role s oprávněním') : s.wagesWorked > 0 ? t('z docházky × sazby') : t('z denních výplat');
-    const pozVysledek = s.mzdySkryte ? t('tržby − nákupy, bez mezd') : t('tržby − nákupy − mzdy');
+    // Pevné náklady (kolo 81): v L samostatný údaj jen tam, kde mřížka zůstane sudá (bez spropitného);
+    // se spropitným jde částka do poznámky výsledku. Bez vyplněných nákladů výsledek řekne, že je bez nájmu.
+    const zaklad: Metrika[] = ['nakupy', 'mzdy', ...(s.tips > 0 ? ['spropitne' as const] : [])];
+    const sPevnymi = velikost === 'L' && s.fixedCostsSet && zaklad.length % 2 === 0;
+    const pozVysledek = !s.fixedCostsSet
+      ? t('bez nájmu a energií — doplň ve Financích › ··· › Pravidelné náklady')
+      : sPevnymi ? t('po nájmu a energiích') : t('po nájmu a energiích ({castka})', { castka: money(s.fixedCosts) });
     const polozky: Record<Metrika, { stitek: string; hodnota: string; poznamka: string }> = {
       trzby: { stitek: t('Tržby'), hodnota: money(s.revenue), poznamka: pozTrzby },
       nakupy: { stitek: t('Nákupy a výdaje'), hodnota: money(s.purchases), poznamka: t('účtenky, objednávky, kasa') },
       mzdy: { stitek: t('Mzdy'), hodnota: mzdy, poznamka: pozMzdy },
       // Spropitné není tržba podniku, ale majitel ho chce vidět vedle ní (Toast, Square): kolik tým za měsíc dostal.
       spropitne: { stitek: t('Spropitné'), hodnota: money(s.tips), poznamka: t('z uzávěrek, mimo tržbu') },
-      vysledek: { stitek: t('Hrubý výsledek'), hodnota: money(s.gross), poznamka: pozVysledek },
+      pevne: { stitek: t('Pevné náklady'), hodnota: money(s.fixedCosts), poznamka: t('nájem, energie — každý měsíc') },
+      vysledek: { stitek: t('Výsledek'), hodnota: money(s.net), poznamka: pozVysledek },
     };
-    const ostatni: Metrika[] = velikost === 'L' ? ['nakupy', 'mzdy', ...(s.tips > 0 ? ['spropitne' as const] : []), 'vysledek'] : ['vysledek'];
+    const ostatni: Metrika[] = velikost === 'L' ? [...zaklad, ...(sPevnymi ? ['pevne' as const] : []), 'vysledek'] : ['vysledek'];
     if (velikost === 'S') {
       const m = polozky[nastaveni.metrika] ?? polozky.trzby;
       obsah = <Stat label={m.stitek} value={m.hodnota} note={m.poznamka} />;
@@ -169,6 +177,8 @@ function SouhrnMesice({ velikost, nastaveni }: WidgetProps<{ mesic: string; metr
               </div>
             ))}
           </dl>
+          {/* Inkoust kreslí údaje bez poznámek — u výsledku je ale poznámka to hlavní: po nájmu, nebo bez něj. */}
+          <p className="mt-3 text-[13px] text-white/60 text-pretty">{t('Výsledek')}: {pozVysledek}</p>
         </div>
       );
     } else {

@@ -6,9 +6,13 @@
 // s rozmazanou skvrnou (FinanceView.tsx:223), kolečko uprostřed místo kostry
 // (:215), štítek t-label jako nadpis sekce (:391), ruční přepínač měsíce
 // a filtr, ručně skládaná okna. Teď:
-//  - hlavička je PageHeader s jedinou limetkou „Export pro účetní" a sdíleným
+//  - hlavička je PageHeader s jedinou limetkou „Export pro účetní" (jen na
+//    monitoru — kolo 81, V12: stáhnout CSV do telefonu není hlavní akce, na
+//    telefonu je export v „···" a hlavička je v řádku bez limetky) a sdíleným
 //    MonthNav; měsíc jde přes MesicStrankyFinanci i do widgetů, takže souhrn
 //    nahoře a kniha výdajů dole ukazují vždycky tentýž měsíc;
+//  - „···" nese „Pravidelné náklady…" (nájem, energie → výsledek měsíce po nich,
+//    components/settings/PevneNaklady) a přepnutí knihy „Podle dodavatele";
 //  - bloky jsou widgety (components/widgety/oblasti/finance.tsx a trzby.tsx),
 //    každý se svým oprávněním — Finance dřív nečetla ma() vůbec a spoléhala
 //    na 403 nebo prázdná data (audit „Finance – oprávnění");
@@ -18,16 +22,18 @@
 // CSV pro účetní se skládá v prohlížeči ze stejného /api/finance, jaký kreslí
 // obrazovka, takže čísla v souboru sedí s tím, co vedení vidí.
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useSyncExternalStore } from 'react';
 import { Icon } from '../Icons';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 import { usePlan, UpgradeModal } from '../Pro';
 import { ulozSoubor, ulozZAdresy, jeObalKlient } from '@/lib/stahni';
 import {
   Button, Card, EmptyState, ErrorState, Field, Input, ListRow, Modal, MonthNav, SearchField, Section,
-  Segmented, Select, Skeleton, SwitchRow, Well,
+  Segmented, Select, Skeleton, SwitchRow, Well, posunMesic, type MenuItem,
 } from '../ui';
 import { okJson } from '@/lib/api';
+import PevneNaklady from '../settings/PevneNaklady';
+import { obnovDataWidgetu } from '../widgety/useDataWidgetu';
 import { obsahuje } from '@/lib/hledani';
 import { pragueToday } from '@/lib/pragueTime';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
@@ -290,6 +296,21 @@ function KnihaVydaju({ mesic }: { mesic: string }) {
 // Stránka
 // ---------------------------------------------------------------------------
 
+/** Monitor (od `md`, kde PageHeader ukazuje vedlejší akce)? Na serveru „ne" — hydratace pak sedí s telefonem. */
+const DOTAZ_MONITOR = '(min-width: 768px)';
+function useMonitor(): boolean {
+  return useSyncExternalStore(
+    (cb) => {
+      const mq = window.matchMedia?.(DOTAZ_MONITOR);
+      if (!mq) return () => {};
+      mq.addEventListener?.('change', cb);
+      return () => mq.removeEventListener?.('change', cb);
+    },
+    () => window.matchMedia?.(DOTAZ_MONITOR).matches ?? false,
+    () => false,
+  );
+}
+
 export default function FinanceView() {
   const t = useT('sprava');
   const smi = useSmi();
@@ -297,10 +318,21 @@ export default function FinanceView() {
   const dnes = pragueToday().slice(0, 7);
   const [mesic, setMesic] = useState(dnes);
   const [exportuji, setExportuji] = useState(false);
+  const [pevne, setPevne] = useState(false);
   const [upgrade, setUpgrade] = useState<string | null>(null);
+  const monitor = useMonitor();
 
   // Export jen s finance.exportovat (a knihou výdajů, ze které se skládá).
   const smiExport = smi('finance.exportovat') && smi('finance.zobrazit');
+  const smiPevne = smi('finance.nastaveni');
+  const exportovat = () => (pro ? setExportuji(true) : setUpgrade(t('Export pro účetní')));
+  const menu: MenuItem[] = [
+    // Na telefonu je export v „···" (stažení CSV do telefonu není hlavní akce — V12); na monitoru je limetkou.
+    ...(smiExport && !monitor ? [{ label: t('Export pro účetní'), icon: 'download', onClick: exportovat }] : []),
+    ...(smiPevne ? [{ label: t('Pravidelné náklady…'), icon: 'coins', hint: t('Nájem, energie — výsledek měsíce je po nich'), onClick: () => setPevne(true) }] : []),
+  ];
+  // Po uložení pevných nákladů se výsledek zobrazeného (a minulého) měsíce přepočítá na serveru.
+  const poUlozeniPevnych = () => { obnovDataWidgetu(urlFinanci(mesic)); obnovDataWidgetu(urlFinanci(posunMesic(mesic, -1))); };
   return (
     <MesicStrankyFinanci.Provider value={mesic}>
       <PlochaWidgetu
@@ -309,15 +341,20 @@ export default function FinanceView() {
           title: t('Finance'),
           subtitle: t('Tržby, nákupy a mzdy měsíce pohromadě.'),
           hintId: 'financeview',
-          primary: smiExport ? (
-            <Button variant="accent" icon="download" onClick={() => (pro ? setExportuji(true) : setUpgrade(t('Export pro účetní')))}>{t('Export pro účetní')}</Button>
+          primary: smiExport && monitor ? (
+            <Button variant="accent" icon="download" onClick={exportovat}>{t('Export pro účetní')}</Button>
           ) : undefined,
+          menu: menu.length ? menu : undefined,
           // Budoucí měsíc nemá co ukázat — šipka dopředu se na dnešku zastaví.
           aside: <MonthNav value={mesic} onChange={setMesic} max={dnes} />,
         }}
         nastroj={<KnihaVydaju mesic={mesic} />}
       />
       {exportuji && <ExportDialog mesic={mesic} onClose={() => setExportuji(false)} />}
+      <Modal open={pevne} onClose={() => setPevne(false)} size="md" title={t('Pravidelné náklady')}
+        subtitle={t('Nájem, energie a další platby každý měsíc. Odečítají se z výsledku měsíce.')}>
+        {pevne && <PevneNaklady onUlozeno={poUlozeniPevnych} />}
+      </Modal>
       {upgrade && <UpgradeModal feature={upgrade} onClose={() => setUpgrade(null)} />}
     </MesicStrankyFinanci.Provider>
   );

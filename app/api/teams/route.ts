@@ -13,6 +13,7 @@ import { cistyJazyk } from '@/lib/i18n/config';
 import { cistaZeme, PREDVOLBY_ZEMI } from '@/lib/i18n/zeme';
 import { normalizujNavKonfig } from '@/lib/navigace';
 import { cistyIco, cistyDic, cistyPrah, pragySedi } from '@/lib/podnikProfil';
+import { cistePevneNaklady, pevneNakladyZDb, type PevnyNaklad } from '@/lib/financeWidgety';
 
 export const dynamic = 'force-dynamic';
 
@@ -125,6 +126,12 @@ export async function GET() {
       biz.address = b?.address ?? null;
       biz.country = b?.country ?? null;
     } catch { /* columns not migrated yet */ }
+    // Pevné náklady (kolo 81): zvlášť, ať chybějící sloupec nevezme ostatní nastavení.
+    let fixedCosts: PevnyNaklad[] = [];
+    try {
+      const [b] = await sql`SELECT fixed_costs FROM teams WHERE id = ${teamId}`;
+      fixedCosts = pevneNakladyZDb(b?.fixed_costs);
+    } catch { /* column not migrated yet */ }
     // IČO a DIČ (kolo 73): taky zvlášť, sloupce přibydou až s DDL.
     try {
       // sql.query (ne šablona): sloupce teams.ico a teams.dic přibudou až s DDL z poznámky ke kolu 73; do té doby je kontrola schématu (check-sql) nezná.
@@ -206,7 +213,7 @@ export async function GET() {
     return NextResponse.json({
       planInfo,
       pinnedShare,
-      team: { ...team, pay_daily_cash: payDailyCash, closing_requires_shift: closingRequiresShift, show_team_schedule: showTeamSchedule, payout_from_register: payoutFromRegister, tips_in_drawer: tipsInDrawer, drawer_float: drawerFloat, dashboard_config: dashboardConfig, levels_config: levelsConfig, points_config: pointsConfig, ...biz, ...lokalizace },
+      team: { ...team, pay_daily_cash: payDailyCash, closing_requires_shift: closingRequiresShift, show_team_schedule: showTeamSchedule, payout_from_register: payoutFromRegister, tips_in_drawer: tipsInDrawer, drawer_float: drawerFloat, dashboard_config: dashboardConfig, levels_config: levelsConfig, points_config: pointsConfig, fixed_costs: fixedCosts, ...biz, ...lokalizace },
       members,
       isOwner: team?.owner_id === me.id,
     });
@@ -226,7 +233,7 @@ const POLE: Record<string, string> = {
   regenerateCode: 'tym.pozvat',
   payDailyCash: 'uzaverky.nastaveni', drawerFloat: 'uzaverky.nastaveni', closingRequiresShift: 'uzaverky.nastaveni',
   payoutFromRegister: 'uzaverky.nastaveni', tipsInDrawer: 'uzaverky.nastaveni',
-  laborTargetPct: 'finance.nastaveni',
+  laborTargetPct: 'finance.nastaveni', fixedCosts: 'finance.nastaveni',
   levelsConfig: 'odmeny.nastaveni', pointsConfig: 'odmeny.nastaveni',
   lowStockDefault: 'sklad.kategorie', criticalStockDefault: 'sklad.kategorie',
 };
@@ -240,7 +247,7 @@ export async function PATCH(request: Request) {
           showTeamSchedule,
           levelsConfig, pointsConfig,
           currency, locale, weekStart, laborTargetPct, lowStockDefault, criticalStockDefault, businessType, address,
-          country, defaultLang, timeFormat, timezone, navConfig, ico, dic } = body ?? {};
+          country, defaultLang, timeFormat, timezone, navConfig, ico, dic, fixedCosts } = body ?? {};
 
   const poslane = Object.keys(body ?? {}).filter(k => body[k] !== undefined && k in POLE);
   const chybi = [...new Set(poslane.map(k => POLE[k]))].filter(k => !c.role.opravneni.has(k));
@@ -255,6 +262,11 @@ export async function PATCH(request: Request) {
   }
   if (dic !== undefined && cistyDic(dic) === undefined) {
     return NextResponse.json({ error: 'DIČ není platné. Začíná kódem země a má jen písmena a číslice, třeba CZ12345678.' }, { status: 400 });
+  }
+  // Pevné náklady se ověří celé předem: nejvýš 20 řádků, název 1–40 znaků, částka celá a nezáporná.
+  const cistePevne = fixedCosts !== undefined ? cistePevneNaklady(fixedCosts) : undefined;
+  if (fixedCosts !== undefined && !cistePevne) {
+    return NextResponse.json({ error: 'Pravidelné náklady nejsou v pořádku: nejvýš 20 řádků, každý s názvem do 40 znaků a celou částkou od nuly.' }, { status: 400 });
   }
   for (const [pole, hodnota] of [['lowStockDefault', lowStockDefault], ['criticalStockDefault', criticalStockDefault]] as const) {
     if (hodnota !== undefined && cistyPrah(hodnota) === undefined) {
@@ -326,6 +338,10 @@ export async function PATCH(request: Request) {
     if (typeof businessType === 'string') await sql`UPDATE teams SET business_type = ${businessType} WHERE id = ${team.id}`;
   } catch { /* columns not migrated yet — ignore until /api/init runs */ }
 
+  // Pevné náklady (kolo 81): vlastní try, sloupec přibývá s DDL.
+  try {
+    if (cistePevne) await sql`UPDATE teams SET fixed_costs = ${JSON.stringify(cistePevne)}::jsonb WHERE id = ${team.id}`;
+  } catch { /* column not migrated yet */ }
   // Adresa má vlastní try: před migrací sloupec chybí a nesmí to vzít ostatní nastavení.
   try {
     if (typeof address === 'string') await sql`UPDATE teams SET address = ${address.trim().slice(0, 200) || null} WHERE id = ${team.id}`;
