@@ -1061,7 +1061,6 @@
   "Trend půjde spočítat, až budou uzávěrky aspoň ze čtyř dní.": "The trend can be calculated once there are closings from at least four days.",
   "Trendy tržeb": "Revenue trends",
   "Tržba": "Revenue",
-  "Tržba celkem (hotově/kartou), odvedeno a odloženo, vyplaceno hotově nebo spropitné, rozdíl kasy — za zvolené období.": "Total revenue (cash/card), amounts withdrawn and set aside, cash paid out or tips, till difference — for the chosen period.",
   "Tržba dne": "Revenue of the day",
   "Tržba po dnech": "Revenue by day",
   "Tržba po dnech: sloupcový graf se zvýrazněným rekordem a u velké karty seznam dnů s částkami. Období i „Měsíc stránky\" (na Financích měsíc z přepínače v hlavičce). Zdroj pokladna, nebo uzávěrky (funguje i bez pokladny).": "Revenue by day: bar chart with the record highlighted and, on the large card, a list of days with amounts. Period includes “Page month” (on Finance, the month from the header switch). Source: register or closings (works without a register too).",
@@ -1952,5 +1951,12 @@
   "Fotku se nepodařilo nahrát — zkontroluj připojení.": "The photo could not be uploaded — check the connection.",
   "Fotka ze splnění": "Completion photo",
   "Otevřít fotku v plné velikosti": "Open the photo in full size",
-  "Fotka ze splnění úkolu {nazev}": "Completion photo of task {nazev}"
+  "Fotka ze splnění úkolu {nazev}": "Completion photo of task {nazev}",
+  "Hosté": "Guests",
+  "Ø na hosta": "Avg per guest",
+  "Ø na hosta {castka}": "avg {castka} per guest",
+  "hosté nevyplnění": "guests not filled in",
+  "Nejvíc hostů: {den}": "Most guests: {den}",
+  "průměr {pocet}": "average {pocet}",
+  "Tržba celkem (hotově/kartou), odvedeno a odloženo, vyplaceno hotově nebo spropitné, rozdíl kasy, a když tým vyplňuje hosty, i hosté a útrata na hosta — za zvolené období.": "Total revenue (cash/card), amounts withdrawn and set aside, cash paid out or tips, till difference, and if the team fills in guests, also guests and spend per guest — for the chosen period."
 }

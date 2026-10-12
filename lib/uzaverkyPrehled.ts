@@ -90,10 +90,39 @@ export interface Souhrn {
   rozdil: number;
   /** Aspoň jedna uzávěrka přišla bez tržby — čísla by lhala, widget je nekreslí. */
   skryto: boolean;
+  /** Hosté (cash_closings.customers) — součet tam, kde je tým vyplnil; 0 = nikdo nevyplnil. */
+  zakaznici: number;
+  /**
+   * Útrata na hosta: tržba jen těch uzávěrek, které hosty mají, dělená jejich hosty. Uzávěrka bez
+   * vyplněného počtu by průměr nafoukla (tržba bez hostů), proto se do čitatele nepočítá. null = nikdo.
+   */
+  naZakaznika: number | null;
+}
+
+/** Hosté jedné uzávěrky, nebo null, když je tým nevyplnil (0 a prázdné = nevyplněno). */
+export function hosteUzaverky(c: { customers?: unknown }): number | null {
+  const n = Number(c.customers);
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+}
+
+const prazdnySouhrn = (): Souhrn => ({ pocet: 0, hotove: 0, kartou: 0, trzba: 0, spropitne: 0, vyplaceno: 0, odvedeno: 0, rozdil: 0, skryto: false, zakaznici: 0, naZakaznika: null });
+
+/** Přičte hlavní uzávěrku do souhrnu (tržba, spropitné, rozdíl, hosté) a vrátí tržbu uzávěrek s hosty. */
+function pricti(s: Souhrn, c: RadekUzaverky): number {
+  s.pocet++;
+  s.hotove += num(c.cash_revenue);
+  s.kartou += num(c.card_revenue);
+  s.spropitne += num(c.tips);
+  s.rozdil += cashDifference(c);
+  const h = hosteUzaverky(c);
+  if (h == null) return 0;
+  s.zakaznici += h;
+  return num(c.cash_revenue) + num(c.card_revenue);
 }
 
 export function souhrnUzaverek(radky: readonly RadekUzaverky[], obdobi: ObdobiSouhrnu, dnes: string): Souhrn {
-  const s: Souhrn = { pocet: 0, hotove: 0, kartou: 0, trzba: 0, spropitne: 0, vyplaceno: 0, odvedeno: 0, rozdil: 0, skryto: false };
+  const s = prazdnySouhrn();
+  let trzbaSHosty = 0;
   for (const c of radky) {
     if (!vObdobi(denUzaverky(c), obdobi, dnes)) continue;
     if (skryty(c)) { s.skryto = true; continue; }
@@ -102,13 +131,10 @@ export function souhrnUzaverek(radky: readonly RadekUzaverky[], obdobi: ObdobiSo
     s.vyplaceno += num(c.self_payout);
     s.odvedeno += num(c.cash_removed) + num(c.final_removal);
     if (!jeHlavni(c)) continue;
-    s.pocet++;
-    s.hotove += num(c.cash_revenue);
-    s.kartou += num(c.card_revenue);
-    s.spropitne += num(c.tips);
-    s.rozdil += cashDifference(c);
+    trzbaSHosty += pricti(s, c);
   }
   s.trzba = s.hotove + s.kartou;
+  s.naZakaznika = s.zakaznici > 0 ? trzbaSHosty / s.zakaznici : null;
   return s;
 }
 
@@ -121,24 +147,27 @@ const vRozmezi = (den: string, od: string, doD: string, dnyTydne: readonly numbe
 
 /** Totéž co `souhrnUzaverek`, jen za rozmezí dnů a (volitelně) jen vybrané dny v týdnu. */
 export function souhrnUzaverekRozmezi(radky: readonly RadekUzaverky[], od: string, doD: string, dnyTydne: readonly number[] = []): Souhrn {
-  const s: Souhrn = { pocet: 0, hotove: 0, kartou: 0, trzba: 0, spropitne: 0, vyplaceno: 0, odvedeno: 0, rozdil: 0, skryto: false };
+  const s = prazdnySouhrn();
+  let trzbaSHosty = 0;
   for (const c of radky) {
     if (!vRozmezi(denUzaverky(c), od, doD, dnyTydne)) continue;
     if (skryty(c)) { s.skryto = true; continue; }
     s.vyplaceno += num(c.self_payout);
     s.odvedeno += num(c.cash_removed) + num(c.final_removal);
     if (!jeHlavni(c)) continue;
-    s.pocet++;
-    s.hotove += num(c.cash_revenue);
-    s.kartou += num(c.card_revenue);
-    s.spropitne += num(c.tips);
-    s.rozdil += cashDifference(c);
+    trzbaSHosty += pricti(s, c);
   }
   s.trzba = s.hotove + s.kartou;
+  s.naZakaznika = s.zakaznici > 0 ? trzbaSHosty / s.zakaznici : null;
   return s;
 }
 
-export type MetrikaGrafu = 'trzba' | 'spropitne' | 'odvedeno' | 'vyplaceno' | 'rozdil';
+/** Vyplnil tým u některé uzávěrky počet hostů? Bez toho se Hosté a Ø na hosta vůbec nenabízí. */
+export function maHosty(radky: readonly RadekUzaverky[]): boolean {
+  return radky.some(c => jeHlavni(c) && hosteUzaverky(c) != null);
+}
+
+export type MetrikaGrafu = 'trzba' | 'spropitne' | 'odvedeno' | 'vyplaceno' | 'rozdil' | 'hoste';
 
 /** Hodnota metriky pro každý den rozmezí (dny bez uzávěrky = 0); skryté řádky se nepočítají. */
 export function hodnotyUzaverekPoDnech(radky: readonly RadekUzaverky[], metrika: MetrikaGrafu, od: string, doD: string): HodnotaDne[] {
@@ -150,6 +179,7 @@ export function hodnotyUzaverekPoDnech(radky: readonly RadekUzaverky[], metrika:
     if (metrika === 'vyplaceno') v = num(c.self_payout);
     else if (metrika === 'odvedeno') v = num(c.cash_removed) + num(c.final_removal);
     else if (!jeHlavni(c)) continue;
+    else if (metrika === 'hoste') v = hosteUzaverky(c) ?? 0;
     else v = metrika === 'trzba' ? num(c.cash_revenue) + num(c.card_revenue) : metrika === 'spropitne' ? num(c.tips) : cashDifference(c);
     m.set(den, (m.get(den) ?? 0) + v);
   }
@@ -262,6 +292,25 @@ export function trendyTrzeb(radky: readonly RadekUzaverky[], dnes: string): Tren
 }
 
 export const DNY_V_TYDNU = ['pondělí', 'úterý', 'středa', 'čtvrtek', 'pátek', 'sobota', 'neděle'];
+
+/**
+ * Den v týdnu s nejvíc hosty v průměru (0 = pondělí) z uzávěrek s vyplněným počtem; jen hlavní řádky.
+ * Den, kdy se hosté nepočítali, se do průměru nezapočte (nebyl to den bez hostů). null = nikdo nevyplnil.
+ */
+export function nejviceHostu(radky: readonly RadekUzaverky[]): { den: number; prumer: number } | null {
+  const poDnech = new Map<string, number>();
+  for (const c of radky) {
+    const h = jeHlavni(c) ? hosteUzaverky(c) : null;
+    const d = denUzaverky(c);
+    if (h != null && d) poDnech.set(d, (poDnech.get(d) ?? 0) + h);
+  }
+  if (poDnech.size === 0) return null;
+  const sumy = new Array(7).fill(0), pocty = new Array(7).fill(0);
+  for (const [d, h] of poDnech) { const w = denVTydnu(d); sumy[w] += h; pocty[w]++; }
+  let den = -1, prumer = 0;
+  for (let i = 0; i < 7; i++) if (pocty[i] && sumy[i] / pocty[i] > prumer) { prumer = sumy[i] / pocty[i]; den = i; }
+  return den < 0 ? null : { den, prumer: Math.round(prumer) };
+}
 
 // ---------------------------------------------------------------------------
 // Fronty: chybějící a ke schválení

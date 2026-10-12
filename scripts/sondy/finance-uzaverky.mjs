@@ -201,6 +201,12 @@ const text = async (p, w) => (await p.locator(`[data-plocha] li[data-widget="${w
       }
       await nastroj(p).getByPlaceholder(/Hledat podle dne/).first().fill('');
     }
+    // Hosté u řádku: fixtura má u části uzávěrek vyplněné zákazníky (84), u části ne.
+    await obdobi.getByRole('tab', { name: 'Vše' }).click();
+    await dokud(async () => (await radky(p).count()) === seznam.closings.length, 3000);
+    const texty = (await radky(p).allInnerTexts()).map(x => x.replace(/\s+/g, ' '));
+    tvrdi(`C6 ${w}: řádek s vyplněnými zákazníky má „84 hostů"`, texty.some(x => /84 hostů/.test(x)), texty.join(' | ').slice(0, 300));
+    tvrdi(`C6 ${w}: řádek bez zákazníků „hostů" nemá`, texty.some(x => !/host/.test(x)));
     await obdobi.getByRole('tab', { name: 'Měsíc' }).click();
     const pres = await p.evaluate(() => document.documentElement.scrollWidth - innerWidth);
     const presKarta = await nastroj(p).evaluate(el => el.scrollWidth - el.clientWidth);

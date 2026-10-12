@@ -1661,5 +1661,6 @@
   "před {n, plural, one {# rokem} few {# lety} other {# lety}}": "pred {n, plural, one {# rokom} few {# rokmi} many {# rokmi} other {# rokmi}}",
   "Založit úkol z karty": "Založiť úlohu z karty",
   "Úkol z karty se nepodařilo připravit — prohlížeč nedovolil uložit rozepsaný úkol.": "Úlohu z karty sa nepodarilo pripraviť — prehliadač nedovolil uložiť rozpísanú úlohu.",
-  "Období": "Obdobie"
+  "Období": "Obdobie",
+  "{n, plural, one {# host} few {# hosté} other {# hostů}}": "{n, plural, one {# hosť} few {# hostia} many {# hosťa} other {# hostí}}"
 }

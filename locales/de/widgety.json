@@ -1062,7 +1062,6 @@
   "Trend půjde spočítat, až budou uzávěrky aspoň ze čtyř dní.": "Der Trend lässt sich berechnen, sobald Kassenabschlüsse von mindestens vier Tagen vorliegen.",
   "Trendy tržeb": "Umsatztrends",
   "Tržba": "Umsatz",
-  "Tržba celkem (hotově/kartou), odvedeno a odloženo, vyplaceno hotově nebo spropitné, rozdíl kasy — za zvolené období.": "Gesamtumsatz (bar/Karte), abgeführt und entnommen, bar ausgezahlt oder Trinkgeld, Kassendifferenz – für den gewählten Zeitraum.",
   "Tržba dne": "Tagesumsatz",
   "Tržba po dnech": "Umsatz pro Tag",
   "Tržba po dnech: sloupcový graf se zvýrazněným rekordem a u velké karty seznam dnů s částkami. Období i „Měsíc stránky\" (na Financích měsíc z přepínače v hlavičce). Zdroj pokladna, nebo uzávěrky (funguje i bez pokladny).": "Umsatz pro Tag: Balkendiagramm mit hervorgehobenem Rekord und bei der großen Karte eine Liste der Tage mit Beträgen. Zeitraum auch „Monat der Seite“ (bei Finanzen der Monat aus dem Schalter in der Kopfzeile). Quelle: Kasse oder Kassenabschlüsse (funktioniert auch ohne Kasse).",
@@ -1953,5 +1952,12 @@
   "Fotku se nepodařilo nahrát — zkontroluj připojení.": "Das Foto konnte nicht hochgeladen werden — prüf die Verbindung.",
   "Fotka ze splnění": "Foto der Erledigung",
   "Otevřít fotku v plné velikosti": "Foto in voller Größe öffnen",
-  "Fotka ze splnění úkolu {nazev}": "Foto der Erledigung der Aufgabe {nazev}"
+  "Fotka ze splnění úkolu {nazev}": "Foto der Erledigung der Aufgabe {nazev}",
+  "Hosté": "Gäste",
+  "Ø na hosta": "Ø pro Gast",
+  "Ø na hosta {castka}": "Ø {castka} pro Gast",
+  "hosté nevyplnění": "Gäste nicht eingetragen",
+  "Nejvíc hostů: {den}": "Meiste Gäste: {den}",
+  "průměr {pocet}": "Durchschnitt {pocet}",
+  "Tržba celkem (hotově/kartou), odvedeno a odloženo, vyplaceno hotově nebo spropitné, rozdíl kasy, a když tým vyplňuje hosty, i hosté a útrata na hosta — za zvolené období.": "Gesamtumsatz (bar/Karte), abgeführt und entnommen, bar ausgezahlt oder Trinkgeld, Kassendifferenz und, wenn das Team Gäste einträgt, auch Gäste und Umsatz pro Gast – für den gewählten Zeitraum."
 }

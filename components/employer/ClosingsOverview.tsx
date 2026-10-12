@@ -37,7 +37,7 @@ import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useSmi } from '../widgety/NavigaceKontext';
 import {
   KLIC_DEN, KLIC_VYPLNIT, UDALOST_DEN, UDALOST_VYPLNIT,
-  denUzaverky, jeHlavni, rozdilUzaverky, type RadekUzaverky,
+  denUzaverky, hosteUzaverky, jeHlavni, rozdilUzaverky, type RadekUzaverky,
 } from '@/lib/uzaverkyPrehled';
 import { filtrujUzaverky, jmenaZUzaverek, nazevExportuUzaverek, pocetFiltru, popisObdobiExportu, PRAZDNY_FILTR, stitkySmen, type FiltrUzaverek, type Razeni } from '@/lib/uzaverkyFiltr';
 import { otevriDen } from '@/lib/denUdalost';
@@ -384,6 +384,9 @@ export default function ClosingsOverview() {
                     // s tabulkovými číslicemi na monitoru, na telefonu vlevo pod jménem a rozdíl kasy vedle ní.
                     detail={<span className="line-clamp-2 break-words">{t('Směna: {crew}', { crew })}</span>}
                     value={trzba != null ? <><span className="sr-only">{t('tržba {castka}', { castka: money(trzba) })}</span><span aria-hidden>{money(trzba)}</span></> : undefined}
+                    // Hosté, když je tým v uzávěrce vyplnil — pod tržbou ve stejném sloupci (číslo k číslu),
+                    // ne za posádkou, kde by je dlouhá směna uřízla na druhém řádku.
+                    valueMeta={hosteUzaverky(c) != null ? t('{n, plural, one {# host} few {# hosté} other {# hostů}}', { n: hosteUzaverky(c)! }) : undefined}
                     // Štítky mají na monitoru jednotnou minimální šířku, ať tržby vlevo od nich stojí v jednom
                     // svislém sloupci (jinak „Sedí" a „Čeká na schválení −200 Kč" posouvaly číslo o 150 px).
                     right={<span className="flex flex-wrap items-center justify-end gap-2 lg:min-w-[16rem]">

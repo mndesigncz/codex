@@ -1061,7 +1061,6 @@
   "Trend půjde spočítat, až budou uzávěrky aspoň ze čtyř dní.": "Trend da się obliczyć, gdy będą zamknięcia kasy z co najmniej czterech dni.",
   "Trendy tržeb": "Trendy utargu",
   "Tržba": "Utarg",
-  "Tržba celkem (hotově/kartou), odvedeno a odloženo, vyplaceno hotově nebo spropitné, rozdíl kasy — za zvolené období.": "Utarg łącznie (gotówka/karta), odprowadzone i odłożone, wypłacone gotówką lub napiwki, różnica w kasie — za wybrany okres.",
   "Tržba dne": "Utarg dnia",
   "Tržba po dnech": "Utarg według dni",
   "Tržba po dnech: sloupcový graf se zvýrazněným rekordem a u velké karty seznam dnů s částkami. Období i „Měsíc stránky\" (na Financích měsíc z přepínače v hlavičce). Zdroj pokladna, nebo uzávěrky (funguje i bez pokladny).": "Utarg według dni: wykres słupkowy z wyróżnionym rekordem, a przy dużej karcie lista dni z kwotami. Okres także „Miesiąc strony” (w Finansach miesiąc z przełącznika w nagłówku). Źródło: kasa lub zamknięcia kasy (działa też bez kasy).",
@@ -1952,5 +1951,12 @@
   "Fotku se nepodařilo nahrát — zkontroluj připojení.": "Nie udało się wgrać zdjęcia — sprawdź połączenie.",
   "Fotka ze splnění": "Zdjęcie z wykonania",
   "Otevřít fotku v plné velikosti": "Otwórz zdjęcie w pełnym rozmiarze",
-  "Fotka ze splnění úkolu {nazev}": "Zdjęcie z wykonania zadania {nazev}"
+  "Fotka ze splnění úkolu {nazev}": "Zdjęcie z wykonania zadania {nazev}",
+  "Hosté": "Goście",
+  "Ø na hosta": "Śr. na gościa",
+  "Ø na hosta {castka}": "śr. {castka} na gościa",
+  "hosté nevyplnění": "goście nie wpisani",
+  "Nejvíc hostů: {den}": "Najwięcej gości: {den}",
+  "průměr {pocet}": "średnio {pocet}",
+  "Tržba celkem (hotově/kartou), odvedeno a odloženo, vyplaceno hotově nebo spropitné, rozdíl kasy, a když tým vyplňuje hosty, i hosté a útrata na hosta — za zvolené období.": "Utarg łącznie (gotówka/karta), odprowadzone i odłożone, wypłacone gotówką lub napiwki, różnica w kasie, a jeśli zespół wpisuje gości, także goście i wydatek na gościa — za wybrany okres."
 }

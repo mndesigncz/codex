@@ -1661,5 +1661,6 @@
   "před {n, plural, one {# rokem} few {# lety} other {# lety}}": "{n, plural, one {# year ago} other {# years ago}}",
   "Založit úkol z karty": "Create task from card",
   "Úkol z karty se nepodařilo připravit — prohlížeč nedovolil uložit rozepsaný úkol.": "Couldn't prepare a task from the card — the browser didn't allow saving the draft.",
-  "Období": "Period"
+  "Období": "Period",
+  "{n, plural, one {# host} few {# hosté} other {# hostů}}": "{n, plural, one {# guest} other {# guests}}"
 }
