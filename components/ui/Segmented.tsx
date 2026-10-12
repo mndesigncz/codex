@@ -15,6 +15,11 @@ import { Icon } from '../Icons';
 // šest a víc položek na telefonu zalomilo na dva řádky a přepínač vypadal
 // jako hromádka textu, ne jako jedna ovládací lišta. Že je kus mimo, prozradí
 // vyblednutý okraj a vybraná položka se sama posune do záběru.
+//
+// Hranice: Segmented je přepínač pohledu pro pár položek (do pěti — Odměny, Úkoly,
+// Vše · Nepřečtené). Navigace mezi víc sekcemi patří na telefonu do svislého seznamu
+// s „Zpět" (Nastavení, kolo 6): posuvný pás třinácti sekcí schoval Notifikace i Role
+// za okraj obrazovky a nic neprozradilo, že tam jsou.
 
 export interface SegmentedOption<T extends string = string> {
   id: T;

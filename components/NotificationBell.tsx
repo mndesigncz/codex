@@ -140,7 +140,7 @@ export default function NotificationBell() {
           <div className="px-4 py-3 border-b border-black/[0.07] flex items-center justify-between">
             <span className="font-bold text-[#16181A] text-sm">{t('Notifikace')}</span>
             {notifs.some(n => !n.is_read) && (
-              <button onClick={markAllRead} className="text-xs text-[#5B7A08] hover:underline">{t('Přečíst vše')}</button>
+              <button type="button" onClick={markAllRead} className="tap-target-sm text-xs text-[#5B7A08] hover:underline">{t('Přečíst vše')}</button>
             )}
           </div>
           <div className="max-h-96 overflow-y-auto scrollbar-thin divide-y divide-black/[0.05]">

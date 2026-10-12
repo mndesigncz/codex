@@ -394,6 +394,24 @@ export default function EmployerLayout({ user }: Props) {
   }
 
   if (appMode === 'togo') {
+    // Spodní dok i v TO GO (kolo 6, V01): stejné položky jako administrace, „Více" se
+    // všemi pohledy mimo dok a akcemi; klepnutí přepne do administrace na ten pohled.
+    const doAdministrace = (fn?: () => void) => { switchMode('full'); fn?.(); };
+    const dokToGo = {
+      polozky: nav.dok.map(n => ({
+        id: n.id, label: n.label, icon: n.icon,
+        ...(n.id === 'chat' ? { badge: unreadChat, badgeLabel: t('{n, plural, one {# nepřečtená zpráva} few {# nepřečtené zprávy} other {# nepřečtených zpráv}}', { n: unreadChat }) } : {}),
+      })),
+      skupiny: mobileGroups,
+      akce: [
+        { label: t('Administrace'), icon: 'swap', onClick: () => doAdministrace() },
+        { label: t('Hledat'), icon: 'search', onClick: () => doAdministrace(() => setHledani(true)) },
+        { label: t('Nastavení'), icon: 'settings', onClick: () => doAdministrace(openSettings) },
+        ...(smiTym ? [{ label: t('Tým'), icon: 'users', onClick: () => doAdministrace(openTeam) }] : []),
+        ...(smiKlient ? [{ label: 'Managero client', icon: 'gift', onClick: () => switchMode('client') }] : []),
+        { label: t('Odhlásit se'), icon: 'logout', onClick: () => odhlasit({ callbackUrl: '/login' }), danger: true },
+      ],
+    };
     return (
       <NavigaceKontext.Provider value={navigaceWidgetu}>
         <ProfileLinkProvider>
@@ -402,6 +420,7 @@ export default function EmployerLayout({ user }: Props) {
             onExit={() => switchMode('full')}
             onOpenView={(v, arg) => { switchMode('full'); navigate(v, arg); }}
             smiPohled={smiPohled}
+            dok={dokToGo}
           />
         </ProfileLinkProvider>
       </NavigaceKontext.Provider>
