@@ -160,6 +160,101 @@ export function poDnech(rez: Rezervace[]): [string, Rezervace[]][] {
 }
 
 // ---------------------------------------------------------------------------
+// Objednávky od stolu — historie (Client › Objednávky › Historie)
+// ---------------------------------------------------------------------------
+//
+// Fronta ukazuje jen poslední tři hodiny; majitel večer chce vědět, kolik objednávek
+// od stolu přišlo, za kolik a kolik jich obsluha nepřijala. Součet je jen z hotových
+// a jmenuje se „Od stolu celkem" — skutečná tržba podniku je z pokladny (Finance).
+
+export type StavObjednavky = 'new' | 'confirmed' | 'done' | 'declined';
+export const STAVY_OBJEDNAVEK: StavObjednavky[] = ['new', 'confirmed', 'done', 'declined'];
+
+/** Nejdelší období historie v jednom dotazu (čtvrt roku). */
+export const MAX_DNI_HISTORIE = 92;
+
+export interface ObjednavkaHistorie {
+  id: number;
+  /** Čas z databáze (UTC bez zóny) — zobrazit jen přes dbTimeHM/dbTimeDayHM. */
+  vytvoreno: string;
+  upraveno: string | null;
+  /** Ve stejných jednotkách jako příjem u obsluhy (cena z menu, smí mít haléře → usePrice). */
+  castka: number;
+  stav: StavObjednavky;
+  stul: string | null;
+  host: string;
+  polozky: { nazev: string; pocet: number }[];
+}
+
+export interface SouhrnObjednavek { pocet: number; soucet: number; prumer: number | null; neprijato: number; hotovych: number }
+
+/** Počet, součet a průměr jen z hotových (nepřijaté a rozpracované by součet nafoukly), počet nepřijatých. */
+export function souhrnObjednavek(objednavky: readonly { castka: number; stav: string }[]): SouhrnObjednavek {
+  const hotove = objednavky.filter(o => o.stav === 'done');
+  const soucet = Math.round(hotove.reduce((s, o) => s + cislo(o.castka), 0) * 100) / 100;
+  return {
+    pocet: objednavky.length,
+    soucet,
+    prumer: hotove.length ? Math.round((soucet / hotove.length) * 100) / 100 : null,
+    neprijato: objednavky.filter(o => o.stav === 'declined').length,
+    hotovych: hotove.length,
+  };
+}
+
+/**
+ * Období historie z dotazu (?from=&to=, RRRR-MM-DD). Bez parametrů dnešek; obrácené
+ * pořadí se prohodí; delší než MAX_DNI_HISTORIE je chyba (ne tiché uříznutí).
+ */
+export function obdobiHistorie(from: unknown, to: unknown, dnes: string): { od: string; do: string } | { chyba: string } {
+  const den = (v: unknown) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T12:00:00Z`)) ? v : null);
+  const f = from == null || from === '' ? null : den(from);
+  const t = to == null || to === '' ? null : den(to);
+  if ((from != null && from !== '' && !f) || (to != null && to !== '' && !t)) return { chyba: 'Období má tvar RRRR-MM-DD.' };
+  let od = f ?? t ?? dnes;
+  let doo = t ?? f ?? dnes;
+  if (od > doo) [od, doo] = [doo, od];
+  const dni = Math.round((Date.parse(`${doo}T12:00:00Z`) - Date.parse(`${od}T12:00:00Z`)) / 86_400_000) + 1;
+  if (dni > MAX_DNI_HISTORIE) return { chyba: `Období může mít nejvýš ${MAX_DNI_HISTORIE} dní.` };
+  return { od, do: doo };
+}
+
+/** Odpověď GET /api/client/admin/orders. Nečekaný tvar je chyba (ErrorState), ne „žádné objednávky". */
+export function vyberHistoriiObjednavek(raw: any): { objednavky: ObjednavkaHistorie[]; souhrn: SouhrnObjednavek; celkem: number } {
+  if (!raw || !Array.isArray(raw.orders)) throw new Error('Objednávky přišly v nečekaném tvaru.');
+  const objednavky: ObjednavkaHistorie[] = raw.orders.map((o: any) => ({
+    id: Number(o.id),
+    vytvoreno: String(o.createdAt ?? ''),
+    upraveno: o.updatedAt ? String(o.updatedAt) : null,
+    castka: cislo(o.total),
+    stav: (STAVY_OBJEDNAVEK.includes(o.status) ? o.status : 'new') as StavObjednavky,
+    stul: text(o.tableName),
+    host: text(o.customerName) ?? 'Host',
+    polozky: seznam(o.polozky).map((l: any) => ({ nazev: String(l?.nazev ?? l?.name ?? '').trim(), pocet: Math.max(1, Math.round(cislo(l?.pocet ?? l?.count) || 1)) })).filter((l: { nazev: string }) => l.nazev),
+  }));
+  const s = raw.souhrn && typeof raw.souhrn === 'object' ? raw.souhrn : null;
+  return {
+    objednavky,
+    souhrn: s ? { pocet: cislo(s.pocet), soucet: cislo(s.soucet), prumer: s.prumer == null ? null : cislo(s.prumer), neprijato: cislo(s.neprijato), hotovych: cislo(s.hotovych) } : souhrnObjednavek(objednavky),
+    celkem: raw.celkem == null ? objednavky.length : cislo(raw.celkem),
+  };
+}
+
+/**
+ * Za kolik minut se s objednávkou pohnulo. Sloupec „přijato v" nemáme — updated_at je čas
+ * poslední změny stavu: u „Připravuje se" přijetí, u „Hotovo" vyřízení. Nová a nečitelné → null.
+ */
+export function dobaObjednavky(o: Pick<ObjednavkaHistorie, 'vytvoreno' | 'upraveno' | 'stav'>, naDatum: (v: string) => Date | null): { co: 'prijato' | 'hotovo' | 'odmitnuto'; minut: number } | null {
+  if (o.stav === 'new' || !o.upraveno) return null;
+  const a = naDatum(o.vytvoreno), b = naDatum(o.upraveno);
+  if (!a || !b) return null;
+  const minut = Math.max(0, Math.round((b.getTime() - a.getTime()) / 60_000));
+  return { co: o.stav === 'confirmed' ? 'prijato' : o.stav === 'done' ? 'hotovo' : 'odmitnuto', minut };
+}
+
+/** „2× Matcha latte, 1× Sencha" — položky zkráceně pro meta řádek. */
+export const polozkyKratce = (polozky: readonly { nazev: string; pocet: number }[]) => polozky.map(l => `${l.pocet}× ${l.nazev}`).join(', ');
+
+// ---------------------------------------------------------------------------
 // Hodnocení
 // ---------------------------------------------------------------------------
 

@@ -46,7 +46,8 @@ export function useStaffInbox(enabled = true) {
   return { d, err, reload: load };
 }
 
-const ORDER_STATUS: Record<string, { label: string; tone: ChipTone }> = {
+/** Stav objednávky slovem a tónem — stejný ve frontě i v historii (Client › Objednávky). */
+export const ORDER_STATUS: Record<string, { label: string; tone: ChipTone }> = {
   new: { label: 'Nová', tone: 'wait' }, confirmed: { label: 'Připravuje se', tone: 'ok' }, done: { label: 'Hotovo', tone: 'muted' }, declined: { label: 'Nepřijato', tone: 'muted' },
 };
 const POS_STATE: Record<string, string> = { NEW: 'v kase čeká na přijetí', CONFIRMED: 'v kase, připravuje se', DISPATCHED: 'v kase vydáno', DECLINED: 'kasa odmítla', SCHEDULING_DELIVERY: 'v kase' };

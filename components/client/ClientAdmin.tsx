@@ -29,10 +29,10 @@ import { useTheme } from '../ThemeProvider';
 import { Icon, LogoMark } from '../Icons';
 import {
   Badge, BarSpark, Button, Card, Chip, DraftNote, EmptyState, ErrorBoundary, ErrorState, Field, Input, ListRow, Menu, Modal, PageHeader,
-  PersonChip, SearchField, Segmented, Select, Skeleton, Stat, SwitchRow, Textarea, Toast, useLoad, type MenuItem,
+  ObdobiLista, PersonChip, SearchField, Segmented, Select, Skeleton, Stat, StatRow, SwitchRow, Textarea, Toast, useLoad, type MenuItem,
 } from '../ui';
 import { Dock } from '../ui/Dock';
-import StaffInbox from './StaffInbox';
+import StaffInbox, { ORDER_STATUS } from './StaffInbox';
 import MobileMoreSheet from '../MobileMoreSheet';
 import FloorPlanEditor from './FloorPlanEditor';
 import QrDesigner from './QrDesigner';
@@ -50,13 +50,16 @@ import {
   czDay, dayKey, nejdriveDnes, RES_STATUS, RUCNI_MAX_JMENO, RUCNI_MAX_POZNAMKA, RUCNI_MAX_TELEFON, slotsFor, validujRucniRezervaci, vOteviraciDobe,
   type PoleRucni,
 } from '@/lib/clientSlots';
-import { dayPlus, dbTimeDayHM, pragueHM, pragueToday } from '@/lib/pragueTime';
+import { dayPlus, dbTimeDayHM, dbTimeHM, parseDbTime, pragueHM, pragueToday } from '@/lib/pragueTime';
+import { obdobiZPresetu, platneRozmezi, type Obdobi as ObdobiHistorie } from '@/lib/obdobi';
+import { usePrice } from '../CurrencyProvider';
 import { useDraft, type Koncept } from '@/lib/useDraft';
 import { czCount, type CzNoun } from '@/lib/czech';
 import { apiMessage } from '@/lib/api';
 import type { Navigace } from '@/lib/widgety/typy';
 import {
-  TON_REZERVACE, hlavniKrok, klicPrechodu, muzeDo, odkazTel, poDnech, prumerCesky, vyberCleny, vyberHodnoceni, vyberRezervace,
+  TON_REZERVACE, dobaObjednavky, hlavniKrok, klicPrechodu, muzeDo, odkazTel, poDnech, polozkyKratce, prumerCesky, vyberCleny, vyberHistoriiObjednavek,
+  vyberHodnoceni, vyberRezervace,
   type NastaveniZapisu, type Rezervace, type StavRezervace, type Stul,
 } from '@/lib/klientPrehled';
 import { useOpravneni } from '../role/useOpravneni';
@@ -109,6 +112,7 @@ const MISTO: CzNoun = { one: 'místo', few: 'místa', many: 'míst' };
 const NOVA_OBJEDNAVKA: CzNoun = { one: 'nová objednávka', few: 'nové objednávky', many: 'nových objednávek' };
 const REZERVACE_KE_SCHVALENI: CzNoun = { one: 'rezervace k potvrzení', few: 'rezervace k potvrzení', many: 'rezervací k potvrzení' };
 const HODNOCENI: CzNoun = { one: 'hodnocení', few: 'hodnocení', many: 'hodnocení' };
+const HOTOVA: CzNoun = { one: 'hotové', few: 'hotových', many: 'hotových' };
 
 async function j(url: string, init?: RequestInit) {
   const r = await fetch(url, init ? { headers: JSON_HLAVICKA, ...init } : undefined);
@@ -755,16 +759,74 @@ function NovaRezervaceOkno({ form, setForm, koncept, zapis, stoly, onZavrit, onZ
 // ---- Objednávky -----------------------------------------------------------------
 
 function ObjednavkyStranka({ oznam, onZmena }: { oznam: Hlaska; onZmena: () => void }) {
+  // Fronta beze změny; Historie je pohled majitele na celé období (kolik přišlo, za kolik, kolik nepřijato).
+  const [pohled, setPohled] = useState<'fronta' | 'historie'>('fronta');
   return (
     <PlochaWidgetu
       stranka="vedeni.klient_objednavky"
       hlavicka={{
         title: 'Objednávky',
         hintId: 'clientadmin-1',
-        subtitle: 'Objednávky od stolu čekají na přijetí. Přijaté jdou do pokladny na stůl, hotové připíšou hostovi body.',
+        subtitle: pohled === 'fronta'
+          ? 'Objednávky od stolu čekají na přijetí. Přijaté jdou do pokladny na stůl, hotové připíšou hostovi body.'
+          : 'Objednávky od stolu za zvolené období. Skutečnou tržbu podniku ukazují Finance z pokladny.',
+        aside: <Segmented options={[{ id: 'fronta', label: 'Fronta' }, { id: 'historie', label: 'Historie' }]}
+          value={pohled} onChange={setPohled} size="sm" ariaLabel="Fronta nebo historie objednávek" />,
       }}
-      nastroj={<StaffInbox onToast={t => oznam(t)} onZmena={onZmena} />}
+      nastroj={pohled === 'fronta' ? <StaffInbox onToast={t => oznam(t)} onZmena={onZmena} /> : <HistorieObjednavek />}
     />
+  );
+}
+
+/** Objednávky od stolu za období: čtyři čísla (2 × 2 na telefonu) a seznam s časem, dobou přijetí a částkou. */
+function HistorieObjednavek() {
+  const cena = usePrice();
+  const [obdobi, setObdobi] = useState<ObdobiHistorie>(() => obdobiZPresetu('dnes'));
+  const r = platneRozmezi(obdobi);
+  const url = `/api/client/admin/orders?from=${r.od}&to=${r.do}`;
+  const data = useDataWidgetu(url, vyberHistoriiObjednavek);
+  const vic = r.od !== r.do;
+  const d = data.data;
+  return (
+    <div className="space-y-4">
+      <ObdobiLista value={obdobi} onChange={setObdobi} volby={['dnes', 'vcera', '7_dni', 'mesic']} dnyTydne={false} hrubost={false} />
+      {data.error ? <ErrorState title="Historie objednávek se nenačetla" onRetry={data.reload} detail={data.error} />
+        : !d ? <PageSkel />
+        : (
+          <>
+            <Card>
+              <StatRow>
+                <Stat label="Objednávek" value={String(d.souhrn.pocet)} />
+                <Stat label="Od stolu celkem" value={cena(d.souhrn.soucet)} note={d.souhrn.hotovych ? `z ${czCount(d.souhrn.hotovych, HOTOVA)}` : 'zatím nic hotového'} />
+                <Stat label="Průměr" value={d.souhrn.prumer == null ? '–' : cena(d.souhrn.prumer)} />
+                <Stat label="Nepřijato" value={String(d.souhrn.neprijato)} tone={d.souhrn.neprijato > 0 ? 'wait' : 'muted'} />
+              </StatRow>
+            </Card>
+            {d.objednavky.length === 0 ? (
+              <Card><EmptyState icon="cup" compact title="Za tohle období žádné objednávky od stolu" hint="Objeví se tu, jakmile si host objedná přes QR kód na stole." /></Card>
+            ) : (
+              <Card pad="none">
+                <ul className="list px-5">
+                  {d.objednavky.map(o => {
+                    const st = ORDER_STATUS[o.stav] ?? ORDER_STATUS.new;
+                    const doba = dobaObjednavky(o, parseDbTime);
+                    const kdy = vic ? dbTimeDayHM(o.vytvoreno) : dbTimeHM(o.vytvoreno);
+                    const casti = [kdy, doba ? (doba.co === 'prijato' ? `přijato za ${doba.minut} min` : doba.co === 'hotovo' ? `hotovo za ${doba.minut} min` : null) : null, polozkyKratce(o.polozky)];
+                    return (
+                      <ListRow key={o.id} title={`${o.stul ?? 'bez stolu'} · ${o.host}`} meta={casti.filter(Boolean).join(' · ')}
+                        value={<span className="tabular-nums">{cena(o.castka)}</span>}
+                        right={<Chip tone={st.tone} size="sm">{st.label}</Chip>} />
+                    );
+                  })}
+                </ul>
+                {d.celkem > d.objednavky.length && (
+                  <p className="t-meta tabular-nums px-5 py-3 border-t border-black/5">Zobrazeno posledních {d.objednavky.length} z {d.celkem}. Kratší období ukáže všechny.</p>
+                )}
+              </Card>
+            )}
+          </>
+        )}
+    </div>
   );
 }
 
