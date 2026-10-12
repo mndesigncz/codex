@@ -1,0 +1,74 @@
+{
+ "_popis": "Kolo 6 (B5): výchozí rozložení zaměstnance po auditu — Sklad s nástrojem před Docházejícími (lib/widgety/stranky/zamestnanec.sklad.ts), Úkoly jen nástroj (zamestnanec.ukoly.ts). Klíč = stránka plochy.",
+ "zamestnanec.sklad": {
+  "stranka": "zamestnanec.sklad",
+  "polozky": [
+   {
+    "id": "sklad-inventura",
+    "widget": "sklad.inventura",
+    "velikost": "M"
+   },
+   {
+    "id": "sklad-zapsat-novou",
+    "widget": "sklad.zapsat_novou",
+    "velikost": "S"
+   },
+   {
+    "id": "sklad-nahlasit",
+    "widget": "sklad.nahlasit",
+    "velikost": "S"
+   },
+   {
+    "id": "nastroj",
+    "widget": "nastroj",
+    "velikost": "L"
+   },
+   {
+    "id": "sklad-dochazi",
+    "widget": "sklad.dochazi",
+    "velikost": "M"
+   }
+  ],
+  "dostupne": [
+   "sklad.dochazi",
+   "vyroba.k_vyrobe",
+   "sklad.inventura",
+   "sklad.zapsat_novou",
+   "sklad.nahlasit",
+   "sklad.stav_kategorie",
+   "odkaz"
+  ],
+  "tarifem": [],
+  "zdroj": "podnik",
+  "rozsah": "typ:zamestnanec",
+  "zamceno": false,
+  "smiUpravit": true,
+  "smiVychozi": false,
+  "verze": 0
+ },
+ "zamestnanec.ukoly": {
+  "stranka": "zamestnanec.ukoly",
+  "polozky": [
+   {
+    "id": "nastroj",
+    "widget": "nastroj",
+    "velikost": "L"
+   }
+  ],
+  "dostupne": [
+   "ukoly.po_terminu",
+   "ukoly.tyden",
+   "vyroba.k_vyrobe",
+   "postupy.povinne_dnes",
+   "navody.povinne_cteni",
+   "odkaz"
+  ],
+  "tarifem": [],
+  "zdroj": "podnik",
+  "rozsah": "typ:zamestnanec",
+  "zamceno": false,
+  "smiUpravit": true,
+  "smiVychozi": false,
+  "verze": 0
+ }
+}

@@ -164,11 +164,22 @@ export default function MyShifts({ user }: Props) {
                     detail={tym.zapnuto ? <KolegoveSmeny kolegove={kolegoveKeSmene(s, tym.smeny)} hotovo={tym.hotovo} /> : undefined}
                     value={`${fmtHM(s.startTime ?? s.start_time)}–${fmtHM(s.endTime ?? s.end_time)}`}
                     right={nabidnuto ? <Chip tone="info" size="sm">{t('V burze')}</Chip> : d === dnes ? <Chip tone="ok" size="sm">{t('Dnes')}</Chip> : undefined}
-                    actions={smiBurza && !nabidnuto ? (
+                    // Zaměstnanec má jedinou akci směny rovnou jako tlačítko (audit kola 6, Z10): „···"
+                    // s jednou položkou stálo tři klepnutí a dvě vrstvy za to, co barista z telefonu
+                    // dělá nejčastěji. Okno s poznámkou zůstává (nabídnout = dvě klepnutí). Vedení má
+                    // v Mých směnách zatím „···" — jeho podobu hlídá sonda k69-b1 balíku Rozvrhu.
+                    actions={smiBurza && !nabidnuto ? (zamestnanec ? (
+                      <Button variant="secondary" size="sm" icon="handover"
+                        aria-label={t('Nabídnout do burzy směnu {den}', { den: denVeVete(d) })}
+                        title={t('Kolega si ji může vzít, vedení výměnu schválí.')}
+                        onClick={() => { setNabidnout(s); setPoznamka(''); setChyba(null); }}>
+                        {t('Nabídnout')}
+                      </Button>
+                    ) : (
                       <Menu size="sm" label={t('Další akce se směnou {den}', { den: denVeVete(d) })} items={[
                         { label: t('Nabídnout do burzy…'), icon: 'handover', hint: t('Kolega si ji může vzít, vedení výměnu schválí.'), onClick: () => { setNabidnout(s); setPoznamka(''); setChyba(null); } },
                       ]} />
-                    ) : undefined}
+                    )) : undefined}
                   />
                 );
               })}

@@ -3,8 +3,14 @@
 // Filtry úkolů: hledání, záložky stavu s počty (Vše / Po termínu / Dnes / Tento týden / Později / Hotové)
 // a panel „Filtry" (priorita, druh úkolu, dny v týdnu termínu, řazení). Člověk se vybírá zvlášť u volajícího.
 // Počty u záložek počítá lib/ukolyFiltr.ts při ostatních filtrech, takže sedí se seznamem pod nimi.
+//
+// Kompaktní podoba na telefonu (`kompaktniNaTelefonu`, Úkoly zaměstnance — audit kola 6, Z3): ovládání
+// je jeden řádek jako u Rozvrhu — vlevo slot volajícího (přepínač Seznam/Týden/Měsíc), vpravo lupa
+// a „Filtry · n". Pole hledání se rozbalí pod řádek až po klepnutí na lupu (nebo když je co hledat)
+// a záložky stavu se kreslí jen u delšího seznamu nebo se zapnutým stavem. První úkol tak začíná
+// na první obrazovce, ne pod čtyřmi řádky ovládání. Od md beze změny.
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button, Segmented, SearchField } from '../ui';
 import { Icon } from '../Icons';
 import { useT } from '@/lib/i18n/client';
@@ -15,7 +21,7 @@ import {
 
 export interface ClovekFiltru { id: number | 'volne'; label: string; n: number }
 
-export function UkolyFiltry({ filtr, onChange, pocty, skrytStav = false, lide = [], className = '' }: {
+export function UkolyFiltry({ filtr, onChange, pocty, skrytStav = false, lide = [], className = '', kompaktniNaTelefonu = false, pilulkyNaTelefonu = true, vlevoNaTelefonu }: {
   filtr: FiltrUkolu;
   onChange: (f: FiltrUkolu) => void;
   pocty: PoctyStavu;
@@ -24,10 +30,23 @@ export function UkolyFiltry({ filtr, onChange, pocty, skrytStav = false, lide = 
   /** Lidé, podle kterých jde filtrovat (jen vedení, které vidí úkoly celého týmu). */
   lide?: ClovekFiltru[];
   className?: string;
+  /** Telefon (pod md): hledání sbalené do lupy, ovládání v jednom řádku. */
+  kompaktniNaTelefonu?: boolean;
+  /** Kompaktně: kreslit na telefonu záložky stavu i bez zapnutého stavu (volající je vypne u krátkého seznamu). */
+  pilulkyNaTelefonu?: boolean;
+  /** Kompaktně: obsah na začátek řádku, jen na telefonu (od md ho volající kreslí jinde). */
+  vlevoNaTelefonu?: React.ReactNode;
 }) {
   const t = useT('widgety');
   const loc = aktualniJazyk();
   const [otevreno, setOtevreno] = useState(false);
+  // Hledání sbalené do lupy zůstane rozbalené, dokud je co hledat.
+  const [hledaniOtevreno, setHledaniOtevreno] = useState(false);
+  const radekRef = useRef<HTMLDivElement>(null);
+  // Pole je v DOM pořád (jen schované), takže autoFocus by nezabral — fokus se dá ručně, až se ukáže.
+  const otevriHledani = () => { setHledaniOtevreno(true); requestAnimationFrame(() => radekRef.current?.querySelector('input')?.focus()); };
+  const hledaniSbalene = kompaktniNaTelefonu && !hledaniOtevreno && !filtr.hledat;
+  const pilulkyJenOdMd = kompaktniNaTelefonu && !pilulkyNaTelefonu && filtr.stav === 'vse';
   const kdoZapnuto = lide.length > 0 && filtr.kdo !== 'all';
   const n = pocetFiltru(filtr) + (kdoZapnuto ? 1 : 0);
   const kdoJmeno = lide.find(l => l.id === filtr.kdo)?.label ?? '';
@@ -52,15 +71,28 @@ export function UkolyFiltry({ filtr, onChange, pocty, skrytStav = false, lide = 
 
   return (
     <div className={`space-y-3 ${className}`} role="group" aria-label={t('Filtry úkolů')}>
-      <div className="flex items-center gap-2 min-w-0">
+      <div ref={radekRef} className={`flex items-center gap-2 min-w-0 ${kompaktniNaTelefonu ? 'max-md:flex-wrap' : ''}`}
+        // Prázdné hledání se po odchodu z pole (mimo jeho našeptávač) zase sbalí do lupy.
+        onBlur={kompaktniNaTelefonu ? (e => {
+          const kam = e.relatedTarget as HTMLElement | null;
+          if (!filtr.hledat && !kam?.closest('[role=combobox], [role=listbox]')) setHledaniOtevreno(false);
+        }) : undefined}>
+        {kompaktniNaTelefonu && vlevoNaTelefonu && <div className="md:hidden min-w-0 shrink">{vlevoNaTelefonu}</div>}
+        {/* Na telefonu v kompaktní podobě jde pole na vlastní řádek pod ovládání (order-last + celá šířka). */}
         <SearchField value={filtr.hledat} onChange={v => nastav({ hledat: v })} placeholder={t('Hledat v úkolech…')} ariaLabel={t('Hledat v úkolech')}
-          storageKey="ukoly" className="min-w-0 flex-1" />
-        <Button variant="secondary" size="sm" aria-expanded={otevreno} onClick={() => setOtevreno(o => !o)} className="shrink-0">
+          storageKey="ukoly"
+          className={`min-w-0 flex-1 ${kompaktniNaTelefonu ? 'max-md:order-last max-md:basis-full' : ''} ${hledaniSbalene ? 'max-md:hidden' : ''}`} />
+        {hledaniSbalene && (
+          <Button variant="secondary" size="sm" iconOnly icon="search" aria-label={t('Hledat v úkolech')} aria-expanded={false}
+            className="md:hidden ml-auto shrink-0" onClick={otevriHledani} />
+        )}
+        <Button variant="secondary" size="sm" aria-expanded={otevreno} onClick={() => setOtevreno(o => !o)}
+          className={`shrink-0 ${kompaktniNaTelefonu && !hledaniSbalene ? 'max-md:ml-auto' : ''}`}>
           {t('Filtry')}{n > 0 ? ` · ${n}` : ''}
         </Button>
       </div>
 
-      {!skrytStav && <div className="flex gap-1.5 overflow-x-auto scrollbar-thin scroll-fade-x -mx-1 px-1 py-0.5" role="group" aria-label={t('Stav úkolů')}>
+      {!skrytStav && <div className={`flex gap-1.5 overflow-x-auto scrollbar-thin scroll-fade-x -mx-1 px-1 py-0.5 ${pilulkyJenOdMd ? 'max-md:hidden' : ''}`} role="group" aria-label={t('Stav úkolů')}>
         {viditelne.map(s => (
           <button key={s.id} type="button" aria-pressed={filtr.stav === s.id} onClick={() => nastav({ stav: s.id })}
             className={`filter-pill tap-target-sm shrink-0 ${filtr.stav === s.id ? 'seg-on' : 'seg-off glass'}`}>

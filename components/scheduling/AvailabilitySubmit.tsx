@@ -14,17 +14,27 @@
 // ne limetka), legenda tečkami místo rámečků `rounded-md` a v podtitulku
 // čárky místo šipek „→". Limetka zůstává jediná — „Odeslat dostupnost".
 // Po odeslání se obnoví widget „Zadej dostupnost" (stejná URL).
+//
+// Audit kola 6 (Z7): „Nemůžu" stálo tři klepnutí na den (cyklus Dostupný →
+// Jen ranní → Jen odpolední → Nemůžu; týden dovolené = 21 klepnutí) a odeslání
+// leželo 1,5 obrazovky pod ohybem. Teď je „Nemůžu" v cyklu hned druhé
+// (jedno klepnutí), legenda je zároveň „štětec" — vybraný stav nastaví každý
+// klepnutý den jedním klepnutím (druhé ho vrátí na Dostupný) — a s rozepsanou
+// změnou je odeslání v plovoucí liště nad dokem (jen samostatná stránka;
+// v Mých směnách vedení má limetku „Hotovo" úprav).
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { odsazeniMesice, zacatekTydne } from '@/lib/week';
 import { useJazyk, useT } from '@/lib/i18n/client';
 import { fmtDenVTydnu } from '@/lib/i18n/format';
 import { useCurrency } from '@/components/CurrencyProvider';
 
-import { Button, Card, Chip, ErrorState, Field, Input, MonthNav, PageHeader, Segmented, Skeleton, Textarea } from '../ui';
+import { Button, Card, Chip, ErrorState, Field, Input, MonthNav, PageHeader, PlovouciLista, Segmented, Skeleton, Textarea } from '../ui';
+import { useSkrytyNastroj } from '@/lib/useSkrytyNastroj';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu } from '../widgety/useDataWidgetu';
 import { okJson } from '@/lib/api';
+import { Icon } from '../Icons';
 import { pragueToday } from '@/lib/pragueTime';
 interface Props {
   user: { id?: string; name?: string | null; avatar?: string; role?: string };
@@ -108,6 +118,13 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
   /** Zvýšením se načtení pustí znovu — `setMonth(m => m)` by efekt nespustil. */
   const [reloadKey, setReloadKey] = useState(0);
   const [confirmed, setConfirmed] = useState(false);
+  // Něco se od načtení (nebo odeslání) změnilo — pak je odeslání v plovoucí liště.
+  const [zmeneno, setZmeneno] = useState(false);
+  const zmena = () => { setConfirmed(false); setZmeneno(true); };
+  // „Štětec": null = klepnutí cyklí stavy, jinak nastaví tenhle stav.
+  const [stetec, setStetec] = useState<DayState | null>(null);
+  const korenRef = useRef<HTMLSpanElement>(null);
+  const schovany = useSkrytyNastroj(korenRef);
 
   const [types, setTypes] = useState<{ id: number; name: string }[]>([]);
   const [typesErr, setTypesErr] = useState(false);
@@ -119,12 +136,15 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
       .catch(() => setTypesErr(true));
   }, []);
   // The tap cycle follows the team's shift types; legacy binary only when none exist.
+  // „Nemůžu" hned za „Dostupný": nejčastější volba je jedno klepnutí, ne poslední v cyklu.
   const stateList: DayState[] = useMemo(
     () => (types.length
-      ? ['available', ...types.map((ty) => `type:${ty.id}`), 'off']
-      : ['available', 'morning', 'afternoon', 'off']),
+      ? ['available', 'off', ...types.map((ty) => `type:${ty.id}`)]
+      : ['available', 'off', 'morning', 'afternoon']),
     [types],
   );
+  // Štětec z jiného seznamu typů (po načtení) by nastavoval stav, který už neexistuje.
+  useEffect(() => { if (stetec && !stateList.includes(stetec)) setStetec(null); }, [stateList, stetec]);
   const metaOf = (st: DayState) => {
     if (st === 'available') return { ...AVAILABLE_META, label: t('Dostupný') };
     if (st === 'off') return { ...OFF_META, label: t('Nemůžu') };
@@ -147,6 +167,7 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
     let active = true;
     setLoading(true);
     setConfirmed(false);
+    setZmeneno(false);
     setLoadFailed(false);
     fetch(`/api/availability?mine=1&month=${month}`)
       .then((r) => {
@@ -189,11 +210,12 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
   const stateOf = (date: string): DayState => dayStates[date] ?? 'available';
 
   const cycleDay = (date: string) => {
-    setConfirmed(false);
+    zmena();
     setDayStates((prev) => {
       const cur = prev[date] ?? 'available';
       const i = stateList.indexOf(cur);
-      const next = stateList[(i < 0 ? 0 : i + 1) % stateList.length];
+      // Se štětcem: nastavit vybraný stav, a když už ho den má, vrátit na Dostupný.
+      const next = stetec ? (cur === stetec ? 'available' : stetec) : stateList[(i < 0 ? 0 : i + 1) % stateList.length];
       const copy = { ...prev };
       if (next === 'available') delete copy[date];
       else copy[date] = next;
@@ -226,6 +248,7 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
       if (res.ok) {
         setExisting(true);
         setConfirmed(true);
+        setZmeneno(false);
         // Připomínka „Zadej dostupnost" (Domů, Moje směny) čte tutéž URL.
         obnovDataWidgetu(`/api/availability?month=${month}&mine=1`);
       } else {
@@ -250,8 +273,11 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
   }, [grid, dayStates]);
 
   const popisCyklu = stateList.map((st) => metaOf(st).label.toLowerCase()).join(', ');
+  // Odeslání nad dokem: jen samostatná stránka, s rozepsanou změnou a když je co odeslat.
+  const listaOdeslani = headingLevel === 'h1' && zmeneno && !loading && !loadFailed && !schovany;
   const nastroj = (
     <Card as="section" aria-labelledby="dostupnost-kalendar" className="space-y-5">
+      <span ref={korenRef} aria-hidden className="hidden" />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="dostupnost-kalendar" className="t-card">{t('Kalendář dostupnosti')}</h2>
         {/* Do minulosti nejde — dostupnost na uplynulý měsíc nemá smysl. */}
@@ -280,15 +306,23 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
       ) : (
         <>
           <div>
-            <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 t-meta mb-2" aria-label={t('Legenda')}>
+            {/* Legenda je zároveň štětec: vybraný stav nastaví klepnutý den, „Přepínat" cyklí. */}
+            <div className="flex flex-wrap items-center gap-1.5 mb-2" role="radiogroup" aria-label={t('Co nastaví klepnutí na den')}>
+              <button type="button" role="radio" aria-checked={stetec === null} onClick={() => setStetec(null)}
+                className={`filter-pill tap-target-sm ${stetec === null ? 'seg-on' : 'seg-off glass'}`}>
+                {t('Přepínat')}
+              </button>
               {stateList.map((st) => (
-                <li key={st} className="flex items-center gap-1.5">
-                  <span aria-hidden className={`h-2.5 w-2.5 rounded-full ${metaOf(st).dot}`} /> {metaOf(st).label}
-                </li>
+                <button key={st} type="button" role="radio" aria-checked={stetec === st} onClick={() => setStetec(st)}
+                  className={`filter-pill tap-target-sm inline-flex items-center gap-1.5 ${stetec === st ? 'seg-on' : 'seg-off glass'}`}>
+                  <span aria-hidden className={`h-2.5 w-2.5 rounded-full shrink-0 ${metaOf(st).dot}`} /> {metaOf(st).label}
+                </button>
               ))}
-            </ul>
+            </div>
             <p className="t-meta mb-3 text-pretty">
-              {t('Klepnutím na den přepínáš: {popis}. Denní volby jsou závazné — „Jen …" a „Nemůžu" generátor vždy dodrží.', { popis: popisCyklu })}
+              {stetec === null
+                ? t('Klepnutím na den přepínáš: {popis}. Denní volby jsou závazné — „Jen …" a „Nemůžu" generátor vždy dodrží.', { popis: popisCyklu })
+                : t('Klepnutím na den nastavíš „{stav}", druhým klepnutím ho vrátíš na Dostupný. Denní volby jsou závazné — „Jen …" a „Nemůžu" generátor vždy dodrží.', { stav: metaOf(stetec).label })}
             </p>
             <div className="grid grid-cols-7 gap-1 sm:gap-1.5 mb-1.5">
               {(zacatek === 0 ? [6, 0, 1, 2, 3, 4, 5] : [0, 1, 2, 3, 4, 5, 6]).map((i) => { const z = fmtDenVTydnu(i, { jazyk }); return z.charAt(0).toLocaleUpperCase() + z.slice(1); }).map((d) => (
@@ -333,7 +367,7 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
             {/* Segmented nemá pole, ke kterému by šel <label> — jméno nese role="group" s aria-label. */}
             <div className="space-y-1.5">
               <p className="text-[13px] font-medium text-black/70" aria-hidden>{t('Preferovaná směna')}</p>
-              <Segmented ariaLabel={t('Preferovaná směna')} value={preferredShift} onChange={(v) => { setPreferredShift(v); setConfirmed(false); }}
+              <Segmented ariaLabel={t('Preferovaná směna')} value={preferredShift} onChange={(v) => { setPreferredShift(v); zmena(); }}
                 options={SHIFTS.map(s => ({ id: s.id, label: s.id === 'morning' ? t('Ranní') : s.id === 'afternoon' ? t('Odpolední') : t('Flexibilní') }))} />
               <p className="text-xs text-black/50">{t('Obecně a nezávazně — denní volby v kalendáři mají přednost.')}</p>
             </div>
@@ -344,7 +378,7 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
                 type="number" inputMode="numeric"
                 min={1}
                 value={maxShifts}
-                onChange={(e) => { setMaxShifts(e.target.value); setConfirmed(false); }}
+                onChange={(e) => { setMaxShifts(e.target.value); zmena(); }}
                 className="!w-full sm:!w-40"
               />
             </Field>
@@ -353,7 +387,7 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
               <Textarea
                 id="dostupnost-poznamka"
                 value={note}
-                onChange={(e) => { setNote(e.target.value); setConfirmed(false); }}
+                onChange={(e) => { setNote(e.target.value); zmena(); }}
                 rows={3}
                 className="resize-none"
               />
@@ -363,15 +397,27 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
           <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-black/[0.06]">
             {err && <p className="w-full note note-danger text-sm" role="alert">{err}</p>}
             {/* Jako sekce pod plochou Mých směn vedení (h2) není hlavní akcí
-                obrazovky — limetku tam má „Hotovo“ v úpravách. Tmavá. */}
-            <Button variant={headingLevel === 'h2' ? 'primary' : 'accent'} icon="send" block loading={saving} disabled={loadFailed} onClick={submit}
+                obrazovky — limetku tam má „Hotovo“ v úpravách. Tmavá. Tmavá
+                je i tehdy, když limetku nese plovoucí lišta s rozepsanou změnou. */}
+            <Button variant={headingLevel === 'h2' || listaOdeslani ? 'primary' : 'accent'} icon="send" block loading={saving} disabled={loadFailed} onClick={submit}
               title={loadFailed ? t('Nejdřív je potřeba načíst, co jsi poslal/a dřív.') : undefined}>
               {existing ? t('Aktualizovat dostupnost') : t('Odeslat dostupnost')}
             </Button>
             {confirmed && <Chip tone="ok" icon="check">{t('Uloženo')}</Chip>}
             {existing && !confirmed && <span className="t-meta">{t('Dostupnost už jsi odeslal/a — můžeš ji upravit.')}</span>}
           </div>
+          {/* Místo pod lištou, ať nezakryje konec karty. */}
+          {listaOdeslani && <div aria-hidden className="h-12" />}
         </>
+      )}
+      {listaOdeslani && (
+        <PlovouciLista label={t('Neodeslaná dostupnost')}>
+          <span className="text-sm font-semibold whitespace-nowrap px-1">{t('Neodesláno')}</span>
+          <button type="button" onClick={() => { void submit(); }} disabled={saving} aria-busy={saving || undefined}
+            className="btn btn-accent btn-sm tap-target whitespace-nowrap disabled:opacity-60">
+            <Icon name="send" size={14} className="inline -mt-0.5 mr-1" />{existing ? t('Aktualizovat dostupnost') : t('Odeslat dostupnost')}
+          </button>
+        </PlovouciLista>
       )}
     </Card>
   );
