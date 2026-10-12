@@ -2,9 +2,13 @@
 // zapnulo. Nástroj = seznam uzávěrek s filtrem měsíce, detailem a novou uzávěrkou
 // (components/employer/ClosingsOverview.tsx); bloky nad ním jsou widgety oblasti uzávěrek a tržeb.
 //
-// Výchozí rozložení je z katalogu: fronty nahoře (co čeká na člověka), čísla, graf a kalendář,
-// seznam dole. Provozní (bez finance.trzby) dostane jen fronty a kalendář — souhrn, trend
-// i rozdíl kasy by bez tržeb neměly co ukázat (N3).
+// Výchozí rozložení: fronty nahoře (co čeká na člověka), souhrn jako jedno číslo a hned pod ním
+// seznam uzávěrek; graf tržeb po dnech a kalendář až pod seznamem. Kolo 6 (V04): dřív stál seznam
+// za dvěma velkými grafy a kalendářem — na telefonu ~3 obrazovky pod ohybem, zkontrolovat včerejší
+// uzávěrku znamenalo dlouho rolovat (vzor Storyous: první obrazovka = denní uzávěrky). Plocha nemá
+// pořadí podle šířky, ale i na monitoru je seznam hned za frontami rozumný.
+// Provozní (bez finance.trzby) dostane jen fronty a kalendář — souhrn, trend
+// i rozdíl kasy by bez tržeb neměly co ukázat (N3); kalendář je i u něj až pod seznamem.
 import type { DefiniceStranky } from '../typy.ts';
 
 export const STRANKA: DefiniceStranky = {
@@ -41,16 +45,16 @@ export const STRANKA: DefiniceStranky = {
     'typ:vedeni': [
       { w: 'uzaverky.chybejici', s: 'M' },
       { w: 'uzaverky.ke_schvaleni', s: 'M' },
-      { w: 'uzaverky.souhrn', s: 'L' },
+      { w: 'uzaverky.souhrn', s: 'S' },
+      { w: 'nastroj' },
       { w: 'trzby.po_dnech', s: 'L' },
       { w: 'uzaverky.kalendar', s: 'L' },
-      { w: 'nastroj' },
     ],
     'role:provozni': [
       { w: 'uzaverky.chybejici', s: 'M' },
       { w: 'uzaverky.ke_schvaleni', s: 'M' },
-      { w: 'uzaverky.kalendar', s: 'L' },
       { w: 'nastroj' },
+      { w: 'uzaverky.kalendar', s: 'L' },
     ],
   },
   aktivni: true,
