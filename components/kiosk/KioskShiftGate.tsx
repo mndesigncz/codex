@@ -2,13 +2,16 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../Icons';
-import { Avatar, Button, Card, Chip, EmptyState, ErrorState, ListRow, MenuPanel, Modal, SearchField, Toast } from '../ui';
+import { Avatar, Button, Card, Chip, EmptyState, ErrorState, ListRow, MenuPanel, Modal, SearchField, Stat, StatRow, Toast } from '../ui';
+import { useNavigace } from '../widgety/NavigaceKontext';
 import { usePopover } from '@/lib/usePopover';
 import { useT } from '@/lib/i18n/client';
 import { fmtHM } from '@/lib/i18n/format';
 import { parseDbTime, dbTimeHM, pragueToday } from '@/lib/pragueTime';
 import { hodinyMinuty } from '@/lib/dochazkaPrehled';
-import { PRAH_HLEDANI_ROSTERU, rozdelRoster, hledejVRosteru, zpozdeniPrichodu, minutPoPlanu } from '@/lib/kioskPrehled';
+import {
+  PRAH_HLEDANI_ROSTERU, rozdelRoster, hledejVRosteru, zpozdeniPrichodu, minutPoPlanu, souhrnOdchodu, SOUHRN_ZAVRIT_S, type SouhrnOdchodu,
+} from '@/lib/kioskPrehled';
 import { nextActiveId, IDLE_MS, ACTING_MAX_AGE_S, ACTING_OBNOVA_MS, obnovitCookie } from '@/lib/kioskIdentity';
 
 export interface RosterMember {
@@ -102,6 +105,15 @@ interface KioskShiftValue {
   selectPerson: (id: number) => void;
   punch: (member: RosterMember) => void;
   reload: () => Promise<void>;
+  /** Souhrn směny toho, kdo právě odpíchl odchod (okno „díky za směnu"); null = nic. */
+  souhrn: { jmeno: string; data: SouhrnOdchodu } | null;
+  zavriSouhrn: () => void;
+}
+
+/** Co PunchDialog předá po úspěšném zápisu — odpověď POST /api/attendance. */
+export interface VysledekPichnuti {
+  entry?: { clockIn?: string | null; clockOut?: string | null } | null;
+  closingDone?: boolean | null;
 }
 
 const Ctx = createContext<KioskShiftValue | null>(null);
@@ -119,6 +131,10 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
   const [hydrated, setHydrated] = useState(false);
   const [activeId, setActiveId] = useState<number | null>(null);
   const [punching, setPunching] = useState<RosterMember | null>(null);
+  // Souhrn po odchodu (kolo 7): místo toastu „nezapomeň na uzávěrku" okno s příchodem,
+  // odchodem a odpracovaným časem. Kreslí ho SouhrnPoOdchodu uvnitř navigace tabletu
+  // (KioskShell), aby „Vyplnit uzávěrku" mohlo přepnout záložku.
+  const [souhrn, setSouhrn] = useState<{ jmeno: string; data: SouhrnOdchodu } | null>(null);
   // Hlášení tabletu jde přes sdílený Toast (role=status, dole uprostřed).
   // `id` odliší dvě stejná hlášení po sobě, jinak by druhé dostalo zbytek času prvního.
   const [flash, setFlash] = useState<{ text: string; tone: 'ok' | 'bad'; id: number } | null>(null);
@@ -267,6 +283,8 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
     selectPerson: setActiveId,
     punch: setPunching,
     reload,
+    souhrn,
+    zavriSouhrn: () => setSouhrn(null),
   };
 
   const answer = (who: ActivePerson | null) => {
@@ -299,7 +317,7 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
           member={punching}
           now={now}
           onClose={() => setPunching(null)}
-          onDone={(action, member, msg) => {
+          onDone={(action, member, vysledek) => {
             setPunching(null);
             // Kdo právě přišel, ten teď u tabletu stojí. Jenže tohle je
             // přepnutí cizí identity — když předtím byl vybraný někdo jiný,
@@ -309,7 +327,13 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
               : null;
             if (action === 'in') { setActiveId(member.id); touchedAt.current = Date.now(); }
             reload();
-            if (msg) showFlash(msg, 'bad');
+            if (action === 'out') {
+              // Shift summary jako Homebase / Square: „8:02–15:34 · 7 h 32 min" a cesta k uzávěrce.
+              // Bez čitelné odpovědi (starší server) aspoň dřívější varování o uzávěrce.
+              const data = souhrnOdchodu(vysledek?.entry, vysledek?.closingDone);
+              if (data) setSouhrn({ jmeno: member.name, data });
+              else if (vysledek?.closingDone === false) showFlash(t('{jmeno}: odchod zaznamenán — nezapomeň vyplnit uzávěrku směny!', { jmeno: member.name }), 'bad');
+            }
             if (switchedFrom) showFlash(t('Zapisuje se teď jako {jmeno}, ne {predtim}. Přepni nahoře u jména, jestli to není tak.', { jmeno: member.name, predtim: switchedFrom }), 'bad');
           }}
         />
@@ -642,7 +666,7 @@ export function PunchDialog({ member, now, onClose, onDone }: {
   member: RosterMember;
   now: number;
   onClose: () => void;
-  onDone: (action: 'in' | 'out', member: RosterMember, flashMsg?: string) => void;
+  onDone: (action: 'in' | 'out', member: RosterMember, vysledek?: VysledekPichnuti) => void;
 }) {
   const t = useT('kiosk');
   const on = !!member.openSince;
@@ -667,11 +691,8 @@ export function PunchDialog({ member, now, onClose, onDone }: {
       });
       const d = await res.json();
       if (res.ok) {
-        if (d.action === 'out' && d.closingDone === false) {
-          onDone('out', member, t('{jmeno}: odchod zaznamenán — nezapomeň vyplnit uzávěrku směny!', { jmeno: member.name }));
-        } else {
-          onDone(on ? 'out' : 'in', member);
-        }
+        // Odchod nese entry (clockIn, clockOut) a closingDone — z nich je souhrn směny.
+        onDone(d.action === 'out' || d.action === 'in' ? d.action : on ? 'out' : 'in', member, { entry: d.entry ?? null, closingDone: typeof d.closingDone === 'boolean' ? d.closingDone : null });
       } else {
         setErr(d.error || t('Nepodařilo se zaznamenat.'));
         setPin('');
@@ -732,6 +753,73 @@ export function PunchDialog({ member, now, onClose, onDone }: {
         )}
 
         {err && <p role="alert" className="text-sm text-bad-ink mt-4">{err}</p>}
+      </div>
+    </Modal>
+  );
+}
+
+/**
+ * Okno „{jméno}, díky za směnu" po odpíchnutí odchodu (kolo 7, R7-7). Člověk si u baru
+ * zkontroluje hodiny kvůli mzdě — Příchod · Odchod · Odpracováno čitelné z metru (Stat 28 px,
+ * dvě čísla vedle sebe a odpracovaný čas přes celý řádek). Chybí-li uzávěrka, Chip
+ * „Uzávěrka chybí" a hlavní akce vede rovnou na záložku Uzávěrka.
+ *
+ * Sdílený tablet (DESIGN „Sdílený tablet a identita"): okno se po 20 s zavře samo a odpočet
+ * je vidět; jakmile se kdokoli tabletu dotkne, odpočet se zastaví — někdo u něj stojí a čte.
+ * Kreslí se uvnitř NavigaceKontext tabletu (KioskShell), ne v KioskShiftProvider: tam by
+ * useNavigace() vedla nikam.
+ */
+export function SouhrnPoOdchodu() {
+  const t = useT('kiosk');
+  const nav = useNavigace();
+  const { souhrn, zavriSouhrn } = useKioskShift();
+  const [zbyva, setZbyva] = useState(SOUHRN_ZAVRIT_S);
+  const [zastaveno, setZastaveno] = useState(false);
+  const otevreno = souhrn != null;
+
+  // Nové okno = nový odpočet (dva odchody po sobě).
+  useEffect(() => { setZbyva(SOUHRN_ZAVRIT_S); setZastaveno(false); }, [souhrn]);
+  useEffect(() => {
+    if (!otevreno || zastaveno) return;
+    const tik = setInterval(() => setZbyva(n => n - 1), 1000);
+    return () => clearInterval(tik);
+  }, [otevreno, zastaveno, souhrn]);
+  useEffect(() => { if (otevreno && !zastaveno && zbyva <= 0) zavriSouhrn(); }, [otevreno, zastaveno, zbyva, zavriSouhrn]);
+  // Dotyk kdekoli na tabletu (i mimo okno) odpočet zastaví.
+  useEffect(() => {
+    if (!otevreno || zastaveno) return;
+    const stop = () => setZastaveno(true);
+    window.addEventListener('pointerdown', stop, true);
+    window.addEventListener('keydown', stop, true);
+    return () => { window.removeEventListener('pointerdown', stop, true); window.removeEventListener('keydown', stop, true); };
+  }, [otevreno, zastaveno]);
+
+  if (!souhrn) return null;
+  const { data } = souhrn;
+  const kUzaverce = data.chybiUzaverka && nav.smiPohled('closing');
+  return (
+    <Modal open onClose={zavriSouhrn} size="sm" title={t('{jmeno}, díky za směnu', { jmeno: souhrn.jmeno })}
+      footer={kUzaverce ? <>
+        <Button variant="secondary" size="lg" className="flex-1" onClick={zavriSouhrn}>{t('Hotovo')}</Button>
+        <Button variant="primary" size="lg" icon="trend" className="flex-1" onClick={() => { zavriSouhrn(); nav.onNavigate('closing'); }}>{t('Vyplnit uzávěrku')}</Button>
+      </> : (
+        <Button variant="primary" size="lg" className="flex-1" onClick={zavriSouhrn}>{t('Hotovo')}</Button>
+      )}>
+      <div data-souhrn-odchodu>
+        <StatRow podleKarty>
+          <Stat label={t('Příchod')} value={data.prichod} />
+          <Stat label={t('Odchod')} value={data.odchod} note={data.presPulnoc ? t('další den') : undefined} />
+          <Stat label={t('Odpracováno')} value={data.odpracovano} />
+        </StatRow>
+        {data.chybiUzaverka && (
+          <p className="mt-4 flex flex-wrap items-center gap-2">
+            <Chip tone="wait" icon="warning">{t('Uzávěrka chybí')}</Chip>
+            <span className="t-meta text-pretty">{t('Za tuhle směnu ještě není vyplněná.')}</span>
+          </p>
+        )}
+        <p className="mt-4 t-meta tabular-nums" aria-live="off">
+          {zastaveno ? t('Okno zůstane otevřené, dokud ho nezavřeš.') : t('Zavře se samo za {n} s', { n: Math.max(0, zbyva) })}
+        </p>
       </div>
     </Modal>
   );

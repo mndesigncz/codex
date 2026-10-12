@@ -191,5 +191,15 @@
   "Žádné položky": "Žiadne položky",
   "Žádné úkoly": "Žiadne úlohy",
   "po čase": "po čase",
-  "chce fotku": "chce fotku"
+  "chce fotku": "chce fotku",
+  "Příchod": "Príchod",
+  "Odchod": "Odchod",
+  "Odpracováno": "Odpracované",
+  "Vyplnit uzávěrku": "Vyplniť uzávierku",
+  "{jmeno}, díky za směnu": "{jmeno}, vďaka za zmenu",
+  "Uzávěrka chybí": "Uzávierka chýba",
+  "Za tuhle směnu ještě není vyplněná.": "Za túto zmenu ešte nie je vyplnená.",
+  "další den": "nasledujúci deň",
+  "Zavře se samo za {n} s": "Zavrie sa samo o {n} s",
+  "Okno zůstane otevřené, dokud ho nezavřeš.": "Okno zostane otvorené, kým ho nezavrieš."
 }

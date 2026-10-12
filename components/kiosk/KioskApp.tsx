@@ -33,7 +33,7 @@ import {
   ZALOZKY_TABLETU, viditelneZalozky, zalozkaPoOmezeni, pocetUkoluTabletu, pocetPostupuTabletu, type IdZalozkyTabletu,
 } from '@/lib/kioskPrehled';
 import {
-  KioskShiftProvider, KioskShiftGate, WhoIsWorking, ActivePersonChip,
+  KioskShiftProvider, KioskShiftGate, WhoIsWorking, ActivePersonChip, SouhrnPoOdchodu,
   useKioskShift, useNow,
 } from './KioskShiftGate';
 
@@ -353,6 +353,9 @@ function KioskShell({ user }: { user: KioskUser }) {
       <MessengerDock user={kioskUser} />
 
       <KioskNastaveni open={nastaveniOtevreno} onClose={() => setNastaveniOtevreno(false)} />
+
+      {/* Souhrn směny po odchodu: uvnitř navigace tabletu, ať „Vyplnit uzávěrku" přepne záložku. */}
+      <SouhrnPoOdchodu />
 
       <Modal open={confirmSignOut} onClose={() => setConfirmSignOut(false)} size="sm"
         title={t('Odhlásit tablet?')}

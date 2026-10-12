@@ -191,5 +191,15 @@
   "Žádné položky": "No items",
   "Žádné úkoly": "No tasks",
   "po čase": "late",
-  "chce fotku": "needs photo"
+  "chce fotku": "needs photo",
+  "Příchod": "Clock-in",
+  "Odchod": "Clock-out",
+  "Odpracováno": "Worked",
+  "Vyplnit uzávěrku": "Fill in the closing",
+  "{jmeno}, díky za směnu": "{jmeno}, thanks for your shift",
+  "Uzávěrka chybí": "Closing missing",
+  "Za tuhle směnu ještě není vyplněná.": "It hasn't been filled in for this shift yet.",
+  "další den": "next day",
+  "Zavře se samo za {n} s": "Closes by itself in {n} s",
+  "Okno zůstane otevřené, dokud ho nezavřeš.": "The window stays open until you close it."
 }

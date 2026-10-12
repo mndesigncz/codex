@@ -4,6 +4,7 @@
 
 import type { Testy } from './_testy.ts';
 import { vyuziti, limityTarifu, LIMITS } from '../../lib/plan.ts';
+import { souhrnOdchodu, SOUHRN_ZAVRIT_S } from '../../lib/kioskPrehled.ts';
 
 export default function ({ eq, ok }: Testy) {
   // ---- 1) čerpání limitu tarifu (karta Váš plán) ----
@@ -18,4 +19,19 @@ export default function ({ eq, ok }: Testy) {
     [{ members: 3, shareLinks: 1 }, { members: null, shareLinks: null }, { members: null, shareLinks: null }]);
   ok('limity: karta a vymáhání čtou tutéž tabulku LIMITS', limityTarifu({ effective: 'free' }) === LIMITS.free);
   eq('limity: bez stavu tarifu (načítá se) žádné varování', limityTarifu(null).members, null);
+
+  // ---- 2) souhrn směny po odchodu (tablet) ----
+  // Říjen = letní čas, Praha je UTC+2.
+  const den = souhrnOdchodu({ clockIn: '2026-10-12T06:02:00Z', clockOut: '2026-10-12T13:34:00Z' }, true);
+  eq('souhrn: příchod, odchod a délka', den && [den.prichod, den.odchod, den.odpracovano, den.presPulnoc, den.chybiUzaverka], ['08:02', '15:34', '7 h 32 min', false, false]);
+  const noc = souhrnOdchodu({ clockIn: '2026-10-12T20:10:00Z', clockOut: '2026-10-13T00:05:00Z' }, false);
+  eq('souhrn: noční směna přes půlnoc — 22:10 → 02:05 je 3 h 55 min, další den', noc && [noc.prichod, noc.odchod, noc.odpracovano, noc.presPulnoc], ['22:10', '02:05', '3 h 55 min', true]);
+  ok('souhrn: closingDone false → uzávěrka chybí', noc?.chybiUzaverka === true);
+  eq('souhrn: čas z databáze bez zóny je UTC (parseDbTime)', souhrnOdchodu({ clockIn: '2026-10-12 06:02:00', clockOut: '2026-10-12 06:47:00' })?.odpracovano, '45 min');
+  ok('souhrn: closingDone chybí (starší server) → uzávěrka se nehlásí', souhrnOdchodu({ clockIn: '2026-10-12T06:00:00Z', clockOut: '2026-10-12T07:00:00Z' }, null)?.chybiUzaverka === false);
+  eq('souhrn: bez odchodu, nečitelné nebo obrácené → nic', [
+    souhrnOdchodu({ clockIn: '2026-10-12T06:00:00Z', clockOut: null }), souhrnOdchodu(null), souhrnOdchodu({ clockIn: 'x', clockOut: 'y' }),
+    souhrnOdchodu({ clockIn: '2026-10-12T08:00:00Z', clockOut: '2026-10-12T07:00:00Z' }),
+  ], [null, null, null, null]);
+  eq('souhrn: okno se zavře samo po 20 s', SOUHRN_ZAVRIT_S, 20);
 }

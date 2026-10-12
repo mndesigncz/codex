@@ -14,8 +14,8 @@
 //
 // Relativní importy s příponou: `npm test` pouští .ts přímo v Node.
 
-import { konecSmeny } from './dochazkaPrehled.ts';
-import { dayPlus, pragueMomentOf } from './pragueTime.ts';
+import { konecSmeny, hodinyMinuty } from './dochazkaPrehled.ts';
+import { dayPlus, pragueMomentOf, parseDbTime, dbTimeHM, pragueDayOf } from './pragueTime.ts';
 import { obsahuje } from './hledani.ts';
 import { stavUkolu } from './ukolyFiltr.ts';
 import type { Ukol } from './ukolyPrehled.ts';
@@ -144,3 +144,51 @@ export function pocetUkoluTabletu(ukoly: readonly Ukol[], dnes: string): number 
 export function pocetPostupuTabletu(postupy: readonly PostupApi[], dnesniBehy: readonly PrubehApi[]): number {
   return povinneDnes(postupy, dnesniBehy).filter(p => !p.hotovo).length;
 }
+
+// ---------------------------------------------------------------------------
+// Souhrn směny po odchodu (kolo 7, R7-7)
+// ---------------------------------------------------------------------------
+
+/** Co tablet ukáže v okně „díky za směnu" po odpíchnutí odchodu. */
+export interface SouhrnOdchodu {
+  /** Pražské „HH:MM" příchodu a odchodu (dbTimeHM — podle formátu času podniku). */
+  prichod: string;
+  odchod: string;
+  /** „7 h 32 min" (hodinyMinuty, stejně jako řádek „Kdo teď pracuje"). */
+  odpracovano: string;
+  /** Délka v ms. */
+  ms: number;
+  /** Odchod připadl na jiný pražský den než příchod (noční směna). */
+  presPulnoc: boolean;
+  /** Server řekl, že uzávěrka za tuhle směnu ještě není (closingDone === false). */
+  chybiUzaverka: boolean;
+}
+
+/**
+ * Souhrn z odpovědi POST /api/attendance (action=out vrací entry s clockIn/clockOut
+ * a closingDone). Čas z databáze přes parseDbTime — stejně jako stopky elapsed();
+ * přes půlnoc se počítá z celých časových razítek, takže 22:10 → 2:05 je 3 h 55 min.
+ * Nečitelný nebo obrácený záznam → null (tablet pak souhrn nekreslí, nevymýšlí ho).
+ * `closingDone` chybí (starší server) → uzávěrka se nehlásí jako chybějící.
+ */
+export function souhrnOdchodu(
+  entry: { clockIn?: string | Date | null; clockOut?: string | Date | null } | null | undefined,
+  closingDone?: boolean | null,
+): SouhrnOdchodu | null {
+  const od = parseDbTime(entry?.clockIn ?? null);
+  const kdy = parseDbTime(entry?.clockOut ?? null);
+  if (!od || !kdy) return null;
+  const ms = kdy.getTime() - od.getTime();
+  if (ms < 0) return null;
+  return {
+    prichod: dbTimeHM(od),
+    odchod: dbTimeHM(kdy),
+    odpracovano: hodinyMinuty(ms),
+    ms,
+    presPulnoc: pragueDayOf(od) !== pragueDayOf(kdy),
+    chybiUzaverka: closingDone === false,
+  };
+}
+
+/** Po kolika sekundách se okno souhrnu na sdíleném tabletu zavře samo (dotyk odpočet zastaví). */
+export const SOUHRN_ZAVRIT_S = 20;

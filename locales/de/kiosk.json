@@ -191,5 +191,15 @@
   "Žádné položky": "Keine Artikel",
   "Žádné úkoly": "Keine Aufgaben",
   "po čase": "zu spät",
-  "chce fotku": "Foto nötig"
+  "chce fotku": "Foto nötig",
+  "Příchod": "Kommen",
+  "Odchod": "Gehen",
+  "Odpracováno": "Gearbeitet",
+  "Vyplnit uzávěrku": "Kassenabschluss ausfüllen",
+  "{jmeno}, díky za směnu": "{jmeno}, danke für die Schicht",
+  "Uzávěrka chybí": "Kassenabschluss fehlt",
+  "Za tuhle směnu ještě není vyplněná.": "Für diese Schicht ist er noch nicht ausgefüllt.",
+  "další den": "am Folgetag",
+  "Zavře se samo za {n} s": "Schließt sich in {n} s von selbst",
+  "Okno zůstane otevřené, dokud ho nezavřeš.": "Das Fenster bleibt offen, bis du es schließt."
 }

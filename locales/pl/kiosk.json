@@ -191,5 +191,15 @@
   "Žádné položky": "Brak pozycji",
   "Žádné úkoly": "Brak zadań",
   "po čase": "po czasie",
-  "chce fotku": "wymaga zdjęcia"
+  "chce fotku": "wymaga zdjęcia",
+  "Příchod": "Wejście",
+  "Odchod": "Wyjście",
+  "Odpracováno": "Przepracowano",
+  "Vyplnit uzávěrku": "Wypełnij zamknięcie",
+  "{jmeno}, díky za směnu": "{jmeno}, dzięki za zmianę",
+  "Uzávěrka chybí": "Brak zamknięcia",
+  "Za tuhle směnu ještě není vyplněná.": "Za tę zmianę nie jest jeszcze wypełnione.",
+  "další den": "następnego dnia",
+  "Zavře se samo za {n} s": "Zamknie się samo za {n} s",
+  "Okno zůstane otevřené, dokud ho nezavřeš.": "Okno zostanie otwarte, dopóki go nie zamkniesz."
 }
