@@ -17,6 +17,7 @@ import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { menaPodniku } from '@/lib/menaPodniku';
 import { nactiBaleniKategorii, baleniRadku } from '@/lib/baleniKategorii';
 import { ingredientCost } from '@/lib/recipeCost';
+import { cilMarze, prahyRadMarze } from '@/lib/recepturyPrehled';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -143,6 +144,13 @@ export async function GET(req: NextRequest) {
 
   // ---- advice: only what the numbers actually support ----
   const insights: { icon: string; title: string; text: string; tone: 'good' | 'warn' | 'info' }[] = [];
+  // Cílová marže podniku (Nastavení › Profil podniku, kolo 7). Bez ní dřívější prahy 65 / 50 / 45 %.
+  let cil: number | null = null;
+  try {
+    const [t] = await sql`SELECT margin_target_pct FROM teams WHERE id = ${teamId}`;
+    cil = cilMarze(t?.margin_target_pct);
+  } catch { /* sloupec před /api/init */ }
+  const prahy = prahyRadMarze(cil);
 
   if (noRecipe.length) {
     insights.push({
@@ -166,17 +174,19 @@ export async function GET(req: NextRequest) {
   if (withCost.length && revenueKnown > 0) {
     const pct = Math.round(((revenueKnown - cogs) / revenueKnown) * 100);
     insights.push({
-      icon: 'coins', tone: pct >= 65 ? 'good' : pct >= 50 ? 'info' : 'warn',
+      icon: 'coins', tone: pct >= prahy.dobra ? 'good' : pct >= prahy.ujde ? 'info' : 'warn',
       title: `Hrubá marže ${pct} % na tom, co má recepturu`,
-      text: pct >= 65
-        ? 'Zdravé číslo. Drž ceny surovin pod kontrolou a hlídej, ať se nezvedne odpad.'
-        : 'Nižší, než bývá v gastru zvykem. Podívej se na položky s nejhorší marží níž — často stačí upravit gramáž nebo cenu.',
+      text: pct >= prahy.dobra
+        ? (cil != null ? `V cíli ${cil} %. Drž ceny surovin pod kontrolou a hlídej, ať se nezvedne odpad.` : 'Zdravé číslo. Drž ceny surovin pod kontrolou a hlídej, ať se nezvedne odpad.')
+        : cil != null
+          ? `Pod cílem ${cil} %. Podívej se na položky s nejhorší marží níž — často stačí upravit gramáž nebo cenu.`
+          : 'Nižší, než bývá v gastru zvykem. Podívej se na položky s nejhorší marží níž — často stačí upravit gramáž nebo cenu.',
     });
   }
 
   const worst = withCost.filter(i => i.marginPct != null && i.qty >= 3)
     .sort((a, b) => (a.marginPct ?? 0) - (b.marginPct ?? 0))[0];
-  if (worst && (worst.marginPct ?? 100) < 45) {
+  if (worst && (worst.marginPct ?? 100) < prahy.nejhorsi) {
     insights.push({
       icon: 'warning', tone: 'warn',
       title: `Nejhorší marže: ${worst.name} (${worst.marginPct} %)`,
@@ -211,6 +221,8 @@ export async function GET(req: NextRequest) {
     ready: true,
     month,
     menuError,
+    // Cílová marže podniku pro poznámku widgetu Marže („cíl 60 %"); nastaveno = podnik ji vyplnil.
+    target: { pct: cil ?? prahy.dobra, nastaveno: cil != null },
     totals: {
       revenue: totalRevenue,
       revenueKnown,

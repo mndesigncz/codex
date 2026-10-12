@@ -65,6 +65,8 @@ const pretece = (p) => p.evaluate(() => document.documentElement.scrollWidth > w
   tvrdi('finance 1: právě jedna inkoustová plocha (Souhrn měsíce)', inkoust === 1, String(inkoust));
   tvrdi('finance 1: podíl mezd proti cíli 28 %', /26 %/.test(await text(p, 'finance.trzby_vs_mzdy')) && /cíl 28 %/.test(await text(p, 'finance.trzby_vs_mzdy')), await text(p, 'finance.trzby_vs_mzdy'));
   tvrdi('finance 1: Kam šly peníze říká, co nejvíc leží ve skladu (N8)', /Káva Brazílie/.test(await text(p, 'finance.kam_sly_penize')));
+  // Kolo 7: podnik má cílovou marži 60 % (fixtura) — widget Marže ji řekne u čísla.
+  tvrdi('finance 1: Marže ukazuje cíl podniku („cíl 60 %")', /cíl 60 %/.test(await text(p, 'finance.marze')), (await text(p, 'finance.marze')).slice(0, 160));
   tvrdi('finance 1: žádná chyba v konzoli', chyby.length === 0, chyby.slice(0, 2).join(' | '));
 
   // Jeden dotaz na /api/finance pro souhrn, podíl mezd, Kam šly peníze i knihu výdajů.

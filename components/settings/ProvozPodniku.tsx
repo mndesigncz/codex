@@ -31,6 +31,7 @@ interface Provoz {
   locale?: string;
   week_start?: number;
   labor_target_pct?: number | null;
+  margin_target_pct?: number | null;
   country?: string | null;
   default_lang?: string;
   time_format?: string;
@@ -41,7 +42,7 @@ function vyberProvoz(raw: any): Provoz {
   const x = raw?.team;
   if (!x || typeof x !== 'object') throw new Error('Podnik přišel v nečekaném tvaru.'); // i18n-ok
   return {
-    currency: x.currency, locale: x.locale, week_start: x.week_start, labor_target_pct: x.labor_target_pct ?? null,
+    currency: x.currency, locale: x.locale, week_start: x.week_start, labor_target_pct: x.labor_target_pct ?? null, margin_target_pct: x.margin_target_pct ?? null,
     country: x.country ?? null, default_lang: x.default_lang, time_format: x.time_format, timezone: x.timezone,
   };
 }
@@ -56,6 +57,7 @@ export default function ProvozPodniku() {
 
   const [toast, setToast] = useState<{ text: string; tone: 'ok' | 'bad' } | null>(null);
   const [cilMezd, setCilMezd] = useState<string | null>(null);
+  const [cilMarze, setCilMarze] = useState<string | null>(null);
   const [ukladam, setUkladam] = useState(false);
 
   /** PATCH /api/teams s optimistickým zápisem (a návratem při chybě). Hotovo říká až odpověď serveru. */
@@ -149,7 +151,8 @@ export default function ProvozPodniku() {
               <option value="12">{t('12 hodin (2:30 PM)')}</option>
             </Select>
           </Field>
-          <Field id="tym-pasmo" label={t('Časové pásmo')} hint={t('Pro Česko, Slovensko, Německo, Rakousko a Polsko je stejné jako v Praze. Jiná pásma aplikace zatím nepodporuje.')}>
+          {/* Pásmo přes celou šířku: po něm jdou dva cíle vedle sebe (devět polí ve dvou sloupcích by nechalo sirotka). */}
+          <Field id="tym-pasmo" className="sm:col-span-2" label={t('Časové pásmo')} hint={t('Pro Česko, Slovensko, Německo, Rakousko a Polsko je stejné jako v Praze. Jiná pásma aplikace zatím nepodporuje.')}>
             <Input id="tym-pasmo" readOnly value={t('Střední Evropa (Praha, Berlín, Varšava)')} />
           </Field>
           <Field id="tym-cil" label={t('Cíl mzdových nákladů (%)')} hint={t('Podíl mezd na tržbách — Mzdy za období ukážou, jestli jste v cíli.')}>
@@ -161,6 +164,18 @@ export default function ProvozPodniku() {
                 const v = cilMezd.trim() === '' ? null : Math.max(0, Math.min(100, Math.round(Number(cilMezd))));
                 setCilMezd(null);
                 if ((team.labor_target_pct ?? null) !== v) void prepni({ laborTargetPct: v }, { labor_target_pct: v }, ulozeno);
+              }} />
+          </Field>
+          {/* Cílová marže (kolo 7): Receptury podle ní barví a řadí, rady o marži s ní počítají. Prázdné = výchozí 65 %. */}
+          <Field id="tym-cil-marze" label={t('Cílová marže na položku (%)')} hint={t('Marže položky menu po surovinách — Receptury podle ní barví a filtrují „Pod cílem". Prázdné = 65 %.')}>
+            <Input id="tym-cil-marze" type="number" inputMode="numeric" min={1} max={95} placeholder="65" disabled={ukladam || !smiCil}
+              value={cilMarze ?? (team.margin_target_pct != null ? String(team.margin_target_pct) : '')}
+              onChange={e => setCilMarze(e.target.value)}
+              onBlur={() => {
+                if (cilMarze === null) return;
+                const v = cilMarze.trim() === '' || !Number.isFinite(Number(cilMarze)) ? null : Math.max(1, Math.min(95, Math.round(Number(cilMarze))));
+                setCilMarze(null);
+                if ((team.margin_target_pct ?? null) !== v) void prepni({ marginTargetPct: v }, { margin_target_pct: v }, ulozeno);
               }} />
           </Field>
         </div>

@@ -673,6 +673,8 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS nav_config JSONB`);
     await ddl(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS lang TEXT`);                          // null = podle podniku
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS labor_target_pct INTEGER`);      // target labor cost as % of revenue
+    // Cílová marže na položku menu v % (kolo 7, Receptury a rady o marži); NULL = výchozí 65 %.
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS margin_target_pct INTEGER`);
     // Pevné náklady podniku (kolo 81, Finance): [{ name, amount }], částky za měsíc v celých
     // jednotkách měny. Výsledek měsíce je tržby − nákupy − mzdy − tyhle řádky.
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS fixed_costs JSONB`);

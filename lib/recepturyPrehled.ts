@@ -237,3 +237,69 @@ export const UDALOST_VYPRODANO = 'managero:menu-vyprodano';
 /** Obě adresy, ze kterých widgety menu čtou (po zápisu se obnoví obě). */
 export const URL_MENU = '/api/menu';
 export const URL_VYPRODANO = '/api/menu?jen=vyprodano';
+
+// ---------------------------------------------------------------------------
+// Cílová marže podniku a řazení receptur (kolo 7, R7-6)
+// ---------------------------------------------------------------------------
+//
+// Prahy marže byly natvrdo 65 / 45 % bez ohledu na podnik (čajovna má jinou
+// marži než bistro). Podnik si teď cíl nastaví (teams.margin_target_pct,
+// Nastavení › Profil podniku) a seznam receptur, editor i rady v /api/pos/margins
+// ho berou odsud. Bez nastaveného cíle platí dnešní prahy beze změny.
+
+/** Cíl, když ho podnik nenastavil. */
+export const VYCHOZI_CIL_MARZE = 65;
+
+export type TonMarze = 'ok' | 'wait' | 'bad';
+
+/**
+ * Tón marže položky: ok ≥ cíl, wait ≥ cíl − 15, bad pod. Bez cíle (null)
+ * dnešní 65 / 45 — seznam receptur vypadá u podniku bez nastavení stejně jako dřív.
+ */
+export function tonMarze(marze: number, cil?: number | null): TonMarze {
+  const ok = cil ?? VYCHOZI_CIL_MARZE;
+  const wait = cil == null ? 45 : cil - 15;
+  return marze >= ok ? 'ok' : marze >= wait ? 'wait' : 'bad';
+}
+
+/** Je marže pod cílem podniku (bez cíle pod 65 %)? Neznámá marže (chybí cena suroviny) pod cílem není. */
+export const jePodCilem = (marze: number | null | undefined, cil?: number | null): boolean =>
+  marze != null && Number.isFinite(marze) && marze < (cil ?? VYCHOZI_CIL_MARZE);
+
+/** Cíl z databáze nebo formuláře: celé číslo 1–95, jinak null (= výchozí). */
+export function cilMarze(v: unknown): number | null {
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  return Number.isInteger(n) && n >= 1 && n <= 95 ? n : null;
+}
+
+/** Prahy rad o marži (/api/pos/margins): dobrá ≥ cíl, ujde ≥ cíl − 15, nejhorší položka pod cíl − 20. Bez cíle 65 / 50 / 45 jako dřív. */
+export function prahyRadMarze(cil?: number | null): { dobra: number; ujde: number; nejhorsi: number } {
+  const c = cil ?? VYCHOZI_CIL_MARZE;
+  return { dobra: c, ujde: c - 15, nejhorsi: c - 20 };
+}
+
+export type RazeniReceptur = 'prodeje' | 'marze' | 'naklad' | 'nazev';
+export const RAZENI_RECEPTUR: readonly RazeniReceptur[] = ['prodeje', 'marze', 'naklad', 'nazev'];
+
+export interface RadekRazeni { nazev: string; prodano: number; marze: number | null; naklad: number | null }
+
+/**
+ * Řazení seznamu receptur: podle prodejů (nejprodávanější první, jako dřív),
+ * marže od nejnižší, nákladu od nejvyššího, nebo podle názvu. Položka bez
+ * marže / nákladu (bez receptury, surovina bez ceny) jde vždy na konec; shoda
+ * se rozhodne názvem. Nemění vstup.
+ */
+export function seradReceptury<T extends RadekRazeni>(radky: readonly T[], razeni: RazeniReceptur, locale = 'cs'): T[] {
+  const nazev = (a: T, b: T) => a.nazev.localeCompare(b.nazev, locale);
+  const naKonec = (a: number | null, b: number | null, vzestupne: boolean) =>
+    a == null && b == null ? 0 : a == null ? 1 : b == null ? -1 : vzestupne ? a - b : b - a;
+  return [...radky].sort((a, b) => {
+    switch (razeni) {
+      case 'marze': return naKonec(a.marze, b.marze, true) || nazev(a, b);
+      case 'naklad': return naKonec(a.naklad, b.naklad, false) || nazev(a, b);
+      case 'nazev': return nazev(a, b);
+      default: return b.prodano - a.prodano || nazev(a, b);
+    }
+  });
+}

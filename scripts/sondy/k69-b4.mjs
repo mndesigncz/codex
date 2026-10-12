@@ -215,6 +215,58 @@ const presahy = (loc) => loc.evaluate(li => {
   await ctx.close();
 }
 
+// 7) Kolo 7 (R7-6): cílová marže a řazení. Káva zdražila (2 600 Kč/kg), takže Latte vyjde na 62 %
+//    a Espresso na 57 %; s cílem podniku 60 % je pod cílem jen Espresso, bez cíle (65 %) obě.
+const sCilem = (cil) => (req, json, stav) => {
+  const path = new URL(req.url()).pathname;
+  if (req.method() === 'GET' && path === '/api/inventory') return json(nacti('k69-b4-inventory').map(i => (i.id === 2 ? { ...i, unitCost: 2600 } : i)));
+  if (req.method() === 'GET' && path === '/api/teams') { const f = nacti('teams'); return json({ ...f, team: { ...f.team, margin_target_pct: cil } }); }
+  return podvrh()(req, json, stav);
+};
+for (const w of [1280, 390]) {
+  const { ctx, p } = await kontext({ fix: FIX_RECEPTURY, viewport: { width: w, height: w < 600 ? 844 : 900 }, mobil: w < 600, dalsi: sCilem(60) });
+  await otevri(p, RECEPTURY, 'vedeni.receptury');
+  const nastroj = widgetLi(p, 'nastroj');
+  const radky = nastroj.locator('ul.list > li');
+  await dokud(async () => (await radky.count()) >= 5, 4000);
+  const pilulka = nastroj.getByRole('button', { name: /^Pod cílem · \d+$/ });
+  tvrdi(`R7 ${w}: pilulka „Pod cílem · 1" vedle „Jen bez receptury" (cíl podniku 60 %)`, await dokud(async () => (await pilulka.count()) === 1 && /· 1$/.test(await pilulka.innerText()), 4000), await pilulka.count() ? await pilulka.innerText() : '0');
+  const tonLatte = await radky.filter({ hasText: 'Latte' }).locator('.list-value span > span').first().getAttribute('class');
+  const tonEspresso = await radky.filter({ hasText: 'Espresso' }).locator('.list-value span > span').first().getAttribute('class');
+  tvrdi(`R7 ${w}: tóny podle cíle — Latte 62 % v cíli (ok), Espresso 57 % „ujde" (inkoust)`, /text-ok-ink/.test(tonLatte ?? '') && !/text-ok-ink|text-bad-ink/.test(tonEspresso ?? ''), `${tonLatte} | ${tonEspresso}`);
+  await pilulka.click();
+  tvrdi(`R7 ${w}: klepnutí nechá jen položky pod cílem (Espresso)`, await dokud(async () => (await radky.count()) === 1 && /Espresso/.test(await radky.first().innerText()), 2000), String(await radky.count()));
+  await pilulka.click();
+  tvrdi(`R7 ${w}: druhé klepnutí filtr zruší`, await dokud(async () => (await radky.count()) >= 5, 2000));
+  if (w < 600) {
+    const [bp, bm] = [await nastroj.getByRole('button', { name: 'Jen bez receptury' }).boundingBox(), await nastroj.getByRole('button', { name: /^Řadit:/ }).boundingBox()];
+    tvrdi(`R7 ${w}: pilulky a Řadit v jednom řádku`, bp && bm && Math.abs((bp.y + bp.height / 2) - (bm.y + bm.height / 2)) < 6, JSON.stringify([bp, bm]));
+    tvrdi(`R7 ${w}: bez vodorovného přetečení`, await bezPreteceni(p));
+  }
+  await nastroj.getByRole('button', { name: 'Řadit: Podle prodejů' }).click();
+  await p.getByRole('menuitem', { name: 'Marže od nejnižší' }).click();
+  const poradiRadku = async () => (await radky.allInnerTexts()).map(x => x.split('\n')[0].trim());
+  tvrdi(`R7 ${w}: Řadit podle marže od nejnižší — Espresso (57 %), Latte (62 %), pak bez marže`, await dokud(async () => { const r = await poradiRadku(); return r[0] === 'Espresso' && r[1] === 'Latte'; }, 2000), (await poradiRadku()).join(', '));
+  await nastroj.scrollIntoViewIfNeeded();
+  await p.screenshot({ path: OUT + `k83-receptury-${w}.png` });
+  // Volba řazení přežije obnovení stránky (localStorage).
+  await p.reload({ waitUntil: 'networkidle' });
+  await dokud(async () => (await radky.count()) >= 5, 6000);
+  tvrdi(`R7 ${w}: řazení si prohlížeč pamatuje`, await dokud(async () => (await nastroj.getByRole('button', { name: 'Řadit: Marže od nejnižší' }).count()) === 1 && (await poradiRadku())[0] === 'Espresso', 4000));
+  await ctx.close();
+}
+{
+  // Bez cíle (null) dnešní prahy: pod 65 % jsou obě kávy, Latte 62 % už není „v cíli".
+  const { ctx, p } = await kontext({ fix: FIX_RECEPTURY, dalsi: sCilem(null) });
+  await otevri(p, RECEPTURY, 'vedeni.receptury');
+  const nastroj = widgetLi(p, 'nastroj');
+  const pilulka = nastroj.getByRole('button', { name: /^Pod cílem · \d+$/ });
+  tvrdi('R8: bez cíle platí 65 % — „Pod cílem · 2"', await dokud(async () => (await pilulka.count()) === 1 && /· 2$/.test(await pilulka.innerText()), 4000));
+  const ton = await nastroj.locator('ul.list > li').filter({ hasText: 'Latte' }).locator('.list-value span > span').first().getAttribute('class');
+  tvrdi('R8: …a Latte 62 % není zelené (dnešní 65 / 45)', !/text-ok-ink/.test(ton ?? ''), ton ?? '');
+  await ctx.close();
+}
+
 // ---------------------------------------------------------------------------
 // Menu (Managero client)
 // ---------------------------------------------------------------------------

@@ -14,6 +14,7 @@ import { cistaZeme, PREDVOLBY_ZEMI } from '@/lib/i18n/zeme';
 import { normalizujNavKonfig } from '@/lib/navigace';
 import { cistyIco, cistyDic, cistyPrah, pragySedi } from '@/lib/podnikProfil';
 import { cistePevneNaklady, pevneNakladyZDb, type PevnyNaklad } from '@/lib/financeWidgety';
+import { cilMarze } from '@/lib/recepturyPrehled';
 
 export const dynamic = 'force-dynamic';
 
@@ -120,6 +121,12 @@ export async function GET() {
         business_type: b.business_type ?? null,
       };
     } catch { /* columns not migrated yet */ }
+    // Cílová marže na položku (kolo 7): vlastní dotaz, sloupec přibývá s /api/init. NULL = výchozí 65 %.
+    let marginTargetPct: number | null = null;
+    try {
+      const [b] = await sql`SELECT margin_target_pct FROM teams WHERE id = ${teamId}`;
+      marginTargetPct = cilMarze(b?.margin_target_pct);
+    } catch { /* column not migrated yet */ }
     // Adresa a země přibyly s průvodcem; vlastní dotaz, ať jejich chybějící sloupce
     // (před /api/init) nevezmou ostatní nastavení.
     try {
@@ -218,7 +225,7 @@ export async function GET() {
     return NextResponse.json({
       planInfo,
       pinnedShare,
-      team: { ...team, pay_daily_cash: payDailyCash, closing_requires_shift: closingRequiresShift, show_team_schedule: showTeamSchedule, payout_from_register: payoutFromRegister, tips_in_drawer: tipsInDrawer, drawer_float: drawerFloat, dashboard_config: dashboardConfig, levels_config: levelsConfig, points_config: pointsConfig, fixed_costs: fixedCosts, ...biz, ...lokalizace },
+      team: { ...team, pay_daily_cash: payDailyCash, closing_requires_shift: closingRequiresShift, show_team_schedule: showTeamSchedule, payout_from_register: payoutFromRegister, tips_in_drawer: tipsInDrawer, drawer_float: drawerFloat, dashboard_config: dashboardConfig, levels_config: levelsConfig, points_config: pointsConfig, fixed_costs: fixedCosts, ...biz, margin_target_pct: marginTargetPct, ...lokalizace },
       members,
       isOwner: team?.owner_id === me.id,
     });
@@ -238,7 +245,7 @@ const POLE: Record<string, string> = {
   regenerateCode: 'tym.pozvat',
   payDailyCash: 'uzaverky.nastaveni', drawerFloat: 'uzaverky.nastaveni', closingRequiresShift: 'uzaverky.nastaveni',
   payoutFromRegister: 'uzaverky.nastaveni', tipsInDrawer: 'uzaverky.nastaveni',
-  laborTargetPct: 'finance.nastaveni', fixedCosts: 'finance.nastaveni',
+  laborTargetPct: 'finance.nastaveni', fixedCosts: 'finance.nastaveni', marginTargetPct: 'finance.nastaveni',
   levelsConfig: 'odmeny.nastaveni', pointsConfig: 'odmeny.nastaveni',
   lowStockDefault: 'sklad.kategorie', criticalStockDefault: 'sklad.kategorie',
 };
@@ -277,6 +284,11 @@ export async function PATCH(request: Request) {
     if (hodnota !== undefined && cistyPrah(hodnota) === undefined) {
       return NextResponse.json({ error: pole === 'lowStockDefault' ? 'Práh nízkých zásob musí být celé číslo od nuly.' : 'Práh kritických zásob musí být celé číslo od nuly.' }, { status: 400 });
     }
+  }
+  // Cílová marže: celé 1–95 %, nebo null (= výchozí 65 %). Nesmysl se odmítne dřív, než se cokoli uloží.
+  const marginTargetPct = body?.marginTargetPct;
+  if (marginTargetPct !== undefined && marginTargetPct !== null && cilMarze(marginTargetPct) === null) {
+    return NextResponse.json({ error: 'Cílová marže musí být celé číslo od 1 do 95 %.' }, { status: 400 });
   }
   if (lowStockDefault !== undefined && criticalStockDefault !== undefined && !pragySedi(cistyPrah(lowStockDefault)!, cistyPrah(criticalStockDefault)!)) {
     return NextResponse.json({ error: 'Kritický práh nesmí být vyšší než práh nízkých zásob.' }, { status: 400 });
@@ -343,6 +355,10 @@ export async function PATCH(request: Request) {
     if (typeof businessType === 'string') await sql`UPDATE teams SET business_type = ${businessType} WHERE id = ${team.id}`;
   } catch { /* columns not migrated yet — ignore until /api/init runs */ }
 
+  // Cílová marže (kolo 7): vlastní try, sloupec přibývá s DDL.
+  try {
+    if (marginTargetPct !== undefined) await sql`UPDATE teams SET margin_target_pct = ${marginTargetPct === null ? null : cilMarze(marginTargetPct)} WHERE id = ${team.id}`;
+  } catch { /* column not migrated yet */ }
   // Pevné náklady (kolo 81): vlastní try, sloupec přibývá s DDL.
   try {
     if (cistePevne) await sql`UPDATE teams SET fixed_costs = ${JSON.stringify(cistePevne)}::jsonb WHERE id = ${team.id}`;

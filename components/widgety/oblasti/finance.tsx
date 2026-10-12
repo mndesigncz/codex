@@ -321,6 +321,8 @@ interface Marze {
   stav: 'ok' | 'nepropojeno' | 'plni';
   hlaska: string | null;
   marginPct: number | null; margin: number; noRecipe: number;
+  /** Cílová marže, kterou si podnik nastavil (Nastavení › Profil podniku); null = nenastavil. */
+  cil: number | null;
   polozky: PolozkaMarze[];
   rady: { icon: string; title: string; text: string; tone: TonPoznamky }[];
 }
@@ -333,6 +335,7 @@ function vyberMarze(raw: any): Marze {
     hlaska: typeof raw.error === 'string' ? raw.error : typeof raw.menuError === 'string' ? raw.menuError : null,
     marginPct: t.marginPct == null ? null : Number(t.marginPct),
     margin: cis(t.margin), noRecipe: cis(t.noRecipe),
+    cil: raw.target?.nastaveno === true && Number.isFinite(Number(raw.target?.pct)) ? Number(raw.target.pct) : null,
     polozky: Array.isArray(raw.items) ? raw.items.map((i: any) => ({
       id: String(i?.productId ?? i?.name ?? ''), name: String(i?.name ?? ''), qty: cis(i?.qty),
       revenue: i?.revenue == null ? null : cis(i.revenue), cost: i?.cost == null ? null : cis(i.cost),
@@ -366,14 +369,16 @@ function MarzeWidget({ velikost, nastaveni }: WidgetProps<{ mesic: string; razen
 
   let obsah: ReactNode = null;
   if (m && sMarzi.length > 0) {
+    // Poznámka s cílem podniku, když ho nastavil („na položkách s recepturou · cíl 60 %").
+    const sCilem = (veta: string) => (m.cil != null ? `${veta} · ${t('cíl {n} %', { n: m.cil })}` : veta);
     if (velikost === 'S') {
-      obsah = <Stat label={t('Marže')} value={m.marginPct != null ? `${m.marginPct} %` : '—'} note={t('na položkách s recepturou')} />;
+      obsah = <Stat label={t('Marže')} value={m.marginPct != null ? `${m.marginPct} %` : '—'} note={sCilem(t('na položkách s recepturou'))} />;
     } else if (velikost === 'M') {
       const [pred, po] = rozdelVetu(t, 'Marže {pct} na položkách s recepturou', 'pct');
       const podleMarze = [...sMarzi].sort((a, b) => (b.marginPct ?? 0) - (a.marginPct ?? 0));
       obsah = (
         <div className="space-y-3">
-          <p className="t-meta">{pred}<span className="font-semibold text-[#16181A] tabular-nums">{m.marginPct} %</span>{po}</p>
+          <p className="t-meta">{pred}<span className="font-semibold text-[#16181A] tabular-nums">{m.marginPct} %</span>{po}{m.cil != null ? ` · ${t('cíl {n} %', { n: m.cil })}` : ''}</p>
           <div>
             <p className="t-label mb-1">{t('Vydělává nejvíc')}</p>
             <ul className="list">{podleMarze.slice(0, 3).map(radek)}</ul>
@@ -393,7 +398,7 @@ function MarzeWidget({ velikost, nastaveni }: WidgetProps<{ mesic: string; razen
       obsah = (
         <div className="space-y-4">
           <StatRow>
-            <Stat label={t('Marže')} value={m.marginPct != null ? `${m.marginPct} %` : '—'} note={t('na položkách s recepturou')} />
+            <Stat label={t('Marže')} value={m.marginPct != null ? `${m.marginPct} %` : '—'} note={sCilem(t('na položkách s recepturou'))} />
             <Stat label={t('Vydělaly')} value={money(m.margin)} note={t('tržba − suroviny')} />
             <Stat label={t('Bez receptury')} value={m.noRecipe.toLocaleString('cs-CZ')} note={t('{n, plural, one {# položka} few {# položky} other {# položek}}', { n: m.noRecipe })} />
           </StatRow>

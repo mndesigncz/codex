@@ -11,6 +11,7 @@ import { nazevExportuUzaverek, popisObdobiExportu } from '../../lib/uzaverkyFilt
 import { souhrnUzaverek, souhrnUzaverekRozmezi, hodnotyUzaverekPoDnech, maHosty, nejviceHostu, hosteUzaverky, type RadekUzaverky } from '../../lib/uzaverkyPrehled.ts';
 import { overPrijem, souhrnPrijmu, rozdilPrijmu, radkyKPrijmu, nedodano, posledniCenyBaleni, polozekUDodavatelu, posledniObjednavkaDodavatelu, dnuOd, type PolozkaObjednavky, type PolozkaSkladu } from '../../lib/skladPrehled.ts';
 import { cenaProSloupec } from '../../lib/cena.ts';
+import { tonMarze, jePodCilem, cilMarze, prahyRadMarze, seradReceptury } from '../../lib/recepturyPrehled.ts';
 
 export default function ({ eq, ok }: Testy) {
   // ---- 1) Export uzávěrek: jméno souboru podle toho, co je vidět ----
@@ -118,4 +119,27 @@ export default function ({ eq, ok }: Testy) {
     { id: 4, supplier: null, status: 'ordered', createdAt: '2026-10-11T08:00:00Z' },
   ] }), { Makro: '2026-10-01T08:00:00Z' });
   eq('dodavatelé: dní od objednávky (přes přechod měsíce, nikdy záporně)', [dnuOd('2026-09-24', '2026-10-12'), dnuOd('2026-10-12', '2026-10-12'), dnuOd('2026-10-13', '2026-10-12')], [18, 0, 0]);
+
+  // ---- 5) Cílová marže a řazení receptur ----
+  eq('marže: bez cíle dnešní prahy 65 / 45', [70, 65, 64, 45, 44].map(m => tonMarze(m)), ['ok', 'ok', 'wait', 'wait', 'bad']);
+  eq('marže: s cílem 60 — ok ≥ 60, wait ≥ 45, bad pod', [60, 59, 45, 44].map(m => tonMarze(m, 60)), ['ok', 'wait', 'wait', 'bad']);
+  eq('marže: čajovna s cílem 80 — 70 je už jen „ujde"', [80, 70, 64].map(m => tonMarze(m, 80)), ['ok', 'wait', 'bad']);
+  ok('marže: pod cílem (bez cíle pod 65), neznámá marže pod cílem není', jePodCilem(64) && !jePodCilem(65) && jePodCilem(59, 60) && !jePodCilem(60, 60) && !jePodCilem(null, 60));
+  eq('marže: cíl z formuláře/DB jen celé 1–95, jinak výchozí (null)', ['60', 1, 95, 0, 96, 60.5, '', null, 'x'].map(cilMarze), [60, 1, 95, null, null, null, null, null, null]);
+  eq('marže: prahy rad bez cíle 65 / 50 / 45 jako dřív, s cílem cíl / cíl − 15 / cíl − 20', [prahyRadMarze(null), prahyRadMarze(70)], [{ dobra: 65, ujde: 50, nejhorsi: 45 }, { dobra: 70, ujde: 55, nejhorsi: 50 }]);
+  const rec = [
+    { nazev: 'Latte', prodano: 120, marze: 72, naklad: 18 },
+    { nazev: 'Espresso', prodano: 200, marze: 81, naklad: 9 },
+    { nazev: 'Matcha', prodano: 40, marze: 48, naklad: 42 },
+    { nazev: 'Limonáda', prodano: 40, marze: null, naklad: null },   // bez receptury / bez ceny suroviny
+    { nazev: 'Čaj', prodano: 15, marze: 55, naklad: 30 },
+  ];
+  const jmena = (r: typeof rec) => r.map(x => x.nazev);
+  eq('řazení: podle prodejů (shoda → název)', jmena(seradReceptury(rec, 'prodeje')), ['Espresso', 'Latte', 'Limonáda', 'Matcha', 'Čaj']);
+  eq('řazení: marže od nejnižší, bez marže na konec', jmena(seradReceptury(rec, 'marze')), ['Matcha', 'Čaj', 'Latte', 'Espresso', 'Limonáda']);
+  eq('řazení: náklad od nejvyššího, bez nákladu na konec', jmena(seradReceptury(rec, 'naklad')), ['Matcha', 'Čaj', 'Latte', 'Espresso', 'Limonáda']);
+  eq('řazení: podle názvu česky (Č za C, před D)', jmena(seradReceptury(rec, 'nazev')), ['Čaj', 'Espresso', 'Latte', 'Limonáda', 'Matcha']);
+  const kopieRec = JSON.stringify(rec);
+  seradReceptury(rec, 'marze');
+  ok('řazení: vstup se nemění', JSON.stringify(rec) === kopieRec);
 }
