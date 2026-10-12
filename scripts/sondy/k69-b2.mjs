@@ -11,7 +11,8 @@
 //
 // Fixtury: scripts/sondy/fixtury/k69-b2-*.json. Časy jsou tokeny, ať sonda
 // nezestárne: "@<min>" = ISO před tolika minutami, "@HM±<min>" = pražské
-// HH:MM posunuté od teď, "DNES" / "VCERA" / "PREDEVCIREM" / "PRED5" = pražské dny.
+// HH:MM posunuté od teď, "DNES" / "VCERA" / "PREDEVCIREM" / "PRED5" = pražské dny,
+// "@D-<n>T<HH:MM>" = pražský čas před n dny jako ISO a "D-<n>" = pražský den před n dny.
 import { readFileSync } from 'node:fs';
 import {
   kontext, konec, tvrdi, otevri, lista, upravit, hotovo, vUpravach, dokud, poradi, poradiPutu, dotazyNa, roleMine, DIR, OUT,
@@ -33,8 +34,17 @@ const skutecneChyby = (chyby) => POSUN ? chyby.filter(c => !/Minified React erro
 const praha = (o = 0) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(ted() + o * 86400000));
 const hmPraha = (min) => new Intl.DateTimeFormat('cs-CZ', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(ted() + min * 60000));
 const DNY = { DNES: praha(0), VCERA: praha(-1), PREDEVCIREM: praha(-2), PRED5: praha(-5) };
+/** Pražský čas „HH:MM" dne `den` jako ISO (kolo 7: záznamy s pevným časem proti plánu 08:00–16:00). */
+const prahaISO = (den, hm) => {
+  const odhad = new Date(`${den}T${hm}:00Z`);
+  const tz = new Intl.DateTimeFormat('en', { timeZone: 'Europe/Prague', timeZoneName: 'longOffset' }).formatToParts(odhad).find(x => x.type === 'timeZoneName')?.value ?? 'GMT+01:00';
+  return new Date(`${den}T${hm}:00${tz.replace('GMT', '') || '+00:00'}`).toISOString();
+};
 const nacti = (jmeno) => {
   let t = readFileSync(DIR + jmeno + '.json', 'utf8');
+  // „@D-1T08:12" = včera 08:12 v Praze jako ISO, „D-2" = předevčírem (pražský den).
+  t = t.replace(/"@D-(\d+)T(\d\d:\d\d)"/g, (_, n, hm) => `"${prahaISO(praha(-Number(n)), hm)}"`);
+  t = t.replace(/"D-(\d+)"/g, (_, n) => `"${praha(-Number(n))}"`);
   t = t.replace(/"@HM([+-]\d+)"/g, (_, m) => `"${hmPraha(Number(m))}"`);
   t = t.replace(/"@(\d+)"/g, (_, m) => `"${new Date(ted() - Number(m) * 60000).toISOString()}"`);
   for (const [k, v] of Object.entries(DNY)) t = t.replaceAll(`"${k}"`, `"${v}"`);
@@ -121,6 +131,22 @@ const doporucene = async (p) => {
   const souhrnB = souhrn.replace(/\u00a0/g, ' ');
   tvrdi('D1: Eva má v řádku „prémie +500 Kč", Petra „srážka −200 Kč"', /Eva Testová[\s\S]{0,160}prémie \+500/.test(souhrnB) && /Petra Malá[\s\S]{0,160}srážka −200/.test(souhrnB), souhrnB.slice(0, 500));
   tvrdi('D1: součet mezd přiznává „vč. prémií a srážek +300 Kč"', /vč\. prémií a srážek \+300/.test(souhrnB), souhrnB.slice(0, 300));
+  // Kolo 7 (R7-2): plán proti skutečnosti v záznamech, stopa ruční opravy a plán v Souhrnu hodin.
+  const radek = async (...texty) => {
+    let loc = nastroj.locator('li.list-row');
+    for (const x of texty) loc = loc.filter({ hasText: x });
+    return (await loc.count()) ? (await loc.first().innerText()).replace(/\u00a0/g, ' ') : '';
+  };
+  const rPetra = await radek('Petra Malá', '08:12');
+  tvrdi('K7: záznam Petry má v meta „plán 08:00–16:00" a Chip „+12 min pozdě"', /plán 08:00–16:00/.test(rPetra) && /\+12 min pozdě/.test(rPetra) && /tablet/.test(rPetra), rPetra);
+  const rJakub = await radek('Jakub Horák', '15:35');
+  tvrdi('K7: Jakub, který odešel v 15:35 ze směny do 16:00, má „odešel o 25 min dřív"', /odešel o 25 min dřív/.test(rJakub), rJakub);
+  const rEva = await radek('Zapomněla se odpíchnout');
+  tvrdi('K7: ručně upravený záznam má „upraveno (Martin)", Chip „Upraveno" a důvod (bez „Zkontrolovat")',
+    /upraveno \(Martin\)/.test(rEva) && /Upraveno/.test(rEva) && /doplněno podle kamery/.test(rEva) && !/Zkontrolovat/.test(rEva), rEva);
+  tvrdi('K7: Souhrn hodin u Petry „plán 40 h" a „3× pozdě"', /Petra Malá[\s\S]{0,240}plán 40 h/.test(souhrnB) && /Petra Malá[\s\S]{0,260}3× pozdě/.test(souhrnB), souhrnB.slice(0, 600));
+  await widgetLi(p, 'dochazka.souhrn_hodin').screenshot({ path: OUT + 'k83-dochazka-souhrn-desk.png' });
+  await nastroj.screenshot({ path: OUT + 'k83-dochazka-zaznamy-desk.png' });
   const souhrnW = widgetLi(p, 'dochazka.souhrn_hodin');
   await souhrnW.getByRole('button', { name: 'Prémie a srážky: Eva Testová' }).click();
   await p.getByRole('menuitem', { name: 'Přidat prémii' }).click();
@@ -265,7 +291,7 @@ const doporucene = async (p) => {
 
 // 6) Telefon 390: bez přetečení, „Přidat záznam" vidět a otevře okno.
 {
-  const { ctx, p } = await kontext({ posunCasu: POSUN, fix: FIX_DOCHAZKA, viewport: { width: 390, height: 844 }, mobil: true, dalsi: podvrh() });
+  const { ctx, p, stav } = await kontext({ posunCasu: POSUN, fix: FIX_DOCHAZKA, viewport: { width: 390, height: 844 }, mobil: true, dalsi: podvrh() });
   await otevri(p, DOCHAZKA, 'vedeni.dochazka');
   tvrdi('T1: telefon 390 — žádné vodorovné přetečení', await bezPreteceni(p));
   const pridat = p.getByRole('button', { name: 'Přidat záznam' });
@@ -281,6 +307,41 @@ const doporucene = async (p) => {
   const okno = p.getByRole('dialog', { name: 'Přidat záznam docházky' });
   tvrdi('T1: …a otevře okno s poli Kdo, Příchod, Odchod', await dokud(() => okno.isVisible(), 2000) && await okno.getByLabel('Kdo').isVisible() && await okno.getByLabel('Příchod').isVisible());
   tvrdi('T1: okno na telefonu nepřetéká', await bezPreteceni(p));
+  tvrdi('K7: Přidat záznam má i „Důvod (nepovinné)"', await okno.getByLabel('Důvod (nepovinné)').isVisible());
+  await okno.getByRole('button', { name: 'Zrušit' }).click();
+  await dokud(async () => !(await okno.isVisible()), 2000);
+
+  // Kolo 7: záznamy s plánem a chipem na 390 — nic nepřeteče, tužka a koš mají 44 px.
+  const nastrojT = widgetLi(p, 'nastroj');
+  const cile = await nastrojT.evaluate(el => [...el.querySelectorAll('button[aria-label^="Upravit čas:"], button[aria-label^="Smazat záznam:"]')]
+    .slice(0, 6).map(b => { const r = b.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }));
+  tvrdi('K7 (390): tužka a koš v záznamech mají aspoň 44 × 44 px', cile.length > 0 && cile.every(([w, h]) => w >= 44 && h >= 44), JSON.stringify(cile));
+  const tPetra = (await nastrojT.locator('li.list-row').filter({ hasText: 'Petra Malá' }).filter({ hasText: '08:12' }).first().innerText()).replace(/\u00a0/g, ' ');
+  tvrdi('K7 (390): řádek Petry ukazuje „+12 min pozdě" (chip pod názvem)', /\+12 min pozdě/.test(tPetra), tPetra);
+  // Okno Upravit čas: vyjede zdola, Důvod je Textarea s 16 px (žádný zoom) a PATCH nese note.
+  await nastrojT.getByRole('button', { name: 'Upravit čas: Petra Malá' }).first().click();
+  const upr = p.getByRole('dialog', { name: 'Upravit čas na směně' });
+  tvrdi('K7 (390): Upravit čas otevře okno s polem Důvod', await dokud(() => upr.isVisible(), 2000) && await upr.getByLabel('Důvod (nepovinné)').isVisible());
+  await p.waitForTimeout(450);
+  const geo = await upr.evaluate(el => {
+    const panel = el.classList.contains('modal-sheet') ? el : (el.querySelector('.modal-sheet') ?? el.closest('.modal-sheet') ?? el);
+    const r = panel.getBoundingClientRect();
+    return { spodek: Math.round(r.bottom), sirka: Math.round(r.width), vyska: innerHeight, okno: innerWidth };
+  });
+  tvrdi('K7 (390): okno Upravit čas dosedá na spodní hranu přes celou šířku', geo.spodek >= geo.vyska - 2 && geo.sirka >= geo.okno - 2, JSON.stringify(geo));
+  const duvod = upr.getByLabel('Důvod (nepovinné)');
+  const pismo = await duvod.evaluate(el => `${el.tagName} ${getComputedStyle(el).fontSize}`);
+  tvrdi('K7 (390): Důvod je Textarea s písmem aspoň 16 px (bez zoomu při fokusu)', /^TEXTAREA /.test(pismo) && parseFloat(pismo.split(' ')[1]) >= 16, pismo);
+  await duvod.fill('Odešla k lékaři');
+  await p.screenshot({ path: OUT + 'k83-dochazka-uprava-tel.png' });
+  await upr.getByRole('button', { name: 'Uložit' }).click();
+  await dokud(() => (stav.zapisy ?? []).some(z => z.m === 'PATCH'), 3000);
+  const patch = (stav.zapisy ?? []).find(z => z.m === 'PATCH');
+  tvrdi('K7 (390): PATCH /api/attendance nese id 882 a note „Odešla k lékaři"', !!patch && /"id":882/.test(patch.telo) && /"note":"Odešla k lékaři"/.test(patch.telo), patch?.telo);
+  tvrdi('K7 (390): bez přetečení i se záznamy s plánem', await bezPreteceni(p));
+  // Snímek prvku přesahujícího okno přepne emulaci zařízení a (pointer: coarse) pak přestane platit —
+  // proto až po měření písma.
+  await nastrojT.screenshot({ path: OUT + 'k83-dochazka-zaznamy-tel.png' });
   await ctx.close();
 }
 

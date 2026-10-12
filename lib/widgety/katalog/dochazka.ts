@@ -210,4 +210,31 @@ export const WIDGETY: DefiniceWidgetu[] = [
     cil: { pohled: 'my-shifts' },
     stav: 'hotovo',
   },
+  // Data: GET /api/attendance → entries[{clockIn,clockOut,source,note,updatedBy}] — stejná adresa jako Odpracováno
+  // a Můj výdělek (zaměstnanec dostane vlastní záznamy za 70 dní), výpočet lib/dochazkaPrehled.radkyMojeDochazky.
+  // Kolo 7 (vzor Homebase / 7shifts „My timesheet"): den na řádek, zapomenutý odchod a „ručně" (vedení opravilo).
+  // Ikona `clipboard`: na Mých směnách ani na Domů ve výchozím rozložení není (AK-19).
+  {
+    id: 'dochazka.moje_zaznamy',
+    oblast: 'dochazka',
+    nazev: 'Moje docházka',
+    popis: 'Tvoje příchody a odchody po dnech za měsíc.',
+    ikona: 'clipboard',
+    velikosti: ['M', 'L'],
+    vychoziVelikost: 'M',
+    rozhrani: ['zamestnanec'],
+    stranky: ['zamestnanec.moje_smeny'],
+    opravneni: { vse: [], nektere: [] },
+    tarif: 'zdarma',
+    nastaveni: [
+      {
+        klic: 'mesic',
+        nazev: 'Měsíc',
+        typ: 'vyber',
+        moznosti: [{ id: 'tento', nazev: 'Tento' }, { id: 'minuly', nazev: 'Minulý' }],
+        vychozi: 'tento',
+      },
+    ],
+    stav: 'hotovo',
+  },
 ];

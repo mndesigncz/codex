@@ -80,6 +80,10 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'wage.adjustment_delete': 'Smazána prémie nebo srážka',
   'points.award': 'Pochvala s body',
   'points.award_delete': 'Smazána pochvala',
+  // docházka (kolo 7: ruční oprava s důvodem)
+  'dochazka.upravit': 'Ručně upraven záznam docházky',
+  'dochazka.pridat': 'Ručně přidán záznam docházky',
+  'dochazka.smazat': 'Smazán záznam docházky',
   // akce
   'event.create': 'Založena akce',
   'event.checkout': 'Akce: zboží vydáno ze skladu',
@@ -98,6 +102,7 @@ export const AUDIT_POPISKY: Record<string, string> = {
   // Managero client (hosté)
   'client.floorplan': 'Uložen plánek stolů',
   'client.reservation': 'Změněna rezervace hosta',
+  'rezervace.zapsat': 'Obsluha ručně zapsala rezervaci (telefon, u dveří)',
   'client.profile': 'Změna veřejné stránky podniku',
   'client.broadcast': 'Odeslána zpráva členům věrnostního programu',
   'client.reaktivace': 'Změna automatického oslovení „Chybíš nám“',

@@ -559,6 +559,9 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS staffing_rules JSONB`);
     // watchdog for forgotten clock-outs: when the person was already reminded
     await ddl(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS nudged_at TIMESTAMP`);
+    // Kolo 7: kdo záznam ručně upravil nebo přidal a kdy (důvod je v note) — hodiny jsou mzda.
+    await ddl(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS updated_by INTEGER`);
+    await ddl(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP`);
 
     // ---- Announcements (pinned team board) ----
     await ddl(sql`
@@ -1645,6 +1648,17 @@ export async function GET(request: Request) {
       CREATE UNIQUE INDEX IF NOT EXISTS client_reservations_no_dup
       ON client_reservations (team_id, customer_id, date, time)
       WHERE status NOT IN ('cancelled','declined')`);
+    // Kolo 7 (R7-3): rezervaci zapsanou obsluhou (telefon, u dveří) nemusí mít host s účtem —
+    // customer_id smí být NULL a jméno a telefon nese rezervace sama; created_by = kdo ji zapsal.
+    // Unikátní index no_dup zůstává: NULL se v něm neporovná, duplicitu ručních hlídá POST.
+    await ddl(sql`ALTER TABLE client_reservations ALTER COLUMN customer_id DROP NOT NULL`);
+    await ddl(sql`ALTER TABLE client_reservations ADD COLUMN IF NOT EXISTS guest_name TEXT`);
+    await ddl(sql`ALTER TABLE client_reservations ADD COLUMN IF NOT EXISTS guest_phone TEXT`);
+    await ddl(sql`ALTER TABLE client_reservations ADD COLUMN IF NOT EXISTS created_by INTEGER`);
+    // Kolo 7 (R7-3): automatické potvrzování rezervací hostů. auto_confirm_max_party =
+    // největší skupina, která se potvrdí sama (0 = všechny velikosti); větší čekají na vedení.
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS auto_confirm BOOLEAN NOT NULL DEFAULT FALSE`);
+    await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS auto_confirm_max_party INTEGER NOT NULL DEFAULT 0`);
 
     // --- Výkonové indexy na provozních tabulkách ---------------------------
     // Uzávěrky, docházka a rozvrh filtrují tyhle tabulky podle team_id/date

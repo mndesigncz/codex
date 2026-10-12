@@ -28,11 +28,13 @@ export async function GET() {
   } catch { orders = []; }
   // Rezervace jsou jména hostů na konkrétní čas — patří jen tomu, kdo smí
   // rezervace vidět. Obsluha v mobilu je v kompaktním příjmu stejně nezobrazuje.
+  // Ručně zapsaná rezervace (kolo 7) nemusí mít účet hosta: LEFT JOIN a jméno z guest_name.
   let reservations: any[] = [];
   if (ctx.role.opravneni.has('rezervace.zobrazit')) try {
     reservations = await sql`
-      SELECT r.id, r.time, r.party, r.note, r.status, us.name AS customer_name, t.name AS table_name
-      FROM client_reservations r JOIN users us ON us.id = r.customer_id LEFT JOIN client_tables t ON t.id = r.table_id
+      SELECT r.id, r.time, r.party, r.note, r.status, COALESCE(us.name, r.guest_name) AS customer_name, t.name AS table_name,
+             (r.customer_id IS NULL OR r.created_by IS NOT NULL) AS manual
+      FROM client_reservations r LEFT JOIN users us ON us.id = r.customer_id LEFT JOIN client_tables t ON t.id = r.table_id
       WHERE r.team_id = ${u.team_id} AND r.date = ${today} AND r.status IN ('requested','confirmed','seated') ORDER BY r.time` as any[];
   } catch { reservations = []; }
   const newCount = orders.filter(o => o.status === 'new').length;

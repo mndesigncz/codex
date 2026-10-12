@@ -3,11 +3,13 @@ import bcrypt from 'bcryptjs';
 import { timingSafeEqual } from 'crypto';
 import { hit, clear } from '@/lib/rateLimit';
 import { neon } from '@neondatabase/serverless';
-import { pragueToday, pragueDaySafe, parseDbTime } from '@/lib/pragueTime';
+import { pragueToday, pragueDaySafe, parseDbTime, dayPlus } from '@/lib/pragueTime';
 import { autoCloseEntry, isForgottenClockOut, pragueMoment, denSmeny } from '@/lib/staleShifts';
 import { notifyUser } from '@/lib/push';
 import { jeClenem } from '@/lib/tenant';
 import { pozaduj, jeOdpoved, clenoveSOpravnenim } from '@/lib/opravneniDb';
+import { audit } from '@/lib/audit';
+import { vyberSmenuPichacek, type SmenaPichacek } from '@/lib/dochazkaPrehled';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +18,41 @@ const sql = neon(process.env.DATABASE_URL!);
 // Current wall-clock time in Prague as "HH:MM".
 function hhmmPrague(d = new Date()): string {
   return d.toLocaleTimeString('cs-CZ', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit' });
+}
+
+// Pražské „d. M. HH:MM" pro push a audit (hodiny jsou mzda — člověk má vidět, co se změnilo).
+function denCas(d: Date | null): string {
+  return d
+    ? d.toLocaleString('cs-CZ', { timeZone: 'Europe/Prague', day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : '…';
+}
+
+/** Nejdelší důvod ruční opravy (time_entries.note) — stejný strop jako Textarea v okně. */
+const MAX_DUVOD = 300;
+
+/**
+ * Důvod ruční opravy z těla požadavku: undefined = beze změny, '' nebo null = smazat,
+ * jinak ořezaný text nejvýš MAX_DUVOD znaků. Neplatný tvar vrátí chybu pro 400.
+ */
+function duvodZTela(v: unknown): { duvod?: string | null; chyba?: string } {
+  if (v === undefined) return {};
+  if (v === null) return { duvod: null };
+  if (typeof v !== 'string') return { chyba: 'Neplatný důvod.' };
+  const d = v.trim();
+  if (d.length > MAX_DUVOD) return { chyba: `Důvod může mít nejvýš ${MAX_DUVOD} znaků.` };
+  return { duvod: d || null };
+}
+
+/**
+ * Ruční čas musí dávat smysl: záznam nejvýš 24 h (delší se do mzdy stejně nepočítá —
+ * lib/wages) a nic v budoucnosti (s deseti minutami na rozladěné hodiny). Překlep
+ * v roce nebo v AM/PM by jinak tiše přidal nebo ubral hodiny ve mzdě.
+ */
+function chybaCasu(od: Date, doCasu: Date | null): string | null {
+  const strop = Date.now() + 10 * 60 * 1000;
+  if (od.getTime() > strop || (doCasu && doCasu.getTime() > strop)) return 'Čas nemůže být v budoucnosti.';
+  if (doCasu && doCasu.getTime() - od.getTime() > 24 * 3600 * 1000) return 'Záznam je delší než 24 hodin — zkontroluj časy.';
+  return null;
 }
 
 // Ensure the employee has a shift for `date`; create an auto one if not, so the
@@ -57,6 +94,11 @@ export async function GET(req: NextRequest) {
   if (opr.has('dochazka.tablet') || opr.has('dochazka.zobrazit')) {
     // Roster: every employee + their currently-open entry (if clocked in)
     // + today's planned shift so the kiosk can show plan vs reality.
+    // Kolo 7: plán je jen PLÁNOVANÁ směna. Automatická (type 'auto', vzniká při
+    // příchodu bez rozvrhu se začátkem i koncem v čase příchodu) by se tvářila
+    // jako „plán 14:12–14:12": Píchačky by ji ukázaly jako rozvrh, Otevřené
+    // příchody by z ní udělaly noční směnu do zítřka a hlídač níž by po půl
+    // hodině poslal „Směna ti už skončila" každému, kdo přišel bez rozvrhu.
     const today = pragueToday();
     // Kolo 62: v rosteru je každý, kdo má v podniku ČLENSTVÍ nebo zrcadlo —
     // člen přepnutý do jiného podniku z tabletu nezmizí. Sazba je z členství
@@ -83,6 +125,7 @@ export async function GET(req: NextRequest) {
       LEFT JOIN LATERAL (
         SELECT start_time, end_time FROM shifts
         WHERE employee_id = u.id AND date = ${today} AND team_id = ${c.teamId}
+          AND auto_created IS NOT TRUE AND type <> 'auto'
         ORDER BY start_time ASC LIMIT 1
       ) sh ON TRUE
       WHERE (m.user_id IS NOT NULL OR u.team_id = ${c.teamId})
@@ -108,7 +151,7 @@ export async function GET(req: NextRequest) {
         ) te ON TRUE
         LEFT JOIN LATERAL (
           SELECT start_time, end_time FROM shifts
-          WHERE employee_id = u.id AND date = ${today} AND team_id = ${c.teamId}
+          WHERE employee_id = u.id AND date = ${today} AND team_id = ${c.teamId} AND type <> 'auto'
           ORDER BY start_time ASC LIMIT 1
         ) sh ON TRUE
         WHERE (m.user_id IS NOT NULL OR u.team_id = ${c.teamId})
@@ -170,14 +213,46 @@ export async function GET(req: NextRequest) {
     if (opr.has('dochazka.zobrazit')) {
       const { searchParams } = new URL(req.url);
       const days = Math.min(180, Math.max(1, parseInt(searchParams.get('days') ?? '30')));
-      entries = await sql`
-        SELECT te.id, te.employee_id AS "employeeId", u.name AS "employeeName", u.avatar AS "employeeAvatar",
-               te.clock_in AS "clockIn", te.clock_out AS "clockOut", te.source, te.note
-        FROM time_entries te
-        LEFT JOIN users u ON u.id = te.employee_id
-        WHERE te.team_id = ${c.teamId}
-          AND te.clock_in >= NOW() - (${days} || ' days')::interval
-        ORDER BY te.clock_in DESC`;
+      // Kolo 7: k záznamu plánovaná směna (plán proti skutečnosti) a kdo ho ručně
+      // upravil. Směna jedním dotazem pro všechny záznamy (LATERAL, žádných N
+      // dotazů): téhož člověka v tomhle podniku, z pražského dne příchodu, nebo
+      // noční (konec ≤ začátek) ze dne před ním — příchod po půlnoci patří
+      // včerejšku. Z kandidátů ta, jejíž začátek je nejblíž příchodu. Automatické
+      // směny se nepočítají (nejsou plán, vznikly z příchodu samého).
+      try {
+        entries = await sql`
+          SELECT te.id, te.employee_id AS "employeeId", u.name AS "employeeName", u.avatar AS "employeeAvatar",
+                 te.clock_in AS "clockIn", te.clock_out AS "clockOut", te.source, te.note,
+                 te.updated_by AS "updatedBy", ub.name AS "updatedByName", te.updated_at AS "updatedAt",
+                 pl.start_time AS "planStart", pl.end_time AS "planEnd", pl.date AS "planDate"
+          FROM time_entries te
+          LEFT JOIN users u ON u.id = te.employee_id
+          LEFT JOIN users ub ON ub.id = te.updated_by
+          LEFT JOIN LATERAL (
+            SELECT s.date, s.start_time, s.end_time FROM shifts s
+            WHERE s.employee_id = te.employee_id AND s.team_id = ${c.teamId}
+              AND s.auto_created IS NOT TRUE AND s.type <> 'auto'
+              AND s.date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' AND s.start_time ~ '^[0-9]{2}:[0-9]{2}'
+              AND (s.date = to_char(te.clock_in AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD')
+                OR (s.date = to_char((te.clock_in AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Prague') - INTERVAL '1 day', 'YYYY-MM-DD')
+                    AND LEFT(s.end_time, 5) <= LEFT(s.start_time, 5)))
+            ORDER BY ABS(EXTRACT(EPOCH FROM ((te.clock_in AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Prague') - (s.date || ' ' || LEFT(s.start_time, 5))::timestamp)))
+            LIMIT 1
+          ) pl ON TRUE
+          WHERE te.team_id = ${c.teamId}
+            AND te.clock_in >= NOW() - (${days} || ' days')::interval
+          ORDER BY te.clock_in DESC`;
+      } catch {
+        // updated_by / updated_at ještě nejsou (migrace /api/init) — záznamy bez plánu a stopy úprav, jako dřív.
+        entries = await sql`
+          SELECT te.id, te.employee_id AS "employeeId", u.name AS "employeeName", u.avatar AS "employeeAvatar",
+                 te.clock_in AS "clockIn", te.clock_out AS "clockOut", te.source, te.note
+          FROM time_entries te
+          LEFT JOIN users u ON u.id = te.employee_id
+          WHERE te.team_id = ${c.teamId}
+            AND te.clock_in >= NOW() - (${days} || ' days')::interval
+          ORDER BY te.clock_in DESC`;
+      }
     }
     // Prémie a srážky za stejné období — jen kdo vidí mzdy (jako sazby). Jedna adresa pro hodiny, sazby i úpravy,
     // ať Souhrn hodin, Mzdy a nástroj nemusí na další endpoint. Bez migrace prázdné.
@@ -200,12 +275,24 @@ export async function GET(req: NextRequest) {
   // hodiny ze všech podniků, kde člověk pracuje — barista ve dvou kavárnách
   // viděl součet obou. NULL připouští řádky z doby před sloupcem team_id
   // (stejně jako otevřený příchod v POST).
-  const entries = await sql`
-    SELECT id, employee_id AS "employeeId", clock_in AS "clockIn", clock_out AS "clockOut", source, note
-    FROM time_entries
-    WHERE employee_id = ${c.meId} AND clock_in >= NOW() - INTERVAL '70 days'
-      AND (team_id = ${c.teamId} OR team_id IS NULL)
-    ORDER BY clock_in DESC`;
+  // Kolo 7: i kdo záznam ručně upravil (updatedBy) — „Moje docházka" u něj ukáže „ručně".
+  let entries: any[];
+  try {
+    entries = await sql`
+      SELECT id, employee_id AS "employeeId", clock_in AS "clockIn", clock_out AS "clockOut", source, note, updated_by AS "updatedBy"
+      FROM time_entries
+      WHERE employee_id = ${c.meId} AND clock_in >= NOW() - INTERVAL '70 days'
+        AND (team_id = ${c.teamId} OR team_id IS NULL)
+      ORDER BY clock_in DESC`;
+  } catch {
+    // updated_by ještě není (migrace) — bez stopy úprav, jako dřív.
+    entries = await sql`
+      SELECT id, employee_id AS "employeeId", clock_in AS "clockIn", clock_out AS "clockOut", source, note
+      FROM time_entries
+      WHERE employee_id = ${c.meId} AND clock_in >= NOW() - INTERVAL '70 days'
+        AND (team_id = ${c.teamId} OR team_id IS NULL)
+      ORDER BY clock_in DESC`;
+  }
   // Their own open entry rides along so the clock widget works for them too.
   // Jen otevřený příchod v tomhle podniku: Píchačky by jinak ukazovaly
   // „na směně" podle příchodu v jiném podniku a odchod (POST) by ho nenašel.
@@ -220,7 +307,24 @@ export async function GET(req: NextRequest) {
   } catch { /* ignore */ }
   // Vlastní sazba jen s oprávněním na vlastní (nebo všechny) mzdy — pro „Můj výdělek".
   const smiSazbu = opr.has('finance.moje_mzda') || opr.has('finance.mzdy');
-  const ja: Record<string, unknown> = { id: c.meId, openSince };
+  // Dnešní směna z rozvrhu pro Píchačky (kolo 7) — jedním dotazem tady, ne přes
+  // /api/shifts: Píchačky jsou i na Domů a widget má jednu adresu. Dnešek a noční
+  // směna ze včerejška, která ještě běží (příchod po půlnoci patří včerejšku);
+  // vybírá lib/dochazkaPrehled.vyberSmenuPichacek. Automatické směny nejsou rozvrh.
+  let smena: SmenaPichacek | null = null;
+  try {
+    const dnes = pragueToday();
+    const smeny = await sql`
+      SELECT date, start_time, end_time FROM shifts
+      WHERE employee_id = ${c.meId} AND team_id = ${c.teamId} AND date IN (${dnes}, ${dayPlus(dnes, -1)})
+        AND auto_created IS NOT TRUE AND type <> 'auto'
+      ORDER BY date DESC, start_time ASC`;
+    smena = vyberSmenuPichacek(smeny as { date: string; start_time: string; end_time: string }[], dnes, Date.now(), openSince);
+  } catch { /* bez rozvrhu Píchačky jen neukážou plán */ }
+  const ja: Record<string, unknown> = {
+    id: c.meId, openSince,
+    shiftStart: smena?.shiftStart ?? null, shiftEnd: smena?.shiftEnd ?? null, shiftDate: smena?.shiftDate ?? null,
+  };
   if (smiSazbu) ja.hourlyRate = await vlastniSazba(c.meId, c.teamId);
   // Vlastní prémie a srážky (Můj výdělek) — kdo smí znát svou mzdu, vidí i co k ní vedení přidalo.
   let adjustments: any[] = [];
@@ -261,13 +365,28 @@ export async function POST(req: NextRequest) {
     if (isNaN(+ci) || isNaN(+co) || co <= ci) {
       return NextResponse.json({ error: 'Odchod musí být po příchodu.' }, { status: 400 });
     }
-    if (+co - +ci > 24 * 3600 * 1000) {
-      return NextResponse.json({ error: 'Záznam je delší než 24 hodin — zkontroluj časy.' }, { status: 400 });
+    const casChyba = chybaCasu(ci, co);
+    if (casChyba) return NextResponse.json({ error: casChyba }, { status: 400 });
+    // Kolo 7: ruční záznam je zásah do mzdových dat — nese důvod, kdo ho přidal a kdy, a jde do auditu.
+    const { duvod, chyba } = duvodZTela(b.note);
+    if (chyba) return NextResponse.json({ error: chyba }, { status: 400 });
+    let entry: any;
+    try {
+      [entry] = await sql`
+        INSERT INTO time_entries (team_id, employee_id, clock_in, clock_out, source, note, updated_by, updated_at)
+        VALUES (${c.teamId}, ${employeeId}, ${ci.toISOString()}, ${co.toISOString()}, 'manual', ${duvod ?? null}, ${c.meId}, NOW())
+        RETURNING id, employee_id AS "employeeId", clock_in AS "clockIn", clock_out AS "clockOut"`;
+    } catch {
+      // updated_by / updated_at ještě nejsou (migrace) — záznam i důvod se uloží bez stopy.
+      [entry] = await sql`
+        INSERT INTO time_entries (team_id, employee_id, clock_in, clock_out, source, note)
+        VALUES (${c.teamId}, ${employeeId}, ${ci.toISOString()}, ${co.toISOString()}, 'manual', ${duvod ?? null})
+        RETURNING id, employee_id AS "employeeId", clock_in AS "clockIn", clock_out AS "clockOut"`;
     }
-    const [entry] = await sql`
-      INSERT INTO time_entries (team_id, employee_id, clock_in, clock_out, source)
-      VALUES (${c.teamId}, ${employeeId}, ${ci.toISOString()}, ${co.toISOString()}, 'manual')
-      RETURNING id, employee_id AS "employeeId", clock_in AS "clockIn", clock_out AS "clockOut"`;
+    let jmeno = '';
+    try { jmeno = String((await sql`SELECT name FROM users WHERE id = ${employeeId}`)[0]?.name ?? ''); } catch { /* jméno je jen do auditu */ }
+    await audit(c.teamId, c.meId, 'dochazka.pridat', 'time_entry', entry?.id ?? null,
+      `${jmeno || `#${employeeId}`}: ${denCas(ci)} – ${denCas(co)}${duvod ? ` · ${duvod}` : ''}`);
     return NextResponse.json({ ok: true, entry });
   }
 
@@ -424,7 +543,10 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ ok: true, action: 'out', entry: row, closingDone });
 }
 
-// PATCH — oprava zapomenutého odchodu: { id, clockOut?: ISO } (default now).
+// PATCH — ruční oprava záznamu: { id, clockIn?: ISO, clockOut?: ISO | null, note?: string }.
+// Bez clockIn i clockOut = „Ukončit" na teď. `note` je důvod opravy: undefined = beze
+// změny, '' = smazat. Každá změna zapíše, kdo ji udělal a kdy (updated_by, updated_at),
+// a jde do auditu — hodiny jsou mzda, účetní i člověk mají vidět, proč se měnily.
 export async function PATCH(req: NextRequest) {
   const c = await pozaduj('dochazka.upravit');
   if (jeOdpoved(c)) return c;
@@ -432,19 +554,28 @@ export async function PATCH(req: NextRequest) {
   const b = await req.json().catch(() => ({}));
   const id = parseInt(b.id);
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Neplatné ID' }, { status: 400 });
+  const { duvod, chyba } = duvodZTela(b.note);
+  if (chyba) return NextResponse.json({ error: chyba }, { status: 400 });
 
-  const [entry] = await sql`SELECT id, clock_in, clock_out FROM time_entries WHERE id = ${id} AND team_id = ${c.teamId}`;
+  const [entry] = await sql`
+    SELECT te.id, te.clock_in, te.clock_out, te.note, te.employee_id, u.name
+    FROM time_entries te LEFT JOIN users u ON u.id = te.employee_id
+    WHERE te.id = ${id} AND te.team_id = ${c.teamId}`;
   if (!entry) return NextResponse.json({ error: 'Záznam nenalezen' }, { status: 404 });
+
+  // Časy z databáze nemají zónu (UTC) — přes parseDbTime, ať porovnání „změnilo se?" nezávisí na zóně serveru.
+  const puvodniOd = parseDbTime(entry.clock_in) ?? new Date(entry.clock_in);
+  const puvodniDo = parseDbTime(entry.clock_out);
 
   // clockIn optional (edit). clockOut given ⇒ set it; clockOut omitted with no
   // clockIn ⇒ force-close to now (the "Ukončit" button).
-  let inTs = new Date(entry.clock_in);
+  let inTs = puvodniOd;
   if (b.clockIn !== undefined) {
     const p = new Date(b.clockIn);
     if (Number.isNaN(p.getTime())) return NextResponse.json({ error: 'Neplatný čas příchodu.' }, { status: 400 });
     inTs = p;
   }
-  let outTs: Date | null = entry.clock_out ? new Date(entry.clock_out) : null;
+  let outTs: Date | null = puvodniDo;
   if (b.clockOut !== undefined) {
     if (b.clockOut === null || b.clockOut === '') outTs = null;
     else {
@@ -452,29 +583,52 @@ export async function PATCH(req: NextRequest) {
       if (Number.isNaN(p.getTime())) return NextResponse.json({ error: 'Neplatný čas odchodu.' }, { status: 400 });
       outTs = p;
     }
-  } else if (b.clockIn === undefined) {
+  } else if (b.clockIn === undefined && b.note === undefined) {
     outTs = new Date(); // force-close to now
   }
   if (outTs && outTs.getTime() <= inTs.getTime()) {
     return NextResponse.json({ error: 'Odchod musí být po příchodu.' }, { status: 400 });
   }
+  const casChyba = chybaCasu(inTs, outTs);
+  if (casChyba) return NextResponse.json({ error: casChyba }, { status: 400 });
 
-  const [row] = await sql`
-    UPDATE time_entries SET clock_in = ${inTs.toISOString()}, clock_out = ${outTs ? outTs.toISOString() : null}
-    WHERE id = ${id}
-    RETURNING id, employee_id AS "employeeId", clock_in AS "clockIn", clock_out AS "clockOut"`;
+  const casZmenen = inTs.getTime() !== puvodniOd.getTime()
+    || (outTs?.getTime() ?? null) !== (puvodniDo?.getTime() ?? null);
+  const duvodZmenen = duvod !== undefined && (duvod ?? null) !== (entry.note ?? null);
+  const zmena = casZmenen || duvodZmenen;
+  const novyDuvod = duvodZmenen ? duvod ?? null : entry.note ?? null;
 
-  // The person whose hours changed deserves to know — hours are wages.
-  const changed = inTs.getTime() !== new Date(entry.clock_in).getTime()
-    || (outTs?.getTime() ?? null) !== (entry.clock_out ? new Date(entry.clock_out).getTime() : null);
-  if (changed && row && Number(row.employeeId) !== c.meId) {
-    const fmt = (d: Date | null) => d
-      ? d.toLocaleString('cs-CZ', { timeZone: 'Europe/Prague', day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })
-      : '…';
+  let row: any;
+  try {
+    [row] = await sql`
+      UPDATE time_entries
+      SET clock_in = ${inTs.toISOString()}, clock_out = ${outTs ? outTs.toISOString() : null}, note = ${novyDuvod},
+          updated_by = CASE WHEN ${zmena} THEN ${c.meId}::int ELSE updated_by END,
+          updated_at = CASE WHEN ${zmena} THEN NOW() ELSE updated_at END
+      WHERE id = ${id} AND team_id = ${c.teamId}
+      RETURNING id, employee_id AS "employeeId", clock_in AS "clockIn", clock_out AS "clockOut", note`;
+  } catch {
+    // updated_by / updated_at ještě nejsou (migrace) — čas a důvod se uloží bez stopy.
+    [row] = await sql`
+      UPDATE time_entries SET clock_in = ${inTs.toISOString()}, clock_out = ${outTs ? outTs.toISOString() : null}, note = ${novyDuvod}
+      WHERE id = ${id} AND team_id = ${c.teamId}
+      RETURNING id, employee_id AS "employeeId", clock_in AS "clockIn", clock_out AS "clockOut", note`;
+  }
+
+  if (zmena) {
+    const pred = `${denCas(puvodniOd)} – ${denCas(puvodniDo)}`;
+    const po = `${denCas(inTs)} – ${denCas(outTs)}`;
+    await audit(c.teamId, c.meId, 'dochazka.upravit', 'time_entry', id,
+      `${entry.name ?? `#${entry.employee_id}`}: ${casZmenen ? `${pred} → ${po}` : po}${novyDuvod ? ` · ${novyDuvod}` : ''}`);
+  }
+
+  // The person whose hours changed deserves to know — hours are wages. A s důvodem,
+  // ať se nemusí ptát, proč mu někdo sáhl na hodiny.
+  if (casZmenen && row && Number(row.employeeId) !== c.meId) {
     try {
       await notifyUser(Number(row.employeeId), {
         title: '🕐 Upravená docházka',
-        body: `Vedení upravilo tvůj záznam: ${fmt(inTs)} – ${fmt(outTs)}.`,
+        body: `Vedení upravilo tvůj záznam: ${denCas(inTs)} – ${denCas(outTs)}${novyDuvod ? ` · ${novyDuvod}` : '.'}`,
         type: 'info',
         category: 'shift',
         link: '/employee/shifts',
@@ -490,6 +644,15 @@ export async function DELETE(req: NextRequest) {
   if (jeOdpoved(c)) return c;
   const id = parseInt(new URL(req.url).searchParams.get('id') ?? '');
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Neplatné ID' }, { status: 400 });
-  await sql`DELETE FROM time_entries WHERE id = ${id} AND team_id = ${c.teamId}`;
+  const [smazany] = await sql`
+    DELETE FROM time_entries WHERE id = ${id} AND team_id = ${c.teamId}
+    RETURNING employee_id, clock_in, clock_out`;
+  // Smazané hodiny zmizí i ze mzdy — do auditu, kdo a čí záznam smazal (kolo 7).
+  if (smazany) {
+    let jmeno = '';
+    try { jmeno = String((await sql`SELECT name FROM users WHERE id = ${smazany.employee_id}`)[0]?.name ?? ''); } catch { /* jen do auditu */ }
+    await audit(c.teamId, c.meId, 'dochazka.smazat', 'time_entry', id,
+      `${jmeno || `#${smazany.employee_id}`}: ${denCas(parseDbTime(smazany.clock_in))} – ${denCas(parseDbTime(smazany.clock_out))}`);
+  }
   return NextResponse.json({ ok: true });
 }

@@ -22,18 +22,140 @@ export function hoursLabel(hours: OpeningHours | null | undefined, dateStr: stri
   return `${d.open}–${d.close}`;
 }
 
-/** Časy, kdy se dá v daný den rezervovat: od otevření po zavření minus hodina, po krocích. */
-export function slotsFor(hours: OpeningHours | null | undefined, dateStr: string, slotMinutes: number): string[] {
+const naMinuty = (t: string) => { const [h, m] = String(t).split(':').map(Number); return h * 60 + (m || 0); };
+const naHM = (min: number) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+const JE_HM = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/**
+ * Kolik minut dopředu musí host rezervovat na dnešek. Pevně — podnik si to
+ * zatím nenastavuje (OpenTable i Resy nabízejí pro dnešek jen časy s předstihem).
+ */
+export const PREDSTIH_REZERVACE_MIN = 30;
+
+/**
+ * Nejdřívější čas, na který jde dnes rezervovat: teď + předstih ve tvaru „HH:MM".
+ * „Teď" dodává volající (server pragueHM(), prohlížeč své hodiny) — tenhle soubor
+ * jde i do klientské komponenty, takže na server nesahá. Přes půlnoc „24:00":
+ * dnes už nic.
+ */
+export function nejdriveDnes(tedHM: string, predstih: number = PREDSTIH_REZERVACE_MIN): string {
+  if (!JE_HM.test(String(tedHM).slice(0, 5))) return '00:00';
+  const m = naMinuty(String(tedHM).slice(0, 5)) + Math.max(0, Math.round(Number(predstih) || 0));
+  return m >= 24 * 60 ? '24:00' : naHM(m);
+}
+
+/**
+ * Časy, kdy se dá v daný den rezervovat: od otevření po zavření minus hodina, po krocích.
+ * S `nejdrive` („HH:MM") jen časy od něj včetně — pro dnešek, ať host nerezervuje
+ * na čas, který už minul (volající dá nejdriveDnes(teď)).
+ */
+export function slotsFor(hours: OpeningHours | null | undefined, dateStr: string, slotMinutes: number, nejdrive?: string): string[] {
   const day = hours?.[dayKey(dateStr)];
   if (!day || day.closed || !day.open || !day.close) return [];
-  const toMin = (t: string) => { const [h, m] = String(t).split(':').map(Number); return h * 60 + (m || 0); };
-  const start = toMin(day.open), end = toMin(day.close) - 60;
+  const start = naMinuty(day.open), end = naMinuty(day.close) - 60;
   const out: string[] = [];
   const step = Math.max(15, slotMinutes || 30);
-  for (let t = Math.ceil(start / step) * step; t <= end; t += step) {
-    out.push(`${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`);
+  for (let t = Math.ceil(start / step) * step; t <= end; t += step) out.push(naHM(t));
+  // „HH:MM" s nulami vpředu se dá porovnat jako text; „24:00" vyřadí všechno.
+  return nejdrive && /^\d{2}:\d{2}$/.test(nejdrive) ? out.filter(s => s >= nejdrive) : out;
+}
+
+/**
+ * Potvrdí se rezervace hosta sama? Podnik zapne `auto_confirm` a volitelně hranici
+ * `auto_confirm_max_party`: skupiny do té velikosti se potvrdí hned, větší dál čekají
+ * na vedení. 0 (nebo nic) = bez hranice, potvrdí se všechny.
+ */
+export function autoPotvrdit(profil: { auto_confirm?: unknown; auto_confirm_max_party?: unknown } | null | undefined, osob: number): boolean {
+  if (profil?.auto_confirm !== true) return false;
+  const max = Math.max(0, Math.round(Number(profil.auto_confirm_max_party) || 0));
+  return max === 0 || Math.max(1, Number(osob) || 1) <= max;
+}
+
+/**
+ * Oznámení hostovi o rozhodnutí o rezervaci. Jedno místo pro ruční potvrzení (PATCH),
+ * automatické potvrzení (POST hosta) i ruční zápis s napojeným členem — ať se texty nerozjedou.
+ */
+export function zpravaHostoviORezervaci(stav: 'confirmed' | 'declined', datum: string, cas: string): { title: string; body: string; link: string; type: 'success' | 'info' } {
+  const kdy = `${String(datum).split('-').reverse().join('. ')} ${String(cas).slice(0, 5)}`;
+  return stav === 'confirmed'
+    ? { title: 'Rezervace potvrzena', body: `Těšíme se ${kdy}.`, link: '/client/me', type: 'success' }
+    : { title: 'Rezervaci se nepodařilo přijmout', body: `Na ${kdy} bohužel nemáme místo.`, link: '/client/me', type: 'info' };
+}
+
+// ---- Ruční zápis rezervace (telefon, u dveří) -------------------------------
+//
+// Obsluha zapíše rezervaci za hosta, který zavolal nebo stojí u dveří. Server
+// i okno „Nová rezervace" kontrolují stejnou funkcí, ať okno neodmítne, co server
+// vezme (a naopak). Čas smí být mimo nabízené sloty — obsluha ví víc — ale musí
+// padnout do otevírací doby dne.
+
+export const RUCNI_MAX_JMENO = 80;
+export const RUCNI_MAX_TELEFON = 30;
+export const RUCNI_MAX_POZNAMKA = 300;
+
+export type PoleRucni = 'name' | 'phone' | 'date' | 'time' | 'party' | 'tableId' | 'note' | 'customerId';
+
+export interface RucniRezervace {
+  jmeno: string;
+  /** Jak ho obsluha napsala (mezery srovnané), nebo null. */
+  telefon: string | null;
+  datum: string;
+  cas: string;
+  osob: number;
+  stulId: number | null;
+  poznamka: string | null;
+  /** Napojení na člena podniku (příslušnost ověří server dotazem). */
+  hostId: number | null;
+}
+
+/** Je „HH:MM" v otevírací době dne? Zavírání po půlnoci (18:00–02:00) se počítá přes půlnoc. */
+export function vOteviraciDobe(hours: OpeningHours | null | undefined, dateStr: string, cas: string): boolean {
+  const day = hours?.[dayKey(dateStr)];
+  if (!day || day.closed || !day.open || !day.close || !JE_HM.test(cas)) return false;
+  const t = naMinuty(cas), od = naMinuty(day.open), doo = naMinuty(day.close);
+  return doo > od ? t >= od && t < doo : t >= od || t < doo;
+}
+
+const kladneCele = (v: unknown): number | null | 'chyba' => {
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  return Number.isInteger(n) && n > 0 ? n : 'chyba';
+};
+
+/**
+ * Kontrola ručně zapisované rezervace. `nejpozdeji` = dnes + dní dopředu podniku
+ * (počítá volající přes pragueTime), `maxOsob` = Nejvíc osob z nastavení.
+ */
+export function validujRucniRezervaci(
+  v: Record<string, unknown> | null | undefined,
+  k: { dnes: string; nejpozdeji: string; maxOsob: number; hodiny: OpeningHours | null | undefined },
+): { ok: true; data: RucniRezervace } | { ok: false; pole: PoleRucni; chyba: string } {
+  const b = v ?? {};
+  const spatne = (pole: PoleRucni, chyba: string) => ({ ok: false as const, pole, chyba });
+  const jmeno = String(b.name ?? '').replace(/\s+/g, ' ').trim();
+  if (!jmeno) return spatne('name', 'Napiš jméno hosta.');
+  if (jmeno.length > RUCNI_MAX_JMENO) return spatne('name', `Jméno je moc dlouhé (nejvýš ${RUCNI_MAX_JMENO} znaků).`);
+  const tel = String(b.phone ?? '').replace(/\s+/g, ' ').trim();
+  if (tel && (tel.length > RUCNI_MAX_TELEFON || !/^\+?[\d ]+$/.test(tel) || (tel.match(/\d/g) ?? []).length < 3)) {
+    return spatne('phone', 'Telefon může mít jen číslice, mezery a + na začátku.');
   }
-  return out;
+  const datum = String(b.date ?? '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(datum) || datum < k.dnes || datum > k.nejpozdeji) return spatne('date', 'Vyber den od dneška do posledního dne, na který podnik rezervuje.');
+  const cas = String(b.time ?? '').slice(0, 5);
+  if (!JE_HM.test(cas)) return spatne('time', 'Vyber čas.');
+  const den = k.hodiny?.[dayKey(datum)];
+  if (!den || den.closed || !den.open || !den.close) return spatne('time', 'V tento den má podnik zavřeno.');
+  if (!vOteviraciDobe(k.hodiny, datum, cas)) return spatne('time', `Čas je mimo otevírací dobu (${den.open}–${den.close}).`);
+  const maxOsob = Math.max(1, Math.round(Number(k.maxOsob) || 8));
+  const osob = Number(b.party);
+  if (!Number.isInteger(osob) || osob < 1 || osob > maxOsob) return spatne('party', `Počet osob od 1 do ${maxOsob}.`);
+  const stulId = kladneCele(b.tableId);
+  if (stulId === 'chyba') return spatne('tableId', 'Vyber stůl ze seznamu.');
+  const poznamka = String(b.note ?? '').trim();
+  if (poznamka.length > RUCNI_MAX_POZNAMKA) return spatne('note', `Poznámka je moc dlouhá (nejvýš ${RUCNI_MAX_POZNAMKA} znaků).`);
+  const hostId = kladneCele(b.customerId);
+  if (hostId === 'chyba') return spatne('customerId', 'Člen se nenašel.');
+  return { ok: true, data: { jmeno, telefon: tel || null, datum, cas, osob, stulId, poznamka: poznamka || null, hostId } };
 }
 
 /** „pá 12. 9." pro seznamy, „pátek 12. září" pro nadpisy. */

@@ -30,7 +30,39 @@
   "order_qr_required": false,
   "order_geo": "off",
   "lat": null,
-  "lng": null
+  "lng": null,
+  "auto_confirm": false,
+  "auto_confirm_max_party": 0,
+  "opening_hours": {
+   "0": {
+    "open": "08:00",
+    "close": "18:00"
+   },
+   "1": {
+    "open": "08:00",
+    "close": "18:00"
+   },
+   "2": {
+    "open": "08:00",
+    "close": "18:00"
+   },
+   "3": {
+    "open": "08:00",
+    "close": "18:00"
+   },
+   "4": {
+    "open": "08:00",
+    "close": "20:00"
+   },
+   "5": {
+    "open": "09:00",
+    "close": "20:00"
+   },
+   "6": {
+    "open": "09:00",
+    "close": "16:00"
+   }
+  }
  },
  "url": "https://www.managero.app/client/kavarna-u-lipy"
 }

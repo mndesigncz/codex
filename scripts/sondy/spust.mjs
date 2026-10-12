@@ -147,6 +147,8 @@ export const ZELENE = [
   'globalni-hledani',
   'den-detail',
   'poznamky',
+  'k83-dochazka',
+  'k83-rezervace',
   'preteceni-vedeni',
   'preteceni-vedeni-tablet',
   'preteceni-zamestnanec',

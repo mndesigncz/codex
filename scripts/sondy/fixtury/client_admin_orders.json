@@ -1,0 +1,120 @@
+{
+ "od": "2026-09-26",
+ "do": "2026-09-26",
+ "orders": [
+  {
+   "id": 88,
+   "createdAt": "2026-09-26 16:42:00",
+   "updatedAt": "2026-09-26 16:42:00",
+   "total": 145,
+   "status": "new",
+   "tableName": "Zahrádka 1",
+   "customerName": "Ondřej Beneš",
+   "polozky": [
+    {
+     "nazev": "Flat white",
+     "pocet": 1
+    },
+    {
+     "nazev": "Croissant s máslem",
+     "pocet": 1
+    }
+   ]
+  },
+  {
+   "id": 87,
+   "createdAt": "2026-09-26 15:10:00",
+   "updatedAt": "2026-09-26 15:13:00",
+   "total": 230,
+   "status": "confirmed",
+   "tableName": "U okna",
+   "customerName": "Tereza Málková",
+   "polozky": [
+    {
+     "nazev": "Matcha latte",
+     "pocet": 2
+    },
+    {
+     "nazev": "Banánový chlebíček",
+     "pocet": 1
+    }
+   ]
+  },
+  {
+   "id": 86,
+   "createdAt": "2026-09-26 13:05:00",
+   "updatedAt": "2026-09-26 13:31:00",
+   "total": 412.5,
+   "status": "done",
+   "tableName": "Velký stůl",
+   "customerName": "Jana Dvořáková",
+   "polozky": [
+    {
+     "nazev": "Snídaňový talíř s vejci, avokádem a kváskovým chlebem",
+     "pocet": 3
+    },
+    {
+     "nazev": "Čerstvá pomerančová šťáva",
+     "pocet": 3
+    }
+   ]
+  },
+  {
+   "id": 85,
+   "createdAt": "2026-09-26 11:20:00",
+   "updatedAt": "2026-09-26 11:44:00",
+   "total": 190,
+   "status": "done",
+   "tableName": "Bar",
+   "customerName": "Petr Novák",
+   "polozky": [
+    {
+     "nazev": "Sencha",
+     "pocet": 2
+    }
+   ]
+  },
+  {
+   "id": 84,
+   "createdAt": "2026-09-26 09:58:00",
+   "updatedAt": "2026-09-26 10:09:00",
+   "total": 95,
+   "status": "declined",
+   "tableName": null,
+   "customerName": "Klára Šimková",
+   "polozky": [
+    {
+     "nazev": "Matcha latte",
+     "pocet": 1
+    }
+   ]
+  },
+  {
+   "id": 83,
+   "createdAt": "2026-09-26 08:15:00",
+   "updatedAt": "2026-09-26 08:32:00",
+   "total": 280,
+   "status": "done",
+   "tableName": "U okna",
+   "customerName": "Eva Testová",
+   "polozky": [
+    {
+     "nazev": "Cappuccino",
+     "pocet": 2
+    },
+    {
+     "nazev": "Kváskový toast",
+     "pocet": 1
+    }
+   ]
+  }
+ ],
+ "souhrn": {
+  "pocet": 6,
+  "soucet": 882.5,
+  "prumer": 294.17,
+  "neprijato": 1,
+  "hotovych": 3
+ },
+ "celkem": 6
+}

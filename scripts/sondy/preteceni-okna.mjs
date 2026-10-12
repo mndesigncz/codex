@@ -6,9 +6,11 @@
 // Kolo 6 (B3): Nastavení na 390 px je svislý seznam sekcí (klik na Role otevře sekci,
 // Zpět se vrátí), Centrum oznámení má klikatelné řádky a filtr Nepřečtené, Tým ukáže
 // u lidí telefon a sazbu — nic z toho nepřetéká.
+// Kolo 7 (R7-3): okno „Nová rezervace" v Managero client (ruční zápis u dveří) na 320
+// a 390 px, česky i německy (Client je česky, ale okno nese sdílené kusy v jazyce).
 //   SONDY_ZAKLAD=http://localhost:3400 node scripts/sondy/preteceni-okna.mjs
 import { readFileSync } from 'node:fs';
-import { kontext, konec, tvrdi, dokud, viewport, url, nastavJazyk, otevriStranku, prover } from './preteceni-jadro.mjs';
+import { kontext, konec, tvrdi, dokud, viewport, url, nastavJazyk, otevriStranku, prover, BASE } from './preteceni-jadro.mjs';
 import { li, stred, dotyk, podrzPrstem, klepniPrstem, vUpravach, fixtura, DIR } from './k68-spolecne.mjs';
 import { dayPlus, pragueToday } from '../../lib/pragueTime.ts';
 
@@ -133,6 +135,20 @@ for (const [w, jazyk] of [[320, 'cs'], [320, 'de'], [390, 'cs']]) {
     await ctx.close();
   }
 }
+// Kolo 7 (R7-3): okno „Nová rezervace" — obsluha zapisuje hosta z telefonu u dveří.
+for (const [w, jazyk] of [[320, 'cs'], [320, 'de'], [390, 'cs']]) {
+  const popis = `okna ${jazyk} ${w}`;
+  const { ctx, p } = await kontext({ viewport: viewport(w), role: 'employer', mobil: true, fix: fixtura('k69-b8-rozlozeni-rezervace') });
+  await nastavJazyk(ctx, jazyk);
+  await otevriStranku(p, `${BASE}/employer/overview?mode=client&tab=reservations`);
+  await p.locator('[data-plocha] li[data-instance]:not([hidden])').first().waitFor({ timeout: 15000 }).catch(() => {});
+  if (await klikni(p, 'Nová rezervace', popis)) {
+    tvrdi(`${popis}: okno „Nová rezervace" se otevřelo`, await dokud(() => dialog(p).isVisible().catch(() => false), 4000));
+    await prover(p, `${popis} Nová rezervace`);
+  }
+  await ctx.close();
+}
+
 // Kolo 6 (B3): Nastavení a Tým na telefonu (390 px, česky).
 {
   const ted = Date.now();

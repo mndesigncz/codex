@@ -28,11 +28,11 @@ import dynamic from 'next/dynamic';
 import { useTheme } from '../ThemeProvider';
 import { Icon, LogoMark } from '../Icons';
 import {
-  Badge, BarSpark, Button, Card, Chip, EmptyState, ErrorBoundary, ErrorState, Field, Input, ListRow, Menu, Modal, PageHeader,
-  PersonChip, Segmented, Select, Skeleton, Stat, SwitchRow, Toast, useLoad, type MenuItem,
+  Badge, BarSpark, Button, Card, Chip, DraftNote, EmptyState, ErrorBoundary, ErrorState, Field, Input, ListRow, Menu, Modal, PageHeader,
+  ObdobiLista, PersonChip, SearchField, Segmented, Select, Skeleton, Stat, StatRow, SwitchRow, Textarea, Toast, useLoad, type MenuItem,
 } from '../ui';
 import { Dock } from '../ui/Dock';
-import StaffInbox from './StaffInbox';
+import StaffInbox, { ORDER_STATUS } from './StaffInbox';
 import MobileMoreSheet from '../MobileMoreSheet';
 import FloorPlanEditor from './FloorPlanEditor';
 import QrDesigner from './QrDesigner';
@@ -46,17 +46,24 @@ import KuponVybranym from './loyalty/KuponVybranym';
 import type { VyberHostu } from './loyalty/ClenoveHromadne';
 import MenuEditor from '../employer/MenuEditor';
 import EventsView from '../employer/EventsView';
-import { czDay, RES_STATUS } from '@/lib/clientSlots';
-import { dbTimeDayHM } from '@/lib/pragueTime';
+import {
+  czDay, dayKey, nejdriveDnes, RES_STATUS, RUCNI_MAX_JMENO, RUCNI_MAX_POZNAMKA, RUCNI_MAX_TELEFON, slotsFor, validujRucniRezervaci, vOteviraciDobe,
+  type PoleRucni,
+} from '@/lib/clientSlots';
+import { dayPlus, dbTimeDayHM, dbTimeHM, parseDbTime, pragueHM, pragueToday } from '@/lib/pragueTime';
+import { obdobiZPresetu, platneRozmezi, type Obdobi as ObdobiHistorie } from '@/lib/obdobi';
+import { usePrice } from '../CurrencyProvider';
+import { useDraft, type Koncept } from '@/lib/useDraft';
 import { czCount, type CzNoun } from '@/lib/czech';
 import { apiMessage } from '@/lib/api';
 import type { Navigace } from '@/lib/widgety/typy';
 import {
-  TON_REZERVACE, hlavniKrok, klicPrechodu, muzeDo, poDnech, prumerCesky, vyberHodnoceni, vyberRezervace,
-  type Rezervace, type StavRezervace,
+  TON_REZERVACE, dobaObjednavky, hlavniKrok, klicPrechodu, muzeDo, odkazTel, poDnech, polozkyKratce, prumerCesky, vyberCleny, vyberHistoriiObjednavek,
+  vyberHodnoceni, vyberRezervace,
+  type NastaveniZapisu, type Rezervace, type StavRezervace, type Stul,
 } from '@/lib/klientPrehled';
 import { useOpravneni } from '../role/useOpravneni';
-import { NavigaceKontext, useNavigace } from '../widgety/NavigaceKontext';
+import { NavigaceKontext, useNavigace, useSmi } from '../widgety/NavigaceKontext';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
 import { otevriNaTisk } from '@/lib/stahni';
@@ -105,6 +112,7 @@ const MISTO: CzNoun = { one: 'místo', few: 'místa', many: 'míst' };
 const NOVA_OBJEDNAVKA: CzNoun = { one: 'nová objednávka', few: 'nové objednávky', many: 'nových objednávek' };
 const REZERVACE_KE_SCHVALENI: CzNoun = { one: 'rezervace k potvrzení', few: 'rezervace k potvrzení', many: 'rezervací k potvrzení' };
 const HODNOCENI: CzNoun = { one: 'hodnocení', few: 'hodnocení', many: 'hodnocení' };
+const HOTOVA: CzNoun = { one: 'hotové', few: 'hotových', many: 'hotových' };
 
 async function j(url: string, init?: RequestInit) {
   const r = await fetch(url, init ? { headers: JSON_HLAVICKA, ...init } : undefined);
@@ -401,6 +409,31 @@ function RezervaceStranka({ oznam, onZmena, otevriHosta }: { oznam: Hlaska; onZm
   const [odmitam, setOdmitam] = useState<Rezervace | null>(null);
   const [stulPro, setStulPro] = useState<{ r: Rezervace; stul: string } | null>(null);
   const usazuje = smi('rezervace.usadit');
+  // Ruční zápis (telefon, u dveří): rezervace vzniká rovnou potvrzená, proto jen s rezervace.schvalovat.
+  const zapisuje = smi('rezervace.schvalovat');
+  const dnes = pragueToday();
+  const [novaOtevrena, setNovaOtevrena] = useState(false);
+  const [form, setForm] = useState<FormRezervace>(() => prazdnaRezervace(dnes));
+  // Rozepsaná rezervace přežije přechod na jinou záložku; po návratu se okno otevře samo (DESIGN „Rozepsané přežije…").
+  // Rozepsané je jen psaný text (jméno, telefon, poznámka): bez něj se nic neukládá — okno samo předvybere
+  // čas a samotný den nebo počet osob nejsou práce, kvůli které by se mělo příště otevírat samo.
+  const maText = !!(form.jmeno.trim() || form.telefon.trim() || form.poznamka.trim());
+  const konceptHodnota = useMemo<KonceptRezervace>(() => (maText
+    ? { jmeno: form.jmeno, telefon: form.telefon, poznamka: form.poznamka, datum: form.datum, osob: form.osob, stul: form.stul, hostId: form.hostId, hostJmeno: form.hostJmeno }
+    : konceptZFormulare(prazdnaRezervace(dnes))), [maText, form.jmeno, form.telefon, form.poznamka, form.datum, form.osob, form.stul, form.hostId, form.hostJmeno, dnes]);
+  const koncept = useDraft('rezervace-nova', konceptHodnota, v => setForm(f => ({ ...f, ...v })),
+    { vychozi: konceptZFormulare(prazdnaRezervace(dnes)), aktivni: novaOtevrena });
+  useEffect(() => { if (koncept.cekaKoncept && zapisuje) setNovaOtevrena(true); }, [koncept.cekaKoncept, zapisuje]);
+  const zavriNovou = () => { koncept.zahodit(); setForm(prazdnaRezervace(pragueToday())); setNovaOtevrena(false); };
+  const zapsano = () => {
+    koncept.hotovo();
+    setForm(prazdnaRezervace(pragueToday()));
+    setNovaOtevrena(false);
+    oznam('Rezervace zapsána.');
+    reload();
+    if (url !== URL_REZERVACE_DNES) obnovDataWidgetu(URL_REZERVACE_DNES);
+    onZmena();
+  };
 
   const zmenit = async (r: Rezervace, telo: { status?: StavRezervace; tableId?: number | null }) => {
     setPracuji(r.id);
@@ -436,17 +469,25 @@ function RezervaceStranka({ oznam, onZmena, otevriHosta }: { oznam: Hlaska; onZm
               {radky.map(r => {
                 const krok = hlavniKrok(r.stav, smi);
                 const konec = ['done', 'declined', 'cancelled'].includes(r.stav);
+                const tel = odkazTel(r.telefon);
                 const dalsi: MenuItem[] = [
                   ...(krok?.na === 'seated' && muzeDo(r.stav, 'done') && smi(klicPrechodu('done'))
                     ? [{ label: 'Rovnou hotovo', icon: 'check', onClick: () => { void zmenit(r, { status: 'done' }); } }] : []),
                   ...(usazuje && !konec ? [{ label: r.stul ? 'Změnit stůl…' : 'Přidělit stůl…', icon: 'location', onClick: () => setStulPro({ r, stul: r.stulId ? String(r.stulId) : '' }) }] : []),
+                  ...(tel ? [{ label: 'Zavolat hostovi', icon: 'chat', onClick: () => { window.location.href = tel; } }] : []),
+                  ...(r.email ? [{ label: 'Napsat e-mail', icon: 'mail', onClick: () => { window.location.href = `mailto:${r.email}`; } }] : []),
                   ...(otevriHosta ? [{ label: 'Otevřít v Zákaznících', icon: 'users', onClick: () => otevriHosta(r.host) }] : []),
                   ...(muzeDo(r.stav, 'declined') && smi(klicPrechodu('declined'))
                     ? [{ label: 'Odmítnout rezervaci…', icon: 'close', danger: true, hint: 'Host dostane zprávu, že se to nepovedlo.', onClick: () => setOdmitam(r) }] : []),
                 ];
                 return (
-                  <ListRow key={r.id} value={r.cas} title={r.host}
-                    meta={[czCount(r.osob, OSOBA), r.stul ?? 'bez stolu', r.email, r.poznamka ? `„${r.poznamka}"` : null].filter(Boolean).join(' · ')}
+                  <ListRow key={r.id} value={r.cas} title={<JmenoHosta r={r} />}
+                    meta={r.rucne
+                      ? <>{czCount(r.osob, OSOBA)} · {r.stul ?? 'bez stolu'} · <Chip tone="muted" size="sm">zapsáno ručně</Chip></>
+                      : [czCount(r.osob, OSOBA), r.stul ?? 'bez stolu'].join(' · ')}
+                    // Kontakt a poznámka hosta jsou to, co obsluha u dveří potřebuje celé — `detail`
+                    // se zalamuje, `meta` by poznámku na telefonu uřízl na „Oslav…".
+                    detail={detailRezervace(r)}
                     right={<Chip tone={TON_REZERVACE[r.stav]} size="sm">{RES_STATUS[r.stav]?.label ?? r.stav}</Chip>}
                     actions={krok || dalsi.length ? (
                       <>
@@ -473,11 +514,16 @@ function RezervaceStranka({ oznam, onZmena, otevriHosta }: { oznam: Hlaska; onZm
           title: 'Rezervace',
           hintId: 'clientadmin-5',
           subtitle: 'Požadavky potvrď nebo odmítni; při příchodu hosty usaď — s napojenou pokladnou se rovnou otevře účet na stole.',
+          primary: zapisuje ? <Button variant="accent" icon="plus" onClick={() => setNovaOtevrena(true)}>Nová rezervace</Button> : undefined,
           aside: <Segmented options={[{ id: 'today', label: 'Dnes' }, { id: 'upcoming', label: 'Nadcházející' }, { id: 'past', label: 'Minulé' }]}
             value={obdobi} onChange={setObdobi} size="sm" ariaLabel="Období" />,
         }}
         nastroj={nastroj}
       />
+      {novaOtevrena && (
+        <NovaRezervaceOkno form={form} setForm={setForm} koncept={koncept} zapis={data.data?.zapis ?? null} stoly={stoly}
+          onZavrit={zavriNovou} onZapsano={zapsano} />
+      )}
       {odmitam && (
         <Potvrzeni title="Odmítnout rezervaci?" akce="Odmítnout" onZavrit={() => setOdmitam(null)}
           text={`${odmitam.host} (${czDay(odmitam.datum)} v ${odmitam.cas}, ${czCount(odmitam.osob, OSOBA)}) dostane zprávu, že se rezervace nepovedla.`}
@@ -501,19 +547,298 @@ function RezervaceStranka({ oznam, onZmena, otevriHosta }: { oznam: Hlaska; onZm
   );
 }
 
+/**
+ * Třetí řádek rezervace: telefon na klepnutí (jinak e-mail) a celá poznámka hosta.
+ * Kontakt přijde jen se zakaznici.kontakty — bez něj API telefon ani e-mail nepošle.
+ */
+function detailRezervace(r: Rezervace): React.ReactNode {
+  const tel = odkazTel(r.telefon);
+  if (!tel && !r.email && !r.poznamka && !r.poznamkaPersonalu) return undefined;
+  return (
+    <>
+      {tel ? (
+        <a href={tel} className="tap-target inline-flex items-center font-medium text-[#16181A] tabular-nums underline decoration-black/25 underline-offset-2"
+          aria-label={`Zavolat hostovi ${r.host}: ${r.telefon}`}>{r.telefon}</a>
+      ) : r.email ? <span className="block truncate">{r.email}</span> : null}
+      {r.poznamka && <span className="block text-black/70">„{r.poznamka}“</span>}
+      {/* Poslední interní poznámka personálu (Zákazníci › Deník) — jiný hlas než host, proto kurzívou s ikonou. */}
+      {r.poznamkaPersonalu && (
+        <span className="flex items-start gap-1.5 italic text-black/60">
+          <Icon name="pencil" size={13} className="shrink-0 mt-0.5" />
+          <span className="min-w-0"><span className="sr-only">Poznámka personálu: </span>{r.poznamkaPersonalu}</span>
+        </span>
+      )}
+    </>
+  );
+}
+
+/** Jméno hosta a kdo to je: štítek úrovně jako v Zákaznících › Členové, „1. návštěva" u člena, který jde poprvé. */
+function JmenoHosta({ r }: { r: Rezervace }) {
+  if (!r.uroven && r.navstev !== 0) return <>{r.host}</>;
+  return (
+    <span className="flex items-center gap-2 min-w-0">
+      <span className="truncate">{r.host}</span>
+      {r.uroven && <Chip tone={r.uroven.ton} size="sm">{r.uroven.label}</Chip>}
+      {!r.uroven && r.navstev === 0 && <Chip tone="muted" size="sm">1. návštěva</Chip>}
+    </span>
+  );
+}
+
+// ---- Nová rezervace (ruční zápis) ------------------------------------------------
+//
+// Host zavolá nebo stojí u dveří: obsluha ho zapíše z telefonu nebo tabletu a rezervace
+// vzniká rovnou potvrzená. Kontrola je stejná funkce jako na serveru
+// (validujRucniRezervaci), čas smí být mimo nabízené sloty, ale v otevírací době.
+
+type FormRezervace = {
+  jmeno: string; telefon: string; datum: string; cas: string; jinyCas: boolean;
+  osob: string; stul: string; poznamka: string;
+  /** Napojený člen (0 = žádný) a jeho jméno pro štítek. */
+  hostId: number; hostJmeno: string;
+};
+const prazdnaRezervace = (dnes: string): FormRezervace => ({
+  jmeno: '', telefon: '', datum: dnes, cas: '', jinyCas: false, osob: '2', stul: '', poznamka: '', hostId: 0, hostJmeno: '',
+});
+/** Co se drží v konceptu: formulář bez času (ten okno předvybere samo podle dne). */
+type KonceptRezervace = Omit<FormRezervace, 'cas' | 'jinyCas'>;
+const konceptZFormulare = ({ cas: _cas, jinyCas: _jiny, ...zbytek }: FormRezervace): KonceptRezervace => zbytek;
+const JINY_CAS = 'jiny';
+/** „Jana Dvořáková" → „Jana D." pro štítek napojeného člena. */
+const kratkeJmeno = (j: string) => { const c = j.trim().split(/\s+/); return c.length > 1 ? `${c[0]} ${c[c.length - 1][0]}.` : j.trim(); };
+
+function NovaRezervaceOkno({ form, setForm, koncept, zapis, stoly, onZavrit, onZapsano }: {
+  form: FormRezervace; setForm: React.Dispatch<React.SetStateAction<FormRezervace>>; koncept: Koncept;
+  zapis: NastaveniZapisu | null; stoly: Stul[]; onZavrit: () => void; onZapsano: () => void;
+}) {
+  // Hledání členů posílá dotaz na Zákazníky — přísně podle klíče (spec §1.5), ne „ano, dokud nevíme".
+  const smiPrisne = useSmi();
+  const hledaClena = smiPrisne('zakaznici.zobrazit');
+  const [q, setQ] = useState('');
+  const [hledano, setHledano] = useState('');
+  useEffect(() => { const t = setTimeout(() => setHledano(q.trim()), 300); return () => clearTimeout(t); }, [q]);
+  const clenove = useLoad(hledaClena && !form.hostId && hledano.length >= 2
+    ? `/api/client/admin/customers?q=${encodeURIComponent(hledano)}&limit=5` : null, vyberCleny);
+  const [busy, setBusy] = useState(false);
+  const [chyba, setChyba] = useState<{ pole: PoleRucni | null; text: string } | null>(null);
+  // „Teď" se bere jednou při otevření okna — volba „Teď (15:10)" nesmí pod rukama měnit hodnotu.
+  const [ted] = useState(() => pragueHM());
+  const dnes = pragueToday();
+  const zitra = dayPlus(dnes, 1);
+  const nejpozdeji = dayPlus(dnes, zapis?.dniDopredu ?? 30);
+  const maxOsob = zapis?.maxOsob ?? 40;
+  const jeDnes = form.datum === dnes;
+  const den = /^\d{4}-\d{2}-\d{2}$/.test(form.datum) ? zapis?.hodiny?.[dayKey(form.datum)] : undefined;
+  const zavreno = !!zapis && (!den || den.closed || !den.open || !den.close);
+  const sloty = zapis ? slotsFor(zapis.hodiny, form.datum, zapis.krok, jeDnes ? nejdriveDnes(ted, 0) : undefined) : [];
+  const nabidnoutTed = jeDnes && !!zapis && vOteviraciDobe(zapis.hodiny, form.datum, ted) && !sloty.includes(ted);
+  const volby = [...(nabidnoutTed ? [ted] : []), ...sloty];
+  const jiny = form.jinyCas || !zapis || volby.length === 0;
+  const zmen = (cast: Partial<FormRezervace>) => { setForm(f => ({ ...f, ...cast })); if (chyba) setChyba(null); };
+  // Po změně dne zvolit první nabízený čas (nebo nechat ruční čas, když je zadaný ručně). Funkční
+  // aktualizace: efekt běží i ve chvíli, kdy koncept právě dosazuje rozepsané — starý `form` by ho přepsal.
+  const klicVoleb = volby.join(',');
+  useEffect(() => {
+    if (!zapis || !klicVoleb) return;
+    const nabidka = klicVoleb.split(',');
+    setForm(f => (f.jinyCas || nabidka.includes(f.cas) ? f : { ...f, cas: nabidka[0] }));
+  }, [form.datum, zapis, klicVoleb, setForm]);
+
+  const telo = () => ({
+    name: form.jmeno, phone: form.telefon, date: form.datum, time: form.cas, party: Number(form.osob),
+    tableId: form.stul ? Number(form.stul) : null, note: form.poznamka, customerId: form.hostId || null,
+  });
+  const ulozit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (busy) return;
+    if (zapis) {
+      const v = validujRucniRezervaci(telo(), { dnes, nejpozdeji, maxOsob, hodiny: zapis.hodiny });
+      if (!v.ok) { setChyba({ pole: v.pole, text: v.chyba }); return; }
+    }
+    setBusy(true);
+    try {
+      const r = await fetch('/api/client/admin/reservations', { method: 'POST', headers: JSON_HLAVICKA, body: JSON.stringify(telo()) });
+      const x = await r.json().catch(() => ({}));
+      if (!r.ok) { setChyba({ pole: typeof x?.pole === 'string' ? x.pole as PoleRucni : null, text: x?.error || 'Rezervaci se nepodařilo zapsat.' }); return; }
+      onZapsano();
+    } catch {
+      setChyba({ pole: null, text: 'Rezervace se nezapsala — vypadlo připojení. Zkus to prosím znovu.' });
+    } finally {
+      setBusy(false);
+    }
+  };
+  const chybaPole = (pole: PoleRucni) => (chyba?.pole === pole ? chyba.text : undefined);
+  const vyberClena = (c: { id: number; jmeno: string }) => {
+    setForm(f => ({ ...f, hostId: c.id, hostJmeno: c.jmeno, jmeno: f.jmeno.trim() && f.jmeno !== f.hostJmeno ? f.jmeno : c.jmeno }));
+    setQ(''); setHledano(''); setChyba(null);
+  };
+
+  return (
+    <Modal open onClose={onZavrit} size="md" title="Nová rezervace"
+      subtitle="Host zavolal nebo stojí u dveří. Rezervace bude rovnou potvrzená."
+      footer={<>
+        <Button variant="secondary" onClick={onZavrit}>Zrušit</Button>
+        <Button type="submit" form="rez-nova" variant="primary" icon="check" loading={busy}>Zapsat rezervaci</Button>
+      </>}>
+      <div className="space-y-4">
+        <DraftNote koncept={koncept} />
+        {chyba && !chyba.pole && <p className="note note-danger" role="alert">{chyba.text}</p>}
+        {hledaClena && (
+          form.hostId ? (
+            <div className="flex items-center gap-2 flex-wrap">
+              <Chip tone="ink" icon="user">člen: {kratkeJmeno(form.hostJmeno)}</Chip>
+              <Button type="button" size="sm" variant="ghost" icon="close" onClick={() => zmen({ hostId: 0, hostJmeno: '' })}
+                aria-label={`Odpojit člena ${form.hostJmeno}`}>Odpojit</Button>
+            </div>
+          ) : (
+            <div data-transient>
+              <p className="field-label">Napojit na člena</p>
+              <SearchField value={q} onChange={setQ} placeholder="Najít člena podle jména" ariaLabel="Najít člena" />
+              {hledano.length >= 2 && (
+                clenove.error ? <p className="t-meta mt-2">Členy se nepodařilo načíst. Rezervaci zapíšeš i bez napojení.</p>
+                : !clenove.data ? <Skeleton className="h-11 mt-2" />
+                : clenove.data.clenove.length === 0 ? <p className="t-meta mt-2">Nikdo takový mezi členy. Zapiš hosta jen jménem.</p>
+                : (
+                  <ul className="list mt-1" aria-label="Nalezení členové">
+                    {clenove.data.clenove.map(c => (
+                      <ListRow key={c.id} title={c.jmeno} meta={c.navstev ? `${c.navstev}× v podniku` : 'zatím nebyl'} onClick={() => vyberClena(c)} />
+                    ))}
+                  </ul>
+                )
+              )}
+              {chybaPole('customerId') && <p role="alert" className="mt-1.5 text-xs text-[var(--bad-ink)]">{chybaPole('customerId')}</p>}
+            </div>
+          )
+        )}
+        <form id="rez-nova" onSubmit={ulozit} className="space-y-4" noValidate>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field id="rez-jmeno" label="Jméno" error={chybaPole('name')}>
+              <Input id="rez-jmeno" value={form.jmeno} maxLength={RUCNI_MAX_JMENO} autoComplete="off" autoCapitalize="words"
+                onChange={e => zmen({ jmeno: e.target.value })} placeholder="Jana Dvořáková" />
+            </Field>
+            <Field id="rez-tel" label="Telefon" error={chybaPole('phone')} hint={form.hostId ? 'Když ho člen má v profilu, vezme se odtamtud.' : undefined}>
+              <Input id="rez-tel" type="tel" inputMode="tel" autoComplete="off" value={form.telefon} maxLength={RUCNI_MAX_TELEFON}
+                onChange={e => zmen({ telefon: e.target.value })} placeholder="+420 776 221 004" />
+            </Field>
+          </div>
+          <div className="space-y-2">
+            <Segmented options={[{ id: 'dnes', label: 'Dnes' }, { id: 'zitra', label: 'Zítra' }]}
+              value={jeDnes ? 'dnes' : form.datum === zitra ? 'zitra' : ''} size="sm" ariaLabel="Den rezervace"
+              onChange={v => zmen({ datum: v === 'dnes' ? dnes : zitra, jinyCas: false })} />
+            {/* Datum a čas sdílí řádek i na telefonu (DESIGN „Na telefonu nesmí prvek skončit v půlce"). */}
+            <div className="grid grid-cols-2 gap-3 items-start">
+              <Field id="rez-den" label="Den" error={chybaPole('date')}>
+                <Input id="rez-den" type="date" min={dnes} max={nejpozdeji} value={form.datum}
+                  onChange={e => zmen({ datum: e.target.value || dnes, jinyCas: false })} />
+              </Field>
+              <Field id="rez-cas" label="Čas" error={chybaPole('time')}
+                hint={zavreno ? 'V tento den má podnik zavřeno.' : jiny && den?.open && den?.close ? `Otevřeno ${den.open}–${den.close}.` : undefined}>
+                {zapis && volby.length > 0 && (
+                  <Select id={jiny ? 'rez-cas-volba' : 'rez-cas'} aria-label={jiny ? 'Volba času' : undefined} value={jiny ? JINY_CAS : form.cas}
+                    onChange={e => (e.target.value === JINY_CAS ? zmen({ jinyCas: true }) : zmen({ cas: e.target.value, jinyCas: false }))}>
+                    {volby.map(c => <option key={c} value={c}>{c === ted && nabidnoutTed ? `Teď (${c})` : c}</option>)}
+                    <option value={JINY_CAS}>Jiný čas…</option>
+                  </Select>
+                )}
+                {jiny && (
+                  <Input id="rez-cas" type="time" step={300} value={form.cas} className={zapis && volby.length > 0 ? 'mt-2' : ''}
+                    onChange={e => zmen({ cas: e.target.value })} />
+                )}
+              </Field>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 items-start">
+            <Field id="rez-osob" label="Osob" error={chybaPole('party')}>
+              <Input id="rez-osob" type="number" inputMode="numeric" min={1} max={maxOsob} value={form.osob}
+                onChange={e => zmen({ osob: e.target.value })} />
+            </Field>
+            <Field id="rez-stul" label="Stůl" error={chybaPole('tableId')}>
+              <Select id="rez-stul" value={form.stul} onChange={e => zmen({ stul: e.target.value })}>
+                <option value="">Bez stolu</option>
+                {stoly.map(t => <option key={t.id} value={t.id}>{t.nazev} · {czCount(t.mist, MISTO)}</option>)}
+              </Select>
+            </Field>
+          </div>
+          <Field id="rez-pozn" label="Poznámka" error={chybaPole('note')}>
+            <Textarea id="rez-pozn" rows={2} maxLength={RUCNI_MAX_POZNAMKA} value={form.poznamka}
+              onChange={e => zmen({ poznamka: e.target.value })} placeholder="Kočárek, oslava, alergie…" />
+          </Field>
+        </form>
+      </div>
+    </Modal>
+  );
+}
+
 // ---- Objednávky -----------------------------------------------------------------
 
 function ObjednavkyStranka({ oznam, onZmena }: { oznam: Hlaska; onZmena: () => void }) {
+  // Fronta beze změny; Historie je pohled majitele na celé období (kolik přišlo, za kolik, kolik nepřijato).
+  const [pohled, setPohled] = useState<'fronta' | 'historie'>('fronta');
   return (
     <PlochaWidgetu
       stranka="vedeni.klient_objednavky"
       hlavicka={{
         title: 'Objednávky',
         hintId: 'clientadmin-1',
-        subtitle: 'Objednávky od stolu čekají na přijetí. Přijaté jdou do pokladny na stůl, hotové připíšou hostovi body.',
+        subtitle: pohled === 'fronta'
+          ? 'Objednávky od stolu čekají na přijetí. Přijaté jdou do pokladny na stůl, hotové připíšou hostovi body.'
+          : 'Objednávky od stolu za zvolené období. Skutečnou tržbu podniku ukazují Finance z pokladny.',
+        aside: <Segmented options={[{ id: 'fronta', label: 'Fronta' }, { id: 'historie', label: 'Historie' }]}
+          value={pohled} onChange={setPohled} size="sm" ariaLabel="Fronta nebo historie objednávek" />,
       }}
-      nastroj={<StaffInbox onToast={t => oznam(t)} onZmena={onZmena} />}
+      nastroj={pohled === 'fronta' ? <StaffInbox onToast={t => oznam(t)} onZmena={onZmena} /> : <HistorieObjednavek />}
     />
+  );
+}
+
+/** Objednávky od stolu za období: čtyři čísla (2 × 2 na telefonu) a seznam s časem, dobou přijetí a částkou. */
+function HistorieObjednavek() {
+  const cena = usePrice();
+  const [obdobi, setObdobi] = useState<ObdobiHistorie>(() => obdobiZPresetu('dnes'));
+  const r = platneRozmezi(obdobi);
+  const url = `/api/client/admin/orders?from=${r.od}&to=${r.do}`;
+  const data = useDataWidgetu(url, vyberHistoriiObjednavek);
+  const vic = r.od !== r.do;
+  const d = data.data;
+  return (
+    <div className="space-y-4">
+      <ObdobiLista value={obdobi} onChange={setObdobi} volby={['dnes', 'vcera', '7_dni', 'mesic']} dnyTydne={false} hrubost={false} />
+      {data.error ? <ErrorState title="Historie objednávek se nenačetla" onRetry={data.reload} detail={data.error} />
+        : !d ? <PageSkel />
+        : (
+          <>
+            <Card>
+              <StatRow>
+                <Stat label="Objednávek" value={String(d.souhrn.pocet)} />
+                <Stat label="Od stolu celkem" value={cena(d.souhrn.soucet)} note={d.souhrn.hotovych ? `z ${czCount(d.souhrn.hotovych, HOTOVA)}` : 'zatím nic hotového'} />
+                <Stat label="Průměr" value={d.souhrn.prumer == null ? '–' : cena(d.souhrn.prumer)} />
+                <Stat label="Nepřijato" value={String(d.souhrn.neprijato)} tone={d.souhrn.neprijato > 0 ? 'wait' : 'muted'} />
+              </StatRow>
+            </Card>
+            {d.objednavky.length === 0 ? (
+              <Card><EmptyState icon="cup" compact title="Za tohle období žádné objednávky od stolu" hint="Objeví se tu, jakmile si host objedná přes QR kód na stole." /></Card>
+            ) : (
+              <Card pad="none">
+                <ul className="list px-5">
+                  {d.objednavky.map(o => {
+                    const st = ORDER_STATUS[o.stav] ?? ORDER_STATUS.new;
+                    const doba = dobaObjednavky(o, parseDbTime);
+                    const kdy = vic ? dbTimeDayHM(o.vytvoreno) : dbTimeHM(o.vytvoreno);
+                    const casti = [kdy, doba ? (doba.co === 'prijato' ? `přijato za ${doba.minut} min` : doba.co === 'hotovo' ? `hotovo za ${doba.minut} min` : null) : null, polozkyKratce(o.polozky)];
+                    return (
+                      <ListRow key={o.id} title={`${o.stul ?? 'bez stolu'} · ${o.host}`} meta={casti.filter(Boolean).join(' · ')}
+                        value={<span className="tabular-nums">{cena(o.castka)}</span>}
+                        right={<Chip tone={st.tone} size="sm">{st.label}</Chip>} />
+                    );
+                  })}
+                </ul>
+                {d.celkem > d.objednavky.length && (
+                  <p className="t-meta tabular-nums px-5 py-3 border-t border-black/5">Zobrazeno posledních {d.objednavky.length} z {d.celkem}. Kratší období ukáže všechny.</p>
+                )}
+              </Card>
+            )}
+          </>
+        )}
+    </div>
   );
 }
 
@@ -770,7 +1095,9 @@ function SettingsTab({ oznam, onChange }: { oznam: Hlaska; onChange: () => void 
     e.preventDefault(); setBusy(true);
     try {
       const r = await j('/api/client/admin/profile', { method: 'PUT', body: JSON.stringify({ enabled: p.enabled, slug: p.slug, reservations_on: p.reservations_on, ordering_on: p.ordering_on, max_party: p.max_party, lead_days: p.lead_days, slot_minutes: p.slot_minutes, menu_slug: p.menu_slug || null,
-        order_qr_required: p.order_qr_required, order_geo: p.order_geo, lat: p.lat ?? '', lng: p.lng ?? '', geo_radius_m: p.geo_radius_m, order_auto_pos: p.order_auto_pos }) });
+        order_qr_required: p.order_qr_required, order_geo: p.order_geo, lat: p.lat ?? '', lng: p.lng ?? '', geo_radius_m: p.geo_radius_m, order_auto_pos: p.order_auto_pos,
+        // Před migrací sloupců (profil je nemá) se nic neposílá, ať uložení zbytku nespadne.
+        ...(p.auto_confirm !== undefined ? { auto_confirm: p.auto_confirm === true, auto_confirm_max_party: Number(p.auto_confirm_max_party) || 0 } : {}) }) });
       setP(r.profile); setD({ ...d, url: r.url }); oznam(r.profile.enabled ? 'Uloženo. Podnik je pro hosty zapnutý.' : 'Uloženo. Podnik je zatím vypnutý.'); onChange();
     } catch (err) { oznam(apiMessage(err, 'Uložení se nepovedlo.'), 'bad'); }
     setBusy(false);
@@ -826,6 +1153,21 @@ function SettingsTab({ oznam, onChange }: { oznam: Hlaska; onChange: () => void 
         <h2 className="t-card">Rezervace a objednávky</h2>
         <ul className="list">
           <SwitchRow title="Hosté můžou rezervovat" checked={!!p.reservations_on} onChange={v => setP({ ...p, reservations_on: v })} />
+          {/* Malá kavárna nemá nikoho, kdo by požadavky hlídal: rezervace se potvrdí sama
+              a ručně se schvalují jen velké skupiny (jako instant booking v OpenTable a Resy). */}
+          <SwitchRow title="Potvrzovat rezervace automaticky"
+            hint={Number(p.auto_confirm_max_party) > 0
+              ? `Větší skupiny (od ${Number(p.auto_confirm_max_party) + 1} osob) dál čekají na tvé potvrzení.`
+              : 'Host má potvrzeno hned po odeslání. Hranici pro velké skupiny nastavíš pod přepínačem.'}
+            checked={p.auto_confirm === true} onChange={v => setP({ ...p, auto_confirm: v })} />
+        </ul>
+        {p.auto_confirm === true && (
+          <Field id="s-auto-max" label="Samy se potvrdí skupiny do (osob)" hint="0 = všechny velikosti. Větší skupiny počkají, až je potvrdíš v Rezervacích.">
+            <Input id="s-auto-max" type="number" inputMode="numeric" min={0} max={40} className="!w-full sm:!w-28" value={p.auto_confirm_max_party ?? 0}
+              onChange={e => setP({ ...p, auto_confirm_max_party: e.target.value })} />
+          </Field>
+        )}
+        <ul className="list">
           <SwitchRow title="Hosté můžou objednávat od stolu" hint="Objednávky potřebují stoly (záložka Stoly) a nabídku z Menu. S napojenou pokladnou jdou přijaté objednávky rovnou na stůl v kase."
             checked={!!p.ordering_on} onChange={v => setP({ ...p, ordering_on: v })} />
         </ul>
