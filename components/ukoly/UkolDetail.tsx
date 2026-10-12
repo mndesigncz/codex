@@ -8,6 +8,7 @@ import type { ReactNode } from 'react';
 import { Button, Chip, Modal } from '../ui';
 import { TaskChecklist, recurrenceLabel, type ChecklistItem } from '../TaskChecklist';
 import { ChipPredUzaverkou } from '../PredUzaverkou';
+import { Poznamky } from '../Poznamky';
 import { useT } from '@/lib/i18n/client';
 import { aktualniJazyk } from '@/lib/i18n/stav';
 import { jeHotovy, jePoTerminu, type Ukol } from '@/lib/ukolyPrehled';
@@ -98,6 +99,9 @@ export function UkolDetail({ ukol, dnes, kdo, navodHref, onClose, onSplnit, onUp
             <TaskChecklist items={ukol.checklist as ChecklistItem[]} velky onToggle={onChecklist} onToggleAll={onChecklistVse} />
           </div>
         )}
+
+        {/* Co k úkolu řekli ostatní („dodavatel vozí až po 10:00") — vidí a píše každý, kdo úkol vidí. */}
+        <Poznamky typ="task" id={ukol.id} className="pt-2" />
       </div>
     </Modal>
   );

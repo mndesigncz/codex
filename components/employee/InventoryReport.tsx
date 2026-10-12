@@ -19,8 +19,9 @@
 
 import { rozborSkladArg } from '@/lib/skladPredani';
 import { useState, useEffect, useMemo } from 'react';
-import { Button, Card, Chip, EmptyState, ErrorState, ListRow, Menu, SearchField, Skeleton, Toast, type MenuItem } from '../ui';
+import { Button, Card, Chip, EmptyState, ErrorState, ListRow, Menu, Modal, SearchField, Skeleton, Toast, type MenuItem } from '../ui';
 import CategoryStockView from '../inventory/CategoryStockView';
+import { Poznamky } from '../Poznamky';
 import { normalizeCategoryPackaging } from '@/lib/packaging';
 import { packagingSourceOf, branchTracksOpen, findById, matcher } from '@/lib/categoryTree';
 import CategoryNav from '../inventory/CategoryNav';
@@ -88,6 +89,9 @@ export default function InventoryReport({ initialCategory }: Props) {
   const [draft, setDraft] = useState<Record<number, number>>({});
   const [savingId, setSavingId] = useState<number | null>(null);
   const [zprava, setZprava] = useState<{ text: string; ton?: 'bad' } | null>(null);
+  // Položka, ke které jsou otevřené poznámky („···" → Poznámky): zaměstnanec nemá okno Upravit položku,
+  // tak je čte a píše tady — ve stejném okně, jaké vidí vedení u položky.
+  const [poznamkyK, setPoznamkyK] = useState<InventoryItem | null>(null);
   // Zápis stavu a „nevedeme" chce sklad.zapsat_stav (kolo 67) — bez něj seznam jen čte.
   // `ma()` se záchytem: dokud oprávnění nedorazí, krokovač je vidět (server zápis stejně hlídá).
   const { ma } = useOpravneni();
@@ -182,6 +186,7 @@ export default function InventoryReport({ initialCategory }: Props) {
     const st = statusOf(item);
     const dirty = isDirty(item);
     const menu: MenuItem[] = [
+      { label: t('Poznámky'), icon: 'chat', onClick: () => setPoznamkyK(item) },
       ...(smiZapsat ? [{ label: item.archived ? t('Máme zpátky') : t('Momentálně nevedeme'), icon: 'archive', onClick: () => setParked(item, item.archived !== true) }] : []),
       ...(item.supplierUrl ? [{ label: t('Objednat u dodavatele'), icon: 'external', onClick: () => { window.open(item.supplierUrl, '_blank', 'noopener'); } }] : []),
     ];
@@ -217,10 +222,12 @@ export default function InventoryReport({ initialCategory }: Props) {
                 je jedna a v řádku nikdy (DP §3.1). */}
             <Button variant={dirty ? 'primary' : 'secondary'} size="sm" disabled={!dirty} loading={savingId === item.id}
               onClick={() => save(item)}>{t('Uložit')}</Button>
-            {menu.length > 0 && <Menu size="sm" label={t('Další akce: {nazev}', { nazev: item.name })} items={menu} />}
-          </> : (
+            <Menu size="sm" label={t('Další akce: {nazev}', { nazev: item.name })} items={menu} />
+          </> : (<>
             <span className="text-sm font-medium tabular-nums">{item.quantity} {item.unit}</span>
-          )}
+            {/* I kdo jen čte, má k položce poznámky („···"). */}
+            <Menu size="sm" label={t('Další akce: {nazev}', { nazev: item.name })} items={menu} />
+          </>)}
         />
       </li>
     );
@@ -301,6 +308,11 @@ export default function InventoryReport({ initialCategory }: Props) {
         nastroj={nastroj}
       />
       {zprava && <Toast message={zprava.text} tone={zprava.ton} onClose={() => setZprava(null)} />}
+      {poznamkyK && (
+        <Modal open onClose={() => setPoznamkyK(null)} size="md" title={poznamkyK.name} subtitle={poznamkyK.category || undefined}>
+          <Poznamky typ="inventory_item" id={poznamkyK.id} />
+        </Modal>
+      )}
     </>
   );
 }

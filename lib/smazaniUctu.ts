@@ -54,6 +54,8 @@ export const ZACHAZENI_TABULEK: Record<string, Zachazeni> = {
   time_entries: 'ponechat', fixed_assignments: 'ponechat', time_off_requests: 'ponechat', shift_reviews: 'ponechat',
   shift_review_items: 'ponechat', reward_redemptions: 'ponechat', inventory_log: 'ponechat', inventory_reports: 'ponechat',
   inventory_items: 'ponechat', chat_messages: 'ponechat', messages: 'ponechat', procedure_runs: 'ponechat',
+  // poznámky k úkolům, návodům, postupům, recepturám a skladu: provozní znalost podniku, autor zůstane anonymní
+  entity_notes: 'ponechat',
   suggestions: 'ponechat', announcements: 'ponechat', receipts: 'ponechat',
   cash_closings: 'ponechat', orders: 'ponechat', events: 'ponechat', tasks: 'ponechat', planning_cards: 'ponechat',
   daily_reports: 'ponechat', recipes: 'ponechat', guides: 'ponechat', procedures: 'ponechat', polls: 'ponechat',
@@ -102,6 +104,7 @@ export const TYMOVE_TABULKY = [
   'client_memberships', 'client_reservations', 'client_orders', 'client_coupons', 'client_coupon_claims', 'client_loyalty_ledger',
   'client_stamp_progress', 'client_stamp_events', 'client_scan_actions', 'client_kasa_idem', 'client_stamp_campaigns', 'client_bill_awards', 'client_groups', 'client_group_members', 'client_reviews',
   'client_broadcasts', 'client_pravidla_verze', 'client_member_notes', 'client_automatizace', 'client_automatizace_log', 'client_promos', 'client_banners', 'client_banner_stats', 'rozlozeni_stranek', 'content_reports', 'client_importy', 'client_vouchers', 'client_voucher_uses', 'client_bonus_rules',
+  'entity_notes',
 ];
 /** Tabulky s `team_id`, které se při smazání podniku ZÁMĚRNĚ nemažou: účetní záznamy platformy (fakturace, provize). */
 export const TYMOVE_PONECHAT = ['billing_events', 'referral_rewards', 'admin_audit'];

@@ -2539,6 +2539,22 @@ export async function GET(request: Request) {
         created_at TIMESTAMP DEFAULT NOW(),
         PRIMARY KEY (blocker_id, blocked_id)
       )`);
+    // Poznámky k věcem (úkol, návod, postup, receptura z kasy, položka skladu,
+    // směna) — jedna tabulka pro všechny, typ drží lib/poznamky.ts
+    // (TYPY_POZNAMEK). entity_id je TEXT: receptura z kasy nemá číselný řádek,
+    // jen product_id pokladny; ostatní typy ukládají číslo jako text.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS entity_notes (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        entity_type TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        user_id INTEGER NOT NULL,
+        text TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS entity_notes_entity ON entity_notes (team_id, entity_type, entity_id)`);
 
     // Kroky migrace, které selhaly (a byly zachyceny), ať se to pozná zvenku
     // místo tichého „ok". Prázdné pole = celé schéma prošlo.
