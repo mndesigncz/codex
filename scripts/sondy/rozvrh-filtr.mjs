@@ -62,6 +62,12 @@ const bezPreteceni = (p) => p.evaluate(() => document.documentElement.scrollWidt
 
 async function nactiRozvrh(p) {
   await otevri(p, ROZVRH, 'vedeni.rozvrh');
+  // Kolo 6 UX (V02): plánovač se otevírá na aktuálním měsíci, dokud v něm jsou směny po dnešku
+  // (fixtura je má až do 12. dne) — sonda pracuje s příštím měsícem, tak si ho vybere sama.
+  const pristi = p.getByRole('button', { name: 'Příští měsíc' });
+  await dokud(() => pristi.isVisible(), 6000);
+  if ((await pristi.getAttribute('aria-pressed')) !== 'true') await pristi.click();
+  await dokud(async () => (await pristi.getAttribute('aria-pressed')) === 'true', 3000);
   return dokud(() => pas(p).isVisible(), 6000);
 }
 
@@ -297,6 +303,36 @@ async function nactiRozvrh(p) {
     && await stisknuto(clovek(p, 17))
     && (await bunka(p, den('04')).locator('span[title]').evaluateAll(els => els.map(e => e.getAttribute('title')))).some(t => t.includes('Tereza Malá')));
   tvrdi('H1: bez chyb v konzoli', chyby.length === 0, chyby.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
+// 8) Týdenní pohled (kolo 6 UX): filtr lidí a návrh platí v tabulce lidé × dny stejně jako v mřížce.
+{
+  const { ctx, p, chyby } = await kontext({ fix: FIX, dalsi: podvrh() });
+  await nactiRozvrh(p);
+  await clovek(p, 16).click();
+  await p.locator('[data-plocha]').getByRole('tab', { name: 'Týden' }).click();
+  const tyden = p.locator('[data-tydenni-pohled]');
+  await dokud(() => tyden.isVisible(), 2000);
+  const radky = () => tyden.locator('[data-radek-tydne]').evaluateAll(els => els.map(e => e.getAttribute('data-radek-tydne')));
+  tvrdi('Y1: týden měsíce začínajícího nedělí = první týden se čtyřmi dny měsíce (2.–8.)', (await tyden.locator('thead').innerText()).includes('2') && (await tyden.locator('p[aria-live]').innerText()).startsWith('2.'), await tyden.locator('p[aria-live]').innerText());
+  tvrdi('Y1: filtr na Evu — v tabulce jen její řádek', JSON.stringify(await radky()) === '["16"]', JSON.stringify(await radky()));
+  const eva = tyden.locator('[data-radek-tydne="16"]');
+  tvrdi('Y1: …se třemi směnami v týdnu a 18 h za týden', await eva.locator('span[title]').count() === 3 && (await eva.locator('td').last().innerText()).trim() === '18', await eva.innerText());
+  await vsichni(p).click();
+  tvrdi('Y1: „Všichni" vrátí do tabulky celý tým (i lidi bez směny v týdnu)', await dokud(async () => (await radky()).length >= 5, 1500), JSON.stringify(await radky()));
+  await typ(p, 'Ranní').click();
+  tvrdi('Y2: filtr typu Ranní — Evina odpolední 4. v tabulce není', await dokud(async () => (await eva.locator('span[title]').count()) === 2, 1500), await eva.innerText());
+  await typ(p, 'Ranní').click();
+  await p.getByRole('button', { name: 'Vygenerovat rozvrh' }).click();
+  await dokud(() => p.getByText('Navržený rozvrh').isVisible(), 4000);
+  await clovek(p, 17).click();
+  const jakub = tyden.locator('[data-radek-tydne="17"]');
+  tvrdi('Y3: návrh v tabulce čárkovaně jako v mřížce (Jakub 4.–6. = 3 směny)', await dokud(async () => (await jakub.locator('span[title].border-dashed').count()) === 3, 2000), await jakub.innerText().catch(() => ''));
+  tvrdi('Y3: hodiny za týden počítají návrh, ne přepsané uložené (18 h)', (await jakub.locator('td').last().innerText()).trim() === '18', await jakub.innerText().catch(() => ''));
+  await jakub.locator('tbody button, button').filter({ has: p.locator('span[title].border-dashed') }).first().click();
+  tvrdi('Y3: klepnutí na den v tabulce otevře okno dne', await dokud(() => p.getByRole('dialog').getByText('Přiřazené směny').isVisible(), 3000));
+  tvrdi('Y: bez chyb v konzoli', chyby.length === 0, chyby.slice(0, 3).join(' | '));
   await ctx.close();
 }
 
