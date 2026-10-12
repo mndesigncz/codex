@@ -468,5 +468,13 @@
   "Jiný měsíc": "Anderer Monat",
   "V měsíci zatím nikdo nemá směnu.": "In diesem Monat hat noch niemand eine Schicht.",
   "Celkem": "Gesamt",
-  "{lidi, plural, one {# člověk} few {# lidé} other {# lidí}} · {h} h": "{lidi, plural, one {# Person} other {# Personen}} · {h} h"
+  "{lidi, plural, one {# člověk} few {# lidé} other {# lidí}} · {h} h": "{lidi, plural, one {# Person} other {# Personen}} · {h} h",
+  "Poznámku se nepodařilo uložit — zkus to znovu.": "Die Notiz konnte nicht gespeichert werden — versuch es noch einmal.",
+  "Zmizí i jejich poznámky ke směnám.": "Auch ihre Schichtnotizen verschwinden.",
+  "Upravit poznámku ke směně — {jmeno}": "Schichtnotiz bearbeiten — {jmeno}",
+  "Přidat poznámku ke směně — {jmeno}": "Schichtnotiz hinzufügen — {jmeno}",
+  "Poznámka ke směně — {jmeno}": "Schichtnotiz — {jmeno}",
+  "Otevíráš sám, klíče u Petry": "Du schließt allein auf, Schlüssel bei Petra",
+  "Poznámka ke směně (nepovinné)": "Schichtnotiz (optional)",
+  "Uvidí ji jen ten, kdo směnu dostane, a vedení.": "Nur die Person auf der Schicht und die Leitung sehen sie."
 }

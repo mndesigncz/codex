@@ -5,6 +5,7 @@ import { neon } from '@neondatabase/serverless';
 import { tymyCiselniku, idClenu } from '@/lib/tenant';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { platnyCas, platneDatum } from '@/lib/rozvrhCsv';
+import { poznamkaSmeny } from '@/lib/rozvrhPrehled';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,7 +31,7 @@ export async function GET(req: Request) {
   // Provozní plánuje, sazby nevidí.
   const sSazbou = ctx.role.opravneni.has('finance.mzdy');
   const smenyMesice = (withRate: boolean) => sql`
-    SELECT s.id, s.employee_id, s.date, s.start_time, s.end_time, s.type,
+    SELECT s.id, s.employee_id, s.date, s.start_time, s.end_time, s.type, s.note,
            u.name AS employee_name, u.avatar AS employee_avatar,
            CASE WHEN ${withRate}
                 THEN (CASE WHEN m.user_id IS NOT NULL THEN COALESCE(m.hourly_rate, 0) ELSE COALESCE(u.hourly_rate, 0) END)
@@ -64,6 +65,8 @@ export async function GET(req: Request) {
     endTime: r.end_time,
     type: r.type,
     hourlyRate: r.hourly_rate == null ? null : Number(r.hourly_rate) || 0,
+    // Instrukce ke směně (kolo 7) — plánovač ji ukazuje v okně dne a ikonou v pilulce.
+    note: r.note ?? null,
   }));
   // Díry v pokrytí se počítají i pro uložený rozvrh — vzniknou i ruční
   // úpravou, ne jen generováním, a vedení je musí vidět hned.
@@ -126,7 +129,8 @@ export async function GET(req: Request) {
   return NextResponse.json({ shifts, gaps, understaffed, demand, verze });
 }
 
-// POST (employer) — { shifts: [{employeeId, date, startTime, endTime, type}] } bulk append
+// POST (employer) — { shifts: [{employeeId, date, startTime, endTime, type, note?}] } bulk append
+// (přidání v okně dne, kopie týdne, import CSV). Poznámka ke směně (kolo 7) se přenese.
 export async function POST(req: Request) {
   const ctx = await pozaduj('rozvrh.upravit');
   if (jeOdpoved(ctx)) return ctx;
@@ -147,6 +151,9 @@ export async function POST(req: Request) {
   if (list.some((s) => !platneDatum(s?.date) || !platnyCas(s?.startTime) || !platnyCas(s?.endTime))) {
     return NextResponse.json({ error: 'Směna má neplatné datum nebo čas (očekává se RRRR-MM-DD a HH:MM).' }, { status: 400 });
   }
+  if (list.some((s) => poznamkaSmeny(s?.note) === false)) {
+    return NextResponse.json({ error: 'Poznámka ke směně může mít nejvýš 200 znaků.' }, { status: 400 });
+  }
 
   let inserted = 0;
   for (const s of list) {
@@ -155,9 +162,10 @@ export async function POST(req: Request) {
     if (!memberIds.has(employeeId)) continue; // cizí zaměstnanec — přeskoč
     const od = platnyCas(s.startTime), doCasu = platnyCas(s.endTime);
     if (!od || !doCasu) continue; // ověřeno už výš, tady jen zúžení typu
+    const note = poznamkaSmeny(s.note) || null;
     await sql`
-      INSERT INTO shifts (team_id, employee_id, date, start_time, end_time, type)
-      VALUES (${ctx.teamId}, ${employeeId}, ${s.date}, ${od}, ${doCasu}, ${s.type ?? 'flexible'})`;
+      INSERT INTO shifts (team_id, employee_id, date, start_time, end_time, type, note)
+      VALUES (${ctx.teamId}, ${employeeId}, ${s.date}, ${od}, ${doCasu}, ${s.type ?? 'flexible'}, ${note})`;
     inserted++;
   }
   return NextResponse.json({ inserted });

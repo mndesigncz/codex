@@ -441,6 +441,8 @@ export interface MojeSmena {
   typeColor?: string | null;
   /** Hodnocení směny (1–5) — API ho vrací jen u vlastních směn. */
   rating?: number | null;
+  /** Instrukce vedení ke směně (kolo 7) — API ji vrací jen u vlastních směn nebo plánovači. */
+  note?: string | null;
 }
 
 const odS = (s: MojeSmena) => hm(s.startTime ?? s.start_time);
@@ -487,6 +489,25 @@ const KATEGORIE_BARVY: Record<string, number> = {
 };
 /** Barva typu směny → kategorie 1–6 (null = šedá tečka). */
 export const kategorieBarvy = (barva: unknown): number | null => KATEGORIE_BARVY[String(barva ?? '').toLowerCase()] ?? null;
+
+// ---------------------------------------------------------------------------
+// Poznámka ke směně (kolo 7, R7-1)
+// ---------------------------------------------------------------------------
+
+/** Nejvýš tolik znaků smí mít poznámka ke směně — jednořádková instrukce („Otevíráš sám, klíče u Petry"). */
+export const MAX_POZNAMKA_SMENY = 200;
+
+/**
+ * Poznámka ke směně ze vstupu API nebo CSV: ořízne mezery a zalomení na jeden
+ * řádek, prázdná → null. Delší než MAX_POZNAMKA_SMENY → false (server odpoví
+ * 400; uříznutá instrukce by mohla říkat něco jiného, než vedení napsalo).
+ */
+export function poznamkaSmeny(v: unknown): string | null | false {
+  if (v == null) return null;
+  const s = String(v).replace(/\s+/g, ' ').trim();
+  if (!s) return null;
+  return s.length > MAX_POZNAMKA_SMENY ? false : s;
+}
 
 // ---------------------------------------------------------------------------
 // Dostupnost: týdenní vzor (kolo 7, R7-1)

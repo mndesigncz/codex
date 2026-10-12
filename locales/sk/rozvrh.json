@@ -468,5 +468,13 @@
   "Jiný měsíc": "Iný mesiac",
   "V měsíci zatím nikdo nemá směnu.": "V mesiaci zatiaľ nikto nemá zmenu.",
   "Celkem": "Spolu",
-  "{lidi, plural, one {# člověk} few {# lidé} other {# lidí}} · {h} h": "{lidi, plural, one {# človek} few {# ľudia} other {# ľudí}} · {h} h"
+  "{lidi, plural, one {# člověk} few {# lidé} other {# lidí}} · {h} h": "{lidi, plural, one {# človek} few {# ľudia} other {# ľudí}} · {h} h",
+  "Poznámku se nepodařilo uložit — zkus to znovu.": "Poznámku sa nepodarilo uložiť — skús to znova.",
+  "Zmizí i jejich poznámky ke směnám.": "Zmiznú aj ich poznámky k zmenám.",
+  "Upravit poznámku ke směně — {jmeno}": "Upraviť poznámku k zmene — {jmeno}",
+  "Přidat poznámku ke směně — {jmeno}": "Pridať poznámku k zmene — {jmeno}",
+  "Poznámka ke směně — {jmeno}": "Poznámka k zmene — {jmeno}",
+  "Otevíráš sám, klíče u Petry": "Otváraš sám, kľúče má Petra",
+  "Poznámka ke směně (nepovinné)": "Poznámka k zmene (nepovinné)",
+  "Uvidí ji jen ten, kdo směnu dostane, a vedení.": "Uvidí ju len ten, kto zmenu dostane, a vedenie."
 }

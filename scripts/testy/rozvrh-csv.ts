@@ -14,7 +14,7 @@ export default function ({ eq, ok }: Testy) {
     { id: 3, name: 'Jan; Novák', email: 'jan@priklad.cz' },           // středník ve jméně
   ];
   const smeny = [
-    { date: '2026-10-05', employeeName: 'Marek "Šéf" Vedoucí', startTime: '07:00', endTime: '15:00', type: 'Ranní' },
+    { date: '2026-10-05', employeeName: 'Marek "Šéf" Vedoucí', startTime: '07:00', endTime: '15:00', type: 'Ranní', note: 'Otevíráš sám; klíče u Petry, "kód" 1234' },
     { date: '2026-10-03', employeeName: 'Anna Nováková', startTime: '14:00', endTime: '22:00', type: 'Odpolední' },
     { date: '2026-10-03', employeeName: 'Jan; Novák', startTime: '22:00', endTime: '06:00', type: 'Noční, víkend' },
     { date: '2026-10-04', employeeName: 'Anna Nováková', startTime: '08:00', endTime: '14:00', type: 'morning' },
@@ -32,6 +32,14 @@ export default function ({ eq, ok }: Testy) {
     zpet.rows.map(r => [r.date, r.startTime, r.endTime, r.employeeId]),
     serazene.map(s => [s.date, s.startTime, s.endTime, lide.find(l => l.name === s.employeeName)!.id]));
   ok('csv: směna vedení se najde (import hledá i mimo „zaměstnance“)', zpet.rows.some(r => r.employeeId === 2));
+  // Kolo 7 (R7-1): poznámka ke směně — šestý sloupec, se středníkem i uvozovkami přežije; bez poznámky null.
+  ok('csv: hlavička má sloupec poznámka', csv.split('\n')[0] === 'datum;zaměstnanec;od;do;typ;poznámka');
+  eq('csv: poznámka přežije round-trip (středník, uvozovky), bez poznámky null',
+    zpet.rows.map(r => r.note), serazene.map(s => (s as { note?: string }).note ?? null));
+  const pet = rozeberCsv('datum;zaměstnanec;od;do;typ\n2026-10-03;anna@priklad.cz;08:00;14:00;Ranní', lide);
+  eq('csv: starší soubor s pěti sloupci se načte (poznámka prázdná)', [pet.errors, pet.rows[0]?.note], [[], null]);
+  const dlouha = rozeberCsv(`2026-10-03;anna@priklad.cz;08:00;14:00;Ranní;${'x'.repeat(201)}`, lide);
+  eq('csv: poznámka přes 200 znaků se řekne chybou, ne uřízne', [dlouha.rows.length, dlouha.errors.length], [0, 1]);
   eq('csv: uvozovky a středník ve jméně přežijí', rozdelRadek('2026-10-03;"Jan; Novák";22:00;06:00;Noční'), ['2026-10-03', 'Jan; Novák', '22:00', '06:00', 'Noční']);
 
   // ---- čárka jako oddělovač a e-mail místo jména ----

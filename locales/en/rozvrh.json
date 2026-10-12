@@ -468,5 +468,13 @@
   "Jiný měsíc": "Another month",
   "V měsíci zatím nikdo nemá směnu.": "Nobody has a shift this month yet.",
   "Celkem": "Total",
-  "{lidi, plural, one {# člověk} few {# lidé} other {# lidí}} · {h} h": "{lidi, plural, one {# person} other {# people}} · {h} h"
+  "{lidi, plural, one {# člověk} few {# lidé} other {# lidí}} · {h} h": "{lidi, plural, one {# person} other {# people}} · {h} h",
+  "Poznámku se nepodařilo uložit — zkus to znovu.": "Couldn't save the note — try again.",
+  "Zmizí i jejich poznámky ke směnám.": "Their shift notes will go too.",
+  "Upravit poznámku ke směně — {jmeno}": "Edit shift note — {jmeno}",
+  "Přidat poznámku ke směně — {jmeno}": "Add shift note — {jmeno}",
+  "Poznámka ke směně — {jmeno}": "Shift note — {jmeno}",
+  "Otevíráš sám, klíče u Petry": "You're opening alone, Petra has the keys",
+  "Poznámka ke směně (nepovinné)": "Shift note (optional)",
+  "Uvidí ji jen ten, kdo směnu dostane, a vedení.": "Only the person on the shift and management will see it."
 }

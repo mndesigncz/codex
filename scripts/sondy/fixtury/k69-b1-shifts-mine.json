@@ -10,7 +10,8 @@
   "type": "Noční",
   "typeLabel": "Noční",
   "typeColor": "#8B5CF6",
-  "rating": 5
+  "rating": 5,
+  "note": null
  },
  {
   "id": 702,
@@ -23,7 +24,8 @@
   "type": "Ranní",
   "typeLabel": "Ranní",
   "typeColor": "#C8F542",
-  "rating": null
+  "rating": null,
+  "note": null
  },
  {
   "id": 703,
@@ -36,7 +38,8 @@
   "type": "Ranní",
   "typeLabel": "Ranní",
   "typeColor": "#C8F542",
-  "rating": null
+  "rating": null,
+  "note": "Otevíráš sám, klíče u Petry. Ve čtvrtek přiveze dodavatel mléko v 9:00."
  },
  {
   "id": 704,
@@ -49,6 +52,7 @@
   "type": "Odpolední",
   "typeLabel": "Odpolední",
   "typeColor": "#3B82F6",
-  "rating": null
+  "rating": null,
+  "note": null
  }
 ]

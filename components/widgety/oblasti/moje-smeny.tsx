@@ -32,6 +32,7 @@
 import { useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { Chip, ListRow, Stat, StatRow } from '../../ui';
+import { Icon } from '../../Icons';
 import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
 import { Widget, type StavNacteni } from '../Widget';
 import { useDataWidgetu } from '../useDataWidgetu';
@@ -98,7 +99,7 @@ const KATEGORIE_BARVY: Record<string, number> = {
 // API vrací u směny bez typu jeho surovou hodnotu; tyhle dvě do věty nepatří.
 const POPISEK_TYPU: Record<string, string> = { auto: 'Mimo rozvrh', custom: 'Směna' };
 
-interface MojeSmena { id?: number; date: string; startTime?: string; endTime?: string; start_time?: string; end_time?: string; type?: string; typeLabel?: string; typeColor?: string; rating?: number | null }
+interface MojeSmena { id?: number; date: string; startTime?: string; endTime?: string; start_time?: string; end_time?: string; type?: string; typeLabel?: string; typeColor?: string; rating?: number | null; note?: string | null }
 
 function vyberSmeny(raw: any): MojeSmena[] {
   if (!Array.isArray(raw)) throw new Error(tg('Směny přišly v nečekaném tvaru.'));
@@ -168,6 +169,13 @@ function NejblizsiSmena({ velikost, nahled }: WidgetProps) {
               {typ && <><span aria-hidden className={`inline-block h-2 w-2 rounded-full align-middle mr-1.5 ${kat ? `cat-dot-${kat}` : 'bg-black/15'}`} />{typ} · </>}
               {denVetou(prvni.den)}
             </span>} />
+          {/* Instrukce vedení ke směně (kolo 7) — ráno je tohle první, co člověk potřebuje vědět. */}
+          {prvni.s.note && (
+            <p className="t-meta text-pretty flex items-start gap-1.5" data-poznamka-smeny>
+              <Icon name="chat" size={13} className="shrink-0 mt-0.5 text-black/45" />
+              <span className="min-w-0">{prvni.s.note}</span>
+            </p>
+          )}
           {tym.zapnuto && <p className="t-meta text-pretty"><KolegoveSmeny kolegove={kolegove} hotovo={tym.hotovo} /></p>}
           {dalsi && (
             <p className="t-meta">
@@ -206,7 +214,10 @@ function SmenyPrehled({ velikost, nahled }: WidgetProps) {
         <StatRow>
           <Stat label={t('Nadcházející')} value={c.nadchazejici.toLocaleString('cs-CZ')} note={t('{n, plural, one {směna} few {směny} other {směn}}', { n: c.nadchazejici })} />
           {/* Součet délek směn z rozvrhu, ne z píchaček — „Odpracováno" podle docházky ukazuje dochazka.moje_odpracovano. */}
-          <Stat label={t('Naplánováno')} value={hodinyText(c.odpracovanoH)} unit={t('h')} note={t('{n, plural, one {# směna} few {# směny} other {# směn}} z rozvrhu do včerejška', { n: c.minulych })} />
+          {/* Poznámka se smí zalomit: „z rozvrhu do včerejška" je to, čím se číslo liší od píchaček,
+              a ve dvou sloupcích na telefonu by se useklo na „z rozvrhu do…". */}
+          <Stat label={t('Naplánováno')} value={hodinyText(c.odpracovanoH)} unit={t('h')}
+            note={<span className="block whitespace-normal text-pretty">{t('{n, plural, one {# směna} few {# směny} other {# směn}} z rozvrhu do včerejška', { n: c.minulych })}</span>} />
           <Stat label={t('Celkem')} value={c.celkem.toLocaleString('cs-CZ')} note={t('{n, plural, one {směna} few {směny} other {směn}}', { n: c.celkem })} />
         </StatRow>
       )}

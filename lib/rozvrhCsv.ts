@@ -5,12 +5,17 @@
 // mimo morning/afternoon/flexible tiše přepsal na „flexible“ a vedení hledal
 // jen mezi zaměstnanci. Vlastní soubor se tak nedal bez ztráty načíst zpět.
 // Čistá logika je tady (bez Reactu), ať ji pokryje test round-tripu.
+//
+// Kolo 7 (R7-1): šestý sloupec „poznámka" — instrukce ke směně jde exportem ven
+// i importem zpátky. Starší soubor s pěti sloupci se načte dál (poznámka prázdná).
+
+import { poznamkaSmeny } from './rozvrhPrehled.ts';
 
 export interface CsvClen { id: number; name: string; email?: string | null }
-export interface CsvSmena { date: string; employeeName: string; startTime: string; endTime: string; type?: string | null }
-export interface CsvRadek { employeeId: number; employeeName: string; date: string; startTime: string; endTime: string; type: string }
+export interface CsvSmena { date: string; employeeName: string; startTime: string; endTime: string; type?: string | null; note?: string | null }
+export interface CsvRadek { employeeId: number; employeeName: string; date: string; startTime: string; endTime: string; type: string; note: string | null }
 
-export const CSV_HLAVICKA = 'datum;zaměstnanec;od;do;typ';
+export const CSV_HLAVICKA = 'datum;zaměstnanec;od;do;typ;poznámka';
 
 /** `8:00`, `08:00`, `08:00:00` → `08:00`; cokoli jiného (25:99, „ráno“) → null. */
 export function platnyCas(v: unknown): string | null {
@@ -44,7 +49,7 @@ export function sestavCsv(shifts: CsvSmena[]): string {
   const lines = shifts
     .slice()
     .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime))
-    .map((s) => [s.date, pole(s.employeeName), s.startTime, s.endTime, pole(s.type ?? '')].join(';'));
+    .map((s) => [s.date, pole(s.employeeName), s.startTime, s.endTime, pole(s.type ?? ''), pole(s.note ?? '')].join(';'));
   return [CSV_HLAVICKA, ...lines].join('\n');
 }
 
@@ -79,7 +84,7 @@ export function rozeberCsv(text: string, lide: CsvClen[]): { rows: CsvRadek[]; e
   const rows: CsvRadek[] = [];
   const errors: string[] = [];
   for (let i = startIdx; i < lines.length; i++) {
-    const [date, who, start, end, type] = rozdelRadek(lines[i]);
+    const [date, who, start, end, type, poznamka] = rozdelRadek(lines[i]);
     const r = `Řádek ${i + 1}`;
     if (!date || !who || !start || !end) { errors.push(`${r}: neúplný (${lines[i]})`); continue; }
     if (!platneDatum(date)) { errors.push(`${r}: neplatné datum „${date}" (očekává RRRR-MM-DD)`); continue; }
@@ -93,7 +98,10 @@ export function rozeberCsv(text: string, lide: CsvClen[]): { rows: CsvRadek[]; e
     if (!emp) { errors.push(`${r}: jméno „${who}" má v týmu víc lidí — napiš místo něj e-mail`); continue; }
     // Typ se zachová, jak je (název typu i morning/afternoon/flexible); prázdný = vlastní.
     const typ = (type ?? '').trim().slice(0, 60) || 'flexible';
-    rows.push({ employeeId: emp.id, employeeName: emp.name, date, startTime: od, endTime: doCasu, type: typ });
+    // Poznámka nepovinná; přes 200 znaků se řádek nepřeskočí potichu, ale řekne to (server by ji odmítl).
+    const note = poznamkaSmeny(poznamka);
+    if (note === false) { errors.push(`${r}: poznámka je delší než 200 znaků`); continue; }
+    rows.push({ employeeId: emp.id, employeeName: emp.name, date, startTime: od, endTime: doCasu, type: typ, note });
   }
   return { rows, errors };
 }

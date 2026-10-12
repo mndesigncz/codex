@@ -145,6 +145,8 @@ export async function GET(request: Request) {
     await ddl(sql`ALTER TABLE shifts ADD COLUMN IF NOT EXISTS team_id INTEGER`);
     // shift created automatically from a clock-in / added via a closing (not planned)
     await ddl(sql`ALTER TABLE shifts ADD COLUMN IF NOT EXISTS auto_created BOOLEAN DEFAULT FALSE`);
+    // Instrukce ke směně od vedení (kolo 7): „Otevíráš sám, klíče u Petry" — vidí ji přiřazený a plánovač.
+    await ddl(sql`ALTER TABLE shifts ADD COLUMN IF NOT EXISTS note TEXT`);
 
     await ddl(sql`
       CREATE TABLE IF NOT EXISTS shift_requests (

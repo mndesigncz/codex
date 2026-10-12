@@ -49,7 +49,8 @@ export default function ({ eq, ok }: Testy) {
     (sb.match(/<Avatar emoji=\{[sp]\.employeeAvatar\} name=\{[sp]\.employeeName\} size="2xs" ring=\{false\} className="sm:hidden" \/>/g) ?? []).length === 2
     && (sb.match(/kratkaFiltru\.get\(Number\([sp]\.employeeId\)\)/g) ?? []).length === 2
     && (sb.match(/casKratce\([sp]\.startTime, [sp]\.endTime\)/g) ?? []).length === 2);
-  ok('mřížka: title pilulky zůstává (celé jméno · typ · od–do)', sb.includes('title={`${s.employeeName} · ${rt.label} · ${fmtHM(s.startTime)}–${fmtHM(s.endTime)}`}'));
+  // Kolo 7 (R7-1): za od–do případně „ · poznámka ke směně".
+  ok('mřížka: title pilulky zůstává (celé jméno · typ · od–do [· poznámka])', sb.includes('title={`${s.employeeName} · ${rt.label} · ${fmtHM(s.startTime)}–${fmtHM(s.endTime)}${s.note ? ` · ${s.note}` : \'\'}`}'));
   ok('mřížka: patička dne jen od sm', /className="hidden sm:block mt-auto t-meta tabular-nums truncate" data-paticka-dne/.test(sb));
 
   // ---- patička a týden ----

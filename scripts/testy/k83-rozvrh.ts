@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import type { Testy } from './_testy.ts';
 import {
   duvodVolna, textRozhodnutiVolna, MAX_DUVOD_VOLNA, otevritMojeZadosti,
-  stavyDostupnosti, denTydne, nastavDenVTydnu, prevezmiVzor,
+  stavyDostupnosti, denTydne, nastavDenVTydnu, prevezmiVzor, poznamkaSmeny, MAX_POZNAMKA_SMENY,
 } from '../../lib/rozvrhPrehled.ts';
 import { VYCHOZI_NAV, NAV_TEXTY } from '../../lib/navigace.ts';
 
@@ -103,4 +103,24 @@ export default function ({ eq, ok }: Testy) {
     /aria-label=\{t\('Nastavit všechny dny \{den\} v měsíci'/.test(dostupnost) && /onClick=\{\(\) => nastavSloupec\(\(i \+ 1\) % 7\)\}/.test(dostupnost)
     && /<Button variant="ghost" size="sm" icon="copy"[\s\S]{0,400}?\{t\('Jako minulý měsíc'\)\}/.test(dostupnost));
   ok('vzor: minulý měsíc se stahuje přes mezipaměť (každý měsíc nejvýš jednou)', /ulozeneMesice\.current\.has\(m\)/.test(dostupnost) && /\/api\/availability\?mine=1&month=\$\{m\}/.test(dostupnost));
+
+  // ---- smena-poznamka ----
+  eq('poznámka směny: ořízne, zalomení na jeden řádek, prázdná null', [poznamkaSmeny('  Klíče\n u Petry '), poznamkaSmeny(' \n '), poznamkaSmeny(null)], ['Klíče u Petry', null, null]);
+  eq('poznámka směny: 200 znaků projde, 201 je false (400, ne uříznutí)', [MAX_POZNAMKA_SMENY, poznamkaSmeny('a'.repeat(200)) === 'a'.repeat(200), poznamkaSmeny('a'.repeat(201))], [200, true, false]);
+  const smenyApi = cti('app/api/shifts/route.ts');
+  const tymVetev = smenyApi.slice(smenyApi.indexOf("if (searchParams.get('team') === '1')"), smenyApi.indexOf("const resolve = await typeResolver(c.teamId);\n  if (opr.has('rozvrh.zobrazit'))"));
+  ok('poznámka směny: týmový náhled (team=1) ji nedostane, vlastní a plánovač ano',
+    /\.\.\.shape\(r, resolveTeam\),/.test(tymVetev) && !/shape\(r, resolveTeam, true\)/.test(tymVetev)
+    && /shape\(r, resolve, !cizi \|\| opr\.has\('rozvrh\.zobrazit'\)\)/.test(smenyApi) && /\.\.\.\(sPoznamkou \? \{ note: r\.note \?\? null \} : \{\}\)/.test(smenyApi));
+  const patch = smenyApi.slice(smenyApi.indexOf('export async function PATCH'));
+  ok('poznámka směny: PATCH chce rozvrh.upravit, hlídá team_id a jde do historie (rozvrh.poznamka)',
+    /pozaduj\('rozvrh\.upravit'\)/.test(patch) && /WHERE id = \$\{id\} AND team_id = \$\{c\.teamId\}/.test(patch) && /audit\(c\.teamId, c\.meId, 'rozvrh\.poznamka', 'shift', id/.test(patch));
+  const rozvrhApi = cti('app/api/schedule/route.ts');
+  ok('poznámka směny: GET /api/schedule ji vrací a hromadné uložení (kopie týdne, import) ji přenese',
+    /s\.type, s\.note,/.test(rozvrhApi) && /note: r\.note \?\? null/.test(rozvrhApi) && /INSERT INTO shifts \(team_id, employee_id, date, start_time, end_time, type, note\)/.test(rozvrhApi));
+  ok('poznámka směny: DDL sloupce shifts.note', /ALTER TABLE shifts ADD COLUMN IF NOT EXISTS note TEXT/.test(cti('app/api/init/route.ts')));
+  const planovac = cti('components/scheduling/ScheduleBuilder.tsx');
+  ok('poznámka směny: okno dne má pole Poznámka (maxLength 200) a pilulka ikonu s poznámkou v title',
+    /label=\{t\('Poznámka ke směně \(nepovinné\)'\)\}/.test(planovac) && /maxLength=\{MAX_POZNAMKA_SMENY\}/.test(planovac) && /\$\{s\.note \? ` · \$\{s\.note\}` : ''\}/.test(planovac));
+  ok('poznámka směny: Moje směny ji ukazují v detailu řádku', /data-poznamka-smeny/.test(cti('components/employee/MyShifts.tsx')) && /prvni\.s\.note/.test(cti('components/widgety/oblasti/moje-smeny.tsx')));
 }

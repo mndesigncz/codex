@@ -9,7 +9,8 @@
    "startTime": "08:00",
    "endTime": "16:00",
    "type": "Ranní",
-   "hourlyRate": 180
+   "hourlyRate": 180,
+   "note": "Otevíráš sám, klíče u Petry"
   },
   {
    "id": 502,
@@ -20,7 +21,8 @@
    "startTime": "22:00",
    "endTime": "06:00",
    "type": "Noční",
-   "hourlyRate": 180
+   "hourlyRate": 180,
+   "note": null
   },
   {
    "id": 503,
@@ -31,7 +33,8 @@
    "startTime": "08:00",
    "endTime": "20:00",
    "type": "Ranní",
-   "hourlyRate": 200
+   "hourlyRate": 200,
+   "note": "Akce pro 30 lidí od 18:00 — zůstaň do úklidu sálu, pak zamkni zadní vchod a vrať klíče do trezoru."
   },
   {
    "id": 504,
@@ -42,7 +45,8 @@
    "startTime": "10:00",
    "endTime": "14:00",
    "type": "Odpolední",
-   "hourlyRate": 0
+   "hourlyRate": 0,
+   "note": null
   }
  ],
  "gaps": [
