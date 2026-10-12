@@ -6,12 +6,14 @@
 //    bez českých vět sekcí `zamestnanec` a `chat`;
 //  • tablet (/kiosk): záložky, zamčená obrazovka a chat v jazyce obsluhy;
 //  • na 390 px nic nepřetéká (ani dokument, ani tlačítka, záložky a chipy, které by text ořízly);
-//  • v tmavém režimu žádný text nesplyne s podkladem.
+//  • v tmavém režimu žádný text nesplyne s podkladem;
+//  • kolo 6 (B5, česky na 390 px): uzávěrka je průvodce po krocích s pevnou lištou a polem 16 px,
+//    první úkol je nad dokem a Sklad uloží víc rozepsaných položek jedním tlačítkem.
 //
 // Jazyk se nastavuje cookie `managero-lang` (stejně jako ho zapíše přepínač), takže sonda
 // ověřuje i serverové vykreslení slovníku. Čeština se hlídá ostatními sondami beze změny.
 import { readFileSync } from 'node:fs';
-import { kontext, konec, tvrdi, roleMine, DIR, OUT, BASE } from './k68-spolecne.mjs';
+import { kontext, konec, tvrdi, roleMine, dokud, dotazyNa, DIR, OUT, BASE } from './k68-spolecne.mjs';
 
 const nacti = (jmeno) => JSON.parse(readFileSync(DIR + jmeno + '.json', 'utf8'));
 const TEL = { width: 390, height: 844 };
@@ -213,5 +215,75 @@ for (const o of [OBRAZOVKY[0], OBRAZOVKY[3], OBRAZOVKY[6]]) {
   const nev = await neviditelne(p);
   tvrdi('tmavý · tablet (de): žádný text nesplyne s podkladem', nev.length === 0, nev.join(' | '));
   await ctx.close();
+}
+
+// ============================================================ kolo 6 (B5): zaměstnanec na telefonu
+{
+  const praha = (o = 0) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now() + o * 86400000));
+  const DNY = { DNES: praha(0), VCERA: praha(-1), PREDEVCIREM: praha(-2), PREDVCEREM: praha(-2), PRED3: praha(-3), PRED4: praha(-4), PRED5: praha(-5), PRED6: praha(-6),
+    ZITRA: praha(1), POZDEJI: praha(20), CAS_DNES: new Date(Date.now() - 60000).toISOString(), CAS_PREDVCEREM: new Date(Date.now() - 2 * 86400000).toISOString() };
+  const sDaty = (jmeno) => {
+    let t = readFileSync(DIR + jmeno + '.json', 'utf8');
+    for (const [k, v] of Object.entries(DNY)) t = t.replaceAll(`"${k}"`, `"${v}"`);
+    return JSON.parse(t.replaceAll('"MESIC"', `"${DNY.DNES.slice(0, 7)}"`));
+  };
+  const FIX6 = nacti('k78-zamestnanec-rozlozeni');
+  const malaPole = (p) => p.evaluate(() => [...document.querySelectorAll('input:not([type=checkbox]):not([type=radio]):not([type=range]), select, textarea')]
+    .filter(e => e.offsetParent && parseFloat(getComputedStyle(e).fontSize) < 16).map(e => e.getAttribute('aria-label') || e.getAttribute('placeholder') || e.tagName));
+
+  // a) Uzávěrka: jeden krok na obrazovce, pevná lišta, pole 16 px.
+  {
+    const k = await kontext({ role: 'employee', viewport: TEL, mobil: true, mineData: BARISTA, fix: sDaty('k69-b5a-rozlozeni-uzaverka'),
+      dalsi: (req, json, stav) => (new URL(req.url()).pathname === '/api/closings' && req.method() === 'GET' ? json(sDaty('k69-b5a-closings-zamestnanec')) : podvrh(req, json, stav)) });
+    await otevriEmployee(k.p, { url: '/employee/shifts?view=closing', plocha: 'zamestnanec.uzaverka' });
+    const lista = k.p.getByRole('region', { name: 'Kroky uzávěrky' });
+    tvrdi('B5 uzávěrka 390: pevná lišta průvodce „Krok 1 z 4"', await dokud(() => lista.isVisible(), 3000) && (await lista.innerText()).includes('Krok 1 z 4'));
+    tvrdi('B5 uzávěrka 390: otevřený je jen první krok (Tržba hotově zatím schovaná)', await k.p.getByLabel('Kasa na začátku').isVisible() && !(await k.p.getByLabel('Tržba hotově').isVisible()));
+    const vyska = await k.p.evaluate(() => document.querySelector('main')?.scrollHeight ?? 0);
+    tvrdi(`B5 uzávěrka 390: stránka je krátká (main ${vyska} px, dřív 4 720 px)`, vyska > 0 && vyska < 3000, String(vyska));
+    tvrdi('B5 uzávěrka 390: žádné viditelné pole pod 16 px (iPhone při fokusu nepřiblíží)', (await malaPole(k.p)).length === 0, (await malaPole(k.p)).join(', '));
+    await lista.getByRole('button', { name: /Další krok/ }).click();
+    tvrdi('B5 uzávěrka 390: „Další krok" otevře Tržby (Krok 2 z 4)', await dokud(() => k.p.getByLabel('Tržba hotově').isVisible(), 2000) && (await lista.innerText()).includes('Krok 2 z 4'));
+    const pt = await preteceni(k.p);
+    tvrdi('B5 uzávěrka 390: bez vodorovného přetečení', pt.dokument <= 0 && pt.prvky.length === 0, JSON.stringify(pt));
+    await k.p.screenshot({ path: `${OUT}k78-b5-uzaverka-390.png` });
+    await k.ctx.close();
+  }
+
+  // b) Úkoly: první úkol nad dokem, ovládání v jednom řádku.
+  {
+    const k = await kontext({ role: 'employee', viewport: TEL, mobil: true, mineData: BARISTA, fix: FIX6['zamestnanec.ukoly'],
+      dalsi: (req, json, stav) => (new URL(req.url()).pathname === '/api/tasks' && req.method() === 'GET' ? json(sDaty('k69-b6a-tasks')) : podvrh(req, json, stav)) });
+    await otevriEmployee(k.p, { url: '/employee/shifts?view=tasks', plocha: 'zamestnanec.ukoly' });
+    const prvni = await k.p.locator('[data-plocha] li[data-widget="nastroj"] ul.list li.list-row').first().boundingBox();
+    const dok = await k.p.locator('div.md\\:hidden.fixed nav').last().boundingBox();
+    tvrdi(`B5 úkoly 390: první úkol je celý nad dokem (spodek ${prvni && Math.round(prvni.y + prvni.height)}, dok ${dok && Math.round(dok.y)})`, !!prvni && !!dok && prvni.y + prvni.height <= dok.y, JSON.stringify({ prvni, dok }));
+    const filtry = await k.p.locator('[data-plocha] li[data-widget="nastroj"]').getByRole('button', { name: /^Filtry/ }).boundingBox();
+    const tyden = await k.p.locator('[data-plocha] li[data-widget="nastroj"]').getByRole('radio', { name: 'Týden' }).or(k.p.locator('[data-plocha] li[data-widget="nastroj"]').getByRole('tab', { name: 'Týden' })).first().boundingBox();
+    tvrdi('B5 úkoly 390: přepínač pohledu a „Filtry" jsou v jednom řádku', !!filtry && !!tyden && Math.abs((filtry.y + filtry.height / 2) - (tyden.y + tyden.height / 2)) < 12, JSON.stringify({ filtry, tyden }));
+    await k.p.screenshot({ path: `${OUT}k78-b5-ukoly-390.png` });
+    await k.ctx.close();
+  }
+
+  // c) Sklad: zápis stavu nahoře, dvě rozepsané položky = jedno „Uložit 2 změny".
+  {
+    const k = await kontext({ role: 'employee', viewport: TEL, mobil: true, mineData: BARISTA, fix: FIX6['zamestnanec.sklad'], dalsi: podvrh });
+    await otevriEmployee(k.p, { url: '/employee/shifts?view=inventory', plocha: 'zamestnanec.sklad' });
+    const pole = k.p.locator('[data-plocha] li[data-widget="nastroj"] input[id^="sklad-mnozstvi-"]');
+    const prvniPole = await pole.first().boundingBox();
+    tvrdi(`B5 sklad 390: první pole zápisu je na první obrazovce (y ${prvniPole && Math.round(prvniPole.y)})`, !!prvniPole && prvniPole.y + prvniPole.height < TEL.height - 110, JSON.stringify(prvniPole));
+    await pole.nth(0).fill('7');
+    const lista = k.p.getByRole('region', { name: 'Rozepsané změny skladu' });
+    tvrdi('B5 sklad 390: jedna rozepsaná položka lištu neukáže (řádkové Uložit stačí)', !(await lista.isVisible()));
+    await pole.nth(1).fill('9');
+    tvrdi('B5 sklad 390: od dvou rozepsaných je lišta „Uložit 2 změny"', await dokud(() => lista.isVisible(), 1500) && (await lista.innerText()).includes('Uložit 2 změny'));
+    const pred = Date.now();
+    await lista.getByRole('button', { name: 'Uložit 2 změny' }).click();
+    tvrdi('B5 sklad 390: …jedno klepnutí pošle oba zápisy', await dokud(() => dotazyNa(k.stav, ['/api/inventory/'], pred).filter(d => d.m === 'PATCH').length === 2, 3000),
+      JSON.stringify(dotazyNa(k.stav, ['/api/inventory/'], pred).map(d => d.m + ' ' + d.path)));
+    tvrdi('B5 sklad 390: …a lišta zmizí', await dokud(async () => !(await lista.isVisible()), 3000));
+    await k.p.screenshot({ path: `${OUT}k78-b5-sklad-390.png` });
+    await k.ctx.close();
+  }
 }
 await konec();
