@@ -1554,5 +1554,12 @@
   "Výplatu se nepodařilo spočítat.": "Auszahlung konnte nicht berechnet werden.",
   "Docházka přišla v nečekaném tvaru.": "Die Zeiterfassungsdaten haben ein unerwartetes Format.",
   "Prémie": "Prämie",
-  "Srážka": "Abzug"
+  "Srážka": "Abzug",
+  "Pochvala": "Lob",
+  "Pochválit": "Loben",
+  "Pochvaly": "Lob",
+  "Pochválit: {jmeno}": "Loben: {jmeno}",
+  "Období žebříčku": "Zeitraum der Rangliste",
+  "Celkem": "Gesamt",
+  "Body získané od 1. dne měsíce, bez odečtů za vyměněné odměny.": "Seit dem 1. des Monats verdiente Punkte, ohne Abzüge für eingelöste Prämien."
 }

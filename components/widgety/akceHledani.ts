@@ -61,6 +61,7 @@ export const AKCE_HLEDANI: AkceHledani[] = [
   // Odměny
   { id: 'odmeny-ohodnotit', nazev: 'Ohodnotit směny', kde: 'Odměny', ikona: 'award', slova: ['body', 'hodnocení', 'žebříček'], stranka: 'rewards', rozhrani: V },
   { id: 'odmeny-katalog', nazev: 'Katalog odměn', kde: 'Odměny', ikona: 'gift', slova: ['vyměnit body', 'bonus', 'odměna'], stranka: 'rewards', rozhrani: VZ },
+  { id: 'odmeny-pochvalit', nazev: 'Pochválit člena', kde: 'Odměny', ikona: 'award', slova: ['pochvala', 'body navíc', 'uznání', 'kudos', 'ocenit', 'poděkovat'], stranka: 'rewards', rozhrani: V },
   // Nastavení
   { id: 'nastaveni-pokladna', nazev: 'Nastavení › Pokladna', kde: 'Nastavení', ikona: 'trend', slova: ['kasa', 'propojit', 'pos', 'storyous', 'dotykačka'], stranka: 'settings', arg: 'pos', rozhrani: V },
   { id: 'nastaveni-notifikace', nazev: 'Nastavení › Notifikace', kde: 'Nastavení', ikona: 'bell', slova: ['oznámení', 'push', 'upozornění', 'e-mail'], stranka: 'settings', arg: 'notifications', rozhrani: VZ },

@@ -17,6 +17,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { Icon } from '../Icons';
 import { Button, Chip, EmptyState, ErrorState, ListRow, Modal, Segmented, Skeleton, Stat, StatRow, Avatar } from '../ui';
 import ShiftReviewModal from './ShiftReviewModal';
+import { PochvalaOkno } from '../widgety/oblasti/odmeny';
 import type { RewardLevel } from '@/lib/rewardLevels';
 import { apiMessage, okJson } from '@/lib/api';
 import { fmtHM } from '@/lib/i18n/format';
@@ -42,7 +43,7 @@ interface Profile {
   employee: { id: number; name: string; avatar?: string; email: string | null; phone: string | null; jobTitle: string | null; hourlyRate: number | null };
   standing: { points: number; levelName: string; levelIndex: number; perks: string; next: RewardLevel | null; pctToNext: number; pointsIntoLevel: number; pointsForNext: number };
   levels: RewardLevel[];
-  breakdown: { tasks: number; procedures: number; closings: number; reviewPoints: number | null; autoPoints: number | null; itemPoints: number | null; ratedShifts: number | null; flagged: number | null };
+  breakdown: { tasks: number; procedures: number; closings: number; reviewPoints: number | null; autoPoints: number | null; itemPoints: number | null; ratedShifts: number | null; flagged: number | null; awards?: number | null; awardCount?: number | null };
   shifts: { upcoming: ShiftRow[]; recent: ShiftRow[] };
   reviews: Review[];
   items: FeedbackItem[];
@@ -52,7 +53,7 @@ interface Profile {
 
 type Zalozka = 'overview' | 'shifts' | 'feedback';
 
-const druhPolozky = (t: PrekladFn): Record<string, string> => ({ task: t('Úkol'), procedure: t('Postup'), closing: t('Uzávěrka') });
+const druhPolozky = (t: PrekladFn): Record<string, string> => ({ task: t('Úkol'), procedure: t('Postup'), closing: t('Uzávěrka'), award: t('Pochvala') });
 const fmtDay = (s: string, loc: string) => new Date(String(s).slice(0, 10) + 'T12:00:00').toLocaleDateString(loc, { weekday: 'short', day: 'numeric', month: 'numeric' });
 const fmtDayLong = (s: string, loc: string) => new Date(String(s).slice(0, 10) + 'T12:00:00').toLocaleDateString(loc, { weekday: 'short', day: 'numeric', month: 'long' });
 const hm = (t: string | null) => String(t ?? '').slice(0, 5);
@@ -80,6 +81,7 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
   const [chyba, setChyba] = useState<string | null>(null);
   const [tab, setTab] = useState<Zalozka>('overview');
   const [rateDate, setRateDate] = useState<string | null>(null);
+  const [chvalim, setChvalim] = useState(false);
 
   const load = useCallback(() => {
     const t = tRef.current;
@@ -156,11 +158,14 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                 {smi('finance.mzdy') && <VyplataMesice employeeId={employeeId} />}
 
                 <section aria-labelledby="profil-body">
-                  <h3 id="profil-body" className="t-label mb-2">{t('Odkud má body')}</h3>
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <h3 id="profil-body" className="t-label">{t('Odkud má body')}</h3>
+                    {smiHodnotit && <Button variant="secondary" size="sm" icon="award" onClick={() => setChvalim(true)}>{t('Pochválit')}</Button>}
+                  </div>
                   <div className="flex flex-wrap gap-1.5">
                     {([
                       [t('Úkoly'), p.breakdown.tasks], [t('Postupy'), p.breakdown.procedures], [t('Uzávěrky'), p.breakdown.closings],
-                      ...(vidiHodnoceni ? [[t('Z hodnocení'), p.breakdown.reviewPoints], [t('Automaticky'), p.breakdown.autoPoints], [t('K položkám'), p.breakdown.itemPoints]] : []),
+                      ...(vidiHodnoceni ? [[t('Z hodnocení'), p.breakdown.reviewPoints], [t('Automaticky'), p.breakdown.autoPoints], [t('K položkám'), p.breakdown.itemPoints], [t('Pochvaly'), p.breakdown.awards ?? null]] : []),
                     ] as [string, number | null][]).filter(([, v]) => v != null).map(([label, val]) => (
                       <Chip key={label} tone="muted" size="sm">{label}: {(val ?? 0).toLocaleString(loc)}</Chip>
                     ))}
@@ -280,6 +285,9 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
           onClose={() => setRateDate(null)}
           onSaved={() => { setRateDate(null); load(); }}
         />
+      )}
+      {chvalim && p && (
+        <PochvalaOkno clovek={{ id: p.employee.id, jmeno: p.employee.name }} onClose={() => setChvalim(false)} onHotovo={load} />
       )}
     </>
   );

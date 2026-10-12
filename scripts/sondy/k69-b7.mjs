@@ -57,7 +57,18 @@ const podvrh = (zam = false) => (req, json, stav) => {
   }
   if (path === '/api/rewards') {
     if (m === 'POST') { stav.markSeen = req.postDataJSON(); return json({ ok: true }); }
-    return json(nacti(zam ? 'k69-b7-rewards-zam' : 'k69-b7-rewards'));
+    const r = nacti(zam ? 'k69-b7-rewards-zam' : 'k69-b7-rewards');
+    // Žebříček za období (kolo 5): ?od=YYYY-MM-01 → jiné pořadí, ať je přepnutí vidět.
+    if (url.searchParams.get('od') && r.standings) {
+      (stav.obdobi ??= []).push(url.searchParams.get('od'));
+      r.standings = r.standings.map((x) => ({ ...x, points: x.name === 'Jakub Horák' ? 77 : 12 })).sort((a, b) => b.points - a.points);
+    }
+    return json(r);
+  }
+  // Pochvaly s body (kolo 5).
+  if (path === '/api/rewards/awards') {
+    if (m === 'POST') { (stav.pochvaly ??= []).push(req.postDataJSON()); return json({ award: { id: 99 } }); }
+    return json(nacti('k69-b7-awards'));
   }
   if (path === '/api/shift-reviews' && m === 'GET') {
     if (url.searchParams.get('month')) return json(mesicni());
@@ -120,6 +131,24 @@ const cast = (p, nazev) => p.locator('[data-plocha]').getByRole('tab', { name: n
   const praveHrany = await nastroj.locator('.list-value').evaluateAll(el => el.map(x => Math.round(x.getBoundingClientRect().right)));
   tvrdi('V-R: body v žebříčku leží pod sebou (stejná pravá hrana)', praveHrany.length >= 2 && new Set(praveHrany).size === 1, JSON.stringify(praveHrany));
   await p.screenshot({ path: OUT + 'k69-b7-vedeni-desk.png', fullPage: true });
+
+  // Kolo 5: Pochvaly s body — widget ukáže poslední, žebříček umí „Tento měsíc" a chválí se oknem.
+  const pochvaly = widgetLi(p, 'odmeny.pochvaly');
+  tvrdi('V-P: widget Pochvaly ukáže Evu s +20 a důvodem', (await pochvaly.innerText()).includes('Eva Testová') && (await pochvaly.innerText()).includes('+20')
+    && (await pochvaly.innerText()).includes('Zaskočila za nemocnou kolegyni'), (await pochvaly.innerText()).replace(/\n/g, ' | '));
+  tvrdi('V-P: widget Pochvaly nemá limetku (druhotná akce)', await pochvaly.locator(LIMETKA).count() === 0);
+  await nastroj.getByRole('tab', { name: 'Tento měsíc' }).click();
+  tvrdi('V-P: „Tento měsíc" si vyžádá /api/rewards?od=1. den měsíce', await dokud(() => (stav.obdobi ?? []).includes(prvni), 2000), JSON.stringify(stav.obdobi));
+  tvrdi('V-P: …a žebříček se přeskládá (Jakub 77 první)', await dokud(async () => { const tx = await nastroj.innerText(); return tx.includes('77') && tx.indexOf('Jakub Horák') < tx.indexOf('Eva Testová'); }, 2000));
+  await nastroj.getByRole('tab', { name: 'Celkem' }).click();
+  await nastroj.getByRole('button', { name: 'Pochválit: Jakub Horák' }).click();
+  const oknoPochvaly = p.getByRole('dialog', { name: 'Pochválit' });
+  tvrdi('V-P: „Pochválit" v řádku otevře okno s Jakubem', await dokud(() => oknoPochvaly.isVisible(), 2000) && (await oknoPochvaly.innerText()).includes('Jakub Horák'));
+  await oknoPochvaly.getByRole('tab', { name: '+20' }).click();
+  await oknoPochvaly.getByLabel('Za co').fill('Zůstal po zavíračce');
+  await oknoPochvaly.getByRole('button', { name: 'Dát body' }).click();
+  tvrdi('V-P: …a odejde POST { userId: 3, points: 20, reason }', await dokud(() => (stav.pochvaly ?? []).some(b => b.userId === 3 && b.points === 20 && b.reason === 'Zůstal po zavíračce'), 2000), JSON.stringify(stav.pochvaly));
+  tvrdi('V-P: okno se po uložení zavře', await dokud(async () => (await oknoPochvaly.count()) === 0, 2000));
 
   // Schválení z widgetu = PATCH { id, action: 'approve' }.
   await zadosti.getByRole('button', { name: 'Schválit: Eva Testová, Káva zdarma na směně' }).click();

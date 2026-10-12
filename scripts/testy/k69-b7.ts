@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs';
 import type { Testy } from './_testy.ts';
 import {
   vyberOdmeny, odkudBody, zbyvaDoDalsi, dnyHodnoceni, bodyDne, vyberPoradi, vytkyTymu, nehodnocene, minulyMesic,
-  vyberKatalog, nabidka, cekajiciZadosti,
+  vyberKatalog, nabidka, cekajiciZadosti, vyberPochvaly, pochvalyMesice, urlZebricku,
 } from '../../lib/odmenyPrehled.ts';
 import { WIDGETY } from '../../lib/widgety/katalog/odmeny.ts';
 import { STRANKA as VEDENI } from '../../lib/widgety/stranky/vedeni.odmeny.ts';
@@ -46,7 +46,7 @@ export default function ({ eq, ok }: Testy) {
   // Součet = totalPoints() na serveru (počty × sazba + body z hodnocení, automatické a u položek),
   // takže řádky sedí s celkem nahoře — včetně odečtených odměn.
   eq('odkud body: součet řádků = celkem podle sazby (jako server)', radky.reduce((s, r) => s + r.body, 0), 10 * 5 + 3 * 10 + 4 * 15 + 40 - 8 - 30);
-  eq('odkud body: počty zůstávají pro meta řádku', radky.map(r => r.pocet), [10, 3, 4, 6, null]);
+  eq('odkud body: počty zůstávají pro meta řádku (pochvaly od kola 5)', radky.map(r => r.pocet), [10, 3, 4, 6, 0, null]);
 
   // ---- hodnocení mých směn ----
   const dny = dnyHodnoceni({
@@ -168,4 +168,32 @@ export default function ({ eq, ok }: Testy) {
   // Okno hodnocení: „Něco je špatně" je Switch, ne ručně psaná pilulka s aria-pressed.
   const okno = bezKomentaru(precti('components/employer/ShiftReviewModal.tsx'));
   ok('review: ShiftReviewModal — „Něco je špatně" je Switch, ne ručně psaná pilulka', !/aria-pressed=\{isFlagged\}/.test(okno) && !/Označeno jako špatně/.test(okno) && /<Switch checked=\{isFlagged\}/.test(okno));
+
+  // ---- kolo 5: pochvaly s body + žebříček za období ----
+  // Pochvala je zdroj bodů jako hodnocení: součet „Odkud mám body" musí sedět s celkem.
+  const sPochvalou = vyberOdmeny({ ...odpoved, me: { ...odpoved.me, points: 177, breakdown: { ...odpoved.me.breakdown, awards: 35, awardCount: 2 } } });
+  const radkyP = odkudBody(sPochvalou.ja!.rozpad, sPochvalou.sazebnik);
+  eq('pochvaly: řádek Pochvaly s body a počtem', radkyP.find(r => r.klic === 'pochvaly') && [radkyP.find(r => r.klic === 'pochvaly')!.body, radkyP.find(r => r.klic === 'pochvaly')!.pocet], [35, 2]);
+  eq('pochvaly: součet řádků = celkem i s pochvalou (142 + 35)', radkyP.reduce((a, r) => a + r.body, 0), 177);
+  // lib/pointsBalance sahá na databázi (neon), tak jen zdroják: pochvaly jsou v součtu i v prázdném rozpadu.
+  const balance = precti('lib/pointsBalance.ts');
+  ok('pochvaly: server počítá pochvaly do celku (totalPoints + awards)', /\+ b\.itemPoints \+ \(b\.awards \?\? 0\)/.test(balance) && /awards: 0, awardCount: 0/.test(balance));
+  eq('pochvaly: bez pole awards (starší odpověď) nula, ne NaN', [sPochvalou.ja!.rozpad.pochvaly, vyberOdmeny(odpoved).ja!.rozpad.pochvaly], [35, 0]);
+  // Pochvala ve zpětné vazbě: položka druhu award u dne, kdy přišla.
+  const dnyP = dnyHodnoceni({ reviews: [], items: [{ work_date: '2026-10-05', kind: 'award', refId: 7, label: 'Zaskočila za kolegyni', points: 20, note: null, flagged: false }] });
+  eq('pochvaly: ve dnech zpětné vazby jako položka award s body', [dnyP.length, dnyP[0]?.polozky[0]?.druh, bodyDne(dnyP[0])], [1, 'award', 20]);
+  const poch = vyberPochvaly({ awards: [
+    { id: 7, userId: 2, name: 'Eva', avatar: '👩', points: 20, reason: 'Za kolegyni', givenBy: 'Martin', createdAt: '2026-10-05T15:10:00.000Z' },
+    { id: 6, userId: 3, name: 'Jakub', avatar: null, points: 10, reason: null, givenBy: null, createdAt: '2026-09-28T19:40:00.000Z' },
+  ] });
+  eq('pochvaly: parser (jméno, body, důvod, kdo dal)', [poch.length, poch[0].jmeno, poch[0].body, poch[1].duvod, poch[1].dal], [2, 'Eva', 20, null, null]);
+  eq('pochvaly: tento měsíc jen od 1. dne (zářijová se nepočítá)', pochvalyMesice(poch, '2026-10-12'), { pocet: 1, body: 20 });
+  let padlo = false; try { vyberPochvaly(null); } catch { padlo = true; }
+  ok('pochvaly: nečekaný tvar je chyba widgetu, ne prázdno', padlo);
+  eq('žebříček za období: adresa s ?od=1. dne měsíce, celkem bez parametru', [urlZebricku('mesic', '2026-10-12'), urlZebricku('celkem', '2026-10-12')], ['/api/rewards?od=2026-10-01', '/api/rewards']);
+  ok('žebříček: widget má nastavení Období (celkem / měsíc)', !!widget('odmeny.zebricek')?.nastaveni?.some(n => n.klic === 'obdobi' && n.moznosti?.some(m => m.id === 'mesic')));
+  ok('pochvaly: widget odmeny.pochvaly v katalogu, akce chválit = hodnoceni.hodnotit', widget('odmeny.pochvaly')?.opravneni.pole?.['akce:pochvalit'] === 'hodnoceni.hodnotit');
+  // Server: období vynechá odečty za odměny — pořadí za měsíc říká, kdo si body vydělal.
+  ok('žebříček za období: shift_review_items bez redemption, když je `od`', /kind <> 'redemption'/.test(balance) && /point_awards/.test(balance));
+  ok('pochvaly: API chválí jen s hodnoceni.hodnotit a hlídá členství', /pozaduj\('hodnoceni\.hodnotit'\)/.test(precti('app/api/rewards/awards/route.ts')) && /jeClenem\(userId, c\.teamId\)/.test(precti('app/api/rewards/awards/route.ts')));
 }

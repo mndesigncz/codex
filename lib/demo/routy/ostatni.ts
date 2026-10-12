@@ -32,7 +32,7 @@ function uroven(body: number) {
   };
 }
 
-const rozpis = (b: number) => ({ tasks: Math.round(b / 30), procedures: Math.round(b / 60), closings: Math.round(b / 80), reviewPoints: Math.round(b * 0.4), ratedShifts: Math.round(b / 35), autoPoints: 0, itemPoints: 0, flagged: 0 });
+const rozpis = (b: number) => ({ tasks: Math.round(b / 30), procedures: Math.round(b / 60), closings: Math.round(b / 80), reviewPoints: Math.round(b * 0.4), ratedShifts: Math.round(b / 35), autoPoints: 0, itemPoints: 0, flagged: 0, awards: 0, awardCount: 0 });
 
 /**
  * Je směna ohodnocená? Starší než dva dny bere ukázka jako dávno ohodnocené
@@ -76,6 +76,27 @@ export const ostatni: Obsluha = (p, k) => {
       }).sort((a, b) => b.points - a.points);
     }
     return ok(telo);
+  }
+  // ---- Pochvaly s body (kolo 5) ----
+  if (cesta === '/api/rewards/awards') {
+    if (!opr.has('hodnoceni.zobrazit')) return chyba('Na tohle nemáš v tomto podniku oprávnění.', 403);
+    const jmeno = (id: number) => LIDE.find(l => l.id === id);
+    const tvar = (a: DemoStav['pochvaly'][number]) => ({ id: a.id, userId: a.userId, name: jmeno(a.userId)?.name ?? '', avatar: jmeno(a.userId)?.avatar ?? null, points: a.points, reason: a.reason, givenBy: jmeno(a.givenBy)?.name ?? null, createdAt: a.createdAt });
+    if (metoda === 'POST') {
+      if (!opr.has('hodnoceni.hodnotit')) return chyba('Na tohle nemáš v tomto podniku oprávnění.', 403);
+      const b = p.telo ?? {};
+      const points = Math.round(Number(b.points));
+      if (!Number.isFinite(points) || points < 1 || points > 500) return chyba('Body musí být 1 až 500.', 400);
+      const a = { id: Date.now(), userId: Number(b.userId), points, reason: b.reason ? String(b.reason).slice(0, 200) : null, givenBy: meId, createdAt: new Date().toISOString() };
+      s.pochvaly.unshift(a);
+      return ok({ award: tvar(a) });
+    }
+    if (metoda === 'DELETE') { s.pochvaly = s.pochvaly.filter(a => String(a.id) !== q.get('id')); return ok({ ok: true }); }
+    const ukazka: DemoStav['pochvaly'] = [
+      { id: 1, userId: 2, points: 20, reason: 'Zaskočila za nemocnou kolegyni', givenBy: meId, createdAt: `${posunDen(s.dnes, -2)}T15:10:00Z` },
+      { id: 2, userId: 3, points: 10, reason: 'Vzorně vyčištěný mlýnek', givenBy: meId, createdAt: `${posunDen(s.dnes, -6)}T19:40:00Z` },
+    ];
+    return ok({ awards: [...s.pochvaly, ...ukazka].map(tvar) });
   }
   if (cesta === '/api/rewards/catalog') {
     return ok({

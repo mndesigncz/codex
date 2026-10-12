@@ -1554,5 +1554,12 @@
   "Výplatu se nepodařilo spočítat.": "Nie udało się obliczyć wypłaty.",
   "Docházka přišla v nečekaném tvaru.": "Dane ewidencji czasu mają nieoczekiwany format.",
   "Prémie": "Premia",
-  "Srážka": "Potrącenie"
+  "Srážka": "Potrącenie",
+  "Pochvala": "Pochwała",
+  "Pochválit": "Pochwal",
+  "Pochvaly": "Pochwały",
+  "Pochválit: {jmeno}": "Pochwal: {jmeno}",
+  "Období žebříčku": "Okres rankingu",
+  "Celkem": "Razem",
+  "Body získané od 1. dne měsíce, bez odečtů za vyměněné odměny.": "Punkty zdobyte od 1. dnia miesiąca, bez odliczeń za wymienione nagrody."
 }

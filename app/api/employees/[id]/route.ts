@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { normalizeLevels, normalizePoints, standingForPoints, PointsConfig } from '@/lib/rewardLevels';
-import { pragueToday, pragueHM } from '@/lib/pragueTime';
+import { pragueToday, pragueHM, pragueDaySafe } from '@/lib/pragueTime';
 import { clenPodniku } from '@/lib/tenant';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { rozeberZaznam } from '@/lib/dochazkaPrehled';
@@ -83,9 +83,17 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
       FROM shift_review_items WHERE employee_id = ${employeeId} AND team_id = ${teamId}`;
     itemPoints = r?.pts ?? 0; flagged += r?.flg ?? 0;
   } catch { /* ignore */ }
+  // Pochvaly s body (kolo 5) — stejná aritmetika jako lib/pointsBalance.
+  let awards = 0, awardCount = 0;
+  try {
+    const [r] = await sql`
+      SELECT COALESCE(SUM(points),0)::int AS pts, COUNT(*)::int AS n
+      FROM point_awards WHERE user_id = ${employeeId} AND team_id = ${teamId}`;
+    awards = r?.pts ?? 0; awardCount = r?.n ?? 0;
+  } catch { /* table missing */ }
 
   const totalPoints = tasksDone * points.task + procedures * points.procedure + closingsTotal * points.closing
-    + reviewPoints + autoPoints + itemPoints;
+    + reviewPoints + autoPoints + itemPoints + awards;
   const st = standingForPoints(levels, totalPoints);
 
   const today = pragueToday();
@@ -153,7 +161,14 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
       FROM shift_review_items i LEFT JOIN cash_closings cc ON cc.id = i.ref_id
       WHERE i.employee_id = ${employeeId} AND i.team_id = ${teamId} AND i.kind = 'closing'
       ORDER BY i.work_date DESC LIMIT 30`;
-    items = [...taskItems, ...procItems, ...closingItems]
+    let awardItems: any[] = [];
+    try {
+      const rows = await sql`
+        SELECT id, points, reason, created_at FROM point_awards
+        WHERE user_id = ${employeeId} AND team_id = ${teamId} ORDER BY created_at DESC LIMIT 30`;
+      awardItems = rows.map((r: any) => ({ work_date: pragueDaySafe(r.created_at), kind: 'award', ref_id: r.id, points: r.points, note: null, flagged: false, label: r.reason ?? 'Pochvala' }));
+    } catch { /* table missing */ }
+    items = [...taskItems, ...procItems, ...closingItems, ...awardItems]
       .map((r: any) => ({
         workDate: r.work_date, kind: r.kind, refId: r.ref_id,
         label: r.label ?? (r.kind === 'task' ? 'Úkol' : r.kind === 'procedure' ? 'Postup' : 'Uzávěrka'),
@@ -231,8 +246,8 @@ export async function GET(_req: Request, props: { params: Promise<{ id: string }
     // Celkové body a úroveň (standing) zůstávají — body jsou vidět i
     // v žebříčku. Z čeho se skládají hodnocení, jen s hodnoceni.zobrazit.
     breakdown: hodnoceni
-      ? { tasks: tasksDone, procedures, closings: closingsTotal, reviewPoints, autoPoints, itemPoints, ratedShifts, flagged }
-      : { tasks: tasksDone, procedures, closings: closingsTotal, reviewPoints: null, autoPoints: null, itemPoints: null, ratedShifts: null, flagged: null },
+      ? { tasks: tasksDone, procedures, closings: closingsTotal, reviewPoints, autoPoints, itemPoints, ratedShifts, flagged, awards, awardCount }
+      : { tasks: tasksDone, procedures, closings: closingsTotal, reviewPoints: null, autoPoints: null, itemPoints: null, ratedShifts: null, flagged: null, awards: null, awardCount: null },
     shifts: { upcoming, recent },
     reviews: hodnoceni ? reviews : [], items: hodnoceni ? items : [],
     month: { hoursMs: monthMs, shifts: recent.filter(sh => sh.date.startsWith(monthKey)).length + upcoming.filter(sh => sh.date.startsWith(monthKey)).length, closings: closingsMonth },

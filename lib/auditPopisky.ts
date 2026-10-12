@@ -77,6 +77,8 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'wage.bonus': 'Přidána prémie k výplatě',
   'wage.deduction': 'Přidána srážka z výplaty',
   'wage.adjustment_delete': 'Smazána prémie nebo srážka',
+  'points.award': 'Pochvala s body',
+  'points.award_delete': 'Smazána pochvala',
   // akce
   'event.create': 'Založena akce',
   'event.checkout': 'Akce: zboží vydáno ze skladu',

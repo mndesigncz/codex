@@ -29,7 +29,7 @@ import {
   Avatar, Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Modal, Segmented, Skeleton, Switch, Textarea, Toast,
 } from '../ui';
 import { DEFAULT_POINTS, normalizeLevels, normalizePoints, type RewardLevel, type PointsConfig } from '@/lib/rewardLevels';
-import { KLIC_KALENDAR, UDALOST_KALENDAR, vyberKatalog, vyberPoradi, type Odmena, type Poradi } from '@/lib/odmenyPrehled';
+import { KLIC_KALENDAR, UDALOST_KALENDAR, urlZebricku, vyberKatalog, vyberPoradi, type ObdobiZebricku, type Odmena, type Poradi } from '@/lib/odmenyPrehled';
 import { apiMessage, okJson } from '@/lib/api';
 import ShiftReviewModal from './ShiftReviewModal';
 import ShiftReviewCalendar from './ShiftReviewCalendar';
@@ -38,7 +38,8 @@ import { ProGate } from '../Pro';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useSmi } from '../widgety/NavigaceKontext';
-import { NaStranceOdmen } from '../widgety/oblasti/odmeny';
+import { NaStranceOdmen, PochvalaOkno } from '../widgety/oblasti/odmeny';
+import { pragueToday } from '@/lib/pragueTime';
 import { useT } from '@/lib/i18n/client';
 import { useLocale } from './jazyk';
 import { useMoney, useSymbol } from '../CurrencyProvider';
@@ -77,6 +78,7 @@ function RewardsViewInner() {
   const cast: Cast | null = casti.some(c => c.id === volba) ? volba : casti[0]?.id ?? null;
   const [denKalendare, setDenKalendare] = useState<string | null>(null);
   const [hodnotim, setHodnotim] = useState<Poradi | null>(null);
+  const [chvalim, setChvalim] = useState<Poradi | null>(null);
   const [profil, setProfil] = useState<number | null>(null);
 
   // Widget Nehodnocené směny otevírá kalendář na dni: na téhle stránce událostí,
@@ -103,7 +105,7 @@ function RewardsViewInner() {
     <ShiftReviewCalendar den={denKalendare} smiHodnotit={hodnoti} onSaved={obnov} />
   ) : cast === 'board' ? (
     <Zebricek smiHodnotit={hodnoti} smiProfil={smi('tym.profil')} vidiHodnoceni={vidiKalendar}
-      onHodnotit={setHodnotim} onProfil={setProfil} />
+      onHodnotit={setHodnotim} onPochvalit={setChvalim} onProfil={setProfil} />
   ) : cast === 'settings' ? (
     <div className="space-y-4">
       {nastavuje && <NastaveniBodu onUlozeno={obnov} />}
@@ -136,6 +138,7 @@ function RewardsViewInner() {
           onSaved={() => { setHodnotim(null); obnov(); }}
         />
       )}
+      {chvalim && <PochvalaOkno clovek={{ id: chvalim.id, jmeno: chvalim.jmeno }} onClose={() => setChvalim(null)} />}
       {profil != null && <EmployeeProfile employeeId={profil} onClose={() => { setProfil(null); obnov(); }} />}
     </>
   );
@@ -145,21 +148,27 @@ function RewardsViewInner() {
 // Žebříček
 // ---------------------------------------------------------------------------
 
-function Zebricek({ smiHodnotit, smiProfil, vidiHodnoceni, onHodnotit, onProfil }: {
+function Zebricek({ smiHodnotit, smiProfil, vidiHodnoceni, onHodnotit, onPochvalit, onProfil }: {
   smiHodnotit: boolean; smiProfil: boolean; vidiHodnoceni: boolean;
-  onHodnotit: (s: Poradi) => void; onProfil: (id: number) => void;
+  onHodnotit: (s: Poradi) => void; onPochvalit: (s: Poradi) => void; onProfil: (id: number) => void;
 }) {
   const t = useT('sprava');
   const loc = useLocale();
-  const data = useDataWidgetu(URL_ODMENY, vyberPoradi);
+  // Období (kolo 5): celkový zůstatek, nebo body získané tento měsíc (bez odečtů za odměny).
+  const [obdobi, setObdobi] = useState<ObdobiZebricku>('celkem');
+  const data = useDataWidgetu(urlZebricku(obdobi, pragueToday()), vyberPoradi);
   const poradi = data.data ?? [];
   return (
     <Card aria-labelledby="zebricek-titulek">
-      <h2 id="zebricek-titulek" className="t-card flex items-center gap-2">
-        <Icon name="award" size={17} className="shrink-0 text-black/40" />
-        
-        {t('Žebříček')}
-      </h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 id="zebricek-titulek" className="t-card flex items-center gap-2">
+          <Icon name="award" size={17} className="shrink-0 text-black/40" />
+          {t('Žebříček')}
+        </h2>
+        <Segmented size="sm" ariaLabel={t('Období žebříčku')} value={obdobi} onChange={setObdobi}
+          options={[{ id: 'celkem', label: t('Celkem') }, { id: 'mesic', label: t('Tento měsíc') }]} />
+      </div>
+      {obdobi === 'mesic' && <p className="t-meta mt-1">{t('Body získané od 1. dne měsíce, bez odečtů za vyměněné odměny.')}</p>}
       {data.error ? (
         <ErrorState compact title={t('Žebříček se nenačetl')} onRetry={data.reload} detail={data.error} className="mt-3" />
       ) : data.loading ? (
@@ -203,6 +212,7 @@ function Zebricek({ smiHodnotit, smiProfil, vidiHodnoceni, onHodnotit, onProfil 
                   <>
                     {/* Akce řádku není limetka ani inkoust: tři lidé = tři „hlavní" akce (DP §3.1). */}
                     <Button variant="secondary" size="sm" onClick={() => onHodnotit(s)} aria-label={`Ohodnotit: ${s.jmeno}`}>{t('Ohodnotit')}</Button>
+                    <Button variant="ghost" size="sm" iconOnly icon="award" aria-label={t('Pochválit: {jmeno}', { jmeno: s.jmeno })} title={t('Pochválit')} onClick={() => onPochvalit(s)} />
                     {smiProfil && (
                       <Button variant="ghost" size="sm" iconOnly icon="user" aria-label={`Profil: ${s.jmeno}`} onClick={() => onProfil(s.id)} />
                     )}

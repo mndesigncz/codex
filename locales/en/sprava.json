@@ -1554,5 +1554,12 @@
   "Výplatu se nepodařilo spočítat.": "Could not calculate the payout.",
   "Docházka přišla v nečekaném tvaru.": "The attendance data came in an unexpected format.",
   "Prémie": "Bonus",
-  "Srážka": "Deduction"
+  "Srážka": "Deduction",
+  "Pochvala": "Praise",
+  "Pochválit": "Praise",
+  "Pochvaly": "Praise",
+  "Pochválit: {jmeno}": "Praise: {jmeno}",
+  "Období žebříčku": "Leaderboard period",
+  "Celkem": "Total",
+  "Body získané od 1. dne měsíce, bez odečtů za vyměněné odměny.": "Points earned since the 1st of the month, reward redemptions not deducted."
 }

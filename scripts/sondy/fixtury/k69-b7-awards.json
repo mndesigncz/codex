@@ -1,0 +1,24 @@
+{
+ "awards": [
+  {
+   "id": 7,
+   "userId": 2,
+   "name": "Eva Testová",
+   "avatar": "👩",
+   "points": 20,
+   "reason": "Zaskočila za nemocnou kolegyni",
+   "givenBy": "Martin Vedoucí",
+   "createdAt": "2026-09-20T15:10:00.000Z"
+  },
+  {
+   "id": 6,
+   "userId": 3,
+   "name": "Jakub Horák",
+   "avatar": "🧔",
+   "points": 10,
+   "reason": "Vzorně vyčištěný mlýnek",
+   "givenBy": "Martin Vedoucí",
+   "createdAt": "2026-09-14T19:40:00.000Z"
+  }
+ ]
+}

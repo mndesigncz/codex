@@ -1554,5 +1554,12 @@
   "Výplatu se nepodařilo spočítat.": "Výplatu sa nepodarilo spočítať.",
   "Docházka přišla v nečekaném tvaru.": "Dochádzka prišla v neočakávanom tvare.",
   "Prémie": "Prémia",
-  "Srážka": "Zrážka"
+  "Srážka": "Zrážka",
+  "Pochvala": "Pochvala",
+  "Pochválit": "Pochváliť",
+  "Pochvaly": "Pochvaly",
+  "Pochválit: {jmeno}": "Pochváliť: {jmeno}",
+  "Období žebříčku": "Obdobie rebríčka",
+  "Celkem": "Spolu",
+  "Body získané od 1. dne měsíce, bez odečtů za vyměněné odměny.": "Body získané od 1. dňa mesiaca, bez odpočtov za vymenené odmeny."
 }

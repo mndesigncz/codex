@@ -490,6 +490,19 @@ export async function GET(request: Request) {
     await ddl(sql`CREATE INDEX IF NOT EXISTS wage_adjustments_team_day ON wage_adjustments (team_id, day)`);
     // Odměna z katalogu může nést i částku k výplatě (bonus v Kč) — schválení ji zapíše jako prémii.
     await ddl(sql`ALTER TABLE rewards_catalog ADD COLUMN IF NOT EXISTS bonus_amount INTEGER`);
+    // Pochvaly s body (kolo 5, „lepší odměny"): vedení dá body kdykoli, s důvodem —
+    // mimo hodnocení směny (to je jedno na den a nese hvězdy). Počítají se do bodů.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS point_awards (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        points INTEGER NOT NULL,
+        reason TEXT,
+        given_by INTEGER,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS point_awards_team_user ON point_awards (team_id, user_id)`);
     // Scheduling rule: how many days in a row a person may be rostered.
     // Team-wide default on teams, optional per-person override on users;
     // NULL on both means no limit.
