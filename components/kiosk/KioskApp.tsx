@@ -24,22 +24,24 @@ import type { PohledNavigace } from '@/lib/widgety/typy';
 import { useJazyk, useT } from '@/lib/i18n/client';
 import { fmtDatum, fmtHM } from '@/lib/i18n/format';
 import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
+import { useSmi } from '../widgety/NavigaceKontext';
+import { useDataWidgetu } from '../widgety/useDataWidgetu';
+import { pragueToday } from '@/lib/pragueTime';
+import { vyberUkoly } from '@/lib/ukolyPrehled';
+import { URL_POSTUPY, URL_PRUBEHY_DNES, vyberPostupy, vyberPrubehy } from '@/lib/postupyPrehled';
+import {
+  ZALOZKY_TABLETU, viditelneZalozky, zalozkaPoOmezeni, pocetUkoluTabletu, pocetPostupuTabletu, type IdZalozkyTabletu,
+} from '@/lib/kioskPrehled';
 import {
   KioskShiftProvider, KioskShiftGate, WhoIsWorking, ActivePersonChip,
   useKioskShift, useNow,
 } from './KioskShiftGate';
 
-const TABS = [
-  { id: 'shift',      icon: 'clock' },
-  { id: 'tasks',      icon: 'check' },
-  { id: 'procedures', icon: 'clipboard' },
-  { id: 'inventory',  icon: 'box' },
-  { id: 'orders',     icon: 'cup' },
-  { id: 'closing',    icon: 'trend' },
-  { id: 'guides',     icon: 'book' },
-] as const;
+// Záložky s klíčem oprávnění žijí v lib/kioskPrehled.ts (testy): role tabletu
+// bez `sklad.zobrazit` dřív Sklad viděla a dostala 403 až po klepnutí.
+const TABS = ZALOZKY_TABLETU;
 
-type IdZalozky = (typeof TABS)[number]['id'];
+type IdZalozky = IdZalozkyTabletu;
 
 // Pohled z widgetu → záložka tabletu (kolo 69, B9). Widgety znají pohledy
 // z aplikace vedení a zaměstnance ('inventory', 'klient:orders'…); tablet
@@ -100,20 +102,41 @@ function KioskShell({ user }: { user: KioskUser }) {
       default: return t('Návody');
     }
   };
+  // Záložky podle role tabletu: tablet v kuchyni bez skladu Sklad nemá.
+  // useSmi je přísné: dokud /api/teams/mine neodpoví, je vidět jen Směna (žádný
+  // záblesk Skladu, který by po načtení zmizel); když načtení selže, ukážou
+  // se všechny a rozhodne server — jako u widgetů.
+  const smi = useSmi();
+  const viditelne = useMemo(() => viditelneZalozky(TABS, smi), [smi]);
   // Seznam pohledů pro widget Odkaz (výběr cíle): jen záložky, kam z plochy
-  // vede cesta, pod id, kterému widgety rozumí.
+  // vede cesta (a na které role má), pod id, kterému widgety rozumí.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const pohledyTabletu: PohledNavigace[] = useMemo(() => Object.entries(POHLED_NA_ZALOZKU).map(([pohled, zalozka]) => {
-    const zal = TABS.find(x => x.id === zalozka)!;
-    return { id: pohled, label: nazevZalozky(zalozka), icon: zal.icon };
-  }), [t]);
+  const pohledyTabletu: PohledNavigace[] = useMemo(() => Object.entries(POHLED_NA_ZALOZKU).flatMap(([pohled, zalozka]) => {
+    const zal = viditelne.find(x => x.id === zalozka);
+    return zal ? [{ id: pohled, label: nazevZalozky(zalozka), icon: zal.icon }] : [];
+  }), [t, viditelne]);
   const { active, onShift, selectPerson, requireActive } = useKioskShift();
   const [tab, setTab] = useState<IdZalozky>('shift');
+  // Když role o záložku přijde (nebo se oprávnění dočtou), aktivní záložka se
+  // vrátí na Směnu — v efektu, ne při renderu.
+  useEffect(() => {
+    const dalsi = zalozkaPoOmezeni(tab, viditelne);
+    if (dalsi !== tab) setTab(dalsi);
+  }, [tab, viditelne]);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [nastaveniOtevreno, setNastaveniOtevreno] = useState(false);
   // Počet nových objednávek od stolu do záložky — tablet na baru je první, kdo je má vidět.
   const inbox = useStaffInbox(true);
   const newOrders = Number(inbox.d?.newCount ?? 0);
+  // Odznaky Úkolů a Postupů: stejné zdroje (a stejná mezipaměť useDataWidgetu)
+  // jako widgety ukoly.dnes a postupy.povinne_dnes na ploše Směna — druhý
+  // odběratel žádný dotaz nepřidá. Dotaz jde jen se splněným klíčem (jinak 403).
+  const dnes = pragueToday();
+  const ukoly = useDataWidgetu(smi('ukoly.zobrazit_tym') ? '/api/tasks' : null, vyberUkoly);
+  const postupy = useDataWidgetu(smi('postupy.zobrazit') ? URL_POSTUPY : null, vyberPostupy);
+  const behy = useDataWidgetu(smi('postupy.zobrazit') ? URL_PRUBEHY_DNES : null, vyberPrubehy);
+  const pocetUkolu = useMemo(() => pocetUkoluTabletu(ukoly.data ?? [], dnes), [ukoly.data, dnes]);
+  const pocetPostupu = useMemo(() => pocetPostupuTabletu(postupy.data?.postupy ?? [], behy.data ?? []), [postupy.data, behy.data]);
   // Úkol „Vyrobit limonádu“ s návodem musí na tabletu otevřít ten návod,
   // ne jen přepnout na záložku Návody — u baru se nehledá v seznamu.
   const [wantGuide, setWantGuide] = useState<number | null>(null);
@@ -172,7 +195,8 @@ function KioskShell({ user }: { user: KioskUser }) {
     if (zalozka === 'procedures' && arg && /^\d+$/.test(arg)) otevriPostupPoPrechodu(Number(arg));
     setTab(zalozka);
   }, []);
-  const smiPohledTabletu = useCallback((pohled: string) => pohled in POHLED_NA_ZALOZKU, []);
+  // Jen známé pohledy — a jen ty, na jejichž záložku role tabletu má.
+  const smiPohledTabletu = useCallback((pohled: string) => pohled in POHLED_NA_ZALOZKU && viditelne.some(z => z.id === POHLED_NA_ZALOZKU[pohled]), [viditelne]);
   const navigaceWidgetu = useHodnotaNavigace(navigujZWidgetu, smiPohledTabletu, pohledyTabletu, [pohledyTabletu]);
   // The real kiosk session user — used where the surface is shared/read-only.
   const kioskUser = { id: user.id ?? 0, name: user.name, role: 'kiosk', avatar: user.avatar ?? '📟' } as any;
@@ -199,6 +223,8 @@ function KioskShell({ user }: { user: KioskUser }) {
   // Datum musí jít stejným pásmem jako hodiny: tablet v UTC by ve 0:30 pražského času ukázal půlnoční hodiny a včerejší datum.
   const dateStr = now ? fmtDatum(now, { jazyk, styl: 'denDlouze' }) : '\u00a0';
   const popisekObjednavek = t('Nové objednávky: {n}', { n: newOrders });
+  const popisekUkolu = t('Nesplněné úkoly: {n}', { n: pocetUkolu });
+  const popisekPostupu = t('Nehotové povinné postupy: {n}', { n: pocetPostupu });
 
   return (
     <NavigaceKontext.Provider value={navigaceWidgetu}>
@@ -239,7 +265,7 @@ function KioskShell({ user }: { user: KioskUser }) {
           712 px nevešlo a poslední („Uzávěrka") byla uříznutá bez jakéhokoli
           náznaku, že tam ještě něco je. U baru se nehledá posuvník. */}
       <nav className="mt-5 flex gap-1.5 flex-wrap sm:flex-wrap overflow-x-auto sm:overflow-x-visible scrollbar-thin -mx-1 px-1">
-        {TABS.map(t => (
+        {viditelne.map(t => (
           // aria-current: odečítač musí říct, na které obrazovce obsluha je —
           // třída seg-on je jen pro oko (v tmavém režimu ji odliší světlý okraj v globals.css).
           <button key={t.id} type="button" onClick={() => setTab(t.id)}
@@ -251,9 +277,16 @@ function KioskShell({ user }: { user: KioskUser }) {
               className="i-lead" motion={tab === t.id ? 'pop' : undefined} /> {nazevZalozky(t.id)}
             {/* Jeden odznak jako v doku a na zvonku (DP §3.20): inkoust
                 s limetkovým číslem, ne ručně limetková pilulka. Na vybrané
-                (inkoustové) záložce odliší odznak prstenec plochy. */}
+                (inkoustové) záložce odliší odznak prstenec plochy. Úkoly a
+                Postupy nesou počet stejně jako Objednávky; Uzávěrka tečku nemá. */}
             {t.id === 'orders' && (
               <Badge count={newOrders} max={99} className="ml-0.5" label={popisekObjednavek} />
+            )}
+            {t.id === 'tasks' && (
+              <Badge count={pocetUkolu} max={99} className="ml-0.5" label={popisekUkolu} />
+            )}
+            {t.id === 'procedures' && (
+              <Badge count={pocetPostupu} max={99} className="ml-0.5" label={popisekPostupu} />
             )}
           </button>
         ))}

@@ -143,7 +143,7 @@ export default function KioskSettings() {
           {smiPiny && (
           <div className="space-y-2.5">
             <p className="t-label">{t('PIN pro odpíchnutí (nepovinné)')}</p>
-            <p className="t-meta -mt-1">{t('Když zaměstnanci nastavíš PIN, na tabletu ho zadá při příchodu — nikdo se nepodepíše za něj.')}</p>
+            <p className="t-meta -mt-1">{t('Když zaměstnanci nastavíš PIN, na tabletu ho zadá při příchodu i odchodu — nikdo se nepodepíše za něj.')}</p>
             {nacitam ? (
               <div className="space-y-2" aria-busy="true"><Skeleton className="h-12" /><Skeleton className="h-12" /><Skeleton className="h-12" /></div>
             ) : chybaLidi ? (
