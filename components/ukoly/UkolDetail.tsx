@@ -17,7 +17,7 @@ import { dayPlus } from '@/lib/pragueTime';
 
 const prioTon = (p: string): 'bad' | 'wait' | 'muted' => (p === 'high' ? 'bad' : p === 'medium' ? 'wait' : 'muted');
 
-export function UkolDetail({ ukol, dnes, kdo, navodHref, onClose, onSplnit, onUpravit, onSmazat, onOdlozit, onChecklist, onChecklistVse, zamceno }: {
+export function UkolDetail({ ukol, dnes, kdo, navodHref, onClose, onSplnit, onStav, onUpravit, onSmazat, onOdlozit, onChecklist, onChecklistVse, zamceno }: {
   ukol: Ukol;
   dnes: string;
   /** Komu úkol patří (jméno nebo odkaz na člověka). */
@@ -26,6 +26,8 @@ export function UkolDetail({ ukol, dnes, kdo, navodHref, onClose, onSplnit, onUp
   onClose: () => void;
   /** Označit jako hotový / vrátit zpět; chybí, když divák úkol splnit nesmí. */
   onSplnit?: (hotovo: boolean) => void;
+  /** Kolo 7: „Začít" — úkol přejde do Probíhá (vedení i zaměstnanec stejně); chybí, když divák úkol plnit nesmí. */
+  onStav?: (status: 'in_progress') => void;
   onUpravit?: () => void;
   onSmazat?: () => void;
   /** Přesune termín na jiný den (jen kdo smí úkol upravit); nabízí se u nehotového úkolu. */
@@ -66,6 +68,7 @@ export function UkolDetail({ ukol, dnes, kdo, navodHref, onClose, onSplnit, onUp
         {onSmazat && <Button variant="ghost" icon="trash" className="mr-auto hover:!text-[var(--bad-ink)]" onClick={onSmazat}>{t('Smazat')}</Button>}
         {onUpravit && <Button variant="secondary" icon="pencil" onClick={onUpravit}>{t('Upravit')}</Button>}
         {onOdlozit && !hotovo && <Button variant="secondary" icon="clock" onClick={() => onOdlozit(dayPlus(ukol.dueDate && ukol.dueDate > dnes ? ukol.dueDate : dnes, 1))}>{ukol.dueDate && ukol.dueDate > dnes ? t('Odložit o den') : t('Odložit na zítra')}</Button>}
+        {onStav && !zamceno && !hotovo && ukol.status !== 'in_progress' && <Button variant="secondary" icon="play" onClick={() => onStav('in_progress')}>{t('Začít')}</Button>}
         {onSplnit && !zamceno && (hotovo
           ? <Button variant="secondary" icon="undo" onClick={() => onSplnit(false)}>{t('Vrátit mezi nehotové')}</Button>
           : <Button variant="primary" icon="check" onClick={() => onSplnit(true)}>{t('Označit jako hotový')}</Button>)}

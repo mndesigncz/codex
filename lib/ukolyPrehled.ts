@@ -83,6 +83,27 @@ export function vyberUkoly(raw: unknown): Ukol[] {
 
 export const jeHotovy = (t: Pick<Ukol, 'status'>) => t.status === 'done';
 
+// ---------------------------------------------------------------------------
+// Stav úkolu při zápisu (kolo 7, R7-4): Čeká → Probíhá → Hotovo jedním slovníkem
+// pro vedení, zaměstnance, widget i tablet (dřív „Probíhá" uměl jen zaměstnanec).
+// ---------------------------------------------------------------------------
+
+/** Stavy, které jde poslat v PATCH /api/tasks `status` — nic jiného server nezapíše. */
+export const STAVY_ZAPISU = ['pending', 'in_progress', 'done'] as const;
+export type StavZapisu = typeof STAVY_ZAPISU[number];
+export const jeStavZapisu = (v: unknown): v is StavZapisu => (STAVY_ZAPISU as readonly unknown[]).includes(v);
+
+/**
+ * Co se zapíše po klepnutí na zaškrtávátko. Odškrtnutí = hotovo; zrušení
+ * odškrtnutí vrátí úkol tam, kde byl předtím — rozpracovaný zůstane
+ * „Probíhá", ne „Čeká" (jinak by omylem odškrtnutý úkol ztratil, že na něm
+ * někdo dělá).
+ */
+export function stavPoOdskrtnuti(hotovo: boolean, predtim?: string | null): StavZapisu {
+  if (hotovo) return 'done';
+  return predtim === 'in_progress' ? 'in_progress' : 'pending';
+}
+
 /** Po termínu = nedokončený a termín byl včera nebo dřív (dnešní termín ještě platí). */
 export const jePoTerminu = (t: Pick<Ukol, 'status' | 'dueDate'>, dnes: string) => !jeHotovy(t) && !!t.dueDate && t.dueDate < dnes;
 

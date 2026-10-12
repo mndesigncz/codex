@@ -297,6 +297,7 @@ export default function Tasks({ user }: Props) {
           kdo={detail.assigneeName ?? t('Já')} zamceno={!smiSplnit(detail)}
           navodHref={detail.sourceMeta?.guideId ? `/employee/shifts?view=guides&guide=${detail.sourceMeta.guideId}` : undefined}
           onSplnit={done => { if (done && detail.dueDate && detail.dueDate !== today) setDetailId(null); updateStatus(detail, done ? 'done' : 'pending'); }}
+          onStav={smiSplnit(detail) ? s => updateStatus(detail, s) : undefined}
           onChecklist={smiSplnit(detail) ? i => toggleChecklistItem(detail, i) : undefined}
           onChecklistVse={smiSplnit(detail) ? d => toggleChecklistAll(detail, d) : undefined} />
       )}

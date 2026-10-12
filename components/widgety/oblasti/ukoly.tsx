@@ -210,6 +210,7 @@ function UkolyDnes({ velikost, nastaveni, nahled }: WidgetProps<{ rozsah?: strin
   const termin = (d: string) => t('termín {datum}', { datum: denKratce(d) });
   const vyroba = t('výroba — naskladní dávku');
   const poTerminuStitek = t('Po termínu');
+  const probihaStitek = t('Probíhá');
   const otevritDetail = t('Otevřít detail úkolu');
   // Řádek otevře detail úkolu v Úkolech (audit kola 6, Z4) — dřív šlo jen odškrtnout a zbytek
   // řádku byl mrtvý. V náhledu galerie a bez práva na Úkoly zůstává řádek jen ke čtení.
@@ -239,6 +240,12 @@ function UkolyDnes({ velikost, nastaveni, nahled }: WidgetProps<{ rozsah?: strin
                 // Odškrtnutí výrobního úkolu naskladní dávku a odepíše suroviny (API).
                 t.source === 'production' ? vyroba : null,
               ].filter(Boolean).join(' · ');
+              // Kolo 7: „Probíhá" jako v Úkolech vedení i zaměstnance — jen štítek, na tabletu stačí odškrtnout.
+              const stitky = [
+                pozde && !hotovo ? <Chip key="po" tone="bad" size="sm">{poTerminuStitek}</Chip> : null,
+                t.status === 'in_progress' && !hotovo ? <Chip key="bezi" tone="info" size="sm">{probihaStitek}</Chip> : null,
+                !pozde && t.requireBeforeClosing && !hotovo ? <ChipPredUzaverkou key="pov" /> : null,
+              ].filter(Boolean);
               return (
                 <ListRow key={t.id} className={sDetailem ? 'relative' : ''} chevron={sDetailem}
                   // Zaškrtávátko je v DOM před roztaženým tlačítkem titulku — z-[1] ho drží nad ním.
@@ -250,8 +257,7 @@ function UkolyDnes({ velikost, nastaveni, nahled }: WidgetProps<{ rozsah?: strin
                         className={`text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542] rounded !transform-none after:absolute after:inset-0 after:content-[''] after:rounded-[var(--r-md)] active:after:bg-black/[0.03] ${hotovo ? 'text-black/45' : ''}`}>{t.title}</button>
                     : <span className={hotovo ? 'text-black/45' : undefined}>{t.title}</span>}
                   meta={meta || undefined}
-                  right={pozde && !hotovo ? <Chip tone="bad" size="sm">{poTerminuStitek}</Chip>
-                    : t.requireBeforeClosing && !hotovo ? <ChipPredUzaverkou /> : undefined}
+                  right={stitky.length > 0 ? <>{stitky}</> : undefined}
                 />
               );
             })}

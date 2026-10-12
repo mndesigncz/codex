@@ -1937,5 +1937,6 @@
   "Připomenout dostupnost ({n})": "Remind about availability ({n})",
   "Pošle upozornění všem, kdo na {mesic} dostupnost nezadali.": "Sends a notification to everyone who hasn't entered availability for {mesic}.",
   "Připomenout ({n})": "Remind ({n})",
-  "Připomenout dostupnost": "Remind about availability"
+  "Připomenout dostupnost": "Remind about availability",
+  "Začít": "Start"
 }

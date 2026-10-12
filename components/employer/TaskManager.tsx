@@ -32,7 +32,7 @@ import { pragueToday } from '@/lib/pragueTime';
 import { apiMessage, okJson } from '@/lib/api';
 import { useDraft } from '@/lib/useDraft';
 import { DraftNote } from '../ui/DraftNote';
-import { vyberUkoly, rozdelPoDnech, jeCiziUkol, splnenoDnes, type Ukol } from '@/lib/ukolyPrehled';
+import { vyberUkoly, rozdelPoDnech, jeCiziUkol, splnenoDnes, stavPoOdskrtnuti, type StavZapisu, type Ukol } from '@/lib/ukolyPrehled';
 import { VYCHOZI_FILTR, filtrujBezStavu, filtrujUkoly, poctyStavu, seradUkoly, statistikaUkolu, rozborPredani, cerstvePredani, UDALOST_PREDANI_UKOLU, type FiltrUkolu } from '@/lib/ukolyFiltr';
 import { UkolDetail } from '../ukoly/UkolDetail';
 import { UkolyFiltry, type ClovekFiltru } from '../ukoly/UkolyFiltry';
@@ -258,16 +258,15 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
   const moveTask = (uk: Ukol, date: string) =>
     zapis(ts => ts.map(x => (x.id === uk.id ? { ...x, dueDate: date } : x)), { id: uk.id, move: true, dueDate: date }, t('Úkol se nepodařilo přesunout.'));
 
-  const setStatus = (uk: Ukol, done: boolean) => {
-    const status = done ? 'done' : 'pending';
-    return zapis(ts => ts.map(x => (x.id === uk.id ? { ...x, status } : x)), { id: uk.id, status }, t('Změnu stavu se nepodařilo uložit.'));
-  };
+  // Kolo 7: Čeká / Probíhá / Hotovo jako u zaměstnance — vedení teď stav i nastaví (Začít v detailu).
+  const setStatus = (uk: Ukol, status: StavZapisu) =>
+    zapis(ts => ts.map(x => (x.id === uk.id ? { ...x, status } : x)), { id: uk.id, status }, t('Změnu stavu se nepodařilo uložit.'));
 
   // Toggle done — úkol, který není na dnešek, se napřed zeptá oknem (dřív confirm()).
   const completeTask = (uk: Ukol, done: boolean) => {
     if (!smiSplnit(uk)) return;
     if (done && uk.dueDate && uk.dueDate !== today) { setMimoDen(uk); return; }
-    void setStatus(uk, done).then(ok => {
+    void setStatus(uk, stavPoOdskrtnuti(done, uk.status)).then(ok => {
       // Výrobní úkol už dávku naskladnil — „Vrátit" by jen lhalo, že se to vrátilo.
       if (ok && done && uk.source !== 'production') setHotovyUkol(h => ({ uk, id: (h?.id ?? 0) + 1 }));
     });
@@ -351,6 +350,8 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
               {uk.dueDate ? ` · ${denKratce(uk.dueDate, loc)}` : ''}
               {done && uk.completedByName ? <>  · {t('splnil')} <PersonLink id={uk.completedBy}>{uk.completedByName}</PersonLink></> : ''}
             </span>
+            {/* Kolo 7: „Probíhá" i ve správcovském seznamu — dřív ho viděl jen zaměstnanec a detail. */}
+            {uk.status === 'in_progress' && !done && <Chip tone="info" size="sm">{t('Probíhá')}</Chip>}
             {uk.source === 'production' && <Chip tone="info" size="sm" icon="leaf">{t('Výroba')}</Chip>}
             {opakovani && <Chip tone="muted" size="sm" icon="refresh">{opakovani}</Chip>}
             {uk.requireBeforeClosing && <ChipPredUzaverkou />}
@@ -565,6 +566,7 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
           navodHref={detail.sourceMeta?.guideId ? `/employer/overview?view=guides&guide=${detail.sourceMeta.guideId}` : undefined}
           zamceno={!smiSplnit(detail)}
           onSplnit={done => { if (done && detail.dueDate && detail.dueDate !== today) setDetailId(null); completeTask(detail, done); }}
+          onStav={smiSplnit(detail) ? s => void setStatus(detail, s) : undefined}
           onUpravit={smiUpravit(detail) ? () => { setDetailId(null); openEdit(detail); } : undefined}
           onSmazat={smiSmazat(detail) ? () => { setDetailId(null); setMazani(detail); } : undefined}
           onOdlozit={smiUpravit(detail) ? den => { setDetailId(null); void moveTask(detail, den); setZprava(t('Úkol je odložený na {den}.', { den: denKratce(den, loc) })); } : undefined}
@@ -586,14 +588,14 @@ export default function TaskManager({ user }: { user: { id?: string | number } }
         <Modal open onClose={() => setMimoDen(null)} size="sm" title={t('Tohle není dnešní úkol')}
           footer={<>
             <Button variant="secondary" onClick={() => setMimoDen(null)}>{t('Zrušit')}</Button>
-            <Button variant="primary" icon="check" onClick={() => { const uk = mimoDen; setMimoDen(null); void setStatus(uk, true); }}>{t('Označit jako hotové')}</Button>
+            <Button variant="primary" icon="check" onClick={() => { const uk = mimoDen; setMimoDen(null); void setStatus(uk, 'done'); }}>{t('Označit jako hotové')}</Button>
           </>}>
           <p className="text-sm text-black/70 text-pretty"><span className="cz-sentence">{t('„{nazev}" má termín {den}.', { nazev: mimoDen.title, den: denDlouze(mimoDen.dueDate!, loc) })}</span> {t('Opravdu ho označit jako hotový už teď?')}</p>
         </Modal>
       )}
       <Toast message={zprava} onClose={() => setZprava(null)} />
       <Toast message={hotovyUkol ? t('Úkol je hotový.') : null} id={hotovyUkol?.id} onClose={() => setHotovyUkol(null)}
-        action={hotovyUkol ? { label: t('Vrátit'), onClick: () => { const u = hotovyUkol.uk; setHotovyUkol(null); void setStatus(u, false); } } : undefined} />
+        action={hotovyUkol ? { label: t('Vrátit'), onClick: () => { const u = hotovyUkol.uk; setHotovyUkol(null); void setStatus(u, stavPoOdskrtnuti(false, u.status)); } } : undefined} />
     </>
   );
 }

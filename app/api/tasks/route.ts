@@ -9,6 +9,7 @@ import { sazebnikBodu } from '@/lib/mzdaSmeny';
 import { jeClenem } from '@/lib/tenant';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { typNaUcet } from '@/lib/opravneni';
+import { jeStavZapisu } from '@/lib/ukolyPrehled';
 
 export const dynamic = 'force-dynamic';
 
@@ -505,6 +506,8 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (b.status === undefined) return NextResponse.json(shape(task));
+  // Kolo 7: jen Čeká / Probíhá / Hotovo — dřív se do sloupce zapsalo, cokoli přišlo.
+  if (!jeStavZapisu(b.status)) return NextResponse.json({ error: 'Neplatný stav úkolu.' }, { status: 400 });
 
   // Record who completed it (cleared when re-opened). On the shared tablet the
   // completion is attributed to the person currently using it, so their points
