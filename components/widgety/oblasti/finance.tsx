@@ -578,7 +578,8 @@ function Uctenky({ velikost, nahled }: WidgetProps) {
   const u = data.data;
   const smiPridat = ok && smi('finance.uctenky_pridat') && !nahled;
   const tentoMesic = pragueToday().slice(0, 7);
-  const mesicni = (u ?? []).filter(r => pragueDaySafe(r.createdAt).startsWith(tentoMesic));
+  // Měsíc podle data nákupu, když ho účtenka má (kolo 81), jinak podle dne nafocení — jako /api/finance.
+  const mesicni = (u ?? []).filter(r => (r.purchaseDate ?? pragueDaySafe(r.createdAt)).startsWith(tentoMesic));
   const soucet = mesicni.reduce((s, r) => s + (r.amount ?? 0), 0);
   const [pred, po] = rozdelVetu(t, 'Tento měsíc {castka}', 'castka');
   const nafotit = smiPridat ? (
