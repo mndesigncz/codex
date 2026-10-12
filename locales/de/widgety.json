@@ -449,6 +449,7 @@
   "Nahlášeno: {n, plural, one {# položka} few {# položky} other {# položek}}. Vedení dostalo upozornění.": "Gemeldet: {n, plural, one {# Artikel} other {# Artikel}}. Die Leitung wurde benachrichtigt.",
   "Najít položku a označit…": "Artikel suchen und markieren…",
   "Najít položku menu": "Artikel der Karte suchen",
+  "Nakoupit ({n})": "Einkaufen ({n})",
   "Naplánované": "Geplante",
   "Naplánované hodiny": "Geplante Stunden",
   "Naplánovat": "Einplanen",

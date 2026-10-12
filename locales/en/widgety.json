@@ -449,6 +449,7 @@
   "Nahlášeno: {n, plural, one {# položka} few {# položky} other {# položek}}. Vedení dostalo upozornění.": "Reported: {n, plural, one {# item} other {# items}}. Management has been notified.",
   "Najít položku a označit…": "Find an item and mark it…",
   "Najít položku menu": "Find a menu item",
+  "Nakoupit ({n})": "Buy ({n})",
   "Naplánované": "Planned",
   "Naplánované hodiny": "Scheduled hours",
   "Naplánovat": "Plan it",

@@ -449,6 +449,7 @@
   "Nahlášeno: {n, plural, one {# položka} few {# položky} other {# položek}}. Vedení dostalo upozornění.": "Zgłoszono: {n, plural, one {# pozycja} few {# pozycje} many {# pozycji} other {# pozycji}}. Kierownictwo dostało powiadomienie.",
   "Najít položku a označit…": "Znajdź pozycję i oznacz…",
   "Najít položku menu": "Znajdź pozycję menu",
+  "Nakoupit ({n})": "Kup ({n})",
   "Naplánované": "Zaplanowane",
   "Naplánované hodiny": "Zaplanowane godziny",
   "Naplánovat": "Zaplanuj",
