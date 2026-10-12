@@ -1,11 +1,31 @@
 {
  "suppliers": [
   {
+   "id": 11,
+   "name": "Makro",
+   "email": "objednavky@makro.cz",
+   "phone": "+420 602 123 456",
+   "note": "Objednávky do středy 12:00, závoz ve čtvrtek",
+   "zOrganizace": false,
+   "sdileno": false,
+   "spravuje": null
+  },
+  {
+   "id": 12,
+   "name": "Bidfood",
+   "email": null,
+   "phone": null,
+   "note": null,
+   "zOrganizace": false,
+   "sdileno": false,
+   "spravuje": null
+  },
+  {
    "id": 1,
    "name": "Velkoobchod Čaj",
    "email": "objednavky@velkoobchod.cz",
    "phone": "+420 777 000 111",
-   "note": null,
+   "note": "Objednávky do čtvrtka, dováží v pátek ráno",
    "zOrganizace": false,
    "sdileno": false,
    "spravuje": null

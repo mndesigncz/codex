@@ -71,6 +71,7 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'inventory.recipe': 'Změněno, jestli se položka vyrábí, nebo nakupuje',
   'supplier.create': 'Přidán dodavatel',
   'supplier.delete': 'Smazán dodavatel',
+  'supplier.update': 'Upraven dodavatel',
   'order.receive': 'Přijata objednávka',
   'order.receive.partial': 'Přijata objednávka (částečně — něco nedorazilo nebo přišlo navíc)',
   'receipt.add': 'Přidána účtenka',

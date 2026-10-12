@@ -26,6 +26,7 @@ const podvrh = () => (req, json, stav) => {
   const path = url.pathname;
   if (stav.chyby[path]) return json({ error: 'Server spadl' }, stav.chyby[path]);
   // Příjem objednávky: tělo si schováme, ať sonda ověří, že cena odešla (review B3).
+  if (req.method() === 'PATCH' && path === '/api/suppliers') { stav.dodavatelPatch = req.postDataJSON(); return json({ supplier: { id: stav.dodavatelPatch.id } }); }
   if (req.method() === 'PATCH' && path === '/api/orders') { stav.prijem = req.postDataJSON(); return json({ ok: true, restocked: 2, castecny: Array.isArray(stav.prijem?.received) }); }
   if (req.method() !== 'GET') return undefined;
   const mapa = {
@@ -40,7 +41,7 @@ const podvrh = () => (req, json, stav) => {
   };
   if (path === '/api/inventory/log' && url.searchParams.get('itemId')) return json([]);
   if (mapa[path]) return json(nacti(mapa[path]));
-  if (path === '/api/suppliers') return json({ suppliers: [{ id: 1, name: 'Makro', email: 'objednavky@makro.cz' }] });
+  if (path === '/api/suppliers') return json(nacti('suppliers'));
   return undefined;
 };
 
@@ -276,6 +277,73 @@ for (const w of [1280, 390]) {
   tvrdi(`P5 ${w}: toast řekne, že se přijalo částečně`, await dokud(async () => (await p.getByText(/Přijato částečně/).count()) > 0, 3000));
   await ctx.close();
 }
+// Kolo 7 (R7-6): Dodavatelé — kontakt (telefon jako tel:), poznámka, počet položek skladu,
+// poslední objednávka, úprava všech čtyř polí a Objednat → nákupní seznam s předvybraným dodavatelem.
+for (const w of [1280, 390]) {
+  const { ctx, p, stav } = await kontext({ fix: FIX_VEDENI, dalsi: podvrh(), viewport: { width: w, height: w < 600 ? 844 : 900 }, mobil: w < 600 });
+  await otevri(p, VEDENI, 'vedeni.sklad');
+  await p.getByRole('button', { name: 'Další akce', exact: true }).first().click();
+  await p.getByRole('menuitem', { name: 'Dodavatelé' }).click();
+  const okno = p.getByRole('dialog', { name: 'Dodavatelé' });
+  await dokud(() => okno.isVisible(), 3000);
+  const seznam = okno.getByRole('list', { name: 'Seznam dodavatelů' });
+  const makro = seznam.locator(':scope > li').filter({ hasText: 'Makro' }).first();
+  await dokud(async () => /poslední objednávka/.test(await makro.innerText()), 4000);
+  const txt = (await makro.innerText()).replace(/\s+/g, ' ');
+  // Fixtura skladu: od Makra je 6 aktivních položek (archivovaná a neschválený návrh se nepočítají).
+  tvrdi(`D1 ${w}: řádek dodavatele — e-mail · telefon, poznámka, „6 položek" a „poslední objednávka před…"`,
+    /objednavky@makro\.cz · \+420 602 123 456/.test(txt) && /závoz ve čtvrtek/.test(txt) && /6 položek/.test(txt) && /poslední objednávka (před \d+ (dnem|dny)|dnes)/.test(txt), txt);
+  const tel = makro.locator('a[href^="tel:"]');
+  const telH = await tel.evaluate(a => Math.max(a.getBoundingClientRect().height, parseFloat(getComputedStyle(a, '::before').height) || 0)).catch(() => 0);
+  tvrdi(`D1 ${w}: telefon je odkaz tel: s dotykovou plochou ≥ 44 px`, await tel.getAttribute('href') === 'tel:+420602123456' && telH >= 44, `${await tel.getAttribute('href')} ${telH}`);
+  const bid = seznam.locator(':scope > li').filter({ hasText: 'Bidfood' }).first();
+  tvrdi(`D1 ${w}: Bidfood bez e-mailu to řekne a má 1 položku`, /bez e-mailu/.test(await bid.innerText()) && /1 položka/.test(await bid.innerText()), (await bid.innerText()).replace(/\s+/g, ' '));
+  const objednat = makro.getByRole('button', { name: 'Objednat od Makro' });
+  const objH = await objednat.evaluate(b => Math.max(b.getBoundingClientRect().height, parseFloat(getComputedStyle(b, '::before').height) || 0));
+  tvrdi(`D2 ${w}: u dodavatele s položkami je „Objednat" (≥ 44 px), u dodavatele bez položek není`, objH >= 44
+    && await seznam.locator(':scope > li').filter({ hasText: 'Velkoobchod Čaj' }).getByRole('button', { name: /^Objednat/ }).count() === 0, String(objH));
+  // Formulář přidání je sbalený za „Nový dodavatel" (seznam zůstane nad ohybem): telefon (type tel,
+  // inputMode tel) a poznámka; na telefonu pole pod sebou.
+  tvrdi(`D3 ${w}: formulář přidání je v klidu sbalený, seznam začíná nad ohybem`, await okno.locator('#sklad-dod-nazev').count() === 0
+    && ((await makro.boundingBox())?.y ?? 9999) < (w < 600 ? 844 : 900) - 60, JSON.stringify(await makro.boundingBox()));
+  if (w < 600) { await p.waitForTimeout(600); await p.screenshot({ path: OUT + 'k83-dodavatele-390.png' }); }
+  await okno.getByRole('button', { name: 'Nový dodavatel' }).click();
+  const fTel = okno.locator('#sklad-dod-telefon'), fNazev = okno.locator('#sklad-dod-nazev'), fEmail = okno.locator('#sklad-dod-email'), fPozn = okno.locator('#sklad-dod-poznamka');
+  tvrdi(`D3 ${w}: formulář má Telefon (type tel, inputMode tel) a Poznámku (max 300)`, await fTel.getAttribute('type') === 'tel' && await fTel.getAttribute('inputmode') === 'tel'
+    && await fPozn.getAttribute('maxlength') === '300');
+  const [bN, bE] = [await fNazev.boundingBox(), await fEmail.boundingBox()];
+  if (w < 600) {
+    tvrdi(`D3 ${w}: na telefonu pole pod sebou`, bN && bE && Math.abs(bN.x - bE.x) < 2 && bE.y > bN.y + bN.height - 1, JSON.stringify([bN, bE]));
+    await p.waitForTimeout(600); // list dojede animací zdola
+    const r = await okno.boundingBox();
+    tvrdi(`D3 ${w}: okno vyjíždí zdola`, r && Math.abs(r.y + r.height - 844) <= 2, JSON.stringify(r));
+    const pres = await okno.evaluate(el => el.scrollWidth - el.clientWidth);
+    tvrdi(`D3 ${w}: okno nepřetéká do strany`, pres <= 0, String(pres));
+    await p.screenshot({ path: OUT + 'k83-dodavatele-390-novy.png' });
+  } else {
+    tvrdi(`D3 ${w}: na počítači dvě pole vedle sebe`, bN && bE && Math.abs(bN.y - bE.y) < 2, JSON.stringify([bN, bE]));
+    await p.screenshot({ path: OUT + 'k83-dodavatele-1280.png' });
+  }
+  // Upravit… → všechna čtyři pole v okně, PATCH je pošle.
+  await makro.getByRole('button', { name: 'Další akce: Makro' }).click();
+  await p.getByRole('menuitem', { name: 'Upravit…' }).click();
+  const ePhone = okno.locator('#sklad-dod-11-telefon');
+  tvrdi(`D4 ${w}: Upravit… otevře v okně formulář všech čtyř polí předvyplněný`, await dokud(() => ePhone.isVisible(), 2000)
+    && await ePhone.inputValue() === '+420 602 123 456' && await okno.locator('#sklad-dod-11-poznamka').inputValue() === 'Objednávky do středy 12:00, závoz ve čtvrtek');
+  await ePhone.fill('+420 602 999 888');
+  await okno.getByRole('button', { name: 'Uložit', exact: true }).click();
+  await dokud(() => stav.dodavatelPatch != null, 3000);
+  const pt = stav.dodavatelPatch ?? {};
+  tvrdi(`D4 ${w}: PATCH nese id, název, e-mail, telefon i poznámku`, pt.id === 11 && pt.name === 'Makro' && pt.email === 'objednavky@makro.cz' && pt.phone === '+420 602 999 888' && /závoz/.test(pt.note ?? ''), JSON.stringify(pt));
+  // Objednat → okno se zavře a otevře nákupní seznam jen s Makrem.
+  await dokud(async () => (await makro.getByRole('button', { name: 'Objednat od Makro' }).count()) === 1, 3000);
+  await makro.getByRole('button', { name: 'Objednat od Makro' }).click();
+  const nakup = p.getByRole('dialog', { name: 'Nákupní seznam' });
+  tvrdi(`D5 ${w}: Objednat zavře Dodavatele a otevře nákupní seznam s předvybraným dodavatelem`, await dokud(() => nakup.isVisible(), 3000)
+    && !(await okno.isVisible().catch(() => false)) && /Dodavatel: Makro/.test(await nakup.innerText()));
+  await ctx.close();
+}
+
 {
   // Přišlo vše = dvě klepnutí jako dřív, PATCH bez received.
   const { ctx, p, stav } = await kontext({ fix: FIX_VEDENI, dalsi: podvrh() });

@@ -9,7 +9,7 @@
 import type { Testy } from './_testy.ts';
 import { nazevExportuUzaverek, popisObdobiExportu } from '../../lib/uzaverkyFiltr.ts';
 import { souhrnUzaverek, souhrnUzaverekRozmezi, hodnotyUzaverekPoDnech, maHosty, nejviceHostu, hosteUzaverky, type RadekUzaverky } from '../../lib/uzaverkyPrehled.ts';
-import { overPrijem, souhrnPrijmu, rozdilPrijmu, radkyKPrijmu, nedodano, posledniCenyBaleni, type PolozkaObjednavky } from '../../lib/skladPrehled.ts';
+import { overPrijem, souhrnPrijmu, rozdilPrijmu, radkyKPrijmu, nedodano, posledniCenyBaleni, polozekUDodavatelu, posledniObjednavkaDodavatelu, dnuOd, type PolozkaObjednavky, type PolozkaSkladu } from '../../lib/skladPrehled.ts';
 import { cenaProSloupec } from '../../lib/cena.ts';
 
 export default function ({ eq, ok }: Testy) {
@@ -104,4 +104,18 @@ export default function ({ eq, ok }: Testy) {
   eq('historie: objednávka přijatá celá (bez received) nic nedodaného nemá', nedodano(rk[4]).length, 0);
   eq('historie: řádky čekající objednávky s itemId a pořadím', rk[6].map(r => [r.i, r.itemId, r.mnozstvi, r.prislo]), [[0, 7, 6, null]]);
   eq('příjem: poslední zaplacená cena za balení podle položky (nejnovější příjem)', posledniCenyBaleni(api), { 7: 24.9, 9: 450 });
+
+  // ---- 4) Dodavatelé: počet položek a poslední objednávka ----
+  const pol = (x: Partial<PolozkaSkladu>): PolozkaSkladu => ({ id: 1, name: 'x', quantity: 1, ...x });
+  eq('dodavatelé: počet aktivních položek podle jména (archiv a návrh ne, mezery se ořežou)', polozekUDodavatelu([
+    pol({ supplier: 'Makro' }), pol({ supplier: ' Makro ' }), pol({ supplier: 'Makro', archived: true }), pol({ supplier: 'Makro', approved: false }),
+    pol({ supplier: 'Bidfood' }), pol({ supplier: null }), pol({ supplier: '' }),
+  ]), { Makro: 2, Bidfood: 1 });
+  eq('dodavatelé: poslední nezrušená objednávka podle jména', posledniObjednavkaDodavatelu({ orders: [
+    { id: 1, supplier: 'Makro', status: 'received', createdAt: '2026-09-24T08:00:00Z' },
+    { id: 2, supplier: 'Makro', status: 'cancelled', createdAt: '2026-10-10T08:00:00Z' },
+    { id: 3, supplier: 'Makro', status: 'ordered', createdAt: '2026-10-01T08:00:00Z' },
+    { id: 4, supplier: null, status: 'ordered', createdAt: '2026-10-11T08:00:00Z' },
+  ] }), { Makro: '2026-10-01T08:00:00Z' });
+  eq('dodavatelé: dní od objednávky (přes přechod měsíce, nikdy záporně)', [dnuOd('2026-09-24', '2026-10-12'), dnuOd('2026-10-12', '2026-10-12'), dnuOd('2026-10-13', '2026-10-12')], [18, 0, 0]);
 }

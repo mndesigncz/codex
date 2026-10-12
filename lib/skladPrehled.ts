@@ -562,3 +562,40 @@ export function posledniCenyBaleni(raw: any): Record<number, number> {
   }
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// Dodavatelé: kolik položek od nich vedeme a kdy se u nich naposledy objednalo (kolo 7)
+// ---------------------------------------------------------------------------
+
+/** Počet aktivních položek skladu podle jména dodavatele (vazba je text `supplier`). */
+export function polozekUDodavatelu(items: readonly PolozkaSkladu[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const i of items) {
+    const jmeno = (i.supplier ?? '').trim();
+    if (!jmeno || !jeAktivni(i)) continue;
+    out[jmeno] = (out[jmeno] ?? 0) + 1;
+  }
+  return out;
+}
+
+/**
+ * Kdy se u dodavatele naposledy objednalo: časová značka vytvoření nejnovější
+ * nezrušené objednávky podle jména dodavatele (GET /api/orders, posledních 100).
+ */
+export function posledniObjednavkaDodavatelu(raw: any): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const o of radkyObjednavek(raw)) {
+    const jmeno = String(o.supplier ?? '').trim();
+    const kdy = String(o.createdAt ?? '');
+    if (!jmeno || !kdy || o.status === 'cancelled') continue;
+    if (!out[jmeno] || kdy > out[jmeno]) out[jmeno] = kdy;
+  }
+  return out;
+}
+
+/** Kolik celých dní uplynulo od dne `den` do dne `dnes` (oba „RRRR-MM-DD"); nikdy záporně. */
+export function dnuOd(den: string, dnes: string): number {
+  const d = (s: string) => { const [y, m, dd] = s.slice(0, 10).split('-').map(Number); return Date.UTC(y, m - 1, dd); };
+  const n = Math.round((d(dnes) - d(den)) / 86_400_000);
+  return Number.isFinite(n) ? Math.max(0, n) : 0;
+}
