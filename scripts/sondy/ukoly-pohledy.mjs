@@ -36,8 +36,15 @@ for (const w of [1280, 390]) {
   // Karty a záložky stavu
   const txt = async () => (await nastroj.innerText()).replace(/\s+/g, ' ');
   const t0 = await txt();
-  tvrdi(`${w}: nahoře jedna věta o dni („1 z 4 hotovo") místo karet se statistikou`, /1\s*z 4 hotovo/.test(t0) && !/Splněno za 7 dní/i.test(t0), t0.slice(0, 200));
-  tvrdi(`${w}: štítek „2 po termínu" zapne filtr`, await nastroj.getByRole('button', { name: '2 po termínu', exact: true }).count() === 1);
+  if (w >= 600) {
+    tvrdi(`${w}: nahoře jedna věta o dni („1 z 4 hotovo") místo karet se statistikou`, /1\s*z 4 hotovo/.test(t0) && !/Splněno za 7 dní/i.test(t0), t0.slice(0, 200));
+    tvrdi(`${w}: štítek „2 po termínu" zapne filtr`, await nastroj.getByRole('button', { name: '2 po termínu', exact: true }).count() === 1);
+  } else {
+    // Kolo 6 (B6, V11): na telefonu je souhrn dne podtitulkem stránky („Dnes 1 z 4 hotovo · 2 po termínu"),
+    // nad prvním úkolem zůstane rychlé přidání, filtry a pás stavů; po termínu je první sekce seznamu.
+    const hlavicka = (await p.locator('main').first().innerText()).replace(/\s+/g, ' ');
+    tvrdi(`${w}: souhrn dne je v podtitulku stránky`, /Dnes 1 z 4 hotovo · 2 po termínu/.test(hlavicka) && !/Splněno za 7 dní/i.test(t0), hlavicka.slice(0, 200));
+  }
   const stavy = nastroj.getByRole('group', { name: 'Stav úkolů' });
   tvrdi(`${w}: záložka Vše počítá všech 9 úkolů`, await stavy.getByRole('button', { name: /^Vše · 9$/ }).count() === 1, await stavy.innerText());
   tvrdi(`${w}: Po termínu = 2 (Umýt okna, Vynést sklo; dnešní ne)`, await stavy.getByRole('button', { name: /^Po termínu · 2$/ }).count() === 1, await stavy.innerText());

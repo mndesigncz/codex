@@ -381,7 +381,9 @@ const zalozka = (p, nazev) => p.locator('nav').getByRole('button', { name: new R
   const { ctx, p } = await kontext({ viewport: { width: 390, height: 844 }, mobil: true, dalsi: podvrh });
   await p.goto(BASE + '/employer/overview?view=settings', { waitUntil: 'networkidle' });
   await p.waitForTimeout(500);
-  tvrdi('S5: Nastavení na telefonu 390 bez přetečení, sekce jako posuvný pás', await bezPreteceni(p) && await p.getByRole('tablist', { name: 'Sekce nastavení' }).isVisible());
+  // Kolo 6 (B3): na telefonu jsou sekce svislý seznam ve skupinách Osobní / Podnik (navigace „Sekce nastavení"),
+  // ne posuvný pás 13 pilulek — klepnutí otevře sekci s hlavičkou a „Zpět".
+  tvrdi('S5: Nastavení na telefonu 390 bez přetečení, sekce jako svislý seznam', await bezPreteceni(p) && await p.getByRole('navigation', { name: 'Sekce nastavení' }).first().isVisible());
   await p.screenshot({ path: OUT + 'k69-b9-nastaveni-tel.png', fullPage: true });
   await ctx.close();
 }

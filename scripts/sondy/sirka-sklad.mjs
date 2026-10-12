@@ -57,7 +57,10 @@ for (const dlouhe of [false, true]) {
       await p.goto(BASE + '/employer/overview?view=inventory', { waitUntil: 'networkidle' });
       await p.getByRole('heading', { name: 'Sklad', level: 1 }).waitFor({ timeout: 15000 });
       await p.waitForTimeout(600);
-      if (n === 'Přidat položku') await p.getByRole('button', { name: 'Přidat položku' }).first().click();
+      // Kolo 6 (B6): na telefonu je hlavní akcí „Nakoupit (N)" a „Přidat položku" ustoupilo do „···";
+      // na monitoru naopak. Akce se proto hledá v hlavičce a teprve pak v nabídce.
+      const vHlavicce = p.locator('main').getByRole('button', { name: new RegExp('^' + n) }).first();
+      if (await vHlavicce.isVisible().catch(() => false)) await vHlavicce.click();
       else {
         await p.getByRole('button', { name: /^(Další akce|Více)/ }).first().click();
         await p.getByRole('menuitem', { name: new RegExp('^' + n) }).first().click();
