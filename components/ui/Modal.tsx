@@ -63,7 +63,9 @@ export function Modal({ open, onClose, title, subtitle, size = 'md', children, f
             className="btn-icon shrink-0 -mt-1 -mr-1"><Icon name="close" size={16} /></button>
         </div>
         <div className="px-6 pb-6 overflow-y-auto scrollbar-thin">{children}</div>
-        {footer && <div className="px-6 pb-6 pt-0 flex items-center justify-end gap-2">{footer}</div>}
+        {/* Tlačítka se zalamují: na 320 px má tělo okna 240 px a „Stornieren" +
+            „Eintrag speichern" mají 270 — bez zalomení vyjelo Zrušit za levý okraj. */}
+        {footer && <div className="px-6 pb-6 pt-0 flex flex-wrap items-center justify-end gap-2">{footer}</div>}
       </div>
     </div>,
     document.body,

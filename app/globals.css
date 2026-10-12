@@ -336,10 +336,15 @@ button:where(.list-row-tap) { margin: 0 -0.5rem; padding-left: 0.5rem; padding-r
   /* `order: 1` pošle ocas za šipku: první řádek je obrázek, jméno
      a šipka, druhý číslo a akce. Bez toho šipka (v DOM za ocasem) spadla
      na třetí, osiřelý řádek. */
-  .list-tail { display: flex; flex: 1 1 100%; order: 1; align-items: flex-end; justify-content: space-between; gap: 0.5rem; }
+  .list-tail { display: flex; flex: 1 1 100%; flex-wrap: wrap; order: 1; align-items: flex-end; justify-content: space-between; gap: 0.5rem; }
   /* Ocas jen se skrytým doplňkem by byl prázdný řádek navíc. */
   .list-tail-tichy { display: none; }
   .list-value { width: auto; text-align: left; }
+  /* Když se číslo, chip a dvě ikony do 320 px nevejdou (německé „Vergessener
+     Abgang?"), akce se zalomí na další řádek a drží se vpravo — dřív koš
+     vyčuhoval z karty. Zalamuje se i uvnitř akcí: krokovač skladu + Uložit
+     + „···" mají přes 290 px. */
+  .list-tail .list-actions { margin-left: auto; flex-wrap: wrap; }
   /* Když v ocase nic než akce není, `space-between` položí jediný prvek
      doleva a pravá půlka řádku zůstane prázdná — „QR na stůl" končící
      v třetině. Hlavní akce v takovém řádku dojede až k okraji, tiché
@@ -354,6 +359,16 @@ button:where(.list-row-tap) { margin: 0 -0.5rem; padding-left: 0.5rem; padding-r
    Nadpis obrazovky 28, sekce 18, karta 15, meta 13, štítek 11. Jediné
    povolené velikosti nadpisů — 10 velikostí h1 a 9 h2 bylo moc. */
 /* StatRow podleKarty: sloupce podle šířky karty. Do 34 rem dva sloupce, lichý poslední přes oba; od 34 rem jedna řada. */
+/* Číslo statistiky (Stat): 28 px, a když se do sloupce nevejde, o stupeň
+   škály míň — stupeň měří Stat.tsx a píše ho jako `data-tesne` na obal
+   (jeden Stat, nebo celá řada StatRow, ať jsou čísla v řadě stejně velká). */
+.stat-hodnota { font-size: 1.75rem; }
+.stat-jednotka { font-size: 1rem; }
+[data-tesne="1"] .stat-hodnota { font-size: 1.125rem; }
+[data-tesne="1"] .stat-jednotka { font-size: 0.8125rem; }
+[data-tesne="2"] .stat-hodnota { font-size: 0.875rem; }
+[data-tesne="2"] .stat-jednotka { font-size: 0.75rem; }
+
 .statrow-karta { container-type: inline-size; }
 .statrow-karta-v { display: grid; margin-inline: -0.5rem; grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 1rem; }
 .statrow-karta-v > * { padding-inline: 1rem; min-width: 0; }
@@ -602,6 +617,15 @@ input, textarea, [contenteditable] { caret-color: #5B7A08; }
   mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
 }
 .scroll-fade-x.at-end { -webkit-mask-image: none; mask-image: none; }
+
+/* Vodorovný pás je zároveň obalem pro absolutně umístěné potomky.
+   Chip ve sloupci tabule nese text pro odečítač (`sr-only` = position:
+   absolute). Bez tohoto pravidla byl jeho obalem nejbližší positioned
+   předek — <li> plochy — takže popisek odjetého sloupce ležel 900 px
+   vpravo od karty, natáhl <main> a telefon dostal vodorovný posuv celé
+   stránky. `:where` má nulovou specificitu: kdo pásu dá `absolute` nebo
+   `sticky`, vyhraje. */
+:where(.overflow-x-auto, .overflow-x-scroll, .scroll-fade-x) { position: relative; }
 
 /* ---------- Zaostření z klávesnice ----------
    Prohlížeč kreslí modrý obdélník, který nepatří k žádnému designu. Kroužek

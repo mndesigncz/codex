@@ -71,8 +71,12 @@ export function PageHeader({ title, subtitle, hintId, primary, secondary, menu, 
 
   return (
     <div className={`space-y-4 ${className}`}>
-      <div className={`flex gap-3 ${vRadku ? 'flex-row items-start justify-between' : 'flex-col sm:flex-row sm:items-start sm:justify-between'}`}>
-        <div className={`min-w-0 ${vRadku ? 'flex-1' : 'sm:flex-1'}`}>
+      {/* Od `sm` stojí akce vedle názvu; když se vedle něj nevejdou (iPad 768 px
+          s postranní lištou má na obsah 448 px a tři tlačítka s menu mají přes
+          480), zalomí se pod něj a drží se vpravo. Bez zalomení se název
+          (`flex-1`) smrštil na nulu a akce vyčuhovaly z obrazovky. */}
+      <div className={`flex gap-3 flex-wrap ${vRadku ? 'flex-row items-start justify-between' : 'flex-col sm:flex-row sm:items-start sm:justify-between'}`}>
+        <div className={`min-w-0 ${vRadku ? 'flex-1 min-w-[12rem]' : 'sm:flex-1 sm:min-w-[14rem]'}`}>
           <Nadpis className="t-page text-balance">{title}</Nadpis>
           {showSubtitle && (
             <p className="t-meta mt-1.5 max-w-[70ch] text-pretty group">
@@ -90,7 +94,9 @@ export function PageHeader({ title, subtitle, hintId, primary, secondary, menu, 
           )}
         </div>
         {(primary || secondary || maMenu || maMenuMobil) && (
-          <div className={`flex items-center gap-2 ${vRadku ? 'shrink-0' : 'sm:shrink-0 sm:ml-auto'}`}>
+          // Akce se zalamují i mezi sebou (vedlejší + „···" + hlavní mají v němčině
+          // přes 500 px) a drží se vpravo — `shrink-0` by je nechalo vyčuhovat.
+          <div className={`flex flex-wrap items-center justify-end gap-2 min-w-0 max-w-full ${vRadku ? '' : 'sm:ml-auto'}`}>
             {secondary && <div className="hidden md:flex items-center gap-2">{secondary}</div>}
             {maMenuMobil ? (
               <>

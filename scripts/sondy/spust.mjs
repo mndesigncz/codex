@@ -147,9 +147,16 @@ export const ZELENE = [
   'globalni-hledani',
   'den-detail',
   'poznamky',
+  'preteceni-vedeni',
+  'preteceni-vedeni-tablet',
+  'preteceni-zamestnanec',
+  'preteceni-kiosk',
+  'preteceni-okna',
+  'preteceni-jazyky',
+  'preteceni-jazyky-zamestnanec',
 ];
 
-const MIMO = new Set(['spust', 'pruchod', 'cookie-role', 'fixtury-k53', 'fixtury-navody', 'k68-spolecne', 'k69-mereni-jadro', 'import-karticka', 'w1-razitka', 'w5-host-bannery', 'poukazy', 'urovne', 'bannery', 'bannery-sprava', 'pruchod-hloubka', 'razitka-kasa', 'vernost-pravidla', 'w6-poukazy-bannery', 'k81-clenove-zpravy']);
+const MIMO = new Set(['spust', 'pruchod', 'cookie-role', 'fixtury-k53', 'fixtury-navody', 'k68-spolecne', 'k69-mereni-jadro', 'import-karticka', 'w1-razitka', 'w5-host-bannery', 'poukazy', 'urovne', 'bannery', 'bannery-sprava', 'pruchod-hloubka', 'razitka-kasa', 'vernost-pravidla', 'w6-poukazy-bannery', 'k81-clenove-zpravy', 'preteceni-jadro']);
 const vsechny = readdirSync(DIR).filter(f => f.endsWith('.mjs')).map(f => f.slice(0, -4)).filter(n => !MIMO.has(n)).sort();
 
 const args = process.argv.slice(2);
