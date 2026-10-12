@@ -59,6 +59,7 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'schedule.clearMonth': 'Vymazán měsíc rozvrhu',
   'schedule.adjust': 'Rozvrh upraven podle nových požadavků',
   'schedule.rules': 'Změna pravidel rozvrhu',
+  'volno.rozhodnout': 'Rozhodnuto o žádosti o volno',
   // sklad, dodavatelé, účtenky
   'inventory.create': 'Přidána položka skladu',
   'inventory.write-in': 'Zapsána nová věc do skladu',

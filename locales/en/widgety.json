@@ -1917,5 +1917,13 @@
   "Zlatý host": "Gold guest",
   "Platinový host": "Platinum guest",
   "1. návštěva": "First visit",
-  "Poznámka personálu:": "Staff note:"
+  "Poznámka personálu:": "Staff note:",
+  "Další akce se žádostí — {kdo}": "More actions for the request — {kdo}",
+  "Zamítnout s důvodem…": "Reject with reason…",
+  "Důvod uvidí žadatel u žádosti i v oznámení.": "The requester sees the reason on the request and in the notification.",
+  "Zamítnout žádost o volno": "Reject time-off request",
+  "Důvod (uvidí žadatel)": "Reason (visible to the requester)",
+  "Nepovinné — třeba „Ten týden už má volno Petr, zkus jiný termín“.": "Optional — e.g. “Peter is already off that week, try another date”.",
+  "Žádost zamítnuta, žadatel dostal upozornění.": "Request rejected, the requester has been notified.",
+  "Vedení: {duvod}": "Management: {duvod}"
 }

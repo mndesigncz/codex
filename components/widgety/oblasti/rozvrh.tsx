@@ -44,7 +44,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Avatar, BulkBar, Button, Chip, EmptyState, Field, Input, ListRow, Menu, Modal, PersonChip, SelectBox, Stat, Toast,
+  Avatar, BulkBar, Button, Chip, EmptyState, Field, Input, ListRow, Menu, Modal, PersonChip, SelectBox, Stat, Textarea, Toast,
   runBulk, useSelection, type MenuItem,
 } from '../../ui';
 import { useMoney } from '../../CurrencyProvider';
@@ -63,7 +63,7 @@ import { parseDbTime, pragueDayOf, pragueHM, pragueToday } from '@/lib/pragueTim
 import {
   KLIC_DEN, KLIC_DOSTUPNOST, UDALOST_DEN, UDALOST_DOSTUPNOST, UDALOST_ZMENA,
   den, denKratce as denKratceCs, dnySDirou, hm, hodinyLidi, hodinyText, kategorieBarvy, kolizeVolna, poptavkaTop,
-  rozdelBurzu, souhrnKolizi, tymPoDnech, TYP_VOLNA, zadostiVolna,
+  rozdelBurzu, souhrnKolizi, tymPoDnech, TYP_VOLNA, zadostiVolna, MAX_DUVOD_VOLNA,
   type DenSDirou, type NabidkaSmeny, type SmenaNahledu, type SmenaRozvrhu, type SmenaVKolizi, type ZadostVolna,
 } from '@/lib/rozvrhPrehled';
 
@@ -796,6 +796,10 @@ function ZadostiVolna({ velikost, nahled }: WidgetProps) {
   const [chyba, setChyba] = useState<string | null>(null);
   const [upravit, setUpravit] = useState<{ z: ZadostVolna; od: string; do: string } | null>(null);
   const [zrusit, setZrusit] = useState<ZadostVolna | null>(null);
+  // Zamítnutí s důvodem (kolo 7): jen z „···" u řádku — Zamítnout jedním klikem a hromadné
+  // rozhodnutí zůstávají bez okna, fronta po sezóně dovolených se má vyřídit rychle.
+  const [sDuvodem, setSDuvodem] = useState<{ z: ZadostVolna; duvod: string } | null>(null);
+  const [zamitnuto, setZamitnuto] = useState<number | null>(null);
   const [historie, setHistorie] = useState(false);
   // Schváleno, ale ve dnech volna zůstaly směny (kolo 6 UX): schválení nic neblokuje,
   // řekne se to toastem s „Upravit rozvrh" — otevře první takový den v plánovači,
@@ -827,6 +831,16 @@ function ZadostiVolna({ velikost, nahled }: WidgetProps) {
   const rozhodni = async (z: ZadostVolna, status: 'approved' | 'rejected') => {
     s(z.id, true); setChyba(null);
     try { const k = await patch({ id: z.id, status }); hotovo(); ohlasKolize([k]); } catch (e) { setChyba(apiMessage(e, CHYBA_ZAPISU)); }
+    s(z.id, false);
+  };
+  const zamitniSDuvodem = async () => {
+    if (!sDuvodem) return;
+    const { z, duvod } = sDuvodem;
+    s(z.id, true); setChyba(null);
+    try {
+      await patch({ id: z.id, status: 'rejected', note: duvod.trim() || null });
+      hotovo(); setSDuvodem(null); setZamitnuto(Date.now());
+    } catch (e) { setChyba(apiMessage(e, CHYBA_ZAPISU)); }
     s(z.id, false);
   };
   // Po sezóně dovolených leží ve frontě dvacet žádostí — pustí je naráz a řekne, kolik prošlo.
@@ -896,6 +910,9 @@ function ZadostiVolna({ velikost, nahled }: WidgetProps) {
                     <>
                       <Button variant="primary" size="sm" loading={pracuji.has(z.id)} onClick={() => rozhodni(z, 'approved')}>{t('Schválit')}</Button>
                       <Button variant="danger" size="sm" disabled={pracuji.has(z.id)} onClick={() => rozhodni(z, 'rejected')}>{t('Zamítnout')}</Button>
+                      <Menu size="sm" label={t('Další akce se žádostí — {kdo}', { kdo: kdo(z) })} items={[
+                        { label: t('Zamítnout s důvodem…'), icon: 'chat', danger: true, disabled: pracuji.has(z.id), hint: t('Důvod uvidí žadatel u žádosti i v oznámení.'), onClick: () => { setChyba(null); setSDuvodem({ z, duvod: '' }); } },
+                      ]} />
                     </>
                   ) : undefined}
                   // Kolize se směnami: po schválení zůstanou v rozvrhu — ať to vedení vidí před klepnutím.
@@ -939,6 +956,7 @@ function ZadostiVolna({ velikost, nahled }: WidgetProps) {
                 <ul className="list mt-1">
                   {vyrizene.map(z => (
                     <ListRow key={z.id} title={kdo(z)} meta={meta(z)}
+                      detail={z.status === 'rejected' && z.decisionNote ? t('Vedení: {duvod}', { duvod: z.decisionNote }) : undefined}
                       right={z.status === 'approved' ? <Chip tone="ok" size="sm">{t('Schváleno')}</Chip> : <Chip tone="bad" size="sm">{t('Zamítnuto')}</Chip>} />
                   ))}
                 </ul>
@@ -972,6 +990,25 @@ function ZadostiVolna({ velikost, nahled }: WidgetProps) {
           </div>
           {chyba && <p className="note note-danger text-sm mt-3" role="alert">{chyba}</p>}
         </Modal>
+      )}
+      {sDuvodem && (
+        <Modal open onClose={() => setSDuvodem(null)} size="sm" title={t('Zamítnout žádost o volno')}
+          subtitle={`${kdo(sDuvodem.z)} · ${rozsahVolna(den(sDuvodem.z.fromDate), den(sDuvodem.z.toDate))}`}
+          footer={<>
+            <Button variant="secondary" onClick={() => setSDuvodem(null)}>{t('Zrušit', undefined, 'dialog')}</Button>
+            <Button variant="danger-solid" loading={pracuji.has(sDuvodem.z.id)} onClick={zamitniSDuvodem}>{t('Zamítnout')}</Button>
+          </>}>
+          <Field id="volno-duvod" label={t('Důvod (uvidí žadatel)')} hint={t('Nepovinné — třeba „Ten týden už má volno Petr, zkus jiný termín“.')}>
+            <Textarea id="volno-duvod" rows={3} maxLength={MAX_DUVOD_VOLNA} value={sDuvodem.duvod}
+              onChange={e => setSDuvodem(v => v && { ...v, duvod: e.target.value })} />
+          </Field>
+          {chyba && <p className="note note-danger text-sm mt-3" role="alert">{chyba}</p>}
+        </Modal>
+      )}
+      {zamitnuto != null && (
+        <NadPlochou>
+          <Toast id={zamitnuto} onClose={() => setZamitnuto(null)} message={t('Žádost zamítnuta, žadatel dostal upozornění.')} />
+        </NadPlochou>
       )}
       {zrusit && (
         <Modal open onClose={() => setZrusit(null)} size="sm" title={t('Zrušit schválené volno?')}

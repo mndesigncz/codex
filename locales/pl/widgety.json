@@ -1917,5 +1917,13 @@
   "Zlatý host": "Gość złoty",
   "Platinový host": "Gość platynowy",
   "1. návštěva": "Pierwsza wizyta",
-  "Poznámka personálu:": "Notatka personelu:"
+  "Poznámka personálu:": "Notatka personelu:",
+  "Další akce se žádostí — {kdo}": "Więcej akcji z wnioskiem — {kdo}",
+  "Zamítnout s důvodem…": "Odrzuć z powodem…",
+  "Důvod uvidí žadatel u žádosti i v oznámení.": "Powód zobaczy wnioskujący przy wniosku i w powiadomieniu.",
+  "Zamítnout žádost o volno": "Odrzuć wniosek o wolne",
+  "Důvod (uvidí žadatel)": "Powód (zobaczy wnioskujący)",
+  "Nepovinné — třeba „Ten týden už má volno Petr, zkus jiný termín“.": "Opcjonalne — np. „W tym tygodniu wolne ma już Piotr, spróbuj innego terminu”.",
+  "Žádost zamítnuta, žadatel dostal upozornění.": "Wniosek odrzucony, wnioskujący dostał powiadomienie.",
+  "Vedení: {duvod}": "Kierownictwo: {duvod}"
 }

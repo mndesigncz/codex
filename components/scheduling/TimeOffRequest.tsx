@@ -33,6 +33,8 @@ interface TimeOffRequestItem {
   createdAt: string;
   employeeName?: string | null;
   employeeAvatar?: string | null;
+  /** Důvod rozhodnutí od vedení (kolo 7) — u zamítnuté žádosti „Vedení: …". */
+  decisionNote?: string | null;
 }
 
 const TYPE_IDS: TimeOffType[] = ['vacation', 'sick', 'other'];
@@ -188,6 +190,8 @@ export default function TimeOffRequest() {
               <ListRow key={r.id}
                 title={<span className="tabular-nums">{formatRange(r.fromDate, r.toDate, jazyk)}</span>}
                 meta={typLabel(r.type)}
+                // Proč vedení zamítlo — dřív jen červený chip a vysvětlení až osobně. `detail` se zalamuje.
+                detail={r.status === 'rejected' && r.decisionNote ? t('Vedení: {duvod}', { duvod: r.decisionNote }) : undefined}
                 right={<Chip tone={STATUS_TONE[r.status]} size="sm">{stavLabel(r.status)}</Chip>}
                 actions={r.status === 'pending'
                   ? <Button variant="ghost" size="sm" onClick={() => cancelRequest(r.id)}>{t('Zrušit')}</Button>

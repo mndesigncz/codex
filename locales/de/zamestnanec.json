@@ -396,5 +396,6 @@
   "Žádost se nepodařilo odeslat. Zkus to prosím znovu.": "Die Anfrage konnte nicht gesendet werden. Bitte versuch es noch einmal.",
   "Žádost se nepodařilo zrušit — zkus to znovu.": "Die Anfrage konnte nicht zurückgezogen werden — versuch es noch einmal.",
   "Žádosti se nenačetly.": "Anträge konnten nicht geladen werden.",
-  "„{nazev}\" má termín {den}.": "„{nazev}“ ist fällig am {den}."
+  "„{nazev}\" má termín {den}.": "„{nazev}“ ist fällig am {den}.",
+  "Vedení: {duvod}": "Leitung: {duvod}"
 }

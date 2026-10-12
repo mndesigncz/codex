@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser, notifyUsers } from '@/lib/push';
 import { pozaduj, jeOdpoved, clenoveSOpravnenim } from '@/lib/opravneniDb';
+import { audit } from '@/lib/audit';
+import { duvodVolna, textRozhodnutiVolna, MAX_DUVOD_VOLNA } from '@/lib/rozvrhPrehled';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +17,8 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const shape = (r: any) => ({
   id: r.id, employeeId: r.employee_id, fromDate: r.from_date, toDate: r.to_date,
   type: r.type, note: r.note, status: r.status, createdAt: r.created_at,
+  // Důvod rozhodnutí od vedení (kolo 7) — žadatel ho vidí u zamítnuté žádosti i v oznámení.
+  decisionNote: r.decision_note ?? null,
   employeeName: r.employee_name ?? null, employeeAvatar: r.employee_avatar ?? null,
   // Kolize s rozvrhem (kolo 6 UX): kolik směn má člověk v dnech čekající žádosti.
   // Jen v seznamu pro vedení a jen u čekajících — o ostatních už se rozhodlo.
@@ -122,7 +126,9 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ ok: true, request: shape(row) });
 }
 
-// PATCH (volno.schvalovat) — approve / reject: { id, status: 'approved'|'rejected' }.
+// PATCH (volno.schvalovat) — approve / reject: { id, status: 'approved'|'rejected', note? }.
+// `note` (kolo 7) je důvod pro žadatele: uloží se jen spolu se `status` (nové
+// rozhodnutí bez důvodu starý důvod smaže), samotná úprava termínu ho nechá.
 export async function PATCH(req: NextRequest) {
   const c = await pozaduj('volno.schvalovat');
   if (jeOdpoved(c)) return c;
@@ -134,6 +140,8 @@ export async function PATCH(req: NextRequest) {
   if (!Number.isFinite(id) || (!status && !wantsDates)) {
     return NextResponse.json({ error: 'Neplatný požadavek' }, { status: 400 });
   }
+  const duvod = duvodVolna(b.note);
+  if (duvod === false) return NextResponse.json({ error: `Důvod může mít nejvýš ${MAX_DUVOD_VOLNA} znaků.` }, { status: 400 });
 
   const [existing] = await sql`
     SELECT * FROM time_off_requests WHERE id = ${id} AND team_id = ${c.teamId}`;
@@ -147,13 +155,16 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Neplatné rozmezí dat.' }, { status: 400 });
   }
   const nextStatus = status ?? String(existing.status);
+  const nextNote = status ? duvod : (existing.decision_note ?? null);
 
   const [row] = await sql`
     UPDATE time_off_requests
-    SET status = ${nextStatus}, from_date = ${fromDate}, to_date = ${toDate}, decided_by = ${c.meId}
+    SET status = ${nextStatus}, from_date = ${fromDate}, to_date = ${toDate}, decided_by = ${c.meId},
+        decision_note = ${nextNote}
     WHERE id = ${id} AND team_id = ${c.teamId}
     RETURNING *`;
   if (!row) return NextResponse.json({ error: 'Žádost nenalezena' }, { status: 404 });
+  if (status) await audit(c.teamId, c.meId, 'volno.rozhodnout', 'time_off', id, status);
 
   // Směny, které po schválení zůstaly v rozvrhu ve dnech volna. Schválení projde jako
   // dřív; widget podle nich ukáže „Upravit rozvrh" (okno dne už umí „Přesto přidat").
@@ -168,7 +179,7 @@ export async function PATCH(req: NextRequest) {
       title: status === 'approved' ? 'Volno schváleno ✓'
         : status === 'rejected' ? 'Volno zamítnuto'
         : '🗓️ Upravený termín volna',
-      body: `${row.from_date === row.to_date ? row.from_date : `${row.from_date} až ${row.to_date}`}${datesChanged && status ? ' (termín upraven vedením)' : ''}`,
+      body: textRozhodnutiVolna({ od: String(row.from_date), doDne: String(row.to_date), status, terminUpraven: datesChanged, duvod: row.decision_note ?? null }),
       type: status === 'approved' ? 'info' : 'warning',
       category: 'timeoff',
       link: '/employee/shifts?view=availability',

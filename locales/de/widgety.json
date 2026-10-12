@@ -1918,5 +1918,13 @@
   "Zlatý host": "Goldgast",
   "Platinový host": "Platingast",
   "1. návštěva": "Erster Besuch",
-  "Poznámka personálu:": "Notiz des Personals:"
+  "Poznámka personálu:": "Notiz des Personals:",
+  "Další akce se žádostí — {kdo}": "Weitere Aktionen zum Antrag — {kdo}",
+  "Zamítnout s důvodem…": "Mit Begründung ablehnen…",
+  "Důvod uvidí žadatel u žádosti i v oznámení.": "Die Begründung sieht die Person beim Antrag und in der Benachrichtigung.",
+  "Zamítnout žádost o volno": "Urlaubsantrag ablehnen",
+  "Důvod (uvidí žadatel)": "Begründung (sieht die Person)",
+  "Nepovinné — třeba „Ten týden už má volno Petr, zkus jiný termín“.": "Optional — z. B. „Peter hat in der Woche schon frei, versuch einen anderen Termin“.",
+  "Žádost zamítnuta, žadatel dostal upozornění.": "Antrag abgelehnt, die Person wurde benachrichtigt.",
+  "Vedení: {duvod}": "Leitung: {duvod}"
 }

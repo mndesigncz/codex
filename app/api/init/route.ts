@@ -588,6 +588,8 @@ export async function GET(request: Request) {
         decided_by INTEGER,
         created_at TIMESTAMP DEFAULT NOW()
       )`);
+    // Důvod rozhodnutí pro žadatele (kolo 7): „Málo lidí, zkus jiný týden" — vidí ho u žádosti i v oznámení.
+    await ddl(sql`ALTER TABLE time_off_requests ADD COLUMN IF NOT EXISTS decision_note TEXT`);
 
     // ---- Supplier orders (from the shopping list) ----
     await ddl(sql`

@@ -396,5 +396,6 @@
   "Žádost se nepodařilo odeslat. Zkus to prosím znovu.": "Couldn't send the request. Please try again.",
   "Žádost se nepodařilo zrušit — zkus to znovu.": "Couldn't cancel the request — try again.",
   "Žádosti se nenačetly.": "Requests didn't load.",
-  "„{nazev}\" má termín {den}.": "“{nazev}” is due {den}."
+  "„{nazev}\" má termín {den}.": "“{nazev}” is due {den}.",
+  "Vedení: {duvod}": "Management: {duvod}"
 }

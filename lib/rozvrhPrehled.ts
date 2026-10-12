@@ -504,6 +504,8 @@ export interface ZadostVolna {
   status: 'pending' | 'approved' | 'rejected' | string;
   /** Kolik směn má člověk v rozvrhu ve dnech volna (API u čekajících žádostí, kolo 6 UX). */
   conflicts?: number | null;
+  /** Důvod rozhodnutí, který vedení napsalo (u zamítnutí ho vidí žadatel; kolo 7). */
+  decisionNote?: string | null;
 }
 
 /** Směna, která schválenému volnu zůstala v rozvrhu (PATCH /api/timeoff → conflicts[]). */
@@ -546,6 +548,34 @@ export function zadostiVolna<T extends ZadostVolna>(zadosti: readonly T[], dnes:
     vyrizene: zadosti.filter(z => z.status !== 'pending' && !(z.status === 'approved' && den(z.toDate || z.fromDate) >= dnes))
       .sort((a, b) => den(b.fromDate).localeCompare(den(a.fromDate))),
   };
+}
+
+/** Nejvýš tolik znaků smí mít důvod rozhodnutí o volnu (PATCH /api/timeoff `note`, kolo 7). */
+export const MAX_DUVOD_VOLNA = 300;
+
+/**
+ * Důvod rozhodnutí o volnu ze vstupu API: ořízne mezery, prázdný → null.
+ * Delší než MAX_DUVOD_VOLNA → false: server odpoví 400 a nic potichu neuřízne
+ * (žadatel by dostal useknutou větu).
+ */
+export function duvodVolna(v: unknown): string | null | false {
+  if (v == null) return null;
+  const s = String(v).trim();
+  if (!s) return null;
+  return s.length > MAX_DUVOD_VOLNA ? false : s;
+}
+
+/**
+ * Text oznámení žadateli po rozhodnutí o volnu: termín („2026-10-03" nebo
+ * „2026-10-03 až 2026-10-07"), poznámka, že vedení termín upravilo, a důvod
+ * zamítnutí za tečkou („ · Málo lidí, zkus jiný týden"). Důvod jde jen k
+ * zamítnutí — u schválení ho UI nenabízí a „schváleno · …" by mátlo.
+ */
+export function textRozhodnutiVolna(o: { od: string; doDne: string; status: 'approved' | 'rejected' | null; terminUpraven: boolean; duvod?: string | null }): string {
+  const termin = o.od === o.doDne ? o.od : `${o.od} až ${o.doDne}`;
+  const upraveno = o.terminUpraven && o.status ? ' (termín upraven vedením)' : '';
+  const duvod = o.status === 'rejected' && o.duvod ? ` · ${o.duvod}` : '';
+  return `${termin}${upraveno}${duvod}`;
 }
 
 export interface NabidkaSmeny {

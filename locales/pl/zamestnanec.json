@@ -396,5 +396,6 @@
   "Žádost se nepodařilo odeslat. Zkus to prosím znovu.": "Nie udało się wysłać wniosku. Spróbuj jeszcze raz.",
   "Žádost se nepodařilo zrušit — zkus to znovu.": "Nie udało się anulować wniosku — spróbuj jeszcze raz.",
   "Žádosti se nenačetly.": "Nie udało się wczytać wniosków.",
-  "„{nazev}\" má termín {den}.": "„{nazev}” ma termin {den}."
+  "„{nazev}\" má termín {den}.": "„{nazev}” ma termin {den}.",
+  "Vedení: {duvod}": "Kierownictwo: {duvod}"
 }
