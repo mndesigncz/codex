@@ -2,12 +2,15 @@
 //
 // Hlídá čistou logiku balíku: validaci úpravy odměny (lib/odmenyKatalog.ts),
 // poslední průběhy jednoho postupu (lib/postupyPrehled.ts), fotky v návodu
-// (lib/navodObsah.ts). Měřená hodnota v kroku přidává své testy níž.
+// (lib/navodObsah.ts) a měřenou hodnotu v kroku postupu (lib/steps.ts).
 
 import type { Testy } from './_testy.ts';
 import { validujOdmenu, jeIkonaOdmeny, grafemy, MAX_NAZEV_ODMENY, MAX_CENA_ODMENY } from '../../lib/odmenyKatalog.ts';
 import { prubehyPostupu, PRUBEHU_V_DETAILU, type PrubehApi } from '../../lib/postupyPrehled.ts';
 import { radekFotky, popisZNazvuSouboru, zapisFotky, vlozFotku, cistyPopis, MAX_POPIS_FOTKY } from '../../lib/navodObsah.ts';
+import {
+  parseStep, parseSteps, serializeStep, sanitizeSteps, cisloZTextu, mimoRozsah, normalizujHodnoty, rozsahKroku, hodnotaSJednotkou, MAX_JEDNOTKA,
+} from '../../lib/steps.ts';
 
 export default function ({ eq, ok }: Testy) {
   // ---- odměny: validace přidání a úpravy ----
@@ -86,5 +89,39 @@ export default function ({ eq, ok }: Testy) {
   eq('vložení: uprostřed řádku = zalomení před i za fotkou', vlozFotku('AB', 1, '![a](/api/upload/1)'), { text: 'A\n![a](/api/upload/1)\nB', kurzor: 21 });
   eq('vložení: na začátek řádku = fotka nad ním', vlozFotku('A\nB', 2, '![a](/api/upload/1)'), { text: 'A\n![a](/api/upload/1)\nB', kurzor: 21 });
   eq('vložení: pozice mimo text = na konec', vlozFotku('A', 99, '![a](/api/upload/1)'), { text: 'A\n![a](/api/upload/1)', kurzor: 21 });
+  // ---- postup: měřená hodnota v kroku ----
+  const stary = parseStep('Změřit teplotu');
+  eq('krok: starý krok (text) nemá měření', [stary.valueKind, stary.valueUnit, stary.valueMin, stary.valueMax], [null, null, null, null]);
+  eq('krok: starý objekt bez valueKind nemá měření', parseStep({ text: 'X', minutes: 5, valueUnit: '°C', valueMin: 2 }).valueKind, null);
+  eq('krok: starý krok se uloží zase jako text (beze změny JSON)', serializeStep(stary), 'Změřit teplotu');
+  const mer = parseStep({ text: 'Teplota lednice', valueKind: 'number', valueUnit: ' °C ', valueMin: '2', valueMax: 6 });
+  eq('krok: měřený krok — jednotka oříznutá, meze jako čísla', [mer.valueKind, mer.valueUnit, mer.valueMin, mer.valueMax], ['number', '°C', 2, 6]);
+  eq('krok: měřený krok přežije uložení a načtení', parseStep(serializeStep(mer)), mer);
+  eq('krok: uložený měřený krok je objekt s valueKind', serializeStep(parseStep({ text: 'T', valueKind: 'number' })), { text: 'T', valueKind: 'number' });
+  eq(`krok: jednotka nejvýš ${MAX_JEDNOTKA} znaků`, parseStep({ text: 'T', valueKind: 'number', valueUnit: 'stupňů Celsia' }).valueUnit?.length, MAX_JEDNOTKA);
+  eq('krok: prázdná jednotka = null', parseStep({ text: 'T', valueKind: 'number', valueUnit: '  ' }).valueUnit, null);
+  eq('krok: meze s desetinnou čárkou', [parseStep({ text: 'T', valueKind: 'number', valueMin: '-1,5', valueMax: '4,5' }).valueMin, parseStep({ text: 'T', valueKind: 'number', valueMax: '4,5' }).valueMax], [-1.5, 4.5]);
+  eq('krok: nesmyslné meze = null', [parseStep({ text: 'T', valueKind: 'number', valueMin: 'abc', valueMax: '' }).valueMin, parseStep({ text: 'T', valueKind: 'number', valueMax: '' }).valueMax], [null, null]);
+  eq('krok: prohozené meze se srovnají', [parseStep({ text: 'T', valueKind: 'number', valueMin: 6, valueMax: 2 }).valueMin, parseStep({ text: 'T', valueKind: 'number', valueMin: 6, valueMax: 2 }).valueMax], [2, 6]);
+  eq('krok: jiný valueKind než number = bez měření', parseStep({ text: 'T', valueKind: 'text' }).valueKind, null);
+  eq('krok: sanitizeSteps (API) měření zachová', sanitizeSteps([{ text: 'T', valueKind: 'number', valueUnit: '°C', valueMin: 2, valueMax: 6 }, 'Druhý']),
+    [{ text: 'T', valueKind: 'number', valueUnit: '°C', valueMin: 2, valueMax: 6 }, 'Druhý']);
+  eq('krok: parseSteps s mixem starých a nových kroků', parseSteps(['A', { text: 'B', valueKind: 'number' }]).map(k => k.valueKind), [null, 'number']);
+  eq('číslo z textu: čárka, tečka, mezery, minus', ['4,2', '4.2', ' 4 ', '-1,5', '−3', ',5', '10.'].map(cisloZTextu), [4.2, 4.2, 4, -1.5, -3, 0.5, 10]);
+  eq('číslo z textu: nesmysl = null', ['', 'abc', '4,2,1', '1e3', '--2', null, undefined, NaN].map(x => cisloZTextu(x as unknown)), [null, null, null, null, null, null, null, null]);
+  eq('mimo rozsah: v rozsahu ne, hranice patří dovnitř', [mimoRozsah(mer, 4), mimoRozsah(mer, 2), mimoRozsah(mer, 6)], [false, false, false]);
+  eq('mimo rozsah: pod i nad', [mimoRozsah(mer, 1.9), mimoRozsah(mer, 6.1)], [true, true]);
+  const jenMin = parseStep({ text: 'T', valueKind: 'number', valueMin: 60 });
+  const jenMax = parseStep({ text: 'T', valueKind: 'number', valueMax: 5 });
+  eq('mimo rozsah: chybějící mez se nehlídá', [mimoRozsah(jenMin, 1000), mimoRozsah(jenMin, 59), mimoRozsah(jenMax, -40), mimoRozsah(jenMax, 5.5)], [false, true, false, true]);
+  eq('mimo rozsah: bez mezí nikdy, bez hodnoty nikdy, neměřený krok nikdy',
+    [mimoRozsah(parseStep({ text: 'T', valueKind: 'number' }), 999), mimoRozsah(mer, null), mimoRozsah(stary, 999)], [false, false, false]);
+  const cs = (n: number) => String(n).replace('.', ',');
+  eq('rozsah bez slov', [rozsahKroku(mer, cs), rozsahKroku(jenMin, cs), rozsahKroku(jenMax, cs), rozsahKroku(stary, cs)], ['2–6 °C', '≥ 60', '≤ 5', null]);
+  eq('hodnota s jednotkou podle jazyka', [hodnotaSJednotkou(4.2, '°C', cs), hodnotaSJednotkou(4.2, null, cs)], ['4,2 °C', '4,2']);
+  eq('hodnoty z API: jen čísla pod indexy kroků < total', normalizujHodnoty({ 0: 4.2, 1: '7,5', 2: 'abc', 3: 9, '-1': 1, x: 2, '1.5': 3, 4: Infinity, 5: null }, 4), { 0: 4.2, 1: 7.5, 3: 9 });
+  eq('hodnoty z API: index rovný total neprojde', normalizujHodnoty({ 2: 1 }, 2), {});
+  eq('hodnoty z API: pole, null a text = {}', [normalizujHodnoty([4.2], 3), normalizujHodnoty(null, 3), normalizujHodnoty('4', 3)], [{}, {}, {}]);
+  eq('hodnoty z API: nesmyslně velké číslo pryč, jinak na 3 desetinná místa', normalizujHodnoty({ 0: 2_000_000, 1: 4.23456 }, 2), { 1: 4.235 });
   ok('vložená fotka je po vložení zase řádek fotky', vlozFotku('A', 1, zapisFotky('p', '/api/upload/9')!).text.split('\n').some(r => radekFotky(r) != null));
 }

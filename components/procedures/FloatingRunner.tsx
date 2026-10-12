@@ -11,14 +11,16 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useProcedures } from './ProcedureProvider';
-import { parseSteps } from '@/lib/steps';
+import { parseSteps, cisloZTextu, mimoRozsah, rozsahKroku } from '@/lib/steps';
 import { SKIP_REASONS } from '@/lib/procedureScoring';
 import StepTimeline from './StepTimeline';
 import { duvodPreskoceni } from './DetailPrubehu';
 import { useOtevreniNavodu } from '@/lib/otevriNavod';
 import { Icon } from '../Icons';
 import { Button, Chip, Input } from '../ui';
-import { useT } from '@/lib/i18n/client';
+import { useT, useJazyk } from '@/lib/i18n/client';
+import { fmtCislo } from '@/lib/i18n/format';
+import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
 
 function fmt(sec: number) {
   const m = Math.floor(sec / 60);
@@ -44,7 +46,13 @@ const PANEL = 'overflow-hidden glass-strong rounded-3xl shadow-[shadow:var(--sha
 
 export default function FloatingRunner() {
   const t = useT('postupy');
-  const { active, justCompleted, syncFailed, toggleItem, toggleSkip, setSkipReason, complete, cancel, dismissCelebration } = useProcedures();
+  const { active, justCompleted, syncFailed, toggleItem, toggleSkip, setSkipReason, setValue, complete, cancel, dismissCelebration } = useProcedures();
+  const { jazyk } = useJazyk();
+  const cislo = (n: number) => fmtCislo(n, { locale: LOCALE_PRO_JAZYK[jazyk] });
+  // Měřené kroky (kolo 7): rozepsaný text pole (ať „4," při psaní nezmizí) a krok, u kterého
+  // člověk zkusil odškrtnout bez hodnoty.
+  const [texty, setTexty] = useState<Record<number, string>>({});
+  const [chybiHodnota, setChybiHodnota] = useState<number | null>(null);
   const [minimized, setMinimized] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const [confirmFinish, setConfirmFinish] = useState(false);
@@ -62,7 +70,7 @@ export default function FloatingRunner() {
   const navodOdkaz = useOtevreniNavodu();
 
   // Reset transient UI when a new run starts / celebration appears.
-  useEffect(() => { if (active) { setMinimized(false); setConfirmClose(false); setConfirmFinish(false); } }, [active?.id]);
+  useEffect(() => { if (active) { setMinimized(false); setConfirmClose(false); setConfirmFinish(false); setTexty({}); setChybiHodnota(null); } }, [active?.id]);
 
   if (!active && !justCompleted) return null;
 
@@ -97,6 +105,29 @@ export default function FloatingRunner() {
   const allDone = total > 0 && done >= total;
   const unfinished = skipped + remaining; // everything not actually done
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+  // Měřené kroky: odškrtnout jde až s hodnotou (HACCP — „hotovo" bez čísla nic neříká).
+  const kroky = parseSteps(active.items);
+  const hodnoty = active.values ?? {};
+  const merene = kroky.map((k, i) => ({ k, i })).filter(x => x.k.valueKind === 'number');
+  const idPole = (i: number) => `runner-${active.id}-hodnota-${i}`;
+  const odskrtni = (i: number) => {
+    const k = kroky[i];
+    if (k?.valueKind === 'number' && !active.checkedItems.includes(i) && hodnoty[String(i)] == null) {
+      setChybiHodnota(i);
+      const pole = document.getElementById(idPole(i));
+      pole?.scrollIntoView({ block: 'nearest' });
+      pole?.focus({ preventScroll: true });
+      return;
+    }
+    toggleItem(i);
+  };
+  const zapis = (i: number, text: string) => {
+    setTexty(prev => ({ ...prev, [i]: text }));
+    const n = cisloZTextu(text);
+    setValue(i, n);
+    if (n != null && chybiHodnota === i) setChybiHodnota(null);
+  };
 
   const doCancel = () => { cancel(); setConfirmClose(false); };
   const doComplete = async () => { setCompleting(true); await complete(); setCompleting(false); };
@@ -178,12 +209,12 @@ export default function FloatingRunner() {
             {/* Steps timeline */}
             <div ref={bodyRef} className="max-h-[46vh] md:max-h-[340px] overflow-y-auto scrollbar-thin px-3.5 pb-2 pt-1">
               <StepTimeline
-                steps={parseSteps(active.items)}
+                steps={kroky}
                 statuses={{
                   ...Object.fromEntries(active.skippedItems.map(i => [i, 'skipped' as const])),
                   ...Object.fromEntries(active.checkedItems.map(i => [i, 'done' as const])),
                 }}
-                onToggle={toggleItem}
+                onToggle={odskrtni}
                 onSkip={(i) => {
                   if (active.skippedItems.includes(i)) toggleSkip(i);
                   else { setSkipFor(i); setSkipNote(''); }
@@ -192,6 +223,45 @@ export default function FloatingRunner() {
                 compact
                 {...navodOdkaz}
               />
+              {/* Naměřené hodnoty (kolo 7): pole pod kroky — StepTimeline je sdílený s detailem
+                  a návody, do jeho řádku se pole nepřidává. Číslo palcem: inputMode decimal,
+                  čárka i tečka, jednotka v poli; mimo rozsah upozorní, ale neblokuje. */}
+              {merene.length > 0 && (
+                <div className="mt-1 mb-2 space-y-2" role="group" aria-labelledby={`runner-${active.id}-hodnoty`}>
+                  <p id={`runner-${active.id}-hodnoty`} className="t-label px-0.5">{t('Naměřené hodnoty')}</p>
+                  {merene.map(({ k, i }) => {
+                    const v = hodnoty[String(i)];
+                    const mimo = mimoRozsah(k, v);
+                    const rozsah = rozsahKroku(k, cislo);
+                    const preskoceno = active.skippedItems.includes(i);
+                    return (
+                      <div key={i} className="well p-2.5">
+                        <label htmlFor={idPole(i)} className="block text-sm font-semibold leading-snug text-[#16181A] text-pretty">
+                          <span className="tabular-nums text-black/45">{i + 1}.</span> {k.text}
+                        </label>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                          <div className="relative w-full sm:w-auto">
+                            <Input id={idPole(i)} inputMode="decimal" autoComplete="off" enterKeyHint="done" disabled={preskoceno}
+                              value={texty[i] ?? (v != null ? cislo(v) : '')}
+                              onChange={e => zapis(i, e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); if (hodnoty[String(i)] != null && !active.checkedItems.includes(i)) toggleItem(i); } }}
+                              aria-invalid={mimo || undefined}
+                              aria-describedby={`${idPole(i)}-info`}
+                              className={`!w-full sm:!w-28 tabular-nums ${k.valueUnit ? 'pr-12' : ''}`} />
+                            {k.valueUnit && <span aria-hidden className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-black/45">{k.valueUnit}</span>}
+                          </div>
+                          {mimo && <Chip tone="bad" size="sm" icon="warning">{t('mimo rozsah')}</Chip>}
+                        </div>
+                        <p id={`${idPole(i)}-info`} className={`t-meta mt-1 ${chybiHodnota === i ? '!text-bad-ink' : ''}`} role={chybiHodnota === i ? 'alert' : undefined}>
+                          {chybiHodnota === i
+                            ? t('Nejdřív zapiš naměřenou hodnotu, pak krok odškrtni.')
+                            : rozsah ? t('Rozsah {rozsah}', { rozsah }) : t('Zapiš naměřenou hodnotu.')}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {skipFor != null && (

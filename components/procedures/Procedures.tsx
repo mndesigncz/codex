@@ -32,7 +32,7 @@ import {
 import DetailPrubehu from './DetailPrubehu';
 import { useProcedures } from './ProcedureProvider';
 import StepTimeline from './StepTimeline';
-import { parseSteps, totalMinutes, fmtMinutes, STEP_WEIGHTS, weightSpec, type Step } from '@/lib/steps';
+import { parseSteps, totalMinutes, fmtMinutes, STEP_WEIGHTS, weightSpec, cisloZTextu, MAX_JEDNOTKA, type Step } from '@/lib/steps';
 import { okJson, apiMessage } from '@/lib/api';
 import StepGuidePicker, { type PickableGuide } from '../guides/StepGuidePicker';
 import { Poznamky, type AutorNaTabletu } from '../Poznamky';
@@ -543,7 +543,7 @@ function ProcedureEditor({
   const [remindDays, setRemindDays] = useState<number[]>(
     Array.isArray(initial?.remindDays) ? [...(initial!.remindDays as number[])] : []
   );
-  const blankStep = (): Step => ({ text: '', minutes: null, note: null, emoji: null, weight: 'normal', penalty: null, guideId: null });
+  const blankStep = (): Step => ({ text: '', minutes: null, note: null, emoji: null, weight: 'normal', penalty: null, guideId: null, valueKind: null, valueUnit: null, valueMin: null, valueMax: null });
   const [steps, setSteps] = useState<Step[]>(() => {
     const parsed = parseSteps(initial?.items);
     return parsed.length ? parsed : [blankStep()];
@@ -588,6 +588,8 @@ function ProcedureEditor({
         // Totéž platí pro návod: kdyby se tu zahodil, každé uložení postupu
         // by obsluze potichu sebralo odkaz na postup, podle kterého pracuje.
         guideId: s.guideId ?? null,
+        // Měřená hodnota (kolo 7) — stejně jako váha a návod musí přežít uložení.
+        valueKind: s.valueKind ?? null, valueUnit: s.valueUnit?.trim() || null, valueMin: s.valueMin ?? null, valueMax: s.valueMax ?? null,
       }))
       .filter(s => s.text.length > 0);
     if (!cleanName) { setError(t('Zadej název postupu.')); return; }
@@ -678,6 +680,15 @@ function ProcedureEditor({
                         postup — a ten v Návodech nejspíš už je. */}
                     <StepGuidePicker guides={guideOptions} value={s.guideId ?? null} stepNumber={i + 1}
                       onChange={g => patchStep(i, { guideId: g })} />
+                    {/* Měřená hodnota (kolo 7, HACCP): v běhu se u kroku zapíše číslo s jednotkou. */}
+                    <button type="button" aria-pressed={s.valueKind === 'number'}
+                      onClick={() => patchStep(i, s.valueKind === 'number'
+                        ? { valueKind: null, valueUnit: null, valueMin: null, valueMax: null }
+                        : { valueKind: 'number', valueUnit: s.valueUnit ?? null })}
+                      aria-label={t('Krok {n}: měřená hodnota', { n: i + 1 })}
+                      className={`filter-pill tap-target shrink-0 whitespace-nowrap ${s.valueKind === 'number' ? 'seg-on' : 'seg-off glass'}`}>
+                      {t('Měřená hodnota')}
+                    </button>
                     <div className="flex shrink-0 items-center">
                       <Button variant="ghost" size="sm" iconOnly icon="chevron" className="rotate-180" aria-label={t('Posunout krok {n} výš', { n: i + 1 })}
                         onClick={() => move(i, -1)} disabled={i === 0} />
@@ -686,6 +697,19 @@ function ProcedureEditor({
                       <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={t('Odebrat krok {n}', { n: i + 1 })} onClick={() => removeStep(i)} />
                     </div>
                   </div>
+                  {s.valueKind === 'number' && (
+                    // Telefon: tři pole vedle sebe přes celou šířku; od sm úzká pole v řádku.
+                    <div className="grid grid-cols-3 gap-2 sm:flex sm:items-center" role="group" aria-label={t('Měřená hodnota kroku {n}', { n: i + 1 })}>
+                      <Input value={s.valueUnit ?? ''} onChange={e => patchStep(i, { valueUnit: e.target.value.slice(0, MAX_JEDNOTKA) || null })}
+                        maxLength={MAX_JEDNOTKA} placeholder="°C" autoComplete="off"
+                        aria-label={t('Jednotka kroku {n}', { n: i + 1 })} className="sm:!w-24 min-w-0" />
+                      <MezHodnoty value={s.valueMin ?? null} onChange={v => patchStep(i, { valueMin: v })} placeholder={t('Od')}
+                        label={t('Nejnižší povolená hodnota kroku {n}', { n: i + 1 })} />
+                      <MezHodnoty value={s.valueMax ?? null} onChange={v => patchStep(i, { valueMax: v })} placeholder={t('Do')}
+                        label={t('Nejvyšší povolená hodnota kroku {n}', { n: i + 1 })} />
+                      <span className="t-meta col-span-3 sm:col-span-1 text-pretty">{t('Hodnota mimo rozsah se v průběhu jen označí, nic neblokuje.')}</span>
+                    </div>
+                  )}
                 </div>
                 {i < steps.length - 1 && (
                   <div className="flex justify-center">
@@ -746,5 +770,29 @@ function ProcedureEditor({
         {error && <p className="note note-danger text-sm" role="alert">{error}</p>}
       </div>
     </Modal>
+  );
+}
+
+/**
+ * Mez měřené hodnoty (Od/Do): textové pole s inputMode decimal — čárka i tečka, „−1,5".
+ * Rozepsaný text drží lokálně, ať „4," při psaní nezmizí; ven jde číslo, nebo null.
+ */
+function MezHodnoty({ value, onChange, placeholder, label }: {
+  value: number | null;
+  onChange: (v: number | null) => void;
+  placeholder: string;
+  label: string;
+}) {
+  const { jazyk } = useJazyk();
+  const zobraz = (n: number | null) => (n == null ? '' : jazyk === 'en' ? String(n) : String(n).replace('.', ','));
+  const [text, setText] = useState(() => zobraz(value));
+  // Hodnota se změnila zvenku (přesun kroku, vypnutí měření) — srovnat text, když nesedí.
+  useEffect(() => {
+    if (cisloZTextu(text) !== value) setText(zobraz(value));
+  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <Input inputMode="decimal" autoComplete="off" value={text} placeholder={placeholder} aria-label={label}
+      onChange={e => { setText(e.target.value); onChange(cisloZTextu(e.target.value)); }}
+      className="sm:!w-24 min-w-0 tabular-nums" />
   );
 }

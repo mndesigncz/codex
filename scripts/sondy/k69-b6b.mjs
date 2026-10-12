@@ -32,7 +32,13 @@ const podvrh = () => (req, json, stav) => {
   const m = req.method();
   if (stav.chyby[path]) return json({ error: 'Server spadl' }, stav.chyby[path]);
   if (path === '/api/procedures/runs') {
-    if (m === 'POST') { stav.spusteno = req.postDataJSON(); return json({ active: { id: 99, procedureId: stav.spusteno.procedureId, name: 'Otevírací rutina', items: ['Zapnout kávovar', 'Zkontrolovat mléko'], checkedItems: [], skippedItems: [], totalItems: 2, startedAt: new Date().toISOString(), status: 'running' } }); }
+    if (m === 'POST') {
+      stav.spusteno = req.postDataJSON();
+      // Tvar skutečné routy (shapeActive): název a kroky spuštěného postupu, values prázdné.
+      const pr = nacti('k69-b6b-procedures').procedures.find(x => x.id === stav.spusteno.procedureId) ?? nacti('k69-b6b-procedures').procedures[0];
+      return json({ active: { id: 99, procedureId: pr.id, name: pr.name, icon: pr.icon, color: pr.color, items: pr.items, checkedItems: [], skippedItems: [], totalItems: pr.items.length, startedAt: new Date().toISOString(), status: 'running', skipReasons: {}, values: {} } });
+    }
+    if (m === 'PATCH') { (stav.persisty ??= []).push(req.postDataJSON()); return json({ ok: true, run: { id: 99, duration_seconds: 75 } }); }
     if (m !== 'GET') return json({ ok: true });
     if (url.searchParams.get('active')) return json({ active: null });
     if (url.searchParams.get('today') === 'team') {
@@ -446,6 +452,102 @@ async function nastrojVUpravach(p, stav, znacka, vidget) {
   tvrdi('NZ1: „Potvrzuji přečtení" pošle POST { markRead: true }', await dokud(() => (stav.zapisyNavodu ?? []).some(z => z.m === 'POST' && z.telo?.includes('markRead')), 2000));
   await p.screenshot({ path: OUT + 'k69-b6b-navody-zam-desk.png', fullPage: true });
   tvrdi('NZ: bez chyb v konzoli', chyby.length === 0, chyby.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
+// Kolo 7 (postup-krok-mereni): editor s Měřenou hodnotou, běžící postup s polem a „mimo rozsah", detail průběhu s hodnotou.
+{
+  const { ctx, p, stav, chyby } = await kontext({ fix: FIX_POSTUPY, dalsi: podvrh() });
+  await otevri(p, POSTUPY, 'vedeni.postupy');
+  const nastroj = widgetLi(p, 'nastroj');
+  // Editor: uložený měřený krok se vrátí s jednotkou a mezemi.
+  await nastroj.getByRole('button', { name: 'Další akce s postupem Kontrola lednic' }).click();
+  await p.getByRole('menuitem', { name: 'Upravit' }).click();
+  const ed = p.getByRole('dialog', { name: 'Upravit postup' });
+  await dokud(() => ed.isVisible(), 2000);
+  const pilulka = ed.getByRole('button', { name: 'Krok 1: měřená hodnota' });
+  tvrdi('PM1: editor — krok „Změřit teplotu" má zapnutou „Měřenou hodnotu" s °C, 2 a 6', await pilulka.getAttribute('aria-pressed') === 'true'
+    && await ed.getByLabel('Jednotka kroku 1').inputValue() === '°C' && await ed.getByLabel('Nejnižší povolená hodnota kroku 1').inputValue() === '2'
+    && await ed.getByLabel('Nejvyšší povolená hodnota kroku 1').inputValue() === '6');
+  tvrdi('PM1: meze mají inputMode decimal (čárka i tečka)', await ed.getByLabel('Nejnižší povolená hodnota kroku 1').getAttribute('inputmode') === 'decimal'
+    && await ed.getByLabel('Nejvyšší povolená hodnota kroku 1').getAttribute('type') !== 'number');
+  await ed.getByLabel('Nejvyšší povolená hodnota kroku 1').fill('6,5');
+  await ed.getByRole('button', { name: 'Uložit změny' }).click();
+  tvrdi('PM1: uložení pošle krok s valueKind/valueUnit/valueMin/valueMax (6,5 → 6.5)', await dokud(() => (stav.zapisyPostupu ?? []).some(z => z.m === 'PATCH' && z.path === '/api/procedures/3'), 2000)
+    && (() => { const it = JSON.parse(stav.zapisyPostupu.find(z => z.path === '/api/procedures/3').telo).items[0]; return it.valueKind === 'number' && it.valueUnit === '°C' && it.valueMin === 2 && it.valueMax === 6.5; })(),
+    JSON.stringify(stav.zapisyPostupu?.map(z => z.telo)));
+  await dokud(async () => (await ed.count()) === 0, 2000);
+  // Nový postup: zapnutí „Měřené hodnoty" rozbalí tři pole.
+  await p.locator('[data-plocha]').getByRole('button', { name: 'Nový postup' }).click();
+  const novy = p.getByRole('dialog', { name: 'Nový postup' });
+  await dokud(() => novy.isVisible(), 2000);
+  tvrdi('PM2: nový krok bez měření — pole jednotky a mezí nejsou', await novy.getByLabel('Jednotka kroku 1').count() === 0);
+  await novy.getByRole('button', { name: 'Krok 1: měřená hodnota' }).click();
+  tvrdi('PM2: „Měřená hodnota" rozbalí Jednotka / Od / Do', await novy.getByLabel('Jednotka kroku 1').isVisible() && await novy.getByLabel('Nejnižší povolená hodnota kroku 1').isVisible());
+  await p.screenshot({ path: OUT + 'k83-postup-editor-desk.png' });
+  await p.keyboard.press('Escape');
+  await novy.getByRole('button', { name: 'Zrušit' }).click().catch(() => {});
+  await dokud(async () => (await novy.count()) === 0, 2000);
+
+  // Běžící postup: odškrtnout až s hodnotou, mimo rozsah = Chip, hodnota jde v persistu i v dokončení.
+  const radek = nastroj.locator('ul.list > li').filter({ hasText: 'Kontrola lednic' }).first();
+  await radek.getByRole('button', { name: 'Spustit' }).click();
+  tvrdi('PM3: Spustit pošle POST s postupem 3', await dokud(() => stav.spusteno?.procedureId === 3, 2000));
+  const pole = p.getByLabel(/Změřit teplotu/).and(p.locator('input'));
+  tvrdi('PM3: běžec ukáže pole „Naměřené hodnoty" s inputMode decimal a jednotkou °C', await dokud(() => pole.isVisible(), 2000)
+    && await pole.getAttribute('inputmode') === 'decimal' && (await p.getByRole('group', { name: 'Naměřené hodnoty' }).innerText()).includes('°C'));
+  await p.getByRole('button', { name: 'Označit jako hotové — Změřit teplotu' }).click();
+  tvrdi('PM3: krok bez hodnoty se neodškrtne a běžec řekne proč', await dokud(() => p.getByText('Nejdřív zapiš naměřenou hodnotu, pak krok odškrtni.').isVisible(), 1500)
+    && await p.getByRole('button', { name: 'Zrušit splnění — Změřit teplotu' }).count() === 0);
+  await pole.fill('7,5');
+  tvrdi('PM4: 7,5 °C mimo rozsah 2–6 → hned Chip „mimo rozsah" (neblokuje)', await dokud(() => p.getByRole('group', { name: 'Naměřené hodnoty' }).getByText('mimo rozsah').isVisible(), 1500));
+  tvrdi('PM4: průběžné uložení pošle values { 0: 7.5 }', await dokud(() => (stav.persisty ?? []).some(b => b.runId === 99 && b.values?.['0'] === 7.5), 2000), JSON.stringify(stav.persisty?.at(-1)));
+  await p.getByRole('button', { name: 'Označit jako hotové — Změřit teplotu' }).click();
+  tvrdi('PM4: s hodnotou jde krok odškrtnout', await dokud(() => p.getByRole('button', { name: 'Zrušit splnění — Změřit teplotu' }).isVisible(), 1500));
+  await p.screenshot({ path: OUT + 'k83-postup-beh-desk.png' });
+  await p.getByRole('button', { name: 'Dokončit' }).click();
+  tvrdi('PM4: Dokončit pošle complete s values { 0: 7.5 }', await dokud(() => (stav.persisty ?? []).some(b => b.complete === true && b.values?.['0'] === 7.5 && b.checkedItems?.includes(0)), 2000), JSON.stringify(stav.persisty?.at(-1)));
+
+  // Detail průběhu: hodnota podle jazyka a Chip s rozsahem.
+  await p.getByRole('button', { name: 'Zavřít', exact: true }).click().catch(() => {});
+  await nastroj.getByRole('button', { name: 'Kontrola lednic', exact: true }).click();
+  const dK = p.getByRole('dialog', { name: 'Kontrola lednic' });
+  await dokud(() => dK.isVisible(), 2000);
+  const sekce = dK.locator('section').filter({ has: p.getByRole('heading', { name: 'Poslední průběhy' }) });
+  await sekce.locator('button.list-row').filter({ hasText: 'Jana Nováková' }).click();
+  const dJ = p.getByRole('dialog', { name: 'Kontrola lednic' }).last();
+  tvrdi('PM5: detail průběhu ukáže „7,5 °C" a Chip „mimo rozsah (2–6 °C)"', await dokud(async () => (await p.getByRole('dialog', { name: 'Kontrola lednic' }).count()) === 2, 2000)
+    && (await dJ.innerText()).includes('7,5 °C') && (await dJ.innerText()).includes('mimo rozsah (2–6 °C)'), (await dJ.innerText()).replace(/\n/g, ' | '));
+  await p.keyboard.press('Escape');
+  await dokud(async () => (await p.getByRole('dialog', { name: 'Kontrola lednic' }).count()) === 1, 1500);
+  await sekce.locator('button.list-row').filter({ hasText: 'Petr Malý' }).click();
+  const dP = p.getByRole('dialog', { name: 'Kontrola lednic' }).last();
+  tvrdi('PM5: hodnota v rozsahu („4,2 °C") bez Chipu', await dokud(async () => (await dP.innerText()).includes('4,2 °C'), 2000) && !(await dP.innerText()).includes('mimo rozsah'));
+  await p.screenshot({ path: OUT + 'k83-postup-detail-prubehu-desk.png' });
+  tvrdi('PM: bez chyb v konzoli', chyby.length === 0, chyby.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+
+// Běžící měřený postup na telefonu 390 a tabletu 768/1024: pole pod textem kroku, nic nepřetéká.
+for (const [sirka, vyska] of [[390, 844], [768, 1024], [1024, 768]]) {
+  const { ctx, p, stav } = await kontext({ fix: FIX_POSTUPY, viewport: { width: sirka, height: vyska }, mobil: true, dalsi: podvrh() });
+  await otevri(p, POSTUPY, 'vedeni.postupy');
+  const radek = widgetLi(p, 'nastroj').locator('ul.list > li').filter({ hasText: 'Kontrola lednic' }).first();
+  await radek.getByRole('button', { name: 'Spustit' }).scrollIntoViewIfNeeded();
+  await radek.getByRole('button', { name: 'Spustit' }).click();
+  await dokud(() => stav.spusteno?.procedureId === 3, 2000);
+  const pole = p.getByLabel(/Změřit teplotu/).and(p.locator('input'));
+  await dokud(() => pole.isVisible(), 2000);
+  await pole.fill('1,5');
+  await dokud(() => p.getByRole('group', { name: 'Naměřené hodnoty' }).getByText('mimo rozsah').isVisible(), 1500);
+  const m = await pole.evaluate(el => {
+    const r = el.getBoundingClientRect(); const skup = el.closest('[role=group]').getBoundingClientRect();
+    const lab = document.querySelector(`label[for="${el.id}"]`).getBoundingClientRect();
+    return { pismo: parseFloat(getComputedStyle(el).fontSize), vyska: Math.round(r.height), pod: r.top >= lab.bottom - 1, uvnitr: r.right <= skup.right + 1, labelSirka: Math.round(lab.width) };
+  });
+  tvrdi(`PM6 ${sirka}: pole hodnoty pod textem kroku, ≥ 16 px a ≥ 44 px, text kroku čitelně široký, nic nepřetéká`,
+    m.pismo >= 16 && m.vyska >= 44 && m.pod && m.uvnitr && m.labelSirka >= 200 && await bezPreteceni(p), JSON.stringify(m));
+  await p.screenshot({ path: OUT + `k83-postup-beh-${sirka}.png` });
   await ctx.close();
 }
 

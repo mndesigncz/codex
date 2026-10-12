@@ -47,6 +47,8 @@ export interface PrubehApi {
   checked_items?: unknown;
   skipped_items?: unknown;
   skip_reasons?: unknown;
+  /** Naměřené hodnoty kroků { index: číslo } (kolo 7). */
+  values?: unknown;
   started_at?: string | null;
   completed_at?: string | null;
   duration_seconds?: number | null;
