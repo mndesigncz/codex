@@ -741,7 +741,6 @@
   "Poslední inventura": "Last stocktake",
   "Poslední inventura byla {datum}.": "The last stocktake was on {datum}.",
   "Poslední inventura sedí — nic nechybí ani nepřebývá.": "The last stocktake matches — nothing is missing or in surplus.",
-  "Poslední inventura v penězích: kolik chybí a přebývá, nejdražší ztráty, ztráta v % z prodaného.": "The last stocktake in money: how much is missing and in surplus, costliest losses, loss as a % of sold.",
   "Poslední pohyby skladu": "Latest stock movements",
   "Poslední průběhy": "Recent runs",
   "Poslední vlastní uzávěrky: tržba hotově/kartou, odloženo, výplata, rozdíl.": "Your latest closings: cash/card revenue, set aside, pay, difference.",
@@ -1976,5 +1975,11 @@
   "Ke skladu se přičte, co přišlo; cena za balení se zapíše k položce.": "What arrived is added to stock; the package price is saved to the item.",
   "Ke skladu se přičte, co přišlo.": "What arrived is added to stock.",
   "Přijato částečně — naskladněno {n, plural, one {# položka} few {# položky} other {# položek}}, nedorazilo {m}.": "Partly received — {n, plural, one {# item} other {# items}} stocked, {m} didn't fully arrive.",
-  "nedodáno {n} {jednotka}": "{n} {jednotka} not delivered"
+  "nedodáno {n} {jednotka}": "{n} {jednotka} not delivered",
+  "Poslední inventura v penězích: kolik chybí a přebývá, nejdražší ztráty, ztráta v % z prodaného, změna proti předchozí inventuře a ve velkém vývoj posledních inventur.": "The last stocktake in money: how much is missing and in surplus, costliest losses, loss as a % of sold, change against the previous stocktake and, in the large size, the trend over recent stocktakes.",
+  "stejně jako minule": "same as last time",
+  "ztráty o {castka} vyšší než minule": "losses {castka} higher than last time",
+  "ztráty o {castka} nižší než minule": "losses {castka} lower than last time",
+  "Vývoj ztrát: {n, plural, one {poslední inventura} few {poslední # inventury} other {posledních # inventur}}": "Loss trend: {n, plural, one {last stocktake} other {last # stocktakes}}",
+  "{n, plural, one {poslední inventura} few {poslední # inventury} other {posledních # inventur}}": "{n, plural, one {last stocktake} other {last # stocktakes}}"
 }

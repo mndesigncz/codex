@@ -133,6 +133,33 @@ const pretece = (p) => p.evaluate(() => document.documentElement.scrollWidth > w
   await ctx.close();
 }
 
+// Kolo 7 (R7-6): Ztráty a manka v čase — M má Chip změny proti předchozí inventuře,
+// L k tomu BarSpark posledních šesti inventur (fixtura: −980 → −1 630 Kč, tedy o 650 Kč hůř).
+{
+  const { ctx, p } = await kontext({ fix: s('k69-b5b-rozlozeni-finance'), dalsi: data() });
+  await otevri(p, '/employer/overview?view=finance', 'vedeni.finance');
+  await dokud(async () => /Chybí/.test(await text(p, 'finance.ztraty')), 5000);
+  const m = await text(p, 'finance.ztraty');
+  tvrdi('ztráty M: Chip změny „ztráty o 650 Kč vyšší než minule"', /ztráty o 650 Kč vyšší než minule/.test(m), m.slice(0, 200));
+  tvrdi('ztráty M: střední bez grafu', await p.locator('[data-plocha] li[data-widget="finance.ztraty"] [role="group"][aria-label^="Vývoj ztrát"]').count() === 0);
+  await ctx.close();
+}
+for (const w of [1280, 390]) {
+  const fixL = { ...s('k69-b5b-rozlozeni-finance'), polozky: [{ id: 'ztraty', widget: 'finance.ztraty', velikost: 'L' }, { id: 'nastroj', widget: 'nastroj', velikost: 'L' }] };
+  const { ctx, p } = await kontext({ fix: fixL, dalsi: data(), viewport: { width: w, height: w < 600 ? 844 : 900 }, mobil: w < 600 });
+  await otevri(p, '/employer/overview?view=finance', 'vedeni.finance');
+  const li = p.locator('[data-plocha] li[data-widget="finance.ztraty"]');
+  const graf = li.locator('[role="group"][aria-label="Vývoj ztrát: posledních 6 inventur"]');
+  tvrdi(`ztráty L ${w}: BarSpark posledních 6 inventur pod čísly`, await dokud(() => graf.isVisible(), 5000) && await graf.locator('.spark-sloupek, .spark-sloupek-hl').count() === 6);
+  tvrdi(`ztráty L ${w}: nejnovější inventura zvýrazněná, popisek „posledních 6 inventur" a Chip změny`, await graf.locator('.spark-sloupek-hl').count() === 1
+    && /posledních 6 inventur/.test(await li.innerText()) && /vyšší než minule/.test(await li.innerText()));
+  const pres = await li.evaluate(el => el.scrollWidth - el.clientWidth);
+  tvrdi(`ztráty L ${w}: graf nepřetéká widget`, pres <= 0 && !(await pretece(p)), String(pres));
+  if (w === 390) { await li.scrollIntoViewIfNeeded(); await p.screenshot({ path: OUT + 'k83-ztraty-L-390.png' }); }
+  else { await li.scrollIntoViewIfNeeded(); await p.screenshot({ path: OUT + 'k83-ztraty-L-1280.png' }); }
+  await ctx.close();
+}
+
 // 5) 500 na maržích → chyba jen v jednom widgetu.
 {
   const { ctx, p } = await kontext({ fix: s('k69-b5b-rozlozeni-finance'), dalsi: data({ chyby: { '/api/pos/margins': 500 } }) });

@@ -10,12 +10,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { menaPodniku } from '@/lib/menaPodniku';
+import { historieZtrat, rozdilyInventury, souhrnZtrat, type ZtrataInventury } from '@/lib/skladPrehled';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
+
+/** Kolik posledních dokončených inventur vrací `?history=1` (vývoj ztrát ve widgetu a v Inventuře). */
+const HISTORIE = 6;
 
 export interface ShrinkRow {
   itemId: number;
@@ -48,8 +52,25 @@ export async function GET(req: NextRequest) {
   // Rady ukazují částky v měně podniku (osm podporovaných měn), ne natvrdo v korunách.
   const mena = await menaPodniku(teamId);
 
-  const idParam = new URL(req.url).searchParams.get('id');
+  const params = new URL(req.url).searchParams;
+  const idParam = params.get('id');
   const wantId = idParam ? parseInt(idParam) : null;
+  if (idParam != null && !Number.isFinite(wantId)) return NextResponse.json({ error: 'Neplatné ID' }, { status: 400 });
+
+  // ?history=1 (kolo 7): k poslední (nebo vybrané) inventuře i čistý rozdíl a ztráty
+  // posledních šesti dokončených — jeden dotaz nad stocktakes a stejný výpočet jako
+  // pro jednu inventuru (lib/skladPrehled). Poměr k prodeji se v řadě nepočítá
+  // (šest dotazů do inventory_log navíc by za to nestálo).
+  let history: ZtrataInventury[] | undefined;
+  if (params.get('history') === '1') {
+    try {
+      const posledni = await sql`
+        SELECT id, completed_at, data FROM stocktakes
+        WHERE team_id = ${teamId} AND status = 'done' AND completed_at IS NOT NULL
+        ORDER BY completed_at DESC LIMIT ${HISTORIE}`;
+      history = historieZtrat(posledni as any[]);
+    } catch { history = []; }
+  }
 
   let take: any;
   try {
@@ -59,17 +80,16 @@ export async function GET(req: NextRequest) {
                   ORDER BY completed_at DESC LIMIT 1`;
     take = rows[0];
   } catch {
-    return NextResponse.json({ ready: false, reason: 'notMigrated' });
+    return NextResponse.json({ ready: false, reason: 'notMigrated', ...(history ? { history: [] } : {}) });
   }
-  if (!take) return NextResponse.json({ ready: false, reason: 'noStocktake' });
+  if (!take) return NextResponse.json({ ready: false, reason: 'noStocktake', ...(history ? { history } : {}) });
 
   const [prev] = await sql`
     SELECT id, completed_at FROM stocktakes
     WHERE team_id = ${teamId} AND status = 'done' AND completed_at < ${take.completed_at}
     ORDER BY completed_at DESC LIMIT 1`;
 
-  const data: any[] = Array.isArray(take.data) ? take.data : [];
-  const counted = data.filter(d => d.counted != null || d.countedOpen != null);
+  const { radky: rozdily, polozek, spocitano } = rozdilyInventury(take.data);
 
   // Kolik se mezi inventurami odepsalo z prodeje — teoretická spotřeba.
   const soldById = new Map<number, number>();
@@ -95,38 +115,18 @@ export async function GET(req: NextRequest) {
     }
   } catch { /* bez historie prostě nebude poměr */ }
 
-  const rows: ShrinkRow[] = counted.map(d => {
-    const pkg = Number(d.packageSize) || 0;
-    const unitCost = d.unitCost != null ? Number(d.unitCost) : null;
-    const qtyDiff = d.counted != null ? Number(d.counted) - Number(d.expected) : 0;
-    const openDiff = d.countedOpen != null && pkg > 0
-      ? r3(Number(d.countedOpen) - Number(d.expectedOpen ?? 0)) : null;
-    const diff = pkg > 0 ? r3(qtyDiff * pkg + (openDiff ?? 0)) : qtyDiff;
-    const perUnit = unitCost != null ? (pkg > 0 ? unitCost / pkg : unitCost) : null;
-    const sold = soldById.get(Number(d.itemId)) ?? null;
-    return {
-      itemId: Number(d.itemId),
-      name: String(d.name),
-      category: d.category ?? null,
-      unit: d.unit ?? 'ks',
-      contentUnit: d.contentUnit ?? null,
-      qtyDiff,
-      openDiff,
-      diff,
-      // Záloha je jednotka položky, ne litr: gramová položka bez uložené jednotky obsahu se nesmí vykázat v litrech.
-      diffUnit: pkg > 0 ? (d.contentUnit || d.unit || 'ks') : (d.unit ?? 'ks'),
-      sold,
-      lossPct: sold && sold > 0 && diff < 0 ? Math.round((-diff / sold) * 100) : null,
-      value: perUnit != null ? Math.round(perUnit * diff) : null,
-    };
-  }).filter(r => r.diff !== 0);
+  // Rozdíly a jejich hodnota z lib/skladPrehled (stejný výpočet jako řada `history`);
+  // tady jen přibude, kolik se za období odepsalo z prodeje.
+  const rows: ShrinkRow[] = rozdily.map(r => {
+    const sold = soldById.get(r.itemId) ?? null;
+    return { ...r, sold, lossPct: sold && sold > 0 && r.diff < 0 ? Math.round((-r.diff / sold) * 100) : null };
+  });
 
   rows.sort((a, b) => (a.value ?? 0) - (b.value ?? 0));
 
   const missing = rows.filter(r => r.diff < 0);
   const surplus = rows.filter(r => r.diff > 0);
-  const lostValue = missing.reduce((s, r) => s + (r.value ?? 0), 0);   // záporné
-  const surplusValue = surplus.reduce((s, r) => s + (r.value ?? 0), 0);
+  const { lostValue, surplusValue, netValue } = souhrnZtrat(rows);   // lostValue záporné
   const noPrice = rows.filter(r => r.value == null).map(r => r.name);
 
   const insights: { icon: string; title: string; text: string; tone: 'good' | 'warn' | 'info' }[] = [];
@@ -172,7 +172,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const uncounted = data.length - counted.length;
+  const uncounted = polozek - spocitano;
   if (uncounted > 0) {
     insights.push({
       icon: 'bulb', tone: 'info',
@@ -183,16 +183,18 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     ready: true,
-    stocktake: { id: take.id, completedAt: take.completed_at, items: data.length, counted: counted.length },
+    stocktake: { id: take.id, completedAt: take.completed_at, items: polozek, counted: spocitano },
     since: prev?.completed_at ?? null,
     totals: {
       lostValue,
       surplusValue,
-      netValue: lostValue + surplusValue,
+      netValue,
       missing: missing.length,
       surplus: surplus.length,
     },
     rows: rows.slice(0, 60),
     insights,
+    // Od nejstarší po nejnovější; jen s ?history=1.
+    ...(history ? { history } : {}),
   });
 }

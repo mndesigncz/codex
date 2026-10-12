@@ -31,8 +31,23 @@ import {
 } from '@/lib/mnozstvi';
 import { useMoney } from '../CurrencyProvider';
 import { Button, Chip, ListRow, Modal, Skeleton, Stat, StatRow, Well } from '../ui';
+import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
+
+/**
+ * Čistý rozdíl posledních inventur v penězích (kolo 7). Stejná URL jako widget
+ * Ztráty a manka, takže na Skladu je to tatáž odpověď ze sdílené mezipaměti.
+ * Jen s `finance.ztraty` (server jinak 403) — bez něj zůstává u řádku počet rozdílů.
+ */
+const URL_ZTRAT = '/api/inventory/shrinkage?history=1';
+const vyberCistyRozdil = (raw: any): Record<number, number> => {
+  const out: Record<number, number> = {};
+  for (const h of Array.isArray(raw?.history) ? raw.history : []) {
+    if (h && h.id != null && Number.isFinite(Number(h.netValue))) out[Number(h.id)] = Number(h.netValue);
+  }
+  return out;
+};
 
 type Row = RadekInventury;
 type Take = { id: number; status: string; data: Row[]; createdAt: string; completedAt: string | null };
@@ -60,6 +75,7 @@ export default function StocktakeModal({ smiZahajit, smiDokoncit, smiZtraty, onC
   const fmt = (n: number) => round3(n).toLocaleString(LOCALE_PRO_JAZYK[jazyk], { maximumFractionDigits: 3 });
   const [open, setOpen] = useState<Take | null>(null);
   const [history, setHistory] = useState<Take[]>([]);
+  const cisteRozdily = useDataWidgetu(smiZtraty && history.length > 0 ? URL_ZTRAT : null, vyberCistyRozdil);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -182,6 +198,8 @@ export default function StocktakeModal({ smiZahajit, smiDokoncit, smiZtraty, onC
       setOpen(null);
       await load();
       onApplied();
+      // Nová dokončená inventura mění řadu ztrát (widget i řádky „Minulé inventury").
+      obnovDataWidgetu(URL_ZTRAT);
       setErr('');
       setDoneMsg(t('Hotovo — spočítáno: {polozky}, zapsáno: {rozdily}.', { polozky: polozekTxt(t, d.applied ?? 0), rozdily: rozdilTxt(t, d.diffs ?? 0) }));
     } else {
@@ -262,12 +280,21 @@ export default function StocktakeModal({ smiZahajit, smiDokoncit, smiZtraty, onC
                       (r.counted != null && r.counted !== r.expected) ||
                       (r.countedOpen != null && r.countedOpen !== (r.expectedOpen ?? 0)));
                     const vybrana = (selected ?? history[0]?.id) === h.id;
+                    // Hodnota rozdílu v penězích (čistý: přebytek − manko), jen s finance.ztraty a jen
+                    // u posledních šesti inventur, které API spočítá; jinak jako dřív počet rozdílů.
+                    const net = cisteRozdily.data?.[h.id];
+                    const sHodnotou = smiZtraty && net != null && diffs.length > 0;
                     return (
                       <li key={h.id} className={vybrana ? 'bg-black/[0.04] rounded-xl' : ''}>
                         <ListRow as="div"
                           title={h.completedAt ? fmtDatum(h.completedAt, { jazyk, styl: 'dlouze' }) : '—'}
-                          meta={t('{n} spočítáno', { n: counted.length })}
-                          right={<Chip tone={diffs.length ? 'wait' : 'ok'} size="sm">{diffs.length ? plural(diffs.length) : t('vše sedělo')}</Chip>}
+                          meta={sHodnotou ? `${t('{n} spočítáno', { n: counted.length })} · ${plural(diffs.length)}` : t('{n} spočítáno', { n: counted.length })}
+                          value={sHodnotou ? (
+                            <span className={`tabular-nums ${net! < 0 ? 'text-bad-ink' : net! > 0 ? 'text-ok-ink' : ''}`}>
+                              {net! > 0 ? '+' : net! < 0 ? '−' : ''}{money(Math.abs(net!))}
+                            </span>
+                          ) : undefined}
+                          right={sHodnotou ? undefined : <Chip tone={diffs.length ? 'wait' : 'ok'} size="sm">{diffs.length ? plural(diffs.length) : t('vše sedělo')}</Chip>}
                           onClick={() => setSelected(h.id)} />
                       </li>
                     );

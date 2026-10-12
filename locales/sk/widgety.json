@@ -742,7 +742,6 @@
   "Poslední inventura": "Posledná inventúra",
   "Poslední inventura byla {datum}.": "Posledná inventúra bola {datum}.",
   "Poslední inventura sedí — nic nechybí ani nepřebývá.": "Posledná inventúra sedí — nič nechýba ani neprebýva.",
-  "Poslední inventura v penězích: kolik chybí a přebývá, nejdražší ztráty, ztráta v % z prodaného.": "Posledná inventúra v peniazoch: koľko chýba a prebýva, najdrahšie straty, strata v % z predaného.",
   "Poslední pohyby skladu": "Posledné pohyby skladu",
   "Poslední průběhy": "Posledné priebehy",
   "Poslední vlastní uzávěrky: tržba hotově/kartou, odloženo, výplata, rozdíl.": "Posledné vlastné uzávierky: tržba v hotovosti/kartou, odložené, výplata, rozdiel.",
@@ -1979,5 +1978,11 @@
   "Ke skladu se přičte, co přišlo; cena za balení se zapíše k položce.": "K skladu sa pripočíta, čo prišlo; cena za balenie sa zapíše k položke.",
   "Ke skladu se přičte, co přišlo.": "K skladu sa pripočíta, čo prišlo.",
   "Přijato částečně — naskladněno {n, plural, one {# položka} few {# položky} other {# položek}}, nedorazilo {m}.": "Prijaté čiastočne — naskladnené {n, plural, one {# položka} few {# položky} many {# položky} other {# položiek}}, nedorazilo {m}.",
-  "nedodáno {n} {jednotka}": "nedodané {n} {jednotka}"
+  "nedodáno {n} {jednotka}": "nedodané {n} {jednotka}",
+  "Poslední inventura v penězích: kolik chybí a přebývá, nejdražší ztráty, ztráta v % z prodaného, změna proti předchozí inventuře a ve velkém vývoj posledních inventur.": "Posledná inventúra v peniazoch: koľko chýba a prebýva, najdrahšie straty, strata v % z predaného, zmena oproti predchádzajúcej inventúre a vo veľkom vývoj posledných inventúr.",
+  "stejně jako minule": "rovnako ako minule",
+  "ztráty o {castka} vyšší než minule": "straty o {castka} vyššie ako minule",
+  "ztráty o {castka} nižší než minule": "straty o {castka} nižšie ako minule",
+  "Vývoj ztrát: {n, plural, one {poslední inventura} few {poslední # inventury} other {posledních # inventur}}": "Vývoj strát: {n, plural, one {posledná inventúra} few {posledné # inventúry} many {posledných # inventúr} other {posledných # inventúr}}",
+  "{n, plural, one {poslední inventura} few {poslední # inventury} other {posledních # inventur}}": "{n, plural, one {posledná inventúra} few {posledné # inventúry} many {posledných # inventúr} other {posledných # inventúr}}"
 }

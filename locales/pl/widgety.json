@@ -741,7 +741,6 @@
   "Poslední inventura": "Ostatnia inwentaryzacja",
   "Poslední inventura byla {datum}.": "Ostatnia inwentaryzacja odbyła się {datum}.",
   "Poslední inventura sedí — nic nechybí ani nepřebývá.": "Ostatnia inwentaryzacja się zgadza — nic nie brakuje ani nie przybywa.",
-  "Poslední inventura v penězích: kolik chybí a přebývá, nejdražší ztráty, ztráta v % z prodaného.": "Ostatnia inwentaryzacja w pieniądzach: ile brakuje i przybywa, najdroższe straty, strata w % ze sprzedanego.",
   "Poslední pohyby skladu": "Ostatnie ruchy magazynu",
   "Poslední průběhy": "Ostatnie przebiegi",
   "Poslední vlastní uzávěrky: tržba hotově/kartou, odloženo, výplata, rozdíl.": "Twoje ostatnie zamknięcia kasy: utarg gotówką/kartą, odłożone, wypłata, różnica.",
@@ -1976,5 +1975,11 @@
   "Ke skladu se přičte, co přišlo; cena za balení se zapíše k položce.": "Do stanu doliczy się to, co dotarło; cena za opakowanie zapisze się przy pozycji.",
   "Ke skladu se přičte, co přišlo.": "Do stanu doliczy się to, co dotarło.",
   "Přijato částečně — naskladněno {n, plural, one {# položka} few {# položky} other {# položek}}, nedorazilo {m}.": "Przyjęto częściowo — na stan {n, plural, one {# pozycja} few {# pozycje} many {# pozycji} other {# pozycji}}, nie dotarło {m}.",
-  "nedodáno {n} {jednotka}": "nie dostarczono {n} {jednotka}"
+  "nedodáno {n} {jednotka}": "nie dostarczono {n} {jednotka}",
+  "Poslední inventura v penězích: kolik chybí a přebývá, nejdražší ztráty, ztráta v % z prodaného, změna proti předchozí inventuře a ve velkém vývoj posledních inventur.": "Ostatnia inwentaryzacja w pieniądzach: ile brakuje i przybywa, najdroższe straty, strata w % ze sprzedanego, zmiana względem poprzedniej inwentaryzacji, a w dużym rozmiarze przebieg ostatnich inwentaryzacji.",
+  "stejně jako minule": "tak samo jak ostatnio",
+  "ztráty o {castka} vyšší než minule": "straty o {castka} wyższe niż ostatnio",
+  "ztráty o {castka} nižší než minule": "straty o {castka} niższe niż ostatnio",
+  "Vývoj ztrát: {n, plural, one {poslední inventura} few {poslední # inventury} other {posledních # inventur}}": "Przebieg strat: {n, plural, one {ostatnia inwentaryzacja} few {ostatnie # inwentaryzacje} many {ostatnich # inwentaryzacji} other {ostatnich # inwentaryzacji}}",
+  "{n, plural, one {poslední inventura} few {poslední # inventury} other {posledních # inventur}}": "{n, plural, one {ostatnia inwentaryzacja} few {ostatnie # inwentaryzacje} many {ostatnich # inwentaryzacji} other {ostatnich # inwentaryzacji}}"
 }

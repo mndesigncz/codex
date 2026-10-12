@@ -599,3 +599,95 @@ export function dnuOd(den: string, dnes: string): number {
   const n = Math.round((d(dnes) - d(den)) / 86_400_000);
   return Number.isFinite(n) ? Math.max(0, n) : 0;
 }
+
+// ---------------------------------------------------------------------------
+// Ztráty a manka z inventur a jejich vývoj (kolo 7)
+// ---------------------------------------------------------------------------
+//
+// Dřív žil výpočet rozdílů jen v /api/inventory/shrinkage a uměl jednu
+// inventuru. Tady je tentýž výpočet (beze změny čísel) pro jednu inventuru
+// i pro řadu posledních — widget Ztráty a manka z ní kreslí vývoj a Inventura
+// u minulých inventur ukazuje hodnotu rozdílu v penězích.
+
+const r3 = (n: number) => Math.round(n * 1000) / 1000;
+
+/** Rozdíl jedné spočítané položky inventury (bez poměru k prodeji — ten chce historii pohybů). */
+export interface RozdilInventury {
+  itemId: number;
+  name: string;
+  category: string | null;
+  unit: string;
+  contentUnit: string | null;
+  /** Rozdíl v celých baleních (spočítáno − evidence). */
+  qtyDiff: number;
+  /** Rozdíl v načatém balení, v obsahových jednotkách. */
+  openDiff: number | null;
+  /** Celkový rozdíl v obsahu (u balení) nebo v kusech. */
+  diff: number;
+  diffUnit: string;
+  /** Hodnota rozdílu v měně podniku; záporná = chybí, null = položka bez ceny. */
+  value: number | null;
+}
+
+/** Rozdíly ze snímku inventury (stocktakes.data): jen spočítané položky s nenulovým rozdílem. */
+export function rozdilyInventury(data: unknown): { radky: RozdilInventury[]; polozek: number; spocitano: number } {
+  const vse: any[] = Array.isArray(data) ? data.filter(d => d && typeof d === 'object') : [];
+  const spocitane = vse.filter(d => d.counted != null || d.countedOpen != null);
+  const radky = spocitane.map((d): RozdilInventury => {
+    const pkg = Number(d.packageSize) || 0;
+    const unitCost = d.unitCost != null ? Number(d.unitCost) : null;
+    const qtyDiff = d.counted != null ? Number(d.counted) - Number(d.expected) : 0;
+    const openDiff = d.countedOpen != null && pkg > 0 ? r3(Number(d.countedOpen) - Number(d.expectedOpen ?? 0)) : null;
+    const diff = pkg > 0 ? r3(qtyDiff * pkg + (openDiff ?? 0)) : qtyDiff;
+    const perUnit = unitCost != null ? (pkg > 0 ? unitCost / pkg : unitCost) : null;
+    return {
+      itemId: Number(d.itemId),
+      name: String(d.name),
+      category: d.category ?? null,
+      unit: d.unit ?? 'ks',
+      contentUnit: d.contentUnit ?? null,
+      qtyDiff,
+      openDiff,
+      diff,
+      // Záloha je jednotka položky, ne litr: gramová položka bez uložené jednotky obsahu se nesmí vykázat v litrech.
+      diffUnit: pkg > 0 ? (d.contentUnit || d.unit || 'ks') : (d.unit ?? 'ks'),
+      value: perUnit != null ? Math.round(perUnit * diff) : null,
+    };
+  }).filter(r => r.diff !== 0);
+  return { radky, polozek: vse.length, spocitano: spocitane.length };
+}
+
+/** Součty rozdílů: chybí (záporně), přebývá, čistý rozdíl a počty položek. Položka bez ceny do peněz nevstupuje. */
+export function souhrnZtrat(radky: readonly Pick<RozdilInventury, 'diff' | 'value'>[]) {
+  const chybi = radky.filter(r => r.diff < 0);
+  const prebyva = radky.filter(r => r.diff > 0);
+  const lostValue = chybi.reduce((s, r) => s + (r.value ?? 0), 0);
+  const surplusValue = prebyva.reduce((s, r) => s + (r.value ?? 0), 0);
+  return { lostValue, surplusValue, netValue: lostValue + surplusValue, missing: chybi.length, surplus: prebyva.length };
+}
+
+/** Jedna dokončená inventura v řadě vývoje ztrát. */
+export interface ZtrataInventury { id: number; completedAt: string; netValue: number; lostValue: number }
+
+/** Řada dokončených inventur od nejstarší po nejnovější (pro BarSpark a změnu proti předchozí). */
+export function historieZtrat(inventury: readonly { id: unknown; completed_at?: unknown; completedAt?: unknown; data?: unknown }[]): ZtrataInventury[] {
+  return inventury
+    .map(s => {
+      const { netValue, lostValue } = souhrnZtrat(rozdilyInventury(s.data).radky);
+      const kdy = s.completed_at ?? s.completedAt;
+      return { id: Number(s.id), completedAt: kdy instanceof Date ? kdy.toISOString() : String(kdy ?? ''), netValue, lostValue };
+    })
+    .filter(h => Number.isFinite(h.id) && h.completedAt !== '')
+    .sort((a, b) => a.completedAt.localeCompare(b.completedAt));
+}
+
+/**
+ * Změna čistého rozdílu poslední inventury proti předchozí: `rozdil` = nyní − předtím
+ * (záporné = ztráty narostly). null, dokud nejsou dvě inventury.
+ */
+export function zmenaZtrat(historie: readonly ZtrataInventury[]): { rozdil: number; horsi: boolean; predtim: number } | null {
+  if (historie.length < 2) return null;
+  const ted = historie[historie.length - 1], predtim = historie[historie.length - 2];
+  const rozdil = ted.netValue - predtim.netValue;
+  return { rozdil, horsi: rozdil < 0, predtim: predtim.netValue };
+}

@@ -10,6 +10,7 @@ import type { Testy } from './_testy.ts';
 import { nazevExportuUzaverek, popisObdobiExportu } from '../../lib/uzaverkyFiltr.ts';
 import { souhrnUzaverek, souhrnUzaverekRozmezi, hodnotyUzaverekPoDnech, maHosty, nejviceHostu, hosteUzaverky, type RadekUzaverky } from '../../lib/uzaverkyPrehled.ts';
 import { overPrijem, souhrnPrijmu, rozdilPrijmu, radkyKPrijmu, nedodano, posledniCenyBaleni, polozekUDodavatelu, posledniObjednavkaDodavatelu, dnuOd, type PolozkaObjednavky, type PolozkaSkladu } from '../../lib/skladPrehled.ts';
+import { rozdilyInventury, souhrnZtrat, historieZtrat, zmenaZtrat } from '../../lib/skladPrehled.ts';
 import { cenaProSloupec } from '../../lib/cena.ts';
 import { tonMarze, jePodCilem, cilMarze, prahyRadMarze, seradReceptury } from '../../lib/recepturyPrehled.ts';
 
@@ -142,4 +143,29 @@ export default function ({ eq, ok }: Testy) {
   const kopieRec = JSON.stringify(rec);
   seradReceptury(rec, 'marze');
   ok('řazení: vstup se nemění', JSON.stringify(rec) === kopieRec);
+
+  // ---- 6) Ztráty z inventur a jejich vývoj ----
+  const snimek = [
+    { itemId: 1, name: 'Mléko', unit: 'l', unitCost: 25, expected: 10, counted: 8 },                           // −2 l × 25 = −50
+    { itemId: 2, name: 'Vodka', unit: 'lahev', contentUnit: 'l', packageSize: 0.7, unitCost: 350, expected: 3, counted: 3, expectedOpen: 0.5, countedOpen: 0.3 }, // −0,2 l = −100
+    { itemId: 3, name: 'Kelímky', unit: 'ks', unitCost: 2, expected: 100, counted: 120 },                       // +20 ks = +40
+    { itemId: 4, name: 'Sirup', unit: 'ks', unitCost: null, expected: 4, counted: 3 },                          // bez ceny
+    { itemId: 5, name: 'Cukr', unit: 'kg', unitCost: 30, expected: 5, counted: 5 },                             // sedí → vypadne
+    { itemId: 6, name: 'Nespočítané', unit: 'ks', unitCost: 10, expected: 5, counted: null },
+  ];
+  const ri = rozdilyInventury(snimek);
+  eq('ztráty: jen spočítané s rozdílem; počet položek a spočítaných', [ri.radky.map(r => r.itemId), ri.polozek, ri.spocitano], [[1, 2, 3, 4], 6, 5]);
+  eq('ztráty: balení — rozdíl v obsahu a jednotka obsahu, hodnota za obsah', [ri.radky[1].diff, ri.radky[1].diffUnit, ri.radky[1].value], [-0.2, 'l', -100]);
+  eq('ztráty: položka bez ceny nemá hodnotu (není nula)', ri.radky[3].value, null);
+  const sz = souhrnZtrat(ri.radky);
+  eq('ztráty: chybí −150, přebývá +40, čistě −110, počty 3 / 1', [sz.lostValue, sz.surplusValue, sz.netValue, sz.missing, sz.surplus], [-150, 40, -110, 3, 1]);
+  const hist = historieZtrat([
+    { id: 12, completed_at: '2026-10-01T18:00:00Z', data: snimek },
+    { id: 10, completed_at: '2026-08-01T18:00:00Z', data: [{ itemId: 1, name: 'Mléko', unit: 'l', unitCost: 25, expected: 10, counted: 9 }] },
+    { id: 11, completed_at: new Date('2026-09-01T18:00:00Z'), data: [] },
+  ]);
+  eq('ztráty: historie od nejstarší, netValue i lostValue', hist.map(h => [h.id, h.netValue, h.lostValue]), [[10, -25, -25], [11, 0, 0], [12, -110, -150]]);
+  eq('ztráty: změna proti předchozí (−110 proti 0 = o 110 horší)', zmenaZtrat(hist), { rozdil: -110, horsi: true, predtim: 0 });
+  eq('ztráty: zlepšení se pozná', zmenaZtrat(hist.slice(0, 2)), { rozdil: 25, horsi: false, predtim: -25 });
+  eq('ztráty: jedna inventura = žádná změna', zmenaZtrat(hist.slice(0, 1)), null);
 }

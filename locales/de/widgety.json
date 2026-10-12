@@ -741,7 +741,6 @@
   "Poslední inventura": "Letzte Inventur",
   "Poslední inventura byla {datum}.": "Die letzte Inventur war am {datum}.",
   "Poslední inventura sedí — nic nechybí ani nepřebývá.": "Die letzte Inventur stimmt — nichts fehlt und nichts ist übrig.",
-  "Poslední inventura v penězích: kolik chybí a přebývá, nejdražší ztráty, ztráta v % z prodaného.": "Die letzte Inventur in Geld: wie viel fehlt und übrig ist, teuerste Verluste, Verlust in % vom Verkauften.",
   "Poslední pohyby skladu": "Letzte Lagerbewegungen",
   "Poslední průběhy": "Letzte Durchläufe",
   "Poslední vlastní uzávěrky: tržba hotově/kartou, odloženo, výplata, rozdíl.": "Deine letzten Kassenabschlüsse: Umsatz bar/Karte, entnommen, Auszahlung, Differenz.",
@@ -1977,5 +1976,11 @@
   "Ke skladu se přičte, co přišlo; cena za balení se zapíše k položce.": "Was geliefert wurde, kommt ins Lager; der Packungspreis wird beim Artikel gespeichert.",
   "Ke skladu se přičte, co přišlo.": "Was geliefert wurde, kommt ins Lager.",
   "Přijato částečně — naskladněno {n, plural, one {# položka} few {# položky} other {# položek}}, nedorazilo {m}.": "Teilweise angenommen – {n, plural, one {# Artikel} other {# Artikel}} eingelagert, {m} nicht vollständig geliefert.",
-  "nedodáno {n} {jednotka}": "{n} {jednotka} nicht geliefert"
+  "nedodáno {n} {jednotka}": "{n} {jednotka} nicht geliefert",
+  "Poslední inventura v penězích: kolik chybí a přebývá, nejdražší ztráty, ztráta v % z prodaného, změna proti předchozí inventuře a ve velkém vývoj posledních inventur.": "Die letzte Inventur in Geld: wie viel fehlt und übrig ist, teuerste Verluste, Verlust in % vom Verkauften, Veränderung gegenüber der vorherigen Inventur und in groß der Verlauf der letzten Inventuren.",
+  "stejně jako minule": "wie beim letzten Mal",
+  "ztráty o {castka} vyšší než minule": "Verluste {castka} höher als beim letzten Mal",
+  "ztráty o {castka} nižší než minule": "Verluste {castka} niedriger als beim letzten Mal",
+  "Vývoj ztrát: {n, plural, one {poslední inventura} few {poslední # inventury} other {posledních # inventur}}": "Verlustverlauf: {n, plural, one {letzte Inventur} other {letzte # Inventuren}}",
+  "{n, plural, one {poslední inventura} few {poslední # inventury} other {posledních # inventur}}": "{n, plural, one {letzte Inventur} other {letzte # Inventuren}}"
 }
