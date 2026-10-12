@@ -51,6 +51,21 @@ const podvrh = (req, json) => {
   tvrdi('„zavírací" najde postup', await dokud(async () => await okno.getByRole('option', { name: /Zavírací rutina/ }).count() >= 1, 5000));
   await p.keyboard.press('Escape');
 
+  // Kolo 5: paleta akcí — „kasa" najde Nastavení › Pokladna (synonymum) a výběr otevře Nastavení na záložce Pokladna;
+  // „po termínu" najde akci Úkoly po termínu (deep link stav:po_terminu).
+  await p.keyboard.press('Control+k');
+  await okno.waitFor({ timeout: 5000 });
+  await okno.getByRole('combobox').fill('kasa');
+  tvrdi('„kasa" najde ve skupině Akce a nastavení Nastavení › Pokladna i Novou uzávěrku', await dokud(async () => await okno.getByRole('option', { name: /Nastavení › Pokladna/ }).count() === 1 && await okno.getByRole('option', { name: /Nová uzávěrka/ }).count() === 1, 4000), await okno.innerText());
+  tvrdi('…skupina se jmenuje „Akce a nastavení"', /Akce a nastavení/i.test(await okno.innerText()));
+  await okno.getByRole('option', { name: /Nastavení › Pokladna/ }).click();
+  tvrdi('výběr otevře Nastavení rovnou na záložce Pokladna', await dokud(async () => await p.getByRole('heading', { name: 'Pokladna', exact: true }).count() >= 1 || await p.locator('[aria-pressed="true"], [aria-selected="true"]').filter({ hasText: 'Pokladna' }).count() >= 1, 8000), (await p.locator('main').innerText()).slice(0, 200));
+  await p.keyboard.press('Control+k');
+  await okno.waitFor({ timeout: 5000 });
+  await okno.getByRole('combobox').fill('po termínu');
+  tvrdi('„po termínu" najde akci Úkoly po termínu', await dokud(async () => await okno.getByRole('option', { name: /Úkoly po termínu/ }).count() === 1, 4000));
+  await p.keyboard.press('Escape');
+
   await p.keyboard.press('Control+k');
   await okno.waitFor({ timeout: 5000 });
   await okno.getByRole('combobox').fill('zzzzzz');

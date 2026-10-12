@@ -4,7 +4,8 @@
 // stránkách a záložkách, a kdo nevěděl, kde co je, ji nenašel.
 //
 // Registr je data: text, klíčová slova (synonyma, hovorové výrazy), cíl a kdo ji má (vedení / zaměstnanec).
-// Texty jsou klíče překladu v sekci „widgety" (tam žije i GlobalniHledani).
+// Texty jsou klíče překladu v sekci „widgety" (tam žije i GlobalniHledani); soubor je pod components/widgety, protože
+// check-i18n bere klíče v uvozovkách odtud jako použité (překládají se nepřímo přes t(akce.nazev)).
 
 export type Rozhrani = 'vedeni' | 'zamestnanec';
 

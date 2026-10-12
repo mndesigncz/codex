@@ -1125,6 +1125,10 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
   const stavFiltru = filtrAktivni ? popisAktivniho : bylFiltrRef.current ? t('Filtr vypnut, celý měsíc.') : '';
   // Pás typů má smysl od dvou typů (nebo když je co odkliknout / jsou díry).
   const ukazPasTypu = pasTypu.length >= 2 || filtr.typy.length > 0 || filtr.jenDiry || (problemDates.length > 0 && pasTypu.length >= 1);
+  const maPasy = pasLidi.length >= 2 || filtr.lide.length > 0 || ukazPasTypu;
+  const pocetAktivnich = filtr.lide.length + filtr.typy.length + (filtr.jenDiry ? 1 : 0);
+  // Telefon: pásy filtrů rozbalené tlačítkem „Filtry" (zapnutý filtr je ukáže vždy).
+  const [filtryTel, setFiltryTel] = useState(false);
   // Filtr se změnil a prvek s fokusem zmizel (Zrušit filtr i s lištou,
   // poslední pilulka pásu typů): fokus na první pilulku, jinak na mřížku.
   useLayoutEffect(() => {
@@ -1497,7 +1501,17 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
           <StavFiltru text={stavFiltru} />
           <div ref={filtrObalRef}>
           {/* Filtr: pás lidí (kolik kdo má směn), přehled vytížení, pás typů
-              a „jen díry". Pás se ukáže, až je co filtrovat (DESIGN.md). */}
+              a „jen díry". Pás se ukáže, až je co filtrovat (DESIGN.md).
+              Na telefonu jsou oba pásy za tlačítkem „Filtry" (jako Úkoly a Sklad): nad kalendářem stály
+              čtyři řádky ovládání a kalendář začínal až pod ohybem. Zapnutý filtr pásy zase ukáže, ať je vidět, co platí. */}
+          {maPasy && (
+            <div className="sm:hidden mb-2">
+              <Button variant="secondary" size="sm" aria-expanded={filtryTel || filtrAktivni} aria-controls="rozvrh-pasy-filtru" onClick={() => setFiltryTel(v => !v)}>
+                {t('Filtry')}{pocetAktivnich > 0 ? ` · ${pocetAktivnich}` : ''}
+              </Button>
+            </div>
+          )}
+          <div id="rozvrh-pasy-filtru" className={maPasy && !(filtryTel || filtrAktivni) ? 'max-sm:hidden' : undefined}>
           {(pasLidi.length >= 2 || filtr.lide.length > 0) && (
             <PasLidi lide={pasLidi} vybrani={filtr.lide} celkem={celkemVPasu} navrh={!!preview}
               onPrepni={(id) => setFiltr(f => ({ ...f, lide: prepni(f.lide, id) }))}
@@ -1509,6 +1523,7 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
               diry={problemDates.length > 0 || filtr.jenDiry ? problemDates.length : null}
               jenDiry={filtr.jenDiry} onJenDiry={() => setFiltr(f => ({ ...f, jenDiry: !f.jenDiry }))} />
           )}
+          </div>
           {planovac && lideMesice.length > 0 && (
             <div className="mt-2">
               <PrehledLidi v={vytizeniLidi} radky={radkyPrehledu} razeni={razeni} onRazeni={setRazeni}

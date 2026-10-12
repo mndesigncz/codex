@@ -1,6 +1,6 @@
 // Paleta akcí v globálním hledání (lib/akceHledani.ts): filtr podle rozhraní a oprávnění, cíle existují a jsou jednoznačné.
 import type { Testy } from './_testy.ts';
-import { AKCE_HLEDANI, akceProHledani } from '../../lib/akceHledani.ts';
+import { AKCE_HLEDANI, akceProHledani } from '../../components/widgety/akceHledani.ts';
 import { obsahujeNekde, proHledani } from '../../lib/hledani.ts';
 
 export default function ({ eq, ok }: Testy) {

@@ -1,5 +1,6 @@
 'use client';
 
+import { akceProHledani } from '@/components/widgety/akceHledani';
 import { predejUkolum } from '@/lib/ukolyFiltr';
 import { GlobalniHledani, useZkratkaHledani } from '../GlobalniHledani';
 import { useState, useEffect } from 'react';
@@ -328,7 +329,7 @@ export default function EmployeeLayout({ user }: Props) {
           { label: t('Odhlásit se'), icon: 'logout', onClick: () => odhlasit({ callbackUrl: '/login' }), danger: true },
         ]}
       />
-      <GlobalniHledani open={hledaniOtevreno} onClose={() => setHledani(false)} stranky={nav.vse} onStranka={navigate}
+      <GlobalniHledani open={hledaniOtevreno} onClose={() => setHledani(false)} stranky={nav.vse} akce={akceProHledani('zamestnanec', smiPohled)} onStranka={navigate}
         hledatUkoly={smiPohled('tasks')} hledatSklad={smiPohled('inventory')} hledatNavody={smiPohled('guides')} hledatPostupy={smiPohled('procedures')} />
       <JazykOkno open={jazykOpen} onClose={() => setJazykOpen(false)} />
     </div>
