@@ -23,7 +23,7 @@
 // Uzávěrkám nepředává, proto z jiné stránky žádost počká v sessionStorage.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Avatar, Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Menu, SearchField, Segmented, Select, Skeleton } from '../ui';
+import { Avatar, Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Menu, MonthNav, SearchField, Segmented, Select, Skeleton } from '../ui';
 import { usePlan, UpgradeModal } from '../Pro';
 import { ulozSoubor } from '@/lib/stahni';
 import { diffReasonLabel, expectedCash, cashDifference, cashLeft, type ShiftPerson } from '@/lib/closing';
@@ -39,7 +39,7 @@ import {
   KLIC_DEN, KLIC_VYPLNIT, UDALOST_DEN, UDALOST_VYPLNIT,
   denUzaverky, jeHlavni, rozdilUzaverky, type RadekUzaverky,
 } from '@/lib/uzaverkyPrehled';
-import { filtrujUzaverky, jmenaZUzaverek, pocetFiltru, PRAZDNY_FILTR, stitkySmen, type FiltrUzaverek, type Razeni } from '@/lib/uzaverkyFiltr';
+import { filtrujUzaverky, jmenaZUzaverek, nazevExportuUzaverek, pocetFiltru, popisObdobiExportu, PRAZDNY_FILTR, stitkySmen, type FiltrUzaverek, type Razeni } from '@/lib/uzaverkyFiltr';
 import { otevriDen } from '@/lib/denUdalost';
 import { useT } from '@/lib/i18n/client';
 import { useLocale } from './jazyk';
@@ -62,7 +62,6 @@ const crewOf = (c: RadekUzaverky): ShiftPerson[] =>
 
 const denVetou = (d: string, loc: string) => new Date(`${d}T12:00:00`).toLocaleDateString(loc, { weekday: 'long', day: 'numeric', month: 'long' });
 const denKratce = (d: string, loc: string) => new Date(`${d}T12:00:00`).toLocaleDateString(loc, { weekday: 'short', day: 'numeric', month: 'long' });
-const nazevMesice = (m: string, loc: string) => new Date(`${m}-01T12:00:00`).toLocaleDateString(loc, { month: 'long', year: 'numeric' });
 
 /** Přečte a smaže žádost, která čekala na připojení nástroje (z jiné stránky). */
 function vezmiZadost(klic: string): string | null {
@@ -89,7 +88,8 @@ export default function ClosingsOverview() {
   const [creatingDate, setCreatingDate] = useState<string | undefined>(undefined);
   // Rozklik uzávěrky otevře plný detail — do řádku se toho vejde jen zlomek.
   const [detailId, setDetailId] = useState<number | null>(null);
-  const [month, setMonth] = useState<string>('all'); // 'all' | 'YYYY-MM'
+  // Období seznamu: null = Vše, jinak „RRRR-MM" z MonthNav. Od/Do ve Filtrech ho dál jen zužují.
+  const [month, setMonth] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [filtr, setFiltr] = useState<FiltrUzaverek>(PRAZDNY_FILTR);
   const [dalsiFiltry, setDalsiFiltry] = useState(false);
@@ -152,15 +152,17 @@ export default function ClosingsOverview() {
     mesice.forEach(m => obnovDataWidgetu(`/api/closings/calendar?month=${m}`));
   }, []);
 
-  // Měsíce v datech, nejnovější první.
+  // Měsíce v datech, nejnovější první. MonthNav jde od nejstaršího do tohoto měsíce.
   const months = useMemo(
     () => Array.from(new Set(allClosings.map(c => denUzaverky(c).slice(0, 7)).filter(Boolean))).sort().reverse(),
     [allClosings],
   );
-  // Exporty jdou za filtrem měsíce; seznam se navíc zúží na den z kalendáře.
-  const closings = month === 'all' ? allClosings : allClosings.filter(c => denUzaverky(c).slice(0, 7) === month);
+  const tentoMesic = pragueToday().slice(0, 7);
+  const nejstarsi = months.length ? months[months.length - 1] : tentoMesic;
+  const closings = month == null ? allClosings : allClosings.filter(c => denUzaverky(c).slice(0, 7) === month);
   const listed = selectedDate ? allClosings.filter(c => denUzaverky(c) === selectedDate) : closings;
-  // Filtry (hledání, stav, kasa, směna, rozmezí dnů) a řazení platí na seznam; exporty zůstávají za měsícem.
+  // Filtry (hledání, stav, kasa, směna, rozmezí dnů) a řazení platí na seznam i na exporty:
+  // stáhne se přesně to, co je vidět (dřív export sledoval jen měsíc a filtry ignoroval).
   const zakladSeznamu = listed.filter(jeHlavni);
   const topLevel = filtrujUzaverky(zakladSeznamu, filtr);
   const nFiltru = pocetFiltru(filtr);
@@ -175,10 +177,16 @@ export default function ClosingsOverview() {
   const smiExport = smi('uzaverky.exportovat') && smi('finance.trzby');
   const v = (x: unknown) => (x == null ? '' : Number(x) || 0);
 
+  // Co je vidět: hlavní řádky po filtrech a za každým jeho pomocné řádky (kolega, za kterého se
+  // zavřelo — jeho výplata a odvod z kasy opravdu odešly, účetní je v podkladu potřebuje).
+  const vybrane = topLevel.flatMap(c => [c, ...coveredBy(c.id)]);
+  // Den z kalendáře je rozmezí jednoho dne; jinak měsíc z MonthNav zúžený Od/Do.
+  const obdobiExportu: [string | null, string, string] = selectedDate ? [null, selectedDate, selectedDate] : [month, filtr.od, filtr.do];
+
   const exportCsv = () => {
     if (!pro) { setUpgradeFor('Export CSV'); return; } // i18n-ok (název funkce)
     const head = ['Datum', 'Směna', 'Vyplnil/a', 'Na směně', 'Kasa na začátku', 'Tržba hotově', 'Tržba kartou', 'Spropitné', 'Spropitné v kase', 'Výdaje', 'Odloženo', 'Výplata', 'Kasa na konci', 'Očekávaná kasa', 'Rozdíl', 'Odvod na konci', 'Zůstalo v kase', 'Zákazníků', 'Poznámka']; // i18n-ok (CSV pro účetní zůstává česky)
-    const rows = closings.map(c => [
+    const rows = vybrane.map(c => [
       denUzaverky(c), c.shift_label ?? '', c.author_name ?? '', crewOf(c).map(p => p.name).join(', '),
       v(c.opening_cash), v(c.cash_revenue), v(c.card_revenue), v(c.tips), c.tips_in_drawer ? 'ano' : 'ne', v(c.expenses),
       v(c.cash_removed), v(c.self_payout), v(c.closing_cash),
@@ -186,7 +194,7 @@ export default function ClosingsOverview() {
       Number(c.final_removal) || 0, cashLeft(c),
       v(c.customers), (c.notes ?? '').replace(/\n/g, ' '),
     ]);
-    stahniCsv([head, ...rows], `uzaverky${month === 'all' ? '' : '-' + month}.csv`);
+    stahniCsv([head, ...rows], nazevExportuUzaverek('uzaverky', ...obdobiExportu));
   };
 
   // Podklad pro účetní: řádky po dnech a souhrn. Souhrn nákladů bere stejný
@@ -196,7 +204,7 @@ export default function ClosingsOverview() {
     if (!pro) { setUpgradeFor(t('Export pro účetní')); return; }
     const head = ['Datum', 'Tržba hotově', 'Tržba kartou', 'Tržba celkem', 'Spropitné', 'Výdaje z kasy', 'Odvedeno', 'Vyplaceno hotově']; // i18n-ok (CSV pro účetní zůstává česky)
     const byDay = new Map<string, { cash: number; card: number; tips: number; exp: number; rem: number; pay: number }>();
-    closings.forEach(c => {
+    vybrane.forEach(c => {
       const d = byDay.get(denUzaverky(c)) ?? { cash: 0, card: 0, tips: 0, exp: 0, rem: 0, pay: 0 };
       d.cash += Number(c.cash_revenue) || 0; d.card += Number(c.card_revenue) || 0; d.tips += Number(c.tips) || 0;
       d.exp += Number(c.expenses) || 0; d.rem += (Number(c.cash_removed) || 0) + (Number(c.final_removal) || 0); d.pay += Number(c.self_payout) || 0;
@@ -205,8 +213,9 @@ export default function ClosingsOverview() {
     const rows = Array.from(byDay.entries()).sort((a, b) => a[0].localeCompare(b[0]))
       .map(([date, d]) => [date, d.cash, d.card, d.cash + d.card, d.tips, d.exp, d.rem, d.pay]);
     const trzby = rows.reduce((s, r) => s + Number(r[3]), 0);
-    const summary: (string | number)[][] = [[], ['SOUHRN OBDOBÍ', month === 'all' ? 'vše' : month], ['Tržby celkem', trzby]]; // i18n-ok (CSV pro účetní zůstává česky)
-    if (month !== 'all' && smi('finance.zobrazit')) {
+    const summary: (string | number)[][] = [[], ['SOUHRN OBDOBÍ', popisObdobiExportu(...obdobiExportu)], ['Tržby celkem', trzby]]; // i18n-ok (CSV pro účetní zůstává česky)
+    // Náklady z Financí jsou za celý měsíc — k zúženému rozmezí dnů by nepatřily.
+    if (month != null && !selectedDate && !filtr.od && !filtr.do && smi('finance.zobrazit')) {
       try {
         const f = await fetch(`/api/finance?month=${month}`).then(okJson);
         const s = f?.summary ?? {};
@@ -215,7 +224,7 @@ export default function ClosingsOverview() {
         if (!s.mzdySkryte) summary.push(['Provozní výsledek (orientační)', Number(s.gross) || 0]); // i18n-ok (CSV pro účetní zůstává česky)
       } catch { summary.push(['Náklady', 'nepodařilo se načíst — viz Finance']); } // i18n-ok (CSV pro účetní zůstává česky)
     }
-    stahniCsv([head, ...rows, ...summary], `ucetni-podklad${month === 'all' ? '' : '-' + month}.csv`);
+    stahniCsv([head, ...rows, ...summary], nazevExportuUzaverek('ucetni-podklad', ...obdobiExportu));
   };
 
   // Vedení vyplňuje uzávěrku samo (např. za den, kdy ji nikdo neudělal).
@@ -239,10 +248,24 @@ export default function ClosingsOverview() {
       <div ref={listRef} className="scroll-mt-4 px-5 pt-5 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 id="uzaverky-seznam-t" className="t-card flex items-center gap-2">
-            
             {t('Seznam uzávěrek')}
             {data.data && <Chip tone="muted" size="sm">{topLevel.length.toLocaleString(loc)}</Chip>}
           </h2>
+          {!selectedDate && (months.length > 1 || month != null) && (
+            // Jediný výběr období (jako Finance): Vše, nebo jeden měsíc šipkami. Dřív tu byl pás pilulek
+            // za každý měsíc v datech, který po půl roce provozu jel na telefonu za pravý okraj.
+            // Na telefonu vlastní řádek; MonthNav vyplní zbytek, a když by na název měsíce zbylo
+            // méně než 12rem (320 px, polské „Wszystko"), zalomí se pod přepínač přes celou šířku.
+            <div className="flex flex-wrap items-center gap-2 min-w-0 w-full sm:w-auto sm:flex-nowrap">
+              <Segmented size="sm" className="shrink-0" ariaLabel={t('Období')} value={month == null ? 'vse' : 'mesic'}
+                onChange={v => setMonth(v === 'vse' ? null : (months[0] ?? tentoMesic))}
+                options={[{ id: 'vse', label: t('Vše') }, { id: 'mesic', label: t('Měsíc') }]} />
+              {month != null && (
+                <MonthNav value={month} onChange={setMonth} min={nejstarsi < month ? nejstarsi : month}
+                  max={tentoMesic > month ? tentoMesic : month} className="flex-[1_1_12rem] sm:flex-none" />
+              )}
+            </div>
+          )}
         </div>
         {selectedDate ? (
           <div className="well flex flex-wrap items-center justify-between gap-2 px-4 py-3">
@@ -258,16 +281,7 @@ export default function ClosingsOverview() {
               <Button variant="ghost" size="sm" onClick={() => vyber(null)}>{t('Zrušit výběr')}</Button>
             </div>
           </div>
-        ) : months.length > 1 && (
-          <div className="flex gap-1.5 overflow-x-auto scrollbar-thin -mx-1 px-1 pb-1" role="group" aria-label={t('Měsíc')}>
-            {(['all', ...months] as string[]).map(m => (
-              <button key={m} type="button" aria-pressed={month === m} onClick={() => setMonth(m)}
-                className={`filter-pill tap-target-sm ${m === 'all' ? '' : 'cz-sentence'} ${month === m ? 'seg-on' : 'seg-off glass'}`}>
-                {m === 'all' ? t('Vše') : nazevMesice(m, loc)}
-              </button>
-            ))}
-          </div>
-        )}
+        ) : null}
         {allClosings.length > 0 && (
           <div className="space-y-2" role="search" aria-label={t('Filtry uzávěrek')}>
             <div className="flex flex-col sm:flex-row gap-2 sm:items-center">

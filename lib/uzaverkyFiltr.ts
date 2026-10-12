@@ -87,3 +87,38 @@ export function jmenaZUzaverek(radky: readonly RadekUzaverky[], n = 6): string[]
   for (const c of radky) for (const j of new Set(lidiNaSmene(c))) m.set(j, (m.get(j) ?? 0) + 1);
   return [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'cs')).slice(0, n).map(x => x[0]);
 }
+
+/** Poslední den měsíce „RRRR-MM" jako „RRRR-MM-DD" (v UTC, ať nerozhoduje pásmo). */
+function konecMesice(mesic: string): string {
+  const [y, m] = mesic.split('-').map(Number);
+  return `${mesic}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Jméno souboru exportu podle toho, co je právě vidět: měsíc z MonthNav, rozmezí Od/Do z Filtrů
+ * (zužuje v rámci měsíce), nebo obojí. „uzaverky-2026-10.csv", „uzaverky-2026-10-03_2026-10-12.csv",
+ * „uzaverky-od-2026-09-01.csv", bez omezení „uzaverky.csv". Rozmezí mimo měsíc = prázdný průnik,
+ * soubor se pak jmenuje podle měsíce (seznam je prázdný a export se stejně nenabídne).
+ */
+export function nazevExportuUzaverek(zaklad: string, mesic: string | null, od = '', doD = ''): string {
+  let a = od, b = doD;
+  if (mesic) {
+    const zac = `${mesic}-01`, kon = konecMesice(mesic);
+    a = a && a > zac ? a : zac;
+    b = b && b < kon ? b : kon;
+    if ((a === zac && b === kon) || a > b) return `${zaklad}-${mesic}.csv`;
+  }
+  if (a && b) return a === b ? `${zaklad}-${a}.csv` : `${zaklad}-${a}_${b}.csv`;
+  if (a) return `${zaklad}-od-${a}.csv`;
+  if (b) return `${zaklad}-do-${b}.csv`;
+  return `${zaklad}.csv`;
+}
+
+/** Popisek období do souhrnu exportu pro účetní: „2026-10", „2026-10-03 – 2026-10-12", „od …", „vše". */
+export function popisObdobiExportu(mesic: string | null, od = '', doD = ''): string {
+  const jmeno = nazevExportuUzaverek('x', mesic, od, doD).replace(/^x-?/, '').replace(/\.csv$/, '');
+  if (!jmeno) return 'vše'; // i18n-ok (CSV pro účetní zůstává česky)
+  if (jmeno.startsWith('od-')) return `od ${jmeno.slice(3)}`; // i18n-ok (CSV pro účetní zůstává česky)
+  if (jmeno.startsWith('do-')) return `do ${jmeno.slice(3)}`; // i18n-ok (CSV pro účetní zůstává česky)
+  return jmeno.replace('_', ' – ');
+}

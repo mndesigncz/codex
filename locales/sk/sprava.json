@@ -1660,5 +1660,6 @@
   "před {n, plural, one {# měsícem} few {# měsíci} other {# měsíci}}": "pred {n, plural, one {# mesiacom} few {# mesiacmi} many {# mesiacmi} other {# mesiacmi}}",
   "před {n, plural, one {# rokem} few {# lety} other {# lety}}": "pred {n, plural, one {# rokom} few {# rokmi} many {# rokmi} other {# rokmi}}",
   "Založit úkol z karty": "Založiť úlohu z karty",
-  "Úkol z karty se nepodařilo připravit — prohlížeč nedovolil uložit rozepsaný úkol.": "Úlohu z karty sa nepodarilo pripraviť — prehliadač nedovolil uložiť rozpísanú úlohu."
+  "Úkol z karty se nepodařilo připravit — prohlížeč nedovolil uložit rozepsaný úkol.": "Úlohu z karty sa nepodarilo pripraviť — prehliadač nedovolil uložiť rozpísanú úlohu.",
+  "Období": "Obdobie"
 }
