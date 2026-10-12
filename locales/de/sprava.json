@@ -1681,5 +1681,13 @@
   "Ikona musí být jedno nebo dvě emoji.": "Das Symbol muss ein oder zwei Emojis sein.",
   "Zadej částku, nebo pole nech prázdné.": "Gib einen Betrag ein oder lass das Feld leer.",
   "Filtry · {n}": "Filter · {n}",
-  "Upravit nebo smazat odměnu {nazev}": "Belohnung {nazev} bearbeiten oder löschen"
+  "Upravit nebo smazat odměnu {nazev}": "Belohnung {nazev} bearbeiten oder löschen",
+  "Poznámky": "Notizen",
+  "Poznámky ({n})": "Notizen ({n})",
+  "Proč zamítnout?": "Warum ablehnen?",
+  "Důvod (uvidí autor)": "Grund (für den Autor sichtbar)",
+  "Nepovinné — přijde autorovi v oznámení a zůstane v poznámkách u podnětu.": "Optional — kommt als Benachrichtigung und bleibt in den Notizen zum Vorschlag.",
+  "Např. Dobrý nápad, ale až po sezóně.": "z. B. Gute Idee, aber erst nach der Saison.",
+  "Podnět je zamítnutý, důvod dostal autor.": "Der Vorschlag ist abgelehnt, der Autor hat den Grund bekommen.",
+  "Podnět je zamítnutý.": "Der Vorschlag ist abgelehnt."
 }

@@ -1681,5 +1681,13 @@
   "Ikona musí být jedno nebo dvě emoji.": "The icon must be one or two emoji.",
   "Zadej částku, nebo pole nech prázdné.": "Enter an amount, or leave the field empty.",
   "Filtry · {n}": "Filters · {n}",
-  "Upravit nebo smazat odměnu {nazev}": "Edit or delete reward {nazev}"
+  "Upravit nebo smazat odměnu {nazev}": "Edit or delete reward {nazev}",
+  "Poznámky": "Notes",
+  "Poznámky ({n})": "Notes ({n})",
+  "Proč zamítnout?": "Why decline?",
+  "Důvod (uvidí autor)": "Reason (the author will see it)",
+  "Nepovinné — přijde autorovi v oznámení a zůstane v poznámkách u podnětu.": "Optional — the author gets it in a notification and it stays in the suggestion's notes.",
+  "Např. Dobrý nápad, ale až po sezóně.": "E.g. Good idea, but after the season.",
+  "Podnět je zamítnutý, důvod dostal autor.": "The suggestion is declined; the author got the reason.",
+  "Podnět je zamítnutý.": "The suggestion is declined."
 }
