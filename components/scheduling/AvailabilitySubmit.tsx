@@ -420,7 +420,8 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
               {' '}{t('Klepnutím na zkratku dne nad kalendářem nastavíš celý sloupec najednou.')}
             </p>
             {/* Hlavička sloupce je tlačítko: nastaví celý den v týdnu v měsíci (týdenní vzor). Index pro
-                fmtDenVTydnu je 0 = pondělí; den pro výpočet jako getDay() (0 = neděle). */}
+                fmtDenVTydnu je 0 = pondělí; den pro výpočet jako getDay() (0 = neděle). Na telefonu
+                44 px vysoké (palec), na monitoru těsné jako dřív. */}
             <div className="grid grid-cols-7 gap-1 sm:gap-1.5 mb-1.5">
               {(zacatek === 0 ? [6, 0, 1, 2, 3, 4, 5] : [0, 1, 2, 3, 4, 5, 6]).map((i) => {
                 const z = fmtDenVTydnu(i, { jazyk });
@@ -429,7 +430,7 @@ export default function AvailabilitySubmit({ user, headingLevel = 'h1' }: Props)
                   <button key={i} type="button" onClick={() => nastavSloupec((i + 1) % 7)}
                     aria-label={t('Nastavit všechny dny {den} v měsíci', { den: fmtDenVTydnu(i, { jazyk, styl: 'dlouhy' }) })}
                     title={stetec ? t('Nastavit celý sloupec: {stav}', { stav: metaOf(stetec).label }) : t('Přepnout celý sloupec')}
-                    className="tap-target-sm min-w-0 whitespace-nowrap rounded-lg py-2 text-center text-[11px] font-semibold text-black/55 hover:bg-black/[0.05] hover:text-[#16181A] transition-colors">
+                    className="tap-target min-h-11 sm:min-h-0 min-w-0 whitespace-nowrap rounded-lg py-2 sm:py-1.5 text-center text-[11px] font-semibold text-black/55 hover:bg-black/[0.05] hover:text-[#16181A] transition-colors">
                     {kratce}
                   </button>
                 );
