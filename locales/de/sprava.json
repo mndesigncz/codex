@@ -882,7 +882,6 @@
   "Smazat menu?": "Karte löschen?",
   "Smazat odkaz?": "Link löschen?",
   "Smazat odkaz…": "Link löschen…",
-  "Smazat odměnu {nazev}": "Belohnung {nazev} löschen",
   "Smazat odměnu „{nazev}\"?": "Belohnung „{nazev}“ löschen?",
   "Smazat opakovaný úkol?": "Wiederkehrende Aufgabe löschen?",
   "Smazat podnět?": "Vorschlag löschen?",
@@ -1672,5 +1671,14 @@
   "Zrušit|dialog": "Abbrechen",
   "Zavolat {nazev}: {telefon}": "{nazev} anrufen: {telefon}",
   "Objednat od {nazev}": "Bei {nazev} bestellen",
-  "Upravit…": "Bearbeiten…"
+  "Upravit…": "Bearbeiten…",
+  "Další akce s odměnou {nazev}": "Weitere Aktionen für Belohnung {nazev}",
+  "Smazat…": "Löschen…",
+  "Odměna upravena.": "Die Belohnung wurde geändert.",
+  "Upravit odměnu": "Belohnung bearbeiten",
+  "Název je povinný.": "Der Name ist erforderlich.",
+  "Název může mít nejvýš 80 znaků.": "Der Name darf höchstens 80 Zeichen haben.",
+  "Cena musí být celé číslo od 1 do 100 000 bodů.": "Der Preis muss eine ganze Zahl von 1 bis 100.000 Punkten sein.",
+  "Ikona musí být jedno nebo dvě emoji.": "Das Symbol muss ein oder zwei Emojis sein.",
+  "Zadej částku, nebo pole nech prázdné.": "Gib einen Betrag ein oder lass das Feld leer."
 }

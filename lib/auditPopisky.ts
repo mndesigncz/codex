@@ -81,6 +81,7 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'reward.create': 'Přidána odměna',
   'reward.approved': 'Schválena odměna',
   'reward.declined': 'Zamítnuta odměna',
+  'reward.update': 'Upravena odměna v katalogu',
   // prémie a srážky
   'wage.bonus': 'Přidána prémie k výplatě',
   'wage.deduction': 'Přidána srážka z výplaty',

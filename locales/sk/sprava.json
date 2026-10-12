@@ -882,7 +882,6 @@
   "Smazat menu?": "Zmazať menu?",
   "Smazat odkaz?": "Zmazať odkaz?",
   "Smazat odkaz…": "Zmazať odkaz…",
-  "Smazat odměnu {nazev}": "Zmazať odmenu {nazev}",
   "Smazat odměnu „{nazev}\"?": "Zmazať odmenu „{nazev}“?",
   "Smazat opakovaný úkol?": "Zmazať opakovanú úlohu?",
   "Smazat podnět?": "Zmazať podnet?",
@@ -1672,5 +1671,14 @@
   "Zrušit|dialog": "Zrušiť",
   "Zavolat {nazev}: {telefon}": "Zavolať {nazev}: {telefon}",
   "Objednat od {nazev}": "Objednať od {nazev}",
-  "Upravit…": "Upraviť…"
+  "Upravit…": "Upraviť…",
+  "Další akce s odměnou {nazev}": "Ďalšie akcie s odmenou {nazev}",
+  "Smazat…": "Zmazať…",
+  "Odměna upravena.": "Odmena upravená.",
+  "Upravit odměnu": "Upraviť odmenu",
+  "Název je povinný.": "Názov je povinný.",
+  "Název může mít nejvýš 80 znaků.": "Názov môže mať najviac 80 znakov.",
+  "Cena musí být celé číslo od 1 do 100 000 bodů.": "Cena musí byť celé číslo od 1 do 100 000 bodov.",
+  "Ikona musí být jedno nebo dvě emoji.": "Ikona musí byť jedno alebo dve emoji.",
+  "Zadej částku, nebo pole nech prázdné.": "Zadaj sumu, alebo pole nechaj prázdne."
 }

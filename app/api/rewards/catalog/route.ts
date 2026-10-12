@@ -11,6 +11,7 @@ import { teamIsPro, PRO_ONLY_MSG } from '@/lib/planServer';
 import { pragueToday } from '@/lib/pragueTime';
 import { ciselnikPodniku, tymyCiselniku } from '@/lib/tenant';
 import { pozaduj, jeOdpoved, clenoveSOpravnenim } from '@/lib/opravneniDb';
+import { HLASKA_ODMENY, validujOdmenu } from '@/lib/odmenyKatalog';
 
 export const dynamic = 'force-dynamic';
 
@@ -85,14 +86,16 @@ export async function POST(req: NextRequest) {
   // Správa katalogu — odmeny.katalog.
   if (b.manage === true) {
     if (!u.opr.has('odmeny.katalog')) return NextResponse.json({ error: 'Nedostatečná oprávnění' }, { status: 403 });
-    const title = String(b.title ?? '').trim().slice(0, 120);
-    const cost = Math.max(1, Math.round(Number(b.cost) || 0));
-    if (!title) return NextResponse.json({ error: 'Název je povinný' }, { status: 400 });
+    // Stejná validace jako úprava (PATCH níž): název 1–80, cena celá 1–100 000, ikona jedno až dvě emoji.
+    const v = validujOdmenu({ title: b.title, cost: b.cost, icon: b.icon ?? null }, true);
+    if (!v.ok) return NextResponse.json({ error: HLASKA_ODMENY[v.chyba] }, { status: 400 });
+    const title = v.hodnoty.title!;
+    const cost = v.hodnoty.cost!;
     // Odměna s částkou k výplatě (bonus v měně podniku): schválení žádosti ji zapíše jako prémii (wage_adjustments).
     const bonus = Number(b.bonusAmount) > 0 ? Math.min(1_000_000, Math.round(Number(b.bonusAmount))) : null;
     const [row] = await sql`
       INSERT INTO rewards_catalog (team_id, title, icon, cost, bonus_amount)
-      VALUES (${u.team_id}, ${title}, ${b.icon ? String(b.icon).slice(0, 8) : null}, ${cost}, ${bonus})
+      VALUES (${u.team_id}, ${title}, ${v.hodnoty.icon ?? null}, ${cost}, ${bonus})
       RETURNING *`;
     audit(u.team_id, u.id, 'reward.create', 'reward', row.id, `${title} (${cost} b.)`);
     return NextResponse.json({ reward: row });
@@ -149,6 +152,20 @@ export async function PATCH(req: NextRequest) {
     if (!u.opr.has('odmeny.katalog')) return zakazano();
     const id = parseInt(b.id);
     if (!Number.isFinite(id)) return NextResponse.json({ error: 'Chybí id' }, { status: 400 });
+    // Úprava (kolo 7): název, cena a emoji se validují stejně jako při přidání. Co v těle
+    // nepřišlo, zůstává. Žádosti si cenu a název kopírují v době žádosti, staré se nemění.
+    const v = validujOdmenu({ title: b.title, cost: b.cost, icon: b.icon }, false);
+    if (!v.ok) return NextResponse.json({ error: HLASKA_ODMENY[v.chyba] }, { status: 400 });
+    const upravuje = v.hodnoty.title !== undefined || v.hodnoty.cost !== undefined || v.hodnoty.icon !== undefined;
+    if (upravuje) {
+      const [ted] = await sql`SELECT id, title, icon, cost FROM rewards_catalog WHERE id = ${id} AND team_id = ${u.team_id}`;
+      if (!ted) return NextResponse.json({ error: 'Odměna nenalezena' }, { status: 404 });
+      const title = v.hodnoty.title ?? String(ted.title);
+      const cost = v.hodnoty.cost ?? Number(ted.cost);
+      const icon = v.hodnoty.icon !== undefined ? v.hodnoty.icon : (ted.icon ?? null);
+      await sql`UPDATE rewards_catalog SET title = ${title}, cost = ${cost}, icon = ${icon} WHERE id = ${id} AND team_id = ${u.team_id}`;
+      audit(u.team_id, u.id, 'reward.update', 'reward', id, `${title} (${cost} b.)`);
+    }
     if (typeof b.active === 'boolean') {
       await sql`UPDATE rewards_catalog SET active = ${b.active} WHERE id = ${id} AND team_id = ${u.team_id}`;
     }
