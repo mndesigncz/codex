@@ -1680,5 +1680,6 @@
   "Název může mít nejvýš 80 znaků.": "Der Name darf höchstens 80 Zeichen haben.",
   "Cena musí být celé číslo od 1 do 100 000 bodů.": "Der Preis muss eine ganze Zahl von 1 bis 100.000 Punkten sein.",
   "Ikona musí být jedno nebo dvě emoji.": "Das Symbol muss ein oder zwei Emojis sein.",
-  "Zadej částku, nebo pole nech prázdné.": "Gib einen Betrag ein oder lass das Feld leer."
+  "Zadej částku, nebo pole nech prázdné.": "Gib einen Betrag ein oder lass das Feld leer.",
+  "Filtry · {n}": "Filter · {n}"
 }

@@ -93,6 +93,9 @@ export default function SuggestionsBoard() {
     return () => window.removeEventListener(udalostPredani('suggestions'), naPredani);
   }, []);
   const [sort, setSort] = useState<'new' | 'votes'>('new');
+  // Telefon: pás stavů je za tlačítkem „Filtry · N" (vzor Rozvrhu z kola 5) — vodorovně
+  // odjížděl za okraj. Zapnutý filtr ho nechá vidět, ať jde zrušit druhým klepnutím.
+  const [filtryTel, setFiltryTel] = useState(false);
   const [composing, setComposing] = useState(false);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -203,15 +206,23 @@ export default function SuggestionsBoard() {
     ];
   };
 
+  const pocetFiltru = filter !== 'all' ? 1 : 0;
+  const ukazPas = filtryTel || pocetFiltru > 0;
   const nastroj = (
     <div className="space-y-4">
       {items.length > 0 && (
-        <div className="flex items-center gap-2">
-          <div className="flex gap-1.5 overflow-x-auto scrollbar-thin scroll-fade-x -mx-1 px-1 py-0.5 min-w-0 flex-1" role="group" aria-label={t('Filtr podle stavu')}>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="sm:hidden">
+            <Button variant="secondary" size="sm" aria-expanded={ukazPas} aria-controls={`${id}-pas`} onClick={() => setFiltryTel(v => !v)}>
+              {pocetFiltru > 0 ? t('Filtry · {n}', { n: pocetFiltru }) : t('Filtry')}
+            </Button>
+          </div>
+          <div id={`${id}-pas`} className={`flex gap-1.5 overflow-x-auto scrollbar-thin scroll-fade-x -mx-1 px-1 py-0.5 min-w-0 flex-1 ${ukazPas ? 'max-sm:order-last max-sm:basis-full' : 'max-sm:hidden'}`}
+            role="group" aria-label={t('Filtr podle stavu')}>
             {filtry(t).map(f => {
               const cnt = f.id === 'all' ? items.length : (counts[f.id] ?? 0);
               return (
-                <button key={f.id} type="button" aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}
+                <button key={f.id} type="button" aria-pressed={filter === f.id} onClick={() => setFilter(filter === f.id && f.id !== 'all' ? 'all' : f.id)}
                   className={`filter-pill tap-target-sm shrink-0 ${filter === f.id ? 'seg-on' : 'seg-off glass'}`}>
                   {f.label}{cnt > 0 && <span className={filter === f.id ? 'text-white/60' : 'text-black/45'}> · {cnt}</span>}
                 </button>

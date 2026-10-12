@@ -219,6 +219,9 @@ export default function Guides({ user, ticksFor, openGuideId, predani, zaKoho, v
   const [activeCat, setActiveCat] = useState<number | 'all'>('all');
   // Stavový filtr vedle kategorií: co ještě čeká na přečtení a co čeká na schválení.
   const [stav, setStav] = useState<StavNavodu>(predani?.stav ?? 'vse');
+  // Telefon: pásy kategorií a stavu jsou za tlačítkem „Filtry · N" (vzor Rozvrhu z kola 5) —
+  // vodorovně odjížděly za okraj. Aktivní filtr je nechá vidět, ať jde zrušit druhým klepnutím.
+  const [filtryTel, setFiltryTel] = useState(false);
   useEffect(() => { if (predani) setStav(predani.stav ?? 'vse'); }, [predani?.stav, predani?.n]); // eslint-disable-line react-hooks/exhaustive-deps
   const [search, setSearch] = useState('');
   const [chyba, setChyba] = useState('');
@@ -381,8 +384,14 @@ export default function Guides({ user, ticksFor, openGuideId, predani, zaKoho, v
     ],
   };
 
+  const maPasKategorii = categories.length > 0 || hasUncategorized || (smiKategorie && !kategorie.loading);
+  // Co čeká na člověka: přečíst nebo schválit. Jen když takový návod je (nebo je filtr zapnutý).
+  const maPasStavu = nKPrecteni > 0 || nNavrhu > 0 || stav !== 'vse';
+  const pocetFiltru = (activeCat !== 'all' ? 1 : 0) + (stav !== 'vse' ? 1 : 0);
+  const ukazPasy = filtryTel || pocetFiltru > 0;
+
   const pilulka = (klic: number | 'all', label: string, n: number) => (
-    <button key={String(klic)} type="button" aria-pressed={activeCat === klic} onClick={() => setActiveCat(klic)}
+    <button key={String(klic)} type="button" aria-pressed={activeCat === klic} onClick={() => setActiveCat(activeCat === klic ? 'all' : klic)}
       className={`filter-pill tap-target whitespace-nowrap shrink-0 ${activeCat === klic ? 'seg-on' : 'seg-off glass'}`}>
       {label} <span className="tabular-nums opacity-60">{n}</span>
     </button>
@@ -455,9 +464,19 @@ export default function Guides({ user, ticksFor, openGuideId, predani, zaKoho, v
     <div className="space-y-3">
       {chyba && <p className="note note-danger" role="alert">{chyba}</p>}
       {kategorie.error && <p className="note note-wait" role="status">{t('Kategorie se nenačetly — návody ukazuji bez nich.')} {kategorie.error}</p>}
-      <SearchField value={search} onChange={setSearch} placeholder={t('Hledat návody…')} storageKey="guides" ariaLabel={t('Hledat návody')}
-        suggestions={categories.map(c => ({ label: c.name, hint: t('kategorie') }))} />
-      {(categories.length > 0 || hasUncategorized || (smiKategorie && !kategorie.loading)) && (
+      <div className="flex items-center gap-2">
+        <SearchField value={search} onChange={setSearch} placeholder={t('Hledat návody…')} storageKey="guides" ariaLabel={t('Hledat návody')}
+          suggestions={categories.map(c => ({ label: c.name, hint: t('kategorie') }))} className="min-w-0 flex-1" />
+        {(maPasKategorii || maPasStavu) && (
+          <div className="sm:hidden shrink-0">
+            <Button variant="secondary" size="sm" aria-expanded={ukazPasy} aria-controls="navody-pasy-filtru" onClick={() => setFiltryTel(v => !v)}>
+              {pocetFiltru > 0 ? t('Filtry · {n}', { n: pocetFiltru }) : t('Filtry')}
+            </Button>
+          </div>
+        )}
+      </div>
+      <div id="navody-pasy-filtru" className={`space-y-3 ${ukazPasy ? '' : 'max-sm:hidden'}`}>
+      {maPasKategorii && (
         <div className="flex gap-2 overflow-x-auto scrollbar-thin scroll-fade-x -mx-1 px-1 items-center" role="group" aria-label={t('Kategorie návodů')}>
           {pilulka('all', t('Vše'), counts.get('vse') ?? 0)}
           {categories.map(c => pilulka(c.id, c.name, counts.get(c.id) ?? 0))}
@@ -468,7 +487,7 @@ export default function Guides({ user, ticksFor, openGuideId, predani, zaKoho, v
         </div>
       )}
       {/* Co čeká na člověka: přečíst nebo schválit. Jen když takový návod je (nebo je filtr zapnutý). */}
-      {(nKPrecteni > 0 || nNavrhu > 0 || stav !== 'vse') && (
+      {maPasStavu && (
         <div className="flex gap-2 overflow-x-auto scrollbar-thin -mx-1 px-1 items-center" role="group" aria-label={t('Stav návodů')}>
           {([['kprecteni', t('K přečtení'), nKPrecteni], ['navrhy', t('Čeká na schválení'), nNavrhu]] as const)
             .filter(([id, , n]) => n > 0 || stav === id)
@@ -480,6 +499,7 @@ export default function Guides({ user, ticksFor, openGuideId, predani, zaKoho, v
             ))}
         </div>
       )}
+      </div>
       {seznam}
     </div>
   );
