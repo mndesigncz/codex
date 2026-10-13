@@ -79,5 +79,17 @@
   "obrázek": "obrázok",
   "{n, plural, one {# hlas} few {# hlasy} other {# hlasů}} · ťuknutím hlasuješ (jde změnit)": "{n, plural, one {# hlas} few {# hlasy} other {# hlasov}} · ťuknutím hlasuješ (dá sa zmeniť)",
   "Žádné konverzace": "Žiadne konverzácie",
-  "„{otazka}\" zmizí z chatu a hlasovat už nepůjde.": "„{otazka}“ zmizne z chatu a hlasovať už nepôjde."
+  "„{otazka}\" zmizí z chatu a hlasovat už nepůjde.": "„{otazka}“ zmizne z chatu a hlasovať už nepôjde.",
+  "Odpovědět": "Odpovedať",
+  "Odpověď na {jmeno}": "Odpoveď pre {jmeno}",
+  "Zrušit odpověď": "Zrušiť odpoveď",
+  "Ty": "Ty",
+  "Viděli: {jmena}": "Videli: {jmena}",
+  "Viděli: {jmena} +{n}": "Videli: {jmena} +{n}",
+  "Přečteno {cas}": "Prečítané {cas}",
+  "Reagovat": "Reagovať",
+  "Reagovat {emoji}": "Reagovať {emoji}",
+  "Reakce {emoji}: {jmena}": "Reakcia {emoji}: {jmena}",
+  "Reakci se nepodařilo uložit.": "Reakciu sa nepodarilo uložiť.",
+  "Přejít na původní zprávu": "Prejsť na pôvodnú správu"
 }

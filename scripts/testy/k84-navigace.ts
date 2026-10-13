@@ -5,6 +5,8 @@
 
 import type { Testy } from './_testy.ts';
 import { adresaOkna, adresaPohledu, rozeberAdresu, stejnyPohled } from '../../lib/navigace.ts';
+import { datumZDotazu } from '../../lib/hledani.ts';
+import { EMOJI_REAKCI, jeEmojiReakce, kdoVidel, posledniVlastniId, prepniReakci, reakcePoZpravach, seskupReakce, shrnJmena, uryvekZpravy } from '../../lib/chatReakce.ts';
 
 export default function ({ eq, ok }: Testy) {
   // ---- čtení adresy ----
@@ -43,4 +45,67 @@ export default function ({ eq, ok }: Testy) {
   ok('prázdný a chybějící argument jsou totéž', stejnyPohled({ view: 'tasks', arg: '' }, { view: 'tasks' }));
   ok('jiný argument = jiný pohled', !stejnyPohled({ view: 'tasks', arg: 'ukol:1' }, { view: 'tasks', arg: 'ukol:2' }));
   ok('jiný pohled', !stejnyPohled({ view: 'tasks' }, { view: 'finance' }));
+
+  testyDatum({ eq, ok });
+  testyChat({ eq, ok });
+}
+
+// ---- reakce, odpovědi a „Viděli" v chatu (lib/chatReakce.ts) ----
+function testyChat({ eq, ok }: Testy) {
+  ok('čtyři reakce, 👍 první', EMOJI_REAKCI.length === 4 && EMOJI_REAKCI[0] === '👍');
+  ok('jen povolené emoji', jeEmojiReakce('✅') && !jeEmojiReakce('🔥') && !jeEmojiReakce(''));
+  const radky = [
+    { messageId: 1, emoji: '❤️', userId: 2, name: 'Eva' },
+    { messageId: 1, emoji: '👍', userId: 3, name: 'Jakub' },
+    { messageId: 1, emoji: '👍', userId: 2, name: 'Eva' },
+    { messageId: 1, emoji: '👍', userId: 2, name: 'Eva' }, // duplicitní řádek se nepočítá dvakrát
+    { messageId: 2, emoji: '😂', userId: 3, name: 'Jakub' },
+  ];
+  eq('seskupení: pořadí podle EMOJI_REAKCI, počet a jména', seskupReakce(radky.filter(r => r.messageId === 1)),
+    [{ emoji: '👍', pocet: 2, jmena: ['Jakub', 'Eva'], userIds: [3, 2] }, { emoji: '❤️', pocet: 1, jmena: ['Eva'], userIds: [2] }]);
+  eq('po zprávách', [...reakcePoZpravach(radky).keys()], [1, 2]);
+  const ja = { id: 1, name: 'Já' };
+  const r1 = seskupReakce(radky.filter(r => r.messageId === 1));
+  eq('přepnutí: přidá mou reakci', prepniReakci(r1, '✅', ja).find(g => g.emoji === '✅'), { emoji: '✅', pocet: 1, jmena: ['Já'], userIds: [1] });
+  eq('přepnutí: odebere mou reakci (a prázdná skupina zmizí)', prepniReakci(prepniReakci(r1, '✅', ja), '✅', ja).some(g => g.emoji === '✅'), false);
+  const clenove = [
+    { id: 1, name: 'Já', lastReadAt: '2026-10-13 08:06:00' },
+    { id: 2, name: 'Eva', lastReadAt: '2026-10-13T08:10:00Z' },
+    { id: 3, name: 'Jakub', lastReadAt: '2026-10-13T08:20:00Z' },
+    { id: 4, name: 'Tereza', lastReadAt: '2026-10-12T20:00:00Z' },
+    { id: 5, name: 'Nikdy', lastReadAt: null },
+  ];
+  eq('viděli: členové s last_read_at po zprávě, bez autora', kdoVidel(clenove, { senderId: 1, createdAt: '2026-10-13T08:05:00Z' }), ['Eva', 'Jakub']);
+  eq('viděli: čas bez zóny (Postgres) se bere jako UTC', kdoVidel(clenove, { senderId: 2, createdAt: '2026-10-13 08:05:00' }), ['Já', 'Jakub']);
+  eq('viděli: neplatný čas zprávy = nikdo', kdoVidel(clenove, { senderId: 1, createdAt: 'x' }), []);
+  eq('shrnutí jmen: dvě a zbytek', shrnJmena(['Eva', 'Petr', 'Jana', 'Tom', 'Al']), { text: 'Eva, Petr', dalsich: 3 });
+  eq('shrnutí jmen: prázdné', shrnJmena([]), { text: '', dalsich: 0 });
+  eq('poslední vlastní zpráva', posledniVlastniId([{ id: 1, senderId: 1 }, { id: 2, senderId: 2 }, { id: 3, senderId: 1 }, { id: 4, senderId: 2 }], 1), 3);
+  eq('poslední vlastní: žádná', posledniVlastniId([{ id: 2, senderId: 2 }], 1), null);
+  eq('úryvek: jeden řádek, zkrácený', uryvekZpravy('Zítra\n zavírám   dřív, ' + 'x'.repeat(100), 20), 'Zítra zavírám dřív,…');
+  eq('úryvek: prázdný = null', uryvekZpravy('   '), null);
+}
+
+// ---- datum v dotazu hledání (lib/hledani.ts) ----
+function testyDatum({ eq }: Testy) {
+  const dnes = '2026-10-13'; // úterý
+  eq('„včera"', datumZDotazu('včera', dnes), '2026-10-12');
+  eq('„vcera" bez háčku', datumZDotazu('vcera', dnes), '2026-10-12');
+  eq('„dnes"', datumZDotazu('Dnes', dnes), '2026-10-13');
+  eq('„předevčírem"', datumZDotazu('předevčírem', dnes), '2026-10-11');
+  eq('„pátek" = poslední pátek', datumZDotazu('pátek', dnes), '2026-10-09');
+  eq('„pá" zkratka', datumZDotazu('pá', dnes), '2026-10-09');
+  eq('„úterý" = dnešek (dnes je úterý)', datumZDotazu('úterý', dnes), '2026-10-13');
+  eq('„3.10." letos (je v minulosti)', datumZDotazu('3.10.', dnes), '2026-10-03');
+  eq('„3. 10." s mezerou', datumZDotazu('3. 10.', dnes), '2026-10-03');
+  eq('„24.12." by bylo v budoucnu → loni', datumZDotazu('24.12.', dnes), '2025-12-24');
+  eq('„3.10.2025" s rokem', datumZDotazu('3.10.2025', dnes), '2025-10-03');
+  eq('ISO „2026-10-03"', datumZDotazu('2026-10-03', dnes), '2026-10-03');
+  eq('„31.2." není den', datumZDotazu('31.2.', dnes), null);
+  eq('obyčejné slovo není den', datumZDotazu('latte', dnes), null);
+  eq('„po termínu" není pondělí', datumZDotazu('po termínu', dnes), null);
+  eq('anglicky „yesterday"', datumZDotazu('yesterday', dnes), '2026-10-12');
+  eq('německy „Freitag"', datumZDotazu('Freitag', dnes), '2026-10-09');
+  eq('polsky „wczoraj"', datumZDotazu('wczoraj', dnes), '2026-10-12');
+  eq('prázdný dotaz', datumZDotazu('', dnes), null);
 }

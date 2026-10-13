@@ -2706,6 +2706,18 @@ export async function GET(request: Request) {
         acked_at TIMESTAMP,
         PRIMARY KEY (announcement_id, user_id)
       )`);
+    // chat_messages.reply_to: citovaná zpráva; chat_reactions: 👍 ✅ ❤️ 😂 po jednom na člověka a emoji.
+    await ddl(sql`ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS reply_to INTEGER`);
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS chat_reactions (
+        id SERIAL PRIMARY KEY,
+        message_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        emoji TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE (message_id, user_id, emoji)
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS chat_reactions_message ON chat_reactions (message_id)`);
 
     // Kroky migrace, které selhaly (a byly zachyceny), ať se to pozná zvenku
     // místo tichého „ok". Prázdné pole = celé schéma prošlo.

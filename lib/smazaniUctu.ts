@@ -40,8 +40,8 @@ export const ZACHAZENI_TABULEK: Record<string, Zachazeni> = {
   account_delete_requests: 'smazat', user_blocks: 'smazat', guide_reads: 'smazat', poll_votes: 'smazat',
   suggestion_votes: 'smazat', conversation_members: 'smazat', team_members: 'smazat', billing_interest: 'smazat',
   rozlozeni_stranek: 'smazat', invitations: 'smazat',
-  // kolo 8: potvrzení přečtení oznámení je osobní stopa, bez účtu nemá smysl
-  announcement_reads: 'smazat',
+  // kolo 8: potvrzení přečtení oznámení a reakce v chatu jsou osobní stopa, bez účtu nemají smysl
+  announcement_reads: 'smazat', chat_reactions: 'smazat',
   // host
   client_cards: 'smazat', client_memberships: 'smazat', client_loyalty_ledger: 'smazat', client_stamp_progress: 'smazat', client_stamp_events: 'smazat', client_scan_actions: 'smazat',
   client_coupon_claims: 'smazat', client_promo_uses: 'smazat', client_group_members: 'smazat', client_event_follows: 'smazat',
@@ -120,6 +120,7 @@ export const TYMOVE_PONECHAT = ['billing_events', 'referral_rewards', 'admin_aud
 export const TYMOVE_NEPRIME: { tabulka: string; kde: string }[] = [
   { tabulka: 'chat_messages', kde: 'conversation_id IN (SELECT id FROM conversations WHERE team_id = $1)' },
   { tabulka: 'conversation_members', kde: 'conversation_id IN (SELECT id FROM conversations WHERE team_id = $1)' },
+  { tabulka: 'chat_reactions', kde: 'message_id IN (SELECT id FROM chat_messages WHERE conversation_id IN (SELECT id FROM conversations WHERE team_id = $1))' },
   { tabulka: 'announcement_reads', kde: 'announcement_id IN (SELECT id FROM announcements WHERE team_id = $1)' },
   { tabulka: 'menu_items', kde: 'section_id IN (SELECT id FROM menu_sections WHERE board_id IN (SELECT id FROM menu_boards WHERE team_id = $1))' },
   { tabulka: 'menu_sections', kde: 'board_id IN (SELECT id FROM menu_boards WHERE team_id = $1)' },
@@ -197,7 +198,7 @@ export function planUzivatele(u: { id: number; email: string; role: string; hash
   const k: Krok[] = [];
   const del = (t: string, sloupec = 'user_id') => k.push(volitelny(`smazat ${t}`, `DELETE FROM ${t} WHERE ${sloupec} = $1`, [id]));
   for (const t of ['push_subscriptions', 'device_tokens', 'notifications', 'password_resets', 'account_delete_requests', 'guide_reads',
-    'poll_votes', 'suggestion_votes', 'conversation_members', 'team_members', 'billing_interest', 'announcement_reads']) del(t);
+    'poll_votes', 'suggestion_votes', 'conversation_members', 'team_members', 'billing_interest', 'announcement_reads', 'chat_reactions']) del(t);
   k.push(volitelny('smazat osobní rozložení stránek', `DELETE FROM rozlozeni_stranek WHERE user_id = $1`, [id]));
   k.push(volitelny('smazat blokace', `DELETE FROM user_blocks WHERE blocker_id = $1 OR blocked_id = $1`, [id]));
   k.push(volitelny('smazat počítadla přihlášení', `DELETE FROM auth_attempts WHERE key = ANY($1)`,
