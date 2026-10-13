@@ -162,6 +162,15 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'billing.upgrade': 'Změna tarifu na vyšší',
   // úkoly (kolo 7)
   'ukoly.fotka': 'Úkol splněn s fotkou jako důkazem',
+  // výplaty (kolo 8, R8-1)
+  'vyplata.oznacena': 'Výplata označená jako vyplacená',
+  'vyplata.zrusena': 'Označení výplaty zrušeno',
+  'vyplata.obdobi_uzavreno': 'Výplatní období uzavřeno',
+  'vyplata.obdobi_otevreno': 'Výplatní období znovu otevřeno',
+  'vyplata.pravidla': 'Změna pravidel výplat (dýško, příplatky, odvody)',
+  'vyplata.smlouva': 'Změna typu smlouvy a limitu hodin člena',
+  'dochazka.pauza_doplnena': 'Pauza doplněná při odchodu (směna rozdělená na dva záznamy)',
+  'dochazka.bez_pauzy': 'Odchod po víc než 6 h bez pauzy',
 };
 
 /** Popisek akce; neznámý klíč nikdy neukážeme syrový. */
