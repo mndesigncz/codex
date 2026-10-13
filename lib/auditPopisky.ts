@@ -274,7 +274,7 @@ export const OBLASTI_AUDITU: Readonly<Record<string, OblastAuditu>> = {
   // akce (výdej a vrácení zboží, oznámení týmu) — samostatná agenda, patří k ostatnímu
   event: 'ostatni',
   // úkoly a nápady (kolo 7: fotka jako důkaz, zamítnutí s důvodem) — provozní agenda, patří k ostatnímu
-  ukoly: 'ostatni', napady: 'ostatni',
+  ukoly: 'ostatni', napady: 'ostatni', oznameni: 'ostatni',
 };
 
 /** Akce, jejichž předpona patří jinam než ony samy (celý klíč má přednost před předponou). */
