@@ -13,6 +13,7 @@ import { Icon } from './Icons';
 import { useVejdiSe } from '@/lib/useVejdiSe';
 import { usePopover } from '@/lib/usePopover';
 import { nactiTeamsMine } from './role/useOpravneni';
+import { useT } from '@/lib/i18n/client';
 
 interface Podnik { teamId: number; teamName: string; role: 'employer' | 'employee' }
 interface Data { activeTeamId: number | null; teams: Podnik[]; organization: { name: string; isOwner: boolean } | null; muzuZalozit: boolean }
@@ -36,8 +37,16 @@ const nactiPodniky = (znovu: boolean): Promise<any> => nactiTeamsMine(znovu);
  * `jenPrepinani`: v hlavičce telefonu se kreslí jen tomu, kdo má víc podniků
  * — s jedním by tam jen ubíral místo názvu obrazovky (na 320 px zbývalo
  * 64 px). Založit další podnik jde z bočního pásu.
+ *
+ * `onNastaveniOrganizace` (kolo 7): položka „Nastavení organizace" v nabídce — jen když je
+ * podnik v organizaci a layout cestu dal (vedení: Nastavení › Organizace). Zaměstnanec
+ * a režim S sebou ji nedávají, takže se nekreslí. Vzor: Shopify, kde je nastavení
+ * organizace dostupné z přepínače obchodů.
  */
-export default function PodnikSwitcher({ compact = false, canCreate = false, jenPrepinani = false, onOverview }: { compact?: boolean; canCreate?: boolean; jenPrepinani?: boolean; onOverview?: () => void }) {
+export default function PodnikSwitcher({ compact = false, canCreate = false, jenPrepinani = false, onOverview, onNastaveniOrganizace }: {
+  compact?: boolean; canCreate?: boolean; jenPrepinani?: boolean; onOverview?: () => void; onNastaveniOrganizace?: () => void;
+}) {
+  const t = useT();
   const { update } = useSession();
   const [data, setData] = useState<Data | null>(null);
   const [open, setOpen] = useState(false);
@@ -135,21 +144,27 @@ export default function PodnikSwitcher({ compact = false, canCreate = false, jen
         <div ref={pop.panelRef} onKeyDown={pop.onPanelKeyDown} role="menu" style={vejdiSe} className="absolute left-0 right-0 top-full mt-1 z-50 glass-strong rounded-2xl p-1.5 shadow-[0_14px_40px_rgba(25,35,15,0.16)] min-w-[220px] pop-in origin-top">
           {data.teams.map(t => (
             <button key={t.teamId} type="button" role="menuitem" disabled={busy} onClick={() => prepni(t.teamId)}
-              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm transition ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 min-h-11 rounded-xl text-sm transition ${
                 t.teamId === data.activeTeamId ? 'bg-[#C8F542]/25 text-[#16181A] font-semibold' : 'text-black/70 hover:text-black hover:bg-black/[0.05]'}`}>
               <span className="min-w-0 flex-1 truncate">{t.teamName}</span>
               <span className="shrink-0 text-[11px] text-black/40">{t.role === 'employer' ? 'vedení' : 'tým'}</span>
               {t.teamId === data.activeTeamId && <Icon name="check" size={14} className="shrink-0 text-[#5B7A08]" />}
             </button>
           ))}
+          {((onOverview && vicPodniku) || (onNastaveniOrganizace && data.organization)) && (
+            <div className="h-px bg-black/[0.06] my-1" />
+          )}
           {onOverview && vicPodniku && (
-            <>
-              <div className="h-px bg-black/[0.06] my-1" />
-              <button type="button" role="menuitem" onClick={() => { setOpen(false); onOverview(); }}
-                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-black/70 hover:text-black hover:bg-black/[0.05] transition">
-                <Icon name="trend" size={15} /> Všechny podniky
-              </button>
-            </>
+            <button type="button" role="menuitem" onClick={() => { setOpen(false); onOverview(); }}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 min-h-11 rounded-xl text-sm text-black/70 hover:text-black hover:bg-black/[0.05] transition">
+              <Icon name="trend" size={15} /> Všechny podniky
+            </button>
+          )}
+          {onNastaveniOrganizace && data.organization && (
+            <button type="button" role="menuitem" onClick={() => { setOpen(false); onNastaveniOrganizace(); }}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 min-h-11 rounded-xl text-sm text-black/70 hover:text-black hover:bg-black/[0.05] transition">
+              <Icon name="settings" size={15} /> {t('Nastavení organizace')}
+            </button>
           )}
           {mohuZalozit && (
             <>
@@ -166,7 +181,7 @@ export default function PodnikSwitcher({ compact = false, canCreate = false, jen
                 </form>
               ) : (
                 <button type="button" role="menuitem" onClick={() => setCreating(true)}
-                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-[#5B7A08] hover:bg-black/[0.05] transition">
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 min-h-11 rounded-xl text-sm text-[#5B7A08] hover:bg-black/[0.05] transition">
                   <Icon name="plus" size={15} /> Přidat podnik
                 </button>
               )}

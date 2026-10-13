@@ -45,6 +45,45 @@ export const LIMITS: Record<PlanId, { members: number | null; shareLinks: number
   max: { members: null, shareLinks: null },
 };
 
+/** Kolik toho podnik z limitů tarifu čerpá (GET /api/billing/status → `usage`). */
+export interface CerpaniTarifu {
+  /** Lidé bez tabletu — týž počet, podle kterého se odmítá další člen (lib/tenant pocetClenu). */
+  members: number;
+  /** Aktivní sdílené odkazy — týž dotaz jako limit v POST /api/share. */
+  shareLinks: number;
+  /** Podniky v organizaci; null, když podnik v žádné není. */
+  teams: number | null;
+}
+
+export type StavVyuziti = 'neomezeno' | 'volno' | 'malo' | 'plno';
+
+export interface Vyuziti {
+  pocet: number;
+  /** null = bez limitu. */
+  limit: number | null;
+  /** Kolik míst zbývá (nikdy záporné); null bez limitu. */
+  zbyva: number | null;
+  /** `malo` = zbývá jedno místo, `plno` = nezbývá nic (i když je přes limit — starší podnik). */
+  stav: StavVyuziti;
+}
+
+/**
+ * Čerpání jednoho limitu pro kartu Váš plán: „2 / 3" a varování, když zbývá
+ * nejvýš jedno místo. Počet je stejný, jaký vymáhá server (canAddMember), takže se
+ * číslo v kartě a v chybové hlášce nikdy neliší.
+ */
+export function vyuziti(n: number, limit: number | null | undefined): Vyuziti {
+  const pocet = Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+  if (limit == null || !Number.isFinite(limit)) return { pocet, limit: null, zbyva: null, stav: 'neomezeno' };
+  const zbyva = Math.max(0, limit - pocet);
+  return { pocet, limit, zbyva, stav: zbyva === 0 ? 'plno' : zbyva <= 1 ? 'malo' : 'volno' };
+}
+
+/** Limity, které platí pro tarif, který podnik právě má (zkušební Pro = bez limitu). */
+export function limityTarifu(p: Pick<PlanInfo, 'effective'> | null | undefined): { members: number | null; shareLinks: number | null } {
+  return LIMITS[p?.effective ?? 'pro'];
+}
+
 /** Ceny v Kč. Roční má přeškrtnutou „srovnávací“ cenu (12 × měsíc, u Pro 4 990 dle zadání). */
 export const PRICES: Record<Exclude<PlanId, 'free'>, { month: number; year: number; yearCompare: number }> = {
   pro: { month: 499, year: 3990, yearCompare: 4990 },

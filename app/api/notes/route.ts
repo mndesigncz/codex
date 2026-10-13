@@ -4,7 +4,7 @@ import { pozaduj, jeOdpoved, type Kontext } from '@/lib/opravneniDb';
 import { typNaUcet } from '@/lib/opravneni';
 import { resolveActingUser } from '@/lib/kioskActing';
 import {
-  jeTypPoznamky, klicEntity, normalizujTextPoznamky, smiSmazatPoznamku, smiUpravitPoznamku,
+  jeTypPoznamky, klicEntity, normalizujTextPoznamky, smiSmazatPoznamku, smiUpravitPoznamku, idsZPoctu,
   MAX_DELKA_POZNAMKY, type TypPoznamky, type Poznamka,
 } from '@/lib/poznamky';
 
@@ -85,6 +85,38 @@ async function entitaViditelna(typ: TypPoznamky, klic: string, v: Volajici): Pro
       if (!s) return false;
       return opr.has('rozvrh.nahled') || Number(s.employee_id) === actingId || Number(s.employee_id) === c.meId;
     }
+    case 'suggestion': {
+      // Podnět z mého podniku; nástěnku Nápadů vidí kdo smí přidávat nebo spravovat (kolo 7).
+      if (!vidiNapady(opr)) return false;
+      const [s] = await sql`SELECT id FROM suggestions WHERE id = ${Number(klic)} AND team_id = ${teamId}`;
+      return !!s;
+    }
+  }
+}
+
+const vidiNapady = (opr: ReadonlySet<string>) => opr.has('napady.pridat') || opr.has('napady.spravovat');
+
+/**
+ * GET ?typ=suggestion&pocty=1,2,3 — počty poznámek pro seznam podnětů jedním dotazem
+ * (tlačítko „Poznámky (n)" u každého řádku; po jednom by to bylo N požadavků).
+ * Počítá jen podněty mého podniku; cizí id se v odpovědi prostě neobjeví.
+ */
+async function pocty(v: Volajici, raw: string | null): Promise<NextResponse> {
+  if (!vidiNapady(v.c.role.opravneni)) return chyba('Tohle už neexistuje.', 404);
+  const ids = idsZPoctu(raw);
+  if (ids.length === 0) return NextResponse.json({ pocty: {} });
+  try {
+    const rows = await sql`
+      SELECT s.id, COUNT(n.id)::int AS n
+      FROM suggestions s
+      LEFT JOIN entity_notes n ON n.team_id = s.team_id AND n.entity_type = 'suggestion' AND n.entity_id = s.id::text
+      WHERE s.team_id = ${v.c.teamId} AND s.id = ANY(${ids})
+      GROUP BY s.id`;
+    return NextResponse.json({ pocty: Object.fromEntries(rows.map(r => [String(r.id), Number(r.n)])) });
+  } catch (e) {
+    if (predMigraci(e)) return NextResponse.json({ pocty: {} });
+    console.error('notes GET pocty', e);
+    return chyba('Poznámky se nenačetly.', 500);
   }
 }
 
@@ -124,6 +156,7 @@ export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams;
   const v = await volajici(req, q.get('actingAs'));
   if (jeOdpoved(v)) return v;
+  if (q.get('typ') === 'suggestion' && q.has('pocty')) return pocty(v, q.get('pocty'));
   const c = cil(q.get('typ'), q.get('id'));
   if (jeOdpoved(c)) return c;
   try {

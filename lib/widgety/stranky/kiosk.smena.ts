@@ -39,6 +39,8 @@ export const STRANKA: DefiniceStranky = {
     'ukoly.dnes',
     'odmeny.zebricek',
     'menu.vyprodano',
+    // Týdenní rozpis týmu (kolo 7) — jen doporučený, ne výchozí: viz katalog rozvrh.tym_nahled.
+    'rozvrh.tym_nahled',
   ],
   vychozi: {
     'typ:kiosk': [

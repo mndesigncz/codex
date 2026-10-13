@@ -204,8 +204,12 @@ export const WIDGETY: DefiniceWidgetu[] = [
     ikona: 'users',
     velikosti: ['M', 'L'],
     vychoziVelikost: 'L',
-    rozhrani: ['vedeni', 'zamestnanec'],
-    stranky: ['zamestnanec.domu', 'vedeni.moje_smeny', 'zamestnanec.moje_smeny', 'zamestnanec.dostupnost'],
+    // Tablet (kolo 7): „kdo je zítra ráno, s kým jsem v sobotu" se řeší u baru. Jen v doporučených
+    // stránky Směna, ne ve výchozím rozložení — podnik, který zaměstnancům náhled rozvrhu vypnul,
+    // ho na tablet nedostane sám; vedení ho přidá v Nastavení › Stránky. Odkaz 'my-shifts' tablet
+    // nemá kam vést, takže se na něm nekreslí (smiPohled).
+    rozhrani: ['vedeni', 'zamestnanec', 'kiosk'],
+    stranky: ['zamestnanec.domu', 'vedeni.moje_smeny', 'zamestnanec.moje_smeny', 'zamestnanec.dostupnost', 'kiosk.smena'],
     opravneni: { vse: ['rozvrh.nahled'], nektere: [] },
     tarif: 'zdarma',
     nastaveni: [

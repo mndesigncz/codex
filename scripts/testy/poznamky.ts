@@ -8,6 +8,7 @@ import type { Testy } from './_testy.ts';
 import {
   TYPY_POZNAMEK, OPRAVNENI_SPRAVY_POZNAMEK, MAX_DELKA_POZNAMKY, jeTypPoznamky, klicEntity, normalizujTextPoznamky,
   smiUpravitPoznamku, smiSmazatPoznamku, relativniCas, urlPoznamek, vyberPoznamky,
+  MAX_DELKA_DUVODU, normalizujDuvod, teloOznameniPodnetu, urlPoctuPoznamek, idsZPoctu, vyberPoctyPoznamek,
 } from '../../lib/poznamky.ts';
 import { KATALOG } from '../../lib/opravneniKatalog.ts';
 
@@ -18,7 +19,7 @@ const DEN = 24 * H;
 
 export default function ({ eq, ok }: Testy) {
   // ---- typ ----
-  eq('šest typů v daném pořadí', [...TYPY_POZNAMEK], ['task', 'guide', 'procedure', 'recipe', 'inventory_item', 'shift']);
+  eq('sedm typů v daném pořadí (kolo 7: + podnět)', [...TYPY_POZNAMEK], ['task', 'guide', 'procedure', 'recipe', 'inventory_item', 'shift', 'suggestion']);
   ok('známý typ projde', jeTypPoznamky('task') && jeTypPoznamky('recipe'));
   ok('neznámý typ, číslo ani prázdno neprojdou', !jeTypPoznamky('tasks') && !jeTypPoznamky(1) && !jeTypPoznamky('') && !jeTypPoznamky(null));
 
@@ -63,6 +64,10 @@ export default function ({ eq, ok }: Testy) {
     && smiSmazatPoznamku({ typ: 'recipe', autorId: 1, meId: 2, opr: new Set(['receptury.upravit']) })
     && smiSmazatPoznamku({ typ: 'inventory_item', autorId: 1, meId: 2, opr: new Set(['sklad.upravit']) })
     && smiSmazatPoznamku({ typ: 'shift', autorId: 1, meId: 2, opr: new Set(['rozvrh.upravit']) }));
+  ok('napady.spravovat smaže cizí poznámku u podnětu, napady.pridat ne',
+    smiSmazatPoznamku({ typ: 'suggestion', autorId: 1, meId: 2, opr: new Set(['napady.spravovat']) })
+    && !smiSmazatPoznamku({ typ: 'suggestion', autorId: 1, meId: 2, opr: new Set(['napady.pridat']) }));
+  eq('podnět: číselný klíč', klicEntity('suggestion', '14'), '14');
   ok('„zobrazit" nestačí na smazání cizí poznámky', !smiSmazatPoznamku({ typ: 'inventory_item', autorId: 1, meId: 2, opr: new Set(['sklad.zobrazit', 'sklad.zapsat_stav']) }));
   const ids = new Set(KATALOG.map(o => o.id));
   for (const typ of TYPY_POZNAMEK) ok(`oprávnění správy „${OPRAVNENI_SPRAVY_POZNAMEK[typ]}" (${typ}) je v katalogu`, ids.has(OPRAVNENI_SPRAVY_POZNAMEK[typ]));
@@ -102,6 +107,25 @@ export default function ({ eq, ok }: Testy) {
   try { vyberPoznamky({ error: 'x' }); } catch { spadlo = true; }
   ok('vyberPoznamky: objekt místo pole je chyba tvaru, ne prázdno', spadlo);
 
+  // ---- podněty: důvod zamítnutí a počty (kolo 7) ----
+  eq('důvod: oříznutý text', normalizujDuvod('  až po sezóně \r\n '), 'až po sezóně');
+  eq('důvod: prázdný = bez důvodu (null)', normalizujDuvod('   '), null);
+  eq('důvod: chybějící = null', normalizujDuvod(undefined), null);
+  eq(`důvod: ${MAX_DELKA_DUVODU} znaků projde`, (normalizujDuvod('x'.repeat(MAX_DELKA_DUVODU)) as string).length, MAX_DELKA_DUVODU);
+  eq(`důvod: ${MAX_DELKA_DUVODU + 1} znaků = odmítnout (false), ne uříznout`, normalizujDuvod('x'.repeat(MAX_DELKA_DUVODU + 1)), false);
+  eq('důvod: číslo = false', normalizujDuvod(5), false);
+  eq('oznámení bez důvodu = jen stav', teloOznameniPodnetu('Prozatím zamítnuto', null), 'Prozatím zamítnuto');
+  eq('oznámení s důvodem = stav — důvod', teloOznameniPodnetu('Prozatím zamítnuto', 'Až po sezóně.'), 'Prozatím zamítnuto — Až po sezóně.');
+  eq('počty: adresa se seřazenými jedinečnými id', urlPoctuPoznamek('suggestion', [12, 3, 12, -1, 0, 1.5]), '/api/notes?typ=suggestion&pocty=3%2C12');
+  eq('počty: bez id žádná adresa (nic se nenačítá)', urlPoctuPoznamek('suggestion', []), null);
+  eq('počty: id z parametru, nesmysly pryč', idsZPoctu('3,12, 7 ,abc,0,-2,12'), [3, 12, 7]);
+  eq('počty: prázdný parametr = []', idsZPoctu(null), []);
+  eq('počty: nejvýš 200 id', idsZPoctu(Array.from({ length: 300 }, (_, i) => i + 1).join(',')).length, 200);
+  eq('počty: odpověď do mapy čísel', vyberPoctyPoznamek({ pocty: { 3: 2, '12': '0', x: 5, 7: -1 } }), { 3: 2, 12: 0 });
+  let spadloPocty = false;
+  try { vyberPoctyPoznamek([]); } catch { spadloPocty = true; }
+  ok('počty: pole místo objektu je chyba tvaru', spadloPocty);
+
   // ---- pojistky nad zdrojákem ----
   const init = zdroj('app/api/init/route.ts');
   ok('migrace zakládá entity_notes s indexem (team_id, entity_type, entity_id)',
@@ -112,6 +136,11 @@ export default function ({ eq, ok }: Testy) {
   ok('API píše za vybraného člověka na tabletu (resolveActingUser)', /resolveActingUser\(/.test(api));
   ok('API nepustí zápis tabletu bez vybraného člověka', /v\.tablet && v\.actingId === v\.c\.meId/.test(api));
   for (const typ of TYPY_POZNAMEK) ok(`API má větev pro typ „${typ}"`, new RegExp(`case '${typ}':`).test(api));
+  ok('API: podnět jen z mého podniku a s napady.pridat nebo napady.spravovat',
+    /FROM suggestions WHERE id = \$\{Number\(klic\)\} AND team_id = \$\{teamId\}/.test(api) && /opr\.has\('napady\.pridat'\) \|\| opr\.has\('napady\.spravovat'\)/.test(api));
+  const napad = zdroj('app/api/suggestions/[id]/route.ts');
+  ok('zamítnutí: důvod jde se stavem v jedné transakci jako poznámka podnětu a do oznámení',
+    /sql\.transaction\(/.test(napad) && /'suggestion'/.test(napad) && /teloOznameniPodnetu\(/.test(napad) && /audit\(c\.teamId, c\.meId, 'napady\.zamitnuto'/.test(napad));
   const komp = zdroj('components/Poznamky.tsx');
   ok('komponenta nepoužívá confirm()', !/\bconfirm\(/.test(komp));
   ok('komponenta po zápisu obnoví sdílenou mezipaměť', /obnovDataWidgetu\(url\)/.test(komp));

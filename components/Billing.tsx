@@ -6,11 +6,11 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Icon } from './Icons';
-import { Button, Chip, Segmented } from './ui';
+import { Button, Chip, Segmented, Stat, StatRow } from './ui';
 import CheckoutModal from './CheckoutModal';
 import {
   PLAN_FEATURES, PLAN_NAMES, PRICES, MAX_EXTRAS, MAX_OFFER_PCT, TRIAL_DAYS, REFERRALS_PER_MONTH,
-  type PlanInfo, type Interval,
+  vyuziti, limityTarifu, type PlanInfo, type Interval, type CerpaniTarifu, type Vyuziti,
 } from '@/lib/plan';
 import { okJson, apiMessage } from '@/lib/api';
 import { useJazyk, useT } from '@/lib/i18n/client';
@@ -23,6 +23,8 @@ type Status = {
   plan: PlanInfo;
   subscription: { status: string | null; interval: string | null; price: string | null; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean; trialEnd: string | null } | null;
   referral: { code: string | null; link: string | null; thisMonth: number; limit: number; total: number; referredCount: number };
+  /** Čerpání limitů tarifu (lidé, sdílené odkazy, podniky v organizaci) — stejná čísla, jaká vymáhá server. */
+  usage?: CerpaniTarifu;
 };
 
 /**
@@ -34,11 +36,28 @@ function VetaSTucnym({ veta, tucne, className }: { veta: (tucne: string) => stri
   return <>{pred}<strong className={className}>{tucne}</strong>{po}</>;
 }
 
-function Cell({ v }: { v: string | boolean }) {
+/**
+ * Hodnota tarifu u funkce: fajfka, pomlčka, nebo text („Až 3"). `chip`: v řádku seznamu na
+ * telefonu se text ukáže jako tlumený Chip, který se zalamuje — sloupec má jen třetinu šířky.
+ */
+function Cell({ v, chip = false }: { v: string | boolean; chip?: boolean }) {
   const t = useT('predplatne');
-  if (v === true) return <Icon name="check" size={16} className="text-[#5B7A08]" />;
-  if (v === false) return <span className="text-black/25">—</span>;
+  if (v === true) return <Icon name="check" size={16} className="text-[#5B7A08]" title={t('ano')} />;
+  if (v === false) return <span role="img" className="text-black/25" aria-label={t('ne')}>—</span>;
+  if (chip) return <Chip size="sm" className="whitespace-normal text-pretty max-w-full">{t(v)}</Chip>;
   return <>{t(v)}</>;
+}
+
+/**
+ * Poznámka pod číslem čerpání: bez limitu tichý text, zbývá-li jedno místo čekací Chip,
+ * nezbývá-li nic Chip „Plno". Dokud je místa dost, nic — číslo „1 / 3" mluví samo.
+ */
+function StavLimitu({ v, zbyva }: { v: Vyuziti; zbyva: (n: number) => string }) {
+  const t = useT('predplatne');
+  if (v.stav === 'neomezeno') return <>{t('bez limitu')}</>;
+  if (v.stav === 'plno') return <Chip size="sm" tone="bad">{t('Plno')}</Chip>;
+  if (v.stav === 'malo') return <Chip size="sm" tone="wait">{zbyva(v.zbyva ?? 0)}</Chip>;
+  return null;
 }
 
 export default function Billing() {
@@ -105,6 +124,14 @@ export default function Billing() {
     if (!st?.referral.link) return;
     try { await navigator.clipboard.writeText(st.referral.link); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* ignore */ }
   };
+
+  // Čerpání limitů (Stripe billing portal „Staff accounts 2 of 5"): limity podle tarifu,
+  // který podnik právě má — zkušební Pro žádný limit nemá.
+  const usage = st?.usage;
+  const limity = limityTarifu(plan);
+  const lide = usage ? vyuziti(usage.members, limity.members) : null;
+  const odkazy = usage ? vyuziti(usage.shareLinks, limity.shareLinks) : null;
+  const uLimitu = plan?.effective === 'free' && [lide, odkazy].some(v => v?.stav === 'malo' || v?.stav === 'plno');
 
   // Nabídka Max po koupi Pro má vlastní (tónovanou) kartu i limetkové tlačítko.
   const nabidkaMax = plan?.effective === 'pro' && active && offerLeft > 0;
@@ -175,6 +202,23 @@ export default function Billing() {
             <Chip tone={plan.effective === 'free' ? 'muted' : 'ok'}>{planLabel(plan)}</Chip>
           )}
         </div>
+        {lide && odkazy && (
+          <div className="mt-5 border-t border-[var(--surface-line)] pt-4">
+            <StatRow>
+              <Stat label={t('Lidé v týmu')} value={lide.pocet} unit={lide.limit != null ? `/ ${lide.limit}` : undefined}
+                note={<StavLimitu v={lide} zbyva={n => t('Zbývá {n, plural, one {# místo} few {# místa} other {# míst}}', { n })} />} />
+              <Stat label={t('Sdílené odkazy')} value={odkazy.pocet} unit={odkazy.limit != null ? `/ ${odkazy.limit}` : undefined}
+                note={<StavLimitu v={odkazy} zbyva={n => t('Zbývá {n, plural, one {# odkaz} few {# odkazy} other {# odkazů}}', { n })} />} />
+              {usage?.teams != null && <Stat label={t('Podniky v organizaci')} value={usage.teams} />}
+            </StatRow>
+            {/* U limitu cesta ven hned vedle čísla — vedlejší akce; limetka zůstává na kartě tarifu Pro. */}
+            {uLimitu && (
+              <div className="mt-4">
+                <Button variant="secondary" icon="award" className="w-full sm:w-auto justify-center" onClick={() => setCheckout({ plan: 'pro', interval })}>{t('Přejít na Pro')}</Button>
+              </div>
+            )}
+          </div>
+        )}
         {plan?.pastDue && (
           <p className="note note-danger mt-4">{t('Poslední platba se nezdařila. Stripe ji zkusí znovu — zkontrolujte kartu přes „Spravovat předplatné“.')}</p>
         )}
@@ -235,7 +279,8 @@ export default function Billing() {
           <Segmented size="sm" ariaLabel={t('Období')} value={interval} onChange={v => setInterval_(v as Interval)}
             options={[{ id: 'month', label: t('Měsíčně') }, { id: 'year', label: t('Ročně · výhodněji') }]} />
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{priceCard('pro')}{priceCard('max')}</div>
+        {/* Až od lg: v Nastavení je od md boční pás sekcí a obsah je na 768 px široký jako na telefonu — dvě karty vedle sebe by tlačítko „Vyzkoušet" vytlačily z karty. */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">{priceCard('pro')}{priceCard('max')}</div>
       </div>
 
       {/* Affiliate */}
@@ -261,28 +306,45 @@ export default function Billing() {
       {/* Srovnání */}
       <div className="card p-6">
         <h3 className="t-card mb-4">{t('Co je v jakém plánu')}</h3>
-        <div className="overflow-x-auto -mx-2 px-2">
-          <table className="w-full text-sm min-w-[520px]">
-            <thead>
-              <tr className="text-left t-label">
-                <th className="py-2 pr-3">{t('Funkce')}</th>
-                <th className="py-2 px-3 w-24">{t('Zdarma')}</th>
-                <th className="py-2 px-3 w-36">Pro</th>
-                <th className="py-2 pl-3 w-36">Max</th>
+        {/* Telefon: funkce pod sebou a pod každou tři úzké sloupce Zdarma / Pro / Max (vzor
+            Stripe pricing table). Dřív tabulka s min-w 520 px v posuvném obalu — Pro a Max
+            byly na 390 px mimo kartu a tabulkou se muselo tahat do strany. */}
+        <ul className="list lg:hidden" aria-label={t('Co je v jakém plánu')}>
+          {PLAN_FEATURES.map(f => (
+            <li key={f.label} className="py-3">
+              <p className="text-sm font-medium text-[#16181A] text-pretty">{t(f.label)}</p>
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                {(['free', 'pro', 'max'] as const).map(p => (
+                  <div key={p} className="min-w-0">
+                    <p className="t-label">{nazevTarifu(p)}</p>
+                    <div className="mt-1 min-h-[1.25rem] flex items-center text-sm text-black/70"><Cell v={f[p]} chip /></div>
+                  </div>
+                ))}
+              </div>
+            </li>
+          ))}
+        </ul>
+        {/* Od lg tabulka s pevnými sloupci: první půlka pro název funkce (zalamuje se), zbytek tarifům (na 768 px má obsah Nastavení jen ~360 px). */}
+        <table className="hidden lg:table w-full text-sm table-fixed">
+          <thead>
+            <tr className="text-left t-label">
+              <th className="py-2 pr-3 w-1/2">{t('Funkce')}</th>
+              <th className="py-2 px-3">{t('Zdarma')}</th>
+              <th className="py-2 px-3">Pro</th>
+              <th className="py-2 pl-3">Max</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-black/[0.06]">
+            {PLAN_FEATURES.map(f => (
+              <tr key={f.label} className="align-top">
+                <td className="py-2.5 pr-3 text-[#16181A] text-pretty">{t(f.label)}</td>
+                <td className="py-2.5 px-3 text-black/55 text-pretty"><Cell v={f.free} /></td>
+                <td className="py-2.5 px-3 text-black/70 text-pretty"><Cell v={f.pro} /></td>
+                <td className="py-2.5 pl-3 text-black/70 text-pretty"><Cell v={f.max} /></td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-black/[0.06]">
-              {PLAN_FEATURES.map(f => (
-                <tr key={f.label}>
-                  <td className="py-2.5 pr-3 text-[#16181A]">{t(f.label)}</td>
-                  <td className="py-2.5 px-3 text-black/55"><Cell v={f.free} /></td>
-                  <td className="py-2.5 px-3 text-black/70"><Cell v={f.pro} /></td>
-                  <td className="py-2.5 pl-3 text-black/70"><Cell v={f.max} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
         <p className="mt-3 t-meta">{t('Ceny bez DPH. Fakturu se všemi náležitostmi vystaví Stripe a najdete ji v portálu.')}</p>
       </div>
     </div>

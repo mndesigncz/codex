@@ -48,7 +48,13 @@
    "icon": "box",
    "color": "1",
    "items": [
-    "Změřit teplotu"
+    {
+     "text": "Změřit teplotu",
+     "valueKind": "number",
+     "valueUnit": "°C",
+     "valueMin": 2,
+     "valueMax": 6
+    }
    ],
    "remindAt": "14:00",
    "remindDays": [],

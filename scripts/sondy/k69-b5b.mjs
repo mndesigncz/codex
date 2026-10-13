@@ -370,7 +370,7 @@ async function togo(opts) {
   await otevri(p, '/employer/overview?view=org', 'vedeni.vsechny_podniky');
   await p.waitForTimeout(1200);
   const t = await p.locator('[data-plocha]').innerText();
-  tvrdi('podniky 4: vypnutý přehled řekne proč a kde se zapíná', /vypnutý/.test(t) && /Nastavení týmu/.test(t));
+  tvrdi('podniky 4: vypnutý přehled řekne proč a kde se zapíná', /vypnutý/.test(t) && /Nastavení › Organizace/.test(t));
   tvrdi('podniky 4: s tlačítkem „Otevřít nastavení" (žádná slepá ulička)', await p.getByRole('button', { name: 'Otevřít nastavení' }).count() === 1);
   await ctx.close();
 }

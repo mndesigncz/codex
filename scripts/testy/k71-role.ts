@@ -9,7 +9,7 @@
 
 import { readFileSync } from 'node:fs';
 import type { Testy } from './_testy.ts';
-import { SYSTEMOVE_ROLE, VSECHNA, sZavislostmi, systemovaRole } from '../../lib/opravneni.ts';
+import { SYSTEMOVE_ROLE, VSECHNA, sZavislostmi, systemovaRole, KIOSK_BILA_LISTINA } from '../../lib/opravneni.ts';
 import { efektivniSystemova, smiUpravitSystemovou, jeUpravitelnaSystemova, procNeupravitelna, poleOpravneni, NEUPRAVITELNE_ROLE, type UpravaRole } from '../../lib/roleUpravy.ts';
 
 const zdroj = (cesta: string) => readFileSync(new URL(`../../${cesta}`, import.meta.url), 'utf8');
@@ -89,4 +89,9 @@ export default function ({ eq, ok }: Testy) {
   ok('API úprav: po změně zahodí cache celého podniku', (api.match(/zneplatniOpravneniPodniku\(c\.teamId\)/g) ?? []).length === 2);
   ok('API úprav: podnik z kontextu, ne z těla', !/b\??\.team_?[iI]d/.test(api));
   ok('init zakládá role_upravy idempotentně', /CREATE TABLE IF NOT EXISTS role_upravy/.test(kod('app/api/init/route.ts')));
+
+  // ---- kolo 7 (R7-7): tablet vidí náhled rozvrhu týmu ----
+  ok('Tablet má rozvrh.nahled (widget Kdo má směnu na Směně)', role('kiosk').opravneni.includes('rozvrh.nahled'));
+  ok('Tablet: rozvrh.nahled je na bílé listině a role Tablet z ní nevybočí', KIOSK_BILA_LISTINA.has('rozvrh.nahled') && role('kiosk').opravneni.every(k => KIOSK_BILA_LISTINA.has(k)));
+  ok('Tablet: rozvrh.nahled nepřitáhne závislost mimo bílou listinu', sZavislostmi(role('kiosk').opravneni).every(k => KIOSK_BILA_LISTINA.has(k)));
 }

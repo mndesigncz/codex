@@ -1,5 +1,5 @@
 // Poznámky k věcem v aplikaci (úkol, návod, postup, receptura z kasy, položka
-// skladu, směna) — čistá část bez Reactu a bez databáze, aby šla otestovat
+// skladu, směna, podnět) — čistá část bez Reactu a bez databáze, aby šla otestovat
 // v `npm test` a aby API i komponenta rozhodovaly podle téhož.
 //
 // Proč jedna sdílená funkce a ne „poznámka k úkolu", „komentář k návodu" zvlášť:
@@ -9,7 +9,7 @@
 // text projde — všude stejně.
 
 /** Typy věcí, ke kterým jde psát. Server i klient berou seznam odsud. */
-export const TYPY_POZNAMEK = ['task', 'guide', 'procedure', 'recipe', 'inventory_item', 'shift'] as const;
+export const TYPY_POZNAMEK = ['task', 'guide', 'procedure', 'recipe', 'inventory_item', 'shift', 'suggestion'] as const;
 export type TypPoznamky = (typeof TYPY_POZNAMEK)[number];
 
 export const jeTypPoznamky = (x: unknown): x is TypPoznamky => typeof x === 'string' && (TYPY_POZNAMEK as readonly string[]).includes(x);
@@ -29,6 +29,8 @@ export const OPRAVNENI_SPRAVY_POZNAMEK: Record<TypPoznamky, string> = {
   recipe: 'receptury.upravit',
   inventory_item: 'sklad.upravit',
   shift: 'rozvrh.upravit',
+  // Kolo 7: vlákno pod podnětem (Nápady) — uklízí ten, kdo podněty spravuje.
+  suggestion: 'napady.spravovat',
 };
 
 /**
@@ -144,4 +146,64 @@ export function vyberPoznamky(raw: unknown): Poznamka[] {
       moje: p.moje === true,
       muzuSmazat: p.muzuSmazat === true,
     }));
+}
+
+// ---------------------------------------------------------------------------
+// Podněty (Nápady): důvod zamítnutí a počty poznámek v seznamu (kolo 7)
+// ---------------------------------------------------------------------------
+
+/** Nejdelší důvod zamítnutí podnětu — jedna dvě věty, ne esej. */
+export const MAX_DELKA_DUVODU = 300;
+
+/**
+ * Důvod zamítnutí k uložení: oříznutý, jednotné konce řádků, nejvýš 300 znaků.
+ * Prázdný nebo chybějící = null (důvod je nepovinný); delší = false (odmítnout, ne tiše uříznout).
+ */
+export function normalizujDuvod(raw: unknown): string | null | false {
+  if (raw == null) return null;
+  if (typeof raw !== 'string') return false;
+  const t = raw.replace(/\r\n?/g, '\n').trim();
+  if (!t) return null;
+  if (t.length > MAX_DELKA_DUVODU) return false;
+  return t;
+}
+
+/** Tělo oznámení autorovi podnětu: stav, a když je, důvod za pomlčkou. */
+export function teloOznameniPodnetu(stav: string, duvod: string | null): string {
+  return duvod ? `${stav} — ${duvod}` : stav;
+}
+
+/** Nejvíc podnětů, pro které se v jednom dotazu vrátí počet poznámek. */
+export const MAX_POCTU_NAJEDNOU = 200;
+
+/** Adresa počtů poznámek pro seznam podnětů (`/api/notes?typ=suggestion&pocty=1,2,3`); bez id null. */
+export function urlPoctuPoznamek(typ: 'suggestion', ids: readonly number[]): string | null {
+  const cista = [...new Set(ids.filter(n => Number.isInteger(n) && n > 0))].sort((a, b) => a - b).slice(0, MAX_POCTU_NAJEDNOU);
+  if (cista.length === 0) return null;
+  return `/api/notes?${new URLSearchParams({ typ, pocty: cista.join(',') }).toString()}`;
+}
+
+/** Seznam id z parametru `pocty` (čárkou oddělená kladná celá čísla, nejvýš 200); nic platného = []. */
+export function idsZPoctu(raw: string | null | undefined): number[] {
+  if (!raw) return [];
+  const out = new Set<number>();
+  for (const kus of raw.split(',')) {
+    const k = klicEntity('suggestion', kus);
+    if (k) out.add(Number(k));
+    if (out.size >= MAX_POCTU_NAJEDNOU) break;
+  }
+  return [...out];
+}
+
+/** Odpověď počtů do mapy id → počet; cokoli jiného je chyba tvaru. */
+export function vyberPoctyPoznamek(raw: unknown): Record<number, number> {
+  const p = (raw as { pocty?: unknown } | null)?.pocty;
+  if (!p || typeof p !== 'object' || Array.isArray(p)) throw new Error('Počty poznámek přišly v nečekaném tvaru.'); // i18n-ok
+  const out: Record<number, number> = {};
+  for (const [k, v] of Object.entries(p as Record<string, unknown>)) {
+    const id = Number(k);
+    const n = Number(v);
+    if (Number.isInteger(id) && id > 0 && Number.isFinite(n) && n >= 0) out[id] = Math.floor(n);
+  }
+  return out;
 }

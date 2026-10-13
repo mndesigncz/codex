@@ -26,8 +26,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '../Icons';
 import {
-  Avatar, Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Modal, Segmented, Skeleton, Switch, Textarea, Toast,
+  Avatar, Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Menu, Modal, Segmented, Skeleton, Switch, Textarea, Toast,
 } from '../ui';
+import { MAX_NAZEV_ODMENY, validujOdmenu, type ChybaOdmeny } from '@/lib/odmenyKatalog';
 import { DEFAULT_POINTS, normalizeLevels, normalizePoints, type RewardLevel, type PointsConfig } from '@/lib/rewardLevels';
 import { KLIC_KALENDAR, UDALOST_KALENDAR, urlZebricku, vyberKatalog, vyberPoradi, type ObdobiZebricku, type Odmena, type Poradi } from '@/lib/odmenyPrehled';
 import { apiMessage, okJson } from '@/lib/api';
@@ -372,6 +373,7 @@ function SpravaKatalogu() {
   const [pridavam, setPridavam] = useState(false);
   const [pracuji, setPracuji] = useState<number | null>(null);
   const [mazani, setMazani] = useState<Odmena | null>(null);
+  const [uprava, setUprava] = useState<Odmena | null>(null);
   const [chyba, setChyba] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const cenaCislo = Math.round(Number(cena));
@@ -434,24 +436,27 @@ function SpravaKatalogu() {
         {t('Katalog odměn')}
       </h2>
       <p className="t-meta mt-1 text-pretty">{t('Za co si tým může vyměnit body. Schválená výměna body odečte automaticky.')}</p>
-      <form className="mt-4 grid grid-cols-[4.5rem_minmax(0,1fr)] sm:grid-cols-[4.5rem_minmax(0,1fr)_7rem_8rem_auto] items-end gap-3"
+      {/* Na telefonu dva sloupce: Název přes celou šířku, pod ním Emoji | Cena, pak Bonus
+          a Přidat přes celou šířku (pořadí přes max-sm:order-*). Dřív pět polí ve dvou
+          sloupcích [4.5rem, 1fr] posadilo Cenu do 72px sloupce. Od sm beze změny. */}
+      <form className="mt-4 grid grid-cols-2 sm:grid-cols-[4.5rem_minmax(0,1fr)_7rem_8rem_auto] items-end gap-3"
         onSubmit={e => { e.preventDefault(); void pridat(); }}>
-        <Field id="nova-odmena-ikona" label={t('Emoji')}>
+        <Field id="nova-odmena-ikona" label={t('Emoji')} className="max-sm:order-2">
           <Input id="nova-odmena-ikona" value={ikona} onChange={e => setIkona(e.target.value)} maxLength={4} className="text-center" />
         </Field>
-        <Field id="nova-odmena-nazev" label={t('Název odměny')}>
-          <Input id="nova-odmena-nazev" value={nazev} onChange={e => setNazev(e.target.value)} maxLength={120} placeholder={t('Např. Směna končí o hodinu dřív')} />
+        <Field id="nova-odmena-nazev" label={t('Název odměny')} className="col-span-2 sm:col-span-1 max-sm:order-1">
+          <Input id="nova-odmena-nazev" value={nazev} onChange={e => setNazev(e.target.value)} maxLength={MAX_NAZEV_ODMENY} placeholder={t('Např. Směna končí o hodinu dřív')} />
         </Field>
-        <Field id="nova-odmena-cena" label={t('Cena v bodech')}>
+        <Field id="nova-odmena-cena" label={t('Cena v bodech')} className="max-sm:order-3">
           <Input id="nova-odmena-cena" type="number" inputMode="numeric" min={1} value={cena} onChange={e => setCena(e.target.value)} className="tabular-nums" />
         </Field>
-        <Field id="nova-odmena-bonus" label={t('Bonus k výplatě')} hint={t('Volitelné; schválení ho zapíše jako prémii.')}>
+        <Field id="nova-odmena-bonus" label={t('Bonus k výplatě')} hint={t('Volitelné; schválení ho zapíše jako prémii.')} className="col-span-2 sm:col-span-1 max-sm:order-4">
           <div className="relative">
             <Input id="nova-odmena-bonus" type="number" inputMode="numeric" min={0} value={bonus} onChange={e => setBonus(e.target.value)} className="tabular-nums pr-9" />
             <span aria-hidden className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-black/45">{symbol}</span>
           </div>
         </Field>
-        <Button type="submit" variant="primary" icon="plus" loading={pridavam} disabled={!jde} className="col-span-2 sm:col-span-1">{t('Přidat')}</Button>
+        <Button type="submit" variant="primary" icon="plus" loading={pridavam} disabled={!jde} className="col-span-2 w-full sm:col-span-1 sm:w-auto max-sm:order-5">{t('Přidat')}</Button>
       </form>
       {chyba && <p className="note note-danger mt-3" role="alert">{chyba}</p>}
       {data.error ? (
@@ -473,12 +478,17 @@ function SpravaKatalogu() {
               ].filter(Boolean).join(' · ')}
               right={o.zOrganizace ? <Chip tone="muted" size="sm">{t('Z organizace')}</Chip> : o.sdileno ? <Chip tone="info" size="sm">{t('Sdíleno')}</Chip> : undefined}
               // Odměnu ze zdrojového podniku organizace (kolo 60) upraví jen jeho vedení —
-              // přepínač i koš by tu vracely 404, tak se neukazují.
+              // přepínač i menu by tu vracely 404, tak se neukazují. Kolo 7: místo koše
+              // menu „Upravit… / Smazat…" (dřív šlo jen vypnout nebo smazat a založit znovu).
               actions={o.zOrganizace ? undefined : (
                 <>
-                  <Switch checked={o.aktivni} disabled={pracuji === o.id} label={t('Nabízet: {nazev}', { nazev: o.nazev })} onChange={v => { void prepnout(o, v); }} />
-                  <Button variant="ghost" size="sm" iconOnly icon="trash" aria-label={t('Smazat odměnu {nazev}', { nazev: o.nazev })} disabled={pracuji != null}
-                    onClick={() => setMazani(o)} />
+                  {/* !flex-none: na telefonu `.list-actions:only-child > :first-child` natáhne první
+                      prvek ocasu přes řádek — přepínač by byl limetkový pruh s knoflíkem vlevo. */}
+                  <Switch checked={o.aktivni} disabled={pracuji === o.id} label={t('Nabízet: {nazev}', { nazev: o.nazev })} onChange={v => { void prepnout(o, v); }} className="!flex-none" />
+                  <Menu size="sm" label={t('Upravit nebo smazat odměnu {nazev}', { nazev: o.nazev })} items={[
+                    { label: t('Upravit…'), icon: 'pencil', onClick: () => setUprava(o), disabled: pracuji != null },
+                    { label: t('Smazat…'), icon: 'trash', danger: true, onClick: () => setMazani(o), disabled: pracuji != null },
+                  ]} />
                 </>
               )} />
           ))}
@@ -493,7 +503,77 @@ function SpravaKatalogu() {
           <p className="text-sm text-black/70 text-pretty">{t('Z katalogu zmizí. Žádosti, které už o ni někdo poslal, zůstanou v historii. Chceš ji jen dočasně skrýt? Vypni „Nabízet".')}</p>
         </Modal>
       )}
+      {uprava && (
+        <UpravaOdmeny odmena={uprava} onClose={() => setUprava(null)}
+          onUlozeno={() => { setUprava(null); setToast(t('Odměna upravena.')); obnov(); }} />
+      )}
       <Toast message={toast} onClose={() => setToast(null)} />
     </Card>
+  );
+}
+
+/** Okno úpravy odměny: emoji, název, cena v bodech a bonus k výplatě (PATCH manage). */
+function UpravaOdmeny({ odmena, onClose, onUlozeno }: { odmena: Odmena; onClose: () => void; onUlozeno: () => void }) {
+  const t = useT('sprava');
+  const symbol = useSymbol();
+  const [ikona, setIkona] = useState(odmena.ikona ?? '');
+  const [nazev, setNazev] = useState(odmena.nazev);
+  const [cena, setCena] = useState(String(odmena.cena));
+  const [bonus, setBonus] = useState(odmena.bonusKc ? String(odmena.bonusKc) : '');
+  const [ukladam, setUkladam] = useState(false);
+  const [chyba, setChyba] = useState<string | null>(null);
+  const bonusCislo = bonus.trim() === '' ? 0 : Number(bonus.trim().replace(/\s/g, '').replace(',', '.'));
+  const bonusOk = Number.isFinite(bonusCislo) && bonusCislo >= 0;
+  const v = validujOdmenu({ title: nazev, cost: cena, icon: ikona }, true);
+  const hlaska = (c: ChybaOdmeny) => c === 'nazev-chybi' ? t('Název je povinný.')
+    : c === 'nazev-dlouhy' ? t('Název může mít nejvýš 80 znaků.')
+    : c === 'cena' ? t('Cena musí být celé číslo od 1 do 100 000 bodů.')
+    : t('Ikona musí být jedno nebo dvě emoji.');
+  const chybaPole = (pole: ChybaOdmeny[]) => (!v.ok && pole.includes(v.chyba) ? hlaska(v.chyba) : undefined);
+
+  const ulozit = async () => {
+    if (!v.ok || !bonusOk || ukladam) return;
+    setUkladam(true);
+    setChyba(null);
+    try {
+      await fetch(URL_KATALOG, {
+        method: 'PATCH', headers: JSON_HLAVICKA,
+        body: JSON.stringify({ manage: true, id: odmena.id, title: v.hodnoty.title, cost: v.hodnoty.cost, icon: v.hodnoty.icon ?? null, bonusAmount: Math.round(bonusCislo) > 0 ? Math.round(bonusCislo) : null }),
+      }).then(okJson);
+      onUlozeno();
+    } catch (e) {
+      setChyba(apiMessage(e, t('Změnu se nepodařilo uložit.')));
+    } finally {
+      setUkladam(false);
+    }
+  };
+
+  return (
+    <Modal open onClose={onClose} size="sm" title={t('Upravit odměnu')}
+      footer={<>
+        <Button variant="secondary" onClick={onClose}>{t('Zrušit')}</Button>
+        <Button type="submit" form="uprava-odmeny" variant="primary" loading={ukladam} disabled={!v.ok || !bonusOk}>{t('Uložit')}</Button>
+      </>}>
+      <form id="uprava-odmeny" className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-3" onSubmit={e => { e.preventDefault(); void ulozit(); }}>
+        <Field id="uprava-odmeny-ikona" label={t('Emoji')}>
+          <Input id="uprava-odmeny-ikona" value={ikona} onChange={e => setIkona(e.target.value)} maxLength={16} className="text-center" aria-invalid={!!chybaPole(['ikona'])} />
+        </Field>
+        <Field id="uprava-odmeny-nazev" label={t('Název odměny')} error={chybaPole(['nazev-chybi', 'nazev-dlouhy'])}>
+          <Input id="uprava-odmeny-nazev" value={nazev} onChange={e => setNazev(e.target.value)} maxLength={MAX_NAZEV_ODMENY} />
+        </Field>
+        {chybaPole(['ikona']) && <p role="alert" className="col-span-2 -mt-1 text-xs text-[var(--bad-ink)]">{chybaPole(['ikona'])}</p>}
+        <Field id="uprava-odmeny-cena" label={t('Cena v bodech')} error={chybaPole(['cena'])} className="col-span-2">
+          <Input id="uprava-odmeny-cena" inputMode="numeric" autoComplete="off" value={cena} onChange={e => setCena(e.target.value)} className="tabular-nums" />
+        </Field>
+        <Field id="uprava-odmeny-bonus" label={t('Bonus k výplatě')} hint={t('Volitelné; schválení ho zapíše jako prémii.')}
+          error={bonusOk ? undefined : t('Zadej částku, nebo pole nech prázdné.')} className="col-span-2">
+          <div className="relative">
+            <Input id="uprava-odmeny-bonus" inputMode="decimal" autoComplete="off" value={bonus} onChange={e => setBonus(e.target.value)} className="tabular-nums pr-9" />
+            <span aria-hidden className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-black/45">{symbol}</span>
+          </div>
+        </Field>
+      </form>
+      {chyba && <p className="note note-danger mt-3" role="alert">{chyba}</p>}
+    </Modal>
   );
 }

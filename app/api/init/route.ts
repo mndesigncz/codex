@@ -947,6 +947,8 @@ export async function GET(request: Request) {
     await ddl(sql`CREATE INDEX IF NOT EXISTS shift_review_items_lookup ON shift_review_items (team_id, employee_id, work_date)`);
     // per-step skip reasons on a run + which procedures are mandatory before the closing
     await ddl(sql`ALTER TABLE procedure_runs ADD COLUMN IF NOT EXISTS skip_reasons JSONB`);
+    // Kolo 7: naměřené hodnoty kroků (teplota lednice…) — { index kroku: číslo }, vedle skip_reasons.
+    await ddl(sql`ALTER TABLE procedure_runs ADD COLUMN IF NOT EXISTS values JSONB DEFAULT '{}'::jsonb`);
     await ddl(sql`ALTER TABLE procedures ADD COLUMN IF NOT EXISTS require_before_closing BOOLEAN DEFAULT FALSE`);
     // Povinné před uzávěrkou i u úkolů a návodů (kolo 70). Úkol zamyká jen
     // svým výskytem na den uzávěrky; částečný index drží dotaz brány malý,

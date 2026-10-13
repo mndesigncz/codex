@@ -14,12 +14,14 @@
 //
 // Relativní importy s příponou: `npm test` pouští .ts přímo v Node.
 
-import { konecSmeny } from './dochazkaPrehled.ts';
-import { dayPlus, pragueMomentOf } from './pragueTime.ts';
+import { konecSmeny, hodinyMinuty } from './dochazkaPrehled.ts';
+import { dayPlus, pragueMomentOf, parseDbTime, dbTimeHM, pragueDayOf } from './pragueTime.ts';
 import { obsahuje } from './hledani.ts';
 import { stavUkolu } from './ukolyFiltr.ts';
 import type { Ukol } from './ukolyPrehled.ts';
 import { povinneDnes, type PostupApi, type PrubehApi } from './postupyPrehled.ts';
+import { stavZasoby, type PolozkaSkladu, type StavZasoby } from './skladPrehled.ts';
+import { rozborSkladArg } from './skladPredani.ts';
 
 // ---------------------------------------------------------------------------
 // Záložky tabletu
@@ -143,4 +145,128 @@ export function pocetUkoluTabletu(ukoly: readonly Ukol[], dnes: string): number 
 /** Povinné postupy před uzávěrkou, které dnes ještě nikdo nedokončil (jako widget postupy.povinne_dnes). */
 export function pocetPostupuTabletu(postupy: readonly PostupApi[], dnesniBehy: readonly PrubehApi[]): number {
   return povinneDnes(postupy, dnesniBehy).filter(p => !p.hotovo).length;
+}
+
+// ---------------------------------------------------------------------------
+// Souhrn směny po odchodu (kolo 7, R7-7)
+// ---------------------------------------------------------------------------
+
+/** Co tablet ukáže v okně „díky za směnu" po odpíchnutí odchodu. */
+export interface SouhrnOdchodu {
+  /** Pražské „HH:MM" příchodu a odchodu (dbTimeHM — podle formátu času podniku). */
+  prichod: string;
+  odchod: string;
+  /** „7 h 32 min" (hodinyMinuty, stejně jako řádek „Kdo teď pracuje"). */
+  odpracovano: string;
+  /** Délka v ms. */
+  ms: number;
+  /** Odchod připadl na jiný pražský den než příchod (noční směna). */
+  presPulnoc: boolean;
+  /** Server řekl, že uzávěrka za tuhle směnu ještě není (closingDone === false). */
+  chybiUzaverka: boolean;
+}
+
+/**
+ * Souhrn z odpovědi POST /api/attendance (action=out vrací entry s clockIn/clockOut
+ * a closingDone). Čas z databáze přes parseDbTime — stejně jako stopky elapsed();
+ * přes půlnoc se počítá z celých časových razítek, takže 22:10 → 2:05 je 3 h 55 min.
+ * Nečitelný nebo obrácený záznam → null (tablet pak souhrn nekreslí, nevymýšlí ho).
+ * `closingDone` chybí (starší server) → uzávěrka se nehlásí jako chybějící.
+ */
+export function souhrnOdchodu(
+  entry: { clockIn?: string | Date | null; clockOut?: string | Date | null } | null | undefined,
+  closingDone?: boolean | null,
+): SouhrnOdchodu | null {
+  const od = parseDbTime(entry?.clockIn ?? null);
+  const kdy = parseDbTime(entry?.clockOut ?? null);
+  if (!od || !kdy) return null;
+  const ms = kdy.getTime() - od.getTime();
+  if (ms < 0) return null;
+  return {
+    prichod: dbTimeHM(od),
+    odchod: dbTimeHM(kdy),
+    odpracovano: hodinyMinuty(ms),
+    ms,
+    presPulnoc: pragueDayOf(od) !== pragueDayOf(kdy),
+    chybiUzaverka: closingDone === false,
+  };
+}
+
+/** Po kolika sekundách se okno souhrnu na sdíleném tabletu zavře samo (dotyk odpočet zastaví). */
+export const SOUHRN_ZAVRIT_S = 20;
+
+// ---------------------------------------------------------------------------
+// Sklad na tabletu: filtr Dochází / Kriticky, řazení a minimum (kolo 7, R7-7)
+// ---------------------------------------------------------------------------
+
+/** Filtr stavu nad kategoriemi: Vše · Dochází (pod minimem, i kriticky) · Kriticky. */
+export type FiltrStavuSkladu = 'vse' | 'dochazi' | 'kriticky';
+
+type PolozkaTabletu = Pick<PolozkaSkladu, 'name' | 'quantity' | 'minQuantity' | 'criticalQuantity' | 'status' | 'archived'> & { category?: string | null };
+
+/** Stav zásoby — týž výpočet jako widgety a nástroj Skladu (lib/skladPrehled stavZasoby), ne vlastní kopie. */
+export const stavPolozkyTabletu = (p: PolozkaTabletu): StavZasoby => stavZasoby(p as PolozkaSkladu);
+
+const sediStav = (st: StavZasoby, f: FiltrStavuSkladu) => f === 'vse' || (f === 'kriticky' ? st === 'critical' : st !== 'ok');
+
+/**
+ * Počty do Segmented „Dochází (n) · Kriticky (n)". Jen položky, které podnik vede —
+ * „nevedeme" (archived) by Dochází nafoukly o věci, které nikdo nedoplní.
+ * Dochází zahrnuje i kriticky (jako „Jen co dochází" ve Skladu vedení).
+ */
+export function pocetStavuSkladu(polozky: readonly PolozkaTabletu[]): { dochazi: number; kriticky: number } {
+  let dochazi = 0, kriticky = 0;
+  for (const p of polozky) {
+    if (p.archived === true) continue;
+    const st = stavPolozkyTabletu(p);
+    if (st !== 'ok') dochazi++;
+    if (st === 'critical') kriticky++;
+  }
+  return { dochazi, kriticky };
+}
+
+const PORADI_STAVU: Record<StavZasoby, number> = { critical: 0, low: 1, ok: 2 };
+
+/** Řazení seznamu tabletu: kriticky › dochází › v pořádku, pak název (česky). */
+export function seradSkladTabletu<T extends PolozkaTabletu>(polozky: readonly T[]): T[] {
+  return [...polozky].sort((a, b) => PORADI_STAVU[stavPolozkyTabletu(a)] - PORADI_STAVU[stavPolozkyTabletu(b)] || String(a.name).localeCompare(String(b.name), 'cs'));
+}
+
+/**
+ * Seznam skladu na tabletu: odložené („nevedeme") zvlášť, filtr stavu, kategorie
+ * a hledání (bez diakritiky), seřazené podle stavu a názvu.
+ */
+export function filtrujSkladTabletu<T extends PolozkaTabletu>(polozky: readonly T[], f: {
+  nevedeme: boolean; stav: FiltrStavuSkladu; kategorie: string | null; hledani: string;
+}): T[] {
+  return seradSkladTabletu(polozky.filter(p =>
+    (f.nevedeme ? p.archived === true : p.archived !== true)
+    && (f.nevedeme || sediStav(stavPolozkyTabletu(p), f.stav))
+    && (f.kategorie == null || p.category === f.kategorie)
+    && obsahuje(p.name, f.hledani)));
+}
+
+/** Zaokrouhlí množství na rozumné desetiny (0,5 bal., ne 0,49999). */
+const mnozstvi = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * Minimum a kolik chybí pro meta řádku: „min 2 ks · chybí 1". Minimum jen když je
+ * nastavené (min > 0 — položka bez minima má 0); „chybí" jen u dochází/kriticky
+ * a jen když je kladné (stav podle balení může hlásit dochází i nad holým minimem).
+ */
+export function minimumPolozky(p: PolozkaTabletu): { min: number | null; chybi: number | null } {
+  const min = Number(p.minQuantity);
+  if (!Number.isFinite(min) || min <= 0) return { min: null, chybi: null };
+  const st = stavPolozkyTabletu(p);
+  const rozdil = mnozstvi(min - (Number(p.quantity) || 0));
+  return { min: mnozstvi(min), chybi: st !== 'ok' && rozdil > 0 ? rozdil : null };
+}
+
+/**
+ * Proklik z widgetu (Docházející zásoby → `stav:dochazi|Nápoje`) → výchozí filtr Skladu
+ * na tabletu. Tvar argumentu čte lib/skladPredani (rozborSkladArg) — stejně jako Sklad vedení.
+ */
+export function filtrZeSkladArg(arg: string | null | undefined): { stav: FiltrStavuSkladu; kategorie: string | null } {
+  const r = rozborSkladArg(arg);
+  return { stav: r.jenDochazi ? 'dochazi' : 'vse', kategorie: r.kategorie ?? null };
 }

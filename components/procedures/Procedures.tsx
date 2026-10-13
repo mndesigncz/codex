@@ -26,12 +26,13 @@ import { cerstvePredaniPohledu, stavZPredani, udalostPredani } from '@/lib/preda
 import { usePathname } from 'next/navigation';
 import { Icon } from '../Icons';
 import {
-  Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Menu, Modal, PageHeader, Segmented, Skeleton, SwitchRow,
+  Avatar, Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Menu, Modal, PageHeader, Segmented, Skeleton, SwitchRow,
   type MenuItem,
 } from '../ui';
+import DetailPrubehu from './DetailPrubehu';
 import { useProcedures } from './ProcedureProvider';
 import StepTimeline from './StepTimeline';
-import { parseSteps, totalMinutes, fmtMinutes, STEP_WEIGHTS, weightSpec, type Step } from '@/lib/steps';
+import { parseSteps, totalMinutes, fmtMinutes, STEP_WEIGHTS, weightSpec, cisloZTextu, MAX_JEDNOTKA, type Step } from '@/lib/steps';
 import { okJson, apiMessage } from '@/lib/api';
 import StepGuidePicker, { type PickableGuide } from '../guides/StepGuidePicker';
 import { Poznamky, type AutorNaTabletu } from '../Poznamky';
@@ -41,8 +42,8 @@ import { PlochaWidgetu, type HlavickaPlochy } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useOpravneni } from '../role/useOpravneni';
 import {
-  URL_POSTUPY, URL_PRUBEHY, UDALOST_OTEVRIT_POSTUP, vyberPostupy, vyberPrubehy, posledniDokonceni,
-  type PostupApi,
+  URL_POSTUPY, URL_PRUBEHY, UDALOST_OTEVRIT_POSTUP, vyberPostupy, vyberPrubehy, posledniDokonceni, prubehyPostupu, delka,
+  type PostupApi, type PrubehApi,
 } from '@/lib/postupyPrehled';
 import { useObnovaPoPrubehu } from '../widgety/oblasti/postupy';
 import { useT, useJazyk, type PrekladFn } from '@/lib/i18n/client';
@@ -365,6 +366,9 @@ export default function Procedures({ user }: Props) {
           running={active?.procedureId === detail.id}
           starting={starting}
           tablet={tablet}
+          prubehy={behy.data ?? null}
+          prubehyChyba={!!behy.error && !behy.data}
+          tym={smi('postupy.prubehy_tymu')}
           // Tablet kreslí nástroj pod vybraným člověkem (actingUser v KioskApp): za něj se píšou poznámky.
           zaKoho={tablet && user.role !== 'kiosk' && Number(user.id) > 0 ? { id: Number(user.id), name: user.name ?? '' } : null}
           onRun={() => { spust(detail); setDetailId(null); }}
@@ -427,7 +431,7 @@ export default function Procedures({ user }: Props) {
 }
 
 function ProcedureDetail({
-  procedure, smiUpravit, smiSpustit, smiSchvalit, running, starting, tablet, zaKoho, onRun, onApprove, onEdit, onClose,
+  procedure, smiUpravit, smiSpustit, smiSchvalit, running, starting, tablet, prubehy, prubehyChyba, tym, zaKoho, onRun, onApprove, onEdit, onClose,
 }: {
   procedure: Procedure;
   smiUpravit: boolean;
@@ -436,6 +440,11 @@ function ProcedureDetail({
   running: boolean;
   starting: boolean;
   tablet: boolean;
+  /** Průběhy z hooku stránky (GET /api/procedures/runs, LIMIT 50) — žádný další dotaz; null = ještě nejsou. */
+  prubehy: PrubehApi[] | null;
+  prubehyChyba: boolean;
+  /** postupy.prubehy_tymu: API vrací průběhy celého týmu, jinak jen moje. */
+  tym: boolean;
   /** Tablet: člověk, za kterého se píšou poznámky (vybraný u tabletu). */
   zaKoho: AutorNaTabletu | null;
   onRun: () => void;
@@ -444,12 +453,18 @@ function ProcedureDetail({
   onClose: () => void;
 }) {
   const t = useT('postupy');
+  const { jazyk } = useJazyk();
   const steps = parseSteps(procedure.items);
   const mins = totalMinutes(steps);
   const navodOdkaz = useOtevreniNavodu();
   const navrh = procedure.approved === false;
+  // Historie tohoto postupu (kolo 7): kdo ho naposledy prošel, kdy, jak dlouho, co zůstalo.
+  const radky = prubehy ? prubehyPostupu(prubehy, procedure.id) : [];
+  const [prubeh, setPrubeh] = useState<PrubehApi | null>(null);
+  const surovy = (id: number) => prubehy?.find(r => Number(r.id) === id) ?? null;
 
   return (
+    <>
     <Modal open onClose={onClose} size="md" title={procedure.name}
       subtitle={[t('{n, plural, one {# krok} few {# kroky} other {# kroků}}', { n: steps.length }), mins > 0 ? fmtMinutes(mins) : null, popisPripominky(procedure, t)].filter(Boolean).join(' · ')}
       footer={<>
@@ -464,9 +479,43 @@ function ProcedureDetail({
       {navrh && <p className="note note-wait text-sm mb-3">{t('Návrh čeká na schválení — spustit půjde až potom.')}</p>}
       {procedure.description && <p className="text-sm leading-relaxed text-black/60 mb-3 text-pretty">{procedure.description}</p>}
       <StepTimeline steps={steps} {...navodOdkaz} />
+      {!navrh && (
+        <section className="mt-6 min-w-0" aria-labelledby={`prubehy-${procedure.id}`}>
+          <div className="flex flex-wrap items-baseline gap-x-2">
+            <h3 id={`prubehy-${procedure.id}`} className="t-label">{t('Poslední průběhy')}</h3>
+            {/* API vrací posledních 50 průběhů za tým — u málo používaného postupu to nemusí být celá historie. */}
+            <span className="t-meta">{tym ? t('z posledních průběhů týmu') : t('jen tvoje')}</span>
+          </div>
+          {prubehyChyba ? (
+            <p className="t-meta mt-1 text-pretty">{t('Průběhy se nenačetly.')}</p>
+          ) : !prubehy ? (
+            <div className="mt-2 space-y-2" aria-busy><Skeleton className="h-11" /><Skeleton className="h-11 w-3/4" /></div>
+          ) : radky.length === 0 ? (
+            <p className="t-meta mt-1 text-pretty">{tym ? t('Tenhle postup zatím nikdo neprošel.') : t('Tenhle postup jsi zatím neprošel.')}</p>
+          ) : (
+            <ul className="list mt-1">
+              {radky.map(r => (
+                <ListRow key={r.id}
+                  lead={<Avatar emoji={r.avatar} name={r.kdo} size="sm" />}
+                  title={r.kdo || t('Neznámý')}
+                  meta={[r.hotovo ? kdyPrubehu(r.kdy, t, jazyk) : t('probíhá'), r.hotovo ? delka(r.sekund) : null].filter(Boolean).join(' · ')}
+                  right={!r.hotovo
+                    ? <Chip tone="info" size="sm">{r.odskrtano}/{r.celkem}</Chip>
+                    : r.nedokonceno > 0 ? <Chip tone="wait" size="sm" icon="warning">{t('{n} nedokončeno', { n: r.nedokonceno })}</Chip> : undefined}
+                  onClick={r.hotovo ? () => setPrubeh(surovy(r.id)) : undefined} />
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
       {/* Postřehy k postupu („krok 3 trvá déle, když je mráz") pod kroky — píše každý, kdo postup vidí. */}
       <Poznamky typ="procedure" id={procedure.id} tablet={tablet} zaKoho={zaKoho} className="mt-6" />
     </Modal>
+    {prubeh && (
+      <DetailPrubehu prubeh={prubeh} kroky={procedure.items}
+        kdy={kdyPrubehu(prubeh.completed_at || prubeh.started_at, t, jazyk)} onClose={() => setPrubeh(null)} />
+    )}
+    </>
   );
 }
 
@@ -494,7 +543,7 @@ function ProcedureEditor({
   const [remindDays, setRemindDays] = useState<number[]>(
     Array.isArray(initial?.remindDays) ? [...(initial!.remindDays as number[])] : []
   );
-  const blankStep = (): Step => ({ text: '', minutes: null, note: null, emoji: null, weight: 'normal', penalty: null, guideId: null });
+  const blankStep = (): Step => ({ text: '', minutes: null, note: null, emoji: null, weight: 'normal', penalty: null, guideId: null, valueKind: null, valueUnit: null, valueMin: null, valueMax: null });
   const [steps, setSteps] = useState<Step[]>(() => {
     const parsed = parseSteps(initial?.items);
     return parsed.length ? parsed : [blankStep()];
@@ -539,6 +588,8 @@ function ProcedureEditor({
         // Totéž platí pro návod: kdyby se tu zahodil, každé uložení postupu
         // by obsluze potichu sebralo odkaz na postup, podle kterého pracuje.
         guideId: s.guideId ?? null,
+        // Měřená hodnota (kolo 7) — stejně jako váha a návod musí přežít uložení.
+        valueKind: s.valueKind ?? null, valueUnit: s.valueUnit?.trim() || null, valueMin: s.valueMin ?? null, valueMax: s.valueMax ?? null,
       }))
       .filter(s => s.text.length > 0);
     if (!cleanName) { setError(t('Zadej název postupu.')); return; }
@@ -629,6 +680,15 @@ function ProcedureEditor({
                         postup — a ten v Návodech nejspíš už je. */}
                     <StepGuidePicker guides={guideOptions} value={s.guideId ?? null} stepNumber={i + 1}
                       onChange={g => patchStep(i, { guideId: g })} />
+                    {/* Měřená hodnota (kolo 7, HACCP): v běhu se u kroku zapíše číslo s jednotkou. */}
+                    <button type="button" aria-pressed={s.valueKind === 'number'}
+                      onClick={() => patchStep(i, s.valueKind === 'number'
+                        ? { valueKind: null, valueUnit: null, valueMin: null, valueMax: null }
+                        : { valueKind: 'number', valueUnit: s.valueUnit ?? null })}
+                      aria-label={t('Krok {n}: měřená hodnota', { n: i + 1 })}
+                      className={`filter-pill tap-target shrink-0 whitespace-nowrap ${s.valueKind === 'number' ? 'seg-on' : 'seg-off glass'}`}>
+                      {t('Měřená hodnota')}
+                    </button>
                     <div className="flex shrink-0 items-center">
                       <Button variant="ghost" size="sm" iconOnly icon="chevron" className="rotate-180" aria-label={t('Posunout krok {n} výš', { n: i + 1 })}
                         onClick={() => move(i, -1)} disabled={i === 0} />
@@ -637,6 +697,25 @@ function ProcedureEditor({
                       <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={t('Odebrat krok {n}', { n: i + 1 })} onClick={() => removeStep(i)} />
                     </div>
                   </div>
+                  {s.valueKind === 'number' && (
+                    // Telefon: tři pole vedle sebe přes celou šířku; od sm úzká pole v řádku.
+                    <div className="grid grid-cols-3 gap-2 sm:flex sm:items-end" role="group" aria-label={t('Měřená hodnota kroku {n}', { n: i + 1 })}>
+                      <Field id={`${uid}-k${i}-jednotka`} label={t('Jednotka')} className="sm:w-24">
+                        <Input id={`${uid}-k${i}-jednotka`} value={s.valueUnit ?? ''} onChange={e => patchStep(i, { valueUnit: e.target.value.slice(0, MAX_JEDNOTKA) || null })}
+                          maxLength={MAX_JEDNOTKA} placeholder="°C" autoComplete="off"
+                          aria-label={t('Jednotka kroku {n}', { n: i + 1 })} />
+                      </Field>
+                      <Field id={`${uid}-k${i}-od`} label={t('Od')} className="sm:w-24">
+                        <MezHodnoty id={`${uid}-k${i}-od`} value={s.valueMin ?? null} onChange={v => patchStep(i, { valueMin: v })}
+                          label={t('Nejnižší povolená hodnota kroku {n}', { n: i + 1 })} />
+                      </Field>
+                      <Field id={`${uid}-k${i}-do`} label={t('Do')} className="sm:w-24">
+                        <MezHodnoty id={`${uid}-k${i}-do`} value={s.valueMax ?? null} onChange={v => patchStep(i, { valueMax: v })}
+                          label={t('Nejvyšší povolená hodnota kroku {n}', { n: i + 1 })} />
+                      </Field>
+                      <p className="t-meta col-span-3 sm:col-span-1 sm:self-center text-pretty">{t('Hodnota mimo rozsah se v průběhu jen označí, nic neblokuje.')}</p>
+                    </div>
+                  )}
                 </div>
                 {i < steps.length - 1 && (
                   <div className="flex justify-center">
@@ -697,5 +776,29 @@ function ProcedureEditor({
         {error && <p className="note note-danger text-sm" role="alert">{error}</p>}
       </div>
     </Modal>
+  );
+}
+
+/**
+ * Mez měřené hodnoty (Od/Do): textové pole s inputMode decimal — čárka i tečka, „−1,5".
+ * Rozepsaný text drží lokálně, ať „4," při psaní nezmizí; ven jde číslo, nebo null.
+ */
+function MezHodnoty({ id, value, onChange, label }: {
+  id: string;
+  value: number | null;
+  onChange: (v: number | null) => void;
+  label: string;
+}) {
+  const { jazyk } = useJazyk();
+  const zobraz = (n: number | null) => (n == null ? '' : jazyk === 'en' ? String(n) : String(n).replace('.', ','));
+  const [text, setText] = useState(() => zobraz(value));
+  // Hodnota se změnila zvenku (přesun kroku, vypnutí měření) — srovnat text, když nesedí.
+  useEffect(() => {
+    if (cisloZTextu(text) !== value) setText(zobraz(value));
+  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <Input id={id} inputMode="decimal" autoComplete="off" value={text} aria-label={label}
+      onChange={e => { setText(e.target.value); onChange(cisloZTextu(e.target.value)); }}
+      className="min-w-0 tabular-nums" />
   );
 }

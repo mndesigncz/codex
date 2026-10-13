@@ -18,6 +18,11 @@ import {
 } from './k68-spolecne.mjs';
 
 const nacti = (jmeno) => JSON.parse(readFileSync(DIR + jmeno + '.json', 'utf8'));
+/** Náhled rozvrhu týmu (/api/shifts?team=1) s dnešním a zítřejším pražským dnem místo DNES/ZITRA ve fixtuře. */
+const tymoveSmeny = () => {
+  const den = (n) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now() + n * 86400000));
+  return JSON.parse(readFileSync(DIR + 'k69-b1-shifts-team.json', 'utf8').replaceAll('"DNES"', `"${den(0)}"`).replaceAll('"ZITRA"', `"${den(1)}"`));
+};
 const FIX = nacti('k69-b9-rozlozeni-smena');
 const KIOSK = roleMine('kiosk');
 const KIOSK_URL = '/kiosk';
@@ -38,6 +43,9 @@ const podvrh = (req, json, stav) => {
   // Předávka a dnešní průběhy postupů ve tvaru skutečných rout (obecné fixtury je nemají).
   if (path === '/api/closings/handover' && m === 'GET') return json(nacti('k69-b9-handover'));
   if (path === '/api/procedures/runs' && m === 'GET') return json(nacti('k69-b6b-runs'));
+  // Náhled rozvrhu týmu (tablet má od kola 7 rozvrh.nahled — Dnešní směny i Kdo má směnu berou
+  // /api/shifts?team=1). Obecná fixtura shifts.json je holé pole ze starší verze API.
+  if (path === '/api/shifts' && m === 'GET' && url.searchParams.get('team') === '1') return json(tymoveSmeny());
   if (path === '/api/rozlozeni/vychozi' && url.searchParams.get('stranka') === STRANKA) {
     if (m === 'PUT') { stav.vychoziPuty.push({ stranka: STRANKA, ...JSON.parse(req.postData() || '{}') }); return json({ ok: true, polozky: [], zamceno: false, verze: 1 }); }
     return json(nacti('k69-b9-vychozi-smena'));
@@ -326,7 +334,8 @@ const zalozka = (p, nazev) => p.locator('nav').getByRole('button', { name: new R
   let dialog = false;
   p.on('dialog', d => { dialog = true; void d.dismiss(); });
   await p.goto(BASE + '/employer/overview?view=settings', { waitUntil: 'networkidle' });
-  tvrdi('S1: Nastavení má PageHeader s jediným h1', await p.getByRole('heading', { level: 1, name: 'Nastavení' }).isVisible() && await p.locator('h1:visible').count() === 1);
+  // Na dev serveru se Nastavení po networkidle ještě dokompilovává (deep link přepne pohled až po něm).
+  tvrdi('S1: Nastavení má PageHeader s jediným h1', await dokud(async () => await p.getByRole('heading', { level: 1, name: 'Nastavení' }).isVisible() && await p.locator('h1:visible').count() === 1, 10000));
   await p.getByRole('button', { name: /Vzhled/ }).filter({ visible: true }).first().click();
   tvrdi('S2: motiv je Segmented (tablist), ne dvě limetkové volby', await dokud(() => p.getByRole('tab', { name: 'Tmavý' }).isVisible(), 1500) && await p.locator(LIMETKA).count() === 0);
   tvrdi('S2: nápovědy jako přepínač', await p.getByRole('switch', { name: /Zobrazovat nápovědy/ }).isVisible());
@@ -383,8 +392,115 @@ const zalozka = (p, nazev) => p.locator('nav').getByRole('button', { name: new R
   await p.waitForTimeout(500);
   // Kolo 6 (B3): na telefonu jsou sekce svislý seznam ve skupinách Osobní / Podnik (navigace „Sekce nastavení"),
   // ne posuvný pás 13 pilulek — klepnutí otevře sekci s hlavičkou a „Zpět".
+  // Deep link přepne pohled až po dokompilování Nastavení (dev server) — čeká se na seznam sekcí.
+  await dokud(() => p.getByRole('navigation', { name: 'Sekce nastavení' }).first().isVisible().catch(() => false), 10000);
   tvrdi('S5: Nastavení na telefonu 390 bez přetečení, sekce jako svislý seznam', await bezPreteceni(p) && await p.getByRole('navigation', { name: 'Sekce nastavení' }).first().isVisible());
   await p.screenshot({ path: OUT + 'k69-b9-nastaveni-tel.png', fullPage: true });
+  await ctx.close();
+}
+
+// ---------------------------------------------------------------------------
+// Nastavení › Historie změn (kolo 7, R7-7): hledání, pilulky lidí, oblasti, „Načíst starší"
+// ---------------------------------------------------------------------------
+{
+  // Fixtura audit.json: 130 záznamů od tří lidí a systému. Podvrh vrací stránky jako
+  // skutečná routa — bez before prvních 100 + nextBefore, s before zbytek a nextBefore null.
+  const VSE = nacti('audit').entries;
+  const historie = (req, json, stav) => {
+    const u = new URL(req.url());
+    if (u.pathname !== '/api/audit') return podvrh(req, json, stav);
+    (stav.audit ??= []).push(u.search);
+    const pred = Number(u.searchParams.get('before')) || null;
+    const zbyva = VSE.filter(z => pred == null || z.id < pred);
+    const strana = zbyva.slice(0, 100);
+    return json({ entries: strana, nextBefore: zbyva.length > 100 ? strana[strana.length - 1].id : null });
+  };
+  for (const [w, h, mobil] of [[390, 844, true], [1280, 900, false]]) {
+    const { ctx, p, stav, chyby } = await kontext({ viewport: { width: w, height: h }, mobil, dalsi: historie });
+    await p.goto(BASE + '/employer/overview?view=settings&tab=audit', { waitUntil: 'networkidle' });
+    const sekce = p.locator('[data-historie]');
+    tvrdi(`H ${w}: Historie změn se otevře s hledáním`, await dokud(() => sekce.getByRole('searchbox').or(sekce.locator('input')).first().isVisible().catch(() => false), 12000));
+    const radky = () => sekce.locator('ul.list > li');
+    tvrdi(`H ${w}: prvních 100 záznamů a nadpis říká, kolik je načteno`, await dokud(async () => (await radky().count()) === 100, 4000) && await sekce.getByText(/Načteno 100 nejnovějších záznamů/).isVisible());
+    const pas = sekce.getByRole('group', { name: 'Kdo změnu udělal' });
+    tvrdi(`H ${w}: pilulky lidí s počtem (Eva · N, Systém · N)`, await pas.getByRole('button', { name: /^Eva Testová · \d+$/ }).isVisible() && await pas.getByRole('button', { name: /^Systém · \d+$/ }).count() === 1);
+    tvrdi(`H ${w}: pás lidí jede uvnitř sebe, stránka bez přetečení`, await pas.evaluate(e => e.scrollWidth >= e.clientWidth) && await bezPreteceni(p));
+    const eva = pas.getByRole('button', { name: /^Eva Testová/ });
+    const pocetEvy = Number((await eva.innerText()).match(/(\d+)\s*$/)?.[1]);
+    await eva.click();
+    tvrdi(`H ${w}: pilulka Evy nechá jen její záznamy`, await dokud(async () => (await radky().count()) === pocetEvy, 2000) && (await radky().allInnerTexts()).every(t => t.includes('Eva Testová')), `${await radky().count()} / ${pocetEvy}`);
+    await eva.click();
+    tvrdi(`H ${w}: druhý klik na pilulku filtr zruší`, await dokud(async () => (await radky().count()) === 100, 2000) && (await eva.getAttribute('aria-pressed')) === 'false');
+    const oblasti = sekce.getByRole('tablist', { name: 'Oblast změn' });
+    tvrdi(`H ${w}: Segmented oblastí (Sklad s počtem)`, await oblasti.getByRole('tab', { name: /^Sklad/ }).isVisible().catch(() => false));
+    await oblasti.getByRole('tab', { name: /^Sklad/ }).click();
+    tvrdi(`H ${w}: oblast Sklad nechá jen skladové akce`, await dokud(async () => { const tx = await radky().allInnerTexts(); return tx.length > 0 && tx.every(t => /skladu|dodavatel|účtenka/i.test(t)); }, 2000));
+    await oblasti.getByRole('tab', { name: /^Vše/ }).click();
+    const hledat = sekce.locator('input').first();
+    await hledat.fill('mrazena');
+    tvrdi(`H ${w}: hledání bez diakritiky najde „Mražená malina"`, await dokud(async () => { const tx = await radky().allInnerTexts(); return tx.length > 0 && tx.every(t => t.includes('Mražená malina')); }, 2000));
+    await hledat.fill('xyz neexistuje');
+    tvrdi(`H ${w}: nic nenalezeno → „Nic neodpovídá filtru" se „Zrušit filtry"`, await dokud(() => sekce.getByText('Nic neodpovídá filtru').isVisible(), 2000));
+    await sekce.getByRole('button', { name: 'Zrušit filtry' }).click();
+    tvrdi(`H ${w}: „Zrušit filtry" vrátí všechno`, await dokud(async () => (await radky().count()) === 100, 2000) && (await hledat.inputValue()) === '');
+    await sekce.getByRole('button', { name: 'Načíst starší' }).click();
+    tvrdi(`H ${w}: „Načíst starší" pošle GET s before = id posledního záznamu`, await dokud(() => (stav.audit ?? []).some(q => /before=1031\b/.test(q)), 3000), JSON.stringify(stav.audit));
+    tvrdi(`H ${w}: přibude zbytek (130) a tlačítko zmizí`, await dokud(async () => (await radky().count()) === 130, 3000) && await sekce.getByRole('button', { name: 'Načíst starší' }).count() === 0
+      && await sekce.getByText(/Celkem 130 záznamů/).isVisible());
+    tvrdi(`H ${w}: bez přetečení`, await bezPreteceni(p) && await sekce.evaluate(e => e.scrollWidth <= e.clientWidth + 1));
+    await p.screenshot({ path: OUT + `k83-historie-${w}.png` });
+    tvrdi(`H ${w}: bez chyb v konzoli`, chyby.length === 0, chyby.slice(0, 3).join(' | '));
+    await ctx.close();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Nastavení › Organizace (kolo 7, R7-7): vlastní sekce; Tým › Podnik už bez karty organizace
+// ---------------------------------------------------------------------------
+{
+  // Fixtura organization.json: Moje kavárny (Vinohrady + Karlín), vlastník. Organizaci se Settings
+  // i karta ptají přes jednu mezipaměť — GET /api/organization smí odejít jen jednou.
+  for (const [w, h, mobil] of [[390, 844, true], [1280, 900, false]]) {
+    const { ctx, p, stav, chyby } = await kontext({ viewport: { width: w, height: h }, mobil, dalsi: podvrh });
+    await p.goto(BASE + '/employer/overview?view=settings&tab=organizace', { waitUntil: 'networkidle' });
+    const karta = p.locator('[aria-labelledby="org-nadpis"]');
+    tvrdi(`O ${w}: ?tab=organizace otevře sekci s kartou „Organizace: Moje kavárny"`, await dokud(() => karta.getByRole('heading', { name: 'Organizace: Moje kavárny' }).isVisible().catch(() => false), 12000));
+    tvrdi(`O ${w}: přepínače organizace (Přehled za všechny podniky, Sdílené číselníky) jsou tady`,
+      await karta.getByRole('switch', { name: /Přehled za všechny podniky/ }).isVisible() && await karta.getByRole('switch', { name: /Sdílené číselníky/ }).isVisible());
+    const pas = p.getByRole('navigation', { name: 'Sekce nastavení' }).filter({ visible: true }).first();
+    if (mobil) {
+      tvrdi('O 390: sekce má hlavičku „Organizace" a cestu „Zpět"', await p.getByRole('heading', { level: 1, name: 'Organizace' }).isVisible() && await p.getByRole('button', { name: 'Zpět' }).isVisible());
+      await p.getByRole('button', { name: 'Zpět' }).click();
+      await dokud(() => pas.isVisible().catch(() => false), 3000);
+      const nazvy = await pas.getByRole('button').allInnerTexts();
+      const i = nazvy.findIndex(x => /^Profil podniku/.test(x));
+      tvrdi('O 390: v seznamu sekcí je Organizace ve skupině Podnik hned za Profilem podniku', i >= 0 && /^Organizace/.test(nazvy[i + 1] ?? ''), nazvy.map(x => x.split('\n')[0]).join(' | '));
+    } else {
+      const nazvy = await pas.getByRole('button').allInnerTexts();
+      const i = nazvy.findIndex(x => /^Profil podniku/.test(x));
+      tvrdi('O 1280: v bočním pásu je Organizace hned za Profilem podniku a je vybraná', i >= 0 && /^Organizace/.test(nazvy[i + 1] ?? '')
+        && (await pas.getByRole('button', { name: /^Organizace/ }).getAttribute('aria-pressed')) === 'true', nazvy.map(x => x.split('\n')[0]).join(' | '));
+    }
+    tvrdi(`O ${w}: /api/organization se volá jednou (Settings i karta sdílí mezipaměť)`, stav.dotazy.filter(d => d.path === '/api/organization').length === 1, String(stav.dotazy.filter(d => d.path === '/api/organization').length));
+    tvrdi(`O ${w}: bez přetečení`, await bezPreteceni(p));
+    await p.screenshot({ path: OUT + `k83-organizace-${w}.png` });
+    tvrdi(`O ${w}: bez chyb v konzoli`, chyby.length === 0, chyby.slice(0, 3).join(' | '));
+    await ctx.close();
+  }
+  // Tým › Podnik: karta organizace už tu není (řádek Profil podniku zůstává).
+  const { ctx, p, chyby } = await kontext({ dalsi: podvrh });
+  await p.goto(BASE + '/employer/overview?view=team-settings', { waitUntil: 'networkidle' });
+  const tablist = p.getByRole('tablist', { name: 'Sekce nastavení týmu' });
+  await dokud(() => tablist.isVisible().catch(() => false), 12000);
+  // Sekce Lidé s obecnou fixturou teams.json hlásí duplicitní klíč (id 17 je v ní dvakrát) — není
+  // předmětem bloku; hlídá se jen, že samotný Podnik žádnou chybu nepřidá.
+  const chybPred = chyby.length;
+  await tablist.getByRole('tab', { name: 'Podnik' }).click();
+  tvrdi('O Tým: Podnik má řádek Profil podniku', await dokud(() => p.getByText('Profil podniku', { exact: true }).first().isVisible().catch(() => false), 5000));
+  await p.waitForTimeout(600);
+  tvrdi('O Tým: karta organizace pod Podnikem zmizela (žádné „Organizace: Moje kavárny" ani přepínač sdílení lidí)',
+    await p.locator('[aria-labelledby="org-nadpis"]').count() === 0 && await p.getByRole('switch', { name: /Sdílení lidí mezi podniky/ }).count() === 0);
+  tvrdi('O Tým: Podnik bez chyb v konzoli', chyby.length === chybPred, chyby.slice(chybPred, chybPred + 3).join(' | '));
   await ctx.close();
 }
 

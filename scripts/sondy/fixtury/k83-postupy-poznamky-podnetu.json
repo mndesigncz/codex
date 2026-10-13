@@ -1,0 +1,20 @@
+[
+ {
+  "id": 501,
+  "text": "Dobrý nápad, ale brunch zkusíme až po sezóně, teď na něj nemáme lidi.",
+  "createdAt": "2026-09-02T09:15:00.000Z",
+  "updatedAt": null,
+  "autor": { "id": 15, "name": "Martin Nemeškal", "avatar": "🧑" },
+  "moje": false,
+  "muzuSmazat": false
+ },
+ {
+  "id": 502,
+  "text": "Rozumím, v říjnu to připomenu.",
+  "createdAt": "2026-09-02T11:40:00.000Z",
+  "updatedAt": null,
+  "autor": { "id": 21, "name": "Petr Novák", "avatar": null },
+  "moje": false,
+  "muzuSmazat": false
+ }
+]

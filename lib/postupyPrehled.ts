@@ -47,6 +47,8 @@ export interface PrubehApi {
   checked_items?: unknown;
   skipped_items?: unknown;
   skip_reasons?: unknown;
+  /** Naměřené hodnoty kroků { index: číslo } (kolo 7). */
+  values?: unknown;
   started_at?: string | null;
   completed_at?: string | null;
   duration_seconds?: number | null;
@@ -159,6 +161,20 @@ export function posledniPrubehy(behy: readonly PrubehApi[], pocet: number): Rade
         nedokonceno: Math.max(0, celkem - odsk),
       };
     });
+}
+
+/** Kolik průběhů jednoho postupu ukáže jeho detail. */
+export const PRUBEHU_V_DETAILU = 5;
+
+/**
+ * Poslední průběhy JEDNOHO postupu pro jeho detail (kolo 7) — kdo ho prošel, kdy, jak
+ * dlouho a jestli něco zůstalo. Páruje se podle ID postupu (ne podle názvu), nejnovější
+ * nahoře, nejvýš `pocet`. Zdroj je seznam z GET /api/procedures/runs (LIMIT 50 za tým),
+ * takže u málo používaného postupu může být kratší, než kolik ho kdy kdo prošel —
+ * obrazovka to říká popiskem „z posledních průběhů týmu".
+ */
+export function prubehyPostupu(behy: readonly PrubehApi[], postupId: number, pocet: number = PRUBEHU_V_DETAILU): RadekPrubehu[] {
+  return posledniPrubehy(behy.filter(r => r.procedure_id != null && Number(r.procedure_id) === postupId), pocet);
 }
 
 /** Poslední DOKONČENÍ postupu podle ID (karta „Spustit postup", řádek nástroje). */

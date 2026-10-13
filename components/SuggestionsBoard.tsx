@@ -23,6 +23,8 @@ import {
   Avatar, Button, Card, Chip, EmptyState, ErrorState, Field, Input, Menu, Modal, Segmented, Skeleton, Textarea, Toast, type ChipTone, type MenuItem,
 } from './ui';
 import NahlasitOkno from './moderace/NahlasitOkno';
+import { Poznamky } from './Poznamky';
+import { MAX_DELKA_DUVODU, urlPoctuPoznamek, urlPoznamek, vyberPoctyPoznamek } from '@/lib/poznamky';
 import { PlochaWidgetu } from './widgety/PlochaWidgetu';
 import { useDataWidgetu, obnovDataWidgetu } from './widgety/useDataWidgetu';
 import { useSmi } from './widgety/NavigaceKontext';
@@ -93,6 +95,9 @@ export default function SuggestionsBoard() {
     return () => window.removeEventListener(udalostPredani('suggestions'), naPredani);
   }, []);
   const [sort, setSort] = useState<'new' | 'votes'>('new');
+  // Telefon: pás stavů je za tlačítkem „Filtry · N" (vzor Rozvrhu z kola 5) — vodorovně
+  // odjížděl za okraj. Zapnutý filtr ho nechá vidět, ať jde zrušit druhým klepnutím.
+  const [filtryTel, setFiltryTel] = useState(false);
   const [composing, setComposing] = useState(false);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -109,6 +114,16 @@ export default function SuggestionsBoard() {
   // Moderace (Apple 1.2): cizí podnět jde nahlásit vedení.
   const [nahlasit, setNahlasit] = useState<number | null>(null);
   const [mazu, setMazu] = useState(false);
+  // Zamítnutí s důvodem (kolo 7): Segmented na „Zamítnout" otevře okno místo okamžitého
+  // PATCH; důvod jde v témže požadavku, server ho uloží jako poznámku a pošle autorovi.
+  const [zamitani, setZamitani] = useState<Podnet | null>(null);
+  const [duvod, setDuvod] = useState('');
+  const [zamitam, setZamitam] = useState(false);
+  const [chybaZamitnuti, setChybaZamitnuti] = useState<string | null>(null);
+  // Poznámky pod podnětem: sbalené, počty pro všechny řádky jedním dotazem.
+  const [otevrenePoznamky, setOtevrenePoznamky] = useState<ReadonlySet<number>>(() => new Set());
+  const urlPoctu = urlPoctuPoznamek('suggestion', items.map(x => x.id));
+  const pocty = useDataWidgetu<Record<number, number>>(urlPoctu, vyberPoctyPoznamek);
   const id = useId();
 
   const zmen = (f: (list: Podnet[]) => Podnet[]) => data.set(prev => (prev ? { ...prev, podnety: f(prev.podnety) } : prev!));
@@ -140,6 +155,7 @@ export default function SuggestionsBoard() {
 
   const setStatus = async (s: Podnet, status: string) => {
     if (s.status === status) return;
+    if (status === 'declined') { setZamitani(s); setDuvod(''); setChybaZamitnuti(null); return; }
     setAkceChyba(null);
     zmen(list => list.map(x => (x.id === s.id ? { ...x, status } : x)));
     try {
@@ -149,6 +165,43 @@ export default function SuggestionsBoard() {
       zmen(list => list.map(x => (x.id === s.id ? { ...x, status: s.status } : x)));
       setAkceChyba(apiMessage(e, t('Stav se nepodařilo změnit.')));
     }
+  };
+
+  const zamitnout = async () => {
+    const s = zamitani;
+    if (!s || zamitam) return;
+    const reason = duvod.trim();
+    setZamitam(true);
+    setChybaZamitnuti(null);
+    try {
+      await fetch(`${URL_NAPADY}/${s.id}`, { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify({ status: 'declined', ...(reason ? { reason } : {}) }) }).then(okJson);
+      zmen(list => list.map(x => (x.id === s.id ? { ...x, status: 'declined' } : x)));
+      setZamitani(null);
+      setDuvod('');
+      data.reload();
+      if (reason) {
+        if (urlPoctu) obnovDataWidgetu(urlPoctu);
+        obnovDataWidgetu(urlPoznamek('suggestion', s.id));
+      }
+      setZprava(reason ? t('Podnět je zamítnutý, důvod dostal autor.') : t('Podnět je zamítnutý.'));
+    } catch (e) {
+      // Okno zůstane otevřené i s napsaným důvodem — nic se neztratí.
+      setChybaZamitnuti(apiMessage(e, t('Stav se nepodařilo změnit.')));
+    } finally {
+      setZamitam(false);
+    }
+  };
+
+  const prepniPoznamky = (sid: number) => {
+    setOtevrenePoznamky(prev => {
+      const dalsi = new Set(prev);
+      if (dalsi.has(sid)) {
+        dalsi.delete(sid);
+        // Po sbalení se počet v tlačítku srovná s tím, co se mezitím napsalo.
+        if (urlPoctu) obnovDataWidgetu(urlPoctu);
+      } else dalsi.add(sid);
+      return dalsi;
+    });
   };
 
   const sendToPlanning = async (s: Podnet) => {
@@ -203,15 +256,23 @@ export default function SuggestionsBoard() {
     ];
   };
 
+  const pocetFiltru = filter !== 'all' ? 1 : 0;
+  const ukazPas = filtryTel || pocetFiltru > 0;
   const nastroj = (
     <div className="space-y-4">
       {items.length > 0 && (
-        <div className="flex items-center gap-2">
-          <div className="flex gap-1.5 overflow-x-auto scrollbar-thin scroll-fade-x -mx-1 px-1 py-0.5 min-w-0 flex-1" role="group" aria-label={t('Filtr podle stavu')}>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="sm:hidden">
+            <Button variant="secondary" size="sm" aria-expanded={ukazPas} aria-controls={`${id}-pas`} onClick={() => setFiltryTel(v => !v)}>
+              {pocetFiltru > 0 ? t('Filtry · {n}', { n: pocetFiltru }) : t('Filtry')}
+            </Button>
+          </div>
+          <div id={`${id}-pas`} className={`flex gap-1.5 overflow-x-auto scrollbar-thin scroll-fade-x -mx-1 px-1 py-0.5 min-w-0 flex-1 ${ukazPas ? 'max-sm:order-last max-sm:basis-full' : 'max-sm:hidden'}`}
+            role="group" aria-label={t('Filtr podle stavu')}>
             {filtry(t).map(f => {
               const cnt = f.id === 'all' ? items.length : (counts[f.id] ?? 0);
               return (
-                <button key={f.id} type="button" aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}
+                <button key={f.id} type="button" aria-pressed={filter === f.id} onClick={() => setFilter(filter === f.id && f.id !== 'all' ? 'all' : f.id)}
                   className={`filter-pill tap-target-sm shrink-0 ${filter === f.id ? 'seg-on' : 'seg-off glass'}`}>
                   {f.label}{cnt > 0 && <span className={filter === f.id ? 'text-white/60' : 'text-black/45'}> · {cnt}</span>}
                 </button>
@@ -247,6 +308,8 @@ export default function SuggestionsBoard() {
               const meta = statusMeta(t)[s.status] ?? statusMeta(t).new;
               const mine = meId != null && s.authorId === meId;
               const polozky = akce(s);
+              const poznamkyOtevrene = otevrenePoznamky.has(s.id);
+              const pocetPoznamek = pocty.data?.[s.id] ?? 0;
               return (
                 <li key={s.id} className="list-row items-start flex-wrap">
                   <Hlas podnet={s} onClick={() => void toggleVote(s)} zamceno={!pridava} />
@@ -261,6 +324,11 @@ export default function SuggestionsBoard() {
                       <span className="truncate min-w-0">{s.authorName ?? t('Neznámý')}{mine ? ' (ty)' : ''}</span>
                       {relDate(s.createdAt, t, loc) && <><span aria-hidden className="text-black/40">·</span><span className="whitespace-nowrap">{relDate(s.createdAt, t, loc)}</span></>}
                     </p>
+                    {/* Vlákno pod podnětem (kolo 7): odpověď vedení, důvod zamítnutí, doplnění od autora. */}
+                    <Button variant="ghost" size="sm" icon="chat" className="-ml-3 mt-1"
+                      aria-expanded={poznamkyOtevrene} aria-controls={`${id}-pozn-${s.id}`} onClick={() => prepniPoznamky(s.id)}>
+                      {pocetPoznamek ? t('Poznámky ({n})', { n: pocetPoznamek }) : t('Poznámky')}
+                    </Button>
                   </div>
                   {polozky.length > 0 && <Menu size="sm" label={t('Další akce: {nazev}', { nazev: s.title })} items={polozky} className="shrink-0 -my-1" />}
                   {/* Posun podnětu — jen kdo podněty spravuje (server to tak pustí). Přes celou šířku
@@ -270,6 +338,11 @@ export default function SuggestionsBoard() {
                     <div className="basis-full min-w-0">
                       <Segmented size="sm" ariaLabel={t('Stav podnětu {nazev}', { nazev: s.title })} value={(statusFlow(t).some(x => x.id === s.status) ? s.status : 'new') as IdStavu}
                         onChange={v => void setStatus(s, v)} options={statusFlow(t).map(x => ({ id: x.id, label: x.label }))} />
+                    </div>
+                  )}
+                  {poznamkyOtevrene && (
+                    <div id={`${id}-pozn-${s.id}`} className="basis-full min-w-0 pb-1">
+                      <Poznamky typ="suggestion" id={s.id} />
                     </div>
                   )}
                 </li>
@@ -342,6 +415,22 @@ export default function SuggestionsBoard() {
             <Button variant="danger-solid" loading={mazu} onClick={remove}>{t('Smazat')}</Button>
           </>}>
           <p className="text-sm text-black/70 text-pretty">{t('„{nazev}" zmizí i s hlasy. Vrátit to nepůjde.', { nazev: mazani.title })}</p>
+        </Modal>
+      )}
+      {zamitani && (
+        <Modal open onClose={() => setZamitani(null)} title={t('Proč zamítnout?')} size="sm"
+          subtitle={zamitani.title}
+          footer={<>
+            <Button variant="secondary" onClick={() => setZamitani(null)}>{t('Zrušit')}</Button>
+            <Button variant="danger-solid" loading={zamitam} onClick={() => { void zamitnout(); }}>{t('Zamítnout')}</Button>
+          </>}>
+          <div className="space-y-3">
+            <Field id={`${id}-duvod`} label={t('Důvod (uvidí autor)')} hint={t('Nepovinné — přijde autorovi v oznámení a zůstane v poznámkách u podnětu.')}>
+              <Textarea id={`${id}-duvod`} value={duvod} onChange={e => setDuvod(e.target.value)} rows={3} maxLength={MAX_DELKA_DUVODU} autoFocus
+                placeholder={t('Např. Dobrý nápad, ale až po sezóně.')} />
+            </Field>
+            {chybaZamitnuti && <p className="note note-danger text-sm" role="alert">{chybaZamitnuti}</p>}
+          </div>
         </Modal>
       )}
       <Toast message={zprava} onClose={() => setZprava(null)} />

@@ -54,10 +54,10 @@ if (await prepinac.count() > 0) {
   tvrdi('po přepnutí se stránka načetla znovu', posty.length >= pocetNavigaciPred + 1, 'bez reloadu by zůstal stav starého podniku');
 }
 
-await p.goto('http://localhost:3000/employer/overview?view=team-settings', { waitUntil: 'networkidle' });
+await p.goto('http://localhost:3000/employer/overview?view=settings&tab=organizace', { waitUntil: 'networkidle' });
 await p.waitForTimeout(1500);
-// Kolo 69 (B2): nastavení týmu je v sekcích nástroje; organizace je v sekci Podnik.
-await p.getByRole('tab', { name: 'Podnik' }).click(); await p.waitForTimeout(600);
+// Kolo 7 (R7-7): organizace je vlastní sekce Nastavení (?tab=organizace), ne karta v Tým › Podnik.
+await p.waitForTimeout(600);
 const t2 = (await p.locator('main').innerText()).toLowerCase();
 tvrdi('nastavení týmu ukazuje kartu organizace', t2.includes('organizace: moje kavárny'), t2.slice(0, 200));
 tvrdi('karta jmenuje oba podniky', t2.includes('kavárna vinohrady') && t2.includes('kavárna karlín'), 'názvy podniků chybí');

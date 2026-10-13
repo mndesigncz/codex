@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
+import { audit } from '@/lib/audit';
+import { MAX_DELKA_DUVODU, normalizujDuvod, teloOznameniPodnetu } from '@/lib/poznamky';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,7 +35,7 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
   const id = parseInt(params.id);
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Neplatné ID' }, { status: 400 });
 
-  const [s] = await sql`SELECT id, author_id FROM suggestions WHERE id = ${id} AND team_id = ${c.teamId}`;
+  const [s] = await sql`SELECT id, author_id, title, status FROM suggestions WHERE id = ${id} AND team_id = ${c.teamId}`;
   if (!s) return NextResponse.json({ error: 'Podnět nenalezen' }, { status: 404 });
 
   const b = await req.json().catch(() => ({}));
@@ -80,7 +82,22 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
   const status = String(b.status ?? '');
   if (STATUSES.includes(status as any)) {
     if (!c.opr.has('napady.spravovat')) return NextResponse.json({ error: 'Stav může měnit jen ten, kdo spravuje podněty.' }, { status: 403 });
-    await sql`UPDATE suggestions SET status = ${status} WHERE id = ${id} AND team_id = ${c.teamId}`;
+    // Zamítnutí s důvodem (kolo 7): důvod přijde v témže požadavku, uloží se jako poznámka
+    // pod podnětem (autor = kdo zamítl) a připojí se do oznámení autorovi. Stav i poznámka
+    // jdou jednou transakcí — dva požadavky by při výpadku nechaly zamítnutí bez důvodu.
+    const duvod = status === 'declined' ? normalizujDuvod(b.reason) : null;
+    if (duvod === false) return NextResponse.json({ error: `Důvod může mít nejvýš ${MAX_DELKA_DUVODU} znaků.` }, { status: 400 });
+    if (duvod) {
+      await sql.transaction([
+        sql`UPDATE suggestions SET status = ${status} WHERE id = ${id} AND team_id = ${c.teamId}`,
+        sql`INSERT INTO entity_notes (team_id, entity_type, entity_id, user_id, text) VALUES (${c.teamId}, 'suggestion', ${String(id)}, ${c.meId}, ${duvod})`,
+      ]);
+    } else {
+      await sql`UPDATE suggestions SET status = ${status} WHERE id = ${id} AND team_id = ${c.teamId}`;
+    }
+    if (status === 'declined' && s.status !== 'declined') {
+      audit(c.teamId, c.meId, 'napady.zamitnuto', 'suggestion', id, duvod ? `${s.title} — ${duvod}` : String(s.title ?? ''));
+    }
     // Let the author know their idea moved (unless they changed it themselves).
     if (s.author_id && Number(s.author_id) !== c.meId && STATUS_LABEL[status]) {
       try {
@@ -88,7 +105,7 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
         const [author] = await sql`SELECT role FROM users WHERE id = ${s.author_id}`;
         await notifyUser(s.author_id, {
           title: 'Tvůj podnět má nový stav',
-          body: STATUS_LABEL[status],
+          body: teloOznameniPodnetu(STATUS_LABEL[status], duvod || null),
           type: status === 'declined' ? 'warning' : 'info',
           link: author?.role === 'employer' ? '/employer/overview?view=suggestions' : '/employee/shifts?view=suggestions',
         });
@@ -114,6 +131,10 @@ export async function DELETE(req: NextRequest, props: { params: Promise<{ id: st
     return NextResponse.json({ error: 'Můžeš smazat jen svůj podnět.' }, { status: 403 });
   }
   await sql`DELETE FROM suggestion_votes WHERE suggestion_id = ${id}`;
+  // Vlákno pod podnětem (kolo 7) bez podnětu nikdo neotevře — smaže se s ním.
+  try {
+    await sql`DELETE FROM entity_notes WHERE team_id = ${c.teamId} AND entity_type = 'suggestion' AND entity_id = ${String(id)}`;
+  } catch { /* před migrací tabulka není */ }
   await sql`DELETE FROM suggestions WHERE id = ${id} AND team_id = ${c.teamId}`;
   return NextResponse.json({ ok: true });
 }

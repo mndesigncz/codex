@@ -21,7 +21,21 @@ export interface Step {
    * záložku Návody a hledání.
    */
   guideId: number | null;
+  /**
+   * Měřená hodnota (kolo 7, HACCP): krok „Změřit teplotu lednice" chce číslo, ne jen
+   * fajfku. 'number' = v běhu se zapíše číslo s jednotkou a odškrtnout jde až s ním;
+   * mimo rozsah valueMin–valueMax se ukáže varování (neblokuje). Starý krok = null.
+   * Nepovinné v typu (parseStep je doplní vždy), ať ručně skládané kroky jinde nemusí nic měnit.
+   */
+  valueKind?: 'number' | null;
+  /** Jednotka u pole (°C, ml, Kč…), nejvýš 8 znaků. */
+  valueUnit?: string | null;
+  valueMin?: number | null;
+  valueMax?: number | null;
 }
+
+/** Nejdelší jednotka měřené hodnoty. */
+export const MAX_JEDNOTKA = 8;
 
 export type StepWeight = 'minor' | 'normal' | 'key';
 
@@ -46,6 +60,32 @@ export function stepPlus(s: Step): number {
   return weightSpec(s.weight).plus;
 }
 
+/**
+ * Číslo z pole, jak ho píše člověk: desetinná čárka i tečka, mezery, minus („-1,5").
+ * Prázdné nebo nesmysl = null. Pole je textové s inputMode="decimal" (check-decimal-inputs).
+ */
+export function cisloZTextu(raw: unknown): number | null {
+  if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null;
+  if (typeof raw !== 'string') return null;
+  const t = raw.replace(/\s/g, '').replace('−', '-').replace(',', '.');
+  if (!/^-?(\d+\.?\d*|\.\d+)$/.test(t)) return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
+
+const meze = (v: unknown): number | null => (v == null || v === '' ? null : cisloZTextu(v as any));
+
+/** Měřená hodnota kroku z uloženého JSON — staré kroky (bez valueKind) mají všude null. */
+function hodnotaKroku(raw: any): Pick<Step, 'valueKind' | 'valueUnit' | 'valueMin' | 'valueMax'> {
+  if (raw?.valueKind !== 'number') return { valueKind: null, valueUnit: null, valueMin: null, valueMax: null };
+  const jednotka = raw.valueUnit == null ? '' : String(raw.valueUnit).trim().slice(0, MAX_JEDNOTKA);
+  let od = meze(raw.valueMin);
+  let po = meze(raw.valueMax);
+  // Prohozené meze („od 6 do 2") se srovnají, ať „mimo rozsah" neplatí pro všechno.
+  if (od != null && po != null && od > po) [od, po] = [po, od];
+  return { valueKind: 'number', valueUnit: jednotka || null, valueMin: od, valueMax: po };
+}
+
 export function parseStep(raw: any): Step {
   if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
     const m = Number(raw.minutes);
@@ -59,9 +99,51 @@ export function parseStep(raw: any): Step {
       weight: raw.weight === 'key' || raw.weight === 'minor' ? raw.weight : 'normal',
       penalty: Number.isFinite(pen) && pen >= 0 ? Math.round(pen) : null,
       guideId: Number.isFinite(g) && g > 0 ? Math.round(g) : null,
+      ...hodnotaKroku(raw),
     };
   }
-  return { text: String(raw ?? '').trim(), minutes: null, note: null, emoji: null, weight: 'normal', penalty: null, guideId: null };
+  return { text: String(raw ?? '').trim(), minutes: null, note: null, emoji: null, weight: 'normal', penalty: null, guideId: null, valueKind: null, valueUnit: null, valueMin: null, valueMax: null };
+}
+
+/**
+ * Naměřené hodnoty průběhu, jak je pošle klient: jen konečná čísla (i „4,2" jako text),
+ * klíče = indexy kroků 0 … total−1; zbytek se zahodí. Na tři desetinná místa, |n| ≤ 1 000 000.
+ */
+export function normalizujHodnoty(raw: unknown, total: number): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+  const max = Number.isFinite(total) ? Math.max(0, Math.floor(total)) : 0;
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!/^\d{1,4}$/.test(k)) continue;
+    const i = Number(k);
+    if (i >= max) continue;
+    const n = cisloZTextu(v);
+    if (n == null || Math.abs(n) > 1_000_000) continue;
+    out[String(i)] = Math.round(n * 1000) / 1000;
+  }
+  return out;
+}
+
+/** „4,2 °C" — číslo podle jazyka (formátovač dodá volající), jednotka za mezerou. */
+export function hodnotaSJednotkou(n: number, jednotka: string | null, cislo: (n: number) => string): string {
+  return jednotka ? `${cislo(n)} ${jednotka}` : cislo(n);
+}
+
+/** Rozsah kroku bez slov (nepotřebuje překlad): „2–6 °C", „≥ 2 °C", „≤ 6 °C"; bez mezí null. */
+export function rozsahKroku(s: Pick<Step, 'valueMin' | 'valueMax' | 'valueUnit'>, cislo: (n: number) => string): string | null {
+  const j = s.valueUnit ? ` ${s.valueUnit}` : '';
+  if (s.valueMin != null && s.valueMax != null) return `${cislo(s.valueMin)}–${cislo(s.valueMax)}${j}`;
+  if (s.valueMin != null) return `≥ ${cislo(s.valueMin)}${j}`;
+  if (s.valueMax != null) return `≤ ${cislo(s.valueMax)}${j}`;
+  return null;
+}
+
+/** Je hodnota mimo rozsah kroku? Chybějící mez se nehlídá; bez hodnoty nebo bez měření = false. */
+export function mimoRozsah(s: Pick<Step, 'valueKind' | 'valueMin' | 'valueMax'>, hodnota: number | null | undefined): boolean {
+  if (s.valueKind !== 'number' || hodnota == null || !Number.isFinite(hodnota)) return false;
+  if (s.valueMin != null && hodnota < s.valueMin) return true;
+  if (s.valueMax != null && hodnota > s.valueMax) return true;
+  return false;
 }
 
 export function parseSteps(items: any): Step[] {
@@ -72,7 +154,8 @@ export function parseSteps(items: any): Step[] {
 // and keep plain-string compatibility when a step carries only text.
 export function serializeStep(s: Step): string | Record<string, any> {
   const plainWeight = !s.weight || s.weight === 'normal';
-  if (!s.minutes && !s.note && !s.emoji && plainWeight && s.penalty == null && s.guideId == null) return s.text;
+  const meri = s.valueKind === 'number';
+  if (!s.minutes && !s.note && !s.emoji && plainWeight && s.penalty == null && s.guideId == null && !meri) return s.text;
   const out: Record<string, any> = { text: s.text };
   if (s.minutes) out.minutes = s.minutes;
   if (s.note) out.note = s.note;
@@ -80,6 +163,12 @@ export function serializeStep(s: Step): string | Record<string, any> {
   if (!plainWeight) out.weight = s.weight;
   if (s.penalty != null) out.penalty = s.penalty;
   if (s.guideId != null) out.guideId = s.guideId;
+  if (meri) {
+    out.valueKind = 'number';
+    if (s.valueUnit) out.valueUnit = s.valueUnit;
+    if (s.valueMin != null) out.valueMin = s.valueMin;
+    if (s.valueMax != null) out.valueMax = s.valueMax;
+  }
   return out;
 }
 

@@ -151,7 +151,7 @@ export default function ({ eq, ok }: Testy) {
   ], ['chrome', 'safari', 'firefox', 'edge', 'jine', 'jine', 'jine']);
 
   // ---- deep link na záložky ----
-  eq('záložka: platná id', ['jazyk', 'privacy', 'podnik', 'zkratky', 'notifications', 'account'].map(z => zalozkaNastaveni(z)), ['jazyk', 'privacy', 'podnik', 'zkratky', 'notifications', 'account']);
+  eq('záložka: platná id', ['jazyk', 'privacy', 'podnik', 'organizace', 'zkratky', 'notifications', 'account'].map(z => zalozkaNastaveni(z)), ['jazyk', 'privacy', 'podnik', 'organizace', 'zkratky', 'notifications', 'account']);
   eq('záložka: neznámá nebo prázdná se zahodí', [zalozkaNastaveni('hack'), zalozkaNastaveni(''), zalozkaNastaveni(null), zalozkaNastaveni(undefined), zalozkaNastaveni(['jazyk'])], [undefined, undefined, undefined, undefined, undefined]);
   ok('záložky: ID bez duplicit', new Set(ZALOZKY_NASTAVENI).size === ZALOZKY_NASTAVENI.length);
 }

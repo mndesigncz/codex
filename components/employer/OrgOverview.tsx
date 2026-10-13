@@ -63,12 +63,14 @@ function SeznamPodniku({ mesic, onOpenTeam }: { mesic: string; onOpenTeam?: (tea
     );
   }
   if (!p.dostupny) {
-    const vNastaveni = p.duvod === 'vypnuto' && nav.smiPohled('team-settings');
+    // Kolo 7: organizace je vlastní sekce Nastavení › Organizace — nápověda říká skutečnou cestu
+    // a tlačítko vede rovnou na ni (dřív „v Nastavení týmu, v části Organizace", která v pásu nebyla).
+    const vNastaveni = p.duvod === 'vypnuto' && nav.smiPohled('settings');
     return (
       <Card>
         <EmptyState compact icon="overview" title={p.zprava ?? t('Přehled organizace teď nejde ukázat.')}
-          hint={p.duvod === 'vypnuto' ? t('Zapíná se v Nastavení týmu, v části Organizace.') : undefined}
-          action={vNastaveni ? <Button variant="secondary" icon="settings" onClick={() => nav.onNavigate('team-settings')}>{t('Otevřít nastavení')}</Button> : undefined} />
+          hint={p.duvod === 'vypnuto' ? t('Zapíná se v Nastavení › Organizace.') : undefined}
+          action={vNastaveni ? <Button variant="secondary" size="sm" icon="settings" onClick={() => nav.onNavigate('settings', 'organizace')}>{t('Otevřít nastavení')}</Button> : undefined} />
       </Card>
     );
   }

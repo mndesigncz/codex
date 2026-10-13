@@ -6,7 +6,7 @@ import { Icon, LogoMark } from '../Icons';
 import PosTick from '../PosTick';
 import StaffInbox, { useStaffInbox } from '../client/StaffInbox';
 import { Modal, Button, Badge } from '../ui';
-import KioskInventory from './KioskInventory';
+import KioskInventory, { type PredaniSkladuTabletu } from './KioskInventory';
 import KioskNastaveni from './KioskNastaveni';
 import KioskTasks from './KioskTasks';
 import Procedures from '../procedures/Procedures';
@@ -33,7 +33,7 @@ import {
   ZALOZKY_TABLETU, viditelneZalozky, zalozkaPoOmezeni, pocetUkoluTabletu, pocetPostupuTabletu, type IdZalozkyTabletu,
 } from '@/lib/kioskPrehled';
 import {
-  KioskShiftProvider, KioskShiftGate, WhoIsWorking, ActivePersonChip,
+  KioskShiftProvider, KioskShiftGate, WhoIsWorking, ActivePersonChip, SouhrnPoOdchodu,
   useKioskShift, useNow,
 } from './KioskShiftGate';
 
@@ -140,6 +140,9 @@ function KioskShell({ user }: { user: KioskUser }) {
   // Úkol „Vyrobit limonádu“ s návodem musí na tabletu otevřít ten návod,
   // ne jen přepnout na záložku Návody — u baru se nehledá v seznamu.
   const [wantGuide, setWantGuide] = useState<number | null>(null);
+  // Proklik z widgetu do Skladu (Docházející zásoby → `stav:dochazi|Nápoje`): argument putuje
+  // jako prop s počítadlem, ať druhý stejný proklik filtr znovu nastaví.
+  const [skladPredani, setSkladPredani] = useState<PredaniSkladuTabletu>({ n: 0 });
   // Na tabletu nejsou URL, takže odkaz `?view=guides&guide=N` tu nefunguje.
   // Plovoucí běžec postupů visí nad všemi třemi rozhraními a sám neví, že
   // je na kiosku — proto si otevírání návodů přebereme a přepneme záložku.
@@ -193,6 +196,7 @@ function KioskShell({ user }: { user: KioskUser }) {
     // Konkrétní postup ze zamčené uzávěrky: detail se otevře, až Postupy
     // naskočí (i po „Kdo jsi?" ve WhoFirst — událost se zkouší znovu).
     if (zalozka === 'procedures' && arg && /^\d+$/.test(arg)) otevriPostupPoPrechodu(Number(arg));
+    if (zalozka === 'inventory') setSkladPredani(s => ({ arg, n: s.n + 1 }));
     setTab(zalozka);
   }, []);
   // Jen známé pohledy — a jen ty, na jejichž záložku role tabletu má.
@@ -334,7 +338,7 @@ function KioskShell({ user }: { user: KioskUser }) {
           {tab === 'inventory' && (
             <WhoFirst>
               <main className="flex-1 mt-5">
-                <KioskInventory />
+                <KioskInventory predani={skladPredani} />
               </main>
             </WhoFirst>
           )}
@@ -353,6 +357,9 @@ function KioskShell({ user }: { user: KioskUser }) {
       <MessengerDock user={kioskUser} />
 
       <KioskNastaveni open={nastaveniOtevreno} onClose={() => setNastaveniOtevreno(false)} />
+
+      {/* Souhrn směny po odchodu: uvnitř navigace tabletu, ať „Vyplnit uzávěrku" přepne záložku. */}
+      <SouhrnPoOdchodu />
 
       <Modal open={confirmSignOut} onClose={() => setConfirmSignOut(false)} size="sm"
         title={t('Odhlásit tablet?')}

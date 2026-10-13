@@ -17,16 +17,37 @@ const mereni = (p) => p.evaluate(() => {
   }
   return { sw: document.documentElement.scrollWidth, W, posun, ven: ven.slice(0, 5), posuvne: posuvne.slice(0, 5) };
 });
-const stranky = ['/employee', '/employee/inventory', '/employee/shifts', '/employee/tasks', '/employee/requests', '/employee/chat'];
+// Kolo 7 (R7-5): Návody a Nápady — pásy filtrů (role=group) na telefonu odjížděly doprava; teď jsou
+// za tlačítkem „Filtry". Měří se i viditelné pásy role=group: v klidu žádný nesmí jet do strany.
+const stranky = ['/employee', '/employee/inventory', '/employee/shifts', '/employee/tasks', '/employee/requests', '/employee/chat',
+  '/employee/shifts?view=guides', '/employee/shifts?view=suggestions'];
+const pasy = (p) => p.evaluate(() => [...document.querySelectorAll('[role=group]')]
+  .filter(e => e.getBoundingClientRect().width > 0 && /(auto|scroll)/.test(getComputedStyle(e).overflowX))
+  .map(e => ({ jmeno: e.getAttribute('aria-label'), jede: e.scrollWidth > e.clientWidth + 1 })));
 for (const dlouhe of [false, true]) for (const w of [360, 390]) for (const cesta of stranky) {
   const { ctx, p } = await kontext({ viewport: { width: w, height: 844 }, role: 'employee', mobil: true,
-    dalsi: dlouhe ? (req, json) => { const u = new URL(req.url()); if (req.method() === 'GET' && u.pathname === '/api/inventory') return json(zdlouhat(fixtura('inventory'))); } : null });
+    dalsi: (req, json) => {
+      const u = new URL(req.url());
+      if (req.method() !== 'GET') return undefined;
+      if (dlouhe && u.pathname === '/api/inventory') return json(zdlouhat(fixtura('inventory')));
+      if (u.pathname === '/api/guides') return json(fixtura('k69-b6b-guides'));
+      if (u.pathname === '/api/suggestions') return json(fixtura('k69-b6a-suggestions'));
+      return undefined;
+    } });
   await p.goto(BASE + cesta, { waitUntil: 'networkidle' }).catch(() => {});
+  // Nadpis počkat (pod zátěží dev serveru se plocha kreslí i přes 1,2 s — „bezi:false" bylo jen pomalé načtení).
+  await p.locator('h1').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
   await p.waitForTimeout(1200);
   const bezi = await p.locator('h1').first().isVisible().catch(() => false);
   const m = await mereni(p);
   tvrdi(`${dlouhe ? 'dlouhé' : 'běžné'} ${w} ${cesta}: načteno a nic nepřetéká`, bezi && m.sw <= m.W + 1 && m.posun === 0 && !m.ven.length && !m.posuvne.length, JSON.stringify({ bezi, ...m }));
-  if (!dlouhe && w === 390) await p.screenshot({ path: OUT + `zam-${cesta.replaceAll('/', '_')}.png`, fullPage: true });
+  if (/view=(guides|suggestions)/.test(cesta)) {
+    const pp = await pasy(p);
+    const filtry = p.getByRole('button', { name: /^Filtry/ });
+    tvrdi(`${dlouhe ? 'dlouhé' : 'běžné'} ${w} ${cesta}: pásy role=group v klidu skryté za „Filtry", žádný nejede do strany`,
+      await filtry.isVisible() && pp.every(x => !x.jede) && pp.length === 0, JSON.stringify(pp));
+  }
+  if (!dlouhe && w === 390) await p.screenshot({ path: OUT + `zam-${cesta.replaceAll('/', '_').replace(/[?=]/g, '-')}.png`, fullPage: true });
   await ctx.close();
 }
 await konec();

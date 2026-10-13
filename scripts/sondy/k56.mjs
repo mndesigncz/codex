@@ -87,7 +87,7 @@ await ctx.route('**/api/organization/overview**', route => route.fulfill({ statu
 await p.goto('http://localhost:3000/employer/overview?view=org', { waitUntil: 'networkidle' });
 await p.waitForTimeout(1500);
 const m4 = norm(await p.locator('main').innerText());
-tvrdi('vypnutý přehled řekne proč a kde se zapíná', m4.includes('vypnutý') && m4.includes('nastavení týmu'), m4.slice(0, 200));
+tvrdi('vypnutý přehled řekne proč a kde se zapíná', m4.includes('vypnutý') && m4.includes('nastavení › organizace'), m4.slice(0, 200));
 
 console.log(fails ? `\n${fails} SELHALO` : '\nvšechny podniky na jedné obrazovce — a sečtené jen tam, kde to dává smysl');
 await b.close();

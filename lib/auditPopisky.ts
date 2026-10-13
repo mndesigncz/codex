@@ -5,6 +5,8 @@
 // a scripts/check-audit-labels.mjs hlídá, že každý klíč, který kód předává
 // do audit(), tu má popisek. Nová akce bez popisku shodí kontrolu v CI.
 
+import { obsahujeNekde } from './hledani.ts';
+
 export const AUDIT_POPISKY: Record<string, string> = {
   // podnik a lidé
   'team.settings': 'Změna nastavení podniku',
@@ -81,6 +83,9 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'reward.create': 'Přidána odměna',
   'reward.approved': 'Schválena odměna',
   'reward.declined': 'Zamítnuta odměna',
+  'reward.update': 'Upravena odměna v katalogu',
+  // nápady
+  'napady.zamitnuto': 'Zamítnut podnět',
   // prémie a srážky
   'wage.bonus': 'Přidána prémie k výplatě',
   'wage.deduction': 'Přidána srážka z výplaty',
@@ -217,4 +222,150 @@ export function detailAkce(akce: string, detail: string | null | undefined): str
     if (akce === 'organization.ciselniky') return shrnutiSdilenychCiselniku(j.sdileneCiselniky, j.zdroje);
   } catch { /* uříznutý JSON — dál */ }
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Oblasti historie změn a filtr (kolo 7, R7-7)
+// ---------------------------------------------------------------------------
+//
+// Nastavení › Historie změn filtruje podle člověka, oblasti a textu. Oblast se
+// odvozuje z předpony akce před tečkou (inventory., closing., role.…) — ale přes
+// výslovnou mapu, ne hádáním: nová předpona bez oblasti shodí test
+// (scripts/testy/k83-nastaveni.ts: každý klíč z AUDIT_POPISKY má oblast).
+
+
+export type OblastAuditu = 'lide' | 'sklad' | 'kasa' | 'uzaverky' | 'odmeny' | 'klient' | 'nastaveni' | 'ostatni';
+
+/** Pořadí oblastí v přepínači (Vše je navíc a první). */
+export const PORADI_OBLASTI: readonly OblastAuditu[] = ['lide', 'sklad', 'kasa', 'uzaverky', 'odmeny', 'klient', 'nastaveni', 'ostatni'];
+
+/** Předpona akce (část před první tečkou) → oblast. Klíče bez uvozovek: kontrola popisků čte jen `'klíč': '…'`. */
+export const OBLASTI_AUDITU: Readonly<Record<string, OblastAuditu>> = {
+  // lidé, role, směny a docházka
+  team: 'lide', ucet: 'lide', uzivatel: 'lide', zprava: 'lide', nahlaseni: 'lide', tym: 'lide', kiosk: 'lide',
+  role: 'lide', schedule: 'lide', volno: 'lide', rozvrh: 'lide', dochazka: 'lide',
+  // sklad, dodavatelé, účtenky
+  inventory: 'sklad', supplier: 'sklad', receipt: 'sklad', order: 'sklad',
+  // kasa a menu
+  pos: 'kasa', menu: 'kasa',
+  // uzávěrky
+  closing: 'uzaverky',
+  // odměny, prémie, pochvaly
+  reward: 'odmeny', wage: 'odmeny', points: 'odmeny',
+  // hosté (Managero client)
+  client: 'klient', klient: 'klient', rezervace: 'klient',
+  // nastavení podniku, organizace, předplatné
+  podnik: 'nastaveni', rozlozeni: 'nastaveni', onboarding: 'nastaveni', organization: 'nastaveni', billing: 'nastaveni',
+  // akce (výdej a vrácení zboží, oznámení týmu) — samostatná agenda, patří k ostatnímu
+  event: 'ostatni',
+  // úkoly a nápady (kolo 7: fotka jako důkaz, zamítnutí s důvodem) — provozní agenda, patří k ostatnímu
+  ukoly: 'ostatni', napady: 'ostatni',
+};
+
+/** Akce, jejichž předpona patří jinam než ony samy (celý klíč má přednost před předponou). */
+export const VYJIMKY_OBLASTI: readonly (readonly [string, OblastAuditu])[] = [
+  ['team.settings', 'nastaveni'],
+  ['team.create', 'nastaveni'],
+  ['kiosk.login', 'nastaveni'],
+];
+
+const predpona = (akce: string) => String(akce ?? '').split('.')[0];
+
+/** Má akce oblast z výslovné mapy (ne jen „ostatní" z neznalosti)? */
+export function maOblast(akce: string): boolean {
+  return VYJIMKY_OBLASTI.some(([k]) => k === akce) || Object.prototype.hasOwnProperty.call(OBLASTI_AUDITU, predpona(akce));
+}
+
+/** Oblast akce; neznámá předpona → „ostatní". */
+export function oblastAkce(akce: string): OblastAuditu {
+  const vyjimka = VYJIMKY_OBLASTI.find(([k]) => k === akce);
+  if (vyjimka) return vyjimka[1];
+  return Object.prototype.hasOwnProperty.call(OBLASTI_AUDITU, predpona(akce)) ? OBLASTI_AUDITU[predpona(akce)] : 'ostatni';
+}
+
+/**
+ * Podmínka oblasti pro SQL (GET /api/audit?oblast=): předpony oblasti, výjimky, které
+ * do ní patří navzdory předponě (`vcetne`) a které z ní odcházejí (`krome`); „ostatní"
+ * bere navíc všechno s neznámou předponou (`nezname`, porovnává se se `znamePredpony`).
+ */
+export function podminkaOblasti(oblast: OblastAuditu): { predpony: string[]; vcetne: string[]; krome: string[]; nezname: boolean; znamePredpony: string[] } {
+  const predpony = Object.entries(OBLASTI_AUDITU).filter(([, o]) => o === oblast).map(([p]) => p);
+  return {
+    predpony,
+    vcetne: VYJIMKY_OBLASTI.filter(([, o]) => o === oblast).map(([k]) => k),
+    krome: VYJIMKY_OBLASTI.filter(([k, o]) => o !== oblast && predpony.includes(predpona(k))).map(([k]) => k),
+    nezname: oblast === 'ostatni',
+    znamePredpony: Object.keys(OBLASTI_AUDITU),
+  };
+}
+
+/** Kolik záznamů vrací GET /api/audit bez `limit` a nejvýš s ním. */
+export const LIMIT_HISTORIE = { vychozi: 100, max: 200 } as const;
+
+const kladneCele = (v: unknown): number | null => {
+  const s = String(v ?? '').trim();
+  if (!/^\d{1,10}$/.test(s)) return null;
+  const n = Number(s);
+  return Number.isSafeInteger(n) && n > 0 ? n : null;
+};
+
+/**
+ * Parametry GET /api/audit z adresy: `before` (id — starší než tenhle záznam, „Načíst
+ * starší"), `limit` (výchozí 100, nejvýš 200), `user` (id člověka) a `oblast`. Cokoli
+ * nečitelného se zahodí (bez filtru), ne odmítne — adresa ze záložky nesmí shodit stránku.
+ */
+export function parametryHistorie(q: { get: (k: string) => string | null }): { before: number | null; limit: number; user: number | null; oblast: OblastAuditu | null } {
+  const limit = kladneCele(q.get('limit'));
+  const oblast = q.get('oblast');
+  return {
+    before: kladneCele(q.get('before')),
+    limit: limit == null ? LIMIT_HISTORIE.vychozi : Math.min(limit, LIMIT_HISTORIE.max),
+    user: kladneCele(q.get('user')),
+    oblast: (PORADI_OBLASTI as readonly string[]).includes(oblast ?? '') ? (oblast as OblastAuditu) : null,
+  };
+}
+
+/** Kurzor další stránky: id posledního vráceného záznamu, když se jich načetlo víc než limit; jinak null. */
+export function dalsiKurzor<T extends { id: number }>(radky: readonly T[], limit: number): { strana: T[]; nextBefore: number | null } {
+  const strana = radky.slice(0, limit);
+  return { strana, nextBefore: radky.length > limit && strana.length ? strana[strana.length - 1].id : null };
+}
+
+/** Záznam historie, jak ho vrací GET /api/audit. */
+export interface ZaznamHistorie {
+  id: number;
+  action: string;
+  label: string;
+  detail: string | null;
+  userId: number | null;
+  userName: string;
+  userAvatar?: string | null;
+  createdAt: string;
+}
+
+/** Filtr historie v Nastavení: člověk (null = všichni), oblast a text (popis, detail, jméno; bez diakritiky). */
+export function filtrujHistorii<T extends ZaznamHistorie>(zaznamy: readonly T[], f: { clovek: number | 'system' | null; oblast: OblastAuditu | null; hledani: string }): T[] {
+  return zaznamy.filter(z =>
+    (f.clovek == null || (f.clovek === 'system' ? z.userId == null : z.userId === f.clovek))
+    && (f.oblast == null || oblastAkce(z.action) === f.oblast)
+    && obsahujeNekde(f.hledani, z.label, z.detail, z.userName));
+}
+
+/** Lidé v načtené historii s počtem záznamů (nejčinnější první), pro pilulky „Eva · 3". Systém má klíč 'system'. */
+export function lideHistorie(zaznamy: readonly ZaznamHistorie[]): { klic: number | 'system'; jmeno: string; pocet: number }[] {
+  const m = new Map<number | 'system', { klic: number | 'system'; jmeno: string; pocet: number }>();
+  for (const z of zaznamy) {
+    const klic = z.userId ?? 'system';
+    const r = m.get(klic) ?? { klic, jmeno: z.userName, pocet: 0 };
+    r.pocet++;
+    m.set(klic, r);
+  }
+  return [...m.values()].sort((a, b) => b.pocet - a.pocet || a.jmeno.localeCompare(b.jmeno, 'cs'));
+}
+
+/** Oblasti v načtené historii s počtem, v pevném pořadí přepínače. */
+export function oblastiHistorie(zaznamy: readonly ZaznamHistorie[]): { oblast: OblastAuditu; pocet: number }[] {
+  const pocty = new Map<OblastAuditu, number>();
+  for (const z of zaznamy) { const o = oblastAkce(z.action); pocty.set(o, (pocty.get(o) ?? 0) + 1); }
+  return PORADI_OBLASTI.filter(o => pocty.has(o)).map(o => ({ oblast: o, pocet: pocty.get(o)! }));
 }

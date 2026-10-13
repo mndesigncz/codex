@@ -450,7 +450,7 @@ export default function EmployerLayout({ user }: Props) {
         {/* Který podnik právě spravuju. Do kola 55 tu název podniku nebyl
             vůbec — s jedním to nevadilo, s třemi je to první otázka. */}
         <div className={`border-b border-black/[0.07] ${sidebarOpen ? 'px-2 py-1.5' : 'px-1 py-1.5'}`}>
-          <PodnikSwitcher compact={!sidebarOpen} canCreate onOverview={() => setCurrentView('org')} />
+          <PodnikSwitcher compact={!sidebarOpen} canCreate onOverview={() => setCurrentView('org')} onNastaveniOrganizace={() => navigate('settings', 'organizace')} />
         </div>
         {/* Šestnáct položek se na notebooku s 900 px na výšku nevejde. Dřív se
             poslední („Nápady") prostě uřízla a nic nenaznačilo, že se rail
@@ -530,7 +530,7 @@ export default function EmployerLayout({ user }: Props) {
           {/* Přepínač podniků byl jen v bočním pásu, který na telefonu není —
               majitel tří podniků se na mobilu nepřepnul a „Všechny podniky"
               nenašel. S jedním podnikem se nic nekreslí. */}
-          <div className="md:hidden shrink-0"><PodnikSwitcher compact canCreate jenPrepinani onOverview={() => setCurrentView('org')} /></div>
+          <div className="md:hidden shrink-0"><PodnikSwitcher compact canCreate jenPrepinani onOverview={() => setCurrentView('org')} onNastaveniOrganizace={() => navigate('settings', 'organizace')} /></div>
           <div className="flex-1 min-w-0">
             <h2 className="font-bold text-[#16181A] text-lg tracking-tight truncate">{title}</h2>
           </div>
