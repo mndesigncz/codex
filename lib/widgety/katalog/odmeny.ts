@@ -119,6 +119,25 @@ export const WIDGETY: DefiniceWidgetu[] = [
     cil: { pohled: 'rewards' },
     stav: 'hotovo',
   },
+  // Data: GET /api/rewards/awards?oslavy=1 → oslavy[{userId,name,avatar,druh,den,zaDni,roky,ja}]
+  // Kolo 8 (R8-3, vzor Kudos „employee milestones"): „Petra má dnes 2 roky u nás 🎉 · Poděkovat". Body za
+  // narozeniny a výročí připisuje denní cron podle Odměny › Nastavení (points_config.auto). V klidu bez
+  // oslavy se widget nekreslí.
+  {
+    id: 'odmeny.oslavy',
+    oblast: 'odmeny',
+    nazev: 'Oslavy v týmu',
+    popis: 'Narozeniny a výročí nástupu kolegů dnes a v příštích dnech — s tlačítkem Poděkovat.',
+    ikona: 'cup',
+    velikosti: ['S', 'M'],
+    vychoziVelikost: 'M',
+    rozhrani: ['vedeni', 'zamestnanec', 'kiosk'],
+    stranky: ['vedeni.prehled', 'vedeni.odmeny', 'zamestnanec.domu', 'kiosk.smena'],
+    opravneni: { vse: [], nektere: [] },
+    tarif: 'pro',
+    cil: { pohled: 'rewards' },
+    stav: 'hotovo',
+  },
   // Data: GET /api/rewards/catalog → redemptions[status=pending]
   {
     id: 'odmeny.zadosti',

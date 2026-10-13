@@ -90,6 +90,10 @@ const podvrh = (bezPlanu = false) => (req, json, stav) => {
     return undefined;
   }
   if (path === '/api/rewards/awards' && q.get('zed') === '1') return json(ZED);
+  if (path === '/api/rewards/awards' && q.get('oslavy') === '1') return json({ oslavy: [
+    { userId: 18, name: 'Tereza Malá', avatar: '👱‍♀️', druh: 'vyroci', den: DNES, zaDni: 0, roky: 2, ja: false },
+    { userId: 17, name: 'Jakub Horák', avatar: '🧔', druh: 'narozeniny', den: den(-3), zaDni: 3, roky: null, ja: false },
+  ] });
   if (path === '/api/timeoff' && q.get('mine') === '1') return json({ ...nactiB1('k69-b1-timeoff-mine'), narok: NAROK });
   if (path === '/api/availability') return json(q.get('mine') ? null : nactiB1('k69-b1-availability'));
   if (path === '/api/shifts/offers') return json(nactiB1('k69-b1-offers'));
@@ -336,15 +340,21 @@ const ROZVRH = '/employer/overview?view=shifts';
 // ---------------------------------------------------------------------------
 {
   const BARISTA = roleMine('barista');
-  const fix = { stranka: 'zamestnanec.domu', polozky: [{ id: 'zed', widget: 'odmeny.zed_diku', velikost: 'M' }, { id: 'moje-uroven', widget: 'moje.uroven', velikost: 'M' }], dostupne: ['odmeny.zed_diku', 'moje.uroven'], tarifem: [], zdroj: 'osobni', rozsah: 'typ:zamestnanec', zamceno: false, smiUpravit: true, smiVychozi: false, verze: 1 };
+  const fix = { stranka: 'zamestnanec.domu', polozky: [{ id: 'oslavy', widget: 'odmeny.oslavy', velikost: 'M' }, { id: 'zed', widget: 'odmeny.zed_diku', velikost: 'M' }, { id: 'moje-uroven', widget: 'moje.uroven', velikost: 'M' }], dostupne: ['odmeny.oslavy', 'odmeny.zed_diku', 'moje.uroven'], tarifem: [], zdroj: 'osobni', rozsah: 'typ:zamestnanec', zamceno: false, smiUpravit: true, smiVychozi: false, verze: 1 };
   const { ctx, p, stav, chyby } = await kontext({ role: 'employee', fix, mineData: BARISTA, viewport: TEL, mobil: true, posunCasu: POSUN, dalsi: podvrh() });
   await otevriPlochu(p, '/employee/shifts?view=home', 'zamestnanec.domu');
   const w = p.locator('[data-plocha] li[data-widget="odmeny.zed_diku"]:not([hidden])');
   await dokud(async () => (await w.locator('li.list-row, .list-row').count()) > 0, 8000);
+  // Oslavy v týmu (kolo 8): výročí dnes s Poděkovat, narozeniny za 3 dny bez tlačítka.
+  const os = p.locator('[data-plocha] li[data-widget="odmeny.oslavy"]:not([hidden])');
+  const to = await text(os);
+  tvrdi('O1 (390): Oslavy v týmu — „Tereza Malá má dnes 2 roky u nás 🎉" s Poděkovat a „Jakub Horák má za 3 dny narozeniny 🎂"', /Tereza Malá má dnes 2 roky u nás 🎉/.test(to) && /Jakub Horák má za 3 dny narozeniny 🎂/.test(to) && (await os.getByRole('button', { name: 'Poděkovat' }).count()) === 1, to);
+  await os.screenshot({ path: OUT + 'k84-tym-oslavy-390.png' });
   const tw = await text(w);
   tvrdi('Z1 (390): Zeď díků ukáže kdo, od koho, #hodnotu, větu a body', /Jakub Horák/.test(tw) && /od Eva Testová/.test(tw) && /#tým/.test(tw) && /Díky za záskok v sobotu/.test(tw) && /\+10/.test(tw), tw.slice(0, 300));
   const tl = w.locator('[data-podekovat]');
-  tvrdi('Z1 (390): tlačítko „Poděkovat · 30 b" (zbytek příspěvku) je nad ohybem a ≥ 44 px', /Poděkovat · 30 b/.test(await text(tl)) && (await tl.boundingBox()).y + (await tl.boundingBox()).height <= TEL.height, await text(tl));
+  await tl.scrollIntoViewIfNeeded();
+  tvrdi('Z1 (390): tlačítko „Poděkovat · 30 b" (zbytek příspěvku) je vidět celé v šířce obrazovky', /Poděkovat · 30 b/.test(await text(tl)) && (await tl.boundingBox()).x + (await tl.boundingBox()).width <= TEL.width && await tl.isVisible(), await text(tl));
   await w.screenshot({ path: OUT + 'k84-tym-zed-390.png' });
   await tl.click();
   const okno = p.getByRole('dialog');
@@ -384,7 +394,7 @@ const ROZVRH = '/employer/overview?view=shifts';
   const fixO = { stranka: 'vedeni.odmeny', polozky: [{ id: 'nastroj', widget: 'nastroj', velikost: 'L' }], dostupne: [], tarifem: [], zdroj: 'aplikace', rozsah: 'typ:vedeni', zamceno: false, smiUpravit: true, smiVychozi: true, verze: 0 };
   const { ctx, p, stav } = await kontext({ fix: fixO, posunCasu: POSUN, dalsi: (req, json, stav) => {
     const u = new URL(req.url());
-    if (u.pathname === '/api/rewards' && req.method() === 'GET') return json({ role: 'employer', levels: [{ name: 'Barista', minPoints: 0, perks: '' }], points: { task: 5, procedure: 10, closing: 15, ratingStar: 4, taskMissed: -5, procedureSkipped: -2, procedureMissed: -4, closingMissing: -10, closingBalanced: 3 }, dik: { prispevek: 50, hodnoty: ['ochota', 'tým'] }, standings: [] });
+    if (u.pathname === '/api/rewards' && req.method() === 'GET') return json({ role: 'employer', levels: [{ name: 'Barista', minPoints: 0, perks: '' }], points: { task: 5, procedure: 10, closing: 15, ratingStar: 4, taskMissed: -5, procedureSkipped: -2, procedureMissed: -4, closingMissing: -10, closingBalanced: 3 }, dik: { prispevek: 50, hodnoty: ['ochota', 'tým'] }, auto: { dochvilnost: { zap: true, body: 10 }, vyroci: { zap: true, body: 50 }, narozeniny: { zap: false, body: 20 } }, standings: [] });
     return podvrh()(req, json, stav);
   } });
   await otevriPlochu(p, '/employer/overview?view=rewards', 'vedeni.odmeny');
@@ -392,11 +402,17 @@ const ROZVRH = '/employer/overview?view=shifts';
   const karta = p.locator('[data-nastaveni-diku]');
   await karta.waitFor({ timeout: 8000 });
   tvrdi('N1 (1280): karta Poděkování mezi kolegy s příspěvkem 50 a hodnotami „ochota, tým"', (await karta.locator('#dik-prispevek').inputValue()) === '50' && (await karta.locator('#dik-hodnoty').inputValue()) === 'ochota, tým');
+  // Automaticky (kolo 8): tři pravidla s přepínačem a body; narozeniny z fixtury vypnuté → pole zakázané.
+  const autoK = p.locator('[data-nastaveni-auto]');
+  tvrdi('N1: karta Automaticky má Týden bez pozdního příchodu / Výročí nástupu / Narozeniny s body 10 / 50 / 20', (await autoK.locator('[data-auto-pravidlo]').count()) === 3 && (await autoK.locator('#auto-dochvilnost').inputValue()) === '10' && (await autoK.locator('#auto-vyroci').inputValue()) === '50' && (await autoK.locator('#auto-narozeniny').isDisabled()));
+  await autoK.locator('[data-auto-pravidlo="narozeniny"]').getByRole('switch').click();
+  await autoK.locator('#auto-narozeniny').fill('25');
+  await autoK.screenshot({ path: OUT + 'k84-tym-nastaveni-auto-1280.png' });
   await karta.locator('#dik-prispevek').fill('80');
   await karta.locator('#dik-hodnoty').fill('ochota, tým, #host');
   await p.getByRole('button', { name: 'Uložit nastavení' }).click();
   const patch = await dokud(() => (stav.zapisy ?? []).find(z => z.path === '/api/teams' && z.m === 'PATCH'), 4000);
-  tvrdi('N1: Uložit pošle PATCH /api/teams s pointsConfig.mesicniPrispevek 80 a hodnotami bez „#"', !!patch && /"mesicniPrispevek":80,"hodnoty":\["ochota","tým","host"\]/.test(patch.body), patch?.body?.slice(0, 300));
+  tvrdi('N1: Uložit pošle PATCH /api/teams s pointsConfig.mesicniPrispevek 80, hodnotami bez „#" a auto (narozeniny zapnuté, 25 b)', !!patch && /"mesicniPrispevek":80,"hodnoty":\["ochota","tým","host"\],"auto":\{"dochvilnost":\{"zap":true,"body":10\},"vyroci":\{"zap":true,"body":50\},"narozeniny":\{"zap":true,"body":25\}\}/.test(patch.body), patch?.body?.slice(0, 400));
   await karta.screenshot({ path: OUT + 'k84-tym-nastaveni-diku-1280.png' });
   await ctx.close();
 }

@@ -22,6 +22,7 @@ import {
 } from '../../lib/rozvrhGenerator.ts';
 import { dnuVRoce, narokDovolene, rokNaroku, vycistiNarok, zbudePoSchvaleni } from '../../lib/dovolena.ts';
 import { BODY_DIKU, VYCHOZI_PRISPEVEK, nastaveniDiku, overDik, vyberZed, zacatekMesice, zbyvaRozdat } from '../../lib/podekovani.ts';
+import { dochvilniZaTyden, duvodAuto, klicAuto, minulyTyden, nastaveniAuto, oslavy, zpozdeniMin } from '../../lib/automatickeBody.ts';
 import { AUDIT_POPISKY } from '../../lib/auditPopisky.ts';
 
 const zdroj = (cesta: string) => readFileSync(new URL(`../../${cesta}`, import.meta.url), 'utf8');
@@ -220,4 +221,37 @@ export default function ({ eq, ok }: Testy) {
   ok('katalog: Zeď díků pro vedení, zaměstnance i tablet bez klíče oprávnění', !!widgetKatalog('odmeny.zed_diku') && widgetKatalog('odmeny.zed_diku')!.rozhrani.includes('kiosk') && widgetKatalog('odmeny.zed_diku')!.opravneni.vse.length === 0);
   const rv = zdroj('components/employer/RewardsView.tsx');
   ok('nastavení odměn: příspěvek a hodnoty jdou do points_config pod klíči mesicniPrispevek a hodnoty', /pointsConfig: \{ \.\.\.body, mesicniPrispevek: nastaveniDiku\(/.test(rv) && /\.prispevek, hodnoty: nastaveniDiku\(/.test(rv));
+
+  // =========================================================================
+  // Automatické body (lib/automatickeBody.ts)
+  // =========================================================================
+  eq('auto: výchozí — vše zapnuté 10 / 50 / 20', nastaveniAuto(null), { dochvilnost: { zap: true, body: 10 }, vyroci: { zap: true, body: 50 }, narozeniny: { zap: true, body: 20 } });
+  eq('auto: z points_config.auto, strop 500, vypnuté pravidlo', nastaveniAuto({ auto: { narozeniny: { zap: false, body: 999 }, vyroci: { body: '30' } } }), { dochvilnost: { zap: true, body: 10 }, vyroci: { zap: true, body: 30 }, narozeniny: { zap: false, body: 500 } });
+  const lideO = [
+    { id: 1, name: 'Petra', birthday: '1990-10-13', nastup: '2024-10-13' },
+    { id: 2, name: 'Adam', birthday: '10-16', nastup: '2026-03-01' },   // narozeniny za 3 dny, nástup letos = žádné výročí
+    { id: 3, name: 'Eva', birthday: null, nastup: '2025-10-20' },       // výročí za 7 dní
+    { id: 4, name: 'Jan', birthday: '02-29', nastup: null },
+  ];
+  eq('oslavy dnes (13. 10. 2026): Petra narozeniny i 2 roky u nás', oslavy(lideO, '2026-10-13').map(o => [o.name, o.druh, o.roky, o.zaDni]), [['Petra', 'narozeniny', null, 0], ['Petra', 'vyroci', 2, 0]]);
+  eq('oslavy týden dopředu: dnes napřed, Adam za 3 dny, Eva výročí 1 rok za 7 dní; nástup letos není výročí', oslavy(lideO, '2026-10-13', 7).map(o => [o.name, o.druh, o.zaDni, o.roky]),
+    [['Petra', 'narozeniny', 0, null], ['Petra', 'vyroci', 0, 2], ['Adam', 'narozeniny', 3, null], ['Eva', 'vyroci', 7, 1]]);
+  eq('oslavy: 29. 2. v nepřestupném roce se slaví 1. 3.', oslavy(lideO.filter(l => l.id === 4), '2027-03-01').map(o => o.druh), ['narozeniny']);
+  eq('oslavy: nesmyslné datum se přeskočí', oslavy([{ id: 9, name: 'X', birthday: '13-45', nastup: 'x' }], '2026-10-13', 400), []);
+  eq('auto: klíč připsání', [klicAuto('narozeniny', '2026'), klicAuto('dochvilnost', '2026-10-05')], ['narozeniny:2026', 'dochvilnost:2026-10-05']);
+  eq('auto: minulý celý týden — v úterý 13. 10. je to 5.–11. 10., v pondělí 12. 10. taky', [minulyTyden('2026-10-13'), minulyTyden('2026-10-12')], [{ od: '2026-10-05', do: '2026-10-11', klic: '2026-10-05' }, { od: '2026-10-05', do: '2026-10-11', klic: '2026-10-05' }]);
+  eq('auto: zpoždění v minutách (dřív záporné, nečitelné null)', [zpozdeniMin('08:12', '08:00'), zpozdeniMin('07:55', '08:00'), zpozdeniMin('x', '08:00')], [12, -5, null]);
+  const prichody = [
+    { employeeId: 1, pozdeMin: 3 }, { employeeId: 1, pozdeMin: -2 }, { employeeId: 1, pozdeMin: 10 },      // 3 směny, nikdy nad 10 → dochvilná
+    { employeeId: 2, pozdeMin: 0 }, { employeeId: 2, pozdeMin: 25 }, { employeeId: 2, pozdeMin: 0 },       // jednou pozdě
+    { employeeId: 3, pozdeMin: 0 }, { employeeId: 3, pozdeMin: 0 },                                        // jen 2 směny
+    { employeeId: 4, pozdeMin: null }, { employeeId: 4, pozdeMin: null }, { employeeId: 4, pozdeMin: null }, // bez plánu se nehodnotí
+  ];
+  eq('auto: dochvilní za týden — jen kdo má ≥ 3 plánované příchody a žádný nad 10 min', dochvilniZaTyden(prichody), [1]);
+  ok('auto: důvody česky s emoji', duvodAuto('narozeniny').includes('🎂') && duvodAuto('vyroci', 1) === 'Rok u nás 🎉' && duvodAuto('vyroci', 3) === '3 roky u nás 🎉' && duvodAuto('vyroci', 5) === '5 let u nás 🎉' && duvodAuto('dochvilnost').includes('⏱️'));
+  const autoDb = zdroj('lib/automatickeBodyDb.ts');
+  ok('auto cron: zápis kind auto s auto_key a ON CONFLICT DO NOTHING (idempotentní), given_by NULL', /kind, auto_key\)/.test(autoDb) && /ON CONFLICT \(team_id, user_id, auto_key\) WHERE auto_key IS NOT NULL DO NOTHING/.test(autoDb) && /NULL, 'auto'/.test(autoDb));
+  ok('auto cron: volá se z /api/init denně', /pripisAutomatickeBody\(\)/.test(zdroj('app/api/init/route.ts')));
+  ok('katalog: Oslavy v týmu pro vedení, zaměstnance i tablet', !!widgetKatalog('odmeny.oslavy') && widgetKatalog('odmeny.oslavy')!.rozhrani.includes('kiosk') && widgetKatalog('odmeny.oslavy')!.stranky.includes('vedeni.prehled'));
+  ok('nastavení odměn: auto jde do points_config', /hodnoty, auto \},/.test(zdroj('components/employer/RewardsView.tsx')));
 }

@@ -1758,5 +1758,13 @@
   "Kolik bodů smí každý za měsíc rozdat kolegům.": "Koľko bodov smie každý za mesiac rozdať kolegom.",
   "Měsíční příspěvek na poděkování (b)": "Mesačný príspevok na poďakovanie (b)",
   "Oddělené čárkou, nejvýš {n}. V poděkování jako #ochota, #tým.": "Oddelené čiarkou, najviac {n}. V poďakovaní ako #ochota, #tím.",
-  "Poděkování mezi kolegy": "Poďakovanie medzi kolegami"
+  "Poděkování mezi kolegy": "Poďakovanie medzi kolegami",
+  "Aspoň {n} plánované směny v týdnu a žádný příchod nad 10 minut po začátku.": "Aspoň {n} plánované zmeny v týždni a žiadny príchod viac než 10 minút po začiatku.",
+  "Body, které aplikace připíše sama: ráno po skončení týdne za dochvilnost, v den výročí nástupu a narozenin. Narozeniny se berou z profilu člověka.": "Body, ktoré aplikácia pripíše sama: ráno po skončení týždňa za dochvíľnosť, v deň výročia nástupu a narodenín. Narodeniny sa berú z profilu človeka.",
+  "Body: {co}": "Body: {co}",
+  "Jednou za rok v den narozenin.": "Raz za rok v deň narodenín.",
+  "Každý rok v den, kdy člověk do podniku nastoupil.": "Každý rok v deň, keď človek do podniku nastúpil.",
+  "Narozeniny": "Narodeniny",
+  "Týden bez pozdního příchodu": "Týždeň bez neskorého príchodu",
+  "Výročí nástupu": "Výročie nástupu"
 }

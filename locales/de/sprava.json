@@ -1758,5 +1758,13 @@
   "Kolik bodů smí každý za měsíc rozdat kolegům.": "Wie viele Punkte jeder pro Monat an Kollegen vergeben darf.",
   "Měsíční příspěvek na poděkování (b)": "Monatsguthaben für Dank (Pkt.)",
   "Oddělené čárkou, nejvýš {n}. V poděkování jako #ochota, #tým.": "Durch Komma getrennt, höchstens {n}. Im Dank als #hilfsbereit, #team.",
-  "Poděkování mezi kolegy": "Dank unter Kollegen"
+  "Poděkování mezi kolegy": "Dank unter Kollegen",
+  "Aspoň {n} plánované směny v týdnu a žádný příchod nad 10 minut po začátku.": "Mindestens {n} geplante Schichten in der Woche und kein Kommen mehr als 10 Minuten nach Beginn.",
+  "Body, které aplikace připíše sama: ráno po skončení týdne za dochvilnost, v den výročí nástupu a narozenin. Narozeniny se berou z profilu člověka.": "Punkte, die die App selbst vergibt: am Morgen nach Wochenende für Pünktlichkeit, am Jubiläum des Eintritts und am Geburtstag. Der Geburtstag kommt aus dem Profil.",
+  "Body: {co}": "Punkte: {co}",
+  "Jednou za rok v den narozenin.": "Einmal im Jahr am Geburtstag.",
+  "Každý rok v den, kdy člověk do podniku nastoupil.": "Jedes Jahr am Tag, an dem die Person im Betrieb angefangen hat.",
+  "Narozeniny": "Geburtstag",
+  "Týden bez pozdního příchodu": "Eine Woche ohne Zuspätkommen",
+  "Výročí nástupu": "Jubiläum des Eintritts"
 }

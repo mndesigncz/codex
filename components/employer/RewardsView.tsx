@@ -31,6 +31,7 @@ import {
 import { MAX_NAZEV_ODMENY, validujOdmenu, type ChybaOdmeny } from '@/lib/odmenyKatalog';
 import { DEFAULT_POINTS, normalizeLevels, normalizePoints, type RewardLevel, type PointsConfig } from '@/lib/rewardLevels';
 import { MAX_HODNOT, MAX_PRISPEVEK, VYCHOZI_HODNOTY, VYCHOZI_PRISPEVEK, nastaveniDiku, type NastaveniDiku } from '@/lib/podekovani';
+import { DRUHY_AUTO, MAX_BODU_AUTO, MIN_SMEN_TYDNE, nastaveniAuto, type DruhAuto, type NastaveniAuto } from '@/lib/automatickeBody';
 import { KLIC_KALENDAR, UDALOST_KALENDAR, urlZebricku, vyberKatalog, vyberPoradi, type ObdobiZebricku, type Odmena, type Poradi } from '@/lib/odmenyPrehled';
 import { apiMessage, okJson } from '@/lib/api';
 import ShiftReviewModal from './ShiftReviewModal';
@@ -235,14 +236,15 @@ function Zebricek({ smiHodnotit, smiProfil, vidiHodnoceni, onHodnotit, onPochval
 function NastaveniBodu({ onUlozeno }: { onUlozeno: () => void }) {
   const t = useT('sprava');
   // `dik` (kolo 8): příspěvek a hodnoty poděkování — server je posílá vedle normalizovaného sazebníku.
-  const data = useDataWidgetu(URL_ODMENY, raw => ({ levels: normalizeLevels(raw?.levels), points: normalizePoints(raw?.points), dik: nastaveniDiku(raw?.dik) }));
+  // `auto` = pravidla automatických bodů; server je posílá už vyčištěná, nastaveniAuto({ auto }) je jen přečte.
+  const data = useDataWidgetu(URL_ODMENY, raw => ({ levels: normalizeLevels(raw?.levels), points: normalizePoints(raw?.points), dik: nastaveniDiku(raw?.dik), auto: nastaveniAuto({ auto: raw?.auto }) }));
   if (data.error) return <Card><ErrorState compact title={t('Nastavení se nenačetlo')} onRetry={data.reload} detail={data.error} /></Card>;
   if (!data.data) return <Card aria-busy><Skeleton className="h-6 w-40" /><Skeleton className="mt-4 h-40" /></Card>;
-  return <FormularBodu levels={data.data.levels} points={data.data.points} dik={data.data.dik} onUlozeno={onUlozeno} />;
+  return <FormularBodu levels={data.data.levels} points={data.data.points} dik={data.data.dik} auto={data.data.auto} onUlozeno={onUlozeno} />;
 }
 
-function FormularBodu({ levels: vychoziUrovne, points: vychoziBody, dik: vychoziDik, onUlozeno }: {
-  levels: RewardLevel[]; points: PointsConfig | null; dik?: NastaveniDiku; onUlozeno: () => void;
+function FormularBodu({ levels: vychoziUrovne, points: vychoziBody, dik: vychoziDik, auto: vychoziAuto, onUlozeno }: {
+  levels: RewardLevel[]; points: PointsConfig | null; dik?: NastaveniDiku; auto?: NastaveniAuto; onUlozeno: () => void;
 }) {
   const t = useT('sprava');
   const [urovne, setUrovne] = useState<RewardLevel[]>(vychoziUrovne);
@@ -250,6 +252,8 @@ function FormularBodu({ levels: vychoziUrovne, points: vychoziBody, dik: vychozi
   // Poděkování mezi kolegy (kolo 8): měsíční příspěvek (0 = vypnuto) a hodnoty podniku (#ochota, #tým…).
   const [prispevek, setPrispevek] = useState<string>(String(vychoziDik?.prispevek ?? VYCHOZI_PRISPEVEK));
   const [hodnoty, setHodnoty] = useState<string>((vychoziDik?.hodnoty ?? VYCHOZI_HODNOTY).join(', '));
+  // Automatické body (kolo 8): přepínač a body za týden bez pozdního příchodu, výročí nástupu, narozeniny.
+  const [auto, setAuto] = useState<NastaveniAuto>(vychoziAuto ?? nastaveniAuto(null));
   const [ukladam, setUkladam] = useState(false);
   const [chyba, setChyba] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -267,7 +271,7 @@ function FormularBodu({ levels: vychoziUrovne, points: vychoziBody, dik: vychozi
         body: JSON.stringify({
           levelsConfig: urovne.map(l => ({ name: l.name.trim() || 'Úroveň' /* i18n-ok (obsah podniku) */, minPoints: Math.max(0, Math.round(l.minPoints) || 0), perks: l.perks.trim() })),
           // Příspěvek a hodnoty jedou v points_config vedle sazebníku pod klíči, které čte nastaveniDiku.
-          pointsConfig: { ...body, mesicniPrispevek: nastaveniDiku({ mesicniPrispevek: prispevek, hodnoty }).prispevek, hodnoty: nastaveniDiku({ mesicniPrispevek: prispevek, hodnoty }).hodnoty },
+          pointsConfig: { ...body, mesicniPrispevek: nastaveniDiku({ mesicniPrispevek: prispevek, hodnoty }).prispevek, hodnoty: nastaveniDiku({ mesicniPrispevek: prispevek, hodnoty }).hodnoty, auto },
         }),
       }).then(okJson);
       setToast(t('Nastavení odměn uloženo.'));
@@ -318,6 +322,36 @@ function FormularBodu({ levels: vychoziUrovne, points: vychoziBody, dik: vychozi
           {pole(t('Chybí uzávěrka'), 'closingMissing', t('Když měl směnu, ale uzávěrku nevyplnil'), true)}
           {pole(t('Kasa sedí'), 'closingBalanced', t('Bonus, když rozdíl v kase vyjde přesně na nulu'))}
         </div>
+      </Card>
+
+      {/* Automatické body (kolo 8, vzor Kudos / Bonusly „automated awards"): připisuje denní cron, každé pravidlo s přepínačem. */}
+      <Card aria-labelledby="auto-titulek" data-nastaveni-auto>
+        <h2 id="auto-titulek" className="t-card">{t('Automaticky')}</h2>
+        <p className="t-meta mt-1 text-pretty">{t('Body, které aplikace připíše sama: ráno po skončení týdne za dochvilnost, v den výročí nástupu a narozenin. Narozeniny se berou z profilu člověka.')}</p>
+        <ul className="list mt-2">
+          {DRUHY_AUTO.map((d: DruhAuto) => {
+            const popis = d === 'dochvilnost' ? t('Týden bez pozdního příchodu') : d === 'vyroci' ? t('Výročí nástupu') : t('Narozeniny');
+            const hint = d === 'dochvilnost' ? t('Aspoň {n} plánované směny v týdnu a žádný příchod nad 10 minut po začátku.', { n: MIN_SMEN_TYDNE })
+              : d === 'vyroci' ? t('Každý rok v den, kdy člověk do podniku nastoupil.') : t('Jednou za rok v den narozenin.');
+            // Přepínač a body vedle sebe; na telefonu se dvojice zalomí pod název (flex-wrap), ne do půlky řádku.
+            return (
+              <li key={d} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3" data-auto-pravidlo={d}>
+                <span className="min-w-0 flex-1 basis-56">
+                  <span id={`auto-${d}-n`} className="block text-sm font-semibold text-[#16181A]">{popis}</span>
+                  <span className="block text-xs text-black/45 mt-0.5 text-pretty">{hint}</span>
+                </span>
+                <span className="flex items-center gap-3">
+                  <span className="flex items-center gap-1.5">
+                    <Input id={`auto-${d}`} type="number" inputMode="numeric" min={0} max={MAX_BODU_AUTO} value={auto[d].body} aria-label={t('Body: {co}', { co: popis })} disabled={!auto[d].zap}
+                      onChange={e => setAuto(a => ({ ...a, [d]: { ...a[d], body: Math.max(0, Math.min(MAX_BODU_AUTO, Number.parseInt(e.target.value, 10) || 0)) } }))} className="!w-20 tabular-nums" />
+                    <span className="t-meta">b</span>
+                  </span>
+                  <Switch checked={auto[d].zap} onChange={v => setAuto(a => ({ ...a, [d]: { ...a[d], zap: v } }))} labelledBy={`auto-${d}-n`} />
+                </span>
+              </li>
+            );
+          })}
+        </ul>
       </Card>
 
       {/* Poděkování mezi kolegy (kolo 8, vzor Bonusly): každý má měsíční příspěvek, nevyužitý propadne 1. dne. */}

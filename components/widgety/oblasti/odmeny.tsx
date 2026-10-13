@@ -1339,6 +1339,55 @@ function ZedDiku({ velikost, nahled }: WidgetProps) {
 }
 
 // ---------------------------------------------------------------------------
+// Oslavy v týmu (kolo 8, R8-3 — vzor Kudos „milestones"): narozeniny a výročí nástupu
+// ---------------------------------------------------------------------------
+
+const URL_OSLAVY = '/api/rewards/awards?oslavy=1';
+interface OslavaRadek { userId: number; name: string; avatar: string | null; druh: 'narozeniny' | 'vyroci'; den: string; zaDni: number; roky: number | null; ja: boolean }
+function vyberOslavy(raw: any): OslavaRadek[] {
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.oslavy)) throw new Error('Oslavy přišly v nečekaném tvaru.');
+  return raw.oslavy.map((o: any) => ({
+    userId: Number(o.userId), name: String(o.name ?? ''), avatar: o.avatar ?? null, druh: o.druh === 'vyroci' ? 'vyroci' : 'narozeniny',
+    den: String(o.den ?? ''), zaDni: Number(o.zaDni) || 0, roky: o.roky == null ? null : Number(o.roky), ja: o.ja === true,
+  }));
+}
+
+/** „Petra má dnes 2 roky u nás 🎉" / „Petra má narozeniny za 3 dny 🎂" — věta pro řádek. */
+function vetaOslavy(t: PrekladFn, o: OslavaRadek): string {
+  const kdy = o.zaDni === 0 ? t('dnes') : o.zaDni === 1 ? t('zítra') : t('za {n, plural, one {# den} few {# dny} other {# dní}}', { n: o.zaDni });
+  if (o.druh === 'narozeniny') return t('{jmeno} má {kdy} narozeniny 🎂', { jmeno: o.name, kdy });
+  return t('{jmeno} má {kdy} {n, plural, one {# rok} few {# roky} other {# let}} u nás 🎉', { jmeno: o.name, kdy, n: o.roky ?? 1 });
+}
+
+function Oslavy({ velikost, nahled }: WidgetProps) {
+  const t = useT('widgety');
+  const { ok, ceka } = useBrana([]);
+  const data = useDataWidgetu(ok ? URL_OSLAVY : null, vyberOslavy);
+  const zed = useDataWidgetu(ok && !nahled ? URL_ZED : null, vyberZed);
+  const seznam = data.data ?? [];
+  const [komu, setKomu] = useState<{ id: number; jmeno: string } | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  // Poděkovat (body z příspěvku) jen s osobním účtem a ne sám sobě; tablet jen čte.
+  const smiDekovat = !nahled && !!zed.data?.prispevek && (zed.data.prispevek.zbyva > 0);
+  const strop = velikost === 'S' ? 1 : 4;
+  return (
+    <Widget nacteni={ceka ? CEKA : data} kostra="text" prazdno={data.data && seznam.length === 0 ? null : undefined}>
+      <ul className="list">
+        {seznam.slice(0, strop).map(o => (
+          <ListRow key={`${o.userId}-${o.druh}`} lead={<Avatar emoji={o.avatar} size="sm" />}
+            title={<span className="text-pretty whitespace-normal">{vetaOslavy(t, o)}</span>}
+            right={o.zaDni === 0 ? <Chip tone="ok" size="sm">{t('dnes')}</Chip> : undefined}
+            actions={smiDekovat && !o.ja && o.zaDni === 0 ? <Button variant="secondary" size="sm" icon="award" onClick={() => setKomu({ id: o.userId, jmeno: o.name })}>{t('Poděkovat')}</Button> : undefined} />
+        ))}
+      </ul>
+      {seznam.length > strop && <p className="t-meta mt-2">{aDalsich(t, seznam.length - strop)}</p>}
+      {komu && <PodekovaniOkno komu={komu} onClose={() => setKomu(null)} onHotovo={() => setToast(t('Díky odeslané — kolega dostal body i oznámení.'))} />}
+      <Toast message={toast} onClose={() => setToast(null)} />
+    </Widget>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Výtky v týmu
 // ---------------------------------------------------------------------------
 
@@ -1438,6 +1487,7 @@ export const KOMPONENTY: Record<string, KomponentaWidgetu> = {
   'odmeny.vytky_tymu': VytkyVTymu,
   'odmeny.pochvaly': Pochvaly,
   'odmeny.zed_diku': ZedDiku,
+  'odmeny.oslavy': Oslavy,
   'odmeny.katalog': KatalogOdmen,
   'odmeny.urovne': Urovne,
   'moje.uroven': MojeUrovenWidget,

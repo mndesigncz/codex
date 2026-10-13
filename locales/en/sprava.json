@@ -1758,5 +1758,13 @@
   "Kolik bodů smí každý za měsíc rozdat kolegům.": "How many points anyone may give colleagues per month.",
   "Měsíční příspěvek na poděkování (b)": "Monthly thanks allowance (pts)",
   "Oddělené čárkou, nejvýš {n}. V poděkování jako #ochota, #tým.": "Comma-separated, at most {n}. Shown in thanks as #helpful, #team.",
-  "Poděkování mezi kolegy": "Thanks between colleagues"
+  "Poděkování mezi kolegy": "Thanks between colleagues",
+  "Aspoň {n} plánované směny v týdnu a žádný příchod nad 10 minut po začátku.": "At least {n} planned shifts in the week and no arrival more than 10 minutes after the start.",
+  "Body, které aplikace připíše sama: ráno po skončení týdne za dochvilnost, v den výročí nástupu a narozenin. Narozeniny se berou z profilu člověka.": "Points the app awards by itself: the morning after a week ends for punctuality, on the work anniversary and on birthdays. Birthdays come from the person's profile.",
+  "Body: {co}": "Points: {co}",
+  "Jednou za rok v den narozenin.": "Once a year on the birthday.",
+  "Každý rok v den, kdy člověk do podniku nastoupil.": "Every year on the day the person joined the business.",
+  "Narozeniny": "Birthday",
+  "Týden bez pozdního příchodu": "A week without a late arrival",
+  "Výročí nástupu": "Work anniversary"
 }

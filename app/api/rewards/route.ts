@@ -6,6 +6,7 @@ import { pragueToday, pragueDaySafe } from '@/lib/pragueTime';
 import { clenovePodniku } from '@/lib/tenant';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { nastaveniDiku } from '@/lib/podekovani';
+import { nastaveniAuto } from '@/lib/automatickeBody';
 
 export const dynamic = 'force-dynamic';
 
@@ -125,6 +126,8 @@ export async function GET(req: NextRequest) {
   // Poděkování mezi kolegy (kolo 8): příspěvek a hodnoty vedle sazebníku — normalizePoints je
   // zahazuje, Nastavení bodů je potřebuje k formuláři, widgety k okně „Poděkovat".
   const dik = nastaveniDiku(pointsRaw);
+  // Automatické body (kolo 8): dochvilnost, výročí, narozeniny — přepínače v Nastavení bodů.
+  const auto = nastaveniAuto(pointsRaw);
 
   if (c.opr.has('odmeny.zebricek')) {
     // Výtky a nehodnocené směny jsou hodnocení lidí, ne pořadí — patří jen
@@ -163,10 +166,10 @@ export async function GET(req: NextRequest) {
     // žebříčkem (vedoucí směny, zaměstnanecká role s odmeny.zebricek)
     // přišel o vlastní body, úroveň i zpětnou vazbu. Vlastní část je teď
     // v odpovědi vždy — kromě tabletu, který body nemá.
-    return NextResponse.json({ role: 'employer', levels, points, dik, standings, ...(c.kiosk ? {} : await vlastni(c.teamId, c.meId, levels, points)) });
+    return NextResponse.json({ role: 'employer', levels, points, dik, auto, standings, ...(c.kiosk ? {} : await vlastni(c.teamId, c.meId, levels, points)) });
   }
 
-  return NextResponse.json({ role: 'employee', levels, points, dik, ...(c.kiosk ? {} : await vlastni(c.teamId, c.meId, levels, points)) });
+  return NextResponse.json({ role: 'employee', levels, points, dik, auto, ...(c.kiosk ? {} : await vlastni(c.teamId, c.meId, levels, points)) });
 }
 
 // Vlastní úroveň, body a zpětná vazba člena (obě větve GET).

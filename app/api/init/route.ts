@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { awardBirthdays } from '@/lib/client';
 import { propadniBody } from '@/lib/propadaniBoduDb';
+import { pripisAutomatickeBody } from '@/lib/automatickeBodyDb';
 import { propadniKredit, oznamPoklesyUrovni } from '@/lib/bodyPravidlaDb';
 import { odesliChybisNam } from '@/lib/reaktivace';
 import { spustAutomatizaceCron } from '@/lib/automatizaceDb';
@@ -2550,6 +2551,9 @@ export async function GET(request: Request) {
     try { poklesyUrovni = await oznamPoklesyUrovni(); } catch { /* nesmí shodit migrace */ }
     // Poukazy: připomenutí konce platnosti podniku i obdarovaným (jednou za platnost, idempotentní).
     try { await pripomenPoukazy(); } catch { /* nesmí shodit migrace */ }
+    // Automatické body zaměstnancům (kolo 8, R8-3): narozeniny, výročí nástupu a týden bez pozdního
+    // příchodu podle points_config.auto; jednou za člověka a událost (auto_key), idempotentní.
+    try { const ab = await pripisAutomatickeBody(); if (ab.dochvilnost || ab.vyroci || ab.narozeniny) console.log('init: automatické body', ab); } catch { /* nesmí shodit migrace */ }
 
     // ---- Kolo 77: nativní obal a obchody (App Store, Google Play) ----
     // Vše idempotentní; kód, který tyhle tabulky čte, je před migrací fail-open.

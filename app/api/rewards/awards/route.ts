@@ -6,6 +6,8 @@ import { audit } from '@/lib/audit';
 import { notifyUser } from '@/lib/push';
 import { pragueToday } from '@/lib/pragueTime';
 import { nastaveniDiku, overDik, zacatekMesice, zbyvaRozdat } from '@/lib/podekovani';
+import { oslavy } from '@/lib/automatickeBody';
+import { clenoveProOslavy } from '@/lib/automatickeBodyDb';
 
 // Pochvaly s body (kolo 5 UX, vzor Bonusly / Connecteam „recognition"): vedení dá člověku body
 // kdykoli s důvodem — ne až při hodnocení směny (to je jedno na den a nese hvězdy). Body se
@@ -60,6 +62,14 @@ async function rozdanoTentoMesic(teamId: number, meId: number): Promise<number> 
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams;
   const limit = Math.max(1, Math.min(100, parseInt(q.get('limit') ?? '') || 30));
+  // GET ?oslavy=1 → { oslavy } — narozeniny a výročí nástupu v týmu dnes a v příštích 7 dnech (kolo 8),
+  // pro widget „Oslavy v týmu" na Přehledu, Domů a tabletu. Jen jména a den, žádný věk.
+  if (q.get('oslavy') === '1') {
+    const c = await pozaduj(null);
+    if (jeOdpoved(c)) return c;
+    const seznam = oslavy(await clenoveProOslavy(c.teamId), pragueToday(), 7);
+    return NextResponse.json({ oslavy: seznam.map(o => ({ userId: o.id, name: o.name, avatar: o.avatar, druh: o.druh, den: o.den, zaDni: o.zaDni, roky: o.roky, ja: o.id === c.meId })) });
+  }
   if (q.get('zed') === '1') {
     const c = await pozaduj(null);
     if (jeOdpoved(c)) return c;
