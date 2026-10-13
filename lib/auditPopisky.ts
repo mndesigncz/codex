@@ -245,7 +245,7 @@ export const OBLASTI_AUDITU: Readonly<Record<string, OblastAuditu>> = {
   team: 'lide', ucet: 'lide', uzivatel: 'lide', zprava: 'lide', nahlaseni: 'lide', tym: 'lide', kiosk: 'lide',
   role: 'lide', schedule: 'lide', volno: 'lide', rozvrh: 'lide', dochazka: 'lide',
   // sklad, dodavatelé, účtenky
-  inventory: 'sklad', supplier: 'sklad', receipt: 'sklad',
+  inventory: 'sklad', supplier: 'sklad', receipt: 'sklad', order: 'sklad',
   // kasa a menu
   pos: 'kasa', menu: 'kasa',
   // uzávěrky
@@ -258,6 +258,8 @@ export const OBLASTI_AUDITU: Readonly<Record<string, OblastAuditu>> = {
   podnik: 'nastaveni', rozlozeni: 'nastaveni', onboarding: 'nastaveni', organization: 'nastaveni', billing: 'nastaveni',
   // akce (výdej a vrácení zboží, oznámení týmu) — samostatná agenda, patří k ostatnímu
   event: 'ostatni',
+  // úkoly a nápady (kolo 7: fotka jako důkaz, zamítnutí s důvodem) — provozní agenda, patří k ostatnímu
+  ukoly: 'ostatni', napady: 'ostatni',
 };
 
 /** Akce, jejichž předpona patří jinam než ony samy (celý klíč má přednost před předponou). */
