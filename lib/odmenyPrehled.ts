@@ -37,6 +37,12 @@ export interface Rozpad {
   zHodnoceni: number; hodnocenychSmen: number; automaticke: number; uPolozek: number; vytek: number;
   /** Body z pochval mimo hodnocení směny (kolo 5) a kolik pochval to bylo. */
   pochvaly: number; pochval: number;
+  /**
+   * Body za uznané „navíc" (kolo 9, N1: point_awards kind 'navic') a kolik zápisů to bylo.
+   * Server je zatím posílá uvnitř `awards` (pochvaly) — jakmile pošle `navicPoints` / `navicCount`
+   * zvlášť, ukáže se řádek „Navíc" sám; do té doby jsou v Pochvalách a součet sedí.
+   */
+  navic: number; navicPocet: number;
 }
 
 export interface Sazebnik { ukol: number; postup: number; uzaverka: number }
@@ -59,6 +65,7 @@ function vyberRozpad(b: any): Rozpad {
     zHodnoceni: cele(b?.reviewPoints), hodnocenychSmen: cele(b?.ratedShifts),
     automaticke: cele(b?.autoPoints), uPolozek: cele(b?.itemPoints), vytek: cele(b?.flagged),
     pochvaly: cele(b?.awards), pochval: cele(b?.awardCount),
+    navic: cele(b?.navicPoints), navicPocet: cele(b?.navicCount),
   };
 }
 
@@ -112,6 +119,8 @@ export function odkudBody(r: Rozpad, s: Sazebnik): RadekBodu[] {
     { klic: 'uzaverky', nazev: 'Uzávěrky', body: r.uzaverky * s.uzaverka, pocet: r.uzaverky, ikona: 'receipt' },
     { klic: 'hodnoceni', nazev: 'Z hodnocení směn', body: r.zHodnoceni + r.automaticke, pocet: r.hodnocenychSmen, ikona: 'star' },
     { klic: 'pochvaly', nazev: 'Pochvaly', body: r.pochvaly, pocet: r.pochval, ikona: 'award' },
+    // Kolo 9: uznané „navíc" jako vlastní řádek — jen když je server posílá zvlášť (jinak jsou v Pochvalách).
+    ...(r.navic !== 0 || r.navicPocet > 0 ? [{ klic: 'navic', nazev: 'Navíc', body: r.navic, pocet: r.navicPocet, ikona: 'sparkle' }] : []),
     // Body u položek jsou i odečtené odměny (záporné řádky ledgeru) — patří do součtu, jinak nesedí s celkem.
     { klic: 'polozky', nazev: 'U položek a za odměny', body: r.uPolozek, pocet: null, ikona: 'gift' },
   ];
@@ -207,7 +216,10 @@ export function dnyHodnoceni(raw: any): DenHodnoceni[] {
     if (!d || it?.kind === 'redemption') continue;
     const x = den(d);
     const vytka = it.flagged === true;
-    x.polozky.push({ druh: String(it.kind ?? ''), id: cele(it.refId), nazev: String(it.label ?? 'Hodnocení'), body: cele(it.points), poznamka: text(it.note), vytka });
+    // Kolo 9: uznané „navíc" přichází jako pochvala s důvodem „Navíc: …" (point_awards kind navic) — vlastní druh s ikonou.
+    const nazev = String(it.label ?? 'Hodnocení');
+    const druh = it.kind === 'award' && /^Navíc: /.test(nazev) ? 'navic' : String(it.kind ?? '');
+    x.polozky.push({ druh, id: cele(it.refId), nazev, body: cele(it.points), poznamka: text(it.note), vytka });
     x.vytka = x.vytka || vytka;
   }
   return Array.from(mapa.values()).sort((a, b) => b.den.localeCompare(a.den));

@@ -3,9 +3,13 @@
 // Detail úkolu: celé zadání na jednom místě (popis, kdo, kdy, priorita, opakování, zdroj, kroky, kdo a kdy ho splnil).
 // Seznam ukazuje jen řádek; tohle okno je pro „co přesně mám udělat" a pro akce, které se do řádku nevejdou.
 // Společné pro Úkoly vedení i zaměstnance — co smí divák udělat, určují předané akce (bez akce se tlačítko nekreslí).
+// Kolo 9 (N1): „Zapsat jako navíc" — úkol, který člověk udělal nad rámec (za kolegu, mimo svůj rozpis), jde
+// jedním klepnutím zapsat jako „navíc" s názvem úkolu a vazbou taskId; vidí ho každý s navic.zapsat.
 
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Button, Chip, Modal } from '../ui';
+import { useSmi } from '../widgety/NavigaceKontext';
+import { ZapsatNavic } from '../navic/ZapsatNavic';
 import { TaskChecklist, recurrenceLabel, type ChecklistItem } from '../TaskChecklist';
 import { ChipPredUzaverkou } from '../PredUzaverkou';
 import { Poznamky } from '../Poznamky';
@@ -13,7 +17,7 @@ import { useT } from '@/lib/i18n/client';
 import { aktualniJazyk } from '@/lib/i18n/stav';
 import { jeHotovy, jePoTerminu, type Ukol } from '@/lib/ukolyPrehled';
 import { postupChecklistu, poCase } from '@/lib/ukolyFiltr';
-import { dayPlus, pragueHM } from '@/lib/pragueTime';
+import { dayPlus, pragueDaySafe, pragueHM } from '@/lib/pragueTime';
 import { fmtHM } from '@/lib/i18n/format';
 
 const prioTon = (p: string): 'bad' | 'wait' | 'muted' => (p === 'high' ? 'bad' : p === 'medium' ? 'wait' : 'muted');
@@ -39,6 +43,8 @@ export function UkolDetail({ ukol, dnes, kdo, navodHref, onClose, onSplnit, onSt
 }) {
   const t = useT('widgety');
   const loc = aktualniJazyk();
+  const smi = useSmi();
+  const [navic, setNavic] = useState(false);
   const hotovo = jeHotovy(ukol);
   const poTerminu = jePoTerminu(ukol, dnes);
   // Kolo 7: dnešní úkol, jehož čas termínu minul (okno je otevřené krátce — stačí čas při vykreslení).
@@ -70,7 +76,13 @@ export function UkolDetail({ ukol, dnes, kdo, navodHref, onClose, onSplnit, onSt
     <Modal open onClose={onClose} size="lg" title={ukol.title}
       subtitle={hotovo ? t('Hotovo') : poTerminu ? t('Po termínu') : t('Čeká na splnění')}
       footer={<>
-        {onSmazat && <Button variant="ghost" icon="trash" className="mr-auto hover:!text-[var(--bad-ink)]" onClick={onSmazat}>{t('Smazat')}</Button>}
+        {/* Vlevo tiché akce (mazání, navíc), vpravo hlavní — na 320 px se patička zalomí, skupina drží pohromadě. */}
+        {(onSmazat || smi('navic.zapsat')) && (
+          <span className="mr-auto flex flex-wrap items-center gap-2">
+            {onSmazat && <Button variant="ghost" icon="trash" className="hover:!text-[var(--bad-ink)]" onClick={onSmazat}>{t('Smazat')}</Button>}
+            {smi('navic.zapsat') && <Button variant="ghost" icon="sparkle" onClick={() => setNavic(true)} data-ukol-navic>{t('Zapsat jako navíc')}</Button>}
+          </span>
+        )}
         {onUpravit && <Button variant="secondary" icon="pencil" onClick={onUpravit}>{t('Upravit')}</Button>}
         {onOdlozit && !hotovo && <Button variant="secondary" icon="clock" onClick={() => onOdlozit(dayPlus(ukol.dueDate && ukol.dueDate > dnes ? ukol.dueDate : dnes, 1))}>{ukol.dueDate && ukol.dueDate > dnes ? t('Odložit o den') : t('Odložit na zítra')}</Button>}
         {onStav && !zamceno && !hotovo && ukol.status !== 'in_progress' && <Button variant="secondary" icon="play" onClick={() => onStav('in_progress')}>{t('Začít')}</Button>}
@@ -124,6 +136,9 @@ export function UkolDetail({ ukol, dnes, kdo, navodHref, onClose, onSplnit, onSt
         {/* Co k úkolu řekli ostatní („dodavatel vozí až po 10:00") — vidí a píše každý, kdo úkol vidí. */}
         <Poznamky typ="task" id={ukol.id} className="pt-2" />
       </div>
+      {/* Okno „navíc" nad detailem: název úkolu jako text, den splnění (nebo dnešek), vazba na úkol. */}
+      <ZapsatNavic open={navic} onClose={() => setNavic(false)}
+        predvolby={{ text: ukol.title, taskId: ukol.id, day: (hotovo && ukol.completedAt && pragueDaySafe(ukol.completedAt)) || dnes }} />
     </Modal>
   );
 }

@@ -12,6 +12,7 @@ export const STRANKA: DefiniceStranky = {
   doporucene: [
     'dochazka.moje_pichacky',
     'moje.nejblizsi_smena',
+    'moje-smeny.navic',
     'uzaverky.predavka',
     'klient.objednavky_od_stolu',
     'klient.dnesni_rezervace',
@@ -43,6 +44,8 @@ export const STRANKA: DefiniceStranky = {
     'typ:zamestnanec': [
       { w: 'dochazka.moje_pichacky', s: 'M' },
       { w: 'moje.nejblizsi_smena', s: 'M' },
+      // Kolo 9 (N1): „Navíc" hned za směnou — zapsat, co bylo nad rámec, je věc konce směny, ne konce měsíce.
+      { w: 'moje-smeny.navic', s: 'M' },
       { w: 'rozvrh.tym_nahled', s: 'M' },
       { w: 'ukoly.dnes', s: 'M' },
       { w: 'postupy.povinne_dnes', s: 'M' },

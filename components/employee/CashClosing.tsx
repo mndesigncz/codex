@@ -18,7 +18,11 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Icon } from '../Icons';
-import { Avatar, Button, Chip, Modal, PageHeader, PlovouciLista, Segmented, SwitchRow } from '../ui';
+import { Avatar, Button, Card, Chip, Modal, PageHeader, PlovouciLista, Segmented, SwitchRow } from '../ui';
+import { ZapsatNavic, type PredvolbyNavic } from '../navic/ZapsatNavic';
+import { NabidkaChipy } from '../navic/NabidkaChipy';
+import { urlNavicMine, useDataNavic } from '../navic/data';
+import type { NabidkaNavic } from '@/lib/navic';
 import {
   Closing, expectedCash, cashDifference, expectedCashLines,
   type Movement, type MovementKind, MOVEMENT_KINDS, movementLabel, sumMovements,
@@ -676,6 +680,15 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
   // Dokud load() nezjistí, kdo formulář vyplňuje (tablet, vedení, směny),
   // dotaz na povinné věci by se ptal za špatného člověka.
   const [zakladNacten, setZakladNacten] = useState(false);
+  // Kolo 9 (N1): po uložené uzávěrce se zeptat „udělal(a) jsi dnes něco navíc?" — zápis jde s closingId
+  // z odpovědi serveru, takže se nic nemusí doposílat a rozepsaný text se neztratí (okno má DiscardGuard).
+  // Na tabletu za vybraného člověka (actingAs), nikdy bez něj.
+  const smiNavic = useSmi();
+  const [navicPoUzaverce, setNavicPoUzaverce] = useState<{ closingId: number | null; day: string } | null>(null);
+  const [oknoNavic, setOknoNavic] = useState<PredvolbyNavic | null>(null);
+  const navicActingAs = isKiosk ? (selEmployee ?? null) : null;
+  const navicData = useDataNavic(navicPoUzaverce && smiNavic('navic.zapsat') && (!isKiosk || navicActingAs) ? urlNavicMine(navicActingAs) : null);
+  const navicZNabidky = (n: NabidkaNavic) => navicPoUzaverce && setOknoNavic({ closingId: navicPoUzaverce.closingId, day: navicPoUzaverce.day, offerId: n.id, text: n.title });
   // Real numbers from the POS (Storyous), when the team connected one.
   const [pos, setPos] = useState<any | null>(null);
   // Counting the drawer by denomination instead of typing one total. When the
@@ -1123,6 +1136,11 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
             : t('Nezapomeň se odpíchnout — jinak se směna uzavře podle času uzávěrky.'))
           : '';
         setMsg((d.approved === false ? t('Uzávěrka odeslána ke schválení vedení.') : zaKolegy ? t('Uzávěrka byla odeslána i za kolegy.') : t('Uzávěrka byla odeslána.')) + dovetek);
+        // Otázka na „navíc" až po uložení: uzávěrka vzniká teprve odesláním a zápis dostane její id rovnou.
+        if (smiNavic('navic.zapsat') && (!isKiosk || selEmployee)) {
+          const idUzaverky = Number(d?.closing?.id);
+          setNavicPoUzaverce({ closingId: Number.isInteger(idUzaverky) && idUzaverky > 0 ? idUzaverky : null, day: form.date });
+        }
         // Widgety na ploše (Moje uzávěrka, Moje uzávěrky, Předávka) čtou tytéž URL.
         obnovDataWidgetu('/api/closings');
         obnovDataWidgetu('/api/closings/handover');
@@ -1240,6 +1258,27 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
           <Icon name="check" size={17} className="shrink-0" /> {msg}
         </p>
       )}
+      {navicPoUzaverce && (
+        <Card as="section" aria-labelledby="navic-po-uzaverce" data-navic-po-uzaverce className="space-y-3">
+          <div className="flex items-start gap-3">
+            <span aria-hidden className="shrink-0 grid h-6 w-6 place-items-center rounded-xl bg-ok/15 text-ok-ink"><Icon name="sparkle" size={14} /></span>
+            <div className="min-w-0 flex-1">
+              <h2 id="navic-po-uzaverce" className="t-card">{t('Udělal(a) jsi dnes něco navíc?')}</h2>
+              <p className="t-meta mt-0.5 text-pretty">{t('Zapiš to k téhle uzávěrce — vedení to uvidí a může to ocenit.')}</p>
+            </div>
+          </div>
+          {navicData.data && navicData.data.nabidka.length > 0 && (
+            <NabidkaChipy nabidka={navicData.data.nabidka} dnesniZapisy={navicData.data.items.filter(z => z.day === navicPoUzaverce.day)}
+              onVyber={navicZNabidky} money={money} velke={isKiosk} />
+          )}
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" icon="pencil" onClick={() => setOknoNavic({ closingId: navicPoUzaverce.closingId, day: navicPoUzaverce.day })}>{t('Napsat vlastní')}</Button>
+            <Button variant="ghost" onClick={() => setNavicPoUzaverce(null)}>{t('Dnes nic')}</Button>
+          </div>
+        </Card>
+      )}
+      <ZapsatNavic open={oknoNavic != null} onClose={() => setOknoNavic(null)} predvolby={oknoNavic} actingAs={navicActingAs}
+        onUlozeno={() => setNavicPoUzaverce(null)} />
       {err && (
         <p className="note note-danger text-sm flex items-center gap-2" role="alert">
           <Icon name="warning" size={17} className="shrink-0" /> {err}

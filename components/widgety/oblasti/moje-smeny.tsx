@@ -28,10 +28,17 @@
 //    (dřív /api/rewards, které člověku s odmeny.zebricek reviews nevracelo);
 //  - moje.schvalene_volno — dřív ručně modré pilulky jen se schváleným volnem.
 //    Teď i čekající žádosti (čekání je taky informace) a rozsah s typem.
+//
+// Kolo 9 (N1, balík Z) — „Navíc":
+//  - moje-smeny.navic — vlastní zápisy toho, co bylo nad rámec směny, body a nabídka
+//    vedení (komponenta components/navic/NavicWidget, okno components/navic/ZapsatNavic);
+//  - Nejbližší směna (když už běží) a Minulé směny mají akci „Navíc" → okno se směnou
+//    a jejím dnem; u směny chip „navíc: 2", když k ní zápisy jsou. GET ?shiftId= po jedné
+//    směně by byl drahý — bere se jedna odpověď vlastních zápisů za 60 dní a počítá se tady.
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useSession } from 'next-auth/react';
-import { Chip, ListRow, Stat, StatRow } from '../../ui';
+import { Button, Chip, ListRow, Stat, StatRow } from '../../ui';
 import { Icon } from '../../Icons';
 import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
 import { Widget, type StavNacteni } from '../Widget';
@@ -47,6 +54,10 @@ import {
   den as denZ, denKratce as denKratceCs, dnuVolna, hodinyText, kategorieBarvy, kolegoveKeSmene, minuleSmeny, mojeCisla, popisekTypu,
   TYP_VOLNA, zadostiVolna, type ZadostVolna,
 } from '@/lib/rozvrhPrehled';
+import { NavicWidget } from '../../navic/NavicWidget';
+import { pocetNavicKeSmene } from '../../navic/logika';
+import { ZapsatNavic, type PredvolbyNavic } from '../../navic/ZapsatNavic';
+import { urlNavicMine, useDataNavic } from '../../navic/data';
 
 // ---------------------------------------------------------------------------
 // Pomocníci (záměrně v souboru — oblast je samostatný líný kus s jedním vlastníkem)
@@ -90,6 +101,20 @@ function rozsahVolna(od: string, doDne: string): string {
   if (!doDne || od === doDne) return f(od, true);
   if (od.slice(0, 4) === doDne.slice(0, 4)) return `${f(od, false)} – ${f(doDne, true)}`;
   return `${f(od, true)} – ${f(doDne, true)}`;
+}
+
+/**
+ * Zápisy „navíc" ke směnám (kolo 9): jedna odpověď vlastních zápisů za 60 dní a počet
+ * ke směně podle shiftId, nebo podle dne, když zápis směnu nenese (zapsaný z Domů).
+ * Bez navic.zapsat se dotaz neposílá a akce „Navíc" se nekreslí.
+ */
+function useNavicKeSmenam(zapnuto: boolean): { pocet: (s: { id?: number; date: string }) => number; smi: boolean; nacteno: boolean } {
+  const smi = useSmi();
+  const smiZapsat = zapnuto && smi('navic.zapsat');
+  const data = useDataNavic(smiZapsat ? urlNavicMine() : null);
+  const items = data.data?.items ?? [];
+  const pocet = (s: { id?: number; date: string }) => pocetNavicKeSmene(items, s);
+  return { pocet, smi: smiZapsat && data.data?.smi.zapsat !== false, nacteno: !!data.data };
 }
 
 // Typ směny nese kategorie, ne stavová barva (ScheduleBuilder, COLORS → cat-dot).
@@ -148,6 +173,9 @@ function NejblizsiSmena({ velikost, nahled }: WidgetProps) {
   const typ = prvni ? (POPISEK_TYPU[String(prvni.s.typeLabel ?? '')] ? t(POPISEK_TYPU[String(prvni.s.typeLabel ?? '')]) : prvni.s.typeLabel ?? null) : null;
   const kat = prvni ? KATEGORIE_BARVY[String(prvni.s.typeColor ?? '').toLowerCase()] ?? null : null;
   const cas = prvni ? (prvni.do ? `${prvni.od}–${prvni.do}` : prvni.od) : '';
+  // Kolo 9: běžící směna nabídne „Navíc" — co bylo nad rámec, se zapisuje ještě na směně, ne večer z paměti.
+  const navic = useNavicKeSmenam(!S && !nahled && probiha);
+  const [oknoNavic, setOknoNavic] = useState<PredvolbyNavic | null>(null);
 
   return (
     <Widget
@@ -182,8 +210,17 @@ function NejblizsiSmena({ velikost, nahled }: WidgetProps) {
               {t('Potom')} <span className="tabular-nums">{denVetou(dalsi.den)}{dalsi.od ? `, ${dalsi.od}${dalsi.do ? `–${dalsi.do}` : ''}` : ''}</span>
             </p>
           )}
+          {probiha && navic.smi && (
+            <div className="flex flex-wrap items-center gap-2 pt-1" data-navic-smeny>
+              <Button variant="secondary" size="sm" icon="sparkle" onClick={() => setOknoNavic({ day: prvni.den, shiftId: prvni.s.id ?? null })}>{t('Navíc')}</Button>
+              {navic.pocet({ id: prvni.s.id, date: prvni.den }) > 0 && (
+                <Chip tone="muted" size="sm" icon="sparkle">{t('navíc: {n}', { n: navic.pocet({ id: prvni.s.id, date: prvni.den }) })}</Chip>
+              )}
+            </div>
+          )}
         </div>
       ))}
+      <ZapsatNavic open={oknoNavic != null} onClose={() => setOknoNavic(null)} predvolby={oknoNavic} />
     </Widget>
   );
 }
@@ -229,13 +266,16 @@ function SmenyPrehled({ velikost, nahled }: WidgetProps) {
 // Minulé směny
 // ---------------------------------------------------------------------------
 
-function MinuleSmeny({ velikost }: WidgetProps) {
+function MinuleSmeny({ velikost, nahled }: WidgetProps) {
   const t = useT('widgety');
   const ja = useJa(t);
   const data = useDataWidgetu(ja.id != null ? `/api/shifts?employeeId=${ja.id}` : null, vyberSmeny);
   const dnes = pragueToday();
   const minule = useMemo(() => minuleSmeny((data.data ?? []).map((s, i) => ({ id: s.id ?? i, ...s })), dnes), [data.data, dnes]);
   const limit = velikost === 'L' ? 20 : 5;
+  // Kolo 9: „Navíc" u minulé směny — zaměstnanec smí zapsat nejvýš 14 dní zpětně (hlídá okno i server).
+  const navic = useNavicKeSmenam(!nahled);
+  const [oknoNavic, setOknoNavic] = useState<PredvolbyNavic | null>(null);
 
   return (
     <Widget
@@ -246,16 +286,25 @@ function MinuleSmeny({ velikost }: WidgetProps) {
       <ul className="list">
         {minule.slice(0, limit).map(s => {
           const kat = kategorieBarvy(s.typeColor);
+          const pocetNavic = navic.smi ? navic.pocet(s) : 0;
           return (
-            <ListRow key={s.id}
+            <ListRow key={s.id} akceVRadku
               title={<span className="cz-sentence">{denKratceRadek(denZ(s.date), dnes, t)}</span>}
               meta={<><span aria-hidden className={`inline-block h-2 w-2 rounded-full align-middle mr-1.5 ${kat ? `cat-dot-${kat}` : 'bg-black/15'}`} />{t(popisekTypu(s))} · <span className="tabular-nums">{fmtHM(s.startTime ?? s.start_time)}–{fmtHM(s.endTime ?? s.end_time)}</span></>}
-              right={s.rating ? <Chip tone="ok" size="sm" icon="star">{s.rating}/5</Chip> : <Chip tone="muted" size="sm">{t('Bez hodnocení')}</Chip>}
+              right={<>
+                {pocetNavic > 0 && <Chip tone="muted" size="sm" icon="sparkle" className="mr-1">{t('navíc: {n}', { n: pocetNavic })}</Chip>}
+                {s.rating ? <Chip tone="ok" size="sm" icon="star">{s.rating}/5</Chip> : <Chip tone="muted" size="sm">{t('Bez hodnocení')}</Chip>}
+              </>}
+              actions={navic.smi ? (
+                <Button variant="ghost" size="sm" iconOnly icon="sparkle" aria-label={t('Zapsat navíc ke směně {den}', { den: denKratceRadek(denZ(s.date), dnes, t) })}
+                  title={t('Zapsat navíc')} onClick={() => setOknoNavic({ day: denZ(s.date), shiftId: typeof s.id === 'number' && s.id > 0 ? s.id : null })} />
+              ) : undefined}
             />
           );
         })}
       </ul>
       {minule.length > limit && <p className="t-meta mt-2">{t('…a dalších {n}', { n: (minule.length - limit).toLocaleString('cs-CZ') })}</p>}
+      <ZapsatNavic open={oknoNavic != null} onClose={() => setOknoNavic(null)} predvolby={oknoNavic} />
     </Widget>
   );
 }
@@ -330,4 +379,5 @@ export const KOMPONENTY: Record<string, KomponentaWidgetu> = {
   'moje.smeny_prehled': SmenyPrehled,
   'moje.minule_smeny': MinuleSmeny,
   'moje.schvalene_volno': SchvaleneVolno,
+  'moje-smeny.navic': NavicWidget,
 };
