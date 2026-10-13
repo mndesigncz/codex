@@ -2203,5 +2203,14 @@
   "Kolik dnešek stojí na lidech: náklad odpracovaného času do teď proti dnešní tržbě z pokladny, odhad do konce plánu; ve střední kartě lidé na směně s nákladem.": "Ile dzisiejszy dzień kosztuje w ludziach: koszt przepracowanego czasu do teraz wobec dzisiejszego utargu z kasy, szacunek do końca planu; w średniej karcie osoby na zmianie z kosztem.",
   "Náklad do teď": "Koszt do teraz",
   "{podil} % z dnešní tržby {castka}": "{podil} % dzisiejszego utargu {castka}",
-  "{podil} % z tržby": "{podil} % utargu"
+  "{podil} % z tržby": "{podil} % utargu",
+  "na hodinu práce": "na godzinę pracy",
+  "Tržba na hodinu práce": "Utarg na godzinę pracy",
+  "Tržba na hodinu práce po dnech v týdnu": "Utarg na godzinę pracy według dni tygodnia",
+  "nejslabší {den} · {castka} na hodinu": "najsłabszy {den} · {castka} na godzinę",
+  "Na člověka a hodinu": "Na osobę i godzinę",
+  "Tržba na člověka a hodinu po hodinách": "Utarg na osobę i godzinę według godzin",
+  "{castka} na člověka": "{castka} na osobę",
+  "nikdo na směně": "nikt na zmianie",
+  "nejslabší hodina {h}:00 · {castka} na člověka": "najsłabsza godzina {h}:00 · {castka} na osobę"
 }

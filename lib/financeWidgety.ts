@@ -228,11 +228,17 @@ export interface FinanceMesice {
     fixedCostsSet: boolean;
     stockValue: number; stockTop: { name: string; value: number }[];
     laborTargetPct: number | null; closingsCount: number; mzdySkryte: boolean;
+    /** Odpracované hodiny započítané do mezd za měsíc a za minulý měsíc (kolo 8); starší server = 0. */
+    wagesHours: number; prevWagesHours: number;
   };
   hoste: { orders: number; total: number; offPos: number; offPosTotal: number; members: number; newMembers: number; couponsRedeemed: number };
+  /** Dny v týdnu (0 = pondělí): tržba z uzávěrek, dny s uzávěrkou, odpracované hodiny — vždy sedm řádků. */
+  dnyVTydnu: DenTydneFinanci[];
   kniha: RadekKnihy[];
   postrehy: RadaSIkonou[];
 }
+
+export interface DenTydneFinanci { poradi: number; trzba: number; dnu: number; hodiny: number }
 
 export function vyberFinance(raw: any): FinanceMesice {
   if (!raw || typeof raw !== 'object' || !raw.summary || typeof raw.summary !== 'object') throw new Error('Finance přišly v nečekaném tvaru.');
@@ -251,11 +257,16 @@ export function vyberFinance(raw: any): FinanceMesice {
       laborTargetPct: nebo(s.laborTargetPct),
       closingsCount: cis(s.closingsCount),
       mzdySkryte: s.mzdySkryte === true,
+      wagesHours: cis(s.wagesHours), prevWagesHours: cis(s.prevWagesHours),
     },
     hoste: {
       orders: cis(g.orders), total: cis(g.total), offPos: cis(g.offPos), offPosTotal: cis(g.offPosTotal),
       members: cis(g.members), newMembers: cis(g.newMembers), couponsRedeemed: cis(g.couponsRedeemed),
     },
+    dnyVTydnu: Array.from({ length: 7 }, (_, i) => {
+      const w = Array.isArray(raw.weekdays) ? raw.weekdays.find((x: any) => Number(x?.wd) === i) : null;
+      return { poradi: i, trzba: cis(w?.revenue), dnu: cis(w?.days), hodiny: cis(w?.hours) };
+    }),
     kniha: Array.isArray(raw.ledger) ? raw.ledger.map((r: any) => ({
       date: text(r?.date), kind: text(r?.kind), label: text(r?.label), amount: cis(r?.amount),
       receiptId: r?.receiptId != null ? Number(r.receiptId) : undefined, photoUrl: r?.photoUrl ?? null, note: r?.note ?? null,
@@ -285,6 +296,33 @@ export function podilMezd(f: FinanceMesice): { podil: number; cil: number | null
   const podil = Math.round((mzdyMesice(f) / f.souhrn.revenue) * 100);
   const cil = f.souhrn.laborTargetPct;
   return { podil, cil, nadCilem: cil == null ? null : podil > cil };
+}
+
+/**
+ * Tržba na odpracovanou hodinu (SPLH): celé jednotky měny; null bez hodin nebo se skrytými mzdami
+ * (bez finance.mzdy API hodiny neposílá — nula by tvrdila, že nikdo nepracoval).
+ */
+export function trzbaNaHodinu(trzba: number, hodiny: number): number | null {
+  if (!(hodiny > 0) || !(trzba >= 0)) return null;
+  return Math.round(trzba / hodiny);
+}
+
+export interface KcNaHodinuDne { poradi: number; kcH: number | null; nejslabsi: boolean }
+
+/**
+ * Kč na hodinu práce po dnech v týdnu (pondělí první), nejslabší den z těch, které hodiny i tržbu mají,
+ * je označený — „v úterý odpoledne je obsluhy moc" se tak vidí na jeden pohled.
+ */
+export function kcNaHodinuPoDnech(f: Pick<FinanceMesice, 'dnyVTydnu' | 'souhrn'>): KcNaHodinuDne[] {
+  if (f.souhrn.mzdySkryte) return f.dnyVTydnu.map(d => ({ poradi: d.poradi, kcH: null, nejslabsi: false }));
+  const radky = f.dnyVTydnu.map(d => ({ poradi: d.poradi, kcH: d.dnu > 0 ? trzbaNaHodinu(d.trzba, d.hodiny) : null, nejslabsi: false }));
+  const sHodnotou = radky.filter(r => r.kcH != null && r.kcH > 0);
+  if (sHodnotou.length >= 2) {
+    const min = Math.min(...sHodnotou.map(r => r.kcH as number));
+    const prvni = radky.find(r => r.kcH === min);
+    if (prvni) prvni.nejslabsi = true;
+  }
+  return radky;
 }
 
 /** Kam šly peníze: nákupy, výdaje z kasy a mzdy (jen když nejsou skryté); nuly vypadnou. */

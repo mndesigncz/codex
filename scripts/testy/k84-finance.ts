@@ -6,7 +6,7 @@
 // nula), odhad do konce plánu jen u lidí, kteří ještě mají přijít.
 
 import type { Testy } from './_testy.ts';
-import { mzdyDnes, podilNakladu, vyberDochazkuDnes } from '../../lib/financeWidgety.ts';
+import { kcNaHodinuPoDnech, mzdyDnes, podilNakladu, trzbaNaHodinu, vyberDochazkuDnes, vyberFinance } from '../../lib/financeWidgety.ts';
 
 const DNES = '2026-10-13';
 /** Pražský okamžik dne DNES v „HH:MM" jako ISO v UTC (říjen = letní čas, +02:00). */
@@ -56,4 +56,25 @@ export default function ({ eq, ok }: Testy) {
   // ---- podíl na tržbě ----
   eq('podíl nákladu: celá %, bez tržby null (nula by tvrdila, že lidé nic nestojí)', [podilNakladu(1400, 7000), podilNakladu(1400, 0), podilNakladu(0, 5000)], [20, null, 0]);
   ok('mzdy dnes: prázdný roster = nic', (() => { const x = mzdyDnes({ roster: [], entries: [] }, TED, DNES); return x.naklad === 0 && x.lide.length === 0 && x.doKonce === 0; })());
+
+  // ---- tržba na hodinu práce (SPLH) ----
+  eq('Kč/h: celé jednotky; bez hodin null (ne nekonečno, ne nula)', [trzbaNaHodinu(184320, 148.6), trzbaNaHodinu(1000, 0), trzbaNaHodinu(0, 10)], [1240, null, 0]);
+  const fin = vyberFinance({
+    month: '2026-10',
+    summary: { revenue: 184320, prevRevenue: 171450, wagesWorked: 48200, wagesCash: 0, purchases: 0, gross: 0, mzdySkryte: false, wagesHours: 148.6, prevWagesHours: 152 },
+    weekdays: [
+      { wd: 0, revenue: 20800, days: 4, hours: 20 }, { wd: 1, revenue: 16400, days: 4, hours: 20 }, { wd: 2, revenue: 23600, days: 4, hours: 20 },
+      { wd: 3, revenue: 25000, days: 4, hours: 20 }, { wd: 4, revenue: 32560, days: 4, hours: 22 }, { wd: 5, revenue: 38880, days: 3, hours: 24 },
+      // Neděle: zavřeno (bez uzávěrek) — nemá Kč/h, ne nulu.
+      { wd: 6, revenue: 0, days: 0, hours: 0 },
+    ],
+  });
+  eq('finance: hodiny a dny v týdnu se vyberou (sedm řádků, pondělí první)', [fin.souhrn.wagesHours, fin.souhrn.prevWagesHours, fin.dnyVTydnu.length, fin.dnyVTydnu[0].trzba, fin.dnyVTydnu[6].dnu], [148.6, 152, 7, 20800, 0]);
+  const stary = vyberFinance({ month: '2026-10', summary: { revenue: 1, mzdySkryte: false } });
+  eq('finance: starší server bez hodin a dnů — nuly, sedm prázdných řádků, Kč/h null', [stary.souhrn.wagesHours, stary.dnyVTydnu.length, trzbaNaHodinu(stary.souhrn.revenue, stary.souhrn.wagesHours)], [0, 7, null]);
+  const dny = kcNaHodinuPoDnech(fin);
+  eq('Kč/h po dnech: úterý je nejslabší, neděle bez dat je null a nejslabší není', [dny.map(d => d.kcH), dny.findIndex(d => d.nejslabsi)], [[1040, 820, 1180, 1250, 1480, 1620, null], 1]);
+  eq('Kč/h po dnech: se skrytými mzdami nic (role bez finance.mzdy)', kcNaHodinuPoDnech({ ...fin, souhrn: { ...fin.souhrn, mzdySkryte: true } }).every(d => d.kcH == null && !d.nejslabsi), true);
+  eq('Kč/h po dnech: jeden den s hodnotou nemá nejslabšího (není s čím srovnat)',
+    kcNaHodinuPoDnech({ ...fin, dnyVTydnu: fin.dnyVTydnu.map((d, i) => (i === 0 ? d : { ...d, dnu: 0, hodiny: 0 })) }).filter(d => d.nejslabsi).length, 0);
 }

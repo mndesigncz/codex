@@ -36,9 +36,10 @@ import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
 import { widget } from '@/lib/widgety/katalog';
 import { mesicZVolby } from '@/lib/widgety/katalog/finance';
 import {
-  kamSlyPenize, mzdyDnes, mzdyMesice, podilMezd, podilNakladu, urlFinanci, vyberDochazkuDnes, vyberFinance, zmenaProti as zmena,
-  type FinanceMesice,
+  kamSlyPenize, kcNaHodinuPoDnech, mzdyDnes, mzdyMesice, podilMezd, podilNakladu, trzbaNaHodinu, urlFinanci, vyberDochazkuDnes,
+  vyberFinance, zmenaProti as zmena, type FinanceMesice,
 } from '@/lib/financeWidgety';
+import { fmtDenVTydnu } from '@/lib/i18n/format';
 import { useT } from '@/lib/i18n/client';
 import { aktualniJazyk } from '@/lib/i18n/stav';
 import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
@@ -226,6 +227,24 @@ function TrzbyVsMzdy({ velikost, nastaveni }: WidgetProps<{ mesic: string }>) {
   const cil = pm?.cil ?? null;
   const nad = pm?.nadCilem === true;
   const trend = s ? zmena(s.revenue, s.prevRevenue) : null;
+  // Tržba na hodinu práce (kolo 8, R8-4): SPLH jako Toast a 7shifts. Podíl mezd skáče se sazbami, Kč/h říká,
+  // jestli je obsluhy moc. Šipka proti minulému měsíci; po dnech v týdnu ve střední kartě.
+  const kcH = s && !s.mzdySkryte ? trzbaNaHodinu(s.revenue, s.wagesHours) : null;
+  const kcHMinule = s && !s.mzdySkryte ? trzbaNaHodinu(s.prevRevenue, s.prevWagesHours) : null;
+  const zmenaKcH = kcH != null && kcHMinule != null && kcHMinule > 0 ? zmena(kcH, kcHMinule) : null;
+  const poDnech = useMemo(() => (f ? kcNaHodinuPoDnech(f) : []), [f]);
+  const jazyk = aktualniJazyk();
+  const nejslabsi = poDnech.find(d => d.nejslabsi) ?? null;
+  const radekKcH = kcH != null ? (
+    <p className="t-meta mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1">
+      <span><span className="font-semibold tabular-nums text-[#16181A]">{money(kcH)}</span> {t('na hodinu práce')}</span>
+      {zmenaKcH != null && (
+        <span className={`tabular-nums font-medium ${zmenaKcH >= 0 ? 'text-ok-ink' : 'text-wait-ink'}`} aria-label={t('{zmena} proti minulému měsíci', { zmena: sZnamenkem(zmenaKcH) })}>
+          {zmenaKcH >= 0 ? '↑' : '↓'} {sZnamenkem(zmenaKcH)}
+        </span>
+      )}
+    </p>
+  ) : null;
 
   let prazdno: ReactNode | undefined;
   if (f && s?.mzdySkryte) prazdno = <p className="t-meta">{t('Mzdy vidí jen role s oprávněním na mzdy.')}</p>;
@@ -235,7 +254,10 @@ function TrzbyVsMzdy({ velikost, nastaveni }: WidgetProps<{ mesic: string }>) {
     <Widget nacteni={ceka ? CEKA : data} kostra={velikost === 'S' ? 'cislo' : 'seznam'} prazdno={prazdno}
       doplnek={podil != null && cil != null ? <Chip tone={nad ? 'bad' : 'ok'} size="sm">{nad ? t('nad cílem') : t('v cíli')}</Chip> : undefined}>
       {s && podil != null && (velikost === 'S' ? (
-        <Stat label={t('Mzdy z tržeb')} value={`${podil} %`} note={cil != null ? t('cíl {cil} %', { cil }) : t('cíl podniku není nastavený')} />
+        <div>
+          <Stat label={t('Mzdy z tržeb')} value={`${podil} %`} note={cil != null ? t('cíl {cil} %', { cil }) : t('cíl podniku není nastavený')} />
+          {radekKcH}
+        </div>
       ) : (
         <div className="space-y-4">
           <div>
@@ -254,6 +276,23 @@ function TrzbyVsMzdy({ velikost, nastaveni }: WidgetProps<{ mesic: string }>) {
             <Stat label={t('Tržby')} value={money(s.revenue)} note={trend != null ? t('{zmena} proti minulému', { zmena: sZnamenkem(trend) }) : undefined} />
             <Stat label={t('Mzdy')} value={money(mzdy)} note={s.wagesWorked > 0 ? t('z docházky × sazby') : t('z denních výplat')} />
           </StatRow>
+          {kcH != null && (
+            <div>
+              <p className="t-label">{t('Tržba na hodinu práce')}</p>
+              {radekKcH}
+              {poDnech.some(d => d.kcH != null) && (
+                <div className="mt-2">
+                  {/* Po–Ne průměr tržby na hodinu; nejslabší den zvýrazněný — tam je obsluhy nejvíc na tržbu. */}
+                  <BarSpark height={44} showLabels highlight={nejslabsi ? nejslabsi.poradi : undefined}
+                    label={t('Tržba na hodinu práce po dnech v týdnu')}
+                    data={poDnech.map(d => ({ value: d.kcH, label: fmtDenVTydnu(d.poradi, { jazyk }), tip: `${fmtDenVTydnu(d.poradi, { jazyk, styl: 'dlouhy' })}: ${d.kcH != null ? money(d.kcH) : '—'}` }))} />
+                  {nejslabsi && nejslabsi.kcH != null && (
+                    <p className="t-meta mt-1 cz-sentence">{t('nejslabší {den} · {castka} na hodinu', { den: fmtDenVTydnu(nejslabsi.poradi, { jazyk, styl: 'dlouhy' }), castka: money(nejslabsi.kcH) })}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       ))}
     </Widget>

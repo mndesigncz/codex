@@ -63,7 +63,8 @@ const data = (opts = {}) => (req, json) => {
   if (req.method() !== 'GET') return undefined;
   if (opts.chyby?.[path]) return json({ error: 'Server spadl' }, opts.chyby[path]);
   if (path === '/api/attendance') return json(nacti('k84-finance-attendance'));
-  if (path === '/api/finance') return json(opts.finance ? opts.finance(u) : { ...nacti('k69-b5b-finance'), month: u.searchParams.get('month') ?? MESIC });
+  if (path === '/api/finance') return json(opts.finance ? opts.finance(u) : { ...nacti('k84-finance-finance'), month: u.searchParams.get('month') ?? MESIC });
+  if (path === '/api/pos/insights') return json(nacti('k84-finance-pos-insights'));
   if (path === '/api/finance/advice') return json(nacti('k69-b5b-finance-advice'));
   if (path === '/api/pos/daily') return json(opts.daily ? opts.daily(u) : nacti('k69-b5b-pos-daily'));
   if (path === '/api/pos/margins') return json(nacti('k69-b5b-pos-margins'));
@@ -112,6 +113,32 @@ if (casti.includes('A')) {
     await dokud(async () => /Náklad do teď/.test(await text(p, 'finance.mzdy_dnes')), 6000);
     const s = await text(p, 'finance.mzdy_dnes', 0);
     tvrdi('A nepropojená pokladna: náklad 1 400 Kč zůstává, místo procenta „pokladna není propojená"', /1 400 Kč/.test(s) && /pokladna není propojená/.test(s), s.slice(0, 160));
+    await ctx.close();
+  }
+}
+
+// ===========================================================================
+// B) Tržba na hodinu práce
+// ===========================================================================
+if (casti.includes('B')) {
+  for (const [jmeno, viewport, mobil] of [['telefon', TELEFON, true], ['monitor', MONITOR, false]]) {
+    const { ctx, p, chyby } = await kontext({ viewport, mobil, fix: nacti('k84-finance-rozlozeni-finance'), dalsi: data() });
+    await otevri(p, '/employer/overview?view=finance', 'vedeni.finance');
+    await dokud(async () => /na hodinu práce/.test(await text(p, 'finance.trzby_vs_mzdy')), 8000);
+    await p.waitForTimeout(400);
+    const s = await text(p, 'finance.trzby_vs_mzdy', 0);
+    // 184 320 Kč / 148,6 h = 1 240 Kč/h; minulý měsíc 171 450 / 152 = 1 128 → +10 %.
+    tvrdi(`B ${jmeno}: malá karta Tržby vs. mzdy má druhé číslo 1 240 Kč na hodinu práce se šipkou +10 %`, /1 240 Kč na hodinu práce/.test(s) && /↑ \+10 %/.test(s), s.slice(0, 200));
+    const m = await text(p, 'finance.trzby_vs_mzdy', 1);
+    tvrdi(`B ${jmeno}: střední karta má graf po dnech v týdnu a jmenuje nejslabší úterý (820 Kč)`, /nejslabší úterý · 820 Kč na hodinu/i.test(m), m.slice(0, 400));
+    const sloupku = await p.locator('[data-plocha] li[data-widget="finance.trzby_vs_mzdy"]').nth(1).getByRole('group', { name: /po dnech v týdnu/ }).count();
+    tvrdi(`B ${jmeno}: graf Po–Ne je přístupný (skupina s popiskem a skrytým seznamem hodnot)`, sloupku === 1, String(sloupku));
+    const h = await text(p, 'trzby.hodiny');
+    tvrdi(`B ${jmeno}: Špičky během dne (měsíc s obsazením) mají řádek Na člověka a hodinu s nejslabší hodinou`, /Na člověka a hodinu/i.test(h) && /nejslabší hodina 19:00 · 325 Kč na člověka/.test(h), h.slice(0, 400));
+    const pre = (await pretece(p, 'finance.trzby_vs_mzdy')) || (await pretece(p, 'trzby.hodiny'));
+    tvrdi(`B ${jmeno}: nic nepřetéká`, !pre, pre);
+    tvrdi(`B ${jmeno}: žádná chyba v konzoli`, chyby.filter(c => !/418|423|425/.test(c)).length === 0, chyby.slice(0, 2).join(' | '));
+    await snimek(p, `B-finance-${jmeno}`);
     await ctx.close();
   }
 }

@@ -8,7 +8,7 @@ import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { neon } from '@neondatabase/serverless';
 import { cashDifference, normalizeMovements } from '@/lib/closing';
 import { pragueToday, pragueDaySafe } from '@/lib/pragueTime';
-import { wagesTotal } from '@/lib/wages';
+import { countsTowardWages, wagesTotal } from '@/lib/wages';
 import { menaPodniku } from '@/lib/menaPodniku';
 import { hodnotaZasobTymu } from '@/lib/hodnotaZasobDb';
 import { normName } from '@/lib/menuPos';
@@ -227,26 +227,49 @@ export async function GET(req: NextRequest) {
   ledger.sort((a, b) => b.date.localeCompare(a.date));
 
   // ---- Wages from attendance × hourly rates (the payroll view of labour). ----
-  let wagesWorked = 0;
+  // Kolo 8 (R8-4): k částce i odpracované hodiny (tržba na hodinu práce — SPLH jako Toast
+  // a 7shifts) za tento i minulý měsíc a po dnech v týdnu. Hodiny jen ze záznamů, které
+  // se počítají do mezd (lib/wages): zapomenuté odpíchnutí není osm hodin práce.
+  let wagesWorked = 0, wagesHours = 0, prevWagesHours = 0;
+  const hoursByWeekday = new Array(7).fill(0);
   if (mzdy) try {
     // Sazba z členství v podniku ZÁZNAMU, ne ze zrcadla (kolo 62): člen
     // přepnutý jinam by měl mzdu z cizí sazby nebo 0. Stejný výraz jako
     // Přehled organizace, ať dají totéž číslo.
-    const entries = await sql`
+    const nactiZaznamy = (mesic: string) => sql`
       SELECT te.clock_in, te.clock_out,
+             to_char((te.clock_in AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD') AS den,
              CASE WHEN m.user_id IS NOT NULL THEN COALESCE(m.hourly_rate, 0)
                   WHEN us.team_id = te.team_id THEN COALESCE(us.hourly_rate, 0) ELSE 0 END AS hourly_rate
       FROM time_entries te
       JOIN users us ON us.id = te.employee_id
       LEFT JOIN team_members m ON m.user_id = te.employee_id AND m.team_id = te.team_id
       WHERE te.team_id = ${u.team_id} AND te.clock_out IS NOT NULL
-        AND to_char((te.clock_in AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM') = ${month}`;
-    // Jedno pravidlo pro celou aplikaci — viz lib/wages.
-    wagesWorked = wagesTotal((entries as any[]).map(e => ({
+        AND to_char((te.clock_in AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM') = ${mesic}`;
+    const entries = await nactiZaznamy(month);
+    const radky = (entries as any[]).map(e => ({
       ms: new Date(e.clock_out).getTime() - new Date(e.clock_in).getTime(),
-      rate: num(e.hourly_rate),
-    }))).total;
+      rate: num(e.hourly_rate), den: String(e.den),
+    }));
+    // Jedno pravidlo pro celou aplikaci — viz lib/wages.
+    wagesWorked = wagesTotal(radky).total;
+    for (const r of radky) {
+      if (!countsTowardWages(r.ms, r.rate)) continue;
+      const h = r.ms / 3600000;
+      wagesHours += h;
+      hoursByWeekday[(new Date(r.den + 'T12:00:00Z').getUTCDay() + 6) % 7] += h;
+    }
+    const prevEntries = await nactiZaznamy(prevMonth);
+    for (const e of prevEntries as any[]) {
+      const ms = new Date(e.clock_out).getTime() - new Date(e.clock_in).getTime();
+      if (countsTowardWages(ms, num(e.hourly_rate))) prevWagesHours += ms / 3600000;
+    }
   } catch { /* ignore */ }
+  // Dny v týdnu (pondělí = 0): tržba z uzávěrek, počet dní s uzávěrkou a odpracované hodiny — widget z toho spočítá Kč/h.
+  const weekdays = Array.from({ length: 7 }, (_, i) => {
+    const wd = byWeekday.get((i + 1) % 7) ?? { total: 0, n: 0 };
+    return { wd: i, revenue: wd.total, days: wd.n, hours: Math.round(hoursByWeekday[i] * 10) / 10 };
+  });
 
   const spent = (kind: string) => ledger.filter((r) => r.kind === kind).reduce((s, r) => s + r.amount, 0);
   const purchases = spent('receipt') + spent('order') + spent('expense');
@@ -402,6 +425,8 @@ export async function GET(req: NextRequest) {
     summary: {
       revenue, cash, card, tips,
       purchases, wagesCash, wagesWorked, totalOut,
+      // Kolo 8 (R8-4): odpracované hodiny (jen s finance.mzdy, jinak 0) pro tržbu na hodinu práce.
+      wagesHours: Math.round(wagesHours * 10) / 10, prevWagesHours: Math.round(prevWagesHours * 10) / 10,
       gross,
       fixedCosts, net, fixedCostsSet,
       stockValue,
@@ -414,6 +439,7 @@ export async function GET(req: NextRequest) {
       mzdySkryte: !mzdy,
     },
     guest,
+    weekdays,
     ledger,
     insights,
   });

@@ -1,0 +1,65 @@
+{
+ "stranka": "vedeni.finance",
+ "polozky": [
+  {
+   "id": "souhrn",
+   "widget": "finance.souhrn_mesice",
+   "velikost": "L"
+  },
+  {
+   "id": "podil-mezd",
+   "widget": "finance.trzby_vs_mzdy",
+   "velikost": "S"
+  },
+  {
+   "id": "uctenky",
+   "widget": "finance.uctenky",
+   "velikost": "S"
+  },
+  {
+   "id": "podil-mezd-m",
+   "widget": "finance.trzby_vs_mzdy",
+   "velikost": "M"
+  },
+  {
+   "id": "spicky",
+   "widget": "trzby.hodiny",
+   "velikost": "L",
+   "nastaveni": {
+    "obdobi": "mesic_s_obsazenim"
+   }
+  },
+  {
+   "id": "marze",
+   "widget": "finance.marze",
+   "velikost": "L"
+  },
+  {
+   "id": "heat",
+   "widget": "trzby.heatmapa",
+   "velikost": "L"
+  },
+  {
+   "id": "nastroj",
+   "widget": "nastroj",
+   "velikost": "L"
+  }
+ ],
+ "dostupne": [
+  "finance.souhrn_mesice",
+  "finance.trzby_vs_mzdy",
+  "finance.uctenky",
+  "trzby.hodiny",
+  "finance.marze",
+  "trzby.heatmapa",
+  "finance.kam_sly_penize",
+  "pokladna.zive"
+ ],
+ "tarifem": [],
+ "zdroj": "osobni",
+ "rozsah": "typ:vedeni",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": true,
+ "verze": 1
+}

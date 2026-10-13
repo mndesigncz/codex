@@ -635,21 +635,34 @@ function Otevrene({ velikost }: WidgetProps) {
 // Špičky během dne
 // ---------------------------------------------------------------------------
 
-interface Obsazeni { hodiny: number[]; rady: { tone: 'good' | 'warn' | 'info'; title: string; text: string }[]; propojeno: boolean }
+interface Obsazeni {
+  hodiny: number[];
+  rady: { tone: 'good' | 'warn' | 'info'; title: string; text: string }[];
+  propojeno: boolean;
+  /** Kč na člověka a hodinu podle hodiny dne (index = hodina); null = v tu hodinu nikdo naplánovaný. */
+  naClovekaHodinu: (number | null)[];
+}
 
 function vyberObsazeni(raw: any, t: PrekladFn): Obsazeni {
   if (!raw || typeof raw !== 'object') throw new Error(t('Rozbor měsíce přišel v nečekaném tvaru.'));
+  const naClovekaHodinu: (number | null)[] = new Array(24).fill(null);
+  for (const x of Array.isArray(raw.staffing) ? raw.staffing : []) {
+    const h = Number(x?.hour);
+    if (Number.isInteger(h) && h >= 0 && h < 24 && x?.perHour != null && Number.isFinite(Number(x.perHour))) naClovekaHodinu[h] = Number(x.perHour);
+  }
   return {
     propojeno: raw.connected === true,
     hodiny: Array.isArray(raw.hours) ? raw.hours.map((v: unknown) => Number(v) || 0) : [],
     rady: Array.isArray(raw.staffingAdvice) ? raw.staffingAdvice
       .filter((r: any) => r && typeof r.title === 'string')
       .map((r: any) => ({ tone: r.tone === 'warn' || r.tone === 'good' ? r.tone : 'info', title: r.title, text: String(r.text ?? '') })) : [],
+    naClovekaHodinu,
   };
 }
 
 function Hodiny({ velikost, nastaveni }: WidgetProps<{ obdobi: string }>) {
   const t = useT('widgety');
+  const money = useMoney();
   const smi = useSmi();
   const { ok, ceka } = useBrana(klice('trzby.hodiny', ['finance.trzby']));
   // Měsíc s obsazením potřebuje rozbor (finance.analyza); bez něj se ukáže 30 dní z pokladny.
@@ -671,6 +684,21 @@ function Hodiny({ velikost, nastaveni }: WidgetProps<{ obdobi: string }>) {
             {t('{obdobi} · nejvíc se protáčí kolem {h}:00', { obdobi: sObsazenim ? t('Tento měsíc') : obdobi.popis, h: spicka })}
           </p>
           <HodinyPokladny hodiny={hodiny} vyska={L ? 96 : 56} />
+          {/* Kolo 8 (R8-4): pod grafem tržba na člověka a hodinu — kde je obsluhy na tržbu nejvíc. Jen hodiny s někým na směně. */}
+          {sObsazenim && mesic.data && mesic.data.naClovekaHodinu.some(v => v != null) && (() => {
+            const nch = mesic.data!.naClovekaHodinu;
+            const hodnoty = nch.filter((v): v is number => v != null);
+            const nejmene = Math.min(...hodnoty);
+            return (
+              <div>
+                <p className="t-label mb-1">{t('Na člověka a hodinu')}</p>
+                <BarSpark height={L ? 56 : 40} highlight={hodnoty.length >= 2 ? nch.indexOf(nejmene) : undefined} label={t('Tržba na člověka a hodinu po hodinách')}
+                  data={nch.map((v, h) => ({ value: v, tip: `${h}:00 — ${v != null ? t('{castka} na člověka', { castka: money(v) }) : t('nikdo na směně')}` }))} />
+                <OsaGrafu popisky={['0:00', '6:00', '12:00', '18:00', '23:00']} />
+                {hodnoty.length >= 2 && <p className="t-meta mt-1">{t('nejslabší hodina {h}:00 · {castka} na člověka', { h: nch.indexOf(nejmene), castka: money(nejmene) })}</p>}
+              </div>
+            );
+          })()}
           {L && sObsazenim && (mesic.data?.rady.length ?? 0) > 0 && <RadyJakoSeznam rady={mesic.data!.rady} />}
         </div>
       )}

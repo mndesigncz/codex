@@ -2203,5 +2203,14 @@
   "Kolik dnešek stojí na lidech: náklad odpracovaného času do teď proti dnešní tržbě z pokladny, odhad do konce plánu; ve střední kartě lidé na směně s nákladem.": "What today costs in people: labour cost worked so far against today's POS sales, estimate until the end of the plan; the medium card lists people on shift with their cost.",
   "Náklad do teď": "Cost so far",
   "{podil} % z dnešní tržby {castka}": "{podil} % of today's sales {castka}",
-  "{podil} % z tržby": "{podil} % of sales"
+  "{podil} % z tržby": "{podil} % of sales",
+  "na hodinu práce": "per labour hour",
+  "Tržba na hodinu práce": "Sales per labour hour",
+  "Tržba na hodinu práce po dnech v týdnu": "Sales per labour hour by weekday",
+  "nejslabší {den} · {castka} na hodinu": "weakest {den} · {castka} per hour",
+  "Na člověka a hodinu": "Per person and hour",
+  "Tržba na člověka a hodinu po hodinách": "Sales per person and hour by hour of day",
+  "{castka} na člověka": "{castka} per person",
+  "nikdo na směně": "nobody on shift",
+  "nejslabší hodina {h}:00 · {castka} na člověka": "weakest hour {h}:00 · {castka} per person"
 }
