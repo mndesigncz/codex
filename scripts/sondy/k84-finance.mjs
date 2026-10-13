@@ -45,7 +45,8 @@ const pretece = (p, widget = null) => p.evaluate((w) => {
   for (const s of document.querySelectorAll(`[data-plocha] li[data-widget="${w}"] section`)) {
     const r = s.getBoundingClientRect();
     const ven = [...s.querySelectorAll('*')].find(x => {
-      if (x.closest('.overflow-x-auto, .sr-only') || x.getAttribute('aria-hidden') === 'true') return false;
+      // Posuvné pásy, skrytý text a klepnutelné řádky seznamu (list-row-tap sahá záměrně do odsazení karty) se nepočítají.
+      if (x.closest('.overflow-x-auto, .sr-only, .list-row-tap') || x.getAttribute('aria-hidden') === 'true') return false;
       const b = x.getBoundingClientRect();
       return b.width > 0 && (b.right > r.right + 1 || b.left < r.left - 1);
     });
@@ -267,6 +268,67 @@ if (casti.includes('D')) {
     await p.waitForTimeout(300);
     tvrdi(`D ${jmeno}: přepínač Účtenky přepočítá buňky (pátek 17–18 h: 40 účtenek)`, /pátek 17–18 h: 40 účtenek/i.test(await bunky.evaluateAll(bs => bs.map(b => b.getAttribute('aria-label')).join('\n'))));
     tvrdi(`D ${jmeno}: žádná chyba v konzoli`, chyby.filter(c => !/418|423|425/.test(c)).length === 0, chyby.slice(0, 2).join(' | '));
+    await ctx.close();
+  }
+}
+
+// ===========================================================================
+// E) Marže: Seznam / Matice (hvězdy, tahouni, hádanky, psi)
+// ===========================================================================
+if (casti.includes('E')) {
+  for (const [jmeno, viewport, mobil] of [['telefon', TELEFON, true], ['monitor', MONITOR, false]]) {
+    const { ctx, p, stav, chyby } = await kontext({ viewport, mobil, fix: nacti('k84-finance-rozlozeni-finance'), dalsi: data() });
+    await otevri(p, '/employer/overview?view=finance', 'vedeni.finance');
+    const w = p.locator('[data-plocha] li[data-widget="finance.marze"]');
+    await dokud(async () => await w.getByRole('tab', { name: 'Matice' }).count() === 1, 8000);
+    await w.scrollIntoViewIfNeeded();
+    tvrdi(`E ${jmeno}: velká karta Marže má přepínač Seznam / Matice`, await w.getByRole('tab', { name: 'Seznam' }).count() === 1 && await w.getByRole('tab', { name: 'Matice' }).count() === 1);
+    await w.getByRole('tab', { name: 'Matice' }).click();
+    await p.waitForTimeout(400);
+    const m = await text(p, 'finance.marze');
+    // Fixtura: Flat white 640 ks / 84 %, Croissant 410 / 58 %, Cheesecake 120 / 42 %; průměr 390 ks a 61 % → hvězda, tahoun, pes; Matcha bez receptury.
+    tvrdi(`E ${jmeno}: kvadranty s počty (Hvězdy 1, Tahouni 1, Hádanky 0, Psi 1) a 1 položka bez receptury`,
+      /Hvězdy[^\d]*1/.test(m) && /Tahouni[^\d]*1/.test(m) && /Hádanky[^\d]*0/.test(m) && /Psi[^\d]*1/.test(m) && /1 položka bez receptury/.test(m), m.slice(0, 400));
+    if (mobil) {
+      // Telefon: žádný graf, čtyři sbalitelné sekce; Hvězdy rozbalené s Flat white, Psi se rozbalí klepnutím.
+      tvrdi('E telefon: místo grafu čtyři sbalitelné sekce (Hvězdy rozbalené s Flat white)', await w.getByRole('img').count() === 0 && (await w.locator('section[aria-label="Hvězdy"]').innerText()).includes('Flat white'));
+      await w.locator('section[aria-label="Psi"]').getByRole('button', { name: /Psi/ }).click();
+      await p.waitForTimeout(300);
+      tvrdi('E telefon: Psi po rozbalení ukážou Cheesecake (42 %)', /Cheesecake[\s\S]{0,60}42 %/.test(await w.locator('section[aria-label="Psi"]').innerText()));
+      const cile = await w.locator('section[aria-label] > button').evaluateAll(bs => bs.map(b => Math.round(Math.max(b.getBoundingClientRect().height, parseFloat(getComputedStyle(b, '::before').height) || 0))));
+      tvrdi('E telefon: hlavičky sekcí mají dotykovou plochu ≥ 44 px', cile.every(h => h >= 44), cile.join(','));
+    } else {
+      const graf = w.getByRole('img', { name: /Matice menu/ });
+      tvrdi('E monitor: bodový graf s popiskem a třemi body (položky s recepturou)', await graf.count() === 1 && await graf.locator('circle').count() === 3, `${await graf.count()} / ${await graf.locator('circle').count()}`);
+      // Chip Psi filtruje seznam na Cheesecake; druhé klepnutí filtr zruší.
+      await w.getByRole('button', { name: /^Psi/ }).click();
+      await p.waitForTimeout(200);
+      const seznam = await w.locator('ul.list').last().innerText();
+      tvrdi('E monitor: klepnutí na Chip Psi zúží seznam na Cheesecake', /Cheesecake/.test(seznam) && !/Flat white/.test(seznam), seznam.slice(0, 120));
+      await w.getByRole('button', { name: /^Psi/ }).click();
+      await p.waitForTimeout(200);
+      tvrdi('E monitor: druhé klepnutí filtr zruší', /Flat white/.test(await w.locator('ul.list').last().innerText()));
+    }
+    // Klepnutí na položku vede do receptury (pohled recipes s productId).
+    const pred = p.url();
+    await w.locator('ul.list').last().getByText('Cheesecake').first().click();
+    await p.waitForTimeout(800);
+    tvrdi(`E ${jmeno}: položka vede do receptury (view=recipes)`, /view=recipes/.test(p.url()) || await p.locator('[data-plocha="vedeni.receptury"]').count() === 1, p.url() + ' (před: ' + pred + ')');
+    const pre = await pretece(p, 'finance.marze');
+    tvrdi(`E ${jmeno}: nic nepřetéká`, !pre, pre);
+    tvrdi(`E ${jmeno}: žádná chyba v konzoli`, chyby.filter(c => !/418|423|425/.test(c)).length === 0, chyby.slice(0, 2).join(' | '));
+    await ctx.close();
+  }
+  // Snímky matice (před prokliknutím do receptury).
+  for (const [jmeno, viewport, mobil] of [['telefon', TELEFON, true], ['monitor', MONITOR, false]]) {
+    const { ctx, p } = await kontext({ viewport, mobil, fix: nacti('k84-finance-rozlozeni-finance'), dalsi: data() });
+    await ctx.addInitScript(() => { try { localStorage.setItem('managero-volba-marze-pohled', 'matice'); } catch { /* soukromé okno */ } });
+    await otevri(p, '/employer/overview?view=finance', 'vedeni.finance');
+    const w = p.locator('[data-plocha] li[data-widget="finance.marze"]');
+    await dokud(async () => /Hvězdy/.test(await text(p, 'finance.marze')), 8000);
+    await w.scrollIntoViewIfNeeded();
+    await p.waitForTimeout(400);
+    await w.screenshot({ path: `${SNIMKY}k84-finance-E-matice-${jmeno}.png` });
     await ctx.close();
   }
 }

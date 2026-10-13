@@ -955,3 +955,46 @@ export function mapaTrzeb(heat: readonly (readonly BunkaHeat[])[], metrika: Metr
   }
   return { hodiny, radky: bunky, max, spicka };
 }
+
+// ---------------------------------------------------------------------------
+// Matice menu: oblíbenost × marže (kolo 8, R8-4)
+// ---------------------------------------------------------------------------
+//
+// Menu engineering (Kasavana & Smith, dnes Toast a meez): položky nad průměrem v prodaných kusech
+// i v marži jsou hvězdy (držet), oblíbené s nízkou marží tahouni (zvážit cenu), málo prodávané
+// s vysokou marží hádanky (propagovat), obojí pod průměrem psi (zvážit vyřazení). Položky bez
+// receptury (bez nákladu) do matice nepatří — jen se přiznají počtem.
+
+export type Kvadrant = 'hvezdy' | 'tahouni' | 'hadanky' | 'psi';
+export const KVADRANTY: Kvadrant[] = ['hvezdy', 'tahouni', 'hadanky', 'psi'];
+
+export interface PolozkaMatice { id: string; name: string; qty: number; revenue: number | null; marginPct: number; kvadrant: Kvadrant }
+
+export interface MaticeMenu {
+  /** Průměrné prodané kusy a průměrná marže položek s recepturou — hranice kvadrantů. */
+  prumerKusy: number;
+  prumerMarze: number;
+  polozky: PolozkaMatice[];
+  pocty: Record<Kvadrant, number>;
+  /** Položky bez receptury (bez nákladu) — mimo matici. */
+  bezReceptury: number;
+}
+
+/** Matice z položek /api/pos/margins; bez položky s marží je prázdná (průměry 0, nic se nekreslí). */
+export function maticeMenu(polozky: readonly { id: string; name: string; qty: number; revenue: number | null; marginPct: number | null }[]): MaticeMenu {
+  const sMarzi = polozky.filter(p => p.marginPct != null && p.qty > 0);
+  const bezReceptury = polozky.filter(p => p.marginPct == null).length;
+  const pocty: Record<Kvadrant, number> = { hvezdy: 0, tahouni: 0, hadanky: 0, psi: 0 };
+  if (sMarzi.length === 0) return { prumerKusy: 0, prumerMarze: 0, polozky: [], pocty, bezReceptury };
+  const prumerKusy = sMarzi.reduce((a, p) => a + p.qty, 0) / sMarzi.length;
+  const prumerMarze = sMarzi.reduce((a, p) => a + (p.marginPct as number), 0) / sMarzi.length;
+  const out = sMarzi.map((p): PolozkaMatice => {
+    const oblibena = p.qty >= prumerKusy, zisková = (p.marginPct as number) >= prumerMarze;
+    const kvadrant: Kvadrant = oblibena && zisková ? 'hvezdy' : oblibena ? 'tahouni' : zisková ? 'hadanky' : 'psi';
+    pocty[kvadrant] += 1;
+    return { id: p.id, name: p.name, qty: p.qty, revenue: p.revenue, marginPct: p.marginPct as number, kvadrant };
+  });
+  // V každém kvadrantu nejdřív nejprodávanější — na telefonu je seznam to hlavní.
+  out.sort((a, b) => b.qty - a.qty || a.name.localeCompare(b.name, 'cs'));
+  return { prumerKusy: Math.round(prumerKusy * 10) / 10, prumerMarze: Math.round(prumerMarze * 10) / 10, polozky: out, pocty, bezReceptury };
+}

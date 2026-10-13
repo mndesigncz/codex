@@ -34,7 +34,7 @@
 //
 // Data jen přes useDataWidgetu (sdílená mezipaměť), v náhledu nic nenaviguje ani nezapisuje.
 
-import React, { useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
+import React, { useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
 import { widget } from '@/lib/widgety/katalog';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
@@ -55,7 +55,7 @@ import { useOpravneni } from '../../role/useOpravneni';
 import { Widget, Zkratitelne, useWidget, type StavNacteni } from '../Widget';
 import { useDataWidgetu, obnovDataWidgetu } from '../useDataWidgetu';
 import { useNavigace, useSmi } from '../NavigaceKontext';
-import { MesicStrankyFinanci, useNaFinancich } from './finance';
+import { MesicStrankyFinanci, useNaFinancich, useSiroka } from './finance';
 import {
   DnyPokladny, HodinyPokladny, ObsluhaPokladny, OsaGrafu, ProdanoPokladny, RadyJakoSeznam,
   kratkeDatum, pismenoDne, popisUctenek, vyberDenniPokladnu, type DenniPokladna,
@@ -713,16 +713,6 @@ function Hodiny({ velikost, nastaveni }: WidgetProps<{ obdobi: string }>) {
 // ---------------------------------------------------------------------------
 // Kdy se prodává: teplotní mapa den v týdnu × hodina (kolo 8, R8-4)
 // ---------------------------------------------------------------------------
-
-/** Monitor (od `md`)? Na serveru „ne" — hydratace pak sedí s telefonem; na telefonu se mřížka otočí. */
-const DOTAZ_SIROKA = '(min-width: 768px)';
-function useSiroka(): boolean {
-  return useSyncExternalStore(
-    (cb) => { const mq = window.matchMedia?.(DOTAZ_SIROKA); if (!mq) return () => {}; mq.addEventListener?.('change', cb); return () => mq.removeEventListener?.('change', cb); },
-    () => window.matchMedia?.(DOTAZ_SIROKA).matches ?? false,
-    () => false,
-  );
-}
 
 const velkePismeno = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
 /** Krátce do buňky: „4,2k", „860", účtenky celé číslo. */

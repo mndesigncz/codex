@@ -31,21 +31,24 @@
 // (mesicZVolby v katalogu). Tentýž měsíc = tatáž URL = jeden dotaz na /api/finance
 // pro souhrn, podíl mezd, Kam šly peníze, hosty, postřehy i knihu výdajů na stránce.
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
 import { widget } from '@/lib/widgety/katalog';
 import { mesicZVolby } from '@/lib/widgety/katalog/finance';
 import {
-  kamSlyPenize, kcNaHodinuPoDnech, mzdyDnes, mzdyMesice, podilMezd, podilNakladu, rozsahMesicu, rozsahSrovnani, trzbaNaHodinu, urlFinanci,
-  vyberDochazkuDnes, vyberFinance, zmenaProti as zmena, zmenySouhrnu, type FinanceMesice, type SrovnaniFinanci,
+  KVADRANTY, kamSlyPenize, kcNaHodinuPoDnech, maticeMenu, mzdyDnes, mzdyMesice, podilMezd, podilNakladu, rozsahMesicu, rozsahSrovnani,
+  trzbaNaHodinu, urlFinanci, vyberDochazkuDnes, vyberFinance, zmenaProti as zmena, zmenySouhrnu,
+  type FinanceMesice, type Kvadrant, type PolozkaMatice, type SrovnaniFinanci,
 } from '@/lib/financeWidgety';
+import { useUlozeno } from '@/lib/useUlozeno';
 import { fmtDenVTydnu } from '@/lib/i18n/format';
 import { useT } from '@/lib/i18n/client';
 import { aktualniJazyk } from '@/lib/i18n/stav';
 import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
 import { pragueDaySafe, pragueToday } from '@/lib/pragueTime';
 import { useMoney } from '../../CurrencyProvider';
-import { Avatar, BarSpark, Button, Chip, ListRow, Modal, Stat, StatRow } from '../../ui';
+import { Icon } from '../../Icons';
+import { Avatar, BarSpark, Button, Chip, ListRow, Modal, Segmented, Stat, StatRow, type ChipTone } from '../../ui';
 import { zmenaZtrat, type ZtrataInventury } from '@/lib/skladPrehled';
 import { useOpravneni } from '../../role/useOpravneni';
 import { Widget, useWidget, type StavNacteni } from '../Widget';
@@ -107,6 +110,16 @@ function useBrana(id: string, zaloha: string[]): { ok: boolean; ceka: boolean } 
 }
 
 const CEKA: StavNacteni = { data: null, error: null, loading: true, reload: () => {} };
+
+/** Monitor (od `md`)? Na serveru „ne" — hydratace pak sedí s telefonem. Sdílí i oblast tržeb (heat mapa). */
+const DOTAZ_SIROKA = '(min-width: 768px)';
+export function useSiroka(): boolean {
+  return useSyncExternalStore(
+    (cb) => { const mq = window.matchMedia?.(DOTAZ_SIROKA); if (!mq) return () => {}; mq.addEventListener?.('change', cb); return () => mq.removeEventListener?.('change', cb); },
+    () => window.matchMedia?.(DOTAZ_SIROKA).matches ?? false,
+    () => false,
+  );
+}
 
 /** „září 2026" pro meta řádek (velké písmeno dodá cz-sentence). */
 function nazevMesice(m: string): string {
@@ -510,10 +523,122 @@ function vyberMarze(raw: any): Marze {
   };
 }
 
-function MarzeWidget({ velikost, nastaveni }: WidgetProps<{ mesic: string; razeni: string }>) {
+/** Tón a popis kvadrantu: hvězdy držet, tahouni zvážit cenu, hádanky propagovat, psi zvážit vyřazení. */
+function popisKvadrantu(t: ReturnType<typeof useT>): Record<Kvadrant, { nazev: string; akce: string; ton: ChipTone; kdo: string }> {
+  return {
+    hvezdy: { nazev: t('Hvězdy'), akce: t('držet'), ton: 'ok', kdo: t('oblíbené a s vysokou marží') },
+    tahouni: { nazev: t('Tahouni'), akce: t('zvážit cenu'), ton: 'info', kdo: t('oblíbené, ale s nízkou marží') },
+    hadanky: { nazev: t('Hádanky'), akce: t('propagovat'), ton: 'wait', kdo: t('vysoká marže, málo se prodávají') },
+    psi: { nazev: t('Psi'), akce: t('zvážit vyřazení'), ton: 'bad', kdo: t('málo se prodávají a málo vydělají') },
+  };
+}
+
+/** Body grafu v inkoustových odstínech stavových tokenů (na bílé kartě je světlá limetka nečitelná). */
+const BARVA_KVADRANTU: Record<Kvadrant, string> = { hvezdy: 'var(--ok-ink)', tahouni: 'var(--info-ink)', hadanky: 'var(--wait-ink)', psi: 'var(--bad-ink)' };
+
+/**
+ * Matice menu (kolo 8, R8-4): na monitoru bodový graf (x = prodané kusy, y = marže v %) s čarami průměrů
+ * a čtyřmi kvadranty, pod ním Chipy s počty, které filtrují seznam; na telefonu místo grafu čtyři
+ * sbalitelné sekce se seznamy. Klepnutí na položku otevře její recepturu.
+ */
+function MaticeMenu({ polozky, nahled }: { polozky: PolozkaMarze[]; nahled: boolean }) {
+  const t = useT('widgety');
+  const money = useMoney();
+  const nav = useNavigace();
+  const siroka = useSiroka();
+  const m = useMemo(() => maticeMenu(polozky), [polozky]);
+  const popisy = popisKvadrantu(t);
+  const [filtr, setFiltr] = useState<Kvadrant | null>(null);
+  const [rozbalene, setRozbalene] = useState<Record<Kvadrant, boolean>>({ hvezdy: true, tahouni: false, hadanky: false, psi: false });
+  const smiReceptury = !nahled && nav.smiPohled('recipes');
+  const otevri = (p: PolozkaMatice) => { if (smiReceptury) nav.onNavigate('recipes', p.id); };
+  const radek = (p: PolozkaMatice) => (
+    <ListRow key={p.id} title={p.name}
+      meta={`${t('{n, plural, one {# kus} few {# kusy} other {# kusů}}', { n: Math.round(p.qty) })}${p.revenue != null ? ` · ${money(p.revenue)}` : ''}`}
+      value={<span className="tabular-nums">{p.marginPct} %</span>}
+      onClick={smiReceptury ? () => otevri(p) : undefined} />
+  );
+  if (m.polozky.length === 0) return <p className="t-meta">{t('Matice potřebuje aspoň jednu prodanou položku s recepturou.')}</p>;
+
+  // Graf: osy s rezervou, body podle kvadrantu, čáry průměrů; popisky kvadrantů v rozích. Souřadnice v „pixelech"
+  // karty L (600 × 260, strop výšky), ať se písmo a body neškálují s šířkou monitoru.
+  const maxKusy = Math.max(1, ...m.polozky.map(p => p.qty)) * 1.08;
+  const W = 600, H = 260, PX = 36, PY = 28;
+  const x = (q: number) => PX + (q / maxKusy) * (W - PX - 12);
+  const y = (pct: number) => H - PY - (Math.max(0, Math.min(100, pct)) / 100) * (H - PY - 14);
+  const graf = (
+    <div className="space-y-2">
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={t('Matice menu: prodané kusy proti marži, čáry průměrů dělí hvězdy, tahouny, hádanky a psy')} className="w-full h-auto max-h-[260px] block text-[#16181A]">
+        <line x1={PX} y1={H - PY} x2={W - 12} y2={H - PY} stroke="currentColor" strokeOpacity="0.15" strokeWidth="1" />
+        <line x1={PX} y1={12} x2={PX} y2={H - PY} stroke="currentColor" strokeOpacity="0.15" strokeWidth="1" />
+        <line x1={x(m.prumerKusy)} y1={12} x2={x(m.prumerKusy)} y2={H - PY} stroke="currentColor" strokeOpacity="0.3" strokeWidth="1" strokeDasharray="4 4" />
+        <line x1={PX} y1={y(m.prumerMarze)} x2={W - 12} y2={y(m.prumerMarze)} stroke="currentColor" strokeOpacity="0.3" strokeWidth="1" strokeDasharray="4 4" />
+        {([['hadanky', PX + 8, 24], ['hvezdy', W - 16, 24], ['psi', PX + 8, H - PY - 8], ['tahouni', W - 16, H - PY - 8]] as [Kvadrant, number, number][]).map(([k, kx, ky]) => (
+          <text key={k} x={kx} y={ky} fontSize="12" fontWeight="600" fill="currentColor" fillOpacity="0.45" textAnchor={kx > W / 2 ? 'end' : 'start'}>{popisy[k].nazev}</text>
+        ))}
+        {m.polozky.map(p => (
+          <g key={p.id} className={smiReceptury ? 'cursor-pointer' : undefined} onClick={() => otevri(p)} opacity={filtr && filtr !== p.kvadrant ? 0.25 : 1}>
+            <title>{`${p.name}: ${t('{n, plural, one {# kus} few {# kusy} other {# kusů}}', { n: Math.round(p.qty) })}, ${p.marginPct} %`}</title>
+            <circle cx={x(p.qty)} cy={y(p.marginPct)} r="7" fill={BARVA_KVADRANTU[p.kvadrant]} stroke="white" strokeWidth="2" />
+            {/* Jméno u bodu: na monitoru je místo, v grafu se tak nemusí hledat kurzorem. */}
+            <text x={x(p.qty) + (x(p.qty) > W * 0.8 ? -11 : 11)} y={y(p.marginPct) + 4} fontSize="11" fill="currentColor" fillOpacity="0.8" textAnchor={x(p.qty) > W * 0.8 ? 'end' : 'start'}>{p.name}</text>
+          </g>
+        ))}
+        <text x={W - 12} y={H - 8} fontSize="11" fill="currentColor" fillOpacity="0.45" textAnchor="end">{t('prodané kusy →')}</text>
+        <text x={12} y={H - PY} fontSize="11" fill="currentColor" fillOpacity="0.45" textAnchor="start" transform={`rotate(-90 12 ${H - PY})`}>{t('marže % →')}</text>
+      </svg>
+      <p className="t-meta">{t('Vlevo nahoře hádanky, vpravo nahoře hvězdy, vlevo dole psi, vpravo dole tahouni · průměr {kusy} kusů a {marze} %', { kusy: Math.round(m.prumerKusy), marze: Math.round(m.prumerMarze) })}</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      {siroka ? (
+        <>
+          {graf}
+          <div role="group" aria-label={t('Kvadranty')} className="flex flex-wrap gap-2">
+            {KVADRANTY.map(k => (
+              <button key={k} type="button" aria-pressed={filtr === k} onClick={() => setFiltr(filtr === k ? null : k)}
+                className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542]" title={popisy[k].kdo}>
+                <Chip tone={popisy[k].ton} className={filtr && filtr !== k ? 'opacity-50' : ''}>{popisy[k].nazev} — {popisy[k].akce} <span className="tabular-nums opacity-70">{m.pocty[k]}</span></Chip>
+              </button>
+            ))}
+          </div>
+          <ul className="list">{m.polozky.filter(p => !filtr || p.kvadrant === filtr).slice(0, 30).map(radek)}</ul>
+        </>
+      ) : (
+        // Telefon: čtyři sbalitelné sekce — graf by na 390 px neuměl ukázat jména.
+        <div className="space-y-2">
+          {KVADRANTY.map(k => {
+            const seznam = m.polozky.filter(p => p.kvadrant === k);
+            const otevreno = rozbalene[k];
+            return (
+              <section key={k} aria-label={popisy[k].nazev}>
+                <button type="button" aria-expanded={otevreno} onClick={() => setRozbalene(r => ({ ...r, [k]: !r[k] }))}
+                  className="tap-target flex w-full items-center justify-between gap-2 py-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542] rounded-lg">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <Chip tone={popisy[k].ton} size="sm">{popisy[k].nazev} <span className="tabular-nums opacity-70">{m.pocty[k]}</span></Chip>
+                    <span className="t-meta truncate">{popisy[k].akce}</span>
+                  </span>
+                  <Icon name={otevreno ? 'chevronUp' : 'chevron'} size={15} className="shrink-0 text-black/45" />
+                </button>
+                {otevreno && (seznam.length === 0 ? <p className="t-meta pb-2">{t('Nic — {kdo}.', { kdo: popisy[k].kdo })}</p> : <ul className="list">{seznam.slice(0, 15).map(radek)}</ul>)}
+              </section>
+            );
+          })}
+        </div>
+      )}
+      {m.bezReceptury > 0 && <p className="t-meta">{t('{n, plural, one {# položka bez receptury} few {# položky bez receptury} other {# položek bez receptury}} — bez nákladu nejde do matice.', { n: m.bezReceptury })}</p>}
+    </div>
+  );
+}
+
+function MarzeWidget({ velikost, nastaveni, nahled }: WidgetProps<{ mesic: string; razeni: string }>) {
   const t = useT('widgety');
   const money = useMoney();
   const { ok, ceka } = useBrana('finance.marze', ['finance.marze']);
+  // Velká karta: Seznam, nebo Matice (oblíbenost × marže) — volba se pamatuje v prohlížeči.
+  const [pohled, setPohled] = useUlozeno<'seznam' | 'matice'>('marze-pohled', 'seznam', ['seznam', 'matice']);
   const { mesic, vice } = useJedenMesic(nastaveni.mesic);
   const data = useDataWidgetu(ok ? `/api/pos/margins?month=${mesic}` : null, vyberMarze);
   const m = data.data;
@@ -570,21 +695,30 @@ function MarzeWidget({ velikost, nastaveni }: WidgetProps<{ mesic: string; razen
             <Stat label={t('Vydělaly')} value={money(m.margin)} note={t('tržba − suroviny')} />
             <Stat label={t('Bez receptury')} value={m.noRecipe.toLocaleString('cs-CZ')} note={t('{n, plural, one {# položka} few {# položky} other {# položek}}', { n: m.noRecipe })} />
           </StatRow>
-          {m.rady.length > 0 && <RadyJakoSeznam rady={m.rady.map(r => ({ ...r, ikona: r.icon }))} />}
-          <ul className="list">
-            {serazene.slice(0, 20).map(p => (p.marginPct != null ? radek(p) : (
-              <ListRow key={p.id} title={p.name || t('Bez názvu')} meta={`${t('{n, plural, one {# kus} few {# kusy} other {# kusů}}', { n: Math.round(p.qty) })} · ${t('bez receptury')}`}
-                value={<span className="tabular-nums text-black/45">—</span>} valueMeta={p.revenue != null ? money(p.revenue) : undefined} />
-            )))}
-          </ul>
-          {serazene.length > 20 && <p className="t-meta">{t('…a dalších {n}', { n: (serazene.length - 20).toLocaleString('cs-CZ') })}</p>}
+          <Segmented size="sm" ariaLabel={t('Pohled na marže')} value={pohled} onChange={setPohled}
+            options={[{ id: 'seznam', label: t('Seznam') }, { id: 'matice', label: t('Matice') }]} />
+          {pohled === 'matice' ? (
+            <MaticeMenu polozky={m.polozky} nahled={nahled} />
+          ) : (
+            <>
+              {m.rady.length > 0 && <RadyJakoSeznam rady={m.rady.map(r => ({ ...r, ikona: r.icon }))} />}
+              <ul className="list">
+                {serazene.slice(0, 20).map(p => (p.marginPct != null ? radek(p) : (
+                  <ListRow key={p.id} title={p.name || t('Bez názvu')} meta={`${t('{n, plural, one {# kus} few {# kusy} other {# kusů}}', { n: Math.round(p.qty) })} · ${t('bez receptury')}`}
+                    value={<span className="tabular-nums text-black/45">—</span>} valueMeta={p.revenue != null ? money(p.revenue) : undefined} />
+                )))}
+              </ul>
+              {serazene.length > 20 && <p className="t-meta">{t('…a dalších {n}', { n: (serazene.length - 20).toLocaleString('cs-CZ') })}</p>}
+            </>
+          )}
         </div>
       );
     }
   }
 
   return (
-    <Widget nacteni={ceka ? CEKA : data} kostra={velikost === 'S' ? 'cislo' : 'seznam'} prazdno={prazdno}
+    // Matice se nezkracuje: graf s kvadranty a sekcemi musí být vidět celý (zkrácený seznam by schoval psy).
+    <Widget nacteni={ceka ? CEKA : data} kostra={velikost === 'S' ? 'cislo' : 'seznam'} prazdno={prazdno} bezZkraceni={velikost === 'L' && pohled === 'matice'}
       odkaz={velikost === 'S' ? undefined : { popisek: t('Receptury'), pohled: 'recipes' }}>
       {obsah}
     </Widget>

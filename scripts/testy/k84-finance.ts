@@ -9,7 +9,7 @@ import type { Testy } from './_testy.ts';
 import {
   kcNaHodinuPoDnech, mzdyDnes, podilNakladu, trzbaNaHodinu, vyberDochazkuDnes, vyberFinance,
   urlFinanci, rozsahMesicu, obdobiZRozsahu, rozsahZVolby, predchoziRozsahMesicu, lonskyRozsah, rozsahSrovnani, mesiceRozsahu, pocetMesicuRozsahu, zmenySouhrnu,
-  vyberHeat, mapaTrzeb,
+  vyberHeat, mapaTrzeb, maticeMenu,
 } from '../../lib/financeWidgety.ts';
 import { mesicZVolby } from '../../lib/widgety/katalog/finance.ts';
 
@@ -128,4 +128,19 @@ export default function ({ eq, ok }: Testy) {
   const ucty = mapaTrzeb(vyberHeat({ heat: heatRaw })!, 'ucty');
   eq('heat: metrika účtenky počítá průměr účtenek na den', [ucty.radky[0][3].prumer, ucty.radky[0][0].prumer], [5, 1.5]);
   eq('heat: bez jediné účtenky výchozí okno 8–20 a žádná špička', (() => { const m = mapaTrzeb(heatRaw.map(r => r.map(c => ({ ...c, trzba: 0, ucty: 0 }))), 'trzba'); return [m.hodiny[0], m.hodiny[m.hodiny.length - 1], m.spicka, m.max]; })(), [8, 20, null, 0]);
+
+  // ---- matice menu ----
+  const matice = maticeMenu([
+    { id: 'p1', name: 'Flat white', qty: 640, revenue: 54400, marginPct: 84 },
+    { id: 'p2', name: 'Croissant', qty: 410, revenue: 22550, marginPct: 58 },
+    { id: 'p4', name: 'Cheesecake', qty: 120, revenue: 10800, marginPct: 42 },
+    { id: 'p5', name: 'Limonáda', qty: 90, revenue: 5400, marginPct: 80 },
+    { id: 'p3', name: 'Matcha latte', qty: 220, revenue: 19800, marginPct: null },
+  ]);
+  // Průměr kusů (640+410+120+90)/4 = 315, průměr marže (84+58+42+80)/4 = 66.
+  eq('matice: průměry z položek s recepturou, položky bez receptury jen počtem', [matice.prumerKusy, matice.prumerMarze, matice.bezReceptury], [315, 66, 1]);
+  eq('matice: hvězdy, tahouni, hádanky, psi', matice.polozky.map(p => [p.name, p.kvadrant]), [['Flat white', 'hvezdy'], ['Croissant', 'tahouni'], ['Cheesecake', 'psi'], ['Limonáda', 'hadanky']]);
+  eq('matice: počty po kvadrantech', matice.pocty, { hvezdy: 1, tahouni: 1, hadanky: 1, psi: 1 });
+  eq('matice: bez položky s marží je prázdná, ne nuly tvářící se jako data', maticeMenu([{ id: 'x', name: 'X', qty: 5, revenue: null, marginPct: null }]), { prumerKusy: 0, prumerMarze: 0, polozky: [], pocty: { hvezdy: 0, tahouni: 0, hadanky: 0, psi: 0 }, bezReceptury: 1 });
+  eq('matice: jediná položka je hvězda (rovná se průměru)', maticeMenu([{ id: 'a', name: 'A', qty: 10, revenue: 100, marginPct: 50 }]).polozky[0].kvadrant, 'hvezdy');
 }
