@@ -1,0 +1,101 @@
+{
+ "closing": {
+  "id": 503,
+  "team_id": 1,
+  "created_by": 16,
+  "date": "PRED3",
+  "shift_date": "PRED3",
+  "shift_label": "8:00–16:00",
+  "opening_cash": 2000,
+  "cash_revenue": 12400,
+  "card_revenue": 8600,
+  "tips": 300,
+  "tips_card": 0,
+  "expenses": 150,
+  "cash_removed": 0,
+  "self_payout": 2000,
+  "closing_cash": 12250,
+  "customers": 86,
+  "notes": "Došlo ovesné mléko.",
+  "approved": true,
+  "approved_by": 15,
+  "approvedByName": "Martin Nemeškal",
+  "covered_by": null,
+  "review_note": "Proč manko 200? Nesedí to s terminálem.",
+  "author_name": "Eva Testová",
+  "author_avatar": "🙂",
+  "event_title": null,
+  "payout_from_register": true,
+  "tips_in_drawer": false,
+  "movements": [
+   {
+    "kind": "payout",
+    "amount": 1200,
+    "userId": 17,
+    "userName": "Jakub Horák"
+   },
+   {
+    "kind": "payout",
+    "amount": 800,
+    "userId": 16,
+    "userName": "Eva Testová",
+    "note": "záloha"
+   },
+   {
+    "kind": "expense",
+    "amount": 150,
+    "note": "mléko"
+   }
+  ],
+  "photos": [
+   {
+    "url": "/api/upload/k84-terminal",
+    "druh": "terminal"
+   },
+   {
+    "url": "/api/upload/k84-uctenka",
+    "druh": "vydaj",
+    "note": "mléko"
+   }
+  ],
+  "denominations": {},
+  "shiftEmployees": [
+   {
+    "id": 16,
+    "name": "Eva Testová",
+    "avatar": "🙂"
+   },
+   {
+    "id": 17,
+    "name": "Jakub Horák",
+    "avatar": "🧔"
+   }
+  ],
+  "final_removal": 0,
+  "created_at": "PRED3T16:05:00Z"
+ },
+ "crew": [
+  {
+   "id": 16,
+   "name": "Eva Testová",
+   "avatar": "🙂"
+  },
+  {
+   "id": 17,
+   "name": "Jakub Horák",
+   "avatar": "🧔"
+  }
+ ],
+ "covered": [],
+ "planned": [],
+ "attendance": [],
+ "procedures": [],
+ "missingProcedures": [],
+ "missingRequired": [],
+ "tasks": [],
+ "receipts": [],
+ "pos": null,
+ "products": [],
+ "notes": [],
+ "day": "PRED3"
+}

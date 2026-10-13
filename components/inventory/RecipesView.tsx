@@ -877,7 +877,7 @@ function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, 
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium truncate">
                         <span className="tabular-nums">{dbTimeDayHM(v.changedAt)}</span> · {v.changedBy?.name ?? t('Neznámý')}
-                        {i === 0 && <Chip tone="ok" size="sm" className="ml-2">{t('platí')}</Chip>}
+                        {i === 0 && <> <Chip tone="ok" size="sm" className="ml-1">{t('platí')}</Chip></>}
                       </p>
                       {v.note && <p className="t-meta">{v.note}</p>}
                       <div className="mt-1">

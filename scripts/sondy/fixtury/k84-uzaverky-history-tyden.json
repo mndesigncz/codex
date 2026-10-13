@@ -1,0 +1,43 @@
+{
+ "versions": [
+  {
+   "id": 12,
+   "productId": "p1",
+   "productName": "Latte",
+   "changedAt": "@VCERA-14:12",
+   "costPerPortion": 15.7,
+   "note": null,
+   "changedBy": {
+    "id": 16,
+    "name": "Eva Testová",
+    "avatar": "🙂"
+   }
+  },
+  {
+   "id": 11,
+   "productId": "p2",
+   "productName": "Espresso",
+   "changedAt": "@PREDEVCIREM-10:00",
+   "costPerPortion": 6.1,
+   "note": null,
+   "changedBy": {
+    "id": 15,
+    "name": "Martin Nemeškal",
+    "avatar": "🧑"
+   }
+  },
+  {
+   "id": 7,
+   "productId": "p1",
+   "productName": "Latte",
+   "changedAt": "@PRED5-09:30",
+   "costPerPortion": 12.5,
+   "note": null,
+   "changedBy": {
+    "id": 15,
+    "name": "Martin Nemeškal",
+    "avatar": "🧑"
+   }
+  }
+ ]
+}

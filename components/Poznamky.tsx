@@ -295,7 +295,7 @@ export function Poznamky({ typ, id, tablet = false, zaKoho = null, vyberKoho, uv
             {navrhyLidi.lide.map(l => (
               <li key={l.id} role="option" aria-selected={false}>
                 <button type="button" onClick={() => vyberZminku(l.name)}
-                  className="tap-target flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-sm text-[#16181A] hover:bg-black/[0.04]">
+                  className="tap-target flex w-full min-h-[44px] items-center gap-2 rounded-xl px-2 py-2 text-left text-sm text-[#16181A] hover:bg-black/[0.04]">
                   <Avatar emoji={l.avatar} name={l.name} size="xs" ring={false} />
                   <span className="min-w-0 truncate">{l.name}</span>
                 </button>

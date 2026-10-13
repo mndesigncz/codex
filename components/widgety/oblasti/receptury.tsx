@@ -29,7 +29,7 @@ import {
   cekajiciNavrhy, dopadNaPorci, marzeProcenta, mnozstviText, recepturZmenenychZaDni, rozdilVerzi, vyberHistorii, vyberNavrhy,
   MAX_DELKA_DUVODU, type NavrhReceptury, type RozdilVerzi, type VerzeReceptury,
 } from '@/lib/recepturyVerze';
-import { useMoney } from '../../CurrencyProvider';
+import { useCost } from '../../CurrencyProvider';
 import { Avatar, Button, Chip, EmptyState, ListRow, Modal, Stat, StatRow, Textarea, Well } from '../../ui';
 import { useOpravneni } from '../../role/useOpravneni';
 import { Widget, type StavNacteni } from '../Widget';
@@ -199,13 +199,14 @@ function NavrhyReceptur({ navrhy, schvaluje, produkty, onClose }: {
   navrhy: NavrhReceptury[]; schvaluje: boolean; produkty: { productId: string; price: number | null }[]; onClose: () => void;
 }) {
   const t = useT('widgety');
-  const money = useMoney();
+  // Náklad porce může mít haléře (sirup za 0,40 Kč) — useCost je nezaokrouhlí na celé koruny.
+  const cena = useCost();
   const locale = LOCALE_PRO_JAZYK[t.jazyk];
   const [vracim, setVracim] = useState<number | null>(null);
   const [poznamka, setPoznamka] = useState('');
   const [busy, setBusy] = useState<number | null>(null);
   const [chyba, setChyba] = useState('');
-  const cena = (productId: string) => produkty.find(p => p.productId === productId)?.price ?? null;
+  const cenaVKase = (productId: string) => produkty.find(p => p.productId === productId)?.price ?? null;
   const serazene = [...navrhy].sort((a, b) => (a.status === 'ceka' ? 0 : 1) - (b.status === 'ceka' ? 0 : 1) || b.createdAt.localeCompare(a.createdAt));
 
   const rozhodni = async (n: NavrhReceptury, akce: 'schvalit' | 'vratit') => {
@@ -231,7 +232,7 @@ function NavrhyReceptur({ navrhy, schvaluje, produkty, onClose }: {
           {serazene.map(n => {
             const rozdil = rozdilVerzi(n.puvodni, n.ingredients);
             const dopad = dopadNaPorci(n.puvodniCost, n.costPerPortion);
-            const c = cena(n.productId);
+            const c = cenaVKase(n.productId);
             const mPred = marzeProcenta(c, n.puvodniCost), mPo = marzeProcenta(c, n.costPerPortion);
             return (
               <Well as="li" key={n.id} className="space-y-2" data-navrh={n.id}>
@@ -249,8 +250,8 @@ function NavrhyReceptur({ navrhy, schvaluje, produkty, onClose }: {
                 <RadkyRozdilu rozdil={rozdil} locale={locale} t={t} />
                 {(n.puvodniCost != null || n.costPerPortion != null) && (
                   <p className="t-meta tabular-nums">
-                    {t('Suroviny na porci')}: {n.puvodniCost != null ? money(n.puvodniCost) : '—'} → {n.costPerPortion != null ? money(n.costPerPortion) : '—'}
-                    {dopad != null && <span className={dopad > 0 ? 'text-bad-ink' : dopad < 0 ? 'text-ok-ink' : ''}> ({dopad > 0 ? '+' : ''}{money(dopad)})</span>}
+                    {t('Suroviny na porci')}: {n.puvodniCost != null ? cena(n.puvodniCost) : '—'} → {n.costPerPortion != null ? cena(n.costPerPortion) : '—'}
+                    {dopad != null && <span className={dopad > 0 ? 'text-bad-ink' : dopad < 0 ? 'text-ok-ink' : ''}> ({dopad > 0 ? '+' : ''}{cena(dopad)})</span>}
                     {mPred != null && mPo != null && <span> · {t('marže')} {mPred} % → {mPo} %</span>}
                   </p>
                 )}
