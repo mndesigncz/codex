@@ -253,20 +253,24 @@ function ObdobiFinanci({ preset, obdobi, srovnani, onZmena, onSrovnani }: {
   const zamcena = 'aria-disabled:opacity-40 aria-disabled:cursor-not-allowed aria-disabled:active:scale-100';
 
   return (
-    <div className="flex items-center gap-1 glass rounded-full p-1 min-w-0 w-full sm:w-fit" role="group" aria-label={t('Období')}>
+    // Skupina „Období" obaluje jen tlačítko s oknem (jako ObdobiLista u grafů — sondy ji tak hledají);
+    // šipky stojí vedle ní se svými popisky.
+    <div className="flex items-center gap-1 glass rounded-full p-1 min-w-0 w-full sm:w-fit">
       <button type="button" onClick={() => krok(-1)} aria-label={jedenMesic ? t('Předchozí měsíc') : t('Předchozí období')} className={`tap-target btn-icon ${zamcena}`}>
         <Icon name="chevronRight" size={16} className="rotate-180" />
       </button>
-      <button type="button" aria-haspopup="dialog" aria-expanded={otevreno} onClick={() => setOtevreno(true)}
-        className="tap-target inline-flex flex-1 max-w-full min-w-0 items-center justify-center gap-2 rounded-full py-1.5 px-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542]">
-        <Icon name="calendar" size={16} className="shrink-0 text-black/55" />
-        <span aria-live="polite" className="min-w-0 truncate text-sm">
-          {preset !== 'vlastni' && <span className="font-semibold text-[#16181A]">{popisky[preset]}</span>}
-          {preset !== 'vlastni' && <span className="text-black/50">{' · '}</span>}
-          <span className={`cz-sentence ${preset !== 'vlastni' ? 'text-black/50' : 'font-semibold text-[#16181A]'}`}>{nazev}</span>
-        </span>
-        <Icon name="chevron" size={14} className="shrink-0 text-black/45" />
-      </button>
+      <div role="group" aria-label={t('Období')} className="flex flex-1 min-w-0">
+        <button type="button" aria-haspopup="dialog" aria-expanded={otevreno} onClick={() => setOtevreno(true)}
+          className="tap-target inline-flex flex-1 max-w-full min-w-0 items-center justify-center gap-2 rounded-full py-1.5 px-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542]">
+          <Icon name="calendar" size={16} className="shrink-0 text-black/55" />
+          <span aria-live="polite" className="min-w-0 truncate text-sm">
+            {preset !== 'vlastni' && <span className="font-semibold text-[#16181A]">{popisky[preset]}</span>}
+            {preset !== 'vlastni' && <span className="text-black/50">{' · '}</span>}
+            <span className={`cz-sentence ${preset !== 'vlastni' ? 'text-black/50' : 'font-semibold text-[#16181A]'}`}>{nazev}</span>
+          </span>
+          <Icon name="chevron" size={14} className="shrink-0 text-black/45" />
+        </button>
+      </div>
       <button type="button" onClick={() => krok(1)} aria-disabled={naKonci || undefined} aria-label={jedenMesic ? t('Další měsíc') : t('Další období')} className={`tap-target btn-icon ${zamcena}`}>
         <Icon name="chevronRight" size={16} />
       </button>

@@ -236,11 +236,12 @@ function vetaDojde(p: PredpovedPolozky | undefined, t: PrekladFn): string | null
 
 /**
  * Chip „~2 dny" (bad pod 2 dny, wait pod 5); nad 5 dní nic — řádek by byl samý štítek. Jen od `sm`: na telefonu
- * by ocas spadl pod řádek a opakoval větu „dojde za", která tam nese tón sama (DetailDojde).
+ * by ocas spadl pod řádek a opakoval větu „dojde za", která tam nese tón sama (DetailDojde). Vrací undefined, ne
+ * prázdný prvek: ListRow by jinak kreslil prázdný ocas a řádek by narostl (sonda k69-b3 T1, řádek do 72 px).
  */
-function ChipDojde({ p, t }: { p: PredpovedPolozky | undefined; t: PrekladFn }) {
+function chipDojde(p: PredpovedPolozky | undefined, t: PrekladFn): React.ReactNode | undefined {
   const ton = p ? tonDojde(p.dojdeZa) : null;
-  if (!p || !ton || p.dojdeZa == null) return null;
+  if (!p || !ton || p.dojdeZa == null) return undefined;
   return <Chip tone={ton} size="sm" className="tabular-nums hidden sm:inline-flex">{p.dojdeZa < 1 ? t('dnes') : t('~{n, plural, one {# den} few {# dny} other {# dní}}', { n: Math.round(p.dojdeZa) })}</Chip>;
 }
 
@@ -355,7 +356,7 @@ function Dochazi({ velikost, nastaveni, nahled }: WidgetProps<NastaveniDochazi>)
         </>}
         // „dojde za ~2 dny (spotřeba 6,1 l/den)" jako druhý řádek meta (zalamuje se — na telefonu nic neuřízne).
         detail={vetaDojde(pred[p.id], t) ? <DetailDojde p={pred[p.id]} t={t} /> : undefined}
-        right={<ChipDojde p={pred[p.id]} t={t} />}
+        right={chipDojde(pred[p.id], t)}
         onClick={smiSklad && !nahled ? () => doSkladu(p.kategorie, p.id) : undefined}
       />
     </li>
