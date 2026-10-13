@@ -1752,5 +1752,11 @@
   "Účtenka výdaje": "Paragon wydatku",
   "Doklady": "Dokumenty",
   "Fotky z telefonu při uzávěrce — podle nich se dohledá rozdíl proti terminálu.": "Zdjęcia z telefonu przy zamknięciu — na ich podstawie odnajdziesz różnicę względem terminala.",
-  "Otevřít doklad {n}: {druh}": "Otwórz dokument {n}: {druh}"
+  "Otevřít doklad {n}: {druh}": "Otwórz dokument {n}: {druh}",
+  "Hodnoty podniku": "Wartości firmy",
+  "Každý může kolegovi poslat 5, 10 nebo 20 bodů z měsíčního příspěvku, s hodnotou podniku a větou. Nevyužité body 1. dne propadnou. Nula poděkování vypne.": "Każdy może wysłać koledze 5, 10 lub 20 punktów z miesięcznej puli, z wartością firmy i zdaniem. Niewykorzystane punkty przepadają 1. dnia. Zero wyłącza podziękowania.",
+  "Kolik bodů smí každý za měsíc rozdat kolegům.": "Ile punktów każdy może rozdać kolegom w miesiącu.",
+  "Měsíční příspěvek na poděkování (b)": "Miesięczna pula na podziękowania (pkt)",
+  "Oddělené čárkou, nejvýš {n}. V poděkování jako #ochota, #tým.": "Oddzielone przecinkiem, najwyżej {n}. W podziękowaniu jako #pomoc, #zespół.",
+  "Poděkování mezi kolegy": "Podziękowania między kolegami"
 }

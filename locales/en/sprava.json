@@ -1752,5 +1752,11 @@
   "Účtenka výdaje": "Expense receipt",
   "Doklady": "Documents",
   "Fotky z telefonu při uzávěrce — podle nich se dohledá rozdíl proti terminálu.": "Photos taken on the phone at closing — use them to trace a difference against the terminal.",
-  "Otevřít doklad {n}: {druh}": "Open document {n}: {druh}"
+  "Otevřít doklad {n}: {druh}": "Open document {n}: {druh}",
+  "Hodnoty podniku": "Company values",
+  "Každý může kolegovi poslat 5, 10 nebo 20 bodů z měsíčního příspěvku, s hodnotou podniku a větou. Nevyužité body 1. dne propadnou. Nula poděkování vypne.": "Anyone can send a colleague 5, 10 or 20 points from a monthly allowance, with a company value and a sentence. Unused points expire on the 1st. Zero turns thanks off.",
+  "Kolik bodů smí každý za měsíc rozdat kolegům.": "How many points anyone may give colleagues per month.",
+  "Měsíční příspěvek na poděkování (b)": "Monthly thanks allowance (pts)",
+  "Oddělené čárkou, nejvýš {n}. V poděkování jako #ochota, #tým.": "Comma-separated, at most {n}. Shown in thanks as #helpful, #team.",
+  "Poděkování mezi kolegy": "Thanks between colleagues"
 }

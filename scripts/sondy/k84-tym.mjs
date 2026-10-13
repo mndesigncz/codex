@@ -41,8 +41,8 @@ const preteceni = (p) => p.evaluate(() => {
 });
 
 /** Docházka s pevnými časy (tokeny jako k83-dochazka). */
-const nactiDochazku = () => {
-  let t = readFileSync(DIR + 'k84-tym-attendance.json', 'utf8');
+const nactiDochazku = (jmeno = 'k84-tym-attendance') => {
+  let t = readFileSync(DIR + jmeno + '.json', 'utf8');
   t = t.replace(/"@D-(\d+)T(\d\d:\d\d)"/g, (_, n, hm) => `"${prahaISO(den(Number(n)), hm)}"`);
   t = t.replace(/"D-(\d+)"/g, (_, n) => `"${den(Number(n))}"`);
   t = t.replace(/"@(\d+)"/g, (_, m) => `"${new Date(TED - Number(m) * 60000).toISOString()}"`);
@@ -67,6 +67,7 @@ const FIX_TYM = { stranka: 'vedeni.tym', polozky: [{ id: 'tym-pozvanky', widget:
 const FIX_ROZVRH = { stranka: 'vedeni.rozvrh', polozky: [{ id: 'nastroj', widget: 'nastroj', velikost: 'L' }], dostupne: [], tarifem: [], zdroj: 'aplikace', rozsah: 'typ:vedeni', zamceno: false, smiUpravit: true, smiVychozi: true, verze: 0 };
 
 const DOCHAZKA = nactiDochazku();
+const ZED = nactiDochazku('k84-tym-zed');
 /** Pražský den s posunem (pro fixtury k69-b1 s tokeny ZA5…). */
 const praha = (o = 0) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(TED + o * 86400000));
 const DNY = { DNES: praha(0), VCERA: praha(-1), PRED3: praha(-3), ZITRA: praha(1), POZITRI: praha(2), ZA3: praha(3), ZA5: praha(5), ZA7: praha(7), ZA10: praha(10), ZA12: praha(12), ZA20: praha(20) };
@@ -84,8 +85,11 @@ const podvrh = (bezPlanu = false) => (req, json, stav) => {
     (stav.zapisy ??= []).push({ m: req.method(), path, body: req.postData() });
     if (path === '/api/schedule/rules') return json({ ok: true });
     if (path === '/api/timeoff') return json({ ok: true, request: {}, vacationPerYear: 25 });
+    if (path === '/api/rewards/awards') return json({ award: { id: 99 }, zbyva: 20 });
+    if (path === '/api/teams') return json({ ok: true });
     return undefined;
   }
+  if (path === '/api/rewards/awards' && q.get('zed') === '1') return json(ZED);
   if (path === '/api/timeoff' && q.get('mine') === '1') return json({ ...nactiB1('k69-b1-timeoff-mine'), narok: NAROK });
   if (path === '/api/availability') return json(q.get('mine') ? null : nactiB1('k69-b1-availability'));
   if (path === '/api/shifts/offers') return json(nactiB1('k69-b1-offers'));
@@ -324,6 +328,76 @@ const ROZVRH = '/employer/overview?view=shifts';
   await dokud(async () => (await w.locator('[data-narok-dovolene]').count()) > 0, 6000);
   tvrdi('D2 (390): widget Moje volno ukáže „Dovolená: zbývá 6 z 20 dní"', /Dovolená: zbývá 6 z 20 dní/.test(await text(w)), await text(w));
   await w.screenshot({ path: OUT + 'k84-tym-moje-volno-390.png' });
+  await ctx.close();
+}
+
+// ---------------------------------------------------------------------------
+// Z — Zeď díků a Poděkovat (zaměstnanec Domů 390), nastavení příspěvku (vedení 1280)
+// ---------------------------------------------------------------------------
+{
+  const BARISTA = roleMine('barista');
+  const fix = { stranka: 'zamestnanec.domu', polozky: [{ id: 'zed', widget: 'odmeny.zed_diku', velikost: 'M' }, { id: 'moje-uroven', widget: 'moje.uroven', velikost: 'M' }], dostupne: ['odmeny.zed_diku', 'moje.uroven'], tarifem: [], zdroj: 'osobni', rozsah: 'typ:zamestnanec', zamceno: false, smiUpravit: true, smiVychozi: false, verze: 1 };
+  const { ctx, p, stav, chyby } = await kontext({ role: 'employee', fix, mineData: BARISTA, viewport: TEL, mobil: true, posunCasu: POSUN, dalsi: podvrh() });
+  await otevriPlochu(p, '/employee/shifts?view=home', 'zamestnanec.domu');
+  const w = p.locator('[data-plocha] li[data-widget="odmeny.zed_diku"]:not([hidden])');
+  await dokud(async () => (await w.locator('li.list-row, .list-row').count()) > 0, 8000);
+  const tw = await text(w);
+  tvrdi('Z1 (390): Zeď díků ukáže kdo, od koho, #hodnotu, větu a body', /Jakub Horák/.test(tw) && /od Eva Testová/.test(tw) && /#tým/.test(tw) && /Díky za záskok v sobotu/.test(tw) && /\+10/.test(tw), tw.slice(0, 300));
+  const tl = w.locator('[data-podekovat]');
+  tvrdi('Z1 (390): tlačítko „Poděkovat · 30 b" (zbytek příspěvku) je nad ohybem a ≥ 44 px', /Poděkovat · 30 b/.test(await text(tl)) && (await tl.boundingBox()).y + (await tl.boundingBox()).height <= TEL.height, await text(tl));
+  await w.screenshot({ path: OUT + 'k84-tym-zed-390.png' });
+  await tl.click();
+  const okno = p.getByRole('dialog');
+  await okno.waitFor({ timeout: 5000 });
+  await dokud(async () => (await okno.locator('[data-zbyva-rozdat]').count()) > 0, 4000);
+  tvrdi('Z1 (390): okno říká „Tento měsíc můžeš rozdat ještě 30 b z 50."', /rozdat ještě 30 b z 50/.test(await text(okno)), (await text(okno)).slice(0, 200));
+  await okno.locator('#dik-komu').selectOption('18');
+  await okno.getByRole('tab', { name: '+20' }).click();
+  await okno.getByRole('button', { name: '#čistota' }).click();
+  await okno.locator('#dik-veta').fill('Umyla mlýnek za mě');
+  await p.screenshot({ path: OUT + 'k84-tym-podekovat-390.png', fullPage: false });
+  await okno.getByRole('button', { name: 'Poslat díky' }).click();
+  const post = await dokud(() => (stav.zapisy ?? []).find(z => z.path === '/api/rewards/awards' && z.m === 'POST'), 4000);
+  tvrdi('Z1 (390): Poslat díky → POST { kind: kolega, userId: 18, points: 20, valueTag: čistota, reason }', !!post && /"kind":"kolega","userId":18,"points":20,"valueTag":"čistota","reason":"Umyla mlýnek za mě"/.test(post.body), post?.body);
+  tvrdi('Z1 (390): okno se zavře a přijde toast', await dokud(async () => (await okno.count()) === 0, 4000) && await dokud(() => p.getByText('Díky odeslané').isVisible().catch(() => false), 3000));
+  const pr = await preteceni(p);
+  tvrdi('Z1 (390): bez přetečení', pr.dokument <= 1 && pr.karty === 0, JSON.stringify(pr));
+  tvrdi('Z1: bez chyb v konzoli', skutecneChyby(chyby).length === 0, skutecneChyby(chyby).slice(0, 2).join(' | '));
+  await ctx.close();
+}
+// Tablet jen čte: žádné tlačítko Poděkovat (odpověď bez příspěvku).
+{
+  const fixK = { stranka: 'kiosk.smena', polozky: [{ id: 'zed', widget: 'odmeny.zed_diku', velikost: 'M' }, { id: 'nastroj', widget: 'nastroj', velikost: 'L' }], dostupne: ['odmeny.zed_diku'], tarifem: [], zdroj: 'podnik', rozsah: 'typ:kiosk', zamceno: true, smiUpravit: false, smiVychozi: false, verze: 1 };
+  const { ctx, p } = await kontext({ role: 'kiosk', fix: fixK, mineData: roleMine('kiosk'), viewport: { width: 1024, height: 768 }, posunCasu: POSUN, dalsi: (req, json, stav) => {
+    const u = new URL(req.url());
+    if (u.pathname === '/api/rewards/awards' && u.searchParams.get('zed') === '1') return json({ ...ZED, prispevek: null, kolegove: [] });
+    return podvrh()(req, json, stav);
+  } });
+  await p.goto(BASE + '/kiosk', { waitUntil: 'networkidle' });
+  const w = p.locator('[data-plocha="kiosk.smena"] li[data-widget="odmeny.zed_diku"]:not([hidden])');
+  const je = await dokud(async () => (await w.count()) > 0, 20000);
+  tvrdi('Z2 (tablet): Zeď díků je na tabletu, jen ke čtení (bez Poděkovat)', je && (await w.locator('[data-podekovat]').count()) === 0, String(je));
+  await ctx.close();
+}
+// Vedení: Odměny › Nastavení má Poděkování mezi kolegy a Uložit pošle příspěvek a hodnoty v pointsConfig.
+{
+  const fixO = { stranka: 'vedeni.odmeny', polozky: [{ id: 'nastroj', widget: 'nastroj', velikost: 'L' }], dostupne: [], tarifem: [], zdroj: 'aplikace', rozsah: 'typ:vedeni', zamceno: false, smiUpravit: true, smiVychozi: true, verze: 0 };
+  const { ctx, p, stav } = await kontext({ fix: fixO, posunCasu: POSUN, dalsi: (req, json, stav) => {
+    const u = new URL(req.url());
+    if (u.pathname === '/api/rewards' && req.method() === 'GET') return json({ role: 'employer', levels: [{ name: 'Barista', minPoints: 0, perks: '' }], points: { task: 5, procedure: 10, closing: 15, ratingStar: 4, taskMissed: -5, procedureSkipped: -2, procedureMissed: -4, closingMissing: -10, closingBalanced: 3 }, dik: { prispevek: 50, hodnoty: ['ochota', 'tým'] }, standings: [] });
+    return podvrh()(req, json, stav);
+  } });
+  await otevriPlochu(p, '/employer/overview?view=rewards', 'vedeni.odmeny');
+  await p.getByRole('tablist', { name: 'Část stránky' }).getByRole('tab', { name: 'Nastavení' }).click();
+  const karta = p.locator('[data-nastaveni-diku]');
+  await karta.waitFor({ timeout: 8000 });
+  tvrdi('N1 (1280): karta Poděkování mezi kolegy s příspěvkem 50 a hodnotami „ochota, tým"', (await karta.locator('#dik-prispevek').inputValue()) === '50' && (await karta.locator('#dik-hodnoty').inputValue()) === 'ochota, tým');
+  await karta.locator('#dik-prispevek').fill('80');
+  await karta.locator('#dik-hodnoty').fill('ochota, tým, #host');
+  await p.getByRole('button', { name: 'Uložit nastavení' }).click();
+  const patch = await dokud(() => (stav.zapisy ?? []).find(z => z.path === '/api/teams' && z.m === 'PATCH'), 4000);
+  tvrdi('N1: Uložit pošle PATCH /api/teams s pointsConfig.mesicniPrispevek 80 a hodnotami bez „#"', !!patch && /"mesicniPrispevek":80,"hodnoty":\["ochota","tým","host"\]/.test(patch.body), patch?.body?.slice(0, 300));
+  await karta.screenshot({ path: OUT + 'k84-tym-nastaveni-diku-1280.png' });
   await ctx.close();
 }
 

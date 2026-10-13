@@ -2152,5 +2152,22 @@
   "Kolik % položek menu má recepturu, kolik se prodává bez receptury, kolik položek je ve skladu. V M navíc „Změněno tento týden\" a návrhy úprav ke schválení.": "Koľko % položiek menu má receptúru, koľko sa predáva bez receptúry, koľko položiek je v sklade. V M navyše „Zmenené tento týždeň“ a návrhy úprav na schválenie.",
   "{n, plural, one {# poznámka} few {# poznámky} other {# poznámek}}": "{n, plural, one {# poznámka} few {# poznámky} other {# poznámok}}",
   "nová": "nová",
-  "Dovolená: zbývá {n} z {celkem} dní": "Dovolenka: zostáva {n} z {celkem} dní"
+  "Dovolená: zbývá {n} z {celkem} dní": "Dovolenka: zostáva {n} z {celkem} dní",
+  "Body kolegovi za to, co pro tebe udělal": "Body kolegovi za to, čo pre teba urobil",
+  "Díky odeslané — kolega dostal body i oznámení.": "Vďaka odoslaná – kolega dostal body aj oznámenie.",
+  "Hodnota": "Hodnota",
+  "Jedna věta": "Jedna veta",
+  "Komu|dik": "Komu",
+  "Např. díky za záskok v sobotu": "Napr. vďaka za záskok v sobotu",
+  "Poděkovat": "Poďakovať",
+  "Poděkování mezi kolegy s body z měsíčního příspěvku — kdo komu za co, a tlačítko Poděkovat.": "Poďakovanie medzi kolegami s bodmi z mesačného príspevku – kto komu za čo, a tlačidlo Poďakovať.",
+  "Poděkování se nepodařilo odeslat.": "Poďakovanie sa nepodarilo odoslať.",
+  "Poslat díky": "Poslať vďaku",
+  "Tento měsíc můžeš rozdat ještě {n} b z {celkem}.": "Tento mesiac môžeš rozdať ešte {n} b z {celkem}.",
+  "Tento měsíc už máš rozdáno — příspěvek {n} b se obnoví 1. dne.": "Tento mesiac už máš rozdané – príspevok {n} b sa obnoví 1. dňa.",
+  "Uvidí ji v oznámení i na Zdi díků.": "Uvidí ju v oznámení aj na Stene vďaky.",
+  "Vyber kolegu…": "Vyber kolegu…",
+  "Za co — hodnota podniku": "Za čo – hodnota podniku",
+  "Zatím nikdo nikomu nepoděkoval. Záskok, pomoc s úklidem, hezké slovo hostovi — body od kolegů těší víc než hvězdy.": "Zatiaľ nikto nikomu nepoďakoval. Záskok, pomoc s upratovaním, pekné slovo hosťovi – body od kolegov tešia viac než hviezdy.",
+  "Zeď díků": "Stena vďaky"
 }

@@ -2149,5 +2149,22 @@
   "Kolik % položek menu má recepturu, kolik se prodává bez receptury, kolik položek je ve skladu. V M navíc „Změněno tento týden\" a návrhy úprav ke schválení.": "What % of menu items have a recipe, how many sell without one, how many items are in stock. In M also \"Changed this week\" and change proposals to approve.",
   "{n, plural, one {# poznámka} few {# poznámky} other {# poznámek}}": "{n, plural, one {# note} other {# notes}}",
   "nová": "new",
-  "Dovolená: zbývá {n} z {celkem} dní": "Leave: {n} of {celkem} days left"
+  "Dovolená: zbývá {n} z {celkem} dní": "Leave: {n} of {celkem} days left",
+  "Body kolegovi za to, co pro tebe udělal": "Points for a colleague for what they did for you",
+  "Díky odeslané — kolega dostal body i oznámení.": "Thanks sent — your colleague got the points and a notification.",
+  "Hodnota": "Value",
+  "Jedna věta": "One sentence",
+  "Komu|dik": "To",
+  "Např. díky za záskok v sobotu": "E.g. thanks for covering Saturday",
+  "Poděkovat": "Say thanks",
+  "Poděkování mezi kolegy s body z měsíčního příspěvku — kdo komu za co, a tlačítko Poděkovat.": "Thanks between colleagues with points from a monthly allowance — who thanked whom for what, and a Say thanks button.",
+  "Poděkování se nepodařilo odeslat.": "The thanks couldn't be sent.",
+  "Poslat díky": "Send thanks",
+  "Tento měsíc můžeš rozdat ještě {n} b z {celkem}.": "This month you can still give {n} of {celkem} pts.",
+  "Tento měsíc už máš rozdáno — příspěvek {n} b se obnoví 1. dne.": "You've given everything this month — the {n} pt allowance resets on the 1st.",
+  "Uvidí ji v oznámení i na Zdi díků.": "They'll see it in the notification and on the Thanks wall.",
+  "Vyber kolegu…": "Pick a colleague…",
+  "Za co — hodnota podniku": "For what — company value",
+  "Zatím nikdo nikomu nepoděkoval. Záskok, pomoc s úklidem, hezké slovo hostovi — body od kolegů těší víc než hvězdy.": "Nobody has thanked anyone yet. A cover shift, help with cleaning, a kind word to a guest — points from colleagues mean more than stars.",
+  "Zeď díků": "Thanks wall"
 }

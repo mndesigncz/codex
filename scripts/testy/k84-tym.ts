@@ -11,6 +11,7 @@ import type { Testy } from './_testy.ts';
 import { dniKNacteni, hodinyClenu, seradCleny, soucetHodinClenu } from '../../lib/tymHodiny.ts';
 import { pragueMomentOf } from '../../lib/pragueTime.ts';
 import { STRANKA as TYM } from '../../lib/widgety/stranky/vedeni.tym.ts';
+import { widget as widgetKatalog } from '../../lib/widgety/katalog/index.ts';
 import type { ZaznamDochazky } from '../../lib/dochazkaPrehled.ts';
 import {
   BEZ_LIMITU, ZAKONNE_LIMITY, klicTydne, smenaVLimitech, souhrnVarovani, varovaniLimitu, varovaniNoveSmeny, varovaniPodleSmeny, vycistiLimity,
@@ -20,6 +21,7 @@ import {
   navrhniRozvrh, planProtiTrzbam, podilMezdPlanu, tonPodilu, trzbaDne, type ClovekGeneratoru, type TypSmeny, type VstupGeneratoru,
 } from '../../lib/rozvrhGenerator.ts';
 import { dnuVRoce, narokDovolene, rokNaroku, vycistiNarok, zbudePoSchvaleni } from '../../lib/dovolena.ts';
+import { BODY_DIKU, VYCHOZI_PRISPEVEK, nastaveniDiku, overDik, vyberZed, zacatekMesice, zbyvaRozdat } from '../../lib/podekovani.ts';
 import { AUDIT_POPISKY } from '../../lib/auditPopisky.ts';
 
 const zdroj = (cesta: string) => readFileSync(new URL(`../../${cesta}`, import.meta.url), 'utf8');
@@ -190,4 +192,32 @@ export default function ({ eq, ok }: Testy) {
   ok('žádost o volno: zůstatek nad poli jen u typu Dovolená, s „po schválení zbude"', /typ !== 'vacation'\) return null/.test(volno) && /po schválení zbude \{n\}/.test(volno));
   const tymSrc = zdroj('components/TeamManagement.tsx');
   ok('Tým: pole Dovolená na rok jen s volno.schvalovat a zápis PUT /api/timeoff s kontrolou odpovědi', /smiNarok && \(/.test(tymSrc) && /fetch\('\/api\/timeoff', \{ method: 'PUT'/.test(tymSrc) && /vacationPerYear: novyNarok \}\) \}\)\.then\(okJson\)/.test(tymSrc));
+
+  // =========================================================================
+  // Poděkuj kolegovi (lib/podekovani.ts)
+  // =========================================================================
+  eq('dík: nastavení bez points_config = výchozí 50 b a čtyři hodnoty', nastaveniDiku(null), { prispevek: VYCHOZI_PRISPEVEK, hodnoty: ['ochota', 'čistota', 'tým', 'host'] });
+  const nz = nastaveniDiku({ mesicniPrispevek: '80', hodnoty: '#ochota, Ochota, tým,, dlouhá hodnota podniku nad limit' });
+  eq('dík: nastavení z uložených hodnot — text s čárkami, „#" pryč, duplicity pryč, strop délky 24', [nz.prispevek, nz.hodnoty.slice(0, 2), nz.hodnoty.length, nz.hodnoty[2].length], [80, ['ochota', 'tým'], 3, 24]);
+  eq('dík: nula vypne, nesmysl výchozí, strop 1000', [nastaveniDiku({ mesicniPrispevek: 0 }).prispevek, nastaveniDiku({ mesicniPrispevek: 'x' }).prispevek, nastaveniDiku({ mesicniPrispevek: 99999 }).prispevek], [0, VYCHOZI_PRISPEVEK, 1000]);
+  eq('dík: začátek měsíce a zbývá rozdat', [zacatekMesice('2026-10-13'), zbyvaRozdat(50, 20), zbyvaRozdat(50, 80)], ['2026-10-01', 30, 0]);
+  const nd = nastaveniDiku({ mesicniPrispevek: 50, hodnoty: ['ochota', 'tým'] });
+  eq('dík: platné poděkování 10 b #tým s větou', overDik({ od: 1, komu: 2, body: 10, hodnota: '#tým', veta: ' Díky za záskok ' }, nd, 20), { ok: true, body: 10, hodnota: 'tým', veta: 'Díky za záskok' });
+  eq('dík: sám sobě nejde', (overDik({ od: 1, komu: 1, body: 5 }, nd, 0) as any).ok, false);
+  eq('dík: jen 5 / 10 / 20', [BODY_DIKU, (overDik({ od: 1, komu: 2, body: 7 }, nd, 0) as any).ok], [[5, 10, 20], false]);
+  ok('dík: nad zbytek příspěvku řekne, kolik ještě jde', (overDik({ od: 1, komu: 2, body: 20, }, nd, 40) as any).chyba === 'Tento měsíc můžeš rozdat už jen 10 b.');
+  ok('dík: vyčerpaný příspěvek řekne, že se obnoví 1. dne', /obnoví 1\. dne/.test((overDik({ od: 1, komu: 2, body: 5 }, nd, 50) as any).chyba));
+  ok('dík: vypnuté (0) odmítne', /vypnuté/.test((overDik({ od: 1, komu: 2, body: 5 }, { prispevek: 0, hodnoty: [] }, 0) as any).chyba));
+  ok('dík: cizí hodnota odmítnutá, prázdná hodnota ok', (overDik({ od: 1, komu: 2, body: 5, hodnota: 'cizí' }, nd, 0) as any).ok === false && (overDik({ od: 1, komu: 2, body: 5, hodnota: '' }, nd, 0) as any).hodnota === null);
+  eq('dík: věta se ořeže na 140 znaků', (overDik({ od: 1, komu: 2, body: 5, veta: 'x'.repeat(200) }, nd, 0) as any).veta.length, 140);
+  const zed = vyberZed({ awards: [{ id: 1, userId: 2, name: 'Eva', avatar: null, points: 10, reason: 'díky', givenBy: 'Jakub', createdAt: '2026-10-01T10:00:00Z', kind: 'kolega', valueTag: 'tým' }], prispevek: { mesicni: 50, zbyva: 30 }, hodnoty: ['tým'], kolegove: [{ id: 2, name: 'Eva' }] });
+  eq('dík: zeď z odpovědi API', [zed.diky[0].jmeno, zed.diky[0].hodnota, zed.prispevek, zed.hodnoty, zed.kolegove[0].jmeno], ['Eva', 'tým', { mesicni: 50, zbyva: 30 }, ['tým'], 'Eva']);
+  ok('dík: nečekaný tvar je chyba (ErrorState), ne prázdná zeď', (() => { try { vyberZed([]); return false; } catch { return true; } })());
+  const awards = zdroj('app/api/rewards/awards/route.ts');
+  ok('awards: poděkování kind kolega jde bez hodnoceni.hodnotit, tablet ne, přes overDik a jeClenem', /if \(b\?\.kind === 'kolega'\) return podekovat\(b\)/.test(awards) && /c\.role\.typ === 'kiosk'/.test(awards) && /overDik\(\{ od: c\.meId, komu/.test(awards) && /jeClenem\(komu, c\.teamId\)/.test(awards));
+  ok('awards: zeď (?zed=1) vrací jen kind kolega a příspěvek jen osobnímu účtu', /a\.kind = 'kolega'/.test(awards) && /const prispevek = osobni && n\.prispevek > 0/.test(awards));
+  ok('awards: poděkování má audit s popiskem a oznámení obdarovanému', /'points\.thanks'/.test(awards) && typeof AUDIT_POPISKY['points.thanks'] === 'string' && /Poděkování od \$\{jmeno\}/.test(awards));
+  ok('katalog: Zeď díků pro vedení, zaměstnance i tablet bez klíče oprávnění', !!widgetKatalog('odmeny.zed_diku') && widgetKatalog('odmeny.zed_diku')!.rozhrani.includes('kiosk') && widgetKatalog('odmeny.zed_diku')!.opravneni.vse.length === 0);
+  const rv = zdroj('components/employer/RewardsView.tsx');
+  ok('nastavení odměn: příspěvek a hodnoty jdou do points_config pod klíči mesicniPrispevek a hodnoty', /pointsConfig: \{ \.\.\.body, mesicniPrispevek: nastaveniDiku\(/.test(rv) && /\.prispevek, hodnoty: nastaveniDiku\(/.test(rv));
 }

@@ -62,6 +62,7 @@ import {
   Avatar, BulkBar, Button, Chip, EmptyState, Field, Input, ListRow, Modal, Segmented, Select, SelectBox, Stat, StatRow, Toast, Well,
   runBulk, useSelection,
 } from '../../ui';
+import { BODY_DIKU, MAX_VETA_DIKU, vyberZed } from '@/lib/podekovani';
 import { useOpravneni } from '../../role/useOpravneni';
 import { useMoney } from '../../CurrencyProvider';
 import { Widget, useWidget, type StavNacteni } from '../Widget';
@@ -1156,7 +1157,13 @@ function Pochvaly({ velikost, nahled }: WidgetProps) {
   const odkaz = useOdkazOdmeny();
   const strop = velikost === 'S' ? 0 : velikost === 'M' ? 4 : 10;
   // Druhotné, ne limetka: na ploše Odměn je hlavní akce jedna (DP §3.1) a tohle je jedna z více.
-  const tlacitko = smiChvalit && <Button variant="secondary" size="sm" icon="award" onClick={() => setOkno(true)}>{t('Pochválit')}</Button>;
+  // Kolo 8: vedle Pochválit (body od vedení) i Poděkovat (body z vlastního měsíčního příspěvku — vedoucí je taky kolega).
+  const [dekuji, setDekuji] = useState(false);
+  const tlacitko = smiChvalit && <>
+    <Button variant="secondary" size="sm" icon="award" onClick={() => setOkno(true)}>{t('Pochválit')}</Button>
+    {!nahled && <Button variant="ghost" size="sm" onClick={() => setDekuji(true)}>{t('Poděkovat')}</Button>}
+    {dekuji && <PodekovaniOkno onClose={() => setDekuji(false)} />}
+  </>;
   return (
     <Widget nacteni={ceka ? CEKA : data} odkaz={velikost === 'S' ? undefined : odkaz}
       prazdno={data.data && pochvaly.length === 0 ? (
@@ -1180,8 +1187,153 @@ function Pochvaly({ velikost, nahled }: WidgetProps) {
         </ul>
       )}
       {pochvaly.length > strop && strop > 0 && <p className="t-meta mt-2">{aDalsich(t, pochvaly.length - strop)}</p>}
-      {tlacitko && <div className="mt-3">{tlacitko}</div>}
+      {tlacitko && <div className="mt-3 flex flex-wrap items-center gap-2">{tlacitko}</div>}
       {okno && <PochvalaOkno onClose={() => setOkno(false)} />}
+    </Widget>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Poděkuj kolegovi a Zeď díků (kolo 8, R8-3 — vzor Bonusly „giveable allowance", Connecteam)
+// ---------------------------------------------------------------------------
+//
+// Zaměstnanec pošle kolegovi 5 / 10 / 20 b z měsíčního příspěvku (vedení ho nastaví v Odměny ›
+// Nastavení, výchozí 50 b; 0 = vypnuto) s hodnotou podniku (#ochota, #tým…) a jednou větou. Body
+// jdou do zůstatku jako každé jiné (lib/pointsBalance → awards), obdarovaný dostane oznámení.
+// Zeď díků ukazuje poslední díky s autorem a hodnotou; na tabletu jen ke čtení (nemá komu „od").
+
+const URL_ZED = '/api/rewards/awards?zed=1&limit=30';
+
+/** Okno „Poděkovat": komu, body (Segmented 5/10/20), hodnota (pilulky) a jedna věta. */
+export function PodekovaniOkno({ komu, onClose, onHotovo }: {
+  komu?: { id: number; jmeno: string } | null;
+  onClose: () => void;
+  onHotovo?: () => void;
+}) {
+  const t = useT('widgety');
+  const zed = useDataWidgetu(URL_ZED, vyberZed);
+  const [kdo, setKdo] = useState<string>(komu ? String(komu.id) : '');
+  const [body, setBody] = useState<string>('10');
+  const [hodnota, setHodnota] = useState<string>('');
+  const [veta, setVeta] = useState('');
+  const [ukladam, setUkladam] = useState(false);
+  const [chyba, setChyba] = useState<string | null>(null);
+  const prispevek = zed.data?.prispevek ?? null;
+  const zbyva = prispevek?.zbyva ?? 0;
+  const n = Number(body);
+  const jde = kdo !== '' && n > 0 && n <= zbyva && !ukladam;
+  const uloz = async () => {
+    if (!jde) return;
+    setUkladam(true); setChyba(null);
+    try {
+      await fetch('/api/rewards/awards', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind: 'kolega', userId: Number(kdo), points: n, valueTag: hodnota || undefined, reason: veta.trim() || undefined }),
+      }).then(okJson);
+      obnovDataWidgetu(URL_ZED);
+      obnovDataWidgetu(URL_ODMENY);
+      onHotovo?.();
+      onClose();
+    } catch (e) {
+      setChyba(apiMessage(e, t('Poděkování se nepodařilo odeslat.')));
+    } finally {
+      setUkladam(false);
+    }
+  };
+  return (
+    <NadPlochou>
+      <Modal open onClose={onClose} size="sm" title={t('Poděkovat')} subtitle={komu?.jmeno ?? t('Body kolegovi za to, co pro tebe udělal')}
+        footer={<>
+          <Button variant="secondary" onClick={onClose}>{t('Zavřít')}</Button>
+          <Button variant="primary" icon="award" onClick={uloz} loading={ukladam} disabled={!jde}>{t('Poslat díky')}</Button>
+        </>}>
+        <div className="space-y-4" data-podekovani-okno>
+          {/* Kolik ještě můžu rozdat — Bonusly to ukazuje nahoře v každém okně, ať člověk nehádá. */}
+          {prispevek && (
+            <p className="t-meta" data-zbyva-rozdat={zbyva}>
+              {zbyva > 0
+                ? t('Tento měsíc můžeš rozdat ještě {n} b z {celkem}.', { n: zbyva, celkem: prispevek.mesicni })
+                : t('Tento měsíc už máš rozdáno — příspěvek {n} b se obnoví 1. dne.', { n: prispevek.mesicni })}
+            </p>
+          )}
+          {!komu && (
+            <Field id="dik-komu" label={t('Komu', undefined, 'dik')}>
+              <Select id="dik-komu" value={kdo} onChange={e => setKdo(e.target.value)} autoFocus>
+                <option value="">{zed.loading ? t('Načítám členy…') : t('Vyber kolegu…')}</option>
+                {(zed.data?.kolegove ?? []).map(k => <option key={k.id} value={k.id}>{k.jmeno}</option>)}
+              </Select>
+            </Field>
+          )}
+          <Field id="dik-body" label={t('Body')}>
+            <Segmented ariaLabel={t('Body')} value={body} onChange={setBody}
+              options={BODY_DIKU.map(v => ({ id: String(v), label: `+${v}` }))} />
+          </Field>
+          {(zed.data?.hodnoty.length ?? 0) > 0 && (
+            <div className="space-y-1.5">
+              <p className="t-label">{t('Za co — hodnota podniku')}</p>
+              <div className="flex flex-wrap gap-1.5" role="group" aria-label={t('Hodnota')}>
+                {zed.data!.hodnoty.map(h => (
+                  <button key={h} type="button" aria-pressed={hodnota === h} onClick={() => setHodnota(hodnota === h ? '' : h)}
+                    className={`filter-pill tap-target-sm ${hodnota === h ? 'seg-on' : 'seg-off glass'}`}>#{h}</button>
+                ))}
+              </div>
+            </div>
+          )}
+          <Field id="dik-veta" label={t('Jedna věta')} hint={t('Uvidí ji v oznámení i na Zdi díků.')}>
+            <Input id="dik-veta" value={veta} onChange={e => setVeta(e.target.value)} maxLength={MAX_VETA_DIKU} inputMode="text" enterKeyHint="send"
+              placeholder={t('Např. díky za záskok v sobotu')} autoFocus={!!komu}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void uloz(); } }} />
+          </Field>
+          {chyba && <p className="note note-danger text-sm" role="alert">{chyba}</p>}
+        </div>
+      </Modal>
+    </NadPlochou>
+  );
+}
+
+/** Widget Zeď díků: poslední díky s autorem a hodnotou; „Poděkovat" pro osobní účet s příspěvkem. */
+function ZedDiku({ velikost, nahled }: WidgetProps) {
+  const t = useT('widgety');
+  const { ok, ceka } = useBrana([]);
+  const data = useDataWidgetu(ok ? URL_ZED : null, vyberZed);
+  const diky = data.data?.diky ?? [];
+  const [okno, setOkno] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const odkaz = useOdkazOdmeny();
+  const prispevek = data.data?.prispevek ?? null;
+  // Tablet (bez příspěvku v odpovědi) jen čte; v náhledu se nezapisuje.
+  const smiDekovat = !nahled && !!prispevek;
+  const strop = velikost === 'S' ? 2 : velikost === 'M' ? 4 : 12;
+  const tlacitko = smiDekovat && (
+    <Button variant="secondary" size="sm" icon="award" onClick={() => setOkno(true)} data-podekovat>
+      {t('Poděkovat')}{prispevek && prispevek.zbyva > 0 ? ` · ${prispevek.zbyva} b` : ''}
+    </Button>
+  );
+  const okna = <>
+    {okno && <PodekovaniOkno onClose={() => setOkno(false)} onHotovo={() => setToast(t('Díky odeslané — kolega dostal body i oznámení.'))} />}
+    <Toast message={toast} onClose={() => setToast(null)} />
+  </>;
+  return (
+    <Widget nacteni={ceka ? CEKA : data} odkaz={velikost === 'S' ? undefined : odkaz}
+      prazdno={data.data && diky.length === 0 ? (
+        <div className="space-y-3">
+          <p className="t-meta text-pretty">{t('Zatím nikdo nikomu nepoděkoval. Záskok, pomoc s úklidem, hezké slovo hostovi — body od kolegů těší víc než hvězdy.')}</p>
+          {tlacitko}
+          {okna}
+        </div>
+      ) : undefined}>
+      <ul className="list">
+        {diky.slice(0, strop).map(d => (
+          <ListRow key={d.id} lead={<Avatar emoji={d.avatar} size="sm" />} title={d.jmeno}
+            meta={[d.od ? t('od {kdo}', { kdo: d.od }) : null, kdyKratce(d.kdy)].filter(Boolean).join(' · ')}
+            detail={d.veta ? `„${d.veta}“` : undefined}
+            right={d.hodnota ? <Chip tone="info" size="sm">#{d.hodnota}</Chip> : undefined}
+            value={sZnamenkem(d.body)} valueMeta={bodTvar(t, d.body)} />
+        ))}
+      </ul>
+      {diky.length > strop && <p className="t-meta mt-2">{aDalsich(t, diky.length - strop)}</p>}
+      {tlacitko && <div className="mt-3">{tlacitko}</div>}
+      {okna}
     </Widget>
   );
 }
@@ -1285,6 +1437,7 @@ export const KOMPONENTY: Record<string, KomponentaWidgetu> = {
   'odmeny.zadosti': ZadostiOOdmeny,
   'odmeny.vytky_tymu': VytkyVTymu,
   'odmeny.pochvaly': Pochvaly,
+  'odmeny.zed_diku': ZedDiku,
   'odmeny.katalog': KatalogOdmen,
   'odmeny.urovne': Urovne,
   'moje.uroven': MojeUrovenWidget,

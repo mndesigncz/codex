@@ -2149,5 +2149,22 @@
   "Kolik % položek menu má recepturu, kolik se prodává bez receptury, kolik položek je ve skladu. V M navíc „Změněno tento týden\" a návrhy úprav ke schválení.": "Jaki % pozycji menu ma recepturę, ile sprzedaje się bez niej, ile pozycji jest w magazynie. W M dodatkowo „Zmienione w tym tygodniu” i propozycje zmian do zatwierdzenia.",
   "{n, plural, one {# poznámka} few {# poznámky} other {# poznámek}}": "{n, plural, one {# notatka} few {# notatki} many {# notatek} other {# notatki}}",
   "nová": "nowa",
-  "Dovolená: zbývá {n} z {celkem} dní": "Urlop: zostaje {n} z {celkem} dni"
+  "Dovolená: zbývá {n} z {celkem} dní": "Urlop: zostaje {n} z {celkem} dni",
+  "Body kolegovi za to, co pro tebe udělal": "Punkty dla kolegi za to, co dla ciebie zrobił",
+  "Díky odeslané — kolega dostal body i oznámení.": "Podziękowanie wysłane – kolega dostał punkty i powiadomienie.",
+  "Hodnota": "Wartość",
+  "Jedna věta": "Jedno zdanie",
+  "Komu|dik": "Komu",
+  "Např. díky za záskok v sobotu": "Np. dzięki za zastępstwo w sobotę",
+  "Poděkovat": "Podziękuj",
+  "Poděkování mezi kolegy s body z měsíčního příspěvku — kdo komu za co, a tlačítko Poděkovat.": "Podziękowania między kolegami z punktami z miesięcznej puli – kto komu za co, i przycisk Podziękuj.",
+  "Poděkování se nepodařilo odeslat.": "Nie udało się wysłać podziękowania.",
+  "Poslat díky": "Wyślij podziękowanie",
+  "Tento měsíc můžeš rozdat ještě {n} b z {celkem}.": "W tym miesiącu możesz rozdać jeszcze {n} z {celkem} pkt.",
+  "Tento měsíc už máš rozdáno — příspěvek {n} b se obnoví 1. dne.": "W tym miesiącu wszystko rozdane – pula {n} pkt odnowi się 1. dnia.",
+  "Uvidí ji v oznámení i na Zdi díků.": "Zobaczy je w powiadomieniu i na Ścianie podziękowań.",
+  "Vyber kolegu…": "Wybierz kolegę…",
+  "Za co — hodnota podniku": "Za co – wartość firmy",
+  "Zatím nikdo nikomu nepoděkoval. Záskok, pomoc s úklidem, hezké slovo hostovi — body od kolegů těší víc než hvězdy.": "Nikt jeszcze nikomu nie podziękował. Zastępstwo, pomoc przy sprzątaniu, miłe słowo dla gościa – punkty od kolegów cieszą bardziej niż gwiazdki.",
+  "Zeď díků": "Ściana podziękowań"
 }

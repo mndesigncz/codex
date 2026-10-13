@@ -1752,5 +1752,11 @@
   "Účtenka výdaje": "Účtenka výdavku",
   "Doklady": "Doklady",
   "Fotky z telefonu při uzávěrce — podle nich se dohledá rozdíl proti terminálu.": "Fotky z telefónu pri uzávierke — podľa nich sa dohľadá rozdiel proti terminálu.",
-  "Otevřít doklad {n}: {druh}": "Otvoriť doklad {n}: {druh}"
+  "Otevřít doklad {n}: {druh}": "Otvoriť doklad {n}: {druh}",
+  "Hodnoty podniku": "Hodnoty podniku",
+  "Každý může kolegovi poslat 5, 10 nebo 20 bodů z měsíčního příspěvku, s hodnotou podniku a větou. Nevyužité body 1. dne propadnou. Nula poděkování vypne.": "Každý môže kolegovi poslať 5, 10 alebo 20 bodov z mesačného príspevku, s hodnotou podniku a vetou. Nevyužité body 1. dňa prepadnú. Nula poďakovanie vypne.",
+  "Kolik bodů smí každý za měsíc rozdat kolegům.": "Koľko bodov smie každý za mesiac rozdať kolegom.",
+  "Měsíční příspěvek na poděkování (b)": "Mesačný príspevok na poďakovanie (b)",
+  "Oddělené čárkou, nejvýš {n}. V poděkování jako #ochota, #tým.": "Oddelené čiarkou, najviac {n}. V poďakovaní ako #ochota, #tím.",
+  "Poděkování mezi kolegy": "Poďakovanie medzi kolegami"
 }

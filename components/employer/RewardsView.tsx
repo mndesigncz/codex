@@ -30,6 +30,7 @@ import {
 } from '../ui';
 import { MAX_NAZEV_ODMENY, validujOdmenu, type ChybaOdmeny } from '@/lib/odmenyKatalog';
 import { DEFAULT_POINTS, normalizeLevels, normalizePoints, type RewardLevel, type PointsConfig } from '@/lib/rewardLevels';
+import { MAX_HODNOT, MAX_PRISPEVEK, VYCHOZI_HODNOTY, VYCHOZI_PRISPEVEK, nastaveniDiku, type NastaveniDiku } from '@/lib/podekovani';
 import { KLIC_KALENDAR, UDALOST_KALENDAR, urlZebricku, vyberKatalog, vyberPoradi, type ObdobiZebricku, type Odmena, type Poradi } from '@/lib/odmenyPrehled';
 import { apiMessage, okJson } from '@/lib/api';
 import ShiftReviewModal from './ShiftReviewModal';
@@ -233,18 +234,22 @@ function Zebricek({ smiHodnotit, smiProfil, vidiHodnoceni, onHodnotit, onPochval
 
 function NastaveniBodu({ onUlozeno }: { onUlozeno: () => void }) {
   const t = useT('sprava');
-  const data = useDataWidgetu(URL_ODMENY, raw => ({ levels: normalizeLevels(raw?.levels), points: normalizePoints(raw?.points) }));
+  // `dik` (kolo 8): příspěvek a hodnoty poděkování — server je posílá vedle normalizovaného sazebníku.
+  const data = useDataWidgetu(URL_ODMENY, raw => ({ levels: normalizeLevels(raw?.levels), points: normalizePoints(raw?.points), dik: nastaveniDiku(raw?.dik) }));
   if (data.error) return <Card><ErrorState compact title={t('Nastavení se nenačetlo')} onRetry={data.reload} detail={data.error} /></Card>;
   if (!data.data) return <Card aria-busy><Skeleton className="h-6 w-40" /><Skeleton className="mt-4 h-40" /></Card>;
-  return <FormularBodu levels={data.data.levels} points={data.data.points} onUlozeno={onUlozeno} />;
+  return <FormularBodu levels={data.data.levels} points={data.data.points} dik={data.data.dik} onUlozeno={onUlozeno} />;
 }
 
-function FormularBodu({ levels: vychoziUrovne, points: vychoziBody, onUlozeno }: {
-  levels: RewardLevel[]; points: PointsConfig | null; onUlozeno: () => void;
+function FormularBodu({ levels: vychoziUrovne, points: vychoziBody, dik: vychoziDik, onUlozeno }: {
+  levels: RewardLevel[]; points: PointsConfig | null; dik?: NastaveniDiku; onUlozeno: () => void;
 }) {
   const t = useT('sprava');
   const [urovne, setUrovne] = useState<RewardLevel[]>(vychoziUrovne);
   const [body, setBody] = useState<PointsConfig>(vychoziBody ?? DEFAULT_POINTS);
+  // Poděkování mezi kolegy (kolo 8): měsíční příspěvek (0 = vypnuto) a hodnoty podniku (#ochota, #tým…).
+  const [prispevek, setPrispevek] = useState<string>(String(vychoziDik?.prispevek ?? VYCHOZI_PRISPEVEK));
+  const [hodnoty, setHodnoty] = useState<string>((vychoziDik?.hodnoty ?? VYCHOZI_HODNOTY).join(', '));
   const [ukladam, setUkladam] = useState(false);
   const [chyba, setChyba] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -261,10 +266,12 @@ function FormularBodu({ levels: vychoziUrovne, points: vychoziBody, onUlozeno }:
         method: 'PATCH', headers: JSON_HLAVICKA,
         body: JSON.stringify({
           levelsConfig: urovne.map(l => ({ name: l.name.trim() || 'Úroveň' /* i18n-ok (obsah podniku) */, minPoints: Math.max(0, Math.round(l.minPoints) || 0), perks: l.perks.trim() })),
-          pointsConfig: body,
+          // Příspěvek a hodnoty jedou v points_config vedle sazebníku pod klíči, které čte nastaveniDiku.
+          pointsConfig: { ...body, mesicniPrispevek: nastaveniDiku({ mesicniPrispevek: prispevek, hodnoty }).prispevek, hodnoty: nastaveniDiku({ mesicniPrispevek: prispevek, hodnoty }).hodnoty },
         }),
       }).then(okJson);
       setToast(t('Nastavení odměn uloženo.'));
+      obnovDataWidgetu('/api/rewards/awards?zed=1&limit=30');
       onUlozeno();
     } catch (e) {
       setChyba(apiMessage(e, t('Nastavení se nepodařilo uložit.')));
@@ -310,6 +317,21 @@ function FormularBodu({ levels: vychoziUrovne, points: vychoziBody, onUlozeno }:
           {pole(t('Neudělaný krok'), 'procedureMissed', t('Za krok, kterého se vůbec nedotkl'), true)}
           {pole(t('Chybí uzávěrka'), 'closingMissing', t('Když měl směnu, ale uzávěrku nevyplnil'), true)}
           {pole(t('Kasa sedí'), 'closingBalanced', t('Bonus, když rozdíl v kase vyjde přesně na nulu'))}
+        </div>
+      </Card>
+
+      {/* Poděkování mezi kolegy (kolo 8, vzor Bonusly): každý má měsíční příspěvek, nevyužitý propadne 1. dne. */}
+      <Card aria-labelledby="dik-titulek" data-nastaveni-diku>
+        <h2 id="dik-titulek" className="t-card">{t('Poděkování mezi kolegy')}</h2>
+        <p className="t-meta mt-1 text-pretty">{t('Každý může kolegovi poslat 5, 10 nebo 20 bodů z měsíčního příspěvku, s hodnotou podniku a větou. Nevyužité body 1. dne propadnou. Nula poděkování vypne.')}</p>
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field id="dik-prispevek" label={t('Měsíční příspěvek na poděkování (b)')} hint={t('Kolik bodů smí každý za měsíc rozdat kolegům.')}>
+            <Input id="dik-prispevek" type="number" inputMode="numeric" min={0} max={MAX_PRISPEVEK} value={prispevek}
+              onChange={e => setPrispevek(e.target.value.replace(/\D/g, ''))} className="tabular-nums" />
+          </Field>
+          <Field id="dik-hodnoty" label={t('Hodnoty podniku')} hint={t('Oddělené čárkou, nejvýš {n}. V poděkování jako #ochota, #tým.', { n: MAX_HODNOT })}>
+            <Input id="dik-hodnoty" value={hodnoty} onChange={e => setHodnoty(e.target.value)} placeholder={VYCHOZI_HODNOTY.join(', ')} />
+          </Field>
         </div>
       </Card>
 

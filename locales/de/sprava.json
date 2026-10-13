@@ -1752,5 +1752,11 @@
   "Účtenka výdaje": "Ausgabenbeleg",
   "Doklady": "Belege",
   "Fotky z telefonu při uzávěrce — podle nich se dohledá rozdíl proti terminálu.": "Fotos vom Telefon beim Kassenabschluss – damit lässt sich eine Differenz zum Terminal nachvollziehen.",
-  "Otevřít doklad {n}: {druh}": "Beleg {n} öffnen: {druh}"
+  "Otevřít doklad {n}: {druh}": "Beleg {n} öffnen: {druh}",
+  "Hodnoty podniku": "Werte des Betriebs",
+  "Každý může kolegovi poslat 5, 10 nebo 20 bodů z měsíčního příspěvku, s hodnotou podniku a větou. Nevyužité body 1. dne propadnou. Nula poděkování vypne.": "Jeder kann einem Kollegen 5, 10 oder 20 Punkte aus einem Monatsguthaben schicken, mit einem Wert des Betriebs und einem Satz. Nicht genutzte Punkte verfallen am 1. Null schaltet das Danken aus.",
+  "Kolik bodů smí každý za měsíc rozdat kolegům.": "Wie viele Punkte jeder pro Monat an Kollegen vergeben darf.",
+  "Měsíční příspěvek na poděkování (b)": "Monatsguthaben für Dank (Pkt.)",
+  "Oddělené čárkou, nejvýš {n}. V poděkování jako #ochota, #tým.": "Durch Komma getrennt, höchstens {n}. Im Dank als #hilfsbereit, #team.",
+  "Poděkování mezi kolegy": "Dank unter Kollegen"
 }

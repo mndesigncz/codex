@@ -100,6 +100,25 @@ export const WIDGETY: DefiniceWidgetu[] = [
     cil: { pohled: 'rewards' },
     stav: 'hotovo',
   },
+  // Data: GET /api/rewards/awards?zed=1 → awards[kind='kolega'], prispevek { mesicni, zbyva } | null, hodnoty, kolegove;
+  // POST /api/rewards/awards { kind: 'kolega', userId, points 5|10|20, valueTag?, reason? }
+  // Kolo 8 (R8-3, vzor Bonusly „giveable allowance"): body od kolegů z měsíčního příspěvku, hodnoty podniku jako #hashtag.
+  // Každý člen (i tablet jen ke čtení) — žádné oprávnění; „Poděkovat" jen osobní účet s příspěvkem > 0.
+  {
+    id: 'odmeny.zed_diku',
+    oblast: 'odmeny',
+    nazev: 'Zeď díků',
+    popis: 'Poděkování mezi kolegy s body z měsíčního příspěvku — kdo komu za co, a tlačítko Poděkovat.',
+    ikona: 'sparkle',
+    velikosti: ['S', 'M', 'L'],
+    vychoziVelikost: 'M',
+    rozhrani: ['vedeni', 'zamestnanec', 'kiosk'],
+    stranky: ['vedeni.odmeny', 'vedeni.prehled', 'zamestnanec.domu', 'zamestnanec.odmeny', 'kiosk.smena'],
+    opravneni: { vse: [], nektere: [] },
+    tarif: 'pro',
+    cil: { pohled: 'rewards' },
+    stav: 'hotovo',
+  },
   // Data: GET /api/rewards/catalog → redemptions[status=pending]
   {
     id: 'odmeny.zadosti',

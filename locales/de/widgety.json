@@ -2150,5 +2150,22 @@
   "Kolik % položek menu má recepturu, kolik se prodává bez receptury, kolik položek je ve skladu. V M navíc „Změněno tento týden\" a návrhy úprav ke schválení.": "Wie viel % der Menüpositionen ein Rezept haben, wie viele ohne Rezept verkauft werden, wie viele Artikel im Lager sind. In M zusätzlich „Diese Woche geändert“ und Änderungsvorschläge zur Freigabe.",
   "{n, plural, one {# poznámka} few {# poznámky} other {# poznámek}}": "{n, plural, one {# Notiz} other {# Notizen}}",
   "nová": "neu",
-  "Dovolená: zbývá {n} z {celkem} dní": "Urlaub: {n} von {celkem} Tagen übrig"
+  "Dovolená: zbývá {n} z {celkem} dní": "Urlaub: {n} von {celkem} Tagen übrig",
+  "Body kolegovi za to, co pro tebe udělal": "Punkte für einen Kollegen, für das, was er für dich getan hat",
+  "Díky odeslané — kolega dostal body i oznámení.": "Danke gesendet – der Kollege hat Punkte und eine Benachrichtigung bekommen.",
+  "Hodnota": "Wert",
+  "Jedna věta": "Ein Satz",
+  "Komu|dik": "An",
+  "Např. díky za záskok v sobotu": "Z. B. danke fürs Einspringen am Samstag",
+  "Poděkovat": "Danke sagen",
+  "Poděkování mezi kolegy s body z měsíčního příspěvku — kdo komu za co, a tlačítko Poděkovat.": "Dank unter Kollegen mit Punkten aus dem Monatsguthaben – wer wem wofür, und ein Danke-Knopf.",
+  "Poděkování se nepodařilo odeslat.": "Das Dankeschön konnte nicht gesendet werden.",
+  "Poslat díky": "Danke senden",
+  "Tento měsíc můžeš rozdat ještě {n} b z {celkem}.": "Diesen Monat kannst du noch {n} von {celkem} Pkt. vergeben.",
+  "Tento měsíc už máš rozdáno — příspěvek {n} b se obnoví 1. dne.": "Diesen Monat ist alles vergeben – das Guthaben von {n} Pkt. gibt es am 1. wieder.",
+  "Uvidí ji v oznámení i na Zdi díků.": "Steht in der Benachrichtigung und an der Dankeswand.",
+  "Vyber kolegu…": "Kollegen wählen…",
+  "Za co — hodnota podniku": "Wofür – Wert des Betriebs",
+  "Zatím nikdo nikomu nepoděkoval. Záskok, pomoc s úklidem, hezké slovo hostovi — body od kolegů těší víc než hvězdy.": "Noch hat niemand jemandem gedankt. Einspringen, Hilfe beim Putzen, ein nettes Wort zum Gast – Punkte von Kollegen freuen mehr als Sterne.",
+  "Zeď díků": "Dankeswand"
 }
