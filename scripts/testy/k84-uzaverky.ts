@@ -6,7 +6,14 @@
 
 import type { Testy } from './_testy.ts';
 import { normalizeMovements, vyplatyZKasyUzaverky, vyplatyICizim, sumMovements } from '../../lib/closing.ts';
-import { odkazNaNavodZEditoru } from '../../lib/recepturyVerze.ts';
+import {
+  cekajiciNavrhy, dopadNaPorci, jeBezeZmeny, marzeProcenta, mnozstviText, mujPosledniNavrh, normalizujSuroviny, odkazNaNavodZEditoru, popisRozdilu,
+  recepturZmenenychZaDni, rezimEditoru, rozdilVerzi, vyberHistorii, vyberNavrhy, type NavrhReceptury,
+} from '../../lib/recepturyVerze.ts';
+import { KATALOG, SYSTEMOVE_ROLE } from '../../lib/opravneniKatalog.ts';
+import { AUDIT_POPISKY } from '../../lib/auditPopisky.ts';
+import { ZACHAZENI_TABULEK, TYMOVE_TABULKY } from '../../lib/smazaniUctu.ts';
+import { widget } from '../../lib/widgety/katalog/index.ts';
 
 export default function ({ eq, ok }: Testy) {
   // ---- pohyby: komu se vyplácelo ----
@@ -46,4 +53,61 @@ export default function ({ eq, ok }: Testy) {
   // ---- odkaz na návod z editoru receptury (oprava-odkaz-navodu-z-receptury) ----
   eq('návod z receptury: zaměstnanec zůstane v /employee', odkazNaNavodZEditoru('zamestnanec.receptury', 12), '/employee/shifts?view=guides&guide=12');
   eq('návod z receptury: vedení /employer', odkazNaNavodZEditoru('vedeni.receptury', 12), '/employer/overview?view=guides&guide=12');
+
+  // ---- historie receptury: rozdíl verzí ----
+  const kava = { itemId: 2, itemName: 'Káva zrnková', amount: 0.018, unit: 'kg' };
+  const mleko = { itemId: 1, itemName: 'Mléko', amount: 0.2, unit: 'l' };
+  const sirup = { itemId: 5, itemName: 'Sirup', amount: 0.015, unit: 'l' };
+  const stara = [kava, mleko];
+  const nova = [{ ...kava, amount: 0.022 }, sirup];
+  const r = rozdilVerzi(stara, nova);
+  eq('rozdíl: změněno množství, přidáno, odebráno', [r.zmeneno.map(z => [z.itemName, z.pred, z.po]), r.pridano.map(p => p.itemName), r.odebrano.map(o => o.itemName)],
+    [[['Káva zrnková', 0.018, 0.022]], ['Sirup'], ['Mléko']]);
+  ok('rozdíl: stejné snímky = beze změny', jeBezeZmeny(rozdilVerzi(stara, [mleko, kava])));
+  eq('množství čitelně: 0,018 kg → 18 g, 0,2 l → 2 dl, 2 ks', [mnozstviText(0.018, 'kg'), mnozstviText(0.2, 'l'), mnozstviText(2, 'ks'), mnozstviText(1.5, 'kg')], ['18 g', '2 dl', '2 ks', '1,5 kg']);
+  eq('popis rozdílu do auditu: „Káva 18 g → 22 g · + Sirup 15 ml · − Mléko"', popisRozdilu(r), 'Káva zrnková 18 g → 22 g · + Sirup 15 ml · − Mléko');
+  eq('popis prázdného rozdílu', popisRozdilu(rozdilVerzi(stara, stara)), 'beze změny');
+  eq('dopad na porci a marže', [dopadNaPorci(12.5, 15.7), dopadNaPorci(null, 3), marzeProcenta(75, 15.7), marzeProcenta(0, 1), marzeProcenta(75, null)], [3.2, null, 79, null, null]);
+  eq('normalizujSuroviny: strop bere prvních N řádků vstupu', normalizujSuroviny([{ itemId: 1, amount: 0 }, { itemId: 3, amount: 0.5 }], 1), []);
+  eq('normalizujSuroviny: platné řádky', normalizujSuroviny([{ itemId: 1, amount: 0 }, { itemId: 'x', amount: 1 }, { itemId: 3, amount: '0.5', itemName: 'Cukr', unit: 'kg' }]), [{ itemId: 3, itemName: 'Cukr', amount: 0.5, unit: 'kg' }]);
+  const ted = Date.parse('2026-10-13T12:00:00Z');
+  const verze = vyberHistorii({ versions: [
+    { id: 3, productId: 'p1', changedAt: '2026-10-12T10:00:00Z', ingredients: nova, costPerPortion: '15.7', changedBy: { id: 7, name: 'Petra' } },
+    { id: 2, productId: 'p2', changedAt: '2026-10-11T10:00:00Z' },
+    { id: 1, productId: 'p1', changedAt: '2026-10-01T10:00:00Z', ingredients: stara },
+    { id: 0, productId: 'p3', changedAt: 'nesmysl' },
+  ] });
+  eq('vyberHistorii: tvar a čísla', [verze.length, verze[0].costPerPortion, verze[0].changedBy?.name, verze[1].ingredients.length, verze[1].costPerPortion], [4, 15.7, 'Petra', 0, null]);
+  eq('změněno za 7 dní: p1 a p2 (p1 z 1. 10. už ne, nečitelný čas ne)', recepturZmenenychZaDni(verze, ted), 2);
+  let spadlo = false;
+  try { vyberHistorii([]); } catch { spadlo = true; }
+  ok('vyberHistorii: pole místo objektu je chyba tvaru, ne prázdno', spadlo);
+
+  // ---- návrhy úprav ----
+  const navrhy: NavrhReceptury[] = vyberNavrhy({ proposals: [
+    { id: 1, productId: 'p1', status: 'ceka', createdAt: '2026-10-12T10:00:00Z', muj: true, ingredients: nova, puvodni: stara, reason: 'sladší sirup' },
+    { id: 2, productId: 'p1', status: 'vraceno', createdAt: '2026-10-10T10:00:00Z', muj: true, reviewNote: 'moc kávy', reviewer: { id: 15, name: 'Martin' } },
+    { id: 3, productId: 'p2', status: 'ceka', createdAt: '2026-10-11T10:00:00Z', muj: false },
+    { id: 4, productId: 'p2', status: 'blbost', createdAt: '2026-10-09T10:00:00Z' },
+  ] });
+  eq('vyberNavrhy: neznámý stav = čeká, jména a poznámka', [navrhy.length, navrhy[3].status, navrhy[1].reviewer?.name, navrhy[1].reviewNote], [4, 'ceka', 'Martin', 'moc kávy']);
+  eq('čekající návrhy od nejstaršího', cekajiciNavrhy(navrhy).map(n => n.id), [4, 3, 1]);
+  eq('můj poslední návrh k p1 je ten čekající, k p2 žádný', [mujPosledniNavrh(navrhy, 'p1')?.id, mujPosledniNavrh(navrhy, 'p2')], [1, null]);
+  eq('režim editoru podle oprávnění', [
+    rezimEditoru(k => k === 'receptury.upravit'), rezimEditoru(k => k === 'receptury.navrhnout'), rezimEditoru(() => false), rezimEditoru(() => true),
+  ], ['upravit', 'navrhnout', 'cist', 'upravit']);
+
+  // ---- katalog, role, audit, smazání účtu ----
+  const klic = KATALOG.find(o => o.id === 'receptury.navrhnout');
+  ok('oprávnění receptury.navrhnout je v katalogu a vyžaduje zobrazit', !!klic && klic.vyzaduje.includes('receptury.zobrazit'));
+  for (const role of ['barista', 'kuchar', 'vedeni', 'provozni']) {
+    ok(`role ${role} má receptury.navrhnout (kdo smí upravovat, smí i navrhnout)`, !!SYSTEMOVE_ROLE.find(r => r.klic === role)?.opravneni.includes('receptury.navrhnout'));
+  }
+  ok('tablet receptury nenavrhuje', !SYSTEMOVE_ROLE.find(r => r.klic === 'kiosk')?.opravneni.includes('receptury.navrhnout'));
+  eq('widget Pokrytí recepturou: schválení s receptury.upravit, návrh s receptury.navrhnout',
+    [widget('receptury.pokryti')?.opravneni.pole?.['akce:schvalit_navrh'], widget('receptury.pokryti')?.opravneni.pole?.['akce:navrhnout']], ['receptury.upravit', 'receptury.navrhnout']);
+  for (const a of ['pos.recipe.navrh', 'pos.recipe.schvaleno', 'pos.recipe.vraceno']) ok(`audit ${a} má popisek`, typeof AUDIT_POPISKY[a] === 'string');
+  for (const tb of ['pos_recipe_versions', 'pos_recipe_proposals']) {
+    ok(`${tb}: rozhodnutí při smazání účtu a mazání s podnikem`, ZACHAZENI_TABULEK[tb] === 'ponechat' && TYMOVE_TABULKY.includes(tb));
+  }
 }

@@ -6,18 +6,19 @@
 import type { DefiniceWidgetu } from '../typy.ts';
 
 export const WIDGETY: DefiniceWidgetu[] = [
-  // Data: GET /api/pos/products → products[], recipes[], unmapped[]; GET /api/inventory → length
+  // Data: GET /api/pos/products → products[], recipes[], unmapped[]; GET /api/inventory → length;
+  // M navíc GET /api/pos/recipe-history (změněno za 7 dní) a /api/pos/recipe-proposals (návrhy ke schválení — kolo 8, R8-5)
   {
     id: 'receptury.pokryti',
     oblast: 'receptury',
     nazev: 'Pokrytí recepturou',
-    popis: 'Kolik % položek menu má recepturu, kolik se prodává bez receptury, kolik položek je ve skladu.',
+    popis: 'Kolik % položek menu má recepturu, kolik se prodává bez receptury, kolik položek je ve skladu. V M navíc „Změněno tento týden" a návrhy úprav ke schválení.',
     ikona: 'leaf',
     velikosti: ['S', 'M'],
     vychoziVelikost: 'M',
     rozhrani: ['vedeni', 'zamestnanec'],
     stranky: ['vedeni.receptury', 'zamestnanec.receptury'],
-    opravneni: { vse: ['receptury.zobrazit'], nektere: [] },
+    opravneni: { vse: ['receptury.zobrazit'], nektere: [], pole: { 'akce:schvalit_navrh': 'receptury.upravit', 'akce:navrhnout': 'receptury.navrhnout' } },
     tarif: 'max',
     cil: { pohled: 'recipes' },
     stav: 'hotovo',

@@ -2728,6 +2728,44 @@ export async function GET(request: Request) {
     // Píchnutí z tabletu bez internetu (fronta v tabletu, POST /api/attendance/sync): čas je z tabletu, ne ze serveru.
     await ddl(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS offline BOOLEAN DEFAULT FALSE`);
 
+    // ---- Uzávěrky, receptury a poznámky (kolo 8, R8-5) ----
+    // Historie receptury: každé uložení zapíše snímek surovin (i s názvy a jednotkami z té doby),
+    // náklad porce a kdo. Verze vzniká ve stejné transakci jako výměna řádků pos_product_map.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS pos_recipe_versions (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        product_id TEXT NOT NULL,
+        product_name TEXT,
+        ingredients JSONB NOT NULL DEFAULT '[]',
+        cost_per_portion NUMERIC,
+        created_by INTEGER,
+        created_at TIMESTAMP DEFAULT NOW(),
+        note TEXT
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS pos_recipe_versions_product ON pos_recipe_versions (team_id, product_id, created_at)`);
+    // Návrh úpravy receptury (receptury.navrhnout): suroviny po změně, snímek původních, proč;
+    // vedení (receptury.upravit) schválí (uloží jako verzi) nebo vrátí s poznámkou.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS pos_recipe_proposals (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        product_id TEXT NOT NULL,
+        product_name TEXT,
+        ingredients JSONB NOT NULL DEFAULT '[]',
+        original JSONB NOT NULL DEFAULT '[]',
+        reason TEXT,
+        status TEXT NOT NULL DEFAULT 'ceka',
+        author_id INTEGER NOT NULL,
+        reviewed_by INTEGER,
+        reviewed_at TIMESTAMP,
+        review_note TEXT,
+        cost_per_portion NUMERIC,
+        original_cost NUMERIC,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS pos_recipe_proposals_team ON pos_recipe_proposals (team_id, status, created_at)`);
+
     // Kroky migrace, které selhaly (a byly zachyceny), ať se to pozná zvenku
     // místo tichého „ok". Prázdné pole = celé schéma prošlo.
     if (migFails.length) console.error('init: kroků selhalo', migFails.length, migFails);

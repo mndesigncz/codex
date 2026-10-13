@@ -147,13 +147,16 @@ export function rozdilVerzi(stare: SurovinaVerze[], nove: SurovinaVerze[]): Rozd
 
 export const jeBezeZmeny = (r: RozdilVerzi): boolean => r.pridano.length === 0 && r.odebrano.length === 0 && r.zmeneno.length === 0;
 
+/** Jednotky pro text: dkg a cl se v kuchyni neříkají, i když je editor nabízí. */
+const JEDNOTKY_TEXTU: Record<string, true> = { ml: true, dl: true, l: true, g: true, kg: true, ks: true };
+
 /**
  * Množství v jednotce položky jako čitelný text: 0,018 kg → „18 g", 0,2 l → „2 dl", 2 ks → „2 ks".
- * Stejná volba jednotky jako v editoru (největší, ve které není samá nula).
+ * Největší běžná jednotka, ve které vyjde aspoň 1 (bez dkg a cl).
  */
 export function mnozstviText(amount: number, unit: string | null, locale: string = CESKY): string {
   const rodina = rodinaJednotky(unit ?? 'ks');
-  const opts = JEDNOTKY_RODIN[rodina];
+  const opts = JEDNOTKY_RODIN[rodina].filter(o => JEDNOTKY_TEXTU[o.label]);
   const base = amount * faktorJednotky(unit ?? 'ks');
   const pick = [...opts].reverse().find(o => base / o.toBase >= 1) ?? opts[0];
   const n = base / pick.toBase;
