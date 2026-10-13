@@ -583,6 +583,10 @@ const FIX_NAPADY = nacti('k69-b6a-rozlozeni-napady');
 
   // Stav podnětu přes Segmented, mazání přes okno.
   await nastroj.getByRole('tablist', { name: 'Stav podnětu Nové zástěry' }).getByRole('tab', { name: 'Zamítnout' }).click();
+  // Kolo 7 (R7-5): Zamítnout se ptá na důvod oknem; potvrzení bez důvodu pošle jediný PATCH.
+  const oknoDuvodu = p.getByRole('dialog', { name: 'Proč zamítnout?' });
+  tvrdi('N-S: Zamítnout v Segmented otevře okno „Proč zamítnout?"', await dokud(() => oknoDuvodu.isVisible(), 2000));
+  await oknoDuvodu.getByRole('button', { name: 'Zamítnout' }).click();
   tvrdi('N-S: posun stavu přes Segmented pošle PATCH status declined', await dokud(() => (stav.podnetyPatche ?? []).some(x => x.id === 13 && x.status === 'declined'), 2000), JSON.stringify(stav.podnetyPatche));
   await nastroj.getByRole('button', { name: 'Další akce: Brunch v neděli' }).click();
   await p.getByRole('menuitem', { name: 'Smazat podnět…' }).click();
