@@ -234,10 +234,11 @@ const OBSLUHA_CLIENTU = mine(['klient.prehled', 'rezervace.zobrazit', 'rezervace
   await nova.getByLabel('Jméno').fill('Marek Svoboda');
   await nova.getByLabel('Telefon').fill('+420 602 111 222');
   await nova.getByLabel('Osob').fill('5');
+  // Den: dnes, nebo po zavíračce (fixtura zavírá v 18:00) nejbližší den s volným časem — denProZapis.
   await nova.getByRole('button', { name: 'Zapsat rezervaci' }).click();
   const zapis = await dokud(() => (stav.zapisy ?? []).at(-1), 3000);
   tvrdi('R-N: „Zapsat rezervaci" pošle POST se jménem, telefonem, dnem, časem a osobami', !!zapis && zapis.name === 'Marek Svoboda' && zapis.phone === '+420 602 111 222'
-    && zapis.date === dnes && /^\d{2}:\d{2}$/.test(zapis.time) && zapis.party === 5 && zapis.customerId === null, JSON.stringify(zapis));
+    && /^\d{4}-\d{2}-\d{2}$/.test(zapis.date) && zapis.date >= dnes && /^\d{2}:\d{2}$/.test(zapis.time) && zapis.party === 5 && zapis.customerId === null, JSON.stringify(zapis));
   tvrdi('R-N: okno se zavře a seznam rezervací se načte znovu', await dokud(async () => !(await nova.isVisible()), 2000)
     && await dokud(() => dotazyNa(stav, ['/api/client/admin/reservations'], predZapisem).some(d => d.m === 'GET'), 2000));
   tvrdi('R-N: potvrzení „Rezervace zapsána."', await dokud(() => p.getByText('Rezervace zapsána.').isVisible(), 2000));

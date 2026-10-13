@@ -6,7 +6,7 @@
 import type { Testy } from './_testy.ts';
 import { souhrnObjednavek, obdobiHistorie, vyberHistoriiObjednavek, dobaObjednavky, polozkyKratce, MAX_DNI_HISTORIE } from '../../lib/klientPrehled.ts';
 import { parseDbTime } from '../../lib/pragueTime.ts';
-import { slotsFor, nejdriveDnes, PREDSTIH_REZERVACE_MIN, autoPotvrdit, zpravaHostoviORezervaci, validujRucniRezervaci, vOteviraciDobe } from '../../lib/clientSlots.ts';
+import { slotsFor, nejdriveDnes, PREDSTIH_REZERVACE_MIN, autoPotvrdit, zpravaHostoviORezervaci, validujRucniRezervaci, vOteviraciDobe, denProZapis } from '../../lib/clientSlots.ts';
 
 export default function ({ eq, ok }: Testy) {
   // ---- sloty v minulosti (rezervace-slot-v-minulosti) ----
@@ -76,4 +76,16 @@ export default function ({ eq, ok }: Testy) {
   ok('historie: nečekaný tvar je chyba (ErrorState), ne „žádné objednávky"', spadlo);
 
   ok('ruční: otevírací doba přes půlnoc (18:00–02:00)', vOteviraciDobe({ '0': { open: '18:00', close: '02:00' } }, den, '01:30') && !vOteviraciDobe({ '0': { open: '18:00', close: '02:00' } }, den, '03:00'));
+
+  // Den pro ruční zápis: po zavíračce okno předvybere nejbližší den s volným časem.
+  {
+    const h = { '0': { open: '08:00', close: '18:00' }, '1': { open: '08:00', close: '18:00' }, '6': { closed: true } };
+    // 2026-10-12 je pondělí („0"), 13. úterý („1"), 18. neděle („6").
+    eq('den pro zápis: dopoledne dnes', denProZapis(h, '2026-10-12', 30, '10:00', '2026-11-11'), '2026-10-12');
+    eq('den pro zápis: před zavřením („Teď") pořád dnes', denProZapis(h, '2026-10-12', 30, '17:45', '2026-11-11'), '2026-10-12');
+    eq('den pro zápis: po zavíračce zítra', denProZapis(h, '2026-10-12', 30, '18:16', '2026-11-11'), '2026-10-13');
+    eq('den pro zápis: přeskočí zavřené a neuvedené dny', denProZapis(h, '2026-10-13', 30, '19:00', '2026-11-11'), '2026-10-19');
+    eq('den pro zápis: nic v okně dní → zůstane dnes', denProZapis(h, '2026-10-13', 30, '19:00', '2026-10-15'), '2026-10-13');
+    eq('den pro zápis: bez otevírací doby dnes', denProZapis(null, '2026-10-13', 30, '19:00', '2026-11-11'), '2026-10-13');
+  }
 }
