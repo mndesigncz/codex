@@ -46,6 +46,7 @@
 
 import { openSpan, uncovered, gapText, toMinutes, urovenDiry, type Interval, type OpeningDay, type UrovenDiry } from './coverage.ts';
 import { prefAllowsSlot, dayPrefLabel, type PrefType } from './dayPrefs.ts';
+import { BEZ_LIMITU, smenaVLimitech, type LimityRozvrhu } from './rozvrhLimity.ts';
 
 // ---- Vstupy ------------------------------------------------------------------
 
@@ -100,6 +101,14 @@ export interface VstupGeneratoru {
    * nepřepíše). Generátor je bere jako obsazené; v návrhu se neobjeví.
    */
   ulozene?: readonly UlozenaSmena[];
+  /**
+   * Odpočinek mezi směnami, nejdelší směna a hodiny za týden (kolo 8, lib/rozvrhLimity).
+   * Generátor je dodrží — kandidát, kterému by směna limit porušila, ji nedostane.
+   * Chybí nebo null = nehlídá se.
+   */
+  limity?: LimityRozvrhu | null;
+  /** Začátek týdne podniku pro týdenní strop (1 = pondělí, výchozí; 0 = neděle). */
+  zacatekTydne?: 0 | 1;
 }
 
 export interface UlozenaSmena { employeeId: number; date: string; startTime: string; endTime: string; type?: string | null }
@@ -296,6 +305,62 @@ export function lidiPodleTrzby(prumer: number | null | undefined, prah: number):
   return prumer > prah ? 2 : 1;
 }
 
+// ---- Plán proti tržbám (kolo 8, R8-3) ------------------------------------------
+//
+// Sling a Deputy ukazují u každého dne rozvrhu „labor %": mzdy naplánovaných směn
+// proti očekávané tržbě. Očekávaná tržba dne = průměr stejného dne v týdnu za
+// posledních 8 týdnů (ocekavaneTrzby výš — totéž, co generátor používá pro
+// „stačí jeden"), cíl je teams.labor_target_pct (Nastavení › Provoz).
+
+/** Očekávaná tržba konkrétního dne z průměrů po dnech v týdnu; null bez dat. */
+export function trzbaDne(dny: TrzbyDnu | null | undefined, date: string): number | null {
+  const d = dny?.[String(denTydne(date))];
+  return d && d.vzorek > 0 && Number.isFinite(d.prumer) ? d.prumer : null;
+}
+
+/** Podíl mezd na tržbě v procentech (celé číslo); null bez mezd nebo bez tržby. */
+export function podilMezdPlanu(mzdy: number | null | undefined, trzba: number | null | undefined): number | null {
+  if (mzdy == null || trzba == null || !(trzba > 0) || !Number.isFinite(mzdy)) return null;
+  return Math.round((mzdy / trzba) * 100);
+}
+
+/** Tón chipu: pod cílem ok, nad cílem wait; bez cíle (nebo bez čísla) tlumený. */
+export function tonPodilu(podil: number | null, cil: number | null | undefined): 'ok' | 'wait' | 'muted' {
+  if (podil == null || cil == null || !(cil > 0)) return 'muted';
+  return podil <= cil ? 'ok' : 'wait';
+}
+
+export interface DenProtiTrzbam { date: string; trzba: number | null; mzdy: number | null; podil: number | null }
+
+/**
+ * Plán proti tržbám po dnech a celkem: mzdy = hodiny × sazba směn dne (směna bez sazby
+ * se do mezd nepočítá); tržba = očekávaná tržba dne. Celkový podíl se počítá jen z dnů,
+ * které mají naplánované mzdy i tržbu — měsíc s pěti naplánovanými dny by jinak proti
+ * tržbě celého měsíce ukázal „3 %" a vypadal levně, i když je každý den nad cílem.
+ */
+export function planProtiTrzbam(
+  smeny: readonly { date: string; startTime: string; endTime: string; hourlyRate?: number | null }[],
+  dny: TrzbyDnu | null | undefined,
+  dnyPlanu: readonly string[],
+): { poDnech: Map<string, DenProtiTrzbam>; trzba: number | null; mzdy: number; podil: number | null } {
+  const mzdyDne = new Map<string, number>();
+  for (const s of smeny) {
+    const sazba = Number(s.hourlyRate);
+    if (!(sazba > 0)) continue;
+    mzdyDne.set(s.date, (mzdyDne.get(s.date) ?? 0) + hodinySmeny(s.startTime, s.endTime) * sazba);
+  }
+  const poDnech = new Map<string, DenProtiTrzbam>();
+  let trzba = 0, mzdy = 0, mzdySTrzbou = 0, dnuSTrzbou = 0;
+  for (const date of dnyPlanu) {
+    const tr = trzbaDne(dny, date);
+    const m = mzdyDne.has(date) ? Math.round(mzdyDne.get(date)!) : null;
+    poDnech.set(date, { date, trzba: tr, mzdy: m, podil: podilMezdPlanu(m, tr) });
+    mzdy += m ?? 0;
+    if (tr != null && m != null) { trzba += tr; mzdySTrzbou += m; dnuSTrzbou++; }
+  }
+  return { poDnech, trzba: dnuSTrzbou > 0 ? trzba : null, mzdy: Math.round(mzdy), podil: dnuSTrzbou > 0 ? podilMezdPlanu(mzdySTrzbou, trzba) : null };
+}
+
 /** Nastavení generování v teams.staffing_rules (JSON) — vyčištěné. */
 export interface NastaveniTrzeb { podleTrzeb: boolean; prah: number | null }
 export function vycistiNastaveniTrzeb(raw: unknown): NastaveniTrzeb {
@@ -316,18 +381,23 @@ interface Stav extends ClovekGeneratoru {
   workedDates: Set<string>;
   lastAssigned: string;
   nemuze: Set<string>;
+  /** Přidělené směny s časy (uložené i navržené) — pro odpočinek a týdenní strop. */
+  smeny: { employeeId: number; date: string; startTime: string; endTime: string }[];
 }
 
 export function navrhniRozvrh(vstup: VstupGeneratoru): VystupGeneratoru {
   const { month, typy } = vstup;
   const balanceShifts = vstup.pravidla?.balanceShifts !== false;
   const splitShifts = vstup.pravidla?.splitShifts === true;
+  const limity = vstup.limity ?? BEZ_LIMITU;
+  const zacatekTydne = vstup.zacatekTydne === 0 ? 0 : 1;
   const prefTypes: PrefType[] = typy.map(t => ({ id: Number(t.id), name: String(t.name), start: String(t.start_time).slice(0, 5) }));
   const lide: Stav[] = vstup.lide.map(l => ({
     ...l,
     assigned: 0, assignedHours: 0, lastAssigned: '',
     workedDates: new Set(l.priorDates ?? []),
     nemuze: new Set(l.unavailable),
+    smeny: [],
   }));
   const podleId = new Map(lide.map(l => [l.id, l]));
   const pevnePoDnech = new Map<number, PevnyDen[]>();
@@ -360,9 +430,14 @@ export function navrhniRozvrh(vstup: VstupGeneratoru): VystupGeneratoru {
   // takže pohled jen dozadu by pustil řadu delší, než je limit.
   const odpocinekOk = (e: Stav, date: string) => radaDniOk(e.workedDates, date, e.maxConsecutive);
   const hodinyOk = (e: Stav, h: number) => e.maxHours == null || e.assignedHours + h <= e.maxHours + 0.01;
-  const vezmi = (e: Stav, date: string, h: number) => {
+  // Kolo 8: odpočinek mezi směnami, nejdelší směna a týdenní strop (lib/rozvrhLimity) —
+  // proti všemu, co už člověk v měsíci má (uložené i navržené, oba průchody).
+  const limityOk = (e: Stav, date: string, start: string, end: string) =>
+    smenaVLimitech({ employeeId: e.id, date, startTime: start, endTime: end }, e.smeny, limity, zacatekTydne);
+  const vezmi = (e: Stav, date: string, h: number, start?: string, end?: string) => {
     e.assigned++; e.workedDates.add(date); e.assignedHours += h;
     if (date > e.lastAssigned) e.lastAssigned = date;
+    if (start && end) e.smeny.push({ employeeId: e.id, date, startTime: start, endTime: end });
   };
   const norm = (x: unknown) => String(x ?? '').trim().toLowerCase();
 
@@ -394,7 +469,7 @@ export function navrhniRozvrh(vstup: VstupGeneratoru): VystupGeneratoru {
     arr.push(u);
     ulozenePoDnech.set(date, arr);
     const e = podleId.get(u.employeeId);
-    if (e) vezmi(e, date, hodinySmeny(u.startTime, u.endTime));
+    if (e) vezmi(e, date, hodinySmeny(u.startTime, u.endTime), u.startTime, u.endTime);
   }
 
   // ---- Příprava dnů ------------------------------------------------------------
@@ -452,7 +527,8 @@ export function navrhniRozvrh(vstup: VstupGeneratoru): VystupGeneratoru {
     const mozne = (e: Stav, st: TypSmeny) => {
       const r = casyTypu(st, oh);
       return dostupny(e, date) && !dnesStoji.has(e.id) && kapacita(e)
-        && odpocinekOk(e, date) && hodinyOk(e, hodinySmeny(r.start, r.end)) && prefOk(e, date, st, r.start);
+        && odpocinekOk(e, date) && hodinyOk(e, hodinySmeny(r.start, r.end)) && prefOk(e, date, st, r.start)
+        && limityOk(e, date, r.start, r.end);
     };
     const poradi = (st: TypSmeny) => (a: Stav, b: Stav) => {
       const cat = kategorie(String(st.start_time));
@@ -498,7 +574,8 @@ export function navrhniRozvrh(vstup: VstupGeneratoru): VystupGeneratoru {
       }));
       const pick = vyberKandidata(kandidati, vyhled);
       if (!pick) return false;
-      obsazeno.set(st.id, pick.id); dnesStoji.add(pick.id); vezmi(pick, date, hodinyTypu(st));
+      const r = casyTypu(st, oh);
+      obsazeno.set(st.id, pick.id); dnesStoji.add(pick.id); vezmi(pick, date, hodinyTypu(st), r.start, r.end);
       return true;
     };
     // Otevřeno = obsazená otevírací směna, nebo uložená směna od otevření.
@@ -535,7 +612,12 @@ export function navrhniRozvrh(vstup: VstupGeneratoru): VystupGeneratoru {
         warnings.push(`${den} — ${emp.name} má pevný den, ale směna by překročila limit ${emp.maxHours} h/měsíc. Vynecháno.`);
         continue;
       }
-      obsazeno.set(st.id, emp.id); dnesStoji.add(emp.id); vezmi(emp, date, h);
+      const rt = casyTypu(st, oh);
+      if (!limityOk(emp, date, rt.start, rt.end)) {
+        warnings.push(`${den} — ${emp.name} má pevný den, ale směna by porušila odpočinek mezi směnami nebo strop hodin (Pravidla). Vynecháno.`);
+        continue;
+      }
+      obsazeno.set(st.id, emp.id); dnesStoji.add(emp.id); vezmi(emp, date, h, rt.start, rt.end);
     }
 
     // Pass 1b: pevné dny bez typu — přednost má jeho preference, pak
@@ -566,7 +648,12 @@ export function navrhniRozvrh(vstup: VstupGeneratoru): VystupGeneratoru {
         warnings.push(`${den} — ${emp.name} má pevný den, ale směna by překročila limit ${emp.maxHours} h/měsíc. Vynecháno.`);
         continue;
       }
-      obsazeno.set(st.id, emp.id); dnesStoji.add(emp.id); vezmi(emp, date, h);
+      const rt = casyTypu(st, oh);
+      if (!limityOk(emp, date, rt.start, rt.end)) {
+        warnings.push(`${den} — ${emp.name} má pevný den, ale směna by porušila odpočinek mezi směnami nebo strop hodin (Pravidla). Vynecháno.`);
+        continue;
+      }
+      obsazeno.set(st.id, emp.id); dnesStoji.add(emp.id); vezmi(emp, date, h, rt.start, rt.end);
     }
 
     // Pass 2: OTEVÍRACÍ směna — povinná, jde před všemi ostatními. Stačí
@@ -657,7 +744,8 @@ export function navrhniRozvrh(vstup: VstupGeneratoru): VystupGeneratoru {
             const p = pulky[i];
             const ph = (p.endMin - p.startMin) / 60;
             const c = lide.filter(e => dostupny(e, date) && !dnesStoji.has(e.id) && kapacita(e)
-              && odpocinekOk(e, date) && hodinyOk(e, ph) && pulkaOk(e, p) && e.splitOk !== false && picks[0]?.id !== e.id);
+              && odpocinekOk(e, date) && hodinyOk(e, ph) && pulkaOk(e, p) && e.splitOk !== false && picks[0]?.id !== e.id
+              && limityOk(e, date, p.start, p.end));
             c.sort((a, b) => a.assigned - b.assigned || a.name.localeCompare(b.name, 'cs'));
             picks[i] = c[0] ?? null;
           }
@@ -665,7 +753,7 @@ export function navrhniRozvrh(vstup: VstupGeneratoru): VystupGeneratoru {
             for (let i = 0; i < 2; i++) {
               const p = pulky[i], who = picks[i]!;
               dnesStoji.add(who.id);
-              vezmi(who, date, (p.endMin - p.startMin) / 60);
+              vezmi(who, date, (p.endMin - p.startMin) / 60, p.start, p.end);
               proposed.push({
                 employeeId: who.id, employeeName: who.name, employeeAvatar: who.avatar ?? '👤',
                 date, startTime: p.start, endTime: p.end,
@@ -682,8 +770,10 @@ export function navrhniRozvrh(vstup: VstupGeneratoru): VystupGeneratoru {
         const pref = volni.some(e => !prefOk(e, date, st, r.start));
         const odp = volni.some(e => prefOk(e, date, st, r.start) && !odpocinekOk(e, date));
         const hod = volni.some(e => prefOk(e, date, st, r.start) && odpocinekOk(e, date) && !hodinyOk(e, h));
+        const lim = volni.some(e => prefOk(e, date, st, r.start) && odpocinekOk(e, date) && hodinyOk(e, h) && !limityOk(e, date, r.start, r.end));
         const proc = odp ? 'volní lidé už mají limit dní v řadě'
           : hod ? 'volní lidé už mají limit hodin za měsíc'
+          : lim ? 'volným lidem by chyběl odpočinek mezi směnami nebo by přesáhli týdenní strop'
           : pref ? 'volní lidé mají ten den povolený jen jiný typ směny'
           : 'nikdo dostupný';
         if (povinna) {

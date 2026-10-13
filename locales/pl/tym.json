@@ -163,5 +163,19 @@
   "Časové pásmo": "Strefa czasowa",
   "Čeká": "Oczekuje",
   "Člena se nepodařilo odebrat.": "Nie udało się usunąć członka.",
-  "Člověk se připojí kódem na stránce /join, nebo odkazem z pozvánky. Nový kód zneplatní ten starý.": "Osoba dołącza kodem na stronie /join albo linkiem z zaproszenia. Nowy kod unieważnia poprzedni."
+  "Člověk se připojí kódem na stránce /join, nebo odkazem z pozvánky. Nový kód zneplatní ten starý.": "Osoba dołącza kodem na stronie /join albo linkiem z zaproszenia. Nowy kod unieważnia poprzedni.",
+  "Celkem {hodiny}": "Razem {hodiny}",
+  "Dovolená na rok (dní)": "Urlop na rok (dni)",
+  "Hodiny se nenačetly": "Godziny się nie wczytały",
+  "Hodiny|widgety": "Godziny",
+  "Jméno": "Imię",
+  "Letos čerpáno {cerpano}, zbývá {zbyva}. Odečítá se jen schválená dovolená, nemoc a jiné volno ne.": "W tym roku wykorzystano {cerpano}, zostaje {zbyva}. Odliczany jest tylko zatwierdzony urlop, chorobowe i inne wolne nie.",
+  "Profil: {jmeno}": "Profil: {jmeno}",
+  "Prázdné = nárok se nesleduje. Odečítá se jen schválená dovolená, nemoc a jiné volno ne.": "Puste = uprawnienie nie jest śledzone. Odliczany jest tylko zatwierdzony urlop, chorobowe i inne wolne nie.",
+  "Rozpad v Docházce": "Szczegóły w Obecności",
+  "Výdělek": "Zarobek",
+  "bez sazby: {n, plural, one {# člověk} few {# lidé} other {# lidí}}": "bez stawki: {n, plural, one {# osoba} few {# osoby} many {# osób} other {# osoby}}",
+  "dovolená {zbyva}/{dni}": "urlop {zbyva}/{dni}",
+  "právě běží": "trwa teraz",
+  "Řadit lidi": "Sortuj osoby"
 }

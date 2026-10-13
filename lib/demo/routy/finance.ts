@@ -126,6 +126,10 @@ export const finance: Obsluha = (p, k) => {
   }
   if (cesta === '/api/pos/insights') return ok({ hours: HODINY_PODIL.map(h => Math.round(180000 * h / 10) * 10), byWeekday: [] });
   if (cesta === '/api/pos/margins/status' || cesta === '/api/pos/places') return ok({ connected: true });
+  // Kolo 8 (R8-5): návrhy úprav receptur a historie verzí — ukázka žádné nemá; počty poznámek v seznamech prázdné.
+  if (cesta === '/api/pos/recipe-proposals') return p.metoda === 'GET' ? ok({ proposals: [], schvaluje: true }) : ok({ ok: true });
+  if (cesta === '/api/pos/recipe-history') return ok({ versions: [] });
+  if (cesta === '/api/notes/pocty') return ok({ pocty: {} });
 
   if (cesta === '/api/finance') {
     const mesic = q.get('month') ?? s.dnes.slice(0, 7);

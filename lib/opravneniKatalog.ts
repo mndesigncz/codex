@@ -417,6 +417,16 @@ export const KATALOG: Opravneni[] = [
   ]
  },
  {
+  "id": "receptury.navrhnout",
+  "oblast": "Receptury",
+  "nazev": "Navrhnout úpravu receptury",
+  "popis": "Navrhnout změnu receptury ke schválení (suroviny a množství, s důvodem). Kdo smí receptury upravovat, návrh schválí nebo vrátí s poznámkou. Kdo má i Upravovat receptury, ukládá rovnou.",
+  "citlivost": "nízká",
+  "vyzaduje": [
+   "receptury.zobrazit"
+  ]
+ },
+ {
   "id": "receptury.upravit",
   "oblast": "Receptury",
   "nazev": "Upravovat receptury z kasy",
@@ -1753,6 +1763,7 @@ export const SYSTEMOVE_ROLE: SystemovaRole[] = [
    "poukazy.zobrazit",
    "predplatne.spravovat",
    "predplatne.zobrazit",
+   "receptury.navrhnout",
    "receptury.upravit",
    "receptury.zobrazit",
    "rezervace.schvalovat",
@@ -1889,6 +1900,7 @@ export const SYSTEMOVE_ROLE: SystemovaRole[] = [
    "postupy.upravit",
    "postupy.vytvorit",
    "postupy.zobrazit",
+   "receptury.navrhnout",
    "receptury.upravit",
    "receptury.zobrazit",
    "rezervace.schvalovat",
@@ -1955,6 +1967,7 @@ export const SYSTEMOVE_ROLE: SystemovaRole[] = [
    "navody.zobrazit",
    "objednavky.vyridit",
    "objednavky.zobrazit",
+   "receptury.navrhnout",
    "receptury.upravit",
    "receptury.zobrazit",
    "postupy.navrhnout",
@@ -1993,6 +2006,7 @@ export const SYSTEMOVE_ROLE: SystemovaRole[] = [
    "navody.navrhnout",
    "navody.zobrazit",
    "objednavky.zobrazit",
+   "receptury.navrhnout",
    "receptury.upravit",
    "receptury.zobrazit",
    "postupy.navrhnout",

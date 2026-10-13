@@ -34,6 +34,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { jePsanePole, jeRozepsano, reakceNaZavreni, type ZpusobZavreni } from './modalClose';
+import { adresaOkna } from './navigace';
 
 // Zámek posuvu se počítá, ne přepisuje. Když se okna překrývají (z okna se
 // otevře další) a zavřou se v jiném pořadí, než se otevřela, prosté
@@ -47,8 +48,53 @@ let lockedFrom = '';
 // úkolu, otázka „zahodit?" nad formulářem), Escape patří jen tomu vrchnímu —
 // každé okno má vlastní posluchač na dokumentu a `stopPropagation` ostatním
 // posluchačům na stejném prvku nezabrání. Dřív jeden Escape zavřel všechno.
-const otevrenaOkna: symbol[] = [];
-const jeVrchni = (id: symbol) => otevrenaOkna[otevrenaOkna.length - 1] === id;
+interface OtevreneOkno {
+  id: symbol;
+  /** Záznam v historii prohlížeče (`history.state.okno`); null = ještě nezapsaný. */
+  token: string | null;
+  /** Uživatel šel Zpět a záznam okna je pryč: zavřít, nebo se zeptat. */
+  zpet: () => void;
+}
+const otevrenaOkna: OtevreneOkno[] = [];
+const jeVrchni = (id: symbol) => otevrenaOkna[otevrenaOkna.length - 1]?.id === id;
+
+// Historie prohlížeče (kolo 8): otevřené okno přidá záznam (`&okno=1`), takže
+// Zpět — gesto na telefonu, tlačítko prohlížeče — nejdřív zavře okno a teprve
+// další Zpět opustí obrazovku. Dřív Zpět s otevřeným oknem zavřel celou
+// aplikaci. Okno zavřené jinak (křížek, Zrušit, uklepnutí) svůj záznam zase
+// odebere (`history.back()`), ať po něm v historii nezůstane prázdný krok;
+// ten popstate je náš a nesmí se počítat jako další Zpět.
+let citacOken = 0;
+/** Časy `history.back()`, které jsme vyvolali sami a jejichž popstate teprve přijde. */
+const vlastniZpet: number[] = [];
+/** Co udělat, až náš popstate dorazí (otevření dalšího okna v témže tiku). */
+const poVlastnimZpet: (() => void)[] = [];
+let posluchacHistorie = false;
+
+function zapisOknoDoHistorie(token: string): void {
+  try {
+    window.history.pushState({ okno: token }, '', `${window.location.pathname}${adresaOkna(window.location.search, true)}`);
+  } catch { /* prohlížeč bez historie */ }
+}
+
+function zajistiPosluchaceHistorie(): void {
+  if (posluchacHistorie || typeof window === 'undefined') return;
+  posluchacHistorie = true;
+  window.addEventListener('popstate', () => {
+    // Starší než 2 s: back() bez popstate (nemělo by nastat) nesmí spolknout skutečné Zpět.
+    while (vlastniZpet.length && Date.now() - vlastniZpet[0] > 2000) vlastniZpet.shift();
+    if (vlastniZpet.length) {
+      vlastniZpet.shift();
+      poVlastnimZpet.splice(0).forEach(fn => fn());
+      return;
+    }
+    const vrchni = otevrenaOkna[otevrenaOkna.length - 1];
+    if (!vrchni?.token) return;
+    // Vpřed na náš vlastní záznam (okno je pořád otevřené) — nic.
+    if (window.history.state?.okno === vrchni.token) return;
+    vrchni.zpet();
+  });
+}
 
 function lockScroll() {
   if (lockCount === 0) lockedFrom = document.body.style.overflow;
@@ -144,6 +190,8 @@ export function useModal<T extends HTMLElement = HTMLDivElement>(open: boolean, 
   rozhodnoutRef.current = rozhodnout;
   const discard = useCallback(() => rozhodnout('zahodit'), [rozhodnout]);
   const attemptClose = useCallback(() => rozhodnout('zavrit'), [rozhodnout]);
+  // Záznam tohoto okna v historii; sdílí se mezi efektem otevření a obsluhou Zpět.
+  const oknoRef = useRef<OtevreneOkno | null>(null);
 
   // Nové otevření začíná s čistým stolem.
   useEffect(() => {
@@ -221,8 +269,26 @@ export function useModal<T extends HTMLElement = HTMLDivElement>(open: boolean, 
     if (!open) return;
     const panel = ref.current;
     const id = Symbol('okno');
-    otevrenaOkna.push(id);
+    const okno: OtevreneOkno = {
+      id, token: null,
+      zpet: () => {
+        // Zpět je uklepnutí: nedotčené okno se zavře, rozepsané se zeptá — a svůj záznam
+        // si vrátí, ať adresa i další Zpět sedí s tím, co je na obrazovce.
+        prepocitat();
+        const r = reakceNaZavreni({ rozepsano: dirtyRef.current, ptameSe: askingRef.current, zpusob: 'uklepnuti' });
+        if (r === 'zavrit') { okno.token = null; zavrit(); return; }
+        if (okno.token) zapisOknoDoHistorie(okno.token);
+        setAsking(r === 'zeptat se');
+      },
+    };
+    oknoRef.current = okno;
+    otevrenaOkna.push(okno);
     lockScroll();
+    zajistiPosluchaceHistorie();
+    const token = `o${++citacOken}`;
+    const zapisZaznam = () => { if (oknoRef.current === okno) { okno.token = token; zapisOknoDoHistorie(token); } };
+    // Okno otevřené v témže tiku, kdy se jiné zavřelo: jeho back() ještě neproběhl, zápis počká.
+    if (vlastniZpet.length) poVlastnimZpet.push(zapisZaznam); else zapisZaznam();
 
     const visible = () => Array.from(panel?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [])
       .filter(el => el.offsetWidth > 0 || el.offsetHeight > 0 || el === document.activeElement);
@@ -261,8 +327,17 @@ export function useModal<T extends HTMLElement = HTMLDivElement>(open: boolean, 
     return () => {
       clearTimeout(t);
       document.removeEventListener('keydown', onKey, true);
-      const i = otevrenaOkna.indexOf(id);
+      const i = otevrenaOkna.indexOf(okno);
       if (i >= 0) otevrenaOkna.splice(i, 1);
+      oknoRef.current = null;
+      // Zavřeno křížkem, Zrušit nebo uklepnutím: záznam okna je ještě na vrchu historie,
+      // tak se odebere. Po Zpět už tam není (token je null); po přechodu jinam ho přepsal
+      // záznam pohledu (history.state.okno nesedí) a nic se nevrací.
+      if (okno.token && typeof window !== 'undefined' && window.history.state?.okno === okno.token) {
+        vlastniZpet.push(Date.now());
+        try { window.history.back(); } catch { vlastniZpet.pop(); }
+      }
+      okno.token = null;
       unlockScroll();
       const back = restoreRef.current;
       restoreRef.current = null;
@@ -270,7 +345,7 @@ export function useModal<T extends HTMLElement = HTMLDivElement>(open: boolean, 
       // nepřijme — pak je lepší nedělat nic než skočit na <body>.
       if (back && back.isConnected) back.focus?.({ preventScroll: true });
     };
-  }, [open]);
+  }, [open, prepocitat, zavrit]);
 
   const guard: ModalGuard = { asking, discard, keep, attemptClose, dirty };
 

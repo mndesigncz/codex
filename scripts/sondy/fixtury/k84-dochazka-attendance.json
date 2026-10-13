@@ -1,0 +1,25 @@
+{
+  "roster": [
+    { "id": 15, "name": "Martin Nemeškal", "avatar": "🧑", "hourlyRate": 0, "hasPin": true, "openSince": null, "openEntryId": null, "nudgedAt": null, "breakSince": null, "jobTitle": null, "shiftStart": null, "shiftEnd": null },
+    { "id": 16, "name": "Eva Testová", "avatar": "👩", "hourlyRate": 150, "hasPin": true, "openSince": null, "openEntryId": null, "nudgedAt": null, "breakSince": null, "jobTitle": "Barista", "shiftStart": null, "shiftEnd": null },
+    { "id": 17, "name": "Petra Malá", "avatar": "👱", "hourlyRate": 140, "hasPin": false, "openSince": null, "openEntryId": null, "nudgedAt": null, "breakSince": null, "jobTitle": "Barista", "shiftStart": null, "shiftEnd": null },
+    { "id": 18, "name": "Honza Kuchař", "avatar": "🧑‍🍳", "hourlyRate": 180, "hasPin": false, "openSince": null, "openEntryId": null, "nudgedAt": null, "breakSince": null, "jobTitle": "Kuchař", "shiftStart": null, "shiftEnd": null }
+  ],
+  "entries": [
+    { "id": 902, "employeeId": 16, "employeeName": "Eva Testová", "employeeAvatar": "👩", "clockIn": "@D-1T12:30", "clockOut": "@D-1T17:31", "source": "break", "note": null, "updatedBy": null, "updatedByName": null, "updatedAt": null, "breakAfter": 901, "geoStatus": null, "geoDistanceM": null, "offline": false, "planStart": "09:00", "planEnd": "17:30", "planDate": "D-1" },
+    { "id": 904, "employeeId": 18, "employeeName": "Honza Kuchař", "employeeAvatar": "🧑‍🍳", "clockIn": "@D-1T10:00", "clockOut": "@D-1T18:00", "source": "self", "note": null, "updatedBy": null, "updatedByName": null, "updatedAt": null, "breakAfter": null, "geoStatus": "far", "geoDistanceM": 1234, "offline": false, "planStart": null, "planEnd": null, "planDate": null },
+    { "id": 901, "employeeId": 16, "employeeName": "Eva Testová", "employeeAvatar": "👩", "clockIn": "@D-1T09:02", "clockOut": "@D-1T12:00", "source": "kiosk", "note": null, "updatedBy": null, "updatedByName": null, "updatedAt": null, "breakAfter": null, "geoStatus": null, "geoDistanceM": null, "offline": false, "planStart": "09:00", "planEnd": "17:30", "planDate": "D-1" },
+    { "id": 903, "employeeId": 17, "employeeName": "Petra Malá", "employeeAvatar": "👱", "clockIn": "@D-1T08:12", "clockOut": "@D-1T16:05", "source": "self", "note": null, "updatedBy": null, "updatedByName": null, "updatedAt": null, "breakAfter": null, "geoStatus": "ok", "geoDistanceM": 40, "offline": false, "planStart": "08:00", "planEnd": "16:00", "planDate": "D-1" },
+    { "id": 906, "employeeId": 18, "employeeName": "Honza Kuchař", "employeeAvatar": "🧑‍🍳", "clockIn": "@D-2T11:00", "clockOut": "@D-2T19:00", "source": "self", "note": null, "updatedBy": null, "updatedByName": null, "updatedAt": null, "breakAfter": null, "geoStatus": "missing", "geoDistanceM": null, "offline": false, "planStart": null, "planEnd": null, "planDate": null },
+    { "id": 905, "employeeId": 16, "employeeName": "Eva Testová", "employeeAvatar": "👩", "clockIn": "@D-2T09:00", "clockOut": "@D-2T17:00", "source": "kiosk", "note": null, "updatedBy": null, "updatedByName": null, "updatedAt": null, "breakAfter": null, "geoStatus": null, "geoDistanceM": null, "offline": true, "planStart": null, "planEnd": null, "planDate": null },
+    { "id": 907, "employeeId": 15, "employeeName": "Martin Nemeškal", "employeeAvatar": "🧑", "clockIn": "@D-2T08:00", "clockOut": "@D-2T12:00", "source": "manual", "note": "Doplněno podle kamery.", "updatedBy": 15, "updatedByName": "Martin Nemeškal", "updatedAt": "@D-2T12:10", "breakAfter": null, "geoStatus": null, "geoDistanceM": null, "offline": false, "planStart": null, "planEnd": null, "planDate": null },
+    { "id": 908, "employeeId": 17, "employeeName": "Petra Malá", "employeeAvatar": "👱", "clockIn": "@D-3T08:00", "clockOut": "@D-3T16:00", "source": "kiosk", "note": "Tablet nešel, píchla jsem až po půl hodině.", "updatedBy": null, "updatedByName": null, "updatedAt": null, "breakAfter": null, "geoStatus": null, "geoDistanceM": null, "offline": false, "planStart": null, "planEnd": null, "planDate": null },
+    { "id": 910, "employeeId": 17, "employeeName": "Petra Malá", "employeeAvatar": "👱", "clockIn": "@D-5T08:00", "clockOut": null, "source": "kiosk", "note": null, "updatedBy": null, "updatedByName": null, "updatedAt": null, "breakAfter": null, "geoStatus": null, "geoDistanceM": null, "offline": false, "planStart": null, "planEnd": null, "planDate": null },
+    { "id": 909, "employeeId": 16, "employeeName": "Eva Testová", "employeeAvatar": "👩", "clockIn": "@MINULY-12T09:00", "clockOut": "@MINULY-12T17:00", "source": "kiosk", "note": null, "updatedBy": null, "updatedByName": null, "updatedAt": null, "breakAfter": null, "geoStatus": null, "geoDistanceM": null, "offline": false, "planStart": null, "planEnd": null, "planDate": null }
+  ],
+  "adjustments": [],
+  "zamky": [
+    { "id": 9, "od": "MINULY-01", "do": "MINULY-KONEC", "lockedBy": 15, "lockedAt": "@D-3T18:00" }
+  ],
+  "pravidlaPichani": { "zapnuto": true, "lat": 50.0875, "lng": 14.4213, "polomerM": 200 }
+}

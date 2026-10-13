@@ -1,0 +1,17 @@
+{
+  "limity": { "minRestHours": 11, "maxShiftHours": 12, "maxWeekHours": 40 },
+  "zacatekTydne": 1,
+  "trzby": {
+    "stav": "ok",
+    "dny": {
+      "0": { "prumer": 14200, "vzorek": 8 },
+      "1": { "prumer": 13600, "vzorek": 8 },
+      "2": { "prumer": 15100, "vzorek": 8 },
+      "3": { "prumer": 16800, "vzorek": 8 },
+      "4": { "prumer": 21400, "vzorek": 8 },
+      "5": { "prumer": 22000, "vzorek": 8 },
+      "6": { "prumer": 9800, "vzorek": 7 }
+    }
+  },
+  "cilMezd": 28
+}

@@ -14,7 +14,6 @@
   "Chat": "Czat",
   "Chrome nebo Android": "Chrome lub Android",
   "Co jsi rozepsal, se neuloží.": "Niezapisany tekst przepadnie.",
-  "Ctrl+Enter odešle": "Ctrl+Enter wysyła",
   "DIČ": "DIČ",
   "DIČ není platné. Začíná kódem země a má jen písmena a číslice, třeba CZ12345678.": "Numer DIČ nie jest prawidłowy. Zaczyna się od kodu kraju i zawiera tylko litery i cyfry, na przykład CZ12345678.",
   "Další akce": "Więcej akcji",
@@ -170,7 +169,6 @@
   "Přesune vybraný widget o jedno místo.": "Przesuwa wybrany widżet o jedno miejsce.",
   "Přidat": "Dodaj",
   "Přidat poznámku": "Dodaj notatkę",
-  "Přidat poznámku…": "Dodaj notatkę…",
   "Přidáno {datum}": "Dodano {datum}",
   "Přihlásit se": "Zaloguj się",
   "Připomínky uzávěrky a její schválení.": "Przypomnienia o zamknięciu kasy i jego zatwierdzenie.",
@@ -326,5 +324,11 @@
   "Žádné zařízení": "Brak urządzeń",
   "Žádost se nepodařilo odeslat.": "Nie udało się wysłać prośby.",
   "Žádost se nepodařilo odeslat. Zkontrolujte připojení.": "Nie udało się wysłać prośby. Sprawdź połączenie.",
-  "Žádosti o volno a jejich vyřízení.": "Wnioski o wolne i ich rozpatrzenie."
+  "Žádosti o volno a jejich vyřízení.": "Wnioski o wolne i ich rozpatrzenie.",
+  "Odepnout": "Odepnij",
+  "Připnout nahoru": "Przypnij na górze",
+  "připnuto": "przypięte",
+  "Přidat poznámku… @jméno někoho upozorní": "Dodaj notatkę… @imię powiadomi kogoś",
+  "Koho zmínit": "Kogo wspomnieć",
+  "Ctrl+Enter odešle · @jméno upozorní kolegu": "Ctrl+Enter wysyła · @imię powiadomi współpracownika"
 }

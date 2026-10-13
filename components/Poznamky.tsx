@@ -16,9 +16,10 @@
 // by nikomu nic neřekla. Kdo smí mazat, rozhodl server (`muzuSmazat`) —
 // tady se tlačítko jen schová.
 
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
-import { Avatar, Button, ErrorState, Menu, Modal, Skeleton, Textarea, type MenuItem } from './ui';
+import { Avatar, Button, Chip, ErrorState, Menu, Modal, Skeleton, Textarea, type MenuItem } from './ui';
+import { Icon } from './Icons';
 import { obnovDataWidgetu, useDataWidgetu } from './widgety/useDataWidgetu';
 import { okJson, apiMessage } from '@/lib/api';
 import { useT, useJazyk, type PrekladFn } from '@/lib/i18n/client';
@@ -26,8 +27,18 @@ import { fmtDatum } from '@/lib/i18n/format';
 import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
 import type { Jazyk } from '@/lib/i18n/config';
 import {
-  MAX_DELKA_POZNAMKY, normalizujTextPoznamky, relativniCas, urlPoznamek, vyberPoznamky, type Poznamka, type TypPoznamky,
+  MAX_DELKA_POZNAMKY, kusyTextu, navrhyZminek, normalizujTextPoznamky, relativniCas, urlPoctu, urlPoznamek, vlozZminku, vyberPoznamky,
+  type ClovekKeZmince, type Poznamka, type TypPoznamky,
 } from '@/lib/poznamky';
+
+/** Lidé podniku pro @zmínky — tentýž /api/teams jako jinde, jen jména (bez tabletu). */
+const URL_LIDE = '/api/teams';
+const vyberLidi = (raw: any): ClovekKeZmince[] =>
+  (Array.isArray(raw?.members) ? raw.members : []).filter((m: any) => m && m.id != null && m.role !== 'kiosk')
+    .map((m: any) => ({ id: Number(m.id), name: String(m.name ?? ''), avatar: m.avatar ?? null }));
+
+/** Připnutá úvodní zpráva vlákna (třeba „Poznámka vedení" u uzávěrky) — není v databázi poznámek, jen se kreslí první. */
+export interface UvodVlakna { text: string; autor: string; avatar?: string | null; kdy?: string | null; popisek: string }
 
 /** Člověk vybraný u tabletu — za něj se poznámka píše. */
 export interface AutorNaTabletu { id: number; name: string }
@@ -42,7 +53,7 @@ function kdyNapsano(iso: string, t: PrekladFn, jazyk: Jazyk): string {
   return fmtDatum(iso, { jazyk, styl: 'kratce' });
 }
 
-export function Poznamky({ typ, id, tablet = false, zaKoho = null, vyberKoho, className = '' }: {
+export function Poznamky({ typ, id, tablet = false, zaKoho = null, vyberKoho, uvod = null, className = '' }: {
   typ: TypPoznamky;
   /** Id věci; u receptury z kasy product_id pokladny. */
   id: string | number;
@@ -50,6 +61,8 @@ export function Poznamky({ typ, id, tablet = false, zaKoho = null, vyberKoho, cl
   tablet?: boolean;
   zaKoho?: AutorNaTabletu | null;
   vyberKoho?: () => Promise<AutorNaTabletu | null>;
+  /** Připnutá první zpráva vlákna mimo poznámky (review_note uzávěrky). */
+  uvod?: UvodVlakna | null;
   className?: string;
 }) {
   const t = useT('spolecne');
@@ -59,8 +72,17 @@ export function Poznamky({ typ, id, tablet = false, zaKoho = null, vyberKoho, cl
   const url = urlPoznamek(typ, id, tablet ? zaKoho?.id ?? null : null);
   const data = useDataWidgetu<Poznamka[]>(url, vyberPoznamky);
   const poznamky = data.data ?? [];
+  // Lidé pro @zmínky se načtou, až je někdo potřebuje („@" v poli) nebo je co zvýraznit.
+  const [chceLidi, setChceLidi] = useState(false);
+  const lideData = useDataWidgetu<ClovekKeZmince[]>(chceLidi ? URL_LIDE : null, vyberLidi);
+  const lide = lideData.data ?? [];
+  // Otevřené vlákno = přečtené (server si to zapsal při GET): bublina v seznamu přestane být tučná.
+  useEffect(() => { if (data.data) obnovDataWidgetu(urlPoctu(typ)); }, [data.data, typ]);
+  useEffect(() => { if (poznamky.some(p => p.zminky.length)) setChceLidi(true); }, [poznamky]);
 
   const [navrh, setNavrh] = useState('');
+  const [kurzor, setKurzor] = useState(0);
+  const poleRef = useRef<HTMLTextAreaElement>(null);
   const [odesilam, setOdesilam] = useState(false);
   const [chyba, setChyba] = useState('');
   const [uprava, setUprava] = useState<{ id: number; text: string } | null>(null);
@@ -87,7 +109,7 @@ export function Poznamky({ typ, id, tablet = false, zaKoho = null, vyberKoho, cl
     const docasna: Poznamka = {
       id: -Date.now(), text, createdAt: new Date().toISOString(), updatedAt: null,
       autor: { id: kdo?.id ?? 0, name: kdo?.name || ja?.name || t('Já'), avatar: kdo ? null : ja?.avatar ?? null },
-      moje: true, muzuSmazat: true,
+      moje: true, muzuSmazat: true, pripnuta: false, zminky: [],
     };
     setOdesilam(true);
     setChyba('');
@@ -97,6 +119,7 @@ export function Poznamky({ typ, id, tablet = false, zaKoho = null, vyberKoho, cl
       const r = await fetch('/api/notes', { method: 'POST', headers: hlavicky, body: JSON.stringify(sZaKoho({ typ, id, text }, kdo)) });
       await okJson(r);
       obnovDataWidgetu(url);
+      obnovDataWidgetu(urlPoctu(typ));
     } catch (e) {
       // Server poznámku nevzal: zpátky do pole, ať se text neztratí, a říct proč.
       data.set(prev => (prev ?? []).filter(p => p.id !== docasna.id));
@@ -124,6 +147,34 @@ export function Poznamky({ typ, id, tablet = false, zaKoho = null, vyberKoho, cl
     } finally {
       setUkladam(false);
     }
+  };
+
+  // Připnout nahoru / odepnout — autor (DP: Resy „Pin" u hosta). Server pořadí vrátí, tady se jen překreslí.
+  const [pripinam, setPripinam] = useState<number | null>(null);
+  const pripni = async (p: Poznamka, pripnuta: boolean) => {
+    if (pripinam != null) return;
+    setPripinam(p.id);
+    setChyba('');
+    try {
+      const r = await fetch('/api/notes', { method: 'PATCH', headers: hlavicky, body: JSON.stringify(sZaKoho({ id: p.id, pripnuta }, zaKoho && tablet ? zaKoho : null)) });
+      await okJson(r);
+      obnovDataWidgetu(url);
+    } catch (e) {
+      setChyba(apiMessage(e, t('Poznámku se nepodařilo uložit.')));
+    } finally {
+      setPripinam(null);
+    }
+  };
+
+  // @zmínka: našeptávač pod polem, klepnutí vloží „@Jméno " a vrátí fokus do pole.
+  const navrhyLidi = navrh.includes('@') ? navrhyZminek(navrh, kurzor, lide) : null;
+  const sledujKurzor = (el: HTMLTextAreaElement | null) => { if (el) setKurzor(el.selectionStart ?? el.value.length); };
+  const vyberZminku = (jmeno: string) => {
+    if (!navrhyLidi) return;
+    const v = vlozZminku(navrh, navrhyLidi.od, kurzor, jmeno);
+    setNavrh(v.text);
+    setKurzor(v.kurzor);
+    requestAnimationFrame(() => { const el = poleRef.current; if (el) { el.focus(); el.setSelectionRange(v.kurzor, v.kurzor); } });
   };
 
   const smaz = async () => {
@@ -166,18 +217,33 @@ export function Poznamky({ typ, id, tablet = false, zaKoho = null, vyberKoho, cl
           <Skeleton className="h-10" />
           <Skeleton className="h-10 w-3/4" />
         </div>
-      ) : poznamky.length === 0 ? (
+      ) : poznamky.length === 0 && !uvod ? (
         <p className="t-meta mt-1 text-pretty">{t('Zatím bez poznámek — napiš první, třeba co se osvědčilo nebo na co dát pozor.')}</p>
       ) : (
         <ul className="list mt-1" aria-label={t('Poznámky')}>
+          {uvod && (
+            // Připnutá úvodní zpráva (u uzávěrky „Poznámka vedení"): první ve vlákně, ať je vidět, na co se odpovídá.
+            <li className="flex items-start gap-3 py-3" data-uvod-vlakna>
+              <Avatar emoji={uvod.avatar} name={uvod.autor} size="sm" className="mt-0.5" />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="text-sm font-medium truncate">{uvod.autor}</span>
+                  {uvod.kdy && <span className="t-meta">{uvod.kdy}</span>}
+                  <Chip tone="muted" size="sm" icon="pin">{uvod.popisek}</Chip>
+                </div>
+                <p className="mt-0.5 text-[15px] text-[#16181A] whitespace-pre-wrap break-words text-pretty">{uvod.text}</p>
+              </div>
+            </li>
+          )}
           {poznamky.map(p => {
             const polozky: MenuItem[] = [
               ...(p.moje && p.id > 0 ? [{ label: t('Upravit'), icon: 'pencil', onClick: () => { setChyba(''); setUprava({ id: p.id, text: p.text }); } }] : []),
+              ...(p.moje && p.id > 0 ? [{ label: p.pripnuta ? t('Odepnout') : t('Připnout nahoru'), icon: 'pin', onClick: () => { void pripni(p, !p.pripnuta); } }] : []),
               ...(p.muzuSmazat && p.id > 0 ? [{ label: t('Smazat'), icon: 'trash', danger: true, onClick: () => setMazani(p) }] : []),
             ];
             const upravuji = uprava?.id === p.id;
             return (
-              <li key={p.id} className="flex items-start gap-3 py-3">
+              <li key={p.id} className="flex items-start gap-3 py-3" data-poznamka={p.id} data-pripnuta={p.pripnuta || undefined}>
                 <Avatar emoji={p.autor.avatar} name={p.autor.name} size="sm" className="mt-0.5" />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-baseline gap-x-2">
@@ -186,6 +252,7 @@ export function Poznamky({ typ, id, tablet = false, zaKoho = null, vyberKoho, cl
                       {p.createdAt ? kdyNapsano(p.createdAt, t, jazyk) : ''}
                     </time>
                     {p.updatedAt && <span className="t-meta">· {t('upraveno')}</span>}
+                    {p.pripnuta && <span className="t-meta inline-flex items-center gap-1"><Icon name="pin" size={11} /> {t('připnuto')}</span>}
                   </div>
                   {upravuji ? (
                     <div className="mt-1.5 space-y-2">
@@ -199,7 +266,11 @@ export function Poznamky({ typ, id, tablet = false, zaKoho = null, vyberKoho, cl
                       </div>
                     </div>
                   ) : (
-                    <p className="mt-0.5 text-[15px] text-[#16181A] whitespace-pre-wrap break-words text-pretty">{p.text}</p>
+                    <p className="mt-0.5 text-[15px] text-[#16181A] whitespace-pre-wrap break-words text-pretty">
+                      {kusyTextu(p.text, p.zminky.length ? lide.filter(l => p.zminky.includes(l.id)) : []).map((k, i) => (
+                        k.zminka ? <span key={i} className="font-semibold text-[#5B7A08]">{k.text}</span> : <span key={i}>{k.text}</span>
+                      ))}
+                    </p>
                   )}
                 </div>
                 {polozky.length > 0 && !upravuji && <Menu size="sm" label={t('Akce s poznámkou')} items={polozky} />}
@@ -212,14 +283,30 @@ export function Poznamky({ typ, id, tablet = false, zaKoho = null, vyberKoho, cl
       {chyba && <p className="note note-danger mt-3 text-sm" role="alert">{chyba}</p>}
 
       <div className="mt-3">
-        <Textarea rows={2} value={navrh} maxLength={MAX_DELKA_POZNAMKY}
-          placeholder={t('Přidat poznámku…')} aria-label={t('Přidat poznámku')}
-          onChange={e => setNavrh(e.target.value)}
+        <Textarea ref={poleRef} rows={2} value={navrh} maxLength={MAX_DELKA_POZNAMKY}
+          placeholder={t('Přidat poznámku… @jméno někoho upozorní')} aria-label={t('Přidat poznámku')}
+          aria-autocomplete={navrhyLidi ? 'list' : undefined} aria-controls={navrhyLidi ? `${uid}-zminky` : undefined}
+          onChange={e => { setNavrh(e.target.value); sledujKurzor(e.target); if (e.target.value.includes('@')) setChceLidi(true); }}
+          onSelect={e => sledujKurzor(e.currentTarget)} onKeyUp={e => sledujKurzor(e.currentTarget)}
           onKeyDown={e => naKlavesu(e, () => { void odesli(); })} />
+        {navrhyLidi && (
+          // Našeptávač @zmínky: nejvýš šest lidí, řádky 44 px (palec na telefonu).
+          <ul id={`${uid}-zminky`} role="listbox" aria-label={t('Koho zmínit')} className="mt-1 well !p-1 divide-y divide-black/[0.05]" data-zminky>
+            {navrhyLidi.lide.map(l => (
+              <li key={l.id} role="option" aria-selected={false}>
+                <button type="button" onClick={() => vyberZminku(l.name)}
+                  className="tap-target flex w-full min-h-[44px] items-center gap-2 rounded-xl px-2 py-2 text-left text-sm text-[#16181A] hover:bg-black/[0.04]">
+                  <Avatar emoji={l.avatar} name={l.name} size="xs" ring={false} />
+                  <span className="min-w-0 truncate">{l.name}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
         <div className="mt-2 flex items-center justify-between gap-3">
           {/* Nápověda ke klávesnici je na telefonu bez klávesnice jen šum; věta o tabletu platí vždy. */}
           <span className={`t-meta min-w-0 truncate ${tablet && !zaKoho ? '' : 'hidden sm:inline'}`}>
-            {tablet && !zaKoho ? t('Na tabletu se poznámka připíše vybranému člověku.') : t('Ctrl+Enter odešle')}
+            {tablet && !zaKoho ? t('Na tabletu se poznámka připíše vybranému člověku.') : t('Ctrl+Enter odešle · @jméno upozorní kolegu')}
           </span>
           <Button variant="primary" size="sm" icon="send" loading={odesilam} disabled={!navrh.trim()} className="ml-auto" onClick={() => { void odesli(); }}>
             {t('Přidat')}

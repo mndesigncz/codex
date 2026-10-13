@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
-import { pozaduj, jeOdpoved, type Kontext } from '@/lib/opravneniDb';
+import { pozaduj, jeOdpoved, roleClena, type Kontext } from '@/lib/opravneniDb';
 import { typNaUcet } from '@/lib/opravneni';
 import { resolveActingUser } from '@/lib/kioskActing';
+import { clenovePodniku } from '@/lib/tenant';
+import { notifyUser } from '@/lib/push';
 import {
-  jeTypPoznamky, klicEntity, normalizujTextPoznamky, smiSmazatPoznamku, smiUpravitPoznamku, idsZPoctu,
+  jeTypPoznamky, klicEntity, normalizujTextPoznamky, smiSmazatPoznamku, smiUpravitPoznamku, idsZPoctu, najdiZminky, odkazNaPoznamku, kategorieOznameni,
   MAX_DELKA_POZNAMKY, type TypPoznamky, type Poznamka,
 } from '@/lib/poznamky';
 
@@ -91,6 +93,28 @@ async function entitaViditelna(typ: TypPoznamky, klic: string, v: Volajici): Pro
       const [s] = await sql`SELECT id FROM suggestions WHERE id = ${Number(klic)} AND team_id = ${teamId}`;
       return !!s;
     }
+    case 'closing': {
+      // Jako GET /api/closings/[id]: všechny s uzaverky.zobrazit_vse, jinak vlastní (autor nebo osádka směny).
+      const [u] = await sql`SELECT created_by, shift_employees FROM cash_closings WHERE id = ${Number(klic)} AND team_id = ${teamId}`;
+      if (!u) return false;
+      if (opr.has('uzaverky.zobrazit_vse')) return true;
+      const osadka = Array.isArray(u.shift_employees) ? u.shift_employees.map(Number) : [];
+      return [Number(u.created_by), ...osadka].some(id => id === actingId || id === c.meId);
+    }
+    case 'event': {
+      if (!opr.has('akce.zobrazit')) return false;
+      const [e] = await sql`SELECT id FROM events WHERE id = ${Number(klic)} AND team_id = ${teamId}`;
+      return !!e;
+    }
+    case 'menu_item': {
+      if (!opr.has('menu.zobrazit') && !opr.has('menu.upravit')) return false;
+      const [m] = await sql`
+        SELECT mi.id FROM menu_items mi
+        JOIN menu_sections ms ON ms.id = mi.section_id
+        JOIN menu_boards mb ON mb.id = ms.board_id
+        WHERE mi.id = ${Number(klic)} AND mb.team_id = ${teamId}`;
+      return !!m;
+    }
   }
 }
 
@@ -138,18 +162,114 @@ const tvar = (r: any, v: Volajici): Poznamka => {
     autor: { id: autorId, name: String(r.autor_name ?? ''), avatar: r.autor_avatar ?? null },
     moje: smiUpravitPoznamku(autorId, v.actingId),
     muzuSmazat: smiSmazatPoznamku({ typ: r.entity_type, autorId, meId: v.actingId, opr: v.c.role.opravneni }),
+    pripnuta: r.pinned === true,
+    zminky: Array.isArray(r.mentions) ? r.mentions.map(Number).filter(Number.isFinite) : [],
   };
 };
 
-const SELECT_POZNAMKY = (teamId: number, typ: string, klic: string) => sql`
-  SELECT n.id, n.entity_type, n.user_id, n.text, n.created_at, n.updated_at, u.name AS autor_name, u.avatar AS autor_avatar
-  FROM entity_notes n
-  LEFT JOIN users u ON u.id = n.user_id
-  WHERE n.team_id = ${teamId} AND n.entity_type = ${typ} AND n.entity_id = ${klic}
-  ORDER BY n.created_at ASC, n.id ASC`;
+/** Sloupce mentions/pinned před migrací (42703): stejný dotaz bez nich. */
+const bezSloupce = (e: unknown) => (e as { code?: string } | null)?.code === '42703';
+
+async function SELECT_POZNAMKY(teamId: number, typ: string, klic: string) {
+  try {
+    return await sql`
+      SELECT n.id, n.entity_type, n.user_id, n.text, n.created_at, n.updated_at, n.mentions, n.pinned, u.name AS autor_name, u.avatar AS autor_avatar
+      FROM entity_notes n
+      LEFT JOIN users u ON u.id = n.user_id
+      WHERE n.team_id = ${teamId} AND n.entity_type = ${typ} AND n.entity_id = ${klic}
+      ORDER BY n.pinned DESC, n.created_at ASC, n.id ASC`;
+  } catch (e) {
+    if (!bezSloupce(e)) throw e;
+    return await sql`
+      SELECT n.id, n.entity_type, n.user_id, n.text, n.created_at, n.updated_at, u.name AS autor_name, u.avatar AS autor_avatar
+      FROM entity_notes n
+      LEFT JOIN users u ON u.id = n.user_id
+      WHERE n.team_id = ${teamId} AND n.entity_type = ${typ} AND n.entity_id = ${klic}
+      ORDER BY n.created_at ASC, n.id ASC`;
+  }
+}
+
+async function JEDNA_POZNAMKA(id: number) {
+  try {
+    const [row] = await sql`
+      SELECT n.id, n.entity_type, n.user_id, n.text, n.created_at, n.updated_at, n.mentions, n.pinned, u.name AS autor_name, u.avatar AS autor_avatar
+      FROM entity_notes n LEFT JOIN users u ON u.id = n.user_id WHERE n.id = ${id}`;
+    return row;
+  } catch (e) {
+    if (!bezSloupce(e)) throw e;
+    const [row] = await sql`
+      SELECT n.id, n.entity_type, n.user_id, n.text, n.created_at, n.updated_at, u.name AS autor_name, u.avatar AS autor_avatar
+      FROM entity_notes n LEFT JOIN users u ON u.id = n.user_id WHERE n.id = ${id}`;
+    return row;
+  }
+}
 
 /** Tabulka před migrací (/api/init ještě neběžel): prázdný seznam, ne 500. */
 const predMigraci = (e: unknown) => (e as { code?: string } | null)?.code === '42P01';
+
+/** Otevření vlákna = přečteno: bublina v seznamu přestane být tučná. Best-effort (před migrací nic). */
+async function oznacPrecteno(teamId: number, userId: number, typ: string, klic: string) {
+  try {
+    await sql`
+      INSERT INTO entity_note_reads (team_id, user_id, entity_type, entity_id, read_at) VALUES (${teamId}, ${userId}, ${typ}, ${klic}, NOW())
+      ON CONFLICT (team_id, user_id, entity_type, entity_id) DO UPDATE SET read_at = NOW()`;
+  } catch { /* před migrací */ }
+}
+
+/** Rozhraní příjemce oznámení (kam odkaz vede): vedení do /employer, ostatní do /employee. */
+async function rozhraniPrijemce(userId: number, teamId: number): Promise<'vedeni' | 'zamestnanec'> {
+  try { return (await roleClena(userId, teamId))?.typ === 'vedeni' ? 'vedeni' : 'zamestnanec'; } catch { return 'zamestnanec'; }
+}
+
+/** Jméno věci do oznámení („… tě zmínil u Latte"). Best-effort; bez něj obecná věta. */
+async function nazevEntity(typ: TypPoznamky, klic: string, teamId: number): Promise<string | null> {
+  try {
+    const id = Number(klic);
+    switch (typ) {
+      case 'task': return (await sql`SELECT title AS n FROM tasks WHERE id = ${id} AND team_id = ${teamId}`)[0]?.n ?? null;
+      case 'guide': return (await sql`SELECT title AS n FROM guides WHERE id = ${id} AND team_id = ${teamId}`)[0]?.n ?? null;
+      case 'procedure': return (await sql`SELECT name AS n FROM procedures WHERE id = ${id} AND team_id = ${teamId}`)[0]?.n ?? null;
+      case 'recipe': return (await sql`SELECT product_name AS n FROM pos_product_map WHERE team_id = ${teamId} AND product_id = ${klic} LIMIT 1`)[0]?.n
+        ?? (await sql`SELECT name AS n FROM pos_products WHERE team_id = ${teamId} AND product_id = ${klic} LIMIT 1`)[0]?.n ?? null;
+      case 'inventory_item': return (await sql`SELECT name AS n FROM inventory_items WHERE id = ${id} AND team_id = ${teamId}`)[0]?.n ?? null;
+      case 'closing': { const r = (await sql`SELECT COALESCE(shift_date, date) AS n FROM cash_closings WHERE id = ${id} AND team_id = ${teamId}`)[0]; return r ? `uzávěrka ${String(r.n).slice(0, 10)}` : null; }
+      case 'event': return (await sql`SELECT title AS n FROM events WHERE id = ${id} AND team_id = ${teamId}`)[0]?.n ?? null;
+      case 'menu_item': return (await sql`SELECT name AS n FROM menu_items WHERE id = ${id}`)[0]?.n ?? null;
+      case 'suggestion': return (await sql`SELECT title AS n FROM suggestions WHERE id = ${id} AND team_id = ${teamId}`)[0]?.n ?? null;
+      case 'shift': return null;
+    }
+  } catch { return null; }
+}
+
+/**
+ * Oznámení po nové poznámce: zmíněným („Martin tě zmínil u Latte: …") a u uzávěrky jejímu autorovi
+ * (vedení se zeptá „proč manko 200?", barista to dostane do telefonu). Nikdy autorovi poznámky.
+ */
+async function oznamPoznamku(v: Volajici, typ: TypPoznamky, klic: string, text: string, zminky: number[]) {
+  const teamId = v.c.teamId;
+  const prijemci = new Map<number, 'zminka' | 'autor_uzaverky'>();
+  for (const id of zminky) if (id !== v.actingId) prijemci.set(id, 'zminka');
+  if (typ === 'closing') {
+    try {
+      const [u] = await sql`SELECT created_by FROM cash_closings WHERE id = ${Number(klic)} AND team_id = ${teamId}`;
+      const autor = Number(u?.created_by);
+      if (Number.isFinite(autor) && autor !== v.actingId && !prijemci.has(autor)) prijemci.set(autor, 'autor_uzaverky');
+    } catch { /* bez autora */ }
+  }
+  if (!prijemci.size) return;
+  const [kdo] = await sql`SELECT name FROM users WHERE id = ${v.actingId}`;
+  const jmeno = kdo?.name ?? 'Kolega';
+  const vec = await nazevEntity(typ, klic, teamId);
+  const ukazka = text.replace(/\s+/g, ' ').slice(0, 120) + (text.length > 120 ? '…' : '');
+  await Promise.allSettled([...prijemci].map(async ([id, duvod]) => {
+    const rozhrani = await rozhraniPrijemce(id, teamId);
+    await notifyUser(id, {
+      title: duvod === 'zminka' ? (vec ? `${jmeno} tě zmínil u ${vec}` : `${jmeno} tě zmínil v poznámce`) : 'Poznámka k tvé uzávěrce',
+      body: `${duvod === 'zminka' ? '' : `${jmeno}: `}${ukazka}`,
+      type: 'info', category: kategorieOznameni(typ), link: odkazNaPoznamku(typ, klic, rozhrani),
+    });
+  }));
+}
 
 // GET ?typ=&id=[&actingAs=] — poznámky k jedné věci, od nejstarší.
 export async function GET(req: NextRequest) {
@@ -162,6 +282,8 @@ export async function GET(req: NextRequest) {
   try {
     if (!(await entitaViditelna(c.typ, c.klic, v))) return chyba('Tohle už neexistuje.', 404);
     const rows = await SELECT_POZNAMKY(v.c.teamId, c.typ, c.klic);
+    // Kdo vlákno otevřel, má ho přečtené (tablet bez vybraného člověka ne — nevíme kdo).
+    if (!(v.tablet && v.actingId === v.c.meId)) await oznacPrecteno(v.c.teamId, v.actingId, c.typ, c.klic);
     return NextResponse.json(rows.map(r => tvar(r, v)));
   } catch (e) {
     if (predMigraci(e)) return NextResponse.json([]);
@@ -188,13 +310,25 @@ export async function POST(req: NextRequest) {
   if (v.tablet && v.actingId === v.c.meId) return chyba('Na tabletu píše vybraný člověk — nejdřív vyber, kdo píše.', 403);
   try {
     if (!(await entitaViditelna(c.typ, c.klic, v))) return chyba('Tohle už neexistuje.', 404);
-    const [r] = await sql`
-      INSERT INTO entity_notes (team_id, entity_type, entity_id, user_id, text)
-      VALUES (${v.c.teamId}, ${c.typ}, ${c.klic}, ${v.actingId}, ${text})
-      RETURNING id`;
-    const [row] = await sql`
-      SELECT n.id, n.entity_type, n.user_id, n.text, n.created_at, n.updated_at, u.name AS autor_name, u.avatar AS autor_avatar
-      FROM entity_notes n LEFT JOIN users u ON u.id = n.user_id WHERE n.id = ${r.id}`;
+    // @zmínky rozhoduje server podle členů podniku (klient jen našeptává) — oznámení dostanou jen skuteční lidé.
+    let zminky: number[] = [];
+    try { zminky = najdiZminky(text, await clenovePodniku(v.c.teamId)); } catch { /* bez zmínek */ }
+    let r: any;
+    try {
+      [r] = await sql`
+        INSERT INTO entity_notes (team_id, entity_type, entity_id, user_id, text, mentions)
+        VALUES (${v.c.teamId}, ${c.typ}, ${c.klic}, ${v.actingId}, ${text}, ${zminky})
+        RETURNING id`;
+    } catch (e) {
+      if (!bezSloupce(e)) throw e;
+      [r] = await sql`
+        INSERT INTO entity_notes (team_id, entity_type, entity_id, user_id, text)
+        VALUES (${v.c.teamId}, ${c.typ}, ${c.klic}, ${v.actingId}, ${text})
+        RETURNING id`;
+    }
+    await oznacPrecteno(v.c.teamId, v.actingId, c.typ, c.klic);
+    try { await oznamPoznamku(v, c.typ, c.klic, text, zminky); } catch (e) { console.error('notes notify', e); }
+    const row = await JEDNA_POZNAMKA(Number(r.id));
     return NextResponse.json(tvar(row, v), { status: 201 });
   } catch (e) {
     if (predMigraci(e)) return chyba('Poznámky ještě nejsou zapnuté — vedení musí spustit aktualizaci databáze.', 503);
@@ -210,6 +344,7 @@ async function nactiPoznamku(id: number, teamId: number) {
 }
 
 // PATCH { id, text, actingAs? } — upravit text; jen autor.
+// PATCH { id, pripnuta: boolean } — připnout nahoru / odepnout; autor (kolo 8, R8-5).
 export async function PATCH(req: NextRequest) {
   let b: any;
   try { b = await req.json(); } catch { return chyba('Neplatné tělo požadavku.', 400); }
@@ -217,16 +352,20 @@ export async function PATCH(req: NextRequest) {
   if (jeOdpoved(v)) return v;
   const id = Number(b?.id);
   if (!Number.isInteger(id) || id <= 0) return chyba('Chybí id poznámky.', 400);
-  const text = normalizujTextPoznamky(b?.text);
-  if (!text) return chyba(typeof b?.text === 'string' && b.text.length > MAX_DELKA_POZNAMKY ? `Poznámka může mít nejvýš ${MAX_DELKA_POZNAMKY} znaků.` : 'Napiš text poznámky.', 400);
+  const jenPripnuti = typeof b?.pripnuta === 'boolean' && b?.text === undefined;
+  const text = jenPripnuti ? null : normalizujTextPoznamky(b?.text);
+  if (!jenPripnuti && !text) return chyba(typeof b?.text === 'string' && b.text.length > MAX_DELKA_POZNAMKY ? `Poznámka může mít nejvýš ${MAX_DELKA_POZNAMKY} znaků.` : 'Napiš text poznámky.', 400);
   try {
     const n = await nactiPoznamku(id, v.c.teamId);
     if (!n) return chyba('Tohle už neexistuje.', 404);
-    if (!smiUpravitPoznamku(Number(n.user_id), v.actingId)) return chyba('Poznámku může upravit jen ten, kdo ji napsal.', 403);
-    await sql`UPDATE entity_notes SET text = ${text}, updated_at = NOW() WHERE id = ${id} AND team_id = ${v.c.teamId}`;
-    const [row] = await sql`
-      SELECT n.id, n.entity_type, n.user_id, n.text, n.created_at, n.updated_at, u.name AS autor_name, u.avatar AS autor_avatar
-      FROM entity_notes n LEFT JOIN users u ON u.id = n.user_id WHERE n.id = ${id}`;
+    if (!smiUpravitPoznamku(Number(n.user_id), v.actingId)) return chyba(jenPripnuti ? 'Připnout poznámku může jen ten, kdo ji napsal.' : 'Poznámku může upravit jen ten, kdo ji napsal.', 403);
+    if (jenPripnuti) {
+      try { await sql`UPDATE entity_notes SET pinned = ${b.pripnuta === true} WHERE id = ${id} AND team_id = ${v.c.teamId}`; }
+      catch (e) { if (bezSloupce(e)) return chyba('Připnutí ještě není zapnuté — vedení musí spustit aktualizaci databáze.', 503); throw e; }
+    } else {
+      await sql`UPDATE entity_notes SET text = ${text}, updated_at = NOW() WHERE id = ${id} AND team_id = ${v.c.teamId}`;
+    }
+    const row = await JEDNA_POZNAMKA(id);
     return NextResponse.json(tvar(row, v));
   } catch (e) {
     console.error('notes PATCH', e);

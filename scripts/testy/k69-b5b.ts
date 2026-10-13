@@ -141,9 +141,10 @@ export default function ({ eq, ok }: Testy) {
   };
   const vid = (sid: string, d: Divak) => vyresRozlozeni({ stranka: stranka(sid as any)!, divak: d, osobni: null, vychozi: [] }).polozky.map(x => x.widget);
   const vlastnik: Divak = { ...role('vedeni'), opravneni: new Set(KATALOG.map(x => x.id)), jeSpravce: true };
-  eq('výchozí TO GO pro vlastníka: hero a týden, kdo je dnes v podniku, výroba, pak uzávěrky ke schválení, úkoly, zprávy, sklad, účtenky a odkaz',
+  // Kolo 8 (R8-4): za hero stojí Mzdy dnes a Otevřené účty (S vedle S), pak týden.
+  eq('výchozí TO GO pro vlastníka: hero, mzdy dnes a otevřené účty, týden, kdo je dnes v podniku, výroba, pak uzávěrky ke schválení, úkoly, zprávy, sklad, účtenky a odkaz',
     vid('vedeni.togo', vlastnik),
-    ['pokladna.dnes', 'trzby.po_dnech', 'dochazka.dnes_v_podniku', 'vyroba.k_vyrobe', 'uzaverky.ke_schvaleni', 'ukoly.dnes',
+    ['pokladna.dnes', 'finance.mzdy_dnes', 'trzby.otevrene', 'trzby.po_dnech', 'dochazka.dnes_v_podniku', 'vyroba.k_vyrobe', 'uzaverky.ke_schvaleni', 'ukoly.dnes',
       'chat.neprectene', 'sklad.dochazi', 'finance.uctenky', 'odkaz']);
   // Plánovaný widget se nekreslí a resolver ho potichu vynechá — TO GO by tak beze stopy
   // přišlo o obsah (dřív „Dnes v podniku"). Každý widget výchozího rozložení musí být hotový.

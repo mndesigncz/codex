@@ -1,0 +1,45 @@
+{
+ "stranka": "vedeni.sklad",
+ "polozky": [
+  {
+   "id": "dochazi",
+   "widget": "sklad.dochazi",
+   "velikost": "M"
+  },
+  {
+   "id": "nakup",
+   "widget": "sklad.nakupni_seznam",
+   "velikost": "M"
+  },
+  {
+   "id": "dochazi-l",
+   "widget": "sklad.dochazi",
+   "velikost": "L"
+  },
+  {
+   "id": "nakup-l",
+   "widget": "sklad.nakupni_seznam",
+   "velikost": "L"
+  },
+  {
+   "id": "nastroj",
+   "widget": "nastroj",
+   "velikost": "L"
+  }
+ ],
+ "dostupne": [
+  "sklad.dochazi",
+  "sklad.nakupni_seznam",
+  "sklad.navrhy",
+  "sklad.hlaseni",
+  "sklad.objednavky",
+  "vyroba.k_vyrobe"
+ ],
+ "tarifem": [],
+ "zdroj": "osobni",
+ "rozsah": "typ:vedeni",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": true,
+ "verze": 1
+}

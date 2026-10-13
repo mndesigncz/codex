@@ -172,5 +172,6 @@
   "Rezervaci jde tady jen potvrdit.": "Here a reservation can only be confirmed.",
   "Chybí rezervace.": "Reservation is missing.",
   "Tuhle rezervaci už potvrdit nejde.": "This reservation can't be confirmed anymore.",
-  "Připomínky se nenačetly.": "Reminders could not be loaded."
+  "Připomínky se nenačetly.": "Reminders could not be loaded.",
+  "Neplatný produkt": "Invalid product"
 }

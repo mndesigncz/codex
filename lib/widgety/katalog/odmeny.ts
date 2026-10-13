@@ -100,6 +100,62 @@ export const WIDGETY: DefiniceWidgetu[] = [
     cil: { pohled: 'rewards' },
     stav: 'hotovo',
   },
+  // Data: GET /api/rewards/awards?zed=1 → awards[kind='kolega'], prispevek { mesicni, zbyva } | null, hodnoty, kolegove;
+  // POST /api/rewards/awards { kind: 'kolega', userId, points 5|10|20, valueTag?, reason? }
+  // Kolo 8 (R8-3, vzor Bonusly „giveable allowance"): body od kolegů z měsíčního příspěvku, hodnoty podniku jako #hashtag.
+  // Každý člen (i tablet jen ke čtení) — žádné oprávnění; „Poděkovat" jen osobní účet s příspěvkem > 0.
+  {
+    id: 'odmeny.zed_diku',
+    oblast: 'odmeny',
+    nazev: 'Zeď díků',
+    popis: 'Poděkování mezi kolegy s body z měsíčního příspěvku — kdo komu za co, a tlačítko Poděkovat.',
+    ikona: 'sparkle',
+    velikosti: ['S', 'M', 'L'],
+    vychoziVelikost: 'M',
+    rozhrani: ['vedeni', 'zamestnanec', 'kiosk'],
+    stranky: ['vedeni.odmeny', 'vedeni.prehled', 'zamestnanec.domu', 'zamestnanec.odmeny', 'kiosk.smena'],
+    opravneni: { vse: [], nektere: [] },
+    tarif: 'pro',
+    cil: { pohled: 'rewards' },
+    stav: 'hotovo',
+  },
+  // Data: GET /api/rewards/challenges → vyzvy[{id,nazev,metrika,cil,od,do,odmenaText,odmenaBody,splnenoAt,hodnota}]
+  // Kolo 8 (R8-3, vzor Kudos / 7shifts Engage): společný cíl s ukazatelem „3 z 5 uzávěrek · zbývají 2 dny";
+  // vyhlašuje vedení v Odměny › Nastavení, splnění vyhodnotí server při načtení. Bez výzvy se v klidu nekreslí.
+  {
+    id: 'odmeny.vyzva',
+    oblast: 'odmeny',
+    nazev: 'Výzva týdne',
+    popis: 'Společný cíl týmu (uzávěrky bez manka, úkoly, hodnocení hostů, tržba) s ukazatelem postupu a odměnou.',
+    ikona: 'fire',
+    velikosti: ['S', 'M'],
+    vychoziVelikost: 'M',
+    rozhrani: ['vedeni', 'zamestnanec', 'kiosk'],
+    stranky: ['vedeni.prehled', 'vedeni.odmeny', 'zamestnanec.domu', 'zamestnanec.odmeny', 'kiosk.smena'],
+    opravneni: { vse: [], nektere: [] },
+    tarif: 'pro',
+    cil: { pohled: 'rewards' },
+    stav: 'hotovo',
+  },
+  // Data: GET /api/rewards/awards?oslavy=1 → oslavy[{userId,name,avatar,druh,den,zaDni,roky,ja}]
+  // Kolo 8 (R8-3, vzor Kudos „employee milestones"): „Petra má dnes 2 roky u nás 🎉 · Poděkovat". Body za
+  // narozeniny a výročí připisuje denní cron podle Odměny › Nastavení (points_config.auto). V klidu bez
+  // oslavy se widget nekreslí.
+  {
+    id: 'odmeny.oslavy',
+    oblast: 'odmeny',
+    nazev: 'Oslavy v týmu',
+    popis: 'Narozeniny a výročí nástupu kolegů dnes a v příštích dnech — s tlačítkem Poděkovat.',
+    ikona: 'cup',
+    velikosti: ['S', 'M'],
+    vychoziVelikost: 'M',
+    rozhrani: ['vedeni', 'zamestnanec', 'kiosk'],
+    stranky: ['vedeni.prehled', 'vedeni.odmeny', 'zamestnanec.domu', 'kiosk.smena'],
+    opravneni: { vse: [], nektere: [] },
+    tarif: 'pro',
+    cil: { pohled: 'rewards' },
+    stav: 'hotovo',
+  },
   // Data: GET /api/rewards/catalog → redemptions[status=pending]
   {
     id: 'odmeny.zadosti',

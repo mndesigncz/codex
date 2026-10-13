@@ -18,6 +18,8 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'uzivatel.zablokovan': 'Uživatel zablokován',
   'uzivatel.odblokovan': 'Uživatel odblokován',
   'zprava.smazana': 'Zpráva v chatu smazána',
+  'oznameni.potvrzeno': 'Oznámení na nástěnce potvrzeno („Rozumím")',
+  'oznameni.pripomenuto': 'Připomenutí oznámení těm, kdo nepotvrdili',
   'team.switch': 'Přepnutí do jiného podniku',
   'team.create': 'Založen nový podnik',
   'team.create_account': 'Založen účet člena',
@@ -62,6 +64,7 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'schedule.adjust': 'Rozvrh upraven podle nových požadavků',
   'schedule.rules': 'Změna pravidel rozvrhu',
   'volno.rozhodnout': 'Rozhodnuto o žádosti o volno',
+  'volno.narok': 'Nastaven nárok na dovolenou',
   'rozvrh.poznamka': 'Poznámka ke směně',
   'rozvrh.pripomenout_dostupnost': 'Lidem bez dostupnosti připomenuto, ať ji zadají',
   'rozvrh.publikovat': 'Rozvrh publikován',
@@ -92,6 +95,10 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'wage.adjustment_delete': 'Smazána prémie nebo srážka',
   'points.award': 'Pochvala s body',
   'points.award_delete': 'Smazána pochvala',
+  'points.thanks': 'Poděkování kolegovi s body',
+  'vyzva.vyhlasit': 'Vyhlášena týmová výzva',
+  'vyzva.smazat': 'Zrušena týmová výzva',
+  'vyzva.splnena': 'Týmová výzva splněna',
   // docházka (kolo 7: ruční oprava s důvodem)
   'dochazka.upravit': 'Ručně upraven záznam docházky',
   'dochazka.pridat': 'Ručně přidán záznam docházky',
@@ -107,6 +114,9 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'pos.disconnect': 'Odpojena kasa',
   'pos.sync': 'Odepsány prodeje ze skladu',
   'pos.recipe': 'Změněna receptura produktu z kasy',
+  'pos.recipe.navrh': 'Navržena úprava receptury z kasy',
+  'pos.recipe.schvaleno': 'Schválen návrh úpravy receptury',
+  'pos.recipe.vraceno': 'Návrh úpravy receptury vrácen s poznámkou',
   'pos.backfill': 'Dotažena historie prodejů z kasy',
   'pos.webhook': 'Vygenerováno nové tajemství napojení kasy',
   'menu.pos.match': 'Menu spárováno s kasou',
@@ -175,6 +185,10 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'vyplata.smlouva': 'Změna typu smlouvy a limitu hodin člena',
   'dochazka.pauza_doplnena': 'Pauza doplněná při odchodu (směna rozdělená na dva záznamy)',
   'dochazka.bez_pauzy': 'Odchod po víc než 6 h bez pauzy',
+  // Záznamy docházky a tablet (kolo 8, R8-2)
+  'dochazka.pravidla_pichani': 'Změna pravidel píchání z telefonu (poloha podniku, poloměr)',
+  'dochazka.mimo_podnik': 'Příchod z telefonu mimo okruh podniku',
+  'dochazka.sync_offline': 'Píchnutí z tabletu doručená po výpadku internetu',
 };
 
 /** Popisek akce; neznámý klíč nikdy neukážeme syrový. */
@@ -265,6 +279,8 @@ export const OBLASTI_AUDITU: Readonly<Record<string, OblastAuditu>> = {
   closing: 'uzaverky',
   // odměny, prémie, pochvaly
   reward: 'odmeny', wage: 'odmeny', points: 'odmeny', vyplata: 'odmeny',
+  // týmové výzvy (kolo 8)
+  vyzva: 'odmeny',
   // hosté (Managero client)
   client: 'klient', klient: 'klient', rezervace: 'klient', recenze: 'klient',
   // nastavení podniku, organizace, předplatné
@@ -272,7 +288,7 @@ export const OBLASTI_AUDITU: Readonly<Record<string, OblastAuditu>> = {
   // akce (výdej a vrácení zboží, oznámení týmu) — samostatná agenda, patří k ostatnímu
   event: 'ostatni',
   // úkoly a nápady (kolo 7: fotka jako důkaz, zamítnutí s důvodem) — provozní agenda, patří k ostatnímu
-  ukoly: 'ostatni', napady: 'ostatni',
+  ukoly: 'ostatni', napady: 'ostatni', oznameni: 'ostatni',
 };
 
 /** Akce, jejichž předpona patří jinam než ony samy (celý klíč má přednost před předponou). */

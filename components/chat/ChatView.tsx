@@ -13,6 +13,7 @@ import {
   useConversations,
   useThreadMessages,
   sendMessage,
+  toggleReaction,
   uploadFile,
   MAX_UPLOAD_BYTES,
   markRead,
@@ -25,6 +26,7 @@ import {
 import { useT } from '@/lib/i18n/client';
 import { useDraft } from '@/lib/useDraft';
 import { prvniNeprectenaId } from '@/lib/chatVlakno';
+import { EMOJI_REAKCI, kdoVidel, posledniVlastniId, prepniReakci, shrnJmena, uryvekZpravy } from '@/lib/chatReakce';
 import { useOpravneni } from '../role/useOpravneni';
 import { obsahuje, obsahujeNekde } from '@/lib/hledani';
 
@@ -288,7 +290,10 @@ function Thread({
   onSent: () => void;
 }) {
   const t = useT('chat');
-  const { messages, setMessages, loading } = useThreadMessages(conv.id);
+  const { messages, setMessages, members, loading } = useThreadMessages(conv.id);
+  // Kolo 8: odpověď cituje zprávu (pruh nad polem), reakce se přepínají optimisticky, „Viděli" z last_read_at.
+  const [odpovedNa, setOdpovedNa] = useState<ChatMessage | null>(null);
+  const [reakceChyba, setReakceChyba] = useState('');
   // Cizí anketu smí zavřít ten, kdo spravuje ankety (server to hlídá stejným
   // klíčem). Do ankety se dřív předávalo jen meId, takže „Uzavřít“ viděl
   // jen autor. Před načtením oprávnění tlačítko nekreslíme (`ma()` by tehdy
@@ -319,9 +324,25 @@ function Thread({
       setMessages(prev => prev.filter(x => x.id !== m.id));
     } catch { setModeraceZprava(t('Zprávu se nepodařilo smazat. Zkontrolujte připojení.')); }
   };
+  const reagovat = async (m: ChatMessage, emoji: string) => {
+    setReakceChyba('');
+    const puvodni = m.reactions ?? [];
+    setMessages(prev => prev.map(x => (x.id === m.id ? { ...x, reactions: prepniReakci(puvodni, emoji, { id: meId, name: t('Ty') }) } : x)));
+    const nove = await toggleReaction(conv.id, m.id, emoji);
+    if (nove) setMessages(prev => prev.map(x => (x.id === m.id ? { ...x, reactions: nove } : x)));
+    else { setMessages(prev => prev.map(x => (x.id === m.id ? { ...x, reactions: puvodni } : x))); setReakceChyba(t('Reakci se nepodařilo uložit.')); }
+  };
+  const odpovedet = (m: ChatMessage) => { setOdpovedNa(m); boxRef.current?.focus(); };
+  const skocNa = (id: number) => {
+    const el = document.getElementById(`zprava-${id}`);
+    if (!el) return;
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    el.classList.add('ring-2', 'ring-[#C8F542]', 'rounded-3xl');
+    setTimeout(() => el.classList.remove('ring-2', 'ring-[#C8F542]', 'rounded-3xl'), 1200);
+  };
   const akceZpravy = (m: ChatMessage): MenuItem[] => {
     const own = m.senderId === meId;
-    const out: MenuItem[] = [];
+    const out: MenuItem[] = [{ label: t('Odpovědět'), icon: 'chat', onClick: () => odpovedet(m) }];
     if (!own) {
       out.push({ label: t('Nahlásit zprávu'), icon: 'warning', onClick: () => setNahlasit(m.id) });
       out.push({ label: t('Zablokovat autora'), icon: 'lock', onClick: () => { void zablokuj(m); } });
@@ -374,6 +395,7 @@ function Thread({
     attachmentUrl?: string;
     attachmentType?: string;
     attachmentName?: string;
+    replyTo?: number | null;
   }) => {
     const msg = await sendMessage(conv.id, payload);
     if (msg) {
@@ -394,7 +416,8 @@ function Thread({
     setText('');
     koncept.hotovo();
     requestAnimationFrame(autoGrow);
-    const ok = await doSend({ content: obsah });
+    const ok = await doSend({ content: obsah, replyTo: odpovedNa?.id ?? null });
+    if (ok) setOdpovedNa(null);
     // The input was cleared optimistically; a failed send must give the text
     // back rather than swallow what the person wrote.
     if (!ok) {
@@ -428,6 +451,8 @@ function Thread({
     }
     setUploading(false);
   };
+
+  const posledniVlastni = posledniVlastniId(messages, meId);
 
   // Čára „Nepřečtené“ se přišpendlí k id zprávy při prvním načtení vlákna;
   // odvozená z živé délky by se posouvala s každou novou zprávou.
@@ -469,6 +494,17 @@ function Thread({
         )}
         {messages.map((m, i) => {
           const prev = messages[i - 1];
+          // „Viděli" jen u poslední vlastní zprávy: v týmu jména, v soukromé konverzaci čas přečtení.
+          let videli: string | undefined;
+          if (m.id === posledniVlastni) {
+            if (conv.type === 'direct') {
+              const druhy = members.find(c => c.id !== meId);
+              videli = druhy && kdoVidel(members, m).length ? t('Přečteno {cas}', { cas: formatClock(druhy.lastReadAt, t) }) : undefined;
+            } else {
+              const j = shrnJmena(kdoVidel(members, m));
+              videli = j.text ? (j.dalsich ? t('Viděli: {jmena} +{n}', { jmena: j.text, n: j.dalsich }) : t('Viděli: {jmena}', { jmena: j.text })) : undefined;
+            }
+          }
           // Oddělovač dne. Dlouhé vlákno bez něj je jedna stěna a u zprávy
           // „přijdu později" se nedá poznat, jestli je z dneška nebo z minulého týdne.
           const newDay = !prev || dayKey(prev.createdAt) !== dayKey(m.createdAt);
@@ -494,6 +530,11 @@ function Thread({
                 dayShown
                 showSender={conv.type === 'team' && m.senderId !== meId && (newDay || prev?.senderId !== m.senderId)}
                 akce={akceZpravy(m)}
+                meId={meId}
+                onReagovat={emoji => { void reagovat(m, emoji); }}
+                onOdpovedet={() => odpovedet(m)}
+                onSkocNa={skocNa}
+                videli={videli}
               />
             </div>
           );
@@ -521,10 +562,21 @@ function Thread({
         <NahlasitOkno kind="zprava" refId={nahlasit} onClose={() => setNahlasit(null)}
           onDone={(z) => { setNahlasit(null); setModeraceZprava(z); }} />
       )}
-      {sendError && (
+      {(sendError || reakceChyba) && (
         <p className="px-3 pt-2 text-xs font-medium text-bad-ink flex items-center gap-1.5">
-          <span aria-hidden><Icon name="warning" size={15} /></span> {sendError}
+          <span aria-hidden><Icon name="warning" size={15} /></span> {sendError || reakceChyba}
         </p>
+      )}
+      {/* Odpověď: citace nad polem (šedý pruh), křížek ji zruší — zpráva pak odejde bez vazby. */}
+      {odpovedNa && (
+        <div className="mx-3 mt-2 flex items-start gap-2 rounded-2xl bg-[var(--well)] border border-[var(--well-line)] px-3 py-2" data-odpoved-na={odpovedNa.id}>
+          <span aria-hidden className="mt-0.5 h-8 w-0.5 shrink-0 rounded-full bg-[#5B7A08]" />
+          <div className="min-w-0 flex-1">
+            <p className="text-[12px] font-semibold text-[#16181A]">{t('Odpověď na {jmeno}', { jmeno: odpovedNa.senderId === meId ? t('Ty') : odpovedNa.senderName })}</p>
+            <p className="t-meta truncate">{uryvekZpravy(odpovedNa.content) ?? t('Příloha')}</p>
+          </div>
+          <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={t('Zrušit odpověď')} onClick={() => setOdpovedNa(null)} className="-my-1 -mr-1" />
+        </div>
       )}
 
       <form
@@ -582,6 +634,11 @@ export function MessageBubble({
   showSender,
   dayShown = false,
   akce,
+  meId,
+  onReagovat,
+  onOdpovedet,
+  onSkocNa,
+  videli,
 }: {
   msg: ChatMessage;
   own: boolean;
@@ -594,14 +651,59 @@ export function MessageBubble({
    * hodnotou ukáže jen hodinu; v doku, kde čáry nejsou, zůstává datum.
    */
   dayShown?: boolean;
+  /** Kolo 8: reakce (najetí na monitoru, podržení na dotyku), odpověď, skok na citovanou zprávu a „Viděli". */
+  meId?: number;
+  onReagovat?: (emoji: string) => void;
+  onOdpovedet?: () => void;
+  onSkocNa?: (id: number) => void;
+  videli?: string;
 }) {
   const t = useT('chat');
+  // Lišta reakcí po podržení prstu (na monitoru stačí najetí — CSS group-hover).
+  const [lista, setLista] = useState(false);
+  const drzeni = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const zrusDrzeni = () => { if (drzeni.current) { clearTimeout(drzeni.current); drzeni.current = null; } };
+  const zacniDrzeni = (e: React.PointerEvent) => {
+    if (e.pointerType !== 'touch' || !onReagovat) return;
+    zrusDrzeni();
+    drzeni.current = setTimeout(() => { drzeni.current = null; setLista(true); }, 450);
+  };
+  useEffect(() => {
+    if (!lista) return;
+    const zavri = (e: Event) => { if (!(e.target as Element | null)?.closest?.(`[data-zprava="${msg.id}"]`)) setLista(false); };
+    document.addEventListener('pointerdown', zavri, true);
+    return () => document.removeEventListener('pointerdown', zavri, true);
+  }, [lista, msg.id]);
+  const reakce = msg.reactions ?? [];
+  const mojeReakce = (emoji: string) => meId != null && reakce.some(r => r.emoji === emoji && r.userIds.includes(meId));
   return (
-    <div className={`flex flex-col ${own ? 'items-end' : 'items-start'}`}>
+    <div className={`flex flex-col ${own ? 'items-end' : 'items-start'}`} id={`zprava-${msg.id}`} data-zprava={msg.id}>
       {showSender && (
         <span className="text-xs text-black/55 ml-3 mb-0.5">{msg.senderName}</span>
       )}
-      <div className={`group flex items-end gap-1 max-w-full ${own ? 'flex-row-reverse' : ''}`}>
+      <div className={`group relative flex items-end gap-1 max-w-full ${own ? 'flex-row-reverse' : ''}`}
+        onPointerDown={zacniDrzeni} onPointerUp={zrusDrzeni} onPointerCancel={zrusDrzeni} onPointerMove={zrusDrzeni}
+        onContextMenu={e => { if (lista) e.preventDefault(); }}>
+      {onReagovat && (
+        // Lišta 👍 ✅ ❤️ 😂 + Odpovědět: na monitoru po najetí nebo s fokusem, na dotyku po podržení (0,45 s).
+        <div role="toolbar" aria-label={t('Reagovat')} data-lista-reakci={lista ? '' : undefined}
+          className={`absolute -top-9 ${own ? 'right-0' : 'left-0'} z-10 flex items-center gap-0.5 rounded-full glass-strong px-1 py-0.5 shadow-[shadow:var(--shadow-float)] transition-opacity
+            ${lista ? 'opacity-100' : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto [@media(hover:none)]:group-hover:opacity-0 [@media(hover:none)]:group-hover:pointer-events-none'}`}>
+          {EMOJI_REAKCI.map(e => (
+            <button key={e} type="button" onClick={() => { setLista(false); onReagovat(e); }} aria-pressed={mojeReakce(e)}
+              aria-label={t('Reagovat {emoji}', { emoji: e })}
+              className={`tap-target-sm grid h-8 w-8 place-items-center rounded-full text-base leading-none transition-colors hover:bg-black/[0.06] ${mojeReakce(e) ? 'bg-[var(--ok-bg)]' : ''}`}>
+              <span aria-hidden>{e}</span>
+            </button>
+          ))}
+          {onOdpovedet && (
+            <button type="button" onClick={() => { setLista(false); onOdpovedet(); }} aria-label={t('Odpovědět')} title={t('Odpovědět')}
+              className="tap-target-sm grid h-8 w-8 place-items-center rounded-full text-black/60 transition-colors hover:bg-black/[0.06] hover:text-black">
+              <Icon name="chat" size={15} />
+            </button>
+          )}
+        </div>
+      )}
       <div
         className={`max-w-[78%] px-4 py-2.5 ${
           own
@@ -639,6 +741,14 @@ export function MessageBubble({
             </span>
           </a>
         )}
+        {/* Citovaná zpráva: šedý pruh nad textem, klepnutí skočí na originál. */}
+        {msg.replyTo && (
+          <button type="button" onClick={() => onSkocNa?.(msg.replyTo!.id)} disabled={!onSkocNa} aria-label={t('Přejít na původní zprávu')}
+            className={`mb-1.5 block w-full max-w-full rounded-xl border-l-2 border-[#5B7A08]/60 bg-black/[0.04] px-2.5 py-1.5 text-left ${onSkocNa ? 'hover:bg-black/[0.07]' : ''}`}>
+            <span className="block text-[11px] font-semibold text-black/60 truncate">{msg.replyTo.senderName}</span>
+            <span className="block text-[12px] text-black/60 truncate">{msg.replyTo.content || t('Příloha')}</span>
+          </button>
+        )}
         {msg.content && (
           <p className={`whitespace-pre-wrap break-words ${msg.attachmentUrl ? 'mt-1.5' : ''}`}>
             {msg.content}
@@ -656,6 +766,20 @@ export function MessageBubble({
           className="opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity" />
       )}
       </div>
+      {/* Reakce pod bublinou: malé chipy s počtem („👍 4"), vlastní zvýrazněná; popisek nese, kdo reagoval. */}
+      {reakce.length > 0 && (
+        <div className={`mt-1 flex flex-wrap gap-1 ${own ? 'justify-end' : ''}`} data-reakce={msg.id}>
+          {reakce.map(r => (
+            <button key={r.emoji} type="button" onClick={onReagovat ? () => onReagovat(r.emoji) : undefined} disabled={!onReagovat}
+              aria-pressed={meId != null && r.userIds.includes(meId)} title={r.jmena.join(', ')}
+              aria-label={t('Reakce {emoji}: {jmena}', { emoji: r.emoji, jmena: r.jmena.join(', ') })}
+              className={`chip chip-sm tap-target-sm tabular-nums ${meId != null && r.userIds.includes(meId) ? 'chip-ok' : 'chip-muted'} ${onReagovat ? 'hover:brightness-95' : ''}`}>
+              <span aria-hidden>{r.emoji}</span> {r.pocet}
+            </button>
+          ))}
+        </div>
+      )}
+      {videli && <span className="mt-0.5 mr-1 text-[11px] text-black/50" data-videli="">{videli}</span>}
     </div>
   );
 }

@@ -691,3 +691,111 @@ export function zmenaZtrat(historie: readonly ZtrataInventury[]): { rozdil: numb
   const rozdil = ted.netValue - predtim.netValue;
   return { rozdil, horsi: rozdil < 0, predtim: predtim.netValue };
 }
+
+// ---------------------------------------------------------------------------
+// Předpověď: „dojde za ~2 dny" podle skutečné spotřeby (kolo 8, R8-4)
+// ---------------------------------------------------------------------------
+//
+// Docházející zásoby a nákupní seznam stály jen na pevném minimu položky. Systémy pro
+// sklad v gastru (CogsWell, MarketMan) navrhují objednávku i z projekce spotřeby:
+// z odpisů posledních dní (prodeje z kasy, ruční odpisy) se spočítá denní spotřeba
+// a z ní, kolik dní zásoba vydrží a kolik koupit na týden. Server (GET
+// /api/inventory/forecast) i widgety počítají tady.
+
+/** Kolik dní zpátky se spotřeba počítá. */
+export const OKNO_SPOTREBY_DNI = 28;
+/** Pod kolik dní je „dojde za" kriticky málo (Chip bad) a pod kolik varování (Chip wait). */
+export const DOJDE_BAD_DNI = 2;
+export const DOJDE_WAIT_DNI = 5;
+
+/** Pohyb z inventory_log, jak ho čte předpověď (balení položky kvůli přepočtu načatého obsahu). */
+export interface PohybProSpotrebu {
+  itemId: number;
+  oldQuantity: number;
+  newQuantity: number;
+  oldOpen: number | null;
+  newOpen: number | null;
+  note: string | null;
+  packageSize: number | null;
+}
+
+/** Inventurní opravy nejsou spotřeba (manko je ztráta, ne prodej) — stejně tak založení a návraty z akce. */
+const NENI_SPOTREBA = /^(inventura|založení|zapsáno|návrat)/i;
+
+/**
+ * Úbytek jednoho pohybu v obsahu (u balení) nebo v kusech; přírůstek a opravy z inventury = 0.
+ * Načaté balení: změna kusů × velikost balení + změna zbytku (odpis 0,04 l z lahve má kusy beze změny).
+ */
+export function ubytekPohybu(p: PohybProSpotrebu): number {
+  if (NENI_SPOTREBA.test(String(p.note ?? '').trim())) return 0;
+  const pkg = num(p.packageSize);
+  const kusy = num(p.newQuantity) - num(p.oldQuantity);
+  const zmena = pkg > 0 ? kusy * pkg + ((p.oldOpen != null && p.newOpen != null) ? num(p.newOpen) - num(p.oldOpen) : 0) : kusy;
+  return zmena < 0 ? r3(-zmena) : 0;
+}
+
+/** Spotřeba za okno po položkách (součet úbytků); položka bez úbytku v mapě není. */
+export function spotrebaZPohybu(pohyby: readonly PohybProSpotrebu[]): Map<number, number> {
+  const m = new Map<number, number>();
+  for (const p of pohyby) {
+    const u = ubytekPohybu(p);
+    if (u <= 0) continue;
+    m.set(p.itemId, r3((m.get(p.itemId) ?? 0) + u));
+  }
+  return m;
+}
+
+/** Zásoba v obsahu (zavřená balení × velikost + načaté), nebo v kusech bez balení. */
+export function zasobaVObsahu(i: Pick<PolozkaSkladu, 'quantity' | 'openAmount' | 'packageSize' | 'effectivePackageSize' | 'effectiveContentUnit'>): number {
+  const pkg = num(baleniPolozky(i).packageSize);
+  return r3(pkg > 0 ? Math.max(0, num(i.quantity)) * pkg + Math.max(0, num(i.openAmount)) : Math.max(0, num(i.quantity)));
+}
+
+/** Za kolik dní zásoba dojde při denní spotřebě (na desetiny); bez spotřeby null — „nikdy" se nevymýšlí. */
+export function dojdeZaDni(zasoba: number, denni: number): number | null {
+  if (!(denni > 0)) return null;
+  return Math.round((Math.max(0, zasoba) / denni) * 10) / 10;
+}
+
+/** Tón Chipu: pod 2 dny kriticky (bad), pod 5 varování (wait), jinak nic. */
+export function tonDojde(dni: number | null): 'bad' | 'wait' | null {
+  if (dni == null) return null;
+  return dni < DOJDE_BAD_DNI ? 'bad' : dni < DOJDE_WAIT_DNI ? 'wait' : null;
+}
+
+/**
+ * Kolik koupit, aby zásoba vydržela `dni` dní: spotřeba × dny − co je, v obsahu; a v celých baleních,
+ * když položka balení má. Nula = na daný počet dní to stačí.
+ */
+export function navrhNaDni(zasoba: number, denni: number, dni: number, packageSize: number | null): { mnozstvi: number; baleni: number | null } {
+  const potreba = Math.max(0, denni * dni - Math.max(0, zasoba));
+  const mnozstvi = Math.round(potreba * 10) / 10;
+  const pkg = num(packageSize);
+  return { mnozstvi, baleni: pkg > 0 ? Math.ceil(mnozstvi / pkg) : null };
+}
+
+/** Předpověď jedné položky z GET /api/inventory/forecast. */
+export interface PredpovedPolozky {
+  /** Denní spotřeba v jednotce `jednotka` (obsah u balení, jinak kusy). */
+  denni: number;
+  dojdeZa: number | null;
+  zasoba: number;
+  jednotka: string;
+  baleni: number | null;
+}
+
+/** { days, items: { "<id>": { dailyUse, runsOutInDays, stock, unit, packageSize } } } → mapa podle id; vadný tvar = prázdno. */
+export function vyberPredpoved(raw: any): Record<number, PredpovedPolozky> {
+  const out: Record<number, PredpovedPolozky> = {};
+  const items = raw && typeof raw === 'object' && raw.items && typeof raw.items === 'object' ? raw.items : {};
+  for (const [id, v] of Object.entries(items as Record<string, any>)) {
+    const n = Number(id);
+    if (!Number.isFinite(n) || !v || typeof v !== 'object') continue;
+    const denni = num(v.dailyUse);
+    out[n] = {
+      denni, dojdeZa: v.runsOutInDays == null ? null : num(v.runsOutInDays), zasoba: num(v.stock),
+      jednotka: String(v.unit ?? ''), baleni: v.packageSize != null && num(v.packageSize) > 0 ? num(v.packageSize) : null,
+    };
+  }
+  return out;
+}

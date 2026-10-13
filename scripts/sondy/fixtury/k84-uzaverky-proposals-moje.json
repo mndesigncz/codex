@@ -1,0 +1,78 @@
+{
+ "schvaluje": false,
+ "proposals": [
+  {
+   "id": 5,
+   "productId": "p1",
+   "productName": "Latte",
+   "status": "ceka",
+   "createdAt": "@VCERA-08:40",
+   "muj": true,
+   "reason": "Víc kávy.",
+   "author": {
+    "id": 16,
+    "name": "Eva Testová",
+    "avatar": "🙂"
+   },
+   "reviewer": null,
+   "reviewedAt": null,
+   "reviewNote": null,
+   "ingredients": [
+    {
+     "itemId": 2,
+     "itemName": "Káva zrnková",
+     "amount": 0.011,
+     "unit": "kg"
+    }
+   ],
+   "puvodni": [
+    {
+     "itemId": 2,
+     "itemName": "Káva zrnková",
+     "amount": 0.009,
+     "unit": "kg"
+    }
+   ],
+   "costPerPortion": null,
+   "puvodniCost": null
+  },
+  {
+   "id": 4,
+   "productId": "p2",
+   "productName": "Espresso",
+   "status": "vraceno",
+   "createdAt": "@PRED5-08:40",
+   "muj": true,
+   "reason": "Míň kávy.",
+   "author": {
+    "id": 16,
+    "name": "Eva Testová",
+    "avatar": "🙂"
+   },
+   "reviewer": {
+    "id": 15,
+    "name": "Martin Nemeškal"
+   },
+   "reviewedAt": "@PRED5-12:00",
+   "reviewNote": "Hosté si stěžují na slabé espresso, nechme 9 g.",
+   "ingredients": [
+    {
+     "itemId": 2,
+     "itemName": "Káva zrnková",
+     "amount": 0.007,
+     "unit": "kg"
+    }
+   ],
+   "puvodni": [
+    {
+     "itemId": 2,
+     "itemName": "Káva zrnková",
+     "amount": 0.009,
+     "unit": "kg"
+    }
+   ],
+   "costPerPortion": null,
+   "puvodniCost": null
+  }
+ ]
+}

@@ -1,0 +1,34 @@
+[
+ {
+  "id": 41,
+  "text": "Terminál ukazuje 8 620, v uzávěrce je 8 420 — @Eva Testová mrkni prosím na výpis.",
+  "createdAt": "PRED3T17:10:00Z",
+  "updatedAt": null,
+  "autor": {
+   "id": 15,
+   "name": "Martin Nemeškal",
+   "avatar": "🧑"
+  },
+  "moje": true,
+  "muzuSmazat": true,
+  "pripnuta": true,
+  "zminky": [
+   16
+  ]
+ },
+ {
+  "id": 42,
+  "text": "Jedna platba 200 Kč prošla až po uzávěrce, dopíšu to zítra.",
+  "createdAt": "PRED3T18:02:00Z",
+  "updatedAt": null,
+  "autor": {
+   "id": 16,
+   "name": "Eva Testová",
+   "avatar": "🙂"
+  },
+  "moje": false,
+  "muzuSmazat": true,
+  "pripnuta": false,
+  "zminky": []
+ }
+]

@@ -1,0 +1,47 @@
+{
+ "days": 28,
+ "items": {
+  "1": {
+   "dailyUse": 6.1,
+   "runsOutInDays": 1.3,
+   "stock": 8,
+   "unit": "l",
+   "packageSize": null
+  },
+  "2": {
+   "dailyUse": 0.8,
+   "runsOutInDays": 1.3,
+   "stock": 1,
+   "unit": "l",
+   "packageSize": null
+  },
+  "3": {
+   "dailyUse": 0.5,
+   "runsOutInDays": 4,
+   "stock": 2,
+   "unit": "ks",
+   "packageSize": null
+  },
+  "5": {
+   "dailyUse": 30,
+   "runsOutInDays": 0,
+   "stock": 0,
+   "unit": "ks",
+   "packageSize": null
+  },
+  "6": {
+   "dailyUse": 0.11,
+   "runsOutInDays": 22.3,
+   "stock": 2.45,
+   "unit": "l",
+   "packageSize": 0.7
+  },
+  "7": {
+   "dailyUse": 1.2,
+   "runsOutInDays": 0.8,
+   "stock": 1,
+   "unit": "l",
+   "packageSize": null
+  }
+ }
+}

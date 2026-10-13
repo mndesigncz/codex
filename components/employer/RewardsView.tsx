@@ -26,10 +26,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '../Icons';
 import {
-  Avatar, Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Menu, Modal, Segmented, Skeleton, Switch, Textarea, Toast,
+  Avatar, Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Menu, Modal, Segmented, Select, Skeleton, Switch, Textarea, Toast,
 } from '../ui';
 import { MAX_NAZEV_ODMENY, validujOdmenu, type ChybaOdmeny } from '@/lib/odmenyKatalog';
 import { DEFAULT_POINTS, normalizeLevels, normalizePoints, type RewardLevel, type PointsConfig } from '@/lib/rewardLevels';
+import { MAX_HODNOT, MAX_PRISPEVEK, VYCHOZI_HODNOTY, VYCHOZI_PRISPEVEK, nastaveniDiku, type NastaveniDiku } from '@/lib/podekovani';
+import { DRUHY_AUTO, MAX_BODU_AUTO, MIN_SMEN_TYDNE, nastaveniAuto, type DruhAuto, type NastaveniAuto } from '@/lib/automatickeBody';
 import { KLIC_KALENDAR, UDALOST_KALENDAR, urlZebricku, vyberKatalog, vyberPoradi, type ObdobiZebricku, type Odmena, type Poradi } from '@/lib/odmenyPrehled';
 import { apiMessage, okJson } from '@/lib/api';
 import ShiftReviewModal from './ShiftReviewModal';
@@ -39,7 +41,9 @@ import { ProGate } from '../Pro';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useSmi } from '../widgety/NavigaceKontext';
-import { NaStranceOdmen, PochvalaOkno } from '../widgety/oblasti/odmeny';
+import { NaStranceOdmen, PochvalaOkno, URL_VYZVY, VyzvaRadek, textMetriky } from '../widgety/oblasti/odmeny';
+import { METRIKY, MAX_NAZEV_VYZVY, MAX_ODMENA_BODY, MAX_ODMENA_TEXT, vyberVyzvy, vycistiVyzvu, type MetrikaVyzvy } from '@/lib/vyzvy';
+import { dayPlus } from '@/lib/pragueTime';
 import { pragueToday } from '@/lib/pragueTime';
 import { useT } from '@/lib/i18n/client';
 import { useLocale } from './jazyk';
@@ -110,6 +114,7 @@ function RewardsViewInner() {
   ) : cast === 'settings' ? (
     <div className="space-y-4">
       {nastavuje && <NastaveniBodu onUlozeno={obnov} />}
+      {nastavuje && <SpravaVyzev />}
       {spravujeKatalog && <SpravaKatalogu />}
     </div>
   ) : null;
@@ -233,18 +238,25 @@ function Zebricek({ smiHodnotit, smiProfil, vidiHodnoceni, onHodnotit, onPochval
 
 function NastaveniBodu({ onUlozeno }: { onUlozeno: () => void }) {
   const t = useT('sprava');
-  const data = useDataWidgetu(URL_ODMENY, raw => ({ levels: normalizeLevels(raw?.levels), points: normalizePoints(raw?.points) }));
+  // `dik` (kolo 8): příspěvek a hodnoty poděkování — server je posílá vedle normalizovaného sazebníku.
+  // `auto` = pravidla automatických bodů; server je posílá už vyčištěná, nastaveniAuto({ auto }) je jen přečte.
+  const data = useDataWidgetu(URL_ODMENY, raw => ({ levels: normalizeLevels(raw?.levels), points: normalizePoints(raw?.points), dik: nastaveniDiku(raw?.dik), auto: nastaveniAuto({ auto: raw?.auto }) }));
   if (data.error) return <Card><ErrorState compact title={t('Nastavení se nenačetlo')} onRetry={data.reload} detail={data.error} /></Card>;
   if (!data.data) return <Card aria-busy><Skeleton className="h-6 w-40" /><Skeleton className="mt-4 h-40" /></Card>;
-  return <FormularBodu levels={data.data.levels} points={data.data.points} onUlozeno={onUlozeno} />;
+  return <FormularBodu levels={data.data.levels} points={data.data.points} dik={data.data.dik} auto={data.data.auto} onUlozeno={onUlozeno} />;
 }
 
-function FormularBodu({ levels: vychoziUrovne, points: vychoziBody, onUlozeno }: {
-  levels: RewardLevel[]; points: PointsConfig | null; onUlozeno: () => void;
+function FormularBodu({ levels: vychoziUrovne, points: vychoziBody, dik: vychoziDik, auto: vychoziAuto, onUlozeno }: {
+  levels: RewardLevel[]; points: PointsConfig | null; dik?: NastaveniDiku; auto?: NastaveniAuto; onUlozeno: () => void;
 }) {
   const t = useT('sprava');
   const [urovne, setUrovne] = useState<RewardLevel[]>(vychoziUrovne);
   const [body, setBody] = useState<PointsConfig>(vychoziBody ?? DEFAULT_POINTS);
+  // Poděkování mezi kolegy (kolo 8): měsíční příspěvek (0 = vypnuto) a hodnoty podniku (#ochota, #tým…).
+  const [prispevek, setPrispevek] = useState<string>(String(vychoziDik?.prispevek ?? VYCHOZI_PRISPEVEK));
+  const [hodnoty, setHodnoty] = useState<string>((vychoziDik?.hodnoty ?? VYCHOZI_HODNOTY).join(', '));
+  // Automatické body (kolo 8): přepínač a body za týden bez pozdního příchodu, výročí nástupu, narozeniny.
+  const [auto, setAuto] = useState<NastaveniAuto>(vychoziAuto ?? nastaveniAuto(null));
   const [ukladam, setUkladam] = useState(false);
   const [chyba, setChyba] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -261,10 +273,12 @@ function FormularBodu({ levels: vychoziUrovne, points: vychoziBody, onUlozeno }:
         method: 'PATCH', headers: JSON_HLAVICKA,
         body: JSON.stringify({
           levelsConfig: urovne.map(l => ({ name: l.name.trim() || 'Úroveň' /* i18n-ok (obsah podniku) */, minPoints: Math.max(0, Math.round(l.minPoints) || 0), perks: l.perks.trim() })),
-          pointsConfig: body,
+          // Příspěvek a hodnoty jedou v points_config vedle sazebníku pod klíči, které čte nastaveniDiku.
+          pointsConfig: { ...body, mesicniPrispevek: nastaveniDiku({ mesicniPrispevek: prispevek, hodnoty }).prispevek, hodnoty: nastaveniDiku({ mesicniPrispevek: prispevek, hodnoty }).hodnoty, auto },
         }),
       }).then(okJson);
       setToast(t('Nastavení odměn uloženo.'));
+      obnovDataWidgetu('/api/rewards/awards?zed=1&limit=30');
       onUlozeno();
     } catch (e) {
       setChyba(apiMessage(e, t('Nastavení se nepodařilo uložit.')));
@@ -313,6 +327,51 @@ function FormularBodu({ levels: vychoziUrovne, points: vychoziBody, onUlozeno }:
         </div>
       </Card>
 
+      {/* Automatické body (kolo 8, vzor Kudos / Bonusly „automated awards"): připisuje denní cron, každé pravidlo s přepínačem. */}
+      <Card aria-labelledby="auto-titulek" data-nastaveni-auto>
+        <h2 id="auto-titulek" className="t-card">{t('Automaticky')}</h2>
+        <p className="t-meta mt-1 text-pretty">{t('Body, které aplikace připíše sama: ráno po skončení týdne za dochvilnost, v den výročí nástupu a narozenin. Narozeniny se berou z profilu člověka.')}</p>
+        <ul className="list mt-2">
+          {DRUHY_AUTO.map((d: DruhAuto) => {
+            const popis = d === 'dochvilnost' ? t('Týden bez pozdního příchodu') : d === 'vyroci' ? t('Výročí nástupu') : t('Narozeniny');
+            const hint = d === 'dochvilnost' ? t('Aspoň {n} plánované směny v týdnu a žádný příchod nad 10 minut po začátku.', { n: MIN_SMEN_TYDNE })
+              : d === 'vyroci' ? t('Každý rok v den, kdy člověk do podniku nastoupil.') : t('Jednou za rok v den narozenin.');
+            // Přepínač a body vedle sebe; na telefonu se dvojice zalomí pod název (flex-wrap), ne do půlky řádku.
+            return (
+              <li key={d} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3" data-auto-pravidlo={d}>
+                <span className="min-w-0 flex-1 basis-56">
+                  <span id={`auto-${d}-n`} className="block text-sm font-semibold text-[#16181A]">{popis}</span>
+                  <span className="block text-xs text-black/45 mt-0.5 text-pretty">{hint}</span>
+                </span>
+                <span className="flex items-center gap-3">
+                  <span className="flex items-center gap-1.5">
+                    <Input id={`auto-${d}`} type="number" inputMode="numeric" min={0} max={MAX_BODU_AUTO} value={auto[d].body} aria-label={t('Body: {co}', { co: popis })} disabled={!auto[d].zap}
+                      onChange={e => setAuto(a => ({ ...a, [d]: { ...a[d], body: Math.max(0, Math.min(MAX_BODU_AUTO, Number.parseInt(e.target.value, 10) || 0)) } }))} className="!w-20 tabular-nums" />
+                    <span className="t-meta">b</span>
+                  </span>
+                  <Switch checked={auto[d].zap} onChange={v => setAuto(a => ({ ...a, [d]: { ...a[d], zap: v } }))} labelledBy={`auto-${d}-n`} />
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </Card>
+
+      {/* Poděkování mezi kolegy (kolo 8, vzor Bonusly): každý má měsíční příspěvek, nevyužitý propadne 1. dne. */}
+      <Card aria-labelledby="dik-titulek" data-nastaveni-diku>
+        <h2 id="dik-titulek" className="t-card">{t('Poděkování mezi kolegy')}</h2>
+        <p className="t-meta mt-1 text-pretty">{t('Každý může kolegovi poslat 5, 10 nebo 20 bodů z měsíčního příspěvku, s hodnotou podniku a větou. Nevyužité body 1. dne propadnou. Nula poděkování vypne.')}</p>
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field id="dik-prispevek" label={t('Měsíční příspěvek na poděkování (b)')} hint={t('Kolik bodů smí každý za měsíc rozdat kolegům.')}>
+            <Input id="dik-prispevek" type="number" inputMode="numeric" min={0} max={MAX_PRISPEVEK} value={prispevek}
+              onChange={e => setPrispevek(e.target.value.replace(/\D/g, ''))} className="tabular-nums" />
+          </Field>
+          <Field id="dik-hodnoty" label={t('Hodnoty podniku')} hint={t('Oddělené čárkou, nejvýš {n}. V poděkování jako #ochota, #tým.', { n: MAX_HODNOT })}>
+            <Input id="dik-hodnoty" value={hodnoty} onChange={e => setHodnoty(e.target.value)} placeholder={VYCHOZI_HODNOTY.join(', ')} />
+          </Field>
+        </div>
+      </Card>
+
       <Card aria-labelledby="urovne-titulek">
         <div className="flex items-center justify-between gap-3">
           <h2 id="urovne-titulek" className="t-card">{t('Úrovně a výhody')}</h2>
@@ -352,6 +411,128 @@ function FormularBodu({ levels: vychoziUrovne, points: vychoziBody, onUlozeno }:
       </div>
       <Toast message={toast} onClose={() => setToast(null)} />
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Nastavení: týmové výzvy (odmeny.nastaveni) — kolo 8, R8-3
+// ---------------------------------------------------------------------------
+//
+// „Tento týden 5 uzávěrek bez manka → pizza pro tým": název, měřítko z hotových čísel, cíl,
+// od–do, odměna (text, body každému). Postup ukazuje widget Výzva týdne; tady seznam a Nová výzva.
+
+function SpravaVyzev() {
+  const t = useT('sprava');
+  const data = useDataWidgetu(URL_VYZVY, vyberVyzvy);
+  const dnes = pragueToday();
+  const vyzvy = data.data ?? [];
+  const [okno, setOkno] = useState(false);
+  const [mazu, setMazu] = useState<number | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [chyba, setChyba] = useState<string | null>(null);
+  const smazat = async (id: number) => {
+    setMazu(id); setChyba(null);
+    try {
+      await fetch(`${URL_VYZVY}?id=${id}`, { method: 'DELETE' }).then(okJson);
+      obnovDataWidgetu(URL_VYZVY);
+      setToast(t('Výzva je zrušená.'));
+    } catch (e) {
+      setChyba(apiMessage(e, t('Výzvu se nepodařilo zrušit.')));
+    } finally { setMazu(null); }
+  };
+  return (
+    <Card aria-labelledby="vyzvy-titulek" data-sprava-vyzev>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="vyzvy-titulek" className="t-card">{t('Týmové výzvy')}</h2>
+        <Button variant="secondary" size="sm" icon="plus" onClick={() => setOkno(true)}>{t('Nová výzva')}</Button>
+      </div>
+      <p className="t-meta mt-1 text-pretty">{t('Společný cíl pro celý tým s ukazatelem postupu na Přehledu, Domů i tabletu. Po splnění přijde všem oznámení a body.')}</p>
+      {data.error ? (
+        <ErrorState compact title={t('Výzvy se nenačetly')} onRetry={data.reload} detail={data.error} className="mt-3" />
+      ) : data.loading && !data.data ? (
+        <Skeleton className="mt-3 h-16" />
+      ) : vyzvy.length === 0 ? (
+        <p className="t-meta mt-3 text-pretty">{t('Zatím žádná výzva. Zkus „5 uzávěrek bez manka do neděle → pizza pro tým“.')}</p>
+      ) : (
+        <ul className="list mt-2">
+          {vyzvy.map(v => (
+            <li key={v.id} className="flex items-start gap-3 py-3">
+              <div className="min-w-0 flex-1"><VyzvaRadek v={v} dnes={dnes} /></div>
+              <Button variant="ghost" size="sm" iconOnly icon="trash" loading={mazu === v.id} aria-label={t('Zrušit výzvu {nazev}', { nazev: v.nazev })} onClick={() => { void smazat(v.id); }} />
+            </li>
+          ))}
+        </ul>
+      )}
+      {chyba && <p className="note note-danger text-sm mt-2" role="alert">{chyba}</p>}
+      {okno && <NovaVyzvaOkno onClose={() => setOkno(false)} onHotovo={() => { setOkno(false); setToast(t('Výzva je vyhlášená — tým dostal oznámení.')); }} />}
+      <Toast message={toast} onClose={() => setToast(null)} />
+    </Card>
+  );
+}
+
+function NovaVyzvaOkno({ onClose, onHotovo }: { onClose: () => void; onHotovo: () => void }) {
+  const t = useT('sprava');
+  const tw = useT('widgety');
+  const dnes = pragueToday();
+  const [nazev, setNazev] = useState('');
+  const [metrika, setMetrika] = useState<MetrikaVyzvy>('uzaverky_bez_manka');
+  const [cil, setCil] = useState('5');
+  const [od, setOd] = useState(dnes);
+  const [doDne, setDoDne] = useState(dayPlus(dnes, 6));
+  const [odmenaText, setOdmenaText] = useState('');
+  const [odmenaBody, setOdmenaBody] = useState('');
+  const [ukladam, setUkladam] = useState(false);
+  const [chyba, setChyba] = useState<string | null>(null);
+  const uloz = async () => {
+    const v = vycistiVyzvu({ nazev, metrika, cil, od, do: doDne, odmenaText, odmenaBody });
+    if (!v.ok) { setChyba(v.chyba); return; }
+    setUkladam(true); setChyba(null);
+    try {
+      await fetch(URL_VYZVY, { method: 'POST', headers: JSON_HLAVICKA, body: JSON.stringify(v.vyzva) }).then(okJson);
+      obnovDataWidgetu(URL_VYZVY);
+      onHotovo();
+    } catch (e) {
+      setChyba(apiMessage(e, t('Výzvu se nepodařilo uložit.')));
+    } finally { setUkladam(false); }
+  };
+  return (
+    <Modal open onClose={onClose} size="md" title={t('Nová výzva')} subtitle={t('Společný cíl, který tým uvidí na Přehledu, Domů i tabletu.')}
+      footer={<>
+        <Button variant="secondary" onClick={onClose}>{t('Zrušit')}</Button>
+        <Button variant="primary" icon="check" loading={ukladam} onClick={() => { void uloz(); }}>{t('Vyhlásit výzvu')}</Button>
+      </>}>
+      <div className="space-y-3" data-nova-vyzva>
+        <Field id="vyzva-nazev" label={t('Název')}>
+          <Input id="vyzva-nazev" value={nazev} onChange={e => setNazev(e.target.value)} maxLength={MAX_NAZEV_VYZVY} placeholder={t('Týden bez manka')} autoFocus />
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field id="vyzva-metrika" label={t('Co se počítá')}>
+            <Select id="vyzva-metrika" value={metrika} onChange={e => setMetrika(e.target.value as MetrikaVyzvy)}>
+              {METRIKY.map(m => <option key={m} value={m}>{textMetriky(tw, m)}</option>)}
+            </Select>
+          </Field>
+          <Field id="vyzva-cil" label={t('Cíl')} hint={metrika === 'hodnoceni_hostu' ? t('Průměr hvězd, nejvýš 5.') : metrika === 'trzba' ? t('Částka v měně podniku.') : undefined}>
+            {/* Textové pole s decimal klávesnicí (check-decimal-inputs): „4,8" hvězdy i s čárkou; vycistiVyzvu čárku převede. */}
+            <Input id="vyzva-cil" inputMode="decimal" value={cil} onChange={e => setCil(e.target.value.replace(/[^\d.,]/g, '').replace(',', '.'))} className="tabular-nums" />
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field id="vyzva-od" label={t('Od')}>
+            <Input id="vyzva-od" type="date" value={od} onChange={e => { setOd(e.target.value); if (doDne < e.target.value) setDoDne(e.target.value); }} className="appearance-none min-w-0" />
+          </Field>
+          <Field id="vyzva-do" label={t('Do')}>
+            <Input id="vyzva-do" type="date" value={doDne} min={od} onChange={e => setDoDne(e.target.value)} className="appearance-none min-w-0" />
+          </Field>
+        </div>
+        <Field id="vyzva-odmena" label={t('Odměna pro tým')} hint={t('Třeba pizza, volný pátek, společný večer.')}>
+          <Input id="vyzva-odmena" value={odmenaText} onChange={e => setOdmenaText(e.target.value)} maxLength={MAX_ODMENA_TEXT} placeholder={t('Pizza pro tým')} />
+        </Field>
+        <Field id="vyzva-body" label={t('Body každému (nepovinné)')} hint={t('Připíšou se všem lidem podniku po splnění.')}>
+          <Input id="vyzva-body" type="number" inputMode="numeric" min={0} max={MAX_ODMENA_BODY} value={odmenaBody} onChange={e => setOdmenaBody(e.target.value)} className="!w-full sm:!w-32 tabular-nums" />
+        </Field>
+        {chyba && <p className="note note-danger text-sm" role="alert">{chyba}</p>}
+      </div>
+    </Modal>
   );
 }
 

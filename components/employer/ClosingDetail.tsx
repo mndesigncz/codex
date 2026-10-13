@@ -18,7 +18,7 @@ import { PersonLink } from './ProfileLinkProvider';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 import {
   Closing, expectedCash, expectedCashLines, cashLeft,
-  movementLabel, diffReasonLabel, hasDenominations, MOVEMENT_KINDS,
+  movementLabel, diffReasonLabel, hasDenominations, normalizePhotos, MOVEMENT_KINDS, vyplatyZKasyUzaverky, vyplatyICizim, type DruhFotky,
 } from '@/lib/closing';
 import { rozdilUzaverky, maSkrytouTrzbu } from '@/lib/uzaverkyPrehled';
 import { okJson, apiMessage } from '@/lib/api';
@@ -32,6 +32,7 @@ import { useSmi } from '../widgety/NavigaceKontext';
 import type { PovinnaPolozka } from '@/lib/povinnePredUzaverkou';
 import { useT } from '@/lib/i18n/client';
 import { useLocale } from './jazyk';
+import { Poznamky } from '../Poznamky';
 
 type Person = { id: number; name: string; avatar?: string | null };
 
@@ -150,8 +151,14 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
   // rozdíl, očekávaná kasa i celé peněžní řádky u skryté uzávěrky vůbec nekreslí.
   const skryta = !!c && maSkrytouTrzbu(c);
   const diff = c && !skryta ? (rozdilUzaverky({ ...c, covered_by: null }) ?? 0) : 0;
-  const lines = c && !skryta ? expectedCashLines(c, { payoutLabel: t('Výplata zaměstnance') }) : [];
+  // Výplata z kasy i kolegům (R8-5): řádek se jmenuje „Výplaty z kasy" a rozepíše se po lidech.
+  const cizimVyplata = !!c && vyplatyICizim(c);
+  const vyplaty = c ? vyplatyZKasyUzaverky(c) : [];
+  const lines = c && !skryta ? expectedCashLines(c, { payoutLabel: cizimVyplata ? t('Výplaty z kasy') : t('Výplata zaměstnance') }) : [];
   const cashTips = c && !skryta ? Math.max(0, (c.tips ?? 0) - (Number(c.tips_card) || 0)) : 0;
+  // Fotky dokladů (R8-5): výpis z terminálu, Z-report, účtenky výdajů — náhledy s proklikem na celou velikost.
+  const fotky = c ? normalizePhotos(c.photos) : [];
+  const druhFotky = (d: DruhFotky) => (d === 'terminal' ? t('Výpis z terminálu') : d === 'zreport' ? t('Z-report pokladny') : t('Účtenka výdaje'));
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
@@ -295,7 +302,11 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
                   {!skryta && <Row label={t('Spropitné kartou')} value={money(Number(c.tips_card) || 0)} />}
                   <Row label={t('Výdaje z kasy')} value={money(c.expenses)} />
                   <Row label={t('Odloženo ven')} value={money(c.cash_removed)} />
-                  {payDailyCash && <Row label={t('Výplata zaměstnance')} value={money(c.self_payout)} />}
+                  {payDailyCash && <Row label={cizimVyplata ? t('Výplaty z kasy') : t('Výplata zaměstnance')} value={money(c.self_payout)} />}
+                  {payDailyCash && cizimVyplata && vyplaty.map(v => (
+                    // Komu z kasy odešlo — Výplatní listina to stejnému člověku odečte z Doplatit.
+                    <Row key={v.userId} label={`↳ ${v.userId === c.created_by ? (c.author_name ?? t('vyplnil/a')) : (v.jmeno ?? t('Neznámý'))}`} value={money(v.castka)} />
+                  ))}
                   {/* Snímek z okamžiku uzávěrky — sazba i čas tak, jak byly tehdy.
                       Docházka a Finance počítají živě; tady zůstává, co člověk
                       viděl, když uzávěrku odesílal. */}
@@ -408,12 +419,35 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
                       return (
                         <div key={i} className="flex items-center gap-2.5 py-2 text-sm">
                           <span className="t-label shrink-0 w-24">{movementLabel(m.kind)}</span>
-                          <span className="min-w-0 flex-1 text-black/60">{m.note || '—'}</span>
+                          <span className="min-w-0 flex-1 text-black/60">
+                            {m.kind === 'payout' && (m.userName || m.userId != null) && (
+                              <span className="font-medium text-[#16181A]">{m.userName ?? (m.userId === c.created_by ? c.author_name : t('Neznámý'))}</span>
+                            )}
+                            {m.kind === 'payout' && (m.userName || m.userId != null) && m.note ? ' · ' : ''}
+                            {m.note || (m.kind === 'payout' && (m.userName || m.userId != null) ? '' : '—')}
+                          </span>
                           <span className="shrink-0 font-semibold text-[#16181A] tabular-nums">{spec?.sign === 1 ? '+' : '−'}{money(m.amount)}</span>
                         </div>
                       );
                     })}
                   </div>
+                </Section>
+              )}
+
+              {fotky.length > 0 && (
+                <Section title={t('Doklady')} hint={t('Fotky z telefonu při uzávěrce — podle nich se dohledá rozdíl proti terminálu.')}>
+                  <ul className="flex flex-wrap gap-3" data-doklady-uzaverky>
+                    {fotky.map((f, i) => (
+                      <li key={f.url} className="w-28">
+                        <a href={f.url} target="_blank" rel="noreferrer" className="block rounded-xl overflow-hidden ring-1 ring-black/10 tap-target"
+                          aria-label={t('Otevřít doklad {n}: {druh}', { n: i + 1, druh: druhFotky(f.druh) })}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={f.url} alt="" className="h-28 w-28 object-cover" loading="lazy" />
+                        </a>
+                        <p className="t-meta mt-1 truncate">{druhFotky(f.druh)}{f.note ? ` · ${f.note}` : ''}</p>
+                      </li>
+                    ))}
+                  </ul>
                 </Section>
               )}
 
@@ -615,13 +649,14 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
                   <Row label={t('Stav')} value={c.approved === false ? t('Čeká na schválení') : t('Schváleno')} />
                   {c.approvedByName && <Row label={t('Schválil/a')} value={c.approvedByName} />}
                 </div>
-                {c.review_note && (
-                  <div className="mt-2 well border border-black/[0.06] p-3.5">
-                    <p className="t-label mb-0.5">{t('Poznámka vedení')}</p>
-                    <p className="text-sm text-black/65 whitespace-pre-wrap">{c.review_note}</p>
-                  </div>
-                )}
               </Section>
+
+              {/* Vlákno k uzávěrce (kolo 8, R8-5): vedení se zeptá „proč manko 200?", autor dostane oznámení a odpoví
+                  z telefonu. „Poznámka vedení" (review_note) zůstává první, připnutá zpráva vlákna. */}
+              <section className="pt-5" data-poznamky-uzaverky>
+                <Poznamky typ="closing" id={id}
+                  uvod={c.review_note ? { text: c.review_note, autor: c.approvedByName ?? t('Vedení'), kdy: null, popisek: t('Poznámka vedení') } : null} />
+              </section>
             </>
           )}
         </div>

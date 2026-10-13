@@ -1,0 +1,14 @@
+{
+  "awards": [
+    { "id": 31, "userId": 17, "name": "Jakub Horák", "avatar": "🧔", "points": 10, "reason": "Díky za záskok v sobotu", "givenBy": "Eva Testová", "createdAt": "@60", "kind": "kolega", "valueTag": "tým" },
+    { "id": 30, "userId": 16, "name": "Eva Testová", "avatar": "🧑", "points": 20, "reason": "Umyla mlýnek za mě", "givenBy": "Tereza Malá", "createdAt": "@D-1T18:20", "kind": "kolega", "valueTag": "čistota" },
+    { "id": 29, "userId": 18, "name": "Tereza Malá", "avatar": "👱‍♀️", "points": 5, "reason": null, "givenBy": "Jakub Horák", "createdAt": "@D-3T09:05", "kind": "kolega", "valueTag": "ochota" }
+  ],
+  "prispevek": { "mesicni": 50, "zbyva": 30 },
+  "hodnoty": ["ochota", "čistota", "tým", "host"],
+  "kolegove": [
+    { "id": 17, "name": "Jakub Horák", "avatar": "🧔" },
+    { "id": 18, "name": "Tereza Malá", "avatar": "👱‍♀️" },
+    { "id": 19, "name": "Ondřej Kučera", "avatar": "🧑" }
+  ]
+}

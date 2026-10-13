@@ -79,5 +79,17 @@
   "obrázek": "image",
   "{n, plural, one {# hlas} few {# hlasy} other {# hlasů}} · ťuknutím hlasuješ (jde změnit)": "{n, plural, one {# vote} other {# votes}} · tap to vote (you can change it)",
   "Žádné konverzace": "No conversations",
-  "„{otazka}\" zmizí z chatu a hlasovat už nepůjde.": "“{otazka}” will disappear from the chat and voting will no longer be possible."
+  "„{otazka}\" zmizí z chatu a hlasovat už nepůjde.": "“{otazka}” will disappear from the chat and voting will no longer be possible.",
+  "Odpovědět": "Reply",
+  "Odpověď na {jmeno}": "Reply to {jmeno}",
+  "Zrušit odpověď": "Cancel reply",
+  "Ty": "You",
+  "Viděli: {jmena}": "Seen by {jmena}",
+  "Viděli: {jmena} +{n}": "Seen by {jmena} +{n}",
+  "Přečteno {cas}": "Read {cas}",
+  "Reagovat": "React",
+  "Reagovat {emoji}": "React {emoji}",
+  "Reakce {emoji}: {jmena}": "Reaction {emoji}: {jmena}",
+  "Reakci se nepodařilo uložit.": "The reaction could not be saved.",
+  "Přejít na původní zprávu": "Go to the original message"
 }

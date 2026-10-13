@@ -79,6 +79,11 @@ export const rozvrh: Obsluha = (p, k) => {
     }
   }
 
+  // Kolo 8 (R8-3): limity rozvrhu a očekávaná tržba po dnech pro plánovač — ukázka nic nehlídá
+  // a tržby nemá, plánovač pak podíl mezd nekreslí.
+  if (cesta === '/api/schedule/generate' && metoda === 'GET') {
+    return ok({ limity: { minRestHours: null, maxShiftHours: null, maxWeekHours: null }, zacatekTydne: 1, trzby: { stav: 'bez_dat', dny: {} }, cilMezd: null });
+  }
   // ---- Generátor: návrh, pak uložení ----
   if (cesta === '/api/schedule/generate' && metoda === 'POST') {
     const b = p.telo ?? {};

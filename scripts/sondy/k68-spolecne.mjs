@@ -159,8 +159,24 @@ export async function kontext({ viewport = { width: 1280, height: 950 }, role = 
 }
 
 /** Otevře stránku a počká, až plocha dostane rozložení (li s daty) a oblasti widgetů. */
+/**
+ * `page.goto` s jedním opakováním při `net::ERR_ABORTED`: okno zavřené těsně před přechodem
+ * (kolo 8, lib/useModal) odebírá svůj záznam historie `history.back()` až v dalším tiku a ten
+ * průchod historií zruší právě rozjetou navigaci. V aplikaci se to netýká přechodů uvnitř
+ * (pushState), jen celého načtení stránky — v sondě je to závod, ne chyba aplikace.
+ */
+export async function jdi(p, url, volby = { waitUntil: 'networkidle' }) {
+  try {
+    await p.goto(url, volby);
+  } catch (e) {
+    if (!/ERR_ABORTED/.test(String(e?.message))) throw e;
+    await p.waitForTimeout(300);
+    await p.goto(url, volby);
+  }
+}
+
 export async function otevri(p, cesta, stranka = 'vedeni.prehled') {
-  await p.goto(BASE + cesta, { waitUntil: 'networkidle' });
+  await jdi(p, BASE + cesta);
   await p.locator(`[data-plocha="${stranka}"] li[data-instance]:not([hidden])`).first().waitFor({ timeout: 15000 });
   await p.waitForTimeout(900);
 }

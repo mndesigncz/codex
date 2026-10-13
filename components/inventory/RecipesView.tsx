@@ -39,14 +39,22 @@ import {
   type DataReceptur, type Receptura, type RazeniReceptur, type TonMarze,
 } from '@/lib/recepturyPrehled';
 import {
-  Button, Card, Chip, EmptyState, Field, Input, ListRow, Menu, Modal, SearchField, Segmented, Select, Skeleton, Stat, Toast, Well,
+  Avatar, Button, Card, Chip, EmptyState, Field, Input, ListRow, Menu, Modal, SearchField, Segmented, Select, Skeleton, Stat, Textarea, Toast, Well,
 } from '../ui';
+import type { StavDat } from '../widgety/useDataWidgetu';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
 import { Poznamky } from '../Poznamky';
+import { urlPoctu, vyberPocty } from '@/lib/poznamky';
 import { useSmi } from '../widgety/NavigaceKontext';
 import { useOpravneni } from '../role/useOpravneni';
-import { URL_RECEPTURY, UDALOST_OTEVRIT_RECEPTURU } from '../widgety/oblasti/receptury';
+import { URL_RECEPTURY, URL_HISTORIE, URL_NAVRHY, UDALOST_OTEVRIT_RECEPTURU, RadkyRozdilu, stavNavrhuText } from '../widgety/oblasti/receptury';
+import {
+  cekajiciNavrhy, dopadNaPorci, jeBezeZmeny, mnozstviText, mujPosledniNavrh, odkazNaNavodZEditoru, rezimEditoru, rozdilVerzi, vyberHistorii, vyberNavrhy,
+  MAX_DELKA_DUVODU, type NavrhReceptury, type RezimEditoru, type VerzeReceptury,
+} from '@/lib/recepturyVerze';
+import { fmtDatum } from '@/lib/i18n/format';
+import { dbTimeDayHM } from '@/lib/pragueTime';
 
 const URL_SKLAD = '/api/inventory';
 const URL_KATEGORIE = '/api/inventory/categories';
@@ -139,6 +147,15 @@ export default function RecipesView({ openProductId, onNavigate, stranka = 'vede
   // Cílová marže podniku (Nastavení › Profil podniku); stejná adresa jako Provoz podniku a Tým.
   const tym = useDataWidgetu('/api/teams', vyberCil);
   const cil = tym.data?.cil ?? null;
+  // Kolo 8 (R8-5): kdo smí jen navrhovat, posílá návrh ke schválení; návrhy a historie verzí
+  // se čtou přes sdílenou mezipaměť (widget Receptury čte tytéž adresy).
+  const rezim: RezimEditoru = rezimEditoru(ma);
+  const navrhy = useDataWidgetu<NavrhReceptury[]>(smi(['receptury.navrhnout', 'receptury.upravit']) ? URL_NAVRHY : null, vyberNavrhy);
+  const [navrhuji, setNavrhuji] = useState(false);
+  // Bublina „💬 3" v řádku: kolik poznámek pod recepturou je, tučně když od poslední návštěvy přibyla cizí.
+  const pocty = useDataWidgetu(urlPoctu('recipe'), vyberPocty);
+  // Verze načtená z historie do editoru — uložení ji zapíše s poznámkou „Vráceno na verzi z …".
+  const [poznamkaVerze, setPoznamkaVerze] = useState<string | null>(null);
 
   // Místní úpravy skladu z editoru (upravená nebo nově založená surovina) platí hned,
   // i než se /api/inventory obnoví — jinak by čerstvá surovina v řádku chyběla.
@@ -160,6 +177,7 @@ export default function RecipesView({ openProductId, onNavigate, stranka = 'vede
   useEffect(() => { setRazeniStav(nactiRazeni()); }, []);
   const setRazeni = (r: RazeniReceptur) => { setRazeniStav(r); try { localStorage.setItem(KLIC_RAZENI, r); } catch { /* soukromé okno */ } };
   const [draft, setDraft] = useState<Draft | null>(null);
+  const historie = useDataWidgetu<VerzeReceptury[]>(draft ? `${URL_HISTORIE}?productId=${encodeURIComponent(draft.productId)}` : null, vyberHistorii);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [zprava, setZprava] = useState<{ text: string; ton?: 'bad' } | null>(null);
@@ -169,10 +187,13 @@ export default function RecipesView({ openProductId, onNavigate, stranka = 'vede
   const recipeByProduct = useMemo(() => new Map(recipes.map(r => [r.productId, r])), [recipes]);
   const itemById = useMemo(() => new Map(items.map((i: any) => [String(i.id), i])), [items]);
   const soldByProduct = useMemo(() => new Map((d?.bezReceptury ?? []).map(u => [u.productId, u.prodano])), [d]);
+  // Produkty s návrhem, který čeká — v seznamu dostanou Chip, ať je fronta vidět tam, kde se receptury hledají.
+  const sNavrhem = useMemo(() => new Set(cekajiciNavrhy(navrhy.data ?? []).map(n => n.productId)), [navrhy.data]);
 
   const openEditor = (productId: string, productName: string) => {
     const r = recipeByProduct.get(productId);
     setErr('');
+    setPoznamkaVerze(null);
     setDraft({
       productId, productName, existing: !!r,
       ingredients: r?.ingredients.length
@@ -257,29 +278,60 @@ export default function RecipesView({ openProductId, onNavigate, stranka = 'vede
   const setIng = (idx: number, patch: Partial<Ingredient>) =>
     setDraft(x => x && ({ ...x, ingredients: x.ingredients.map((y, i) => i === idx ? { ...y, ...patch } : y) }));
 
+  /** Suroviny z editoru v jednotce položky (tak se ukládají i navrhují). */
+  const surovinyZDraftu = (dr: Draft) => dr.ingredients
+    .filter(ing => ing.itemId && num(ing.amount) > 0)
+    .map(ing => {
+      const item = itemById.get(ing.itemId);
+      const conv = UNITS[familyOf(item)].find(u => u.label === ing.unit)?.toBase ?? 1;
+      const amount = (num(ing.amount) * conv) / itemFactor(item);
+      return { itemId: parseInt(ing.itemId), amount: Math.round(amount * 1e6) / 1e6 };
+    });
+
   /** Uloží recepturu; `smazat` pošle prázdné suroviny rovnou (dřív se čekalo
-   *  na překreslení přes setTimeout a odešla stará receptura — nic se nesmazalo). */
-  const save = async (smazat = false) => {
+   *  na překreslení přes setTimeout a odešla stará receptura — nic se nesmazalo).
+   *  `costPerPortion` jde do historie jako snímek nákladu porce. */
+  const save = async (smazat = false, costPerPortion: number | null = null) => {
     if (!draft) return;
     setSaving(true); setErr('');
-    const ingredients = smazat ? [] : draft.ingredients
-      .filter(ing => ing.itemId && num(ing.amount) > 0)
-      .map(ing => {
-        const item = itemById.get(ing.itemId);
-        const conv = UNITS[familyOf(item)].find(u => u.label === ing.unit)?.toBase ?? 1;
-        const amount = (num(ing.amount) * conv) / itemFactor(item);
-        return { itemId: parseInt(ing.itemId), amount: Math.round(amount * 1e6) / 1e6 };
-      });
+    const ingredients = smazat ? [] : surovinyZDraftu(draft);
     try {
       await fetch(URL_RECEPTURY, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId: draft.productId, productName: draft.productName, ingredients }),
+        body: JSON.stringify({ productId: draft.productId, productName: draft.productName, ingredients, costPerPortion, note: poznamkaVerze }),
       }).then(okJson);
       setDraft(null);
+      setPoznamkaVerze(null);
       setZprava({ text: ingredients.length ? t('Receptura uložena.') : t('Receptura smazána.') });
       obnovDataWidgetu(URL_RECEPTURY);
+      obnovDataWidgetu(URL_HISTORIE);
     } catch (e) { setErr(apiMessage(e, t('Uložení se nepodařilo.'))); }
     setSaving(false);
+  };
+
+  /** Návrh změny ke schválení (receptury.navrhnout bez receptury.upravit). */
+  const navrhni = async (reason: string, costPerPortion: number | null, puvodniCost: number | null) => {
+    if (!draft) return;
+    setNavrhuji(true); setErr('');
+    try {
+      await fetch(URL_NAVRHY, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId: draft.productId, productName: draft.productName, ingredients: surovinyZDraftu(draft), reason, costPerPortion, puvodniCost }),
+      }).then(okJson);
+      setDraft(null);
+      setZprava({ text: t('Návrh odeslán — vedení dostalo oznámení a rozhodne.') });
+      obnovDataWidgetu(URL_NAVRHY);
+    } catch (e) { setErr(apiMessage(e, t('Návrh se nepodařilo odeslat.'))); }
+    setNavrhuji(false);
+  };
+
+  /** Verze z historie do editoru — platit začne až uložením (žádný tichý zápis). */
+  const obnovVerzi = (v: VerzeReceptury) => {
+    setDraft(x => x && ({ ...x, ingredients: v.ingredients.length
+      ? v.ingredients.map(ing => doRadku(String(ing.itemId), ing.amount, itemById.get(String(ing.itemId))))
+      : [{ itemId: '', amount: '', unit: 'ks' }] }));
+    setPoznamkaVerze(`Vráceno na verzi z ${fmtDatum(v.changedAt, { jazyk: 'cs', styl: 'kratce' })}`); // i18n-ok (poznámka do historie, česky jako audit)
+    setZprava({ text: t('Verze načtena do editoru — platit začne, až recepturu uložíš.') });
   };
 
   // N1: odpis prodejů přes stejnou synchronizaci jako Nastavení → Pokladna.
@@ -356,8 +408,18 @@ export default function RecipesView({ openProductId, onNavigate, stranka = 'vede
         draft={draft} items={items} itemById={itemById}
         setIng={setIng} setDraft={setDraft} save={save} saving={saving} err={err} yieldOf={yieldOf}
         recipes={recipes} products={products} categories={kategorie.data ?? []} cil={cil}
-        smiUpravit={ma('receptury.upravit')}
+        smiUpravit={rezim !== 'cist'}
+        rezim={rezim}
+        historie={historie}
+        navrh={mujPosledniNavrh(navrhy.data ?? [], draft.productId)}
+        onNavrhnout={navrhni} navrhuji={navrhuji}
+        onObnovitVerzi={obnovVerzi}
+        poznamkaVerze={poznamkaVerze}
         guide={(navody.data ?? []).find(g => g.productId === draft.productId) ?? null}
+        // Návod se otvírá podle rozhraní (zaměstnanec /employee, vedení /employer), ne natvrdo (R8-5):
+        // přes navigaci stránky, a jen bez ní odkazem.
+        onOpenGuide={onNavigate ? (id => onNavigate('guides', String(id))) : undefined}
+        guideHref={id => odkazNaNavodZEditoru(stranka, id)}
         onItemSaved={patched => { setMistniSklad(m => ({ ...m, [String(patched.id)]: patched })); obnovDataWidgetu(URL_SKLAD); }}
         onItemCreated={created => { setMistniSklad(m => ({ ...m, [String(created.id)]: created })); obnovDataWidgetu(URL_SKLAD); }}
         // Proklik na celou položku ve Skladu (prahy, dodavatel, výroba) — druhý směr k „Používá se v kase" u položky.
@@ -429,7 +491,17 @@ export default function RecipesView({ openProductId, onNavigate, stranka = 'vede
                       value={eco?.marginPct != null ? <span className={TEXT_MARZE[tonMarze(eco.marginPct, cil)]}>{eco.marginPct} %</span> : undefined}
                       valueMeta={eco ? t('náklad {castka}', { castka: money(eco.cost) }) : undefined}
                       aside={sold > 0 ? t('prodáno {n}×', { n: sold }) : undefined}
-                      right={sRec ? undefined : <Chip tone="wait" size="sm">{t('bez receptury')}</Chip>}
+                      right={(() => {
+                        const pz = pocty.data?.[p.productId];
+                        const stav = sNavrhem.has(p.productId)
+                          ? <Chip tone="wait" size="sm" icon="pencil">{rezim === 'upravit' ? t('Návrh ke schválení') : t('Návrh čeká')}</Chip>
+                          : sRec ? null : <Chip tone="wait" size="sm">{t('bez receptury')}</Chip>;
+                        if (!pz && !stav) return undefined;
+                        return <span className="inline-flex items-center gap-1.5 flex-wrap justify-end">
+                          {pz && <Chip tone="muted" size="sm" icon="chat" className={pz.nove ? 'font-bold' : ''}><span className="sr-only">{t('{n, plural, one {# poznámka} few {# poznámky} other {# poznámek}}', { n: pz.n })}{pz.nove ? `, ${t('nová')}` : ''}</span><span aria-hidden>{pz.n}</span></Chip>}
+                          {stav}
+                        </span>;
+                      })()}
                       onClick={() => openEditor(p.productId, p.name)} />
                   </li>
                 );
@@ -462,17 +534,29 @@ export default function RecipesView({ openProductId, onNavigate, stranka = 'vede
 // ruce, a hned pod ním je vidět, kolik porcí z balení vyjde a co stojí — na
 // tom se chyba o řád (0,02 l vs 0,2 l) pozná dřív, než se odepíše sklad.
 // ---------------------------------------------------------------------------
-function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, err, yieldOf, recipes, products, categories, cil, smiUpravit, guide, onItemSaved, onItemCreated, onOpenItem }: {
+function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, err, yieldOf, recipes, products, categories, cil, smiUpravit, rezim, historie, navrh, onNavrhnout, navrhuji, onObnovitVerzi, poznamkaVerze, guide, onOpenGuide, guideHref, onItemSaved, onItemCreated, onOpenItem }: {
   draft: Draft; items: any[]; itemById: Map<string, any>;
   setIng: (idx: number, patch: Partial<Ingredient>) => void;
   setDraft: React.Dispatch<React.SetStateAction<Draft | null>>;
-  save: (smazat?: boolean) => void; saving: boolean; err: string;
+  save: (smazat?: boolean, costPerPortion?: number | null) => void; saving: boolean; err: string;
+  /** upravit = ukládá rovnou; navrhnout = „Navrhnout změnu" + Proč; cist = jen čte. */
+  rezim: RezimEditoru;
+  historie: StavDat<VerzeReceptury[]>;
+  /** Poslední vlastní návrh k téhle receptuře — Chip stavu. */
+  navrh: NavrhReceptury | null;
+  onNavrhnout: (reason: string, costPerPortion: number | null, puvodniCost: number | null) => Promise<void>;
+  navrhuji: boolean;
+  onObnovitVerzi: (v: VerzeReceptury) => void;
+  poznamkaVerze: string | null;
   yieldOf: (item: any, amountBase: number) => { portions: number | null; perPortion: number | null } | null;
   recipes: Receptura[]; products: { productId: string; name: string; price: number | null }[]; categories: { id: number; name: string }[];
   /** Cílová marže podniku (null = výchozí prahy 65 / 45). */
   cil: number | null;
   smiUpravit: boolean;
   guide: { id: number; title: string } | null;
+  /** Otevřít návod navigací stránky (zůstane se ve správném rozhraní); bez ní odkaz z `guideHref`. */
+  onOpenGuide?: (guideId: number) => void;
+  guideHref: (guideId: number) => string;
   onItemSaved: (item: any) => void;
   onItemCreated: (item: any) => void;
   /** Otevřít položku ve Skladu (celý formulář); bez práva na sklad se nenabízí. */
@@ -490,6 +574,11 @@ function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, 
   // Zakládání nové suroviny: index řádku, do kterého se má vložit, nebo -1 pro nový řádek na konci.
   const [creatingAt, setCreatingAt] = useState<number | null>(null);
   const [mazani, setMazani] = useState(false);
+  // Historie verzí (okno) a návrh ke schválení (důvod).
+  const [historieOtevrena, setHistorieOtevrena] = useState(false);
+  const [rozbalena, setRozbalena] = useState<number | null>(null);
+  const [duvod, setDuvod] = useState('');
+  const locale = LOCALE_PRO_JAZYK[jazyk];
 
   const nameOfProduct = (r: Receptura) => products.find(p => p.productId === r.productId)?.name ?? r.productName ?? r.productId;
   const copyable = recipes
@@ -697,23 +786,63 @@ function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, 
           )}
 
           {err && <p className="note note-danger" role="alert">{err}</p>}
-          {smiUpravit ? (
+          {poznamkaVerze && <p className="note note-wait text-sm" role="status">{t('Načtená starší verze — platit začne, až ji uložíš.')}</p>}
+          {navrh && (
+            // Stav vlastního návrhu: „Čeká" / „Schváleno" / „Vráceno" i s poznámkou vedení.
+            <div className="space-y-1" data-stav-navrhu={navrh.status}>
+              <p className="t-meta flex items-center gap-2">{t('Tvůj návrh')} <Chip tone={navrh.status === 'ceka' ? 'wait' : navrh.status === 'schvaleno' ? 'ok' : 'bad'} size="sm">{stavNavrhuText(t, navrh.status)}</Chip>
+                <span>· {fmtDatum(navrh.createdAt, { jazyk, styl: 'kratce' })}</span></p>
+              {navrh.reviewNote && <p className="note note-wait text-sm">{navrh.reviewer?.name ? `${navrh.reviewer.name}: ` : ''}{navrh.reviewNote}</p>}
+            </div>
+          )}
+          {rezim === 'upravit' ? (
             <div className="space-y-2">
-              <Button variant="accent" className="w-full" loading={saving} onClick={() => save()}>{t('Uložit recepturu')}</Button>
+              <Button variant="accent" className="w-full" loading={saving} onClick={() => save(false, cost.missingPrice === 0 && cost.exact > 0 ? cost.exact : null)}>{t('Uložit recepturu')}</Button>
               {draft.existing && (
                 <Button variant="danger" className="w-full" disabled={saving} onClick={() => setMazani(true)}>{t('Smazat recepturu')}</Button>
               )}
+            </div>
+          ) : rezim === 'navrhnout' ? (
+            // Jen receptury.navrhnout: editor je živý, ale místo uložení jde návrh vedení ke schválení.
+            <div className="space-y-2">
+              <Field id={`${uid}-proc`} label={t('Proč')} hint={t('Např. „nový dodavatel sirupu je sladší, stačí 15 ml". Vedení návrh schválí, nebo vrátí s poznámkou.')}>
+                <Textarea id={`${uid}-proc`} rows={2} value={duvod} maxLength={MAX_DELKA_DUVODU} onChange={e => setDuvod(e.target.value)} />
+              </Field>
+              <Button variant="accent" className="w-full" icon="send" loading={navrhuji} disabled={!duvod.trim() || ready === 0}
+                onClick={() => {
+                  const stara = recipes.find(r => r.productId === draft.productId);
+                  const puvodniCost = stara?.ingredients.length ? recipeCost(stara.ingredients.map(ing => {
+                    const item = itemById.get(String(ing.itemId));
+                    return { unitCost: Number(item?.unitCost) || 0, packageSize: baleniPolozky(item).packageSize ?? 0, amount: Number(ing.amount) || 0 };
+                  })) : null;
+                  void onNavrhnout(duvod.trim(), cost.missingPrice === 0 && cost.exact > 0 ? cost.exact : null,
+                    puvodniCost && puvodniCost.missingPrice === 0 && puvodniCost.exact > 0 ? puvodniCost.exact : null);
+                }}>
+                {t('Navrhnout změnu')}
+              </Button>
             </div>
           ) : (
             <p className="t-meta">{t('Recepturu mění jen ten, kdo smí receptury upravovat.')}</p>
           )}
 
-          {guide && (
-            <a href={`/employer/overview?view=guides&guide=${guide.id}`} className="btn btn-secondary btn-sm w-full min-w-0">
+          {/* Kdo co kdy změnil (kolo 8, R8-5): odkaz s počtem, okno zdola na telefonu. */}
+          {!historie.vypnuto && (
+            <Button variant="ghost" size="sm" icon="clock" className="w-full" aria-haspopup="dialog" data-historie-receptury
+              disabled={historie.loading && !historie.data} onClick={() => { setRozbalena(null); setHistorieOtevrena(true); }}>
+              {!historie.data ? t('Historie') : historie.data.length === 0 ? t('Historie · bez změn') : t('Historie · {n, plural, one {# změna} few {# změny} other {# změn}}', { n: historie.data.length })}
+            </Button>
+          )}
+
+          {guide && (onOpenGuide ? (
+            <Button variant="secondary" size="sm" icon="book" className="w-full min-w-0" data-navod={guide.id} onClick={() => onOpenGuide(guide.id)}>
+              <span className="min-w-0 truncate">{t('Návod: {nazev}', { nazev: guide.title })}</span>
+            </Button>
+          ) : (
+            <a href={guideHref(guide.id)} data-navod={guide.id} className="btn btn-secondary btn-sm w-full min-w-0">
               <Icon name="book" size={15} className="shrink-0" />
               <span className="min-w-0 truncate">{t('Návod: {nazev}', { nazev: guide.title })}</span>
             </a>
-          )}
+          ))}
 
           <p className="t-meta">{t('Uloženou recepturu odepisuje synchronizace s pokladnou po každém prodeji.')}</p>
         </Card>
@@ -724,6 +853,63 @@ function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, 
       <Card className="min-w-0">
         <Poznamky typ="recipe" id={draft.productId} />
       </Card>
+
+      <Modal open={historieOtevrena} onClose={() => setHistorieOtevrena(false)} size="md" title={t('Historie receptury')} subtitle={draft.productName}
+        footer={<Button variant="secondary" onClick={() => setHistorieOtevrena(false)}>{t('Zavřít')}</Button>}>
+        {historie.error && !historie.data ? (
+          <p className="note note-danger text-sm" role="alert">{historie.error}</p>
+        ) : !historie.data ? (
+          <div className="space-y-2" aria-busy><Skeleton className="h-12" /><Skeleton className="h-12 w-3/4" /></div>
+        ) : historie.data.length === 0 ? (
+          <EmptyState compact icon="clock" title={t('Zatím bez historie')} hint={t('Od teď se každé uložení zapíše: kdo, kdy a co změnil.')} />
+        ) : (
+          <ul className="list" data-verze-receptury>
+            {historie.data.map((v, i) => {
+              // Rozdíl proti předchozí (starší) verzi; nejstarší verze proti ničemu = celá receptura přidaná.
+              const starsi = historie.data![i + 1];
+              const rozdil = rozdilVerzi(starsi?.ingredients ?? [], v.ingredients);
+              const dopad = dopadNaPorci(starsi?.costPerPortion ?? null, v.costPerPortion);
+              const otevrena = rozbalena === v.id;
+              return (
+                <li key={v.id} className="py-3 space-y-2" data-verze={v.id}>
+                  <div className="flex items-start gap-3">
+                    <Avatar emoji={v.changedBy?.avatar} name={v.changedBy?.name ?? ''} size="sm" className="mt-0.5" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">
+                        <span className="tabular-nums">{dbTimeDayHM(v.changedAt)}</span> · {v.changedBy?.name ?? t('Neznámý')}
+                        {i === 0 && <> <Chip tone="ok" size="sm" className="ml-1">{t('platí')}</Chip></>}
+                      </p>
+                      {v.note && <p className="t-meta">{v.note}</p>}
+                      <div className="mt-1">
+                        {jeBezeZmeny(rozdil) && v.ingredients.length === 0
+                          ? <p className="t-meta">{t('Receptura smazána')}</p>
+                          : <RadkyRozdilu rozdil={rozdil} locale={locale} t={t} />}
+                      </div>
+                    </div>
+                    {v.costPerPortion != null && (
+                      <div className="shrink-0 text-right tabular-nums">
+                        <p className="text-sm font-semibold text-[#16181A]">{cena(v.costPerPortion)}</p>
+                        {dopad != null && dopad !== 0 && <p className={`t-meta ${dopad > 0 ? 'text-bad-ink' : 'text-ok-ink'}`}>{dopad > 0 ? '+' : ''}{cena(dopad)}</p>}
+                      </div>
+                    )}
+                  </div>
+                  {otevrena && (
+                    <ul className="t-meta pl-11 space-y-0.5 tabular-nums" aria-label={t('Suroviny verze')}>
+                      {v.ingredients.length === 0 ? <li>—</li> : v.ingredients.map(ing => <li key={ing.itemId}>{ing.itemName ?? `#${ing.itemId}`} · {mnozstviText(ing.amount, ing.unit, locale)}</li>)}
+                    </ul>
+                  )}
+                  <div className="flex flex-wrap gap-2 pl-11">
+                    <Button variant="ghost" size="sm" aria-expanded={otevrena} onClick={() => setRozbalena(otevrena ? null : v.id)}>{otevrena ? t('Skrýt') : t('Zobrazit')}</Button>
+                    {rezim === 'upravit' && i > 0 && (
+                      <Button variant="secondary" size="sm" icon="undo" onClick={() => { onObnovitVerzi(v); setHistorieOtevrena(false); }}>{t('Vrátit na tuto verzi')}</Button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Modal>
 
       <Modal open={mazani} onClose={() => setMazani(false)} size="sm" title={t('Smazat recepturu?')}
         footer={<>

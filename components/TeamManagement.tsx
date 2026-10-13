@@ -26,11 +26,12 @@ import KioskSettings from './KioskSettings';
 import EmployeeProfile from './employer/EmployeeProfile';
 import ShareSettings from './employer/ShareSettings';
 import { usePersonProfile } from './employer/ProfileLinkProvider';
-import { Avatar, Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Menu, Modal, SearchField, Segmented, Select, Skeleton, SwitchRow, Textarea, Toast, type MenuItem } from './ui';
+import { Avatar, Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Menu, Modal, ObdobiLista, SearchField, Segmented, Select, Skeleton, SwitchRow, Textarea, Toast, type MenuItem } from './ui';
 import { Icon } from './Icons';
 import { PlochaWidgetu } from './widgety/PlochaWidgetu';
-import { useDataWidgetu } from './widgety/useDataWidgetu';
+import { obnovDataWidgetu, useDataWidgetu } from './widgety/useDataWidgetu';
 import { obnovTym } from './widgety/oblasti/tym';
+import { vycistiNarok, type NarokDovolene } from '@/lib/dovolena';
 import NavigaceNastaveni from './NavigaceNastaveni';
 import { useNavigace } from './widgety/NavigaceKontext';
 import { useMoney, useSymbol } from './CurrencyProvider';
@@ -39,6 +40,11 @@ import { obsahujeNekde } from '@/lib/hledani';
 import { useOpravneni } from './role/useOpravneni';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { useLocale } from './employer/jazyk';
+import { useObdobi } from '@/lib/useObdobi';
+import { obdobiZPresetu, platneRozmezi } from '@/lib/obdobi';
+import { dayPlus, pragueToday } from '@/lib/pragueTime';
+import { hodinyMinuty, type ClenRosteru, type ZaznamDochazky } from '@/lib/dochazkaPrehled';
+import { dniKNacteni, hodinyClenu, seradCleny, soucetHodinClenu, type RazeniClenu } from '@/lib/tymHodiny';
 
 interface Member {
   id: number;
@@ -99,6 +105,8 @@ interface Invitation {
 }
 
 interface DataTymu { team: Team | null; members: Member[] }
+/** Docházka z /api/attendance (jen co hodiny u lidí potřebují): roster se sazbami a záznamy. */
+interface DataDochazky { roster: ClenRosteru[]; entries: ZaznamDochazky[] }
 
 function vyberTym(raw: any): DataTymu {
   if (!raw || typeof raw !== 'object') throw new Error('Tým přišel v nečekaném tvaru.'); // i18n-ok
@@ -107,6 +115,14 @@ function vyberTym(raw: any): DataTymu {
 function vyberPozvanky(raw: any): Invitation[] {
   if (!raw || !Array.isArray(raw.invitations)) throw new Error('Pozvánky přišly v nečekaném tvaru.'); // i18n-ok
   return raw.invitations;
+}
+function vyberDochazku(raw: any): DataDochazky {
+  if (!raw || !Array.isArray(raw.entries)) throw new Error('Docházka přišla v nečekaném tvaru.'); // i18n-ok
+  return { roster: Array.isArray(raw.roster) ? raw.roster : [], entries: raw.entries };
+}
+/** Nároky na dovolenou po lidech z GET /api/timeoff (kolo 8); starší server je neposílá → prázdno. */
+function vyberNaroky(raw: any): Record<string, NarokDovolene> {
+  return raw && typeof raw === 'object' && raw.naroky && typeof raw.naroky === 'object' ? raw.naroky : {};
 }
 /** Výchozí role podniku z /api/roles ve tvaru hodnoty <select> ('' = neznámá). */
 function vyberVychoziRoli(raw: any): string {
@@ -143,6 +159,8 @@ const stavPozvanky = (t: PrekladFn): Record<string, { label: string; tone: 'ok' 
 
 type Sekce = 'lide' | 'podnik' | 'uzaverka' | 'sdileni' | 'tablet' | 'integrace'; // i18n-ok (id záložek)
 const JSON_HLAVICKA = { 'Content-Type': 'application/json' };
+/** Nárok je nastavený (nárok i zůstatek jsou čísla) — jen tehdy se zůstatek kreslí. */
+const h2 = (n: NarokDovolene | null): n is NarokDovolene & { dni: number; zbyva: number } => !!n && n.dni != null && n.zbyva != null;
 
 
 export default function TeamManagement({ user }: { user: { id: number; name: string; role: string; avatar?: string } }) {
@@ -212,14 +230,39 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
   const [zvolena, setZvolena] = useState<Sekce>('lide');
   const aktivni: Sekce = sekce.some(s => s.id === zvolena) ? zvolena : 'lide';
 
+  // ---- Lidé: hodiny a výdělek za období (kolo 8, R8-3) ----
+  // „Kdo kolik odpracoval" patří tam, kde člověk lidi hledá: u každého člena hodiny za zvolené
+  // období a pod nimi hrubá mzda (hodiny × sazba, jako Souhrn hodin). Čte stejnou adresu jako
+  // Docházka (/api/attendance?days=N, nejvýš 180 dní zpět) — jen s dochazka.zobrazit; sazby
+  // server bez finance.mzdy neposílá a mzda se pak nekreslí. Výplata s příplatky a dýškem
+  // (/api/payroll) se sem napojí v dalším kole; zatím je výdělek stejný jako v Souhrnu hodin.
+  const smiHodiny = ma('dochazka.zobrazit');
+  const dnes = pragueToday();
+  const vychoziObdobi = useMemo(() => obdobiZPresetu('mesic', dnes), [dnes]);
+  const { obdobi, nastav: nastavObdobi } = useObdobi('tym-lide', vychoziObdobi);
+  const nejdrive = dayPlus(dnes, -179);
+  const rozmezi = useMemo(() => { const r = platneRozmezi(obdobi, dnes); return { od: r.od < nejdrive ? nejdrive : r.od, do: r.do }; }, [obdobi, dnes, nejdrive]);
+  const dochazka = useDataWidgetu<DataDochazky>(smiHodiny ? `/api/attendance?days=${dniKNacteni(rozmezi.od, dnes)}` : null, vyberDochazku);
+  const hodiny = useMemo(() => (dochazka.data ? hodinyClenu(dochazka.data.entries, dochazka.data.roster, rozmezi.od, rozmezi.do, Date.now(), smiVidetSazby) : null),
+    [dochazka.data, rozmezi.od, rozmezi.do, smiVidetSazby]);
+  const soucet = useMemo(() => (hodiny ? soucetHodinClenu(hodiny) : null), [hodiny]);
+  const [razeni, setRazeni] = useState<RazeniClenu>('jmeno');
+
   // ---- Lidé: hledání, úprava, odebrání ----
   const [hledat, setHledat] = useState('');
   const zobrazeni = useMemo(() => {
     const q = hledat.trim().toLowerCase();
-    return q ? members.filter(m => obsahujeNekde(q, m.name, m.email, m.job_title, m.phone)) : members;
-  }, [members, hledat]);
+    const sez = q ? members.filter(m => obsahujeNekde(q, m.name, m.email, m.job_title, m.phone)) : members;
+    // Bez hodin zůstává pořadí serveru (vedení napřed, pak abeceda); řazení přijde až s docházkou.
+    return hodiny && razeni !== 'jmeno' ? seradCleny(sez, hodiny, razeni) : sez;
+  }, [members, hledat, hodiny, razeni]);
 
-  const [uprava, setUprava] = useState<{ m: Member; role: string; pozice: string; sazba: string } | null>(null);
+  // Nárok na dovolenou (kolo 8): dní za rok na členství, nastavuje kdo volno schvaluje; čte se s nároky
+  // a zůstatky z /api/timeoff (stejná adresa jako fronta žádostí), ukládá PUT /api/timeoff.
+  const smiNarok = ma('volno.schvalovat');
+  const naroky = useDataWidgetu<Record<string, NarokDovolene>>(smiNarok ? '/api/timeoff' : null, vyberNaroky);
+  const narokClena = (id: number): NarokDovolene | null => naroky.data?.[String(id)] ?? null;
+  const [uprava, setUprava] = useState<{ m: Member; role: string; pozice: string; sazba: string; dovolena: string } | null>(null);
   const [ukladamClena, setUkladamClena] = useState(false);
   const [chybaClena, setChybaClena] = useState<string | null>(null);
   const [odebrat, setOdebrat] = useState<Member | null>(null);
@@ -248,12 +291,17 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
 
   const otevriUpravu = (m: Member) => {
     setChybaClena(null);
-    setUprava({ m, role: roleClena(m), pozice: m.job_title ?? '', sazba: m.hourly_rate ? String(m.hourly_rate) : '' });
+    const n = narokClena(m.id);
+    setUprava({ m, role: roleClena(m), pozice: m.job_title ?? '', sazba: m.hourly_rate ? String(m.hourly_rate) : '', dovolena: n?.dni != null ? String(n.dni) : '' });
   };
 
   const ulozClena = async () => {
     if (!uprava) return;
     const { m } = uprava;
+    // Nárok na dovolenou jde vlastním požadavkem (PUT /api/timeoff) — členství, ne účet.
+    const puvodniNarok = narokClena(m.id)?.dni ?? null;
+    const novyNarok = vycistiNarok(uprava.dovolena);
+    const narokZmena = smiNarok && novyNarok !== puvodniNarok;
     // Posílá se jen to, co se změnilo A na co má přihlášený oprávnění.
     // Server odmítne celý požadavek, když chybí oprávnění k jedinému poli
     // (teams/members PATCH) — a sazba, kterou server neposlal (bez
@@ -267,10 +315,14 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
     const sazba = uprava.sazba === '' ? 0 : parseInt(uprava.sazba, 10) || 0;
     if (smiSazbu && m.hourly_rate != null && sazba !== (m.hourly_rate ?? 0)) telo.hourlyRate = sazba;
     else if (smiSazbu && m.hourly_rate == null && uprava.sazba !== '') telo.hourlyRate = sazba;
-    if (Object.keys(telo).length === 1) { setUprava(null); return; }
+    if (Object.keys(telo).length === 1 && !narokZmena) { setUprava(null); return; }
     setUkladamClena(true); setChybaClena(null);
     try {
-      await fetch('/api/teams/members', { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify(telo) }).then(okJson);
+      if (Object.keys(telo).length > 1) await fetch('/api/teams/members', { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify(telo) }).then(okJson);
+      if (narokZmena) {
+        await fetch('/api/timeoff', { method: 'PUT', headers: JSON_HLAVICKA, body: JSON.stringify({ userId: m.id, vacationPerYear: novyNarok }) }).then(okJson);
+        obnovDataWidgetu('/api/timeoff');
+      }
       const puvodni = data.data;
       if (puvodni) data.set({ ...puvodni, members: puvodni.members.map(x => (x.id !== m.id ? x : {
         ...x,
@@ -471,9 +523,35 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
           {t('Lidé v podniku')}
           {data.data && <Chip tone="muted" size="sm">{members.length.toLocaleString(loc)}</Chip>}
         </h2>
+        {/* Období hodin a výdělku (kolo 8): jedno tlačítko jako v Docházce — tento měsíc, minulý, 30 dní, vlastní od–do. */}
+        {smiHodiny && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <ObdobiLista value={obdobi} onChange={nastavObdobi} dnyTydne={false} hrubost={false}
+              volby={['tyden', '7_dni', '30_dni', 'mesic', 'minuly_mesic', '90_dni', '180_dni']} />
+            {soucet && (
+              <span className="t-meta tabular-nums" data-tym-soucet>
+                {t('Celkem {hodiny}', { hodiny: hodinyMinuty(soucet.ms) })}
+                {smiVidetSazby && soucet.mzda > 0 ? ` · ${money(soucet.mzda)}` : ''}
+                {smiVidetSazby && soucet.bezSazby > 0 ? ` · ${t('bez sazby: {n, plural, one {# člověk} few {# lidé} other {# lidí}}', { n: soucet.bezSazby })}` : ''}
+              </span>
+            )}
+          </div>
+        )}
         {/* Od šesti lidí se v seznamu hledalo Ctrl+F v prohlížeči (dřív až nad osm). */}
         {members.length >= 6 && (
           <SearchField value={hledat} onChange={setHledat} storageKey="tym" placeholder={t('Hledat člena — jméno, pozice…')} ariaLabel={t('Hledat člena týmu')} />
+        )}
+        {/* Podle čeho je na řádku největší číslo, podle toho musí jít řadit (DESIGN „Řazení"). */}
+        {hodiny && members.length > 2 && (
+          <Segmented size="sm" ariaLabel={t('Řadit lidi')} value={razeni} onChange={setRazeni}
+            options={[
+              { id: 'jmeno' as const, label: t('Jméno') },
+              { id: 'hodiny' as const, label: t('Hodiny', undefined, 'widgety') },
+              ...(smiVidetSazby ? [{ id: 'vydelek' as const, label: t('Výdělek') }] : []),
+            ]} />
+        )}
+        {smiHodiny && dochazka.error && !dochazka.data && (
+          <ErrorState compact title={t('Hodiny se nenačetly')} detail={dochazka.error} onRetry={dochazka.reload} />
         )}
       </div>
       <div className="px-5 pb-3 pt-1">
@@ -483,6 +561,7 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
           <ul className="list">
             {zobrazeni.map(m => {
               const owner = m.id === team?.owner_id;
+              const h = hodiny?.get(String(m.id)) ?? null;
               // Telefon jako odkaz tel: v řádku je na telefonu drobný cíl — „Zavolat" je proto
               // i v „···" (44 px položka), s číslem v názvu.
               const tel = smiKontakty && m.phone ? m.phone.replace(/[^\d+]/g, '') : '';
@@ -500,9 +579,10 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                     : menu.length === 1 ? <Button variant="secondary" size="sm" onClick={menu[0].onClick}>{menu[0].kratce ?? menu[0].label}</Button> : null}
                 </>
               );
-              // Meta: pozice · telefon (odkaz tel:) · „bez sazby" · e-mail. E-mail je poslední —
+              // Meta: pozice · telefon (odkaz tel:) · sazba nebo „bez sazby" · e-mail. E-mail je poslední —
               // když se řádek na telefonu nevejde, utne se tečkami on, ne telefon. „Bez sazby"
               // je text, ne chip: widget Chybí sazba je hned nad nástrojem (vlastník se nepočítá).
+              // S hodinami (kolo 8) jde sazba do meta a sloupec čísel patří hodinám a výdělku.
               const sazba = smiVidetSazby && m.hourly_rate != null && m.hourly_rate > 0 ? m.hourly_rate : null;
               const casti: React.ReactNode[] = [
                 m.job_title ? <span key="pozice">{m.job_title}</span> : null,
@@ -511,17 +591,30 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                     aria-label={t('Zavolat: {jmeno}, {telefon}', { jmeno: m.name, telefon: m.phone })}>{m.phone}</a>
                 ) : null,
                 smiVidetSazby && sazba == null && !owner ? <span key="sazba">{t('bez sazby')}</span> : null,
+                smiHodiny && sazba != null ? <span key="sazba-h" className="tabular-nums">{t('{sazba}/h', { sazba: money(sazba) })}</span> : null,
+                // Zůstatek dovolené (kolo 8) — vedoucí ho při schvalování nemusí dohledávat jinde.
+                h2(narokClena(m.id)) ? <span key="dovolena" className="tabular-nums" data-tym-dovolena={m.id}>{t('dovolená {zbyva}/{dni}', { zbyva: narokClena(m.id)!.zbyva, dni: narokClena(m.id)!.dni })}</span> : null,
                 m.email ? <span key="email">{m.email}</span> : null,
               ].filter(Boolean);
               const meta = casti.length ? casti.flatMap((c, i) => (i ? [' · ', c] : [c])) : undefined;
               const jinde = t('Je členem i jiného podniku a je tam právě přepnutý. Tady zůstává v seznamu, rozvrhu i ve mzdách.');
+              // Hodiny za období a pod nimi hrubá mzda; kdo nic neodpíchl, má „0 min" — sloupec drží i tak.
+              const hodinyRadku = smiHodiny
+                ? (hodiny ? <span data-tym-hodiny={m.id}>{hodinyMinuty(h?.ms ?? 0)}</span> : <span aria-hidden className="text-black/35">…</span>)
+                : undefined;
+              const vydelekRadku = smiHodiny && smiVidetSazby && h?.mzda != null ? <span data-tym-vydelek={m.id}>{money(h.mzda)}</span>
+                : smiHodiny && h?.bezi ? t('právě běží') : undefined;
               return (
                 <ListRow key={m.id} akceVRadku
                   lead={<Avatar emoji={m.avatar} size="sm" />}
-                  title={m.name}
+                  // Klepnutí na jméno otevře profil (řádek nese akce, celý klikací být nemůže).
+                  title={smiProfil
+                    ? <button type="button" onClick={() => otevriProfil(m.id)} aria-label={t('Profil: {jmeno}', { jmeno: m.name })} className="max-w-full truncate text-left rounded-sm hover:underline decoration-black/25 underline-offset-2">{m.name}</button>
+                    : m.name}
                   meta={meta}
                   // Sazba v jednom sloupci s tabulkovými číslicemi; bez ní pomlčka, ať sloupec drží.
-                  value={smiVidetSazby ? (sazba != null ? t('{sazba}/h', { sazba: money(sazba) }) : <span aria-hidden className="hidden sm:inline text-black/35">—</span>) : undefined}
+                  value={smiHodiny ? hodinyRadku : smiVidetSazby ? (sazba != null ? t('{sazba}/h', { sazba: money(sazba) }) : <span aria-hidden className="hidden sm:inline text-black/35">—</span>) : undefined}
+                  valueMeta={vydelekRadku}
                   right={<>
                     {owner ? <Chip tone="ink" size="sm">{t('Vlastník')}</Chip> : <Chip tone="muted" size="sm">{nazevRole(t, m, role)}</Chip>}
                     {/* Na telefonu jen ikona (s popisem v title a pro odečítač), od sm celý chip. */}
@@ -538,6 +631,12 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
               );
             })}
           </ul>
+        )}
+        {/* Rozpad po dnech, plán proti skutečnosti a prémie jsou v Docházce — jedno klepnutí, ne hledání v navigaci. */}
+        {smiHodiny && hodiny && nav.smiPohled('attendance') && (
+          <div className="mt-2 flex justify-start sm:justify-end">
+            <Button variant="ghost" size="sm" icon="chevron" onClick={() => nav.onNavigate('attendance')}>{t('Rozpad v Docházce')}</Button>
+          </div>
         )}
       </div>
     </Card>
@@ -808,6 +907,16 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                 placeholder={uprava.m.hourly_rate == null && !ma('finance.mzdy') ? t('skrytá') : '0'}
                 onChange={e => setUprava(u => (u ? { ...u, sazba: e.target.value.replace(/\D/g, '') } : u))} />
             </Field>
+            {/* Nárok na dovolenou (kolo 8): dní za kalendářní rok; zaměstnanec vidí zůstatek v žádosti o volno. */}
+            {smiNarok && (
+              <Field id="clen-dovolena" label={t('Dovolená na rok (dní)')}
+                hint={h2(narokClena(uprava.m.id))
+                  ? t('Letos čerpáno {cerpano}, zbývá {zbyva}. Odečítá se jen schválená dovolená, nemoc a jiné volno ne.', { cerpano: narokClena(uprava.m.id)!.cerpano, zbyva: narokClena(uprava.m.id)!.zbyva })
+                  : t('Prázdné = nárok se nesleduje. Odečítá se jen schválená dovolená, nemoc a jiné volno ne.')}>
+                <Input id="clen-dovolena" inputMode="decimal" value={uprava.dovolena} placeholder="20"
+                  onChange={e => setUprava(u => (u ? { ...u, dovolena: e.target.value.replace(/[^\d.,]/g, '').replace(',', '.') } : u))} className="!w-full sm:!w-32 tabular-nums" />
+              </Field>
+            )}
           </div>
         </Modal>
       )}

@@ -21,8 +21,18 @@ import type { DefiniceWidgetu } from '../typy.ts';
  */
 export function mesicZVolby(volba: unknown, zaklad: string): string {
   if (volba !== 'minuly') return zaklad;
-  const [y, m] = zaklad.split('-').map(Number);
-  return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
+  // Kolo 8: základ může být rozsah měsíců „RRRR-MM:RRRR-MM" (Finance za čtvrtletí) — „Minulý" je pak
+  // stejně dlouhý rozsah před ním (duben–červen k červenci–září).
+  const [od, doM = od] = zaklad.split(':');
+  const posun = (mesic: string, o: number) => {
+    const [y, m] = mesic.split('-').map(Number);
+    const d = new Date(Date.UTC(y, m - 1 + o, 1));
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+  };
+  const [y1, m1] = od.split('-').map(Number); const [y2, m2] = doM.split('-').map(Number);
+  const n = Math.max(1, (y2 - y1) * 12 + (m2 - m1) + 1);
+  const novyOd = posun(od, -n), novyDo = posun(od, -1);
+  return n === 1 ? novyOd : `${novyOd}:${novyDo}`;
 }
 
 export const WIDGETY: DefiniceWidgetu[] = [
@@ -93,6 +103,27 @@ export const WIDGETY: DefiniceWidgetu[] = [
       },
     ],
     cil: { pohled: 'finance' },
+    stav: 'hotovo',
+  },
+  // Data (kolo 8, R8-4): GET /api/attendance?days=1 → roster[{id,name,hourlyRate,openSince,shiftStart,shiftEnd}],
+  // entries[{employeeId,clockIn,clockOut}] (jen s dochazka.zobrazit); GET /api/pos/summary?date=<dnes> → total;
+  // GET /api/finance?month → summary.laborTargetPct (cíl podniku, jen s finance.zobrazit). Obnova po 2 min jako Pokladna dnes.
+  // Pozor: mzdy se počítají v prohlížeči z rosteru a dnešních záznamů (lib/financeWidgety mzdyDnes) — až přibude
+  // GET /api/payroll, vezme se náklad odsud a tvar MzdyDnes zůstane.
+  {
+    id: 'finance.mzdy_dnes',
+    oblast: 'finance',
+    nazev: 'Mzdy dnes',
+    popis: 'Kolik dnešek stojí na lidech: náklad odpracovaného času do teď proti dnešní tržbě z pokladny, odhad do konce plánu; ve střední kartě lidé na směně s nákladem.',
+    ikona: 'coins',
+    velikosti: ['S', 'M'],
+    vychoziVelikost: 'S',
+    rozhrani: ['vedeni'],
+    stranky: ['vedeni.prehled', 'vedeni.togo', 'vedeni.dochazka', 'vedeni.finance'],
+    opravneni: { vse: ['finance.mzdy', 'finance.trzby'], nektere: [], pole: { hotove_smeny_dne: 'dochazka.zobrazit', cil_podniku: 'finance.zobrazit' } },
+    tarif: 'max',
+    kostra: { S: 'cislo', M: 'cislo' },
+    cil: { pohled: 'attendance' },
     stav: 'hotovo',
   },
   // Data: GET /api/finance?month → ledger[{kind,amount}], summary{wagesCash,wagesWorked,stockValue,stockTop}

@@ -10,10 +10,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { getConnection, menuProducts } from '@/lib/storyous';
 import { productsFromMirror } from '@/lib/posMirror';
-import { audit } from '@/lib/audit';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { nactiBaleniKategorii, baleniRadku } from '@/lib/baleniKategorii';
 import { jednotkaMnozstvi } from '@/lib/jednotky';
+import { nakladZTela, poUlozeniReceptury, pripravReceptuRu, surovinyZTela } from '@/lib/recepturyDb';
+import { popisRozdilu } from '@/lib/recepturyVerze';
 
 export const dynamic = 'force-dynamic';
 
@@ -84,47 +85,29 @@ export async function GET() {
   });
 }
 
-// Replace the whole recipe of one product: { productId, productName, ingredients: [{itemId, amount}] }.
-// Empty ingredients = remove the recipe.
+// Replace the whole recipe of one product: { productId, productName, ingredients: [{itemId, amount}], costPerPortion?, note? }.
+// Empty ingredients = remove the recipe. Kolo 8 (R8-5): zápis jde přes lib/recepturyDb —
+// výměna řádků a verze do historie v jedné transakci, audit s rozdílem („Káva 18 g → 22 g").
 export async function POST(req: NextRequest) {
   const c = await pozaduj('receptury.upravit');
   if (jeOdpoved(c)) return c;
-  const u = { id: c.meId, team_id: c.teamId };
   const b = await req.json().catch(() => ({}));
   const productId = String(b.productId ?? '').trim();
   if (!productId) return NextResponse.json({ error: 'Chybí produkt' }, { status: 400 });
-  const raw = Array.isArray(b.ingredients) ? b.ingredients : [];
-  const ingredients: { itemId: number; amount: number }[] = [];
-  for (const ing of raw.slice(0, 12)) {
-    const itemId = parseInt(ing?.itemId);
-    const amount = Number(ing?.amount);
-    if (!Number.isFinite(itemId)) continue;
-    ingredients.push({ itemId, amount: Number.isFinite(amount) && amount > 0 ? amount : 1 });
-  }
+  if (productId.length > 120) return NextResponse.json({ error: 'Neplatný produkt' }, { status: 400 });
+  const ingredients = surovinyZTela(b.ingredients);
   try {
     // Suroviny se ověří dřív a celá výměna receptury (smazání starých řádků + vložení
-    // nových) jde v JEDNÉ transakci: pád mezi DELETE a INSERTy dřív smazal recepturu
-    // bez náhrady a produkt se přestal odepisovat.
-    const ids = Array.from(new Set(ingredients.map(i => i.itemId)));
-    const znama = ids.length
-      ? new Set((await sql`SELECT id FROM inventory_items WHERE id = ANY(${ids}) AND team_id = ${u.team_id}`).map((r: any) => Number(r.id)))
-      : new Set<number>();
-    const jmeno = b.productName ? String(b.productName).slice(0, 160) : null;
-    const writes: any[] = [sql`DELETE FROM pos_product_map WHERE team_id = ${u.team_id} AND product_id = ${productId}`];
-    for (const ing of ingredients) {
-      if (!znama.has(ing.itemId)) continue;
-      writes.push(sql`
-        INSERT INTO pos_product_map (team_id, product_id, product_name, item_id, amount_per_sale)
-        VALUES (${u.team_id}, ${productId}, ${jmeno}, ${ing.itemId}, ${ing.amount})
-        ON CONFLICT DO NOTHING`);
-    }
-    await sql.transaction(writes);
-    if (ingredients.length) {
-      try { await sql`DELETE FROM pos_unmapped WHERE team_id = ${u.team_id} AND product_id = ${productId}`; } catch {}
-    }
-    audit(u.team_id, u.id, 'pos.recipe', 'pos', null,
-      `${b.productName ?? productId}: ${ingredients.length} ingrediencí`);
-    return NextResponse.json({ ok: true });
+    // nových + verze do historie) jde v JEDNÉ transakci: pád mezi DELETE a INSERTy dřív
+    // smazal recepturu bez náhrady a produkt se přestal odepisovat.
+    const u = {
+      productId, productName: b.productName ? String(b.productName) : null, ingredients,
+      costPerPortion: nakladZTela(b.costPerPortion), note: typeof b.note === 'string' ? b.note.trim() || null : null,
+    };
+    const p = await pripravReceptuRu(c.teamId, c.meId, u);
+    await sql.transaction(p.writes);
+    const rozdil = await poUlozeniReceptury(c.teamId, c.meId, u, p);
+    return NextResponse.json({ ok: true, zmena: popisRozdilu(rozdil) });
   } catch (e) {
     // „Spusť /api/init" patří jen k chybějící tabulce (42P01). Při výpadku spojení
     // by ta rada člověka poslala špatným směrem — a stará receptura teď zůstala

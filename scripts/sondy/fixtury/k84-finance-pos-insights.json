@@ -1,0 +1,165 @@
+{
+ "connected": true,
+ "month": "MESIC",
+ "bills": 1240,
+ "total": 213800,
+ "tips": 4260,
+ "discounts": 0,
+ "staff": [
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  8,
+  16,
+  16,
+  16,
+  16,
+  24,
+  24,
+  24,
+  24,
+  16,
+  16,
+  16,
+  8,
+  0,
+  0,
+  0,
+  0
+ ],
+ "staffing": [
+  {
+   "hour": 7,
+   "revenueShare": 2.0,
+   "staffShare": 3.6,
+   "perHour": 525
+  },
+  {
+   "hour": 8,
+   "revenueShare": 8.4,
+   "staffShare": 7.1,
+   "perHour": 1125
+  },
+  {
+   "hour": 9,
+   "revenueShare": 12.2,
+   "staffShare": 7.1,
+   "perHour": 1625
+  },
+  {
+   "hour": 10,
+   "revenueShare": 10.3,
+   "staffShare": 7.1,
+   "perHour": 1375
+  },
+  {
+   "hour": 11,
+   "revenueShare": 8.9,
+   "staffShare": 7.1,
+   "perHour": 1188
+  },
+  {
+   "hour": 12,
+   "revenueShare": 14.5,
+   "staffShare": 10.7,
+   "perHour": 1292
+  },
+  {
+   "hour": 13,
+   "revenueShare": 13.1,
+   "staffShare": 10.7,
+   "perHour": 1167
+  },
+  {
+   "hour": 14,
+   "revenueShare": 7.0,
+   "staffShare": 10.7,
+   "perHour": 625
+  },
+  {
+   "hour": 15,
+   "revenueShare": 5.6,
+   "staffShare": 10.7,
+   "perHour": 500
+  },
+  {
+   "hour": 16,
+   "revenueShare": 6.5,
+   "staffShare": 7.1,
+   "perHour": 875
+  },
+  {
+   "hour": 17,
+   "revenueShare": 6.1,
+   "staffShare": 7.1,
+   "perHour": 812
+  },
+  {
+   "hour": 18,
+   "revenueShare": 4.2,
+   "staffShare": 7.1,
+   "perHour": 562
+  },
+  {
+   "hour": 19,
+   "revenueShare": 1.2,
+   "staffShare": 3.6,
+   "perHour": 325
+  }
+ ],
+ "staffingAdvice": [
+  {
+   "title": "12:00 táhne 14,6 % tržby, ale jen 9,2 % hodin",
+   "text": "Posuň jednu směnu o hodinu dřív.",
+   "tone": "warn"
+  }
+ ],
+ "avgRate": 165,
+ "reconcile": {
+  "days": [],
+  "totals": {
+   "comparedDays": 0,
+   "offDays": 0,
+   "netDiff": 0
+  },
+  "insights": [],
+  "note": ""
+ },
+ "avgBill": 168,
+ "avgPersons": 1.8,
+ "hours": [
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  4200,
+  18000,
+  26000,
+  22000,
+  19000,
+  31000,
+  28000,
+  15000,
+  12000,
+  14000,
+  13000,
+  9000,
+  2600,
+  0,
+  0,
+  0,
+  0
+ ],
+ "byPerson": [],
+ "refunds": {
+  "count": 0,
+  "total": 0
+ }
+}

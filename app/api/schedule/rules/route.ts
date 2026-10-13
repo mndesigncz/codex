@@ -8,6 +8,7 @@ import { audit } from '@/lib/audit';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { pragueToday } from '@/lib/pragueTime';
 import { navrhPrahu, ocekavaneTrzby, vycistiNastaveniTrzeb, type TrzbyDnu } from '@/lib/rozvrhGenerator';
+import { BEZ_LIMITU, vycistiLimity, type LimityRozvrhu } from '@/lib/rozvrhLimity';
 
 export const dynamic = 'force-dynamic';
 
@@ -132,7 +133,14 @@ export async function GET() {
     ...(smiTrzby ? { dny: dny ?? {}, navrhPrahu: navrhPrahu(dny ?? {}) } : {}),
   };
 
-  return NextResponse.json({ teamMax, teamMaxHours, balanceShifts, splitShifts, members, trzby });
+  // Kolo 8 (R8-3): odpočinek mezi směnami, nejdelší směna, hodiny za týden (NULL = vypnuto).
+  let limity: LimityRozvrhu = BEZ_LIMITU;
+  try {
+    const [t] = await sql`SELECT min_rest_hours, max_shift_hours, max_week_hours FROM teams WHERE id = ${u.team_id}`;
+    limity = vycistiLimity(t);
+  } catch { /* sloupce ještě nejsou (spusť /api/init) — bez limitů */ }
+
+  return NextResponse.json({ teamMax, teamMaxHours, balanceShifts, splitShifts, members, trzby, limity });
 }
 
 // PUT { teamMax?, teamMaxHours?, balanceShifts?, trzby?: { podleTrzeb, prah }, overrides?: [{ id, maxConsecutive?, maxHours? }] }
@@ -199,7 +207,19 @@ export async function PUT(req: NextRequest) {
     } catch { trzbyNeulozeny = true; }
   }
 
+  // Limity rozvrhu (kolo 8): { minRestHours, maxShiftHours, maxWeekHours }, null = vypnuto.
+  // Vlastní try/catch jako tržby — chybějící sloupce nesmí shodit zbytek pravidel.
+  let limityNeulozeny = false;
+  let limityText = '';
+  if (b.limity !== undefined && b.limity !== null && typeof b.limity === 'object') {
+    const l = vycistiLimity(b.limity);
+    limityText = ` · odpočinek ${l.minRestHours ?? '–'} h, směna ${l.maxShiftHours ?? '–'} h, týden ${l.maxWeekHours ?? '–'} h`;
+    try {
+      await sql`UPDATE teams SET min_rest_hours = ${l.minRestHours}, max_shift_hours = ${l.maxShiftHours}, max_week_hours = ${l.maxWeekHours} WHERE id = ${u.team_id}`;
+    } catch { limityNeulozeny = true; }
+  }
+
   audit(u.team_id, u.id, 'schedule.rules', 'schedule', null,
-    b.teamMax !== undefined ? `Max dní po sobě: ${cleanTeamLimit(b.teamMax) ?? 'bez omezení'}` : 'Výjimky u lidí');
-  return NextResponse.json({ ok: true, ...(trzbyNeulozeny ? { trzbyNeulozeny: true } : {}) });
+    (b.teamMax !== undefined ? `Max dní po sobě: ${cleanTeamLimit(b.teamMax) ?? 'bez omezení'}` : 'Výjimky u lidí') + limityText);
+  return NextResponse.json({ ok: true, ...(trzbyNeulozeny ? { trzbyNeulozeny: true } : {}), ...(limityNeulozeny ? { limityNeulozeny: true } : {}) });
 }

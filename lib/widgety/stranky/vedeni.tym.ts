@@ -22,6 +22,9 @@ export const STRANKA: DefiniceStranky = {
     'tym.pozvanky',
     'tym.role',
     'tym.bez_sazby',
+    // Kolo 8 (R8-3): „kdo kolik odpracoval" má nástroj v řádcích lidí; Souhrn hodin
+    // (graf po dnech, plán, prémie) je v galerii hned po ruce, kdo chce rozpad i tady.
+    'dochazka.souhrn_hodin',
     'dochazka.prave_na_smene',
     'rozvrh.dostupnost_tymu',
   ],

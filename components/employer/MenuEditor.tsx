@@ -36,7 +36,7 @@ import { cenaDoPole, cenaZFormulare } from '@/lib/cena';
 import { UDALOST_VYPRODANO, URL_MENU, URL_VYPRODANO } from '@/lib/recepturyPrehled';
 import KopieZPodniku, { useJinePodniky } from '../organizace/KopieZPodniku';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
-import { obnovDataWidgetu } from '../widgety/useDataWidgetu';
+import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useOpravneni } from '../role/useOpravneni';
 import { UDALOST_MENU_ZAPNUTO } from '../widgety/oblasti/menu';
 import JazykyListku from './menu/JazykyListku';
@@ -47,6 +47,8 @@ import type { Jazyk } from '@/lib/i18n/config';
 import type { JazykyListku as Langs, Preklady } from '@/lib/menu';
 import { useT } from '@/lib/i18n/client';
 import { sUzlem, VLOZ } from './jazyk';
+import { Poznamky } from '../Poznamky';
+import { urlPoctu, vyberPocty } from '@/lib/poznamky';
 
 interface Item {
   id?: number;
@@ -112,6 +114,10 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
   const [ukladam, setUkladam] = useState(false);
   const [chyba, setChybaStav] = useState<string | null>(null);
   const [toast, setToast] = useState<{ text: string; ton?: 'bad'; id: number; akce?: { label: string; onClick: () => void } } | null>(null);
+  // Poznámky k položce menu (kolo 8, R8-5): „Od pondělí jiný dodavatel croissantů" — okno s vláknem,
+  // v řádku počet. Jen u uložených položek (nová ještě nemá id).
+  const [poznamkyPolozky, setPoznamkyPolozky] = useState<{ si: number; ii: number } | null>(null);
+  const poctyPoznamek = useDataWidgetu(urlPoctu('menu_item'), vyberPocty);
   const [neniMigrace, setNeniMigrace] = useState(false);
   const [pin, setPin] = useState('');
   const [vzhledOtevren, setVzhledOtevren] = useState(false);
@@ -1024,6 +1030,15 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
                           aria-label={t('Alergeny a štítky — {nazev}', { nazev: it.name || t('nová položka') })}>
                           {(it.allergens?.length ?? 0) > 0 ? t('Alergeny: {seznam}', { seznam: it.allergens!.join(', ') }) : t('Alergeny')}
                         </Button>
+                        {it.id != null && (() => {
+                          const pz = poctyPoznamek.data?.[String(it.id)];
+                          return (
+                            <Button variant="ghost" size="sm" icon="chat" className={pz?.nove ? 'font-bold' : ''} data-poznamky-polozky={it.id}
+                              aria-label={t('Poznámky — {nazev}', { nazev: it.name || t('položku') })} onClick={() => setPoznamkyPolozky({ si, ii })}>
+                              {pz ? t('Poznámky · {n}', { n: pz.n }) : t('Poznámky')}
+                            </Button>
+                          );
+                        })()}
                         {(it.tags ?? []).map(k => <Chip key={k} size="sm">{(STITKY as any)[k]?.cs ?? k}</Chip>)}
                         <span className="flex-1" />
                         {!zamceno && (
@@ -1143,6 +1158,13 @@ export default function MenuEditor({ hlavicka = true }: { hlavicka?: boolean } =
               onStitky={(kody) => upravit((b) => { b.sections[si].items[ii].tags = kody; })} />
           );
         })()}
+      </Modal>
+      <Modal open={poznamkyPolozky != null && board?.sections[poznamkyPolozky.si]?.items[poznamkyPolozky.ii]?.id != null} onClose={() => setPoznamkyPolozky(null)} size="md"
+        title={t('Poznámky k položce')} subtitle={poznamkyPolozky && board ? (board.sections[poznamkyPolozky.si]?.items[poznamkyPolozky.ii]?.name || t('položku')) : undefined}
+        footer={<Button variant="primary" onClick={() => setPoznamkyPolozky(null)}>{t('Hotovo')}</Button>}>
+        {poznamkyPolozky && board?.sections[poznamkyPolozky.si]?.items[poznamkyPolozky.ii]?.id != null && (
+          <Poznamky typ="menu_item" id={board.sections[poznamkyPolozky.si].items[poznamkyPolozky.ii].id as number} />
+        )}
       </Modal>
       <Modal open={noveMenu != null} onClose={() => setNoveMenu(null)} size="sm" title={t('Nové menu')} subtitle={t('Založí se prázdné, s vlastní adresou.')}
         footer={<>

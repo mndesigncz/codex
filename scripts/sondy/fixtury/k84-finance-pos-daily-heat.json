@@ -1,0 +1,1148 @@
+{
+ "connected": true,
+ "from": "DNES",
+ "to": "DNES",
+ "today": "DNES",
+ "placeName": "Kavárna Vinohrady",
+ "menuError": null,
+ "lastSyncAt": "2026-09-26T10:05:00Z",
+ "totals": {
+  "bills": 128,
+  "total": 21480,
+  "cash": 7400,
+  "card": 13080,
+  "other": 1000,
+  "tips": 860,
+  "tipsCash": 300,
+  "tipsCard": 560,
+  "discounts": 0,
+  "refundCount": 1,
+  "refundTotal": 120,
+  "methods": [
+   {
+    "id": "meal",
+    "label": "stravenky",
+    "amount": 1000
+   }
+  ],
+  "avgBill": 168,
+  "soldQty": 342,
+  "productRevenue": 21100
+ },
+ "days": [
+  {
+   "day": "DNES",
+   "bills": 128,
+   "cash": 7400,
+   "card": 13080,
+   "other": 1000,
+   "total": 21480,
+   "tips": 860,
+   "tipsCash": 300,
+   "tipsCard": 560,
+   "discounts": 0,
+   "refundCount": 1,
+   "refundTotal": 120,
+   "persons": 0,
+   "closings": 0,
+   "declared": null,
+   "diff": null
+  }
+ ],
+ "hours": [
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  420,
+  1800,
+  2600,
+  2200,
+  1900,
+  3100,
+  2800,
+  1500,
+  1200,
+  1400,
+  1300,
+  900,
+  260,
+  0,
+  0,
+  0,
+  0
+ ],
+ "byPerson": [
+  {
+   "name": "Eva Nováková",
+   "total": 12400,
+   "bills": 71
+  },
+  {
+   "name": "Petr Malý",
+   "total": 9080,
+   "bills": 57
+  }
+ ],
+ "items": [
+  {
+   "productId": "p1",
+   "name": "Flat white",
+   "category": "Káva",
+   "qty": 64,
+   "price": 85,
+   "revenue": 5440
+  },
+  {
+   "productId": "p2",
+   "name": "Croissant",
+   "category": "Pečivo",
+   "qty": 41,
+   "price": 55,
+   "revenue": 2255
+  },
+  {
+   "productId": "p3",
+   "name": "Matcha latte",
+   "category": "Čaj",
+   "qty": 22,
+   "price": null,
+   "revenue": null
+  }
+ ],
+ "notes": [
+  {
+   "tone": "warn",
+   "title": "1 položka nemá cenu",
+   "text": "Matcha latte chybí cena v menu pokladny."
+  }
+ ],
+ "note": "Účtenky vystavené do 6:00 patří k předchozímu dni.",
+ "heat": [
+  [
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 1600,
+    "ucty": 9,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 7200,
+    "ucty": 42,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 10400,
+    "ucty": 61,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 8800,
+    "ucty": 52,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 7600,
+    "ucty": 45,
+    "dni": 4,
+    "lidi": 2.0
+   },
+   {
+    "trzba": 12400,
+    "ucty": 73,
+    "dni": 4,
+    "lidi": 2.0
+   },
+   {
+    "trzba": 11200,
+    "ucty": 66,
+    "dni": 4,
+    "lidi": 2.0
+   },
+   {
+    "trzba": 6000,
+    "ucty": 35,
+    "dni": 4,
+    "lidi": 2.0
+   },
+   {
+    "trzba": 4800,
+    "ucty": 28,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 5600,
+    "ucty": 33,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 5200,
+    "ucty": 31,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 3600,
+    "ucty": 21,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 1040,
+    "ucty": 6,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   }
+  ],
+  [
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 720,
+    "ucty": 4,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 3240,
+    "ucty": 19,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 4680,
+    "ucty": 28,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 3960,
+    "ucty": 23,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 3420,
+    "ucty": 20,
+    "dni": 4,
+    "lidi": 2.0
+   },
+   {
+    "trzba": 5580,
+    "ucty": 33,
+    "dni": 4,
+    "lidi": 2.0
+   },
+   {
+    "trzba": 5040,
+    "ucty": 30,
+    "dni": 4,
+    "lidi": 2.0
+   },
+   {
+    "trzba": 2700,
+    "ucty": 16,
+    "dni": 4,
+    "lidi": 2.0
+   },
+   {
+    "trzba": 2160,
+    "ucty": 13,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 2520,
+    "ucty": 15,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 2340,
+    "ucty": 14,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 1620,
+    "ucty": 10,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 468,
+    "ucty": 3,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   }
+  ],
+  [
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 1440,
+    "ucty": 8,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 6480,
+    "ucty": 38,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 9360,
+    "ucty": 55,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 7920,
+    "ucty": 47,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 6840,
+    "ucty": 40,
+    "dni": 4,
+    "lidi": 2.0
+   },
+   {
+    "trzba": 11160,
+    "ucty": 66,
+    "dni": 4,
+    "lidi": 2.0
+   },
+   {
+    "trzba": 10080,
+    "ucty": 59,
+    "dni": 4,
+    "lidi": 2.0
+   },
+   {
+    "trzba": 5400,
+    "ucty": 32,
+    "dni": 4,
+    "lidi": 2.0
+   },
+   {
+    "trzba": 4320,
+    "ucty": 25,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 5040,
+    "ucty": 30,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 4680,
+    "ucty": 28,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 3240,
+    "ucty": 19,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 936,
+    "ucty": 6,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   }
+  ],
+  [
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 1600,
+    "ucty": 9,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 7200,
+    "ucty": 42,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 10400,
+    "ucty": 61,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 8800,
+    "ucty": 52,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 7600,
+    "ucty": 45,
+    "dni": 4,
+    "lidi": 2.0
+   },
+   {
+    "trzba": 12400,
+    "ucty": 73,
+    "dni": 4,
+    "lidi": 2.0
+   },
+   {
+    "trzba": 11200,
+    "ucty": 66,
+    "dni": 4,
+    "lidi": 2.0
+   },
+   {
+    "trzba": 6000,
+    "ucty": 35,
+    "dni": 4,
+    "lidi": 2.0
+   },
+   {
+    "trzba": 4800,
+    "ucty": 28,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 5600,
+    "ucty": 33,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 5200,
+    "ucty": 31,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 3600,
+    "ucty": 21,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 1040,
+    "ucty": 6,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   }
+  ],
+  [
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 2560,
+    "ucty": 15,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 11520,
+    "ucty": 68,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 16640,
+    "ucty": 98,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 14080,
+    "ucty": 83,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 12160,
+    "ucty": 72,
+    "dni": 4,
+    "lidi": 2.0
+   },
+   {
+    "trzba": 19840,
+    "ucty": 117,
+    "dni": 4,
+    "lidi": 2.0
+   },
+   {
+    "trzba": 17920,
+    "ucty": 105,
+    "dni": 4,
+    "lidi": 2.0
+   },
+   {
+    "trzba": 9600,
+    "ucty": 56,
+    "dni": 4,
+    "lidi": 2.0
+   },
+   {
+    "trzba": 7680,
+    "ucty": 45,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 8960,
+    "ucty": 53,
+    "dni": 4,
+    "lidi": 2.0
+   },
+   {
+    "trzba": 26880,
+    "ucty": 158,
+    "dni": 4,
+    "lidi": 2.0
+   },
+   {
+    "trzba": 26880,
+    "ucty": 158,
+    "dni": 4,
+    "lidi": 2.0
+   },
+   {
+    "trzba": 1664,
+    "ucty": 10,
+    "dni": 4,
+    "lidi": 2.0
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   }
+  ],
+  [
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 2240,
+    "ucty": 13,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 10080,
+    "ucty": 59,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 14560,
+    "ucty": 86,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 12320,
+    "ucty": 72,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 10640,
+    "ucty": 63,
+    "dni": 4,
+    "lidi": 2.0
+   },
+   {
+    "trzba": 17360,
+    "ucty": 102,
+    "dni": 4,
+    "lidi": 2.0
+   },
+   {
+    "trzba": 15680,
+    "ucty": 92,
+    "dni": 4,
+    "lidi": 2.0
+   },
+   {
+    "trzba": 8400,
+    "ucty": 49,
+    "dni": 4,
+    "lidi": 2.0
+   },
+   {
+    "trzba": 6720,
+    "ucty": 40,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 7840,
+    "ucty": 46,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 7280,
+    "ucty": 43,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 5040,
+    "ucty": 30,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 1456,
+    "ucty": 9,
+    "dni": 4,
+    "lidi": 1.0
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 4,
+    "lidi": null
+   }
+  ],
+  [
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 0,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 0,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 0,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 0,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 0,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 0,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 0,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 0,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 0,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 0,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 0,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 0,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 0,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 0,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 0,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 0,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 0,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 0,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 0,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 0,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 0,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 0,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 0,
+    "lidi": null
+   },
+   {
+    "trzba": 0,
+    "ucty": 0,
+    "dni": 0,
+    "lidi": null
+   }
+  ]
+ ]
+}

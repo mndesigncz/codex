@@ -170,6 +170,8 @@ export const sklad: Obsluha = (p, k) => {
   }
   if (cesta === '/api/stocktake') return ok({ open: null, history: [] });
   if (cesta === '/api/production') return ok({ toMake: [] });
+  // Kolo 8 (R8-4): předpověď „dojde za" ze spotřeby — ukázka nemá historii odpisů, widgety řádek vynechají.
+  if (cesta === '/api/inventory/forecast') return ok({ days: 28, items: {} });
   if (cesta === '/api/pos/usage') {
     if (metoda === 'GET' && q.get('q')) {
       // Hledání produktu z kasy pro přiřazení suroviny do receptury.

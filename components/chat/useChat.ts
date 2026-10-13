@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { pragueToday, pragueDaySafe } from '@/lib/pragueTime';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
+import type { ClenVlakna, Reakce } from '@/lib/chatReakce';
 
 /**
  * Překladač sekce `chat`. Nikde se nevolá: slouží jako ZNAČKA pro scripts/check-i18n.mjs, která
@@ -43,7 +44,14 @@ export interface ChatMessage {
   createdAt: string;
   senderName: string;
   senderAvatar: string;
+  /** Kolo 8: citovaná zpráva (odpověď) — úryvek a autor; null bez odpovědi. */
+  replyTo?: { id: number; senderName: string; content: string } | null;
+  /** Kolo 8: reakce 👍 ✅ ❤️ 😂 pod bublinou. */
+  reactions?: Reakce[];
 }
+
+/** Vlákno: zprávy a členové s last_read_at (z toho se počítá „Viděli"). */
+export interface Vlakno { messages: ChatMessage[]; members: ClenVlakna[] }
 
 export interface UploadResult {
   url: string;
@@ -59,10 +67,31 @@ export async function fetchConversations(): Promise<Conversation[]> {
 }
 
 export async function fetchMessages(conversationId: number): Promise<ChatMessage[]> {
+  return (await fetchVlakno(conversationId)).messages;
+}
+
+export async function fetchVlakno(conversationId: number): Promise<Vlakno> {
   const res = await fetch(`/api/conversations/${conversationId}/messages`).catch(() => null);
-  if (!res || !res.ok) return [];
+  if (!res || !res.ok) return { messages: [], members: [] };
   const data = await res.json();
-  return data.messages ?? [];
+  return { messages: data.messages ?? [], members: Array.isArray(data.members) ? data.members : [] };
+}
+
+/**
+ * Přepne vlastní reakci na zprávu; vrátí reakce zprávy po změně, nebo null,
+ * když se to nepovedlo (i offline — volající vrátí optimistický stav zpět).
+ */
+export async function toggleReaction(conversationId: number, messageId: number, emoji: string): Promise<Reakce[] | null> {
+  try {
+    const res = await fetch(`/api/conversations/${conversationId}/reactions`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messageId, emoji }),
+    });
+    if (!res.ok) return null;
+    const d = await res.json().catch(() => null);
+    return Array.isArray(d?.reactions) ? d.reactions : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -76,7 +105,7 @@ export async function fetchMessages(conversationId: number): Promise<ChatMessage
  */
 export async function sendMessage(
   conversationId: number,
-  payload: { content?: string; attachmentUrl?: string; attachmentType?: string; attachmentName?: string },
+  payload: { content?: string; attachmentUrl?: string; attachmentType?: string; attachmentName?: string; replyTo?: number | null },
 ): Promise<ChatMessage | null> {
   try {
     const res = await fetch(`/api/conversations/${conversationId}/messages`, {
@@ -210,15 +239,17 @@ export function useConversations(pollMs = 8000) {
 // Hook: load + poll messages for a single open conversation.
 export function useThreadMessages(conversationId: number | null, pollMs = 5000) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [members, setMembers] = useState<ClenVlakna[]>([]);
   const [loading, setLoading] = useState(false);
   const idRef = useRef(conversationId);
   idRef.current = conversationId;
 
   const load = useCallback(async () => {
     if (idRef.current == null) return;
-    const msgs = await fetchMessages(idRef.current);
+    const v = await fetchVlakno(idRef.current);
     if (idRef.current === conversationId) {
-      setMessages(msgs);
+      setMessages(v.messages);
+      setMembers(v.members);
       setLoading(false);
     }
   }, [conversationId]);
@@ -226,6 +257,7 @@ export function useThreadMessages(conversationId: number | null, pollMs = 5000) 
   useEffect(() => {
     if (conversationId == null) {
       setMessages([]);
+      setMembers([]);
       return;
     }
     setLoading(true);
@@ -236,5 +268,5 @@ export function useThreadMessages(conversationId: number | null, pollMs = 5000) 
     return () => clearInterval(t);
   }, [conversationId, load, pollMs]);
 
-  return { messages, setMessages, loading, reload: load };
+  return { messages, setMessages, members, loading, reload: load };
 }

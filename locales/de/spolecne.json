@@ -14,7 +14,6 @@
   "Chat": "Chat",
   "Chrome nebo Android": "Chrome oder Android",
   "Co jsi rozepsal, se neuloží.": "Was du geschrieben hast, wird nicht gespeichert.",
-  "Ctrl+Enter odešle": "Strg+Enter sendet",
   "DIČ": "DIČ (Steuer-ID)",
   "DIČ není platné. Začíná kódem země a má jen písmena a číslice, třeba CZ12345678.": "Die DIČ (Steuer-ID) ist nicht gültig. Sie beginnt mit einem Ländercode und besteht nur aus Buchstaben und Ziffern, zum Beispiel CZ12345678.",
   "Další akce": "Weitere Aktionen",
@@ -170,7 +169,6 @@
   "Přesune vybraný widget o jedno místo.": "Verschiebt das ausgewählte Widget um einen Platz.",
   "Přidat": "Hinzufügen",
   "Přidat poznámku": "Notiz hinzufügen",
-  "Přidat poznámku…": "Notiz hinzufügen…",
   "Přidáno {datum}": "Hinzugefügt am {datum}",
   "Přihlásit se": "Anmelden",
   "Připomínky uzávěrky a její schválení.": "Erinnerungen an den Kassenabschluss und dessen Freigabe.",
@@ -326,5 +324,11 @@
   "Žádné zařízení": "Keine Geräte",
   "Žádost se nepodařilo odeslat.": "Die Anfrage konnte nicht gesendet werden.",
   "Žádost se nepodařilo odeslat. Zkontrolujte připojení.": "Die Anfrage konnte nicht gesendet werden. Prüfen Sie Ihre Verbindung.",
-  "Žádosti o volno a jejich vyřízení.": "Urlaubsanträge und deren Bearbeitung."
+  "Žádosti o volno a jejich vyřízení.": "Urlaubsanträge und deren Bearbeitung.",
+  "Odepnout": "Lösen",
+  "Připnout nahoru": "Oben anheften",
+  "připnuto": "angeheftet",
+  "Přidat poznámku… @jméno někoho upozorní": "Notiz hinzufügen… @Name benachrichtigt jemanden",
+  "Koho zmínit": "Wen erwähnen",
+  "Ctrl+Enter odešle · @jméno upozorní kolegu": "Strg+Enter sendet · @Name benachrichtigt eine Kollegin oder einen Kollegen"
 }

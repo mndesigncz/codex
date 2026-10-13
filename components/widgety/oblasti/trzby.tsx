@@ -34,7 +34,7 @@
 //
 // Data jen přes useDataWidgetu (sdílená mezipaměť), v náhledu nic nenaviguje ani nezapisuje.
 
-import { useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import React, { useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
 import { widget } from '@/lib/widgety/katalog';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
@@ -42,11 +42,12 @@ import { dbTimeHM, dayPlus, pragueToday } from '@/lib/pragueTime';
 import { apiMessage, okJson } from '@/lib/api';
 import { fmtMesic } from '@/lib/i18n/format';
 import { aktualniJazyk } from '@/lib/i18n/stav';
-import { DLOUHO_OTEVRENY_MIN, zmenaOprotiMinulemuTydnu, nactiKalendareUzaverek, dnyObdobi, dnyVTydnu, obdobiPokladny, pondeliTydne, kalendarTrzeb, kasaProtiUzaverkam, mesiceObdobi, minutOtevrenosti, tydnyTrzeb, vyberKalendarTrzeb as vyberKalendar, podilSlev, slevyNadPrah, PRAH_SLEV_PCT } from '@/lib/financeWidgety';
+import { DLOUHO_OTEVRENY_MIN, zmenaOprotiMinulemuTydnu, nactiKalendareUzaverek, dnyObdobi, dnyVTydnu, obdobiPokladny, pondeliTydne, kalendarTrzeb, kasaProtiUzaverkam, mesiceObdobi, minutOtevrenosti, rozsahMesicu, tydnyTrzeb, vyberKalendarTrzeb as vyberKalendar, podilSlev, slevyNadPrah, PRAH_SLEV_PCT, mapaTrzeb, vyberHeat, type BunkaMapy, type MetrikaHeat } from '@/lib/financeWidgety';
 import { useMoney } from '../../CurrencyProvider';
 import { Icon } from '../../Icons';
 import { otevriDen } from '@/lib/denUdalost';
-import { BarSpark, Button, CasovyGraf, Chip, ListRow, ObdobiLista, Segmented, Stat, StatRow } from '../../ui';
+import { BarSpark, Button, CasovyGraf, Chip, ListRow, Modal, ObdobiLista, Segmented, Stat, StatRow } from '../../ui';
+import { fmtDenVTydnu } from '@/lib/i18n/format';
 import { agreguj, hrubostProRozmezi, type HodnotaDne, jeVybranyDen, obdobiZPresetu, pocetDni, platneRozmezi, predchoziRozmezi, souhrn as souhrnObdobi, zmenaPct, type Obdobi, type Slot } from '@/lib/obdobi';
 import { useObdobi } from '@/lib/useObdobi';
 import { useUlozeno } from '@/lib/useUlozeno';
@@ -54,7 +55,7 @@ import { useOpravneni } from '../../role/useOpravneni';
 import { Widget, Zkratitelne, useWidget, type StavNacteni } from '../Widget';
 import { useDataWidgetu, obnovDataWidgetu } from '../useDataWidgetu';
 import { useNavigace, useSmi } from '../NavigaceKontext';
-import { MesicStrankyFinanci, useNaFinancich } from './finance';
+import { MesicStrankyFinanci, useNaFinancich, useSiroka } from './finance';
 import {
   DnyPokladny, HodinyPokladny, ObsluhaPokladny, OsaGrafu, ProdanoPokladny, RadyJakoSeznam,
   kratkeDatum, pismenoDne, popisUctenek, vyberDenniPokladnu, type DenniPokladna,
@@ -408,8 +409,11 @@ function PrehledDnu({ dny, dnes, rekord, onDen }: { dny: DenTrzby[]; dnes: strin
 function obdobiZNastaveni(volba: string, mesicStranky: string | null): Obdobi {
   const dnes = pragueToday();
   if (volba === 'mesic_stranky' && mesicStranky) {
-    const x = obdobiPokladny(`mesic:${mesicStranky}`, dnes);
-    return { preset: 'vlastni', od: x.from, do: x.to, dnyTydne: [], hrubost: 'auto' };
+    // Období stránky Financí může být rozsah měsíců (kolo 8): od prvního dne prvního po poslední den posledního (nejdál dnešek).
+    const r = rozsahMesicu(mesicStranky, dnes);
+    const x = obdobiPokladny(`mesic:${r.od}`, dnes);
+    const y = obdobiPokladny(`mesic:${r.do}`, dnes);
+    return { preset: 'vlastni', od: x.from, do: y.to, dnyTydne: [], hrubost: 'auto' };
   }
   if (volba === '7_dni') return obdobiZPresetu('7_dni', dnes);
   if (volba === 'tento_mesic' || volba === 'mesic_stranky') return obdobiZPresetu('mesic', dnes);
@@ -635,21 +639,34 @@ function Otevrene({ velikost }: WidgetProps) {
 // Špičky během dne
 // ---------------------------------------------------------------------------
 
-interface Obsazeni { hodiny: number[]; rady: { tone: 'good' | 'warn' | 'info'; title: string; text: string }[]; propojeno: boolean }
+interface Obsazeni {
+  hodiny: number[];
+  rady: { tone: 'good' | 'warn' | 'info'; title: string; text: string }[];
+  propojeno: boolean;
+  /** Kč na člověka a hodinu podle hodiny dne (index = hodina); null = v tu hodinu nikdo naplánovaný. */
+  naClovekaHodinu: (number | null)[];
+}
 
 function vyberObsazeni(raw: any, t: PrekladFn): Obsazeni {
   if (!raw || typeof raw !== 'object') throw new Error(t('Rozbor měsíce přišel v nečekaném tvaru.'));
+  const naClovekaHodinu: (number | null)[] = new Array(24).fill(null);
+  for (const x of Array.isArray(raw.staffing) ? raw.staffing : []) {
+    const h = Number(x?.hour);
+    if (Number.isInteger(h) && h >= 0 && h < 24 && x?.perHour != null && Number.isFinite(Number(x.perHour))) naClovekaHodinu[h] = Number(x.perHour);
+  }
   return {
     propojeno: raw.connected === true,
     hodiny: Array.isArray(raw.hours) ? raw.hours.map((v: unknown) => Number(v) || 0) : [],
     rady: Array.isArray(raw.staffingAdvice) ? raw.staffingAdvice
       .filter((r: any) => r && typeof r.title === 'string')
       .map((r: any) => ({ tone: r.tone === 'warn' || r.tone === 'good' ? r.tone : 'info', title: r.title, text: String(r.text ?? '') })) : [],
+    naClovekaHodinu,
   };
 }
 
 function Hodiny({ velikost, nastaveni }: WidgetProps<{ obdobi: string }>) {
   const t = useT('widgety');
+  const money = useMoney();
   const smi = useSmi();
   const { ok, ceka } = useBrana(klice('trzby.hodiny', ['finance.trzby']));
   // Měsíc s obsazením potřebuje rozbor (finance.analyza); bez něj se ukáže 30 dní z pokladny.
@@ -671,10 +688,130 @@ function Hodiny({ velikost, nastaveni }: WidgetProps<{ obdobi: string }>) {
             {t('{obdobi} · nejvíc se protáčí kolem {h}:00', { obdobi: sObsazenim ? t('Tento měsíc') : obdobi.popis, h: spicka })}
           </p>
           <HodinyPokladny hodiny={hodiny} vyska={L ? 96 : 56} />
+          {/* Kolo 8 (R8-4): pod grafem tržba na člověka a hodinu — kde je obsluhy na tržbu nejvíc. Jen hodiny s někým na směně. */}
+          {sObsazenim && mesic.data && mesic.data.naClovekaHodinu.some(v => v != null) && (() => {
+            const nch = mesic.data!.naClovekaHodinu;
+            const hodnoty = nch.filter((v): v is number => v != null);
+            const nejmene = Math.min(...hodnoty);
+            return (
+              <div>
+                <p className="t-label mb-1">{t('Na člověka a hodinu')}</p>
+                <BarSpark height={L ? 56 : 40} highlight={hodnoty.length >= 2 ? nch.indexOf(nejmene) : undefined} label={t('Tržba na člověka a hodinu po hodinách')}
+                  data={nch.map((v, h) => ({ value: v, tip: `${h}:00 — ${v != null ? t('{castka} na člověka', { castka: money(v) }) : t('nikdo na směně')}` }))} />
+                <OsaGrafu popisky={['0:00', '6:00', '12:00', '18:00', '23:00']} />
+                {hodnoty.length >= 2 && <p className="t-meta mt-1">{t('nejslabší hodina {h}:00 · {castka} na člověka', { h: nch.indexOf(nejmene), castka: money(nejmene) })}</p>}
+              </div>
+            );
+          })()}
           {L && sObsazenim && (mesic.data?.rady.length ?? 0) > 0 && <RadyJakoSeznam rady={mesic.data!.rady} />}
         </div>
       )}
     </Widget>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Kdy se prodává: teplotní mapa den v týdnu × hodina (kolo 8, R8-4)
+// ---------------------------------------------------------------------------
+
+const velkePismeno = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
+/** Krátce do buňky: „4,2k", „860", účtenky celé číslo. */
+const kratceBunka = (v: number, metrika: MetrikaHeat) => (metrika === 'ucty' ? String(Math.round(v)) : v >= 10000 ? `${Math.round(v / 1000)}k` : v >= 1000 ? `${(v / 1000).toFixed(1).replace('.', ',')}k` : String(Math.round(v)));
+
+function Heatmapa({ nastaveni }: WidgetProps<Record<string, unknown>>) {
+  const t = useT('widgety');
+  const money = useMoney();
+  const loc = aktualniJazyk();
+  const { ok, ceka } = useBrana(klice('trzby.heatmapa', ['finance.trzby']));
+  const { nahled, instance } = useWidget();
+  const siroka = useSiroka();
+  const dnes = pragueToday();
+  void nastaveni;
+  // Období v kartě (výchozí posledních 30 dní — každý den v týdnu aspoň čtyřikrát), pamatuje se po instanci.
+  const vychozi = useMemo(() => obdobiZPresetu('30_dni', dnes), [dnes]);
+  const { obdobi, nastav } = useObdobi(`heatmapa-${instance}`, vychozi);
+  const r = platneRozmezi(obdobi, dnes);
+  const [metrika, setMetrika] = useUlozeno<MetrikaHeat>('heatmapa-metrika', 'trzba', ['trzba', 'ucty']);
+  const data = useDataWidgetu(ok ? `/api/pos/daily?from=${r.od}&to=${r.do}&lite=1&heat=1` : null, (raw: any) => ({ propojeno: raw?.connected === true && !!raw?.totals, heat: vyberHeat(raw) }));
+  const d = data.data;
+  // Jen vybrané dny v týdnu (z lišty období) — ostatní řádky se nekreslí.
+  const mapa = useMemo(() => (d?.heat ? mapaTrzeb(d.heat, metrika) : null), [d?.heat, metrika]);
+  const radky = useMemo(() => (mapa ? mapa.radky.filter(rd => obdobi.dnyTydne.length === 0 || obdobi.dnyTydne.includes(rd[0]?.den ?? -1)) : []), [mapa, obdobi.dnyTydne]);
+  const [vybrana, setVybrana] = useState<BunkaMapy | null>(null);
+  const denDlouze = (i: number) => fmtDenVTydnu(i, { jazyk: loc, styl: 'dlouhy' });
+  const denKratce = (i: number) => fmtDenVTydnu(i, { jazyk: loc });
+  const hodnota = (v: number) => (metrika === 'trzba' ? money(v) : t('{n, plural, one {# účtenka} few {# účtenky} other {# účtenek}}', { n: Math.round(v) }));
+  const popisBunky = (b: BunkaMapy) => `${denDlouze(b.den)} ${b.hodina}–${b.hodina + 1} h: ${b.prumer != null ? hodnota(b.prumer) : t('bez prodeje')}`;
+  const nic = mapa && mapa.max === 0;
+
+  const bunka = (b: BunkaMapy, sCislem: boolean) => (
+    <button key={`${b.den}-${b.hodina}`} type="button" disabled={b.prumer == null || nahled} onClick={() => setVybrana(b)} aria-label={popisBunky(b)}
+      style={{ background: b.intenzita > 0 ? `color-mix(in srgb, var(--ink) ${Math.round(8 + b.intenzita * 72)}%, transparent)` : undefined }}
+      className={`flex items-center justify-center rounded-md text-[11px] leading-none tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542] ${sCislem ? 'min-h-[2rem]' : 'min-h-[1.5rem]'} ${b.intenzita > 0 ? (b.intenzita > 0.55 ? 'text-white' : 'text-[#16181A]') : 'bg-black/[0.04] text-black/35'} disabled:cursor-default`}>
+      {sCislem && b.prumer != null && b.prumer > 0 ? kratceBunka(b.prumer, metrika) : ''}
+    </button>
+  );
+
+  return (
+    <>
+      <Widget bezZkraceni nacteni={ceka ? CEKA : data} kostra="graf"
+        prazdno={d && !d.propojeno ? <NepropojenaPokladna /> : d && d.propojeno && !d.heat ? <p className="t-meta">{t('Pokladna zatím neposílá rozpis po hodinách.')}</p> : nic ? <p className="t-meta">{t('Za tohle období pokladna nic nenamarkovala.')}</p> : undefined}>
+        {mapa && !nic && (
+          <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 min-w-0">
+              {!nahled && <ObdobiLista value={obdobi} onChange={nastav} hrubost={false} />}
+              <Segmented size="sm" ariaLabel={t('Co ukázat')} value={metrika} onChange={setMetrika}
+                options={[{ id: 'trzba', label: t('Tržba') }, { id: 'ucty', label: t('Účtenky') }]} />
+            </div>
+            {mapa.spicka && (
+              <p className="t-meta cz-sentence">{t('nejsilnější {den} {od}–{do} h · průměr {hodnota}', { den: denDlouze(mapa.spicka.den), od: mapa.spicka.hodina, do: mapa.spicka.hodina + 1, hodnota: hodnota(mapa.spicka.prumer ?? 0) })}</p>
+            )}
+            {siroka ? (
+              // Monitor: řádky = dny, sloupce = hodiny, číslo v buňce.
+              <div role="group" aria-label={t('Teplotní mapa tržeb po dnech v týdnu a hodinách')} className="min-w-0">
+                <div className="grid gap-1" style={{ gridTemplateColumns: `3.25rem repeat(${mapa.hodiny.length}, minmax(0, 1fr))` }}>
+                  <span aria-hidden />
+                  {mapa.hodiny.map(h => <span key={h} aria-hidden className="text-center text-[11px] text-black/45 tabular-nums">{h}</span>)}
+                  {radky.map(rd => (
+                    <React.Fragment key={rd[0]?.den}>
+                      <span className="self-center text-[12px] font-medium text-black/70 cz-sentence">{denKratce(rd[0]?.den ?? 0)}</span>
+                      {rd.map(b => bunka(b, true))}
+                    </React.Fragment>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              // Telefon: otočeno — hodiny v řádcích, dny ve sloupcích; vejde se bez vodorovného posunu.
+              <div role="group" aria-label={t('Teplotní mapa tržeb po dnech v týdnu a hodinách')} className="min-w-0">
+                <div className="grid gap-1" style={{ gridTemplateColumns: `2.25rem repeat(${radky.length}, minmax(0, 1fr))` }}>
+                  <span aria-hidden />
+                  {radky.map(rd => <span key={rd[0]?.den} aria-hidden className="text-center text-[11px] font-medium text-black/60 cz-sentence truncate">{denKratce(rd[0]?.den ?? 0)}</span>)}
+                  {mapa.hodiny.map((h, i) => (
+                    <React.Fragment key={h}>
+                      <span className="self-center text-[11px] text-black/45 tabular-nums">{h}:00</span>
+                      {radky.map(rd => bunka(rd[i], false))}
+                    </React.Fragment>
+                  ))}
+                </div>
+              </div>
+            )}
+            <p className="t-meta">{t('Průměr na den s prodejem. Tmavší = silnější hodina; klepnutím otevřeš podrobnosti.')}</p>
+          </div>
+        )}
+      </Widget>
+      {/* Titulek jako řetězec (ne uzel): jen tak dostane okno přístupné jméno „Pátek 17–18 h". */}
+      <Modal open={!!vybrana} onClose={() => setVybrana(null)} size="sm"
+        title={vybrana ? `${velkePismeno(denDlouze(vybrana.den))} ${vybrana.hodina}–${vybrana.hodina + 1} h` : ''}
+        subtitle={vybrana ? t('průměr z {n, plural, one {# dne} few {# dnů} other {# dnů}} s prodejem', { n: vybrana.dni }) : undefined}>
+        {vybrana && (
+          <StatRow>
+            <Stat label={t('Průměrná tržba')} value={money(vybrana.dni > 0 ? Math.round(vybrana.trzba / vybrana.dni) : 0)} note={t('celkem {castka}', { castka: money(vybrana.trzba) })} />
+            <Stat label={t('Účtenky')} value={(vybrana.dni > 0 ? Math.round((vybrana.ucty / vybrana.dni) * 10) / 10 : 0).toLocaleString(loc)} note={t('{n, plural, one {# účtenka} few {# účtenky} other {# účtenek}} celkem', { n: vybrana.ucty })} />
+            <Stat label={t('Na směně')} value={vybrana.lidi != null ? vybrana.lidi.toLocaleString(loc) : '—'} note={vybrana.lidi != null ? t('{n, plural, one {člověk} few {lidé} other {lidí}} v průměru', { n: Math.round(vybrana.lidi) }) : t('bez rozvrhu')} />
+          </StatRow>
+        )}
+      </Modal>
+    </>
   );
 }
 
@@ -967,6 +1104,7 @@ export const KOMPONENTY: Record<string, KomponentaWidgetu> = {
   'trzby.otevrene': Otevrene,
   'trzby.po_dnech': PoDnech,
   'trzby.hodiny': Hodiny,
+  'trzby.heatmapa': Heatmapa,
   'trzby.top_produkty': TopProdukty,
   'trzby.po_obsluze': PoObsluze,
   'trzby.platby': Platby,

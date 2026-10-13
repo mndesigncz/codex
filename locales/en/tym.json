@@ -163,5 +163,19 @@
   "Časové pásmo": "Time zone",
   "Čeká": "Pending",
   "Člena se nepodařilo odebrat.": "The member could not be removed.",
-  "Člověk se připojí kódem na stránce /join, nebo odkazem z pozvánky. Nový kód zneplatní ten starý.": "People join with the code on the /join page, or with the link from the invitation. A new code invalidates the old one."
+  "Člověk se připojí kódem na stránce /join, nebo odkazem z pozvánky. Nový kód zneplatní ten starý.": "People join with the code on the /join page, or with the link from the invitation. A new code invalidates the old one.",
+  "Celkem {hodiny}": "Total {hodiny}",
+  "Dovolená na rok (dní)": "Leave per year (days)",
+  "Hodiny se nenačetly": "Hours didn't load",
+  "Hodiny|widgety": "Hours",
+  "Jméno": "Name",
+  "Letos čerpáno {cerpano}, zbývá {zbyva}. Odečítá se jen schválená dovolená, nemoc a jiné volno ne.": "Used this year: {cerpano}, remaining {zbyva}. Only approved leave counts; sick days and other time off don't.",
+  "Profil: {jmeno}": "Profile: {jmeno}",
+  "Prázdné = nárok se nesleduje. Odečítá se jen schválená dovolená, nemoc a jiné volno ne.": "Empty = entitlement isn't tracked. Only approved leave counts; sick days and other time off don't.",
+  "Rozpad v Docházce": "Breakdown in Attendance",
+  "Výdělek": "Earnings",
+  "bez sazby: {n, plural, one {# člověk} few {# lidé} other {# lidí}}": "no rate: {n, plural, one {# person} other {# people}}",
+  "dovolená {zbyva}/{dni}": "leave {zbyva}/{dni}",
+  "právě běží": "running now",
+  "Řadit lidi": "Sort people"
 }

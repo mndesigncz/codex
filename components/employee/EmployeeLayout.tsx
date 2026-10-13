@@ -3,7 +3,7 @@
 import { akceProHledani } from '@/components/widgety/akceHledani';
 import { predejUkolum } from '@/lib/ukolyFiltr';
 import { GlobalniHledani, useZkratkaHledani } from '../GlobalniHledani';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { predejPohledu } from '@/lib/predaniPohledu';
 import { odhlasit } from '@/lib/odhlaseni';
 import PodnikSwitcher from '../PodnikSwitcher';
@@ -17,7 +17,7 @@ import { useConversations } from '../chat/useChat';
 import EmployeeDashboard from './EmployeeDashboard';
 import MobileMoreSheet from '../MobileMoreSheet';
 import { VYCHOZI_NAV } from '@/lib/navigace';
-import { useNavigaceAplikace } from '../useNavigaceAplikace';
+import { useHistoriePohledu, useNavigaceAplikace } from '../useNavigaceAplikace';
 import { useJazyk, useT } from '@/lib/i18n/client';
 import { JAZYK_NAZEV } from '@/lib/i18n/config';
 import JazykOkno from '../JazykOkno';
@@ -84,16 +84,16 @@ export default function EmployeeLayout({ user }: Props) {
   // Navigace podle oprávnění (první) a nastavení podniku (skrýt, přejmenovat, pořadí).
   const nav = useNavigaceAplikace('zamestnanec', smiPohled, [opravneni, nacteno]);
   const [jazykOpen, setJazykOpen] = useState(false);
-  // Deep links from notifications: /employee/shifts?view=X
-  useEffect(() => {
-    const p = new URLSearchParams(window.location.search);
-    const v = p.get('view');
-    if (v && (byId[v] || v === 'settings')) setCurrentView(v);
-    // Odkaz na konkrétní záložku Nastavení: `?view=settings&tab=jazyk` (neznámá záložka se zahodí).
-    if (v === 'settings') setSettingsTab(zalozkaNastaveni(p.get('tab')));
-    const g = Number(p.get('guide'));
-    if (v === 'guides' && Number.isFinite(g) && g > 0) setGuideId(g);
-  }, []);
+  // Adresa a historie obrazovek (kolo 8): odkaz z oznámení `/employee/shifts?view=X`
+  // (i `&tab=jazyk`, `&guide=12` — čte se jako `arg`) otevře rovnou tu obrazovku, každý
+  // přechod se zapíše do historie a Zpět na telefonu vrátí předchozí obrazovku místo
+  // zavření aplikace. Okna si své záznamy řeší lib/useModal.
+  const zname = (v: string) => byId[v] != null || v === 'settings';
+  const historie = useHistoriePohledu({
+    vychozi: 'home', zname,
+    naStart: (v, a) => naviguj(v, a, false),
+    naZpet: (v, a) => naviguj(v, a, false),
+  });
   // A quick-access tile can ask for a specific stock category.
   const [inventoryCat, setInventoryCat] = useState<string | undefined>();
   // Zvedne se při každém příchodu do Skladu z widgetu: stejný argument podruhé (filtr mezitím zrušený) se použije znovu.
@@ -112,7 +112,9 @@ export default function EmployeeLayout({ user }: Props) {
   // Záložka Nastavení z odkazu nebo z widgetu; nonce říká otevřenému Nastavení, že si ji někdo vyžádal znovu.
   const [settingsTab, setSettingsTab] = useState<ReturnType<typeof zalozkaNastaveni>>();
   const [settingsNonce, setSettingsNonce] = useState(0);
-  const navigate = (view: string, arg?: string) => {
+  const navigate = (view: string, arg?: string) => naviguj(view, arg);
+  /** Přepne pohled; `zapsat` = zapsat i do historie (při Zpět a při načtení z adresy ne — záznam už tam je). */
+  const naviguj = (view: string, arg?: string, zapsat = true) => {
     if (view === 'tasks') predejUkolum(arg);
     setSettingsTab(view === 'settings' ? zalozkaNastaveni(arg) : undefined);
     if (view === 'settings') setSettingsNonce(n => n + 1);
@@ -129,6 +131,7 @@ export default function EmployeeLayout({ user }: Props) {
     // Postupy připojí. Úkoly `arg` zatím nevyužijí (seznam je krátký).
     if (view === 'procedures' && arg && /^\d+$/.test(arg)) otevriPostupPoPrechodu(Number(arg));
     setCurrentView(view);
+    if (zapsat) historie.zapis(view, arg);
   };
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const { otevreno: hledaniOtevreno, setOtevreno: setHledani } = useZkratkaHledani();
@@ -140,10 +143,10 @@ export default function EmployeeLayout({ user }: Props) {
   const [moreOpen, setMoreOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const ucet = usePopover(accountOpen, setAccountOpen, { focusFirst: true, arrowKeys: true });
-  const openSettings = () => { setSettingsTab(undefined); setCurrentView('settings'); setAccountOpen(false); setMoreOpen(false); };
+  const openSettings = () => { navigate('settings'); setAccountOpen(false); setMoreOpen(false); };
 
   const renderView = () => {
-    if (!smiPohled(currentView)) return <BezOpravneni onZpet={() => setCurrentView('home')} />;
+    if (!smiPohled(currentView)) return <BezOpravneni onZpet={() => navigate('home')} />;
     switch (currentView) {
       case 'home':         return <EmployeeDashboard user={user} />;
       // Výměny a kalendář vlastních směn jsou od kola 69 widgety plochy Mých směn.
@@ -218,7 +221,7 @@ export default function EmployeeLayout({ user }: Props) {
                 )}
                 <div className="space-y-0.5">
                   {items.map(item => (
-                    <button key={item.id} onClick={() => setCurrentView(item.id)} title={item.label}
+                    <button key={item.id} onClick={() => navigate(item.id)} title={item.label}
                       className={`w-full flex items-center gap-3 py-2.5 rounded-2xl text-sm font-medium transition duration-200 ${sidebarOpen ? 'px-3.5' : 'px-0 justify-center'} ${
                         currentView === item.id ? 'seg-on' : 'seg-off'
                       }`}>
@@ -325,7 +328,7 @@ export default function EmployeeLayout({ user }: Props) {
           ...(n.id === 'chat' && currentView !== 'chat' ? { badge: unreadChat, badgeLabel: t('{n, plural, one {# nepřečtená zpráva} few {# nepřečtené zprávy} other {# nepřečtených zpráv}}', { n: unreadChat }) } : {}),
         }))}
         activeId={currentView}
-        onSelect={id => { setCurrentView(id); setMoreOpen(false); }}
+        onSelect={id => { navigate(id); setMoreOpen(false); }}
         more={{ onClick: () => setMoreOpen(v => !v), active: moreOpen || currentView === 'settings' || mobileSecondary.some(n => n.id === currentView) }} />
 
       <MobileMoreSheet
@@ -333,7 +336,7 @@ export default function EmployeeLayout({ user }: Props) {
         onClose={() => setMoreOpen(false)}
         groups={mobileGroups}
         activeId={currentView}
-        onSelect={setCurrentView}
+        onSelect={navigate}
         actions={[
           { label: t('Hledat'), icon: 'search', onClick: () => { setMoreOpen(false); setHledani(true); } },
           { label: t('Nastavení'), icon: 'settings', onClick: openSettings },
@@ -342,7 +345,8 @@ export default function EmployeeLayout({ user }: Props) {
         ]}
       />
       <GlobalniHledani open={hledaniOtevreno} onClose={() => setHledani(false)} stranky={nav.vse} akce={akceProHledani('zamestnanec', smiPohled)} onStranka={navigate}
-        hledatUkoly={smiPohled('tasks')} hledatSklad={smiPohled('inventory')} hledatNavody={smiPohled('guides')} hledatPostupy={smiPohled('procedures')} />
+        hledatUkoly={smiPohled('tasks')} hledatSklad={smiPohled('inventory')} hledatNavody={smiPohled('guides')} hledatPostupy={smiPohled('procedures')}
+        hledatReceptury={smiPohled('recipes')} />
       <JazykOkno open={jazykOpen} onClose={() => setJazykOpen(false)} />
     </div>
     </NavigaceKontext.Provider>

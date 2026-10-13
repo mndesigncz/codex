@@ -2,7 +2,8 @@
 // rozložení se ladí v Nastavení → Stránky.
 //
 // Výchozí pro vedení je z katalogu, jen přibyl ukoly.dnes S, aby v kole 68 zůstala řada čísel
-// (spec §6.1). Plánované widgety se vynechají, dokud je balík nedodá. Výchozí pro Provozní,
+// (spec §6.1). Kolo 8 (R8-4): za Tržby vs. mzdy přibyly Mzdy dnes S (šestá malá karta — řada
+// čísel zůstává sudá na telefonu i na monitoru). Plánované widgety se vynechají, dokud je balík nedodá. Výchozí pro Provozní,
 // Skladníka a Účetní platí jen s aspoň třemi viditelnými widgety a zároveň s aspoň polovinou
 // svých položek viditelných (spec §1.3, pravidlo tří; rozlozeni.ts vychoziZKodu).
 import type { DefiniceStranky } from '../typy.ts';
@@ -26,6 +27,7 @@ export const STRANKA: DefiniceStranky = {
     'trzby.platby',
     'finance.souhrn_mesice',
     'finance.trzby_vs_mzdy',
+    'finance.mzdy_dnes',
     'finance.marze',
     'uzaverky.chybejici',
     'uzaverky.ke_schvaleni',
@@ -66,6 +68,7 @@ export const STRANKA: DefiniceStranky = {
       { w: 'sklad.dochazi', s: 'S' },
       { w: 'ukoly.dnes', s: 'S' },
       { w: 'finance.trzby_vs_mzdy', s: 'S' },
+      { w: 'finance.mzdy_dnes', s: 'S' },
       { w: 'rozvrh.dnesni_smeny', s: 'M' },
       { w: 'hodnoceni.ohodnotit_smeny', s: 'M' },
       { w: 'akce.nejblizsi', s: 'M' },

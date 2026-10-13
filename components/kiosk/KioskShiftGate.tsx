@@ -1,5 +1,16 @@
 'use client';
 
+// Kolo 8 (R8-2, tablet):
+//  - pauza přes výběr člověka a PIN jako příchod a odchod (POST /api/attendance, action 'break_start' /
+//    'break_end'; /api/attendance/pauza je jen pro vlastní Píchačky a tablet odmítá). V okně člověka na směně
+//    jsou tři velká tlačítka Pauza / Odpíchnout odchod / Zpět (≥ 48 px), na pauze Konec pauzy / Odchod / Zpět;
+//    dlaždice i řádek nesou „pauza 8 min";
+//  - tablet píchá i bez internetu: pás nahoře „Bez internetu — píchnutí se uloží a odešlou samy", PIN se ověří
+//    proti otisku z posledního připojení (bcrypt hash, jen účet tabletu ho z API dostane), píchnutí jde do fronty
+//    v localStorage s časem tabletu a klíčem a po připojení dávkou na POST /api/attendance/sync. Rozpis na
+//    obrazovce se podle fronty hned přepíše (lib/kioskOffline.rosterSFrontou), poslední rozpis se pamatuje,
+//    ať zamčený tablet bez sítě nabídne lidi k příchodu.
+
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../Icons';
 import { Avatar, Button, Card, Chip, EmptyState, ErrorState, ListRow, MenuPanel, Modal, SearchField, Stat, StatRow, Toast } from '../ui';
@@ -13,6 +24,9 @@ import {
   PRAH_HLEDANI_ROSTERU, rozdelRoster, hledejVRosteru, zpozdeniPrichodu, minutPoPlanu, souhrnOdchodu, SOUHRN_ZAVRIT_S, type SouhrnOdchodu,
 } from '@/lib/kioskPrehled';
 import { nextActiveId, IDLE_MS, ACTING_MAX_AGE_S, ACTING_OBNOVA_MS, obnovitCookie } from '@/lib/kioskIdentity';
+import bcrypt from 'bcryptjs';
+import { novyKlic } from '@/lib/idempotenceKlic';
+import { duvodProcNeOffline, poSynchronizaci, pridejDoFronty, rosterSFrontou, zastaraleVeFronte, type AkceFronty, type PolozkaFronty } from '@/lib/kioskOffline';
 
 export interface RosterMember {
   id: number;
@@ -20,9 +34,14 @@ export interface RosterMember {
   avatar?: string | null;
   hasPin: boolean;
   openSince: string | null;
+  /** Od kdy běží pauza (záznam po pauze ještě bez konce); na pauze je openSince null. */
+  breakSince?: string | null;
   shiftStart?: string | null;
   shiftEnd?: string | null;
 }
+
+/** Co se na tabletu píchá: příchod, odchod, začátek a konec pauzy. */
+export type AkceTabletu = 'in' | 'out' | 'break_start' | 'break_end';
 
 export interface ActivePerson {
   id: number;
@@ -32,6 +51,19 @@ export interface ActivePerson {
 
 const LS_ACTIVE = 'managero-kiosk-active';
 const LS_ACTIVE_OLD = 'pangea-kiosk-active';
+/** Fronta píchnutí bez internetu, otisky PINů z posledního připojení a poslední rozpis (kolo 8). */
+const LS_FRONTA = 'managero-kiosk-fronta';
+const LS_OTISKY = 'managero-kiosk-otisky';
+const LS_ROZPIS = 'managero-kiosk-rozpis';
+const JSON_HLAVICKA = { 'Content-Type': 'application/json' };
+
+const nactiJson = <T,>(klic: string, vychozi: T): T => {
+  try { const raw = localStorage.getItem(klic); return raw ? (JSON.parse(raw) as T) : vychozi; } catch { return vychozi; }
+};
+const ulozJson = (klic: string, v: unknown) => { try { localStorage.setItem(klic, JSON.stringify(v)); } catch { /* soukromé okno */ } };
+
+/** Chyba sítě (fetch spadl dřív, než server odpověděl) — ne odmítnutí serverem. */
+const jeVypadekSite = (e: unknown) => e instanceof TypeError || (typeof navigator !== 'undefined' && !navigator.onLine);
 // The active person is mirrored into a cookie so server routes can attribute
 // work to them even for shared components that post their own request bodies
 // (the procedure runner, for example). Server side it is only ever honoured for
@@ -85,6 +117,12 @@ export function elapsed(fromIso: string, now: number) {
 
 const timeOf = (iso: string) => dbTimeHM(iso);
 
+/** Kolik minut běží pauza (0, dokud prohlížeč nezná „teď"). */
+function minutPauzy(breakSince: string | null | undefined, now: number): number {
+  const od = parseDbTime(breakSince ?? null)?.getTime();
+  return now && od != null ? Math.max(0, Math.floor((now - od) / 60000)) : 0;
+}
+
 interface KioskShiftValue {
   roster: RosterMember[];
   onShift: RosterMember[];
@@ -108,6 +146,16 @@ interface KioskShiftValue {
   /** Souhrn směny toho, kdo právě odpíchl odchod (okno „díky za směnu"); null = nic. */
   souhrn: { jmeno: string; data: SouhrnOdchodu } | null;
   zavriSouhrn: () => void;
+  /** Tablet je bez internetu (prohlížeč to hlásí, nebo poslední načtení rozpisu spadlo na síti). */
+  offline: boolean;
+  /** Píchnutí, která čekají na odeslání. */
+  fronta: PolozkaFronty[];
+  /** Je k člověku otisk PINu pro ověření bez internetu? */
+  maOtisk: (id: number) => boolean;
+  /** Ověří PIN proti otisku (bez internetu). */
+  overPinOffline: (id: number, pin: string) => Promise<boolean>;
+  /** Zařadí píchnutí do fronty (bez internetu) a hned přepíše rozpis na obrazovce. */
+  zaradDoFronty: (member: RosterMember, action: AkceFronty, pinOvereno: boolean) => void;
 }
 
 /** Co PunchDialog předá po úspěšném zápisu — odpověď POST /api/attendance. */
@@ -126,9 +174,16 @@ export function useKioskShift(): KioskShiftValue {
 
 export function KioskShiftProvider({ children }: { children: React.ReactNode }) {
   const t = useT('kiosk');
-  const [roster, setRoster] = useState<RosterMember[]>([]);
+  const [rosterZeServeru, setRosterZeServeru] = useState<RosterMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [hydrated, setHydrated] = useState(false);
+  // Bez internetu (kolo 8): fronta píchnutí, otisky PINů a stav sítě.
+  const [fronta, setFronta] = useState<PolozkaFronty[]>([]);
+  const frontaRef = useRef<PolozkaFronty[]>([]);
+  const otisky = useRef<Record<string, string>>({});
+  const [online, setOnline] = useState(true);
+  const [sitSpadla, setSitSpadla] = useState(false);
+  const odesilam = useRef(false);
   const [activeId, setActiveId] = useState<number | null>(null);
   const [punching, setPunching] = useState<RosterMember | null>(null);
   // Souhrn po odchodu (kolo 7): místo toastu „nezapomeň na uzávěrku" okno s příchodem,
@@ -160,9 +215,22 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
       const res = await fetch('/api/attendance');
       if (!res.ok) throw new Error(String(res.status));
       const d = await res.json();
-      if (Array.isArray(d.roster)) setRoster(d.roster);
+      if (Array.isArray(d.roster)) {
+        // Otisky PINů (jen účet tabletu je dostane) zůstanou v úložišti pro píchání bez internetu;
+        // do stavu ani na obrazovku nejdou. Rozpis se pamatuje pro zamčený tablet bez sítě.
+        const nove: Record<string, string> = {};
+        const cisty: RosterMember[] = (d.roster as (RosterMember & { offlinePin?: string | null })[]).map(({ offlinePin, ...m }) => {
+          if (offlinePin) nove[String(m.id)] = String(offlinePin);
+          return m;
+        });
+        otisky.current = nove;
+        ulozJson(LS_OTISKY, nove);
+        ulozJson(LS_ROZPIS, cisty);
+        setRosterZeServeru(cisty);
+      }
       setLoadFailed(false);
-    } catch {
+      setSitSpadla(false);
+    } catch (e) {
       // Při výpadku necháme na obrazovce poslední známý rozpis — na tabletu
       // za barem je lepší mít staré jméno než prázdno. Jenomže když selže
       // hned to první načtení, žádné staré jméno není a obrazovka pak psala
@@ -170,16 +238,37 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
       // v aplikaci je, jen k němu tablet nedosáhl, a obsluha místo
       // zkontrolování wifi volala šéfovi.
       setLoadFailed(true);
+      if (jeVypadekSite(e)) {
+        setSitSpadla(true);
+        // Bez sítě a bez rozpisu (tablet se právě zapnul): poslední známý rozpis z úložiště.
+        setRosterZeServeru(r => (r.length ? r : nactiJson<RosterMember[]>(LS_ROZPIS, [])));
+      }
     }
     setLoading(false);
   }, []);
+
+  // Fronta a otisky z úložiště (po obnovení stránky), stav sítě z prohlížeče.
+  useEffect(() => {
+    otisky.current = nactiJson<Record<string, string>>(LS_OTISKY, {});
+    const f = nactiJson<PolozkaFronty[]>(LS_FRONTA, []);
+    frontaRef.current = f; setFronta(f);
+    setOnline(typeof navigator === 'undefined' ? true : navigator.onLine);
+    const on = () => setOnline(true), off = () => setOnline(false);
+    window.addEventListener('online', on); window.addEventListener('offline', off);
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, []);
+  const ulozFrontu = useCallback((f: PolozkaFronty[]) => { frontaRef.current = f; setFronta(f); ulozJson(LS_FRONTA, f); }, []);
+  const offline = !online || sitSpadla;
 
   useEffect(() => { reload(); }, [reload]);
   // Keep in sync with the employer app and any second tablet.
   useEffect(() => { const t = setInterval(reload, 20000); return () => clearInterval(t); }, [reload]);
 
-  const onShift = useMemo(() => roster.filter(m => m.openSince), [roster]);
-  const offShift = useMemo(() => roster.filter(m => !m.openSince), [roster]);
+  // Rozpis na obrazovce = rozpis ze serveru přepsaný frontou: kdo si bez internetu píchl příchod, je na směně hned.
+  const roster = useMemo(() => rosterSFrontou(rosterZeServeru, fronta), [rosterZeServeru, fronta]);
+  // Na pauze je člověk pořád na směně (tablet zůstává odemčený, práce se mu připisuje).
+  const onShift = useMemo(() => roster.filter(m => m.openSince || m.breakSince), [roster]);
+  const offShift = useMemo(() => roster.filter(m => !m.openSince && !m.breakSince), [roster]);
 
   // Restore the last active person after a tablet refresh.
   useEffect(() => {
@@ -277,6 +366,42 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
 
   useEffect(() => { activeRef.current = active; }, [active]);
 
+  // ---- Bez internetu: fronta a její odeslání ----
+  const maOtisk = useCallback((id: number) => !!otisky.current[String(id)], []);
+  const overPinOffline = useCallback(async (id: number, pin: string) => {
+    const otisk = otisky.current[String(id)];
+    if (!otisk) return false;
+    // bcryptjs je v balíku tabletu napevno: dynamický import by bez internetu neměl odkud stáhnout kus kódu.
+    return bcrypt.compare(pin, otisk);
+  }, []);
+  const zaradDoFronty = useCallback((member: RosterMember, action: AkceFronty, pinOvereno: boolean) => {
+    ulozFrontu(pridejDoFronty(frontaRef.current, { klic: novyKlic(), employeeId: member.id, jmeno: member.name, action, cas: new Date().toISOString(), pinOvereno }));
+  }, [ulozFrontu]);
+  const odesliFrontu = useCallback(async () => {
+    const f = frontaRef.current;
+    if (!f.length || odesilam.current) return;
+    odesilam.current = true;
+    try {
+      const { platne, zastarale } = zastaraleVeFronte(f, Date.now());
+      if (zastarale.length) {
+        ulozFrontu(platne);
+        showFlash(t('{n, plural, one {# píchnutí je starší než den} few {# píchnutí jsou starší než den} other {# píchnutí je starších než den}} — doplň je ručně v Docházce: {kdo}', { n: zastarale.length, kdo: [...new Set(zastarale.map(z => z.jmeno))].join(', ') }), 'bad');
+      }
+      if (!platne.length) return;
+      const res = await fetch('/api/attendance/sync', { method: 'POST', headers: JSON_HLAVICKA, body: JSON.stringify({ pichnuti: platne }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) { showFlash(d?.error || t('Frontu píchnutí se nepodařilo odeslat.'), 'bad'); return; }
+      const { zbyva, doruceno, odmitnuto } = poSynchronizaci(platne, Array.isArray(d?.vysledky) ? d.vysledky : []);
+      ulozFrontu(zbyva);
+      if (odmitnuto.length) showFlash(t('Server odmítl {n} píchnutí: {co}', { n: odmitnuto.length, co: odmitnuto.map(o => `${o.jmeno} — ${o.error}`).join('; ') }), 'bad');
+      else if (doruceno) showFlash(t('{n, plural, one {# píchnutí odesláno} few {# píchnutí odeslána} other {# píchnutí odesláno}} po výpadku.', { n: doruceno }), 'ok');
+      await reload();
+    } catch { /* síť pořád není — zkusí se při dalším připojení */ }
+    finally { odesilam.current = false; }
+  }, [ulozFrontu, showFlash, reload, t]);
+  // Jakmile je síť (událost prohlížeče, nebo rozpis zase prošel), fronta se odešle.
+  useEffect(() => { if (online && !sitSpadla && fronta.length) void odesliFrontu(); }, [online, sitSpadla, fronta.length, odesliFrontu]);
+
   const value: KioskShiftValue = {
     roster, onShift, offShift, loading, loadFailed, activeId, active,
     requireActive,
@@ -285,6 +410,7 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
     reload,
     souhrn,
     zavriSouhrn: () => setSouhrn(null),
+    offline, fronta, maOtisk, overPinOffline, zaradDoFronty,
   };
 
   const answer = (who: ActivePerson | null) => {
@@ -295,6 +421,22 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
 
   return (
     <Ctx.Provider value={value}>
+      {/* Pás nahoře při výpadku (role=status, ať ho odečítač ohlásí): co se stane s píchnutím a kolik jich čeká. */}
+      {offline && (
+        <p role="status" data-offline-pas className="note note-wait flex items-center gap-2 mb-3">
+          <Icon name="warning" size={16} className="shrink-0" />
+          <span className="text-pretty">
+            {t('Bez internetu — píchnutí se uloží a odešlou samy.')}
+            {fronta.length > 0 && <> {t('({n, plural, one {# čeká} few {# čekají} other {# čeká}})', { n: fronta.length })}</>}
+          </span>
+        </p>
+      )}
+      {!offline && fronta.length > 0 && (
+        <p role="status" data-offline-pas className="note note-info flex items-center gap-2 mb-3">
+          <Icon name="refresh" size={16} className="shrink-0" />
+          <span>{t('Odesílají se píchnutí z výpadku ({n})…', { n: fronta.length })}</span>
+        </p>
+      )}
       {children}
       {/* Tablet se ptá místo aby hádal. Zavřít jde — ale pak se nic nezapíše,
           protože zápis pod cizí jméno je horší než žádný zápis. */}
@@ -317,7 +459,7 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
           member={punching}
           now={now}
           onClose={() => setPunching(null)}
-          onDone={(action, member, vysledek) => {
+          onDone={(action, member, vysledek, msg) => {
             setPunching(null);
             // Kdo právě přišel, ten teď u tabletu stojí. Jenže tohle je
             // přepnutí cizí identity — když předtím byl vybraný někdo jiný,
@@ -326,7 +468,7 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
               ? (onShift.find(m => m.id === activeId)?.name ?? null)
               : null;
             if (action === 'in') { setActiveId(member.id); touchedAt.current = Date.now(); }
-            reload();
+            if (!offline) reload();
             if (action === 'out') {
               // Shift summary jako Homebase / Square: „8:02–15:34 · 7 h 32 min" a cesta k uzávěrce.
               // Bez čitelné odpovědi (starší server) aspoň dřívější varování o uzávěrce.
@@ -334,6 +476,7 @@ export function KioskShiftProvider({ children }: { children: React.ReactNode }) 
               if (data) setSouhrn({ jmeno: member.name, data });
               else if (vysledek?.closingDone === false) showFlash(t('{jmeno}: odchod zaznamenán — nezapomeň vyplnit uzávěrku směny!', { jmeno: member.name }), 'bad');
             }
+            if (msg) showFlash(msg, 'bad');
             if (switchedFrom) showFlash(t('Zapisuje se teď jako {jmeno}, ne {predtim}. Přepni nahoře u jména, jestli to není tak.', { jmeno: member.name, predtim: switchedFrom }), 'bad');
           }}
         />
@@ -432,6 +575,7 @@ export function PersonPicker({ members, onPick, emptyText }: {
   emptyText: string;
 }) {
   const t = useT('kiosk');
+  const now = useNow(60000);
   const [dotaz, setDotaz] = useState('');
   const hledani = members.length >= PRAH_HLEDANI_ROSTERU;
   const nalezeni = useMemo(() => (hledani ? hledejVRosteru(members, dotaz) : members), [members, dotaz, hledani]);
@@ -446,18 +590,21 @@ export function PersonPicker({ members, onPick, emptyText }: {
       {lide.map(m => (
         // Jamka, ne karta: výběr leží v kartě zamykací obrazovky nebo „Kdo teď
         // pracuje" a karta v kartě se nedělá (DP §3.9). Velká plocha zůstává —
-        // u baru se ťuká na délku paže.
+        // u baru se ťuká na délku paže. Na pauze dlaždice zešedne.
         <button
           type="button"
           key={m.id}
           onClick={() => onPick(m)}
-          className="well p-5 text-left min-h-[112px] hover:bg-black/[0.05] active:scale-[0.98] transition"
+          data-na-pauze={m.breakSince && !m.openSince ? '' : undefined}
+          className={`well p-5 text-left min-h-[112px] hover:bg-black/[0.05] active:scale-[0.98] transition ${m.breakSince && !m.openSince ? 'opacity-70' : ''}`}
         >
           <Avatar emoji={m.avatar} size="xl" ring={false} />
           {/* Dvě řádky místo „Karolína Šť…": na telefonu jsou dlaždice dvě vedle sebe. */}
           <span className="block t-card mt-3 line-clamp-2 break-words">{m.name}</span>
           {m.openSince ? (
             <span className="block text-sm font-semibold text-ok-ink mt-0.5">{t('Na směně')}</span>
+          ) : m.breakSince ? (
+            <span className="block text-sm font-semibold text-black/55 mt-0.5 tabular-nums">{t('pauza {n} min', { n: minutPauzy(m.breakSince, now) })}</span>
           ) : m.shiftStart ? (
             <span className="block t-meta tabular-nums mt-0.5">{t('Dnes {od}–{do}', { od: fmtHM(m.shiftStart), do: fmtHM(m.shiftEnd) })}</span>
           ) : (
@@ -528,9 +675,10 @@ export function WhoIsWorking() {
           const isActive = m.id === activeId;
           // Plán proti skutečnosti: od kolika · jak dlouho · plán do. Po plánu
           // chip „wait", bez rozpisu chip „info" — vedle stavu „Zapisuje se".
-          const od = parseDbTime(m.openSince)?.getTime();
+          const naPauze = !m.openSince && !!m.breakSince;
+          const od = parseDbTime(m.openSince ?? m.breakSince)?.getTime();
           const doba = now && od != null ? hodinyMinuty(now - od) : '—';
-          const poPlanu = minutPoPlanu(dnes, m.shiftStart, m.shiftEnd, now);
+          const poPlanu = naPauze ? null : minutPoPlanu(dnes, m.shiftStart, m.shiftEnd, now);
           return (
             // akceVRadku: na telefonu zůstane ikona odchodu v prvním řádku u jména
             // a chipy s „Přepnout" jdou pod něj — jinak by odchod skončil sám na třetím řádku.
@@ -540,20 +688,29 @@ export function WhoIsWorking() {
               lead={<Avatar emoji={m.avatar} size="md" ring={false} />}
               title={m.name}
               meta={<span className="tabular-nums">
-                {t('od {cas}', { cas: dbTimeHM(m.openSince) })} · {doba}
+                {naPauze ? t('na pauze od {cas}', { cas: dbTimeHM(m.breakSince) }) : <>{t('od {cas}', { cas: dbTimeHM(m.openSince) })} · {doba}</>}
                 {m.shiftEnd && <span className="hidden md:inline"> · {t('plán do {cas}', { cas: fmtHM(m.shiftEnd) })}</span>}
               </span>}
               right={<span className="flex flex-wrap items-center justify-end gap-2">
+                {naPauze && <Chip tone="muted" icon="cup" className="tabular-nums">{t('pauza {n} min', { n: minutPauzy(m.breakSince, now) })}</Chip>}
                 {poPlanu != null && <Chip tone="wait" icon="clock" className="tabular-nums">{t('po plánu +{n} min', { n: poPlanu })}</Chip>}
                 {!m.shiftStart && <Chip tone="info">{t('bez rozpisu')}</Chip>}
                 {isActive
                   ? <Chip tone="ok" icon="check">{t('Zapisuje se')}</Chip>
                   : <Button variant="secondary" onClick={() => selectPerson(m.id)} aria-label={t('Zapisovat jako {jmeno}', { jmeno: m.name })}>{t('Přepnout')}</Button>}
               </span>}
-              actions={
-                <Button variant="ghost" iconOnly icon="logout" title={t('Odchod – {jmeno}', { jmeno: m.name })}
-                  aria-label={t('Odchod – {jmeno}', { jmeno: m.name })} onClick={() => punch(m)} />
-              }
+              actions={naPauze ? (
+                <Button variant="ghost" iconOnly icon="play" title={t('Konec pauzy – {jmeno}', { jmeno: m.name })}
+                  aria-label={t('Konec pauzy – {jmeno}', { jmeno: m.name })} onClick={() => punch(m)} />
+              ) : (
+                <>
+                  {/* Pauza je vidět rovnou v řádku, ne až v okně — „najít funkci je hardcore". Obě otevřou totéž okno. */}
+                  <Button variant="ghost" iconOnly icon="cup" title={t('Pauza – {jmeno}', { jmeno: m.name })}
+                    aria-label={t('Pauza – {jmeno}', { jmeno: m.name })} onClick={() => punch(m)} />
+                  <Button variant="ghost" iconOnly icon="logout" title={t('Odchod – {jmeno}', { jmeno: m.name })}
+                    aria-label={t('Odchod – {jmeno}', { jmeno: m.name })} onClick={() => punch(m)} />
+                </>
+              )}
             />
           );
         })}
@@ -666,60 +823,97 @@ export function PunchDialog({ member, now, onClose, onDone }: {
   member: RosterMember;
   now: number;
   onClose: () => void;
-  onDone: (action: 'in' | 'out', member: RosterMember, vysledek?: VysledekPichnuti) => void;
+  onDone: (action: AkceTabletu, member: RosterMember, vysledek?: VysledekPichnuti, flashMsg?: string) => void;
 }) {
   const t = useT('kiosk');
+  const { offline, maOtisk, overPinOffline, zaradDoFronty } = useKioskShift();
   const on = !!member.openSince;
+  // Na pauze: záznam po pauze bez konce — okno nabídne Konec pauzy, nebo rovnou odchod.
+  const naPauze = !on && !!member.breakSince;
   // PIN i při odchodu: server ho u action=out vyžaduje (app/api/attendance/route.ts,
   // `isKiosk && (empPinHash || emp.pin)`), takže bez číselníku odchod člověka
   // s PINem končil „Nesprávný PIN". A podepsat odchod za kolegu je stejná lež
-  // jako podepsat mu příchod.
+  // jako podepsat mu příchod. Pauza (kolo 8) chce PIN ze stejného důvodu.
   const needPin = member.hasPin;
   const [pin, setPin] = useState('');
   // Jak příchod sedí na rozpis — jen chip, nic se neblokuje (server posílá
   // vedení upozornění od stejných 10 minut).
-  const rozpis = !on ? zpozdeniPrichodu(pragueToday(), member.shiftStart, now) : null;
+  const rozpis = !on && !naPauze ? zpozdeniPrichodu(pragueToday(), member.shiftStart, now) : null;
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const pinChybi = needPin && pin.length < 4;
 
-  const submit = async () => {
+  /** Bez internetu: PIN proti otisku z posledního připojení, píchnutí do fronty. Pauza bez sítě nejde. */
+  const offlinePichnuti = async (action: AkceTabletu): Promise<boolean> => {
+    if (action !== 'in' && action !== 'out') { setErr(t('Pauza bez internetu nejde zapsat — zkus to, až bude tablet online.')); return false; }
+    if (duvodProcNeOffline(member, maOtisk(member.id))) { setErr(t('Bez internetu nejde ověřit PIN — zkus to, až bude tablet online.')); return false; }
+    if (needPin && !(await overPinOffline(member.id, pin))) { setErr(t('Nesprávný PIN')); setPin(''); return false; }
+    zaradDoFronty(member, action, needPin);
+    onDone(action, member, undefined, action === 'in'
+      ? t('{jmeno}: příchod uložený v tabletu — odešle se sám, až bude internet.', { jmeno: member.name })
+      : t('{jmeno}: odchod uložený v tabletu — odešle se sám, až bude internet.', { jmeno: member.name }));
+    return true;
+  };
+
+  const submit = async (action: AkceTabletu) => {
     setErr(''); setBusy(true);
     try {
+      if (offline) { await offlinePichnuti(action); return; }
       const res = await fetch('/api/attendance', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ employeeId: member.id, action: on ? 'out' : 'in', pin: needPin ? pin : undefined }),
+        method: 'POST', headers: JSON_HLAVICKA,
+        body: JSON.stringify({ employeeId: member.id, action, pin: needPin ? pin : undefined }),
       });
       const d = await res.json();
       if (res.ok) {
-        // Odchod nese entry (clockIn, clockOut) a closingDone — z nich je souhrn směny.
-        onDone(d.action === 'out' || d.action === 'in' ? d.action : on ? 'out' : 'in', member, { entry: d.entry ?? null, closingDone: typeof d.closingDone === 'boolean' ? d.closingDone : null });
+        // Odpověď nese entry (clockIn, clockOut) a closingDone — handler z nich složí souhrn směny
+        // a bez uzávěrky varuje; pauza (break_start/break_end) souhrn nemá.
+        onDone(action, member, { entry: d.entry ?? null, closingDone: typeof d.closingDone === 'boolean' ? d.closingDone : null });
       } else {
         setErr(d.error || t('Nepodařilo se zaznamenat.'));
         setPin('');
       }
-    } catch { setErr(t('Chyba serveru.')); }
-    setBusy(false);
+    } catch (e) {
+      // Síť spadla uprostřed: ještě to zkusit uložit do fronty, ne jen říct „Chyba serveru".
+      if (jeVypadekSite(e)) { try { await offlinePichnuti(action); } catch { setErr(t('Chyba serveru.')); } }
+      else setErr(t('Chyba serveru.'));
+    } finally { setBusy(false); }
   };
 
   // Sdílené okno místo ručně psaného překryvu (zákaz č. 23): Escape, past
   // fokusu, vyjetí zdola na telefonu a DiscardGuard má Modal sám.
+  // Tlačítka na tabletu: tři velká (≥ 48 px) — Zpět a Pauza vedle sebe, odchod přes celou šířku,
+  // ať se „Odpíchnout odchod" nikdy nezalomí ani na 390 px. Potvrzení v okně je `primary`
+  // (DP §3.1: limetka patří obrazovce, ne modálu), odchod `danger-solid` — ukončuje směnu.
+  const paticka = naPauze ? (
+    <div className="grid grid-cols-2 gap-2 w-full">
+      <Button variant="secondary" size="lg" className="!h-14" onClick={onClose}>{t('Zpět')}</Button>
+      <Button variant="danger-solid" size="lg" className="!h-14" disabled={pinChybi || busy} onClick={() => submit('out')}>{t('Odpíchnout odchod')}</Button>
+      <Button variant="primary" size="lg" icon="play" className="col-span-2 !h-14" loading={busy} disabled={pinChybi} onClick={() => submit('break_end')}>{t('Konec pauzy')}</Button>
+    </div>
+  ) : on ? (
+    <div className="grid grid-cols-2 gap-2 w-full">
+      <Button variant="secondary" size="lg" className="!h-14" onClick={onClose}>{t('Zpět')}</Button>
+      <Button variant="secondary" size="lg" icon="cup" className="!h-14" disabled={pinChybi || busy} onClick={() => submit('break_start')}>{t('Pauza')}</Button>
+      <Button variant="danger-solid" size="lg" icon="logout" className="col-span-2 !h-14" loading={busy} disabled={pinChybi} onClick={() => submit('out')}>{t('Odpíchnout odchod')}</Button>
+    </div>
+  ) : (
+    <>
+      <Button variant="secondary" size="lg" className="flex-1" onClick={onClose}>{t('Zpět')}</Button>
+      <Button variant="primary" size="lg" className="flex-1" loading={busy} disabled={pinChybi} onClick={() => submit('in')}>{t('Odpíchnout příchod')}</Button>
+    </>
+  );
   return (
     <Modal open onClose={onClose} size="sm" title={member.name}
       subtitle={on
         ? t('Na směně od {cas} · {doba}', { cas: timeOf(member.openSince!), doba: elapsed(member.openSince!, now) })
-        : t('Zaznamenej příchod na směnu')}
-      footer={<>
-        {/* Potvrzení v okně je `primary` (DP §3.1: limetka patří obrazovce,
-            ne modálu), odchod `danger-solid` — ukončuje směnu. */}
-        <Button variant="secondary" size="lg" className="flex-1" onClick={onClose}>{t('Zpět')}</Button>
-        <Button variant={on ? 'danger-solid' : 'primary'} size="lg" className="flex-1" loading={busy}
-          disabled={needPin && pin.length < 4} onClick={submit}>
-          {on ? t('Odpíchnout odchod') : t('Odpíchnout příchod')}
-        </Button>
-      </>}>
+        : naPauze
+          ? t('Na pauze od {cas} · {doba}', { cas: timeOf(member.breakSince!), doba: elapsed(member.breakSince!, now) })
+          : t('Zaznamenej příchod na směnu')}
+      footer={paticka}>
       <div className="text-center">
         <Avatar emoji={member.avatar} size="xl" ring={false} />
-        {!on && member.shiftStart && (
+        {offline && <p className="note note-wait text-sm mt-3 text-left" role="status">{t('Tablet je bez internetu. Píchnutí se uloží a odešle samo, až bude síť.')}</p>}
+        {!on && !naPauze && member.shiftStart && (
           <p className="mt-2 flex flex-wrap justify-center gap-1.5">
             <Chip tone="info" icon="calendar" className="tabular-nums">{t('Dnes máš směnu {od}–{do}', { od: fmtHM(member.shiftStart), do: fmtHM(member.shiftEnd) })}</Chip>
             {rozpis?.druh === 'pozde' && <Chip tone="wait" icon="clock" className="tabular-nums">{t('Přicházíš o {n} min později', { n: rozpis.min })}</Chip>}
@@ -729,7 +923,7 @@ export function PunchDialog({ member, now, onClose, onDone }: {
 
         {needPin && (
           <div className="mt-5">
-            <p className="t-meta mb-3">{on ? t('Zadej PIN pro odchod') : t('Zadej PIN pro příchod')}</p>
+            <p className="t-meta mb-3">{on ? t('Zadej PIN pro odchod') : naPauze ? t('Zadej PIN pro konec pauzy nebo odchod') : t('Zadej PIN pro příchod')}</p>
             {/* Tečky nesou délku PINu i pro odečítač (role=img s popisem). */}
             <div className="flex justify-center gap-2 mb-3" role="img" aria-label={t('Zadáno číslic: {n}', { n: pin.length })}>
               {[0, 1, 2, 3].map(i => (

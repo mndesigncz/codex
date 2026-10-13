@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { awardBirthdays } from '@/lib/client';
 import { propadniBody } from '@/lib/propadaniBoduDb';
+import { pripisAutomatickeBody } from '@/lib/automatickeBodyDb';
 import { propadniKredit, oznamPoklesyUrovni } from '@/lib/bodyPravidlaDb';
 import { odesliChybisNam } from '@/lib/reaktivace';
 import { spustAutomatizaceCron } from '@/lib/automatizaceDb';
@@ -2550,6 +2551,9 @@ export async function GET(request: Request) {
     try { poklesyUrovni = await oznamPoklesyUrovni(); } catch { /* nesmí shodit migrace */ }
     // Poukazy: připomenutí konce platnosti podniku i obdarovaným (jednou za platnost, idempotentní).
     try { await pripomenPoukazy(); } catch { /* nesmí shodit migrace */ }
+    // Automatické body zaměstnancům (kolo 8, R8-3): narozeniny, výročí nástupu a týden bez pozdního
+    // příchodu podle points_config.auto; jednou za člověka a událost (auto_key), idempotentní.
+    try { const ab = await pripisAutomatickeBody(); if (ab.dochvilnost || ab.vyroci || ab.narozeniny) console.log('init: automatické body', ab); } catch { /* nesmí shodit migrace */ }
 
     // ---- Kolo 77: nativní obal a obchody (App Store, Google Play) ----
     // Vše idempotentní; kód, který tyhle tabulky čte, je před migrací fail-open.
@@ -2694,6 +2698,126 @@ export async function GET(request: Request) {
         locked_at TIMESTAMP DEFAULT NOW()
       )`);
     await ddl(sql`CREATE UNIQUE INDEX IF NOT EXISTS payroll_locks_team_period ON payroll_locks (team_id, period_from, period_to)`);
+
+    // ---- Kolo 8 (R8-6): nástěnka s potvrzením přečtení, reakce a odpovědi v chatu ----
+    // announcements.require_ack: oznámení chce od každého „Rozumím"; announcement_reads: kdo a kdy potvrdil.
+    await ddl(sql`ALTER TABLE announcements ADD COLUMN IF NOT EXISTS require_ack BOOLEAN DEFAULT FALSE`);
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS announcement_reads (
+        announcement_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        read_at TIMESTAMP DEFAULT NOW(),
+        acked_at TIMESTAMP,
+        PRIMARY KEY (announcement_id, user_id)
+      )`);
+    // chat_messages.reply_to: citovaná zpráva; chat_reactions: 👍 ✅ ❤️ 😂 po jednom na člověka a emoji.
+    await ddl(sql`ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS reply_to INTEGER`);
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS chat_reactions (
+        id SERIAL PRIMARY KEY,
+        message_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        emoji TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE (message_id, user_id, emoji)
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS chat_reactions_message ON chat_reactions (message_id)`);
+
+    // ---- Záznamy docházky a tablet (kolo 8, R8-2) ----
+    // Píchání z telefonu jen u podniku: {zapnuto, lat, lng, polomerM} (lib/geoPichani). Záznam nese, jak poloha
+    // dopadla ('ok' | 'far' | 'missing'; NULL = neověřovalo se: tablet, ručně, pravidlo vypnuté) a vzdálenost v metrech.
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS clock_geo JSONB`);
+    await ddl(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS geo_status TEXT`);
+    await ddl(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS geo_distance_m INTEGER`);
+    // Píchnutí z tabletu bez internetu (fronta v tabletu, POST /api/attendance/sync): čas je z tabletu, ne ze serveru.
+    await ddl(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS offline BOOLEAN DEFAULT FALSE`);
+
+    // ---- Uzávěrky, receptury a poznámky (kolo 8, R8-5) ----
+    // Historie receptury: každé uložení zapíše snímek surovin (i s názvy a jednotkami z té doby),
+    // náklad porce a kdo. Verze vzniká ve stejné transakci jako výměna řádků pos_product_map.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS pos_recipe_versions (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        product_id TEXT NOT NULL,
+        product_name TEXT,
+        ingredients JSONB NOT NULL DEFAULT '[]',
+        cost_per_portion NUMERIC,
+        created_by INTEGER,
+        created_at TIMESTAMP DEFAULT NOW(),
+        note TEXT
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS pos_recipe_versions_product ON pos_recipe_versions (team_id, product_id, created_at)`);
+    // Návrh úpravy receptury (receptury.navrhnout): suroviny po změně, snímek původních, proč;
+    // vedení (receptury.upravit) schválí (uloží jako verzi) nebo vrátí s poznámkou.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS pos_recipe_proposals (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        product_id TEXT NOT NULL,
+        product_name TEXT,
+        ingredients JSONB NOT NULL DEFAULT '[]',
+        original JSONB NOT NULL DEFAULT '[]',
+        reason TEXT,
+        status TEXT NOT NULL DEFAULT 'ceka',
+        author_id INTEGER NOT NULL,
+        reviewed_by INTEGER,
+        reviewed_at TIMESTAMP,
+        review_note TEXT,
+        cost_per_portion NUMERIC,
+        original_cost NUMERIC,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS pos_recipe_proposals_team ON pos_recipe_proposals (team_id, status, created_at)`);
+    // Poznámky: @zmínky (kdo dostal oznámení) a připnutí nahoru autorem; typy navíc closing, event,
+    // menu_item (lib/poznamky.ts). Kdo kdy naposled vlákno otevřel — bublina v seznamu je tučná,
+    // když od té doby někdo jiný něco napsal.
+    // Fotky dokladů k uzávěrce (výpis z terminálu, Z-report, účtenka výdaje): [{ url: /api/upload/<id>, druh, note }].
+    await ddl(sql`ALTER TABLE cash_closings ADD COLUMN IF NOT EXISTS photos JSONB`);
+    await ddl(sql`ALTER TABLE entity_notes ADD COLUMN IF NOT EXISTS mentions INTEGER[]`);
+    await ddl(sql`ALTER TABLE entity_notes ADD COLUMN IF NOT EXISTS pinned BOOLEAN DEFAULT FALSE`);
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS entity_note_reads (
+        team_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        entity_type TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        read_at TIMESTAMP DEFAULT NOW(),
+        PRIMARY KEY (team_id, user_id, entity_type, entity_id)
+      )`);
+
+    // ---- kolo 8: R8-3 (rozvrh, tým a odměny) ----
+    // Limity rozvrhu (lib/rozvrhLimity): odpočinek mezi směnami, nejdelší směna,
+    // hodiny za týden — v hodinách, NULL = nehlídá se. Plánovač varuje, generátor dodrží.
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS min_rest_hours INTEGER`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS max_shift_hours INTEGER`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS max_week_hours INTEGER`);
+    // Nárok na dovolenou (dní za kalendářní rok) na členství — i DPP/DPČ mají od 2024 dovolenou.
+    await ddl(sql`ALTER TABLE team_members ADD COLUMN IF NOT EXISTS vacation_per_year NUMERIC`);
+    // Poděkování mezi kolegy a automatické body: druh pochvaly ('vedeni' | 'kolega' | 'auto'),
+    // hodnota podniku (#ochota, #tým…) a klíč automatického připsání (jednou za člověka a událost).
+    await ddl(sql`ALTER TABLE point_awards ADD COLUMN IF NOT EXISTS kind TEXT DEFAULT 'vedeni'`);
+    await ddl(sql`ALTER TABLE point_awards ADD COLUMN IF NOT EXISTS value_tag TEXT`);
+    await ddl(sql`ALTER TABLE point_awards ADD COLUMN IF NOT EXISTS auto_key TEXT`);
+    await ddl(sql`CREATE UNIQUE INDEX IF NOT EXISTS point_awards_auto_key ON point_awards (team_id, user_id, auto_key) WHERE auto_key IS NOT NULL`);
+    // Týmová výzva (Odměny): měřítko z hotových čísel, cíl, termín, odměna; splneno_at po dosažení.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS reward_challenges (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        nazev TEXT NOT NULL,
+        metrika TEXT NOT NULL,
+        cil NUMERIC NOT NULL,
+        od TEXT NOT NULL,
+        do_dne TEXT NOT NULL,
+        odmena_text TEXT,
+        odmena_body INTEGER,
+        splneno_at TIMESTAMP,
+        created_by INTEGER,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS reward_challenges_team ON reward_challenges (team_id, do_dne)`);
+    // ---- konec R8-3 ----
 
     // Kroky migrace, které selhaly (a byly zachyceny), ať se to pozná zvenku
     // místo tichého „ok". Prázdné pole = celé schéma prošlo.

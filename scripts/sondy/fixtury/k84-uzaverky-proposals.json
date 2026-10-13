@@ -1,0 +1,40 @@
+{
+ "schvaluje": true,
+ "proposals": [
+  {
+   "id": 3,
+   "productId": "p2",
+   "productName": "Espresso",
+   "status": "ceka",
+   "createdAt": "@VCERA-08:40",
+   "muj": false,
+   "reason": "Nová káva je slabší, 9 g nestačí — chutná vodově.",
+   "author": {
+    "id": 16,
+    "name": "Eva Testová",
+    "avatar": "🙂"
+   },
+   "reviewer": null,
+   "reviewedAt": null,
+   "reviewNote": null,
+   "ingredients": [
+    {
+     "itemId": 2,
+     "itemName": "Káva zrnková",
+     "amount": 0.011,
+     "unit": "kg"
+    }
+   ],
+   "puvodni": [
+    {
+     "itemId": 2,
+     "itemName": "Káva zrnková",
+     "amount": 0.009,
+     "unit": "kg"
+    }
+   ],
+   "costPerPortion": 7.4,
+   "puvodniCost": 6.1
+  }
+ ]
+}

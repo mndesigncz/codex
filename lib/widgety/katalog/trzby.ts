@@ -158,6 +158,25 @@ export const WIDGETY: DefiniceWidgetu[] = [
     cil: { pohled: 'finance' },
     stav: 'hotovo',
   },
+  // Data (kolo 8, R8-4): GET /api/pos/daily?from&to&lite=1&heat=1 → heat[7][24]{trzba,ucty,dni,lidi}
+  // Pozor: vlastní ObdobiLista v kartě (výchozí posledních 30 dní) — rychlý filtr v hlavičce vypnutý (rychlyFiltr: false).
+  {
+    id: 'trzby.heatmapa',
+    oblast: 'trzby',
+    nazev: 'Kdy se prodává',
+    popis: 'Teplotní mapa den v týdnu × hodina: průměrná tržba (nebo účtenky) v každé hodině, nejsilnější okna tmavší; klepnutí na buňku ukáže průměr, účtenky a kolik lidí bývá na směně. Pro plánování obsluhy.',
+    ikona: 'grid',
+    velikosti: ['L'],
+    vychoziVelikost: 'L',
+    rozhrani: ['vedeni'],
+    stranky: ['vedeni.finance', 'vedeni.uzaverky'],
+    opravneni: { vse: ['finance.trzby'], nektere: [] },
+    kostra: { L: 'graf' },
+    tarif: 'max',
+    rychlyFiltr: false,
+    cil: { pohled: 'finance' },
+    stav: 'hotovo',
+  },
   // Data: období: GET /api/pos/daily?from&to → items[{name,category,qty,revenue}]; měsíc s marží:
   // GET /api/pos/margins?month → items[{name,qty,revenue,cost,marginPct}]
   {

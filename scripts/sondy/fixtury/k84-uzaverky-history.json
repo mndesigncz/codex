@@ -1,0 +1,58 @@
+{
+ "versions": [
+  {
+   "id": 12,
+   "productId": "p1",
+   "productName": "Latte",
+   "changedAt": "@VCERA-14:12",
+   "costPerPortion": 15.7,
+   "note": null,
+   "changedBy": {
+    "id": 16,
+    "name": "Eva Testová",
+    "avatar": "🙂"
+   },
+   "ingredients": [
+    {
+     "itemId": 1,
+     "itemName": "Mléko plnotučné",
+     "amount": 0.2,
+     "unit": "l"
+    },
+    {
+     "itemId": 2,
+     "itemName": "Káva zrnková",
+     "amount": 0.011,
+     "unit": "kg"
+    }
+   ]
+  },
+  {
+   "id": 7,
+   "productId": "p1",
+   "productName": "Latte",
+   "changedAt": "@PRED5-09:30",
+   "costPerPortion": 12.5,
+   "note": null,
+   "changedBy": {
+    "id": 15,
+    "name": "Martin Nemeškal",
+    "avatar": "🧑"
+   },
+   "ingredients": [
+    {
+     "itemId": 1,
+     "itemName": "Mléko plnotučné",
+     "amount": 0.2,
+     "unit": "l"
+    },
+    {
+     "itemId": 2,
+     "itemName": "Káva zrnková",
+     "amount": 0.009,
+     "unit": "kg"
+    }
+   ]
+  }
+ ]
+}

@@ -10,10 +10,12 @@
 // se „Zkusit znovu"), ne „0 Kč"; a null z API (tržby, které role v podniku
 // nesmí vidět) zůstává null, ne nula, která by tvrdila, že podnik nic neutržil.
 
-import { dayPlus, pragueToday } from './pragueTime.ts';
+import { dayPlus, parseDbTime, pragueDayOf, pragueMomentOf, pragueToday } from './pragueTime.ts';
 import { okJson } from './api.ts';
 import { vyresPreset } from './obdobi.ts';
 import { dnesJesteChybi } from './uzaverkyOrganizace.ts';
+import { earnedFor } from './wages.ts';
+import { konecSmeny, rozeberZaznam, type ClenRosteru, type ZaznamDochazky } from './dochazkaPrehled.ts';
 
 const cis = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 const nebo = (v: unknown) => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
@@ -217,6 +219,9 @@ export interface RadekKnihy {
 
 export interface FinanceMesice {
   mesic: string;
+  /** Rozsah měsíců „RRRR-MM" (kolo 8); u jednoho měsíce od = do = mesic. Srovnávané období: predOd–predDo. */
+  od: string; do: string; mesicu: number;
+  predOd: string; predDo: string;
   souhrn: {
     revenue: number; prevRevenue: number; cash: number; card: number; tips: number;
     purchases: number; wagesCash: number; wagesWorked: number; gross: number; diffSum: number;
@@ -226,17 +231,27 @@ export interface FinanceMesice {
     fixedCostsSet: boolean;
     stockValue: number; stockTop: { name: string; value: number }[];
     laborTargetPct: number | null; closingsCount: number; mzdySkryte: boolean;
+    /** Odpracované hodiny započítané do mezd za měsíc a za minulý měsíc (kolo 8); starší server = 0. */
+    wagesHours: number; prevWagesHours: number;
   };
   hoste: { orders: number; total: number; offPos: number; offPosTotal: number; members: number; newMembers: number; couponsRedeemed: number };
+  /** Dny v týdnu (0 = pondělí): tržba z uzávěrek, dny s uzávěrkou, odpracované hodiny — vždy sedm řádků. */
+  dnyVTydnu: DenTydneFinanci[];
   kniha: RadekKnihy[];
   postrehy: RadaSIkonou[];
 }
 
+export interface DenTydneFinanci { poradi: number; trzba: number; dnu: number; hodiny: number }
+
 export function vyberFinance(raw: any): FinanceMesice {
   if (!raw || typeof raw !== 'object' || !raw.summary || typeof raw.summary !== 'object') throw new Error('Finance přišly v nečekaném tvaru.');
   const s = raw.summary; const g = raw.guest ?? {};
+  const mesic = text(raw.month);
+  const od = text(raw.from) || mesic, doM = text(raw.to) || od;
   return {
-    mesic: text(raw.month),
+    mesic,
+    od, do: doM, mesicu: Math.max(1, cis(raw.months) || pocetMesicuRozsahu(od, doM)),
+    predOd: text(raw.prevFrom) || text(raw.prevMonth), predDo: text(raw.prevTo) || text(raw.prevMonth),
     souhrn: {
       revenue: cis(s.revenue), prevRevenue: cis(s.prevRevenue), cash: cis(s.cash), card: cis(s.card), tips: cis(s.tips),
       purchases: cis(s.purchases), wagesCash: cis(s.wagesCash), wagesWorked: cis(s.wagesWorked), gross: cis(s.gross), diffSum: cis(s.diffSum),
@@ -249,11 +264,16 @@ export function vyberFinance(raw: any): FinanceMesice {
       laborTargetPct: nebo(s.laborTargetPct),
       closingsCount: cis(s.closingsCount),
       mzdySkryte: s.mzdySkryte === true,
+      wagesHours: cis(s.wagesHours), prevWagesHours: cis(s.prevWagesHours),
     },
     hoste: {
       orders: cis(g.orders), total: cis(g.total), offPos: cis(g.offPos), offPosTotal: cis(g.offPosTotal),
       members: cis(g.members), newMembers: cis(g.newMembers), couponsRedeemed: cis(g.couponsRedeemed),
     },
+    dnyVTydnu: Array.from({ length: 7 }, (_, i) => {
+      const w = Array.isArray(raw.weekdays) ? raw.weekdays.find((x: any) => Number(x?.wd) === i) : null;
+      return { poradi: i, trzba: cis(w?.revenue), dnu: cis(w?.days), hodiny: cis(w?.hours) };
+    }),
     kniha: Array.isArray(raw.ledger) ? raw.ledger.map((r: any) => ({
       date: text(r?.date), kind: text(r?.kind), label: text(r?.label), amount: cis(r?.amount),
       receiptId: r?.receiptId != null ? Number(r.receiptId) : undefined, photoUrl: r?.photoUrl ?? null, note: r?.note ?? null,
@@ -268,7 +288,104 @@ export function vyberFinance(raw: any): FinanceMesice {
   };
 }
 
-export const urlFinanci = (mesic: string) => `/api/finance?month=${mesic}`;
+/**
+ * Adresa /api/finance pro měsíc („RRRR-MM") nebo rozsah měsíců („RRRR-MM:RRRR-MM", kolo 8).
+ * Jeden měsíc jde dál přes `?month=`, ať sondy a mezipaměť widgetů drží stejnou URL jako dřív.
+ */
+export const urlFinanci = (obdobi: string) => {
+  const r = rozsahMesicu(obdobi);
+  return r.od === r.do ? `/api/finance?month=${r.od}` : `/api/finance?from=${r.od}&to=${r.do}`;
+};
+
+// ---------------------------------------------------------------------------
+// Období Financí: měsíc nebo rozsah měsíců (kolo 8, R8-4)
+// ---------------------------------------------------------------------------
+//
+// Hlavička Financí dřív uměla jen ‹ měsíc ›. Square a Toast mají výběr rozsahu a „compare to":
+// předchozí období nebo stejné období loni. Období stránky je tu řetězec „RRRR-MM" nebo
+// „RRRR-MM:RRRR-MM" — stejný tvar nese MesicStrankyFinanci do widgetů, takže souhrn nahoře,
+// Kam šly peníze i kniha výdajů ukazují vždycky týž rozsah (a jednu URL).
+
+export type PresetObdobiFinanci = 'tento_mesic' | 'minuly_mesic' | 'ctvrtleti' | 'od_zacatku_roku' | 'lonsky_rok' | 'vlastni';
+export type SrovnaniFinanci = 'predchozi' | 'loni';
+
+export const PRESETY_OBDOBI_FINANCI: PresetObdobiFinanci[] = ['tento_mesic', 'minuly_mesic', 'ctvrtleti', 'od_zacatku_roku', 'lonsky_rok', 'vlastni'];
+
+/** Měsíc posunutý o `o` měsíců („RRRR-MM"). */
+export function posunMesice(mesic: string, o: number): string {
+  const [y, m] = mesic.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + o, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+/** Kolik měsíců má rozsah od–do včetně (obrácený nebo vadný = 1). */
+export function pocetMesicuRozsahu(od: string, doM: string): number {
+  const [y1, m1] = od.split('-').map(Number); const [y2, m2] = doM.split('-').map(Number);
+  const n = (y2 - y1) * 12 + (m2 - m1) + 1;
+  return Number.isFinite(n) && n >= 1 ? n : 1;
+}
+
+const JE_MESIC = /^\d{4}-\d{2}$/;
+
+/** „RRRR-MM" nebo „RRRR-MM:RRRR-MM" → { od, do }; vadný nebo obrácený tvar = dnešní měsíc. */
+export function rozsahMesicu(obdobi: string, dnes: string = pragueToday()): { od: string; do: string } {
+  const [a, b] = String(obdobi).split(':');
+  const od = JE_MESIC.test(a) ? a : dnes.slice(0, 7);
+  const doM = b != null && JE_MESIC.test(b) ? b : od;
+  return doM < od ? { od: doM, do: od } : { od, do: doM };
+}
+
+/** Zpět do řetězce období: jeden měsíc bez dvojtečky. */
+export const obdobiZRozsahu = (od: string, doM: string): string => (od === doM ? od : `${od}:${doM}`);
+
+/** Rozsah měsíců z rychlé volby k danému „dnes" (čtvrtletí a rok jen do dnešního měsíce — budoucí měsíce nemají co ukázat). */
+export function rozsahZVolby(preset: Exclude<PresetObdobiFinanci, 'vlastni'>, dnes: string = pragueToday()): { od: string; do: string } {
+  const mesic = dnes.slice(0, 7);
+  const [y, m] = mesic.split('-').map(Number);
+  switch (preset) {
+    case 'tento_mesic': return { od: mesic, do: mesic };
+    case 'minuly_mesic': { const p = posunMesice(mesic, -1); return { od: p, do: p }; }
+    case 'ctvrtleti': return { od: `${y}-${String(Math.floor((m - 1) / 3) * 3 + 1).padStart(2, '0')}`, do: mesic };
+    case 'od_zacatku_roku': return { od: `${y}-01`, do: mesic };
+    case 'lonsky_rok': return { od: `${y - 1}-01`, do: `${y - 1}-12` };
+  }
+}
+
+/** Stejně dlouhý rozsah bezprostředně před tímhle (totéž, co počítá server jako prevRevenue). */
+export function predchoziRozsahMesicu(od: string, doM: string): { od: string; do: string } {
+  const n = pocetMesicuRozsahu(od, doM);
+  return { od: posunMesice(od, -n), do: posunMesice(od, -1) };
+}
+
+/** Tytéž měsíce o rok dřív („stejné období loni"). */
+export const lonskyRozsah = (od: string, doM: string): { od: string; do: string } => ({ od: posunMesice(od, -12), do: posunMesice(doM, -12) });
+
+/** Rozsah ke srovnání podle volby: předchozí období, nebo stejné období loni. */
+export function rozsahSrovnani(obdobi: string, srovnani: SrovnaniFinanci): string {
+  const r = rozsahMesicu(obdobi);
+  const x = srovnani === 'loni' ? lonskyRozsah(r.od, r.do) : predchoziRozsahMesicu(r.od, r.do);
+  return obdobiZRozsahu(x.od, x.do);
+}
+
+/** Měsíce rozsahu od nejnovějšího (pro knihu výdajů po měsících). */
+export function mesiceRozsahu(od: string, doM: string): string[] {
+  const out: string[] = [];
+  for (let m = doM; m >= od && out.length < 36; m = posunMesice(m, -1)) out.push(m);
+  return out;
+}
+
+/** Změna čtyř čísel souhrnu proti srovnávanému období (%); null, kde srovnávané období nic nemá. */
+export function zmenySouhrnu(ted: FinanceMesice, pred: FinanceMesice | null): { trzby: number | null; nakupy: number | null; mzdy: number | null; vysledek: number | null } {
+  if (!pred) return { trzby: zmenaProti(ted.souhrn.revenue, ted.souhrn.prevRevenue), nakupy: null, mzdy: null, vysledek: null };
+  const vys = (a: number, b: number) => (b !== 0 ? Math.round(((a - b) / Math.abs(b)) * 100) : null);
+  return {
+    trzby: zmenaProti(ted.souhrn.revenue, pred.souhrn.revenue),
+    nakupy: zmenaProti(ted.souhrn.purchases, pred.souhrn.purchases),
+    mzdy: ted.souhrn.mzdySkryte || pred.souhrn.mzdySkryte ? null : zmenaProti(mzdyMesice(ted), mzdyMesice(pred)),
+    // Výsledek může být záporný: změna proti absolutní hodnotě (ze −10 000 na −5 000 je +50 %).
+    vysledek: vys(ted.souhrn.net, pred.souhrn.net),
+  };
+}
 
 /** Mzdy měsíce: odpracováno × sazba, a když docházka chybí, denní výplaty (jako dřív FinanceView). */
 export const mzdyMesice = (f: FinanceMesice) => Math.max(f.souhrn.wagesCash, f.souhrn.wagesWorked);
@@ -283,6 +400,33 @@ export function podilMezd(f: FinanceMesice): { podil: number; cil: number | null
   const podil = Math.round((mzdyMesice(f) / f.souhrn.revenue) * 100);
   const cil = f.souhrn.laborTargetPct;
   return { podil, cil, nadCilem: cil == null ? null : podil > cil };
+}
+
+/**
+ * Tržba na odpracovanou hodinu (SPLH): celé jednotky měny; null bez hodin nebo se skrytými mzdami
+ * (bez finance.mzdy API hodiny neposílá — nula by tvrdila, že nikdo nepracoval).
+ */
+export function trzbaNaHodinu(trzba: number, hodiny: number): number | null {
+  if (!(hodiny > 0) || !(trzba >= 0)) return null;
+  return Math.round(trzba / hodiny);
+}
+
+export interface KcNaHodinuDne { poradi: number; kcH: number | null; nejslabsi: boolean }
+
+/**
+ * Kč na hodinu práce po dnech v týdnu (pondělí první), nejslabší den z těch, které hodiny i tržbu mají,
+ * je označený — „v úterý odpoledne je obsluhy moc" se tak vidí na jeden pohled.
+ */
+export function kcNaHodinuPoDnech(f: Pick<FinanceMesice, 'dnyVTydnu' | 'souhrn'>): KcNaHodinuDne[] {
+  if (f.souhrn.mzdySkryte) return f.dnyVTydnu.map(d => ({ poradi: d.poradi, kcH: null, nejslabsi: false }));
+  const radky = f.dnyVTydnu.map(d => ({ poradi: d.poradi, kcH: d.dnu > 0 ? trzbaNaHodinu(d.trzba, d.hodiny) : null, nejslabsi: false }));
+  const sHodnotou = radky.filter(r => r.kcH != null && r.kcH > 0);
+  if (sHodnotou.length >= 2) {
+    const min = Math.min(...sHodnotou.map(r => r.kcH as number));
+    const prvni = radky.find(r => r.kcH === min);
+    if (prvni) prvni.nejslabsi = true;
+  }
+  return radky;
 }
 
 /** Kam šly peníze: nákupy, výdaje z kasy a mzdy (jen když nejsou skryté); nuly vypadnou. */
@@ -628,4 +772,229 @@ export function zmenaOprotiMinulemuTydnu(dnes: readonly number[], minuly: readon
   const min = trzbaDoHodiny(minuly, posledni);
   if (!(min > 0)) return null;
   return { pct: Math.round(((trzbaDoHodiny(dnes, posledni) - min) / min) * 100), doHodiny: hodinaTed };
+}
+
+// ---------------------------------------------------------------------------
+// Mzdy dnes živě: náklad směny proti dnešní tržbě (kolo 8, R8-4)
+// ---------------------------------------------------------------------------
+//
+// Toast ukazuje labor cost jako % net sales po čtvrthodinách „for in-the-moment
+// staffing decisions". Tady totéž z toho, co aplikace už má: roster z
+// /api/attendance (kdo je napíchnutý, od kdy, za kolik, jaký má plán) a dnešní
+// záznamy docházky (kdo už odešel a kolik to stálo). Tržba je z pokladny.
+
+/** Roster a dnešní záznamy z GET /api/attendance?days=1, jak je potřebuje mzdyDnes. */
+export interface DochazkaDnes { roster: ClenRosteru[]; entries: ZaznamDochazky[] | null }
+
+export function vyberDochazkuDnes(raw: any): DochazkaDnes {
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.roster)) throw new Error('Docházka přišla v nečekaném tvaru.');
+  return {
+    roster: raw.roster.filter((r: any) => r && r.id != null).map((r: any) => ({
+      id: r.id, name: typeof r.name === 'string' ? r.name : undefined, avatar: r.avatar ?? null,
+      openSince: r.openSince ?? null, openEntryId: r.openEntryId ?? null,
+      shiftStart: r.shiftStart ?? null, shiftEnd: r.shiftEnd ?? null,
+      hourlyRate: r.hourlyRate == null ? null : Number(r.hourlyRate),
+    })),
+    // Bez dochazka.zobrazit API záznamy neposílá (pole chybí) — hotové dnešní směny pak neznáme.
+    entries: Array.isArray(raw.entries) ? raw.entries.filter((e: any) => e && typeof e.clockIn === 'string').map((e: any) => ({
+      id: e.id, employeeId: e.employeeId, clockIn: e.clockIn, clockOut: e.clockOut ?? null,
+    })) : null,
+  };
+}
+
+export interface ClovekNaSmene {
+  id: string;
+  jmeno: string;
+  avatar: string | null;
+  /** Sazba za hodinu; null = nenastavená (náklad se nepočítá). */
+  sazba: number | null;
+  /** Od kdy je napíchnutý. */
+  od: Date;
+  /** Náklad běžící směny do teď. */
+  naklad: number;
+  /** Plánovaný konec „HH:MM", nebo null bez plánu. */
+  planDo: string | null;
+}
+
+export interface MzdyDnes {
+  /** Náklad odpracovaného času dnes do teď: hotové dnešní směny + běžící × sazby. */
+  naklad: number;
+  /** Odhad do konce plánu: zbytek běžících směn a celé plánované směny lidí, kteří teprve přijdou. */
+  doKonce: number;
+  /** Lidé právě na směně, nejdražší první. */
+  lide: ClovekNaSmene[];
+  /** Lidé s časem dnes, ale bez sazby — jejich náklad v součtu chybí. */
+  bezSazby: number;
+  /** Dnešní hotové směny jsou v součtu (jen s dochazka.zobrazit); jinak je to jen běžící čas. */
+  sHotovymi: boolean;
+}
+
+const sazbaClena = (r: ClenRosteru): number | null => (Number.isFinite(Number(r.hourlyRate)) && Number(r.hourlyRate) > 0 ? Number(r.hourlyRate) : null);
+
+/**
+ * Dnešní mzdový náklad živě. Běžící směny se berou z rosteru (openSince), hotové
+ * z dnešních záznamů (clockOut), ať se jeden záznam nepočítá dvakrát. Zapomenuté
+ * odpíchnutí (nad 16 h) a záznamy nad 24 h se nepočítají — stejně jako lib/wages.
+ */
+export function mzdyDnes(d: DochazkaDnes, ted: number, dnes: string): MzdyDnes {
+  let naklad = 0, doKonce = 0, bezSazby = 0;
+  const lide: ClovekNaSmene[] = [];
+  const sHotovymi = d.entries != null;
+  const hotoveDnes = new Set<string>();
+  for (const e of d.entries ?? []) {
+    if (!e.clockOut) continue;
+    const od = parseDbTime(e.clockIn);
+    if (!od || pragueDayOf(od) !== dnes) continue;
+    const id = String(e.employeeId ?? '');
+    const clen = d.roster.find(r => String(r.id) === id);
+    const sazba = clen ? sazbaClena(clen) : null;
+    const { ms } = rozeberZaznam(e, ted);
+    if (ms <= 0) continue;
+    hotoveDnes.add(id);
+    if (sazba == null) { bezSazby += 1; continue; }
+    naklad += earnedFor(ms, sazba);
+  }
+  for (const r of d.roster) {
+    const id = String(r.id);
+    const sazba = sazbaClena(r);
+    const od = parseDbTime(r.openSince);
+    const konec = konecSmeny(dnes, r.shiftStart, r.shiftEnd);
+    if (od) {
+      const { ms } = rozeberZaznam({ clockIn: r.openSince as string, clockOut: null }, ted);
+      const n = sazba != null ? earnedFor(ms, sazba) : 0;
+      if (sazba == null && ms > 0 && !hotoveDnes.has(id)) bezSazby += 1;
+      naklad += n;
+      if (sazba != null && konec && konec.getTime() > ted && konec.getTime() > od.getTime()) doKonce += earnedFor(konec.getTime() - ted, sazba);
+      lide.push({ id, jmeno: r.name ?? 'Bez jména', avatar: r.avatar ?? null, sazba, od, naklad: n, planDo: konec ? String(r.shiftEnd).slice(0, 5) : null });
+      continue;
+    }
+    // Teprve přijde: plánovaná směna, která ještě nezačala, stojí celá. Kdo měl začít a nepřišel, se nepočítá —
+    // nevíme, jestli přijde; kdo už dnes odpracoval a odešel, je v `naklad`.
+    const zacatek = r.shiftStart ? pragueMomentOf(dnes, String(r.shiftStart).slice(0, 5)) : null;
+    if (sazba != null && zacatek && konec && zacatek.getTime() > ted && konec.getTime() > zacatek.getTime() && !hotoveDnes.has(id)) {
+      doKonce += earnedFor(konec.getTime() - zacatek.getTime(), sazba);
+    }
+  }
+  lide.sort((a, b) => b.naklad - a.naklad || a.jmeno.localeCompare(b.jmeno, 'cs'));
+  return { naklad, doKonce, lide, bezSazby, sHotovymi };
+}
+
+/** Podíl mzdového nákladu na tržbě v celých %, null bez tržby (nula by tvrdila „lidé nic nestojí"). */
+export function podilNakladu(naklad: number, trzba: number): number | null {
+  if (!(trzba > 0)) return null;
+  return Math.round((naklad / trzba) * 100);
+}
+
+// ---------------------------------------------------------------------------
+// Teplotní mapa tržeb: den v týdnu × hodina (kolo 8, R8-4)
+// ---------------------------------------------------------------------------
+//
+// Lightspeed „Hourly Performance": heat mapa nejrušnějších období k plánování obsluhy.
+// Data z /api/pos/daily?heat=1: 7 řádků (pondělí první) × 24 hodin, v buňce tržba a účtenky
+// za celé období, dny s prodejem toho dne v týdnu a průměrný počet lidí na směně.
+
+export interface BunkaHeat { trzba: number; ucty: number; dni: number; lidi: number | null }
+
+/** `heat` z /api/pos/daily; null, když ho odpověď nenese (starší server nebo bez heat=1). */
+export function vyberHeat(raw: any): BunkaHeat[][] | null {
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.heat) || raw.heat.length !== 7) return null;
+  return raw.heat.map((radek: any) => Array.from({ length: 24 }, (_, h) => {
+    const c = Array.isArray(radek) ? radek[h] : null;
+    return { trzba: cis(c?.trzba), ucty: cis(c?.ucty), dni: cis(c?.dni), lidi: nebo(c?.lidi) };
+  }));
+}
+
+export type MetrikaHeat = 'trzba' | 'ucty';
+
+export interface BunkaMapy {
+  /** 0 = pondělí … 6 = neděle. */
+  den: number;
+  hodina: number;
+  /** Průměr na den s prodejem (tržba, nebo účtenky) — null, když ten den v týdnu v období neprodával. */
+  prumer: number | null;
+  /** Celkem za období. */
+  celkem: number;
+  ucty: number;
+  trzba: number;
+  dni: number;
+  lidi: number | null;
+  /** 0–1 podíl na nejsilnější buňce (podbarvení). */
+  intenzita: number;
+}
+
+export interface MapaTrzeb {
+  /** Hodiny otevírací doby, které se kreslí (od první do poslední s prodejem, aspoň tři). */
+  hodiny: number[];
+  /** Sedm řádků po hodinách z `hodiny`. */
+  radky: BunkaMapy[][];
+  max: number;
+  /** Nejsilnější buňka, nebo null bez prodeje. */
+  spicka: BunkaMapy | null;
+}
+
+/**
+ * Mřížka pro widget: průměr na den (ne součet — pondělků je v období jinak než sobot), podbarvení
+ * podle nejsilnější buňky, hodiny jen v otevírací době (hodiny bez jediné účtenky na krajích se vynechají).
+ */
+export function mapaTrzeb(heat: readonly (readonly BunkaHeat[])[], metrika: MetrikaHeat): MapaTrzeb {
+  const sProdejem = Array.from({ length: 24 }, (_, h) => heat.some(r => (r[h]?.ucty ?? 0) > 0));
+  let prvni = sProdejem.indexOf(true), posledni = sProdejem.lastIndexOf(true);
+  if (prvni < 0) { prvni = 8; posledni = 20; }
+  if (posledni - prvni < 2) posledni = Math.min(23, prvni + 2);
+  const hodiny = Array.from({ length: posledni - prvni + 1 }, (_, i) => prvni + i);
+  const bunky: BunkaMapy[][] = heat.map((r, den) => hodiny.map(h => {
+    const c = r[h] ?? { trzba: 0, ucty: 0, dni: 0, lidi: null };
+    const celkem = metrika === 'trzba' ? c.trzba : c.ucty;
+    return { den, hodina: h, prumer: c.dni > 0 ? Math.round((celkem / c.dni) * 10) / 10 : null, celkem, ucty: c.ucty, trzba: c.trzba, dni: c.dni, lidi: c.lidi, intenzita: 0 };
+  }));
+  const max = Math.max(0, ...bunky.flat().map(b => b.prumer ?? 0));
+  let spicka: BunkaMapy | null = null;
+  for (const b of bunky.flat()) {
+    b.intenzita = max > 0 && b.prumer != null ? Math.min(1, b.prumer / max) : 0;
+    if (b.prumer != null && b.prumer > 0 && (!spicka || b.prumer > spicka.prumer!)) spicka = b;
+  }
+  return { hodiny, radky: bunky, max, spicka };
+}
+
+// ---------------------------------------------------------------------------
+// Matice menu: oblíbenost × marže (kolo 8, R8-4)
+// ---------------------------------------------------------------------------
+//
+// Menu engineering (Kasavana & Smith, dnes Toast a meez): položky nad průměrem v prodaných kusech
+// i v marži jsou hvězdy (držet), oblíbené s nízkou marží tahouni (zvážit cenu), málo prodávané
+// s vysokou marží hádanky (propagovat), obojí pod průměrem psi (zvážit vyřazení). Položky bez
+// receptury (bez nákladu) do matice nepatří — jen se přiznají počtem.
+
+export type Kvadrant = 'hvezdy' | 'tahouni' | 'hadanky' | 'psi';
+export const KVADRANTY: Kvadrant[] = ['hvezdy', 'tahouni', 'hadanky', 'psi'];
+
+export interface PolozkaMatice { id: string; name: string; qty: number; revenue: number | null; marginPct: number; kvadrant: Kvadrant }
+
+export interface MaticeMenu {
+  /** Průměrné prodané kusy a průměrná marže položek s recepturou — hranice kvadrantů. */
+  prumerKusy: number;
+  prumerMarze: number;
+  polozky: PolozkaMatice[];
+  pocty: Record<Kvadrant, number>;
+  /** Položky bez receptury (bez nákladu) — mimo matici. */
+  bezReceptury: number;
+}
+
+/** Matice z položek /api/pos/margins; bez položky s marží je prázdná (průměry 0, nic se nekreslí). */
+export function maticeMenu(polozky: readonly { id: string; name: string; qty: number; revenue: number | null; marginPct: number | null }[]): MaticeMenu {
+  const sMarzi = polozky.filter(p => p.marginPct != null && p.qty > 0);
+  const bezReceptury = polozky.filter(p => p.marginPct == null).length;
+  const pocty: Record<Kvadrant, number> = { hvezdy: 0, tahouni: 0, hadanky: 0, psi: 0 };
+  if (sMarzi.length === 0) return { prumerKusy: 0, prumerMarze: 0, polozky: [], pocty, bezReceptury };
+  const prumerKusy = sMarzi.reduce((a, p) => a + p.qty, 0) / sMarzi.length;
+  const prumerMarze = sMarzi.reduce((a, p) => a + (p.marginPct as number), 0) / sMarzi.length;
+  const out = sMarzi.map((p): PolozkaMatice => {
+    const oblibena = p.qty >= prumerKusy, zisková = (p.marginPct as number) >= prumerMarze;
+    const kvadrant: Kvadrant = oblibena && zisková ? 'hvezdy' : oblibena ? 'tahouni' : zisková ? 'hadanky' : 'psi';
+    pocty[kvadrant] += 1;
+    return { id: p.id, name: p.name, qty: p.qty, revenue: p.revenue, marginPct: p.marginPct as number, kvadrant };
+  });
+  // V každém kvadrantu nejdřív nejprodávanější — na telefonu je seznam to hlavní.
+  out.sort((a, b) => b.qty - a.qty || a.name.localeCompare(b.name, 'cs'));
+  return { prumerKusy: Math.round(prumerKusy * 10) / 10, prumerMarze: Math.round(prumerMarze * 10) / 10, polozky: out, pocty, bezReceptury };
 }
