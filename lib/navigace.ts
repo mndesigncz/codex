@@ -285,3 +285,70 @@ export function slozNavigaci({ rozhrani, smiPohled, nastaveni, jazyk, nazev }: S
 function vychoziTitul(sekce: VychoziSekce[], id: string): string | null {
   return sekce.find(s => s.id === id)?.title ?? null;
 }
+
+// ---------------------------------------------------------------------------
+// Adresa obrazovky (kolo 8)
+//
+// Každý pohled má adresu `?view=…&arg=…`, otevřené okno k ní přidá `&okno=1`.
+// Layouty zapisují přechody do historie prohlížeče (history.pushState) a Zpět
+// (gesto na telefonu, tlačítko prohlížeče) vrací o pohled dřív místo opuštění
+// aplikace; odkaz na obrazovku jde poslat. Tady je jen čistá práce s query
+// stringem — bez `window`, ať se dá proměřit testem.
+
+export interface StavAdresy {
+  view: string | null;
+  arg: string | null;
+  /** `&okno=1`: v adrese je otevřené okno (záznam historie patří oknu, ne pohledu). */
+  okno: boolean;
+}
+
+/** Parametry, které říkají, CO je otevřené; při zápisu nového pohledu se přepisují. */
+const PARAMETRY_POHLEDU = ['view', 'arg', 'tab', 'guide', 'billing', 'okno', 'mode'];
+
+const paramy = (search: string) => new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+
+/**
+ * Rozebere query string. Starší odkazy nesou argument pod jiným jménem —
+ * `?view=settings&tab=billing`, `?view=guides&guide=12`, návrat ze Stripe
+ * `?view=settings&billing=success` — ty se čtou jako `arg`, ať je jedna cesta.
+ */
+export function rozeberAdresu(search: string): StavAdresy {
+  const q = paramy(search);
+  const view = (q.get('view') ?? '').trim() || null;
+  let arg = (q.get('arg') ?? '').trim() || null;
+  if (!arg) {
+    const tab = (q.get('tab') ?? '').trim();
+    const guide = (q.get('guide') ?? '').trim();
+    if (view === 'settings' && tab) arg = tab;
+    else if (view === 'settings' && q.get('billing')) arg = 'billing';
+    else if (view === 'guides' && /^\d+$/.test(guide)) arg = guide;
+  }
+  return { view, arg, okno: q.get('okno') === '1' };
+}
+
+/**
+ * Query string pro pohled (`?view=finance&arg=…`): parametry pohledu se přepíšou,
+ * ostatní (`scena`, `role` v ukázce) zůstanou. `mode` se zahazuje — pohled
+ * administrace sám říká, že jde o plný režim. Prázdný výsledek = bez otazníku.
+ */
+export function adresaPohledu(search: string, view: string, arg?: string | null): string {
+  const q = paramy(search);
+  for (const k of PARAMETRY_POHLEDU) q.delete(k);
+  q.set('view', view);
+  if (arg) q.set('arg', arg);
+  const s = q.toString();
+  return s ? `?${s}` : '';
+}
+
+/** Táž adresa s otevřeným (`&okno=1`) nebo zavřeným oknem. */
+export function adresaOkna(search: string, otevreno: boolean): string {
+  const q = paramy(search);
+  if (otevreno) q.set('okno', '1'); else q.delete('okno');
+  const s = q.toString();
+  return s ? `?${s}` : '';
+}
+
+/** Tentýž pohled se stejným argumentem (prázdný a chybějící argument jsou totéž). */
+export function stejnyPohled(a: { view: string | null; arg?: string | null }, b: { view: string | null; arg?: string | null }): boolean {
+  return a.view === b.view && (a.arg || null) === (b.arg || null);
+}

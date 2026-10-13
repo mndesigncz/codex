@@ -37,7 +37,7 @@ import { useStrazRole, coSeZahodi } from '../role/rozepsano';
 import { NavigaceKontext, useHodnotaNavigace } from '../widgety/NavigaceKontext';
 import { otevriPostupPoPrechodu } from '@/lib/otevriPostup';
 import { VYCHOZI_NAV } from '@/lib/navigace';
-import { useNavigaceAplikace } from '../useNavigaceAplikace';
+import { useHistoriePohledu, useNavigaceAplikace } from '../useNavigaceAplikace';
 import { useJazyk, useT } from '@/lib/i18n/client';
 import { JAZYK_NAZEV } from '@/lib/i18n/config';
 import JazykOkno from '../JazykOkno';
@@ -148,7 +148,9 @@ export default function EmployerLayout({ user }: Props) {
   // na jiný pohled nebo do jiného režimu ji odmontuje, takže se nejdřív
   // zeptá. Přechod na tentýž pohled nic neodmontuje, ten projde rovnou.
   const straz = useStrazRole();
-  const setCurrentView = (v: string) => { if (v === currentView) setCurrentViewRaw(v); else straz.pokus(() => setCurrentViewRaw(v)); };
+  // Každý přechod jde přes `navigate`: zapíše se do historie prohlížeče (kolo 8), takže Zpět
+  // na telefonu vrátí předchozí obrazovku a adresa `?view=…&arg=…` jde poslat.
+  const setCurrentView = (v: string) => navigate(v);
   // TO GO vs. full administration. Phones default to TO GO (the pocket view);
   // the choice is remembered and the switch is always one tap away.
   const [appMode, setAppMode] = useState<'togo' | 'full' | 'client' | null>(null);
@@ -223,7 +225,8 @@ export default function EmployerLayout({ user }: Props) {
     if (view !== currentView) { straz.pokus(() => naviguj(view, arg)); return; }
     naviguj(view, arg);
   };
-  const naviguj = (view: string, arg?: string) => {
+  /** Přepne pohled; `zapsat` = zapsat i do historie (při Zpět a při načtení z adresy ne — záznam už tam je). */
+  const naviguj = (view: string, arg?: string, zapsat = true) => {
     if (view === 'tasks') predejUkolum(arg);
     setInventoryCat(view === 'inventory' ? arg : undefined);
     if (view === 'inventory') setInventoryN(n => n + 1);
@@ -242,23 +245,23 @@ export default function EmployerLayout({ user }: Props) {
     // změna záložky se mu oznámí počítadlem, ne jen novým výchozím tabem.
     if (view === 'settings') setSettingsNonce(n => n + 1);
     setCurrentViewRaw(view);
+    if (zapsat) historie.zapis(view, arg);
   };
-  // Deep links from notifications and old bookmarks: /employer/overview?view=X
-  useEffect(() => {
-    const p = new URLSearchParams(window.location.search);
-    const v = p.get('view');
-    if (v && (byId[v] || v === 'settings' || v === 'team-settings' || v === 'org')) setCurrentViewRaw(v);
-    // Odkaz na konkrétní záložku Nastavení: `&tab=billing`. Návrat ze Stripe
-    // pokladny nese jen `&billing=success|cancel` (starší odkazy a záložky),
-    // což taky znamená Předplatné — bez toho se otevřel Účet a potvrzení
-    // platby se nikde neukázalo.
-    if (v === 'settings') {
-      const tab = p.get('tab') ?? (p.get('billing') ? 'billing' : null);
-      if (tab) setSettingsTab(tab);
-    }
-    const g = Number(p.get('guide'));
-    if (v === 'guides' && Number.isFinite(g) && g > 0) setGuideId(g);
-  }, []);
+  // Adresa a historie obrazovek (kolo 8). Odkaz z oznámení nebo starší záložka
+  // `/employer/overview?view=X` (i `&tab=billing`, `&guide=12`, `&billing=success`
+  // ze Stripe — všechno se čte jako `arg`) otevře rovnou tu obrazovku; Zpět a Vpřed
+  // přepínají pohledy. Rozepsaná role se při Zpět zeptá jako při každém přechodu —
+  // záznam pohledu se nejdřív vrátí, ať adresa nelže, než se člověk rozhodne.
+  const zname = (v: string) => byId[v] != null || v === 'settings' || v === 'team-settings' || v === 'org';
+  const historie = useHistoriePohledu({
+    vychozi: 'overview', zname,
+    naStart: (v, a) => naviguj(v, a, false),
+    naZpet: (v, a) => {
+      if (!straz.guard.dirty) { naviguj(v, a, false); return; }
+      historie.zapis(currentView);
+      straz.pokus(() => naviguj(v, a));
+    },
+  });
   const [sidebarOpen, setSidebarOpen] = useState(true);
   // Chat byl na telefonu jediná ikona v docku, která nikdy nedala vědět,
   // že něco přišlo. Sklad hlásil „3", Docházka „2", chat mlčel — takže
