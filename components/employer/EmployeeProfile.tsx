@@ -23,7 +23,7 @@ import { apiMessage, okJson } from '@/lib/api';
 import { fmtHM } from '@/lib/i18n/format';
 import { useMoney } from '../CurrencyProvider';
 import { useOpravneni } from '../role/useOpravneni';
-import { hodinyMinuty, sazbyZRosteru, souhrnHodin, spropitneZaObdobi, upravyPoLidech, upravyVRozmezi, zaznamyVRozmezi, type ClenRosteru, type UpravaMzdy, type UzaverkaSpropitne, type ZaznamDochazky } from '@/lib/dochazkaPrehled';
+import { doplatit, hodinyMinuty, normalizujPravidlaDyska, normalizujPravidlaPriplatku, priplatkyVypnute, sazbyZRosteru, souhrnHodin, spropitneZaObdobi, upravyPoLidech, upravyVRozmezi, zaznamyVRozmezi, type ClenRosteru, type PayrollClovek, type PravidlaDyska, type PravidlaPriplatku, type UpravaMzdy, type UzaverkaSpropitne, type ZaznamDochazky } from '@/lib/dochazkaPrehled';
 import { pragueToday } from '@/lib/pragueTime';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
@@ -297,10 +297,15 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
 /** „+500 Kč" / „−200 Kč" — částka se znaménkem. */
 const sZnamenkem = (castka: number, money: (n: number) => string) => (castka >= 0 ? `+${money(castka)}` : `−${money(Math.abs(castka))}`);
 
+/** Odpověď GET /api/payroll (jen to, co profil čte): lidé se z kasy / vyplaceno a pravidla podniku. */
+interface PayrollProfilu { lide: PayrollClovek[]; payDailyCash: boolean; pravidla: { dysko: PravidlaDyska; priplatky: PravidlaPriplatku } }
+
 /**
- * Výplata za tento měsíc: hodiny × sazba, prémie a srážky (se seznamem), podíl na spropitném a součet k výplatě.
- * Stejné výpočty jako Souhrn hodin v Docházce (lib/dochazkaPrehled), stejné adresy (/api/attendance, /api/closings),
- * takže dotaz se sdílí s widgety. Jen s finance.mzdy; spropitné navíc jen s celými tržbami.
+ * Výplata za tento měsíc: hodiny × sazba, příplatky, prémie a srážky (se seznamem), podíl na spropitném, co už odešlo
+ * z kasy („Moje výplata dnes" z uzávěrek) a kolik doplatit. Stejné výpočty jako Souhrn hodin a Výplatní listina
+ * (lib/dochazkaPrehled), stejné adresy (/api/attendance, /api/closings, /api/payroll), takže dotazy se sdílejí s widgety.
+ * Jen s finance.mzdy; spropitné navíc jen s celými tržbami. Kolo 8: dřív se „K výplatě" počítalo, jako by nikdo nic
+ * nedostal — majitel pak vyplatil dvakrát.
  */
 function VyplataMesice({ employeeId }: { employeeId: number }) {
   const t = useT('sprava');
@@ -316,16 +321,27 @@ function VyplataMesice({ employeeId }: { employeeId: number }) {
   });
   const vidiDyska = smi('finance.trzby') && smi('uzaverky.zobrazit_vse');
   const uzaverky = useDataWidgetu<UzaverkaSpropitne[]>(vidiDyska ? '/api/closings' : null, raw => (Array.isArray(raw?.closings) ? raw.closings : []));
+  const payroll = useDataWidgetu<PayrollProfilu>(`/api/payroll?od=${od}&do=${dnes}`, raw => {
+    if (!raw || !Array.isArray(raw.lide)) throw new Error(t('Výplaty přišly v nečekaném tvaru.'));
+    return { lide: raw.lide, payDailyCash: raw.payDailyCash === true, pravidla: { dysko: normalizujPravidlaDyska(raw.pravidla?.dysko), priplatky: normalizujPravidlaPriplatku(raw.pravidla?.priplatky) } };
+  });
+  const [zKasyOkno, setZKasyOkno] = useState(false);
   const ted = Date.now();
   const vse = zaznamyVRozmezi(data.data?.entries ?? [], od, dnes);
   const upravy = upravyVRozmezi(data.data?.adjustments ?? [], od, dnes).filter(u => Number(u.userId) === employeeId);
-  const dyska = vidiDyska && uzaverky.data ? spropitneZaObdobi(uzaverky.data, vse, ted, od, dnes) : null;
+  const pravidla = payroll.data?.pravidla ?? null;
+  const pozice = new Map((payroll.data?.lide ?? []).filter(l => l.jobTitle).map(l => [String(l.id), String(l.jobTitle)]));
+  const dyska = vidiDyska && uzaverky.data ? spropitneZaObdobi(uzaverky.data, vse, ted, od, dnes, [], pravidla ? { pravidla: pravidla.dysko, pozice } : null) : null;
   const sazby = sazbyZRosteru(data.data?.roster ?? []);
   const radek = souhrnHodin(vse.filter(e => Number(e.employeeId) === employeeId), ted, sazby,
-    { spropitne: dyska && !dyska.skryto ? dyska.poLidech : null, upravy: upravyPoLidech(upravy), lide: new Map([[String(employeeId), { jmeno: '', avatar: null }]]) })[0];
+    { spropitne: dyska && !dyska.skryto ? dyska.poLidech : null, upravy: upravyPoLidech(upravy), lide: new Map([[String(employeeId), { jmeno: '', avatar: null }]]), priplatky: pravidla && !priplatkyVypnute(pravidla.priplatky) ? pravidla.priplatky : null })[0];
   const sazba = sazby.get(String(employeeId));
   const upravySoucet = radek?.upravy ?? 0;
-  const vyplata = (radek?.mzda ?? 0) + upravySoucet + (radek?.spropitne ?? 0);
+  const clovek = payroll.data?.lide.find(l => Number(l.id) === employeeId);
+  const zKasy = Math.round(Number(clovek?.zKasy) || 0);
+  const vyplaceno = Math.round(Number(clovek?.vyplaceno) || 0);
+  const kDoplaceni = doplatit({ mzda: radek?.mzda ?? null, priplatky: radek?.priplatky ?? 0, spropitne: radek?.spropitne ?? null, upravy: upravySoucet, zKasy, vyplaceno });
+  const datum = (d: string) => new Date(`${String(d).slice(0, 10)}T12:00:00`).toLocaleDateString(loc, { day: 'numeric', month: 'numeric' });
   if (data.error) return <p className="note note-wait text-sm">{t('Výplatu se nepodařilo spočítat.')} {data.error}</p>;
   return (
     <section aria-labelledby="profil-vyplata">
@@ -333,19 +349,33 @@ function VyplataMesice({ employeeId }: { employeeId: number }) {
       {data.loading ? <Skeleton className="h-16" /> : (
         <>
           <StatRow podleKarty>
-            <Stat label={t('Mzda')} value={money(radek?.mzda ?? 0)} note={sazba ? `${hodinyMinuty(radek?.ms ?? 0)} × ${money(sazba)}/h` : t('bez sazby')} />
+            <Stat label={t('Mzda')} value={money((radek?.mzda ?? 0) + (radek?.priplatky ?? 0))} note={sazba ? `${hodinyMinuty(radek?.ms ?? 0)} × ${money(sazba)}/h${(radek?.priplatky ?? 0) > 0 ? ` · ${t('vč. příplatků {castka}', { castka: money(radek!.priplatky) })}` : ''}` : t('bez sazby')} />
             <Stat label={t('Prémie a srážky')} value={sZnamenkem(upravySoucet, money)} note={upravy.length ? t('{n, plural, one {# zápis} few {# zápisy} other {# zápisů}}', { n: upravy.length }) : t('zatím nic')} />
-            {dyska && !dyska.skryto && <Stat label={t('Spropitné')} value={money(Math.round(radek?.spropitne ?? 0))} note={t('podíl podle hodin')} />}
-            <Stat label={t('K výplatě')} value={money(Math.round(vyplata))} note={t('od 1. do dneška')} />
+            {dyska && !dyska.skryto && <Stat label={t('Spropitné')} value={money(Math.round(radek?.spropitne ?? 0))} note={t('podíl podle pravidel podniku')} />}
+            {(zKasy > 0 || payroll.data?.payDailyCash) && (
+              <button type="button" onClick={() => setZKasyOkno(true)} className="block w-full min-w-0 text-left rounded-xl tap-target" aria-label={t('Výplaty z kasy po uzávěrkách')}>
+                <Stat label={t('Z kasy')} value={`−${money(zKasy)}`} note={t('už vyplaceno · {n}× v uzávěrkách', { n: (clovek?.zKasyPocet ?? 0).toLocaleString(loc) })} />
+              </button>
+            )}
+            <Stat label={t('Doplatit')} value={money(kDoplaceni)} tone="ok" note={vyplaceno > 0 ? t('vyplaceno {castka}', { castka: money(vyplaceno) }) : t('k výplatě od 1. do dneška')} />
           </StatRow>
           {upravy.length > 0 && (
             <ul className="list mt-2">
               {upravy.slice(0, 5).map(u => (
                 <ListRow key={u.id} title={u.note || (u.amount > 0 ? t('Prémie') : t('Srážka'))}
-                  meta={new Date(`${String(u.day).slice(0, 10)}T12:00:00`).toLocaleDateString(loc, { day: 'numeric', month: 'numeric' })}
+                  meta={datum(String(u.day))}
                   value={<span className={u.amount > 0 ? 'text-ok-ink' : 'text-bad-ink'}>{sZnamenkem(Number(u.amount), money)}</span>} />
               ))}
             </ul>
+          )}
+          {zKasyOkno && (
+            <Modal open onClose={() => setZKasyOkno(false)} size="sm" title={t('Už vyplaceno z kasy')} subtitle={t('od 1. do dneška')} nadOkny>
+              {(clovek?.uzaverky?.length ?? 0) === 0 ? <p className="t-meta">{t('Tento měsíc zatím žádná výplata z kasy.')}</p> : (
+                <ul className="list">
+                  {clovek!.uzaverky!.map(u => <ListRow key={u.id} title={datum(u.den)} meta={u.kdo ? t('uzávěrku poslal/a {kdo}', { kdo: u.kdo }) : undefined} value={money(u.castka)} />)}
+                </ul>
+              )}
+            </Modal>
           )}
         </>
       )}

@@ -218,7 +218,6 @@
   "Jiné": "Sonstiges",
   "Já": "Ich",
   "K položkám": "Für Positionen",
-  "K výplatě": "Zur Auszahlung",
   "Kalendář": "Kalender",
   "Kalendář hodnocení": "Bewertungskalender",
   "Kalendář se nenačetl": "Der Kalender wurde nicht geladen",
@@ -1407,7 +1406,6 @@
   "pod {cesta}": "unter {cesta}",
   "pod {nazev}": "unter {nazev}",
   "podniku {podnik}": "den Betrieb {podnik}",
-  "podíl podle hodin": "Anteil nach Stunden",
   "položku": "den Artikel",
   "postup": "Ablauf",
   "povinný": "Pflicht",
@@ -1689,5 +1687,16 @@
   "Např. Dobrý nápad, ale až po sezóně.": "z. B. Gute Idee, aber erst nach der Saison.",
   "Podnět je zamítnutý, důvod dostal autor.": "Der Vorschlag ist abgelehnt, der Autor hat den Grund bekommen.",
   "Podnět je zamítnutý.": "Der Vorschlag ist abgelehnt.",
-  "Zapíná se v Nastavení › Organizace.": "Sie wird in Einstellungen › Organisation aktiviert."
+  "Zapíná se v Nastavení › Organizace.": "Sie wird in Einstellungen › Organisation aktiviert.",
+  "Doplatit": "Noch zu zahlen",
+  "Tento měsíc zatím žádná výplata z kasy.": "Diesen Monat noch keine Auszahlung aus der Kasse.",
+  "Už vyplaceno z kasy": "Schon aus der Kasse ausgezahlt",
+  "Výplaty přišly v nečekaném tvaru.": "Die Auszahlungen kamen in unerwarteter Form.",
+  "Výplaty z kasy po uzávěrkách": "Kassenauszahlungen nach Abschlüssen",
+  "podíl podle pravidel podniku": "Anteil nach den Regeln des Betriebs",
+  "uzávěrku poslal/a {kdo}": "Abschluss gesendet von {kdo}",
+  "vyplaceno {castka}": "ausgezahlt {castka}",
+  "vč. příplatků {castka}": "inkl. Zuschläge {castka}",
+  "už vyplaceno · {n}× v uzávěrkách": "schon ausgezahlt · {n}× in Kassenabschlüssen",
+  "k výplatě od 1. do dneška": "zur Auszahlung, vom 1. bis heute"
 }
