@@ -235,6 +235,7 @@ async function nazevEntity(typ: TypPoznamky, klic: string, teamId: number): Prom
       case 'closing': { const r = (await sql`SELECT COALESCE(shift_date, date) AS n FROM cash_closings WHERE id = ${id} AND team_id = ${teamId}`)[0]; return r ? `uzávěrka ${String(r.n).slice(0, 10)}` : null; }
       case 'event': return (await sql`SELECT title AS n FROM events WHERE id = ${id} AND team_id = ${teamId}`)[0]?.n ?? null;
       case 'menu_item': return (await sql`SELECT name AS n FROM menu_items WHERE id = ${id}`)[0]?.n ?? null;
+      case 'suggestion': return (await sql`SELECT title AS n FROM suggestions WHERE id = ${id} AND team_id = ${teamId}`)[0]?.n ?? null;
       case 'shift': return null;
     }
   } catch { return null; }

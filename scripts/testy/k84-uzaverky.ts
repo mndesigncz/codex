@@ -116,7 +116,7 @@ export default function ({ eq, ok }: Testy) {
   }
 
   // ---- poznámky: typy navíc, zmínky, připnutí, počty ----
-  ok('typy poznámek: uzávěrka, akce a položka menu', ['closing', 'event', 'menu_item'].every(jeTypPoznamky) && TYPY_POZNAMEK.length === 9);
+  ok('typy poznámek: uzávěrka, akce a položka menu', ['closing', 'event', 'menu_item'].every(jeTypPoznamky) && TYPY_POZNAMEK.length === 10);
   eq('správa poznámek u nových typů', [OPRAVNENI_SPRAVY_POZNAMEK.closing, OPRAVNENI_SPRAVY_POZNAMEK.event, OPRAVNENI_SPRAVY_POZNAMEK.menu_item], ['uzaverky.mazat', 'akce.upravit', 'menu.upravit']);
   const lide = [{ id: 1, name: 'Petra Nováková' }, { id: 2, name: 'Petr Král' }, { id: 3, name: 'Eva Testová' }, { id: 4, name: 'Eva Malá' }];
   eq('zmínky: celé jméno, křestní jen když je jediné, bez diakritiky, ne „@Petrák"',

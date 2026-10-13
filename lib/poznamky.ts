@@ -362,6 +362,8 @@ export function odkazNaPoznamku(typ: TypPoznamky, id: string, rozhrani: 'vedeni'
     case 'closing': return rozhrani === 'vedeni' ? `${zaklad}reports` : `${zaklad}closing`;
     case 'event': return rozhrani === 'vedeni' ? `${zaklad}events` : `${zaklad}home`;
     case 'menu_item': return rozhrani === 'vedeni' ? `${zaklad}menu` : `${zaklad}home`;
+    // podnět (kolo 7): nástěnka Nápadů je v obou rozhraních pod `suggestions`
+    case 'suggestion': return `${zaklad}suggestions`;
   }
 }
 
