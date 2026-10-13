@@ -59,6 +59,20 @@ async function zapis(teamId: number, p: PolozkaSync): Promise<NextResponse> {
     WHERE employee_id = ${p.employeeId} AND clock_out IS NULL AND (team_id = ${teamId} OR team_id IS NULL)
     ORDER BY clock_in DESC LIMIT 1`;
   if (p.action === 'in') {
+    // Příchod během otevřené pauzy ji ukončí v čase tabletu (stejně jako online POST).
+    try {
+      const [pauza] = await sql`
+        SELECT id FROM time_entries
+        WHERE employee_id = ${p.employeeId} AND team_id = ${teamId} AND source = 'break' AND clock_out = clock_in
+          AND clock_in >= NOW() - INTERVAL '12 hours'
+        ORDER BY clock_in DESC LIMIT 1`;
+      if (pauza) {
+        const [row] = await sql`
+          UPDATE time_entries SET clock_in = ${casIso}, clock_out = NULL, offline = TRUE WHERE id = ${pauza.id}
+          RETURNING id, clock_in AS "clockIn", clock_out AS "clockOut"`;
+        return NextResponse.json({ ok: true, action: 'in', entry: row, poPauze: true });
+      }
+    } catch { /* před migrací break_after/offline — jede se dál jako obyčejný příchod */ }
     if (open) {
       const otevrenoOd = parseDbTime(open.clock_in)?.getTime() ?? 0;
       // Zapomenutý odchod z dřívějška nesmí blokovat dnešní příchod: zavře se v čase nového příchodu

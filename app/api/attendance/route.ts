@@ -563,6 +563,15 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === 'in') {
+    // Příchod člověka, který je na pauze (tablet nebo telefon nabídly „Konec pauzy", ale přišlo 'in'):
+    // pauzu ukončit, ne zakládat druhý záznam vedle otevřené pauzy — ta by zůstala viset bez konce.
+    const pauza = await otevrenaPauza(employeeId, c.teamId);
+    if (pauza) {
+      const [row] = await sql`
+        UPDATE time_entries SET clock_in = NOW(), clock_out = NULL WHERE id = ${pauza.id}
+        RETURNING id, clock_in AS "clockIn", clock_out AS "clockOut"`;
+      return NextResponse.json({ ok: true, action: 'in', entry: row, poPauze: true });
+    }
     let autoClosedPrevious = false;
     if (open) {
       // A forgotten clock-out from a previous day must not block today's
