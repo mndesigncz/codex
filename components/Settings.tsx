@@ -20,6 +20,8 @@ import SekceZkratky from './settings/SekceZkratky';
 import SekcePodnik from './settings/SekcePodnik';
 import PevneNaklady from './settings/PevneNaklady';
 import SekceHistorie from './settings/SekceHistorie';
+import OrganizationSettings, { URL_ORGANIZACE } from './employer/OrganizationSettings';
+import { useDataWidgetu } from './widgety/useDataWidgetu';
 import { zalozkaNastaveni, otevritSekciRovnou, SKUPINA_ZALOZKY, SKUPINY_NASTAVENI, type SectionId, type SkupinaNastaveni } from '@/lib/nastaveniZalozky';
 import TeamManagement from './TeamManagement';
 import { dbTimeDayHM, parseDbTime } from '@/lib/pragueTime';
@@ -138,6 +140,11 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
   // Záložky podniku podle oprávnění (kolo 67). Vedení má všechno, takže
   // vidí totéž co dřív; Provozní nebo Účetní jen to, co mu server dovolí.
   const { ma } = useOpravneni();
+  // Organizace (kolo 7): sekce jen pro podnik, který je v organizaci — zjišťuje se jednou přes
+  // mezipaměť useDataWidgetu na téže URL, ze které čte OrganizationSettings (jeden dotaz, ne dva).
+  // Zaměstnanec se neptá (URL null): organizaci spravuje vedení z Nastavení.
+  // Obal `{ org }`: podnik bez organizace je platná odpověď (org null), ne věčné načítání.
+  const organizace = useDataWidgetu<{ org: { id: number; name: string } | null }>(isEmployer ? URL_ORGANIZACE : null, d => ({ org: d?.organization ?? null }));
   // Sekce ve dvou skupinách (kolo 6, B3): „Osobní" — můj účet, platí v každém podniku —
   // a „Podnik" — nastavení podniku. Skupinu nese lib/nastaveniZalozky (SKUPINA_ZALOZKY),
   // nadpisy kreslí boční pás na počítači i svislý seznam na telefonu.
@@ -154,6 +161,8 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
     // Profil podniku (kolo 73) a od kola 6 i Provoz podniku: název, adresa, IČO, prahy skladu, měna,
     // formáty, jazyk a cíl mezd. Cíl mezd smí i role s finance.nastaveni, proto i ona tu sekci vidí.
     ...(isEmployer && ma(['podnik.nastaveni', 'finance.nastaveni']) ? [sekce('podnik', t('Profil podniku'), 'receipt', t('Údaje, provoz a prahy skladu'))] : []),
+    // Organizace: jen když GET /api/organization organizaci vrátí (routa pustí každého člena, mění jen vlastník).
+    ...(isEmployer && organizace.data?.org ? [sekce('organizace', t('Organizace'), 'grid', t('Sdílení mezi podniky'))] : []),
     ...(isEmployer && ma(['tym.role_spravovat', 'tym.role_prirazovat']) ? [sekce('roles', t('Role a oprávnění'), 'lock', t('Kdo co v podniku smí'))] : []),
     // Výchozí plocha pro typ role nebo roli a zámky (spec §3.8); tablet stačí spravovat.
     ...(isEmployer && ma(['podnik.nastaveni', 'kiosk.spravovat']) ? [sekce('stranky', t('Stránky'), 'overview', t('Výchozí plocha a zámky'))] : []),
@@ -178,7 +187,10 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
   // a jeho dotazy by skončily 403. Místo toho Účet — ten má každý.
   // 'team' v seznamu není, ale obsah má (správa týmu); pouští se se stejným
   // klíčem jako pohled Nastavení týmu, ať se jeho chování nemění.
-  const povolena = sections.some(s => s.id === zvolena) || (zvolena === 'team' && isEmployer && ma('tym.zobrazit'));
+  // Odkaz ?tab=organizace před odpovědí /api/organization: sekce ještě v seznamu není, ale nesmí
+  // spadnout do Účtu — než přijde odpověď, kreslí se kostra a pak buď sekce, nebo (bez organizace) Účet.
+  const organizaceCeka = zvolena === 'organizace' && isEmployer && organizace.loading;
+  const povolena = sections.some(s => s.id === zvolena) || (zvolena === 'team' && isEmployer && ma('tym.zobrazit')) || organizaceCeka;
   const section: SectionId = povolena ? zvolena : 'account';
   // POS (Storyous) connection form.
   const [posStatus, setPosStatus] = useState<any | null>(null);
@@ -729,6 +741,10 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
           ) : section === 'podnik' ? (
             // Pravidelné náklady (nájem, energie) patří k profilu podniku; edituje je i okno ve Financích.
             <SekcePodnik pravidelneNaklady={ma('finance.nastaveni') ? <PevneNaklady /> : undefined} />
+          ) : section === 'organizace' ? (
+            // Nastavení organizace (sdílení lidí, přehled za všechny podniky, sdílené číselníky) — dřív
+            // čtvrtá karta pod Tým › Podnik. Seznam podniků tu není, ten má „Všechny podniky".
+            organizaceCeka ? <Skeleton className="h-48 rounded-3xl" /> : <OrganizationSettings />
           ) : section === 'nahlaseni' ? (
             <NahlasenyObsah />
           ) : section === 'billing' && smiPlatby ? (

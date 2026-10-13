@@ -9,6 +9,7 @@ import {
   LIMIT_HISTORIE, PORADI_OBLASTI, OBLASTI_AUDITU, type ZaznamHistorie,
 } from '../../lib/auditPopisky.ts';
 import { stranka } from '../../lib/widgety/stranky/index.ts';
+import { zalozkaNastaveni, otevritSekciRovnou, SKUPINA_ZALOZKY, ZALOZKY_NASTAVENI } from '../../lib/nastaveniZalozky.ts';
 import { vyuziti, limityTarifu, LIMITS } from '../../lib/plan.ts';
 import {
   souhrnOdchodu, SOUHRN_ZAVRIT_S, pocetStavuSkladu, seradSkladTabletu, filtrujSkladTabletu, minimumPolozky, filtrZeSkladArg,
@@ -116,4 +117,9 @@ export default function ({ eq, ok }: Testy) {
   eq('filtr: bez filtru všechno', ids({ clovek: null, oblast: null, hledani: '  ' }).length, 5);
   eq('pilulky: lidé s počtem, nejčinnější první, systém zvlášť', lideHistorie(hist).map(l => `${l.klic}:${l.pocet}`), ['16:2', '17:1', '15:1', 'system:1']);
   eq('oblasti: jen ty v datech, v pevném pořadí, s počtem', oblastiHistorie(hist), [{ oblast: 'lide', pocet: 1 }, { oblast: 'sklad', pocet: 2 }, { oblast: 'uzaverky', pocet: 1 }, { oblast: 'nastaveni', pocet: 1 }]);
+
+  // ---- 6) Organizace jako vlastní sekce Nastavení (dřív karta pod Tým › Podnik) ----
+  eq('organizace: záložka existuje a patří do skupiny Podnik', [zalozkaNastaveni('organizace'), SKUPINA_ZALOZKY.organizace], ['organizace', 'podnik']);
+  ok('organizace: řadí se hned za Profil podniku (nastavení podniku pohromadě)', ZALOZKY_NASTAVENI.indexOf('organizace') === ZALOZKY_NASTAVENI.indexOf('podnik') + 1);
+  ok('organizace: odkaz z nápovědy „Všechny podniky" a z přepínače podniku (?tab=organizace) otevře sekci rovnou i na telefonu', otevritSekciRovnou('organizace'));
 }

@@ -1248,7 +1248,6 @@
   "Zapnuto kvůli {seznam}": "Turned on because of {seznam}",
   "Zapnuto {n} ze {celkem} oprávnění": "{n} of {celkem} permissions on",
   "Zapomenutý odchod?": "Forgot to clock out?",
-  "Zapíná se v Nastavení týmu, v části Organizace.": "It is turned on in Team settings, in the Organization section.",
   "Zatím není kam ji zanořit.": "There is nowhere to nest it yet.",
   "Zatím tu nikdo není": "Nobody here yet",
   "Zatím žádná odpracovaná směna": "No worked shift yet",
@@ -1689,5 +1688,6 @@
   "Nepovinné — přijde autorovi v oznámení a zůstane v poznámkách u podnětu.": "Optional — the author gets it in a notification and it stays in the suggestion's notes.",
   "Např. Dobrý nápad, ale až po sezóně.": "E.g. Good idea, but after the season.",
   "Podnět je zamítnutý, důvod dostal autor.": "The suggestion is declined; the author got the reason.",
-  "Podnět je zamítnutý.": "The suggestion is declined."
+  "Podnět je zamítnutý.": "The suggestion is declined.",
+  "Zapíná se v Nastavení › Organizace.": "It is turned on in Settings › Organization."
 }

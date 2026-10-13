@@ -27,8 +27,11 @@ export default async function ({ eq, ok }: Testy) {
   ok('skupiny: každá záložka má skupinu Osobní nebo Podnik', ZALOZKY_NASTAVENI.every(z => SKUPINY_NASTAVENI.includes(SKUPINA_ZALOZKY[z])));
   eq('skupiny: osobní jsou účet, jazyk, vzhled, notifikace, zabezpečení, data a zkratky',
     ZALOZKY_NASTAVENI.filter(z => SKUPINA_ZALOZKY[z] === 'osobni'), ['account', 'jazyk', 'app', 'notifications', 'security', 'privacy', 'zkratky']);
-  ok('skupiny: profil podniku, role, stránky, pokladna, předplatné a historie patří podniku',
-    (['podnik', 'roles', 'stranky', 'pos', 'billing', 'audit', 'nahlaseni'] as const).every(z => SKUPINA_ZALOZKY[z] === 'podnik'));
+  ok('skupiny: profil podniku, organizace, role, stránky, pokladna, předplatné a historie patří podniku',
+    (['podnik', 'organizace', 'roles', 'stranky', 'pos', 'billing', 'audit', 'nahlaseni'] as const).every(z => SKUPINA_ZALOZKY[z] === 'podnik'));
+  // Kolo 7: Organizace je vlastní záložka (dřív karta pod Tým › Podnik) — odkaz ?tab=organizace ji na telefonu otevře rovnou.
+  eq('organizace: záložka hned za Profilem podniku', ZALOZKY_NASTAVENI[ZALOZKY_NASTAVENI.indexOf('podnik') + 1], 'organizace');
+  ok('organizace: ?tab=organizace otevře sekci rovnou', otevritSekciRovnou('organizace'));
   eq('skupiny: pořadí Osobní, Podnik', SKUPINY_NASTAVENI, ['osobni', 'podnik']);
   // Telefon: Nastavení otevře seznam sekcí; rovnou sekci jen na výslovné přání (?tab=, banner).
   eq('telefon: bez záložky a s výchozím Účtem seznam sekcí', [otevritSekciRovnou(undefined), otevritSekciRovnou('account')], [false, false]);

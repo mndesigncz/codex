@@ -163,5 +163,8 @@
   "Nic neodpovídá filtru": "Nic nie pasuje do filtra",
   "Hledá se jen v načtených záznamech — zkus načíst starší.": "Szukamy tylko we wczytanych wpisach — spróbuj wczytać starsze.",
   "Zrušit filtry": "Wyczyść filtry",
-  "{n} z {celkem} načtených záznamů odpovídá filtru.": "{n} z {celkem} wczytanych wpisów pasuje do filtra."
+  "{n} z {celkem} načtených záznamů odpovídá filtru.": "{n} z {celkem} wczytanych wpisów pasuje do filtra.",
+  "Organizace": "Organizacja",
+  "Nastavení organizace": "Ustawienia organizacji",
+  "Sdílení mezi podniky": "Współdzielenie między lokalami"
 }

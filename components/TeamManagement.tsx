@@ -21,7 +21,6 @@
 // a po zápisu (obnovTym) se překreslí widgety i nástroj.
 
 import { useEffect, useMemo, useState } from 'react';
-import OrganizationSettings from './employer/OrganizationSettings';
 import NoisiumConnect from './NoisiumConnect';
 import KioskSettings from './KioskSettings';
 import EmployeeProfile from './employer/EmployeeProfile';
@@ -601,8 +600,10 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
   );
 
   // Název a Provoz podniku (měna, formáty, jazyk, cíl mezd) se přestěhovaly do Nastavení →
-  // Profil podniku (kolo 6, B3) — jeden domov pro nastavení podniku. Tady zůstává navigace
-  // aplikace a organizace; řádek níž vede do Profilu podniku, ať ho nikdo nehledá.
+  // Profil podniku (kolo 6, B3) — jeden domov pro nastavení podniku; organizace má od kola 7
+  // vlastní sekci Nastavení › Organizace (dřív čtvrtá karta tady dole, kam nápověda „Všechny
+  // podniky" odkazovala na sekci, která v pásu nebyla). Tady zůstává navigace aplikace;
+  // řádek níž vede do Profilu podniku, ať ho nikdo nehledá.
   const odkazProfil = ma(['podnik.nastaveni', 'finance.nastaveni']) && nav.smiPohled('settings');
   const podnik = team && (
     <>
@@ -623,7 +624,6 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
         </Card>
       )}
       {ma('podnik.nastaveni') && <NavigaceNastaveni />}
-      <OrganizationSettings />
     </>
   );
 

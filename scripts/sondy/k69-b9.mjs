@@ -455,6 +455,56 @@ const zalozka = (p, nazev) => p.locator('nav').getByRole('button', { name: new R
 }
 
 // ---------------------------------------------------------------------------
+// Nastavení › Organizace (kolo 7, R7-7): vlastní sekce; Tým › Podnik už bez karty organizace
+// ---------------------------------------------------------------------------
+{
+  // Fixtura organization.json: Moje kavárny (Vinohrady + Karlín), vlastník. Organizaci se Settings
+  // i karta ptají přes jednu mezipaměť — GET /api/organization smí odejít jen jednou.
+  for (const [w, h, mobil] of [[390, 844, true], [1280, 900, false]]) {
+    const { ctx, p, stav, chyby } = await kontext({ viewport: { width: w, height: h }, mobil, dalsi: podvrh });
+    await p.goto(BASE + '/employer/overview?view=settings&tab=organizace', { waitUntil: 'networkidle' });
+    const karta = p.locator('[aria-labelledby="org-nadpis"]');
+    tvrdi(`O ${w}: ?tab=organizace otevře sekci s kartou „Organizace: Moje kavárny"`, await dokud(() => karta.getByRole('heading', { name: 'Organizace: Moje kavárny' }).isVisible().catch(() => false), 12000));
+    tvrdi(`O ${w}: přepínače organizace (Přehled za všechny podniky, Sdílené číselníky) jsou tady`,
+      await karta.getByRole('switch', { name: /Přehled za všechny podniky/ }).isVisible() && await karta.getByRole('switch', { name: /Sdílené číselníky/ }).isVisible());
+    const pas = p.getByRole('navigation', { name: 'Sekce nastavení' }).filter({ visible: true }).first();
+    if (mobil) {
+      tvrdi('O 390: sekce má hlavičku „Organizace" a cestu „Zpět"', await p.getByRole('heading', { level: 1, name: 'Organizace' }).isVisible() && await p.getByRole('button', { name: 'Zpět' }).isVisible());
+      await p.getByRole('button', { name: 'Zpět' }).click();
+      await dokud(() => pas.isVisible().catch(() => false), 3000);
+      const nazvy = await pas.getByRole('button').allInnerTexts();
+      const i = nazvy.findIndex(x => /^Profil podniku/.test(x));
+      tvrdi('O 390: v seznamu sekcí je Organizace ve skupině Podnik hned za Profilem podniku', i >= 0 && /^Organizace/.test(nazvy[i + 1] ?? ''), nazvy.map(x => x.split('\n')[0]).join(' | '));
+    } else {
+      const nazvy = await pas.getByRole('button').allInnerTexts();
+      const i = nazvy.findIndex(x => /^Profil podniku/.test(x));
+      tvrdi('O 1280: v bočním pásu je Organizace hned za Profilem podniku a je vybraná', i >= 0 && /^Organizace/.test(nazvy[i + 1] ?? '')
+        && (await pas.getByRole('button', { name: /^Organizace/ }).getAttribute('aria-pressed')) === 'true', nazvy.map(x => x.split('\n')[0]).join(' | '));
+    }
+    tvrdi(`O ${w}: /api/organization se volá jednou (Settings i karta sdílí mezipaměť)`, stav.dotazy.filter(d => d.path === '/api/organization').length === 1, String(stav.dotazy.filter(d => d.path === '/api/organization').length));
+    tvrdi(`O ${w}: bez přetečení`, await bezPreteceni(p));
+    await p.screenshot({ path: OUT + `k83-organizace-${w}.png` });
+    tvrdi(`O ${w}: bez chyb v konzoli`, chyby.length === 0, chyby.slice(0, 3).join(' | '));
+    await ctx.close();
+  }
+  // Tým › Podnik: karta organizace už tu není (řádek Profil podniku zůstává).
+  const { ctx, p, chyby } = await kontext({ dalsi: podvrh });
+  await p.goto(BASE + '/employer/overview?view=team-settings', { waitUntil: 'networkidle' });
+  const tablist = p.getByRole('tablist', { name: 'Sekce nastavení týmu' });
+  await dokud(() => tablist.isVisible().catch(() => false), 12000);
+  // Sekce Lidé s obecnou fixturou teams.json hlásí duplicitní klíč (id 17 je v ní dvakrát) — není
+  // předmětem bloku; hlídá se jen, že samotný Podnik žádnou chybu nepřidá.
+  const chybPred = chyby.length;
+  await tablist.getByRole('tab', { name: 'Podnik' }).click();
+  tvrdi('O Tým: Podnik má řádek Profil podniku', await dokud(() => p.getByText('Profil podniku', { exact: true }).first().isVisible().catch(() => false), 5000));
+  await p.waitForTimeout(600);
+  tvrdi('O Tým: karta organizace pod Podnikem zmizela (žádné „Organizace: Moje kavárny" ani přepínač sdílení lidí)',
+    await p.locator('[aria-labelledby="org-nadpis"]').count() === 0 && await p.getByRole('switch', { name: /Sdílení lidí mezi podniky/ }).count() === 0);
+  tvrdi('O Tým: Podnik bez chyb v konzoli', chyby.length === chybPred, chyby.slice(chybPred, chybPred + 3).join(' | '));
+  await ctx.close();
+}
+
+// ---------------------------------------------------------------------------
 // Chat: filtr Nepřečtené, odznak, anketa oknem
 // ---------------------------------------------------------------------------
 {

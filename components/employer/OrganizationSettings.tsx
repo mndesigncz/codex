@@ -15,15 +15,24 @@
 // v jedné kartě s .list (dřív vlastní inkoustový přepínač v bílém boxu = karta
 // v kartě), výběr zdroje má pevný sloupec (každý select začínal jinde),
 // potvrzení je Modal místo confirm() a „Uloženo ✓" je Toast.
+//
+// Kolo 7 (R7-7): karta je vlastní sekce Nastavení › Organizace (dřív čtvrtá pod Tým › Podnik).
+// Organizaci čte přes mezipaměť useDataWidgetu na téže URL jako seznam sekcí v Nastavení —
+// jeden dotaz pro obojí; po uložení se přepíše místně (set), server zůstává pravda.
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Icon } from '../Icons';
 import { Button, Card, Chip, Modal, Segmented, Select, SwitchRow, Toast } from '../ui';
-import { okJson } from '@/lib/api';
+import { useDataWidgetu } from '../widgety/useDataWidgetu';
 import { CISELNIKY, coSeSlucuje, coSeVypina, normalizujNastaveni, type Ciselnik, type NastaveniOrganizace, type ZdrojeCiselniku } from '@/lib/organizace';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 
 interface Org { id: number; name: string; isOwner: boolean; settings: NastaveniOrganizace; teams: { id: number; name: string }[] }
+
+/** Táž URL čte i Settings (seznam sekcí) — sdílená mezipaměť se ptá jednou. */
+export const URL_ORGANIZACE = '/api/organization';
+/** Obal `{ org }`: podnik bez organizace je platná odpověď (org null), ne věčné načítání. */
+const vyberOrganizaci = (d: any): { org: Org | null } => ({ org: d?.organization ?? null });
 
 /** Co server vrátí za každý podnik, kterému se kopírovalo nebo slučovalo. */
 interface Kopie { teamId: number; ciselnik: Ciselnik; akce: 'kopie' | 'slouceni'; ok: boolean; pocet: number }
@@ -36,8 +45,10 @@ const popisRadku = (t: PrekladFn, ciselnik: Ciselnik, n: number): string =>
 
 export default function OrganizationSettings() {
   const t = useT('sprava');
-  const [org, setOrg] = useState<Org | null>(null);
-  const [nacteno, setNacteno] = useState(false);
+  const stav = useDataWidgetu(URL_ORGANIZACE, vyberOrganizaci);
+  const org = stav.data?.org ?? null;
+  /** Místní přepis nad načtenou odpovědí (optimistický zápis a návrat při chybě). */
+  const setOrg = (f: (o: Org | null) => Org | null) => stav.set(prev => ({ org: f(prev?.org ?? null) }));
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const msgChyba = msg !== '' && msg !== t('Nastavení organizace uloženo.');
@@ -48,27 +59,16 @@ export default function OrganizationSettings() {
   const [potvrdit, setPotvrdit] = useState<{ veta: string; patch: Partial<NastaveniOrganizace> } | null>(null);
   // Výpadek načtení není „podnik není v organizaci“: karta dřív při chybě tiše
   // zmizela a majitel řetězce nepoznal, že sekce existuje, jen se nenačetla.
-  const [chyba, setChyba] = useState(false);
-  const [pokus, setPokus] = useState(0);
-  useEffect(() => {
-    let alive = true;
-    setChyba(false);
-    fetch('/api/organization').then(okJson)
-      .then(d => { if (alive) { setOrg(d?.organization ?? null); setNacteno(true); } })
-      .catch(() => { if (alive) { setChyba(true); setNacteno(true); } });
-    return () => { alive = false; };
-  }, [pokus]);
-
-  if (chyba) {
+  if (stav.error) {
     return (
       <Card>
         <p className="text-sm font-semibold text-[#16181A]">{t('Organizace se nenačetla')}</p>
         <p className="t-meta mt-1">{t('Nejspíš vypadlo připojení. Nastavení je v pořádku — zkuste to znovu.')}</p>
-        <div className="mt-3"><Button variant="secondary" size="sm" icon="refresh" onClick={() => setPokus(n => n + 1)}>{t('Zkusit znovu')}</Button></div>
+        <div className="mt-3"><Button variant="secondary" size="sm" icon="refresh" onClick={stav.reload}>{t('Zkusit znovu')}</Button></div>
       </Card>
     );
   }
-  if (!nacteno || !org) return null;
+  if (stav.loading || !org) return null;
 
   const nazevPodniku = (id: number) => org.teams.find(x => x.id === id)?.name ?? t('Podnik {id}', { id });
 

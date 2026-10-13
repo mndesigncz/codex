@@ -163,5 +163,8 @@
   "Nic neodpovídá filtru": "Filtru nič nezodpovedá",
   "Hledá se jen v načtených záznamech — zkus načíst starší.": "Hľadá sa len v načítaných záznamoch — skús načítať staršie.",
   "Zrušit filtry": "Zrušiť filtre",
-  "{n} z {celkem} načtených záznamů odpovídá filtru.": "{n} z {celkem} načítaných záznamov zodpovedá filtru."
+  "{n} z {celkem} načtených záznamů odpovídá filtru.": "{n} z {celkem} načítaných záznamov zodpovedá filtru.",
+  "Organizace": "Organizácia",
+  "Nastavení organizace": "Nastavenia organizácie",
+  "Sdílení mezi podniky": "Zdieľanie medzi podnikmi"
 }

@@ -1248,7 +1248,6 @@
   "Zapnuto kvůli {seznam}": "Zapnuté kvôli {seznam}",
   "Zapnuto {n} ze {celkem} oprávnění": "Zapnuté {n} z {celkem} oprávnení",
   "Zapomenutý odchod?": "Zabudnutý odchod?",
-  "Zapíná se v Nastavení týmu, v části Organizace.": "Zapína sa v Nastaveniach tímu, v časti Organizácia.",
   "Zatím není kam ji zanořit.": "Zatiaľ nie je kam ju zanoriť.",
   "Zatím tu nikdo není": "Zatiaľ tu nikto nie je",
   "Zatím žádná odpracovaná směna": "Zatiaľ žiadna odpracovaná zmena",
@@ -1689,5 +1688,6 @@
   "Nepovinné — přijde autorovi v oznámení a zůstane v poznámkách u podnětu.": "Nepovinné — príde autorovi v oznámení a zostane v poznámkach pri podnete.",
   "Např. Dobrý nápad, ale až po sezóně.": "Napr. Dobrý nápad, ale až po sezóne.",
   "Podnět je zamítnutý, důvod dostal autor.": "Podnet je zamietnutý, dôvod dostal autor.",
-  "Podnět je zamítnutý.": "Podnet je zamietnutý."
+  "Podnět je zamítnutý.": "Podnet je zamietnutý.",
+  "Zapíná se v Nastavení › Organizace.": "Zapína sa v Nastaveniach › Organizácia."
 }

@@ -163,5 +163,8 @@
   "Nic neodpovídá filtru": "Nothing matches the filter",
   "Hledá se jen v načtených záznamech — zkus načíst starší.": "Only loaded entries are searched — try loading older ones.",
   "Zrušit filtry": "Clear filters",
-  "{n} z {celkem} načtených záznamů odpovídá filtru.": "{n} of {celkem} loaded entries match the filter."
+  "{n} z {celkem} načtených záznamů odpovídá filtru.": "{n} of {celkem} loaded entries match the filter.",
+  "Organizace": "Organization",
+  "Nastavení organizace": "Organization settings",
+  "Sdílení mezi podniky": "Sharing between businesses"
 }

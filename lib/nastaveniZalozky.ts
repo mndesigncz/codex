@@ -4,11 +4,11 @@
 
 export type SectionId =
   | 'account' | 'jazyk' | 'app' | 'notifications' | 'security' | 'privacy' | 'zkratky'
-  | 'team' | 'billing' | 'podnik' | 'audit' | 'pos' | 'roles' | 'stranky' | 'nahlaseni';
+  | 'team' | 'billing' | 'podnik' | 'organizace' | 'audit' | 'pos' | 'roles' | 'stranky' | 'nahlaseni';
 
 export const ZALOZKY_NASTAVENI: readonly SectionId[] = [
   'account', 'jazyk', 'app', 'notifications', 'security', 'privacy', 'zkratky',
-  'team', 'billing', 'podnik', 'audit', 'pos', 'roles', 'stranky', 'nahlaseni',
+  'team', 'billing', 'podnik', 'organizace', 'audit', 'pos', 'roles', 'stranky', 'nahlaseni',
 ];
 
 /** Skupina záložky: „Osobní" (můj účet, platí v každém podniku) a „Podnik" (nastavení podniku). */
@@ -21,7 +21,9 @@ export type SkupinaNastaveni = 'osobni' | 'podnik';
  */
 export const SKUPINA_ZALOZKY: Record<SectionId, SkupinaNastaveni> = {
   account: 'osobni', jazyk: 'osobni', app: 'osobni', notifications: 'osobni', security: 'osobni', privacy: 'osobni', zkratky: 'osobni',
-  podnik: 'podnik', roles: 'podnik', stranky: 'podnik', pos: 'podnik', billing: 'podnik', audit: 'podnik', nahlaseni: 'podnik', team: 'podnik',
+  // Organizace (kolo 7): vlastní sekce jen pro podnik v organizaci — dřív čtvrtá karta pod Tým › Podnik,
+  // kam nápověda „Všechny podniky" odkazovala na sekci, která v pásu nebyla.
+  podnik: 'podnik', organizace: 'podnik', roles: 'podnik', stranky: 'podnik', pos: 'podnik', billing: 'podnik', audit: 'podnik', nahlaseni: 'podnik', team: 'podnik',
 };
 
 /** Pořadí skupin v seznamu i v bočním pásu. */
