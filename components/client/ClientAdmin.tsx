@@ -50,7 +50,7 @@ import {
   czDay, dayKey, denProZapis, NEDORAZENI_LIMIT, nedorazilNaRade, nejdriveDnes, RES_STATUS, RUCNI_MAX_JMENO, RUCNI_MAX_POZNAMKA, RUCNI_MAX_TELEFON, slotsFor, validujRucniRezervaci, vOteviraciDobe,
   type PoleRucni,
 } from '@/lib/clientSlots';
-import { dayPlus, dbTimeDayHM, dbTimeHM, parseDbTime, pragueHM, pragueToday } from '@/lib/pragueTime';
+import { dayPlus, dbTimeDayHM, dbTimeHM, parseDbTime, pragueDaySafe, pragueHM, pragueToday } from '@/lib/pragueTime';
 import { obdobiZPresetu, platneRozmezi, type Obdobi as ObdobiHistorie } from '@/lib/obdobi';
 import { odsazeniMesice, zacatekTydne, zkratkyDnu } from '@/lib/week';
 import { useCurrency, useMoney, usePrice } from '../CurrencyProvider';
@@ -60,9 +60,9 @@ import { apiMessage } from '@/lib/api';
 import { NOTE_MAX } from '@/lib/poznamkyHosta';
 import type { Navigace } from '@/lib/widgety/typy';
 import {
-  TON_REZERVACE, dobaObjednavky, HLEDANI_MIN, hlavniKrok, klicPrechodu, muzeDo, nabidkaNedorazil, odkazTel, poDnech, polozkyKratce, prumerCesky, souhrnDneRezervaci,
-  varovaniHosta, vyberCleny, vyberHistoriiObjednavek, vyberHodnoceni, vyberMesicRezervaci, vyberRezervace,
-  type NastaveniZapisu, type Rezervace, type StavRezervace, type Stul,
+  TON_REZERVACE, dobaObjednavky, FILTRY_HODNOCENI, filtrujHodnoceni, HLEDANI_MIN, hlavniKrok, jeNevyrizene, klicPrechodu, muzeDo, nabidkaNedorazil, ODPOVED_MAX, odkazTel,
+  poctyHodnoceni, poDnech, polozkyKratce, prumerCesky, souhrnDneRezervaci, varovaniHosta, vyberCleny, vyberHistoriiObjednavek, vyberHodnoceni, vyberMesicRezervaci, vyberRezervace,
+  type FiltrHodnoceni, type NastaveniZapisu, type Recenze, type Rezervace, type StavRezervace, type Stul,
 } from '@/lib/klientPrehled';
 import { useOpravneni } from '../role/useOpravneni';
 import { NavigaceKontext, useNavigace, useSmi } from '../widgety/NavigaceKontext';
@@ -1258,7 +1258,7 @@ function ZakazniciStranka({ oznam, hledat }: { oznam: Hlaska; hledat: string }) 
   const dalsiAkce = ma('kupony.spravovat') ? (vyber: VyberHostu) => [{ label: 'Kupon', icon: 'tag', onClick: () => setKuponVyber(vyber) }] : undefined;
   const nastroj = !cast ? null
     : cast.id === 'members' ? <ClenoveSprava oznam={oznam} hledat={hledat} dalsiAkce={dalsiAkce} />
-    : cast.id === 'reviews' ? <Recenze />
+    : cast.id === 'reviews' ? <Recenze oznam={oznam} />
     : cast.id === 'automations' ? <Automatizace oznam={oznam} />
     : <ZpravyRozeslani oznam={oznam} />;
   return (
@@ -1281,8 +1281,15 @@ function ZakazniciStranka({ oznam, hledat }: { oznam: Hlaska; hledat: string }) 
 }
 
 // ---- Hodnocení ------------------------------------------------------------------
+//
+// Kolo 8 (R8-7): filtr nad seznamem („Vše · 84", „1–2 ★ · 6", „S komentářem", „Nevyřízené")
+// a období; u hodnocení „Odpovědět" (okno, na telefonu zdola; host dostane oznámení a odpověď
+// vidí v Moje stránka) a „Označit jako vyřízené". Chip „odpovězeno · Martin" a „vyřízeno" u řádku.
+// Dřív jen průměr, rozložení a seznam — slabé hodnocení přišlo oznámením, ale vyřídit se nedalo.
 
-function Recenze() {
+type OdpovedNaHodnoceni = { v: Recenze; text: string; vyridit: boolean };
+
+function Recenze({ oznam }: { oznam: Hlaska }) {
   const { data: d, error, reload } = useLoad<{ h: ReturnType<typeof vyberHodnoceni>; crew: Map<number, { name: string; avatar: string | null }[]> }>(
     '/api/client/admin/reviews',
     raw => ({
@@ -1292,45 +1299,120 @@ function Recenze() {
       }))])),
     }),
   );
+  const [filtr, setFiltr] = useState<FiltrHodnoceni>('vse');
+  const [obdobi, setObdobi] = useState<ObdobiHistorie>(() => obdobiZPresetu('90_dni'));
+  const [odpovidam, setOdpovidam] = useState<OdpovedNaHodnoceni | null>(null);
+  const [busy, setBusy] = useState(false);
+  const rozmezi = platneRozmezi(obdobi);
   if (error) return <ErrorState title="Hodnocení se nenačetla" onRetry={reload} detail={error} />;
   if (!d) return <PageSkel />;
   const { h, crew } = d;
   if (h.pocet === 0) return <Card><EmptyState icon="star" title="Zatím žádné hodnocení" hint="Objeví se, jakmile host ohodnotí hotovou návštěvu." compact /></Card>;
+  // Počty na pilulkách jsou v rámci období — ať je vidět, kam má cenu klikat (DESIGN „Filtrovací pás").
+  const vObdobi = filtrujHodnoceni(h.posledni, 'vse', rozmezi, pragueDaySafe);
+  const pocty = poctyHodnoceni(vObdobi);
+  const seznam = filtrujHodnoceni(vObdobi, filtr, null, pragueDaySafe);
+  const ulozit = async (v: Recenze, telo: { reply?: string; resolved?: boolean }) => {
+    setBusy(true);
+    try {
+      await j('/api/client/admin/reviews', { method: 'PATCH', body: JSON.stringify({ id: v.id, ...telo }) });
+      oznam(telo.reply !== undefined ? `${v.host} dostane tvoji odpověď.` : telo.resolved ? 'Hodnocení označeno jako vyřízené.' : 'Hodnocení je zase mezi nevyřízenými.');
+      setOdpovidam(null);
+      reload();
+    } catch (e) { oznam(apiMessage(e, 'Nepovedlo se uložit.'), 'bad'); }
+    setBusy(false);
+  };
   return (
+    <>
     <div className="grid grid-cols-1 md:grid-cols-[minmax(14rem,auto)_1fr] gap-4 items-start">
       <Card className="space-y-4">
         <Stat label="Průměr" value={prumerCesky(h.prumer)} unit="/ 5" note={czCount(h.pocet, HODNOCENI)} />
         <BarSpark height={56} showLabels label="Rozložení hodnocení od jedné do pěti hvězd"
           data={h.rozlozeni.map((n, i) => ({ value: n, label: String(i + 1), tip: `${i + 1} z 5: ${czCount(n, HODNOCENI)}` }))} />
       </Card>
-      <Card pad="none">
-        <ul className="list px-5">
-          {h.posledni.map(v => {
-            const lide = crew.get(v.id) ?? [];
-            return (
-              <li key={v.id} className="list-row items-start">
-                <div className="min-w-0 flex-1">
-                  <p className="text-[15px] font-medium leading-snug text-[#16181A] flex items-center gap-2 min-w-0">
-                    <span className="truncate">{v.host}</span>
-                    <span className={`inline-flex items-center gap-0.5 shrink-0 tabular-nums ${v.hvezdy <= 2 ? 'text-wait-ink' : 'text-black/55'}`} aria-label={`${v.hvezdy} z 5`}>
-                      {v.hvezdy}<Icon name="star" size={14} />
-                    </span>
-                  </p>
-                  <p className={`text-sm mt-0.5 text-pretty ${v.poznamka ? 'text-black/70' : 'text-black/45'}`}>{v.poznamka ? `„${v.poznamka}"` : 'Bez komentáře.'}</p>
-                  <p className="t-meta mt-1">{dbTimeDayHM(v.kdy)} · {v.zdroj === 'objednavka' ? 'objednávka od stolu' : 'rezervace'}</p>
-                  {lide.length > 0 && (
-                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                      <span className="t-meta">Ten den na směně:</span>
-                      {lide.map(c => <PersonChip key={c.name} name={c.name} avatar={c.avatar} size="sm" tone={v.hvezdy <= 2 ? 'wait' : 'muted'} />)}
-                    </div>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      </Card>
+      <div className="space-y-3 min-w-0">
+        <ObdobiLista value={obdobi} onChange={setObdobi} volby={['7_dni', 'mesic', '90_dni', '365_dni']} dnyTydne={false} hrubost={false} />
+        <div className="flex gap-1.5 overflow-x-auto scroll-fade-x" role="group" aria-label="Filtr hodnocení">
+          {FILTRY_HODNOCENI.map(f => (
+            <button key={f.id} type="button" aria-pressed={filtr === f.id}
+              onClick={() => setFiltr(x => (x === f.id && f.id !== 'vse' ? 'vse' : f.id))}
+              className={`filter-pill tap-target-sm tabular-nums whitespace-nowrap ${filtr === f.id ? 'seg-on' : 'seg-off glass'}`}>{f.popisek} · {pocty[f.id]}</button>
+          ))}
+        </div>
+        {seznam.length === 0 ? (
+          <Card><EmptyState icon="star" compact title={filtr === 'nevyrizene' ? 'Nic nevyřízeného' : 'Za tohle období žádné hodnocení'}
+            hint={filtr === 'nevyrizene' ? 'Všechna slabá hodnocení mají odpověď, nebo jsou vyřízená.' : 'Zkus delší období nebo jiný filtr.'} /></Card>
+        ) : (
+        <Card pad="none">
+          <ul className="list px-5">
+            {seznam.map(v => {
+              const lide = crew.get(v.id) ?? [];
+              const dalsi: MenuItem[] = [
+                v.vyrizeno
+                  ? { label: 'Vrátit mezi nevyřízené', icon: 'undo', onClick: () => { void ulozit(v, { resolved: false }); } }
+                  : { label: 'Označit jako vyřízené', icon: 'check', hint: 'Probráno se směnou nebo host odškodněný. Host to nevidí.', onClick: () => { void ulozit(v, { resolved: true }); } },
+              ];
+              return (
+                <li key={v.id} className="list-row items-start flex-wrap sm:flex-nowrap">
+                  <div className="min-w-0 flex-1 basis-56">
+                    <p className="text-[15px] font-medium leading-snug text-[#16181A] flex items-center gap-2 min-w-0 flex-wrap">
+                      <span className="truncate">{v.host}</span>
+                      <span className={`inline-flex items-center gap-0.5 shrink-0 tabular-nums ${v.hvezdy <= 2 ? 'text-wait-ink' : 'text-black/55'}`} aria-label={`${v.hvezdy} z 5`}>
+                        {v.hvezdy}<Icon name="star" size={14} />
+                      </span>
+                      {v.odpoved && <Chip tone="ok" size="sm" icon="check">odpovězeno{v.odpovedel ? ` · ${v.odpovedel}` : ''}</Chip>}
+                      {v.vyrizeno && <Chip tone="muted" size="sm">vyřízeno</Chip>}
+                      {jeNevyrizene(v) && <Chip tone="wait" size="sm">nevyřízené</Chip>}
+                    </p>
+                    <p className={`text-sm mt-0.5 text-pretty ${v.poznamka ? 'text-black/70' : 'text-black/45'}`}>{v.poznamka ? `„${v.poznamka}“` : 'Bez komentáře.'}</p>
+                    <p className="t-meta mt-1">{dbTimeDayHM(v.kdy)} · {v.zdroj === 'objednavka' ? 'objednávka od stolu' : 'rezervace'}</p>
+                    {v.odpoved && (
+                      <p className="text-sm mt-1.5 text-black/70 flex items-start gap-1.5 text-pretty">
+                        <Icon name="chat" size={13} className="shrink-0 mt-0.5" />
+                        <span className="min-w-0 whitespace-pre-line"><span className="sr-only">Odpověď podniku: </span>{v.odpoved}{v.odpovedenoKdy ? <span className="t-meta"> · {dbTimeDayHM(v.odpovedenoKdy)}</span> : null}</span>
+                      </p>
+                    )}
+                    {lide.length > 0 && (
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        <span className="t-meta">Ten den na směně:</span>
+                        {lide.map(c => <PersonChip key={c.name} name={c.name} avatar={c.avatar} size="sm" tone={v.hvezdy <= 2 ? 'wait' : 'muted'} />)}
+                      </div>
+                    )}
+                  </div>
+                  <div className="list-actions flex gap-1.5 shrink-0 ml-auto">
+                    <Button size="sm" variant="secondary" icon="chat" onClick={() => setOdpovidam({ v, text: v.odpoved ?? '', vyridit: v.vyrizeno })}
+                      aria-label={`${v.odpoved ? 'Upravit odpověď' : 'Odpovědět'}: ${v.host}, ${v.hvezdy} z 5`}>{v.odpoved ? 'Upravit odpověď' : 'Odpovědět'}</Button>
+                    <Menu size="sm" label={`Další akce s hodnocením ${v.host}`} items={dalsi} />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+        )}
+      </div>
     </div>
+    {odpovidam && (
+      <Modal open onClose={() => setOdpovidam(null)} size="md" title={`Odpověď pro ${odpovidam.v.host}`}
+        subtitle={`${odpovidam.v.hvezdy} z 5 · ${odpovidam.v.poznamka ? `„${odpovidam.v.poznamka}“` : 'bez komentáře'}`}
+        footer={<>
+          <Button variant="secondary" onClick={() => setOdpovidam(null)}>Zrušit</Button>
+          <Button variant="primary" icon="send" loading={busy} disabled={!odpovidam.text.trim()}
+            onClick={() => { void ulozit(odpovidam.v, { reply: odpovidam.text.trim(), resolved: odpovidam.vyridit }); }}>Odeslat odpověď</Button>
+        </>}>
+        <div className="space-y-4">
+          <Field id="rec-odpoved" label="Odpověď hostovi" hint="Host dostane oznámení a odpověď uvidí v Moje stránka.">
+            <Textarea id="rec-odpoved" rows={4} maxLength={ODPOVED_MAX} value={odpovidam.text} autoFocus
+              onChange={e => setOdpovidam(o => (o ? { ...o, text: e.target.value } : o))} placeholder="Děkujeme za zpětnou vazbu. Příště…" />
+          </Field>
+          <ul className="list">
+            <SwitchRow title="Označit jako vyřízené" hint="Probráno se směnou nebo host odškodněný. Jen pro podnik, host to nevidí."
+              checked={odpovidam.vyridit} onChange={v => setOdpovidam(o => (o ? { ...o, vyridit: v } : o))} />
+          </ul>
+        </div>
+      </Modal>
+    )}
+    </>
   );
 }
 
