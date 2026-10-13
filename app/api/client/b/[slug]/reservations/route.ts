@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
 import { sql, customer, profileBySlug, join, slotsFor } from '@/lib/client';
 import { clenoveSOpravnenim } from '@/lib/opravneniDb';
 import { notifyUser, notifyUsers } from '@/lib/push';
-import { autoPotvrdit, nejdriveDnes, zpravaHostoviORezervaci } from '@/lib/clientSlots';
+import { autoPotvrdit, NEDORAZENI_LIMIT, nejdriveDnes, zpravaHostoviORezervaci } from '@/lib/clientSlots';
 import { pragueToday, pragueHM, dayPlus } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
@@ -53,7 +53,14 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
   if (dup) return NextResponse.json({ error: 'Na tenhle termín už rezervaci máš.' }, { status: 409 });
   // Malý podnik si zapne automatické potvrzování (Nastavení › Rezervace a objednávky):
   // rezervace vznikne rovnou potvrzená, větší skupiny než nastavená hranice dál čekají.
-  const status = autoPotvrdit(p, party) ? 'confirmed' : 'requested';
+  // Kolo 8 (R8-7): host, který už dvakrát nedorazil, se sám nepotvrdí — vedení ho potvrdí ručně.
+  let nedorazeni = 0;
+  try {
+    const [n] = await sql`SELECT COUNT(*)::int AS n FROM client_reservations WHERE team_id = ${teamId} AND customer_id = ${me.id} AND status = 'no_show'` as any[];
+    nedorazeni = Number(n?.n) || 0;
+  } catch { /* před migrací stavu */ }
+  const status = autoPotvrdit(p, party, nedorazeni) ? 'confirmed' : 'requested';
+  const cekaKvuliNedorazeni = status === 'requested' && nedorazeni >= NEDORAZENI_LIMIT && autoPotvrdit(p, party);
   // Dedup výš je rychlá cesta; skutečnou pojistku proti dvojkliku dělá
   // unikátní index (viz /api/init). Kolizi překládáme na klidné 409.
   let r: any;
@@ -71,8 +78,8 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
   // Host dostane stejné „Rezervace potvrzena“ jako po ručním potvrzení.
   if (status === 'confirmed') notifyUser(me.id, zpravaHostoviORezervaci('confirmed', date, time)).catch(() => {});
   await upozorni(teamId, {
-    // Vedoucí musí poznat, že nemusí nic dělat.
-    title: status === 'confirmed' ? 'Nová rezervace (potvrzena automaticky)' : 'Nová rezervace',
+    // Vedoucí musí poznat, že nemusí nic dělat — a naopak proč tahle čeká, když se jinak potvrzují samy.
+    title: status === 'confirmed' ? 'Nová rezervace (potvrzena automaticky)' : cekaKvuliNedorazeni ? `Nová rezervace čeká — host už ${nedorazeni}× nedorazil` : 'Nová rezervace',
     body: `${me.name} · ${date.split('-').reverse().join('. ')} ${time} · ${party} ${party === 1 ? 'osoba' : party < 5 ? 'osoby' : 'osob'}`,
     link: '/employer/overview?mode=client&tab=reservations', type: 'info',
   });

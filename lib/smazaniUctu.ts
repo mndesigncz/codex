@@ -214,6 +214,8 @@ export function planUzivatele(u: { id: number; email: string; role: string; hash
   // Soubory: bez podniku patří jen osobě (mažou se; blob maže smazUcet), v podniku zůstanou bez vazby na osobu.
   k.push(volitelny('smazat soubory mimo podnik', `DELETE FROM uploads WHERE user_id = $1 AND team_id IS NULL`, [id]));
   k.push(volitelny('odpojit soubory podniku od osoby', `UPDATE uploads SET user_id = NULL, name = 'Příloha' WHERE user_id = $1`, [id]));
+  // Odpověď podniku na hodnocení hosta zůstává podniku, jen bez vazby na smazaný účet toho, kdo ji psal.
+  k.push(volitelny('odpojit odpovědi na hodnocení od osoby', `UPDATE client_reviews SET replied_by = NULL WHERE replied_by = $1`, [id]));
   // Protokol akcí: zůstane, vymaže se volný text. Záznam o samotném smazání (bez osobních údajů) se zachová.
   k.push(volitelny('vymazat text protokolu', `UPDATE audit_log SET detail = NULL WHERE (user_id = $1 OR (entity = 'user' AND entity_id = $1))
     AND action NOT IN ('ucet.smazan', 'podnik.smazan', 'ucet.stripe_chyba')`, [id]));

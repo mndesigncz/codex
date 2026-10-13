@@ -9,6 +9,8 @@ import { Button, Chip, ListRow, Skeleton, Textarea, Well, useLoad } from '../../
 import { useOpravneni } from '../../role/useOpravneni';
 import { useMoney } from '../../CurrencyProvider';
 import { casovaOsa, zbyvaDoUrovne, zbyvaDoOdmeny, type UdalostOsy } from '@/lib/clenPrehled';
+import { vyberRezervaceHosta } from '@/lib/klientPrehled';
+import { NEDORAZENI_LIMIT } from '@/lib/clientSlots';
 import { czCount, type CzNoun } from '@/lib/czech';
 import { dbTimeDayHM } from '@/lib/pragueTime';
 import { apiMessage, okJson } from '@/lib/api';
@@ -19,6 +21,7 @@ import { HistorieClena, SpravaClena } from './ClenSprava';
 import { denCesky } from './datum';
 
 const NAVSTEVA: CzNoun = { one: 'návštěva', few: 'návštěvy', many: 'návštěv' };
+const REZERVACE: CzNoun = { one: 'rezervace', few: 'rezervace', many: 'rezervací' };
 const POPISEK_DRUHU: Record<string, string> = { body: 'Body', kupon: 'Kupon', poukaz: 'Poukaz', objednavka: 'Objednávka' };
 
 export { denCesky };
@@ -38,6 +41,7 @@ export default function DetailClena({ customerId, jmeno, zablokovany = false, oz
   return (
     <Well className="mb-3 space-y-3">
       <SkupinyClena customerId={customerId} oznam={oznam} prazdne={!vidiDenik && !smi('zakaznici.poznamky')} />
+      {smi('rezervace.zobrazit') && <RezervaceClena customerId={customerId} />}
       {vidiDenik && <RazitkaClen customerId={customerId} oznam={oznam} />}
       {smi('zakaznici.poznamky') && <PoznamkyClena customerId={customerId} oznam={oznam} />}
       {smi('zakaznici.sprava_clenu') && <SpravaClena clen={{ id: customerId, name: jmeno, blocked: zablokovany }} oznam={oznam} onZmena={onZmena} />}
@@ -68,6 +72,30 @@ export default function DetailClena({ customerId, jmeno, zablokovany = false, oz
           </>
         )}
     </Well>
+  );
+}
+
+/**
+ * Kolo 8 (R8-7): „Nedorazil 2× z 9 rezervací" — host, který nepřišel, se tu pozná dřív, než se
+ * zase přihlásí. Jen se rezervace.zobrazit; bez rezervací se nic nekreslí.
+ */
+function RezervaceClena({ customerId }: { customerId: number }) {
+  const { data: r } = useLoad(`/api/client/admin/reservations?customer=${customerId}`, vyberRezervaceHosta);
+  if (!r || r.celkem === 0) return null;
+  return (
+    <div>
+      <p className="t-label mb-1.5">Rezervace</p>
+      <p className="text-sm font-medium tabular-nums flex items-center gap-2 flex-wrap">
+        {r.nedorazeni > 0
+          ? <><span>Nedorazil {r.nedorazeni}× z {czCount(r.celkem, REZERVACE)}</span><Chip tone="bad" size="sm">{r.nedorazeni}× nedorazil</Chip></>
+          : <span>{czCount(r.celkem, REZERVACE)}, vždy dorazil</span>}
+      </p>
+      <p className="t-meta">
+        {r.probehlo > 0 ? `${czCount(r.probehlo, REZERVACE)} proběhlo` : 'Zatím žádná neproběhla'}
+        {r.posledni ? ` · naposledy ${denCesky(r.posledni)}` : ''}
+        {r.nedorazeni >= NEDORAZENI_LIMIT ? ' · další rezervace se mu nepotvrdí sama' : ''}
+      </p>
+    </div>
   );
 }
 

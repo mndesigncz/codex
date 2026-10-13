@@ -14,33 +14,114 @@ import { aktivniBonus } from '@/lib/bonusAkceDb';
 import { pripisBodyZaRezervaci } from '@/lib/bodyZdrojeDb';
 import { poznamkaRazitek } from '@/lib/bonusAkce';
 import { tierForMember, tierRulesFromProfile, validujRucniRezervaci, zpravaHostoviORezervaci } from '@/lib/clientSlots';
+import { cisliceTelefonu, HLEDANI_MIN } from '@/lib/klientPrehled';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 const FLOW: Record<string, string[]> = {
   requested: ['confirmed', 'declined'],
-  confirmed: ['seated', 'declined', 'done'],
+  // Kolo 8 (R8-7): „Nedorazil" (no_show) je práce u dveří jako usazení; omyl jde vrátit na potvrzeno.
+  confirmed: ['seated', 'declined', 'done', 'no_show'],
   seated: ['done'],
+  no_show: ['confirmed'],
 };
+
+/** Nejvíc řádků v Minulých a v hledání najednou — oříznutí se hlásí (`celkem`), neschovává. */
+const STRANKA_VYCHOZI = 100;
+const STRANKA_MAX = 500;
+const HLEDANI_MAX = 50;
 
 export async function GET(req: NextRequest) {
   const ctx = await pozaduj('rezervace.zobrazit');
   if (jeOdpoved(ctx)) return ctx;
   const u = { id: ctx.meId, team_id: ctx.teamId };
+  const q = new URL(req.url).searchParams;
   // Sdílený tablet za barem (systémová role Kiosk) má rezervace.zobrazit
   // kvůli dnešnímu příjmu hostů. Dřív tuhle routu vůbec neviděl (hlídal ji
   // employer()) a rezervace znal jen z dnešního inboxu — historie 100
   // minulých a 60 dní dopředu s poznámkami hostů na zařízení, ke kterému
   // má přístup každý u baru, nepatří. Proto jen dnešek a bez poznámky.
   const tablet = ctx.role.typ === 'kiosk';
-  const range = tablet ? 'today' : String(new URL(req.url).searchParams.get('range') ?? 'upcoming');
   const today = pragueToday();
-  const rows = range === 'today'
-    ? await sql`SELECT r.*, COALESCE(us.name, r.guest_name) AS customer_name, us.email AS customer_email, COALESCE(NULLIF(us.phone, ''), r.guest_phone) AS customer_phone, t.name AS table_name FROM client_reservations r LEFT JOIN users us ON us.id = r.customer_id LEFT JOIN client_tables t ON t.id = r.table_id WHERE r.team_id = ${u.team_id} AND r.date = ${today} ORDER BY r.time`
-    : range === 'past'
-    ? await sql`SELECT r.*, COALESCE(us.name, r.guest_name) AS customer_name, us.email AS customer_email, COALESCE(NULLIF(us.phone, ''), r.guest_phone) AS customer_phone, t.name AS table_name FROM client_reservations r LEFT JOIN users us ON us.id = r.customer_id LEFT JOIN client_tables t ON t.id = r.table_id WHERE r.team_id = ${u.team_id} AND r.date < ${today} ORDER BY r.date DESC, r.time DESC LIMIT 100`
-    : await sql`SELECT r.*, COALESCE(us.name, r.guest_name) AS customer_name, us.email AS customer_email, COALESCE(NULLIF(us.phone, ''), r.guest_phone) AS customer_phone, t.name AS table_name FROM client_reservations r LEFT JOIN users us ON us.id = r.customer_id LEFT JOIN client_tables t ON t.id = r.table_id WHERE r.team_id = ${u.team_id} AND r.date >= ${today} AND r.date <= ${dayPlus(today, 60)} ORDER BY r.date, r.time`;
+  // Kolo 8 (R8-7): hledání podle jména nebo telefonu (?q=), skok na den (?date=), tečky
+  // v kalendáři (?month=), historie jednoho hosta (?customer=), stránkování Minulých (?limit=&offset=)
+  // a filtr „Nedorazili" (?status=no_show). Tablet má pořád jen dnešek.
+  const hledat = tablet ? '' : String(q.get('q') ?? '').replace(/\s+/g, ' ').trim().slice(0, 80);
+  const den = !tablet && /^\d{4}-\d{2}-\d{2}$/.test(String(q.get('date') ?? '')) ? String(q.get('date')) : null;
+  const mesic = !tablet && /^\d{4}-\d{2}$/.test(String(q.get('month') ?? '')) ? String(q.get('month')) : null;
+  const host = !tablet ? parseInt(String(q.get('customer') ?? ''), 10) : NaN;
+  const range = tablet ? 'today' : String(q.get('range') ?? 'upcoming');
+  const limit = Math.min(STRANKA_MAX, Math.max(1, parseInt(String(q.get('limit') ?? ''), 10) || STRANKA_VYCHOZI));
+  const offset = Math.max(0, parseInt(String(q.get('offset') ?? ''), 10) || 0);
+  const jenNedorazili = q.get('status') === 'no_show';
+
+  if (mesic) {
+    // Kalendář: kolik živých rezervací má který den měsíce (zrušené, nepřijaté a nedorazivší ne).
+    const od = `${mesic}-01`, doo = `${mesic}-31`;
+    const dny = await sql`
+      SELECT date, COUNT(*)::int AS n FROM client_reservations
+      WHERE team_id = ${u.team_id} AND date >= ${od} AND date <= ${doo} AND status NOT IN ('declined','cancelled','no_show')
+      GROUP BY date ORDER BY date` as any[];
+    return NextResponse.json({ month: mesic, days: Object.fromEntries(dny.map(d => [String(d.date), Number(d.n) || 0])) });
+  }
+
+  if (Number.isInteger(host) && host > 0) {
+    // Historie hosta pro detail člena: kolik rezervací měl, kolikrát nedorazil, kolik proběhlo.
+    const [s] = await sql`
+      SELECT COUNT(*)::int AS celkem,
+             COUNT(*) FILTER (WHERE status = 'no_show')::int AS nedorazeni,
+             COUNT(*) FILTER (WHERE status = 'done')::int AS probehlo,
+             MAX(date) FILTER (WHERE status IN ('done','seated','no_show')) AS posledni
+      FROM client_reservations WHERE team_id = ${u.team_id} AND customer_id = ${host}` as any[];
+    const rows = await sql`
+      SELECT r.id, r.date, r.time, r.party, r.status, t.name AS table_name
+      FROM client_reservations r LEFT JOIN client_tables t ON t.id = r.table_id
+      WHERE r.team_id = ${u.team_id} AND r.customer_id = ${host} ORDER BY r.date DESC, r.time DESC LIMIT 20` as any[];
+    return NextResponse.json({ reservations: rows, souhrn: { celkem: Number(s?.celkem) || 0, nedorazeni: Number(s?.nedorazeni) || 0, probehlo: Number(s?.probehlo) || 0, posledni: s?.posledni ?? null } });
+  }
+
+  const cislice = cisliceTelefonu(hledat);
+  const vzor = `%${hledat.replace(/[%_\\]/g, '')}%`;
+  const vzorCislic = cislice.length >= 3 ? `%${cislice}%` : null;
+  let rows: any[];
+  let celkem: number | null = null;
+  let pocty: { celkem: number; nedorazeni: number } | null = null;
+  if (hledat.length >= HLEDANI_MIN) {
+    // Hledá se ve všech rezervacích (budoucích i minulých) podle jména hosta, jména zapsaného
+    // ručně a telefonu (jen číslice, ať „776 221 004" najde „+420776221004"). Nejdřív budoucí
+    // od nejbližší, pak minulé od nejnovější.
+    rows = await sql`
+      SELECT r.*, COALESCE(us.name, r.guest_name) AS customer_name, us.email AS customer_email, COALESCE(NULLIF(us.phone, ''), r.guest_phone) AS customer_phone, t.name AS table_name
+      FROM client_reservations r LEFT JOIN users us ON us.id = r.customer_id LEFT JOIN client_tables t ON t.id = r.table_id
+      WHERE r.team_id = ${u.team_id}
+        AND (COALESCE(us.name, r.guest_name, '') ILIKE ${vzor}
+          OR (${vzorCislic}::text IS NOT NULL AND regexp_replace(COALESCE(NULLIF(us.phone, ''), r.guest_phone, ''), '[^0-9]', '', 'g') LIKE ${vzorCislic}))
+      ORDER BY (r.date >= ${today}) DESC, CASE WHEN r.date >= ${today} THEN r.date END ASC, r.date DESC, r.time
+      LIMIT ${HLEDANI_MAX}` as any[];
+    const [n] = await sql`
+      SELECT COUNT(*)::int AS n FROM client_reservations r LEFT JOIN users us ON us.id = r.customer_id
+      WHERE r.team_id = ${u.team_id}
+        AND (COALESCE(us.name, r.guest_name, '') ILIKE ${vzor}
+          OR (${vzorCislic}::text IS NOT NULL AND regexp_replace(COALESCE(NULLIF(us.phone, ''), r.guest_phone, ''), '[^0-9]', '', 'g') LIKE ${vzorCislic}))` as any[];
+    celkem = Number(n?.n) || rows.length;
+  } else if (den) {
+    rows = await sql`SELECT r.*, COALESCE(us.name, r.guest_name) AS customer_name, us.email AS customer_email, COALESCE(NULLIF(us.phone, ''), r.guest_phone) AS customer_phone, t.name AS table_name FROM client_reservations r LEFT JOIN users us ON us.id = r.customer_id LEFT JOIN client_tables t ON t.id = r.table_id WHERE r.team_id = ${u.team_id} AND r.date = ${den} ORDER BY r.time` as any[];
+  } else if (range === 'today') {
+    rows = await sql`SELECT r.*, COALESCE(us.name, r.guest_name) AS customer_name, us.email AS customer_email, COALESCE(NULLIF(us.phone, ''), r.guest_phone) AS customer_phone, t.name AS table_name FROM client_reservations r LEFT JOIN users us ON us.id = r.customer_id LEFT JOIN client_tables t ON t.id = r.table_id WHERE r.team_id = ${u.team_id} AND r.date = ${today} ORDER BY r.time` as any[];
+  } else if (range === 'past') {
+    // Minulé jsou oříznuté po stránkách; „Zobrazeno 100 z 240" říká celkem a filtr „Nedorazili" má svůj počet.
+    rows = jenNedorazili
+      ? await sql`SELECT r.*, COALESCE(us.name, r.guest_name) AS customer_name, us.email AS customer_email, COALESCE(NULLIF(us.phone, ''), r.guest_phone) AS customer_phone, t.name AS table_name FROM client_reservations r LEFT JOIN users us ON us.id = r.customer_id LEFT JOIN client_tables t ON t.id = r.table_id WHERE r.team_id = ${u.team_id} AND r.date < ${today} AND r.status = 'no_show' ORDER BY r.date DESC, r.time DESC LIMIT ${limit} OFFSET ${offset}` as any[]
+      : await sql`SELECT r.*, COALESCE(us.name, r.guest_name) AS customer_name, us.email AS customer_email, COALESCE(NULLIF(us.phone, ''), r.guest_phone) AS customer_phone, t.name AS table_name FROM client_reservations r LEFT JOIN users us ON us.id = r.customer_id LEFT JOIN client_tables t ON t.id = r.table_id WHERE r.team_id = ${u.team_id} AND r.date < ${today} ORDER BY r.date DESC, r.time DESC LIMIT ${limit} OFFSET ${offset}` as any[];
+    const [n] = await sql`
+      SELECT COUNT(*)::int AS celkem, COUNT(*) FILTER (WHERE status = 'no_show')::int AS nedorazeni
+      FROM client_reservations WHERE team_id = ${u.team_id} AND date < ${today}` as any[];
+    pocty = { celkem: Number(n?.celkem) || 0, nedorazeni: Number(n?.nedorazeni) || 0 };
+    celkem = jenNedorazili ? pocty.nedorazeni : pocty.celkem;
+  } else {
+    rows = await sql`SELECT r.*, COALESCE(us.name, r.guest_name) AS customer_name, us.email AS customer_email, COALESCE(NULLIF(us.phone, ''), r.guest_phone) AS customer_phone, t.name AS table_name FROM client_reservations r LEFT JOIN users us ON us.id = r.customer_id LEFT JOIN client_tables t ON t.id = r.table_id WHERE r.team_id = ${u.team_id} AND r.date >= ${today} AND r.date <= ${dayPlus(today, 60)} ORDER BY r.date, r.time` as any[];
+  }
   const tables = await sql`SELECT id, name, seats, storyous_desk_id FROM client_tables WHERE team_id = ${u.team_id} AND active = TRUE ORDER BY position, id`;
   // Kdo vidí rezervace, nemusí vidět kontakt na hosta — e-mail a telefon jsou
   // osobní údaje a patří jen tomu, kdo smí hostům psát (zakaznici.kontakty).
@@ -69,7 +150,7 @@ export async function GET(req: NextRequest) {
       FROM teams t LEFT JOIN client_profiles p ON p.team_id = t.id WHERE t.id = ${u.team_id}` as any[];
     zapis = { opening_hours: n?.opening_hours ?? {}, max_party: Number(n?.max_party) || 8, lead_days: Number(n?.lead_days) || 30, slot_minutes: Number(n?.slot_minutes) || 30 };
   }
-  return NextResponse.json({ reservations, tables, today, zapis });
+  return NextResponse.json({ reservations, tables, today, zapis, celkem: celkem ?? reservations.length, pocty });
 }
 
 /**
@@ -128,10 +209,13 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ ok: true, reservation: r });
 }
 
+/** Kolik poznámek personálu jede s řádkem rezervace (nejnovější první). */
+const POZNAMEK_K_REZERVACI = 3;
+
 /**
- * Kdo host je: počet návštěv a úroveň (pravidla podniku, stejně jako Zákazníci › Členové)
- * a poslední poznámka personálu. Jen pro hosty s účtem; ručně zapsaný host bez členství
- * nic nedostane. Nezmigrované sloupce (útrata, poznámky) seznam rezervací neshodí.
+ * Kdo host je: počet návštěv, útrata a úroveň (pravidla podniku, stejně jako Zákazníci › Členové),
+ * kolikrát nedorazil, jeho skupiny a poslední poznámky personálu. Jen pro hosty s účtem; ručně
+ * zapsaný host bez členství nic nedostane. Nezmigrované sloupce (útrata, poznámky) seznam rezervací neshodí.
  */
 async function kontextHostu(teamId: number, rows: any[], smi: { hoste: boolean; poznamky: boolean }) {
   const out = new Map<number, Record<string, unknown>>();
@@ -146,17 +230,40 @@ async function kontextHostu(teamId: number, rows: any[], smi: { hoste: boolean; 
         WHERE team_id = ${teamId} AND customer_id = ANY(${ids})` as any[];
       for (const m of clenove) {
         const t = tierForMember({ visits: m.visits, spend: m.spend, lastVisitAt: m.last_visit_at }, pravidla);
-        pridej(Number(m.customer_id), { customer_visits: Number(m.visits) || 0, customer_level: t.id, customer_level_label: t.label });
+        pridej(Number(m.customer_id), { customer_visits: Number(m.visits) || 0, customer_spend: Number(m.spend) || 0, customer_level: t.id, customer_level_label: t.label });
       }
     } catch (e) { console.error('[rezervace] kontext hostů', e); }
+    // Kolo 8 (R8-7): kolikrát host nedorazil a kolik rezervací celkem měl — „2× nedorazil" u další
+    // rezervace, ať se host, který nepřišel potřetí, nepodobá štamgastovi.
+    try {
+      const nedorazeni = await sql`
+        SELECT customer_id, COUNT(*)::int AS celkem, COUNT(*) FILTER (WHERE status = 'no_show')::int AS nedorazeni
+        FROM client_reservations WHERE team_id = ${teamId} AND customer_id = ANY(${ids}) GROUP BY customer_id` as any[];
+      for (const n of nedorazeni) pridej(Number(n.customer_id), { customer_no_shows: Number(n.nedorazeni) || 0, customer_reservations: Number(n.celkem) || 0 });
+    } catch (e) { console.error('[rezervace] nedorazení', e); }
+    // Skupiny hosta („VIP", „firemní akce") jako štítky v knize rezervací (SevenRooms tagy).
+    try {
+      const skupiny = await sql`
+        SELECT gm.customer_id, g.name, g.color FROM client_group_members gm
+        JOIN client_groups g ON g.id = gm.group_id AND g.team_id = gm.team_id
+        WHERE gm.team_id = ${teamId} AND gm.customer_id = ANY(${ids}) AND g.archived = FALSE
+        ORDER BY gm.customer_id, g.name` as any[];
+      const poHostech = new Map<number, { name: string; color: string | null }[]>();
+      for (const s of skupiny) { const id = Number(s.customer_id); if (!poHostech.has(id)) poHostech.set(id, []); poHostech.get(id)!.push({ name: String(s.name ?? ''), color: s.color ? String(s.color) : null }); }
+      for (const [id, g] of poHostech) pridej(id, { customer_groups: g });
+    } catch (e) { console.error('[rezervace] skupiny hostů', e); }
   }
   if (smi.poznamky) {
     try {
+      // Poslední tři poznámky k hostovi: „alergie na ořechy" zapsaná minule se musí ukázat u dveří.
       const poznamky = await sql`
-        SELECT DISTINCT ON (customer_id) customer_id, body FROM client_member_notes
-        WHERE team_id = ${teamId} AND customer_id = ANY(${ids})
-        ORDER BY customer_id, created_at DESC, id DESC` as any[];
-      for (const n of poznamky) pridej(Number(n.customer_id), { staff_note: String(n.body ?? '') });
+        SELECT customer_id, body FROM (
+          SELECT customer_id, body, ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY created_at DESC, id DESC) AS poradi
+          FROM client_member_notes WHERE team_id = ${teamId} AND customer_id = ANY(${ids})
+        ) x WHERE poradi <= ${POZNAMEK_K_REZERVACI} ORDER BY customer_id, poradi` as any[];
+      const poHostech = new Map<number, string[]>();
+      for (const n of poznamky) { const id = Number(n.customer_id); if (!poHostech.has(id)) poHostech.set(id, []); poHostech.get(id)!.push(String(n.body ?? '')); }
+      for (const [id, texty] of poHostech) pridej(id, { staff_note: texty[0], staff_notes: texty });
     } catch (e) { console.error('[rezervace] poznámky personálu', e); }
   }
   return out;
@@ -234,9 +341,11 @@ export async function PATCH(req: NextRequest) {
       try { bodyRezervace = await pripisBodyZaRezervaci(u.team_id, Number(r.id), hostId); } catch (e) { console.error('[rezervace] body', e); }
     }
   }
-  if ((next === 'confirmed' || next === 'declined') && hostId) {
+  // Hostovi se hlásí rozhodnutí o rezervaci — ne vrácení omylu („Nedorazil" → zpět na potvrzeno).
+  if ((next === 'confirmed' || next === 'declined') && hostId && String(r.status) !== 'no_show') {
     notifyUser(hostId, zpravaHostoviORezervaci(next, String(r.date), String(r.time))).catch(() => {});
   }
-  audit(u.team_id, u.id, 'client.reservation', 'client', id, `${r.customer_name} · ${r.date} ${r.time} → ${status}`);
+  // Nedorazení je záznam o hostovi (vypíná mu automatické potvrzení) — do protokolu jmenovitě.
+  audit(u.team_id, u.id, next === 'no_show' ? 'rezervace.nedorazil' : 'client.reservation', 'client', id, `${r.customer_name} · ${r.date} ${r.time} → ${status}`);
   return NextResponse.json({ ok: true, status, tableId, posNote, loyalty, bodyRezervace });
 }

@@ -1670,6 +1670,11 @@ export async function GET(request: Request) {
     // největší skupina, která se potvrdí sama (0 = všechny velikosti); větší čekají na vedení.
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS auto_confirm BOOLEAN NOT NULL DEFAULT FALSE`);
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS auto_confirm_max_party INTEGER NOT NULL DEFAULT 0`);
+    // Kolo 8 (R8-7): stav 'no_show' (host nedorazil) — počet nedorazení hosta se čte podle (team, host, stav);
+    // připomínka rezervace hostovi (reminded_at) a jeho odpověď „Potvrdit" (guest_confirmed_at).
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_reservations_customer_status ON client_reservations (team_id, customer_id, status)`);
+    await ddl(sql`ALTER TABLE client_reservations ADD COLUMN IF NOT EXISTS reminded_at TIMESTAMP`);
+    await ddl(sql`ALTER TABLE client_reservations ADD COLUMN IF NOT EXISTS guest_confirmed_at TIMESTAMP`);
 
     // --- Výkonové indexy na provozních tabulkách ---------------------------
     // Uzávěrky, docházka a rozvrh filtrují tyhle tabulky podle team_id/date
@@ -2136,6 +2141,11 @@ export async function GET(request: Request) {
         UNIQUE (customer_id, ref)
       )`);
     await ddl(sql`CREATE INDEX IF NOT EXISTS client_reviews_team ON client_reviews (team_id, created_at)`);
+    // Kolo 8 (R8-7): odpověď podniku na hodnocení (host ji vidí v Moje stránka) a stav „vyřízeno".
+    await ddl(sql`ALTER TABLE client_reviews ADD COLUMN IF NOT EXISTS reply TEXT`);
+    await ddl(sql`ALTER TABLE client_reviews ADD COLUMN IF NOT EXISTS replied_by INTEGER`);
+    await ddl(sql`ALTER TABLE client_reviews ADD COLUMN IF NOT EXISTS replied_at TIMESTAMP`);
+    await ddl(sql`ALTER TABLE client_reviews ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMP`);
     await ddl(sql`
       CREATE TABLE IF NOT EXISTS client_broadcasts (
         id SERIAL PRIMARY KEY,

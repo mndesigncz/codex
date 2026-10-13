@@ -409,5 +409,6 @@
   "Vrátit zpět": "Undo",
   "Dnes už se nedá rezervovat, vyber zítřek.": "No more reservations today, pick tomorrow.",
   "Zítra": "Tomorrow",
-  "Rezervace je potvrzená. Těšíme se na tebe.": "Your reservation is confirmed. See you soon."
+  "Rezervace je potvrzená. Těšíme se na tebe.": "Your reservation is confirmed. See you soon.",
+  "Nedorazil": "No-show"
 }
