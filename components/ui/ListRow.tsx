@@ -80,7 +80,10 @@ export function ListRow({
             zákazníků neukazoval žádná jména — jen iniciály a čísla.
             Naměřeno: 768 px → jméno 0 px, 1024 px → 250 px. */}
         {aside != null && <span className="list-aside shrink-0 hidden lg:block text-[13px] text-black/55">{aside}</span>}
-        {right && <span className="shrink-0 flex items-center gap-2 text-right">{right}</span>}
+        {/* Bez `shrink-0`: když je obsah širší než řádek (dva chipy v polštině na 320 px), span se smí
+            zúžit a vnořený `flex-wrap` chipy zalomí — s `shrink-0` měl šířku obsahu a karta přetékala
+            (sonda k84-dochazka V4 v CI, kde písmo vychází o pár px širší). Co se vejde, vypadá stejně. */}
+        {right && <span className="min-w-0 max-w-full flex items-center gap-2 text-right">{right}</span>}
         {actions && !akceMimoOcas && <span className="list-actions shrink-0">{actions}</span>}
       </span>}
       {akceMimoOcas && <span className="list-actions list-actions-radek shrink-0">{actions}</span>}
