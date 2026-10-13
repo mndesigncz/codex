@@ -542,7 +542,8 @@ function RezervaceStranka({ oznam, onZmena, otevriHosta }: { oznam: Hlaska; onZm
           <Card key={datum} pad="none" aria-labelledby={`rez-${datum}`}>
             <h2 id={`rez-${datum}`} className="t-card cz-sentence px-5 pt-4">
               {czDay(datum, true)}{' '}
-              <span className="text-black/40 font-medium tabular-nums">· {czCount(s.pocet, REZERVACE)} · {czCount(s.osob, OSOBA)}{s.spicka ? ` · špička ${s.spicka}` : ''}</span>
+              {/* Den, kde nic neproběhlo (jen zrušené a nedorazivší), říká jen počet řádků — „0 osob" by mátlo. */}
+              <span className="text-black/40 font-medium tabular-nums">· {s.pocet > 0 ? `${czCount(s.pocet, REZERVACE)} · ${czCount(s.osob, OSOBA)}${s.spicka ? ` · špička ${s.spicka}` : ''}` : czCount(radky.length, REZERVACE)}</span>
             </h2>
             <ul className="list px-5 pb-1">
               {radky.map(r => {
@@ -793,16 +794,19 @@ function HostOkno({ r, hostId, oznam, onZavrit, onZmena, otevriHosta }: {
         {otevriHosta && <Button variant="primary" icon="users" onClick={otevriHosta}>Otevřít v Zákaznících</Button>}
       </>}>
       <div className="space-y-4">
-        <ul className="list">
-          <ListRow title="Rezervace" value={<span className="tabular-nums">{r.rezervaciCelkem ?? '–'}</span>}
-            valueMeta={r.rezervaciCelkem == null ? undefined : nedorazeni > 0 ? `${nedorazeni}× nedorazil` : 'vždy dorazil'}
-            right={nedorazeni > 0 ? <Chip tone="bad" size="sm" className="tabular-nums">{nedorazeni}× nedorazil</Chip> : undefined}
-            meta={nedorazeni >= NEDORAZENI_LIMIT ? 'Další rezervace se mu nepotvrdí sama — počká na tebe.' : undefined} />
-          {r.navstev != null && <ListRow title="Návštěvy" value={<span className="tabular-nums">{r.navstev}</span>} meta={r.utrata ? `útrata celkem ${money(r.utrata)}` : undefined} />}
-          {r.skupiny.length > 0 && (
-            <ListRow title="Skupiny" detail={<span className="flex flex-wrap gap-1 mt-0.5">{r.skupiny.map(g => <Chip key={g.nazev} tone="muted" size="sm" icon="tag">{g.nazev}</Chip>)}</span>} />
-          )}
-        </ul>
+        {/* Čísla hosta jako Stat (ne ListRow s číslem v ocasu, které na telefonu padá pod popisek). */}
+        <StatRow>
+          <Stat label="Rezervace" value={r.rezervaciCelkem == null ? '–' : String(r.rezervaciCelkem)}
+            note={r.rezervaciCelkem == null ? undefined : nedorazeni > 0 ? `${nedorazeni}× nedorazil` : 'vždy dorazil'} tone={nedorazeni > 0 ? 'bad' : undefined} />
+          {r.navstev != null && <Stat label="Návštěvy" value={String(r.navstev)} note={r.utrata ? `útrata ${money(r.utrata)}` : undefined} />}
+        </StatRow>
+        {nedorazeni >= NEDORAZENI_LIMIT && <p className="note note-wait">Další rezervace se mu nepotvrdí sama — počká na tebe.</p>}
+        {r.skupiny.length > 0 && (
+          <div>
+            <p className="t-label mb-1.5">Skupiny</p>
+            <div className="flex flex-wrap gap-1">{r.skupiny.map(g => <Chip key={g.nazev} tone="muted" size="sm" icon="tag">{g.nazev}</Chip>)}</div>
+          </div>
+        )}
         {poznamkuje && (
           <div>
             <p className="t-label mb-1.5">Poznámky pro personál</p>

@@ -1,0 +1,13 @@
+{
+ "reviews": [
+  {
+   "id": 1,
+   "rating": 5,
+   "note": "Nejlepší matcha ve městě.",
+   "createdAt": "DNES 17:10:00",
+   "reply": "Děkujeme, Jano! Těšíme se zas.",
+   "repliedAt": "DNES 18:00:00",
+   "kind": "order"
+  }
+ ]
+}

@@ -1,0 +1,136 @@
+{
+ "reservations": [
+  {
+   "id": 5,
+   "date": "VCERA",
+   "time": "19:00",
+   "party": 2,
+   "status": "no_show",
+   "note": null,
+   "customer_id": 102,
+   "customer_name": "Petr Novák",
+   "customer_email": "p.novak@email.cz",
+   "customer_phone": "+420 605 118 992",
+   "table_id": 3,
+   "table_name": "Zahrádka 1",
+   "customer_visits": 7,
+   "customer_spend": 2100,
+   "customer_level": "bronze",
+   "customer_level_label": "Člen",
+   "customer_no_shows": 2,
+   "customer_reservations": 9,
+   "customer_groups": [],
+   "staff_notes": [],
+   "created_by": null
+  },
+  {
+   "id": 4,
+   "date": "VCERA",
+   "time": "17:30",
+   "party": 4,
+   "status": "done",
+   "note": null,
+   "customer_id": 101,
+   "customer_name": "Jana Dvořáková",
+   "customer_email": "jana.dvorakova@email.cz",
+   "customer_phone": "+420 776 221 004",
+   "table_id": 1,
+   "table_name": "U okna",
+   "customer_visits": 41,
+   "customer_spend": 18400,
+   "customer_level": "gold",
+   "customer_level_label": "Zlatý host",
+   "customer_no_shows": 0,
+   "customer_reservations": 12,
+   "customer_groups": [
+    {
+     "name": "VIP",
+     "color": null
+    }
+   ],
+   "staff_notes": [
+    "Alergie na ořechy"
+   ],
+   "staff_note": "Alergie na ořechy",
+   "created_by": null
+  },
+  {
+   "id": 3,
+   "date": "PREDEVCIREM",
+   "time": "20:00",
+   "party": 2,
+   "status": "confirmed",
+   "note": null,
+   "customer_id": 104,
+   "customer_name": "Ondřej Beneš",
+   "customer_email": "ondrej@email.cz",
+   "customer_phone": "+420 777 000 111",
+   "table_id": null,
+   "table_name": null,
+   "customer_visits": 3,
+   "customer_spend": 900,
+   "customer_level": "bronze",
+   "customer_level_label": "Člen",
+   "customer_no_shows": 0,
+   "customer_reservations": 3,
+   "customer_groups": [],
+   "staff_notes": [],
+   "created_by": null
+  }
+ ],
+ "tables": [
+  {
+   "id": 1,
+   "name": "U okna",
+   "seats": 4,
+   "storyous_desk_id": null
+  },
+  {
+   "id": 3,
+   "name": "Zahrádka 1",
+   "seats": 2,
+   "storyous_desk_id": null
+  }
+ ],
+ "today": "DNES",
+ "zapis": {
+  "opening_hours": {
+   "0": {
+    "open": "08:00",
+    "close": "23:00"
+   },
+   "1": {
+    "open": "08:00",
+    "close": "23:00"
+   },
+   "2": {
+    "open": "08:00",
+    "close": "23:00"
+   },
+   "3": {
+    "open": "08:00",
+    "close": "23:00"
+   },
+   "4": {
+    "open": "08:00",
+    "close": "23:00"
+   },
+   "5": {
+    "open": "08:00",
+    "close": "23:00"
+   },
+   "6": {
+    "open": "08:00",
+    "close": "23:00"
+   }
+  },
+  "max_party": 8,
+  "lead_days": 30,
+  "slot_minutes": 30
+ },
+ "celkem": 240,
+ "pocty": {
+  "celkem": 240,
+  "nedorazeni": 6
+ }
+}
