@@ -18,6 +18,8 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'uzivatel.zablokovan': 'Uživatel zablokován',
   'uzivatel.odblokovan': 'Uživatel odblokován',
   'zprava.smazana': 'Zpráva v chatu smazána',
+  'oznameni.potvrzeno': 'Oznámení na nástěnce potvrzeno („Rozumím")',
+  'oznameni.pripomenuto': 'Připomenutí oznámení těm, kdo nepotvrdili',
   'team.switch': 'Přepnutí do jiného podniku',
   'team.create': 'Založen nový podnik',
   'team.create_account': 'Založen účet člena',

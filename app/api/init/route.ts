@@ -2695,6 +2695,18 @@ export async function GET(request: Request) {
       )`);
     await ddl(sql`CREATE UNIQUE INDEX IF NOT EXISTS payroll_locks_team_period ON payroll_locks (team_id, period_from, period_to)`);
 
+    // ---- Kolo 8 (R8-6): nástěnka s potvrzením přečtení, reakce a odpovědi v chatu ----
+    // announcements.require_ack: oznámení chce od každého „Rozumím"; announcement_reads: kdo a kdy potvrdil.
+    await ddl(sql`ALTER TABLE announcements ADD COLUMN IF NOT EXISTS require_ack BOOLEAN DEFAULT FALSE`);
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS announcement_reads (
+        announcement_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        read_at TIMESTAMP DEFAULT NOW(),
+        acked_at TIMESTAMP,
+        PRIMARY KEY (announcement_id, user_id)
+      )`);
+
     // Kroky migrace, které selhaly (a byly zachyceny), ať se to pozná zvenku
     // místo tichého „ok". Prázdné pole = celé schéma prošlo.
     if (migFails.length) console.error('init: kroků selhalo', migFails.length, migFails);

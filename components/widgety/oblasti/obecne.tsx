@@ -523,6 +523,13 @@ interface Oznameni {
   createdAt: string;
   authorName: string | null;
   authorAvatar: string | null;
+  /** Kolo 8: oznámení chce od každého „Rozumím". */
+  requireAck: boolean;
+  /** Já (na tabletu člověk u něj) jsem potvrdil. */
+  acked: boolean;
+  /** Kolik lidí potvrdilo; `memberCount` jen pro správu nástěnky (z kolika). */
+  ackCount: number;
+  memberCount: number | null;
 }
 
 function vyberOznameni(raw: any): Oznameni[] {
@@ -535,7 +542,75 @@ function vyberOznameni(raw: any): Oznameni[] {
     createdAt: String(a.createdAt ?? ''),
     authorName: typeof a.authorName === 'string' ? a.authorName : null,
     authorAvatar: typeof a.authorAvatar === 'string' ? a.authorAvatar : null,
+    requireAck: a.requireAck === true,
+    acked: a.acked === true,
+    ackCount: Number(a.ackCount) || 0,
+    memberCount: Number.isFinite(Number(a.memberCount)) && a.memberCount != null ? Number(a.memberCount) : null,
   }));
+}
+
+/** Kdo oznámení potvrdil a kdo ještě ne (GET ?cteni=<id>, jen správa nástěnky). */
+interface Cteni { potvrdili: { id: number; name: string; avatar: string | null; at: string }[]; ceka: { id: number; name: string; avatar: string | null }[] }
+function vyberCteni(raw: any): Cteni {
+  if (!Array.isArray(raw?.potvrdili) || !Array.isArray(raw?.ceka)) throw new Error('Stav přečtení přišel v nečekaném tvaru.');
+  const clovek = (x: any) => ({ id: Number(x.id), name: String(x.name ?? ''), avatar: typeof x.avatar === 'string' ? x.avatar : null });
+  return { potvrdili: raw.potvrdili.map((x: any) => ({ ...clovek(x), at: String(x.at ?? '') })), ceka: raw.ceka.map(clovek) };
+}
+
+/**
+ * „Přečteno 5 z 8" → okno zdola se dvěma seznamy (potvrdili s časem / zatím ne)
+ * a „Připomenout" — push těm, kdo ještě nepotvrdili. Connecteam tomu říká
+ * „who has viewed your update"; tady je to pod stejným oznámením, kde se čte.
+ */
+function KdoCetlOkno({ oznameni, onClose }: { oznameni: Oznameni; onClose: () => void }) {
+  const t = useT('widgety');
+  const data = useDataWidgetu(`${URL_OZNAMENI}?cteni=${oznameni.id}`, vyberCteni);
+  const [posilam, setPosilam] = useState(false);
+  const [hlaska, setHlaska] = useState<{ text: string; chyba: boolean } | null>(null);
+  const pripomenout = async () => {
+    setPosilam(true);
+    setHlaska(null);
+    try {
+      const res = await fetch(URL_OZNAMENI, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: oznameni.id, remind: true }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) { setHlaska({ text: typeof d?.error === 'string' ? d.error : t('Připomenutí se nepodařilo odeslat.'), chyba: true }); return; }
+      setHlaska({ text: t('Připomenutí odešlo {n, plural, one {# člověku} few {# lidem} other {# lidem}}.', { n: Number(d?.reminded) || 0 }), chyba: false });
+    } catch {
+      setHlaska({ text: t('Připomenutí se nepodařilo odeslat — zkontroluj připojení.'), chyba: true });
+    } finally {
+      setPosilam(false);
+    }
+  };
+  const d = data.data;
+  const ceka = d?.ceka.length ?? 0;
+  return (
+    <Modal open onClose={onClose} size="sm" title={t('Kdo četl')}
+      subtitle={d ? t('Přečteno {a} z {b}', { a: cislo(d.potvrdili.length), b: cislo(d.potvrdili.length + d.ceka.length) }) : undefined}
+      footer={<>
+        <Button variant="secondary" onClick={onClose}>{t('Zavřít')}</Button>
+        <Button variant="primary" icon="bell" loading={posilam} disabled={!d || ceka === 0} onClick={pripomenout}>{t('Připomenout')}</Button>
+      </>}>
+      {data.loading && <p className="t-meta">{t('Načítám…')}</p>}
+      {data.error && <p className="note note-danger" role="alert">{t('Stav přečtení se nenačetl.')}</p>}
+      {d && (
+        <div className="space-y-4">
+          <div>
+            <p className="t-label">{t('Potvrdili')}</p>
+            {d.potvrdili.length === 0
+              ? <p className="t-meta mt-1">{t('Nikdo zatím nepotvrdil.')}</p>
+              : <ul className="list mt-1">{d.potvrdili.map(c => <ListRow key={c.id} lead={<Avatar emoji={c.avatar} name={c.name} size="sm" />} title={c.name} right={<span className="t-meta tabular-nums">{dbTimeDayHM(c.at)}</span>} />)}</ul>}
+          </div>
+          <div>
+            <p className="t-label">{t('Zatím ne')}</p>
+            {d.ceka.length === 0
+              ? <p className="t-meta mt-1">{t('Všichni potvrdili.')}</p>
+              : <ul className="list mt-1">{d.ceka.map(c => <ListRow key={c.id} lead={<Avatar emoji={c.avatar} name={c.name} size="sm" />} title={c.name} />)}</ul>}
+          </div>
+          {hlaska && <p className={`note ${hlaska.chyba ? 'note-danger' : 'note-ok'}`} role="status">{hlaska.text}</p>}
+        </div>
+      )}
+    </Modal>
+  );
 }
 
 /**
@@ -547,12 +622,14 @@ function NoveOznameni({ nahled, okno }: { nahled: boolean; okno?: { onClose: () 
   const t = useT('widgety');
   const [text, setText] = useState('');
   const [doChatu, setDoChatu] = useState(false);
+  // Kolo 8: „Vyžadovat potvrzení" — každý pod oznámením klepne na „Rozumím" a vedení vidí, kdo ještě ne.
+  const [potvrzeni, setPotvrzeni] = useState(false);
   const [ukladam, setUkladam] = useState(false);
   const [chyba, setChyba] = useState<string | null>(null);
   const id = useId();
   // V náhledu (galerie) koncept nečte ani nepíše — jinak by se přetahoval se skutečnou nástěnkou.
-  const koncept = useDraft('oznameni', { content: text, alsoChat: doChatu }, v => { setText(v.content); setDoChatu(v.alsoChat); }, {
-    vychozi: { content: '', alsoChat: false }, aktivni: !nahled,
+  const koncept = useDraft('oznameni', { content: text, alsoChat: doChatu, requireAck: potvrzeni }, v => { setText(v.content); setDoChatu(v.alsoChat); setPotvrzeni(v.requireAck === true); }, {
+    vychozi: { content: '', alsoChat: false, requireAck: false }, aktivni: !nahled,
   });
 
   const pripnout = async () => {
@@ -563,13 +640,14 @@ function NoveOznameni({ nahled, okno }: { nahled: boolean; okno?: { onClose: () 
     try {
       const res = await fetch(URL_OZNAMENI, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: obsah, postToChat: doChatu }),
+        body: JSON.stringify({ content: obsah, postToChat: doChatu, requireAck: potvrzeni }),
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok || !d?.ok) { setChyba(typeof d?.error === 'string' ? d.error : t('Oznámení se nepodařilo připnout.')); return; }
       koncept.hotovo();
       setText('');
       setDoChatu(false);
+      setPotvrzeni(false);
       obnovDataWidgetu(URL_OZNAMENI);
       okno?.onClose();
     } catch {
@@ -587,6 +665,7 @@ function NoveOznameni({ nahled, okno }: { nahled: boolean; okno?: { onClose: () 
           onChange={e => setText(e.target.value)} />
       </Field>
       <SwitchRow as="div" className="!py-1" title={t('Poslat i do týmového chatu')} checked={doChatu} onChange={setDoChatu} />
+      <SwitchRow as="div" className="!py-1" title={t('Vyžadovat potvrzení')} hint={t('Každý pod oznámením klepne na „Rozumím" a uvidíš, kdo ještě ne.')} checked={potvrzeni} onChange={setPotvrzeni} />
       {chyba && <p className="note note-danger" role="alert">{chyba}</p>}
     </div>
   );
@@ -662,10 +741,35 @@ function Nastenka({ velikost, nastaveni, nahled }: WidgetProps<{ archiv?: unknow
   const [upravuji, setUpravuji] = useState<Oznameni | null>(null);
   const [mazu, setMazu] = useState<Oznameni | null>(null);
   const [mazani, setMazani] = useState(false);
+  // Kolo 8: potvrzení přečtení („Rozumím") a okno „Kdo četl".
+  const [kdoCetl, setKdoCetl] = useState<Oznameni | null>(null);
+  const [potvrzuji, setPotvrzuji] = useState<number | null>(null);
 
   const M = velikost === 'M';
   const vse = data.data ?? [];
   const pripnuta = vse.filter(a => a.pinned);
+  // Dokud člověk nepotvrdí, nese nástěnka tečku: počet k potvrzení v doplňku hlavičky (tón wait).
+  const kPotvrzeni = pripnuta.filter(a => a.requireAck && !a.acked).length;
+
+  /** „Rozumím": za sebe; na tabletu za člověka vybraného PINem (cookie actingAs jako u úkolů). */
+  const potvrdit = async (a: Oznameni) => {
+    if (nahled || potvrzuji != null) return;
+    setChyba(null);
+    setPotvrzuji(a.id);
+    try {
+      const res = await fetch(URL_OZNAMENI, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: a.id }) });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setChyba(typeof d?.error === 'string' ? d.error : t('Potvrzení se nepodařilo uložit.'));
+        return;
+      }
+      obnovDataWidgetu(URL_OZNAMENI);
+    } catch {
+      setChyba(t('Potvrzení se nepodařilo uložit — zkontroluj připojení.'));
+    } finally {
+      setPotvrzuji(null);
+    }
+  };
   // Odepnutá tým nevidí; správce si je zapne v nastavení widgetu („Ukázat i odepnutá").
   const odepnuta = spravuje && nastaveni.archiv === true ? vse.filter(a => !a.pinned) : [];
 
@@ -721,6 +825,21 @@ function Nastenka({ velikost, nastaveni, nahled }: WidgetProps<{ archiv?: unknow
     { label: t('Smazat…'), icon: 'trash', danger: true, onClick: () => setMazu(a) },
   ];
 
+  /** Vpravo: stav potvrzení — správě nástěnky „Přečteno 5 z 8" (klepnutí otevře, kdo), ostatním „K potvrzení" / „Potvrzeno". */
+  const stavPotvrzeni = (a: Oznameni) => {
+    if (!a.requireAck) return null;
+    if (spravuje && a.memberCount != null) {
+      const vsichni = a.ackCount >= a.memberCount;
+      return (
+        <button type="button" onClick={() => setKdoCetl(a)} aria-haspopup="dialog" data-kdo-cetl={a.id}
+          className={`chip chip-sm tap-target-sm ${vsichni ? 'chip-ok' : 'chip-wait'} hover:brightness-95 transition`}>
+          <Icon name={vsichni ? 'check' : 'users'} size={11} className="shrink-0" />
+          {t('Přečteno {a} z {b}', { a: cislo(a.ackCount), b: cislo(a.memberCount) })}
+        </button>
+      );
+    }
+    return a.acked ? <Chip tone="ok" size="sm" icon="check">{t('Potvrzeno')}</Chip> : <Chip tone="wait" size="sm">{t('K potvrzení')}</Chip>;
+  };
   const radek = (a: Oznameni) => (
     <ListRow key={a.id} className="items-start"
       lead={<Avatar emoji={a.authorAvatar} name={a.authorName} size="sm" />}
@@ -728,7 +847,11 @@ function Nastenka({ velikost, nastaveni, nahled }: WidgetProps<{ archiv?: unknow
       // `line-clamp` si nastavuje vlastní display, proto ne zároveň s `block` (ten by ořez přebil).
       title={<span className={`whitespace-pre-wrap break-words ${M ? 'line-clamp-3' : 'block'}`}>{a.content}</span>}
       meta={[a.authorName, dbTimeDayHM(a.createdAt)].filter(Boolean).join(' · ')}
-      right={!a.pinned ? <Chip tone="muted" size="sm">{t('Odepnuto')}</Chip> : undefined}
+      // „Rozumím" pod textem (44 px, tmavé primary — widget nikdy limetku): dokud člověk nepotvrdí.
+      detail={a.requireAck && !a.acked && a.pinned ? (
+        <Button variant="primary" size="md" icon="check" className="mt-1.5" loading={potvrzuji === a.id} onClick={() => { void potvrdit(a); }}>{t('Rozumím')}</Button>
+      ) : undefined}
+      right={!a.pinned ? <Chip tone="muted" size="sm">{t('Odepnuto')}</Chip> : stavPotvrzeni(a) ?? undefined}
       // Na telefonu se akce odlomí na vlastní řádek a jediné „···" by skončilo vlevo pod
       // textem; obal ho drží u pravého okraje jako v ostatních řádcích.
       actions={spravuje ? <div className="flex justify-end"><Menu size="sm" label={t('Další akce s oznámením: {text}', { text: a.content.length > 40 ? `${a.content.slice(0, 40)}…` : a.content })} items={akceRadku(a)} /></div> : undefined} />
@@ -753,7 +876,8 @@ function Nastenka({ velikost, nastaveni, nahled }: WidgetProps<{ archiv?: unknow
   return (
     <>
       <Widget nacteni={ceka ? CEKA : nacteniData} prazdno={prazdno}
-        doplnek={pripnuta.length > 0 ? <Chip tone="muted" size="sm">{cislo(pripnuta.length)}</Chip> : undefined}>
+        doplnek={kPotvrzeni > 0 ? <Chip tone="wait" size="sm" aria-label={t('{n, plural, one {# oznámení k potvrzení} few {# oznámení k potvrzení} other {# oznámení k potvrzení}}', { n: kPotvrzeni })}>{cislo(kPotvrzeni)}</Chip>
+          : pripnuta.length > 0 ? <Chip tone="muted" size="sm">{cislo(pripnuta.length)}</Chip> : undefined}>
         <div className="space-y-4">
           {spravuje && !M && <NoveOznameni nahled={nahled} />}
           {chyba && <p className="note note-danger" role="alert">{chyba}</p>}
@@ -789,6 +913,9 @@ function Nastenka({ velikost, nastaveni, nahled }: WidgetProps<{ archiv?: unknow
         <NadPlochou>
           <UpravaOznameni oznameni={upravuji} onClose={() => setUpravuji(null)} onUlozit={txt => zapis(upravuji, { content: txt })} />
         </NadPlochou>
+      )}
+      {kdoCetl && !nahled && (
+        <NadPlochou><KdoCetlOkno oznameni={kdoCetl} onClose={() => setKdoCetl(null)} /></NadPlochou>
       )}
       {mazu && !nahled && (
         <NadPlochou>
