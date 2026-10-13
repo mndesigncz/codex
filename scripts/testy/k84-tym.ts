@@ -12,6 +12,13 @@ import { dniKNacteni, hodinyClenu, seradCleny, soucetHodinClenu } from '../../li
 import { pragueMomentOf } from '../../lib/pragueTime.ts';
 import { STRANKA as TYM } from '../../lib/widgety/stranky/vedeni.tym.ts';
 import type { ZaznamDochazky } from '../../lib/dochazkaPrehled.ts';
+import {
+  BEZ_LIMITU, ZAKONNE_LIMITY, klicTydne, smenaVLimitech, souhrnVarovani, varovaniLimitu, varovaniNoveSmeny, varovaniPodleSmeny, vycistiLimity,
+  type SmenaLimitu,
+} from '../../lib/rozvrhLimity.ts';
+import {
+  navrhniRozvrh, planProtiTrzbam, podilMezdPlanu, tonPodilu, trzbaDne, type ClovekGeneratoru, type TypSmeny, type VstupGeneratoru,
+} from '../../lib/rozvrhGenerator.ts';
 
 const zdroj = (cesta: string) => readFileSync(new URL(`../../${cesta}`, import.meta.url), 'utf8');
 const p = (den: string, hm: string) => pragueMomentOf(den, hm)!.toISOString();
@@ -65,4 +72,90 @@ export default function ({ eq, ok }: Testy) {
   ok('Tým: řazení Jméno / Hodiny / Výdělek (výdělek jen s finance.mzdy)', /id: 'hodiny' as const/.test(tym) && /smiVidetSazby \? \[\{ id: 'vydelek' as const/.test(tym));
   ok('Tým: odkaz „Rozpad v Docházce" jen na pohled, kam divák smí', /nav\.smiPohled\('attendance'\)/.test(tym) && /t\('Rozpad v Docházce'\)/.test(tym));
   ok('Tým: stránka doporučuje Souhrn hodin', TYM.doporucene.includes('dochazka.souhrn_hodin'));
+
+  // =========================================================================
+  // Limity rozvrhu (lib/rozvrhLimity.ts): odpočinek, nejdelší směna, týden
+  // =========================================================================
+  eq('limity: vyčištění — null, prázdno a nesmysl = vypnuto, hodiny se ořežou', vycistiLimity({ minRestHours: null, maxShiftHours: '', maxWeekHours: 'x' }), BEZ_LIMITU);
+  eq('limity: vyčištění z řádku teams (snake_case) a strop', vycistiLimity({ min_rest_hours: 11, max_shift_hours: 40, max_week_hours: 500 }), { minRestHours: 11, maxShiftHours: 24, maxWeekHours: 168 });
+  eq('limity: zákonné výchozí 11 / 12 / 40', ZAKONNE_LIMITY, { minRestHours: 11, maxShiftHours: 12, maxWeekHours: 40 });
+  eq('limity: klíč týdne — pondělí (zacatek 1) a neděle (zacatek 0)', [klicTydne('2026-10-11', 1), klicTydne('2026-10-11', 0), klicTydne('2026-10-12', 0)], ['2026-10-05', '2026-10-11', '2026-10-11']);
+
+  const sm = (klic: string, kdo: number, date: string, od: string, doC: string): SmenaLimitu => ({ klic, employeeId: kdo, date, startTime: od, endTime: doC });
+  // Eva: sobota zavírá 15–23, neděle otvírá 7–15 → 8 h odpočinku (varování na nedělní směně).
+  const vikend = [sm('a', 1, '2026-10-10', '15:00', '23:00'), sm('b', 1, '2026-10-11', '07:00', '15:00')];
+  eq('limity: 8 h mezi zavírací a ranní = varování odpočinku na té pozdější', varovaniLimitu(vikend, ZAKONNE_LIMITY), [{ klic: 'b', employeeId: 1, date: '2026-10-11', druh: 'odpocinek', hodnota: 8, limit: 11 }]);
+  eq('limity: noční přes půlnoc 22–02 a ranní 9:00 = 7 h', varovaniLimitu([sm('n', 1, '2026-10-09', '22:00', '02:00'), sm('r', 1, '2026-10-10', '09:00', '17:00')], ZAKONNE_LIMITY).map(v => [v.klic, v.druh, v.hodnota]), [['r', 'odpocinek', 7]]);
+  eq('limity: 13 h směna nad 12', varovaniLimitu([sm('d', 2, '2026-10-05', '07:00', '20:00')], ZAKONNE_LIMITY).map(v => [v.druh, v.hodnota, v.limit]), [['smena', 13, 12]]);
+  eq('limity: 12 h přesně neporušuje', varovaniLimitu([sm('d', 2, '2026-10-05', '08:00', '20:00')], ZAKONNE_LIMITY), []);
+  const tyden = ['05', '06', '07', '08', '09', '10'].map((d, i) => sm(`t${i}`, 3, `2026-10-${d}`, '08:00', '16:00'));
+  eq('limity: šest osmihodinových = 48 h, varování až na sobotní (šesté) směně', varovaniLimitu(tyden, ZAKONNE_LIMITY).map(v => [v.klic, v.druh, v.hodnota]), [['t5', 'tyden', 48]]);
+  eq('limity: pět osmihodinových = 40 h bez varování', varovaniLimitu(tyden.slice(0, 5), ZAKONNE_LIMITY), []);
+  eq('limity: týden od neděle — neděle 11. patří k dalšímu týdnu, sobota 10. k předchozímu', varovaniLimitu([...tyden.slice(0, 5), sm('ne', 3, '2026-10-11', '08:00', '16:00')], ZAKONNE_LIMITY, 0), []);
+  eq('limity: vypnuté = žádná varování', varovaniLimitu([...vikend, ...tyden], BEZ_LIMITU), []);
+  eq('limity: souhrn počítá druhy a první den', souhrnVarovani(varovaniLimitu([...vikend, ...tyden, sm('d', 2, '2026-10-05', '07:00', '20:00')], ZAKONNE_LIMITY)), { celkem: 3, odpocinek: 1, smena: 1, tyden: 1, prvniDen: '2026-10-05' });
+  eq('limity: seskupení podle směny', [...varovaniPodleSmeny(varovaniLimitu(vikend, ZAKONNE_LIMITY)).keys()], ['b']);
+  // Nová směna: přidaná zavírací v sobotu udělá z už existující nedělní ranní porušení — varování se vrátí (klíč té existující).
+  eq('limity: nová dřívější směna, která zkrátí odpočinek té existující, se hlásí', varovaniNoveSmeny({ employeeId: 1, date: '2026-10-10', startTime: '15:00', endTime: '23:00' }, [vikend[1]], ZAKONNE_LIMITY).map(v => [v.klic, v.druh]), [['b', 'odpocinek']]);
+  eq('limity: nová směna bez porušení = nic', varovaniNoveSmeny({ employeeId: 1, date: '2026-10-12', startTime: '08:00', endTime: '16:00' }, vikend, ZAKONNE_LIMITY), []);
+  eq('limity: cizí směny se nepletou', varovaniNoveSmeny({ employeeId: 9, date: '2026-10-11', startTime: '07:00', endTime: '15:00' }, [vikend[0]], ZAKONNE_LIMITY), []);
+  eq('limity: generátor — smenaVLimitech', [smenaVLimitech({ employeeId: 1, date: '2026-10-11', startTime: '07:00', endTime: '15:00' }, [vikend[0]], ZAKONNE_LIMITY), smenaVLimitech({ employeeId: 1, date: '2026-10-11', startTime: '10:00', endTime: '18:00' }, [vikend[0]], ZAKONNE_LIMITY)], [false, true]);
+
+  // ---- generátor limity dodrží ----
+  // Pondělí a úterý 8–22, Otvíračka 8–14 a Zavíračka 14–22. Eva v pondělí zavírá (do 22), Filip otvírá.
+  // V úterý by podle jména otvírala Eva — s odpočinkem 11 h nesmí (10 h), otvírá Filip a Eva zavírá.
+  const oh: VstupGeneratoru['openingHours'] = {};
+  for (let i = 0; i <= 6; i++) oh[String(i)] = { open: '08:00', close: '22:00', closed: i > 1 };
+  const typy: TypSmeny[] = [
+    { id: 1, name: 'Otvíračka', start_time: '08:00', end_time: '14:00', starts_at_open: true },
+    { id: 2, name: 'Zavíračka', start_time: '14:00', end_time: '22:00', ends_at_close: true },
+  ];
+  const clovek = (id: number, name: string, extra: Partial<ClovekGeneratoru> = {}): ClovekGeneratoru => ({ id, name, unavailable: [], dayPrefs: {}, preferredShift: null, maxShifts: null, maxConsecutive: null, maxHours: null, ...extra });
+  const lideG = [clovek(1, 'Eva', { dayPrefs: { '2026-10-05': 'type:2' } }), clovek(2, 'Filip', { dayPrefs: { '2026-10-05': 'type:1' } })];
+  const smenyDne = (v: ReturnType<typeof navrhniRozvrh>, d: string) => v.proposed.filter(p => p.date === d).map(p => [p.employeeName, p.shiftTypeName]).sort();
+  const bezLimitu = navrhniRozvrh({ month: '2026-10', lide: lideG, typy, openingHours: oh });
+  eq('generátor bez limitů: v úterý otvírá Eva (abeceda), zavírá Filip', smenyDne(bezLimitu, '2026-10-06'), [['Eva', 'Otvíračka'], ['Filip', 'Zavíračka']]);
+  // Otvíračky se obsazují napřed v celém měsíci (Eva dostane úterní 8–14), takže pondělní
+  // zavírací do 22 už Eva vzít nesmí (10 h do úterního otevření) a Filip ten den stojí —
+  // generátor ji nechá neobsazenou a řekne proč. Limit je limit: raději díra než porušení.
+  const sLimity = navrhniRozvrh({ month: '2026-10', lide: lideG, typy, openingHours: oh, limity: ZAKONNE_LIMITY });
+  eq('generátor s limity: pondělní zavírací by Evě dala 10 h do úterní otvíračky — zůstane neobsazená', smenyDne(sLimity, '2026-10-05'), [['Filip', 'Otvíračka']]);
+  eq('generátor s limity: úterý Eva otvírá, Filip zavírá', smenyDne(sLimity, '2026-10-06'), [['Eva', 'Otvíračka'], ['Filip', 'Zavíračka']]);
+  ok('generátor s limity: neobsazená směna má v důvodu odpočinek / týdenní strop', sLimity.warnings.some(w => w.startsWith('5.10.') && w.includes('odpočinek mezi směnami')));
+  eq('generátor s limity: návrh sám limity neporušuje', varovaniLimitu(sLimity.proposed.map((p, i) => sm(`p${i}`, p.employeeId, p.date, p.startTime, p.endTime)), ZAKONNE_LIMITY), []);
+  const dlouha: TypSmeny[] = [{ id: 3, name: 'Celý den', start_time: '08:00', end_time: '22:00', starts_at_open: true, ends_at_close: true }];
+  const nikdo = navrhniRozvrh({ month: '2026-10', lide: [clovek(1, 'Eva')], typy: dlouha, openingHours: oh, limity: { ...BEZ_LIMITU, maxShiftHours: 12 } });
+  eq('generátor: 14h typ nad stropem 12 h nikdo nedostane', nikdo.proposed.length, 0);
+  ok('generátor: důvod říká, že jde o odpočinek nebo strop', nikdo.warnings.some(w => w.includes('odpočinek mezi směnami nebo by přesáhli týdenní strop')));
+
+  // =========================================================================
+  // Plán proti tržbám (lib/rozvrhGenerator.ts)
+  // =========================================================================
+  const dny = { '0': { prumer: 18400, vzorek: 8 }, '1': { prumer: 0, vzorek: 0 } };
+  eq('tržby dne: pondělí z průměru, úterý bez vzorku null, sobota bez dat null', [trzbaDne(dny, '2026-10-05'), trzbaDne(dny, '2026-10-06'), trzbaDne(dny, '2026-10-10')], [18400, null, null]);
+  eq('podíl mezd: 2 800 / 18 400 = 15 %, bez tržby null', [podilMezdPlanu(2800, 18400), podilMezdPlanu(2800, 0), podilMezdPlanu(null, 18400)], [15, null, null]);
+  eq('tón podílu: pod cílem ok, nad cílem wait, bez cíle tlumený', [tonPodilu(15, 28), tonPodilu(30, 28), tonPodilu(15, null), tonPodilu(null, 28)], ['ok', 'wait', 'muted', 'muted']);
+  const plan = planProtiTrzbam([
+    { date: '2026-10-05', startTime: '08:00', endTime: '16:00', hourlyRate: 150 },
+    { date: '2026-10-05', startTime: '12:00', endTime: '20:00', hourlyRate: 200 },
+    { date: '2026-10-06', startTime: '08:00', endTime: '16:00', hourlyRate: 150 },
+    { date: '2026-10-07', startTime: '08:00', endTime: '16:00', hourlyRate: null },
+  ], dny, ['2026-10-05', '2026-10-06', '2026-10-07']);
+  eq('plán proti tržbám: pondělí 2 800 Kč mezd proti 18 400 = 15 %', plan.poDnech.get('2026-10-05'), { date: '2026-10-05', trzba: 18400, mzdy: 2800, podil: 15 });
+  eq('plán proti tržbám: den bez tržby má mzdy, ale podíl null', plan.poDnech.get('2026-10-06'), { date: '2026-10-06', trzba: null, mzdy: 1200, podil: null });
+  eq('plán proti tržbám: směna bez sazby = den bez mezd', plan.poDnech.get('2026-10-07'), { date: '2026-10-07', trzba: null, mzdy: null, podil: null });
+  eq('plán proti tržbám: celkem — podíl jen z dnů s tržbou, mzdy ze všech', [plan.trzba, plan.mzdy, plan.podil], [18400, 4000, 15]);
+  eq('plán proti tržbám: bez tržeb vůbec', planProtiTrzbam([], null, ['2026-10-05']).podil, null);
+
+  // ---- ve zdroji: plánovač a pravidla ----
+  const plano = zdroj('components/scheduling/ScheduleBuilder.tsx');
+  ok('plánovač: limity a tržby čte z GET /api/schedule/generate jen s rozvrh.zobrazit', /useDataWidgetu<InfoPlanu>\(planovac \? URL_INFO_PLANU : null/.test(plano));
+  ok('plánovač: podíl mezd jen s finance.trzby a finance.mzdy', /smiTrzby && smiMzdy && infoPlanu\.data\?\.trzby\?\.stav === 'ok'/.test(plano));
+  ok('plánovač: okno dne má „Přesto přidat" po varování limitů', /varovaniLimituRucne\.length > 0 \? t\('Přesto přidat'\)/.test(plano) && /data-limit-otazka/.test(plano));
+  ok('plánovač: pravidla posílají limity a hlásí neuložené', /limity: \{\s*minRestHours:/.test(plano) && /limityNeulozeny/.test(plano));
+  const pravidla = zdroj('app/api/schedule/rules/route.ts');
+  ok('pravidla: GET vrací limity, PUT je čistí přes vycistiLimity', /limity = vycistiLimity\(t\)/.test(pravidla) && /const l = vycistiLimity\(b\.limity\)/.test(pravidla));
+  const gener = zdroj('app/api/schedule/generate/route.ts');
+  ok('generátor: GET s rozvrh.zobrazit; tržby jen s finance.trzby, cíl mezd jen s finance.mzdy', /export async function GET\(\)/.test(gener) && /cilMezd: smiMzdy \? cilMezd : null/.test(gener) && /if \(smiTrzby\)/.test(gener));
+  ok('generátor: POST předává limity a začátek týdne generátoru', /limity,\s*zacatekTydne,\s*\}\);/.test(gener));
 }

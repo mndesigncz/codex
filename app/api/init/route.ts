@@ -2782,6 +2782,39 @@ export async function GET(request: Request) {
         PRIMARY KEY (team_id, user_id, entity_type, entity_id)
       )`);
 
+    // ---- kolo 8: R8-3 (rozvrh, tým a odměny) ----
+    // Limity rozvrhu (lib/rozvrhLimity): odpočinek mezi směnami, nejdelší směna,
+    // hodiny za týden — v hodinách, NULL = nehlídá se. Plánovač varuje, generátor dodrží.
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS min_rest_hours INTEGER`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS max_shift_hours INTEGER`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS max_week_hours INTEGER`);
+    // Nárok na dovolenou (dní za kalendářní rok) na členství — i DPP/DPČ mají od 2024 dovolenou.
+    await ddl(sql`ALTER TABLE team_members ADD COLUMN IF NOT EXISTS vacation_per_year NUMERIC`);
+    // Poděkování mezi kolegy a automatické body: druh pochvaly ('vedeni' | 'kolega' | 'auto'),
+    // hodnota podniku (#ochota, #tým…) a klíč automatického připsání (jednou za člověka a událost).
+    await ddl(sql`ALTER TABLE point_awards ADD COLUMN IF NOT EXISTS kind TEXT DEFAULT 'vedeni'`);
+    await ddl(sql`ALTER TABLE point_awards ADD COLUMN IF NOT EXISTS value_tag TEXT`);
+    await ddl(sql`ALTER TABLE point_awards ADD COLUMN IF NOT EXISTS auto_key TEXT`);
+    await ddl(sql`CREATE UNIQUE INDEX IF NOT EXISTS point_awards_auto_key ON point_awards (team_id, user_id, auto_key) WHERE auto_key IS NOT NULL`);
+    // Týmová výzva (Odměny): měřítko z hotových čísel, cíl, termín, odměna; splneno_at po dosažení.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS reward_challenges (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        nazev TEXT NOT NULL,
+        metrika TEXT NOT NULL,
+        cil NUMERIC NOT NULL,
+        od TEXT NOT NULL,
+        do_dne TEXT NOT NULL,
+        odmena_text TEXT,
+        odmena_body INTEGER,
+        splneno_at TIMESTAMP,
+        created_by INTEGER,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS reward_challenges_team ON reward_challenges (team_id, do_dne)`);
+    // ---- konec R8-3 ----
+
     // Kroky migrace, které selhaly (a byly zachyceny), ať se to pozná zvenku
     // místo tichého „ok". Prázdné pole = celé schéma prošlo.
     if (migFails.length) console.error('init: kroků selhalo', migFails.length, migFails);

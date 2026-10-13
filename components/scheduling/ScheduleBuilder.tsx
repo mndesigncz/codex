@@ -46,14 +46,19 @@ import { apiMessage, okJson } from '@/lib/api';
 import { openPrint, esc } from '@/lib/printDoc';
 import { ulozSoubor } from '@/lib/stahni';
 import { useJazyk, useT, type PrekladFn } from '@/lib/i18n/client';
-import { tg } from '@/lib/i18n/stav';
+import { aktualniJazyk, tg } from '@/lib/i18n/stav';
 import { fmtDatum, fmtHM } from '@/lib/i18n/format';
 import type { Jazyk } from '@/lib/i18n/config';
 import { dnuTxt, hodinTxt, hodinuTxt, hodinyTextJ, prelozPopisStavu, rozsahVolnaJ, smenTxt, upozorneniTxt } from './texty';
 import { pragueDaySafe, pragueToday } from '@/lib/pragueTime';
 import { publikaceZOdpovedi, stavChipu, type Publikace } from '@/lib/rozvrhPublikace';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
-import { obnovDataWidgetu } from '../widgety/useDataWidgetu';
+import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
+import {
+  BEZ_LIMITU, souhrnVarovani, varovaniLimitu, varovaniNoveSmeny, varovaniPodleSmeny, vycistiLimity,
+  type LimityRozvrhu, type SmenaLimitu, type VarovaniSmeny,
+} from '@/lib/rozvrhLimity';
+import { planProtiTrzbam, tonPodilu, type DenProtiTrzbam, type TrzbyDnu } from '@/lib/rozvrhGenerator';
 import { nactiTeamsMine, useOpravneni } from '../role/useOpravneni';
 import { nastavRozepsanyNavrh } from '../role/rozepsano';
 import { prepocitejDen, stavClenaDne, seradRadky, kolize, vychoziTyp, type StavClenaDne, type TypDne } from '@/lib/rozvrhDen';
@@ -226,6 +231,48 @@ function tridaTecky(barva: unknown): string {
  * tečka 8 + kruh 18 se vejdou do 32 px buňky), od `sm` volnější.
  */
 const TRIDA_PILULKY = 'flex items-center gap-0.5 sm:gap-1 min-w-0 rounded-full px-0.5 sm:px-1 py-0.5 text-[11px] font-medium overflow-hidden';
+
+// ---- Limity rozvrhu a plán proti tržbám (kolo 8, R8-3) ----
+// Limity (odpočinek, nejdelší směna, týden) a očekávané tržby po dnech v týdnu
+// s cílem mezd posílá GET /api/schedule/generate — jedna adresa navíc k /api/schedule,
+// přes useDataWidgetu (sdílená mezipaměť, i Pravidla po uložení obnoví).
+const URL_INFO_PLANU = '/api/schedule/generate';
+interface InfoPlanu {
+  limity: LimityRozvrhu;
+  zacatekTydne: 0 | 1;
+  trzby: { stav: string; dny: TrzbyDnu } | null;
+  cilMezd: number | null;
+}
+/** Shovívavý výběr: starší server (nebo podvrh bez fixtury) → bez limitů a bez tržeb, plánovač jede dál. */
+function vyberInfoPlanu(raw: any): InfoPlanu {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { limity: BEZ_LIMITU, zacatekTydne: 1, trzby: null, cilMezd: null };
+  const cil = Number(raw.cilMezd);
+  return {
+    limity: vycistiLimity(raw.limity),
+    zacatekTydne: raw.zacatekTydne === 0 ? 0 : 1,
+    trzby: raw.trzby && typeof raw.trzby === 'object' ? { stav: String(raw.trzby.stav ?? ''), dny: raw.trzby.dny && typeof raw.trzby.dny === 'object' ? raw.trzby.dny : {} } : null,
+    cilMezd: Number.isFinite(cil) && cil > 0 ? cil : null,
+  };
+}
+/** Klíč navržené směny pro varování (návrh nemá id). */
+const klicNavrhu = (p: { date: string; employeeId: number | string; startTime: string }) => `n-${p.date}-${p.employeeId}-${p.startTime}`;
+/** Věta varování: „9 h odpočinku (nejméně 11)"; krátce jen „9 h" do pilulky v mřížce. */
+function textVarovani(t: PrekladFn, v: VarovaniSmeny, kratce = false): string {
+  const h = v.hodnota.toLocaleString(aktualniJazyk());
+  if (kratce) return `${h} h`;
+  if (v.druh === 'odpocinek') return t('{h} h odpočinku (nejméně {limit})', { h, limit: v.limit });
+  if (v.druh === 'smena') return t('{h} h směna (nejvýš {limit})', { h, limit: v.limit });
+  return t('{h} h týdně (nejvýš {limit})', { h, limit: v.limit });
+}
+/** Chip varování u směny: jantarový, s plnou větou v title (v mřížce jen „9 h"). */
+function ChipLimitu({ v, kratce = false }: { v: VarovaniSmeny; kratce?: boolean }) {
+  const t = useT('rozvrh');
+  return (
+    <span title={textVarovani(t, v)} className="inline-flex max-w-full" data-varovani={v.druh}>
+      <Chip tone="wait" size="sm" icon="warning"><span className="truncate">{textVarovani(t, v, kratce)}</span></Chip>
+    </span>
+  );
+}
 /** Tečka typu v pilulce. Pod 360 px (buňka 28 px) se nevejde vedle avataru — ten má přednost (kdo). */
 const TRIDA_TECKY_PILULKY = 'hidden min-[360px]:block h-2 w-2 rounded-full flex-shrink-0';
 const DEFAULT_TYPES = [
@@ -1232,6 +1279,35 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
     const n = nakladPlanu(smenyPlanu);
     return smiMzdy ? n : { ...n, castka: null };
   }, [smenyPlanu, smiMzdy]);
+
+  // ---- Limity rozvrhu a plán proti tržbám (kolo 8, R8-3) ----
+  // Limity z Pravidel: varování u směn (uložené i návrh dohromady, bez filtru — limit
+  // platí člověku, ne pohledu). Tržby jen s finance.trzby + finance.mzdy.
+  const smiTrzby = smi('finance.trzby');
+  const infoPlanu = useDataWidgetu<InfoPlanu>(planovac ? URL_INFO_PLANU : null, vyberInfoPlanu);
+  const limity = infoPlanu.data?.limity ?? BEZ_LIMITU;
+  const zacatekLimitu: 0 | 1 = infoPlanu.data?.zacatekTydne ?? zacatek;
+  const smenyLimitu = useMemo<SmenaLimitu[]>(() => [
+    ...(nahradiUlozene ? [] : shifts).map(s => ({ klic: `u-${s.id}`, employeeId: Number(s.employeeId), date: s.date, startTime: s.startTime, endTime: s.endTime })),
+    ...(preview?.proposed ?? []).map(p => ({ klic: klicNavrhu(p), employeeId: Number(p.employeeId), date: p.date, startTime: p.startTime, endTime: p.endTime })),
+  ], [shifts, preview, nahradiUlozene]);
+  const varovaniLimit = useMemo(() => varovaniLimitu(smenyLimitu, limity, zacatekLimitu), [smenyLimitu, limity, zacatekLimitu]);
+  const varovaniSmen = useMemo(() => varovaniPodleSmeny(varovaniLimit), [varovaniLimit]);
+  const souhrnLimitu = useMemo(() => souhrnVarovani(varovaniLimit), [varovaniLimit]);
+  const varovaniU = useCallback((klic: string): VarovaniSmeny[] => varovaniSmen.get(klic) ?? [], [varovaniSmen]);
+  const trzbyDnu = smiTrzby && smiMzdy && infoPlanu.data?.trzby?.stav === 'ok' ? infoPlanu.data.trzby.dny : null;
+  const cilMezd = infoPlanu.data?.cilMezd ?? null;
+  // Celý měsíc bez filtru (`dnyMesice` z mřížky): podíl mezd se nemění tím, na koho se plánovač zrovna dívá.
+  const smenyMesiceSeSazbou = useMemo(() => {
+    const sazby = new Map<number, number | null>();
+    for (const m of members) if (m.hourly_rate != null) sazby.set(Number(m.id), Number(m.hourly_rate));
+    for (const s of shifts) if (s.hourlyRate != null) sazby.set(Number(s.employeeId), Number(s.hourlyRate));
+    return [
+      ...(nahradiUlozene ? [] : shifts).map(s => ({ date: s.date, startTime: s.startTime, endTime: s.endTime, hourlyRate: s.hourlyRate ?? sazby.get(Number(s.employeeId)) ?? null })),
+      ...(preview?.proposed ?? []).map(p => ({ date: p.date, startTime: p.startTime, endTime: p.endTime, hourlyRate: sazby.get(Number(p.employeeId)) ?? null })),
+    ];
+  }, [members, shifts, preview, nahradiUlozene]);
+  const planTrzby = useMemo(() => (trzbyDnu ? planProtiTrzbam(smenyMesiceSeSazbou, trzbyDnu, dnyMesice) : null), [trzbyDnu, smenyMesiceSeSazbou, dnyMesice]);
   const bezSazby = useMemo(() => (smiMzdy ? lideBezSazby(smenyPlanu) : 0), [smiMzdy, smenyPlanu]);
   // Náklad člověka v přehledu „Směny podle lidí": jeho hodiny za měsíc (všech typů, jako přehled)
   // × sazba. Jen s finance.mzdy; bez sazby se částka nekreslí (chip „bez sazby" je nad mřížkou).
@@ -1504,7 +1580,8 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
   );
   // Naplánované hodiny a mzdový náklad toho, co mřížka kreslí (kolo 6 UX) — v obou pohledech.
   // Částka jen tam, kde má aspoň jedna směna sazbu (API ji posílá jen s finance.mzdy); bez ní jen hodiny.
-  // Poměr k tržbám tu není: tržby zná jen náhled generátoru.
+  // Kolo 8: čtvrté číslo „Podíl mezd" — mzdy celého měsíce proti očekávané tržbě (průměr
+  // stejného dne v týdnu za 8 týdnů), s cílem z Nastavení › Provoz; jen s finance.trzby + finance.mzdy.
   const souhrnPlanu = planovac && smenyPlanu.length > 0 ? (
     <div data-naklad-planu className={siroka ? 'mb-3' : undefined}>
       <StatRow>
@@ -1516,8 +1593,35 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
               ? <Chip tone="wait" size="sm">{t('{n, plural, one {# člověk bez sazby} few {# lidé bez sazby} other {# lidí bez sazby}}', { n: bezSazby })}</Chip>
               : t('hodiny × sazba')} />
         )}
+        {planTrzby && planTrzby.podil != null && (
+          <Stat label={t('Podíl mezd')} value={`${planTrzby.podil} %`}
+            note={<span data-podil-mezd={tonPodilu(planTrzby.podil, cilMezd)} className="inline-flex items-center gap-1.5">
+              {cilMezd != null && <Chip tone={tonPodilu(planTrzby.podil, cilMezd)} size="sm">{t('cíl {n} %', { n: cilMezd })}</Chip>}
+              <span>{t('tržba ~{castka}', { castka: money(planTrzby.trzba ?? 0) })}</span>
+            </span>} />
+        )}
       </StatRow>
     </div>
+  ) : null;
+  // Varování k limitům (kolo 8): jedna věta nad mřížkou, klepnutí otevře první den s varováním.
+  const listaLimitu = planovac && souhrnLimitu.celkem > 0 ? (
+    <p className="note note-wait text-sm flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-3" data-varovani-limitu={souhrnLimitu.celkem} role="status">
+      <span className="flex items-start gap-1.5 min-w-0">
+        <Icon name="warning" size={16} className="shrink-0 mt-0.5" />
+        <span className="text-pretty">
+          {t('{n, plural, one {# varování} few {# varování} other {# varování}} k limitům rozvrhu', { n: souhrnLimitu.celkem })}
+          {' · '}
+          {[
+            souhrnLimitu.odpocinek > 0 ? `${t('odpočinek')} ${souhrnLimitu.odpocinek}×` : null,
+            souhrnLimitu.smena > 0 ? `${t('dlouhá směna')} ${souhrnLimitu.smena}×` : null,
+            souhrnLimitu.tyden > 0 ? `${t('nad týdenní strop')} ${souhrnLimitu.tyden}×` : null,
+          ].filter(Boolean).join(' · ')}
+        </span>
+      </span>
+      {souhrnLimitu.prvniDen && (
+        <Button variant="ghost" size="sm" className="-my-1" onClick={() => otevriDen(souhrnLimitu.prvniDen!)}>{t('Ukázat první')}</Button>
+      )}
+    </p>
   ) : null;
   const nastroj = (
     <Card as="section" aria-labelledby="planovac-nadpis" className="space-y-4">
@@ -1746,6 +1850,7 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
           )}
           </div>
           {siroka && <>{legenda}{souhrnPlanu}</>}
+          {listaLimitu}
           {tydenni ? (
             <TydenniPohled
               tydny={tydny} tyden={tydenAktivni} onTyden={setTyden} mesic={month} zacatek={zacatek} jazyk={jazyk}
@@ -1756,6 +1861,8 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
                 navrh: (proposedByDay[d] ?? []).filter(p => projdeSmena({ employeeId: p.employeeId, typ: typNavrhu(p) }, filtr)),
               })}
               tecka={(s) => tridaTecky(resolveShiftType(s, shiftTypes, t).color)}
+              varovani={(s) => varovaniU('id' in s ? `u-${s.id}` : klicNavrhu(s))}
+              trzby={planTrzby?.poDnech ?? null} cilMezd={cilMezd}
               onDen={otevriDen}
             />
           ) : (<>
@@ -1860,6 +1967,12 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
                           <span className="hidden sm:inline truncate min-w-0">{kratkaFiltru.get(Number(s.employeeId)) ?? s.employeeName}</span>
                           {/* Poznámka ke směně: ikona od `sm` (na telefonu se do 32 px vedle avataru nevejde), text v title. */}
                           {s.note && <Icon name="chat" size={10} aria-hidden className="hidden sm:block flex-shrink-0 text-black/45" />}
+                          {/* Limit rozvrhu porušený (kolo 8): výstražná ikona od `sm`, věta v title; celý chip má okno dne. */}
+                          {varovaniU(`u-${s.id}`).length > 0 && (
+                            <span title={varovaniU(`u-${s.id}`).map(v => textVarovani(t, v)).join(' · ')} data-varovani-pilulky className="hidden sm:flex flex-shrink-0">
+                              <Icon name="warning" size={10} className="text-wait-ink" />
+                            </span>
+                          )}
                           <span className="hidden sm:inline ml-auto flex-shrink-0 tabular-nums text-black/55">{casKratce(s.startTime, s.endTime)}</span>
                         </span>
                       );
@@ -1872,6 +1985,11 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
                         <span className={`${TRIDA_TECKY_PILULKY} ${tridaTecky(resolveShiftType(p, shiftTypes, t).color)}`} />
                         <Avatar emoji={p.employeeAvatar} name={p.employeeName} size="2xs" ring={false} className="sm:hidden" />
                         <span className="hidden sm:inline truncate min-w-0">{kratkaFiltru.get(Number(p.employeeId)) ?? p.employeeName}</span>
+                        {varovaniU(klicNavrhu(p)).length > 0 && (
+                          <span title={varovaniU(klicNavrhu(p)).map(v => textVarovani(t, v)).join(' · ')} data-varovani-pilulky className="hidden sm:flex flex-shrink-0">
+                            <Icon name="warning" size={10} className="text-wait-ink" />
+                          </span>
+                        )}
                         <span className="hidden sm:inline ml-auto flex-shrink-0 tabular-nums text-black/55">{casKratce(p.startTime, p.endTime)}</span>
                       </span>
                     ))}
@@ -2131,6 +2249,9 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
           // Dostupnost týmu jen s dostupnost.zobrazit — data jsou tatáž, která
           // plánovač načetl pro měsíc (jeden dotaz, ne dotaz na každý den).
           dostupnost={smiDostupnost ? { submissions, volno: timeOff } : null}
+          // Limity rozvrhu a plán proti tržbám (kolo 8): chipy u směn, věta před přidáním, tržba dne.
+          limity={limity} zacatekLimitu={zacatekLimitu} smenyLimitu={smenyLimitu} varovaniU={varovaniU}
+          trzbaDne={planTrzby?.poDnech.get(dayModal) ?? null} cilMezd={cilMezd}
           onClose={zavriDen}
           // S otevřeným návrhem se přidává do návrhu, jinak rovnou do rozvrhu.
           onAdd={pridejVOkne}
@@ -2161,7 +2282,7 @@ export default function ScheduleBuilder({ onNavigate, user }: Props & { onNaviga
  * od–do, návrh čárkovaně) a klepnutí otevře stávající okno dne. Tabulka je
  * `table-fixed` ve šířce karty, nic nejede do strany.
  */
-function TydenniPohled({ tydny, tyden, onTyden, mesic, zacatek, jazyk, radky, dny, hodiny, nahradiUlozene, mimoFiltr, smenyDne, tecka, onDen }: {
+function TydenniPohled({ tydny, tyden, onTyden, mesic, zacatek, jazyk, radky, dny, hodiny, nahradiUlozene, mimoFiltr, smenyDne, tecka, varovani, trzby = null, cilMezd = null, onDen }: {
   tydny: string[];
   tyden: string;
   onTyden: (t: string) => void;
@@ -2176,9 +2297,15 @@ function TydenniPohled({ tydny, tyden, onTyden, mesic, zacatek, jazyk, radky, dn
   mimoFiltr: (den: string) => boolean;
   smenyDne: (den: string) => { ulozene: Shift[]; navrh: Proposed[] };
   tecka: (s: Shift | Proposed) => string;
+  /** Varování k limitům rozvrhu u směny (kolo 8) — chip pod časem v pilulce. */
+  varovani?: (s: Shift | Proposed) => VarovaniSmeny[];
+  /** Plán proti tržbám po dnech (kolo 8): řádek „tržba · mzdy · %" v patičce; null = bez tržeb. */
+  trzby?: Map<string, DenProtiTrzbam> | null;
+  cilMezd?: number | null;
   onDen: (den: string) => void;
 }) {
   const t = useT('rozvrh');
+  const { money } = useCurrency();
   const i = tydny.indexOf(tyden);
   const zkratky = zkratkyDnuJazyk(zacatek, jazyk);
   const rozsah = `${fmtDatum(dny[0], { jazyk, styl: 'kratce' })} – ${fmtDatum(dny[6], { jazyk, styl: 'kratce' })}`;
@@ -2196,11 +2323,17 @@ function TydenniPohled({ tydny, tyden, onTyden, mesic, zacatek, jazyk, radky, dn
         ? 'border border-dashed border-black/30 dark:border-white/40 text-black/70'
         : `bg-black/[0.05] ${nahradiUlozene ? 'line-through text-black/45' : 'text-black/70'}`}`}>
       <span className={`h-2 w-2 mt-[3px] rounded-full shrink-0 ${tecka(s)}`} />
-      <span className="flex flex-wrap min-w-0 tabular-nums leading-snug">
-        <span>{hodinaKratce(s.startTime)}</span>{hodinaKratce(s.endTime) && <span>–{hodinaKratce(s.endTime)}</span>}
+      <span className="flex flex-col min-w-0 leading-snug">
+        <span className="flex flex-wrap min-w-0 tabular-nums">
+          <span>{hodinaKratce(s.startTime)}</span>{hodinaKratce(s.endTime) && <span>–{hodinaKratce(s.endTime)}</span>}
+        </span>
+        {/* Porušený limit (kolo 8): „9 h" jantarově pod časem, celá věta v title. */}
+        {(varovani?.(s) ?? []).slice(0, 1).map(v => <ChipLimitu key={v.druh} v={v} kratce />)}
       </span>
     </span>
   );
+  // Plán proti tržbám v patičce (jen s tržbami): tržba od lg, podíl chipem vždy.
+  const trzbyRadek = trzby && poDnech.some(d => trzby.get(d.den)?.trzba != null);
   return (
     <div data-tydenni-pohled>
       <div className="flex items-center justify-between gap-2 mb-2">
@@ -2281,6 +2414,27 @@ function TydenniPohled({ tydny, tyden, onTyden, mesic, zacatek, jazyk, radky, dn
               ))}
               <td className="text-right px-2 py-1.5 tabular-nums font-semibold text-[13px] text-[#16181A]">{hodinyTextJ(hodinCelkem, jazyk)}</td>
             </tr>
+            {trzbyRadek && (
+              <tr className="border-t border-black/[0.06] bg-black/[0.02]" data-plan-trzby-tyden>
+                <th scope="row" className="text-left font-medium px-2 py-1.5 truncate" title={t('Očekávaná tržba (průměr stejného dne v týdnu za 8 týdnů) a mzdy naplánovaných směn')}>{t('Mzdy / tržba')}</th>
+                {poDnech.map(d => {
+                  const x = trzby!.get(d.den);
+                  const podil = d.vMesici ? x?.podil ?? null : null;
+                  return (
+                    <td key={d.den} className="text-center py-1.5 tabular-nums text-black/55 overflow-hidden"
+                      title={x?.trzba != null ? `${t('tržba ~{castka}', { castka: money(x.trzba) })}${x.mzdy != null ? ` · ${t('mzdy {castka}', { castka: money(x.mzdy) })}` : ''}` : undefined}>
+                      {podil != null ? (
+                        <span className="flex flex-col items-center gap-0.5 leading-snug">
+                          <span className="hidden lg:block truncate max-w-full">~{money(x!.trzba!)}</span>
+                          <Chip tone={tonPodilu(podil, cilMezd)} size="sm">{podil} %</Chip>
+                        </span>
+                      ) : x?.trzba != null && d.vMesici ? <span className="hidden lg:block truncate max-w-full">~{money(x.trzba)}</span> : '—'}
+                    </td>
+                  );
+                })}
+                <td className="text-right px-2 py-1.5 text-[11px] text-black/45">{cilMezd != null ? t('cíl {n} %', { n: cilMezd }) : ''}</td>
+              </tr>
+            )}
           </tfoot>
         </table>
       </div>
@@ -2783,7 +2937,17 @@ function DayModal({
   date, onNavigate, employees, shifts, proposed = [], shiftTypes, openingHours, unavailable, submissions,
   onClose, onAdd, onRemove, onRemoveProposed, onPoznamka, events = [], readOnly = false,
   navrh = false, nahradiUlozene = false, dostupnost = null, doporuceni, filtrAktivni = false,
+  limity = BEZ_LIMITU, zacatekLimitu = 1, smenyLimitu = [], varovaniU, trzbaDne = null, cilMezd = null,
 }: {
+  /** Limity rozvrhu (kolo 8): věta s „Přesto přidat" před přidáním, chipy u směn dne. */
+  limity?: LimityRozvrhu;
+  zacatekLimitu?: 0 | 1;
+  /** Všechny směny měsíce (uložené i návrh) pro odpočinek a týdenní strop. */
+  smenyLimitu?: SmenaLimitu[];
+  varovaniU?: (klic: string) => VarovaniSmeny[];
+  /** Očekávaná tržba a mzdy dne (jen s finance.trzby + finance.mzdy). */
+  trzbaDne?: DenProtiTrzbam | null;
+  cilMezd?: number | null;
   onNavigate?: (view: string, arg?: string) => void;
   date: string;
   employees: Member[];
@@ -2909,6 +3073,25 @@ function DayModal({
 
   // Druhá směna téhož člověka na překrývající se čas je vždycky omyl.
   const kolidujeRucne = !!employeeId && kolize(obsazene.filter((x) => x.employeeId === Number(employeeId)), { startTime: start, endTime: end });
+  // Limity rozvrhu (kolo 8): co by vlastní čas porušil — věta hned při výběru, tlačítko „Přesto přidat".
+  const varovaniLimituRucne = useMemo(
+    () => (employeeId && start && end ? varovaniNoveSmeny({ employeeId: Number(employeeId), date, startTime: start, endTime: end }, smenyLimitu, limity, zacatekLimitu) : []),
+    [employeeId, start, end, date, smenyLimitu, limity, zacatekLimitu],
+  );
+  // Přidání z řádku člověka (TymNaDen) limity neukazuje předem: když by směna něco porušila,
+  // požadavek se zastaví a nahoře se objeví otázka s „Přesto přidat" — stejná věta jako u vlastního času.
+  const [potvrditLimit, setPotvrditLimit] = useState<{ p: NovaSmena; varovani: VarovaniSmeny[] } | null>(null);
+  const onAddSLimity = async (p: NovaSmena): Promise<boolean> => {
+    const v = varovaniNoveSmeny({ employeeId: p.employeeId, date: p.date, startTime: p.startTime, endTime: p.endTime }, smenyLimitu, limity, zacatekLimitu);
+    if (v.length > 0) { setPotvrditLimit({ p, varovani: v }); return false; }
+    return onAdd(p);
+  };
+  const [potvrzuji, setPotvrzuji] = useState(false);
+  const pridejPresto = async () => {
+    if (!potvrditLimit) return;
+    setPotvrzuji(true);
+    try { if (await onAdd(potvrditLimit.p)) setPotvrditLimit(null); } finally { setPotvrzuji(false); }
+  };
 
   const save = async () => {
     if (!employeeId || !start || !end || kolidujeRucne) return;
@@ -2931,9 +3114,14 @@ function DayModal({
   const [vlastniCas, setVlastniCas] = useState(false);
   const tlacitkoPridat = (
     <Button variant="primary" icon="plus" loading={saving} disabled={!employeeId || employees.length === 0 || kolidujeRucne} onClick={save}>
-      {varovani ? t('Přesto přidat') : navrh ? t('Přidat do návrhu') : t('Přidat směnu')}
+      {varovani || varovaniLimituRucne.length > 0 ? t('Přesto přidat') : navrh ? t('Přidat do návrhu') : t('Přidat směnu')}
     </Button>
   );
+  /** Chipy porušených limitů u směny dne (pod časem — na telefonu jediné místo, kde se vejdou celé). */
+  const chipyLimitu = (klic: string) => {
+    const v = varovaniU?.(klic) ?? [];
+    return v.length > 0 ? <span className="flex flex-wrap justify-end gap-1 mt-0.5">{v.map(x => <ChipLimitu key={x.druh} v={x} />)}</span> : undefined;
+  };
   return (
     <Modal open onClose={onClose} size="md" title={nadpis.charAt(0).toUpperCase() + nadpis.slice(1)}
       subtitle={dayOpen ? t('Otevřeno {od}–{do}', { od: dayOpen, do: dayClose }) : oh?.closed ? t('Zavřeno') : undefined}
@@ -2963,6 +3151,33 @@ function DayModal({
               {missingHere.map((n) => <li key={`m-${n}`}>{t('Směna „{nazev}" nemá nikoho.', { nazev: n })}</li>)}
             </ul>
           </div>
+        )}
+
+        {potvrditLimit && (
+          // Přidání z řádku člověka narazilo na limit: otázka nahoře, „Přesto přidat" je rozhodnutí vedení.
+          <div className="note note-wait" role="status" data-limit-otazka>
+            <p className="text-sm font-semibold flex items-center gap-1.5">
+              <Icon name="warning" size={16} className="shrink-0" />
+              {t('Směna poruší limity rozvrhu')}
+            </p>
+            <ul className="text-xs mt-1 space-y-0.5 list-disc pl-4">
+              {potvrditLimit.varovani.map((v, i) => <li key={i}>{textVarovani(t, v)}</li>)}
+            </ul>
+            <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setPotvrditLimit(null)}>{t('Zrušit', undefined, 'dialog')}</Button>
+              <Button variant="primary" size="sm" icon="plus" loading={potvrzuji} onClick={() => { void pridejPresto(); }}>{t('Přesto přidat')}</Button>
+            </div>
+          </div>
+        )}
+
+        {trzbaDne && trzbaDne.trzba != null && (
+          // Plán proti tržbám (kolo 8): očekávaná tržba dne (průměr stejného dne v týdnu), mzdy směn dne a podíl s cílem.
+          <p className="t-meta flex flex-wrap items-center gap-x-1.5 gap-y-1 text-pretty" data-plan-trzby-den>
+            <Icon name="chart" size={15} className="shrink-0 text-black/40" />
+            <span>{t('Očekávaná tržba ~{trzba}', { trzba: money(trzbaDne.trzba) })}</span>
+            {trzbaDne.mzdy != null && <span>· {t('mzdy {castka}', { castka: money(trzbaDne.mzdy) })}</span>}
+            {trzbaDne.podil != null && <Chip tone={tonPodilu(trzbaDne.podil, cilMezd)} size="sm">{trzbaDne.podil} %{cilMezd != null ? ` · ${t('cíl {n} %', { n: cilMezd })}` : ''}</Chip>}
+          </p>
         )}
 
         {doporuceni && (
@@ -3023,6 +3238,7 @@ function DayModal({
                       </span>
                     ) : undefined}
                     value={`${fmtHM(s.startTime)}–${fmtHM(s.endTime)}`}
+                    valueMeta={chipyLimitu(`u-${s.id}`)}
                     right={nahradiUlozene ? <Chip tone="muted" size="sm">{t('zmizí')}</Chip> : undefined}
                     actions={readOnly ? undefined : (
                       <>
@@ -3069,6 +3285,7 @@ function DayModal({
                   title={p.employeeName}
                   meta={<span className="inline-flex items-center gap-1.5">{p.color && <TeckaBarvy barva={p.color} className="h-2 w-2" />}{p.shiftTypeName || t('Směna')}</span>}
                   value={`${fmtHM(p.startTime)}–${fmtHM(p.endTime)}`}
+                  valueMeta={chipyLimitu(klicNavrhu(p))}
                   right={<Chip tone="muted" size="sm" icon="sparkle">{t('Návrh')}</Chip>}
                   actions={onRemoveProposed ? (
                     <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={t('Odebrat z návrhu — {jmeno}', { jmeno: p.employeeName })} onClick={() => onRemoveProposed(p)} />
@@ -3082,7 +3299,7 @@ function DayModal({
         {dostupnost && (
           <TymNaDen date={date} employees={employees} obsazene={obsazene} dostupnost={dostupnost}
             shiftTypes={shiftTypes} oh={oh} resolveTimes={resolveTimes} missingHere={missingHere}
-            navrh={navrh} readOnly={readOnly} onAdd={onAdd} />
+            navrh={navrh} readOnly={readOnly} onAdd={onAddSLimity} />
         )}
 
         {!readOnly && sTymem && !vlastniCas && employees.length > 0 && (
@@ -3113,6 +3330,11 @@ function DayModal({
                 {kolidujeRucne
                   ? <p className="note note-danger text-sm" role="alert">{t('Tenhle člověk už ten den má směnu, která se s tímhle časem překrývá.')}</p>
                   : varovani && <p className="note note-wait text-sm" role="status">{varovani}</p>}
+                {!kolidujeRucne && varovaniLimituRucne.length > 0 && (
+                  <p className="note note-wait text-sm" role="status" data-limit-rucne>
+                    {t('Směna poruší limity rozvrhu')}: {varovaniLimituRucne.map(v => textVarovani(t, v)).join(' · ')}
+                  </p>
+                )}
 
                 {shiftTypes.length > 0 && (
                   <div className="space-y-1.5">
@@ -3416,6 +3638,8 @@ function ScheduleRulesManager() {
   // Chyba prahu až po pokusu o uložení nebo po opuštění pole — zapnutí
   // funkce bez dat nesmí vypadat jako chyba uživatele.
   const [prahDotcen, setPrahDotcen] = useState(false);
+  // Limity rozvrhu (kolo 8): odpočinek mezi směnami, nejdelší směna, hodiny za týden — '' = nehlídat.
+  const [limity, setLimity] = useState<{ minRestHours: string; maxShiftHours: string; maxWeekHours: string }>({ minRestHours: '', maxShiftHours: '', maxWeekHours: '' });
   // Co je uložené na serveru — z toho se pozná neuložená změna (limetka
   // u Uložit) a jestli se mají posílat tržby.
   const [ulozeno, setUlozeno] = useState('');
@@ -3455,9 +3679,15 @@ function ScheduleRulesManager() {
       setSplitOks(sok);
       const tz = JSON.stringify({ podleTrzeb: t.podleTrzeb === true, prah: t.prah != null ? String(t.prah) : '' });
       setUlozeneTrzby(tz);
+      const lim = {
+        minRestHours: d.limity?.minRestHours != null ? String(d.limity.minRestHours) : '',
+        maxShiftHours: d.limity?.maxShiftHours != null ? String(d.limity.maxShiftHours) : '',
+        maxWeekHours: d.limity?.maxWeekHours != null ? String(d.limity.maxWeekHours) : '',
+      };
+      setLimity(lim);
       setUlozeno(JSON.stringify({
         teamMax: d.teamMax != null ? String(d.teamMax) : '', teamMaxHours: d.teamMaxHours != null ? String(d.teamMaxHours) : '',
-        balance: d.balanceShifts !== false, split: d.splitShifts === true, ov, hov, sok, tz,
+        balance: d.balanceShifts !== false, split: d.splitShifts === true, ov, hov, sok, tz, lim,
       }));
     }).catch((e) => setLoadErr(apiMessage(e, t('Pravidla se nenačetla.')))).finally(() => setLoading(false));
   }, [tick]);
@@ -3467,7 +3697,7 @@ function ScheduleRulesManager() {
   const prahChyba = trzbyInfo.smiTrzby && podleTrzeb && (prahCislo == null || !Number.isFinite(prahCislo) || prahCislo <= 0);
   const trzbyTed = JSON.stringify({ podleTrzeb, prah: prah.trim() });
   const trzbyZmena = trzbyTed !== ulozeneTrzby;
-  const stavPravidel = (tz: string) => JSON.stringify({ teamMax, teamMaxHours, balance, split, ov: overrides, hov: hourOverrides, sok: splitOks, tz });
+  const stavPravidel = (tz: string) => JSON.stringify({ teamMax, teamMaxHours, balance, split, ov: overrides, hov: hourOverrides, sok: splitOks, tz, lim: limity });
   const stavTed = stavPravidel(trzbyTed);
   const neulozeno = ulozeno !== '' && stavTed !== ulozeno;
   /** Zapnutí předvyplní práh návrhem z dat, ať se nezačíná od prázdného pole. */
@@ -3490,6 +3720,11 @@ function ScheduleRulesManager() {
           // Tržby jen se změnou a jen s finance.trzby: jinak by uložení
           // jiného pravidla přepsalo práh (bez oprávnění ho klient ani nezná).
           ...(trzbyInfo.smiTrzby && trzbyZmena ? { trzby: { podleTrzeb, prah: prahCislo } } : {}),
+          limity: {
+            minRestHours: limity.minRestHours === '' ? null : parseInt(limity.minRestHours),
+            maxShiftHours: limity.maxShiftHours === '' ? null : parseInt(limity.maxShiftHours),
+            maxWeekHours: limity.maxWeekHours === '' ? null : parseInt(limity.maxWeekHours),
+          },
           overrides: members.map(m => ({
             id: m.id,
             maxConsecutive: overrides[m.id] === '' ? null : parseInt(overrides[m.id]),
@@ -3503,12 +3738,15 @@ function ScheduleRulesManager() {
       setUlozeno(d?.trzbyNeulozeny ? stavPravidel(ulozeneTrzby) : stavTed);
       if (d?.trzbyNeulozeny) {
         setErr(t('Počet lidí podle tržeb se neuložil — databáze ho ještě nezná (spusť /api/init). Ostatní pravidla jsou uložená.'));
+      } else if (d?.limityNeulozeny) {
+        setErr(t('Limity rozvrhu se neuložily — databáze je ještě nezná (spusť /api/init). Ostatní pravidla jsou uložená.'));
       } else {
         setUlozeneTrzby(trzbyTed);
         setMsg(t('Uloženo. Pravidla se použijí při dalším generování rozvrhu.'));
       }
-      // Widget „Naplánované hodiny" ukazuje strop z pravidel.
+      // Widget „Naplánované hodiny" ukazuje strop z pravidel; plánovač čte limity z /api/schedule/generate.
       obnovDataWidgetu('/api/schedule/rules');
+      obnovDataWidgetu(URL_INFO_PLANU);
     } catch (e) { setErr(apiMessage(e, t('Uložení se nepodařilo.'))); }
     setSaving(false);
   };
@@ -3544,6 +3782,35 @@ function ScheduleRulesManager() {
           <Input id="pravidla-tym-hodiny" type="number" inputMode="numeric" min={8} max={400} value={teamMaxHours}
             onChange={e => setTeamMaxHours(e.target.value)} className="!w-full sm:!w-36" />
         </Field>
+      </Card>
+
+      {/* Zákonné limity (kolo 8): plánovač porušení jen označí (směnu uložíš i tak — „Přesto přidat"),
+          generátor je dodrží. Každý limit jde vypnout; nabídka začíná zákonnými hodnotami. */}
+      <Card as="section" aria-labelledby="pravidla-limity" className="space-y-3" data-pravidla-limity>
+        <h2 id="pravidla-limity" className="t-section flex items-center gap-2"><Icon name="warning" size={17} className="text-black/40 shrink-0" /> {t('Odpočinek a strop hodin')}</h2>
+        <p className="t-meta text-pretty">
+          {t('Zákonná pravidla rozvrhu: odpočinek mezi směnami (zákoník práce 11 h), nejdelší směna (12 h) a hodiny za týden (40 h). V plánovači dostane směna, která je poruší, jantarové varování — uložit ji jde i tak. Generátor je dodrží.')}
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Field id="pravidla-odpocinek" label={t('Odpočinek mezi směnami')}>
+            <Select id="pravidla-odpocinek" value={limity.minRestHours} onChange={e => setLimity(l => ({ ...l, minRestHours: e.target.value }))}>
+              <option value="">{t('Nehlídat')}</option>
+              {[8, 10, 11, 12].map(n => <option key={n} value={n}>{t('aspoň {n} h', { n })}</option>)}
+            </Select>
+          </Field>
+          <Field id="pravidla-smena" label={t('Nejdelší směna')}>
+            <Select id="pravidla-smena" value={limity.maxShiftHours} onChange={e => setLimity(l => ({ ...l, maxShiftHours: e.target.value }))}>
+              <option value="">{t('Nehlídat')}</option>
+              {[8, 9, 10, 12, 14].map(n => <option key={n} value={n}>{t('nejvýš {n} h', { n })}</option>)}
+            </Select>
+          </Field>
+          <Field id="pravidla-tyden" label={t('Hodin za týden')}>
+            <Select id="pravidla-tyden" value={limity.maxWeekHours} onChange={e => setLimity(l => ({ ...l, maxWeekHours: e.target.value }))}>
+              <option value="">{t('Nehlídat')}</option>
+              {[20, 30, 38, 40, 48].map(n => <option key={n} value={n}>{t('nejvýš {n} h', { n })}</option>)}
+            </Select>
+          </Field>
+        </div>
       </Card>
 
       <Card as="section" aria-labelledby="pravidla-generator">

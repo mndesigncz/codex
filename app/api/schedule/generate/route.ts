@@ -4,8 +4,9 @@ import { tymyCiselniku, idClenu } from '@/lib/tenant';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { pragueToday } from '@/lib/pragueTime';
 import {
-  navrhniRozvrh, ocekavaneTrzby, vycistiNastaveniTrzeb, type ClovekGeneratoru, type TypSmeny, type VstupGeneratoru,
+  navrhniRozvrh, ocekavaneTrzby, vycistiNastaveniTrzeb, type ClovekGeneratoru, type TrzbyDnu, type TypSmeny, type VstupGeneratoru,
 } from '@/lib/rozvrhGenerator';
+import { BEZ_LIMITU, vycistiLimity, type LimityRozvrhu } from '@/lib/rozvrhLimity';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,6 +20,56 @@ function defaultsOpening() {
   const oh: Record<string, { open: string; close: string; closed: boolean }> = {};
   for (let d = 0; d <= 6; d++) oh[String(d)] = { open: '08:00', close: '20:00', closed: false };
   return oh;
+}
+
+/**
+ * Tržby dne za posledních 8 týdnů ze stejného zdroje jako kalendář uzávěrek
+ * (/api/closings/calendar): hotovost + karta ze všech uzávěrek dne směny.
+ * Jedno místo pro generátor (POST) i plán proti tržbám (GET) — kolo 8.
+ */
+async function historieTrzeb(teamId: number, dnes: string): Promise<{ date: string; trzba: number }[]> {
+  const od = (() => { const d = new Date(dnes + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() - 8 * 7); return d.toISOString().slice(0, 10); })();
+  try {
+    const rows = await sql`
+      SELECT COALESCE(shift_date, date)::text AS date,
+             SUM(COALESCE(cash_revenue, 0) + COALESCE(card_revenue, 0))::float AS trzba
+      FROM cash_closings
+      WHERE team_id = ${teamId} AND COALESCE(shift_date, date) >= ${od} AND COALESCE(shift_date, date) < ${dnes}
+      GROUP BY 1`;
+    return (rows as any[]).map(r => ({ date: String(r.date).slice(0, 10), trzba: Number(r.trzba) || 0 }));
+  } catch { return []; }
+}
+
+/** Limity rozvrhu a začátek týdne podniku (kolo 8); bez migrace bez limitů. */
+async function limityPodniku(teamId: number): Promise<{ limity: LimityRozvrhu; zacatekTydne: 0 | 1; cilMezd: number | null }> {
+  try {
+    const [t] = await sql`SELECT min_rest_hours, max_shift_hours, max_week_hours, week_start, labor_target_pct FROM teams WHERE id = ${teamId}`;
+    const cil = Number(t?.labor_target_pct);
+    return { limity: vycistiLimity(t), zacatekTydne: Number(t?.week_start) === 0 ? 0 : 1, cilMezd: Number.isFinite(cil) && cil > 0 ? cil : null };
+  } catch {
+    return { limity: BEZ_LIMITU, zacatekTydne: 1, cilMezd: null };
+  }
+}
+
+// GET — co plánovač potřebuje k mřížce navíc k /api/schedule (kolo 8, R8-3):
+// limity rozvrhu (varování u směn), očekávaná tržba po dnech v týdnu a cíl mezd
+// (podíl mezd u každého dne). Tržby jen s finance.trzby, cíl mezd jen s finance.mzdy —
+// bez nich odpověď o tržbách mlčí a UI podíl nekreslí.
+export async function GET() {
+  const ctx = await pozaduj('rozvrh.zobrazit');
+  if (jeOdpoved(ctx)) return ctx;
+  const { limity, zacatekTydne, cilMezd } = await limityPodniku(ctx.teamId);
+  const smiTrzby = ctx.role.opravneni.has('finance.trzby');
+  const smiMzdy = ctx.role.opravneni.has('finance.mzdy');
+  let trzby: { stav: 'ok' | 'bez_dat'; dny: TrzbyDnu } | null = null;
+  if (smiTrzby) {
+    const dnes = pragueToday();
+    let oteviraci: Record<string, any> | null = null;
+    try { const [t] = await sql`SELECT opening_hours FROM teams WHERE id = ${ctx.teamId}`; oteviraci = t?.opening_hours ?? null; } catch { /* bez otvíračky */ }
+    const dny = ocekavaneTrzby(await historieTrzeb(ctx.teamId, dnes), dnes, oteviraci);
+    trzby = { stav: Object.keys(dny).length > 0 ? 'ok' : 'bez_dat', dny };
+  }
+  return NextResponse.json({ limity, zacatekTydne, trzby, cilMezd: smiMzdy ? cilMezd : null });
 }
 
 export async function POST(req: Request) {
@@ -264,18 +315,7 @@ export async function POST(req: Request) {
       // Stejný zdroj jako kalendář uzávěrek (/api/closings/calendar): tržba
       // dne = hotovost + karta ze všech uzávěrek dne směny.
       const dnes = pragueToday();
-      const od = (() => { const d = new Date(dnes + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() - 8 * 7); return d.toISOString().slice(0, 10); })();
-      let historie: { date: string; trzba: number }[] = [];
-      try {
-        const rows = await sql`
-          SELECT COALESCE(shift_date, date)::text AS date,
-                 SUM(COALESCE(cash_revenue, 0) + COALESCE(card_revenue, 0))::float AS trzba
-          FROM cash_closings
-          WHERE team_id = ${ctx.teamId} AND COALESCE(shift_date, date) >= ${od} AND COALESCE(shift_date, date) < ${dnes}
-          GROUP BY 1`;
-        historie = (rows as any[]).map(r => ({ date: String(r.date).slice(0, 10), trzba: Number(r.trzba) || 0 }));
-      } catch { historie = []; }
-      const dny = ocekavaneTrzby(historie, dnes, openingHours);
+      const dny = ocekavaneTrzby(await historieTrzeb(ctx.teamId, dnes), dnes, openingHours);
       if (Object.keys(dny).length === 0) stavTrzeb = 'bez_dat';
       else { stavTrzeb = 'ok'; trzby = { prah: nastaveniTrzeb.prah, dny }; }
     }
@@ -300,6 +340,9 @@ export async function POST(req: Request) {
     }));
   }
 
+  // Odpočinek mezi směnami, nejdelší směna a týdenní strop (kolo 8): generátor je dodrží.
+  const { limity, zacatekTydne } = await limityPodniku(ctx.teamId);
+
   const vysledek = navrhniRozvrh({
     month,
     lide,
@@ -309,6 +352,8 @@ export async function POST(req: Request) {
     pravidla: { balanceShifts, splitShifts },
     trzby,
     ulozene,
+    limity,
+    zacatekTydne,
   });
 
   // Tvar odpovědi: proposed/warnings/gaps/understaffed jako dřív (sondy
