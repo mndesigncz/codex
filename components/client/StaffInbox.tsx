@@ -17,7 +17,7 @@
 //  - hlášení o kase je `.note note-wait`, potvrzení akcí jeden Toast dole
 //    (dřív limetkový proužek nahoře, druhá kopie té z ClientAdmin).
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Icon } from '../Icons';
 import { Button, Card, Chip, EmptyState, ListRow, Menu, Modal, Skeleton, Toast, type ChipTone, type MenuItem } from '../ui';
 import CardScan from './CardScan';
@@ -30,6 +30,9 @@ import { okJson, apiMessage } from '@/lib/api';
 import { useOpravneni } from '../role/useOpravneni';
 
 const EVERY_MS = 20 * 1000;
+
+/** Stránka, která má dnešní rezervace jinde (widget), to řekne příjmu kontextem — JSX nástroje zůstává stejné. */
+export const PrijemBezRezervaci = createContext(false);
 
 export function useStaffInbox(enabled = true) {
   const [d, setD] = useState<any | null>(null);
@@ -88,7 +91,10 @@ function kdy(iso: string): string {
 
 // onZmena: po přijetí, hotovu, odmítnutí nebo odeslání do kasy — skořápka Clientu
 // podle toho obnoví odznaky „Objednávky N" (jinak by svítily staré až do Přehledu).
-export default function StaffInbox({ compact = false, onToast, onZmena }: { compact?: boolean; onToast?: (m: string) => void; onZmena?: () => void }) {
+// Kolo 8 (R8-7): stránka Objednávky v Managero client má dnešní rezervace ve widgetu pod frontou —
+// nástroj je nekreslí podruhé (kontext kolem plochy, nebo prop). Tablet a mobil zaměstnance je mají dál tady.
+export default function StaffInbox({ compact = false, bezRezervaci: bezRezervaciProp = false, onToast, onZmena }: { compact?: boolean; bezRezervaci?: boolean; onToast?: (m: string) => void; onZmena?: () => void }) {
+  const bezRezervaci = useContext(PrijemBezRezervaci) || bezRezervaciProp;
   const { d, err, reload } = useStaffInbox(true);
   // Tlačítka podle `ma` (před načtením oprávnění ANO, rozhoduje server).
   const { ma } = useOpravneni();
@@ -167,7 +173,7 @@ export default function StaffInbox({ compact = false, onToast, onZmena }: { comp
   const news = orders.filter(o => o.status === 'new');
   const inProgress = orders.filter(o => o.status === 'confirmed');
   const recent = orders.filter(o => ['done', 'declined'].includes(o.status));
-  const reservations: any[] = d.reservations ?? [];
+  const reservations: any[] = bezRezervaci ? [] : d.reservations ?? [];
 
   // Řetězec k terminálu. Vypnutá pokladna, nespárovaný stůl a nenavázané
   // položky vypadají v příjmu úplně stejně jako všechno v pořádku — proto
@@ -263,7 +269,7 @@ export default function StaffInbox({ compact = false, onToast, onZmena }: { comp
         </details>
       )}
       {!compact && orders.length === 0 && reservations.length === 0 && (
-        <Card><EmptyState icon="inbox" title="Nic k vyřízení" hint="Objednávky od stolu a dnešní rezervace se objeví tady." compact /></Card>
+        <Card><EmptyState icon="inbox" title="Nic k vyřízení" hint={bezRezervaci ? 'Objednávky od stolu se objeví tady; dnešní rezervace jsou ve widgetu pod frontou.' : 'Objednávky od stolu a dnešní rezervace se objeví tady.'} compact /></Card>
       )}
       {odmitam && (
         <Modal open onClose={() => setOdmitam(null)} size="sm" title="Odmítnout objednávku?"

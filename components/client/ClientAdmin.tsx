@@ -32,7 +32,7 @@ import {
   ObdobiLista, PersonChip, SearchField, Segmented, Select, Skeleton, Stat, StatRow, SwitchRow, Textarea, Toast, useLoad, type MenuItem,
 } from '../ui';
 import { Dock } from '../ui/Dock';
-import StaffInbox, { ORDER_STATUS } from './StaffInbox';
+import StaffInbox, { ORDER_STATUS, PrijemBezRezervaci } from './StaffInbox';
 import MobileMoreSheet from '../MobileMoreSheet';
 import FloorPlanEditor from './FloorPlanEditor';
 import QrDesigner from './QrDesigner';
@@ -1029,7 +1029,10 @@ function NovaRezervaceOkno({ form, setForm, koncept, zapis, stoly, onZavrit, onZ
 function ObjednavkyStranka({ oznam, onZmena }: { oznam: Hlaska; onZmena: () => void }) {
   // Fronta beze změny; Historie je pohled majitele na celé období (kolik přišlo, za kolik, kolik nepřijato).
   const [pohled, setPohled] = useState<'fronta' | 'historie'>('fronta');
+  // Dnešní rezervace kreslí widget klient.dnesni_rezervace pod frontou (výchozí rozložení) —
+  // nástroj je nekreslí podruhé (dřív tytéž rezervace dvakrát pod sebou).
   return (
+    <PrijemBezRezervaci.Provider value={true}>
     <PlochaWidgetu
       stranka="vedeni.klient_objednavky"
       hlavicka={{
@@ -1043,6 +1046,7 @@ function ObjednavkyStranka({ oznam, onZmena }: { oznam: Hlaska; onZmena: () => v
       }}
       nastroj={pohled === 'fronta' ? <StaffInbox onToast={t => oznam(t)} onZmena={onZmena} /> : <HistorieObjednavek />}
     />
+    </PrijemBezRezervaci.Provider>
   );
 }
 
