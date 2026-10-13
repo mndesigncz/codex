@@ -760,7 +760,6 @@
   "Posunout výš": "Move up",
   "Potom": "Then",
   "Potvrdit": "Confirm",
-  "Potvrzeno": "Confirmed",
   "Potvrzení se neuložilo — zkontroluj připojení.": "Your confirmation wasn't saved — check your connection.",
   "Potvrzení se neuložilo.": "Your confirmation wasn't saved.",
   "Použije se pro mzdy v Docházce, Financích i uzávěrkách.": "Used for wages in Attendance, Finance and closings.",
@@ -1008,7 +1007,6 @@
   "Stoly a plánek": "Tables and floor plan",
   "Storna": "Voids",
   "Stránka pro hosty je zapnutá": "The guest page is on",
-  "Stránka, akce, úkol, položka skladu, člověk…": "Page, action, task, stock item, person…",
   "Stránky": "Pages",
   "Stáhnout|widgety": "Withdraw",
   "Střední": "Medium",
@@ -2109,5 +2107,6 @@
   "„Ano\" zapíše 30 minut pauzy doprostřed směny a odpíchne odchod. „Ne\" odpíchne odchod a vedoucí dostane poznámku.": "“Yes” records a 30-minute break in the middle of the shift and clocks you out. “No” clocks you out and the manager gets a note.",
   "Výplatní listina": "Payroll sheet",
   "Řádek na člověka: hodiny, mzda, příplatky, dýško, prémie, co už odešlo z kasy a kolik doplatit; CSV pro účetní, Vyplaceno a uzavření období.": "One row per person: hours, wage, surcharges, tips, bonuses, what already left the till and what is still to pay; CSV for the accountant, Paid and closing the period.",
-  "už vyplaceno · {n}× v uzávěrkách": "already paid · {n}× in closings"
+  "už vyplaceno · {n}× v uzávěrkách": "already paid · {n}× in closings",
+  "Stránka, akce, úkol, host, receptura, uzávěrka…": "Page, action, task, guest, recipe, closing…"
 }

@@ -760,7 +760,6 @@
   "Posunout výš": "Przesuń wyżej",
   "Potom": "Potem",
   "Potvrdit": "Potwierdź",
-  "Potvrzeno": "Potwierdzona",
   "Potvrzení se neuložilo — zkontroluj připojení.": "Potwierdzenie nie zostało zapisane — sprawdź połączenie.",
   "Potvrzení se neuložilo.": "Potwierdzenie nie zostało zapisane.",
   "Použije se pro mzdy v Docházce, Financích i uzávěrkách.": "Używana do wynagrodzeń w Ewidencji czasu, Finansach i zamknięciach kasy.",
@@ -1008,7 +1007,6 @@
   "Stoly a plánek": "Stoliki i plan",
   "Storna": "Anulowania",
   "Stránka pro hosty je zapnutá": "Strona dla gości jest włączona",
-  "Stránka, akce, úkol, položka skladu, člověk…": "Strona, akcja, zadanie, pozycja magazynu, osoba…",
   "Stránky": "Strony",
   "Stáhnout|widgety": "Wycofaj",
   "Střední": "Średni",
@@ -2109,5 +2107,6 @@
   "„Ano\" zapíše 30 minut pauzy doprostřed směny a odpíchne odchod. „Ne\" odpíchne odchod a vedoucí dostane poznámku.": "„Tak” zapisze 30 minut przerwy w środku zmiany i odbije wyjście. „Nie” odbije wyjście, a kierownik dostanie notatkę.",
   "Výplatní listina": "Lista płac",
   "Řádek na člověka: hodiny, mzda, příplatky, dýško, prémie, co už odešlo z kasy a kolik doplatit; CSV pro účetní, Vyplaceno a uzavření období.": "Wiersz na osobę: godziny, wynagrodzenie, dodatki, napiwki, premie, co już wyszło z kasy i ile zostało do dopłaty; CSV dla księgowej, Wypłacono i zamknięcie okresu.",
-  "už vyplaceno · {n}× v uzávěrkách": "już wypłacono · {n}× w zamknięciach"
+  "už vyplaceno · {n}× v uzávěrkách": "już wypłacono · {n}× w zamknięciach",
+  "Stránka, akce, úkol, host, receptura, uzávěrka…": "Strona, akcja, zadanie, gość, receptura, zamknięcie kasy…"
 }

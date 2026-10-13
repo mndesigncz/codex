@@ -120,13 +120,16 @@ interface Props {
 }
 
 /** Hledání uvnitř ProfileLinkProvideru (kvůli otevření profilu člověka). */
-function HledaniVedeni({ otevreno, zavrit, stranky, akce, onStranka, ukoly, sklad, lide, navody, postupy }: {
+function HledaniVedeni({ otevreno, zavrit, stranky, akce, onStranka, ukoly, sklad, lide, navody, postupy, hoste, rezervace, receptury, menu, uzaverky }: {
   otevreno: boolean; zavrit: () => void; stranky: { id: string; label: string; icon: string }[]; akce: AkceHledani[]; onStranka: (id: string, arg?: string) => void;
   ukoly: boolean; sklad: boolean; lide: boolean; navody: boolean; postupy: boolean;
+  /** Kolo 8: hosté, rezervace, receptury, menu a uzávěrky — každé jen s příslušným oprávněním. */
+  hoste: boolean; rezervace: boolean; receptury: boolean; menu: boolean; uzaverky: boolean;
 }) {
   const otevriProfil = usePersonProfile();
   return <GlobalniHledani open={otevreno} onClose={zavrit} stranky={stranky} akce={akce} onStranka={onStranka} hledatUkoly={ukoly} hledatSklad={sklad} hledatNavody={navody} hledatPostupy={postupy}
-    hledatLidi={lide && !!otevriProfil} onOsoba={otevriProfil ?? undefined} />;
+    hledatLidi={lide && !!otevriProfil} onOsoba={otevriProfil ?? undefined}
+    hledatHosty={hoste} hledatRezervace={rezervace} hledatReceptury={receptury} hledatMenu={menu} hledatUzaverky={uzaverky} />;
 }
 
 export default function EmployerLayout({ user }: Props) {
@@ -656,8 +659,10 @@ export default function EmployerLayout({ user }: Props) {
           { label: t('Odhlásit se'), icon: 'logout', onClick: () => odhlasit({ callbackUrl: '/login' }), danger: true },
         ]}
       />
-      <HledaniVedeni otevreno={hledaniOtevreno} zavrit={() => setHledani(false)} stranky={nav.vse} akce={akceProHledani('vedeni', smiPohled)} onStranka={navigate}
-        ukoly={smiPohled('tasks')} sklad={smiPohled('inventory')} lide={ma('tym.profil')} navody={smiPohled('guides')} postupy={smiPohled('procedures')} />
+      {/* Cíl hledání jde stejnou cestou jako proklik z widgetu: záložky Managero client („klient:customers") i pohledy administrace. */}
+      <HledaniVedeni otevreno={hledaniOtevreno} zavrit={() => setHledani(false)} stranky={nav.vse} akce={akceProHledani('vedeni', smiPohled)} onStranka={navigujZWidgetu}
+        ukoly={smiPohled('tasks')} sklad={smiPohled('inventory')} lide={ma('tym.profil')} navody={smiPohled('guides')} postupy={smiPohled('procedures')}
+        hoste={smiKlient && ma('zakaznici.zobrazit')} rezervace={smiKlient && ma('rezervace.zobrazit')} receptury={smiPohled('recipes')} menu={smiKlient && ma('menu.zobrazit')} uzaverky={smiPohled('reports')} />
       <JazykOkno open={jazykOpen} onClose={() => setJazykOpen(false)} />
     </div>
     </ProfileLinkProvider>

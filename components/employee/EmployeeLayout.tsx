@@ -345,7 +345,8 @@ export default function EmployeeLayout({ user }: Props) {
         ]}
       />
       <GlobalniHledani open={hledaniOtevreno} onClose={() => setHledani(false)} stranky={nav.vse} akce={akceProHledani('zamestnanec', smiPohled)} onStranka={navigate}
-        hledatUkoly={smiPohled('tasks')} hledatSklad={smiPohled('inventory')} hledatNavody={smiPohled('guides')} hledatPostupy={smiPohled('procedures')} />
+        hledatUkoly={smiPohled('tasks')} hledatSklad={smiPohled('inventory')} hledatNavody={smiPohled('guides')} hledatPostupy={smiPohled('procedures')}
+        hledatReceptury={smiPohled('recipes')} />
       <JazykOkno open={jazykOpen} onClose={() => setJazykOpen(false)} />
     </div>
     </NavigaceKontext.Provider>
