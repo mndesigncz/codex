@@ -47,6 +47,7 @@ import { Poznamky } from '../Poznamky';
 import { useSmi } from '../widgety/NavigaceKontext';
 import { useOpravneni } from '../role/useOpravneni';
 import { URL_RECEPTURY, UDALOST_OTEVRIT_RECEPTURU } from '../widgety/oblasti/receptury';
+import { odkazNaNavodZEditoru } from '@/lib/recepturyVerze';
 
 const URL_SKLAD = '/api/inventory';
 const URL_KATEGORIE = '/api/inventory/categories';
@@ -358,6 +359,10 @@ export default function RecipesView({ openProductId, onNavigate, stranka = 'vede
         recipes={recipes} products={products} categories={kategorie.data ?? []} cil={cil}
         smiUpravit={ma('receptury.upravit')}
         guide={(navody.data ?? []).find(g => g.productId === draft.productId) ?? null}
+        // Návod se otvírá podle rozhraní (zaměstnanec /employee, vedení /employer), ne natvrdo (R8-5):
+        // přes navigaci stránky, a jen bez ní odkazem.
+        onOpenGuide={onNavigate ? (id => onNavigate('guides', String(id))) : undefined}
+        guideHref={id => odkazNaNavodZEditoru(stranka, id)}
         onItemSaved={patched => { setMistniSklad(m => ({ ...m, [String(patched.id)]: patched })); obnovDataWidgetu(URL_SKLAD); }}
         onItemCreated={created => { setMistniSklad(m => ({ ...m, [String(created.id)]: created })); obnovDataWidgetu(URL_SKLAD); }}
         // Proklik na celou položku ve Skladu (prahy, dodavatel, výroba) — druhý směr k „Používá se v kase" u položky.
@@ -462,7 +467,7 @@ export default function RecipesView({ openProductId, onNavigate, stranka = 'vede
 // ruce, a hned pod ním je vidět, kolik porcí z balení vyjde a co stojí — na
 // tom se chyba o řád (0,02 l vs 0,2 l) pozná dřív, než se odepíše sklad.
 // ---------------------------------------------------------------------------
-function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, err, yieldOf, recipes, products, categories, cil, smiUpravit, guide, onItemSaved, onItemCreated, onOpenItem }: {
+function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, err, yieldOf, recipes, products, categories, cil, smiUpravit, guide, onOpenGuide, guideHref, onItemSaved, onItemCreated, onOpenItem }: {
   draft: Draft; items: any[]; itemById: Map<string, any>;
   setIng: (idx: number, patch: Partial<Ingredient>) => void;
   setDraft: React.Dispatch<React.SetStateAction<Draft | null>>;
@@ -473,6 +478,9 @@ function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, 
   cil: number | null;
   smiUpravit: boolean;
   guide: { id: number; title: string } | null;
+  /** Otevřít návod navigací stránky (zůstane se ve správném rozhraní); bez ní odkaz z `guideHref`. */
+  onOpenGuide?: (guideId: number) => void;
+  guideHref: (guideId: number) => string;
   onItemSaved: (item: any) => void;
   onItemCreated: (item: any) => void;
   /** Otevřít položku ve Skladu (celý formulář); bez práva na sklad se nenabízí. */
@@ -708,12 +716,16 @@ function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, 
             <p className="t-meta">{t('Recepturu mění jen ten, kdo smí receptury upravovat.')}</p>
           )}
 
-          {guide && (
-            <a href={`/employer/overview?view=guides&guide=${guide.id}`} className="btn btn-secondary btn-sm w-full min-w-0">
+          {guide && (onOpenGuide ? (
+            <Button variant="secondary" size="sm" icon="book" className="w-full min-w-0" data-navod={guide.id} onClick={() => onOpenGuide(guide.id)}>
+              <span className="min-w-0 truncate">{t('Návod: {nazev}', { nazev: guide.title })}</span>
+            </Button>
+          ) : (
+            <a href={guideHref(guide.id)} data-navod={guide.id} className="btn btn-secondary btn-sm w-full min-w-0">
               <Icon name="book" size={15} className="shrink-0" />
               <span className="min-w-0 truncate">{t('Návod: {nazev}', { nazev: guide.title })}</span>
             </a>
-          )}
+          ))}
 
           <p className="t-meta">{t('Uloženou recepturu odepisuje synchronizace s pokladnou po každém prodeji.')}</p>
         </Card>

@@ -6,6 +6,7 @@
 
 import type { Testy } from './_testy.ts';
 import { normalizeMovements, vyplatyZKasyUzaverky, vyplatyICizim, sumMovements } from '../../lib/closing.ts';
+import { odkazNaNavodZEditoru } from '../../lib/recepturyVerze.ts';
 
 export default function ({ eq, ok }: Testy) {
   // ---- pohyby: komu se vyplácelo ----
@@ -41,4 +42,8 @@ export default function ({ eq, ok }: Testy) {
   const listina = new Map<number, number>();
   for (const v of vyplatyZKasyUzaverky({ created_by: 16, self_payout: 2500, movements: pohyby })) listina.set(v.userId, (listina.get(v.userId) ?? 0) + v.castka);
   eq('listina: Petr 1 200, Eva 1 300, dohromady self_payout', [listina.get(7), listina.get(16), [...listina.values()].reduce((a, b) => a + b, 0)], [1200, 1300, 2500]);
+
+  // ---- odkaz na návod z editoru receptury (oprava-odkaz-navodu-z-receptury) ----
+  eq('návod z receptury: zaměstnanec zůstane v /employee', odkazNaNavodZEditoru('zamestnanec.receptury', 12), '/employee/shifts?view=guides&guide=12');
+  eq('návod z receptury: vedení /employer', odkazNaNavodZEditoru('vedeni.receptury', 12), '/employer/overview?view=guides&guide=12');
 }
