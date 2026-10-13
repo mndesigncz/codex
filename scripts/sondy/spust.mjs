@@ -150,6 +150,7 @@ export const ZELENE = [
   'k83-dochazka',
   'k83-rezervace',
   'k83-rozvrh',
+  'k83-ukoly',
   'preteceni-vedeni',
   'preteceni-vedeni-tablet',
   'preteceni-zamestnanec',

@@ -1644,5 +1644,21 @@
   "Uvidí ho účetní v exportu.": "Uvidí ho účtovník v exporte.",
   "Uvidí ho i člověk v oznámení o změně a účetní v exportu.": "Uvidí ho aj človek v oznámení o zmene a účtovník v exporte.",
   "Např. zapomněl se odpíchnout": "Napr. zabudol sa odpichnúť",
-  "Upraveno|zaznam": "Upravený"
+  "Upraveno|zaznam": "Upravený",
+  "Probíhá": "Prebieha",
+  "po čase": "po čase",
+  "Do kdy (nepovinné)": "Do kedy (nepovinné)",
+  "Nejdřív vyber den.": "Najprv vyber deň.",
+  "{n, plural, one {Úkol je zadaný # člověku} few {Úkol je zadaný # lidem} other {Úkol je zadaný # lidem}}": "{n, plural, one {Úloha je zadaná # človeku} few {Úloha je zadaná # ľuďom} other {Úloha je zadaná # ľuďom}}",
+  "Nezadalo se {n} z {celkem}: {komu}": "Nezadalo sa {n} z {celkem}: {komu}",
+  "Každý dostane vlastní úkol ({n, plural, one {# člověk} few {# lidé} other {# lidí}}).": "Každý dostane vlastnú úlohu ({n, plural, one {# človek} few {# ľudia} other {# ľudí}}).",
+  "chce fotku": "chce fotku",
+  "Vyžadovat fotku při splnění": "Vyžadovať fotku pri splnení",
+  "Úkol půjde odškrtnout až s fotkou z telefonu nebo tabletu — uvidíš ji v detailu úkolu.": "Úlohu pôjde odškrtnúť až s fotkou z telefónu alebo tabletu — uvidíš ju v detaile úlohy.",
+  "před {n, plural, one {# dnem} few {# dny} other {# dny}}": "pred {n, plural, one {# dňom} few {# dňami} many {# dňami} other {# dňami}}",
+  "před {n, plural, one {# týdnem} few {# týdny} other {# týdny}}": "pred {n, plural, one {# týždňom} few {# týždňami} many {# týždňami} other {# týždňami}}",
+  "před {n, plural, one {# měsícem} few {# měsíci} other {# měsíci}}": "pred {n, plural, one {# mesiacom} few {# mesiacmi} many {# mesiacmi} other {# mesiacmi}}",
+  "před {n, plural, one {# rokem} few {# lety} other {# lety}}": "pred {n, plural, one {# rokom} few {# rokmi} many {# rokmi} other {# rokmi}}",
+  "Založit úkol z karty": "Založiť úlohu z karty",
+  "Úkol z karty se nepodařilo připravit — prohlížeč nedovolil uložit rozepsaný úkol.": "Úlohu z karty sa nepodarilo pripraviť — prehliadač nedovolil uložiť rozpísanú úlohu."
 }

@@ -24,14 +24,17 @@
 
 import { useEffect, useId, useState } from 'react';
 import { Icon } from '../Icons';
-import { Button, Card, Chip, EmptyState, ErrorState, Field, Input, Menu, Modal, Segmented, Skeleton, Textarea, Toast, type MenuItem } from '../ui';
+import { Avatar, Button, Card, Chip, EmptyState, ErrorState, Field, Input, Menu, Modal, Segmented, Skeleton, Textarea, Toast, type MenuItem } from '../ui';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { useDataWidgetu } from '../widgety/useDataWidgetu';
-import { useSmi } from '../widgety/NavigaceKontext';
+import { useNavigace, useSmi } from '../widgety/NavigaceKontext';
 import { URL_PLANOVANI } from '../widgety/oblasti/planovani';
 import { apiMessage, okJson } from '@/lib/api';
-import { vyberKarty, kartySloupce, sloupecKarty, type KartaPlanu } from '@/lib/ukolyPrehled';
-import { useT } from '@/lib/i18n/client';
+import { vyberKarty, kartySloupce, sloupecKarty, stariKarty, krestniJmeno, konceptUkoluZKarty, type KartaPlanu } from '@/lib/ukolyPrehled';
+import { zapisKoncept } from '@/lib/useDraft';
+import { parseDbTime } from '@/lib/pragueTime';
+import { fmtDatum } from '@/lib/i18n/format';
+import { useJazyk, useT } from '@/lib/i18n/client';
 import { useLocale } from './jazyk';
 
 // Sloupce tabule jsou kategorie, ne stavy — každý potřebuje vlastní
@@ -52,9 +55,13 @@ type IdSloupce = (typeof COLUMNS)[number]['id'];
 export default function PlanningBoard() {
   const loc = useLocale();
   const t = useT('sprava');
+  const { jazyk } = useJazyk();
   const nazvySloupcu: Record<IdSloupce, string> = { ideas: t('Nápady'), in_progress: t('Rozpracováno'), review: t('Ke schválení'), done: t('Hotovo') };
   const smi = useSmi();
+  const nav = useNavigace();
   const upravuje = smi('planovani.upravit');
+  // Kolo 7: z karty jde založit úkol — jen kdo smí úkoly zadávat (a vidí stránku Úkolů).
+  const zakladaUkoly = smi('ukoly.zadavat') && nav.smiPohled('tasks');
   const data = useDataWidgetu<KartaPlanu[]>(URL_PLANOVANI, vyberKarty);
   const cards = data.data ?? [];
   const [newCard, setNewCard] = useState<{ column: string; title: string; description: string } | null>(null);
@@ -162,12 +169,56 @@ export default function PlanningBoard() {
     if (card) void moveCard(card, colId);
   };
 
+  /**
+   * Kolo 7: karta → rozepsaný úkol. Název a popis karty se zapíšou jako koncept formuláře
+   * Úkolů (tvar konceptUkoluZKarty = prázdný formulář TaskManageru) a Úkoly ho po přechodu
+   * otevřou samy s „Vrátili jsme ti rozepsaný úkol" — termín a komu doplní člověk.
+   */
+  const zalozUkol = (card: KartaPlanu) => {
+    if (!zapisKoncept('ukoly', konceptUkoluZKarty(card))) {
+      setZprava({ text: t('Úkol z karty se nepodařilo připravit — prohlížeč nedovolil uložit rozepsaný úkol.'), ton: 'bad' });
+      return;
+    }
+    nav.onNavigate('tasks', 'pohled:list');
+  };
+
   const polozkyMenu = (card: KartaPlanu): MenuItem[] => [
-    ...COLUMNS.filter(c => c.id !== sloupecKarty(card)).map(c => ({ label: t('Přesunout do: {sloupec}', { sloupec: nazvySloupcu[c.id] }), icon: 'swap', onClick: () => void moveCard(card, c.id) })),
-    ...(noisium ? [{ label: publishing === card.id ? t('Publikuji…') : t('Publikovat do Noisium'), icon: 'upload', onClick: () => void publishToNoisium(card) }] : []),
-    { label: t('Upravit kartu'), icon: 'pencil', onClick: () => setEditCard({ id: card.id, title: card.title, description: card.description ?? '' }) },
-    { label: t('Smazat kartu…'), icon: 'trash', danger: true, onClick: () => setMazani(card) },
+    ...(zakladaUkoly ? [{ label: t('Založit úkol z karty'), icon: 'check', onClick: () => zalozUkol(card) }] : []),
+    ...(upravuje ? [
+      ...COLUMNS.filter(c => c.id !== sloupecKarty(card)).map(c => ({ label: t('Přesunout do: {sloupec}', { sloupec: nazvySloupcu[c.id] }), icon: 'swap', onClick: () => void moveCard(card, c.id) })),
+      ...(noisium ? [{ label: publishing === card.id ? t('Publikuji…') : t('Publikovat do Noisium'), icon: 'upload', onClick: () => void publishToNoisium(card) }] : []),
+      { label: t('Upravit kartu'), icon: 'pencil', onClick: () => setEditCard({ id: card.id, title: card.title, description: card.description ?? '' }) },
+      { label: t('Smazat kartu…'), icon: 'trash', danger: true, onClick: () => setMazani(card) },
+    ] : []),
   ];
+
+  /** Kolo 7: „před 3 dny" — jak dlouho karta leží (stariKarty v lib/ukolyPrehled). */
+  const stariText = (card: KartaPlanu): string | null => {
+    const s = stariKarty(card.vytvoreno);
+    switch (s.druh) {
+      case 'ted': return t('právě teď');
+      case 'min': return t('před {n} min', { n: s.n });
+      case 'h': return t('před {n} h', { n: s.n });
+      case 'den': return t('před {n, plural, one {# dnem} few {# dny} other {# dny}}', { n: s.n });
+      case 'tyden': return t('před {n, plural, one {# týdnem} few {# týdny} other {# týdny}}', { n: s.n });
+      case 'mesic': return t('před {n, plural, one {# měsícem} few {# měsíci} other {# měsíci}}', { n: s.n });
+      case 'rok': return t('před {n, plural, one {# rokem} few {# lety} other {# lety}}', { n: s.n });
+      case 'nevim': return null;
+    }
+  };
+  /** Patka karty: kdo ji založil a jak dlouho leží (Trello). Celé jméno a přesné datum v `title`. */
+  const patka = (card: KartaPlanu) => {
+    const kdy = stariText(card);
+    if (!card.autor && !kdy) return null;
+    const datum = parseDbTime(card.vytvoreno);
+    const presne = [card.autor, datum ? fmtDatum(datum, { jazyk, styl: 'dlouze' }) : null].filter(Boolean).join(' · ');
+    return (
+      <p className="t-meta mt-2.5 flex items-center gap-1.5 min-w-0" title={presne || undefined}>
+        {card.autor && <Avatar emoji={card.autorAvatar} name={card.autor} size="xs" ring={false} />}
+        <span className="truncate">{[card.autor ? krestniJmeno(card.autor) : null, kdy].filter(Boolean).join(' · ')}</span>
+      </p>
+    );
+  };
 
   const otevriNovou = (column: IdSloupce = COLUMNS[0].id) => {
     setChybaFormulare(null);
@@ -245,8 +296,9 @@ export default function PlanningBoard() {
                           {card.description && <p className="text-[13px] text-black/55 mt-1 break-words text-pretty">{card.description}</p>}
                         </div>
                       )}
-                      {upravuje && <Menu size="sm" label={t('Možnosti karty {nazev}', { nazev: card.title })} items={polozkyMenu(card)} className="-mr-1.5 -mt-1" />}
+                      {(upravuje || zakladaUkoly) && <Menu size="sm" label={t('Možnosti karty {nazev}', { nazev: card.title })} items={polozkyMenu(card)} className="-mr-1.5 -mt-1" />}
                     </div>
+                    {patka(card)}
                   </li>
                 ))}
                 {karty.length === 0 && newCard?.column !== col.id && <li className="t-meta text-center py-3">{t('Žádná karta')}</li>}

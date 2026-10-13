@@ -116,6 +116,23 @@ export function vOteviraciDobe(hours: OpeningHours | null | undefined, dateStr: 
   return doo > od ? t >= od && t < doo : t >= od || t < doo;
 }
 
+/** „RRRR-MM-DD" + 1 den (v UTC poledne, ať letní čas den neposune). */
+const dalsiDen = (d: string) => { const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + 1); return x.toISOString().slice(0, 10); };
+
+/**
+ * Den, který okno ručního zápisu předvybere: dnes, když se na dnešek ještě dá zapsat
+ * (zbývá nabízený čas, nebo je otevřeno a okno nabídne „Teď"), jinak nejbližší další
+ * den s volným časem do `nejpozdeji`. Po zavíračce (nebo v zavřený den) tak obsluha
+ * nezačíná na dni, kde nejde nic vybrat. Nemá-li časy žádný den, zůstane dnes.
+ */
+export function denProZapis(hours: OpeningHours | null | undefined, dnes: string, slotMinutes: number, tedHM: string, nejpozdeji: string): string {
+  if (slotsFor(hours, dnes, slotMinutes, nejdriveDnes(tedHM, 0)).length > 0 || vOteviraciDobe(hours, dnes, tedHM)) return dnes;
+  for (let d = dalsiDen(dnes), i = 0; d <= nejpozdeji && i < 366; d = dalsiDen(d), i++) {
+    if (slotsFor(hours, d, slotMinutes).length > 0) return d;
+  }
+  return dnes;
+}
+
 const kladneCele = (v: unknown): number | null | 'chyba' => {
   if (v == null || v === '') return null;
   const n = Number(v);

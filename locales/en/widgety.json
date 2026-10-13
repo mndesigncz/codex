@@ -1937,5 +1937,20 @@
   "Připomenout dostupnost ({n})": "Remind about availability ({n})",
   "Pošle upozornění všem, kdo na {mesic} dostupnost nezadali.": "Sends a notification to everyone who hasn't entered availability for {mesic}.",
   "Připomenout ({n})": "Remind ({n})",
-  "Připomenout dostupnost": "Remind about availability"
+  "Připomenout dostupnost": "Remind about availability",
+  "Začít": "Start",
+  "po čase": "late",
+  "dnes do {cas}": "today until {cas}",
+  "zítra do {cas}": "tomorrow until {cas}",
+  "Přilož fotku": "Attach a photo",
+  "U tohoto úkolu chce vedení fotku jako důkaz, že je hotovo.": "For this task, management wants a photo as proof that it's done.",
+  "Splní se za: {jmeno}": "Completed as: {jmeno}",
+  "Náhled fotky": "Photo preview",
+  "Vyfotit znovu": "Retake photo",
+  "Vyfotit / nahrát": "Take / upload photo",
+  "Fotku se nepodařilo nahrát.": "The photo could not be uploaded.",
+  "Fotku se nepodařilo nahrát — zkontroluj připojení.": "The photo could not be uploaded — check the connection.",
+  "Fotka ze splnění": "Completion photo",
+  "Otevřít fotku v plné velikosti": "Open the photo in full size",
+  "Fotka ze splnění úkolu {nazev}": "Completion photo of task {nazev}"
 }

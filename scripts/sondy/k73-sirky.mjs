@@ -67,7 +67,8 @@ for (const w of [320, 360]) {
   const { ctx, p } = await kontext({ viewport: { width: 320, height: 800 }, role: 'employer', mobil: true });
   await p.goto(BASE + '/employer/overview?view=tasks', { waitUntil: 'networkidle' });
   await p.waitForTimeout(800);
-  await p.getByRole('button', { name: /^Upravit úkol/ }).first().click();
+  // Jménem: fixtura má víc úkolů na týž den a úkol s časem termínu (kolo 7) je v seznamu dřív.
+  await p.getByRole('button', { name: 'Upravit úkol Vyrobit Domácí limonáda' }).click();
   const vlozit = p.getByRole('button', { name: /^Vložit bod za bod 1/ });
   const videt = await dokud(() => vlozit.first().isVisible().catch(() => false), 3000);
   if (!videt) tvrdi('4: úkol má kontrolní seznam s tlačítkem „Vložit bod" (fixtura)', false, 'tlačítko není vidět — fixtura úkolu bez kontrolního seznamu?');

@@ -412,5 +412,8 @@
   "Minulý měsíc se nenačetl — zkus to znovu.": "Der letzte Monat wurde nicht geladen — versuch es noch einmal.",
   "Není co převzít — dny už mají vlastní stav, nebo se minulý měsíc žádný den neopakoval.": "Nichts zu übernehmen — die Tage haben schon eine eigene Auswahl, oder letzten Monat hat sich nichts wiederholt.",
   "{n, plural, one {Převzato z minulého měsíce: # den} few {Převzato z minulého měsíce: # dny} other {Převzato z minulého měsíce: # dní}}": "{n, plural, one {Aus dem letzten Monat übernommen: # Tag} other {Aus dem letzten Monat übernommen: # Tage}}",
-  "Vrátit|zpet": "Rückgängig"
+  "Vrátit|zpet": "Rückgängig",
+  "po čase": "zu spät",
+  "chce fotku": "Foto nötig",
+  "s fotkou": "mit Foto"
 }

@@ -1644,5 +1644,21 @@
   "Uvidí ho účetní v exportu.": "Księgowa zobaczy go w eksporcie.",
   "Uvidí ho i člověk v oznámení o změně a účetní v exportu.": "Zobaczy go osoba w powiadomieniu o zmianie i księgowa w eksporcie.",
   "Např. zapomněl se odpíchnout": "Np. zapomniał zarejestrować wyjście",
-  "Upraveno|zaznam": "Edytowany"
+  "Upraveno|zaznam": "Edytowany",
+  "Probíhá": "W toku",
+  "po čase": "po czasie",
+  "Do kdy (nepovinné)": "Do której (opcjonalnie)",
+  "Nejdřív vyber den.": "Najpierw wybierz dzień.",
+  "{n, plural, one {Úkol je zadaný # člověku} few {Úkol je zadaný # lidem} other {Úkol je zadaný # lidem}}": "{n, plural, one {Zadanie przydzielone # osobie} few {Zadanie przydzielone # osobom} many {Zadanie przydzielone # osobom} other {Zadanie przydzielone # osoby}}",
+  "Nezadalo se {n} z {celkem}: {komu}": "Nie przydzielono {n} z {celkem}: {komu}",
+  "Každý dostane vlastní úkol ({n, plural, one {# člověk} few {# lidé} other {# lidí}}).": "Każdy dostanie własne zadanie ({n, plural, one {# osoba} few {# osoby} many {# osób} other {# osoby}}).",
+  "chce fotku": "wymaga zdjęcia",
+  "Vyžadovat fotku při splnění": "Wymagaj zdjęcia przy wykonaniu",
+  "Úkol půjde odškrtnout až s fotkou z telefonu nebo tabletu — uvidíš ji v detailu úkolu.": "Zadanie da się odhaczyć dopiero ze zdjęciem z telefonu lub tabletu — zobaczysz je w szczegółach zadania.",
+  "před {n, plural, one {# dnem} few {# dny} other {# dny}}": "{n, plural, one {# dzień temu} few {# dni temu} many {# dni temu} other {# dnia temu}}",
+  "před {n, plural, one {# týdnem} few {# týdny} other {# týdny}}": "{n, plural, one {# tydzień temu} few {# tygodnie temu} many {# tygodni temu} other {# tygodnia temu}}",
+  "před {n, plural, one {# měsícem} few {# měsíci} other {# měsíci}}": "{n, plural, one {# miesiąc temu} few {# miesiące temu} many {# miesięcy temu} other {# miesiąca temu}}",
+  "před {n, plural, one {# rokem} few {# lety} other {# lety}}": "{n, plural, one {# rok temu} few {# lata temu} many {# lat temu} other {# roku temu}}",
+  "Založit úkol z karty": "Utwórz zadanie z karty",
+  "Úkol z karty se nepodařilo připravit — prohlížeč nedovolil uložit rozepsaný úkol.": "Nie udało się przygotować zadania z karty — przeglądarka nie pozwoliła zapisać szkicu."
 }

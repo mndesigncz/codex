@@ -12,12 +12,13 @@ import { Poznamky } from '../Poznamky';
 import { useT } from '@/lib/i18n/client';
 import { aktualniJazyk } from '@/lib/i18n/stav';
 import { jeHotovy, jePoTerminu, type Ukol } from '@/lib/ukolyPrehled';
-import { postupChecklistu } from '@/lib/ukolyFiltr';
-import { dayPlus } from '@/lib/pragueTime';
+import { postupChecklistu, poCase } from '@/lib/ukolyFiltr';
+import { dayPlus, pragueHM } from '@/lib/pragueTime';
+import { fmtHM } from '@/lib/i18n/format';
 
 const prioTon = (p: string): 'bad' | 'wait' | 'muted' => (p === 'high' ? 'bad' : p === 'medium' ? 'wait' : 'muted');
 
-export function UkolDetail({ ukol, dnes, kdo, navodHref, onClose, onSplnit, onUpravit, onSmazat, onOdlozit, onChecklist, onChecklistVse, zamceno }: {
+export function UkolDetail({ ukol, dnes, kdo, navodHref, onClose, onSplnit, onStav, onUpravit, onSmazat, onOdlozit, onChecklist, onChecklistVse, zamceno }: {
   ukol: Ukol;
   dnes: string;
   /** Komu úkol patří (jméno nebo odkaz na člověka). */
@@ -26,6 +27,8 @@ export function UkolDetail({ ukol, dnes, kdo, navodHref, onClose, onSplnit, onUp
   onClose: () => void;
   /** Označit jako hotový / vrátit zpět; chybí, když divák úkol splnit nesmí. */
   onSplnit?: (hotovo: boolean) => void;
+  /** Kolo 7: „Začít" — úkol přejde do Probíhá (vedení i zaměstnanec stejně); chybí, když divák úkol plnit nesmí. */
+  onStav?: (status: 'in_progress') => void;
   onUpravit?: () => void;
   onSmazat?: () => void;
   /** Přesune termín na jiný den (jen kdo smí úkol upravit); nabízí se u nehotového úkolu. */
@@ -38,6 +41,9 @@ export function UkolDetail({ ukol, dnes, kdo, navodHref, onClose, onSplnit, onUp
   const loc = aktualniJazyk();
   const hotovo = jeHotovy(ukol);
   const poTerminu = jePoTerminu(ukol, dnes);
+  // Kolo 7: dnešní úkol, jehož čas termínu minul (okno je otevřené krátce — stačí čas při vykreslení).
+  const poCasu = poCase(ukol, dnes, pragueHM());
+  const casTerminu = ukol.dueDate && ukol.dueTime ? fmtHM(ukol.dueTime) : null;
   const den = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString(loc, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const cas = (iso: string) => new Date(iso).toLocaleString(loc, { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Prague' });
   const opakovani = recurrenceLabel(ukol.recurrence);
@@ -46,10 +52,11 @@ export function UkolDetail({ ukol, dnes, kdo, navodHref, onClose, onSplnit, onUp
 
   const terminPopis = (() => {
     if (!ukol.dueDate) return t('Bez termínu');
-    if (hotovo) return den(ukol.dueDate);
-    if (ukol.dueDate === dnes) return `${den(ukol.dueDate)} · ${t('dnes')}`;
-    if (ukol.dueDate === dayPlus(dnes, 1)) return `${den(ukol.dueDate)} · ${t('zítra')}`;
-    return `${den(ukol.dueDate)}${poTerminu ? ` · ${t('po termínu')}` : ''}`;
+    const doCasu = casTerminu ? ` · ${t('do {cas}', { cas: casTerminu })}` : '';
+    if (hotovo) return `${den(ukol.dueDate)}${doCasu}`;
+    if (ukol.dueDate === dnes) return `${den(ukol.dueDate)} · ${casTerminu ? t('dnes do {cas}', { cas: casTerminu }) : t('dnes')}${poCasu ? ` · ${t('po čase')}` : ''}`;
+    if (ukol.dueDate === dayPlus(dnes, 1)) return `${den(ukol.dueDate)} · ${casTerminu ? t('zítra do {cas}', { cas: casTerminu }) : t('zítra')}`;
+    return `${den(ukol.dueDate)}${doCasu}${poTerminu ? ` · ${t('po termínu')}` : ''}`;
   })();
 
   const radek = (nazev: string, hodnota: ReactNode) => (
@@ -66,6 +73,7 @@ export function UkolDetail({ ukol, dnes, kdo, navodHref, onClose, onSplnit, onUp
         {onSmazat && <Button variant="ghost" icon="trash" className="mr-auto hover:!text-[var(--bad-ink)]" onClick={onSmazat}>{t('Smazat')}</Button>}
         {onUpravit && <Button variant="secondary" icon="pencil" onClick={onUpravit}>{t('Upravit')}</Button>}
         {onOdlozit && !hotovo && <Button variant="secondary" icon="clock" onClick={() => onOdlozit(dayPlus(ukol.dueDate && ukol.dueDate > dnes ? ukol.dueDate : dnes, 1))}>{ukol.dueDate && ukol.dueDate > dnes ? t('Odložit o den') : t('Odložit na zítra')}</Button>}
+        {onStav && !zamceno && !hotovo && ukol.status !== 'in_progress' && <Button variant="secondary" icon="play" onClick={() => onStav('in_progress')}>{t('Začít')}</Button>}
         {onSplnit && !zamceno && (hotovo
           ? <Button variant="secondary" icon="undo" onClick={() => onSplnit(false)}>{t('Vrátit mezi nehotové')}</Button>
           : <Button variant="primary" icon="check" onClick={() => onSplnit(true)}>{t('Označit jako hotový')}</Button>)}
@@ -86,12 +94,25 @@ export function UkolDetail({ ukol, dnes, kdo, navodHref, onClose, onSplnit, onUp
 
         <dl className="divide-y divide-black/[0.06] border-y border-black/[0.06]">
           {radek(t('Komu'), ukol.teamTask ? t('Kdokoli z týmu') : kdo)}
-          {radek(t('Termín'), <span className={poTerminu ? 'text-bad-ink font-medium' : undefined}>{terminPopis}</span>)}
+          {radek(t('Termín'), <span className={poTerminu || poCasu ? 'text-bad-ink font-medium' : undefined}>{terminPopis}</span>)}
           {ukol.createdAt && radek(t('Založeno'), cas(ukol.createdAt))}
           {hotovo && ukol.completedAt && radek(t('Splněno'), <>{cas(ukol.completedAt)}{ukol.completedByName ? ` · ${ukol.completedByName}` : ''}</>)}
           {hotovo && !ukol.completedAt && ukol.completedByName && radek(t('Splnil'), ukol.completedByName)}
           {navodHref && radek(t('Návod'), <a href={navodHref} className="btn btn-ghost btn-sm -my-1"><span className="truncate max-w-[16rem]">{ukol.sourceMeta?.guideTitle ?? t('Otevřít návod')}</span></a>)}
         </dl>
+
+        {/* Kolo 7: fotka jako důkaz splnění — pod řádkem Splněno, klepnutí otevře plnou velikost. */}
+        {ukol.completionPhoto && (
+          <div>
+            <p className="t-label">{t('Fotka ze splnění')}</p>
+            <a href={ukol.completionPhoto} target="_blank" rel="noopener noreferrer" title={t('Otevřít fotku v plné velikosti')}
+              className="mt-1.5 inline-block max-w-full rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={ukol.completionPhoto} alt={t('Fotka ze splnění úkolu {nazev}', { nazev: ukol.title })} loading="lazy"
+                className="block rounded-2xl max-h-64 w-auto max-w-full" />
+            </a>
+          </div>
+        )}
 
         {postup != null && (
           <div>

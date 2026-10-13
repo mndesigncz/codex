@@ -47,7 +47,7 @@ import type { VyberHostu } from './loyalty/ClenoveHromadne';
 import MenuEditor from '../employer/MenuEditor';
 import EventsView from '../employer/EventsView';
 import {
-  czDay, dayKey, nejdriveDnes, RES_STATUS, RUCNI_MAX_JMENO, RUCNI_MAX_POZNAMKA, RUCNI_MAX_TELEFON, slotsFor, validujRucniRezervaci, vOteviraciDobe,
+  czDay, dayKey, denProZapis, nejdriveDnes, RES_STATUS, RUCNI_MAX_JMENO, RUCNI_MAX_POZNAMKA, RUCNI_MAX_TELEFON, slotsFor, validujRucniRezervaci, vOteviraciDobe,
   type PoleRucni,
 } from '@/lib/clientSlots';
 import { dayPlus, dbTimeDayHM, dbTimeHM, parseDbTime, pragueHM, pragueToday } from '@/lib/pragueTime';
@@ -636,6 +636,16 @@ function NovaRezervaceOkno({ form, setForm, koncept, zapis, stoly, onZavrit, onZ
   const zmen = (cast: Partial<FormRezervace>) => { setForm(f => ({ ...f, ...cast })); if (chyba) setChyba(null); };
   // Po změně dne zvolit první nabízený čas (nebo nechat ruční čas, když je zadaný ručně). Funkční
   // aktualizace: efekt běží i ve chvíli, kdy koncept právě dosazuje rozepsané — starý `form` by ho přepsal.
+  // Po zavíračce (nebo v zavřený den) nezačínat na dnešku, kde nejde nic vybrat: jednou, jakmile
+  // je nastavení zápisu, předvybrat nejbližší den s volným časem. Jen výchozí dnešek bez ručního
+  // času — rozepsaný jiný den nebo ručně zadaný čas zůstane.
+  const denPredvybran = useRef(false);
+  useEffect(() => {
+    if (denPredvybran.current || !zapis) return;
+    denPredvybran.current = true;
+    const den = denProZapis(zapis.hodiny, dnes, zapis.krok, ted, nejpozdeji);
+    if (den !== dnes) setForm(f => (f.datum === dnes && !f.jinyCas ? { ...f, datum: den } : f));
+  }, [zapis, dnes, ted, nejpozdeji, setForm]);
   const klicVoleb = volby.join(',');
   useEffect(() => {
     if (!zapis || !klicVoleb) return;

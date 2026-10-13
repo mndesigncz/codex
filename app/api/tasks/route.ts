@@ -9,6 +9,8 @@ import { sazebnikBodu } from '@/lib/mzdaSmeny';
 import { jeClenem } from '@/lib/tenant';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { typNaUcet } from '@/lib/opravneni';
+import { jeStavZapisu, casNeboNull, validujCasTerminu, doplnkyVyskytu, textOznameniUkolu, platnaFotka, validujDukaz, type DoplnkyVyskytu } from '@/lib/ukolyPrehled';
+import { audit } from '@/lib/audit';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +30,8 @@ const shape = (r: any) => ({
   assignedTo: r.assigned_to ?? null, createdBy: r.created_by,
   teamTask: r.assigned_to == null,
   priority: r.priority, status: r.status, dueDate: r.due_date,
+  // Kolo 7: „do 14:00" (HH:MM, nepovinné; jen s dnem termínu).
+  dueTime: r.due_date ? casNeboNull(r.due_time) : null,
   recurrence: r.recurrence ?? null,
   seriesId: r.series_id ?? null,
   checklist: Array.isArray(r.checklist) ? r.checklist : [],
@@ -44,6 +48,9 @@ const shape = (r: any) => ({
   sourceMeta: r.source_meta ?? null,
   // Kolo 70: výskyt úkolu zamyká uzávěrku svého dne, dokud není hotový.
   requireBeforeClosing: r.require_before_closing === true,
+  // Kolo 7: splní se jen s fotkou; fotka ze splnění (jen /api/upload/<id>).
+  requirePhoto: r.require_photo === true,
+  completionPhoto: platnaFotka(r.completion_photo) ? r.completion_photo : null,
 });
 
 // Povinný před uzávěrkou smí úkol označit jen ten, kdo úkoly zadává nebo
@@ -69,7 +76,26 @@ async function zapisPovinny(flag: boolean, cil: { id?: number | null; seriesId?:
   } catch { /* sloupec ještě není — úkol platí, jen bez zámku */ }
 }
 
+// Kolo 7: doplňky výskytu (čas termínu, „jen s fotkou") se zapisují ZVLÁŠŤ a best-effort,
+// stejně jako příznak povinného úkolu výš: před migrací by INSERT s novým
+// sloupcem shodil i založení úkolu. Cíl: jeden řádek, budoucí nesplněné
+// výskyty série, nebo konkrétní dny série (nově vygenerované výskyty).
+type CilDoplnku = { id?: number | null; seriesId?: string | null; odDne?: string; dny?: string[] };
+async function zapisDoplnky(d: DoplnkyVyskytu, cil: CilDoplnku) {
+  try {
+    if (cil.seriesId && cil.dny) {
+      if (cil.dny.length) await sql`UPDATE tasks SET due_time = ${d.due_time}, require_photo = ${d.require_photo} WHERE series_id = ${cil.seriesId} AND due_date = ANY(${cil.dny}::text[])`;
+    } else if (cil.seriesId && cil.odDne) {
+      await sql`UPDATE tasks SET due_time = ${d.due_time}, require_photo = ${d.require_photo} WHERE series_id = ${cil.seriesId} AND due_date >= ${cil.odDne} AND status <> 'done'`;
+    } else if (cil.seriesId) {
+      await sql`UPDATE tasks SET due_time = ${d.due_time}, require_photo = ${d.require_photo} WHERE series_id = ${cil.seriesId}`;
+    }
+    if (cil.id != null) await sql`UPDATE tasks SET due_time = ${d.due_time}, require_photo = ${d.require_photo} WHERE id = ${cil.id}`;
+  } catch { /* sloupce ještě nejsou — úkol platí, jen bez času a bez fotky */ }
+}
+
 const RECURRENCES = ['daily', 'weekdays', 'weekly'];
+const DEN = /^\d{4}-\d{2}-\d{2}$/;
 const TARGET_UPCOMING = 5;   // keep this many future, undone occurrences per series
 const HORIZON_DAYS = 120;    // never generate further than this ahead
 
@@ -147,6 +173,12 @@ async function topUpSeries(teamId: number) {
         await sql`
           UPDATE tasks SET require_before_closing = (SELECT COALESCE(require_before_closing, FALSE) FROM tasks WHERE id = ${tmpl.id})
           WHERE series_id = ${seriesId} AND due_date = ANY(${inserts}::text[])`;
+      } catch { /* před migrací */ }
+      // Kolo 7: čas termínu a „jen s fotkou" ze vzoru (doplnkyVyskytu; fotka ze splnění ne) — zvlášť, ať případný
+      // výpadek nového sloupce nevezme s sebou zámek uzávěrky výš.
+      try {
+        const [vzor] = await sql`SELECT due_time, require_photo FROM tasks WHERE id = ${tmpl.id}`;
+        await zapisDoplnky(doplnkyVyskytu(vzor), { seriesId, dny: inserts });
       } catch { /* před migrací */ }
     }
   }
@@ -234,7 +266,13 @@ export async function POST(req: NextRequest) {
     : [];
   const priority = b.priority ?? 'medium';
   const dueDate = b.dueDate || null;
+  if (dueDate != null && !(typeof dueDate === 'string' && DEN.test(dueDate))) return NextResponse.json({ error: 'Termín zadej jako datum (RRRR-MM-DD).' }, { status: 400 });
+  // Kolo 7: „do 14:00" jen s dnem — opakovaný úkol bez data začíná dnes, takže den má.
+  const casV = validujCasTerminu(b.dueTime, !!(dueDate || recurrence));
+  if (!casV.ok) return NextResponse.json({ error: casV.chyba }, { status: 400 });
   const povinny = b.requireBeforeClosing === true && smiPovinny(c.opr);
+  // Kolo 7: „splní se jen s fotkou" nastaví, kdo zadává úkoly (jako zámek uzávěrky); bez práva se ignoruje.
+  const chceFoto = b.requirePhoto === true && smiPovinny(c.opr);
   // Zámek patří dni — úkol bez termínu a bez opakování by nezamkl nikdy nic
   // a manažer by si myslel, že hlídá.
   if (povinny && !dueDate && !recurrence) return NextResponse.json({ error: BEZ_DNE }, { status: 400 });
@@ -272,11 +310,15 @@ export async function POST(req: NextRequest) {
     await zapisPovinny(true, seriesId ? { seriesId } : { id: Number(first.id) });
     first = { ...first, require_before_closing: true };
   }
+  if ((casV.cas || chceFoto) && first) {
+    await zapisDoplnky({ due_time: casV.cas, require_photo: chceFoto }, seriesId ? { seriesId } : { id: Number(first.id) });
+    first = { ...first, due_time: casV.cas, require_photo: chceFoto };
+  }
 
   // Notify the assignee (specific person) when it isn't self-assigned.
   if (assignedTo && assignedTo !== c.meId) {
     try {
-      await notifyUser(assignedTo, { title: 'Nový úkol', body: title, type: priority === 'high' ? 'warning' : 'info', category: 'task', link: '/employee/shifts?view=tasks' });
+      await notifyUser(assignedTo, { title: 'Nový úkol', body: textOznameniUkolu(title, dates[0], casV.cas, todayStr()), type: priority === 'high' ? 'warning' : 'info', category: 'task', link: '/employee/shifts?view=tasks' });
     } catch { /* best-effort */ }
   }
 
@@ -381,6 +423,18 @@ export async function PATCH(req: NextRequest) {
       ? (RECURRENCES.includes(b.recurrence) ? b.recurrence : null)
       : (task.recurrence ?? null);
     const dueDate = b.dueDate !== undefined ? (b.dueDate || null) : task.due_date;
+    if (b.dueDate && !(typeof b.dueDate === 'string' && DEN.test(b.dueDate))) return NextResponse.json({ error: 'Termín zadej jako datum (RRRR-MM-DD).' }, { status: 400 });
+    // Kolo 7: čas termínu. Bez dne (a bez opakování, které den dá) čas zmizí —
+    // poslaný čas bez dne je chyba vstupu, uložený se tiše zahodí s dnem.
+    const maDen = !!(dueDate || newRecurrence);
+    let cas: string | null;
+    if (b.dueTime !== undefined) {
+      const v = validujCasTerminu(b.dueTime, maDen);
+      if (!v.ok) return NextResponse.json({ error: v.chyba }, { status: 400 });
+      cas = v.cas;
+    } else cas = maDen ? casNeboNull(task.due_time) : null;
+    // Kolo 7: „jen s fotkou" — z formuláře jen s právem (jako zámek uzávěrky), jinak zůstává.
+    const chceFoto = b.requirePhoto !== undefined && smiPovinny(c.opr) ? b.requirePhoto === true : task.require_photo === true;
 
     // Příznak: z formuláře jen s právem, jinak zůstává, jak byl. Zapisuje se
     // vždycky (i beze změny), protože přestavba série níž maže budoucí výskyty
@@ -463,6 +517,8 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (povinny || bylPovinny) await zapisPovinny(povinny, cilPovinny);
+    // Doplňky (čas) vždycky: přestavba série výš zakládá výskyty bez nich.
+    await zapisDoplnky({ due_time: cas, require_photo: chceFoto }, cilPovinny);
 
     // Return a representative row (the edited one if it survived, else the series' next occurrence).
     let [row] = await sql`
@@ -505,6 +561,8 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (b.status === undefined) return NextResponse.json(shape(task));
+  // Kolo 7: jen Čeká / Probíhá / Hotovo — dřív se do sloupce zapsalo, cokoli přišlo.
+  if (!jeStavZapisu(b.status)) return NextResponse.json({ error: 'Neplatný stav úkolu.' }, { status: 400 });
 
   // Record who completed it (cleared when re-opened). On the shared tablet the
   // completion is attributed to the person currently using it, so their points
@@ -521,6 +579,22 @@ export async function PATCH(req: NextRequest) {
   }
   let row: any;
   const done = b.status === 'done';
+  // Kolo 7: fotka jako důkaz. Úkol s require_photo se bez fotky nesplní (ani z widgetu
+  // a tabletu); fotka musí být soubor nahraný v tomhle podniku. Na tabletu ji přiloží
+  // vybraný člověk (effectiveId) — audit i „splnil" jdou na něj.
+  const dukaz = validujDukaz({ pozadovana: task.require_photo === true, ulozena: task.completion_photo, vstup: b.completionPhotoUrl, hotovo: done });
+  if (!dukaz.ok) return NextResponse.json({ error: dukaz.chyba }, { status: 400 });
+  if (dukaz.foto) {
+    const idSouboru = Number(dukaz.foto.split('/').pop());
+    const [soubor] = Number.isInteger(idSouboru) && c.teamId
+      ? await sql`SELECT id FROM uploads WHERE id = ${idSouboru} AND team_id = ${c.teamId}`
+      : [];
+    if (!soubor) return NextResponse.json({ error: 'Fotka není platná — nahraj ji prosím znovu.' }, { status: 400 });
+    try {
+      await sql`UPDATE tasks SET completion_photo = ${dukaz.foto} WHERE id = ${id}`;
+      await audit(c.teamId, effectiveId, 'ukoly.fotka', 'task', id, String(task.title ?? '').slice(0, 120));
+    } catch { /* před migrací — úkol se splní i bez uložené fotky */ }
+  }
   // Výrobní úkol: odškrtnutí = vyrobeno. Dávka se naskladní a suroviny odepíšou
   // tady na serveru, aby to platilo z appky, tabletu i z telefonu stejně.
   if (done && task.source === 'production' && task.source_ref && taskTeam && !task.source_meta?.produced) {

@@ -1644,5 +1644,21 @@
   "Uvidí ho účetní v exportu.": "Die Buchhaltung sieht ihn im Export.",
   "Uvidí ho i člověk v oznámení o změně a účetní v exportu.": "Die Person sieht ihn in der Benachrichtigung, die Buchhaltung im Export.",
   "Např. zapomněl se odpíchnout": "Z. B. Ausstempeln vergessen",
-  "Upraveno|zaznam": "Bearbeitet"
+  "Upraveno|zaznam": "Bearbeitet",
+  "Probíhá": "In Arbeit",
+  "po čase": "zu spät",
+  "Do kdy (nepovinné)": "Bis wann (optional)",
+  "Nejdřív vyber den.": "Wähle zuerst einen Tag.",
+  "{n, plural, one {Úkol je zadaný # člověku} few {Úkol je zadaný # lidem} other {Úkol je zadaný # lidem}}": "{n, plural, one {Aufgabe an # Person vergeben} other {Aufgabe an # Personen vergeben}}",
+  "Nezadalo se {n} z {celkem}: {komu}": "{n} von {celkem} nicht vergeben: {komu}",
+  "Každý dostane vlastní úkol ({n, plural, one {# člověk} few {# lidé} other {# lidí}}).": "Jede Person bekommt eine eigene Aufgabe ({n, plural, one {# Person} other {# Personen}}).",
+  "chce fotku": "Foto nötig",
+  "Vyžadovat fotku při splnění": "Foto bei Erledigung verlangen",
+  "Úkol půjde odškrtnout až s fotkou z telefonu nebo tabletu — uvidíš ji v detailu úkolu.": "Die Aufgabe lässt sich nur mit einem Foto vom Handy oder Tablet abhaken — du siehst es im Aufgabendetail.",
+  "před {n, plural, one {# dnem} few {# dny} other {# dny}}": "vor {n, plural, one {# Tag} other {# Tagen}}",
+  "před {n, plural, one {# týdnem} few {# týdny} other {# týdny}}": "vor {n, plural, one {# Woche} other {# Wochen}}",
+  "před {n, plural, one {# měsícem} few {# měsíci} other {# měsíci}}": "vor {n, plural, one {# Monat} other {# Monaten}}",
+  "před {n, plural, one {# rokem} few {# lety} other {# lety}}": "vor {n, plural, one {# Jahr} other {# Jahren}}",
+  "Založit úkol z karty": "Aufgabe aus Karte erstellen",
+  "Úkol z karty se nepodařilo připravit — prohlížeč nedovolil uložit rozepsaný úkol.": "Aufgabe aus der Karte konnte nicht vorbereitet werden — der Browser hat das Speichern des Entwurfs nicht erlaubt."
 }

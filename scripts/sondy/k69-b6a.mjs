@@ -13,6 +13,12 @@
 //
 // Fixtury: scripts/sondy/fixtury/k69-b6a-*.json; datumy (DNES, VCERA…) se doplní
 // při podvrhu podle pražského dne, ať sonda nezestárne.
+//
+// Kolo 7 (R7-4, bloky K7-*): Chip Probíhá v řádku vedení a Začít v detailu, čas termínu
+// („· HH:MM", Chip „po čase", Termín a „Do kdy" vedle sebe na 390), jeden úkol třem
+// lidem (tři POST, Toast „Úkol je zadaný 3 lidem", částečné selhání jménem), SwitchRow
+// „Vyžadovat fotku" a štítky chce fotku / s fotkou; Plánování: patka karty s autorem
+// a stářím nepřetéká, „Založit úkol z karty" otevře Úkoly s rozepsaným formulářem.
 import { readFileSync } from 'node:fs';
 import {
   kontext, konec, tvrdi, otevri, lista, upravit, hotovo, vUpravach, dokud, poradi, poradiPutu, dotazyNa, roleMine, mine, ROLE, DIR, OUT, BASE,
@@ -20,7 +26,11 @@ import {
 
 const praha = (o = 0) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(Date.now() + o * 86400000));
 const DNY = { DNES: praha(0), VCERA: praha(-1), PREDVCEREM: praha(-2), ZITRA: praha(1), POZDEJI: praha(20) };
-const CASY = { CAS_DNES: new Date(Date.now() - 60000).toISOString(), CAS_PREDVCEREM: new Date(Date.now() - 2 * 86400000).toISOString() };
+// Kolo 7: CAS_PRED = pražské „HH:MM" před půl hodinou (čas termínu, který už minul → „po čase");
+// těsně po půlnoci 00:00, ať zůstane dnešní.
+const hmPraha = (d) => new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(d);
+const casPred = () => { const pred = new Date(Date.now() - 30 * 60000); return praha(0) === new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(pred) ? hmPraha(pred) : '00:00'; };
+const CASY = { CAS_DNES: new Date(Date.now() - 60000).toISOString(), CAS_PREDVCEREM: new Date(Date.now() - 2 * 86400000).toISOString(), CAS_PRED: casPred() };
 const nacti = (jmeno) => {
   let t = readFileSync(DIR + jmeno + '.json', 'utf8');
   for (const [k, v] of Object.entries({ ...DNY, ...CASY })) t = t.replaceAll(`"${k}"`, `"${v}"`);
@@ -35,10 +45,21 @@ const podvrh = ({ napadySpravuje = true } = {}) => (req, json, stav) => {
   if (stav.chyby[path]) return json({ error: 'Server spadl' }, stav.chyby[path]);
   if (path === '/api/tasks') {
     if (m === 'PATCH') { const t = req.postDataJSON(); (stav.ukolyPatche ??= []).push(t); return json({ id: t.id, ...t, pointsEarned: t.status === 'done' ? 5 : null }); }
-    if (m === 'POST') { stav.novyUkol = req.postDataJSON(); return json({ id: 99, ...stav.novyUkol }); }
+    if (m === 'POST') {
+      const t = req.postDataJSON();
+      (stav.ukolyPosty ??= []).push(t);
+      // Kolo 7: zadání víc lidem — `stav.selhatPro` = komu POST spadne (částečné selhání).
+      if (stav.selhatPro != null && t.assignedTo === stav.selhatPro) return json({ error: 'Server spadl' }, 500);
+      stav.novyUkol = t; return json({ id: 99, ...stav.novyUkol });
+    }
     if (m === 'GET') return json(nacti('k69-b6a-tasks'));
   }
   if (path === '/api/teams' && m === 'GET') return json(nacti('k69-b6a-teams'));
+  // Kolo 7: přechod Plánování → Úkoly v jedné stránce — každá plocha dostane svoje rozložení.
+  if (path === '/api/rozlozeni' && m === 'GET' && stav.rozlozeniPodle) {
+    const r = stav.rozlozeniPodle[url.searchParams.get('stranka')];
+    if (r) return json(r);
+  }
   if (path === '/api/planning') {
     if (m === 'POST') { stav.novaKarta = req.postDataJSON(); return json({ id: 50, ...stav.novaKarta }); }
     if (m === 'GET') {
@@ -251,6 +272,101 @@ const FIX_UKOLY = nacti('k69-b6a-rozlozeni-ukoly');
   await ctx.close();
 }
 
+// Kolo 7 (R7-4): stav Probíhá, čas termínu, fotka a jeden úkol víc lidem — vedení na 1280.
+{
+  const { ctx, p, stav, chyby } = await kontext({ fix: FIX_UKOLY, dalsi: podvrh() });
+  await otevri(p, UKOLY, 'vedeni.ukoly');
+  const nastroj = widgetLi(p, 'nastroj');
+  const radek = (nazev) => nastroj.locator('li.list-row', { has: p.getByRole('button', { name: nazev, exact: true }) });
+  tvrdi('K7-1: rozpracovaný úkol (Vynést sklo) má i v seznamu vedení Chip Probíhá', await radek('Vynést sklo').locator('.chip', { hasText: /^Probíhá$/ }).count() === 1);
+  const sirupy = await radek('Doplnit sirupy').innerText();
+  tvrdi('K7-2: dnešní úkol, jehož čas minul (Doplnit sirupy), ukazuje „· HH:MM" a Chip „po čase"', sirupy.includes(` · ${CASY.CAS_PRED}`) && await radek('Doplnit sirupy').locator('.chip', { hasText: /^po čase$/ }).count() === 1, zkrat(sirupy));
+  // Uvnitř dne podle času termínu: „Doplnit sirupy" (před půl hodinou) proti „Objednat mléko" (18:00);
+  // povinný „Zavřít bar" zůstává nahoře (zámek uzávěrky má přednost).
+  const poradiDnes = await nastroj.evaluate(el => {
+    const dnes = [...el.querySelectorAll('section')].find(s => /^DNES|^Dnes/.test(s.querySelector('h2')?.textContent ?? ''));
+    const radky = [...(dnes?.querySelectorAll('li.list-row') ?? [])].map(li => li.textContent ?? '');
+    return { bar: radky.findIndex(r => r.includes('Zavřít bar')), sirupy: radky.findIndex(r => r.includes('Doplnit sirupy')), mleko: radky.findIndex(r => r.includes('Objednat mléko')) };
+  });
+  tvrdi('K7-2: …sekce Dnes řadí podle času termínu (povinný úkol nahoře)', poradiDnes.bar === 0 && (poradiDnes.sirupy < poradiDnes.mleko) === (CASY.CAS_PRED < '18:00'), JSON.stringify(poradiDnes));
+  tvrdi('K7-4: úkol „jen s fotkou" (Zavřít bar) má Chip „chce fotku", hotový s fotkou (Ranní káva) „s fotkou"',
+    await radek('Zavřít bar').locator('.chip', { hasText: /^chce fotku$/ }).count() === 1 && await radek('Ranní káva pro tým').locator('.chip', { hasText: /^s fotkou$/ }).count() === 1);
+
+  // Začít v detailu (vedení i zaměstnanec stejně).
+  await nastroj.getByRole('button', { name: 'Umýt okna', exact: true }).click();
+  const det = p.getByRole('dialog', { name: 'Umýt okna' });
+  await dokud(() => det.isVisible(), 2000);
+  await det.getByRole('button', { name: 'Začít' }).click();
+  tvrdi('K7-1: „Začít" v detailu pošle PATCH status in_progress', await dokud(() => (stav.ukolyPatche ?? []).some(t => t.id === 1 && t.status === 'in_progress'), 2000), JSON.stringify(stav.ukolyPatche));
+  await det.getByRole('button', { name: 'Zavřít', exact: true }).click().catch(() => p.keyboard.press('Escape'));
+  await dokud(async () => (await det.count()) === 0, 1500);
+
+  // Nový úkol třem lidem s časem a fotkou.
+  await p.locator('[data-plocha]').getByRole('button', { name: 'Nový úkol' }).click();
+  const form = nastroj.locator('form');
+  await dokud(() => form.getByLabel('Název úkolu').isVisible(), 1500);
+  const prepinacFotky = form.getByRole('switch', { name: 'Vyžadovat fotku při splnění' });
+  tvrdi('K7-4: formulář vedení má SwitchRow „Vyžadovat fotku při splnění" (pod „Vyžadovat před uzávěrkou")', await prepinacFotky.isVisible()
+    && await form.getByRole('switch', { name: 'Vyžadovat před uzávěrkou' }).isVisible());
+  tvrdi('K7-2: „Do kdy" je bez termínu zamčené', await form.getByLabel('Do kdy (nepovinné)').isDisabled());
+  await form.getByLabel('Název úkolu').fill('Přečíst nový návod');
+  const pas = form.getByRole('group', { name: 'Kdo úkol udělá' });
+  for (const j of ['Martin Nemeškal', 'Eva Testová', 'Petr Novák']) await pas.getByRole('button', { name: j }).click();
+  tvrdi('K7-3: tři lidé zapnutí (aria-pressed), „Kdokoli" se vypnulo', await pas.getByRole('button', { name: 'Kdokoli' }).getAttribute('aria-pressed') === 'false'
+    && (await pas.locator('button[aria-pressed="true"]').count()) === 3);
+  await form.getByLabel('Termín', { exact: true }).fill(DNY.DNES);
+  await form.getByLabel('Do kdy (nepovinné)').fill('14:00');
+  await prepinacFotky.click();
+  stav.ukolyPosty = [];
+  await form.getByRole('button', { name: 'Vytvořit úkol' }).click();
+  tvrdi('K7-3: tři POST /api/tasks, každý jinému člověku (15, 16, 21), se stejným tělem — čas 14:00 a requirePhoto',
+    await dokud(() => (stav.ukolyPosty ?? []).length === 3, 3000)
+    && JSON.stringify(stav.ukolyPosty.map(t => t.assignedTo).sort((a, b) => a - b)) === '[15,16,21]'
+    && stav.ukolyPosty.every(t => t.title === 'Přečíst nový návod' && t.dueDate === DNY.DNES && t.dueTime === '14:00' && t.requirePhoto === true), JSON.stringify(stav.ukolyPosty));
+  tvrdi('K7-3: Toast „Úkol je zadaný 3 lidem" a formulář se zavřel', await dokud(() => p.getByText('Úkol je zadaný 3 lidem').isVisible(), 2000)
+    && await dokud(async () => (await nastroj.getByLabel('Název úkolu').count()) === 0, 1500));
+
+  // Částečné selhání: Petrovi se úkol nezadá — formulář zůstane jen s ním a řekne to jménem.
+  await p.locator('[data-plocha]').getByRole('button', { name: 'Nový úkol' }).click();
+  await dokud(() => form.getByLabel('Název úkolu').isVisible(), 1500);
+  await form.getByLabel('Název úkolu').fill('Uklidit sklad');
+  for (const j of ['Eva Testová', 'Petr Novák']) await form.getByRole('group', { name: 'Kdo úkol udělá' }).getByRole('button', { name: j }).click();
+  stav.ukolyPosty = []; stav.selhatPro = 21;
+  await form.getByRole('button', { name: 'Vytvořit úkol' }).click();
+  tvrdi('K7-3: když jeden POST spadne, note-wait řekne „Nezadalo se 1 z 2: Petr" a formulář zůstane jen s Petrem',
+    await dokud(() => form.getByText('Nezadalo se 1 z 2: Petr').isVisible(), 3000)
+    && await form.getByRole('group', { name: 'Kdo úkol udělá' }).getByRole('button', { name: 'Petr Novák' }).getAttribute('aria-pressed') === 'true'
+    && await form.getByRole('group', { name: 'Kdo úkol udělá' }).getByRole('button', { name: 'Eva Testová' }).getAttribute('aria-pressed') === 'false');
+  stav.selhatPro = null;
+  await p.screenshot({ path: OUT + 'k83-ukoly-vedeni-desk.png', fullPage: true });
+  tvrdi('K7: bez chyb v konzoli', chyby.length === 0, chyby.slice(0, 3).join(' | '));
+  await ctx.close();
+}
+// Kolo 7: telefon 390 — formulář: Termín a „Do kdy" vedle sebe, pás lidí jede uvnitř sebe, nic nepřetéká.
+{
+  const { ctx, p } = await kontext({ fix: FIX_UKOLY, viewport: { width: 390, height: 844 }, mobil: true, dalsi: podvrh() });
+  await otevri(p, UKOLY, 'vedeni.ukoly');
+  await p.locator('[data-plocha] button[aria-haspopup="menu"][aria-label="Další akce"]:visible').first().click();
+  await p.getByRole('menuitem', { name: 'Nový úkol' }).click();
+  const form = widgetLi(p, 'nastroj').locator('form');
+  await dokud(() => form.getByLabel('Název úkolu').isVisible(), 2000);
+  const termin = await form.getByLabel('Termín', { exact: true }).boundingBox();
+  const cas = await form.getByLabel('Do kdy (nepovinné)').boundingBox();
+  tvrdi('K7-2 (390): Termín a „Do kdy" sdílí řádek (stejná výška, vedle sebe)', !!termin && !!cas && Math.abs(termin.y - cas.y) < 2 && cas.x > termin.x + termin.width - 1,
+    JSON.stringify({ termin, cas }));
+  const pas = await form.getByRole('group', { name: 'Kdo úkol udělá' }).locator('div.overflow-x-auto').evaluate(el => ({ sw: el.scrollWidth, cw: el.clientWidth, ox: getComputedStyle(el).overflowX }));
+  tvrdi('K7-3 (390): pás lidí se posouvá uvnitř sebe (overflow-x) a stránka nepřetéká', pas.ox === 'auto' && await bezPreteceni(p), JSON.stringify(pas));
+  const pilulka = await form.getByRole('group', { name: 'Kdo úkol udělá' }).getByRole('button', { name: 'Kdokoli' }).evaluate(el => {
+    const r = el.getBoundingClientRect(); const pr = getComputedStyle(el, '::before'); return { h: r.height, cil: parseFloat(pr.height) };
+  });
+  tvrdi('K7-3 (390): pilulka má dotykový cíl ≥ 44 px (tap-target)', pilulka.cil >= 44, JSON.stringify(pilulka));
+  await form.getByRole('switch', { name: 'Vyžadovat fotku při splnění' }).scrollIntoViewIfNeeded();
+  tvrdi('K7-4 (390): SwitchRow „Vyžadovat fotku" je vidět', await form.getByRole('switch', { name: 'Vyžadovat fotku při splnění' }).isVisible());
+  await form.scrollIntoViewIfNeeded();
+  await p.screenshot({ path: OUT + 'k83-ukoly-formular-tel.png' });
+  await ctx.close();
+}
+
 // ---------------------------------------------------------------------------
 // Úkoly (zaměstnanec)
 // ---------------------------------------------------------------------------
@@ -360,8 +476,13 @@ const FIX_PLAN = nacti('k69-b6a-rozlozeni-planovani');
   await otevri(p, PLANOVANI, 'vedeni.planovani');
   await p.waitForTimeout(600);
   tvrdi('P4: bez planovani.upravit žádná „Nová karta" ani „Přidat kartu"', await p.getByRole('button', { name: /Nová karta|Přidat kartu/ }).count() === 0);
-  tvrdi('P4: …fronta je vidět bez „Schválit" a karty bez menu', (await widgetLi(p, 'planovani.ke_schvaleni').innerText()).includes('Letní terasa')
-    && await p.getByRole('button', { name: /^Schválit kartu/ }).count() === 0 && await p.getByRole('button', { name: /^Možnosti karty|^Další akce s kartou/ }).count() === 0);
+  tvrdi('P4: …fronta je vidět bez „Schválit" a bez menu řádku', (await widgetLi(p, 'planovani.ke_schvaleni').innerText()).includes('Letní terasa')
+    && await p.getByRole('button', { name: /^Schválit kartu/ }).count() === 0 && await p.getByRole('button', { name: /^Další akce s kartou/ }).count() === 0);
+  // Kolo 7: kdo smí zadávat úkoly (ukoly.zadavat), má u karty menu — ale jen „Založit úkol z karty", nic z úprav tabule.
+  await widgetLi(p, 'nastroj').getByRole('button', { name: 'Možnosti karty Nová sezónní káva' }).click();
+  const polozky = await p.getByRole('menuitem').allInnerTexts();
+  tvrdi('P4 (K7): menu karty bez planovani.upravit nabízí jen „Založit úkol z karty"', polozky.length === 1 && polozky[0].includes('Založit úkol z karty'), JSON.stringify(polozky));
+  await p.keyboard.press('Escape');
   tvrdi('P4: …a nic se nezapsalo', !(stav.kartyPatche ?? []).length && !dotazyNa(stav, ['/api/noisium']).length);
   await ctx.close();
 }
@@ -396,6 +517,35 @@ const FIX_PLAN = nacti('k69-b6a-rozlozeni-planovani');
   tvrdi('P6: …a otevře pole názvu karty (přepne na záložku Nápady)', await dokud(() => widgetLi(p, 'nastroj').getByLabel('Název karty').isVisible(), 1500)
     && await zalozky.getByRole('tab', { name: /^Nápady/ }).getAttribute('aria-selected') === 'true');
   await p.screenshot({ path: OUT + 'k69-b6a-planovani-tel.png', fullPage: true });
+  await ctx.close();
+}
+
+// Kolo 7 (R7-4): patka karty (autor + stáří) a „Založit úkol z karty".
+for (const [nazev, viewport] of [['1280', { width: 1280, height: 950 }], ['390', { width: 390, height: 844 }]]) {
+  const mobil = nazev === '390';
+  const { ctx, p, stav, chyby } = await kontext({ fix: FIX_PLAN, viewport, mobil, dalsi: podvrh() });
+  stav.rozlozeniPodle = { 'vedeni.planovani': FIX_PLAN, 'vedeni.ukoly': FIX_UKOLY };
+  await otevri(p, PLANOVANI, 'vedeni.planovani');
+  const nastroj = widgetLi(p, 'nastroj');
+  if (mobil) { await nastroj.getByRole('tab', { name: /^Rozpracováno/ }).click(); await p.waitForTimeout(300); }
+  const patka = nastroj.locator('li.card', { hasText: 'Oprava mlýnku' }).locator('p.t-meta');
+  const tP = (await patka.innerText()).trim();
+  tvrdi(`K7-5 (${nazev}): patka karty „Oprava mlýnku" — křestní jméno autora a stáří („Eva · před 2 dny"), celé jméno v title`,
+    /Eva · před 2 dny/.test(tP) && (await patka.getAttribute('title') ?? '').startsWith('Eva Testová'), tP);
+  const pretece = await nastroj.evaluate(el => [...el.querySelectorAll('li.card p.t-meta')].filter(x => x.getBoundingClientRect().width > 0 && x.scrollWidth > x.clientWidth + 1).map(x => x.textContent));
+  tvrdi(`K7-5 (${nazev}): žádná patka nepřetéká (truncate) a stránka taky ne`, pretece.length === 0 && await bezPreteceni(p), JSON.stringify(pretece));
+  await p.screenshot({ path: OUT + `k83-planovani-${nazev}.png`, fullPage: !mobil });
+
+  await nastroj.getByRole('button', { name: 'Možnosti karty Oprava mlýnku' }).click();
+  await p.getByRole('menuitem', { name: 'Založit úkol z karty' }).click();
+  await p.locator('[data-plocha="vedeni.ukoly"] li[data-instance]:not([hidden])').first().waitFor({ timeout: 15000 });
+  const form = widgetLi(p, 'nastroj').locator('form');
+  tvrdi(`K7-6 (${nazev}): „Založit úkol z karty" otevře Úkoly s rozepsaným formulářem (název a popis z karty)`,
+    await dokud(async () => (await form.getByLabel('Název úkolu').inputValue().catch(() => '')) === 'Oprava mlýnku', 4000)
+    && await form.getByLabel('Popis').inputValue() === 'Servis přijede ve čtvrtek.');
+  tvrdi(`K7-6 (${nazev}): …a DraftNote řekne „Vrátili jsme ti rozepsaný úkol"`, await p.getByText('Vrátili jsme ti rozepsaný úkol z minula.').isVisible());
+  tvrdi(`K7-6 (${nazev}): …nic se zatím neodeslalo (termín a komu doplní člověk)`, !(stav.ukolyPosty ?? []).length);
+  tvrdi(`K7 (${nazev}): bez chyb v konzoli`, chyby.length === 0, chyby.slice(0, 3).join(' | '));
   await ctx.close();
 }
 

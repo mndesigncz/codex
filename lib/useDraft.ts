@@ -46,6 +46,20 @@ export interface Koncept {
 
 const KLIC = (jmeno: string) => `managero-koncept-${jmeno}`;
 
+/**
+ * Zapíše koncept formuláře zvenku — kolo 7: „Založit úkol z karty" v Plánování
+ * připraví rozepsaný úkol a Úkoly ho po přechodu otevřou samy (cekaKoncept)
+ * i s „Vrátili jsme ti rozepsaný úkol". Hodnota musí mít tvar formuláře
+ * (vychozi), jinak ji slouceni při obnovení zahodí. Vrátí false, když
+ * úložiště nejde (soukromé okno) — volající to řekne, ne mlčí.
+ */
+export function zapisKoncept(jmeno: string, hodnota: Record<string, unknown>): boolean {
+  try {
+    sessionStorage.setItem(KLIC(jmeno), JSON.stringify(hodnota));
+    return true;
+  } catch { return false; }
+}
+
 export function useDraft<T extends Record<string, unknown>>(
   /** Jméno formuláře. Musí být v aplikaci jedinečné. */
   jmeno: string,

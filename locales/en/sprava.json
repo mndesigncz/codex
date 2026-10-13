@@ -1644,5 +1644,21 @@
   "Uvidí ho účetní v exportu.": "The accountant will see it in the export.",
   "Uvidí ho i člověk v oznámení o změně a účetní v exportu.": "The person sees it in the change notification and the accountant in the export.",
   "Např. zapomněl se odpíchnout": "E.g. forgot to clock out",
-  "Upraveno|zaznam": "Edited"
+  "Upraveno|zaznam": "Edited",
+  "Probíhá": "In progress",
+  "po čase": "late",
+  "Do kdy (nepovinné)": "By what time (optional)",
+  "Nejdřív vyber den.": "Pick a day first.",
+  "{n, plural, one {Úkol je zadaný # člověku} few {Úkol je zadaný # lidem} other {Úkol je zadaný # lidem}}": "{n, plural, one {Task assigned to # person} other {Task assigned to # people}}",
+  "Nezadalo se {n} z {celkem}: {komu}": "{n} of {celkem} not assigned: {komu}",
+  "Každý dostane vlastní úkol ({n, plural, one {# člověk} few {# lidé} other {# lidí}}).": "Everyone gets their own task ({n, plural, one {# person} other {# people}}).",
+  "chce fotku": "needs photo",
+  "Vyžadovat fotku při splnění": "Require a photo on completion",
+  "Úkol půjde odškrtnout až s fotkou z telefonu nebo tabletu — uvidíš ji v detailu úkolu.": "The task can only be ticked off with a photo from a phone or tablet — you'll see it in the task detail.",
+  "před {n, plural, one {# dnem} few {# dny} other {# dny}}": "{n, plural, one {# day ago} other {# days ago}}",
+  "před {n, plural, one {# týdnem} few {# týdny} other {# týdny}}": "{n, plural, one {# week ago} other {# weeks ago}}",
+  "před {n, plural, one {# měsícem} few {# měsíci} other {# měsíci}}": "{n, plural, one {# month ago} other {# months ago}}",
+  "před {n, plural, one {# rokem} few {# lety} other {# lety}}": "{n, plural, one {# year ago} other {# years ago}}",
+  "Založit úkol z karty": "Create task from card",
+  "Úkol z karty se nepodařilo připravit — prohlížeč nedovolil uložit rozepsaný úkol.": "Couldn't prepare a task from the card — the browser didn't allow saving the draft."
 }

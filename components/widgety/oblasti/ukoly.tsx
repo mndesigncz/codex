@@ -24,11 +24,12 @@
 //    s ukoly.upravit, odškrtává se jen dnešek a dřív.
 //  - ukoly.splneno_dnes — co dnes kdo dokončil (completedAt z API, kolo 69).
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSession } from 'next-auth/react';
 import { Chip, ListRow, Stat } from '../../ui';
 import { Icon } from '../../Icons';
 import TaskWeekBoard from '../../TaskWeekBoard';
+import { PrilozFoto } from '../../ukoly/PrilozFoto';
 import { useCurrency } from '../../CurrencyProvider';
 import type { KomponentaWidgetu, Navigace, WidgetProps } from '@/lib/widgety/typy';
 import { widget } from '@/lib/widgety/katalog';
@@ -40,8 +41,9 @@ import { apiMessage, okJson } from '@/lib/api';
 import { oznamZmenuPovinnych, ChipPredUzaverkou } from '../../PredUzaverkou';
 import { pragueToday, pragueHM } from '@/lib/pragueTime';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
+import { fmtHM } from '@/lib/i18n/format';
 import {
-  vyberUkoly, vRozsahu, poTerminu, podleLidi, splnenoDnes, jeCiziUkol, povinnePrvni, type Ukol, type RozsahUkolu,
+  vyberUkoly, vRozsahu, poTerminu, podleLidi, splnenoDnes, jeCiziUkol, povinnePrvni, podleCasuTerminu, chceFotku, type Ukol, type RozsahUkolu,
 } from '@/lib/ukolyPrehled';
 
 // ---------------------------------------------------------------------------
@@ -106,6 +108,21 @@ function filtrujUkoly(nav: Navigace, kdo: number | null) {
 }
 
 /**
+ * Pražské „HH:MM" teď, obnovené každou minutu — pro štítek „po čase" (lib/ukolyFiltr poCase).
+ * Do připojení null: server a prohlížeč by se o minutu rozešly a štítek by
+ * při hydrataci problikl. Sdílí ho Úkoly vedení, zaměstnance i tablet.
+ */
+export function useTedHM(): string | null {
+  const [ted, setTed] = useState<string | null>(null);
+  useEffect(() => {
+    setTed(pragueHM());
+    const i = setInterval(() => setTed(pragueHM()), 30000);
+    return () => clearInterval(i);
+  }, []);
+  return ted;
+}
+
+/**
  * Kulaté zaškrtávátko: hotovo = limetkové kolečko s fajfkou (stav, ne akce),
  * jako Checklist. Cizí úkol bez ukoly.plnit má zaškrtávátko zašedlé — i odečítač
  * pak slyší „nedostupné", ne tlačítko, které po stisku skončí chybou.
@@ -135,35 +152,49 @@ function useOdskrtavani(data: StavDat<Ukol[]>, ja: number | null, nahled: boolea
   const { role } = useOpravneni();
   const [chyba, setChyba] = useState<string | null>(null);
   const [probiha, setProbiha] = useState<ReadonlySet<number>>(() => new Set());
+  // Kolo 7: úkol „jen s fotkou" se odškrtne až v okně Přilož fotku (server bez fotky vrátí 400).
+  const [fotoUkol, setFotoUkol] = useState<Ukol | null>(null);
   const puvodniStav = useRef(new Map<number, string>());
   const naTabletu = role?.typ === 'kiosk';
 
   /** Vlastní, pro kohokoli a svoje zadané každý; cizí jen s ukoly.plnit (jako PATCH /api/tasks). */
   const smiOdskrtnout = (t: Ukol) => !nahled && !naTabletu && ja != null && (!jeCiziUkol(t, ja) || smi('ukoly.plnit'));
 
-  const prepni = async (t: Ukol, hotovo = t.status !== 'done') => {
-    if (!smiOdskrtnout(t) || probiha.has(t.id)) return false;
+  /** Zápis stavu. S fotkou (z okna) vrátí hlášku chyby oknu místo pruhu pod seznamem. */
+  const zapis = async (t: Ukol, hotovo: boolean, foto?: string): Promise<string | null> => {
     if (hotovo) puvodniStav.current.set(t.id, t.status);
     const novy = hotovo ? 'done' : (puvodniStav.current.get(t.id) ?? 'pending');
     setChyba(null);
     setProbiha(p => new Set(p).add(t.id));
-    data.set(prev => (prev ?? []).map(x => (x.id === t.id ? { ...x, status: novy } : x)));
+    data.set(prev => (prev ?? []).map(x => (x.id === t.id ? { ...x, status: novy, ...(foto ? { completionPhoto: foto } : {}) } : x)));
     try {
-      await fetch(URL_UKOLY, { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify({ id: t.id, status: novy }) }).then(okJson);
+      await fetch(URL_UKOLY, { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify({ id: t.id, status: novy, ...(foto ? { completionPhotoUrl: foto } : {}) }) }).then(okJson);
       // Srovná i ostatní widgety a nástroj nad /api/tasks (sdílená mezipaměť).
       data.reload();
       // Povinný úkol zamyká uzávěrku — otevřený formulář uzávěrky se přepočítá.
       oznamZmenuPovinnych();
-      return true;
+      if (foto) setFotoUkol(null);
+      return null;
     } catch (e) {
-      data.set(prev => (prev ?? []).map(x => (x.id === t.id ? { ...x, status: t.status } : x)));
-      setChyba(apiMessage(e, chybaUlozeni));
-      return false;
+      data.set(prev => (prev ?? []).map(x => (x.id === t.id ? { ...x, status: t.status, completionPhoto: t.completionPhoto } : x)));
+      const hlaska = apiMessage(e, chybaUlozeni);
+      if (!foto) setChyba(hlaska);
+      return hlaska;
     } finally {
       setProbiha(p => { const n = new Set(p); n.delete(t.id); return n; });
     }
   };
-  return { chyba, setChyba, probiha, smiOdskrtnout, prepni };
+
+  const prepni = async (t: Ukol, hotovo = t.status !== 'done') => {
+    if (!smiOdskrtnout(t) || probiha.has(t.id)) return false;
+    if (hotovo && chceFotku(t)) { setFotoUkol(t); return false; }
+    return (await zapis(t, hotovo)) == null;
+  };
+  // Okno patří k hooku — widget ho jen vykreslí (`{o.okno}`).
+  const okno: ReactNode = fotoUkol
+    ? <PrilozFoto nazev={fotoUkol.title} onClose={() => setFotoUkol(null)} onHotovo={url => zapis(fotoUkol, true, url)} />
+    : null;
+  return { chyba, setChyba, probiha, smiOdskrtnout, prepni, okno };
 }
 
 // ---------------------------------------------------------------------------
@@ -192,7 +223,8 @@ function UkolyDnes({ velikost, nastaveni, nahled }: WidgetProps<{ rozsah?: strin
     const vidim = vRozsahu(data.data ?? [], rozsah, ja.id).filter(t => t.status !== 'done' || odskrtnute.has(t.id));
     const po = vidim.filter(t => t.dueDate && t.dueDate < dnes);
     // Povinné před uzávěrkou nahoru — bez nich nepůjde dnešní uzávěrka odeslat.
-    const dnesni = vidim.filter(t => !t.dueDate || t.dueDate === dnes).sort(povinnePrvni<Ukol>(dnes));
+    // …a uvnitř dne podle času termínu („do 10:00" před „do 14:00", bez času na konci).
+    const dnesni = vidim.filter(t => !t.dueDate || t.dueDate === dnes).sort((a, b) => povinnePrvni<Ukol>(dnes)(a, b) || podleCasuTerminu(a, b));
     const vse = [...po, ...dnesni];
     return {
       radky: vse,
@@ -210,6 +242,7 @@ function UkolyDnes({ velikost, nastaveni, nahled }: WidgetProps<{ rozsah?: strin
   const termin = (d: string) => t('termín {datum}', { datum: denKratce(d) });
   const vyroba = t('výroba — naskladní dávku');
   const poTerminuStitek = t('Po termínu');
+  const probihaStitek = t('Probíhá');
   const otevritDetail = t('Otevřít detail úkolu');
   // Řádek otevře detail úkolu v Úkolech (audit kola 6, Z4) — dřív šlo jen odškrtnout a zbytek
   // řádku byl mrtvý. V náhledu galerie a bez práva na Úkoly zůstává řádek jen ke čtení.
@@ -236,9 +269,17 @@ function UkolyDnes({ velikost, nastaveni, nahled }: WidgetProps<{ rozsah?: strin
                 t.assignedTo == null ? proKohokoli
                   : rozsah === 'tym' && t.assignedTo !== ja.id ? t.assigneeName : null,
                 pozde ? termin(t.dueDate!) : null,
+                // Kolo 7: čas termínu jen v meta („· 10:00"), štítek „po čase" mají seznamy Úkolů.
+                t.dueDate && t.dueTime ? fmtHM(t.dueTime) : null,
                 // Odškrtnutí výrobního úkolu naskladní dávku a odepíše suroviny (API).
                 t.source === 'production' ? vyroba : null,
               ].filter(Boolean).join(' · ');
+              // Kolo 7: „Probíhá" jako v Úkolech vedení i zaměstnance — jen štítek, na tabletu stačí odškrtnout.
+              const stitky = [
+                pozde && !hotovo ? <Chip key="po" tone="bad" size="sm">{poTerminuStitek}</Chip> : null,
+                t.status === 'in_progress' && !hotovo ? <Chip key="bezi" tone="info" size="sm">{probihaStitek}</Chip> : null,
+                !pozde && t.requireBeforeClosing && !hotovo ? <ChipPredUzaverkou key="pov" /> : null,
+              ].filter(Boolean);
               return (
                 <ListRow key={t.id} className={sDetailem ? 'relative' : ''} chevron={sDetailem}
                   // Zaškrtávátko je v DOM před roztaženým tlačítkem titulku — z-[1] ho drží nad ním.
@@ -250,14 +291,14 @@ function UkolyDnes({ velikost, nastaveni, nahled }: WidgetProps<{ rozsah?: strin
                         className={`text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8F542] rounded !transform-none after:absolute after:inset-0 after:content-[''] after:rounded-[var(--r-md)] active:after:bg-black/[0.03] ${hotovo ? 'text-black/45' : ''}`}>{t.title}</button>
                     : <span className={hotovo ? 'text-black/45' : undefined}>{t.title}</span>}
                   meta={meta || undefined}
-                  right={pozde && !hotovo ? <Chip tone="bad" size="sm">{poTerminuStitek}</Chip>
-                    : t.requireBeforeClosing && !hotovo ? <ChipPredUzaverkou /> : undefined}
+                  right={stitky.length > 0 ? <>{stitky}</> : undefined}
                 />
               );
             })}
           </ul>
           {!L && radky.length > 5 && <p className="t-meta mt-2">{aDalsich(radky.length - 5, t)}</p>}
           {o.chyba && <p className="note note-danger mt-3" role="alert">{o.chyba}</p>}
+          {o.okno}
         </>
       )}
     </Widget>
@@ -402,6 +443,7 @@ function Tyden({ nahled }: WidgetProps) {
         onMove={nahled ? undefined : (t, datum) => { const u = podle(t); if (u) void presun(u, datum); }}
         canMove={t => { const u = podle(t); return !!u && (u.createdBy === ja.id || presunCizi); }} />
       {(o.chyba || chybaPresunu) && <p className="note note-danger mt-3" role="alert">{o.chyba ?? chybaPresunu}</p>}
+      {o.okno}
     </Widget>
   );
 }

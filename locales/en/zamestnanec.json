@@ -412,5 +412,8 @@
   "Minulý měsíc se nenačetl — zkus to znovu.": "Last month didn't load — try again.",
   "Není co převzít — dny už mají vlastní stav, nebo se minulý měsíc žádný den neopakoval.": "Nothing to copy — the days already have their own setting, or nothing repeated last month.",
   "{n, plural, one {Převzato z minulého měsíce: # den} few {Převzato z minulého měsíce: # dny} other {Převzato z minulého měsíce: # dní}}": "{n, plural, one {Copied from last month: # day} other {Copied from last month: # days}}",
-  "Vrátit|zpet": "Undo"
+  "Vrátit|zpet": "Undo",
+  "po čase": "late",
+  "chce fotku": "needs photo",
+  "s fotkou": "with photo"
 }
