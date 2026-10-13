@@ -28,7 +28,7 @@ import { obnovOpravneni, useOpravneni } from '../role/useOpravneni';
 import type { DefiniceStranky, DefiniceWidgetu, IdStranky, PolozkaRozlozeni, Rozsah, Tarif, Velikost } from '@/lib/widgety/typy';
 import { widget as najdiWidget } from '@/lib/widgety/katalog';
 import { stranka as najdiStranku } from '@/lib/widgety/stranky';
-import { filtrujViditelne, inkoustovaInstance, maOpravneniNaWidget, presun, sNastavenimVychozimi, vychoziZKodu } from '@/lib/widgety/rozlozeni';
+import { filtrujViditelne, inkoustovaInstance, maOpravneniNaWidget, presun, sNastavenimVychozimi, vycistiNastaveni, vychoziZKodu } from '@/lib/widgety/rozlozeni';
 import { rozvrhni, sloupcuProSirku, type Sloupcu } from '@/lib/widgety/mrizka';
 import { delkaKyvu, fazeKyvu, idZWidgetu, uhelKyvu } from '@/lib/widgety/hash';
 import { HYSTEREZE_PX, NASTROJ, TOAST_S_AKCI_MS } from '@/lib/widgety/konstanty';
@@ -158,6 +158,8 @@ interface Obsluha {
   klikKlid: (e: React.MouseEvent<HTMLElement>, instance: string) => void;
   /** Otevře střední kartu zvětšenou v okně (velká podoba widgetu). */
   zvetsit: (instance: string) => void;
+  /** Rychlý filtr v hlavičce (kolo 8): změní jedno pole nastavení instance a uloží rozložení. */
+  zmenNastaveni: (instance: string, zmena: Record<string, unknown>) => void;
 }
 
 interface PolozkaProps {
@@ -183,6 +185,7 @@ interface PolozkaProps {
   navodId: string;
   stranka: DefiniceStranky;
   nastroj: React.ReactNode;
+  tarif: Tarif;
   h: Obsluha;
 }
 
@@ -250,7 +253,7 @@ function ZvetsenyWidget({ p, def, nazev, stranka, onClose }: { p: PolozkaRozloze
 }
 
 const PolozkaPlochy = memo(function PolozkaPlochy(props: PolozkaProps) {
-  const { p, index, pocet, def, nazev, rozpeti, skryta, upravy, odznakyMizi, pripojit, bezOpravneni, schematicky, inkoust, pokus, nova, mini, sbaleno, navodId, stranka, nastroj, h } = props;
+  const { p, index, pocet, def, nazev, rozpeti, skryta, upravy, odznakyMizi, pripojit, bezOpravneni, schematicky, inkoust, pokus, nova, mini, sbaleno, navodId, stranka, nastroj, tarif, h } = props;
   const t = useT('widgety');
   const jeNastroj = p.widget === NASTROJ;
   const nahlasSkryti = useCallback((ano: boolean) => h.nahlasSkryti(p.id, ano), [h, p.id]);
@@ -260,10 +263,14 @@ const PolozkaPlochy = memo(function PolozkaPlochy(props: PolozkaProps) {
   // Střední karta, která má velkou podobu (graf, delší seznam), se dá zvětšit do okna — jako „Otevřít" u widgetů v jiných aplikacích.
   const smiZvetsit = !jeNastroj && !upravy && !schematicky && p.velikost === 'M' && !!def?.velikosti.includes('L');
   const zvetsit = useCallback(() => h.zvetsit(p.id), [h, p.id]);
+  // Rychlý filtr v hlavičce mění nastavení instance jen v klidu, u hotového widgetu a s právem na něj.
+  const zmenNastaveni = useCallback((zmena: Record<string, unknown>) => h.zmenNastaveni(p.id, zmena), [h, p.id]);
+  const smiFiltr = !jeNastroj && !upravy && !schematicky && !bezOpravneni;
   const kontext = useMemo<KontextWidgetu>(() => ({
     instance: p.id, velikost: p.velikost, definice: def, nahled: false, upravy, inkoust, nahlasSkryti,
     nahlasVyrizeno, mini, rozbal, pohledStranky: stranka.pohled, rozhraniStranky: stranka.rozhrani, sbaleno, prepniSbaleni, zvetsit: smiZvetsit ? zvetsit : null,
-  }), [p.id, p.velikost, def, upravy, inkoust, nahlasSkryti, nahlasVyrizeno, mini, rozbal, stranka.pohled, stranka.rozhrani, sbaleno, prepniSbaleni, smiZvetsit, zvetsit]);
+    nastaveni: p.nastaveni, zmenNastaveni: smiFiltr ? zmenNastaveni : null, tarif,
+  }), [p.id, p.velikost, p.nastaveni, def, upravy, inkoust, nahlasSkryti, nahlasVyrizeno, mini, rozbal, stranka.pohled, stranka.rozhrani, sbaleno, prepniSbaleni, smiZvetsit, zvetsit, smiFiltr, zmenNastaveni, tarif]);
   const Komponenta = useMemo(() => (def && !jeNastroj ? lineWidget(p.widget, pokus) : null), [def, jeNastroj, p.widget, pokus]);
   const nastaveni = useMemo(() => sNastavenimVychozimi(def?.nastaveni, p.nastaveni), [def, p.nastaveni]);
   // Fáze a délka kmitu z hashe id: vypadá náhodně, ale je stálá — sousedé se
@@ -737,6 +744,22 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
     fokusPoOkne.current = instance;
   }, [pripravFlip, r, oznam, nazevPolozky, t]);
 
+  // Rychlý filtr v hlavičce (kolo 8): jedno pole, stejná cesta uložení jako okno nastavení
+  // (vyčištěné podle schématu, hodnota rovná výchozí se neukládá).
+  const zmenNastaveni = useCallback((instance: string, zmena: Record<string, unknown>) => {
+    const pol = polozkyRef.current;
+    const p = pol.find(x => x.id === instance);
+    if (!p || p.widget === NASTROJ || bezOpravneni(p)) return;
+    const hodnoty = vycistiNastaveni(najdiWidget(p.widget)?.nastaveni, { ...(p.nastaveni ?? {}), ...zmena });
+    posledniOperace.current = performance.now();
+    pripravFlip();
+    r.zmen(pol.map(x => {
+      if (x.id !== instance) return x;
+      const { nastaveni: _stare, ...zbytek } = x;
+      return Object.keys(hodnoty).length ? { ...zbytek, nastaveni: hodnoty } : zbytek;
+    }));
+  }, [bezOpravneni, pripravFlip, r]);
+
   const obnovVychozi = useCallback(async () => {
     pripravFlip();
     const ok = await r.obnovVychozi();
@@ -1160,8 +1183,8 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
     setSbalene(n);
   }, [pripravFlip, fokusVKarte, oznam, klicSbaleni, t]);
 
-  const obsluhaRef = useRef({ klavesaPolozky, odeber, klikKlid, prepniSbaleni });
-  obsluhaRef.current = { klavesaPolozky, odeber, klikKlid, prepniSbaleni };
+  const obsluhaRef = useRef({ klavesaPolozky, odeber, klikKlid, prepniSbaleni, zmenNastaveni });
+  obsluhaRef.current = { klavesaPolozky, odeber, klikKlid, prepniSbaleni, zmenNastaveni };
   const obsluha = useMemo<Obsluha>(() => ({
     pointerDown: tahPointerDown,
     klavesa: (e, id) => obsluhaRef.current.klavesaPolozky(e, id),
@@ -1173,6 +1196,7 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
     prepniSbaleni: id => obsluhaRef.current.prepniSbaleni(id),
     klikKlid: (e, id) => obsluhaRef.current.klikKlid(e, id),
     zvetsit: id => setVelky(id),
+    zmenNastaveni: (id, zmena) => obsluhaRef.current.zmenNastaveni(id, zmena),
   }), [tahPointerDown, nahlasSkryti, nahlasVyrizeno, rozbal]);
 
   // ---- Menu ----
@@ -1345,6 +1369,7 @@ export function PlochaWidgetu({ stranka: idStranky, hlavicka, nastroj, rezim = '
                 navodId={navodId}
                 stranka={stranka}
                 nastroj={p.widget === NASTROJ ? nastroj : null}
+                tarif={tarif}
                 h={obsluha}
               />
             ))}

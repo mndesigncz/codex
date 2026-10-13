@@ -139,6 +139,14 @@ export interface DefiniceWidgetu {
   opravneni: OpravneniWidgetu;
   tarif: Tarif;
   nastaveni?: PoleNastaveni[];
+  /**
+   * Rychlý filtr v hlavičce karty (kolo 8): klíč pole typu `vyber`, jehož
+   * hodnota se kreslí jako Chip vedle titulku („Měsíc: tento ▾") a mění se
+   * jedním klepnutím — bez podržení prstu a „Nastavit widget". Bez příznaku
+   * je to první viditelné pole `vyber`; `false` = žádný (widget má vlastní
+   * ovládání v těle, třeba lištu období).
+   */
+  rychlyFiltr?: string | false;
   kostra?: Partial<Record<Velikost, Kostra>>;
   /** Widget peněz: smí být jedinou inkoustovou plochou stránky (DP §2.10). */
   muzeInkoust?: boolean;

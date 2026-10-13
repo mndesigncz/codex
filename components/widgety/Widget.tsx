@@ -15,12 +15,17 @@
 
 import React, { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Icon } from '../Icons';
-import { Button, Card, ErrorState, Menu, Skeleton, type MenuItem } from '../ui';
+import { Button, Card, ErrorState, Menu, MenuPanel, Modal, Skeleton, type MenuItem } from '../ui';
 import type { LoadState } from '../ui/useLoad';
-import type { DefiniceWidgetu, Kostra, Rozhrani, Velikost } from '@/lib/widgety/typy';
+import type { DefiniceWidgetu, Kostra, PoleNastaveni, Rozhrani, Smi, Tarif, Velikost } from '@/lib/widgety/typy';
 import { kostraWidgetu } from '@/lib/widgety/rozlozeni';
 import { useT } from '@/lib/i18n/client';
-import { useNavigace } from './NavigaceKontext';
+import { usePopover } from '@/lib/usePopover';
+import { useJeTelefon } from '@/lib/useJeTelefon';
+import { useNavigace, useSmi } from './NavigaceKontext';
+// Registr importuje odsud `Chybi` a tady se z něj berou filtry polí: kruh je neškodný, obě strany
+// sahají na import až za běhu (v lineWidget a při vykreslení), ne při načtení modulu.
+import { viditelnaPole, viditelneMoznosti } from './registr';
 
 export type { WidgetProps } from '@/lib/widgety/typy';
 
@@ -67,12 +72,18 @@ export interface KontextWidgetu {
   zvetsit?: (() => void) | null;
   /** Widget je zvětšený v okně: kreslí se jen obsah, bez karty a hlavičky (název nese okno). */
   vOkne?: boolean;
+  /** Uložené nastavení instance (bez výchozích) — pro rychlý filtr v hlavičce. */
+  nastaveni?: Record<string, unknown>;
+  /** Změní nastavení instance (uloží se jako přes „Nastavit widget"); null = tady se nemění (náhled, úpravy, bez práva). */
+  zmenNastaveni?: ((zmena: Record<string, unknown>) => void) | null;
+  /** Tarif podniku — pole nastavení jen s tarifem se bez něj nenabízí. */
+  tarif?: Tarif;
 }
 
 const MIMO_PLOCHU: KontextWidgetu = {
   instance: 'widget', velikost: 'M', definice: undefined, nahled: false, upravy: false, inkoust: false,
   nahlasSkryti: () => {}, nahlasVyrizeno: () => {}, mini: null, rozbal: () => {}, zvetsit: null, vOkne: false,
-  pohledStranky: null, sbaleno: false, prepniSbaleni: () => {},
+  pohledStranky: null, sbaleno: false, prepniSbaleni: () => {}, zmenNastaveni: null,
 };
 
 export const KontextWidgetuCtx = createContext<KontextWidgetu>(MIMO_PLOCHU);
@@ -167,6 +178,95 @@ export function Zkratitelne({ id, velikost, children }: { id: string; velikost: 
 }
 
 // ---------------------------------------------------------------------------
+// Rychlý filtr v hlavičce (kolo 8)
+// ---------------------------------------------------------------------------
+//
+// Období, řazení a kategorii většiny widgetů šlo změnit jen přes „Nastavit
+// widget" v kontextovém menu po podržení prstu — na telefonu to nikdo
+// neobjevil. Obal proto kreslí vedle titulku Chip s hodnotou prvního pole
+// typu `vyber` („Měsíc: tento ▾", „Řadit: mzda ▾"); klepnutí otevře volby
+// (na telefonu list zdola, na monitoru nabídku) a změna se uloží do instance
+// stejnou cestou jako z okna nastavení. Katalog může pole určit nebo chip
+// vypnout (`rychlyFiltr`). V úpravách, v náhledu galerie a bez práva na
+// rozložení se nekreslí.
+
+type PoleVyberu = Extract<PoleNastaveni, { typ: 'vyber' }>;
+
+/**
+ * Widgety, které si ve velké kartě kreslí vlastní lištu období: tam by chip
+ * byl druhé ovládání téhož. Patří jim `rychlyFiltr: false` v katalogu
+ * (soubory jiných oblastí); do té doby je zná obal.
+ */
+const VLASTNI_LISTA_L = new Set(['trzby.po_dnech', 'dochazka.souhrn_hodin', 'uzaverky.souhrn']);
+
+/** Pole rychlého filtru: z `rychlyFiltr`, jinak první viditelné pole `vyber`; null = bez chipu. */
+export function poleRychlehoFiltru(def: DefiniceWidgetu | undefined, smi: Smi, tarif: Tarif, velikost: Velikost): PoleVyberu | null {
+  if (!def || def.rychlyFiltr === false) return null;
+  if (velikost === 'L' && VLASTNI_LISTA_L.has(def.id)) return null;
+  const pole = viditelnaPole(def, smi, tarif).filter((p): p is PoleVyberu => p.typ === 'vyber');
+  const vybrane = def.rychlyFiltr ? pole.find(p => p.klic === def.rychlyFiltr) : pole[0];
+  // Jedna volba není filtr.
+  return vybrane && viditelneMoznosti(vybrane.moznosti, smi).length > 1 ? vybrane : null;
+}
+
+/** Nad tuhle délku chip nese jen hodnotu („Moje a pro kohokoli ▾"), název pole zůstává v aria-label. */
+const MAX_POPISEK_CHIPU = 22;
+
+function RychlyFiltr({ pole, hodnota, onZmena, inkoust, idTitulku, uzky }: {
+  pole: PoleVyberu;
+  hodnota: unknown;
+  onZmena: (id: string) => void;
+  inkoust: boolean;
+  idTitulku: string;
+  /** Malá karta: chip má vlastní řádek a smí být nejvýš tak široký jako karta. */
+  uzky: boolean;
+}) {
+  const t = useT('widgety');
+  const smi = useSmi();
+  const telefon = useJeTelefon();
+  const [open, setOpen] = useState(false);
+  // Na telefonu je to okno (zdola); nabídka a její „klepnutí vedle" se tam nesmí míchat.
+  const pop = usePopover(open && !telefon, setOpen, { focusFirst: true, arrowKeys: true });
+  const moznosti = viditelneMoznosti(pole.moznosti, smi);
+  const aktualni = moznosti.find(m => m.id === hodnota) ?? moznosti.find(m => m.id === pole.vychozi) ?? moznosti[0];
+  if (!aktualni) return null;
+  const nazevPole = t(pole.nazev);
+  const popisek = `${nazevPole}: ${t(aktualni.nazev)}`;
+  const text = popisek.length > MAX_POPISEK_CHIPU ? t(aktualni.nazev) : popisek;
+  const vyber = (id: string) => { setOpen(false); if (id !== aktualni.id) onZmena(id); };
+  const volby = (role: 'menuitemradio' | 'radio', vysoke: boolean) => moznosti.map(m => {
+    const je = m.id === aktualni.id;
+    return (
+      <button key={m.id} type="button" role={role} aria-checked={je} onClick={() => vyber(m.id)}
+        className={`w-full flex items-center gap-3 px-3 rounded-xl text-sm text-left text-[#16181A] transition-colors hover:bg-black/[0.05] ${vysoke ? 'min-h-[44px] py-2.5' : 'py-2.5'} ${je ? 'font-semibold' : ''}`}>
+        <span aria-hidden className="w-[18px] shrink-0 grid place-items-center text-ok-ink">{je && <Icon name="check" size={16} />}</span>
+        <span className="min-w-0 flex-1">{t(m.nazev)}</span>
+      </button>
+    );
+  });
+  return (
+    <div ref={pop.ref} className={`relative min-w-0 ${uzky ? 'max-w-full' : 'shrink-0'}`} data-rychly-filtr={pole.klic}>
+      <button ref={pop.triggerRef} type="button" onClick={() => setOpen(v => !v)} onKeyDown={pop.onTriggerKeyDown}
+        aria-haspopup={telefon ? 'dialog' : 'menu'} aria-expanded={open} aria-label={popisek} aria-describedby={idTitulku} title={popisek}
+        className={`chip chip-sm tap-target-sm transition-colors ${uzky ? 'max-w-full' : 'max-w-[11rem]'} ${inkoust ? 'bg-white/10 text-white/80 hover:bg-white/15' : 'chip-muted hover:bg-black/10'} ${open ? 'ring-2 ring-[#C8F542]' : ''}`}>
+        <span className="truncate">{text}</span>
+        <Icon name="chevron" size={11} className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && !telefon && (
+        <MenuPanel ref={pop.panelRef} onKeyDown={pop.onPanelKeyDown} aria-label={nazevPole} className="absolute top-full mt-2 right-0 origin-top-right">
+          {volby('menuitemradio', false)}
+        </MenuPanel>
+      )}
+      {open && telefon && (
+        <Modal open onClose={() => setOpen(false)} size="sm" title={nazevPole}>
+          <div role="radiogroup" aria-label={nazevPole} className="-mx-2 space-y-0.5">{volby('radio', true)}</div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Obal
 // ---------------------------------------------------------------------------
 
@@ -252,6 +352,7 @@ function KostraTela({ tvar, velikost }: { tvar: Kostra; velikost: Velikost }) {
 export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkraceni, ton, nacteni, kostra, prazdno, children }: ObalWidgetuProps) {
   const k = useWidget();
   const nav = useNavigace();
+  const smi = useSmi();
   const t = useT('widgety');
   // Název z katalogu se překládá při vykreslení; vlastní titulek (odkaz, výjimky) se bere, jak je.
   const nazev = titulek ?? (k.definice ? t(k.definice.nazev) : '');
@@ -336,6 +437,14 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
   // uvnitř slova („Docház / ející…"). Odkaz s textem nebo „···" zůstávají v hlavičce jako dřív.
   const sipkaCile = klepnutelna && !vidiOdkaz && !(akce && akce.length > 0);
   const sipkaDole = S && sipkaCile;
+  // Rychlý filtr (kolo 8): období / řazení / kategorie z nastavení přímo v hlavičce.
+  const poleFiltru = !k.nahled && !k.upravy && k.zmenNastaveni ? poleRychlehoFiltru(k.definice, smi, k.tarif ?? 'max', k.velikost) : null;
+  const filtr = poleFiltru ? (
+    <RychlyFiltr pole={poleFiltru} hodnota={k.nastaveni?.[poleFiltru.klic]} inkoust={inkoust} idTitulku={idTitulku} uzky={S}
+      onZmena={id => k.zmenNastaveni?.({ [poleFiltru.klic]: id })} />
+  ) : null;
+  // Malá karta (171 px na telefonu): chip v hlavičce by s názvem a šipkou přetekl, má vlastní řádek pod ní.
+  const filtrVHlavicce = filtr && !S ? filtr : null;
   const tlacitkoCile = sipkaCile ? (
     <Button variant="ghost" size="sm" icon="chevronRight" aria-label={t('Otevřít {nazev}', { nazev })}
       className={`${sipkaDole ? 'shrink-0 -mb-1.5 -mr-2 self-end' : ''} ${inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : ''}`}
@@ -368,7 +477,8 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
           plocha — sonda k68-design měří backgroundColor, gradientu se netýká. */}
       {S && !inkoust && <span aria-hidden className="w-dotek" />}
       <div className={`relative flex items-start justify-between gap-3 ${naCili && mozeSbalit ? 'cursor-pointer' : ''}`}
-        onClick={naCili && mozeSbalit ? (e => { if (!(e.target as Element).closest('button, a, [role="menu"], [role="menuitem"]')) k.prepniSbaleni(); }) : undefined}>
+        // Okno rychlého filtru je portál do <body>, ale React jeho klepnutí bublá sem — pozadí okna kartu sbalit nesmí.
+        onClick={naCili && mozeSbalit ? (e => { if (!(e.target as Element).closest('button, a, [role="menu"], [role="menuitem"], [role="dialog"], .modal-overlay')) k.prepniSbaleni(); }) : undefined}>
         {/* Malá karta je na telefonu široká ~171 px a na název zbývá ~107 px:
             „Docházející zásoby" by skončil jako „Docházející zá…" a číslo pod
             ním by nemělo jméno. U S proto dva řádky, ikona u prvního. Dlouhé
@@ -389,8 +499,10 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
         </h2>
         {/* Ovládací prvky vpravo v jedné skupině a Sbalit VŽDY úplně vpravo: dřív stál mezi názvem a odkazem
             („Finance ›"), takže se podle toho, jaké další prvky karta měla, posouval a „plaval". */}
-        {(mozeSbalit || mozeZvetsit || vidiOdkaz || (!odkaz && akce && akce.length > 0) || (sipkaCile && !sipkaDole)) && (
+        {(filtrVHlavicce || mozeSbalit || mozeZvetsit || vidiOdkaz || (!odkaz && akce && akce.length > 0) || (sipkaCile && !sipkaDole)) && (
           <div className="flex items-center shrink-0 -my-1.5 -mr-2">
+            {/* Filtr před ovládáním karty: Sbalit zůstává vždy úplně vpravo. */}
+            {filtrVHlavicce && <span className={`flex min-w-0 ${mozeSbalit || mozeZvetsit || vidiOdkaz || (akce && akce.length > 0) || (sipkaCile && !sipkaDole) ? 'mr-1' : 'mr-2'}`}>{filtrVHlavicce}</span>}
             {vidiOdkaz && (
               <Button variant="ghost" size="sm" iconAfter="chevronRight"
                 className={inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : ''}
@@ -421,6 +533,7 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
           </div>
         )}
       </div>
+      {S && filtr && <div className="relative mt-2 flex min-w-0">{filtr}</div>}
       {!(mozeSbalit && k.sbaleno) && (
         <div className={`relative mt-3 flex-1 min-h-0 ${sipkaDole ? (chyba ? 'flex flex-col justify-end gap-1' : 'flex items-end gap-1') : S && !prazdnyStav ? 'flex flex-col justify-end' : ''}`}>
           {sipkaDole ? (
