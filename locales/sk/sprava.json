@@ -218,7 +218,6 @@
   "Jiné": "Iné",
   "Já": "Ja",
   "K položkám": "K položkám",
-  "K výplatě": "K výplate",
   "Kalendář": "Kalendár",
   "Kalendář hodnocení": "Kalendár hodnotení",
   "Kalendář se nenačetl": "Kalendár sa nenačítal",
@@ -1407,7 +1406,6 @@
   "pod {cesta}": "pod {cesta}",
   "pod {nazev}": "pod {nazev}",
   "podniku {podnik}": "podniku {podnik}",
-  "podíl podle hodin": "podiel podľa hodín",
   "položku": "položku",
   "postup": "postup",
   "povinný": "povinný",
@@ -1689,5 +1687,16 @@
   "Např. Dobrý nápad, ale až po sezóně.": "Napr. Dobrý nápad, ale až po sezóne.",
   "Podnět je zamítnutý, důvod dostal autor.": "Podnet je zamietnutý, dôvod dostal autor.",
   "Podnět je zamítnutý.": "Podnet je zamietnutý.",
-  "Zapíná se v Nastavení › Organizace.": "Zapína sa v Nastaveniach › Organizácia."
+  "Zapíná se v Nastavení › Organizace.": "Zapína sa v Nastaveniach › Organizácia.",
+  "Doplatit": "Doplatiť",
+  "Tento měsíc zatím žádná výplata z kasy.": "Tento mesiac zatiaľ žiadna výplata z kasy.",
+  "Už vyplaceno z kasy": "Už vyplatené z kasy",
+  "Výplaty přišly v nečekaném tvaru.": "Výplaty prišli v nečakanom tvare.",
+  "Výplaty z kasy po uzávěrkách": "Výplaty z kasy po uzávierkach",
+  "podíl podle pravidel podniku": "podiel podľa pravidiel podniku",
+  "uzávěrku poslal/a {kdo}": "uzávierku poslal/a {kdo}",
+  "vyplaceno {castka}": "vyplatené {castka}",
+  "vč. příplatků {castka}": "vrát. príplatkov {castka}",
+  "už vyplaceno · {n}× v uzávěrkách": "už vyplatené · {n}× v uzávierkach",
+  "k výplatě od 1. do dneška": "k výplate od 1. do dnes"
 }

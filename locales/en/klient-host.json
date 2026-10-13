@@ -409,5 +409,16 @@
   "Vrátit zpět": "Undo",
   "Dnes už se nedá rezervovat, vyber zítřek.": "No more reservations today, pick tomorrow.",
   "Zítra": "Tomorrow",
-  "Rezervace je potvrzená. Těšíme se na tebe.": "Your reservation is confirmed. See you soon."
+  "Rezervace je potvrzená. Těšíme se na tebe.": "Your reservation is confirmed. See you soon.",
+  "Nedorazil": "No-show",
+  "Potvrdit|rezervace": "Confirm",
+  "Potvrzeno tebou": "Confirmed by you",
+  "Dorazíš? Potvrď, nebo rezervaci zruš — uvolníš místo jiným.": "Coming? Confirm, or cancel the reservation to free the table for others.",
+  "Potvrdit rezervaci {kdy}": "Confirm reservation {kdy}",
+  "Potvrzení se nepovedlo. Zkus to prosím znovu.": "The confirmation failed. Please try again.",
+  "Potvrzení neodešlo — vypadlo připojení. Zkus to prosím znovu.": "The confirmation didn't go through — the connection dropped. Please try again.",
+  "Díky, podnik s tebou počítá.": "Thanks, the business is counting on you.",
+  "Potvrdit nebo zrušit": "Confirm or cancel",
+  "Odpovědi na tvoje hodnocení": "Replies to your ratings",
+  "Odpověď podniku": "Reply from the business"
 }

@@ -16,6 +16,10 @@
       "schedule": "0 21 * * *"
     },
     {
+      "path": "/api/client/reservations/remind",
+      "schedule": "0 7 * * *"
+    },
+    {
       "path": "/api/digest",
       "schedule": "30 21 * * *"
     },

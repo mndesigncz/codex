@@ -1,0 +1,75 @@
+{
+ "reviews": [
+  {
+   "id": 1,
+   "ref": "ord:12",
+   "rating": 5,
+   "note": "Nejlepší matcha ve městě.",
+   "created_at": "DNES 17:10:00",
+   "customer_name": "Jana Dvořáková",
+   "reply": "Děkujeme, Jano! Těšíme se zas.",
+   "replied_at": "DNES 18:00:00",
+   "resolved_at": null,
+   "replied_by_name": "Martin",
+   "crew": [
+    {
+     "name": "Eva Testová",
+     "avatar": "👩"
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "ref": "res:14",
+   "rating": 2,
+   "note": "Dlouho jsme čekali na stůl.",
+   "created_at": "VCERA 19:40:00",
+   "customer_name": "Petr Novák",
+   "reply": null,
+   "replied_at": null,
+   "resolved_at": null,
+   "replied_by_name": null,
+   "crew": [
+    {
+     "name": "Jakub Horák",
+     "avatar": "👤"
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "ref": "ord:9",
+   "rating": 4,
+   "note": null,
+   "created_at": "VCERA 12:00:00",
+   "customer_name": "Tereza Málková",
+   "reply": null,
+   "replied_at": null,
+   "resolved_at": null,
+   "replied_by_name": null,
+   "crew": []
+  },
+  {
+   "id": 4,
+   "ref": "res:3",
+   "rating": 1,
+   "note": "Studený čaj.",
+   "created_at": "PREDEVCIREM 12:00:00",
+   "customer_name": "Ota Zima",
+   "reply": null,
+   "replied_at": null,
+   "resolved_at": "VCERA 08:00:00",
+   "replied_by_name": null,
+   "crew": []
+  }
+ ],
+ "count": 61,
+ "avg": 4.62,
+ "dist": [
+  2,
+  3,
+  5,
+  18,
+  33
+ ]
+}

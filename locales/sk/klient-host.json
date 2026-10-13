@@ -409,5 +409,16 @@
   "Vrátit zpět": "Vrátiť späť",
   "Dnes už se nedá rezervovat, vyber zítřek.": "Dnes sa už nedá rezervovať, vyber zajtrajšok.",
   "Zítra": "Zajtra",
-  "Rezervace je potvrzená. Těšíme se na tebe.": "Rezervácia je potvrdená. Tešíme sa na teba."
+  "Rezervace je potvrzená. Těšíme se na tebe.": "Rezervácia je potvrdená. Tešíme sa na teba.",
+  "Nedorazil": "Nedorazil",
+  "Potvrdit|rezervace": "Potvrdiť",
+  "Potvrzeno tebou": "Potvrdené tebou",
+  "Dorazíš? Potvrď, nebo rezervaci zruš — uvolníš místo jiným.": "Prídeš? Potvrď, alebo rezerváciu zruš — uvoľníš miesto iným.",
+  "Potvrdit rezervaci {kdy}": "Potvrdiť rezerváciu {kdy}",
+  "Potvrzení se nepovedlo. Zkus to prosím znovu.": "Potvrdenie sa nepodarilo. Skús to prosím znova.",
+  "Potvrzení neodešlo — vypadlo připojení. Zkus to prosím znovu.": "Potvrdenie neodišlo — vypadlo pripojenie. Skús to prosím znova.",
+  "Díky, podnik s tebou počítá.": "Vďaka, podnik s tebou počíta.",
+  "Potvrdit nebo zrušit": "Potvrdiť alebo zrušiť",
+  "Odpovědi na tvoje hodnocení": "Odpovede na tvoje hodnotenia",
+  "Odpověď podniku": "Odpoveď podniku"
 }

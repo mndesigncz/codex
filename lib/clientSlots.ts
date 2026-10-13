@@ -65,10 +65,56 @@ export function slotsFor(hours: OpeningHours | null | undefined, dateStr: string
  * `auto_confirm_max_party`: skupiny do té velikosti se potvrdí hned, větší dál čekají
  * na vedení. 0 (nebo nic) = bez hranice, potvrdí se všechny.
  */
-export function autoPotvrdit(profil: { auto_confirm?: unknown; auto_confirm_max_party?: unknown } | null | undefined, osob: number): boolean {
+export function autoPotvrdit(profil: { auto_confirm?: unknown; auto_confirm_max_party?: unknown } | null | undefined, osob: number, nedorazeni = 0): boolean {
   if (profil?.auto_confirm !== true) return false;
+  // Kolo 8 (R8-7): host, který už dvakrát nedorazil, se sám nepotvrdí — rezervace počká na vedení
+  // (OpenTable takového hosta označí „potential no-show" a nechá ho podnik potvrdit předem).
+  if (Math.max(0, Math.round(Number(nedorazeni) || 0)) >= NEDORAZENI_LIMIT) return false;
   const max = Math.max(0, Math.round(Number(profil.auto_confirm_max_party) || 0));
   return max === 0 || Math.max(1, Number(osob) || 1) <= max;
+}
+
+// ---- Nedorazil (no-show) ----------------------------------------------------
+//
+// Kdo nepřišel, dřív zůstal „Potvrzeno" nebo se ručně přepnul na „Proběhlo" — a host,
+// který nedorazil potřetí, měl u příští rezervace stejné „Potvrzeno" jako štamgast.
+
+/** Od kolika nedorazení se hostovi vypne automatické potvrzení a rezervace čeká na vedení. */
+export const NEDORAZENI_LIMIT = 2;
+/** Kolik minut po čase rezervace nabídne řádek „Nedorazil" jako tlačítko (dřív je jen v „···"). */
+export const NEDORAZIL_PO_MIN = 30;
+
+/**
+ * Je už na čase označit potvrzenou rezervaci jako „Nedorazil"? Dnes půl hodiny po čase
+ * rezervace, minulé dny vždy. Usazené, proběhlé a zrušené ne. `tedHM` dodává volající
+ * (prohlížeč své hodiny, server pragueHM()).
+ */
+export function nedorazilNaRade(r: { stav: string; datum: string; cas: string }, dnes: string, tedHM: string): boolean {
+  if (r.stav !== 'confirmed') return false;
+  if (r.datum < dnes) return true;
+  if (r.datum > dnes || !JE_HM.test(String(r.cas).slice(0, 5)) || !JE_HM.test(String(tedHM).slice(0, 5))) return false;
+  return naMinuty(String(r.cas).slice(0, 5)) + NEDORAZIL_PO_MIN <= naMinuty(String(tedHM).slice(0, 5));
+}
+
+// ---- Připomínka rezervace hostovi -------------------------------------------
+//
+// Host po potvrzení dřív nedostal nic; na rezervaci zapomněl a podnik se o volném
+// stole dozvěděl pozdě. Ráno přijde push s „Potvrdit / Zrušit" (jen oznámení v aplikaci,
+// žádné SMS). Text je tady, ať ho cron i testy skládají stejně.
+
+/**
+ * Co se hostovi pošle: dnes ráno pro dnešek, den předem pro zítřek. Odkaz vede na stránku
+ * podniku › Rezervace s tou rezervací (tam je Potvrdit i Zrušit); bez adresy podniku na Moje stránka.
+ */
+export function zpravaPripominky(r: { id: number; datum: string; cas: string; osob: number; podnik: string; slug?: string | null }, dnes: string): { title: string; body: string; link: string; type: 'info' } {
+  const kdy = r.datum === dnes ? 'Dnes' : r.datum === dalsiDen(dnes) ? 'Zítra' : String(r.datum).split('-').reverse().join('. ');
+  const osob = Math.max(1, Number(r.osob) || 1);
+  return {
+    title: `${kdy} v ${String(r.cas).slice(0, 5)} stůl pro ${osob} v ${r.podnik}`,
+    body: 'Potvrď, že dorazíš, nebo rezervaci zruš — uvolníš místo jiným.',
+    link: r.slug ? `/client/${encodeURIComponent(r.slug)}?tab=reserve&rezervace=${r.id}` : '/client/me',
+    type: 'info',
+  };
 }
 
 /**
@@ -189,6 +235,7 @@ export const RES_STATUS: Record<string, { label: string; tone: 'wait' | 'ok' | '
   done:      { label: 'Proběhlo', tone: 'done' },
   declined:  { label: 'Nepřijato', tone: 'off' },
   cancelled: { label: 'Zrušeno', tone: 'off' },
+  no_show:   { label: 'Nedorazil', tone: 'off' },
 };
 
 

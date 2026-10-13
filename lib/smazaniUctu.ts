@@ -63,6 +63,8 @@ export const ZACHAZENI_TABULEK: Record<string, Zachazeni> = {
   pos_bills: 'ponechat', client_broadcasts: 'ponechat', client_pravidla_verze: 'ponechat',
   // stav publikování rozvrhu (kolo 7): kdo publikoval, zůstane anonymně jako u směn
   schedule_publications: 'ponechat',
+  // výplaty (kolo 8): označení „vyplaceno“ a uzavřená období jsou účetní záznam podniku; autor zůstane anonymní
+  payroll_payments: 'ponechat', payroll_locks: 'ponechat',
   // vlastnictví: řeší se u podniku
   teams: 'tym', organizations: 'tym',
 };
@@ -107,7 +109,7 @@ export const TYMOVE_TABULKY = [
   'client_memberships', 'client_reservations', 'client_orders', 'client_coupons', 'client_coupon_claims', 'client_loyalty_ledger',
   'client_stamp_progress', 'client_stamp_events', 'client_scan_actions', 'client_kasa_idem', 'client_stamp_campaigns', 'client_bill_awards', 'client_groups', 'client_group_members', 'client_reviews',
   'client_broadcasts', 'client_pravidla_verze', 'client_member_notes', 'client_automatizace', 'client_automatizace_log', 'client_promos', 'client_banners', 'client_banner_stats', 'rozlozeni_stranek', 'content_reports', 'client_importy', 'client_vouchers', 'client_voucher_uses', 'client_bonus_rules',
-  'entity_notes', 'schedule_publications',
+  'entity_notes', 'schedule_publications', 'payroll_payments', 'payroll_locks',
 ];
 /** Tabulky s `team_id`, které se při smazání podniku ZÁMĚRNĚ nemažou: účetní záznamy platformy (fakturace, provize). */
 export const TYMOVE_PONECHAT = ['billing_events', 'referral_rewards', 'admin_audit'];
@@ -212,6 +214,8 @@ export function planUzivatele(u: { id: number; email: string; role: string; hash
   // Soubory: bez podniku patří jen osobě (mažou se; blob maže smazUcet), v podniku zůstanou bez vazby na osobu.
   k.push(volitelny('smazat soubory mimo podnik', `DELETE FROM uploads WHERE user_id = $1 AND team_id IS NULL`, [id]));
   k.push(volitelny('odpojit soubory podniku od osoby', `UPDATE uploads SET user_id = NULL, name = 'Příloha' WHERE user_id = $1`, [id]));
+  // Odpověď podniku na hodnocení hosta zůstává podniku, jen bez vazby na smazaný účet toho, kdo ji psal.
+  k.push(volitelny('odpojit odpovědi na hodnocení od osoby', `UPDATE client_reviews SET replied_by = NULL WHERE replied_by = $1`, [id]));
   // Protokol akcí: zůstane, vymaže se volný text. Záznam o samotném smazání (bez osobních údajů) se zachová.
   k.push(volitelny('vymazat text protokolu', `UPDATE audit_log SET detail = NULL WHERE (user_id = $1 OR (entity = 'user' AND entity_id = $1))
     AND action NOT IN ('ucet.smazan', 'podnik.smazan', 'ucet.stripe_chyba')`, [id]));

@@ -247,7 +247,7 @@ export default function FloatingRunner() {
                               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); if (hodnoty[String(i)] != null && !active.checkedItems.includes(i)) toggleItem(i); } }}
                               aria-invalid={mimo || undefined}
                               aria-describedby={`${idPole(i)}-info`}
-                              className={`!w-full sm:!w-28 tabular-nums ${k.valueUnit ? 'pr-12' : ''}`} />
+                              className={`!w-full sm:!w-28 min-h-11 tabular-nums ${k.valueUnit ? 'pr-12' : ''}`} />
                             {k.valueUnit && <span aria-hidden className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-black/45">{k.valueUnit}</span>}
                           </div>
                           {mimo && <Chip tone="bad" size="sm" icon="warning">{t('mimo rozsah')}</Chip>}

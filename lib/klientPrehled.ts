@@ -18,10 +18,15 @@ const text = (v: unknown): string | null => (typeof v === 'string' && v.trim() ?
 // Rezervace
 // ---------------------------------------------------------------------------
 
-export type StavRezervace = 'requested' | 'confirmed' | 'seated' | 'done' | 'declined' | 'cancelled';
+export type StavRezervace = 'requested' | 'confirmed' | 'seated' | 'done' | 'declined' | 'cancelled' | 'no_show';
+
+/** Skupina hosta pro štítek u rezervace (Zákazníci › Skupiny): „VIP", „firemní akce". */
+export interface SkupinaHosta { nazev: string; barva: string | null }
 
 export interface Rezervace {
   id: number;
+  /** Účet hosta (null = zapsaný ručně bez účtu) — otevírá okno Host. */
+  hostId: number | null;
   datum: string;
   cas: string;
   host: string;
@@ -44,6 +49,18 @@ export interface Rezervace {
   navstev: number | null;
   /** Poslední interní poznámka personálu k hostovi (zakaznici.poznamky, nikdy na tabletu). */
   poznamkaPersonalu: string | null;
+  /** Poslední poznámky personálu (nejnovější první) — pro varování „alergie" a okno Host. */
+  poznamky: string[];
+  /** Skupiny hosta (jen se zakaznici.zobrazit; jinak prázdné). */
+  skupiny: SkupinaHosta[];
+  /** Kolikrát host nedorazil (null = není člen nebo divák nesmí vidět). */
+  nedorazeni: number | null;
+  /** Kolik rezervací host v podniku celkem měl (pro „Nedorazil 2× z 9 rezervací"). */
+  rezervaciCelkem: number | null;
+  /** Kumulovaná útrata hosta (jen se zakaznici.zobrazit). */
+  utrata: number | null;
+  /** Host na připomínku odpověděl „Potvrdit" (guest_confirmed_at). */
+  hostPotvrdil: boolean;
   /**
    * Zapsala ji obsluha (telefon, u dveří): host bez účtu (customer_id NULL), nebo ručně
    * zapsaná a napojená na člena (created_by).
@@ -56,9 +73,15 @@ export interface Stul { id: number; nazev: string; mist: number }
 /** Co potřebuje okno „Nová rezervace" (API to pošle jen s rezervace.schvalovat). */
 export interface NastaveniZapisu { hodiny: Record<string, { open?: string | null; close?: string | null; closed?: boolean }>; maxOsob: number; dniDopredu: number; krok: number }
 
-export interface SeznamRezervaci { rezervace: Rezervace[]; stoly: Stul[]; zapis: NastaveniZapisu | null }
+export interface SeznamRezervaci {
+  rezervace: Rezervace[]; stoly: Stul[]; zapis: NastaveniZapisu | null;
+  /** Kolik rezervací odpovídá dotazu celkem (Minulé a hledání jsou oříznuté — „Zobrazeno 100 z 240"). */
+  celkem: number;
+  /** Počty pro pilulky filtru Minulých („Vše · 240", „Nedorazili · 6"); null mimo Minulé. */
+  minule: { celkem: number; nedorazeni: number } | null;
+}
 
-const STAVY: StavRezervace[] = ['requested', 'confirmed', 'seated', 'done', 'declined', 'cancelled'];
+const STAVY: StavRezervace[] = ['requested', 'confirmed', 'seated', 'done', 'declined', 'cancelled', 'no_show'];
 
 /**
  * Odpověď /api/client/admin/reservations. Nečekaný tvar je chyba widgetu
@@ -69,6 +92,7 @@ export function vyberRezervace(raw: any): SeznamRezervaci {
   return {
     rezervace: raw.reservations.map((r: any) => ({
       id: Number(r.id),
+      hostId: r.customer_id == null || !(Number(r.customer_id) > 0) ? null : Number(r.customer_id),
       datum: String(r.date ?? '').slice(0, 10),
       cas: String(r.time ?? '').slice(0, 5),
       host: text(r.customer_name) ?? 'Host',
@@ -81,7 +105,13 @@ export function vyberRezervace(raw: any): SeznamRezervaci {
       poznamka: text(r.note),
       uroven: urovenHosta(r.customer_level, r.customer_level_label),
       navstev: r.customer_visits == null ? null : Math.max(0, Math.round(cislo(r.customer_visits))),
-      poznamkaPersonalu: text(r.staff_note),
+      poznamkaPersonalu: text(r.staff_note) ?? (Array.isArray(r.staff_notes) ? text(r.staff_notes[0]) : null),
+      poznamky: Array.isArray(r.staff_notes) ? r.staff_notes.map((n: unknown) => text(n)).filter((n: string | null): n is string => !!n) : (text(r.staff_note) ? [text(r.staff_note) as string] : []),
+      skupiny: seznam(r.customer_groups).map((g: any) => ({ nazev: text(g?.name) ?? '', barva: text(g?.color) })).filter((g: SkupinaHosta) => g.nazev),
+      nedorazeni: r.customer_no_shows == null ? null : Math.max(0, Math.round(cislo(r.customer_no_shows))),
+      rezervaciCelkem: r.customer_reservations == null ? null : Math.max(0, Math.round(cislo(r.customer_reservations))),
+      utrata: r.customer_spend == null ? null : cislo(r.customer_spend),
+      hostPotvrdil: !!r.guest_confirmed_at,
       rucne: r.customer_id === null || (r.created_by != null && r.created_by !== ''),
     })),
     stoly: seznam(raw.tables).map((t: any) => ({ id: Number(t.id), nazev: String(t.name ?? ''), mist: cislo(t.seats) })),
@@ -91,8 +121,52 @@ export function vyberRezervace(raw: any): SeznamRezervaci {
       dniDopredu: Math.max(1, cislo(raw.zapis.lead_days) || 30),
       krok: Math.max(15, cislo(raw.zapis.slot_minutes) || 30),
     } : null,
+    celkem: raw.celkem == null ? raw.reservations.length : Math.max(raw.reservations.length, cislo(raw.celkem)),
+    minule: raw.pocty && typeof raw.pocty === 'object' ? { celkem: cislo(raw.pocty.celkem), nedorazeni: cislo(raw.pocty.nedorazeni) } : null,
   };
 }
+
+/** Odpověď /api/client/admin/reservations?month=RRRR-MM: počet živých rezervací po dnech (tečky v kalendáři). */
+export function vyberMesicRezervaci(raw: any): Record<string, number> {
+  if (!raw || typeof raw.days !== 'object' || raw.days == null) throw new Error('Kalendář rezervací přišel v nečekaném tvaru.');
+  const out: Record<string, number> = {};
+  for (const [den, n] of Object.entries(raw.days)) if (/^\d{4}-\d{2}-\d{2}$/.test(den) && cislo(n) > 0) out[den] = Math.round(cislo(n));
+  return out;
+}
+
+/** Odpověď /api/client/admin/reservations?customer=ID: historie hosta pro detail člena. */
+export function vyberRezervaceHosta(raw: any): { celkem: number; nedorazeni: number; probehlo: number; posledni: string | null } {
+  if (!raw || typeof raw.souhrn !== 'object' || raw.souhrn == null) throw new Error('Rezervace hosta přišly v nečekaném tvaru.');
+  const s = raw.souhrn;
+  return { celkem: cislo(s.celkem), nedorazeni: cislo(s.nedorazeni), probehlo: cislo(s.probehlo), posledni: text(s.posledni)?.slice(0, 10) ?? null };
+}
+
+/** Slova v poznámce personálu, kvůli kterým se poznámka ukáže u dveří jako varování (alergie, dieta). */
+const VAROVNA_SLOVA = /alergi|bezlep|bez lepku|lepek|lepku|vegan|lakt[oó]z|o[řr]ech|celiak|intoleran|diabet|arašíd|arasid|nesnáší|nesmí/i;
+
+/** První poznámka personálu, která je varování pro obsluhu u dveří („alergie na ořechy"); jinak null. */
+export function varovaniHosta(poznamky: readonly string[]): string | null {
+  return poznamky.find(p => VAROVNA_SLOVA.test(p)) ?? null;
+}
+
+/**
+ * Nadpis dne: kolik rezervací, kolik osob a kdy je špička (hodina s nejvíc rezervacemi, až od
+ * dvou v jedné hodině). Zrušené, nepřijaté a nedorazivší se nepočítají — stůl neobsadí.
+ */
+export function souhrnDneRezervaci(radky: readonly Pick<Rezervace, 'stav' | 'osob' | 'cas'>[]): { pocet: number; osob: number; spicka: string | null } {
+  const zive = radky.filter(r => r.stav !== 'declined' && r.stav !== 'cancelled' && r.stav !== 'no_show');
+  const poHodine = new Map<string, number>();
+  for (const r of zive) { const h = `${r.cas.slice(0, 2)}:00`; poHodine.set(h, (poHodine.get(h) ?? 0) + 1); }
+  let spicka: string | null = null; let max = 1;
+  for (const [h, n] of [...poHodine.entries()].sort()) if (n > max) { max = n; spicka = h; }
+  return { pocet: zive.length, osob: zive.reduce((s, r) => s + r.osob, 0), spicka };
+}
+
+/** Kolik znaků hledání stačí, aby se poslal dotaz (jméno nebo telefon). */
+export const HLEDANI_MIN = 2;
+
+/** Čísla z telefonu pro hledání („+420 776 221 004" → „420776221004"); prázdné, když tam žádná nejsou. */
+export const cisliceTelefonu = (q: string) => String(q ?? '').replace(/\D/g, '');
 
 /** Štítek úrovně jako v Zákaznících › Členové: stříbro tlumeně, zlato a platina inkoustem, obyčejný člen bez štítku. */
 function urovenHosta(id: unknown, label: unknown): Rezervace['uroven'] {
@@ -109,13 +183,29 @@ export function odkazTel(telefon: string | null | undefined): string | null {
 /** Kam smí rezervace ze svého stavu (stejná mapa jako FLOW v API). */
 const PRECHODY: Record<string, StavRezervace[]> = {
   requested: ['confirmed', 'declined'],
-  confirmed: ['seated', 'declined', 'done'],
+  confirmed: ['seated', 'declined', 'done', 'no_show'],
   seated: ['done'],
+  // Omyl u dveří (nebo host dorazil pozdě): „Nedorazil" jde vrátit na potvrzeno a pak usadit.
+  no_show: ['confirmed'],
 };
 export const muzeDo = (z: StavRezervace, na: StavRezervace) => PRECHODY[z]?.includes(na) ?? false;
 
-/** Které oprávnění přechod chce (API kontroluje totéž, tady jen aby tlačítko nesvítilo naprázdno). */
-export const klicPrechodu = (na: StavRezervace) => (na === 'confirmed' || na === 'declined' ? 'rezervace.schvalovat' : 'rezervace.usadit');
+/**
+ * Které oprávnění přechod chce (API kontroluje totéž, tady jen aby tlačítko nesvítilo naprázdno).
+ * Vrácení omylu „Nedorazil" → potvrzeno (`z` = 'no_show') je práce u dveří jako usazení, ne rozhodnutí
+ * o kapacitě — kdo smí označit nedorazení, smí ho i vzít zpět.
+ */
+export const klicPrechodu = (na: StavRezervace, z?: StavRezervace) =>
+  ((na === 'confirmed' && z !== 'no_show') || na === 'declined' ? 'rezervace.schvalovat' : 'rezervace.usadit');
+
+/**
+ * Kde je v řádku „Nedorazil": po čase rezervace + 30 min (a u minulých dnů) jako tlačítko vedle
+ * „Usadit" — jedno klepnutí od dveří; dřív jen v „···" (zpětně). Bez rezervace.usadit nikde.
+ */
+export function nabidkaNedorazil(r: Pick<Rezervace, 'stav' | 'datum' | 'cas'>, smi: (klic: string) => boolean, naRade: boolean): 'tlacitko' | 'menu' | null {
+  if (!muzeDo(r.stav, 'no_show') || !smi(klicPrechodu('no_show'))) return null;
+  return naRade ? 'tlacitko' : 'menu';
+}
 
 /**
  * Hlavní krok řádku — jedno tlačítko vpředu, zbytek v „···" (DP §3.6).
@@ -123,6 +213,8 @@ export const klicPrechodu = (na: StavRezervace) => (na === 'confirmed' || na ===
  * „Potvrdit" nedostane, ale u potvrzené „Usadit" ano.
  */
 export function hlavniKrok(stav: StavRezervace, smi: (klic: string) => boolean): { na: StavRezervace; popisek: string } | null {
+  // „Nedorazil" je uzavřené; vrácení omylu je v „···", ne hlavní krok (jinak by řádek sváděl „Potvrdit").
+  if (stav === 'no_show') return null;
   const kroky: { na: StavRezervace; popisek: string }[] = [
     { na: 'confirmed', popisek: 'Potvrdit' },
     { na: 'seated', popisek: 'Usadit' },
@@ -133,12 +225,12 @@ export function hlavniKrok(stav: StavRezervace, smi: (klic: string) => boolean):
 
 /** Tón stavu rezervace pro Chip (stav, ne kategorie: pět tónů, DP §2.1). */
 export const TON_REZERVACE: Record<StavRezervace, ChipTone> = {
-  requested: 'wait', confirmed: 'ok', seated: 'ok', done: 'muted', declined: 'muted', cancelled: 'muted',
+  requested: 'wait', confirmed: 'ok', seated: 'ok', done: 'muted', declined: 'muted', cancelled: 'muted', no_show: 'bad',
 };
 
-/** Dnešek pro widget S: kolik dnes přijde a kolik čeká na potvrzení (zrušené a odmítnuté se nepočítají). */
+/** Dnešek pro widget S: kolik dnes přijde a kolik čeká na potvrzení (zrušené, odmítnuté a nedorazivší se nepočítají). */
 export function souhrnDne(rez: Rezervace[]): { dnes: number; ceka: number; osob: number } {
-  const plati = rez.filter(r => r.stav !== 'declined' && r.stav !== 'cancelled');
+  const plati = rez.filter(r => r.stav !== 'declined' && r.stav !== 'cancelled' && r.stav !== 'no_show');
   return {
     dnes: plati.length,
     ceka: plati.filter(r => r.stav === 'requested').length,
@@ -258,7 +350,16 @@ export const polozkyKratce = (polozky: readonly { nazev: string; pocet: number }
 // Hodnocení
 // ---------------------------------------------------------------------------
 
-export interface Recenze { id: number; hvezdy: number; poznamka: string | null; kdy: string; host: string; zdroj: 'objednavka' | 'rezervace' }
+export interface Recenze {
+  id: number; hvezdy: number; poznamka: string | null; kdy: string; host: string; zdroj: 'objednavka' | 'rezervace';
+  /** Odpověď podniku hostovi (host ji vidí v Moje stránka) a kdo ji napsal. */
+  odpoved: string | null;
+  odpovedel: string | null;
+  /** Čas odpovědi z databáze (UTC bez zóny) — zobrazit jen přes dbTimeDayHM. */
+  odpovedenoKdy: string | null;
+  /** Označeno jako vyřízené (slabé hodnocení probrané se směnou, host odškodněný…). */
+  vyrizeno: boolean;
+}
 
 export interface Hodnoceni {
   pocet: number;
@@ -283,7 +384,46 @@ export function vyberHodnoceni(raw: any): Hodnoceni {
       kdy: String(v.created_at ?? ''),
       host: text(v.customer_name) ?? 'Host',
       zdroj: String(v.ref ?? '').startsWith('ord:') ? 'objednavka' : 'rezervace',
+      odpoved: text(v.reply),
+      odpovedel: text(v.replied_by_name),
+      odpovedenoKdy: v.replied_at ? String(v.replied_at) : null,
+      vyrizeno: !!v.resolved_at,
     })),
+  };
+}
+
+/** Nejdelší odpověď hostovi na hodnocení. */
+export const ODPOVED_MAX = 1000;
+
+export type FiltrHodnoceni = 'vse' | 'slabe' | 'komentar' | 'nevyrizene';
+export const FILTRY_HODNOCENI: { id: FiltrHodnoceni; popisek: string }[] = [
+  { id: 'vse', popisek: 'Vše' },
+  { id: 'slabe', popisek: '1–2 ★' },
+  { id: 'komentar', popisek: 'S komentářem' },
+  { id: 'nevyrizene', popisek: 'Nevyřízené' },
+];
+
+/** Slabé hodnocení (1–2 ★), na které podnik zatím neodpověděl ani ho neoznačil jako vyřízené. */
+export const jeNevyrizene = (v: Pick<Recenze, 'hvezdy' | 'odpoved' | 'vyrizeno'>) => v.hvezdy <= 2 && !v.vyrizeno && !v.odpoved;
+
+/** Hodnocení podle filtru a období (období podle pražského dne z `kdy`, dodá volající přes `den`). */
+export function filtrujHodnoceni(seznam: readonly Recenze[], filtr: FiltrHodnoceni, obdobi: { od: string; do: string } | null, den: (kdy: string) => string): Recenze[] {
+  return seznam.filter(v => {
+    if (filtr === 'slabe' && v.hvezdy > 2) return false;
+    if (filtr === 'komentar' && !v.poznamka) return false;
+    if (filtr === 'nevyrizene' && !jeNevyrizene(v)) return false;
+    if (obdobi) { const d = den(v.kdy); if (!d || d < obdobi.od || d > obdobi.do) return false; }
+    return true;
+  });
+}
+
+/** Počty na pilulky filtru (v rámci zvoleného období), ať je vidět, kam má cenu klikat. */
+export function poctyHodnoceni(seznam: readonly Recenze[]): Record<FiltrHodnoceni, number> {
+  return {
+    vse: seznam.length,
+    slabe: seznam.filter(v => v.hvezdy <= 2).length,
+    komentar: seznam.filter(v => !!v.poznamka).length,
+    nevyrizene: seznam.filter(jeNevyrizene).length,
   };
 }
 

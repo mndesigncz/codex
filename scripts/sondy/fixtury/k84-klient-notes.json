@@ -1,0 +1,16 @@
+{
+ "notes": [
+  {
+   "id": 1,
+   "body": "Alergie na ořechy",
+   "created_at": "2026-09-12 10:20:00",
+   "autor": "Martin"
+  },
+  {
+   "id": 2,
+   "body": "Dort si přinesou sami.",
+   "created_at": "2026-09-30 18:05:00",
+   "autor": "Eva"
+  }
+ ]
+}

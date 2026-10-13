@@ -168,5 +168,9 @@
   "Odhlášení se nepodařilo uložit. Zkus to znovu.": "Couldn't save the unsubscribe. Try again.",
   "Tvůj účet je v tomhle podniku zablokovaný. Obrať se na obsluhu.": "Your account is blocked at this business. Please ask the staff.",
   "Na tenhle čas už je pozdě, vyber pozdější.": "It's too late for this time, pick a later one.",
-  "Poznámka ke směně může mít nejvýš 200 znaků.": "A shift note can have at most 200 characters."
+  "Poznámka ke směně může mít nejvýš 200 znaků.": "A shift note can have at most 200 characters.",
+  "Rezervaci jde tady jen potvrdit.": "Here a reservation can only be confirmed.",
+  "Chybí rezervace.": "Reservation is missing.",
+  "Tuhle rezervaci už potvrdit nejde.": "This reservation can't be confirmed anymore.",
+  "Připomínky se nenačetly.": "Reminders could not be loaded."
 }

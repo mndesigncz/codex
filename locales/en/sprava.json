@@ -218,7 +218,6 @@
   "Jiné": "Other",
   "Já": "Me",
   "K položkám": "For items",
-  "K výplatě": "To pay out",
   "Kalendář": "Calendar",
   "Kalendář hodnocení": "Review calendar",
   "Kalendář se nenačetl": "The calendar did not load",
@@ -1407,7 +1406,6 @@
   "pod {cesta}": "under {cesta}",
   "pod {nazev}": "under {nazev}",
   "podniku {podnik}": "the business {podnik}",
-  "podíl podle hodin": "share by hours",
   "položku": "the item",
   "postup": "procedure",
   "povinný": "required",
@@ -1689,5 +1687,16 @@
   "Např. Dobrý nápad, ale až po sezóně.": "E.g. Good idea, but after the season.",
   "Podnět je zamítnutý, důvod dostal autor.": "The suggestion is declined; the author got the reason.",
   "Podnět je zamítnutý.": "The suggestion is declined.",
-  "Zapíná se v Nastavení › Organizace.": "It is turned on in Settings › Organization."
+  "Zapíná se v Nastavení › Organizace.": "It is turned on in Settings › Organization.",
+  "Doplatit": "Still to pay",
+  "Tento měsíc zatím žádná výplata z kasy.": "No payout from the till this month yet.",
+  "Už vyplaceno z kasy": "Already paid from the till",
+  "Výplaty přišly v nečekaném tvaru.": "Payouts arrived in an unexpected shape.",
+  "Výplaty z kasy po uzávěrkách": "Till payouts by closing",
+  "podíl podle pravidel podniku": "share per the business rules",
+  "uzávěrku poslal/a {kdo}": "closing sent by {kdo}",
+  "vyplaceno {castka}": "paid {castka}",
+  "vč. příplatků {castka}": "incl. surcharges {castka}",
+  "už vyplaceno · {n}× v uzávěrkách": "already paid · {n}× in closings",
+  "k výplatě od 1. do dneška": "to pay out, from the 1st to today"
 }

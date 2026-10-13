@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
 import { sql, customer, profileBySlug, join, slotsFor } from '@/lib/client';
 import { clenoveSOpravnenim } from '@/lib/opravneniDb';
 import { notifyUser, notifyUsers } from '@/lib/push';
-import { autoPotvrdit, nejdriveDnes, zpravaHostoviORezervaci } from '@/lib/clientSlots';
+import { autoPotvrdit, NEDORAZENI_LIMIT, nejdriveDnes, zpravaHostoviORezervaci } from '@/lib/clientSlots';
 import { pragueToday, pragueHM, dayPlus } from '@/lib/pragueTime';
 
 export const dynamic = 'force-dynamic';
@@ -53,7 +53,14 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
   if (dup) return NextResponse.json({ error: 'Na tenhle termín už rezervaci máš.' }, { status: 409 });
   // Malý podnik si zapne automatické potvrzování (Nastavení › Rezervace a objednávky):
   // rezervace vznikne rovnou potvrzená, větší skupiny než nastavená hranice dál čekají.
-  const status = autoPotvrdit(p, party) ? 'confirmed' : 'requested';
+  // Kolo 8 (R8-7): host, který už dvakrát nedorazil, se sám nepotvrdí — vedení ho potvrdí ručně.
+  let nedorazeni = 0;
+  try {
+    const [n] = await sql`SELECT COUNT(*)::int AS n FROM client_reservations WHERE team_id = ${teamId} AND customer_id = ${me.id} AND status = 'no_show'` as any[];
+    nedorazeni = Number(n?.n) || 0;
+  } catch { /* před migrací stavu */ }
+  const status = autoPotvrdit(p, party, nedorazeni) ? 'confirmed' : 'requested';
+  const cekaKvuliNedorazeni = status === 'requested' && nedorazeni >= NEDORAZENI_LIMIT && autoPotvrdit(p, party);
   // Dedup výš je rychlá cesta; skutečnou pojistku proti dvojkliku dělá
   // unikátní index (viz /api/init). Kolizi překládáme na klidné 409.
   let r: any;
@@ -71,10 +78,39 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
   // Host dostane stejné „Rezervace potvrzena“ jako po ručním potvrzení.
   if (status === 'confirmed') notifyUser(me.id, zpravaHostoviORezervaci('confirmed', date, time)).catch(() => {});
   await upozorni(teamId, {
-    // Vedoucí musí poznat, že nemusí nic dělat.
-    title: status === 'confirmed' ? 'Nová rezervace (potvrzena automaticky)' : 'Nová rezervace',
+    // Vedoucí musí poznat, že nemusí nic dělat — a naopak proč tahle čeká, když se jinak potvrzují samy.
+    title: status === 'confirmed' ? 'Nová rezervace (potvrzena automaticky)' : cekaKvuliNedorazeni ? `Nová rezervace čeká — host už ${nedorazeni}× nedorazil` : 'Nová rezervace',
     body: `${me.name} · ${date.split('-').reverse().join('. ')} ${time} · ${party} ${party === 1 ? 'osoba' : party < 5 ? 'osoby' : 'osob'}`,
     link: '/employer/overview?mode=client&tab=reservations', type: 'info',
   });
   return NextResponse.json({ ok: true, reservation: r });
+}
+
+/**
+ * Kolo 8 (R8-7): host odpoví na připomínku „Potvrdit" — podnik pak u rezervace vidí „host potvrdil".
+ * Zrušení má svou routu (/api/client/reservations/[id]); tady jen potvrzení vlastní potvrzené
+ * rezervace v tomhle podniku, která ještě nezačala. Druhé potvrzení nic nemění (idempotentní).
+ */
+export async function PATCH(req: Request, props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
+  const me = await customer();
+  if (!me) return NextResponse.json({ error: 'Přihlas se jako host.' }, { status: 401 });
+  const p = await profileBySlug(params.slug);
+  if (!p) return NextResponse.json({ error: 'Podnik nenalezen' }, { status: 404 });
+  const b = await req.json().catch(() => ({}));
+  if (b?.action !== 'confirm') return NextResponse.json({ error: 'Rezervaci jde tady jen potvrdit.' }, { status: 400 });
+  const id = parseInt(String(b.id), 10);
+  if (!Number.isInteger(id) || id <= 0) return NextResponse.json({ error: 'Chybí rezervace.' }, { status: 400 });
+  const teamId = Number(p.team_id);
+  const [r] = await sql`
+    SELECT id, date, time, status, guest_confirmed_at FROM client_reservations
+    WHERE id = ${id} AND team_id = ${teamId} AND customer_id = ${me.id}` as any[];
+  if (!r) return NextResponse.json({ error: 'Rezervace nenalezena' }, { status: 404 });
+  if (String(r.status) !== 'confirmed' || String(r.date) < pragueToday()) {
+    return NextResponse.json({ error: 'Tuhle rezervaci už potvrdit nejde.' }, { status: 400 });
+  }
+  if (!r.guest_confirmed_at) {
+    await sql`UPDATE client_reservations SET guest_confirmed_at = NOW(), updated_at = NOW() WHERE id = ${id} AND team_id = ${teamId}`;
+  }
+  return NextResponse.json({ ok: true, id, guestConfirmed: true });
 }

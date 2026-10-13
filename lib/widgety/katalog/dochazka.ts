@@ -237,4 +237,35 @@ export const WIDGETY: DefiniceWidgetu[] = [
     ],
     stav: 'hotovo',
   },
+  // Data: GET /api/attendance?days=N (hodiny, sazby, prémie), GET /api/closings (dýško), GET /api/payroll?od&do
+  // (z kasy, vyplaceno, zámky, smlouvy, pravidla). Zápisy: /api/payroll/payments, /locks, /rules, /smlouva.
+  // Kolo 8 (R8-1, vzor 7shifts „Worked Hours & Wages", Lightspeed „Labor report"): řádek na člověka, na počítači
+  // tabulka s řazením a Celkem, na telefonu karty; CSV pro účetní; „Vyplaceno" a „Uzavřít období"; Pravidla výplat.
+  // Ikona `receipt`: na Docházce ve výchozím rozložení není (AK-19).
+  {
+    id: 'dochazka.vyplatni_listina',
+    oblast: 'dochazka',
+    nazev: 'Výplatní listina',
+    popis: 'Řádek na člověka: hodiny, mzda, příplatky, dýško, prémie, co už odešlo z kasy a kolik doplatit; CSV pro účetní, Vyplaceno a uzavření období.',
+    ikona: 'receipt',
+    velikosti: ['L'],
+    vychoziVelikost: 'L',
+    rozhrani: ['vedeni'],
+    stranky: ['vedeni.dochazka', 'vedeni.finance'],
+    opravneni: {
+      vse: ['dochazka.zobrazit'],
+      nektere: [],
+      pole: {
+        kc_mzda_z_kasy_doplatit: 'finance.mzdy',
+        dysko: ['finance.trzby', 'uzaverky.zobrazit_vse'],
+        'akce:csv': 'dochazka.exportovat',
+        'akce:vyplaceno': 'finance.sazby_upravit',
+        'akce:pravidla': 'finance.sazby_upravit',
+      },
+    },
+    tarif: 'zdarma',
+    kostra: { L: 'seznam' },
+    cil: { pohled: 'attendance' },
+    stav: 'hotovo',
+  },
 ];

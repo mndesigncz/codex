@@ -115,6 +115,10 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'client.floorplan': 'Uložen plánek stolů',
   'client.reservation': 'Změněna rezervace hosta',
   'rezervace.zapsat': 'Obsluha ručně zapsala rezervaci (telefon, u dveří)',
+  'rezervace.nedorazil': 'Rezervace označena „Nedorazil“ (host nepřišel)',
+  'rezervace.pripominka': 'Hostům odešla připomínka rezervace s Potvrdit / Zrušit',
+  'recenze.odpovedet': 'Odpověď hostovi na hodnocení',
+  'recenze.vyridit': 'Hodnocení označeno jako vyřízené',
   'client.profile': 'Změna veřejné stránky podniku',
   'client.broadcast': 'Odeslána zpráva členům věrnostního programu',
   'client.reaktivace': 'Změna automatického oslovení „Chybíš nám“',
@@ -162,6 +166,15 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'billing.upgrade': 'Změna tarifu na vyšší',
   // úkoly (kolo 7)
   'ukoly.fotka': 'Úkol splněn s fotkou jako důkazem',
+  // výplaty (kolo 8, R8-1)
+  'vyplata.oznacena': 'Výplata označená jako vyplacená',
+  'vyplata.zrusena': 'Označení výplaty zrušeno',
+  'vyplata.obdobi_uzavreno': 'Výplatní období uzavřeno',
+  'vyplata.obdobi_otevreno': 'Výplatní období znovu otevřeno',
+  'vyplata.pravidla': 'Změna pravidel výplat (dýško, příplatky, odvody)',
+  'vyplata.smlouva': 'Změna typu smlouvy a limitu hodin člena',
+  'dochazka.pauza_doplnena': 'Pauza doplněná při odchodu (směna rozdělená na dva záznamy)',
+  'dochazka.bez_pauzy': 'Odchod po víc než 6 h bez pauzy',
 };
 
 /** Popisek akce; neznámý klíč nikdy neukážeme syrový. */
@@ -251,9 +264,9 @@ export const OBLASTI_AUDITU: Readonly<Record<string, OblastAuditu>> = {
   // uzávěrky
   closing: 'uzaverky',
   // odměny, prémie, pochvaly
-  reward: 'odmeny', wage: 'odmeny', points: 'odmeny',
+  reward: 'odmeny', wage: 'odmeny', points: 'odmeny', vyplata: 'odmeny',
   // hosté (Managero client)
-  client: 'klient', klient: 'klient', rezervace: 'klient',
+  client: 'klient', klient: 'klient', rezervace: 'klient', recenze: 'klient',
   // nastavení podniku, organizace, předplatné
   podnik: 'nastaveni', rozlozeni: 'nastaveni', onboarding: 'nastaveni', organization: 'nastaveni', billing: 'nastaveni',
   // akce (výdej a vrácení zboží, oznámení týmu) — samostatná agenda, patří k ostatnímu

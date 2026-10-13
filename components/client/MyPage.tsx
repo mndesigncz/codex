@@ -40,6 +40,8 @@ export default function MyPage() {
   const [d, setD] = useState<any | null>(null);
   const [card, setCard] = useState<any | null>(null);
   const [pending, setPending] = useState<any[]>([]);
+  // Kolo 8 (R8-7): odpovědi podniků na moje hodnocení (po podnicích, jen ty s odpovědí).
+  const [odpovedi, setOdpovedi] = useState<OdpovedPodniku[]>([]);
   const [err, setErr] = useState('');
   const [flash, setFlash] = useState('');
   const load = useCallback(() => fetch('/api/client/me').then(okJson).then(setD).catch(() => setErr(t('Nenačetlo se. Zkus obnovit stránku.'))), [t]);
@@ -50,6 +52,16 @@ export default function MyPage() {
     fetch('/api/client/reviews').then(okJson).then(x => setPending(Array.isArray(x?.pending) ? x.pending : [])).catch(() => {});
   }, [load]);
   useEffect(() => { if (flash) { const t = setTimeout(() => setFlash(''), 4000); return () => clearTimeout(t); } }, [flash]);
+  const slugy = (d?.memberships ?? []).map((m: any) => String(m.slug)).filter(Boolean).slice(0, 8).join(',');
+  useEffect(() => {
+    if (!slugy) return;
+    let zivy = true;
+    Promise.all(slugy.split(',').map((slug: string) => fetch(`/api/client/b/${encodeURIComponent(slug)}/reviews`).then(okJson)
+      .then(x => (Array.isArray(x?.reviews) ? x.reviews : []).map((v: any) => ({ ...v, slug })))
+      .catch(() => [])))
+      .then(vse => { if (!zivy) return; const m = new Map((d?.memberships ?? []).map((x: any) => [String(x.slug), String(x.name)])); setOdpovedi(vse.flat().map((v: any) => ({ ...v, business: m.get(v.slug) ?? v.slug }))); });
+    return () => { zivy = false; };
+  }, [slugy, d?.memberships]);
 
   if (err) return <p className="note note-danger text-sm px-4 py-3">{err}</p>;
   if (!d) return <div className="space-y-4"><Skeleton className="h-56 rounded-3xl" /><Skeleton className="h-24 rounded-3xl" /><Skeleton className="h-40 rounded-3xl" /></div>;
@@ -71,6 +83,22 @@ export default function MyPage() {
           <h2 id="h-review" className="text-lg font-bold tracking-tight mb-3">{t('Jak to bylo?')}</h2>
           <ul className="space-y-3">
             {pending.map((p: any) => <ReviewPrompt key={p.ref} p={p} onDone={() => { setPending(x => x.filter(y => y.ref !== p.ref)); setFlash(t('Díky za hodnocení.')); }} />)}
+          </ul>
+        </section>
+      )}
+
+      {odpovedi.length > 0 && (
+        <section aria-labelledby="h-odpovedi">
+          <h2 id="h-odpovedi" className="text-lg font-bold tracking-tight mb-3">{t('Odpovědi na tvoje hodnocení')}</h2>
+          <ul className="space-y-3">
+            {odpovedi.map(o => (
+              <li key={`${o.slug}-${o.id}`} className="card p-4 sm:p-5">
+                <p className="font-semibold leading-tight">{o.business} <span className="text-black/50 font-medium tabular-nums">· {t('{n} z 5', { n: o.rating })}</span></p>
+                {o.note && <p className="text-sm text-black/55 mt-1">„{o.note}“</p>}
+                <p className="text-xs font-semibold uppercase tracking-wider text-black/45 mt-3">{t('Odpověď podniku')}{o.repliedAt ? ` · ${denCesky(o.repliedAt, jazyk)}` : ''}</p>
+                <p className="text-sm mt-1 whitespace-pre-line text-pretty">{o.reply}</p>
+              </li>
+            ))}
           </ul>
         </section>
       )}
@@ -144,7 +172,7 @@ export default function MyPage() {
           {upcoming.length > 0 && (
             <section aria-labelledby="h-res">
               <h2 id="h-res" className="text-lg font-bold tracking-tight mb-3">{t('Nadcházející rezervace')}</h2>
-              <ul className="divide-y divide-black/[0.06]">{upcoming.map((r: any) => <ResRow key={r.id} r={r} />)}</ul>
+              <ul className="divide-y divide-black/[0.06]">{upcoming.map((r: any) => <ResRow key={r.id} r={r} akce />)}</ul>
             </section>
           )}
           {open.length > 0 && (
@@ -348,17 +376,29 @@ function ProfileForm({ me, onSaved }: { me: any; onSaved: (me: any) => void }) {
   );
 }
 
-function ResRow({ r }: { r: any }) {
+/** Odpověď podniku na moje hodnocení (GET /api/client/b/[slug]/reviews). */
+interface OdpovedPodniku { id: number; slug: string; business: string; rating: number; note: string | null; reply: string; repliedAt: string | null }
+
+/** Řádek rezervace; `akce` u nadcházející vede na stránku podniku, kde ji host potvrdí nebo zruší (kolo 8, R8-7). */
+function ResRow({ r, akce = false }: { r: any; akce?: boolean }) {
   const t = useT('klient-host');
   const { jazyk } = useJazyk();
   const st = RES_STATUS[r.status] ?? RES_STATUS.requested;
+  const ziva = akce && r.slug && ['requested', 'confirmed'].includes(String(r.status));
   return (
-    <li className="py-3 flex items-start gap-3">
-      <div className="min-w-0 flex-1">
+    <li className="py-3 flex items-start gap-3 flex-wrap">
+      <div className="min-w-0 flex-1 basis-40">
         <p className="font-semibold cz-sentence">{fmtDatum(r.date, { jazyk, styl: 'denDlouze' })} <span className="text-black/50 font-medium">· {r.time}</span></p>
         <p className="text-sm text-black/55 truncate">{r.business} · {t('{n, plural, one {# osoba} few {# osoby} other {# osob}}', { n: r.party })}</p>
       </div>
-      <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${st.tone === 'ok' ? 'bg-[#C8F542]/25 text-[#3E5406]' : st.tone === 'wait' ? 'bg-wait/15 text-wait-ink' : 'bg-black/[0.06] text-black/60'}`}>{t(st.label)}</span>
+      <div className="flex items-center gap-2 shrink-0 ml-auto">
+        <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${st.tone === 'ok' ? 'bg-[#C8F542]/25 text-[#3E5406]' : st.tone === 'wait' ? 'bg-wait/15 text-wait-ink' : 'bg-black/[0.06] text-black/60'}`}>{t(st.label)}</span>
+        {ziva && (
+          <Link href={`/client/${encodeURIComponent(String(r.slug))}?tab=reserve&rezervace=${r.id}`} className="tap-target-sm inline-flex items-center gap-1 text-xs font-semibold text-black/60 hover:text-black transition">
+            {t('Potvrdit nebo zrušit')}<Icon name="chevronRight" size={14} />
+          </Link>
+        )}
+      </div>
     </li>
   );
 }

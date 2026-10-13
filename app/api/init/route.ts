@@ -1670,6 +1670,11 @@ export async function GET(request: Request) {
     // největší skupina, která se potvrdí sama (0 = všechny velikosti); větší čekají na vedení.
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS auto_confirm BOOLEAN NOT NULL DEFAULT FALSE`);
     await ddl(sql`ALTER TABLE client_profiles ADD COLUMN IF NOT EXISTS auto_confirm_max_party INTEGER NOT NULL DEFAULT 0`);
+    // Kolo 8 (R8-7): stav 'no_show' (host nedorazil) — počet nedorazení hosta se čte podle (team, host, stav);
+    // připomínka rezervace hostovi (reminded_at) a jeho odpověď „Potvrdit" (guest_confirmed_at).
+    await ddl(sql`CREATE INDEX IF NOT EXISTS client_reservations_customer_status ON client_reservations (team_id, customer_id, status)`);
+    await ddl(sql`ALTER TABLE client_reservations ADD COLUMN IF NOT EXISTS reminded_at TIMESTAMP`);
+    await ddl(sql`ALTER TABLE client_reservations ADD COLUMN IF NOT EXISTS guest_confirmed_at TIMESTAMP`);
 
     // --- Výkonové indexy na provozních tabulkách ---------------------------
     // Uzávěrky, docházka a rozvrh filtrují tyhle tabulky podle team_id/date
@@ -2136,6 +2141,11 @@ export async function GET(request: Request) {
         UNIQUE (customer_id, ref)
       )`);
     await ddl(sql`CREATE INDEX IF NOT EXISTS client_reviews_team ON client_reviews (team_id, created_at)`);
+    // Kolo 8 (R8-7): odpověď podniku na hodnocení (host ji vidí v Moje stránka) a stav „vyřízeno".
+    await ddl(sql`ALTER TABLE client_reviews ADD COLUMN IF NOT EXISTS reply TEXT`);
+    await ddl(sql`ALTER TABLE client_reviews ADD COLUMN IF NOT EXISTS replied_by INTEGER`);
+    await ddl(sql`ALTER TABLE client_reviews ADD COLUMN IF NOT EXISTS replied_at TIMESTAMP`);
+    await ddl(sql`ALTER TABLE client_reviews ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMP`);
     await ddl(sql`
       CREATE TABLE IF NOT EXISTS client_broadcasts (
         id SERIAL PRIMARY KEY,
@@ -2646,6 +2656,44 @@ export async function GET(request: Request) {
     // jen require_photo, fotku ne.
     await ddl(sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS require_photo BOOLEAN DEFAULT FALSE`);
     await ddl(sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS completion_photo TEXT`);
+
+    // ---- Výplaty (kolo 8, R8-1) ----
+    // Pravidla podniku: rozdělení dýška (metoda, váhy pozic, dělit i s vedením, platí od), příplatky za
+    // víkend / noc / svátek a hranice odvodů z DPP; zda zaměstnanec vidí svůj podíl na dýšku v Mém výdělku.
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS tip_rules JSONB`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS pay_rules JSONB`);
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS show_tips_to_staff BOOLEAN DEFAULT FALSE`);
+    // Typ smlouvy (HPP / DPC / DPP / OSVC) a roční strop hodin (DPP 300 h) patří k členství, ne k osobě.
+    await ddl(sql`ALTER TABLE team_members ADD COLUMN IF NOT EXISTS contract_type TEXT`);
+    await ddl(sql`ALTER TABLE team_members ADD COLUMN IF NOT EXISTS contract_hours_year INTEGER`);
+    // Pauza na směně: záznam po pauze (source 'break') ukazuje na záznam před ní — délka pauzy je mezera.
+    await ddl(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS break_after INTEGER`);
+    // Označení „Vyplaceno“ (částka, způsob, den) za období a uzavřená výplatní období.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS payroll_payments (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        period_from TEXT NOT NULL,
+        period_to TEXT NOT NULL,
+        amount INTEGER NOT NULL,
+        method TEXT,
+        paid_at TEXT NOT NULL,
+        note TEXT,
+        created_by INTEGER,
+        created_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS payroll_payments_team_period ON payroll_payments (team_id, period_from, period_to)`);
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS payroll_locks (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        period_from TEXT NOT NULL,
+        period_to TEXT NOT NULL,
+        locked_by INTEGER,
+        locked_at TIMESTAMP DEFAULT NOW()
+      )`);
+    await ddl(sql`CREATE UNIQUE INDEX IF NOT EXISTS payroll_locks_team_period ON payroll_locks (team_id, period_from, period_to)`);
 
     // Kroky migrace, které selhaly (a byly zachyceny), ať se to pozná zvenku
     // místo tichého „ok". Prázdné pole = celé schéma prošlo.
