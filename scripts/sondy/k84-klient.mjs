@@ -41,7 +41,8 @@ const bezPreteceni = (p) => p.evaluate(() => document.documentElement.scrollWidt
 const dotazy = (stav, cast) => stav.dotazy.filter(d => d.m === 'GET' && d.u.includes(cast));
 // Posunuté hodiny mění pozdrav na Přehledu („Dobrý den" → „Dobrý večer") a dev server hlásí
 // hydratační rozdíl — to je rozdíl hodin sondy, ne chyba balíku (brief: dev-only hydratace se ignoruje).
-const chybyBezHydratace = (chyby) => chyby.filter(c => !/Hydration failed|hydration-mismatch|hydrat/i.test(c));
+// V produkčním buildu (CI) je táž hydratační neshoda minifikovaná: React #418 (text), #423, #425.
+const chybyBezHydratace = (chyby) => chyby.filter(c => !/Hydration failed|hydration-mismatch|hydrat|Minified React error #4(18|23|25)/i.test(c));
 
 /** Podvrh API vedení: rezervace podle dotazu, poznámky, hodnocení, příjem. */
 const podvrh = (req, json, stav) => {
