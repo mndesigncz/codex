@@ -35,7 +35,8 @@ import {
   chybiUdaje, cekajiciObjednavky, historieObjednavek, hodnotaZasob, utrataZaMesic, jeAktivni, nakupniSeznam, podstrom, poDodavatelich,
   souhrnKategorie, stavInventury, stavZasoby, vyberHlaseni, vyberKategorie, vyberPohyby,
   MAX_NASOBEK_PRIJMU, nedodano, posledniCenyBaleni, radkyKPrijmu, rozdilPrijmu, souhrnPrijmu,
-  type DruhPohybu, type HodnotaZasob, type Hlaseni, type KategorieSkladu, type Objednavka, type PolozkaSkladu, type Pohyb, type RadekObjednavky,
+  navrhNaDni, tonDojde, vyberPredpoved,
+  type DruhPohybu, type HodnotaZasob, type Hlaseni, type KategorieSkladu, type Objednavka, type PolozkaSkladu, type Pohyb, type PredpovedPolozky, type RadekObjednavky,
 } from '@/lib/skladPrehled';
 import { cenaDoPole, cenaZFormulare } from '@/lib/cena';
 import { pocetDoPole, pocetZPole } from '@/lib/inventura';
@@ -51,6 +52,7 @@ import { Widget, useVyrizeno, useWidget, type StavNacteni } from '../Widget';
 import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
 import { useNavigace, useSmi } from '../NavigaceKontext';
 import { skladArg } from '@/lib/skladPredani';
+import { useUlozeno } from '@/lib/useUlozeno';
 
 // ---------------------------------------------------------------------------
 // Společné drobnosti
@@ -58,6 +60,8 @@ import { skladArg } from '@/lib/skladPredani';
 
 const URL_SKLAD = '/api/inventory';
 const URL_KATEGORIE = '/api/inventory/categories';
+/** Předpověď spotřeby (kolo 8, R8-4): denní spotřeba a „dojde za" z odpisů posledních 28 dní. */
+const URL_PREDPOVED = '/api/inventory/forecast';
 
 const seznam = (x: unknown): any[] => (Array.isArray(x) ? x : []);
 // Čísla se píšou podle zvoleného jazyka (v němčině „1.250“, v angličtině „1,250“),
@@ -217,6 +221,37 @@ const idKategorie = (v: unknown): number | null =>
 /** Kolik řádků má nákupní seznam (totéž číslo jako „Nakoupit (7)" v hlavičce Skladu). */
 const vyberPocetNakupu = (raw: unknown): number => nakupniSeznam(vyberSklad(raw)).length;
 
+/** Číslo spotřeby: do 10 s jednou desetinou (0,8 l), jinak celé (30 ks). */
+const spotrebaCislo = (n: number) => n.toLocaleString(LOCALE_PRO_JAZYK[aktualniJazyk()], { maximumFractionDigits: n < 10 ? 1 : 0 });
+
+/**
+ * „dojde za ~2 dny (spotřeba 6,1 l/den)" — druhý řádek položky; bez spotřeby za okno nic (nevymýšlí se „nikdy").
+ * Pod jeden den „dojde dnes".
+ */
+function vetaDojde(p: PredpovedPolozky | undefined, t: PrekladFn): string | null {
+  if (!p || !(p.denni > 0) || p.dojdeZa == null) return null;
+  const spotreba = t('spotřeba {n} {jednotka}/den', { n: spotrebaCislo(p.denni), jednotka: p.jednotka });
+  return p.dojdeZa < 1 ? `${t('dojde dnes')} (${spotreba})` : `${t('dojde za ~{n, plural, one {# den} few {# dny} other {# dní}}', { n: Math.round(p.dojdeZa) })} (${spotreba})`;
+}
+
+/**
+ * Chip „~2 dny" (bad pod 2 dny, wait pod 5); nad 5 dní nic — řádek by byl samý štítek. Jen od `sm`: na telefonu
+ * by ocas spadl pod řádek a opakoval větu „dojde za", která tam nese tón sama (DetailDojde).
+ */
+function ChipDojde({ p, t }: { p: PredpovedPolozky | undefined; t: PrekladFn }) {
+  const ton = p ? tonDojde(p.dojdeZa) : null;
+  if (!p || !ton || p.dojdeZa == null) return null;
+  return <Chip tone={ton} size="sm" className="tabular-nums hidden sm:inline-flex">{p.dojdeZa < 1 ? t('dnes') : t('~{n, plural, one {# den} few {# dny} other {# dní}}', { n: Math.round(p.dojdeZa) })}</Chip>;
+}
+
+/** Věta „dojde za…" v tónu stavu (pod 2 dny bad, pod 5 wait) — na telefonu jediný nositel tónu. */
+function DetailDojde({ p, t }: { p: PredpovedPolozky | undefined; t: PrekladFn }) {
+  const veta = vetaDojde(p, t);
+  if (!veta) return null;
+  const ton = p ? tonDojde(p.dojdeZa) : null;
+  return <span className={ton === 'bad' ? 'text-bad-ink' : ton === 'wait' ? 'text-wait-ink' : ''}>{veta}</span>;
+}
+
 function Dochazi({ velikost, nastaveni, nahled }: WidgetProps<NastaveniDochazi>) {
   const t = useT('widgety');
   const nav = useNavigace();
@@ -231,19 +266,25 @@ function Dochazi({ velikost, nastaveni, nahled }: WidgetProps<NastaveniDochazi>)
   // Kategorie jen s vybranou kategorií: kvůli podkategoriím a jménu do odkazu.
   // Stejná URL jako výběr v nastavení widgetu, takže dotaz se sdílí.
   const kategorie = useDataWidgetu<KategorieSkladu[]>(ok && katId != null ? URL_KATEGORIE : null, vyberKategorie);
+  // Předpověď (kolo 8): „dojde za" podle skutečné spotřeby; bez ní (starší server, chyba) zůstane jen minimum položky.
+  const predpoved = useDataWidgetu<Record<number, PredpovedPolozky>>(ok && velikost !== 'S' ? URL_PREDPOVED : null, vyberPredpoved);
+  const pred = predpoved.data ?? {};
+  // Řazení (M/L): podle stavu (kriticky málo první), nebo podle toho, co dojde dřív; pamatuje se v prohlížeči.
+  const [razeni, setRazeni] = useUlozeno<'stav' | 'dojde'>('dochazi-razeni', 'stav', ['stav', 'dojde']);
 
   const vybrana = katId != null ? kategorie.data?.find(k => k.id === katId) ?? null : null;
   const ztracena = katId != null && kategorie.data != null && !vybrana;
 
   const polozky = useMemo(() => {
     const ids = katId != null && kategorie.data ? podstrom(kategorie.data, katId) : null;
+    const dojde = (p: Polozka) => pred[p.id]?.dojdeZa ?? Infinity;
     return (sklad.data ?? [])
       .filter(p => nastaveni.vyroba || !p.vyroba)
       .filter(p => !ids || (p.kategorieId != null && ids.has(p.kategorieId)))
       .filter(p => (nastaveni.jen_kriticke ? p.kriticke : p.dochazi))
-      // Nejdřív kriticky málo, pak podle abecedy — nejhorší nahoře.
-      .sort((a, b) => Number(b.kriticke) - Number(a.kriticke) || a.nazev.localeCompare(b.nazev, 'cs'));
-  }, [sklad.data, kategorie.data, katId, nastaveni.vyroba, nastaveni.jen_kriticke]);
+      // Nejdřív kriticky málo, pak podle abecedy — nejhorší nahoře; „dojde dřív" podle předpovědi (bez spotřeby na konec).
+      .sort((a, b) => (razeni === 'dojde' && velikost !== 'S' ? dojde(a) - dojde(b) : 0) || Number(b.kriticke) - Number(a.kriticke) || a.nazev.localeCompare(b.nazev, 'cs'));
+  }, [sklad.data, kategorie.data, katId, nastaveni.vyroba, nastaveni.jen_kriticke, pred, razeni, velikost]);
 
   const kritickych = polozky.filter(p => p.kriticke).length;
   const dochazi = polozky.length - kritickych;
@@ -312,6 +353,9 @@ function Dochazi({ velikost, nastaveni, nahled }: WidgetProps<NastaveniDochazi>)
           <span className={`font-medium tabular-nums ${p.kriticke ? 'text-bad-ink' : 'text-wait-ink'}`}>{mnozstvi(p.mnozstvi)} {p.jednotka}</span>
           {metaKategorie && p.kategorie ? ` · ${p.kategorie}` : ''}
         </>}
+        // „dojde za ~2 dny (spotřeba 6,1 l/den)" jako druhý řádek meta (zalamuje se — na telefonu nic neuřízne).
+        detail={vetaDojde(pred[p.id], t) ? <DetailDojde p={pred[p.id]} t={t} /> : undefined}
+        right={<ChipDojde p={pred[p.id]} t={t} />}
         onClick={smiSklad && !nahled ? () => doSkladu(p.kategorie, p.id) : undefined}
       />
     </li>
@@ -337,7 +381,12 @@ function Dochazi({ velikost, nastaveni, nahled }: WidgetProps<NastaveniDochazi>)
       odkaz={{ popisek: vybrana?.nazev ?? t('Sklad'), pohled: 'inventory', arg: vybrana?.nazev }}
       prazdno={prazdno}
     >
-      {velikost === 'L' ? (
+      {/* Řazení jen s předpovědí: bez ní by „Dojde dřív" nemělo podle čeho řadit. */}
+      {Object.keys(pred).length > 0 && (
+        <Segmented size="sm" className="mb-2" ariaLabel={t('Řadit')} value={razeni} onChange={setRazeni}
+          options={[{ id: 'stav', label: t('Podle stavu') }, { id: 'dojde', label: t('Dojde dřív') }]} />
+      )}
+      {velikost === 'L' && razeni !== 'dojde' ? (
         <div className="space-y-4">
           {skupiny.map(s => (
             <section key={s.nazev} aria-label={s.nazev}>
@@ -377,6 +426,9 @@ function NakupniSeznam({ velikost, nastaveni, nahled }: WidgetProps<NastaveniNak
   const def = widget('sklad.nakupni_seznam');
   const { ok, ceka } = useBrana('sklad.nakupni_seznam');
   const sklad = useDataWidgetu<PolozkaSkladu[]>(ok ? URL_SKLAD : null, vyberSklad);
+  // Předpověď (kolo 8): „na 7 dní: 43 l → 5 balení" u řádku podle skutečné spotřeby.
+  const predpoved = useDataWidgetu<Record<number, PredpovedPolozky>>(ok ? URL_PREDPOVED : null, vyberPredpoved);
+  const pred = predpoved.data ?? {};
   const smiCeny = smi(pole(def, 'odhad_ceny') ?? 'sklad.ceny');
   const smiObjednat = smi(pole(def, 'akce:sestavit_objednavku') ?? 'nakup.vytvorit') && nav.smiPohled('inventory');
   const dodavatel = nastaveni.dodavatel == null || nastaveni.dodavatel === '' ? null : String(nastaveni.dodavatel);
@@ -391,9 +443,14 @@ function NakupniSeznam({ velikost, nastaveni, nahled }: WidgetProps<NastaveniNak
   const odhad = smiCeny ? radky.reduce((s, r) => s + (r.cena ?? 0), 0) : 0;
 
   const radek = (r: (typeof radky)[number], sDodavatelem: boolean) => {
+    const pp = pred[r.id];
+    const navrh = pp && pp.denni > 0 ? navrhNaDni(pp.zasoba, pp.denni, 7, pp.baleni) : null;
     const meta = [
       sDodavatelem ? r.dodavatel : null,
       r.naVyrobu.length > 0 ? t('na výrobu: {suroviny}', { suroviny: r.naVyrobu.join(', ') }) : null,
+      navrh && navrh.mnozstvi > 0
+        ? `${t('na 7 dní: {mnozstvi} {jednotka}', { mnozstvi: mnozstvi(navrh.mnozstvi), jednotka: pp.jednotka })}${navrh.baleni != null && navrh.baleni > 0 ? ` → ${t('{n, plural, one {# balení} few {# balení} other {# balení}}', { n: navrh.baleni })}` : ''}`
+        : null,
     ].filter(Boolean).join(' · ');
     return (
       <ListRow key={r.id} title={r.nazev} meta={meta || undefined}

@@ -94,6 +94,14 @@ const data = (opts = {}) => (req, json) => {
   if (path === '/api/receipts') return json(nacti('k69-b5b-receipts'));
   if (path === '/api/inventory/shrinkage') return json(nacti('k69-b5b-shrinkage'));
   if (path === '/api/closings/calendar') return json({ month: u.searchParams.get('month'), days: {} });
+  // Sklad (F): položky z k69-b3 a předpověď spotřeby.
+  if (path === '/api/inventory/forecast') return json(nacti('k84-finance-inventory-forecast'));
+  if (path === '/api/inventory') return json(nacti('k69-b3-inventory'));
+  if (path === '/api/inventory/categories') return json(nacti('k69-b3-categories'));
+  if (path === '/api/inventory/reports') return json(nacti('k69-b3-reports'));
+  if (path === '/api/orders') return json(nacti('k69-b3-orders'));
+  if (path === '/api/production') return json(nacti('k69-b3-production'));
+  if (path === '/api/suppliers') return json(nacti('suppliers'));
   return undefined;
 };
 
@@ -329,6 +337,46 @@ if (casti.includes('E')) {
     await w.scrollIntoViewIfNeeded();
     await p.waitForTimeout(400);
     await w.screenshot({ path: `${SNIMKY}k84-finance-E-matice-${jmeno}.png` });
+    await ctx.close();
+  }
+}
+
+// ===========================================================================
+// F) Sklad: „dojde za ~N dní" podle skutečné spotřeby, návrh na 7 dní
+// ===========================================================================
+if (casti.includes('F')) {
+  for (const [jmeno, viewport, mobil] of [['telefon', TELEFON, true], ['monitor', MONITOR, false]]) {
+    const { ctx, p, stav, chyby } = await kontext({ viewport, mobil, fix: nacti('k84-finance-rozlozeni-sklad'), dalsi: data() });
+    await otevri(p, '/employer/inventory', 'vedeni.sklad');
+    const w = p.locator('[data-plocha] li[data-widget="sklad.dochazi"]').first();
+    await dokud(async () => /dojde/.test(await text(p, 'sklad.dochazi')), 8000);
+    await w.scrollIntoViewIfNeeded();
+    const d = await text(p, 'sklad.dochazi');
+    tvrdi(`F ${jmeno}: widget čte /api/inventory/forecast jednou (sdílí se mezi kartami)`, new Set(dotazyNa(stav, ['/api/inventory/forecast']).map(x => x.u)).size === 1 && dotazyNa(stav, ['/api/inventory/forecast']).length >= 1);
+    tvrdi(`F ${jmeno}: Ovesné mléko má druhý řádek „dojde za ~1 den (spotřeba 0,8 l/den)"`, /Ovesné mléko[\s\S]{0,80}dojde za ~1 den \(spotřeba 0,8 l\/den\)/.test(d), d.slice(0, 400));
+    tvrdi(`F ${jmeno}: Kelímky „dojde dnes" a Sirup Mango „dojde za ~4 dny"`, /Kelímky[\s\S]{0,80}dojde dnes/.test(d) && /Sirup Mango[\s\S]{0,80}dojde za ~4 dny/.test(d), d.slice(0, 500));
+    const chipy = await w.locator('.chip').allInnerTexts();
+    tvrdi(`F ${jmeno}: Chipy ~dny: pod 2 dny bad (Ovesné mléko, Kelímky), pod 5 wait (Sirup Mango)`,
+      await w.locator('.chip-bad').count() >= 2 && await w.locator('.chip-wait').filter({ hasText: /4 dny/ }).count() === 1, chipy.join(' | '));
+    // Řazení „Dojde dřív": Kelímky (dnes) před Ovesným mlékem (1,3 dne) a Sirupem Mango (4 dny) — podle stavu by byl
+    // Sirup (low) až za oběma kritickými, ale abecedně Kelímky před Ovesným. (Vanilkový sirup je ve fixtuře jen návrh.)
+    await w.getByRole('tab', { name: 'Dojde dřív' }).click();
+    await p.waitForTimeout(300);
+    const poradi = await w.locator('ul.list .list-row').allInnerTexts();
+    const idx = (n) => poradi.findIndex(x => x.includes(n));
+    tvrdi(`F ${jmeno}: „Dojde dřív" seřadí Kelímky < Ovesné mléko < Sirup Mango`,
+      idx('Kelímky') >= 0 && idx('Kelímky') < idx('Ovesné mléko') && idx('Ovesné mléko') < idx('Sirup Mango'), poradi.map(x => x.split('\n')[0]).join(' < '));
+    // A podle stavu zpět: kritické (Kelímky, Ovesné mléko) před Sirupem Mango (low).
+    await w.getByRole('tab', { name: 'Podle stavu' }).click();
+    await p.waitForTimeout(300);
+    const poradi2 = await w.locator('ul.list .list-row').allInnerTexts();
+    tvrdi(`F ${jmeno}: „Podle stavu" vrátí kritické před docházející`, poradi2.findIndex(x => x.includes('Sirup Mango')) > poradi2.findIndex(x => x.includes('Ovesné mléko')), poradi2.map(x => x.split('\n')[0]).join(' < '));
+    const n = await text(p, 'sklad.nakupni_seznam');
+    tvrdi(`F ${jmeno}: nákupní seznam navrhuje množství na 7 dní (Kelímky 210 ks, Sirup Mango 1,5 ks)`, /Kelímky[\s\S]{0,120}na 7 dní: 210 ks/.test(n) && /Sirup Mango[\s\S]{0,120}na 7 dní: 1,5 ks/.test(n), n.slice(0, 500));
+    const pre = (await pretece(p, 'sklad.dochazi')) || (await pretece(p, 'sklad.nakupni_seznam'));
+    tvrdi(`F ${jmeno}: nic nepřetéká`, !pre, pre);
+    tvrdi(`F ${jmeno}: žádná chyba v konzoli`, chyby.filter(c => !/418|423|425/.test(c)).length === 0, chyby.slice(0, 2).join(' | '));
+    await snimek(p, `F-sklad-${jmeno}`);
     await ctx.close();
   }
 }

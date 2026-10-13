@@ -2258,5 +2258,13 @@
   "Pohled na marže": "Margin view",
   "Seznam": "List",
   "Matice": "Matrix",
-  "marže % →": "margin % →"
+  "marže % →": "margin % →",
+  "spotřeba {n} {jednotka}/den": "usage {n} {jednotka}/day",
+  "dojde dnes": "runs out today",
+  "dojde za ~{n, plural, one {# den} few {# dny} other {# dní}}": "runs out in ~{n, plural, one {# day} other {# days}}",
+  "~{n, plural, one {# den} few {# dny} other {# dní}}": "~{n, plural, one {# day} other {# days}}",
+  "Podle stavu": "By status",
+  "Dojde dřív": "Runs out first",
+  "na 7 dní: {mnozstvi} {jednotka}": "for 7 days: {mnozstvi} {jednotka}",
+  "{n, plural, one {# balení} few {# balení} other {# balení}}": "{n, plural, one {# package} other {# packages}}"
 }

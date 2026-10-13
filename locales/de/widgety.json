@@ -2259,5 +2259,13 @@
   "Pohled na marže": "Ansicht der Margen",
   "Seznam": "Liste",
   "Matice": "Matrix",
-  "marže % →": "Marge % →"
+  "marže % →": "Marge % →",
+  "spotřeba {n} {jednotka}/den": "Verbrauch {n} {jednotka}/Tag",
+  "dojde dnes": "geht heute aus",
+  "dojde za ~{n, plural, one {# den} few {# dny} other {# dní}}": "reicht noch ~{n, plural, one {# Tag} other {# Tage}}",
+  "~{n, plural, one {# den} few {# dny} other {# dní}}": "~{n, plural, one {# Tag} other {# Tage}}",
+  "Podle stavu": "Nach Status",
+  "Dojde dřív": "Geht zuerst aus",
+  "na 7 dní: {mnozstvi} {jednotka}": "für 7 Tage: {mnozstvi} {jednotka}",
+  "{n, plural, one {# balení} few {# balení} other {# balení}}": "{n, plural, one {# Packung} other {# Packungen}}"
 }

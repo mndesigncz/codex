@@ -2261,5 +2261,13 @@
   "Pohled na marže": "Pohľad na marže",
   "Seznam": "Zoznam",
   "Matice": "Matica",
-  "marže % →": "marža % →"
+  "marže % →": "marža % →",
+  "spotřeba {n} {jednotka}/den": "spotreba {n} {jednotka}/deň",
+  "dojde dnes": "dôjde dnes",
+  "dojde za ~{n, plural, one {# den} few {# dny} other {# dní}}": "dôjde za ~{n, plural, one {# deň} few {# dni} other {# dní}}",
+  "~{n, plural, one {# den} few {# dny} other {# dní}}": "~{n, plural, one {# deň} few {# dni} other {# dní}}",
+  "Podle stavu": "Podľa stavu",
+  "Dojde dřív": "Dôjde skôr",
+  "na 7 dní: {mnozstvi} {jednotka}": "na 7 dní: {mnozstvi} {jednotka}",
+  "{n, plural, one {# balení} few {# balení} other {# balení}}": "{n, plural, one {# balenie} few {# balenia} other {# balení}}"
 }

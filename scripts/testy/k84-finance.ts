@@ -12,6 +12,7 @@ import {
   vyberHeat, mapaTrzeb, maticeMenu,
 } from '../../lib/financeWidgety.ts';
 import { mesicZVolby } from '../../lib/widgety/katalog/finance.ts';
+import { ubytekPohybu, spotrebaZPohybu, zasobaVObsahu, dojdeZaDni, tonDojde, navrhNaDni, vyberPredpoved } from '../../lib/skladPrehled.ts';
 
 const DNES = '2026-10-13';
 /** Pražský okamžik dne DNES v „HH:MM" jako ISO v UTC (říjen = letní čas, +02:00). */
@@ -143,4 +144,25 @@ export default function ({ eq, ok }: Testy) {
   eq('matice: počty po kvadrantech', matice.pocty, { hvezdy: 1, tahouni: 1, hadanky: 1, psi: 1 });
   eq('matice: bez položky s marží je prázdná, ne nuly tvářící se jako data', maticeMenu([{ id: 'x', name: 'X', qty: 5, revenue: null, marginPct: null }]), { prumerKusy: 0, prumerMarze: 0, polozky: [], pocty: { hvezdy: 0, tahouni: 0, hadanky: 0, psi: 0 }, bezReceptury: 1 });
   eq('matice: jediná položka je hvězda (rovná se průměru)', maticeMenu([{ id: 'a', name: 'A', qty: 10, revenue: 100, marginPct: 50 }]).polozky[0].kvadrant, 'hvezdy');
+
+  // ---- sklad: dojde za ~N dní podle skutečné spotřeby ----
+  const pohyb = (x: Partial<import('../../lib/skladPrehled.ts').PohybProSpotrebu>) => ({ itemId: 1, oldQuantity: 0, newQuantity: 0, oldOpen: null, newOpen: null, note: 'Prodej (Storyous)', packageSize: null, ...x });
+  eq('spotřeba: úbytek kusů, přírůstek 0, inventura a založení 0', [
+    ubytekPohybu(pohyb({ oldQuantity: 8, newQuantity: 5 })), ubytekPohybu(pohyb({ oldQuantity: 2, newQuantity: 8, note: 'Příjem objednávky' })),
+    ubytekPohybu(pohyb({ oldQuantity: 8, newQuantity: 6, note: 'Inventura #3' })), ubytekPohybu(pohyb({ oldQuantity: 0, newQuantity: 5, note: 'Založení položky' })),
+  ], [3, 0, 0, 0]);
+  eq('spotřeba: načaté balení — odpis z lahve bez změny kusů, i přes otevření nové lahve', [
+    ubytekPohybu(pohyb({ oldQuantity: 3, newQuantity: 3, oldOpen: 0.39, newOpen: 0.35, packageSize: 0.7 })),
+    ubytekPohybu(pohyb({ oldQuantity: 3, newQuantity: 2, oldOpen: 0.02, newOpen: 0.66, packageSize: 0.7 })),
+  ], [0.04, 0.06]);
+  const spotreba = spotrebaZPohybu([pohyb({ oldQuantity: 8, newQuantity: 5 }), pohyb({ oldQuantity: 5, newQuantity: 4 }), pohyb({ itemId: 2, oldQuantity: 1, newQuantity: 1, note: 'Prodej (Storyous)' }), pohyb({ itemId: 3, oldQuantity: 2, newQuantity: 6, note: 'Příjem' })]);
+  eq('spotřeba: součet po položkách; položka bez úbytku v mapě není', [spotreba.get(1), spotreba.has(2), spotreba.has(3)], [4, false, false]);
+  eq('zásoba v obsahu: balení × velikost + načaté; bez balení kusy', [zasobaVObsahu({ quantity: 3, openAmount: 0.35, packageSize: 0.7 }), zasobaVObsahu({ quantity: 8 }), zasobaVObsahu({ quantity: -1 })], [2.45, 8, 0]);
+  eq('dojde za: dny na desetiny; bez spotřeby null (ne nekonečno)', [dojdeZaDni(8, 6.1), dojdeZaDni(0, 2), dojdeZaDni(5, 0)], [1.3, 0, null]);
+  eq('tón: pod 2 dny bad, pod 5 wait, jinak nic', [tonDojde(1.3), tonDojde(2), tonDojde(4.9), tonDojde(5), tonDojde(null)], ['bad', 'wait', 'wait', null, null]);
+  eq('návrh na 7 dní: spotřeba × 7 − zásoba, v celých baleních; stačí-li zásoba, nula', [navrhNaDni(0, 6.1, 7, 10), navrhNaDni(2, 0.5, 7, null), navrhNaDni(50, 2, 7, 10)],
+    [{ mnozstvi: 42.7, baleni: 5 }, { mnozstvi: 1.5, baleni: null }, { mnozstvi: 0, baleni: 0 }]);
+  const predpoved = vyberPredpoved({ days: 28, items: { 2: { dailyUse: 0.8, unit: 'l', runsOutInDays: 1.3, stock: 1, packageSize: null }, 6: { dailyUse: 0.11, unit: 'l', runsOutInDays: 22.3, stock: 2.45, packageSize: 0.7 }, x: null } });
+  eq('předpověď: výběr z API podle id, vadné položky se přeskočí', [Object.keys(predpoved), predpoved[2], predpoved[6].baleni], [['2', '6'], { denni: 0.8, dojdeZa: 1.3, zasoba: 1, jednotka: 'l', baleni: null }, 0.7]);
+  eq('předpověď: starší server bez pole = prázdno', vyberPredpoved({}), {});
 }
