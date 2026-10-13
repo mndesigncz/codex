@@ -359,7 +359,7 @@ function ReserveTab({ slug, b, me, today, signedIn, onDone }: { slug: string; b:
   });
   const [potvrzene, setPotvrzene] = useState<Record<number, true>>({});
   const [potvrzuji, setPotvrzuji] = useState<number | null>(null);
-  const confirm = async (id: number) => {
+  const potvrdit = async (id: number) => {
     setPotvrzuji(id); setErr('');
     try {
       const r = await fetch(`/api/client/b/${encodeURIComponent(slug)}/reservations`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, action: 'confirm' }) });
@@ -450,7 +450,7 @@ function ReserveTab({ slug, b, me, today, signedIn, onDone }: { slug: string; b:
                     <div className="flex items-center gap-2 shrink-0 ml-auto">
                       {r.status === 'confirmed' && (potvrzeno
                         ? <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#3E5406]"><Icon name="check" size={14} />{t('Potvrzeno tebou')}</span>
-                        : <button type="button" onClick={() => { void confirm(r.id); }} disabled={potvrzuji === r.id}
+                        : <button type="button" onClick={() => { void potvrdit(r.id); }} disabled={potvrzuji === r.id}
                             className="tap-target inline-flex items-center gap-1.5 btn btn-primary btn-sm active:scale-[0.98] disabled:opacity-50 transition"
                             aria-label={t('Potvrdit rezervaci {kdy}', { kdy: `${fmtDatum(r.date, { jazyk, styl: 'denDlouze' })} ${r.time}` })}>
                             <Icon name="check" size={14} />{potvrzuji === r.id ? '…' : t('Potvrdit', undefined, 'rezervace')}

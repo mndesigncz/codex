@@ -8,8 +8,9 @@ import type { Testy } from './_testy.ts';
 import {
   RES_STATUS, autoPotvrdit, NEDORAZENI_LIMIT, nedorazilNaRade, NEDORAZIL_PO_MIN, zpravaPripominky,
 } from '../../lib/clientSlots.ts';
+import { STRANKA as OBJEDNAVKY } from '../../lib/widgety/stranky/vedeni.klient_objednavky.ts';
 import {
-  vyberRezervace, vyberMesicRezervaci, vyberRezervaceHosta, muzeDo, hlavniKrok, nabidkaNedorazil, TON_REZERVACE, souhrnDne, souhrnDneRezervaci,
+  vyberRezervace, vyberMesicRezervaci, vyberRezervaceHosta, muzeDo, hlavniKrok, klicPrechodu, nabidkaNedorazil, TON_REZERVACE, souhrnDne, souhrnDneRezervaci,
   varovaniHosta, cisliceTelefonu, HLEDANI_MIN, vyberHodnoceni, filtrujHodnoceni, poctyHodnoceni, jeNevyrizene, FILTRY_HODNOCENI, ODPOVED_MAX,
   type Recenze, type Rezervace,
 } from '../../lib/klientPrehled.ts';
@@ -27,6 +28,7 @@ export default function ({ eq, ok }: Testy) {
   eq('no-show: nový stav má popisek a tón', [RES_STATUS.no_show.label, TON_REZERVACE.no_show], ['Nedorazil', 'bad']);
   eq('no-show: z potvrzené jde na no_show, z usazené ne, zpět jen na potvrzeno', [muzeDo('confirmed', 'no_show'), muzeDo('seated', 'no_show'), muzeDo('no_show', 'confirmed'), muzeDo('no_show', 'seated')], [true, false, true, false]);
   eq('no-show: hlavní krok u „Nedorazil" není (ne „Potvrdit")', hlavniKrok('no_show', vse), null);
+  eq('no-show: vrácení omylu na potvrzeno chce usadit (práce u dveří), potvrzení požadavku schvalovat', [klicPrechodu('confirmed', 'no_show'), klicPrechodu('confirmed', 'requested'), klicPrechodu('confirmed'), klicPrechodu('no_show')], ['rezervace.usadit', 'rezervace.schvalovat', 'rezervace.schvalovat', 'rezervace.usadit']);
   const r = { stav: 'confirmed' as const, datum: '2026-10-18', cas: '19:00' };
   eq('no-show: před časem rezervace není na řadě, 30 min po něm ano', [nedorazilNaRade(r, '2026-10-18', '18:50'), nedorazilNaRade(r, '2026-10-18', '19:29'), nedorazilNaRade(r, '2026-10-18', '19:30')], [false, false, true]);
   eq('no-show: minulý den vždy, budoucí nikdy, jen potvrzené', [nedorazilNaRade(r, '2026-10-19', '08:00'), nedorazilNaRade(r, '2026-10-17', '23:59'), nedorazilNaRade({ ...r, stav: 'seated' }, '2026-10-19', '08:00')], [true, false, false]);
@@ -71,6 +73,11 @@ export default function ({ eq, ok }: Testy) {
   eq('připomínka: dnes v 18:00 stůl pro 4, odkaz na stránku podniku s tou rezervací', [dnes.title, dnes.link, dnes.type], ['Dnes v 18:00 stůl pro 4 v Čajovna Pangea', '/client/cajovna-pangea?tab=reserve&rezervace=7', 'info']);
   eq('připomínka: zítřek slovem, jiný den datem, bez adresy podniku na Moje stránka', [zpravaPripominky({ id: 7, datum: '2026-10-19', cas: '18:00', osob: 2, podnik: 'X' }, '2026-10-18').title.slice(0, 5), zpravaPripominky({ id: 7, datum: '2026-10-25', cas: '18:00', osob: 2, podnik: 'X' }, '2026-10-18').title.slice(0, 11), zpravaPripominky({ id: 7, datum: '2026-10-19', cas: '18:00', osob: 2, podnik: 'X' }, '2026-10-18').link], ['Zítra', '25. 10. 202', '/client/me']);
   ok('připomínka: text říká Potvrdit / Zrušit', /Potvrď/.test(dnes.body) && /zruš/.test(dnes.body));
+
+  // ---- objednávky: dnešní rezervace jen jednou (objednavky-dnesni-rezervace-dvakrat) ----
+  const vychozi = (OBJEDNAVKY.vychozi?.['typ:vedeni'] ?? []).map(p => p.w);
+  eq('objednávky: výchozí rozložení má nástroj (ten dnešní rezervace kreslí) a ne widget Dnešní rezervace', [vychozi.includes('nastroj'), vychozi.includes('klient.dnesni_rezervace')], [true, false]);
+  ok('objednávky: widget Dnešní rezervace zůstává v Doporučených', (OBJEDNAVKY.doporucene ?? []).includes('klient.dnesni_rezervace'));
 
   // ---- hodnocení: filtr a odpověď (hodnoceni-filtr-odpoved) ----
   const h = vyberHodnoceni({ reviews: [

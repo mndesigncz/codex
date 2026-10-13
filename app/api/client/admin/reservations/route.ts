@@ -274,13 +274,19 @@ export async function PATCH(req: NextRequest) {
   if (jeOdpoved(ctx)) return ctx;
   const u = { id: ctx.meId, team_id: ctx.teamId };
   const b = await req.json().catch(() => ({}));
+  const id = parseInt(String(b.id), 10);
+  // Ručně zapsaná rezervace nemusí mít účet hosta — jméno nese sama (guest_name).
+  const [r] = await sql`SELECT r.*, COALESCE(us.name, r.guest_name) AS customer_name FROM client_reservations r LEFT JOIN users us ON us.id = r.customer_id WHERE r.id = ${id} AND r.team_id = ${u.team_id}`;
+  const hostId = r?.customer_id == null ? null : Number(r.customer_id);
+  if (!r) return NextResponse.json({ error: 'Rezervace nenalezena' }, { status: 404 });
   // Potvrdit/odmítnout je rozhodnutí o kapacitě podniku (a jde z něj
-  // upozornění hostovi); usadit, přidělit stůl a uzavřít je práce u dveří.
-  // Jsou to různá oprávnění, takže se kontroluje každá část požadavku zvlášť
+  // upozornění hostovi); usadit, přidělit stůl, uzavřít a „Nedorazil" (i jeho
+  // vrácení na potvrzeno — stejný klíč jako lib/klientPrehled klicPrechodu) je práce
+  // u dveří. Jsou to různá oprávnění, takže se kontroluje každá část požadavku zvlášť
   // a chybí-li kterákoli, neuloží se nic.
   const chce = b.status ? String(b.status) : null;
   const potreba = new Set<string>();
-  if (chce === 'confirmed' || chce === 'declined') potreba.add('rezervace.schvalovat');
+  if ((chce === 'confirmed' && String(r.status) !== 'no_show') || chce === 'declined') potreba.add('rezervace.schvalovat');
   else if (chce) potreba.add('rezervace.usadit');
   if (b.tableId !== undefined) potreba.add('rezervace.usadit');
   if (potreba.has('rezervace.schvalovat') && !ctx.role.opravneni.has('rezervace.schvalovat')) {
@@ -289,11 +295,6 @@ export async function PATCH(req: NextRequest) {
   if (potreba.has('rezervace.usadit') && !ctx.role.opravneni.has('rezervace.usadit')) {
     return NextResponse.json({ error: 'Usazovat hosty a přidělovat stoly nemáš povoleno.' }, { status: 403 });
   }
-  const id = parseInt(String(b.id), 10);
-  // Ručně zapsaná rezervace nemusí mít účet hosta — jméno nese sama (guest_name).
-  const [r] = await sql`SELECT r.*, COALESCE(us.name, r.guest_name) AS customer_name FROM client_reservations r LEFT JOIN users us ON us.id = r.customer_id WHERE r.id = ${id} AND r.team_id = ${u.team_id}`;
-  const hostId = r?.customer_id == null ? null : Number(r.customer_id);
-  if (!r) return NextResponse.json({ error: 'Rezervace nenalezena' }, { status: 404 });
 
   let tableId: number | null = r.table_id ?? null;
   if (b.tableId !== undefined) {

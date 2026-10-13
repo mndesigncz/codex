@@ -32,7 +32,7 @@ import {
   ObdobiLista, PersonChip, SearchField, Segmented, Select, Skeleton, Stat, StatRow, SwitchRow, Textarea, Toast, useLoad, type MenuItem,
 } from '../ui';
 import { Dock } from '../ui/Dock';
-import StaffInbox, { ORDER_STATUS, PrijemBezRezervaci } from './StaffInbox';
+import StaffInbox, { ORDER_STATUS } from './StaffInbox';
 import MobileMoreSheet from '../MobileMoreSheet';
 import FloorPlanEditor from './FloorPlanEditor';
 import QrDesigner from './QrDesigner';
@@ -555,7 +555,7 @@ function RezervaceStranka({ oznam, onZmena, otevriHosta }: { oznam: Hlaska; onZm
                   ...(krok?.na === 'seated' && muzeDo(r.stav, 'done') && smi(klicPrechodu('done'))
                     ? [{ label: 'Rovnou hotovo', icon: 'check', onClick: () => { void zmenit(r, { status: 'done' }); } }] : []),
                   ...(nedorazil === 'menu' ? [{ label: 'Nedorazil', icon: 'close', hint: 'Host nepřišel. Další rezervace se mu po dvou nedorazeních nepotvrdí sama.', onClick: () => { void zmenit(r, { status: 'no_show' }); } }] : []),
-                  ...(r.stav === 'no_show' && muzeDo(r.stav, 'confirmed') && smi(klicPrechodu('confirmed'))
+                  ...(r.stav === 'no_show' && muzeDo(r.stav, 'confirmed') && smi(klicPrechodu('confirmed', r.stav))
                     ? [{ label: 'Vrátit na potvrzeno', icon: 'undo', hint: 'Omyl, nebo host dorazil později.', onClick: () => { void zmenit(r, { status: 'confirmed' }); } }] : []),
                   ...(usazuje && !konec ? [{ label: r.stul ? 'Změnit stůl…' : 'Přidělit stůl…', icon: 'location', onClick: () => setStulPro({ r, stul: r.stulId ? String(r.stulId) : '' }) }] : []),
                   ...(tel ? [{ label: 'Zavolat hostovi', icon: 'chat', onClick: () => { window.location.href = tel; } }] : []),
@@ -1033,10 +1033,9 @@ function NovaRezervaceOkno({ form, setForm, koncept, zapis, stoly, onZavrit, onZ
 function ObjednavkyStranka({ oznam, onZmena }: { oznam: Hlaska; onZmena: () => void }) {
   // Fronta beze změny; Historie je pohled majitele na celé období (kolik přišlo, za kolik, kolik nepřijato).
   const [pohled, setPohled] = useState<'fronta' | 'historie'>('fronta');
-  // Dnešní rezervace kreslí widget klient.dnesni_rezervace pod frontou (výchozí rozložení) —
-  // nástroj je nekreslí podruhé (dřív tytéž rezervace dvakrát pod sebou).
+  // Dnešní rezervace kreslí nástroj (příjem u obsluhy); widget klient.dnesni_rezervace už ve výchozím
+  // rozložení Objednávek není (dřív tytéž rezervace dvakrát pod sebou) — kdo ho chce, přidá si ho z galerie.
   return (
-    <PrijemBezRezervaci.Provider value={true}>
     <PlochaWidgetu
       stranka="vedeni.klient_objednavky"
       hlavicka={{
@@ -1050,7 +1049,6 @@ function ObjednavkyStranka({ oznam, onZmena }: { oznam: Hlaska; onZmena: () => v
       }}
       nastroj={pohled === 'fronta' ? <StaffInbox onToast={t => oznam(t)} onZmena={onZmena} /> : <HistorieObjednavek />}
     />
-    </PrijemBezRezervaci.Provider>
   );
 }
 

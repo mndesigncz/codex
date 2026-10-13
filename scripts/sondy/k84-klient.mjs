@@ -10,7 +10,8 @@
 //    „Načíst další" (GET limit=200); klepnutí na jméno otevře okno Host s „9 · 2× nedorazil" a poznámkami,
 //    „Přidat poznámku" pošle POST /api/client/admin/notes.
 // Hodnocení: pilulky s počty, „1–2 ★" zúží seznam, „Odpovědět" → okno → PATCH { id, reply, resolved }.
-// Objednávky: nástroj už nekreslí „Dnešní rezervace" (jsou ve widgetu pod frontou).
+// Objednávky: výchozí rozložení (fixtura k84-klient-rozlozeni-objednavky) už nemá widget Dnešní rezervace —
+//   dnešní rezervace kreslí jen nástroj, host je na stránce jednou.
 // Host (390): stránka podniku ?tab=reserve&rezervace=11 zvýrazní rezervaci, „Potvrdit" pošle
 //   PATCH /api/client/b/<slug>/reservations { id, action: 'confirm' } a ukáže „Potvrzeno tebou";
 //   Moje stránka má sekci „Odpovědi na tvoje hodnocení" a u rezervace odkaz „Potvrdit nebo zrušit".
@@ -130,7 +131,7 @@ for (const [vp, mobil, jmeno] of [[DESK, false, 'desk'], [TEL, true, 'tel']]) {
   tvrdi(`R ${jmeno}: „Načíst další" pošle GET range=past&limit=200`, await dokud(() => dotazy(stav, 'range=past&limit=200').length > 0, 3000));
   await p.getByRole('button', { name: 'Nedorazili · 6' }).click();
   tvrdi(`R ${jmeno}: „Nedorazili" pošle GET status=no_show`, await dokud(() => dotazy(stav, 'status=no_show').length > 0, 3000));
-  tvrdi(`R ${jmeno}: u minulé potvrzené (Ondřej) je „Nedorazil" tlačítko (zpětně)`, await nastroj.locator('li.list-row', { hasText: 'Ondřej Beneš' }).getByRole('button', { name: /^Nedorazil:/ }).isVisible());
+  tvrdi(`R ${jmeno}: u minulé potvrzené (Ondřej) je „Nedorazil" tlačítko (zpětně)`, await dokud(() => nastroj.locator('li.list-row', { hasText: 'Ondřej Beneš' }).getByRole('button', { name: /^Nedorazil:/ }).isVisible(), 4000));
   if (mobil) await p.screenshot({ path: OUT + `k84-klient-rezervace-minule-${jmeno}.png`, fullPage: true });
   // Okno Host.
   await nastroj.getByRole('button', { name: 'Karta hosta Petr Novák' }).first().click();
@@ -185,14 +186,15 @@ for (const [vp, mobil, jmeno] of [[DESK, false, 'desk'], [TEL, true, 'tel']]) {
 }
 
 // ---------------------------------------------------------------------------
-// Objednávky: dnešní rezervace jen jednou (ve widgetu, ne v nástroji)
+// Objednávky: dnešní rezervace jen jednou (v nástroji; výchozí rozložení bez widgetu)
 // ---------------------------------------------------------------------------
 {
-  const { ctx, p, chyby } = await kontext({ fix: nacti('k69-b8-rozlozeni-objednavky'), dalsi: podvrh });
+  const { ctx, p, chyby } = await kontext({ fix: nacti('k84-klient-rozlozeni-objednavky'), dalsi: podvrh });
   await otevri(p, CLIENT('orders'), 'vedeni.klient_objednavky');
   const nastroj = widgetLi(p, 'nastroj');
-  tvrdi('O: nástroj příjmu kreslí frontu, ale ne kartu „Dnešní rezervace"', await dokud(() => nastroj.getByText('Nová objednávka od stolu').isVisible(), 5000) && await nastroj.getByRole('heading', { name: 'Dnešní rezervace' }).count() === 0);
-  tvrdi('O: dnešní rezervace jsou na stránce jednou — ve widgetu (jméno hosta nejvýš jednou)', await widgetLi(p, 'klient.dnesni_rezervace').count() === 1 && (await p.locator('[data-plocha]').getByText('Pavel Horák').count()) <= 1);
+  tvrdi('O: nástroj příjmu kreslí frontu i kartu „Dnešní rezervace" (ručně zapsaný host se jménem)', await dokud(() => nastroj.getByText('Nová objednávka od stolu').isVisible(), 5000)
+    && await nastroj.getByRole('heading', { name: 'Dnešní rezervace' }).isVisible() && await nastroj.locator('li', { hasText: 'Pavel Horák' }).first().isVisible());
+  tvrdi('O: widget Dnešní rezervace na stránce není — host je na ní jednou', await widgetLi(p, 'klient.dnesni_rezervace').count() === 0 && (await p.locator('[data-plocha]').getByText('Pavel Horák').count()) === 1);
   tvrdi('O: bez chyb v konzoli', chybyBezHydratace(chyby).length === 0, chybyBezHydratace(chyby).slice(0, 3).join(' | '));
   await ctx.close();
 }

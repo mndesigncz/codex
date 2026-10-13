@@ -190,8 +190,13 @@ const PRECHODY: Record<string, StavRezervace[]> = {
 };
 export const muzeDo = (z: StavRezervace, na: StavRezervace) => PRECHODY[z]?.includes(na) ?? false;
 
-/** Které oprávnění přechod chce (API kontroluje totéž, tady jen aby tlačítko nesvítilo naprázdno). */
-export const klicPrechodu = (na: StavRezervace) => (na === 'confirmed' || na === 'declined' ? 'rezervace.schvalovat' : 'rezervace.usadit');
+/**
+ * Které oprávnění přechod chce (API kontroluje totéž, tady jen aby tlačítko nesvítilo naprázdno).
+ * Vrácení omylu „Nedorazil" → potvrzeno (`z` = 'no_show') je práce u dveří jako usazení, ne rozhodnutí
+ * o kapacitě — kdo smí označit nedorazení, smí ho i vzít zpět.
+ */
+export const klicPrechodu = (na: StavRezervace, z?: StavRezervace) =>
+  ((na === 'confirmed' && z !== 'no_show') || na === 'declined' ? 'rezervace.schvalovat' : 'rezervace.usadit');
 
 /**
  * Kde je v řádku „Nedorazil": po čase rezervace + 30 min (a u minulých dnů) jako tlačítko vedle
