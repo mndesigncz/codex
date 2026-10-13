@@ -85,3 +85,32 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
   });
   return NextResponse.json({ ok: true, reservation: r });
 }
+
+/**
+ * Kolo 8 (R8-7): host odpoví na připomínku „Potvrdit" — podnik pak u rezervace vidí „host potvrdil".
+ * Zrušení má svou routu (/api/client/reservations/[id]); tady jen potvrzení vlastní potvrzené
+ * rezervace v tomhle podniku, která ještě nezačala. Druhé potvrzení nic nemění (idempotentní).
+ */
+export async function PATCH(req: Request, props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
+  const me = await customer();
+  if (!me) return NextResponse.json({ error: 'Přihlas se jako host.' }, { status: 401 });
+  const p = await profileBySlug(params.slug);
+  if (!p) return NextResponse.json({ error: 'Podnik nenalezen' }, { status: 404 });
+  const b = await req.json().catch(() => ({}));
+  if (b?.action !== 'confirm') return NextResponse.json({ error: 'Rezervaci jde tady jen potvrdit.' }, { status: 400 });
+  const id = parseInt(String(b.id), 10);
+  if (!Number.isInteger(id) || id <= 0) return NextResponse.json({ error: 'Chybí rezervace.' }, { status: 400 });
+  const teamId = Number(p.team_id);
+  const [r] = await sql`
+    SELECT id, date, time, status, guest_confirmed_at FROM client_reservations
+    WHERE id = ${id} AND team_id = ${teamId} AND customer_id = ${me.id}` as any[];
+  if (!r) return NextResponse.json({ error: 'Rezervace nenalezena' }, { status: 404 });
+  if (String(r.status) !== 'confirmed' || String(r.date) < pragueToday()) {
+    return NextResponse.json({ error: 'Tuhle rezervaci už potvrdit nejde.' }, { status: 400 });
+  }
+  if (!r.guest_confirmed_at) {
+    await sql`UPDATE client_reservations SET guest_confirmed_at = NOW(), updated_at = NOW() WHERE id = ${id} AND team_id = ${teamId}`;
+  }
+  return NextResponse.json({ ok: true, id, guestConfirmed: true });
+}

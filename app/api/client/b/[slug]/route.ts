@@ -102,10 +102,19 @@ export async function GET(req: Request, props: { params: Promise<{ slug: string 
   if (me) {
     const m = await membership(me.id, teamId);
     try { const [us] = await sql`SELECT birthday FROM users WHERE id = ${me.id}`; myBirthday = us?.birthday ?? null; } catch { myBirthday = null; }
-    const reservations = await sql`
-      SELECT id, date, time, party, note, status, created_at FROM client_reservations
-      WHERE team_id = ${teamId} AND customer_id = ${me.id} AND date >= ${today} AND status NOT IN ('cancelled','declined','done')
-      ORDER BY date, time`;
+    // Kolo 8 (R8-7): guest_confirmed_at — host na připomínku odpověděl „Potvrdit" (před migrací sloupce postaru).
+    let reservations: any[];
+    try {
+      reservations = await sql`
+        SELECT id, date, time, party, note, status, created_at, guest_confirmed_at FROM client_reservations
+        WHERE team_id = ${teamId} AND customer_id = ${me.id} AND date >= ${today} AND status NOT IN ('cancelled','declined','done','no_show')
+        ORDER BY date, time` as any[];
+    } catch {
+      reservations = await sql`
+        SELECT id, date, time, party, note, status, created_at FROM client_reservations
+        WHERE team_id = ${teamId} AND customer_id = ${me.id} AND date >= ${today} AND status NOT IN ('cancelled','declined','done')
+        ORDER BY date, time` as any[];
+    }
     const claims = await sql`
       SELECT cl.id, cl.code, cl.claimed_at, cl.redeemed_at, c.title, c.valid_until FROM client_coupon_claims cl JOIN client_coupons c ON c.id = cl.coupon_id
       WHERE cl.team_id = ${teamId} AND cl.customer_id = ${me.id} AND cl.redeemed_at IS NULL ORDER BY cl.claimed_at DESC`;

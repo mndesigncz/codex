@@ -102,14 +102,17 @@ export function nedorazilNaRade(r: { stav: string; datum: string; cas: string },
 // stole dozvěděl pozdě. Ráno přijde push s „Potvrdit / Zrušit" (jen oznámení v aplikaci,
 // žádné SMS). Text je tady, ať ho cron i testy skládají stejně.
 
-/** Co se hostovi pošle: dnes ráno pro dnešek, den předem pro zítřek. Odkaz vede na Moje stránka s tou rezervací. */
-export function zpravaPripominky(r: { id: number; datum: string; cas: string; osob: number; podnik: string }, dnes: string): { title: string; body: string; link: string; type: 'info' } {
+/**
+ * Co se hostovi pošle: dnes ráno pro dnešek, den předem pro zítřek. Odkaz vede na stránku
+ * podniku › Rezervace s tou rezervací (tam je Potvrdit i Zrušit); bez adresy podniku na Moje stránka.
+ */
+export function zpravaPripominky(r: { id: number; datum: string; cas: string; osob: number; podnik: string; slug?: string | null }, dnes: string): { title: string; body: string; link: string; type: 'info' } {
   const kdy = r.datum === dnes ? 'Dnes' : r.datum === dalsiDen(dnes) ? 'Zítra' : String(r.datum).split('-').reverse().join('. ');
   const osob = Math.max(1, Number(r.osob) || 1);
   return {
     title: `${kdy} v ${String(r.cas).slice(0, 5)} stůl pro ${osob} v ${r.podnik}`,
     body: 'Potvrď, že dorazíš, nebo rezervaci zruš — uvolníš místo jiným.',
-    link: `/client/me?rezervace=${r.id}`,
+    link: r.slug ? `/client/${encodeURIComponent(r.slug)}?tab=reserve&rezervace=${r.id}` : '/client/me',
     type: 'info',
   };
 }

@@ -168,5 +168,9 @@
   "Odhlášení se nepodařilo uložit. Zkus to znovu.": "Nie udało się zapisać wypisania. Spróbuj ponownie.",
   "Tvůj účet je v tomhle podniku zablokovaný. Obrať se na obsluhu.": "Twoje konto jest w tym lokalu zablokowane. Zwróć się do obsługi.",
   "Na tenhle čas už je pozdě, vyber pozdější.": "Na tę godzinę jest już za późno, wybierz późniejszą.",
-  "Poznámka ke směně může mít nejvýš 200 znaků.": "Notatka do zmiany może mieć najwyżej 200 znaków."
+  "Poznámka ke směně může mít nejvýš 200 znaků.": "Notatka do zmiany może mieć najwyżej 200 znaków.",
+  "Rezervaci jde tady jen potvrdit.": "Tutaj rezerwację można tylko potwierdzić.",
+  "Chybí rezervace.": "Brak rezerwacji.",
+  "Tuhle rezervaci už potvrdit nejde.": "Tej rezerwacji nie da się już potwierdzić.",
+  "Připomínky se nenačetly.": "Nie udało się wczytać przypomnień."
 }

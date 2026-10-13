@@ -349,6 +349,30 @@ function ReserveTab({ slug, b, me, today, signedIn, onDone }: { slug: string; b:
     }
   };
   const [zrusitId, setZrusitId] = useState<number | null>(null);
+  // Kolo 8 (R8-7): připomínka vede na ?tab=reserve&rezervace=ID — ta rezervace se zvýrazní a host ji
+  // jedním klepnutím potvrdí (podnik pak vidí „host potvrdil"). Potvrzené se drží i lokálně, ať se
+  // tlačítko nevrátí, než stránka načte guest_confirmed_at znovu.
+  const [zPripominky] = useState<number | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const id = Number(new URLSearchParams(window.location.search).get('rezervace'));
+    return Number.isInteger(id) && id > 0 ? id : null;
+  });
+  const [potvrzene, setPotvrzene] = useState<Record<number, true>>({});
+  const [potvrzuji, setPotvrzuji] = useState<number | null>(null);
+  const confirm = async (id: number) => {
+    setPotvrzuji(id); setErr('');
+    try {
+      const r = await fetch(`/api/client/b/${encodeURIComponent(slug)}/reservations`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, action: 'confirm' }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { setErr(d.error ? t(d.error) : t('Potvrzení se nepovedlo. Zkus to prosím znovu.')); return; }
+      setPotvrzene(x => ({ ...x, [id]: true }));
+      onDone(t('Díky, podnik s tebou počítá.'));
+    } catch {
+      setErr(t('Potvrzení neodešlo — vypadlo připojení. Zkus to prosím znovu.'));
+    } finally {
+      setPotvrzuji(null);
+    }
+  };
   const cancel = async (id: number) => {
     setZrusitId(null);
     try {
@@ -412,15 +436,27 @@ function ReserveTab({ slug, b, me, today, signedIn, onDone }: { slug: string; b:
           <ul className="divide-y divide-black/[0.06]">
             {me.reservations.map((r: any) => {
               const st = RES_STATUS[r.status] ?? RES_STATUS.requested;
+              const potvrzeno = !!r.guest_confirmed_at || !!potvrzene[r.id];
+              const zvyraznit = zPripominky === r.id;
               return (
-                <li key={r.id} className="py-3 flex items-start gap-3">
-                  <div className="min-w-0 flex-1">
+                <li key={r.id} id={`rezervace-${r.id}`} className={`py-3 flex items-start gap-3 flex-wrap ${zvyraznit ? '-mx-2 px-2 rounded-2xl bg-[#C8F542]/15' : ''}`}>
+                  <div className="min-w-0 flex-1 basis-40">
                     <p className="font-semibold cz-sentence">{fmtDatum(r.date, { jazyk, styl: 'denDlouze' })} <span className="text-black/50 font-medium">· {r.time}</span></p>
                     <p className="text-sm text-black/55">{t('{n, plural, one {# osoba} few {# osoby} other {# osob}}', { n: r.party })}{r.note ? ` · ${r.note}` : ''}</p>
                     <span className={`inline-block mt-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${st.tone === 'ok' ? 'bg-[#C8F542]/25 text-[#3E5406]' : st.tone === 'wait' ? 'bg-wait/15 text-wait-ink' : 'bg-black/[0.06] text-black/60'}`}>{t(st.label)}</span>
+                    {zvyraznit && !potvrzeno && r.status === 'confirmed' && <p className="text-xs text-black/60 mt-1">{t('Dorazíš? Potvrď, nebo rezervaci zruš — uvolníš místo jiným.')}</p>}
                   </div>
                   {['requested', 'confirmed'].includes(r.status) && (
-                    <button onClick={() => setZrusitId(r.id)} className="tap-target-sm text-xs text-black/55 hover:text-bad-ink transition shrink-0">{t('Zrušit', undefined, 'rezervace')}</button>
+                    <div className="flex items-center gap-2 shrink-0 ml-auto">
+                      {r.status === 'confirmed' && (potvrzeno
+                        ? <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#3E5406]"><Icon name="check" size={14} />{t('Potvrzeno tebou')}</span>
+                        : <button type="button" onClick={() => { void confirm(r.id); }} disabled={potvrzuji === r.id}
+                            className="tap-target-sm inline-flex items-center gap-1.5 btn btn-primary btn-sm active:scale-[0.98] disabled:opacity-50 transition"
+                            aria-label={t('Potvrdit rezervaci {kdy}', { kdy: `${fmtDatum(r.date, { jazyk, styl: 'denDlouze' })} ${r.time}` })}>
+                            <Icon name="check" size={14} />{potvrzuji === r.id ? '…' : t('Potvrdit', undefined, 'rezervace')}
+                          </button>)}
+                      <button onClick={() => setZrusitId(r.id)} className="tap-target-sm text-xs text-black/55 hover:text-bad-ink transition shrink-0">{t('Zrušit', undefined, 'rezervace')}</button>
+                    </div>
                   )}
                 </li>
               );

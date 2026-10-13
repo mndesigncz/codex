@@ -410,5 +410,15 @@
   "Dnes už se nedá rezervovat, vyber zítřek.": "Na dziś nie da się już zarezerwować, wybierz jutro.",
   "Zítra": "Jutro",
   "Rezervace je potvrzená. Těšíme se na tebe.": "Rezerwacja jest potwierdzona. Do zobaczenia.",
-  "Nedorazil": "Nie przyszedł"
+  "Nedorazil": "Nie przyszedł",
+  "Potvrdit|rezervace": "Potwierdź",
+  "Potvrzeno tebou": "Potwierdzone przez ciebie",
+  "Dorazíš? Potvrď, nebo rezervaci zruš — uvolníš místo jiným.": "Przyjdziesz? Potwierdź albo anuluj rezerwację — zwolnisz miejsce innym.",
+  "Potvrdit rezervaci {kdy}": "Potwierdź rezerwację {kdy}",
+  "Potvrzení se nepovedlo. Zkus to prosím znovu.": "Potwierdzenie się nie udało. Spróbuj ponownie.",
+  "Potvrzení neodešlo — vypadlo připojení. Zkus to prosím znovu.": "Potwierdzenie nie dotarło — połączenie zostało przerwane. Spróbuj ponownie.",
+  "Díky, podnik s tebou počítá.": "Dzięki, lokal na ciebie czeka.",
+  "Potvrdit nebo zrušit": "Potwierdź lub anuluj",
+  "Odpovědi na tvoje hodnocení": "Odpowiedzi na twoje oceny",
+  "Odpověď podniku": "Odpowiedź lokalu"
 }
