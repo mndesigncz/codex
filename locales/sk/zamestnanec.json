@@ -435,5 +435,8 @@
   "Odebrat doklad {n}": "Odobrať doklad {n}",
   "Nejvýš {n} fotky — odeber některou, když chceš jinou.": "Najviac {n} fotky — odober niektorú, keď chceš inú.",
   "Doklady k tržbě": "Doklady k tržbe",
-  "Vyfoť výpis z terminálu a Z-report — vedení pak dohledá každý rozdíl.": "Odfoť výpis z terminálu a Z-report — vedenie potom dohľadá každý rozdiel."
+  "Vyfoť výpis z terminálu a Z-report — vedení pak dohledá každý rozdíl.": "Odfoť výpis z terminálu a Z-report — vedenie potom dohľadá každý rozdiel.",
+  "Dovolená: zbývá {n} z {celkem} dní": "Dovolenka: zostáva {n} z {celkem} dní",
+  "o {n, plural, one {# den} few {# dny} other {# dní}} víc, než zbývá": "o {n, plural, one {# deň} few {# dni} other {# dní}} viac, než zostáva",
+  "po schválení zbude {n}": "po schválení zostane {n}"
 }

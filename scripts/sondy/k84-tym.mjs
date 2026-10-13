@@ -67,20 +67,36 @@ const FIX_TYM = { stranka: 'vedeni.tym', polozky: [{ id: 'tym-pozvanky', widget:
 const FIX_ROZVRH = { stranka: 'vedeni.rozvrh', polozky: [{ id: 'nastroj', widget: 'nastroj', velikost: 'L' }], dostupne: [], tarifem: [], zdroj: 'aplikace', rozsah: 'typ:vedeni', zamceno: false, smiUpravit: true, smiVychozi: true, verze: 0 };
 
 const DOCHAZKA = nactiDochazku();
+/** Pražský den s posunem (pro fixtury k69-b1 s tokeny ZA5…). */
+const praha = (o = 0) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague' }).format(new Date(TED + o * 86400000));
+const DNY = { DNES: praha(0), VCERA: praha(-1), PRED3: praha(-3), ZITRA: praha(1), POZITRI: praha(2), ZA3: praha(3), ZA5: praha(5), ZA7: praha(7), ZA10: praha(10), ZA12: praha(12), ZA20: praha(20) };
+const MESIC = DNY.DNES.slice(0, 7);
+const nactiB1 = (jmeno) => {
+  let t = readFileSync(DIR + jmeno + '.json', 'utf8');
+  for (const [k, v] of Object.entries(DNY)) t = t.replaceAll(`"${k}"`, `"${v}"`);
+  return JSON.parse(t.replaceAll('"MESIC"', `"${MESIC}"`).replaceAll('"@-', `"${MESIC}-`));
+};
+/** Nárok 20 dní, letos čerpáno 14 → zbývá 6 (stejná čísla jako test k84-tym). */
+const NAROK = { rok: Number(DNY.DNES.slice(0, 4)), dni: 20, cerpano: 14, ceka: 0, zbyva: 6 };
 const podvrh = (bezPlanu = false) => (req, json, stav) => {
   const u = new URL(req.url()); const path = u.pathname; const q = u.searchParams;
   if (req.method() !== 'GET') {
     (stav.zapisy ??= []).push({ m: req.method(), path, body: req.postData() });
     if (path === '/api/schedule/rules') return json({ ok: true });
+    if (path === '/api/timeoff') return json({ ok: true, request: {}, vacationPerYear: 25 });
     return undefined;
   }
+  if (path === '/api/timeoff' && q.get('mine') === '1') return json({ ...nactiB1('k69-b1-timeoff-mine'), narok: NAROK });
+  if (path === '/api/availability') return json(q.get('mine') ? null : nactiB1('k69-b1-availability'));
+  if (path === '/api/shifts/offers') return json(nactiB1('k69-b1-offers'));
+  if (path === '/api/shifts' && q.get('employeeId')) return json(nactiB1('k69-b1-shifts-mine').map(s => ({ ...s, employeeId: 16 })));
   if (path === '/api/attendance') { (stav.dochazka ??= []).push(u.search); return json(DOCHAZKA); }
   if (path === '/api/invitations') return json({ invitations: [] });
   if (path === '/api/schedule') { const r = nactiRozvrh(q.get('month') ?? DNES.slice(0, 7)); stav.mapa = r.mapa; return json(r.data); }
   if (path === '/api/schedule/generate') return json(bezPlanu ? [] : PLAN);
   if (path === '/api/schedule/rules') return json({ teamMax: null, teamMaxHours: null, balanceShifts: true, splitShifts: false, members: [], trzby: { podleTrzeb: false, prah: null, prahNastaven: false, smiTrzby: true, dny: {}, navrhPrahu: null }, limity: PLAN.limity });
   if (path === '/api/availability') return json(q.get('mine') ? null : []);
-  if (path === '/api/timeoff') return json({ requests: [], isEmployer: true });
+  if (path === '/api/timeoff') return json({ requests: [], isEmployer: true, naroky: { 16: NAROK } });
   if (path === '/api/fixed-assignments') return json({ assignments: [] });
   if (path === '/api/events') return json({ events: [] });
   return undefined;
@@ -130,6 +146,18 @@ const ROZVRH = '/employer/overview?view=shifts';
   const rozpad = nastroj.getByRole('button', { name: 'Rozpad v Docházce' });
   tvrdi('T1: pod seznamem je „Rozpad v Docházce"', (await rozpad.count()) === 1);
   await p.screenshot({ path: OUT + 'k84-tym-tym-1280.png', fullPage: false });
+  // Nárok na dovolenou (kolo 8): v řádku „dovolená 6/20", v okně Upravit pole Dovolená na rok → PUT /api/timeoff.
+  tvrdi('T1: u Evy je „dovolená 6/20"', /dovolená 6\/20/.test(await text(nastroj.locator('[data-tym-dovolena="16"]'))));
+  await nastroj.getByRole('button', { name: 'Upravit: Eva Testová' }).click();
+  const okno = p.getByRole('dialog');
+  await okno.waitFor({ timeout: 5000 });
+  const pole = okno.locator('#clen-dovolena');
+  tvrdi('T1: okno Upravit člena má pole Dovolená na rok s hodnotou 20 a nápovědou o čerpání', (await pole.inputValue()) === '20' && /čerpáno 14, zbývá 6/.test(await text(okno)), await text(okno));
+  await pole.fill('25');
+  await okno.getByRole('button', { name: 'Uložit' }).click();
+  const put = await dokud(() => (stav.zapisy ?? []).find(z => z.path === '/api/timeoff' && z.m === 'PUT'), 4000);
+  tvrdi('T1: Uložit pošle PUT /api/timeoff { userId: 16, vacationPerYear: 25 } a žádný PATCH členství', !!put && /"userId":16,"vacationPerYear":25/.test(put.body) && !(stav.zapisy ?? []).some(z => z.path === '/api/teams/members'), put?.body);
+  tvrdi('T1: okno se po uložení zavře', await dokud(async () => (await okno.count()) === 0, 4000));
   await rozpad.click();
   tvrdi('T1: Rozpad v Docházce otevře Docházku', await dokud(async () => (await p.locator('[data-plocha="vedeni.dochazka"]').count()) > 0 || /view=attendance/.test(p.url()), 6000), p.url());
   tvrdi('T1: bez chyb v konzoli', skutecneChyby(chyby).length === 0, skutecneChyby(chyby).slice(0, 2).join(' | '));
@@ -259,6 +287,43 @@ const ROZVRH = '/employer/overview?view=shifts';
   tvrdi('P3 (390): bez přetečení dokumentu i okna', pr.dokument <= 1 && pr.karty === 0, JSON.stringify(pr));
   await p.screenshot({ path: OUT + 'k84-tym-okno-dne-390.png', fullPage: false });
   tvrdi('P3: bez chyb v konzoli', skutecneChyby(chyby).length === 0, skutecneChyby(chyby).slice(0, 2).join(' | '));
+  await ctx.close();
+}
+
+// ---------------------------------------------------------------------------
+// D — Zůstatek dovolené u žádosti o volno (zaměstnanec, 390×844) a ve widgetu Moje volno
+// ---------------------------------------------------------------------------
+{
+  const BARISTA = roleMine('barista');
+  const { ctx, p, chyby } = await kontext({ role: 'employee', fix: nactiB1('k69-b1-rozlozeni-dostupnost'), mineData: BARISTA, viewport: TEL, mobil: true, posunCasu: POSUN, dalsi: podvrh() });
+  await otevriPlochu(p, '/employee/shifts?view=availability', 'zamestnanec.dostupnost');
+  await p.getByRole('button', { name: 'Žádost o volno' }).first().click();
+  const okno = p.getByRole('dialog', { name: 'Žádost o volno' });
+  await okno.waitFor({ timeout: 5000 });
+  await dokud(async () => (await okno.locator('[data-narok-dovolene]').count()) > 0, 5000);
+  const chip = await text(okno.locator('[data-narok-dovolene]'));
+  tvrdi('D1 (390): nad poli žádosti je „Dovolená: zbývá 6 z 20 dní"', /Dovolená: zbývá 6 z 20 dní/.test(chip), chip);
+  await okno.getByLabel('Od').fill(DNY.ZA10);
+  await okno.getByLabel('Do').fill(DNY.ZA12);
+  tvrdi('D1 (390): po výběru tří dnů „po schválení zbude 3"', await dokud(async () => /po schválení zbude 3/.test(await text(okno.locator('[data-narok-dovolene]'))), 2000), await text(okno.locator('[data-narok-dovolene]')));
+  await okno.screenshot({ path: OUT + 'k84-tym-volno-390.png' });
+  await okno.getByLabel('Do').fill(DNY.ZA20);
+  tvrdi('D1 (390): jedenáct dnů = „o 5 dní víc, než zbývá"', await dokud(async () => /o 5 dní víc, než zbývá/.test(await text(okno.locator('[data-narok-dovolene]'))), 2000), await text(okno.locator('[data-narok-dovolene]')));
+  await okno.getByRole('tab', { name: 'Nemoc' }).click();
+  tvrdi('D1 (390): u nemoci se zůstatek nekreslí (neodečítá se)', await dokud(async () => (await okno.locator('[data-narok-dovolene]').count()) === 0, 2000));
+  const pr = await preteceni(p);
+  tvrdi('D1 (390): bez přetečení', pr.dokument <= 1 && pr.karty === 0, JSON.stringify(pr));
+  tvrdi('D1: bez chyb v konzoli', skutecneChyby(chyby).length === 0, skutecneChyby(chyby).slice(0, 2).join(' | '));
+  await ctx.close();
+}
+{
+  const BARISTA = roleMine('barista');
+  const { ctx, p } = await kontext({ role: 'employee', fix: nactiB1('k69-b1-rozlozeni-moje-zamestnanec'), mineData: BARISTA, viewport: TEL, mobil: true, posunCasu: POSUN, dalsi: podvrh() });
+  await otevriPlochu(p, '/employee/shifts?view=my-shifts', 'zamestnanec.moje_smeny');
+  const w = p.locator('[data-plocha] li[data-widget="moje.schvalene_volno"]:not([hidden])');
+  await dokud(async () => (await w.locator('[data-narok-dovolene]').count()) > 0, 6000);
+  tvrdi('D2 (390): widget Moje volno ukáže „Dovolená: zbývá 6 z 20 dní"', /Dovolená: zbývá 6 z 20 dní/.test(await text(w)), await text(w));
+  await w.screenshot({ path: OUT + 'k84-tym-moje-volno-390.png' });
   await ctx.close();
 }
 

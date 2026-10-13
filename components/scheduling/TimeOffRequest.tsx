@@ -23,10 +23,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button, Card, Chip, EmptyState, Field, Input, ListRow, Modal, Segmented } from '../ui';
 import { useDraft, type Koncept } from '@/lib/useDraft';
 import { DraftNote } from '../ui/DraftNote';
-import { obnovDataWidgetu } from '../widgety/useDataWidgetu';
+import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useJazyk, useT } from '@/lib/i18n/client';
 import { fmtDatum } from '@/lib/i18n/format';
 import type { Jazyk } from '@/lib/i18n/config';
+import { zbudePoSchvaleni, type NarokDovolene } from '@/lib/dovolena';
 type TimeOffType = 'vacation' | 'sick' | 'other';
 type TimeOffStatus = 'pending' | 'approved' | 'rejected';
 
@@ -60,7 +61,41 @@ function formatRange(fromDate: string, toDate: string, jazyk: Jazyk): string {
   return `${full(fromDate)} – ${full(toDate)}`;
 }
 
-const obnovWidget = () => obnovDataWidgetu('/api/timeoff?mine=1');
+const URL_MOJE = '/api/timeoff?mine=1';
+const obnovWidget = () => obnovDataWidgetu(URL_MOJE);
+
+/** Nárok na dovolenou z GET /api/timeoff?mine=1 (kolo 8); starší server ho neposílá → null. */
+export function vyberNarok(raw: any): NarokDovolene | null {
+  const n = raw && typeof raw === 'object' ? raw.narok : null;
+  if (!n || typeof n !== 'object' || n.dni == null) return null;
+  return { rok: Number(n.rok), dni: Number(n.dni), cerpano: Number(n.cerpano) || 0, ceka: Number(n.ceka) || 0, zbyva: Number(n.zbyva) };
+}
+
+/** Stejná adresa jako widget Moje volno a seznam žádostí (sdílená mezipaměť) — jeden dotaz pro všechno. */
+export function useNarokDovolene(): NarokDovolene | null {
+  return useDataWidgetu<NarokDovolene | null>(URL_MOJE, vyberNarok).data ?? null;
+}
+
+/**
+ * Zůstatek dovolené nad poli žádosti (Homebase: „remaining balance" přímo ve formuláři):
+ * chip „Dovolená: zbývá 6 z 20 dní" a po výběru dnů „po schválení zbude 3" — nebo varování,
+ * že žádost zůstatek přesahuje (odeslat jde i tak, rozhodne vedení). Jen u typu Dovolená
+ * a jen s nastaveným nárokem; nemoc a jiné volno se neodečítají.
+ */
+export function ZustatekDovolene({ narok, od, doDne, typ }: { narok: NarokDovolene | null; od: string; doDne: string; typ: TimeOffType }) {
+  const t = useT('zamestnanec');
+  if (!narok || narok.dni == null || narok.zbyva == null || typ !== 'vacation') return null;
+  const zbude = zbudePoSchvaleni(narok, od, doDne || od, typ);
+  const ton = narok.zbyva > 0 ? 'ok' : narok.zbyva === 0 ? 'wait' : 'bad';
+  return (
+    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 t-meta" data-narok-dovolene={narok.zbyva}>
+      <Chip tone={ton} size="sm" icon="sun">{t('Dovolená: zbývá {n} z {celkem} dní', { n: narok.zbyva, celkem: narok.dni })}</Chip>
+      {zbude != null && (zbude >= 0
+        ? <span data-zbude={zbude}>{t('po schválení zbude {n}', { n: zbude })}</span>
+        : <span className="text-wait-ink" data-zbude={zbude}>{t('o {n, plural, one {# den} few {# dny} other {# dní}} víc, než zbývá', { n: -zbude })}</span>)}
+    </p>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Formulář
@@ -147,9 +182,11 @@ export function useFormularVolna({ aktivni = true, onOdeslano }: { aktivni?: boo
 export function PoleVolna({ f }: { f: FormularVolna }) {
   const t = useT('zamestnanec');
   const typLabel = (id: TimeOffType) => (id === 'vacation' ? t('Dovolená') : id === 'sick' ? t('Nemoc') : t('Jiné'));
+  const narok = useNarokDovolene();
   return (
     <div className="space-y-3">
       <DraftNote koncept={f.koncept} co="rozepsanou žádost" />{/* i18n-ok: druh konceptu je identifikátor, větu překládá DraftNote */}
+      <ZustatekDovolene narok={narok} od={f.fromDate} doDne={f.toDate} typ={f.type} />{/* kolo 8: zůstatek nad poli */}
       {/* Dvojice dat sdílí řádek i na telefonu (DESIGN: dvojice polí grid-cols-2). */}
       <div className="grid grid-cols-2 gap-3">
         <Field id="volno-od" label={t('Od')}>

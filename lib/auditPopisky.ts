@@ -64,6 +64,7 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'schedule.adjust': 'Rozvrh upraven podle nových požadavků',
   'schedule.rules': 'Změna pravidel rozvrhu',
   'volno.rozhodnout': 'Rozhodnuto o žádosti o volno',
+  'volno.narok': 'Nastaven nárok na dovolenou',
   'rozvrh.poznamka': 'Poznámka ke směně',
   'rozvrh.pripomenout_dostupnost': 'Lidem bez dostupnosti připomenuto, ať ji zadají',
   'rozvrh.publikovat': 'Rozvrh publikován',

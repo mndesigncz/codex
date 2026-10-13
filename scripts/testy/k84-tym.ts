@@ -19,6 +19,8 @@ import {
 import {
   navrhniRozvrh, planProtiTrzbam, podilMezdPlanu, tonPodilu, trzbaDne, type ClovekGeneratoru, type TypSmeny, type VstupGeneratoru,
 } from '../../lib/rozvrhGenerator.ts';
+import { dnuVRoce, narokDovolene, rokNaroku, vycistiNarok, zbudePoSchvaleni } from '../../lib/dovolena.ts';
+import { AUDIT_POPISKY } from '../../lib/auditPopisky.ts';
 
 const zdroj = (cesta: string) => readFileSync(new URL(`../../${cesta}`, import.meta.url), 'utf8');
 const p = (den: string, hm: string) => pragueMomentOf(den, hm)!.toISOString();
@@ -160,4 +162,32 @@ export default function ({ eq, ok }: Testy) {
   const gener = zdroj('app/api/schedule/generate/route.ts');
   ok('generátor: GET s rozvrh.zobrazit; tržby jen s finance.trzby, cíl mezd jen s finance.mzdy', /export async function GET\(\)/.test(gener) && /cilMezd: smiMzdy \? cilMezd : null/.test(gener) && /if \(smiTrzby\)/.test(gener));
   ok('generátor: POST předává limity a začátek týdne generátoru', /limity,\s*zacatekTydne,\s*\}\);/.test(gener));
+
+  // =========================================================================
+  // Nárok a zůstatek dovolené (lib/dovolena.ts)
+  // =========================================================================
+  eq('dovolená: dny v roce — celý týden 7, přes Silvestr jen do 31. 12., mimo rok 0', [dnuVRoce('2026-07-01', '2026-07-07', 2026), dnuVRoce('2026-12-29', '2027-01-03', 2026), dnuVRoce('2026-12-29', '2027-01-03', 2027), dnuVRoce('2025-05-01', '2025-05-02', 2026)], [7, 3, 3, 0]);
+  eq('dovolená: jeden den bez „do", nesmysl 0', [dnuVRoce('2026-03-05', '', 2026), dnuVRoce('x', '2026-03-05', 2026), dnuVRoce('2026-03-05', '2026-03-01', 2026)], [1, 0, 0]);
+  eq('dovolená: nárok vyčištěný — null/prázdno nenastaveno, půldny, strop 366, záporné null', [vycistiNarok(null), vycistiNarok(''), vycistiNarok('20'), vycistiNarok(12.5), vycistiNarok(999), vycistiNarok(-3)], [null, null, 20, 12.5, 366, null]);
+  const zadosti = [
+    { fromDate: '2026-02-02', toDate: '2026-02-06', type: 'vacation', status: 'approved' },  // 5
+    { fromDate: '2026-07-13', toDate: '2026-07-21', type: 'vacation', status: 'approved' },  // 9
+    { fromDate: '2026-03-10', toDate: '2026-03-12', type: 'sick', status: 'approved' },      // nemoc se neodečítá
+    { fromDate: '2026-04-01', toDate: '2026-04-01', type: 'vacation', status: 'rejected' },  // zamítnutá ne
+    { fromDate: '2026-11-02', toDate: '2026-11-04', type: 'vacation', status: 'pending' },   // 3 čeká
+    { fromDate: '2025-08-04', toDate: '2025-08-08', type: 'vacation', status: 'approved' },  // loni
+  ];
+  eq('dovolená: nárok 20, čerpáno 14 (jen schválená dovolená letos), čeká 3, zbývá 6', narokDovolene(zadosti, 20, 2026), { rok: 2026, dni: 20, cerpano: 14, ceka: 3, zbyva: 6 });
+  eq('dovolená: bez nároku zůstatek null, čerpání se ale počítá', narokDovolene(zadosti, null, 2026).zbyva, null);
+  const n = narokDovolene(zadosti, 20, 2026);
+  eq('dovolená: po schválení 3 dnů zbude 3; 11 dnů = −5; nemoc null; bez dnů null', [zbudePoSchvaleni(n, '2026-11-02', '2026-11-04'), zbudePoSchvaleni(n, '2026-11-02', '2026-11-12'), zbudePoSchvaleni(n, '2026-11-02', '2026-11-04', 'sick'), zbudePoSchvaleni(n, '', '')], [3, -5, null, null]);
+  eq('dovolená: rok nároku podle začátku žádosti, jinak dnešek', [rokNaroku('2026-10-13'), rokNaroku('2026-10-13', '2027-01-05'), rokNaroku('2026-10-13', 'x')], [2026, 2027, 2026]);
+  ok('dovolená: audit „volno.narok" má popisek', typeof AUDIT_POPISKY['volno.narok'] === 'string');
+  const timeoff = zdroj('app/api/timeoff/route.ts');
+  ok('timeoff: ?mine=1 posílá narok, tým naroky a „zbydePoSchvaleni" u čekající dovolené', /narok: NarokDovolene = narokDovolene/.test(timeoff) && /naroky: narokyOut/.test(timeoff) && /zbydePoSchvaleni: zbude/.test(timeoff));
+  ok('timeoff: PUT nároku jen s volno.schvalovat, člen přes jeClenem, na team_members', /export async function PUT/.test(timeoff) && /pozaduj\('volno.schvalovat'\)/.test(timeoff) && /jeClenem\(userId, c\.teamId\)/.test(timeoff) && /UPDATE team_members SET vacation_per_year/.test(timeoff));
+  const volno = zdroj('components/scheduling/TimeOffRequest.tsx');
+  ok('žádost o volno: zůstatek nad poli jen u typu Dovolená, s „po schválení zbude"', /typ !== 'vacation'\) return null/.test(volno) && /po schválení zbude \{n\}/.test(volno));
+  const tymSrc = zdroj('components/TeamManagement.tsx');
+  ok('Tým: pole Dovolená na rok jen s volno.schvalovat a zápis PUT /api/timeoff s kontrolou odpovědi', /smiNarok && \(/.test(tymSrc) && /fetch\('\/api\/timeoff', \{ method: 'PUT'/.test(tymSrc) && /vacationPerYear: novyNarok \}\) \}\)\.then\(okJson\)/.test(tymSrc));
 }

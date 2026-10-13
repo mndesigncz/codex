@@ -2149,5 +2149,6 @@
   "Vrátit": "Zurücklegen",
   "Kolik % položek menu má recepturu, kolik se prodává bez receptury, kolik položek je ve skladu. V M navíc „Změněno tento týden\" a návrhy úprav ke schválení.": "Wie viel % der Menüpositionen ein Rezept haben, wie viele ohne Rezept verkauft werden, wie viele Artikel im Lager sind. In M zusätzlich „Diese Woche geändert“ und Änderungsvorschläge zur Freigabe.",
   "{n, plural, one {# poznámka} few {# poznámky} other {# poznámek}}": "{n, plural, one {# Notiz} other {# Notizen}}",
-  "nová": "neu"
+  "nová": "neu",
+  "Dovolená: zbývá {n} z {celkem} dní": "Urlaub: {n} von {celkem} Tagen übrig"
 }

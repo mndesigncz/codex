@@ -435,5 +435,8 @@
   "Odebrat doklad {n}": "Beleg {n} entfernen",
   "Nejvýš {n} fotky — odeber některou, když chceš jinou.": "Höchstens {n} Fotos – entferne eines, um ein anderes hinzuzufügen.",
   "Doklady k tržbě": "Belege zum Umsatz",
-  "Vyfoť výpis z terminálu a Z-report — vedení pak dohledá každý rozdíl.": "Fotografiere den Terminalbeleg und den Z-Bericht – die Leitung kann dann jede Differenz nachvollziehen."
+  "Vyfoť výpis z terminálu a Z-report — vedení pak dohledá každý rozdíl.": "Fotografiere den Terminalbeleg und den Z-Bericht – die Leitung kann dann jede Differenz nachvollziehen.",
+  "Dovolená: zbývá {n} z {celkem} dní": "Urlaub: {n} von {celkem} Tagen übrig",
+  "o {n, plural, one {# den} few {# dny} other {# dní}} víc, než zbývá": "{n, plural, one {# Tag} other {# Tage}} mehr, als übrig ist",
+  "po schválení zbude {n}": "nach Genehmigung bleiben {n}"
 }

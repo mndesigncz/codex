@@ -29,8 +29,9 @@ import { usePersonProfile } from './employer/ProfileLinkProvider';
 import { Avatar, Button, Card, Chip, EmptyState, ErrorState, Field, Input, ListRow, Menu, Modal, ObdobiLista, SearchField, Segmented, Select, Skeleton, SwitchRow, Textarea, Toast, type MenuItem } from './ui';
 import { Icon } from './Icons';
 import { PlochaWidgetu } from './widgety/PlochaWidgetu';
-import { useDataWidgetu } from './widgety/useDataWidgetu';
+import { obnovDataWidgetu, useDataWidgetu } from './widgety/useDataWidgetu';
 import { obnovTym } from './widgety/oblasti/tym';
+import { vycistiNarok, type NarokDovolene } from '@/lib/dovolena';
 import NavigaceNastaveni from './NavigaceNastaveni';
 import { useNavigace } from './widgety/NavigaceKontext';
 import { useMoney, useSymbol } from './CurrencyProvider';
@@ -119,6 +120,10 @@ function vyberDochazku(raw: any): DataDochazky {
   if (!raw || !Array.isArray(raw.entries)) throw new Error('Docházka přišla v nečekaném tvaru.'); // i18n-ok
   return { roster: Array.isArray(raw.roster) ? raw.roster : [], entries: raw.entries };
 }
+/** Nároky na dovolenou po lidech z GET /api/timeoff (kolo 8); starší server je neposílá → prázdno. */
+function vyberNaroky(raw: any): Record<string, NarokDovolene> {
+  return raw && typeof raw === 'object' && raw.naroky && typeof raw.naroky === 'object' ? raw.naroky : {};
+}
 /** Výchozí role podniku z /api/roles ve tvaru hodnoty <select> ('' = neznámá). */
 function vyberVychoziRoli(raw: any): string {
   return raw?.vychozi && typeof raw.vychozi === 'object' ? hodnotaRole({ klic: raw.vychozi.klic ?? null, id: raw.vychozi.id ?? null }) : '';
@@ -154,6 +159,8 @@ const stavPozvanky = (t: PrekladFn): Record<string, { label: string; tone: 'ok' 
 
 type Sekce = 'lide' | 'podnik' | 'uzaverka' | 'sdileni' | 'tablet' | 'integrace'; // i18n-ok (id záložek)
 const JSON_HLAVICKA = { 'Content-Type': 'application/json' };
+/** Nárok je nastavený (nárok i zůstatek jsou čísla) — jen tehdy se zůstatek kreslí. */
+const h2 = (n: NarokDovolene | null): n is NarokDovolene & { dni: number; zbyva: number } => !!n && n.dni != null && n.zbyva != null;
 
 
 export default function TeamManagement({ user }: { user: { id: number; name: string; role: string; avatar?: string } }) {
@@ -250,7 +257,12 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
     return hodiny && razeni !== 'jmeno' ? seradCleny(sez, hodiny, razeni) : sez;
   }, [members, hledat, hodiny, razeni]);
 
-  const [uprava, setUprava] = useState<{ m: Member; role: string; pozice: string; sazba: string } | null>(null);
+  // Nárok na dovolenou (kolo 8): dní za rok na členství, nastavuje kdo volno schvaluje; čte se s nároky
+  // a zůstatky z /api/timeoff (stejná adresa jako fronta žádostí), ukládá PUT /api/timeoff.
+  const smiNarok = ma('volno.schvalovat');
+  const naroky = useDataWidgetu<Record<string, NarokDovolene>>(smiNarok ? '/api/timeoff' : null, vyberNaroky);
+  const narokClena = (id: number): NarokDovolene | null => naroky.data?.[String(id)] ?? null;
+  const [uprava, setUprava] = useState<{ m: Member; role: string; pozice: string; sazba: string; dovolena: string } | null>(null);
   const [ukladamClena, setUkladamClena] = useState(false);
   const [chybaClena, setChybaClena] = useState<string | null>(null);
   const [odebrat, setOdebrat] = useState<Member | null>(null);
@@ -279,12 +291,17 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
 
   const otevriUpravu = (m: Member) => {
     setChybaClena(null);
-    setUprava({ m, role: roleClena(m), pozice: m.job_title ?? '', sazba: m.hourly_rate ? String(m.hourly_rate) : '' });
+    const n = narokClena(m.id);
+    setUprava({ m, role: roleClena(m), pozice: m.job_title ?? '', sazba: m.hourly_rate ? String(m.hourly_rate) : '', dovolena: n?.dni != null ? String(n.dni) : '' });
   };
 
   const ulozClena = async () => {
     if (!uprava) return;
     const { m } = uprava;
+    // Nárok na dovolenou jde vlastním požadavkem (PUT /api/timeoff) — členství, ne účet.
+    const puvodniNarok = narokClena(m.id)?.dni ?? null;
+    const novyNarok = vycistiNarok(uprava.dovolena);
+    const narokZmena = smiNarok && novyNarok !== puvodniNarok;
     // Posílá se jen to, co se změnilo A na co má přihlášený oprávnění.
     // Server odmítne celý požadavek, když chybí oprávnění k jedinému poli
     // (teams/members PATCH) — a sazba, kterou server neposlal (bez
@@ -298,10 +315,14 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
     const sazba = uprava.sazba === '' ? 0 : parseInt(uprava.sazba, 10) || 0;
     if (smiSazbu && m.hourly_rate != null && sazba !== (m.hourly_rate ?? 0)) telo.hourlyRate = sazba;
     else if (smiSazbu && m.hourly_rate == null && uprava.sazba !== '') telo.hourlyRate = sazba;
-    if (Object.keys(telo).length === 1) { setUprava(null); return; }
+    if (Object.keys(telo).length === 1 && !narokZmena) { setUprava(null); return; }
     setUkladamClena(true); setChybaClena(null);
     try {
-      await fetch('/api/teams/members', { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify(telo) }).then(okJson);
+      if (Object.keys(telo).length > 1) await fetch('/api/teams/members', { method: 'PATCH', headers: JSON_HLAVICKA, body: JSON.stringify(telo) }).then(okJson);
+      if (narokZmena) {
+        await fetch('/api/timeoff', { method: 'PUT', headers: JSON_HLAVICKA, body: JSON.stringify({ userId: m.id, vacationPerYear: novyNarok }) }).then(okJson);
+        obnovDataWidgetu('/api/timeoff');
+      }
       const puvodni = data.data;
       if (puvodni) data.set({ ...puvodni, members: puvodni.members.map(x => (x.id !== m.id ? x : {
         ...x,
@@ -571,6 +592,8 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                 ) : null,
                 smiVidetSazby && sazba == null && !owner ? <span key="sazba">{t('bez sazby')}</span> : null,
                 smiHodiny && sazba != null ? <span key="sazba-h" className="tabular-nums">{t('{sazba}/h', { sazba: money(sazba) })}</span> : null,
+                // Zůstatek dovolené (kolo 8) — vedoucí ho při schvalování nemusí dohledávat jinde.
+                h2(narokClena(m.id)) ? <span key="dovolena" className="tabular-nums" data-tym-dovolena={m.id}>{t('dovolená {zbyva}/{dni}', { zbyva: narokClena(m.id)!.zbyva, dni: narokClena(m.id)!.dni })}</span> : null,
                 m.email ? <span key="email">{m.email}</span> : null,
               ].filter(Boolean);
               const meta = casti.length ? casti.flatMap((c, i) => (i ? [' · ', c] : [c])) : undefined;
@@ -884,6 +907,16 @@ export default function TeamManagement({ user }: { user: { id: number; name: str
                 placeholder={uprava.m.hourly_rate == null && !ma('finance.mzdy') ? t('skrytá') : '0'}
                 onChange={e => setUprava(u => (u ? { ...u, sazba: e.target.value.replace(/\D/g, '') } : u))} />
             </Field>
+            {/* Nárok na dovolenou (kolo 8): dní za kalendářní rok; zaměstnanec vidí zůstatek v žádosti o volno. */}
+            {smiNarok && (
+              <Field id="clen-dovolena" label={t('Dovolená na rok (dní)')}
+                hint={h2(narokClena(uprava.m.id))
+                  ? t('Letos čerpáno {cerpano}, zbývá {zbyva}. Odečítá se jen schválená dovolená, nemoc a jiné volno ne.', { cerpano: narokClena(uprava.m.id)!.cerpano, zbyva: narokClena(uprava.m.id)!.zbyva })
+                  : t('Prázdné = nárok se nesleduje. Odečítá se jen schválená dovolená, nemoc a jiné volno ne.')}>
+                <Input id="clen-dovolena" inputMode="decimal" value={uprava.dovolena} placeholder="20"
+                  onChange={e => setUprava(u => (u ? { ...u, dovolena: e.target.value.replace(/[^\d.,]/g, '').replace(',', '.') } : u))} className="!w-full sm:!w-32 tabular-nums" />
+              </Field>
+            )}
           </div>
         </Modal>
       )}

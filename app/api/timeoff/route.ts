@@ -4,10 +4,47 @@ import { notifyUser, notifyUsers } from '@/lib/push';
 import { pozaduj, jeOdpoved, clenoveSOpravnenim } from '@/lib/opravneniDb';
 import { audit } from '@/lib/audit';
 import { duvodVolna, textRozhodnutiVolna, MAX_DUVOD_VOLNA } from '@/lib/rozvrhPrehled';
+import { jeClenem } from '@/lib/tenant';
+import { pragueToday } from '@/lib/pragueTime';
+import { narokDovolene, rokNaroku, vycistiNarok, zbudePoSchvaleni, type NarokDovolene } from '@/lib/dovolena';
 
 export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
+
+/**
+ * Nárok na dovolenou (dní za rok) z členství — kolo 8 (R8-3). Bez migrace (sloupec
+ * team_members.vacation_per_year ještě není) prázdná mapa: nic se nekreslí.
+ */
+async function narokyClenu(teamId: number, userIds: number[] | null): Promise<Map<number, number | null>> {
+  const out = new Map<number, number | null>();
+  try {
+    const rows = userIds
+      ? await sql`SELECT user_id, vacation_per_year FROM team_members WHERE team_id = ${teamId} AND user_id = ANY(${userIds})`
+      : await sql`SELECT user_id, vacation_per_year FROM team_members WHERE team_id = ${teamId}`;
+    for (const r of rows as any[]) out.set(Number(r.user_id), vycistiNarok(r.vacation_per_year));
+  } catch { /* před migrací */ }
+  return out;
+}
+
+/** Schválené a čekající dovolené v roce po lidech — pro zůstatek (jen typ vacation). */
+async function dovoleneRoku(teamId: number, rok: number, userIds: number[] | null): Promise<Map<number, any[]>> {
+  const out = new Map<number, any[]>();
+  try {
+    const rows = userIds
+      ? await sql`SELECT employee_id, from_date, to_date, type, status FROM time_off_requests
+                  WHERE team_id = ${teamId} AND employee_id = ANY(${userIds}) AND type = 'vacation' AND status IN ('approved', 'pending')
+                    AND to_date >= ${`${rok}-01-01`} AND from_date <= ${`${rok}-12-31`}`
+      : await sql`SELECT employee_id, from_date, to_date, type, status FROM time_off_requests
+                  WHERE team_id = ${teamId} AND type = 'vacation' AND status IN ('approved', 'pending')
+                    AND to_date >= ${`${rok}-01-01`} AND from_date <= ${`${rok}-12-31`}`;
+    for (const r of rows as any[]) {
+      const id = Number(r.employee_id);
+      out.set(id, [...(out.get(id) ?? []), { fromDate: String(r.from_date), toDate: String(r.to_date), type: r.type, status: r.status }]);
+    }
+  } catch { /* bez tabulky */ }
+  return out;
+}
 
 // Vlastní žádosti má každý člen; volno týmu (i typ „nemoc", tedy zdravotní
 // údaj) jen s volno.zobrazit, rozhodování s volno.schvalovat.
@@ -47,7 +84,13 @@ export async function GET(req: NextRequest) {
         SELECT t.* FROM time_off_requests t
         WHERE t.employee_id = ${c.meId} AND t.team_id = ${c.teamId}
         ORDER BY t.from_date DESC LIMIT 50`;
-      return NextResponse.json({ requests: rows.map(shape), isEmployer: false });
+      // Nárok a zůstatek dovolené za letošní rok (kolo 8): „Zbývá 6 dní z 20" v žádosti i widgetu.
+      // Čerpání z celého roku (ne jen z posledních 50 žádostí), ať zůstatek sedí.
+      const rok = rokNaroku(pragueToday());
+      const naroky = await narokyClenu(c.teamId, [c.meId]);
+      const dovolene = await dovoleneRoku(c.teamId, rok, [c.meId]);
+      const narok: NarokDovolene = narokDovolene(dovolene.get(c.meId) ?? [], naroky.get(c.meId) ?? null, rok);
+      return NextResponse.json({ requests: rows.map(shape), isEmployer: false, narok });
     } catch {
       return NextResponse.json({ error: 'Žádosti o volno se nenačetly.' }, { status: 500 });
     }
@@ -84,10 +127,52 @@ export async function GET(req: NextRequest) {
           SELECT t.* FROM time_off_requests t
           WHERE t.employee_id = ${c.meId}
           ORDER BY t.from_date DESC LIMIT 50`;
-    return NextResponse.json({ requests: rows.map(shape), isEmployer });
+    if (!isEmployer) return NextResponse.json({ requests: rows.map(shape), isEmployer });
+    // Vedení (kolo 8): nárok a zůstatek každého člena (`naroky`, pro pole „Dovolená na rok" v Týmu)
+    // a u čekající dovolené „po schválení zbude" (fronta žádostí). Bez nároku null — nekreslí se.
+    const rok = rokNaroku(pragueToday());
+    const naroky = await narokyClenu(c.teamId, null);
+    const dovolene = await dovoleneRoku(c.teamId, rok, null);
+    const narokyOut: Record<string, NarokDovolene> = {};
+    for (const [id, dni] of naroky) narokyOut[String(id)] = narokDovolene(dovolene.get(id) ?? [], dni, rok);
+    const requests = rows.map((r: any) => {
+      const s = shape(r);
+      const n = narokyOut[String(r.employee_id)];
+      const zbude = s.status === 'pending' && s.type === 'vacation' && n ? zbudePoSchvaleni(n, s.fromDate, s.toDate) : null;
+      return zbude == null ? s : { ...s, zbydePoSchvaleni: zbude, narokDni: n.dni };
+    });
+    return NextResponse.json({ requests, isEmployer, naroky: narokyOut });
   } catch {
     return NextResponse.json({ requests: [], isEmployer });
   }
+}
+
+// PUT (volno.schvalovat) — nárok na dovolenou člena: { userId, vacationPerYear: dní | null }.
+// Na členství v TOMHLE podniku (team_members), ne na účtu — v každém podniku může být jiný.
+export async function PUT(req: NextRequest) {
+  const c = await pozaduj('volno.schvalovat');
+  if (jeOdpoved(c)) return c;
+  const b = await req.json().catch(() => ({}));
+  const userId = parseInt(b.userId);
+  if (!Number.isFinite(userId)) return NextResponse.json({ error: 'Chybí člověk.' }, { status: 400 });
+  if (b.vacationPerYear !== null && b.vacationPerYear !== '' && b.vacationPerYear !== undefined
+    && (!Number.isFinite(Number(b.vacationPerYear)) || Number(b.vacationPerYear) < 0 || Number(b.vacationPerYear) > 366)) {
+    return NextResponse.json({ error: 'Nárok na dovolenou musí být 0 až 366 dní.' }, { status: 400 });
+  }
+  if (!(await jeClenem(userId, c.teamId))) return NextResponse.json({ error: 'Člověk není v podniku.' }, { status: 404 });
+  const dni = vycistiNarok(b.vacationPerYear);
+  try {
+    const done = await sql`
+      UPDATE team_members SET vacation_per_year = ${dni} WHERE team_id = ${c.teamId} AND user_id = ${userId}
+      RETURNING user_id`;
+    if (!done.length) return NextResponse.json({ error: 'Nárok jde nastavit jen členovi s členstvím v podniku.' }, { status: 404 });
+  } catch {
+    return NextResponse.json({ error: 'Nárok na dovolenou se nepodařilo uložit — databáze ho ještě nezná (spusť /api/init).' }, { status: 503 });
+  }
+  let jmeno = '';
+  try { jmeno = String((await sql`SELECT name FROM users WHERE id = ${userId}`)[0]?.name ?? ''); } catch { /* jen do auditu */ }
+  await audit(c.teamId, c.meId, 'volno.narok', 'user', userId, `${jmeno || `#${userId}`}: ${dni == null ? 'nenastaveno' : `${dni} dní za rok`}`);
+  return NextResponse.json({ ok: true, vacationPerYear: dni });
 }
 
 // POST — vlastní žádost o volno (kdokoli s osobním účtem, ne tablet).

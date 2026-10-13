@@ -2151,5 +2151,6 @@
   "Vrátit": "Vrátiť",
   "Kolik % položek menu má recepturu, kolik se prodává bez receptury, kolik položek je ve skladu. V M navíc „Změněno tento týden\" a návrhy úprav ke schválení.": "Koľko % položiek menu má receptúru, koľko sa predáva bez receptúry, koľko položiek je v sklade. V M navyše „Zmenené tento týždeň“ a návrhy úprav na schválenie.",
   "{n, plural, one {# poznámka} few {# poznámky} other {# poznámek}}": "{n, plural, one {# poznámka} few {# poznámky} other {# poznámok}}",
-  "nová": "nová"
+  "nová": "nová",
+  "Dovolená: zbývá {n} z {celkem} dní": "Dovolenka: zostáva {n} z {celkem} dní"
 }

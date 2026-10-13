@@ -269,20 +269,34 @@ function vyberMojeZadosti(raw: any): ZadostVolna[] {
   return raw.requests;
 }
 
+/** Nárok na dovolenou z téže odpovědi (kolo 8): „Dovolená: zbývá 6 z 20 dní"; bez nároku null. */
+function vyberNarokDovolene(raw: any): { dni: number; zbyva: number } | null {
+  const n = raw && typeof raw === 'object' ? raw.narok : null;
+  if (!n || typeof n !== 'object' || n.dni == null || !Number.isFinite(Number(n.zbyva))) return null;
+  return { dni: Number(n.dni), zbyva: Number(n.zbyva) };
+}
+
 function SchvaleneVolno({ velikost }: WidgetProps) {
   const t = useT('widgety');
   // `?mine=1`: jen vlastní žádosti i pro vedení, kterému by jinak přišel celý tým.
   const data = useDataWidgetu('/api/timeoff?mine=1', vyberMojeZadosti);
+  const narok = useDataWidgetu('/api/timeoff?mine=1', vyberNarokDovolene).data ?? null;
   const dnes = pragueToday();
   const { cekajici, schvalene } = useMemo(() => zadostiVolna(data.data ?? [], dnes), [data.data, dnes]);
   const vse = [...schvalene, ...cekajici].sort((a, b) => denZ(a.fromDate).localeCompare(denZ(b.fromDate)));
   const S = velikost === 'S';
   const prvni = schvalene[0] ?? null;
+  // Zůstatek dovolené (kolo 8) — totéž číslo jako v žádosti; bez nároku se nekreslí.
+  const zustatek = narok ? (
+    <p className="t-meta mt-2 flex items-center gap-1.5" data-narok-dovolene={narok.zbyva}>
+      <Chip tone={narok.zbyva > 0 ? 'ok' : narok.zbyva === 0 ? 'wait' : 'bad'} size="sm" icon="sun">{t('Dovolená: zbývá {n} z {celkem} dní', { n: narok.zbyva, celkem: narok.dni })}</Chip>
+    </p>
+  ) : null;
 
   return (
     <Widget
       nacteni={data}
-      prazdno={vse.length === 0 ? <p className="t-meta text-pretty">{t('Žádné volno před sebou nemáš.')}</p> : undefined}
+      prazdno={vse.length === 0 ? <div><p className="t-meta text-pretty">{t('Žádné volno před sebou nemáš.')}</p>{zustatek}</div> : undefined}
     >
       {S ? (
         prvni ? (
@@ -304,6 +318,7 @@ function SchvaleneVolno({ velikost }: WidgetProps) {
             ))}
           </ul>
           {vse.length > 5 && <p className="t-meta mt-2">{t('…a dalších {n}', { n: (vse.length - 5).toLocaleString('cs-CZ') })}</p>}
+          {zustatek}
         </>
       )}
     </Widget>

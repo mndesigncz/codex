@@ -435,5 +435,8 @@
   "Odebrat doklad {n}": "Remove document {n}",
   "Nejvýš {n} fotky — odeber některou, když chceš jinou.": "At most {n} photos — remove one to add another.",
   "Doklady k tržbě": "Sales documents",
-  "Vyfoť výpis z terminálu a Z-report — vedení pak dohledá každý rozdíl.": "Photograph the terminal slip and the Z-report — management can then trace every difference."
+  "Vyfoť výpis z terminálu a Z-report — vedení pak dohledá každý rozdíl.": "Photograph the terminal slip and the Z-report — management can then trace every difference.",
+  "Dovolená: zbývá {n} z {celkem} dní": "Leave: {n} of {celkem} days left",
+  "o {n, plural, one {# den} few {# dny} other {# dní}} víc, než zbývá": "{n, plural, one {# day} other {# days}} more than you have left",
+  "po schválení zbude {n}": "{n} left after approval"
 }
