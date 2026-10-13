@@ -36,8 +36,8 @@ import type { KomponentaWidgetu, WidgetProps } from '@/lib/widgety/typy';
 import { widget } from '@/lib/widgety/katalog';
 import { mesicZVolby } from '@/lib/widgety/katalog/finance';
 import {
-  kamSlyPenize, kcNaHodinuPoDnech, mzdyDnes, mzdyMesice, podilMezd, podilNakladu, trzbaNaHodinu, urlFinanci, vyberDochazkuDnes,
-  vyberFinance, zmenaProti as zmena, type FinanceMesice,
+  kamSlyPenize, kcNaHodinuPoDnech, mzdyDnes, mzdyMesice, podilMezd, podilNakladu, rozsahMesicu, rozsahSrovnani, trzbaNaHodinu, urlFinanci,
+  vyberDochazkuDnes, vyberFinance, zmenaProti as zmena, zmenySouhrnu, type FinanceMesice, type SrovnaniFinanci,
 } from '@/lib/financeWidgety';
 import { fmtDenVTydnu } from '@/lib/i18n/format';
 import { useT } from '@/lib/i18n/client';
@@ -59,8 +59,13 @@ import { NovaUctenka, SeznamUctenek, URL_UCTENEK, vyberUctenky } from '../../emp
 // Měsíc stránky a data /api/finance (sdílí je i FinanceView)
 // ---------------------------------------------------------------------------
 
-/** Měsíc z přepínače v hlavičce Financí („RRRR-MM"); mimo Finance null = dnešní měsíc. */
+/**
+ * Období z hlavičky Financí: měsíc „RRRR-MM", nebo od kola 8 rozsah měsíců „RRRR-MM:RRRR-MM"
+ * (čtvrtletí, od začátku roku…); mimo Finance null = dnešní měsíc.
+ */
 export const MesicStrankyFinanci = createContext<string | null>(null);
+/** S čím Finance srovnávají (předchozí období / stejné období loni); mimo Finance null = srovnání ze serveru (minulý měsíc). */
+export const SrovnaniStrankyFinanci = createContext<SrovnaniFinanci | null>(null);
 
 /** Widget stojí přímo na Financích — odkaz „Finance ›" by vedl na stránku, kde už je. */
 export function useNaFinancich(): boolean {
@@ -70,6 +75,16 @@ export function useNaFinancich(): boolean {
 function useMesic(volba: unknown): string {
   const zaklad = useContext(MesicStrankyFinanci) ?? pragueToday().slice(0, 7);
   return mesicZVolby(volba, zaklad);
+}
+
+/**
+ * Jeden měsíc pro API, která rozsah neumějí (/api/pos/margins, /api/finance/advice): u rozsahu jeho
+ * poslední měsíc; `vice` říká widgetu, ať to v meta řádku přizná („za říjen 2026").
+ */
+function useJedenMesic(volba: unknown): { mesic: string; vice: boolean } {
+  const obdobi = useMesic(volba);
+  const r = rozsahMesicu(obdobi);
+  return { mesic: r.do, vice: r.od !== r.do };
 }
 
 // Výběr dat z /api/finance a výpočty (podíl mezd, Kam šly peníze) jsou čistá logika
@@ -101,6 +116,17 @@ function nazevMesice(m: string): string {
 }
 
 const sZnamenkem = (p: number) => `${p > 0 ? '+' : p < 0 ? '−' : ''}${Math.abs(p)} %`;
+
+/** „září 2026", nebo u rozsahu „červenec 2026 – září 2026" (kolo 8). */
+const nazevObdobi = (f: Pick<FinanceMesice, 'od' | 'do' | 'mesicu' | 'mesic'>): string =>
+  (f.mesicu > 1 ? `${nazevMesice(f.od)} – ${nazevMesice(f.do)}` : nazevMesice(f.mesic || f.od));
+
+/** Změna v procentech jako tónovaný text (zelená růst, oranžová pokles); null = nic. */
+function Zmena({ pct, inkoust = false }: { pct: number | null; inkoust?: boolean }) {
+  if (pct == null) return null;
+  const barva = inkoust ? (pct >= 0 ? 'text-[#C8F542]' : 'text-bad-lift') : (pct >= 0 ? 'text-ok-ink' : 'text-wait-ink');
+  return <span className={`tabular-nums font-medium ${barva}`}>{sZnamenkem(pct)}</span>;
+}
 
 /** Věta s údajem, který se kreslí zvlášť (tučně): překlad se rozdělí na text před a za ním. */
 const KOTVA = '\u0001';
@@ -137,13 +163,20 @@ function SouhrnMesice({ velikost, nastaveni }: WidgetProps<{ mesic: string; metr
   const data = useDataWidgetu(ok ? urlFinanci(mesic) : null, vyberFinance);
   const f = data.data;
   const naFinancich = useNaFinancich();
+  // Srovnání (kolo 8): na Financích podle přepínače v hlavičce (předchozí období / loni) — druhý dotaz na
+  // srovnávané období dá změnu všem čtyřem číslům. Jinde stačí prevRevenue ze serveru.
+  const srovnani = useContext(SrovnaniStrankyFinanci);
+  const pred = useDataWidgetu(ok && srovnani ? urlFinanci(rozsahSrovnani(mesic, srovnani)) : null, vyberFinance);
+  const zmeny = useMemo(() => (f ? zmenySouhrnu(f, srovnani ? pred.data : null) : null), [f, pred.data, srovnani]);
+  const vice = (f?.mesicu ?? 1) > 1;
+  const protiCemu = srovnani === 'loni' ? t('proti stejnému období loni') : srovnani === 'predchozi' || vice ? t('proti předchozímu období') : t('proti minulému měsíci');
 
   let obsah: ReactNode = null;
-  if (f) {
+  if (f && zmeny) {
     const s = f.souhrn;
-    const trend = zmena(s.revenue, s.prevRevenue);
+    const trend = zmeny.trzby;
     // „z uzávěrek": Tržba po dnech vedle ukazuje číslo z pokladny za jiné období — bez zdroje to vypadalo jako chyba (V12).
-    const pozTrzby = `${t('z uzávěrek')} · ${trend != null ? t('{zmena} proti minulému měsíci', { zmena: sZnamenkem(trend) }) : t('{n, plural, one {# uzávěrka} few {# uzávěrky} other {# uzávěrek}}', { n: s.closingsCount })}`;
+    const pozTrzby = `${t('z uzávěrek')} · ${trend != null ? `${sZnamenkem(trend)} ${protiCemu}` : t('{n, plural, one {# uzávěrka} few {# uzávěrky} other {# uzávěrek}}', { n: s.closingsCount })}`;
     // Bez finance.mzdy API mzdy nepošle a hrubý výsledek je bez nich — nula by lhala.
     const mzdy = s.mzdySkryte ? t('skryto') : money(mzdyMesice(f));
     const pozMzdy = s.mzdySkryte ? t('mzdy vidí jen role s oprávněním') : s.wagesWorked > 0 ? t('z docházky × sazby') : t('z denních výplat');
@@ -154,17 +187,19 @@ function SouhrnMesice({ velikost, nastaveni }: WidgetProps<{ mesic: string; metr
     const pozVysledek = !s.fixedCostsSet
       ? t('bez nájmu a energií — doplň ve Financích › ··· › Pravidelné náklady')
       : sPevnymi ? t('po nájmu a energiích') : t('po nájmu a energiích ({castka})', { castka: money(s.fixedCosts) });
-    const polozky: Record<Metrika, { stitek: string; hodnota: string; poznamka: string }> = {
-      trzby: { stitek: t('Tržby'), hodnota: money(s.revenue), poznamka: pozTrzby },
-      nakupy: { stitek: t('Nákupy a výdaje'), hodnota: money(s.purchases), poznamka: t('účtenky, objednávky, kasa') },
-      mzdy: { stitek: t('Mzdy'), hodnota: mzdy, poznamka: pozMzdy },
+    // Změna v % u čtyř čísel (jen se srovnávaným obdobím): v poznámce Statu, na inkoustu vedle čísla.
+    const sProcentem = (poznamka: string, pct: number | null) => (pct != null ? `${sZnamenkem(pct)} ${protiCemu} · ${poznamka}` : poznamka);
+    const polozky: Record<Metrika, { stitek: string; hodnota: string; poznamka: string; zmena: number | null }> = {
+      trzby: { stitek: t('Tržby'), hodnota: money(s.revenue), poznamka: pozTrzby, zmena: zmeny.trzby },
+      nakupy: { stitek: t('Nákupy a výdaje'), hodnota: money(s.purchases), poznamka: sProcentem(t('účtenky, objednávky, kasa'), zmeny.nakupy), zmena: zmeny.nakupy },
+      mzdy: { stitek: t('Mzdy'), hodnota: mzdy, poznamka: sProcentem(pozMzdy, zmeny.mzdy), zmena: zmeny.mzdy },
       // Spropitné není tržba podniku, ale majitel ho chce vidět vedle ní (Toast, Square): kolik tým za měsíc dostal.
-      spropitne: { stitek: t('Spropitné'), hodnota: money(s.tips), poznamka: t('z uzávěrek, mimo tržbu') },
+      spropitne: { stitek: t('Spropitné'), hodnota: money(s.tips), poznamka: t('z uzávěrek, mimo tržbu'), zmena: null },
       // Nevyplněné pevné náklady nejsou „0 Kč" (malá S karta s touhle metrikou by tvrdila, že nájem nic nestojí).
       pevne: s.fixedCostsSet
-        ? { stitek: t('Pevné náklady'), hodnota: money(s.fixedCosts), poznamka: t('nájem, energie — každý měsíc') }
-        : { stitek: t('Pevné náklady'), hodnota: '—', poznamka: t('zatím nevyplněné — doplň ve Financích › ··· › Pravidelné náklady') },
-      vysledek: { stitek: t('Výsledek'), hodnota: money(s.net), poznamka: pozVysledek },
+        ? { stitek: t('Pevné náklady'), hodnota: money(s.fixedCosts), poznamka: vice ? t('nájem, energie — za {n, plural, one {# měsíc} few {# měsíce} other {# měsíců}}', { n: f.mesicu }) : t('nájem, energie — každý měsíc'), zmena: null }
+        : { stitek: t('Pevné náklady'), hodnota: '—', poznamka: t('zatím nevyplněné — doplň ve Financích › ··· › Pravidelné náklady'), zmena: null },
+      vysledek: { stitek: t('Výsledek'), hodnota: money(s.net), poznamka: sProcentem(pozVysledek, zmeny.vysledek), zmena: zmeny.vysledek },
     };
     const ostatni: Metrika[] = velikost === 'L' ? [...zaklad, ...(sPevnymi ? ['pevne' as const] : []), 'vysledek'] : ['vysledek'];
     if (velikost === 'S') {
@@ -180,6 +215,7 @@ function SouhrnMesice({ velikost, nastaveni }: WidgetProps<{ mesic: string; metr
               <div key={k} className="min-w-0">
                 <dt className="t-label !text-white/55 truncate">{polozky[k].stitek}</dt>
                 <dd className="mt-1 text-[15px] font-semibold tabular-nums text-white truncate">{polozky[k].hodnota}</dd>
+                {polozky[k].zmena != null && <dd className="mt-0.5 text-[12px] truncate"><Zmena pct={polozky[k].zmena} inkoust /></dd>}
               </div>
             ))}
           </dl>
@@ -197,11 +233,16 @@ function SouhrnMesice({ velikost, nastaveni }: WidgetProps<{ mesic: string; metr
   }
 
   return (
-    <Widget nacteni={ceka ? CEKA : data} kostra="cislo"
+    // Rozsah měsíců (kolo 8): karta se jmenuje „Souhrn období" a v meta řádku nese od–do a počet měsíců.
+    <Widget nacteni={ceka ? CEKA : data} kostra="cislo" titulek={vice ? t('Souhrn období') : undefined}
       odkaz={velikost === 'S' || naFinancich ? undefined : { popisek: t('Finance'), pohled: 'finance' }}>
       {f && (
         <div className="space-y-3">
-          {velikost !== 'S' && <p className={`t-meta cz-sentence ${inkoust ? '!text-white/60' : ''}`}>{nazevMesice(f.mesic || mesic)}</p>}
+          {velikost !== 'S' && (
+            <p className={`t-meta cz-sentence ${inkoust ? '!text-white/60' : ''}`}>
+              {nazevObdobi(f)}{vice ? ` · ${t('{n, plural, one {# měsíc} few {# měsíce} other {# měsíců}}', { n: f.mesicu })}` : ''}
+            </p>
+          )}
           {obsah}
         </div>
       )}
@@ -248,7 +289,7 @@ function TrzbyVsMzdy({ velikost, nastaveni }: WidgetProps<{ mesic: string }>) {
 
   let prazdno: ReactNode | undefined;
   if (f && s?.mzdySkryte) prazdno = <p className="t-meta">{t('Mzdy vidí jen role s oprávněním na mzdy.')}</p>;
-  else if (f && podil == null) prazdno = <p className="t-meta">{t('Tenhle měsíc zatím nejsou tržby z uzávěrek.')}</p>;
+  else if (f && podil == null) prazdno = <p className="t-meta">{f.mesicu > 1 ? t('Za tohle období nejsou tržby z uzávěrek.') : t('Tenhle měsíc zatím nejsou tržby z uzávěrek.')}</p>;
 
   return (
     <Widget nacteni={ceka ? CEKA : data} kostra={velikost === 'S' ? 'cislo' : 'seznam'} prazdno={prazdno}
@@ -402,10 +443,10 @@ function KamSlyPenize({ nastaveni }: WidgetProps<{ mesic: string }>) {
 
   return (
     <Widget nacteni={ceka ? CEKA : data}
-      prazdno={f && radky.length === 0 ? <p className="t-meta">{t('Tenhle měsíc zatím žádné výdaje.')}</p> : undefined}>
+      prazdno={f && radky.length === 0 ? <p className="t-meta">{f.mesicu > 1 ? t('Za tohle období žádné výdaje.') : t('Tenhle měsíc zatím žádné výdaje.')}</p> : undefined}>
       {f && radky.length > 0 && (
         <div className="space-y-3">
-          <p className="t-meta cz-sentence">{nazevMesice(f.mesic || mesic)}</p>
+          <p className="t-meta cz-sentence">{nazevObdobi(f)}</p>
           <ul className="space-y-3">
             {radky.map(x => (
               <li key={x.stitek}>
@@ -473,7 +514,7 @@ function MarzeWidget({ velikost, nastaveni }: WidgetProps<{ mesic: string; razen
   const t = useT('widgety');
   const money = useMoney();
   const { ok, ceka } = useBrana('finance.marze', ['finance.marze']);
-  const mesic = useMesic(nastaveni.mesic);
+  const { mesic, vice } = useJedenMesic(nastaveni.mesic);
   const data = useDataWidgetu(ok ? `/api/pos/margins?month=${mesic}` : null, vyberMarze);
   const m = data.data;
   const sMarzi = (m?.polozky ?? []).filter(p => p.marginPct != null);
@@ -494,13 +535,16 @@ function MarzeWidget({ velikost, nastaveni }: WidgetProps<{ mesic: string; razen
   if (m && sMarzi.length > 0) {
     // Poznámka s cílem podniku, když ho nastavil („na položkách s recepturou · cíl 60 %").
     const sCilem = (veta: string) => (m.cil != null ? `${veta} · ${t('cíl {n} %', { n: m.cil })}` : veta);
+    // Marže se počítá po měsících: u rozsahu stránky (čtvrtletí) je to poslední měsíc a karta to řekne.
+    const zaMesic = vice ? <p className="t-meta cz-sentence">{t('za {mesic}', { mesic: nazevMesice(mesic) })}</p> : null;
     if (velikost === 'S') {
-      obsah = <Stat label={t('Marže')} value={m.marginPct != null ? `${m.marginPct} %` : '—'} note={sCilem(t('na položkách s recepturou'))} />;
+      obsah = <Stat label={t('Marže')} value={m.marginPct != null ? `${m.marginPct} %` : '—'} note={sCilem(vice ? t('za {mesic}', { mesic: nazevMesice(mesic) }) : t('na položkách s recepturou'))} />;
     } else if (velikost === 'M') {
       const [pred, po] = rozdelVetu(t, 'Marže {pct} na položkách s recepturou', 'pct');
       const podleMarze = [...sMarzi].sort((a, b) => (b.marginPct ?? 0) - (a.marginPct ?? 0));
       obsah = (
         <div className="space-y-3">
+          {zaMesic}
           <p className="t-meta">{pred}<span className="font-semibold text-[#16181A] tabular-nums">{m.marginPct} %</span>{po}{m.cil != null ? ` · ${t('cíl {n} %', { n: m.cil })}` : ''}</p>
           <div>
             <p className="t-label mb-1">{t('Vydělává nejvíc')}</p>
@@ -520,6 +564,7 @@ function MarzeWidget({ velikost, nastaveni }: WidgetProps<{ mesic: string; razen
         : k === 'kusy' ? b.qty - a.qty : (b.revenue ?? 0) - (a.revenue ?? 0)));
       obsah = (
         <div className="space-y-4">
+          {zaMesic}
           <StatRow>
             <Stat label={t('Marže')} value={m.marginPct != null ? `${m.marginPct} %` : '—'} note={sCilem(t('na položkách s recepturou'))} />
             <Stat label={t('Vydělaly')} value={money(m.margin)} note={t('tržba − suroviny')} />
@@ -588,13 +633,19 @@ function HosteVernost({ velikost, nastaveni }: WidgetProps<{ mesic: string }>) {
 function Doporuceni({ velikost, nastaveni }: WidgetProps<{ mesic: string }>) {
   const t = useT('widgety');
   const { ok, ceka } = useBrana('finance.doporuceni', ['finance.analyza']);
-  const mesic = useMesic(nastaveni.mesic);
+  // Rady se počítají za jeden měsíc: u rozsahu stránky za jeho poslední měsíc (a karta to řekne).
+  const { mesic, vice } = useJedenMesic(nastaveni.mesic);
   const data = useDataWidgetu(ok ? `/api/finance/advice?month=${mesic}` : null, vyberDoporuceni);
   const d = data.data;
   return (
     <Widget nacteni={ceka ? CEKA : data}
       prazdno={d && d.rady.length === 0 ? <p className="t-meta text-pretty">{t('Za tenhle měsíc zatím není dost dat na doporučení. Přibudou z uzávěrek, docházky a prodejů v pokladně.')}</p> : undefined}>
-      {d && d.rady.length > 0 && (velikost === 'L' ? <SkupinyDoporuceni d={d} /> : <PrvniRady d={d} />)}
+      {d && d.rady.length > 0 && (
+        <div className="space-y-3">
+          {vice && <p className="t-meta cz-sentence">{t('za {mesic}', { mesic: nazevMesice(mesic) })}</p>}
+          {velikost === 'L' ? <SkupinyDoporuceni d={d} /> : <PrvniRady d={d} />}
+        </div>
+      )}
     </Widget>
   );
 }

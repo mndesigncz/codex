@@ -6,7 +6,12 @@
 // nula), odhad do konce plánu jen u lidí, kteří ještě mají přijít.
 
 import type { Testy } from './_testy.ts';
-import { kcNaHodinuPoDnech, mzdyDnes, podilNakladu, trzbaNaHodinu, vyberDochazkuDnes, vyberFinance } from '../../lib/financeWidgety.ts';
+import {
+  kcNaHodinuPoDnech, mzdyDnes, podilNakladu, trzbaNaHodinu, vyberDochazkuDnes, vyberFinance,
+  urlFinanci, rozsahMesicu, obdobiZRozsahu, rozsahZVolby, predchoziRozsahMesicu, lonskyRozsah, rozsahSrovnani, mesiceRozsahu, pocetMesicuRozsahu, zmenySouhrnu,
+  vyberHeat, mapaTrzeb,
+} from '../../lib/financeWidgety.ts';
+import { mesicZVolby } from '../../lib/widgety/katalog/finance.ts';
 
 const DNES = '2026-10-13';
 /** Pražský okamžik dne DNES v „HH:MM" jako ISO v UTC (říjen = letní čas, +02:00). */
@@ -77,4 +82,50 @@ export default function ({ eq, ok }: Testy) {
   eq('Kč/h po dnech: se skrytými mzdami nic (role bez finance.mzdy)', kcNaHodinuPoDnech({ ...fin, souhrn: { ...fin.souhrn, mzdySkryte: true } }).every(d => d.kcH == null && !d.nejslabsi), true);
   eq('Kč/h po dnech: jeden den s hodnotou nemá nejslabšího (není s čím srovnat)',
     kcNaHodinuPoDnech({ ...fin, dnyVTydnu: fin.dnyVTydnu.map((d, i) => (i === 0 ? d : { ...d, dnu: 0, hodiny: 0 })) }).filter(d => d.nejslabsi).length, 0);
+
+  // ---- období Financí: měsíc nebo rozsah měsíců ----
+  eq('období: URL jednoho měsíce zůstává ?month=, rozsah jde přes from/to', [urlFinanci('2026-10'), urlFinanci('2026-07:2026-09'), urlFinanci('2026-10:2026-10')],
+    ['/api/finance?month=2026-10', '/api/finance?from=2026-07&to=2026-09', '/api/finance?month=2026-10']);
+  eq('období: rozsah z řetězce, obrácený se srovná, vadný = dnešní měsíc', [rozsahMesicu('2026-09:2026-07', DNES), rozsahMesicu('nic', DNES), obdobiZRozsahu('2026-07', '2026-07')],
+    [{ od: '2026-07', do: '2026-09' }, { od: '2026-10', do: '2026-10' }, '2026-07']);
+  eq('období: rychlé volby k 13. 10. 2026 (čtvrtletí a rok jen do dnešního měsíce)', [
+    rozsahZVolby('tento_mesic', DNES), rozsahZVolby('minuly_mesic', DNES), rozsahZVolby('ctvrtleti', DNES), rozsahZVolby('od_zacatku_roku', DNES), rozsahZVolby('lonsky_rok', DNES),
+    rozsahZVolby('ctvrtleti', '2026-08-05'),
+  ], [
+    { od: '2026-10', do: '2026-10' }, { od: '2026-09', do: '2026-09' }, { od: '2026-10', do: '2026-10' }, { od: '2026-01', do: '2026-10' }, { od: '2025-01', do: '2025-12' },
+    { od: '2026-07', do: '2026-08' },
+  ]);
+  eq('období: předchozí stejně dlouhý rozsah a stejné období loni (i přes přelom roku)', [
+    predchoziRozsahMesicu('2026-07', '2026-09'), predchoziRozsahMesicu('2026-01', '2026-02'), lonskyRozsah('2026-01', '2026-10'), pocetMesicuRozsahu('2025-11', '2026-02'),
+  ], [{ od: '2026-04', do: '2026-06' }, { od: '2025-11', do: '2025-12' }, { od: '2025-01', do: '2025-10' }, 4]);
+  eq('období: srovnávané období podle volby', [rozsahSrovnani('2026-07:2026-09', 'predchozi'), rozsahSrovnani('2026-07:2026-09', 'loni'), rozsahSrovnani('2026-10', 'loni')],
+    ['2026-04:2026-06', '2025-07:2025-09', '2025-10']);
+  eq('období: měsíce rozsahu od nejnovějšího (kniha po měsících)', mesiceRozsahu('2025-11', '2026-02'), ['2026-02', '2026-01', '2025-12', '2025-11']);
+  eq('období: volba „Minulý" ve widgetu u rozsahu = stejně dlouhý rozsah před ním', [mesicZVolby('minuly', '2026-07:2026-09'), mesicZVolby('minuly', '2026-01'), mesicZVolby('tento', '2026-07:2026-09')],
+    ['2026-04:2026-06', '2025-12', '2026-07:2026-09']);
+  const rozsah = vyberFinance({ month: '2026-07', from: '2026-07', to: '2026-09', months: 3, prevFrom: '2026-04', prevTo: '2026-06', summary: { revenue: 540000, prevRevenue: 500000, purchases: 150000, wagesWorked: 120000, wagesCash: 0, gross: 270000, net: 150000, fixedCosts: 120000, fixedCostsSet: true, mzdySkryte: false } });
+  eq('finance: odpověď za rozsah nese od, do, počet měsíců a srovnávané období', [rozsah.od, rozsah.do, rozsah.mesicu, rozsah.predOd, rozsah.predDo], ['2026-07', '2026-09', 3, '2026-04', '2026-06']);
+  const starsi = vyberFinance({ month: '2026-10', prevMonth: '2026-09', summary: { revenue: 1, mzdySkryte: false } });
+  eq('finance: starší server bez from/to = jeden měsíc, srovnání = prevMonth', [starsi.od, starsi.do, starsi.mesicu, starsi.predOd], ['2026-10', '2026-10', 1, '2026-09']);
+  const pred = vyberFinance({ month: '2026-04', from: '2026-04', to: '2026-06', months: 3, summary: { revenue: 500000, prevRevenue: 0, purchases: 100000, wagesWorked: 100000, wagesCash: 0, gross: 300000, net: -20000, mzdySkryte: false } });
+  eq('změny souhrnu: čtyři čísla proti srovnávanému období (výsledek proti absolutní hodnotě)', zmenySouhrnu(rozsah, pred), { trzby: 8, nakupy: 50, mzdy: 20, vysledek: 850 });
+  eq('změny souhrnu: bez srovnávaného období jen tržby z prevRevenue serveru', zmenySouhrnu(rozsah, null), { trzby: 8, nakupy: null, mzdy: null, vysledek: null });
+  eq('změny souhrnu: skryté mzdy = změna mezd null', zmenySouhrnu(rozsah, { ...pred, souhrn: { ...pred.souhrn, mzdySkryte: true } }).mzdy, null);
+
+  // ---- teplotní mapa den v týdnu × hodina ----
+  const heatRaw = Array.from({ length: 7 }, (_, wd) => Array.from({ length: 24 }, (_, h) => ({
+    trzba: wd === 6 ? 0 : h === 12 ? 4000 * (wd === 4 ? 2 : 1) : h >= 9 && h <= 17 ? 1000 : 0,
+    ucty: wd === 6 ? 0 : h === 12 ? 20 : h >= 9 && h <= 17 ? 6 : 0,
+    dni: wd === 6 ? 0 : 4, lidi: h === 12 ? 2 : h >= 9 && h <= 17 ? 1 : null,
+  })));
+  eq('heat: výběr — bez pole heat null (starší server), jinak 7 × 24 s čísly', [vyberHeat({ hours: [] }), vyberHeat({ heat: heatRaw })?.length, vyberHeat({ heat: heatRaw })?.[0].length, vyberHeat({ heat: heatRaw })?.[4][12]],
+    [null, 7, 24, { trzba: 8000, ucty: 20, dni: 4, lidi: 2 }]);
+  const mapa = mapaTrzeb(vyberHeat({ heat: heatRaw })!, 'trzba');
+  eq('heat: hodiny jen v otevírací době (9–17), sedm řádků', [mapa.hodiny[0], mapa.hodiny[mapa.hodiny.length - 1], mapa.radky.length], [9, 17, 7]);
+  eq('heat: průměr na den s prodejem (ne součet), neděle bez prodeje = null, špička pátek 12 h', [mapa.radky[0][3].prumer, mapa.radky[4][3].prumer, mapa.radky[6][3].prumer, mapa.spicka && [mapa.spicka.den, mapa.spicka.hodina], mapa.max],
+    [1000, 2000, null, [4, 12], 2000]);
+  eq('heat: intenzita 0–1 podle nejsilnější buňky (pátek 12 h = 1, pondělí 12 h = 0,5, pondělí 9 h = 0,125)', [mapa.radky[4][3].intenzita, mapa.radky[0][3].intenzita, mapa.radky[0][0].intenzita], [1, 0.5, 0.125]);
+  const ucty = mapaTrzeb(vyberHeat({ heat: heatRaw })!, 'ucty');
+  eq('heat: metrika účtenky počítá průměr účtenek na den', [ucty.radky[0][3].prumer, ucty.radky[0][0].prumer], [5, 1.5]);
+  eq('heat: bez jediné účtenky výchozí okno 8–20 a žádná špička', (() => { const m = mapaTrzeb(heatRaw.map(r => r.map(c => ({ ...c, trzba: 0, ucty: 0 }))), 'trzba'); return [m.hodiny[0], m.hodiny[m.hodiny.length - 1], m.spicka, m.max]; })(), [8, 20, null, 0]);
 }

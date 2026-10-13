@@ -69,9 +69,12 @@ const pretece = (p) => p.evaluate(() => document.documentElement.scrollWidth > w
   tvrdi('finance 1: Marže ukazuje cíl podniku („cíl 60 %")', /cíl 60 %/.test(await text(p, 'finance.marze')), (await text(p, 'finance.marze')).slice(0, 160));
   tvrdi('finance 1: žádná chyba v konzoli', chyby.length === 0, chyby.slice(0, 2).join(' | '));
 
-  // Jeden dotaz na /api/finance pro souhrn, podíl mezd, Kam šly peníze i knihu výdajů.
-  const financeDotazu = new Set(dotazyNa(stav, ['/api/finance']).filter(d => !d.path.includes('advice')).map(d => d.u)).size;
-  tvrdi('finance 1: widgety a kniha výdajů sdílí jednu URL /api/finance', financeDotazu === 1, String(financeDotazu));
+  // Jeden dotaz na /api/finance pro souhrn, podíl mezd, Kam šly peníze i knihu výdajů;
+  // kolo 8 (R8-4) navíc jeden na srovnávané období (minulý měsíc) pro změnu v % u čísel souhrnu.
+  const financeUrl = [...new Set(dotazyNa(stav, ['/api/finance']).filter(d => !d.path.includes('advice')).map(d => new URL(d.u).search))];
+  const mesicPred = (() => { const [y, m] = dnes.slice(0, 7).split('-').map(Number); return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`; })();
+  tvrdi('finance 1: widgety a kniha výdajů sdílí jednu URL /api/finance (+ srovnávaný minulý měsíc pro změnu v %)',
+    financeUrl.length === 2 && financeUrl.includes(`?month=${dnes.slice(0, 7)}`) && financeUrl.includes(`?month=${mesicPred}`), financeUrl.join(' | '));
 
   // Kniha výdajů: klikací účtenka nesmí být <li class="contents"> (bez linky nad sebou)
   // a šipka jen u účtenek nesmí odsunout částku ze sloupce čísel (DP §3.6).
@@ -102,7 +105,11 @@ const pretece = (p) => p.evaluate(() => document.documentElement.scrollWidth > w
   const nove = new Set(stav.dotazy.slice(pred).filter(d => d.path === '/api/finance').map(d => new URL(d.u).searchParams.get('month')));
   const [y, m] = dnes.split('-').map(Number);
   const minuly = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
-  tvrdi('finance 8: „Předchozí měsíc" načte minulý měsíc jednou URL pro widgety i knihu', nove.size === 1 && nove.has(minuly), [...nove].join(','));
+  // Kolo 8 (R8-4): minulý měsíc už je v mezipaměti ze srovnání v Souhrnu (načetl se s dneškem), nově se tak ptá jen
+  // na měsíc před ním (nové srovnání) — a nikdy na nic jiného.
+  const predminuly = m <= 2 ? `${y - 1}-${String(m + 10).padStart(2, '0')}` : `${y}-${String(m - 2).padStart(2, '0')}`;
+  tvrdi('finance 8: „Předchozí měsíc" načte minulý měsíc jednou URL pro widgety i knihu (ze srovnání už je v mezipaměti) a nově jen srovnávaný měsíc před ním',
+    nove.size >= 1 && nove.has(predminuly) && [...nove].every(x => x === minuly || x === predminuly), [...nove].join(','));
 
   // 2) Úpravy: nástroj je zástupce bez „−" a jde posunout šipkou → PUT.
   await upravit(p).click();

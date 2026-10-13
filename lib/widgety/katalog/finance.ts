@@ -21,8 +21,18 @@ import type { DefiniceWidgetu } from '../typy.ts';
  */
 export function mesicZVolby(volba: unknown, zaklad: string): string {
   if (volba !== 'minuly') return zaklad;
-  const [y, m] = zaklad.split('-').map(Number);
-  return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
+  // Kolo 8: základ může být rozsah měsíců „RRRR-MM:RRRR-MM" (Finance za čtvrtletí) — „Minulý" je pak
+  // stejně dlouhý rozsah před ním (duben–červen k červenci–září).
+  const [od, doM = od] = zaklad.split(':');
+  const posun = (mesic: string, o: number) => {
+    const [y, m] = mesic.split('-').map(Number);
+    const d = new Date(Date.UTC(y, m - 1 + o, 1));
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+  };
+  const [y1, m1] = od.split('-').map(Number); const [y2, m2] = doM.split('-').map(Number);
+  const n = Math.max(1, (y2 - y1) * 12 + (m2 - m1) + 1);
+  const novyOd = posun(od, -n), novyDo = posun(od, -1);
+  return n === 1 ? novyOd : `${novyOd}:${novyDo}`;
 }
 
 export const WIDGETY: DefiniceWidgetu[] = [

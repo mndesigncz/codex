@@ -1790,5 +1790,20 @@
   "Výzvy se nenačetly": "Challenges didn't load",
   "Zatím žádná výzva. Zkus „5 uzávěrek bez manka do neděle → pizza pro tým“.": "No challenge yet. Try \"5 closings without shortage by Sunday → pizza for the team\".",
   "Zrušit výzvu {nazev}": "Cancel challenge {nazev}",
-  "Částka v měně podniku.": "Amount in the business currency."
+  "Částka v měně podniku.": "Amount in the business currency.",
+  "Minulý měsíc": "Last month",
+  "Čtvrtletí": "Quarter",
+  "Od začátku roku": "Year to date",
+  "Loňský rok": "Last year",
+  "Vlastní": "Custom",
+  "Rychlá volba období": "Quick period choice",
+  "Vlastní rozmezí": "Custom range",
+  "Srovnat s": "Compare to",
+  "Předchozí období": "Previous period",
+  "Stejné období loni": "Same period last year",
+  "V tomhle období žádné účtenky ani objednávky": "No receipts or orders in this period",
+  "V tomhle období žádné výdaje": "No expenses in this period",
+  "Předchozí měsíc": "Previous month",
+  "Další měsíc": "Next month",
+  "Další období": "Next period"
 }

@@ -57,16 +57,37 @@ const snimek = (p, jmeno) => p.screenshot({ path: `${SNIMKY}k84-finance-${jmeno}
 const TELEFON = { width: 390, height: 844 };
 const MONITOR = { width: 1280, height: 900 };
 
+const posunMesic = (mesic, o) => { const [y, m] = mesic.split('-').map(Number); const d = new Date(Date.UTC(y, m - 1 + o, 1)); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`; };
+const pocetMesicu = (od, doM) => { const [y1, m1] = od.split('-').map(Number); const [y2, m2] = doM.split('-').map(Number); return (y2 - y1) * 12 + (m2 - m1) + 1; };
+/**
+ * /api/finance jako skutečná routa (kolo 8): `?month=` nebo `?from=&to=`; odpověď nese from/to/months a srovnávané
+ * období. Kniha výdajů dostane data rozprostřená po měsících rozsahu (nejnovější měsíc první), ať jde seskupit.
+ * Loňský rozsah vrací nižší tržby (160 000), ať srovnání „loni" ukáže jinou změnu než „předchozí období".
+ */
+const financeZaObdobi = (u) => {
+  const f = nacti('k84-finance-finance');
+  const od = u.searchParams.get('from') ?? u.searchParams.get('month') ?? MESIC;
+  const doM = u.searchParams.get('to') ?? od;
+  const n = pocetMesicu(od, doM);
+  const ledger = f.ledger.map((r, i) => ({ ...r, date: `${posunMesic(doM, -(i % n))}-${String(10 + i).padStart(2, '0')}` }));
+  // Stejné měsíce loni: 160 000 (+15 % proti nim); jakékoli dřívější období: 171 450 jako prevRevenue (+8 %); jinak čísla fixtury.
+  const lonske = od === `${Number(MESIC.slice(0, 4)) - 1}-01` && doM === `${Number(MESIC.slice(0, 4)) - 1}-${MESIC.slice(5)}`;
+  const predchozi = !lonske && doM < MESIC;
+  const summary = lonske ? { ...f.summary, revenue: 160000, purchases: 50000, wagesWorked: 40000, gross: 70000, net: 70000 }
+    : predchozi ? { ...f.summary, revenue: 171450, purchases: 60000, wagesWorked: 46000, gross: 65450, net: 65450 } : f.summary;
+  return { ...f, summary, ledger, month: od, prevMonth: posunMesic(od, -n), from: od, to: doM, months: n, prevFrom: posunMesic(od, -n), prevTo: posunMesic(od, -1) };
+};
+
 /** Datové endpointy balíku; `chyby` = cesta → HTTP kód. */
 const data = (opts = {}) => (req, json) => {
   const u = new URL(req.url()); const path = u.pathname;
   if (req.method() !== 'GET') return undefined;
   if (opts.chyby?.[path]) return json({ error: 'Server spadl' }, opts.chyby[path]);
   if (path === '/api/attendance') return json(nacti('k84-finance-attendance'));
-  if (path === '/api/finance') return json(opts.finance ? opts.finance(u) : { ...nacti('k84-finance-finance'), month: u.searchParams.get('month') ?? MESIC });
+  if (path === '/api/finance') return json(opts.finance ? opts.finance(u) : financeZaObdobi(u));
   if (path === '/api/pos/insights') return json(nacti('k84-finance-pos-insights'));
   if (path === '/api/finance/advice') return json(nacti('k69-b5b-finance-advice'));
-  if (path === '/api/pos/daily') return json(opts.daily ? opts.daily(u) : nacti('k69-b5b-pos-daily'));
+  if (path === '/api/pos/daily') return json(opts.daily ? opts.daily(u) : u.searchParams.get('heat') === '1' ? nacti('k84-finance-pos-daily-heat') : nacti('k69-b5b-pos-daily'));
   if (path === '/api/pos/margins') return json(nacti('k69-b5b-pos-margins'));
   if (path === '/api/pos/status') return json(nacti('k69-b5b-pos-status'));
   if (path === '/api/receipts') return json(nacti('k69-b5b-receipts'));
@@ -139,6 +160,113 @@ if (casti.includes('B')) {
     tvrdi(`B ${jmeno}: nic nepřetéká`, !pre, pre);
     tvrdi(`B ${jmeno}: žádná chyba v konzoli`, chyby.filter(c => !/418|423|425/.test(c)).length === 0, chyby.slice(0, 2).join(' | '));
     await snimek(p, `B-finance-${jmeno}`);
+    await ctx.close();
+  }
+}
+
+// ===========================================================================
+// C) Finance za libovolné období a srovnání s loňskem
+// ===========================================================================
+if (casti.includes('C')) {
+  const rok = MESIC.slice(0, 4);
+  for (const [jmeno, viewport, mobil] of [['telefon', TELEFON, true], ['monitor', MONITOR, false]]) {
+    const { ctx, p, stav, chyby } = await kontext({ viewport, mobil, fix: nacti('k69-b5b-rozlozeni-finance'), dalsi: data() });
+    await otevri(p, '/employer/overview?view=finance', 'vedeni.finance');
+    await p.waitForTimeout(800);
+    const tlacitko = p.getByRole('button', { name: /Tento měsíc/ }).first();
+    tvrdi(`C ${jmeno}: v hlavičce je výběr období „Tento měsíc · <měsíc>" (ne jen šipky měsíce)`, await tlacitko.isVisible());
+    await tlacitko.click();
+    const okno = p.getByRole('dialog', { name: 'Období' });
+    await dokud(() => okno.isVisible(), 3000);
+    if (mobil) {
+      await p.waitForTimeout(600);
+      const r = await okno.boundingBox();
+      tvrdi('C telefon: okno období vyjíždí zdola', !!r && Math.abs(r.y + r.height - TELEFON.height) <= 2, JSON.stringify(r));
+      // Dotyková plocha = výška tlačítka, nebo jeho ::before (tap-target rozšiřuje zásah, ne vzhled).
+      const cile = await okno.getByRole('button').filter({ hasNot: p.locator('[aria-label="Zavřít"]') }).evaluateAll(bs => bs.filter(b => b.getAttribute('aria-label') !== 'Zavřít').map(b => Math.round(Math.max(b.getBoundingClientRect().height, parseFloat(getComputedStyle(b, '::before').height) || 0))));
+      tvrdi('C telefon: všechny volby mají dotykovou plochu ≥ 44 px', cile.every(h => h >= 44), cile.join(','));
+      await snimek(p, 'C-obdobi-okno-telefon');
+    }
+    tvrdi(`C ${jmeno}: okno nabízí Tento měsíc, Minulý měsíc, Čtvrtletí, Od začátku roku, Loňský rok, Vlastní a Srovnat s`,
+      (await Promise.all(['Tento měsíc', 'Minulý měsíc', 'Čtvrtletí', 'Od začátku roku', 'Loňský rok', 'Vlastní'].map(n => okno.getByRole('button', { name: n, exact: true }).isVisible()))).every(Boolean)
+      && await okno.getByRole('tablist', { name: 'Srovnat s' }).isVisible());
+    const od = Date.now();
+    await okno.getByRole('button', { name: 'Od začátku roku', exact: true }).click();
+    await dokud(() => okno.isVisible().then(v => !v), 3000);
+    await dokud(async () => /Souhrn období[\s\S]*proti/.test(await text(p, 'finance.souhrn_mesice')), 8000);
+    await p.waitForTimeout(600);
+    const url = `/api/finance?from=${rok}-01&to=${MESIC}`;
+    const dotazy = new Set(dotazyNa(stav, ['/api/finance'], od).filter(d => !d.path.includes('advice')).map(d => new URL(d.u).pathname + new URL(d.u).search));
+    tvrdi(`C ${jmeno}: volba rozsahu pošle ${url} a předchozí období; widgety i kniha sdílí tytéž URL`, dotazy.has(url) && dotazy.size === 2, [...dotazy].join(' | '));
+    const souhrn = await text(p, 'finance.souhrn_mesice');
+    tvrdi(`C ${jmeno}: Souhrn období nese od–do, počet měsíců a změnu v % u čísel`, /Souhrn období/.test(souhrn) && /leden \d{4} – /i.test(souhrn) && /měsíců/.test(souhrn) && /\+8 % proti předchozímu období/.test(souhrn), souhrn.slice(0, 260));
+    const nastroj = p.locator('[data-plocha] li[data-widget="nastroj"]');
+    const skupin = await nastroj.locator('section[aria-label]').count();
+    tvrdi(`C ${jmeno}: kniha výdajů za víc měsíců je ve skupinách po měsících`, skupin >= 2, String(skupin));
+    tvrdi(`C ${jmeno}: tlačítko období říká „Od začátku roku"`, await p.getByRole('button', { name: /Od začátku roku/ }).first().isVisible());
+    // Srovnání s loňskem: druhý dotaz jde na stejné měsíce o rok dřív a změna se přepočítá.
+    const od2 = Date.now();
+    await p.getByRole('button', { name: /Od začátku roku/ }).first().click();
+    await dokud(() => okno.isVisible(), 3000);
+    await okno.getByRole('tab', { name: 'Stejné období loni' }).click();
+    await okno.getByRole('button', { name: 'Hotovo' }).click();
+    await dokud(async () => /proti stejnému období loni/.test(await text(p, 'finance.souhrn_mesice')), 8000);
+    const dotazy2 = dotazyNa(stav, ['/api/finance'], od2).map(d => new URL(d.u).search);
+    const lonsky = `?from=${Number(rok) - 1}-01&to=${Number(rok) - 1}-${MESIC.slice(5)}`;
+    tvrdi(`C ${jmeno}: Srovnat s loňskem načte ${lonsky} a souhrn říká změnu proti stejnému období loni (+15 %)`, dotazy2.includes(lonsky) && /\+15 % proti stejnému období loni/.test(await text(p, 'finance.souhrn_mesice')), dotazy2.join(' | ') + ' ' + (await text(p, 'finance.souhrn_mesice')).slice(0, 200));
+    const pre = await pretece(p, 'finance.souhrn_mesice');
+    tvrdi(`C ${jmeno}: nic nepřetéká`, !pre, pre);
+    tvrdi(`C ${jmeno}: žádná chyba v konzoli`, chyby.filter(c => !/418|423|425/.test(c)).length === 0, chyby.slice(0, 2).join(' | '));
+    await snimek(p, `C-finance-obdobi-${jmeno}`);
+    await ctx.close();
+  }
+}
+
+// ===========================================================================
+// D) Kdy se prodává: teplotní mapa den v týdnu × hodina
+// ===========================================================================
+if (casti.includes('D')) {
+  for (const [jmeno, viewport, mobil] of [['telefon', TELEFON, true], ['monitor', MONITOR, false]]) {
+    const { ctx, p, stav, chyby } = await kontext({ viewport, mobil, fix: nacti('k84-finance-rozlozeni-finance'), dalsi: data() });
+    await otevri(p, '/employer/overview?view=finance', 'vedeni.finance');
+    const w = p.locator('[data-plocha] li[data-widget="trzby.heatmapa"]');
+    await dokud(async () => /nejsilnější/.test(await text(p, 'trzby.heatmapa')), 8000);
+    await w.scrollIntoViewIfNeeded();
+    await p.waitForTimeout(400);
+    const h = await text(p, 'trzby.heatmapa');
+    const url = dotazyNa(stav, ['/api/pos/daily']).map(d => new URL(d.u).search).find(q => /heat=1/.test(q));
+    tvrdi(`D ${jmeno}: widget Kdy se prodává čte /api/pos/daily s lite=1&heat=1`, !!url && /lite=1/.test(url), url ?? '—');
+    tvrdi(`D ${jmeno}: jmenuje nejsilnější okno — pátek 17–18 h (průměr 6 720 Kč)`, /nejsilnější pátek 17–18 h · průměr 6 720 Kč/i.test(h), h.slice(0, 200));
+    tvrdi(`D ${jmeno}: lišta období a přepínač Tržba / Účtenky jsou v kartě`, await w.getByRole('button', { name: /Posledních 30 dní/ }).count() === 1 && await w.getByRole('tab', { name: 'Účtenky' }).count() === 1);
+    const bunky = w.getByRole('group', { name: /Teplotní mapa/ }).getByRole('button');
+    const n = await bunky.count();
+    // 7 dnů × 13 hodin (7–19); neděle bez prodeje = zakázané buňky.
+    tvrdi(`D ${jmeno}: mřížka má 7 × 13 buněk (hodiny otevírací doby 7–19)`, n === 91, String(n));
+    const rozmery = await bunky.evaluateAll(bs => { const r = bs.map(b => b.getBoundingClientRect()); const x0 = r[0].x, y0 = r[0].y; return { vodorovne: r.filter(b => Math.abs(b.y - y0) < 1).length, svisle: r.filter(b => Math.abs(b.x - x0) < 1).length }; });
+    tvrdi(`D ${jmeno}: ${mobil ? 'na telefonu dny ve sloupcích a hodiny v řádcích (7 × 13)' : 'na monitoru hodiny ve sloupcích a dny v řádcích (13 × 7)'}`,
+      mobil ? rozmery.vodorovne === 7 && rozmery.svisle === 13 : rozmery.vodorovne === 13 && rozmery.svisle === 7, JSON.stringify(rozmery));
+    if (!mobil) tvrdi('D monitor: v buňkách jsou čísla (pátek 17 h „6,7k")', (await bunky.allInnerTexts()).some(x => x === '6,7k'));
+    const pre = await pretece(p, 'trzby.heatmapa');
+    tvrdi(`D ${jmeno}: nic nepřetéká`, !pre, pre);
+    await snimek(p, `D-heatmapa-${jmeno}`);
+    // Klepnutí na buňku otevře okno s průměrem, účtenkami a lidmi na směně.
+    await w.getByRole('button', { name: /^pátek 17–18 h/i }).click();
+    const okno = p.getByRole('dialog', { name: /pátek 17–18 h/i });
+    await dokud(() => okno.isVisible(), 3000);
+    const o = (await okno.innerText()).replace(/\u00a0/g, ' ');
+    tvrdi(`D ${jmeno}: okno buňky: průměr 6 720 Kč, 39,5 účtenky, 2 lidé na směně, ze 4 dnů`, /6 720 Kč/.test(o) && /39,5/.test(o) && /\n2\n/.test(o) && /4 dnů s prodejem/.test(o), o.slice(0, 300));
+    if (mobil) {
+      await p.waitForTimeout(600);
+      const rr = await okno.boundingBox();
+      tvrdi('D telefon: okno buňky vyjíždí zdola', !!rr && Math.abs(rr.y + rr.height - TELEFON.height) <= 2, JSON.stringify(rr));
+    }
+    await snimek(p, `D-heatmapa-okno-${jmeno}`);
+    await p.keyboard.press('Escape');
+    // Přepnutí na účtenky přepočítá buňky (pátek 17 h = 40 účtenek za den).
+    await w.getByRole('tab', { name: 'Účtenky' }).click();
+    await p.waitForTimeout(300);
+    tvrdi(`D ${jmeno}: přepínač Účtenky přepočítá buňky (pátek 17–18 h: 40 účtenek)`, /pátek 17–18 h: 40 účtenek/i.test(await bunky.evaluateAll(bs => bs.map(b => b.getAttribute('aria-label')).join('\n'))));
+    tvrdi(`D ${jmeno}: žádná chyba v konzoli`, chyby.filter(c => !/418|423|425/.test(c)).length === 0, chyby.slice(0, 2).join(' | '));
     await ctx.close();
   }
 }

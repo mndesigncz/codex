@@ -219,6 +219,9 @@ export interface RadekKnihy {
 
 export interface FinanceMesice {
   mesic: string;
+  /** Rozsah měsíců „RRRR-MM" (kolo 8); u jednoho měsíce od = do = mesic. Srovnávané období: predOd–predDo. */
+  od: string; do: string; mesicu: number;
+  predOd: string; predDo: string;
   souhrn: {
     revenue: number; prevRevenue: number; cash: number; card: number; tips: number;
     purchases: number; wagesCash: number; wagesWorked: number; gross: number; diffSum: number;
@@ -243,8 +246,12 @@ export interface DenTydneFinanci { poradi: number; trzba: number; dnu: number; h
 export function vyberFinance(raw: any): FinanceMesice {
   if (!raw || typeof raw !== 'object' || !raw.summary || typeof raw.summary !== 'object') throw new Error('Finance přišly v nečekaném tvaru.');
   const s = raw.summary; const g = raw.guest ?? {};
+  const mesic = text(raw.month);
+  const od = text(raw.from) || mesic, doM = text(raw.to) || od;
   return {
-    mesic: text(raw.month),
+    mesic,
+    od, do: doM, mesicu: Math.max(1, cis(raw.months) || pocetMesicuRozsahu(od, doM)),
+    predOd: text(raw.prevFrom) || text(raw.prevMonth), predDo: text(raw.prevTo) || text(raw.prevMonth),
     souhrn: {
       revenue: cis(s.revenue), prevRevenue: cis(s.prevRevenue), cash: cis(s.cash), card: cis(s.card), tips: cis(s.tips),
       purchases: cis(s.purchases), wagesCash: cis(s.wagesCash), wagesWorked: cis(s.wagesWorked), gross: cis(s.gross), diffSum: cis(s.diffSum),
@@ -281,7 +288,104 @@ export function vyberFinance(raw: any): FinanceMesice {
   };
 }
 
-export const urlFinanci = (mesic: string) => `/api/finance?month=${mesic}`;
+/**
+ * Adresa /api/finance pro měsíc („RRRR-MM") nebo rozsah měsíců („RRRR-MM:RRRR-MM", kolo 8).
+ * Jeden měsíc jde dál přes `?month=`, ať sondy a mezipaměť widgetů drží stejnou URL jako dřív.
+ */
+export const urlFinanci = (obdobi: string) => {
+  const r = rozsahMesicu(obdobi);
+  return r.od === r.do ? `/api/finance?month=${r.od}` : `/api/finance?from=${r.od}&to=${r.do}`;
+};
+
+// ---------------------------------------------------------------------------
+// Období Financí: měsíc nebo rozsah měsíců (kolo 8, R8-4)
+// ---------------------------------------------------------------------------
+//
+// Hlavička Financí dřív uměla jen ‹ měsíc ›. Square a Toast mají výběr rozsahu a „compare to":
+// předchozí období nebo stejné období loni. Období stránky je tu řetězec „RRRR-MM" nebo
+// „RRRR-MM:RRRR-MM" — stejný tvar nese MesicStrankyFinanci do widgetů, takže souhrn nahoře,
+// Kam šly peníze i kniha výdajů ukazují vždycky týž rozsah (a jednu URL).
+
+export type PresetObdobiFinanci = 'tento_mesic' | 'minuly_mesic' | 'ctvrtleti' | 'od_zacatku_roku' | 'lonsky_rok' | 'vlastni';
+export type SrovnaniFinanci = 'predchozi' | 'loni';
+
+export const PRESETY_OBDOBI_FINANCI: PresetObdobiFinanci[] = ['tento_mesic', 'minuly_mesic', 'ctvrtleti', 'od_zacatku_roku', 'lonsky_rok', 'vlastni'];
+
+/** Měsíc posunutý o `o` měsíců („RRRR-MM"). */
+export function posunMesice(mesic: string, o: number): string {
+  const [y, m] = mesic.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + o, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+/** Kolik měsíců má rozsah od–do včetně (obrácený nebo vadný = 1). */
+export function pocetMesicuRozsahu(od: string, doM: string): number {
+  const [y1, m1] = od.split('-').map(Number); const [y2, m2] = doM.split('-').map(Number);
+  const n = (y2 - y1) * 12 + (m2 - m1) + 1;
+  return Number.isFinite(n) && n >= 1 ? n : 1;
+}
+
+const JE_MESIC = /^\d{4}-\d{2}$/;
+
+/** „RRRR-MM" nebo „RRRR-MM:RRRR-MM" → { od, do }; vadný nebo obrácený tvar = dnešní měsíc. */
+export function rozsahMesicu(obdobi: string, dnes: string = pragueToday()): { od: string; do: string } {
+  const [a, b] = String(obdobi).split(':');
+  const od = JE_MESIC.test(a) ? a : dnes.slice(0, 7);
+  const doM = b != null && JE_MESIC.test(b) ? b : od;
+  return doM < od ? { od: doM, do: od } : { od, do: doM };
+}
+
+/** Zpět do řetězce období: jeden měsíc bez dvojtečky. */
+export const obdobiZRozsahu = (od: string, doM: string): string => (od === doM ? od : `${od}:${doM}`);
+
+/** Rozsah měsíců z rychlé volby k danému „dnes" (čtvrtletí a rok jen do dnešního měsíce — budoucí měsíce nemají co ukázat). */
+export function rozsahZVolby(preset: Exclude<PresetObdobiFinanci, 'vlastni'>, dnes: string = pragueToday()): { od: string; do: string } {
+  const mesic = dnes.slice(0, 7);
+  const [y, m] = mesic.split('-').map(Number);
+  switch (preset) {
+    case 'tento_mesic': return { od: mesic, do: mesic };
+    case 'minuly_mesic': { const p = posunMesice(mesic, -1); return { od: p, do: p }; }
+    case 'ctvrtleti': return { od: `${y}-${String(Math.floor((m - 1) / 3) * 3 + 1).padStart(2, '0')}`, do: mesic };
+    case 'od_zacatku_roku': return { od: `${y}-01`, do: mesic };
+    case 'lonsky_rok': return { od: `${y - 1}-01`, do: `${y - 1}-12` };
+  }
+}
+
+/** Stejně dlouhý rozsah bezprostředně před tímhle (totéž, co počítá server jako prevRevenue). */
+export function predchoziRozsahMesicu(od: string, doM: string): { od: string; do: string } {
+  const n = pocetMesicuRozsahu(od, doM);
+  return { od: posunMesice(od, -n), do: posunMesice(od, -1) };
+}
+
+/** Tytéž měsíce o rok dřív („stejné období loni"). */
+export const lonskyRozsah = (od: string, doM: string): { od: string; do: string } => ({ od: posunMesice(od, -12), do: posunMesice(doM, -12) });
+
+/** Rozsah ke srovnání podle volby: předchozí období, nebo stejné období loni. */
+export function rozsahSrovnani(obdobi: string, srovnani: SrovnaniFinanci): string {
+  const r = rozsahMesicu(obdobi);
+  const x = srovnani === 'loni' ? lonskyRozsah(r.od, r.do) : predchoziRozsahMesicu(r.od, r.do);
+  return obdobiZRozsahu(x.od, x.do);
+}
+
+/** Měsíce rozsahu od nejnovějšího (pro knihu výdajů po měsících). */
+export function mesiceRozsahu(od: string, doM: string): string[] {
+  const out: string[] = [];
+  for (let m = doM; m >= od && out.length < 36; m = posunMesice(m, -1)) out.push(m);
+  return out;
+}
+
+/** Změna čtyř čísel souhrnu proti srovnávanému období (%); null, kde srovnávané období nic nemá. */
+export function zmenySouhrnu(ted: FinanceMesice, pred: FinanceMesice | null): { trzby: number | null; nakupy: number | null; mzdy: number | null; vysledek: number | null } {
+  if (!pred) return { trzby: zmenaProti(ted.souhrn.revenue, ted.souhrn.prevRevenue), nakupy: null, mzdy: null, vysledek: null };
+  const vys = (a: number, b: number) => (b !== 0 ? Math.round(((a - b) / Math.abs(b)) * 100) : null);
+  return {
+    trzby: zmenaProti(ted.souhrn.revenue, pred.souhrn.revenue),
+    nakupy: zmenaProti(ted.souhrn.purchases, pred.souhrn.purchases),
+    mzdy: ted.souhrn.mzdySkryte || pred.souhrn.mzdySkryte ? null : zmenaProti(mzdyMesice(ted), mzdyMesice(pred)),
+    // Výsledek může být záporný: změna proti absolutní hodnotě (ze −10 000 na −5 000 je +50 %).
+    vysledek: vys(ted.souhrn.net, pred.souhrn.net),
+  };
+}
 
 /** Mzdy měsíce: odpracováno × sazba, a když docházka chybí, denní výplaty (jako dřív FinanceView). */
 export const mzdyMesice = (f: FinanceMesice) => Math.max(f.souhrn.wagesCash, f.souhrn.wagesWorked);
@@ -779,4 +883,75 @@ export function mzdyDnes(d: DochazkaDnes, ted: number, dnes: string): MzdyDnes {
 export function podilNakladu(naklad: number, trzba: number): number | null {
   if (!(trzba > 0)) return null;
   return Math.round((naklad / trzba) * 100);
+}
+
+// ---------------------------------------------------------------------------
+// Teplotní mapa tržeb: den v týdnu × hodina (kolo 8, R8-4)
+// ---------------------------------------------------------------------------
+//
+// Lightspeed „Hourly Performance": heat mapa nejrušnějších období k plánování obsluhy.
+// Data z /api/pos/daily?heat=1: 7 řádků (pondělí první) × 24 hodin, v buňce tržba a účtenky
+// za celé období, dny s prodejem toho dne v týdnu a průměrný počet lidí na směně.
+
+export interface BunkaHeat { trzba: number; ucty: number; dni: number; lidi: number | null }
+
+/** `heat` z /api/pos/daily; null, když ho odpověď nenese (starší server nebo bez heat=1). */
+export function vyberHeat(raw: any): BunkaHeat[][] | null {
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.heat) || raw.heat.length !== 7) return null;
+  return raw.heat.map((radek: any) => Array.from({ length: 24 }, (_, h) => {
+    const c = Array.isArray(radek) ? radek[h] : null;
+    return { trzba: cis(c?.trzba), ucty: cis(c?.ucty), dni: cis(c?.dni), lidi: nebo(c?.lidi) };
+  }));
+}
+
+export type MetrikaHeat = 'trzba' | 'ucty';
+
+export interface BunkaMapy {
+  /** 0 = pondělí … 6 = neděle. */
+  den: number;
+  hodina: number;
+  /** Průměr na den s prodejem (tržba, nebo účtenky) — null, když ten den v týdnu v období neprodával. */
+  prumer: number | null;
+  /** Celkem za období. */
+  celkem: number;
+  ucty: number;
+  trzba: number;
+  dni: number;
+  lidi: number | null;
+  /** 0–1 podíl na nejsilnější buňce (podbarvení). */
+  intenzita: number;
+}
+
+export interface MapaTrzeb {
+  /** Hodiny otevírací doby, které se kreslí (od první do poslední s prodejem, aspoň tři). */
+  hodiny: number[];
+  /** Sedm řádků po hodinách z `hodiny`. */
+  radky: BunkaMapy[][];
+  max: number;
+  /** Nejsilnější buňka, nebo null bez prodeje. */
+  spicka: BunkaMapy | null;
+}
+
+/**
+ * Mřížka pro widget: průměr na den (ne součet — pondělků je v období jinak než sobot), podbarvení
+ * podle nejsilnější buňky, hodiny jen v otevírací době (hodiny bez jediné účtenky na krajích se vynechají).
+ */
+export function mapaTrzeb(heat: readonly (readonly BunkaHeat[])[], metrika: MetrikaHeat): MapaTrzeb {
+  const sProdejem = Array.from({ length: 24 }, (_, h) => heat.some(r => (r[h]?.ucty ?? 0) > 0));
+  let prvni = sProdejem.indexOf(true), posledni = sProdejem.lastIndexOf(true);
+  if (prvni < 0) { prvni = 8; posledni = 20; }
+  if (posledni - prvni < 2) posledni = Math.min(23, prvni + 2);
+  const hodiny = Array.from({ length: posledni - prvni + 1 }, (_, i) => prvni + i);
+  const bunky: BunkaMapy[][] = heat.map((r, den) => hodiny.map(h => {
+    const c = r[h] ?? { trzba: 0, ucty: 0, dni: 0, lidi: null };
+    const celkem = metrika === 'trzba' ? c.trzba : c.ucty;
+    return { den, hodina: h, prumer: c.dni > 0 ? Math.round((celkem / c.dni) * 10) / 10 : null, celkem, ucty: c.ucty, trzba: c.trzba, dni: c.dni, lidi: c.lidi, intenzita: 0 };
+  }));
+  const max = Math.max(0, ...bunky.flat().map(b => b.prumer ?? 0));
+  let spicka: BunkaMapy | null = null;
+  for (const b of bunky.flat()) {
+    b.intenzita = max > 0 && b.prumer != null ? Math.min(1, b.prumer / max) : 0;
+    if (b.prumer != null && b.prumer > 0 && (!spicka || b.prumer > spicka.prumer!)) spicka = b;
+  }
+  return { hodiny, radky: bunky, max, spicka };
 }

@@ -1790,5 +1790,20 @@
   "Výzvy se nenačetly": "Wyzwania się nie wczytały",
   "Zatím žádná výzva. Zkus „5 uzávěrek bez manka do neděle → pizza pro tým“.": "Jeszcze brak wyzwania. Spróbuj „5 zamknięć bez manka do niedzieli → pizza dla zespołu”.",
   "Zrušit výzvu {nazev}": "Anuluj wyzwanie {nazev}",
-  "Částka v měně podniku.": "Kwota w walucie lokalu."
+  "Částka v měně podniku.": "Kwota w walucie lokalu.",
+  "Minulý měsíc": "Zeszły miesiąc",
+  "Čtvrtletí": "Kwartał",
+  "Od začátku roku": "Od początku roku",
+  "Loňský rok": "Ubiegły rok",
+  "Vlastní": "Własna",
+  "Rychlá volba období": "Szybki wybór okresu",
+  "Vlastní rozmezí": "Własny zakres",
+  "Srovnat s": "Porównaj z",
+  "Předchozí období": "Poprzedni okres",
+  "Stejné období loni": "Ten sam okres rok temu",
+  "V tomhle období žádné účtenky ani objednávky": "W tym okresie brak paragonów i zamówień",
+  "V tomhle období žádné výdaje": "W tym okresie brak wydatków",
+  "Předchozí měsíc": "Poprzedni miesiąc",
+  "Další měsíc": "Następny miesiąc",
+  "Další období": "Następny okres"
 }

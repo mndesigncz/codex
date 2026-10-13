@@ -2,6 +2,12 @@
 // revenue from closings, every expense the app knows about (receipts, cash
 // movements, supplier orders, daily payouts), computed wages, and rule-based
 // advice built from the numbers the app already collects.
+//
+// Kolo 8 (R8-4): místo jednoho měsíce libovolný rozsah měsíců (`?from=RRRR-MM&to=RRRR-MM`,
+// strop 24; `?month=` dál funguje jako rozsah o jednom měsíci). Každý dotaz bere celý rozsah
+// najednou (od prvního dne `from` do prvního dne po `to`), ne měsíc po měsíci — čtvrtletí
+// je pořád jedna sada dotazů. Pevné náklady se násobí počtem měsíců; srovnání
+// (`prevRevenue`) je proti stejně dlouhému rozsahu bezprostředně před tímhle.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
@@ -23,20 +29,36 @@ const sql = neon(process.env.DATABASE_URL!);
 const num = (v: any) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 const WEEKDAYS = ['neděle', 'pondělí', 'úterý', 'středa', 'čtvrtek', 'pátek', 'sobota'];
 
-async function monthClosings(teamId: number, month: string) {
+/** Uzávěrky od prvního dne měsíce `od` do posledního dne měsíce `doM` (oba „RRRR-MM"). */
+async function closingsRozsahu(teamId: number, od: string, doM: string) {
   try {
     return await sql`
       SELECT cc.*, ev.title AS event_title
       FROM cash_closings cc LEFT JOIN events ev ON ev.id = cc.event_id
       WHERE cc.team_id = ${teamId}
-        AND COALESCE(cc.shift_date, cc.date) >= ${month + '-01'}
-        AND COALESCE(cc.shift_date, cc.date) <= ${month + '-31'}`;
+        AND COALESCE(cc.shift_date, cc.date) >= ${od + '-01'}
+        AND COALESCE(cc.shift_date, cc.date) <= ${doM + '-31'}`;
   } catch {
     return await sql`
       SELECT cc.* FROM cash_closings cc
-      WHERE cc.team_id = ${teamId} AND cc.date >= ${month + '-01'} AND cc.date <= ${month + '-31'}`;
+      WHERE cc.team_id = ${teamId} AND cc.date >= ${od + '-01'} AND cc.date <= ${doM + '-31'}`;
   }
 }
+
+/** Měsíc posunutý o `o` měsíců („RRRR-MM"). */
+function posunMesic(mesic: string, o: number): string {
+  const [y, m] = mesic.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + o, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+/** Kolik měsíců je od `od` do `doM` včetně. */
+const pocetMesicu = (od: string, doM: string) => {
+  const [y1, m1] = od.split('-').map(Number); const [y2, m2] = doM.split('-').map(Number);
+  return (y2 - y1) * 12 + (m2 - m1) + 1;
+};
+
+const MAX_MESICU = 24;
 
 export async function GET(req: NextRequest) {
   // Kolo 67: finance podle oprávnění, podnik z databáze. Mzdy jsou zvlášť
@@ -49,14 +71,22 @@ export async function GET(req: NextRequest) {
   const mena = await menaPodniku(c.teamId);
   const mzdy = c.role.opravneni.has('finance.mzdy');
   const { searchParams } = new URL(req.url);
-  const month = searchParams.get('month') ?? pragueToday().slice(0, 7);
-  if (!/^\d{4}-\d{2}$/.test(month)) return NextResponse.json({ error: 'Neplatný měsíc' }, { status: 400 });
-  const [y, m] = month.split('-').map(Number);
-  const prevMonth = `${m === 1 ? y - 1 : y}-${String(m === 1 ? 12 : m - 1).padStart(2, '0')}`;
+  const month = searchParams.get('from') ?? searchParams.get('month') ?? pragueToday().slice(0, 7);
+  const doM = searchParams.get('to') ?? month;
+  if (!/^\d{4}-\d{2}$/.test(month) || !/^\d{4}-\d{2}$/.test(doM)) return NextResponse.json({ error: 'Neplatný měsíc' }, { status: 400 });
+  if (doM < month) return NextResponse.json({ error: 'Období je obráceně' }, { status: 400 });
+  const mesicu = pocetMesicu(month, doM);
+  if (mesicu > MAX_MESICU) return NextResponse.json({ error: `Nejvýš ${MAX_MESICU} měsíců najednou.` }, { status: 400 });
+  // Srovnání: stejně dlouhý rozsah bezprostředně před tímhle (u jednoho měsíce minulý měsíc).
+  const prevMonth = posunMesic(month, -mesicu);
+  const prevDo = posunMesic(month, -1);
+  /** První den měsíce po konci rozsahu — horní mez „< …" pro všechny dotazy. */
+  const dalsiMesic = `${posunMesic(doM, 1)}-01`;
+  const jedenMesic = mesicu === 1;
 
   // ---- Revenue: closings are the source of truth. Stubs (covered coworkers)
   // carry no revenue of their own; event closings count and stay labelled. ----
-  const closings = await monthClosings(u.team_id, month);
+  const closings = await closingsRozsahu(u.team_id, month, doM);
   const real = (closings as any[]).filter((c) => !c.covered_by);
   let cash = 0, card = 0, tips = 0, diffSum = 0, diffAbs = 0;
   const byWeekday = new Map<number, { total: number; n: number }>();
@@ -78,7 +108,7 @@ export async function GET(req: NextRequest) {
   }
   const revenue = cash + card;
 
-  const prevClosings = await monthClosings(u.team_id, prevMonth);
+  const prevClosings = await closingsRozsahu(u.team_id, prevMonth, prevDo);
   const prevRevenue = (prevClosings as any[])
     .filter((c) => !c.covered_by)
     .reduce((s, c) => s + num(c.cash_revenue) + num(c.card_revenue), 0);
@@ -98,7 +128,6 @@ export async function GET(req: NextRequest) {
 
   // Receipts (purchases on the go). Měsíc podle data nákupu, když ho účtenka má
   // (kolo 81): účtenka za zářijový nákup nafocená 1. října patří do září.
-  const dalsiMesic = `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, '0')}-01`;
   let receiptRows: any[] = [];
   try {
     receiptRows = await sql`
@@ -113,7 +142,7 @@ export async function GET(req: NextRequest) {
         SELECT id, photo_url, supplier, amount, note, created_at FROM receipts
         WHERE team_id = ${u.team_id}
           AND ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') >= ${month + '-01'}::timestamp
-          AND ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') < (${month + '-01'}::timestamp + INTERVAL '1 month')`;
+          AND ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') < ${dalsiMesic}::timestamp`;
     } catch { /* not migrated */ }
   }
   for (const r of receiptRows) {
@@ -161,7 +190,7 @@ export async function GET(req: NextRequest) {
       FROM orders o LEFT JOIN users us ON us.id = o.created_by
       WHERE o.team_id = ${u.team_id} AND o.total_cost IS NOT NULL AND o.total_cost > 0
         AND ((COALESCE(o.received_at, o.created_at) AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') >= ${month + '-01'}::timestamp
-        AND ((COALESCE(o.received_at, o.created_at) AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') < (${month + '-01'}::timestamp + INTERVAL '1 month')`;
+        AND ((COALESCE(o.received_at, o.created_at) AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') < ${dalsiMesic}::timestamp`;
     for (const o of orders as any[]) {
       const items: PolozkaObjednavky[] = (Array.isArray(o.items) ? o.items : [])
         .filter((i: any) => i && typeof i.name === 'string')
@@ -182,7 +211,7 @@ export async function GET(req: NextRequest) {
     const evs = await sql`
       SELECT id, title, date, revenue, costs, (SELECT COUNT(*)::int FROM cash_closings cc WHERE cc.event_id = events.id) AS closings
       FROM events
-      WHERE team_id = ${u.team_id} AND date >= ${month + '-01'} AND date < to_char((${month + '-01'}::date + INTERVAL '1 month'), 'YYYY-MM-DD')
+      WHERE team_id = ${u.team_id} AND date >= ${month + '-01'} AND date < ${dalsiMesic}
         AND status <> 'cancelled'`;
     for (const e of evs as any[]) {
       if (num(e.costs) > 0) ledger.push({ date: String(e.date), kind: 'expense', label: `Náklady akce — ${e.title}`, amount: num(e.costs) });
@@ -208,14 +237,14 @@ export async function GET(req: NextRequest) {
              COALESCE(SUM(total) FILTER (WHERE storyous_order_id IS NULL), 0)::int AS off_total
       FROM client_orders
       WHERE team_id = ${u.team_id} AND status = 'done'
-        AND ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') >= ${month + '-01'}::timestamp AND ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') < (${month + '-01'}::timestamp + INTERVAL '1 month')` as any[];
+        AND ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') >= ${month + '-01'}::timestamp AND ((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') < ${dalsiMesic}::timestamp` as any[];
     const [gm] = await sql`
       SELECT COUNT(*)::int AS members,
-             COUNT(*) FILTER (WHERE ((joined_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') >= ${month + '-01'}::timestamp AND ((joined_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') < (${month + '-01'}::timestamp + INTERVAL '1 month'))::int AS new_members
+             COUNT(*) FILTER (WHERE ((joined_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') >= ${month + '-01'}::timestamp AND ((joined_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') < ${dalsiMesic}::timestamp)::int AS new_members
       FROM client_memberships WHERE team_id = ${u.team_id}` as any[];
     const [gc] = await sql`
       SELECT COUNT(*)::int AS n FROM client_coupon_claims
-      WHERE team_id = ${u.team_id} AND ((redeemed_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') >= ${month + '-01'}::timestamp AND ((redeemed_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') < (${month + '-01'}::timestamp + INTERVAL '1 month')` as any[];
+      WHERE team_id = ${u.team_id} AND ((redeemed_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') >= ${month + '-01'}::timestamp AND ((redeemed_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague') < ${dalsiMesic}::timestamp` as any[];
     guest = {
       orders: Number(go?.n) || 0, total: Number(go?.total) || 0,
       offPos: Number(go?.off_n) || 0, offPosTotal: Number(go?.off_total) || 0,
@@ -236,7 +265,7 @@ export async function GET(req: NextRequest) {
     // Sazba z členství v podniku ZÁZNAMU, ne ze zrcadla (kolo 62): člen
     // přepnutý jinam by měl mzdu z cizí sazby nebo 0. Stejný výraz jako
     // Přehled organizace, ať dají totéž číslo.
-    const nactiZaznamy = (mesic: string) => sql`
+    const nactiZaznamy = (odMesice: string, doMesice: string) => sql`
       SELECT te.clock_in, te.clock_out,
              to_char((te.clock_in AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD') AS den,
              CASE WHEN m.user_id IS NOT NULL THEN COALESCE(m.hourly_rate, 0)
@@ -245,8 +274,9 @@ export async function GET(req: NextRequest) {
       JOIN users us ON us.id = te.employee_id
       LEFT JOIN team_members m ON m.user_id = te.employee_id AND m.team_id = te.team_id
       WHERE te.team_id = ${u.team_id} AND te.clock_out IS NOT NULL
-        AND to_char((te.clock_in AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM') = ${mesic}`;
-    const entries = await nactiZaznamy(month);
+        AND to_char((te.clock_in AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM') >= ${odMesice}
+        AND to_char((te.clock_in AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Prague', 'YYYY-MM') <= ${doMesice}`;
+    const entries = await nactiZaznamy(month, doM);
     const radky = (entries as any[]).map(e => ({
       ms: new Date(e.clock_out).getTime() - new Date(e.clock_in).getTime(),
       rate: num(e.hourly_rate), den: String(e.den),
@@ -259,7 +289,7 @@ export async function GET(req: NextRequest) {
       wagesHours += h;
       hoursByWeekday[(new Date(r.den + 'T12:00:00Z').getUTCDay() + 6) % 7] += h;
     }
-    const prevEntries = await nactiZaznamy(prevMonth);
+    const prevEntries = await nactiZaznamy(prevMonth, prevDo);
     for (const e of prevEntries as any[]) {
       const ms = new Date(e.clock_out).getTime() - new Date(e.clock_in).getTime();
       if (countsTowardWages(ms, num(e.hourly_rate))) prevWagesHours += ms / 3600000;
@@ -299,7 +329,7 @@ export async function GET(req: NextRequest) {
     const pct = Math.round(((revenue - prevRevenue) / prevRevenue) * 100);
     insights.push({
       icon: 'trend', tone: pct >= 0 ? 'good' : 'warn',
-      title: `Tržby ${pct >= 0 ? '+' : ''}${pct} % proti minulému měsíci`,
+      title: `Tržby ${pct >= 0 ? '+' : ''}${pct} % proti ${jedenMesic ? 'minulému měsíci' : 'předchozímu období'}`,
       text: pct >= 0
         ? 'Držíte růst — mrkni, který den táhne nejvíc, a zopakuj, co tam funguje.'
         : 'Pokles stojí za pozornost: srovnej slabé dny níže a zvaž akci nebo úpravu otevíracích hodin.',
@@ -320,15 +350,16 @@ export async function GET(req: NextRequest) {
     const [t] = await sql`SELECT fixed_costs FROM teams WHERE id = ${u.team_id}`;
     fixedCostsRows = pevneNakladyZDb(t?.fixed_costs);
   } catch { /* sloupec ještě není */ }
-  const fixedCosts = soucetPevnychNakladu(fixedCostsRows);
+  // Pevné náklady jsou za měsíc — za čtvrtletí třikrát.
+  const fixedCosts = soucetPevnychNakladu(fixedCostsRows) * mesicu;
   const fixedCostsSet = fixedCostsRows.length > 0;
   const gross = revenue + eventsRevenueNoClosing - purchases - Math.max(wagesCash, wagesWorked);
   const net = cistyVysledek(gross, fixedCosts);
   if (fixedCostsSet && net < 0) {
     insights.push({
       icon: 'warning', tone: 'warn',
-      title: `Po nájmu a energiích je měsíc ${mena.money(Math.abs(net))} v minusu`,
-      text: `Pevné náklady dělají ${mena.money(fixedCosts)} měsíčně. Hrubý výsledek je ${mena.money(gross)} — buď víc tržby, nebo levnější nákupy a kratší směny.`,
+      title: `Po nájmu a energiích je ${jedenMesic ? 'měsíc' : 'období'} ${mena.money(Math.abs(net))} v minusu`,
+      text: `Pevné náklady dělají ${mena.money(fixedCosts)}${jedenMesic ? ' měsíčně' : ` za ${mesicu} měsíce`}. Hrubý výsledek je ${mena.money(gross)} — buď víc tržby, nebo levnější nákupy a kratší směny.`,
     });
   }
   if (revenue > 0 && laborBase > 0) {
@@ -357,7 +388,7 @@ export async function GET(req: NextRequest) {
   if (diffAbs > mena.prah(200)) {
     insights.push({
       icon: 'warning', tone: 'warn',
-      title: `Rozdíly v kase za měsíc: ${diffSum >= 0 ? '+' : ''}${mena.money(diffSum)} (celkem ±${mena.money(diffAbs)})`,
+      title: `Rozdíly v kase za ${jedenMesic ? 'měsíc' : 'období'}: ${diffSum >= 0 ? '+' : ''}${mena.money(diffSum)} (celkem ±${mena.money(diffAbs)})`,
       text: 'Projdi uzávěrky s rozdílem v Přehledech — nejčastěji jde o nezapsaný výdaj nebo rozměňování. Počítání bankovek v uzávěrce rozdíly srazí.',
     });
   }
@@ -393,7 +424,7 @@ export async function GET(req: NextRequest) {
   if (tips > 0) {
     insights.push({
       icon: 'award', tone: 'good',
-      title: `Spropitné za měsíc: ${mena.money(tips)}`,
+      title: `Spropitné za ${jedenMesic ? 'měsíc' : 'období'}: ${mena.money(tips)}`,
       text: 'Hezký signál spokojenosti hostů — propiš ho do odměn, ať ho tým vidí.',
     });
   }
@@ -422,6 +453,8 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     month, prevMonth,
+    // Rozsah měsíců (kolo 8): u jednoho měsíce from = to = month; prevFrom–prevTo je srovnávané období.
+    from: month, to: doM, months: mesicu, prevFrom: prevMonth, prevTo: prevDo,
     summary: {
       revenue, cash, card, tips,
       purchases, wagesCash, wagesWorked, totalOut,

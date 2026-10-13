@@ -63,6 +63,10 @@ export async function GET(req: NextRequest) {
   // `lite=1`: jen dny, součty, hodiny a otevřené účty (bez rozpisu po produktech a poznámek) — snese až 400 dní
   // (roční graf); plný pohled zůstává na tři měsíce.
   const lite = sp.get('lite') === '1';
+  // `heat=1` (kolo 8, R8-4): k hodinám i teplotní mapa den v týdnu × hodina (tržba, účtenky, dny
+  // s prodejem a průměrný počet lidí na směně z rozvrhu) — widget Kdy se prodává. Jen na vyžádání,
+  // ať běžný dotaz nenese 168 buněk navíc.
+  const chceHeat = sp.get('heat') === '1';
   const span = Math.round((Date.parse(to) - Date.parse(from)) / 86400000);
   if (!Number.isFinite(span) || span > (lite ? 400 : 92)) {
     return NextResponse.json({ error: lite ? 'Nejvýš 400 dní najednou.' : 'Nejvýš tři měsíce najednou.' }, { status: 400 });
@@ -94,6 +98,10 @@ export async function GET(req: NextRequest) {
     };
   };
   const hours = new Array(24).fill(0);
+  // Teplotní mapa: [den v týdnu, pondělí = 0][hodina] → tržba a účtenky; dny s prodejem po dnech v týdnu.
+  const heat = Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => ({ trzba: 0, ucty: 0 })));
+  const dnyRadku = Array.from({ length: 7 }, () => new Set<string>());
+  const denVTydnu = (day: string) => (new Date(day + 'T12:00:00Z').getUTCDay() + 6) % 7;
 
   // Účtenky ze zrcadla — pokladna se tu už nevolá. Když zrcadlo období
   // nepokrývá (starší než první synchronizace), řekne se to místo nul.
@@ -137,6 +145,11 @@ export async function GET(req: NextRequest) {
       const when = new Date(b.paidAt ?? b.createdAt);
       const localH = pragueHourOf(when);
       if (localH != null) hours[localH] += price;
+      if (chceHeat && localH != null) {
+        const wd = denVTydnu(day);
+        heat[wd][localH].trzba += price; heat[wd][localH].ucty += 1;
+        dnyRadku[wd].add(day);
+      }
 
       const who = b.paidByName ?? b.createdByName;
       if (who) {
@@ -149,6 +162,36 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ connected: true, error: 'Zrcadlo pokladny není připravené — spusť migraci a synchronizaci v Nastavení → Pokladna.' }, { status: 502 });
   }
 
+  // Teplotní mapa (kolo 8): průměrný počet lidí na směně v buňce z rozvrhu — stejná smyčka jako obsazení
+  // v /api/pos/insights (směna 18:00–02:00 se počítá i po půlnoci, nedokončená „auto" směna ne).
+  let heatOut: { trzba: number; ucty: number; dni: number; lidi: number | null }[][] | null = null;
+  if (chceHeat) {
+    const lidi = Array.from({ length: 7 }, () => new Array(24).fill(0));
+    let rozvrh = false;
+    try {
+      const shifts = await sql`
+        SELECT s.date, s.start_time, s.end_time FROM shifts s
+        WHERE s.team_id = ${teamId} AND s.date >= ${dayPlus(from, -1)} AND s.date <= ${to}`;
+      rozvrh = true;
+      for (const sh of shifts as any[]) {
+        const st = String(sh.start_time ?? '').slice(0, 5), en = String(sh.end_time ?? '').slice(0, 5);
+        if (!/^\d{2}:\d{2}$/.test(st) || !/^\d{2}:\d{2}$/.test(en) || en === st) continue;
+        const h0 = parseInt(st.slice(0, 2), 10), h1 = parseInt(en.slice(0, 2), 10);
+        const span = en < st ? (24 - h0) + h1 : h1 - h0;
+        for (let k = 0; k < span && k < 24; k++) {
+          const h = (h0 + k) % 24;
+          const day = h0 + k >= 24 ? dayPlus(String(sh.date), 1) : String(sh.date);
+          if (day < from || day > to) continue;
+          lidi[denVTydnu(day)][h] += 1;
+        }
+      }
+    } catch { /* bez rozvrhu se lidé neukážou */ }
+    heatOut = heat.map((radek, wd) => radek.map((c, h) => ({
+      trzba: Math.round(c.trzba), ucty: c.ucty, dni: dnyRadku[wd].size,
+      lidi: rozvrh && dnyRadku[wd].size > 0 ? Math.round((lidi[wd][h] / dnyRadku[wd].size) * 10) / 10 : null,
+    })));
+  }
+
   // Odlehčený pohled (grafy v čase): dny a součty, bez rozpisu po produktech, bez poznámek a bez uzávěrek.
   if (lite) {
     const dl = Array.from(days.values()).sort((a, b) => a.day.localeCompare(b.day));
@@ -158,7 +201,7 @@ export async function GET(req: NextRequest) {
       totals: { bills: sm('bills'), total: sm('total'), cash: sm('cash'), card: sm('card'), other: sm('other'), tips: sm('tips'), tipsCash: sm('tipsCash'), tipsCard: sm('tipsCard'),
         discounts: sm('discounts'), refundCount: sm('refundCount'), refundTotal: sm('refundTotal'), voidCount, voidTotal: Math.round(voidTotal), methods: [], avgBill: sm('bills') > 0 ? Math.round(sm('total') / sm('bills')) : 0, soldQty: 0, productRevenue: 0 },
       days: dl.map(d => ({ ...d, closings: 0, declared: null, diff: null })),
-      hours, byPerson: [], items: [], notes: [], note: '', open: sestavOtevrene(),
+      hours, heat: heatOut, byPerson: [], items: [], notes: [], note: '', open: sestavOtevrene(),
     });
   }
 
@@ -337,6 +380,7 @@ export async function GET(req: NextRequest) {
       };
     }),
     hours,
+    heat: heatOut,
     open: sestavOtevrene(),
     byPerson: poLidech
       ? Array.from(byPerson.entries())
