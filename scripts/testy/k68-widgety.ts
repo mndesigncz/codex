@@ -620,7 +620,8 @@ export default function (t: Testy) {
       const url = ZDROJE_FRONT[f];
       const klic = cekaNaTebe.opravneni.pole?.[f];
       if (!url || !klic) { spatneFronty.push(`${f}: chybí zdroj nebo klíč pole`); continue; }
-      const soubor = new URL(`../../app${url}/route.ts`, import.meta.url);
+      // Adresa fronty smí nést filtr (`/api/navic?scope=team&status=ceka`): k souboru routy vede jen cesta.
+      const soubor = new URL(`../../app${url.split('?')[0]}/route.ts`, import.meta.url);
       const brana = existsSync(soubor) ? branaGet(readFileSync(soubor, 'utf8')) : undefined;
       if (brana === undefined) { spatneFronty.push(`${f}: GET ${url} bez čitelné brány`); continue; }
       if (brana === null) continue; // každý člen podniku

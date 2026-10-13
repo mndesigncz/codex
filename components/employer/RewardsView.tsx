@@ -21,7 +21,8 @@
 //
 // Oprávnění: žebříček s odmeny.zebricek, kalendář s hodnoceni.zobrazit (hodnotit jen
 // s hodnoceni.hodnotit), úrovně a bodování s odmeny.nastaveni, katalog s odmeny.katalog,
-// profil člověka s tym.profil. Část, na kterou role nemá, se v přepínači nenabízí.
+// profil člověka s tym.profil, Navíc (nabídka) s navic.zobrazit_tym (správa jen s navic.nabidka).
+// Část, na kterou role nemá, se v přepínači nenabízí.
 
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '../Icons';
@@ -42,6 +43,8 @@ import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
 import { useSmi } from '../widgety/NavigaceKontext';
 import { NaStranceOdmen, PochvalaOkno, URL_VYZVY, VyzvaRadek, textMetriky } from '../widgety/oblasti/odmeny';
+import { SpravaNabidky } from '../navic-vedeni/SpravaNabidky';
+import { useCastNavic } from '../navic-vedeni/cast';
 import { METRIKY, MAX_NAZEV_VYZVY, MAX_ODMENA_BODY, MAX_ODMENA_TEXT, vyberVyzvy, vycistiVyzvu, type MetrikaVyzvy } from '@/lib/vyzvy';
 import { dayPlus } from '@/lib/pragueTime';
 import { pragueToday } from '@/lib/pragueTime';
@@ -53,7 +56,7 @@ const URL_ODMENY = '/api/rewards';
 const URL_KATALOG = '/api/rewards/catalog';
 const JSON_HLAVICKA = { 'Content-Type': 'application/json' };
 
-type Cast = 'board' | 'calendar' | 'settings';
+type Cast = 'board' | 'calendar' | 'navic' | 'settings';
 
 export default function RewardsView({ user }: { user: { id?: string } }) {
   const t = useT('sprava');
@@ -74,12 +77,17 @@ function RewardsViewInner() {
   const hodnoti = smi('hodnoceni.hodnotit');
   const nastavuje = smi('odmeny.nastaveni');
   const spravujeKatalog = smi('odmeny.katalog');
+  // Kolo 9 (N1): část Navíc = nabídka „Co se dá udělat navíc" (fronta a historie jsou widget Navíc v týmu na ploše).
+  const vidiNavic = smi('navic.zobrazit_tym');
   const casti = [
     ...(vidiZebricek ? [{ id: 'board' as const, label: t('Žebříček') }] : []),
     ...(vidiKalendar ? [{ id: 'calendar' as const, label: t('Kalendář') }] : []),
+    ...(vidiNavic ? [{ id: 'navic' as const, label: t('Navíc') }] : []),
     ...(nastavuje || spravujeKatalog ? [{ id: 'settings' as const, label: t('Nastavení') }] : []),
   ];
   const [volba, setVolba] = useState<Cast>('board');
+  // Oznámení, hledání a „Čeká na tebe" otevírají rovnou část Navíc (?view=rewards&arg=navic, událost, sessionStorage).
+  useCastNavic(useCallback(() => setVolba('navic'), []));
   const cast: Cast | null = casti.some(c => c.id === volba) ? volba : casti[0]?.id ?? null;
   const [denKalendare, setDenKalendare] = useState<string | null>(null);
   const [hodnotim, setHodnotim] = useState<Poradi | null>(null);
@@ -111,6 +119,8 @@ function RewardsViewInner() {
   ) : cast === 'board' ? (
     <Zebricek smiHodnotit={hodnoti} smiProfil={smi('tym.profil')} vidiHodnoceni={vidiKalendar}
       onHodnotit={setHodnotim} onPochvalit={setChvalim} onProfil={setProfil} />
+  ) : cast === 'navic' ? (
+    <SpravaNabidky />
   ) : cast === 'settings' ? (
     <div className="space-y-4">
       {nastavuje && <NastaveniBodu onUlozeno={obnov} />}

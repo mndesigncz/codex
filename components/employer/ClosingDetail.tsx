@@ -33,6 +33,7 @@ import type { PovinnaPolozka } from '@/lib/povinnePredUzaverkou';
 import { useT } from '@/lib/i18n/client';
 import { useLocale } from './jazyk';
 import { Poznamky } from '../Poznamky';
+import { NavicUzaverky } from '../navic-vedeni/NavicUzaverky';
 
 type Person = { id: number; name: string; avatar?: string | null };
 
@@ -608,6 +609,9 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
                   )}
                 </Section>
               )}
+
+              {/* Kolo 9 (N1): co lidé z osádky ten den zapsali navíc — s Uznat / Odmítnout; bez oprávnění se nekreslí. */}
+              <NavicUzaverky uzaverka={{ id, day: String(c.shift_date ?? c.date).slice(0, 10), lide: d.crew.map(p => p.id) }} onZmena={onChanged} />
 
               {d.receipts.length > 0 && (
                 <Section title={t('Účtenky z toho dne')}>

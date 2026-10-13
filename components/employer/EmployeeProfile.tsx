@@ -18,6 +18,7 @@ import { Icon } from '../Icons';
 import { Button, Chip, EmptyState, ErrorState, ListRow, Modal, Segmented, Skeleton, Stat, StatRow, Avatar } from '../ui';
 import ShiftReviewModal from './ShiftReviewModal';
 import { PochvalaOkno } from '../widgety/oblasti/odmeny';
+import { NavicClena } from '../navic-vedeni/NavicClena';
 import type { RewardLevel } from '@/lib/rewardLevels';
 import { apiMessage, okJson } from '@/lib/api';
 import { fmtHM } from '@/lib/i18n/format';
@@ -172,6 +173,9 @@ export default function EmployeeProfile({ employeeId, onClose }: { employeeId: n
                     {vidiHodnoceni && (p.breakdown.flagged ?? 0) > 0 && <Chip tone="bad" size="sm" icon="warning">{t('Výtky: {n}', { n: p.breakdown.flagged })}</Chip>}
                   </div>
                 </section>
+
+                {/* Kolo 9 (N1): co člověk udělal navíc — tento měsíc, poslední zápisy, čekající jde uznat odsud. */}
+                <NavicClena clovek={{ id: e.id, jmeno: e.name }} onZmena={load} />
 
                 {flaggedItems.length > 0 && (
                   <section aria-labelledby="profil-napravit">

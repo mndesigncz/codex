@@ -22,6 +22,8 @@ export const ZDROJE_FRONT: Readonly<Record<string, string>> = {
   rezervace: '/api/client/admin/reservations',
   objednavky: '/api/client/staff/inbox',
   slaba_hodnoceni: '/api/client/admin/summary',
+  // Kolo 9 (N1): zápisy „navíc" k uznání — GET pustí každého člena (pozaduj(null)), fronta chce navic.uznat.
+  navic: '/api/navic?scope=team&status=ceka',
 };
 
 export const WIDGETY: DefiniceWidgetu[] = [
@@ -30,7 +32,8 @@ export const WIDGETY: DefiniceWidgetu[] = [
   // [approved=false]; GET /api/inventory/reports → reports[status!=done]; GET /api/rewards/catalog →
   // redemptions[status=pending]; GET /api/procedures → procedures[approved=false]; GET /api/guides →
   // guides[approved=false]; GET /api/client/admin/reservations → reservations[status=requested] (60 dní dopředu);
-  // GET /api/client/staff/inbox → newCount (orders[status=new]); GET /api/client/admin/summary → reviews.low7
+  // GET /api/client/staff/inbox → newCount (orders[status=new]); GET /api/client/admin/summary → reviews.low7;
+  // GET /api/navic?scope=team&status=ceka → items[status=ceka] (kolo 9, N1)
   // Pozor: rezervace a objednávky nejdou přes /api/client/admin/summary — ten chce klient.prehled, který
   // Provozní (rezervace.schvalovat, objednavky.vyridit) nemá, a fronty by skončily na 403.
   // Pozor: Dnes je fronta hlídaná jen smiPohled(view) — chip „žádost o volno" se ukáže i roli, která volno nesmí
@@ -58,6 +61,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         'navody.schvalovat',
         'rezervace.schvalovat',
         'objednavky.vyridit',
+        'navic.uznat',
       ],
       pole: {
         volno: 'volno.schvalovat',
@@ -71,6 +75,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
         rezervace: 'rezervace.schvalovat',
         objednavky: 'objednavky.vyridit',
         slaba_hodnoceni: 'zakaznici.recenze',
+        navic: 'navic.uznat',
       },
     },
     tarif: 'zdarma',
@@ -91,6 +96,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
           { id: 'rezervace', nazev: 'Rezervace', opravneni: 'rezervace.schvalovat' },
           { id: 'objednavky', nazev: 'Objednávky od stolu', opravneni: 'objednavky.vyridit' },
           { id: 'slaba_hodnoceni', nazev: 'Slabá hodnocení', opravneni: 'zakaznici.recenze' },
+          { id: 'navic', nazev: 'Navíc k uznání', opravneni: 'navic.uznat' },
         ],
         vychozi: 'vse',
       },

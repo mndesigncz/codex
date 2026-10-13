@@ -39,6 +39,12 @@
 //    (SVG s hexy). Teď řádek na den s Chipy a detail dne v okně.
 //  - Nové: Nehodnocené směny, Výtky v týmu, Moje úroveň a body.
 //
+// Kolo 9 (N1, balík V) — Navíc v týmu (odmeny.navic_tymu): fronta zápisů „navíc" k uznání
+// (Uznat / Odmítnout v řádku přes okno UznatNavic z components/navic-vedeni), historie
+// s odměnou, souhrn měsíce a „Zapsat za člena". Čekající se berou zvlášť (status=ceka,
+// stejná adresa jako fronta v „Čeká na tebe") a slučují s měsícem — nesmí zmizet jen
+// proto, že jsou ze staršího měsíce.
+//
 // Data jen přes useDataWidgetu (sdílená mezipaměť — /api/rewards i /api/rewards/catalog
 // čte víc widgetů i stránka jedním dotazem), dotaz až při `nacteno && ma(klíč)` (spec §1.5).
 // V náhledu (galerie) se nic nezapisuje ani neotevírá.
@@ -67,6 +73,12 @@ import { BODY_DIKU, MAX_VETA_DIKU, vyberZed } from '@/lib/podekovani';
 import { postupVyzvy, vyberVyzvy, vyzvyKZobrazeni, type MetrikaVyzvy, type Vyzva } from '@/lib/vyzvy';
 import { useOpravneni } from '../../role/useOpravneni';
 import { useMoney } from '../../CurrencyProvider';
+import { seradNavic, souhrnNavic, urlNavic, type Navic } from '@/lib/navic';
+import { useNavic } from '../../navic-vedeni/data';
+import { NavicRadek, textOdmeny } from '../../navic-vedeni/NavicRadek';
+import { UznatNavic, type AkceNavic } from '../../navic-vedeni/UznatNavic';
+import { ZapsatZaClena } from '../../navic-vedeni/ZapsatZaClena';
+import { filtrujNavic, lideZeZapisu, mesicZNastaveni, poctyStavu, sloucCekajici, type FiltrStavu } from '../../navic-vedeni/logika';
 import { Widget, useWidget, type StavNacteni } from '../Widget';
 import { obnovDataWidgetu, useDataWidgetu } from '../useDataWidgetu';
 import { NavigaceKontext, useNavigace, useSmi } from '../NavigaceKontext';
@@ -1547,6 +1559,115 @@ function NehodnoceneSmeny({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?:
   );
 }
 
+// ---------------------------------------------------------------------------
+// Navíc v týmu (kolo 9, N1 — balík V)
+// ---------------------------------------------------------------------------
+
+const ID_NAVIC = 'odmeny.navic_tymu';
+const URL_NAVIC_CEKA = urlNavic({ scope: 'team', status: 'ceka' });
+
+/** Widget Navíc v týmu: souhrn měsíce, čekající první s inline rozhodnutím, ve velké kartě filtry. */
+function NavicTymu({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: 'tento' | 'minuly' }>) {
+  const t = useT('widgety');
+  const smi = useSmi();
+  const money = useMoney();
+  const { ok, ceka } = useBranaWidgetu(ID_NAVIC, ['navic.zobrazit_tym']);
+  const dnes = pragueToday();
+  const mesic = mesicZNastaveni(nastaveni.obdobi, dnes);
+  const mesicni = useNavic(ok ? urlNavic({ scope: 'team', mesic }) : null);
+  const cekajici = useNavic(ok ? URL_NAVIC_CEKA : null);
+  const smiUznat = !nahled && smi(klicCasti(ID_NAVIC, 'akce:uznat') ?? 'navic.uznat');
+  const [filtr, setFiltr] = useState<FiltrStavu>('vse');
+  const [clovek, setClovek] = useState<string>('');
+  const [rozhoduji, setRozhoduji] = useState<{ z: Navic; akce: AkceNavic } | null>(null);
+  const [zapisuji, setZapisuji] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const odkaz = useOdkazOdmeny();
+  // Odkaz vede rovnou na část Navíc (RewardsView čte `arg` z adresy po přechodu).
+  const odkazNavic = odkaz ? { ...odkaz, arg: 'navic' } : undefined;
+
+  const vse = mesicni.data && cekajici.data ? sloucCekajici(mesicni.data.items, cekajici.data.items) : null;
+  const souhrn = souhrnNavic(mesicni.data?.items ?? [], mesic);
+  const pocetCeka = cekajici.data ? cekajici.data.items.length : souhrn.ceka;
+  const lide = useMemo(() => lideZeZapisu(vse ?? []), [vse]);
+  const clovekId = clovek ? Number(clovek) : null;
+  const pocty = poctyStavu(filtrujNavic(vse ?? [], { clovek: clovekId }));
+  const seznam = velikost === 'L' ? filtrujNavic(vse ?? [], { stav: filtr, clovek: clovekId }) : seradNavic(vse ?? []);
+  const strop = velikost === 'L' ? seznam.length : 5;
+  const videt = seznam.slice(0, strop);
+  const nabidka = mesicni.data?.nabidka ?? [];
+
+  const hotovo = (item: Navic, akce: AkceNavic) => {
+    setToast(akce === 'uznat' ? t('Uznáno: {odmena}', { odmena: textOdmeny(t, item, money) }) : t('Odmítnuto.'));
+  };
+  const souhrnText = [
+    nastaveni.obdobi === 'minuly' ? t('Minulý měsíc') : t('Tento měsíc'),
+    t('{n} uznáno', { n: cislo(souhrn.uznano) }),
+    `${cislo(souhrn.body)} b`,
+    souhrn.premie > 0 ? money(souhrn.premie) : null,
+    pocetCeka > 0 ? t('{n, plural, one {# čeká} few {# čekají} other {# čeká}}', { n: pocetCeka }) : null,
+  ].filter(Boolean);
+  const tlacitko = smiUznat && (
+    <Button variant="secondary" size="sm" icon="star" onClick={() => setZapisuji(true)}>{t('Zapsat za člena')}</Button>
+  );
+  const okna = (
+    <>
+      {rozhoduji && !nahled && <UznatNavic zapis={rozhoduji.z} akce={rozhoduji.akce} onClose={() => setRozhoduji(null)} onHotovo={hotovo} />}
+      {zapisuji && !nahled && (
+        <NadPlochou>
+          <ZapsatZaClena nabidka={nabidka} onClose={() => setZapisuji(false)}
+            onHotovo={item => setToast(t('Zapsáno a uznáno: {odmena}', { odmena: textOdmeny(t, item, money) }))} />
+        </NadPlochou>
+      )}
+      <Toast message={toast} onClose={() => setToast(null)} />
+    </>
+  );
+
+  return (
+    <Widget nacteni={ceka ? CEKA : [mesicni, cekajici]} odkaz={odkazNavic}
+      doplnek={pocetCeka > 0 ? <Chip tone="wait" size="sm">{t('{n} čeká', { n: cislo(pocetCeka) })}</Chip> : undefined}
+      prazdno={vse && vse.length === 0 ? (
+        <div className="space-y-3" data-navic-prazdno>
+          <p className="t-meta text-pretty">{t('Zatím nikdo nic navíc nezapsal. Lidé zapisují z Domů, z Moje směny, při uzávěrce i na tabletu; ty můžeš zapsat za člena.')}</p>
+          {tlacitko}
+          {okna}
+        </div>
+      ) : undefined}>
+      <p className="t-meta" data-navic-souhrn>{souhrnText.join(' · ')}</p>
+      {velikost === 'L' && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Segmented size="sm" ariaLabel={t('Stav zápisů')} value={filtr} onChange={setFiltr}
+            options={[
+              { id: 'ceka', label: t('Čeká'), count: pocty.ceka || undefined },
+              { id: 'uznano', label: t('Uznané'), count: pocty.uznano || undefined },
+              { id: 'odmitnuto', label: t('Odmítnuté'), count: pocty.odmitnuto || undefined },
+              { id: 'vse', label: t('Vše') },
+            ]} />
+          {lide.length > 1 && (
+            <Select aria-label={t('Člověk')} value={clovek} onChange={e => setClovek(e.target.value)} className="!w-auto max-w-full">
+              <option value="">{t('Všichni')}</option>
+              {lide.map(l => <option key={l.id} value={l.id}>{l.jmeno}</option>)}
+            </Select>
+          )}
+        </div>
+      )}
+      {videt.length === 0 ? (
+        <p className="t-meta mt-3">{filtr === 'ceka' ? t('Nic nečeká na uznání.') : t('Pro tenhle filtr tu nic není.')}</p>
+      ) : (
+        <ul className="list mt-2">
+          {videt.map(z => (
+            <NavicRadek key={z.id} z={z} smiUznat={smiUznat}
+              onUznat={x => setRozhoduji({ z: x, akce: 'uznat' })} onOdmitnout={x => setRozhoduji({ z: x, akce: 'odmitnout' })} />
+          ))}
+        </ul>
+      )}
+      {seznam.length > videt.length && <p className="t-meta mt-2">{aDalsich(t, seznam.length - videt.length)}</p>}
+      {tlacitko && <div className="mt-3 flex flex-wrap items-center gap-2">{tlacitko}</div>}
+      {okna}
+    </Widget>
+  );
+}
+
 export const KOMPONENTY: Record<string, KomponentaWidgetu> = {
   'hodnoceni.ohodnotit_smeny': OhodnotitSmeny,
   'hodnoceni.nehodnocene': NehodnoceneSmeny,
@@ -1559,6 +1680,7 @@ export const KOMPONENTY: Record<string, KomponentaWidgetu> = {
   'odmeny.vyzva': VyzvaTydne,
   'odmeny.katalog': KatalogOdmen,
   'odmeny.urovne': Urovne,
+  'odmeny.navic_tymu': NavicTymu,
   'moje.uroven': MojeUrovenWidget,
   'moje.zpetna_vazba': ZpetnaVazba,
   'moje.hodnoceni_smen': HodnoceniSmen,
