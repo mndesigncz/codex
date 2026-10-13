@@ -144,7 +144,9 @@ export default function ({ eq, ok }: Testy) {
   eq('plán proti tržbám: pondělí 2 800 Kč mezd proti 18 400 = 15 %', plan.poDnech.get('2026-10-05'), { date: '2026-10-05', trzba: 18400, mzdy: 2800, podil: 15 });
   eq('plán proti tržbám: den bez tržby má mzdy, ale podíl null', plan.poDnech.get('2026-10-06'), { date: '2026-10-06', trzba: null, mzdy: 1200, podil: null });
   eq('plán proti tržbám: směna bez sazby = den bez mezd', plan.poDnech.get('2026-10-07'), { date: '2026-10-07', trzba: null, mzdy: null, podil: null });
-  eq('plán proti tržbám: celkem — podíl jen z dnů s tržbou, mzdy ze všech', [plan.trzba, plan.mzdy, plan.podil], [18400, 4000, 15]);
+  eq('plán proti tržbám: celkem — tržba a podíl jen z naplánovaných dnů s tržbou, mzdy ze všech', [plan.trzba, plan.mzdy, plan.podil], [18400, 4000, 15]);
+  eq('plán proti tržbám: den s tržbou, ale bez směn se do celku nepočítá (pět naplánovaných dnů ≠ 3 % z měsíce)',
+    planProtiTrzbam([{ date: '2026-10-05', startTime: '08:00', endTime: '16:00', hourlyRate: 500 }], { '0': { prumer: 10000, vzorek: 8 }, '1': { prumer: 90000, vzorek: 8 } }, ['2026-10-05', '2026-10-06']).podil, 40);
   eq('plán proti tržbám: bez tržeb vůbec', planProtiTrzbam([], null, ['2026-10-05']).podil, null);
 
   // ---- ve zdroji: plánovač a pravidla ----

@@ -1,0 +1,19 @@
+{
+  "shifts": [
+    { "id": 501, "employeeId": 18, "employeeName": "Tereza Malá", "employeeAvatar": "👱‍♀️", "date": "PO1", "startTime": "08:00", "endTime": "16:00", "type": "Ranní", "hourlyRate": 150, "note": null },
+    { "id": 502, "employeeId": 18, "employeeName": "Tereza Malá", "employeeAvatar": "👱‍♀️", "date": "UT1", "startTime": "08:00", "endTime": "16:00", "type": "Ranní", "hourlyRate": 150, "note": null },
+    { "id": 503, "employeeId": 18, "employeeName": "Tereza Malá", "employeeAvatar": "👱‍♀️", "date": "ST1", "startTime": "08:00", "endTime": "16:00", "type": "Ranní", "hourlyRate": 150, "note": null },
+    { "id": 504, "employeeId": 18, "employeeName": "Tereza Malá", "employeeAvatar": "👱‍♀️", "date": "CT1", "startTime": "08:00", "endTime": "16:00", "type": "Ranní", "hourlyRate": 150, "note": null },
+    { "id": 505, "employeeId": 18, "employeeName": "Tereza Malá", "employeeAvatar": "👱‍♀️", "date": "PA1", "startTime": "08:00", "endTime": "16:00", "type": "Ranní", "hourlyRate": 150, "note": null },
+    { "id": 506, "employeeId": 18, "employeeName": "Tereza Malá", "employeeAvatar": "👱‍♀️", "date": "SO1", "startTime": "08:00", "endTime": "16:00", "type": "Ranní", "hourlyRate": 150, "note": null },
+    { "id": 507, "employeeId": 16, "employeeName": "Eva Testová", "employeeAvatar": "🧑", "date": "SO1", "startTime": "15:00", "endTime": "23:00", "type": "Zavírací", "hourlyRate": 180, "note": "Zamkni zadní vchod." },
+    { "id": 508, "employeeId": 16, "employeeName": "Eva Testová", "employeeAvatar": "🧑", "date": "NE1", "startTime": "07:00", "endTime": "15:00", "type": "Ranní", "hourlyRate": 180, "note": null },
+    { "id": 509, "employeeId": 17, "employeeName": "Jakub Horák", "employeeAvatar": "🧔", "date": "PO2", "startTime": "07:00", "endTime": "20:00", "type": "Ranní", "hourlyRate": 200, "note": null },
+    { "id": 510, "employeeId": 17, "employeeName": "Jakub Horák", "employeeAvatar": "🧔", "date": "UT2", "startTime": "12:00", "endTime": "20:00", "type": "Odpolední", "hourlyRate": 200, "note": null }
+  ],
+  "gaps": [],
+  "understaffed": [],
+  "demand": {},
+  "verze": "k84",
+  "publication": null
+}

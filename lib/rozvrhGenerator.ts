@@ -334,8 +334,9 @@ export interface DenProtiTrzbam { date: string; trzba: number | null; mzdy: numb
 
 /**
  * Plán proti tržbám po dnech a celkem: mzdy = hodiny × sazba směn dne (směna bez sazby
- * se do mezd nepočítá, ale den se započte); tržba = očekávaná tržba dne. Celkový podíl
- * se počítá jen z dnů, které mají tržbu — den bez dat by součet zkreslil.
+ * se do mezd nepočítá); tržba = očekávaná tržba dne. Celkový podíl se počítá jen z dnů,
+ * které mají naplánované mzdy i tržbu — měsíc s pěti naplánovanými dny by jinak proti
+ * tržbě celého měsíce ukázal „3 %" a vypadal levně, i když je každý den nad cílem.
  */
 export function planProtiTrzbam(
   smeny: readonly { date: string; startTime: string; endTime: string; hourlyRate?: number | null }[],
@@ -355,7 +356,7 @@ export function planProtiTrzbam(
     const m = mzdyDne.has(date) ? Math.round(mzdyDne.get(date)!) : null;
     poDnech.set(date, { date, trzba: tr, mzdy: m, podil: podilMezdPlanu(m, tr) });
     mzdy += m ?? 0;
-    if (tr != null) { trzba += tr; mzdySTrzbou += m ?? 0; dnuSTrzbou++; }
+    if (tr != null && m != null) { trzba += tr; mzdySTrzbou += m; dnuSTrzbou++; }
   }
   return { poDnech, trzba: dnuSTrzbou > 0 ? trzba : null, mzdy: Math.round(mzdy), podil: dnuSTrzbou > 0 ? podilMezdPlanu(mzdySTrzbou, trzba) : null };
 }
