@@ -158,12 +158,6 @@ export interface DefiniceWidgetu {
    * u `odkaz` v obalu widgetu.
    */
   cil?: { pohled: string; arg?: string };
-  /**
-   * Rychlý filtr v hlavičce karty z prvního pole `vyber` (kolo 8, R8-6: „Měsíc: Tento ▾").
-   * `false` u widgetů, které mají vlastní lištu období v kartě (ObdobiLista) — druhý
-   * přepínač téhož v hlavičce by si s ní odporoval.
-   */
-  rychlyFiltr?: boolean;
   /** planovany = komponenta ještě není; nikde se nekreslí ani nenabízí. */
   stav: 'hotovo' | 'planovany';
 }
