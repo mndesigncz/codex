@@ -1,0 +1,100 @@
+{
+ "od": "MESIC-01",
+ "do": "DNES",
+ "ja": {
+  "zKasy": 2400,
+  "zKasyPocet": 6,
+  "uzaverky": [
+   {
+    "id": 501,
+    "den": "D-1",
+    "castka": 400,
+    "kdo": "Eva Testová"
+   },
+   {
+    "id": 502,
+    "den": "D-2",
+    "castka": 400,
+    "kdo": "Eva Testová"
+   },
+   {
+    "id": 503,
+    "den": "D-3",
+    "castka": 400,
+    "kdo": "Eva Testová"
+   },
+   {
+    "id": 504,
+    "den": "D-4",
+    "castka": 400,
+    "kdo": "Eva Testová"
+   },
+   {
+    "id": 505,
+    "den": "D-5",
+    "castka": 400,
+    "kdo": "Eva Testová"
+   },
+   {
+    "id": 506,
+    "den": "D-6",
+    "castka": 400,
+    "kdo": "Eva Testová"
+   }
+  ],
+  "vyplaty": [
+   {
+    "id": 1,
+    "amount": 12450,
+    "method": "hotove",
+    "paidAt": "MINULY-12",
+    "od": "MINULY-01",
+    "do": "MINULY-KONEC",
+    "note": null
+   }
+  ],
+  "spropitne": 1860,
+  "spropitnePoDnech": [
+   {
+    "den": "D-3",
+    "castka": 312,
+    "mojeMs": 22500000,
+    "smenaMs": 64800000
+   },
+   {
+    "den": "D-5",
+    "castka": 540,
+    "mojeMs": 28800000,
+    "smenaMs": 57600000
+   },
+   {
+    "den": "D-7",
+    "castka": 1008,
+    "mojeMs": 28800000,
+    "smenaMs": 28800000
+   }
+  ]
+ },
+ "zamky": [
+  {
+   "id": 1,
+   "od": "MINULY-01",
+   "do": "MINULY-KONEC",
+   "lockedBy": 15,
+   "lockedAt": null
+  }
+ ],
+ "pravidla": {
+  "priplatky": {
+   "vikend": true,
+   "vikendPct": 10,
+   "noc": true,
+   "nocPct": 10,
+   "nocOd": "22:00",
+   "nocDo": "06:00",
+   "svatek": true,
+   "svatekPct": 100
+  },
+  "showTipsToStaff": true
+ }
+}

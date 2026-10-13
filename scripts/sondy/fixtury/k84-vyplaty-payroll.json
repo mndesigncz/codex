@@ -1,0 +1,129 @@
+{
+ "od": "MESIC-01",
+ "do": "DNES",
+ "vidiMzdy": true,
+ "payDailyCash": true,
+ "lide": [
+  {
+   "id": 15,
+   "name": "Martin Nemeškal",
+   "avatar": "🧑",
+   "jobTitle": "Vedoucí",
+   "role": "employer",
+   "contractType": null,
+   "contractHoursYear": null,
+   "hodinyLetosMs": 0,
+   "zKasy": 0,
+   "zKasyPocet": 0,
+   "uzaverky": [],
+   "vyplaceno": 0,
+   "vyplaty": []
+  },
+  {
+   "id": 16,
+   "name": "Eva Testová",
+   "avatar": "👩",
+   "jobTitle": "Barista",
+   "role": "employee",
+   "contractType": "DPP",
+   "contractHoursYear": 300,
+   "hodinyLetosMs": 943200000,
+   "zKasy": 2400,
+   "zKasyPocet": 6,
+   "uzaverky": [
+    {
+     "id": 501,
+     "den": "D-1",
+     "castka": 400,
+     "kdo": "Eva Testová"
+    },
+    {
+     "id": 502,
+     "den": "D-2",
+     "castka": 400,
+     "kdo": "Eva Testová"
+    },
+    {
+     "id": 503,
+     "den": "D-3",
+     "castka": 400,
+     "kdo": "Eva Testová"
+    },
+    {
+     "id": 504,
+     "den": "D-4",
+     "castka": 400,
+     "kdo": "Eva Testová"
+    },
+    {
+     "id": 505,
+     "den": "D-5",
+     "castka": 400,
+     "kdo": "Eva Testová"
+    },
+    {
+     "id": 506,
+     "den": "D-6",
+     "castka": 400,
+     "kdo": "Eva Testová"
+    }
+   ],
+   "vyplaceno": 0,
+   "vyplaty": []
+  },
+  {
+   "id": 17,
+   "name": "Jakub Horák",
+   "avatar": "🧔",
+   "jobTitle": "Kuchař",
+   "role": "employee",
+   "contractType": "HPP",
+   "contractHoursYear": null,
+   "hodinyLetosMs": 3240000000,
+   "zKasy": 0,
+   "zKasyPocet": 0,
+   "uzaverky": [],
+   "vyplaceno": 0,
+   "vyplaty": []
+  },
+  {
+   "id": 18,
+   "name": "Petra Malá",
+   "avatar": "👱",
+   "jobTitle": "Barista",
+   "role": "employee",
+   "contractType": "DPC",
+   "contractHoursYear": null,
+   "hodinyLetosMs": 1440000000,
+   "zKasy": 0,
+   "zKasyPocet": 0,
+   "uzaverky": [],
+   "vyplaceno": 0,
+   "vyplaty": []
+  }
+ ],
+ "zamky": [],
+ "pravidla": {
+  "dysko": {
+   "metoda": "hodiny",
+   "vahy": {},
+   "vylouceni": [
+    "15"
+   ],
+   "sVedenim": false,
+   "platiOd": null
+  },
+  "priplatky": {
+   "vikend": true,
+   "vikendPct": 10,
+   "noc": true,
+   "nocPct": 10,
+   "nocOd": "22:00",
+   "nocDo": "06:00",
+   "svatek": true,
+   "svatekPct": 100
+  },
+  "showTipsToStaff": true,
+  "hraniceOdvodu": 11500
+ }
+}
