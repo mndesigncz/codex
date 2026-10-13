@@ -19,6 +19,7 @@ import SekceData from './settings/SekceData';
 import SekceZkratky from './settings/SekceZkratky';
 import SekcePodnik from './settings/SekcePodnik';
 import PevneNaklady from './settings/PevneNaklady';
+import SekceHistorie from './settings/SekceHistorie';
 import { zalozkaNastaveni, otevritSekciRovnou, SKUPINA_ZALOZKY, SKUPINY_NASTAVENI, type SectionId, type SkupinaNastaveni } from '@/lib/nastaveniZalozky';
 import TeamManagement from './TeamManagement';
 import { dbTimeDayHM, parseDbTime } from '@/lib/pragueTime';
@@ -179,7 +180,6 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
   // klíčem jako pohled Nastavení týmu, ať se jeho chování nemění.
   const povolena = sections.some(s => s.id === zvolena) || (zvolena === 'team' && isEmployer && ma('tym.zobrazit'));
   const section: SectionId = povolena ? zvolena : 'account';
-  const [auditEntries, setAuditEntries] = useState<any[] | null>(null);
   // POS (Storyous) connection form.
   const [posStatus, setPosStatus] = useState<any | null>(null);
   const [posForm, setPosForm] = useState({ clientId: '', clientSecret: '', merchantId: '', placeId: '' });
@@ -243,19 +243,6 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
       setPosMsg(d.error || 'Připojení se nepodařilo.');
     }
   };
-  // Chyba načtení historie je chyba, ne prázdný seznam („Zatím žádný záznam“ by lhalo).
-  const [auditErr, setAuditErr] = useState(false);
-  const nactiAudit = () => {
-    setAuditErr(false);
-    fetch('/api/audit').then(okJson)
-      .then(d => setAuditEntries(Array.isArray(d.entries) ? d.entries : []))
-      .catch(() => setAuditErr(true));
-  };
-  useEffect(() => {
-    if (section !== 'audit' || auditEntries) return;
-    nactiAudit();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [section]);
 
   // Account form
   const [name, setName] = useState('');
@@ -885,36 +872,8 @@ export default function Settings({ user, initialTab, tabNonce, vOkne = false }: 
           ) : section === 'stranky' ? (
             <VychoziRozlozeni />
           ) : section === 'audit' ? (
-            <section className="card p-6">
-              <h2 className={cardTitle}>{t('Historie změn')}</h2>
-              <p className="t-meta mt-1 mb-4">{t('Důležité zásahy v týmu — mazání, nastavení, odměny. Posledních 100 záznamů.')}</p>
-              {auditErr ? (
-                <ErrorState title={t('Historii změn se nepodařilo načíst')} onRetry={nactiAudit} compact />
-              ) : auditEntries === null ? (
-                <div className="space-y-2" aria-busy="true" aria-label={t('Načítám historii')}>
-                  {[0, 1, 2].map(i => <Skeleton key={i} className="h-10 w-full" />)}
-                </div>
-              ) : auditEntries.length === 0 ? (
-                <EmptyState icon="clock" title={t('Zatím žádný záznam')} hint={t('Kdo co změnil, se sem zapisuje samo — smazání, schválení, úpravy cen.')} compact />
-              ) : (
-                <div className="divide-y divide-black/[0.05]">
-                  {auditEntries.map(e => (
-                    <div key={e.id} className="flex items-start gap-3 py-2.5">
-                      <span className="shrink-0 text-lg">{e.userAvatar}</span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm text-[#16181A]">
-                          <strong>{e.userName}</strong> · {e.label}
-                          {e.detail && <span className="text-black/50"> — {e.detail}</span>}
-                        </p>
-                        <p className="t-meta tabular-nums">
-                          {dbTimeDayHM(e.createdAt)}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
+            // Historie změn s hledáním, lidmi, oblastmi a „Načíst starší" (kolo 7) — vlastní soubor.
+            <SekceHistorie />
           ) : (
             <TeamManagement user={user} />
           )}

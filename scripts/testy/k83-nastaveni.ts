@@ -4,6 +4,10 @@
 
 import type { Testy } from './_testy.ts';
 import { widget } from '../../lib/widgety/katalog/index.ts';
+import {
+  AUDIT_POPISKY, oblastAkce, maOblast, podminkaOblasti, parametryHistorie, dalsiKurzor, filtrujHistorii, lideHistorie, oblastiHistorie,
+  LIMIT_HISTORIE, PORADI_OBLASTI, OBLASTI_AUDITU, type ZaznamHistorie,
+} from '../../lib/auditPopisky.ts';
 import { stranka } from '../../lib/widgety/stranky/index.ts';
 import { vyuziti, limityTarifu, LIMITS } from '../../lib/plan.ts';
 import {
@@ -73,4 +77,43 @@ export default function ({ eq, ok }: Testy) {
   ok('rozpis: NE ve výchozím rozložení tabletu (podnik s vypnutým náhledem ho nesmí dostat sám)',
     !Object.values(stranka('kiosk.smena')?.vychozi ?? {}).some(seznam => (seznam ?? []).some(q => q.w === 'rozvrh.tym_nahled')));
   ok('rozpis: widget chce rozvrh.nahled — bez klíče ho tablet nevidí', JSON.stringify(tym?.opravneni.vse) === JSON.stringify(['rozvrh.nahled']));
+
+  // ---- 5) historie změn: oblasti, parametry API, kurzor, filtr ----
+  const bezOblasti = Object.keys(AUDIT_POPISKY).filter(k => !maOblast(k));
+  eq('historie: každý klíč z AUDIT_POPISKY má oblast z výslovné mapy (nová předpona = doplnit OBLASTI_AUDITU)', bezOblasti, []);
+  ok('historie: mapa míří jen na známé oblasti', Object.values(OBLASTI_AUDITU).every(o => PORADI_OBLASTI.includes(o)));
+  eq('historie: oblast podle předpony', [oblastAkce('inventory.delete'), oblastAkce('closing.delete'), oblastAkce('role.assign'), oblastAkce('pos.sync'), oblastAkce('reward.approved'), oblastAkce('client.points'), oblastAkce('organization.settings')],
+    ['sklad', 'uzaverky', 'lide', 'kasa', 'odmeny', 'klient', 'nastaveni']);
+  eq('historie: výjimka má přednost před předponou (team.settings je nastavení, team.remove lidé)', [oblastAkce('team.settings'), oblastAkce('team.remove'), oblastAkce('kiosk.login'), oblastAkce('kiosk.pin')], ['nastaveni', 'lide', 'nastaveni', 'lide']);
+  eq('historie: neznámá akce → ostatní', [oblastAkce('neco.nove'), oblastAkce(''), oblastAkce('bezTecky')], ['ostatni', 'ostatni', 'ostatni']);
+  const pl = podminkaOblasti('lide');
+  ok('historie SQL: oblast Lidé má předponu team, ale ne team.settings (krome)', pl.predpony.includes('team') && pl.krome.includes('team.settings') && !pl.nezname);
+  ok('historie SQL: oblast Nastavení bere team.settings jako výjimku (vcetne)', podminkaOblasti('nastaveni').vcetne.includes('team.settings'));
+  ok('historie SQL: Ostatní bere i neznámé předpony', podminkaOblasti('ostatni').nezname && podminkaOblasti('ostatni').znamePredpony.includes('inventory'));
+  const q = (o: Record<string, string>) => ({ get: (k: string) => o[k] ?? null });
+  eq('historie API: výchozí parametry', parametryHistorie(q({})), { before: null, limit: 100, user: null, oblast: null });
+  eq('historie API: before, limit, user, oblast', parametryHistorie(q({ before: '881', limit: '50', user: '16', oblast: 'sklad' })), { before: 881, limit: 50, user: 16, oblast: 'sklad' });
+  eq('historie API: limit nad strop → 200, nesmysly se zahodí', parametryHistorie(q({ limit: '5000', before: '-3', user: 'x', oblast: 'hack' })), { before: null, limit: LIMIT_HISTORIE.max, user: null, oblast: null });
+  eq('historie API: nula a desetinné číslo nejsou id', [parametryHistorie(q({ before: '0' })).before, parametryHistorie(q({ user: '1.5' })).user], [null, null]);
+  const radky = Array.from({ length: 6 }, (_, i) => ({ id: 100 - i }));
+  eq('kurzor: načteno víc než limit → strana a nextBefore = id posledního', [dalsiKurzor(radky, 5).strana.length, dalsiKurzor(radky, 5).nextBefore], [5, 96]);
+  eq('kurzor: přesně limit nebo méně → konec', [dalsiKurzor(radky.slice(0, 5), 5).nextBefore, dalsiKurzor([], 5).nextBefore], [null, null]);
+  const z = (id: number, action: string, userId: number | null, userName: string, label: string, detail: string | null = null): ZaznamHistorie =>
+    ({ id, action, label, detail, userId, userName, createdAt: '2026-10-12 08:00:00' });
+  const hist = [
+    z(9, 'inventory.delete', 16, 'Eva Testová', 'Smazána položka skladu', 'Mražená malina'),
+    z(8, 'role.assign', 15, 'Martin Nemeškal', 'Změněna role člena', 'Jakub → Provozní'),
+    z(7, 'closing.delete', 16, 'Eva Testová', 'Smazána uzávěrka'),
+    z(6, 'billing.referral', null, 'Systém', 'Měsíc zdarma za doporučení'),
+    z(5, 'inventory.create', 17, 'Jakub Horák', 'Přidána položka skladu', 'Citrony'),
+  ];
+  const ids = (f: Parameters<typeof filtrujHistorii>[1]) => filtrujHistorii(hist, f).map(x => x.id);
+  eq('filtr: člověk', ids({ clovek: 16, oblast: null, hledani: '' }), [9, 7]);
+  eq('filtr: systém (bez člověka)', ids({ clovek: 'system', oblast: null, hledani: '' }), [6]);
+  eq('filtr: oblast', ids({ clovek: null, oblast: 'sklad', hledani: '' }), [9, 5]);
+  eq('filtr: hledání v popisu, detailu i jméně bez diakritiky', [ids({ clovek: null, oblast: null, hledani: 'malina' }), ids({ clovek: null, oblast: null, hledani: 'jakub' }), ids({ clovek: null, oblast: null, hledani: 'uzaverka' })], [[9], [8, 5], [7]]);
+  eq('filtr: vše dohromady', ids({ clovek: 16, oblast: 'sklad', hledani: 'mraz' }), [9]);
+  eq('filtr: bez filtru všechno', ids({ clovek: null, oblast: null, hledani: '  ' }).length, 5);
+  eq('pilulky: lidé s počtem, nejčinnější první, systém zvlášť', lideHistorie(hist).map(l => `${l.klic}:${l.pocet}`), ['16:2', '17:1', '15:1', 'system:1']);
+  eq('oblasti: jen ty v datech, v pevném pořadí, s počtem', oblastiHistorie(hist), [{ oblast: 'lide', pocet: 1 }, { oblast: 'sklad', pocet: 2 }, { oblast: 'uzaverky', pocet: 1 }, { oblast: 'nastaveni', pocet: 1 }]);
 }

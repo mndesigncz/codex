@@ -400,6 +400,61 @@ const zalozka = (p, nazev) => p.locator('nav').getByRole('button', { name: new R
 }
 
 // ---------------------------------------------------------------------------
+// Nastavení › Historie změn (kolo 7, R7-7): hledání, pilulky lidí, oblasti, „Načíst starší"
+// ---------------------------------------------------------------------------
+{
+  // Fixtura audit.json: 130 záznamů od tří lidí a systému. Podvrh vrací stránky jako
+  // skutečná routa — bez before prvních 100 + nextBefore, s before zbytek a nextBefore null.
+  const VSE = nacti('audit').entries;
+  const historie = (req, json, stav) => {
+    const u = new URL(req.url());
+    if (u.pathname !== '/api/audit') return podvrh(req, json, stav);
+    (stav.audit ??= []).push(u.search);
+    const pred = Number(u.searchParams.get('before')) || null;
+    const zbyva = VSE.filter(z => pred == null || z.id < pred);
+    const strana = zbyva.slice(0, 100);
+    return json({ entries: strana, nextBefore: zbyva.length > 100 ? strana[strana.length - 1].id : null });
+  };
+  for (const [w, h, mobil] of [[390, 844, true], [1280, 900, false]]) {
+    const { ctx, p, stav, chyby } = await kontext({ viewport: { width: w, height: h }, mobil, dalsi: historie });
+    await p.goto(BASE + '/employer/overview?view=settings&tab=audit', { waitUntil: 'networkidle' });
+    const sekce = p.locator('[data-historie]');
+    tvrdi(`H ${w}: Historie změn se otevře s hledáním`, await dokud(() => sekce.getByRole('searchbox').or(sekce.locator('input')).first().isVisible().catch(() => false), 12000));
+    const radky = () => sekce.locator('ul.list > li');
+    tvrdi(`H ${w}: prvních 100 záznamů a nadpis říká, kolik je načteno`, await dokud(async () => (await radky().count()) === 100, 4000) && await sekce.getByText(/Načteno 100 nejnovějších záznamů/).isVisible());
+    const pas = sekce.getByRole('group', { name: 'Kdo změnu udělal' });
+    tvrdi(`H ${w}: pilulky lidí s počtem (Eva · N, Systém · N)`, await pas.getByRole('button', { name: /^Eva Testová · \d+$/ }).isVisible() && await pas.getByRole('button', { name: /^Systém · \d+$/ }).count() === 1);
+    tvrdi(`H ${w}: pás lidí jede uvnitř sebe, stránka bez přetečení`, await pas.evaluate(e => e.scrollWidth >= e.clientWidth) && await bezPreteceni(p));
+    const eva = pas.getByRole('button', { name: /^Eva Testová/ });
+    const pocetEvy = Number((await eva.innerText()).match(/(\d+)\s*$/)?.[1]);
+    await eva.click();
+    tvrdi(`H ${w}: pilulka Evy nechá jen její záznamy`, await dokud(async () => (await radky().count()) === pocetEvy, 2000) && (await radky().allInnerTexts()).every(t => t.includes('Eva Testová')), `${await radky().count()} / ${pocetEvy}`);
+    await eva.click();
+    tvrdi(`H ${w}: druhý klik na pilulku filtr zruší`, await dokud(async () => (await radky().count()) === 100, 2000) && (await eva.getAttribute('aria-pressed')) === 'false');
+    const oblasti = sekce.getByRole('tablist', { name: 'Oblast změn' });
+    tvrdi(`H ${w}: Segmented oblastí (Sklad s počtem)`, await oblasti.getByRole('tab', { name: /^Sklad/ }).isVisible().catch(() => false));
+    await oblasti.getByRole('tab', { name: /^Sklad/ }).click();
+    tvrdi(`H ${w}: oblast Sklad nechá jen skladové akce`, await dokud(async () => { const tx = await radky().allInnerTexts(); return tx.length > 0 && tx.every(t => /skladu|dodavatel|účtenka/i.test(t)); }, 2000));
+    await oblasti.getByRole('tab', { name: /^Vše/ }).click();
+    const hledat = sekce.locator('input').first();
+    await hledat.fill('mrazena');
+    tvrdi(`H ${w}: hledání bez diakritiky najde „Mražená malina"`, await dokud(async () => { const tx = await radky().allInnerTexts(); return tx.length > 0 && tx.every(t => t.includes('Mražená malina')); }, 2000));
+    await hledat.fill('xyz neexistuje');
+    tvrdi(`H ${w}: nic nenalezeno → „Nic neodpovídá filtru" se „Zrušit filtry"`, await dokud(() => sekce.getByText('Nic neodpovídá filtru').isVisible(), 2000));
+    await sekce.getByRole('button', { name: 'Zrušit filtry' }).click();
+    tvrdi(`H ${w}: „Zrušit filtry" vrátí všechno`, await dokud(async () => (await radky().count()) === 100, 2000) && (await hledat.inputValue()) === '');
+    await sekce.getByRole('button', { name: 'Načíst starší' }).click();
+    tvrdi(`H ${w}: „Načíst starší" pošle GET s before = id posledního záznamu`, await dokud(() => (stav.audit ?? []).some(q => /before=1031\b/.test(q)), 3000), JSON.stringify(stav.audit));
+    tvrdi(`H ${w}: přibude zbytek (130) a tlačítko zmizí`, await dokud(async () => (await radky().count()) === 130, 3000) && await sekce.getByRole('button', { name: 'Načíst starší' }).count() === 0
+      && await sekce.getByText(/Celkem 130 záznamů/).isVisible());
+    tvrdi(`H ${w}: bez přetečení`, await bezPreteceni(p) && await sekce.evaluate(e => e.scrollWidth <= e.clientWidth + 1));
+    await p.screenshot({ path: OUT + `k83-historie-${w}.png` });
+    tvrdi(`H ${w}: bez chyb v konzoli`, chyby.length === 0, chyby.slice(0, 3).join(' | '));
+    await ctx.close();
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Chat: filtr Nepřečtené, odznak, anketa oknem
 // ---------------------------------------------------------------------------
 {

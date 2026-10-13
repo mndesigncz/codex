@@ -1,0 +1,1305 @@
+{
+ "entries": [
+  {
+   "id": 1130,
+   "action": "inventory.delete",
+   "label": "Smazána položka skladu",
+   "detail": "Mražená malina",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-12 15:30:00"
+  },
+  {
+   "id": 1129,
+   "action": "pos.sync",
+   "label": "Odepsány prodeje ze skladu",
+   "detail": "42 prodejů",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-12 14:43:00"
+  },
+  {
+   "id": 1128,
+   "action": "menu.pos.match",
+   "label": "Menu spárováno s kasou",
+   "detail": "18 položek",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-12 13:56:00"
+  },
+  {
+   "id": 1127,
+   "action": "team.settings",
+   "label": "Změna nastavení podniku",
+   "detail": "název, měna",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-12 13:09:00"
+  },
+  {
+   "id": 1126,
+   "action": "dochazka.upravit",
+   "label": "Ručně upraven záznam docházky",
+   "detail": "Eva Testová 8:00 → 8:15 — zapomněla se odpíchnout",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-12 12:22:00"
+  },
+  {
+   "id": 1125,
+   "action": "role.assign",
+   "label": "Změněna role člena",
+   "detail": "Jakub Horák → Provozní",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-12 11:35:00"
+  },
+  {
+   "id": 1124,
+   "action": "schedule.adjust",
+   "label": "Rozvrh upraven podle nových požadavků",
+   "detail": null,
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-12 10:48:00"
+  },
+  {
+   "id": 1123,
+   "action": "inventory.create",
+   "label": "Přidána položka skladu",
+   "detail": "Citrony",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-12 10:01:00"
+  },
+  {
+   "id": 1122,
+   "action": "client.points",
+   "label": "Ruční úprava bodů člena",
+   "detail": "+50 bodů — Jana K.",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-12 09:14:00"
+  },
+  {
+   "id": 1121,
+   "action": "organization.settings",
+   "label": "Změna nastavení organizace",
+   "detail": "Sdílení lidí: zapnuto, sdílené číselníky: vypnuto",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-12 08:27:00"
+  },
+  {
+   "id": 1120,
+   "action": "supplier.create",
+   "label": "Přidán dodavatel",
+   "detail": "Mlékárna Valašské Meziříčí",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-12 07:40:00"
+  },
+  {
+   "id": 1119,
+   "action": "billing.referral",
+   "label": "Měsíc zdarma za doporučení",
+   "detail": null,
+   "userId": null,
+   "userName": "Systém",
+   "userAvatar": "⚙️",
+   "createdAt": "2026-10-12 06:53:00"
+  },
+  {
+   "id": 1118,
+   "action": "reward.approved",
+   "label": "Schválena odměna",
+   "detail": "Volný oběd",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-12 06:06:00"
+  },
+  {
+   "id": 1117,
+   "action": "receipt.add",
+   "label": "Přidána účtenka",
+   "detail": "Makro 1 284 Kč",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-12 05:19:00"
+  },
+  {
+   "id": 1116,
+   "action": "closing.delete",
+   "label": "Smazána uzávěrka",
+   "detail": "11. 10. — ranní směna",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-12 04:32:00"
+  },
+  {
+   "id": 1115,
+   "action": "wage.bonus",
+   "label": "Přidána prémie k výplatě",
+   "detail": "500 Kč — Eva Testová",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-12 03:45:00"
+  },
+  {
+   "id": 1114,
+   "action": "inventory.delete",
+   "label": "Smazána položka skladu",
+   "detail": "Mražená malina",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-12 02:58:00"
+  },
+  {
+   "id": 1113,
+   "action": "pos.sync",
+   "label": "Odepsány prodeje ze skladu",
+   "detail": "42 prodejů",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-12 02:11:00"
+  },
+  {
+   "id": 1112,
+   "action": "menu.pos.match",
+   "label": "Menu spárováno s kasou",
+   "detail": "18 položek",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-12 01:24:00"
+  },
+  {
+   "id": 1111,
+   "action": "team.settings",
+   "label": "Změna nastavení podniku",
+   "detail": "název, měna",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-12 00:37:00"
+  },
+  {
+   "id": 1110,
+   "action": "dochazka.upravit",
+   "label": "Ručně upraven záznam docházky",
+   "detail": "Eva Testová 8:00 → 8:15 — zapomněla se odpíchnout",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-11 23:50:00"
+  },
+  {
+   "id": 1109,
+   "action": "role.assign",
+   "label": "Změněna role člena",
+   "detail": "Jakub Horák → Provozní",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-11 23:03:00"
+  },
+  {
+   "id": 1108,
+   "action": "schedule.adjust",
+   "label": "Rozvrh upraven podle nových požadavků",
+   "detail": null,
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-11 22:16:00"
+  },
+  {
+   "id": 1107,
+   "action": "inventory.create",
+   "label": "Přidána položka skladu",
+   "detail": "Citrony",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-11 21:29:00"
+  },
+  {
+   "id": 1106,
+   "action": "client.points",
+   "label": "Ruční úprava bodů člena",
+   "detail": "+50 bodů — Jana K.",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-11 20:42:00"
+  },
+  {
+   "id": 1105,
+   "action": "organization.settings",
+   "label": "Změna nastavení organizace",
+   "detail": "Sdílení lidí: zapnuto, sdílené číselníky: vypnuto",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-11 19:55:00"
+  },
+  {
+   "id": 1104,
+   "action": "supplier.create",
+   "label": "Přidán dodavatel",
+   "detail": "Mlékárna Valašské Meziříčí",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-11 19:08:00"
+  },
+  {
+   "id": 1103,
+   "action": "rozvrh.publikovat",
+   "label": "Rozvrh publikován",
+   "detail": "říjen",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-11 18:21:00"
+  },
+  {
+   "id": 1102,
+   "action": "reward.approved",
+   "label": "Schválena odměna",
+   "detail": "Volný oběd",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-11 17:34:00"
+  },
+  {
+   "id": 1101,
+   "action": "receipt.add",
+   "label": "Přidána účtenka",
+   "detail": "Makro 1 284 Kč",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-11 16:47:00"
+  },
+  {
+   "id": 1100,
+   "action": "closing.delete",
+   "label": "Smazána uzávěrka",
+   "detail": "11. 10. — ranní směna",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-11 16:00:00"
+  },
+  {
+   "id": 1099,
+   "action": "wage.bonus",
+   "label": "Přidána prémie k výplatě",
+   "detail": "500 Kč — Eva Testová",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-11 15:13:00"
+  },
+  {
+   "id": 1098,
+   "action": "inventory.delete",
+   "label": "Smazána položka skladu",
+   "detail": "Mražená malina",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-11 14:26:00"
+  },
+  {
+   "id": 1097,
+   "action": "pos.sync",
+   "label": "Odepsány prodeje ze skladu",
+   "detail": "42 prodejů",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-11 13:39:00"
+  },
+  {
+   "id": 1096,
+   "action": "billing.referral",
+   "label": "Měsíc zdarma za doporučení",
+   "detail": null,
+   "userId": null,
+   "userName": "Systém",
+   "userAvatar": "⚙️",
+   "createdAt": "2026-10-11 12:52:00"
+  },
+  {
+   "id": 1095,
+   "action": "team.settings",
+   "label": "Změna nastavení podniku",
+   "detail": "název, měna",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-11 12:05:00"
+  },
+  {
+   "id": 1094,
+   "action": "dochazka.upravit",
+   "label": "Ručně upraven záznam docházky",
+   "detail": "Eva Testová 8:00 → 8:15 — zapomněla se odpíchnout",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-11 11:18:00"
+  },
+  {
+   "id": 1093,
+   "action": "role.assign",
+   "label": "Změněna role člena",
+   "detail": "Jakub Horák → Provozní",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-11 10:31:00"
+  },
+  {
+   "id": 1092,
+   "action": "schedule.adjust",
+   "label": "Rozvrh upraven podle nových požadavků",
+   "detail": null,
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-11 09:44:00"
+  },
+  {
+   "id": 1091,
+   "action": "inventory.create",
+   "label": "Přidána položka skladu",
+   "detail": "Citrony",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-11 08:57:00"
+  },
+  {
+   "id": 1090,
+   "action": "client.points",
+   "label": "Ruční úprava bodů člena",
+   "detail": "+50 bodů — Jana K.",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-11 08:10:00"
+  },
+  {
+   "id": 1089,
+   "action": "organization.settings",
+   "label": "Změna nastavení organizace",
+   "detail": "Sdílení lidí: zapnuto, sdílené číselníky: vypnuto",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-11 07:23:00"
+  },
+  {
+   "id": 1088,
+   "action": "supplier.create",
+   "label": "Přidán dodavatel",
+   "detail": "Mlékárna Valašské Meziříčí",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-11 06:36:00"
+  },
+  {
+   "id": 1087,
+   "action": "rozvrh.publikovat",
+   "label": "Rozvrh publikován",
+   "detail": "říjen",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-11 05:49:00"
+  },
+  {
+   "id": 1086,
+   "action": "reward.approved",
+   "label": "Schválena odměna",
+   "detail": "Volný oběd",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-11 05:02:00"
+  },
+  {
+   "id": 1085,
+   "action": "receipt.add",
+   "label": "Přidána účtenka",
+   "detail": "Makro 1 284 Kč",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-11 04:15:00"
+  },
+  {
+   "id": 1084,
+   "action": "closing.delete",
+   "label": "Smazána uzávěrka",
+   "detail": "11. 10. — ranní směna",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-11 03:28:00"
+  },
+  {
+   "id": 1083,
+   "action": "wage.bonus",
+   "label": "Přidána prémie k výplatě",
+   "detail": "500 Kč — Eva Testová",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-11 02:41:00"
+  },
+  {
+   "id": 1082,
+   "action": "inventory.delete",
+   "label": "Smazána položka skladu",
+   "detail": "Mražená malina",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-11 01:54:00"
+  },
+  {
+   "id": 1081,
+   "action": "pos.sync",
+   "label": "Odepsány prodeje ze skladu",
+   "detail": "42 prodejů",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-11 01:07:00"
+  },
+  {
+   "id": 1080,
+   "action": "menu.pos.match",
+   "label": "Menu spárováno s kasou",
+   "detail": "18 položek",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-11 00:20:00"
+  },
+  {
+   "id": 1079,
+   "action": "team.settings",
+   "label": "Změna nastavení podniku",
+   "detail": "název, měna",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-10 23:33:00"
+  },
+  {
+   "id": 1078,
+   "action": "dochazka.upravit",
+   "label": "Ručně upraven záznam docházky",
+   "detail": "Eva Testová 8:00 → 8:15 — zapomněla se odpíchnout",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-10 22:46:00"
+  },
+  {
+   "id": 1077,
+   "action": "role.assign",
+   "label": "Změněna role člena",
+   "detail": "Jakub Horák → Provozní",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-10 21:59:00"
+  },
+  {
+   "id": 1076,
+   "action": "schedule.adjust",
+   "label": "Rozvrh upraven podle nových požadavků",
+   "detail": null,
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-10 21:12:00"
+  },
+  {
+   "id": 1075,
+   "action": "inventory.create",
+   "label": "Přidána položka skladu",
+   "detail": "Citrony",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-10 20:25:00"
+  },
+  {
+   "id": 1074,
+   "action": "client.points",
+   "label": "Ruční úprava bodů člena",
+   "detail": "+50 bodů — Jana K.",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-10 19:38:00"
+  },
+  {
+   "id": 1073,
+   "action": "billing.referral",
+   "label": "Měsíc zdarma za doporučení",
+   "detail": null,
+   "userId": null,
+   "userName": "Systém",
+   "userAvatar": "⚙️",
+   "createdAt": "2026-10-10 18:51:00"
+  },
+  {
+   "id": 1072,
+   "action": "supplier.create",
+   "label": "Přidán dodavatel",
+   "detail": "Mlékárna Valašské Meziříčí",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-10 18:04:00"
+  },
+  {
+   "id": 1071,
+   "action": "rozvrh.publikovat",
+   "label": "Rozvrh publikován",
+   "detail": "říjen",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-10 17:17:00"
+  },
+  {
+   "id": 1070,
+   "action": "reward.approved",
+   "label": "Schválena odměna",
+   "detail": "Volný oběd",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-10 16:30:00"
+  },
+  {
+   "id": 1069,
+   "action": "receipt.add",
+   "label": "Přidána účtenka",
+   "detail": "Makro 1 284 Kč",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-10 15:43:00"
+  },
+  {
+   "id": 1068,
+   "action": "closing.delete",
+   "label": "Smazána uzávěrka",
+   "detail": "11. 10. — ranní směna",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-10 14:56:00"
+  },
+  {
+   "id": 1067,
+   "action": "wage.bonus",
+   "label": "Přidána prémie k výplatě",
+   "detail": "500 Kč — Eva Testová",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-10 14:09:00"
+  },
+  {
+   "id": 1066,
+   "action": "inventory.delete",
+   "label": "Smazána položka skladu",
+   "detail": "Mražená malina",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-10 13:22:00"
+  },
+  {
+   "id": 1065,
+   "action": "pos.sync",
+   "label": "Odepsány prodeje ze skladu",
+   "detail": "42 prodejů",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-10 12:35:00"
+  },
+  {
+   "id": 1064,
+   "action": "menu.pos.match",
+   "label": "Menu spárováno s kasou",
+   "detail": "18 položek",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-10 11:48:00"
+  },
+  {
+   "id": 1063,
+   "action": "team.settings",
+   "label": "Změna nastavení podniku",
+   "detail": "název, měna",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-10 11:01:00"
+  },
+  {
+   "id": 1062,
+   "action": "dochazka.upravit",
+   "label": "Ručně upraven záznam docházky",
+   "detail": "Eva Testová 8:00 → 8:15 — zapomněla se odpíchnout",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-10 10:14:00"
+  },
+  {
+   "id": 1061,
+   "action": "role.assign",
+   "label": "Změněna role člena",
+   "detail": "Jakub Horák → Provozní",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-10 09:27:00"
+  },
+  {
+   "id": 1060,
+   "action": "schedule.adjust",
+   "label": "Rozvrh upraven podle nových požadavků",
+   "detail": null,
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-10 08:40:00"
+  },
+  {
+   "id": 1059,
+   "action": "inventory.create",
+   "label": "Přidána položka skladu",
+   "detail": "Citrony",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-10 07:53:00"
+  },
+  {
+   "id": 1058,
+   "action": "client.points",
+   "label": "Ruční úprava bodů člena",
+   "detail": "+50 bodů — Jana K.",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-10 07:06:00"
+  },
+  {
+   "id": 1057,
+   "action": "organization.settings",
+   "label": "Změna nastavení organizace",
+   "detail": "Sdílení lidí: zapnuto, sdílené číselníky: vypnuto",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-10 06:19:00"
+  },
+  {
+   "id": 1056,
+   "action": "supplier.create",
+   "label": "Přidán dodavatel",
+   "detail": "Mlékárna Valašské Meziříčí",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-10 05:32:00"
+  },
+  {
+   "id": 1055,
+   "action": "rozvrh.publikovat",
+   "label": "Rozvrh publikován",
+   "detail": "říjen",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-10 04:45:00"
+  },
+  {
+   "id": 1054,
+   "action": "reward.approved",
+   "label": "Schválena odměna",
+   "detail": "Volný oběd",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-10 03:58:00"
+  },
+  {
+   "id": 1053,
+   "action": "receipt.add",
+   "label": "Přidána účtenka",
+   "detail": "Makro 1 284 Kč",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-10 03:11:00"
+  },
+  {
+   "id": 1052,
+   "action": "closing.delete",
+   "label": "Smazána uzávěrka",
+   "detail": "11. 10. — ranní směna",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-10 02:24:00"
+  },
+  {
+   "id": 1051,
+   "action": "wage.bonus",
+   "label": "Přidána prémie k výplatě",
+   "detail": "500 Kč — Eva Testová",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-10 01:37:00"
+  },
+  {
+   "id": 1050,
+   "action": "billing.referral",
+   "label": "Měsíc zdarma za doporučení",
+   "detail": null,
+   "userId": null,
+   "userName": "Systém",
+   "userAvatar": "⚙️",
+   "createdAt": "2026-10-10 00:50:00"
+  },
+  {
+   "id": 1049,
+   "action": "pos.sync",
+   "label": "Odepsány prodeje ze skladu",
+   "detail": "42 prodejů",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-10 00:03:00"
+  },
+  {
+   "id": 1048,
+   "action": "menu.pos.match",
+   "label": "Menu spárováno s kasou",
+   "detail": "18 položek",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-09 23:16:00"
+  },
+  {
+   "id": 1047,
+   "action": "team.settings",
+   "label": "Změna nastavení podniku",
+   "detail": "název, měna",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-09 22:29:00"
+  },
+  {
+   "id": 1046,
+   "action": "dochazka.upravit",
+   "label": "Ručně upraven záznam docházky",
+   "detail": "Eva Testová 8:00 → 8:15 — zapomněla se odpíchnout",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-09 21:42:00"
+  },
+  {
+   "id": 1045,
+   "action": "role.assign",
+   "label": "Změněna role člena",
+   "detail": "Jakub Horák → Provozní",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-09 20:55:00"
+  },
+  {
+   "id": 1044,
+   "action": "schedule.adjust",
+   "label": "Rozvrh upraven podle nových požadavků",
+   "detail": null,
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-09 20:08:00"
+  },
+  {
+   "id": 1043,
+   "action": "inventory.create",
+   "label": "Přidána položka skladu",
+   "detail": "Citrony",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-09 19:21:00"
+  },
+  {
+   "id": 1042,
+   "action": "client.points",
+   "label": "Ruční úprava bodů člena",
+   "detail": "+50 bodů — Jana K.",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-09 18:34:00"
+  },
+  {
+   "id": 1041,
+   "action": "organization.settings",
+   "label": "Změna nastavení organizace",
+   "detail": "Sdílení lidí: zapnuto, sdílené číselníky: vypnuto",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-09 17:47:00"
+  },
+  {
+   "id": 1040,
+   "action": "supplier.create",
+   "label": "Přidán dodavatel",
+   "detail": "Mlékárna Valašské Meziříčí",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-09 17:00:00"
+  },
+  {
+   "id": 1039,
+   "action": "rozvrh.publikovat",
+   "label": "Rozvrh publikován",
+   "detail": "říjen",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-09 16:13:00"
+  },
+  {
+   "id": 1038,
+   "action": "reward.approved",
+   "label": "Schválena odměna",
+   "detail": "Volný oběd",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-09 15:26:00"
+  },
+  {
+   "id": 1037,
+   "action": "receipt.add",
+   "label": "Přidána účtenka",
+   "detail": "Makro 1 284 Kč",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-09 14:39:00"
+  },
+  {
+   "id": 1036,
+   "action": "closing.delete",
+   "label": "Smazána uzávěrka",
+   "detail": "11. 10. — ranní směna",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-09 13:52:00"
+  },
+  {
+   "id": 1035,
+   "action": "wage.bonus",
+   "label": "Přidána prémie k výplatě",
+   "detail": "500 Kč — Eva Testová",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-09 13:05:00"
+  },
+  {
+   "id": 1034,
+   "action": "inventory.delete",
+   "label": "Smazána položka skladu",
+   "detail": "Mražená malina",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-09 12:18:00"
+  },
+  {
+   "id": 1033,
+   "action": "pos.sync",
+   "label": "Odepsány prodeje ze skladu",
+   "detail": "42 prodejů",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-09 11:31:00"
+  },
+  {
+   "id": 1032,
+   "action": "menu.pos.match",
+   "label": "Menu spárováno s kasou",
+   "detail": "18 položek",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-09 10:44:00"
+  },
+  {
+   "id": 1031,
+   "action": "team.settings",
+   "label": "Změna nastavení podniku",
+   "detail": "název, měna",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-09 09:57:00"
+  },
+  {
+   "id": 1030,
+   "action": "dochazka.upravit",
+   "label": "Ručně upraven záznam docházky",
+   "detail": "Eva Testová 8:00 → 8:15 — zapomněla se odpíchnout",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-09 09:10:00"
+  },
+  {
+   "id": 1029,
+   "action": "role.assign",
+   "label": "Změněna role člena",
+   "detail": "Jakub Horák → Provozní",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-09 08:23:00"
+  },
+  {
+   "id": 1028,
+   "action": "schedule.adjust",
+   "label": "Rozvrh upraven podle nových požadavků",
+   "detail": null,
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-09 07:36:00"
+  },
+  {
+   "id": 1027,
+   "action": "billing.referral",
+   "label": "Měsíc zdarma za doporučení",
+   "detail": null,
+   "userId": null,
+   "userName": "Systém",
+   "userAvatar": "⚙️",
+   "createdAt": "2026-10-09 06:49:00"
+  },
+  {
+   "id": 1026,
+   "action": "client.points",
+   "label": "Ruční úprava bodů člena",
+   "detail": "+50 bodů — Jana K.",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-09 06:02:00"
+  },
+  {
+   "id": 1025,
+   "action": "organization.settings",
+   "label": "Změna nastavení organizace",
+   "detail": "Sdílení lidí: zapnuto, sdílené číselníky: vypnuto",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-09 05:15:00"
+  },
+  {
+   "id": 1024,
+   "action": "supplier.create",
+   "label": "Přidán dodavatel",
+   "detail": "Mlékárna Valašské Meziříčí",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-09 04:28:00"
+  },
+  {
+   "id": 1023,
+   "action": "rozvrh.publikovat",
+   "label": "Rozvrh publikován",
+   "detail": "říjen",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-09 03:41:00"
+  },
+  {
+   "id": 1022,
+   "action": "reward.approved",
+   "label": "Schválena odměna",
+   "detail": "Volný oběd",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-09 02:54:00"
+  },
+  {
+   "id": 1021,
+   "action": "receipt.add",
+   "label": "Přidána účtenka",
+   "detail": "Makro 1 284 Kč",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-09 02:07:00"
+  },
+  {
+   "id": 1020,
+   "action": "closing.delete",
+   "label": "Smazána uzávěrka",
+   "detail": "11. 10. — ranní směna",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-09 01:20:00"
+  },
+  {
+   "id": 1019,
+   "action": "wage.bonus",
+   "label": "Přidána prémie k výplatě",
+   "detail": "500 Kč — Eva Testová",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-09 00:33:00"
+  },
+  {
+   "id": 1018,
+   "action": "inventory.delete",
+   "label": "Smazána položka skladu",
+   "detail": "Mražená malina",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-08 23:46:00"
+  },
+  {
+   "id": 1017,
+   "action": "pos.sync",
+   "label": "Odepsány prodeje ze skladu",
+   "detail": "42 prodejů",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-08 22:59:00"
+  },
+  {
+   "id": 1016,
+   "action": "menu.pos.match",
+   "label": "Menu spárováno s kasou",
+   "detail": "18 položek",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-08 22:12:00"
+  },
+  {
+   "id": 1015,
+   "action": "team.settings",
+   "label": "Změna nastavení podniku",
+   "detail": "název, měna",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-08 21:25:00"
+  },
+  {
+   "id": 1014,
+   "action": "dochazka.upravit",
+   "label": "Ručně upraven záznam docházky",
+   "detail": "Eva Testová 8:00 → 8:15 — zapomněla se odpíchnout",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-08 20:38:00"
+  },
+  {
+   "id": 1013,
+   "action": "role.assign",
+   "label": "Změněna role člena",
+   "detail": "Jakub Horák → Provozní",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-08 19:51:00"
+  },
+  {
+   "id": 1012,
+   "action": "schedule.adjust",
+   "label": "Rozvrh upraven podle nových požadavků",
+   "detail": null,
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-08 19:04:00"
+  },
+  {
+   "id": 1011,
+   "action": "inventory.create",
+   "label": "Přidána položka skladu",
+   "detail": "Citrony",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-08 18:17:00"
+  },
+  {
+   "id": 1010,
+   "action": "client.points",
+   "label": "Ruční úprava bodů člena",
+   "detail": "+50 bodů — Jana K.",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-08 17:30:00"
+  },
+  {
+   "id": 1009,
+   "action": "organization.settings",
+   "label": "Změna nastavení organizace",
+   "detail": "Sdílení lidí: zapnuto, sdílené číselníky: vypnuto",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-08 16:43:00"
+  },
+  {
+   "id": 1008,
+   "action": "supplier.create",
+   "label": "Přidán dodavatel",
+   "detail": "Mlékárna Valašské Meziříčí",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-08 15:56:00"
+  },
+  {
+   "id": 1007,
+   "action": "rozvrh.publikovat",
+   "label": "Rozvrh publikován",
+   "detail": "říjen",
+   "userId": 15,
+   "userName": "Martin Nemeškal",
+   "userAvatar": "🧑",
+   "createdAt": "2026-10-08 15:09:00"
+  },
+  {
+   "id": 1006,
+   "action": "reward.approved",
+   "label": "Schválena odměna",
+   "detail": "Volný oběd",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-08 14:22:00"
+  },
+  {
+   "id": 1005,
+   "action": "receipt.add",
+   "label": "Přidána účtenka",
+   "detail": "Makro 1 284 Kč",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-08 13:35:00"
+  },
+  {
+   "id": 1004,
+   "action": "billing.referral",
+   "label": "Měsíc zdarma za doporučení",
+   "detail": null,
+   "userId": null,
+   "userName": "Systém",
+   "userAvatar": "⚙️",
+   "createdAt": "2026-10-08 12:48:00"
+  },
+  {
+   "id": 1003,
+   "action": "wage.bonus",
+   "label": "Přidána prémie k výplatě",
+   "detail": "500 Kč — Eva Testová",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-08 12:01:00"
+  },
+  {
+   "id": 1002,
+   "action": "inventory.delete",
+   "label": "Smazána položka skladu",
+   "detail": "Mražená malina",
+   "userId": 17,
+   "userName": "Jakub Horák",
+   "userAvatar": "🧔",
+   "createdAt": "2026-10-08 11:14:00"
+  },
+  {
+   "id": 1001,
+   "action": "pos.sync",
+   "label": "Odepsány prodeje ze skladu",
+   "detail": "42 prodejů",
+   "userId": 16,
+   "userName": "Eva Testová",
+   "userAvatar": "👩",
+   "createdAt": "2026-10-08 10:27:00"
+  }
+ ],
+ "nextBefore": 1001
+}
