@@ -42,6 +42,7 @@ import { useOpravneni } from '../role/useOpravneni';
 import { NaStranceAkci } from '../widgety/oblasti/akce';
 import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { useLocale } from './jazyk';
+import { Poznamky } from '../Poznamky';
 
 type Ev = any;
 
@@ -884,6 +885,12 @@ function EventDetail({ event: e, members, items, menuBoards, money, patch, oznam
             )}
           </div>
         </Sec>
+
+        {/* Poznámky k akci (kolo 8, R8-5): „stánek bere jen kartu", „loni chyběly kelímky" — vlákno zůstane u akce,
+            @zmínka pošle kolegovi oznámení. Stejný blok jako u úkolu nebo receptury. */}
+        <div className="mt-6 pt-5 border-t border-black/[0.06]" data-poznamky-akce>
+          <Poznamky typ="event" id={e.id} />
+        </div>
 
         {/* Tlačítka detailu jsou v obsahu, ne v patičce okna: patička patří
             druhému kroku a „Smazat akci" musí po Zrušit dostat fokus zpátky. */}

@@ -32,6 +32,7 @@ import { useSmi } from '../widgety/NavigaceKontext';
 import type { PovinnaPolozka } from '@/lib/povinnePredUzaverkou';
 import { useT } from '@/lib/i18n/client';
 import { useLocale } from './jazyk';
+import { Poznamky } from '../Poznamky';
 
 type Person = { id: number; name: string; avatar?: string | null };
 
@@ -628,13 +629,14 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
                   <Row label={t('Stav')} value={c.approved === false ? t('Čeká na schválení') : t('Schváleno')} />
                   {c.approvedByName && <Row label={t('Schválil/a')} value={c.approvedByName} />}
                 </div>
-                {c.review_note && (
-                  <div className="mt-2 well border border-black/[0.06] p-3.5">
-                    <p className="t-label mb-0.5">{t('Poznámka vedení')}</p>
-                    <p className="text-sm text-black/65 whitespace-pre-wrap">{c.review_note}</p>
-                  </div>
-                )}
               </Section>
+
+              {/* Vlákno k uzávěrce (kolo 8, R8-5): vedení se zeptá „proč manko 200?", autor dostane oznámení a odpoví
+                  z telefonu. „Poznámka vedení" (review_note) zůstává první, připnutá zpráva vlákna. */}
+              <section className="pt-5" data-poznamky-uzaverky>
+                <Poznamky typ="closing" id={id}
+                  uvod={c.review_note ? { text: c.review_note, autor: c.approvedByName ?? t('Vedení'), kdy: null, popisek: t('Poznámka vedení') } : null} />
+              </section>
             </>
           )}
         </div>

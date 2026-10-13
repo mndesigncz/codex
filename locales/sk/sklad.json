@@ -325,5 +325,7 @@
   "Suroviny verze": "Suroviny verzie",
   "Skrýt": "Skryť",
   "Zobrazit": "Zobraziť",
-  "Vrátit na tuto verzi": "Vrátiť na túto verziu"
+  "Vrátit na tuto verzi": "Vrátiť na túto verziu",
+  "{n, plural, one {# poznámka} few {# poznámky} other {# poznámek}}": "{n, plural, one {# poznámka} few {# poznámky} other {# poznámok}}",
+  "nová": "nová"
 }

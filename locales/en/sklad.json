@@ -325,5 +325,7 @@
   "Suroviny verze": "Ingredients in this version",
   "Skrýt": "Hide",
   "Zobrazit": "View",
-  "Vrátit na tuto verzi": "Restore this version"
+  "Vrátit na tuto verzi": "Restore this version",
+  "{n, plural, one {# poznámka} few {# poznámky} other {# poznámek}}": "{n, plural, one {# note} other {# notes}}",
+  "nová": "new"
 }

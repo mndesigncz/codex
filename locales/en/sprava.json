@@ -1743,5 +1743,8 @@
   "{mesic} je uzavřené — otevři ho ve Výplatní listině.": "{mesic} is closed — reopen it in the Payroll sheet.",
   "{n, plural, one {# píchnutí doručeno} few {# píchnutí doručena} other {# píchnutí doručeno}} po výpadku": "{n, plural, one {# punch} other {# punches}} after outage",
   "{n, plural, one {# směna} few {# směny} other {# směn}}": "{n, plural, one {# shift} other {# shifts}}",
-  "Výplaty z kasy": "Payouts from the till"
+  "Výplaty z kasy": "Payouts from the till",
+  "Poznámky — {nazev}": "Notes — {nazev}",
+  "Poznámky · {n}": "Notes · {n}",
+  "Poznámky k položce": "Notes on this item"
 }

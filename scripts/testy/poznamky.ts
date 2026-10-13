@@ -19,7 +19,7 @@ const DEN = 24 * H;
 
 export default function ({ eq, ok }: Testy) {
   // ---- typ ----
-  eq('sedm typů v daném pořadí (kolo 7: + podnět)', [...TYPY_POZNAMEK], ['task', 'guide', 'procedure', 'recipe', 'inventory_item', 'shift', 'suggestion']);
+  eq('deset typů v daném pořadí (kolo 7: + podnět; kolo 8: + uzávěrka, akce, položka menu)', [...TYPY_POZNAMEK], ['task', 'guide', 'procedure', 'recipe', 'inventory_item', 'shift', 'suggestion', 'closing', 'event', 'menu_item']);
   ok('známý typ projde', jeTypPoznamky('task') && jeTypPoznamky('recipe'));
   ok('neznámý typ, číslo ani prázdno neprojdou', !jeTypPoznamky('tasks') && !jeTypPoznamky(1) && !jeTypPoznamky('') && !jeTypPoznamky(null));
 

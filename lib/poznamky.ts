@@ -8,8 +8,10 @@
 // znamená jedno chování — kdo smí mazat, jak se počítá „před 2 h", jak dlouhý
 // text projde — všude stejně.
 
-/** Typy věcí, ke kterým jde psát. Server i klient berou seznam odsud. */
-export const TYPY_POZNAMEK = ['task', 'guide', 'procedure', 'recipe', 'inventory_item', 'shift', 'suggestion'] as const;
+/** Typy věcí, ke kterým jde psát. Server i klient berou seznam odsud.
+ *  Kolo 7: podnět (Nápady). Kolo 8 (R8-5): i uzávěrka (vlákno pod detailem — vedení se zeptá,
+ *  autor odpoví z telefonu), akce a položka menu („Od pondělí jiný dodavatel croissantů"). */
+export const TYPY_POZNAMEK = ['task', 'guide', 'procedure', 'recipe', 'inventory_item', 'shift', 'suggestion', 'closing', 'event', 'menu_item'] as const;
 export type TypPoznamky = (typeof TYPY_POZNAMEK)[number];
 
 export const jeTypPoznamky = (x: unknown): x is TypPoznamky => typeof x === 'string' && (TYPY_POZNAMEK as readonly string[]).includes(x);
@@ -31,6 +33,9 @@ export const OPRAVNENI_SPRAVY_POZNAMEK: Record<TypPoznamky, string> = {
   shift: 'rozvrh.upravit',
   // Kolo 7: vlákno pod podnětem (Nápady) — uklízí ten, kdo podněty spravuje.
   suggestion: 'napady.spravovat',
+  closing: 'uzaverky.mazat',
+  event: 'akce.upravit',
+  menu_item: 'menu.upravit',
 };
 
 /**
@@ -119,6 +124,10 @@ export interface Poznamka {
   moje: boolean;
   /** Server už rozhodl: autor, nebo správce oblasti. UI tlačítko jen schová. */
   muzuSmazat: boolean;
+  /** Připnutá nahoru (autor) — první ve vlákně, bez ohledu na čas. */
+  pripnuta: boolean;
+  /** Koho poznámka zmiňuje (@Jméno) — dostali oznámení. */
+  zminky: number[];
 }
 
 /** Adresa seznamu — klíč sdílené mezipaměti (useDataWidgetu). Tablet ji nese i za koho. */
@@ -145,6 +154,8 @@ export function vyberPoznamky(raw: unknown): Poznamka[] {
       },
       moje: p.moje === true,
       muzuSmazat: p.muzuSmazat === true,
+      pripnuta: p.pripnuta === true,
+      zminky: Array.isArray(p.zminky) ? p.zminky.map(Number).filter(Number.isFinite) : [],
     }));
 }
 
@@ -206,4 +217,155 @@ export function vyberPoctyPoznamek(raw: unknown): Record<number, number> {
     if (Number.isInteger(id) && id > 0 && Number.isFinite(n) && n >= 0) out[id] = Math.floor(n);
   }
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// Zmínky (@Jméno) — kolo 8, R8-5
+// ---------------------------------------------------------------------------
+
+export interface ClovekKeZmince { id: number; name: string; avatar?: string | null }
+
+const bezDiakritiky = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+/** Jména, pod kterými jde člověka zmínit: celé jméno a křestní, když je v podniku jediné. */
+export function jmenaKeZmince(lide: readonly ClovekKeZmince[]): Map<number, string[]> {
+  const krestni = new Map<string, number>();
+  for (const l of lide) {
+    const k = bezDiakritiky(l.name.trim().split(/\s+/)[0] ?? '');
+    if (k) krestni.set(k, (krestni.get(k) ?? 0) + 1);
+  }
+  const out = new Map<number, string[]>();
+  for (const l of lide) {
+    const cele = l.name.trim();
+    if (!cele) continue;
+    const k = cele.split(/\s+/)[0];
+    const varianty = [cele];
+    if (k !== cele && krestni.get(bezDiakritiky(k)) === 1) varianty.push(k);
+    out.set(l.id, varianty);
+  }
+  return out;
+}
+
+/**
+ * Koho text zmiňuje: „@Petra Nováková" nebo „@Petra" (křestní, když je jediná). Bez ohledu na
+ * velikost písmen a diakritiku; za jménem musí být konec, mezera nebo interpunkce, ať „@Petra"
+ * nechytne „@Petrák". Vrací id bez duplicit, v pořadí výskytu.
+ */
+export function najdiZminky(text: string, lide: readonly ClovekKeZmince[]): number[] {
+  const t = bezDiakritiky(text);
+  const nalezy: { i: number; id: number }[] = [];
+  for (const [id, varianty] of jmenaKeZmince(lide)) {
+    for (const v of varianty) {
+      const hledane = '@' + bezDiakritiky(v);
+      let od = 0;
+      while (od <= t.length) {
+        const i = t.indexOf(hledane, od);
+        if (i < 0) break;
+        const dalsi = t[i + hledane.length];
+        if (dalsi === undefined || !/[\p{L}\p{N}]/u.test(dalsi)) { nalezy.push({ i, id }); break; }
+        od = i + 1;
+      }
+    }
+  }
+  const videno = new Set<number>();
+  return nalezy.sort((a, b) => a.i - b.i).map(n => n.id).filter(id => !videno.has(id) && (videno.add(id), true));
+}
+
+export interface NavrhyZminek { /** Kde v textu „@" začíná. */ od: number; dotaz: string; lide: ClovekKeZmince[] }
+
+/**
+ * Když kurzor stojí v rozepsané zmínce („@pe|"), nabídnout lidi, jejichž jméno tak začíná (nejvýš 6).
+ * Rozepsaná zmínka = „@" na začátku textu nebo po mezeře, bez nového řádku mezi „@" a kurzorem;
+ * dotaz smí mít i mezeru (příjmení). Jinak null.
+ */
+export function navrhyZminek(text: string, kurzor: number, lide: readonly ClovekKeZmince[]): NavrhyZminek | null {
+  const pred = text.slice(0, Math.max(0, Math.min(kurzor, text.length)));
+  const od = pred.lastIndexOf('@');
+  if (od < 0) return null;
+  if (od > 0 && !/\s/.test(pred[od - 1])) return null;
+  const dotaz = pred.slice(od + 1);
+  if (/\n/.test(dotaz) || dotaz.length > 40) return null;
+  const q = bezDiakritiky(dotaz.trim());
+  const shoda = lide.filter(l => {
+    const n = bezDiakritiky(l.name);
+    return !q || n.startsWith(q) || n.split(/\s+/).some(cast => cast.startsWith(q));
+  }).slice(0, 6);
+  return shoda.length ? { od, dotaz, lide: shoda } : null;
+}
+
+/** Vloží vybranou zmínku místo rozepsané („@pe" → „@Petra Nováková ") a vrátí text i nový kurzor. */
+export function vlozZminku(text: string, od: number, kurzor: number, jmeno: string): { text: string; kurzor: number } {
+  const vlozene = `@${jmeno} `;
+  const novy = text.slice(0, od) + vlozene + text.slice(Math.max(kurzor, od));
+  return { text: novy, kurzor: od + vlozene.length };
+}
+
+/** Text rozsekaný na běžné kusy a zmínky (pro zvýraznění v poznámce). Bez lidí vrací jeden kus. */
+export function kusyTextu(text: string, lide: readonly ClovekKeZmince[]): { text: string; zminka: boolean }[] {
+  const varianty = [...jmenaKeZmince(lide).values()].flat().sort((a, b) => b.length - a.length);
+  if (!varianty.length) return [{ text, zminka: false }];
+  const t = bezDiakritiky(text);
+  const kusy: { text: string; zminka: boolean }[] = [];
+  let i = 0, od = 0;
+  while (i < t.length) {
+    if (t[i] === '@') {
+      const v = varianty.find(x => {
+        const h = bezDiakritiky(x);
+        if (!t.startsWith(h, i + 1)) return false;
+        const dalsi = t[i + 1 + h.length];
+        return dalsi === undefined || !/[\p{L}\p{N}]/u.test(dalsi);
+      });
+      if (v) {
+        if (i > od) kusy.push({ text: text.slice(od, i), zminka: false });
+        kusy.push({ text: text.slice(i, i + 1 + v.length), zminka: true });
+        i += 1 + v.length; od = i;
+        continue;
+      }
+    }
+    i++;
+  }
+  if (od < text.length) kusy.push({ text: text.slice(od), zminka: false });
+  return kusy;
+}
+
+// ---------------------------------------------------------------------------
+// Počty v seznamech a odkazy z oznámení — kolo 8, R8-5
+// ---------------------------------------------------------------------------
+
+export interface PocetPoznamek { n: number; /** Od poslední návštěvy přibyla cizí poznámka. */ nove: boolean }
+
+/** Adresa počtů pro jeden typ (bublina v řádku seznamu) — klíč sdílené mezipaměti. */
+export const urlPoctu = (typ: TypPoznamky): string => `/api/notes/pocty?typ=${typ}`;
+
+/** Odpověď /api/notes/pocty → mapa klíč entity → počet; jiný tvar je chyba. */
+export function vyberPocty(raw: unknown): Record<string, PocetPoznamek> {
+  const r = raw as any;
+  if (!r || typeof r !== 'object' || !r.pocty || typeof r.pocty !== 'object') throw new Error('Počty poznámek přišly v nečekaném tvaru.'); // i18n-ok
+  const out: Record<string, PocetPoznamek> = {};
+  for (const [k, v] of Object.entries(r.pocty as Record<string, any>)) {
+    const n = Number(v?.n);
+    if (Number.isFinite(n) && n > 0) out[k] = { n, nove: v?.nove === true };
+  }
+  return out;
+}
+
+/** Kam vede oznámení „X tě zmínil u Latte" — na obrazovku s tou věcí, podle rozhraní příjemce. */
+export function odkazNaPoznamku(typ: TypPoznamky, id: string, rozhrani: 'vedeni' | 'zamestnanec'): string {
+  const zaklad = rozhrani === 'vedeni' ? '/employer/overview?view=' : '/employee/shifts?view=';
+  switch (typ) {
+    case 'task': return `${zaklad}tasks`;
+    case 'guide': return `${zaklad}guides&guide=${encodeURIComponent(id)}`;
+    case 'procedure': return `${zaklad}procedures`;
+    case 'recipe': return `${zaklad}recipes`;
+    case 'inventory_item': return `${zaklad}inventory`;
+    case 'shift': return `${zaklad}shifts`;
+    case 'closing': return rozhrani === 'vedeni' ? `${zaklad}reports` : `${zaklad}closing`;
+    case 'event': return rozhrani === 'vedeni' ? `${zaklad}events` : `${zaklad}home`;
+    case 'menu_item': return rozhrani === 'vedeni' ? `${zaklad}menu` : `${zaklad}home`;
+  }
+}
+
+/** Kategorie oznámení podle typu věci (lib/pushPravidla NotifCategory) — úkol a uzávěrka mají vlastní přepínač. */
+export function kategorieOznameni(typ: TypPoznamky): 'task' | 'closing' | 'general' {
+  return typ === 'task' ? 'task' : typ === 'closing' ? 'closing' : 'general';
 }

@@ -45,6 +45,7 @@ import type { StavDat } from '../widgety/useDataWidgetu';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
 import { Poznamky } from '../Poznamky';
+import { urlPoctu, vyberPocty } from '@/lib/poznamky';
 import { useSmi } from '../widgety/NavigaceKontext';
 import { useOpravneni } from '../role/useOpravneni';
 import { URL_RECEPTURY, URL_HISTORIE, URL_NAVRHY, UDALOST_OTEVRIT_RECEPTURU, RadkyRozdilu, stavNavrhuText } from '../widgety/oblasti/receptury';
@@ -151,6 +152,8 @@ export default function RecipesView({ openProductId, onNavigate, stranka = 'vede
   const rezim: RezimEditoru = rezimEditoru(ma);
   const navrhy = useDataWidgetu<NavrhReceptury[]>(smi(['receptury.navrhnout', 'receptury.upravit']) ? URL_NAVRHY : null, vyberNavrhy);
   const [navrhuji, setNavrhuji] = useState(false);
+  // Bublina „💬 3" v řádku: kolik poznámek pod recepturou je, tučně když od poslední návštěvy přibyla cizí.
+  const pocty = useDataWidgetu(urlPoctu('recipe'), vyberPocty);
   // Verze načtená z historie do editoru — uložení ji zapíše s poznámkou „Vráceno na verzi z …".
   const [poznamkaVerze, setPoznamkaVerze] = useState<string | null>(null);
 
@@ -488,9 +491,17 @@ export default function RecipesView({ openProductId, onNavigate, stranka = 'vede
                       value={eco?.marginPct != null ? <span className={TEXT_MARZE[tonMarze(eco.marginPct, cil)]}>{eco.marginPct} %</span> : undefined}
                       valueMeta={eco ? t('náklad {castka}', { castka: money(eco.cost) }) : undefined}
                       aside={sold > 0 ? t('prodáno {n}×', { n: sold }) : undefined}
-                      right={sNavrhem.has(p.productId)
-                        ? <Chip tone="wait" size="sm" icon="pencil">{rezim === 'upravit' ? t('Návrh ke schválení') : t('Návrh čeká')}</Chip>
-                        : sRec ? undefined : <Chip tone="wait" size="sm">{t('bez receptury')}</Chip>}
+                      right={(() => {
+                        const pz = pocty.data?.[p.productId];
+                        const stav = sNavrhem.has(p.productId)
+                          ? <Chip tone="wait" size="sm" icon="pencil">{rezim === 'upravit' ? t('Návrh ke schválení') : t('Návrh čeká')}</Chip>
+                          : sRec ? null : <Chip tone="wait" size="sm">{t('bez receptury')}</Chip>;
+                        if (!pz && !stav) return undefined;
+                        return <span className="inline-flex items-center gap-1.5 flex-wrap justify-end">
+                          {pz && <Chip tone="muted" size="sm" icon="chat" className={pz.nove ? 'font-bold' : ''}><span className="sr-only">{t('{n, plural, one {# poznámka} few {# poznámky} other {# poznámek}}', { n: pz.n })}{pz.nove ? `, ${t('nová')}` : ''}</span><span aria-hidden>{pz.n}</span></Chip>}
+                          {stav}
+                        </span>;
+                      })()}
                       onClick={() => openEditor(p.productId, p.name)} />
                   </li>
                 );

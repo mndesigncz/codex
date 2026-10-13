@@ -2146,5 +2146,7 @@
   "Proč návrh vracíš — navrhovatel to uvidí": "Dlaczego zwracasz — autor propozycji to zobaczy",
   "Vrátit s poznámkou": "Zwróć z uwagą",
   "Vrátit": "Przywróć",
-  "Kolik % položek menu má recepturu, kolik se prodává bez receptury, kolik položek je ve skladu. V M navíc „Změněno tento týden\" a návrhy úprav ke schválení.": "Jaki % pozycji menu ma recepturę, ile sprzedaje się bez niej, ile pozycji jest w magazynie. W M dodatkowo „Zmienione w tym tygodniu” i propozycje zmian do zatwierdzenia."
+  "Kolik % položek menu má recepturu, kolik se prodává bez receptury, kolik položek je ve skladu. V M navíc „Změněno tento týden\" a návrhy úprav ke schválení.": "Jaki % pozycji menu ma recepturę, ile sprzedaje się bez niej, ile pozycji jest w magazynie. W M dodatkowo „Zmienione w tym tygodniu” i propozycje zmian do zatwierdzenia.",
+  "{n, plural, one {# poznámka} few {# poznámky} other {# poznámek}}": "{n, plural, one {# notatka} few {# notatki} many {# notatek} other {# notatki}}",
+  "nová": "nowa"
 }

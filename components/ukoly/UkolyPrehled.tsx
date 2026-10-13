@@ -16,6 +16,8 @@ import {
 import { pragueDaySafe } from '@/lib/pragueTime';
 import { jeHotovy, type Ukol } from '@/lib/ukolyPrehled';
 import { splneniPodleLidi, statistikaUkolu, ukolyPoDnech, type MetrikaUkolu } from '@/lib/ukolyFiltr';
+import { urlPoctu, vyberPocty } from '@/lib/poznamky';
+import { useDataWidgetu } from '../widgety/useDataWidgetu';
 
 const METRIKY: MetrikaUkolu[] = ['splneno', 'zalozeno', 'terminy'];
 
@@ -32,6 +34,15 @@ export function UkolyPrehled({ ukoly, dnes, lidi = false, onOtevri }: {
   const [metrika, setMetrika] = useUlozeno<MetrikaUkolu>('ukoly-metrika', 'splneno', METRIKY);
   const [porovnat, setPorovnat] = useUlozeno<boolean>('ukoly-porovnat-2', true);
   const [vybrany, setVybrany] = useState<Slot | null>(null);
+  // Bublina „💬 3" u úkolu (kolo 8, R8-5): kolik poznámek pod ním je, tučně když od poslední návštěvy přibyla cizí.
+  const pocty = useDataWidgetu(urlPoctu('task'), vyberPocty);
+  const bublina = (u: Ukol) => {
+    const pz = pocty.data?.[String(u.id)];
+    if (!pz) return null;
+    return <Chip tone="muted" size="sm" icon="chat" className={pz.nove ? 'font-bold' : ''}>
+      <span className="sr-only">{t('{n, plural, one {# poznámka} few {# poznámky} other {# poznámek}}', { n: pz.n })}{pz.nove ? `, ${t('nová')}` : ''}</span><span aria-hidden>{pz.n}</span>
+    </Chip>;
+  };
 
   const r = platneRozmezi(obdobi, dnes);
   const pred = predchoziRozmezi(r.od, r.do);
@@ -108,7 +119,7 @@ export function UkolyPrehled({ ukoly, dnes, lidi = false, onOtevri }: {
                 {ukolyVyberu.slice(0, 50).map(u => (
                   <ListRow key={u.id} as="li" onClick={() => onOtevri(u)} title={u.title}
                     meta={[u.assigneeName ?? t('Kdokoli'), u.dueDate ? kratceDatum(u.dueDate) : ''].filter(Boolean).join(' · ')}
-                    right={jeHotovy(u) ? <Chip tone="ok" size="sm">{t('Hotovo')}</Chip> : undefined} />
+                    right={jeHotovy(u) || bublina(u) ? <span className="inline-flex items-center gap-1.5">{bublina(u)}{jeHotovy(u) && <Chip tone="ok" size="sm">{t('Hotovo')}</Chip>}</span> : undefined} />
                 ))}
               </ul>
               {ukolyVyberu.length > 50 && <p className="t-meta py-2">{t('…a dalších {n}', { n: ukolyVyberu.length - 50 })}</p>}

@@ -325,5 +325,7 @@
   "Suroviny verze": "Zutaten dieser Version",
   "Skrýt": "Verbergen",
   "Zobrazit": "Ansehen",
-  "Vrátit na tuto verzi": "Auf diese Version zurücksetzen"
+  "Vrátit na tuto verzi": "Auf diese Version zurücksetzen",
+  "{n, plural, one {# poznámka} few {# poznámky} other {# poznámek}}": "{n, plural, one {# Notiz} other {# Notizen}}",
+  "nová": "neu"
 }

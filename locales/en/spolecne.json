@@ -14,7 +14,6 @@
   "Chat": "Chat",
   "Chrome nebo Android": "Chrome or Android",
   "Co jsi rozepsal, se neuloží.": "What you've written won't be saved.",
-  "Ctrl+Enter odešle": "Ctrl+Enter sends",
   "DIČ": "VAT ID (DIČ)",
   "DIČ není platné. Začíná kódem země a má jen písmena a číslice, třeba CZ12345678.": "The VAT ID (DIČ) is not valid. It starts with a country code and has only letters and digits, for example CZ12345678.",
   "Další akce": "More actions",
@@ -170,7 +169,6 @@
   "Přesune vybraný widget o jedno místo.": "Moves the selected widget by one place.",
   "Přidat": "Add",
   "Přidat poznámku": "Add a note",
-  "Přidat poznámku…": "Add a note…",
   "Přidáno {datum}": "Added {datum}",
   "Přihlásit se": "Sign in",
   "Připomínky uzávěrky a její schválení.": "Closing reminders and approvals.",
@@ -326,5 +324,11 @@
   "Žádné zařízení": "No devices",
   "Žádost se nepodařilo odeslat.": "The request couldn't be sent.",
   "Žádost se nepodařilo odeslat. Zkontrolujte připojení.": "The request couldn't be sent. Check your connection.",
-  "Žádosti o volno a jejich vyřízení.": "Time-off requests and their decisions."
+  "Žádosti o volno a jejich vyřízení.": "Time-off requests and their decisions.",
+  "Odepnout": "Unpin",
+  "Připnout nahoru": "Pin to top",
+  "připnuto": "pinned",
+  "Přidat poznámku… @jméno někoho upozorní": "Add a note… @name notifies someone",
+  "Koho zmínit": "Who to mention",
+  "Ctrl+Enter odešle · @jméno upozorní kolegu": "Ctrl+Enter sends · @name notifies a colleague"
 }

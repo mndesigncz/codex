@@ -2765,6 +2765,20 @@ export async function GET(request: Request) {
         created_at TIMESTAMP DEFAULT NOW()
       )`);
     await ddl(sql`CREATE INDEX IF NOT EXISTS pos_recipe_proposals_team ON pos_recipe_proposals (team_id, status, created_at)`);
+    // Poznámky: @zmínky (kdo dostal oznámení) a připnutí nahoru autorem; typy navíc closing, event,
+    // menu_item (lib/poznamky.ts). Kdo kdy naposled vlákno otevřel — bublina v seznamu je tučná,
+    // když od té doby někdo jiný něco napsal.
+    await ddl(sql`ALTER TABLE entity_notes ADD COLUMN IF NOT EXISTS mentions INTEGER[]`);
+    await ddl(sql`ALTER TABLE entity_notes ADD COLUMN IF NOT EXISTS pinned BOOLEAN DEFAULT FALSE`);
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS entity_note_reads (
+        team_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        entity_type TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        read_at TIMESTAMP DEFAULT NOW(),
+        PRIMARY KEY (team_id, user_id, entity_type, entity_id)
+      )`);
 
     // Kroky migrace, které selhaly (a byly zachyceny), ať se to pozná zvenku
     // místo tichého „ok". Prázdné pole = celé schéma prošlo.

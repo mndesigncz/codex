@@ -325,5 +325,7 @@
   "Suroviny verze": "Składniki wersji",
   "Skrýt": "Ukryj",
   "Zobrazit": "Zobacz",
-  "Vrátit na tuto verzi": "Przywróć tę wersję"
+  "Vrátit na tuto verzi": "Przywróć tę wersję",
+  "{n, plural, one {# poznámka} few {# poznámky} other {# poznámek}}": "{n, plural, one {# notatka} few {# notatki} many {# notatek} other {# notatki}}",
+  "nová": "nowa"
 }

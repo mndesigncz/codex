@@ -14,6 +14,10 @@ import { KATALOG, SYSTEMOVE_ROLE } from '../../lib/opravneniKatalog.ts';
 import { AUDIT_POPISKY } from '../../lib/auditPopisky.ts';
 import { ZACHAZENI_TABULEK, TYMOVE_TABULKY } from '../../lib/smazaniUctu.ts';
 import { widget } from '../../lib/widgety/katalog/index.ts';
+import {
+  TYPY_POZNAMEK, OPRAVNENI_SPRAVY_POZNAMEK, jeTypPoznamky, kategorieOznameni, kusyTextu, najdiZminky, navrhyZminek, odkazNaPoznamku,
+  urlPoctu, vlozZminku, vyberPocty, vyberPoznamky,
+} from '../../lib/poznamky.ts';
 
 export default function ({ eq, ok }: Testy) {
   // ---- pohyby: komu se vyplácelo ----
@@ -110,4 +114,31 @@ export default function ({ eq, ok }: Testy) {
   for (const tb of ['pos_recipe_versions', 'pos_recipe_proposals']) {
     ok(`${tb}: rozhodnutí při smazání účtu a mazání s podnikem`, ZACHAZENI_TABULEK[tb] === 'ponechat' && TYMOVE_TABULKY.includes(tb));
   }
+
+  // ---- poznámky: typy navíc, zmínky, připnutí, počty ----
+  ok('typy poznámek: uzávěrka, akce a položka menu', ['closing', 'event', 'menu_item'].every(jeTypPoznamky) && TYPY_POZNAMEK.length === 9);
+  eq('správa poznámek u nových typů', [OPRAVNENI_SPRAVY_POZNAMEK.closing, OPRAVNENI_SPRAVY_POZNAMEK.event, OPRAVNENI_SPRAVY_POZNAMEK.menu_item], ['uzaverky.mazat', 'akce.upravit', 'menu.upravit']);
+  const lide = [{ id: 1, name: 'Petra Nováková' }, { id: 2, name: 'Petr Král' }, { id: 3, name: 'Eva Testová' }, { id: 4, name: 'Eva Malá' }];
+  eq('zmínky: celé jméno, křestní jen když je jediné, bez diakritiky, ne „@Petrák"',
+    najdiZminky('Ahoj @petra, @Petr Král a @eva – @Petrák to neřeší; @Eva Malá ano', lide), [1, 2, 4]);
+  eq('zmínky: bez duplicit, v pořadí výskytu', najdiZminky('@Petr Král, pak @Petra Nováková, zase @petr král', lide), [2, 1]);
+  eq('zmínky: nic', najdiZminky('bez zavináče', lide), []);
+  eq('našeptávač: „@pe" nabídne Petru i Petra, „@ev" obě Evy, „@x" nic, mimo @ nic', [
+    navrhyZminek('ahoj @pe', 8, lide)?.lide.map(l => l.id), navrhyZminek('@ev', 3, lide)?.lide.map(l => l.id), navrhyZminek('@x', 2, lide), navrhyZminek('ahoj', 4, lide), navrhyZminek('mail@pe', 7, lide),
+  ], [[1, 2], [3, 4], null, null, null]);
+  eq('našeptávač: dotaz s mezerou (příjmení) a konec řádku ho ukončí', [navrhyZminek('@eva t', 6, lide)?.lide.map(l => l.id), navrhyZminek('@eva\nnovy', 8, lide)], [[3], null]);
+  eq('vložení zmínky nahradí rozepsané a posune kurzor', vlozZminku('ahoj @pe a dál', 5, 8, 'Petra Nováková'), { text: 'ahoj @Petra Nováková  a dál', kurzor: 21 });
+  eq('kusy textu: zmínka se zvýrazní, zbytek ne', kusyTextu('Díky @Petra Nováková!', lide).map(k => [k.text, k.zminka]), [['Díky ', false], ['@Petra Nováková', true], ['!', false]]);
+  const pz = vyberPoznamky([
+    { id: 3, text: 'c', createdAt: '2026-10-03T00:00:00Z', autor: { id: 1, name: 'P' }, pripnuta: true },
+    { id: 2, text: 'b', createdAt: '2026-10-02T00:00:00Z', autor: { id: 1, name: 'P' }, pripnuta: 'ano', zminky: ['3', 'x'] },
+  ]);
+  eq('vyberPoznamky: pořadí serveru (připnutá první), připnutí jen true, zmínky jako čísla', [pz.map(p => [p.id, p.pripnuta]), pz[1].zminky], [[[3, true], [2, false]], [3]]);
+  eq('počty: adresa a výběr (nula se vynechá, jiný tvar je chyba)', [urlPoctu('task'), vyberPocty({ pocty: { '5': { n: 3, nove: true }, '6': { n: 0 } } })], ['/api/notes/pocty?typ=task', { '5': { n: 3, nove: true } }]);
+  let spadloPocty = false; try { vyberPocty([]); } catch { spadloPocty = true; }
+  ok('počty: pole je chyba tvaru', spadloPocty);
+  eq('odkaz z oznámení: podle typu a rozhraní', [odkazNaPoznamku('closing', '5', 'vedeni'), odkazNaPoznamku('closing', '5', 'zamestnanec'), odkazNaPoznamku('guide', '12', 'zamestnanec'), odkazNaPoznamku('menu_item', '3', 'zamestnanec')],
+    ['/employer/overview?view=reports', '/employee/shifts?view=closing', '/employee/shifts?view=guides&guide=12', '/employee/shifts?view=home']);
+  eq('kategorie oznámení: úkol, uzávěrka, jinak obecná', [kategorieOznameni('task'), kategorieOznameni('closing'), kategorieOznameni('recipe')], ['task', 'closing', 'general']);
+  ok('entity_note_reads: osobní stav čtení se maže s účtem i s podnikem', ZACHAZENI_TABULEK.entity_note_reads === 'smazat' && TYMOVE_TABULKY.includes('entity_note_reads'));
 }

@@ -2146,5 +2146,7 @@
   "Proč návrh vracíš — navrhovatel to uvidí": "Why you're returning it — the proposer will see this",
   "Vrátit s poznámkou": "Return with a note",
   "Vrátit": "Put back",
-  "Kolik % položek menu má recepturu, kolik se prodává bez receptury, kolik položek je ve skladu. V M navíc „Změněno tento týden\" a návrhy úprav ke schválení.": "What % of menu items have a recipe, how many sell without one, how many items are in stock. In M also \"Changed this week\" and change proposals to approve."
+  "Kolik % položek menu má recepturu, kolik se prodává bez receptury, kolik položek je ve skladu. V M navíc „Změněno tento týden\" a návrhy úprav ke schválení.": "What % of menu items have a recipe, how many sell without one, how many items are in stock. In M also \"Changed this week\" and change proposals to approve.",
+  "{n, plural, one {# poznámka} few {# poznámky} other {# poznámek}}": "{n, plural, one {# note} other {# notes}}",
+  "nová": "new"
 }
