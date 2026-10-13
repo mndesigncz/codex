@@ -3,7 +3,8 @@
 // Nástroj = záznamy docházky po dnech (hledání, úprava, přidání, export). Přepínač období 7/30/90
 // zůstává v hlavičce stránky a řídí i widgety s volbou „Podle stránky" (Mzdy, Souhrn hodin).
 // Výchozí rozložení je z katalogu beze změny: nahoře kdo je teď na směně a zapomenuté odchody,
-// pod tím peníze a hodiny, nástroj na konci.
+// pod tím peníze a hodiny, nástroj na konci. Kolo 8 (R8-1): pod Souhrnem hodin Výplatní listina —
+// kdo kolik odpracoval a kolik mu dlužím, na jednom místě (majitel: „proč to zobrazuje tak málo údajů").
 import type { DefiniceStranky } from '../typy.ts';
 
 export const STRANKA: DefiniceStranky = {
@@ -23,6 +24,7 @@ export const STRANKA: DefiniceStranky = {
     'dochazka.dlouhe_prichody',
     'dochazka.mzdy_za_obdobi',
     'dochazka.souhrn_hodin',
+    'dochazka.vyplatni_listina',
     'finance.trzby_vs_mzdy',
     'tym.bez_sazby',
     'rozvrh.dnesni_smeny',
@@ -35,6 +37,7 @@ export const STRANKA: DefiniceStranky = {
       { w: 'dochazka.mzdy_za_obdobi', s: 'M' },
       { w: 'tym.bez_sazby', s: 'S' },
       { w: 'dochazka.souhrn_hodin', s: 'L' },
+      { w: 'dochazka.vyplatni_listina', s: 'L' },
       { w: 'nastroj' },
     ],
   },
