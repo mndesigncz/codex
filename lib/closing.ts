@@ -61,6 +61,10 @@ export interface Movement {
   kind: MovementKind;
   amount: number;
   note?: string;
+  /** Výplata z kasy: KOMU se vyplácelo (člen podniku). Bez něj = autor uzávěrky (řádky před kolem 8). */
+  userId?: number;
+  /** Jméno v okamžiku uzávěrky — historie zůstane čitelná, i když člověk z podniku odejde. */
+  userName?: string;
 }
 
 export const MOVEMENT_KINDS: { kind: MovementKind; label: string; hint: string; sign: 1 | -1 }[] = [
@@ -82,10 +86,51 @@ export function normalizeMovements(raw: any): Movement[] {
       const amount = Math.round(Number(m?.amount));
       if (!Number.isFinite(amount) || amount === 0) return null;
       const note = String(m?.note ?? '').trim().slice(0, 160);
-      return { kind, amount: Math.abs(amount), note: note || undefined };
+      const out: Movement = { kind, amount: Math.abs(amount), note: note || undefined };
+      // Komu se vyplácelo nese jen výplata; u výdaje nebo odvodu by to byl šum.
+      if (kind === 'payout') {
+        const userId = Number(m?.userId);
+        if (Number.isInteger(userId) && userId > 0) out.userId = userId;
+        const userName = String(m?.userName ?? '').trim().slice(0, 80);
+        if (userName) out.userName = userName;
+      }
+      return out;
     })
     .filter(Boolean)
     .slice(0, 60) as Movement[];
+}
+
+export interface VyplataZKasy { userId: number; castka: number; /** Jméno z pohybu (snímek), když je známé. */ jmeno?: string }
+
+/**
+ * Komu z téhle uzávěrky odešla výplata z kasy (kolo 8, R8-5).
+ *
+ * Pohyby „Výplata z kasy" jsou rozepsané po lidech (`userId`; bez něj autor uzávěrky). Uzávěrka bez
+ * takových pohybů má výplatu jen v `self_payout` a ta patří autorovi — tak to počítaly Výplaty (R8-1)
+ * doteď, a tak se počítá dál. Když pohyby jsou, `self_payout` je jejich součet (součet drží i server),
+ * takže se bere rozpis, ne hrubá částka — jinak by se kolegova výplata připsala autorovi.
+ */
+export function vyplatyZKasyUzaverky(c: { created_by: number; self_payout: number | null | undefined; movements?: Movement[] | null }): VyplataZKasy[] {
+  const autor = Number(c.created_by);
+  const vyplaty = (c.movements ?? []).filter(m => m.kind === 'payout' && m.amount > 0);
+  if (vyplaty.length === 0) {
+    const castka = Math.round(Number(c.self_payout) || 0);
+    return castka > 0 ? [{ userId: autor, castka }] : [];
+  }
+  const podleLidi = new Map<number, VyplataZKasy>();
+  for (const m of vyplaty) {
+    const userId = m.userId ?? autor;
+    const v = podleLidi.get(userId) ?? { userId, castka: 0, jmeno: m.userName };
+    v.castka += Math.round(m.amount);
+    if (!v.jmeno && m.userName) v.jmeno = m.userName;
+    podleLidi.set(userId, v);
+  }
+  return [...podleLidi.values()];
+}
+
+/** Šla z téhle uzávěrky výplata i někomu jinému než autorovi? (Detail pak píše „Výplaty z kasy", ne „Výplata zaměstnance".) */
+export function vyplatyICizim(c: { created_by: number; self_payout: number | null | undefined; movements?: Movement[] | null }): boolean {
+  return vyplatyZKasyUzaverky(c).some(v => v.userId !== Number(c.created_by));
 }
 
 export function sumMovements(movements: Movement[], kind: MovementKind): number {

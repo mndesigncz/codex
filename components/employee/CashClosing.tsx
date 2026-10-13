@@ -220,28 +220,53 @@ function DrawerCounter({ denomSet, counts, onChange, money, symbol }: {
   );
 }
 
+/** Člověk, kterému jde vyplatit z kasy: ten, kdo uzávěrku vyplňuje, a kolegové ze směny (kolo 8, R8-5). */
+export type PrijemceVyplaty = { id: number; name: string; avatar?: string | null; /** Měl ten den směnu — nabízí se hned, ostatní až pod „Jiný…". */ naSmene: boolean };
+
 /**
  * Itemised cash movements. One line per thing that left (or entered) the till,
  * so a closing answers "co si z kasy brali" instead of showing one lump sum.
+ *
+ * Kolo 8 (R8-5, uzaverka-vyplata-komu): „Výplata z kasy" už není volný text
+ * „Vyplaceno komu", ale výběr člověka — pilulky lidí ze směny (já první) a „Jiný…"
+ * pro zbytek podniku. Pohyb nese `userId` a snímek jména, Výplaty (GET /api/payroll)
+ * pak kolegovi odečtou, co dostal z kasy, místo aby to připsaly tomu, kdo zavíral.
  */
-function MovementEditor({ movements, setMovements, payDailyCash, money, symbol }: {
+function MovementEditor({ movements, setMovements, payDailyCash, money, symbol, lide, jaId }: {
   movements: Movement[];
   setMovements: (m: Movement[]) => void;
   payDailyCash: boolean;
   money: (n: number) => string;
   symbol: string;
+  /** Komu jde vyplatit: já + kolegové (na směně napřed). Prázdné = bez výběru (tablet před výběrem směny). */
+  lide: PrijemceVyplaty[];
+  /** Kdo uzávěrku vyplňuje (za koho se zavírá) — výchozí příjemce výplaty. */
+  jaId: number | null;
 }) {
   const t = useT('zamestnanec');
   const [kind, setKind] = useState<MovementKind>('expense');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
+  // Komu jde výplata; null = ten, kdo zavírá (výchozí, žádné klepnutí navíc).
+  const [komu, setKomu] = useState<number | null>(null);
+  const [jiny, setJiny] = useState(false);
 
   const kinds = MOVEMENT_KINDS.filter(k => k.kind !== 'payout' || payDailyCash);
+  const naSmene = lide.filter(l => l.naSmene || l.id === jaId);
+  const ostatni = lide.filter(l => !l.naSmene && l.id !== jaId);
+  const prijemceId = komu ?? jaId;
+  const prijemce = lide.find(l => l.id === prijemceId) ?? null;
+  const jmenoPrijemce = (m: Movement) => (m.userId != null && m.userId === jaId ? t('Já') : m.userName ?? '');
 
   const add = () => {
     const v = Math.abs(Math.round(Number(amount)));
     if (!Number.isFinite(v) || v === 0) return;
-    setMovements([...movements, { kind, amount: v, note: note.trim() || undefined }]);
+    const pohyb: Movement = { kind, amount: v, note: note.trim() || undefined };
+    if (kind === 'payout' && prijemceId != null) {
+      pohyb.userId = prijemceId;
+      if (prijemce) pohyb.userName = prijemce.name;
+    }
+    setMovements([...movements, pohyb]);
     setAmount(''); setNote('');
   };
 
@@ -256,10 +281,15 @@ function MovementEditor({ movements, setMovements, payDailyCash, money, symbol }
         <div className="divide-y divide-black/[0.06]">
           {movements.map((m, i) => {
             const spec = MOVEMENT_KINDS.find(k => k.kind === m.kind);
+            const komuText = m.kind === 'payout' ? jmenoPrijemce(m) : '';
             return (
-              <div key={i} className="flex items-center gap-2.5 py-2">
+              <div key={i} className="flex items-center gap-2.5 py-2" data-pohyb={m.kind} data-komu={m.userId ?? undefined}>
                 <Chip tone={spec?.sign === 1 ? 'ok' : 'muted'} size="sm" className="shrink-0">{popisekPohybu(t, m.kind)}</Chip>
-                <span className="min-w-0 flex-1 truncate text-sm text-black/60">{m.note || '—'}</span>
+                <span className="min-w-0 flex-1 truncate text-sm text-black/60">
+                  {komuText ? <span className="font-medium text-[#16181A]">{komuText}</span> : null}
+                  {komuText && m.note ? ' · ' : ''}
+                  {m.note || (komuText ? '' : '—')}
+                </span>
                 <span className="shrink-0 text-sm font-semibold text-[#16181A] tabular-nums">
                   {spec?.sign === 1 ? '+' : '−'}{money(m.amount)}
                 </span>
@@ -282,6 +312,36 @@ function MovementEditor({ movements, setMovements, payDailyCash, money, symbol }
         ))}
       </div>
 
+      {kind === 'payout' && lide.length > 0 && (
+        // Komu: pilulky v posuvném pásu (telefon 390 px), já první; „Jiný…" rozbalí zbytek podniku.
+        <div className="space-y-2" role="group" aria-label={t('Komu se vyplácí')}>
+          <p className="t-meta">{t('Komu se vyplácí')}</p>
+          <div className="flex gap-1.5 overflow-x-auto scroll-fade-x pb-1 -mb-1" data-vyplata-komu>
+            {naSmene.map(l => (
+              <button key={l.id} type="button" aria-pressed={prijemceId === l.id} onClick={() => { setKomu(l.id); }}
+                className={`filter-pill tap-target-sm whitespace-nowrap shrink-0 ${prijemceId === l.id ? 'seg-on' : 'seg-off glass'}`}>
+                {l.avatar && <Avatar emoji={l.avatar} size="xs" ring={false} />}
+                {l.id === jaId ? t('Já') : l.name}
+              </button>
+            ))}
+            {ostatni.length > 0 && (
+              <button type="button" aria-expanded={jiny} onClick={() => setJiny(v => !v)}
+                className={`filter-pill tap-target-sm whitespace-nowrap shrink-0 ${jiny || (prijemce && !naSmene.includes(prijemce)) ? 'seg-on' : 'seg-off glass'}`}>
+                {prijemce && !naSmene.includes(prijemce) ? prijemce.name : t('Jiný…')}
+              </button>
+            )}
+          </div>
+          {jiny && ostatni.length > 0 && (
+            <select value={prijemce && !naSmene.includes(prijemce) ? prijemce.id : ''} aria-label={t('Jiný člen podniku')}
+              onChange={e => { if (e.target.value) { setKomu(Number(e.target.value)); setJiny(false); } }}
+              className={`${inputClass} appearance-none min-w-0 h-[46px]`} style={{ WebkitAppearance: 'none' }}>
+              <option value="">{t('Vyber člověka')}</option>
+              {ostatni.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
+          )}
+        </div>
+      )}
+
       <div className="flex gap-2 flex-wrap">
         <div className="relative w-32 shrink-0">
           <input type="number" inputMode="numeric" value={amount} onChange={e => setAmount(e.target.value)}
@@ -293,8 +353,8 @@ function MovementEditor({ movements, setMovements, payDailyCash, money, symbol }
         </div>
         <input value={note} onChange={e => setNote(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
-          aria-label={t('Za co byl pohyb v kase')}
-          placeholder={napovedaPohybu(t, kind) ?? t('Za co')}
+          aria-label={kind === 'payout' ? t('Poznámka k výplatě (nepovinná)') : t('Za co byl pohyb v kase')}
+          placeholder={kind === 'payout' ? t('Poznámka (nepovinná)') : (napovedaPohybu(t, kind) ?? t('Za co'))}
           className={`${inputClass} py-2 flex-1 min-w-[8rem]`} />
         {/* Vedlejší akce: limetka patří jen „Odeslat uzávěrku" (DP §4 D). */}
         <Button variant="secondary" size="sm" icon="plus" onClick={add} disabled={!amount} className="shrink-0 grow sm:grow-0 justify-center">
@@ -750,6 +810,17 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
     }, 300);
     return () => { cancelled = true; clearTimeout(t); };
   }, [form.date, actorId]);
+
+  // Komu jde vyplatit z kasy: ten, za koho se zavírá, a kolegové (na směně napřed). Jméno
+  // toho, kdo zavírá: vlastní účet, vybraný člen (vedení) nebo člověk ze směny (tablet).
+  const prijemciVyplaty = useMemo<PrijemceVyplaty[]>(() => {
+    if (actorId == null) return [];
+    const ja = isSelf ? { id: user.id, name: user.name, avatar: null as string | null }
+      : members.find(m => m.id === actorId) ?? (() => { const s = eligible.find(x => x.employeeId === actorId); return s ? { id: actorId, name: s.employeeName ?? '', avatar: s.employeeAvatar ?? null } : null; })();
+    const seznam: PrijemceVyplaty[] = ja ? [{ id: ja.id, name: ja.name, avatar: ja.avatar ?? null, naSmene: true }] : [];
+    for (const cw of coworkers) if (cw.id !== actorId) seznam.push({ id: cw.id, name: cw.name, avatar: cw.avatar ?? null, naSmene: cw.hadShift === true });
+    return seznam;
+  }, [actorId, isSelf, user.id, user.name, members, eligible, coworkers]);
 
   const pickShift = (s: EligibleShift) => {
     setForm(f => ({ ...f, date: s.date, shiftLabel: `${s.startTime}–${s.endTime}` }));
@@ -1346,6 +1417,7 @@ function FormularUzaverky({ user, onSubmitted, initialDate, vPlose = false }: Pr
           <MovementEditor
             movements={movements} setMovements={setMovements}
             payDailyCash={payDailyCash} money={money} symbol={symbol}
+            lide={prijemciVyplaty} jaId={actorId}
           />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

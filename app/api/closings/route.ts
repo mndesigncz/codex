@@ -3,7 +3,7 @@ import { menaPodniku } from '@/lib/menaPodniku';
 import { pozaduj, jeOdpoved, clenoveSOpravnenim, type Kontext } from '@/lib/opravneniDb';
 import { neon } from '@neondatabase/serverless';
 import { notifyUser } from '@/lib/push';
-import { cashDifference, normalizeMovements, normalizeDenominations, normalizeHandover, ShiftPerson } from '@/lib/closing';
+import { cashDifference, normalizeMovements, normalizeDenominations, normalizeHandover, sumMovements, ShiftPerson } from '@/lib/closing';
 import { dayPlus, pragueToday } from '@/lib/pragueTime';
 import { denSmeny, zavreneDnyTydne, smenaBezUzaverky } from '@/lib/staleShifts';
 import { mzdaZaSmenu } from '@/lib/mzdaSmeny';
@@ -416,6 +416,27 @@ export async function POST(request: Request) {
 
   // Itemised movements and the reason for a mismatch travel with the closing.
   const movements = normalizeMovements(b.movements);
+  // Kolo 8 (R8-5): výplata z kasy nese KOMU. Cizí id (ne člen podniku) se zahodí — výplata pak
+  // patří autorovi jako dřív; jméno se bere ze serveru, ne z těla (snímek do historie).
+  const komuIds = [...new Set(movements.filter(m => m.kind === 'payout' && m.userId != null).map(m => m.userId as number))];
+  if (komuIds.length) {
+    let clenove = new Set<number>();
+    try { clenove = new Set(await idClenu(c.teamId)); } catch { /* bez seznamu členů se nikdo nepřipíše */ }
+    const jmena = new Map<number, string>();
+    const platne = komuIds.filter(id => clenove.has(id));
+    if (platne.length) {
+      try { for (const u of await sql`SELECT id, name FROM users WHERE id = ANY(${platne})` as any[]) jmena.set(Number(u.id), String(u.name ?? '')); } catch { /* jméno zůstane z těla */ }
+    }
+    for (const m of movements) {
+      if (m.kind !== 'payout' || m.userId == null) continue;
+      if (!clenove.has(m.userId)) { delete m.userId; delete m.userName; continue; }
+      const jmeno = jmena.get(m.userId);
+      if (jmeno) m.userName = jmeno;
+    }
+  }
+  // Rozepsané výplaty jsou zdroj pravdy pro self_payout (formulář to tak počítá; server to drží
+  // i proti upravenému tělu) — Výplaty z téhle částky odečítají, co už z kasy odešlo.
+  const selfPayout = movements.some(m => m.kind === 'payout') ? sumMovements(movements, 'payout') : money(b.selfPayout);
   const diffReason = b.diffReason ? String(b.diffReason).slice(0, 40) : null;
   const diffNote = b.diffNote ? String(b.diffNote).trim().slice(0, 500) || null : null;
   const denominations = normalizeDenominations(b.denominations);
@@ -445,7 +466,7 @@ export async function POST(request: Request) {
         ${JSON.stringify(movements)}::jsonb, ${diffReason}, ${diffNote},
         ${JSON.stringify(denominations)}::jsonb, ${finalRemoval}, ${eventId},
         ${money(b.openingCash)}, ${money(b.cashRevenue)}, ${money(b.cardRevenue)}, ${money(b.tips)}, ${money(b.expenses)},
-        ${money(b.cashRemoved)}, ${money(b.selfPayout)}, ${money(b.closingCash)}, ${count(b.customers)}, ${b.notes || null}
+        ${money(b.cashRemoved)}, ${selfPayout}, ${money(b.closingCash)}, ${count(b.customers)}, ${b.notes || null}
       ) RETURNING *`;
   } catch {
    try {
@@ -462,7 +483,7 @@ export async function POST(request: Request) {
         ${JSON.stringify(movements)}::jsonb, ${diffReason}, ${diffNote},
         ${JSON.stringify(denominations)}::jsonb,
         ${money(b.openingCash)}, ${money(b.cashRevenue)}, ${money(b.cardRevenue)}, ${money(b.tips)}, ${money(b.expenses)},
-        ${money(b.cashRemoved)}, ${money(b.selfPayout)}, ${money(b.closingCash)}, ${count(b.customers)}, ${b.notes || null}
+        ${money(b.cashRemoved)}, ${selfPayout}, ${money(b.closingCash)}, ${count(b.customers)}, ${b.notes || null}
       ) RETURNING *`;
    } catch {
     try {
@@ -475,7 +496,7 @@ export async function POST(request: Request) {
         ) VALUES (
           ${c.teamId}, ${actorId}, ${date}, ${shiftLabel}, ${shiftId}, ${approved}, ${p.bezSchvaleni ? c.meId : null}, ${payoutFromRegister},
           ${money(b.openingCash)}, ${money(b.cashRevenue)}, ${money(b.cardRevenue)}, ${money(b.tips)}, ${money(b.expenses)},
-          ${money(b.cashRemoved)}, ${money(b.selfPayout)}, ${money(b.closingCash)}, ${count(b.customers)}, ${b.notes || null}
+          ${money(b.cashRemoved)}, ${selfPayout}, ${money(b.closingCash)}, ${count(b.customers)}, ${b.notes || null}
         ) RETURNING *`;
     } catch {
       // approval/shift columns not migrated yet — insert the core row so closings still work.
@@ -487,7 +508,7 @@ export async function POST(request: Request) {
         ) VALUES (
           ${c.teamId}, ${actorId}, ${date}, ${shiftLabel},
           ${money(b.openingCash)}, ${money(b.cashRevenue)}, ${money(b.cardRevenue)}, ${money(b.tips)}, ${money(b.expenses)},
-          ${money(b.cashRemoved)}, ${money(b.selfPayout)}, ${money(b.closingCash)}, ${count(b.customers)}, ${b.notes || null}
+          ${money(b.cashRemoved)}, ${selfPayout}, ${money(b.closingCash)}, ${count(b.customers)}, ${b.notes || null}
         ) RETURNING *`;
     }
    }

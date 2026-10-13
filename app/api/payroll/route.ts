@@ -3,6 +3,7 @@ import { neon } from '@neondatabase/serverless';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { clenovePodniku } from '@/lib/tenant';
 import { dayPlus, pragueToday } from '@/lib/pragueTime';
+import { normalizeMovements, vyplatyZKasyUzaverky } from '@/lib/closing';
 import { spropitneZaObdobi, rozeberZaznam, denZaznamu, normalizujSmlouvu, type UzaverkaSpropitne, type ZaznamDochazky } from '@/lib/dochazkaPrehled';
 import { idsZeSmeny, nactiPravidla, nactiZamky, pozicePodniku, rozmeziZDotazu } from './_spolecne';
 
@@ -22,25 +23,25 @@ export const dynamic = 'force-dynamic';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-interface RadekZKasy { id: number; created_by: number; den: string; castka: number; kdo: string | null }
+interface RadekZKasy { id: number; created_by: number; /** Komu výplata patří (R8-5: z pohybů uzávěrky; bez rozpisu autor). */ user_id: number; den: string; castka: number; kdo: string | null }
 
-/** „Moje výplata dnes" z hlavních uzávěrek v období — vyplaceno z kasy i bokem je vyplaceno. */
+/**
+ * Výplaty z hlavních uzávěrek v období — vyplaceno z kasy i bokem je vyplaceno.
+ * Kolo 8 (R8-5): pohyby „Výplata z kasy" nesou KOMU, takže se uzávěrka rozepíše po lidech
+ * (lib/closing vyplatyZKasyUzaverky); uzávěrka bez rozpisu patří autorovi jako dřív.
+ * `jen` = jen řádky jednoho člověka (i z uzávěrek, které zavíral někdo jiný).
+ */
 async function vyplatyZKasy(teamId: number, od: string, doD: string, jen?: number): Promise<RadekZKasy[]> {
   try {
-    const rows = jen == null
-      ? await sql`
-          SELECT cc.id, cc.created_by, COALESCE(cc.shift_date, cc.date) AS den, cc.self_payout, u.name AS kdo
-          FROM cash_closings cc LEFT JOIN users u ON u.id = cc.created_by
-          WHERE cc.team_id = ${teamId} AND cc.self_payout > 0 AND cc.covered_by IS NULL
-            AND COALESCE(cc.shift_date, cc.date) >= ${od} AND COALESCE(cc.shift_date, cc.date) <= ${doD}
-          ORDER BY den DESC`
-      : await sql`
-          SELECT cc.id, cc.created_by, COALESCE(cc.shift_date, cc.date) AS den, cc.self_payout, u.name AS kdo
-          FROM cash_closings cc LEFT JOIN users u ON u.id = cc.created_by
-          WHERE cc.team_id = ${teamId} AND cc.created_by = ${jen} AND cc.self_payout > 0 AND cc.covered_by IS NULL
-            AND COALESCE(cc.shift_date, cc.date) >= ${od} AND COALESCE(cc.shift_date, cc.date) <= ${doD}
-          ORDER BY den DESC`;
-    return (rows as any[]).map(r => ({ id: Number(r.id), created_by: Number(r.created_by), den: String(r.den).slice(0, 10), castka: Math.round(Number(r.self_payout) || 0), kdo: r.kdo ?? null }));
+    const rows = await sql`
+      SELECT cc.id, cc.created_by, COALESCE(cc.shift_date, cc.date) AS den, cc.self_payout, cc.movements, u.name AS kdo
+      FROM cash_closings cc LEFT JOIN users u ON u.id = cc.created_by
+      WHERE cc.team_id = ${teamId} AND cc.self_payout > 0 AND cc.covered_by IS NULL
+        AND COALESCE(cc.shift_date, cc.date) >= ${od} AND COALESCE(cc.shift_date, cc.date) <= ${doD}
+      ORDER BY den DESC`;
+    const out = (rows as any[]).flatMap(r => vyplatyZKasyUzaverky({ created_by: Number(r.created_by), self_payout: Number(r.self_payout) || 0, movements: normalizeMovements(r.movements) })
+      .map(v => ({ id: Number(r.id), created_by: Number(r.created_by), user_id: v.userId, den: String(r.den).slice(0, 10), castka: v.castka, kdo: r.kdo ?? null })));
+    return jen == null ? out : out.filter(x => x.user_id === jen);
   } catch { return []; }
 }
 
@@ -162,7 +163,7 @@ export async function GET(req: NextRequest) {
   const zamky = await nactiZamky(c.teamId, r.od, r.do);
   const out = lide.map(l => {
     const id = String(l.id);
-    const moje = zKasy.filter(x => x.created_by === l.id);
+    const moje = zKasy.filter(x => x.user_id === l.id);
     const v = vyplaty.filter(x => x.user_id === l.id);
     const s = smlouvy.get(id);
     return {

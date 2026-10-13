@@ -1742,5 +1742,6 @@
   "z telefonu · {d}": "from phone · {d}",
   "{mesic} je uzavřené — otevři ho ve Výplatní listině.": "{mesic} is closed — reopen it in the Payroll sheet.",
   "{n, plural, one {# píchnutí doručeno} few {# píchnutí doručena} other {# píchnutí doručeno}} po výpadku": "{n, plural, one {# punch} other {# punches}} after outage",
-  "{n, plural, one {# směna} few {# směny} other {# směn}}": "{n, plural, one {# shift} other {# shifts}}"
+  "{n, plural, one {# směna} few {# směny} other {# směn}}": "{n, plural, one {# shift} other {# shifts}}",
+  "Výplaty z kasy": "Payouts from the till"
 }

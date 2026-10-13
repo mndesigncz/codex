@@ -1742,5 +1742,6 @@
   "z telefonu · {d}": "z telefónu · {d}",
   "{mesic} je uzavřené — otevři ho ve Výplatní listině.": "{mesic} je uzavretý — otvor ho vo Výplatnej listine.",
   "{n, plural, one {# píchnutí doručeno} few {# píchnutí doručena} other {# píchnutí doručeno}} po výpadku": "{n, plural, one {# pichnutie} few {# pichnutia} other {# pichnutí}} po výpadku",
-  "{n, plural, one {# směna} few {# směny} other {# směn}}": "{n, plural, one {# zmena} few {# zmeny} other {# zmien}}"
+  "{n, plural, one {# směna} few {# směny} other {# směn}}": "{n, plural, one {# zmena} few {# zmeny} other {# zmien}}",
+  "Výplaty z kasy": "Výplaty z kasy"
 }

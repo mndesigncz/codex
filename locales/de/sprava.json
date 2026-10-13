@@ -1742,5 +1742,6 @@
   "z telefonu · {d}": "vom Handy · {d}",
   "{mesic} je uzavřené — otevři ho ve Výplatní listině.": "{mesic} ist abgeschlossen — öffne ihn in der Lohnliste.",
   "{n, plural, one {# píchnutí doručeno} few {# píchnutí doručena} other {# píchnutí doručeno}} po výpadku": "{n, plural, one {# Stempelung} other {# Stempelungen}} nach dem Ausfall",
-  "{n, plural, one {# směna} few {# směny} other {# směn}}": "{n, plural, one {# Schicht} other {# Schichten}}"
+  "{n, plural, one {# směna} few {# směny} other {# směn}}": "{n, plural, one {# Schicht} other {# Schichten}}",
+  "Výplaty z kasy": "Auszahlungen aus der Kasse"
 }

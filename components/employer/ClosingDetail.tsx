@@ -18,7 +18,7 @@ import { PersonLink } from './ProfileLinkProvider';
 import { useMoney, useSymbol } from '../CurrencyProvider';
 import {
   Closing, expectedCash, expectedCashLines, cashLeft,
-  movementLabel, diffReasonLabel, hasDenominations, MOVEMENT_KINDS,
+  movementLabel, diffReasonLabel, hasDenominations, MOVEMENT_KINDS, vyplatyZKasyUzaverky, vyplatyICizim,
 } from '@/lib/closing';
 import { rozdilUzaverky, maSkrytouTrzbu } from '@/lib/uzaverkyPrehled';
 import { okJson, apiMessage } from '@/lib/api';
@@ -150,7 +150,10 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
   // rozdíl, očekávaná kasa i celé peněžní řádky u skryté uzávěrky vůbec nekreslí.
   const skryta = !!c && maSkrytouTrzbu(c);
   const diff = c && !skryta ? (rozdilUzaverky({ ...c, covered_by: null }) ?? 0) : 0;
-  const lines = c && !skryta ? expectedCashLines(c, { payoutLabel: t('Výplata zaměstnance') }) : [];
+  // Výplata z kasy i kolegům (R8-5): řádek se jmenuje „Výplaty z kasy" a rozepíše se po lidech.
+  const cizimVyplata = !!c && vyplatyICizim(c);
+  const vyplaty = c ? vyplatyZKasyUzaverky(c) : [];
+  const lines = c && !skryta ? expectedCashLines(c, { payoutLabel: cizimVyplata ? t('Výplaty z kasy') : t('Výplata zaměstnance') }) : [];
   const cashTips = c && !skryta ? Math.max(0, (c.tips ?? 0) - (Number(c.tips_card) || 0)) : 0;
 
   useEffect(() => { load(); }, [load]);
@@ -295,7 +298,11 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
                   {!skryta && <Row label={t('Spropitné kartou')} value={money(Number(c.tips_card) || 0)} />}
                   <Row label={t('Výdaje z kasy')} value={money(c.expenses)} />
                   <Row label={t('Odloženo ven')} value={money(c.cash_removed)} />
-                  {payDailyCash && <Row label={t('Výplata zaměstnance')} value={money(c.self_payout)} />}
+                  {payDailyCash && <Row label={cizimVyplata ? t('Výplaty z kasy') : t('Výplata zaměstnance')} value={money(c.self_payout)} />}
+                  {payDailyCash && cizimVyplata && vyplaty.map(v => (
+                    // Komu z kasy odešlo — Výplatní listina to stejnému člověku odečte z Doplatit.
+                    <Row key={v.userId} label={`↳ ${v.userId === c.created_by ? (c.author_name ?? t('vyplnil/a')) : (v.jmeno ?? t('Neznámý'))}`} value={money(v.castka)} />
+                  ))}
                   {/* Snímek z okamžiku uzávěrky — sazba i čas tak, jak byly tehdy.
                       Docházka a Finance počítají živě; tady zůstává, co člověk
                       viděl, když uzávěrku odesílal. */}
@@ -408,7 +415,13 @@ export default function ClosingDetail({ id, onClose, onChanged, payDailyCash, ma
                       return (
                         <div key={i} className="flex items-center gap-2.5 py-2 text-sm">
                           <span className="t-label shrink-0 w-24">{movementLabel(m.kind)}</span>
-                          <span className="min-w-0 flex-1 text-black/60">{m.note || '—'}</span>
+                          <span className="min-w-0 flex-1 text-black/60">
+                            {m.kind === 'payout' && (m.userName || m.userId != null) && (
+                              <span className="font-medium text-[#16181A]">{m.userName ?? (m.userId === c.created_by ? c.author_name : t('Neznámý'))}</span>
+                            )}
+                            {m.kind === 'payout' && (m.userName || m.userId != null) && m.note ? ' · ' : ''}
+                            {m.note || (m.kind === 'payout' && (m.userName || m.userId != null) ? '' : '—')}
+                          </span>
                           <span className="shrink-0 font-semibold text-[#16181A] tabular-nums">{spec?.sign === 1 ? '+' : '−'}{money(m.amount)}</span>
                         </div>
                       );
