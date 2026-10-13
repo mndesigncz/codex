@@ -2819,6 +2819,61 @@ export async function GET(request: Request) {
     await ddl(sql`CREATE INDEX IF NOT EXISTS reward_challenges_team ON reward_challenges (team_id, do_dne)`);
     // ---- konec R8-3 ----
 
+    // ---- Navíc (kolo 9, N1): co člověk na směně udělal nad rámec povinností ----
+    // extra_work: zápis (sám / vedení / tablet za vybraného), den, nepovinně směna, uzávěrka,
+    // úkol, položka nabídky, fotka; stav ceka → uznano (body → point_awards kind 'navic',
+    // prémie → wage_adjustments source 'navic') nebo odmitnuto s důvodem.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS extra_work (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        reported_by INTEGER,
+        day TEXT NOT NULL,
+        shift_id INTEGER,
+        closing_id INTEGER,
+        task_id INTEGER,
+        offer_id INTEGER,
+        text TEXT NOT NULL,
+        photo_url TEXT,
+        points_proposed INTEGER,
+        status TEXT NOT NULL DEFAULT 'ceka',
+        points INTEGER,
+        bonus_czk INTEGER,
+        award_id INTEGER,
+        adjustment_id INTEGER,
+        decided_by INTEGER,
+        decided_at TIMESTAMP,
+        decision_note TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS extra_work_team_day ON extra_work (team_id, day)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS extra_work_team_status ON extra_work (team_id, status)`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS extra_work_user ON extra_work (team_id, user_id, day)`);
+    // extra_offers: nabídka „Co se dá udělat navíc" s body (a volitelně prémií), platností,
+    // limitem za den a automatickým uznáním.
+    await ddl(sql`
+      CREATE TABLE IF NOT EXISTS extra_offers (
+        id SERIAL PRIMARY KEY,
+        team_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT,
+        points INTEGER NOT NULL DEFAULT 0,
+        bonus_czk INTEGER,
+        auto_approve BOOLEAN DEFAULT FALSE,
+        active BOOLEAN DEFAULT TRUE,
+        valid_from TEXT,
+        valid_to TEXT,
+        max_per_day INTEGER,
+        created_by INTEGER,
+        created_at TIMESTAMP DEFAULT NOW(),
+        archived_at TIMESTAMP
+      )`);
+    await ddl(sql`CREATE INDEX IF NOT EXISTS extra_offers_team ON extra_offers (team_id, active)`);
+    // ---- konec Navíc ----
+
+
     // Kroky migrace, které selhaly (a byly zachyceny), ať se to pozná zvenku
     // místo tichého „ok". Prázdné pole = celé schéma prošlo.
     if (migFails.length) console.error('init: kroků selhalo', migFails.length, migFails);
