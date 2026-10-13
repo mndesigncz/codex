@@ -64,7 +64,7 @@ export const WIDGETY: DefiniceWidgetu[] = [
     id: 'uzaverky.souhrn',
     oblast: 'uzaverky',
     nazev: 'Souhrn uzávěrek',
-    popis: 'Tržba celkem (hotově/kartou), odvedeno a odloženo, vyplaceno hotově nebo spropitné, rozdíl kasy — za zvolené období.',
+    popis: 'Tržba celkem (hotově/kartou), odvedeno a odloženo, vyplaceno hotově nebo spropitné, rozdíl kasy, a když tým vyplňuje hosty, i hosté a útrata na hosta — za zvolené období.',
     ikona: 'coins',
     velikosti: ['S', 'M', 'L'],
     vychoziVelikost: 'L',
@@ -94,6 +94,8 @@ export const WIDGETY: DefiniceWidgetu[] = [
           { id: 'vyplaceno', nazev: 'Vyplaceno' },
           { id: 'spropitne', nazev: 'Spropitné' },
           { id: 'rozdil_kasy', nazev: 'Rozdíl kasy' },
+          // Jen když tým v uzávěrkách vyplňuje hosty; jinak widget ukáže tržbu.
+          { id: 'na_hosta', nazev: 'Ø na hosta' },
         ],
         vychozi: 'trzba',
       },

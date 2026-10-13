@@ -71,6 +71,9 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'inventory.recipe': 'Změněno, jestli se položka vyrábí, nebo nakupuje',
   'supplier.create': 'Přidán dodavatel',
   'supplier.delete': 'Smazán dodavatel',
+  'supplier.update': 'Upraven dodavatel',
+  'order.receive': 'Přijata objednávka',
+  'order.receive.partial': 'Přijata objednávka (částečně — něco nedorazilo nebo přišlo navíc)',
   'receipt.add': 'Přidána účtenka',
   // uzávěrky
   'closing.delete': 'Smazána uzávěrka',
@@ -167,6 +170,7 @@ const POLE_NASTAVENI: Record<string, string> = {
   dashboardConfig: 'domovská plocha', showTeamSchedule: 'sdílení rozvrhu', regenerateCode: 'kód pro pozvání',
   payDailyCash: 'denní výplata v hotovosti', drawerFloat: 'kasa na začátku', closingRequiresShift: 'uzávěrka jen ve směně',
   payoutFromRegister: 'výplaty z kasy', tipsInDrawer: 'spropitné v kase', laborTargetPct: 'cíl mzdových nákladů',
+  marginTargetPct: 'cílová marže',
   fixedCosts: 'pravidelné náklady',
   levelsConfig: 'úrovně odměn', pointsConfig: 'body odměn', lowStockDefault: 'výchozí nízký stav',
   criticalStockDefault: 'výchozí kritický stav', address: 'adresa', ico: 'IČO', dic: 'DIČ',

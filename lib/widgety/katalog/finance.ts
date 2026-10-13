@@ -231,13 +231,13 @@ export const WIDGETY: DefiniceWidgetu[] = [
     cil: { pohled: 'finance' },
     stav: 'hotovo',
   },
-  // Data: GET /api/inventory/shrinkage[?id] → ready, stocktake{completedAt,counted},
+  // Data: GET /api/inventory/shrinkage?history=1 (kolo 7: + history[{id,completedAt,netValue,lostValue}] posledních 6) → ready, stocktake{completedAt,counted},
   // totals{lostValue,surplusValue,netValue,missing,surplus}, rows[], insights[]
   {
     id: 'finance.ztraty',
     oblast: 'finance',
     nazev: 'Ztráty a manka',
-    popis: 'Poslední inventura v penězích: kolik chybí a přebývá, nejdražší ztráty, ztráta v % z prodaného.',
+    popis: 'Poslední inventura v penězích: kolik chybí a přebývá, nejdražší ztráty, ztráta v % z prodaného, změna proti předchozí inventuře a ve velkém vývoj posledních inventur.',
     ikona: 'warning',
     velikosti: ['S', 'M', 'L'],
     vychoziVelikost: 'M',

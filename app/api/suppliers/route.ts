@@ -81,13 +81,20 @@ export async function PATCH(req: NextRequest) {
   const b = await req.json().catch(() => ({}));
   const id = parseInt(b.id);
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Chybí id' }, { status: 400 });
+  // Prázdný název by z dodavatele udělal řádek bez jména (vazba položek je právě jméno).
+  if (b.name !== undefined && !String(b.name ?? '').trim()) return NextResponse.json({ error: 'Název je povinný' }, { status: 400 });
   try {
+    // Jen vlastní dodavatel podniku (ze zdroje organizace upravuje zdroj); cizí id = 404, ne tichá nula změn.
+    const [puvodni] = await sql`SELECT id, name FROM suppliers WHERE id = ${id} AND team_id = ${u.team_id}`;
+    if (!puvodni) return NextResponse.json({ error: 'Dodavatel nenalezen' }, { status: 404 });
     if (b.name !== undefined) await sql`UPDATE suppliers SET name = ${String(b.name).trim().slice(0, 120)} WHERE id = ${id} AND team_id = ${u.team_id}`;
     if (b.email !== undefined) await sql`UPDATE suppliers SET email = ${b.email ? String(b.email).trim().slice(0, 200) : null} WHERE id = ${id} AND team_id = ${u.team_id}`;
     if (b.phone !== undefined) await sql`UPDATE suppliers SET phone = ${b.phone ? String(b.phone).trim().slice(0, 40) : null} WHERE id = ${id} AND team_id = ${u.team_id}`;
     if (b.note !== undefined) await sql`UPDATE suppliers SET note = ${b.note ? String(b.note).trim().slice(0, 300) : null} WHERE id = ${id} AND team_id = ${u.team_id}`;
     const [row] = await sql`SELECT * FROM suppliers WHERE id = ${id} AND team_id = ${u.team_id}`;
     if (!row) return NextResponse.json({ error: 'Dodavatel nenalezen' }, { status: 404 });
+    const pole = (['name', 'email', 'phone', 'note'] as const).filter(k => b[k] !== undefined);
+    audit(u.team_id, u.id, 'supplier.update', 'supplier', id, `${row.name}${pole.length ? ` (${pole.join(', ')})` : ''}`);
     return NextResponse.json({ supplier: row });
   } catch { return NextResponse.json({ error: 'Uložení se nepodařilo' }, { status: 500 }); }
 }

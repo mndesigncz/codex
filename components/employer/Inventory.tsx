@@ -47,6 +47,7 @@ import CategoryNav from '../inventory/CategoryNav';
 import { type ItemDefaults, DEFAULT_FIELDS, mergeDefaults, hasDefaults } from '@/lib/itemDefaults';
 import StocktakeModal from '../inventory/Stocktake';
 import NakupniSeznamOkno, { type RadekSeznamu } from './NakupniSeznamOkno';
+import DodavateleOkno from '../inventory/DodavateleOkno';
 import ItemRecipeLinks from '../inventory/ItemRecipeLinks';
 import ProductionRecipe from '../inventory/ProductionRecipe';
 import { Poznamky } from '../Poznamky';
@@ -1394,8 +1395,10 @@ export default function Inventory({ initialCategory, predaniN = 0, onNavigate }:
       </datalist>
 
       {showSuppliers && (
-        <SuppliersModal suppliers={suppliers} smiUpravit={ma('dodavatele.upravit')} onClose={() => setShowSuppliers(false)}
-          onChanged={nactiDodavatele} potvrdit={setPotvrzeni} />
+        <DodavateleOkno suppliers={suppliers} polozky={items} smiUpravit={ma('dodavatele.upravit')} smiObjednavky={ma('nakup.zobrazit')}
+          onClose={() => setShowSuppliers(false)} onChanged={nactiDodavatele} potvrdit={setPotvrzeni}
+          // „Objednat" u dodavatele: okno se zavře a otevře se nákupní seznam jen s jeho položkami.
+          onObjednat={jmeno => { setShowSuppliers(false); setShoppingSupplier(jmeno); setShowShopping(true); }} />
       )}
 
       {showStocktake && (
@@ -2306,103 +2309,5 @@ function PackagingEditor({ category, onSaved }: {
         {err && <span className="text-xs font-medium text-bad-ink" role="alert">{err}</span>}
       </div>
     </div>
-  );
-}
-
-// Suppliers manager: name + e-mail is all an order needs to leave the app.
-function SuppliersModal({ suppliers, smiUpravit, onClose, onChanged, potvrdit }: {
-  suppliers: any[];
-  /** dodavatele.upravit — bez něj se seznam jen čte. */
-  smiUpravit: boolean;
-  onClose: () => void;
-  onChanged: () => Promise<void> | void;
-  potvrdit: (p: Potvrzeni) => void;
-}) {
-  const t = useT('sprava');
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
-  const [editId, setEditId] = useState<number | null>(null);
-  const [editEmail, setEditEmail] = useState('');
-
-  const add = async () => {
-    if (!name.trim()) return;
-    setBusy(true); setErr('');
-    const res = await fetch('/api/suppliers', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name.trim(), email: email.trim() || null, phone: phone.trim() || null }),
-    }).catch(() => null);
-    setBusy(false);
-    if (res?.ok) { setName(''); setEmail(''); setPhone(''); await onChanged(); }
-    else { const d = res ? await res.json().catch(() => ({})) : {}; setErr(d.error || t('Uložení se nepodařilo.')); }
-  };
-
-  return (
-    <Modal open onClose={onClose} size="lg" title={t('Dodavatelé')}
-      subtitle={t('S vyplněným e-mailem jde objednávka poslat rovnou z nákupního seznamu. Jméno dodavatele u položek vybíráš našeptávačem.')}>
-      <div className="space-y-4">
-        {err && <p className="note note-danger" role="alert">{err}</p>}
-        {smiUpravit && (
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-end">
-            <Field id="sklad-dod-nazev" label={t('Název dodavatele')}>
-              <input id="sklad-dod-nazev" value={name} onChange={e => setName(e.target.value)} maxLength={120} className={inputClass} />
-            </Field>
-            <Field id="sklad-dod-email" label={t('E-mail pro objednávky')}>
-              <input id="sklad-dod-email" value={email} onChange={e => setEmail(e.target.value)} placeholder="objednavky@dodavatel.cz" type="email" maxLength={200} className={inputClass} />
-            </Field>
-            <Button variant="primary" icon="plus" onClick={add} loading={busy} disabled={!name.trim()}>{t('Přidat')}</Button>
-          </div>
-        )}
-
-        {suppliers.length === 0 ? (
-          <EmptyState illustration="sklad" title={t('Zatím žádný dodavatel')} hint={t('S dodavatelem u položky pošleš objednávku e-mailem rovnou z nákupního seznamu.')} compact />
-        ) : (
-          <ul className="list">
-            {suppliers.map(sp => (
-              <li key={sp.id}>
-                <ListRow as="div"
-                  title={<>
-                    {sp.name}
-                    {sp.zOrganizace && <Chip tone="muted" size="sm" className="ml-1.5 align-middle">{t('z organizace')}</Chip>}
-                    {sp.sdileno && <Chip tone="info" size="sm" className="ml-1.5 align-middle">{t('sdíleno')}</Chip>}
-                  </>}
-                  meta={editId === sp.id ? undefined : <span className={sp.email ? '' : 'text-wait-ink'}>{sp.email ?? t('bez e-mailu')}</span>}
-                  actions={sp.zOrganizace || !smiUpravit ? undefined : editId === sp.id ? (
-                    <span className="flex items-center gap-1.5">
-                      <input value={editEmail} onChange={e => setEditEmail(e.target.value)} type="email" aria-label={t('E-mail dodavatele {nazev}', { nazev: sp.name })}
-                        className={`${inputClass} !w-full sm:!w-52`} />
-                      <Button variant="primary" size="sm" onClick={async () => {
-                        const res = await fetch('/api/suppliers', {
-                          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ id: sp.id, email: editEmail.trim() || null }),
-                        }).catch(() => null);
-                        if (res?.ok) { setEditId(null); await onChanged(); }
-                        else setErr(t('E-mail se nepodařilo uložit.'));
-                      }}>{t('Uložit')}</Button>
-                    </span>
-                  ) : (
-                    <Menu size="sm" label={t('Další akce: {nazev}', { nazev: sp.name })} items={[
-                      { label: t('Upravit e-mail'), icon: 'pencil', onClick: () => { setEditId(sp.id); setEditEmail(sp.email ?? ''); } },
-                      { label: t('Smazat dodavatele…'), icon: 'trash', danger: true, onClick: () => potvrdit({
-                        titulek: t('Smazat dodavatele „{nazev}"?', { nazev: sp.name }),
-                        text: t('U položek zůstane jeho jméno jako text, jen z něj nepůjde poslat objednávka e-mailem.'),
-                        akce: t('Smazat dodavatele'),
-                        provest: async () => {
-                          const res = await fetch(`/api/suppliers?id=${sp.id}`, { method: 'DELETE' }).catch(() => null);
-                          if (res?.ok) await onChanged();
-                          else setErr(t('Dodavatele se nepodařilo smazat.'));
-                        },
-                      }) },
-                    ]} />
-                  )}
-                />
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </Modal>
   );
 }

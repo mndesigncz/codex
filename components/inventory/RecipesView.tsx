@@ -34,9 +34,12 @@ import { baleniPolozky, jednotkaPolozky } from '@/lib/packaging';
 import { tg } from '@/lib/i18n/stav';
 import { useJazyk, useT } from '@/lib/i18n/client';
 import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
-import { vyberReceptury, vetaOdpisu, type DataReceptur, type Receptura } from '@/lib/recepturyPrehled';
 import {
-  Button, Card, Chip, EmptyState, Field, Input, ListRow, Modal, SearchField, Segmented, Select, Skeleton, Stat, Toast, Well,
+  vyberReceptury, vetaOdpisu, tonMarze, jePodCilem, cilMarze, seradReceptury, RAZENI_RECEPTUR,
+  type DataReceptur, type Receptura, type RazeniReceptur, type TonMarze,
+} from '@/lib/recepturyPrehled';
+import {
+  Button, Card, Chip, EmptyState, Field, Input, ListRow, Menu, Modal, SearchField, Segmented, Select, Skeleton, Stat, Toast, Well,
 } from '../ui';
 import { PlochaWidgetu } from '../widgety/PlochaWidgetu';
 import { obnovDataWidgetu, useDataWidgetu } from '../widgety/useDataWidgetu';
@@ -88,8 +91,19 @@ function doRadku(itemId: string, amount: number, item: any): Ingredient {
 // musí být vidět — tiché oříznutí je ztráta dat bez upozornění.
 const LIMIT = 200;
 
-/** Marže tónem stavu: nad 65 % v pořádku, pod 45 % pozor (stejné prahy jako editor). */
-const tonMarze = (m: number) => (m >= 65 ? 'text-ok-ink' : m >= 45 ? 'text-[#16181A]' : 'text-bad-ink');
+/** Marže v seznamu tónem stavu proti cíli podniku (lib/recepturyPrehled.tonMarze); „ujde" inkoustem jako dřív. */
+const TEXT_MARZE: Record<TonMarze, string> = { ok: 'text-ok-ink', wait: 'text-[#16181A]', bad: 'text-bad-ink' };
+/** Pruh a věta marže v editoru — stejné prahy, „ujde" tady žlutě (je to stav jedné receptury, ne sloupec čísel). */
+const PRUH_MARZE: Record<TonMarze, string> = { ok: 'bg-[#C8F542]', wait: 'bg-wait', bad: 'bg-bad' };
+const VETA_MARZE: Record<TonMarze, string> = { ok: 'text-ok-ink', wait: 'text-wait-ink', bad: 'text-bad-ink' };
+
+/** Řazení seznamu si prohlížeč pamatuje (jako Sklad); soukromé okno ho jen nezapamatuje. */
+const KLIC_RAZENI = 'managero-receptury-razeni';
+const nactiRazeni = (): RazeniReceptur => {
+  try { const v = localStorage.getItem(KLIC_RAZENI); return (RAZENI_RECEPTUR as readonly string[]).includes(v ?? '') ? (v as RazeniReceptur) : 'prodeje'; }
+  catch { return 'prodeje'; }
+};
+const vyberCil = (raw: any): { cil: number | null } => ({ cil: cilMarze(raw?.team?.margin_target_pct) });
 
 // Typ je pojmenovaný, aby ho uneslo i líné načtení: u parametru s výchozí
 // hodnotou (`= {}`) se props z `import()` samy neodvodí.
@@ -122,6 +136,9 @@ export default function RecipesView({ openProductId, onNavigate, stranka = 'vede
   const kategorie = useDataWidgetu(URL_KATEGORIE, vyberKategorie);
   // Návod k položce: „takhle se to dělá" patří vedle „tohle se z toho odepíše".
   const navody = useDataWidgetu(smi('navody.zobrazit') ? URL_NAVODY : null, vyberNavody);
+  // Cílová marže podniku (Nastavení › Profil podniku); stejná adresa jako Provoz podniku a Tým.
+  const tym = useDataWidgetu('/api/teams', vyberCil);
+  const cil = tym.data?.cil ?? null;
 
   // Místní úpravy skladu z editoru (upravená nebo nově založená surovina) platí hned,
   // i než se /api/inventory obnoví — jinak by čerstvá surovina v řádku chyběla.
@@ -138,6 +155,10 @@ export default function RecipesView({ openProductId, onNavigate, stranka = 'vede
   const [cat, setCat] = useState(VSE);
   const [search, setSearch] = useState('');
   const [onlyMissing, setOnlyMissing] = useState(false);
+  const [podCilem, setPodCilem] = useState(false);
+  const [razeni, setRazeniStav] = useState<RazeniReceptur>('prodeje');
+  useEffect(() => { setRazeniStav(nactiRazeni()); }, []);
+  const setRazeni = (r: RazeniReceptur) => { setRazeniStav(r); try { localStorage.setItem(KLIC_RAZENI, r); } catch { /* soukromé okno */ } };
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -191,16 +212,6 @@ export default function RecipesView({ openProductId, onNavigate, stranka = 'vede
     return [VSE, ...Array.from(set).sort((a, b) => a.localeCompare(b, LOCALE_PRO_JAZYK[jazyk]))];
   }, [products, jazyk]);
 
-  const q = search.trim();
-  const shown = useMemo(() => products.filter(p => {
-    if (cat !== VSE && (p.category || BEZ_KATEGORIE) !== cat) return false;
-    if (onlyMissing && recipeByProduct.get(p.productId)?.ingredients.length) return false;
-    if (q && !obsahujeNekde(q, p.name, p.category)) return false;
-    return true;
-  }).sort((a, b) => (soldByProduct.get(b.productId) ?? 0) - (soldByProduct.get(a.productId) ?? 0)
-    || a.name.localeCompare(b.name, LOCALE_PRO_JAZYK[jazyk])),
-  [products, cat, onlyMissing, q, recipeByProduct, soldByProduct, jazyk]);
-
   /** Co stojí suroviny na jednu porci produktu — a jaká z toho vyjde marže.
    *  Chybí-li u některé suroviny cena nebo balení, vrátíme null: nadhodnocená
    *  marže je horší než žádná, protože se podle ní mění ceny. */
@@ -218,6 +229,29 @@ export default function RecipesView({ openProductId, onNavigate, stranka = 'vede
     // Marže z nezaokrouhleného nákladu: u levného nápoje posune
     // zaokrouhlení na celé koruny procenta o jednotky.
     return { cost: total, marginPct: marginPct(price, exact) };
+  };
+  // Ekonomika všech položek najednou: podle ní se řadí, počítá „Pod cílem" i kreslí řádek.
+  const ekonomika = useMemo(() => new Map(products.map(p => [p.productId, economyOf(p.productId, p.price ?? null)])),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [products, recipeByProduct, itemById]);
+
+  const q = search.trim();
+  // Filtry kromě „Pod cílem" — z nich se počítá číslo na pilulce (co by klepnutí ukázalo).
+  const zakladSeznamu = useMemo(() => products.filter(p => {
+    if (cat !== VSE && (p.category || BEZ_KATEGORIE) !== cat) return false;
+    if (onlyMissing && recipeByProduct.get(p.productId)?.ingredients.length) return false;
+    if (q && !obsahujeNekde(q, p.name, p.category)) return false;
+    return true;
+  }), [products, cat, onlyMissing, q, recipeByProduct]);
+  const nPodCilem = useMemo(() => zakladSeznamu.filter(p => jePodCilem(ekonomika.get(p.productId)?.marginPct, cil)).length, [zakladSeznamu, ekonomika, cil]);
+  const shown = useMemo(() => seradReceptury(
+    zakladSeznamu
+      .filter(p => !podCilem || jePodCilem(ekonomika.get(p.productId)?.marginPct, cil))
+      .map(p => ({ p, nazev: p.name, prodano: soldByProduct.get(p.productId) ?? 0, marze: ekonomika.get(p.productId)?.marginPct ?? null, naklad: ekonomika.get(p.productId)?.cost ?? null })),
+    razeni, LOCALE_PRO_JAZYK[jazyk],
+  ).map(x => x.p), [zakladSeznamu, podCilem, ekonomika, cil, soldByProduct, razeni, jazyk]);
+  const NAZVY_RAZENI: Record<RazeniReceptur, string> = {
+    prodeje: t('Podle prodejů'), marze: t('Marže od nejnižší'), naklad: t('Náklad od nejvyššího'), nazev: t('Podle názvu'),
   };
 
   const setIng = (idx: number, patch: Partial<Ingredient>) =>
@@ -321,7 +355,7 @@ export default function RecipesView({ openProductId, onNavigate, stranka = 'vede
       <RecipeEditor
         draft={draft} items={items} itemById={itemById}
         setIng={setIng} setDraft={setDraft} save={save} saving={saving} err={err} yieldOf={yieldOf}
-        recipes={recipes} products={products} categories={kategorie.data ?? []}
+        recipes={recipes} products={products} categories={kategorie.data ?? []} cil={cil}
         smiUpravit={ma('receptury.upravit')}
         guide={(navody.data ?? []).find(g => g.productId === draft.productId) ?? null}
         onItemSaved={patched => { setMistniSklad(m => ({ ...m, [String(patched.id)]: patched })); obnovDataWidgetu(URL_SKLAD); }}
@@ -335,14 +369,30 @@ export default function RecipesView({ openProductId, onNavigate, stranka = 'vede
       <div className="space-y-4">
         {sklad.error && <p className="note note-wait" role="status">{t('Sklad se nenačetl — marže a suroviny teď nespočítám.')} {sklad.error}</p>}
         {d.chyba && <p className="note note-danger" role="alert">{t(d.chyba)}</p>}
-        {/* Procházení menu — hledání, jen chybějící, kategorie */}
-        <div className="flex flex-wrap gap-2 items-center">
-          <SearchField className="flex-1 min-w-[200px]" value={search} onChange={setSearch}
+        {/* Procházení menu — hledání; pod ním (na monitoru vedle) filtry a řazení v jednom pásu */}
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+          <SearchField className="flex-1 min-w-0" value={search} onChange={setSearch}
             placeholder={t('Hledat mezi {n} položkami menu…', { n: products.length })} storageKey="recipes" ariaLabel={t('Hledat položku menu')} />
-          <button type="button" aria-pressed={onlyMissing} onClick={() => setOnlyMissing(v => !v)}
-            className={`filter-pill tap-target ${onlyMissing ? 'seg-on' : 'seg-off glass'}`}>
-            {t('Jen bez receptury')}
-          </button>
+          <div className="flex items-center gap-2 min-w-0 sm:shrink-0">
+            {/* Pilulky jedou v jednom řádku; co se nevejde (320 px, němčina), posune se prstem uvnitř pásu.
+                Na monitoru se nesmršťují — ustoupí hledání. */}
+            <div className="flex items-center gap-2 overflow-x-auto min-w-0 flex-1 sm:flex-none sm:overflow-visible py-1" role="group" aria-label={t('Filtry receptur')}>
+              <button type="button" aria-pressed={onlyMissing} onClick={() => setOnlyMissing(v => !v)}
+                className={`filter-pill tap-target whitespace-nowrap shrink-0 ${onlyMissing ? 'seg-on' : 'seg-off glass'}`}>
+                {t('Jen bez receptury')}
+              </button>
+              {/* Druhý klik ruší; ukáže se, až když je pod cílem aspoň jedna položka (nebo je filtr zapnutý). */}
+              {(nPodCilem > 0 || podCilem) && (
+                <button type="button" aria-pressed={podCilem} onClick={() => setPodCilem(v => !v)}
+                  title={t('Marže pod cílem podniku ({n} %)', { n: cil ?? 65 })}
+                  className={`filter-pill tap-target whitespace-nowrap shrink-0 ${podCilem ? 'seg-on' : 'seg-off glass'}`}>
+                  {t('Pod cílem · {n}', { n: nPodCilem })}
+                </button>
+              )}
+            </div>
+            <Menu label={t('Řadit: {druh}', { druh: NAZVY_RAZENI[razeni] })} icon="swap"
+              items={RAZENI_RECEPTUR.map(k => ({ label: NAZVY_RAZENI[k], icon: k === razeni ? 'check' : undefined, onClick: () => setRazeni(k) }))} />
+          </div>
         </div>
         {categories.length > 2 && (
           // Zalamuje se; posuvný pás se záporným okrajem (-mx-1) dřív přečníval 4 px za widget.
@@ -360,8 +410,8 @@ export default function RecipesView({ openProductId, onNavigate, stranka = 'vede
           {shown.length === 0 ? (
             <div className="p-5">
               <EmptyState compact icon="search"
-                title={onlyMissing ? t('Všechno tady má recepturu') : t('Nic nenalezeno')}
-                hint={onlyMissing ? t('V téhle kategorii se každý prodej odepisuje ze skladu.') : t('Zkus jiné hledání nebo kategorii.')} />
+                title={onlyMissing ? t('Všechno tady má recepturu') : podCilem ? t('Nic není pod cílem') : t('Nic nenalezeno')}
+                hint={onlyMissing ? t('V téhle kategorii se každý prodej odepisuje ze skladu.') : podCilem ? t('Všechny položky s recepturou mají marži aspoň {n} %.', { n: cil ?? 65 }) : t('Zkus jiné hledání nebo kategorii.')} />
             </div>
           ) : (
             <ul className="list px-5">
@@ -369,14 +419,14 @@ export default function RecipesView({ openProductId, onNavigate, stranka = 'vede
                 const r = recipeByProduct.get(p.productId);
                 const sRec = !!r?.ingredients.length;
                 const sold = soldByProduct.get(p.productId) ?? 0;
-                const eco = economyOf(p.productId, p.price ?? null);
+                const eco = ekonomika.get(p.productId) ?? null;
                 return (
                   <li key={p.productId}>
                     <ListRow as="div" title={p.name}
                       meta={sRec
                         ? r!.ingredients.map(ing => `${Number(ing.amount).toLocaleString(LOCALE_PRO_JAZYK[jazyk], { maximumFractionDigits: 3 })} ${ing.itemUnit ?? ''} ${ing.itemName ?? '?'}`.replace(/\s+/g, ' ').trim()).join(' + ')
                         : (p.category || t('bez kategorie'))}
-                      value={eco?.marginPct != null ? <span className={tonMarze(eco.marginPct)}>{eco.marginPct} %</span> : undefined}
+                      value={eco?.marginPct != null ? <span className={TEXT_MARZE[tonMarze(eco.marginPct, cil)]}>{eco.marginPct} %</span> : undefined}
                       valueMeta={eco ? t('náklad {castka}', { castka: money(eco.cost) }) : undefined}
                       aside={sold > 0 ? t('prodáno {n}×', { n: sold }) : undefined}
                       right={sRec ? undefined : <Chip tone="wait" size="sm">{t('bez receptury')}</Chip>}
@@ -412,13 +462,15 @@ export default function RecipesView({ openProductId, onNavigate, stranka = 'vede
 // ruce, a hned pod ním je vidět, kolik porcí z balení vyjde a co stojí — na
 // tom se chyba o řád (0,02 l vs 0,2 l) pozná dřív, než se odepíše sklad.
 // ---------------------------------------------------------------------------
-function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, err, yieldOf, recipes, products, categories, smiUpravit, guide, onItemSaved, onItemCreated, onOpenItem }: {
+function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, err, yieldOf, recipes, products, categories, cil, smiUpravit, guide, onItemSaved, onItemCreated, onOpenItem }: {
   draft: Draft; items: any[]; itemById: Map<string, any>;
   setIng: (idx: number, patch: Partial<Ingredient>) => void;
   setDraft: React.Dispatch<React.SetStateAction<Draft | null>>;
   save: (smazat?: boolean) => void; saving: boolean; err: string;
   yieldOf: (item: any, amountBase: number) => { portions: number | null; perPortion: number | null } | null;
   recipes: Receptura[]; products: { productId: string; name: string; price: number | null }[]; categories: { id: number; name: string }[];
+  /** Cílová marže podniku (null = výchozí prahy 65 / 45). */
+  cil: number | null;
   smiUpravit: boolean;
   guide: { id: number; title: string } | null;
   onItemSaved: (item: any) => void;
@@ -632,11 +684,12 @@ function RecipeEditor({ draft, items, itemById, setIng, setDraft, save, saving, 
                     <span className="font-semibold tabular-nums text-[#16181A]">{money(menuPrice - cost.exact)}</span>
                   </div>
                   <div className="h-1.5 rounded-full bg-black/[0.06] overflow-hidden mt-1.5" aria-hidden>
-                    <div className={`h-full rounded-full ${margin >= 65 ? 'bg-[#C8F542]' : margin >= 45 ? 'bg-wait' : 'bg-bad'}`}
+                    <div className={`h-full rounded-full ${PRUH_MARZE[tonMarze(margin, cil)]}`}
                       style={{ width: `${Math.max(0, Math.min(100, margin))}%` }} />
                   </div>
-                  <p className={`text-[13px] font-semibold ${margin >= 65 ? 'text-ok-ink' : margin >= 45 ? 'text-wait-ink' : 'text-bad-ink'}`}>
+                  <p className={`text-[13px] font-semibold ${VETA_MARZE[tonMarze(margin, cil)]}`}>
                     {t('marže {n} %', { n: margin })}
+                    {cil != null && <span className="font-normal text-black/55"> · {t('cíl {n} %', { n: cil })}</span>}
                   </p>
                 </>
               )}

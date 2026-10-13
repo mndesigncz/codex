@@ -62,5 +62,43 @@
    "title": "Mléko mizí rychleji, než se prodává",
    "text": "5 % z prodaného."
   }
+ ],
+ "history": [
+  {
+   "id": -2,
+   "completedAt": "2026-04-19T18:00:00Z",
+   "netValue": -720,
+   "lostValue": -810
+  },
+  {
+   "id": -1,
+   "completedAt": "2026-05-24T18:00:00Z",
+   "netValue": -540,
+   "lostValue": -600
+  },
+  {
+   "id": 0,
+   "completedAt": "2026-06-21T18:00:00Z",
+   "netValue": -1210,
+   "lostValue": -1300
+  },
+  {
+   "id": 1,
+   "completedAt": "2026-07-19T18:00:00Z",
+   "netValue": -860,
+   "lostValue": -1020
+  },
+  {
+   "id": 2,
+   "completedAt": "2026-08-23T18:00:00Z",
+   "netValue": -980,
+   "lostValue": -1100
+  },
+  {
+   "id": 3,
+   "completedAt": "2026-09-20T18:00:00Z",
+   "netValue": -1630,
+   "lostValue": -1840
+  }
  ]
 }

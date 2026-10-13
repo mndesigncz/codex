@@ -43,7 +43,8 @@ import { aktualniJazyk } from '@/lib/i18n/stav';
 import { LOCALE_PRO_JAZYK } from '@/lib/i18n/config';
 import { pragueDaySafe, pragueToday } from '@/lib/pragueTime';
 import { useMoney } from '../../CurrencyProvider';
-import { Button, Chip, ListRow, Modal, Stat, StatRow } from '../../ui';
+import { BarSpark, Button, Chip, ListRow, Modal, Stat, StatRow } from '../../ui';
+import { zmenaZtrat, type ZtrataInventury } from '@/lib/skladPrehled';
 import { useOpravneni } from '../../role/useOpravneni';
 import { Widget, useWidget, type StavNacteni } from '../Widget';
 import { useDataWidgetu } from '../useDataWidgetu';
@@ -321,6 +322,8 @@ interface Marze {
   stav: 'ok' | 'nepropojeno' | 'plni';
   hlaska: string | null;
   marginPct: number | null; margin: number; noRecipe: number;
+  /** Cílová marže, kterou si podnik nastavil (Nastavení › Profil podniku); null = nenastavil. */
+  cil: number | null;
   polozky: PolozkaMarze[];
   rady: { icon: string; title: string; text: string; tone: TonPoznamky }[];
 }
@@ -333,6 +336,7 @@ function vyberMarze(raw: any): Marze {
     hlaska: typeof raw.error === 'string' ? raw.error : typeof raw.menuError === 'string' ? raw.menuError : null,
     marginPct: t.marginPct == null ? null : Number(t.marginPct),
     margin: cis(t.margin), noRecipe: cis(t.noRecipe),
+    cil: raw.target?.nastaveno === true && Number.isFinite(Number(raw.target?.pct)) ? Number(raw.target.pct) : null,
     polozky: Array.isArray(raw.items) ? raw.items.map((i: any) => ({
       id: String(i?.productId ?? i?.name ?? ''), name: String(i?.name ?? ''), qty: cis(i?.qty),
       revenue: i?.revenue == null ? null : cis(i.revenue), cost: i?.cost == null ? null : cis(i.cost),
@@ -366,14 +370,16 @@ function MarzeWidget({ velikost, nastaveni }: WidgetProps<{ mesic: string; razen
 
   let obsah: ReactNode = null;
   if (m && sMarzi.length > 0) {
+    // Poznámka s cílem podniku, když ho nastavil („na položkách s recepturou · cíl 60 %").
+    const sCilem = (veta: string) => (m.cil != null ? `${veta} · ${t('cíl {n} %', { n: m.cil })}` : veta);
     if (velikost === 'S') {
-      obsah = <Stat label={t('Marže')} value={m.marginPct != null ? `${m.marginPct} %` : '—'} note={t('na položkách s recepturou')} />;
+      obsah = <Stat label={t('Marže')} value={m.marginPct != null ? `${m.marginPct} %` : '—'} note={sCilem(t('na položkách s recepturou'))} />;
     } else if (velikost === 'M') {
       const [pred, po] = rozdelVetu(t, 'Marže {pct} na položkách s recepturou', 'pct');
       const podleMarze = [...sMarzi].sort((a, b) => (b.marginPct ?? 0) - (a.marginPct ?? 0));
       obsah = (
         <div className="space-y-3">
-          <p className="t-meta">{pred}<span className="font-semibold text-[#16181A] tabular-nums">{m.marginPct} %</span>{po}</p>
+          <p className="t-meta">{pred}<span className="font-semibold text-[#16181A] tabular-nums">{m.marginPct} %</span>{po}{m.cil != null ? ` · ${t('cíl {n} %', { n: m.cil })}` : ''}</p>
           <div>
             <p className="t-label mb-1">{t('Vydělává nejvíc')}</p>
             <ul className="list">{podleMarze.slice(0, 3).map(radek)}</ul>
@@ -393,7 +399,7 @@ function MarzeWidget({ velikost, nastaveni }: WidgetProps<{ mesic: string; razen
       obsah = (
         <div className="space-y-4">
           <StatRow>
-            <Stat label={t('Marže')} value={m.marginPct != null ? `${m.marginPct} %` : '—'} note={t('na položkách s recepturou')} />
+            <Stat label={t('Marže')} value={m.marginPct != null ? `${m.marginPct} %` : '—'} note={sCilem(t('na položkách s recepturou'))} />
             <Stat label={t('Vydělaly')} value={money(m.margin)} note={t('tržba − suroviny')} />
             <Stat label={t('Bez receptury')} value={m.noRecipe.toLocaleString('cs-CZ')} note={t('{n, plural, one {# položka} few {# položky} other {# položek}}', { n: m.noRecipe })} />
           </StatRow>
@@ -496,6 +502,8 @@ interface Ztraty {
   kdy: string | null;
   ztrata: number; prebytek: number; chybi: number; prebyva: number;
   radky: RadekZtraty[];
+  /** Posledních až šest dokončených inventur, od nejstarší (GET ?history=1). */
+  historie: ZtrataInventury[];
   rady: { icon: string; title: string; text: string; tone: TonPoznamky }[];
 }
 
@@ -513,8 +521,14 @@ function vyberZtraty(raw: any): Ztraty {
     })) : [],
     rady: Array.isArray(raw.insights) ? raw.insights.filter((i: any) => i && typeof i.title === 'string')
       .map((i: any) => ({ icon: typeof i.icon === 'string' ? i.icon : 'bulb', title: i.title, text: String(i.text ?? ''), tone: i.tone === 'good' || i.tone === 'warn' ? i.tone : 'info' })) : [],
+    historie: Array.isArray(raw.history) ? raw.history
+      .filter((h: any) => h && h.id != null && typeof h.completedAt === 'string')
+      .map((h: any) => ({ id: Number(h.id), completedAt: h.completedAt, netValue: cis(h.netValue), lostValue: cis(h.lostValue) })) : [],
   };
 }
+
+/** Ztráty z widgetu i řada posledních inventur v jednom dotazu (stejná URL pro všechny velikosti). */
+const URL_ZTRAT = '/api/inventory/shrinkage?history=1';
 
 const denVetou = (d: string) => {
   const [, m, dd] = d.split('-').map(Number);
@@ -525,9 +539,18 @@ function ZtratyWidget({ velikost }: WidgetProps) {
   const t = useT('widgety');
   const money = useMoney();
   const { ok, ceka } = useBrana('finance.ztraty', ['finance.ztraty']);
-  const data = useDataWidgetu(ok ? '/api/inventory/shrinkage' : null, vyberZtraty);
+  const data = useDataWidgetu(ok ? URL_ZTRAT : null, vyberZtraty);
   const z = data.data;
   const chybejici = (z?.radky ?? []).filter(r => r.diff < 0);
+  // Vývoj: čistý rozdíl poslední inventury proti předchozí (záporný = ztráty narostly).
+  const zmena = z ? zmenaZtrat(z.historie) : null;
+  const chipZmeny = zmena ? (
+    <Chip tone={zmena.rozdil === 0 ? 'muted' : zmena.horsi ? 'bad' : 'ok'} size="sm">
+      {zmena.rozdil === 0 ? t('stejně jako minule')
+        : zmena.horsi ? t('ztráty o {castka} vyšší než minule', { castka: money(Math.abs(zmena.rozdil)) })
+          : t('ztráty o {castka} nižší než minule', { castka: money(Math.abs(zmena.rozdil)) })}
+    </Chip>
+  ) : null;
 
   let prazdno: ReactNode | undefined;
   if (z && !z.pripraveno) prazdno = <p className="t-meta text-pretty">{z.duvod === 'notMigrated' ? t('Inventury ještě nejsou zapnuté.') : t('Ztráty se spočítají po první dokončené inventuře.')}</p>;
@@ -546,11 +569,26 @@ function ZtratyWidget({ velikost }: WidgetProps) {
         <Stat label={t('Chybí za')} value={money(z.ztrata)} note={z.kdy ? t('inventura {datum}', { datum: denVetou(z.kdy) }) : undefined} />
       ) : (
         <div className="space-y-3">
-          <p className="t-meta">{z.kdy ? t('Inventura {datum}', { datum: denVetou(z.kdy) }) : t('Poslední inventura')}</p>
+          <p className="t-meta flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span>{z.kdy ? t('Inventura {datum}', { datum: denVetou(z.kdy) }) : t('Poslední inventura')}</span>
+            {chipZmeny}
+          </p>
           <StatRow>
             <Stat label={t('Chybí')} value={money(z.ztrata)} note={t('{n, plural, one {# položka} few {# položky} other {# položek}}', { n: z.chybi })} />
             <Stat label={t('Přebývá')} value={money(z.prebytek)} note={t('{n, plural, one {# položka} few {# položky} other {# položek}}', { n: z.prebyva })} />
           </StatRow>
+          {/* Vývoj v L: sloupek = ztráta inventury (čistý rozdíl, přebytek je nula), nejnovější zvýrazněná. */}
+          {velikost === 'L' && z.historie.length >= 2 && (
+            <div>
+              <BarSpark height={40} highlight={z.historie.length - 1}
+                label={t('Vývoj ztrát: {n, plural, one {poslední inventura} few {poslední # inventury} other {posledních # inventur}}', { n: z.historie.length })}
+                data={z.historie.map(h => ({
+                  value: Math.max(0, -h.netValue),
+                  tip: `${denVetou(pragueDaySafe(h.completedAt))}: ${h.netValue > 0 ? '+' : h.netValue < 0 ? '−' : ''}${money(Math.abs(h.netValue))}`,
+                }))} />
+              <p className="t-meta mt-1">{t('{n, plural, one {poslední inventura} few {poslední # inventury} other {posledních # inventur}}', { n: z.historie.length })}</p>
+            </div>
+          )}
           {velikost === 'L' && z.rady.length > 0 && <RadyJakoSeznam rady={z.rady.map(r => ({ ...r, ikona: r.icon }))} />}
           {chybejici.length > 0 && (
             <div>

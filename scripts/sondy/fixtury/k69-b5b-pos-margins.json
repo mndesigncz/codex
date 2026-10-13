@@ -30,7 +30,7 @@
    "qty": 410,
    "revenue": 22550,
    "cost": 30,
-   "marginPct": 45
+   "marginPct": 58
   },
   {
    "productId": "p4",
@@ -58,5 +58,9 @@
    "title": "Cheesecake vydělává nejmíň",
    "text": "Suroviny zdražily — zvaž cenu."
   }
- ]
+ ],
+ "target": {
+  "pct": 60,
+  "nastaveno": true
+ }
 }

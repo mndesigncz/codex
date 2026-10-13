@@ -14,7 +14,9 @@ import { ensureProductionTasks } from '@/lib/production';
 import { tymyCiselniku } from '@/lib/tenant';
 import { pozaduj, jeOdpoved } from '@/lib/opravneniDb';
 import { cenaZDb, cenaZFormulare } from '@/lib/cena';
-import { cenaKZapisu } from '@/lib/cenaSloupce';
+import { cenaKZapisu, sloupecJeDesetinny } from '@/lib/cenaSloupce';
+import { overPrijem, type PolozkaObjednavky } from '@/lib/skladPrehled';
+import { audit } from '@/lib/audit';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,8 +36,12 @@ function cleanItems(raw: any): OrderItem[] {
     .filter(i => i.name);
 }
 
+// Cena za balení zapsaná při příjmu po položkách je nákupní cena — bez `sklad.ceny` z řádků zmizí stejně jako totalCost.
+const polozkyProRoli = (items: unknown, sCenou: boolean) =>
+  (Array.isArray(items) ? items : []).map((x: any) => (sCenou || !x || typeof x !== 'object' ? x : (({ unitCost: _u, ...zbytek }) => zbytek)(x)));
+
 const shape = (r: any, sCenou: boolean) => ({
-  id: r.id, supplier: r.supplier, items: r.items ?? [], totalCost: sCenou ? cenaZDb(r.total_cost) : null, // NUMERIC chodí jako řetězec
+  id: r.id, supplier: r.supplier, items: polozkyProRoli(r.items, sCenou), totalCost: sCenou ? cenaZDb(r.total_cost) : null, // NUMERIC chodí jako řetězec
   status: r.status, note: r.note, createdAt: r.created_at, receivedAt: r.received_at,
   createdByName: r.created_by_name ?? null,
 });
@@ -126,8 +132,11 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ ok: true, order: shape(row, c.role.opravneni.has('sklad.ceny')), emailed, emailError });
 }
 
-// PATCH — receive or cancel: { id, action: 'received'|'cancelled', totalCost?, restock? }.
+// PATCH — receive or cancel: { id, action: 'received'|'cancelled', totalCost?, restock?, received? }.
 // Receiving with restock=true adds the ordered quantities to matching stock items.
+// `received: [{ i?, itemId, qty, unitCost? }]` (kolo 7) = příjem po položkách: naskladní se, co opravdu
+// přišlo, cena za balení se zapíše do inventory_items.unit_cost a do orders.items[i] (received, unitCost).
+// Bez `received` je chování beze změny (přišlo vše, co se objednalo).
 export async function PATCH(req: NextRequest) {
   const c = await pozaduj('nakup.prijmout');
   if (jeOdpoved(c)) return c;
@@ -146,35 +155,70 @@ export async function PATCH(req: NextRequest) {
   // není, se odmítne — dřív se z něj tiše stala nula.
   const zadanaCena = action === 'received' ? cenaZFormulare(b.totalCost) : { ok: true as const, hodnota: null };
   if (!zadanaCena.ok) return NextResponse.json({ error: 'Cena musí být číslo, třeba 123,45.' }, { status: 400 });
+  const smiCenu = c.role.opravneni.has('sklad.ceny_upravit');
   const totalCost = await cenaKZapisu('orders.total_cost', zadanaCena.hodnota);
-  if (totalCost != null && !c.role.opravneni.has('sklad.ceny_upravit')) {
+  if (totalCost != null && !smiCenu) {
     return NextResponse.json({ error: 'Nákupní cenu zapisuje jen ten, kdo smí měnit ceny. Přijmi zboží bez ní.' }, { status: 403 });
   }
 
-  const [row] = await sql`
-    UPDATE orders
-    SET status = ${action},
-        total_cost = ${totalCost},
-        received_at = ${action === 'received' ? new Date().toISOString() : null}
-    WHERE id = ${id}
-    RETURNING *`;
+  // Příjem po položkách se ověří celý dřív, než se cokoli zapíše (cizí položka, nesmyslné
+  // množství nebo cena bez oprávnění = nic se nepřijme).
+  const items: PolozkaObjednavky[] = Array.isArray(order.items) ? order.items : [];
+  let poPolozkach: Extract<ReturnType<typeof overPrijem>, { ok: true }> | null = null;
+  if (action === 'received' && b.received != null) {
+    const o = overPrijem(items, b.received, smiCenu);
+    if (!o.ok) return NextResponse.json({ error: o.chyba }, { status: o.status });
+    poPolozkach = o;
+  }
+  // Množství skladu je v DDL INTEGER, dokud někdo nespustí migraci (lib/cenaSloupce):
+  // 2,5 kg se pak naskladní zaokrouhleně, jinak by databáze přičtení odmítla.
+  const desetinne = poPolozkach ? await sloupecJeDesetinny('inventory_items.quantity') : true;
+  const prislo = (i: number) => {
+    const q = poPolozkach ? poPolozkach.radky[i].qty : Number(items[i]?.qty) || 0;
+    return desetinne ? q : Math.round(q);
+  };
+  // Do řádků objednávky se uloží, co přišlo a za kolik (historie ukáže „nedodáno 2 ks").
+  const noveItems = poPolozkach
+    ? items.map((it, i) => ({ ...it, received: poPolozkach!.radky[i].qty, ...(poPolozkach!.radky[i].unitCost != null ? { unitCost: poPolozkach!.radky[i].unitCost } : {}) }))
+    : null;
 
-  // Auto-restock: add ordered quantities to matching inventory items.
+  const [row] = noveItems
+    ? await sql`
+      UPDATE orders
+      SET status = ${action},
+          total_cost = ${totalCost},
+          received_at = ${new Date().toISOString()},
+          items = ${JSON.stringify(noveItems)}
+      WHERE id = ${id}
+      RETURNING *`
+    : await sql`
+      UPDATE orders
+      SET status = ${action},
+          total_cost = ${totalCost},
+          received_at = ${action === 'received' ? new Date().toISOString() : null}
+      WHERE id = ${id}
+      RETURNING *`;
+
+  // Auto-restock: add received (bez received[] objednané) quantities to matching inventory items.
   let restocked = 0;
+  const castecny = poPolozkach?.castecny === true;
+  const poznamka = castecny ? `Příjem objednávky #${id} (částečný)` : `Příjem objednávky #${id}`;
   if (action === 'received' && b.restock !== false) {
-    const items: OrderItem[] = Array.isArray(order.items) ? order.items : [];
-    for (const it of items) {
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      const q = prislo(i);
+      if (!(q > 0)) continue; // nedorazilo nic — sklad se nemění
       try {
         let updated: any[] = [];
         if (it.itemId) {
           updated = await sql`
-            UPDATE inventory_items SET quantity = quantity + ${it.qty}, updated_by = ${c.meId}, updated_at = NOW()
+            UPDATE inventory_items SET quantity = quantity + ${q}, updated_by = ${c.meId}, updated_at = NOW()
             WHERE id = ${it.itemId} AND team_id = ${c.teamId}
             RETURNING id, quantity`;
         }
         if (updated.length === 0) {
           updated = await sql`
-            UPDATE inventory_items SET quantity = quantity + ${it.qty}, updated_by = ${c.meId}, updated_at = NOW()
+            UPDATE inventory_items SET quantity = quantity + ${q}, updated_by = ${c.meId}, updated_at = NOW()
             WHERE LOWER(name) = LOWER(${it.name}) AND team_id = ${c.teamId}
             RETURNING id, quantity`;
         }
@@ -183,16 +227,31 @@ export async function PATCH(req: NextRequest) {
           try {
             await sql`
               INSERT INTO inventory_log (item_id, user_id, old_quantity, new_quantity, note)
-              VALUES (${updated[0].id}, ${c.meId}, ${updated[0].quantity - it.qty}, ${updated[0].quantity}, ${'Příjem objednávky #' + id})`;
+              VALUES (${updated[0].id}, ${c.meId}, ${Number(updated[0].quantity) - q}, ${updated[0].quantity}, ${poznamka})`;
           } catch { /* log is best-effort */ }
+          // Cena za balení tam, kde přišla: stejná definice jako pole položky a hromadná úprava
+          // (cena balení, bez balení cena jednotky). Haléře jen v NUMERIC sloupci (lib/cenaSloupce).
+          const cena = poPolozkach?.radky[i].unitCost;
+          if (cena != null) {
+            try {
+              const uc = await cenaKZapisu('inventory_items.unit_cost', cena);
+              await sql`UPDATE inventory_items SET unit_cost = ${uc} WHERE id = ${updated[0].id} AND team_id = ${c.teamId}`;
+            } catch { /* sloupec před migrací */ }
+          }
         }
       } catch { /* skip item */ }
     }
   }
 
+  if (action === 'received') {
+    const nedorazilo = poPolozkach ? poPolozkach.radky.filter(r => r.qty < (Number(items[r.i]?.qty) || 0)).length : 0;
+    audit(c.teamId, c.meId, castecny ? 'order.receive.partial' : 'order.receive', 'order', id,
+      [order.supplier, castecny ? `nedodáno ${nedorazilo} z ${items.length}` : null].filter(Boolean).join(' · ') || undefined); // i18n-ok (detail auditu)
+  }
+
   // Příjem surovin může odblokovat výrobu (vlajky v nákupu zmizí, úkol se přepíše).
   if (restocked > 0) { try { await ensureProductionTasks(c.teamId, c.meId); } catch { /* před migrací */ } }
-  return NextResponse.json({ ok: true, order: shape(row, c.role.opravneni.has('sklad.ceny')), restocked });
+  return NextResponse.json({ ok: true, order: shape(row, c.role.opravneni.has('sklad.ceny')), restocked, castecny });
 }
 
 // DELETE ?id= — remove an order record.

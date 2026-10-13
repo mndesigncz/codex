@@ -7,6 +7,7 @@
 // se rozjela (N7, N8) — proto jeden výpočet tady.
 
 import { baleniPolozky } from './packaging.ts';
+import { cenaZFormulare, naHalere } from './cena.ts';
 
 // ---------------------------------------------------------------------------
 // Předávání mezi widgetem a nástrojem
@@ -407,4 +408,286 @@ export function vyberPohyby(raw: unknown, druh: DruhPohybu = 'vse'): Pohyb[] {
       };
     })
     .filter(p => druh === 'vse' || (druh === 'prodej_z_kasy' ? p.zKasy : !p.zKasy));
+}
+
+// ---------------------------------------------------------------------------
+// Příjem objednávky po položkách (kolo 7, R7-6)
+// ---------------------------------------------------------------------------
+//
+// Když přijde jen část dodávky nebo za jinou cenu, zapíše se to po řádcích:
+// kolik opravdu přišlo (naskladní se to, ne objednané množství) a za kolik
+// jedno balení (cena se propíše do inventory_items.unit_cost — z ní počítají
+// marže receptur a hodnota zásob). Server i okno příjmu počítají tady.
+
+/** Položka objednávky, jak leží v orders.items (JSON). `received`/`unitCost` přibudou při příjmu po položkách. */
+export interface PolozkaObjednavky {
+  name: string;
+  qty: number;
+  unit?: string;
+  itemId?: number | null;
+  received?: number | null;
+  unitCost?: number | null;
+}
+
+/** Strop „přišlo": víc než desetinásobek objednaného je překlep (50 místo 5,0), ne dodávka. */
+export const MAX_NASOBEK_PRIJMU = 10;
+
+export type OverenyPrijem =
+  | { ok: true; radky: { i: number; itemId: number | null; qty: number; unitCost: number | null }[]; castecny: boolean }
+  | { ok: false; status: 400 | 403; chyba: string };
+
+const cisloZTextu = (v: unknown): number => (typeof v === 'number' ? v : Number(String(v ?? '').replace(/[\s  ]/g, '').replace(',', '.')));
+
+/**
+ * Ověří `received` z PATCH /api/orders proti položkám objednávky. Řádek se hledá
+ * podle pořadí `i` (se shodným `itemId`, je-li uvedené), jinak podle `itemId`;
+ * cizí položka je chyba, ne tichý příjem. `qty` konečné, ≥ 0 a nejvýš 10×
+ * objednané; `unitCost` (cena za balení) jen s oprávněním `sklad.ceny_upravit`.
+ * Řádky, které v `received` nejsou, přišly celé. Vrací všechny řádky objednávky.
+ */
+export function overPrijem(polozky: readonly PolozkaObjednavky[], received: unknown, smiCenu: boolean): OverenyPrijem {
+  if (!Array.isArray(received) || received.length === 0) return { ok: false, status: 400, chyba: 'Příjem nemá žádné položky.' };
+  if (received.length > polozky.length) return { ok: false, status: 400, chyba: 'Příjem má víc řádků než objednávka.' };
+  const zadano = new Map<number, { qty: number; unitCost: number | null }>();
+  for (const r of received) {
+    if (!r || typeof r !== 'object') return { ok: false, status: 400, chyba: 'Neplatný řádek příjmu.' };
+    const itemId = Number.isFinite(Number(r.itemId)) && r.itemId != null && r.itemId !== '' ? Number(r.itemId) : null;
+    let i = Number.isInteger(r.i) && r.i >= 0 && r.i < polozky.length && (itemId == null || Number(polozky[r.i].itemId) === itemId) ? r.i : -1;
+    if (i < 0 && itemId != null) i = polozky.findIndex((p, k) => Number(p.itemId) === itemId && !zadano.has(k));
+    if (i < 0) return { ok: false, status: 400, chyba: 'Položka v objednávce není.' };
+    if (zadano.has(i)) return { ok: false, status: 400, chyba: 'Položka je v příjmu dvakrát.' };
+    const objednano = Math.max(0, num(polozky[i].qty));
+    const qty = cisloZTextu(r.qty);
+    if (!Number.isFinite(qty) || qty < 0) return { ok: false, status: 400, chyba: 'Množství musí být číslo, třeba 2 nebo 0,5.' };
+    if (qty > Math.max(1, objednano) * MAX_NASOBEK_PRIJMU) return { ok: false, status: 400, chyba: 'Přišlo víc než desetkrát tolik, kolik se objednalo — zkontroluj množství.' };
+    let unitCost: number | null = null;
+    if (r.unitCost != null && String(r.unitCost).trim() !== '') {
+      if (!smiCenu) return { ok: false, status: 403, chyba: 'Nákupní cenu zapisuje jen ten, kdo smí měnit ceny. Přijmi zboží bez ní.' };
+      const c = cenaZFormulare(r.unitCost);
+      if (!c.ok) return { ok: false, status: 400, chyba: 'Cena musí být číslo, třeba 123,45.' };
+      unitCost = c.hodnota;
+    }
+    zadano.set(i, { qty: Math.round(qty * 1000) / 1000, unitCost });
+  }
+  const radky = polozky.map((p, i) => {
+    const z = zadano.get(i);
+    return { i, itemId: p.itemId != null && Number.isFinite(Number(p.itemId)) ? Number(p.itemId) : null, qty: z ? z.qty : Math.max(0, num(p.qty)), unitCost: z ? z.unitCost : null };
+  });
+  const castecny = radky.some(r => Math.abs(r.qty - Math.max(0, num(polozky[r.i].qty))) > 1e-9);
+  return { ok: true, radky, castecny };
+}
+
+/** Řádek okna příjmu: objednáno, kolik přišlo (null = pole zatím neplatné) a cena za balení (null = nevyplněno). */
+export interface RadekPrijmu { mnozstvi: number; prislo: number | null; cena: number | null }
+
+export interface SouhrnPrijmu {
+  /** Součet řádků (přišlo × cena za balení); null, když některému řádku, který přišel, cena chybí — chybějící cena není nula. */
+  soucet: number | null;
+  /** Kolik řádků přišlo méně, než se objednalo (včetně nuly). */
+  nedodano: number;
+  /** Kolik řádků přišlo víc. */
+  navic: number;
+  /** Liší se něco od objednávky? */
+  castecny: boolean;
+}
+
+export function souhrnPrijmu(radky: readonly RadekPrijmu[]): SouhrnPrijmu {
+  let soucet: number | null = 0, nedodano = 0, navic = 0, nejakaCena = false;
+  for (const r of radky) {
+    const prislo = r.prislo ?? r.mnozstvi;
+    if (prislo < r.mnozstvi - 1e-9) nedodano++;
+    else if (prislo > r.mnozstvi + 1e-9) navic++;
+    if (prislo <= 0) continue;
+    if (r.cena == null) { soucet = null; continue; }
+    nejakaCena = true;
+    if (soucet != null) soucet += prislo * r.cena;
+  }
+  return { soucet: soucet != null && nejakaCena ? naHalere(soucet) : null, nedodano, navic, castecny: nedodano + navic > 0 };
+}
+
+/** Rozdíl jednoho řádku proti objednanému (záporný = chybí), zaokrouhlený na tisíciny. */
+export const rozdilPrijmu = (r: Pick<RadekPrijmu, 'mnozstvi' | 'prislo'>): number => Math.round(((r.prislo ?? r.mnozstvi) - r.mnozstvi) * 1000) / 1000;
+
+/** Řádek objednávky pro okno příjmu a historii (s pořadím a odkazem na položku skladu). */
+export interface RadekObjednavky {
+  i: number;
+  itemId: number | null;
+  nazev: string;
+  mnozstvi: number;
+  jednotka: string;
+  /** Kolik přišlo (jen u objednávek přijatých po položkách); null = přišlo, co se objednalo. */
+  prislo: number | null;
+  /** Cena za balení zapsaná při příjmu (jen se `sklad.ceny`). */
+  cena: number | null;
+}
+
+/** GET /api/orders → id objednávky → její řádky (s itemId a tím, co přišlo). */
+export function radkyKPrijmu(raw: any): Record<number, RadekObjednavky[]> {
+  const out: Record<number, RadekObjednavky[]> = {};
+  for (const o of radkyObjednavek(raw)) {
+    out[Number(o.id)] = (Array.isArray(o.items) ? o.items : []).map((x: any, i: number) => ({
+      i,
+      itemId: x?.itemId != null && Number.isFinite(Number(x.itemId)) ? Number(x.itemId) : null,
+      nazev: String(x?.name ?? ''),
+      mnozstvi: num(x?.qty),
+      jednotka: String(x?.unit ?? ''),
+      prislo: x?.received != null && Number.isFinite(Number(x.received)) ? Number(x.received) : null,
+      cena: x?.unitCost != null && Number.isFinite(Number(x.unitCost)) && Number(x.unitCost) >= 0 ? Number(x.unitCost) : null,
+    }));
+  }
+  return out;
+}
+
+/** Co z přijaté objednávky nedorazilo: řádky, kde přišlo méně, než se objednalo. */
+export function nedodano(radky: readonly RadekObjednavky[] | undefined): { nazev: string; chybi: number; jednotka: string }[] {
+  return (radky ?? [])
+    .filter(r => r.prislo != null && r.prislo < r.mnozstvi - 1e-9)
+    .map(r => ({ nazev: r.nazev, chybi: Math.round((r.mnozstvi - (r.prislo as number)) * 1000) / 1000, jednotka: r.jednotka }));
+}
+
+/**
+ * Poslední zaplacená cena za balení podle položky skladu: z nejnovější přijaté
+ * objednávky, která ji u řádku má. Okno příjmu jí předvyplní pole ceny.
+ */
+export function posledniCenyBaleni(raw: any): Record<number, number> {
+  const out: Record<number, number> = {};
+  const prijate = radkyObjednavek(raw)
+    .filter(o => o.status === 'received')
+    .sort((a, b) => String(b.receivedAt ?? b.createdAt ?? '').localeCompare(String(a.receivedAt ?? a.createdAt ?? '')));
+  for (const o of prijate) {
+    for (const x of Array.isArray(o.items) ? o.items : []) {
+      const id = Number(x?.itemId), c = Number(x?.unitCost);
+      if (x?.itemId != null && Number.isFinite(id) && x?.unitCost != null && Number.isFinite(c) && c >= 0 && !(id in out)) out[id] = c;
+    }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Dodavatelé: kolik položek od nich vedeme a kdy se u nich naposledy objednalo (kolo 7)
+// ---------------------------------------------------------------------------
+
+/** Počet aktivních položek skladu podle jména dodavatele (vazba je text `supplier`). */
+export function polozekUDodavatelu(items: readonly PolozkaSkladu[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const i of items) {
+    const jmeno = (i.supplier ?? '').trim();
+    if (!jmeno || !jeAktivni(i)) continue;
+    out[jmeno] = (out[jmeno] ?? 0) + 1;
+  }
+  return out;
+}
+
+/**
+ * Kdy se u dodavatele naposledy objednalo: časová značka vytvoření nejnovější
+ * nezrušené objednávky podle jména dodavatele (GET /api/orders, posledních 100).
+ */
+export function posledniObjednavkaDodavatelu(raw: any): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const o of radkyObjednavek(raw)) {
+    const jmeno = String(o.supplier ?? '').trim();
+    const kdy = String(o.createdAt ?? '');
+    if (!jmeno || !kdy || o.status === 'cancelled') continue;
+    if (!out[jmeno] || kdy > out[jmeno]) out[jmeno] = kdy;
+  }
+  return out;
+}
+
+/** Kolik celých dní uplynulo od dne `den` do dne `dnes` (oba „RRRR-MM-DD"); nikdy záporně. */
+export function dnuOd(den: string, dnes: string): number {
+  const d = (s: string) => { const [y, m, dd] = s.slice(0, 10).split('-').map(Number); return Date.UTC(y, m - 1, dd); };
+  const n = Math.round((d(dnes) - d(den)) / 86_400_000);
+  return Number.isFinite(n) ? Math.max(0, n) : 0;
+}
+
+// ---------------------------------------------------------------------------
+// Ztráty a manka z inventur a jejich vývoj (kolo 7)
+// ---------------------------------------------------------------------------
+//
+// Dřív žil výpočet rozdílů jen v /api/inventory/shrinkage a uměl jednu
+// inventuru. Tady je tentýž výpočet (beze změny čísel) pro jednu inventuru
+// i pro řadu posledních — widget Ztráty a manka z ní kreslí vývoj a Inventura
+// u minulých inventur ukazuje hodnotu rozdílu v penězích.
+
+const r3 = (n: number) => Math.round(n * 1000) / 1000;
+
+/** Rozdíl jedné spočítané položky inventury (bez poměru k prodeji — ten chce historii pohybů). */
+export interface RozdilInventury {
+  itemId: number;
+  name: string;
+  category: string | null;
+  unit: string;
+  contentUnit: string | null;
+  /** Rozdíl v celých baleních (spočítáno − evidence). */
+  qtyDiff: number;
+  /** Rozdíl v načatém balení, v obsahových jednotkách. */
+  openDiff: number | null;
+  /** Celkový rozdíl v obsahu (u balení) nebo v kusech. */
+  diff: number;
+  diffUnit: string;
+  /** Hodnota rozdílu v měně podniku; záporná = chybí, null = položka bez ceny. */
+  value: number | null;
+}
+
+/** Rozdíly ze snímku inventury (stocktakes.data): jen spočítané položky s nenulovým rozdílem. */
+export function rozdilyInventury(data: unknown): { radky: RozdilInventury[]; polozek: number; spocitano: number } {
+  const vse: any[] = Array.isArray(data) ? data.filter(d => d && typeof d === 'object') : [];
+  const spocitane = vse.filter(d => d.counted != null || d.countedOpen != null);
+  const radky = spocitane.map((d): RozdilInventury => {
+    const pkg = Number(d.packageSize) || 0;
+    const unitCost = d.unitCost != null ? Number(d.unitCost) : null;
+    const qtyDiff = d.counted != null ? Number(d.counted) - Number(d.expected) : 0;
+    const openDiff = d.countedOpen != null && pkg > 0 ? r3(Number(d.countedOpen) - Number(d.expectedOpen ?? 0)) : null;
+    const diff = pkg > 0 ? r3(qtyDiff * pkg + (openDiff ?? 0)) : qtyDiff;
+    const perUnit = unitCost != null ? (pkg > 0 ? unitCost / pkg : unitCost) : null;
+    return {
+      itemId: Number(d.itemId),
+      name: String(d.name),
+      category: d.category ?? null,
+      unit: d.unit ?? 'ks',
+      contentUnit: d.contentUnit ?? null,
+      qtyDiff,
+      openDiff,
+      diff,
+      // Záloha je jednotka položky, ne litr: gramová položka bez uložené jednotky obsahu se nesmí vykázat v litrech.
+      diffUnit: pkg > 0 ? (d.contentUnit || d.unit || 'ks') : (d.unit ?? 'ks'),
+      value: perUnit != null ? Math.round(perUnit * diff) : null,
+    };
+  }).filter(r => r.diff !== 0);
+  return { radky, polozek: vse.length, spocitano: spocitane.length };
+}
+
+/** Součty rozdílů: chybí (záporně), přebývá, čistý rozdíl a počty položek. Položka bez ceny do peněz nevstupuje. */
+export function souhrnZtrat(radky: readonly Pick<RozdilInventury, 'diff' | 'value'>[]) {
+  const chybi = radky.filter(r => r.diff < 0);
+  const prebyva = radky.filter(r => r.diff > 0);
+  const lostValue = chybi.reduce((s, r) => s + (r.value ?? 0), 0);
+  const surplusValue = prebyva.reduce((s, r) => s + (r.value ?? 0), 0);
+  return { lostValue, surplusValue, netValue: lostValue + surplusValue, missing: chybi.length, surplus: prebyva.length };
+}
+
+/** Jedna dokončená inventura v řadě vývoje ztrát. */
+export interface ZtrataInventury { id: number; completedAt: string; netValue: number; lostValue: number }
+
+/** Řada dokončených inventur od nejstarší po nejnovější (pro BarSpark a změnu proti předchozí). */
+export function historieZtrat(inventury: readonly { id: unknown; completed_at?: unknown; completedAt?: unknown; data?: unknown }[]): ZtrataInventury[] {
+  return inventury
+    .map(s => {
+      const { netValue, lostValue } = souhrnZtrat(rozdilyInventury(s.data).radky);
+      const kdy = s.completed_at ?? s.completedAt;
+      return { id: Number(s.id), completedAt: kdy instanceof Date ? kdy.toISOString() : String(kdy ?? ''), netValue, lostValue };
+    })
+    .filter(h => Number.isFinite(h.id) && h.completedAt !== '')
+    .sort((a, b) => a.completedAt.localeCompare(b.completedAt));
+}
+
+/**
+ * Změna čistého rozdílu poslední inventury proti předchozí: `rozdil` = nyní − předtím
+ * (záporné = ztráty narostly). null, dokud nejsou dvě inventury.
+ */
+export function zmenaZtrat(historie: readonly ZtrataInventury[]): { rozdil: number; horsi: boolean; predtim: number } | null {
+  if (historie.length < 2) return null;
+  const ted = historie[historie.length - 1], predtim = historie[historie.length - 2];
+  const rozdil = ted.netValue - predtim.netValue;
+  return { rozdil, horsi: rozdil < 0, predtim: predtim.netValue };
 }

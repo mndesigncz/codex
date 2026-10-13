@@ -26,7 +26,8 @@ const podvrh = () => (req, json, stav) => {
   const path = url.pathname;
   if (stav.chyby[path]) return json({ error: 'Server spadl' }, stav.chyby[path]);
   // Příjem objednávky: tělo si schováme, ať sonda ověří, že cena odešla (review B3).
-  if (req.method() === 'PATCH' && path === '/api/orders') { stav.prijem = req.postDataJSON(); return json({ ok: true, restocked: 2 }); }
+  if (req.method() === 'PATCH' && path === '/api/suppliers') { stav.dodavatelPatch = req.postDataJSON(); return json({ supplier: { id: stav.dodavatelPatch.id } }); }
+  if (req.method() === 'PATCH' && path === '/api/orders') { stav.prijem = req.postDataJSON(); return json({ ok: true, restocked: 2, castecny: Array.isArray(stav.prijem?.received) }); }
   if (req.method() !== 'GET') return undefined;
   const mapa = {
     '/api/inventory': 'k69-b3-inventory',
@@ -40,7 +41,7 @@ const podvrh = () => (req, json, stav) => {
   };
   if (path === '/api/inventory/log' && url.searchParams.get('itemId')) return json([]);
   if (mapa[path]) return json(nacti(mapa[path]));
-  if (path === '/api/suppliers') return json({ suppliers: [{ id: 1, name: 'Makro', email: 'objednavky@makro.cz' }] });
+  if (path === '/api/suppliers') return json(nacti('suppliers'));
   return undefined;
 };
 
@@ -219,6 +220,140 @@ const doporucene = (galerie) => galerie.evaluate(el => {
   await hist.click();
   tvrdi('R2: …s přijatou objednávkou Bidfood a košem „Smazat z historie"', (await obj.innerText()).includes('Bidfood')
     && await obj.getByRole('button', { name: /^Smazat z historie: Bidfood/ }).isVisible());
+  // Kolo 7: Bidfood přišel jen zčásti (4 ze 6 sirupů) — historie to řekne chipem.
+  tvrdi('R2: přijatá objednávka s chybějící položkou má chip „nedodáno 2 ks" u Sirup Mango', /Sirup Mango\s*nedodáno 2 ks/.test((await obj.innerText()).replace(/\s+/g, ' ')), (await obj.innerText()).replace(/\s+/g, ' ').slice(0, 300));
+  await ctx.close();
+}
+
+// Kolo 7 (R7-6): příjem po položkách — u dodávky palcem. Přišlo vše zůstává dvě klepnutí;
+// Upravit množství odkryje pole Přišlo (jednotka v poli, inputMode decimal) a cenu za balení
+// předvyplněnou ze skladu, rozdíl proti objednanému hned u řádku, součet předvyplní celkovou cenu.
+for (const w of [1280, 390]) {
+  const { ctx, p, stav } = await kontext({ fix: FIX_VEDENI, dalsi: podvrh(), viewport: { width: w, height: w < 600 ? 844 : 900 }, mobil: w < 600 });
+  await otevri(p, VEDENI, 'vedeni.sklad');
+  const obj = widgetLi(p, 'sklad.objednavky');
+  await dokud(() => obj.getByRole('button', { name: 'Přijmout' }).first().isVisible(), 4000);
+  await obj.getByRole('button', { name: 'Přijmout' }).first().click();
+  const okno = p.getByRole('dialog', { name: /Přišlo od Makro/ });
+  await dokud(() => okno.isVisible(), 3000);
+  const rezim = okno.getByRole('tablist', { name: 'Co přišlo' });
+  tvrdi(`P1 ${w}: nahoře přepínač Přišlo vše | Upravit množství, výchozí Přišlo vše`, await rezim.getByRole('tab', { name: 'Přišlo vše' }).getAttribute('aria-selected') === 'true');
+  tvrdi(`P1 ${w}: v Přišlo vše žádná pole množství (dvě klepnutí jako dřív)`, await okno.getByLabel('Přišlo', { exact: true }).count() === 0);
+  await rezim.getByRole('tab', { name: 'Upravit množství' }).click();
+  const prislo = okno.getByLabel('Přišlo', { exact: true });
+  tvrdi(`P2 ${w}: Upravit množství — u každé položky pole Přišlo předvyplněné objednaným`, await dokud(async () => (await prislo.count()) === 2, 2000)
+    && await prislo.nth(0).inputValue() === '12' && await prislo.nth(1).inputValue() === '500', `${await prislo.count()}`);
+  tvrdi(`P2 ${w}: pole Přišlo má inputMode decimal`, await prislo.nth(0).getAttribute('inputmode') === 'decimal');
+  const cenaMleka = okno.getByLabel('Cena za l', { exact: true }), cenaKelimku = okno.getByLabel('Cena za ks', { exact: true });
+  tvrdi(`P2 ${w}: cena za balení předvyplněná ze skladu (55 a 2)`, await dokud(async () => (await cenaMleka.inputValue()) === '55', 3000) && await cenaKelimku.inputValue() === '2', `${await cenaMleka.inputValue()} / ${await cenaKelimku.inputValue()}`);
+  tvrdi(`P2 ${w}: …a s inputMode decimal`, await cenaMleka.getAttribute('inputmode') === 'decimal');
+  await prislo.nth(0).fill('10');
+  await cenaMleka.fill('52,50');
+  await prislo.nth(1).fill('450');
+  await cenaKelimku.fill('1,80');
+  const txt = (await okno.innerText()).replace(/\s+/g, ' ');
+  tvrdi(`P3 ${w}: rozdíl proti objednanému je hned vidět (chybí 2 l, chybí 50 ks)`, /chybí 2 l/.test(txt) && /chybí 50 ks/.test(txt), txt.slice(0, 300));
+  const celkem = okno.getByLabel(/Celková cena/);
+  tvrdi(`P3 ${w}: součet řádků předvyplní Celkovou cenu (10 × 52,50 + 450 × 1,80 = 1335)`, await celkem.inputValue() === '1335', await celkem.inputValue());
+  if (w < 600) {
+    const r = await okno.boundingBox();
+    tvrdi(`P4 ${w}: okno příjmu vyjíždí zdola (dosedá na spodní hranu)`, r && Math.abs(r.y + r.height - 844) <= 2, JSON.stringify(r));
+    const m = await okno.evaluate(el => {
+      const pres = [...el.querySelectorAll('*')].filter(x => x.scrollWidth > x.clientWidth + 1 && getComputedStyle(x).overflowX !== 'visible' && !x.closest('[role="tablist"]')).length;
+      const pole = [...el.querySelectorAll('input')].map(i => ({ h: i.getBoundingClientRect().height, f: parseFloat(getComputedStyle(i).fontSize) }));
+      return { pres, sirka: el.scrollWidth - el.clientWidth, pole };
+    });
+    tvrdi(`P4 ${w}: okno nepřetéká do strany`, m.sirka <= 0 && m.pres === 0, JSON.stringify(m).slice(0, 200));
+    tvrdi(`P4 ${w}: pole mají aspoň 44 px a písmo ≥ 16 px (žádný zoom při fokusu)`, m.pole.every(x => x.h >= 44 && x.f >= 16), JSON.stringify(m.pole));
+    await prislo.nth(0).scrollIntoViewIfNeeded();
+    await p.screenshot({ path: OUT + 'k83-prijem-390.png' });
+  } else await p.screenshot({ path: OUT + 'k83-prijem-1280.png' });
+  await okno.getByRole('button', { name: 'Přijmout a naskladnit' }).click();
+  await dokud(() => stav.prijem != null, 3000);
+  const r = stav.prijem?.received ?? [];
+  tvrdi(`P5 ${w}: PATCH nese received[] po položkách s cenou za balení`, r.length === 2
+    && r[0].itemId === 2 && r[0].qty === 10 && r[0].unitCost === 52.5 && r[1].itemId === 5 && r[1].qty === 450 && r[1].unitCost === 1.8, JSON.stringify(stav.prijem));
+  tvrdi(`P5 ${w}: …a předvyplněný součet jako totalCost`, stav.prijem?.totalCost === 1335, JSON.stringify(stav.prijem));
+  tvrdi(`P5 ${w}: toast řekne, že se přijalo částečně`, await dokud(async () => (await p.getByText(/Přijato částečně/).count()) > 0, 3000));
+  await ctx.close();
+}
+// Kolo 7 (R7-6): Dodavatelé — kontakt (telefon jako tel:), poznámka, počet položek skladu,
+// poslední objednávka, úprava všech čtyř polí a Objednat → nákupní seznam s předvybraným dodavatelem.
+for (const w of [1280, 390]) {
+  const { ctx, p, stav } = await kontext({ fix: FIX_VEDENI, dalsi: podvrh(), viewport: { width: w, height: w < 600 ? 844 : 900 }, mobil: w < 600 });
+  await otevri(p, VEDENI, 'vedeni.sklad');
+  await p.getByRole('button', { name: 'Další akce', exact: true }).first().click();
+  await p.getByRole('menuitem', { name: 'Dodavatelé' }).click();
+  const okno = p.getByRole('dialog', { name: 'Dodavatelé' });
+  await dokud(() => okno.isVisible(), 3000);
+  const seznam = okno.getByRole('list', { name: 'Seznam dodavatelů' });
+  const makro = seznam.locator(':scope > li').filter({ hasText: 'Makro' }).first();
+  await dokud(async () => /poslední objednávka/.test(await makro.innerText()), 4000);
+  const txt = (await makro.innerText()).replace(/\s+/g, ' ');
+  // Fixtura skladu: od Makra je 6 aktivních položek (archivovaná a neschválený návrh se nepočítají).
+  tvrdi(`D1 ${w}: řádek dodavatele — e-mail · telefon, poznámka, „6 položek" a „poslední objednávka před…"`,
+    /objednavky@makro\.cz · \+420 602 123 456/.test(txt) && /závoz ve čtvrtek/.test(txt) && /6 položek/.test(txt) && /poslední objednávka (před \d+ (dnem|dny)|dnes)/.test(txt), txt);
+  const tel = makro.locator('a[href^="tel:"]');
+  const telH = await tel.evaluate(a => Math.max(a.getBoundingClientRect().height, parseFloat(getComputedStyle(a, '::before').height) || 0)).catch(() => 0);
+  tvrdi(`D1 ${w}: telefon je odkaz tel: s dotykovou plochou ≥ 44 px`, await tel.getAttribute('href') === 'tel:+420602123456' && telH >= 44, `${await tel.getAttribute('href')} ${telH}`);
+  const bid = seznam.locator(':scope > li').filter({ hasText: 'Bidfood' }).first();
+  tvrdi(`D1 ${w}: Bidfood bez e-mailu to řekne a má 1 položku`, /bez e-mailu/.test(await bid.innerText()) && /1 položka/.test(await bid.innerText()), (await bid.innerText()).replace(/\s+/g, ' '));
+  const objednat = makro.getByRole('button', { name: 'Objednat od Makro' });
+  const objH = await objednat.evaluate(b => Math.max(b.getBoundingClientRect().height, parseFloat(getComputedStyle(b, '::before').height) || 0));
+  tvrdi(`D2 ${w}: u dodavatele s položkami je „Objednat" (≥ 44 px), u dodavatele bez položek není`, objH >= 44
+    && await seznam.locator(':scope > li').filter({ hasText: 'Velkoobchod Čaj' }).getByRole('button', { name: /^Objednat/ }).count() === 0, String(objH));
+  // Formulář přidání je sbalený za „Nový dodavatel" (seznam zůstane nad ohybem): telefon (type tel,
+  // inputMode tel) a poznámka; na telefonu pole pod sebou.
+  tvrdi(`D3 ${w}: formulář přidání je v klidu sbalený, seznam začíná nad ohybem`, await okno.locator('#sklad-dod-nazev').count() === 0
+    && ((await makro.boundingBox())?.y ?? 9999) < (w < 600 ? 844 : 900) - 60, JSON.stringify(await makro.boundingBox()));
+  if (w < 600) { await p.waitForTimeout(600); await p.screenshot({ path: OUT + 'k83-dodavatele-390.png' }); }
+  await okno.getByRole('button', { name: 'Nový dodavatel' }).click();
+  const fTel = okno.locator('#sklad-dod-telefon'), fNazev = okno.locator('#sklad-dod-nazev'), fEmail = okno.locator('#sklad-dod-email'), fPozn = okno.locator('#sklad-dod-poznamka');
+  tvrdi(`D3 ${w}: formulář má Telefon (type tel, inputMode tel) a Poznámku (max 300)`, await fTel.getAttribute('type') === 'tel' && await fTel.getAttribute('inputmode') === 'tel'
+    && await fPozn.getAttribute('maxlength') === '300');
+  const [bN, bE] = [await fNazev.boundingBox(), await fEmail.boundingBox()];
+  if (w < 600) {
+    tvrdi(`D3 ${w}: na telefonu pole pod sebou`, bN && bE && Math.abs(bN.x - bE.x) < 2 && bE.y > bN.y + bN.height - 1, JSON.stringify([bN, bE]));
+    await p.waitForTimeout(600); // list dojede animací zdola
+    const r = await okno.boundingBox();
+    tvrdi(`D3 ${w}: okno vyjíždí zdola`, r && Math.abs(r.y + r.height - 844) <= 2, JSON.stringify(r));
+    const pres = await okno.evaluate(el => el.scrollWidth - el.clientWidth);
+    tvrdi(`D3 ${w}: okno nepřetéká do strany`, pres <= 0, String(pres));
+    await p.screenshot({ path: OUT + 'k83-dodavatele-390-novy.png' });
+  } else {
+    tvrdi(`D3 ${w}: na počítači dvě pole vedle sebe`, bN && bE && Math.abs(bN.y - bE.y) < 2, JSON.stringify([bN, bE]));
+    await p.screenshot({ path: OUT + 'k83-dodavatele-1280.png' });
+  }
+  // Upravit… → všechna čtyři pole v okně, PATCH je pošle.
+  await makro.getByRole('button', { name: 'Další akce: Makro' }).click();
+  await p.getByRole('menuitem', { name: 'Upravit…' }).click();
+  const ePhone = okno.locator('#sklad-dod-11-telefon');
+  tvrdi(`D4 ${w}: Upravit… otevře v okně formulář všech čtyř polí předvyplněný`, await dokud(() => ePhone.isVisible(), 2000)
+    && await ePhone.inputValue() === '+420 602 123 456' && await okno.locator('#sklad-dod-11-poznamka').inputValue() === 'Objednávky do středy 12:00, závoz ve čtvrtek');
+  await ePhone.fill('+420 602 999 888');
+  await okno.getByRole('button', { name: 'Uložit', exact: true }).click();
+  await dokud(() => stav.dodavatelPatch != null, 3000);
+  const pt = stav.dodavatelPatch ?? {};
+  tvrdi(`D4 ${w}: PATCH nese id, název, e-mail, telefon i poznámku`, pt.id === 11 && pt.name === 'Makro' && pt.email === 'objednavky@makro.cz' && pt.phone === '+420 602 999 888' && /závoz/.test(pt.note ?? ''), JSON.stringify(pt));
+  // Objednat → okno se zavře a otevře nákupní seznam jen s Makrem.
+  await dokud(async () => (await makro.getByRole('button', { name: 'Objednat od Makro' }).count()) === 1, 3000);
+  await makro.getByRole('button', { name: 'Objednat od Makro' }).click();
+  const nakup = p.getByRole('dialog', { name: 'Nákupní seznam' });
+  tvrdi(`D5 ${w}: Objednat zavře Dodavatele a otevře nákupní seznam s předvybraným dodavatelem`, await dokud(() => nakup.isVisible(), 3000)
+    && !(await okno.isVisible().catch(() => false)) && /Dodavatel: Makro/.test(await nakup.innerText()));
+  await ctx.close();
+}
+
+{
+  // Přišlo vše = dvě klepnutí jako dřív, PATCH bez received.
+  const { ctx, p, stav } = await kontext({ fix: FIX_VEDENI, dalsi: podvrh() });
+  await otevri(p, VEDENI, 'vedeni.sklad');
+  const obj = widgetLi(p, 'sklad.objednavky');
+  await dokud(() => obj.getByRole('button', { name: 'Přijmout' }).first().isVisible(), 4000);
+  await obj.getByRole('button', { name: 'Přijmout' }).first().click();
+  await p.getByRole('dialog', { name: /Přišlo od Makro/ }).getByRole('button', { name: 'Přijmout a naskladnit' }).click();
+  await dokud(() => stav.prijem != null, 3000);
+  tvrdi('P6: Přišlo vše — PATCH bez received (server naskladní objednané)', stav.prijem?.action === 'received' && stav.prijem?.received === undefined, JSON.stringify(stav.prijem));
   await ctx.close();
 }
 

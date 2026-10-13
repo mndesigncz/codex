@@ -31,7 +31,8 @@
   "drawer_float": null,
   "dashboard_config": {},
   "levels_config": [],
-  "points_config": {}
+  "points_config": {},
+  "margin_target_pct": null
  },
  "members": [
   {

@@ -34,12 +34,16 @@ import {
   KLIC_NAKUP, KLIC_UPRAVIT, UDALOST_NAKUP, UDALOST_UPRAVIT,
   chybiUdaje, cekajiciObjednavky, historieObjednavek, hodnotaZasob, utrataZaMesic, jeAktivni, nakupniSeznam, podstrom, poDodavatelich,
   souhrnKategorie, stavInventury, stavZasoby, vyberHlaseni, vyberKategorie, vyberPohyby,
-  type DruhPohybu, type HodnotaZasob, type Hlaseni, type KategorieSkladu, type Objednavka, type PolozkaSkladu, type Pohyb,
+  MAX_NASOBEK_PRIJMU, nedodano, posledniCenyBaleni, radkyKPrijmu, rozdilPrijmu, souhrnPrijmu,
+  type DruhPohybu, type HodnotaZasob, type Hlaseni, type KategorieSkladu, type Objednavka, type PolozkaSkladu, type Pohyb, type RadekObjednavky,
 } from '@/lib/skladPrehled';
+import { cenaDoPole, cenaZFormulare } from '@/lib/cena';
+import { pocetDoPole, pocetZPole } from '@/lib/inventura';
 import { Icon } from '../../Icons';
-import { Avatar, BulkBar, Button, Chip, Field, Input, ListRow, Modal, SearchField, SelectBox, Stat, Textarea, Toast, Well, useSelection } from '../../ui';
+import { Avatar, BulkBar, Button, Chip, Field, Input, ListRow, Modal, SearchField, Segmented, SelectBox, Stat, Textarea, Toast, Well, useSelection } from '../../ui';
 import { useOpravneni } from '../../role/useOpravneni';
-import { useMoney } from '../../CurrencyProvider';
+import { useMoney, useSymbol } from '../../CurrencyProvider';
+import PoleMnozstvi from '../../inventory/PoleMnozstvi';
 import type { ToMake } from '../../inventory/ProductionBoard';
 import NewStockEntry from '../../inventory/NewStockEntry';
 import StocktakeModal from '../../inventory/Stocktake';
@@ -715,58 +719,152 @@ function HlaseniW({ velikost, nahled }: WidgetProps) {
 
 const URL_OBJEDNAVKY = '/api/orders';
 
+/** Řádek příjmu po položkách, jak jde na server (PATCH /api/orders `received`). */
+interface PrijatyRadek { i: number; itemId: number | null; qty: number; unitCost?: number }
+
 /**
  * Okno příjmu objednávky: co v ní je, volitelná celková cena a Přijmout /
  * Zrušit. Dřív to uměl panel Objednávky na Skladu (tlačítko „Přišlo" a pole
  * ceny); cena jde do orders.total_cost a z ní počítá výdaje /api/finance
  * („Objednávka — dodavatel"). Bez ní by Finance příjem zboží neviděly.
  * Pole ceny jen pro `sklad.ceny_upravit` — server cenu bez něj odmítne 403.
+ *
+ * Kolo 7: příjem u dodávky dělá obsluha palcem na telefonu. Výchozí „Přišlo vše"
+ * zůstává na dvě klepnutí; „Upravit množství" odkryje u každého řádku pole Přišlo
+ * (předvyplněné objednaným, jednotka v poli) a se `sklad.ceny_upravit` cenu za
+ * balení předvyplněnou poslední zaplacenou cenou. Rozdíl proti objednanému je vidět
+ * hned u řádku, součet řádků předvyplní celkovou cenu (dá se přepsat).
  */
-function OknoPrijmu({ o, smiCenu, onPrijmout, onZrusit, onZavrit }: {
+function OknoPrijmu({ o, radky: radkyZApi, ceny, smiCenu, onPrijmout, onZrusit, onZavrit }: {
   o: Objednavka;
+  /** Řádky objednávky s itemId (radkyKPrijmu); bez nich se vezmou položky z `o` bez odkazu na sklad. */
+  radky: RadekObjednavky[] | undefined;
+  /** Předvyplnění ceny za balení podle položky skladu (poslední příjem, jinak cena ve skladu). */
+  ceny: Record<number, number>;
   smiCenu: boolean;
-  onPrijmout: (cena: number | null) => Promise<void>;
+  onPrijmout: (cena: number | null, prijato: PrijatyRadek[] | null) => Promise<void>;
   onZrusit: () => void;
   onZavrit: () => void;
 }) {
   const t = useT('widgety');
   const money = useMoney();
+  const symbol = useSymbol();
+  const radky = useMemo<RadekObjednavky[]>(() => radkyZApi && radkyZApi.length
+    ? radkyZApi
+    : o.polozky.map((p, i) => ({ i, itemId: null, nazev: p.nazev, mnozstvi: p.mnozstvi, jednotka: p.jednotka, prislo: null, cena: null })), [radkyZApi, o.polozky]);
+  const [rezim, setRezim] = useState<'vse' | 'upravit'>('vse');
+  const [prislo, setPrislo] = useState<string[]>(() => radky.map(r => pocetDoPole(r.mnozstvi)));
+  const predvyplnena = (r: RadekObjednavky) => (r.itemId != null && ceny[r.itemId] != null ? cenaDoPole(ceny[r.itemId]) : '');
+  const [cenyRadku, setCenyRadku] = useState<string[]>(() => radky.map(predvyplnena));
+  // Ceny se načítají až s otevřením okna: dorazí-li později, doplní se jen do polí, na která člověk ještě nesáhl.
+  const dotcene = React.useRef(new Set<number>());
+  useEffect(() => {
+    setCenyRadku(s => s.map((v, k) => (dotcene.current.has(k) || v !== '' ? v : predvyplnena(radky[k]))));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ceny, radky]);
   const [cena, setCena] = useState('');
+  // Dokud člověk celkovou cenu nepřepíše, drží součet řádků.
+  const [cenaRucne, setCenaRucne] = useState(false);
   const [pracuji, setPracuji] = useState(false);
   const [chyba, setChyba] = useState('');
-  const castka = cena.trim() === '' ? null : Number(cena.replace(/\s/g, '').replace(',', '.'));
-  const spatne = castka != null && (!Number.isFinite(castka) || castka < 0);
+  const upravit = rezim === 'upravit';
+
+  const rozbor = radky.map((r, i) => {
+    const p = pocetZPole(prislo[i], true);
+    const strop = Math.max(1, r.mnozstvi) * MAX_NASOBEK_PRIJMU;
+    const chybaQty: 'cislo' | 'moc' | null = !p.ok || p.hodnota == null ? 'cislo' : p.hodnota > strop ? 'moc' : null;
+    const c = cenaZFormulare(cenyRadku[i]);
+    return { r, qty: chybaQty ? null : (p.ok ? p.hodnota : null), chybaQty, strop, cena: c.ok ? c.hodnota : null, chybaCeny: !c.ok };
+  });
+  const souhrn = souhrnPrijmu(rozbor.map(x => ({ mnozstvi: x.r.mnozstvi, prislo: x.qty, cena: smiCenu ? x.cena : null })));
+  const auto = upravit && smiCenu && !cenaRucne;
+  const cenaText = auto ? (souhrn.soucet != null ? cenaDoPole(souhrn.soucet) : '') : cena;
+  const zadana = cenaZFormulare(cenaText);
+  const spatne = !zadana.ok;
+  const castka = zadana.ok ? zadana.hodnota : null;
+  const chybaRadku = upravit && rozbor.some(x => x.chybaQty || (smiCenu && x.chybaCeny));
   const potvrdit = async () => {
-    if (spatne) return;
+    if (spatne || chybaRadku) return;
     setPracuji(true); setChyba('');
-    try { await onPrijmout(castka); onZavrit(); }
+    const prijato: PrijatyRadek[] | null = upravit
+      ? rozbor.map(x => ({ i: x.r.i, itemId: x.r.itemId, qty: x.qty ?? 0, ...(smiCenu && x.cena != null ? { unitCost: x.cena } : {}) }))
+      : null;
+    try { await onPrijmout(castka, prijato); onZavrit(); }
     catch (e) { setChyba(apiMessage(e, t('Příjem se nepodařil.'))); setPracuji(false); }
   };
+  const naEnter = (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter') { e.preventDefault(); void potvrdit(); } };
   return (
     <NadPlochou>
-      <Modal open onClose={onZavrit} size="sm"
+      <Modal open onClose={onZavrit} size="md"
         title={o.dodavatel ? t('Přišlo od {dodavatel}?', { dodavatel: o.dodavatel }) : t('Přišla objednávka?')}
         subtitle={`${t('Objednáno {kdy}', { kdy: pred(o.vytvoreno, t) })}${o.autor ? ` · ${o.autor}` : ''}`}
         footer={<>
           <Button variant="secondary" disabled={pracuji} onClick={onZavrit}>{t('Zavřít')}</Button>
-          <Button variant="primary" loading={pracuji} disabled={spatne} onClick={potvrdit}>{t('Přijmout a naskladnit')}</Button>
+          <Button variant="primary" loading={pracuji} disabled={spatne || chybaRadku} onClick={potvrdit}>{t('Přijmout a naskladnit')}</Button>
         </>}>
         <div className="space-y-4">
-          <ul className="list" aria-label={t('Položky objednávky')}>
-            {o.polozky.map((p, i) => (
-              <ListRow key={i} title={p.nazev} value={`${mnozstvi(p.mnozstvi)} ${p.jednotka}`.trim()} />
-            ))}
-          </ul>
+          <Segmented size="sm" ariaLabel={t('Co přišlo')} value={rezim} onChange={setRezim}
+            options={[{ id: 'vse', label: t('Přišlo vše') }, { id: 'upravit', label: t('Upravit množství') }]} />
+          {!upravit ? (
+            <ul className="list" aria-label={t('Položky objednávky')}>
+              {radky.map(r => (
+                <ListRow key={r.i} title={r.nazev} value={`${mnozstvi(r.mnozstvi)} ${r.jednotka}`.trim()} />
+              ))}
+            </ul>
+          ) : (
+            // Řádek se na telefonu láme: název a objednané nahoře, pole pod ním vedle sebe
+            // (DESIGN: pevné sloupce se na 390 px nevejdou — pod `sm` je z tabulky věta pod názvem).
+            <ul className="list" aria-label={t('Položky objednávky')}>
+              {rozbor.map((x, k) => {
+                const rozdil = x.qty == null ? 0 : rozdilPrijmu({ mnozstvi: x.r.mnozstvi, prislo: x.qty });
+                const j = x.r.jednotka;
+                const idQ = `sklad-prijem-${o.id}-${x.r.i}-q`, idC = `sklad-prijem-${o.id}-${x.r.i}-c`;
+                return (
+                  <li key={x.r.i} className="py-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3" data-radek-prijmu="">
+                    <div className="min-w-0 flex-1 sm:pt-6">
+                      <p className="font-medium text-[15px] leading-snug text-[#16181A] break-words">{x.r.nazev}</p>
+                      <p className="t-meta mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span className="tabular-nums whitespace-nowrap">{t('objednáno {n} {jednotka}', { n: mnozstvi(x.r.mnozstvi), jednotka: j })}</span>
+                        {rozdil < 0 && <Chip tone="wait" size="sm">{t('chybí {n} {jednotka}', { n: mnozstvi(-rozdil), jednotka: j })}</Chip>}
+                        {rozdil > 0 && <Chip tone="info" size="sm">{t('navíc {n} {jednotka}', { n: mnozstvi(rozdil), jednotka: j })}</Chip>}
+                      </p>
+                    </div>
+                    <div className={`grid gap-2 ${smiCenu ? 'grid-cols-2' : 'grid-cols-1'} sm:flex sm:shrink-0`}>
+                      <Field id={idQ} label={t('Přišlo')} className="sm:w-32"
+                        error={x.chybaQty === 'cislo' ? t('Zadej číslo, i 0.') : x.chybaQty === 'moc' ? t('Nejvýš {n}', { n: mnozstvi(x.strop) }) : undefined}>
+                        <PoleMnozstvi id={idQ} value={prislo[k]} jednotka={j} desetinne invalid={!!x.chybaQty} nazev={x.r.nazev}
+                          onChange={v => setPrislo(s => s.map((z, n) => (n === k ? v : z)))} onKeyDown={naEnter} />
+                      </Field>
+                      {smiCenu && (
+                        <Field id={idC} label={j ? t('Cena za {jednotka}', { jednotka: j }) : t('Cena za balení')} className="sm:w-36"
+                          error={x.chybaCeny ? t('Zadej částku, například 1 250.') : undefined}>
+                          <PoleMnozstvi id={idC} value={cenyRadku[k]} jednotka={symbol} desetinne invalid={x.chybaCeny}
+                            placeholder={t('cena')} onChange={v => { dotcene.current.add(k); setCenyRadku(s => s.map((z, n) => (n === k ? v : z))); }} onKeyDown={naEnter} />
+                        </Field>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {upravit && souhrn.castecny && (
+            <p className="t-meta" role="status">
+              {souhrn.nedodano > 0 && t('{n, plural, one {# položka nepřišla celá} few {# položky nepřišly celé} other {# položek nepřišlo celých}} — naskladní se jen to, co přišlo.', { n: souhrn.nedodano })}
+              {souhrn.nedodano > 0 && souhrn.navic > 0 && ' '}
+              {souhrn.navic > 0 && t('{n, plural, one {# položka přišla} few {# položky přišly} other {# položek přišlo}} navíc.', { n: souhrn.navic })}
+            </p>
+          )}
           {smiCenu && (
             <Field id={`sklad-prijem-cena-${o.id}`} label={t('Celková cena (nepovinné)')}
-              hint={spatne ? undefined : t('Z ceny počítají Finance výdaje za zboží.')}
+              hint={spatne ? undefined : auto && souhrn.soucet != null ? t('Součet řádků — můžeš ho přepsat.') : t('Z ceny počítají Finance výdaje za zboží.')}
               error={spatne ? t('Zadej částku, například 1 250.') : undefined}>
-              <Input id={`sklad-prijem-cena-${o.id}`} inputMode="decimal" value={cena} placeholder={t('např. {castka}', { castka: money(1250) })}
-                onChange={e => setCena(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void potvrdit(); } }} />
+              <Input id={`sklad-prijem-cena-${o.id}`} inputMode="decimal" value={cenaText} placeholder={t('např. {castka}', { castka: money(1250) })}
+                onChange={e => { setCenaRucne(true); setCena(e.target.value); }}
+                onKeyDown={naEnter} />
             </Field>
           )}
-          <p className="t-meta">{t('Přijetí přičte objednané množství ke skladu.')}</p>
+          <p className="t-meta">{!upravit ? t('Přijetí přičte objednané množství ke skladu.') : smiCenu ? t('Ke skladu se přičte, co přišlo; cena za balení se zapíše k položce.') : t('Ke skladu se přičte, co přišlo.')}</p>
           {chyba && <p className="note note-danger" role="alert">{chyba}</p>}
           {/* Zrušení je destruktivní a vzácné — stranou pod obsahem, ne vedle
               hlavní akce v patičce (na telefonu by se tři tlačítka nevešla). */}
@@ -788,6 +886,8 @@ function Objednavky({ velikost, nahled }: WidgetProps) {
   const data = useDataWidgetu<Objednavka[]>(ok ? URL_OBJEDNAVKY : null, cekajiciObjednavky);
   // Stejná URL = tatáž odpověď z mezipaměti, jen jiný výběr (žádný druhý dotaz).
   const historie = useDataWidgetu<Objednavka[]>(ok && velikost === 'L' ? URL_OBJEDNAVKY : null, historieObjednavek);
+  // Řádky s itemId a tím, co přišlo (okno příjmu, „nedodáno" v historii) a poslední ceny za balení.
+  const radkyObj = useDataWidgetu<Record<number, RadekObjednavky[]>>(ok ? URL_OBJEDNAVKY : null, radkyKPrijmu);
   const smiCenu = smi(pole(def, 'totalcost') ?? 'sklad.ceny');
   const smiZapsatCenu = smi(pole(def, 'pole:cena_prijmu') ?? 'sklad.ceny_upravit');
   const smiMazat = smi(pole(def, 'akce:smazat_historii') ?? 'nakup.prijmout');
@@ -796,25 +896,46 @@ function Objednavky({ velikost, nahled }: WidgetProps) {
   const [rusim, setRusim] = useState<Objednavka | null>(null);
   const [mazu, setMazu] = useState<Objednavka | null>(null);
   const [ukazHistorii, setUkazHistorii] = useState(false);
+  // Ceny skladu jen tomu, kdo je smí zapisovat, a až když se okno příjmu otevře.
+  const sklad = useDataWidgetu<PolozkaSkladu[]>(ok && smiZapsatCenu && prijimam ? URL_SKLAD : null, vyberSklad);
+  const posledni = useDataWidgetu<Record<number, number>>(ok && smiZapsatCenu && prijimam ? URL_OBJEDNAVKY : null, posledniCenyBaleni);
+  const cenyKPrijmu = useMemo(() => {
+    const out: Record<number, number> = {};
+    for (const p of sklad.data ?? []) if (p.unitCost != null && Number(p.unitCost) > 0) out[p.id] = Number(p.unitCost);
+    // Poslední zaplacená cena má přednost před cenou ve skladu (ta může být i ručně odhadnutá).
+    return { ...out, ...(posledni.data ?? {}) };
+  }, [sklad.data, posledni.data]);
   const z = useZprava();
   useEffect(() => { if (upravy || nahled) { setPrijimam(null); setRusim(null); setMazu(null); } }, [upravy, nahled]);
 
   const cekajici = data.data ?? [];
-  const zmen = async (o: Objednavka, action: 'received' | 'cancelled', cena: number | null = null) => {
+  const zmen = async (o: Objednavka, action: 'received' | 'cancelled', cena: number | null = null, prijato: PrijatyRadek[] | null = null) => {
     const res = await fetch(URL_OBJEDNAVKY, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: o.id, action, ...(action === 'received' && cena != null ? { totalCost: cena } : {}) }),
+      body: JSON.stringify({
+        id: o.id, action,
+        ...(action === 'received' && cena != null ? { totalCost: cena } : {}),
+        ...(action === 'received' && prijato ? { received: prijato } : {}),
+      }),
     });
     const d = await okJson(res);
     obnovDataWidgetu(URL_OBJEDNAVKY);
     // Příjem naskladňuje — sklad a všechno, co z něj počítá, ať to vidí hned.
-    // Cena příjmu mění výdaje ve Financích.
-    if (action === 'received') { obnovSklad(); obnovDataWidgetu('/api/finance'); }
-    return d as { restocked?: number } | null;
+    // Cena příjmu mění výdaje ve Financích, cena za balení marže receptur a hodnotu zásob.
+    if (action === 'received') {
+      obnovSklad(); obnovDataWidgetu('/api/finance');
+      if (prijato?.some(r => r.unitCost != null)) { obnovDataWidgetu(`/api/pos/margins?month=${pragueToday().slice(0, 7)}`); obnovDataWidgetu('/api/pos/usage'); }
+    }
+    return d as { restocked?: number; castecny?: boolean } | null;
   };
-  const prijmout = async (o: Objednavka, cena: number | null) => {
-    const d = await zmen(o, 'received', cena);
+  const prijmout = async (o: Objednavka, cena: number | null, prijato: PrijatyRadek[] | null) => {
+    const d = await zmen(o, 'received', cena, prijato);
     const n = typeof d?.restocked === 'number' ? d.restocked : o.polozky.length;
+    const chybi = prijato ? prijato.filter(r => r.qty < (radkyObj.data?.[o.id]?.[r.i]?.mnozstvi ?? 0)).length : 0;
+    if (d?.castecny && chybi > 0) {
+      z.ok(t('Přijato částečně — naskladněno {n, plural, one {# položka} few {# položky} other {# položek}}, nedorazilo {m}.', { n, m: chybi }));
+      return;
+    }
     z.ok(o.dodavatel
       ? t('Přijato od {dodavatel} — naskladněno {n, plural, one {# položka} few {# položky} other {# položek}}.', { dodavatel: o.dodavatel, n })
       : t('Přijato — naskladněno {n, plural, one {# položka} few {# položky} other {# položek}}.', { n }));
@@ -889,7 +1010,10 @@ function Objednavky({ velikost, nahled }: WidgetProps) {
             {ukazHistorii && (
               <>
                 <ul className="list mt-1" aria-label={t('Historie objednávek')}>
-                  {hist.slice(0, stropHistorie).map(o => (
+                  {hist.slice(0, stropHistorie).map(o => {
+                    // Co z přijaté objednávky nedorazilo (příjem po položkách) — ať se ví, co doobjednat.
+                    const chybi = o.stav === 'received' ? nedodano(radkyObj.data?.[o.id]) : [];
+                    return (
                     <li key={o.id}>
                       <ListRow as="div"
                         title={o.dodavatel ?? t('Bez dodavatele')}
@@ -897,6 +1021,16 @@ function Objednavky({ velikost, nahled }: WidgetProps) {
                           <span className={o.stav === 'received' ? 'text-ok-ink' : 'text-bad-ink'}>{o.stav === 'received' ? t('Přijato', undefined, 'widgety') : t('Zrušeno')}</span>
                           {` · ${datumKratce(o.prijata ?? o.vytvoreno)}`}
                         </>}
+                        detail={chybi.length > 0 ? (
+                          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            {chybi.map((c, k) => (
+                              <span key={k} className="inline-flex items-center gap-1.5 min-w-0">
+                                <span className="truncate">{c.nazev}</span>
+                                <Chip tone="wait" size="sm">{t('nedodáno {n} {jednotka}', { n: mnozstvi(c.chybi), jednotka: c.jednotka })}</Chip>
+                              </span>
+                            ))}
+                          </span>
+                        ) : undefined}
                         value={smiCenu && o.cena != null && o.cena > 0 ? money(o.cena) : undefined}
                         actions={smiMazat ? (
                           <Button variant="ghost" size="sm" iconOnly icon="trash" className="tap-target-sm"
@@ -905,7 +1039,8 @@ function Objednavky({ velikost, nahled }: WidgetProps) {
                         ) : undefined}
                       />
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
                 {hist.length > stropHistorie && <p className="t-meta mt-2">{aDalsich(hist.length - stropHistorie, t)}</p>}
               </>
@@ -914,8 +1049,8 @@ function Objednavky({ velikost, nahled }: WidgetProps) {
         )}
       </Widget>
       {prijimam && (
-        <OknoPrijmu o={prijimam} smiCenu={smiZapsatCenu}
-          onPrijmout={cena => prijmout(prijimam, cena)}
+        <OknoPrijmu o={prijimam} smiCenu={smiZapsatCenu} radky={radkyObj.data?.[prijimam.id]} ceny={cenyKPrijmu}
+          onPrijmout={(cena, prijato) => prijmout(prijimam, cena, prijato)}
           onZrusit={() => { setRusim(prijimam); setPrijimam(null); }}
           onZavrit={() => setPrijimam(null)} />
       )}

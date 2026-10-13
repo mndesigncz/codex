@@ -150,6 +150,37 @@ const bezPreteceni = (p) => p.evaluate(() => document.documentElement.scrollWidt
   await ctx.close();
 }
 
+// Hosté z uzávěrek (kolo 7, R7-6): graf Souhrnu s metrikou Hosté, řádek seznamu „84 hostů";
+// bez vyplněných hostů se nic z toho neukáže (beze změny).
+for (const w of [1280, 390]) {
+  const { ctx, p } = await kontext({ fix: FIX_UZAVERKY, dalsi: podvrh(), viewport: { width: w, height: 900 }, mobil: w < 600 });
+  await otevri(p, VEDENI, 'vedeni.uzaverky');
+  const souhrn = widgetLi(p, 'uzaverky.souhrn');
+  const metriky = souhrn.getByRole('tablist', { name: 'Co ukázat v grafu' });
+  await dokud(() => metriky.isVisible(), 4000);
+  tvrdi(`G1 ${w}: Souhrn L nabízí v grafu metriku „Hosté"`, await metriky.getByRole('tab', { name: 'Hosté' }).count() === 1);
+  await metriky.getByRole('tab', { name: 'Hosté' }).click();
+  const txt = (await souhrn.innerText()).replace(/\s+/g, ' ');
+  tvrdi(`G1 ${w}: po přepnutí je hlavní číslo Hosté s Ø na hosta (nebo poctivé „hosté nevyplnění")`, /HOSTÉ|Hosté/.test(txt) && /Ø na hosta|hosté nevyplnění/.test(txt), txt.slice(0, 200));
+  tvrdi(`G1 ${w}: počet hostů není v měně`, !/Hosté\s*[\d\s]+Kč/i.test(txt), txt.slice(0, 160));
+  const radky = await widgetLi(p, 'nastroj').locator('ul.list > li').allInnerTexts();
+  tvrdi(`G2 ${w}: řádek uzávěrky s vyplněnými hosty má „84 hostů"`, radky.some(x => /84 hostů/.test(x.replace(/\s+/g, ' '))), radky.join(' | ').replace(/\s+/g, ' ').slice(0, 300));
+  tvrdi(`G2 ${w}: uzávěrka bez hostů (null i 0) „hostů" nemá`, radky.filter(x => !/host/.test(x)).length === 2, String(radky.filter(x => !/host/.test(x)).length));
+  tvrdi(`G3 ${w}: bez vodorovného přetečení`, await bezPreteceni(p));
+  if (w === 390) { await souhrn.scrollIntoViewIfNeeded(); await p.screenshot({ path: OUT + 'k83-uzaverky-hoste-390.png' }); }
+  await ctx.close();
+}
+{
+  const bezHostu = (d) => ({ ...d, closings: d.closings.map(c => ({ ...c, customers: null })) });
+  const { ctx, p } = await kontext({ fix: FIX_UZAVERKY, dalsi: podvrh({ upravit: bezHostu }) });
+  await otevri(p, VEDENI, 'vedeni.uzaverky');
+  const metriky = widgetLi(p, 'uzaverky.souhrn').getByRole('tablist', { name: 'Co ukázat v grafu' });
+  await dokud(() => metriky.isVisible(), 4000);
+  tvrdi('G4: bez vyplněných hostů graf „Hosté" nenabízí (tři metriky jako dřív)', await metriky.getByRole('tab').count() === 3);
+  tvrdi('G4: …a seznam „hostů" neukazuje', !/host/.test(await widgetLi(p, 'nastroj').innerText()));
+  await ctx.close();
+}
+
 // 4) Oprávnění: Provozní (bez finance.trzby / finance.mzdy) — zastaralý server pošle Souhrn i Trendy.
 {
   const fix = { ...FIX_UZAVERKY, polozky: [...FIX_UZAVERKY.polozky, { id: 'uzaverky-trendy', widget: 'uzaverky.trendy', velikost: 'M' }, { id: 'uzaverky-mesic', widget: 'uzaverky.mesic_v_cislech', velikost: 'M' }] };
