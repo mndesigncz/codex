@@ -1,0 +1,16 @@
+{
+ "stranka": "zamestnanec.moje_smeny",
+ "polozky": [
+  { "id": "moje-vydelek", "widget": "moje.vydelek", "velikost": "M" },
+  { "id": "nastroj", "widget": "nastroj", "velikost": "L" },
+  { "id": "moje-minule-smeny", "widget": "moje.minule_smeny", "velikost": "M" }
+ ],
+ "dostupne": ["moje.vydelek", "moje.minule_smeny", "moje-smeny.navic", "odkaz"],
+ "tarifem": [],
+ "zdroj": "podnik",
+ "rozsah": "typ:zamestnanec",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": false,
+ "verze": 0
+}

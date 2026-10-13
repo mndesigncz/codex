@@ -46,7 +46,7 @@ export function prelozChybu(t: PrekladFn, chyba: string): string {
  * (na 320 px v polštině by „Zaskočit za kolegu na směnu · 50 b · 300 Kč" jinak přetekl).
  * Vyčerpaný denní limit pilulku vypne a řekne proč.
  */
-export function NabidkaChipy({ nabidka, dnesniZapisy = [], vybrane = null, onVyber, money, velke = false, label, className = '' }: {
+export function NabidkaChipy({ nabidka, dnesniZapisy = [], vybrane = null, onVyber, money, velke = false, pas = false, label, className = '' }: {
   nabidka: readonly NabidkaNavic[];
   /** Dnešní zápisy člověka — kvůli limitu za den (limitNabidkyVycerpan). */
   dnesniZapisy?: readonly Pick<Navic, 'offerId' | 'status'>[];
@@ -56,6 +56,12 @@ export function NabidkaChipy({ nabidka, dnesniZapisy = [], vybrane = null, onVyb
   money: (n: number) => string;
   /** Tablet: vyšší pilulky (lg). */
   velke?: boolean;
+  /**
+   * Střední karta widgetu: jeden vodorovný pás, který se posouvá do strany (jako příjemci výplaty
+   * v uzávěrce) — tři položky pod sebou by na 390 px vzaly kartě půlku výšky a seznam by zmizel
+   * pod „Zobrazit vše". Jinde (okno, velká karta, tablet) se pilulky zalamují.
+   */
+  pas?: boolean;
   label?: ReactNode;
   className?: string;
 }) {
@@ -64,7 +70,7 @@ export function NabidkaChipy({ nabidka, dnesniZapisy = [], vybrane = null, onVyb
   return (
     <div className={`min-w-0 ${className}`} data-nabidka-navic>
       {label && <p className="t-label mb-1.5">{label}</p>}
-      <div className="flex flex-wrap gap-2">
+      <div className={pas ? 'flex gap-2 overflow-x-auto scroll-fade-x scrollbar-none snap-x snap-proximity -mx-1 px-1 py-0.5' : 'flex flex-wrap gap-2'}>
         {nabidka.map(n => {
           const vycerpano = limitNabidkyVycerpan(n, dnesniZapisy);
           const je = vybrane === n.id;
@@ -74,7 +80,7 @@ export function NabidkaChipy({ nabidka, dnesniZapisy = [], vybrane = null, onVyb
               title={vycerpano ? t('Dnes už zapsané (limit {n}× za den).', { n: n.maxPerDay ?? 1 }) : n.description ?? undefined}
               icon={n.autoApprove ? 'check' : 'plus'}
               onClick={() => onVyber(n)}
-              className="max-w-full !whitespace-normal h-auto min-h-11 py-2 text-left">
+              className={pas ? 'shrink-0 snap-start min-h-[44px]' : 'max-w-full !whitespace-normal h-auto min-h-[44px] py-2 text-left'}>
               {popisekNabidky(n, money)}
             </Button>
           );

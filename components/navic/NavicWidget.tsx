@@ -131,23 +131,29 @@ export function NavicWidget({ velikost, nastaveni, nahled, instance }: WidgetPro
   }
 
   const L = velikost === 'L';
-  const videt = L ? items.filter(z => filtr === 'vse' || z.status === filtr) : items.slice(0, 4);
+  const videt = L ? items.filter(z => filtr === 'vse' || z.status === filtr) : items.slice(0, 3);
   const pocty = { ceka: items.filter(z => z.status === 'ceka').length, uznano: items.filter(z => z.status === 'uznano').length };
+  // Pilulky a „Zapsat navíc" NAD seznamem: střední karta se nad 300 px zkracuje pod „Zobrazit vše"
+  // a akce dole by zmizela pod odleskem — hlavní věc widgetu je zapsat, starší zápisy se smí schovat.
+  const akce = smiZapsat ? (
+    <div className="space-y-2" data-navic-akce>
+      {nabidka.length > 0 && <NabidkaChipy nabidka={nabidka} dnesniZapisy={dnesni} onVyber={zNabidky} money={money} label={t('Co se dá udělat navíc')} pas={!L} />}
+      {tlacitko('sm')}
+    </div>
+  ) : null;
 
   return (
     <>
       <Widget nacteni={data}
-        doplnek={ceka > 0 ? <Chip tone="wait" size="sm">{t('{n, plural, one {# čeká} few {# čekají} other {# čeká}}', { n: ceka })}</Chip> : undefined}
+        // Chip „2 čekají" jen ve velké kartě: střední má v hlavičce i šipku, Zvětšit a Sbalit a na 320 px v polštině
+        // se vedle chipu lámal i šestipísmenný název („Ek / s…"); řádky v těle stav nesou samy.
+        doplnek={L && ceka > 0 ? <Chip tone="wait" size="sm">{t('{n, plural, one {# čeká} few {# čekají} other {# čeká}}', { n: ceka })}</Chip> : undefined}
         prazdno={data.data && items.length === 0 && nabidka.length === 0 ? (
           <EmptyState compact illustration="odmeny" title={minuly ? t('Nic navíc') : t('Zatím nic navíc')} hint={prazdnoText} action={tlacitko('md')} />
         ) : undefined}>
         <div className="space-y-3" data-navic-widget={velikost}>
-          {L && (
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <StatRadek t={t} body={souhrn.body} premie={souhrn.premie} money={money} uznano={souhrn.uznano} mesic={nazevMesice} />
-              {tlacitko('sm')}
-            </div>
-          )}
+          {L && <StatRadek t={t} body={souhrn.body} premie={souhrn.premie} money={money} uznano={souhrn.uznano} mesic={nazevMesice} />}
+          {akce}
           {L && items.length > 0 && (
             <Segmented size="sm" ariaLabel={t('Stav')} value={filtr} onChange={setFiltr}
               options={[{ id: 'vse', label: t('Vše') }, { id: 'ceka', label: t('Čeká'), count: pocty.ceka }, { id: 'uznano', label: t('Uznané'), count: pocty.uznano }]} />
@@ -160,10 +166,6 @@ export function NavicWidget({ velikost, nastaveni, nahled, instance }: WidgetPro
             <p className="t-meta text-pretty">{prazdnoText}</p>
           )}
           {!L && items.length > videt.length && <p className="t-meta">{t('…a {n, plural, one {# další} few {# další} other {# dalších}}', { n: items.length - videt.length })}</p>}
-          {smiZapsat && nabidka.length > 0 && (
-            <NabidkaChipy nabidka={nabidka} dnesniZapisy={dnesni} onVyber={zNabidky} money={money} label={t('Co se dá udělat navíc')} />
-          )}
-          {!L && tlacitko('sm')}
         </div>
       </Widget>
       {okna}

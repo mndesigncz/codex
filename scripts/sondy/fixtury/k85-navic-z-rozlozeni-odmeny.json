@@ -1,0 +1,15 @@
+{
+ "stranka": "zamestnanec.odmeny",
+ "polozky": [
+  { "id": "nastroj", "widget": "nastroj", "velikost": "L" },
+  { "id": "moje-smeny-navic", "widget": "moje-smeny.navic", "velikost": "L" }
+ ],
+ "dostupne": ["moje-smeny.navic", "odmeny.katalog", "moje.odkud_body", "odkaz"],
+ "tarifem": [],
+ "zdroj": "podnik",
+ "rozsah": "typ:zamestnanec",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": false,
+ "verze": 0
+}
