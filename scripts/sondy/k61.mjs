@@ -83,9 +83,9 @@ async function kontext(viewport) {
 {
   stav.navodyBezZdroje = true;
   const ctx = await kontext({ width: 1280, height: 950 }); const p = await ctx.newPage();
-  await p.goto('http://localhost:3000/employer/overview?view=team-settings', { waitUntil: 'networkidle' }); await p.waitForTimeout(1000);
-  // Kolo 69 (B2): organizace je v sekci Podnik a potvrzení je Modal „Změnit sdílení?", ne confirm().
-  await p.getByRole('tab', { name: 'Podnik' }).click(); await p.waitForTimeout(600);
+  await p.goto('http://localhost:3000/employer/overview?view=settings&tab=organizace', { waitUntil: 'networkidle' }); await p.waitForTimeout(1000);
+  // Kolo 7 (R7-7): organizace je vlastní sekce Nastavení (?tab=organizace), ne karta v Tým › Podnik.
+  await p.waitForTimeout(600);
   const okno = p.getByRole('dialog', { name: 'Změnit sdílení?' });
   const pred = posty.filter(x => x.url === '/api/organization').length;
   await p.locator('select[aria-labelledby="org-zdroj-kategorieNavodu"]').selectOption('2'); await p.waitForTimeout(500);

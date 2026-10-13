@@ -279,7 +279,8 @@ export default function Billing() {
           <Segmented size="sm" ariaLabel={t('Období')} value={interval} onChange={v => setInterval_(v as Interval)}
             options={[{ id: 'month', label: t('Měsíčně') }, { id: 'year', label: t('Ročně · výhodněji') }]} />
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{priceCard('pro')}{priceCard('max')}</div>
+        {/* Až od lg: v Nastavení je od md boční pás sekcí a obsah je na 768 px široký jako na telefonu — dvě karty vedle sebe by tlačítko „Vyzkoušet" vytlačily z karty. */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">{priceCard('pro')}{priceCard('max')}</div>
       </div>
 
       {/* Affiliate */}
@@ -308,7 +309,7 @@ export default function Billing() {
         {/* Telefon: funkce pod sebou a pod každou tři úzké sloupce Zdarma / Pro / Max (vzor
             Stripe pricing table). Dřív tabulka s min-w 520 px v posuvném obalu — Pro a Max
             byly na 390 px mimo kartu a tabulkou se muselo tahat do strany. */}
-        <ul className="list sm:hidden" aria-label={t('Co je v jakém plánu')}>
+        <ul className="list lg:hidden" aria-label={t('Co je v jakém plánu')}>
           {PLAN_FEATURES.map(f => (
             <li key={f.label} className="py-3">
               <p className="text-sm font-medium text-[#16181A] text-pretty">{t(f.label)}</p>
@@ -323,8 +324,8 @@ export default function Billing() {
             </li>
           ))}
         </ul>
-        {/* Od sm tabulka s pevnými sloupci: první půlka pro název funkce (zalamuje se), zbytek tarifům. */}
-        <table className="hidden sm:table w-full text-sm table-fixed">
+        {/* Od lg tabulka s pevnými sloupci: první půlka pro název funkce (zalamuje se), zbytek tarifům (na 768 px má obsah Nastavení jen ~360 px). */}
+        <table className="hidden lg:table w-full text-sm table-fixed">
           <thead>
             <tr className="text-left t-label">
               <th className="py-2 pr-3 w-1/2">{t('Funkce')}</th>

@@ -46,9 +46,9 @@ const RADEK = '(contains(@class,"well") or contains(@class,"glass-card") or self
 const radky = (text, scope = p) => scope.locator(`xpath=//*[${RADEK} and .//text()[contains(., "${text}")] and not(.//*[${RADEK} and .//text()[contains(., "${text}")]])]`);
 
 // 1) Nastavení organizace
-await p.goto('http://localhost:3000/employer/overview?view=team-settings', { waitUntil: 'networkidle' }); await p.waitForTimeout(1200);
-// Kolo 69 (B2): nastavení týmu je v sekcích nástroje; organizace je v sekci Podnik.
-await p.getByRole('tab', { name: 'Podnik' }).click(); await p.waitForTimeout(600);
+await p.goto('http://localhost:3000/employer/overview?view=settings&tab=organizace', { waitUntil: 'networkidle' }); await p.waitForTimeout(1200);
+// Kolo 7 (R7-7): organizace je vlastní sekce Nastavení (?tab=organizace), ne karta v Tým › Podnik.
+await p.waitForTimeout(600);
 let m = norm(await p.locator('main').innerText());
 tvrdi('nastavení: blok „Kdo který číselník spravuje"', m.includes('kdo který číselník spravuje'), m.slice(0, 200));
 tvrdi('nastavení: pět výběrů zdroje', await p.locator('select[aria-labelledby^="org-zdroj-"]').count() === 5, String(await p.locator('select[aria-labelledby^="org-zdroj-"]').count()));

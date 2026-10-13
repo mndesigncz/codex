@@ -87,6 +87,8 @@ for (const [w, h, mobil] of ROZMERY) {
   const menu = p.getByRole('menu').first();
   const polozka = menu.getByRole('menuitem', { name: 'Nastavení organizace' });
   tvrdi(`S ${w}: nabídka má „Nastavení organizace" vedle „Všechny podniky"`, await dokud(() => polozka.isVisible().catch(() => false), 3000) && await menu.getByRole('menuitem', { name: /Všechny podniky/ }).isVisible());
+  // Nabídka vyjíždí s animací — měřit až po ní (v CI byla výška 42–43 px uprostřed zvětšování).
+  await menu.evaluate(m => Promise.all(m.getAnimations({ subtree: true }).map(a => a.finished.catch(() => null))));
   tvrdi(`S ${w}: položky nabídky jsou cíle ≥ 44 px`, await menu.getByRole('menuitem').evaluateAll(els => els.every(e => e.getBoundingClientRect().height >= 43.5)),
     JSON.stringify(await menu.getByRole('menuitem').evaluateAll(els => els.map(e => Math.round(e.getBoundingClientRect().height)))));
   tvrdi(`S ${w}: nabídka se vejde na obrazovku`, await menu.evaluate(m => { const r = m.getBoundingClientRect(); return r.left >= -1 && r.right <= innerWidth + 1; }));
