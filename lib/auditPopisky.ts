@@ -260,7 +260,7 @@ export const OBLASTI_AUDITU: Readonly<Record<string, OblastAuditu>> = {
   // uzávěrky
   closing: 'uzaverky',
   // odměny, prémie, pochvaly
-  reward: 'odmeny', wage: 'odmeny', points: 'odmeny',
+  reward: 'odmeny', wage: 'odmeny', points: 'odmeny', vyplata: 'odmeny',
   // hosté (Managero client)
   client: 'klient', klient: 'klient', rezervace: 'klient',
   // nastavení podniku, organizace, předplatné
