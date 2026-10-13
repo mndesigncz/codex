@@ -155,6 +155,7 @@ export const ZELENE = [
   'k83-postupy',
   'k83-nastaveni',
   'k84-vyplaty',
+  'k84-klient',
   'preteceni-vedeni',
   'preteceni-vedeni-tablet',
   'preteceni-zamestnanec',

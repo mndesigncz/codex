@@ -266,7 +266,7 @@ export const OBLASTI_AUDITU: Readonly<Record<string, OblastAuditu>> = {
   // odměny, prémie, pochvaly
   reward: 'odmeny', wage: 'odmeny', points: 'odmeny', vyplata: 'odmeny',
   // hosté (Managero client)
-  client: 'klient', klient: 'klient', rezervace: 'klient',
+  client: 'klient', klient: 'klient', rezervace: 'klient', recenze: 'klient',
   // nastavení podniku, organizace, předplatné
   podnik: 'nastaveni', rozlozeni: 'nastaveni', onboarding: 'nastaveni', organization: 'nastaveni', billing: 'nastaveni',
   // akce (výdej a vrácení zboží, oznámení týmu) — samostatná agenda, patří k ostatnímu
