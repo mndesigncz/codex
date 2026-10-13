@@ -61,6 +61,7 @@ import { useT, type PrekladFn } from '@/lib/i18n/client';
 import { tg, aktualniJazyk } from '@/lib/i18n/stav';
 import { fmtDatum, fmtHM, fmtMesic } from '@/lib/i18n/format';
 import { parseDbTime, pragueDayOf, pragueHM, pragueToday } from '@/lib/pragueTime';
+import { useJeTelefon } from '@/lib/useJeTelefon';
 import {
   KLIC_DEN, KLIC_DOSTUPNOST, UDALOST_DEN, UDALOST_DOSTUPNOST, UDALOST_ZMENA,
   den, denKratce as denKratceCs, dnySDirou, hm, hodinyLidi, hodinyText, kategorieBarvy, kolizeVolna, poptavkaTop,
@@ -392,10 +393,15 @@ function vyberCleny(raw: any): Clen[] {
 
 /** Kolik jmen ukázat jako pilulky ve střední velikosti. */
 const PILULEK_M = 10;
+/** Na telefonu jsou pilulky po dvou v řádku: čtyři = dva řádky, ať plánovač pod widgetem začíná
+ *  nad dokem (DP §5.8, sonda k69-b1 K1) — od kola 8 má karta navíc řádek s chipem měsíce. */
+const PILULEK_M_TELEFON = 4;
 /** Kolik řádků ukázat ve velké velikosti, než zbytek schová „…a dalších N". */
 const RADKU_L = 8;
 
 function DostupnostTymu({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: string }>) {
+  const telefon = useJeTelefon();
+  const pilulek = telefon ? PILULEK_M_TELEFON : PILULEK_M;
   const t = useT('widgety');
   const brana = useBrana(['dostupnost.zobrazit']);
   const smi = useSmi();
@@ -527,11 +533,11 @@ function DostupnostTymu({ velikost, nastaveni, nahled }: WidgetProps<{ mesic?: s
         {!vsichni && (
           <>
             <ul className="flex flex-wrap gap-2" aria-label={t('Kdo ještě nezadal')}>
-              {chybi.slice(0, PILULEK_M).map(c => (
+              {chybi.slice(0, pilulek).map(c => (
                 <li key={c.id} className="min-w-0 max-w-full"><PersonChip name={c.name} avatar={c.avatar} /></li>
               ))}
             </ul>
-            {chybi.length > PILULEK_M && <p className="t-meta">{t('…a dalších {n}', { n: (chybi.length - PILULEK_M).toLocaleString('cs-CZ') })}</p>}
+            {chybi.length > pilulek && <p className="t-meta">{t('…a dalších {n}', { n: (chybi.length - pilulek).toLocaleString('cs-CZ') })}</p>}
           </>
         )}
       </div>

@@ -11,7 +11,7 @@
 //   SONDY_ZAKLAD=http://localhost:3432 node scripts/sondy/k84-dochazka.mjs
 import { readFileSync, mkdirSync } from 'node:fs';
 import bcrypt from 'bcryptjs';
-import { kontext, konec, tvrdi, otevri, dokud, roleMine, DIR, OUT, BASE } from './k68-spolecne.mjs';
+import { kontext, konec, tvrdi, otevri, dokud, roleMine, jdi, DIR, OUT, BASE } from './k68-spolecne.mjs';
 
 const TEL = { width: 390, height: 844 };
 const PC = { width: 1280, height: 900 };
@@ -264,7 +264,9 @@ const podvrhTabletu = (req, json, stav) => {
 };
 const nastrojTabletu = (p) => p.locator('[data-plocha="kiosk.smena"] li[data-widget="nastroj"]');
 const otevriTablet = async (p) => {
-  await p.goto(BASE + '/kiosk', { waitUntil: 'networkidle' });
+  // `jdi`, ne `goto`: okno zavřené o řádek výš (Konec pauzy) odebírá svůj záznam historie v dalším
+  // tiku a ten průchod by rozjeté načtení zrušil (net::ERR_ABORTED v CI).
+  await jdi(p, BASE + '/kiosk');
   await p.locator('[data-plocha="kiosk.smena"] li[data-instance]:not([hidden])').first().waitFor({ timeout: 15000 });
   await p.waitForTimeout(900);
 };
@@ -302,7 +304,6 @@ const otevriTablet = async (p) => {
   // Dlaždice ve výběru osoby: Jakub na pauze šedý s „pauza N min". Dva lidé na směně a nikdo vybraný →
   // tablet se ptá „Kdo jsi?" a nabídne mřížku všech na směně.
   await p.evaluate(() => { try { localStorage.removeItem('managero-kiosk-active'); } catch { /* */ } });
-  await p.goto(BASE + '/kiosk', { waitUntil: 'networkidle' });
   await otevriTablet(p);
   const kdo = p.getByRole('button', { name: /Kdo jsi\?/ });
   tvrdi('K2 (768): dva na směně, nikdo vybraný → „Kdo jsi?"', await dokud(() => kdo.isVisible(), 3000));

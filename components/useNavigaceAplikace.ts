@@ -75,9 +75,16 @@ export function useHistoriePohledu({ vychozi, zname, naZpet, naStart }: {
     if (typeof window === 'undefined') return;
     const cil = { view, arg: arg || null };
     const adresa = `${window.location.pathname}${adresaPohledu(window.location.search, view, arg)}`;
-    // Záznam okna (`okno=1`) se přepíše: přechod z otevřeného okna jinam nemá nechat
-    // v historii okno, které už není — Zpět by na něj „vrátil" a nic neukázal.
-    const prepsat = stejnyPohled(cil, posledni.current) || window.history.state?.okno != null;
+    const stejny = stejnyPohled(cil, posledni.current);
+    const oknoNaVrchu = window.history.state?.okno != null;
+    // Tentýž pohled a na vrchu záznam okna (volba z hledání nad otevřeným detailem): nic se
+    // nezapisuje. Záznam patří oknu, které se právě zavírá a samo ho odebere (`history.back()`
+    // v lib/useModal). Přepsat ho by nechalo pod ním záznam staršího, pořád otevřeného okna —
+    // Zpět by na něj „vrátil", okno by ho vzalo za svůj a neptalo se (sonda k84-navigace 1b).
+    if (stejny && oknoNaVrchu) return;
+    // Záznam okna (`okno=1`) se při přechodu jinam přepíše: přechod z otevřeného okna jinam nemá
+    // nechat v historii okno, které už není — Zpět by na něj „vrátil" a nic neukázal.
+    const prepsat = stejny || oknoNaVrchu;
     posledni.current = cil;
     try {
       if (prepsat) window.history.replaceState({ view, arg: cil.arg }, '', adresa);

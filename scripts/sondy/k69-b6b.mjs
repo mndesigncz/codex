@@ -540,6 +540,9 @@ for (const [sirka, vyska] of [[390, 844], [768, 1024], [1024, 768]]) {
   await dokud(() => pole.isVisible(), 2000);
   await pole.fill('1,5');
   await dokud(() => p.getByRole('group', { name: 'Naměřené hodnoty' }).getByText('mimo rozsah').isVisible(), 1500);
+  // Panel běžícího postupu přijíždí s `pop-in` (scale): na pomalém stroji CI se pole měřilo
+  // uprostřed animace (44 × 0,98 = 43 px). Měří se až po doběhnutí animací panelu.
+  await pole.evaluate(el => Promise.all((el.closest('.pop-in') ?? el).getAnimations({ subtree: true }).map(a => a.finished.catch(() => null))));
   const m = await pole.evaluate(el => {
     const r = el.getBoundingClientRect(); const skup = el.closest('[role=group]').getBoundingClientRect();
     const lab = document.querySelector(`label[for="${el.id}"]`).getBoundingClientRect();

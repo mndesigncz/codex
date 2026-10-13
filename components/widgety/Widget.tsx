@@ -354,6 +354,8 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
   const nav = useNavigace();
   const smi = useSmi();
   const t = useT('widgety');
+  // Telefon (do 767 px): chip rychlého filtru má vlastní řádek pod hlavičkou (viz `filtrPod`).
+  const telefon = useJeTelefon();
   // Název z katalogu se překládá při vykreslení; vlastní titulek (odkaz, výjimky) se bere, jak je.
   const nazev = titulek ?? (k.definice ? t(k.definice.nazev) : '');
   const S = k.velikost === 'S';
@@ -439,12 +441,17 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
   const sipkaDole = S && sipkaCile;
   // Rychlý filtr (kolo 8): období / řazení / kategorie z nastavení přímo v hlavičce.
   const poleFiltru = !k.nahled && !k.upravy && k.zmenNastaveni ? poleRychlehoFiltru(k.definice, smi, k.tarif ?? 'max', k.velikost) : null;
+  // Chip má vlastní řádek pod hlavičkou u malé karty (171 px) a na telefonu u každé: v jednom
+  // sloupci je karta ~358 px a vedle Zvětšit, Sbalit a šipky by chip („Měsíc: Tento ▾" ≤ 176 px)
+  // nechal názvu pár desítek pixelů — „Dostupnost týmu" se lámal a v polštině na 320 px hlavička
+  // přetékala (sondy k68-design 7, preteceni-jazyky). Na monitoru a tabletu má střední karta
+  // nejméně dva sloupce a chip se vedle názvu vejde.
+  const filtrPod = S || telefon;
   const filtr = poleFiltru ? (
-    <RychlyFiltr pole={poleFiltru} hodnota={k.nastaveni?.[poleFiltru.klic]} inkoust={inkoust} idTitulku={idTitulku} uzky={S}
+    <RychlyFiltr pole={poleFiltru} hodnota={k.nastaveni?.[poleFiltru.klic]} inkoust={inkoust} idTitulku={idTitulku} uzky={filtrPod}
       onZmena={id => k.zmenNastaveni?.({ [poleFiltru.klic]: id })} />
   ) : null;
-  // Malá karta (171 px na telefonu): chip v hlavičce by s názvem a šipkou přetekl, má vlastní řádek pod ní.
-  const filtrVHlavicce = filtr && !S ? filtr : null;
+  const filtrVHlavicce = filtr && !filtrPod ? filtr : null;
   const tlacitkoCile = sipkaCile ? (
     <Button variant="ghost" size="sm" icon="chevronRight" aria-label={t('Otevřít {nazev}', { nazev })}
       className={`${sipkaDole ? 'shrink-0 -mb-1.5 -mr-2 self-end' : ''} ${inkoust ? '!text-white/70 hover:!text-white hover:!bg-white/10' : ''}`}
@@ -533,7 +540,7 @@ export function Widget({ titulek, ikona, doplnek, odkaz, akce, otevrit, bezZkrac
           </div>
         )}
       </div>
-      {S && filtr && <div className="relative mt-2 flex min-w-0">{filtr}</div>}
+      {filtrPod && filtr && <div className="relative mt-2 flex min-w-0">{filtr}</div>}
       {!(mozeSbalit && k.sbaleno) && (
         <div className={`relative mt-3 flex-1 min-h-0 ${sipkaDole ? (chyba ? 'flex flex-col justify-end gap-1' : 'flex items-end gap-1') : S && !prazdnyStav ? 'flex flex-col justify-end' : ''}`}>
           {sipkaDole ? (
