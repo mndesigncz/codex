@@ -72,9 +72,10 @@ export function NavicRadek({ z, smiUznat, onUznat, onOdmitnout, pracuji = false,
       actions={ceka && smiUznat && onUznat && onOdmitnout ? (
         <>
           {/* Jméno v přístupném názvu: v seznamu je víc stejných tlačítek za sebou. */}
-          <Button variant="primary" size="sm" icon="check" loading={pracuji} disabled={pracuji}
+          {/* `tap-target`: malé tlačítko (36 px) dostane na telefonu dotykovou plochu 44 px. */}
+          <Button variant="primary" size="sm" icon="check" loading={pracuji} disabled={pracuji} className="tap-target"
             aria-label={t('Uznat: {jmeno}', { jmeno: z.userName })} onClick={() => onUznat(z)}>{t('Uznat')}</Button>
-          <Button variant="danger" size="sm" disabled={pracuji}
+          <Button variant="danger" size="sm" disabled={pracuji} className="tap-target"
             aria-label={t('Odmítnout: {jmeno}', { jmeno: z.userName })} onClick={() => onOdmitnout(z)}>{t('Odmítnout')}</Button>
         </>
       ) : undefined} />

@@ -1,0 +1,16 @@
+{
+ "stranka": "vedeni.prehled",
+ "polozky": [
+  { "id": "ceka", "widget": "prehled.ceka_na_tebe", "velikost": "L" },
+  { "id": "navic-tymu", "widget": "odmeny.navic_tymu", "velikost": "M" },
+  { "id": "nastenka", "widget": "oznameni.nastenka", "velikost": "M" }
+ ],
+ "dostupne": ["prehled.ceka_na_tebe", "odmeny.navic_tymu", "oznameni.nastenka"],
+ "tarifem": [],
+ "zdroj": "osobni",
+ "rozsah": "typ:vedeni",
+ "zamceno": false,
+ "smiUpravit": true,
+ "smiVychozi": true,
+ "verze": 1
+}

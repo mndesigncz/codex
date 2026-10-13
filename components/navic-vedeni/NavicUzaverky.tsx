@@ -28,7 +28,9 @@ export function NavicUzaverky({ uzaverka, onZmena }: {
   const [rozhoduji, setRozhoduji] = useState<{ z: Navic; akce: AkceNavic } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   if (!smiTym) return null;
-  const zapisy = data.data ? zapisyKUzaverce(data.data.items, uzaverka) : [];
+  // vyberNavic (lib/navic) dává chybějícím vazbám 0 místo null (`cele(null)` je 0) — zapisyKUzaverce by pak
+  // zápis ze dne bez uzávěrky (closingId 0) přeskočil. Dokud to lib neopraví, nula se tu bere jako „bez vazby".
+  const zapisy = data.data ? zapisyKUzaverce(data.data.items.map(z => (z.closingId ? z : { ...z, closingId: null })), uzaverka) : [];
   return (
     <section className="pt-5" data-navic-uzaverky>
       <h3 className="t-label mb-2.5">{t('Navíc na směně')}</h3>

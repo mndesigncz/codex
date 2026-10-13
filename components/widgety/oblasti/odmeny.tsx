@@ -1633,7 +1633,11 @@ function NavicTymu({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: 'tent
           {okna}
         </div>
       ) : undefined}>
-      <p className="t-meta" data-navic-souhrn>{souhrnText.join(' · ')}</p>
+      {/* Zapsat za člena nahoře vedle souhrnu: dole by ho u dlouhého seznamu schovalo zkrácení „Zobrazit vše". */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <p className="t-meta min-w-0" data-navic-souhrn>{souhrnText.join(' · ')}</p>
+        {tlacitko}
+      </div>
       {velikost === 'L' && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Segmented size="sm" ariaLabel={t('Stav zápisů')} value={filtr} onChange={setFiltr}
@@ -1662,7 +1666,6 @@ function NavicTymu({ velikost, nastaveni, nahled }: WidgetProps<{ obdobi?: 'tent
         </ul>
       )}
       {seznam.length > videt.length && <p className="t-meta mt-2">{aDalsich(t, seznam.length - videt.length)}</p>}
-      {tlacitko && <div className="mt-3 flex flex-wrap items-center gap-2">{tlacitko}</div>}
       {okna}
     </Widget>
   );

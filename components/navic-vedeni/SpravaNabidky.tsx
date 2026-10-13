@@ -99,12 +99,15 @@ export function SpravaNabidky() {
               meta={[metaNabidky(t, n, money), platnost(n)].filter(Boolean).join(' · ')}
               detail={n.description ?? undefined}
               right={chipStavu(n) ?? undefined}
-              akceVRadku
+              // `!flex-none`: na telefonu `.list-actions:only-child > :first-child` natáhne první prvek ocasu přes
+              // řádek a „···" by stálo vlevo pod textem; takhle drží vpravo (jako Switch v Katalogu odměn).
               actions={smi ? (
-                <Menu size="sm" label={t('Upravit nebo smazat položku {nazev}', { nazev: n.title })} items={[
-                  { label: t('Upravit…'), icon: 'pencil', onClick: () => setOkno({ polozka: n }) },
-                  { label: t('Smazat…'), icon: 'trash', danger: true, onClick: () => setMazani(n) },
-                ]} />
+                <span className="!flex-none">
+                  <Menu size="sm" label={t('Upravit nebo smazat položku {nazev}', { nazev: n.title })} items={[
+                    { label: t('Upravit…'), icon: 'pencil', onClick: () => setOkno({ polozka: n }) },
+                    { label: t('Smazat…'), icon: 'trash', danger: true, onClick: () => setMazani(n) },
+                  ]} />
+                </span>
               ) : undefined} />
           ))}
         </ul>
