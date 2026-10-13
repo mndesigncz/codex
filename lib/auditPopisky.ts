@@ -177,6 +177,10 @@ export const AUDIT_POPISKY: Record<string, string> = {
   'vyplata.smlouva': 'Změna typu smlouvy a limitu hodin člena',
   'dochazka.pauza_doplnena': 'Pauza doplněná při odchodu (směna rozdělená na dva záznamy)',
   'dochazka.bez_pauzy': 'Odchod po víc než 6 h bez pauzy',
+  // Záznamy docházky a tablet (kolo 8, R8-2)
+  'dochazka.pravidla_pichani': 'Změna pravidel píchání z telefonu (poloha podniku, poloměr)',
+  'dochazka.mimo_podnik': 'Příchod z telefonu mimo okruh podniku',
+  'dochazka.sync_offline': 'Píchnutí z tabletu doručená po výpadku internetu',
 };
 
 /** Popisek akce; neznámý klíč nikdy neukážeme syrový. */

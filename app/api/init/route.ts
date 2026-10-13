@@ -2719,6 +2719,15 @@ export async function GET(request: Request) {
       )`);
     await ddl(sql`CREATE INDEX IF NOT EXISTS chat_reactions_message ON chat_reactions (message_id)`);
 
+    // ---- Záznamy docházky a tablet (kolo 8, R8-2) ----
+    // Píchání z telefonu jen u podniku: {zapnuto, lat, lng, polomerM} (lib/geoPichani). Záznam nese, jak poloha
+    // dopadla ('ok' | 'far' | 'missing'; NULL = neověřovalo se: tablet, ručně, pravidlo vypnuté) a vzdálenost v metrech.
+    await ddl(sql`ALTER TABLE teams ADD COLUMN IF NOT EXISTS clock_geo JSONB`);
+    await ddl(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS geo_status TEXT`);
+    await ddl(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS geo_distance_m INTEGER`);
+    // Píchnutí z tabletu bez internetu (fronta v tabletu, POST /api/attendance/sync): čas je z tabletu, ne ze serveru.
+    await ddl(sql`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS offline BOOLEAN DEFAULT FALSE`);
+
     // Kroky migrace, které selhaly (a byly zachyceny), ať se to pozná zvenku
     // místo tichého „ok". Prázdné pole = celé schéma prošlo.
     if (migFails.length) console.error('init: kroků selhalo', migFails.length, migFails);

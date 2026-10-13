@@ -3,13 +3,22 @@ import bcrypt from 'bcryptjs';
 import { timingSafeEqual } from 'crypto';
 import { hit, clear } from '@/lib/rateLimit';
 import { neon } from '@neondatabase/serverless';
-import { pragueToday, pragueDaySafe, parseDbTime, dayPlus } from '@/lib/pragueTime';
+import { pragueToday, pragueDaySafe, parseDbTime, dayPlus, pragueDayOf } from '@/lib/pragueTime';
 import { autoCloseEntry, isForgottenClockOut, pragueMoment, denSmeny } from '@/lib/staleShifts';
-import { notifyUser } from '@/lib/push';
+import { notifyUser, notifyUsers } from '@/lib/push';
 import { jeClenem } from '@/lib/tenant';
 import { pozaduj, jeOdpoved, clenoveSOpravnenim } from '@/lib/opravneniDb';
 import { audit } from '@/lib/audit';
-import { vyberSmenuPichacek, type SmenaPichacek } from '@/lib/dochazkaPrehled';
+import { vyberSmenuPichacek, type SmenaPichacek, type ZamekObdobi } from '@/lib/dochazkaPrehled';
+import { hlaskaZamku, zamekDne } from '@/lib/dochazkaZaznamy';
+import { VYCHOZI_PRAVIDLA_PICHANI, normalizujPravidlaPichani, overPolohu, parsePoloha, pravidloUcinne, type PravidlaPichani } from '@/lib/geoPichani';
+
+// Kolo 8 (R8-2): uzavřené výplatní období (payroll_locks) se v docházce nemění — PATCH, DELETE i ruční
+// POST končí 409 s hláškou, kam jít (Výplatní listina). GET nese `breakAfter` (pauza = dva záznamy),
+// polohu z telefonu (geo_status / geo_distance_m podle teams.clock_geo), `offline` (doručeno po výpadku
+// z tabletu) a pozici člověka v rosteru. Tablet píchá pauzu přes výběr člověka a PIN (action
+// 'break_start' / 'break_end' tady, ne přes /api/attendance/pauza, které je pro vlastní Píchačky).
+// PUT ukládá pravidla píchání z telefonu (jen u podniku, poloměr).
 
 export const dynamic = 'force-dynamic';
 
@@ -53,6 +62,55 @@ function chybaCasu(od: Date, doCasu: Date | null): string | null {
   if (od.getTime() > strop || (doCasu && doCasu.getTime() > strop)) return 'Čas nemůže být v budoucnosti.';
   if (doCasu && doCasu.getTime() - od.getTime() > 24 * 3600 * 1000) return 'Záznam je delší než 24 hodin — zkontroluj časy.';
   return null;
+}
+
+/** Zámky výplatních období podniku, které zasahují do <od, do>; před migrací prázdné. */
+async function zamkyPodniku(teamId: number, od: string, doD: string): Promise<ZamekObdobi[]> {
+  try {
+    const rows = await sql`
+      SELECT id, period_from, period_to, locked_by, locked_at FROM payroll_locks
+      WHERE team_id = ${teamId} AND period_from <= ${doD} AND period_to >= ${od}
+      ORDER BY period_from DESC`;
+    return (rows as any[]).map(r => ({ id: Number(r.id), od: String(r.period_from), do: String(r.period_to), lockedBy: r.locked_by != null ? Number(r.locked_by) : null, lockedAt: r.locked_at ? String(r.locked_at) : null }));
+  } catch { return []; }
+}
+
+/**
+ * 409, když některý z dnů leží v uzavřeném období. Hodiny jsou mzda: co je vyplacené a uzavřené,
+ * se mění jen po otevření ve Výplatní listině — jinak by se listina a docházka rozešly potichu.
+ */
+async function odmitniZamceny(teamId: number, dny: readonly (string | null)[]): Promise<NextResponse | null> {
+  const platne = dny.filter((d): d is string => !!d);
+  if (!platne.length) return null;
+  const od = platne.reduce((a, b) => (a < b ? a : b)), doD = platne.reduce((a, b) => (a > b ? a : b));
+  const zamky = await zamkyPodniku(teamId, od, doD);
+  for (const d of platne) {
+    const z = zamekDne(zamky, d);
+    if (z) return NextResponse.json({ error: hlaskaZamku(z), zamek: { od: z.od, do: z.do } }, { status: 409 });
+  }
+  return null;
+}
+
+const denV = (d: Date | null | undefined): string | null => (d ? pragueDayOf(d) : null);
+
+/** Pravidla píchání z telefonu (teams.clock_geo); před migrací nebo bez nastavení výchozí (vypnuto). */
+async function pravidlaPichaniPodniku(teamId: number): Promise<PravidlaPichani> {
+  try {
+    const [t] = await sql`SELECT clock_geo FROM teams WHERE id = ${teamId}`;
+    return t?.clock_geo ? normalizujPravidlaPichani(t.clock_geo) : { ...VYCHOZI_PRAVIDLA_PICHANI };
+  } catch { return { ...VYCHOZI_PRAVIDLA_PICHANI }; }
+}
+
+/** Otevřená pauza člověka (záznam po pauze s odchodem rovným příchodu, do 12 h) — tablet ji ukončí nebo z ní odpíchne odchod. */
+async function otevrenaPauza(employeeId: number, teamId: number): Promise<{ id: number; clock_in: string; break_after: number | null } | null> {
+  try {
+    const [p] = await sql`
+      SELECT id, clock_in, break_after FROM time_entries
+      WHERE employee_id = ${employeeId} AND team_id = ${teamId} AND source = 'break' AND clock_out = clock_in
+        AND clock_in >= NOW() - INTERVAL '12 hours'
+      ORDER BY clock_in DESC LIMIT 1`;
+    return p ? { id: Number(p.id), clock_in: String(p.clock_in), break_after: p.break_after != null ? Number(p.break_after) : null } : null;
+  } catch { return null; }
 }
 
 // Ensure the employee has a shift for `date`; create an auto one if not, so the
@@ -113,6 +171,8 @@ export async function GET(req: NextRequest) {
              (u.pin IS NOT NULL AND u.pin <> '') AS "hasPin",
              te.clock_in AS "openSince",
              te.id AS "openEntryId", te.nudged_at AS "nudgedAt",
+             pz.clock_in AS "breakSince",
+             COALESCE(m.job_title, u.job_title) AS "jobTitle",
              sh.start_time AS "shiftStart", sh.end_time AS "shiftEnd"
       FROM users u
       LEFT JOIN team_members m ON m.user_id = u.id AND m.team_id = ${c.teamId}
@@ -122,6 +182,12 @@ export async function GET(req: NextRequest) {
           AND (team_id = ${c.teamId} OR team_id IS NULL)
         ORDER BY clock_in DESC LIMIT 1
       ) te ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT clock_in FROM time_entries
+        WHERE employee_id = u.id AND team_id = ${c.teamId} AND source = 'break' AND clock_out = clock_in
+          AND clock_in >= NOW() - INTERVAL '12 hours'
+        ORDER BY clock_in DESC LIMIT 1
+      ) pz ON TRUE
       LEFT JOIN LATERAL (
         SELECT start_time, end_time FROM shifts
         WHERE employee_id = u.id AND date = ${today} AND team_id = ${c.teamId}
@@ -164,12 +230,18 @@ export async function GET(req: NextRequest) {
     // uložení PINu hlásil hasPin=false — tablet pak nenabídl číselník a člověk
     // se z tabletu nemohl odpíchnout ani zrušit PIN. Čte se zvlášť, ať výpadek
     // sloupce pin_hash (chybí migrace) neshodí celý roster.
+    // Kolo 8 (R8-2): účet tabletu dostane i otisk PINu (bcrypt), aby bez internetu ověřil PIN proti němu
+    // a píchnutí uložil do fronty (lib/kioskOffline). Jen tablet — vedení ani zaměstnanec otisky nevidí.
+    const otiskyProTablet = c.role.typ === 'kiosk' && opr.has('dochazka.tablet');
     try {
       const ids = (roster as any[]).map(r => Number(r.id));
       if (ids.length) {
-        const rows = await sql`SELECT id FROM users WHERE id = ANY(${ids}) AND pin_hash IS NOT NULL AND pin_hash <> ''`;
-        const shash = new Set((rows as any[]).map(r => Number(r.id)));
-        for (const r of roster as any[]) r.hasPin = r.hasPin === true || shash.has(Number(r.id));
+        const rows = await sql`SELECT id, pin_hash FROM users WHERE id = ANY(${ids}) AND pin_hash IS NOT NULL AND pin_hash <> ''`;
+        const shash = new Map((rows as any[]).map(r => [Number(r.id), String(r.pin_hash)]));
+        for (const r of roster as any[]) {
+          r.hasPin = r.hasPin === true || shash.has(Number(r.id));
+          if (otiskyProTablet && shash.has(Number(r.id))) r.offlinePin = shash.get(Number(r.id));
+        }
       }
     } catch { /* bez pin_hash zůstává starý sloupec pin */ }
 
@@ -224,6 +296,7 @@ export async function GET(req: NextRequest) {
           SELECT te.id, te.employee_id AS "employeeId", u.name AS "employeeName", u.avatar AS "employeeAvatar",
                  te.clock_in AS "clockIn", te.clock_out AS "clockOut", te.source, te.note,
                  te.updated_by AS "updatedBy", ub.name AS "updatedByName", te.updated_at AS "updatedAt",
+                 te.break_after AS "breakAfter", te.geo_status AS "geoStatus", te.geo_distance_m AS "geoDistanceM", te.offline,
                  pl.start_time AS "planStart", pl.end_time AS "planEnd", pl.date AS "planDate"
           FROM time_entries te
           LEFT JOIN users u ON u.id = te.employee_id
@@ -267,7 +340,18 @@ export async function GET(req: NextRequest) {
           ORDER BY day DESC, id DESC`;
       } catch { /* wage_adjustments ještě nejsou (migrace) */ }
     }
-    return NextResponse.json({ roster, entries, adjustments });
+    // Zámky období za načtené dny a pravidla píchání z telefonu (kolo 8, R8-2) — nástroj Záznamy docházky
+    // z nich pozná zamčený měsíc (ikona zámku místo tužky) a nabídne „Pravidla píchání" v „···".
+    let zamky: ZamekObdobi[] = [];
+    let pravidlaPichani: PravidlaPichani | undefined;
+    if (opr.has('dochazka.zobrazit')) {
+      const { searchParams } = new URL(req.url);
+      const days = Math.min(180, Math.max(1, parseInt(searchParams.get('days') ?? '30')));
+      const dnes = pragueToday();
+      zamky = await zamkyPodniku(c.teamId, dayPlus(dnes, -(days - 1)), dnes);
+      pravidlaPichani = await pravidlaPichaniPodniku(c.teamId);
+    }
+    return NextResponse.json({ roster, entries, adjustments, zamky, ...(pravidlaPichani ? { pravidlaPichani } : {}) });
   }
 
   // Zaměstnanec — vlastní záznamy (posledních 70 dní — i „minulý měsíc" na 31.) v TOMHLE podniku.
@@ -279,7 +363,8 @@ export async function GET(req: NextRequest) {
   let entries: any[];
   try {
     entries = await sql`
-      SELECT id, employee_id AS "employeeId", clock_in AS "clockIn", clock_out AS "clockOut", source, note, updated_by AS "updatedBy"
+      SELECT id, employee_id AS "employeeId", clock_in AS "clockIn", clock_out AS "clockOut", source, note, updated_by AS "updatedBy",
+             break_after AS "breakAfter", geo_status AS "geoStatus", geo_distance_m AS "geoDistanceM", offline
       FROM time_entries
       WHERE employee_id = ${c.meId} AND clock_in >= NOW() - INTERVAL '70 days'
         AND (team_id = ${c.teamId} OR team_id IS NULL)
@@ -348,7 +433,8 @@ export async function POST(req: NextRequest) {
 
   const b = await req.json().catch(() => ({}));
   const employeeId = parseInt(b.employeeId);
-  const action = b.action === 'out' ? 'out' : 'in';
+  // 'break_start' / 'break_end' je pauza z tabletu (kolo 8, R8-2) — přes výběr člověka a PIN jako příchod a odchod.
+  const action: 'in' | 'out' | 'break_start' | 'break_end' = b.action === 'out' || b.action === 'break_start' || b.action === 'break_end' ? b.action : 'in';
   if (!Number.isFinite(employeeId)) return NextResponse.json({ error: 'Chybí zaměstnanec' }, { status: 400 });
 
   // Manual complete entry: kdo upravuje docházku, doplní zapomenutý záznam
@@ -367,6 +453,8 @@ export async function POST(req: NextRequest) {
     }
     const casChyba = chybaCasu(ci, co);
     if (casChyba) return NextResponse.json({ error: casChyba }, { status: 400 });
+    const zamceno = await odmitniZamceny(c.teamId, [denV(ci), denV(co)]);
+    if (zamceno) return zamceno;
     // Kolo 7: ruční záznam je zásah do mzdových dat — nese důvod, kdo ho přidal a kdy, a jde do auditu.
     const { duvod, chyba } = duvodZTela(b.note);
     if (chyba) return NextResponse.json({ error: chyba }, { status: 400 });
@@ -450,6 +538,30 @@ export async function POST(req: NextRequest) {
 
   const today = pragueToday();
 
+  // Pauza z tabletu (kolo 8, R8-2): stejný datový model jako POST /api/attendance/pauza — záznam po pauze
+  // se zdrojem 'break' a break_after, zatím s odchodem rovným příchodu; „Konec pauzy" ho otevře.
+  if (action === 'break_start') {
+    if (!open) return NextResponse.json({ error: 'Není na směně — pauzu nemá odkud začít.' }, { status: 409 });
+    const tedIso = new Date().toISOString();
+    try {
+      await sql`UPDATE time_entries SET clock_out = ${tedIso} WHERE id = ${open.id}`;
+      await sql`
+        INSERT INTO time_entries (team_id, employee_id, clock_in, clock_out, source, break_after)
+        VALUES (${c.teamId}, ${employeeId}, ${tedIso}, ${tedIso}, 'break', ${open.id})`;
+    } catch {
+      return NextResponse.json({ error: 'Pauzu se nepodařilo zapsat — databáze ještě není připravená.' }, { status: 503 });
+    }
+    return NextResponse.json({ ok: true, action: 'break_start', pauzaOd: tedIso });
+  }
+  if (action === 'break_end') {
+    const p = await otevrenaPauza(employeeId, c.teamId);
+    if (!p) return NextResponse.json({ error: 'Žádná pauza neběží.' }, { status: 409 });
+    const [row] = await sql`
+      UPDATE time_entries SET clock_in = NOW(), clock_out = NULL WHERE id = ${p.id}
+      RETURNING id, clock_in AS "clockIn", clock_out AS "clockOut"`;
+    return NextResponse.json({ ok: true, action: 'break_end', entry: row });
+  }
+
   if (action === 'in') {
     let autoClosedPrevious = false;
     if (open) {
@@ -469,10 +581,39 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Příchod už je zaznamenaný.' }, { status: 409 });
       }
     }
-    const [row] = await sql`
-      INSERT INTO time_entries (team_id, employee_id, source)
-      VALUES (${c.teamId}, ${employeeId}, ${isKiosk ? 'kiosk' : 'self'})
-      RETURNING id, clock_in AS "clockIn", clock_out AS "clockOut"`;
+    // Poloha z telefonu (kolo 8, R8-2): jen u vlastního píchnutí a jen když to podnik zapnul. Mimo okruh se
+    // příchod zapíše i tak (chip „mimo podnik" v Záznamech) a vedení dostane upozornění — nic se neblokuje.
+    const pravidla = isKiosk ? null : await pravidlaPichaniPodniku(c.teamId);
+    const poloha = pravidla && pravidloUcinne(pravidla) ? overPolohu(pravidla, parsePoloha(b.poloha ?? b.geo)) : null;
+    let row: any;
+    try {
+      [row] = await sql`
+        INSERT INTO time_entries (team_id, employee_id, source, geo_status, geo_distance_m)
+        VALUES (${c.teamId}, ${employeeId}, ${isKiosk ? 'kiosk' : 'self'}, ${poloha?.status ?? null}, ${poloha?.vzdalenostM ?? null})
+        RETURNING id, clock_in AS "clockIn", clock_out AS "clockOut"`;
+    } catch {
+      // geo_status / geo_distance_m ještě nejsou (migrace) — příchod se zapíše bez polohy.
+      [row] = await sql`
+        INSERT INTO time_entries (team_id, employee_id, source)
+        VALUES (${c.teamId}, ${employeeId}, ${isKiosk ? 'kiosk' : 'self'})
+        RETURNING id, clock_in AS "clockIn", clock_out AS "clockOut"`;
+    }
+    if (poloha?.status === 'far') {
+      let jmeno = '';
+      try { jmeno = String((await sql`SELECT name FROM users WHERE id = ${employeeId}`)[0]?.name ?? ''); } catch { /* jen do textů */ }
+      const km = poloha.vzdalenostM != null ? (poloha.vzdalenostM < 1000 ? `${poloha.vzdalenostM} m` : `${Math.round(poloha.vzdalenostM / 100) / 10} km`) : '?';
+      await audit(c.teamId, c.meId, 'dochazka.mimo_podnik', 'time_entry', row?.id ?? null, `${jmeno || `#${employeeId}`}: ${km} od podniku`);
+      try {
+        const vedouci = (await clenoveSOpravnenim(c.teamId, 'dochazka.zobrazit')).filter(id => id !== employeeId);
+        await notifyUsers(vedouci, {
+          title: 'Příchod mimo podnik',
+          body: `${jmeno || 'Zaměstnanec'} se odpíchl/a z telefonu ${km} od podniku. Záznam je v Docházce označený „mimo podnik".`,
+          type: 'warning',
+          category: 'shift',
+          link: '/employer/overview?view=attendance',
+        });
+      } catch { /* best-effort */ }
+    }
     // Žádná plánovaná směna? Založí se automatická, aby ji uzávěrka viděla.
     // Den NENÍ „dnes podle hodin na zdi": kdo klepne na příchod po půlnoci
     // v podniku, který zavírá ve dvě, patří ještě k včerejšku. Dřív tu bylo
@@ -510,19 +651,30 @@ export async function POST(req: NextRequest) {
       }
     } catch { /* late check is best-effort */ }
 
-    return NextResponse.json({ ok: true, action: 'in', entry: row, autoClosedPrevious });
+    return NextResponse.json({ ok: true, action: 'in', entry: row, autoClosedPrevious, ...(poloha ? { poloha } : {}) });
   }
 
   // clock out
-  if (!open) return NextResponse.json({ error: 'Žádný otevřený příchod k odpíchnutí.' }, { status: 409 });
-  const [row] = await sql`
-    UPDATE time_entries SET clock_out = NOW() WHERE id = ${open.id}
-    RETURNING id, clock_in AS "clockIn", clock_out AS "clockOut"`;
+  let row: any;
+  let zacatekSmeny: Date;
+  if (open) {
+    [row] = await sql`
+      UPDATE time_entries SET clock_out = NOW() WHERE id = ${open.id}
+      RETURNING id, clock_in AS "clockIn", clock_out AS "clockOut"`;
+    zacatekSmeny = parseDbTime(open.clock_in) ?? new Date();
+  } else {
+    // Odchod rovnou z pauzy (tablet): záznam po pauze se smaže, směna skončila odchodem záznamu před ní.
+    const p = await otevrenaPauza(employeeId, c.teamId);
+    if (!p) return NextResponse.json({ error: 'Žádný otevřený příchod k odpíchnutí.' }, { status: 409 });
+    await sql`DELETE FROM time_entries WHERE id = ${p.id} AND employee_id = ${employeeId}`;
+    row = null;
+    zacatekSmeny = parseDbTime(p.clock_in) ?? new Date();
+  }
   // Směna patří dni, kdy začala. Kdo se odpíchne po půlnoci, hledal by jinak
   // svou směnu i uzávěrku pod zítřejším datem — a nenašel ani jedno. A „den,
   // kdy začala" se počítá stejným pravidlem jako u příchodu, jinak by si
   // příchod založil směnu na sobotu a odchod ji hledal pod nedělí.
-  const shiftDay = await denSmeny(c.teamId, employeeId, parseDbTime(open.clock_in) ?? new Date());
+  const shiftDay = await denSmeny(c.teamId, employeeId, zacatekSmeny);
   // Extend the auto-created shift's end to the real clock-out time.
   try { await sql`UPDATE shifts SET end_time = ${hhmmPrague()} WHERE employee_id = ${employeeId} AND date = ${shiftDay} AND auto_created = TRUE`; } catch { /* not migrated */ }
 
@@ -591,6 +743,9 @@ export async function PATCH(req: NextRequest) {
   }
   const casChyba = chybaCasu(inTs, outTs);
   if (casChyba) return NextResponse.json({ error: casChyba }, { status: 400 });
+  // Uzavřené období (kolo 8, R8-2): ani původní den, ani nový čas nesmí ležet v zámku.
+  const zamceno = await odmitniZamceny(c.teamId, [denV(puvodniOd), denV(puvodniDo), denV(inTs), denV(outTs)]);
+  if (zamceno) return zamceno;
 
   const casZmenen = inTs.getTime() !== puvodniOd.getTime()
     || (outTs?.getTime() ?? null) !== (puvodniDo?.getTime() ?? null);
@@ -644,6 +799,11 @@ export async function DELETE(req: NextRequest) {
   if (jeOdpoved(c)) return c;
   const id = parseInt(new URL(req.url).searchParams.get('id') ?? '');
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Neplatné ID' }, { status: 400 });
+  // Uzavřené období (kolo 8, R8-2) se nemaže — nejdřív otevřít ve Výplatní listině.
+  const [puvodni] = await sql`SELECT clock_in, clock_out FROM time_entries WHERE id = ${id} AND team_id = ${c.teamId}`;
+  if (!puvodni) return NextResponse.json({ error: 'Záznam nenalezen' }, { status: 404 });
+  const zamceno = await odmitniZamceny(c.teamId, [denV(parseDbTime(puvodni.clock_in)), denV(parseDbTime(puvodni.clock_out))]);
+  if (zamceno) return zamceno;
   const [smazany] = await sql`
     DELETE FROM time_entries WHERE id = ${id} AND team_id = ${c.teamId}
     RETURNING employee_id, clock_in, clock_out`;
@@ -655,4 +815,27 @@ export async function DELETE(req: NextRequest) {
       `${jmeno || `#${smazany.employee_id}`}: ${denCas(parseDbTime(smazany.clock_in))} – ${denCas(parseDbTime(smazany.clock_out))}`);
   }
   return NextResponse.json({ ok: true });
+}
+
+// PUT { pravidlaPichani: { zapnuto, lat, lng, polomerM } } — píchání z telefonu jen u podniku (kolo 8, R8-2).
+// Mění, kdo smí upravovat docházku: je to pravidlo o tom, jak se docházka zapisuje, ne o mzdách.
+export async function PUT(req: NextRequest) {
+  const c = await pozaduj('dochazka.upravit');
+  if (jeOdpoved(c)) return c;
+  const b = await req.json().catch(() => ({}));
+  if (!b || typeof b !== 'object' || !b.pravidlaPichani || typeof b.pravidlaPichani !== 'object') {
+    return NextResponse.json({ error: 'Neplatné tělo požadavku.' }, { status: 400 });
+  }
+  const p = normalizujPravidlaPichani(b.pravidlaPichani);
+  if (p.zapnuto && (p.lat == null || p.lng == null)) {
+    return NextResponse.json({ error: 'Nejdřív nastav polohu podniku — na místě klepni na „Použít moji polohu".' }, { status: 400 });
+  }
+  try {
+    await sql`UPDATE teams SET clock_geo = ${JSON.stringify(p)}::jsonb WHERE id = ${c.teamId}`;
+  } catch {
+    return NextResponse.json({ error: 'Pravidla se nepodařilo uložit — databáze ještě není připravená.' }, { status: 503 });
+  }
+  await audit(c.teamId, c.meId, 'dochazka.pravidla_pichani', 'team', c.teamId,
+    p.zapnuto ? `jen u podniku, ${p.polomerM} m, poloha ${p.lat}, ${p.lng}` : `vypnuto${p.lat != null ? ` (poloha ${p.lat}, ${p.lng} zůstává)` : ''}`);
+  return NextResponse.json({ ok: true, pravidlaPichani: p });
 }
